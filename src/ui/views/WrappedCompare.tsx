@@ -6,7 +6,7 @@ import type { View } from "../../common/types.ts";
 import type { Side, SideKind } from "../../common/wrapped/compare.ts";
 import { sideSpec } from "../../common/wrapped/compare.ts";
 import type { Slide } from "../../common/wrapped/types.ts";
-import { SlideCard } from "./Wrapped/SlideCard.tsx";
+import { StaticCard } from "./Wrapped/StaticCard.tsx";
 
 type Data = View<"wrappedCompare">;
 type Cmp = NonNullable<Data["compare"]>;
@@ -240,20 +240,14 @@ const Pair = ({
 			<div className="row g-3">
 				{[a, b].map((s, i) => (
 					<div className="col-md-6" key={i}>
-						<div
-							style={{
-								outline:
-									(win === "a" && i === 0) || (win === "b" && i === 1)
-										? "3px solid var(--bs-warning)"
-										: undefined,
-								borderRadius: 16,
-							}}
-						>
-							<SlideCard
+						<div>
+							<StaticCard
+								ring={(win === "a" && i === 0) || (win === "b" && i === 1)}
 								slide={s}
 								index={i}
 								faces={faces}
 								teams={teams}
+								foot={i === 0 ? labelA : labelB}
 							/>
 						</div>
 					</div>
@@ -374,11 +368,12 @@ const WrappedCompare = (props: Data) => {
 								<div className="row g-3">
 									{list.slice(0, showAll ? undefined : 2).map((s, i) => (
 										<div className="col-md-6" key={s.id}>
-											<SlideCard
+											<StaticCard
 												slide={s}
 												index={i}
 												faces={c.faces}
 												teams={c.teams}
+												foot={label}
 											/>
 										</div>
 									))}

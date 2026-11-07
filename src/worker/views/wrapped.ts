@@ -29,7 +29,8 @@ const processInputs = (params: RouteParams<"wrapped">) => {
 			pid = int;
 		}
 	}
-	return { mode, season, tid, pid };
+	// /wrapped/choose is the page for picking a season, team, player or the all-time Wrapped
+	return { mode, season, tid, pid, choose: params.type === "choose" };
 };
 
 export default defineView({
@@ -159,6 +160,7 @@ export default defineView({
 			teamOptions,
 			playerOptions,
 			userTid: g.get("userTid"),
+			choose: inputs.choose,
 		};
 	},
 });
