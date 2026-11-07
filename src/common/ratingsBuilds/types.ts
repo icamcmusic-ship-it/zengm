@@ -57,3 +57,21 @@ export type DrawFlavor = {
 	strength: number;
 	asked: boolean;
 };
+
+// What is saved on a player (p.ratingsBuild) after "Regenerate ratings"
+export type StoredRatingsBuild = {
+	name: string;
+	tags: string[];
+	seed: string;
+
+	// The ratings (and fuzz, pot and listed height) from before the first regeneration. Another regeneration starts from
+	// these, so rerolling never compounds specialization.
+	base: BuildRatings;
+	baseFuzz: number;
+	basePot: number;
+	baseHgtInches: number;
+
+	// The ratings the regeneration wrote. If the player's ratings still equal these, `base` is still his base; if he has
+	// developed or been edited since, his current ratings become the new base.
+	applied: BuildRatings;
+};

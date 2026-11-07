@@ -195,6 +195,7 @@ import { initUILocalGames } from "../util/initUILocalGames.ts";
 import { ValueChangeCalculator } from "../core/team/ValueChangeCalculator.ts";
 import type { GenOrderResult } from "../core/draft/genOrder.ts";
 import undoLog from "./undoLog.ts";
+import * as regenerateRatings from "./regenerateRatings.ts";
 import {
 	getAwardsByPlayer,
 	updatePlayerAwards,
@@ -5624,6 +5625,7 @@ const api = {
 	exhibitionGame,
 	leagueFileUpload,
 	playMenu,
+	regenerateRatings,
 	toolsMenu,
 	undoLog,
 	main: {
