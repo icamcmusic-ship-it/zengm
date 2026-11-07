@@ -104,6 +104,15 @@ const HistoryAll = ({ awards, seasons }: View<"historyAll">) => {
 		"Season",
 		"League Champion",
 		"Runner Up",
+		...(__SPORT === "basketball"
+			? [
+					{
+						desc: "Newspaper, Wrapped and Storylines for the season",
+						title: "Read",
+						sortType: "name" as const,
+					},
+				]
+			: []),
 		...awards.map((award) => {
 			return {
 				desc: award.name,
@@ -139,6 +148,30 @@ const HistoryAll = ({ awards, seasons }: View<"historyAll">) => {
 				seasonLink,
 				champEl,
 				runnerUpEl,
+				...(__SPORT === "basketball"
+					? [
+							<>
+								<a href={helpers.leagueUrl(["newspaper", "all", s.season])}>
+									Newspaper
+								</a>
+								{" | "}
+								<a href={helpers.leagueUrl(["wrapped", "season", s.season])}>
+									Wrapped
+								</a>
+								{" | "}
+								<a
+									href={helpers.leagueUrl([
+										"storylines",
+										"all",
+										"all",
+										s.season,
+									])}
+								>
+									Storylines
+								</a>
+							</>,
+						]
+					: []),
 				...awards.map(({ shortName }) => {
 					const award = awardsByShortName[shortName];
 					if (!award || !award[0]) {

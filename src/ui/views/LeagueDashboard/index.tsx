@@ -200,6 +200,36 @@ const LeagueDashboard = ({
 						teams={teams}
 						userTid={userTid}
 					/>
+					{__SPORT === "basketball" ? (
+						<div className="mt-3">
+							<h2>From the records</h2>
+							<ul className="list-unstyled mb-0">
+								<li>
+									<a href={helpers.leagueUrl(["newspaper"])}>
+										» Latest newspaper
+									</a>
+								</li>
+								<li>
+									<a href={helpers.leagueUrl(["wrapped"])}>» Latest Wrapped</a>
+								</li>
+								<li>
+									<a href={helpers.leagueUrl(["storylines"])}>
+										» Top storylines
+									</a>
+									{" | "}
+									<a
+										href={helpers.leagueUrl([
+											"storylines",
+											"team",
+											helpers.getTeamUrlPart(userTid),
+										])}
+									>
+										your team
+									</a>
+								</li>
+							</ul>
+						</div>
+					) : null}
 				</div>
 			</div>
 		</>

@@ -448,6 +448,15 @@ const TopStuff = ({
 
 	const negotiationModal = useNegotiaionModal();
 
+	// Wrapped needs a season the player actually played in: the one being viewed, else his latest
+	const playedSeasons = player.stats.map((row) => row.season);
+	const wrappedSeason =
+		__SPORT !== "basketball" || playedSeasons.length === 0
+			? undefined
+			: season !== undefined && playedSeasons.includes(season)
+				? season
+				: Math.max(...playedSeasons);
+
 	const buttonsAvailableOutsideGodMode = (
 		<>
 			{!spectator && (showTradeFor || showTradingBlock) ? (
@@ -607,7 +616,7 @@ const TopStuff = ({
 						</div>
 					</div>
 
-					<div className="d-flex gap-2 mt-2">
+					<div className="d-flex flex-wrap gap-2 mt-2">
 						<a
 							href={helpers.leagueUrl(["customize_player", player.pid])}
 							className={clsx(
@@ -617,6 +626,27 @@ const TopStuff = ({
 						>
 							Edit
 						</a>
+						{wrappedSeason !== undefined ? (
+							<a
+								href={helpers.leagueUrl([
+									"wrapped",
+									"player",
+									wrappedSeason,
+									player.pid,
+								])}
+								className="btn btn-light-bordered"
+							>
+								Wrapped
+							</a>
+						) : null}
+						{__SPORT === "basketball" ? (
+							<a
+								href={helpers.leagueUrl(["storylines", "player", player.pid])}
+								className="btn btn-light-bordered"
+							>
+								Storylines
+							</a>
+						) : null}
 						{godMode ? (
 							<button
 								className="btn btn-outline-god-mode"

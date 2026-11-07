@@ -196,6 +196,7 @@ import { initUILocalGames } from "../util/initUILocalGames.ts";
 import { ValueChangeCalculator } from "../core/team/ValueChangeCalculator.ts";
 import type { GenOrderResult } from "../core/draft/genOrder.ts";
 import undoLog from "./undoLog.ts";
+import { getStorylineWhy } from "../util/storylinesData.ts";
 import {
 	getAwardsByPlayer,
 	updatePlayerAwards,
@@ -5693,6 +5694,7 @@ const api = {
 		getRandomName,
 		getRandomRatings,
 		getRandomTeams,
+		getStorylineWhy,
 		getPlayersForScheduledEvents,
 		getSavedTrade,
 		getTeamGraphStat,

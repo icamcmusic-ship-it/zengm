@@ -165,6 +165,22 @@ export const MoreLinks = (
 			}
 		}
 
+		// Native pages built from this league's own records (basketball only)
+		if (__SPORT === "basketball") {
+			const y = season ?? currentSeason;
+			links.push(
+				{ url: ["newspaper", team, y], name: "Newspaper (team edition)" },
+				{ url: ["wrapped", "team", y, team], name: "Wrapped" },
+				{
+					url:
+						season === undefined
+							? ["storylines", "team", team]
+							: ["storylines", "team", team, season],
+					name: "Storylines",
+				},
+			);
+		}
+
 		if (page === "team_history") {
 			links.push({
 				url: [
@@ -232,6 +248,15 @@ export const MoreLinks = (
 				name: "Award Settings",
 			},
 		];
+
+		if (__SPORT === "basketball") {
+			const y = season ?? currentSeason;
+			links.push(
+				{ url: ["newspaper", "all", y], name: "Newspaper" },
+				{ url: ["wrapped", "season", y], name: "Wrapped" },
+				{ url: ["storylines", "all", "all", y], name: "Storylines" },
+			);
+		}
 
 		if (godMode) {
 			links.push({
@@ -319,6 +344,14 @@ export const MoreLinks = (
 			{ url: ["season_preview"], name: "Season Previews" },
 			{ url: ["notes", "teamSeason"], name: "Team Notes" },
 		];
+
+		if (__SPORT === "basketball") {
+			links.push(
+				{ url: ["newspaper"], name: "Newspaper" },
+				{ url: ["wrapped"], name: "Wrapped" },
+				{ url: ["storylines"], name: "Storylines" },
+			);
+		}
 	} else if (props.type === "importExport") {
 		links = [
 			{ url: ["import_players"], name: "Import Players" },
