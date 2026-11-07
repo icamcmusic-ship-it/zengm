@@ -2424,6 +2424,9 @@ export type UpdateEvent =
 	| "teamFinances"
 	| "draftLottery"
 	| "undoTrade"
+	// The Wrapped and Storylines snapshot finished building, or made progress
+	| "wrappedReady"
+	| "wrappedProgress"
 
 	// This should be used for things that do stuff like "select all players on watch list", not updating the watch property for individual players. crossTabEmit handles that automatically.
 	| "watchList";

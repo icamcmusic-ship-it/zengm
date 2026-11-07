@@ -4,6 +4,7 @@ import {
 } from "../../common/constants.ts";
 import { helpers } from "../../common/helpers.ts";
 import { idb } from "./index.ts";
+import { changeLog } from "./changeLog.ts";
 import cmp from "./cmp.ts";
 import { g, local, lock } from "../util/index.ts";
 import type {
@@ -833,7 +834,10 @@ class Cache {
 	async fill(season?: number) {
 		this._validateStatus("empty", "full");
 
+		const wasFull = this._status === "full";
 		this._setStatus("filling");
+
+		changeLog.onFill(wasFull);
 
 		let season2 = season;
 
@@ -1158,6 +1162,8 @@ class Cache {
 
 		this._dirty = true;
 
+		changeLog.noteWrite(store, obj);
+
 		this._markDirtyIndexes(store, obj, prevObj);
 
 		return obj[pk];
@@ -1204,6 +1210,8 @@ class Cache {
 
 		this._dirty = true;
 
+		changeLog.noteDelete(store, idParsed);
+
 		this._markDirtyIndexes(store);
 	}
 
@@ -1221,6 +1229,8 @@ class Cache {
 		}
 
 		this._dirty = true;
+
+		changeLog.noteClear(store);
 
 		this._markDirtyIndexes(store);
 	}

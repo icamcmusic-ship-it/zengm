@@ -3,6 +3,9 @@ import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import type { View } from "../../common/types.ts";
 import { plainText } from "../../common/storylines/index.ts";
+import { WrappedLoading } from "./Wrapped/Loading.tsx";
+
+type LoadedProps = Extract<View<"storylines">, { loading: false }>;
 
 const TOKEN = /\[\[([pt]):([^\]|]*)\|([^\]]*)]]/g;
 
@@ -12,7 +15,7 @@ const RichText = ({
 	teams,
 }: {
 	text: string;
-	teams: View<"storylines">["teams"];
+	teams: LoadedProps["teams"];
 }) => {
 	const parts = [];
 	let last = 0;
@@ -51,7 +54,7 @@ const RichText = ({
 
 const PAGE = 30;
 
-const Storylines = ({ stories, kinds, teams }: View<"storylines">) => {
+const StorylinesList = ({ stories, kinds, teams }: LoadedProps) => {
 	useTitleBar({ title: "Storylines" });
 	const [kind, setKind] = useState("all");
 	const [search, setSearch] = useState("");
@@ -179,6 +182,19 @@ const Storylines = ({ stories, kinds, teams }: View<"storylines">) => {
 			) : null}
 		</>
 	);
+};
+
+// The league's history is read in the worker, which can take a while for a big league the first time. Until it's ready the page shows a placeholder.
+const Storylines = (props: View<"storylines">) => {
+	if (props.loading) {
+		return <StorylinesLoading progress={props.progress} />;
+	}
+	return <StorylinesList {...props} />;
+};
+
+const StorylinesLoading = ({ progress }: { progress: string }) => {
+	useTitleBar({ title: "Storylines" });
+	return <WrappedLoading progress={progress} kind="stories" />;
 };
 
 export default Storylines;

@@ -11,6 +11,7 @@ import {
 } from "../../../common/wrapped/deck.ts";
 import type { WrappedMode } from "../../../common/wrapped/types.ts";
 import { SlideCard } from "./SlideCard.tsx";
+import { WrappedLoading } from "./Loading.tsx";
 
 const COUNT_KEY = "wrappedSlideCount";
 
@@ -21,7 +22,9 @@ const MODES: [WrappedMode, string][] = [
 	["all", "All-time"],
 ];
 
-const Wrapped = (props: View<"wrapped">) => {
+type LoadedProps = Extract<View<"wrapped">, { loading: false }>;
+
+const WrappedDeck = (props: LoadedProps) => {
 	const {
 		mode,
 		season,
@@ -311,6 +314,25 @@ const Wrapped = (props: View<"wrapped">) => {
 			</p>
 		</>
 	);
+};
+
+// The league's history is read in the worker, which can take a while for a big league the first time. Until it's ready the page shows a placeholder.
+const Wrapped = (props: View<"wrapped">) => {
+	if (props.loading) {
+		return <WrappedLoadingPage progress={props.progress} mode={props.mode} />;
+	}
+	return <WrappedDeck {...props} />;
+};
+
+const WrappedLoadingPage = ({
+	progress,
+	mode,
+}: {
+	progress: string;
+	mode: WrappedMode;
+}) => {
+	useTitleBar({ title: mode === "all" ? "All-Time Wrapped" : "Wrapped" });
+	return <WrappedLoading progress={progress} kind="deck" />;
 };
 
 export default Wrapped;

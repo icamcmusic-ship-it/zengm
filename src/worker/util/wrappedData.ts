@@ -1,7 +1,9 @@
 import { idb } from "../db/index.ts";
-import { g } from "./index.ts";
+import { changeLog } from "../db/changeLog.ts";
+import { g, local, lock, toUI } from "./index.ts";
 import { getSeasonState } from "./processInputs.ts";
 import { isCurrentSeasonComplete } from "../../common/seasons.ts";
+import { PLAYER } from "../../common/constants.ts";
 import type {
 	WAward,
 	WBoxLine,
@@ -11,9 +13,33 @@ import type {
 	WStat,
 	WTeamSeason,
 } from "../../common/wrapped/types.ts";
-import { LeagueIndex } from "../../common/wrapped/league.ts";
-import type { PlayerAward, UpdateEvent } from "../../common/types.ts";
+import {
+	LeagueIndex,
+	newLinesCache,
+	type LinesCache,
+} from "../../common/wrapped/league.ts";
+import type {
+	Game,
+	Player,
+	PlayerAward,
+	TeamSeason,
+	UpdateEvent,
+} from "../../common/types.ts";
 import { wperfMark, wperfTime } from "./wrappedPerf.ts";
+import {
+	forgetPlayers,
+	loadPersisted,
+	saveGames,
+	savePlayers,
+} from "./wrappedPersist.ts";
+import { hashString } from "../../common/wrapped/util.ts";
+
+// Where the Wrapped and Storylines snapshot comes from. Reading and converting a whole league is slow, so the converted pieces are kept between page loads and only what changed (found through the change log, see db/changeLog.ts) is read again:
+// - players: one converted player per pid; retired players are never read again unless they are written to
+// - team seasons and team stats: converted per season
+// - box scores: converted per season
+// - the per-season player lines in the LeagueIndex, for seasons that are over
+// The converters below (toStat, toBox, toWPlayer, toWTeamSeason, toWGame) are the one place a snapshot field is read from the database.
 
 const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
 
@@ -76,74 +102,616 @@ const awardOf = (a: PlayerAward): WAward[] => {
 	];
 };
 
-// Read the whole league into the plain snapshot the Wrapped and Storylines engines use
-export const loadWrappedLeague = async (): Promise<WLeague> => {
-	const currentSeason = g.get("season");
-	const playersRaw = await wperfTime("snapshot.readPlayers", () =>
-		idb.merged.players.getAll({
-			activeAndRetired: true,
-		}),
-	);
-	const tMap = performance.now();
-	const players: WPlayer[] = playersRaw.map((p) => ({
-		pid: p.pid,
-		name: `${p.firstName} ${p.lastName}`.trim(),
-		firstName: p.firstName,
-		lastName: p.lastName,
-		bornYear: p.born.year,
-		bornLoc: p.born.loc,
-		college: p.college,
-		draft: {
-			year: p.draft.year,
-			round: p.draft.round,
-			pick: p.draft.pick,
-			tid: p.draft.tid,
-		},
-		tid: p.tid,
-		retiredYear: p.retiredYear,
-		diedYear: p.diedYear,
-		hof: !!p.hof,
-		awards: p.awards.flatMap(awardOf),
-		stats: p.stats.filter((r) => !r.playoffs).map(toStat),
-		po: p.stats.filter((r) => r.playoffs).map(toStat),
-		injuries: p.injuries.map((i) => ({
-			season: i.season,
-			games: i.games,
-			type: i.type,
-		})),
-		ovr: Object.fromEntries(p.ratings.map((r) => [r.season, r.ovr])),
-		moves: (p.transactions ?? []).map((t) => ({
-			season: t.season,
-			tid: t.tid,
-			type: t.type,
-			fromTid: "fromTid" in t ? t.fromTid : undefined,
-		})),
-		relatives: p.relatives.map((r) => ({ type: r.type, pid: r.pid })),
-	}));
+const toWPlayer = (p: Player): WPlayer => ({
+	pid: p.pid,
+	name: `${p.firstName} ${p.lastName}`.trim(),
+	firstName: p.firstName,
+	lastName: p.lastName,
+	bornYear: p.born.year,
+	bornLoc: p.born.loc,
+	college: p.college,
+	draft: {
+		year: p.draft.year,
+		round: p.draft.round,
+		pick: p.draft.pick,
+		tid: p.draft.tid,
+	},
+	tid: p.tid,
+	retiredYear: p.retiredYear,
+	diedYear: p.diedYear,
+	hof: !!p.hof,
+	awards: p.awards.flatMap(awardOf),
+	stats: p.stats.filter((r) => !r.playoffs).map(toStat),
+	po: p.stats.filter((r) => r.playoffs).map(toStat),
+	injuries: p.injuries.map((i) => ({
+		season: i.season,
+		games: i.games,
+		type: i.type,
+	})),
+	ovr: Object.fromEntries(p.ratings.map((r) => [r.season, r.ovr])),
+	moves: (p.transactions ?? []).map((t) => ({
+		season: t.season,
+		tid: t.tid,
+		type: t.type,
+		fromTid: "fromTid" in t ? t.fromTid : undefined,
+	})),
+	relatives: p.relatives.map((r) => ({ type: r.type, pid: r.pid })),
+});
 
-	wperfMark("snapshot.mapPlayers", performance.now() - tMap);
-	const tTeams = performance.now();
-	const teamSeasonsRaw = await idb.merged.teamSeasons.getAll();
-	const tids = [...new Set(teamSeasonsRaw.map((ts) => ts.tid))];
-	const statsByKey = new Map<
-		string,
-		{ gp: number; pts: number; oppPts: number }
-	>();
-	for (const tid of tids) {
-		const rows = await idb.merged.teamStats.getAll({ tid });
-		for (const r of rows) {
-			if (r.playoffs) {
-				continue;
+// seed is filled in once the playoff series are known
+const toWTeamSeason = (
+	ts: TeamSeason,
+	st: { gp: number; pts: number; oppPts: number } | undefined,
+): WTeamSeason => ({
+	tid: ts.tid,
+	season: ts.season,
+	abbrev: ts.abbrev,
+	region: ts.region,
+	name: ts.name,
+	colors: ts.colors,
+	imgURL: ts.imgURL,
+	won: ts.won,
+	lost: ts.lost,
+	tied: ts.tied ?? 0,
+	otl: ts.otl ?? 0,
+	playoffRoundsWon: ts.playoffRoundsWon,
+	seed: undefined,
+	gp: st?.gp ?? 0,
+	pts: st?.pts ?? 0,
+	oppPts: st?.oppPts ?? 0,
+});
+
+const toWGame = (gm: Game): WGame => ({
+	gid: gm.gid,
+	season: gm.season,
+	day: gm.day ?? 0,
+	playoffs: !!gm.playoffs,
+	overtimes: gm.overtimes ?? 0,
+	teams: [
+		{
+			tid: gm.teams[0].tid,
+			pts: gm.teams[0].pts,
+			players: gm.teams[0].players.map(toBox),
+		},
+		{
+			tid: gm.teams[1].tid,
+			pts: gm.teams[1].pts,
+			players: gm.teams[1].players.map(toBox),
+		},
+	],
+});
+
+// Entries in the persisted cache are only good for the code that made them, so the version comes from the text of the converters: adding a field to one of them is enough to start over.
+const persistVersion = () =>
+	hashString(
+		[toStat, toBox, awardOf, toWPlayer, toWGame]
+			.map((f) => f.toString())
+			.join("\n"),
+	).toString(36);
+
+// Let the worker handle other messages (and the UI stay responsive) between chunks of work
+export const yieldToWorker = (): Promise<void> =>
+	new Promise((resolve) => {
+		setTimeout(resolve, 0);
+	});
+
+const CHUNK = 400;
+
+// What a page shows while the snapshot is being built. The page is told so it can update the text, not more than a few times a second.
+const setProgress = (c: LeagueCache, text: string) => {
+	c.progress = text;
+	const now = performance.now();
+	if (now - c.lastProgressEmit > 300) {
+		c.lastProgressEmit = now;
+		void toUI("realtimeUpdate", [["wrappedProgress"]]);
+	}
+};
+
+// persisted: it is also in the persisted cache (see wrappedPersist.ts)
+type PlayerEntry = { seq: number; wp: WPlayer; persisted?: boolean };
+type TeamSeasonsEntry = {
+	seq: number;
+	rows: { tsid: number; w: WTeamSeason }[];
+};
+type GamesEntry = {
+	seq: number;
+	count: number | undefined;
+	list: WGame[];
+	persisted?: boolean;
+};
+
+type LeagueCache = {
+	lid: number;
+	epoch: number;
+	players: Map<number, PlayerEntry>;
+	teams: Map<number, TeamSeasonsEntry>;
+	games: Map<number, GamesEntry>;
+	linesCache: LinesCache;
+	persistLoaded: boolean;
+	persisting: boolean;
+	sig: string | undefined;
+	built: Promise<Built> | undefined;
+	// The finished snapshot for readySig, for callers that can't wait
+	ready: Built | undefined;
+	readySig: string | undefined;
+	error: { sig: string; message: string } | undefined;
+	progress: string;
+	lastProgressEmit: number;
+	// Builds are one at a time, so each can use what the one before it kept
+	queue: Promise<unknown>;
+	version: number;
+};
+
+export type Built = {
+	L: WLeague;
+	X: LeagueIndex;
+	// Changes whenever a different snapshot is built
+	version: number;
+	// For results derived from this snapshot only, gone when the snapshot is replaced
+	memo: Map<string, unknown>;
+};
+
+let state: LeagueCache | undefined;
+
+const newCache = (lid: number): LeagueCache => ({
+	lid,
+	epoch: changeLog.epoch,
+	players: new Map(),
+	teams: new Map(),
+	games: new Map(),
+	linesCache: newLinesCache(),
+	persistLoaded: false,
+	persisting: false,
+	sig: undefined,
+	built: undefined,
+	ready: undefined,
+	readySig: undefined,
+	error: undefined,
+	progress: "Starting",
+	lastProgressEmit: 0,
+	queue: Promise.resolve(),
+	version: 0,
+});
+
+// Cheap summary of everything the snapshot is built from. If it hasn't changed, the snapshot hasn't either.
+const signature = () =>
+	[
+		g.get("lid"),
+		changeLog.epoch,
+		g.get("season"),
+		g.get("phase"),
+		g.get("startingSeason"),
+		g.get("userTid"),
+		JSON.stringify(g.get("numGamesPlayoffSeries")),
+		changeLog.store("players"),
+		changeLog.store("teamSeasons"),
+		changeLog.store("teamStats"),
+		changeLog.store("playoffSeries"),
+		changeLog.store("games"),
+		// Anything else the snapshot reads from the game attributes
+		changeLog.store("gameAttributes"),
+	].join("|");
+
+// What the engine's per-season lines of a player depend on, by season. When a player's data changes, the seasons that differ are dropped from the lines cache.
+const statSigs = (rows: WStat[]) => {
+	const out = new Map<number, string>();
+	for (const r of rows) {
+		if (r.gp > 0) {
+			out.set(r.season, `${out.get(r.season) ?? ""};${JSON.stringify(r)}`);
+		}
+	}
+	return out;
+};
+
+const dropChangedSeasons = (
+	cache: LinesCache,
+	prev: WPlayer | undefined,
+	next: WPlayer | undefined,
+) => {
+	if (cache.reg.size === 0 && cache.po.size === 0) {
+		return;
+	}
+	const sameIdentity =
+		prev && next && prev.name === next.name && prev.bornYear === next.bornYear;
+	for (const [kind, map] of [
+		["reg", cache.reg],
+		["po", cache.po],
+	] as const) {
+		const a = prev
+			? statSigs(kind === "reg" ? prev.stats : prev.po)
+			: new Map<number, string>();
+		const b = next
+			? statSigs(kind === "reg" ? next.stats : next.po)
+			: new Map<number, string>();
+		for (const season of new Set([...a.keys(), ...b.keys()])) {
+			if (!sameIdentity || a.get(season) !== b.get(season)) {
+				map.delete(season);
 			}
-			statsByKey.set(`${tid}|${r.season}`, {
-				gp: n(r.gp),
-				pts: n(r.pts),
-				oppPts: n(r.oppPts),
+		}
+	}
+};
+
+const isInLeague = (p: { tid: number }) =>
+	p.tid === PLAYER.RETIRED || p.tid >= PLAYER.FREE_AGENT;
+
+// The players, in the order that reading the whole players store gives (retired players from IndexedDB, then the rest of the cache), converted
+const loadPlayers = async (c: LeagueCache, seq0: number) => {
+	const cacheByKey = (await idb.cache.players.getAllByKey()) as Record<
+		number,
+		Player
+	>;
+	const dbRetired = await idb.league
+		.transaction("players")
+		.store.index("tid")
+		.getAllKeys(PLAYER.RETIRED);
+
+	const order: number[] = [];
+	const seen = new Set<number>();
+	for (const pid of dbRetired) {
+		if (seen.has(pid)) {
+			continue;
+		}
+		seen.add(pid);
+		if (idb.cache.players.hasPendingDelete(pid)) {
+			continue;
+		}
+		const cp = cacheByKey[pid];
+		if (cp && !isInLeague(cp)) {
+			continue;
+		}
+		order.push(pid);
+	}
+	for (const cp of Object.values(cacheByKey)) {
+		if (!seen.has(cp.pid)) {
+			seen.add(cp.pid);
+			if (isInLeague(cp)) {
+				order.push(cp.pid);
+			}
+		}
+	}
+
+	const current = new Map<number, PlayerEntry>();
+	const store = (pid: number, wp: WPlayer) => {
+		dropChangedSeasons(c.linesCache, c.players.get(pid)?.wp, wp);
+		current.set(pid, { seq: seq0, wp });
+	};
+
+	// Players that have to be read from IndexedDB: not in the cache, and no still-valid converted copy
+	const toRead: number[] = [];
+	let sinceYield = 0;
+	for (const pid of order) {
+		const prev = c.players.get(pid);
+		const cp = cacheByKey[pid];
+		// A persisted copy is of a retired player as he was in the database, so it says nothing about a player who is in the cache now
+		if (prev && changeLog.player(pid) <= prev.seq && !(cp && prev.persisted)) {
+			current.set(pid, prev);
+			continue;
+		}
+		if (cp) {
+			store(pid, toWPlayer(cp));
+			sinceYield += 1;
+			if (sinceYield >= CHUNK) {
+				sinceYield = 0;
+				await yieldToWorker();
+			}
+		} else {
+			toRead.push(pid);
+		}
+	}
+
+	if (toRead.length > 0) {
+		if (toRead.length > dbRetired.length * 0.2) {
+			// Most of them: one pass over the retired players is much faster than looking each one up. Only what a player is converted to is kept, since each comes with all of his ratings and stats.
+			const needed = new Set(toRead);
+			let done = 0;
+			for await (const { value } of idb.league
+				.transaction("players")
+				.store.index("tid")
+				.iterate(PLAYER.RETIRED)) {
+				if (
+					needed.has(value.pid) &&
+					!idb.cache.players.hasPendingDelete(value.pid)
+				) {
+					store(value.pid, toWPlayer(value));
+					done += 1;
+					if (done % 250 === 0) {
+						setProgress(
+							c,
+							`Reading players: ${done.toLocaleString("en-US")} of ${needed.size.toLocaleString("en-US")}`,
+						);
+					}
+				}
+			}
+		} else {
+			// A few at a time
+			const BATCH = 300;
+			for (let i = 0; i < toRead.length; i += BATCH) {
+				const wps = await idb.merged.players.getAll(
+					{ pids: toRead.slice(i, i + BATCH) },
+					{ map: toWPlayer },
+				);
+				for (const wp of wps) {
+					store(wp.pid, wp);
+				}
+				setProgress(
+					c,
+					`Reading players: ${i + wps.length} of ${toRead.length}`,
+				);
+				await yieldToWorker();
+			}
+		}
+	}
+
+	// Players that are gone (or no longer count) can't leave anything behind in the lines cache
+	const gone: number[] = [];
+	for (const [pid, prev] of c.players) {
+		if (!current.has(pid)) {
+			dropChangedSeasons(c.linesCache, prev.wp, undefined);
+			if (prev.persisted) {
+				gone.push(pid);
+			}
+		}
+	}
+	if (gone.length > 0) {
+		void forgetPlayers(c.lid, gone);
+	}
+	c.players = current;
+
+	const out: WPlayer[] = [];
+	for (const pid of order) {
+		const e = current.get(pid);
+		if (e) {
+			out.push(e.wp);
+		}
+	}
+	wperfMark("snapshot.playersRead", toRead.length);
+	return out;
+};
+
+const loadTeamSeasons = async (
+	c: LeagueCache,
+	seq0: number,
+	currentSeason: number,
+) => {
+	const seasons: number[] = [];
+	for (let s = g.get("startingSeason"); s <= currentSeason; s++) {
+		seasons.push(s);
+	}
+	const valid = (s: number) => {
+		const e = c.teams.get(s);
+		return (
+			e !== undefined &&
+			changeLog.season("teamSeasons", s) <= e.seq &&
+			changeLog.season("teamStats", s) <= e.seq
+		);
+	};
+	const need = seasons.filter((s) => !valid(s));
+
+	if (need.length > 0) {
+		const rowsBySeason = new Map<number, TeamSeason[]>();
+		if (need.length > 3) {
+			// Most of them: one pass over the store
+			const needSet = new Set(need);
+			for (const s of need) {
+				rowsBySeason.set(s, []);
+			}
+			for (const ts of await idb.merged.teamSeasons.getAll(undefined, {
+				filter: (row) => needSet.has(row.season),
+			})) {
+				rowsBySeason.get(ts.season)!.push(ts);
+			}
+		} else {
+			for (const s of need) {
+				rowsBySeason.set(s, await idb.merged.teamSeasons.getAll({ season: s }));
+			}
+		}
+
+		type St = { gp: number; pts: number; oppPts: number };
+		const statsByKey = new Map<string, St>();
+		const toSt = (r: any) => ({
+			season: r.season as number,
+			playoffs: !!r.playoffs,
+			st: { gp: n(r.gp), pts: n(r.pts), oppPts: n(r.oppPts) },
+		});
+		const add = (tid: number, r: ReturnType<typeof toSt>) => {
+			if (!r.playoffs) {
+				statsByKey.set(`${tid}|${r.season}`, r.st);
+			}
+		};
+		if (need.length > 3) {
+			const needSet = new Set(need);
+			const tids = new Set<number>();
+			for (const rows of rowsBySeason.values()) {
+				for (const ts of rows) {
+					tids.add(ts.tid);
+				}
+			}
+			for (const tid of tids) {
+				const rows = await idb.merged.teamStats.getAll(
+					{ tid },
+					{ filter: (r) => needSet.has(r.season), map: toSt },
+				);
+				for (const r of rows) {
+					add(tid, r);
+				}
+			}
+		} else {
+			for (const [season, tsRows] of rowsBySeason) {
+				for (const tid of new Set(tsRows.map((ts) => ts.tid))) {
+					const rows = await idb.merged.teamStats.getAll(
+						{ tid, season },
+						{ map: toSt },
+					);
+					for (const r of rows) {
+						add(tid, r);
+					}
+				}
+			}
+		}
+
+		for (const [season, tsRows] of rowsBySeason) {
+			c.teams.set(season, {
+				seq: seq0,
+				rows: tsRows.map((ts) => ({
+					tsid: ts.rid,
+					w: toWTeamSeason(ts, statsByKey.get(`${ts.tid}|${ts.season}`)),
+				})),
 			});
 		}
 	}
 
-	wperfMark("snapshot.teamSeasonsAndStats", performance.now() - tTeams);
+	// Same order as the whole store: by tsid
+	const all: { tsid: number; w: WTeamSeason }[] = [];
+	for (const s of seasons) {
+		all.push(...(c.teams.get(s)?.rows ?? []));
+	}
+	all.sort((a, b) => a.tsid - b.tsid);
+	return all.map((x) => x.w);
+};
+
+// Seasons that have box scores in IndexedDB, found without reading any of them
+const seasonsWithGames = async () => {
+	const out: number[] = [];
+	let cursor = await idb.league
+		.transaction("games")
+		.store.index("season")
+		.openKeyCursor();
+	while (cursor) {
+		const season = cursor.key as number;
+		out.push(season);
+		cursor = await cursor.continue(season + 1);
+	}
+	return out;
+};
+
+const loadGames = async (
+	c: LeagueCache,
+	seq0: number,
+	currentSeason: number,
+) => {
+	const seasons = new Set(await seasonsWithGames());
+	// The cache has the current season's games, which may not be flushed yet
+	seasons.add(currentSeason);
+	const sorted = [...seasons].sort((a, b) => a - b);
+
+	const out: WGame[] = [];
+	for (const season of sorted) {
+		// A season that is over only changes if box scores are deleted, which changes how many there are
+		const count =
+			season === currentSeason
+				? undefined
+				: await idb.league
+						.transaction("games")
+						.store.index("season")
+						.count(season);
+		const e = c.games.get(season);
+		let list: WGame[];
+		if (e && e.count === count && changeLog.season("games", season) <= e.seq) {
+			list = e.list;
+		} else {
+			setProgress(c, `Reading box scores: ${season}`);
+			list = await idb.merged.games.getAll(
+				{ season },
+				{ filter: (gm) => gm.teams.length === 2, map: toWGame },
+			);
+			c.games.set(season, { seq: seq0, count, list });
+			await yieldToWorker();
+		}
+		for (const gm of list) {
+			out.push(gm);
+		}
+	}
+	for (const season of c.games.keys()) {
+		if (!seasons.has(season)) {
+			c.games.delete(season);
+		}
+	}
+	return out;
+};
+
+// What an earlier session saved. seq 0 makes an entry good until the player (or season) is written to, which the change log has already seen if it happened before the cache was loaded.
+const loadFromPersisted = async (c: LeagueCache) => {
+	c.persistLoaded = true;
+	const saved = await wperfTime("snapshot.persistedLoad", () =>
+		loadPersisted(c.lid, persistVersion()),
+	);
+	for (const [pid, wp] of saved.players) {
+		c.players.set(pid, { seq: 0, wp, persisted: true });
+	}
+	for (const [season, { count, list }] of saved.games) {
+		c.games.set(season, { seq: 0, count, list, persisted: true });
+	}
+	wperfMark("snapshot.persistedPlayers", saved.players.size);
+};
+
+// Save what a later session could use, once things are quiet. Only retired players and seasons that are over, which don't change.
+const persistSoon = (c: LeagueCache) => {
+	if (c.persisting) {
+		return;
+	}
+	c.persisting = true;
+	setTimeout(async () => {
+		try {
+			const currentSeason = g.get("season");
+			const players = [...c.players].filter(
+				([pid, e]) =>
+					!e.persisted &&
+					e.wp.tid === PLAYER.RETIRED &&
+					// JSON can't hold Infinity
+					Number.isFinite(e.wp.retiredYear) &&
+					changeLog.player(pid) <= e.seq,
+			);
+			for (let i = 0; i < players.length; i += 300) {
+				const chunk = players.slice(i, i + 300);
+				// Still good when it's saved? Otherwise the change log has already dropped it.
+				await savePlayers(
+					c.lid,
+					chunk.map(([pid, e]) => [pid, e.wp]),
+				);
+				for (const [, e] of chunk) {
+					e.persisted = true;
+				}
+				await yieldToWorker();
+			}
+			for (const [season, e] of c.games) {
+				if (
+					!e.persisted &&
+					e.count !== undefined &&
+					season < currentSeason &&
+					changeLog.season("games", season) <= e.seq
+				) {
+					await saveGames(c.lid, season, e.count, e.list);
+					e.persisted = true;
+					await yieldToWorker();
+				}
+			}
+		} finally {
+			c.persisting = false;
+		}
+	}, 500);
+};
+
+const build = async (c: LeagueCache): Promise<Built> => {
+	if (!c.persistLoaded) {
+		await loadFromPersisted(c);
+	}
+	const seq0 = changeLog.seq;
+	const currentSeason = g.get("season");
+
+	// Games are read at the same time as the players, since waiting on IndexedDB is a good part of it
+	const gamesPromise = wperfTime("snapshot.games", () =>
+		loadGames(c, seq0, currentSeason),
+	);
+	gamesPromise.catch(() => {});
+	const teamsPromise = wperfTime("snapshot.teams", () =>
+		loadTeamSeasons(c, seq0, currentSeason),
+	);
+	teamsPromise.catch(() => {});
+	const players = await wperfTime("snapshot.players", () =>
+		loadPlayers(c, seq0),
+	);
+	const teamSeasons = await teamsPromise;
+
 	const series = await idb.merged.playoffSeries.getAll();
 	const seedOf = new Map<string, number>();
 	for (const ps of series) {
@@ -154,30 +722,9 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 			}
 		}
 	}
-
-	const teamSeasons: WTeamSeason[] = teamSeasonsRaw
-		.filter((ts) => ts.season <= currentSeason)
-		.map((ts) => {
-			const st = statsByKey.get(`${ts.tid}|${ts.season}`);
-			return {
-				tid: ts.tid,
-				season: ts.season,
-				abbrev: ts.abbrev,
-				region: ts.region,
-				name: ts.name,
-				colors: ts.colors,
-				imgURL: ts.imgURL,
-				won: ts.won,
-				lost: ts.lost,
-				tied: ts.tied ?? 0,
-				otl: ts.otl ?? 0,
-				playoffRoundsWon: ts.playoffRoundsWon,
-				seed: seedOf.get(`${ts.tid}|${ts.season}`),
-				gp: st?.gp ?? 0,
-				pts: st?.pts ?? 0,
-				oppPts: st?.oppPts ?? 0,
-			};
-		});
+	for (const ts of teamSeasons) {
+		ts.seed = seedOf.get(`${ts.tid}|${ts.season}`);
+	}
 
 	const numPlayoffRounds: Record<number, number> = {};
 	for (const ts of teamSeasons) {
@@ -189,32 +736,9 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 		}
 	}
 
-	const gamesRaw = await wperfTime("snapshot.readGames", () =>
-		idb.merged.games.getAll(),
-	);
-	const games: WGame[] = gamesRaw
-		.filter((gm) => gm.teams.length === 2)
-		.map((gm) => ({
-			gid: gm.gid,
-			season: gm.season,
-			day: gm.day ?? 0,
-			playoffs: !!gm.playoffs,
-			overtimes: gm.overtimes ?? 0,
-			teams: [
-				{
-					tid: gm.teams[0].tid,
-					pts: gm.teams[0].pts,
-					players: gm.teams[0].players.map(toBox),
-				},
-				{
-					tid: gm.teams[1].tid,
-					pts: gm.teams[1].pts,
-					players: gm.teams[1].players.map(toBox),
-				},
-			],
-		}));
+	const games = await gamesPromise;
 
-	return {
+	const L: WLeague = {
 		startingSeason: g.get("startingSeason"),
 		season: currentSeason,
 		currentComplete: isCurrentSeasonComplete(getSeasonState()),
@@ -235,33 +759,130 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 		})),
 		games,
 	};
+
+	const X = await wperfTime("index", () => {
+		const x = new LeagueIndex(L, {
+			linesCache: c.linesCache,
+			// Seasons that are over don't change, and the cache forgets a season if one of its players' rows do
+			reuseLines: (season) => season < L.season,
+		});
+		(globalThis as any).__wrappedLast = x;
+		return x;
+	});
+	c.version += 1;
+	persistSoon(c);
+	return { L, X, version: c.version, memo: new Map() };
 };
 
-// One snapshot at a time, rebuilt when the league changes
-let cached: { key: string; X: Promise<LeagueIndex> } | undefined;
+// Read the whole league into the plain snapshot the Wrapped and Storylines engines use, without keeping anything. Slower than getWrapped, which reuses what it has built before, but it can't be out of date.
+export const loadWrappedLeague = async (): Promise<WLeague> => {
+	const c = newCache(g.get("lid"));
+	return (await build(c)).L;
+};
 
-const STALE: UpdateEvent[] = [
-	"firstRun",
-	"gameSim",
-	"playerMovement",
-	"newPhase",
-	"gameAttributes",
-	"teamFinances",
-];
-
-export const getWrappedIndex = (updateEvents: ReadonlySet<UpdateEvent>) => {
-	const key = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}`;
-	if (!cached || cached.key !== key || STALE.some((e) => updateEvents.has(e))) {
-		cached = {
-			key,
-			X: wperfTime("snapshot", () => loadWrappedLeague()).then((L) =>
-				wperfTime("index", () => {
-					const X = new LeagueIndex(L);
-					(globalThis as any).__wrappedLast = X;
-					return X;
-				}),
-			),
-		};
+// The snapshot and its index. Rebuilt only if something it reads changed since the last call, and then only the changed parts are read again.
+export const getWrapped = (): Promise<Built> => {
+	const lid = g.get("lid");
+	if (!state || state.lid !== lid || state.epoch !== changeLog.epoch) {
+		state = newCache(lid);
 	}
-	return cached.X;
+	const c = state;
+	const sig = signature();
+	if (c.built && c.sig === sig) {
+		return c.built;
+	}
+	c.sig = sig;
+	c.error = undefined;
+	const prev = c.queue;
+	const built = (async () => {
+		await prev;
+		return build(c);
+	})();
+	c.queue = built.catch(() => {});
+	c.built = built;
+	built.then(
+		(b) => {
+			if (c.built === built) {
+				c.ready = b;
+				c.readySig = sig;
+			}
+		},
+		(error) => {
+			if (c.built === built) {
+				c.built = undefined;
+				c.sig = undefined;
+				c.error = {
+					sig,
+					message: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+	return built;
+};
+
+export type WrappedStatus =
+	| { status: "ready"; built: Built }
+	| { status: "loading"; progress: string }
+	| { status: "error"; message: string };
+
+// Like getWrapped, but never waits: if the snapshot isn't ready it starts building it and says so, and the page asking is sent an update when it is ready (a "wrappedReady" event). Pages use it to show a placeholder at once instead of nothing.
+export const getWrappedStatus = (retry: boolean): WrappedStatus => {
+	const lid = g.get("lid");
+	if (!state || state.lid !== lid || state.epoch !== changeLog.epoch) {
+		state = newCache(lid);
+	}
+	const c = state;
+	const sig = signature();
+	if (c.ready && c.readySig === sig) {
+		return { status: "ready", built: c.ready };
+	}
+	if (retry) {
+		c.error = undefined;
+	}
+	if (c.error) {
+		return { status: "error", message: c.error.message };
+	}
+	if (!c.built || c.sig !== sig) {
+		c.progress = "Starting";
+		getWrapped().then(
+			() => toUI("realtimeUpdate", [["wrappedReady"]]),
+			() => toUI("realtimeUpdate", [["wrappedReady"]]),
+		);
+	}
+	return { status: "loading", progress: c.progress };
+};
+
+// A result derived from one snapshot, computed once (and shared by callers that ask while it is being computed)
+export const memoize = <T>(
+	built: Built,
+	key: string,
+	f: () => Promise<T> | T,
+): Promise<T> => {
+	let p = built.memo.get(key) as Promise<T> | undefined;
+	if (!p) {
+		p = Promise.resolve().then(f);
+		built.memo.set(key, p);
+		// A failure shouldn't stick
+		p.catch(() => {
+			if (built.memo.get(key) === p) {
+				built.memo.delete(key);
+			}
+		});
+	}
+	return p;
+};
+
+// True while games are being simmed in bulk, when a page showing the snapshot should wait instead of rebuilding after every day
+export const isBulkSimming = () =>
+	lock.get("gameSim") || local.autoPlayUntil !== undefined;
+
+// Kept so views can pass their update events; what changed is known from the change log instead
+export const getWrappedIndex = async (
+	_updateEvents?: ReadonlySet<UpdateEvent>,
+) => (await getWrapped()).X;
+
+// Drop everything kept for the league, like when something that bypasses the cache wrote to the database
+export const resetWrappedCache = () => {
+	state = undefined;
 };

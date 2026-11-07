@@ -32,7 +32,10 @@ export const wperfTime = async <T>(
 
 // Profiling scripts set self.__wperfOn before opening a page, then read back what the views returned (to check that a refactor doesn't change output) and the snapshot they were built from
 export const wperfOutput = (name: string, data: unknown) => {
-	const w = globalThis as { __wperfOn?: boolean; __wperfOut?: Record<string, string> };
+	const w = globalThis as {
+		__wperfOn?: boolean;
+		__wperfOut?: Record<string, string>;
+	};
 	if (!w.__wperfOn) {
 		return;
 	}
