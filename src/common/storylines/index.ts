@@ -1,9 +1,5 @@
-// Storylines: narrative patterns detected in a league's history (ring chasers, homecomings, droughts, Cinderella runs, collapses, one-team legends ...) and written up from templates. Everything is found in the data; only the wording is chosen, deterministically, from a few variants per kind.
-//
-// Text can carry links as tokens: [[p:PID|Name]] for a player and [[t:TID:SEASON|Name]] for a team season. The UI turns them into links; plainText() strips them.
-
 import { LeagueIndex, type SeasonLine } from "../wrapped/league.ts";
-import type { WLeague, WPlayer, WStat } from "../wrapped/types.ts";
+import type { WLeague } from "../wrapped/types.ts";
 import {
 	fmtNum,
 	fmtRecord,
@@ -17,84 +13,25 @@ import {
 	span,
 	winPct,
 } from "../wrapped/util.ts";
+import {
+	isActive,
+	plainText,
+	pLink,
+	regRows,
+	seasonsOf,
+	stints,
+	titleSeasons,
+	tLink,
+	type Draft,
+	type Kind,
+	type Story,
+} from "./kit.ts";
+import { GAME_KINDS } from "./kindsGames.ts";
+import { PLAYER_KINDS } from "./kindsPlayers.ts";
+import { TEAM_KINDS } from "./kindsTeams.ts";
 
-export type StoryShape = "career" | "team" | "season" | "playoffs";
-
-export type Story = {
-	id: string;
-	kind: string;
-	shape: StoryShape;
-	season: number;
-	score: number;
-	headline: string;
-	body: string;
-	evidence: [string, string][];
-	pids: number[];
-	tids: number[];
-};
-
-export const pLink = (p: { pid: number; name: string }) =>
-	`[[p:${p.pid}|${p.name}]]`;
-export const tLink = (X: LeagueIndex, tid: number, season: number) =>
-	`[[t:${tid}:${season}|${X.teamName(tid, season)}]]`;
-
-export const plainText = (t: string) =>
-	t.replace(/\[\[[pt]:[^\]|]*\|([^\]]*)]]/g, "$1");
-
-type Draft = Omit<Story, "headline" | "body" | "id"> & {
-	key: string;
-	heads: string[];
-	bodies: string[];
-};
-
-type Kind = { kind: string; find: (X: LeagueIndex) => Draft[] };
-
-const regRows = (p: WPlayer) => p.stats.filter((r) => r.gp > 0);
-
-// Consecutive runs with one team: [{tid, from, to, ws, gp}]
-export const stints = (p: WPlayer) => {
-	const out: {
-		tid: number;
-		from: number;
-		to: number;
-		ws: number;
-		gp: number;
-	}[] = [];
-	for (const s of regRows(p)) {
-		const last = out.at(-1);
-		if (last && last.tid === s.tid && s.season - last.to <= 1) {
-			last.to = s.season;
-			last.ws += s.ws;
-			last.gp += s.gp;
-		} else {
-			out.push({
-				tid: s.tid,
-				from: s.season,
-				to: s.season,
-				ws: s.ws,
-				gp: s.gp,
-			});
-		}
-	}
-	return out;
-};
-
-const seasonsOf = (rows: WStat[]) =>
-	[...new Set(rows.map((r) => r.season))].sort((a, b) => a - b);
-
-const titleSeasons = (X: LeagueIndex, p: WPlayer) => {
-	const out: number[] = [];
-	for (const s of seasonsOf(p.po)) {
-		const c = X.champion(s);
-		if (c && p.po.some((r) => r.season === s && r.tid === c.tid && r.gp > 0)) {
-			out.push(s);
-		}
-	}
-	return out;
-};
-
-const isActive = (X: LeagueIndex, p: WPlayer) =>
-	p.retiredYear > X.L.season && p.tid >= 0;
+export { plainText, pLink, stints, tLink };
+export type { Story, StoryShape } from "./kit.ts";
 
 const KINDS: Kind[] = [
 	{
@@ -1446,6 +1383,7 @@ const KINDS: Kind[] = [
 							score: 10 + (l.pts - 50) * 3,
 							pids: [l.pid],
 							tids: [t.tid],
+							gids: [g.gid],
 							heads: [
 								`${l.name} scored ${l.pts}`,
 								`${l.pts} points in one night`,
@@ -1467,12 +1405,25 @@ const KINDS: Kind[] = [
 	},
 ];
 
-export const KIND_NAMES = KINDS.map((k) => k.kind);
+export const ALL_KINDS: Kind[] = [
+	...KINDS,
+	...PLAYER_KINDS,
+	...TEAM_KINDS,
+	...GAME_KINDS,
+];
+
+export const kindSlug = (kind: string) =>
+	kind
+		.toLowerCase()
+		.replace(/[^\da-z]+/g, "-")
+		.replace(/^-|-$/g, "");
+
+export const KIND_NAMES = ALL_KINDS.map((k) => k.kind);
 
 export const findStories = (L: WLeague | LeagueIndex): Story[] => {
 	const X = L instanceof LeagueIndex ? L : new LeagueIndex(L);
 	const out: Story[] = [];
-	for (const k of KINDS) {
+	for (const k of ALL_KINDS) {
 		let drafts: Draft[];
 		try {
 			drafts = k.find(X);
