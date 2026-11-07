@@ -830,7 +830,7 @@ export const draftStory = (c: Ctx, tid?: number): Article | undefined => {
 	}
 	const top = picks[0]!;
 	const r = c.rng("draft", tid ?? "");
-	const ageWord = top.age <= 19 ? "teenager" : `${top.age}-year-old`;
+	const ageWord = `${top.age}-year-old`;
 	const body: Block[] = [
 		P(
 			"With the ",
