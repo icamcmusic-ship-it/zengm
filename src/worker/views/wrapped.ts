@@ -6,6 +6,7 @@ import { validateTeam } from "../util/processInputs.ts";
 import { getWrappedIndex } from "../util/wrappedData.ts";
 import { candidates } from "../../common/wrapped/build.ts";
 import { polish } from "../../common/wrapped/util.ts";
+import { wperfOutput, wperfTime } from "../util/wrappedPerf.ts";
 import type { WrappedMode } from "../../common/wrapped/types.ts";
 
 const MODES: WrappedMode[] = ["season", "team", "player", "all"];
@@ -39,7 +40,9 @@ export default defineView({
 		if (__SPORT !== "basketball") {
 			return { errorMessage: "Wrapped is only available for basketball." };
 		}
-		const X = await getWrappedIndex(updateEvents);
+		const X = await wperfTime("wrapped.getIndex", () =>
+			getWrappedIndex(updateEvents),
+		);
 		const { mode } = inputs;
 
 		// Default season: the latest finished one, or the current one if none has finished yet
@@ -73,7 +76,9 @@ export default defineView({
 		}
 
 		const soFar = mode !== "all" && !X.decided(season);
-		const cands = candidates({ X, mode, season, tid, pid, soFar });
+		const cands = await wperfTime(`wrapped.candidates.${mode}`, () =>
+			candidates({ X, mode, season, tid, pid, soFar }),
+		);
 
 		// Pictures for every player and team the slides mention
 		const pids = [
@@ -144,7 +149,7 @@ export default defineView({
 			title = "All-Time Wrapped";
 		}
 
-		return {
+		const out = {
 			mode,
 			season,
 			tid,
@@ -160,5 +165,7 @@ export default defineView({
 			playerOptions,
 			userTid: g.get("userTid"),
 		};
+		wperfOutput(`wrapped.${mode}`, out);
+		return out;
 	},
 });

@@ -13,6 +13,7 @@ import type {
 } from "../../common/wrapped/types.ts";
 import { LeagueIndex } from "../../common/wrapped/league.ts";
 import type { PlayerAward, UpdateEvent } from "../../common/types.ts";
+import { wperfMark, wperfTime } from "./wrappedPerf.ts";
 
 const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
 
@@ -78,9 +79,12 @@ const awardOf = (a: PlayerAward): WAward[] => {
 // Read the whole league into the plain snapshot the Wrapped and Storylines engines use
 export const loadWrappedLeague = async (): Promise<WLeague> => {
 	const currentSeason = g.get("season");
-	const playersRaw = await idb.merged.players.getAll({
-		activeAndRetired: true,
-	});
+	const playersRaw = await wperfTime("snapshot.readPlayers", () =>
+		idb.merged.players.getAll({
+			activeAndRetired: true,
+		}),
+	);
+	const tMap = performance.now();
 	const players: WPlayer[] = playersRaw.map((p) => ({
 		pid: p.pid,
 		name: `${p.firstName} ${p.lastName}`.trim(),
@@ -117,6 +121,8 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 		relatives: p.relatives.map((r) => ({ type: r.type, pid: r.pid })),
 	}));
 
+	wperfMark("snapshot.mapPlayers", performance.now() - tMap);
+	const tTeams = performance.now();
 	const teamSeasonsRaw = await idb.merged.teamSeasons.getAll();
 	const tids = [...new Set(teamSeasonsRaw.map((ts) => ts.tid))];
 	const statsByKey = new Map<
@@ -137,6 +143,7 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 		}
 	}
 
+	wperfMark("snapshot.teamSeasonsAndStats", performance.now() - tTeams);
 	const series = await idb.merged.playoffSeries.getAll();
 	const seedOf = new Map<string, number>();
 	for (const ps of series) {
@@ -182,7 +189,9 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 		}
 	}
 
-	const gamesRaw = await idb.merged.games.getAll();
+	const gamesRaw = await wperfTime("snapshot.readGames", () =>
+		idb.merged.games.getAll(),
+	);
 	const games: WGame[] = gamesRaw
 		.filter((gm) => gm.teams.length === 2)
 		.map((gm) => ({
@@ -243,7 +252,16 @@ const STALE: UpdateEvent[] = [
 export const getWrappedIndex = (updateEvents: ReadonlySet<UpdateEvent>) => {
 	const key = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}`;
 	if (!cached || cached.key !== key || STALE.some((e) => updateEvents.has(e))) {
-		cached = { key, X: loadWrappedLeague().then((L) => new LeagueIndex(L)) };
+		cached = {
+			key,
+			X: wperfTime("snapshot", () => loadWrappedLeague()).then((L) =>
+				wperfTime("index", () => {
+					const X = new LeagueIndex(L);
+					(globalThis as any).__wrappedLast = X;
+					return X;
+				}),
+			),
+		};
 	}
 	return cached.X;
 };
