@@ -140,50 +140,70 @@ const QUOTES: Record<string, string[]> = {
 		"At some point you stop asking who can beat them and start asking who wants to try.",
 		"Everybody is building a team to beat them. So far that's just a hobby.",
 		"You don't beat them. You wait for them to get old.",
+		"Dynasties are just habits with trophies.",
+		"At this point the league is playing for second.",
 	],
 	first: [
 		"You never forget the first one. Neither do the fans.",
 		"Nobody in that locker room will ever buy a drink in that town again.",
 		"The franchise finally has a banner that means something.",
+		"Some franchises wait a lifetime for a night like this one.",
+		"Whatever happens next, this banner is theirs.",
 	],
 	drought: [
 		"A whole generation of fans just found out what this feels like.",
 		"They kept the banner space open for a long time. Worth it.",
 		"You could hear the city exhale.",
+		"Patience finally paid, with interest.",
+		"The old guard in that building can finally exhale.",
 	],
 	repeat: [
 		"Winning one is hard. Winning it again with a target on your back is harder.",
 		"The second one tells you the first one wasn't luck.",
 		"Everybody came for them this year. Nobody got there.",
+		"One title is a story. Two is a team.",
+		"The target on their back did not slow them down.",
 	],
 	upset: [
 		"Nobody had them in the conversation in October. Nobody.",
 		"Seeds are for gardens.",
 		"Somewhere a bookmaker is very unhappy.",
+		"Somewhere a bookmaker is very unhappy.",
+		"Nobody in the preseason picks would admit to this one.",
 	],
 	game7: [
 		"Game 7 is where reputations get made or buried. Theirs got made.",
 		"I aged five years watching that series and I didn't even have a team in it.",
 		"They should frame the tape of that one.",
+		"Nothing in sports is quite like one game with everything on it.",
+		"Seven games, one margin, no regrets.",
 	],
 	sweep: [
 		"Four games. I've sat through longer press conferences.",
 		"That wasn't a series. That was a statement.",
 		"Brooms in June. Doesn't get cleaner than that.",
+		"There was never a moment when the other bench looked comfortable.",
+		"Four wins, no doubt, no drama.",
 	],
 	dominant: [
 		"The best team won. Sometimes it really is that simple.",
 		"You could see this one coming from the first week.",
 		"They were the best team in October and the best team in June.",
+		"Wire to wire, there was nobody else.",
+		"The standings said it in January and the bracket said it in June.",
 	],
 	decisive: [
 		"Every possession in that last game felt like a season.",
 		"Margins that thin are where champions live.",
+		"A bounce here or there and the story reads differently.",
+		"A series like that does not have a loser, only a second place.",
 	],
 	generic: [
 		"Pretty or not, a title counts the same.",
 		"Banners hang forever. Nobody asks how.",
 		"Good teams win games. Champions win the last one.",
+		"Every title has its own road, and this one had plenty of turns.",
+		"The banner will not mention how hard it was.",
 	],
 };
 
@@ -336,11 +356,11 @@ export const champHeadline = (c: Ctx, x: ChampX) => {
 		r,
 		fns.map((fn) => fn(x.n, x.o, x)),
 	)!;
-	const quote = r.pick(QUOTES[key] ?? QUOTES.generic!);
+	const quote = c.cycle(`champ-quote|${key}`, QUOTES[key] ?? QUOTES.generic!);
 	return { key, head, quote, r };
 };
 
-const titleCount = (c: Ctx, x: ChampX): Seg[] => {
+export const titleCount = (c: Ctx, x: ChampX): Seg[] => {
 	if (x.nTitles === 1) {
 		return [`It is the first championship in franchise history.`];
 	}
@@ -354,7 +374,7 @@ const titleCount = (c: Ctx, x: ChampX): Seg[] => {
 	];
 };
 
-const road = (c: Ctx, x: ChampX, r: Rng, skipFinal: boolean): Seg[] => {
+export const road = (c: Ctx, x: ChampX, r: Rng, skipFinal: boolean): Seg[] => {
 	const legs = x.path
 		.filter((_s, i) => !(skipFinal && i === x.path.length - 1))
 		.map((s): Seg[] =>
@@ -370,7 +390,7 @@ const road = (c: Ctx, x: ChampX, r: Rng, skipFinal: boolean): Seg[] => {
 	return andList(legs);
 };
 
-const finalsMvp = (c: Ctx) => {
+export const finalsMvp = (c: Ctx) => {
 	const a = c.award("FMVP");
 	return a ? c.player(a.pid) : undefined;
 };
@@ -492,7 +512,7 @@ export const leadFinal = (c: Ctx): Article | undefined => {
 		);
 	}
 	body.push(P(...titleCount(c, x)));
-	body.push({ type: "quote", text: quote, cite: c.quoteSource(r) });
+	body.push(c.quote(quote, c.quoteSource(r)));
 
 	return {
 		id: "lead",
@@ -694,7 +714,7 @@ export const leadMidseason = (c: Ctx): Article | undefined => {
 				c.tl(a.tid, c.tfull(a.tid)),
 				` are ${record(a)} after ${a.gp} games, a pace of ${pace(a)} wins over ${N}.`,
 				best
-					? ` The most wins in a season in this league is ${best.won}, by the ${best.season} ${best.region} ${best.name}.`
+					? ` The most wins in a season in this league is ${best.won}, by the ${best.season} ${best.region} ${best.name}; ${pace(a)} would ${pace(a) > best.won ? "pass" : "fall short of"} it.`
 					: "",
 			),
 		);
@@ -780,7 +800,15 @@ export const leadMidseason = (c: Ctx): Article | undefined => {
 		size: "lead",
 		kicker: `Standings · ${c.f.gp} games in`,
 		head: c.freshHead(r, heads) ?? `${na} lead the league`,
-		deck: ["The regular season is under way; nothing below is final."],
+		deck: [
+			c.cycle("deck-mid", [
+				`${c.f.gp} games into the schedule; nothing below is final.`,
+				`The ${c.season} season is ${c.f.gp} games old and nothing below is settled.`,
+				`After ${c.f.gp} of ${N} games, everything below can still change.`,
+				`Through ${c.f.gp} games: a snapshot, not a verdict.`,
+				`${N - c.f.gp} games to go for the busiest teams; none of this is final.`,
+			]),
+		],
 		byline: c.byline("front", c.city(a.tid)),
 		photoPid: ladder[0]?.pid,
 		body,
@@ -899,7 +927,14 @@ export const leadPlayoffs = (c: Ctx): Article | undefined => {
 		size: "lead",
 		kicker: `Playoffs · ${capFirst(phrase)}`,
 		head: c.freshHead(r, heads)!,
-		deck: ["The regular season is over; the playoffs are under way."],
+		deck: [
+			c.cycle("deck-po", [
+				`The ${c.season} regular season is over and ${word(alive.length)} teams are still playing.`,
+				`The ${phrase} is under way; the regular season is in the books.`,
+				`${capFirst(word(alive.length))} teams left in the ${c.season} playoffs.`,
+				`The bracket is down to the ${phrase}, and every game now counts double.`,
+			]),
+		],
 		byline: c.byline("playoffs"),
 		photoPid: stars[0]?.pid,
 		body,
@@ -1003,7 +1038,12 @@ export const leadPreseason = (c: Ctx): Article | undefined => {
 			`A new season begins, and the ${c.tn(fav.t.tid)} look strongest`,
 		])!,
 		deck: [
-			"Nothing has been played yet; the outlook comes from roster ratings.",
+			c.cycle("deck-pre", [
+				`Nothing has been played yet in ${c.season}; the outlook comes from roster ratings.`,
+				`${c.season} has not tipped off, so these are ratings, not results.`,
+				`Before a single game of ${c.season}, the rosters say this.`,
+				`The ${c.season} season preview: every team is 0-0 and the ratings have the floor.`,
+			]),
 		],
 		byline: c.byline("front"),
 		photoPid: stars[0]?.pid,

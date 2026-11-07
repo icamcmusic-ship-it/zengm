@@ -3,6 +3,7 @@
 import {
 	Rng,
 	fmt1,
+	hashString,
 	ordinal,
 	record,
 	tidySegs,
@@ -121,6 +122,9 @@ export class Ctx {
 	readonly qual: NPPlayer[];
 	private readonly usedHeads = new Set<string>();
 	private readonly usedPids = new Set<string>();
+	private readonly ovrCache = new Map<number, number>();
+	// Names of people who are not in the season's player list (retired stars, old draftees)
+	private readonly names = new Map<number, string>();
 
 	constructor(facts: NewsFacts, tid?: number) {
 		this.f = facts;
@@ -131,6 +135,21 @@ export class Ctx {
 		}
 		for (const p of facts.players) {
 			this.playerMap.set(p.pid, p);
+		}
+		for (const r of facts.careerBoard ?? []) {
+			this.names.set(r.pid, r.name);
+		}
+		for (const r of facts.draftRetro?.picks ?? []) {
+			this.names.set(r.pid, r.name);
+		}
+		for (const r of facts.then?.list ?? []) {
+			this.names.set(r.pid, r.name);
+		}
+		for (const r of facts.mvps ?? []) {
+			this.names.set(r.pid, r.name);
+		}
+		for (const r of facts.retirees) {
+			this.names.set(r.pid, r.name);
 		}
 		this.rows = facts.teams
 			.filter((t) => t.gp > 0 || facts.edition === "preseason")
@@ -153,6 +172,14 @@ export class Ctx {
 	}
 	get inPlayoffs() {
 		return this.f.edition === "playoffs";
+	}
+	// The regular season is over: its numbers are final even while the playoffs go on
+	get regDone() {
+		return this.f.edition === "final" || this.f.edition === "playoffs";
+	}
+	// Present tense while the regular season is being played
+	R(present: string, past: string) {
+		return this.regDone ? past : present;
 	}
 
 	// Present tense while the season is being played, past once it is over
@@ -186,8 +213,11 @@ export class Ctx {
 	tl(tid: number, label?: string): Seg {
 		return { tid, t: label ?? this.tn(tid), season: this.season };
 	}
+	pname(pid: number) {
+		return this.player(pid)?.name ?? this.names.get(pid) ?? "";
+	}
 	pl(pid: number, name?: string): Seg {
-		return { pid, t: name ?? this.player(pid)?.name ?? "Unknown" };
+		return { pid, t: name ?? (this.pname(pid) || "Unknown") };
 	}
 	gl(gid: number, tid: number, t: string): Seg {
 		return { gid, tid, season: this.season, t };
@@ -258,6 +288,68 @@ export class Ctx {
 
 	quoteSource(r: Rng) {
 		return r.pick(QUOTE_SOURCES);
+	}
+
+	// A choice that moves through the list from a seeded start along a golden-ratio sequence in the season, so neighbouring seasons seldom share a variant and every variant comes round
+	cycle<T>(key: string, list: readonly T[], offset = 0): T {
+		const start = (hashString(`${this.f.seedKey}|cycle|${key}|${this.tid ?? ""}`) % 100000) / 100000;
+		const x = (start + (this.season + offset) * 0.6180339887498949) % 1;
+		return list[Math.min(list.length - 1, Math.floor(x * list.length))] as T;
+	}
+
+	// Mean rating of a team's eight best players, the same measure the preview uses
+	teamOvr(tid: number): number | undefined {
+		const hit = this.ovrCache.get(tid);
+		if (hit !== undefined) {
+			return hit;
+		}
+		const ovrs = this.f.players
+			.filter((p) => p.tid === tid)
+			.map((p) => p.ovr)
+			.toSorted((a, b) => b - a)
+			.slice(0, 8);
+		if (ovrs.length < 5) {
+			return undefined;
+		}
+		const v = ovrs.reduce((a, b) => a + b, 0) / ovrs.length;
+		this.ovrCache.set(tid, v);
+		return v;
+	}
+
+	// 1-based rank of a team by roster rating
+	ovrRank(tid: number): number | undefined {
+		const mine = this.teamOvr(tid);
+		if (mine === undefined) {
+			return undefined;
+		}
+		let better = 0;
+		for (const t of this.f.teams) {
+			const o = this.teamOvr(t.tid);
+			if (o !== undefined && o > mine) {
+				better += 1;
+			}
+		}
+		return better + 1;
+	}
+
+	// Pythagorean wins for a season of numGames
+	pyth(t: NPTeam): number | undefined {
+		if (t.pts === undefined || t.oppPts === undefined || t.gp === 0) {
+			return undefined;
+		}
+		const e = 13.91;
+		const share = t.pts ** e / (t.pts ** e + t.oppPts ** e);
+		return share * t.gp;
+	}
+
+	// Seasons before this one that the paper may talk about
+	get past() {
+		return this.f.season - 1;
+	}
+
+	// A newsroom-colour pull quote. Always labelled as invented
+	quote(text: string, cite?: string): Block {
+		return { type: "quote", text, cite, colour: true };
 	}
 
 	// Avoid two stories in one paper sharing a headline
@@ -331,9 +423,18 @@ export const finishArticle = (a: Article): Article => {
 			body.push(b);
 		}
 	}
+	// A fold with nothing before or after it is pointless
+	const fi = body.findIndex((b) => b.type === "fold");
+	const cleaned =
+		fi < 0
+			? body
+			: body.filter(
+					(b, i) =>
+						b.type !== "fold" || (i === fi && i > 0 && i < body.length - 1),
+				);
 	return {
 		...a,
 		deck: a.deck ? tidySegs(a.deck) : undefined,
-		body,
+		body: cleaned,
 	};
 };

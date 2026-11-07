@@ -146,7 +146,8 @@ export const polish = (s: string) =>
 		.replace(/\b1 (game|point|win|loss|season|round|title)s\b/g, "1 $1")
 		.replace(/\b1 losses\b/g, "1 loss")
 		.replace(/ {2,}/g, " ")
-		.replace(/ ([,.:;])/g, "$1")
+		.replace(/ ([,:;])/g, "$1")
+		.replace(/ \.(?!\d)/g, ".")
 		.replace(/\.\./g, ".")
 		.replace(/\bundefined\b|\bNaN\b/g, "");
 

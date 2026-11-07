@@ -295,9 +295,9 @@ export const seriesRecaps = (c: Ctx): Article[] => {
 				!started
 					? [`${capFirst(phrase)} matchups`, `The ${phrase} is set`]
 					: [
-							`${capFirst(phrase)}: ${plural(list.length, "series", "series")}, the results`,
-							`How the ${phrase} went`,
-							`${capFirst(phrase)} roundup`,
+							`${capFirst(phrase)}, ${c.season}: ${plural(list.length, "series", "series")}, the results`,
+							`How the ${c.season} ${phrase} went`,
+							`${c.season} ${phrase} roundup`,
 						],
 			)!,
 			byline: c.byline("playoffs"),
@@ -802,7 +802,7 @@ export const signingsStory = (c: Ctx, tid?: number): Article | undefined => {
 		head: c.freshHead(r, [
 			`${top.name} ${top.kind === "reSigned" ? "re-signs with" : "signs with"} the ${c.tn(top.tid)}`,
 			`Money moves: ${top.name} gets ${money(top.amount)} a year`,
-			"The ledger: this season's signings",
+			`The ledger: the ${c.season} signings`,
 		])!,
 		byline: c.byline("moves"),
 		body: [
@@ -923,9 +923,9 @@ export const retireStories = (c: Ctx): Article[] => {
 					`. He finishes with ${top.pts.toLocaleString("en-US")} points, ${top.trb.toLocaleString("en-US")} rebounds and ${top.ast.toLocaleString("en-US")} assists in ${plural(top.gp, "game")}${top.gp > 0 ? ` (${fmt1(top.pts / top.gp)} a game)` : ""}.`,
 				),
 				honors.length
-					? P(`His résumé: ${honors.join(", ")}.`)
+					? P(`${poss(top.name)} résumé: ${honors.join(", ")}.`)
 					: P(`He piled up ${fmt1(top.ws)} career win shares.`),
-				top.hof ? P("He has already been voted into the Hall of Fame.") : P(""),
+				top.hof ? P(c.cycle("hof-line", [`${top.name} has already been voted into the Hall of Fame.`, `The Hall of Fame vote is already in: ${top.name} is a member.`, `${top.name}, age ${top.age}, goes into the record books and the Hall of Fame at once.`])) : P(""),
 			],
 		},
 	];
@@ -999,14 +999,17 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 						c.pl(b.pid),
 						` is ${b.ws > a.ws ? "better than people think" : "real but thinner"}: ${fmt1(b.ws)} win shares and ${fmt1(b.pts)} points a game for a ${c.rec(b.tid)} team.`,
 						b.ws > a.ws
-							? " By the most complete single number we have, he was the more valuable player."
-							: " The numbers back the winner.",
+							? ` By the most complete single number we have, he ${c.T("is", "was")} the more valuable player, ${fmt1(b.ws)} win shares to ${fmt1(a.ws)}.`
+							: ` The numbers back ${a.name}: ${fmt1(a.ws)} win shares to ${fmt1(b.ws)}.`,
 					),
 					P(
-						r.pick([
-							"Argue with me in the letters page.",
-							"That's the column. Fight about it at the water cooler.",
-							"Write in if you disagree. Many of you will.",
+						c.cycle("column-close", [
+							`Argue with me in the letters page, ${a.name} fans especially.`,
+							`That's the column. Fight about it at the water cooler, ${c.season} edition.`,
+							`Write in if you disagree about ${b.name}. Many of you will.`,
+							`If ${a.name} versus ${b.name} is not the argument of the ${c.season} season, I do not know what is.`,
+							`Take it up with the ballot box, or with me.`,
+							`The mailbag is open for ${b.name} partisans.`,
 						]),
 					),
 				],
@@ -1039,8 +1042,16 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 					),
 					P(
 						avg >= 28
-							? "That is not a core that is about to get better. Sell while the names still mean something."
-							: "The good news is that the core is young. The bad news is that young cores are supposed to show signs of life by now.",
+							? c.cycle("column-old", [
+									`At ${avg.toFixed(1)} years old, that is not a core about to get better; sell while the names still mean something.`,
+									`A core that averages ${avg.toFixed(1)} years is not climbing back; the ${old.t.name} should cash in.`,
+									`${avg.toFixed(1)} is not a number that gets better with time.`,
+								])
+							: c.cycle("column-young", [
+									`The good news is that a core averaging ${avg.toFixed(1)} is young; the bad news is that young cores should show signs of life by now.`,
+									`At ${avg.toFixed(1)} years old the core can still grow, but the ${old.t.name} are running out of excuses.`,
+									`Youth (${avg.toFixed(1)} on average) is a plan only if it comes with progress.`,
+								]),
 					),
 				],
 			};
@@ -1064,8 +1075,16 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 					),
 					P(
 						pd !== undefined && pd < 4
-							? "That margin is thinner than the record suggests. Close games even out."
-							: "That is not luck. Teams that win by that much are usually exactly as good as they look.",
+							? c.cycle("column-thin", [
+									`A margin of ${fmt1(pd)} a game is thinner than the record suggests; close games even out.`,
+									`${fmt1(pd)} points a game does not say ${record(t)}; luck has a way of evening out.`,
+									`${record(t)} on a ${fmt1(pd)} margin is a record to be suspicious of.`,
+								])
+							: c.cycle("column-solid", [
+									`${fmt1(pd ?? 0)} points a game is not luck; teams that win by that much are usually as good as they look.`,
+									`Winning by ${fmt1(pd ?? 0)} a game is how real contenders look.`,
+									`${record(t)} with a ${fmt1(pd ?? 0)} margin: believe it.`,
+								]),
 					),
 					c.done ? P(`They ${c.fate(t.playoffRoundsWon)}.`) : P(""),
 				],
@@ -1092,7 +1111,7 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 // ---- Sidebars --------------------------------------------------------------
 
 export const standingsSidebar = (c: Ctx, tid?: number): Sidebar | undefined => {
-	if (c.rows.length === 0) {
+	if (c.rows.length === 0 || c.pre) {
 		return undefined;
 	}
 	const me = tid !== undefined ? c.team(tid) : undefined;
@@ -1192,6 +1211,11 @@ export const numbersSidebar = (c: Ctx): Sidebar | undefined => {
 	};
 };
 
+const signedDiffText = (t: NPTeam) =>
+	t.pts !== undefined && t.oppPts !== undefined
+		? `${t.pts - t.oppPts >= 0 ? "+" : "−"}${fmt1(Math.abs(t.pts - t.oppPts))}`
+		: "";
+
 export const teamStatsTable = (c: Ctx): Article | undefined => {
 	const ts = c.f.teams.filter(
 		(t) => t.pts !== undefined && t.oppPts !== undefined && t.gp > 0,
@@ -1208,7 +1232,12 @@ export const teamStatsTable = (c: Ctx): Article | undefined => {
 		id: "team-numbers",
 		size: "feature",
 		kicker: "Team numbers",
-		head: `Point differential: ${sorted[0]!.name} ${c.T("lead", "led")} the league`,
+		head: c.cycle("team-numbers-head", [
+			`Point differential: ${sorted[0]!.name} ${c.T("lead", "led")} the league at ${signedDiffText(sorted[0]!)}`,
+			`${sorted[0]!.name} ${c.T("outscore", "outscored")} everyone: ${signedDiffText(sorted[0]!)} a game`,
+			`The ${c.season} margin table: ${sorted[0]!.name} on top, ${sorted.at(-1)!.name} at the bottom`,
+			`Who wins by how much: the ${c.season} point differentials`,
+		]),
 		byline: c.byline("numbers"),
 		body: [
 			P(
