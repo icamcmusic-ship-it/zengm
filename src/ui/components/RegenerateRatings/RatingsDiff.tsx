@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { Fragment } from "react";
 import { getCol } from "../../../common/getCol.ts";
 import type { RatingKey } from "../../../common/types.basketball.ts";
 
@@ -57,11 +58,12 @@ export const ChangeSummary = ({
 	}
 	return (
 		<>
-			{changed.slice(0, max).map((r, i) => (
-				<span key={r.key} className="text-nowrap">
-					{i > 0 ? " " : ""}
-					{ratingLabel(r.key)} <Delta before={r.before} after={r.after} />
-				</span>
+			{changed.slice(0, max).map((r) => (
+				<Fragment key={r.key}>
+					<span className="text-nowrap">
+						{ratingLabel(r.key)} <Delta before={r.before} after={r.after} />
+					</span>{" "}
+				</Fragment>
 			))}
 			{changed.length > max ? (
 				<span className="text-body-secondary"> +{changed.length - max}</span>

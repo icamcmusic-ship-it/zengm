@@ -82,7 +82,15 @@ const RowDetail = ({
 }) => {
 	const eligible = builds.filter((b) => row.hgt >= b.min && row.hgt <= b.max);
 	return (
-		<div className="p-2">
+		<div
+			className="p-2"
+			// Pinned to the visible edge, so on a phone the details do not scroll away with a wide table
+			style={{
+				position: "sticky",
+				left: 0,
+				width: "min(100%, calc(100vw - 3rem))",
+			}}
+		>
 			<RatingsDiff
 				ratings={row.ratings}
 				pinned={lock.pinKeys}
@@ -198,7 +206,9 @@ export const RegenerateRatingsModal = ({
 	const [applying, setApplying] = useState(false);
 	const [expanded, setExpanded] = useState<number | undefined>();
 	const [builds, setBuilds] = useState<BuildInfo[]>([]);
-	const [showSettings, setShowSettings] = useState(true);
+	const [showSettings, setShowSettings] = useState(
+		() => window.innerWidth >= 992,
+	);
 	const requestId = useRef(0);
 
 	useEffect(() => {
@@ -430,13 +440,41 @@ export const RegenerateRatingsModal = ({
 							</select>
 						</div>
 					) : null}
-					<button
-						type="button"
-						className="btn btn-sm btn-link ms-auto"
-						onClick={() => setShowSettings((v) => !v)}
-					>
-						{showSettings ? "Hide settings" : "Show settings"}
-					</button>
+					<div className="d-flex flex-wrap gap-2 ms-auto">
+						<button
+							type="button"
+							className="btn btn-sm btn-light-bordered"
+							onClick={() => update({ seed: mintSeed() })}
+							title="Draw a new seed"
+						>
+							Reroll seed
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-light-bordered"
+							disabled={!preview?.canUndo}
+							onClick={undo}
+							title="Undo the last Apply (until the page is reloaded)"
+						>
+							Undo last apply
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-light-bordered"
+							disabled={!preview || preview.numWithOriginals === 0}
+							onClick={restore}
+							title="Put prospects in scope back to their ratings from before they were first regenerated (survives a reload)"
+						>
+							Restore originals
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-link"
+							onClick={() => setShowSettings((v) => !v)}
+						>
+							{showSettings ? "Hide settings" : "Show settings"}
+						</button>
+					</div>
 				</div>
 
 				<div className="row g-3">
@@ -617,7 +655,7 @@ export const RegenerateRatingsModal = ({
 																	</>
 																) : null}
 															</td>
-															<td>
+															<td className="text-wrap">
 																{r.skipped ? (
 																	<span className="text-body-secondary">
 																		left alone
@@ -638,7 +676,7 @@ export const RegenerateRatingsModal = ({
 																	</>
 																)}
 															</td>
-															<td>
+															<td className="text-wrap">
 																{r.skipped ? null : (
 																	<ChangeSummary ratings={r.ratings} />
 																)}
@@ -732,34 +770,7 @@ export const RegenerateRatingsModal = ({
 					</div>
 				</div>
 			</Modal.Body>
-			<Modal.Footer className="justify-content-between">
-				<div className="d-flex flex-wrap gap-2">
-					<button
-						type="button"
-						className="btn btn-light-bordered"
-						disabled={!preview?.canUndo}
-						onClick={undo}
-						title="Undo the last Apply"
-					>
-						Undo last apply
-					</button>
-					<button
-						type="button"
-						className="btn btn-light-bordered"
-						disabled={!preview || preview.numWithOriginals === 0}
-						onClick={restore}
-						title="Put prospects in scope back to their ratings from before they were first regenerated"
-					>
-						Restore originals
-					</button>
-					<button
-						type="button"
-						className="btn btn-light-bordered"
-						onClick={() => update({ seed: mintSeed() })}
-					>
-						Reroll seed
-					</button>
-				</div>
+			<Modal.Footer>
 				<div className="d-flex flex-wrap gap-2">
 					<button type="button" className="btn btn-secondary" onClick={onHide}>
 						Close

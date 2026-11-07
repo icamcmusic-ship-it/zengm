@@ -117,6 +117,9 @@ export const getPlayer = async <
 	return {
 		...p,
 
+		// Set by "Regenerate ratings"
+		build: pRaw.ratingsBuild?.name,
+
 		// Filter out rows with no games played
 		stats: p.stats.filter((row) => (row.gp ?? 0) > 0),
 

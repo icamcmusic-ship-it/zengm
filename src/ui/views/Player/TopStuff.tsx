@@ -595,6 +595,12 @@ const TopStuff = ({
 									<br />
 								</>
 							)}
+							{player.build ? (
+								<>
+									Build: {player.build}
+									<br />
+								</>
+							) : null}
 							Experience:{" "}
 							{player.experience === 0
 								? "none"

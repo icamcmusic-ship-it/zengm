@@ -18,6 +18,11 @@ const getSeason = async (playersAll: Player[], season: number) => {
 	});
 	players.sort((a, b) => b.valueFuzz - a.valueFuzz);
 
+	// Set by "Regenerate ratings"
+	const buildByPid = new Map(
+		playersAllFiltered.map((p) => [p.pid, p.ratingsBuild?.name]),
+	);
+
 	const players2 = addFirstNameShort(
 		players.map((pa, i) => {
 			const ratings = last(pa.ratings);
@@ -28,6 +33,7 @@ const getSeason = async (playersAll: Player[], season: number) => {
 				lastName: pa.lastName,
 				age: pa.age,
 				watch: pa.watch,
+				build: buildByPid.get(pa.pid),
 
 				// Ratings - just take the only entry
 				ovr: ratings.ovr,
