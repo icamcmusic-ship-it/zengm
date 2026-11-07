@@ -118,13 +118,20 @@ export const polish = (t: string) => {
 	let s = t;
 	s = s.replace(ONE_RE, (_m, pre: string, w: string) => `${pre}1 ${SING[w]}`);
 	s = s.replace(/([A-Za-z])'(s|t|re|ll|d|ve|m)\b/g, "$1’$2");
-	s = s.replace(/\b(\d{4})–\1\b/g, "$1").replace(/\bfrom (\d{4}) to \1\b/g, "in $1");
+	s = s
+		.replace(/\b(\d{4})–\1\b/g, "$1")
+		.replace(/\bfrom (\d{4}) to \1\b/g, "in $1");
 	s = s.replace(/(\S) {2,}(?=\S)/g, "$1 ");
+	s = s.replace(
+		/\b(the|The) 1st-(best|biggest|worst|highest|lowest)\b/g,
+		"$1 $2",
+	);
 	return s;
 };
 
 // Text that must never reach the screen
-export const isBadText = (t: string) => /\b(undefined|NaN|null|Infinity)\b/.test(t);
+export const isBadText = (t: string) =>
+	/\b(undefined|NaN|null|Infinity)\b/.test(t);
 
 export const listText = (items: string[]) => {
 	if (items.length <= 1) {
