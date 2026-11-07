@@ -186,3 +186,259 @@
 		margin-bottom: 0.3rem;
 	}
 }
+
+// ---- Photos, boxes and the newer blocks ----
+
+.np-photo {
+	float: right;
+	margin: 0.15rem 0 0.5rem 0.75rem;
+	aspect-ratio: 2 / 3;
+	border: 1px solid var(--bs-border-color);
+	background: var(--bs-tertiary-bg);
+	overflow: hidden;
+
+	a {
+		display: block;
+		height: 100%;
+	}
+	img,
+	svg {
+		display: block;
+		width: 100%;
+		height: auto;
+	}
+}
+
+.np-box {
+	float: right;
+	clear: right;
+	width: 14rem;
+	max-width: 45%;
+	margin: 0.15rem 0 0.5rem 0.75rem;
+	border: 1px solid var(--bs-border-color);
+	padding: 0.4rem 0.6rem;
+	font-size: 0.85rem;
+	background: var(--bs-tertiary-bg);
+
+	@media (max-width: 575.98px) {
+		float: none;
+		width: auto;
+		max-width: none;
+		margin-left: 0;
+	}
+}
+
+.np-article::after {
+	content: "";
+	display: block;
+	clear: both;
+}
+
+.np-colour-tag {
+	display: inline-block;
+	font-family: var(--bs-body-font-family);
+	font-size: 0.65rem;
+	font-style: normal;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--bs-secondary-color);
+	border: 1px solid var(--bs-border-color);
+	border-radius: 0.2rem;
+	padding: 0 0.3rem;
+	line-height: 1.3;
+}
+
+.np-quote .np-colour-tag {
+	margin-bottom: 0.2rem;
+}
+
+.np-aside {
+	font-size: 0.85rem;
+	font-style: italic;
+	color: var(--bs-secondary-color);
+}
+
+.np-timeline {
+	list-style: none;
+	padding-left: 0;
+	margin: 0.5rem 0;
+	border-left: 2px solid var(--bs-border-color);
+
+	li {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 0.6rem;
+		padding: 0.15rem 0 0.15rem 0.75rem;
+		position: relative;
+
+		&::before {
+			content: "";
+			position: absolute;
+			left: -5px;
+			top: 0.65rem;
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			background: var(--bs-body-color);
+		}
+	}
+}
+
+.np-timeline-label {
+	font-weight: 700;
+	min-width: 6.5rem;
+	font-size: 0.85rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.np-tape {
+	font-family: var(--bs-body-font-family);
+	th,
+	td {
+		border-bottom: 1px solid var(--bs-border-color);
+	}
+}
+
+.np-more {
+	font-family: var(--bs-body-font-family);
+	margin-bottom: 0.5rem;
+}
+
+// ---- Back issues ----
+
+.np-backissues {
+	margin-top: 1.5rem;
+	border-top: 3px double var(--bs-border-color);
+	padding-top: 0.5rem;
+	font-family: var(--bs-body-font-family);
+}
+
+.np-issues {
+	display: flex;
+	gap: 0.35rem;
+	overflow-x: auto;
+	padding-bottom: 0.35rem;
+	scrollbar-width: thin;
+}
+
+.np-issue {
+	flex: 0 0 auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	min-width: 3.4rem;
+	padding: 0.2rem 0.35rem;
+	border: 1px solid var(--bs-border-color);
+	border-radius: 0.25rem;
+	text-decoration: none;
+	font-size: 0.8rem;
+	line-height: 1.2;
+}
+
+.np-issue-cur {
+	background: var(--bs-body-color);
+	color: var(--bs-body-bg);
+	border-color: var(--bs-body-color);
+}
+
+.np-issue-y {
+	font-weight: 700;
+}
+
+.np-issue-c {
+	font-size: 0.7rem;
+	opacity: 0.8;
+}
+
+.np-editions {
+	font-family: var(--bs-body-font-family);
+	margin: 0.5rem 0 1rem;
+	font-size: 0.85rem;
+
+	summary {
+		cursor: pointer;
+	}
+}
+
+.np-edition-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem 0.9rem;
+	padding-top: 0.4rem;
+
+	a {
+		display: inline-flex;
+		align-items: center;
+		text-decoration: none;
+	}
+}
+
+.np-masthead-logo img {
+	object-fit: contain;
+}
+
+// ---- Print edition: only the paper, in black on white ----
+
+@media print {
+	body :not(.np-paper):not(.np-paper *):not(:has(.np-paper)) {
+		display: none !important;
+	}
+	html,
+	body {
+		background: #fff !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+	.np-paper {
+		--bs-body-color: #000;
+		--bs-body-bg: #fff;
+		--bs-border-color: #888;
+		--bs-secondary-color: #444;
+		--bs-tertiary-bg: #fff;
+		color: #000;
+		background: #fff;
+		max-width: none;
+		width: 100%;
+		font-size: 10.5pt;
+	}
+	.np-toolbar,
+	.np-tabs,
+	.np-backissues,
+	.np-editions,
+	.np-more {
+		display: none !important;
+	}
+	.np-paper a {
+		color: inherit;
+		text-decoration: none;
+	}
+	.np-paper .row > [class*="col-"] {
+		flex: 0 0 auto;
+		width: 100%;
+	}
+	.np-columns {
+		column-count: 2;
+	}
+	.np-section-title {
+		break-after: avoid;
+	}
+	.np-article,
+	.np-side {
+		break-inside: avoid;
+	}
+	.np-article.np-lead {
+		break-inside: auto;
+	}
+	.np-paper .table {
+		--bs-table-bg: transparent;
+		--bs-table-striped-bg: #f2f2f2;
+		--bs-table-color: #000;
+		color: #000;
+	}
+	.np-issue-cur {
+		background: transparent;
+		color: #000;
+	}
+}
