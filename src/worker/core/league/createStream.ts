@@ -92,6 +92,7 @@ import { getOldAwardsByPlayer } from "../../db/migrations/73/getOldAwardsByPlaye
 import { getNewAwardsByPlayer } from "../../db/migrations/73/getNewAwardsByPlayer.ts";
 import { migrateScheduledEvents74 } from "../../db/migrations/74/migrate.ts";
 import { unwrapGameAttribute } from "../../../common/unwrapGameAttribute.ts";
+import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
 
 export type TeamInfo = TeamBasic & {
 	disabled?: boolean;
@@ -1579,7 +1580,7 @@ const afterDBStream = async ({
 				p.tid = playerTids.pop()!;
 
 				const lastStats = p.stats?.at(-1);
-				if (lastStats) {
+				if (lastStats && !isPreDraftStatsRow(lastStats, p.draft?.year)) {
 					lastStats.tid = p.tid;
 
 					if (p.statsTids) {

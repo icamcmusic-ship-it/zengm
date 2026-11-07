@@ -9,6 +9,7 @@ import { getNumPlayersTradedAwayNormalized } from "./getNumPlayersTradedAwayNorm
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { getContractExp } from "../../../common/contracts.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
+import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
 
 // A player whose rookie contract just expired, while his team can re-sign him. That's during the re-signing phase, or before then for a player still on his team, which includes when AI teams re-sign players in newPhaseResignPlayers before the phase is updated.
 const isResigningAfterRookieContract = (p: Player) => {
@@ -45,7 +46,11 @@ const getMinFractionDiff = async (pid: number, tid: number) => {
 			let stats;
 			for (let i = p.stats.length - 1; i >= 0; i--) {
 				const row = p.stats[i]!;
-				if (row.season === season && !row.playoffs) {
+				if (
+					row.season === season &&
+					!row.playoffs &&
+					!isPreDraftStatsRow(row, p.draft.year)
+				) {
 					stats = row;
 				} else if (row.season < season) {
 					break;

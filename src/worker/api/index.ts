@@ -201,6 +201,7 @@ import {
 } from "../core/awards/awardsByPlayer.ts";
 import { registerGlobal } from "../../common/registerGlobal.ts";
 import { getTeamInfoCache } from "../core/team/getTeamInfoCache.ts";
+import { isPreDraftStatsRow } from "../../common/preDraft.ts";
 import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
 
 const acceptContractNegotiation = async ({
@@ -932,7 +933,12 @@ const deleteOldData = async (options: {
 			if (g.get("phase") === PHASE.PRESEASON) {
 				latestSeason -= 1;
 			}
-			p.stats = p.stats.filter((row) => row.season >= latestSeason);
+			p.stats = p.stats.filter(
+				(row) =>
+					row.season >= latestSeason ||
+					// Draft prospects keep their pre-draft (college) rows, which are old by definition but are all they have
+					(p.tid === PLAYER.UNDRAFTED && isPreDraftStatsRow(row, p.draft.year)),
+			);
 		}
 		if (p.injuries.length > 0) {
 			if (

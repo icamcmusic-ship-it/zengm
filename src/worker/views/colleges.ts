@@ -7,6 +7,7 @@ import { getValueStatsRow } from "../core/player/checkJerseyNumberRetirement.ts"
 import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { extraStats } from "./hallOfFame.ts";
 import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
+import { getProStats } from "../../common/preDraft.ts";
 import { player } from "../core/index.ts";
 
 type InfoTemp = {
@@ -79,7 +80,8 @@ const reducer = (
 	let displayStat = 0;
 	let valueStat = 0;
 	let gp = 0;
-	for (const stats of p.stats) {
+	// Pre-draft (college) rows are not part of the pro career being summed here
+	for (const stats of getProStats(p)) {
 		gp += stats.gp ?? 0;
 		valueStat += getValueStatsRow(stats);
 		for (const displayStatName of displayStatNames) {

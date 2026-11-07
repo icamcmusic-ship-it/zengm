@@ -6,6 +6,7 @@ import { orderBy } from "../../common/utils.ts";
 import { PHASE } from "../../common/constants.ts";
 import { loadAbbrevs } from "./gameLog.ts";
 import getPlayoffsByConf from "../core/season/getPlayoffsByConf.ts";
+import { getProStats } from "../../common/preDraft.ts";
 import { validateSeasonOnly } from "../util/processInputs.ts";
 
 export default defineView({
@@ -22,7 +23,9 @@ export default defineView({
 
 			const prevTeamTidsByPid = new Map<number, number>();
 
-			for (const p of playersRaw) {
+			for (const pAll of playersRaw) {
+				// Pre-draft (college) rows are not a team he played for
+				const p = { ...pAll, stats: getProStats(pAll) };
 				const prevTid = p.stats.findLast(
 					(row) => row.season === season - 1,
 				)?.tid;

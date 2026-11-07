@@ -4,6 +4,7 @@ import { maxBy, orderBy } from "../../../common/utils.ts";
 import { idb } from "../../db/index.ts";
 import { g, local, logEvent, helpers } from "../../util/index.ts";
 import { getThreshold } from "./madeHof.football.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 // Higher in basketball, because real player leagues have a lot
 const MAX_RETIRED_JERSEY_NUMBERS_PER_AI_TEAM =
@@ -81,7 +82,7 @@ export const getBestPos = (
 	}
 
 	const posByEWA: Record<string, number> = {};
-	for (const ps of p.stats) {
+	for (const ps of getProStats(p)) {
 		if (ps.tid === tid || tid === undefined) {
 			const ewa =
 				bySport({
@@ -116,7 +117,7 @@ export const getBestPos = (
 // score over 1 means eligible to be retired by AI
 export const getScore = (p: Player, tid: number) => {
 	let value = 0;
-	for (const ps of p.stats) {
+	for (const ps of getProStats(p)) {
 		if (ps.tid === tid) {
 			value += getValueStatsRow(ps);
 		}
@@ -200,7 +201,8 @@ const retireJerseyNumber = async ({
 
 	// Last season player played for team
 	const seasonTeamInfo =
-		p.stats.findLast((row) => row.tid === t.tid)?.season ?? seasonRetired;
+		getProStats(p).findLast((row) => row.tid === t.tid)?.season ??
+		seasonRetired;
 
 	t.retiredJerseyNumbers.push({
 		number,
@@ -240,7 +242,7 @@ const checkJerseyNumberRetirement = async (p: Player) => {
 	// Find team he played the most with
 	const scoresByTid = new Map<number, number>();
 
-	for (const ps of p.stats) {
+	for (const ps of getProStats(p)) {
 		if (!scoresByTid.has(ps.tid)) {
 			scoresByTid.set(ps.tid, getScore(p, ps.tid));
 		}
@@ -259,7 +261,7 @@ const checkJerseyNumberRetirement = async (p: Player) => {
 
 		// Figure out most common jersey number
 		const valuesByJerseyNumber = new Map<string, number>();
-		for (const ps of p.stats) {
+		for (const ps of getProStats(p)) {
 			if (ps.tid !== tid || ps.jerseyNumber === undefined) {
 				continue;
 			}

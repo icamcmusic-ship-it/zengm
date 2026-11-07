@@ -1572,6 +1572,9 @@ export type PlayerFormatOptions = {
 	oldStats?: boolean;
 	statType?: PlayerStatType;
 	mergeStats?: "none" | "totOnly" | "totAndTeams";
+
+	// Stats rows from before the player was drafted (college seasons, tid DOES_NOT_EXIST). "exclude" (default) hides them so they can't affect career totals etc, "only" returns just them, "include" returns everything
+	preDraftStats?: "exclude" | "only" | "include";
 };
 
 // Is SeasonType one of the values in the seasonType option? Distributes over unions, so if seasonType is a union of single values (like "playoffs" | "regularSeason"), the result is boolean because it's not known which one it is

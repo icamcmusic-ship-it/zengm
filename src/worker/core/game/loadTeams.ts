@@ -9,6 +9,7 @@ import {
 } from "../../../common/constants.ts";
 import playThroughInjuriesFactor from "../../../common/playThroughInjuriesFactor.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
 
 const MAX_NUM_PLAYERS_PACE = 7;
@@ -264,8 +265,9 @@ export const processTeam = async (
 		const injuryFactor = playThroughInjuriesFactor(p.injury.gamesRemaining);
 
 		// p.jerseyNumber fallback is for exhibition game players for the current season with no stats
+		const proStats = getProStats(p);
 		const jerseyNumber =
-			p.stats.length > 0 ? p.stats.at(-1)!.jerseyNumber : p.jerseyNumber;
+			proStats.length > 0 ? proStats.at(-1)!.jerseyNumber : p.jerseyNumber;
 
 		const rating = last(p.ratings);
 		const playerCompositeRatings: any = {};

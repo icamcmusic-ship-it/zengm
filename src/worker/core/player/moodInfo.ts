@@ -7,6 +7,7 @@ import type { Player } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
 import { uniformSeed } from "../../../common/random.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 const hasActiveNegotiation = async (tid: number, pid: number) => {
 	return (await idb.cache.negotiations.getAll()).some(
@@ -129,16 +130,19 @@ const moodInfo = async (
 		// Decrease that 0.7 to make players less likely to be at extremes (1% or 99%) in mood
 		probWilling = 1 / (1 + Math.exp(-0.7 * sumAndStuff));
 
+		// Pre-draft (college) rows are not part of his pro history
+		const proStats = getProStats(p);
+
 		let seed =
 			tid +
 			p.pid +
-			p.stats.length +
+			proStats.length +
 			last(p.ratings).ovr +
-			(p.stats.at(-1)?.min ?? 0);
+			(proStats.at(-1)?.min ?? 0);
 
 		if (__SPORT === "baseball") {
 			// Since min is 0 in baseball
-			seed += (p.stats.at(-1)?.pa ?? 0) + (p.stats.at(-1)?.outs ?? 0);
+			seed += (proStats.at(-1)?.pa ?? 0) + (proStats.at(-1)?.outs ?? 0);
 		}
 
 		const rand = uniformSeed(seed);
