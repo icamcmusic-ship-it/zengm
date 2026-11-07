@@ -1,0 +1,1091 @@
+// Wrapped (src/ui/views/Wrapped): tap-through "story" decks and the chooser.
+//
+// Everything that has a colour takes it from Bootstrap's --bs-* variables (so the light theme, the dark theme and BBGM's orange/blue primaries all work) or from team colours that the view sets as --wrapped-c1 / --wrapped-c2 (and their -rgb triplets). Sizes inside a slide are multiples of --wrapped-u, which the view sets in px from the card's measured size (1% of its width, capped by its height), so a slide looks the same on a phone, on a desktop and in the 1080x1920 image export. Deliberately no color-mix(), container query units or backdrop-filter: html2canvas (Save image) can't draw those.
+
+@function u($n) {
+	@return calc(var(--wrapped-u) * var(--wrapped-fit, 1) * #{$n});
+}
+
+// Chrome (buttons, progress) is not scaled by the fit step
+@function uc($n) {
+	@return calc(var(--wrapped-u) * #{$n});
+}
+
+$wrapped-display: var(--bs-font-sans-serif);
+$wrapped-serif: Georgia, "Times New Roman", serif;
+
+// ---- page: controls, stage and card -----------------------------------------------------------
+
+.wrapped-stage {
+	display: flex;
+	justify-content: center;
+	padding: 1rem 0;
+	border-radius: var(--bs-border-radius-lg);
+	background:
+		radial-gradient(
+			120% 90% at 100% 0%,
+			rgba(var(--bs-primary-rgb), 0.16),
+			transparent 60%
+		),
+		radial-gradient(
+			100% 80% at 0% 100%,
+			rgba(var(--bs-info-rgb), 0.14),
+			transparent 60%
+		),
+		var(--bs-tertiary-bg);
+}
+
+.wrapped-note {
+	max-width: 36rem;
+}
+
+// Phones: the card runs edge to edge, with no frame around it
+@media (max-width: 575.98px) {
+	.wrapped-stage {
+		margin: 0 calc(var(--wrapped-gutter, 0.5rem) * -1);
+		padding: 0;
+		border-radius: 0;
+		background: none;
+	}
+}
+
+// The look of the current slide, shared by the card (its chrome) and the slide itself.
+.wrapped-card,
+.wrapped-export-host {
+	--wrapped-fg: var(--bs-body-color);
+	--wrapped-fg-rgb: var(--bs-body-color-rgb);
+	--wrapped-dim: var(--bs-secondary-color);
+	--wrapped-on-fg: var(--bs-body-bg);
+
+	// The slide's own surface: the page colour with a wash of the team colour
+	--wrapped-bg: linear-gradient(
+			rgba(var(--wrapped-c1-rgb), 0.2),
+			rgba(var(--wrapped-c1-rgb), 0.2)
+		),
+		linear-gradient(var(--bs-body-bg), var(--bs-body-bg));
+	--wrapped-deco-1: rgba(var(--wrapped-c2-rgb), 0.34);
+	--wrapped-deco-2: rgba(var(--wrapped-c1-rgb), 0.3);
+	--wrapped-deco-3: rgba(var(--wrapped-c2-rgb), 0.18);
+
+	&--solid {
+		--wrapped-fg: var(--wrapped-ink);
+		--wrapped-fg-rgb: var(--wrapped-ink-rgb);
+		--wrapped-dim: rgba(var(--wrapped-ink-rgb), 0.76);
+		--wrapped-on-fg: var(--wrapped-c1);
+		--wrapped-bg: linear-gradient(var(--wrapped-c1), var(--wrapped-c1));
+		--wrapped-deco-1: rgba(var(--wrapped-c2-rgb), 0.3);
+		--wrapped-deco-2: rgba(var(--wrapped-c2-rgb), 0.28);
+		--wrapped-deco-3: rgba(var(--wrapped-c2-rgb), 0.2);
+	}
+}
+
+.wrapped-card {
+	position: relative;
+	overflow: hidden;
+	max-width: 100%;
+	border-radius: var(--bs-border-radius-xl, 1rem);
+	box-shadow: var(--bs-box-shadow-lg);
+	background: var(--bs-body-bg);
+	color: var(--wrapped-fg);
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-touch-callout: none;
+	touch-action: pan-y;
+	outline: none;
+
+	@media (max-width: 575.98px) {
+		border-radius: 0;
+		box-shadow: none;
+	}
+}
+
+.wrapped-view {
+	position: absolute;
+	inset: 0;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+// Progress: one segment per slide, filled up to the current one
+.wrapped-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	z-index: 3;
+	display: flex;
+	gap: 3px;
+	padding: 0.6rem 0.75rem 0;
+
+	&__seg {
+		position: relative;
+		flex: 1 1 0;
+		min-width: 0;
+		height: 0.9rem;
+		padding: 0;
+		border: 0;
+		background: none;
+		cursor: pointer;
+
+		// The visible bar is thinner than the tap target
+		&::before,
+		> i {
+			content: "";
+			position: absolute;
+			left: 0;
+			right: 0;
+			top: 0.35rem;
+			height: 3px;
+			border-radius: 3px;
+		}
+		&::before {
+			background: rgba(var(--wrapped-fg-rgb), 0.28);
+		}
+		> i {
+			display: block;
+			background: var(--wrapped-fg);
+			transform-origin: left center;
+			transform: scaleX(0);
+		}
+		&.is-done > i {
+			transform: none;
+		}
+		&.is-now > i {
+			transform: none;
+		}
+		&.is-playing > i {
+			transform: scaleX(0);
+			animation: wrapped-fill var(--wrapped-dwell, 8s) linear forwards;
+		}
+		&:focus-visible {
+			outline: 2px solid var(--wrapped-fg);
+			outline-offset: 1px;
+		}
+	}
+}
+
+.wrapped-top {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 1.25rem;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.35rem 0.6rem 0 1rem;
+	pointer-events: none;
+
+	> * {
+		pointer-events: auto;
+	}
+
+	&__t {
+		display: flex;
+		gap: 0.5em;
+		min-width: 0;
+		white-space: nowrap;
+		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		opacity: 0.85;
+	}
+	&__title {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	&__n {
+		flex: none;
+		font-weight: 500;
+		opacity: 0.8;
+	}
+	&__b {
+		display: flex;
+		gap: 0.4rem;
+		flex: none;
+	}
+}
+
+.wrapped-tools {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	padding: 0.5rem 0.6rem 0.75rem;
+}
+
+// Buttons on a slide: Bootstrap .btn for the metrics and focus handling, tinted by the slide
+.wrapped-btn.btn {
+	--bs-btn-padding-y: 0.3rem;
+	--bs-btn-padding-x: 0.75rem;
+	--bs-btn-border-width: 0;
+	--bs-btn-disabled-opacity: 0.35;
+	--bs-btn-disabled-bg: transparent;
+	--bs-btn-focus-shadow-rgb: var(--wrapped-fg-rgb);
+	--bs-btn-active-bg: rgba(var(--wrapped-fg-rgb), 0.34);
+	--bs-btn-active-color: var(--wrapped-fg);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	min-width: 2.25rem;
+	height: 2.25rem;
+	border-radius: 999px;
+	font-weight: 600;
+	color: var(--wrapped-fg);
+	background: rgba(var(--wrapped-fg-rgb), 0.14);
+	text-decoration: none;
+
+	&:hover,
+	&:focus-visible {
+		color: var(--wrapped-fg);
+		background: rgba(var(--wrapped-fg-rgb), 0.26);
+		text-decoration: none;
+	}
+	&:focus-visible {
+		outline: 2px solid var(--wrapped-fg);
+		outline-offset: 2px;
+		box-shadow: none;
+	}
+	&--icon {
+		padding: 0;
+		width: 2.25rem;
+		font-size: 1rem;
+	}
+	&--nav {
+		padding: 0;
+		width: 2.25rem;
+	}
+	&.is-on {
+		background: rgba(var(--wrapped-fg-rgb), 0.34);
+	}
+
+	@media (pointer: coarse) {
+		min-width: 2.75rem;
+		height: 2.75rem;
+	}
+}
+
+.wrapped-btn__short {
+	display: none;
+}
+@media (max-width: 400px) {
+	.wrapped-btn__long {
+		display: none;
+	}
+	.wrapped-btn__short {
+		display: inline;
+	}
+}
+
+// ---- a slide ---------------------------------------------------------------------------------------
+
+.wrapped-slide {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	color: var(--wrapped-fg);
+	background: var(--wrapped-bg);
+	font-variant-numeric: lining-nums;
+	line-height: 1.25;
+
+	// Layouts (seeded by the slide id): a centred, b bottom, c top, d spread with a pill kicker, e framed
+	&__content {
+		position: relative;
+		z-index: 1;
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: u(3.4);
+		padding: var(--wrapped-pad-top, max(4.5rem, #{u(15)})) u(7)
+			var(--wrapped-pad-bottom, max(4.5rem, #{u(15)}));
+		overflow: hidden;
+
+		// Long names and big numbers wrap instead of running off the slide
+		overflow-wrap: anywhere;
+		> * {
+			min-width: 0;
+			max-width: 100%;
+		}
+	}
+
+	&--lay-a &__content,
+	&--lay-e &__content {
+		align-items: center;
+		text-align: center;
+	}
+	&--lay-b &__content {
+		justify-content: flex-end;
+	}
+	&--lay-c &__content,
+	&--lay-d &__content {
+		justify-content: flex-start;
+		padding-top: var(--wrapped-pad-top-lg, max(5.5rem, #{u(19)}));
+	}
+	&--lay-d &__content {
+		justify-content: space-evenly;
+	}
+	&--lay-d &__kicker {
+		align-self: flex-start;
+		padding: u(1.2) u(3);
+		border-radius: 999px;
+		background: var(--wrapped-fg);
+		color: var(--wrapped-on-fg);
+		letter-spacing: 0.1em;
+	}
+	&--lay-d &__head {
+		font-size: u(12);
+		line-height: 0.95;
+		text-transform: uppercase;
+	}
+	&--lay-d &__head--sm {
+		font-size: u(8.6);
+	}
+	&--lay-d &__head--xs {
+		font-size: u(6.6);
+	}
+	&--lay-c &__head {
+		font-size: u(11);
+	}
+	&--lay-c &__head--sm {
+		font-size: u(7.4);
+	}
+	&--lay-c &__head--xs {
+		font-size: u(6);
+	}
+	&--lay-e &__content::before {
+		content: "";
+		position: absolute;
+		inset: var(--wrapped-frame-v, #{u(13)}) u(4);
+		border: u(0.6) solid var(--wrapped-fg);
+		border-radius: u(6);
+		opacity: 0.22;
+		pointer-events: none;
+	}
+	&--lay-e &__hero {
+		flex-direction: column;
+		gap: u(2);
+	}
+	&--lay-a &__hero {
+		flex-direction: column;
+		gap: u(2);
+	}
+	&--lay-a &__duo,
+	&--lay-e &__duo {
+		justify-content: center;
+		text-align: left;
+	}
+
+	// Backdrop: three shapes, five arrangements
+	&__deco {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+
+		i {
+			position: absolute;
+			display: block;
+		}
+	}
+	&__d1 {
+		width: u(78);
+		aspect-ratio: 1;
+		right: u(-26);
+		top: u(-22);
+		border-radius: 50%;
+		background: var(--wrapped-deco-1);
+	}
+	&__d2 {
+		width: u(44);
+		aspect-ratio: 1;
+		left: u(-14);
+		bottom: u(10);
+		border-radius: 50%;
+		border: u(4.5) solid var(--wrapped-deco-2);
+	}
+	&__d3 {
+		left: -20%;
+		right: -20%;
+		height: u(12);
+		bottom: u(8);
+		background: repeating-linear-gradient(
+			90deg,
+			var(--wrapped-deco-3) 0 #{u(2.2)},
+			transparent #{u(2.2)} #{u(5)}
+		);
+		transform: rotate(var(--wrapped-rot, 0deg));
+	}
+	&--bg-2 &__d1 {
+		border-radius: 26%;
+		transform: rotate(calc(var(--wrapped-rot, 0deg) + 20deg));
+		right: u(-30);
+		top: u(-30);
+	}
+	&--bg-2 &__d3 {
+		bottom: auto;
+		top: u(-6);
+		height: u(26);
+		background: repeating-linear-gradient(
+			0deg,
+			var(--wrapped-deco-3) 0 #{u(1.4)},
+			transparent #{u(1.4)} #{u(4)}
+		);
+	}
+	&--bg-3 &__d1 {
+		width: u(150);
+		right: u(-75);
+		top: u(-75);
+		background: repeating-radial-gradient(
+			circle,
+			var(--wrapped-deco-1) 0 #{u(3)},
+			transparent #{u(3)} #{u(8)}
+		);
+	}
+	&--bg-3 &__d2 {
+		border-radius: 30%;
+		transform: rotate(var(--wrapped-rot, 0deg));
+	}
+	&--bg-4 &__d1 {
+		width: 150%;
+		aspect-ratio: auto;
+		height: u(70);
+		left: -25%;
+		right: auto;
+		top: auto;
+		bottom: u(-40);
+		border-radius: 50% 50% 0 0;
+	}
+	&--bg-4 &__d2 {
+		left: auto;
+		right: u(-12);
+		bottom: auto;
+		top: u(20);
+	}
+	&--bg-5 &__d1 {
+		width: u(60);
+		border-radius: 0;
+		right: u(-10);
+		top: u(-10);
+		transform: rotate(45deg);
+	}
+	&--bg-5 &__d3 {
+		left: -30%;
+		right: -30%;
+		bottom: u(-6);
+		height: u(30);
+		background: var(--wrapped-deco-3);
+		transform: rotate(calc(var(--wrapped-rot, 0deg) - 8deg));
+	}
+
+	// Type
+	&__kicker {
+		font-size: u(3.6);
+		font-weight: 700;
+		line-height: 1.2;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--wrapped-dim);
+	}
+	&__head {
+		margin: 0;
+		font-family: $wrapped-display;
+		font-size: u(9.2);
+		font-weight: 800;
+		line-height: 1.04;
+		letter-spacing: -0.015em;
+		text-wrap: balance;
+	}
+	&__head--sm {
+		font-size: u(7.4);
+	}
+	&__head--xs {
+		font-size: u(6);
+		line-height: 1.1;
+	}
+	&__mega {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: u(1) u(1.5);
+		font-size: u(22);
+		font-weight: 800;
+		line-height: 0.95;
+		letter-spacing: -0.03em;
+		font-variant-numeric: lining-nums;
+
+		small {
+			font-size: u(5);
+			font-weight: 700;
+			line-height: 1;
+			letter-spacing: 0.06em;
+			text-transform: uppercase;
+			color: var(--wrapped-dim);
+		}
+		&--l {
+			font-size: u(14);
+		}
+		&--xl {
+			font-size: u(11);
+		}
+	}
+	&__name {
+		font-size: u(5.6);
+		font-weight: 800;
+		line-height: 1.1;
+	}
+	&__sub {
+		margin: 0;
+		max-width: 64ch;
+		font-family: $wrapped-serif;
+		font-size: u(4.3);
+		line-height: 1.4;
+		color: var(--wrapped-dim);
+	}
+	&__line {
+		font-size: u(5);
+		font-weight: 700;
+		line-height: 1.25;
+	}
+	&__facts {
+		display: flex;
+		flex-direction: column;
+		gap: u(1.2);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: u(3.7);
+		font-weight: 600;
+		line-height: 1.35;
+		color: var(--wrapped-dim);
+
+		li::before {
+			content: "\25C6\00a0";
+			color: var(--wrapped-fg);
+			opacity: 0.55;
+		}
+	}
+	&__gloss {
+		max-width: 52ch;
+		padding-top: u(1.2);
+		border-top: 1px solid rgba(var(--wrapped-fg-rgb), 0.22);
+		font-size: u(2.9);
+		font-weight: 500;
+		color: var(--wrapped-dim);
+	}
+	&__links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: u(1.6);
+		justify-content: center;
+
+		a,
+		button {
+			padding: u(1.8) u(3);
+			border: 0;
+			border-radius: 999px;
+			font-size: u(3.1);
+			font-weight: 700;
+			line-height: 1;
+			color: var(--wrapped-fg);
+			background: rgba(var(--wrapped-fg-rgb), 0.14);
+			text-decoration: none;
+
+			&:hover,
+			&:focus-visible {
+				background: rgba(var(--wrapped-fg-rgb), 0.26);
+				text-decoration: none;
+			}
+		}
+	}
+
+	// Pieces
+	&__duo,
+	&__hero {
+		display: flex;
+		align-items: center;
+		gap: u(5);
+		min-width: 0;
+	}
+	&__hero-txt {
+		display: flex;
+		flex-direction: column;
+		gap: u(1);
+		min-width: 0;
+	}
+	&__face {
+		flex: none;
+		width: u(30);
+		aspect-ratio: 2 / 3;
+		border-radius: u(4);
+		overflow: hidden;
+		background: rgba(var(--wrapped-c2-rgb), 0.35);
+
+		> * {
+			display: block;
+			width: 100% !important;
+			height: 100% !important;
+			max-width: none !important;
+			max-height: none !important;
+			object-fit: cover;
+		}
+		&--lg {
+			width: u(36);
+		}
+		&--sm {
+			width: u(22);
+		}
+	}
+	&__logo {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: u(24);
+		aspect-ratio: 1;
+
+		img {
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+		}
+		&--sm {
+			width: u(7);
+		}
+		&--md {
+			width: u(14);
+		}
+	}
+	&__abbr {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		border-radius: 50%;
+		font-size: u(5);
+		font-weight: 800;
+		line-height: 1;
+		box-shadow: inset 0 0 0 u(0.6) rgba(0, 0, 0, 0.2);
+	}
+	&__logo--sm &__abbr {
+		font-size: u(1.9);
+	}
+	&__logo--md &__abbr {
+		font-size: u(3.8);
+	}
+
+	&__chips {
+		display: grid;
+		grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr));
+		gap: u(2);
+		width: 100%;
+	}
+	&__chip {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: u(2.4) u(1);
+		border-radius: u(3);
+		background: rgba(var(--wrapped-fg-rgb), 0.09);
+		text-align: center;
+
+		b {
+			font-size: u(6);
+			font-weight: 800;
+			line-height: 1;
+			font-variant-numeric: lining-nums;
+		}
+		span {
+			margin-top: u(0.8);
+			font-size: u(2.8);
+			font-weight: 700;
+			line-height: 1.3;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			color: var(--wrapped-dim);
+		}
+	}
+	// Summary: label and value tiles
+	&__tiles {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: u(2.4);
+		width: 100%;
+		text-align: left;
+	}
+	&__tile {
+		display: flex;
+		flex-direction: column;
+		gap: u(0.7);
+		min-width: 0;
+		padding: u(2.6) u(3);
+		border-radius: u(3);
+		background: rgba(var(--wrapped-fg-rgb), 0.12);
+
+		span {
+			font-size: u(2.7);
+			font-weight: 700;
+			line-height: 1.2;
+			letter-spacing: 0.1em;
+			text-transform: uppercase;
+			color: var(--wrapped-dim);
+		}
+		b {
+			font-size: u(4.4);
+			font-weight: 800;
+			line-height: 1.12;
+		}
+	}
+	&__brand {
+		font-size: u(3);
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--wrapped-dim);
+	}
+
+	// A ranked list: number, picture, name and value, with a bar when the values compare
+	&__rows {
+		display: flex;
+		flex-direction: column;
+		gap: u(1.8);
+		width: 100%;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		text-align: left;
+	}
+	&__row {
+		display: flex;
+		align-items: center;
+		gap: u(2.4);
+		padding: u(2) u(3);
+		border-radius: u(3);
+		background: rgba(var(--wrapped-fg-rgb), 0.09);
+
+		&.is-top {
+			background: var(--wrapped-fg);
+			color: var(--wrapped-on-fg);
+		}
+	}
+	&__rank {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: u(7);
+		aspect-ratio: 1;
+		border-radius: 50%;
+		background: var(--wrapped-fg);
+		color: var(--wrapped-on-fg);
+		font-size: u(4);
+		font-weight: 800;
+		line-height: 1;
+	}
+	&__row.is-top &__rank {
+		background: var(--wrapped-on-fg);
+		color: var(--wrapped-fg);
+	}
+	&__who {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		min-width: 0;
+		font-size: u(4.2);
+		font-weight: 800;
+		line-height: 1.1;
+
+		a {
+			color: inherit;
+			text-decoration: none;
+			&:hover {
+				text-decoration: underline;
+			}
+		}
+		small {
+			font-size: u(2.8);
+			font-weight: 600;
+			line-height: 1.2;
+			color: var(--wrapped-dim);
+		}
+	}
+	&__row.is-top &__who small {
+		color: var(--wrapped-on-fg);
+		opacity: 0.75;
+	}
+	&__val {
+		font-size: u(5.4);
+		font-weight: 800;
+		line-height: 1;
+		font-variant-numeric: lining-nums;
+		text-align: right;
+
+		// Words rather than a number (an award, a result): smaller, and allowed to wrap
+		&--text {
+			flex: 0 1 45%;
+			font-size: u(3.5);
+			line-height: 1.15;
+			font-weight: 700;
+		}
+	}
+	&__bar {
+		display: block;
+		height: u(1.4);
+		margin-top: u(1.1);
+		border-radius: 999px;
+		background: rgba(var(--wrapped-fg-rgb), 0.14);
+		overflow: hidden;
+
+		i {
+			display: block;
+			height: 100%;
+			border-radius: inherit;
+			background: rgba(var(--wrapped-fg-rgb), 0.6);
+			transform-origin: left center;
+		}
+	}
+	&__row.is-top &__bar {
+		background: rgba(var(--wrapped-on-fg-rgb, 0, 0, 0), 0.18);
+		i {
+			background: var(--wrapped-on-fg);
+		}
+	}
+
+	// The footer only shows in the image export
+	&__foot {
+		display: none;
+	}
+}
+
+// ---- motion ------------------------------------------------------------------------------------------
+
+@keyframes wrapped-rise {
+	from {
+		opacity: 0;
+		transform: translateY(calc(var(--wrapped-u) * 5)) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+@keyframes wrapped-pop {
+	from {
+		transform: scale(0.4);
+		opacity: 0;
+	}
+}
+@keyframes wrapped-drift {
+	to {
+		translate: calc(var(--wrapped-u) * -4) calc(var(--wrapped-u) * 5);
+	}
+}
+@keyframes wrapped-grow {
+	from {
+		transform: scaleX(0);
+	}
+}
+@keyframes wrapped-fill {
+	to {
+		transform: scaleX(1);
+	}
+}
+@keyframes wrapped-tx-fade {
+	from {
+		opacity: 0;
+	}
+}
+@keyframes wrapped-tx-slide {
+	from {
+		transform: translateX(14%);
+		opacity: 0;
+	}
+}
+@keyframes wrapped-tx-slide-b {
+	from {
+		transform: translateX(-14%);
+		opacity: 0;
+	}
+}
+@keyframes wrapped-tx-zoom {
+	from {
+		transform: scale(1.08);
+		opacity: 0;
+	}
+}
+@keyframes wrapped-tx-wipe {
+	from {
+		clip-path: inset(0 0 0 100%);
+	}
+	to {
+		clip-path: inset(0);
+	}
+}
+@keyframes wrapped-tx-wipe-b {
+	from {
+		clip-path: inset(0 100% 0 0);
+	}
+	to {
+		clip-path: inset(0);
+	}
+}
+@keyframes wrapped-tx-tilt {
+	from {
+		transform: perspective(900px) rotateY(-14deg) scale(0.96);
+		transform-origin: left center;
+		opacity: 0;
+	}
+}
+
+.wrapped-slide {
+	animation: wrapped-tx-fade 0.35s ease both;
+
+	&--tx-slide {
+		animation: wrapped-tx-slide 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	}
+	&--tx-slide#{&}--back {
+		animation-name: wrapped-tx-slide-b;
+	}
+	&--tx-zoom {
+		animation: wrapped-tx-zoom 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	}
+	&--tx-wipe {
+		animation: wrapped-tx-wipe 0.55s cubic-bezier(0.6, 0, 0.2, 1) both;
+	}
+	&--tx-wipe#{&}--back {
+		animation-name: wrapped-tx-wipe-b;
+	}
+	&--tx-tilt {
+		animation: wrapped-tx-tilt 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	}
+
+	.wrapped-in {
+		animation: wrapped-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+		animation-delay: calc(min(var(--i, 0), 8) * 100ms + 80ms);
+	}
+	&__d1 {
+		animation:
+			wrapped-pop 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+			wrapped-drift 9s ease-in-out 1s infinite alternate;
+	}
+	&__d2 {
+		animation:
+			wrapped-pop 1.1s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+			wrapped-drift 11s ease-in-out 1s infinite alternate-reverse;
+	}
+	&__bar i {
+		animation: wrapped-grow 1s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	}
+	&__row.wrapped-in {
+		animation-delay: calc(var(--i, 0) * 120ms + 300ms);
+	}
+}
+
+// Paused: the backdrop stops drifting
+.wrapped-card--paused .wrapped-slide__deco i {
+	animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wrapped-slide,
+	.wrapped-slide *,
+	.wrapped-progress__seg > i {
+		animation: none !important;
+		transition: none !important;
+	}
+}
+
+// ---- image export (360x640 CSS px, drawn at 3x = 1080x1920) ------------------------------------------
+
+.wrapped-export-host {
+	position: fixed;
+	left: -10000px;
+	top: 0;
+	z-index: -1;
+	width: 360px;
+	height: 640px;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.wrapped-slide--static {
+	--wrapped-pad-top: #{uc(12)};
+	--wrapped-pad-bottom: #{uc(14)};
+	--wrapped-pad-top-lg: #{uc(14)};
+	--wrapped-frame-v: #{uc(10)};
+
+	&,
+	* {
+		animation: none !important;
+		transition: none !important;
+	}
+	.wrapped-slide__links {
+		display: none;
+	}
+	.wrapped-slide__foot {
+		position: absolute;
+		left: uc(7);
+		right: uc(7);
+		bottom: uc(5);
+		z-index: 2;
+		display: flex;
+		justify-content: space-between;
+		gap: uc(3);
+		font-size: uc(2.8);
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--wrapped-dim);
+	}
+}
+
+// ---- chooser ---------------------------------------------------------------------------------------------
+
+.wrapped-choose {
+	max-width: 62rem;
+
+	&__grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+		gap: 1rem;
+		align-items: start;
+	}
+	&__card {
+		overflow: hidden;
+	}
+	&__stripe {
+		height: 0.4rem;
+		background: linear-gradient(
+			90deg,
+			var(--bs-primary),
+			var(--bs-info),
+			var(--bs-success),
+			var(--bs-warning)
+		);
+	}
+	&__chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+	&__chip.btn {
+		min-width: 4rem;
+		border-radius: 999px;
+	}
+	&__results .list-group-item {
+		padding-top: 0.6rem;
+		padding-bottom: 0.6rem;
+	}
+}
