@@ -13,6 +13,7 @@ import type {
 } from "../../common/wrapped/types.ts";
 import { LeagueIndex } from "../../common/wrapped/league.ts";
 import type { PlayerAward, UpdateEvent } from "../../common/types.ts";
+import { getProAwards, getProStats } from "../../common/preDraft.ts";
 
 const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
 
@@ -99,9 +100,14 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 		retiredYear: p.retiredYear,
 		diedYear: p.diedYear,
 		hof: !!p.hof,
-		awards: p.awards.flatMap(awardOf),
-		stats: p.stats.filter((r) => !r.playoffs).map(toStat),
-		po: p.stats.filter((r) => r.playoffs).map(toStat),
+		// Pre-draft (college) honors and stats rows are not part of a pro career
+		awards: getProAwards(p).flatMap(awardOf),
+		stats: getProStats(p)
+			.filter((r) => !r.playoffs)
+			.map(toStat),
+		po: getProStats(p)
+			.filter((r) => r.playoffs)
+			.map(toStat),
 		injuries: p.injuries.map((i) => ({
 			season: i.season,
 			games: i.games,

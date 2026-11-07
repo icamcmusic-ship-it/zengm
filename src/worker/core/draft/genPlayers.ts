@@ -3,6 +3,7 @@ import { finances, player, realRosters } from "../index.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
+import { generateCollegeStats } from "./generateCollegeStats.ts";
 
 const genPlayers = async (
 	draftYear: number,
@@ -56,6 +57,19 @@ const genPlayers = async (
 		await player.addRelatives(p);
 
 		await player.updateValues(p);
+	}
+
+	// Optionally give the new prospects college stats and honors. Only for prospects who don't already have some, because this is also called to top off a class that was imported
+	if (
+		__SPORT === "basketball" &&
+		!forceScrubs &&
+		g.get("generateCollegeStats")
+	) {
+		await generateCollegeStats({
+			draftYear,
+			seed: `${g.get("lid")}-${draftYear}-auto`,
+			onlyMissing: true,
+		});
 	}
 
 	// Easter eggs!

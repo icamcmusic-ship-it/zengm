@@ -4,6 +4,10 @@ import genOrder from "./genOrder.ts";
 import genOrderFantasy from "./genOrderFantasy.ts";
 import genPicks from "./genPicks.ts";
 import genPlayers from "./genPlayers.ts";
+import {
+	generateCollegeStats,
+	removeCollegeStats,
+} from "./generateCollegeStats.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
 import getOrder from "./getOrder.ts";
 import getRookieContractLength from "./getRookieContractLength.ts";
@@ -19,6 +23,8 @@ export default {
 	genPicks,
 	genPlayers,
 	genPlayersWithoutSaving,
+	generateCollegeStats,
+	removeCollegeStats,
 	getOrder,
 	getRookieContractLength,
 	getRookieSalaries,

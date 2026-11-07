@@ -6,6 +6,7 @@ import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { last } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
+import { hasPreDraftStats } from "../../common/preDraft.ts";
 
 const getSeason = async (playersAll: Player[], season: number) => {
 	const playersAllFiltered = playersAll.filter((p) => p.draft.year === season);
@@ -42,6 +43,10 @@ const getSeason = async (playersAll: Player[], season: number) => {
 	return {
 		players: players2,
 		season,
+
+		// How many of these prospects have college stats, for the generate college stats button
+		numWithCollegeStats: playersAllFiltered.filter((p) => hasPreDraftStats(p))
+			.length,
 	};
 };
 

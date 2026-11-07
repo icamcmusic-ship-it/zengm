@@ -105,6 +105,7 @@ const gameAttributesKeysSportSpecific = {
 		"forceRetireRealPlayers",
 		"forceHistoricalRosters",
 		"easterEggPlayers",
+		"generateCollegeStats",
 	]),
 	football: new Set<GameAttributeKey>([
 		"fantasyPoints",
@@ -711,6 +712,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	forceRetireRealPlayers: false,
 	forceHistoricalRosters: false,
 	easterEggPlayers: true,
+	generateCollegeStats: false,
 	fakeAgeProb: 0.01,
 	awards: [
 		defaultAwards.mvp,

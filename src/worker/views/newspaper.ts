@@ -26,6 +26,7 @@ import { league, team } from "../core/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import { validateSeason, validateTeam } from "../util/processInputs.ts";
+import { getProStats } from "../../common/preDraft.ts";
 
 const processInputs = (params: RouteParams<"newspaper">) => {
 	return {
@@ -61,7 +62,7 @@ const lineFor = (
 	season: number,
 	playoffs: boolean,
 ): NPLine | undefined => {
-	const rows = p.stats.filter(
+	const rows = getProStats(p).filter(
 		(s) => s.season === season && s.playoffs === playoffs,
 	);
 	if (rows.length === 0) {
@@ -99,7 +100,7 @@ const lineFor = (
 
 // The team a player played for most that season (or his current team)
 const seasonTid = (p: Player, season: number) => {
-	const rows = p.stats.filter((s) => s.season === season && !s.playoffs);
+	const rows = getProStats(p).filter((s) => s.season === season && !s.playoffs);
 	if (rows.length === 0) {
 		return p.tid;
 	}
@@ -338,7 +339,8 @@ export const getNewsFacts = async (season: number): Promise<NewsFacts> => {
 			draftPick: p.draft.pick,
 			draftTid: p.draft.tid,
 			rookie:
-				p.draft.year === season - 1 && !p.stats.some((s) => s.season < season),
+				p.draft.year === season - 1 &&
+				!getProStats(p).some((s) => s.season < season),
 			contractAmount:
 				isCurrent && contract
 					? (contract.amounts.at(season - contract.start) ??
@@ -550,7 +552,7 @@ export const getNewsFacts = async (season: number): Promise<NewsFacts> => {
 	if (edition === "final") {
 		const retired = await idb.merged.players.getAll({ retiredYear: season });
 		for (const p of retired) {
-			const rows = p.stats.filter((s) => !s.playoffs);
+			const rows = getProStats(p).filter((s) => !s.playoffs);
 			const sum = (key: string) =>
 				rows.reduce((acc, row) => acc + num((row as any)[key]), 0);
 			if (rows.length === 0) {

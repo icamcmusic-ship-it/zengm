@@ -853,6 +853,9 @@ export type GameAttributesLeague = {
 	footballOvertime: FootballOvertime;
 	footballOvertimePlayoffs: FootballOvertime;
 	easterEggPlayers: boolean;
+
+	// Basketball only. Generate college stats and honors for each new draft class as it is created
+	generateCollegeStats: boolean;
 	fakeAgeProb: number;
 };
 

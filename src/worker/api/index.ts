@@ -201,7 +201,10 @@ import {
 } from "../core/awards/awardsByPlayer.ts";
 import { registerGlobal } from "../../common/registerGlobal.ts";
 import { getTeamInfoCache } from "../core/team/getTeamInfoCache.ts";
-import { isPreDraftStatsRow } from "../../common/preDraft.ts";
+import {
+	getPreDraftAwards,
+	isPreDraftStatsRow,
+} from "../../common/preDraft.ts";
 import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
 
 const acceptContractNegotiation = async ({
@@ -1799,6 +1802,8 @@ const exportDraftClass = async ({
 			pos: p.pos,
 			ratings: [p.ratings[retiredPlayers ? p.ratings.length - 1 : 0]],
 			stats: p.stats,
+			// Pre-draft honors go with the pre-draft stats, so a class can be exported and imported without losing them
+			...(retiredPlayers ? {} : { awards: getPreDraftAwards(p) }),
 			real: p.real,
 			relatives: p.relatives,
 			srID: p.srID,
@@ -2752,6 +2757,24 @@ const handleUploadedDraftClass = async ({
 	await draft.genPlayers(draftYear, scoutingLevel);
 
 	await toUI("realtimeUpdate", [["playerMovement"]]);
+};
+
+const generateCollegeStats = async ({
+	draftYear,
+	seed,
+}: {
+	draftYear: number;
+	seed: string;
+}) => {
+	const output = await draft.generateCollegeStats({ draftYear, seed });
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return output;
+};
+
+const removeCollegeStats = async (draftYear: number) => {
+	const output = await draft.removeCollegeStats(draftYear);
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return output;
 };
 
 const idbCacheFlush = async () => {
@@ -5707,6 +5730,8 @@ const api = {
 		ping,
 		prefetchRealPlayerStats,
 		handleUploadedDraftClass,
+		generateCollegeStats,
+		removeCollegeStats,
 		idbCacheFlush,
 		importPlayers,
 		importPlayersGetReal,

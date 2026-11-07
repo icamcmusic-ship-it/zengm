@@ -185,6 +185,7 @@ type Key =
 	| "footballOvertime"
 	| "footballOvertimePlayoffs"
 	| "easterEggPlayers"
+	| "generateCollegeStats"
 	| "fakeAgeProb";
 
 export type Settings = Pick<
@@ -404,6 +405,7 @@ export const getInitialSettings = (): Settings => {
 		footballOvertime: g.get("footballOvertime"),
 		footballOvertimePlayoffs: g.get("footballOvertimePlayoffs"),
 		easterEggPlayers: g.get("easterEggPlayers"),
+		generateCollegeStats: g.get("generateCollegeStats"),
 		fakeAgeProb: g.get("fakeAgeProb"),
 
 		// Might as well be undefined, because it will never be saved from this form, only the new league form
