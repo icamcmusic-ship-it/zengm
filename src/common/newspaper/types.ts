@@ -9,6 +9,9 @@ export type NPRecord = {
 	otl?: number;
 };
 
+// One earlier season of a franchise
+export type NPYear = NPRecord & { season: number; playoffRoundsWon: number };
+
 export type NPTeam = NPRecord & {
 	tid: number;
 	abbrev: string;
@@ -35,6 +38,16 @@ export type NPTeam = NPRecord & {
 	titles: number[];
 	// First season of the franchise in the league
 	firstSeason: number;
+	// Earlier seasons of the franchise, oldest first
+	hist?: NPYear[];
+	// Games decided by five points or fewer, and overtime games, from the stored box scores
+	close?: { w: number; l: number };
+	ot?: { w: number; l: number };
+	// Longest winning and losing streaks of the season so far, from the box scores
+	bestStreak?: number;
+	worstStreak?: number;
+	// Total of the contracts on the roster, in thousands (current season only)
+	payroll?: number;
 };
 
 export type NPLine = {
@@ -73,6 +86,48 @@ export type NPPlayer = NPLine & {
 	rookie: boolean;
 	contractAmount?: number; // thousands
 	contractExp?: number;
+	// Per game extras. Left out when the file does not have them
+	gs?: number; // games started
+	ftp?: number;
+	tov?: number;
+	pf?: number;
+	orb?: number;
+	ows?: number;
+	dws?: number;
+	pm?: number; // plus-minus per game
+	// Counts from the stored box scores (games with a box score only)
+	dd?: number;
+	td?: number;
+	g30?: number;
+	g40?: number;
+	hi?: number;
+	boxGp?: number;
+	// Regular-season totals before this season
+	career?: NPCareer;
+	honors?: NPHonors;
+	college?: string;
+	country?: string;
+	jersey?: string;
+};
+
+export type NPCareer = {
+	gp: number;
+	pts: number;
+	trb: number;
+	ast: number;
+	stl: number;
+	blk: number;
+	tp: number;
+	ws: number;
+	seasons: number;
+};
+
+export type NPHonors = {
+	mvp: number;
+	dpoy: number;
+	allStar: number;
+	allLeague: number;
+	titles: number;
 };
 
 export type NPAward = {
@@ -207,6 +262,72 @@ export type NPInjury = {
 	gamesRemaining: number;
 };
 
+export type NPChampion = {
+	season: number;
+	tid: number;
+	runnerUp?: number;
+	fmvp?: string;
+};
+
+export type NPMvp = {
+	season: number;
+	pid: number;
+	name: string;
+	tid: number;
+	age?: number;
+};
+
+// Regular-season record of one team against another this season
+export type NPHeadToHead = {
+	a: number;
+	b: number;
+	aw: number;
+	bw: number;
+	// Points a scored minus points b scored over all the meetings
+	margin: number;
+};
+
+export type NPRetroPick = {
+	pid: number;
+	name: string;
+	pick: number;
+	round: number;
+	draftTid: number;
+	tid: number; // current team, or -1 for retired / free agent
+	retired: boolean;
+	ovr?: number;
+	pts: number;
+	ws: number;
+	seasons: number;
+	allStar: number;
+};
+
+export type NPThen = {
+	pid: number;
+	name: string;
+	ws: number; // that season
+	pts: number; // per game that season
+	tid: number; // team then
+	// Now
+	nowTid: number;
+	retired: boolean;
+	age?: number;
+	ovr?: number;
+	nowPpg?: number;
+};
+
+export type NPCareerRow = {
+	pid: number;
+	name: string;
+	tid: number; // current team or -1
+	active: boolean;
+	pts: number; // through last season
+	trb: number;
+	ast: number;
+	ws: number;
+	seasons: number;
+};
+
 export type NewsFacts = {
 	leagueName: string;
 	// Stable per league, used to seed text choices
@@ -219,6 +340,7 @@ export type NewsFacts = {
 	gp: number;
 	userTid: number;
 	confs: { cid: number; name: string }[];
+	divs?: { did: number; cid: number; name: string }[];
 	teams: NPTeam[];
 	players: NPPlayer[];
 	awards: NPAward[];
@@ -245,6 +367,24 @@ export type NewsFacts = {
 	};
 	// Seasons that exist in the league, for the season picker / back issues
 	firstSeason: number;
+	// Rules of the playoffs
+	playIn?: boolean;
+	numPlayoffTeams?: number;
+	byConf?: boolean;
+	salaryCap?: number;
+	luxuryPayroll?: number;
+	minPayroll?: number;
+	// History, for the back pages
+	champions?: NPChampion[];
+	mvps?: NPMvp[];
+	h2h?: NPHeadToHead[];
+	// Teams that met in last season's playoffs, for renewed rivalries
+	prevPairs?: [number, number][];
+	draftRetro?: { year: number; picks: NPRetroPick[] };
+	then?: { year: number; list: NPThen[] };
+	careerBoard?: NPCareerRow[];
+	// Counts for the transaction wire
+	wire?: { trades: number; freeAgents: number; reSigned: number; releases: number };
 };
 
 // Output
@@ -254,7 +394,9 @@ export type Seg =
 	| string
 	| { pid: number; t: string }
 	| { tid: number; t: string; season: number }
-	| { gid: number; tid: number; season: number; t: string };
+	| { gid: number; tid: number; season: number; t: string }
+	// A link to another edition of the paper: a team's local edition, or the league edition (team "all")
+	| { paper: { team: number | "all"; season: number }; t: string };
 
 export type Block =
 	| { type: "p"; segs: Seg[] }
@@ -268,12 +410,29 @@ export type Block =
 			hl?: number;
 	  }
 	| { type: "nums"; items: { value: string; label: string }[] }
-	| { type: "quote"; text: string; cite?: string }
-	| { type: "sub"; text: string };
+	// Quotes are always newsroom colour, invented from the numbers, and the page says so
+	| { type: "quote"; text: string; cite?: string; colour?: boolean }
+	| { type: "sub"; text: string }
+	| { type: "timeline"; items: { label: string; segs: Seg[] }[] }
+	| {
+			type: "tape";
+			a: string;
+			b: string;
+			rows: { label: string; a: string; b: string }[];
+	  }
+	| { type: "aside"; segs: Seg[] }
+	// Everything after this sits behind a "Continue reading" fold
+	| { type: "fold" };
 
 export type Article = {
 	id: string;
+	// Page type, for tests and rotation
+	type?: string;
 	size: "lead" | "feature" | "brief";
+	// Writing that is the newsroom's own voice rather than reporting (letters, classifieds, rumours)
+	colour?: boolean;
+	// A "By the numbers" box inside the story
+	box?: { title: string; items: { value: string; label: string }[] };
 	kicker?: string;
 	head: string;
 	deck?: Seg[];

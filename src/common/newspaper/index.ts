@@ -1,12 +1,30 @@
 // Newspaper engine: turns NewsFacts into a laid-out Paper. Pure and deterministic: the same facts always give the same paper.
 
+import { leadChampion } from "./champ.ts";
 import { Ctx, finishArticle } from "./ctx.ts";
 import {
-	leadFinal,
+	breakoutFeature,
+	bestRecordFeature,
+	featFeature,
+	mvpFeature,
+	topPickFeature,
+	tradeFeature,
+} from "./features.ts";
+import {
 	leadMidseason,
 	leadPlayoffs,
 	leadPreseason,
 } from "./front.ts";
+import { PAGES, type PageDef, type SectionId } from "./kit.ts";
+import "./pages-rank.ts";
+import "./pages-league.ts";
+import "./pages-players.ts";
+import "./pages-history.ts";
+import "./pages-money.ts";
+import "./pages-playoffs.ts";
+import "./pages-colour.ts";
+import { playInSidebar } from "./pages-league.ts";
+import { varyPaper } from "./vary.ts";
 import {
 	allLeagueBlock,
 	awardRace,
@@ -33,7 +51,7 @@ import {
 	tradeStories,
 } from "./sections.ts";
 import { teamGames, teamLead, teamPlayerFeatures } from "./team.ts";
-import { Rng, segsText } from "./text.ts";
+import { Rng, hashString, segsText } from "./text.ts";
 import type {
 	Article,
 	EditionId,
@@ -163,7 +181,7 @@ const section = (
 const leadFor = (c: Ctx) => {
 	switch (c.f.edition) {
 		case "final":
-			return leadFinal(c) ?? leadMidseason(c);
+			return leadChampion(c) ?? leadMidseason(c);
 		case "playoffs":
 			return leadPlayoffs(c) ?? leadMidseason(c);
 		case "midseason":
@@ -173,24 +191,85 @@ const leadFor = (c: Ctx) => {
 	}
 };
 
+// Pages of one section that fit the edition, in a stable order that is different for every league. The window of pages that runs starts a few places further on each season, so neighbouring seasons show different pages and every page comes round.
+const pagesFor = (c: Ctx, section: SectionId, quota: number): Article[] => {
+	const eds = (p: PageDef) => p.eds ?? ["midseason", "playoffs", "final"];
+	const candidates = PAGES.filter(
+		(p) => p.section === section && eds(p).includes(c.f.edition),
+	).toSorted(
+		(a, b) =>
+			hashString(`${c.f.seedKey}|${section}|${a.id}`) -
+			hashString(`${c.f.seedKey}|${section}|${b.id}`),
+	);
+	const n = candidates.length;
+	if (n === 0) {
+		return [];
+	}
+	const start =
+		(hashString(`${c.f.seedKey}|${section}|start`) +
+			(c.season - c.f.firstSeason) * quota) %
+		n;
+	const out: Article[] = [];
+	for (let k = 0; k < n && out.length < quota; k++) {
+		const page = candidates[(start + k) % n]!;
+		const a = page.build(c);
+		if (a) {
+			out.push(a);
+		}
+	}
+	return out;
+};
+
+// The features that can run, in a seeded rotation: the first two go on the front page, the rest to Features
+const featureStories = (c: Ctx): Article[] => {
+	const makers = [
+		mvpFeature,
+		bestRecordFeature,
+		featFeature,
+		breakoutFeature,
+		(cc: Ctx) => tradeFeature(cc),
+		topPickFeature,
+	];
+	const start = hashString(`${c.f.seedKey}|features`) + (c.season - c.f.firstSeason);
+	const out: Article[] = [];
+	for (let k = 0; k < makers.length; k++) {
+		const a = makers[(start + k) % makers.length]!(c);
+		if (a) {
+			out.push(a);
+		}
+	}
+	return out;
+};
+
 const leaguePaper = (c: Ctx): Section[] => {
 	const lead = leadFor(c);
-	const mvp = c.done ? awardStory(c, "MVP") : awardRace(c);
+	const feats = featureStories(c);
+	const mvp = feats.find((a) => a.id === "feature-mvp");
+	const frontFeats = [
+		mvp ?? (c.done ? awardStory(c, "MVP") : awardRace(c)),
+		...feats.filter((a) => a !== mvp),
+	].slice(0, 2);
+	const restFeats = feats.filter((a) => !frontFeats.includes(a));
 	const front = section(
 		"front",
 		"Front page",
 		[
 			lead,
-			mvp,
+			...frontFeats,
 			c.done ? finalsMvpStory(c) : bestGamesStory(c),
-			tradeStories(c)[0],
 		],
 		[numbersSidebar(c), standingsSidebar(c), leadersSidebar(c)],
 	);
 	const playoffs =
 		c.f.series.length > 0
-			? section("playoffs", "Playoffs", seriesRecaps(c), [bracketSidebar(c)])
+			? section(
+					"playoffs",
+					"Playoffs",
+					[...seriesRecaps(c), ...pagesFor(c, "playoffs", 3)],
+					[bracketSidebar(c), playInSidebar(c)],
+				)
 			: undefined;
+	const awardPages = pagesFor(c, "awards", c.done ? 3 : 2);
 	const awards = c.done
 		? section("awards", "Awards", [
 				awardStory(c, "DPOY"),
@@ -198,9 +277,13 @@ const leaguePaper = (c: Ctx): Section[] => {
 				awardStory(c, "SMOY"),
 				awardStory(c, "MIP"),
 				allLeagueBlock(c),
+				...awardPages,
 			])
-		: undefined;
+		: section("awards", "Awards", awardPages);
+	const teams = section("teams", "Teams", pagesFor(c, "teams", 6));
+	const players = section("players", "Players", pagesFor(c, "players", 6));
 	const features = section("features", "Features", [
+		...restFeats,
 		surpriseStory(c),
 		breakoutStory(c),
 		declineStory(c),
@@ -208,28 +291,40 @@ const leaguePaper = (c: Ctx): Section[] => {
 		injuryStory(c),
 		c.done ? bestGamesStory(c) : undefined,
 		closeGamesStory(c),
+		...pagesFor(c, "features", 3),
 	]);
 	const moves = section("moves", "Transactions", [
 		...tradeStories(c).slice(1),
 		signingsStory(c),
+		...pagesFor(c, "money", 4),
 	]);
-	const draft = section("draft", "Draft", [draftStory(c)]);
+	const draft = section("draft", "Draft", [
+		draftStory(c),
+		...pagesFor(c, "draft", 2),
+	]);
 	const numbers = section("numbers", "By the numbers", [
 		teamStatsTable(c),
 		leaderTables(c),
+		...pagesFor(c, "numbers", 3),
 	]);
+	const history = section("history", "History", pagesFor(c, "history", 6));
 	const obits = section("obits", "Retirements", retireStories(c));
 	const opinion = section("opinion", "Opinion", [opinionColumn(c)]);
+	const colour = section("colour", "Colour & letters", pagesFor(c, "colour", 4));
 	return compact([
 		front,
 		playoffs,
 		awards,
+		teams,
+		players,
 		features,
 		moves,
 		draft,
 		numbers,
+		history,
 		obits,
 		opinion,
+		colour,
 	]);
 };
 
@@ -285,7 +380,7 @@ export const buildPaper = (facts: NewsFacts, tid?: number): Paper => {
 			}
 		}
 	}
-	return {
+	const paper: Paper = {
 		name: id.name,
 		motto: id.motto,
 		season: facts.season,
@@ -298,6 +393,7 @@ export const buildPaper = (facts: NewsFacts, tid?: number): Paper => {
 		ticker: ticker.slice(0, 6),
 		sections,
 	};
+	return varyPaper(paper, facts);
 };
 
 // All the text of a paper, for tests
@@ -307,6 +403,9 @@ export const paperText = (paper: Paper) => {
 		for (const a of [...s.articles, ...s.sidebars]) {
 			if ("head" in a) {
 				out.push(a.head, a.kicker ?? "", a.deck ? segsText(a.deck) : "");
+				if (a.box) {
+					out.push(a.box.title, ...a.box.items.map((x) => `${x.value} ${x.label}`));
+				}
 			} else {
 				out.push(a.title);
 			}
@@ -324,6 +423,19 @@ export const paperText = (paper: Paper) => {
 					);
 				} else if (b.type === "nums") {
 					out.push(...b.items.map((x) => `${x.value} ${x.label}`));
+				} else if (b.type === "timeline") {
+					out.push(...b.items.map((x) => `${x.label} ${segsText(x.segs)}`));
+				} else if (b.type === "tape") {
+					out.push(
+						`${b.a} ${b.b}`,
+						...b.rows.map((x) => `${x.label} ${x.a} ${x.b}`),
+					);
+				} else if (b.type === "aside") {
+					out.push(segsText(b.segs));
+				} else if (b.type === "fold") {
+					// Nothing to read
+				} else if (b.type === "quote") {
+					out.push(b.text, b.cite ?? "");
 				} else {
 					out.push(b.text);
 				}
