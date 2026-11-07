@@ -146,7 +146,7 @@ const makeGame = (gid: number, season: number): Game =>
 	}) as any;
 
 // Everything about the snapshot that matters, in a form that can be compared
-const plain = (x: unknown) => JSON.parse(JSON.stringify(x));
+const plain = (x: unknown) => structuredClone(x);
 
 const marks = () =>
 	((globalThis as any).__wperf ?? []) as { name: string; ms: number }[];
