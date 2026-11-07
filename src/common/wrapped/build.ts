@@ -1,4 +1,6 @@
 import { planDeck } from "./deck.ts";
+import { slideTexts, spoilerText } from "./items.ts";
+import { quizSlides } from "./quiz.ts";
 import { LeagueIndex } from "./league.ts";
 import type { Deck, Slide, WLeague, WrappedMode } from "./types.ts";
 import type { Topic, TopicCtx } from "./topics/helpers.ts";
@@ -13,11 +15,31 @@ import {
 	MORE_TEAM,
 } from "./topics/more.ts";
 
-export const TOPICS: Record<WrappedMode, Topic[]> = {
+import { X_PLAYER } from "./topics/xplayer.ts";
+import { X_TEAM } from "./topics/xteam.ts";
+import { X_SEASON } from "./topics/xseason.ts";
+import { X_ALL } from "./topics/xall.ts";
+
+// The first topic sets, and the extra ones ported from the Explorer later
+export const BASE_TOPICS: Record<WrappedMode, Topic[]> = {
 	season: [...SEASON_TOPICS, ...MORE_SEASON],
 	team: [...TEAM_TOPICS, ...MORE_TEAM],
 	player: [...PLAYER_TOPICS, ...MORE_PLAYER],
 	all: [...ALL_TOPICS, ...MORE_ALL],
+};
+
+export const EXTRA_TOPICS: Record<WrappedMode, Topic[]> = {
+	season: X_SEASON,
+	team: X_TEAM,
+	player: X_PLAYER,
+	all: X_ALL,
+};
+
+export const TOPICS: Record<WrappedMode, Topic[]> = {
+	season: [...BASE_TOPICS.season, ...EXTRA_TOPICS.season],
+	team: [...BASE_TOPICS.team, ...EXTRA_TOPICS.team],
+	player: [...BASE_TOPICS.player, ...EXTRA_TOPICS.player],
+	all: [...BASE_TOPICS.all, ...EXTRA_TOPICS.all],
 };
 
 // Every candidate slide; a topic that throws is skipped, so one bad topic can't break the deck
@@ -35,6 +57,25 @@ export const candidates = (ctx: TopicCtx) => {
 			out.push(...r);
 		} else if (r) {
 			out.push(r);
+		}
+	}
+	// Slides that name the champion while talking about the title are spoilers
+	if (ctx.mode !== "all" && ctx.X.decided(ctx.season)) {
+		const c = ctx.X.champion(ctx.season);
+		const names: string[] = [];
+		if (c) {
+			names.push(`${c.region} ${c.name}`, c.region, c.name, c.abbrev);
+		}
+		const fm = ctx.X.awardWinner(ctx.season, "Finals MVP");
+		if (fm) {
+			names.push(fm.name);
+		}
+		if (names.length > 0) {
+			for (const s of out) {
+				if (spoilerText(slideTexts(s).join(" . "), names)) {
+					s.spoiler = true;
+				}
+			}
 		}
 	}
 	// The deck's own subject needs no name tag
@@ -56,6 +97,11 @@ export const candidates = (ctx: TopicCtx) => {
 		if (s.who === self) {
 			delete s.who;
 		}
+	}
+	try {
+		out.push(...quizSlides(ctx));
+	} catch (error) {
+		console.error(error);
 	}
 	return out;
 };

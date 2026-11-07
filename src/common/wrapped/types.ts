@@ -22,6 +22,26 @@ export type WStat = {
 	ws: number;
 	bpm: number;
 	vorp: number;
+	// Extra fields the snapshot keeps when the database has them. Missing means "not recorded", never zero.
+	orb?: number;
+	drb?: number;
+	pf?: number;
+	// Summed plus-minus over the games played
+	pm?: number;
+	ortg?: number;
+	drtg?: number;
+	usgp?: number;
+	ows?: number;
+	dws?: number;
+	dd?: number;
+	td?: number;
+	// Single-game highs of the season
+	ptsMax?: number;
+	trbMax?: number;
+	astMax?: number;
+	stlMax?: number;
+	blkMax?: number;
+	tpMax?: number;
 };
 
 export type WAward = { season: number; type: string };
@@ -50,6 +70,18 @@ export type WPlayer = {
 	// tid of each transaction (draft, sign, trade, release) with its season, oldest first
 	moves: { season: number; tid: number; type: string; fromTid?: number }[];
 	relatives: { type: string; pid: number }[];
+	// Potential by season, like ovr
+	pot?: Record<number, number>;
+	// Position by season
+	pos?: Record<number, string>;
+	// Height rating (0-100) at the end of the career so far
+	hgt?: number;
+	// What teams actually paid him, in thousands of dollars
+	paid?: { season: number; tid: number; amount: number }[];
+	// Draft rookie ovr and pot
+	draftOvr?: number;
+	draftPot?: number;
+	jersey?: string;
 };
 
 export type WTeamSeason = {
@@ -70,6 +102,25 @@ export type WTeamSeason = {
 	gp: number;
 	pts: number;
 	oppPts: number;
+	cid?: number;
+	did?: number;
+	wonHome?: number;
+	lostHome?: number;
+	wonAway?: number;
+	lostAway?: number;
+	wonDiv?: number;
+	lostDiv?: number;
+	wonConf?: number;
+	lostConf?: number;
+	// Home games played and total attendance (counts playoff games too)
+	gpHome?: number;
+	att?: number;
+	payroll?: number;
+	hype?: number;
+	pop?: number;
+	// Current winning (positive) or losing (negative) streak at the end of the season
+	streak?: number;
+	numPlayersTradedAway?: number;
 };
 
 export type WSeriesTeam = { tid: number; seed: number; won: number };
@@ -89,6 +140,16 @@ export type WBoxLine = {
 	stl: number;
 	blk: number;
 	tp: number;
+	tpa?: number;
+	fg?: number;
+	fga?: number;
+	ft?: number;
+	fta?: number;
+	tov?: number;
+	orb?: number;
+	drb?: number;
+	pf?: number;
+	pm?: number;
 };
 
 export type WGame = {
@@ -97,9 +158,10 @@ export type WGame = {
 	day: number;
 	playoffs: boolean;
 	overtimes: number;
+	att?: number;
 	teams: [
-		{ tid: number; pts: number; players: WBoxLine[] },
-		{ tid: number; pts: number; players: WBoxLine[] },
+		{ tid: number; pts: number; players: WBoxLine[]; ptsQtrs?: number[] },
+		{ tid: number; pts: number; players: WBoxLine[]; ptsQtrs?: number[] },
 	];
 };
 
@@ -116,6 +178,9 @@ export type WLeague = {
 	series: WSeries[];
 	// Box scores, only for the seasons that still have them
 	games: WGame[];
+	// Conferences and divisions as they are now
+	confs?: { cid: number; name: string }[];
+	divs?: { did: number; cid: number; name: string }[];
 };
 
 export type WrappedMode = "season" | "team" | "player" | "all";
@@ -127,6 +192,17 @@ export type SlideListRow = {
 	pid?: number;
 	tid?: number;
 	season?: number;
+};
+
+// A multiple-choice question that becomes a quiz slide
+export type Quiz = {
+	kind: string;
+	q: string;
+	clue?: string;
+	chips?: [string, string][];
+	// Shuffled answer choices, exactly one is right
+	opts: { name: string; ok: boolean }[];
+	answer: { name: string; extra?: string };
 };
 
 export type Slide = {
@@ -154,6 +230,10 @@ export type Slide = {
 	note?: string;
 	// Who the slide is about, shown when the headline and lines don't name them
 	who?: string;
+	// Set on quiz slides: the question and its choices
+	quiz?: Quiz;
+	// True when the slide gives the champion away, so "no spoilers" holds it back
+	spoiler?: boolean;
 };
 
 export type Deck = {

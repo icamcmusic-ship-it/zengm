@@ -124,6 +124,8 @@ export const routeInfos = {
 	"/l/:lid/customize_player/:pid": "customizePlayer",
 	"/l/:lid/customize_player/:pid/:type": "customizePlayer",
 	"/l/:lid/history_all": "historyAll",
+	"/l/:lid/wrapped/compare": "wrappedCompare",
+	"/l/:lid/wrapped/compare/:a/:b": "wrappedCompare",
 	"/l/:lid/wrapped": "wrapped",
 	"/l/:lid/wrapped/:type": "wrapped",
 	"/l/:lid/wrapped/:type/:season": "wrapped",

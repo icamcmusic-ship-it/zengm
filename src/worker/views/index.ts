@@ -109,5 +109,6 @@ export { default as transactions } from "./transactions.ts";
 export { default as upcomingFreeAgents } from "./upcomingFreeAgents.ts";
 export { default as watchList } from "./watchList.ts";
 export { default as wrapped } from "./wrapped.ts";
+export { default as wrappedCompare } from "./wrappedCompare.ts";
 export { default as storylines } from "./storylines.ts";
 export { default as hype } from "./hype.ts";

@@ -16,6 +16,10 @@ import type { PlayerAward, UpdateEvent } from "../../common/types.ts";
 
 const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
 
+// A stat the database may not have recorded
+const opt = (x: unknown) =>
+	typeof x === "number" && Number.isFinite(x) ? x : undefined;
+
 const toStat = (r: any): WStat => ({
 	season: r.season,
 	tid: r.tid,
@@ -38,6 +42,23 @@ const toStat = (r: any): WStat => ({
 	ws: n(r.ows) + n(r.dws),
 	bpm: n(r.obpm) + n(r.dbpm),
 	vorp: n(r.vorp),
+	orb: opt(r.orb),
+	drb: opt(r.drb),
+	pf: opt(r.pf),
+	pm: opt(r.pm),
+	ortg: opt(r.ortg),
+	drtg: opt(r.drtg),
+	usgp: opt(r.usgp),
+	ows: opt(r.ows),
+	dws: opt(r.dws),
+	dd: opt(r.dd),
+	td: opt(r.td),
+	ptsMax: opt(r.ptsMax),
+	trbMax: opt(r.trbMax),
+	astMax: opt(r.astMax),
+	stlMax: opt(r.stlMax),
+	blkMax: opt(r.blkMax),
+	tpMax: opt(r.tpMax),
 });
 
 const toBox = (p: any): WBoxLine => ({
@@ -50,6 +71,16 @@ const toBox = (p: any): WBoxLine => ({
 	stl: n(p.stl),
 	blk: n(p.blk),
 	tp: n(p.tp),
+	tpa: opt(p.tpa),
+	fg: opt(p.fg),
+	fga: opt(p.fga),
+	ft: opt(p.ft),
+	fta: opt(p.fta),
+	tov: opt(p.tov),
+	orb: opt(p.orb),
+	drb: opt(p.drb),
+	pf: opt(p.pf),
+	pm: opt(p.pm),
 });
 
 const TEAM_ORD = ["First", "Second", "Third", "Fourth", "Fifth"];
@@ -115,6 +146,19 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 			fromTid: "fromTid" in t ? t.fromTid : undefined,
 		})),
 		relatives: p.relatives.map((r) => ({ type: r.type, pid: r.pid })),
+		pot: Object.fromEntries(p.ratings.map((r) => [r.season, r.pot])),
+		pos: Object.fromEntries(p.ratings.map((r) => [r.season, r.pos])),
+		hgt: p.ratings.at(-1)?.hgt,
+		paid: (p.contracts ?? []).flatMap((c) =>
+			(c.payments ?? []).map((x) => ({
+				season: x.season,
+				tid: x.tid,
+				amount: x.amount,
+			})),
+		),
+		draftOvr: p.draft.ovr,
+		draftPot: p.draft.pot,
+		jersey: p.stats.findLast((r) => r.jerseyNumber)?.jerseyNumber,
 	}));
 
 	const teamSeasonsRaw = await idb.merged.teamSeasons.getAll();
@@ -169,6 +213,23 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 				gp: st?.gp ?? 0,
 				pts: st?.pts ?? 0,
 				oppPts: st?.oppPts ?? 0,
+				cid: ts.cid,
+				did: ts.did,
+				wonHome: ts.wonHome,
+				lostHome: ts.lostHome,
+				wonAway: ts.wonAway,
+				lostAway: ts.lostAway,
+				wonDiv: ts.wonDiv,
+				lostDiv: ts.lostDiv,
+				wonConf: ts.wonConf,
+				lostConf: ts.lostConf,
+				gpHome: ts.gpHome,
+				att: ts.att,
+				payroll: ts.payrollEndOfSeason,
+				hype: ts.hype,
+				pop: ts.pop,
+				streak: ts.streak,
+				numPlayersTradedAway: ts.numPlayersTradedAway,
 			};
 		});
 
@@ -191,16 +252,19 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 			day: gm.day ?? 0,
 			playoffs: !!gm.playoffs,
 			overtimes: gm.overtimes ?? 0,
+			att: opt(gm.att),
 			teams: [
 				{
 					tid: gm.teams[0].tid,
 					pts: gm.teams[0].pts,
 					players: gm.teams[0].players.map(toBox),
+					ptsQtrs: gm.teams[0].ptsQtrs,
 				},
 				{
 					tid: gm.teams[1].tid,
 					pts: gm.teams[1].pts,
 					players: gm.teams[1].players.map(toBox),
+					ptsQtrs: gm.teams[1].ptsQtrs,
 				},
 			],
 		}));
@@ -225,6 +289,8 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 			),
 		})),
 		games,
+		confs: g.get("confs").map((c) => ({ cid: c.cid, name: c.name })),
+		divs: g.get("divs").map((d) => ({ did: d.did, cid: d.cid, name: d.name })),
 	};
 };
 

@@ -118,5 +118,4 @@ export { default as UpcomingFreeAgents } from "./UpcomingFreeAgents.tsx";
 export { default as Upgrade65 } from "./Upgrade65.tsx";
 export { default as WatchList } from "./WatchList.tsx";
 export { default as Wrapped } from "./Wrapped/index.tsx";
-export { default as Storylines } from "./Storylines/index.tsx";
-export { default as Hype } from "./Hype.tsx";
+export { default as WrappedCompare } from "./WrappedCompare.tsx";

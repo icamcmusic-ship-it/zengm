@@ -26,6 +26,17 @@ export type SeasonLine = WStat & {
 	tsPct: number;
 };
 
+const OPT_SUM = ["orb", "drb", "pf", "pm", "ows", "dws", "dd", "td"] as const;
+const OPT_MAX = [
+	"ptsMax",
+	"trbMax",
+	"astMax",
+	"stlMax",
+	"blkMax",
+	"tpMax",
+] as const;
+const OPT_RATE = ["ortg", "drtg", "usgp"] as const;
+
 const STAT_KEYS = [
 	"gp",
 	"gs",
@@ -82,6 +93,22 @@ export const sumRows = (rows: WStat[]): WStat => {
 	}
 	out.per = minW > 0 ? out.per / minW : 0;
 	out.bpm = minW > 0 ? out.bpm / minW : 0;
+	// Optional fields stay undefined unless every row recorded them
+	for (const k of OPT_SUM) {
+		if (rows.length > 0 && rows.every((r) => r[k] !== undefined)) {
+			out[k] = rows.reduce((a, r) => a + r[k]!, 0);
+		}
+	}
+	for (const k of OPT_MAX) {
+		if (rows.length > 0 && rows.every((r) => r[k] !== undefined)) {
+			out[k] = Math.max(...rows.map((r) => r[k]!));
+		}
+	}
+	for (const k of OPT_RATE) {
+		if (rows.length > 0 && rows.every((r) => r[k] !== undefined) && minW > 0) {
+			out[k] = rows.reduce((a, r) => a + r[k]! * r.min, 0) / minW;
+		}
+	}
 	return out;
 };
 
@@ -111,6 +138,7 @@ export class LeagueIndex {
 	players = new Map<number, WPlayer>();
 	private teamMap = new Map<string, WTeamSeason>();
 	private linesBySeason = new Map<number, SeasonLine[]>();
+	private lineMaps = new Map<number, Map<number, SeasonLine>>();
 	private poBySeason = new Map<number, SeasonLine[]>();
 	private seriesBySeason = new Map<number, WSeries>();
 	private gamesBySeason = new Map<number, WGame[]>();
@@ -166,6 +194,90 @@ export class LeagueIndex {
 				}
 			}
 		}
+	}
+
+	// Every player's line for one team in one season, using only the games he played for that team
+	teamLines(tid: number, season: number): SeasonLine[] {
+		const all = this.cached("teamLines", () => {
+			const m = new Map<string, SeasonLine[]>();
+			for (const p of this.L.players) {
+				const by = new Map<string, WStat[]>();
+				for (const r of p.stats) {
+					if (r.gp <= 0) {
+						continue;
+					}
+					const k = `${r.tid}|${r.season}`;
+					const rows = by.get(k);
+					if (rows) {
+						rows.push(r);
+					} else {
+						by.set(k, [r]);
+					}
+				}
+				for (const [k, rows] of by) {
+					const list = m.get(k);
+					const line = toLine(p, rows);
+					if (list) {
+						list.push(line);
+					} else {
+						m.set(k, [line]);
+					}
+				}
+			}
+			return m;
+		});
+		return all.get(`${tid}|${season}`) ?? [];
+	}
+
+	// A player's last regular-season line before this season
+	prevLine(pid: number, season: number) {
+		for (let s = season - 1; s >= season - 6; s--) {
+			const l = this.line(pid, s);
+			if (l) {
+				return l;
+			}
+		}
+		return undefined;
+	}
+
+	// Playoff series a team played in a season, round by round
+	seriesOf(tid: number, season: number) {
+		const ps = this.series(season);
+		if (!ps || !this.decided(season)) {
+			return [];
+		}
+		const out: {
+			round: number;
+			won: number;
+			lost: number;
+			seed: number;
+			oppTid: number;
+			oppSeed: number;
+			win: boolean;
+		}[] = [];
+		for (const [ri, round] of ps.rounds.entries()) {
+			for (const m of round) {
+				if (!m.away) {
+					continue;
+				}
+				const me =
+					m.home.tid === tid ? m.home : m.away.tid === tid ? m.away : undefined;
+				if (!me) {
+					continue;
+				}
+				const opp = me === m.home ? m.away : m.home;
+				out.push({
+					round: ri,
+					won: me.won,
+					lost: opp.won,
+					seed: me.seed,
+					oppTid: opp.tid,
+					oppSeed: opp.seed,
+					win: me.won > opp.won,
+				});
+			}
+		}
+		return out;
 	}
 
 	cached<T>(key: string, f: () => T): T {
@@ -263,7 +375,12 @@ export class LeagueIndex {
 	}
 
 	line(pid: number, season: number) {
-		return this.lines(season).find((l) => l.pid === pid);
+		let m = this.lineMaps.get(season);
+		if (!m) {
+			m = new Map(this.lines(season).map((l) => [l.pid, l]));
+			this.lineMaps.set(season, m);
+		}
+		return m.get(pid);
 	}
 
 	// Most games anyone played that season, for "qualified" cutoffs

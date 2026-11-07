@@ -152,7 +152,7 @@ export const spread = (list: Slide[]) => {
 	return out;
 };
 
-const finish = (s: Slide, seed: string): Slide => {
+export const finish = (s: Slide, seed: string): Slide => {
 	const head = polish(pickBy(`${seed}|head|${s.id}`, s.heads));
 	return {
 		...s,
