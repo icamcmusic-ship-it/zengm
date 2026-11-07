@@ -63,7 +63,15 @@ export const StatsTable = ({
 	superCols?: SuperCol[];
 	leaders: View<"player">["leaders"];
 }) => {
-	const hasRegularSeasonStats = hasStats(p.careerStats, onlyShowIf);
+	// Pre-draft (college) rows are shown in the regular season table, but they are not part of the career row
+	const collegeStats = p.preDraftStats.filter(
+		(row) =>
+			onlyShowIf === undefined ||
+			onlyShowIf.some((stat) => hasNonZeroStat(row[stat])),
+	);
+	const hasProRegularSeasonStats = hasStats(p.careerStats, onlyShowIf);
+	const hasRegularSeasonStats =
+		hasProRegularSeasonStats || collegeStats.length > 0;
 	const hasPlayoffStats = hasStats(p.careerStatsPlayoffs, onlyShowIf);
 
 	// Show playoffs by default if that's all we have
@@ -122,6 +130,10 @@ export const StatsTable = ({
 	}
 
 	const isBaseballFielding = __SPORT === "baseball" && name === "Fielding";
+
+	// College rows only go in the regular season tab
+	const collegeRows =
+		playoffs === false && !isBaseballFielding ? collegeStats : [];
 
 	let footer: FooterRow[];
 	if (isBaseballFielding) {
@@ -231,6 +243,9 @@ export const StatsTable = ({
 		}
 	}
 
+	// A prospect has no career row to show, just his college seasons
+	const hideFooter = playoffs === false && !hasProRegularSeasonStats;
+
 	const leadersType =
 		playoffs === "combined"
 			? "combined"
@@ -256,6 +271,49 @@ export const StatsTable = ({
 	}
 
 	const rows = [];
+
+	for (const [i, ps] of collegeRows.entries()) {
+		const teamName = ps.teamName === "" ? "College" : ps.teamName;
+		const psAny = ps as any;
+		rows.push({
+			key: `college-${i}`,
+			data: [
+				{
+					searchValue: ps.season,
+					sortValue: i - collegeRows.length,
+					value: (
+						<>
+							{ps.season}{" "}
+							<span
+								className="badge text-bg-secondary fw-normal"
+								title="College season, from before he was drafted. Not part of his career totals."
+							>
+								College
+							</span>
+						</>
+					),
+				},
+				{
+					searchValue: teamName,
+					sortValue: teamName,
+					value: <span title="College">{teamName}</span>,
+				},
+				ps.age,
+				...stats.map((stat) =>
+					// Single game highs of a college season don't have a box score to link to
+					stat.endsWith("Max") ? (
+						Array.isArray(psAny[stat]) ? (
+							helpers.roundStat(psAny[stat][0], stat)
+						) : null
+					) : (
+						<>{formatStatGameHigh(ps, stat)}</>
+					),
+				),
+				null,
+			],
+			classNames: "text-body-secondary fst-italic",
+		});
+	}
 
 	let prevSeason;
 	for (const [i, ps] of playerStats.entries()) {
@@ -347,7 +405,7 @@ export const StatsTable = ({
 				cols={cols}
 				defaultSort={[0, "asc"]}
 				defaultStickyCols={2}
-				footer={footer}
+				footer={hideFooter ? undefined : footer}
 				hideAllControls
 				name={`Player:${name}`}
 				rows={rows}

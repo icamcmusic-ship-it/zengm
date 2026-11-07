@@ -19,6 +19,7 @@ import type {
 } from "../../common/types.ts";
 import { defineView, keepType } from "../util/defineView.ts";
 import { last, orderBy } from "../../common/utils.ts";
+import { getPreDraftAwards, getPreDraftStats } from "../../common/preDraft.ts";
 import { formatEventText } from "../util/formatEventText.ts";
 import { upgradeFace } from "../util/face.ts";
 import { choice } from "../../common/random.ts";
@@ -114,11 +115,38 @@ export const getPlayer = async <
 		return;
 	}
 
+	// Pre-draft (college) rows are not part of the main stats or the career totals, so get them separately. See common/preDraft.ts
+	const preDraftRaw = getPreDraftStats(pRaw).filter((row) => !row.playoffs);
+	let preDraftStats: ((typeof p.stats)[number] & { teamName: string })[] = [];
+	if (preDraftRaw.length > 0) {
+		const preDraft = await player.format(pRaw, {
+			stats: ["season", "tid", "abbrev", "age", "jerseyNumber", ...stats],
+			seasonType: "regularSeason",
+			preDraftStats: "only",
+			mergeStats: "none",
+		});
+
+		// Rows come back in the same order as p.stats, so the school name (which is not a stat) can be matched up by index
+		if (preDraft && preDraft.stats.length === preDraftRaw.length) {
+			preDraftStats = preDraft.stats.map((row, i) => ({
+				...row,
+				teamName: preDraftRaw[i]!.teamName ?? pRaw.college ?? "",
+			})) as any;
+		}
+	}
+	const earlierHonors = getPreDraftAwards(pRaw).map((award) => ({
+		season: award.season,
+		type: award.type!,
+	}));
+
 	return {
 		...p,
 
 		// Filter out rows with no games played
 		stats: p.stats.filter((row) => (row.gp ?? 0) > 0),
+
+		preDraftStats: preDraftStats.filter((row) => (row.gp ?? 0) > 0),
+		earlierHonors,
 
 		// Handle prefixing awards
 		awards: p.awards.map(
