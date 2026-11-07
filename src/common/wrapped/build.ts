@@ -13,11 +13,31 @@ import {
 	MORE_TEAM,
 } from "./topics/more.ts";
 
-export const TOPICS: Record<WrappedMode, Topic[]> = {
+import { X_PLAYER } from "./topics/xplayer.ts";
+import { X_TEAM } from "./topics/xteam.ts";
+import { X_SEASON } from "./topics/xseason.ts";
+import { X_ALL } from "./topics/xall.ts";
+
+// The first topic sets, and the extra ones ported from the Explorer later
+export const BASE_TOPICS: Record<WrappedMode, Topic[]> = {
 	season: [...SEASON_TOPICS, ...MORE_SEASON],
 	team: [...TEAM_TOPICS, ...MORE_TEAM],
 	player: [...PLAYER_TOPICS, ...MORE_PLAYER],
 	all: [...ALL_TOPICS, ...MORE_ALL],
+};
+
+export const EXTRA_TOPICS: Record<WrappedMode, Topic[]> = {
+	season: X_SEASON,
+	team: X_TEAM,
+	player: X_PLAYER,
+	all: X_ALL,
+};
+
+export const TOPICS: Record<WrappedMode, Topic[]> = {
+	season: [...BASE_TOPICS.season, ...EXTRA_TOPICS.season],
+	team: [...BASE_TOPICS.team, ...EXTRA_TOPICS.team],
+	player: [...BASE_TOPICS.player, ...EXTRA_TOPICS.player],
+	all: [...BASE_TOPICS.all, ...EXTRA_TOPICS.all],
 };
 
 // Every candidate slide; a topic that throws is skipped, so one bad topic can't break the deck
