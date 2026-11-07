@@ -1324,6 +1324,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	pos?: string; // Only in players from custom league files
 	ptModifier: number;
 	ratings: NonEmptyArray<PlayerRatings>;
+
+	// Set by "Regenerate ratings": the build (archetype) the player's ratings were rebuilt around, plus the ratings from before the first regeneration so another regeneration never compounds on the last
+	ratingsBuild?: StoredRatingsBuild;
 	real?: boolean;
 	relatives: Relative[];
 	retiredYear: number;
@@ -2198,6 +2201,7 @@ import type {
 import type { gameAttributesSyncedToUi } from "./gameAttributesSyncedToUi.ts";
 import type { UndoLog } from "../worker/util/UndoLog.ts";
 import type { LeagueUrlParts } from "../ui/router/types.ts";
+import type { StoredRatingsBuild } from "./ratingsBuilds/types.ts";
 
 type TeamStatsPlus = Record<TeamStatAttrBaseball, number> &
 	Record<TeamStatAttrByPosBaseball, number[]> &

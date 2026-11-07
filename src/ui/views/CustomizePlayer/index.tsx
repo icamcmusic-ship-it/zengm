@@ -21,6 +21,7 @@ import { helpers } from "../../util/helpers.ts";
 import { showNotification } from "../../util/showNotification.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import RatingsForm from "./RatingsForm.tsx";
+import { RegenerateBuild } from "./RegenerateBuild.tsx";
 import RelativesForm from "./RelativesForm.tsx";
 import type {
 	View,
@@ -38,6 +39,7 @@ import { realtimeUpdate } from "../../util/realtimeUpdate.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { useLocal } from "../../util/local.ts";
 import clsx from "clsx";
+import type { StoredRatingsBuild } from "../../../common/ratingsBuilds/types.ts";
 
 // In the form, the contract fields are the player's current contract or contract demand
 type PlayerWithContract = PlayerWithoutKey & {
@@ -339,6 +341,9 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 			saving: false,
 			p,
 
+			// Set by "Regenerate build" (basketball): the build the form's ratings were rebuilt around, saved with the player
+			regen: undefined as StoredRatingsBuild | undefined,
+
 			// Different amounts in different seasons, in millions of dollars, starting at props.contractSeasons.start
 			contractVariable: props.contractVariable,
 			contractAmounts: props.contractSeasons.amounts.map((amount) =>
@@ -411,12 +416,24 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 				};
 			}
 
+			// A regenerated build keeps the pot it was regenerated with, which saving would otherwise recompute (and re-roll)
+			const formRatings: any = last(state.p.ratings);
+			const keepRegen =
+				state.regen !== undefined &&
+				Object.entries(state.regen.applied).every(
+					([key, value]) => Number.parseInt(formRatings[key]) === value,
+				);
+			if (keepRegen) {
+				p.ratingsBuild = state.regen;
+			}
+
 			const pid = await toWorker("main", "upsertCustomizedPlayer", {
 				p,
 				contractSeasons,
 				originalTid: props.originalTid,
 				season,
 				recomputePosOvrPot,
+				keepPot: keepRegen,
 			});
 
 			realtimeUpdate([], helpers.leagueUrl(["player", pid]));
@@ -1552,6 +1569,32 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 									<span className="glyphicon glyphicon-plus" />
 								</button>
 							</div>
+							{bySport({
+								baseball: false,
+								basketball: true,
+								football: false,
+								hockey: false,
+							}) ? (
+								<RegenerateBuild
+									pid={props.p.pid}
+									ratingsRow={p.ratings[r]!}
+									age={(p as any).age}
+									hgtInches={p.hgt}
+									college={p.college}
+									disabled={!godMode}
+									currentBuild={props.p.ratingsBuild?.name}
+									onApply={({ ratings, stored }) => {
+										setState((prevState) => {
+											const p2: any = { ...prevState.p };
+											p2.ratings[p2.ratings.length - 1] = {
+												...p2.ratings.at(-1),
+												...ratings,
+											};
+											return { ...prevState, p: p2, regen: stored };
+										});
+									}}
+								/>
+							) : null}
 						</div>
 
 						<h2>Ratings</h2>

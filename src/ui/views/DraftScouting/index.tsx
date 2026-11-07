@@ -4,6 +4,7 @@ import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { View } from "../../../common/types.ts";
 import { MoreLinks } from "../../components/MoreLinks.tsx";
 import { useLocal } from "../../util/local.ts";
+import { RegenerateRatingsButton } from "../../components/RegenerateRatings/RegenerateRatingsButton.tsx";
 
 const PAGE_SIZE = 3;
 
@@ -47,6 +48,8 @@ const DraftScouting = ({ fantasyDraft, seasons }: View<"draftScouting">) => {
 				ratings will be when they enter the {!noDraft ? "draft" : "league"}. The
 				further in the future, the more uncertainty there is in their estimates.
 			</p>
+
+			<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
 
 			{pagination ? (
 				<div className="d-flex flex-row-reverse">

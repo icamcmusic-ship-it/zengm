@@ -28,7 +28,18 @@ const DraftClass = ({
 	const [showImportForm, setShowImportForm] = useState(false);
 	const [status, setStatus] = useState<"exporting" | "loading" | undefined>();
 
+	// Only once some prospect has been through "Regenerate ratings"
+	const showBuild =
+		!challengeNoRatings && players.some((p) => p.build !== undefined);
+
 	const cols = getCols(["#", "Name", "Pos", "Age", "Ovr", "Pot"]);
+	if (showBuild) {
+		cols.push({
+			title: "Build",
+			desc: "Build (archetype) from Regenerate ratings",
+			sortType: "string",
+		});
+	}
 
 	const rows: DataTableRow<"player">[] = players.map((p) => {
 		return {
@@ -54,6 +65,7 @@ const DraftClass = ({
 				p.age,
 				!challengeNoRatings ? p.ovr : null,
 				!challengeNoRatings ? p.pot : null,
+				...(showBuild ? [p.build ?? ""] : []),
 			],
 		};
 	});
