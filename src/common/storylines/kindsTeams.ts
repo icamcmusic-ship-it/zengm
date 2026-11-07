@@ -22,6 +22,10 @@ import {
 	topOn,
 	type Draft,
 	type Kind,
+	champion,
+	lineOf,
+	teamsInSeason,
+	careerOf,
 } from "./kit.ts";
 
 const rec = (t: WTeamSeason) => fmtRecord(t.won, t.lost, t.tied, t.otl);
@@ -97,7 +101,7 @@ export const TEAM_KINDS: Kind[] = [
 		find: (X) => {
 			const out: Draft[] = [];
 			for (const s of X.decidedSeasons()) {
-				const c = X.champion(s);
+				const c = champion(X, s);
 				const b = X.team(c?.tid ?? -1, s + 1);
 				if (
 					!c ||
@@ -114,6 +118,7 @@ export const TEAM_KINDS: Kind[] = [
 					kind: "Title hangover",
 					shape: "team",
 					season: s + 1,
+					span: [s, s + 1],
 					score: 30 + (c.won - b.won) * 1.2,
 					pids: top ? [top.pid] : [],
 					tids: [c.tid],
@@ -155,6 +160,7 @@ export const TEAM_KINDS: Kind[] = [
 					kind: "Big leap",
 					shape: "team",
 					season: b.season,
+					span: [b.season - 1, b.season],
 					score: 20 + d * 120,
 					pids: top ? [top.pid] : [],
 					tids: [b.tid],
@@ -181,11 +187,11 @@ export const TEAM_KINDS: Kind[] = [
 		find: (X) => {
 			const out: Draft[] = [];
 			for (const s of X.decidedSeasons()) {
-				const teams = [...X.teamsIn(s)].filter((t) => gamesOf(t) >= 20);
+				const teams = [...teamsInSeason(X, s)].filter((t) => gamesOf(t) >= 20);
 				const best = [...teams].sort(
 					(a, b) => wp(b) - wp(a) || a.tid - b.tid,
 				)[0];
-				const c = X.champion(s);
+				const c = champion(X, s);
 				if (!best || !c || c.tid === best.tid || wp(best) < 0.7) {
 					continue;
 				}
@@ -227,7 +233,7 @@ export const TEAM_KINDS: Kind[] = [
 				if (wp(t) < 0.85) {
 					continue;
 				}
-				const champ = X.champion(t.season)?.tid === t.tid;
+				const champ = champion(X, t.season)?.tid === t.tid;
 				out.push({
 					key: `${t.tid}|${t.season}`,
 					kind: "Juggernaut",
@@ -304,13 +310,14 @@ export const TEAM_KINDS: Kind[] = [
 						continue;
 					}
 					const t = X.team(tid, run.at(-1)!)!;
-					const titles = run.filter((s) => X.champion(s)?.tid === tid);
+					const titles = run.filter((s) => champion(X, s)?.tid === tid);
 					const ongoing = run.at(-1) === now;
 					out.push({
 						key: `${tid}|${run[0]}`,
 						kind: "Playoff streak",
 						shape: "team",
 						season: run.at(-1)!,
+						span: [run[0]!, run.at(-1)!],
 						score: 15 + run.length * 3 + titles.length * 3,
 						pids: [],
 						tids: [tid],
@@ -358,6 +365,7 @@ export const TEAM_KINDS: Kind[] = [
 						kind: "Lost decade",
 						shape: "team",
 						season: run.at(-1)!,
+						span: [run[0]!, run.at(-1)!],
 						score: 12 + run.length * 3,
 						pids: [],
 						tids: [tid],
@@ -398,12 +406,13 @@ export const TEAM_KINDS: Kind[] = [
 					const t = X.team(tid, run.at(-1)!)!;
 					const wins = run.reduce((a, s) => a + X.team(tid, s)!.won, 0);
 					const gms = run.reduce((a, s) => a + gamesOf(X.team(tid, s)!), 0);
-					const titles = run.filter((s) => X.champion(s)?.tid === tid).length;
+					const titles = run.filter((s) => champion(X, s)?.tid === tid).length;
 					out.push({
 						key: `${tid}|${run[0]}`,
 						kind: "Dominant stretch",
 						shape: "team",
 						season: run.at(-1)!,
+						span: [run[0]!, run.at(-1)!],
 						score: 15 + run.length * 4 + titles * 5,
 						pids: [],
 						tids: [tid],
@@ -448,12 +457,13 @@ export const TEAM_KINDS: Kind[] = [
 						lastLow.season > used
 					) {
 						used = lastLow.season;
-						const champ = X.champion(t.season)?.tid === tid;
+						const champ = champion(X, t.season)?.tid === tid;
 						out.push({
 							key: `${tid}|${t.season}`,
 							kind: "Rebuild complete",
 							shape: "team",
 							season: t.season,
+							span: [lastLow.season, t.season],
 							score: 22 + (wp(t) - wp(lastLow)) * 60 + (champ ? 12 : 0),
 							pids: [],
 							tids: [tid],
@@ -484,7 +494,7 @@ export const TEAM_KINDS: Kind[] = [
 		find: (X) => {
 			const out: Draft[] = [];
 			for (const s of X.decidedSeasons()) {
-				const teams = X.teamsIn(s).filter((t) => t.gp >= 20);
+				const teams = teamsInSeason(X, s).filter((t) => t.gp >= 20);
 				if (teams.length < 8) {
 					continue;
 				}
@@ -496,7 +506,7 @@ export const TEAM_KINDS: Kind[] = [
 				if (def[0]!.tid !== t.tid) {
 					continue;
 				}
-				const champ = X.champion(s)?.tid === t.tid;
+				const champ = champion(X, s)?.tid === t.tid;
 				out.push({
 					key: `${t.tid}|${s}`,
 					kind: "Complete team",
@@ -575,12 +585,12 @@ export const TEAM_KINDS: Kind[] = [
 		find: (X) => {
 			const out: Draft[] = [];
 			for (const s of X.decidedSeasons()) {
-				const teams = X.teamsIn(s).filter((t) => t.gp >= 20);
+				const teams = teamsInSeason(X, s).filter((t) => t.gp >= 20);
 				const t = [...teams].sort((a, b) => mov(b) - mov(a))[0];
 				if (!t || mov(t) < 8) {
 					continue;
 				}
-				const champ = X.champion(s)?.tid === t.tid;
+				const champ = champion(X, s)?.tid === t.tid;
 				out.push({
 					key: `${s}`,
 					kind: "Point differential king",
@@ -628,6 +638,7 @@ export const TEAM_KINDS: Kind[] = [
 					kind: "Finals rematch",
 					shape: "playoffs",
 					season: s + 1,
+					span: [s, s + 1],
 					score: 32 + (revenge ? 6 : 0),
 					pids: [],
 					tids: [b.w.tid, b.l.tid],
@@ -684,7 +695,7 @@ export const TEAM_KINDS: Kind[] = [
 		find: (X) => {
 			const out: Draft[] = [];
 			for (const s of X.decidedSeasons()) {
-				const c = X.champion(s);
+				const c = champion(X, s);
 				if (!c) {
 					continue;
 				}
@@ -726,7 +737,7 @@ export const TEAM_KINDS: Kind[] = [
 		kind: "Least likely champion",
 		find: (X) => {
 			const champs = X.decidedSeasons()
-				.map((s) => X.champion(s))
+				.map((s) => champion(X, s))
 				.filter((t): t is WTeamSeason => !!t && gamesOf(t) >= 20);
 			if (champs.length < 6) {
 				return [];
@@ -805,7 +816,7 @@ export const TEAM_KINDS: Kind[] = [
 			let best = 0;
 			let prevT: WTeamSeason | undefined;
 			X.decidedSeasons().forEach((s, i) => {
-				const t = [...X.teamsIn(s)]
+				const t = [...teamsInSeason(X, s)]
 					.filter((x) => gamesOf(x) >= 20)
 					.sort((a, b) => b.won - a.won || a.tid - b.tid)[0];
 				if (!t) {
@@ -850,7 +861,7 @@ export const TEAM_KINDS: Kind[] = [
 				const byTeam = new Map<number, { pid: number; award: string }[]>();
 				for (const a of AWARDS_INDIVIDUAL) {
 					for (const pid of X.awardPids(s, a)) {
-						const l = X.line(pid, s);
+						const l = lineOf(X, pid, s);
 						if (l) {
 							byTeam.set(l.tid, [
 								...(byTeam.get(l.tid) ?? []),
@@ -901,7 +912,7 @@ export const TEAM_KINDS: Kind[] = [
 			for (const s of X.decidedSeasons()) {
 				const byTeam = new Map<number, SeasonLine[]>();
 				for (const pid of X.awardPids(s, "All-Star")) {
-					const l = X.line(pid, s);
+					const l = lineOf(X, pid, s);
 					if (l) {
 						byTeam.set(l.tid, [...(byTeam.get(l.tid) ?? []), l]);
 					}
@@ -954,7 +965,7 @@ export const TEAM_KINDS: Kind[] = [
 						continue;
 					}
 					const trio = topN(ls, 3, (l) => l.ws);
-					const champ = X.champion(s)?.tid === tid;
+					const champ = champion(X, s)?.tid === tid;
 					out.push({
 						key: `${tid}|${s}`,
 						kind: "Big three",
@@ -1029,7 +1040,7 @@ export const TEAM_KINDS: Kind[] = [
 		find: (X) => {
 			const rows: { t: WTeamSeason; age: number }[] = [];
 			for (const s of X.decidedSeasons()) {
-				const c = X.champion(s);
+				const c = champion(X, s);
 				if (!c) {
 					continue;
 				}
@@ -1177,17 +1188,18 @@ export const TEAM_KINDS: Kind[] = [
 						const ps = topN(
 							[...common].map((pid) => X.players.get(pid)!),
 							3,
-							(p: WPlayer) => X.career(p).ws,
+							(p: WPlayer) => careerOf(X, p).ws,
 						);
 						const titles = seasons
 							.slice(i, j + 1)
-							.filter((s) => X.champion(s)?.tid === tid).length;
+							.filter((s) => champion(X, s)?.tid === tid).length;
 						const t = X.team(tid, to)!;
 						out.push({
 							key: `${tid}|${from}`,
 							kind: "The core",
 							shape: "team",
 							season: to,
+							span: [from, to],
 							score: 18 + (j - i + 1) * 4 + titles * 6,
 							pids: ps.map((p) => p.pid),
 							tids: [tid],
@@ -1317,7 +1329,7 @@ export const TEAM_KINDS: Kind[] = [
 					1,
 					(l) => l.ppg,
 				)[0];
-				const c = X.champion(s);
+				const c = champion(X, s);
 				const t = top ? X.team(top.tid, s) : undefined;
 				if (!top || !c || !t || c.tid === top.tid || top.ppg < 25) {
 					continue;
@@ -1357,7 +1369,7 @@ export const TEAM_KINDS: Kind[] = [
 				if (titles.length < 3) {
 					continue;
 				}
-				const tids = [...new Set(titles.map((s) => X.champion(s)!.tid))];
+				const tids = [...new Set(titles.map((s) => champion(X, s)!.tid))];
 				out.push({
 					key: `${p.pid}`,
 					kind: "Ring collector",
@@ -1389,7 +1401,7 @@ export const TEAM_KINDS: Kind[] = [
 			const out: Draft[] = [];
 			for (const p of X.L.players) {
 				const titles = titleSeasons(X, p);
-				const tids = [...new Set(titles.map((s) => X.champion(s)!.tid))];
+				const tids = [...new Set(titles.map((s) => champion(X, s)!.tid))];
 				if (tids.length < 2 || titles.length > 2) {
 					continue;
 				}
@@ -1409,7 +1421,7 @@ export const TEAM_KINDS: Kind[] = [
 						`A ring on each team: ${p.name}`,
 					],
 					bodies: [
-						`${pLink(p)} won a title with the ${tLink(X, X.champion(first)!.tid, first)} in ${first} and another with the ${tLink(X, X.champion(last)!.tid, last)} in ${last}.`,
+						`${pLink(p)} won a title with the ${tLink(X, champion(X, first)!.tid, first)} in ${first} and another with the ${tLink(X, champion(X, last)!.tid, last)} in ${last}.`,
 					],
 					evidence: [
 						["Titles", titles.join(", ")],

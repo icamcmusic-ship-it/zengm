@@ -2,7 +2,7 @@
 //
 // Text can carry links as tokens: [[p:PID|Name]] for a player, [[t:TID:SEASON|Name]] for a team season and [[g:GID:TID:SEASON|text]] for a box score (TID is the team whose game log shows it). The UI turns them into links; plainText() strips them.
 
-import type { LeagueIndex } from "../wrapped/league.ts";
+import type { LeagueIndex, SeasonLine } from "../wrapped/league.ts";
 import type { WPlayer, WStat, WTeamSeason } from "../wrapped/types.ts";
 import { fmtNum } from "../wrapped/util.ts";
 
@@ -19,6 +19,8 @@ export type Story = {
 	evidence: [string, string][];
 	pids: number[];
 	tids: number[];
+	// First and last season the story covers, when it covers more than `season`
+	span?: [number, number];
 	// Box scores this story is about, when it is about particular games
 	gids?: number[];
 };
@@ -43,7 +45,16 @@ export type Draft = Omit<Story, "headline" | "body" | "id"> & {
 
 export type Kind = { kind: string; find: (X: LeagueIndex) => Draft[] };
 
-export const regRows = (p: WPlayer) => p.stats.filter((r) => r.gp > 0);
+// Regular-season rows with games played, computed once per player
+const regCache = new WeakMap<WPlayer, WStat[]>();
+export const regRows = (p: WPlayer) => {
+	let rows = regCache.get(p);
+	if (!rows) {
+		rows = p.stats.filter((r) => r.gp > 0);
+		regCache.set(p, rows);
+	}
+	return rows;
+};
 
 // Consecutive runs with one team: [{tid, from, to, ws, gp}]
 export const stints = (p: WPlayer) => {
@@ -76,16 +87,20 @@ export const stints = (p: WPlayer) => {
 export const seasonsOf = (rows: WStat[]) =>
 	[...new Set(rows.map((r) => r.season))].sort((a, b) => a - b);
 
-export const titleSeasons = (X: LeagueIndex, p: WPlayer) => {
-	const out: number[] = [];
-	for (const s of seasonsOf(p.po)) {
-		const c = X.champion(s);
-		if (c && p.po.some((r) => r.season === s && r.tid === c.tid && r.gp > 0)) {
-			out.push(s);
+export const titleSeasons = (X: LeagueIndex, p: WPlayer) =>
+	X.cached(`sl|titles|${p.pid}`, () => {
+		const out: number[] = [];
+		for (const s of seasonsOf(p.po)) {
+			const c = champion(X, s);
+			if (
+				c &&
+				p.po.some((r) => r.season === s && r.tid === c.tid && r.gp > 0)
+			) {
+				out.push(s);
+			}
 		}
-	}
-	return out;
-};
+		return out;
+	});
 
 export const isActive = (X: LeagueIndex, p: WPlayer) =>
 	p.retiredYear > X.L.season && p.tid >= 0;
@@ -161,3 +176,40 @@ export const runsOf = (seasons: number[], ok: (s: number) => boolean) => {
 export const teamsWithHistory = (X: LeagueIndex) => [
 	...new Set(X.L.teamSeasons.map((t) => t.tid)),
 ];
+
+// The seasons a story covers
+export const spanOf = (s: Pick<Story, "season" | "span">): [number, number] =>
+	s.span ?? [s.season, s.season];
+
+export const overlapsSeason = (
+	s: Pick<Story, "season" | "span">,
+	season: number,
+) => {
+	const [a, b] = spanOf(s);
+	return season >= a && season <= b;
+};
+
+// ---- shared indexes, built once per league snapshot (the LeagueIndex lookups scan lists, which is too slow inside loops over every player and season) ----
+
+export const champion = (X: LeagueIndex, season: number) =>
+	X.cached(`sl|champ|${season}`, () => X.champion(season));
+
+export const teamsInSeason = (X: LeagueIndex, season: number) =>
+	X.cached(`sl|teams|${season}`, () => X.teamsIn(season));
+
+const lineIndex = (X: LeagueIndex) =>
+	X.cached("sl|lines", () => {
+		const m = new Map<string, SeasonLine>();
+		for (const s of X.seasons) {
+			for (const l of X.lines(s)) {
+				m.set(`${l.pid}|${s}`, l);
+			}
+		}
+		return m;
+	});
+
+export const lineOf = (X: LeagueIndex, pid: number, season: number) =>
+	lineIndex(X).get(`${pid}|${season}`);
+
+export const careerOf = (X: LeagueIndex, p: WPlayer) =>
+	X.cached(`sl|career|${p.pid}`, () => X.career(p));

@@ -7,6 +7,11 @@ import { gLink, pLink, tLink, topN, type Draft, type Kind } from "./kit.ts";
 
 const MAX_PER_KIND = 25;
 
+// Candidates are scored first and only the best few are written up, so a league with thousands of stored games stays cheap
+type Cand = { score: number; make: () => Draft };
+const pick = (cands: Cand[]) =>
+	topN(cands, MAX_PER_KIND, (c) => c.score).map((c) => c.make());
+
 type Side = WGame["teams"][number];
 
 const sides = (g: WGame) =>
@@ -32,7 +37,7 @@ const playerGame = (
 ): Kind => ({
 	kind,
 	find: (X) => {
-		const out: Draft[] = [];
+		const out: Cand[] = [];
 		for (const g of X.L.games) {
 			for (const [t, o] of sides(g)) {
 				for (const l of t.players) {
@@ -40,31 +45,34 @@ const playerGame = (
 						continue;
 					}
 					out.push({
-						key: `${g.gid}|${l.pid}`,
-						kind,
-						shape: "season",
-						season: g.season,
 						score: score(l, g),
-						pids: [l.pid],
-						tids: [t.tid, o.tid],
-						gids: [g.gid],
-						heads: heads(l, g),
-						bodies: [
-							`${pLink(l)} ${say(l)} for the ${tLink(X, t.tid, g.season)} against the ${tLink(X, o.tid, g.season)}${where(g)} in ${g.season}, ${result(t, o)}. ${gLink(g, "Box score")}`,
-							`${g.season}${where(g)}: ${t.pts > o.pts ? "a win" : "a loss"} over the ${tLink(X, o.tid, g.season)}, ${t.pts}–${o.pts}, and ${pLink(l)} ${say(l)}. ${gLink(g, "Box score")}`,
-						],
-						evidence: [
-							[LABEL[kind] ?? "Stat", fmtNum(measure(l))],
-							...(LABEL[kind] === "PTS"
-								? []
-								: [["PTS", `${l.pts}`] as [string, string]]),
-							...extra(l),
-						],
+						make: () => ({
+							key: `${g.gid}|${l.pid}`,
+							kind,
+							shape: "season",
+							season: g.season,
+							score: score(l, g),
+							pids: [l.pid],
+							tids: [t.tid, o.tid],
+							gids: [g.gid],
+							heads: heads(l, g),
+							bodies: [
+								`${pLink(l)} ${say(l)} for the ${tLink(X, t.tid, g.season)} against the ${tLink(X, o.tid, g.season)}${where(g)} in ${g.season}, ${result(t, o)}. ${gLink(g, "Box score")}`,
+								`${g.season}${where(g)}: ${t.pts > o.pts ? "a win" : "a loss"} over the ${tLink(X, o.tid, g.season)}, ${t.pts}–${o.pts}, and ${pLink(l)} ${say(l)}. ${gLink(g, "Box score")}`,
+							],
+							evidence: [
+								[LABEL[kind] ?? "Stat", fmtNum(measure(l))],
+								...(LABEL[kind] === "PTS"
+									? []
+									: [["PTS", `${l.pts}`] as [string, string]]),
+								...extra(l),
+							],
+						}),
 					});
 				}
 			}
 		}
-		return topN(out, MAX_PER_KIND, (d) => d.score);
+		return pick(out);
 	},
 });
 
@@ -78,7 +86,7 @@ const teamGame = (
 ): Kind => ({
 	kind,
 	find: (X) => {
-		const out: Draft[] = [];
+		const out: Cand[] = [];
 		for (const g of X.L.games) {
 			// a is the side the story is about (the winner for lopsided games)
 			const [a, b] =
@@ -89,20 +97,23 @@ const teamGame = (
 				continue;
 			}
 			out.push({
-				key: `${g.gid}`,
-				kind,
-				shape: "season",
-				season: g.season,
 				score: score(a, b, g),
-				pids: [],
-				tids: [a.tid, b.tid],
-				gids: [g.gid],
-				heads: heads(X, a, b, g),
-				bodies: body(X, a, b, g),
-				evidence: ev(a, b, g),
+				make: () => ({
+					key: `${g.gid}`,
+					kind,
+					shape: "season",
+					season: g.season,
+					score: score(a, b, g),
+					pids: [],
+					tids: [a.tid, b.tid],
+					gids: [g.gid],
+					heads: heads(X, a, b, g),
+					bodies: body(X, a, b, g),
+					evidence: ev(a, b, g),
+				}),
 			});
 		}
-		return topN(out, MAX_PER_KIND, (d) => d.score);
+		return pick(out);
 	},
 });
 

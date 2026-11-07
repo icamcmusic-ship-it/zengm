@@ -15,22 +15,28 @@ import {
 } from "../wrapped/util.ts";
 import {
 	isActive,
+	overlapsSeason,
 	plainText,
 	pLink,
 	regRows,
 	seasonsOf,
+	spanOf,
 	stints,
 	titleSeasons,
 	tLink,
 	type Draft,
 	type Kind,
 	type Story,
+	champion,
+	lineOf,
+	teamsInSeason,
+	careerOf,
 } from "./kit.ts";
 import { GAME_KINDS } from "./kindsGames.ts";
 import { PLAYER_KINDS } from "./kindsPlayers.ts";
 import { TEAM_KINDS } from "./kindsTeams.ts";
 
-export { plainText, pLink, stints, tLink };
+export { overlapsSeason, plainText, pLink, spanOf, stints, tLink };
 export type { Story, StoryShape } from "./kit.ts";
 
 const KINDS: Kind[] = [
@@ -49,7 +55,7 @@ const KINDS: Kind[] = [
 				if (before < 8 || age < 31) {
 					continue;
 				}
-				const tid = X.champion(first)!.tid;
+				const tid = champion(X, first)!.tid;
 				out.push({
 					key: `${p.pid}`,
 					kind: "Ring chaser",
@@ -98,6 +104,7 @@ const KINDS: Kind[] = [
 					kind: "Homecoming",
 					shape: "career",
 					season: back.from,
+					span: [home.from, back.from],
 					score: 20 + away * 3 + home.ws / 2,
 					pids: [p.pid],
 					tids: [home.tid],
@@ -167,7 +174,7 @@ const KINDS: Kind[] = [
 			if (now === undefined) {
 				return out;
 			}
-			for (const t of X.teamsIn(now)) {
+			for (const t of teamsInSeason(X, now)) {
 				const hist = X.teamHistory(t.tid).filter((x) => X.decided(x.season));
 				const titles = X.titlesOf(t.tid);
 				const last = titles.at(-1);
@@ -181,6 +188,7 @@ const KINDS: Kind[] = [
 					kind: "Drought",
 					shape: "team",
 					season: now,
+					span: [from + 1, now],
 					score: n * 2,
 					pids: [],
 					tids: [t.tid],
@@ -289,6 +297,7 @@ const KINDS: Kind[] = [
 					kind: "Collapse",
 					shape: "team",
 					season: b.season,
+					span: [b.season - 1, b.season],
 					score: d * 100 + (gone ? 5 : 0),
 					pids: gone ? [gone.pid] : [],
 					tids: [b.tid],
@@ -313,12 +322,12 @@ const KINDS: Kind[] = [
 		find: (X) => {
 			const out: Draft[] = [];
 			for (const s of X.decidedSeasons()) {
-				const c = X.champion(s);
+				const c = champion(X, s);
 				if (!c) {
 					continue;
 				}
 				for (let back = 1; back <= 3; back++) {
-					const prev = X.teamsIn(s - back);
+					const prev = teamsInSeason(X, s - back);
 					const mine = X.team(c.tid, s - back);
 					if (!mine || prev.length < 4) {
 						continue;
@@ -371,13 +380,14 @@ const KINDS: Kind[] = [
 					continue;
 				}
 				const tid = rows[0]!.tid;
-				const c = X.career(p);
+				const c = careerOf(X, p);
 				const active = isActive(X, p);
 				out.push({
 					key: `${p.pid}`,
 					kind: "One-team legend",
 					shape: "career",
 					season: rows.at(-1)!.season,
+					span: [rows[0]!.season, rows.at(-1)!.season],
 					score: 15 + n * 2 + c.ws / 6,
 					pids: [p.pid],
 					tids: [tid],
@@ -443,7 +453,7 @@ const KINDS: Kind[] = [
 				let best = { n: 0, to: 0 };
 				for (const s of ss) {
 					const full = X.maxGp(s);
-					const l = X.line(p.pid, s);
+					const l = lineOf(X, p.pid, s);
 					run = l && full > 20 && l.gp >= full ? run + 1 : 0;
 					if (run > best.n) {
 						best = { n: run, to: s };
@@ -457,6 +467,7 @@ const KINDS: Kind[] = [
 					kind: "Iron man",
 					shape: "career",
 					season: best.to,
+					span: [best.to - best.n + 1, best.to],
 					score: 20 + best.n * 4,
 					pids: [p.pid],
 					tids: [],
@@ -525,7 +536,7 @@ const KINDS: Kind[] = [
 			const out: Draft[] = [];
 			for (const p of X.L.players) {
 				const lines = seasonsOf(regRows(p))
-					.map((s) => X.line(p.pid, s))
+					.map((s) => lineOf(X, p.pid, s))
 					.filter((l): l is SeasonLine => !!l && X.decided(l.season));
 				if (lines.length < 5 || isActive(X, p)) {
 					continue;
@@ -567,7 +578,7 @@ const KINDS: Kind[] = [
 			for (const p of X.L.players) {
 				let best: SeasonLine | undefined;
 				for (const s of seasonsOf(regRows(p))) {
-					const l = X.line(p.pid, s);
+					const l = lineOf(X, p.pid, s);
 					if (l && l.age >= 36 && l.ws >= 5 && (!best || l.ws > best.ws)) {
 						best = l;
 					}
@@ -735,7 +746,7 @@ const KINDS: Kind[] = [
 			const out: Draft[] = [];
 			const champs = X.decidedSeasons().map((s) => ({
 				s,
-				tid: X.champion(s)?.tid,
+				tid: champion(X, s)?.tid,
 			}));
 			const seen = new Set<string>();
 			for (const { s, tid } of champs) {
@@ -755,6 +766,7 @@ const KINDS: Kind[] = [
 					kind: "Dynasty",
 					shape: "team",
 					season: win.at(-1)!,
+					span: [s, win.at(-1)!],
 					score: 30 + win.length * 10,
 					pids: [],
 					tids: [tid],
@@ -805,7 +817,7 @@ const KINDS: Kind[] = [
 				if (
 					ss.length < 2 ||
 					titleSeasons(X, p).length > 0 ||
-					(ss.length === 2 && X.career(p).ws < 25)
+					(ss.length === 2 && careerOf(X, p).ws < 25)
 				) {
 					continue;
 				}
@@ -814,7 +826,7 @@ const KINDS: Kind[] = [
 					kind: "So close",
 					shape: "career",
 					season: ss.at(-1)!,
-					score: 20 + ss.length * 8 + X.career(p).ws / 10,
+					score: 20 + ss.length * 8 + careerOf(X, p).ws / 10,
 					pids: [pid],
 					tids: [],
 					heads: [
@@ -841,7 +853,7 @@ const KINDS: Kind[] = [
 						p.stats.length > 0 &&
 						titleSeasons(X, p).length === 0,
 				)
-				.map((p) => ({ p, c: X.career(p) }))
+				.map((p) => ({ p, c: careerOf(X, p) }))
 				.filter((x) => x.c.ws >= 40)
 				.sort((a, b) => b.c.ws - a.c.ws)
 				.slice(0, 5);
@@ -875,7 +887,7 @@ const KINDS: Kind[] = [
 				if (p.draft.round > 0 || p.stats.length === 0) {
 					continue;
 				}
-				const c = X.career(p);
+				const c = careerOf(X, p);
 				const as = p.awards.filter((a) => a.type === "All-Star").length;
 				if (c.ws < 25) {
 					continue;
@@ -917,7 +929,7 @@ const KINDS: Kind[] = [
 				) {
 					continue;
 				}
-				const c = X.career(p);
+				const c = careerOf(X, p);
 				if (c.ws > 8) {
 					continue;
 				}
@@ -951,15 +963,15 @@ const KINDS: Kind[] = [
 			const out: Draft[] = [];
 			const ds = X.decidedSeasons();
 			for (const s of ds) {
-				const c = X.champion(s);
-				const p = X.champion(s - 1);
-				const pp = X.champion(s - 2);
+				const c = champion(X, s);
+				const p = champion(X, s - 1);
+				const pp = champion(X, s - 2);
 				if (
 					!c ||
 					!p ||
 					c.tid !== p.tid ||
 					(pp && pp.tid === c.tid) ||
-					X.champion(s + 1)?.tid === c.tid
+					champion(X, s + 1)?.tid === c.tid
 				) {
 					continue;
 				}
@@ -968,6 +980,7 @@ const KINDS: Kind[] = [
 					kind: "Repeat champions",
 					shape: "team",
 					season: s,
+					span: [s - 1, s],
 					score: 35,
 					pids: [],
 					tids: [c.tid],
@@ -1089,7 +1102,7 @@ const KINDS: Kind[] = [
 						continue;
 					}
 					for (const s of [t.season, t.season + 1]) {
-						const c = X.champion(s);
+						const c = champion(X, s);
 						const po = X.poLines(s).find((l) => l.pid === p.pid);
 						if (!c || c.tid !== t.tid || !po || !po.tids.includes(c.tid)) {
 							continue;
@@ -1296,7 +1309,7 @@ const KINDS: Kind[] = [
 			const out: Draft[] = [];
 			for (const s of X.decidedSeasons()) {
 				for (const l of X.qualified(s)) {
-					const prev = X.line(l.pid, s - 1);
+					const prev = lineOf(X, l.pid, s - 1);
 					if (!prev || l.ws - prev.ws < 7 || l.ws < 9) {
 						continue;
 					}
@@ -1306,6 +1319,7 @@ const KINDS: Kind[] = [
 						kind: "Breakout",
 						shape: "season",
 						season: s,
+						span: [s - 1, s],
 						score: 10 + (l.ws - prev.ws) * 3,
 						pids: [l.pid],
 						tids: [l.tid],
@@ -1335,7 +1349,7 @@ const KINDS: Kind[] = [
 				if (p.retiredYear > X.L.season || p.stats.length === 0) {
 					continue;
 				}
-				const c = X.career(p);
+				const c = careerOf(X, p);
 				if (c.ws < 50) {
 					continue;
 				}

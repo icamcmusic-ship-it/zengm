@@ -15,6 +15,8 @@ import {
 	type Draft,
 	type Kind,
 	type RateKey,
+	lineOf,
+	careerOf,
 } from "./kit.ts";
 
 const AWARD_MVP = "Most Valuable Player";
@@ -43,7 +45,7 @@ const crown = (
 				continue;
 			}
 			const p = X.players.get(pid)!;
-			const best = Math.max(...ss.map((s) => X.line(pid, s)![key]));
+			const best = Math.max(...ss.map((s) => lineOf(X, pid, s)![key]));
 			out.push({
 				key: `${pid}`,
 				kind,
@@ -230,7 +232,7 @@ export const PLAYER_KINDS: Kind[] = [
 					if (labels.length < 2) {
 						continue;
 					}
-					const l = X.line(pid, s)!;
+					const l = lineOf(X, pid, s)!;
 					const p = X.players.get(pid)!;
 					out.push({
 						key: `${pid}|${s}`,
@@ -299,7 +301,7 @@ export const PLAYER_KINDS: Kind[] = [
 			const out: Draft[] = [];
 			for (const s of X.decidedSeasons()) {
 				for (const l of X.qualified(s)) {
-					const prev = X.line(l.pid, s - 1);
+					const prev = lineOf(X, l.pid, s - 1);
 					if (
 						!prev ||
 						prev.gp < 20 ||
@@ -315,6 +317,7 @@ export const PLAYER_KINDS: Kind[] = [
 						kind: "Scoring jump",
 						shape: "season",
 						season: s,
+						span: [s - 1, s],
 						score: 15 + (l.ppg - prev.ppg) * 2.5,
 						pids: [l.pid],
 						tids: [l.tid],
@@ -389,7 +392,7 @@ export const PLAYER_KINDS: Kind[] = [
 			for (const p of X.L.players) {
 				const lines = seasonsOf(regRows(p))
 					.filter((s) => X.decided(s))
-					.map((s) => X.line(p.pid, s))
+					.map((s) => lineOf(X, p.pid, s))
 					.filter((l): l is SeasonLine => !!l);
 				if (lines.length < 3) {
 					continue;
@@ -448,9 +451,9 @@ export const PLAYER_KINDS: Kind[] = [
 					}
 				}
 				for (const [s, inj] of bySeason) {
-					const before = X.line(p.pid, s - 1);
-					const missed = X.line(p.pid, s);
-					const back = X.line(p.pid, s + 1);
+					const before = lineOf(X, p.pid, s - 1);
+					const missed = lineOf(X, p.pid, s);
+					const back = lineOf(X, p.pid, s + 1);
 					if (
 						inj.games < 40 ||
 						!X.decided(s + 1) ||
@@ -468,6 +471,7 @@ export const PLAYER_KINDS: Kind[] = [
 						kind: "Comeback",
 						shape: "career",
 						season: s + 1,
+						span: [s, s + 1],
 						score: 15 + inj.games / 4 + back.ws,
 						pids: [p.pid],
 						tids: [back.tid],
@@ -499,7 +503,7 @@ export const PLAYER_KINDS: Kind[] = [
 					(i) => X.decided(i.season) || i.season < X.L.season,
 				);
 				const games = inj.reduce((a, i) => a + i.games, 0);
-				const c = X.career(p);
+				const c = careerOf(X, p);
 				if (games < 300 || c.ws < 25 || inj.length < 4) {
 					continue;
 				}
@@ -553,14 +557,14 @@ export const PLAYER_KINDS: Kind[] = [
 					season: first,
 					score: 15 + (22 - age) * 9,
 					pids: [p.pid],
-					tids: [X.line(p.pid, first)?.tid ?? p.tid].filter((t) => t >= 0),
+					tids: [lineOf(X, p.pid, first)?.tid ?? p.tid].filter((t) => t >= 0),
 					heads: [
 						`${p.name} was an All-Star at ${age}`,
 						`Too young to be this good: ${p.name}`,
 						`A ${age}-year-old in the All-Star Game`,
 					],
 					bodies: [
-						`${pLink(p)} made the All-Star team in ${first}, at age ${age}${X.line(p.pid, first) ? `, with ${fmtNum(X.line(p.pid, first)!.ppg, 1)} points a game` : ""}.`,
+						`${pLink(p)} made the All-Star team in ${first}, at age ${age}${lineOf(X, p.pid, first) ? `, with ${fmtNum(lineOf(X, p.pid, first)!.ppg, 1)} points a game` : ""}.`,
 					],
 					evidence: [
 						["Age", `${age}`],
@@ -593,7 +597,7 @@ export const PLAYER_KINDS: Kind[] = [
 					season: old,
 					score: 12 + (age - 34) * 9,
 					pids: [p.pid],
-					tids: [X.line(p.pid, old)?.tid ?? p.tid].filter((t) => t >= 0),
+					tids: [lineOf(X, p.pid, old)?.tid ?? p.tid].filter((t) => t >= 0),
 					heads: [
 						`${p.name} was still an All-Star at ${age}`,
 						`Old but gold: ${p.name}`,
@@ -618,7 +622,7 @@ export const PLAYER_KINDS: Kind[] = [
 			for (const p of X.L.players) {
 				const lines = seasonsOf(regRows(p))
 					.filter((s) => X.decided(s))
-					.map((s) => X.line(p.pid, s))
+					.map((s) => lineOf(X, p.pid, s))
 					.filter((l): l is SeasonLine => !!l);
 				if (lines.length < 8) {
 					continue;
@@ -716,7 +720,7 @@ export const PLAYER_KINDS: Kind[] = [
 				if (!row) {
 					continue;
 				}
-				const l = X.line(p.pid, row.season);
+				const l = lineOf(X, p.pid, row.season);
 				const as = p.awards.some(
 					(a) => a.type === "All-Star" && a.season === row.season,
 				);
@@ -765,7 +769,7 @@ export const PLAYER_KINDS: Kind[] = [
 					continue;
 				}
 				const as = p.awards.filter((a) => a.type === "All-Star").length;
-				const c = X.career(p);
+				const c = careerOf(X, p);
 				if (as < 2 && c.ws < 45) {
 					continue;
 				}
@@ -850,7 +854,7 @@ export const PLAYER_KINDS: Kind[] = [
 					continue;
 				}
 				const mvps = ps.reduce((a, p) => a + X.countAwards(p, AWARD_MVP), 0);
-				const top = topN(stars, 3, (p) => X.career(p).ws);
+				const top = topN(stars, 3, (p) => careerOf(X, p).ws);
 				out.push({
 					key: `${year}`,
 					kind: "Stacked draft class",
@@ -943,7 +947,7 @@ export const PLAYER_KINDS: Kind[] = [
 				if (!p.hof || p.stats.length === 0) {
 					continue;
 				}
-				const c = X.career(p);
+				const c = careerOf(X, p);
 				const ss = seasonsOf(regRows(p));
 				const titles = titleSeasons(X, p).length;
 				const mvps = X.countAwards(p, AWARD_MVP);
@@ -999,8 +1003,8 @@ export const PLAYER_KINDS: Kind[] = [
 					seen.add(key);
 					const asD = dad.awards.filter((a) => a.type === "All-Star").length;
 					const asK = kid.awards.filter((a) => a.type === "All-Star").length;
-					const cD = X.career(dad);
-					const cK = X.career(kid);
+					const cD = careerOf(X, dad);
+					const cK = careerOf(X, kid);
 					if (
 						asD + asK < 2 ||
 						cD.ws + cK.ws < 30 ||

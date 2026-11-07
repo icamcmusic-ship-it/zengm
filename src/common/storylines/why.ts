@@ -18,6 +18,8 @@ import {
 	tLink,
 	type RateKey,
 	type Story,
+	lineOf,
+	teamsInSeason,
 } from "./kit.ts";
 
 export type WhySection = {
@@ -233,8 +235,9 @@ export const whyOf = (
 			if (!p) {
 				continue;
 			}
-			const l = X.line(pid, s.season);
-			const c = X.career(p, s.season);
+			const l = lineOf(X, pid, s.season);
+			// No games that season (a draft-year story, say): the whole career instead
+			const c = l ? X.career(p, s.season) : X.career(p);
 			const ws = l ? leadersBy(X, s.season, "ws").map((x) => x.ws) : [];
 			rows.push([
 				pLink(p),
@@ -254,7 +257,7 @@ export const whyOf = (
 		out.push({
 			id: "players",
 			title: `The players in ${s.season}`,
-			note: "Season line, then career totals through that season. WS rank is among qualified players.",
+			note: "Season line, then career totals through that season (the whole career if he did not play that season). WS rank is among qualified players.",
 			cols: [
 				"Player",
 				"Team",
@@ -271,7 +274,7 @@ export const whyOf = (
 		});
 		if (pids.length === 1) {
 			const pid = pids[0]!;
-			const l = X.line(pid, s.season);
+			const l = lineOf(X, pid, s.season);
 			if (l && X.qualified(s.season).some((q) => q.pid === pid)) {
 				const n = X.qualified(s.season).length;
 				out.push({
@@ -296,7 +299,7 @@ export const whyOf = (
 			if (!t) {
 				continue;
 			}
-			const peers = X.teamsIn(s.season).map((x) =>
+			const peers = teamsInSeason(X, s.season).map((x) =>
 				winPct(x.won, x.lost, x.tied),
 			);
 			const n = X.numRounds(s.season);

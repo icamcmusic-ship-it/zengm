@@ -4,6 +4,7 @@ import {
 	findStories,
 	KIND_NAMES,
 	kindSlug,
+	overlapsSeason,
 	plainText,
 	stints,
 } from "./index.ts";
@@ -257,5 +258,51 @@ describe("threads", () => {
 
 	test("deterministic", () => {
 		expect(buildThreads(X, stories)).toEqual(threads);
+	});
+});
+
+describe("season filter", () => {
+	const L = makeRichLeague(20);
+	const stories = findStories(L);
+	const seasons = [...new Set(L.teamSeasons.map((t) => t.season))];
+
+	test("a story matches the seasons it covers, and every season has stories", () => {
+		expect(overlapsSeason({ season: 2030 }, 2030)).toBe(true);
+		expect(overlapsSeason({ season: 2030 }, 2031)).toBe(false);
+		expect(overlapsSeason({ season: 2031, span: [2028, 2031] }, 2029)).toBe(
+			true,
+		);
+		expect(overlapsSeason({ season: 2031, span: [2028, 2031] }, 2032)).toBe(
+			false,
+		);
+		for (const y of seasons) {
+			expect(
+				stories.filter((s) => overlapsSeason(s, y)).length,
+				`${y}`,
+			).toBeGreaterThan(0);
+		}
+	});
+
+	test("multi-season stories carry their span, within their own season range", () => {
+		const spans = stories.filter((s) => s.span);
+		expect(spans.length).toBeGreaterThan(20);
+		for (const s of spans) {
+			expect(s.span![0], s.id).toBeLessThanOrEqual(s.span![1]);
+			expect(overlapsSeason(s, s.season), s.id).toBe(true);
+		}
+	});
+
+	test("the season filter combines with team and kind filters", () => {
+		const y = seasons[5]!;
+		const tid = stories.find((s) => s.tids.length > 0 && s.season === y)!
+			.tids[0]!;
+		const both = stories.filter(
+			(s) => s.tids.includes(tid) && overlapsSeason(s, y),
+		);
+		expect(both.length).toBeGreaterThan(0);
+		expect(both.length).toBeLessThan(stories.length);
+		for (const s of both) {
+			expect(s.tids).toContain(tid);
+		}
 	});
 });
