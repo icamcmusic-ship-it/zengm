@@ -584,6 +584,22 @@ $wrapped-serif: Georgia, "Times New Roman", serif;
 		font-weight: 500;
 		color: var(--wrapped-dim);
 	}
+	&__stamp {
+		align-self: flex-start;
+		max-width: 100%;
+		padding: u(2.2) u(4);
+		border-radius: u(3);
+		background: var(--wrapped-fg);
+		color: var(--wrapped-on-fg);
+		font-size: u(3.8);
+		font-weight: 800;
+		line-height: 1.2;
+		transform: rotate(-2deg);
+	}
+	&--lay-a &__stamp,
+	&--lay-e &__stamp {
+		align-self: center;
+	}
 	&__links {
 		display: flex;
 		flex-wrap: wrap;

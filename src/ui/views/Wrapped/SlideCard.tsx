@@ -250,6 +250,10 @@ const rankingOf = (list: NonNullable<Slide["list"]>) => {
 	if (nums.every((v) => Number.isInteger(v) && v >= 1000 && v <= 3000)) {
 		return undefined;
 	}
+	// Everyone tied: nothing to rank or compare
+	if (nums.every((v) => v === nums[0])) {
+		return undefined;
+	}
 	const desc = nums.every((v, i) => i === 0 || v <= nums[i - 1]!);
 	const asc = nums.every((v, i) => i === 0 || v >= nums[i - 1]!);
 	if (!desc && !asc) {
@@ -550,7 +554,15 @@ export const SlideCard = ({
 			) : null}
 			{lineBlock}
 			{slide.note ? (
-				<div className={cls("wrapped-slide__gloss")} style={inn()}>
+				// A short note is a stamp on the slide, a longer one a quiet caption
+				<div
+					className={cls(
+						slide.note.length <= 48 && hasBody
+							? "wrapped-slide__stamp"
+							: "wrapped-slide__gloss",
+					)}
+					style={inn()}
+				>
 					{slide.note}
 				</div>
 			) : null}
