@@ -31,6 +31,7 @@ import {
 	loadPersisted,
 	saveGames,
 	savePlayers,
+	saveTeams,
 } from "./wrappedPersist.ts";
 import { hashString } from "../../common/wrapped/util.ts";
 
@@ -184,7 +185,7 @@ const toWGame = (gm: Game): WGame => ({
 // Entries in the persisted cache are only good for the code that made them, so the version comes from the text of the converters: adding a field to one of them is enough to start over.
 const persistVersion = () =>
 	hashString(
-		[toStat, toBox, awardOf, toWPlayer, toWGame]
+		[toStat, toBox, awardOf, toWPlayer, toWTeamSeason, toWGame]
 			.map((f) => f.toString())
 			.join("\n"),
 	).toString(36);
@@ -212,6 +213,7 @@ type PlayerEntry = { seq: number; wp: WPlayer; persisted?: boolean };
 type TeamSeasonsEntry = {
 	seq: number;
 	rows: { tsid: number; w: WTeamSeason }[];
+	persisted?: boolean;
 };
 type GamesEntry = {
 	seq: number;
@@ -235,6 +237,7 @@ type LeagueCache = {
 	ready: Built | undefined;
 	readySig: string | undefined;
 	error: { sig: string; message: string } | undefined;
+	notified: Promise<Built> | undefined;
 	progress: string;
 	lastProgressEmit: number;
 	// Builds are one at a time, so each can use what the one before it kept
@@ -278,6 +281,7 @@ const newCache = (lid: number): LeagueCache => ({
 	ready: undefined,
 	readySig: undefined,
 	error: undefined,
+	notified: undefined,
 	progress: "Starting",
 	lastProgressEmit: 0,
 	queue: Promise.resolve(),
@@ -652,7 +656,11 @@ const loadFromPersisted = async (c: LeagueCache) => {
 	for (const [season, { count, list }] of saved.games) {
 		c.games.set(season, { seq: 0, count, list, persisted: true });
 	}
+	for (const [season, rows] of saved.teams) {
+		c.teams.set(season, { seq: 0, rows, persisted: true });
+	}
 	wperfMark("snapshot.persistedPlayers", saved.players.size);
+	wperfMark("snapshot.persistedTeams", saved.teams.size);
 };
 
 // Save what a later session could use, once things are quiet. Only retired players and seasons that are over, which don't change.
@@ -683,6 +691,17 @@ const persistSoon = (c: LeagueCache) => {
 					e.persisted = true;
 				}
 				await yieldToWorker();
+			}
+			for (const [season, e] of c.teams) {
+				if (
+					!e.persisted &&
+					season < currentSeason &&
+					changeLog.season("teamSeasons", season) <= e.seq &&
+					changeLog.season("teamStats", season) <= e.seq
+				) {
+					await saveTeams(c.lid, season, e.rows);
+					e.persisted = true;
+				}
 			}
 			for (const [season, e] of c.games) {
 				if (
@@ -858,10 +877,15 @@ export const getWrappedStatus = (retry: boolean): WrappedStatus => {
 	}
 	if (!c.built || c.sig !== sig) {
 		c.progress = "Starting";
-		getWrapped().then(
-			() => toUI("realtimeUpdate", [["wrappedReady"]]),
-			() => toUI("realtimeUpdate", [["wrappedReady"]]),
-		);
+	}
+	// Tell the page once when what it is waiting for is done, however the build was started
+	const built = getWrapped();
+	if (c.notified !== built) {
+		c.notified = built;
+		const notify = () => {
+			void toUI("realtimeUpdate", [["wrappedReady"]]);
+		};
+		built.then(notify, notify);
 	}
 	return { status: "loading", progress: c.progress };
 };

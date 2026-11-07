@@ -336,8 +336,18 @@ describe("Wrapped snapshot", () => {
 		(globalThis as any).__wperf = [];
 		const b = await getWrapped();
 		expect(lastMark("snapshot.persistedPlayers")).toBe(2);
+		// The team seasons of every season that is over (2009 to 2015)
+		expect(lastMark("snapshot.persistedTeams")).toBe(7);
 		expect(lastMark("snapshot.playersRead")).toBe(0);
 		expect(plain(b.L)).toEqual(plain(await loadWrappedLeague()));
+
+		// A team season of a past season written to
+		const ts = (await idb.cache.teamSeasons.getAll()).find(
+			(t) => t.season === 2015 && t.tid === 1,
+		)!;
+		ts.won += 7;
+		await idb.cache.teamSeasons.put(ts);
+		await idb.league.put("teamSeasons", ts);
 
 		// A retired player edited, then another new session
 		const p2 = (await idb.merged.players.get(2))!;
@@ -350,6 +360,9 @@ describe("Wrapped snapshot", () => {
 		changeLog.reset();
 		(globalThis as any).__wperf = [];
 		const c = await getWrapped();
+		expect(
+			c.L.teamSeasons.find((t) => t.season === 2015 && t.tid === 1)!.won,
+		).toBe(ts.won);
 		expect(c.L.players.find((p) => p.pid === 2)!.stats[0]!.pts).toBe(12345);
 		expect(lastMark("snapshot.playersRead")).toBeGreaterThan(0);
 		expect(plain(c.L)).toEqual(plain(await loadWrappedLeague()));

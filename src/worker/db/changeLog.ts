@@ -5,6 +5,7 @@ import {
 	forgetGames,
 	forgetLeague,
 	forgetPlayers,
+	forgetTeams,
 } from "../util/wrappedPersist.ts";
 
 // A record of what has been written through the cache since a league was loaded, so that things derived from the database (like the Wrapped and Storylines snapshot) know what has to be recomputed. Every write to the cache (add, put, delete, clear) goes through note*, and loading a league (Cache.fill) resets the log. It only stores numbers: a sequence number per player, per (store, season) and per store.
@@ -83,8 +84,12 @@ export const changeLog = {
 			}
 		} else if (SEASON_STORES.has(store)) {
 			if (typeof row?.season === "number") {
-				if (store === "games" && row.season < g.get("season")) {
-					void forgetGames(g.get("lid"), row.season);
+				if (row.season < g.get("season")) {
+					if (store === "games") {
+						void forgetGames(g.get("lid"), row.season);
+					} else if (store === "teamSeasons" || store === "teamStats") {
+						void forgetTeams(g.get("lid"), row.season);
+					}
 				}
 				seasonSeq.set(`${store}|${row.season}`, seq);
 			} else {
@@ -104,6 +109,9 @@ export const changeLog = {
 			forgetPlayerSoon(pid);
 		} else if (SEASON_STORES.has(store)) {
 			seasonSeq.set(`${store}|*`, seq);
+			if (store === "teamSeasons" || store === "teamStats") {
+				void forgetTeams(g.get("lid"));
+			}
 		}
 	},
 
@@ -116,6 +124,9 @@ export const changeLog = {
 			void forgetLeague(g.get("lid"));
 		} else if (SEASON_STORES.has(store)) {
 			seasonSeq.set(`${store}|*`, seq);
+			if (store === "teamSeasons" || store === "teamStats") {
+				void forgetTeams(g.get("lid"));
+			}
 		}
 	},
 
