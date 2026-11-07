@@ -179,7 +179,11 @@ const getTeams = async (season: number, numRounds: number) => {
 			firstSeason,
 			hist,
 		});
-		logos[t.tid] = { imgURL: s.imgURL, imgURLSmall: s.imgURLSmall };
+		const info = g.get("teamInfoCache")[t.tid];
+		logos[t.tid] = {
+			imgURL: s.imgURL ?? info?.imgURL,
+			imgURLSmall: s.imgURLSmall ?? info?.imgURLSmall,
+		};
 	}
 	void numRounds;
 	return { teams: out, recordWins, logos };

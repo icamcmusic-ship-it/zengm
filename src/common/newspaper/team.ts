@@ -466,7 +466,7 @@ export const teamPlayoffPath = (c: Ctx, tid: number): Article | undefined => {
 		size: "feature",
 		kicker: "The playoff road",
 		head: c.freshHead(r, [
-			`The ${t.name}' road through the ${c.season} playoffs`,
+			`${poss(`The ${t.name}`)} road through the ${c.season} playoffs`,
 			`Series by series: the ${t.name} in the postseason`,
 			`${t.name} in the playoffs, game by game`,
 		])!,
