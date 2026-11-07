@@ -1,11 +1,19 @@
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
-import { defineView } from "../util/defineView.ts";
+import { defineView, keepType } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
-import { getWrappedIndex } from "../util/wrappedData.ts";
-import { candidates } from "../../common/wrapped/build.ts";
+import {
+	getWrapped,
+	getWrappedStatus,
+	isBulkSimming,
+	memoize,
+	yieldToWorker,
+	type Built,
+} from "../util/wrappedData.ts";
+import { candidatesAsync } from "../../common/wrapped/build.ts";
 import { polish } from "../../common/wrapped/util.ts";
+import { wperfMark, wperfOutput, wperfTime } from "../util/wrappedPerf.ts";
 import type { WrappedMode } from "../../common/wrapped/types.ts";
 
 const MODES: WrappedMode[] = ["season", "team", "player", "all"];
@@ -36,11 +44,47 @@ const processInputs = (params: RouteParams<"wrapped">) => {
 export default defineView({
 	id: "wrapped",
 	processInputs,
-	load: async ({ inputs, updateEvents }) => {
+	// Whether the page is showing its placeholder, which it replaces once the league history is ready
+	keepPrevOutput: { loading: keepType<boolean>() },
+	load: async ({ inputs, updateEvents, prevInputs, prevOutput }) => {
 		if (__SPORT !== "basketball") {
 			return { errorMessage: "Wrapped is only available for basketball." };
 		}
-		const X = await getWrappedIndex(updateEvents);
+		// While games are being simmed, leave the page as it is rather than rebuilding it every day. It updates when the sim stops.
+		if (
+			prevInputs !== undefined &&
+			!updateEvents.has("firstRun") &&
+			prevOutput.loading !== true &&
+			JSON.stringify(prevInputs) === JSON.stringify(inputs) &&
+			isBulkSimming()
+		) {
+			return;
+		}
+		const tView = performance.now();
+		let built: Built;
+		const changed =
+			prevInputs === undefined ||
+			JSON.stringify(prevInputs) !== JSON.stringify(inputs);
+		if (changed || prevOutput.loading === true) {
+			// Don't make the page wait for the league history to be read. Show a placeholder, which gets replaced when it is ready.
+			const st = getWrappedStatus(updateEvents.has("firstRun"));
+			if (st.status === "loading") {
+				return {
+					loading: true as const,
+					progress: st.progress,
+					mode: inputs.mode,
+				};
+			}
+			if (st.status === "error") {
+				return {
+					errorMessage: `Could not read the league history: ${st.message}`,
+				};
+			}
+			built = st.built;
+		} else {
+			built = await wperfTime("wrapped.getIndex", () => getWrapped());
+		}
+		const { X } = built;
 		const { mode } = inputs;
 
 		// Default season: the latest finished one, or the current one if none has finished yet
@@ -74,7 +118,12 @@ export default defineView({
 		}
 
 		const soFar = mode !== "all" && !X.decided(season);
-		const cands = candidates({ X, mode, season, tid, pid, soFar });
+		// The slides only depend on the snapshot and which deck it is, so opening the same deck again is free
+		const cands = await wperfTime(`wrapped.candidates.${mode}`, () =>
+			memoize(built, `cands|${mode}|${season}|${tid ?? ""}|${pid ?? ""}`, () =>
+				candidatesAsync({ X, mode, season, tid, pid, soFar }, yieldToWorker),
+			),
+		);
 
 		// Pictures for every player and team the slides mention
 		const pids = [
@@ -145,7 +194,8 @@ export default defineView({
 			title = "All-Time Wrapped";
 		}
 
-		return {
+		const out = {
+			loading: false as const,
 			mode,
 			season,
 			tid,
@@ -162,5 +212,8 @@ export default defineView({
 			userTid: g.get("userTid"),
 			choose: inputs.choose,
 		};
+		wperfMark("wrapped.view", performance.now() - tView);
+		wperfOutput(`wrapped.${mode}`, out);
+		return out;
 	},
 });

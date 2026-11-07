@@ -7,8 +7,9 @@ import type { Side, SideKind } from "../../common/wrapped/compare.ts";
 import { sideSpec } from "../../common/wrapped/compare.ts";
 import type { Slide } from "../../common/wrapped/types.ts";
 import { StaticCard } from "./Wrapped/StaticCard.tsx";
+import { WrappedLoading } from "./Wrapped/Loading.tsx";
 
-type Data = View<"wrappedCompare">;
+type Data = Extract<View<"wrappedCompare">, { loading: false }>;
 type Cmp = NonNullable<Data["compare"]>;
 
 const KINDS: [SideKind, string][] = [
@@ -257,7 +258,7 @@ const Pair = ({
 	);
 };
 
-const WrappedCompare = (props: Data) => {
+const CompareLoaded = (props: Data) => {
 	const c = props.compare;
 	useTitleBar({
 		title: c ? `${c.a.label} vs ${c.b.label}` : "Compare Wrapped",
@@ -385,6 +386,19 @@ const WrappedCompare = (props: Data) => {
 			) : null}
 		</>
 	);
+};
+
+// The league's history is read in the worker, which can take a while for a big league the first time. Until it's ready the page shows a placeholder.
+const CompareLoading = ({ progress }: { progress: string }) => {
+	useTitleBar({ title: "Compare Wrapped" });
+	return <WrappedLoading progress={progress} kind="deck" />;
+};
+
+const WrappedCompare = (props: View<"wrappedCompare">) => {
+	if (props.loading) {
+		return <CompareLoading progress={props.progress} />;
+	}
+	return <CompareLoaded {...props} />;
 };
 
 export default WrappedCompare;

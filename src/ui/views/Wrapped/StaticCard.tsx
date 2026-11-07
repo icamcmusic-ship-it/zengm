@@ -27,8 +27,8 @@ export const StaticCard = ({
 }: {
 	slide: Slide;
 	index: number;
-	faces: View<"wrapped">["faces"];
-	teams: View<"wrapped">["teams"];
+	faces: Extract<View<"wrapped">, { loading: false }>["faces"];
+	teams: Extract<View<"wrapped">, { loading: false }>["teams"];
 	foot?: string;
 	// The side that stands out more gets a ring
 	ring?: boolean;

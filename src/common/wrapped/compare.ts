@@ -1,5 +1,5 @@
 // "Compare two": two players, two teams (or one team's two seasons) or two seasons, side by side. Each side gets its own full list of candidate slides; the topics both sides have are shown as pairs with the side that stands out more named, the ones only one side has come after, and a scoreboard of plain numbers closes it. Pure, so tests cover it.
-import { candidates } from "./build.ts";
+import { candidates, candidatesAsync } from "./build.ts";
 import { finish } from "./deck.ts";
 import type { LeagueIndex } from "./league.ts";
 import type { Slide, WrappedMode } from "./types.ts";
@@ -72,20 +72,32 @@ export const validSides = (X: LeagueIndex, a: Side, b: Side) => {
 
 const SKIP = new Set(["intro", "summary"]);
 
-// Every slide a side has, one per topic, with its headline chosen
-export const sideSlides = (X: LeagueIndex, s: Side): Slide[] => {
-	const mode = KIND_MODE[s.k];
-	const cands = candidates({
-		X,
-		mode,
-		season: s.season,
-		tid: s.k === "t" ? s.id : undefined,
-		pid: s.k === "p" ? s.id : undefined,
-		soFar: !X.decided(s.season),
-	}).filter((c) => !c.quiz && !SKIP.has(c.id) && c.score > 0);
+const sideCtx = (X: LeagueIndex, s: Side) => ({
+	X,
+	mode: KIND_MODE[s.k],
+	season: s.season,
+	tid: s.k === "t" ? s.id : undefined,
+	pid: s.k === "p" ? s.id : undefined,
+	soFar: !X.decided(s.season),
+});
+
+const finishSide = (s: Side, all: Slide[]) => {
+	const cands = all.filter((c) => !c.quiz && !SKIP.has(c.id) && c.score > 0);
 	const seed = `cmp|${sideSpec(s)}`;
 	return cands.map((c) => finish(c, seed));
 };
+
+// Every slide a side has, one per topic, with its headline chosen
+export const sideSlides = (X: LeagueIndex, s: Side): Slide[] =>
+	finishSide(s, candidates(sideCtx(X, s)));
+
+// The same, but lets the caller do other work between topics
+export const sideSlidesAsync = async (
+	X: LeagueIndex,
+	s: Side,
+	pause: () => Promise<void>,
+): Promise<Slide[]> =>
+	finishSide(s, await candidatesAsync(sideCtx(X, s), pause));
 
 const byTopic = (cands: Slide[]) => {
 	const m = new Map<string, Slide>();

@@ -1,7 +1,7 @@
 import { planDeck } from "./deck.ts";
 import { slideTexts, spoilerText } from "./items.ts";
 import { quizSlides } from "./quiz.ts";
-import { LeagueIndex } from "./league.ts";
+import { isLeagueIndex, LeagueIndex } from "./league.ts";
 import type { Deck, Slide, WLeague, WrappedMode } from "./types.ts";
 import type { Topic, TopicCtx } from "./topics/helpers.ts";
 import { SEASON_TOPICS } from "./topics/season.ts";
@@ -42,23 +42,22 @@ export const TOPICS: Record<WrappedMode, Topic[]> = {
 	all: [...BASE_TOPICS.all, ...EXTRA_TOPICS.all],
 };
 
-// Every candidate slide; a topic that throws is skipped, so one bad topic can't break the deck
-export const candidates = (ctx: TopicCtx) => {
-	const out: Slide[] = [];
-	for (const t of TOPICS[ctx.mode]) {
-		let r: ReturnType<Topic>;
-		try {
-			r = t(ctx);
-		} catch (error) {
-			console.error(error);
-			continue;
-		}
-		if (Array.isArray(r)) {
-			out.push(...r);
-		} else if (r) {
-			out.push(r);
-		}
+const runTopic = (t: Topic, ctx: TopicCtx, out: Slide[]) => {
+	let r: ReturnType<Topic>;
+	try {
+		r = t(ctx);
+	} catch (error) {
+		console.error(error);
+		return;
 	}
+	if (Array.isArray(r)) {
+		out.push(...r);
+	} else if (r) {
+		out.push(r);
+	}
+};
+
+const finishCandidates = (ctx: TopicCtx, out: Slide[]) => {
 	// Slides that name the champion while talking about the title are spoilers
 	if (ctx.mode !== "all" && ctx.X.decided(ctx.season)) {
 		const c = ctx.X.champion(ctx.season);
@@ -106,6 +105,33 @@ export const candidates = (ctx: TopicCtx) => {
 	return out;
 };
 
+// Every candidate slide; a topic that throws is skipped, so one bad topic can't break the deck
+export const candidates = (ctx: TopicCtx) => {
+	const out: Slide[] = [];
+	for (const t of TOPICS[ctx.mode]) {
+		runTopic(t, ctx, out);
+	}
+	return finishCandidates(ctx, out);
+};
+
+// The same, but lets the caller do other work (like answer messages) between topics. Gives exactly what candidates gives.
+export const candidatesAsync = async (
+	ctx: TopicCtx,
+	pause: () => Promise<void>,
+) => {
+	const out: Slide[] = [];
+	let t0 = performance.now();
+	for (const t of TOPICS[ctx.mode]) {
+		runTopic(t, ctx, out);
+		// Only pause once a while's gone by, since pausing has a cost too
+		if (performance.now() - t0 > 30) {
+			await pause();
+			t0 = performance.now();
+		}
+	}
+	return finishCandidates(ctx, out);
+};
+
 export const buildDeck = (
 	L: WLeague | LeagueIndex,
 	o: {
@@ -116,7 +142,7 @@ export const buildDeck = (
 		n?: unknown;
 	},
 ): Deck => {
-	const X = L instanceof LeagueIndex ? L : new LeagueIndex(L);
+	const X = isLeagueIndex(L) ? L : new LeagueIndex(L);
 	const soFar = o.mode !== "all" && !X.decided(o.season);
 	const ctx: TopicCtx = {
 		X,

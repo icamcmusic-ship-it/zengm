@@ -13,7 +13,7 @@ import { answerQuiz, resetQuiz, useQuizAnswers } from "./deckState.ts";
 import type { View } from "../../../common/types.ts";
 import type { Slide } from "../../../common/wrapped/types.ts";
 
-type Data = View<"wrapped">;
+type Data = Extract<View<"wrapped">, { loading: false }>;
 
 // Styles are in public/css/wrapped.scss. Sizes there are multiples of --wrapped-u, which index.tsx sets from the card's size.
 

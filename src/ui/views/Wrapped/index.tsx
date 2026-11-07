@@ -28,6 +28,9 @@ import {
 	readAccents,
 	FALLBACK_ACCENTS,
 } from "./SlideCard.tsx";
+import { WrappedLoading } from "./Loading.tsx";
+
+type LoadedProps = Extract<View<"wrapped">, { loading: false }>;
 
 const COUNT_KEY = "wrappedSlideCount";
 const AUTOPLAY_KEY = "wrappedAutoplay";
@@ -62,7 +65,7 @@ const url = (m: WrappedMode, s: number, id?: string | number) => {
 };
 
 const teamUrlPart = (
-	teamOptions: View<"wrapped">["teamOptions"],
+	teamOptions: LoadedProps["teamOptions"],
 	t: number | undefined,
 ) => {
 	const o = teamOptions.find((x) => x.tid === t);
@@ -75,7 +78,7 @@ const Chooser = ({
 	seasons,
 	teamOptions,
 	playerOptions,
-}: View<"wrapped">) => {
+}: LoadedProps) => {
 	useTitleBar({ title: "Pick a Wrapped" });
 	const [query, setQuery] = useState("");
 	const season = seasons[0] ?? 0;
@@ -201,7 +204,7 @@ const Chooser = ({
 
 // ---- a deck ------------------------------------------------------------------------------------------------------
 
-const Deck = (props: View<"wrapped">) => {
+const Deck = (props: LoadedProps) => {
 	const {
 		mode,
 		season,
@@ -804,7 +807,22 @@ const Deck = (props: View<"wrapped">) => {
 	);
 };
 
+// The league's history is read in the worker, which can take a while for a big league the first time. Until it's ready the page shows a placeholder.
+const WrappedLoadingPage = ({
+	progress,
+	mode,
+}: {
+	progress: string;
+	mode: WrappedMode;
+}) => {
+	useTitleBar({ title: mode === "all" ? "All-Time Wrapped" : "Wrapped" });
+	return <WrappedLoading progress={progress} kind="deck" />;
+};
+
 const Wrapped = (props: View<"wrapped">) => {
+	if (props.loading) {
+		return <WrappedLoadingPage progress={props.progress} mode={props.mode} />;
+	}
 	if (props.choose) {
 		return <Chooser {...props} />;
 	}

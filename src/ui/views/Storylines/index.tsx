@@ -9,13 +9,16 @@ import type { LeagueUrlParts } from "../../router/types.ts";
 import { plainText } from "../../../common/storylines/index.ts";
 import { StoryCard, type UIStory } from "./StoryCard.tsx";
 import { WhyModal } from "./WhyModal.tsx";
+import { WrappedLoading } from "../Wrapped/Loading.tsx";
+
+type LoadedData = Extract<View<"storylines">, { loading: false }>;
 
 const PAGE = 30;
 
 // The page's own URL with a different season ("all" drops it), keeping the team, player or kind filter
 const storylinesUrlParts = (
-	filter: View<"storylines">["filter"],
-	teams: View<"storylines">["teams"],
+	filter: LoadedData["filter"],
+	teams: LoadedData["teams"],
 	season: string,
 ): LeagueUrlParts => {
 	const withFilter = filter && filter.type !== "thread";
@@ -77,7 +80,7 @@ const ThreadView = ({
 	followed,
 	toggle,
 }: {
-	data: View<"storylines">;
+	data: LoadedData;
 	onWhy: (s: UIStory) => void;
 	followed: string[];
 	toggle: (key: string) => void;
@@ -133,7 +136,7 @@ const ThreadView = ({
 	);
 };
 
-const Storylines = (data: View<"storylines">) => {
+const StorylinesList = (data: LoadedData) => {
 	const {
 		stories,
 		kinds,
@@ -401,6 +404,19 @@ const Storylines = (data: View<"storylines">) => {
 			{whyModal}
 		</>
 	);
+};
+
+// The league's history is read in the worker, which can take a while for a big league the first time. Until it's ready the page shows a placeholder.
+const StorylinesLoading = ({ progress }: { progress: string }) => {
+	useTitleBar({ title: "Storylines" });
+	return <WrappedLoading progress={progress} kind="stories" />;
+};
+
+const Storylines = (props: View<"storylines">) => {
+	if (props.loading) {
+		return <StorylinesLoading progress={props.progress} />;
+	}
+	return <StorylinesList {...props} />;
 };
 
 export default Storylines;

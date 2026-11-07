@@ -4,7 +4,9 @@ import type { View } from "../../../common/types.ts";
 
 const TOKEN = /\[\[([gpt]):([^\]|]*)\|([^\]]*)]]/g;
 
-export type Teams = View<"storylines">["teams"];
+type LoadedData = Extract<View<"storylines">, { loading: false }>;
+
+export type Teams = LoadedData["teams"];
 
 // Text with [[p:pid|Name]], [[t:tid:season|Name]] and [[g:gid:tid:season|text]] tokens, as links
 export const RichText = ({ text, teams }: { text: string; teams: Teams }) => {

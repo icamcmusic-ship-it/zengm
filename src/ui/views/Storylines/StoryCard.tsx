@@ -2,7 +2,9 @@ import { helpers } from "../../util/helpers.ts";
 import type { View } from "../../../common/types.ts";
 import { RichText, type Teams } from "./RichText.tsx";
 
-export type UIStory = View<"storylines">["stories"][number];
+type LoadedData = Extract<View<"storylines">, { loading: false }>;
+
+export type UIStory = LoadedData["stories"][number];
 
 export const StoryCard = ({
 	story: s,

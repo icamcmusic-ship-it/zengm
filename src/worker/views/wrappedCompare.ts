@@ -1,13 +1,20 @@
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
-import { defineView } from "../util/defineView.ts";
+import { defineView, keepType } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
-import { getWrappedIndex } from "../util/wrappedData.ts";
+import {
+	getWrapped,
+	getWrappedStatus,
+	isBulkSimming,
+	memoize,
+	yieldToWorker,
+	type Built,
+} from "../util/wrappedData.ts";
 import {
 	matchCands,
 	parseSide,
 	sideLabel,
-	sideSlides,
+	sideSlidesAsync,
 	sideSpec,
 	statRows,
 	tally,
@@ -28,11 +35,42 @@ const MAX_BOTH = 14;
 export default defineView({
 	id: "wrappedCompare",
 	processInputs,
-	load: async ({ inputs, updateEvents }) => {
+	// Whether the page is showing its placeholder, which it replaces once the league history is ready
+	keepPrevOutput: { loading: keepType<boolean>() },
+	load: async ({ inputs, updateEvents, prevInputs, prevOutput }) => {
 		if (__SPORT !== "basketball") {
 			return { errorMessage: "Wrapped is only available for basketball." };
 		}
-		const X = await getWrappedIndex(updateEvents);
+		// While games are being simmed, leave the page as it is rather than rebuilding it every day
+		if (
+			prevInputs !== undefined &&
+			!updateEvents.has("firstRun") &&
+			prevOutput.loading !== true &&
+			JSON.stringify(prevInputs) === JSON.stringify(inputs) &&
+			isBulkSimming()
+		) {
+			return;
+		}
+		let built: Built;
+		const changed =
+			prevInputs === undefined ||
+			JSON.stringify(prevInputs) !== JSON.stringify(inputs);
+		if (changed || prevOutput.loading === true) {
+			// Don't make the page wait for the league history to be read
+			const st = getWrappedStatus(updateEvents.has("firstRun"));
+			if (st.status === "loading") {
+				return { loading: true as const, progress: st.progress };
+			}
+			if (st.status === "error") {
+				return {
+					errorMessage: `Could not read the league history: ${st.message}`,
+				};
+			}
+			built = st.built;
+		} else {
+			built = await getWrapped();
+		}
+		const { X } = built;
 		const { a, b } = inputs;
 
 		// Choices for the picker
@@ -59,15 +97,25 @@ export default defineView({
 		};
 
 		if (!a || !b) {
-			return { ...base, error: undefined as string | undefined, compare: undefined };
+			return {
+				...base,
+				loading: false as const,
+				error: undefined as string | undefined,
+				compare: undefined,
+			};
 		}
 		const error = validSides(X, a, b);
 		if (error) {
-			return { ...base, error, compare: undefined };
+			return { ...base, loading: false as const, error, compare: undefined };
 		}
 
-		const slidesA = sideSlides(X, a);
-		const slidesB = sideSlides(X, b);
+		// Each side's slides only depend on the snapshot and the side, so comparing again is cheap
+		const slidesA = await memoize(built, `cmp|${sideSpec(a)}`, () =>
+			sideSlidesAsync(X, a, yieldToWorker),
+		);
+		const slidesB = await memoize(built, `cmp|${sideSpec(b)}`, () =>
+			sideSlidesAsync(X, b, yieldToWorker),
+		);
 		const m = matchCands(slidesA, slidesB);
 		const both = m.both.slice(0, MAX_BOTH);
 		const onlyA = m.onlyA.slice(0, MAX_ONLY);
@@ -106,6 +154,7 @@ export default defineView({
 
 		return {
 			...base,
+			loading: false as const,
 			error: undefined as string | undefined,
 			compare: {
 				kind: a.k,

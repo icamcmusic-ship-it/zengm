@@ -1,9 +1,17 @@
 import type { LeagueIndex } from "../../common/wrapped/league.ts";
-import { findStories, type Story } from "../../common/storylines/index.ts";
+import {
+	findStoriesAsync,
+	type Story,
+} from "../../common/storylines/index.ts";
 import { buildThreads, type Thread } from "../../common/storylines/threads.ts";
 import { whyOf, type WhySection } from "../../common/storylines/why.ts";
-import type { UpdateEvent } from "../../common/types.ts";
-import { getWrappedIndex } from "./wrappedData.ts";
+import {
+	getWrapped,
+	memoize,
+	yieldToWorker,
+	type Built,
+} from "./wrappedData.ts";
+import { wperfTime } from "./wrappedPerf.ts";
 
 type State = {
 	X: LeagueIndex;
@@ -13,16 +21,13 @@ type State = {
 	threads: Thread[];
 };
 
-// Stories and threads are found once per snapshot (the snapshot itself is rebuilt when the league changes)
-const states = new WeakMap<LeagueIndex, State>();
-
-export const getStoryState = async (
-	updateEvents: ReadonlySet<UpdateEvent>,
-): Promise<State> => {
-	const X = await getWrappedIndex(updateEvents);
-	let state = states.get(X);
-	if (!state) {
-		const stories = findStories(X);
+// Stories and threads are found once per snapshot (the snapshot itself is rebuilt when the league changes), without holding up the worker
+export const getStoryState = (built: Built): Promise<State> =>
+	memoize(built, "storyState", async () => {
+		const { X } = built;
+		const stories = await wperfTime("storylines.find", () =>
+			findStoriesAsync(X, yieldToWorker),
+		);
 		const kindCounts = new Map<string, number>();
 		for (const s of stories) {
 			kindCounts.set(s.kind, (kindCounts.get(s.kind) ?? 0) + 1);
@@ -50,22 +55,19 @@ export const getStoryState = async (
 		stories.forEach((s, i) => {
 			rank.get(s.id)!.rank = i + 1;
 		});
-		state = {
+		return {
 			X,
 			stories,
 			byId: new Map(stories.map((s) => [s.id, s])),
 			rank,
 			threads: buildThreads(X, stories),
 		};
-		states.set(X, state);
-	}
-	return state;
-};
+	});
 
 export const getStorylineWhy = async (
 	id: string,
 ): Promise<WhySection[] | undefined> => {
-	const state = await getStoryState(new Set());
+	const state = await getStoryState(await getWrapped());
 	const story = state.byId.get(id);
 	const r = state.rank.get(id);
 	if (!story || !r) {

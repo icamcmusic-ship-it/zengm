@@ -1,6 +1,7 @@
 import { PHASE } from "../../../common/constants.ts";
 import { league } from "../index.ts";
 import { idb } from "../../db/index.ts";
+import { changeLog } from "../../db/changeLog.ts";
 import {
 	local,
 	lock,
@@ -47,6 +48,8 @@ const finalize = async (
 		// Fill only in preseason, because not much changes before then
 		await save();
 		saved = true;
+		// Everything was just saved, so this fill loads exactly what was already in the cache
+		changeLog.keepOnNextFill();
 		await idb.cache.fill();
 	} else if (!local.autoPlayUntil && phase !== PHASE.AFTER_TRADE_DEADLINE) {
 		// Flush on other phase changes only outside of auto play, except never for trade deadline one cause who cares
