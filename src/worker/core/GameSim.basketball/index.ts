@@ -91,6 +91,8 @@ type PlayerGameSim = {
 		playingThrough: boolean;
 	};
 	ptModifier: number;
+	// Raw ratings, for the wording of the play-by-play only (see loadTeams)
+	pbpRatings?: Record<string, number>;
 };
 type TeamGameSim = {
 	id: number;
@@ -1717,6 +1719,7 @@ class GameSim extends GameSimBase {
 			pid: p.id,
 			outOfBounds,
 			clock: this.t,
+			poss: this.possessionLength,
 		});
 		return outOfBounds ? "outOfBoundsOffense" : ("tov" as const);
 	}
@@ -1757,6 +1760,7 @@ class GameSim extends GameSimBase {
 			pidTov: pStoleFrom.id,
 			outOfBounds,
 			clock: this.t,
+			poss: this.possessionLength,
 		});
 		return outOfBounds ? "outOfBoundsOffense" : ("stl" as const);
 	}
@@ -2060,6 +2064,7 @@ class GameSim extends GameSimBase {
 			t: this.o,
 			pid: p.id,
 			clock: this.t,
+			poss: this.possessionLength,
 		};
 		if (
 			fgaLogType === "fgaLowPost" ||
