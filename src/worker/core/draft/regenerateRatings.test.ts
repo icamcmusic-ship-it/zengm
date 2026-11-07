@@ -201,12 +201,12 @@ describe("regenerate ratings (worker)", () => {
 	test("locks: a locked build and pinned ratings are respected through the worker", async () => {
 		const season = g.get("season");
 		const [a, b] = await getClass();
-		const ra = last(a!.ratings) as PlayerRatings;
+		const ra = { ...(last(a!.ratings) as PlayerRatings) };
 		await applyRegenerate({
 			draftYear: season,
 			settings: settings(),
 			locks: {
-				[a!.pid]: { build: "Stretch Big", ratings: { tp: ra.tp, ft: ra.ft } },
+				[a!.pid]: { build: "Stretch Big", pinKeys: ["tp", "ft"] },
 			},
 			pids: [a!.pid],
 		});
@@ -219,6 +219,27 @@ describe("regenerate ratings (worker)", () => {
 			(await idb.cache.players.get(b!.pid))!.ratingsBuild,
 			undefined,
 		);
+	});
+
+	test("relative ovr and pot locks", async () => {
+		const season = g.get("season");
+		const players = await getClass();
+		const target = players.find(
+			(p) => (last(p.ratings) as PlayerRatings).ovr > 30,
+		)!;
+		const rt = { ...(last(target.ratings) as PlayerRatings) };
+		await applyRegenerate({
+			draftYear: season,
+			settings: settings(),
+			locks: { [target.pid]: { ovrDelta: -4, potDelta: 3 } },
+			pids: [target.pid],
+		});
+		const after = last(
+			(await idb.cache.players.get(target.pid))!.ratings,
+		) as PlayerRatings;
+		assert.strictEqual(after.ovr, rt.ovr - 4);
+		assert.strictEqual(ovr(after), rt.ovr - 4);
+		assert.strictEqual(after.pot, rt.pot + 3);
 	});
 
 	test("undo restores the last apply exactly", async () => {

@@ -10,21 +10,21 @@ import {
 	type NumericSettingKey,
 } from "./settings.ts";
 
-export const RANDOM_GROUPS: Record<string, NumericSettingKey[]> = {
+export const RANDOM_GROUPS = {
 	// How many builds a class is drawn from and how many stay Balanced
 	mix: ["buildsPerClass", "diversity"],
 	// How lopsided each player gets
 	shape: ["specialization", "buildNoise"],
 	// How strongly the class leans, and whether it has two flavors
 	flavor: ["flavorStrength", "flavorBlend"],
-};
+} satisfies Record<string, NumericSettingKey[]>;
 
 export type RandomScope = "gentle" | "wide" | keyof typeof RANDOM_GROUPS;
 
 export const RANDOM_SCOPES: RandomScope[] = [
 	"gentle",
 	"wide",
-	...(Object.keys(RANDOM_GROUPS) as RandomScope[]),
+	...(Object.keys(RANDOM_GROUPS) as (keyof typeof RANDOM_GROUPS)[]),
 ];
 
 const decimals = (step: number) => {
@@ -59,13 +59,13 @@ export const randomizeSettings = (
 ) => {
 	const rng = new Rng(`randomize|${randomSeed}`);
 	const mode = scope === "gentle" ? "gentle" : "wide";
-	const groups =
+	const groups: (keyof typeof RANDOM_GROUPS)[] =
 		scope === "gentle" || scope === "wide"
-			? Object.keys(RANDOM_GROUPS)
+			? (Object.keys(RANDOM_GROUPS) as (keyof typeof RANDOM_GROUPS)[])
 			: [scope];
 	const patch: Partial<BuildSettings> = {};
 	for (const g of groups) {
-		for (const key of RANDOM_GROUPS[g]!) {
+		for (const key of RANDOM_GROUPS[g] as NumericSettingKey[]) {
 			// Drawn even when skipped, so locking one setting does not reshuffle the others
 			const v = drawOne(key, mode, rng);
 			if (skip[key] || v === current[key]) {

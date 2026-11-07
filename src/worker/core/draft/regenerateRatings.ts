@@ -28,12 +28,32 @@ import updateValues from "../player/updateValues.ts";
 // builds without changing anyone's overall. The engine is pure (src/common/ratingsBuilds); this is the plumbing that reads
 // prospects, previews, writes the ratings back the way the game's own code would, and undoes it.
 
+// Locks as the UI states them. They are all relative to the player (never absolute true values), so the UI never needs a
+// rating, ovr or pot it should not be able to see.
+export type UiLock = {
+	// Leave him exactly as he is
+	skip?: boolean;
+
+	// Force this build
+	build?: string;
+
+	// Ratings to keep exactly where they are
+	pinKeys?: RatingKey[];
+
+	// Build him to a different overall / pot than he has
+	ovrDelta?: number;
+	potDelta?: number;
+
+	// "Reroll just him"
+	reroll?: number;
+};
+
 export type RegenerateParams = {
 	draftYear: number;
 	settings: Partial<BuildSettings>;
 
 	// By pid
-	locks: Record<number, PlayerLock>;
+	locks: Record<number, UiLock>;
 
 	// The prospects to change. null = the whole class. The engine always works out the whole class, so one prospect's
 	// result never depends on who else is selected.
@@ -63,7 +83,10 @@ export type PreviewRow = {
 	skills: [string[], string[]];
 	hgtInches: [number | undefined, number | undefined];
 	ratings: { key: RatingKey; before: number; after: number }[];
-	locks: PlayerLock;
+	locks: UiLock;
+
+	// The hgt rating, which is never fuzzed, so the UI can list the builds he is eligible for
+	hgt: number;
 };
 
 export type PreviewResult = {
@@ -142,9 +165,43 @@ export const resolveBase = (
 	};
 };
 
+const toEngineLock = (
+	lock: UiLock | undefined,
+	base: BuildRatings,
+	ovr: number,
+	pot: number,
+): PlayerLock | undefined => {
+	if (!lock) {
+		return undefined;
+	}
+	const out: PlayerLock = {};
+	if (lock.skip) {
+		out.skip = true;
+	}
+	if (lock.build) {
+		out.build = lock.build;
+	}
+	if (lock.pinKeys && lock.pinKeys.length > 0) {
+		out.ratings = {};
+		for (const key of lock.pinKeys) {
+			out.ratings[key] = base[key];
+		}
+	}
+	if (lock.ovrDelta) {
+		out.ovr = Math.min(100, Math.max(0, ovr + lock.ovrDelta));
+	}
+	if (lock.potDelta) {
+		out.pot = Math.min(100, Math.max(0, pot + lock.potDelta));
+	}
+	if (lock.reroll) {
+		out.reroll = lock.reroll;
+	}
+	return out;
+};
+
 const makeInput = (
 	p: Player,
-	lock: PlayerLock | undefined,
+	lock: UiLock | undefined,
 ): { input: PlayerInput; resolved: Resolved } => {
 	const row = last(p.ratings) as PlayerRatings;
 	const resolved = resolveBase(p, row);
@@ -163,7 +220,12 @@ const makeInput = (
 				classYear: classYearFromAge(age),
 				nonNcaa: p.college === "",
 			},
-			lock,
+			lock: toEngineLock(
+				lock,
+				resolved.ratings,
+				F.ovr(resolved.ratings),
+				resolved.pot,
+			),
 		},
 	};
 };
@@ -221,7 +283,8 @@ const makeRow = (
 	r: PlayerResult,
 	inScope: boolean,
 	hasBase: boolean,
-	locks: PlayerLock,
+	locks: UiLock,
+	hgt: number,
 ): PreviewRow => {
 	const row = last(p.ratings) as PlayerRatings;
 	const ratings = RATING_KEYS.map((key) => ({
@@ -256,6 +319,7 @@ const makeRow = (
 		hgtInches: [p.hgt, r.after.hgtInches],
 		ratings,
 		locks,
+		hgt,
 	};
 };
 
@@ -272,6 +336,7 @@ export const previewRegenerate = async (
 			inScope.has(p.pid),
 			p.ratingsBuild !== undefined,
 			params.locks[p.pid] ?? {},
+			inputs[i]!.input.ratings.hgt,
 		),
 	);
 	let numChanged = 0;
@@ -497,7 +562,7 @@ export type SingleParams = {
 	hgtInches: number;
 	college: string;
 	settings: Partial<BuildSettings>;
-	lock: PlayerLock;
+	lock: UiLock;
 };
 
 export type SingleResult = {
@@ -547,7 +612,12 @@ export const previewRegenerateSingle = async (
 			classYear: classYearFromAge(params.age),
 			nonNcaa: params.college === "",
 		},
-		lock: params.lock,
+		lock: toEngineLock(
+			params.lock,
+			resolved.ratings,
+			F.ovr(resolved.ratings),
+			resolved.pot,
+		),
 	};
 	const r = regenerateOne(F, input, { ...settings, pot: "keep" });
 	return {

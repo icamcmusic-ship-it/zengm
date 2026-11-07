@@ -5,7 +5,6 @@ export {
 	ARCHETYPES,
 	CLASS_FLAVORS,
 	BALANCED,
-	TABLE_SIZE,
 	archetypeByName,
 	flavorByName,
 	pickArchetype,

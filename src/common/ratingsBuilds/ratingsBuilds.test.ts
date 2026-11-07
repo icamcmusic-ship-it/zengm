@@ -10,6 +10,7 @@ import {
 	DEFAULT_SETTINGS,
 	RATING_KEYS,
 	Rng,
+	TABLE_SIZE,
 	archetypeByName,
 	ovrExact,
 	randomizeSettings,
@@ -58,6 +59,7 @@ const settings = (extra: Record<string, any> = {}) => ({
 describe("ratingsBuilds data", () => {
 	test("the whole table was ported", () => {
 		assert.strictEqual(ARCHETYPES.length, 447);
+		assert.strictEqual(TABLE_SIZE, ARCHETYPES.length);
 		assert.strictEqual(CLASS_FLAVORS.length, 70);
 		assert.strictEqual(
 			new Set(ARCHETYPES.map((a) => a.name)).size,

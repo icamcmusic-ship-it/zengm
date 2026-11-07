@@ -1,5 +1,6 @@
 import { DEFAULT_LEVEL } from "../budgetLevels.ts";
-import { TABLE_SIZE } from "./selection.ts";
+// The number of builds in the table. Kept here, not read off the table, so the UI can import settings without bundling it (a test asserts they agree).
+export const TABLE_SIZE = 447;
 
 export type FuzzMode = "keep" | "zero" | "regenerate";
 

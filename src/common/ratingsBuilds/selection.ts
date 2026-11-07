@@ -5,6 +5,7 @@ import { ARCHETYPES } from "./archetypes.data.ts";
 import { CLASS_FLAVORS } from "./flavors.data.ts";
 import type { Rng } from "./rng.ts";
 import { clamp } from "./rng.ts";
+import { TABLE_SIZE } from "./settings.ts";
 import type { Archetype, ClassFlavor, DrawFlavor } from "./types.ts";
 
 export { ARCHETYPES, CLASS_FLAVORS };
@@ -14,8 +15,6 @@ const SPECIALISTS = ARCHETYPES.filter((a) => a.name !== "Balanced");
 
 const BY_NAME = new Map(ARCHETYPES.map((a) => [a.name, a]));
 export const archetypeByName = (name: string) => BY_NAME.get(name);
-
-export const TABLE_SIZE = ARCHETYPES.length;
 
 // A flavor's draw weight multiplier is compressed in log space (and so is the weight in pool membership)
 const RARITY_COMPRESS = 0.42;
