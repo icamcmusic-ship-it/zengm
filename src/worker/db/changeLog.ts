@@ -17,6 +17,15 @@ const playerSeq = new Map<number, number>();
 const seasonSeq = new Map<string, number>();
 const storeSeq = new Map<Store, number>();
 
+// Writes happen while a league is being created, before every game attribute is set
+const gNumber = (key: "lid" | "season") => {
+	try {
+		return g.get(key);
+	} catch {
+		return undefined;
+	}
+};
+
 // Retired players written to, to be dropped from the persisted Wrapped snapshot (see util/wrappedPersist.ts)
 const forgetPids = new Set<number>();
 const forgetPlayerSoon = (pid: number) => {
@@ -24,10 +33,26 @@ const forgetPlayerSoon = (pid: number) => {
 		queueMicrotask(() => {
 			const pids = [...forgetPids];
 			forgetPids.clear();
-			void forgetPlayers(g.get("lid"), pids);
+			const lid = gNumber("lid");
+			if (lid !== undefined) {
+				void forgetPlayers(lid, pids);
+			}
 		});
 	}
 	forgetPids.add(pid);
+};
+
+const forgetLeagueSoon = () => {
+	const lid = gNumber("lid");
+	if (lid !== undefined) {
+		void forgetLeague(lid);
+	}
+};
+const forgetTeamsSoon = () => {
+	const lid = gNumber("lid");
+	if (lid !== undefined) {
+		void forgetTeams(lid);
+	}
 };
 
 const SEASON_STORES = new Set<Store>([
@@ -60,7 +85,7 @@ export const changeLog = {
 			return;
 		}
 		if (wasFull) {
-			void forgetLeague(g.get("lid"));
+			forgetLeagueSoon();
 		}
 		changeLog.reset();
 	},
@@ -84,11 +109,17 @@ export const changeLog = {
 			}
 		} else if (SEASON_STORES.has(store)) {
 			if (typeof row?.season === "number") {
-				if (row.season < g.get("season")) {
+				const lid = gNumber("lid");
+				const current = gNumber("season");
+				if (
+					lid !== undefined &&
+					current !== undefined &&
+					row.season < current
+				) {
 					if (store === "games") {
-						void forgetGames(g.get("lid"), row.season);
+						void forgetGames(lid, row.season);
 					} else if (store === "teamSeasons" || store === "teamStats") {
-						void forgetTeams(g.get("lid"), row.season);
+						void forgetTeams(lid, row.season);
 					}
 				}
 				seasonSeq.set(`${store}|${row.season}`, seq);
@@ -110,7 +141,7 @@ export const changeLog = {
 		} else if (SEASON_STORES.has(store)) {
 			seasonSeq.set(`${store}|*`, seq);
 			if (store === "teamSeasons" || store === "teamStats") {
-				void forgetTeams(g.get("lid"));
+				forgetTeamsSoon();
 			}
 		}
 	},
@@ -121,11 +152,11 @@ export const changeLog = {
 		if (store === "players") {
 			// Every player is gone
 			playerSeq.set(-1, seq);
-			void forgetLeague(g.get("lid"));
+			forgetLeagueSoon();
 		} else if (SEASON_STORES.has(store)) {
 			seasonSeq.set(`${store}|*`, seq);
 			if (store === "teamSeasons" || store === "teamStats") {
-				void forgetTeams(g.get("lid"));
+				forgetTeamsSoon();
 			}
 		}
 	},

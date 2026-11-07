@@ -610,6 +610,7 @@ const loadGames = async (
 	const sorted = [...seasons].sort((a, b) => a - b);
 
 	const out: WGame[] = [];
+	let read = 0;
 	for (const season of sorted) {
 		// A season that is over only changes if box scores are deleted, which changes how many there are
 		const count =
@@ -624,6 +625,7 @@ const loadGames = async (
 		if (e && e.count === count && changeLog.season("games", season) <= e.seq) {
 			list = e.list;
 		} else {
+			read += 1;
 			setProgress(c, `Reading box scores: ${season}`);
 			list = await idb.merged.games.getAll(
 				{ season },
@@ -636,6 +638,7 @@ const loadGames = async (
 			out.push(gm);
 		}
 	}
+	wperfMark("snapshot.gamesRead", read);
 	for (const season of c.games.keys()) {
 		if (!seasons.has(season)) {
 			c.games.delete(season);
@@ -681,8 +684,10 @@ const persistSoon = (c: LeagueCache) => {
 					changeLog.player(pid) <= e.seq,
 			);
 			for (let i = 0; i < players.length; i += 300) {
-				const chunk = players.slice(i, i + 300);
-				// Still good when it's saved? Otherwise the change log has already dropped it.
+				// Checked again here, since a player written to while earlier ones were being saved has had his saved copy dropped, and must not get it back
+				const chunk = players
+					.slice(i, i + 300)
+					.filter(([pid, e]) => changeLog.player(pid) <= e.seq);
 				await savePlayers(
 					c.lid,
 					chunk.map(([pid, e]) => [pid, e.wp]),
@@ -796,7 +801,10 @@ const build = async (c: LeagueCache): Promise<Built> => {
 			// Seasons that are over don't change, and the cache forgets a season if one of its players' rows do
 			reuseLines: (season) => season < L.season,
 		});
-		(globalThis as any).__wrappedLast = x;
+		// For profiling scripts (see wrappedPerf.ts), which read the snapshot back
+		if ((globalThis as { __wperfOn?: boolean }).__wperfOn) {
+			(globalThis as any).__wrappedLast = x;
+		}
 		return x;
 	});
 	c.version += 1;
