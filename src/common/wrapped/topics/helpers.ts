@@ -24,7 +24,18 @@ export const mk = (
 });
 
 export type Metric = {
-	k: "ppg" | "rpg" | "apg" | "spg" | "bpg" | "tpg" | "per" | "ws" | "tsPct" | "vorp" | "bpm";
+	k:
+		| "ppg"
+		| "rpg"
+		| "apg"
+		| "spg"
+		| "bpg"
+		| "tpg"
+		| "per"
+		| "ws"
+		| "tsPct"
+		| "vorp"
+		| "bpm";
 	label: string;
 	what: string;
 	unit: string;
@@ -36,21 +47,94 @@ export type Metric = {
 };
 
 export const METRICS: Metric[] = [
-	{ k: "ppg", label: "points per game", what: "scoring", unit: "PPG", d: 1, theme: "scoring" },
-	{ k: "rpg", label: "rebounds per game", what: "rebounding", unit: "RPG", d: 1, theme: "inside" },
-	{ k: "apg", label: "assists per game", what: "playmaking", unit: "APG", d: 1, theme: "playmaking" },
-	{ k: "spg", label: "steals per game", what: "steals", unit: "SPG", d: 1, theme: "defense" },
-	{ k: "bpg", label: "blocks per game", what: "shot-blocking", unit: "BPG", d: 1, theme: "defense" },
-	{ k: "tpg", label: "threes per game", what: "three-point shooting", unit: "3PM per game", d: 1, theme: "scoring" },
-	{ k: "per", label: "PER", what: "efficiency", unit: "PER", d: 1, theme: "efficiency" },
-	{ k: "ws", label: "win shares", what: "win shares", unit: "WS", d: 1, total: true, theme: "efficiency" },
-	{ k: "tsPct", label: "true shooting", what: "true shooting", unit: "TS%", d: 1, pct: true, minPpg: 10, theme: "efficiency" },
-	{ k: "bpm", label: "box plus-minus", what: "box plus-minus", unit: "BPM", d: 1, theme: "efficiency" },
+	{
+		k: "ppg",
+		label: "points per game",
+		what: "scoring",
+		unit: "PPG",
+		d: 1,
+		theme: "scoring",
+	},
+	{
+		k: "rpg",
+		label: "rebounds per game",
+		what: "rebounding",
+		unit: "RPG",
+		d: 1,
+		theme: "inside",
+	},
+	{
+		k: "apg",
+		label: "assists per game",
+		what: "playmaking",
+		unit: "APG",
+		d: 1,
+		theme: "playmaking",
+	},
+	{
+		k: "spg",
+		label: "steals per game",
+		what: "steals",
+		unit: "SPG",
+		d: 1,
+		theme: "defense",
+	},
+	{
+		k: "bpg",
+		label: "blocks per game",
+		what: "shot-blocking",
+		unit: "BPG",
+		d: 1,
+		theme: "defense",
+	},
+	{
+		k: "tpg",
+		label: "threes per game",
+		what: "three-point shooting",
+		unit: "3PM per game",
+		d: 1,
+		theme: "scoring",
+	},
+	{
+		k: "per",
+		label: "PER",
+		what: "efficiency",
+		unit: "PER",
+		d: 1,
+		theme: "efficiency",
+	},
+	{
+		k: "ws",
+		label: "win shares",
+		what: "win shares",
+		unit: "WS",
+		d: 1,
+		total: true,
+		theme: "efficiency",
+	},
+	{
+		k: "tsPct",
+		label: "true shooting",
+		what: "true shooting",
+		unit: "TS%",
+		d: 1,
+		pct: true,
+		minPpg: 10,
+		theme: "efficiency",
+	},
+	{
+		k: "bpm",
+		label: "box plus-minus",
+		what: "box plus-minus",
+		unit: "BPM",
+		d: 1,
+		theme: "efficiency",
+	},
 ];
 
 export const metricVal = (l: SeasonLine, m: Metric) => {
 	const v = l[m.k];
-	return isNum(v) ? v : NaN;
+	return isNum(v) ? v : Number.NaN;
 };
 
 export const showMetric = (v: number, m: Metric) =>
@@ -60,8 +144,10 @@ export const NOTES: Record<string, string> = {
 	PER: "PER: player efficiency rating, a per-minute summary of a box score (15 is average)",
 	WS: "Win shares: an estimate of the wins a player added",
 	BPM: "BPM: box plus-minus, points per 100 possessions above an average player",
-	"TS%": "TS%: true shooting, scoring efficiency counting threes and free throws",
-	"game score": "Game score: a one-number summary of a box-score line (40 is a great night)",
+	"TS%":
+		"TS%: true shooting, scoring efficiency counting threes and free throws",
+	"game score":
+		"Game score: a one-number summary of a box-score line (40 is a great night)",
 };
 
 // A box-score line with its game context

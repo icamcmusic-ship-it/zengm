@@ -200,6 +200,22 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
+				active: (pageID) => pageID === "wrapped",
+				league: true,
+				commandPalette: true,
+				path: ["wrapped"],
+				text: "Wrapped",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "storylines",
+				league: true,
+				commandPalette: true,
+				path: ["storylines"],
+				text: "Storylines",
+			},
+			{
+				type: "link",
 				active: (pageID) => pageID === "powerRankings",
 				league: true,
 				commandPalette: true,

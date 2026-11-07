@@ -850,14 +850,12 @@ const rookies: Topic = ({ X, season }) => {
 		pid: rk[0]!.pid,
 		season,
 		heads: ["The new kids", `${rk[0]!.name} led the rookies in scoring`],
-		list: rk
-			.slice(0, 5)
-			.map((l) => ({
-				name: l.name,
-				value: `${fmtNum(l.ppg, 1)} PPG`,
-				pid: l.pid,
-				tid: l.tid,
-			})),
+		list: rk.slice(0, 5).map((l) => ({
+			name: l.name,
+			value: `${fmtNum(l.ppg, 1)} PPG`,
+			pid: l.pid,
+			tid: l.tid,
+		})),
 	});
 };
 

@@ -178,7 +178,8 @@ export class LeagueIndex {
 	// A season whose playoffs are over, so awards and the champion are known
 	decided(season: number) {
 		return (
-			season < this.L.season || (season === this.L.season && this.L.currentComplete)
+			season < this.L.season ||
+			(season === this.L.season && this.L.currentComplete)
 		);
 	}
 

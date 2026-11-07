@@ -160,12 +160,10 @@ const rank: Topic = ({ X, season, pid }) => {
 			`Among the league’s best in ${best.m.label}`,
 		],
 		hero: { text: showMetric(metricVal(l, best.m), best.m), unit: best.m.unit },
-		list: ranks
-			.slice(0, 5)
-			.map((x) => ({
-				name: x.m.label,
-				value: `${ordinal(x.r)} (${showMetric(metricVal(l, x.m), x.m)})`,
-			})),
+		list: ranks.slice(0, 5).map((x) => ({
+			name: x.m.label,
+			value: `${ordinal(x.r)} (${showMetric(metricVal(l, x.m), x.m)})`,
+		})),
 		lines: [`Out of ${q.length} qualified players`],
 		note: NOTES[best.m.unit],
 		facts: best.r === 1 ? [`lead|${best.m.k}|${pid}`] : [],

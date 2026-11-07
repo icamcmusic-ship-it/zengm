@@ -109,7 +109,7 @@ const SING: Record<string, string> = {
 	selections: "selection",
 };
 const ONE_RE = new RegExp(
-	`(^|[^\\w.,/$#\\-–])1 (${Object.keys(SING).join("|")})\\b`,
+	String.raw`(^|[^\w.,/$#\-–])1 (${Object.keys(SING).join("|")})\b`,
 	"g",
 );
 

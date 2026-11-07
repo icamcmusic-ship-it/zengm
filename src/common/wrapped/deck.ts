@@ -31,13 +31,15 @@ export const clampCount = (n: unknown, mode: WrappedMode) => {
 const norm = (t: string) =>
 	t
 		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, " ")
+		.replace(/[^\da-z]+/g, " ")
 		.trim();
 
 export const factsOf = (s: Slide) => {
 	const out = [`id:${s.id}`, ...(s.facts ?? [])];
 	if (s.hero) {
-		out.push(`hero:${norm(s.hero.text)}|${norm(s.hero.unit ?? "")}|${s.pid ?? s.tid ?? ""}`);
+		out.push(
+			`hero:${norm(s.hero.text)}|${norm(s.hero.unit ?? "")}|${s.pid ?? s.tid ?? ""}`,
+		);
 	}
 	return out;
 };

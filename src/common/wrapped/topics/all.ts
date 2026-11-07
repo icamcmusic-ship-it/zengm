@@ -64,13 +64,11 @@ const goat: Topic = ({ X }) => {
 			["Titles", `${rings}`],
 			["Points", fmtNum(g.c.pts)],
 		],
-		list: list
-			.slice(1, 4)
-			.map((x) => ({
-				name: x.p.name,
-				value: `${fmtNum(x.c.ws, 1)} WS`,
-				pid: x.p.pid,
-			})),
+		list: list.slice(1, 4).map((x) => ({
+			name: x.p.name,
+			value: `${fmtNum(x.c.ws, 1)} WS`,
+			pid: x.p.pid,
+		})),
 		lines: ["Ranked by win shares plus MVP awards"],
 	});
 };
@@ -149,13 +147,11 @@ const team: Topic = ({ X }) => {
 				? "And they won the title"
 				: "But they didn’t win the title",
 		],
-		list: ts
-			.slice(1, 4)
-			.map((t) => ({
-				name: `${t.season} ${t.region} ${t.name}`,
-				value: fmtRecord(t.won, t.lost, t.tied, t.otl),
-				tid: t.tid,
-			})),
+		list: ts.slice(1, 4).map((t) => ({
+			name: `${t.season} ${t.region} ${t.name}`,
+			value: fmtRecord(t.won, t.lost, t.tied, t.otl),
+			tid: t.tid,
+		})),
 	});
 };
 
@@ -175,14 +171,12 @@ const titles: Topic = ({ X }) => {
 		core: true,
 		kicker: "Every champion",
 		heads: ["The champions", "Roll call of champions"],
-		list: list
-			.slice(0, 8)
-			.map((x) => ({
-				name: `${x.s}`,
-				value: `${x.t!.region} ${x.t!.name}`,
-				sub: x.m ? `Finals MVP: ${x.m.name}` : undefined,
-				tid: x.t!.tid,
-			})),
+		list: list.slice(0, 8).map((x) => ({
+			name: `${x.s}`,
+			value: `${x.t!.region} ${x.t!.name}`,
+			sub: x.m ? `Finals MVP: ${x.m.name}` : undefined,
+			tid: x.t!.tid,
+		})),
 		lines: [
 			list.length > 8 ? `…and ${plural(list.length - 8, "more season")}` : null,
 		],
@@ -218,13 +212,11 @@ const leaders: Topic = ({ X }) => {
 					`The ${noun} king: ${top.p.name}`,
 				],
 				hero: { text: fmtNum(top.c[k]), unit: noun },
-				list: list
-					.slice(1, 5)
-					.map((x) => ({
-						name: x.p.name,
-						value: fmtNum(x.c[k]),
-						pid: x.p.pid,
-					})),
+				list: list.slice(1, 5).map((x) => ({
+					name: x.p.name,
+					value: fmtNum(x.c[k]),
+					pid: x.p.pid,
+				})),
 				lines: [
 					list[1] ? `${fmtNum(gap)} ahead of ${list[1].p.name}` : null,
 					top.p.retiredYear < Infinity

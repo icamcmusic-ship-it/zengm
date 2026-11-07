@@ -187,13 +187,11 @@ const star: Topic = ({ X, season, tid }) => {
 				? `${fmtNum((100 * s.pts) / team, 0)}% of the team’s points`
 				: null,
 		],
-		list: rows
-			.slice(1, 4)
-			.map((l) => ({
-				name: l.name,
-				value: `${fmtNum(l.ppg, 1)} PPG`,
-				pid: l.pid,
-			})),
+		list: rows.slice(1, 4).map((l) => ({
+			name: l.name,
+			value: `${fmtNum(l.ppg, 1)} PPG`,
+			pid: l.pid,
+		})),
 	});
 };
 
@@ -333,13 +331,11 @@ const newcomers: Topic = ({ X, season, tid }) => {
 			`${plural(isNew.length, "new face")} on the roster`,
 			`${isNew[0]!.name} led the newcomers`,
 		],
-		list: isNew
-			.slice(0, 5)
-			.map((l) => ({
-				name: l.name,
-				value: `${fmtNum(l.ppg, 1)} PPG`,
-				pid: l.pid,
-			})),
+		list: isNew.slice(0, 5).map((l) => ({
+			name: l.name,
+			value: `${fmtNum(l.ppg, 1)} PPG`,
+			pid: l.pid,
+		})),
 	});
 };
 
