@@ -114,6 +114,22 @@ describe("regenerate ratings (worker)", () => {
 		assert.ok(changed > 40, `only ${changed} changed`);
 	});
 
+	test("after applying, the same preview shows nothing left to change", async () => {
+		const params = {
+			draftYear: g.get("season"),
+			settings: settings(),
+			locks: {},
+			pids: null,
+		};
+		const first = await previewRegenerate(params);
+		assert.ok(first.numChanged > 40);
+		await applyRegenerate(params);
+		const second = await previewRegenerate(params);
+		assert.strictEqual(second.numChanged, 0);
+		assert.strictEqual(second.numOvrChanged, 0);
+		assert.strictEqual(second.numWithOriginals, 70);
+	});
+
 	test("same seed and settings give the same class", async () => {
 		const players = await getClass();
 		const p1 = await previewRegenerate({

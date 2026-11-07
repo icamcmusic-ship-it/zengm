@@ -7,7 +7,6 @@ import type {
 } from "../../../worker/core/draft/regenerateRatings.ts";
 import { helpers } from "../../util/helpers.ts";
 import { toWorker } from "../../util/toWorker.ts";
-import { showNotification } from "../../util/showNotification.ts";
 import { ActionButton } from "../ActionButton.tsx";
 import { Modal } from "../Modal.tsx";
 import { ResponsiveTableWrapper } from "../ResponsiveTableWrapper.tsx";
@@ -194,6 +193,8 @@ export const RegenerateRatingsModal = ({
 	const [locks, setLocks] = useState<Record<number, UiLock>>({});
 	const [preview, setPreview] = useState<PreviewResult | undefined>();
 	const [error, setError] = useState<string | undefined>();
+	// Said inside the modal, not as a toast: a toast lands on top of the footer buttons
+	const [status, setStatus] = useState<string | undefined>();
 	const [applying, setApplying] = useState(false);
 	const [expanded, setExpanded] = useState<number | undefined>();
 	const [builds, setBuilds] = useState<BuildInfo[]>([]);
@@ -296,17 +297,15 @@ export const RegenerateRatingsModal = ({
 				locks,
 				pids,
 			});
-			showNotification({
-				type: "changes",
-				text: `Regenerated the ratings of ${result.applied} prospect${result.applied === 1 ? "" : "s"}. Overalls and potentials are unchanged.`,
-			});
+			const unchanged = preview?.rows.every(
+				(r) => !r.inScope || r.skipped || (r.ovrUnchanged && r.potUnchanged),
+			);
+			setStatus(
+				`Applied to ${result.applied} prospect${result.applied === 1 ? "" : "s"}.${unchanged ? " Overalls and potentials are unchanged." : ""}`,
+			);
 			await load();
 		} catch (error) {
-			showNotification({
-				type: "error",
-				text: error.message,
-				persistent: true,
-			});
+			setError(error.message);
 		} finally {
 			setApplying(false);
 		}
@@ -318,13 +317,11 @@ export const RegenerateRatingsModal = ({
 			"undoRegenerate",
 			undefined,
 		);
-		showNotification({
-			type: "changes",
-			text:
-				result.restored > 0
-					? `Undid the last apply (${result.restored} prospects restored).`
-					: "Nothing to undo.",
-		});
+		setStatus(
+			result.restored > 0
+				? `Undid the last apply (${result.restored} prospects restored).`
+				: "Nothing to undo.",
+		);
 		await load();
 	};
 
@@ -337,10 +334,9 @@ export const RegenerateRatingsModal = ({
 				pids,
 			},
 		);
-		showNotification({
-			type: "changes",
-			text: `Restored the original ratings of ${result.restored} prospect${result.restored === 1 ? "" : "s"}.`,
-		});
+		setStatus(
+			`Restored the original ratings of ${result.restored} prospect${result.restored === 1 ? "" : "s"}.`,
+		);
 		await load();
 	};
 
@@ -349,13 +345,7 @@ export const RegenerateRatingsModal = ({
 	const anyShortfall = rows.some((r) => r.inScope && r.shortfall !== 0);
 
 	return (
-		<Modal
-			show={show}
-			onHide={onHide}
-			size="xl"
-			fullscreen="lg-down"
-			scrollable
-		>
+		<Modal show={show} onHide={onHide} fullscreen scrollable>
 			<Modal.Header closeButton>
 				<Modal.Title>Regenerate ratings</Modal.Title>
 			</Modal.Header>
@@ -449,270 +439,298 @@ export const RegenerateRatingsModal = ({
 					</button>
 				</div>
 
-				{showSettings ? (
-					<div className="border rounded p-3 mb-3">
-						<SettingsForm
-							settings={settings}
-							update={update}
-							idPrefix="regen"
-						/>
-						<button
-							type="button"
-							className="btn btn-sm btn-link px-0 mt-2"
-							onClick={reset}
-						>
-							Reset settings
-						</button>
-					</div>
-				) : null}
-
-				{error ? <div className="alert alert-danger">{error}</div> : null}
-
-				{preview ? (
-					<>
-						<div className="mb-2 d-flex flex-wrap gap-x-3 gap-y-1 column-gap-4">
-							<span>
-								Class flavor:{" "}
-								<b>
-									{preview.flavor
-										? `${preview.flavor.name} (${preview.flavor.label})`
-										: "none"}
-								</b>
-							</span>
-							<span>
-								Build pool:{" "}
-								<b>
-									{preview.poolSize === null ? "every build" : preview.poolSize}
-								</b>
-							</span>
-							<span>
-								Changing <b>{numInScope}</b> of {preview.numPlayers} prospects
-							</span>
-							<span className={allOk ? "text-success" : "text-warning"}>
-								{allOk
-									? "All overalls unchanged"
-									: `${preview.numOvrChanged} overall${preview.numOvrChanged === 1 ? "" : "s"} will change (locks)`}
-							</span>
-							{anyShortfall ? (
-								<span className="text-danger">
-									Some prospects cannot be built to the overall asked for at
-									their height
-								</span>
-							) : null}
+				<div className="row g-3">
+					{showSettings ? (
+						<div className="col-lg-4">
+							<div
+								className="border rounded p-3"
+								style={{ maxHeight: "68vh", overflowY: "auto" }}
+							>
+								<SettingsForm
+									settings={settings}
+									update={update}
+									idPrefix="regen"
+								/>
+								<button
+									type="button"
+									className="btn btn-sm btn-link px-0 mt-2"
+									onClick={reset}
+								>
+									Reset settings
+								</button>
+							</div>
 						</div>
+					) : null}
+					<div className={showSettings ? "col-lg-8" : "col-12"}>
+						{error ? <div className="alert alert-danger">{error}</div> : null}
+						{status ? (
+							<div
+								className="alert alert-success alert-dismissible py-2"
+								role="status"
+							>
+								{status}
+								<button
+									type="button"
+									className="btn-close py-2"
+									aria-label="Dismiss"
+									onClick={() => setStatus(undefined)}
+								/>
+							</div>
+						) : null}
 
-						<ResponsiveTableWrapper>
-							<table className="table table-sm table-striped align-middle mb-0">
-								<thead>
-									<tr>
-										{scope === "selected" ? (
-											<th>
-												<input
-													type="checkbox"
-													className="form-check-input"
-													aria-label="Select all prospects"
-													checked={
-														selected.size > 0 && selected.size === rows.length
-													}
-													onChange={(event) =>
-														setSelected(
-															event.target.checked
-																? new Set(rows.map((r) => r.pid))
-																: new Set(),
-														)
-													}
-												/>
-											</th>
-										) : null}
-										<th>#</th>
-										<th>Name</th>
-										<th>Age</th>
-										<th>Pos</th>
-										<th>Ovr</th>
-										<th>Pot</th>
-										<th>Build</th>
-										<th>Ratings changed</th>
-										<th title="Overall and potential unchanged">OK</th>
-										<th />
-									</tr>
-								</thead>
-								<tbody>
-									{rows.map((r, i) => {
-										const lock = locks[r.pid] ?? {};
-										const open = expanded === r.pid;
-										const dim = !r.inScope || r.skipped;
-										return (
-											<Fragment key={r.pid}>
-												<tr className={clsx({ "text-body-tertiary": dim })}>
-													{scope === "selected" ? (
-														<td>
-															<input
-																type="checkbox"
-																className="form-check-input"
-																aria-label={`Select ${r.firstName} ${r.lastName}`}
-																checked={selected.has(r.pid)}
-																onChange={(event) =>
-																	setSelected((prev) => {
-																		const next = new Set(prev);
-																		if (event.target.checked) {
-																			next.add(r.pid);
-																		} else {
-																			next.delete(r.pid);
-																		}
-																		return next;
-																	})
-																}
-															/>
-														</td>
-													) : null}
-													<td>{i + 1}</td>
-													<td className="text-nowrap">
-														<a href={helpers.leagueUrl(["player", r.pid])}>
-															{r.firstName} {r.lastName}
-														</a>
-													</td>
-													<td>{r.age}</td>
-													<td className="text-nowrap">
-														{r.pos[0]}
-														{r.pos[0] !== r.pos[1] && !dim ? (
-															<>
-																{" "}
-																<span className="text-body-secondary">
-																	{"→"}
-																</span>{" "}
-																<b>{r.pos[1]}</b>
-															</>
-														) : null}
-													</td>
-													<td className="text-nowrap">
-														{r.ovr[0]}
-														{r.ovr[0] !== r.ovr[1] && !dim ? (
-															<>
-																{" "}
-																{"→"} <b>{r.ovr[1]}</b>
-															</>
-														) : null}
-													</td>
-													<td className="text-nowrap">
-														{r.pot[0]}
-														{r.pot[0] !== r.pot[1] && !dim ? (
-															<>
-																{" "}
-																{"→"} <b>{r.pot[1]}</b>
-															</>
-														) : null}
-													</td>
-													<td>
-														{r.skipped ? (
-															<span className="text-body-secondary">
-																left alone
-															</span>
-														) : (
-															<>
-																<b>{r.build.name}</b>
-																{r.prevBuild && r.prevBuild !== r.build.name ? (
-																	<span className="text-body-secondary">
-																		{" "}
-																		(was {r.prevBuild})
-																	</span>
-																) : null}
-																<div className="small text-body-secondary">
-																	{r.build.tags.join(", ")}
-																</div>
-															</>
-														)}
-													</td>
-													<td>
-														{r.skipped ? null : (
-															<ChangeSummary ratings={r.ratings} />
-														)}
-													</td>
-													<td>
-														{r.skipped ? null : r.shortfall !== 0 ? (
-															<span
-																className="text-danger"
-																title="This overall cannot be reached at his height with the locks you set"
-															>
-																!
-															</span>
-														) : r.ovrUnchanged && r.potUnchanged ? (
-															<span
-																className="text-success"
-																title="Overall and potential unchanged"
-															>
-																{"✓"}
-															</span>
-														) : (
-															<span
-																className="text-warning"
-																title="You asked for a different overall or potential"
-															>
-																~
-															</span>
-														)}
-													</td>
-													<td className="text-nowrap text-end">
-														<div className="btn-group btn-group-sm">
-															<button
-																type="button"
-																className="btn btn-light-bordered"
-																onClick={() =>
-																	setLock(r.pid, {
-																		...lock,
-																		reroll: (lock.reroll ?? 0) + 1,
-																	})
-																}
-																title="Reroll just him"
-															>
-																Reroll
-															</button>
-															<button
-																type="button"
-																className={clsx(
-																	"btn",
-																	lockCount(lock) > 0
-																		? "btn-secondary"
-																		: "btn-light-bordered",
-																)}
-																onClick={() =>
-																	setExpanded(open ? undefined : r.pid)
-																}
-																aria-expanded={open}
-															>
-																{open
-																	? "Close"
-																	: lockCount(lock) > 0
-																		? `Locks (${lockCount(lock)})`
-																		: "Details"}
-															</button>
-														</div>
-													</td>
-												</tr>
-												{open ? (
-													<tr>
-														<td
-															colSpan={scope === "selected" ? 11 : 10}
-															className="bg-body-secondary"
-														>
-															<RowDetail
-																row={r}
-																builds={builds}
-																lock={lock}
-																setLock={(l) => setLock(r.pid, l)}
-															/>
-														</td>
-													</tr>
+						{preview ? (
+							<>
+								<div className="mb-2 d-flex flex-wrap gap-x-3 gap-y-1 column-gap-4">
+									<span>
+										Class flavor:{" "}
+										<b>
+											{preview.flavor
+												? `${preview.flavor.name} (${preview.flavor.label})`
+												: "none"}
+										</b>
+									</span>
+									<span>
+										Build pool:{" "}
+										<b>
+											{preview.poolSize === null
+												? "every build"
+												: preview.poolSize}
+										</b>
+									</span>
+									<span>
+										Changing <b>{numInScope}</b> of {preview.numPlayers}{" "}
+										prospects
+									</span>
+									<span className={allOk ? "text-success" : "text-warning"}>
+										{allOk
+											? "All overalls unchanged"
+											: `${preview.numOvrChanged} overall${preview.numOvrChanged === 1 ? "" : "s"} will change (locks)`}
+									</span>
+									{anyShortfall ? (
+										<span className="text-danger">
+											Some prospects cannot be built to the overall asked for at
+											their height
+										</span>
+									) : null}
+								</div>
+
+								<ResponsiveTableWrapper>
+									<table className="table table-sm table-striped align-middle mb-0">
+										<thead>
+											<tr>
+												{scope === "selected" ? (
+													<th>
+														<input
+															type="checkbox"
+															className="form-check-input"
+															aria-label="Select all prospects"
+															checked={
+																selected.size > 0 &&
+																selected.size === rows.length
+															}
+															onChange={(event) =>
+																setSelected(
+																	event.target.checked
+																		? new Set(rows.map((r) => r.pid))
+																		: new Set(),
+																)
+															}
+														/>
+													</th>
 												) : null}
-											</Fragment>
-										);
-									})}
-								</tbody>
-							</table>
-						</ResponsiveTableWrapper>
-					</>
-				) : error ? null : (
-					<div className="text-body-secondary">Loading preview...</div>
-				)}
+												<th>#</th>
+												<th>Name</th>
+												<th>Pos</th>
+												<th>Ovr</th>
+												<th>Pot</th>
+												<th>Build</th>
+												<th>Ratings changed</th>
+												<th title="Overall and potential unchanged">OK</th>
+												<th />
+											</tr>
+										</thead>
+										<tbody>
+											{rows.map((r, i) => {
+												const lock = locks[r.pid] ?? {};
+												const open = expanded === r.pid;
+												const dim = !r.inScope || r.skipped;
+												return (
+													<Fragment key={r.pid}>
+														<tr className={clsx({ "text-body-tertiary": dim })}>
+															{scope === "selected" ? (
+																<td>
+																	<input
+																		type="checkbox"
+																		className="form-check-input"
+																		aria-label={`Select ${r.firstName} ${r.lastName}`}
+																		checked={selected.has(r.pid)}
+																		onChange={(event) =>
+																			setSelected((prev) => {
+																				const next = new Set(prev);
+																				if (event.target.checked) {
+																					next.add(r.pid);
+																				} else {
+																					next.delete(r.pid);
+																				}
+																				return next;
+																			})
+																		}
+																	/>
+																</td>
+															) : null}
+															<td>{i + 1}</td>
+															<td className="text-nowrap">
+																<a href={helpers.leagueUrl(["player", r.pid])}>
+																	{r.firstName} {r.lastName}
+																</a>{" "}
+																<span className="text-body-secondary small">
+																	{r.age}
+																</span>
+															</td>
+															<td className="text-nowrap">
+																{r.pos[0]}
+																{r.pos[0] !== r.pos[1] && !dim ? (
+																	<>
+																		{" "}
+																		<span className="text-body-secondary">
+																			{"→"}
+																		</span>{" "}
+																		<b>{r.pos[1]}</b>
+																	</>
+																) : null}
+															</td>
+															<td className="text-nowrap">
+																{r.ovr[0]}
+																{r.ovr[0] !== r.ovr[1] && !dim ? (
+																	<>
+																		{" "}
+																		{"→"} <b>{r.ovr[1]}</b>
+																	</>
+																) : null}
+															</td>
+															<td className="text-nowrap">
+																{r.pot[0]}
+																{r.pot[0] !== r.pot[1] && !dim ? (
+																	<>
+																		{" "}
+																		{"→"} <b>{r.pot[1]}</b>
+																	</>
+																) : null}
+															</td>
+															<td>
+																{r.skipped ? (
+																	<span className="text-body-secondary">
+																		left alone
+																	</span>
+																) : (
+																	<>
+																		<b>{r.build.name}</b>
+																		{r.prevBuild &&
+																		r.prevBuild !== r.build.name ? (
+																			<span className="text-body-secondary">
+																				{" "}
+																				(was {r.prevBuild})
+																			</span>
+																		) : null}
+																		<div className="small text-body-secondary">
+																			{r.build.tags.join(", ")}
+																		</div>
+																	</>
+																)}
+															</td>
+															<td>
+																{r.skipped ? null : (
+																	<ChangeSummary ratings={r.ratings} />
+																)}
+															</td>
+															<td>
+																{r.skipped ? null : r.shortfall !== 0 ? (
+																	<span
+																		className="text-danger"
+																		title="This overall cannot be reached at his height with the locks you set"
+																	>
+																		!
+																	</span>
+																) : r.ovrUnchanged && r.potUnchanged ? (
+																	<span
+																		className="text-success"
+																		title="Overall and potential unchanged"
+																	>
+																		{"✓"}
+																	</span>
+																) : (
+																	<span
+																		className="text-warning"
+																		title="You asked for a different overall or potential"
+																	>
+																		~
+																	</span>
+																)}
+															</td>
+															<td className="text-nowrap text-end">
+																<div className="btn-group btn-group-sm">
+																	<button
+																		type="button"
+																		className="btn btn-light-bordered"
+																		onClick={() =>
+																			setLock(r.pid, {
+																				...lock,
+																				reroll: (lock.reroll ?? 0) + 1,
+																			})
+																		}
+																		title="Reroll just him"
+																	>
+																		Reroll
+																	</button>
+																	<button
+																		type="button"
+																		className={clsx(
+																			"btn",
+																			lockCount(lock) > 0
+																				? "btn-secondary"
+																				: "btn-light-bordered",
+																		)}
+																		onClick={() =>
+																			setExpanded(open ? undefined : r.pid)
+																		}
+																		aria-expanded={open}
+																	>
+																		{open
+																			? "Hide"
+																			: lockCount(lock) > 0
+																				? `Locks (${lockCount(lock)})`
+																				: "Details"}
+																	</button>
+																</div>
+															</td>
+														</tr>
+														{open ? (
+															<tr>
+																<td
+																	colSpan={scope === "selected" ? 10 : 9}
+																	className="bg-body-secondary"
+																>
+																	<RowDetail
+																		row={r}
+																		builds={builds}
+																		lock={lock}
+																		setLock={(l) => setLock(r.pid, l)}
+																	/>
+																</td>
+															</tr>
+														) : null}
+													</Fragment>
+												);
+											})}
+										</tbody>
+									</table>
+								</ResponsiveTableWrapper>
+							</>
+						) : error ? null : (
+							<div className="text-body-secondary">Loading preview...</div>
+						)}
+					</div>
+				</div>
 			</Modal.Body>
 			<Modal.Footer className="justify-content-between">
 				<div className="d-flex flex-wrap gap-2">

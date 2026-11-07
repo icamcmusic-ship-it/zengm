@@ -286,15 +286,30 @@ const makeRow = (
 	locks: UiLock,
 	hgt: number,
 ): PreviewRow => {
+	// "Before" is what the player has right now (not the original he was built from), so a regeneration that has already
+	// been applied previews as no change
 	const row = last(p.ratings) as PlayerRatings;
+	const current = toBuildRatings(row);
+	const currentOvr = F.ovr(current);
+	const after = r.skipped
+		? {
+				ratings: current,
+				fuzz: row.fuzz,
+				ovr: currentOvr,
+				pot: row.pot,
+				pos: row.pos,
+				skills: row.skills,
+				hgtInches: p.hgt,
+			}
+		: r.after;
 	const ratings = RATING_KEYS.map((key) => ({
 		key,
 		before: NO_FUZZ_HGT.has(key)
-			? r.before.ratings[key]
-			: display(r.before.ratings[key], row.fuzz),
+			? current[key]
+			: display(current[key], row.fuzz),
 		after: NO_FUZZ_HGT.has(key)
-			? r.after.ratings[key]
-			: display(r.after.ratings[key], r.after.fuzz),
+			? after.ratings[key]
+			: display(after.ratings[key], after.fuzz),
 	}));
 	return {
 		pid: p.pid,
@@ -304,19 +319,16 @@ const makeRow = (
 		inScope,
 		skipped: r.skipped,
 		hasBase,
-		pos: [row.pos, r.after.pos],
-		ovr: [
-			display(F.ovr(toBuildRatings(row)), row.fuzz),
-			display(r.after.ovr, r.after.fuzz),
-		],
-		pot: [display(row.pot, row.fuzz), display(r.after.pot, r.after.fuzz)],
-		ovrUnchanged: r.after.ovr === r.before.ovr,
-		potUnchanged: r.after.pot === r.before.pot,
+		pos: [row.pos, after.pos],
+		ovr: [display(currentOvr, row.fuzz), display(after.ovr, after.fuzz)],
+		pot: [display(row.pot, row.fuzz), display(after.pot, after.fuzz)],
+		ovrUnchanged: after.ovr === currentOvr,
+		potUnchanged: after.pot === row.pot,
 		shortfall: r.ovrShortfall,
 		build: r.build,
 		prevBuild: p.ratingsBuild?.name,
-		skills: [row.skills, r.after.skills],
-		hgtInches: [p.hgt, r.after.hgtInches],
+		skills: [row.skills, after.skills],
+		hgtInches: [p.hgt, after.hgtInches],
 		ratings,
 		locks,
 		hgt,
