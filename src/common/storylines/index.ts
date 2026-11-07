@@ -2,7 +2,11 @@
 //
 // Text can carry links as tokens: [[p:PID|Name]] for a player and [[t:TID:SEASON|Name]] for a team season. The UI turns them into links; plainText() strips them.
 
-import { LeagueIndex, type SeasonLine } from "../wrapped/league.ts";
+import {
+	isLeagueIndex,
+	LeagueIndex,
+	type SeasonLine,
+} from "../wrapped/league.ts";
 import type { WLeague, WPlayer, WStat } from "../wrapped/types.ts";
 import {
 	fmtNum,
@@ -1469,37 +1473,66 @@ const KINDS: Kind[] = [
 
 export const KIND_NAMES = KINDS.map((k) => k.kind);
 
+const draftToStory = (k: Kind, d: Draft): Story | undefined => {
+	const id = `${k.kind}|${d.key}`;
+	const { key: _key, heads, bodies, ...rest } = d;
+	const story: Story = {
+		...rest,
+		id,
+		headline: polish(pickBy(`${id}|h`, heads)),
+		body: polish(pickBy(`${id}|b`, bodies)),
+		evidence: d.evidence.map(([a, b]) => [a, polish(b)]),
+	};
+	if (
+		isBadText(
+			plainText(
+				`${story.headline} ${story.body} ${story.evidence.flat().join(" ")}`,
+			),
+		)
+	) {
+		return undefined;
+	}
+	return story;
+};
+
+const findKind = (X: LeagueIndex, k: Kind, out: Story[]) => {
+	let drafts: Draft[];
+	try {
+		drafts = k.find(X);
+	} catch (error) {
+		console.error(error);
+		return;
+	}
+	for (const d of drafts) {
+		const story = draftToStory(k, d);
+		if (story) {
+			out.push(story);
+		}
+	}
+};
+
 export const findStories = (L: WLeague | LeagueIndex): Story[] => {
-	const X = L instanceof LeagueIndex ? L : new LeagueIndex(L);
+	const X = isLeagueIndex(L) ? L : new LeagueIndex(L);
 	const out: Story[] = [];
 	for (const k of KINDS) {
-		let drafts: Draft[];
-		try {
-			drafts = k.find(X);
-		} catch (error) {
-			console.error(error);
-			continue;
-		}
-		for (const d of drafts) {
-			const id = `${k.kind}|${d.key}`;
-			const { key: _key, heads, bodies, ...rest } = d;
-			const story: Story = {
-				...rest,
-				id,
-				headline: polish(pickBy(`${id}|h`, heads)),
-				body: polish(pickBy(`${id}|b`, bodies)),
-				evidence: d.evidence.map(([a, b]) => [a, polish(b)]),
-			};
-			if (
-				isBadText(
-					plainText(
-						`${story.headline} ${story.body} ${story.evidence.flat().join(" ")}`,
-					),
-				)
-			) {
-				continue;
-			}
-			out.push(story);
+		findKind(X, k, out);
+	}
+	return diversify(out);
+};
+
+// The same, but lets the caller do other work (like answer messages) between kinds. Gives exactly what findStories gives.
+export const findStoriesAsync = async (
+	L: WLeague | LeagueIndex,
+	pause: () => Promise<void>,
+): Promise<Story[]> => {
+	const X = isLeagueIndex(L) ? L : new LeagueIndex(L);
+	const out: Story[] = [];
+	let t0 = performance.now();
+	for (const k of KINDS) {
+		findKind(X, k, out);
+		if (performance.now() - t0 > 30) {
+			await pause();
+			t0 = performance.now();
 		}
 	}
 	return diversify(out);

@@ -106,19 +106,55 @@ const toLine = (p: WPlayer, rows: WStat[]): SeasonLine => {
 	};
 };
 
+// Per-season player lines that can be kept from one index to the next. A season's lines only depend on stat rows of that season, so the owner of the cache (the worker) drops a season when its rows change.
+export type LinesCache = {
+	reg: Map<number, SeasonLine[]>;
+	po: Map<number, SeasonLine[]>;
+};
+
+export const newLinesCache = (): LinesCache => ({
+	reg: new Map(),
+	po: new Map(),
+});
+
+type SeasonRows = { p: WPlayer; rows: WStat[] }[];
+
+// True for an index (as opposed to the plain snapshot it is built from)
+export const isLeagueIndex = (x: WLeague | LeagueIndex): x is LeagueIndex =>
+	typeof (x as LeagueIndex).lines === "function";
+
 export class LeagueIndex {
 	L: WLeague;
 	players = new Map<number, WPlayer>();
 	private teamMap = new Map<string, WTeamSeason>();
+	private teamsBySeason = new Map<number, WTeamSeason[]>();
+	// In the order of L.teamSeasons
+	private teamsByTid = new Map<number, WTeamSeason[]>();
+	private rowsBySeason:
+		| { reg: Map<number, SeasonRows>; po: Map<number, SeasonRows> }
+		| undefined;
 	private linesBySeason = new Map<number, SeasonLine[]>();
 	private poBySeason = new Map<number, SeasonLine[]>();
+	private lineByPid = new Map<number, Map<number, SeasonLine | undefined>>();
+	private awardIndex: Map<string, number[]> | undefined;
 	private seriesBySeason = new Map<number, WSeries>();
 	private gamesBySeason = new Map<number, WGame[]>();
 	private memo = new Map<string, unknown>();
+	private linesCache: LinesCache | undefined;
+	private reuseLines: ((season: number) => boolean) | undefined;
 	seasons: number[];
 
-	constructor(L: WLeague) {
+	// linesCache and reuseLines: lines of a season for which reuseLines is true come from linesCache if they are there, and are stored there when computed
+	constructor(
+		L: WLeague,
+		opts?: {
+			linesCache?: LinesCache;
+			reuseLines?: (season: number) => boolean;
+		},
+	) {
 		this.L = L;
+		this.linesCache = opts?.linesCache;
+		this.reuseLines = opts?.reuseLines;
 		for (const p of L.players) {
 			this.players.set(p.pid, p);
 		}
@@ -126,6 +162,18 @@ export class LeagueIndex {
 		for (const ts of L.teamSeasons) {
 			this.teamMap.set(`${ts.tid}|${ts.season}`, ts);
 			seasons.add(ts.season);
+			let bySeason = this.teamsBySeason.get(ts.season);
+			if (!bySeason) {
+				bySeason = [];
+				this.teamsBySeason.set(ts.season, bySeason);
+			}
+			bySeason.push(ts);
+			let byTid = this.teamsByTid.get(ts.tid);
+			if (!byTid) {
+				byTid = [];
+				this.teamsByTid.set(ts.tid, byTid);
+			}
+			byTid.push(ts);
 		}
 		this.seasons = [...seasons].sort((a, b) => a - b);
 		for (const s of L.series) {
@@ -139,33 +187,70 @@ export class LeagueIndex {
 			}
 			list.push(g);
 		}
-		for (const p of L.players) {
-			for (const [src, target] of [
-				[p.stats, this.linesBySeason],
-				[p.po, this.poBySeason],
-			] as const) {
-				const bySeason = new Map<number, WStat[]>();
-				for (const r of src) {
-					if (r.gp <= 0) {
+	}
+
+	// Which of a player's rows belong to which season, only built when a season's lines are not already cached
+	private rows() {
+		if (!this.rowsBySeason) {
+			const out = {
+				reg: new Map<number, SeasonRows>(),
+				po: new Map<number, SeasonRows>(),
+			};
+			for (const p of this.L.players) {
+				for (const [src, target] of [
+					[p.stats, out.reg],
+					[p.po, out.po],
+				] as const) {
+					if (src.length === 0) {
 						continue;
 					}
-					let rows = bySeason.get(r.season);
-					if (!rows) {
-						rows = [];
-						bySeason.set(r.season, rows);
+					const bySeason = new Map<number, WStat[]>();
+					for (const r of src) {
+						if (r.gp <= 0) {
+							continue;
+						}
+						let rows = bySeason.get(r.season);
+						if (!rows) {
+							rows = [];
+							bySeason.set(r.season, rows);
+						}
+						rows.push(r);
 					}
-					rows.push(r);
-				}
-				for (const [season, rows] of bySeason) {
-					let list = target.get(season);
-					if (!list) {
-						list = [];
-						target.set(season, list);
+					for (const [season, rows] of bySeason) {
+						let list = target.get(season);
+						if (!list) {
+							list = [];
+							target.set(season, list);
+						}
+						list.push({ p, rows });
 					}
-					list.push(toLine(p, rows));
 				}
 			}
+			this.rowsBySeason = out;
 		}
+		return this.rowsBySeason;
+	}
+
+	private seasonLines(kind: "reg" | "po", season: number) {
+		const mem = kind === "reg" ? this.linesBySeason : this.poBySeason;
+		let lines = mem.get(season);
+		if (lines) {
+			return lines;
+		}
+		const reuse = this.linesCache && this.reuseLines?.(season);
+		if (reuse) {
+			lines = this.linesCache![kind].get(season);
+		}
+		if (!lines) {
+			lines = (this.rows()[kind].get(season) ?? []).map(({ p, rows }) =>
+				toLine(p, rows),
+			);
+			if (reuse) {
+				this.linesCache![kind].set(season, lines);
+			}
+		}
+		mem.set(season, lines);
+		return lines;
 	}
 
 	cached<T>(key: string, f: () => T): T {
@@ -198,10 +283,10 @@ export class LeagueIndex {
 			return t;
 		}
 		let best: WTeamSeason | undefined;
-		for (const ts of this.L.teamSeasons) {
+		for (const ts of this.teamsByTid.get(tid) ?? []) {
 			if (
-				ts.tid === tid &&
-				(!best || Math.abs(ts.season - season) < Math.abs(best.season - season))
+				!best ||
+				Math.abs(ts.season - season) < Math.abs(best.season - season)
 			) {
 				best = ts;
 			}
@@ -214,8 +299,9 @@ export class LeagueIndex {
 		return t ? `${t.region} ${t.name}` : "a free agent";
 	}
 
+	// A copy, so callers can sort it
 	teamsIn(season: number) {
-		return this.L.teamSeasons.filter((ts) => ts.season === season);
+		return [...(this.teamsBySeason.get(season) ?? [])];
 	}
 
 	teamWinp(ts: WTeamSeason) {
@@ -231,7 +317,9 @@ export class LeagueIndex {
 			return undefined;
 		}
 		const n = this.numRounds(season);
-		return this.teamsIn(season).find((t) => t.playoffRoundsWon >= n && n > 0);
+		return this.teamsBySeason
+			.get(season)
+			?.find((t) => t.playoffRoundsWon >= n && n > 0);
 	}
 
 	runnerUp(season: number) {
@@ -239,7 +327,9 @@ export class LeagueIndex {
 			return undefined;
 		}
 		const n = this.numRounds(season);
-		return this.teamsIn(season).find((t) => t.playoffRoundsWon === n - 1);
+		return this.teamsBySeason
+			.get(season)
+			?.find((t) => t.playoffRoundsWon === n - 1);
 	}
 
 	series(season: number) {
@@ -255,15 +345,26 @@ export class LeagueIndex {
 	}
 
 	lines(season: number) {
-		return this.linesBySeason.get(season) ?? [];
+		return this.seasonLines("reg", season);
 	}
 
 	poLines(season: number) {
-		return this.poBySeason.get(season) ?? [];
+		return this.seasonLines("po", season);
 	}
 
 	line(pid: number, season: number) {
-		return this.lines(season).find((l) => l.pid === pid);
+		let byPid = this.lineByPid.get(season);
+		if (!byPid) {
+			byPid = new Map();
+			for (const l of this.lines(season)) {
+				// The first one wins, like find
+				if (!byPid.has(l.pid)) {
+					byPid.set(l.pid, l);
+				}
+			}
+			this.lineByPid.set(season, byPid);
+		}
+		return byPid.get(pid);
 	}
 
 	// Most games anyone played that season, for "qualified" cutoffs
@@ -293,16 +394,32 @@ export class LeagueIndex {
 
 	// Award winners: the pids of players with this award type in this season
 	awardPids(season: number, type: string) {
-		const out: number[] = [];
 		if (!this.decided(season) && type !== "All-Star") {
-			return out;
+			return [];
 		}
-		for (const p of this.L.players) {
-			if (p.awards.some((a) => a.season === season && a.type === type)) {
-				out.push(p.pid);
+		if (!this.awardIndex) {
+			const index = new Map<string, number[]>();
+			for (const p of this.L.players) {
+				// A player holding the same award twice in a season is listed once
+				const seen = new Set<string>();
+				for (const a of p.awards) {
+					const key = `${a.season}|${a.type}`;
+					if (seen.has(key)) {
+						continue;
+					}
+					seen.add(key);
+					let pids = index.get(key);
+					if (!pids) {
+						pids = [];
+						index.set(key, pids);
+					}
+					pids.push(p.pid);
+				}
 			}
+			this.awardIndex = index;
 		}
-		return out;
+		// A copy, so callers can sort it
+		return [...(this.awardIndex.get(`${season}|${type}`) ?? [])];
 	}
 
 	awardWinner(season: number, type: string) {
@@ -311,9 +428,13 @@ export class LeagueIndex {
 	}
 
 	countAwards(p: WPlayer, type: string, upTo: number = Infinity) {
-		return p.awards.filter(
-			(a) => a.type === type && a.season <= upTo && this.decided(a.season),
-		).length;
+		let n = 0;
+		for (const a of p.awards) {
+			if (a.type === type && a.season <= upTo && this.decided(a.season)) {
+				n += 1;
+			}
+		}
+		return n;
 	}
 
 	careerRows(p: WPlayer, upTo: number = Infinity) {
@@ -342,21 +463,23 @@ export class LeagueIndex {
 	}
 
 	titlesOf(tid: number, upTo: number = Infinity) {
-		return this.L.teamSeasons
-			.filter(
-				(ts) =>
-					ts.tid === tid &&
-					ts.season <= upTo &&
-					this.decided(ts.season) &&
-					ts.playoffRoundsWon >= this.numRounds(ts.season) &&
-					this.numRounds(ts.season) > 0,
-			)
-			.map((ts) => ts.season);
+		const out: number[] = [];
+		for (const ts of this.teamsByTid.get(tid) ?? []) {
+			if (
+				ts.season <= upTo &&
+				this.decided(ts.season) &&
+				ts.playoffRoundsWon >= this.numRounds(ts.season) &&
+				this.numRounds(ts.season) > 0
+			) {
+				out.push(ts.season);
+			}
+		}
+		return out;
 	}
 
 	teamHistory(tid: number) {
-		return this.L.teamSeasons
-			.filter((ts) => ts.tid === tid)
-			.sort((a, b) => a.season - b.season);
+		return [...(this.teamsByTid.get(tid) ?? [])].sort(
+			(a, b) => a.season - b.season,
+		);
 	}
 }

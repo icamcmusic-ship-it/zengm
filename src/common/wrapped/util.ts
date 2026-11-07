@@ -31,13 +31,23 @@ export const pickBy = <T>(seed: string, list: readonly T[]): T => {
 	return list[hashString(seed) % list.length]!;
 };
 
-export const fmtNum = (n: number, d: number = 0) =>
-	isNum(n)
-		? n.toLocaleString("en-US", {
-				minimumFractionDigits: d,
-				maximumFractionDigits: d,
-			})
-		: "–";
+// Building an Intl.NumberFormat is slow and every slide formats many numbers, so keep one per number of digits
+const formatters = new Map<number, Intl.NumberFormat>();
+
+export const fmtNum = (n: number, d: number = 0) => {
+	if (!isNum(n)) {
+		return "–";
+	}
+	let f = formatters.get(d);
+	if (!f) {
+		f = new Intl.NumberFormat("en-US", {
+			minimumFractionDigits: d,
+			maximumFractionDigits: d,
+		});
+		formatters.set(d, f);
+	}
+	return f.format(n);
+};
 
 export const ordinal = (n: number) => {
 	const v = Math.abs(n) % 100;
