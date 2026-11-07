@@ -6,6 +6,7 @@ import { LeagueIndex, newLinesCache } from "./league.ts";
 import { LegacyLeagueIndex } from "./legacyLeagueIndex.ts";
 import type { WLeague, WrappedMode } from "./types.ts";
 import { findStories } from "../storylines/index.ts";
+import { gameLines } from "./topics/helpers.ts";
 
 // The optimized LeagueIndex has to give exactly what the original, unindexed one gave, through every topic and every storyline kind (including ones added later, as long as they use the same methods)
 const legacy = (L: WLeague) =>
@@ -85,6 +86,15 @@ describe.each(fixtures)(
 			expect(expected.length).toBeGreaterThan(0);
 			expect(findStories(fresh)).toEqual(expected);
 			expect(findStories(cachedB)).toEqual(expected);
+		});
+
+		test("box score lines are made once for the same box scores", () => {
+			const withGames = old.seasons.filter((s) => old.hasBoxScores(s));
+			expect(withGames.length).toBeGreaterThan(0);
+			for (const s of withGames) {
+				expect(gameLines(cachedA, s)).toBe(gameLines(cachedB, s));
+				expect(gameLines(cachedA, s)).toEqual(gameLines(old, s));
+			}
 		});
 
 		test("index lookups", () => {

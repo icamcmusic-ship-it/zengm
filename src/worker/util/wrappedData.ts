@@ -253,6 +253,17 @@ export type Built = {
 
 let state: LeagueCache | undefined;
 
+// The snapshot of a big league is a lot of memory, so it isn't kept for a league nobody has looked at in a while. What is saved (see wrappedPersist.ts) makes building it again quick.
+const KEEP_MS = 10 * 60 * 1000;
+let evictTimer: ReturnType<typeof setTimeout> | undefined;
+const touch = () => {
+	clearTimeout(evictTimer);
+	evictTimer = setTimeout(() => {
+		state = undefined;
+	}, KEEP_MS);
+	(evictTimer as { unref?: () => void }).unref?.();
+};
+
 const newCache = (lid: number): LeagueCache => ({
 	lid,
 	epoch: changeLog.epoch,
@@ -782,6 +793,7 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 
 // The snapshot and its index. Rebuilt only if something it reads changed since the last call, and then only the changed parts are read again.
 export const getWrapped = (): Promise<Built> => {
+	touch();
 	const lid = g.get("lid");
 	if (!state || state.lid !== lid || state.epoch !== changeLog.epoch) {
 		state = newCache(lid);
@@ -828,6 +840,7 @@ export type WrappedStatus =
 
 // Like getWrapped, but never waits: if the snapshot isn't ready it starts building it and says so, and the page asking is sent an update when it is ready (a "wrappedReady" event). Pages use it to show a placeholder at once instead of nothing.
 export const getWrappedStatus = (retry: boolean): WrappedStatus => {
+	touch();
 	const lid = g.get("lid");
 	if (!state || state.lid !== lid || state.epoch !== changeLog.epoch) {
 		state = newCache(lid);

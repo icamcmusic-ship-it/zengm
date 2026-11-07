@@ -26,63 +26,74 @@ export type SeasonLine = WStat & {
 	tsPct: number;
 };
 
-const STAT_KEYS = [
-	"gp",
-	"gs",
-	"min",
-	"pts",
-	"trb",
-	"ast",
-	"stl",
-	"blk",
-	"tov",
-	"tp",
-	"tpa",
-	"fg",
-	"fga",
-	"ft",
-	"fta",
-	"ws",
-	"vorp",
-] as const;
-
 export const sumRows = (rows: WStat[]): WStat => {
-	const out: WStat = {
-		season: rows[0]?.season ?? 0,
-		tid: rows.at(-1)?.tid ?? -1,
-		gp: 0,
-		gs: 0,
-		min: 0,
-		pts: 0,
-		trb: 0,
-		ast: 0,
-		stl: 0,
-		blk: 0,
-		tov: 0,
-		tp: 0,
-		tpa: 0,
-		fg: 0,
-		fga: 0,
-		ft: 0,
-		fta: 0,
-		per: 0,
-		ws: 0,
-		bpm: 0,
-		vorp: 0,
-	};
+	// One variable per stat rather than looking each up by name, since this runs for every player season
+	let gp = 0;
+	let gs = 0;
+	let min = 0;
+	let pts = 0;
+	let trb = 0;
+	let ast = 0;
+	let stl = 0;
+	let blk = 0;
+	let tov = 0;
+	let tp = 0;
+	let tpa = 0;
+	let fg = 0;
+	let fga = 0;
+	let ft = 0;
+	let fta = 0;
+	let ws = 0;
+	let vorp = 0;
+	let per = 0;
+	let bpm = 0;
 	let minW = 0;
 	for (const r of rows) {
-		for (const k of STAT_KEYS) {
-			out[k] += r[k];
-		}
+		gp += r.gp;
+		gs += r.gs;
+		min += r.min;
+		pts += r.pts;
+		trb += r.trb;
+		ast += r.ast;
+		stl += r.stl;
+		blk += r.blk;
+		tov += r.tov;
+		tp += r.tp;
+		tpa += r.tpa;
+		fg += r.fg;
+		fga += r.fga;
+		ft += r.ft;
+		fta += r.fta;
+		ws += r.ws;
+		vorp += r.vorp;
 		// PER and BPM are rates, weight by minutes
-		out.per += r.per * r.min;
-		out.bpm += r.bpm * r.min;
+		per += r.per * r.min;
+		bpm += r.bpm * r.min;
 		minW += r.min;
 	}
-	out.per = minW > 0 ? out.per / minW : 0;
-	out.bpm = minW > 0 ? out.bpm / minW : 0;
-	return out;
+	return {
+		season: rows[0]?.season ?? 0,
+		tid: rows.at(-1)?.tid ?? -1,
+		gp,
+		gs,
+		min,
+		pts,
+		trb,
+		ast,
+		stl,
+		blk,
+		tov,
+		tp,
+		tpa,
+		fg,
+		fga,
+		ft,
+		fta,
+		per: minW > 0 ? per / minW : 0,
+		ws,
+		bpm: minW > 0 ? bpm / minW : 0,
+		vorp,
+	};
 };
 
 const toLine = (p: WPlayer, rows: WStat[]): SeasonLine => {
@@ -117,6 +128,12 @@ export const newLinesCache = (): LinesCache => ({
 	po: new Map(),
 });
 
+// Results made from one list of box scores, for any index that has that same list
+const sharedByGames = new WeakMap<
+	WGame,
+	{ n: number; last: WGame; memo: Map<string, unknown> }
+>();
+
 type SeasonRows = { p: WPlayer; rows: WStat[] }[];
 
 // True for an index (as opposed to the plain snapshot it is built from)
@@ -140,6 +157,8 @@ export class LeagueIndex {
 	private seriesBySeason = new Map<number, WSeries>();
 	private gamesBySeason = new Map<number, WGame[]>();
 	private memo = new Map<string, unknown>();
+	private careers = new Map<WPlayer, WStat>();
+	private playerPos: Map<number, number> | undefined;
 	private linesCache: LinesCache | undefined;
 	private reuseLines: ((season: number) => boolean) | undefined;
 	seasons: number[];
@@ -231,6 +250,25 @@ export class LeagueIndex {
 		return this.rowsBySeason;
 	}
 
+	// The lines, in the order of L.players, which is the order lines are made in. The same array if they already are.
+	private inPlayerOrder(lines: SeasonLine[]) {
+		if (!this.playerPos) {
+			this.playerPos = new Map(this.L.players.map((p, i) => [p.pid, i]));
+		}
+		const pos = this.playerPos;
+		let prev = -1;
+		for (const l of lines) {
+			const i = pos.get(l.pid) ?? Infinity;
+			if (i < prev) {
+				return lines.toSorted(
+					(a, b) => (pos.get(a.pid) ?? Infinity) - (pos.get(b.pid) ?? Infinity),
+				);
+			}
+			prev = i;
+		}
+		return lines;
+	}
+
 	private seasonLines(kind: "reg" | "po", season: number) {
 		const mem = kind === "reg" ? this.linesBySeason : this.poBySeason;
 		let lines = mem.get(season);
@@ -240,6 +278,14 @@ export class LeagueIndex {
 		const reuse = this.linesCache && this.reuseLines?.(season);
 		if (reuse) {
 			lines = this.linesCache![kind].get(season);
+			if (lines) {
+				// Lines are in the order of the players, which may have changed since they were made (a player who retires moves)
+				const sorted = this.inPlayerOrder(lines);
+				if (sorted !== lines) {
+					lines = sorted;
+					this.linesCache![kind].set(season, lines);
+				}
+			}
 		}
 		if (!lines) {
 			lines = (this.rows()[kind].get(season) ?? []).map(({ p, rows }) =>
@@ -254,6 +300,29 @@ export class LeagueIndex {
 	}
 
 	cached<T>(key: string, f: () => T): T {
+		// What is made from a season's box scores only depends on them, so an index whose box scores for the season are the very same list as another's can use the other's result
+		const season = /^gl\|(\d+)$/.exec(key)?.[1];
+		const games =
+			season === undefined
+				? undefined
+				: this.gamesBySeason.get(Number.parseInt(season));
+		const first = games?.[0];
+		if (games && first) {
+			// Lists of box scores are only ever replaced as a whole, so the same first and last game and the same count mean the same list
+			let shared = sharedByGames.get(first);
+			if (
+				!shared ||
+				shared.n !== games.length ||
+				shared.last !== games.at(-1)
+			) {
+				shared = { n: games.length, last: games.at(-1)!, memo: new Map() };
+				sharedByGames.set(first, shared);
+			}
+			if (!shared.memo.has(key)) {
+				shared.memo.set(key, f());
+			}
+			return shared.memo.get(key) as T;
+		}
 		if (!this.memo.has(key)) {
 			this.memo.set(key, f());
 		}
@@ -441,7 +510,16 @@ export class LeagueIndex {
 		return p.stats.filter((r) => r.season <= upTo && r.gp > 0);
 	}
 
+	// A copy, so callers can change it. The whole career is summed once per player.
 	career(p: WPlayer, upTo: number = Infinity) {
+		if (upTo === Infinity) {
+			let c = this.careers.get(p);
+			if (!c) {
+				c = sumRows(this.careerRows(p));
+				this.careers.set(p, c);
+			}
+			return { ...c };
+		}
 		return sumRows(this.careerRows(p, upTo));
 	}
 

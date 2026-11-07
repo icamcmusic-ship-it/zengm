@@ -1,5 +1,12 @@
 import * as fakeIndexedDB from "fake-indexeddb";
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from "vitest";
 import { DEFAULT_LEVEL } from "../../common/budgetLevels.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import type {
@@ -83,7 +90,11 @@ const makePlayer = (
 	};
 };
 
-const makeTeamSeason = (rid: number, tid: number, season: number): TeamSeason => {
+const makeTeamSeason = (
+	rid: number,
+	tid: number,
+	season: number,
+): TeamSeason => {
 	const t = team.generate({
 		tid,
 		cid: 0,
@@ -93,10 +104,20 @@ const makeTeamSeason = (rid: number, tid: number, season: number): TeamSeason =>
 		abbrev: `AB${tid}`,
 		pop: 1,
 	});
-	return { ...team.genSeasonRow(t), rid, season, won: 40 + tid, lost: 42 - tid };
+	return {
+		...team.genSeasonRow(t),
+		rid,
+		season,
+		won: 40 + tid,
+		lost: 42 - tid,
+	};
 };
 
-const makeTeamStats = (rid: number, tid: number, season: number): TeamStats => ({
+const makeTeamStats = (
+	rid: number,
+	tid: number,
+	season: number,
+): TeamStats => ({
 	...team.genStatsRow(tid, false),
 	rid,
 	season,
@@ -116,7 +137,9 @@ const makeGame = (gid: number, season: number): Game =>
 			{
 				tid: 0,
 				pts: 100,
-				players: [{ pid: 3, name: "A B", min: 30, pts: 20, orb: 1, drb: 4, ast: 5 }],
+				players: [
+					{ pid: 3, name: "A B", min: 30, pts: 20, orb: 1, drb: 4, ast: 5 },
+				],
 			},
 			{ tid: 1, pts: 90, players: [] },
 		],
@@ -268,7 +291,7 @@ describe("Wrapped snapshot", () => {
 		// Like editing a retired player in God Mode
 		const p1 = (await idb.merged.players.get(1))!;
 		p1.stats = p1.stats.map((r) =>
-			r.season === 2015 ? { ...r, pts: r.pts + 500 } : r,
+			r.season === 2015 ? { ...r, pts: (r.pts ?? 0) + 500 } : r,
 		);
 		await idb.cache.players.put(p1);
 
@@ -278,6 +301,28 @@ describe("Wrapped snapshot", () => {
 		expect(plain(b.X.lines(2015))).toEqual(
 			plain(new LeagueIndex(b.L).lines(2015)),
 		);
+	});
+
+	test("a player who retires moves in the player order, and lines of past seasons follow", async () => {
+		const a = await getWrapped();
+		a.X.lines(2015);
+		a.X.poLines(2015);
+
+		// Retiring: written to the cache and, once flushed, IndexedDB; he is read as a retired player from then on
+		const p4 = (await idb.cache.players.get(4))!;
+		p4.tid = PLAYER.RETIRED;
+		p4.retiredYear = 2016;
+		await idb.cache.players.put(p4);
+		await idb.league.put("players", p4);
+		delete idb.cache._data.players[4];
+
+		const b = await getWrapped();
+		// Retired players come first, then the rest
+		expect(b.L.players.map((p) => p.pid)).toEqual([1, 2, 4, 3]);
+		const fresh = new LeagueIndex(b.L);
+		expect(plain(b.X.lines(2015))).toEqual(plain(fresh.lines(2015)));
+		expect(plain(b.X.lines(2009))).toEqual(plain(fresh.lines(2009)));
+		expect(plain(b.L)).toEqual(plain(await loadWrappedLeague()));
 	});
 
 	test("a new session starts from what the last one saved, and drops what was changed since", async () => {

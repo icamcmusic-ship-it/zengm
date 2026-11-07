@@ -4,7 +4,7 @@ import { helpers } from "../../util/helpers.ts";
 import type { View } from "../../../common/types.ts";
 import type { Slide } from "../../../common/wrapped/types.ts";
 
-type Data = View<"wrapped">;
+type Data = Extract<View<"wrapped">, { loading: false }>;
 
 // Gradient colors for slides that aren't about one team
 const PALETTE: [string, string][] = [
