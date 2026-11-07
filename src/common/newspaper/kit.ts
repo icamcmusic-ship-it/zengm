@@ -319,9 +319,9 @@ export const rankPage = (spec: RankSpec): PageDef => {
 					const out: Block[] = [
 						P(
 							r.pick([
-								`Here is how the league ${c.T("stacks", "stacked")} up in ${spec.topic}${c.done ? " over the season" : " so far"}.`,
-								`The ${x.top} best in ${spec.topic}, ${c.T("by the numbers so far", "by the final numbers")}:`,
-								`${T}, ranked${c.done ? "" : " as of today"}:`,
+								`Here is how the league ${c.T("stacks", "stacked")} up in ${spec.topic}${c.done ? " over the season" : " so far"}, with ${nameOf(c, a)} on top at ${spec.fmt(a.v)}.`,
+								`The ${x.top} best in ${spec.topic}, ${c.T("by the numbers so far", "by the final numbers")}, ${spec.fmt(a.v)} for ${nameOf(c, a)} at the head:`,
+								`${T}, ranked${c.done ? "" : " as of today"}; ${nameOf(c, a)} ${a.kind === "t" ? c.T("lead", "led") : c.T("leads", "led")} at ${spec.fmt(a.v)}:`,
 							]),
 						),
 						table(

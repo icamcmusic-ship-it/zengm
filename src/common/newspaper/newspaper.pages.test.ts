@@ -203,3 +203,47 @@ describe("back pages", () => {
 		}
 	});
 });
+
+describe("local edition", () => {
+	const ids = (paper: Paper) => paper.sections.flatMap((s) => s.articles.map((a) => a.id));
+
+	test("has the team's own sections and links to other editions", () => {
+		const paper = buildPaper(makeFixture("midseason", 2025), 3);
+		const all = ids(paper);
+		for (const id of ["team-roster", "team-ranks", "team-franchise", "team-back-issues", "team-injuries"]) {
+			assert.include(all, id);
+		}
+		const links: unknown[] = [];
+		for (const s of paper.sections) {
+			for (const a of s.articles) {
+				for (const b of a.body) {
+					if (b.type === "list") {
+						for (const item of b.items) {
+							links.push(...item.filter((seg) => typeof seg !== "string" && "paper" in seg));
+						}
+					}
+				}
+			}
+		}
+		assert.isAbove(links.length, 2);
+	});
+
+	test("the road through the playoffs appears once the playoffs have begun", () => {
+		const facts = makeFixture("final", 2025);
+		const champ = facts.champion!;
+		const paper = buildPaper(facts, champ);
+		assert.include(ids(paper), "team-path");
+		const path = paper.sections[0]!.articles.find((a) => a.id === "team-path")!;
+		assert.isTrue(path.body.some((b) => b.type === "timeline"));
+		// A team that missed the playoffs has no road
+		const out = facts.teams.find((t) => t.playoffRoundsWon < 0)!;
+		assert.notInclude(ids(buildPaper(facts, out.tid)), "team-path");
+		// Nothing about injuries once the season is over
+		assert.notInclude(ids(paper), "team-injuries");
+	});
+
+	test("the preview edition of a team has no results", () => {
+		const text = paperText(buildPaper(makeFixture("preseason", 2025), 4));
+		assert.notMatch(text, /playoff road|went \d+-\d+ at home/);
+	});
+});

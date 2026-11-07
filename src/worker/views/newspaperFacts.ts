@@ -1,6 +1,13 @@
 // Pure helpers that turn stored players and games into newspaper facts. They take plain objects and touch no database, so they can be tested directly.
 
-import type { NPCareer, NPHeadToHead, NPHonors, NPLine } from "../../common/newspaper/types.ts";
+import { PHASE } from "../../common/constants.ts";
+import type {
+	EditionId,
+	NPCareer,
+	NPHeadToHead,
+	NPHonors,
+	NPLine,
+} from "../../common/newspaper/types.ts";
 import type { Game, Player } from "../../common/types.ts";
 
 type NPLineExtras = {
@@ -257,4 +264,63 @@ export const aggregateGames = (games: Game[]): GameAggregates => {
 	}
 
 	return { teams, players, h2h: [...pair.values()] };
+};
+
+// Which edition a season's paper is: a past season is always the final edition, the season in progress depends on the phase and on whether any game has been played
+export const pickEdition = ({
+	season,
+	currentSeason,
+	phase,
+	gp,
+}: {
+	season: number;
+	currentSeason: number;
+	phase: number;
+	gp: number;
+}): EditionId => {
+	if (season < currentSeason) {
+		return "final";
+	}
+	if (phase >= PHASE.DRAFT_LOTTERY) {
+		return "final";
+	}
+	if (phase === PHASE.PLAYOFFS) {
+		return "playoffs";
+	}
+	if (phase < PHASE.REGULAR_SEASON || gp === 0) {
+		return "preseason";
+	}
+	return "midseason";
+};
+
+export const REBUILD_EVERY_GAMES = 6;
+
+// What the view does when something happened: nothing, show the paper it already built, or build a new one. Past seasons never change, so their papers are kept; the season in progress is rebuilt when a phase changes or several days have been played, not on every simmed day.
+export const decideRebuild = ({
+	inputsChanged,
+	structural,
+	simmed,
+	isCurrent,
+	cached,
+	sameStamp,
+	gpDelta,
+}: {
+	inputsChanged: boolean;
+	structural: boolean;
+	simmed: boolean;
+	isCurrent: boolean;
+	cached: boolean;
+	sameStamp: boolean;
+	gpDelta: number;
+}): "skip" | "reuse" | "build" => {
+	if (!inputsChanged && !structural && !(simmed && isCurrent)) {
+		return "skip";
+	}
+	if (cached && sameStamp) {
+		const stale = isCurrent && Math.abs(gpDelta) >= REBUILD_EVERY_GAMES;
+		if (!stale && !(structural && isCurrent)) {
+			return inputsChanged ? "reuse" : "skip";
+		}
+	}
+	return "build";
 };

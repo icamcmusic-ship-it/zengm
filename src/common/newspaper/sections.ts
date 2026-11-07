@@ -1111,7 +1111,7 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 // ---- Sidebars --------------------------------------------------------------
 
 export const standingsSidebar = (c: Ctx, tid?: number): Sidebar | undefined => {
-	if (c.rows.length === 0 || (c.pre && tid === undefined)) {
+	if (c.rows.length === 0 || c.pre) {
 		return undefined;
 	}
 	const me = tid !== undefined ? c.team(tid) : undefined;

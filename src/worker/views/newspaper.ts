@@ -28,6 +28,8 @@ import type {
 import type { Game, Player, TeamSeason } from "../../common/types.ts";
 import {
 	aggregateGames,
+	decideRebuild,
+	pickEdition,
 	careerBefore,
 	honorsBefore,
 	lineFor,
@@ -50,23 +52,13 @@ const processInputs = (params: RouteParams<"newspaper">) => {
 	};
 };
 
-const getEdition = (season: number, gp: number): EditionId => {
-	const current = g.get("season");
-	if (season < current) {
-		return "final";
-	}
-	const phase = g.get("phase");
-	if (phase >= PHASE.DRAFT_LOTTERY) {
-		return "final";
-	}
-	if (phase === PHASE.PLAYOFFS) {
-		return "playoffs";
-	}
-	if (phase < PHASE.REGULAR_SEASON || gp === 0) {
-		return "preseason";
-	}
-	return "midseason";
-};
+const getEdition = (season: number, gp: number): EditionId =>
+	pickEdition({
+		season,
+		currentSeason: g.get("season"),
+		phase: g.get("phase"),
+		gp,
+	});
 
 // "Springfield, USA" gives USA. Born where the file does not say gives nothing
 const countryOf = (loc: string | undefined) => {
@@ -917,7 +909,6 @@ type Built = {
 	};
 };
 const paperCache = new Map<string, Built>();
-const REBUILD_EVERY_GAMES = 6;
 
 const currentGp = async (season: number) => {
 	const tss = await idb.cache.teamSeasons.indexGetAll("teamSeasonsBySeasonTid", [
@@ -951,29 +942,33 @@ export default defineView({
 			};
 		}
 
-		const lid = g.get("lid");
-		const key = `${lid}|${inputs.season}|${inputs.team}`;
+		const key = `${g.get("lid")}|${inputs.season}|${inputs.team}`;
 		const gp = isCurrent ? await currentGp(inputs.season) : 0;
 		const stamp = isCurrent
 			? `${g.get("phase")}|${g.get("gameOver") ? 1 : 0}`
 			: "past";
 		const hit = paperCache.get(key);
-		if (hit && hit.stamp === stamp) {
-			// Same phase: reuse the paper unless several games have been played since it was built, or the page was just opened after a change
-			const stale = isCurrent && Math.abs(gp - hit.gp) >= REBUILD_EVERY_GAMES;
-			if (!stale && !(structural && isCurrent)) {
-				return {
-					error: undefined,
-					...hit.result,
-					season: inputs.season,
-					team: inputs.team,
-					userTid: g.get("userTid"),
-					seasons: seasonList(),
-				};
-			}
-		}
-		if (!inputsChanged && simmed && hit && Math.abs(gp - hit.gp) < REBUILD_EVERY_GAMES && hit.stamp === stamp) {
+		const decision = decideRebuild({
+			inputsChanged,
+			structural,
+			simmed,
+			isCurrent,
+			cached: hit !== undefined,
+			sameStamp: hit?.stamp === stamp,
+			gpDelta: gp - (hit?.gp ?? 0),
+		});
+		if (decision === "skip") {
 			return;
+		}
+		if (decision === "reuse" && hit) {
+			return {
+				error: undefined,
+				...hit.result,
+				season: inputs.season,
+				team: inputs.team,
+				userTid: g.get("userTid"),
+				seasons: seasonList(),
+			};
 		}
 
 		const { facts, logos } = await getNewsFacts(inputs.season);

@@ -50,7 +50,20 @@ import {
 	teamStatsTable,
 	tradeStories,
 } from "./sections.ts";
-import { teamGames, teamLead, teamPlayerFeatures } from "./team.ts";
+import {
+	teamBackIssues,
+	teamFranchise,
+	teamGames,
+	teamInjuries,
+	teamLead,
+	teamLetter,
+	teamPlayerFeatures,
+	teamPlayoffPath,
+	teamRanks,
+	teamRecordBook,
+	teamRookies,
+	teamRoster,
+} from "./team.ts";
 import { Rng, hashString, segsText } from "./text.ts";
 import type {
 	Article,
@@ -198,15 +211,15 @@ const pagesFor = (c: Ctx, section: SectionId, quota: number): Article[] => {
 		(p) => p.section === section && eds(p).includes(c.f.edition),
 	).toSorted(
 		(a, b) =>
-			hashString(`${c.f.seedKey}|${section}|${a.id}`) -
-			hashString(`${c.f.seedKey}|${section}|${b.id}`),
+			hashString(`${c.f.seedKey}|${section}|${c.tid ?? ""}|${a.id}`) -
+			hashString(`${c.f.seedKey}|${section}|${c.tid ?? ""}|${b.id}`),
 	);
 	const n = candidates.length;
 	if (n === 0) {
 		return [];
 	}
 	const start =
-		(hashString(`${c.f.seedKey}|${section}|start`) +
+		(hashString(`${c.f.seedKey}|${section}|${c.tid ?? ""}|start`) +
 			(c.season - c.f.firstSeason) * quota) %
 		n;
 	const out: Article[] = [];
@@ -333,14 +346,28 @@ const teamPaper = (c: Ctx, tid: number): Section[] => {
 	const front = section(
 		"front",
 		"Front page",
-		[teamLead(c, tid), feats[0], teamGames(c, tid)],
+		[teamLead(c, tid), feats[0], teamPlayoffPath(c, tid), teamGames(c, tid)],
 		[standingsSidebar(c, tid), numbersSidebar(c)],
 	);
-	const players = section("players", "Players", feats.slice(1));
+	const players = section("players", "Players", [
+		...feats.slice(1),
+		teamRoster(c, tid),
+		teamRookies(c, tid),
+		teamInjuries(c, tid),
+	]);
+	const numbers = section("numbers", "By the numbers", [
+		teamRanks(c, tid),
+		teamRecordBook(c, tid),
+		...pagesFor(c, "teams", 1),
+	]);
 	const moves = section("moves", "Transactions", [
 		...tradeStories(c, tid),
 		signingsStory(c, tid),
 		draftStory(c, tid),
+	]);
+	const history = section("history", "History", [
+		teamFranchise(c, tid),
+		...pagesFor(c, "history", 2),
 	]);
 	// League news in brief: the league paper's front page headlines
 	const lc = new Ctx(c.f);
@@ -362,8 +389,12 @@ const teamPaper = (c: Ctx, tid: number): Section[] => {
 				],
 			})
 		: undefined;
-	const league = section("league", "Around the league", [briefs]);
-	return compact([front, players, moves, league]);
+	const league = section("league", "Around the league", [
+		briefs,
+		teamBackIssues(c, tid),
+		teamLetter(c, tid),
+	]);
+	return compact([front, players, numbers, moves, history, league]);
 };
 
 export const buildPaper = (facts: NewsFacts, tid?: number): Paper => {
