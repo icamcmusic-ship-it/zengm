@@ -52,7 +52,12 @@ const intro: Topic = ({ X, season, pid }) => {
 		],
 		hero: { text: `${l.age}`, unit: "years old" },
 		lines: [
-			yrs === 1 ? "His rookie season" : `Season ${yrs} of his career`,
+			// In the league's first season, everyone's history starts at once
+			p.stats[0]!.season === X.L.startingSeason
+				? `Season ${yrs} in this league’s records`
+				: yrs === 1
+					? "His rookie season"
+					: `Season ${yrs} of his career`,
 			`Played for the ${l.tids.map((t) => X.teamName(t, season)).join(" and ")}`,
 		],
 	});

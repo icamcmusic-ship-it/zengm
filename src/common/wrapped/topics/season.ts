@@ -92,7 +92,7 @@ const champ: Topic = ({ X, season }) => {
 			ru ? `Beat the ${X.teamName(ru.tid, season)} in the finals` : null,
 			titles.length === 1
 				? "The franchise’s first title"
-				: `Title No. ${titles.length}${prev !== undefined ? `, the first since ${prev}` : ""}`,
+				: `Title No. ${titles.length}${prev === undefined ? "" : prev === season - 1 ? ", back-to-back" : `, the first since ${prev}`}`,
 			fmvp ? `Finals MVP: ${fmvp.name}` : null,
 			c.seed !== undefined
 				? `Entered the playoffs as the No. ${c.seed} seed`
@@ -835,7 +835,12 @@ const sweeps: Topic = ({ X, season }) => {
 const rookies: Topic = ({ X, season }) => {
 	const rk = X.lines(season).filter((l) => {
 		const p = X.players.get(l.pid);
-		return p && p.stats.every((r) => r.season >= season) && l.gp >= 20;
+		return (
+			p &&
+			season > X.L.startingSeason &&
+			p.stats.every((r) => r.season >= season) &&
+			l.gp >= 20
+		);
 	});
 	if (rk.length < 5) {
 		return null;

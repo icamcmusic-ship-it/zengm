@@ -3,6 +3,7 @@ import { g } from "./index.ts";
 import { getSeasonState } from "./processInputs.ts";
 import { isCurrentSeasonComplete } from "../../common/seasons.ts";
 import type {
+	WAward,
 	WBoxLine,
 	WGame,
 	WLeague,
@@ -11,7 +12,7 @@ import type {
 	WTeamSeason,
 } from "../../common/wrapped/types.ts";
 import { LeagueIndex } from "../../common/wrapped/league.ts";
-import type { UpdateEvent } from "../../common/types.ts";
+import type { PlayerAward, UpdateEvent } from "../../common/types.ts";
 
 const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
 
@@ -51,6 +52,29 @@ const toBox = (p: any): WBoxLine => ({
 	tp: n(p.tp),
 });
 
+const TEAM_ORD = ["First", "Second", "Third", "Fourth", "Fifth"];
+
+// Awards are either simple {season, type} or built-in {season, name, rank, numTeams}. Built-in individual awards only count for the winner (rank 1); team awards become "First Team All-League" and the like.
+const awardOf = (a: PlayerAward): WAward[] => {
+	if (a.type !== undefined) {
+		return [{ season: a.season, type: a.type }];
+	}
+	if (a.numTeams === undefined) {
+		if (a.rank !== 1) {
+			return [];
+		}
+		const type = a.actAs === "mvp" ? "Most Valuable Player" : a.name;
+		return [{ season: a.season, type }];
+	}
+	const ord = TEAM_ORD[a.rank - 1];
+	return [
+		{
+			season: a.season,
+			type: a.numTeams > 1 && ord ? `${ord} Team ${a.name}` : a.name,
+		},
+	];
+};
+
 // Read the whole league into the plain snapshot the Wrapped and Storylines engines use
 export const loadWrappedLeague = async (): Promise<WLeague> => {
 	const currentSeason = g.get("season");
@@ -75,7 +99,7 @@ export const loadWrappedLeague = async (): Promise<WLeague> => {
 		retiredYear: p.retiredYear,
 		diedYear: p.diedYear,
 		hof: !!p.hof,
-		awards: p.awards.map((a) => ({ season: a.season, type: a.type ?? "" })),
+		awards: p.awards.flatMap(awardOf),
 		stats: p.stats.filter((r) => !r.playoffs).map(toStat),
 		po: p.stats.filter((r) => r.playoffs).map(toStat),
 		injuries: p.injuries.map((i) => ({

@@ -674,7 +674,12 @@ const KINDS: Kind[] = [
 					.map((a) => a.season)
 					.sort((a, b) => a - b)[0];
 				const first = seasonsOf(regRows(p))[0];
-				if (m === undefined || first === undefined || m - first > 2) {
+				if (
+					m === undefined ||
+					first === undefined ||
+					first <= X.L.startingSeason ||
+					m - first > 2
+				) {
 					continue;
 				}
 				out.push({
@@ -851,7 +856,8 @@ const KINDS: Kind[] = [
 					continue;
 				}
 				for (const l of X.poLines(s)) {
-					if (l.tids.includes(ru.tid)) {
+					// Only players who mattered in that run
+					if (l.tids.includes(ru.tid) && l.gp >= 3 && l.mpg >= 20) {
 						lost.set(l.pid, [...(lost.get(l.pid) ?? []), s]);
 					}
 				}
@@ -859,7 +865,11 @@ const KINDS: Kind[] = [
 			const out: Draft[] = [];
 			for (const [pid, ss] of lost) {
 				const p = X.players.get(pid)!;
-				if (ss.length < 2 || titleSeasons(X, p).length > 0) {
+				if (
+					ss.length < 2 ||
+					titleSeasons(X, p).length > 0 ||
+					(ss.length === 2 && X.career(p).ws < 25)
+				) {
 					continue;
 				}
 				out.push({
@@ -1219,8 +1229,21 @@ export const findStories = (L: WLeague | LeagueIndex): Story[] => {
 			out.push(story);
 		}
 	}
-	return out.sort(
+	return diversify(out);
+};
+
+// Biggest stories first, but each further story of the same kind counts a little less, so one kind can't fill the top of the list
+export const diversify = (stories: Story[]) => {
+	const sorted = [...stories].sort(
 		(a, b) =>
 			b.score - a.score || b.season - a.season || (a.id < b.id ? -1 : 1),
 	);
+	const seen = new Map<string, number>();
+	const ranked = sorted.map((s) => {
+		const k = seen.get(s.kind) ?? 0;
+		seen.set(s.kind, k + 1);
+		return { s, v: s.score * 0.85 ** k };
+	});
+	ranked.sort((a, b) => b.v - a.v || (a.s.id < b.s.id ? -1 : 1));
+	return ranked.map((r) => r.s);
 };

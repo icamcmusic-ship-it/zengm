@@ -358,6 +358,7 @@ const honors: Topic = ({ X, season, tid }) => {
 		return null;
 	}
 	return mk({
+		who: X.teamName(tid!, season),
 		id: "t-honors",
 		group: "awards",
 		theme: "awards",

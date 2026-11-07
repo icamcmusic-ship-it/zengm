@@ -1,8 +1,29 @@
 import { describe, expect, test } from "vitest";
-import { findStories, plainText, stints } from "./index.ts";
+import { diversify, findStories, plainText, stints } from "./index.ts";
 import { makeLeague } from "../wrapped/fixture.ts";
 
 describe("storylines", () => {
+	test("diversify spreads kinds", () => {
+		const mk = (kind: string, score: number) => ({
+			id: kind + score,
+			kind,
+			shape: "career" as const,
+			season: 1,
+			score,
+			headline: "",
+			body: "",
+			evidence: [],
+			pids: [],
+			tids: [],
+		});
+		const out = diversify([
+			mk("a", 100),
+			mk("a", 99),
+			mk("a", 98),
+			mk("b", 90),
+		]);
+		expect(out.map((s) => s.kind)).toEqual(["a", "b", "a", "a"]);
+	});
 	test("plainText strips link tokens", () => {
 		expect(
 			plainText("[[p:3|Joe Smith]] beat the [[t:1:2030|Boston Celtics]]"),
@@ -24,8 +45,10 @@ describe("storylines", () => {
 		}));
 		const stories = findStories(L);
 		expect(stories.length).toBeGreaterThan(0);
-		for (let i = 1; i < stories.length; i++) {
-			expect(stories[i - 1]!.score).toBeGreaterThanOrEqual(stories[i]!.score);
+		// within a kind, biggest first
+		for (const k of new Set(stories.map((s) => s.kind))) {
+			const sc = stories.filter((s) => s.kind === k).map((s) => s.score);
+			expect([...sc].sort((a, b) => b - a)).toEqual(sc);
 		}
 		expect(JSON.stringify(stories)).not.toMatch(/undefined|NaN/);
 		expect(findStories(L)).toEqual(stories);

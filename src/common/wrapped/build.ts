@@ -31,6 +31,16 @@ export const candidates = (ctx: TopicCtx) => {
 			out.push(r);
 		}
 	}
+	for (const s of out) {
+		if (s.who === undefined) {
+			const p = s.pid !== undefined ? ctx.X.players.get(s.pid) : undefined;
+			if (p) {
+				s.who = p.name;
+			} else if (s.tid !== undefined) {
+				s.who = ctx.X.teamName(s.tid, s.season ?? ctx.season);
+			}
+		}
+	}
 	return out;
 };
 

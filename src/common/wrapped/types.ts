@@ -152,6 +152,8 @@ export type Slide = {
 	// Facts this slide states, so no two slides say the same thing
 	facts?: string[];
 	note?: string;
+	// Who the slide is about, shown when the headline and lines don't name them
+	who?: string;
 };
 
 export type Deck = {

@@ -27,17 +27,24 @@ const textColor = (hex: string) => {
 	return lum > 0.6 ? "#111" : "#fff";
 };
 
+const lum = (hex: string) => {
+	const v = Number.parseInt(hex.slice(1), 16);
+	return (
+		(0.299 * (v >> 16) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255
+	);
+};
+
+// Darkest team color first, so white text reads well; a near-white second color is skipped
 export const slideColors = (slide: Slide, teams: Data["teams"], i: number) => {
 	const t = slide.tid !== undefined ? teams[`${slide.tid}`] : undefined;
-	if (
-		t &&
-		/^#[\da-f]{6}$/i.test(t.colors[0]) &&
-		/^#[\da-f]{6}$/i.test(t.colors[1])
-	) {
-		// Avoid a washed-out pair (white + light gray): fall back to the third color
-		const c2 =
-			t.colors[1].toLowerCase() === "#ffffff" ? t.colors[2] : t.colors[1];
-		return [t.colors[0], c2] as [string, string];
+	const cs = (t?.colors ?? []).filter((c) => /^#[\da-f]{6}$/i.test(c));
+	if (cs.length >= 2) {
+		const sorted = [...cs].sort((a, b) => lum(a) - lum(b));
+		const c1 = sorted[0]!;
+		const c2 = sorted.slice(1).find((c) => lum(c) < 0.85) ?? c1;
+		if (lum(c1) < 0.6) {
+			return [c1, c2] as [string, string];
+		}
 	}
 	return PALETTE[i % PALETTE.length]!;
 };
@@ -56,7 +63,7 @@ export const SlideCard = ({
 	const [c1, c2] = slideColors(slide, teams, index);
 	const fg = textColor(c1);
 	const style: CSSProperties = {
-		background: `linear-gradient(150deg, ${c1} 0%, ${c1} 35%, ${c2} 100%)`,
+		background: `linear-gradient(150deg, ${c1} 0%, ${c1} 40%, ${c2} 140%)`,
 		color: fg,
 		borderRadius: 16,
 		minHeight: 480,
@@ -68,6 +75,11 @@ export const SlideCard = ({
 	const face = slide.pid !== undefined ? faces[slide.pid] : undefined;
 	const team = slide.tid !== undefined ? teams[`${slide.tid}`] : undefined;
 	const head = slide.head ?? slide.heads[0]!;
+	const said = [head, slide.kicker, ...slide.lines].join(" ");
+	const showWho =
+		slide.who !== undefined &&
+		!said.includes(slide.who) &&
+		!said.includes(slide.who.split(" ").at(-1)!);
 	const headSize =
 		head.length > 60 ? "1.35rem" : head.length > 36 ? "1.65rem" : "2rem";
 
@@ -107,6 +119,11 @@ export const SlideCard = ({
 			>
 				{head}
 			</h2>
+			{showWho ? (
+				<div className="fs-5 mb-2 mt-n2" style={{ opacity: 0.9 }}>
+					{slide.who}
+				</div>
+			) : null}
 			{slide.hero || picture ? (
 				<div className="d-flex align-items-center gap-3 mb-3">
 					{picture}
