@@ -54,7 +54,7 @@ const Wrapped = (props: View<"wrapped">) => {
 	// New deck: back to the first slide
 	useEffect(() => {
 		setI(0);
-	}, [seed]);
+	}, [seed, prefs.quiz, prefs.noSpoil]);
 
 	const cur = Math.min(i, slides.length - 1);
 	const go = (d: number) =>

@@ -22,21 +22,21 @@ export const SlideView = ({
 	deck: string;
 	all: Slide[];
 }) => {
+	let card;
 	if (slide.quiz) {
-		return <QuizCard slide={slide} deck={deck} />;
-	}
-	if (slide.id === "quizscore") {
-		return (
+		card = <QuizCard slide={slide} deck={deck} />;
+	} else if (slide.id === "quizscore") {
+		card = (
 			<QuizScoreCard
 				slide={slide}
 				deck={deck}
 				questions={all.filter((s) => s.quiz)}
 			/>
 		);
-	}
-	return (
-		<FitSlide dep={`${deck}|${slide.id}`}>
+	} else {
+		card = (
 			<SlideCard slide={slide} index={index} faces={faces} teams={teams} />
-		</FitSlide>
-	);
+		);
+	}
+	return <FitSlide dep={`${deck}|${slide.id}`}>{card}</FitSlide>;
 };
