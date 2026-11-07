@@ -5100,6 +5100,7 @@ const upsertCustomizedPlayer = async (
 		originalTid,
 		season,
 		recomputePosOvrPot,
+		keepPot,
 	}: {
 		p: PlayerWithoutKey & {
 			// The contract fields in the form
@@ -5112,6 +5113,9 @@ const upsertCustomizedPlayer = async (
 		originalTid: number | undefined;
 		season: number;
 		recomputePosOvrPot: boolean;
+
+		// Keep the pot in the form even though ratings changed, for "Regenerate build", which promises pot is unchanged
+		keepPot?: boolean;
 	},
 	conditions: Conditions,
 ): Promise<number> => {
@@ -5199,7 +5203,12 @@ const upsertCustomizedPlayer = async (
 	// Recalculate player pos, ovr, pot, and values if necessary
 	const originalPot = last(p.ratings).pot;
 	await player.develop(p, 0);
-	if (!recomputePosOvrPot) {
+	if (keepPot) {
+		last(p.ratings).pot = originalPot;
+		if (p.tid === PLAYER.UNDRAFTED) {
+			p.draft.pot = originalPot;
+		}
+	} else if (!recomputePosOvrPot) {
 		// Make sure not to randomly change pot if it was not necessary (no ratings/age change, and in non-basketball sports no pos change).
 		// Why do this here, rather than just calling develop only if this stuff changed? Because develop handles PlayerRatings.pos being set to the right value too, and that can change in BBGM even if no ratings change.
 		last(p.ratings).pot = originalPot;
