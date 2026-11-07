@@ -69,6 +69,7 @@ export { default as negotiationList } from "./negotiationList.ts";
 export { default as newLeague } from "./newLeague.ts";
 export { default as newTeam } from "./newTeam.ts";
 export { default as news } from "./news.ts";
+export { default as newspaper } from "./newspaper.ts";
 export { default as notes } from "./notes.ts";
 export { default as player } from "./player.ts";
 export { default as playerBios } from "./playerBios.ts";

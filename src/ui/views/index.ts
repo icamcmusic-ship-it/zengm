@@ -77,6 +77,7 @@ export { default as NegotiationList } from "./NegotiationList.tsx";
 export { default as NewLeague } from "./NewLeague/index.tsx";
 export { default as NewTeam } from "./NewTeam.tsx";
 export { default as News } from "./News.tsx";
+export { default as Newspaper } from "./Newspaper/index.tsx";
 export { default as Notes } from "./Notes.tsx";
 export { default as Player } from "./Player/index.tsx";
 export { default as PlayerBios } from "./PlayerBios.tsx";
