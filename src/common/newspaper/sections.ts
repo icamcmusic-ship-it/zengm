@@ -737,11 +737,11 @@ export const tradeStories = (c: Ctx, tid?: number): Article[] => {
 				x.kind === "player",
 		);
 		const when =
-			tr.phase <= 2
-				? tr.phase <= 0
+			tr.phase >= 4 || tr.phase < 0
+				? "in the offseason"
+				: tr.phase === 0
 					? "before the season"
-					: "during the season"
-				: "after the season";
+					: "during the season";
 		return {
 			id: `trade-${i}`,
 			size: i === 0 ? "feature" : "brief",

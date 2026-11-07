@@ -471,10 +471,19 @@ export const getNewsFacts = async (season: number): Promise<NewsFacts> => {
 	// Transactions: the summer before plus the season itself, and the summer after once the season is over
 	const trades: NPTrade[] = [];
 	const signings: NPSigning[] = [];
+	// Signing events have no phase, so the summer before is everything logged after the last playoff event of the previous season
+	const prevEvents = await idb.merged.events.getAll({ season: season - 1 });
+	const lastPlayoffEid = Math.max(
+		-1,
+		...prevEvents.filter((e) => e.type === "playoffs").map((e) => e.eid),
+	);
 	const events = [
-		...(await idb.merged.events.getAll({ season: season - 1 })).filter(
-			(e) => ((e as { phase?: number }).phase ?? 0) >= PHASE.RESIGN_PLAYERS,
-		),
+		...prevEvents.filter((e) => {
+			const phase = (e as { phase?: number }).phase;
+			return phase !== undefined
+				? phase >= PHASE.RESIGN_PLAYERS
+				: lastPlayoffEid >= 0 && e.eid > lastPlayoffEid;
+		}),
 		...(await idb.merged.events.getAll({ season })).filter(
 			(e) =>
 				edition === "final" ||
