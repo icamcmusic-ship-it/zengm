@@ -2,16 +2,7 @@
 
 import { Ctx, P } from "./ctx.ts";
 import { champFacts, seriesOf, sides } from "./front.ts";
-import {
-	aOrAn,
-	andList,
-	fmt1,
-	ordinal,
-	plural,
-	poss,
-	record,
-	winp,
-} from "./text.ts";
+import { andList, fmt1, ordinal, plural, poss, record, winp } from "./text.ts";
 import type { Article, Block, NPPlayer } from "./types.ts";
 
 export const teamLead = (c: Ctx, tid: number): Article | undefined => {
@@ -218,13 +209,14 @@ export const teamPlayerFeatures = (c: Ctx, tid: number): Article[] => {
 			return {
 				id: `team-player-${p.pid}`,
 				size: i === 0 ? "feature" : "brief",
-				kicker: i === 0 ? "Player of the year" : "Profile",
+				kicker:
+					i === 0 ? (c.done ? "Player of the year" : "Team leader") : "Profile",
 				head: c.freshHead(r, [
 					`${p.name}: ${fmt1(p.pts)} points a game for the ${tn}`,
 					i === 0
 						? `${p.name} ${c.T("leads", "led")} the ${tn} with ${fmt1(p.ws)} win shares`
 						: `${poss(p.name)} season in numbers`,
-					`${aOrAn(String(p.age))}-year-old ${p.pos} ${p.name} ${c.T("keeps", "kept")} producing`,
+					`${p.name}, ${p.age}, ${c.T("keeps", "kept")} producing for the ${tn}`,
 				])!,
 				byline: c.byline("local"),
 				photoPid: p.pid,

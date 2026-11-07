@@ -242,7 +242,7 @@ export const awardRace = (c: Ctx): Article | undefined => {
 export const seriesRecaps = (c: Ctx): Article[] => {
 	const out: Article[] = [];
 	const r = c.rng("series");
-	for (let i = c.f.series.length - 1; i >= 0; i--) {
+	for (let i = Math.min(c.f.currentRound, c.f.series.length - 1); i >= 0; i--) {
 		const list = c.f.series[i]!;
 		const items: Seg[][] = [];
 		for (const s of list) {
@@ -252,7 +252,7 @@ export const seriesRecaps = (c: Ctx): Article[] => {
 			}
 			const winner = s.home.won >= s.away.won ? s.home : s.away;
 			const loser = winner === s.home ? s.away : s.home;
-			const finished = c.done || i < c.f.series.length - 1;
+			const finished = c.done || i < c.f.currentRound;
 			if (!finished || winner.won === loser.won) {
 				items.push([
 					`(${s.home.seed}) `,
@@ -285,15 +285,21 @@ export const seriesRecaps = (c: Ctx): Article[] => {
 			continue;
 		}
 		const phrase = c.roundPhrase(i);
+		const started = list.some((s) => s.home.won + (s.away?.won ?? 0) > 0);
 		out.push({
 			id: `round-${i}`,
 			size: i === c.f.series.length - 1 ? "feature" : "brief",
 			kicker: capFirst(phrase),
-			head: c.freshHead(r, [
-				`${capFirst(phrase)}: ${plural(list.length, "series", "series")}, the results`,
-				`How the ${phrase} went`,
-				`${capFirst(phrase)} roundup`,
-			])!,
+			head: c.freshHead(
+				r,
+				!started
+					? [`${capFirst(phrase)} matchups`, `The ${phrase} is set`]
+					: [
+							`${capFirst(phrase)}: ${plural(list.length, "series", "series")}, the results`,
+							`How the ${phrase} went`,
+							`${capFirst(phrase)} roundup`,
+						],
+			)!,
 			byline: c.byline("playoffs"),
 			body: [{ type: "list", items }],
 		});
@@ -341,7 +347,7 @@ export const bracketSidebar = (c: Ctx): Sidebar | undefined => {
 	const items: Seg[][] = [];
 	for (const [i, list] of c.f.series.entries()) {
 		for (const s of list) {
-			if (!s.away) {
+			if (!s.away || i > c.f.currentRound) {
 				continue;
 			}
 			items.push([

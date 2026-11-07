@@ -373,9 +373,9 @@ export const getNewsFacts = async (season: number): Promise<NewsFacts> => {
 			a.group?.type === "conf"
 				? (confs.find((c) => c.cid === (a.group as any).cid)?.name ??
 					"Conference")
-				: a.group
-					? "group"
-					: undefined;
+				: a.group?.type === "div"
+					? "Division"
+					: undefined; // Playoff series awards like Finals MVP count as league-wide
 		if (a.numTeams === undefined) {
 			const winner = a.winner[0];
 			if (winner?.pid !== undefined) {
@@ -607,6 +607,8 @@ export const getNewsFacts = async (season: number): Promise<NewsFacts> => {
 		awards,
 		teamAwards,
 		series,
+		currentRound:
+			edition === "final" ? numRounds : Math.max(0, ps?.currentRound ?? 0),
 		champion,
 		runnerUp,
 		games: games.filter((x) => keepGids.has(x.gid)),

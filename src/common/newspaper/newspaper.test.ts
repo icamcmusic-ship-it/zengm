@@ -190,6 +190,7 @@ const makeFacts = (edition: EditionId): NewsFacts => {
 				: [],
 		teamAwards: [],
 		series,
+		currentRound: edition === "final" ? 3 : 1,
 		champion: edition === "final" ? 0 : undefined,
 		runnerUp: edition === "final" ? 1 : undefined,
 		games: [

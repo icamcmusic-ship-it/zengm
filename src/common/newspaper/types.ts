@@ -151,7 +151,12 @@ export type NPTrade = {
 
 export type NPTradeAsset =
 	| { kind: "player"; pid: number; name: string; amount?: number; exp?: number }
-	| { kind: "pick"; season: number | "fantasy" | "expansion"; round: number; originalTid: number };
+	| {
+			kind: "pick";
+			season: number | "fantasy" | "expansion";
+			round: number;
+			originalTid: number;
+	  };
 
 export type NPSigning = {
 	kind: "freeAgent" | "reSigned";
@@ -219,6 +224,8 @@ export type NewsFacts = {
 	awards: NPAward[];
 	teamAwards: NPTeamAward[];
 	series: NPSeries[][];
+	// Index of the playoff round being played (numRounds once the playoffs are over)
+	currentRound: number;
 	champion?: number;
 	runnerUp?: number;
 	games: NPGame[];
@@ -229,7 +236,13 @@ export type NewsFacts = {
 	draft: NPDraftee[];
 	injuries: NPInjury[];
 	// Most wins by any team in any earlier season, if known
-	recordWins?: { won: number; tid: number; season: number; region: string; name: string };
+	recordWins?: {
+		won: number;
+		tid: number;
+		season: number;
+		region: string;
+		name: string;
+	};
 	// Seasons that exist in the league, for the season picker / back issues
 	firstSeason: number;
 };
@@ -247,7 +260,13 @@ export type Block =
 	| { type: "p"; segs: Seg[] }
 	| { type: "list"; items: Seg[][]; ordered?: boolean }
 	| { type: "notebook"; items: { lead: string; segs: Seg[] }[] }
-	| { type: "table"; head: string[]; rows: Seg[][][]; numCols?: number[]; hl?: number }
+	| {
+			type: "table";
+			head: string[];
+			rows: Seg[][][];
+			numCols?: number[];
+			hl?: number;
+	  }
 	| { type: "nums"; items: { value: string; label: string }[] }
 	| { type: "quote"; text: string; cite?: string }
 	| { type: "sub"; text: string };

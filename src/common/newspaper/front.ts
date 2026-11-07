@@ -190,6 +190,9 @@ const QUOTES: Record<string, string[]> = {
 export const seriesOf = (c: Ctx, tid: number) => {
 	const out: { s: NPSeries; round: number }[] = [];
 	for (const [round, list] of c.f.series.entries()) {
+		if (round > c.f.currentRound) {
+			break;
+		}
 		for (const s of list) {
 			if (s.home.tid === tid || s.away?.tid === tid) {
 				out.push({ s, round });
@@ -791,8 +794,8 @@ export const leadPlayoffs = (c: Ctx): Article | undefined => {
 	}
 	const r = c.rng("front-po");
 	// The current round is the last one with any matchups
-	const ri = rounds.length - 1;
-	const cur = rounds[ri]!.filter((s) => s.away);
+	const ri = Math.max(0, Math.min(c.f.currentRound, rounds.length - 1));
+	const cur = (rounds[ri] ?? []).filter((s) => s.away);
 	const alive = cur.flatMap((s) => {
 		const need = Math.ceil((s.gids.length || 1) / 2);
 		void need;
@@ -810,6 +813,15 @@ export const leadPlayoffs = (c: Ctx): Article | undefined => {
 	const items: Seg[][] = cur.map((s) => {
 		const lead = s.home.won >= s.away!.won ? s.home : s.away!;
 		const trail = lead === s.home ? s.away! : s.home;
+		if (lead.won === 0 && trail.won === 0) {
+			return [
+				`(${s.home.seed}) `,
+				c.tl(s.home.tid),
+				` vs. (${s.away!.seed}) `,
+				c.tl(s.away!.tid),
+				", yet to tip off",
+			];
+		}
 		return lead.won === trail.won
 			? [
 					c.tl(s.home.tid),
@@ -875,7 +887,7 @@ export const leadPlayoffs = (c: Ctx): Article | undefined => {
 		(a, b) => winp(c.team(b.tid)!) - winp(c.team(a.tid)!),
 	)[0];
 	const heads = [
-		`Down to ${word(alive.length)}: the ${phrase} are under way`,
+		`Down to ${word(alive.length)}: the ${phrase} ${phrase.endsWith("finals") ? "are" : "is"} under way`,
 		fav ? `${c.tn(fav.tid)} lead the field into the ${phrase}` : null,
 		`Playoffs: ${phrase}, and counting`,
 		stars[0]
