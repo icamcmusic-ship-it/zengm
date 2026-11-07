@@ -613,10 +613,8 @@ export const quarterNote = (
 			: sa > sb
 				? `${a} lead ${sa}-${sb}`
 				: `${b} lead ${sb}-${sa}`;
-	return pickV(rng, [
-		`End of the ${label}: ${lead}.`,
-		`${lead} after ${label === "game" ? "the game" : `the ${label}`}.`,
-	]);
+	const which = label === "overtime" ? "overtime" : `the ${label}`;
+	return pickV(rng, [`End of ${which}: ${lead}.`, `${lead} after ${which}.`]);
 };
 
 export const crowdLine = (rng: Rng, kind: "wow" | "tight", team: string) =>

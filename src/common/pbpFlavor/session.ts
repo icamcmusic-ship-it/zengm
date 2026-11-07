@@ -402,6 +402,10 @@ export class FlavorSession {
 	private lastShotSaid = false;
 	private crowdN = 0;
 	private lastPtype: string | undefined;
+	// each team's defensive look, from its roster (quick guards press, length plays zone...)
+	private scheme: [string, string] = ["man", "man"];
+	// a rare stoppage, at most one a game
+	private oddity: boolean;
 
 	constructor(init: FlavorInit) {
 		this.gid = init.gid;
@@ -429,6 +433,24 @@ export class FlavorSession {
 			names.push(l.name);
 		}
 		this.variety = new VarietyMemory(names);
+		this.oddity = new Rng(this.gid, 555).random() < 0.06;
+		for (const t of [0, 1] as const) {
+			const r = new Rng(this.gid, 777 + t);
+			const ps = [...this.players.values()]
+				.filter((p) => p.t === t)
+				.slice(0, 8);
+			const avg = (k: "spd" | "hgt") =>
+				ps.reduce((a, p) => a + p.R[k], 0) / Math.max(1, ps.length);
+			const [r1, r2, r3] = [r.random(), r.random(), r.random()];
+			this.scheme[t] =
+				avg("spd") >= 62 && r1 < 0.5
+					? "press"
+					: avg("hgt") >= 58 && r2 < 0.4
+						? "zone"
+						: r3 < 0.5
+							? "switch"
+							: "man";
+		}
 		this.periodLens[1] = init.quarterLength * 60;
 	}
 
@@ -611,17 +633,32 @@ export class FlavorSession {
 				}
 		}
 
+		if (
+			typeof res === "object" &&
+			this.oddity &&
+			(e.type === "timeout" || e.type === "outOfBounds" || e.type === "sub") &&
+			rng.random() < 0.03
+		) {
+			this.oddity = false;
+			const fl = this.floor(0).concat(this.floor(1));
+			const someone = fl.length > 0 ? rng.pick(fl).name : "A player";
+			const odd = pickV(rng, [
+				"A wet spot near the baseline brings out the mop crew.",
+				"The shot clock malfunctions; play stops while it's reset.",
+				`${someone} loses a shoe and has to stop to put it back on.`,
+				"The scoreboard briefly shows the wrong score; it's fixed during the stoppage.",
+			]);
+			res.note = [res.note, odd].filter(Boolean).join(" ");
+		}
 		return typeof res === "object" ? this.cleanResult(res, undefined) : res;
 	}
 
 	// ---- structure ----
 	private onPeriod(rng: Rng, ev: any, score: [number, number]): FlavorResult {
 		const prevLabel =
-			this.period >= this.numPeriods
-				? this.period === this.numPeriods
-					? "fourth quarter"
-					: "overtime"
-				: `${["first", "second", "third", "fourth"][this.period - 1] ?? "period"} ${this.numPeriods === 2 ? "half" : "quarter"}`;
+			this.period > this.numPeriods
+				? "overtime"
+				: `${["first", "second", "third", "fourth", "fifth", "sixth"][this.period - 1] ?? "last"} ${this.numPeriods === 2 ? "half" : "quarter"}`;
 		const prevLen = this.periodLens[this.period] ?? this.quarterLength * 60;
 		this.absBase += prevLen;
 		this.period = ev.period;
@@ -649,6 +686,20 @@ export class FlavorSession {
 				score[1],
 			),
 		];
+		if (
+			ev.type === "period" &&
+			this.period <= this.numPeriods &&
+			rng.random() < 0.45
+		) {
+			const ti: 0 | 1 = rng.random() < 0.5 ? 0 : 1;
+			const look = {
+				press: "pick up full court with a press",
+				zone: "switch to a 2-3 zone",
+				switch: "start switching everything on defense",
+				man: "go back to man-to-man",
+			}[this.scheme[ti]];
+			notes.push(`${cap(this.the(ti))} ${look}.`);
+		}
 		if (ev.type === "overtime") {
 			const n = this.period - this.numPeriods;
 			if (n >= 2) {
@@ -779,6 +830,8 @@ export class FlavorSession {
 				return ds.length > 0 ? rng.pick(ds) : null;
 			},
 			female: this.female,
+			zone: this.scheme[o] === "zone",
+			press: this.scheme[o] === "press",
 		};
 		void p;
 		return ctx;
