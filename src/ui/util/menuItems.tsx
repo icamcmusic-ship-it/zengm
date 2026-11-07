@@ -51,6 +51,21 @@ if (__SPORT === "baseball") {
 	);
 }
 
+// Season newspaper (basketball only)
+const newspaperLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "newspaper",
+					league: true,
+					commandPalette: true,
+					path: ["newspaper"],
+					text: "Newspaper",
+				},
+			]
+		: [];
+
 export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 	{
 		type: "link",
@@ -222,19 +237,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["news"],
 				text: "News Feed",
 			},
-			...(bySport({
-				basketball: [
-					{
-						type: "link",
-						active: (pageID) => pageID === "newspaper",
-						league: true,
-						commandPalette: true,
-						path: ["newspaper"],
-						text: "Newspaper",
-					},
-				],
-				default: [],
-			}) as MenuItemLink[]),
+			...newspaperLinks,
 			{
 				type: "link",
 				league: true,
