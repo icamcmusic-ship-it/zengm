@@ -231,11 +231,17 @@ const leaders: Topic = ({ X }) => {
 
 const awardKings: Topic = ({ X }) => {
 	const out: Slide[] = [];
-	for (const [type, key, score] of [
-		["Most Valuable Player", "mvp", 0.75],
-		["All-Star", "as", 0.5],
-		["Won Championship", "rings", 0.6],
-		["Defensive Player of the Year", "dpoy", 0.4],
+	for (const [type, key, score, noun, kick] of [
+		["Most Valuable Player", "mvp", 0.75, "MVP award", "Most MVPs"],
+		["All-Star", "as", 0.5, "All-Star selection", "Most All-Star selections"],
+		["Won Championship", "rings", 0.6, "title", "Ring collector"],
+		[
+			"Defensive Player of the Year",
+			"dpoy",
+			0.4,
+			"DPOY award",
+			"Most Defensive Player of the Year awards",
+		],
 	] as const) {
 		const list = X.L.players
 			.map((p) => ({ p, n: awardCount(X, p, type) }))
@@ -245,27 +251,16 @@ const awardKings: Topic = ({ X }) => {
 		if (!t || (type !== "Most Valuable Player" && t.n < 2)) {
 			continue;
 		}
-		const label =
-			key === "rings"
-				? "titles"
-				: key === "as"
-					? "All-Star selections"
-					: `${type} awards`;
 		out.push(
 			mk({
 				id: `a-most-${key}`,
 				group: "award-kings",
 				theme: "awards",
 				score,
-				kicker:
-					key === "rings"
-						? "Ring collector"
-						: `Most ${key === "as" ? "All-Star" : type} awards`,
+				kicker: kick,
 				pid: t.p.pid,
-				heads: [
-					`${t.p.name}: ${plural(t.n, key === "rings" ? "title" : key === "as" ? "All-Star selection" : type)}`,
-				],
-				hero: { text: `${t.n}`, unit: label },
+				heads: [`${t.p.name}: ${plural(t.n, noun)}`],
+				hero: { text: `${t.n}`, unit: t.n === 1 ? noun : `${noun}s` },
 				list: list
 					.slice(1, 5)
 					.map((x) => ({ name: x.p.name, value: `${x.n}`, pid: x.p.pid })),

@@ -45,8 +45,8 @@ export default defineView({
 		// Default season: the latest finished one, or the current one if none has finished yet
 		const decided = X.decidedSeasons();
 		let season = inputs.season ?? decided.at(-1) ?? X.L.season;
-		if (!X.seasons.includes(season)) {
-			season = X.seasons.at(-1) ?? X.L.season;
+		if (!X.seasons.includes(season) || X.lines(season).length === 0) {
+			season = X.seasons.findLast((s) => X.lines(s).length > 0) ?? X.L.season;
 		}
 
 		let tid = inputs.tid;
@@ -155,7 +155,7 @@ export default defineView({
 			cands,
 			faces,
 			teams,
-			seasons: [...X.seasons].reverse(),
+			seasons: X.seasons.filter((s) => X.lines(s).length > 0).reverse(),
 			teamOptions,
 			playerOptions,
 			userTid: g.get("userTid"),

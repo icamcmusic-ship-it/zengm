@@ -6,12 +6,18 @@ import { SEASON_TOPICS } from "./topics/season.ts";
 import { TEAM_TOPICS } from "./topics/team.ts";
 import { PLAYER_TOPICS } from "./topics/player.ts";
 import { ALL_TOPICS } from "./topics/all.ts";
+import {
+	MORE_ALL,
+	MORE_PLAYER,
+	MORE_SEASON,
+	MORE_TEAM,
+} from "./topics/more.ts";
 
 export const TOPICS: Record<WrappedMode, Topic[]> = {
-	season: SEASON_TOPICS,
-	team: TEAM_TOPICS,
-	player: PLAYER_TOPICS,
-	all: ALL_TOPICS,
+	season: [...SEASON_TOPICS, ...MORE_SEASON],
+	team: [...TEAM_TOPICS, ...MORE_TEAM],
+	player: [...PLAYER_TOPICS, ...MORE_PLAYER],
+	all: [...ALL_TOPICS, ...MORE_ALL],
 };
 
 // Every candidate slide; a topic that throws is skipped, so one bad topic can't break the deck
@@ -31,6 +37,13 @@ export const candidates = (ctx: TopicCtx) => {
 			out.push(r);
 		}
 	}
+	// The deck's own subject needs no name tag
+	const self =
+		ctx.mode === "team" && ctx.tid !== undefined
+			? ctx.X.teamName(ctx.tid, ctx.season)
+			: ctx.mode === "player" && ctx.pid !== undefined
+				? ctx.X.players.get(ctx.pid)?.name
+				: undefined;
 	for (const s of out) {
 		if (s.who === undefined) {
 			const p = s.pid !== undefined ? ctx.X.players.get(s.pid) : undefined;
@@ -39,6 +52,9 @@ export const candidates = (ctx: TopicCtx) => {
 			} else if (s.tid !== undefined) {
 				s.who = ctx.X.teamName(s.tid, s.season ?? ctx.season);
 			}
+		}
+		if (s.who === self) {
+			delete s.who;
 		}
 	}
 	return out;

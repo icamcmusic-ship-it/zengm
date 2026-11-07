@@ -1192,6 +1192,279 @@ const KINDS: Kind[] = [
 			return out;
 		},
 	},
+	{
+		kind: "Drought over",
+		find: (X) => {
+			const out: Draft[] = [];
+			for (const tid of new Set(X.L.teamSeasons.map((t) => t.tid))) {
+				let miss = 0;
+				for (const t of X.teamHistory(tid)) {
+					if (!X.decided(t.season)) {
+						continue;
+					}
+					if (t.playoffRoundsWon < 0) {
+						miss += 1;
+						continue;
+					}
+					if (miss >= 5) {
+						out.push({
+							key: `${tid}|${t.season}`,
+							kind: "Drought over",
+							shape: "team",
+							season: t.season,
+							score: 15 + miss * 3 + t.playoffRoundsWon * 4,
+							pids: [],
+							tids: [tid],
+							heads: [
+								`The ${t.region} ${t.name} are back in the playoffs`,
+								`${miss} years later, playoff basketball for the ${t.name}`,
+							],
+							bodies: [
+								`After missing the playoffs ${plural(miss, "season")} in a row, the ${tLink(X, tid, t.season)} went ${fmtRecord(t.won, t.lost, t.tied, t.otl)} in ${t.season} and got back in.`,
+							],
+							evidence: [
+								["Seasons missed", `${miss}`],
+								["Record", fmtRecord(t.won, t.lost, t.tied, t.otl)],
+							],
+						});
+					}
+					miss = 0;
+				}
+			}
+			return out;
+		},
+	},
+	{
+		kind: "First title",
+		find: (X) => {
+			const out: Draft[] = [];
+			for (const tid of new Set(X.L.teamSeasons.map((t) => t.tid))) {
+				const titles = X.titlesOf(tid);
+				const first = titles[0];
+				const hist = X.teamHistory(tid);
+				if (first === undefined || first === hist[0]!.season) {
+					continue;
+				}
+				const before = hist.filter((t) => t.season < first).length;
+				const t = X.team(tid, first)!;
+				const fmvp = X.awardWinner(first, "Finals MVP");
+				out.push({
+					key: `${tid}`,
+					kind: "First title",
+					shape: "team",
+					season: first,
+					score: 20 + before * 2,
+					pids: fmvp ? [fmvp.pid] : [],
+					tids: [tid],
+					heads: [
+						`The ${t.region} ${t.name} win their first title`,
+						"A first banner",
+					],
+					bodies: [
+						`After ${plural(before, "season")} without one, the ${tLink(X, tid, first)} won the franchise’s first title in ${first}.${fmvp ? ` ${pLink(fmvp)} was Finals MVP.` : ""}`,
+					],
+					evidence: [
+						["Seasons waited", `${before}`],
+						["Record", fmtRecord(t.won, t.lost, t.tied, t.otl)],
+					],
+				});
+			}
+			return out;
+		},
+	},
+	{
+		kind: "Finals sweep",
+		find: (X) => {
+			const out: Draft[] = [];
+			for (const s of X.decidedSeasons()) {
+				const f = X.series(s)?.rounds.at(-1)?.[0];
+				if (!f?.away) {
+					continue;
+				}
+				const [w, l] =
+					f.home.won > f.away.won ? [f.home, f.away] : [f.away, f.home];
+				if (l.won !== 0 || w.won < 2) {
+					continue;
+				}
+				out.push({
+					key: `${s}`,
+					kind: "Finals sweep",
+					shape: "playoffs",
+					season: s,
+					score: 30,
+					pids: [],
+					tids: [w.tid, l.tid],
+					heads: [
+						`A finals sweep in ${s}`,
+						`The ${X.team(w.tid, s)?.name ?? "champions"} swept the finals`,
+					],
+					bodies: [
+						`The ${tLink(X, w.tid, s)} swept the ${tLink(X, l.tid, s)} ${w.won}-0 in the ${s} finals.`,
+					],
+					evidence: [["Series", `${w.won}-0`]],
+				});
+			}
+			return out;
+		},
+	},
+	{
+		kind: "Hometown hero",
+		find: (X) => {
+			const out: Draft[] = [];
+			for (const p of X.L.players) {
+				const city = p.bornLoc.split(",")[0]!.trim();
+				if (city.length < 3) {
+					continue;
+				}
+				const rows = regRows(p);
+				const tids = [...new Set(rows.map((r) => r.tid))].filter(
+					(tid) => X.teamAny(tid, rows.at(-1)!.season)?.region === city,
+				);
+				for (const tid of tids) {
+					const mine = rows.filter((r) => r.tid === tid);
+					const ws = mine.reduce((a, r) => a + r.ws, 0);
+					if (ws < 15) {
+						continue;
+					}
+					const ss = seasonsOf(mine);
+					out.push({
+						key: `${p.pid}|${tid}`,
+						kind: "Hometown hero",
+						shape: "career",
+						season: ss.at(-1)!,
+						score: 15 + ws / 3,
+						pids: [p.pid],
+						tids: [tid],
+						heads: [
+							`${p.name}, starring for his hometown team`,
+							`${city}’s own ${p.name}`,
+						],
+						bodies: [
+							`Born in ${p.bornLoc}, ${pLink(p)} played ${plural(ss.length, "season")} for the ${tLink(X, tid, ss.at(-1)!)} and produced ${fmtNum(ws, 1)} win shares for them.`,
+						],
+						evidence: [
+							["Born", p.bornLoc],
+							["Seasons", `${ss.length}`],
+							["WS", fmtNum(ws, 1)],
+						],
+					});
+				}
+			}
+			return out;
+		},
+	},
+	{
+		kind: "Breakout",
+		find: (X) => {
+			const out: Draft[] = [];
+			for (const s of X.decidedSeasons()) {
+				for (const l of X.qualified(s)) {
+					const prev = X.line(l.pid, s - 1);
+					if (!prev || l.ws - prev.ws < 7 || l.ws < 9) {
+						continue;
+					}
+					const p = X.players.get(l.pid)!;
+					out.push({
+						key: `${l.pid}|${s}`,
+						kind: "Breakout",
+						shape: "season",
+						season: s,
+						score: 10 + (l.ws - prev.ws) * 3,
+						pids: [l.pid],
+						tids: [l.tid],
+						heads: [
+							`${p.name} broke out in ${s}`,
+							`Where did ${p.name} come from?`,
+						],
+						bodies: [
+							`${pLink(p)} went from ${fmtNum(prev.ppg, 1)} points and ${fmtNum(prev.ws, 1)} win shares in ${s - 1} to ${fmtNum(l.ppg, 1)} and ${fmtNum(l.ws, 1)} in ${s}, at age ${l.age}.`,
+						],
+						evidence: [
+							["WS before", fmtNum(prev.ws, 1)],
+							["WS after", fmtNum(l.ws, 1)],
+							["Age", `${l.age}`],
+						],
+					});
+				}
+			}
+			return out;
+		},
+	},
+	{
+		kind: "Farewell",
+		find: (X) => {
+			const out: Draft[] = [];
+			for (const p of X.L.players) {
+				if (p.retiredYear > X.L.season || p.stats.length === 0) {
+					continue;
+				}
+				const c = X.career(p);
+				if (c.ws < 50) {
+					continue;
+				}
+				const mvps = X.countAwards(p, "Most Valuable Player");
+				const titles = titleSeasons(X, p).length;
+				out.push({
+					key: `${p.pid}`,
+					kind: "Farewell",
+					shape: "career",
+					season: p.retiredYear,
+					score: 10 + c.ws / 3 + mvps * 5,
+					pids: [p.pid],
+					tids: [],
+					heads: [`${p.name} retires`, `So long, ${p.name}`],
+					bodies: [
+						`${pLink(p)} retired in ${p.retiredYear} after ${plural(seasonsOf(regRows(p)).length, "season")}: ${fmtNum(c.pts)} points, ${fmtNum(c.ws, 1)} win shares${mvps > 0 ? `, ${plural(mvps, "MVP")}` : ""}${titles > 0 ? `, ${plural(titles, "title")}` : ""}.`,
+					],
+					evidence: [
+						["Points", fmtNum(c.pts)],
+						["WS", fmtNum(c.ws, 1)],
+						["Titles", `${titles}`],
+					],
+				});
+			}
+			return out;
+		},
+	},
+	{
+		kind: "Scoring explosion",
+		find: (X) => {
+			const out: Draft[] = [];
+			for (const g of X.L.games) {
+				for (let i = 0; i < 2; i++) {
+					const t = g.teams[i]!;
+					const o = g.teams[1 - i]!;
+					for (const l of t.players) {
+						if (l.pts < 55) {
+							continue;
+						}
+						out.push({
+							key: `${g.gid}|${l.pid}`,
+							kind: "Scoring explosion",
+							shape: "season",
+							season: g.season,
+							score: 10 + (l.pts - 50) * 3,
+							pids: [l.pid],
+							tids: [t.tid],
+							heads: [
+								`${l.name} scored ${l.pts}`,
+								`${l.pts} points in one night`,
+							],
+							bodies: [
+								`${pLink(l)} put up ${l.pts} points, ${l.trb} rebounds and ${l.ast} assists for the ${tLink(X, t.tid, g.season)} against the ${tLink(X, o.tid, g.season)}${g.playoffs ? " in the playoffs" : ""} in ${g.season}, a ${t.pts > o.pts ? "win" : "loss"}, ${t.pts}–${o.pts}.`,
+							],
+							evidence: [
+								["PTS", `${l.pts}`],
+								["REB", `${l.trb}`],
+								["AST", `${l.ast}`],
+							],
+						});
+					}
+				}
+			}
+			return out;
+		},
+	},
 ];
 
 export const KIND_NAMES = KINDS.map((k) => k.kind);
