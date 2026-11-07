@@ -291,6 +291,27 @@ export const processTeam = async (
 			ovrs: rating.ovrs,
 		};
 
+		// Raw ratings, only used to word the basketball play-by-play (which kind of finish or pass is plausible for him). The sim itself never reads them.
+		if (__SPORT === "basketball") {
+			const r = rating as Record<string, any>;
+			(p2 as any).pbpRatings = {
+				hgt: r["hgt"],
+				stre: r["stre"],
+				spd: r["spd"],
+				jmp: r["jmp"],
+				ins: r["ins"],
+				dnk: r["dnk"],
+				ft: r["ft"],
+				fg: r["fg"],
+				tp: r["tp"],
+				oiq: r["oiq"],
+				diq: r["diq"],
+				drb: r["drb"],
+				pss: r["pss"],
+				reb: r["reb"],
+			};
+		}
+
 		// Reset ptModifier for AI teams. This should not be necessary since it should always be 1, but let's be safe.
 		if (!g.get("userTids").includes(t.id) || g.get("spectator")) {
 			p2.ptModifier = 1;

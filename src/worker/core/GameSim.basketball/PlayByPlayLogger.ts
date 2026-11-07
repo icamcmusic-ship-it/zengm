@@ -68,7 +68,6 @@ type PlayByPlayEventInputNoScore =
 	| {
 			type:
 				| BlockType
-				| FgaType
 				| FgMissType
 				| "pfNonShooting"
 				| "drb"
@@ -79,6 +78,14 @@ type PlayByPlayEventInputNoScore =
 			t: TeamNum;
 			pid: number;
 			clock: number;
+	  }
+	| {
+			type: FgaType;
+			t: TeamNum;
+			pid: number;
+			clock: number;
+			// Seconds the possession had lasted when the play happened. Only used to word the play-by-play, never by the sim.
+			poss?: number;
 	  }
 	| {
 			type: "jumpBall";
@@ -93,6 +100,7 @@ type PlayByPlayEventInputNoScore =
 			pid: number;
 			clock: number;
 			desperation: boolean;
+			poss?: number;
 	  }
 	| {
 			type: "fgaTipIn";
@@ -100,6 +108,7 @@ type PlayByPlayEventInputNoScore =
 			pid: number;
 			clock: number;
 			pidPass: number;
+			poss?: number;
 	  }
 	| {
 			type: "gameOver";
@@ -128,6 +137,7 @@ type PlayByPlayEventInputNoScore =
 			pidTov: number;
 			outOfBounds: boolean;
 			clock: number;
+			poss?: number;
 	  }
 	| {
 			type: "sub";
@@ -142,6 +152,7 @@ type PlayByPlayEventInputNoScore =
 			pid: number;
 			outOfBounds: boolean;
 			clock: number;
+			poss?: number;
 	  }
 	| {
 			type: "elamActive";
