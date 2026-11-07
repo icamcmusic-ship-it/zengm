@@ -129,6 +129,8 @@ export const routeInfos = {
 	"/l/:lid/wrapped/:type/:season": "wrapped",
 	"/l/:lid/wrapped/:type/:season/:id": "wrapped",
 	"/l/:lid/storylines": "storylines",
+	"/l/:lid/storylines/:type": "storylines",
+	"/l/:lid/storylines/:type/:id": "storylines",
 	"/l/:lid/upcoming_free_agents": "upcomingFreeAgents",
 	"/l/:lid/upcoming_free_agents/:season": "upcomingFreeAgents",
 	"/l/:lid/god_mode": "godMode",
