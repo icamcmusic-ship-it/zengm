@@ -3,12 +3,33 @@ import useLocalStorageState from "use-local-storage-state";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import { helpers } from "../../util/helpers.ts";
 import { useLocal } from "../../util/local.ts";
+import { realtimeUpdate } from "../../util/realtimeUpdate.ts";
 import type { View } from "../../../common/types.ts";
+import type { LeagueUrlParts } from "../../router/types.ts";
 import { plainText } from "../../../common/storylines/index.ts";
 import { StoryCard, type UIStory } from "./StoryCard.tsx";
 import { WhyModal } from "./WhyModal.tsx";
 
 const PAGE = 30;
+
+// The page's own URL with a different season ("all" drops it), keeping the team, player or kind filter
+const storylinesUrlParts = (
+	filter: View<"storylines">["filter"],
+	teams: View<"storylines">["teams"],
+	season: string,
+): LeagueUrlParts => {
+	const withFilter = filter && filter.type !== "thread";
+	const type = withFilter ? filter.type : "all";
+	const id = !withFilter
+		? "all"
+		: filter.type === "team"
+			? `${teams[Number(filter.id)]?.abbrev ?? ""}_${filter.id}`
+			: filter.id;
+	if (season !== "all") {
+		return ["storylines", type, id, season];
+	}
+	return withFilter ? ["storylines", type, id] : ["storylines"];
+};
 
 // Followed threads are remembered per league in this browser
 const useFollowed = () => {
@@ -113,8 +134,17 @@ const ThreadView = ({
 };
 
 const Storylines = (data: View<"storylines">) => {
-	const { stories, kinds, kindSlugs, teams, filter, threads, totalStories } =
-		data;
+	const {
+		stories,
+		kinds,
+		kindSlugs,
+		teams,
+		filter,
+		threads,
+		totalStories,
+		season,
+		seasons,
+	} = data;
 	useTitleBar({
 		title: filter?.type === "thread" ? "Storyline thread" : "Storylines",
 	});
@@ -211,7 +241,7 @@ const Storylines = (data: View<"storylines">) => {
 							onClick={() => setTab(t)}
 						>
 							{t === "stories"
-								? `Stories (${filter ? stories.length : totalStories})`
+								? `Stories (${totalStories})`
 								: `Threads (${threads.length})`}
 						</button>
 					</li>
@@ -220,6 +250,27 @@ const Storylines = (data: View<"storylines">) => {
 			<div className="d-flex flex-wrap gap-2 mb-3">
 				{tab === "stories" ? (
 					<>
+						<select
+							className="form-select form-select-sm"
+							style={{ width: "auto" }}
+							value={season ?? "all"}
+							aria-label="Season"
+							onChange={(e) => {
+								realtimeUpdate(
+									[],
+									helpers.leagueUrl(
+										storylinesUrlParts(filter, teams, e.target.value),
+									),
+								);
+							}}
+						>
+							<option value="all">All seasons</option>
+							{[...seasons].reverse().map((y) => (
+								<option key={y} value={y}>
+									{y}
+								</option>
+							))}
+						</select>
 						<select
 							className="form-select form-select-sm"
 							style={{ width: "auto", maxWidth: "100%" }}
@@ -266,7 +317,11 @@ const Storylines = (data: View<"storylines">) => {
 			{tab === "stories" ? (
 				<>
 					{list.length === 0 ? (
-						<p>No storylines yet. Play a few seasons and check back!</p>
+						<p>
+							{season !== undefined
+								? `No stories for ${season} yet.`
+								: "No storylines yet. Play a few seasons and check back!"}
+						</p>
 					) : null}
 					<div className="row g-3">
 						{list.slice(0, shown).map((s) => (

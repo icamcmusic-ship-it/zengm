@@ -3,7 +3,7 @@ import { getStoryState } from "../util/storylinesData.ts";
 import { validateTeam } from "../util/processInputs.ts";
 import { kindSlug, KIND_NAMES } from "../../common/storylines/index.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
-import type { Story } from "../../common/storylines/index.ts";
+import { overlapsSeason, type Story } from "../../common/storylines/index.ts";
 
 // Without a filter only the biggest stories are sent, so a long league does not move megabytes to the page
 const CAP = 1200;
@@ -24,7 +24,11 @@ const processInputs = (params: RouteParams<"storylines">) => {
 		const int = Number.parseInt(params.id);
 		pid = Number.isNaN(int) ? undefined : int;
 	}
-	return { type, tid, pid, id: params.id };
+	const season =
+		params.season !== undefined && /^\d+$/.test(params.season)
+			? Number.parseInt(params.season)
+			: undefined;
+	return { type, tid, pid, id: params.id, season };
 };
 
 export default defineView({
@@ -87,7 +91,7 @@ export default defineView({
 		} else if (inputs.type === "kind") {
 			const kind = KIND_NAMES.find((k) => kindSlug(k) === inputs.id);
 			if (kind) {
-				list = stories.filter((s) => s.kind === kind).slice(0, CAP);
+				list = stories.filter((s) => s.kind === kind);
 				filter = { type: "kind", id: inputs.id!, label: kind };
 			}
 		} else if (inputs.type === "thread") {
@@ -98,16 +102,22 @@ export default defineView({
 				filter = { type: "thread", id: thread.key, label: thread.title };
 			}
 		}
-		if (!filter) {
-			list = stories.slice(0, CAP);
+		// The season filter runs on the finished stories, so detection and its caching are untouched. A story matches if the season falls inside the seasons it covers.
+		const season =
+			filter?.type === "thread" ? undefined : (inputs.season ?? undefined);
+		if (season !== undefined) {
+			list = list.filter((s) => overlapsSeason(s, season));
 		}
+		const matching = list.length;
+		list = list.slice(0, CAP);
 
 		return {
 			stories: list.map((s) => ({
 				...s,
 				thread: threadOf.get(s.id),
 			})),
-			totalStories: stories.length,
+			totalStories: matching,
+			season,
 			kinds: KIND_NAMES,
 			kindSlugs: Object.fromEntries(KIND_NAMES.map((k) => [k, kindSlug(k)])),
 			teams,

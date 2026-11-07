@@ -131,6 +131,7 @@ export const routeInfos = {
 	"/l/:lid/storylines": "storylines",
 	"/l/:lid/storylines/:type": "storylines",
 	"/l/:lid/storylines/:type/:id": "storylines",
+	"/l/:lid/storylines/:type/:id/:season": "storylines",
 	"/l/:lid/upcoming_free_agents": "upcomingFreeAgents",
 	"/l/:lid/upcoming_free_agents/:season": "upcomingFreeAgents",
 	"/l/:lid/god_mode": "godMode",

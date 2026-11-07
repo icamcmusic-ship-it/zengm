@@ -27,7 +27,11 @@ export const StoryCard = ({
 			<div className="card-body">
 				<div className="d-flex justify-content-between small text-body-secondary mb-1">
 					<span className="text-uppercase fw-bold">{s.kind}</span>
-					<span>{s.season}</span>
+					<span>
+						{s.span && s.span[0] !== s.span[1]
+							? `${s.span[0]}–${s.span[1]}`
+							: s.season}
+					</span>
 				</div>
 				{phase ? (
 					<div className="mb-1">
