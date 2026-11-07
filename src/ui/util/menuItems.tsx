@@ -66,6 +66,21 @@ const newspaperLinks: MenuItemLink[] =
 			]
 		: [];
 
+// Game hype and record chases (basketball only)
+const hypeLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "hype",
+					league: true,
+					commandPalette: true,
+					path: ["hype"],
+					text: "Games to Watch",
+				},
+			]
+		: [];
+
 export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 	{
 		type: "link",
@@ -254,6 +269,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 				text: "News Feed",
 			},
 			...newspaperLinks,
+			...hypeLinks,
 			{
 				type: "link",
 				league: true,

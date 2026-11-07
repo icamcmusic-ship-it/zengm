@@ -28,17 +28,20 @@ export type Target = {
 const phaseRank = (g: { playoffs: boolean; playIn: boolean }) =>
 	g.playIn ? 1 : g.playoffs ? 2 : 0;
 
-// Did a stored game come before the target?
+// Did a stored game come before the target? Everything stored is before an upcoming game. Regular season games are ordered by day (games on the same day are not before each other), later games by gid, which follows the order they were played in.
 const isBefore = (g: HGame, t: Target) => {
+	if (!t.completed) {
+		return true;
+	}
 	const a = phaseRank(g);
 	const b = phaseRank(t);
 	if (a !== b) {
 		return a < b;
 	}
-	if (g.day > 0 && t.day > 0 && g.day !== t.day) {
+	if (a === 0 && g.day > 0 && t.day > 0) {
 		return g.day < t.day;
 	}
-	return g.gid < t.gid && g.gid !== t.gid;
+	return g.gid < t.gid;
 };
 
 type Index = {
@@ -46,17 +49,19 @@ type Index = {
 	// Finished games oldest first
 	sorted: HGame[];
 	lines: Map<number, HLine[]>;
-	players: Map<number, HPlayerRaw>;
 	series: Map<number, HSeries[]>;
 };
 
-const cache = new WeakMap<HRaw, Index>();
+const cache = new WeakMap<HGame[], Index>();
+const playerCache = new WeakMap<HPlayerRaw[], Map<number, HPlayerRaw>>();
 
 const ord = (a: HGame, b: HGame) =>
-	phaseRank(a) - phaseRank(b) || a.day - b.day || a.gid - b.gid;
+	phaseRank(a) - phaseRank(b) ||
+	(phaseRank(a) === 0 ? a.day - b.day : 0) ||
+	a.gid - b.gid;
 
 const indexOf = (raw: HRaw): Index => {
-	const hit = cache.get(raw);
+	const hit = cache.get(raw.games);
 	if (hit) {
 		return hit;
 	}
@@ -109,11 +114,19 @@ const indexOf = (raw: HRaw): Index => {
 		byGid: new Map(raw.games.map((g) => [g.gid, g])),
 		sorted,
 		lines,
-		players: new Map(raw.players.map((p) => [p.pid, p])),
 		series,
 	};
-	cache.set(raw, idx);
+	cache.set(raw.games, idx);
 	return idx;
+};
+
+const playersOf = (raw: HRaw) => {
+	let m = playerCache.get(raw.players);
+	if (!m) {
+		m = new Map(raw.players.map((p) => [p.pid, p]));
+		playerCache.set(raw.players, m);
+	}
+	return m;
 };
 
 const teamInfo = (raw: HRaw, tid: number) => raw.teams.find((t) => t.tid === tid);
@@ -412,7 +425,7 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 		if (game) {
 			const out: HListed[] = [];
 			for (const bl of game.teams[ti]!.players) {
-				const p = idx.players.get(bl.pid);
+				const p = playersOf(raw).get(bl.pid);
 				if (!p || (bl.inj && !(bl.min > 0))) {
 					continue;
 				}

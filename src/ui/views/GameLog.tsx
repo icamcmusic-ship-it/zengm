@@ -8,6 +8,7 @@ import { bySport } from "../../common/sportFunctions.ts";
 import getWinner from "../../common/getWinner.ts";
 import formatScoreWithShootout from "../../common/formatScoreWithShootout.ts";
 import { BoxScoreWrapper } from "../components/BoxScoreWrapper.tsx";
+import { GameHype } from "../components/GameHype.tsx";
 import { BoxScoreRow } from "../components/BoxScoreRow.tsx";
 import { useLocal } from "../util/local.ts";
 
@@ -215,6 +216,7 @@ const GameLog = ({
 					<p />
 					<div className="row">
 						<div className="col-md-10">
+							{boxScore.gid >= 0 ? <GameHype gid={boxScore.gid} /> : null}
 							{boxScore.gid >= 0 ? (
 								<BoxScoreWrapper
 									boxScore={boxScore}

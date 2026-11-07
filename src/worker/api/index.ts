@@ -20,6 +20,7 @@ import {
 } from "../../common/constants.ts";
 import { isGoldActive } from "../../common/isGoldActive.ts";
 import actions from "./actions.ts";
+import hype from "./hype.ts";
 import * as awardSettings from "./awardSettings.ts";
 import leagueFileUpload, {
 	decompressStreamIfNecessary,
@@ -5622,6 +5623,7 @@ const api = {
 	awardSettings,
 	eightyTwoZeroDraft,
 	exhibitionGame,
+	hype,
 	leagueFileUpload,
 	playMenu,
 	toolsMenu,

@@ -201,8 +201,8 @@ export const preHype = (I: HGameInput): Pre => {
 	}
 	if (H.ovr !== null && A.ovr !== null) {
 		const lo = Math.min(H.ovr, A.ovr);
-		if (lo >= 55) {
-			add("stars", Math.min(6, (lo - 53) / 2), `Two strong rosters (team ovr ${H.ovr} and ${A.ovr})`);
+		if (lo >= 60) {
+			add("stars", Math.min(6, (lo - 58) / 2), `Two strong rosters (team ovr ${H.ovr} and ${A.ovr})`);
 		}
 	}
 

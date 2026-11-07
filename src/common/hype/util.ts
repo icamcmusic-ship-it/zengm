@@ -106,3 +106,16 @@ export const record = (t: {
 	}
 	return s;
 };
+
+// A clutch play from the box score (HTML with player links) as text with [[p:pid|Name]] tokens
+export const clutchText = (html: string) =>
+	html
+		.replace(
+			/<a href="[^"]*\/player\/(\d+)[^"]*">([^<]*)<\/a>/g,
+			(_m, pid: string, name: string) => `[[p:${pid}|${name}]]`,
+		)
+		.replace(/<[^>]*>/g, "")
+		.replace(/&amp;/g, "&")
+		.replace(/&#39;|&apos;/g, "'")
+		.replace(/&quot;/g, '"')
+		.trim();

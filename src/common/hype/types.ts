@@ -374,3 +374,20 @@ export type HypeGame = {
 	// Blend used for ranking: the pre-game hype for upcoming games, a mix of both for finished ones
 	watch: number;
 };
+
+// What the views send to the UI: no story objects, just the facts to show
+export type HypeLite = {
+	gid: number;
+	season: number;
+	day: number;
+	kind: "rs" | "po" | "pi";
+	completed: boolean;
+	teams: HypeGame["teams"];
+	score: number;
+	label: string;
+	reasons: Reason[];
+	series: string | null;
+	post: { score: number; label: string; reasons: Reason[]; note?: string } | null;
+	verdict: Verdict | null;
+	watch: number;
+};

@@ -8,7 +8,7 @@ import {
 } from "./gather.ts";
 import { postHype, verdictOf } from "./post.ts";
 import { preHype } from "./pre.ts";
-import type { Chase, HListed, HRaw, HypeGame } from "./types.ts";
+import type { Chase, HListed, HRaw, HypeGame, HypeLite } from "./types.ts";
 import { record } from "./util.ts";
 
 export { buildRecords, withActiveCareers } from "./records.ts";
@@ -95,3 +95,19 @@ export const chaseBoard = (raw: HRaw, limit = 25): ChaseRow[] => {
 		.slice(0, limit)
 		.map((x) => ({ ...x, text: chaseText(C, x, 0, done) }));
 };
+
+export const toLite = (h: HypeGame): HypeLite => ({
+	gid: h.gid,
+	season: h.season,
+	day: h.day,
+	kind: h.kind,
+	completed: h.completed,
+	teams: h.teams,
+	score: h.pre.score,
+	label: h.pre.label,
+	reasons: h.pre.reasons,
+	series: h.pre.series?.text ?? null,
+	post: h.post,
+	verdict: h.verdict,
+	watch: h.watch,
+});

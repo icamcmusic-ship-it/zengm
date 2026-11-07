@@ -119,3 +119,4 @@ export { default as Upgrade65 } from "./Upgrade65.tsx";
 export { default as WatchList } from "./WatchList.tsx";
 export { default as Wrapped } from "./Wrapped/index.tsx";
 export { default as Storylines } from "./Storylines.tsx";
+export { default as Hype } from "./Hype.tsx";
