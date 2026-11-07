@@ -4,6 +4,7 @@ import type { PlayerWithoutKey } from "../../../common/types.ts";
 import valueCombineOvrPot from "./valueCombineOvrPot.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 /**
  * Returns a numeric value for a given player, representing is general worth to a typical team
@@ -84,7 +85,8 @@ const value = (
 	const intercept = 31.693;
 
 	// 1. Account for stats (and current ratings if not enough stats)
-	const ps = p.stats.filter((playerStats) => !playerStats.playoffs);
+	// Pre-draft (college) rows must not change a player's value, see common/preDraft.ts
+	const ps = getProStats(p).filter((playerStats) => !playerStats.playoffs);
 	let current = ovr;
 
 	// No stats at all? Just look at ratings more, then.

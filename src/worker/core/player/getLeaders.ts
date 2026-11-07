@@ -6,11 +6,12 @@ import player from "./index.ts";
 import getSeasonLeaders, {
 	splitRegularSeasonPlayoffsCombined,
 } from "../season/getSeasonLeaders.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 // Return the attrs/ratings/stats this player is the leader in, by season
 const getLeaders = async (pRaw: Player) => {
 	const seasons = new Set<number>();
-	for (const row of [...pRaw.stats, ...pRaw.ratings]) {
+	for (const row of [...getProStats(pRaw), ...pRaw.ratings]) {
 		seasons.add(row.season);
 	}
 

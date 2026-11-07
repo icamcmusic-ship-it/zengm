@@ -1,6 +1,7 @@
 import { g, helpers } from "../../util/index.ts";
 import type { Player, PlayerWithoutKey } from "../../../common/types.ts";
 import type { PlayerRatings } from "../../../common/types.football.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 const getMostCommonPos = (ratings: PlayerRatings[]) => {
 	const counts = new Map<string, number>();
@@ -65,7 +66,7 @@ export const getThreshold = (pos?: string) => {
 const madeHof = (
 	p: Player<PlayerRatings> | PlayerWithoutKey<PlayerRatings>,
 ): boolean => {
-	const avs: number[] = p.stats
+	const avs: number[] = getProStats(p)
 		.filter((ps) => {
 			// No playoff stats, because AV is scaled strangely there
 			return !ps.playoffs;

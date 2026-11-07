@@ -17,6 +17,7 @@ import { extraStats } from "./hallOfFame.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
 import { formatPlayerAwardName } from "../../common/awards.ts";
+import { getProAwards, getProStats } from "../../common/preDraft.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 
 const processInputs = (params: RouteParams<"most">) => {
@@ -41,6 +42,15 @@ type PlayersAll = (Player & {
 	most: Most;
 })[];
 
+const withoutPreDraft = (p: Player): Player => {
+	const stats = getProStats(p);
+	const awards = getProAwards(p);
+	if (stats === p.stats && awards === p.awards) {
+		return p;
+	}
+	return { ...p, stats, awards };
+};
+
 const getMostXPlayers = async ({
 	filter,
 	getValue,
@@ -55,10 +65,13 @@ const getMostXPlayers = async ({
 	const LIMIT = 100;
 	let playersAll: PlayersAll = [];
 
-	for await (const { value: p } of idb.league
+	for await (const { value: pRaw } of idb.league
 		.transaction("players")
 		.store.index("draft.year, retiredYear")
 		.iterate(IDBKeyRange.bound([-Infinity], [g.get("season") - 1, Infinity]))) {
+		// Pre-draft (college) rows and honors are not part of a pro career, so none of the "most" lists can see them. See common/preDraft.ts
+		const p = withoutPreDraft(pRaw);
+
 		if (filter !== undefined && !filter(p)) {
 			continue;
 		}

@@ -1,5 +1,6 @@
 import { g, helpers } from "../../util/index.ts";
 import type { PlayerWithoutKey } from "../../../common/types.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 const madeHof = (p: PlayerWithoutKey): boolean => {
 	let earliestSeason = Infinity;
@@ -7,7 +8,7 @@ const madeHof = (p: PlayerWithoutKey): boolean => {
 	// Same as MVP formula
 	let score = 0;
 	let scoreFirstSeason;
-	for (const ps of p.stats) {
+	for (const ps of getProStats(p)) {
 		const g = (ps.evG ?? 0) + (ps.ppG ?? 0) + (ps.shG ?? 0);
 		const a = (ps.evA ?? 0) + (ps.ppA ?? 0) + (ps.shA ?? 0);
 		score +=

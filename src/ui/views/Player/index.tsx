@@ -21,6 +21,7 @@ import { SafeHtml } from "../../components/SafeHtml.tsx";
 import { useLocal } from "../../util/local.ts";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
+import { COLLEGE_AWARD_PREFIX } from "../../../common/preDraft.ts";
 
 const Player2 = ({
 	bestPos,
@@ -81,6 +82,9 @@ const Player2 = ({
 	});
 
 	const awardsGrouped = groupAwards(player.awards);
+
+	// Honors from before he was drafted, kept separate from pro awards
+	const earlierHonorsGrouped = groupAwards(player.earlierHonors);
 
 	let hasLeader = false;
 	for (const row of Object.values(leaders)) {
@@ -302,6 +306,33 @@ const Player2 = ({
 					</HideableSection>
 				</div>
 			</div>
+
+			{earlierHonorsGrouped.length > 0 ? (
+				<div className="row">
+					<div className="col-12 col-md-6 col-lg-4">
+						<HideableSection
+							title="Earlier honors"
+							description="From before he was drafted, so not counted as pro awards."
+						>
+							<table className="table table-nonfluid table-striped table-borderless table-sm player-awards">
+								<tbody>
+									{earlierHonorsGrouped.map((a, i) => {
+										return (
+											<tr key={i}>
+												<td>
+													{a.count > 1 ? `${a.count}x ` : null}
+													{a.type.replace(COLLEGE_AWARD_PREFIX, "")} (
+													{Object.values(a.seasons).flat().join(", ")})
+												</td>
+											</tr>
+										);
+									})}
+								</tbody>
+							</table>
+						</HideableSection>
+					</div>
+				</div>
+			) : null}
 
 			<div className="row" style={{ marginBottom: "-1rem" }}>
 				<div className="col-md-6 col-lg-4">

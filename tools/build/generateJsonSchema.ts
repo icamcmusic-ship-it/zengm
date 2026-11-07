@@ -1656,6 +1656,9 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					easterEggPlayers: {
 						type: "boolean",
 					},
+					generateCollegeStats: {
+						type: "boolean",
+					},
 					fakeAgeProb: {
 						type: "number",
 						minimum: 0,

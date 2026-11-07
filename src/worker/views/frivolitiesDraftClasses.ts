@@ -8,11 +8,13 @@ import { extraStats } from "./hallOfFame.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
 import { defineView } from "../util/defineView.ts";
+import { getProStats } from "../../common/preDraft.ts";
 import { player } from "../core/index.ts";
 
 const playerValue = (p: Player) => {
 	let sum = 0;
-	for (const ps of p.stats) {
+	// Pre-draft (college) rows are not part of the value he provided in the league
+	for (const ps of getProStats(p)) {
 		sum +=
 			bySport({
 				baseball: ps.war,

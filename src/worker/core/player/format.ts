@@ -19,6 +19,11 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { actualPhase } from "../../util/actualPhase.ts";
 import { getPayrollSeason } from "../../util/getPayrollSeason.ts";
 import { last } from "../../../common/utils.ts";
+import {
+	getPreDraftStats,
+	getProAwards,
+	getProStats,
+} from "../../../common/preDraft.ts";
 import { getCurrentContract } from "../../../common/contracts.ts";
 import {
 	getContractSummary,
@@ -441,8 +446,11 @@ const processAttrs = (
 			).length;
 		} else if (attr === "numSons") {
 			output.numSons = p.relatives.filter((rel) => rel.type === "son").length;
+		} else if (attr === "awards") {
+			// Pre-draft (college) honors are not pro awards, see common/preDraft.ts
+			output.awards = helpers.deepCopy(getProAwards(p));
 		} else if (attr === "numAllStar") {
-			output.numAllStar = p.awards.filter(
+			output.numAllStar = getProAwards(p).filter(
 				(a) =>
 					a.type === "All-Star" &&
 					(season === undefined || a.season <= season) &&
@@ -520,7 +528,8 @@ const processAttrs = (
 			);
 		} else if (attr === "experience") {
 			const seasons = new Set<number>();
-			for (const row of p.stats) {
+			// Pre-draft (college) rows are not pro experience, see common/preDraft.ts
+			for (const row of getProStats(p)) {
 				// gp is for real player data before minutes were tracked
 				const played = (row.min ?? 0) > 0 || (row.gp ?? 0) > 0;
 				if (played && (season === undefined || row.season <= season)) {
@@ -1413,10 +1422,17 @@ const processPlayer = (
 	if (playerRatings.length === 0) {
 		return;
 	}
+	// By default pre-draft (college) rows are not part of a player's stats, so they can't leak into career totals, leaders, etc. See common/preDraft.ts
+	const allStats =
+		options.preDraftStats === "exclude"
+			? getProStats(p)
+			: options.preDraftStats === "only"
+				? getPreDraftStats(p)
+				: p.stats;
 	const playerStats =
 		seasonRange === undefined
-			? p.stats
-			: p.stats.filter(
+			? allStats
+			: allStats.filter(
 					(r) => r.season >= seasonRange[0] && r.season <= seasonRange[1],
 				);
 
@@ -1496,6 +1512,7 @@ const normalizeOptions = (
 		oldStats = false,
 		statType = "perGame",
 		mergeStats = "none",
+		preDraftStats = "exclude",
 	} = optionsInput;
 
 	if (mergeStats === "totAndTeams" && season !== undefined) {
@@ -1526,6 +1543,7 @@ const normalizeOptions = (
 		oldStats,
 		statType,
 		mergeStats,
+		preDraftStats,
 	};
 };
 

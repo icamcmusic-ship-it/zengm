@@ -20,6 +20,7 @@ import { getRoundsWonText } from "./frivolitiesTeamSeasons.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { last } from "../../common/utils.ts";
 import { getTeamInfoBySeason } from "../util/getTeamInfoBySeason.ts";
+import { isPreDraftStatsRow } from "../../common/preDraft.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 
 const processInputs = (params: RouteParams<"tradeSummary">) => {
@@ -75,7 +76,8 @@ const findStatSum = (
 	season: number,
 	phase: Phase,
 	tid: number,
-	statSumsBySeason?: StatSumsBySeason,
+	statSumsBySeason: StatSumsBySeason | undefined,
+	draftYear: number,
 ) => {
 	// >= 0 check is for rookies traded after the draft, where they have no stats entry so it is -1
 	let index = statsIndex !== undefined && statsIndex >= 0 ? statsIndex : 0;
@@ -107,6 +109,11 @@ const findStatSum = (
 	let statSumTeam = 0;
 	let seenOtherTeam = false;
 	for (const [i, row] of allStats.entries()) {
+		// Pre-draft (college) rows are not value the team got from the player
+		if (isPreDraftStatsRow(row, draftYear)) {
+			continue;
+		}
+
 		const stat = bySport({
 			baseball: row.war ?? 0,
 			basketball: (row.ows ?? 0) + (row.dws ?? 0),
@@ -225,6 +232,7 @@ const getActualPlayerInfo = async (
 		phase,
 		tid,
 		statSumsBySeason,
+		p.draft.year,
 	);
 
 	let foundCurrentTransaction = false;

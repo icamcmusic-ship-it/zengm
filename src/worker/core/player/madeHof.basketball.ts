@@ -1,5 +1,6 @@
 import { g, helpers } from "../../util/index.ts";
 import type { PlayerWithoutKey } from "../../../common/types.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 /**
  * Is a player worthy of the Hall of Fame?
@@ -14,7 +15,7 @@ const madeHof = (p: PlayerWithoutKey): boolean => {
 	let earliestSeason = Infinity;
 
 	// Average together WS and EWA
-	const winShares = p.stats.map((ps) => {
+	const winShares = getProStats(p).map((ps) => {
 		let sum = 0;
 
 		if (typeof ps.dws === "number") {

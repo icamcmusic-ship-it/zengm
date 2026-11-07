@@ -7,6 +7,7 @@ import realRosters from "../realRosters/index.ts";
 import { idb } from "../../db/index.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { gauss } from "../../../common/random.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 const checkForceRetireSeasons = (p: Player) => {
 	// No redshirt seasons before league was created, since we have no stats then
@@ -21,7 +22,7 @@ const checkForceRetireSeasons = (p: Player) => {
 	);
 
 	// If a season has games played, it can't be a redshirt season
-	for (const row of p.stats) {
+	for (const row of getProStats(p)) {
 		if ((row.gp ?? 0) > 0) {
 			redshirtSeasons.delete(row.season);
 		}
@@ -133,7 +134,7 @@ const shouldRetire = async (p: Player): Promise<boolean> => {
 		// Only players older than maxAge or without a contract will retire
 		if (age > maxAge || (pot < minPot && p.tid === PLAYER.FREE_AGENT)) {
 			let ws = 0;
-			for (const stats of p.stats) {
+			for (const stats of getProStats(p)) {
 				if (stats.season === g.get("season") && !stats.playoffs) {
 					ws += (stats.dws ?? 0) + (stats.ows ?? 0);
 				}

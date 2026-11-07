@@ -9,11 +9,13 @@ import { wrappedPlayerNameLabels } from "../../components/PlayerNameLabels.tsx";
 import type { DataTableRow } from "../../components/DataTable/index.tsx";
 import { downloadFile } from "../../util/downloadFile.ts";
 import { LeagueFileUpload } from "../../components/LeagueFileUpload.tsx";
+import { CollegeStats } from "./CollegeStats.tsx";
 
 const DraftClass = ({
 	challengeNoRatings,
 	fantasyDraft,
 	godMode,
+	numWithCollegeStats,
 	offset,
 	players,
 	season,
@@ -21,11 +23,13 @@ const DraftClass = ({
 	challengeNoRatings: boolean;
 	fantasyDraft: boolean;
 	godMode: boolean;
+	numWithCollegeStats: number;
 	offset: number;
 	players: View<"draftScouting">["seasons"][0]["players"];
 	season: number;
 }) => {
 	const [showImportForm, setShowImportForm] = useState(false);
+	const [showCollegeStats, setShowCollegeStats] = useState(false);
 	const [status, setStatus] = useState<"exporting" | "loading" | undefined>();
 
 	// Only once some prospect has been through "Regenerate ratings"
@@ -87,6 +91,14 @@ const DraftClass = ({
 						>
 							Import
 						</button>
+						{__SPORT === "basketball" ? (
+							<button
+								className="btn btn-light-bordered btn-xs"
+								onClick={() => setShowCollegeStats((val) => !val)}
+							>
+								College stats
+							</button>
+						) : null}
 						<button
 							className="btn btn-light-bordered btn-xs"
 							disabled={status === "exporting" || status === "loading"}
@@ -138,6 +150,14 @@ const DraftClass = ({
 					) : null}
 				</div>
 			)}
+
+			{showCollegeStats && __SPORT === "basketball" && !fantasyDraft ? (
+				<CollegeStats
+					numPlayers={players.length}
+					numWithCollegeStats={numWithCollegeStats}
+					season={season}
+				/>
+			) : null}
 
 			{showImportForm ? (
 				<div>

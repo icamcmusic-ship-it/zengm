@@ -84,6 +84,7 @@ const DraftScouting = ({ fantasyDraft, seasons }: View<"draftScouting">) => {
 								challengeNoRatings={challengeNoRatings}
 								fantasyDraft={fantasyDraft}
 								godMode={godMode}
+								numWithCollegeStats={info.numWithCollegeStats}
 								offset={offset}
 								players={info.players}
 								season={info.season}

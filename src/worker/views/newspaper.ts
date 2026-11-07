@@ -44,6 +44,7 @@ import getNumPlayoffTeams from "../core/season/getNumPlayoffTeams.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import { validateSeason, validateTeam } from "../util/processInputs.ts";
+import { getProStats } from "../../common/preDraft.ts";
 
 const processInputs = (params: RouteParams<"newspaper">) => {
 	return {
@@ -535,7 +536,8 @@ export const getNewsFacts = async (
 			draftPick: p.draft.pick,
 			draftTid: p.draft.tid,
 			rookie:
-				p.draft.year === season - 1 && !p.stats.some((s) => s.season < season),
+				p.draft.year === season - 1 &&
+				!getProStats(p).some((s) => s.season < season),
 			contractAmount:
 				isCurrent && contract
 					? (contract.amounts.at(season - contract.start) ??
@@ -744,7 +746,7 @@ export const getNewsFacts = async (
 	if (edition === "final") {
 		const retired = await idb.merged.players.getAll({ retiredYear: season });
 		for (const p of retired) {
-			const rows = p.stats.filter((s) => !s.playoffs);
+			const rows = getProStats(p).filter((s) => !s.playoffs);
 			const sum = (key: string) =>
 				rows.reduce((acc, row) => acc + num((row as any)[key]), 0);
 			if (rows.length === 0) {

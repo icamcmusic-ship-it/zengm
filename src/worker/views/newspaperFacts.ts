@@ -1,6 +1,7 @@
 // Pure helpers that turn stored players and games into newspaper facts. They take plain objects and touch no database, so they can be tested directly.
 
 import { PHASE } from "../../common/constants.ts";
+import { getProAwards, getProStats } from "../../common/preDraft.ts";
 import type {
 	EditionId,
 	NPCareer,
@@ -37,7 +38,7 @@ export const lineFor = (
 	season: number,
 	playoffs: boolean,
 ): (NPLine & NPLineExtras) | undefined => {
-	const rows = p.stats.filter(
+	const rows = getProStats(p).filter(
 		(s) => s.season === season && s.playoffs === playoffs,
 	);
 	if (rows.length === 0) {
@@ -86,7 +87,7 @@ export const lineFor = (
 
 // The team a player played for most that season (or his current team)
 export const seasonTid = (p: Pick<Player, "stats" | "tid">, season: number) => {
-	const rows = p.stats.filter((s) => s.season === season && !s.playoffs);
+	const rows = getProStats(p).filter((s) => s.season === season && !s.playoffs);
 	if (rows.length === 0) {
 		return p.tid;
 	}
@@ -99,7 +100,7 @@ export const careerBefore = (
 	p: Pick<Player, "stats">,
 	season: number,
 ): NPCareer | undefined => {
-	const rows = p.stats.filter((s) => !s.playoffs && s.season < season);
+	const rows = getProStats(p).filter((s) => !s.playoffs && s.season < season);
 	const gp = sumRows(rows, "gp");
 	if (gp === 0) {
 		return undefined;
@@ -125,7 +126,7 @@ export const honorsBefore = (
 	season: number,
 ): NPHonors => {
 	const out: NPHonors = { mvp: 0, dpoy: 0, allStar: 0, allLeague: 0, titles: 0 };
-	for (const a of p.awards as any[]) {
+	for (const a of getProAwards(p) as any[]) {
 		if (a.season >= season) {
 			continue;
 		}

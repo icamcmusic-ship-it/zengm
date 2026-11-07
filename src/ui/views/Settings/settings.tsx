@@ -1240,6 +1240,14 @@ export const settings: Setting[] = (
 						description:
 							'When enabled there is a very rare chance for an "Easter egg" player to appear, one of a few select notable historical figures.',
 					},
+					{
+						category: "Events",
+						key: "generateCollegeStats",
+						name: "Generate College Stats",
+						type: "bool",
+						description:
+							"When enabled, each new draft class gets generated college stats and honors for its prospects, shown on their player pages. Pro stats and experience are not affected. You can also do this by hand for any class on the Draft Scouting page.",
+					},
 				]
 			: []),
 		{

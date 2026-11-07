@@ -204,6 +204,10 @@ import {
 } from "../core/awards/awardsByPlayer.ts";
 import { registerGlobal } from "../../common/registerGlobal.ts";
 import { getTeamInfoCache } from "../core/team/getTeamInfoCache.ts";
+import {
+	getPreDraftAwards,
+	isPreDraftStatsRow,
+} from "../../common/preDraft.ts";
 import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
 
 const acceptContractNegotiation = async ({
@@ -935,7 +939,12 @@ const deleteOldData = async (options: {
 			if (g.get("phase") === PHASE.PRESEASON) {
 				latestSeason -= 1;
 			}
-			p.stats = p.stats.filter((row) => row.season >= latestSeason);
+			p.stats = p.stats.filter(
+				(row) =>
+					row.season >= latestSeason ||
+					// Draft prospects keep their pre-draft (college) rows, which are old by definition but are all they have
+					(p.tid === PLAYER.UNDRAFTED && isPreDraftStatsRow(row, p.draft.year)),
+			);
 		}
 		if (p.injuries.length > 0) {
 			if (
@@ -1796,6 +1805,8 @@ const exportDraftClass = async ({
 			pos: p.pos,
 			ratings: [p.ratings[retiredPlayers ? p.ratings.length - 1 : 0]],
 			stats: p.stats,
+			// Pre-draft honors go with the pre-draft stats, so a class can be exported and imported without losing them
+			...(retiredPlayers ? {} : { awards: getPreDraftAwards(p) }),
 			real: p.real,
 			relatives: p.relatives,
 			srID: p.srID,
@@ -2691,8 +2702,11 @@ const handleUploadedDraftClass = async ({
 		p.gamesUntilTradable = 0;
 		p.ptModifier = 1;
 
-		// Would be nice to allow keeping it, but it's kind of messy to duplicate the logic here and in importPlayers and to add a UI
-		delete p.stats;
+		// Keep pre-draft (college) stats rows and honors, shifted to the draft year being imported. There is no pro experience for a prospect, so rows are all DOES_NOT_EXIST. Anything else about the stats is dropped, because they can't be pro stats.
+		player.prepareUploadedProspectPreDraft(p, {
+			draftYear,
+			fileSeason: uploadedSeason,
+		});
 
 		// Make sure player object is fully defined
 		const p2 = await player.augmentPartialPlayer(
@@ -2746,6 +2760,24 @@ const handleUploadedDraftClass = async ({
 	await draft.genPlayers(draftYear, scoutingLevel);
 
 	await toUI("realtimeUpdate", [["playerMovement"]]);
+};
+
+const generateCollegeStats = async ({
+	draftYear,
+	seed,
+}: {
+	draftYear: number;
+	seed: string;
+}) => {
+	const output = await draft.generateCollegeStats({ draftYear, seed });
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return output;
+};
+
+const removeCollegeStats = async (draftYear: number) => {
+	const output = await draft.removeCollegeStats(draftYear);
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return output;
 };
 
 const idbCacheFlush = async () => {
@@ -5713,6 +5745,8 @@ const api = {
 		ping,
 		prefetchRealPlayerStats,
 		handleUploadedDraftClass,
+		generateCollegeStats,
+		removeCollegeStats,
 		idbCacheFlush,
 		importPlayers,
 		importPlayersGetReal,

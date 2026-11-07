@@ -4,6 +4,7 @@ import type { Phase, Player, FlatContractInfo } from "../../../common/types.ts";
 import genJerseyNumber from "./genJerseyNumber.ts";
 import setJerseyNumber from "./setJerseyNumber.ts";
 import { addContract, createContract } from "../contract/index.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 
 const sign = async (
 	p: Player,
@@ -12,7 +13,7 @@ const sign = async (
 	phase: Phase,
 ) => {
 	const isRookie =
-		p.stats.length === 0 &&
+		getProStats(p).length === 0 &&
 		p.draft.year === g.get("season") &&
 		p.draft.tid === tid;
 

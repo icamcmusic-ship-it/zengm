@@ -5,6 +5,7 @@ import {
 	getContractExp,
 	getCurrentContract,
 } from "../../../common/contracts.ts";
+import { getProStats } from "../../../common/preDraft.ts";
 import { getOwedContracts, getPayrollAmount } from "../contract/index.ts";
 
 const getPlayerInfo = (p: Player) => {
@@ -38,7 +39,7 @@ const getContracts = async (tid: number): Promise<ContractInfo[]> => {
 			contracts.push({
 				pid: p.pid,
 				...getPlayerInfo(p),
-				jerseyNumber: p.stats.at(-1)?.jerseyNumber,
+				jerseyNumber: getProStats(p).at(-1)?.jerseyNumber,
 				amount: getPayrollAmount(contract),
 				exp: getContractExp(contract),
 				start: contract.start,

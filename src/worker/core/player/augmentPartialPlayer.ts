@@ -19,6 +19,7 @@ import {
 } from "../contract/index.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { randInt } from "../../../common/random.ts";
+import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
 
 /**
  * Take a partial player object, such as from an uploaded JSON file, and add everything it needs to be a real player object.
@@ -104,7 +105,14 @@ const augmentPartialPlayer = async (
 
 	if (!p.statsTids) {
 		p.statsTids = Array.from(
-			new Set(Array.isArray(p.stats) ? p.stats.map((s: any) => s.tid) : []),
+			new Set(
+				Array.isArray(p.stats)
+					? p.stats
+							// Pre-draft (college) rows are not a team the player played for
+							.filter((s: any) => !isPreDraftStatsRow(s, p.draft?.year))
+							.map((s: any) => s.tid)
+					: [],
+			),
 		);
 	}
 

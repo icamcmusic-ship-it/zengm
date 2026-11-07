@@ -20,6 +20,7 @@ import { getLeaderRequirementsStats } from "../core/season/getLeaderRequirements
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateSeason } from "../util/processInputs.ts";
 import { validateSeasonType } from "../util/processInputs.ts";
+import { getProStats } from "../../common/preDraft.ts";
 import { validateStatType } from "../util/processInputs.ts";
 
 const processInputs = (params: RouteParams<"leaders">) => {
@@ -566,7 +567,11 @@ export const iterateAllPlayersWithStats = async (
 ) => {
 	await idb.merged.players.forEach(
 		typeof season === "number" ? getActiveSeasonSelector(season) : undefined,
-		(p) => {
+		(pAll) => {
+			// Pre-draft (college) rows are not part of the pro leaders, see common/preDraft.ts
+			const proStats = getProStats(pAll);
+			const p = proStats === pAll.stats ? pAll : { ...pAll, stats: proStats };
+
 			if (season === "all") {
 				const seasons = new Set(p.stats.map((row) => row.season));
 				for (const season of seasons) {

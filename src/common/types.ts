@@ -853,6 +853,9 @@ export type GameAttributesLeague = {
 	footballOvertime: FootballOvertime;
 	footballOvertimePlayoffs: FootballOvertime;
 	easterEggPlayers: boolean;
+
+	// Basketball only. Generate college stats and honors for each new draft class as it is created
+	generateCollegeStats: boolean;
 	fakeAgeProb: number;
 };
 
@@ -1216,6 +1219,9 @@ type PlayerSalary = {
 
 type PlayerStatsCommon = {
 	jerseyNumber?: string;
+
+	// Only for pre-draft (college) rows, which have tid PLAYER.DOES_NOT_EXIST. The school or program name to show in the team column
+	teamName?: string;
 	playoffs: boolean;
 	season: number;
 	tid: number;
@@ -1575,6 +1581,9 @@ export type PlayerFormatOptions = {
 	oldStats?: boolean;
 	statType?: PlayerStatType;
 	mergeStats?: "none" | "totOnly" | "totAndTeams";
+
+	// Stats rows from before the player was drafted (college seasons, tid DOES_NOT_EXIST). "exclude" (default) hides them so they can't affect career totals etc, "only" returns just them, "include" returns everything
+	preDraftStats?: "exclude" | "only" | "include";
 };
 
 // Is SeasonType one of the values in the seasonType option? Distributes over unions, so if seasonType is a union of single values (like "playoffs" | "regularSeason"), the result is boolean because it's not known which one it is
