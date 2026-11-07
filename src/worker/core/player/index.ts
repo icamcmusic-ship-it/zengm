@@ -4,6 +4,13 @@ import addRelatives from "./addRelatives.ts";
 import addStatsRow from "./addStatsRow.ts";
 import addToFreeAgents from "./addToFreeAgents.ts";
 import augmentPartialPlayer from "./augmentPartialPlayer.ts";
+import {
+	normalizePreDraftAwards,
+	normalizePreDraftStats,
+	prepareUploadedProspectPreDraft,
+	replacePreDraftAwards,
+	replacePreDraftStats,
+} from "./normalizePreDraft.ts";
 import bonus from "./bonus.ts";
 import checkJerseyNumberRetirement from "./checkJerseyNumberRetirement.ts";
 import checkStatisticalFeat from "./checkStatisticalFeat.ts";
@@ -60,6 +67,11 @@ export default {
 	addStatsRow,
 	addToFreeAgents,
 	augmentPartialPlayer,
+	normalizePreDraftAwards,
+	normalizePreDraftStats,
+	prepareUploadedProspectPreDraft,
+	replacePreDraftAwards,
+	replacePreDraftStats,
 	bonus,
 	checkJerseyNumberRetirement,
 	checkStatisticalFeat,

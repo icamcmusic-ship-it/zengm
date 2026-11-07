@@ -2694,8 +2694,11 @@ const handleUploadedDraftClass = async ({
 		p.gamesUntilTradable = 0;
 		p.ptModifier = 1;
 
-		// Would be nice to allow keeping it, but it's kind of messy to duplicate the logic here and in importPlayers and to add a UI
-		delete p.stats;
+		// Keep pre-draft (college) stats rows and honors, shifted to the draft year being imported. There is no pro experience for a prospect, so rows are all DOES_NOT_EXIST. Anything else about the stats is dropped, because they can't be pro stats.
+		player.prepareUploadedProspectPreDraft(p, {
+			draftYear,
+			fileSeason: uploadedSeason,
+		});
 
 		// Make sure player object is fully defined
 		const p2 = await player.augmentPartialPlayer(

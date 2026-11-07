@@ -1216,6 +1216,9 @@ type PlayerSalary = {
 
 type PlayerStatsCommon = {
 	jerseyNumber?: string;
+
+	// Only for pre-draft (college) rows, which have tid PLAYER.DOES_NOT_EXIST. The school or program name to show in the team column
+	teamName?: string;
 	playoffs: boolean;
 	season: number;
 	tid: number;
