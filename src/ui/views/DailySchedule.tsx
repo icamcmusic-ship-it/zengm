@@ -8,6 +8,7 @@ import { NoGamesMessage } from "./GameLog.tsx";
 import allowForceTie from "../../common/allowForceTie.ts";
 import { ForceWin } from "../components/ForceWin.tsx";
 import { ScoreBox } from "../components/ScoreBox/index.tsx";
+import { HypeLine, useHypeGids } from "../components/GameHype.tsx";
 
 const DailySchedule = ({
 	cid,
@@ -41,6 +42,12 @@ const DailySchedule = ({
 		season: currentSeason,
 		userTid,
 	} = useLocal(["gameSimInProgress", "phase", "season", "userTid"]);
+
+	const hype = useHypeGids(
+		[...upcoming, ...completed]
+			.filter((game) => game.teams[0].tid >= 0 && game.teams[1].tid >= 0)
+			.map((game) => game.gid),
+	);
 
 	let simToDay = null;
 	if (upcoming.length > 0 && !isToday) {
@@ -171,6 +178,7 @@ const DailySchedule = ({
 												playersUpcoming={playersUpcoming}
 												actions={actions}
 											/>
+											<HypeLine h={hype[game.gid]} className="mt-1" />
 											<ForceWin allowTie={allowTie} game={game} />
 										</div>
 									);
@@ -194,6 +202,7 @@ const DailySchedule = ({
 											style={{ maxWidth: 510 }}
 										>
 											<ScoreBox game={game} />
+											<HypeLine h={hype[game.gid]} className="mt-1" />
 										</div>
 									);
 								})}

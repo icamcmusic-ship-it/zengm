@@ -7,6 +7,7 @@ import StartingLineup from "./StartingLineup.tsx";
 import TeamStats from "./TeamStats.tsx";
 import type { View } from "../../../common/types.ts";
 import Headlines from "./Headlines.tsx";
+import GamesToWatch from "./GamesToWatch.tsx";
 import { useLocal } from "../../util/local.ts";
 
 const LeagueDashboard = ({
@@ -190,6 +191,9 @@ const LeagueDashboard = ({
 					/>
 				</div>
 				<div className="col-xl-5 col-lg-4 mb-3">
+					<GamesToWatch
+						refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
+					/>
 					<Headlines
 						events={events}
 						season={season}

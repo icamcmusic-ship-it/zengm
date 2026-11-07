@@ -9,6 +9,7 @@ import { Dropdown } from "react-bootstrap";
 import { ForceWin } from "../components/ForceWin.tsx";
 import { ScoreBox } from "../components/ScoreBox/index.tsx";
 import { helpers } from "../util/helpers.ts";
+import { HypeLine, useHypeGids } from "../components/GameHype.tsx";
 
 const Schedule = ({
 	canLiveSimFirstGame,
@@ -34,6 +35,14 @@ const Schedule = ({
 		"phase",
 		"userTid",
 	]);
+
+	// Hype of the next games only: it is judged on what is known today
+	const hype = useHypeGids(
+		upcoming
+			.slice(0, 8)
+			.filter((game) => game.teams[0].tid >= 0 && game.teams[1].tid >= 0)
+			.map((game) => game.gid),
+	);
 
 	const [forcingAll, setForcingAll] = useState(false);
 	const [forceWinKey, setForceWinKey] = useState(0);
@@ -163,6 +172,7 @@ const Schedule = ({
 										playersUpcomingAbbrev={topPlayers.type === "byTid"}
 										actions={actions}
 									/>
+									<HypeLine h={hype[game.gid]} className="mt-1" />
 									<ForceWin
 										key={forceWinKey}
 										allowTie={allowTie}
