@@ -7,6 +7,12 @@ import type { ReactNode } from "react";
 import { formatClock } from "../../common/formatClock.ts";
 import { formatLiveGameStat } from "./formatLiveGameStat.ts";
 import type { PlayByPlayEvent } from "../../worker/core/GameSim/PlayByPlayLoggerBase.ts";
+import {
+	FlavorSession,
+	playersFromInitEvent,
+	type FlavorHost,
+	type FlavorResult,
+} from "../../common/pbpFlavor/index.ts";
 
 const getPronoun = (pronoun: Parameters<typeof helpers.pronoun>[1]) => {
 	return helpers.pronoun(local.getState().gender, pronoun);
@@ -28,6 +34,67 @@ const getName = (pid: number) => {
 	return playersByPid?.[pid]?.name ?? "???";
 };
 
+// The play-by-play text (varied phrasing, ratings-based plays, running tallies, milestones...) comes from src/common/pbpFlavor, one session
+// per live game. The plain text below is kept for the events that layer does not word (Elam ending, shootout) and as a fallback
+let flavor: FlavorSession | undefined;
+
+const makeFlavorSession = (initEvent: unknown, boxScore: any) => {
+	const allStar = boxScore.teams.some((t: any) => t.tid < 0);
+	return new FlavorSession({
+		gid: boxScore.gid ?? 0,
+		numPeriods: boxScore.numPeriods ?? 4,
+		quarterLength: 12,
+		female: local.getState().gender === "female",
+		noArticle: allStar,
+		teams: boxScore.teams.map((t: any) => ({
+			name: allStar
+				? `${t.region ?? ""} ${t.name ?? ""}`.trim()
+				: (t.name ?? t.abbrev ?? "Team"),
+			abbrev: t.abbrev ?? "",
+		})) as [{ name: string; abbrev: string }, { name: string; abbrev: string }],
+		players: playersFromInitEvent(initEvent),
+	});
+};
+
+const makeFlavorHost = (boxScore: any): FlavorHost => ({
+	stat: (pid) => {
+		const p = playersByPid?.[pid] as any;
+		return p
+			? {
+					pts: p.pts ?? 0,
+					ast: p.ast ?? 0,
+					trb: (p.orb ?? 0) + (p.drb ?? 0),
+					stl: p.stl ?? 0,
+					blk: p.blk ?? 0,
+					tov: p.tov ?? 0,
+					pf: p.pf ?? 0,
+				}
+			: undefined;
+	},
+	score: () => [boxScore.teams[0].pts ?? 0, boxScore.teams[1].pts ?? 0],
+	onCourt: (t) =>
+		boxScore.teams[t].players
+			.filter((p: any) => p.inGame)
+			.map((p: any) => p.pid),
+});
+
+const withNote = (text: ReactNode, fr: FlavorResult) => {
+	if (!fr.note && !fr.danger) {
+		return text;
+	}
+	return (
+		<>
+			{fr.danger ? <span className="text-danger">{text}</span> : text}
+			{fr.note ? (
+				<>
+					<br />
+					<span className="text-body-secondary">{fr.note}</span>
+				</>
+			) : null}
+		</>
+	);
+};
+
 const getText = (
 	event: PlayByPlayEventOutput,
 	boxScore: {
@@ -37,7 +104,13 @@ const getText = (
 			{ pts: number; players: unknown[] },
 		];
 	},
+	fr?: FlavorResult,
 ) => {
+	// Worded by the flavor layer (its text already holds the assist, the foul and the running totals)
+	if (fr && !fr.keepText) {
+		return withNote(fr.text, fr);
+	}
+
 	let texts: ReactNode[] | undefined;
 	let weights;
 	if (playersByPid === undefined) {
@@ -55,7 +128,7 @@ const getText = (
 		texts = [
 			`Start of ${
 				overtimes === 1 ? "" : `${helpers.ordinal(overtimes)} `
-			} overtime`,
+			}overtime`,
 		];
 	} else if (event.type === "injury") {
 		texts = [`${getName(event.pid)} was injured!`];
@@ -354,6 +427,10 @@ const getText = (
 			);
 		}
 
+		if (fr?.keepText && fr.note) {
+			text = withNote(text, fr);
+		}
+
 		return text;
 	} else {
 		throw new Error(`No text for ${event.type}`);
@@ -410,6 +487,7 @@ const processLiveGameEvents = ({
 		events[0]?.type === "init"
 	) {
 		playersByPidGid = boxScore.gid;
+		flavor = undefined;
 		playersByPid = {};
 		for (const t of boxScore.teams) {
 			for (const p of t.players) {
@@ -520,17 +598,24 @@ const processLiveGameEvents = ({
 		} else if (e.type === "timeouts") {
 			boxScore.teams[0].timeouts = e.timeouts[0];
 			boxScore.teams[1].timeouts = e.timeouts[1];
-		} else if (e.type !== "init") {
-			text = getText(e, boxScore);
-			t = eventT;
-			textOnly =
-				e.type === "gameOver" ||
-				e.type === "period" ||
-				e.type === "overtime" ||
-				e.type === "elamActive" ||
-				e.type === "shootoutStart" ||
-				e.type === "shootoutTie" ||
-				e.type === "shootoutTeam";
+		} else if (e.type === "init") {
+			flavor = makeFlavorSession(e, boxScore);
+		} else {
+			const fr = flavor?.describe(e, makeFlavorHost(boxScore), events);
+			// An event with no text of its own (the start of a shot, which its result describes) just moves on to the next event
+			const silent = fr === "silent";
+			if (!silent) {
+				text = getText(e, boxScore, fr === undefined ? undefined : fr);
+				t = eventT;
+				textOnly =
+					e.type === "gameOver" ||
+					e.type === "period" ||
+					e.type === "overtime" ||
+					e.type === "elamActive" ||
+					e.type === "shootoutStart" ||
+					e.type === "shootoutTie" ||
+					e.type === "shootoutTeam";
+			}
 
 			let time;
 			if (eAny.clock !== undefined) {
@@ -571,7 +656,9 @@ const processLiveGameEvents = ({
 						: 0;
 			}
 
-			stop = true;
+			if (!silent) {
+				stop = true;
+			}
 		}
 	}
 

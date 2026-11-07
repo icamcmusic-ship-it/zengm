@@ -1,98 +1,62 @@
 [
 	{
 		"seed": 1000,
-		"pts": [
-			48,
-			69
-		],
+		"pts": [48, 69],
 		"hash": "c8c9eca1cf28e9cf4c9f08b4149aa1a0175fa25d7ee2926294a1e25101f1136c"
 	},
 	{
 		"seed": 1037,
-		"pts": [
-			62,
-			42
-		],
+		"pts": [62, 42],
 		"hash": "2739abae5b1bdd36fafa64430298b9cf765acdb991a50f22a3309cfa3c58aea0"
 	},
 	{
 		"seed": 1074,
-		"pts": [
-			61,
-			106
-		],
+		"pts": [61, 106],
 		"hash": "42ddf8532313cfc5612bc7a2a9e65996a71f27c01b6bda7f121c071b85557e9c"
 	},
 	{
 		"seed": 1111,
-		"pts": [
-			70,
-			49
-		],
+		"pts": [70, 49],
 		"hash": "b72eb6f913b5893a536d0beb9a1c9ba1d143bb00baa159b67e123dfc4fd8a55d"
 	},
 	{
 		"seed": 1148,
-		"pts": [
-			51,
-			60
-		],
+		"pts": [51, 60],
 		"hash": "2cb21e384f7de1fc34a7ba410914a320ebf5c24187479f738a3316ec31175034"
 	},
 	{
 		"seed": 1185,
-		"pts": [
-			61,
-			62
-		],
+		"pts": [61, 62],
 		"hash": "12769b7113073c88b2e738ef41be2265faf1d115d5ab266d46ff14867a5a360e"
 	},
 	{
 		"seed": 1222,
-		"pts": [
-			57,
-			67
-		],
+		"pts": [57, 67],
 		"hash": "186c174b07488a9c950cb9b44e9de93f6749924d12a3f0dfff9416f851dd372b"
 	},
 	{
 		"seed": 1259,
-		"pts": [
-			63,
-			84
-		],
+		"pts": [63, 84],
 		"hash": "f1560b05f03e0d4edcedf5cc7f6fc277c5a2c054b7193c588b1ea6301fad604c"
 	},
 	{
 		"seed": 1296,
-		"pts": [
-			75,
-			63
-		],
+		"pts": [75, 63],
 		"hash": "ffe365e8d3d8277d98901e06d672042055b221e93cd85fd789fe780ae0c25066"
 	},
 	{
 		"seed": 1333,
-		"pts": [
-			65,
-			50
-		],
+		"pts": [65, 50],
 		"hash": "90ed169144063d62a9c2b74291da71a62a15150025c8725d7900b6eb2f9bc576"
 	},
 	{
 		"seed": 1370,
-		"pts": [
-			60,
-			58
-		],
+		"pts": [60, 58],
 		"hash": "604b0998e4704112b247b1e45ab96281e068a73c767fb1201fa3dfe7c3daff60"
 	},
 	{
 		"seed": 1407,
-		"pts": [
-			86,
-			71
-		],
+		"pts": [86, 71],
 		"hash": "0cdfc46a6158fb21a124869a4fe6b40c47589043eb4adf4218f28498f60310be"
 	}
 ]

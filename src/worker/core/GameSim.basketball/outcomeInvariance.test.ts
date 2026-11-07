@@ -1,5 +1,7 @@
 import { assert, beforeAll, test } from "vitest";
+// @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { createHash } from "node:crypto";
+// @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import fs from "node:fs";
 import GameSim from "./index.ts";
 import { player, team } from "../index.ts";
@@ -77,7 +79,7 @@ const boxScoreOf = (result: ReturnType<GameSim["run"]>) => {
 	};
 };
 
-const simGame = async (seed: number, doPlayByPlay: boolean) => {
+const simGame = (seed: number, doPlayByPlay: boolean) => {
 	return withSeededRandom(seed, async () => {
 		await genTwoTeams();
 		const teams = await loadTeams([0, 1], {});
@@ -113,7 +115,7 @@ test("fixed-seed box scores are identical to the recorded ones", async () => {
 		});
 	}
 
-	if (process.env["RECORD_FIXTURE"]) {
+	if ((globalThis as any).process?.env?.["RECORD_FIXTURE"]) {
 		fs.writeFileSync(FIXTURE, `${JSON.stringify(out, null, "\t")}\n`);
 		return;
 	}
@@ -137,6 +139,8 @@ test("a game's text events can be produced twice without touching the sim's rand
 	const a = await simGame(SEEDS[0]!, true);
 	const b = await simGame(SEEDS[0]!, true);
 	const types = (r: typeof a) =>
-		r.result.playByPlay!.map((e: any) => `${e.type}:${e.pid ?? ""}:${e.clock ?? ""}`);
+		r.result.playByPlay!.map(
+			(e: any) => `${e.type}:${e.pid ?? ""}:${e.clock ?? ""}`,
+		);
 	assert.deepStrictEqual(types(a), types(b));
 });
