@@ -419,7 +419,10 @@ export const teamPlayoffPath = (c: Ctx, tid: number): Article | undefined => {
 			.filter((g): g is NonNullable<typeof g> => g !== undefined);
 		body.push({
 			type: "sub",
-			text: `${capFirst(c.roundPhrase(round))}: ${me.won > opp.won ? (done ? "won" : "lead") : me.won < opp.won ? (done ? "lost" : "trail") : "level"} ${Math.max(me.won, opp.won)}-${Math.min(me.won, opp.won)}`,
+			text:
+				me.won + opp.won === 0 && !done
+					? `${capFirst(c.roundPhrase(round))}: yet to tip off`
+					: `${capFirst(c.roundPhrase(round))}: ${me.won > opp.won ? (done ? "won" : "lead") : me.won < opp.won ? (done ? "lost" : "trail") : "level"} ${Math.max(me.won, opp.won)}-${Math.min(me.won, opp.won)}`,
 		});
 		body.push(
 			P(

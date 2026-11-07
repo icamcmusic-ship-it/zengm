@@ -170,7 +170,13 @@ const assemble = (
 	};
 };
 
-const bySeason = (id: number): Builder => (c, r) => playerSeason(c, id, r);
+// A paragraph about one subject runs once per paper, so two features about the same player or team do not repeat each other
+const once =
+	(key: string, id: number, fn: (c: Ctx, id: number, r: Rng) => Para | undefined): Builder =>
+	(c, r) =>
+		c.claim(`${key}|${id}`) ? fn(c, id, r) : undefined;
+
+const bySeason = (id: number): Builder => once("ps", id, playerSeason);
 
 // ---- The MVP ------------------------------------------------------------------
 
@@ -236,10 +242,10 @@ export const mvpFeature = (c: Ctx): Article | undefined => {
 			intro,
 			paras: [
 				merge(c, r, bySeason(p.pid), (cc, rr) => playerRank(cc, p!.pid, rr)),
-				merge(c, r, (cc, rr) => teamSeason(cc, p!.tid, rr), (cc, rr) => teamRace(cc, p!.tid, rr)),
-				merge(c, r, (cc, rr) => playerNight(cc, p!.pid, rr), (cc, rr) => playerShare(cc, p!.pid, rr)),
-				merge(c, r, (cc, rr) => playerCareer(cc, p!.pid, rr), (cc, rr) => playerRace(cc, p!.pid, rr)),
-				merge(c, r, (cc, rr) => teamHistory(cc, p!.tid, rr)),
+				merge(c, r, once("ts", p!.tid, teamSeason), (cc, rr) => teamRace(cc, p!.tid, rr)),
+				merge(c, r, once("pn", p!.pid, playerNight), once("psh", p!.pid, playerShare)),
+				merge(c, r, once("pc", p!.pid, playerCareer), (cc, rr) => playerRace(cc, p!.pid, rr)),
+				merge(c, r, once("th", p!.tid, teamHistory)),
 			],
 			quote: quoteFor(c, "star", p.name, `${fmt1(p.pts)} points a game`),
 			next: teamPost(c, p.tid, r),
@@ -283,11 +289,11 @@ export const bestRecordFeature = (c: Ctx): Article | undefined => {
 		{
 			intro,
 			paras: [
-				merge(c, r, (cc, rr) => teamSeason(cc, a.tid, rr), (cc, rr) => teamRace(cc, a.tid, rr)),
-				merge(c, r, (cc, rr) => teamCore(cc, a.tid, rr)),
-				merge(c, r, (cc, rr) => teamNight(cc, a.tid, rr), (cc, rr) => teamHistory(cc, a.tid, rr)),
+				merge(c, r, once("ts", a.tid, teamSeason), (cc, rr) => teamRace(cc, a.tid, rr)),
+				merge(c, r, once("tc", a.tid, teamCore)),
+				merge(c, r, once("tn", a.tid, teamNight), once("th", a.tid, teamHistory)),
 				lead ? merge(c, r, bySeason(lead.pid), (cc, rr) => playerRank(cc, lead.pid, rr)) : undefined,
-				lead ? merge(c, r, (cc, rr) => playerNight(cc, lead.pid, rr), (cc, rr) => playerCareer(cc, lead.pid, rr)) : undefined,
+				lead ? merge(c, r, once("pn", lead.pid, playerNight), once("pc", lead.pid, playerCareer)) : undefined,
 			],
 			quote: quoteFor(c, winp(a) >= 0.5 ? "teamUp" : "teamDown", tn, `${aOr(record(a))} record`),
 			next: c.done ? (teamPost(c, a.tid, r) ?? teamDraft(c, a.tid, r)) : teamPost(c, a.tid, r),
@@ -358,9 +364,9 @@ export const topPickFeature = (c: Ctx): Article | undefined => {
 			intro,
 			paras: [
 				scout,
-				ts ? merge(c, r, (cc, rr) => teamSeason(cc, d.tid, rr), (cc, rr) => teamRace(cc, d.tid, rr)) : undefined,
-				merge(c, r, (cc, rr) => teamCore(cc, d.tid, rr)),
-				merge(c, r, (cc, rr) => teamHistory(cc, d.tid, rr)),
+				ts ? merge(c, r, once("ts", d.tid, teamSeason), (cc, rr) => teamRace(cc, d.tid, rr)) : undefined,
+				merge(c, r, once("tc", d.tid, teamCore)),
+				merge(c, r, once("th", d.tid, teamHistory)),
 				P(
 					`The ${c.f.draft.length}-player ${c.season} class ${teens > 0 ? `includes ${plural(teens, "teenager")}` : "has no one under 20"}; its first round is below.`,
 				),
@@ -431,9 +437,9 @@ export const featFeature = (c: Ctx): Article | undefined => {
 			paras: [
 				merge(c, r, bySeason(f.pid)),
 				more,
-				merge(c, r, (cc, rr) => playerShare(cc, f.pid, rr), (cc, rr) => playerRace(cc, f.pid, rr)),
-				merge(c, r, (cc, rr) => teamSeason(cc, f.tid, rr), (cc, rr) => teamRace(cc, f.tid, rr)),
-				merge(c, r, (cc, rr) => playerCareer(cc, f.pid, rr), (cc, rr) => playerRank(cc, f.pid, rr)),
+				merge(c, r, once("psh", f.pid, playerShare), (cc, rr) => playerRace(cc, f.pid, rr)),
+				merge(c, r, once("ts", f.tid, teamSeason), (cc, rr) => teamRace(cc, f.tid, rr)),
+				merge(c, r, once("pc", f.pid, playerCareer), (cc, rr) => playerRank(cc, f.pid, rr)),
 			],
 			quote: quoteFor(c, "star", f.name, `${f.pts} points in one game`),
 			next: teamPost(c, f.tid, r),
@@ -501,10 +507,10 @@ export const tradeFeature = (c: Ctx, tr?: NPTrade): Article | undefined => {
 		{
 			intro,
 			paras: [
-				merge(c, r, (cc, rr) => teamSeason(cc, a, rr), (cc, rr) => teamRace(cc, a, rr)),
-				merge(c, r, (cc, rr) => teamSeason(cc, b, rr), (cc, rr) => teamRace(cc, b, rr)),
-				star ? merge(c, r, bySeason(star.pid), (cc, rr) => playerShare(cc, star.pid, rr)) : undefined,
-				star ? merge(c, r, (cc, rr) => playerNight(cc, star.pid, rr), (cc, rr) => playerCareer(cc, star.pid, rr)) : undefined,
+				merge(c, r, once("ts", a, teamSeason), (cc, rr) => teamRace(cc, a, rr)),
+				merge(c, r, once("ts", b, teamSeason), (cc, rr) => teamRace(cc, b, rr)),
+				star ? merge(c, r, bySeason(star.pid), once("psh", star.pid, playerShare)) : undefined,
+				star ? merge(c, r, once("pn", star.pid, playerNight), once("pc", star.pid, playerCareer)) : undefined,
 			],
 			quote: quoteFor(c, "deal", `${c.tn(a)}-${c.tn(b)}`, `the ${c.season} win-shares column`),
 			next: tradeSince(c, t, r),
@@ -556,10 +562,10 @@ export const breakoutFeature = (c: Ctx): Article | undefined => {
 		{
 			intro,
 			paras: [
-				merge(c, r, bySeason(b.pid), (cc, rr) => playerShare(cc, b.pid, rr)),
-				merge(c, r, (cc, rr) => playerNight(cc, b.pid, rr), (cc, rr) => teamCore(cc, b.tid, rr)),
-				merge(c, r, (cc, rr) => teamSeason(cc, b.tid, rr), (cc, rr) => teamRace(cc, b.tid, rr)),
-				merge(c, r, (cc, rr) => playerCareer(cc, b.pid, rr), (cc, rr) => playerRank(cc, b.pid, rr)),
+				merge(c, r, bySeason(b.pid), once("psh", b.pid, playerShare)),
+				merge(c, r, once("pn", b.pid, playerNight), once("tc", b.tid, teamCore)),
+				merge(c, r, once("ts", b.tid, teamSeason), (cc, rr) => teamRace(cc, b.tid, rr)),
+				merge(c, r, once("pc", b.pid, playerCareer), (cc, rr) => playerRank(cc, b.pid, rr)),
 			],
 			quote: quoteFor(c, "riser", b.name, aOr(`${b.ovr} rating`)),
 			next: breakNext(c, b.pid, r),

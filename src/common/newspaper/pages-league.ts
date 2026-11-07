@@ -736,7 +736,7 @@ addPage(
 								? `The most balanced league in ${x.past.length + 1} seasons`
 								: `How balanced ${c.T("is", "was")} ${c.season}?`,
 						`Parity index: ${c.season} against ${x.past.length} earlier seasons`,
-						`${x.within} of ${x.n} teams ${c.T("sit", "sat")} within ten points of .500`,
+						`${x.within} of ${x.n} teams ${c.T("sit", "sat")} within ten points of an even record`,
 						`Top-heavy or level? The ${c.season} spread`,
 					];
 				},
@@ -749,7 +749,7 @@ addPage(
 							`The standard deviation of team winning percentage ${c.T("is", "was")} ${x.now.toFixed(3)} in ${c.season}${c.done ? "" : " so far"}. Among ${x.past.length + 1} seasons on file, that ${c.T("ranks", "ranked")} ${ordinal(rank)} from the most balanced.`,
 						),
 						P(
-							`${x.within} of ${x.n} teams ${c.T("are", "were")} within ten points of .500 this season, and the ${x.now.toFixed(3)} spread compares with ${widest.v.toFixed(3)} in ${widest.season}, the widest on file, and ${tight.v.toFixed(3)} in ${tight.season}, the tightest.`,
+							`${x.within} of ${x.n} teams ${c.T("are", "were")} within ten points of an even record this season, and the ${x.now.toFixed(3)} spread compares with ${widest.v.toFixed(3)} in ${widest.season}, the widest on file, and ${tight.v.toFixed(3)} in ${tight.season}, the tightest.`,
 						),
 					];
 				},

@@ -223,7 +223,7 @@ addPage(
 				],
 				build: (x, r, c) => [
 					P(
-						`${plural(x.cands.length, "player")} on expiring contracts ${c.T("play", "played")} for teams under .450 in ${c.season}: `,
+						`${plural(x.cands.length, "player")} on expiring contracts ${c.T("play", "played")} for teams winning less than 45% of their games in ${c.season}: `,
 						...x.cands.flatMap((y, i): Seg[] => [
 							i > 0 ? (i === x.cands.length - 1 ? " and " : ", ") : "",
 							c.pl(y.p.pid),
