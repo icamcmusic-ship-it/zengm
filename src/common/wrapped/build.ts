@@ -1,4 +1,6 @@
 import { planDeck } from "./deck.ts";
+import { slideTexts, spoilerText } from "./items.ts";
+import { quizSlides } from "./quiz.ts";
 import { LeagueIndex } from "./league.ts";
 import type { Deck, Slide, WLeague, WrappedMode } from "./types.ts";
 import type { Topic, TopicCtx } from "./topics/helpers.ts";
@@ -57,6 +59,25 @@ export const candidates = (ctx: TopicCtx) => {
 			out.push(r);
 		}
 	}
+	// Slides that name the champion while talking about the title are spoilers
+	if (ctx.mode !== "all" && ctx.X.decided(ctx.season)) {
+		const c = ctx.X.champion(ctx.season);
+		const names: string[] = [];
+		if (c) {
+			names.push(`${c.region} ${c.name}`, c.region, c.name, c.abbrev);
+		}
+		const fm = ctx.X.awardWinner(ctx.season, "Finals MVP");
+		if (fm) {
+			names.push(fm.name);
+		}
+		if (names.length > 0) {
+			for (const s of out) {
+				if (spoilerText(slideTexts(s).join(" . "), names)) {
+					s.spoiler = true;
+				}
+			}
+		}
+	}
 	// The deck's own subject needs no name tag
 	const self =
 		ctx.mode === "team" && ctx.tid !== undefined
@@ -76,6 +97,11 @@ export const candidates = (ctx: TopicCtx) => {
 		if (s.who === self) {
 			delete s.who;
 		}
+	}
+	try {
+		out.push(...quizSlides(ctx));
+	} catch (error) {
+		console.error(error);
 	}
 	return out;
 };

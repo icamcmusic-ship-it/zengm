@@ -4,13 +4,12 @@ import { helpers } from "../../util/helpers.ts";
 import { realtimeUpdate } from "../../util/realtimeUpdate.ts";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
 import type { View } from "../../../common/types.ts";
-import {
-	clampCount,
-	DECK_MAX,
-	planDeck,
-} from "../../../common/wrapped/deck.ts";
+import { clampCount, DECK_MAX } from "../../../common/wrapped/deck.ts";
+import { planItems } from "../../../common/wrapped/items.ts";
 import type { WrappedMode } from "../../../common/wrapped/types.ts";
-import { SlideCard } from "./SlideCard.tsx";
+import { DeckOptions } from "./DeckOptions.tsx";
+import { useDeckPrefs } from "./deckState.ts";
+import { SlideView } from "./SlideView.tsx";
 
 const COUNT_KEY = "wrappedSlideCount";
 
@@ -43,9 +42,10 @@ const Wrapped = (props: View<"wrapped">) => {
 	const [count, setCount] = useState(() =>
 		clampCount(safeLocalStorage.getItem(COUNT_KEY) ?? undefined, mode),
 	);
+	const prefs = useDeckPrefs();
 	const slides = useMemo(
-		() => planDeck(cands, mode, count, seed),
-		[cands, mode, count, seed],
+		() => planItems(cands, mode, count, seed, prefs),
+		[cands, mode, count, seed, prefs],
 	);
 	const [i, setI] = useState(0);
 	const slideRef = useRef<HTMLDivElement>(null);
@@ -222,6 +222,7 @@ const Wrapped = (props: View<"wrapped">) => {
 					))}
 				</select>
 			</div>
+			<DeckOptions showSpoil={mode !== "all" && !soFar} />
 			{soFar ? (
 				<p className="text-body-secondary">
 					This season isn’t over yet, so the deck covers it so far. Awards and
@@ -266,12 +267,14 @@ const Wrapped = (props: View<"wrapped">) => {
 							/>
 						))}
 					</div>
-					<SlideCard
+					<SlideView
 						key={slide.id}
 						slide={slide}
 						index={cur}
 						faces={faces}
 						teams={teams}
+						deck={seed}
+						all={slides}
 					/>
 					<div className="d-flex align-items-center gap-2 mt-2">
 						<button

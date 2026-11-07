@@ -306,6 +306,12 @@ export const makeRichLeague = (numSeasons = 12, seed = "rich"): WLeague => {
 			if (r.gp <= 0) {
 				continue;
 			}
+			// Spread the integer-ish stats so leaders are not tied
+			r.pts += ri(0, r.gp);
+			r.trb += ri(0, r.gp);
+			r.ast += ri(0, r.gp);
+			r.stl += ri(0, Math.ceil(r.gp / 2));
+			r.blk += ri(0, Math.ceil(r.gp / 3));
 			ovr = Math.max(25, Math.min(85, ovr + ri(-5, 6)));
 			p.ovr[r.season] = ovr;
 			p.pot[r.season] = Math.min(90, ovr + Math.max(0, ri(0, 14) - (r.season - p.bornYear - 19))) ;

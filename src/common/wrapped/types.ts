@@ -194,6 +194,17 @@ export type SlideListRow = {
 	season?: number;
 };
 
+// A multiple-choice question that becomes a quiz slide
+export type Quiz = {
+	kind: string;
+	q: string;
+	clue?: string;
+	chips?: [string, string][];
+	// Shuffled answer choices, exactly one is right
+	opts: { name: string; ok: boolean }[];
+	answer: { name: string; extra?: string };
+};
+
 export type Slide = {
 	id: string;
 	// Topic group, at most a couple of slides per group make the deck
@@ -219,6 +230,10 @@ export type Slide = {
 	note?: string;
 	// Who the slide is about, shown when the headline and lines don't name them
 	who?: string;
+	// Set on quiz slides: the question and its choices
+	quiz?: Quiz;
+	// True when the slide gives the champion away, so "no spoilers" holds it back
+	spoiler?: boolean;
 };
 
 export type Deck = {
