@@ -1,3 +1,5 @@
+// Paragraphs are pushed one at a time, in reading order, which is clearer for prose than one big push
+/* eslint-disable unicorn/prefer-single-call */
 // Front page lead stories: champion (final edition), playoffs in progress, mid-season race, preseason preview.
 
 import { Ctx, P } from "./ctx.ts";

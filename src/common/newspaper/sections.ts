@@ -1,7 +1,9 @@
+// Paragraphs are pushed one at a time, in reading order, which is clearer for prose than one big push
+/* eslint-disable unicorn/prefer-single-call */
 // Articles and sidebars for the inside sections of the league paper.
 
 import { Ctx, P } from "./ctx.ts";
-import { inGames, seriesVerb, sides } from "./front.ts";
+import { inGames, seriesVerb } from "./front.ts";
 import {
 	aOrAn,
 	andList,
@@ -273,9 +275,9 @@ export const seriesRecaps = (c: Ctx): Article[] => {
 				c.tl(loser.tid),
 				` ${inGames(winner.won, loser.won)}`,
 				winner.seed > loser.seed ? " — an upset" : "",
-				best
+				...(best
 					? ["; ", c.pl(best.pid, best.name), ` scored ${best.pts} in one game`]
-					: "",
+					: []),
 				".",
 			]);
 		}

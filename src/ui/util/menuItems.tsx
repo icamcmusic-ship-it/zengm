@@ -222,6 +222,19 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["news"],
 				text: "News Feed",
 			},
+			...(bySport({
+				basketball: [
+					{
+						type: "link",
+						active: (pageID) => pageID === "newspaper",
+						league: true,
+						commandPalette: true,
+						path: ["newspaper"],
+						text: "Newspaper",
+					},
+				],
+				default: [],
+			}) as MenuItemLink[]),
 			{
 				type: "link",
 				league: true,

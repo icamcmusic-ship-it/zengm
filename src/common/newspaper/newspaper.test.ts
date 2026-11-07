@@ -100,46 +100,48 @@ const makeFacts = (edition: EditionId): NewsFacts => {
 	}
 	const series: NPSeries[][] = [];
 	if (edition === "final" || edition === "playoffs") {
-		series.push([
-			{
-				round: 0,
-				home: { tid: 0, seed: 1, won: 4 },
-				away: { tid: 7, seed: 4, won: 1 },
-				gids: [],
-			},
-			{
-				round: 0,
-				home: { tid: 1, seed: 1, won: 4 },
-				away: { tid: 6, seed: 4, won: 3 },
-				gids: [],
-			},
-			{
-				round: 0,
-				home: { tid: 2, seed: 2, won: 2 },
-				away: { tid: 3, seed: 3, won: 4 },
-				gids: [],
-			},
-			{
-				round: 0,
-				home: { tid: 4, seed: 2, won: 4 },
-				away: { tid: 5, seed: 3, won: 0 },
-				gids: [],
-			},
-		]);
-		series.push([
-			{
-				round: 1,
-				home: { tid: 0, seed: 1, won: 4 },
-				away: { tid: 3, seed: 3, won: 2 },
-				gids: [],
-			},
-			{
-				round: 1,
-				home: { tid: 1, seed: 1, won: edition === "final" ? 4 : 2 },
-				away: { tid: 4, seed: 2, won: 1 },
-				gids: [],
-			},
-		]);
+		series.push(
+			[
+				{
+					round: 0,
+					home: { tid: 0, seed: 1, won: 4 },
+					away: { tid: 7, seed: 4, won: 1 },
+					gids: [],
+				},
+				{
+					round: 0,
+					home: { tid: 1, seed: 1, won: 4 },
+					away: { tid: 6, seed: 4, won: 3 },
+					gids: [],
+				},
+				{
+					round: 0,
+					home: { tid: 2, seed: 2, won: 2 },
+					away: { tid: 3, seed: 3, won: 4 },
+					gids: [],
+				},
+				{
+					round: 0,
+					home: { tid: 4, seed: 2, won: 4 },
+					away: { tid: 5, seed: 3, won: 0 },
+					gids: [],
+				},
+			],
+			[
+				{
+					round: 1,
+					home: { tid: 0, seed: 1, won: 4 },
+					away: { tid: 3, seed: 3, won: 2 },
+					gids: [],
+				},
+				{
+					round: 1,
+					home: { tid: 1, seed: 1, won: edition === "final" ? 4 : 2 },
+					away: { tid: 4, seed: 2, won: 1 },
+					gids: [],
+				},
+			],
+		);
 		if (edition === "final") {
 			series.push([
 				{
@@ -330,22 +332,6 @@ describe("newspaper engine", () => {
 		const text = paperText(buildPaper(makeFacts("midseason")));
 		assert.notInclude(text, "won the title");
 	});
-});
-
-test("dump", async () => {
-	if (typeof process !== "undefined" && process.env.NP_DUMP) {
-		const fs = await import("node:fs");
-		fs.writeFileSync(
-			process.env.NP_DUMP,
-			[
-				paperText(buildPaper(makeFacts("final"))),
-				paperText(buildPaper(makeFacts("midseason"))),
-				paperText(buildPaper(makeFacts("preseason"))),
-				paperText(buildPaper(makeFacts("playoffs"))),
-				paperText(buildPaper(makeFacts("final"), 3)),
-			].join("\n=====\n"),
-		);
-	}
 });
 
 describe("newspaper text helpers", () => {

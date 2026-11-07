@@ -1,0 +1,188 @@
+// Season newspaper (src/ui/views/Newspaper). Colors come from Bootstrap variables so the light and dark themes both work.
+
+.np-paper {
+	font-family: Georgia, "Times New Roman", serif;
+	max-width: 1100px;
+}
+
+.np-masthead {
+	border-bottom: 3px double var(--bs-border-color);
+	text-align: center;
+	padding-bottom: 0.5rem;
+	margin-bottom: 0.5rem;
+
+	h1 {
+		font-family: "Old English Text MT", "UnifrakturMaguntia", Georgia, serif;
+		font-size: clamp(1.8rem, 6vw, 3.4rem);
+		font-weight: 700;
+		margin: 0;
+		line-height: 1.1;
+	}
+}
+
+.np-motto {
+	font-style: italic;
+	color: var(--bs-secondary-color);
+}
+
+.np-dateline-bar {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 0.25rem 1rem;
+	border-top: 1px solid var(--bs-border-color);
+	border-bottom: 1px solid var(--bs-border-color);
+	padding: 0.2rem 0;
+	margin-top: 0.5rem;
+	font-size: 0.8rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.np-ticker {
+	font-size: 0.85rem;
+	color: var(--bs-secondary-color);
+	margin-bottom: 0.75rem;
+
+	span + span::before {
+		content: " · ";
+	}
+}
+
+.np-section-title {
+	font-size: 0.85rem;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	border-bottom: 2px solid var(--bs-body-color);
+	margin: 1.5rem 0 0.75rem;
+	padding-bottom: 0.15rem;
+}
+
+.np-article {
+	margin-bottom: 1.25rem;
+	padding-bottom: 1rem;
+	border-bottom: 1px solid var(--bs-border-color);
+	break-inside: avoid;
+}
+
+.np-kicker {
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--bs-secondary-color);
+}
+
+.np-headline {
+	font-size: clamp(1.5rem, 4vw, 2.4rem);
+	font-weight: 700;
+	line-height: 1.15;
+	margin: 0.2rem 0 0.4rem;
+}
+
+.np-head {
+	font-size: 1.3rem;
+	font-weight: 700;
+	line-height: 1.2;
+	margin: 0.15rem 0 0.35rem;
+}
+
+.np-brief .np-head {
+	font-size: 1.05rem;
+}
+
+.np-deck {
+	font-size: 1.05rem;
+	font-style: italic;
+	margin-bottom: 0.35rem;
+}
+
+.np-byline {
+	font-size: 0.8rem;
+	color: var(--bs-secondary-color);
+	margin-bottom: 0.5rem;
+}
+
+.np-body {
+	p {
+		margin-bottom: 0.6rem;
+		line-height: 1.5;
+	}
+	table {
+		font-family: var(--bs-body-font-family);
+	}
+}
+
+.np-lead .np-body > p:first-child::first-letter {
+	float: left;
+	font-size: 3.2rem;
+	line-height: 0.9;
+	padding: 0.15rem 0.35rem 0 0;
+	font-weight: 700;
+}
+
+.np-columns {
+	column-count: 2;
+	column-gap: 2rem;
+	@media (max-width: 767.98px) {
+		column-count: 1;
+	}
+}
+
+.np-quote {
+	border-left: 3px solid var(--bs-border-color);
+	padding-left: 0.75rem;
+	margin: 0.75rem 0;
+	font-style: italic;
+
+	p {
+		margin-bottom: 0.2rem;
+	}
+	cite {
+		font-size: 0.8rem;
+		color: var(--bs-secondary-color);
+	}
+}
+
+.np-sub {
+	font-size: 0.95rem;
+	font-weight: 700;
+	margin: 0.75rem 0 0.35rem;
+}
+
+.np-side {
+	border: 1px solid var(--bs-border-color);
+	padding: 0.5rem 0.75rem;
+	margin-bottom: 1rem;
+	font-size: 0.9rem;
+}
+
+.np-side-title {
+	font-weight: 700;
+	text-transform: uppercase;
+	font-size: 0.75rem;
+	letter-spacing: 0.08em;
+	border-bottom: 1px solid var(--bs-border-color);
+	margin-bottom: 0.4rem;
+}
+
+.np-nums {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.15rem 0.6rem;
+	margin: 0;
+
+	dt {
+		font-weight: 700;
+		text-align: right;
+	}
+	dd {
+		margin: 0;
+	}
+}
+
+.np-notebook {
+	padding-left: 1.1rem;
+	li {
+		margin-bottom: 0.3rem;
+	}
+}
