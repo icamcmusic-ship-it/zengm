@@ -485,6 +485,8 @@ export const getDefaultSettings = () => {
 		),
 		// On by default for new leagues, while leagues created before this setting existed keep it off (the gameAttributes default)
 		generateCollegeStats: true,
+		// Per-prospect scouting, on by default for new leagues
+		scoutingSystem: true,
 		fakeAgeProb: unwrapGameAttribute(defaultGameAttributes, "fakeAgeProb"),
 
 		// This can be undefined, but if the setting is ever displayed to the user, it should have a value

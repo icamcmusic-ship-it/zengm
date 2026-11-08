@@ -718,6 +718,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	forceHistoricalRosters: false,
 	easterEggPlayers: true,
 	generateCollegeStats: false,
+	scoutingSystem: false,
+	draftBoardAutoDraft: true,
 	fakeAgeProb: 0.01,
 	awards: [
 		defaultAwards.mvp,

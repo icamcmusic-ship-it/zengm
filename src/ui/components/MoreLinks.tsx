@@ -210,6 +210,10 @@ export const MoreLinks = (
 					draftType === "freeAgents" ? "Upcoming Prospects" : "Draft Scouting",
 			},
 			{
+				url: ["draft_board"],
+				name: "Draft Board",
+			},
+			{
 				url: team === undefined ? ["draft_picks"] : ["draft_picks", team],
 				name: "Draft Picks",
 			},

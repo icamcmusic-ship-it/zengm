@@ -14,6 +14,21 @@ import { player, team } from "../index.ts";
 import { last } from "../../../common/utils.ts";
 import { choice } from "../../../common/random.ts";
 import { prepareWholeRoster } from "../team/ovr.ts";
+import { getDraftAdjustment, getTeamNeeds } from "./draftNeeds.ts";
+
+// Top ranked prospect on the user's draft board who is still available
+export const getDraftBoardPick = <T extends { draftBoard?: { rank?: number } }>(
+	players: T[],
+) => {
+	let best: T | undefined;
+	for (const p of players) {
+		const rank = p.draftBoard?.rank;
+		if (rank !== undefined && (!best || rank < best.draftBoard!.rank!)) {
+			best = p;
+		}
+	}
+	return best;
+};
 
 export const getTeamOvrDiffs = (
 	teamPlayers: PlayerWithoutKey[],
@@ -181,12 +196,22 @@ const runPicks = async (
 			);
 			const teamOvrDiffs = await getTeamOvrDiffs(teamPlayers, playersAll);
 
+			// Basketball: a small need/strategy adjustment on top of value (see draftNeeds.ts)
+			let adjustments: number[] | undefined;
+			if (!DRAFT_BY_TEAM_OVR && !g.get("userTids").includes(dp.tid)) {
+				const t = await idb.cache.teams.get(dp.tid);
+				const needs = getTeamNeeds(teamPlayers);
+				adjustments = playersAll.map((p) =>
+					getDraftAdjustment(p, needs, t?.strategy),
+				);
+			}
+
 			const score = (p: Player, i: number) => {
 				if (DRAFT_BY_TEAM_OVR) {
 					return (teamOvrDiffs[i]! + 0.05 * p.value) ** 40;
 				}
 
-				return p.value ** 69;
+				return Math.max(0, p.value + (adjustments?.[i] ?? 0)) ** 69;
 			};
 			/*let sum = 0;
 			for (const p of playersAll) {
@@ -198,7 +223,13 @@ const runPicks = async (
 			}
 			console.log(sum);*/
 
-			const selection = choice(playersAll, score);
+			// The user's own draft board, when auto drafting for the user
+			const boardPick =
+				g.get("userTids").includes(dp.tid) && g.get("draftBoardAutoDraft")
+					? getDraftBoardPick(playersAll)
+					: undefined;
+
+			const selection = boardPick ?? choice(playersAll, score);
 
 			const pid = selection.pid;
 			await selectPlayer(dp, pid);

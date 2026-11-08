@@ -1230,6 +1230,14 @@ export const settings: Setting[] = (
 				);
 			},
 		},
+		{
+			category: "Events",
+			key: "scoutingSystem",
+			name: "Scouting System",
+			type: "bool",
+			description:
+				"When enabled, your scouting budget gives you scouting points every season to spend on individual draft prospects (assign a scout or attend a workout) on the Draft Scouting page. Each one narrows how far off your view of that prospect's ratings can be and gives a scout report with confidence ranges. Prospects you don't scout keep the normal rating fuzz.",
+		},
 		...(__SPORT === "basketball"
 			? [
 					{

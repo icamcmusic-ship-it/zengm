@@ -6,6 +6,7 @@ import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { last } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
+import { getScoutReport, getScoutingStatus } from "../core/draft/scouting.ts";
 import { hasPreDraftStats } from "../../common/preDraft.ts";
 
 const getSeason = async (playersAll: Player[], season: number) => {
@@ -18,6 +19,9 @@ const getSeason = async (playersAll: Player[], season: number) => {
 		fuzz: true,
 	});
 	players.sort((a, b) => b.valueFuzz - a.valueFuzz);
+
+	const playersByPid = new Map(playersAllFiltered.map((p) => [p.pid, p]));
+	const scoutingSystem = g.get("scoutingSystem");
 
 	// Set by "Regenerate ratings"
 	const buildByPid = new Map(
@@ -35,6 +39,9 @@ const getSeason = async (playersAll: Player[], season: number) => {
 				age: pa.age,
 				watch: pa.watch,
 				build: buildByPid.get(pa.pid),
+				scoutReport: scoutingSystem
+					? getScoutReport(playersByPid.get(pa.pid)!)
+					: undefined,
 
 				// Ratings - just take the only entry
 				ovr: ratings.ovr,
@@ -94,6 +101,10 @@ export default defineView({
 			return {
 				fantasyDraft,
 				seasons,
+				scoutingStatus:
+					g.get("scoutingSystem") && !fantasyDraft
+						? await getScoutingStatus()
+						: undefined,
 			};
 		}
 	},

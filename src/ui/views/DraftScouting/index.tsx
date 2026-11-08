@@ -4,11 +4,16 @@ import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { View } from "../../../common/types.ts";
 import { MoreLinks } from "../../components/MoreLinks.tsx";
 import { useLocal } from "../../util/local.ts";
+import { helpers } from "../../util/helpers.ts";
 import { RegenerateRatingsButton } from "../../components/RegenerateRatings/RegenerateRatingsButton.tsx";
 
 const PAGE_SIZE = 3;
 
-const DraftScouting = ({ fantasyDraft, seasons }: View<"draftScouting">) => {
+const DraftScouting = ({
+	fantasyDraft,
+	seasons,
+	scoutingStatus,
+}: View<"draftScouting">) => {
 	const { challengeNoRatings, draftType, godMode } = useLocal([
 		"challengeNoRatings",
 		"draftType",
@@ -49,6 +54,16 @@ const DraftScouting = ({ fantasyDraft, seasons }: View<"draftScouting">) => {
 				further in the future, the more uncertainty there is in their estimates.
 			</p>
 
+			{scoutingStatus ? (
+				<p>
+					<b>Scouting points:</b> {scoutingStatus.remaining} of{" "}
+					{scoutingStatus.total} left this season (from your scouting budget).
+					Assign a scout (1 point) or attend a workout (3 points) to narrow a
+					prospect's ratings. Rank prospects on your{" "}
+					<a href={helpers.leagueUrl(["draft_board"])}>Draft Board</a>.
+				</p>
+			) : null}
+
 			<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
 
 			{pagination ? (
@@ -88,6 +103,7 @@ const DraftScouting = ({ fantasyDraft, seasons }: View<"draftScouting">) => {
 								offset={offset}
 								players={info.players}
 								season={info.season}
+								scoutingRemaining={scoutingStatus?.remaining}
 							/>
 						</div>
 					);

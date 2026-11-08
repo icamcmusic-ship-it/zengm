@@ -862,6 +862,8 @@ export type GameAttributesLeague = {
 
 	// Basketball only. Generate college stats and honors for each new draft class as it is created
 	generateCollegeStats: boolean;
+	scoutingSystem: boolean;
+	draftBoardAutoDraft: boolean;
 	fakeAgeProb: number;
 };
 
@@ -1339,6 +1341,10 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 
 	// Set by "Regenerate ratings": the build (archetype) the player's ratings were rebuilt around, plus the ratings from before the first regeneration so another regeneration never compounds on the last
 	ratingsBuild?: StoredRatingsBuild;
+	// Scouting the user's team did on this prospect (scouting system), one entry per scout assignment or workout
+	scouting?: ScoutingEntry[];
+	// The user's own draft board entry for this prospect (draft board planner)
+	draftBoard?: DraftBoardEntry;
 	real?: boolean;
 	relatives: Relative[];
 	retiredYear: number;
@@ -2637,3 +2643,19 @@ export type SavedTradingBlock = {
 };
 
 export type TeamNum = 0 | 1;
+
+export type ScoutingEntry = {
+	season: number;
+	type: "scout" | "workout";
+	points: number;
+	// |fuzz| before this action, so the report can say how much it narrowed
+	fuzzBefore: number;
+};
+
+export type DraftBoardEntry = {
+	// 1 = top of the board, undefined = unranked
+	rank?: number;
+	// 1 = top tier
+	tier?: number;
+	note?: string;
+};

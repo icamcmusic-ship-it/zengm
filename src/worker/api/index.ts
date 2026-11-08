@@ -156,6 +156,8 @@ import loadData from "../core/realRosters/loadData.basketball.ts";
 import loadStatsBasketball from "../core/realRosters/loadStats.basketball.ts";
 import formatPlayerFactory from "../core/realRosters/formatPlayerFactory.ts";
 import { applyRealPlayerPhotos } from "../core/league/processPlayerNewLeague.ts";
+import * as scouting from "../core/draft/scouting.ts";
+import * as draftDay from "../core/draft/draftDay.ts";
 import { actualPhase } from "../util/actualPhase.ts";
 import { getCol } from "../../common/getCol.ts";
 import { getCols } from "../../common/getCols.ts";
@@ -2773,6 +2775,60 @@ const generateCollegeStats = async ({
 	const output = await draft.generateCollegeStats({ draftYear, seed });
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 	return output;
+};
+
+const scoutProspect = async ({
+	pid,
+	type,
+}: {
+	pid: number;
+	type: "scout" | "workout";
+}) => {
+	const output = await scouting.scoutProspect(pid, type);
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return output;
+};
+
+const updateDraftBoard = async (
+	entries: {
+		pid: number;
+		rank?: number;
+		tier?: number;
+		note?: string;
+	}[],
+) => {
+	for (const { pid, rank, tier, note } of entries) {
+		const p = await idb.cache.players.get(pid);
+		if (!p) {
+			continue;
+		}
+		const entry = { rank, tier, note: note || undefined };
+		if (
+			entry.rank === undefined &&
+			entry.tier === undefined &&
+			entry.note === undefined
+		) {
+			delete p.draftBoard;
+		} else {
+			p.draftBoard = entry;
+		}
+		await idb.cache.players.put(p);
+	}
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+};
+
+const getDraftDayInfo = async (otherTid: number | undefined) => {
+	const boards = await draftDay.getAITeamBoards();
+	const tid = otherTid ?? boards[0]?.tid;
+	return {
+		boards,
+		trade: tid !== undefined ? await draftDay.getDraftDayTrade(tid) : undefined,
+	};
+};
+
+const setDraftBoardAutoDraft = async (draftBoardAutoDraft: boolean) => {
+	await league.setGameAttributes({ draftBoardAutoDraft });
+	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 
 const removeCollegeStats = async (draftYear: number) => {
@@ -5749,6 +5805,10 @@ const api = {
 		handleUploadedDraftClass,
 		generateCollegeStats,
 		removeCollegeStats,
+		scoutProspect,
+		updateDraftBoard,
+		setDraftBoardAutoDraft,
+		getDraftDayInfo,
 		idbCacheFlush,
 		importPlayers,
 		importPlayersGetReal,
