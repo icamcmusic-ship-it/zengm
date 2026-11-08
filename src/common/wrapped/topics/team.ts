@@ -307,6 +307,10 @@ const close: Topic = ({ X, season, tid }) => {
 };
 
 const newcomers: Topic = ({ X, season, tid }) => {
+	// In a league's first season the whole roster is "new"
+	if (season <= X.L.startingSeason) {
+		return null;
+	}
 	const rows = X.lines(season).filter(
 		(l) => l.tids.includes(tid!) && l.gp >= 10,
 	);

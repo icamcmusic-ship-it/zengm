@@ -33,12 +33,18 @@ export const FALLBACK_ACCENTS = [
 // Colors for slides that aren't about one team come from the current theme, so BBGM's light and dark themes each get their own
 export const readAccents = () => {
 	const style = getComputedStyle(document.documentElement);
-	const out = ["--bs-primary", "--bs-purple", "--bs-pink", "--bs-orange", "--bs-success", "--bs-teal"]
+	const out = [
+		"--bs-primary",
+		"--bs-purple",
+		"--bs-pink",
+		"--bs-orange",
+		"--bs-success",
+		"--bs-teal",
+	]
 		.map((name) => style.getPropertyValue(name).trim())
 		.filter((c) => /^#[\da-f]{6}$/i.test(c));
 	return out.length >= 2 ? out : FALLBACK_ACCENTS;
 };
-
 
 const hash = (s: string) => {
 	let h = 2166136261;
@@ -75,8 +81,7 @@ const relLum = (hex: string) => {
 // Black or white text, whichever reads better on the color
 const ink = (hex: string) => {
 	const l = relLum(hex);
-	return (l + 0.05) / (relLum("#111111") + 0.05) >=
-		(1.05) / (l + 0.05)
+	return (l + 0.05) / (relLum("#111111") + 0.05) >= 1.05 / (l + 0.05)
 		? "#111111"
 		: "#ffffff";
 };
@@ -166,7 +171,9 @@ const Count = ({ text, animate }: { text: string; animate: boolean }) => {
 			setShown(text);
 			return;
 		}
-		const to = Number.parseFloat(m[1]!.replaceAll(",", "") + (m[2] ? `.${m[2]}` : ""));
+		const to = Number.parseFloat(
+			m[1]!.replaceAll(",", "") + (m[2] ? `.${m[2]}` : ""),
+		);
 		const dec = m[2]?.length ?? 0;
 		const fmt = new Intl.NumberFormat("en-US", {
 			minimumFractionDigits: dec,
@@ -208,7 +215,12 @@ const TeamLogo = ({
 	}
 	const [c1, , c3] = team.colors;
 	return (
-		<span className={clsx("wrapped-slide__logo", size && `wrapped-slide__logo--${size}`)}>
+		<span
+			className={clsx(
+				"wrapped-slide__logo",
+				size && `wrapped-slide__logo--${size}`,
+			)}
+		>
 			{team.imgURL ? (
 				<img alt="" src={team.imgURL} />
 			) : (
@@ -496,7 +508,10 @@ export const SlideCard = ({
 				{kickerEl}
 				<h2
 					className={cls(
-						clsx("wrapped-slide__head", size0 && `wrapped-slide__head--${size0}`),
+						clsx(
+							"wrapped-slide__head",
+							size0 && `wrapped-slide__head--${size0}`,
+						),
 					)}
 					style={inn()}
 				>
@@ -522,11 +537,7 @@ export const SlideCard = ({
 						))}
 					</div>
 				) : null}
-				<div
-					className="wrapped-slide__opts"
-					role="group"
-					aria-label="Answers"
-				>
+				<div className="wrapped-slide__opts" role="group" aria-label="Answers">
 					{q.opts.map((o, i) => {
 						const picked = done?.pick === i;
 						return (
@@ -541,11 +552,15 @@ export const SlideCard = ({
 									done && !o.ok && !picked && "is-dim",
 								)}
 								style={{ "--i": i + 2 } as CSSProperties}
-								disabled={!!done || !quiz}
+								// Answered: aria-disabled rather than disabled, so a tap on it still reaches the slide and moves on, like a tap anywhere else
+								disabled={!quiz}
+								aria-disabled={done ? true : undefined}
 								data-testid={done && o.ok ? "quiz-right" : undefined}
-								onClick={() =>
-									answerQuiz(deckKey, slide.id, { pick: i, ok: o.ok })
-								}
+								onClick={() => {
+									if (!done) {
+										answerQuiz(deckKey, slide.id, { pick: i, ok: o.ok });
+									}
+								}}
 							>
 								<span className="wrapped-slide__rank" aria-hidden="true">
 									{done && o.ok ? "✓" : done && picked ? "✗" : "ABCDEFGH"[i]}
@@ -557,10 +572,7 @@ export const SlideCard = ({
 						);
 					})}
 				</div>
-				<div
-					className="wrapped-slide__verdict"
-					aria-live="polite"
-				>
+				<div className="wrapped-slide__verdict" aria-live="polite">
 					{done ? (
 						<>
 							<b>{done.ok ? "Correct!" : "Not quite."}</b>
@@ -583,10 +595,7 @@ export const SlideCard = ({
 		quizBody = (
 			<>
 				{kickerEl}
-				<h2
-					className={cls("wrapped-slide__head")}
-					style={inn()}
-				>
+				<h2 className={cls("wrapped-slide__head")} style={inn()}>
 					{answered === 0
 						? "Take the quiz to get a score"
 						: `You got ${right} of ${rows.length}`}
@@ -616,8 +625,8 @@ export const SlideCard = ({
 				</ol>
 				{answered < rows.length ? (
 					<div className={cls("wrapped-slide__gloss")} style={inn()}>
-						Skipped questions count as missed. Go back and tap an answer to
-						play along.
+						Skipped questions count as missed. Go back and tap an answer to play
+						along.
 					</div>
 				) : null}
 				{staticMode ? null : (
@@ -661,7 +670,9 @@ export const SlideCard = ({
 				) : (
 					<div
 						className={cls("wrapped-slide__chips")}
-						style={{ ...inn(), "--n": Math.min(4, chips.length) } as CSSProperties}
+						style={
+							{ ...inn(), "--n": Math.min(4, chips.length) } as CSSProperties
+						}
 					>
 						{chips.map(([k, v]) => (
 							<div className="wrapped-slide__chip" key={k}>
@@ -713,7 +724,8 @@ export const SlideCard = ({
 								<span
 									className={clsx(
 										"wrapped-slide__val",
-										numeric(r.value) === undefined && "wrapped-slide__val--text",
+										numeric(r.value) === undefined &&
+											"wrapped-slide__val--text",
 									)}
 								>
 									{r.value}

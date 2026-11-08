@@ -74,8 +74,14 @@ export const nonShootingFoul = (
 	];
 	const x = pickW(rng, rows)!;
 	if (opts.bonus && opts.shooter) {
+		// The fouling team is "in the penalty"/"over the limit", the team with the ball is "in the bonus"
 		const team = opts.teamPenalty ? cap(opts.teamPenalty) : "They";
-		return `${x[1]} (${tag}). ${team} ${pickV(rng, ["are in the penalty", "are in the bonus", "are over the limit"])}, so ${opts.shooter.name} ${pickV(rng, ["heads to the line", "goes to the line for two", "will shoot two"])}.`;
+		const state = pickV(rng, [
+			`${team} are in the penalty`,
+			`${cap(ballTeam)} are in the bonus`,
+			`${team} are over the limit`,
+		]);
+		return `${x[1]} (${tag}). ${state}, so ${opts.shooter.name} ${pickV(rng, ["heads to the line", "goes to the line for two", "will shoot two"])}.`;
 	}
 	return `${x[1]} (${tag}). ${pickV(rng, [`Side out, ${ball} ball.`, `${cap(ballTeam)} inbound from the sideline.`, `Baseline inbound for ${ballTeam}.`, `${ball} ball.`])}`;
 };

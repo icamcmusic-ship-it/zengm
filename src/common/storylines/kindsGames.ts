@@ -58,7 +58,7 @@ const playerGame = (
 							heads: heads(l, g),
 							bodies: [
 								`${pLink(l)} ${say(l)} for the ${tLink(X, t.tid, g.season)} against the ${tLink(X, o.tid, g.season)}${where(g)} in ${g.season}, ${result(t, o)}. ${gLink(g, "Box score")}`,
-								`${g.season}${where(g)}: ${t.pts > o.pts ? "a win" : "a loss"} over the ${tLink(X, o.tid, g.season)}, ${t.pts}–${o.pts}, and ${pLink(l)} ${say(l)}. ${gLink(g, "Box score")}`,
+								`${g.season}${where(g)}: ${t.pts > o.pts ? "a win over" : "a loss to"} the ${tLink(X, o.tid, g.season)}, ${t.pts}–${o.pts}, and ${pLink(l)} ${say(l)}. ${gLink(g, "Box score")}`,
 							],
 							evidence: [
 								[LABEL[kind] ?? "Stat", fmtNum(measure(l))],

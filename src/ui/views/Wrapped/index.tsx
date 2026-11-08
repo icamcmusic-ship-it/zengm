@@ -74,11 +74,7 @@ const teamUrlPart = (
 
 // ---- the chooser: /wrapped/choose ------------------------------------------------------------------------
 
-const Chooser = ({
-	seasons,
-	teamOptions,
-	playerOptions,
-}: LoadedProps) => {
+const Chooser = ({ seasons, teamOptions, playerOptions }: LoadedProps) => {
 	useTitleBar({ title: "Pick a Wrapped" });
 	const [query, setQuery] = useState("");
 	const season = seasons[0] ?? 0;
@@ -87,7 +83,9 @@ const Chooser = ({
 	const hits =
 		q === ""
 			? playerOptions.slice(0, 6)
-			: playerOptions.filter((p) => p.label.toLowerCase().includes(q)).slice(0, 8);
+			: playerOptions
+					.filter((p) => p.label.toLowerCase().includes(q))
+					.slice(0, 8);
 
 	const card = (title: string, text: string, body: ReactNode) => (
 		<div className="card wrapped-choose__card">
@@ -393,7 +391,11 @@ const Deck = (props: LoadedProps) => {
 	// A quiz question waits for its answer
 	const waiting = !!slides[cur]?.quiz && !getAnswer(seed, slides[cur]!.id);
 	const playing =
-		autoplay && !reduced && !showSettings && !waiting && cur < slides.length - 1;
+		autoplay &&
+		!reduced &&
+		!showSettings &&
+		!waiting &&
+		cur < slides.length - 1;
 	useEffect(() => {
 		if (!playing) {
 			return;
@@ -417,7 +419,9 @@ const Deck = (props: LoadedProps) => {
 		setExporting(slide);
 		try {
 			// Two frames so the copy is laid out, then its pictures
-			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+			await new Promise((r) =>
+				requestAnimationFrame(() => requestAnimationFrame(r)),
+			);
 			const host = hostRef.current;
 			if (!host) {
 				return;
@@ -533,7 +537,7 @@ const Deck = (props: LoadedProps) => {
 							onClick={(e) => {
 								const t = e.target as HTMLElement;
 								if (
-									t.closest("a, button") ||
+									t.closest('a, button:not([aria-disabled="true"])') ||
 									(window.getSelection()?.toString() ?? "") !== ""
 								) {
 									return;

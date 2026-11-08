@@ -159,12 +159,19 @@ const Picker = ({ data }: { data: Data }) => {
 			return { k, season: seasons[Math.min(i, seasons.length - 1)] ?? season };
 		}
 		if (k === "t") {
-			return { k, id: teamOptions[Math.min(i, teamOptions.length - 1)]?.tid, season };
+			return {
+				k,
+				id: teamOptions[Math.min(i, teamOptions.length - 1)]?.tid,
+				season,
+			};
 		}
 		const p = playerOptions[Math.min(i, playerOptions.length - 1)];
 		return { k, id: p?.pid, season: p?.seasons[0] ?? season };
 	};
-	const [sides, setSides] = useState<[Side, Side]>([initial("p", 0), initial("p", 1)]);
+	const [sides, setSides] = useState<[Side, Side]>([
+		initial("p", 0),
+		initial("p", 1),
+	]);
 	const ready = sides.every((s) => s.k === "s" || s.id !== undefined);
 	return (
 		<>
@@ -295,16 +302,25 @@ const CompareLoaded = (props: Data) => {
 						</button>
 					</div>
 					<p>
-						<b>{c.a.label}</b> and <b>{c.b.label}</b> share{" "}
-						{c.tally.both} slide topics: {c.tally.a} stand out more for{" "}
-						{c.a.label}, {c.tally.b} for {c.b.label}, {c.tally.even} are even.{" "}
+						<b>{c.a.label}</b> and <b>{c.b.label}</b> share {c.tally.both} slide
+						topics: {c.tally.a} stand out more for {c.a.label}, {c.tally.b} for{" "}
+						{c.b.label}, {c.tally.even} are even.{" "}
 						{c.tally.onlyA > 0 || c.tally.onlyB > 0
 							? `${c.tally.onlyA} are only for ${c.a.label}, ${c.tally.onlyB} only for ${c.b.label}.`
 							: null}
 					</p>
 					<h2 className="h5">Scoreboard</h2>
-					<div className="table-responsive mb-4">
-						<table className="table table-sm" style={{ maxWidth: 720 }}>
+					{/* Fixed layout with wrapping cells, so long values (like a list of awards) wrap instead of making the table wider than a phone screen */}
+					<div className="mb-4" style={{ maxWidth: 720 }}>
+						<table
+							className="table table-sm wrapped-compare-scoreboard"
+							style={{ tableLayout: "fixed", width: "100%" }}
+						>
+							<colgroup>
+								<col style={{ width: "34%" }} />
+								<col style={{ width: "33%" }} />
+								<col style={{ width: "33%" }} />
+							</colgroup>
 							<thead>
 								<tr>
 									<th />
@@ -359,10 +375,12 @@ const CompareLoaded = (props: Data) => {
 							) : null}
 						</>
 					) : null}
-					{([
-						[c.a.label, c.onlyA],
-						[c.b.label, c.onlyB],
-					] as const).map(([label, list]) =>
+					{(
+						[
+							[c.a.label, c.onlyA],
+							[c.b.label, c.onlyB],
+						] as const
+					).map(([label, list]) =>
 						list.length > 0 ? (
 							<div key={label} className="mb-4">
 								<h2 className="h5">Only {label}</h2>

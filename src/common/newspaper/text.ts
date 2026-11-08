@@ -143,8 +143,9 @@ export const segsText = (segs: Seg[]) => segs.map(segText).join("");
 // Final clean-up of a string: double spaces, "1 games", " ." etc
 export const polish = (s: string) =>
 	s
-		.replace(/\b1 (game|point|win|loss|season|round|title)s\b/g, "1 $1")
-		.replace(/\b1 losses\b/g, "1 loss")
+		// Not "27.1 points" or "1,001 games"
+		.replace(/(?<![\d,.])\b1 (game|point|win|season|round|title)s\b/g, "1 $1")
+		.replace(/(?<![\d,.])\b1 losses\b/g, "1 loss")
 		.replace(/ {2,}/g, " ")
 		.replace(/ ([,:;])/g, "$1")
 		.replace(/ \.(?!\d)/g, ".")

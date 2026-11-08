@@ -234,7 +234,7 @@ export const SettingsForm = ({
 				: range(
 						"diversity",
 						"Archetype diversity",
-						"Exactly 100 - this percent of the class stays Balanced.",
+						"The share of the class that gets a specialized build. The rest stays Balanced.",
 						(v) => `${v}%`,
 					)}
 			{range(

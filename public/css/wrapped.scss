@@ -58,7 +58,8 @@ $wrapped-serif: Georgia, "Times New Roman", serif;
 	--wrapped-on-fg: var(--bs-body-bg);
 
 	// The slide's own surface: the page colour with a wash of the team colour
-	--wrapped-bg: linear-gradient(
+	--wrapped-bg:
+		linear-gradient(
 			rgba(var(--wrapped-c1-rgb), 0.2),
 			rgba(var(--wrapped-c1-rgb), 0.2)
 		),
@@ -1063,7 +1064,7 @@ $wrapped-serif: Georgia, "Times New Roman", serif;
 		text-align: left;
 		cursor: pointer;
 
-		&:hover:not(:disabled),
+		&:hover:not(:disabled, [aria-disabled="true"]),
 		&:focus-visible {
 			background: rgba(var(--wrapped-fg-rgb), 0.2);
 			border-color: rgba(var(--wrapped-fg-rgb), 0.5);
@@ -1072,7 +1073,8 @@ $wrapped-serif: Georgia, "Times New Roman", serif;
 			outline: 2px solid var(--wrapped-fg);
 			outline-offset: 2px;
 		}
-		&:disabled {
+		&:disabled,
+		&[aria-disabled="true"] {
 			cursor: default;
 		}
 		&.is-right {
@@ -1113,6 +1115,16 @@ $wrapped-serif: Georgia, "Times New Roman", serif;
 .wrapped-card--compact {
 	margin: 0 auto;
 	box-shadow: var(--bs-box-shadow);
+}
+
+// Tables are nowrap site-wide; this one wraps so it fits a phone screen
+.wrapped-compare-scoreboard {
+	white-space: normal;
+	overflow-wrap: anywhere;
+
+	td {
+		vertical-align: top;
+	}
 }
 
 // ---- image export (360x640 CSS px, drawn at 3x = 1080x1920) ------------------------------------------

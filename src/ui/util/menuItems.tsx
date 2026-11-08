@@ -66,6 +66,29 @@ const newspaperLinks: MenuItemLink[] =
 			]
 		: [];
 
+// Wrapped and Storylines (basketball only)
+const wrappedLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "wrapped",
+					league: true,
+					commandPalette: true,
+					path: ["wrapped"],
+					text: "Wrapped",
+				},
+				{
+					type: "link",
+					active: (pageID) => pageID === "storylines",
+					league: true,
+					commandPalette: true,
+					path: ["storylines"],
+					text: "Storylines",
+				},
+			]
+		: [];
+
 // Game hype and record chases (basketball only)
 const hypeLinks: MenuItemLink[] =
 	__SPORT === "basketball"
@@ -228,22 +251,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["history_all"],
 				text: "History",
 			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "wrapped",
-				league: true,
-				commandPalette: true,
-				path: ["wrapped"],
-				text: "Wrapped",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "storylines",
-				league: true,
-				commandPalette: true,
-				path: ["storylines"],
-				text: "Storylines",
-			},
+			...wrappedLinks,
 			{
 				type: "link",
 				active: (pageID) => pageID === "powerRankings",

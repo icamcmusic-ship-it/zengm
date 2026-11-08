@@ -353,6 +353,11 @@ describe("newspaper text helpers", () => {
 	});
 	test("polish and tidySegs", () => {
 		assert.strictEqual(polish("in 1 games ."), "in 1 game.");
+		assert.strictEqual(polish("averaged 27.1 points"), "averaged 27.1 points");
+		assert.strictEqual(
+			polish("1,001 games and 1 losses"),
+			"1,001 games and 1 loss",
+		);
 		assert.deepStrictEqual(
 			tidySegs(["a ", "b", { pid: 1, t: "X" }, "", " ."]),
 			["a b", { pid: 1, t: "X" }, "."],
