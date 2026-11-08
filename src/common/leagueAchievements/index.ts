@@ -1,12 +1,73 @@
 import { Defs, RARITY_RANK, type AchievementDef, formatValue } from "./defs.ts";
 import type { AData } from "./adapter.ts";
-import type { AchResult, Best, Occurrence } from "./engine.ts";
+import type { AchResult, Best, EngineRun, Occurrence } from "./engine.ts";
 import type { Who } from "./labels.ts";
 
 export * from "./defs.ts";
 export * from "./labels.ts";
 export * from "./engine.ts";
 export { toAData, type AData, type AExtras } from "./adapter.ts";
+
+// Records metrics compare each season with the record book before it. In a league's first seasons every mark is a record, so "one player holds two league records" or "three records fall in a season" would unlock at once. They count once the league has this many completed seasons of its own (the Explorer reads leagues long after the fact, so it has no such rule).
+export const RECORDS_WARMUP_SEASONS = 5;
+const WARMUP_METRICS = new Set(["recHolder", "recYear", "recBreaks"]);
+
+// Completed regular seasons of the league's own (phase 3 is the playoffs)
+export const completedSeasons = (data: AData, own: number) =>
+	Math.max(0, data.meta.season - own + (data.meta.phase >= 3 ? 1 : 0));
+
+// The engine's summary, counted again from the results
+const recount = (run: EngineRun) => {
+	const s = run.summary;
+	const zero = () => ({ total: 0, unlocked: 0, unavailable: 0 });
+	s.total = 0;
+	s.unlocked = 0;
+	s.unavailable = 0;
+	s.byRarity = {};
+	s.byTopic = {};
+	for (const d of Defs.defs) {
+		const r = run.results.get(d.id);
+		const b = (s.byRarity[d.rarity] ??= zero());
+		const t = (s.byTopic[d.topic] ??= zero());
+		b.total += 1;
+		t.total += 1;
+		s.total += 1;
+		if (r?.state === "unavailable") {
+			b.unavailable += 1;
+			t.unavailable += 1;
+			s.unavailable += 1;
+		} else if (r?.state === "unlocked") {
+			b.unlocked += 1;
+			t.unlocked += 1;
+			s.unlocked += 1;
+		}
+	}
+	s.possible = s.total - s.unavailable;
+	s.pct = s.possible ? s.unlocked / s.possible : 0;
+};
+
+// Native rules on top of the engine's results (changes them in place): the records warm-up above
+export const applyNativeRules = (run: EngineRun, data: AData) => {
+	if (completedSeasons(data, run.own) >= RECORDS_WARMUP_SEASONS) {
+		return run;
+	}
+	for (const d of [...Defs.defs, ...Defs.retired]) {
+		const r = run.results.get(d.id);
+		if (WARMUP_METRICS.has(d.metric) && r && r.state !== "unavailable") {
+			run.results.set(d.id, {
+				id: d.id,
+				state: "unavailable",
+				count: 0,
+				first: null,
+				best: null,
+				progress: 0,
+				warmup: true,
+			});
+		}
+	}
+	recount(run);
+	return run;
+};
 
 // The catalogue as shown: retired and merged tiers are computed but never shown, counted or announced
 export const DEFS: AchievementDef[] = Defs.defs;

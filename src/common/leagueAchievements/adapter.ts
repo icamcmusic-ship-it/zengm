@@ -210,6 +210,8 @@ export type AData = {
 export type AExtras = {
 	phase: number;
 	numGames: number;
+	// Wins needed to take a series in each round of the current season, so a series still being played isn't read as decided (a 3-0 lead is not a sweep)
+	seriesWinsNeeded?: number[];
 	// Only trades and free agent signings are read
 	events: any[];
 	awards: any[];
@@ -682,19 +684,32 @@ export const toAData = (L: WLeague, x: AExtras): AData => {
 			};
 		});
 
+	const inProgress = (season: number) =>
+		season === L.season && !L.currentComplete && x.seriesWinsNeeded;
 	const playoffSeries = L.series
 		.map((ps) => ({
 			season: ps.season,
-			series: ps.rounds.map((round) =>
-				round.map((m) => ({
-					home: m.home
-						? { tid: m.home.tid, seed: m.home.seed, won: num(m.home.won) }
-						: null,
-					away: m.away
-						? { tid: m.away.tid, seed: m.away.seed, won: num(m.away.won) }
-						: null,
-					gids: Array.isArray(m.gids) ? m.gids.slice() : [],
-				})),
+			series: ps.rounds.map((round, ri) =>
+				round
+					.filter((m) => {
+						const need = inProgress(ps.season)
+							? x.seriesWinsNeeded![ri]
+							: undefined;
+						return (
+							need === undefined ||
+							!m.away ||
+							Math.max(num(m.home.won), num(m.away.won)) >= need
+						);
+					})
+					.map((m) => ({
+						home: m.home
+							? { tid: m.home.tid, seed: m.home.seed, won: num(m.home.won) }
+							: null,
+						away: m.away
+							? { tid: m.away.tid, seed: m.away.seed, won: num(m.away.won) }
+							: null,
+						gids: Array.isArray(m.gids) ? m.gids.slice() : [],
+					})),
 			),
 		}))
 		.sort((a, b) => a.season - b.season);

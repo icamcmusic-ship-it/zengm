@@ -185,7 +185,9 @@ const ItemRow = ({
 				<div className="col-12 col-md-5 small">
 					{item.state === "unavailable" ? (
 						<span className="text-body-secondary">
-							Not tracked in this league: needs {item.need}
+							{item.warmup
+								? `Counts once the league has ${item.need}`
+								: `Not tracked in this league: needs ${item.need}`}
 						</span>
 					) : unlocked ? (
 						<>

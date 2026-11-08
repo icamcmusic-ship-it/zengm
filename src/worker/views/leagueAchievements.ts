@@ -15,6 +15,7 @@ import {
 	NEED_TEXT,
 	nextTier,
 	RARITIES,
+	RECORDS_WARMUP_SEASONS,
 	teamView,
 	TOPICS,
 	whoOf,
@@ -48,6 +49,8 @@ export type LeagueAchievementItem = {
 	progress: number;
 	// The data it needs, when the league doesn't have it
 	need?: string;
+	// Unavailable only until the league has more history
+	warmup?: boolean;
 	first?: Who;
 	// The league's best so far, as text (locked only; missing means nothing qualifying recorded yet)
 	best?: string;
@@ -115,7 +118,10 @@ export default defineView({
 				progress: r.progress ?? 0,
 			};
 			if (r.state === "unavailable") {
-				item.need = NEED_TEXT[d.need];
+				item.warmup = r.warmup;
+				item.need = r.warmup
+					? `${RECORDS_WARMUP_SEASONS} completed seasons of league history`
+					: NEED_TEXT[d.need];
 			} else if (r.state === "unlocked") {
 				item.first = whoOf(look, d, r.first);
 				const nx = nextTier(results, d);

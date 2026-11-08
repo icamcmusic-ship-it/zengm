@@ -43,6 +43,8 @@ export type AchResult = {
 	// Unlocked only: occurrences per team, and per season
 	byTeam?: Map<number, { n: number; first: Occurrence }>;
 	bySeason?: Map<number, { n: number; first: Occurrence }>;
+	// Set by applyNativeRules: unavailable until the league has enough history
+	warmup?: boolean;
 };
 
 export type CountSummary = {

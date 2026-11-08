@@ -3,6 +3,7 @@ import { changeLog } from "../db/changeLog.ts";
 import { g, helpers, lock, local, logEvent, toUI } from "./index.ts";
 import { getWrapped, memoize, yieldToWorker } from "./wrappedData.ts";
 import {
+	applyNativeRules,
 	computeAchievements,
 	DEF_BY_ID,
 	makeLookup,
@@ -48,6 +49,9 @@ const readExtras = async (): Promise<AExtras> => {
 	return {
 		phase: g.get("phase"),
 		numGames: g.get("numGames"),
+		seriesWinsNeeded: g
+			.get("numGamesPlayoffSeries", "current")
+			.map((n) => Math.ceil(n / 2)),
 		events,
 		awards,
 		allStars,
@@ -95,7 +99,7 @@ export const getLeagueAchievements = async (): Promise<Computed> => {
 	return memoize(built, `leagueAchievements|${sig}`, async () => {
 		const extras = await readExtras();
 		const data = toAData(built.L, extras);
-		const run = await drive(computeAchievements(data));
+		const run = applyNativeRules(await drive(computeAchievements(data)), data);
 		return { data, run };
 	});
 };
