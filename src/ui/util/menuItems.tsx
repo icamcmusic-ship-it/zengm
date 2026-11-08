@@ -104,6 +104,21 @@ const leagueAchievementsLinks: MenuItemLink[] =
 			]
 		: [];
 
+// Archetype landscape (basketball only)
+const archetypeLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "archetypes",
+					league: true,
+					commandPalette: true,
+					path: ["archetypes"],
+					text: "Archetypes",
+				},
+			]
+		: [];
+
 // Game hype and record chases (basketball only)
 const hypeLinks: MenuItemLink[] =
 	__SPORT === "basketball"
@@ -317,6 +332,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			...newspaperLinks,
 			...hypeLinks,
+			...archetypeLinks,
 			{
 				type: "link",
 				league: true,

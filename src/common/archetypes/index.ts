@@ -4,6 +4,7 @@ export {
 	archetypeById,
 	archetypeByName,
 	classify,
+	explain,
 	scoreAll,
 	tierFromPercentile,
 	TIER_NAMES,

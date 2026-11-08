@@ -6,6 +6,7 @@ import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { last } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
+import { archetypeFor, getLeagueNorms } from "../core/player/archetype.ts";
 import { hasPreDraftStats } from "../../common/preDraft.ts";
 
 const getSeason = async (playersAll: Player[], season: number) => {
@@ -18,6 +19,15 @@ const getSeason = async (playersAll: Player[], season: number) => {
 		fuzz: true,
 	});
 	players.sort((a, b) => b.valueFuzz - a.valueFuzz);
+
+	// Derived from the prospects' ratings (live: their ratings can still be regenerated)
+	const norms = __SPORT === "basketball" ? await getLeagueNorms() : undefined;
+	const archetypeByPid = new Map(
+		playersAllFiltered.map((p) => [
+			p.pid,
+			norms ? archetypeFor(p, norms)?.view : undefined,
+		]),
+	);
 
 	// Set by "Regenerate ratings"
 	const buildByPid = new Map(
@@ -35,6 +45,8 @@ const getSeason = async (playersAll: Player[], season: number) => {
 				age: pa.age,
 				watch: pa.watch,
 				build: buildByPid.get(pa.pid),
+				archetype: archetypeByPid.get(pa.pid)?.label,
+				archetypeGroup: archetypeByPid.get(pa.pid)?.group,
 
 				// Ratings - just take the only entry
 				ovr: ratings.ovr,

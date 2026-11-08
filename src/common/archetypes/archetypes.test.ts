@@ -113,12 +113,15 @@ describe("classification", () => {
 				const a = classify(p.ratings);
 				const nudged = { ...p.ratings };
 				for (const k of RATING_KEYS) {
-					if (k !== "hgt")
+					if (k !== "hgt") {
 						nudged[k] = Math.min(99, Math.max(1, nudged[k] + rng.int(-1, 1)));
+					}
 				}
 				const b = classify(nudged, { previousId: a.id });
 				n++;
-				if (b.id !== a.id) flips++;
+				if (b.id !== a.id) {
+					flips++;
+				}
 			}
 			assert.ok(flips / n < 0.06, `flip rate ${flips / n}`);
 		});
@@ -167,7 +170,7 @@ describe("targeting an archetype with the regenerator", () => {
 		}
 	});
 
-	test("round trip: aimed players keep ovr exactly and derive to the target almost always", async () => {
+	test("round trip: aimed players keep ovr exactly and derive to the target almost always", () => {
 		resetG();
 		const rng = new Rng("aim");
 		const inputs: PlayerInput[] = [];
@@ -178,12 +181,16 @@ describe("targeting an archetype with the regenerator", () => {
 		while (inputs.length < 160) {
 			const { heightInInches, ratings } = genRatings(2025, DEFAULT_LEVEL);
 			const r = {} as BuildRatings;
-			for (const k of RATING_KEYS) r[k] = ratings[k];
+			for (const k of RATING_KEYS) {
+				r[k] = ratings[k];
+			}
 			const ovr = F.ovr(r);
 			const fits = pickable.filter(
 				(a) => r.hgt >= a.hgt[0] + 2 && r.hgt <= a.hgt[1] - 2,
 			);
-			if (fits.length === 0 || ovr < 38) continue;
+			if (fits.length === 0 || ovr < 38) {
+				continue;
+			}
 			const a = fits[rng.int(0, fits.length - 1)]!;
 			inputs.push({
 				key: `p${i++}`,
@@ -207,10 +214,18 @@ describe("targeting an archetype with the regenerator", () => {
 		let derivedMatch = 0;
 		let loose = 0;
 		for (const [k, r] of res.results.entries()) {
-			if (r.after.ovr === inputs[k]!.ovr) ovrOk++;
-			if (r.target?.matched) matched++;
-			if (r.target?.inLabel) loose++;
-			if (r.derived.id === wanted[k]) derivedMatch++;
+			if (r.after.ovr === inputs[k]!.ovr) {
+				ovrOk++;
+			}
+			if (r.target?.matched) {
+				matched++;
+			}
+			if (r.target?.inLabel) {
+				loose++;
+			}
+			if (r.derived.id === wanted[k]) {
+				derivedMatch++;
+			}
 		}
 		assert.strictEqual(matched, derivedMatch);
 		assert.ok(

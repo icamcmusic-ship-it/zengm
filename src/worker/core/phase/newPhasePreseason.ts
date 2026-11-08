@@ -12,6 +12,7 @@ import {
 	team,
 } from "../index.ts";
 import { idb } from "../../db/index.ts";
+import { updateArchetypesForPreseason } from "../player/archetype.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import type {
 	Conditions,
@@ -525,6 +526,9 @@ const newPhasePreseason = async (
 			await player.updateValues(p);
 		}
 	}
+
+	// The archetype label for the new season, now that development has happened
+	await updateArchetypesForPreseason(players);
 
 	if (repeatSeason?.type !== "playersAndRosters") {
 		await freeAgents.normalizeContractDemands({

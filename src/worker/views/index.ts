@@ -112,6 +112,7 @@ export { default as wrapped } from "./wrapped.ts";
 export { default as wrappedCompare } from "./wrappedCompare.ts";
 export { default as storylines } from "./storylines.ts";
 export { default as leagueAchievements } from "./leagueAchievements.ts";
+export { default as archetypes } from "./archetypes.ts";
 export { default as hype } from "./hype.ts";
 export { default as tradeGrader } from "./tradeGrader.ts";
 export { default as contractValue } from "./contractValue.ts";

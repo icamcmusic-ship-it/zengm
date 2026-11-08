@@ -3098,6 +3098,10 @@ const cols: {
 		sortSequence: ["desc", "asc"],
 		sortType: "number",
 	},
+	Archetype: {
+		desc: "Archetype, derived from his ratings",
+		sortType: "string",
+	},
 	College: {},
 	Compare: {
 		sortSequence: [],

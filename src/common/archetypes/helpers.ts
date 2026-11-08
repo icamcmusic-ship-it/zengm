@@ -18,14 +18,14 @@ export const GROUP_INFO: Record<
 		color: "#1d6fb8",
 		darkColor: "#6db3f2",
 	},
-	wing: { label: "Wings", short: "W", color: "#2b8a3e", darkColor: "#69db7c" },
+	wing: { label: "Wings", short: "W", color: "#3a9d52", darkColor: "#3a9d52" },
 	forward: {
 		label: "Forwards",
 		short: "F",
 		color: "#c2680a",
 		darkColor: "#ffa94d",
 	},
-	big: { label: "Bigs", short: "C", color: "#a61e4d", darkColor: "#f783ac" },
+	big: { label: "Bigs", short: "C", color: "#c2456f", darkColor: "#c2456f" },
 };
 
 export const GROUPS: ArchetypeGroup[] = ["guard", "wing", "forward", "big"];

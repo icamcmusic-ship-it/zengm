@@ -1,3 +1,4 @@
+/* eslint-disable no-undef, curly */
 // @ts-nocheck
 // Regenerates norms.data.ts. Not part of the normal run: RUN_ARCHETYPE_CALIBRATION=1
 import { writeFileSync } from "node:fs";

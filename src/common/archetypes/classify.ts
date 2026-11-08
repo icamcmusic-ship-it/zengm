@@ -103,6 +103,16 @@ const whyOf = (a: Archetype, z: Record<DimKey, number>): Why[] => {
 	return rows.slice(0, 3);
 };
 
+// Why he fits one archetype right now: the three dimensions that contribute most, from his current ratings
+export const explain = (
+	id: string,
+	ratings: ArchetypeRatings,
+	norms: Norms = DEFAULT_NORMS,
+): Why[] => {
+	const a = archetypeById(id);
+	return a ? whyOf(a, prepare(ratings, norms).z) : [];
+};
+
 export type ClassifyOptions = {
 	norms?: Norms;
 	ovr?: number;

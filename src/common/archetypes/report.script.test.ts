@@ -1,3 +1,4 @@
+/* eslint-disable no-undef, curly */
 // @ts-nocheck
 import { appendFileSync } from "node:fs";
 import { test } from "vitest";

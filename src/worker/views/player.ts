@@ -7,6 +7,7 @@ import {
 	DEFAULT_JERSEY,
 } from "../../common/constants.ts";
 import { player } from "../core/index.ts";
+import { archetypeInfoForPlayer } from "../core/player/archetype.ts";
 import { idb } from "../db/index.ts";
 import { playerValueIndex } from "../util/valueData.ts";
 import { g, helpers } from "../util/index.ts";
@@ -145,6 +146,9 @@ export const getPlayer = async <
 
 		// Set by "Regenerate ratings"
 		build: pRaw.ratingsBuild?.name,
+
+		// Derived from his ratings, stored at each preseason (basketball)
+		archetype: await archetypeInfoForPlayer(pRaw),
 
 		// Filter out rows with no games played
 		stats: p.stats.filter((row) => (row.gp ?? 0) > 0),

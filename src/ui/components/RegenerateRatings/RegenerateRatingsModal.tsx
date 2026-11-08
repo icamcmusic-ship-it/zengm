@@ -13,6 +13,12 @@ import { ResponsiveTableWrapper } from "../ResponsiveTableWrapper.tsx";
 import { SkillsBlock } from "../SkillsBlock.tsx";
 import { ChangeSummary, RatingsDiff } from "./RatingsDiff.tsx";
 import { SettingsForm } from "./SettingsForm.tsx";
+import {
+	ArchetypeOptions,
+	ArchetypePoolPicker,
+	eligibleArchetypes,
+	type ArchetypeTargetInfo,
+} from "./ArchetypeTargets.tsx";
 import { mintSeed, useBuildSettings } from "./useBuildSettings.ts";
 import type { RatingKey } from "../../../common/types.basketball.ts";
 
@@ -33,6 +39,7 @@ const lockCount = (lock: UiLock | undefined) => {
 	return (
 		(lock.skip ? 1 : 0) +
 		(lock.build ? 1 : 0) +
+		(lock.archetype ? 1 : 0) +
 		(lock.pinKeys?.length ?? 0) +
 		(lock.ovrDelta ? 1 : 0) +
 		(lock.potDelta ? 1 : 0)
@@ -72,15 +79,18 @@ const NumberLock = ({
 const RowDetail = ({
 	row,
 	builds,
+	archetypes,
 	lock,
 	setLock,
 }: {
 	row: PreviewRow;
 	builds: BuildInfo[];
+	archetypes: ArchetypeTargetInfo[];
 	lock: UiLock;
 	setLock: (lock: UiLock) => void;
 }) => {
 	const eligible = builds.filter((b) => row.hgt >= b.min && row.hgt <= b.max);
+	const eligibleArch = eligibleArchetypes(archetypes, row.hgt);
 	return (
 		<div
 			className="p-2"
@@ -114,26 +124,56 @@ const RowDetail = ({
 					</span>
 				</div>
 				<label className="d-flex align-items-center gap-2">
-					<span>Build</span>
+					<span>Archetype</span>
 					<select
 						className="form-select form-select-sm"
 						style={{ maxWidth: "16rem" }}
-						value={lock.build ?? ""}
+						value={lock.archetype ?? ""}
 						onChange={(event) =>
-							setLock({ ...lock, build: event.target.value || undefined })
+							setLock({
+								...lock,
+								archetype: event.target.value || undefined,
+								build: event.target.value ? undefined : lock.build,
+							})
 						}
+						aria-label="Target archetype"
 					>
 						<option value="">Auto</option>
-						{lock.build && !eligible.some((b) => b.name === lock.build) ? (
-							<option value={lock.build}>{lock.build}</option>
+						{lock.archetype &&
+						!eligibleArch.some((a) => a.id === lock.archetype) ? (
+							<option value={lock.archetype}>{lock.archetype}</option>
 						) : null}
-						{eligible.map((b) => (
-							<option key={b.name} value={b.name}>
-								{b.name}
-							</option>
-						))}
+						<ArchetypeOptions list={eligibleArch} />
 					</select>
 				</label>
+				<details>
+					<summary className="text-body-secondary">Advanced: build</summary>
+					<label className="d-flex align-items-center gap-2 mt-1">
+						<span>Build</span>
+						<select
+							className="form-select form-select-sm"
+							style={{ maxWidth: "16rem" }}
+							value={lock.build ?? ""}
+							onChange={(event) =>
+								setLock({
+									...lock,
+									build: event.target.value || undefined,
+									archetype: event.target.value ? undefined : lock.archetype,
+								})
+							}
+						>
+							<option value="">Auto</option>
+							{lock.build && !eligible.some((b) => b.name === lock.build) ? (
+								<option value={lock.build}>{lock.build}</option>
+							) : null}
+							{eligible.map((b) => (
+								<option key={b.name} value={b.name}>
+									{b.name}
+								</option>
+							))}
+						</select>
+					</label>
+				</details>
 				<NumberLock
 					label="Ovr shift"
 					title="Build him to a different overall: this many points more (or fewer) than he has. Blank keeps his overall."
@@ -206,6 +246,7 @@ export const RegenerateRatingsModal = ({
 	const [applying, setApplying] = useState(false);
 	const [expanded, setExpanded] = useState<number | undefined>();
 	const [builds, setBuilds] = useState<BuildInfo[]>([]);
+	const [archetypes, setArchetypes] = useState<ArchetypeTargetInfo[]>([]);
 	const [showSettings, setShowSettings] = useState(
 		() => window.innerWidth >= 992,
 	);
@@ -228,8 +269,14 @@ export const RegenerateRatingsModal = ({
 				"getBuildList",
 				undefined,
 			);
+			const targets = await toWorker(
+				"regenerateRatings",
+				"getArchetypeTargets",
+				undefined,
+			);
 			if (mounted) {
 				setBuilds(list);
+				setArchetypes(targets);
 			}
 		})();
 		return () => {
@@ -361,11 +408,11 @@ export const RegenerateRatingsModal = ({
 			</Modal.Header>
 			<Modal.Body>
 				<p className="text-body-secondary">
-					Rebuild prospects into varied, specialized builds (Floor General,
-					Stretch Big, Rim Protector, ...) without changing anyone's overall
-					rating, potential or height. Every build is re-solved against the
-					game's own ovr formula. Nothing is saved until you press Apply, and
-					Apply can be undone.
+					Rebuild prospects into specialized archetypes (Floor General, Stretch
+					Five, Rim Protector, ...) without changing anyone's overall rating,
+					potential or height. Every build is re-solved against the game's own
+					ovr formula. Nothing is saved until you press Apply, and Apply can be
+					undone.
 				</p>
 
 				<div className="d-flex flex-wrap align-items-end gap-3 mb-3">
@@ -484,6 +531,11 @@ export const RegenerateRatingsModal = ({
 								className="border rounded p-3"
 								style={{ maxHeight: "68vh", overflowY: "auto" }}
 							>
+								<ArchetypePoolPicker
+									list={archetypes}
+									value={settings.archetypePool}
+									onChange={(ids) => update({ archetypePool: ids })}
+								/>
 								<SettingsForm
 									settings={settings}
 									update={update}
@@ -581,7 +633,7 @@ export const RegenerateRatingsModal = ({
 												<th>Pos</th>
 												<th>Ovr</th>
 												<th>Pot</th>
-												<th>Build</th>
+												<th>Archetype</th>
 												<th>Ratings changed</th>
 												<th title="Overall and potential unchanged">OK</th>
 												<th />
@@ -662,16 +714,33 @@ export const RegenerateRatingsModal = ({
 																	</span>
 																) : (
 																	<>
-																		<b>{r.build.name}</b>
-																		{r.prevBuild &&
-																		r.prevBuild !== r.build.name ? (
+																		<b>{r.archetype.after}</b>
+																		{r.archetype.target ? (
+																			<span
+																				className={
+																					r.archetype.target.matched
+																						? "text-success"
+																						: "text-warning"
+																				}
+																				title={
+																					r.archetype.target.matched
+																						? `Aimed at ${r.archetype.target.name}: it came out`
+																						: `Aimed at ${r.archetype.target.name}: ${r.archetype.target.inLabel ? "close, it is part of his label" : "his ratings could not get all the way there at this overall"}`
+																				}
+																			>
+																				{" "}
+																				{r.archetype.target.matched ? "✓" : "~"}
+																			</span>
+																		) : null}
+																		{r.archetype.before !==
+																		r.archetype.after ? (
 																			<span className="text-body-secondary">
 																				{" "}
-																				(was {r.prevBuild})
+																				(was {r.archetype.before})
 																			</span>
 																		) : null}
 																		<div className="small text-body-secondary">
-																			{r.build.tags.join(", ")}
+																			via {r.build.name}
 																		</div>
 																	</>
 																)}
@@ -751,6 +820,7 @@ export const RegenerateRatingsModal = ({
 																	<RowDetail
 																		row={r}
 																		builds={builds}
+																		archetypes={archetypes}
 																		lock={lock}
 																		setLock={(l) => setLock(r.pid, l)}
 																	/>

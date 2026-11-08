@@ -1,3 +1,4 @@
+/* eslint-disable no-undef, curly */
 // @ts-nocheck
 // Regenerates seeds.data.ts: merges the 447 ratings builds into the archetypes. Not part of the normal run:
 // RUN_ARCHETYPE_SEEDS=1

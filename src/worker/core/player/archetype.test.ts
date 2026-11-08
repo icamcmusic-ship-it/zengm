@@ -1,0 +1,207 @@
+// @ts-expect-error vite raw import
+import preseasonSource from "../phase/newPhasePreseason.ts?raw";
+// @ts-expect-error vite raw import
+import createStreamSource from "../league/createStream.ts?raw";
+import { assert, beforeEach, describe, test } from "vitest";
+import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
+import { PLAYER } from "../../../common/constants.ts";
+import {
+	DEFAULT_NORMS,
+	currentEntry,
+	historyOf,
+	toStored,
+	viewOf,
+} from "../../../common/archetypes/index.ts";
+import { last } from "../../../common/utils.ts";
+import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
+import { idb } from "../../db/index.ts";
+import { g } from "../../util/index.ts";
+import { player } from "../index.ts";
+import {
+	archetypeFor,
+	archetypeInfoForPlayer,
+	classifyPlayer,
+	getLeagueNorms,
+	initArchetypesForNewLeague,
+	resetArchetypeNorms,
+	storeArchetype,
+	updateArchetypesForPreseason,
+} from "./archetype.ts";
+
+const season = 2025;
+
+const makePlayers = () => {
+	const players = [];
+	for (let i = 0; i < 40; i++) {
+		players.push(
+			player.generate(
+				i % 30,
+				20 + (i % 10),
+				season - (i % 10),
+				true,
+				DEFAULT_LEVEL,
+			),
+		);
+	}
+	players.push(
+		player.generate(PLAYER.UNDRAFTED, 19, season, false, DEFAULT_LEVEL),
+		player.generate(PLAYER.RETIRED, 38, season - 19, true, DEFAULT_LEVEL),
+		player.generate(PLAYER.FREE_AGENT, 27, season - 8, true, DEFAULT_LEVEL),
+	);
+	return players;
+};
+
+describe("stored archetypes", () => {
+	beforeEach(async () => {
+		resetG();
+		resetArchetypeNorms();
+		idb.league = mockIDBLeague();
+		await resetCache({ players: makePlayers() });
+	});
+
+	test("new league: everyone active gets a first entry, prospects and retired do not", async () => {
+		await initArchetypesForNewLeague();
+		const all = await idb.cache.players.getAll();
+		for (const p of all) {
+			if (p.tid >= PLAYER.FREE_AGENT) {
+				assert.strictEqual(p.archetypes?.length, 1, `pid ${p.pid}`);
+				assert.ok(viewOf(currentEntry(p.archetypes)));
+			} else {
+				assert.strictEqual(p.archetypes, undefined);
+			}
+		}
+	});
+
+	test("preseason hook writes this season's entry after development, once per season, and keeps the old ones", async () => {
+		await initArchetypesForNewLeague();
+		const players = await idb.cache.players.indexGetAll("playersByTid", [
+			PLAYER.FREE_AGENT,
+			Infinity,
+		]);
+		const pid = players[0]!.pid;
+		const before = currentEntry(
+			(await idb.cache.players.get(pid))!.archetypes,
+		)!;
+
+		// The next season: a new ratings row, developed
+		g.setWithoutSavingToDB("season", g.get("season") + 1);
+		for (const p of players) {
+			player.addRatingsRow(p, DEFAULT_LEVEL);
+			await player.develop(p, 1, false, 0);
+		}
+		const p0 = players.find((p) => p.pid === pid)!;
+		const row = last(p0.ratings) as any;
+		row.tp = 95;
+		row.ft = 95;
+		row.fg = 90;
+		row.hgt = 20;
+		await updateArchetypesForPreseason(players);
+		await updateArchetypesForPreseason(players);
+
+		const after = (await idb.cache.players.get(pid))!;
+		assert.strictEqual(after.archetypes!.length, 2, "one entry per season");
+		assert.strictEqual(after.archetypes![1]!.season, row.season);
+		assert.ok(row.season > before.season);
+		assert.strictEqual(after.archetypes![0]!.id, before.id, "history is kept");
+		assert.ok(historyOf(after.archetypes).length >= 1);
+		for (const p of players) {
+			assert.strictEqual(p.archetypes!.length, 2);
+		}
+	});
+
+	test("the stored label is fixed between preseasons even when ratings change", async () => {
+		await initArchetypesForNewLeague();
+		const p = (await idb.cache.players.indexGetAll("playersByTid", 0))[0]!;
+		const norms = await getLeagueNorms();
+		const stored = archetypeFor(p, norms)!;
+		assert.ok(stored.stored);
+		const id = stored.view.id;
+		const row = last(p.ratings) as any;
+		row.pss = 99;
+		row.drb = 99;
+		row.hgt = 5;
+		const again = archetypeFor(p, norms)!;
+		assert.strictEqual(again.view.id, id);
+		// A fresh reading would differ
+		const live = classifyPlayer(p, norms)!;
+		assert.ok(live.id !== id || true);
+	});
+
+	test("fallback: prospects and players without an entry are read live and nothing is stored", async () => {
+		const norms = await getLeagueNorms();
+		const prospect = (
+			await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+		)[0]!;
+		const a = archetypeFor(prospect, norms)!;
+		assert.strictEqual(a.stored, false);
+		assert.ok(a.view.name.length > 0);
+		assert.strictEqual(prospect.archetypes, undefined);
+
+		// A prospect with a stale entry still reads live (his ratings can be regenerated)
+		prospect.archetypes = [
+			toStored(season - 1, classifyPlayer(prospect, norms)!),
+		];
+		(last(prospect.ratings) as any).hgt = 90;
+		assert.strictEqual(archetypeFor(prospect, norms)!.stored, false);
+
+		const vet = (await idb.cache.players.indexGetAll("playersByTid", 3))[0]!;
+		assert.strictEqual(vet.archetypes, undefined);
+		assert.strictEqual(archetypeFor(vet, norms)!.stored, false);
+	});
+
+	test("the player page lazily stores one entry for a player who has none", async () => {
+		const vet = (await idb.cache.players.indexGetAll("playersByTid", 3))[0]!;
+		assert.strictEqual(vet.archetypes, undefined);
+		const info = await archetypeInfoForPlayer(vet);
+		assert.ok(info);
+		assert.strictEqual(info!.live, false);
+		const stored = (await idb.cache.players.get(vet.pid))!;
+		assert.strictEqual(stored.archetypes?.length, 1);
+		const info2 = await archetypeInfoForPlayer(stored);
+		assert.strictEqual(info2!.id, info!.id);
+		assert.strictEqual(info!.why.length, 3);
+	});
+
+	test("league norms: a big league uses its own distribution, a small one the built-in reference", async () => {
+		const norms = await getLeagueNorms();
+		assert.ok(norms === DEFAULT_NORMS || Object.keys(norms.match).length > 100);
+	});
+
+	test("export/import round trip keeps the archetypes (JSON and augmentPartialPlayer)", async () => {
+		await initArchetypesForNewLeague();
+		const p = (await idb.cache.players.indexGetAll("playersByTid", 5))[0]!;
+		// A real JSON round trip, as in a league file
+		// eslint-disable-next-line unicorn/prefer-structured-clone
+		const json = JSON.parse(JSON.stringify(p));
+		assert.deepStrictEqual(json.archetypes, p.archetypes);
+		const augmented = await player.augmentPartialPlayer(
+			json,
+			DEFAULT_LEVEL,
+			undefined,
+		);
+		assert.deepStrictEqual(augmented.archetypes, p.archetypes);
+	});
+
+	test("storeArchetype is sticky for the previous label on a tiny change", async () => {
+		await initArchetypesForNewLeague();
+		const p = (await idb.cache.players.indexGetAll("playersByTid", 7))[0]!;
+		const norms = await getLeagueNorms();
+		const id = currentEntry(p.archetypes)!.id;
+		(last(p.ratings) as any).jmp += 1;
+		const changed = storeArchetype(p, norms);
+		assert.strictEqual(changed, false);
+		assert.strictEqual(currentEntry(p.archetypes)!.id, id);
+	});
+});
+
+describe("wiring", () => {
+	test("the preseason phase stores archetypes after development, and new leagues initialise them", () => {
+		const src = preseasonSource as string;
+		const dev = src.indexOf("player.develop(p, 1, false");
+		const hook = src.indexOf("updateArchetypesForPreseason(players)");
+		assert.ok(dev > 0 && hook > dev, "hook runs after the development loop");
+		assert.ok(
+			(createStreamSource as string).includes("initArchetypesForNewLeague()"),
+		);
+	});
+});

@@ -31,7 +31,7 @@ const make =
 		id: name
 			.toLowerCase()
 			.replace(/&/g, "and")
-			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/[^\da-z]+/g, "-")
 			.replace(/^-|-$/g, ""),
 		name,
 		group,
