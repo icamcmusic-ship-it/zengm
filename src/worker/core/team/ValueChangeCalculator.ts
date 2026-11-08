@@ -1269,7 +1269,7 @@ export class ValueChangeCalculator {
 		}
 	}
 
-	async evaluate(args: EvaluateArgs): Promise<number> {
+	evaluate(args: EvaluateArgs): Promise<number> {
 		return this.evaluateInternal(args);
 	}
 

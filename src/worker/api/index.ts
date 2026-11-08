@@ -3116,7 +3116,7 @@ const importPlayersGetReal = async (param: unknown, conditions: Conditions) => {
 	return players;
 };
 
-const evaluateMultiTeamTrade = async (multiTeamTrade: MultiTeamTrade) => {
+const evaluateMultiTeamTrade = (multiTeamTrade: MultiTeamTrade) => {
 	return evaluateMulti(multiTeamTrade, g.get("userTid"));
 };
 
