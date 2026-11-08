@@ -73,6 +73,14 @@ export type HBoxLine = {
 	stl: number;
 	blk: number;
 	tp: number;
+	// Shooting and turnovers, when the box score has them (older or trimmed data may not)
+	tpa?: number;
+	fg?: number;
+	fga?: number;
+	ft?: number;
+	fta?: number;
+	tov?: number;
+	// Season-to-date context is not here: the engine compares lines with the season's stored games
 };
 
 export type HGameTeam = {
@@ -184,6 +192,26 @@ export type HTeamState = {
 	cid: number;
 	did: number;
 	seed?: number;
+	// Played the day before (regular season)
+	b2b?: boolean;
+};
+
+// The season so far, from the stored regular season games before a game
+export type HEnv = {
+	// Games, combined points per game and their spread, most points by a team
+	n: number;
+	mean: number;
+	sd: number;
+	hiTeam: number;
+	// Most threes by a team
+	hiTeamTp: number;
+	// Player lines (players who played), the average line by stat and the season's best single game by stat
+	nLines: number;
+	per: Partial<Record<string, number>>;
+	best: Partial<Record<string, number>>;
+	// Team shooting (fg%) and turnovers per team-game: mean and spread, null when the box scores lack them
+	fgp: { mean: number; sd: number } | null;
+	tov: { mean: number; sd: number } | null;
 };
 
 export type HListed = {
@@ -246,7 +274,9 @@ export type HGameInput = {
 	records: HRecords | null;
 	starCut: number | null;
 	// Season scoring environment of the games stored before this one
-	env: { n: number; mean: number; sd: number; hiTeam: number } | null;
+	env: HEnv | null;
+	// Stars who could not play (injured going in)
+	out: { pid: number; name: string; tid: number; ovr: number }[];
 	// The earliest season whose lines are stored in full (for "first meeting since")
 	linesFrom: number;
 	teamName: Record<number, string>;

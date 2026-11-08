@@ -9,6 +9,7 @@ import { promiseWorker } from "./util/promiseWorker.ts";
 import { registerGlobal } from "../common/registerGlobal.ts";
 import { getCopies, getCopy } from "./db/deprecatedConsoleApi.ts";
 import { leagueAchievementsTally } from "./util/leagueAchievements.ts";
+import { hypeCalibrationDump } from "./util/hypeData.ts";
 
 // Old functions that people used from the console. They are added to the idb object itself so bbgm.idb.league etc. still work, but they are not in the type of idb, so the app can't use them.
 Object.assign(db.idb, { getCopies, getCopy });
@@ -21,6 +22,8 @@ registerGlobal({
 	random,
 	// Used by tools/leagueAchievementsCalibration
 	leagueAchievementsTally,
+	// Used by tools/hypeCalibration
+	hypeCalibrationDump,
 });
 
 if (__NODE_ENV === "development") {

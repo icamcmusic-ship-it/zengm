@@ -1,6 +1,6 @@
 // Small pure helpers of the hype engine
 import { hashString } from "../wrapped/util.ts";
-import type { HListed, HRow, HTot, StatKey } from "./types.ts";
+import type { HBoxLine, HListed, HRow, HTot, StatKey } from "./types.ts";
 
 export const clamp = (x: number, a: number, b: number) =>
 	Math.max(a, Math.min(b, x));
@@ -126,3 +126,21 @@ export const clutchText = (html: string) =>
 		.replace(/&#39;|&apos;/g, "'")
 		.replace(/&quot;/g, '"')
 		.trim();
+
+// Game score (Hollinger), with rebounds at a flat 0.5 (the split is not kept); without shooting numbers, from points alone
+export const gmsc = (p: HBoxLine) => {
+	const base = 0.5 * p.trb + p.stl + 0.7 * p.ast + 0.7 * p.blk - num(p.tov);
+	if (known(p.fg) && known(p.fga) && known(p.ft) && known(p.fta)) {
+		return p.pts + 0.4 * p.fg - 0.7 * p.fga - 0.4 * (p.fta - p.ft) + base;
+	}
+	return 0.8 * p.pts + base;
+};
+
+// True shooting, or null without the numbers or with too few shots
+export const tsPct = (p: HBoxLine) => {
+	if (!known(p.fga) || !known(p.fta)) {
+		return null;
+	}
+	const att = p.fga + 0.44 * p.fta;
+	return att >= 5 ? p.pts / (2 * att) : null;
+};

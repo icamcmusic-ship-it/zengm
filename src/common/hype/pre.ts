@@ -19,7 +19,8 @@ import type {
 	Pre,
 	Reason,
 } from "./types.ts";
-import { PRE_K, clamp, known, label, pl, squash } from "./util.ts";
+import { preScore } from "./calibration.ts";
+import { clamp, known, label, pl } from "./util.ts";
 
 const winPct = (w: number, l: number) => (w + 2) / (w + l + 4);
 
@@ -74,7 +75,7 @@ export const chaseCtx = (I: HGameInput): ChaseCtx => ({
 export const preHype = (I: HGameInput): Pre => {
 	const reasons: Reason[] = [];
 	const add = (k: string, pts: number, text: string) => {
-		if (pts > 0.4) {
+		if (Math.abs(pts) > 0.4 && Number.isFinite(pts)) {
 			reasons.push({ k, pts: Math.round(pts * 10) / 10, text });
 		}
 	};
@@ -125,12 +126,91 @@ export const preHype = (I: HGameInput): Pre => {
 			const gp = (a.w + a.l + b.w + b.l) / 2;
 			const late = clamp((gp / I.numGames - 0.55) / 0.45, 0, 1);
 			const q = (winPct(a.w, a.l) + winPct(b.w, b.l)) / 2;
-			if (q > 0.55 && gp >= 8 && a.w > a.l && b.w > b.l) {
-				add(
-					"stakes",
-					clamp((q - 0.55) * 70, 0, 10),
-					`Two winning teams: ${a.w}-${a.l} vs ${b.w}-${b.l}`,
-				);
+			if (gp >= 8) {
+				const both = a.w > a.l && b.w > b.l;
+				const pts = (q - 0.5) * (q > 0.5 ? 55 : 45) * clamp(gp / 20, 0.4, 1);
+				if (pts > 0 && both) {
+					add(
+						"teams",
+						pts,
+						`Two winning teams: ${a.w}-${a.l} vs ${b.w}-${b.l}`,
+					);
+				} else if (pts < 0 && a.w < a.l && b.w < b.l) {
+					add(
+						"teams",
+						pts * (1 + 0.6 * late),
+						`Two losing teams: ${a.w}-${a.l} vs ${b.w}-${b.l}`,
+					);
+				}
+			}
+			// the league's best: marquee matchups and top seed battles; its worst: tank races
+			const all = I.standings
+				.map((x) => ({ tid: x.tid, wp: winPct(x.won, x.lost) }))
+				.sort((x, y) => y.wp - x.wp || x.tid - y.tid);
+			const lr = (tid: number) => all.findIndex((x) => x.tid === tid) + 1;
+			const n = all.length;
+			if (gp >= 15 && n >= 8) {
+				const ra = lr(H.tid);
+				const rb = lr(A.tid);
+				if (Math.max(ra, rb) <= 4) {
+					add(
+						"marquee",
+						8 - Math.max(ra, rb) + 1,
+						`Marquee matchup: two of the league's top four (${a.w}-${a.l} and ${b.w}-${b.l})`,
+					);
+				} else if (a.rank <= 2 && b.rank <= 2 && late > 0.3) {
+					add("stakes", 6 * late, "Battle for the top seed");
+				}
+				if (Math.min(ra, rb) > n - 3 && late > 0.4) {
+					add(
+						"stakes",
+						3,
+						"Tank race: two of the league's three worst records, lottery odds at stake",
+					);
+				}
+			}
+			// late in the season: games that can settle a playoff spot, and games that settle nothing
+			if (late > 0.5) {
+				const fate = (tid: number, r: Snap) => {
+					const left = I.numGames - (r.w + r.l);
+					if (r.gb === null) {
+						return null;
+					}
+					if (r.gb > left) {
+						return r.rank <= I.maxPlayoffSeed ? "in" : "out";
+					}
+					if (r.gb >= left - 1) {
+						return r.rank <= I.maxPlayoffSeed ? "clinch" : "elim";
+					}
+					return "open";
+				};
+				const fa = fate(H.tid, a);
+				const fb = fate(A.tid, b);
+				if (
+					(fa === "in" || fa === "out") &&
+					(fb === "in" || fb === "out") &&
+					!(a.rank <= 2 && b.rank <= 2)
+				) {
+					add(
+						"stakes",
+						-10 * late,
+						"Little at stake: both teams' playoff fates are settled",
+					);
+				}
+				for (const [tid, f] of [
+					[H.tid, fa],
+					[A.tid, fb],
+				] as const) {
+					if (f === "clinch") {
+						add("stakes", 5, `The ${nm(tid)} can close in on a playoff spot`);
+					} else if (f === "elim") {
+						add(
+							"stakes",
+							5,
+							`The ${nm(tid)} are on the brink of playoff elimination`,
+						);
+					}
+				}
 			}
 			const race = [
 				{ tid: H.tid, r: a },
@@ -206,6 +286,13 @@ export const preHype = (I: HGameInput): Pre => {
 			.filter((p) => p.ovr !== null && p.ovr >= cut)
 			.sort((x, y) => y.ovr! - x.ovr! || x.pid - y.pid);
 		if (stars.length) {
+			const sides = new Set(stars.map((x) => x.tid)).size;
+			if (stars[0]!.ovr! >= cut + 7) {
+				add("stars", 5, `Superstar: ${pl(stars[0]!)} (${stars[0]!.ovr})`);
+			}
+			if (sides === 2) {
+				add("stars", 4, "Stars on both sides");
+			}
 			add(
 				"stars",
 				Math.min(14, 4 * stars.length),
@@ -223,6 +310,39 @@ export const preHype = (I: HGameInput): Pre => {
 				"stars",
 				Math.min(6, (lo - 58) / 2),
 				`Two strong rosters (team ovr ${H.ovr} and ${A.ovr})`,
+			);
+		}
+	}
+
+	if (!I.playoffs && !I.playIn) {
+		for (const t of [H, A]) {
+			if (t.b2b) {
+				add(
+					"rest",
+					-2,
+					`The ${nm(t.tid)} are on the second night of a back-to-back`,
+				);
+			}
+		}
+		if (I.day === 1) {
+			add("stakes", 4, "Opening night");
+		}
+	}
+	if (cut !== null && Number.isFinite(cut)) {
+		const outStars = I.out
+			.filter((p) => p.ovr >= cut)
+			.sort((x, y) => y.ovr - x.ovr || x.pid - y.pid);
+		if (outStars.length) {
+			add(
+				"injury",
+				-Math.min(
+					18,
+					outStars.reduce((s, p) => s + 6 + (p.ovr - cut) * 0.5, 0),
+				),
+				`Out injured: ${outStars
+					.slice(0, 3)
+					.map((p) => `${pl(p)} (${p.ovr})`)
+					.join(", ")}`,
 			);
 		}
 	}
@@ -292,8 +412,10 @@ export const preHype = (I: HGameInput): Pre => {
 	}
 
 	const raw = reasons.reduce((s, r) => s + r.pts, 0);
-	reasons.sort((x, y) => y.pts - x.pts || (x.text < y.text ? -1 : 1));
-	const score = squash(raw, PRE_K);
+	reasons.sort(
+		(x, y) => Math.abs(y.pts) - Math.abs(x.pts) || (x.text < y.text ? -1 : 1),
+	);
+	const score = preScore(raw);
 	return {
 		score,
 		raw: Math.round(raw * 10) / 10,
