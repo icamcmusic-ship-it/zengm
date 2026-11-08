@@ -1144,6 +1144,28 @@ export const settings: Setting[] = (
 		},
 		{
 			category: "Events",
+			key: "aiTradesNeedBased",
+			name: "Need-Based AI-to-AI Trades",
+			godModeRequired: "always",
+			type: "bool",
+			description:
+				"When enabled, many AI-to-AI trades are driven by team needs: contenders buy veterans before the trade deadline, rebuilding teams sell veterans for picks and young players, and teams over the tax dump salary into cap space. The reason is written into the trade's transaction text. When disabled, AI teams only make the classic random value-for-value trades.",
+		},
+		{
+			category: "Events",
+			key: "aiTradeOffersFrequency",
+			name: "AI Trade Offers To You",
+			type: "float",
+			description:
+				"How often AI teams send you trade offers during the season, roughly the number of offers per 10 games. Offers target players on your trading block or your team's needs and show up in your inbox and on the Trade Proposals page. 0 disables them.",
+			validator: (value) => {
+				if (value < 0) {
+					throw new Error("Value cannot be less than 0");
+				}
+			},
+		},
+		{
+			category: "Events",
 			key: "aiJerseyRetirement",
 			name: "AI Teams Retire Jersey Numbers",
 			godModeRequired: "always",

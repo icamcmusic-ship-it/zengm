@@ -149,6 +149,12 @@ import getWinner from "../../common/getWinner.ts";
 import formatScoreWithShootout from "../../common/formatScoreWithShootout.ts";
 import { getStats } from "../../common/advancedPlayerSearch.ts";
 import type { LookingFor } from "../core/trade/makeItWork.ts";
+import { dismissAiOffer } from "../core/trade/aiOffers.ts";
+import {
+	evaluateMulti,
+	proposeMulti,
+	type MultiTeamTrade,
+} from "../core/trade/multiTeam.ts";
 import type { LookingForState } from "../../ui/views/TradingBlock/useLookingForState.ts";
 import { getPlayer } from "../views/player.ts";
 import type { NoteInfo } from "../../ui/views/Player/Note.tsx";
@@ -3162,6 +3168,37 @@ const importPlayersGetReal = async (param: unknown, conditions: Conditions) => {
 	return players;
 };
 
+const evaluateMultiTeamTrade = (multiTeamTrade: MultiTeamTrade) => {
+	return evaluateMulti(multiTeamTrade, g.get("userTid"));
+};
+
+const proposeMultiTeamTrade = async ({
+	forceTrade,
+	multiTeamTrade,
+}: {
+	forceTrade: boolean;
+	multiTeamTrade: MultiTeamTrade;
+}) => {
+	const { undo, ...result } = await proposeMulti(multiTeamTrade, forceTrade);
+
+	let undoKey;
+	if (undo) {
+		undoKey = local.undoLog.add(undo, [
+			"advanceDay",
+			"leagueChange",
+			"newPhase",
+		]);
+	}
+	await toUI("realtimeUpdate", []);
+
+	return { ...result, undoKey };
+};
+
+const dismissAiTradeOffer = async (id: number) => {
+	await dismissAiOffer(id);
+	await toUI("realtimeUpdate", [["gameAttributes"]]);
+};
+
 const incrementTradeProposalsSeed = async () => {
 	await league.setGameAttributes({
 		tradeProposalsSeed: g.get("tradeProposalsSeed") + 1,
@@ -5574,7 +5611,10 @@ const createTrade = async (teams: TradeTeams) => {
 };
 
 const proposeTrade = async (forceTrade: boolean, conditions: Conditions) => {
-	const { accepted, message, undo } = await trade.propose(forceTrade);
+	const result = await trade.propose(forceTrade);
+	const { accepted, message } = result;
+	const undo = result.accepted ? result.undo : undefined;
+	const explanation = result.explanation;
 	await toUI("realtimeUpdate", []);
 
 	let undoKey;
@@ -5588,6 +5628,7 @@ const proposeTrade = async (forceTrade: boolean, conditions: Conditions) => {
 
 	return {
 		accepted,
+		explanation,
 		message,
 		undoKey,
 	};
@@ -5877,6 +5918,9 @@ const api = {
 		idbCacheFlush,
 		importPlayers,
 		importPlayersGetReal,
+		dismissAiTradeOffer,
+		evaluateMultiTeamTrade,
+		proposeMultiTeamTrade,
 		incrementTradeProposalsSeed,
 		init,
 		initGold,

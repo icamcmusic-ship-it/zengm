@@ -1,6 +1,8 @@
-import betweenAiTeams from "./betweenAiTeams.ts";
+import aiOffers from "./aiOffers.ts";
+import betweenAiTeams, { needAttempt } from "./betweenAiTeams.ts";
 import clear from "./clear.ts";
 import create from "./create.ts";
+import explain from "./explain.ts";
 import get from "./get.ts";
 import getOtherTid from "./getOtherTid.ts";
 import getPickValues from "./getPickValues.ts";
@@ -13,9 +15,12 @@ import summary from "./summary.ts";
 import updatePlayers from "./updatePlayers.ts";
 
 export default {
+	aiOffers,
 	betweenAiTeams,
+	needAttempt,
 	clear,
 	create,
+	explain,
 	get,
 	getOtherTid,
 	getPickValues,

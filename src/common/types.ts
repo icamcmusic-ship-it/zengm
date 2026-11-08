@@ -352,6 +352,9 @@ export type EventBBGMWithoutKey =
 			phase?: Phase;
 			score?: number;
 			teams?: TradeEventTeams;
+
+			// Why the AI made this trade, or that it was one leg of a three-team trade. Appended to the event text
+			note?: string;
 	  }
 	| {
 			type: "freeAgent" | "reSigned";
@@ -590,6 +593,15 @@ type FootballOvertime = "suddenDeath" | "exceptFg" | "bothPossess";
 export type GameAttributesLeague = {
 	aiJerseyRetirement: boolean;
 	aiTradesFactor: number;
+
+	// AI-to-AI trades are driven by team needs (contenders buy, rebuilders sell, salary dumps) rather than just random
+	aiTradesNeedBased: boolean;
+
+	// How often AI teams send trade offers to the user during the season, roughly offers per 10 games. 0 disables
+	aiTradeOffersFrequency: number;
+
+	// Pending AI-initiated trade offers to the user
+	aiTradeOffers: AiTradeOffer[];
 	allStarGame: number | null;
 	allStarNum: number;
 	allStarType: "draft" | "byConf" | "top";
@@ -2545,6 +2557,20 @@ export type TradeTeam = {
 };
 
 export type TradeTeams = [TradeTeam, TradeTeam];
+
+// A trade offer an AI team sent to the user, see trade/aiOffers.ts. teams[0] is the user's team
+export type AiTradeOffer = {
+	id: number;
+	tid: number;
+	season: number;
+	phase: Phase;
+
+	// Number of games the user's team had played when the offer was made, used to expire offers
+	gp: number;
+
+	teams: TradeTeams;
+	reason: string;
+};
 
 export type Trade = {
 	rid: 0;

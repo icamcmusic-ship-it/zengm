@@ -71,6 +71,14 @@ export const getDefaultSettings = () => {
 			defaultGameAttributes,
 			"aiTradesFactor",
 		),
+		aiTradesNeedBased: unwrapGameAttribute(
+			defaultGameAttributes,
+			"aiTradesNeedBased",
+		),
+		aiTradeOffersFrequency: unwrapGameAttribute(
+			defaultGameAttributes,
+			"aiTradeOffersFrequency",
+		),
 		injuryRate: unwrapGameAttribute(defaultGameAttributes, "injuryRate"),
 		homeCourtAdvantage: unwrapGameAttribute(
 			defaultGameAttributes,

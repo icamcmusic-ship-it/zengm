@@ -102,6 +102,8 @@ export { default as teamStatDists } from "./teamStatDists.ts";
 export { default as teamStats } from "./teamStats.ts";
 export { default as trade } from "./trade.ts";
 export { default as tradeProposals } from "./tradeProposals.ts";
+export { default as tradeMarket } from "./tradeMarket.ts";
+export { default as tradeThree } from "./tradeThree.ts";
 export { default as tradeSummary } from "./tradeSummary.ts";
 export { default as tradingBlock } from "./tradingBlock.ts";
 export { default as tragicDeaths } from "./tragicDeaths.ts";

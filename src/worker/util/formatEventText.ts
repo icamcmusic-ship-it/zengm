@@ -163,7 +163,11 @@ export const formatEventText = async (event: EventBBGM) => {
 			}
 		}
 
-		text += `. <a href="${helpers.leagueUrl([
+		text += ".";
+		if (event.note) {
+			text += ` ${event.note}`;
+		}
+		text += ` <a href="${helpers.leagueUrl([
 			"trade_summary",
 			event.eid,
 		])}">(Details)</a>`;

@@ -22,6 +22,8 @@ export type Key =
 	| "salaryCapType"
 	| "budget"
 	| "aiTradesFactor"
+	| "aiTradesNeedBased"
+	| "aiTradeOffersFrequency"
 	| "playersRefuseToNegotiate"
 	| "contractOptions"
 	| "contractExtensions"

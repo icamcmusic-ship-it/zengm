@@ -716,6 +716,16 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					aiTradesFactor: {
 						type: "number",
 					},
+					aiTradesNeedBased: {
+						type: "boolean",
+					},
+					aiTradeOffersFrequency: {
+						type: "number",
+						minimum: 0,
+					},
+					aiTradeOffers: {
+						type: "array",
+					},
 					allStarDunk: {
 						type: "boolean",
 					},

@@ -480,6 +480,14 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
+				active: (pageID) => pageID === "tradeMarket",
+				league: true,
+				commandPalette: true,
+				path: ["trade_market"],
+				text: "Trade Market",
+			},
+			{
+				type: "link",
 				active: (pageID) => pageID === "savedTrades",
 				league: true,
 				commandPalette: true,
