@@ -51,10 +51,12 @@ export const TraitBadges = ({
 	traits: ScoutedTrait[];
 	max?: number;
 }) => {
+	// An estimate has to be more extreme than an exact reading to earn a badge
 	const scores = {} as TraitScores;
 	const uncertain = new Set<TraitKey>();
 	for (const t of traits) {
-		scores[t.key] = t.estimate;
+		scores[t.key] =
+			t.exact || Math.abs(t.estimate - 50) >= 30 ? t.estimate : 50;
 		if (!t.exact) {
 			uncertain.add(t.key);
 		}

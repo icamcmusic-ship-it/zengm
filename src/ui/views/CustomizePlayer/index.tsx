@@ -80,6 +80,11 @@ const copyValidValues = (
 	target.moodTraits = source.moodTraits;
 	target.moodTraits.sort();
 
+	// Basketball player traits, edited by the traits sliders (God Mode)
+	if (source.traits) {
+		target.traits = source.traits;
+	}
+
 	// HoF toggle? Need to update awards list too.
 	if (target.hof !== source.hof) {
 		// Always remove old entries, so there are never duplicates
@@ -1614,6 +1619,7 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 										? 0
 										: Math.max(0, props.traitsInfo.season - p.draft.year)
 								}
+								disabled={!godMode}
 								leagueSeed={props.traitsInfo.leagueSeed}
 								pid={p.pid}
 								ratings={p.ratings[r] as any}

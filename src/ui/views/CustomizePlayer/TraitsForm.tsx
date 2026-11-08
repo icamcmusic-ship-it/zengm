@@ -16,6 +16,7 @@ import {
 // God Mode editor for the 0-100 trait scores. Moving a slider changes the stored random component of that trait so the score lands on the chosen value with the player's current ratings, age and experience. If the ratings change a lot afterwards the score moves with them.
 export const TraitsForm = ({
 	age,
+	disabled,
 	experience,
 	leagueSeed,
 	onChange,
@@ -24,6 +25,7 @@ export const TraitsForm = ({
 	traits,
 }: {
 	age: number;
+	disabled: boolean;
 	experience: number;
 	leagueSeed: number;
 	onChange: (traits: PlayerTraits) => void;
@@ -72,6 +74,7 @@ export const TraitsForm = ({
 								min={0}
 								max={100}
 								step={1}
+								disabled={disabled}
 								value={scores[key]}
 								onChange={(event) => {
 									setScore(key, Number.parseInt(event.target.value));

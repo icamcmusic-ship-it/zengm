@@ -48,23 +48,25 @@ const DraftClass = ({
 	const [traitColumn, setTraitColumn] = useState<TraitKey | "">("");
 
 	const cols = getCols(["#", "Name", "Pos", "Age", "Ovr", "Pot"]);
-	if (showTraits) {
-		cols.push({
-			title: "Traits",
-			desc: "Notable player traits as far as your scouts can tell. A ? means an estimate, see the player page for the range.",
-			sortType: "number",
-			sortSequence: ["desc", "asc"],
-		});
-		if (traitColumn) {
-			cols.push(...getCols([`trait:${traitColumn}`]));
-		}
-	}
 	if (showBuild) {
 		cols.push({
 			title: "Build",
 			desc: "Build (archetype) from Regenerate ratings",
 			sortType: "string",
 		});
+	}
+	if (showTraits) {
+		if (traitColumn) {
+			// One trait as a sortable number, instead of the badges
+			cols.push(...getCols([`trait:${traitColumn}`]));
+		} else {
+			cols.push({
+				title: "Traits",
+				desc: "Notable player traits as far as your scouts can tell. A ? means an estimate, see the player page for the range.",
+				sortType: "number",
+				sortSequence: ["desc", "asc"],
+			});
+		}
 	}
 
 	const rows: DataTableRow<"player">[] = players.map((p) => {
@@ -94,28 +96,25 @@ const DraftClass = ({
 				...(showBuild ? [p.build ?? ""] : []),
 				...(showTraits
 					? [
-							p.traits
-								? {
-										value: <TraitBadges traits={p.traits} max={2} />,
-										sortValue: p.traits.reduce(
-											(sum, t) => sum + Math.abs(t.estimate - 50),
-											0,
-										),
-									}
-								: null,
-							...(traitColumn
-								? [
-										(() => {
-											const t = p.traits?.find((t) => t.key === traitColumn);
-											return t
-												? {
-														value: `${t.exact ? "" : "~"}${t.estimate}`,
-														sortValue: t.estimate,
-													}
-												: null;
-										})(),
-									]
-								: []),
+							traitColumn
+								? (() => {
+										const t = p.traits?.find((t) => t.key === traitColumn);
+										return t
+											? {
+													value: `${t.exact ? "" : "~"}${t.estimate}`,
+													sortValue: t.estimate,
+												}
+											: null;
+									})()
+								: p.traits
+									? {
+											value: <TraitBadges traits={p.traits} max={1} />,
+											sortValue: p.traits.reduce(
+												(sum, t) => sum + Math.abs(t.estimate - 50),
+												0,
+											),
+										}
+									: null,
 						]
 					: []),
 			],
