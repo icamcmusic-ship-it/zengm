@@ -1,5 +1,9 @@
 /* BBGM worker-console script: rare random unretirements.
 
+   NOTE: this is now built in. Turn on League Settings > League extras > Unretirements (chance, min retirement age and
+   ovr boost range are settings there; see src/worker/core/phase/unretire.ts). Players brought back by this script are
+   never brought back again by the built-in feature. The script is kept for one-off manual use.
+
    Each "roll", with a small chance, ONE random retired player whose retirement came at age 35 or older comes out of
    retirement, becomes a free agent, and gets +3 to +6 overall added to his last (retirement-year) rating.
 

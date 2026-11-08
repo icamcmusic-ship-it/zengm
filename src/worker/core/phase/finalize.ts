@@ -17,6 +17,7 @@ import { getGlobalSettings } from "../../util/getGlobalSettings.ts";
 import { processScheduledEvents } from "./processScheduledEvents.ts";
 import { autoPlayStopsAt, cleanupAutoPlay } from "../league/autoPlay.ts";
 import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
+import { unretireAtPhase } from "./unretire.ts";
 
 const save = async () => {
 	await updateStatus("Saving...");
@@ -43,6 +44,9 @@ const finalize = async (
 	await league.setGameAttributes({
 		phase,
 	});
+
+	// League extras that happen at a phase change (each one checks its own switch)
+	await unretireAtPhase(phase);
 
 	let saved = false;
 	if (phase === PHASE.PRESEASON) {
