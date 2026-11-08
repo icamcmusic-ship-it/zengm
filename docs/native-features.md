@@ -56,6 +56,15 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
 - Player pages: college rows (tagged _College_) in the stats tables, an _Earlier honors_ box, and _Wrapped_ and _Storylines_ buttons.
 - Team pages (_More_ links), League → History, History (all seasons) and Team History rows link to the Newspaper, Wrapped and Storylines for that team/season.
 
+## Coaching staff
+
+- **Where:** Team menu → _Coaching Staff_ (`/l/:lid/staff`, `/l/:lid/staff/:team`), League menu → _Coaches_ (`/l/:lid/coaches[/:season]`: head coaches, the season's coaching carousel, Coach of the Year history), and a page per coach (`/l/:lid/coach/:cid`). Team Finances links to the staff instead of offering the coaching slider.
+- **What:** every team has a head coach and three assistants (player development, offense, defense) with ratings (development, offense, defense, motivation), a style (pace, threes, defense, rotation, each -1 to 1), age and a contract. Salaries are paid as coaching expenses (not against the salary cap). The staff's development score is turned into an equivalent coaching budget level, so it replaces the coaching budget's effect on progs, calibrated so the league average matches the default budget (see `staff.test.ts`). After the playoffs each season: records are written to each coach, Coach of the Year is awarded, coaches age/improve/retire, contracts expire, AI teams fire (losing head coaches especially) and hire from the pool (bigger markets pay more). Your expiring coaches leave unless you _Extend_ them; firing pays half the remaining contract as a buyout. Any vacancy still open in the preseason is filled automatically.
+- **Settings:** **League Settings → Finances → Coaching Staff** (basketball only). On by default for new leagues; existing leagues (DB version 76 migration) and league files from before version 76 keep the slider until it's turned on, which generates staffs.
+- **Storage:** `coaches` object store (key `cid`, index `tid`), included in league export under _All team data_.
+- **For other features:** `src/worker/core/staff/data.ts` has `getTeamCoachStyle(tid)` (for team strategy / game sim later), `getCoachingCarousel(season)`, `getHeadCoachForSeason(tid, season)` and `getCoachAwards(type)`.
+- **Known limits:** no in-game effects yet (style is exposed only). Scouts and trainers are not modeled. With the budget disabled, every team gets the average development effect, as with the slider. Mid-season hires get the whole season's record.
+
 ## Performance
 
 Wrapped and Storylines read the whole league into a snapshot. Converted pieces that can't change any more (retired players, finished seasons' box scores and team seasons) are cached in a separate IndexedDB database (`wrapped-cache`), versioned by the converter code and invalidated through the league's change log, so later sessions only read what changed. Idle snapshots are evicted from memory. `tools/perf/wrapped/` holds the Playwright benchmark scripts (see the header of `bench.cjs`).
