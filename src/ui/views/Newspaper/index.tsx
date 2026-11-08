@@ -333,20 +333,23 @@ const ArticleView = ({ article, env }: { article: Article; env: Env }) => {
 					{article.byline.dateline ? ` · ${article.byline.dateline}` : null}
 				</div>
 			) : null}
-			<ArticlePhoto article={article} env={env} />
-			{article.box ? (
-				<aside className="np-box">
-					<div className="np-side-title">{article.box.title}</div>
-					<dl className="np-nums">
-						{article.box.items.map((item, i) => (
-							<div key={i} style={{ display: "contents" }}>
-								<dt>{item.value}</dt>
-								<dd>{item.label}</dd>
-							</div>
-						))}
-					</dl>
-				</aside>
-			) : null}
+			{/* the photo and the numbers box share one right-hand column: side by side when there's room, so the box doesn't leave a gap under the photo */}
+			<div className="np-figs">
+				<ArticlePhoto article={article} env={env} />
+				{article.box ? (
+					<aside className="np-box">
+						<div className="np-side-title">{article.box.title}</div>
+						<dl className="np-nums">
+							{article.box.items.map((item, i) => (
+								<div key={i} style={{ display: "contents" }}>
+									<dt>{item.value}</dt>
+									<dd>{item.label}</dd>
+								</div>
+							))}
+						</dl>
+					</aside>
+				) : null}
+			</div>
 			<div className={`np-body${lead && long ? " np-columns" : ""}`}>
 				{top.map((block, i) => (
 					<BlockView key={i} block={block} env={env} />
