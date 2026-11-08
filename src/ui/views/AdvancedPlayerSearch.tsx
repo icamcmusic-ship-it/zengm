@@ -685,7 +685,7 @@ const AdvancedPlayerSearch = (props: View<"advancedPlayerSearch">) => {
 		});
 
 		return { uniqueColFiltersWithInfo, uniqueStatTypeInfos };
-	}, [rendered.filters, rendered.showStatTypes]);
+	}, [rendered.filters, rendered.showStatTypes, archetypesOn]);
 
 	const cols = getCols([
 		...DEFAULT_COLS,
