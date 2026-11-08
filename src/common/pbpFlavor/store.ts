@@ -380,7 +380,12 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 			head.num(1);
 			for (const key of RATING_KEYS) {
 				const v = p.ratings[key];
-				head.num(isInt(v) ? v + 1 : 0);
+				// (ratings are whole numbers; anything else is rounded)
+				head.num(
+					typeof v === "number" && Number.isFinite(v)
+						? Math.max(0, Math.round(v)) + 1
+						: 0,
+				);
 			}
 		} else {
 			head.num(0);
