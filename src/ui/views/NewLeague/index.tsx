@@ -61,6 +61,7 @@ import { realtimeUpdate } from "../../util/realtimeUpdate.ts";
 import { applyRealTeamInfo } from "../../../common/applyRealTeamInfo.ts";
 import { gameAttributesArrayToObject } from "../../../common/gameAttributesArrayToObject.ts";
 import { unwrapGameAttribute } from "../../../common/unwrapGameAttribute.ts";
+import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 
 const animationVariants = {
 	visible: {
@@ -382,6 +383,11 @@ const getSettingsFromGameAttributes = (
 	const newSettings = helpers.deepCopy(defaultSettings);
 
 	if (gameAttributes) {
+		// A file with a phase is an export of an existing league (rather than just rosters). For a setting it doesn't have, because the
+		// league is from before the setting existed, use what such leagues get (the game attributes default, like the database upgrade
+		// does) instead of the new league default, so settings that change how games or AI teams play stay off until they are turned on
+		const isLeagueExport =
+			unwrapGameAttribute(gameAttributes, "phase") !== undefined;
 		for (const key of helpers.keys(newSettings)) {
 			if (
 				key === "noStartingInjuries" ||
@@ -398,6 +404,14 @@ const getSettingsFromGameAttributes = (
 					newSettings[key] = (value as any)?.type;
 				} else {
 					(newSettings[key] as any) = value;
+				}
+			} else if (isLeagueExport) {
+				const existingLeagueValue = unwrapGameAttribute(
+					defaultGameAttributes,
+					key as keyof typeof defaultGameAttributes,
+				);
+				if (existingLeagueValue !== undefined) {
+					(newSettings[key] as any) = existingLeagueValue;
 				}
 			}
 		}
