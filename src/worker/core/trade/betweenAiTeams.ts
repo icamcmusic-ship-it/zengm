@@ -15,6 +15,7 @@ import {
 	getKindWeights,
 	getRationale,
 	getSalaryDumpCandidates,
+	getSalaryFillerPids,
 	getVeteranCandidates,
 	isBuyer,
 	isSeller,
@@ -211,6 +212,24 @@ const toCandidates = (players: Player[]): CandidatePlayer[] =>
 		};
 	});
 
+const getSalaryFiller = ({
+	incoming,
+	payroll,
+	candidates,
+}: {
+	incoming: number;
+	payroll: number;
+	candidates: CandidatePlayer[];
+}) =>
+	getSalaryFillerPids({
+		incoming,
+		payroll,
+		candidates,
+		salaryCap: g.get("salaryCap"),
+		salaryCapType: g.get("salaryCapType"),
+		softCapTradeSalaryMatch: g.get("softCapTradeSalaryMatch"),
+	});
+
 const emptyTeam = (tid: number) => ({
 	dpids: [],
 	dpidsExcluded: [],
@@ -221,14 +240,23 @@ const emptyTeam = (tid: number) => ({
 
 // Build a trade (not yet processed) driven by a team need. Returns undefined if no sensible trade was found
 export const needAttempt = async (
-	valueChangeCalculator: ValueChangeCalculator,
+	valueChangeCalculator: ValueChangeCalculator = new ValueChangeCalculator({
+		quick: true,
+	}),
 	aiTids: number[],
 	forceKind?: NeedTradeKind,
+	failures?: string[],
 ) => {
+	// Record why no trade happened, for debugging and tests
+	const fail = (reason: string) => {
+		failures?.push(reason);
+		return undefined;
+	};
+
 	const { infos, ctx } = await getNeedInfo(aiTids);
 	const kind = forceKind ?? pickKind(getKindWeights(infos, ctx), Math.random());
 	if (!kind) {
-		return;
+		return fail("noKind");
 	}
 
 	let teams0: TradeTeams;
@@ -247,7 +275,7 @@ export const needAttempt = async (
 			(t) => (t.winp ?? 0.5) ** 2,
 		);
 		if (!seller || !buyer) {
-			return;
+			return fail("noSellerOrBuyer");
 		}
 
 		const sellerPlayers = (
@@ -256,7 +284,7 @@ export const needAttempt = async (
 		const vets = getVeteranCandidates(toCandidates(sellerPlayers));
 		const vet = choice(vets, (p) => p.value);
 		if (!vet) {
-			return;
+			return fail("noVeteran");
 		}
 
 		const buyerPlayers = (
@@ -264,18 +292,34 @@ export const needAttempt = async (
 		).filter((p) => !isUntradable(p).untradable);
 		const protectedPids = getBuyerProtected(toCandidates(buyerPlayers));
 
+		// A buyer over the cap has to send salary back
+		const fillerPids = getSalaryFiller({
+			incoming: vet.contractAmount,
+			payroll: buyer.payroll,
+			candidates: toCandidates(buyerPlayers).filter(
+				(p) => !protectedPids.has(p.pid),
+			),
+		});
+		if (!fillerPids) {
+			return fail("noSalaryFiller");
+		}
+
 		mainTid = seller.tid;
 		otherTid = buyer.tid;
 		holdUserConstant = true;
 		teams0 = [
 			{ ...emptyTeam(seller.tid), pids: [vet.pid] },
-			{ ...emptyTeam(buyer.tid), pidsExcluded: Array.from(protectedPids) },
+			{
+				...emptyTeam(buyer.tid),
+				pids: fillerPids,
+				pidsExcluded: Array.from(protectedPids),
+			},
 		];
 	} else {
 		const dumpers = infos.filter((t) => wantsToDumpSalary(t, ctx));
 		const dumper = choice(dumpers);
 		if (!dumper) {
-			return;
+			return fail("noDumper");
 		}
 
 		const dumperPlayers = (
@@ -289,7 +333,7 @@ export const needAttempt = async (
 		).slice(0, 3);
 		const p = choice(candidates);
 		if (!p) {
-			return;
+			return fail("noDumpCandidate");
 		}
 
 		// Receiving team needs room for the whole contract
@@ -300,7 +344,7 @@ export const needAttempt = async (
 			t.strategy === "rebuilding" ? 2 : 1,
 		);
 		if (!receiver) {
-			return;
+			return fail("noReceiver");
 		}
 
 		// Receiving team gives nothing back, the dumping team adds sweeteners
@@ -317,8 +361,15 @@ export const needAttempt = async (
 		otherTid = receiver.tid;
 		salary = p.contractAmount;
 		holdUserConstant = false;
+		// Sweeteners are draft picks, not more players, which would just eat up the receiving team's cap space
 		teams0 = [
-			{ ...emptyTeam(dumper.tid), pids: [p.pid] },
+			{
+				...emptyTeam(dumper.tid),
+				pids: [p.pid],
+				pidsExcluded: dumperPlayers
+					.filter((p2) => p2.pid !== p.pid)
+					.map((p2) => p2.pid),
+			},
 			{
 				...emptyTeam(receiver.tid),
 				pidsExcluded: receiverPlayers.map((p) => p.pid),
@@ -333,19 +384,19 @@ export const needAttempt = async (
 		valueChangeCalculator,
 	});
 	if (!teams) {
-		return;
+		return fail("makeItWorkFailed");
 	}
 
 	if (
 		kind !== "salaryDump" &&
 		teams[1].pids.length + teams[1].dpids.length === 0
 	) {
-		return;
+		return fail("nothingInReturn");
 	}
 
 	const tradeSummary = await summary(teams);
 	if (tradeSummary.warning) {
-		return;
+		return fail("salaryCapWarning");
 	}
 
 	// The main team needs to be OK with this too. A salary dump is allowed to cost some value, that's the point of it
@@ -358,7 +409,7 @@ export const needAttempt = async (
 		tradingPartnerTid: undefined,
 	});
 	if (dvMain < (kind === "salaryDump" ? -4 : -1)) {
-		return;
+		return fail("mainTeamRejects");
 	}
 
 	const names = [];

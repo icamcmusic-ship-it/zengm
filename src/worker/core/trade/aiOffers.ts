@@ -306,8 +306,50 @@ export const addAiOffer = async (
 	return offer;
 };
 
+// Seasons for which the user was already told the trade deadline is coming up. Not saved, so at worst the notice shows again after a reload
+const deadlineNoticeSeasons = new Set<number>();
+export const DEADLINE_NOTICE_DAYS = 7;
+
+const deadlineNotice = async () => {
+	const season = g.get("season");
+	if (deadlineNoticeSeasons.has(season)) {
+		return;
+	}
+	const schedule = await idb.cache.schedule.getAll();
+	if (schedule.length === 0) {
+		return;
+	}
+	const today = Math.min(...schedule.map((game) => game.day));
+	const deadline = schedule.find(
+		(game) => game.awayTid === -3 && game.homeTid === -3,
+	);
+	if (!deadline) {
+		return;
+	}
+	const daysLeft = deadline.day - today;
+	if (daysLeft > DEADLINE_NOTICE_DAYS) {
+		return;
+	}
+	deadlineNoticeSeasons.add(season);
+	await logEvent({
+		type: "info",
+		text: `The trade deadline is ${daysLeft <= 1 ? "tomorrow" : `in ${daysLeft} days`}. See who AI teams are shopping on the <a href="${helpers.leagueUrl(["trade_market"])}">Trade Market</a>.`,
+		saveToDb: false,
+		tids: [g.get("userTid")],
+	});
+};
+
 // Called every day during the regular season
 const aiOffers = async () => {
+	if (
+		g.get("phase") === PHASE.REGULAR_SEASON &&
+		!g.get("spectator") &&
+		!g.get("challengeNoTrades") &&
+		!local.autoPlayUntil
+	) {
+		await deadlineNotice();
+	}
+
 	if (!canReceiveOffers()) {
 		return;
 	}

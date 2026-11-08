@@ -5,6 +5,7 @@ import {
 	getKindWeights,
 	getRationale,
 	getSalaryDumpCandidates,
+	getSalaryFillerPids,
 	getVeteranCandidates,
 	isBuyer,
 	isDeadlineWindow,
@@ -169,5 +170,50 @@ describe("need-driven AI trades", () => {
 			returnTo: { numPlayers: 0, numYoungPlayers: 0, numPicks: 1 },
 		});
 		assert.include(sell, "rebuilding Rebuilders sell veteran A and B");
+	});
+
+	test("salary filler for a buyer over the cap", () => {
+		const candidates = [
+			{ pid: 1, age: 25, value: 40, contractAmount: 20000, contractExp: 2027 },
+			{ pid: 2, age: 25, value: 40, contractAmount: 8000, contractExp: 2027 },
+			{ pid: 3, age: 25, value: 40, contractAmount: 5000, contractExp: 2027 },
+		];
+		const base = {
+			candidates,
+			salaryCap: 140000,
+			salaryCapType: "soft" as const,
+			softCapTradeSalaryMatch: 125,
+		};
+
+		// Under the cap after the trade, nothing needed
+		assert.deepEqual(
+			getSalaryFillerPids({ ...base, incoming: 10000, payroll: 100000 }),
+			[],
+		);
+
+		// Over the cap: outgoing must be at least 80% of incoming
+		const pids = getSalaryFillerPids({
+			...base,
+			incoming: 20000,
+			payroll: 150000,
+		})!;
+		const outgoing = candidates
+			.filter((p) => pids.includes(p.pid))
+			.reduce((memo, p) => memo + p.contractAmount, 0);
+		assert.isAtLeast(outgoing, 16000);
+
+		// Hard cap: payroll can't go up when over the cap
+		const hard = getSalaryFillerPids({
+			...base,
+			salaryCapType: "hard",
+			incoming: 12000,
+			payroll: 150000,
+		})!;
+		assert.deepEqual(hard, [1]);
+
+		// Impossible
+		assert.isUndefined(
+			getSalaryFillerPids({ ...base, incoming: 100000, payroll: 150000 }),
+		);
 	});
 });

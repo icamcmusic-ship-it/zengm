@@ -151,6 +151,71 @@ export const getSalaryDumpCandidates = (
 		.sort((a, b) => score(b) - score(a));
 };
 
+// Salary a team over the cap must send back to take on "incoming" salary, using the cheapest set of players found greedily. Returns [] if no salary needs to go back, or undefined if it can't be done
+export const getSalaryFillerPids = ({
+	incoming,
+	payroll,
+	candidates,
+	salaryCap,
+	salaryCapType,
+	softCapTradeSalaryMatch,
+}: {
+	incoming: number;
+	payroll: number;
+	candidates: CandidatePlayer[];
+	salaryCap: number;
+	salaryCapType: "hard" | "soft" | "none";
+	softCapTradeSalaryMatch: number;
+}): number[] | undefined => {
+	if (salaryCapType === "none") {
+		return [];
+	}
+
+	const fits = (outgoing: number) => {
+		const after = payroll + incoming - outgoing;
+		if (after <= salaryCap) {
+			return true;
+		}
+		if (salaryCapType === "hard") {
+			return after <= payroll;
+		}
+		return (100 * incoming) / Math.max(outgoing, 1) <= softCapTradeSalaryMatch;
+	};
+
+	if (fits(0)) {
+		return [];
+	}
+
+	// Biggest contracts first, so as few players as possible are needed, then drop any that aren't needed
+	const sorted = [...candidates].sort(
+		(a, b) => b.contractAmount - a.contractAmount,
+	);
+	const pids: number[] = [];
+	let outgoing = 0;
+	for (const p of sorted) {
+		if (fits(outgoing)) {
+			break;
+		}
+		pids.push(p.pid);
+		outgoing += p.contractAmount;
+	}
+	if (!fits(outgoing)) {
+		return;
+	}
+
+	// Try to swap the biggest contract for smaller ones that still fit
+	for (let i = 0; i < pids.length; i++) {
+		const p = sorted.find((p2) => p2.pid === pids[i])!;
+		if (fits(outgoing - p.contractAmount)) {
+			outgoing -= p.contractAmount;
+			pids.splice(i, 1);
+			i -= 1;
+		}
+	}
+
+	return pids.length <= 3 ? pids : undefined;
+};
+
 // Players a buyer would rather keep: its best players and its veterans. A contender pays with picks, prospects and depth
 export const getBuyerProtected = (players: CandidatePlayer[]) => {
 	const sorted = [...players].sort((a, b) => b.value - a.value);
@@ -219,7 +284,7 @@ export const getRationale = ({
 }) => {
 	const players = listNames(playerNames);
 	if (kind === "deadlineBuy") {
-		return `Deadline deal: the contending ${otherTeam} add ${players} for the stretch run, and the ${mainTeam} get ${describeReturn(returnTo)} for the future.`;
+		return `Deadline deal: the contending ${otherTeam} add ${players} for the stretch run, and the ${mainTeam} get ${describeReturn(returnTo)} in return.`;
 	}
 	if (kind === "rebuildSell") {
 		return `The rebuilding ${mainTeam} sell veteran ${players} for ${describeReturn(returnTo)}, and the contending ${otherTeam} load up.`;

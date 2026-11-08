@@ -451,8 +451,19 @@ const Trade = (props: View<"trade">) => {
 							{otl > 0 ? <>-{otl}</> : null}
 							{tied > 0 ? <>-{tied}</> : null}, {strategy}
 						</div>
+						<a
+							className="ms-auto me-2 text-nowrap"
+							href={helpers.leagueUrl(["trade_market"])}
+						>
+							Trade market
+						</a>
+						<a
+							className="me-2 text-nowrap"
+							href={helpers.leagueUrl(["trade_three"])}
+						>
+							3-team trade
+						</a>
 						<SaveTrade
-							className="ms-auto"
 							tradeTeams={[
 								{
 									pids: userPids,
