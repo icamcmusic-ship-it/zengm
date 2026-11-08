@@ -181,6 +181,8 @@ export type RankSpec = {
 	minTop?: number;
 	size?: "feature" | "brief";
 	tableRows?: number;
+	// A plain sentence that can open the table instead of the usual ones (the variation pass in vary.ts has rewrites for some of them)
+	lead?: (c: Ctx, items: Item[]) => string | undefined;
 };
 
 const who = (c: Ctx, it: Item): Seg =>
@@ -298,6 +300,39 @@ export const rankPage = (spec: RankSpec): PageDef => {
 						out.push(P(note));
 					}
 					return out;
+				},
+			},
+			{
+				id: "lead-table",
+				fit: (x, c) => spec.lead?.(c, x.items) !== undefined,
+				heads: (x, c) => {
+					const a = x.items[0]!;
+					return [
+						`${T}: ${nameOf(c, a)} at the top`,
+						`${T}, ${c.season}`,
+						`The ${spec.topic} list`,
+					];
+				},
+				build: (x, r, c) => {
+					const rows = x.items.slice(0, x.top);
+					const isP = x.items[0]!.kind === "p";
+					return [
+						P(spec.lead!(c, x.items)!),
+						table(
+							isP ? ["", "Player", "Team", spec.col] : ["", "Team", spec.col],
+							rows.map((it, i) =>
+								isP
+									? [
+											[String(i + 1)],
+											[who(c, it)],
+											[c.team(teamId(c, it) ?? -1) ? c.tl(teamId(c, it)!, c.team(teamId(c, it)!)?.abbrev) : (it.note ?? "–")],
+											[spec.fmt(it.v)],
+										]
+									: [[String(i + 1)], [who(c, it)], [spec.fmt(it.v)]],
+							),
+							isP ? [0, 3] : [0, 2],
+						),
+					];
 				},
 			},
 			{

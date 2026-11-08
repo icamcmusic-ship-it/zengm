@@ -323,6 +323,7 @@ const specs: RankSpec[] = [
 		col: "Change",
 		fmt: (v) => signed(v, 0),
 		minTop: 3,
+		lead: () => "The biggest rating gains among rotation players this season:",
 		items: (c) =>
 			desc(
 				players(
@@ -678,6 +679,7 @@ const specs: RankSpec[] = [
 		topic: "franchise wins",
 		unit: "wins",
 		col: "Wins",
+		lead: (c) => `Franchise wins through ${c.pre ? c.season - 1 : c.season} (current teams):`,
 		fmt: (v) => Math.round(v).toLocaleString("en-US"),
 		items: (c) =>
 			desc(
@@ -750,6 +752,7 @@ const specs: RankSpec[] = [
 		topic: "playoff droughts",
 		unit: "seasons without the playoffs",
 		col: "Seasons",
+		lead: () => "Seasons since each team last made the playoffs:",
 		fmt: int,
 		minTop: 3,
 		items: (c) =>
