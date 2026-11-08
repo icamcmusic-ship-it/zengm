@@ -23,6 +23,7 @@ import { recomputeLocalUITeamOvrs } from "../../util/recomputeLocalUITeamOvrs.ts
 const processTrade = async (
 	rawTeams: TradeTeams,
 	initialHash: string | undefined,
+	options: { note?: string } = {},
 ) => {
 	const tids: [number, number] = [rawTeams[0].tid, rawTeams[1].tid];
 	const pids: [number[], number[]] = [rawTeams[0].pids, rawTeams[1].pids];
@@ -208,6 +209,7 @@ const processTrade = async (
 		score: Math.round(helpers.bound(maxPlayerValue - 40, 0, Infinity)),
 		teams,
 		phase: g.get("phase"),
+		...(options.note ? { note: options.note } : {}),
 	});
 
 	// Can only do this now, after we know the eid

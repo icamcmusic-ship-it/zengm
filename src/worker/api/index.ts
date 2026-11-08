@@ -148,6 +148,7 @@ import getWinner from "../../common/getWinner.ts";
 import formatScoreWithShootout from "../../common/formatScoreWithShootout.ts";
 import { getStats } from "../../common/advancedPlayerSearch.ts";
 import type { LookingFor } from "../core/trade/makeItWork.ts";
+import { dismissAiOffer } from "../core/trade/aiOffers.ts";
 import type { LookingForState } from "../../ui/views/TradingBlock/useLookingForState.ts";
 import { getPlayer } from "../views/player.ts";
 import type { NoteInfo } from "../../ui/views/Player/Note.tsx";
@@ -3110,6 +3111,11 @@ const importPlayersGetReal = async (param: unknown, conditions: Conditions) => {
 	return players;
 };
 
+const dismissAiTradeOffer = async (id: number) => {
+	await dismissAiOffer(id);
+	await toUI("realtimeUpdate", [["gameAttributes"]]);
+};
+
 const incrementTradeProposalsSeed = async () => {
 	await league.setGameAttributes({
 		tradeProposalsSeed: g.get("tradeProposalsSeed") + 1,
@@ -5756,6 +5762,7 @@ const api = {
 		idbCacheFlush,
 		importPlayers,
 		importPlayersGetReal,
+		dismissAiTradeOffer,
 		incrementTradeProposalsSeed,
 		init,
 		initGold,

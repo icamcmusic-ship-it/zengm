@@ -304,6 +304,7 @@ const play = async (
 			}
 			if (phase === PHASE.REGULAR_SEASON) {
 				await trade.betweenAiTeams();
+				await trade.aiOffers();
 			}
 		}
 

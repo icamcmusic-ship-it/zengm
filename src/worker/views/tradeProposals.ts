@@ -160,7 +160,8 @@ export default defineView({
 			updateEvents.has("playerMovement") ||
 			updateEvents.has("gameSim") ||
 			updateEvents.has("newPhase") ||
-			updateEvents.has("g.tradeProposalsSeed")
+			updateEvents.has("g.tradeProposalsSeed") ||
+			updateEvents.has("gameAttributes")
 		) {
 			const teamSeason = await idb.cache.teamSeasons.indexGet(
 				"teamSeasonsByTidSeason",
@@ -180,7 +181,21 @@ export default defineView({
 				addInlinePlayerInfo(offer),
 			);
 
+			// Offers AI teams sent on their own, see trade/aiOffers.ts
+			const aiOffersRaw = g
+				.get("aiTradeOffers")
+				.filter((offer) => offer.teams[0].tid === g.get("userTid"));
+			const aiOffersAugmented = await augmentOffers(
+				aiOffersRaw.map((offer) => offer.teams),
+			);
+			const aiOffers = aiOffersAugmented.map((offer, i) => ({
+				...addInlinePlayerInfo(offer),
+				id: aiOffersRaw[i]!.id,
+				reason: aiOffersRaw[i]!.reason,
+			}));
+
 			return {
+				aiOffers,
 				offers,
 				seed,
 			};

@@ -1,3 +1,4 @@
+import aiOffers from "./aiOffers.ts";
 import betweenAiTeams from "./betweenAiTeams.ts";
 import clear from "./clear.ts";
 import create from "./create.ts";
@@ -14,6 +15,7 @@ import summary from "./summary.ts";
 import updatePlayers from "./updatePlayers.ts";
 
 export default {
+	aiOffers,
 	betweenAiTeams,
 	clear,
 	create,

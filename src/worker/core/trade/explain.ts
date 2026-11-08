@@ -11,14 +11,7 @@ import summary from "./summary.ts";
 export type ExplanationEffect = "good" | "bad" | "neutral";
 
 export type ExplanationTerm = {
-	key:
-		| "value"
-		| "pick"
-		| "strategy"
-		| "contract"
-		| "injury"
-		| "fit"
-		| "salary";
+	key: "value" | "pick" | "strategy" | "contract" | "injury" | "fit" | "salary";
 	text: string;
 	effect: ExplanationEffect;
 };
@@ -270,7 +263,10 @@ export const buildTradeExplanation = (
 		const overCap = input.payrollAfter > input.salaryCap;
 		if (Math.abs(diff) >= 1) {
 			const amount = helpers.formatCurrency(Math.abs(diff) / 1000, "M");
-			let text = diff > 0 ? `Adds ${amount} to our payroll` : `Saves ${amount} in payroll`;
+			let text =
+				diff > 0
+					? `Adds ${amount} to our payroll`
+					: `Saves ${amount} in payroll`;
 			if (input.salaryCapType !== "none") {
 				text += overCap
 					? `, leaving us ${helpers.formatCurrency((input.payrollAfter - input.salaryCap) / 1000, "M")} over the cap.`

@@ -30,6 +30,8 @@ type Key =
 	| "minContractLength"
 	| "maxContractLength"
 	| "aiTradesFactor"
+	| "aiTradesNeedBased"
+	| "aiTradeOffersFrequency"
 	| "injuryRate"
 	| "homeCourtAdvantage"
 	| "rookieContractLengths"
@@ -250,6 +252,8 @@ export const getInitialSettings = (): Settings => {
 		minContractLength: g.get("minContractLength"),
 		maxContractLength: g.get("maxContractLength"),
 		aiTradesFactor: g.get("aiTradesFactor"),
+		aiTradesNeedBased: g.get("aiTradesNeedBased"),
+		aiTradeOffersFrequency: g.get("aiTradeOffersFrequency"),
 		injuryRate: g.get("injuryRate"),
 		homeCourtAdvantage: g.get("homeCourtAdvantage"),
 		rookieContractLengths: g.get("rookieContractLengths"),

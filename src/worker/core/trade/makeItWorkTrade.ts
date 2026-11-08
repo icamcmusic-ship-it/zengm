@@ -74,7 +74,7 @@ const makeItWorkTrade = async () => {
 	if (s.warning) {
 		return {
 			changed: updated,
-		explanation,
+			explanation,
 			message: `${
 				g.get("teamInfoCache")[teams[1].tid]?.region
 			} GM: "Something like this would work if you can figure out how to get it done without breaking the salary cap rules."`,
