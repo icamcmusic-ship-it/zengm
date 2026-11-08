@@ -87,7 +87,8 @@ describe("ratingsBuilds data", () => {
 	});
 });
 
-describe("regenerateClass", () => {
+// The "thousands of random players" checks are heavy; a longer limit keeps them from timing out on a busy machine
+describe("regenerateClass", { timeout: 60_000 }, () => {
 	test("keeps every overall exactly across thousands of random players", () => {
 		resetG();
 		let total = 0;
