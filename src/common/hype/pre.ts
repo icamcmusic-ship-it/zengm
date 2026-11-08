@@ -12,12 +12,24 @@ import {
 	seriesRecord,
 	seriesSoFar,
 } from "./story.ts";
-import type { HGameInput, HStanding, HTeamState, Pre, Reason } from "./types.ts";
+import type {
+	HGameInput,
+	HStanding,
+	HTeamState,
+	Pre,
+	Reason,
+} from "./types.ts";
 import { PRE_K, clamp, known, label, pl, squash } from "./util.ts";
 
 const winPct = (w: number, l: number) => (w + 2) / (w + l + 4);
 
-type Snap = { w: number; l: number; st: number; rank: number; gb: number | null };
+type Snap = {
+	w: number;
+	l: number;
+	st: number;
+	rank: number;
+	gb: number | null;
+};
 
 // Where each of the two teams stands in its group (conference, or the league) and how far from the playoff line
 const snapshot = (
@@ -138,7 +150,11 @@ export const preHype = (I: HGameInput): Pre => {
 				q > 0.5 &&
 				gp / I.numGames > 0.6
 			) {
-				add("stakes", 4 * late, "Head-to-head for seeding (records within a game)");
+				add(
+					"stakes",
+					4 * late,
+					"Head-to-head for seeding (records within a game)",
+				);
 			}
 		}
 		for (const t of [H, A]) {
@@ -166,7 +182,8 @@ export const preHype = (I: HGameInput): Pre => {
 	if (meets.length) {
 		const recent = meets.filter((x) => x.season >= season - 5);
 		const lastYear = meets.find((x) => x.season === season - 1);
-		let pts = Math.min(14, 2 * meets.length + 3 * recent.length) + (lastYear ? 4 : 0);
+		let pts =
+			Math.min(14, 2 * meets.length + 3 * recent.length) + (lastYear ? 4 : 0);
 		if (I.playoffs && meets.some((x) => x.season >= season - 3)) {
 			pts += 3;
 		}
@@ -202,7 +219,11 @@ export const preHype = (I: HGameInput): Pre => {
 	if (H.ovr !== null && A.ovr !== null) {
 		const lo = Math.min(H.ovr, A.ovr);
 		if (lo >= 60) {
-			add("stars", Math.min(6, (lo - 58) / 2), `Two strong rosters (team ovr ${H.ovr} and ${A.ovr})`);
+			add(
+				"stars",
+				Math.min(6, (lo - 58) / 2),
+				`Two strong rosters (team ovr ${H.ovr} and ${A.ovr})`,
+			);
 		}
 	}
 

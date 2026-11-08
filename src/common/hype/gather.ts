@@ -129,7 +129,8 @@ const playersOf = (raw: HRaw) => {
 	return m;
 };
 
-const teamInfo = (raw: HRaw, tid: number) => raw.teams.find((t) => t.tid === tid);
+const teamInfo = (raw: HRaw, tid: number) =>
+	raw.teams.find((t) => t.tid === tid);
 
 // Regular season record and streak going into the target, from the stored games
 const recordFrom = (raw: HRaw, idx: Index, tid: number, t: Target) => {
@@ -140,7 +141,8 @@ const recordFrom = (raw: HRaw, idx: Index, tid: number, t: Target) => {
 		if (g.playoffs || g.playIn || !isBefore(g, t)) {
 			continue;
 		}
-		const i = g.teams[0].tid === tid ? 0 : g.teams[1].tid === tid ? 1 : undefined;
+		const i =
+			g.teams[0].tid === tid ? 0 : g.teams[1].tid === tid ? 1 : undefined;
 		if (i === undefined) {
 			continue;
 		}
@@ -176,14 +178,23 @@ const teamState = (
 		const i = game.teams[0].tid === tid ? 0 : 1;
 		const me = game.teams[i]!;
 		const w = me.pts > game.teams[1 - i]!.pts;
-		if (!game.playoffs && !game.playIn && me.won !== undefined && me.lost !== undefined) {
+		if (
+			!game.playoffs &&
+			!game.playIn &&
+			me.won !== undefined &&
+			me.lost !== undefined
+		) {
 			won = me.won - (w ? 1 : 0);
 			lost = me.lost - (w ? 0 : 1);
 			tied = me.tied ?? 0;
 			otl = me.otl ?? 0;
 		} else {
 			// playoff games carry the regular season record
-			const r = recordFrom(raw, idx, tid, { ...t, playoffs: true, playIn: false });
+			const r = recordFrom(raw, idx, tid, {
+				...t,
+				playoffs: true,
+				playIn: false,
+			});
 			won = r.won;
 			lost = r.lost;
 		}
@@ -323,7 +334,21 @@ const sumRows = (lines: HLine[], season: number): HRow[] => {
 		}
 		let r = by.get(l.tid);
 		if (!r) {
-			by.set(l.tid, (r = { season, tid: l.tid, gp: 0, pts: 0, trb: 0, ast: 0, stl: 0, blk: 0, tp: 0, min: 0 }));
+			by.set(
+				l.tid,
+				(r = {
+					season,
+					tid: l.tid,
+					gp: 0,
+					pts: 0,
+					trb: 0,
+					ast: 0,
+					stl: 0,
+					blk: 0,
+					tp: 0,
+					min: 0,
+				}),
+			);
 		}
 		r.gp += 1;
 		r.pts! += l.pts;
@@ -477,7 +502,11 @@ export const resultFor = (raw: HRaw, gid: number): HResult | null => {
 	const lastGameOfSeries =
 		!!state && state.info.gids.at(-1) === gid && state.info.numToWin > 0;
 	let clinchedTitle = false;
-	if (state && lastGameOfSeries && state.info.round === state.info.numRounds - 1) {
+	if (
+		state &&
+		lastGameOfSeries &&
+		state.info.round === state.info.numRounds - 1
+	) {
 		const winSide =
 			state.info.home.tid === winTid ? state.info.home : state.info.away;
 		clinchedTitle = !!winSide && winSide.won >= state.info.numToWin;
@@ -496,6 +525,8 @@ export const resultFor = (raw: HRaw, gid: number): HResult | null => {
 	};
 };
 
-export const hasStored = (raw: HRaw, gid: number) => indexOf(raw).byGid.has(gid);
-export const storedGame = (raw: HRaw, gid: number) => indexOf(raw).byGid.get(gid);
+export const hasStored = (raw: HRaw, gid: number) =>
+	indexOf(raw).byGid.has(gid);
+export const storedGame = (raw: HRaw, gid: number) =>
+	indexOf(raw).byGid.get(gid);
 export const storedGames = (raw: HRaw) => indexOf(raw).sorted;

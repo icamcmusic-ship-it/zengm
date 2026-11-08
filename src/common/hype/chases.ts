@@ -72,7 +72,13 @@ export const findChases = (
 				rec: HRecordEntry | null | undefined,
 				seasonCur: number | null,
 			) => {
-				if (!known(cur) || !rec || rec.pid === P.pid || !gp || !known(seasonCur)) {
+				if (
+					!known(cur) ||
+					!rec ||
+					rec.pid === P.pid ||
+					!gp ||
+					!known(seasonCur)
+				) {
 					return;
 				}
 				const rate = seasonCur / gp;
@@ -157,23 +163,21 @@ export const findChases = (
 				one("league", "career", careerTotal(P, k), gpAll, top, seasonAll);
 			}
 			const cf = R.careerFranchise[tid]?.[k]?.[0];
-			if (
-				cf &&
-				cf.v >= cMin &&
-				fr &&
-				fr.n >= MIN_FRANCHISE_SEASONS &&
-				gpF
-			) {
+			if (cf && cf.v >= cMin && fr && fr.n >= MIN_FRANCHISE_SEASONS && gpF) {
 				one("franchise", "career", careerTotal(P, k, tid), gpF, cf, seasonF);
 			}
 		}
 	}
 	// a player's league chase makes his franchise chase of the same stat and kind redundant
 	const seen = new Set(
-		out.filter((x) => x.scope === "league").map((x) => `${x.pid}|${x.k}|${x.kind}`),
+		out
+			.filter((x) => x.scope === "league")
+			.map((x) => `${x.pid}|${x.k}|${x.kind}`),
 	);
 	return out
-		.filter((x) => x.scope === "league" || !seen.has(`${x.pid}|${x.k}|${x.kind}`))
+		.filter(
+			(x) => x.scope === "league" || !seen.has(`${x.pid}|${x.k}|${x.kind}`),
+		)
 		.sort((a, b) => b.pts - a.pts || a.need - b.need);
 };
 

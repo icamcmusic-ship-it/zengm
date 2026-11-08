@@ -29,11 +29,28 @@
 (function () {
 	"use strict";
 	if (typeof bbgm === "undefined" || !bbgm.idb) {
-		console.error("`bbgm` not found. Switch the console to the BBGM worker context first (see the notes at the top of this script).");
+		console.error(
+			"`bbgm` not found. Switch the console to the BBGM worker context first (see the notes at the top of this script).",
+		);
 		return;
 	}
 	const { idb, g, player, PLAYER, PHASE, logEvent, helpers } = bbgm;
-	const RATING_KEYS = ["stre", "spd", "jmp", "endu", "ins", "dnk", "ft", "fg", "tp", "oiq", "diq", "drb", "pss", "reb"]; // hgt is never changed
+	const RATING_KEYS = [
+		"stre",
+		"spd",
+		"jmp",
+		"endu",
+		"ins",
+		"dnk",
+		"ft",
+		"fg",
+		"tp",
+		"oiq",
+		"diq",
+		"drb",
+		"pss",
+		"reb",
+	]; // hgt is never changed
 
 	const config = {
 		chance: 0.1, // chance per roll that anyone comes back (one roll per season when watching)
@@ -51,12 +68,28 @@
 		await idb.cache.flush();
 		const players = await idb.league.getAll("players");
 		return players.filter((p) => {
-			if (p.tid !== PLAYER.RETIRED) {return false;}
-			if (p.diedYear !== undefined && p.diedYear !== null) {return false;}
-			if (p.unretiredByScript) {return false;}
-			if (!config.allowHof && p.hof) {return false;}
-			if (!p.born || typeof p.born.year !== "number" || !Number.isFinite(p.retiredYear)) {return false;}
-			if (!p.ratings || p.ratings.length === 0) {return false;}
+			if (p.tid !== PLAYER.RETIRED) {
+				return false;
+			}
+			if (p.diedYear !== undefined && p.diedYear !== null) {
+				return false;
+			}
+			if (p.unretiredByScript) {
+				return false;
+			}
+			if (!config.allowHof && p.hof) {
+				return false;
+			}
+			if (
+				!p.born ||
+				typeof p.born.year !== "number" ||
+				!Number.isFinite(p.retiredYear)
+			) {
+				return false;
+			}
+			if (!p.ratings || p.ratings.length === 0) {
+				return false;
+			}
 			return p.retiredYear - p.born.year >= config.minRetireAge;
 		});
 	}
@@ -66,7 +99,9 @@
 		let guard = 0;
 		while (player.ovr(ratings) < targetOvr && guard++ < 2000) {
 			const open = RATING_KEYS.filter((k) => ratings[k] < 100);
-			if (open.length === 0) {break;}
+			if (open.length === 0) {
+				break;
+			}
 			// Favour strong ratings (a good player gets better at what he is good at), but let weak ones move too
 			const weights = open.map((k) => 20 + ratings[k]);
 			let r = Math.random() * weights.reduce((a, b) => a + b, 0);
@@ -110,22 +145,52 @@
 		const newOvr = p.ratings.at(-1).ovr;
 		const text = `<a href="${helpers.leagueUrl(["player", p.pid])}">${name}</a> has come out of retirement and is now a free agent.`;
 		if (config.notify && logEvent) {
-			logEvent({ type: "freeAgent", text, showNotification: true, pids: [p.pid], tids: [], score: 20 });
+			logEvent({
+				type: "freeAgent",
+				text,
+				showNotification: true,
+				pids: [p.pid],
+				tids: [],
+				score: 20,
+			});
 		}
-		const result = { pid: p.pid, name, age: season - p.born.year, oldOvr, newOvr, boost: newOvr - oldOvr };
-		console.log("[unretire] " + name + ": ovr " + oldOvr + " -> " + newOvr + " (age " + result.age + "), now a free agent");
+		const result = {
+			pid: p.pid,
+			name,
+			age: season - p.born.year,
+			oldOvr,
+			newOvr,
+			boost: newOvr - oldOvr,
+		};
+		console.log(
+			"[unretire] " +
+				name +
+				": ovr " +
+				oldOvr +
+				" -> " +
+				newOvr +
+				" (age " +
+				result.age +
+				"), now a free agent",
+		);
 		return result;
 	}
 
 	async function run(opts) {
 		const force = !!(opts && opts.force);
 		if (!force && Math.random() >= config.chance) {
-			console.log("[unretire] roll: nobody this time (chance " + config.chance + ")");
+			console.log(
+				"[unretire] roll: nobody this time (chance " + config.chance + ")",
+			);
 			return null;
 		}
 		const pool = await eligible();
 		if (pool.length === 0) {
-			console.log("[unretire] no eligible retired players (retired at " + config.minRetireAge + "+)");
+			console.log(
+				"[unretire] no eligible retired players (retired at " +
+					config.minRetireAge +
+					"+)",
+			);
 			return null;
 		}
 		const p = pool[Math.floor(Math.random() * pool.length)];
@@ -135,7 +200,14 @@
 	async function list() {
 		const pool = await eligible();
 		const rows = pool
-			.map((p) => ({ pid: p.pid, name: p.firstName + " " + p.lastName, retiredYear: p.retiredYear, ageAtRetirement: p.retiredYear - p.born.year, lastOvr: p.ratings.at(-1).ovr, hof: !!p.hof }))
+			.map((p) => ({
+				pid: p.pid,
+				name: p.firstName + " " + p.lastName,
+				retiredYear: p.retiredYear,
+				ageAtRetirement: p.retiredYear - p.born.year,
+				lastOvr: p.ratings.at(-1).ovr,
+				hof: !!p.hof,
+			}))
 			.sort((a, b) => b.lastOvr - a.lastOvr);
 		console.table(rows.slice(0, 50));
 		console.log("[unretire] " + rows.length + " eligible");
@@ -158,14 +230,24 @@
 				console.error("[unretire] watcher error", error);
 			}
 		}, 3000);
-		console.log("[unretire] watching: one roll per season at phase " + config.phase + " (" + Object.keys(PHASE).find((k) => PHASE[k] === config.phase) + ")");
+		console.log(
+			"[unretire] watching: one roll per season at phase " +
+				config.phase +
+				" (" +
+				Object.keys(PHASE).find((k) => PHASE[k] === config.phase) +
+				")",
+		);
 	}
 	function stop() {
-		if (timer) {clearInterval(timer);}
+		if (timer) {
+			clearInterval(timer);
+		}
 		timer = null;
 		console.log("[unretire] stopped");
 	}
 
 	bbgm.unretire = { run, list, start, stop, config, eligible };
-	console.log("[unretire] ready. Try bbgm.unretire.list(), bbgm.unretire.run({force:true}), bbgm.unretire.start()");
+	console.log(
+		"[unretire] ready. Try bbgm.unretire.list(), bbgm.unretire.run({force:true}), bbgm.unretire.start()",
+	);
 })();

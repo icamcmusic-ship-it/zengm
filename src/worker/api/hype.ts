@@ -30,7 +30,13 @@ const recentGids = async () => {
 		}
 	}
 	return games
-		.filter((gm) => gm.teams[0].tid >= 0 && gm.teams[1].tid >= 0 && (gm.day ?? 0) === maxDay && gm.season === g.get("season"))
+		.filter(
+			(gm) =>
+				gm.teams[0].tid >= 0 &&
+				gm.teams[1].tid >= 0 &&
+				(gm.day ?? 0) === maxDay &&
+				gm.season === g.get("season"),
+		)
 		.map((gm) => gm.gid);
 };
 
@@ -60,7 +66,9 @@ const hype = {
 			const gids = await recentGids();
 			const map = await hypeForGids(gids);
 			recentGames.push(
-				...Object.values(map).sort((a, b) => b.watch - a.watch || a.gid - b.gid),
+				...Object.values(map).sort(
+					(a, b) => b.watch - a.watch || a.gid - b.gid,
+				),
 			);
 		}
 		return {

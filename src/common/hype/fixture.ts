@@ -90,7 +90,15 @@ export const makeRaw = (seed = "hype-fixture"): HRaw => {
 			allStar: pid === MOVER_PID ? [2027] : [],
 			moves:
 				pid === MOVER_PID
-					? [{ season: SEASON - 1, phase: 7, tid: 2, type: "trade", fromTid: 3 }]
+					? [
+							{
+								season: SEASON - 1,
+								phase: 7,
+								tid: 2,
+								type: "trade",
+								fromTid: 3,
+							},
+						]
 					: [],
 			released: [],
 		});
@@ -101,7 +109,10 @@ export const makeRaw = (seed = "hype-fixture"): HRaw => {
 	let gid = 1000;
 	const order = [0, 1, 2, 3, 4, 5, 6, 7];
 	for (let day = 1; day <= NUM_GAMES; day++) {
-		const rot = [order[0]!, ...order.slice(1).map((_, k) => order[1 + ((k + day - 1) % 7)]!)];
+		const rot = [
+			order[0]!,
+			...order.slice(1).map((_, k) => order[1 + ((k + day - 1) % 7)]!),
+		];
 		const cycle = Math.floor((day - 1) / 7);
 		for (let k = 0; k < 4; k++) {
 			let a = rot[k]!;
@@ -184,10 +195,18 @@ export const makeRaw = (seed = "hype-fixture"): HRaw => {
 	const finalW = new Map<number, number>();
 	for (const g of games) {
 		const hw = g.teams[0].pts > g.teams[1].pts;
-		finalW.set(g.teams[0].tid, (finalW.get(g.teams[0].tid) ?? 0) + (hw ? 1 : 0));
-		finalW.set(g.teams[1].tid, (finalW.get(g.teams[1].tid) ?? 0) + (hw ? 0 : 1));
+		finalW.set(
+			g.teams[0].tid,
+			(finalW.get(g.teams[0].tid) ?? 0) + (hw ? 1 : 0),
+		);
+		finalW.set(
+			g.teams[1].tid,
+			(finalW.get(g.teams[1].tid) ?? 0) + (hw ? 0 : 1),
+		);
 	}
-	const seeds = [...order].sort((a, b) => (finalW.get(b) ?? 0) - (finalW.get(a) ?? 0) || a - b).slice(0, 4);
+	const seeds = [...order]
+		.sort((a, b) => (finalW.get(b) ?? 0) - (finalW.get(a) ?? 0) || a - b)
+		.slice(0, 4);
 	const series: HSeries[] = [];
 	let day = NUM_GAMES + 1;
 	const playSeries = (
@@ -211,8 +230,16 @@ export const makeRaw = (seed = "hype-fixture"): HRaw => {
 			const homeTid = n === 1 ? lo.tid : hi.tid;
 			const awayTid = n === 1 ? hi.tid : lo.tid;
 			// the better seed wins unless it is the third game
-			const homeWins = homeTid === hi.tid ? (n + round) % 3 !== 0 : (n + round) % 3 === 0;
-			const g = makeGame(gid++, d, [homeTid, awayTid], homeWins ? [101, 96] : [95, 100], true, false);
+			const homeWins =
+				homeTid === hi.tid ? (n + round) % 3 !== 0 : (n + round) % 3 === 0;
+			const g = makeGame(
+				gid++,
+				d,
+				[homeTid, awayTid],
+				homeWins ? [101, 96] : [95, 100],
+				true,
+				false,
+			);
 			fillBox(g, players, ri);
 			games.push(g);
 			s.gids.push(g.gid);
@@ -227,14 +254,32 @@ export const makeRaw = (seed = "hype-fixture"): HRaw => {
 		series.push(s);
 		return { winner: s.home.won > s.away!.won ? s.home : s.away!, end: d };
 	};
-	const a = playSeries(0, { tid: seeds[0]!, seed: 1 }, { tid: seeds[3]!, seed: 4 }, day);
-	const b = playSeries(0, { tid: seeds[1]!, seed: 2 }, { tid: seeds[2]!, seed: 3 }, day);
+	const a = playSeries(
+		0,
+		{ tid: seeds[0]!, seed: 1 },
+		{ tid: seeds[3]!, seed: 4 },
+		day,
+	);
+	const b = playSeries(
+		0,
+		{ tid: seeds[1]!, seed: 2 },
+		{ tid: seeds[2]!, seed: 3 },
+		day,
+	);
 	day = Math.max(a.end, b.end);
-	const [x, y] = a.winner.seed < b.winner.seed ? [a.winner, b.winner] : [b.winner, a.winner];
+	const [x, y] =
+		a.winner.seed < b.winner.seed ? [a.winner, b.winner] : [b.winner, a.winner];
 	playSeries(1, x, y, day);
 
 	// History: the finals of the year before, and a few older meetings between teams 0 and 1
-	const past = (season: number, round: number, hi: number, lo: number, hiWon: number, loWon: number): HSeries => ({
+	const past = (
+		season: number,
+		round: number,
+		hi: number,
+		lo: number,
+		hiWon: number,
+		loWon: number,
+	): HSeries => ({
 		season,
 		round,
 		numRounds: 2,
@@ -264,12 +309,30 @@ export const makeRaw = (seed = "hype-fixture"): HRaw => {
 	};
 	// this season's rows, from the box scores
 	for (const p of players) {
-		const mine = games.filter((g) => !g.playoffs && g.teams.some((t) => t.players.some((l) => l.pid === p.pid && l.min > 0)));
+		const mine = games.filter(
+			(g) =>
+				!g.playoffs &&
+				g.teams.some((t) =>
+					t.players.some((l) => l.pid === p.pid && l.min > 0),
+				),
+		);
 		let pts = 0;
 		for (const g of mine) {
-			pts += g.teams.flatMap((t) => t.players).find((l) => l.pid === p.pid)!.pts;
+			pts += g.teams
+				.flatMap((t) => t.players)
+				.find((l) => l.pid === p.pid)!.pts;
 		}
-		p.rows.push({ season: SEASON, tid: p.tid, gp: mine.length, pts, trb: mine.length * 3, ast: mine.length, stl: mine.length, blk: 0, tp: mine.length });
+		p.rows.push({
+			season: SEASON,
+			tid: p.tid,
+			gp: mine.length,
+			pts,
+			trb: mine.length * 3,
+			ast: mine.length,
+			stl: mine.length,
+			blk: 0,
+			tp: mine.length,
+		});
 	}
 	raw.records = buildRecords(players, SEASON);
 	return raw;
@@ -277,7 +340,9 @@ export const makeRaw = (seed = "hype-fixture"): HRaw => {
 
 function quarters(total: number, gid: number) {
 	const r = seededRng(`q${gid}-${total}`);
-	const q = [0.25, 0.25, 0.25].map((f) => Math.round(total * (f + (r() - 0.5) * 0.06)));
+	const q = [0.25, 0.25, 0.25].map((f) =>
+		Math.round(total * (f + (r() - 0.5) * 0.06)),
+	);
 	q.push(total - q[0]! - q[1]! - q[2]!);
 	return q;
 }
@@ -305,15 +370,32 @@ function makeGame(
 	};
 }
 
-function fillBox(g: HGame, players: HPlayerRaw[], ri: (a: number, b: number) => number) {
+function fillBox(
+	g: HGame,
+	players: HPlayerRaw[],
+	ri: (a: number, b: number) => number,
+) {
 	for (const t of g.teams) {
 		const roster = players.filter((p) => p.tid === t.tid);
 		let left = t.pts;
 		const lines: HBoxLine[] = roster.map((p) => {
 			const i = p.pid % 10;
-			const pts = Math.min(left, Math.max(0, Math.round(ri(1, 4) + (10 - i) * 1.4)));
+			const pts = Math.min(
+				left,
+				Math.max(0, Math.round(ri(1, 4) + (10 - i) * 1.4)),
+			);
 			left -= pts;
-			return { pid: p.pid, name: p.name, min: Math.max(8, 36 - i * 3), pts, trb: 3, ast: 1, stl: 1, blk: 0, tp: 1 };
+			return {
+				pid: p.pid,
+				name: p.name,
+				min: Math.max(8, 36 - i * 3),
+				pts,
+				trb: 3,
+				ast: 1,
+				stl: 1,
+				blk: 0,
+				tp: 1,
+			};
 		});
 		lines[6]!.pts += left;
 		t.players = lines;

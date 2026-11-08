@@ -22,7 +22,9 @@ const addRow = (t: Tot, r: HRow) => {
 // ovr that makes a player a star in a season: the top 3% of the players with games (never worse than the 5th best)
 const starCutOf = (ovrs: number[]) => {
 	const s = [...ovrs].sort((a, b) => b - a);
-	return s.length ? s[Math.min(s.length - 1, Math.max(4, Math.round(s.length * 0.03)))]! : Number.POSITIVE_INFINITY;
+	return s.length
+		? s[Math.min(s.length - 1, Math.max(4, Math.round(s.length * 0.03)))]!
+		: Number.POSITIVE_INFINITY;
 };
 
 export const buildRecords = (

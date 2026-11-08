@@ -3,7 +3,12 @@ import type { View } from "../../common/types.ts";
 import { HypeGameRow, HypeText } from "../components/GameHype.tsx";
 import { helpers } from "../util/helpers.ts";
 
-const DAY_LABELS = ["Next up", "The day after", "Two days out", "Three days out"];
+const DAY_LABELS = [
+	"Next up",
+	"The day after",
+	"Two days out",
+	"Three days out",
+];
 
 const Hype = ({ chases, days, recent }: View<"hype">) => {
 	useTitleBar({ title: "Games to Watch" });
@@ -45,13 +50,16 @@ const Hype = ({ chases, days, recent }: View<"hype">) => {
 					<h2>Record chases</h2>
 					{chases.length === 0 ? (
 						<p>
-							No one is close to a league or franchise record yet. Records need a
-							few seasons of history to count.
+							No one is close to a league or franchise record yet. Records need
+							a few seasons of history to count.
 						</p>
 					) : (
 						<ul className="ps-3">
 							{chases.map((c) => (
-								<li key={`${c.pid}-${c.k}-${c.scope}-${c.kind}`} className="mb-1">
+								<li
+									key={`${c.pid}-${c.k}-${c.scope}-${c.kind}`}
+									className="mb-1"
+								>
 									<HypeText text={c.text} />
 								</li>
 							))}

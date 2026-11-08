@@ -112,7 +112,12 @@ export const Reasons = ({
 
 export const gameUrl = (h: HypeLite) => {
 	const t = h.teams[0]!;
-	return helpers.leagueUrl(["game_log", `${t.abbrev}_${t.tid}`, h.season, h.gid]);
+	return helpers.leagueUrl([
+		"game_log",
+		`${t.abbrev}_${t.tid}`,
+		h.season,
+		h.gid,
+	]);
 };
 
 // One game: "AWAY (record) at HOME (record)", the badge, and the reasons

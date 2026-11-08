@@ -38,8 +38,7 @@ const toRow = (s: any): HRow => {
 		gp: finite(s.gp) ?? 0,
 		min: finite(s.min),
 		pts: finite(s.pts),
-		trb:
-			orb !== undefined && drb !== undefined ? orb + drb : finite(s.trb),
+		trb: orb !== undefined && drb !== undefined ? orb + drb : finite(s.trb),
 		ast: finite(s.ast),
 		stl: finite(s.stl),
 		blk: finite(s.blk),
@@ -124,7 +123,10 @@ const toHGame = (gm: Game, playInGids: Set<number>): HGame => {
 	};
 };
 
-const loadSeries = async (): Promise<{ series: HSeries[]; playInGids: Set<number> }> => {
+const loadSeries = async (): Promise<{
+	series: HSeries[];
+	playInGids: Set<number>;
+}> => {
 	const all = await idb.merged.playoffSeries.getAll();
 	const series: HSeries[] = [];
 	const playInGids = new Set<number>();
@@ -201,19 +203,24 @@ const starCutNow = async (season: number) => {
 		if (p.tid < 0) {
 			continue;
 		}
-		const r = p.ratings.findLast((x) => x.season === season) ?? p.ratings.at(-1);
+		const r =
+			p.ratings.findLast((x) => x.season === season) ?? p.ratings.at(-1);
 		if (!r) {
 			continue;
 		}
 		const o = player.fuzzRating(r.ovr, r.fuzz);
 		all.push(o);
-		if (p.stats.some((s) => s.season === season && !s.playoffs && (s.gp ?? 0) > 0)) {
+		if (
+			p.stats.some((s) => s.season === season && !s.playoffs && (s.gp ?? 0) > 0)
+		) {
 			played.push(o);
 		}
 	}
 	const list = (played.length >= 100 ? played : all).sort((a, b) => b - a);
 	return list.length
-		? list[Math.min(list.length - 1, Math.max(4, Math.round(list.length * 0.03)))]!
+		? list[
+				Math.min(list.length - 1, Math.max(4, Math.round(list.length * 0.03)))
+			]!
 		: Number.POSITIVE_INFINITY;
 };
 
@@ -373,7 +380,9 @@ export const upcomingTargets = async (
 	const schedule = await seasonCore.getSchedule();
 	const phase = g.get("phase");
 	const playoffSeries =
-		phase === PHASE.PLAYOFFS ? await idb.cache.playoffSeries.get(g.get("season")) : undefined;
+		phase === PHASE.PLAYOFFS
+			? await idb.cache.playoffSeries.get(g.get("season"))
+			: undefined;
 	const playIn = !!playoffSeries && playoffSeries.currentRound === -1;
 	const days = new Map<number, UpcomingGame[]>();
 	for (const game of schedule) {
@@ -402,7 +411,9 @@ export const upcomingTargets = async (
 };
 
 // Hype of a set of upcoming games (one snapshot for all of them)
-export const hypeForUpcoming = async (games: UpcomingGame[]): Promise<HypeLite[]> => {
+export const hypeForUpcoming = async (
+	games: UpcomingGame[],
+): Promise<HypeLite[]> => {
 	if (games.length === 0) {
 		return [];
 	}
@@ -422,7 +433,9 @@ export const hypeForGids = async (
 	const out: Record<number, HypeLite> = {};
 	const { days } = await upcomingTargets(Number.MAX_SAFE_INTEGER);
 	const upcoming = new Map(days.flatMap((d) => d.games).map((x) => [x.gid, x]));
-	const wantUp = gids.map((gid) => upcoming.get(gid)).filter((x) => x !== undefined);
+	const wantUp = gids
+		.map((gid) => upcoming.get(gid))
+		.filter((x) => x !== undefined);
 	for (const h of await hypeForUpcoming(wantUp)) {
 		out[h.gid] = h;
 	}
@@ -453,7 +466,12 @@ export const hypeChases = async (limit = 25): Promise<ChaseRow[]> => {
 	const season = g.get("season");
 	const raw = await getHypeRaw(season, {});
 	// every player on a roster now
-	const players: Player[] = (await idb.cache.players.getAll()).filter((p) => p.tid >= 0);
+	const players: Player[] = (await idb.cache.players.getAll()).filter(
+		(p) => p.tid >= 0,
+	);
 	const rel = new Map<number, { season: number; tid: number }[]>();
-	return chaseBoard({ ...raw, players: players.map((p) => toRaw(p, rel)) }, limit);
+	return chaseBoard(
+		{ ...raw, players: players.map((p) => toRaw(p, rel)) },
+		limit,
+	);
 };

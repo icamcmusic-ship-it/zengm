@@ -9,15 +9,7 @@ import type {
 	SeriesSoFar,
 	StatKey,
 } from "./types.ts";
-import {
-	careerTotal,
-	curGp,
-	curTotal,
-	fmtN,
-	known,
-	pick,
-	pl,
-} from "./util.ts";
+import { careerTotal, curGp, curTotal, fmtN, known, pick, pl } from "./util.ts";
 
 const listed = (I: HGameInput) => [...I.players[0], ...I.players[1]];
 const nm = (I: HGameInput, tid: number) => I.teamName[tid] ?? "";
@@ -120,7 +112,8 @@ export const heaters = (I: HGameInput): Heater[] => {
 		}
 		const last = prior.slice(-5);
 		const rest = prior.slice(0, -5);
-		const avg = (a: typeof prior) => a.reduce((s, x) => s + x.pts, 0) / a.length;
+		const avg = (a: typeof prior) =>
+			a.reduce((s, x) => s + x.pts, 0) / a.length;
 		const hot = avg(last);
 		const base = avg(rest);
 		const thirties = prior.slice(-3).every((x) => x.pts >= 30);
@@ -144,7 +137,7 @@ const isRookie = (p: HListed, season: number) =>
 
 export const rookieDuel = (I: HGameInput): RookieDuel | null => {
 	const best = I.players.map((players, ti) => {
-		let b: RookieDuel["a"] & { rank: number } | null = null;
+		let b: (RookieDuel["a"] & { rank: number }) | null = null;
 		for (const p of players) {
 			if (!isRookie(p, I.season)) {
 				continue;
@@ -160,7 +153,15 @@ export const rookieDuel = (I: HGameInput): RookieDuel | null => {
 			}
 			const rank = (no !== null ? 6 - no : 0) + (ppg !== null ? ppg / 4 : 0);
 			if (!b || rank > b.rank) {
-				b = { pid: p.pid, name: p.name, tid: I.teams[ti]!.tid, no, ppg, rank, year: d.year };
+				b = {
+					pid: p.pid,
+					name: p.name,
+					tid: I.teams[ti]!.tid,
+					no,
+					ppg,
+					rank,
+					year: d.year,
+				};
 			}
 		}
 		return b;
@@ -168,7 +169,8 @@ export const rookieDuel = (I: HGameInput): RookieDuel | null => {
 	if (!best[0] || !best[1]) {
 		return null;
 	}
-	const [a, b] = best[0].rank >= best[1].rank ? [best[0], best[1]] : [best[1], best[0]];
+	const [a, b] =
+		best[0].rank >= best[1].rank ? [best[0], best[1]] : [best[1], best[0]];
 	const desc = (x: typeof a) =>
 		x.ppg !== null && (x.no === null || x.ppg >= 15)
 			? `${pl(x)} (${x.ppg.toFixed(1)} ppg)`
@@ -208,13 +210,19 @@ export const revenge = (I: HGameInput): Revenge[] => {
 			const rows = p.rows.filter((r) => r.gp > 0 && r.season < S);
 			const cur = (p.cur ?? []).filter((r) => r.gp > 0);
 			// cheap test first
-			if (!rows.some((r) => r.tid === oppTid) && !cur.some((r) => r.tid === oppTid)) {
+			if (
+				!rows.some((r) => r.tid === oppTid) &&
+				!cur.some((r) => r.tid === oppTid)
+			) {
 				continue;
 			}
 			const withOpp = rows.filter((r) => r.tid === oppTid);
 			const oppNow = cur.filter((r) => r.tid === oppTid);
-			const lastWith = oppNow.length ? S : Math.max(...withOpp.map((r) => r.season));
-			const seasons = new Set(withOpp.map((r) => r.season)).size + (oppNow.length ? 1 : 0);
+			const lastWith = oppNow.length
+				? S
+				: Math.max(...withOpp.map((r) => r.season));
+			const seasons =
+				new Set(withOpp.map((r) => r.season)).size + (oppNow.length ? 1 : 0);
 			if (lastWith < S - 4 && seasons < 4) {
 				continue;
 			}
@@ -228,7 +236,9 @@ export const revenge = (I: HGameInput): Revenge[] => {
 				-1,
 				...withOpp.map((r) => p.ovrBySeason[r.season] ?? -1),
 			);
-			const allStar = p.allStar.filter((s) => withOpp.some((r) => r.season === s)).length;
+			const allStar = p.allStar.filter((s) =>
+				withOpp.some((r) => r.season === s),
+			).length;
 			const cut = I.records?.starCut[lastWith] ?? Number.POSITIVE_INFINITY;
 			const star = allStar > 0 || ppgBest >= 18 || ovrBest >= cut;
 			if (!star && seasons < 2 && ppgBest < 10) {
@@ -248,13 +258,16 @@ export const revenge = (I: HGameInput): Revenge[] => {
 			let movedSince = false;
 			if (direct) {
 				const mv = p.moves
-					.filter((x) => x.season >= lastWith && x.season <= S && x.tid === myTid)
+					.filter(
+						(x) => x.season >= lastWith && x.season <= S && x.tid === myTid,
+					)
 					.sort((a, b) => a.season - b.season || a.phase - b.phase)
 					.at(-1);
 				if (mv) {
 					when = mv.season === S && mv.phase >= 1 ? "this season" : mv.season;
 					whenPhase = mv.phase;
-					movedSince = mv.season === S || (mv.season === S - 1 && mv.phase >= 3);
+					movedSince =
+						mv.season === S || (mv.season === S - 1 && mv.phase >= 3);
 					if (mv.type === "trade" && mv.fromTid === oppTid) {
 						how = "traded";
 					} else if (mv.type === "freeAgent") {
@@ -283,7 +296,11 @@ export const revenge = (I: HGameInput): Revenge[] => {
 			const recent = direct && lastWith >= S - 1;
 			if (
 				!(first === true && (recent || star)) &&
-				!(star && seasons >= 3 && (first === true || (first === null && lastWith >= S - 1))) &&
+				!(
+					star &&
+					seasons >= 3 &&
+					(first === true || (first === null && lastWith >= S - 1))
+				) &&
 				!(star && recent && allStar)
 			) {
 				continue;

@@ -95,9 +95,19 @@ describe("hype engine", () => {
 				pts: 200 + i * 7 + (g.gid % 5),
 				won: 33,
 				lost: 1,
-				players: t.players.map((p) => ({ ...p, pts: 33 + (p.pid % 4), trb: 17, ast: 12 })),
+				players: t.players.map((p) => ({
+					...p,
+					pts: 33 + (p.pid % 4),
+					trb: 17,
+					ast: 12,
+				})),
 			});
-			return { ...g, overtimes: 3, clutch: ["A game-winning something at the buzzer"], teams: [flip(g.teams[0], 0), flip(g.teams[1], 1)] as HGame["teams"] };
+			return {
+				...g,
+				overtimes: 3,
+				clutch: ["A game-winning something at the buzzer"],
+				teams: [flip(g.teams[0], 0), flip(g.teams[1], 1)] as HGame["teams"],
+			};
 		});
 		// same-day games are not "before" either, but the box score record of the game itself is its own
 		const raw1: HRaw = {
@@ -107,14 +117,25 @@ describe("hype engine", () => {
 					? {
 							...g,
 							teams: [
-								{ ...g.teams[0], won: mid.teams[0].won, lost: mid.teams[0].lost },
-								{ ...g.teams[1], won: mid.teams[1].won, lost: mid.teams[1].lost },
+								{
+									...g.teams[0],
+									won: mid.teams[0].won,
+									lost: mid.teams[0].lost,
+								},
+								{
+									...g.teams[1],
+									won: mid.teams[1].won,
+									lost: mid.teams[1].lost,
+								},
 							] as HGame["teams"],
 						}
 					: g,
 			),
 		};
-		const changed = hypeForGame(raw1, targetOfGame(raw1.games.find((g) => g.gid === mid.gid)!))!.pre;
+		const changed = hypeForGame(
+			raw1,
+			targetOfGame(raw1.games.find((g) => g.gid === mid.gid)!),
+		)!.pre;
 		expect(changed).toEqual(base);
 	});
 
@@ -129,18 +150,34 @@ describe("hype engine", () => {
 				let lost = 0;
 				let streak = 0;
 				for (const x of before) {
-					const i = x.teams[0].tid === tid ? 0 : x.teams[1].tid === tid ? 1 : -1;
+					const i =
+						x.teams[0].tid === tid ? 0 : x.teams[1].tid === tid ? 1 : -1;
 					if (i < 0) {
 						continue;
 					}
 					const w = x.teams[i as 0 | 1].pts > x.teams[(1 - i) as 0 | 1].pts;
 					won += w ? 1 : 0;
 					lost += w ? 0 : 1;
-					streak = w ? (streak > 0 ? streak + 1 : 1) : streak < 0 ? streak - 1 : -1;
+					streak = w
+						? streak > 0
+							? streak + 1
+							: 1
+						: streak < 0
+							? streak - 1
+							: -1;
 				}
-				return { won, lost, tied: 0, otl: 0, streak, ovr: g.teams.find((t) => t.tid === tid)?.ovr };
+				return {
+					won,
+					lost,
+					tied: 0,
+					otl: 0,
+					streak,
+					ovr: g.teams.find((t) => t.tid === tid)?.ovr,
+				};
 			};
-			const teamNow = Object.fromEntries(raw0.teams.map((t) => [t.tid, rec(t.tid)]));
+			const teamNow = Object.fromEntries(
+				raw0.teams.map((t) => [t.tid, rec(t.tid)]),
+			);
 			const raw1: HRaw = { ...raw0, games: before, teamNow };
 			const target: Target = { ...targetOfGame(g), completed: false };
 			const up = hypeForGame(raw1, target)!;
@@ -153,7 +190,9 @@ describe("hype engine", () => {
 	test("career milestone: needs N points, from the rows plus this season's games", () => {
 		const games = gamesOf(raw0, 0);
 		const p = raw0.players[MILESTONE_PID]!;
-		const prior = p.rows.filter((r) => r.season < SEASON).reduce((s, r) => s + r.pts!, 0);
+		const prior = p.rows
+			.filter((r) => r.season < SEASON)
+			.reduce((s, r) => s + r.pts!, 0);
 		expect(prior).toBe(19800);
 		let found = 0;
 		games.forEach((g, k) => {
@@ -163,7 +202,13 @@ describe("hype engine", () => {
 			const m = h.story.milestones.find((x) => x.pid === MILESTONE_PID);
 			if (need > 0 && need <= 30) {
 				expect(m, `game ${k}`).toBeTruthy();
-				expect(h.reasons.some((r) => plainText(r.text) === `Milestone watch: Player 0 needs ${need} ${need === 1 ? "point" : "points"} for 20,000 career`)).toBe(true);
+				expect(
+					h.reasons.some(
+						(r) =>
+							plainText(r.text) ===
+							`Milestone watch: Player 0 needs ${need} ${need === 1 ? "point" : "points"} for 20,000 career`,
+					),
+				).toBe(true);
 				expect(m!.mark).toBe(20000);
 				found++;
 			} else {
@@ -181,38 +226,59 @@ describe("hype engine", () => {
 		expect(heat).toBeTruthy();
 		expect(heat!.hot).toBeCloseTo(25, 5);
 		expect(heat!.base).toBeCloseTo(10, 5);
-		expect(plainText(heat!.text)).toBe("Player 12 is on a heater: 25.0 points a game over his last 5 (10.0 before that)");
+		expect(plainText(heat!.text)).toBe(
+			"Player 12 is on a heater: 25.0 points a game over his last 5 (10.0 before that)",
+		);
 		// not before it started
 		for (const g of games.slice(0, 10)) {
-			expect(complete(raw0, g).pre.story.heaters.some((x) => x.pid === HEATER_PID)).toBe(false);
+			expect(
+				complete(raw0, g).pre.story.heaters.some((x) => x.pid === HEATER_PID),
+			).toBe(false);
 		}
 	});
 
 	test("revenge: first meeting with the team that traded him", () => {
-		const meets = regular.filter((g) => g.teams.some((t) => t.tid === 2) && g.teams.some((t) => t.tid === 3));
+		const meets = regular.filter(
+			(g) =>
+				g.teams.some((t) => t.tid === 2) && g.teams.some((t) => t.tid === 3),
+		);
 		const first = complete(raw0, meets[0]!).pre;
 		const r = first.story.revenge.find((x) => x.pid === MOVER_PID);
 		expect(r).toBeTruthy();
 		expect(r!.how).toBe("traded");
 		expect(r!.first).toBe(true);
 		expect(r!.oppTid).toBe(3);
-		const text = first.reasons.find((x) => x.k === "revenge" && x.text.includes("Player 22"))!.text;
-		expect(plainText(text)).toMatch(/first time since they traded him last offseason|first crack at them/);
+		const text = first.reasons.find(
+			(x) => x.k === "revenge" && x.text.includes("Player 22"),
+		)!.text;
+		expect(plainText(text)).toMatch(
+			/first time since they traded him last offseason|first crack at them/,
+		);
 		expect(plainText(text)).toContain("Team3");
 		// the second meeting is no longer the first
 		const second = complete(raw0, meets[1]!).pre;
 		const r2 = second.story.revenge.find((x) => x.pid === MOVER_PID);
 		expect(r2?.first ?? false).toBe(false);
 		if (r2) {
-			expect(plainText(second.reasons.find((x) => x.k === "revenge")!.text)).not.toMatch(/first time since|first crack/);
+			expect(
+				plainText(second.reasons.find((x) => x.k === "revenge")!.text),
+			).not.toMatch(/first time since|first crack/);
 		}
 		// he is never "revenge" against a team he did not play for
-		const other = regular.find((g) => g.teams.some((t) => t.tid === 2) && g.teams.some((t) => t.tid === 6))!;
-		expect(complete(raw0, other).pre.story.revenge.some((x) => x.pid === MOVER_PID)).toBe(false);
+		const other = regular.find(
+			(g) =>
+				g.teams.some((t) => t.tid === 2) && g.teams.some((t) => t.tid === 6),
+		)!;
+		expect(
+			complete(raw0, other).pre.story.revenge.some((x) => x.pid === MOVER_PID),
+		).toBe(false);
 	});
 
 	test("rookie duel and last year's finals rematch", () => {
-		const g = regular.find((x) => x.teams.some((t) => t.tid === 0) && x.teams.some((t) => t.tid === 1))!;
+		const g = regular.find(
+			(x) =>
+				x.teams.some((t) => t.tid === 0) && x.teams.some((t) => t.tid === 1),
+		)!;
 		const h = complete(raw0, g).pre;
 		expect(h.story.rookies).toBeTruthy();
 		const txt = plainText(h.story.rookies!.text);
@@ -220,9 +286,19 @@ describe("hype engine", () => {
 		expect(txt).toContain("Player 15");
 		expect([ROOKIE_A, ROOKIE_B]).toContain(h.story.rookies!.a.pid);
 		// teams 0 and 1 met in the playoffs three times, last in 2029 (the finals)
-		const meet = h.reasons.find((r) => r.k === "rivalry" && r.text.startsWith("Met"))!;
-		expect(meet.text).toBe("Met 3 times in the playoffs before (last in 2029), a rematch of last year's Finals");
-		expect(h.reasons.some((r) => r.text.includes("were knocked out by the City0 Team0 last season") || r.text.includes("were knocked out by the City1 Team1 last season"))).toBe(true);
+		const meet = h.reasons.find(
+			(r) => r.k === "rivalry" && r.text.startsWith("Met"),
+		)!;
+		expect(meet.text).toBe(
+			"Met 3 times in the playoffs before (last in 2029), a rematch of last year's Finals",
+		);
+		expect(
+			h.reasons.some(
+				(r) =>
+					r.text.includes("were knocked out by the City0 Team0 last season") ||
+					r.text.includes("were knocked out by the City1 Team1 last season"),
+			),
+		).toBe(true);
 	});
 
 	test("record chase: on pace for the league single-season record", () => {
@@ -245,11 +321,19 @@ describe("hype engine", () => {
 		expect(t).toContain((2700 - 40 * 30 + 1).toLocaleString("en-US"));
 		expect(t).toContain("40 games left");
 		// the record holder himself is never "chasing" it
-		for (const x of games.slice(10, 50).map((gg) => complete(raw0, gg).pre.story.chases)) {
-			expect(x.some((y) => y.pid === HOLDER_PID && y.record.pid === HOLDER_PID)).toBe(false);
+		for (const x of games
+			.slice(10, 50)
+			.map((gg) => complete(raw0, gg).pre.story.chases)) {
+			expect(
+				x.some((y) => y.pid === HOLDER_PID && y.record.pid === HOLDER_PID),
+			).toBe(false);
 		}
 		// early in the season there is no pace to judge (15 games)
-		expect(complete(raw0, games[5]!).pre.story.chases.some((x) => x.pid === CHASER_PID)).toBe(false);
+		expect(
+			complete(raw0, games[5]!).pre.story.chases.some(
+				(x) => x.pid === CHASER_PID,
+			),
+		).toBe(false);
 		// the board shows him after 30 games
 		const g30 = Math.max(...games.slice(0, 30).map((x) => x.day));
 		const before = raw0.games.filter((x) => !x.playoffs && x.day <= g30);
@@ -263,17 +347,42 @@ describe("hype engine", () => {
 			...p,
 			rows: p.rows.map((r) =>
 				r.season === SEASON
-					? { ...r, gp: before.filter((x) => x.teams.some((t) => t.players.some((l) => l.pid === p.pid && l.min > 0))).length, pts: before.reduce((s, x) => s + (x.teams.flatMap((t) => t.players).find((l) => l.pid === p.pid)?.pts ?? 0), 0) }
+					? {
+							...r,
+							gp: before.filter((x) =>
+								x.teams.some((t) =>
+									t.players.some((l) => l.pid === p.pid && l.min > 0),
+								),
+							).length,
+							pts: before.reduce(
+								(s, x) =>
+									s +
+									(x.teams
+										.flatMap((t) => t.players)
+										.find((l) => l.pid === p.pid)?.pts ?? 0),
+								0,
+							),
+						}
 					: r,
 			),
 		}));
-		const board = chaseBoard({ ...raw0, games: before, players: rows, teamNow });
-		expect(board.some((x) => x.pid === CHASER_PID && x.scope === "league")).toBe(true);
+		const board = chaseBoard({
+			...raw0,
+			games: before,
+			players: rows,
+			teamNow,
+		});
+		expect(
+			board.some((x) => x.pid === CHASER_PID && x.scope === "league"),
+		).toBe(true);
 		expect(isBadText(board.map((x) => x.text).join("\n"))).toBe(false);
 	});
 
 	test("records: unknown stats are skipped, never counted as 0", () => {
-		const players = raw0.players.map((p) => ({ ...p, rows: p.rows.map((r) => ({ ...r })) }));
+		const players = raw0.players.map((p) => ({
+			...p,
+			rows: p.rows.map((r) => ({ ...r })),
+		}));
 		// holder of the points record loses his tp in one season: his tp career and that season are unknown
 		const h = players[HOLDER_PID]!;
 		delete h.rows[2]!.tp;
@@ -284,14 +393,26 @@ describe("hype engine", () => {
 		expect(R.firstSeason).toBe(2022);
 		expect(R.seasonFranchise[4]?.n).toBe(8);
 		// naive recomputation of the career points leader
-		const career = (pid: number) => players[pid]!.rows.filter((r) => r.season < SEASON).reduce((s, r) => s + r.pts!, 0);
-		const best = players.map((p) => ({ pid: p.pid, v: career(p.pid) })).sort((a, b) => b.v - a.v)[0]!;
+		const career = (pid: number) =>
+			players[pid]!.rows.filter((r) => r.season < SEASON).reduce(
+				(s, r) => s + r.pts!,
+				0,
+			);
+		const best = players
+			.map((p) => ({ pid: p.pid, v: career(p.pid) }))
+			.sort((a, b) => b.v - a.v)[0]!;
 		expect(R.careerLeague.pts![0]!.v).toBe(best.v);
 		// active holders keep adding
-		const R2 = withActiveCareers(R, (pid) => players[pid]!.rows.filter((r) => r.season === SEASON));
+		const R2 = withActiveCareers(R, (pid) =>
+			players[pid]!.rows.filter((r) => r.season === SEASON),
+		);
 		const top = R2.careerLeague.pts![0]!;
-		const cur = players[top.pid]!.rows.filter((r) => r.season === SEASON).reduce((s, r) => s + r.pts!, 0);
-		expect(top.v).toBe(R.careerLeague.pts!.find((e) => e.pid === top.pid)!.v + cur);
+		const cur = players[top.pid]!.rows.filter(
+			(r) => r.season === SEASON,
+		).reduce((s, r) => s + r.pts!, 0);
+		expect(top.v).toBe(
+			R.careerLeague.pts!.find((e) => e.pid === top.pid)!.v + cur,
+		);
 		// a player with an unknown stat never chases it
 		const raw2: HRaw = { ...raw0, players, records: R };
 		const g = gamesOf(raw2, 4)[40]!;
@@ -309,35 +430,58 @@ describe("hype engine", () => {
 			}
 			seen++;
 			const rec = (tid: number) => {
-				const gs = regular.filter((x) => x.day < g.day && x.teams.some((y) => y.tid === tid));
-				const won = gs.filter((x) => x.teams.find((y) => y.tid === tid)!.pts > x.teams.find((y) => y.tid !== tid)!.pts).length;
+				const gs = regular.filter(
+					(x) => x.day < g.day && x.teams.some((y) => y.tid === tid),
+				);
+				const won = gs.filter(
+					(x) =>
+						x.teams.find((y) => y.tid === tid)!.pts >
+						x.teams.find((y) => y.tid !== tid)!.pts,
+				).length;
 				return `${won}-${gs.length - won}`;
 			};
-			expect(t.text).toBe(`Two winning teams: ${rec(g.teams[0].tid)} vs ${rec(g.teams[1].tid)}`);
+			expect(t.text).toBe(
+				`Two winning teams: ${rec(g.teams[0].tid)} vs ${rec(g.teams[1].tid)}`,
+			);
 		}
 		expect(seen).toBeGreaterThan(0);
 	});
 
 	test("playoffs: series state, elimination, winner takes all", () => {
-		const finalsGames = playoff.filter((g) => raw0.series.find((s) => s.season === SEASON && s.round === 1)?.gids.includes(g.gid));
+		const finalsGames = playoff.filter((g) =>
+			raw0.series
+				.find((s) => s.season === SEASON && s.round === 1)
+				?.gids.includes(g.gid),
+		);
 		expect(finalsGames.length).toBeGreaterThanOrEqual(2);
 		const first = complete(raw0, finalsGames[0]!).pre;
-		expect(first.reasons.find((r) => r.k === "stakes")!.text).toBe("Game 1 of the Finals");
+		expect(first.reasons.find((r) => r.k === "stakes")!.text).toBe(
+			"Game 1 of the Finals",
+		);
 		expect(first.series!.text).toMatch(/^Game 1|^Series opener/);
 		const last = complete(raw0, finalsGames.at(-1)!).pre;
 		const lastText = last.reasons.find((r) => r.k === "stakes")!.text;
-		expect(lastText).toMatch(/^Game \d of the Finals(: elimination game \(1-[01]\)|, winner takes all|: Game 3, winner takes all)/);
+		expect(lastText).toMatch(
+			/^Game \d of the Finals(: elimination game \(1-[01]\)|, winner takes all|: Game 3, winner takes all)/,
+		);
 		// a third game of a best-of-3 is winner takes all
-		const three = raw0.series.find((s) => s.season === SEASON && s.gids.length === 3);
+		const three = raw0.series.find(
+			(s) => s.season === SEASON && s.gids.length === 3,
+		);
 		if (three) {
 			const g3 = raw0.games.find((g) => g.gid === three.gids[2])!;
 			const t3 = complete(raw0, g3).pre;
-			expect(t3.reasons.find((r) => r.k === "stakes")!.text).toMatch(/winner takes all/);
+			expect(t3.reasons.find((r) => r.k === "stakes")!.text).toMatch(
+				/winner takes all/,
+			);
 			expect(t3.series!.lines.join(" ")).toContain("Winner takes");
 		}
 		expect(last.series!.hw + last.series!.aw).toBe(finalsGames.length - 1);
 		// playoff games weigh more than a typical regular season game
-		const avgRs = regular.slice(0, 60).reduce((s, g) => s + complete(raw0, g).pre.score, 0) / 60;
+		const avgRs =
+			regular
+				.slice(0, 60)
+				.reduce((s, g) => s + complete(raw0, g).pre.score, 0) / 60;
 		expect(first.score).toBeGreaterThan(avgRs);
 		// no result of the game itself in the series line
 		expect(first.series!.lines.join(" ")).not.toMatch(/\d+-\d+ \(/);
@@ -355,7 +499,9 @@ describe("post-game verdict", () => {
 		const r = variant((g) => ({
 			...g,
 			overtimes: 1,
-			clutch: ["[[p:12|Player 12]] made a game-winning three-pointer at the buzzer."],
+			clutch: [
+				"[[p:12|Player 12]] made a game-winning three-pointer at the buzzer.",
+			],
 			teams: [
 				{ ...g.teams[0], pts: 110, ptsQtrs: [28, 27, 25, 28, 2] },
 				{ ...g.teams[1], pts: 108, ptsQtrs: [25, 29, 26, 28, 0] },

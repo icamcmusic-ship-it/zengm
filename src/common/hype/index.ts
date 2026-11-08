@@ -1,11 +1,6 @@
 // Game hype: a must-watch score (0-100) with reasons for upcoming games, and for finished ones the same pre-game hype plus a verdict on whether the game lived up to it. Basketball only. Everything comes from data known before the game (pre) or the box score (post); nothing is invented.
 import { chaseText, findChases, type ChaseCtx } from "./chases.ts";
-import {
-	inputFor,
-	resultFor,
-	storedGame,
-	type Target,
-} from "./gather.ts";
+import { inputFor, resultFor, storedGame, type Target } from "./gather.ts";
 import { postHype, verdictOf } from "./post.ts";
 import { preHype } from "./pre.ts";
 import type { Chase, HListed, HRaw, HypeGame, HypeLite } from "./types.ts";
@@ -44,9 +39,7 @@ export const hypeForGame = (raw: HRaw, t: Target): HypeGame | null => {
 		pre,
 		post,
 		verdict,
-		watch: post
-			? Math.round(0.35 * pre.score + 0.65 * post.score)
-			: pre.score,
+		watch: post ? Math.round(0.35 * pre.score + 0.65 * post.score) : pre.score,
 	};
 };
 

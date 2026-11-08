@@ -153,7 +153,14 @@ export type HRaw = {
 	// Current records of the teams, used for upcoming games
 	teamNow?: Record<
 		number,
-		{ won: number; lost: number; tied: number; otl: number; streak: number; ovr?: number }
+		{
+			won: number;
+			lost: number;
+			tied: number;
+			otl: number;
+			streak: number;
+			ovr?: number;
+		}
 	>;
 	playoffsByConf: boolean;
 	// Teams per conference (or league) in the playoffs, play-in included
@@ -215,7 +222,12 @@ export type HSeriesState = {
 	index: number;
 };
 
-export type HStanding = { tid: number; won: number; lost: number; group: number };
+export type HStanding = {
+	tid: number;
+	won: number;
+	lost: number;
+	group: number;
+};
 
 export type HGameInput = {
 	gid: number;
@@ -259,7 +271,12 @@ export type Chase = {
 	rate: number;
 	left: number;
 	proj: number;
-	status: "broken" | "on pace" | "just off the pace" | "off the pace" | "within reach";
+	status:
+		| "broken"
+		| "on pace"
+		| "just off the pace"
+		| "off the pace"
+		| "within reach";
 	pts: number;
 };
 
@@ -273,7 +290,13 @@ export type Milestone = {
 	text: string;
 };
 
-export type Heater = { pid: number; name: string; hot: number; base: number; text: string };
+export type Heater = {
+	pid: number;
+	name: string;
+	hot: number;
+	base: number;
+	text: string;
+};
 
 export type Revenge = {
 	pid: number;
@@ -294,8 +317,22 @@ export type Revenge = {
 };
 
 export type RookieDuel = {
-	a: { pid: number; name: string; tid: number; no: number | null; ppg: number | null; year: number };
-	b: { pid: number; name: string; tid: number; no: number | null; ppg: number | null; year: number };
+	a: {
+		pid: number;
+		name: string;
+		tid: number;
+		no: number | null;
+		ppg: number | null;
+		year: number;
+	};
+	b: {
+		pid: number;
+		name: string;
+		tid: number;
+		no: number | null;
+		ppg: number | null;
+		year: number;
+	};
 	text: string;
 	pts: number;
 };
@@ -387,7 +424,12 @@ export type HypeLite = {
 	label: string;
 	reasons: Reason[];
 	series: string | null;
-	post: { score: number; label: string; reasons: Reason[]; note?: string } | null;
+	post: {
+		score: number;
+		label: string;
+		reasons: Reason[];
+		note?: string;
+	} | null;
 	verdict: Verdict | null;
 	watch: number;
 };

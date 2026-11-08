@@ -37,7 +37,8 @@ export const pick = <T>(gid: number, salt: number, arr: readonly T[]): T =>
 	arr[hashString(`${gid}:${salt}`) % arr.length]!;
 
 // "a 7-point" or "an 8-point"
-export const an = (n: number) => (/^(8|11|18|8\d|80\d)$/.test(String(n)) ? "an " : "a ");
+export const an = (n: number) =>
+	/^(8|11|18|8\d|80\d)$/.test(String(n)) ? "an " : "a ";
 
 // Player name as a link token that the UI turns into a link: [[p:pid|Name]]
 export const pl = (p: { pid: number; name: string }) =>
@@ -63,7 +64,11 @@ export const sumGp = (rows: readonly HTot[]) =>
 	rows.reduce((s, r) => s + num(r.gp), 0);
 
 // Career total of a listed player through the game: rows of earlier seasons plus this season so far
-export const careerTotal = (p: HListed, k: StatKey, tid?: number): number | null => {
+export const careerTotal = (
+	p: HListed,
+	k: StatKey,
+	tid?: number,
+): number | null => {
 	if (!p.cur) {
 		return null;
 	}
@@ -73,7 +78,11 @@ export const careerTotal = (p: HListed, k: StatKey, tid?: number): number | null
 	return sumStat(rows, k);
 };
 
-export const curTotal = (p: HListed, k: StatKey, tid?: number): number | null => {
+export const curTotal = (
+	p: HListed,
+	k: StatKey,
+	tid?: number,
+): number | null => {
 	if (!p.cur) {
 		return null;
 	}
@@ -84,9 +93,7 @@ export const curTotal = (p: HListed, k: StatKey, tid?: number): number | null =>
 };
 
 export const curGp = (p: HListed, tid?: number) =>
-	p.cur
-		? sumGp(p.cur.filter((r) => tid === undefined || r.tid === tid))
-		: 0;
+	p.cur ? sumGp(p.cur.filter((r) => tid === undefined || r.tid === tid)) : 0;
 
 export const isBadText = (t: string) =>
 	/\b(undefined|NaN|null|Infinity)\b|\[\[p:\d*\|]]/.test(t);

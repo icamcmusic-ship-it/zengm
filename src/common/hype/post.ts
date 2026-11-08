@@ -10,7 +10,17 @@ import type {
 	Reason,
 	Verdict,
 } from "./types.ts";
-import { POST_K, an, fmtN, known, label, num, pick, pl, squash } from "./util.ts";
+import {
+	POST_K,
+	an,
+	fmtN,
+	known,
+	label,
+	num,
+	pick,
+	pl,
+	squash,
+} from "./util.ts";
 
 const nm = (I: HGameInput, tid: number) => I.teamName[tid] ?? "";
 
@@ -73,7 +83,10 @@ const lineFacts = (p: HBoxLine) => {
 		return { pts: 12, text: `${pl(p)} scored ${p.pts}` };
 	}
 	if (dd >= 4) {
-		return { pts: 11, text: `${pl(p)}: a quadruple-double (${p.pts} pts, ${p.trb} reb, ${p.ast} ast)` };
+		return {
+			pts: 11,
+			text: `${pl(p)}: a quadruple-double (${p.pts} pts, ${p.trb} reb, ${p.ast} ast)`,
+		};
 	}
 	if (dd >= 3 && p.pts >= 10 && p.trb >= 10 && p.ast >= 10) {
 		return {
@@ -88,7 +101,10 @@ const lineFacts = (p: HBoxLine) => {
 		return { pts: 4, text: `${pl(p)} hit ${p.tp} threes` };
 	}
 	if (p.blk >= 8 || p.stl >= 7) {
-		return { pts: 3, text: `${pl(p)}: ${p.blk >= 8 ? `${p.blk} blocks` : `${p.stl} steals`}` };
+		return {
+			pts: 3,
+			text: `${pl(p)}: ${p.blk >= 8 ? `${p.blk} blocks` : `${p.stl} steals`}`,
+		};
 	}
 	return null;
 };
@@ -104,11 +120,17 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 		const raw = reasons.reduce((s, r) => s + r.pts, 0);
 		reasons.sort((x, y) => y.pts - x.pts || (x.text < y.text ? -1 : 1));
 		const score = squash(raw, POST_K);
-		return { score, raw: Math.round(raw * 10) / 10, label: label(score), reasons };
+		return {
+			score,
+			raw: Math.round(raw * 10) / 10,
+			label: label(score),
+			reasons,
+		};
 	};
 	if (isEmpty(res)) {
 		const r = finish();
-		r.note = "No points or box score lines stored (a forfeit or an unplayed game): nothing to rate.";
+		r.note =
+			"No points or box score lines stored (a forfeit or an unplayed game): nothing to rate.";
 		return r;
 	}
 	const wp = res.winPts;
@@ -137,10 +159,18 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 	const F = flow(res);
 	if (F.ok) {
 		if (F.changes) {
-			add("flow", Math.min(12, 3 * F.changes), `${F.changes} lead change${F.changes === 1 ? "" : "s"} between periods`);
+			add(
+				"flow",
+				Math.min(12, 3 * F.changes),
+				`${F.changes} lead change${F.changes === 1 ? "" : "s"} between periods`,
+			);
 		}
 		if (F.ties) {
-			add("flow", Math.min(6, 2 * F.ties), `Tied after ${F.ties} period${F.ties === 1 ? "" : "s"}`);
+			add(
+				"flow",
+				Math.min(6, 2 * F.ties),
+				`Tied at ${F.ties === 1 ? "one period break" : `${F.ties} period breaks`}`,
+			);
 		}
 		if (F.deficit >= 9 && margin > 0) {
 			add(
@@ -153,11 +183,17 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 			add(
 				"late",
 				8 * (1 - F.lateMargin / 6),
-				F.lateMargin === 0 ? "Tied going into the fourth" : `Within ${F.lateMargin} going into the fourth`,
+				F.lateMargin === 0
+					? "Tied going into the fourth"
+					: `Within ${F.lateMargin} going into the fourth`,
 			);
 		}
 		if (F.lateLeader < 0 && margin > 0 && !res.overtimes) {
-			add("late", 5, `${nm(I, res.winTid)} trailed going into the fourth and won it late`);
+			add(
+				"late",
+				5,
+				`${nm(I, res.winTid)} trailed going into the fourth and won it late`,
+			);
 		}
 	}
 
@@ -177,12 +213,19 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 		ctext.push(s);
 	}
 	if (cl) {
-		add("clutch", Math.min(20, cl), ctext[0]! + (ctext.length > 1 ? ` (+${ctext.length - 1} more)` : ""));
+		add(
+			"clutch",
+			Math.min(20, cl),
+			ctext[0]! + (ctext.length > 1 ? ` (+${ctext.length - 1} more)` : ""),
+		);
 	}
 
 	// star duel: the top scorer on each side
 	const tops = res.teams.map((t) =>
-		t.players.reduce<HBoxLine | null>((b, p) => (!b || p.pts > b.pts ? p : b), null),
+		t.players.reduce<HBoxLine | null>(
+			(b, p) => (!b || p.pts > b.pts ? p : b),
+			null,
+		),
 	);
 	if (tops[0] && tops[1]) {
 		const lo = Math.min(tops[0].pts, tops[1].pts);
@@ -201,21 +244,37 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 		.map((p) => ({ p, f: lineFacts(p) }))
 		.filter((x) => x.f !== null)
 		.sort((x, y) => y.f!.pts - x.f!.pts || x.p.pid - y.p.pid);
-	lines.slice(0, 2).forEach((x, i) => add("star", x.f!.pts * (i ? 0.6 : 1), x.f!.text));
+	lines
+		.slice(0, 2)
+		.forEach((x, i) => add("star", x.f!.pts * (i ? 0.6 : 1), x.f!.text));
 
 	// scoring extremes against the season's stored games
 	const T = I.env;
 	if (T && T.n >= 30 && T.sd > 0) {
-		const adj = res.overtimes ? (wp + lp) * (4 / (4 + 0.4167 * res.overtimes)) : wp + lp;
+		const adj = res.overtimes
+			? (wp + lp) * (4 / (4 + 0.4167 * res.overtimes))
+			: wp + lp;
 		const z = (wp + lp - T.mean) / T.sd;
 		const zr = (adj - T.mean) / T.sd;
 		if (zr >= 2) {
-			add("pace", Math.min(8, 3 * (zr - 1.5)), `A shootout: ${wp + lp} combined points (season average ${Math.round(T.mean)})`);
+			add(
+				"pace",
+				Math.min(8, 3 * (zr - 1.5)),
+				`A shootout: ${wp + lp} combined points (season average ${Math.round(T.mean)})`,
+			);
 		} else if (zr <= -2 && margin <= 8) {
-			add("defense", Math.min(6, 2.5 * (-zr - 1.5)), `A defensive struggle: ${wp + lp} combined points (season average ${Math.round(T.mean)}), and close`);
+			add(
+				"defense",
+				Math.min(6, 2.5 * (-zr - 1.5)),
+				`A defensive struggle: ${wp + lp} combined points (season average ${Math.round(T.mean)}), and close`,
+			);
 		}
 		if (z > 0 && wp >= T.hiTeam && T.n >= 100 && !I.playoffs) {
-			add("pace", 4, `${wp} points by the ${nm(I, res.winTid)}: the most by a team in a stored game this season`);
+			add(
+				"pace",
+				4,
+				`${wp} points by the ${nm(I, res.winTid)}: the most by a team in a stored game this season`,
+			);
 		}
 	}
 
@@ -225,13 +284,22 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 		const l = I.teams.find((t) => t.tid === res.loseTid);
 		if (!I.playoffs && !I.playIn && w && l) {
 			if (l.streak >= 7) {
-				add("streak", Math.min(6, l.streak - 4), `Ended ${an(l.streak)}${l.streak}-game winning streak (${nm(I, l.tid)})`);
+				add(
+					"streak",
+					Math.min(6, l.streak - 4),
+					`Ended ${an(l.streak)}${l.streak}-game winning streak (${nm(I, l.tid)})`,
+				);
 			}
 			if (w.won + w.lost >= 10 && l.won + l.lost >= 10) {
-				const pw = (r: { won: number; lost: number }) => r.won / (r.won + r.lost);
+				const pw = (r: { won: number; lost: number }) =>
+					r.won / (r.won + r.lost);
 				const gap = pw(l) - pw(w);
 				if (gap >= 0.2) {
-					add("upset", Math.min(10, 25 * (gap - 0.12)), `Upset: ${w.won}-${w.lost} ${nm(I, w.tid)} beat the ${l.won}-${l.lost} ${nm(I, l.tid)}`);
+					add(
+						"upset",
+						Math.min(10, 25 * (gap - 0.12)),
+						`Upset: ${w.won}-${w.lost} ${nm(I, w.tid)} beat the ${l.won}-${l.lost} ${nm(I, l.tid)}`,
+					);
 				}
 			}
 		} else if (I.seriesState?.info.away) {
@@ -252,25 +320,40 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 		}
 		const line = allLines(res).find((p) => p.pid === c.pid);
 		if (line && known(line[c.k]) && c.cur + line[c.k] > c.record.v) {
-			add("milestone", c.scope === "league" ? 8 : 5, `${pl(c)} broke ${recLabel(C, c)} (${fmtN(c.cur + line[c.k])})`);
+			add(
+				"milestone",
+				c.scope === "league" ? 8 : 5,
+				`${pl(c)} broke ${recLabel(C, c)} (${fmtN(c.cur + line[c.k])})`,
+			);
 		}
 	}
 	const stakes =
 		pre.reasons.filter((r) => r.k === "stakes").reduce((s, r) => s + r.pts, 0) +
-		0.5 * pre.reasons.filter((r) => r.k === "rivalry" || r.k === "revenge").reduce((s, r) => s + r.pts, 0);
+		0.5 *
+			pre.reasons
+				.filter((r) => r.k === "rivalry" || r.k === "revenge")
+				.reduce((s, r) => s + r.pts, 0);
 	if (stakes) {
 		const top =
 			pre.reasons.find((r) => r.k === "stakes") ??
 			pre.reasons.find((r) => r.k === "rivalry" || r.k === "revenge");
 		if (top) {
-			const head = top.k === "stakes" ? "Stakes: " : top.k === "revenge" ? "Revenge game: " : "Rivalry: ";
+			const head =
+				top.k === "stakes"
+					? "Stakes: "
+					: top.k === "revenge"
+						? "Revenge game: "
+						: "Rivalry: ";
 			add(
 				"stakes",
 				0.45 * stakes,
 				head +
 					top.text
 						.replace(/: a revenge game$/, "")
-						.replace(/^(Both|Two|Head|Play|Game|Met|Division|Rivalry|Clinched|First)\b/, (w) => w.toLowerCase()),
+						.replace(
+							/^(Both|Two|Head|Play|Game|Met|Division|Rivalry|Clinched|First)\b/,
+							(w) => w.toLowerCase(),
+						),
 			);
 		}
 	}
@@ -283,13 +366,19 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 type Fact = { pol: number; w: number; text: string; story: boolean };
 
 // Did the game live up to the billing? Compares the two scores and checks what the pre-game story lines promised against the box score
-export const verdictOf = (I: HGameInput, res: HResult, pre: Pre, post: Post): Verdict | null => {
+export const verdictOf = (
+	I: HGameInput,
+	res: HResult,
+	pre: Pre,
+	post: Post,
+): Verdict | null => {
 	if (isEmpty(res)) {
 		return null;
 	}
 	const facts: Fact[] = [];
 	let story = false;
-	const add = (pol: number, w: number, text: string) => facts.push({ pol, w, text, story });
+	const add = (pol: number, w: number, text: string) =>
+		facts.push({ pol, w, text, story });
 	const margin = Math.abs(res.winPts - res.losePts);
 	const lineOf = (pid: number) => {
 		for (const t of res.teams) {
@@ -302,7 +391,13 @@ export const verdictOf = (I: HGameInput, res: HResult, pre: Pre, post: Post): Ve
 		return null;
 	};
 	if (res.overtimes > 0) {
-		add(1, 6, res.overtimes === 1 ? "it went to overtime" : `it took ${res.overtimes} overtimes`);
+		add(
+			1,
+			6,
+			res.overtimes === 1
+				? "it went to overtime"
+				: `it took ${res.overtimes} overtimes`,
+		);
 	}
 	if (margin >= 20) {
 		add(-1, 6, `${nm(I, res.winTid)} won by ${margin}`);
@@ -343,7 +438,11 @@ export const verdictOf = (I: HGameInput, res: HResult, pre: Pre, post: Post): Ve
 		if (got >= m.mark) {
 			add(1, 4, `${pl(x.p)} reached ${fmtN(m.mark)} career ${m.word}`);
 		} else {
-			add(-1, 2, `${pl(x.p)} fell ${fmtN(m.mark - got)} short of ${fmtN(m.mark)} career ${m.word}`);
+			add(
+				-1,
+				2,
+				`${pl(x.p)} fell ${fmtN(m.mark - got)} short of ${fmtN(m.mark)} career ${m.word}`,
+			);
 		}
 	}
 	const C = chaseCtx(I);
@@ -361,7 +460,11 @@ export const verdictOf = (I: HGameInput, res: HResult, pre: Pre, post: Post): Ve
 		} else if (now === c.record.v) {
 			add(1, 4, `${pl(c)} tied ${recLabel(C, c)}`);
 		} else {
-			add(0, 1, `${pl(c)} added ${x.p[c.k]} ${c.word}, ${fmtN(c.record.v - now + 1)} to go`);
+			add(
+				0,
+				1,
+				`${pl(c)} added ${x.p[c.k]} ${c.word}, ${fmtN(c.record.v - now + 1)} to go`,
+			);
 		}
 	}
 	for (const r of st.revenge) {
@@ -379,7 +482,11 @@ export const verdictOf = (I: HGameInput, res: HResult, pre: Pre, post: Post): Ve
 		} else if (!won && x.p.pts < 12) {
 			add(-1, 2, `${pl(r)}'s return fell flat (${x.p.pts} points in a loss)`);
 		} else {
-			add(0, 1, `${pl(r)} had ${x.p.pts} in a ${won ? "win" : "loss"} against his old team`);
+			add(
+				0,
+				1,
+				`${pl(r)} had ${x.p.pts} in a ${won ? "win" : "loss"} against his old team`,
+			);
 		}
 	}
 	for (const h of st.heaters) {
@@ -397,17 +504,35 @@ export const verdictOf = (I: HGameInput, res: HResult, pre: Pre, post: Post): Ve
 		const b = lineOf(st.rookies.b.pid);
 		if (a && b && a.p.min > 0 && b.p.min > 0 && a.p.pts !== b.p.pts) {
 			const [hi, lo] = a.p.pts > b.p.pts ? [a, b] : [b, a];
-			add(hi.p.pts >= 20 ? 1 : 0, 2, `the rookie duel went to ${pl(hi.p)} (${hi.p.pts} to ${lo.p.pts})`);
+			add(
+				hi.p.pts >= 20 ? 1 : 0,
+				2,
+				`the rookie duel went to ${pl(hi.p)} (${hi.p.pts} to ${lo.p.pts})`,
+			);
 		}
 	}
 	story = false;
 	const clutch = post.reasons.find((r) => r.k === "clutch");
-	if (clutch && /game-winning|win the game|go-ahead|buzzer/i.test(clutch.text)) {
-		add(1, 5, `a late ${/buzzer/i.test(clutch.text) ? "buzzer-beater" : "game-winner"}`);
+	if (
+		clutch &&
+		/game-winning|win the game|go-ahead|buzzer/i.test(clutch.text)
+	) {
+		add(
+			1,
+			5,
+			`a late ${/buzzer/i.test(clutch.text) ? "buzzer-beater" : "game-winner"}`,
+		);
 	}
 	const hist = post.reasons.find((r) => r.k === "star");
 	if (hist) {
-		add(1, 4, hist.text.replace(/^(\[\[p:\d+\|[^\]]*]]|[^:]+?)(:| scored| hit).*$/, "a big line from $1"));
+		add(
+			1,
+			4,
+			hist.text.replace(
+				/^(\[\[p:\d+\|[^\]]*]]|[^:]+?)(:| scored| hit).*$/,
+				"a big line from $1",
+			),
+		);
 	}
 	if (F.ok && F.changes === 0 && margin >= 6) {
 		add(-1, 1, "no lead changes between periods");
@@ -431,15 +556,29 @@ export const verdictOf = (I: HGameInput, res: HResult, pre: Pre, post: Post): Ve
 		kind = "quiet";
 	}
 	const HEAD: Record<Verdict["kind"], string[]> = {
-		lived: ["Lived up to the hype", "Delivered on the billing", "As good as advertised"],
+		lived: [
+			"Lived up to the hype",
+			"Delivered on the billing",
+			"As good as advertised",
+		],
 		fizzled: ["Didn't live up to it", "Fell flat", "All hype, little payoff"],
-		exceeded: ["Better than billed", "A sleeper that delivered", "Nobody saw this one coming"],
-		quiet: ["As billed, a quiet one", "No surprises, nothing special", "Ordinary on paper, ordinary on the floor"],
+		exceeded: [
+			"Better than billed",
+			"A sleeper that delivered",
+			"Nobody saw this one coming",
+		],
+		quiet: [
+			"As billed, a quiet one",
+			"No surprises, nothing special",
+			"Ordinary on paper, ordinary on the floor",
+		],
 	};
 	const want = kind === "fizzled" || kind === "quiet" ? -1 : 1;
 	const sorted = facts
 		.slice()
-		.sort((a, b) => Number(b.pol === want) - Number(a.pol === want) || b.w - a.w);
+		.sort(
+			(a, b) => Number(b.pol === want) - Number(a.pol === want) || b.w - a.w,
+		);
 	const why = sorted
 		.filter((f) => f.pol === want || f.pol === 0)
 		.slice(0, 2)
@@ -459,7 +598,9 @@ export const verdictOf = (I: HGameInput, res: HResult, pre: Pre, post: Post): Ve
 		);
 	}
 	const other = sorted
-		.filter((f) => f.story && f.pol === -want && f.w >= 2 && !why.includes(f.text))
+		.filter(
+			(f) => f.story && f.pol === -want && f.w >= 2 && !why.includes(f.text),
+		)
 		.sort((a, b) => b.w - a.w)[0];
 	const head = pick(I.gid, 51, HEAD[kind]);
 	const text = `${head}: ${why.length === 2 && !other ? `${why[0]}, and ${why[1]}` : why[0]}${other ? `, though ${other.text}` : ""}.`;
