@@ -276,6 +276,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "improvedPositions",
+		key: "improvedPositions",
+		name: "Improved positions",
+		description:
+			"Positions (PG, G, SG, GF, SF, F, PF, FC, C) from two axes, size and ball skills, instead of one line: tall playmakers become F, GF or FC rather than C, small bigs PF or F. A player keeps his position unless his ratings clearly move him to another one, and positions change only when players develop (preseason) or are created. Overall shares stay about the same. Off: the original formula.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "skillBadges",
 		key: "featureSkillBadges",
 		name: "Extended Skill Badges",

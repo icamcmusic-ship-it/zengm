@@ -176,7 +176,8 @@ const develop = async (
 				// Must be a custom league player, let's not rock the boat
 				ratings.pos = p.pos;
 			} else {
-				ratings.pos = pos(ratings);
+				// A developing player sticks to his current position (improved positions only); a new one gets a fresh one
+				ratings.pos = pos(ratings, newPlayer ? undefined : ratings.pos);
 			}
 		} else {
 			let pos;

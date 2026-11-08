@@ -1,5 +1,5 @@
 import { buildBaseNorms, probit } from "./norms.ts";
-import { positionOf, posPrior } from "./position.ts";
+import { isPos, positionOf, posPrior } from "./position.ts";
 import { gateFactor, prepare, rawMatch } from "./score.ts";
 import type { Archetype, ArchetypeRatings, Norms } from "./types.ts";
 
@@ -48,7 +48,8 @@ export const matchZ = (table: number[], score: number) => {
 
 // A reference league's norms: dimension quantiles, height correlations, ovr quantiles and every archetype's match table
 export const buildNorms = (
-	rows: { ratings: ArchetypeRatings; ovr?: number }[],
+	// pos: his position as the game shows it (else BBGM's formula)
+	rows: { ratings: ArchetypeRatings; ovr?: number; pos?: string }[],
 	archetypes: Archetype[],
 	// Tables to use for archetypes with too few peers in this league (the built-in reference league)
 	fallback?: Norms,
@@ -56,7 +57,7 @@ export const buildNorms = (
 	const base = buildBaseNorms(rows);
 	const prepared = rows.map((r) => ({
 		...prepare(r.ratings, { ...base, match: {} }),
-		pos: positionOf(r.ratings),
+		pos: isPos(r.pos) ? r.pos : positionOf(r.ratings),
 	}));
 	const match: Norms["match"] = {};
 	for (const a of archetypes) {

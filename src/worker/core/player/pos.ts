@@ -5,13 +5,14 @@ import posHockey from "./pos.hockey.ts";
 import type { MinimalPlayerRatings } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 
-const pos = (ratings: MinimalPlayerRatings) => {
-	return bySport<(ratings: any) => string>({
+// previous: the position he has now, which basketball's improved positions stick to (ignored elsewhere)
+const pos = (ratings: MinimalPlayerRatings, previous?: string) => {
+	return bySport<(ratings: any, previous?: string) => string>({
 		baseball: posBaseball,
 		basketball: posBasketball,
 		football: posFootball,
 		hockey: posHockey,
-	})(ratings);
+	})(ratings, previous);
 };
 
 export default pos;

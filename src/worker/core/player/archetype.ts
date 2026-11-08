@@ -23,6 +23,7 @@ import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { applyFuzz, getFuzz } from "./fuzzRating.ts";
 import ovr from "./ovr.ts";
+import posFn from "./pos.ts";
 
 // The archetype a player has is DERIVED from his ratings (src/common/archetypes), but it is STORED on him (p.archetypes) at
 // the start of every preseason, so what the UI shows stays fixed between preseasons. Prospects, and players who have no entry
@@ -66,13 +67,14 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 		PLAYER.FREE_AGENT,
 		Infinity,
 	]);
-	const rows: { ratings: ArchetypeRatings; ovr: number }[] = [];
+	const rows: { ratings: ArchetypeRatings; ovr: number; pos?: string }[] = [];
 	for (const p of players) {
 		const ratings = ratingsForArchetype(p);
 		if (ratings) {
 			rows.push({
 				ratings,
 				ovr: (last(p.ratings) as any).ovr ?? ovr(last(p.ratings) as any),
+				pos: (last(p.ratings) as any).pos,
 			});
 		}
 	}
@@ -98,7 +100,8 @@ export const fuzzedArchetypeLabel = (
 	for (const key of RATING_KEYS) {
 		shown[key] = key === "hgt" ? ratings[key] : applyFuzz(ratings[key], f);
 	}
-	return classify(shown, { norms }).label;
+	// His position comes from the true ratings, as the game shows it
+	return classify(shown, { norms, pos: posFn(ratings as any) }).label;
 };
 
 export const classifyPlayer = (
