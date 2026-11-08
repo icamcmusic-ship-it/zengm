@@ -54,7 +54,7 @@ const LOTTERY_DRAFT_TYPES = [
 ] as const;
 
 // chances does not have to be the perfect length. If chances is too long for numNonPlayoffTeams, it will be truncated. If it's too short, the last entry will be repeated until it's long enough.
-const getLotteryInfo = (
+export const getLotteryInfo = (
 	draftType: DraftType,
 	numNonPlayoffTeams: number,
 	numPlayInTeams: number,

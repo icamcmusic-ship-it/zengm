@@ -56,6 +56,7 @@ const Title = ({
 const getRows = ({
 	award,
 	challengeNoRatings,
+	odds,
 	currentSeason,
 	season,
 	teams,
@@ -63,6 +64,7 @@ const getRows = ({
 }: {
 	award: InputAward;
 	challengeNoRatings: boolean;
+	odds?: Record<number, number>;
 	currentSeason: number;
 	userTid: number;
 } & Pick<View<"awardRaces">, "season" | "teams">) => {
@@ -193,6 +195,14 @@ const getRows = ({
 			data.push(...statsRow);
 		}
 
+		if (odds) {
+			const prob = odds[p.pid] ?? 0;
+			data.push({
+				value: formatProb(prob),
+				sortValue: prob,
+			});
+		}
+
 		return {
 			key: p.pid,
 			metadata: {
@@ -227,12 +237,31 @@ export const getAwardKey = (
 	]);
 };
 
+// Win probability, as shown in the award race tables (see worker/core/seasonOdds/awardOdds.ts)
+const formatProb = (prob: number) => {
+	if (prob <= 0) {
+		return "0%";
+	}
+	if (prob >= 1) {
+		return "100%";
+	}
+	if (prob < 0.01) {
+		return "<1%";
+	}
+	if (prob > 0.99) {
+		return ">99%";
+	}
+	return `${Math.round(100 * prob)}%`;
+};
+
 export const AwardRaceTable = ({
 	confs,
 	divs,
+	odds,
 	rowsInfo: { award, season, teams },
 	titleOverride,
 }: {
+	odds?: Record<number, number>;
 	rowsInfo: RowsInfo;
 	titleOverride?: ReactNode;
 } & Pick<View<"awardRaces">, "confs" | "divs">) => {
@@ -256,6 +285,13 @@ export const AwardRaceTable = ({
 	if (mip) {
 		cols.push(getCol("Compare"));
 	}
+	if (odds) {
+		cols.push(
+			getCol("Win%", {
+				desc: "Chance to win, projecting award scores to the end of the regular season",
+			}),
+		);
+	}
 
 	const title = titleOverride ?? (
 		<Title asterisk={asterisk} award={award} confs={confs} divs={divs} />
@@ -270,6 +306,7 @@ export const AwardRaceTable = ({
 	const rows = getRows({
 		award,
 		challengeNoRatings,
+		odds,
 		currentSeason,
 		season,
 		teams,
@@ -305,6 +342,7 @@ export const AwardRaceTable = ({
 };
 
 const AwardRaces = ({
+	awardOdds,
 	awardCandidates,
 	confs,
 	divs,
@@ -340,6 +378,7 @@ const AwardRaces = ({
 								<AwardRaceTable
 									confs={confs}
 									divs={divs}
+									odds={awardOdds?.[key]}
 									rowsInfo={{ award, season, teams }}
 								/>
 							</div>

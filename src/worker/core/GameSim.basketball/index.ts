@@ -1479,11 +1479,9 @@ class GameSim extends GameSimBase {
 			for (const p of this.team[t].player) {
 				// Only players on the court can be injured
 				if (this.playersOnCourt[t].includes(p)) {
-					const injuryRate = getInjuryRate(
-						baseRate,
-						p.age,
-						p.injury.gamesRemaining > 0,
-					);
+					const injuryRate =
+						getInjuryRate(baseRate, p.age, p.injury.gamesRemaining > 0) *
+						((p as any).injuryRiskFactor ?? 1); // injuryDepth setting, see game/injuryDepthTeam.ts
 
 					if (Math.random() < injuryRate) {
 						p.injured = true;

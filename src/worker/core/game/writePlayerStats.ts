@@ -10,6 +10,10 @@ import getWinner from "../../../common/getWinner.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { randInt } from "../../../common/random.ts";
 import { processPlayerStats } from "../../util/processPlayerStats.ts";
+import {
+	isInjuryDepthEnabled,
+	maybeSameBodyPart,
+} from "../player/injuryDepth.ts";
 
 export const P_FATIGUE_DAILY_REDUCTION = 20;
 
@@ -37,6 +41,9 @@ const doInjury = async (
 	});
 
 	p2.injury = player.injury(healthLevel);
+	if (isInjuryDepthEnabled()) {
+		p2.injury = maybeSameBodyPart(p2, p2.injury);
+	}
 
 	// Is this a reinjury or not?
 	let reaggravateExtraDays;

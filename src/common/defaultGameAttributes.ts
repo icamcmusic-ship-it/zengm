@@ -94,6 +94,7 @@ const gameAttributesKeysSportSpecific = {
 		"storePlayByPlay",
 		"technicalFouls",
 		"realisticPossessions",
+		"injuryDepth",
 		"randomDebutsForever",
 		"realDraftRatings",
 		"numPlayersDunk",
@@ -602,6 +603,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	// The realistic possession model (shot clock, transition, late-clock shots, end-of-period clock management; see
 	// GameSim.basketball/possessionModel.ts). Off for existing leagues (and tests), so their games play out as before; on for new leagues
 	realisticPossessions: false,
+	// Off for existing leagues (and tests); new leagues turn it on (see views/newLeague.ts)
+	injuryDepth: false,
 	playerMoodTraits: true,
 	numPlayersOnCourt: 5,
 	aiJerseyRetirement: true,

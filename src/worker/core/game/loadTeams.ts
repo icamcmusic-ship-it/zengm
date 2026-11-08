@@ -11,6 +11,7 @@ import playThroughInjuriesFactor from "../../../common/playThroughInjuriesFactor
 import { bySport } from "../../../common/sportFunctions.ts";
 import { getProStats } from "../../../common/preDraft.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
+import { applyInjuryDepth } from "./injuryDepthTeam.ts";
 
 const MAX_NUM_PLAYERS_PACE = 7;
 
@@ -135,8 +136,10 @@ export const processTeam = async (
 		tid: number;
 		playThroughInjuries: [number, number];
 		depth?: unknown;
+		loadManagement?: boolean;
 	},
 	teamSeason: {
+		lastGameDay?: number;
 		won: number;
 		lost: number;
 		tied: number;
@@ -381,6 +384,8 @@ export const processTeam = async (
 	}
 
 	if (__SPORT === "basketball") {
+		applyInjuryDepth(t, teamInput, teamSeason, players);
+
 		t.pace = 0;
 
 		let numPlayers = 0;

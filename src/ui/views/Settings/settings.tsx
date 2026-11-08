@@ -1881,6 +1881,14 @@ export const settings: Setting[] = (
 				"Rare technical fouls (1 FT, possession unchanged), flagrant fouls (2 FTs and the ball) and ejections in the game simulation.",
 		},
 		{
+			category: "Injuries",
+			key: "injuryDepth",
+			name: "Injury Depth",
+			type: "bool",
+			description:
+				"Players returning from injury play under a minutes restriction and have a higher re-injury risk (often the same body part) for a while, some players are injury prone, the second night of a back-to-back is a little riskier and tiring, and teams can rest players on back-to-backs (load management). League-wide injury totals stay about the same.",
+		},
+		{
 			category: "Game Simulation",
 			key: "realisticPossessions",
 			name: "Realistic Possession Model",

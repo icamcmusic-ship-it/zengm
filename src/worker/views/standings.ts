@@ -5,6 +5,7 @@ import { getTiebreakers, orderTeams } from "../util/orderTeams.ts";
 import { season, team } from "../core/index.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { bySport } from "../../common/sportFunctions.ts";
+import { getSeasonOdds } from "../core/seasonOdds/index.ts";
 import { validateSeason } from "../util/processInputs.ts";
 
 const processInputs = (params: RouteParams<"standings">) => {
@@ -219,7 +220,12 @@ export default defineView({
 							(t) => t.seasonAttrs.clinchedPlayoffs === "w",
 						);
 
+			// Monte Carlo playoff/seed/title odds (basketball, current season)
+			const seasonOdds =
+				inputs.season === g.get("season") ? await getSeasonOdds() : undefined;
+
 			return {
+				seasonOdds,
 				confs,
 				divs,
 				maxPlayoffSeed,

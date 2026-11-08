@@ -67,6 +67,28 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
 - Player pages: college rows (tagged _College_) in the stats tables, an _Earlier honors_ box, and _Wrapped_ and _Storylines_ buttons.
 - Team pages (_More_ links), League → History, History (all seasons) and Team History rows link to the Newspaper, Wrapped and Storylines for that team/season.
 
+## Injury depth
+
+- **Setting:** **League Settings → Injuries → Injury Depth** (`injuryDepth`). On for new leagues, off for existing leagues (they play exactly as before).
+- **What:**
+  - **Minutes restriction on return:** after an injury of 5+ games, a player comes back on a restriction for about a third as many days (2–10), starting at ~55% of his normal playing-time weight and easing back to 100%. It goes through the same knob as the roster page's playing time setting, so the rotation code respects it.
+  - **Re-injury risk:** for 15 days after any injury of 2+ games the injury risk is higher (up to 1.8×, fading), and a new injury has a 45% chance to be to the same body part.
+  - **Injury-prone players:** about 7% of players (fixed per player), plus anyone with 5+ injuries of 3+ games in the last three seasons, get hurt 1.4× as often. Shown as a badge on the player page.
+  - **Back-to-backs:** the second night of a back-to-back (regular season) has 1.15× injury risk and slightly lower endurance (more fatigue in the game). Marked **B2B** on Schedule and Daily Schedule.
+  - **Load management:** on the second night of a back-to-back, AI teams rest veterans in their top 8 (34+, or 31+ and injury prone) when they have at least 10 healthy players. For your team, turn it on for the whole team on the Roster page (below Play Through Injuries) or for single players on their player pages.
+  - Everyone's base rate is scaled by 0.9 so league-wide totals stay about the same.
+- **Player page:** the Injuries section adds a body-part history (injuries, games missed, last season) and, with the setting on, the restriction / recently returned / injury-prone status and the load management checkbox.
+- **Known limits:** basketball only. The countdowns are per day (like BBGM's injury countdown), not per game played. Resting is decided when the teams are loaded, so a rested player shows as not playing in the box score.
+
+## Season odds
+
+- **Where:** _Standings_ (a _Season odds_ section below the tables), _Power Rankings_ (Playoffs and Title columns), _Award Races_ (a Win% column), _Draft Lottery_ (a _What-if simulator_ below the lottery table).
+- **What:** 1,000 Monte Carlo simulations of the rest of the season in the worker: each remaining game is decided from team strength (team rating from the current roster, ignoring injuries of 10 days or less, blended with point margin as games are played) plus home court, playoffs are seeded with the game's own playoff code, then the play-in and the bracket are played out. Gives projected record, playoff and play-in odds, seed distribution, reaching the semifinals/finals and title odds. During the playoffs it plays out the remaining series from the current state. Results are cached and refreshed after each day of games, trades, signings or injuries (about 0.2 s per refresh).
+- **Award races:** each candidate's award score (BBGM's award scoring) is projected to the end of the regular season with noise that shrinks as the season goes on, and the winner drawn 5,000 times.
+- **Lottery what-if:** move teams up or down the lottery order (chances stay with the slot) or pick another lottery format, then _Run lottery_ for exact odds (where fast enough), a 20,000-lottery simulation (hover a cell) and one sample draw.
+- **Settings:** none.
+- **Known limits:** basketball only, current season only. Tiebreakers are approximated (random among tied teams) and playoff reseeding is ignored. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats.
+
 ## Performance
 
 Wrapped and Storylines read the whole league into a snapshot. Converted pieces that can't change any more (retired players, finished seasons' box scores and team seasons) are cached in a separate IndexedDB database (`wrapped-cache`), versioned by the converter code and invalidated through the league's change log, so later sessions only read what changed. Idle snapshots are evicted from memory. `tools/perf/wrapped/` holds the Playwright benchmark scripts (see the header of `bench.cjs`).

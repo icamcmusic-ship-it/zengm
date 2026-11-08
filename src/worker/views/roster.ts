@@ -198,6 +198,7 @@ export default defineView({
 					"name",
 					"keepRosterSorted",
 					"playThroughInjuries",
+					"loadManagement",
 				],
 				seasonAttrs,
 				stats: ["pts", "oppPts", "gp"],
@@ -373,6 +374,8 @@ export default defineView({
 				}),
 				gb,
 				rank,
+				// injuryDepth setting, for the load management toggle
+				injuryDepth: __SPORT === "basketball" && !!g.get("injuryDepth"),
 			};
 			t2.seasonAttrs.avgAge = t2.seasonAttrs.avgAge ?? team.avgAge(players);
 

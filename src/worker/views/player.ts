@@ -29,6 +29,7 @@ import { getTeamInfoBySeason } from "../util/getTeamInfoBySeason.ts";
 import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
 import { getGroupPrefix } from "../core/awards/prefixes.ts";
 import type { LeagueUrlParts } from "../../ui/router/types.ts";
+import { getHealthInfo } from "../core/player/getHealthInfo.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 
 export const processInputs = (
@@ -151,6 +152,9 @@ export const getPlayer = async <
 
 		preDraftStats: preDraftStats.filter((row) => (row.gp ?? 0) > 0),
 		earlierHonors,
+
+		// Injury history by body part, and the injuryDepth setting's state (see core/player/injuryDepth.ts)
+		healthInfo: getHealthInfo(pRaw),
 
 		// Handle prefixing awards
 		awards: p.awards.map(

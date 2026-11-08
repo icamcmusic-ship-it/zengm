@@ -12,6 +12,7 @@ import hasTies from "../core/season/hasTies.ts";
 import { getActualPlayThroughInjuries } from "../core/game/loadTeams.ts";
 import { PHASE } from "../../common/constants.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { getSeasonOdds } from "../core/seasonOdds/index.ts";
 import { validatePlayoffs, validateSeason } from "../util/processInputs.ts";
 
 const processInputs = (params: RouteParams<"powerRankings">) => {
@@ -267,7 +268,22 @@ export default defineView({
 				}
 			}
 
+			// Monte Carlo playoff and title odds (basketball, current season)
+			let seasonOdds:
+				| Record<number, { playoffs: number; title: number }>
+				| undefined;
+			if (season === g.get("season")) {
+				const odds = await getSeasonOdds();
+				if (odds) {
+					seasonOdds = {};
+					for (const t of odds.teams) {
+						seasonOdds[t.tid] = { playoffs: t.playoffs, title: t.title };
+					}
+				}
+			}
+
 			return {
+				seasonOdds,
 				confs: g.get("confs", season),
 				divs: g.get("divs", season),
 				playoffs,
