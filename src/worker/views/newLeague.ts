@@ -227,6 +227,7 @@ export const getDefaultSettings = () => {
 		),
 		// Off by default for existing leagues, on for new ones
 		technicalFouls: true,
+		playerTraits: __SPORT === "basketball",
 		playerMoodTraits: unwrapGameAttribute(
 			defaultGameAttributes,
 			"playerMoodTraits",

@@ -42,6 +42,7 @@ export const gameAttributesKeysGameState: GameAttributeKey[] = [
 	"autoRelocate",
 	"autoExpand",
 	"tradeProposalsSeed",
+	"playerTraitsSeed",
 ];
 export const gameAttributesKeysTeams: GameAttributeKey[] = ["confs", "divs"];
 export const gameAttributesCache: GameAttributeKey[] = [
@@ -93,6 +94,8 @@ const gameAttributesKeysSportSpecific = {
 		"elamPoints",
 		"storePlayByPlay",
 		"technicalFouls",
+		"playerTraits",
+		"playerTraitsSeed",
 		"randomDebutsForever",
 		"realDraftRatings",
 		"numPlayersDunk",
@@ -598,6 +601,9 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	storePlayByPlay: true,
 	// Off for existing leagues (and tests), so their games play out as before; new leagues turn it on (see views/newLeague.ts)
 	technicalFouls: false,
+	// Off for existing leagues, on for new ones (see views/newLeague.ts)
+	playerTraits: false,
+	playerTraitsSeed: 0,
 	playerMoodTraits: true,
 	numPlayersOnCourt: 5,
 	aiJerseyRetirement: true,
