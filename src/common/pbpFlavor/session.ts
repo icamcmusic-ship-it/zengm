@@ -1195,8 +1195,14 @@ export class FlavorSession {
 		const p = this.pl(ev.pid);
 		const ctx = this.baseCtx(rng, t, ev.poss, p, ev);
 		const play: any = { k: "tov", p, ti: t };
-		// a turnover after a very long possession is a shot-clock violation
-		if (!ev.outOfBounds && ev.poss !== undefined && ev.poss >= 17) {
+		// a turnover after a very long possession is a shot-clock violation, if the shot clock was on (not at the end of a period, when the game
+		// clock was under 24 seconds as the possession started)
+		if (
+			!ev.outOfBounds &&
+			ev.poss !== undefined &&
+			ev.poss >= 17 &&
+			(typeof ev.clock !== "number" || ev.clock + ev.poss >= 24)
+		) {
 			play.shotClock = true;
 		}
 		const ds = this.floor(o);

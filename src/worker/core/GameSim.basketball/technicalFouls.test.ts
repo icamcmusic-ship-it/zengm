@@ -25,8 +25,8 @@ afterEach(() => {
 	Object.assign(TECHNICAL_FOUL_RATES, RATES);
 });
 
-// Many games between the same two teams (made once, slow), each with its own seed
-const simGames = async (
+// Many games between the same two teams (made once, slow), one seed for all
+const simGames = (
 	seed: number,
 	numGames: number,
 	opts: { techFouls?: boolean; doPlayByPlay?: boolean } = {},
@@ -139,7 +139,7 @@ test("a technical is one free throw for the other team, and possession doesn't c
 			assert.deepStrictEqual([sim.o, sim.d, sim.prevPossessionOutcome], before);
 			const dFta = sim.team.map((t, i) => t.stat.fta - fta[i]!);
 			assert.isTrue(
-				(dFta[0] === 0 && dFta[1] <= 1) || (dFta[1] === 0 && dFta[0]! <= 1),
+				(dFta[0] === 0 && dFta[1]! <= 1) || (dFta[1] === 0 && dFta[0]! <= 1),
 			);
 		};
 		sim.run();

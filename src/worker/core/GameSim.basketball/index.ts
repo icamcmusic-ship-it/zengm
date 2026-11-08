@@ -1638,7 +1638,8 @@ class GameSim extends GameSimBase {
 			this.techFouls &&
 			clockFactor !== "intentionalFoul" &&
 			this.t > 10 &&
-			Math.random() < TECHNICAL_FOUL_RATES.flagrantPerPossession * g.get("foulRateFactor")
+			Math.random() <
+				TECHNICAL_FOUL_RATES.flagrantPerPossession * g.get("foulRateFactor")
 		) {
 			return this.doFlagrantFoul(shooter);
 		}
