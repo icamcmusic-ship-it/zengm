@@ -57,13 +57,11 @@ const finalsHistory: Topic = ({ X }) => {
 					`So close, ${top[1]} times over`,
 				],
 				hero: { text: `${top[1]}`, unit: "finals losses" },
-				list: losses
-					.slice(1, 4)
-					.map(([t, n]) => ({
-						name: tname(X, t),
-						value: plural(n, "loss", "losses"),
-						tid: t,
-					})),
+				list: losses.slice(1, 4).map(([t, n]) => ({
+					name: tname(X, t),
+					value: plural(n, "loss", "losses"),
+					tid: t,
+				})),
 				lines: [
 					titles > 0
 						? `They have ${plural(titles, "title")} to show for it`
@@ -604,13 +602,11 @@ const waits: Topic = ({ X }) => {
 							? "team without a title"
 							: "teams without a title",
 				},
-				list: never
-					.slice(0, 4)
-					.map((x) => ({
-						name: tname(X, x.tid),
-						value: plural(x.n, "season"),
-						tid: x.tid,
-					})),
+				list: never.slice(0, 4).map((x) => ({
+					name: tname(X, x.tid),
+					value: plural(x.n, "season"),
+					tid: x.tid,
+				})),
 			}),
 		);
 	}
@@ -809,14 +805,12 @@ const identity: Topic = ({ X }) => {
 					text: `${exp.length}`,
 					unit: exp.length === 1 ? "expansion team" : "expansion teams",
 				},
-				list: exp
-					.slice(0, 4)
-					.map((x) => ({
-						name: `${x.first.region} ${x.first.name}`,
-						value: `${x.first.season}`,
-						sub: `${x.first.won}-${x.first.lost} in year one`,
-						tid: x.tid,
-					})),
+				list: exp.slice(0, 4).map((x) => ({
+					name: `${x.first.region} ${x.first.name}`,
+					value: `${x.first.season}`,
+					sub: `${x.first.won}-${x.first.lost} in year one`,
+					tid: x.tid,
+				})),
 			}),
 		);
 	}
@@ -900,13 +894,11 @@ const oneTeam: Topic = ({ X }) => {
 			`${plural(one.length, "player")} never left their team`,
 		],
 		hero: { text: `${top.seasons}`, unit: "seasons, one team" },
-		list: one
-			.slice(1, 5)
-			.map((x) => ({
-				name: x.p.name,
-				value: plural(x.seasons, "season"),
-				pid: x.p.pid,
-			})),
+		list: one.slice(1, 5).map((x) => ({
+			name: x.p.name,
+			value: plural(x.seasons, "season"),
+			pid: x.p.pid,
+		})),
 		lines: [
 			`${plural(one.length, "player")} with 6+ seasons, all for one franchise`,
 		],
@@ -936,13 +928,11 @@ const ringless: Topic = ({ X }) => {
 			`The best career without a title`,
 		],
 		hero: { text: fmtNum(top.c.ws, 1), unit: "win shares, zero rings" },
-		list: ringless
-			.slice(1, 4)
-			.map((x) => ({
-				name: x.p.name,
-				value: `${fmtNum(x.c.ws, 1)} WS`,
-				pid: x.p.pid,
-			})),
+		list: ringless.slice(1, 4).map((x) => ({
+			name: x.p.name,
+			value: `${fmtNum(x.c.ws, 1)} WS`,
+			pid: x.p.pid,
+		})),
 	});
 };
 
@@ -965,13 +955,11 @@ const mvpClub: Topic = ({ X }) => {
 					`${plural(rows.length, "player")} have won MVP more than once`,
 					`${rows[0]!.p.name}: ${plural(rows[0]!.n, "MVP")}`,
 				],
-				list: rows
-					.slice(0, 5)
-					.map((x) => ({
-						name: x.p.name,
-						value: plural(x.n, "MVP"),
-						pid: x.p.pid,
-					})),
+				list: rows.slice(0, 5).map((x) => ({
+					name: x.p.name,
+					value: plural(x.n, "MVP"),
+					pid: x.p.pid,
+				})),
 			}),
 		);
 	}
@@ -1023,13 +1011,11 @@ const mvpClub: Topic = ({ X }) => {
 					`${plural(roy.length, "Rookie of the Year")} later won MVP`,
 					`${roy[0]!.name} did both`,
 				],
-				list: roy
-					.slice(0, 4)
-					.map((p) => ({
-						name: p.name,
-						value: plural(X.countAwards(p, "Most Valuable Player"), "MVP"),
-						pid: p.pid,
-					})),
+				list: roy.slice(0, 4).map((p) => ({
+					name: p.name,
+					value: plural(X.countAwards(p, "Most Valuable Player"), "MVP"),
+					pid: p.pid,
+				})),
 			}),
 		);
 	}
@@ -1233,13 +1219,11 @@ const farewell: Topic = ({ X }) => {
 			`Farewell, ${top.p.name}`,
 		],
 		hero: { text: fmtNum(top.c.ws, 1), unit: "career win shares" },
-		list: rows
-			.slice(1, 4)
-			.map((x) => ({
-				name: x.p.name,
-				value: `${fmtNum(x.c.ws, 1)} WS`,
-				pid: x.p.pid,
-			})),
+		list: rows.slice(1, 4).map((x) => ({
+			name: x.p.name,
+			value: `${fmtNum(x.c.ws, 1)} WS`,
+			pid: x.p.pid,
+		})),
 		lines: [`${plural(yrs, "season")}, retired in ${top.p.retiredYear}`],
 	});
 };
@@ -1309,13 +1293,11 @@ const peaks: Topic = ({ X }) => {
 					text: fmtNum(rate[0].r, 3).replace(/^0/, ""),
 					unit: "win shares per 48",
 				},
-				list: rate
-					.slice(1, 4)
-					.map((x) => ({
-						name: x.p.name,
-						value: fmtNum(x.r, 3).replace(/^0/, ""),
-						pid: x.p.pid,
-					})),
+				list: rate.slice(1, 4).map((x) => ({
+					name: x.p.name,
+					value: fmtNum(x.r, 3).replace(/^0/, ""),
+					pid: x.p.pid,
+				})),
 				note: "Win shares per 48 minutes: wins added per 48 minutes played (.100 is average)",
 			}),
 		);
@@ -1386,13 +1368,11 @@ const clubs: Topic = ({ X }) => {
 					text: `${mem.length}`,
 					unit: `players with ${fmtNum(mark)}+ ${noun}`,
 				},
-				list: mem
-					.slice(0, 4)
-					.map((x) => ({
-						name: x.p.name,
-						value: fmtNum(x.c[k]),
-						pid: x.p.pid,
-					})),
+				list: mem.slice(0, 4).map((x) => ({
+					name: x.p.name,
+					value: fmtNum(x.c[k]),
+					pid: x.p.pid,
+				})),
 			}),
 		);
 	}
@@ -1485,13 +1465,11 @@ const mostTraded: Topic = ({ X }) => {
 			`The most-traded player in league history`,
 		],
 		hero: { text: `${t.n}`, unit: "trades" },
-		list: rows
-			.slice(1, 4)
-			.map((x) => ({
-				name: x.p.name,
-				value: plural(x.n, "trade"),
-				pid: x.p.pid,
-			})),
+		list: rows.slice(1, 4).map((x) => ({
+			name: x.p.name,
+			value: plural(x.n, "trade"),
+			pid: x.p.pid,
+		})),
 	});
 };
 
@@ -1702,13 +1680,11 @@ const draftHistory: Topic = ({ X }) => {
 					`The best undrafted player in league history`,
 				],
 				hero: { text: fmtNum(und[0].c.ws, 1), unit: "win shares" },
-				list: und
-					.slice(1, 4)
-					.map((x) => ({
-						name: x.p.name,
-						value: `${fmtNum(x.c.ws, 1)} WS`,
-						pid: x.p.pid,
-					})),
+				list: und.slice(1, 4).map((x) => ({
+					name: x.p.name,
+					value: `${fmtNum(x.c.ws, 1)} WS`,
+					pid: x.p.pid,
+				})),
 			}),
 		);
 	}
@@ -1812,13 +1788,11 @@ const injuriesAll: Topic = ({ X }) => {
 				`The longest injury list: ${rows[0]!.p.name}`,
 			],
 			hero: { text: fmtNum(rows[0]!.g), unit: "games lost to injury" },
-			list: rows
-				.slice(1, 4)
-				.map((x) => ({
-					name: x.p.name,
-					value: `${fmtNum(x.g)} games`,
-					pid: x.p.pid,
-				})),
+			list: rows.slice(1, 4).map((x) => ({
+				name: x.p.name,
+				value: `${fmtNum(x.g)} games`,
+				pid: x.p.pid,
+			})),
 			lines: [`${plural(rows[0]!.n, "separate injury", "separate injuries")}`],
 		}),
 	);

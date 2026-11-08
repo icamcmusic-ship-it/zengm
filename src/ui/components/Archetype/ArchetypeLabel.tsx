@@ -1,10 +1,7 @@
 import { OverlayTrigger, Popover } from "react-bootstrap";
 import { useId } from "react";
 import { GROUP_INFO, TIER_NAMES } from "../../../common/archetypes/index.ts";
-import type {
-	ArchetypeGroup,
-	Tier,
-} from "../../../common/archetypes/index.ts";
+import type { ArchetypeGroup, Tier } from "../../../common/archetypes/index.ts";
 
 export type ArchetypeLabelInfo = {
 	name: string;
@@ -43,7 +40,10 @@ const whyText = (w: { label: string; z: number; want: number }) =>
 export const ArchetypeWhy = ({
 	info,
 }: {
-	info: Pick<ArchetypeLabelInfo, "desc" | "why" | "tier" | "conf" | "season" | "live" | "history">;
+	info: Pick<
+		ArchetypeLabelInfo,
+		"desc" | "why" | "tier" | "conf" | "season" | "live" | "history"
+	>;
 }) => (
 	<div className="archetype-popover">
 		<p className="mb-2">{info.desc}</p>
@@ -99,7 +99,10 @@ export const ArchetypeLabel = ({ info }: { info: ArchetypeLabelInfo }) => {
 				</Popover>
 			}
 		>
-			<button type="button" className="archetype-label btn btn-link p-0 align-baseline">
+			<button
+				type="button"
+				className="archetype-label btn btn-link p-0 align-baseline"
+			>
 				<GroupDot group={info.group} />
 				{info.label}
 			</button>

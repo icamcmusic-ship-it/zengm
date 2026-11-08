@@ -1,5 +1,9 @@
 import { assert, describe, test } from "vitest";
-import { getDraftAdjustment, getTeamNeeds, getNeedLabels } from "./draftNeeds.ts";
+import {
+	getDraftAdjustment,
+	getTeamNeeds,
+	getNeedLabels,
+} from "./draftNeeds.ts";
 import { getDraftBoardPick } from "./runPicks.ts";
 
 // Deterministic pseudo random numbers
@@ -122,7 +126,10 @@ describe("draft by need", () => {
 	});
 
 	test("draft board pick: top ranked available, else nothing", () => {
-		const players: { pid: number; draftBoard?: { rank?: number; note?: string } }[] = [
+		const players: {
+			pid: number;
+			draftBoard?: { rank?: number; note?: string };
+		}[] = [
 			{ pid: 1 },
 			{ pid: 2, draftBoard: { rank: 3 } },
 			{ pid: 3, draftBoard: { rank: 1, note: "x" } },

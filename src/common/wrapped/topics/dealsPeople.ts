@@ -679,13 +679,11 @@ const busiest: Topic = ({ X, season }) => {
 		tid,
 		heads: [`The ${X.teamName(tid, season)} made the most trades`],
 		hero: { text: `${v.n}`, unit: "trades" },
-		list: list
-			.slice(0, 5)
-			.map(([t, x]) => ({
-				name: X.teamName(t, season),
-				value: `${x.n}`,
-				tid: t,
-			})),
+		list: list.slice(0, 5).map(([t, x]) => ({
+			name: X.teamName(t, season),
+			value: `${x.n}`,
+			tid: t,
+		})),
 		lines: [],
 		facts: [`a-busiest`],
 	});
@@ -961,13 +959,11 @@ const releaseTeam: Topic = ({ X, season }) => {
 		tid: list[0]![0],
 		heads: [`The ${X.teamName(list[0]![0], season)} released the most players`],
 		hero: { text: `${list[0]![1]}`, unit: "releases" },
-		list: list
-			.slice(0, 5)
-			.map(([t, n]) => ({
-				name: X.teamName(t, season),
-				value: `${n}`,
-				tid: t,
-			})),
+		list: list.slice(0, 5).map(([t, n]) => ({
+			name: X.teamName(t, season),
+			value: `${n}`,
+			tid: t,
+		})),
 		lines: [],
 		facts: [`a-relteam`],
 	});
@@ -1079,13 +1075,11 @@ const slotValue: Topic = ({ X, season }) => {
 				? `No. 1 picks have been worth it`
 				: `The best pick to have has been No. ${best.k}`,
 		],
-		list: rows
-			.slice(0, 8)
-			.map((r) => ({
-				name: `Pick ${r.k}`,
-				value: `${fmtNum(r.avg, 1)} WS`,
-				sub: plural(r.n, "player"),
-			})),
+		list: rows.slice(0, 8).map((r) => ({
+			name: `Pick ${r.k}`,
+			value: `${fmtNum(r.avg, 1)} WS`,
+			sub: plural(r.n, "player"),
+		})),
 		lines: ["Average career win shares by draft slot"],
 		facts: [`a-slot`],
 	});
@@ -1146,13 +1140,11 @@ const draftFranchise: Topic = ({ X, season }) => {
 		tid: list[0]![0],
 		heads: [`The ${X.teamName(list[0]![0], season)} drafted best`],
 		hero: { text: ws1(list[0]![1]), unit: "win shares from their own picks" },
-		list: list
-			.slice(0, 5)
-			.map(([t, v]) => ({
-				name: X.teamName(t, season),
-				value: ws1(v),
-				tid: t,
-			})),
+		list: list.slice(0, 5).map(([t, v]) => ({
+			name: X.teamName(t, season),
+			value: ws1(v),
+			tid: t,
+		})),
 		lines: [],
 		facts: [`a-draftfr`],
 	});

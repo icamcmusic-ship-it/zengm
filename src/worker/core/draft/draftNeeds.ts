@@ -83,7 +83,11 @@ export const getDraftAdjustment = (
 };
 
 export const getNeedLabels = (needs: TeamNeeds) => {
-	const names: Record<Group, string> = { G: "Guard", F: "Wing/forward", C: "Big" };
+	const names: Record<Group, string> = {
+		G: "Guard",
+		F: "Wing/forward",
+		C: "Big",
+	};
 	return (["G", "F", "C"] as const)
 		.filter((group) => needs[group] > 0.05)
 		.sort((a, b) => needs[b] - needs[a])

@@ -641,14 +641,12 @@ const ratingsTop: Topic = ({ X, season }) => {
 			`${top.l.name} was the league’s highest-rated player at ${top.ovr}`,
 			`The top ratings of ${season}`,
 		],
-		list: rows
-			.slice(0, 5)
-			.map((x) => ({
-				name: x.l.name,
-				value: `${x.ovr}`,
-				sub: X.teamName(x.l.tid, season),
-				pid: x.l.pid,
-			})),
+		list: rows.slice(0, 5).map((x) => ({
+			name: x.l.name,
+			value: `${x.ovr}`,
+			sub: X.teamName(x.l.tid, season),
+			pid: x.l.pid,
+		})),
 		lines: [
 			mvp && mvp.pid !== top.l.pid
 				? `The MVP, ${mvp.name}, was rated ${X.players.get(mvp.pid)?.ovr[season] ?? "–"}`
@@ -690,14 +688,12 @@ const biggestLeap: Topic = ({ X, season }) => {
 			`${top.l.name} jumped ${top.d} points in rating`,
 			`The year’s biggest rating leap: ${top.l.name}`,
 		],
-		list: rows
-			.slice(0, 4)
-			.map((x) => ({
-				name: x.l.name,
-				value: `+${x.d}`,
-				sub: `${x.a} to ${x.b}`,
-				pid: x.l.pid,
-			})),
+		list: rows.slice(0, 4).map((x) => ({
+			name: x.l.name,
+			value: `+${x.d}`,
+			sub: `${x.a} to ${x.b}`,
+			pid: x.l.pid,
+		})),
 		lines: [
 			down.d <= -4 ? `The biggest drop: ${down.l.name}, ${down.d}` : null,
 		],
@@ -831,13 +827,11 @@ const ironmen: Topic = ({ X, season, soFar }) => {
 			`${plural(rows.length, "player")} played every game`,
 			`${top[0]!.name} did not miss a game`,
 		],
-		list: top
-			.slice(0, 4)
-			.map((l) => ({
-				name: l.name,
-				value: `${fmtNum(l.mpg, 1)} MPG`,
-				pid: l.pid,
-			})),
+		list: top.slice(0, 4).map((l) => ({
+			name: l.name,
+			value: `${fmtNum(l.mpg, 1)} MPG`,
+			pid: l.pid,
+		})),
 	});
 };
 
@@ -870,13 +864,11 @@ const benchStar: Topic = ({ X, season, soFar }) => {
 			`${fmtNum(top[0]!.ppg, 1)} a game without starting`,
 		],
 		hero: { text: fmtNum(top[0]!.ppg, 1), unit: "PPG off the bench" },
-		list: top
-			.slice(1, 4)
-			.map((l) => ({
-				name: l.name,
-				value: `${fmtNum(l.ppg, 1)} PPG`,
-				pid: l.pid,
-			})),
+		list: top.slice(1, 4).map((l) => ({
+			name: l.name,
+			value: `${fmtNum(l.ppg, 1)} PPG`,
+			pid: l.pid,
+		})),
 	});
 };
 
@@ -904,13 +896,11 @@ const efficient: Topic = ({ X, season }) => {
 			`The most efficient high-volume scorer: ${top[0]!.name}`,
 		],
 		hero: { text: pct(top[0]!.tsPct), unit: "true shooting" },
-		list: top
-			.slice(1, 4)
-			.map((l) => ({
-				name: l.name,
-				value: `${pct(l.tsPct)} on ${fmtNum(l.ppg, 1)}`,
-				pid: l.pid,
-			})),
+		list: top.slice(1, 4).map((l) => ({
+			name: l.name,
+			value: `${pct(l.tsPct)} on ${fmtNum(l.ppg, 1)}`,
+			pid: l.pid,
+		})),
 		lines: [`Among players averaging 18 or more points`],
 		note: "TS%: true shooting, scoring efficiency counting threes and free throws",
 	});
@@ -1347,13 +1337,11 @@ const allStarTeams: Topic = ({ X, season }) => {
 			`${X.teamName(top[0], season)} sent ${top[1].length} players to the All-Star Game`,
 			`${plural(pids.length, "All-Star")} in all`,
 		],
-		list: rows
-			.slice(0, 4)
-			.map(([t, ps]) => ({
-				name: X.teamName(t, season),
-				value: `${ps.length}`,
-				tid: t,
-			})),
+		list: rows.slice(0, 4).map(([t, ps]) => ({
+			name: X.teamName(t, season),
+			value: `${ps.length}`,
+			tid: t,
+		})),
 		lines: [none > 0 ? `${plural(none, "team")} had no All-Star` : null],
 	});
 };
@@ -1808,13 +1796,11 @@ const milestones: Topic = ({ X, season, soFar }) => {
 			`${plural(hits.length, "career milestone")} crossed this season`,
 			`${hits[0]!.p} passed ${fmtNum(hits[0]!.mark)} career ${hits[0]!.noun}`,
 		],
-		list: hits
-			.slice(0, 5)
-			.map((h) => ({
-				name: h.p,
-				value: `${fmtNum(h.mark)} ${h.noun}`,
-				pid: h.pid,
-			})),
+		list: hits.slice(0, 5).map((h) => ({
+			name: h.p,
+			value: `${fmtNum(h.mark)} ${h.noun}`,
+			pid: h.pid,
+		})),
 	});
 };
 
@@ -1884,14 +1870,12 @@ const absences: Topic = ({ X, season, soFar }) => {
 			`${top.l.name}, one of the best, lost ${top.games} games to injury`,
 			`The stars who missed the most time`,
 		],
-		list: rows
-			.slice(0, 4)
-			.map((x) => ({
-				name: x.l.name,
-				value: `${x.games} games`,
-				sub: `rated ${x.ovr}`,
-				pid: x.l.pid,
-			})),
+		list: rows.slice(0, 4).map((x) => ({
+			name: x.l.name,
+			value: `${x.games} games`,
+			sub: `rated ${x.ovr}`,
+			pid: x.l.pid,
+		})),
 	});
 };
 

@@ -791,7 +791,12 @@ const applyToClass = async (
 		return 0;
 	}
 	const seed = classSeed(settings.seed ?? "regen", draftYear);
-	const { players: all, inputs, result, inScope } = await compute({
+	const {
+		players: all,
+		inputs,
+		result,
+		inScope,
+	} = await compute({
 		draftYear,
 		settings: { ...settings, seed },
 		locks: {},

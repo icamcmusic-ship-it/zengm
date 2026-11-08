@@ -31,7 +31,10 @@ const makeProspects = (
 	});
 };
 
-const perGame = (seasons: ReturnType<typeof generateCollegeClass>, key: string) => {
+const perGame = (
+	seasons: ReturnType<typeof generateCollegeClass>,
+	key: string,
+) => {
 	let min = 0;
 	let gp = 0;
 	let pts = 0;

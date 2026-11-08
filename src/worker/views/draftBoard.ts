@@ -6,10 +6,7 @@ import { last } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
 import { getScoutReport } from "../core/draft/scouting.ts";
-import {
-	getPreDraftAwards,
-	getPreDraftStats,
-} from "../../common/preDraft.ts";
+import { getPreDraftAwards, getPreDraftStats } from "../../common/preDraft.ts";
 import { getPreDraftLabel } from "../../common/collegeStats/overseas.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
@@ -52,7 +49,8 @@ export default defineView({
 		const seasons = [...new Set(allProspects.map((p) => p.draft.year))].sort(
 			(a, b) => a - b,
 		);
-		const season = inputSeason ?? (fantasyDraft ? g.get("season") : firstSeason);
+		const season =
+			inputSeason ?? (fantasyDraft ? g.get("season") : firstSeason);
 		const players = allProspects.filter(
 			(p) => fantasyDraft || p.draft.year === season,
 		);

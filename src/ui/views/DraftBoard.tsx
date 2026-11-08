@@ -184,7 +184,9 @@ const DraftBoard = ({
 								<tr
 									key={p.pid}
 									className={
-										p.board.tier !== undefined && p.board.tier !== prevTier && i > 0
+										p.board.tier !== undefined &&
+										p.board.tier !== prevTier &&
+										i > 0
 											? "border-top border-2"
 											: undefined
 									}

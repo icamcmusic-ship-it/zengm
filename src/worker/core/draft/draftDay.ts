@@ -128,8 +128,20 @@ export const getDraftDayTrade = async (otherTid: number) => {
 	let tradeTeams: TradeTeams = teams;
 	if (teams[0].tid !== userTid || teams[1].tid !== otherTid) {
 		tradeTeams = [
-			{ tid: userTid, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
-			{ tid: otherTid, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+			{
+				tid: userTid,
+				pids: [],
+				pidsExcluded: [],
+				dpids: [],
+				dpidsExcluded: [],
+			},
+			{
+				tid: otherTid,
+				pids: [],
+				pidsExcluded: [],
+				dpids: [],
+				dpidsExcluded: [],
+			},
 		];
 	}
 	const summary = await trade.summary(tradeTeams);

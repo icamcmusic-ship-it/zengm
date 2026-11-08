@@ -274,7 +274,8 @@ export const thirdsByTrait = (r: GamesResult, key: TraitKey) => {
 };
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-export const mean = (xs: number[]) => (xs.length ? sum(xs) / xs.length : NaN);
+export const mean = (xs: number[]) =>
+	xs.length ? sum(xs) / xs.length : Number.NaN;
 export const sd = (xs: number[]) => {
 	const m = mean(xs);
 	return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));

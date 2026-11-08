@@ -118,7 +118,7 @@ const staffLinks: MenuItemLink[] =
 					league: true,
 					commandPalette: true,
 					feature: "coachingStaff",
-				path: ["staff"],
+					path: ["staff"],
 					text: "Coaching Staff",
 				},
 			]
@@ -132,7 +132,7 @@ const coachesLinks: MenuItemLink[] =
 					league: true,
 					commandPalette: true,
 					feature: "coachingStaff",
-				path: ["coaches"],
+					path: ["coaches"],
 					text: "Coaches",
 				},
 			]
@@ -148,7 +148,7 @@ const archetypeLinks: MenuItemLink[] =
 					league: true,
 					commandPalette: true,
 					feature: "archetypes",
-				path: ["archetypes"],
+					path: ["archetypes"],
 					text: "Archetypes",
 				},
 			]

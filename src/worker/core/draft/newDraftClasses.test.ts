@@ -5,7 +5,10 @@ import { g } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
 import { draft, player } from "../index.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
-import { getPreDraftStats, hasPreDraftStats } from "../../../common/preDraft.ts";
+import {
+	getPreDraftStats,
+	hasPreDraftStats,
+} from "../../../common/preDraft.ts";
 import {
 	generateCollegeStatsAllClasses,
 	processNewDraftClasses,
@@ -134,9 +137,7 @@ describe("all classes buttons", () => {
 		assert.strictEqual(await ratingsSnapshot(), applied, "deterministic");
 		const { restored } = await restoreOriginalRatingsAllClasses();
 		assert.strictEqual(restored, prospects.length);
-		assert(
-			(await getProspects()).every((p) => p.ratingsBuild === undefined),
-		);
+		assert((await getProspects()).every((p) => p.ratingsBuild === undefined));
 	});
 });
 
@@ -218,6 +219,9 @@ describe("new draft class settings", () => {
 		const players = await getProspects();
 		assert(players.length > 50);
 		assert(players.every((p) => p.ratingsBuild));
-		assert.isAbove(players.filter(hasPreDraftStats).length, players.length * 0.8);
+		assert.isAbove(
+			players.filter(hasPreDraftStats).length,
+			players.length * 0.8,
+		);
 	});
 });

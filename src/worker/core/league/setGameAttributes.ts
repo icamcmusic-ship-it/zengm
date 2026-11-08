@@ -44,7 +44,10 @@ const setGameAttributes = async (
 	// GameSim records events for storage when storePlayByPlay is on, so keep it in step with the storage scope
 	// An explicit storePlayByPlay false (the League Extras switch) wins over the scope and means none
 	if (gameAttributes.pbpStore !== undefined) {
-		if (gameAttributes.storePlayByPlay === true && gameAttributes.pbpStore === "none") {
+		if (
+			gameAttributes.storePlayByPlay === true &&
+			gameAttributes.pbpStore === "none"
+		) {
 			gameAttributes.pbpStore = "all";
 		} else if (gameAttributes.storePlayByPlay !== false) {
 			gameAttributes.storePlayByPlay = gameAttributes.pbpStore !== "none";

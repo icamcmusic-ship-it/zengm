@@ -557,7 +557,11 @@ export type NativeFeatureSettingKey =
 	| NativeFeatureEnableKey
 	| NativeFeatureOptionKey;
 
-type ValueOf<T> = T extends boolean ? boolean : T extends number ? number : string;
+type ValueOf<T> = T extends boolean
+	? boolean
+	: T extends number
+		? number
+		: string;
 
 // Game attributes added by the registry (existing ones are declared in GameAttributesLeague already)
 export type NativeFeatureGameAttributes = {
@@ -670,7 +674,9 @@ export const nativeFeatureEnabledForSport = (
 };
 
 // A feature option, falling back to its default. Bool options of a feature that is off read as false.
-export const nativeFeatureOptionForSport = <T extends boolean | number | string>(
+export const nativeFeatureOptionForSport = <
+	T extends boolean | number | string,
+>(
 	key: NativeFeatureOptionKey,
 	get: (key: string) => unknown,
 	sport: string,

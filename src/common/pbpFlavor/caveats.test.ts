@@ -1,8 +1,5 @@
 import { assert, test } from "vitest";
-import {
-	FlavorSession,
-	shootoutShotText,
-} from "./session.ts";
+import { FlavorSession, shootoutShotText } from "./session.ts";
 import { Rng } from "./rng.ts";
 
 const init = (quarterLength: number) =>

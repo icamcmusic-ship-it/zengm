@@ -74,7 +74,9 @@ export const ArchetypeRosterPanel = ({
 								{players.map((p) => (
 									<tr key={p.pid}>
 										<td>
-											<a href={helpers.leagueUrl(["player", p.pid])}>{p.name}</a>
+											<a href={helpers.leagueUrl(["player", p.pid])}>
+												{p.name}
+											</a>
 										</td>
 										<td>{p.pos}</td>
 										<td>{p.ovr}</td>
@@ -82,7 +84,10 @@ export const ArchetypeRosterPanel = ({
 											<GroupDot group={p.group} />
 											{p.label}
 											{p.live ? (
-												<span className="text-body-secondary" title="Live reading, saved at the next preseason">
+												<span
+													className="text-body-secondary"
+													title="Live reading, saved at the next preseason"
+												>
 													{" "}
 													*
 												</span>

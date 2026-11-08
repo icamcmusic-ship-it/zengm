@@ -549,13 +549,11 @@ const teamValueAll: Topic = ({ X, season }) => {
 		heads: [
 			`The ${X.teamName(list[0]!.t, season)} got the most for their money`,
 		],
-		list: list
-			.slice(0, 5)
-			.map((x) => ({
-				name: X.teamName(x.t, season),
-				value: `${fmtNum(x.v, 2)} WS/$1M`,
-				tid: x.t,
-			})),
+		list: list.slice(0, 5).map((x) => ({
+			name: X.teamName(x.t, season),
+			value: `${fmtNum(x.v, 2)} WS/$1M`,
+			tid: x.t,
+		})),
 		lines: ["All-time win shares per $1M of salary"],
 		facts: [`a-value`],
 	});

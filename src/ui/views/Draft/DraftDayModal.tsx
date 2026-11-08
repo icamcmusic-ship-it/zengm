@@ -181,7 +181,9 @@ export const DraftDayModal = ({
 						{tradeInfo?.warning ? (
 							<div className="text-danger mt-2">{tradeInfo.warning}</div>
 						) : null}
-						{message ? <div className="alert alert-info mt-2">{message}</div> : null}
+						{message ? (
+							<div className="alert alert-info mt-2">{message}</div>
+						) : null}
 					</>
 				)}
 			</Modal.Body>
@@ -209,11 +211,11 @@ export const DraftDayModal = ({
 						busy ||
 						!teams ||
 						!!tradeInfo?.warning ||
-						(teams[0].pids.length +
+						teams[0].pids.length +
 							teams[0].dpids.length +
 							teams[1].pids.length +
 							teams[1].dpids.length ===
-							0)
+							0
 					}
 					onClick={async () => {
 						setBusy(true);

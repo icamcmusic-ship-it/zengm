@@ -1,4 +1,7 @@
-import { getPbpStoreScope, shouldStorePbp } from "../../../common/pbpSettings.ts";
+import {
+	getPbpStoreScope,
+	shouldStorePbp,
+} from "../../../common/pbpSettings.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { updatePlayerAwards } from "../awards/awardsByPlayer.ts";
 import { idb } from "../../db/index.ts";
