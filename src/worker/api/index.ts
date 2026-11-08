@@ -2900,6 +2900,8 @@ const generateCollegeStatsAllClasses = async (options: {
 	const output = await draft.generateCollegeStatsAllClasses(options);
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 	return output;
+};
+
 const staffAction = async (
 	action:
 		| { type: "hire"; cid: number; role: CoachRole; years: number }
