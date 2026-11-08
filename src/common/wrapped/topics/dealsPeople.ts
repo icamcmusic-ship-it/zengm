@@ -907,8 +907,8 @@ const lotteryTeam: Topic = ({ X, season }) => {
 		tid: lt,
 		heads: [`The ${X.teamName(lt, season)} have been the luckiest lottery team`],
 		list: [
-			{ name: X.teamName(lt, season), value: `${lv.net >= 0 ? "+" : ""}${lv.net}`, sub: plural(lv.wins, "No. 1 pick"), tid: lt },
-			{ name: X.teamName(ut, season), value: `${uv.net}`, sub: plural(uv.wins, "No. 1 pick"), tid: ut },
+			{ name: X.teamName(lt, season), value: `${lv.net >= 0 ? "+" : ""}${lv.net}`, sub: plural(lv.wins, "lottery win"), tid: lt },
+			{ name: X.teamName(ut, season), value: `${uv.net}`, sub: plural(uv.wins, "lottery win"), tid: ut },
 		],
 		lines: ["Spots gained or lost on lottery nights, all-time"],
 		facts: [`a-lotteam`],

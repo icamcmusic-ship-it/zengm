@@ -208,6 +208,8 @@ const champTrades: Topic = ({ X, season, soFar }) => {
 		kicker: "Built by trade",
 		season,
 		tid: c.tid,
+		// It is about the champion even where it doesn't name them
+		spoiler: true,
 		heads: [
 			`The champions traded for ${useful[0]!.name}`,
 			`Trades that built a champion`,

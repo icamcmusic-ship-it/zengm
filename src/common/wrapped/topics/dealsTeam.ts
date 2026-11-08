@@ -210,7 +210,7 @@ const pickFlow: Topic = ({ X, season, tid }) => {
 				? `Collecting picks: ${inn} in, ${out} out`
 				: inn < out
 					? `Spending picks: ${out} out, ${inn} in`
-					: `${inn} picks in, ${out} out`,
+					: `Draft picks: ${inn} in, ${out} out`,
 		],
 		hero: { text: `${inn >= out ? "+" : ""}${inn - out}`, unit: "draft picks by trade" },
 		lines: [],
