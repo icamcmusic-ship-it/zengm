@@ -12,6 +12,8 @@ import { ResponsiveTableWrapper } from "../components/ResponsiveTableWrapper.tsx
 import { getCol } from "../../common/getCol.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { useLocal } from "../util/local.ts";
+import { SeasonOddsTable } from "../components/SeasonOdds.tsx";
+import HideableSection from "../components/HideableSection.tsx";
 
 type StandingsTeam =
 	View<"standings">["rankingGroups"]["league"][number][number];
@@ -405,6 +407,7 @@ const SmallStandings = ({
 };
 
 const Standings = ({
+	seasonOdds,
 	confs,
 	divs,
 	maxPlayoffSeed,
@@ -635,7 +638,19 @@ const Standings = ({
 		);
 	}
 
-	return allStandings;
+	if (!seasonOdds) {
+		return allStandings;
+	}
+
+	return (
+		<>
+			{allStandings}
+			<div className="clearfix" />
+			<HideableSection title="Season odds" className="mt-3">
+				<SeasonOddsTable odds={seasonOdds} season={season} />
+			</HideableSection>
+		</>
+	);
 };
 
 export default Standings;

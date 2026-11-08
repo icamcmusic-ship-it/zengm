@@ -161,7 +161,9 @@ import { getCol } from "../../common/getCol.ts";
 import { getCols } from "../../common/getCols.ts";
 import { formatScheduleForEditor } from "../views/scheduleEditor.ts";
 import type { KeyboardShortcutsLocal } from "../../ui/util/keyboardShortcuts.ts";
-import { getNumPlayoffTeamsRaw } from "../core/season/getNumPlayoffTeams.ts";
+import getNumPlayoffTeamsForSeason, {
+	getNumPlayoffTeamsRaw,
+} from "../core/season/getNumPlayoffTeams.ts";
 import type { NewLeagueSettings } from "../views/newLeague.ts";
 import { getNumPlayersTradedAwayNormalizedAll } from "../core/player/getNumPlayersTradedAwayNormalized.ts";
 import { getAdjustedTicketPrice } from "../../common/getAdjustedTicketPrice.ts";
@@ -209,6 +211,12 @@ import {
 	getPreDraftAwards,
 	isPreDraftStatsRow,
 } from "../../common/preDraft.ts";
+import {
+	getWhatIfChances,
+	lotteryWhatIfProbs,
+	type WhatIfDraftType,
+} from "../core/draft/lotteryWhatIf.ts";
+import type { DraftType as DraftTypeWhatIf } from "../../common/types.ts";
 import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
 
 const acceptContractNegotiation = async ({
@@ -4520,6 +4528,42 @@ const updateOptions = async (
 	await toUI("realtimeUpdate", [["options"]]);
 };
 
+// Draft lottery what-if simulator. rows are the current lottery teams, reordered by the user (worst first). Rows keep their current chances
+// for draftType "current", otherwise chances follow the chosen format by position.
+const draftLotteryWhatIf = async ({
+	draftType,
+	rows,
+	currentDraftType,
+	currentNumToPick,
+	season,
+}: {
+	draftType: WhatIfDraftType;
+	rows: { tid: number; chances: number }[];
+	currentDraftType: DraftTypeWhatIf;
+	currentNumToPick: number;
+	season: number;
+}) => {
+	const info = getWhatIfChances({
+		draftType,
+		numLotteryTeams: rows.length,
+		currentChances: rows.map((row) => row.chances),
+		currentDraftType,
+		currentNumToPick,
+		numPlayInTeams: (await getNumPlayoffTeamsForSeason(season)).numPlayInTeams,
+	});
+	const output = lotteryWhatIfProbs({
+		draftType: info.draftType,
+		chances: info.chances,
+		numToPick: info.numToPick,
+		numSims: 20000,
+	});
+	return {
+		...output,
+		chances: info.chances,
+		numToPick: info.numToPick,
+	};
+};
+
 // injuryDepth setting: rest a player (pid) or a team's veterans (tid) on the second night of back-to-backs
 const setLoadManagement = async ({
 	pid,
@@ -5846,6 +5890,7 @@ const api = {
 		updateOptions,
 		updatePlayThroughInjuries,
 		setLoadManagement,
+		draftLotteryWhatIf,
 		updatePlayerWatch,
 		updatePlayersWatch,
 		updatePlayingTime,

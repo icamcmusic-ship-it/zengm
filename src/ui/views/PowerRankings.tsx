@@ -10,6 +10,8 @@ import { wrappedMovOrDiff } from "../components/MovOrDiff.tsx";
 import { wrappedTeamLogoAndName } from "../components/TeamLogoAndName.tsx";
 import { bySport } from "../../common/sportFunctions.ts";
 import { useLocal } from "../util/local.ts";
+import { getCol } from "../../common/getCol.ts";
+import { formatOdds } from "../components/SeasonOdds.tsx";
 
 const Other = ({
 	actualShowHealthy,
@@ -34,6 +36,7 @@ const Other = ({
 };
 
 const PowerRankings = ({
+	seasonOdds,
 	confs,
 	divs,
 	playoffs,
@@ -96,7 +99,7 @@ const PowerRankings = ({
 		},
 		{
 			title: "",
-			colspan: 5 + (ties ? 1 : 0) + (otl ? 1 : 0),
+			colspan: 5 + (ties ? 1 : 0) + (otl ? 1 : 0) + (seasonOdds ? 2 : 0),
 		},
 		{
 			title: (
@@ -137,6 +140,23 @@ const PowerRankings = ({
 	];
 
 	const cols = getCols(colNames);
+
+	// Monte Carlo odds, after AvgAge (see worker/core/seasonOdds)
+	if (seasonOdds) {
+		const index = colNames.indexOf("AvgAge") + 1;
+		cols.splice(
+			index,
+			0,
+			{
+				...getCol("Win%", { desc: "Chance to make the playoffs" }),
+				title: "Playoffs",
+			},
+			{
+				...getCol("Win%", { desc: "Chance to win the title" }),
+				title: "Title",
+			},
+		);
+	}
 
 	if (__SPORT === "basketball") {
 		for (const [colName, col] of Iterator.zip([colNames, cols], {
@@ -190,6 +210,18 @@ const PowerRankings = ({
 					__SPORT === "basketball" ? "mov" : "diff",
 				),
 				t.powerRankings.avgAge?.toFixed(1),
+				...(seasonOdds
+					? [
+							{
+								value: formatOdds(seasonOdds[t.tid]?.playoffs ?? 0),
+								sortValue: seasonOdds[t.tid]?.playoffs ?? 0,
+							},
+							{
+								value: formatOdds(seasonOdds[t.tid]?.title ?? 0),
+								sortValue: seasonOdds[t.tid]?.title ?? 0,
+							},
+						]
+					: []),
 				...otherKeys.map((key) => ({
 					value: (
 						<Other

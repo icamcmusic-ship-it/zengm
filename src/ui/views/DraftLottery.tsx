@@ -35,6 +35,7 @@ import { PlayPauseNext } from "../components/PlayPauseNext.tsx";
 import { ResponsiveTableWrapper } from "../components/ResponsiveTableWrapper.tsx";
 import { DraftAbbrev } from "../components/DraftAbbrev.tsx";
 import { HelpPopover } from "../components/HelpPopover.tsx";
+import { DraftLotteryWhatIf } from "./DraftLotteryWhatIf.tsx";
 
 type MyDraftType = DraftType | "dummy";
 export const getDraftTypeDescription = (
@@ -990,6 +991,16 @@ const DraftLottery = (props: Props) => {
 			) : null}
 
 			<DraftLotteryTable {...props} />
+
+			{props.type !== "completed" && props.draftLotteryResult ? (
+				<DraftLotteryWhatIf
+					key={props.season}
+					draftLotteryResult={props.draftLotteryResult}
+					draftType={props.draftType}
+					numToPick={props.numToPick}
+					season={props.season}
+				/>
+			) : null}
 
 			{colaTable ? <ColaTable colaTable={colaTable} /> : null}
 		</>
