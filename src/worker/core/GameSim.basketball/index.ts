@@ -17,6 +17,10 @@ import {
 } from "./PlayByPlayLogger.ts";
 import getWinner from "../../../common/getWinner.ts";
 import { formatClock } from "../../../common/formatClock.ts";
+import type {
+	ClutchMeta,
+	ClutchPlayerRef,
+} from "../../../common/pbpFlavor/clutch.ts";
 import PlayByPlayLogger from "./PlayByPlayLogger.ts";
 import { choice, truncGauss, uniform } from "../../../common/random.ts";
 import {
@@ -198,6 +202,11 @@ const getSortedIndexes = (ovrs: number[]) => {
 // Use if denominator of prob might be 0
 const boundProb = (prob: number) => helpers.bound(prob, 0.001, 0.999);
 
+const ref = (p: { id: number; name: string }): ClutchPlayerRef => ({
+	pid: p.id,
+	name: p.name,
+});
+
 class GameSim extends GameSimBase {
 	team: [TeamGameSim, TeamGameSim];
 
@@ -220,6 +229,9 @@ class GameSim extends GameSimBase {
 		player: PlayerGameSim;
 		type: ShotType;
 		time: number;
+		// Additive metadata for the clutch-play flavor text (no random draws): the assister and the defender the shot was made over, if known
+		ast?: PlayerGameSim;
+		def?: PlayerGameSim;
 	}[];
 
 	clutchPlays: {
@@ -227,7 +239,19 @@ class GameSim extends GameSimBase {
 		showNotification: boolean;
 		pids: [number];
 		tids: [number];
+		// What happened, for the flavor wording (src/common/pbpFlavor/clutch.ts). Present without play-by-play logging
+		meta?: ClutchMeta;
 	}[];
+
+	// Latest candidate for a game-saving defensive play (see noteDefensiveStop)
+	defensiveStop:
+		| {
+				t: TeamNum;
+				period: number;
+				oppPts: number;
+				meta: Extract<ClutchMeta, { kind: "defense" }>;
+		  }
+		| undefined;
 
 	o: TeamNum;
 
@@ -383,6 +407,7 @@ class GameSim extends GameSimBase {
 
 		this.lastScoringPlay = [];
 		this.clutchPlays = [];
+		this.defensiveStop = undefined;
 		this.elam = this.allStarGame ? g.get("elamASG") : g.get("elam");
 		this.elamActive = false;
 		this.elamDone = false;
@@ -482,6 +507,7 @@ class GameSim extends GameSimBase {
 		}
 
 		this.checkGameWinner();
+		this.checkDefensiveStop();
 
 		this.doShootout();
 
@@ -630,6 +656,11 @@ class GameSim extends GameSimBase {
 			showNotification: this.team[winner].id === g.get("userTid"),
 			pids: [shooters[winner].id],
 			tids: [this.team[winner].id],
+			meta: {
+				kind: "shootout",
+				player: ref(shooters[winner]),
+				opp: ref(shooters[loser]),
+			},
 		});
 	}
 
@@ -2401,6 +2432,13 @@ class GameSim extends GameSimBase {
 			return this.doStl(p);
 		}
 
+		// Credited to his matchup (same slot on the court), so no random draw is needed
+		const ind = this.playersOnCourt[this.o].indexOf(p);
+		const matchup = this.playersOnCourt[this.d][ind >= 0 ? ind : 0];
+		if (matchup) {
+			this.noteDefensiveStop("tov", matchup, p);
+		}
+
 		// Ball could go out of bounds on the turnover
 		const outOfBounds = Math.random() < 0.3;
 		if (outOfBounds) {
@@ -2453,6 +2491,7 @@ class GameSim extends GameSimBase {
 
 		const p = this.pickPlayer("stealing", this.d, 4);
 		this.recordStat(this.d, p, "stl");
+		this.noteDefensiveStop("stl", p, pStoleFrom);
 		this.playByPlay.logEvent({
 			type: "stl",
 			t: this.d,
@@ -2937,6 +2976,7 @@ class GameSim extends GameSimBase {
 
 		const p2 = this.pickPlayer("blocking", this.d, 10);
 		this.recordStat(this.d, p2, "blk");
+		this.noteDefensiveStop("blk", p2, p, type);
 		let blockLogType: BlockType | undefined;
 		if (type === "tipIn") {
 			blockLogType = "blkTipIn";
@@ -3029,6 +3069,7 @@ class GameSim extends GameSimBase {
 			clock: this.t,
 			pidFoul: fouler?.id,
 		};
+		let defender: PlayerGameSim | undefined = fouler;
 
 		// assign correct log events
 		if (fgMakeLogType === "fgPutBackAndOne" || fgMakeLogType === "fgPutBack") {
@@ -3041,8 +3082,9 @@ class GameSim extends GameSimBase {
 			fgMakeLogType === "fgAtRim"
 		) {
 			// Randomly pick a name to be dunked on
-			const pidDefense =
-				fouler?.id ?? this.pickPlayer("blocking", this.d, 5).id;
+			const pDefense = fouler ?? this.pickPlayer("blocking", this.d, 5);
+			defender = pDefense;
+			const pidDefense = pDefense.id;
 
 			this.playByPlay.logEvent({
 				...baseLogInformation,
@@ -3057,7 +3099,7 @@ class GameSim extends GameSimBase {
 				pidAst: passer?.id,
 			});
 		}
-		this.recordLastScore(this.o, p, type);
+		this.recordLastScore(this.o, p, type, passer, defender);
 
 		if (andOne && !this.elamDone) {
 			this.doPf({ t: this.d, type: "pfAndOne", shooter: p, fouler });
@@ -3163,14 +3205,19 @@ class GameSim extends GameSimBase {
 				play.type === "ft" ? " with no time on the clock" : " at the buzzer";
 		}
 
-		eventText += ` to force ${helpers.overtimeCounter(
+		const otLabel = helpers.overtimeCounter(
 			this.team[0].stat.ptsQtrs.length - this.numPeriods + 1,
-		)} overtime`;
+		);
+		eventText += ` to force ${otLabel} overtime`;
 		this.clutchPlays.push({
 			text: eventText,
 			showNotification: team.id === g.get("userTid"),
 			pids: [p.id],
 			tids: [team.id],
+			meta: {
+				...this.scoringMeta(this.lastScoringPlay.length - 1, "forceOT"),
+				otLabel,
+			},
 		});
 	}
 
@@ -3274,13 +3321,127 @@ class GameSim extends GameSimBase {
 					showNotification: team.id === g.get("userTid"),
 					pids: [p.id],
 					tids: [team.id],
+					meta: {
+						...this.scoringMeta(i, winner === -1 ? "tying" : "winner"),
+						shootout: winner === -1 && this.shootoutRounds > 0,
+					},
 				});
 				return;
 			}
 		}
 	}
 
-	recordLastScore(teamnum: TeamNum, playernum: PlayerGameSim, type: ShotType) {
+	// Flavor metadata for the scoring play at this.lastScoringPlay[i] (only reads what the sim already recorded)
+	scoringMeta(i: number, kind: "winner" | "tying" | "forceOT"): ClutchMeta {
+		const play = this.lastScoringPlay[i]!;
+		const prev = this.lastScoringPlay[i - 1];
+		let finish: "and1" | "and1Three" | "twoFt" | "threeFt" | undefined;
+		let fgPlay = play;
+		if (play.type === "ft" && prev && prev.team === play.team) {
+			if (prev.type === "threePointer") {
+				finish = "and1Three";
+				fgPlay = prev;
+			} else if (prev.type === "ft") {
+				if (kind === "forceOT") {
+					const prev2 = this.lastScoringPlay[i - 2];
+					finish =
+						prev2 && prev2.team === play.team && prev2.type === "ft"
+							? "threeFt"
+							: "twoFt";
+				}
+			} else {
+				finish = "and1";
+				fgPlay = prev;
+			}
+		}
+		return {
+			kind,
+			player: ref(play.player),
+			shot: play.type as Extract<ClutchMeta, { kind: "winner" }>["shot"],
+			finish,
+			time: play.time,
+			elam: this.elamActive,
+			ast: fgPlay.ast ? ref(fgPlay.ast) : undefined,
+			def: fgPlay.def ? ref(fgPlay.def) : undefined,
+		};
+	}
+
+	// A block, steal or forced turnover by the defense in the last 10 seconds of the 4th quarter or overtime, with the defense tied or
+	// ahead by no more than the offense could have scored on the play (2 or 3 for a block, 3 otherwise), so it stopped a go-ahead or tying
+	// score. Only a candidate: checkDefensiveStop keeps it if the defense went on to win in that period and the offense never scored again.
+	noteDefensiveStop(
+		play: "blk" | "stl" | "tov",
+		defender: PlayerGameSim,
+		opp: PlayerGameSim,
+		shot?: ShotType,
+	) {
+		const period = this.team[0].stat.ptsQtrs.length;
+		if (period < this.numPeriods || this.t > 10 || this.elamActive) {
+			return;
+		}
+		const lead = this.team[this.d].stat.pts - this.team[this.o].stat.pts;
+		const maxPts = play === "blk" && shot !== "threePointer" ? 2 : 3;
+		if (lead < 0 || lead > maxPts) {
+			return;
+		}
+		this.defensiveStop = {
+			t: this.d,
+			period,
+			oppPts: this.team[this.o].stat.pts,
+			meta: {
+				kind: "defense",
+				play,
+				player: ref(defender),
+				opp: ref(opp),
+				shot: shot as Extract<ClutchMeta, { kind: "defense" }>["shot"],
+				time: this.t,
+				lead,
+			},
+		};
+	}
+
+	checkDefensiveStop() {
+		const stop = this.defensiveStop;
+		if (!stop) {
+			return;
+		}
+		const winner = getWinner([this.team[0].stat, this.team[1].stat]);
+		const other = stop.t === 0 ? 1 : 0;
+		if (
+			winner !== stop.t ||
+			stop.period !== this.team[0].stat.ptsQtrs.length ||
+			this.team[other].stat.pts !== stop.oppPts
+		) {
+			return;
+		}
+		const { meta } = stop;
+		const verb =
+			meta.play === "blk"
+				? "blocked"
+				: meta.play === "stl"
+					? "stole the ball from"
+					: "forced a turnover by";
+		const team = this.team[stop.t];
+		this.clutchPlays.push({
+			text: `<a href="${helpers.leagueUrl(["player", meta.player.pid])}">${
+				meta.player.name
+			}</a> ${verb} <a href="${helpers.leagueUrl(["player", meta.opp.pid])}">${
+				meta.opp.name
+			}</a> with ${formatClock(meta.time)} seconds remaining to preserve the win`,
+			showNotification: team.id === g.get("userTid"),
+			pids: [meta.player.pid],
+			tids: [team.id],
+			meta,
+		});
+	}
+
+	recordLastScore(
+		teamnum: TeamNum,
+		playernum: PlayerGameSim,
+		type: ShotType,
+		ast?: PlayerGameSim,
+		def?: PlayerGameSim,
+	) {
 		// only record plays in the fourth quarter or overtime...
 		if (this.team[0].stat.ptsQtrs.length < this.numPeriods) {
 			return;
@@ -3301,6 +3462,8 @@ class GameSim extends GameSimBase {
 			player: playernum,
 			type,
 			time: this.t,
+			ast,
+			def,
 		};
 
 		if (!this.lastScoringPlay[0]) {
