@@ -10,7 +10,7 @@
 //
 // usage: node bench.cjs <profileDir> <port> <label> [outJson]
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
-const fs = require("fs");
+const fs = require("node:fs");
 const { install } = require("./route.cjs");
 const BUILD = process.env.BUILD;
 const [profile, port, label, outFile] = process.argv.slice(2);
@@ -29,8 +29,8 @@ const STORY = ".card.h-100 .card-title, [data-story]";
 	const workerMarks = async (page, clear) => {
 		for (const w of page.workers()) {
 			try {
-				const m = await w.evaluate((clear) => { const a = self.__wperf; if (!a) return null; const out = a.slice(); if (clear) a.length = 0; return out; }, clear);
-				if (m) return m;
+				const m = await w.evaluate((clear) => { const a = self.__wperf; if (!a) {return null;} const out = a.slice(); if (clear) {a.length = 0;} return out; }, clear);
+				if (m) {return m;}
 			} catch {}
 		}
 		return [];
@@ -43,10 +43,10 @@ const STORY = ".card.h-100 .card-title, [data-story]";
 		const r = await page.evaluate(({ url, sel }) => new Promise((resolve) => {
 			const t0 = performance.now();
 			let first;
-			const a = document.createElement("a"); a.href = url; document.body.appendChild(a); a.click(); a.remove();
+			const a = document.createElement("a"); a.href = url; document.body.append(a); a.click(); a.remove();
 			const iv = setInterval(() => {
 				const now = performance.now() - t0;
-				if (first === undefined && document.querySelector("[data-loading]")) first = now;
+				if (first === undefined && document.querySelector("[data-loading]")) {first = now;}
 				if (document.querySelector(sel)) { clearInterval(iv); resolve({ ms: now, first: first ?? now }); }
 			}, 4);
 		}), { url: BASE + path, sel });
@@ -58,8 +58,8 @@ const STORY = ".card.h-100 .card-title, [data-story]";
 			for (const w of page.workers()) {
 				try {
 					const out = await w.evaluate(() => self.__wperfOut ? Object.assign({}, self.__wperfOut) : null);
-					if (out) { for (const [k, v] of Object.entries(out)) fs.writeFileSync(`${process.env.DUMP}/${label}-${k}.json`, v); }
-				} catch (e) { console.log("dump err", String(e).slice(0, 200)); }
+					if (out) { for (const [k, v] of Object.entries(out)) {fs.writeFileSync(`${process.env.DUMP}/${label}-${k}.json`, v);} }
+				} catch (error) { console.log("dump err", String(error).slice(0, 200)); }
 			}
 		}
 		return { ms, first, marks };
@@ -104,7 +104,7 @@ const STORY = ".card.h-100 .card-title, [data-story]";
 		await page.waitForTimeout(4000);
 		for (const [name, path, sel] of [...scenarios, ["season", "/wrapped/season", SLIDE], ["team", "/wrapped/team", SLIDE], ["all", "/wrapped/all", SLIDE], ["storylines", "/storylines", STORY]]) {
 			// navigate away first so the same route re-opens
-			await page.evaluate((url) => { const a = document.createElement("a"); a.href = url; document.body.appendChild(a); a.click(); a.remove(); }, BASE + "/standings");
+			await page.evaluate((url) => { const a = document.createElement("a"); a.href = url; document.body.append(a); a.click(); a.remove(); }, BASE + "/standings");
 			await page.waitForTimeout(1500);
 			const r = await nav(page, path, sel);
 			results.push({ label, kind: "session", name, ...r });
@@ -112,5 +112,5 @@ const STORY = ".card.h-100 .card-title, [data-story]";
 		}
 		await ctx.close();
 	}
-	if (outFile) fs.writeFileSync(outFile, JSON.stringify(results, null, 1));
+	if (outFile) {fs.writeFileSync(outFile, JSON.stringify(results, null, 1));}
 })();

@@ -168,4 +168,31 @@ export default defineConfig(
 			"@typescript-eslint/no-var-requires": "off",
 		},
 	},
+	{
+		// Playwright benchmark scripts: CommonJS run by node, with function bodies evaluated in the page
+		files: ["tools/perf/**/*.cjs"],
+
+		languageOptions: {
+			sourceType: "commonjs",
+			globals: {
+				...globals.node,
+				...globals.browser,
+			},
+		},
+
+		rules: {
+			"@typescript-eslint/no-require-imports": "off",
+		},
+	},
+	{
+		// Scripts pasted into the worker console, where the bbgm global exists
+		files: ["tools/console-scripts/**/*.js"],
+
+		languageOptions: {
+			globals: {
+				...globals.sharedWorker,
+				bbgm: "readonly",
+			},
+		},
+	},
 );

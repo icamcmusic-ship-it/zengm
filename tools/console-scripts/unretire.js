@@ -51,12 +51,12 @@
 		await idb.cache.flush();
 		const players = await idb.league.getAll("players");
 		return players.filter((p) => {
-			if (p.tid !== PLAYER.RETIRED) return false;
-			if (p.diedYear !== undefined && p.diedYear !== null) return false;
-			if (p.unretiredByScript) return false;
-			if (!config.allowHof && p.hof) return false;
-			if (!p.born || typeof p.born.year !== "number" || !Number.isFinite(p.retiredYear)) return false;
-			if (!p.ratings || p.ratings.length === 0) return false;
+			if (p.tid !== PLAYER.RETIRED) {return false;}
+			if (p.diedYear !== undefined && p.diedYear !== null) {return false;}
+			if (p.unretiredByScript) {return false;}
+			if (!config.allowHof && p.hof) {return false;}
+			if (!p.born || typeof p.born.year !== "number" || !Number.isFinite(p.retiredYear)) {return false;}
+			if (!p.ratings || p.ratings.length === 0) {return false;}
 			return p.retiredYear - p.born.year >= config.minRetireAge;
 		});
 	}
@@ -66,11 +66,11 @@
 		let guard = 0;
 		while (player.ovr(ratings) < targetOvr && guard++ < 2000) {
 			const open = RATING_KEYS.filter((k) => ratings[k] < 100);
-			if (open.length === 0) break;
+			if (open.length === 0) {break;}
 			// Favour strong ratings (a good player gets better at what he is good at), but let weak ones move too
 			const weights = open.map((k) => 20 + ratings[k]);
 			let r = Math.random() * weights.reduce((a, b) => a + b, 0);
-			let pick = open[open.length - 1];
+			let pick = open.at(-1);
 			for (let i = 0; i < open.length; i++) {
 				r -= weights[i];
 				if (r <= 0) {
@@ -84,7 +84,7 @@
 	}
 
 	async function unretire(p) {
-		const last = p.ratings[p.ratings.length - 1];
+		const last = p.ratings.at(-1);
 		const oldOvr = last.ovr;
 		const boost = randInt(config.boostMin, config.boostMax);
 
@@ -93,7 +93,7 @@
 		if (last.season !== season) {
 			player.addRatingsRow(p);
 		}
-		const row = p.ratings[p.ratings.length - 1];
+		const row = p.ratings.at(-1);
 		row.locked = false;
 		boostTo(row, Math.min(100, oldOvr + boost));
 
@@ -107,7 +107,7 @@
 		await idb.cache.players.put(p);
 
 		const name = `${p.firstName} ${p.lastName}`;
-		const newOvr = p.ratings[p.ratings.length - 1].ovr;
+		const newOvr = p.ratings.at(-1).ovr;
 		const text = `<a href="${helpers.leagueUrl(["player", p.pid])}">${name}</a> has come out of retirement and is now a free agent.`;
 		if (config.notify && logEvent) {
 			logEvent({ type: "freeAgent", text, showNotification: true, pids: [p.pid], tids: [], score: 20 });
@@ -135,7 +135,7 @@
 	async function list() {
 		const pool = await eligible();
 		const rows = pool
-			.map((p) => ({ pid: p.pid, name: p.firstName + " " + p.lastName, retiredYear: p.retiredYear, ageAtRetirement: p.retiredYear - p.born.year, lastOvr: p.ratings[p.ratings.length - 1].ovr, hof: !!p.hof }))
+			.map((p) => ({ pid: p.pid, name: p.firstName + " " + p.lastName, retiredYear: p.retiredYear, ageAtRetirement: p.retiredYear - p.born.year, lastOvr: p.ratings.at(-1).ovr, hof: !!p.hof }))
 			.sort((a, b) => b.lastOvr - a.lastOvr);
 		console.table(rows.slice(0, 50));
 		console.log("[unretire] " + rows.length + " eligible");
@@ -154,14 +154,14 @@
 					lastRolled = key;
 					await run();
 				}
-			} catch (e) {
-				console.error("[unretire] watcher error", e);
+			} catch (error) {
+				console.error("[unretire] watcher error", error);
 			}
 		}, 3000);
 		console.log("[unretire] watching: one roll per season at phase " + config.phase + " (" + Object.keys(PHASE).find((k) => PHASE[k] === config.phase) + ")");
 	}
 	function stop() {
-		if (timer) clearInterval(timer);
+		if (timer) {clearInterval(timer);}
 		timer = null;
 		console.log("[unretire] stopped");
 	}

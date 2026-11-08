@@ -1,7 +1,7 @@
 // usage: BUILD=... node outputs.cjs <profile> <label> : opens each page once in one session and dumps what the views returned
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const { install } = require("./route.cjs");
-const fs = require("fs");
+const fs = require("node:fs");
 (async () => {
 	const [profile, label] = process.argv.slice(2);
 	const ctx = await chromium.launchPersistentContext(profile, { executablePath: process.env.CHROME, viewport: { width: 1280, height: 900 } });
@@ -14,7 +14,7 @@ const fs = require("fs");
 	const w = page.workers()[0];
 	await w.evaluate(() => { self.__wperfOn = true; });
 	const go = async (path, sel) => {
-		await page.evaluate((u) => { const a = document.createElement("a"); a.href = u; document.body.appendChild(a); a.click(); }, "/l/1" + path);
+		await page.evaluate((u) => { const a = document.createElement("a"); a.href = u; document.body.append(a); a.click(); }, "/l/1" + path);
 		await page.waitForSelector(sel);
 		await page.waitForTimeout(500);
 	};
@@ -24,7 +24,7 @@ const fs = require("fs");
 		await go(path, sel);
 	}
 	const out = await w.evaluate(() => Object.assign({}, self.__wperfOut));
-	for (const [k, v] of Object.entries(out)) fs.writeFileSync(`dump/${label}-${k}.json`, v);
+	for (const [k, v] of Object.entries(out)) {fs.writeFileSync(`dump/${label}-${k}.json`, v);}
 	console.log(label, Object.keys(out).join(","), Object.values(out).map((v) => v.length).join(","));
 	await ctx.close();
 })();

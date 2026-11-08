@@ -40,13 +40,13 @@ const { install } = require("./route.cjs");
 			}
 		}
 		if (gc > 0) {
-			const target = []; for (let s = first; s < seasons[0]; s++) target.push(s);
+			const target = []; for (let s = first; s < seasons[0]; s++) {target.push(s);}
 			for (const s of target) {
 				for (let i = 0; i < games.length; i += 300) {
 					const tx = db.transaction("games", "readwrite");
 					const st = tx.objectStore("games");
 					for (const g of games.slice(i, i + 300)) {
-						if (g.season !== seasons[seasons.length - 2]) continue;
+						if (g.season !== seasons.at(-2)) {continue;}
 						const c = structuredClone(g);
 						c.gid = ++maxGid; c.season = s;
 						st.put(c); ng++;

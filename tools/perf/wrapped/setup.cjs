@@ -35,7 +35,7 @@ const BASE = `http://localhost:3001`;
 		const t = await page.innerText(".navbar").catch(() => "");
 		const m = t.match(/(20\d\d) (preseason|regular season|playoffs|draft|free agency|after playoffs|expansion draft|re-signing)/i);
 		console.log(Math.round((Date.now() - t0) / 1000), m && m[0], "errs", errors.length);
-		if (m && Number(m[1]) >= target) break;
+		if (m && Number(m[1]) >= target) {break;}
 	}
 	await page.waitForTimeout(3000);
 	console.log("errors", JSON.stringify(errors.slice(0, 10)));
