@@ -203,8 +203,8 @@ const starCutNow = async (season: number) => {
 		if (p.tid < 0) {
 			continue;
 		}
-		const r =
-			p.ratings.findLast((x) => x.season === season) ?? p.ratings.at(-1);
+		// (that season's ratings only: a later row would leak today's ovr into an older game)
+		const r = p.ratings.findLast((x) => x.season === season);
 		if (!r) {
 			continue;
 		}
