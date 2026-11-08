@@ -147,7 +147,7 @@ Tests in `src/common/nativeFeatures.test.ts` check that every key has a default 
 ### Trade grader
 
 - **Where:** League menu → _Trade Grader_, `/l/:lid/trade_grader[/:tab/:team/:season/:ws]`; grades also show on Trade Summary and the transactions list.
-- **What:** each side of every trade graded by the win shares what it received produced for it. A toggle counts **regular season + playoffs** (default, `ws` = `all`) or **regular season only** (`rs`); Trade Summary follows the last choice made on the grader (per browser). Each side notes the titles its team won with a player it received playing for it in those playoffs.
+- **What:** each side of every trade graded by the win shares what it received produced for it. A toggle counts **regular season + playoffs** (default, `ws` = `all`) or **regular season only** (`rs`); Trade Summary and the grades on the Transactions list follow the last choice made on the grader (per browser). Each side notes the titles its team won with a player it received playing for it in those playoffs.
 
 ### Contract value
 
@@ -283,11 +283,11 @@ Unlike most of the pages above, these work in **all sports** (the trade code is 
 ## Coaching staff
 
 - **Where:** Team menu → _Coaching Staff_ (`/l/:lid/staff`, `/l/:lid/staff/:team`), League menu → _Coaches_ (`/l/:lid/coaches[/:season]`: head coaches, the season's coaching carousel, Coach of the Year history), and a page per coach (`/l/:lid/coach/:cid`). Team Finances links to the staff instead of offering the coaching slider.
-- **What:** every team has a head coach and three assistants (player development, offense, defense) with ratings (development, offense, defense, motivation), a style (pace, threes, defense, rotation, each -1 to 1), age and a contract. Salaries are paid as coaching expenses (not against the salary cap). The staff's development score is turned into an equivalent coaching budget level, so it replaces the coaching budget's effect on progs, calibrated so the league average matches the default budget (see `staff.test.ts`). After the playoffs each season: records are written to each coach, Coach of the Year is awarded, coaches age/improve/retire, contracts expire, AI teams fire (losing head coaches especially) and hire from the pool (bigger markets pay more). Your expiring coaches leave unless you _Extend_ them; firing pays half the remaining contract as a buyout. Any vacancy still open in the preseason is filled automatically.
+- **What:** every team has a head coach and three assistants (player development, offense, defense) with ratings (development, offense, defense, motivation), a style (pace, threes, defense, rotation, each -1 to 1), age and a contract. Salaries are paid as coaching expenses (not against the salary cap). The staff's development score is turned into an equivalent coaching budget level, so it replaces the coaching budget's effect on progs, calibrated so the league average matches the default budget (see `staff.test.ts`). After the playoffs each season: records are written to each coach (a coach hired or fired during the season gets only the games he was in charge of), Coach of the Year is awarded, coaches age/improve/retire, contracts expire, AI teams fire (losing head coaches especially) and hire from the pool (bigger markets pay more). Your expiring coaches leave unless you _Extend_ them; firing pays half the remaining contract as a buyout. Any vacancy still open in the preseason is filled automatically.
 - **Setting:** `coachingStaff` (basketball only). On by default for new leagues; existing leagues (DB version 76 migration) and league files from before version 76 keep the slider until it's turned on, which generates staffs.
 - **Storage:** `coaches` object store (key `cid`, index `tid`), included in league export under _All team data_.
 - **For other features:** `src/worker/core/staff/data.ts` has `getTeamCoachStyle(tid)` (for team strategy / game sim later), `getCoachingCarousel(season)`, `getHeadCoachForSeason(tid, season)` and `getCoachAwards(type)`.
-- **Known limits:** no in-game effects yet (style is exposed only). Scouts and trainers are not modeled. With the budget disabled, every team gets the average development effect, as with the slider. Mid-season hires get the whole season's record.
+- **Known limits:** no in-game effects yet (style is exposed only). Scouts and trainers are not modeled. With the budget disabled, every team gets the average development effect, as with the slider.
 
 ## Known limits (all features)
 

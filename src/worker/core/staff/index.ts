@@ -205,6 +205,21 @@ export const hire = async (
 		exp: contractStartSeason() + (years ?? randInt(2, 4)) - 1,
 	};
 	addTransaction(c, tid, role, "hired");
+	c.hiredRecord = undefined;
+	const phase = g.get("phase");
+	if (phase >= PHASE.REGULAR_SEASON && phase <= PHASE.PLAYOFFS) {
+		const ts = await getRecord(g.get("season"), tid);
+		if (ts && ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0) > 0) {
+			c.hiredRecord = {
+				season: g.get("season"),
+				tid,
+				won: ts.won,
+				lost: ts.lost,
+				tied: ts.tied ?? 0,
+				otl: ts.otl ?? 0,
+			};
+		}
+	}
 	await idb.cache.coaches.put(c);
 	if (role === "head") {
 		await logHeadCoachEvent(
@@ -237,6 +252,20 @@ export const fire = async (c: Coach) => {
 		}
 	}
 	addTransaction(c, tid, c.role, "fired");
+	// Fired during a season: he keeps the games he coached
+	const phase = g.get("phase");
+	const season = g.get("season");
+	if (
+		phase >= PHASE.REGULAR_SEASON &&
+		phase <= PHASE.PLAYOFFS &&
+		!c.stats.some((row) => row.season === season && row.tid === tid)
+	) {
+		const row = await coachedRecord(c, season, tid);
+		if (row && row.won + row.lost + row.tied + row.otl > 0) {
+			c.stats.push({ ...row, playoffRoundsWon: -1 });
+		}
+	}
+	c.hiredRecord = undefined;
 	c.tid = COACH_FREE_AGENT;
 	await idb.cache.coaches.put(c);
 	if (c.role === "head") {
@@ -447,28 +476,44 @@ const winPct = (r: {
 	return gp > 0 ? (r.won + 0.5 * (r.tied ?? 0)) / gp : 0;
 };
 
-// Record the season for every employed coach. Coaches who were hired mid-season get the full team record (simple, and how the record follows whoever was in charge at the end).
+// The team's record for the games this coach was in charge of (all of them unless he was hired during the season)
+const coachedRecord = async (c: Coach, season: number, tid: number) => {
+	const ts = await getRecord(season, tid);
+	if (!ts) {
+		return undefined;
+	}
+	const base =
+		c.hiredRecord &&
+		c.hiredRecord.season === season &&
+		c.hiredRecord.tid === tid
+			? c.hiredRecord
+			: { won: 0, lost: 0, tied: 0, otl: 0 };
+	return {
+		season,
+		tid,
+		role: c.role,
+		won: Math.max(0, ts.won - base.won),
+		lost: Math.max(0, ts.lost - base.lost),
+		tied: Math.max(0, (ts.tied ?? 0) - base.tied),
+		otl: Math.max(0, (ts.otl ?? 0) - base.otl),
+		playoffRoundsWon: ts.playoffRoundsWon,
+	};
+};
+
+// Record the season for every employed coach. Coaches hired during the season get the games since they were hired.
 const recordSeason = async () => {
 	const season = g.get("season");
 	const coaches = (await idb.cache.coaches.getAll()).filter((c) => c.tid >= 0);
 	for (const c of coaches) {
-		if (c.stats.some((row) => row.season === season)) {
+		if (c.stats.some((row) => row.season === season && row.tid === c.tid)) {
 			continue;
 		}
-		const ts = await getRecord(season, c.tid);
-		if (!ts) {
+		const row = await coachedRecord(c, season, c.tid);
+		if (!row) {
 			continue;
 		}
-		c.stats.push({
-			season,
-			tid: c.tid,
-			role: c.role,
-			won: ts.won,
-			lost: ts.lost,
-			tied: ts.tied,
-			otl: ts.otl,
-			playoffRoundsWon: ts.playoffRoundsWon,
-		});
+		c.stats.push(row);
+		c.hiredRecord = undefined;
 		await idb.cache.coaches.put(c);
 	}
 };
