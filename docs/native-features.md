@@ -59,6 +59,14 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
   - Setting: **League Settings → Events → Generate College Stats** does this automatically for every new draft class.
 - **Regenerate ratings:** rebuilds prospects into specialized builds (Floor General, Stretch Big, Rim Protector, …) without changing overall, potential or height. Scope: whole class, selected prospects or one prospect. Settings include seed, variation, class flavor and strength, builds per class, archetype diversity, specialization and rookie caps, each lockable; per-player reroll and rating locks; preview with diffs; _Apply_, _Undo last apply_ (until reload) and _Restore originals_ (survives reloads).
 
+## Archetypes
+
+- **What:** a 2K-style archetype for every basketball player (119 of them: Floor General, Sharpshooter, 3-and-D Wing, Stretch Four, Rim Protector, Point Center, ... plus rare "unicorn" types), **derived from his actual ratings**, with an optional hybrid partner ("Slasher / Playmaker"), a tier by overall within the league, a confidence and a "why" (the three ratings groups that fit best). Engine: `src/common/archetypes/` (profile scoring over BBGM's composite ratings, height gates, signature skills, league percentiles).
+- **Stored per preseason:** the label is saved on the player (`p.archetypes`, one entry per season) when the preseason phase begins, after development, so it holds all season and his history of changes is kept (it travels in league files). New leagues get a first entry for everyone; older leagues and players without an entry fall back to a live reading (stored the first time the player page is opened). Prospects are always read live, since their ratings can be regenerated.
+- **Where:** the player page (_Archetype_ line with a why popover and career history, replacing _Build_), Draft Scouting (_Archetype_ column), Advanced Player Search (_Archetype_ filter), the roster page (_Roster composition_ panel with balance warnings) and League → _Archetypes_ (`/l/:lid/archetypes`: counts, best players, trends).
+- **Regenerate ratings:** prospects can be aimed at an archetype (per prospect, or a class pool). It uses the same solver, so overall, potential and height stay exact; the preview shows the archetype the new ratings actually derive to (a check mark when it is the one asked for). The 447 builds are still available under _Advanced: build_.
+- **Known limits:** archetypes use scouting-fuzzed ratings (like skills and positions), so they can differ slightly from the true ones; aiming at a very specific archetype succeeds about four times in five at a given overall.
+
 ## Customize Player: Regenerate build
 
 - **Where:** a player page → _Edit_ (`/l/:lid/customize_player/:pid`), _Regenerate build_ button (opens a dialog).

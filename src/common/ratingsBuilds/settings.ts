@@ -37,6 +37,9 @@ export type BuildSettings = {
 	// Promise the 3 / A / R badge to builds tagged for it
 	signatureSkills: boolean;
 
+	// Archetype ids (see src/common/archetypes) the class is aimed at. Empty: the class is drawn from the builds as before.
+	archetypePool: string[];
+
 	// Keep every player's height (default). Off: height is part of what a reroll redraws.
 	keepHeights: boolean;
 	fuzz: FuzzMode;
@@ -57,6 +60,7 @@ export const DEFAULT_SETTINGS: BuildSettings = {
 	skillCap: 70,
 	physCap: 80,
 	signatureSkills: false,
+	archetypePool: [],
 	keepHeights: true,
 	fuzz: "keep",
 	pot: "keep",
@@ -99,6 +103,9 @@ export const normalizeSettings = (
 	if (!["keep", "estimate", "build"].includes(s.pot)) {
 		s.pot = "keep";
 	}
+	s.archetypePool = Array.isArray(s.archetypePool)
+		? s.archetypePool.filter((x) => typeof x === "string")
+		: [];
 	s.keepHeights = !!s.keepHeights;
 	s.signatureSkills = !!s.signatureSkills;
 	return s;

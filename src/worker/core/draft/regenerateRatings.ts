@@ -18,6 +18,13 @@ import type {
 } from "../../../common/types.basketball.ts";
 import { last } from "../../../common/utils.ts";
 import { idb } from "../../db/index.ts";
+import {
+	ARCHETYPES as ARCHETYPE_LIST,
+	currentEntry,
+	viewOf,
+	type Norms,
+} from "../../../common/archetypes/index.ts";
+import { fuzzedArchetypeLabel, getLeagueNorms } from "../player/archetype.ts";
 import { g, helpers, toUI } from "../../util/index.ts";
 import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import fuzzRating from "../player/fuzzRating.ts";
@@ -34,8 +41,11 @@ export type UiLock = {
 	// Leave him exactly as he is
 	skip?: boolean;
 
-	// Force this build
+	// Force this build (advanced)
 	build?: string;
+
+	// Aim at this archetype (an id), the default way to ask for a type of player
+	archetype?: string;
 
 	// Ratings to keep exactly where they are
 	pinKeys?: RatingKey[];
@@ -80,6 +90,14 @@ export type PreviewRow = {
 	shortfall: number;
 	build: { name: string; tags: string[] };
 	prevBuild: string | undefined;
+
+	// The archetype derived from his ratings: now, after, and how the one asked for (if any) came out
+	archetype: {
+		before: string;
+		after: string;
+		prevStored: string | undefined;
+		target?: { name: string; matched: boolean; inLabel: boolean };
+	};
 	skills: [string[], string[]];
 	hgtInches: [number | undefined, number | undefined];
 	ratings: { key: RatingKey; before: number; after: number }[];
@@ -181,6 +199,9 @@ const toEngineLock = (
 	if (lock.build) {
 		out.build = lock.build;
 	}
+	if (lock.archetype) {
+		out.archetype = lock.archetype;
+	}
 	if (lock.pinKeys && lock.pinKeys.length > 0) {
 		out.ratings = {};
 		for (const key of lock.pinKeys) {
@@ -255,6 +276,7 @@ type Computed = {
 	players: Player[];
 	inputs: { input: PlayerInput; resolved: Resolved }[];
 	result: ReturnType<typeof regenerateClass>;
+	norms: Norms;
 	inScope: Set<number>;
 };
 
@@ -265,15 +287,17 @@ const compute = async (params: RegenerateParams): Promise<Computed> => {
 	const players = await getProspects(params.draftYear);
 	const inputs = players.map((p) => makeInput(p, params.locks[p.pid]));
 	const settings = await defaultSettings(params.settings);
+	const norms = await getLeagueNorms();
 	const result = regenerateClass(
 		F,
 		inputs.map((x) => x.input),
 		settings,
+		{ norms },
 	);
 	const inScope = new Set(
 		params.pids === null ? players.map((p) => p.pid) : params.pids,
 	);
-	return { players, inputs, result, inScope };
+	return { players, inputs, result, inScope, norms };
 };
 
 const display = (value: number, fuzz: number) => fuzzRating(value, fuzz);
@@ -285,6 +309,7 @@ const makeRow = (
 	hasBase: boolean,
 	locks: UiLock,
 	hgt: number,
+	norms: Norms,
 ): PreviewRow => {
 	// "Before" is what the player has right now (not the original he was built from), so a regeneration that has already
 	// been applied previews as no change
@@ -327,6 +352,20 @@ const makeRow = (
 		shortfall: r.ovrShortfall,
 		build: r.build,
 		prevBuild: p.ratingsBuild?.name,
+		archetype: {
+			before: fuzzedArchetypeLabel(current, row.fuzz, norms),
+			after: r.skipped
+				? fuzzedArchetypeLabel(current, row.fuzz, norms)
+				: fuzzedArchetypeLabel(after.ratings, after.fuzz, norms),
+			prevStored: viewOf(currentEntry(p.archetypes))?.label,
+			target: r.target
+				? {
+						name: r.target.name,
+						matched: r.target.matched,
+						inLabel: r.target.inLabel,
+					}
+				: undefined,
+		},
 		skills: [row.skills, after.skills],
 		hgtInches: [p.hgt, after.hgtInches],
 		ratings,
@@ -340,7 +379,7 @@ const canUndo = () => undoStack !== undefined && undoStack.lid === g.get("lid");
 export const previewRegenerate = async (
 	params: RegenerateParams,
 ): Promise<PreviewResult> => {
-	const { players, inputs, result, inScope } = await compute(params);
+	const { players, inputs, result, inScope, norms } = await compute(params);
 	const rows = players.map((p, i) =>
 		makeRow(
 			p,
@@ -349,6 +388,7 @@ export const previewRegenerate = async (
 			p.ratingsBuild !== undefined,
 			params.locks[p.pid] ?? {},
 			inputs[i]!.input.ratings.hgt,
+			norms,
 		),
 	);
 	let numChanged = 0;
@@ -554,6 +594,17 @@ export const restoreOriginalRatings = async ({
 	return { restored };
 };
 
+export const getArchetypeTargets = () =>
+	ARCHETYPE_LIST.map((a) => ({
+		id: a.id,
+		name: a.name,
+		group: a.group,
+		desc: a.desc,
+		min: a.hgt[0],
+		max: a.hgt[1],
+		rare: !!a.rare,
+	}));
+
 export const getBuildList = () =>
 	ARCHETYPES.map((a) => ({
 		name: a.name,
@@ -586,6 +637,11 @@ export type SingleResult = {
 	build: { name: string; tags: string[] };
 	shortfall: number;
 	prevBuild: string | undefined;
+	archetype: {
+		before: string;
+		after: string;
+		target?: { name: string; matched: boolean; inLabel: boolean };
+	};
 	// What to save on the player, so the next regeneration starts from the same base
 	stored: StoredRatingsBuild;
 };
@@ -631,7 +687,8 @@ export const previewRegenerateSingle = async (
 			resolved.pot,
 		),
 	};
-	const r = regenerateOne(F, input, { ...settings, pot: "keep" });
+	const norms = await getLeagueNorms();
+	const r = regenerateOne(F, input, { ...settings, pot: "keep" }, { norms });
 	return {
 		ratings: RATING_KEYS.map((key) => ({
 			key,
@@ -645,6 +702,17 @@ export const previewRegenerateSingle = async (
 		build: r.build,
 		shortfall: r.ovrShortfall,
 		prevBuild: p?.ratingsBuild?.name,
+		archetype: {
+			before: fuzzedArchetypeLabel(current, params.fuzz, norms),
+			after: fuzzedArchetypeLabel(r.after.ratings, r.after.fuzz, norms),
+			target: r.target
+				? {
+						name: r.target.name,
+						matched: r.target.matched,
+						inLabel: r.target.inLabel,
+					}
+				: undefined,
+		},
 		stored: {
 			name: r.build.name,
 			tags: r.build.tags,

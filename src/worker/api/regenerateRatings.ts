@@ -5,6 +5,7 @@ import league from "../core/league/index.ts";
 export {
 	applyRegenerate,
 	applyRegenerateAllClasses,
+	getArchetypeTargets,
 	getBuildList,
 	previewRegenerate,
 	previewRegenerateAllClasses,

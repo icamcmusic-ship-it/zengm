@@ -1,4 +1,6 @@
 import { last } from "../../../common/utils.ts";
+import { ArchetypeLabel } from "../../components/Archetype/ArchetypeLabel.tsx";
+import { TIER_NAMES } from "../../../common/archetypes/index.ts";
 import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import { WatchBlock } from "../../components/WatchBlock.tsx";
@@ -604,10 +606,25 @@ const TopStuff = ({
 									<br />
 								</>
 							)}
-							{player.build ? (
+							{player.archetype ? (
 								<>
-									Build: {player.build}
+									Archetype: <ArchetypeLabel info={player.archetype} />
+									{player.archetype.tier ? (
+										<span className="text-body-secondary">
+											{" "}
+											({TIER_NAMES[player.archetype.tier]})
+										</span>
+									) : null}
 									<br />
+									{player.archetype.history.length > 1 ? (
+										<>
+											Archetype history:{" "}
+											{player.archetype.history
+												.map((h) => `${h.season} ${h.label}`)
+												.join(", ")}
+											<br />
+										</>
+									) : null}
 								</>
 							) : null}
 							Experience:{" "}

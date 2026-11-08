@@ -21,6 +21,7 @@ import { validateTeam, type SeasonType } from "../util/processInputs.ts";
 import type { processInputs } from "../views/advancedPlayerSearch.ts";
 import { actualPhase } from "../util/actualPhase.ts";
 import { player } from "../core/index.ts";
+import { archetypeLabelAt, getLeagueNorms } from "../core/player/archetype.ts";
 
 const getPlayers = async (
 	// Ignored if seasonRange is set
@@ -77,6 +78,9 @@ const getPlayers = async (
 			...options,
 			seasonRange,
 		});
+		const norms0 =
+			__SPORT === "basketball" ? await getLeagueNorms() : undefined;
+		const raw0 = new Map(playersAll.map((p) => [p.pid, p]));
 
 		return players.map(
 			({
@@ -100,9 +104,15 @@ const getPlayers = async (
 				const lastStats = stats.at(-1);
 				const useStatsSeasons = stats.length > 1 || firstStats?.abbrev !== "FA";
 
+				const peak = maxBy(ratings, (row) => row.ovr) ?? last(ratings);
+				const rawP = raw0.get(p.pid);
 				return {
 					...p,
-					ratings: maxBy(ratings, (row) => row.ovr) ?? last(ratings),
+					archetype:
+						rawP && norms0
+							? archetypeLabelAt(rawP, peak.season, norms0)
+							: undefined,
+					ratings: peak,
 					stats: {
 						...totals,
 						seasonStart: useStatsSeasons
@@ -127,6 +137,14 @@ const getPlayers = async (
 
 	const isCurrentSeason = g.get("season") === season;
 
+	// Archetype column and filter (basketball)
+	const norms = __SPORT === "basketball" ? await getLeagueNorms() : undefined;
+	const rawByPid = new Map(playersAll.map((p) => [p.pid, p]));
+	const archetypeOf = (pid: number, s: number) => {
+		const raw = rawByPid.get(pid);
+		return raw && norms ? archetypeLabelAt(raw, s, norms) : undefined;
+	};
+
 	return players.flatMap((p) => {
 		// player.formatAll `tid` option doesn't work well enough (factoring in showNoStats and showRookies), so let's do it manually
 		// For the current season, use the current team (including FA), not the last stats team
@@ -141,6 +159,7 @@ const getPlayers = async (
 		return [
 			{
 				...p,
+				archetype: archetypeOf(p.pid, season),
 				// stats can be undefined for a rookie with showRookies and without showNoStats
 				stats: {
 					...p.stats,

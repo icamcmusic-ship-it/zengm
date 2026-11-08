@@ -23,6 +23,8 @@ import {
 import { isGoldActive } from "../../common/isGoldActive.ts";
 import actions from "./actions.ts";
 import hype from "./hype.ts";
+import archetypes from "./archetypes.ts";
+import { getLeagueNorms, storeArchetype } from "../core/player/archetype.ts";
 import * as awardSettings from "./awardSettings.ts";
 import leagueFileUpload, {
 	decompressStreamIfNecessary,
@@ -5502,6 +5504,11 @@ const upsertCustomizedPlayer = async (
 	}
 	await player.updateValues(p);
 
+	// His ratings were edited by hand, so his archetype for this season is read again
+	if (__SPORT === "basketball" && p.tid >= PLAYER.FREE_AGENT) {
+		storeArchetype(p as Player, await getLeagueNorms());
+	}
+
 	if (p.tid >= 0 && p.tid !== originalTid) {
 		if (!p.transactions) {
 			p.transactions = [];
@@ -5920,6 +5927,7 @@ const whileWorkerBusy =
 
 const api = {
 	actions,
+	archetypes,
 	awardSettings,
 	eightyTwoZeroDraft,
 	exhibitionGame,

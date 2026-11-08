@@ -136,6 +136,7 @@ export const routeInfos = {
 	"/l/:lid/wrapped/:type/:season": "wrapped",
 	"/l/:lid/wrapped/:type/:season/:id": "wrapped",
 	"/l/:lid/storylines": "storylines",
+	"/l/:lid/archetypes": "archetypes",
 	"/l/:lid/hype": "hype",
 	"/l/:lid/trade_grader": "tradeGrader",
 	"/l/:lid/trade_grader/:tab": "tradeGrader",

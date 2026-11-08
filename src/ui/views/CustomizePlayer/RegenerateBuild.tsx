@@ -16,6 +16,11 @@ import { Modal } from "../../components/Modal.tsx";
 import { SkillsBlock } from "../../components/SkillsBlock.tsx";
 import { toWorker } from "../../util/toWorker.ts";
 import type { RatingKey } from "../../../common/types.basketball.ts";
+import {
+	ArchetypeOptions,
+	eligibleArchetypes,
+	type ArchetypeTargetInfo,
+} from "../../components/RegenerateRatings/ArchetypeTargets.tsx";
 import type { StoredRatingsBuild } from "../../../common/ratingsBuilds/types.ts";
 
 type BuildInfo = { name: string; min: number; max: number; tags: string[] };
@@ -61,6 +66,7 @@ export const RegenerateBuild = ({
 	const [result, setResult] = useState<SingleResult | undefined>();
 	const [error, setError] = useState<string | undefined>();
 	const [builds, setBuilds] = useState<BuildInfo[]>([]);
+	const [archetypes, setArchetypes] = useState<ArchetypeTargetInfo[]>([]);
 	const requestId = useRef(0);
 
 	const ratings = parseRatings(ratingsRow);
@@ -78,8 +84,14 @@ export const RegenerateBuild = ({
 				"getBuildList",
 				undefined,
 			);
+			const targets = await toWorker(
+				"regenerateRatings",
+				"getArchetypeTargets",
+				undefined,
+			);
 			if (mounted) {
 				setBuilds(list);
+				setArchetypes(targets);
 			}
 		})();
 		return () => {
@@ -129,6 +141,9 @@ export const RegenerateBuild = ({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [show, ratingsKey, JSON.stringify(settings), JSON.stringify(lock), pid]);
 
+	const eligibleArch = ratings
+		? eligibleArchetypes(archetypes, ratings.hgt)
+		: [];
 	const eligible = ratings
 		? builds.filter((b) => ratings.hgt >= b.min && ratings.hgt <= b.max)
 		: [];
@@ -168,24 +183,51 @@ export const RegenerateBuild = ({
 								compact
 								idPrefix="regen-one"
 							/>
-							<label className="form-label mb-0" htmlFor="regen-one-build">
-								Build
+							<label className="form-label mb-0" htmlFor="regen-one-archetype">
+								Archetype
 							</label>
 							<select
-								id="regen-one-build"
+								id="regen-one-archetype"
 								className="form-select form-select-sm mb-2"
-								value={lock.build ?? ""}
+								value={lock.archetype ?? ""}
 								onChange={(event) =>
-									setLock({ ...lock, build: event.target.value || undefined })
+									setLock({
+										...lock,
+										archetype: event.target.value || undefined,
+										build: event.target.value ? undefined : lock.build,
+									})
 								}
 							>
 								<option value="">Auto (drawn from the seed)</option>
-								{eligible.map((b) => (
-									<option key={b.name} value={b.name}>
-										{b.name}
-									</option>
-								))}
+								<ArchetypeOptions list={eligibleArch} />
 							</select>
+							<details>
+								<summary className="text-body-secondary">
+									Advanced: build
+								</summary>
+								<select
+									id="regen-one-build"
+									className="form-select form-select-sm mb-2 mt-1"
+									aria-label="Build"
+									value={lock.build ?? ""}
+									onChange={(event) =>
+										setLock({
+											...lock,
+											build: event.target.value || undefined,
+											archetype: event.target.value
+												? undefined
+												: lock.archetype,
+										})
+									}
+								>
+									<option value="">Auto (drawn from the seed)</option>
+									{eligible.map((b) => (
+										<option key={b.name} value={b.name}>
+											{b.name}
+										</option>
+									))}
+								</select>
+							</details>
 						</div>
 						<div className="col-lg-8">
 							{error ? <div className="alert alert-danger">{error}</div> : null}
@@ -193,9 +235,27 @@ export const RegenerateBuild = ({
 								<>
 									<div className="mb-2 d-flex flex-wrap column-gap-4">
 										<span>
-											Build: <b>{result.build.name}</b>{" "}
+											Archetype: <b>{result.archetype.after}</b>
+											{result.archetype.target ? (
+												<span
+													className={
+														result.archetype.target.matched
+															? "text-success"
+															: "text-warning"
+													}
+												>
+													{" "}
+													{result.archetype.target.matched ? "\u2713" : "~"}
+												</span>
+											) : null}
+											{result.archetype.before !== result.archetype.after ? (
+												<span className="text-body-secondary">
+													{" "}
+													(was {result.archetype.before})
+												</span>
+											) : null}{" "}
 											<span className="text-body-secondary">
-												{result.build.tags.join(", ")}
+												via {result.build.name}
 											</span>
 										</span>
 										<span>

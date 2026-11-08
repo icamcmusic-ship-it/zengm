@@ -32,6 +32,7 @@ import { SafeHtml } from "../../components/SafeHtml.tsx";
 import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { confirm } from "../../util/confirm.tsx";
 import { bySport } from "../../../common/sportFunctions.ts";
+import { ArchetypeRosterPanel } from "../../components/Archetype/ArchetypeRosterPanel.tsx";
 
 const handleRelease = async (
 	p: View<"roster">["players"][number],
@@ -542,6 +543,13 @@ const Roster = ({
 						: undefined
 				}
 			/>
+
+			{__SPORT === "basketball" && season === currentSeason ? (
+				<ArchetypeRosterPanel
+					tid={tid}
+					refreshKey={players.map((p) => p.pid).join(",")}
+				/>
+			) : null}
 		</>
 	);
 };

@@ -1480,6 +1480,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	scouting?: ScoutingEntry[];
 	// The user's own draft board entry for this prospect (draft board planner)
 	draftBoard?: DraftBoardEntry;
+
+	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
+	archetypes?: StoredArchetype[];
 	real?: boolean;
 	relatives: Relative[];
 	retiredYear: number;
@@ -2361,6 +2364,7 @@ import type { gameAttributesSyncedToUi } from "./gameAttributesSyncedToUi.ts";
 import type { UndoLog } from "../worker/util/UndoLog.ts";
 import type { LeagueUrlParts } from "../ui/router/types.ts";
 import type { StoredRatingsBuild } from "./ratingsBuilds/types.ts";
+import type { StoredArchetype } from "./archetypes/types.ts";
 
 type TeamStatsPlus = Record<TeamStatAttrBaseball, number> &
 	Record<TeamStatAttrByPosBaseball, number[]> &

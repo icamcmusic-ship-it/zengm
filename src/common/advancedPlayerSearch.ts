@@ -89,6 +89,17 @@ const allFiltersTemp: Record<
 				getValue: (p) => p.ratings.pos,
 				workerFieldOverride: null,
 			},
+			// Basketball: the archetype derived from his ratings (the one stored at that preseason, a live reading otherwise)
+			...(__SPORT === "basketball"
+				? {
+						archetype: {
+							colKey: "Archetype",
+							valueType: "string" as const,
+							getValue: (p: AdvancedPlayerSearchPlayer) => p.archetype ?? "",
+							workerFieldOverride: null,
+						},
+					}
+				: {}),
 			abbrev: {
 				colKey: "Team",
 				valueType: "string",
