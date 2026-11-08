@@ -289,12 +289,17 @@ export const stintFor = (
 	}
 	const living = !left && p.tid === tid;
 
-	// In-season trade: only rows after the one he had when traded (a new stats row starts with the new team). Valid only if that row is where it should be
-	let afterIndex: number | null = null;
+	// Which of his stats rows came after the trade. Trade events store statsIndex like processTrade does: for a trade before the playoffs end, the index his first row with the new team will have (it may not exist yet); after the playoffs, the index of his last row with the old team. Used only if the row there is where it should be, else rows are picked by season
+	let firstIndex: number | null = null;
 	if (start.type === "trade" && isNum(start.statsIndex) && start.statsIndex >= 0) {
+		const duringSeason = start.phase <= PHASE.PLAYOFFS;
 		const row = p.rows.find((r) => r.i === start.statsIndex);
-		if (row && row.season === start.season) {
-			afterIndex = start.statsIndex;
+		if (duringSeason) {
+			if (!row || (row.season === start.season && row.tid === tid)) {
+				firstIndex = start.statsIndex;
+			}
+		} else if (row && row.season === start.season) {
+			firstIndex = start.statsIndex + 1;
 		}
 	}
 
@@ -307,16 +312,16 @@ export const stintFor = (
 		if (r.playoffs) {
 			continue;
 		}
-		if (afterIndex !== null ? r.i <= afterIndex : r.season < from) {
+		if (firstIndex !== null ? r.i < firstIndex : r.season < from) {
 			continue;
 		}
 		if (r.season < from || r.season > endSeason) {
 			continue;
 		}
 		if (r.tid !== tid) {
-			// Played for someone else: he's gone. Without a valid statsIndex, rows of his old team in the season of an in-season trade come before it
+			// Played for someone else: he's gone. Without a valid statsIndex, rows of his old team in the season of an in-season trade may come before it
 			if (
-				(afterIndex !== null || r.season > from) &&
+				(firstIndex !== null || r.season > from) &&
 				(r.gp === null || r.gp > 0)
 			) {
 				break;

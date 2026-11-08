@@ -116,8 +116,8 @@ describe("trade grader", () => {
 		rows: [row(2022, 1, 4), row(2023, 1, 6)],
 		transactions: [{ type: "draft", tid: 1, season: 2021, phase: 5 }],
 	});
-	const statsIndexP1 = p1.rows[1]!.i;
-	const statsIndexP2 = p2.rows[0]!.i;
+	const statsIndexP1 = p1.rows[2]!.i; // in-season: his first row with the new team
+	const statsIndexP2 = p2.rows[1]!.i;
 	const L = league({
 		season: 2024,
 		phase: PHASE.REGULAR_SEASON,
@@ -212,6 +212,20 @@ describe("trade grader", () => {
 		const G3 = gradeTrades(league({ players: [p], trades: [{ eid: 40, season: 2020, phase: PHASE.DRAFT, tids: [0, 1], assets: [[{ pid: 21, name: "x", statsIndex: p.rows[0]!.i }], []] }] }));
 		expect(G3.trades[0]!.h).toBe(2021);
 		expect(G3.trades[0]!.sides[0].items[0]).toMatchObject({ now: 4, later: 0, total: 4 });
+	});
+
+	test("in-season trade back to a team he already played for that season: only the new stint counts", () => {
+		// team 0, traded to 1, traded back to 0 (trade 51), all in 2020
+		const p = player(22, {
+			tid: 0,
+			rows: [row(2020, 0, 1), row(2020, 1, 2), row(2020, 0, 3)],
+			transactions: [
+				{ type: "trade", tid: 1, season: 2020, phase: 1, eid: 50 },
+				{ type: "trade", tid: 0, season: 2020, phase: 1, eid: 51 },
+			],
+		});
+		const G4 = gradeTrades(league({ players: [p], trades: [{ eid: 51, season: 2020, phase: 1, tids: [0, 1], assets: [[{ pid: 22, name: "x", statsIndex: p.rows[2]!.i }], []] }] }));
+		expect(G4.trades[0]!.sides[0].items[0]).toMatchObject({ now: 3, total: 3, living: true });
 	});
 });
 

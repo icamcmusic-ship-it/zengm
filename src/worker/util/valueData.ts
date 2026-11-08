@@ -345,10 +345,25 @@ export const peekValueSnapshot = () => {
 	return s.last;
 };
 
-// A player's value index by completed season, only if contract values were already computed for the last snapshot (so the player page never waits for them)
-export const peekPlayerValueIndex = (pid: number) => {
-	const snap = peekValueSnapshot();
-	if (!snap || !snap.memo.has("contracts")) {
+// The snapshot if it's ready within ms (building it if needed), else the last one built, else undefined. For pages that only add grades or value when they are cheap to get (transactions, the player page), so they never wait long. The first build of a big league takes longer, and those pages pick it up the next time they load.
+export const valueSnapshotWithin = async (ms: number) => {
+	if (__SPORT !== "basketball") {
+		return undefined;
+	}
+	const built = getValueSnapshot().catch(() => undefined);
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<undefined>((resolve) => {
+		timer = setTimeout(() => resolve(undefined), ms);
+	});
+	const snap = await Promise.race([built, timeout]);
+	clearTimeout(timer);
+	return snap ?? peekValueSnapshot();
+};
+
+// A player's value index by completed season
+export const playerValueIndex = async (pid: number) => {
+	const snap = await valueSnapshotWithin(1000);
+	if (!snap) {
 		return undefined;
 	}
 	const cv = contractValueOf(snap);
