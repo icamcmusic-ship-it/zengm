@@ -39,7 +39,15 @@ const LeagueExtras = ({ initialSettings }: View<"leagueExtras">) => {
 					setDirty(true);
 				}}
 				onSave={async (settings) => {
-					await toWorker("main", "updateGameAttributesGodMode", settings);
+					// Only the League extras keys: the form leaves the other settings out, and
+					// updateGameAttributesGodMode would read missing ones (like repeatSeason) as changes
+					const gameAttributes: Record<string, unknown> = {};
+					for (const key of shown) {
+						if (Object.hasOwn(settings, key)) {
+							gameAttributes[key] = settings[key as keyof typeof settings];
+						}
+					}
+					await toWorker("main", "updateGameAttributes", gameAttributes);
 
 					setDirty(false);
 
