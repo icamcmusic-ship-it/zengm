@@ -1882,6 +1882,14 @@ export const settings: Setting[] = (
 		},
 		{
 			category: "Game Simulation",
+			key: "realisticPossessions",
+			name: "Realistic Possession Model",
+			type: "bool",
+			description:
+				"Possessions play out like in the NBA: a 24-second shot clock (14 after an offensive rebound), fast breaks and half-court possessions, late-clock shots and shot-clock violations, holding for the last shot, 2-for-1s, and intentional fouling late in games. Box score averages stay about the same.",
+		},
+		{
+			category: "Game Simulation",
 			key: "storePlayByPlay",
 			name: "Save Play-by-Play",
 			type: "bool",

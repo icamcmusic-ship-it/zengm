@@ -227,6 +227,8 @@ export const getDefaultSettings = () => {
 		),
 		// Off by default for existing leagues, on for new ones
 		technicalFouls: true,
+		// Off by default for existing leagues, on for new ones
+		realisticPossessions: true,
 		playerMoodTraits: unwrapGameAttribute(
 			defaultGameAttributes,
 			"playerMoodTraits",

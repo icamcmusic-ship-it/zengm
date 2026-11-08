@@ -652,6 +652,7 @@ export type GameAttributesLeague = {
 	storePlayByPlay: boolean;
 	// Basketball: technical and flagrant fouls, ejections in the game sim
 	technicalFouls: boolean;
+	realisticPossessions: boolean;
 	equalizeRegions: boolean;
 	fantasyPoints?: "standard" | "ppr" | "halfPpr";
 	forceRetireAge: number;
