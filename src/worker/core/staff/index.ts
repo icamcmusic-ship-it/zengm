@@ -12,6 +12,7 @@ import {
 	COACH_ROLE_NAMES,
 	coachOvr,
 	coachSalaryDemand,
+	STAFF_DEV_SCORE_REF,
 	staffDevScore,
 	staffDevScoreToLevel,
 } from "../../../common/staff.ts";
@@ -136,21 +137,49 @@ export const getStaffPayroll = async (tid: number) => {
 	return total;
 };
 
-export const getStaffLevel = async (tid: number) => {
+const getTeamDevScore = async (tid: number) => {
 	const staff = await getTeamStaff(tid);
+	return staffDevScore({
+		head: staff.head?.ratings,
+		dev: staff.dev?.ratings,
+		off: staff.off?.ratings,
+		def: staff.def?.ratings,
+	});
+};
+
+// Average dev score of the league's current staffs, the score of an "average" staff (development effect 0). Normalizing
+// by it keeps the league-wide development effect centered as the coach pool's ratings drift over the decades, so the
+// coaching staff doesn't inflate or deflate player ratings (docs/rating-inflation.md). Only the spread across teams
+// matters, like with AI coaching budgets.
+// Only for measuring the old behaviour (fixed reference) in tools/ratingInflation
+export const staffDevScoreRefOptions = { fixed: false };
+
+export const getLeagueStaffDevScoreRef = async () => {
+	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	if (teams.length === 0 || staffDevScoreRefOptions.fixed) {
+		return STAFF_DEV_SCORE_REF;
+	}
+	let total = 0;
+	for (const t of teams) {
+		total += await getTeamDevScore(t.tid);
+	}
+	return total / teams.length;
+};
+
+export const getStaffLevel = async (tid: number, ref?: number) => {
 	return staffDevScoreToLevel(
-		staffDevScore({
-			head: staff.head?.ratings,
-			dev: staff.dev?.ratings,
-			off: staff.off?.ratings,
-			def: staff.def?.ratings,
-		}),
+		await getTeamDevScore(tid),
+		ref ?? (await getLeagueStaffDevScoreRef()),
 	);
 };
 
 // Keep t.budget.coaching equal to the staff's level, which is what is recorded in teamSeason.expenseLevels and used for player development
-export const syncBudget = async (t: Team, alsoInitial?: boolean) => {
-	const level = await getStaffLevel(t.tid);
+export const syncBudget = async (
+	t: Team,
+	alsoInitial?: boolean,
+	ref?: number,
+) => {
+	const level = await getStaffLevel(t.tid, ref);
 	t.budget.coaching = level;
 	if (alsoInitial) {
 		t.initialBudget.coaching = level;
@@ -161,8 +190,9 @@ export const syncBudget = async (t: Team, alsoInitial?: boolean) => {
 
 const syncAllBudgets = async (alsoInitial?: boolean) => {
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	const ref = await getLeagueStaffDevScoreRef();
 	for (const t of teams) {
-		await syncBudget(t, alsoInitial);
+		await syncBudget(t, alsoInitial, ref);
 	}
 };
 

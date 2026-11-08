@@ -114,11 +114,18 @@ export const effectToLevel = (effect: number) => {
 	);
 };
 
-// Translate a staff into an equivalent coaching budget level (1-100), which is what player development uses
-export const staffDevScoreToLevel = (score: number) => {
+// Translate a staff into an equivalent coaching budget level (1-100), which is what player development uses. ref is the
+// score of an average staff: the league average of the current staffs (see getLeagueStaffDevScoreRef in
+// worker/core/staff), so the league-wide development effect stays centered like default AI coaching budgets, instead of
+// following the coach pool's ratings as they drift (which made rookies develop slower in a new league and faster after
+// a couple of decades, see docs/rating-inflation.md). STAFF_DEV_SCORE_REF is the fallback without a league.
+export const staffDevScoreToLevel = (
+	score: number,
+	ref: number = STAFF_DEV_SCORE_REF,
+) => {
 	const effect = Math.min(
 		0.98,
-		Math.max(-0.98, (score - STAFF_DEV_SCORE_REF) / STAFF_DEV_SCORE_SPREAD),
+		Math.max(-0.98, (score - ref) / STAFF_DEV_SCORE_SPREAD),
 	);
 	return effectToLevel(effect * BUDGET_LEVEL_SCALE);
 };
