@@ -9,9 +9,13 @@ import type {
 	WBoxLine,
 	WGame,
 	WLeague,
+	WLottery,
+	WPick,
 	WPlayer,
 	WStat,
 	WTeamSeason,
+	WTrade,
+	WTradeAsset,
 } from "../../common/wrapped/types.ts";
 import {
 	LeagueIndex,
@@ -19,6 +23,9 @@ import {
 	type LinesCache,
 } from "../../common/wrapped/league.ts";
 import type {
+	DraftLotteryResult,
+	DraftPick,
+	EventBBGM,
 	Game,
 	Player,
 	PlayerAward,
@@ -35,6 +42,7 @@ import {
 } from "./wrappedPersist.ts";
 import { hashString } from "../../common/wrapped/util.ts";
 import { getProAwards, getProStats } from "../../common/preDraft.ts";
+import { NUM_PRIOR_SEASONS_EVENTS } from "../db/Cache.ts";
 
 // Where the Wrapped and Storylines snapshot comes from. Reading and converting a whole league is slow, so the converted pieces are kept between page loads and only what changed (found through the change log, see db/changeLog.ts) is read again:
 // - players: one converted player per pid; retired players are never read again unless they are written to
@@ -195,6 +203,8 @@ const toWPlayer = (p: Player): WPlayer => ({
 		tid: t.tid,
 		type: t.type,
 		fromTid: "fromTid" in t ? t.fromTid : undefined,
+		phase: t.phase,
+		eid: "eid" in t ? t.eid : undefined,
 	})),
 	relatives: p.relatives.map((r) => ({ type: r.type, pid: r.pid })),
 	pot: Object.fromEntries(p.ratings.map((r) => [r.season, r.pot])),
@@ -215,6 +225,86 @@ const toWPlayer = (p: Player): WPlayer => ({
 	rat: Object.fromEntries(
 		p.ratings.map((r: any) => [r.season, RATING_SKILLS.map((k) => n(r[k]))]),
 	),
+	contracts: (p.contracts ?? []).map((c) => {
+		// When and by whom it was signed: the signing transaction, or the draft for a rookie contract
+		const tr =
+			c.eid !== undefined
+				? (p.transactions ?? []).find(
+						(t) => "eid" in t && t.eid === c.eid,
+					)
+				: undefined;
+		const payTid = c.payments?.find((x) => x.tid >= 0)?.tid;
+		return {
+			type: c.type,
+			start: c.start,
+			amounts: [...c.amounts],
+			signed: tr ? tr.season : c.type === "rookie" ? p.draft.year : undefined,
+			tid: tr
+				? tr.tid
+				: c.type === "rookie" && p.draft.tid >= 0
+					? p.draft.tid
+					: payTid,
+			ended: c.endedEarly
+				? {
+						season: c.endedEarly.season,
+						reason: c.endedEarly.reason,
+						tid: c.endedEarly.tid,
+					}
+				: undefined,
+		};
+	}),
+	draftOriginalTid: p.draft.originalTid,
+	draftDpid: p.draft.dpid,
+});
+
+// A trade event, with what each side received. Legacy events without the assets are left out.
+const toWTrade = (e: EventBBGM): WTrade | undefined => {
+	if (e.type !== "trade" || !e.teams) {
+		return undefined;
+	}
+	const assets = (i: 0 | 1): WTradeAsset[] =>
+		e.teams![i].assets.map((a) =>
+			"pid" in a
+				? {
+						pid: a.pid,
+						name: a.name,
+						amount: n(a.contract?.amount),
+						exp: n(a.contract?.exp),
+					}
+				: {
+						dpid: a.dpid,
+						season: a.season,
+						round: a.round,
+						originalTid: a.originalTid,
+					},
+		);
+	return {
+		eid: e.eid,
+		season: e.season,
+		phase: e.phase ?? 0,
+		tids: [e.tids[0], e.tids[1]],
+		got: [assets(0), assets(1)],
+	};
+};
+
+const toWLottery = (r: DraftLotteryResult): WLottery => ({
+	season: r.season,
+	type: r.draftType,
+	rows: r.result.map((x) => ({
+		tid: x.tid,
+		originalTid: x.originalTid,
+		chances: n(x.chances),
+		pick: n(x.pick),
+	})),
+});
+
+const toWPick = (dp: DraftPick): WPick => ({
+	dpid: dp.dpid,
+	tid: dp.tid,
+	originalTid: dp.originalTid,
+	round: dp.round,
+	season: dp.season,
+	pick: dp.pick,
 });
 
 // seed is filled in once the playoff series are known
@@ -334,12 +424,16 @@ type GamesEntry = {
 	persisted?: boolean;
 };
 
+// Trades of one season. count is how many events the season has in IndexedDB, for seasons that are no longer in the cache
+type TradesEntry = { seq: number; count: number | undefined; list: WTrade[] };
+
 type LeagueCache = {
 	lid: number;
 	epoch: number;
 	players: Map<number, PlayerEntry>;
 	teams: Map<number, TeamSeasonsEntry>;
 	games: Map<number, GamesEntry>;
+	trades: Map<number, TradesEntry>;
 	linesCache: LinesCache;
 	persistLoaded: boolean;
 	persisting: boolean;
@@ -385,6 +479,7 @@ const newCache = (lid: number): LeagueCache => ({
 	players: new Map(),
 	teams: new Map(),
 	games: new Map(),
+	trades: new Map(),
 	linesCache: newLinesCache(),
 	persistLoaded: false,
 	persisting: false,
@@ -415,6 +510,9 @@ const signature = () =>
 		changeLog.store("teamStats"),
 		changeLog.store("playoffSeries"),
 		changeLog.store("games"),
+		changeLog.store("events"),
+		changeLog.store("draftLotteryResults"),
+		changeLog.store("draftPicks"),
 		// Anything else the snapshot reads from the game attributes
 		changeLog.store("gameAttributes"),
 	].join("|");
@@ -759,6 +857,52 @@ const loadGames = async (
 	return out;
 };
 
+// Trades from the events store, read per season. A season that is no longer in the cache only changes if its events are deleted, which changes how many there are.
+const loadTrades = async (
+	c: LeagueCache,
+	seq0: number,
+	currentSeason: number,
+) => {
+	const out: WTrade[] = [];
+	const inCache = (s: number) => s >= currentSeason - NUM_PRIOR_SEASONS_EVENTS;
+	for (let s = g.get("startingSeason"); s <= currentSeason; s++) {
+		const count = inCache(s)
+			? undefined
+			: await idb.league
+					.transaction("events")
+					.store.index("season")
+					.count(s);
+		const e = c.trades.get(s);
+		let list: WTrade[];
+		if (
+			e &&
+			e.count === count &&
+			(count !== undefined || changeLog.store("events") <= e.seq)
+		) {
+			list = e.list;
+		} else if (count === 0) {
+			list = [];
+			c.trades.set(s, { seq: seq0, count, list });
+		} else {
+			const rows = await idb.merged.events.getAll(
+				{ season: s },
+				{ filter: (ev) => ev.type === "trade" },
+			);
+			list = [];
+			for (const ev of rows) {
+				const t = toWTrade(ev);
+				if (t) {
+					list.push(t);
+				}
+			}
+			list.sort((a, b) => a.eid - b.eid);
+			c.trades.set(s, { seq: seq0, count, list });
+		}
+		out.push(...list);
+	}
+	return out;
+};
+
 // What an earlier session saved. seq 0 makes an entry good until the player (or season) is written to, which the change log has already seen if it happened before the cache was loaded.
 const loadFromPersisted = async (c: LeagueCache) => {
 	c.persistLoaded = true;
@@ -885,6 +1029,17 @@ const build = async (c: LeagueCache): Promise<Built> => {
 
 	const games = await gamesPromise;
 
+	const trades = await wperfTime("snapshot.trades", () =>
+		loadTrades(c, seq0, currentSeason),
+	);
+	const lottery = (await idb.merged.draftLotteryResults.getAll())
+		.filter((r) => r.draftType !== "dummy" && r.result.length > 0)
+		.map(toWLottery)
+		.sort((a, b) => a.season - b.season);
+	const picks = (await idb.cache.draftPicks.getAll())
+		.map(toWPick)
+		.sort((a, b) => a.dpid - b.dpid);
+
 	const L: WLeague = {
 		startingSeason: g.get("startingSeason"),
 		season: currentSeason,
@@ -908,6 +1063,9 @@ const build = async (c: LeagueCache): Promise<Built> => {
 		games,
 		confs: g.get("confs").map((c) => ({ cid: c.cid, name: c.name })),
 		divs: g.get("divs").map((d) => ({ did: d.did, cid: d.cid, name: d.name })),
+		trades,
+		lottery,
+		picks,
 	};
 
 	const X = await wperfTime("index", () => {

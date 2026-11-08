@@ -23,6 +23,7 @@ import "./pages-history.ts";
 import "./pages-money.ts";
 import "./pages-playoffs.ts";
 import "./pages-colour.ts";
+import "./pages-deals.ts";
 import { playInSidebar } from "./pages-league.ts";
 import { varyPaper } from "./vary.ts";
 import {
@@ -293,8 +294,13 @@ const leaguePaper = (c: Ctx): Section[] => {
 				...awardPages,
 			])
 		: section("awards", "Awards", awardPages);
-	const teams = section("teams", "Teams", pagesFor(c, "teams", 6));
-	const players = section("players", "Players", pagesFor(c, "players", 6));
+	// The preview has no games to report, so it has room for more of these
+	const teams = section("teams", "Teams", pagesFor(c, "teams", c.pre ? 8 : 6));
+	const players = section(
+		"players",
+		"Players",
+		pagesFor(c, "players", c.pre ? 8 : 6),
+	);
 	const features = section("features", "Features", [
 		...restFeats,
 		surpriseStory(c),
@@ -309,7 +315,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 	const moves = section("moves", "Transactions", [
 		...tradeStories(c).slice(1),
 		signingsStory(c),
-		...pagesFor(c, "money", 4),
+		...pagesFor(c, "money", c.pre ? 5 : 4),
 	]);
 	const draft = section("draft", "Draft", [
 		draftStory(c),
@@ -397,7 +403,12 @@ const teamPaper = (c: Ctx, tid: number): Section[] => {
 	return compact([front, players, numbers, moves, history, league]);
 };
 
-export const buildPaper = (facts: NewsFacts, tid?: number): Paper => {
+// vary: false leaves the leads as the pages wrote them (for tests of the variation pass)
+export const buildPaper = (
+	facts: NewsFacts,
+	tid?: number,
+	opts?: { vary?: boolean },
+): Paper => {
 	const c = new Ctx(facts, tid);
 	const id = paperIdentity(facts, tid);
 	const info = editionInfo(facts);
@@ -424,7 +435,7 @@ export const buildPaper = (facts: NewsFacts, tid?: number): Paper => {
 		ticker: ticker.slice(0, 6),
 		sections,
 	};
-	return varyPaper(paper, facts);
+	return opts?.vary === false ? paper : varyPaper(paper, facts);
 };
 
 // All the text of a paper, for tests

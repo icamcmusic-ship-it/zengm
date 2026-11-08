@@ -547,6 +547,13 @@ export const getNewsFacts = async (
 				isCurrent && contract
 					? contract.start + contract.amounts.length - 1
 					: undefined,
+			contractStart: isCurrent && contract ? contract.start : undefined,
+			contractType: isCurrent && contract ? contract.type : undefined,
+			prevTid: prevLine
+				? getProStats(p)
+						.filter((s) => s.season === season - 1 && !s.playoffs)
+						.at(-1)?.tid
+				: undefined,
 		});
 		if (isCurrent && p.injury.gamesRemaining > 0 && p.tid >= 0) {
 			injuries.push({
@@ -729,6 +736,34 @@ export const getNewsFacts = async (
 			});
 		}
 	}
+	// What each traded player gave the team that got him this season, from his own stats rows
+	const tradedPids = trades.flatMap((tr) =>
+		tr.got.flat().flatMap((a) => (a.kind === "player" ? [a.pid] : [])),
+	);
+	if (tradedPids.length > 0) {
+		const tps = await idb.merged.players.getAll({
+			pids: [...new Set(tradedPids)],
+		});
+		for (const tr of trades) {
+			tr.got.forEach((side, i) => {
+				for (const a of side) {
+					const p = a.kind === "player" ? tps.find((x) => x.pid === a.pid) : undefined;
+					if (a.kind === "player" && p) {
+						const rows = getProStats(p).filter(
+							(r) => r.season === season && !r.playoffs && r.tid === tr.tids[i],
+						);
+						if (rows.length > 0) {
+							a.ws = rows.reduce(
+								(acc, r) => acc + num((r as any).ows) + num((r as any).dws),
+								0,
+							);
+						}
+					}
+				}
+			});
+		}
+	}
+
 	// Names for signed players not in the season's player list
 	const missing = signings.filter((s) => !s.name).map((s) => s.pid);
 	if (missing.length > 0) {
@@ -797,6 +832,41 @@ export const getNewsFacts = async (
 		releases: seasonEvents.filter((e) => e.type === "release").length,
 	};
 
+	// Releases, named from the season's player list or the players store
+	const releaseEvents = seasonEvents.filter(
+		(e) => e.type === "release" && e.pids?.length && e.tids?.length,
+	);
+	const releases: NonNullable<NewsFacts["releases"]> = [];
+	if (releaseEvents.length > 0) {
+		const relPlayers = await idb.merged.players.getAll({
+			pids: [...new Set(releaseEvents.map((e) => e.pids![0]!))],
+		});
+		for (const e of releaseEvents) {
+			const p = relPlayers.find((x) => x.pid === e.pids![0]);
+			if (p) {
+				releases.push({
+					pid: p.pid,
+					name: `${p.firstName} ${p.lastName}`,
+					tid: e.tids![0]!,
+				});
+			}
+		}
+	}
+
+	// The draft lottery of this season, once it has been run
+	const lotteryResult = await idb.merged.draftLotteryResults.get(season);
+	const lottery = lotteryResult
+		? lotteryResult.result
+				.map((x, i) => ({
+					tid: x.tid,
+					originalTid: x.originalTid,
+					slot: i + 1,
+					pick: num(x.pick),
+					chances: num(x.chances),
+				}))
+				.filter((x) => x.pick > 0)
+		: undefined;
+
 	const history = await getHistory(season, teams, numRounds, edition);
 
 	// Draft
@@ -859,6 +929,8 @@ export const getNewsFacts = async (
 		minPayroll: g.get("minPayroll"),
 		h2h: agg.h2h.filter((h) => h.aw + h.bw >= 2),
 		wire,
+		lottery: lottery && lottery.length > 0 ? lottery : undefined,
+		releases,
 		...history,
 	};
 	return { facts, logos };

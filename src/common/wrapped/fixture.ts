@@ -1,6 +1,7 @@
 // A deterministic fake league for tests of the Wrapped and Storylines engines
 import type { WGame, WLeague, WPlayer, WStat, WTeamSeason } from "./types.ts";
 import { seededRng } from "./util.ts";
+import { addDeals } from "./fixtureDeals.ts";
 
 export const makeLeague = (numSeasons = 4, seed = "fixture"): WLeague => {
 	const rng = seededRng(seed);
@@ -403,5 +404,5 @@ export const makeRichLeague = (numSeasons = 12, seed = "rich"): WLeague => {
 		}
 		g.att = 15000;
 	}
-	return L;
+	return addDeals(L, { seed: `${seed}|deals` });
 };

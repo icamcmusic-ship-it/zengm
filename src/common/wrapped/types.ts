@@ -71,8 +71,15 @@ export type WPlayer = {
 	injuries: { season: number; games: number; type: string }[];
 	// Overall rating by season
 	ovr: Record<number, number>;
-	// tid of each transaction (draft, sign, trade, release) with its season, oldest first
-	moves: { season: number; tid: number; type: string; fromTid?: number }[];
+	// tid of each transaction (draft, sign, trade, release) with its season, oldest first. phase and eid (the event) when the database has them
+	moves: {
+		season: number;
+		tid: number;
+		type: string;
+		fromTid?: number;
+		phase?: number;
+		eid?: number;
+	}[];
 	relatives: { type: string; pid: number }[];
 	// Potential by season, like ovr
 	pot?: Record<number, number>;
@@ -91,6 +98,61 @@ export type WPlayer = {
 	weight?: number;
 	// Skill ratings by season, in the order of RATING_SKILLS in wrappedData.ts (League achievements)
 	rat?: Record<number, number[]>;
+	// Every contract he signed, oldest first (see WContract)
+	contracts?: WContract[];
+	// Team whose pick he was drafted with, and that pick's dpid (for following traded picks)
+	draftOriginalTid?: number;
+	draftDpid?: number;
+};
+
+// A signed contract. Amounts are per season in thousands of dollars, from `start`.
+export type WContract = {
+	// "rookie", "reSign", "freeAgent" or "unknown"
+	type: string;
+	start: number;
+	amounts: number[];
+	// Season it was signed in and the team that signed it, when known
+	signed?: number;
+	tid?: number;
+	// Set when it ended before running out: released, retired, died
+	ended?: { season: number; reason: string; tid?: number };
+};
+
+// What one side of a trade received: a player (with his contract then) or a draft pick
+export type WTradeAsset =
+	| { pid: number; name: string; amount: number; exp: number }
+	| {
+			dpid: number;
+			season: number | string;
+			round: number;
+			originalTid: number;
+	  };
+
+export type WTrade = {
+	eid: number;
+	season: number;
+	// Phase of the season it was made in (PHASE in common/constants)
+	phase: number;
+	tids: [number, number];
+	// got[i]: what tids[i] received
+	got: [WTradeAsset[], WTradeAsset[]];
+};
+
+// One draft lottery. rows are in the order before the lottery (worst team first), pick is where each one ended up.
+export type WLottery = {
+	season: number;
+	type?: string;
+	rows: { tid: number; originalTid: number; chances: number; pick: number }[];
+};
+
+// A draft pick that is not used yet, owned by tid
+export type WPick = {
+	dpid: number;
+	tid: number;
+	originalTid: number;
+	round: number;
+	season: number | string;
+	pick: number;
 };
 
 export type WTeamSeason = {
@@ -196,6 +258,12 @@ export type WLeague = {
 	// Conferences and divisions as they are now
 	confs?: { cid: number; name: string }[];
 	divs?: { did: number; cid: number; name: string }[];
+	// Trades with what each side received, oldest first (only the ones whose events are still in the database)
+	trades?: WTrade[];
+	// Draft lotteries by season
+	lottery?: WLottery[];
+	// Draft picks not used yet, with who owns them now
+	picks?: WPick[];
 };
 
 export type WrappedMode = "season" | "team" | "player" | "all";

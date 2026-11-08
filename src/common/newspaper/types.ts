@@ -86,6 +86,11 @@ export type NPPlayer = NPLine & {
 	rookie: boolean;
 	contractAmount?: number; // thousands
 	contractExp?: number;
+	// First season of the current contract and what kind it is ("rookie", "reSign", "freeAgent", "unknown"), current season only
+	contractStart?: number;
+	contractType?: string;
+	// Team he finished last season with, if he played
+	prevTid?: number;
 	// Per game extras. Left out when the file does not have them
 	gs?: number; // games started
 	ftp?: number;
@@ -205,7 +210,15 @@ export type NPTrade = {
 };
 
 export type NPTradeAsset =
-	| { kind: "player"; pid: number; name: string; amount?: number; exp?: number }
+	| {
+			kind: "player";
+			pid: number;
+			name: string;
+			amount?: number;
+			exp?: number;
+			// Win shares this season for the team that received him
+			ws?: number;
+	  }
 	| {
 			kind: "pick";
 			season: number | "fantasy" | "expansion";
@@ -385,7 +398,23 @@ export type NewsFacts = {
 	careerBoard?: NPCareerRow[];
 	// Counts for the transaction wire
 	wire?: { trades: number; freeAgents: number; reSigned: number; releases: number };
+	// This season's draft lottery, in the order before it (worst team first)
+	lottery?: NPLotteryRow[];
+	// Players released this season
+	releases?: NPRelease[];
 };
+
+export type NPLotteryRow = {
+	tid: number;
+	// Team whose pick it was
+	originalTid: number;
+	// Place before the lottery and the pick it gave
+	slot: number;
+	pick: number;
+	chances: number;
+};
+
+export type NPRelease = { pid: number; name: string; tid: number };
 
 // Output
 

@@ -137,6 +137,9 @@ export const makeFixture = (
 				college: pid % 3 === 0 ? "State" : undefined,
 				country: pid % 4 === 0 ? "Canada" : "USA",
 				jersey: String(pid % 99),
+				contractStart: season - (pid % 3),
+				contractType: ["rookie", "reSign", "freeAgent"][pid % 3],
+				prevTid: pid % 6 === 0 ? (tid + 1 + (season % 3)) % NUM_TEAMS : tid,
 			});
 			pid += 1;
 		}
@@ -247,8 +250,8 @@ export const makeFixture = (
 				]
 			: [],
 		trades: [
-			{ phase: 1, tids: [season % 5, 5 + (season % 6)], got: [[{ kind: "player", pid: 30 + (season % 30), name: players[30 + (season % 30)]!.name }], [{ kind: "pick", season: season + 1, round: 1, originalTid: 0 }]], score: 10 },
-			{ phase: 1, tids: [(season + 2) % 4, 4 + ((season + 1) % 6)], got: [[{ kind: "player", pid: 45 + (season % 20), name: players[45 + (season % 20)]!.name }], [{ kind: "player", pid: 70 + (season % 20), name: players[70 + (season % 20)]!.name }]], score: 6 },
+			{ phase: 1, tids: [season % 5, 5 + (season % 6)], got: [[{ kind: "player", pid: 30 + (season % 30), name: players[30 + (season % 30)]!.name, ws: gp ? 1 + (season % 6) : undefined }], [{ kind: "pick", season: season + 1, round: 1, originalTid: 0 }]], score: 10 },
+			{ phase: 1, tids: [(season + 2) % 4, 4 + ((season + 1) % 6)], got: [[{ kind: "player", pid: 45 + (season % 20), name: players[45 + (season % 20)]!.name, ws: gp ? 0.5 + (season % 4) : undefined }], [{ kind: "player", pid: 70 + (season % 20), name: players[70 + (season % 20)]!.name, ws: gp ? 2.5 - (season % 3) : undefined }]], score: 6 },
 		],
 		signings: ([
 			{ kind: "freeAgent", phase: 8, pid: 70 + (season % 20), name: players[70 + (season % 20)]!.name, tid: 5, amount: 18000 + (season % 7) * 500, exp: season + 3, score: 5 },
@@ -338,6 +341,10 @@ export const makeFixture = (
 			ws: 120 - i * 5,
 			seasons: 14,
 		})),
+		lottery: final
+			? [0, 1, 2, 3, 4].map((i) => ({ tid: M(11 - i), originalTid: M(11 - i), slot: i + 1, pick: [[1, 2, 3, 4, 5], [3, 1, 2, 4, 5], [1, 4, 2, 3, 5], [2, 3, 5, 1, 4]][season % 4]![i]!, chances: [140, 140, 140, 125, 105][i]! }))
+			: undefined,
+		releases: Array.from({ length: 2 + (season % 4) }, (_, i) => ({ pid: 90 + i, name: players[90 + i]!.name, tid: (i + season) % NUM_TEAMS })),
 		wire: { trades: 4 + (season % 6), freeAgents: 18 + (season % 9), reSigned: 7 + (season % 5), releases: 10 + (season % 7) },
 	};
 };

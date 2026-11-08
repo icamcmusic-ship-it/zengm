@@ -165,6 +165,10 @@ const RULES: Rule[] = [
 
 const norm = (s: string) => s.replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, " ").trim();
 
+// The rule a plain lead paragraph matches, if any
+export const ruleOf = (text: string) =>
+	RULES.find((r) => r.re.test(norm(text)))?.id;
+
 export const varyStats = () => ({
 	rules: RULES.length,
 	alts: RULES.reduce((a, r) => a + r.alts.length, 0),
