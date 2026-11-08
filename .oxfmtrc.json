@@ -6,6 +6,7 @@
 	"ignorePatterns": [
 		"data/real-player-*.json",
 		"**/realSchedules*.json",
-		"CLA-*.md"
+		"CLA-*.md",
+		"src/common/leagueAchievements/*.generated.ts"
 	]
 }

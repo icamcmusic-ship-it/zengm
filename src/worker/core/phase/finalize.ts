@@ -16,6 +16,7 @@ import type { Conditions, Phase, PhaseReturn } from "../../../common/types.ts";
 import { getGlobalSettings } from "../../util/getGlobalSettings.ts";
 import { processScheduledEvents } from "./processScheduledEvents.ts";
 import { autoPlayStopsAt, cleanupAutoPlay } from "../league/autoPlay.ts";
+import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
 
 const save = async () => {
 	await updateStatus("Saving...");
@@ -103,6 +104,9 @@ const finalize = async (
 			});
 		}
 	}
+
+	// League achievements unlocked by this phase change (waits while auto playing)
+	scheduleLeagueAchievementsCheck();
 
 	// Save a reference, since local.autoPlayUntil might be cleared during an await below, if the user stops auto play
 	const autoPlayUntil = local.autoPlayUntil;

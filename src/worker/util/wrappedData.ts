@@ -88,6 +88,9 @@ const toStat = (r: any): WStat => ({
 	stlMax: opt(r.stlMax),
 	blkMax: opt(r.blkMax),
 	tpMax: opt(r.tpMax),
+	obpm: opt(r.obpm),
+	dbpm: opt(r.dbpm),
+	jersey: r.jerseyNumber === undefined ? undefined : String(r.jerseyNumber),
 });
 
 const toBox = (p: any): WBoxLine => ({
@@ -110,6 +113,7 @@ const toBox = (p: any): WBoxLine => ({
 	drb: opt(p.drb),
 	pf: opt(p.pf),
 	pm: opt(p.pm),
+	gs: opt(p.gs),
 });
 
 const TEAM_ORD = ["First", "Second", "Third", "Fourth", "Fifth"];
@@ -134,6 +138,25 @@ const awardOf = (a: PlayerAward): WAward[] => {
 		},
 	];
 };
+
+// The skill ratings kept per season in WPlayer.rat
+export const RATING_SKILLS = [
+	"hgt",
+	"stre",
+	"spd",
+	"jmp",
+	"endu",
+	"ins",
+	"dnk",
+	"ft",
+	"fg",
+	"tp",
+	"oiq",
+	"diq",
+	"drb",
+	"pss",
+	"reb",
+] as const;
 
 const toWPlayer = (p: Player): WPlayer => ({
 	pid: p.pid,
@@ -187,6 +210,11 @@ const toWPlayer = (p: Player): WPlayer => ({
 	draftOvr: p.draft.ovr,
 	draftPot: p.draft.pot,
 	jersey: p.stats.findLast((r) => r.jerseyNumber)?.jerseyNumber,
+	hgtIn: opt(p.hgt),
+	weight: opt(p.weight),
+	rat: Object.fromEntries(
+		p.ratings.map((r: any) => [r.season, RATING_SKILLS.map((k) => n(r[k]))]),
+	),
 });
 
 // seed is filled in once the playoff series are known
@@ -227,6 +255,9 @@ const toWTeamSeason = (
 	pop: ts.pop,
 	streak: ts.streak,
 	numPlayersTradedAway: ts.numPlayersTradedAway,
+	tiedHome: ts.tiedHome,
+	tiedAway: ts.tiedAway,
+	luxuryTax: opt(ts.expenses?.luxuryTax),
 });
 
 const toWGame = (gm: Game): WGame => ({
@@ -265,6 +296,7 @@ const persistVersion = () =>
 			toWGame,
 			getProStats,
 			getProAwards,
+			RATING_SKILLS,
 		]
 			.map((f) => f.toString())
 			.join("\n"),
@@ -869,6 +901,7 @@ const build = async (c: LeagueCache): Promise<Built> => {
 					away: m.away
 						? { tid: m.away.tid, seed: m.away.seed, won: m.away.won }
 						: undefined,
+					gids: m.gids,
 				})),
 			),
 		})),

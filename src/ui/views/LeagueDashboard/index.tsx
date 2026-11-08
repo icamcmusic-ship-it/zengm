@@ -8,6 +8,7 @@ import TeamStats from "./TeamStats.tsx";
 import type { View } from "../../../common/types.ts";
 import Headlines from "./Headlines.tsx";
 import GamesToWatch from "./GamesToWatch.tsx";
+import RecentAchievements from "./RecentAchievements.tsx";
 import { useLocal } from "../../util/local.ts";
 
 const LeagueDashboard = ({
@@ -199,6 +200,9 @@ const LeagueDashboard = ({
 						season={season}
 						teams={teams}
 						userTid={userTid}
+					/>
+					<RecentAchievements
+						refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
 					/>
 					{__SPORT === "basketball" ? (
 						<div className="mt-3">

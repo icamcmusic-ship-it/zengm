@@ -2440,6 +2440,8 @@ export type UpdateEvent =
 	// The Wrapped and Storylines snapshot finished building, or made progress
 	| "wrappedReady"
 	| "wrappedProgress"
+	// A League achievement was unlocked
+	| "leagueAchievements"
 
 	// This should be used for things that do stuff like "select all players on watch list", not updating the watch property for individual players. crossTabEmit handles that automatically.
 	| "watchList";
