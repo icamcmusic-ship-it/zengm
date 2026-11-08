@@ -16,6 +16,7 @@ import writePlayerStats, {
 	P_FATIGUE_DAILY_REDUCTION,
 } from "./writePlayerStats.ts";
 import writeTeamStats from "./writeTeamStats.ts";
+import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
 import { idb } from "../../db/index.ts";
 import {
 	g,
@@ -111,6 +112,9 @@ const play = async (
 		}
 
 		await updatePlayMenu();
+
+		// League achievements unlocked by these games
+		scheduleLeagueAchievementsCheck();
 	};
 
 	// Saves a vector of results objects for a day, as is output from cbSimGames

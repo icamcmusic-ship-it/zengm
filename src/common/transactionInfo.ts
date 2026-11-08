@@ -92,6 +92,10 @@ export const types: Partial<
 		text: "Award",
 		category: "award",
 	},
+	achievement: {
+		text: "Achievement",
+		category: "league",
+	},
 	hallOfFame: {
 		text: "Hall of Fame",
 		category: "award",

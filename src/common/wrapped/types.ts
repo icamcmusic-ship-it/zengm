@@ -42,6 +42,10 @@ export type WStat = {
 	stlMax?: number;
 	blkMax?: number;
 	tpMax?: number;
+	// Box plus-minus split, and the jersey number worn (League achievements)
+	obpm?: number;
+	dbpm?: number;
+	jersey?: string;
 };
 
 export type WAward = { season: number; type: string };
@@ -82,6 +86,11 @@ export type WPlayer = {
 	draftOvr?: number;
 	draftPot?: number;
 	jersey?: string;
+	// Listed height in inches and weight in pounds (League achievements)
+	hgtIn?: number;
+	weight?: number;
+	// Skill ratings by season, in the order of RATING_SKILLS in wrappedData.ts (League achievements)
+	rat?: Record<number, number[]>;
 };
 
 export type WTeamSeason = {
@@ -121,13 +130,17 @@ export type WTeamSeason = {
 	// Current winning (positive) or losing (negative) streak at the end of the season
 	streak?: number;
 	numPlayersTradedAway?: number;
+	// League achievements
+	tiedHome?: number;
+	tiedAway?: number;
+	luxuryTax?: number;
 };
 
 export type WSeriesTeam = { tid: number; seed: number; won: number };
 
 export type WSeries = {
 	season: number;
-	rounds: { home: WSeriesTeam; away?: WSeriesTeam }[][];
+	rounds: { home: WSeriesTeam; away?: WSeriesTeam; gids?: number[] }[][];
 };
 
 export type WBoxLine = {
@@ -150,6 +163,8 @@ export type WBoxLine = {
 	drb?: number;
 	pf?: number;
 	pm?: number;
+	// 1 if he started
+	gs?: number;
 };
 
 export type WGame = {

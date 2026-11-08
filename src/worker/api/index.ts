@@ -197,6 +197,7 @@ import { ValueChangeCalculator } from "../core/team/ValueChangeCalculator.ts";
 import type { GenOrderResult } from "../core/draft/genOrder.ts";
 import undoLog from "./undoLog.ts";
 import { getStorylineWhy } from "../util/storylinesData.ts";
+import { getRecentLeagueAchievements } from "../util/leagueAchievements.ts";
 import * as regenerateRatings from "./regenerateRatings.ts";
 import {
 	getAwardsByPlayer,
@@ -5738,6 +5739,7 @@ const api = {
 		getRandomRatings,
 		getRandomTeams,
 		getStorylineWhy,
+		getRecentLeagueAchievements,
 		getPlayersForScheduledEvents,
 		getSavedTrade,
 		getTeamGraphStat,

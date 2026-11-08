@@ -89,6 +89,21 @@ const wrappedLinks: MenuItemLink[] =
 			]
 		: [];
 
+// Achievements unlocked by the league itself, unlike the account achievements in Tools (basketball only)
+const leagueAchievementsLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "leagueAchievements",
+					league: true,
+					commandPalette: true,
+					path: ["league_achievements"],
+					text: "League Achievements",
+				},
+			]
+		: [];
+
 // Game hype and record chases (basketball only)
 const hypeLinks: MenuItemLink[] =
 	__SPORT === "basketball"
@@ -252,6 +267,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 				text: "History",
 			},
 			...wrappedLinks,
+			...leagueAchievementsLinks,
 			{
 				type: "link",
 				active: (pageID) => pageID === "powerRankings",
