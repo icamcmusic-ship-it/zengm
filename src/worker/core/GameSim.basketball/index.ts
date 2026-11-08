@@ -19,6 +19,29 @@ import getWinner from "../../../common/getWinner.ts";
 import { formatClock } from "../../../common/formatClock.ts";
 import PlayByPlayLogger from "./PlayByPlayLogger.ts";
 import { choice, truncGauss, uniform } from "../../../common/random.ts";
+import {
+	drawBackcourtTime,
+	drawHalfCourtSearch,
+	drawOrbQuickShot,
+	drawRestartSearch,
+	drawTransitionTime,
+	gaussian,
+	HALF_COURT_SEARCH_MODE,
+	ORB_RESET_SEARCH_MEAN,
+	ORB_RESET_SEARCH_SD,
+	paceScales,
+	PROB_ORB_QUICK_SHOT,
+	PROB_TRANSITION,
+	PROB_VIOLATION_IN_CRISIS,
+	SHOT_CLOCK_FULL,
+	SHOT_CLOCK_RESET_ORB,
+	shotClockMakeFactor,
+	teamPaceFactor,
+	deriveTraits,
+	NEUTRAL_TRAITS,
+	type Traits,
+	TOV_SCALE,
+} from "./possessionModel.ts";
 
 const SHOT_CLOCK = 24;
 // const NUM_TIMEOUTS_MAX_FINAL_PERIOD = 4;
@@ -229,6 +252,19 @@ class GameSim extends GameSimBase {
 	ejected = new Set<PlayerGameSim>();
 	techs = new Map<PlayerGameSim | number, number>();
 	flagrants = new Map<PlayerGameSim, number>();
+	// The realistic possession model (the realisticPossessions setting, see possessionModel.ts): a real shot clock, transition and
+	// half-court possessions, late-clock shots and violations, end-of-period clock management. When it is off, nothing here is used and no
+	// extra random numbers are drawn, so games play out exactly as before
+	realPoss: boolean;
+	shotClock = SHOT_CLOCK_FULL;
+	shotClockViolations: [number, number] = [0, 0];
+	teamPaceFactor: [number, number] = [1, 1];
+	// Ratings-derived inputs (see possessionModel.ts Traits), refreshed with the team composite ratings
+	traits: [Traits, Traits] = [{ ...NEUTRAL_TRAITS }, { ...NEUTRAL_TRAITS }];
+	possTimeScale = 1;
+	gameClockFactor = 1;
+	// The current segment of the possession followed a shot or free throw attempt (for the shot clock reset when it goes out off the defense)
+	afterShotAttempt = false;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -298,6 +334,17 @@ class GameSim extends GameSimBase {
 
 		// Sanity check for very small values - things behave weirdly below this
 		this.paceFactor = Math.max(this.paceFactor, 0.1);
+
+		this.realPoss = !!g.get("realisticPossessions");
+		if (this.realPoss) {
+			const scales = paceScales(this.paceFactor);
+			this.possTimeScale = scales.possTimeScale;
+			this.gameClockFactor = scales.gameClockFactor;
+			this.teamPaceFactor = [
+				teamPaceFactor(this.team[0].pace),
+				teamPaceFactor(this.team[1].pace),
+			];
+		}
 
 		this.foulsThisQuarter = [0, 0];
 		this.foulsLastTwoMinutes = [0, 0];
@@ -723,6 +770,10 @@ class GameSim extends GameSimBase {
 			return;
 		}
 
+		if (this.realPoss) {
+			return this.getClockFactorRealistic();
+		}
+
 		if (this.shouldIntentionalFoul()) {
 			return "intentionalFoul";
 		}
@@ -811,6 +862,12 @@ class GameSim extends GameSimBase {
 		) {
 			// Time to gather ball after shot was made, and then to inbound it too
 			dt += uniform(1, 5);
+			if (this.realPoss) {
+				// (2-3 s on average in the NBA; it runs off the game clock, not the shot clock)
+				dt *=
+					(0.75 * this.possTimeScale * this.gameClockFactor) /
+					this.teamPaceFactor[this.o];
+			}
 		}
 
 		return dt;
@@ -854,6 +911,13 @@ class GameSim extends GameSimBase {
 		this.t -= dtInbound;
 		this.possessionLength = 0;
 		this.isClockRunning = true; // Set after computing dtIinbound!
+		if (this.realPoss) {
+			this.resetShotClock();
+			this.traits = [
+				deriveTraits(this.team[0].compositeRating),
+				deriveTraits(this.team[1].compositeRating),
+			];
+		}
 
 		const clockFactor = this.getClockFactor();
 		const outcome = this.getPossessionOutcome(clockFactor);
@@ -1465,10 +1529,20 @@ class GameSim extends GameSimBase {
 		}
 
 		// Adjust for pace up until near the end of the period, so we don't make end of game stuff too weird
-		const secondsAdjusted =
-			this.t - seconds / this.paceFactor > 40
-				? seconds / this.paceFactor
-				: seconds;
+		let secondsAdjusted;
+		if (this.realPoss) {
+			// Possession times are already scaled for pace (possessionModel.ts); only extra dead time for a very slow pace setting
+			this.shotClock -= seconds;
+			secondsAdjusted =
+				this.t - seconds * this.gameClockFactor > 40
+					? seconds * this.gameClockFactor
+					: seconds;
+		} else {
+			secondsAdjusted =
+				this.t - seconds / this.paceFactor > 40
+					? seconds / this.paceFactor
+					: seconds;
+		}
 
 		if (secondsAdjusted > this.t) {
 			this.possessionLength += this.t;
@@ -1518,27 +1592,9 @@ class GameSim extends GameSimBase {
 
 		// With not much time on the clock at the end of a quarter, possession might end with the clock running out
 		if (this.t <= 6 && !tipInFromOutOfBounds) {
-			// When lateGamePutBack is true, more likely to get a shot up
-			if (
-				this.t <= 0.1 ||
-				Math.random() > (this.t / 8) ** (1 / (lateGamePutBack ? 12 : 6))
-			) {
-				const period = this.team[this.o].stat.ptsQtrs.length;
-				const pointDifferential =
-					this.team[this.o].stat.pts - this.team[this.d].stat.pts;
-				this.advanceClockSeconds(Infinity);
-				this.playByPlay.logEvent({
-					type: "endOfPeriod",
-					t: this.o,
-					clock: this.t,
-					reason:
-						clockFactor === "intentionalFoul"
-							? "intentionalFoul"
-							: period >= this.numPeriods && pointDifferential > 0
-								? "runOutClock"
-								: "noShot",
-				});
-				return "endOfPeriod";
+			const noShot = this.noShotBeforeBuzzer(clockFactor, lateGamePutBack);
+			if (noShot) {
+				return noShot;
 			}
 		}
 
@@ -1548,6 +1604,120 @@ class GameSim extends GameSimBase {
 			this.prevPossessionOutcome === "nonShootingFoul" ||
 			(this.prevPossessionOutcome === "timeout" && timeoutAdvancesBall);
 
+		if (this.realPoss) {
+			return this.getPossessionOutcomeRealistic(
+				clockFactor,
+				possessionStartsInFrontcourt,
+				tipInFromOutOfBounds,
+				lateGamePutBack,
+			);
+		}
+
+		const timeout = this.maybeTimeoutToAdvanceBall(
+			possessionStartsInFrontcourt,
+			timeoutAdvancesBall,
+		);
+		if (timeout) {
+			return timeout;
+		}
+
+		// Simulate backcourt events, only if necessary
+		if (!possessionStartsInFrontcourt) {
+			// Turnover in backcourt? Actually for possessions starting in backcourt, currently this simulates
+			if (this.t > 0.2 && Math.random() < this.probTov()) {
+				let dt;
+				if (this.t < 8 || clockFactor === "intentionalFoul") {
+					dt = uniform(0.1, Math.min(this.t, 5));
+				} else {
+					dt = uniform(1, 8);
+				}
+				this.advanceClockSeconds(dt);
+				return this.doTov();
+			}
+
+			// Offense loses ball out of bounds, but retains possession
+			if (Math.random() < 0.01) {
+				return this.doOutOfBounds(1);
+			}
+		}
+
+		const shooter = this.pickPlayer("usage", this.o, 1.25);
+
+		// Flagrant foul? (only with the technicalFouls setting, so otherwise no random number is drawn here)
+		if (
+			this.techFouls &&
+			clockFactor !== "intentionalFoul" &&
+			this.t > 10 &&
+			Math.random() <
+				TECHNICAL_FOUL_RATES.flagrantPerPossession * g.get("foulRateFactor")
+		) {
+			return this.doFlagrantFoul(shooter);
+		}
+
+		// Non-shooting foul?
+		if (
+			Math.random() < this.probNonShootingFoul() ||
+			clockFactor === "intentionalFoul"
+		) {
+			return this.doNonShootingFoulPossession(shooter, clockFactor);
+		}
+
+		// Time to advance ball to frontcourt
+		if (!possessionStartsInFrontcourt) {
+			const upperLimitMin =
+				clockFactor === "catchUp" ? 1 : clockFactor === "maintainLead" ? 4 : 2;
+			const min = Math.max(Math.min(this.t - 0.3, upperLimitMin), 0);
+			const upperLimitMax =
+				clockFactor === "catchUp" ? 4 : clockFactor === "maintainLead" ? 8 : 6;
+			const max = Math.max(Math.min(this.t - 0.3, upperLimitMax), 0);
+			const dt = uniform(min, max);
+			this.advanceClockSeconds(dt);
+		}
+
+		// Shot!
+		return this.doShot(
+			shooter,
+			clockFactor,
+			possessionStartsInFrontcourt,
+			tipInFromOutOfBounds,
+			lateGamePutBack,
+		);
+	}
+
+	// The possession ends with the clock running out before a shot goes up (end of a period), or undefined if a shot can still be tried
+	noShotBeforeBuzzer(
+		clockFactor: ClockFactor,
+		lateGamePutBack: boolean,
+	): PossessionOutcome | undefined {
+		// When lateGamePutBack is true, more likely to get a shot up
+		if (
+			this.t <= 0.1 ||
+			Math.random() > (this.t / 8) ** (1 / (lateGamePutBack ? 12 : 6))
+		) {
+			const period = this.team[this.o].stat.ptsQtrs.length;
+			const pointDifferential =
+				this.team[this.o].stat.pts - this.team[this.d].stat.pts;
+			this.advanceClockSeconds(Infinity);
+			this.playByPlay.logEvent({
+				type: "endOfPeriod",
+				t: this.o,
+				clock: this.t,
+				reason:
+					clockFactor === "intentionalFoul"
+						? "intentionalFoul"
+						: period >= this.numPeriods && pointDifferential > 0
+							? "runOutClock"
+							: "noShot",
+			});
+			return "endOfPeriod";
+		}
+	}
+
+	// Late in the game, a trailing team may call a timeout to advance the ball to the frontcourt
+	maybeTimeoutToAdvanceBall(
+		possessionStartsInFrontcourt: boolean,
+		timeoutAdvancesBall: boolean,
+	): PossessionOutcome | undefined {
 		if (
 			!possessionStartsInFrontcourt &&
 			timeoutAdvancesBall &&
@@ -1610,30 +1780,337 @@ class GameSim extends GameSimBase {
 				return "timeout";
 			}
 		}
+	}
 
-		// Simulate backcourt events, only if necessary
-		if (!possessionStartsInFrontcourt) {
-			// Turnover in backcourt? Actually for possessions starting in backcourt, currently this simulates
-			if (this.t > 0.2 && Math.random() < this.probTov()) {
-				let dt;
-				if (this.t < 8 || clockFactor === "intentionalFoul") {
-					dt = uniform(0.1, Math.min(this.t, 5));
-				} else {
-					dt = uniform(1, 8);
+	// A non-shooting foul (or an intentional foul, with that clockFactor). dtNormal, if given, is when an ordinary foul happens
+	doNonShootingFoulPossession(
+		shooter: PlayerGameSim,
+		clockFactor: ClockFactor,
+		dtNormal?: () => number,
+	): PossessionOutcome {
+		let dt;
+		if (clockFactor === "intentionalFoul") {
+			if (this.t < 8) {
+				if (this.t <= 0.2 || (this.t < 1 && Math.random() > this.t)) {
+					// Time ran out while trying to foul
+					this.advanceClockSeconds(Infinity);
+					this.playByPlay.logEvent({
+						type: "endOfPeriod",
+						t: this.o,
+						clock: this.t,
+						reason: "intentionalFoul",
+					});
+					return "endOfPeriod";
 				}
-				this.advanceClockSeconds(dt);
-				return this.doTov();
+				dt = uniform(0.1, Math.min(this.t - 0.2, 4));
+			} else {
+				dt = uniform(1, 5);
 			}
+		} else if (dtNormal) {
+			dt = dtNormal();
+		} else {
+			if (this.t < 2) {
+				dt = uniform(0, this.t);
+			} else {
+				dt = uniform(1, Math.min(this.t, SHOT_CLOCK - this.possessionLength));
+			}
+		}
+		this.advanceClockSeconds(dt);
+		this.isClockRunning = false;
 
-			// Offense loses ball out of bounds, but retains possession
-			if (Math.random() < 0.01) {
-				return this.doOutOfBounds(1);
+		// In the bonus? Checks offset by 1, because the foul counter won't increment until doPf is called below
+		const numFoulsUntilBonus = this.getNumFoulsUntilBonus();
+		const inBonus = numFoulsUntilBonus <= 1;
+
+		if (this.t <= 0) {
+			throw new Error("Clock at 0 for non-shooting foul");
+		}
+
+		if (inBonus) {
+			this.doPf({ t: this.d, type: "pfBonus", shooter });
+		} else {
+			this.doPf({ t: this.d, type: "pfNonShooting" });
+		}
+
+		if (inBonus) {
+			return this.doFt(shooter, 2);
+		}
+
+		return "nonShootingFoul";
+	}
+
+	// ---- Realistic possession model (realisticPossessions setting; see possessionModel.ts) ----
+
+	// The "poss" of a play-by-play event: seconds of shot clock used (what the text reads as "late in the shot clock"), or with the shot clock
+	// off, or in the old model, seconds since the possession started
+	eventPoss() {
+		if (this.realPoss && this.t > this.shotClock) {
+			return SHOT_CLOCK_FULL - this.shotClock;
+		}
+		return this.possessionLength;
+	}
+
+	// At the start of each segment of a possession: a full 24 on a change of possession, 14 after an offensive rebound (or a missed shot out of
+	// bounds off the defense), at least 14 after a defensive foul, unchanged after a timeout or the ball going out off the defense
+	resetShotClock() {
+		const prev = this.prevPossessionOutcome;
+		if (prev === "orb") {
+			this.shotClock = SHOT_CLOCK_RESET_ORB;
+		} else if (prev === "nonShootingFoul") {
+			this.shotClock = Math.max(SHOT_CLOCK_RESET_ORB, this.shotClock);
+		} else if (prev === "outOfBoundsDefense") {
+			this.shotClock = this.afterShotAttempt
+				? SHOT_CLOCK_RESET_ORB
+				: Math.max(1, this.shotClock);
+		} else if (prev === "timeout") {
+			this.shotClock = Math.max(1, this.shotClock);
+		} else {
+			this.shotClock = SHOT_CLOCK_FULL;
+		}
+		this.afterShotAttempt = false;
+	}
+
+	getClockFactorRealistic() {
+		if (this.shouldIntentionalFoulRealistic()) {
+			return "intentionalFoul" as const;
+		}
+
+		const period = this.team[this.o].stat.ptsQtrs.length;
+		const pointDifferential =
+			this.team[this.o].stat.pts - this.team[this.d].stat.pts;
+		const finalPeriod = period >= this.numPeriods;
+
+		// Run out the clock if winning, once the shot clock can't make them shoot
+		if (
+			finalPeriod &&
+			pointDifferential > 0 &&
+			this.t <= this.shotClock + 0.5
+		) {
+			return "runOutClock" as const;
+		}
+
+		// Hold for the last shot, when the shot clock is (about) off
+		if (
+			this.t <= this.shotClock + 2 &&
+			(!finalPeriod || pointDifferential >= 0)
+		) {
+			return "holdForLastShot" as const;
+		}
+
+		if (
+			finalPeriod &&
+			((this.t <= 3 * 60 && pointDifferential <= -10) ||
+				(this.t <= 2 * 60 && pointDifferential <= -5) ||
+				(this.t <= 1 * 60 && pointDifferential < 0))
+		) {
+			return "catchUp" as const;
+		}
+		if (
+			finalPeriod &&
+			((this.t <= 3 * 60 && pointDifferential > 10) ||
+				(this.t <= 2 * 60 && pointDifferential > 5) ||
+				(this.t <= 1 * 60 && pointDifferential > 0))
+		) {
+			return "maintainLead" as const;
+		}
+
+		// 2-for-1: with ~34-50 s left, shoot with ~29-35 s left, early enough to get the ball back for the last shot
+		if (this.t >= 34 && this.t <= 50) {
+			return "twoForOne" as const;
+		}
+	}
+
+	// The trailing team (on defense) fouls on purpose late in the game: down 1-2 once the leader could run out the clock (shot clock off), down 3 then too unless time is nearly gone,
+	// down 4-6 inside ~35 s (sometimes inside a minute), down 7-12 a bit earlier and only sometimes
+	shouldIntentionalFoulRealistic() {
+		if (this.team[0].stat.ptsQtrs.length < this.numPeriods || this.t <= 0.3) {
+			return false;
+		}
+		const lead = this.team[this.o].stat.pts - this.team[this.d].stat.pts;
+		if (lead <= 0) {
+			return false;
+		}
+		const shotClockOff = this.t <= this.shotClock;
+		let prob = 0;
+		if (lead <= 2) {
+			prob = shotClockOff ? 1 : 0;
+		} else if (lead === 3) {
+			// (down 3, most teams play for a stop and a three, but with the leader about to run out the clock, foul)
+			prob = shotClockOff && this.t > 10 ? 1 : 0;
+		} else if (lead <= 6) {
+			prob = this.t <= 35 ? 1 : this.t <= 60 ? 0.3 : 0;
+		} else if (lead <= 9) {
+			prob = this.t <= 60 ? 0.5 : this.t <= 90 ? 0.15 : 0;
+		} else if (lead <= 12) {
+			prob = this.t <= 40 ? 0.2 : 0;
+		}
+		return prob >= 1 || (prob > 0 && Math.random() < prob);
+	}
+
+	// How likely a late-clock crisis ends in a violation rather than a forced shot: ball handling and the defense's pressure, through the same
+	// ratings as the turnover chance (~1 for an average matchup)
+	violationTendency() {
+		return helpers.bound(
+			(this.traits[this.o].shotDiscipline * this.probTov()) / 0.13,
+			0.5,
+			1.8,
+		);
+	}
+
+	// When the shot goes up (seconds from now), or that the shot clock runs out first
+	planPossession(
+		clockFactor: ClockFactor,
+		possessionStartsInFrontcourt: boolean,
+		tipInFromOutOfBounds: boolean,
+		lateGamePutBack: boolean,
+	) {
+		const sc = this.shotClock;
+		const tLeft = this.t;
+		if (tipInFromOutOfBounds) {
+			return { shotAt: 0, violation: false };
+		}
+		if (lateGamePutBack) {
+			return {
+				shotAt: uniform(Math.min(tLeft, 0.1), Math.min(tLeft, 1)) * 0.9,
+				violation: false,
+			};
+		}
+
+		// Faster teams (pace rating) and a faster league (pace setting) take less time
+		const k = this.possTimeScale / this.teamPaceFactor[this.o];
+		const prev = this.prevPossessionOutcome;
+
+		let shotAt;
+		if (
+			prev === "nonShootingFoul" ||
+			prev === "outOfBoundsDefense" ||
+			prev === "timeout"
+		) {
+			// Inbounding with part of the shot clock used: run a set play with what is left
+			shotAt = k * drawRestartSearch(sc, clockFactor === "maintainLead");
+		} else if (prev === "orb") {
+			shotAt =
+				Math.random() < PROB_ORB_QUICK_SHOT
+					? drawOrbQuickShot()
+					: k *
+						Math.max(
+							1,
+							ORB_RESET_SEARCH_MEAN + ORB_RESET_SEARCH_SD * gaussian(),
+						);
+		} else {
+			let probTransition = possessionStartsInFrontcourt
+				? 0
+				: (prev === "stl"
+						? PROB_TRANSITION.steal
+						: prev === "drb"
+							? PROB_TRANSITION.drb
+							: PROB_TRANSITION.inbound) *
+					this.teamPaceFactor[this.o] ** 3;
+			if (clockFactor === "maintainLead") {
+				probTransition *= 0.3;
+			} else if (clockFactor === "catchUp") {
+				probTransition *= 1.5;
 			}
+			if (Math.random() < probTransition) {
+				shotAt = k * drawTransitionTime();
+			} else {
+				let backcourt = possessionStartsInFrontcourt
+					? 0
+					: k * drawBackcourtTime();
+				let mean = HALF_COURT_SEARCH_MODE;
+				if (clockFactor === "catchUp") {
+					mean = 5;
+					backcourt *= 0.7;
+				} else if (clockFactor === "maintainLead") {
+					// Milk the shot clock
+					mean += 4;
+				}
+				shotAt = backcourt + drawHalfCourtSearch(k * mean);
+			}
+		}
+
+		// End of a period
+		if (
+			clockFactor === "holdForLastShot" &&
+			tLeft > 1.5 &&
+			Math.random() < 0.85
+		) {
+			// Hold for the last shot, going with ~1-4 s left
+			shotAt = tLeft - uniform(1, Math.min(4.5, tLeft - 0.5));
+		} else if (clockFactor === "twoForOne" && Math.random() < 0.7) {
+			const target = tLeft - uniform(29, 35);
+			if (target >= 1.5) {
+				shotAt = Math.min(shotAt, target);
+			}
+		}
+
+		let violation = false;
+		if (tLeft <= sc) {
+			// Shot clock off: the game clock is the limit, and someone gets a shot up before the buzzer (the chance of not even getting one
+			// up is at the start of the possession, noShotBeforeBuzzer)
+			if (shotAt > tLeft - 0.3) {
+				shotAt = tLeft - uniform(0.1, Math.min(1.5, tLeft * 0.8));
+			}
+		} else if (shotAt >= sc - 0.3) {
+			// Late-clock crisis: no shot found in time. Either a violation or a forced, contested shot just before the horn
+			if (Math.random() < PROB_VIOLATION_IN_CRISIS * this.violationTendency()) {
+				violation = true;
+				shotAt = sc;
+			} else {
+				shotAt = sc - uniform(0.1, Math.min(1.5, sc * 0.8));
+			}
+		}
+
+		return { shotAt: Math.max(0, shotAt), violation };
+	}
+
+	getPossessionOutcomeRealistic(
+		clockFactor: ClockFactor,
+		possessionStartsInFrontcourt: boolean,
+		tipInFromOutOfBounds: boolean,
+		lateGamePutBack: boolean,
+	): PossessionOutcome {
+		const timeout = this.maybeTimeoutToAdvanceBall(
+			possessionStartsInFrontcourt,
+			this.timeoutAdvancesBall(),
+		);
+		if (timeout) {
+			return timeout;
+		}
+
+		const { shotAt, violation } = this.planPossession(
+			clockFactor,
+			possessionStartsInFrontcourt,
+			tipInFromOutOfBounds,
+			lateGamePutBack,
+		);
+		// Something that happens before the shot (or violation) would have
+		const beforeShot = (fraction: number) =>
+			Math.max(0, Math.min(fraction * shotAt, this.t - 0.05));
+
+		// Turnover
+		if (
+			!tipInFromOutOfBounds &&
+			this.t > 0.2 &&
+			Math.random() < TOV_SCALE * this.probTov()
+		) {
+			this.advanceClockSeconds(
+				clockFactor === "intentionalFoul"
+					? uniform(0.1, Math.min(this.t - 0.05, 5))
+					: beforeShot(uniform(0.15, 1)),
+			);
+			return this.doTov();
+		}
+
+		// Offense loses ball out of bounds, but retains possession
+		if (!tipInFromOutOfBounds && Math.random() < 0.01) {
+			this.advanceClockSeconds(beforeShot(uniform(0.1, 0.9)));
+			return this.doOutOfBounds(1);
 		}
 
 		const shooter = this.pickPlayer("usage", this.o, 1.25);
 
-		// Flagrant foul? (only with the technicalFouls setting, so otherwise no random number is drawn here)
+		// Flagrant foul? (only with the technicalFouls setting)
 		if (
 			this.techFouls &&
 			clockFactor !== "intentionalFoul" &&
@@ -1644,80 +2121,62 @@ class GameSim extends GameSimBase {
 			return this.doFlagrantFoul(shooter);
 		}
 
-		// Non-shooting foul?
+		// Non-shooting foul, or an intentional foul
 		if (
-			Math.random() < this.probNonShootingFoul() ||
-			clockFactor === "intentionalFoul"
+			!tipInFromOutOfBounds &&
+			(Math.random() < this.probNonShootingFoul() ||
+				clockFactor === "intentionalFoul")
 		) {
-			let dt;
-			if (clockFactor === "intentionalFoul") {
-				if (this.t < 8) {
-					if (this.t <= 0.2 || (this.t < 1 && Math.random() > this.t)) {
-						// Time ran out while trying to foul
-						this.advanceClockSeconds(Infinity);
-						this.playByPlay.logEvent({
-							type: "endOfPeriod",
-							t: this.o,
-							clock: this.t,
-							reason: "intentionalFoul",
-						});
-						return "endOfPeriod";
-					}
-					dt = uniform(0.1, Math.min(this.t - 0.2, 4));
-				} else {
-					dt = uniform(1, 5);
-				}
-			} else {
-				if (this.t < 2) {
-					dt = uniform(0, this.t);
-				} else {
-					dt = uniform(1, Math.min(this.t, SHOT_CLOCK - this.possessionLength));
-				}
-			}
-			this.advanceClockSeconds(dt);
-			this.isClockRunning = false;
-
-			// In the bonus? Checks offset by 1, because the foul counter won't increment until doPf is called below
-			const numFoulsUntilBonus = this.getNumFoulsUntilBonus();
-			const inBonus = numFoulsUntilBonus <= 1;
-
-			if (this.t <= 0) {
-				throw new Error("Clock at 0 for non-shooting foul");
-			}
-
-			if (inBonus) {
-				this.doPf({ t: this.d, type: "pfBonus", shooter });
-			} else {
-				this.doPf({ t: this.d, type: "pfNonShooting" });
-			}
-
-			if (inBonus) {
-				return this.doFt(shooter, 2);
-			}
-
-			return "nonShootingFoul";
+			return this.doNonShootingFoulPossession(shooter, clockFactor, () =>
+				beforeShot(uniform(0.1, 1)),
+			);
 		}
 
-		// Time to advance ball to frontcourt
-		if (!possessionStartsInFrontcourt) {
-			const upperLimitMin =
-				clockFactor === "catchUp" ? 1 : clockFactor === "maintainLead" ? 4 : 2;
-			const min = Math.max(Math.min(this.t - 0.3, upperLimitMin), 0);
-			const upperLimitMax =
-				clockFactor === "catchUp" ? 4 : clockFactor === "maintainLead" ? 8 : 6;
-			const max = Math.max(Math.min(this.t - 0.3, upperLimitMax), 0);
-			const dt = uniform(min, max);
-			this.advanceClockSeconds(dt);
+		if (shotAt > 0) {
+			this.advanceClockSeconds(Math.min(shotAt, this.t));
 		}
 
-		// Shot!
+		if (violation) {
+			return this.doShotClockViolation();
+		}
+
+		if (this.t <= 0) {
+			// (should not happen: shots are planned before the buzzer)
+			this.playByPlay.logEvent({
+				type: "endOfPeriod",
+				t: this.o,
+				clock: this.t,
+				reason: "noShot",
+			});
+			return "endOfPeriod";
+		}
+
 		return this.doShot(
 			shooter,
 			clockFactor,
 			possessionStartsInFrontcourt,
 			tipInFromOutOfBounds,
 			lateGamePutBack,
+			true,
 		);
+	}
+
+	// The shot clock runs out: a turnover, and the other team inbounds the ball
+	doShotClockViolation(): PossessionOutcome {
+		const p = this.pickPlayer("turnovers", this.o, 2);
+		this.recordStat(this.o, p, "tov");
+		this.shotClockViolations[this.o] += 1;
+		this.isClockRunning = false;
+		this.playByPlay.logEvent({
+			type: "tov",
+			t: this.o,
+			pid: p.id,
+			outOfBounds: false,
+			clock: this.t,
+			poss: SHOT_CLOCK_FULL,
+			shotClock: true,
+		});
+		return "outOfBoundsOffense";
 	}
 
 	/**
@@ -1760,7 +2219,9 @@ class GameSim extends GameSimBase {
 			pid: p.id,
 			outOfBounds,
 			clock: this.t,
-			poss: this.possessionLength,
+			poss: this.eventPoss(),
+			// (the play-by-play text would otherwise guess from a long possession that this was a shot-clock violation)
+			shotClock: this.realPoss && this.eventPoss() >= 17 ? false : undefined,
 		});
 		return outOfBounds ? "outOfBoundsOffense" : ("tov" as const);
 	}
@@ -1801,7 +2262,7 @@ class GameSim extends GameSimBase {
 			pidTov: pStoleFrom.id,
 			outOfBounds,
 			clock: this.t,
-			poss: this.possessionLength,
+			poss: this.eventPoss(),
 		});
 		return outOfBounds ? "outOfBoundsOffense" : ("stl" as const);
 	}
@@ -1988,6 +2449,19 @@ class GameSim extends GameSimBase {
 				if (passer !== undefined) {
 					probMake += 0.025;
 				}
+
+				// Early-clock shots are better, late-clock shots are contested (only while the shot clock is on)
+				if (this.realPoss && !putBack && this.t > this.shotClock) {
+					probMake *= shotClockMakeFactor(this.shotClock);
+				}
+				if (
+					this.realPoss &&
+					this.t <= 120 &&
+					this.team[0].stat.ptsQtrs.length >= this.numPeriods &&
+					Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <= 5
+				) {
+					probMake *= this.traits[this.o].clutch;
+				}
 			}
 		}
 
@@ -2008,6 +2482,8 @@ class GameSim extends GameSimBase {
 		possessionStartsInFrontcourt: boolean,
 		tipInFromOutOfBounds: boolean,
 		lateGamePutBack: boolean,
+		// The realistic possession model already ran the clock to the shot, and handled turnovers
+		preTimed: boolean = false,
 	) {
 		const putBack = lateGamePutBack; // Eventually use this in more situations
 
@@ -2039,7 +2515,7 @@ class GameSim extends GameSimBase {
 
 		// Time from the ball being in the frontcourt to a shot
 		let dt;
-		if (tipInFromOutOfBounds) {
+		if (preTimed || tipInFromOutOfBounds) {
 			dt = 0;
 		} else if (putBack) {
 			dt = uniform(Math.min(this.t, 0.1), Math.min(this.t, 1));
@@ -2067,7 +2543,7 @@ class GameSim extends GameSimBase {
 		this.advanceClockSeconds(dt);
 
 		// Turnovers for possessions that start in the frontcourt only (other turnovers are already handled above for the entire possession, although I guess it'd be better to do it here)
-		if (possessionStartsInFrontcourt) {
+		if (possessionStartsInFrontcourt && !preTimed) {
 			if (Math.random() < this.probTov()) {
 				let pTurnover;
 				if (tipInFromOutOfBounds) {
@@ -2105,7 +2581,7 @@ class GameSim extends GameSimBase {
 			t: this.o,
 			pid: p.id,
 			clock: this.t,
-			poss: this.possessionLength,
+			poss: this.eventPoss(),
 		};
 		if (
 			fgaLogType === "fgaLowPost" ||
@@ -2941,6 +3417,7 @@ class GameSim extends GameSimBase {
 
 	doReb() {
 		let p;
+		this.afterShotAttempt = true;
 
 		if (this.t === 0) {
 			return "endOfPeriod";

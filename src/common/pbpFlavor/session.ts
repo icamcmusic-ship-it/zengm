@@ -1216,8 +1216,11 @@ export class FlavorSession {
 		const ctx = this.baseCtx(rng, t, ev.poss, p, ev);
 		const play: any = { k: "tov", p, ti: t };
 		// a turnover after a very long possession is a shot-clock violation, if the shot clock was on (not at the end of a period, when the game
-		// clock was under 24 seconds as the possession started)
-		if (
+		// clock was under 24 seconds as the possession started). The realistic possession model says which turnovers were violations (shotClock
+		// true/false); otherwise it is a guess from the possession length
+		if (typeof ev.shotClock === "boolean") {
+			play.shotClock = ev.shotClock;
+		} else if (
 			!ev.outOfBounds &&
 			ev.poss !== undefined &&
 			ev.poss >= 17 &&

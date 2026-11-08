@@ -186,6 +186,8 @@ type PlayByPlayEventInputNoScore =
 			outOfBounds: boolean;
 			clock: number;
 			poss?: number;
+			// Realistic possession model only: true for a shot-clock violation, false for a turnover late in the shot clock that was not one
+			shotClock?: boolean;
 	  }
 	| {
 			type: "elamActive";
