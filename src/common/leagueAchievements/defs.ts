@@ -1,7 +1,8 @@
 import { DEF_ROWS, MERGED, RETIRED_ROWS, TOPICS } from "./defs.generated.ts";
+import { CALIBRATION } from "./calibration.generated.ts";
 import type { Rarity } from "./labels.ts";
 
-// The League achievements catalogue. The rows come from the League Explorer (see tools/convertLeagueAchievements.ts); this turns them into the def objects the engine reads.
+// The League achievements catalogue. The rows come from the League Explorer (see tools/convertLeagueAchievements.ts); this turns them into the def objects the engine reads. Rarities are recalibrated on simulated BBGM leagues (calibration.generated.ts).
 
 export const RARITIES: Rarity[] = ["common", "rare", "legendary", "impossible"];
 export const RARITY_RANK: Record<Rarity, number> = {
@@ -102,11 +103,13 @@ const LETTER: Record<DefRow[2], Rarity> = {
 
 const toDef = (row: DefRow, i: number): AchievementDef => {
 	const [topic, metric, r, t, name, desc, unit, low, kind, need, fmtV] = row;
+	const id = `${metric}-${t}`;
 	return {
-		id: `${metric}-${t}`,
+		id,
 		topic,
 		metric,
-		rarity: LETTER[r],
+		// Rarity as measured on simulated BBGM leagues (calibration.generated.ts, see tools/leagueAchievementsCalibration), else the Explorer's
+		rarity: LETTER[CALIBRATION[id]?.[0] ?? r],
 		t,
 		name,
 		desc,

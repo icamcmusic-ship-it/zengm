@@ -170,7 +170,10 @@ export default defineConfig(
 	},
 	{
 		// Playwright benchmark scripts: CommonJS run by node, with function bodies evaluated in the page
-		files: ["tools/perf/**/*.cjs"],
+		files: [
+			"tools/perf/**/*.cjs",
+			"tools/leagueAchievementsCalibration/**/*.cjs",
+		],
 
 		languageOptions: {
 			sourceType: "commonjs",

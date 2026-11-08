@@ -4,6 +4,7 @@ import { g, helpers, lock, local, logEvent, toUI } from "./index.ts";
 import { getWrapped, memoize, yieldToWorker } from "./wrappedData.ts";
 import {
 	applyNativeRules,
+	completedSeasons,
 	computeAchievements,
 	DEF_BY_ID,
 	makeLookup,
@@ -318,4 +319,27 @@ export const getRecentLeagueAchievements = async (n = 5) => {
 export const getLeagueAchievementsLog = async () => {
 	const state = await loadState(g.get("lid"), g.get("startingSeason"));
 	return state?.log ?? [];
+};
+
+// For tools/leagueAchievementsCalibration (from the console: bbgm.leagueAchievementsTally()): every tier's state, count and first season in this league, to measure how often tiers happen in simulated leagues
+export const leagueAchievementsTally = async () => {
+	const { data, run } = await getLeagueAchievements();
+	const tiers: Record<
+		string,
+		{ s: "u" | "l" | "x"; n: number; first: number | null }
+	> = {};
+	for (const [id, r] of run.results) {
+		tiers[id] = {
+			s: r.state === "unlocked" ? "u" : r.state === "locked" ? "l" : "x",
+			n: r.count,
+			first: r.first?.season ?? null,
+		};
+	}
+	return {
+		own: run.own,
+		season: g.get("season"),
+		phase: g.get("phase"),
+		completed: completedSeasons(data, run.own),
+		tiers,
+	};
 };

@@ -39,6 +39,17 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
 - **What:** varied, ratings-aware wording for every play (shot types, passes, fouls with personal and team foul counts, bonus situations, runs, milestones, quarter summaries). It only changes the text: game results are identical with or without it (covered by `outcomeInvariance.test.ts`).
 - **Known limits:** Elam ending events keep the original wording. Clock phrases follow the league's quarter length and number of periods; shootout lines are seeded like the rest, so a replay reads the same.
 
+## League achievements
+
+- **Where:** League menu → _League achievements_, `/l/:lid/league_achievements`; a _Recent achievements_ card on the dashboard; unlocks are announced as notifications.
+- **Rarity:** measured on simulated random-players BBGM leagues, not on real NBA history (BBGM sims are far more generous): common more than 0.6 times a season, rare 0.15–0.6, legendary 0.025–0.15, impossible rarer. No tier that any calibration league unlocked in its first 5 seasons is impossible. The data is `src/common/leagueAchievements/calibration.generated.ts`; regenerate it with `tools/leagueAchievementsCalibration/` (`sim.cjs` sims leagues in a headless browser against the dev server and records the tally every season, `calibrate.ts` turns the outputs into bands; see the file headers).
+- **Saved state:** which tiers were already announced, and the log, are kept in the league (the `leagueAchievements` game attribute), so exporting and importing a league carries them. Older versions kept them in a separate `league-achievements` database: it is read once per league and moved in.
+
+## Trade grader
+
+- **Where:** League menu → _Trade Grader_, `/l/:lid/trade_grader[/:tab/:team/:season/:ws]`; grades also show on Trade Summary and the transactions list.
+- **What:** each side of every trade graded by the win shares what it received produced for it. A toggle counts **regular season + playoffs** (default, `ws` = `all`) or **regular season only** (`rs`); Trade Summary follows the last choice made on the grader (per browser). Each side notes the titles its team won with a player it received playing for it in those playoffs.
+
 ## Draft Scouting: College stats and Regenerate ratings
 
 - **Where:** _Players → Draft → Draft Scouting_ (`/l/:lid/draft_scouting`).
