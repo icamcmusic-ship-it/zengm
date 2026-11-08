@@ -115,7 +115,10 @@ const TeamCell = ({ segs, env }: { segs: Seg[]; env: Env }) => {
 
 const Quote = ({ block }: { block: Extract<Block, { type: "quote" }> }) => (
 	<blockquote className="np-quote">
-		<span className="np-colour-tag" title="Written by the newsroom from the numbers, not a real quote">
+		<span
+			className="np-colour-tag"
+			title="Written by the newsroom from the numbers, not a real quote"
+		>
 			Colour
 		</span>
 		<p>“{block.text}”</p>
@@ -193,7 +196,9 @@ const BlockView = ({ block, env }: { block: Block; env: Env }) => {
 							{block.rows.map((row, i) => (
 								<tr key={i}>
 									<td className="text-end">{row.a}</td>
-									<td className="text-center text-body-secondary">{row.label}</td>
+									<td className="text-center text-body-secondary">
+										{row.label}
+									</td>
 									<td>{row.b}</td>
 								</tr>
 							))}
@@ -214,7 +219,9 @@ const BlockView = ({ block, env }: { block: Block; env: Env }) => {
 			);
 		case "table": {
 			const teamCols = new Set(
-				block.head.flatMap((h, i) => (h === "Team" || h === "Teams" ? [i] : [])),
+				block.head.flatMap((h, i) =>
+					h === "Team" || h === "Teams" ? [i] : [],
+				),
 			);
 			return (
 				<div className="table-responsive">
@@ -224,7 +231,9 @@ const BlockView = ({ block, env }: { block: Block; env: Env }) => {
 								{block.head.map((h, i) => (
 									<th
 										key={i}
-										className={block.numCols?.includes(i) ? "text-end" : undefined}
+										className={
+											block.numCols?.includes(i) ? "text-end" : undefined
+										}
 									>
 										{h}
 									</th>
@@ -233,11 +242,16 @@ const BlockView = ({ block, env }: { block: Block; env: Env }) => {
 						</thead>
 						<tbody>
 							{block.rows.map((row, i) => (
-								<tr key={i} className={block.hl === i ? "table-info" : undefined}>
+								<tr
+									key={i}
+									className={block.hl === i ? "table-info" : undefined}
+								>
 									{row.map((cell, j) => (
 										<td
 											key={j}
-											className={block.numCols?.includes(j) ? "text-end" : undefined}
+											className={
+												block.numCols?.includes(j) ? "text-end" : undefined
+											}
 										>
 											{teamCols.has(j) ? (
 												<TeamCell segs={cell} env={env} />
@@ -259,15 +273,13 @@ const BlockView = ({ block, env }: { block: Block; env: Env }) => {
 const PHOTO_WIDTH = { lead: 96, feature: 78, brief: 56 } as const;
 
 const ArticlePhoto = ({ article, env }: { article: Article; env: Env }) => {
-	const photo = article.photoPid !== undefined ? env.photos[article.photoPid] : undefined;
+	const photo =
+		article.photoPid !== undefined ? env.photos[article.photoPid] : undefined;
 	if (!photo || (!photo.face && !photo.imgURL)) {
 		return null;
 	}
 	return (
-		<figure
-			className="np-photo"
-			style={{ width: PHOTO_WIDTH[article.size] }}
-		>
+		<figure className="np-photo" style={{ width: PHOTO_WIDTH[article.size] }}>
 			<a href={helpers.leagueUrl(["player", article.photoPid!])}>
 				<PlayerPicture
 					face={photo.face}
@@ -288,7 +300,8 @@ const ArticleView = ({ article, env }: { article: Article; env: Env }) => {
 	const top = foldAt < 0 ? article.body : article.body.slice(0, foldAt);
 	const rest = foldAt < 0 ? [] : article.body.slice(foldAt + 1);
 	const showRest = open || env.printing;
-	const long = article.body.length >= 5 && article.size !== "brief" && foldAt < 0;
+	const long =
+		article.body.length >= 5 && article.size !== "brief" && foldAt < 0;
 	return (
 		<article className={`np-article np-${article.size}`}>
 			{article.kicker || article.colour ? (
@@ -477,7 +490,11 @@ const BackIssues = ({
 							className={`np-issue${s === season ? " np-issue-cur" : ""}`}
 							aria-current={s === season ? "page" : undefined}
 							href={helpers.leagueUrl(["newspaper", teamParam(env, team), s])}
-							title={champ !== undefined ? `${s}: champions ${env.abbrevs.get(champ) ?? ""}` : String(s)}
+							title={
+								champ !== undefined
+									? `${s}: champions ${env.abbrevs.get(champ) ?? ""}`
+									: String(s)
+							}
 						>
 							<span className="np-issue-y">{s}</span>
 							<span className="np-issue-c">
@@ -503,11 +520,15 @@ const Editions = ({
 }) => (
 	<details className="np-editions">
 		<summary>
-			{team === "all" ? "Local editions" : "League edition and other local editions"}
+			{team === "all"
+				? "Local editions"
+				: "League edition and other local editions"}
 		</summary>
 		<div className="np-edition-list">
 			{team !== "all" ? (
-				<a href={helpers.leagueUrl(["newspaper", "all", season])}>League edition</a>
+				<a href={helpers.leagueUrl(["newspaper", "all", season])}>
+					League edition
+				</a>
 			) : null}
 			{[...env.abbrevs.entries()].map(([tid, abbrev]) => {
 				const logo = env.logos[tid];

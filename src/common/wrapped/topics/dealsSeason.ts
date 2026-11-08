@@ -60,7 +60,10 @@ const tradeCount: Topic = ({ X, season }) => {
 		kicker: w.high ? "Trade frenzy" : "Quiet phones",
 		season,
 		heads: w.high
-			? [`${n} trades: a busy year on the phones`, `The trade market never slept`]
+			? [
+					`${n} trades: a busy year on the phones`,
+					`The trade market never slept`,
+				]
 			: [`Only ${plural(n, "trade")} all year`, `A quiet trade market`],
 		hero: { text: `${n}`, unit: plural(n, "trade", "trades") },
 		lines: [
@@ -128,7 +131,9 @@ const bestTrade: Topic = ({ X, season, soFar }) => {
 		heads: [
 			`The ${X.teamName(win.tid, season)} won the trade of the year`,
 			`One trade, one clear winner`,
-			star ? `${star.name} made the deal for the ${X.teamName(win.tid, season)}` : null,
+			star
+				? `${star.name} made the deal for the ${X.teamName(win.tid, season)}`
+				: null,
 		].filter((h): h is string => !!h),
 		hero: { text: `+${ws1(e.margin)}`, unit: "win shares in the deal" },
 		list: [sideRow(X, e, 0, season, true), sideRow(X, e, 1, season, true)],
@@ -151,10 +156,7 @@ const deadline: Topic = ({ X, season, soFar }) => {
 	for (const e of list) {
 		for (const i of [0, 1] as const) {
 			const tid = e.sides[i].tid;
-			net.set(
-				tid,
-				(net.get(tid) ?? 0) + e.sides[i].ws - e.sides[1 - i]!.ws,
-			);
+			net.set(tid, (net.get(tid) ?? 0) + e.sides[i].ws - e.sides[1 - i]!.ws);
 		}
 	}
 	const rows = [...net].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
@@ -449,7 +451,10 @@ const resignBig: Topic = ({ X, season }) => {
 			`${top.p.name} signed the biggest extension`,
 			`${plural(list.length, "player")} re-signed, led by ${top.p.name}`,
 		],
-		hero: { text: money(top.total), unit: `over ${plural(top.c.amounts.length, "season")}` },
+		hero: {
+			text: money(top.total),
+			unit: `over ${plural(top.c.amounts.length, "season")}`,
+		},
 		list: list.slice(0, 4).map((r) => ({
 			name: r.p.name,
 			value: money(r.total),
@@ -576,9 +581,7 @@ const paydayDip: Topic = ({ X, season, soFar }) => {
 			`A big raise and a step back for ${p.name}`,
 		],
 		hero: { text: ws1(worst.d), unit: "win shares from last season" },
-		lines: [
-			`From ${money(worst.old)} to ${money(worst.avg)} a year`,
-		],
+		lines: [`From ${money(worst.old)} to ${money(worst.avg)} a year`],
 		facts: [`ctdip|${worst.pid}|${season}`],
 	});
 };
@@ -673,7 +676,9 @@ const lotteryWin: Topic = ({ X, season }) => {
 		id: "s-lot-no1",
 		group: "s-lottery",
 		theme: "draft",
-		score: clamp01(0.22 + (no1.slot > 1 ? 0.1 : 0) + (odds > 0 && odds < 0.1 ? 0.15 : 0)),
+		score: clamp01(
+			0.22 + (no1.slot > 1 ? 0.1 : 0) + (odds > 0 && odds < 0.1 ? 0.15 : 0),
+		),
 		kicker: "The top pick",
 		season,
 		tid: no1.tid,
@@ -771,7 +776,11 @@ const draftTradedPicks: Topic = ({ X, season }) => {
 		id: "s-draft-traded",
 		group: "s-draft",
 		theme: "draft",
-		score: clamp01(0.22 + cls.length * 0.02 + (top.draft.round === 1 && top.draft.pick <= 5 ? 0.1 : 0)),
+		score: clamp01(
+			0.22 +
+				cls.length * 0.02 +
+				(top.draft.round === 1 && top.draft.pick <= 5 ? 0.1 : 0),
+		),
 		kicker: "Other teams' picks",
 		season,
 		pid: top.pid,
@@ -797,7 +806,9 @@ const draftYoungest: Topic = ({ X, season }) => {
 		return null;
 	}
 	const ages = cls.map((p) => season - p.bornYear);
-	const young = cls.toSorted((a, b) => b.bornYear - a.bornYear || a.pid - b.pid)[0]!;
+	const young = cls.toSorted(
+		(a, b) => b.bornYear - a.bornYear || a.pid - b.pid,
+	)[0]!;
 	const avg = sum(ages) / ages.length;
 	return mk({
 		id: "s-draft-age",
@@ -811,7 +822,10 @@ const draftYoungest: Topic = ({ X, season }) => {
 			`The ${season} draft class averaged ${fmtNum(avg, 1)} years old`,
 			`${young.name} was the youngest pick`,
 		],
-		hero: { text: `${season - young.bornYear}`, unit: "the youngest pick's age" },
+		hero: {
+			text: `${season - young.bornYear}`,
+			unit: "the youngest pick's age",
+		},
 		lines: [
 			`${young.name}, ${young.draft.round > 1 ? `round ${young.draft.round}, ` : ""}pick ${young.draft.pick}`,
 			`${plural(cls.length, "player")} drafted`,
@@ -1018,7 +1032,9 @@ const rookieSlot: Topic = ({ X, season, soFar }) => {
 		id: "s-rookie-late",
 		group: "s-draft",
 		theme: "draft",
-		score: clamp01(0.3 + (rank === 1 ? 0.15 : 0) + Math.min(0.15, late.p.draft.pick / 100)),
+		score: clamp01(
+			0.3 + (rank === 1 ? 0.15 : 0) + Math.min(0.15, late.p.draft.pick / 100),
+		),
 		kicker: "Found money",
 		season,
 		pid: late.p.pid,
@@ -1028,7 +1044,9 @@ const rookieSlot: Topic = ({ X, season, soFar }) => {
 			`The rookie nobody saw coming: ${late.p.name}`,
 		],
 		hero: { text: ws1(late.l!.ws), unit: "rookie win shares" },
-		lines: [`${ordinal(rank)} among ${plural(rookies.length, "rookie")} with 20 games`],
+		lines: [
+			`${ordinal(rank)} among ${plural(rookies.length, "rookie")} with 20 games`,
+		],
 		facts: [`rookielate|${late.p.pid}`],
 	});
 };
@@ -1072,7 +1090,9 @@ const firstBust: Topic = ({ X, season, soFar }) => {
 				pid: best.pid,
 			},
 		],
-		lines: [`The No. 1 pick ranks ${ordinal(rank)} in his class in career win shares`],
+		lines: [
+			`The No. 1 pick ranks ${ordinal(rank)} in his class in career win shares`,
+		],
 		facts: [`no1later|${year}`],
 	});
 };

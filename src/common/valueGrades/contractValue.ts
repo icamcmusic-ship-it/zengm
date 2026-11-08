@@ -239,7 +239,8 @@ export const computeContractValue = (L: VLeague): ContractValue => {
 				}
 				live.set(pay.season, (live.get(pay.season) ?? 0) + pay.amount);
 				// Payments from before teams were tracked go to the team he played for
-				const payer = pay.tid >= 0 ? pay.tid : (sl.get(pay.season)?.tid ?? null);
+				const payer =
+					pay.tid >= 0 ? pay.tid : (sl.get(pay.season)?.tid ?? null);
 				if (payer !== null && payer >= 0) {
 					const k = `${payer}|${pay.season}`;
 					payroll.set(k, (payroll.get(k) ?? 0) + pay.amount);
@@ -376,7 +377,11 @@ export const computeContractValue = (L: VLeague): ContractValue => {
 				paid += amount;
 				expected += M(amount) * (rate.get(s) ?? 0);
 				elapsed += 1;
-				if (line?.tid !== null && line?.tid !== undefined && !tids.includes(line.tid)) {
+				if (
+					line?.tid !== null &&
+					line?.tid !== undefined &&
+					!tids.includes(line.tid)
+				) {
 					tids.push(line.tid);
 				}
 			}
@@ -452,7 +457,9 @@ export const computeContractValue = (L: VLeague): ContractValue => {
 			}
 		}
 	}
-	const records = new Map(L.teamSeasons.map((t) => [`${t.tid}|${t.season}`, t]));
+	const records = new Map(
+		L.teamSeasons.map((t) => [`${t.tid}|${t.season}`, t]),
+	);
 	const teamSeasons: TeamSeasonValue[] = [];
 	for (const [k, pay] of payroll) {
 		const [tidS, seasonS] = k.split("|");
@@ -524,13 +531,21 @@ export const topN = <T>(arr: T[], n: number, cmp: (a: T, b: T) => number) => {
 	return out;
 };
 
-const metricValue = (x: { surplus: number; perM: number | null; index: number | null }, m: Metric) =>
+const metricValue = (
+	x: { surplus: number; perM: number | null; index: number | null },
+	m: Metric,
+) =>
 	m === "surplus" ? x.surplus : m === "perM" ? (x.perM ?? 0) : (x.index ?? 0);
 
 type Filter = { season?: number; tid?: number };
 
 // Best and worst value player-seasons by a metric. Per $ measures need 1,000+ minutes for the best list and look only at big contracts (top 15% that season) for the worst, or cheap deals dominate
-export const valueSeasons = (cv: ContractValue, metric: Metric, o: Filter = {}, n = 100) => {
+export const valueSeasons = (
+	cv: ContractValue,
+	metric: Metric,
+	o: Filter = {},
+	n = 100,
+) => {
 	const pool = cv.rows.filter(
 		(r) =>
 			(o.season === undefined || r.season === o.season) &&
@@ -565,7 +580,12 @@ const dealMatches = (c: Deal, o: Filter) =>
 	(o.tid === undefined || c.tids.includes(o.tid));
 
 // Best and worst whole contracts (two or more completed seasons)
-export const valueDeals = (cv: ContractValue, metric: Metric, o: Filter = {}, n = 100) => {
+export const valueDeals = (
+	cv: ContractValue,
+	metric: Metric,
+	o: Filter = {},
+	n = 100,
+) => {
 	const all = dealPool(cv);
 	const bigCut = percentile(
 		all.map((c) => c.amount),
@@ -613,7 +633,13 @@ export const albatross = (cv: ContractValue, o: Filter = {}) => {
 export const bargains = (cv: ContractValue, o: Filter = {}) => {
 	const by = new Map<
 		number,
-		{ season: number; best: ValueRow | null; worst: ValueRow | null; n: number; top: ValueRow[] }
+		{
+			season: number;
+			best: ValueRow | null;
+			worst: ValueRow | null;
+			n: number;
+			top: ValueRow[];
+		}
 	>();
 	for (const r of cv.rows) {
 		if (
@@ -661,8 +687,14 @@ export type TeamValue = {
 };
 
 // Teams ranked by value index over the chosen seasons
-export const teamEfficiency = (cv: ContractValue, o: { season?: number } = {}) => {
-	const m = new Map<number, Omit<TeamValue, "index" | "surplus" | "winp" | "rank">>();
+export const teamEfficiency = (
+	cv: ContractValue,
+	o: { season?: number } = {},
+) => {
+	const m = new Map<
+		number,
+		Omit<TeamValue, "index" | "surplus" | "winp" | "rank">
+	>();
 	for (const t of cv.teamSeasons) {
 		if (o.season !== undefined && t.season !== o.season) {
 			continue;
@@ -800,12 +832,26 @@ export const contractYear = (cv: ContractValue, o: Filter = {}) => {
 export const deadByTeam = (cv: ContractValue) => {
 	const m = new Map<
 		number,
-		{ tid: number; paid: number; owed: number; releases: Set<string>; owedPids: Set<number>; lastOwed: number | null }
+		{
+			tid: number;
+			paid: number;
+			owed: number;
+			releases: Set<string>;
+			owedPids: Set<number>;
+			lastOwed: number | null;
+		}
 	>();
 	for (const d of cv.dead) {
 		let e = m.get(d.tid);
 		if (!e) {
-			e = { tid: d.tid, paid: 0, owed: 0, releases: new Set(), owedPids: new Set(), lastOwed: null };
+			e = {
+				tid: d.tid,
+				paid: 0,
+				owed: 0,
+				releases: new Set(),
+				owedPids: new Set(),
+				lastOwed: null,
+			};
 			m.set(d.tid, e);
 		}
 		if (d.owed) {

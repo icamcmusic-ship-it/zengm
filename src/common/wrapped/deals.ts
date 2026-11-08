@@ -204,9 +204,7 @@ export const assetText = (
 	max: number = 3,
 ) => {
 	const parts = assets.map((a) =>
-		isPlayerAsset(a)
-			? (X.players.get(a.pid)?.name ?? a.name)
-			: pickText(X, a),
+		isPlayerAsset(a) ? (X.players.get(a.pid)?.name ?? a.name) : pickText(X, a),
 	);
 	if (parts.length > max) {
 		return `${parts.slice(0, max).join(", ")} and ${parts.length - max} more`;
@@ -311,9 +309,7 @@ export const signingsFor = (
 	s: number,
 	types: string[] = ["freeAgent", "reSign"],
 ) =>
-	contractRows(X, s).filter(
-		(r) => r.c.start === s && types.includes(r.c.type),
-	);
+	contractRows(X, s).filter((r) => r.c.start === s && types.includes(r.c.type));
 
 // Released players: what was still owed after the release, in thousands
 export type Release = {
@@ -450,9 +446,7 @@ export const timesTraded = (X: LeagueIndex, p: WPlayer, upTo: number) => {
 // Trades a player was part of, through upTo
 export const tradesWith = (X: LeagueIndex, pid: number, upTo: number) =>
 	tradeEvals(X, upTo).filter((e) =>
-		e.t.got.some((side) =>
-			side.some((a) => isPlayerAsset(a) && a.pid === pid),
-		),
+		e.t.got.some((side) => side.some((a) => isPlayerAsset(a) && a.pid === pid)),
 	);
 
 export const hasDeals = (X: LeagueIndex) =>

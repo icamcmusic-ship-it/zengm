@@ -43,7 +43,12 @@ const DEFS: LineDef[] = [
 			`${n}’s team was better with him on the bench`,
 			`A tough year on the floor for ${n}`,
 		],
-		extra: (l) => (isNum(l.pm) ? [`${l.pm >= 0 ? "+" : ""}${fmtNum(l.pm)} over ${plural(l.gp, "game")}`] : []),
+		extra: (l) =>
+			isNum(l.pm)
+				? [
+						`${l.pm >= 0 ? "+" : ""}${fmtNum(l.pm)} over ${plural(l.gp, "game")}`,
+					]
+				: [],
 		w: 0.85,
 	},
 	{
@@ -59,7 +64,10 @@ const DEFS: LineDef[] = [
 			`One of the most efficient offensive seasons: ${n}`,
 			`${n}’s offensive rating: ${fmtNum(v, 0)}`,
 		],
-		extra: (l) => (isNum(l.drtg) ? [`Defensive rating: ${fmtNum(l.drtg, 0)} (lower is better)`] : []),
+		extra: (l) =>
+			isNum(l.drtg)
+				? [`Defensive rating: ${fmtNum(l.drtg, 0)} (lower is better)`]
+				: [],
 		note: "Offensive rating: points produced per 100 possessions",
 		w: 0.8,
 	},
@@ -187,7 +195,9 @@ const DEFS: LineDef[] = [
 			`${n} took just ${pct(v, 0)} of his shots from three`,
 			`${n} stayed inside the arc`,
 		],
-		extra: (l) => [`${fmtNum(l.tpa / Math.max(1, l.gp), 1)} three-point attempts a game`],
+		extra: (l) => [
+			`${fmtNum(l.tpa / Math.max(1, l.gp), 1)} three-point attempts a game`,
+		],
 		w: 0.6,
 	},
 	{
@@ -260,7 +270,9 @@ const DEFS: LineDef[] = [
 			`${n} made ${fmtNum(v, 1)} defensive plays a game`,
 			`${n}: steals and blocks all night`,
 		],
-		extra: (l) => [`${fmtNum(l.spg, 1)} steals and ${fmtNum(l.bpg, 1)} blocks a game`],
+		extra: (l) => [
+			`${fmtNum(l.spg, 1)} steals and ${fmtNum(l.bpg, 1)} blocks a game`,
+		],
 		w: 0.7,
 	},
 	{
@@ -380,12 +392,54 @@ const RATE_TOPICS = DEFS.map(playerTopic);
 // ---------------------------------------------------------------------------------------------
 
 const HIGHS = [
-	{ k: "ptsMax", noun: "points", one: "point", unit: "PTS", min: 35, tag: "pts" },
-	{ k: "trbMax", noun: "rebounds", one: "rebound", unit: "REB", min: 15, tag: "trb" },
-	{ k: "astMax", noun: "assists", one: "assist", unit: "AST", min: 12, tag: "ast" },
-	{ k: "stlMax", noun: "steals", one: "steal", unit: "STL", min: 5, tag: "stl" },
-	{ k: "blkMax", noun: "blocks", one: "block", unit: "BLK", min: 5, tag: "blk" },
-	{ k: "tpMax", noun: "three-pointers", one: "three-pointer", unit: "3PM", min: 7, tag: "tp" },
+	{
+		k: "ptsMax",
+		noun: "points",
+		one: "point",
+		unit: "PTS",
+		min: 35,
+		tag: "pts",
+	},
+	{
+		k: "trbMax",
+		noun: "rebounds",
+		one: "rebound",
+		unit: "REB",
+		min: 15,
+		tag: "trb",
+	},
+	{
+		k: "astMax",
+		noun: "assists",
+		one: "assist",
+		unit: "AST",
+		min: 12,
+		tag: "ast",
+	},
+	{
+		k: "stlMax",
+		noun: "steals",
+		one: "steal",
+		unit: "STL",
+		min: 5,
+		tag: "stl",
+	},
+	{
+		k: "blkMax",
+		noun: "blocks",
+		one: "block",
+		unit: "BLK",
+		min: 5,
+		tag: "blk",
+	},
+	{
+		k: "tpMax",
+		noun: "three-pointers",
+		one: "three-pointer",
+		unit: "3PM",
+		min: 7,
+		tag: "tp",
+	},
 ] as const;
 
 const seasonHighs: Topic = ({ X, season, pid }) => {
@@ -519,7 +573,8 @@ const moved: Topic = ({ X, season, pid }) => {
 	}
 	const rows = p.stats.filter((r) => r.season === season && r.gp > 0);
 	const parts = rows.map(
-		(r) => `${fmtNum(r.pts / r.gp, 1)} ppg in ${plural(r.gp, "game")} for the ${X.teamName(r.tid, season)}`,
+		(r) =>
+			`${fmtNum(r.pts / r.gp, 1)} ppg in ${plural(r.gp, "game")} for the ${X.teamName(r.tid, season)}`,
 	);
 	return mk({
 		id: "p-moved",
@@ -579,7 +634,9 @@ const injured: Topic = ({ X, season, pid }) => {
 		hero: { text: `${games}`, unit: "games out" },
 		lines: [
 			`The worst: ${worst.type}, ${plural(worst.games, "game")}`,
-			mine.length > 1 ? `${plural(mine.length, "separate injury", "separate injuries")} in all` : null,
+			mine.length > 1
+				? `${plural(mine.length, "separate injury", "separate injuries")} in all`
+				: null,
 			`Still played ${plural(l.gp, "game")} and averaged ${fmtNum(l.ppg, 1)} points`,
 		],
 	});
@@ -628,20 +685,26 @@ const ovrTopic: Topic = ({ X, season, pid }) => {
 		id: "p-ovr",
 		group: "p-ratings",
 		theme: "ratings",
-		score: Math.max(rankScore(sr, inSeason.length), rankScore(hr, board.length)) * 0.8,
+		score:
+			Math.max(rankScore(sr, inSeason.length), rankScore(hr, board.length)) *
+			0.8,
 		kicker: "The ratings",
 		pid: pid!,
 		tid: l.tid,
 		season,
 		heads: [
 			`${l.name} was rated ${v} overall`,
-			sr <= 3 ? `${l.name}: one of the highest-rated players in the league` : `${l.name}’s overall rating: ${v}`,
+			sr <= 3
+				? `${l.name}: one of the highest-rated players in the league`
+				: `${l.name}’s overall rating: ${v}`,
 		],
 		hero: { text: `${v}`, unit: "overall" },
 		lines: [
 			`${nth(sr, "highest")} rating in the league this season`,
 			`${nth(hr, "highest")} of ${fmtNum(board.length)} player-seasons in league history`,
-			isNum(p.pot?.[season]) && l.age <= 25 ? `Potential: ${p.pot![season]}` : null,
+			isNum(p.pot?.[season]) && l.age <= 25
+				? `Potential: ${p.pot![season]}`
+				: null,
 		],
 		note: "Overall rating: the game’s single number for how good a player is right now",
 	});
@@ -694,8 +757,14 @@ const ovrJump: Topic = ({ X, season, pid }) => {
 		season,
 		heads:
 			d > 0
-				? [`${l.name} jumped ${plural(d, "point")} in overall rating`, `${l.name} took a leap`]
-				: [`${l.name} dropped ${plural(-d, "point")} in overall rating`, `${l.name} lost a step`],
+				? [
+						`${l.name} jumped ${plural(d, "point")} in overall rating`,
+						`${l.name} took a leap`,
+					]
+				: [
+						`${l.name} dropped ${plural(-d, "point")} in overall rating`,
+						`${l.name} lost a step`,
+					],
 		hero: { text: `${d > 0 ? "+" : ""}${d}`, unit: "overall rating" },
 		lines: [
 			`From ${a} to ${b}`,
@@ -817,13 +886,17 @@ const earnings: Topic = ({ X, season, pid, soFar }) => {
 		tid: l.tid,
 		season,
 		heads: [
-			rank === 1 ? `${l.name} was the league’s highest-paid player` : `${l.name} earned ${money(v)}`,
+			rank === 1
+				? `${l.name} was the league’s highest-paid player`
+				: `${l.name} earned ${money(v)}`,
 			`${money(v)} for ${l.name}`,
 		],
 		hero: { text: money(v), unit: "paid this season" },
 		lines: [
 			`${nth(rank, "highest")} salary in the league`,
-			career > v * 1.2 ? `${money(career)} earned over his career so far` : null,
+			career > v * 1.2
+				? `${money(career)} earned over his career so far`
+				: null,
 		],
 	});
 };
@@ -865,7 +938,9 @@ const value: Topic = ({ X, season, pid, soFar }) => {
 					`The price tag was heavy on ${l.name}`,
 				],
 		hero: { text: fmtNum(ratio, 2), unit: "win shares per $1M" },
-		lines: [`${nth(w.rank, w.high ? "best" : "worst")} among ${plural(board.length, "qualified player")} this season`],
+		lines: [
+			`${nth(w.rank, w.high ? "best" : "worst")} among ${plural(board.length, "qualified player")} this season`,
+		],
 	});
 };
 
@@ -903,11 +978,18 @@ const raise: Topic = ({ X, season, pid, soFar }) => {
 		tid: l.tid,
 		season,
 		heads: [
-			d > 0 ? `${l.name} got a ${money(d)} raise` : `${l.name} took a ${money(-d)} pay cut`,
+			d > 0
+				? `${l.name} got a ${money(d)} raise`
+				: `${l.name} took a ${money(-d)} pay cut`,
 			`${l.name}’s salary went from ${money(a)} to ${money(b)}`,
 		],
-		hero: { text: `${d > 0 ? "+" : "-"}${money(Math.abs(d))}`, unit: "year over year" },
-		lines: [`${nth(w.rank, w.high ? "biggest raise" : "biggest cut")} in the league this season`],
+		hero: {
+			text: `${d > 0 ? "+" : "-"}${money(Math.abs(d))}`,
+			unit: "year over year",
+		},
+		lines: [
+			`${nth(w.rank, w.high ? "biggest raise" : "biggest cut")} in the league this season`,
+		],
 	});
 };
 
@@ -986,7 +1068,11 @@ const loyal: Topic = ({ X, season, pid }) => {
 		],
 		hero: { text: `${years}`, unit: "straight seasons" },
 		lines: [
-			`${fmtNum(X.careerRows(p, season).filter((r) => r.tid === l.tid).reduce((a, r) => a + r.gp, 0))} games for the franchise`,
+			`${fmtNum(
+				X.careerRows(p, season)
+					.filter((r) => r.tid === l.tid)
+					.reduce((a, r) => a + r.gp, 0),
+			)} games for the franchise`,
 		],
 	});
 };
@@ -997,8 +1083,11 @@ const honors: Topic = ({ X, season, pid }) => {
 	if (!p || !l) {
 		return null;
 	}
-	const mine = p.awards.filter((a) => a.season <= season && X.decided(a.season));
-	const count = (f: (t: string) => boolean) => mine.filter((a) => f(a.type)).length;
+	const mine = p.awards.filter(
+		(a) => a.season <= season && X.decided(a.season),
+	);
+	const count = (f: (t: string) => boolean) =>
+		mine.filter((a) => f(a.type)).length;
 	const allLeague = count((t) => /Team All-League/.test(t));
 	const allStar = count((t) => t === "All-Star");
 	const dpoy = count((t) => t === "Defensive Player of the Year");
@@ -1024,9 +1113,13 @@ const honors: Topic = ({ X, season, pid }) => {
 		list: [
 			mvp > 0 ? { name: "MVP awards", value: `${mvp}` } : null,
 			rings > 0 ? { name: "Championships", value: `${rings}` } : null,
-			allLeague > 0 ? { name: "All-League teams", value: `${allLeague}` } : null,
+			allLeague > 0
+				? { name: "All-League teams", value: `${allLeague}` }
+				: null,
 			allStar > 0 ? { name: "All-Star games", value: `${allStar}` } : null,
-			dpoy > 0 ? { name: "Defensive Player of the Year", value: `${dpoy}` } : null,
+			dpoy > 0
+				? { name: "Defensive Player of the Year", value: `${dpoy}` }
+				: null,
 		].filter((x) => x !== null),
 		lines: ["Through this season"],
 	});
@@ -1046,7 +1139,12 @@ const crown: Topic = ({ X, season, pid, soFar }) => {
 		["blocks", (x) => x.bpg],
 		["threes", (x) => x.tpg],
 		["PER", (x) => x.per],
-		...(soFar ? [] : ([["win shares", (x: SeasonLine) => x.ws]] as [string, (x: SeasonLine) => number][])),
+		...(soFar
+			? []
+			: ([["win shares", (x: SeasonLine) => x.ws]] as [
+					string,
+					(x: SeasonLine) => number,
+				][])),
 	];
 	const led = cats
 		.filter(([, f]) => q.every((x) => x === l || f(x) < f(l)))
@@ -1108,7 +1206,9 @@ const allStarStreak: Topic = ({ X, season, pid }) => {
 			`${l.name} keeps making the All-Star team`,
 		],
 		hero: { text: `${n}`, unit: "All-Star games in a row" },
-		lines: [`${p.awards.filter((a) => a.type === "All-Star").length} in his career`],
+		lines: [
+			`${p.awards.filter((a) => a.type === "All-Star").length} in his career`,
+		],
 	});
 };
 
@@ -1122,7 +1222,8 @@ const careerBest: Topic = ({ X, season, pid, soFar }) => {
 	if (prior.length < 3 || l.gp < 30) {
 		return null;
 	}
-	const better = (f: (x: SeasonLine) => number) => prior.every((x) => f(x) < f(l));
+	const better = (f: (x: SeasonLine) => number) =>
+		prior.every((x) => f(x) < f(l));
 	if (!better((x) => x.ppg) || !better((x) => x.per) || !better((x) => x.ws)) {
 		return null;
 	}
@@ -1225,11 +1326,15 @@ const ring: Topic = ({ X, season, pid }) => {
 	if (!p || !l || !X.decided(season)) {
 		return null;
 	}
-	if (!p.awards.some((a) => a.season === season && a.type === "Won Championship")) {
+	if (
+		!p.awards.some((a) => a.season === season && a.type === "Won Championship")
+	) {
 		return null;
 	}
 	const rings = X.countAwards(p, "Won Championship", season);
-	const fm = p.awards.some((a) => a.season === season && a.type === "Finals MVP");
+	const fm = p.awards.some(
+		(a) => a.season === season && a.type === "Finals MVP",
+	);
 	return mk({
 		id: "p-ring",
 		group: "p-playoff",
@@ -1240,11 +1345,19 @@ const ring: Topic = ({ X, season, pid }) => {
 		tid: l.tid,
 		season,
 		heads: [
-			rings === 1 ? `${l.name} won his first championship` : `Ring No. ${rings} for ${l.name}`,
+			rings === 1
+				? `${l.name} won his first championship`
+				: `Ring No. ${rings} for ${l.name}`,
 			`${l.name} is a champion`,
 		],
-		hero: { text: `${rings}`, unit: rings === 1 ? "championship" : "championships" },
-		lines: [fm ? "Finals MVP, too" : null, `With the ${X.teamName(l.tid, season)}`],
+		hero: {
+			text: `${rings}`,
+			unit: rings === 1 ? "championship" : "championships",
+		},
+		lines: [
+			fm ? "Finals MVP, too" : null,
+			`With the ${X.teamName(l.tid, season)}`,
+		],
 	});
 };
 
@@ -1297,7 +1410,11 @@ const draftClass: Topic = ({ X, season, pid }) => {
 	const cls = X.cached(`class|${p.draft.year}`, () =>
 		X.L.players
 			.filter((q) => q.draft.year === p.draft.year && q.draft.round >= 1)
-			.map((q) => ({ q, ws: X.career(q, season).ws, gp: X.career(q, season).gp })),
+			.map((q) => ({
+				q,
+				ws: X.career(q, season).ws,
+				gp: X.career(q, season).gp,
+			})),
 	);
 	if (cls.length < 20) {
 		return null;
@@ -1377,9 +1494,19 @@ const draftSlot: Topic = ({ X, season, pid }) => {
 		return null;
 	}
 	const label =
-		b === "r2" ? "second-round picks" : b === "top5" ? "top-5 picks" : b === "lottery" ? "lottery picks" : "late first-rounders";
-	const pickText = p.draft.round === 2 ? "in the second round" : `No. ${p.draft.pick}`;
-	const slotText = p.draft.round === 2 ? "a second-round pick" : `the No. ${p.draft.pick} pick`;
+		b === "r2"
+			? "second-round picks"
+			: b === "top5"
+				? "top-5 picks"
+				: b === "lottery"
+					? "lottery picks"
+					: "late first-rounders";
+	const pickText =
+		p.draft.round === 2 ? "in the second round" : `No. ${p.draft.pick}`;
+	const slotText =
+		p.draft.round === 2
+			? "a second-round pick"
+			: `the No. ${p.draft.pick} pick`;
 	return mk({
 		id: "p-slot",
 		group: "p-draft",
@@ -1399,7 +1526,9 @@ const draftSlot: Topic = ({ X, season, pid }) => {
 					`A tough career so far for ${slotText}`,
 				],
 		hero: { text: fmtNum(mine, 1), unit: "career win shares" },
-		lines: [`${nth(w.rank, w.high ? "best" : "worst")} of ${plural(mates.length, "player")} among ${label}`],
+		lines: [
+			`${nth(w.rank, w.high ? "best" : "worst")} of ${plural(mates.length, "player")} among ${label}`,
+		],
 	});
 };
 
@@ -1431,7 +1560,9 @@ const undrafted: Topic = ({ X, season, pid }) => {
 			`${l.name} made it without hearing his name called`,
 		],
 		hero: { text: fmtNum(mine, 1), unit: "career win shares" },
-		lines: [`${nth(rank, "best")} of ${plural(all.length, "undrafted player")} so far`],
+		lines: [
+			`${nth(rank, "best")} of ${plural(all.length, "undrafted player")} so far`,
+		],
 	});
 };
 
@@ -1509,7 +1640,9 @@ const family: Topic = ({ X, season, pid }) => {
 			value: `${fmtNum(X.career(x.q!, season).pts)} pts`,
 			pid: x.q!.pid,
 		})),
-		lines: [`${top.q!.name}: ${fmtNum(c.gp)} games, ${fmtNum(c.pts)} career points`],
+		lines: [
+			`${top.q!.name}: ${fmtNum(c.gp)} games, ${fmtNum(c.pts)} career points`,
+		],
 	});
 };
 
@@ -1518,8 +1651,16 @@ const family: Topic = ({ X, season, pid }) => {
 // ---------------------------------------------------------------------------------------------
 
 const MARKS = {
-	pts: { noun: "points", marks: [5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000], k: "pts" },
-	trb: { noun: "rebounds", marks: [2500, 5000, 7500, 10000, 12500, 15000], k: "trb" },
+	pts: {
+		noun: "points",
+		marks: [5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000],
+		k: "pts",
+	},
+	trb: {
+		noun: "rebounds",
+		marks: [2500, 5000, 7500, 10000, 12500, 15000],
+		k: "trb",
+	},
 	ast: { noun: "assists", marks: [2500, 5000, 7500, 10000], k: "ast" },
 	stl: { noun: "steals", marks: [1000, 1500, 2000, 2500, 3000], k: "stl" },
 	blk: { noun: "blocks", marks: [1000, 1500, 2000, 2500, 3000], k: "blk" },
@@ -1596,7 +1737,9 @@ const firsts: Topic = ({ X, season, pid, soFar }) => {
 					`A first for ${l.name}: ${lvl} points a game`,
 				],
 				hero: { text: fmtNum(l.ppg, 1), unit: "PPG" },
-				lines: [`His best before this: ${fmtNum(Math.max(...prior.map((x) => x.ppg)), 1)}`],
+				lines: [
+					`His best before this: ${fmtNum(Math.max(...prior.map((x) => x.ppg)), 1)}`,
+				],
 			});
 		}
 	}
@@ -1610,7 +1753,9 @@ const position: Topic = ({ X, season, pid, soFar }) => {
 	if (!p || !l || !pos || soFar || !X.qualified(season).includes(l)) {
 		return null;
 	}
-	const mates = X.qualified(season).filter((x) => X.players.get(x.pid)?.pos?.[season] === pos);
+	const mates = X.qualified(season).filter(
+		(x) => X.players.get(x.pid)?.pos?.[season] === pos,
+	);
 	if (mates.length < 10) {
 		return null;
 	}
@@ -1680,10 +1825,14 @@ const rookieYear: Topic = ({ X, season, pid }) => {
 		season,
 		heads: [
 			`${l.name} scored ${fmtNum(l.ppg, 1)} a game as a rookie`,
-			rank === 1 ? `The best rookie scoring season in league history` : `A rookie year to remember`,
+			rank === 1
+				? `The best rookie scoring season in league history`
+				: `A rookie year to remember`,
 		],
 		hero: { text: fmtNum(l.ppg, 1), unit: "PPG as a rookie" },
-		lines: [`${nth(rank, "highest")} scoring average by a rookie of ${fmtNum(rookies.length)}`],
+		lines: [
+			`${nth(rank, "highest")} scoring average by a rookie of ${fmtNum(rookies.length)}`,
+		],
 	});
 };
 

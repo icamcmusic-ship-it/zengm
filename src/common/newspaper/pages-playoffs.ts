@@ -53,7 +53,9 @@ addPage(
 				id: "ledger",
 				fit: (x) => x.upsets.length > 0,
 				heads: (x, c) => {
-					const u = x.upsets.toSorted((a, b) => b.w.seed - b.l.seed - (a.w.seed - a.l.seed))[0]!;
+					const u = x.upsets.toSorted(
+						(a, b) => b.w.seed - b.l.seed - (a.w.seed - a.l.seed),
+					)[0]!;
 					return [
 						`No. ${u.w.seed} ${c.tn(u.w.tid)} ${c.T("topple", "toppled")} No. ${u.l.seed} ${c.tn(u.l.tid)}`,
 						`${plural(x.upsets.length, "upset")} in the ${c.season} bracket`,
@@ -123,13 +125,20 @@ addPage(
 					];
 				},
 				build: (x, r, c) => {
-					const longest = x.done.toSorted((a, b) => b.w.won + b.l.won - (a.w.won + a.l.won))[0]!;
+					const longest = x.done.toSorted(
+						(a, b) => b.w.won + b.l.won - (a.w.won + a.l.won),
+					)[0]!;
 					const sweeps = x.done.filter((d) => d.l.won === 0);
-					const rounds = [...new Set(x.done.map((d) => d.round))].toSorted((a, b) => a - b);
+					const rounds = [...new Set(x.done.map((d) => d.round))].toSorted(
+						(a, b) => a - b,
+					);
 					return [
 						P(
 							sweeps.length === 0
-								? `No ${c.season} series ${c.T("has", "")} ended in a sweep. The longest, `.replace("  ", " ")
+								? `No ${c.season} series ${c.T("has", "")} ended in a sweep. The longest, `.replace(
+										"  ",
+										" ",
+									)
 								: `${plural(sweeps.length, "series", "series")} ${c.T("have ended", "ended")} in sweeps. The longest, `,
 							c.tl(longest.w.tid),
 							` over `,
@@ -176,8 +185,7 @@ addPage(
 					}
 					const margin = games.reduce(
 						(a, g) =>
-							a +
-							(g.won.tid === d.w.tid ? 1 : -1) * (g.won.pts - g.lost.pts),
+							a + (g.won.tid === d.w.tid ? 1 : -1) * (g.won.pts - g.lost.pts),
 						0,
 					);
 					return { d, margin, games: games.length };
@@ -189,7 +197,9 @@ addPage(
 			{
 				id: "closest",
 				heads: (x, c) => {
-					const y = x.rows.toSorted((a, b) => Math.abs(a.margin) - Math.abs(b.margin))[0]!;
+					const y = x.rows.toSorted(
+						(a, b) => Math.abs(a.margin) - Math.abs(b.margin),
+					)[0]!;
 					return [
 						`${c.tn(y.d.w.tid)} ${c.T("edge", "edged")} ${c.tn(y.d.l.tid)} by ${Math.abs(y.margin)} points over ${word(y.games)} games`,
 						`The closest series of the playoffs`,
@@ -198,7 +208,9 @@ addPage(
 					];
 				},
 				build: (x, r, c) => {
-					const sorted = x.rows.toSorted((a, b) => Math.abs(a.margin) - Math.abs(b.margin));
+					const sorted = x.rows.toSorted(
+						(a, b) => Math.abs(a.margin) - Math.abs(b.margin),
+					);
 					const y = sorted[0]!;
 					return [
 						P(
@@ -210,11 +222,13 @@ addPage(
 						),
 						table(
 							["Series", "Result", "Net points"],
-							sorted.slice(0, 5).map((z) => [
-								[c.tl(z.d.w.tid), " over ", c.tl(z.d.l.tid)],
-								[`${z.d.w.won}-${z.d.l.won}`],
-								[z.margin >= 0 ? `+${z.margin}` : `${z.margin}`],
-							]),
+							sorted
+								.slice(0, 5)
+								.map((z) => [
+									[c.tl(z.d.w.tid), " over ", c.tl(z.d.l.tid)],
+									[`${z.d.w.won}-${z.d.l.won}`],
+									[z.margin >= 0 ? `+${z.margin}` : `${z.margin}`],
+								]),
 							[1, 2],
 						),
 					];
@@ -260,12 +274,16 @@ addPage(
 			if (done.length < 4) {
 				return undefined;
 			}
-			const rounds = [...new Set(done.map((d) => d.round))].toSorted((a, b) => a - b);
+			const rounds = [...new Set(done.map((d) => d.round))].toSorted(
+				(a, b) => a - b,
+			);
 			return {
 				byRound: rounds.map((round) => ({
 					round,
-					top: done.filter((d) => d.round === round && d.w.seed < d.l.seed).length,
-					low: done.filter((d) => d.round === round && d.w.seed > d.l.seed).length,
+					top: done.filter((d) => d.round === round && d.w.seed < d.l.seed)
+						.length,
+					low: done.filter((d) => d.round === round && d.w.seed > d.l.seed)
+						.length,
 				})),
 			};
 		},
@@ -298,7 +316,18 @@ addPage(
 );
 
 addPage(
-	arcPage<{ roads: { tid: number; legs: { round: number; opp: number; w: number; l: number; seed?: number }[] }[] }>({
+	arcPage<{
+		roads: {
+			tid: number;
+			legs: {
+				round: number;
+				opp: number;
+				w: number;
+				l: number;
+				seed?: number;
+			}[];
+		}[];
+	}>({
 		id: "finalists-roads",
 		section: "playoffs",
 		kicker: "Two roads to the finals",

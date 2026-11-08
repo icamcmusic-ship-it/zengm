@@ -210,7 +210,10 @@ export const makeCtx = (L: VLeague): Ctx => {
 			);
 		}
 	}
-	const pickMoves = new Map<number, { eid: number; to: number; from: number }[]>();
+	const pickMoves = new Map<
+		number,
+		{ eid: number; to: number; from: number }[]
+	>();
 	const trades = L.trades.toSorted((a, b) => a.eid - b.eid);
 	for (const t of trades) {
 		for (const i of [0, 1] as const) {
@@ -226,7 +229,14 @@ export const makeCtx = (L: VLeague): Ctx => {
 			}
 		}
 	}
-	return { cur: L.season, phase: L.phase, players, byDpid, byPickKey, pickMoves };
+	return {
+		cur: L.season,
+		phase: L.phase,
+		players,
+		byDpid,
+		byPickKey,
+		pickMoves,
+	};
 };
 
 type Stint = {
@@ -291,7 +301,11 @@ export const stintFor = (
 
 	// Which of his stats rows came after the trade. Trade events store statsIndex like processTrade does: for a trade before the playoffs end, the index his first row with the new team will have (it may not exist yet); after the playoffs, the index of his last row with the old team. Used only if the row there is where it should be, else rows are picked by season
 	let firstIndex: number | null = null;
-	if (start.type === "trade" && isNum(start.statsIndex) && start.statsIndex >= 0) {
+	if (
+		start.type === "trade" &&
+		isNum(start.statsIndex) &&
+		start.statsIndex >= 0
+	) {
 		const duringSeason = start.phase <= PHASE.PLAYOFFS;
 		const row = p.rows.find((r) => r.i === start.statsIndex);
 		if (duringSeason) {

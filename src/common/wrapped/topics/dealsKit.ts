@@ -2,11 +2,7 @@
 import type { LeagueIndex } from "../league.ts";
 import type { SlideListRow } from "../types.ts";
 import { clamp01, fmtNum, plural } from "../util.ts";
-import {
-	assetText,
-	type TradeEval,
-	type TradeSide,
-} from "../deals.ts";
+import { assetText, type TradeEval, type TradeSide } from "../deals.ts";
 import { money } from "./kit.ts";
 
 export { clamp01, money };
@@ -29,7 +25,9 @@ export const sideRow = (
 	withWs: boolean,
 ): SlideListRow => ({
 	name: X.teamName(e.sides[i].tid, s),
-	value: withWs ? `${ws1(e.sides[i].ws)} WS` : plural(e.t.got[i].length, "asset"),
+	value: withWs
+		? `${ws1(e.sides[i].ws)} WS`
+		: plural(e.t.got[i].length, "asset"),
 	sub: `Got ${assetText(X, e.t.got[i])}`,
 	tid: e.sides[i].tid,
 });

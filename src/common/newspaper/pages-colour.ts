@@ -2,13 +2,7 @@
 // Colour pages: letters, classifieds, the hot stove, overheard in the arena, the forecast, the quiz, and the preseason pages (title odds, five questions, last year's leaders). Colour is the newsroom's own voice: the facts are real, the voices are invented, and the page says so.
 
 import { Ctx, P } from "./ctx.ts";
-import {
-	PLAYED,
-	PRE_ONLY,
-	addPage,
-	arcPage,
-	table,
-} from "./kit.ts";
+import { PLAYED, PRE_ONLY, addPage, arcPage, table } from "./kit.ts";
 import { fmt1, money, ordinal, plural, record, winp } from "./text.ts";
 import type { Block, NPPlayer, NPTeam, Seg } from "./types.ts";
 
@@ -126,7 +120,9 @@ addPage(
 				c.tl(worst.tid),
 				".",
 			]);
-			const scoring = c.f.teams.filter((t) => t.pts !== undefined).toSorted((a, b) => a.pts! - b.pts!);
+			const scoring = c.f.teams
+				.filter((t) => t.pts !== undefined)
+				.toSorted((a, b) => a.pts! - b.pts!);
 			if (scoring.length >= 8) {
 				const t = scoring[0]!;
 				items.push([
@@ -135,7 +131,9 @@ addPage(
 					`, ${c.T("last", "last")} in the league at ${fmt1(t.pts!)} points a game; references not required.`,
 				]);
 			}
-			const defense = c.f.teams.filter((t) => t.oppPts !== undefined).toSorted((a, b) => b.oppPts! - a.oppPts!);
+			const defense = c.f.teams
+				.filter((t) => t.oppPts !== undefined)
+				.toSorted((a, b) => b.oppPts! - a.oppPts!);
 			if (defense.length >= 8) {
 				const t = defense[0]!;
 				items.push([
@@ -154,7 +152,9 @@ addPage(
 					"; reward offered.",
 				]);
 			}
-			const hot = c.f.teams.filter((t) => t.streak >= 4).toSorted((a, b) => b.streak - a.streak)[0];
+			const hot = c.f.teams
+				.filter((t) => t.streak >= 4)
+				.toSorted((a, b) => b.streak - a.streak)[0];
 			if (hot) {
 				items.push([
 					`FOUND: a winning streak, ${hot.streak} games long, currently in the possession of the `,
@@ -162,7 +162,9 @@ addPage(
 					"; do not disturb.",
 				]);
 			}
-			const old = c.qual.filter((p) => p.min >= 20).toSorted((a, b) => b.age - a.age)[0];
+			const old = c.qual
+				.filter((p) => p.min >= 20)
+				.toSorted((a, b) => b.age - a.age)[0];
 			if (old) {
 				items.push([
 					`FOR SALE: one very reliable veteran, ${old.age} years old and still playing ${fmt1(old.min)} minutes a night; inquire with `,
@@ -181,9 +183,7 @@ addPage(
 					`The back page: classifieds`,
 					`Small ads, big numbers`,
 				],
-				build: (x) => [
-					{ type: "list", items: x.items },
-				],
+				build: (x) => [{ type: "list", items: x.items }],
 			},
 		],
 	}),
@@ -204,9 +204,17 @@ addPage(
 				return undefined;
 			}
 			const cands = c.f.players
-				.filter((p) => p.contractExp !== undefined && p.contractExp <= c.season && p.gp > 0)
+				.filter(
+					(p) =>
+						p.contractExp !== undefined &&
+						p.contractExp <= c.season &&
+						p.gp > 0,
+				)
 				.map((p) => ({ p, t: c.team(p.tid) }))
-				.filter((x): x is { p: NPPlayer; t: NPTeam } => x.t !== undefined && winp(x.t) < 0.45)
+				.filter(
+					(x): x is { p: NPPlayer; t: NPTeam } =>
+						x.t !== undefined && winp(x.t) < 0.45,
+				)
 				.toSorted((a, b) => b.p.ovr - a.p.ovr)
 				.slice(0, 4);
 			return cands.length >= 2 ? { cands } : undefined;
@@ -292,12 +300,15 @@ addPage(
 							`${x.worst.lost} losses${c.done ? "" : " so far"} for the ${x.worst.name}, and the popcorn ${c.T("has been", "was")} the highlight.`,
 							`We ${c.T("keep", "kept")} coming back to watch the ${x.worst.name} at ${record(x.worst)}, and I could not tell you why.`,
 							`${record(x.worst)} and the lines for the concessions in ${city(c, x.worst)} are still long.`,
-							`The ${x.worst.name} ${c.T("are", "were")} ${record(x.worst)}, but the hot dogs ${c.T("are", "were")} undefeated.`.replace("undefeated", "perfect"),
+							`The ${x.worst.name} ${c.T("are", "were")} ${record(x.worst)}, but the hot dogs ${c.T("are", "were")} undefeated.`.replace(
+								"undefeated",
+								"perfect",
+							),
 							`${x.worst.won} wins is ${x.worst.won === 1 ? "a number" : "a number"} you can count on two hands, and we ${c.T("still count", "still counted")} every one.`,
 						]),
 						"a season-ticket holder in " + city(c, x.worst),
 					),
-			],
+				],
 			},
 		],
 	}),
@@ -314,8 +325,14 @@ addPage(
 		beat: "opinion",
 		colour: true,
 		prep: (c) => {
-			const hot = c.f.teams.filter((t) => t.streak >= 3).toSorted((a, b) => b.streak - a.streak).slice(0, 3);
-			const cold = c.f.teams.filter((t) => t.streak <= -3).toSorted((a, b) => a.streak - b.streak).slice(0, 3);
+			const hot = c.f.teams
+				.filter((t) => t.streak >= 3)
+				.toSorted((a, b) => b.streak - a.streak)
+				.slice(0, 3);
+			const cold = c.f.teams
+				.filter((t) => t.streak <= -3)
+				.toSorted((a, b) => a.streak - b.streak)
+				.slice(0, 3);
 			return hot.length + cold.length >= 3 ? { hot, cold } : undefined;
 		},
 		arcs: [
@@ -384,14 +401,23 @@ addPage(
 			}
 			const home = c.f.teams
 				.filter((t) => t.wonHome + t.lostHome >= 8)
-				.toSorted((a, b) => winp({ won: b.wonHome, lost: b.lostHome }) - winp({ won: a.wonHome, lost: a.lostHome }))[0];
+				.toSorted(
+					(a, b) =>
+						winp({ won: b.wonHome, lost: b.lostHome }) -
+						winp({ won: a.wonHome, lost: a.lostHome }),
+				)[0];
 			if (home) {
 				qs.push({
 					q: `Which team has the best home record in ${c.season}, ${home.wonHome}-${home.lostHome} (its city starts with ${city(c, home).charAt(0)})?`,
-					a: [c.tl(home.tid, c.tfull(home.tid)), ` (${home.wonHome}-${home.lostHome})`],
+					a: [
+						c.tl(home.tid, c.tfull(home.tid)),
+						` (${home.wonHome}-${home.lostHome})`,
+					],
 				});
 			}
-			const old = c.qual.filter((p) => p.min >= 15).toSorted((a, b) => b.age - a.age)[0];
+			const old = c.qual
+				.filter((p) => p.min >= 15)
+				.toSorted((a, b) => b.age - a.age)[0];
 			if (old) {
 				qs.push({
 					q: `Who is the oldest regular in the ${c.season} league, at ${old.age}?`,
@@ -576,7 +602,9 @@ addPage(
 					` rank ${ordinal(c.ovrRank(champ.tid) ?? 0)} by roster rating hold up?`,
 				]);
 			}
-			const young = c.f.players.filter((p) => p.age <= 22).toSorted((a, b) => b.pot - a.pot)[0];
+			const young = c.f.players
+				.filter((p) => p.age <= 22)
+				.toSorted((a, b) => b.pot - a.pot)[0];
 			if (young) {
 				qs.push([
 					`How far can `,
@@ -584,7 +612,9 @@ addPage(
 					` (${young.age}, ${young.ovr} now, ${young.pot} potential) climb?`,
 				]);
 			}
-			const old = c.f.players.toSorted((a, b) => b.ovr - a.ovr).find((p) => p.age >= 34);
+			const old = c.f.players
+				.toSorted((a, b) => b.ovr - a.ovr)
+				.find((p) => p.age >= 34);
 			if (old) {
 				qs.push([
 					`Is ${old.age} too old for `,

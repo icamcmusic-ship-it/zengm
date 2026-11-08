@@ -48,7 +48,11 @@ describe("back pages", () => {
 				assert.notMatch(paperText(a), BAD, `${edition} ${season}`);
 				for (const tid of [0, 3, 11]) {
 					const team = buildPaper(facts, tid);
-					assert.notMatch(paperText(team), BAD, `${edition} ${season} team ${tid}`);
+					assert.notMatch(
+						paperText(team),
+						BAD,
+						`${edition} ${season} team ${tid}`,
+					);
 					assert.strictEqual(team.tid, tid);
 				}
 			}
@@ -69,7 +73,14 @@ describe("back pages", () => {
 		assert.isAtLeast(PAGES.length, 60, "registered page types");
 		assert.isAtLeast(used.length, 60, `page types used: ${used.length}`);
 		// The champion story, the six features and the champion arcs on top
-		for (const f of ["feature-mvp", "feature-best", "feature-feat", "feature-break", "feature-trade", "feature-pick"]) {
+		for (const f of [
+			"feature-mvp",
+			"feature-best",
+			"feature-feat",
+			"feature-break",
+			"feature-trade",
+			"feature-pick",
+		]) {
 			assert.ok(all.has(f), `feature ${f}`);
 		}
 		const champ = [...all].filter((t) => t.startsWith("champion-"));
@@ -77,12 +88,16 @@ describe("back pages", () => {
 	});
 
 	test("unfinished editions claim no outcome", () => {
-		const claims = /(are champions|were champions|The ballots|Most Valuable Player\. |(2022|2025|2029) (title|championship|MVP)|won the (2022|2025|2029))/;
+		const claims =
+			/(are champions|were champions|The ballots|Most Valuable Player\. |(2022|2025|2029) (title|championship|MVP)|won the (2022|2025|2029))/;
 		for (const edition of ["preseason", "midseason", "playoffs"] as const) {
 			for (const season of [2022, 2025, 2029]) {
 				const text = paperText(buildPaper(makeFixture(edition, season)));
 				const m = text.match(claims);
-				assert.isNull(m, `${edition} ${season}: ${m ? text.slice(Math.max(0, m.index! - 80), m.index! + 80) : ""}`);
+				assert.isNull(
+					m,
+					`${edition} ${season}: ${m ? text.slice(Math.max(0, m.index! - 80), m.index! + 80) : ""}`,
+				);
 			}
 		}
 	});
@@ -90,7 +105,10 @@ describe("back pages", () => {
 	test("present tense while the season is on", () => {
 		for (const edition of ["midseason"] as const) {
 			const text = paperText(buildPaper(makeFixture(edition, 2025)));
-			assert.notMatch(text, /\b(ended the season|capped a|finished the season)\b/);
+			assert.notMatch(
+				text,
+				/\b(ended the season|capped a|finished the season)\b/,
+			);
 		}
 	});
 
@@ -182,7 +200,9 @@ describe("back pages", () => {
 				}
 			}
 			const share = repeated / total;
-			const top = [...worst.entries()].toSorted((a, b) => b[1] - a[1]).slice(0, 30);
+			const top = [...worst.entries()]
+				.toSorted((a, b) => b[1] - a[1])
+				.slice(0, 30);
 			assert.isBelow(
 				share,
 				0.03,
@@ -205,12 +225,19 @@ describe("back pages", () => {
 });
 
 describe("local edition", () => {
-	const ids = (paper: Paper) => paper.sections.flatMap((s) => s.articles.map((a) => a.id));
+	const ids = (paper: Paper) =>
+		paper.sections.flatMap((s) => s.articles.map((a) => a.id));
 
 	test("has the team's own sections and links to other editions", () => {
 		const paper = buildPaper(makeFixture("midseason", 2025), 3);
 		const all = ids(paper);
-		for (const id of ["team-roster", "team-ranks", "team-franchise", "team-back-issues", "team-injuries"]) {
+		for (const id of [
+			"team-roster",
+			"team-ranks",
+			"team-franchise",
+			"team-back-issues",
+			"team-injuries",
+		]) {
 			assert.include(all, id);
 		}
 		const links: unknown[] = [];
@@ -219,7 +246,11 @@ describe("local edition", () => {
 				for (const b of a.body) {
 					if (b.type === "list") {
 						for (const item of b.items) {
-							links.push(...item.filter((seg) => typeof seg !== "string" && "paper" in seg));
+							links.push(
+								...item.filter(
+									(seg) => typeof seg !== "string" && "paper" in seg,
+								),
+							);
 						}
 					}
 				}

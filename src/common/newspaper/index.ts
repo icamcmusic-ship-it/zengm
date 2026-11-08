@@ -10,11 +10,7 @@ import {
 	topPickFeature,
 	tradeFeature,
 } from "./features.ts";
-import {
-	leadMidseason,
-	leadPlayoffs,
-	leadPreseason,
-} from "./front.ts";
+import { leadMidseason, leadPlayoffs, leadPreseason } from "./front.ts";
 import { PAGES, type PageDef, type SectionId } from "./kit.ts";
 import "./pages-rank.ts";
 import "./pages-league.ts";
@@ -244,7 +240,8 @@ const featureStories = (c: Ctx): Article[] => {
 		(cc: Ctx) => tradeFeature(cc),
 		topPickFeature,
 	];
-	const start = hashString(`${c.f.seedKey}|features`) + (c.season - c.f.firstSeason);
+	const start =
+		hashString(`${c.f.seedKey}|features`) + (c.season - c.f.firstSeason);
 	const out: Article[] = [];
 	for (let k = 0; k < makers.length; k++) {
 		const a = makers[(start + k) % makers.length]!(c);
@@ -267,11 +264,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 	const front = section(
 		"front",
 		"Front page",
-		[
-			lead,
-			...frontFeats,
-			c.done ? finalsMvpStory(c) : bestGamesStory(c),
-		],
+		[lead, ...frontFeats, c.done ? finalsMvpStory(c) : bestGamesStory(c)],
 		[numbersSidebar(c), standingsSidebar(c), leadersSidebar(c)],
 	);
 	const playoffs =
@@ -329,7 +322,11 @@ const leaguePaper = (c: Ctx): Section[] => {
 	const history = section("history", "History", pagesFor(c, "history", 6));
 	const obits = section("obits", "Retirements", retireStories(c));
 	const opinion = section("opinion", "Opinion", [opinionColumn(c)]);
-	const colour = section("colour", "Colour & letters", pagesFor(c, "colour", 4));
+	const colour = section(
+		"colour",
+		"Colour & letters",
+		pagesFor(c, "colour", 4),
+	);
 	return compact([
 		front,
 		playoffs,
@@ -446,7 +443,10 @@ export const paperText = (paper: Paper) => {
 			if ("head" in a) {
 				out.push(a.head, a.kicker ?? "", a.deck ? segsText(a.deck) : "");
 				if (a.box) {
-					out.push(a.box.title, ...a.box.items.map((x) => `${x.value} ${x.label}`));
+					out.push(
+						a.box.title,
+						...a.box.items.map((x) => `${x.value} ${x.label}`),
+					);
 				}
 			} else {
 				out.push(a.title);

@@ -326,7 +326,11 @@ const getHistory = async (
 				seasons: career.seasons,
 			});
 		}
-		if (retroYear !== undefined && p.draft.year === retroYear && p.draft.round > 0) {
+		if (
+			retroYear !== undefined &&
+			p.draft.year === retroYear &&
+			p.draft.round > 0
+		) {
 			const c = careerBefore(p, season);
 			retroPicks.push({
 				pid: p.pid,
@@ -336,7 +340,9 @@ const getHistory = async (
 				draftTid: p.draft.tid,
 				tid: p.tid >= 0 ? p.tid : -1,
 				retired: p.retiredYear !== Infinity && p.tid === PLAYER.RETIRED,
-				ovr: ratingsFor(p, season - 1) ? Math.round(ratingsFor(p, season - 1)!.ovr) : undefined,
+				ovr: ratingsFor(p, season - 1)
+					? Math.round(ratingsFor(p, season - 1)!.ovr)
+					: undefined,
 				pts: c?.pts ?? 0,
 				ws: c?.ws ?? 0,
 				seasons: c?.seasons ?? 0,
@@ -747,7 +753,8 @@ export const getNewsFacts = async (
 		for (const tr of trades) {
 			tr.got.forEach((side, i) => {
 				for (const a of side) {
-					const p = a.kind === "player" ? tps.find((x) => x.pid === a.pid) : undefined;
+					const p =
+						a.kind === "player" ? tps.find((x) => x.pid === a.pid) : undefined;
 					if (a.kind === "player" && p) {
 						const rows = getProStats(p).filter(
 							(r) => r.season === season && !r.playoffs && r.tid === tr.tids[i],
@@ -989,10 +996,10 @@ type Built = {
 const paperCache = new Map<string, Built>();
 
 const currentGp = async (season: number) => {
-	const tss = await idb.cache.teamSeasons.indexGetAll("teamSeasonsBySeasonTid", [
-		[season],
-		[season, "Z"],
-	]);
+	const tss = await idb.cache.teamSeasons.indexGetAll(
+		"teamSeasonsBySeasonTid",
+		[[season], [season, "Z"]],
+	);
 	return Math.max(
 		0,
 		...tss.map((ts) => ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0)),

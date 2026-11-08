@@ -174,8 +174,28 @@ export const makeLeague = (numSeasons = 4, seed = "fixture"): WLeague => {
 	};
 };
 
-const PLACES = ["USA", "USA", "USA", "USA", "Canada", "France", "Serbia", "Spain", "Nigeria", "Australia"];
-const COLLEGES = ["Duke", "Kansas", "Kentucky", "UCLA", "Gonzaga", "", "", "Arizona"];
+const PLACES = [
+	"USA",
+	"USA",
+	"USA",
+	"USA",
+	"Canada",
+	"France",
+	"Serbia",
+	"Spain",
+	"Nigeria",
+	"Australia",
+];
+const COLLEGES = [
+	"Duke",
+	"Kansas",
+	"Kentucky",
+	"UCLA",
+	"Gonzaga",
+	"",
+	"",
+	"Arizona",
+];
 const POS = ["PG", "SG", "SF", "PF", "C", "G", "F", "GF", "FC"];
 
 // A richer deterministic league: draft classes, ratings and pay, awards, playoff rows, injuries, trades, retirements and every optional stat, so the extra topics have something to say. It uses its own random stream, so makeLeague itself is unchanged.
@@ -284,7 +304,12 @@ export const makeRichLeague = (numSeasons = 12, seed = "rich"): WLeague => {
 				row.min = Math.round(row.min * frac);
 				row.pts = Math.round(row.pts * frac);
 				p.stats.push(second);
-				p.moves.push({ season: start + 1, tid: second.tid, type: "trade", fromTid: row.tid });
+				p.moves.push({
+					season: start + 1,
+					tid: second.tid,
+					type: "trade",
+					fromTid: row.tid,
+				});
 			}
 		}
 	}
@@ -293,7 +318,9 @@ export const makeRichLeague = (numSeasons = 12, seed = "rich"): WLeague => {
 
 	// Ratings, pay, optional stats, playoffs, injuries
 	const top4 = (s: number) =>
-		L.teamSeasons.filter((t) => t.season === s && t.playoffRoundsWon >= 0).map((t) => t.tid);
+		L.teamSeasons
+			.filter((t) => t.season === s && t.playoffRoundsWon >= 0)
+			.map((t) => t.tid);
 	for (const p of L.players) {
 		p.bornLoc = PLACES[p.pid % PLACES.length]!;
 		p.college = COLLEGES[p.pid % COLLEGES.length]!;
@@ -315,7 +342,10 @@ export const makeRichLeague = (numSeasons = 12, seed = "rich"): WLeague => {
 			r.blk += ri(0, Math.ceil(r.gp / 3));
 			ovr = Math.max(25, Math.min(85, ovr + ri(-5, 6)));
 			p.ovr[r.season] = ovr;
-			p.pot[r.season] = Math.min(90, ovr + Math.max(0, ri(0, 14) - (r.season - p.bornYear - 19))) ;
+			p.pot[r.season] = Math.min(
+				90,
+				ovr + Math.max(0, ri(0, 14) - (r.season - p.bornYear - 19)),
+			);
 			p.pos[r.season] = POS[p.pid % POS.length]!;
 			p.paid.push({ season: r.season, tid: r.tid, amount: ri(600, 36000) });
 			const trb = r.trb;
@@ -340,7 +370,11 @@ export const makeRichLeague = (numSeasons = 12, seed = "rich"): WLeague => {
 				p.po.push({ ...rowFor(p, r.season, r.tid, ri(5, 20)), per: ri(8, 28) });
 			}
 			if (ri(0, 5) === 0) {
-				p.injuries.push({ season: r.season, games: ri(3, 60), type: ri(0, 1) ? "Sprained Ankle" : "Torn ACL" });
+				p.injuries.push({
+					season: r.season,
+					games: ri(3, 60),
+					type: ri(0, 1) ? "Sprained Ankle" : "Torn ACL",
+				});
 			}
 		}
 	}
@@ -362,7 +396,10 @@ export const makeRichLeague = (numSeasons = 12, seed = "rich"): WLeague => {
 				x.p.awards.push({ season: s, type: "First Team All-Defensive" });
 			}
 		});
-		lines[1]?.p.awards.push({ season: s, type: "Defensive Player of the Year" });
+		lines[1]?.p.awards.push({
+			season: s,
+			type: "Defensive Player of the Year",
+		});
 		lines[3]?.p.awards.push({ season: s, type: "Finals MVP" });
 		const rk = lines.find((x) => x.p.draft.year === s - 1);
 		rk?.p.awards.push({ season: s, type: "Rookie of the Year" });
@@ -396,7 +433,11 @@ export const makeRichLeague = (numSeasons = 12, seed = "rich"): WLeague => {
 		{ cid: 0, name: "East" },
 		{ cid: 1, name: "West" },
 	];
-	L.divs = [0, 1, 2, 3].map((did) => ({ did, cid: did % 2, name: `Div${did}` }));
+	L.divs = [0, 1, 2, 3].map((did) => ({
+		did,
+		cid: did % 2,
+		name: `Div${did}`,
+	}));
 	for (const g of L.games) {
 		for (const t of g.teams) {
 			const q = Math.floor(t.pts / 4);

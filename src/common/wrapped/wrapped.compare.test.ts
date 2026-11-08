@@ -44,9 +44,15 @@ describe("compare specs", () => {
 	test("validation", () => {
 		const a: Side = { k: "p", id: 6, season };
 		expect(validSides(X, a, { k: "t", id: 1, season })).toMatch(/of a kind/);
-		expect(validSides(X, a, { k: "p", id: 6, season: 1900 })).toMatch(/no 1900 season/);
-		expect(validSides(X, { k: "t", id: 99, season }, { k: "t", id: 1, season })).toMatch(/did not play/);
-		expect(validSides(X, { k: "t", id: 2, season }, { k: "t", id: 1, season })).toBeUndefined();
+		expect(validSides(X, a, { k: "p", id: 6, season: 1900 })).toMatch(
+			/no 1900 season/,
+		);
+		expect(
+			validSides(X, { k: "t", id: 99, season }, { k: "t", id: 1, season }),
+		).toMatch(/did not play/);
+		expect(
+			validSides(X, { k: "t", id: 2, season }, { k: "t", id: 1, season }),
+		).toBeUndefined();
 	});
 });
 
@@ -62,7 +68,14 @@ describe("matching", () => {
 		]);
 		expect(m.onlyA.map((s) => s.id)).toEqual(["only-a"]);
 		expect(m.onlyB.map((s) => s.id)).toEqual(["only-b"]);
-		expect(tally(m)).toEqual({ both: 2, a: 1, b: 0, even: 1, onlyA: 1, onlyB: 1 });
+		expect(tally(m)).toEqual({
+			both: 2,
+			a: 1,
+			b: 0,
+			even: 1,
+			onlyA: 1,
+			onlyB: 1,
+		});
 	});
 });
 
@@ -105,7 +118,9 @@ describe("two sides of each kind", () => {
 			}
 			const rows = statRows(X, a, b);
 			expect(rows.length).toBeGreaterThan(3);
-			expect(isBadText(rows.map((r) => `${r.label} ${r.a} ${r.b}`).join(" "))).toBe(false);
+			expect(
+				isBadText(rows.map((r) => `${r.label} ${r.a} ${r.b}`).join(" ")),
+			).toBe(false);
 			expect(isBadText(sideLabel(X, a))).toBe(false);
 			for (const r of rows) {
 				if (r.a === "–" || r.b === "–") {

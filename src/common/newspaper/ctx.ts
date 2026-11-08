@@ -155,7 +155,9 @@ export class Ctx {
 			.filter((t) => t.gp > 0 || facts.edition === "preseason")
 			.toSorted(
 				(a, b) =>
-					winp(b) - winp(a) || b.won - b.lost - (a.won - a.lost) || a.tid - b.tid,
+					winp(b) - winp(a) ||
+					b.won - b.lost - (a.won - a.lost) ||
+					a.tid - b.tid,
 			);
 		const minGp = Math.max(1, Math.ceil(facts.gp * (this.done ? 0.6 : 0.5)));
 		this.qual = facts.players.filter((p) => p.gp >= minGp && p.min >= 12);
@@ -244,7 +246,10 @@ export class Ctx {
 	}
 
 	// Per-game rank among qualified players, 1-based, or undefined
-	statRank(pid: number, key: "pts" | "trb" | "ast" | "stl" | "blk" | "ws" | "per") {
+	statRank(
+		pid: number,
+		key: "pts" | "trb" | "ast" | "stl" | "blk" | "ws" | "per",
+	) {
 		const sorted = this.qual.toSorted((a, b) => b[key] - a[key]);
 		const i = sorted.findIndex((p) => p.pid === pid);
 		return i >= 0 ? i + 1 : undefined;
@@ -292,7 +297,10 @@ export class Ctx {
 
 	// A choice that moves through the list from a seeded start along a golden-ratio sequence in the season, so neighbouring seasons seldom share a variant and every variant comes round
 	cycle<T>(key: string, list: readonly T[], offset = 0): T {
-		const start = (hashString(`${this.f.seedKey}|cycle|${key}|${this.tid ?? ""}`) % 100000) / 100000;
+		const start =
+			(hashString(`${this.f.seedKey}|cycle|${key}|${this.tid ?? ""}`) %
+				100000) /
+			100000;
 		const x = (start + (this.season + offset) * 0.6180339887498949) % 1;
 		return list[Math.min(list.length - 1, Math.floor(x * list.length))] as T;
 	}
@@ -376,7 +384,9 @@ export class Ctx {
 	}
 }
 
-export const P = (...segs: (Seg | Seg[] | null | undefined | false)[]): Block => {
+export const P = (
+	...segs: (Seg | Seg[] | null | undefined | false)[]
+): Block => {
 	const out: Seg[] = [];
 	for (const s of segs) {
 		if (s === null || s === undefined || s === false) {

@@ -82,9 +82,7 @@ const teamSlide = (ctx: TopicCtx, d: TeamDef): Slide | null => {
 	const last = board
 		.filter(
 			(x) =>
-				x.season < season &&
-				(w.high ? x.v >= v : x.v <= v) &&
-				x.tid !== tid,
+				x.season < season && (w.high ? x.v >= v : x.v <= v) && x.tid !== tid,
 		)
 		.sort((a, b) => b.season - a.season)[0];
 	const name = X.teamName(tid!, season);
@@ -101,7 +99,9 @@ const teamSlide = (ctx: TopicCtx, d: TeamDef): Slide | null => {
 		lines: [
 			`${nth(sr, w.high ? "highest" : "lowest")} in the league this season`,
 			`${nth(w.rank, w.high ? "highest" : "lowest")} of ${fmtNum(vals.length)} team seasons in league history`,
-			last ? `Last team this ${w.high ? "high" : "low"}: ${X.teamName(last.tid, last.season)}, ${last.season}` : null,
+			last
+				? `Last team this ${w.high ? "high" : "low"}: ${X.teamName(last.tid, last.season)}, ${last.season}`
+				: null,
 			...(d.extra?.(t, X, v) ?? []),
 		],
 		note: d.note,
@@ -143,9 +143,15 @@ const TEAM_DEFS: TeamDef[] = [
 		},
 		show: (v) => fmtNumWinp(v),
 		unit: "home win pct",
-		hi: (n, v) => [`${n} were nearly unbeatable at home`, `A fortress: ${n} at home`],
+		hi: (n, v) => [
+			`${n} were nearly unbeatable at home`,
+			`A fortress: ${n} at home`,
+		],
 		lo: (n) => [`${n} struggled at home`, `Home was no advantage for ${n}`],
-		extra: (t) => [`Home record: ${t.wonHome}-${t.lostHome}`, `Road record: ${t.wonAway}-${t.lostAway}`],
+		extra: (t) => [
+			`Home record: ${t.wonHome}-${t.lostHome}`,
+			`Road record: ${t.wonAway}-${t.lostAway}`,
+		],
 		w: 0.8,
 	},
 	{
@@ -160,7 +166,10 @@ const TEAM_DEFS: TeamDef[] = [
 		show: (v) => fmtNumWinp(v),
 		unit: "road win pct",
 		hi: (n) => [`${n} won on the road, too`, `Road warriors: ${n}`],
-		lo: (n) => [`${n} were lost away from home`, `${n} could not win on the road`],
+		lo: (n) => [
+			`${n} were lost away from home`,
+			`${n} could not win on the road`,
+		],
 		extra: (t) => [`Road record: ${t.wonAway}-${t.lostAway}`],
 		w: 0.8,
 	},
@@ -172,13 +181,23 @@ const TEAM_DEFS: TeamDef[] = [
 		val: (t) => {
 			const h = wl(t.wonHome, t.lostHome);
 			const r = wl(t.wonAway, t.lostAway);
-			return h && r && h.w + h.l >= 10 && r.w + r.l >= 10 ? pctOf(h) - pctOf(r) : undefined;
+			return h && r && h.w + h.l >= 10 && r.w + r.l >= 10
+				? pctOf(h) - pctOf(r)
+				: undefined;
 		},
 		show: (v) => `${v >= 0 ? "+" : "-"}${fmtNum(Math.abs(v) * 100, 0)}`,
 		unit: "points of win pct, home minus road",
-		hi: (n) => [`${n} were a different team at home`, `Home and away: two different seasons for ${n}`],
-		lo: (n) => [`${n} won more on the road than at home`, `Better away than home: ${n}`],
-		extra: (t) => [`${t.wonHome}-${t.lostHome} at home, ${t.wonAway}-${t.lostAway} away`],
+		hi: (n) => [
+			`${n} were a different team at home`,
+			`Home and away: two different seasons for ${n}`,
+		],
+		lo: (n) => [
+			`${n} won more on the road than at home`,
+			`Better away than home: ${n}`,
+		],
+		extra: (t) => [
+			`${t.wonHome}-${t.lostHome} at home, ${t.wonAway}-${t.lostAway} away`,
+		],
 		w: 0.7,
 	},
 	{
@@ -218,11 +237,20 @@ const TEAM_DEFS: TeamDef[] = [
 		group: "t-crowd",
 		theme: "people",
 		kicker: "The crowd",
-		val: (t) => (isNum(t.att) && isNum(t.gpHome) && t.gpHome >= 10 ? t.att / t.gpHome : undefined),
+		val: (t) =>
+			isNum(t.att) && isNum(t.gpHome) && t.gpHome >= 10
+				? t.att / t.gpHome
+				: undefined,
 		show: (v) => fmtNum(v, 0),
 		unit: "fans a game",
-		hi: (n, v) => [`${n} drew ${fmtNum(v, 0)} fans a night`, `Packed houses for ${n}`],
-		lo: (n, v) => [`Only ${fmtNum(v, 0)} fans a night showed up for ${n}`, `Plenty of empty seats for ${n}`],
+		hi: (n, v) => [
+			`${n} drew ${fmtNum(v, 0)} fans a night`,
+			`Packed houses for ${n}`,
+		],
+		lo: (n, v) => [
+			`Only ${fmtNum(v, 0)} fans a night showed up for ${n}`,
+			`Plenty of empty seats for ${n}`,
+		],
 		w: 0.7,
 	},
 	{
@@ -233,8 +261,14 @@ const TEAM_DEFS: TeamDef[] = [
 		val: (t) => (isNum(t.payroll) && t.payroll > 0 ? t.payroll : undefined),
 		show: (v) => money(v),
 		unit: "payroll",
-		hi: (n, v) => [`${n} spent ${money(v)} on salaries`, `Money was no object for ${n}`],
-		lo: (n, v) => [`${n} ran the cheapest payroll: ${money(v)}`, `${n} did it on a shoestring`],
+		hi: (n, v) => [
+			`${n} spent ${money(v)} on salaries`,
+			`Money was no object for ${n}`,
+		],
+		lo: (n, v) => [
+			`${n} ran the cheapest payroll: ${money(v)}`,
+			`${n} did it on a shoestring`,
+		],
 		extra: (t) => [`${t.won}-${t.lost} on the court`],
 		w: 0.7,
 		total: true,
@@ -244,10 +278,16 @@ const TEAM_DEFS: TeamDef[] = [
 		group: "t-money",
 		theme: "money",
 		kicker: "Wins per dollar",
-		val: (t) => (isNum(t.payroll) && t.payroll > 5000 && t.won + t.lost > 20 ? (t.won / games(t)) / (t.payroll / 100000) : undefined),
+		val: (t) =>
+			isNum(t.payroll) && t.payroll > 5000 && t.won + t.lost > 20
+				? t.won / games(t) / (t.payroll / 100000)
+				: undefined,
 		show: (v) => fmtNum(v, 2),
 		unit: "win pct per $100M",
-		hi: (n) => [`${n} got the most out of every dollar`, `The bargain team of the year: ${n}`],
+		hi: (n) => [
+			`${n} got the most out of every dollar`,
+			`The bargain team of the year: ${n}`,
+		],
 		lo: (n) => [`${n} paid a lot for a little`, `Wins were expensive for ${n}`],
 		extra: (t) => [`${money(t.payroll ?? 0)} payroll, ${t.won}-${t.lost}`],
 		w: 0.75,
@@ -261,7 +301,10 @@ const TEAM_DEFS: TeamDef[] = [
 		val: (t) => (isNum(t.hype) ? t.hype : undefined),
 		show: (v) => fmtNum(v * 100, 0),
 		unit: "hype (out of 100)",
-		hi: (n) => [`The city was buzzing about ${n}`, `${n} had the hottest ticket in the league`],
+		hi: (n) => [
+			`The city was buzzing about ${n}`,
+			`${n} had the hottest ticket in the league`,
+		],
 		lo: (n) => [`Nobody was talking about ${n}`],
 		w: 0.55,
 	},
@@ -273,8 +316,14 @@ const TEAM_DEFS: TeamDef[] = [
 		val: (t) => (t.gp > 10 ? (t.pts - t.oppPts) / t.gp : undefined),
 		show: (v) => `${v >= 0 ? "+" : ""}${fmtNum(v, 1)}`,
 		unit: "points per game",
-		hi: (n, v) => [`${n} outscored opponents by ${fmtNum(v, 1)} a game`, `A dominant margin for ${n}`],
-		lo: (n, v) => [`${n} were outscored by ${fmtNum(-v, 1)} a night`, `The wrong side of the scoreboard: ${n}`],
+		hi: (n, v) => [
+			`${n} outscored opponents by ${fmtNum(v, 1)} a game`,
+			`A dominant margin for ${n}`,
+		],
+		lo: (n, v) => [
+			`${n} were outscored by ${fmtNum(-v, 1)} a night`,
+			`The wrong side of the scoreboard: ${n}`,
+		],
 		w: 0.8,
 	},
 	{
@@ -292,9 +341,17 @@ const TEAM_DEFS: TeamDef[] = [
 		},
 		show: (v) => `${v >= 0 ? "+" : "-"}${fmtNum(Math.abs(v), 1)}`,
 		unit: "wins over expected",
-		hi: (n, v) => [`${n} won ${fmtNum(v, 1)} more games than their scoring said they should`, `Fortune smiled on ${n}`],
-		lo: (n, v) => [`${n} should have won ${fmtNum(-v, 1)} more games`, `Hard luck for ${n}`],
-		extra: (t) => [`Points scored ${fmtNum(t.pts / t.gp, 1)}, allowed ${fmtNum(t.oppPts / t.gp, 1)} per game`],
+		hi: (n, v) => [
+			`${n} won ${fmtNum(v, 1)} more games than their scoring said they should`,
+			`Fortune smiled on ${n}`,
+		],
+		lo: (n, v) => [
+			`${n} should have won ${fmtNum(-v, 1)} more games`,
+			`Hard luck for ${n}`,
+		],
+		extra: (t) => [
+			`Points scored ${fmtNum(t.pts / t.gp, 1)}, allowed ${fmtNum(t.oppPts / t.gp, 1)} per game`,
+		],
 		note: "Expected wins come from the Pythagorean formula: points scored and allowed",
 		w: 0.7,
 		total: true,
@@ -310,8 +367,14 @@ const TEAM_DEFS: TeamDef[] = [
 		},
 		show: (v) => fmtNum(v, 1),
 		unit: "average age by minutes",
-		hi: (n, v) => [`${n} were the veterans, averaging ${fmtNum(v, 1)} years old`, `An old roster: ${n}`],
-		lo: (n, v) => [`${n} were young: ${fmtNum(v, 1)} years old on average`, `A youth movement in ${n.split(" ").at(-1)}`],
+		hi: (n, v) => [
+			`${n} were the veterans, averaging ${fmtNum(v, 1)} years old`,
+			`An old roster: ${n}`,
+		],
+		lo: (n, v) => [
+			`${n} were young: ${fmtNum(v, 1)} years old on average`,
+			`A youth movement in ${n.split(" ").at(-1)}`,
+		],
 		w: 0.7,
 	},
 	{
@@ -322,12 +385,20 @@ const TEAM_DEFS: TeamDef[] = [
 		val: (t, X) => {
 			const rows = X.teamLines(t.tid, t.season);
 			const tot = rows.reduce((a, l) => a + l.pts, 0);
-			return rows.length >= 5 && tot > 0 ? Math.max(...rows.map((l) => l.pts)) / tot : undefined;
+			return rows.length >= 5 && tot > 0
+				? Math.max(...rows.map((l) => l.pts)) / tot
+				: undefined;
 		},
 		show: (v) => pct(v, 0),
 		unit: "of points from the top scorer",
-		hi: (n, v) => [`One man did ${pct(v, 0)} of ${n}’s scoring`, `${n} lived and died with one scorer`],
-		lo: (n, v) => [`${n} shared the scoring: no one took more than ${pct(v, 0)}`, `The most balanced attack: ${n}`],
+		hi: (n, v) => [
+			`One man did ${pct(v, 0)} of ${n}’s scoring`,
+			`${n} lived and died with one scorer`,
+		],
+		lo: (n, v) => [
+			`${n} shared the scoring: no one took more than ${pct(v, 0)}`,
+			`The most balanced attack: ${n}`,
+		],
 		w: 0.7,
 	},
 	{
@@ -342,13 +413,20 @@ const TEAM_DEFS: TeamDef[] = [
 				return undefined;
 			}
 			const mine = rows
-				.filter((l) => X.players.get(l.pid)?.draft.tid === t.tid && (X.players.get(l.pid)?.draft.round ?? 0) > 0)
+				.filter(
+					(l) =>
+						X.players.get(l.pid)?.draft.tid === t.tid &&
+						(X.players.get(l.pid)?.draft.round ?? 0) > 0,
+				)
 				.reduce((a, l) => a + l.min, 0);
 			return mine / tot;
 		},
 		show: (v) => pct(v, 0),
 		unit: "of minutes from their own draftees",
-		hi: (n, v) => [`${pct(v, 0)} of ${n}’s minutes went to players they drafted`, `Built through the draft: ${n}`],
+		hi: (n, v) => [
+			`${pct(v, 0)} of ${n}’s minutes went to players they drafted`,
+			`Built through the draft: ${n}`,
+		],
 		lo: (n) => [`${n} had almost nobody they drafted themselves`],
 		w: 0.7,
 	},
@@ -364,13 +442,21 @@ const TEAM_DEFS: TeamDef[] = [
 				return undefined;
 			}
 			const mine = rows
-				.filter((l) => !X.line(l.pid, t.season - 1) && X.players.get(l.pid)!.stats[0]!.season === t.season && t.season > X.L.startingSeason)
+				.filter(
+					(l) =>
+						!X.line(l.pid, t.season - 1) &&
+						X.players.get(l.pid)!.stats[0]!.season === t.season &&
+						t.season > X.L.startingSeason,
+				)
 				.reduce((a, l) => a + l.min, 0);
 			return mine / tot;
 		},
 		show: (v) => pct(v, 0),
 		unit: "of minutes to rookies",
-		hi: (n, v) => [`Rookies played ${pct(v, 0)} of ${n}’s minutes`, `${n} gave the kids the keys`],
+		hi: (n, v) => [
+			`Rookies played ${pct(v, 0)} of ${n}’s minutes`,
+			`${n} gave the kids the keys`,
+		],
 		w: 0.7,
 		minBoard: 40,
 	},
@@ -386,12 +472,20 @@ const TEAM_DEFS: TeamDef[] = [
 			if (rows.length < 5 || prev.size < 5 || tot <= 0) {
 				return undefined;
 			}
-			return rows.filter((l) => prev.has(l.pid)).reduce((a, l) => a + l.min, 0) / tot;
+			return (
+				rows.filter((l) => prev.has(l.pid)).reduce((a, l) => a + l.min, 0) / tot
+			);
 		},
 		show: (v) => pct(v, 0),
 		unit: "of minutes from last year’s roster",
-		hi: (n, v) => [`${n} brought back ${pct(v, 0)} of their minutes`, `The same group, one more year: ${n}`],
-		lo: (n, v) => [`Only ${pct(v, 0)} of ${n}’s minutes came from last year’s roster`, `A new look for ${n}`],
+		hi: (n, v) => [
+			`${n} brought back ${pct(v, 0)} of their minutes`,
+			`The same group, one more year: ${n}`,
+		],
+		lo: (n, v) => [
+			`Only ${pct(v, 0)} of ${n}’s minutes came from last year’s roster`,
+			`A new look for ${n}`,
+		],
 		w: 0.7,
 	},
 	{
@@ -406,7 +500,10 @@ const TEAM_DEFS: TeamDef[] = [
 		show: (v) => fmtNum(v),
 		unit: "players used",
 		total: true,
-		hi: (n, v) => [`${n} used ${fmtNum(v)} different players`, `The revolving door never stopped for ${n}`],
+		hi: (n, v) => [
+			`${n} used ${fmtNum(v)} different players`,
+			`The revolving door never stopped for ${n}`,
+		],
 		w: 0.65,
 	},
 	{
@@ -415,12 +512,19 @@ const TEAM_DEFS: TeamDef[] = [
 		theme: "awards",
 		kicker: "All-Stars",
 		val: (t, X) => {
-			const n = X.teamLines(t.tid, t.season).filter((l) => X.players.get(l.pid)?.awards.some((a) => a.season === t.season && a.type === "All-Star")).length;
+			const n = X.teamLines(t.tid, t.season).filter((l) =>
+				X.players
+					.get(l.pid)
+					?.awards.some((a) => a.season === t.season && a.type === "All-Star"),
+			).length;
 			return n > 0 ? n : undefined;
 		},
 		show: (v) => fmtNum(v),
 		unit: "All-Stars",
-		hi: (n, v) => [`${plural(v, "All-Star")} on ${n}`, `${n} sent ${plural(v, "player")} to the All-Star Game`],
+		hi: (n, v) => [
+			`${plural(v, "All-Star")} on ${n}`,
+			`${n} sent ${plural(v, "player")} to the All-Star Game`,
+		],
 		w: 0.75,
 		minBoard: 10,
 	},
@@ -432,7 +536,10 @@ const TEAM_DEFS: TeamDef[] = [
 		val: rate((l) => l.stl),
 		show: (v) => fmtNum(v, 1),
 		unit: "steals a game",
-		hi: (n, v) => [`${n} swiped ${fmtNum(v, 1)} steals a game`, `Pickpockets: ${n}`],
+		hi: (n, v) => [
+			`${n} swiped ${fmtNum(v, 1)} steals a game`,
+			`Pickpockets: ${n}`,
+		],
 		w: 0.7,
 	},
 	{
@@ -443,7 +550,10 @@ const TEAM_DEFS: TeamDef[] = [
 		val: rate((l) => l.blk),
 		show: (v) => fmtNum(v, 1),
 		unit: "blocks a game",
-		hi: (n, v) => [`${n} blocked ${fmtNum(v, 1)} shots a game`, `No layups allowed: ${n}`],
+		hi: (n, v) => [
+			`${n} blocked ${fmtNum(v, 1)} shots a game`,
+			`No layups allowed: ${n}`,
+		],
 		w: 0.7,
 	},
 	{
@@ -454,8 +564,14 @@ const TEAM_DEFS: TeamDef[] = [
 		val: rate((l) => l.ast),
 		show: (v) => fmtNum(v, 1),
 		unit: "assists a game",
-		hi: (n, v) => [`${n} dished ${fmtNum(v, 1)} assists a game`, `The ball moved for ${n}`],
-		lo: (n, v) => [`${n} managed just ${fmtNum(v, 1)} assists a game`, `One-on-one basketball in ${n.split(" ").at(-1)}`],
+		hi: (n, v) => [
+			`${n} dished ${fmtNum(v, 1)} assists a game`,
+			`The ball moved for ${n}`,
+		],
+		lo: (n, v) => [
+			`${n} managed just ${fmtNum(v, 1)} assists a game`,
+			`One-on-one basketball in ${n.split(" ").at(-1)}`,
+		],
 		w: 0.7,
 	},
 	{
@@ -466,7 +582,10 @@ const TEAM_DEFS: TeamDef[] = [
 		val: rate((l) => l.trb),
 		show: (v) => fmtNum(v, 1),
 		unit: "rebounds a game",
-		hi: (n, v) => [`${n} grabbed ${fmtNum(v, 1)} rebounds a game`, `Owners of the glass: ${n}`],
+		hi: (n, v) => [
+			`${n} grabbed ${fmtNum(v, 1)} rebounds a game`,
+			`Owners of the glass: ${n}`,
+		],
 		lo: (n, v) => [`${n} got only ${fmtNum(v, 1)} rebounds a game`],
 		w: 0.7,
 	},
@@ -478,7 +597,10 @@ const TEAM_DEFS: TeamDef[] = [
 		val: rate((l) => l.tp),
 		show: (v) => fmtNum(v, 1),
 		unit: "threes a game",
-		hi: (n, v) => [`${n} made ${fmtNum(v, 1)} threes a game`, `Splash: ${n} lived from deep`],
+		hi: (n, v) => [
+			`${n} made ${fmtNum(v, 1)} threes a game`,
+			`Splash: ${n} lived from deep`,
+		],
 		w: 0.75,
 	},
 	{
@@ -490,7 +612,10 @@ const TEAM_DEFS: TeamDef[] = [
 		show: (v) => fmtNum(v, 1),
 		unit: "turnovers a game",
 		hi: (n, v) => [`${n} gave it away ${fmtNum(v, 1)} times a game`],
-		lo: (n, v) => [`${n} turned it over just ${fmtNum(v, 1)} times a game`, `Careful with the ball: ${n}`],
+		lo: (n, v) => [
+			`${n} turned it over just ${fmtNum(v, 1)} times a game`,
+			`Careful with the ball: ${n}`,
+		],
 		w: 0.65,
 	},
 	{
@@ -507,7 +632,10 @@ const TEAM_DEFS: TeamDef[] = [
 		show: (v) => pct(v),
 		unit: "from the line",
 		hi: (n, v) => [`${n} hit ${pct(v)} of their free throws`],
-		lo: (n, v) => [`${n} made only ${pct(v)} of their free throws`, `The line was a problem for ${n}`],
+		lo: (n, v) => [
+			`${n} made only ${pct(v)} of their free throws`,
+			`The line was a problem for ${n}`,
+		],
 		w: 0.65,
 	},
 	{
@@ -517,12 +645,19 @@ const TEAM_DEFS: TeamDef[] = [
 		kicker: "Talent",
 		val: (t, X) => {
 			const rows = rosterByMin(X, t.tid, t.season).slice(0, 8);
-			const vals = rows.map((l) => X.players.get(l.pid)?.ovr[t.season]).filter(isNum);
-			return vals.length >= 6 ? vals.reduce((a, b) => a + b, 0) / vals.length : undefined;
+			const vals = rows
+				.map((l) => X.players.get(l.pid)?.ovr[t.season])
+				.filter(isNum);
+			return vals.length >= 6
+				? vals.reduce((a, b) => a + b, 0) / vals.length
+				: undefined;
 		},
 		show: (v) => fmtNum(v, 1),
 		unit: "average rating of the top 8",
-		hi: (n, v) => [`${n} had the most talent: ${fmtNum(v, 1)} average rating`, `A rotation full of high ratings: ${n}`],
+		hi: (n, v) => [
+			`${n} had the most talent: ${fmtNum(v, 1)} average rating`,
+			`A rotation full of high ratings: ${n}`,
+		],
 		lo: (n, v) => [`${n}’s rotation was rated just ${fmtNum(v, 1)} on average`],
 		w: 0.65,
 	},
@@ -539,7 +674,9 @@ const TEAM_RATE = TEAM_DEFS.map(teamTopic);
 // ---------------------------------------------------------------------------------------------
 
 const drought: Topic = ({ X, season, tid }) => {
-	const hist = X.teamHistory(tid!).filter((t) => t.season <= season && X.decided(t.season));
+	const hist = X.teamHistory(tid!).filter(
+		(t) => t.season <= season && X.decided(t.season),
+	);
 	const me = hist.find((t) => t.season === season);
 	if (!me || hist.length < 5) {
 		return null;
@@ -591,7 +728,9 @@ const drought: Topic = ({ X, season, tid }) => {
 };
 
 const frRecord: Topic = ({ X, season, tid }) => {
-	const hist = X.teamHistory(tid!).filter((t) => t.season <= season && X.decided(t.season));
+	const hist = X.teamHistory(tid!).filter(
+		(t) => t.season <= season && X.decided(t.season),
+	);
 	if (hist.length < 4) {
 		return null;
 	}
@@ -599,7 +738,9 @@ const frRecord: Topic = ({ X, season, tid }) => {
 	const lost = hist.reduce((a, t) => a + t.lost, 0);
 	const pctAll = won / Math.max(1, won + lost);
 	const others = [...new Set(X.L.teamSeasons.map((t) => t.tid))].map((id) => {
-		const h = X.teamHistory(id).filter((t) => t.season <= season && X.decided(t.season));
+		const h = X.teamHistory(id).filter(
+			(t) => t.season <= season && X.decided(t.season),
+		);
 		const w = h.reduce((a, t) => a + t.won, 0);
 		const l = h.reduce((a, t) => a + t.lost, 0);
 		return w / Math.max(1, w + l);
@@ -614,11 +755,15 @@ const frRecord: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		heads: [
-			rank === 1 ? `Nobody has a better all-time record than the ${X.teamName(tid!, season)}` : `${ordinal(rank)} in all-time winning percentage`,
+			rank === 1
+				? `Nobody has a better all-time record than the ${X.teamName(tid!, season)}`
+				: `${ordinal(rank)} in all-time winning percentage`,
 			`${fmtNum(won)} wins and counting`,
 		],
 		hero: { text: fmtNumWinp(pctAll), unit: "all-time win pct" },
-		lines: [`${fmtNum(won)}-${fmtNum(lost)} over ${plural(hist.length, "season")}`],
+		lines: [
+			`${fmtNum(won)}-${fmtNum(lost)} over ${plural(hist.length, "season")}`,
+		],
 	});
 };
 
@@ -643,10 +788,15 @@ const bubble: Topic = ({ X, season, tid }) => {
 		kicker: "Last team in",
 		tid,
 		season,
-		heads: [`The ${X.teamName(tid!, season)} squeezed in as the last seed`, `Barely made it: the ${me.region} ${me.name}`],
+		heads: [
+			`The ${X.teamName(tid!, season)} squeezed in as the last seed`,
+			`Barely made it: the ${me.region} ${me.name}`,
+		],
 		hero: { text: `${me.won}-${me.lost}`, unit: "record" },
 		lines: [
-			bestOut ? `First team out: ${X.teamName(bestOut.tid, season)}, ${bestOut.won}-${bestOut.lost}` : null,
+			bestOut
+				? `First team out: ${X.teamName(bestOut.tid, season)}, ${bestOut.won}-${bestOut.lost}`
+				: null,
 		],
 	});
 };
@@ -671,7 +821,9 @@ const upset: Topic = ({ X, season, tid }) => {
 						`${X.teamName(tid!, season)} stunned ${X.teamName(s.oppTid, season)}`,
 					],
 					hero: { text: `${s.won}-${s.lost}`, unit: "series" },
-					lines: [`Eliminated the No. ${s.oppSeed} seed, ${X.teamName(s.oppTid, season)}`],
+					lines: [
+						`Eliminated the No. ${s.oppSeed} seed, ${X.teamName(s.oppTid, season)}`,
+					],
 					facts: [`ups|${tid}|${season}|${s.round}`],
 				}),
 			);
@@ -740,7 +892,10 @@ const rival: Topic = ({ X, season, tid }) => {
 			`Not the first time against the ${X.teamAny(last.oppTid, season)?.name}`,
 		],
 		hero: { text: `${met + 1}`, unit: "playoff series" },
-		lines: [`Before this year: ${w}-${l} in series against them`, `${last.win ? "Won" : "Lost"} this year’s series ${last.won}-${last.lost}`],
+		lines: [
+			`Before this year: ${w}-${l} in series against them`,
+			`${last.win ? "Won" : "Lost"} this year’s series ${last.won}-${last.lost}`,
+		],
 	});
 };
 
@@ -749,8 +904,13 @@ const draftPicks: Topic = ({ X, season, tid }) => {
 		return null;
 	}
 	const picks = X.L.players
-		.filter((p) => p.draft.year === season && p.draft.tid === tid && p.draft.round >= 1)
-		.sort((a, b) => a.draft.round - b.draft.round || a.draft.pick - b.draft.pick);
+		.filter(
+			(p) =>
+				p.draft.year === season && p.draft.tid === tid && p.draft.round >= 1,
+		)
+		.sort(
+			(a, b) => a.draft.round - b.draft.round || a.draft.pick - b.draft.pick,
+		);
 	if (picks.length === 0) {
 		return null;
 	}
@@ -766,12 +926,17 @@ const draftPicks: Topic = ({ X, season, tid }) => {
 		pid: top.pid,
 		who: X.teamName(tid!, season),
 		heads: [
-			top.draft.round === 1 ? `With the No. ${top.draft.pick} pick, ${top.name}` : `${top.name} headed the draft class`,
+			top.draft.round === 1
+				? `With the No. ${top.draft.pick} pick, ${top.name}`
+				: `${top.name} headed the draft class`,
 			`The ${season} draft haul`,
 		],
 		list: picks.slice(0, 5).map((p) => ({
 			name: p.name,
-			value: p.draft.round === 1 ? `No. ${p.draft.pick}` : `Rd ${p.draft.round}, ${p.draft.pick}`,
+			value:
+				p.draft.round === 1
+					? `No. ${p.draft.pick}`
+					: `Rd ${p.draft.round}, ${p.draft.pick}`,
 			pid: p.pid,
 		})),
 		lines: [`${plural(picks.length, "pick")} in all`],
@@ -785,7 +950,9 @@ const tradeActivity: Topic = ({ X, season, tid }) => {
 	}
 	const acquired = X.teamLines(tid!, season).filter((l) => {
 		const p = X.players.get(l.pid)!;
-		return p.moves.some((m) => m.season === season && m.tid === tid && m.type === "trade");
+		return p.moves.some(
+			(m) => m.season === season && m.tid === tid && m.type === "trade",
+		);
 	});
 	if (acquired.length < 2) {
 		return null;
@@ -801,12 +968,23 @@ const tradeActivity: Topic = ({ X, season, tid }) => {
 		season,
 		pid: best.pid,
 		who: X.teamName(tid!, season),
-		heads: [`${plural(acquired.length, "player")} came in by trade`, `The ${X.teamAny(tid!, season)?.name} were busy on the trade market`],
+		heads: [
+			`${plural(acquired.length, "player")} came in by trade`,
+			`The ${X.teamAny(tid!, season)?.name} were busy on the trade market`,
+		],
 		list: acquired
 			.sort((a, b) => b.ws - a.ws)
 			.slice(0, 4)
-			.map((l) => ({ name: l.name, value: `${fmtNum(l.ppg, 1)} PPG`, pid: l.pid })),
-		lines: [typeof t.numPlayersTradedAway === "number" && t.numPlayersTradedAway > 0 ? `${plural(t.numPlayersTradedAway, "player")} went the other way` : null],
+			.map((l) => ({
+				name: l.name,
+				value: `${fmtNum(l.ppg, 1)} PPG`,
+				pid: l.pid,
+			})),
+		lines: [
+			typeof t.numPlayersTradedAway === "number" && t.numPlayersTradedAway > 0
+				? `${plural(t.numPlayersTradedAway, "player")} went the other way`
+				: null,
+		],
 	});
 };
 
@@ -816,7 +994,15 @@ const injuryToll: Topic = ({ X, season, tid }) => {
 		return null;
 	}
 	const toll = (id: number) =>
-		X.teamLines(id, season).reduce((a, l) => a + (X.players.get(l.pid)?.injuries.filter((i) => i.season === season).reduce((b, i) => b + i.games, 0) ?? 0), 0);
+		X.teamLines(id, season).reduce(
+			(a, l) =>
+				a +
+				(X.players
+					.get(l.pid)
+					?.injuries.filter((i) => i.season === season)
+					.reduce((b, i) => b + i.games, 0) ?? 0),
+			0,
+		);
 	const all = X.teamsIn(season).map((x) => toll(x.tid));
 	const mine = toll(tid!);
 	if (mine < 40 || all.length < 6) {
@@ -824,7 +1010,13 @@ const injuryToll: Topic = ({ X, season, tid }) => {
 	}
 	const rank = rankOf(all, mine);
 	const worst = [...X.teamLines(tid!, season)]
-		.map((l) => ({ l, g: X.players.get(l.pid)!.injuries.filter((i) => i.season === season).reduce((b, i) => b + i.games, 0) }))
+		.map((l) => ({
+			l,
+			g: X.players
+				.get(l.pid)!
+				.injuries.filter((i) => i.season === season)
+				.reduce((b, i) => b + i.games, 0),
+		}))
 		.sort((a, b) => b.g - a.g)[0]!;
 	return mk({
 		id: "t-injuries",
@@ -836,9 +1028,15 @@ const injuryToll: Topic = ({ X, season, tid }) => {
 		season,
 		pid: worst.l.pid,
 		who: X.teamName(tid!, season),
-		heads: [`${fmtNum(mine)} player-games lost to injury`, `The training room stayed busy`],
+		heads: [
+			`${fmtNum(mine)} player-games lost to injury`,
+			`The training room stayed busy`,
+		],
 		hero: { text: fmtNum(mine), unit: "player-games missed" },
-		lines: [`${nth(rank, "most")} in the league`, `Most affected: ${worst.l.name}, ${plural(worst.g, "game")}`],
+		lines: [
+			`${nth(rank, "most")} in the league`,
+			`Most affected: ${worst.l.name}, ${plural(worst.g, "game")}`,
+		],
 	});
 };
 
@@ -854,7 +1052,14 @@ const world: Topic = ({ X, season, tid }) => {
 			places.set(loc, (places.get(loc) ?? 0) + 1);
 		}
 	}
-	const all = X.teamsIn(season).map((t) => new Set(X.teamLines(t.tid, season).map((l) => X.players.get(l.pid)?.bornLoc).filter(Boolean)).size);
+	const all = X.teamsIn(season).map(
+		(t) =>
+			new Set(
+				X.teamLines(t.tid, season)
+					.map((l) => X.players.get(l.pid)?.bornLoc)
+					.filter(Boolean),
+			).size,
+	);
 	const n = places.size;
 	if (n < 4) {
 		return null;
@@ -869,9 +1074,18 @@ const world: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		who: X.teamName(tid!, season),
-		heads: [`Players from ${n} different places`, `A roster with roots in ${n} places`],
+		heads: [
+			`Players from ${n} different places`,
+			`A roster with roots in ${n} places`,
+		],
 		hero: { text: `${n}`, unit: "birthplaces" },
-		lines: [[...places.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k} (${v})`).join(", ")],
+		lines: [
+			[...places.entries()]
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 4)
+				.map(([k, v]) => `${k} (${v})`)
+				.join(", "),
+		],
 	});
 };
 
@@ -903,7 +1117,10 @@ const tenure: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		pid: best.l.pid,
-		heads: [`${best.l.name} has been here ${best.years} seasons`, `The face of the franchise: ${best.l.name}`],
+		heads: [
+			`${best.l.name} has been here ${best.years} seasons`,
+			`The face of the franchise: ${best.l.name}`,
+		],
 		hero: { text: `${best.years}`, unit: "seasons with the team" },
 		lines: [`${fmtNum(best.l.ppg, 1)} points a game this season`],
 	});
@@ -940,10 +1157,19 @@ const duo: Topic = ({ X, season, tid }) => {
 		season,
 		pid: a.pid,
 		who: X.teamName(tid!, season),
-		heads: [`${a.name} and ${b.name}: ${fmtNum(sum, 1)} win shares between them`, `A two-man show`],
+		heads: [
+			`${a.name} and ${b.name}: ${fmtNum(sum, 1)} win shares between them`,
+			`A two-man show`,
+		],
 		hero: { text: fmtNum(sum, 1), unit: "combined win shares" },
-		list: [a, b].map((l) => ({ name: l.name, value: `${fmtNum(l.ws, 1)} WS`, pid: l.pid })),
-		lines: [`${nth(rank, "best")} duo of ${fmtNum(all.length)} team seasons in history`],
+		list: [a, b].map((l) => ({
+			name: l.name,
+			value: `${fmtNum(l.ws, 1)} WS`,
+			pid: l.pid,
+		})),
+		lines: [
+			`${nth(rank, "best")} duo of ${fmtNum(all.length)} team seasons in history`,
+		],
 	});
 };
 
@@ -956,9 +1182,13 @@ const benchShare: Topic = ({ X, season, tid }) => {
 	const share = (id: number) => {
 		const r = X.teamLines(id, season);
 		const t = r.reduce((a, l) => a + l.pts, 0);
-		return t > 0 ? r.filter((l) => l.gs < l.gp * 0.5).reduce((a, l) => a + l.pts, 0) / t : undefined;
+		return t > 0
+			? r.filter((l) => l.gs < l.gp * 0.5).reduce((a, l) => a + l.pts, 0) / t
+			: undefined;
 	};
-	const all = X.teamsIn(season).map((t) => share(t.tid)).filter(isNum);
+	const all = X.teamsIn(season)
+		.map((t) => share(t.tid))
+		.filter(isNum);
 	const mine = share(tid!)!;
 	if (all.length < 6 || new Set(all).size < 4 || mine <= 0) {
 		return null;
@@ -974,17 +1204,32 @@ const benchShare: Topic = ({ X, season, tid }) => {
 		season,
 		who: X.teamName(tid!, season),
 		heads: w.high
-			? [`${pct(mine, 0)} of the points came off the bench`, `The reserves carried the scoring`]
-			: [`Starters did ${pct(1 - mine, 0)} of the scoring`, `The bench barely scored`],
+			? [
+					`${pct(mine, 0)} of the points came off the bench`,
+					`The reserves carried the scoring`,
+				]
+			: [
+					`Starters did ${pct(1 - mine, 0)} of the scoring`,
+					`The bench barely scored`,
+				],
 		hero: { text: pct(mine, 0), unit: "of points from reserves" },
-		lines: [`${nth(w.rank, w.high ? "most" : "least")} bench scoring in the league`],
+		lines: [
+			`${nth(w.rank, w.high ? "most" : "least")} bench scoring in the league`,
+		],
 	});
 };
 
 const ringed: Topic = ({ X, season, tid }) => {
 	const rows = X.teamLines(tid!, season).filter((l) => l.gp >= 10);
 	const champs = rows.filter((l) =>
-		X.players.get(l.pid)!.awards.some((a) => a.type === "Won Championship" && a.season < season && X.decided(a.season)),
+		X.players
+			.get(l.pid)!
+			.awards.some(
+				(a) =>
+					a.type === "Won Championship" &&
+					a.season < season &&
+					X.decided(a.season),
+			),
 	);
 	if (champs.length < 2) {
 		return null;
@@ -998,10 +1243,16 @@ const ringed: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		who: X.teamName(tid!, season),
-		heads: [`${plural(champs.length, "past champion")} on the roster`, `Rings in the room`],
+		heads: [
+			`${plural(champs.length, "past champion")} on the roster`,
+			`Rings in the room`,
+		],
 		list: champs.slice(0, 4).map((l) => ({
 			name: l.name,
-			value: plural(X.countAwards(X.players.get(l.pid)!, "Won Championship", season - 1), "ring"),
+			value: plural(
+				X.countAwards(X.players.get(l.pid)!, "Won Championship", season - 1),
+				"ring",
+			),
 			pid: l.pid,
 		})),
 	});
@@ -1019,7 +1270,12 @@ const leagueLeaders: Topic = ({ X, season, tid, soFar }) => {
 		["steals", (l) => l.spg],
 		["blocks", (l) => l.bpg],
 		["PER", (l) => l.per],
-		...(soFar ? [] : ([["win shares", (l: SeasonLine) => l.ws]] as [string, (l: SeasonLine) => number][])),
+		...(soFar
+			? []
+			: ([["win shares", (l: SeasonLine) => l.ws]] as [
+					string,
+					(l: SeasonLine) => number,
+				][])),
 	];
 	const led: { cat: string; l: SeasonLine }[] = [];
 	for (const [cat, f] of cats) {
@@ -1041,8 +1297,15 @@ const leagueLeaders: Topic = ({ X, season, tid, soFar }) => {
 		season,
 		pid: led[0]!.l.pid,
 		who: X.teamName(tid!, season),
-		heads: [`${led.length} league leaders wore their jersey`, `Topping the charts: ${led.map((x) => x.cat).join(" and ")}`],
-		list: led.map((x) => ({ name: x.l.name, value: `Led in ${x.cat}`, pid: x.l.pid })),
+		heads: [
+			`${led.length} league leaders wore their jersey`,
+			`Topping the charts: ${led.map((x) => x.cat).join(" and ")}`,
+		],
+		list: led.map((x) => ({
+			name: x.l.name,
+			value: `Led in ${x.cat}`,
+			pid: x.l.pid,
+		})),
 	});
 };
 
@@ -1051,7 +1314,12 @@ const topSalary: Topic = ({ X, season, tid, soFar }) => {
 		return null;
 	}
 	const rows = X.teamLines(tid!, season)
-		.map((l) => ({ l, paid: (X.players.get(l.pid)?.paid ?? []).filter((x) => x.season === season && x.tid === tid).reduce((a, x) => a + x.amount, 0) }))
+		.map((l) => ({
+			l,
+			paid: (X.players.get(l.pid)?.paid ?? [])
+				.filter((x) => x.season === season && x.tid === tid)
+				.reduce((a, x) => a + x.amount, 0),
+		}))
 		.filter((x) => x.paid > 0)
 		.sort((a, b) => b.paid - a.paid);
 	const top = rows[0];
@@ -1071,10 +1339,19 @@ const topSalary: Topic = ({ X, season, tid, soFar }) => {
 		season,
 		pid: top.l.pid,
 		heads: good
-			? [`${top.l.name}: the highest-paid and the best on the team`, `The money went to the right player`]
-			: [`${top.l.name} was the highest-paid, but ranked ${ordinal(wsRank)} on the team in win shares`, `${money(top.paid)} for ${top.l.name}`],
+			? [
+					`${top.l.name}: the highest-paid and the best on the team`,
+					`The money went to the right player`,
+				]
+			: [
+					`${top.l.name} was the highest-paid, but ranked ${ordinal(wsRank)} on the team in win shares`,
+					`${money(top.paid)} for ${top.l.name}`,
+				],
 		hero: { text: money(top.paid), unit: "salary" },
-		lines: [`${fmtNum(top.l.ppg, 1)} points, ${fmtNum(top.l.ws, 1)} win shares`, `${nth(wsRank, "most")} win shares on the roster`],
+		lines: [
+			`${fmtNum(top.l.ppg, 1)} points, ${fmtNum(top.l.ws, 1)} win shares`,
+			`${nth(wsRank, "most")} win shares on the roster`,
+		],
 	});
 };
 
@@ -1092,9 +1369,15 @@ const endStreak: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		heads: [
-			t.streak > 0 ? `The regular season ended on a ${t.streak}-game winning streak` : `The regular season ended on a ${-t.streak}-game skid`,
+			t.streak > 0
+				? `The regular season ended on a ${t.streak}-game winning streak`
+				: `The regular season ended on a ${-t.streak}-game skid`,
 		],
-		hero: { text: `${Math.abs(t.streak)}`, unit: t.streak > 0 ? "straight wins to finish" : "straight losses to finish" },
+		hero: {
+			text: `${Math.abs(t.streak)}`,
+			unit:
+				t.streak > 0 ? "straight wins to finish" : "straight losses to finish",
+		},
 		lines: [`Final record: ${t.won}-${t.lost}`],
 	});
 };
@@ -1122,10 +1405,18 @@ const confRank: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		heads: [
-			rank === 1 ? `Best record in the ${conf}` : rank === mates.length ? `Last place in the ${conf}` : `${ordinal(rank)} in the ${conf}`,
+			rank === 1
+				? `Best record in the ${conf}`
+				: rank === mates.length
+					? `Last place in the ${conf}`
+					: `${ordinal(rank)} in the ${conf}`,
 		],
 		hero: { text: ordinal(rank), unit: `of ${mates.length} in the ${conf}` },
-		lines: [rank > 1 ? `${gamesBack} wins behind the leader, ${X.teamName(mates[0]!.tid, season)}` : `${t.won - mates[1]!.won} wins clear of ${X.teamName(mates[1]!.tid, season)}`],
+		lines: [
+			rank > 1
+				? `${gamesBack} wins behind the leader, ${X.teamName(mates[0]!.tid, season)}`
+				: `${t.won - mates[1]!.won} wins clear of ${X.teamName(mates[1]!.tid, season)}`,
+		],
 	});
 };
 
@@ -1137,7 +1428,9 @@ const teamGames = (X: X, season: number, tid: number) =>
 	X.games(season).filter((g) => g.teams.some((t) => t.tid === tid));
 
 const overtime: Topic = ({ X, season, tid }) => {
-	const gs = teamGames(X, season, tid!).filter((g) => g.overtimes > 0 && !g.playoffs);
+	const gs = teamGames(X, season, tid!).filter(
+		(g) => g.overtimes > 0 && !g.playoffs,
+	);
 	if (gs.length < 3) {
 		return null;
 	}
@@ -1155,7 +1448,10 @@ const overtime: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		who: X.teamName(tid!, season),
-		heads: [`${w}-${gs.length - w} in overtime games`, `${plural(gs.length, "game")} went to overtime`],
+		heads: [
+			`${w}-${gs.length - w} in overtime games`,
+			`${plural(gs.length, "game")} went to overtime`,
+		],
 		hero: { text: `${w}-${gs.length - w}`, unit: "in overtime" },
 		lines: [],
 	});
@@ -1187,14 +1483,22 @@ const routs: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		who: X.teamName(tid!, season),
-		heads: wins ? [`${plural(n, "win")} by 20 or more`] : [`${plural(n, "loss", "losses")} by 20 or more`],
+		heads: wins
+			? [`${plural(n, "win")} by 20 or more`]
+			: [`${plural(n, "loss", "losses")} by 20 or more`],
 		hero: { text: `${n}`, unit: wins ? "wins by 20+" : "losses by 20+" },
-		lines: [wins ? `Also lost by 20+ ${plural(lost, "time")}` : `Also won by 20+ ${plural(big, "time")}`],
+		lines: [
+			wins
+				? `Also lost by 20+ ${plural(lost, "time")}`
+				: `Also won by 20+ ${plural(big, "time")}`,
+		],
 	});
 };
 
 const quarters: Topic = ({ X, season, tid }) => {
-	const gs = teamGames(X, season, tid!).filter((g) => !g.playoffs && g.teams.every((t) => (t.ptsQtrs?.length ?? 0) >= 4));
+	const gs = teamGames(X, season, tid!).filter(
+		(g) => !g.playoffs && g.teams.every((t) => (t.ptsQtrs?.length ?? 0) >= 4),
+	);
 	if (gs.length < 30) {
 		return null;
 	}
@@ -1221,9 +1525,17 @@ const quarters: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		who: X.teamName(tid!, season),
-		heads: [`The ${ordinal(bi + 1)} quarter was their best`, `Winning the ${ordinal(bi + 1)} quarter, game after game`],
-		list: per.map((d, i) => ({ name: `${ordinal(i + 1)} quarter`, value: `${d >= 0 ? "+" : ""}${fmtNum(d, 1)}` })),
-		lines: [`Worst quarter: the ${ordinal(wi + 1)}, ${per[wi]! >= 0 ? "+" : ""}${fmtNum(per[wi]!, 1)}`],
+		heads: [
+			`The ${ordinal(bi + 1)} quarter was their best`,
+			`Winning the ${ordinal(bi + 1)} quarter, game after game`,
+		],
+		list: per.map((d, i) => ({
+			name: `${ordinal(i + 1)} quarter`,
+			value: `${d >= 0 ? "+" : ""}${fmtNum(d, 1)}`,
+		})),
+		lines: [
+			`Worst quarter: the ${ordinal(wi + 1)}, ${per[wi]! >= 0 ? "+" : ""}${fmtNum(per[wi]!, 1)}`,
+		],
 	});
 };
 
@@ -1232,7 +1544,9 @@ const vsChamps: Topic = ({ X, season, tid }) => {
 	if (!c || c.tid === tid) {
 		return null;
 	}
-	const gs = teamGames(X, season, tid!).filter((g) => g.teams.some((t) => t.tid === c.tid));
+	const gs = teamGames(X, season, tid!).filter((g) =>
+		g.teams.some((t) => t.tid === c.tid),
+	);
 	if (gs.length < 2) {
 		return null;
 	}
@@ -1250,7 +1564,10 @@ const vsChamps: Topic = ({ X, season, tid }) => {
 		tid,
 		season,
 		who: X.teamName(tid!, season),
-		heads: [`${w}-${gs.length - w} against the eventual champions`, `Games with the ${c.name}`],
+		heads: [
+			`${w}-${gs.length - w} against the eventual champions`,
+			`Games with the ${c.name}`,
+		],
 		hero: { text: `${w}-${gs.length - w}`, unit: `vs ${c.region} ${c.name}` },
 		lines: [],
 	});

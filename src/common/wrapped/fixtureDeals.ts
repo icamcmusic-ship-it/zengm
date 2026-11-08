@@ -125,28 +125,58 @@ export const addDeals = (
 			move(pa, at, a, b);
 			move(pb, at, b, a);
 			const phase = during ? 2 : k % 2 === 0 ? 7 : 5;
-			pa.moves.push({ season: at, tid: b, type: "trade", fromTid: a, phase, eid: id });
-			pb.moves.push({ season: at, tid: a, type: "trade", fromTid: b, phase, eid: id });
+			pa.moves.push({
+				season: at,
+				tid: b,
+				type: "trade",
+				fromTid: a,
+				phase,
+				eid: id,
+			});
+			pb.moves.push({
+				season: at,
+				tid: a,
+				type: "trade",
+				fromTid: b,
+				phase,
+				eid: id,
+			});
 			// A blockbuster now and then: picks pile on to one side
 			if (k === 3) {
 				for (const yr of [s + 2, s + 3, s + 3]) {
 					gotA.push({ dpid: dpid++, season: yr, round: 2, originalTid: b });
 				}
 			}
-			trades.push({ eid: id, season: at, phase, tids: [a, b], got: [gotA, gotB] });
+			trades.push({
+				eid: id,
+				season: at,
+				phase,
+				tids: [a, b],
+				got: [gotA, gotB],
+			});
 			// And one player gets flipped again the same summer
 			if (k === 2 && !during) {
 				const c = tids[(tids.indexOf(b) + 1) % tids.length]!;
 				if (c !== a) {
 					const id2 = eid++;
 					move(pa, at, b, c);
-					pa.moves.push({ season: at, tid: c, type: "trade", fromTid: b, phase: 8, eid: id2 });
+					pa.moves.push({
+						season: at,
+						tid: c,
+						type: "trade",
+						fromTid: b,
+						phase: 8,
+						eid: id2,
+					});
 					trades.push({
 						eid: id2,
 						season: at,
 						phase: 8,
 						tids: [b, c],
-						got: [[{ dpid: dpid++, season: s + 2, round: 2, originalTid: c }], [asset(pa)]],
+						got: [
+							[{ dpid: dpid++, season: s + 2, round: 2, originalTid: c }],
+							[asset(pa)],
+						],
 					});
 				}
 			}
@@ -155,9 +185,9 @@ export const addDeals = (
 
 	// Contracts: the career cut into deals of one to five seasons, paid what the snapshot says he was paid
 	for (const p of L.players) {
-		const ss = [...new Set(p.stats.filter((r) => r.gp > 0).map((r) => r.season))].sort(
-			(a, b) => a - b,
-		);
+		const ss = [
+			...new Set(p.stats.filter((r) => r.gp > 0).map((r) => r.season)),
+		].sort((a, b) => a - b);
 		const contracts: WContract[] = [];
 		let i = 0;
 		while (i < ss.length) {
@@ -179,19 +209,34 @@ export const addDeals = (
 						? "reSign"
 						: "freeAgent";
 			// An active player's last deal runs past this season
-			if (i + len >= ss.length && p.retiredYear > last && start + len - 1 === last) {
+			if (
+				i + len >= ss.length &&
+				p.retiredYear > last &&
+				start + len - 1 === last
+			) {
 				for (let j = ri(0, 3); j > 0; j--) {
 					amounts.push(amounts.at(-1)! + 500);
 				}
 			}
 			const c: WContract = { type, start, amounts, signed: start - 1, tid };
 			// Now and then a player is let go before his deal runs out
-			const nextTid = ss[i + len] !== undefined ? rowIn(p, ss[i + len]!)?.tid : undefined;
+			const nextTid =
+				ss[i + len] !== undefined ? rowIn(p, ss[i + len]!)?.tid : undefined;
 			if (len >= 2 && ri(0, 6) === 0) {
 				const cut = start + ri(0, len - 2);
 				c.ended = { season: cut, reason: "released", tid };
-			} else if (nextTid !== undefined && nextTid !== tid && type !== "rookie" && ri(0, 2) === 0) {
-				p.moves.push({ season: start + len - 1, tid: nextTid, type: "freeAgent", phase: 8 });
+			} else if (
+				nextTid !== undefined &&
+				nextTid !== tid &&
+				type !== "rookie" &&
+				ri(0, 2) === 0
+			) {
+				p.moves.push({
+					season: start + len - 1,
+					tid: nextTid,
+					type: "freeAgent",
+					phase: 8,
+				});
 			}
 			contracts.push(c);
 			i += len;
@@ -231,8 +276,16 @@ export const addDeals = (
 	for (const s of [last + 1, last + 2]) {
 		for (const round of [1, 2]) {
 			for (const tid of tids) {
-				const owner = ri(0, 4) === 0 ? tids[(tids.indexOf(tid) + 1) % tids.length]! : tid;
-				picks.push({ dpid: dpid++, tid: owner, originalTid: tid, round, season: s, pick: 0 });
+				const owner =
+					ri(0, 4) === 0 ? tids[(tids.indexOf(tid) + 1) % tids.length]! : tid;
+				picks.push({
+					dpid: dpid++,
+					tid: owner,
+					originalTid: tid,
+					round,
+					season: s,
+					pick: 0,
+				});
 			}
 		}
 	}

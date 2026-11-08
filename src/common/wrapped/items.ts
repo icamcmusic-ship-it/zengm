@@ -7,7 +7,8 @@ const TITLE_WORDS =
 
 const clean = (x: string) => x.replace(/\s+/g, " ").trim();
 
-const escapeRe = (s: string) => s.replace(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
+const escapeRe = (s: string) =>
+	s.replace(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`);
 
 // Does the text talk about a title or the finals and name one of these names?
 export const spoilerText = (text: string, names: readonly string[]) => {
@@ -75,8 +76,7 @@ export const planItems = (
 	let held: Slide[] = [];
 	if (o.noSpoil) {
 		held = body.filter(
-			(s) =>
-				SPOIL_CORE[mode].includes(s.id) || s.spoiler === true,
+			(s) => SPOIL_CORE[mode].includes(s.id) || s.spoiler === true,
 		);
 		body = body.filter((s) => !held.includes(s));
 	}

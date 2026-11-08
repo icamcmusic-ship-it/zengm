@@ -83,8 +83,7 @@ export default defineView({
 			lastDone: cv.lastDone,
 			currentSeason: g.get("season"),
 			unknownCount: cv.unknownCount,
-			rate:
-				season === "all" ? null : (cv.rate.get(season) ?? null),
+			rate: season === "all" ? null : (cv.rate.get(season) ?? null),
 			hasData: cv.rows.length > 0,
 			bySeasonRows: undefined as
 				| Record<Metric, ReturnType<typeof valueSeasons>>
@@ -134,7 +133,10 @@ export default defineView({
 			const payroll = new Map(
 				cv.teamSeasons.map((t) => [`${t.tid}|${t.season}`, t.payroll]),
 			);
-			const groups = new Map<string, NonNullable<typeof out.deadGroups>[number]>();
+			const groups = new Map<
+				string,
+				NonNullable<typeof out.deadGroups>[number]
+			>();
 			let paid = 0;
 			let owed = 0;
 			const releases = new Set<string>();

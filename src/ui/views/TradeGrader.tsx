@@ -37,10 +37,11 @@ const netClass = (v: number | null | undefined) =>
 				? "text-danger"
 				: undefined;
 
-const col = (
-	title: string,
-	o: Partial<Col> = {},
-): Col => ({ title, sortSequence: ["desc", "asc"], ...o });
+const col = (title: string, o: Partial<Col> = {}): Col => ({
+	title,
+	sortSequence: ["desc", "asc"],
+	...o,
+});
 
 const useTeams = () => {
 	const { teamInfoCache } = useLocal(["teamInfoCache"]);
@@ -181,7 +182,10 @@ const SidesTable = ({
 			sortType: "number",
 			desc: "Win shares the arrivals produced in the season the trade was made for",
 		}),
-		col("After", { sortType: "number", desc: "Win shares in the seasons after" }),
+		col("After", {
+			sortType: "number",
+			desc: "Win shares in the seasons after",
+		}),
 		col("Total", { sortType: "number" }),
 		col("Gave", {
 			sortType: "number",
@@ -235,13 +239,14 @@ const SidesTable = ({
 			{ value: s.unknown ? "?" : n1(s.got.later), sortValue: s.got.later },
 			{
 				value: (
-					<b>
-						{s.unknown ? "?" : `${n1(s.got.total)}${s.partial ? "*" : ""}`}
-					</b>
+					<b>{s.unknown ? "?" : `${n1(s.got.total)}${s.partial ? "*" : ""}`}</b>
 				),
 				sortValue: s.got.total,
 			},
-			{ value: n1(s.net === null ? null : s.gave.total), sortValue: s.gave.total },
+			{
+				value: n1(s.net === null ? null : s.gave.total),
+				sortValue: s.gave.total,
+			},
 			{
 				value: <span className={netClass(s.net)}>{sgn(s.net)}</span>,
 				sortValue: s.net,
@@ -306,7 +311,9 @@ const CardsTable = ({
 		data: [
 			{
 				value: (
-					<a href={helpers.leagueUrl(["trade_grader", "team", teamPart(c.tid)])}>
+					<a
+						href={helpers.leagueUrl(["trade_grader", "team", teamPart(c.tid)])}
+					>
 						{full(c.tid)}
 					</a>
 				),
@@ -349,7 +356,13 @@ const CardsTable = ({
 	);
 };
 
-const NetBars = ({ years, label }: { years: { season: number; net: number }[]; label: string }) => {
+const NetBars = ({
+	years,
+	label,
+}: {
+	years: { season: number; net: number }[];
+	label: string;
+}) => {
 	const max = Math.max(1, ...years.map((y) => Math.abs(y.net)));
 	return (
 		<div role="img" aria-label={label} style={{ maxWidth: 560 }}>
@@ -408,9 +421,18 @@ const SideCell = ({ s }: { s: GradeSide }) => {
 	);
 };
 
-const SeasonTrades = ({ trades, season }: { trades: GradeTrade[]; season: number }) => {
+const SeasonTrades = ({
+	trades,
+	season,
+}: {
+	trades: GradeTrade[];
+	season: number;
+}) => {
 	const cols: Col[] = [
-		col("Gap", { sortType: "number", desc: "Net win shares between the sides" }),
+		col("Gap", {
+			sortType: "number",
+			desc: "Net win shares between the sides",
+		}),
 		col("Side", { sortSequence: [] }),
 		col("Side", { sortSequence: [] }),
 		col("", { sortSequence: [] }),
@@ -500,12 +522,20 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 					<p className="text-body-secondary">
 						Most win shares gained over what was given up.
 					</p>
-					<SidesTable name="TradeGraderWins" sides={wins} defaultSort={[9, "desc"]} />
+					<SidesTable
+						name="TradeGraderWins"
+						sides={wins}
+						defaultSort={[9, "desc"]}
+					/>
 					<h2 className="mt-3">Biggest losses{where}</h2>
 					<p className="text-body-secondary">
 						Most win shares given away over what came back.
 					</p>
-					<SidesTable name="TradeGraderLosses" sides={losses} defaultSort={[9, "asc"]} />
+					<SidesTable
+						name="TradeGraderLosses"
+						sides={losses}
+						defaultSort={[9, "asc"]}
+					/>
 				</>
 			);
 	} else if (tab === "cards") {
@@ -516,8 +546,8 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 				<>
 					<p className="text-body-secondary">
 						Each team's graded trades: its average grade, how many it won, lost
-						or broke even on, and the win shares it got against what it gave
-						up. Click a team for its full report.
+						or broke even on, and the win shares it got against what it gave up.
+						Click a team for its full report.
 					</p>
 					<CardsTable name="TradeGraderCards" cards={cards} />
 				</>
@@ -676,7 +706,9 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 							href={helpers.leagueUrl([
 								"trade_grader",
 								t.id,
-								t.id === "team" && team === "all" ? teamPart(props.userTid) : teamUrl,
+								t.id === "team" && team === "all"
+									? teamPart(props.userTid)
+									: teamUrl,
 								t.id === "season" ? String(season) : "all",
 							])}
 						>

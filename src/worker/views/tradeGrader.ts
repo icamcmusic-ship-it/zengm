@@ -106,9 +106,7 @@ export default defineView({
 				.sort((a, b) => b.eid - a.eid || a.i - b.i);
 		} else if (tab === "season") {
 			seasonTrades = G.trades.filter(
-				(t) =>
-					t.season === season &&
-					(team === "all" || t.tids.includes(team)),
+				(t) => t.season === season && (team === "all" || t.tids.includes(team)),
 			);
 			const gap = (t: (typeof G.trades)[number]) =>
 				t.sides[0].net === null ? -1 : Math.abs(t.sides[0].net);
