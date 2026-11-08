@@ -20,6 +20,13 @@ import { formatClock } from "../../../common/formatClock.ts";
 import PlayByPlayLogger from "./PlayByPlayLogger.ts";
 import { choice, truncGauss, uniform } from "../../../common/random.ts";
 import {
+	lateGameSituationWeight,
+	teamChemistryBonus,
+	teamLateGameDecisionQuality,
+	type TraitEffects,
+	type TraitSituation,
+} from "../../../common/playerTraits/index.ts";
+import {
 	drawBackcourtTime,
 	drawHalfCourtSearch,
 	drawOrbQuickShot,
@@ -44,6 +51,9 @@ import {
 } from "./possessionModel.ts";
 
 const SHOT_CLOCK = 24;
+// Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
+// weight, before late-game IQ moves it (see applyLateGameDecision)
+const LATE_GAME_BASE_ERROR = 0.06;
 // const NUM_TIMEOUTS_MAX_FINAL_PERIOD = 4;
 // const NUM_TIMEOUTS_MAX_FINAL_PERIOD_LAST_3_MIN = 2;
 const NUM_TIMEOUTS_OVERTIME = 2;
@@ -128,6 +138,10 @@ type PlayerGameSim = {
 	ptModifier: number;
 	// Raw ratings, for the wording of the play-by-play only (see loadTeams)
 	pbpRatings?: Record<string, number>;
+	// Player traits (the playerTraits setting): his effects on the game, set once per game in loadTeams, undefined with the setting off.
+	// gameZ is his game-to-game form this game, one standard normal draw per player per game (only when traitEffects exist)
+	traitEffects?: TraitEffects;
+	gameZ?: number;
 };
 type TeamGameSim = {
 	id: number;
@@ -259,7 +273,11 @@ class GameSim extends GameSimBase {
 	shotClock = SHOT_CLOCK_FULL;
 	shotClockViolations: [number, number] = [0, 0];
 	teamPaceFactor: [number, number] = [1, 1];
-	// Ratings-derived inputs (see possessionModel.ts Traits), refreshed with the team composite ratings
+	// Player traits (the playerTraits setting, see docs/player-traits.md). When no player has trait effects, nothing here is used and no
+	// extra random numbers are drawn, so games play out exactly as before. None of it reads or depends on the play-by-play
+	traitsOn: boolean;
+	// What the traits of the players on the court mean for the realistic possession model (see possessionModel.ts Traits), refreshed every
+	// possession
 	traits: [Traits, Traits] = [{ ...NEUTRAL_TRAITS }, { ...NEUTRAL_TRAITS }];
 	possTimeScale = 1;
 	gameClockFactor = 1;
@@ -310,6 +328,17 @@ class GameSim extends GameSimBase {
 		this.techFouls = !!g.get("technicalFouls") && !allStarGame;
 
 		this.team = teams; // If a team plays twice in a day, this needs to be a deep copy
+
+		// Player traits: one normal draw per player per game for his game-to-game form, only when he has trait effects
+		this.traitsOn = false;
+		for (const t of teams) {
+			for (const p of t.player) {
+				if (p.traitEffects) {
+					this.traitsOn = true;
+					p.gameZ = gaussian();
+				}
+			}
+		}
 
 		// Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
 		this.numPlayersOnCourt = g.get("numPlayersOnCourt");
@@ -474,6 +503,8 @@ class GameSim extends GameSimBase {
 				// @ts-expect-error
 				delete p.valueNoPot;
 				delete p.compositeRating;
+				delete p.traitEffects;
+				delete p.gameZ;
 
 				// @ts-expect-error
 				delete p.ptModifier;
@@ -848,6 +879,10 @@ class GameSim extends GameSimBase {
 			probability *= 0.5;
 		}
 
+		if (this.traitsOn) {
+			probability *= this.traitMean(this.d, (e) => e.foulProneness, 1);
+		}
+
 		return probability * g.get("foulRateFactor");
 	}
 
@@ -913,13 +948,15 @@ class GameSim extends GameSimBase {
 		this.isClockRunning = true; // Set after computing dtIinbound!
 		if (this.realPoss) {
 			this.resetShotClock();
-			this.traits = [
-				deriveTraits(this.team[0].compositeRating),
-				deriveTraits(this.team[1].compositeRating),
-			];
+			if (this.traitsOn) {
+				this.traits = [
+					deriveTraits(this.playersOnCourt[0].map((p) => p.traitEffects)),
+					deriveTraits(this.playersOnCourt[1].map((p) => p.traitEffects)),
+				];
+			}
 		}
 
-		const clockFactor = this.getClockFactor();
+		const clockFactor = this.applyLateGameDecision(this.getClockFactor());
 		const outcome = this.getPossessionOutcome(clockFactor);
 
 		// Swap o and d so that o will get another possession when they are swapped again at the beginning of the loop.
@@ -1270,6 +1307,130 @@ class GameSim extends GameSimBase {
 	 *
 	 * This should be called after this.updatePlayersOnCourt as it only produces different output when the players on the court change.
 	 */
+	/* Player traits (the playerTraits setting). Everything below is only called when this.traitsOn, and works on the sim's own numbers (score,
+	   clock, ratings): nothing here reads the play-by-play. */
+
+	// The game situation for team t, for the situational trait hooks
+	traitSituation(t: TeamNum): TraitSituation {
+		return {
+			scoreDiff: this.team[t].stat.pts - this.team[1 - t]!.stat.pts,
+			timeLeft: this.t,
+			period: this.team[0].stat.ptsQtrs.length,
+			numPeriods: this.numPeriods,
+		};
+	}
+
+	// Average of an effect over the players on the court for team t (neutral, 1 or 0, for a player without trait effects)
+	traitMean(
+		t: TeamNum,
+		f: (e: TraitEffects) => number,
+		neutral: number,
+	): number {
+		let total = 0;
+		for (const p of this.playersOnCourt[t]) {
+			total += p.traitEffects ? f(p.traitEffects) : neutral;
+		}
+		return total / this.playersOnCourt[t].length;
+	}
+
+	// How hard the defense of team t's opponent pressures the ball, 0 to 1, from its perimeter defense
+	traitPressure(offense: TeamNum) {
+		return helpers.bound(
+			(this.team[1 - offense]!.compositeRating.defensePerimeter - 0.3) / 0.4,
+			0,
+			1,
+		);
+	}
+
+	// The offense's turnover probability, scaled: clutch (in clutch time) and handling under pressure, averaged over the players on the court
+	traitTurnoverMult(offense: TeamNum) {
+		const sit = this.traitSituation(offense);
+		const pressure = this.traitPressure(offense);
+		return this.traitMean(
+			offense,
+			(e) => e.clutchTurnoverMult(sit) * e.pressureTurnoverMult(pressure),
+			1,
+		);
+	}
+
+	// Shot make probability changes for a shooter: his game-to-game form, shot selection quality, clutch and, for assisted jumpers and
+	// finishes (the plays that come off a screen, roll or pop), screening
+	traitShotDelta(
+		p: PlayerGameSim,
+		passer: PlayerGameSim | undefined,
+		type: ShotType,
+	) {
+		const e = p.traitEffects!;
+		let delta = e.gameFormShotDelta(p.gameZ ?? 0);
+		delta += e.shotSelectionBias(p.compositeRating.usage).shotQualityDelta;
+		delta += e.clutchShotModifier(this.traitSituation(this.o));
+		if (
+			passer !== undefined &&
+			(type === "midRange" || type === "threePointer" || type === "atRim")
+		) {
+			delta += e.screenShotDelta;
+		}
+		return delta;
+	}
+
+	// Weight multiplier for a player in a pickPlayer draw (who shoots, fouls, steals, rebounds or turns it over)
+	traitPickWeight(rating: CompositeRating, p: PlayerGameSim, t: TeamNum) {
+		const e = p.traitEffects;
+		if (!e) {
+			return 1;
+		}
+		switch (rating) {
+			case "usage":
+				return e.shotSelectionBias(p.compositeRating.usage).attemptWeightMult;
+			case "fouling":
+				return e.foulProneness;
+			case "stealing":
+				return e.gambleStealMultiplier * e.looseBallBonus;
+			case "rebounding":
+				return e.looseBallBonus;
+			case "turnovers":
+				return (
+					e.clutchTurnoverMult(this.traitSituation(t)) *
+					e.pressureTurnoverMult(this.traitPressure(t))
+				);
+			default:
+				return 1;
+		}
+	}
+
+	// End-of-game decisions (foul when behind, hold for the last shot, two-for-one): a team with poor late-game IQ sometimes misses the right
+	// call and plays the possession normally. The chance of missing it is 0 outside the last four minutes
+	applyLateGameDecision(clockFactor: ClockFactor): ClockFactor {
+		if (
+			!this.traitsOn ||
+			(clockFactor !== "intentionalFoul" &&
+				clockFactor !== "holdForLastShot" &&
+				clockFactor !== "twoForOne")
+		) {
+			return clockFactor;
+		}
+		// The trailing team (on defense) decides to foul, otherwise the offense decides how to use the clock
+		const t = clockFactor === "intentionalFoul" ? this.d : this.o;
+		const sit = this.traitSituation(t);
+		const weight = lateGameSituationWeight(sit);
+		if (weight <= 0) {
+			return clockFactor;
+		}
+		const effects = this.playersOnCourt[t]
+			.toSorted(
+				(a, b) => b.compositeRating.dribbling - a.compositeRating.dribbling,
+			)
+			.map((p) => p.traitEffects)
+			.filter((e) => e !== undefined);
+		const quality = teamLateGameDecisionQuality(effects, sit);
+		const probCorrect = helpers.bound(
+			1 - LATE_GAME_BASE_ERROR * weight + quality,
+			0,
+			1,
+		);
+		return Math.random() < probCorrect ? clockFactor : undefined;
+	}
+
 	updateSynergy() {
 		for (const t of teamNums) {
 			// Count all the *fractional* skills of the active players on a team (including duplicates)
@@ -1348,6 +1509,17 @@ class GameSim extends GameSimBase {
 
 			this.team[t].synergy.off *= 0.5 + 0.5 * perimFactor; // Defensive synergy
 
+			// Player traits: floor spacing (off-ball movement) and screening
+			if (this.traitsOn) {
+				for (let i = 0; i < this.numPlayersOnCourt; i++) {
+					const e = this.playersOnCourt[t][i]!.traitEffects;
+					if (e) {
+						this.team[t].synergy.off +=
+							e.spacingContribution + e.screenContribution;
+					}
+				}
+			}
+
 			this.team[t].synergy.def = 0;
 			this.team[t].synergy.def += helpers.sigmoid(skillsCount.Dp, 15, 0.75); // 1 / (1 + e^-(15 * (x - 0.75))) from 0 to 5
 
@@ -1416,6 +1588,24 @@ class GameSim extends GameSimBase {
 			ratings.defensePerimeter =
 				defensePerimeter / 5 + this.synergyFactor * synergy.def;
 			ratings.blocking = blocking / 5 + this.synergyFactor * synergy.def;
+
+			// Player traits: team chemistry (leadership) lifts or lowers every team composite rating a little
+			if (this.traitsOn) {
+				const bonus = teamChemistryBonus(
+					this.playersOnCourt[t].map(
+						(p) => p.traitEffects?.chemistryContribution ?? 0,
+					),
+				);
+				if (bonus !== 0) {
+					const factor = 1 + bonus;
+					ratings.dribbling *= factor;
+					ratings.passing *= factor;
+					ratings.rebounding *= factor;
+					ratings.defense *= factor;
+					ratings.defensePerimeter *= factor;
+					ratings.blocking *= factor;
+				}
+			}
 		}
 	}
 
@@ -1449,7 +1639,8 @@ class GameSim extends GameSimBase {
 					}
 				} else {
 					p.stat.benchTime += min;
-					p.stat.energy += min * 0.094;
+					p.stat.energy +=
+						min * 0.094 * (p.traitEffects?.energyRecoveryRate ?? 1);
 
 					if (p.stat.energy > 1) {
 						p.stat.energy = 1;
@@ -1481,7 +1672,8 @@ class GameSim extends GameSimBase {
 				if (this.playersOnCourt[t].includes(p)) {
 					const injuryRate =
 						getInjuryRate(baseRate, p.age, p.injury.gamesRemaining > 0) *
-						((p as any).injuryRiskFactor ?? 1); // injuryDepth setting, see game/injuryDepthTeam.ts
+						((p as any).injuryRiskFactor ?? 1) * // injuryDepth setting, see game/injuryDepthTeam.ts
+						(p.traitEffects?.injuryRateMultiplier ?? 1); // player traits (durability)
 
 					if (Math.random() < injuryRate) {
 						p.injured = true;
@@ -2023,7 +2215,9 @@ class GameSim extends GameSimBase {
 					// Milk the shot clock
 					mean += 4;
 				}
-				shotAt = backcourt + drawHalfCourtSearch(k * mean);
+				shotAt =
+					backcourt +
+					drawHalfCourtSearch(k * mean, this.traits[this.o].consistency);
 			}
 		}
 
@@ -2183,12 +2377,14 @@ class GameSim extends GameSimBase {
 	 * @return {number} Probability from 0 to 1.
 	 */
 	probTov() {
-		return boundProb(
+		const prob =
 			(g.get("turnoverFactor") *
 				(0.14 * this.team[this.d].compositeRating.defense)) /
-				(0.5 *
-					(this.team[this.o].compositeRating.dribbling +
-						this.team[this.o].compositeRating.passing)),
+			(0.5 *
+				(this.team[this.o].compositeRating.dribbling +
+					this.team[this.o].compositeRating.passing));
+		return boundProb(
+			this.traitsOn ? prob * this.traitTurnoverMult(this.o) : prob,
 		);
 	}
 
@@ -2230,12 +2426,16 @@ class GameSim extends GameSimBase {
 	 * @return {number} Probability from 0 to 1.
 	 */
 	probStl() {
-		return boundProb(
+		const prob =
 			g.get("stealFactor") *
-				((0.45 * this.team[this.d].compositeRating.defensePerimeter) /
-					(0.5 *
-						(this.team[this.o].compositeRating.dribbling +
-							this.team[this.o].compositeRating.passing))),
+			((0.45 * this.team[this.d].compositeRating.defensePerimeter) /
+				(0.5 *
+					(this.team[this.o].compositeRating.dribbling +
+						this.team[this.o].compositeRating.passing)));
+		return boundProb(
+			this.traitsOn
+				? prob * this.traitMean(this.d, (e) => e.gambleStealMultiplier, 1)
+				: prob,
 		);
 	}
 
@@ -2428,6 +2628,11 @@ class GameSim extends GameSimBase {
 				foulFactor *= 0.4;
 			}
 
+			// Player traits: a defense of foul-prone players fouls more shooters
+			if (this.traitsOn) {
+				foulFactor *= this.traitMean(this.d, (e) => e.foulProneness, 1);
+			}
+
 			probMissAndFoul *= foulFactor;
 			probAndOne *= foulFactor;
 			probMake =
@@ -2452,13 +2657,15 @@ class GameSim extends GameSimBase {
 				if (this.realPoss && !putBack && this.t > this.shotClock) {
 					probMake *= shotClockMakeFactor(this.shotClock);
 				}
-				if (
-					this.realPoss &&
-					this.t <= 120 &&
-					this.team[0].stat.ptsQtrs.length >= this.numPeriods &&
-					Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <= 5
-				) {
-					probMake *= this.traits[this.o].clutch;
+
+				// Player traits: his game form, shot selection (gunners vs disciplined shooters), clutch and screens. Clamped, since the
+				// deltas can push a probability out of range
+				if (this.traitsOn && p.traitEffects) {
+					probMake = helpers.bound(
+						probMake + this.traitShotDelta(p, passer, type),
+						0,
+						1,
+					);
 				}
 			}
 		}
@@ -3109,13 +3316,22 @@ class GameSim extends GameSimBase {
 		}
 	}
 
+	// 95% max, a 75 FT rating gets you 90%, and a 25 FT rating gets you 60%. Player traits: clutch free throw shooting
+	freeThrowProb(t: TeamNum, p: PlayerGameSim) {
+		const base =
+			g.get("ftAccuracyFactor") * p.compositeRating.shootingFT * 0.6 + 0.45;
+		if (this.traitsOn && p.traitEffects) {
+			return helpers.bound(
+				base + p.traitEffects.clutchFtModifier(this.traitSituation(t)),
+				0,
+				0.95,
+			);
+		}
+		return helpers.bound(base, 0, 0.95);
+	}
+
 	doFt(p: PlayerGameSim, amount: number) {
-		// 95% max, a 75 FT rating gets you 90%, and a 25 FT rating gets you 60%
-		const ftp = helpers.bound(
-			g.get("ftAccuracyFactor") * p.compositeRating.shootingFT * 0.6 + 0.45,
-			0,
-			0.95,
-		);
+		const ftp = this.freeThrowProb(this.o, p);
 
 		let outcome: PossessionOutcome | undefined;
 
@@ -3236,11 +3452,7 @@ class GameSim extends GameSimBase {
 		amount: number,
 		tech: boolean,
 	) {
-		const ftp = helpers.bound(
-			g.get("ftAccuracyFactor") * p.compositeRating.shootingFT * 0.6 + 0.45,
-			0,
-			0.95,
-		);
+		const ftp = this.freeThrowProb(t, p);
 		for (let i = 0; i < amount; i++) {
 			this.recordStat(t, p, "fta");
 			if (Math.random() < ftp) {
@@ -3494,7 +3706,12 @@ class GameSim extends GameSimBase {
 				}
 			}
 
-			const value = (compositeRating * this.fatigue(p.stat.energy)) ** power;
+			let value = (compositeRating * this.fatigue(p.stat.energy)) ** power;
+
+			// Player traits: shot selection, foul proneness, steals and hustle
+			if (this.traitsOn && p.traitEffects) {
+				value *= this.traitPickWeight(rating, p, t);
+			}
 
 			array[i] = value;
 			total += value;

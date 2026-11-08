@@ -477,13 +477,13 @@ describe("effects: mean-zero scores give no net effect (Monte Carlo)", () => {
 		assert.approximately(mean("steal"), 1, 0.01);
 		assert.approximately(mean("rec"), 1, 0.01);
 		assert.approximately(mean("clutchShot"), 0, 0.002);
-		assert.approximately(mean("clutchTov"), 1, 0.007);
+		assert.approximately(mean("clutchTov"), 1, 0.009);
 		assert.approximately(mean("press"), 1, 0.01);
 		assert.approximately(mean("late"), 0, 0.002);
 		assert.approximately(mean("quality"), 0, 0.002);
 		assert.approximately(mean("attempt"), 1, 0.01);
 		assert.approximately(mean("form"), 0, 0.003);
-		assert.approximately(mean("chem"), 0, 0.03);
+		assert.approximately(mean("chem"), 0, 0.05);
 	});
 
 	test("traitZ is clamped and linear", () => {

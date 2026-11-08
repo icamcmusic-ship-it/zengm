@@ -69,11 +69,12 @@ const SEARCH_SD_EARLY = 6.5;
 const SEARCH_SD_LATE = 3.6;
 // Some possessions stall (nothing there, the ball gets reset): the late-clock tail
 const PROB_STALL = 0.035;
-export const drawHalfCourtSearch = (mode: number) => {
+// spreadScale is the team's consistency trait (1 = average, below 1 = steadier)
+export const drawHalfCourtSearch = (mode: number, spreadScale = 1) => {
 	const z = gaussian();
 	let search = Math.max(
 		1,
-		mode + (z < 0 ? SEARCH_SD_EARLY : SEARCH_SD_LATE) * z,
+		mode + spreadScale * (z < 0 ? SEARCH_SD_EARLY : SEARCH_SD_LATE) * z,
 	);
 	if (Math.random() < PROB_STALL) {
 		search += uniform(4, 13);
@@ -120,30 +121,46 @@ export const shotClockMakeFactor = (shotClockLeft: number) => {
 	return factor / SHOT_CLOCK_MAKE_NORM;
 };
 
-/* Player/team "traits" that change possessions, as inputs derived from RATINGS (composite ratings and the like), computed inside GameSim from
-   the roster on the court. Nothing here reads play-by-play events; the sim never depends on them. 1 means no effect, so adding a trait is
-   filling in its derivation (e.g. clutch from a rating) and using the field where the sim already has a hook:
+/* Player traits (the playerTraits setting, see docs/player-traits.md and common/playerTraits) as they change possessions in the realistic
+   possession model. GameSim derives these from the trait effects of the players on the court (deriveTraits below, once per possession); they
+   are only ever used when the setting is on, so with it off every value is 1 and nothing changes. Nothing here reads play-by-play events; the
+   sim never depends on them. The other trait effects (clutch shot/FT/turnover, game form, shot selection, ...) are applied directly in GameSim:
    - shotDiscipline: scales the chance a late-clock crisis ends in a violation (1 = average; below 1 = finds a shot)
-   - clutch: scales shot quality in the last 2 minutes of a close 4th quarter/overtime (applied to probMake)
    - consistency: scales how spread out a team's half-court search times are (lower = steadier possession lengths)
-   - durability: scales injury rate (hook: GameSim.injuries)
-   Nothing derives them from ratings yet, so every value is 1 and games are as they would be without traits. */
+   (A clutch hook used to be here as a multiplier on shot quality; it is the real clutchShotModifier now, which also works without the
+   realistic possession model. Durability is the injury rate multiplier.) */
 export type Traits = {
 	shotDiscipline: number;
-	clutch: number;
 	consistency: number;
-	durability: number;
 };
 export const NEUTRAL_TRAITS: Traits = {
 	shotDiscipline: 1,
-	clutch: 1,
 	consistency: 1,
-	durability: 1,
 };
+
+// How much a team's average shot discipline z (-1 to 1) moves its late-clock violation chance (high discipline = fewer violations)
+const VIOLATION_PER_DISCIPLINE_Z = 0.3;
+
+// Traits of a group of players on the court, from their trait effects (undefined = traits off for him = neutral)
 export const deriveTraits = (
-	_compositeRating: Record<string, number>,
+	effects: readonly (
+		| { scores: Readonly<{ shotDiscipline: number }>; varianceScale: number }
+		| undefined
+	)[],
 ): Traits => {
-	return { ...NEUTRAL_TRAITS };
+	if (effects.length === 0) {
+		return { ...NEUTRAL_TRAITS };
+	}
+	let z = 0;
+	let variance = 0;
+	for (const e of effects) {
+		z += e ? helpers.bound((e.scores.shotDiscipline - 50) / 40, -1, 1) : 0;
+		variance += e ? e.varianceScale : 1;
+	}
+	return {
+		shotDiscipline: 1 - (VIOLATION_PER_DISCIPLINE_Z * z) / effects.length,
+		consistency: variance / effects.length,
+	};
 };
 
 // Standard normal

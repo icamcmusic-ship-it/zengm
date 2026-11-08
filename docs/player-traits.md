@@ -1,6 +1,6 @@
 # Player traits (basketball)
 
-Twelve 0-100 traits per player that the pure game sim can read directly. Nothing here depends on play-by-play: the sim computes with the numbers, the play-by-play only describes the results. Basketball only, behind the league setting **Player Traits** (`playerTraits`; off for existing leagues, on for new ones).
+Twelve 0-100 traits per player that the pure game sim can read directly. Nothing here depends on play-by-play: the sim computes with the numbers, the play-by-play only describes the results. The traits are wired into the game sim (see "How the sim uses the traits"). Basketball only, behind the league setting **Player Traits** (`playerTraits`; off for existing leagues, on for new ones).
 
 Code: `src/common/playerTraits/` (pure, no worker/DB/`g` access) and `src/worker/core/player/traits.ts` (reads `g` and the player). Calibration test: `src/worker/core/player/playerTraits.test.ts`. Pure tests: `src/common/playerTraits/*.test.ts`.
 
@@ -31,7 +31,7 @@ Code: `src/common/playerTraits/` (pure, no worker/DB/`g` access) and `src/worker
 
 Visibility only matters for scouting (below). The sim always uses the true scores.
 
-## API for the sim (what part 2 wires into GameSim)
+## API for the sim
 
 ```ts
 import { player } from "../core/index.ts"; // worker side
@@ -40,7 +40,7 @@ const effects = player.getSimTraitEffects(p); // TraitEffects | undefined
 
 - `getSimTraitEffects(p, season?)` returns `undefined` when the setting is off. **When undefined the sim must not draw any extra random number and must use the old formulas**, so it is byte-for-byte today's behaviour. Call it once per player per game when building the game's players (e.g. in `loadTeams`), keep the result on the sim player (`p.traitEffects`).
 - `traitEffects(scores)` (common) builds the same object from scores; `NEUTRAL_EFFECTS` is the all-neutral object. For code that wants "always an object", use `effects ?? NEUTRAL_EFFECTS`; every hook returns exactly its neutral value for it.
-- `player.getTraitInjuryRateMultiplier(p)` is the only thing the injury code needs: multiply the per-possession injury rate by it. It is `1` with the setting off.
+- `player.getTraitInjuryRateMultiplier(p)` is the injury multiplier alone, `1` with the setting off (the sim reads it from `traitEffects.injuryRateMultiplier`).
 
 Every hook is linear in `z = clamp((score - 50) / 40, -1, 1)`, so 50 is exactly neutral and positive z is the good end. Situation objects are `{ scoreDiff, timeLeft, period, numPeriods? }`: `scoreDiff` is points for the team in question minus points against, `timeLeft` is seconds left in the period, `period` is 1-based (5+ is overtime).
 
@@ -68,15 +68,42 @@ Team helpers: `teamChemistryBonus(contributions)` (bounded, tanh, symmetric), `t
 
 Amplitudes live in `EFFECT_AMPLITUDES` (single place to tune).
 
-### Notes for part 2
+### Notes
 
 - `gameFormShotDelta` needs a per-player per-game normal draw. Draw it only when `effects` is defined, so traits-off consumes exactly the same random numbers as before. Neutral players have `varianceScale` 1, so with traits on every player gets game-to-game noise of sd 0.03; this adds variance but no bias.
 - Make probabilities should be clamped after adding the deltas.
 - The sim should read effects only; `PlayByPlay` may mention them in flavor text but must not change any result (`outcomeInvariance.test.ts` guards this).
 
+## How the sim uses the traits (GameSim.basketball, part 2)
+
+`loadTeams` sets `p.traitEffects = player.getSimTraitEffects(p)` once per game for every player (undefined with the setting off). `GameSim` has `traitsOn` (true when any player has effects), and everything below is behind it, so **with the setting off the sim uses its old formulas, draws no extra random numbers and is byte-for-byte what it was** (`outcomeInvariance.test.ts`). With it on, the only new random draw is one standard normal per player per game (`gameZ`, drawn in the GameSim constructor, for game form). Nothing here touches `PlayByPlayLogger`, `pbpFlavor` or `game.pbp`: the sim computes with its own numbers (score, clock, ratings, energy), and `playerTraitsSim.test.ts` checks that a seeded game gives the identical box score with play-by-play logging off (`storePlayByPlay` false, `doPlayByPlay` false), stored and live, with the possession model, technical fouls and injury depth on or off. The effect objects are removed from the result at the end of `run()`.
+
+| Hook                                                       | Where it is applied                                                                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clutchShotModifier(situation)`                            | `getShotInfo`: added to the shooter's make probability (`traitShotDelta`)                                                                                                                                                                                                                                                 |
+| `clutchFtModifier(situation)`                              | `freeThrowProb` (used by `doFt` and the technical/flagrant free throws)                                                                                                                                                                                                                                                   |
+| `clutchTurnoverMult(situation)`, `pressureTurnoverMult(p)` | `probTov`: the offense's turnover probability times the mean of both over its players on the court; also the weight of each player in the "who turned it over" draw. Pressure is the defense's perimeter defense mapped to 0-1 (`traitPressure`)                                                                          |
+| `gameFormShotDelta(gameZ)`, `varianceScale`                | `getShotInfo`: added to his make probability. `gameZ` is his draw for this game, so volatile players (low consistency) swing more; steady ones less. Mean zero                                                                                                                                                            |
+| `shotSelectionBias(usage)`                                 | Weight multiplier in the "who shoots" draw (`pickPlayer("usage")`, `ratingArray`) and make probability delta in `getShotInfo`: gunners (low shot discipline) take more shots at a lower make probability                                                                                                                  |
+| `screenShotDelta`                                          | `getShotInfo`: assisted jumpers and finishes (the plays that come off a screen, roll or pop)                                                                                                                                                                                                                              |
+| `spacingContribution`, `screenContribution`                | `updateSynergy`: added to the team's `synergy.off` for every player on the court (so it flows through `synergyFactor` into shot quality, dribbling and passing composites)                                                                                                                                                |
+| `looseBallBonus`                                           | Weight in the rebounding and stealing draws (who gets the loose ball or the deflection), team totals unchanged                                                                                                                                                                                                            |
+| `foulProneness`                                            | Weight in the fouling draw (who fouls), and the defense's foul probabilities (`probNonShootingFoul`, the shooting foul factor in `getShotInfo`) times the mean over its players on the court                                                                                                                              |
+| `gambleStealMultiplier`                                    | `probStl` times the mean over the defenders; also the weight in the stealing draw                                                                                                                                                                                                                                         |
+| `energyRecoveryRate`                                       | `updatePlayingTime`: the energy regained per minute on the bench                                                                                                                                                                                                                                                          |
+| `lateGameDecisionQuality(situation)`                       | `applyLateGameDecision`: when the sim decides to foul when behind, hold for the last shot or play for a 2-for-1, the team (ball handler weighted most) makes the right call with probability `1 - 0.06 * lateGameSituationWeight + quality`; else it plays the possession normally. Nothing outside the last four minutes |
+| `chemistryContribution`                                    | `updateTeamCompositeRatings`: `teamChemistryBonus` of the players on the court multiplies every team composite rating                                                                                                                                                                                                     |
+| `injuryRateMultiplier`                                     | `injuries()`: times the injury depth factor (`injuryRiskFactor`) and the base rate                                                                                                                                                                                                                                        |
+
+Possession model: the realistic possession model's `Traits` (possessionModel.ts) are now derived from the real traits of the players on the court (`deriveTraits`): `shotDiscipline` scales the chance that a late-clock crisis ends in a violation (violationTendency), `consistency` (the team's mean `varianceScale`) scales how spread out half-court search times are. The old multiplicative clutch hook is the real `clutchShotModifier` now, which also works without the possession model.
+
+The situation passed to the hooks is built from the sim's own state: `scoreDiff` = the team's points minus the other team's, `timeLeft` = `this.t`, `period` = the number of quarter scores so far (5+ is overtime).
+
+Calibration of the sim-level averages is in `playerTraitsSim.test.ts` (smoke test, 250 games) and `traitsMetrics.ts`; the table for ~1000 or more games: `TRAITS_METRICS=1 TRAITS_METRICS_GAMES=1000 TRAITS_METRICS_OUT=table.txt vitest --run --project basketball src/worker/core/GameSim.basketball/playerTraitsSim.test.ts -t "prints league"`.
+
 ## Calibration (neutrality)
 
-The goal: with traits mean-zero distributed, league-wide averages of points, FG%, turnovers, fouls, injuries do not move. Because every hook is linear in z, this reduces to the average z being 0 over the players who actually play. Per-trait `CALIBRATION_OFFSETS` in `scores.ts` shift scores so the average rotation player (top 300 by ovr in a generated 30 team league, with the league's age/experience mix) is 50. `playerTraits.test.ts` regenerates leagues and asserts:
+The goal: with traits mean-zero distributed, league-wide averages of points, FG%, turnovers, fouls, injuries do not move. Because every hook is linear in z, this reduces to the average z being 0 over the players who actually play (weighted by what the hook affects: minutes on the court, shots taken). Per-trait `CALIBRATION_OFFSETS` in `scores.ts` shift scores so the minutes-weighted average player is 50. That is 1-2 points below the equal-weighted rotation average (top 300 by ovr in a generated 30 team league), because the players who get the minutes are better than the rotation average and the traits correlate with ratings: an earlier calibration to the rotation average showed in the sim as about +0.6% FG%, -0.8% FTA and -0.6% fouls with traits on. `playerTraits.test.ts` regenerates leagues and asserts:
 
 - mean score of every trait within 2 points of 50, mean z within 0.06;
 - mean of every hook at its neutral value (injury 1 +-0.02, foul 1 +-0.02, loose ball 1 +-0.012, clutch shot 0 +-0.002, ...);
@@ -84,7 +111,22 @@ The goal: with traits mean-zero distributed, league-wide averages of points, FG%
 
 and `src/common/playerTraits/playerTraits.test.ts` does the same Monte Carlo on the pure functions (20,000 players), plus exact neutrality at score 50 / traits off, bounds for every score 0-100 and every situation, determinism, seed distribution, drift stationarity.
 
-If the ratings generator or the league's age mix changes a lot, rerun the calibration (temporary test printing mean scores) and update `CALIBRATION_OFFSETS` and `REFERENCE_RATINGS`.
+The sim level check is `playerTraitsSim.test.ts` / `traitsMetrics.ts`: the same 30-team league and matchups simulated with the setting off and on. 10,000 games each (realisticPossessions off; the run with it on is the same within noise):
+
+| metric            | off    | on     | diff   |
+| ----------------- | ------ | ------ | ------ |
+| points per team   | 105.45 | 105.56 | +0.10% |
+| FG%               | 0.4393 | 0.4405 | +0.27% |
+| 3PA / FGA         | 0.3501 | 0.3486 | -0.41% |
+| TOV%              | 0.1412 | 0.1415 | +0.19% |
+| FT%               | 0.7571 | 0.7553 | -0.25% |
+| FTA per team      | 22.83  | 22.82  | -0.05% |
+| fouls per team    | 19.32  | 19.30  | -0.13% |
+| injuries per game | 0.3037 | 0.3118 | +2.7%  |
+
+(Standard error of a difference at 10,000 games: about 0.15% for points, 0.17% for FG%, 0.2% for the 3PA rate, 0.33% for TOV%, 0.4% for FTA, 2.6% for injuries.) The effects themselves, same run: top-third clutch players' make probability in clutch time +1.9 points, bottom third -0.9 (designed: +-0.04 times z times the situation weight); gunners (bottom third of shot discipline) take 12.2 -> 12.7 shots per 36 minutes at 44.5% -> 43.8%, disciplined players 14.3 -> 13.8 at 43.5% -> 44.3%; the sd of per-game FG% grows by 0.0043 for volatile players and 0.0032 for steady ones.
+
+If the ratings generator or the league's age mix changes a lot, rerun the calibration (temporary test printing mean scores, minutes-weighted over the sim's players) and update `CALIBRATION_OFFSETS` and `REFERENCE_RATINGS`.
 
 ## Scouting uncertainty
 

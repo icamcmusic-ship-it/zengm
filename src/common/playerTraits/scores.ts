@@ -90,20 +90,22 @@ const contextPart = (
 	}
 };
 
-// Offsets that make the average rotation player's score exactly average once the context parts and clamping are included. Found by simulation, see playerTraits.calibration.test.ts.
+// Offsets that make the average player on the court average (score 50): the average of the rotation (top 300 by ovr in a generated league), then moved down by the amount
+// the players who actually play minutes and take the shots sit above that average (about 1-2 points, see playerTraitsSim.test.ts: the minutes-weighted mean of every trait is
+// 50 in the sim, so the league-wide averages of points, FG%, turnovers, fouls and injuries do not move when traits are on). Found by simulation.
 export const CALIBRATION_OFFSETS: Record<TraitKey, number> = {
-	clutch: -3.6,
-	consistency: 0,
-	durability: 1.2,
+	clutch: -5.5,
+	consistency: -1.2,
+	durability: 0.3,
 	shotDiscipline: -4,
-	offBall: 0,
-	screen: -0.9,
-	hustle: 0.4,
-	foulDiscipline: -2.8,
-	recovery: 1,
-	handle: -0.6,
+	offBall: -1.5,
+	screen: -1.8,
+	hustle: -0.6,
+	foulDiscipline: -3.8,
+	recovery: 0.6,
+	handle: -2,
 	lateGameIq: -3.6,
-	leadership: -3.3,
+	leadership: -5,
 };
 
 export const ratingPart = (key: TraitKey, ratings: TraitRatings) => {

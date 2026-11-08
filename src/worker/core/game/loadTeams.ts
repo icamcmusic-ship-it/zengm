@@ -319,6 +319,15 @@ export const processTeam = async (
 			};
 		}
 
+		// Player traits (the playerTraits setting): his effects on the game, computed once per game. Undefined with the setting off, and then the
+		// sim uses its old formulas and draws no extra random numbers
+		if (__SPORT === "basketball") {
+			const traitEffects = player.getSimTraitEffects(p);
+			if (traitEffects) {
+				(p2 as any).traitEffects = traitEffects;
+			}
+		}
+
 		// Reset ptModifier for AI teams. This should not be necessary since it should always be 1, but let's be safe.
 		if (!g.get("userTids").includes(t.id) || g.get("spectator")) {
 			p2.ptModifier = 1;
