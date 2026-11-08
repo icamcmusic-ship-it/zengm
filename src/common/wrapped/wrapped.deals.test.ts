@@ -55,7 +55,7 @@ describe("front-office topics", () => {
 				expect(isBadText(JSON.stringify(s)), s.id).toBe(false);
 				expect(s.score, s.id).toBeGreaterThanOrEqual(0);
 				expect(s.score, s.id).toBeLessThanOrEqual(1);
-				expect(JSON.stringify(s), s.id).not.toMatch(/\b1 (seasons|trades|players|picks|teams)\b|  /);
+				expect(JSON.stringify(s), s.id).not.toMatch(/\b1 (seasons|trades|players|picks|teams)\b| {2}/);
 			}
 		});
 	}
@@ -148,7 +148,7 @@ describe("front-office topics", () => {
 			}
 		}
 		for (const id of ids3) {
-			expect(id, id).not.toMatch(/^(s|t|p|a)-(d|ct|fa|lot|rel)-/);
+			expect(id, id).not.toMatch(/^([apst])-(d|ct|fa|lot|rel)-/);
 		}
 	});
 });
