@@ -37,7 +37,7 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
 
 - **Where:** the live game view (_Play → … → Watch game_, or _Watch game_ on the schedule).
 - **What:** varied, ratings-aware wording for every play (shot types, passes, fouls with personal and team foul counts, bonus situations, runs, milestones, quarter summaries). It only changes the text: game results are identical with or without it (covered by `outcomeInvariance.test.ts`).
-- **Known limits:** the wording assumes 12-minute quarters for clock-based phrases. Elam ending and shootout events keep the original wording.
+- **Known limits:** Elam ending events keep the original wording. Clock phrases follow the league's quarter length and number of periods; shootout lines are seeded like the rest, so a replay reads the same.
 
 ## Draft Scouting: College stats and Regenerate ratings
 

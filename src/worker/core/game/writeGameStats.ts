@@ -199,6 +199,7 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 		numPlayersOnCourt: results.numPlayersOnCourt,
 		season: g.get("season"),
 		numPeriods: g.get("numPeriods"),
+		quarterLength: g.get("quarterLength"),
 		overtimes: results.overtimes,
 		won: {
 			tid: 0,

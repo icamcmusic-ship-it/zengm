@@ -61,6 +61,7 @@ const zeroStats = () => Object.fromEntries(STATS.map((s) => [s, 0]));
 const makeStartingBoxScore = (boxScore: any) => ({
 	gid: boxScore.gid,
 	numPeriods: boxScore.numPeriods ?? 4,
+	quarterLength: boxScore.quarterLength,
 	quarter: "",
 	time: "",
 	teams: boxScore.teams.map((t: any) => ({

@@ -418,6 +418,7 @@ export type Game = {
 	numGamesToWinSeries?: number;
 	numPeriods?: number; // Optional only for legacy, otherwise it's the number of periods in the game, defined at the start
 	numPlayersOnCourt?: number;
+	quarterLength?: number; // Minutes per period when the game was played (missing for older games)
 	playoffs?: boolean;
 	overtimes: number;
 	scoringSummary?: unknown;
