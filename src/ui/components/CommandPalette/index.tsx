@@ -31,6 +31,7 @@ import {
 import { menuItems } from "../../util/menuItems.tsx";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
 import { local, useLocal } from "../../util/local.ts";
+import { isFeatureOn } from "../../util/nativeFeatures.ts";
 import { relativeTime } from "../../util/relativeTime.ts";
 import { router } from "../../router/index.ts";
 
@@ -122,6 +123,10 @@ const getResultsGroupedDefault = ({
 		}
 
 		if (menuItem.godMode && !godMode) {
+			return false;
+		}
+
+		if (menuItem.feature && !isFeatureOn(menuItem.feature)) {
 			return false;
 		}
 

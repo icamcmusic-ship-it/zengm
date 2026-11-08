@@ -8,6 +8,8 @@ import type {
 } from "../../common/types.ts";
 import { GAME_NAME } from "../../common/constants.ts";
 import type { LeagueUrlParts } from "../router/types.ts";
+import type { NativeFeatureId } from "../../common/nativeFeatures.ts";
+import { isFeatureOn } from "../util/nativeFeatures.ts";
 
 const style = { maxWidth: 1000 };
 
@@ -22,6 +24,8 @@ type Category =
 
 type FrivolityInfo = {
 	urlParts: RemovePrefix<LeagueUrlParts, "frivolities">;
+	// League extras feature that hides it when off
+	feature?: NativeFeatureId;
 	name: string;
 	description: string;
 };
@@ -53,12 +57,14 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 			? ([
 					{
 						urlParts: ["redraft"],
+						feature: "frivolities",
 						name: "Redraft",
 						description:
 							"Every draft class re-ordered by career win shares, with each class's steals and busts.",
 					},
 					{
 						urlParts: ["pick_value"],
+						feature: "frivolities",
 						name: "Draft Pick Value",
 						description:
 							"What each pick has produced: typical careers and how often it becomes a starter or All-Star.",
@@ -87,6 +93,7 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 		},
 		{
 			urlParts: ["jersey_numbers", "teams"],
+			feature: "frivolities",
 			name: "Jersey Numbers by Team",
 			description:
 				"The best player in each number for each team, retired numbers and numbers due to be retired.",
@@ -100,6 +107,7 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 			? ([
 					{
 						urlParts: ["family_trees"],
+						feature: "frivolities",
 						name: "Family Trees",
 						description:
 							"Families of related players, their careers side by side and family records.",
@@ -116,12 +124,14 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 	Teams: [
 		{
 			urlParts: ["economics"],
+			feature: "frivolities",
 			name: "League Economics",
 			description:
 				"Payroll inequality, luxury tax bills, payroll growth and whether money buys titles.",
 		},
 		{
 			urlParts: ["home_court"],
+			feature: "frivolities",
 			name: "Home Court",
 			description:
 				"What playing at home is worth, by season, era and team, and in the playoffs.",
@@ -388,19 +398,24 @@ const Frivolities = () => {
 							<Fragment key={category}>
 								<h3 className={`ms-1${i > 0 ? " mt-3" : ""}`}>{category}</h3>
 								<div className="list-group">
-									{frivolities[category].map((frivolity) => (
-										<a
-											key={frivolity.name}
-											href={helpers.leagueUrl([
-												"frivolities",
-												...frivolity.urlParts,
-											])}
-											className="list-group-item list-group-item-action"
-										>
-											<h3 className="mb-1">{frivolity.name}</h3>
-											<p className="mb-1">{frivolity.description}</p>
-										</a>
-									))}
+									{frivolities[category]
+										.filter(
+											(frivolity) =>
+												!frivolity.feature || isFeatureOn(frivolity.feature),
+										)
+										.map((frivolity) => (
+											<a
+												key={frivolity.name}
+												href={helpers.leagueUrl([
+													"frivolities",
+													...frivolity.urlParts,
+												])}
+												className="list-group-item list-group-item-action"
+											>
+												<h3 className="mb-1">{frivolity.name}</h3>
+												<p className="mb-1">{frivolity.description}</p>
+											</a>
+										))}
 								</div>
 							</Fragment>
 						))}

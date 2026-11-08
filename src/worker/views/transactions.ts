@@ -1,3 +1,4 @@
+import { featureOn } from "../util/nativeFeatures.ts";
 import { idb } from "../db/index.ts";
 import type { EventBBGM } from "../../common/types.ts";
 import { formatEventText } from "../util/formatEventText.ts";
@@ -76,9 +77,11 @@ export default defineView({
 			events.reverse(); // Newest first
 
 			// Trade grader grades for trade rows (basketball only), when they're quick to get
-			const snap = events.some((event) => event.type === "trade")
-				? await valueSnapshotWithin(1000)
-				: undefined;
+			const snap =
+				featureOn("tradeGrader") &&
+				events.some((event) => event.type === "trade")
+					? await valueSnapshotWithin(1000)
+					: undefined;
 			const gradesByEid = snap ? tradeGradesOf(snap).byEid : undefined;
 
 			const events2 = [];

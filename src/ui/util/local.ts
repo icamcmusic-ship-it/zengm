@@ -3,6 +3,10 @@ import { shallow } from "zustand/shallow";
 import type { LocalStateUI, GameAttributesLeague } from "../../common/types.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import { safeLocalStorage } from "./safeLocalStorage.ts";
+import {
+	nativeFeatureLocalDefaults,
+	type NativeFeatureSettingKey,
+} from "../../common/nativeFeatures.ts";
 import { gameAttributesSyncedToUi } from "../../common/gameAttributesSyncedToUi.ts";
 
 // These are variables that are needed to display parts of the UI not driven explicitly by worker/views/*.js files. Like
@@ -49,6 +53,10 @@ if (showTemp === "true") {
 
 const useLocalRaw = createWithEqualityFn<LocalStateWithActions>(
 	(set, get) => ({
+		...(nativeFeatureLocalDefaults as unknown as Pick<
+			GameAttributesLeague,
+			NativeFeatureSettingKey
+		>),
 		alwaysShowCountry: false,
 		budget: defaultGameAttributes.budget,
 		challengeNoRatings: false,

@@ -590,7 +590,7 @@ export type TragicDeaths = {
 
 type FootballOvertime = "suddenDeath" | "exceptFg" | "bothPossess";
 
-export type GameAttributesLeague = {
+export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	aiJerseyRetirement: boolean;
 	aiTradesFactor: number;
 
@@ -1052,6 +1052,8 @@ export type MenuItemLink = {
 	active?: (pageID?: string, pathname?: string) => boolean;
 	league?: true;
 	godMode?: true;
+	// League extras feature (common/nativeFeatures.ts): hidden when it is turned off
+	feature?: NativeFeatureId;
 	nonLeague?: true;
 	commandPalette?: true;
 	commandPaletteOnly?: true;
@@ -2370,6 +2372,10 @@ import type {
 	KeyboardShortcutsLocal,
 } from "../ui/util/keyboardShortcuts.ts";
 import type { gameAttributesSyncedToUi } from "./gameAttributesSyncedToUi.ts";
+import type {
+	NativeFeatureGameAttributes,
+	NativeFeatureId,
+} from "./nativeFeatures.ts";
 import type { UndoLog } from "../worker/util/UndoLog.ts";
 import type { LeagueUrlParts } from "../ui/router/types.ts";
 import type { StoredRatingsBuild } from "./ratingsBuilds/types.ts";

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import DraftClass from "./DraftClass.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { View } from "../../../common/types.ts";
@@ -15,6 +16,8 @@ const DraftScouting = ({
 	seasons,
 	scoutingStatus,
 }: View<"draftScouting">) => {
+	const regeneratorOn = useFeatureOn("ratingsRegenerator");
+	const collegeStatsOn = useFeatureOn("collegeStats");
 	const { challengeNoRatings, draftType, godMode } = useLocal([
 		"challengeNoRatings",
 		"draftType",
@@ -65,9 +68,15 @@ const DraftScouting = ({
 				</p>
 			) : null}
 
-			<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
-			{!fantasyDraft ? (
-				<AllClassesPanel seasons={seasons.map((info) => info.season)} />
+			{regeneratorOn ? (
+				<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
+			) : null}
+			{!fantasyDraft && (regeneratorOn || collegeStatsOn) ? (
+				<AllClassesPanel
+					seasons={seasons.map((info) => info.season)}
+					showStats={collegeStatsOn}
+					showRatings={regeneratorOn}
+				/>
 			) : null}
 
 			{pagination ? (

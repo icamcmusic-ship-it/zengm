@@ -10,6 +10,7 @@ import { newLeagueGodModeLimits } from "../util/newLeagueGodModeLimits.ts";
 import { getNewLeagueLid } from "../util/getNewLeagueLid.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import { DEFAULT_REAL_DRAFT_RATINGS } from "../../common/constants.ts";
+import { nativeFeatureNewLeagueDefaults } from "../../common/nativeFeatures.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { getMetaAttribute } from "../db/metaAttributes.ts";
 
@@ -229,6 +230,10 @@ export const getDefaultSettings = () => {
 		elamMinutes: unwrapGameAttribute(defaultGameAttributes, "elamMinutes"),
 		elamOvertime: unwrapGameAttribute(defaultGameAttributes, "elamOvertime"),
 		elamPoints: unwrapGameAttribute(defaultGameAttributes, "elamPoints"),
+		storePlayByPlay: unwrapGameAttribute(
+			defaultGameAttributes,
+			"storePlayByPlay",
+		),
 		pbpLiveGame: unwrapGameAttribute(defaultGameAttributes, "pbpLiveGame"),
 		pbpBoxScore: unwrapGameAttribute(defaultGameAttributes, "pbpBoxScore"),
 		pbpStore: unwrapGameAttribute(defaultGameAttributes, "pbpStore"),
@@ -508,6 +513,9 @@ export const getDefaultSettings = () => {
 		),
 		coachingStaff: unwrapGameAttribute(defaultGameAttributes, "coachingStaff"),
 		fakeAgeProb: unwrapGameAttribute(defaultGameAttributes, "fakeAgeProb"),
+
+		// League extras (src/common/nativeFeatures.ts)
+		...nativeFeatureNewLeagueDefaults(),
 
 		// This can be undefined, but if the setting is ever displayed to the user, it should have a value
 		realDraftRatings:

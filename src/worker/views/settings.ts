@@ -11,6 +11,18 @@ import { defaultTragicDeaths } from "../util/defaultTragicDeaths.ts";
 import { defaultInjuries } from "../util/defaultInjuries.ts";
 import { defineView } from "../util/defineView.ts";
 import { DEFAULT_REAL_DRAFT_RATINGS } from "../../common/constants.ts";
+import {
+	NATIVE_FEATURE_SETTING_KEYS,
+	type NativeFeatureSettingKey,
+} from "../../common/nativeFeatures.ts";
+
+const getNativeFeatureSettings = () => {
+	const out: Partial<Record<NativeFeatureSettingKey, unknown>> = {};
+	for (const key of NATIVE_FEATURE_SETTING_KEYS) {
+		out[key] = g.get(key);
+	}
+	return out as Pick<GameAttributesLeague, NativeFeatureSettingKey>;
+};
 
 type Key =
 	| "godMode"
@@ -203,7 +215,8 @@ type Key =
 	| "scoutingSystem"
 	| "rerandomizeDraftClassRatings"
 	| "coachingStaff"
-	| "fakeAgeProb";
+	| "fakeAgeProb"
+	| NativeFeatureSettingKey;
 
 export type Settings = Pick<
 	GameAttributesLeague,
@@ -332,7 +345,6 @@ export const getInitialSettings = (): Settings => {
 			pbpStore: g.get("pbpStore"),
 			storePlayByPlay: g.get("storePlayByPlay"),
 		}),
-		technicalFouls: g.get("technicalFouls"),
 		realisticPossessions: g.get("realisticPossessions"),
 		injuryDepth: g.get("injuryDepth"),
 		playerTraits: g.get("playerTraits"),
@@ -438,11 +450,13 @@ export const getInitialSettings = (): Settings => {
 		footballOvertime: g.get("footballOvertime"),
 		footballOvertimePlayoffs: g.get("footballOvertimePlayoffs"),
 		easterEggPlayers: g.get("easterEggPlayers"),
-		generateCollegeStats: g.get("generateCollegeStats"),
 		scoutingSystem: g.get("scoutingSystem"),
 		rerandomizeDraftClassRatings: g.get("rerandomizeDraftClassRatings"),
 		coachingStaff: g.get("coachingStaff"),
 		fakeAgeProb: g.get("fakeAgeProb"),
+
+		// League extras (src/common/nativeFeatures.ts)
+		...getNativeFeatureSettings(),
 
 		// Might as well be undefined, because it will never be saved from this form, only the new league form
 		realDraftRatings: g.get("realDraftRatings") ?? DEFAULT_REAL_DRAFT_RATINGS,

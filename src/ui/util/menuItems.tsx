@@ -60,6 +60,7 @@ const newspaperLinks: MenuItemLink[] =
 					active: (pageID) => pageID === "newspaper",
 					league: true,
 					commandPalette: true,
+					feature: "newspaper",
 					path: ["newspaper"],
 					text: "Newspaper",
 				},
@@ -75,6 +76,7 @@ const wrappedLinks: MenuItemLink[] =
 					active: (pageID) => pageID === "wrapped",
 					league: true,
 					commandPalette: true,
+					feature: "wrapped",
 					path: ["wrapped"],
 					text: "Wrapped",
 				},
@@ -83,6 +85,7 @@ const wrappedLinks: MenuItemLink[] =
 					active: (pageID) => pageID === "storylines",
 					league: true,
 					commandPalette: true,
+					feature: "storylines",
 					path: ["storylines"],
 					text: "Storylines",
 				},
@@ -98,6 +101,7 @@ const leagueAchievementsLinks: MenuItemLink[] =
 					active: (pageID) => pageID === "leagueAchievements",
 					league: true,
 					commandPalette: true,
+					feature: "leagueAchievements",
 					path: ["league_achievements"],
 					text: "League Achievements",
 				},
@@ -147,6 +151,22 @@ const archetypeLinks: MenuItemLink[] =
 			]
 		: [];
 
+// League timeline (League extras)
+const timelineLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "timeline",
+					league: true,
+					commandPalette: true,
+					feature: "timeline",
+					path: ["timeline"],
+					text: "Timeline",
+				},
+			]
+		: [];
+
 // Game hype and record chases (basketball only)
 const hypeLinks: MenuItemLink[] =
 	__SPORT === "basketball"
@@ -156,6 +176,7 @@ const hypeLinks: MenuItemLink[] =
 					active: (pageID) => pageID === "hype",
 					league: true,
 					commandPalette: true,
+					feature: "hype",
 					path: ["hype"],
 					text: "Games to Watch",
 				},
@@ -171,6 +192,7 @@ const valueLinks: MenuItemLink[] =
 					active: (pageID) => pageID === "tradeGrader",
 					league: true,
 					commandPalette: true,
+					feature: "tradeGrader",
 					path: ["trade_grader"],
 					text: "Trade Grader",
 				},
@@ -179,6 +201,7 @@ const valueLinks: MenuItemLink[] =
 					active: (pageID) => pageID === "contractValue",
 					league: true,
 					commandPalette: true,
+					feature: "contractValue",
 					path: ["contract_value"],
 					text: "Contract Value",
 				},
@@ -334,6 +357,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			...wrappedLinks,
 			...leagueAchievementsLinks,
+			...timelineLinks,
 			{
 				type: "link",
 				active: (pageID) => pageID === "powerRankings",
@@ -1046,6 +1070,14 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
+				active: (pageID) => pageID === "leagueExtras",
+				league: true,
+				commandPalette: true,
+				path: ["league_extras"],
+				text: "League Extras",
+			},
+			{
+				type: "link",
 				active: (pageID) => pageID === "awardSettings",
 				league: true,
 				commandPalette: true,
@@ -1076,6 +1108,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 				commandPalette: true,
 				commandPaletteOnly: true,
 				path: ["frivolities", ...row.urlParts],
+				feature: row.feature,
 				text: `${category} > ${row.name}`,
 			})),
 		),

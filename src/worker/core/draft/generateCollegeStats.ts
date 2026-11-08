@@ -9,6 +9,7 @@ import {
 import { hasPreDraftStats } from "../../../common/preDraft.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
+import { featureOption } from "../../util/nativeFeatures.ts";
 import { player } from "../index.ts";
 import { autoRegenerateClass } from "./regenerateRatings.ts";
 import {
@@ -158,6 +159,8 @@ export const processNewDraftClasses = async (
 	options?: {
 		// false for a class that was imported and only topped off, so imported ratings are kept
 		rerandomize?: boolean;
+		// false to leave out the automatic college stats (a class of forced scrubs)
+		stats?: boolean;
 	},
 ) => {
 	if (__SPORT !== "basketball") {
@@ -165,7 +168,9 @@ export const processNewDraftClasses = async (
 	}
 	const rerandomize =
 		g.get("rerandomizeDraftClassRatings") && options?.rerandomize !== false;
-	const stats = g.get("generateCollegeStats");
+	// Also off with the College Stats switch of League Extras
+	const stats =
+		options?.stats !== false && featureOption<boolean>("generateCollegeStats");
 	if (!rerandomize && !stats) {
 		return;
 	}

@@ -6,6 +6,7 @@ import {
 	awardsSchema,
 	playerAwardSchema,
 } from "../../common/types.ts";
+import { nativeFeatureJsonSchemaProperties } from "../../common/nativeFeatures.ts";
 
 const zodJsonSchema = (schema: any) => {
 	const jsonSchema = toJSONSchema(schema, {
@@ -710,6 +711,8 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 			gameAttributes: {
 				type: "object",
 				properties: {
+					// League extras (src/common/nativeFeatures.ts)
+					...nativeFeatureJsonSchemaProperties(),
 					aiJerseyRetirement: {
 						type: "boolean",
 					},

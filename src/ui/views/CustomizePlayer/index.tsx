@@ -6,6 +6,7 @@ import {
 	useEffect,
 	useLayoutEffect,
 } from "react";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import {
 	PHASE,
 	PLAYER,
@@ -324,6 +325,7 @@ const useJerseyNumberConflictInfo = (
 };
 
 const CustomizePlayer = (props: View<"customizePlayer">) => {
+	const regeneratorOn = useFeatureOn("ratingsRegenerator");
 	const { godMode, minContract, phase, season } = useLocal([
 		"godMode",
 		"minContract",
@@ -1575,12 +1577,7 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 									<span className="glyphicon glyphicon-plus" />
 								</button>
 							</div>
-							{bySport({
-								baseball: false,
-								basketball: true,
-								football: false,
-								hockey: false,
-							}) ? (
+							{regeneratorOn ? (
 								<RegenerateBuild
 									pid={props.p.pid}
 									ratingsRow={p.ratings[r]!}

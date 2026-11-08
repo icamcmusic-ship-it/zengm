@@ -1,4 +1,5 @@
 import { getPeriodName } from "../../common/getPeriodName.ts";
+import { isFeatureOn } from "./nativeFeatures.ts";
 import { choice } from "../../common/random.ts";
 import { helpers } from "./helpers.ts";
 import { local } from "./local.ts";
@@ -626,7 +627,10 @@ const processLiveGameEvents = ({
 			boxScore.teams[0].timeouts = e.timeouts[0];
 			boxScore.teams[1].timeouts = e.timeouts[1];
 		} else if (e.type === "init") {
-			flavor = makeFlavorSession(e, boxScore);
+			// League extras: without the flavor layer, the original wording is used
+			flavor = isFeatureOn("pbpFlavor")
+				? makeFlavorSession(e, boxScore)
+				: undefined;
 		} else {
 			const fr = flavor?.describe(e, makeFlavorHost(boxScore), events);
 			// An event with no text of its own (the start of a shot, which its result describes) just moves on to the next event

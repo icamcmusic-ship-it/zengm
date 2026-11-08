@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { defineView, keepType } from "../util/defineView.ts";
 import { loadFromSnapshot, teamNamer } from "../util/leagueHistoryData.ts";
 import {
@@ -32,6 +33,10 @@ export default defineView({
 	processInputs,
 	keepPrevOutput: { loading: keepType<boolean>() },
 	load: async ({ inputs, updateEvents, prevInputs, prevOutput }) => {
+		const featureOff = featureOffError("frivolities");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return { errorMessage: "Redraft is only available for basketball." };
 		}

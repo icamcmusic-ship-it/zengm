@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { defineView, keepType } from "../util/defineView.ts";
@@ -38,6 +39,10 @@ export default defineView({
 	// Whether the page is showing its placeholder, which it replaces once the league history is ready
 	keepPrevOutput: { loading: keepType<boolean>() },
 	load: async ({ inputs, updateEvents, prevInputs, prevOutput }) => {
+		const featureOff = featureOffError("wrapped");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return { errorMessage: "Wrapped is only available for basketball." };
 		}

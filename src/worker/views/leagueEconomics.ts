@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
@@ -8,6 +9,10 @@ import { buildEconomics } from "../../common/leagueHistory/economics.ts";
 export default defineView({
 	id: "leagueEconomics",
 	load: async ({ updateEvents }) => {
+		const featureOff = featureOffError("frivolities");
+		if (featureOff) {
+			return featureOff;
+		}
 		// Payrolls and luxury taxes are only written at the end of a season
 		if (
 			!updateEvents.has("firstRun") &&

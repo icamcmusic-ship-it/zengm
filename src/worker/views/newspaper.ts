@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import { getCurrentContract } from "../../common/contracts.ts";
 import { buildPaper } from "../../common/newspaper/index.ts";
@@ -1010,6 +1011,10 @@ export default defineView({
 	id: "newspaper",
 	processInputs,
 	load: async ({ inputs, updateEvents, prevInputs }) => {
+		const featureOff = featureOffError("newspaper");
+		if (featureOff) {
+			return featureOff;
+		}
 		const isCurrent = inputs.season === g.get("season");
 		const inputsChanged =
 			updateEvents.has("firstRun") ||

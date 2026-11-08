@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { defineView } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { g } from "../util/index.ts";
@@ -40,6 +41,10 @@ export default defineView({
 	id: "tradeGrader",
 	processInputs,
 	load: async ({ inputs, updateEvents, prevInputs }) => {
+		const featureOff = featureOffError("tradeGrader");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return {
 				errorMessage: "The Trade grader is only available for basketball.",

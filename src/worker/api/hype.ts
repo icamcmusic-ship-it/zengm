@@ -2,6 +2,7 @@
 import type { ChaseRow, HypeLite } from "../../common/hype/index.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 import {
 	hypeChases,
 	hypeForGids,
@@ -18,7 +19,8 @@ export type HypeBoard = {
 	recent: HypeLite[];
 };
 
-const enabled = () => __SPORT === "basketball";
+// League extras: hype is only computed while the feature is on
+const enabled = () => featureOn("hype");
 
 // Finished games of the latest day (current season)
 const recentGids = async () => {

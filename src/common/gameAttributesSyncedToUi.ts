@@ -1,3 +1,5 @@
+import { NATIVE_FEATURE_SETTING_KEYS } from "./nativeFeatures.ts";
+
 export const gameAttributesSyncedToUi = [
 	"alwaysShowCountry",
 	"budget",
@@ -35,4 +37,7 @@ export const gameAttributesSyncedToUi = [
 	"teamInfoCache",
 	"userTid",
 	"userTids",
+
+	// League extras switches and options, so menus and links can hide disabled features
+	...NATIVE_FEATURE_SETTING_KEYS,
 ] as const;

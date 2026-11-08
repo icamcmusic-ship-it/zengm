@@ -70,6 +70,7 @@ const genPlayers = async (
 	// Ratings are re-randomized only for a class that was generated here from scratch, not an imported one being topped off
 	await processNewDraftClasses([draftYear], {
 		rerandomize: existingPlayers.length === 0,
+		stats: !forceScrubs,
 	});
 
 	// Easter eggs!

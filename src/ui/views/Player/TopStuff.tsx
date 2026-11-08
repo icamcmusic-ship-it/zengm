@@ -1,6 +1,7 @@
 import { last } from "../../../common/utils.ts";
 import { ArchetypeLabel } from "../../components/Archetype/ArchetypeLabel.tsx";
 import { TIER_NAMES } from "../../../common/archetypes/index.ts";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import { WatchBlock } from "../../components/WatchBlock.tsx";
@@ -455,8 +456,10 @@ const TopStuff = ({
 
 	// Wrapped needs a season the player actually played in: the one being viewed, else his latest
 	const playedSeasons = player.stats.map((row) => row.season);
+	const wrappedOn = useFeatureOn("wrapped");
+	const storylinesOn = useFeatureOn("storylines");
 	const wrappedSeason =
-		__SPORT !== "basketball" || playedSeasons.length === 0
+		!wrappedOn || playedSeasons.length === 0
 			? undefined
 			: season !== undefined && playedSeasons.includes(season)
 				? season
@@ -665,7 +668,7 @@ const TopStuff = ({
 								Wrapped
 							</a>
 						) : null}
-						{__SPORT === "basketball" ? (
+						{storylinesOn ? (
 							<a
 								href={helpers.leagueUrl(["storylines", "player", player.pid])}
 								className="btn btn-light-bordered"

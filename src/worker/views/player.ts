@@ -1,3 +1,4 @@
+import { featureOn } from "../util/nativeFeatures.ts";
 import {
 	getTraitViewContext,
 	getTraitsForView,
@@ -594,7 +595,9 @@ export default defineView({
 			const leaders = await player.getLeaders(topStuff.pRaw);
 
 			// Contract value index by season, when it's quick to get (basketball only)
-			const valueIndex = await playerValueIndex(topStuff.pid);
+			const valueIndex = featureOn("contractValue")
+				? await playerValueIndex(topStuff.pid)
+				: undefined;
 
 			// Basketball player traits (estimates only, for prospects and rookies), undefined if the setting is off
 			const playerTraits = getTraitsForView(

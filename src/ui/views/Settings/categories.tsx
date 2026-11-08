@@ -175,6 +175,16 @@ const categories: {
 	{
 		name: "UI",
 	},
+	{
+		name: "League extras",
+		helpText: (
+			<p>
+				Features of this fork that you can turn off. A feature that is off hides
+				its menu items, links and dashboard cards, and skips its background
+				work.
+			</p>
+		),
+	},
 ];
 
 export default categories;

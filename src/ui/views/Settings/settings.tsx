@@ -27,6 +27,10 @@ import type {
 import { parseCurrencyFormat } from "../../util/parseCurrencyFormat.ts";
 import { getDraftTypeDescription } from "../DraftLottery.tsx";
 import { bySport } from "../../../common/sportFunctions.ts";
+import {
+	NATIVE_FEATURES,
+	type NativeFeatureDef,
+} from "../../../common/nativeFeatures.ts";
 
 const REAL_DRAFT_RATINGS_INFO: Record<
 	RealDraftRatings,
@@ -73,6 +77,43 @@ const getSingleModeWeights = (selectedMode: RealDraftRatings) =>
 export const descriptions = {
 	difficulty:
 		"Increasing difficulty makes AI teams more reluctant to trade with you, makes players less likely to sign with you, and makes it harder to turn a profit.",
+};
+
+// Settings form entries of the League extras registry (src/common/nativeFeatures.ts)
+const nativeFeatureSettings = (): Setting[] => {
+	const out: Setting[] = [];
+	const defs: readonly NativeFeatureDef[] = NATIVE_FEATURES;
+	for (const f of defs) {
+		out.push({
+			category: "League extras",
+			key: f.key as Key,
+			name: f.name,
+			type: "bool",
+			description: f.description,
+		});
+		for (const o of f.options ?? []) {
+			out.push({
+				category: "League extras",
+				key: o.key as Key,
+				name: o.name,
+				type: o.type,
+				decoration: o.decoration,
+				description: `${f.name}: ${o.description}`,
+				validator: (value: unknown) => {
+					if (typeof value !== "number") {
+						return;
+					}
+					if (o.min !== undefined && value < o.min) {
+						throw new Error(`Value cannot be less than ${o.min}`);
+					}
+					if (o.max !== undefined && value > o.max) {
+						throw new Error(`Value cannot be greater than ${o.max}`);
+					}
+				},
+			});
+		}
+	}
+	return out;
 };
 
 type GodModeRequired = "always" | "existingLeagueOnly" | undefined;
@@ -686,7 +727,7 @@ export const settings: Setting[] = (
 						name: "Re-randomize ratings when a new draft class is created",
 						type: "bool",
 						description:
-							"When enabled, every newly created draft class (each season's new class, and all classes at league creation) is run through Regenerate ratings, using the settings saved with \"Save as league default\" in the Regenerate ratings dialog (or the defaults: class flavor drawn from the seed, heights, overall and potential kept). Seeded from the league and the class year, so it is deterministic. Runs before college/overseas stats are generated. Drafted players are never touched.",
+							'When enabled, every newly created draft class (each season\'s new class, and all classes at league creation) is run through Regenerate ratings, using the settings saved with "Save as league default" in the Regenerate ratings dialog (or the defaults: class flavor drawn from the seed, heights, overall and potential kept). Seeded from the league and the class year, so it is deterministic. Runs before college/overseas stats are generated. Drafted players are never touched.',
 					},
 					{
 						category: "Draft",
@@ -1979,14 +2020,6 @@ export const settings: Setting[] = (
 					throw new Error("Value cannot be less than 0");
 				}
 			},
-		},
-		{
-			category: "Game Simulation",
-			key: "technicalFouls",
-			name: "Technical & Flagrant Fouls",
-			type: "bool",
-			description:
-				"Rare technical fouls (1 FT, possession unchanged), flagrant fouls (2 FTs and the ball) and ejections in the game simulation.",
 		},
 		...(__SPORT === "basketball"
 			? [
@@ -3352,5 +3385,8 @@ export const settings: Setting[] = (
 				return JSON.stringify(value);
 			},
 		},
+
+		// League extras: one switch per native feature plus its options, all from the registry
+		...nativeFeatureSettings(),
 	] as Setting[]
 ).filter((setting) => !gameAttributesKeysOtherSports.has(setting.key as any));

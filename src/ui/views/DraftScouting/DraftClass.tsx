@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { DataTable } from "../../components/DataTable/index.tsx";
 import { helpers } from "../../util/helpers.ts";
 import { toWorker } from "../../util/toWorker.ts";
@@ -94,6 +95,7 @@ const DraftClass = ({
 	players: View<"draftScouting">["seasons"][0]["players"];
 	season: number;
 }) => {
+	const collegeStatsOn = useFeatureOn("collegeStats");
 	const [showImportForm, setShowImportForm] = useState(false);
 	const [showCollegeStats, setShowCollegeStats] = useState(false);
 	const [status, setStatus] = useState<"exporting" | "loading" | undefined>();
@@ -226,7 +228,7 @@ const DraftClass = ({
 						>
 							Import
 						</button>
-						{__SPORT === "basketball" ? (
+						{collegeStatsOn ? (
 							<button
 								className="btn btn-light-bordered btn-xs"
 								onClick={() => setShowCollegeStats((val) => !val)}
@@ -286,7 +288,7 @@ const DraftClass = ({
 				</div>
 			)}
 
-			{showCollegeStats && __SPORT === "basketball" && !fantasyDraft ? (
+			{showCollegeStats && collegeStatsOn && !fantasyDraft ? (
 				<CollegeStats
 					numPlayers={players.length}
 					numWithCollegeStats={numWithCollegeStats}

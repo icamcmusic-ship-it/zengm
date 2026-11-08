@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { defineView, keepType } from "../util/defineView.ts";
 import { loadFromSnapshot } from "../util/leagueHistoryData.ts";
 import { buildPickValue } from "../../common/leagueHistory/pickValue.ts";
@@ -6,6 +7,10 @@ export default defineView({
 	id: "pickValue",
 	keepPrevOutput: { loading: keepType<boolean>() },
 	load: async ({ updateEvents, prevOutput }) => {
+		const featureOff = featureOffError("frivolities");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return {
 				errorMessage: "Draft Pick Value is only available for basketball.",

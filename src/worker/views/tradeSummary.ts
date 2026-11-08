@@ -1,3 +1,4 @@
+import { featureOn } from "../util/nativeFeatures.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import type {
 	DiscriminateUnion,
@@ -643,7 +644,7 @@ export default defineView({
 						};
 				  }[]
 				| undefined;
-			if (__SPORT === "basketball") {
+			if (featureOn("tradeGrader")) {
 				try {
 					// Both ways of counting win shares, as the Trade grader's toggle (the page shows the one picked there)
 					const graded = await gradeOneTrade(event, { playoffs: true });
