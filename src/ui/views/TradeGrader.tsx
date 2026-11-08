@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import { createContext, Fragment, use, type ReactNode } from "react";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
@@ -718,6 +719,7 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 
 	return (
 		<WsContext value={ws}>
+			<MoreLinks type="trade" page="trade_grader" />
 			<p>
 				Every trade graded A+ to F for each side by the{" "}
 				{ws === "all" ? "regular season and playoff" : "regular-season"} win

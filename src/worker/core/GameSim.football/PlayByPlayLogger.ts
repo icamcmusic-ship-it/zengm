@@ -346,8 +346,10 @@ class FootballPlayByPlayLogger extends PlayByPlayLoggerBase<PlayByPlayEventOutpu
 	}
 
 	setClockForScores(clock: number) {
-		for (const { playByPlayEvent, scoringSummaryEvent } of this
-			.currentPlayScores) {
+		for (const {
+			playByPlayEvent,
+			scoringSummaryEvent,
+		} of this.currentPlayScores) {
 			if (playByPlayEvent) {
 				playByPlayEvent.clock = clock;
 			}

@@ -51,7 +51,8 @@ export const getTraitSeeds = (p: TraitPlayer) =>
 
 // Create p.traits if it is missing or partial. Safe to call as often as you like. Returns true if p changed.
 export const ensureTraits = (p: TraitPlayer & { pid: number }) => {
-	if (__SPORT !== "basketball") {
+	// Nothing is stored while the Player Traits setting is off: missing seeds are derived from the league seed and pid when it's turned on
+	if (__SPORT !== "basketball" || !traitsEnabled()) {
 		return false;
 	}
 	// Also repairs junk from a hand-edited league file (non-numbers, out of range)
@@ -68,7 +69,8 @@ export const ensureTraits = (p: TraitPlayer & { pid: number }) => {
 
 // New players (draft prospects, league creation): seeds from league seed + pid
 export const initTraits = (p: TraitPlayer & { pid: number }) => {
-	if (__SPORT !== "basketball") {
+	// Nothing is stored while the Player Traits setting is off: missing seeds are derived from the league seed and pid when it's turned on
+	if (__SPORT !== "basketball" || !traitsEnabled()) {
 		return;
 	}
 	p.traits = generateTraitSeeds(getLeagueTraitSeed(), p.pid);
@@ -107,7 +109,7 @@ export const developTraits = (
 	p: TraitPlayer & { pid: number },
 	season = g.get("season"),
 ) => {
-	if (__SPORT !== "basketball") {
+	if (__SPORT !== "basketball" || !traitsEnabled()) {
 		return;
 	}
 	p.traits = driftTraitSeeds(

@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import { useState } from "react";
 import clsx from "clsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
@@ -103,6 +104,7 @@ const Timeline = ({
 
 	return (
 		<>
+			<MoreLinks type="league" page="timeline" />
 			<p>
 				The league's history season by season: champions, MVPs, newspaper front
 				pages, the top storylines, achievements, records, the biggest trades and

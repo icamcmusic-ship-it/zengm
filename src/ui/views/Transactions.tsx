@@ -5,6 +5,7 @@ import { helpers } from "../util/helpers.ts";
 import type { View } from "../../common/types.ts";
 import { SafeHtml } from "../components/SafeHtml.tsx";
 import { TradeGradeBadge } from "../components/TradeGradeBadge.tsx";
+import { wsPref } from "./TradeSummary/index.tsx";
 import { useLocal } from "../util/local.ts";
 
 const Transactions = ({
@@ -14,6 +15,8 @@ const Transactions = ({
 	team,
 }: View<"transactions">) => {
 	const { teamInfoCache } = useLocal(["teamInfoCache"]);
+	const ws = wsPref();
+
 	useTitleBar({
 		title: "Transactions",
 		dropdown: {
@@ -57,29 +60,32 @@ const Transactions = ({
 			{moreLinks}
 
 			<ul className="list-group">
-				{events.map((e) => (
-					<li key={e.eid} className="list-group-item">
-						<SafeHtml dirty={e.text} />
-						{e.grades ? (
-							<div className="mt-1 small">
-								<a
-									href={helpers.leagueUrl(["trade_summary", e.eid])}
-									className="text-reset text-decoration-none"
-									title="Trade grader: regular-season win shares each side got out of it"
-								>
-									{e.grades.map((x) => (
-										<span key={x.tid} className="me-2">
-											<span className="text-body-secondary">
-												{teamInfoCache[x.tid]?.abbrev ?? "???"}
-											</span>{" "}
-											<TradeGradeBadge grade={x.g} />
-										</span>
-									))}
-								</a>
-							</div>
-						) : null}
-					</li>
-				))}
+				{events.map((e) => {
+					const grades = ws === "rs" ? (e.gradesRs ?? e.grades) : e.grades;
+					return (
+						<li key={e.eid} className="list-group-item">
+							<SafeHtml dirty={e.text} />
+							{grades ? (
+								<div className="mt-1 small">
+									<a
+										href={helpers.leagueUrl(["trade_summary", e.eid])}
+										className="text-reset text-decoration-none"
+										title={`Trade grader: ${ws === "rs" ? "regular season" : "regular season + playoffs"} win shares each side got out of it`}
+									>
+										{grades.map((x) => (
+											<span key={x.tid} className="me-2">
+												<span className="text-body-secondary">
+													{teamInfoCache[x.tid]?.abbrev ?? "???"}
+												</span>{" "}
+												<TradeGradeBadge grade={x.g} />
+											</span>
+										))}
+									</a>
+								</div>
+							) : null}
+						</li>
+					);
+				})}
 			</ul>
 		</>
 	);

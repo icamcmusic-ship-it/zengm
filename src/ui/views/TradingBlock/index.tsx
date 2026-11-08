@@ -1,3 +1,4 @@
+import { MoreLinks } from "../../components/MoreLinks.tsx";
 import { useState, type ReactNode } from "react";
 import { PHASE } from "../../../common/constants.ts";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
@@ -798,6 +799,7 @@ const TradingBlock = ({
 
 	return (
 		<>
+			<MoreLinks type="trade" page="trading_block" />
 			<div className="row">
 				<div className="col-md-9">
 					<DataTable

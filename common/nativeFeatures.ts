@@ -483,7 +483,7 @@ export const NATIVE_FEATURES = [
 		key: "featureFrivolities",
 		name: "Extra Frivolities",
 		description:
-			"Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economics and Home Court pages (the ones available in this sport).",
+			"Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economics and Home Court pages (the ones available in this sport), and the Draft Lottery what-if simulator outside basketball.",
 		default: true,
 	},
 	{

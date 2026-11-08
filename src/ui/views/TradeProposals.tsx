@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import { useFeatureOn } from "../util/nativeFeatures.ts";
 import { PHASE } from "../../common/constants.ts";
 import { helpers } from "../util/helpers.ts";
@@ -121,6 +122,7 @@ const TradeProposals = ({ aiOffers, offers, seed }: View<"tradeProposals">) => {
 
 	return (
 		<>
+			<MoreLinks type="trade" page="trade_proposals" />
 			{aiOffers.length > 0 ? (
 				<>
 					<h2>Offers sent to you</h2>

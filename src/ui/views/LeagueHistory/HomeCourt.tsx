@@ -1,3 +1,4 @@
+import { MoreLinks } from "../../components/MoreLinks.tsx";
 import { useMemo } from "react";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import { helpers } from "../../util/helpers.ts";
@@ -209,6 +210,7 @@ const HomeCourt = ({
 
 	return (
 		<>
+			<MoreLinks type="finances" page="frivolities/home_court" />
 			<p>
 				What playing at home is worth: by season, by era, by team and in the
 				playoffs. Regular season records come from the standings; margins come

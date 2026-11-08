@@ -1,3 +1,4 @@
+import { MoreLinks } from "../../components/MoreLinks.tsx";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { PHASE } from "../../../common/constants.ts";
@@ -411,6 +412,7 @@ const Trade = (props: View<"trade">) => {
 
 	return (
 		<>
+			<MoreLinks type="trade" page="trade" />
 			<div className="row">
 				<div className="col-md-9">
 					<div className="d-flex flex-wrap row-gap-1 mb-2 align-items-center">

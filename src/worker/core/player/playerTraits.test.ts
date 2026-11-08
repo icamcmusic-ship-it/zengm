@@ -4,6 +4,7 @@ import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { g, helpers } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
 import { draft, player } from "../index.ts";
+import { getTraitSeeds } from "./traits.ts";
 import createRandomPlayers from "../league/create/createRandomPlayers.ts";
 import createGameAttributes from "../league/createGameAttributes.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
@@ -126,6 +127,23 @@ describe("generation, settings and storage", () => {
 		resetG();
 		g.setWithoutSavingToDB("season", 2026);
 		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		g.setWithoutSavingToDB("playerTraits", true);
+	});
+
+	test("setting off: nothing is written on players, derived seeds still match", () => {
+		g.setWithoutSavingToDB("playerTraits", false);
+		g.setWithoutSavingToDB("playerTraitsSeed", 4);
+		const p: any = {
+			...player.generate(PLAYER.FREE_AGENT, 25, 2026, false, DEFAULT_LEVEL),
+			pid: 2,
+		};
+		delete p.traits;
+		player.initTraits(p);
+		assert.isFalse(player.ensureTraits(p));
+		player.developTraits(p);
+		assert.isUndefined(p.traits);
+		g.setWithoutSavingToDB("playerTraits", true);
+		assert.deepEqual(getTraitSeeds(p), generateTraitSeeds(4, 2));
 	});
 
 	test("setting defaults: off for existing leagues, seed 0", () => {

@@ -952,9 +952,10 @@ const ColaTable = ({
 };
 
 const DraftLottery = (props: Props) => {
-	// The what-if simulator belongs to the Season Odds switch in basketball (the other sports have no such switch)
+	// The what-if simulator belongs to the Season Odds switch in basketball. Season Odds is basketball only, so in the other sports it goes with the (all sports) Extra Frivolities switch
 	const seasonOddsOn = useFeatureOn("seasonOdds");
-	const whatIfOn = __SPORT !== "basketball" || seasonOddsOn;
+	const frivolitiesOn = useFeatureOn("frivolities");
+	const whatIfOn = __SPORT === "basketball" ? seasonOddsOn : frivolitiesOn;
 	useTitleBar({
 		title: NO_LOTTERY_DRAFT_TYPES.has(props.draftType as any)
 			? "Draft Order"

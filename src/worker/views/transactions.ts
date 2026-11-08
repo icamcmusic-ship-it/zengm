@@ -82,12 +82,18 @@ export default defineView({
 				events.some((event) => event.type === "trade")
 					? await valueSnapshotWithin(1000)
 					: undefined;
+			// Both win share options, so the page can follow the Trade grader's toggle (stored in the browser)
 			const gradesByEid = snap ? tradeGradesOf(snap).byEid : undefined;
+			const gradesByEidRs = snap
+				? tradeGradesOf(snap, { playoffs: false }).byEid
+				: undefined;
 
 			const events2 = [];
 			for (const event of events) {
 				const graded =
 					event.type === "trade" ? gradesByEid?.get(event.eid) : undefined;
+				const gradedRs =
+					event.type === "trade" ? gradesByEidRs?.get(event.eid) : undefined;
 				events2.push({
 					eid: event.eid,
 					type: event.type,
@@ -98,6 +104,12 @@ export default defineView({
 					score: event.score,
 					grades: graded
 						? graded.sides.map((side) => ({
+								tid: side.tid,
+								g: side.grade?.g ?? null,
+							}))
+						: undefined,
+					gradesRs: gradedRs
+						? gradedRs.sides.map((side) => ({
 								tid: side.tid,
 								g: side.grade?.g ?? null,
 							}))

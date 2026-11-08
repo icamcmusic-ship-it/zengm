@@ -79,13 +79,54 @@ export const descriptions = {
 		"Increasing difficulty makes AI teams more reluctant to trade with you, makes players less likely to sign with you, and makes it harder to turn a profit.",
 };
 
+// League extras sections, named after the BBGM settings categories they belong with
+const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
+	newspaper: "League extras: History & Stories",
+	wrapped: "League extras: History & Stories",
+	storylines: "League extras: History & Stories",
+	hype: "League extras: History & Stories",
+	leagueAchievements: "League extras: History & Stories",
+	timeline: "League extras: History & Stories",
+	tradeGrader: "League extras: History & Stories",
+	contractValue: "League extras: History & Stories",
+	frivolities: "League extras: History & Stories",
+	pbpFlavor: "League extras: Game Simulation",
+	pbpLiveGame: "League extras: Game Simulation",
+	pbpBoxScore: "League extras: Game Simulation",
+	storePlayByPlay: "League extras: Game Simulation",
+	technicalFouls: "League extras: Game Simulation",
+	realisticPossessions: "League extras: Game Simulation",
+	seasonOdds: "League extras: Game Simulation",
+	playerTraits: "League extras: Players",
+	injuryDepth: "League extras: Players",
+	archetypes: "League extras: Players",
+	skillBadges: "League extras: Players",
+	unretire: "League extras: Players",
+	contractOptions: "League extras: Contracts",
+	contractExtensions: "League extras: Contracts",
+	tradeRequests: "League extras: Contracts",
+	holdouts: "League extras: Contracts",
+	tradeExplain: "League extras: Trades",
+	aiNeedTrades: "League extras: Trades",
+	aiTradeOffers: "League extras: Trades",
+	tradeMarket: "League extras: Trades",
+	threeTeamTrades: "League extras: Trades",
+	collegeStats: "League extras: Draft",
+	ratingsRegenerator: "League extras: Draft",
+	scoutingSystem: "League extras: Draft",
+	draftBoard: "League extras: Draft",
+	aiDraftNeeds: "League extras: Draft",
+	coachingStaff: "League extras: Team",
+};
+
 // Settings form entries of the League extras registry (src/common/nativeFeatures.ts)
 const nativeFeatureSettings = (): Setting[] => {
 	const out: Setting[] = [];
 	const defs: readonly NativeFeatureDef[] = NATIVE_FEATURES;
 	for (const f of defs) {
+		const category = NATIVE_FEATURE_GROUPS[f.id] ?? "League extras";
 		out.push({
-			category: "League extras",
+			category,
 			key: f.key as Key,
 			name: f.name,
 			type: "bool",
@@ -93,7 +134,7 @@ const nativeFeatureSettings = (): Setting[] => {
 		});
 		for (const o of f.options ?? []) {
 			out.push({
-				category: "League extras",
+				category,
 				key: o.key as Key,
 				name: o.name,
 				type: o.type,

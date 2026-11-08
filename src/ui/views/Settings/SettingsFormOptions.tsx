@@ -1,3 +1,4 @@
+import CollapseArrow from "../../components/CollapseArrow.tsx";
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
 import clsx from "clsx";
 import { AnimatePresence, m } from "framer-motion";
@@ -348,6 +349,7 @@ const SettingsFormOptions = ({
 	showGodModeSettings,
 	state,
 	visibleCategories,
+	expandAll,
 }: {
 	disabled: boolean;
 	gameSimPreset: string;
@@ -361,14 +363,47 @@ const SettingsFormOptions = ({
 	showGodModeSettings: boolean;
 	state: State;
 	visibleCategories: ReturnType<typeof getVisibleCategories>;
+	expandAll?: boolean;
 }) => {
+	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+
 	return (
 		<>
 			{visibleCategories.map((category) => {
+				const collapsed =
+					!!category.collapsible && !expandAll && !expanded.has(category.name);
 				return (
 					<Fragment key={category.name}>
 						<h2 className="mb-3" id={category.name}>
-							{category.name}
+							{category.collapsible ? (
+								<button
+									type="button"
+									className="btn btn-link p-0 text-reset text-decoration-none"
+									style={{ fontSize: "inherit", fontWeight: "inherit" }}
+									aria-expanded={!collapsed}
+									onClick={() => {
+										setExpanded((prev) => {
+											const next = new Set(prev);
+											if (next.has(category.name)) {
+												next.delete(category.name);
+											} else {
+												next.add(category.name);
+											}
+											return next;
+										});
+									}}
+								>
+									<span className="me-1" style={{ fontSize: "0.7em" }}>
+										<CollapseArrow open={!collapsed} />
+									</span>
+									{category.name}{" "}
+									<span className="text-body-secondary fs-6">
+										({category.settings.length})
+									</span>
+								</button>
+							) : (
+								category.name
+							)}
 							{category.appendNumTeams ? (
 								<span
 									className={
@@ -416,7 +451,7 @@ const SettingsFormOptions = ({
 									))}
 							</select>
 						) : null}
-						<div className="row mb-5 mb-md-3">
+						<div className={clsx("row mb-5 mb-md-3", collapsed && "d-none")}>
 							{category.settings.map(
 								(
 									{

@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import { PHASE } from "../../common/constants.ts";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
@@ -103,6 +104,7 @@ const SavedTrades = ({ offers }: View<"savedTrades">) => {
 
 	return (
 		<>
+			<MoreLinks type="trade" page="saved_trades" />
 			<p>
 				Add trades to this list by clicking the "save trade" icon{" "}
 				<span className="glyphicon glyphicon-flag" /> on any of the{" "}

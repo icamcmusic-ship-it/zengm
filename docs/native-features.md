@@ -212,7 +212,7 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **What:** 1,000 Monte Carlo simulations of the rest of the season in the worker: each remaining game is decided from team strength (team rating from the current roster, ignoring injuries of 10 days or less, blended with point margin as games are played) plus home court, playoffs are seeded with the game's own playoff code, then the play-in and the bracket are played out. Gives projected record, playoff and play-in odds, seed distribution, reaching the semifinals/finals and title odds. During the playoffs it plays out the remaining series from the current state. Results are cached and refreshed after each day of games, trades, signings or injuries (about 0.2 s per refresh), and only when a page that shows them asks.
 - **Award races:** each candidate's award score (BBGM's award scoring) is projected to the end of the regular season with noise that shrinks as the season goes on, and the winner drawn 5,000 times.
 - **Lottery what-if:** move teams up or down the lottery order (chances stay with the slot) or pick another lottery format, then _Run lottery_ for exact odds (where fast enough), a 20,000-lottery simulation (hover a cell) and one sample draw.
-- **Known limits:** current season only. Tiebreakers are approximated (random among tied teams) and playoff reseeding is ignored. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats; in the other sports it belongs to no switch and is always there.
+- **Known limits:** current season only. Tiebreakers are approximated (random among tied teams) and playoff reseeding is ignored. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats; in the other sports (no Season Odds there) it goes with the _Extra frivolities_ switch.
 
 ## Players
 
@@ -222,7 +222,7 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Stored per preseason:** the label is saved on the player (`p.archetypes`, one entry per season) when the preseason phase begins, after development, so it holds all season and his history of changes is kept (it travels in league files). New leagues get a first entry for everyone; older leagues and players without an entry fall back to a live reading (stored the first time the player page is opened). Prospects are always read live, since their ratings can be regenerated. With the switch off nothing is stored or computed.
 - **Where:** the player page (_Archetype_ line with a why popover and career history, replacing _Build_), Draft Scouting (_Archetype_ column), Advanced Player Search (_Archetype_ filter), the roster page (_Roster composition_ panel with balance warnings) and League → _Archetypes_ (`/l/:lid/archetypes`: counts, best players, trends).
 - **Regenerate ratings:** prospects can be aimed at an archetype (per prospect, or a class pool). It uses the same solver, so overall, potential and height stay exact; the preview shows the archetype the new ratings actually derive to (a check mark when it is the one asked for). The 447 builds are still available under _Advanced: build_.
-- **Known limits:** archetypes use scouting-fuzzed ratings (like skills and positions), so they can differ slightly from the true ones; aiming at a very specific archetype succeeds about four times in five at a given overall. With the switch off, the Advanced Player Search still lists an (empty) Archetype column.
+- **Known limits:** archetypes use scouting-fuzzed ratings (like skills and positions), so they can differ slightly from the true ones; aiming at a very specific archetype succeeds about four times in five at a given overall.
 
 ### Extended skill badges
 
@@ -295,7 +295,6 @@ Unlike most of the pages above, these work in **all sports** (the trade code is 
 - The Wrapped, Storylines and Timeline pages share a whole-history snapshot that takes a while the first time in a big league.
 - The league-wide averages with player traits, the possession model or injury depth on stay about the same as with them off, but individual games and seasons are of course different; use the switches (off) to replay the old behaviour.
 - Existing leagues keep playing as before until the game-affecting switches (possession model, traits, injury depth, contracts, trades, drafting, coaching staff) are turned on in League Extras. Games already played replay unchanged.
-- The Advanced Player Search still lists an (empty) Archetype column and filter when the Archetypes switch is off.
 - Draft board and scouting need prospects: the Draft Board is empty in a league without upcoming classes.
 
 ## Performance

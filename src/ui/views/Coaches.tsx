@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import type { View } from "../../common/types.ts";
@@ -33,6 +34,7 @@ const Coaches = ({
 
 	return (
 		<>
+			<MoreLinks type="league" page="coaches" />
 			<h2>Head coaches</h2>
 			<div className="table-responsive">
 				<table className="table table-striped table-sm table-hover">

@@ -219,7 +219,14 @@ export type Category =
 	| "Players"
 	| "Real Players"
 	| "UI"
-	| "League extras";
+	| "League extras"
+	| "League extras: History & Stories"
+	| "League extras: Game Simulation"
+	| "League extras: Players"
+	| "League extras: Contracts"
+	| "League extras: Trades"
+	| "League extras: Draft"
+	| "League extras: Team";
 
 export type FieldType =
 	| "bool"

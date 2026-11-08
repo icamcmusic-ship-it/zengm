@@ -11,7 +11,7 @@ import { useLocal } from "../../util/local.ts";
 import { TitlesNote, TRADE_GRADER_WS_KEY } from "../TradeGrader.tsx";
 
 // The win shares the Trade grader was last set to count (regular season and playoffs unless it was switched)
-const wsPref = (): "all" | "rs" => {
+export const wsPref = (): "all" | "rs" => {
 	try {
 		return localStorage.getItem(TRADE_GRADER_WS_KEY) === "rs" ? "rs" : "all";
 	} catch {

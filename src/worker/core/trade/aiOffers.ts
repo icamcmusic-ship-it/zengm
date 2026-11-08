@@ -308,13 +308,14 @@ export const addAiOffer = async (
 	return offer;
 };
 
-// Seasons for which the user was already told the trade deadline is coming up. Not saved, so at worst the notice shows again after a reload
-const deadlineNoticeSeasons = new Set<number>();
+// Leagues/seasons for which the user was already told the trade deadline is coming up this session
+const deadlineNoticeSeasons = new Set<string>();
 export const DEADLINE_NOTICE_DAYS = 7;
 
 const deadlineNotice = async () => {
 	const season = g.get("season");
-	if (deadlineNoticeSeasons.has(season)) {
+	const noticeKey = `${g.get("lid")}:${season}`;
+	if (deadlineNoticeSeasons.has(noticeKey)) {
 		return;
 	}
 	const schedule = await idb.cache.schedule.getAll();
@@ -332,7 +333,25 @@ const deadlineNotice = async () => {
 	if (daysLeft > DEADLINE_NOTICE_DAYS) {
 		return;
 	}
-	deadlineNoticeSeasons.add(season);
+	// Reload-safe without saving anything: the notice belongs to the day the window opens (or the season's first day, if
+	// the deadline is closer than that), so reloading later in the window doesn't show it again
+	if (daysLeft < DEADLINE_NOTICE_DAYS) {
+		const teamSeason = await idb.cache.teamSeasons.indexGet(
+			"teamSeasonsByTidSeason",
+			[g.get("userTid"), season],
+		);
+		const gp = teamSeason
+			? teamSeason.won +
+				teamSeason.lost +
+				(teamSeason.tied ?? 0) +
+				(teamSeason.otl ?? 0)
+			: 0;
+		if (gp > 0) {
+			deadlineNoticeSeasons.add(noticeKey);
+			return;
+		}
+	}
+	deadlineNoticeSeasons.add(noticeKey);
 	await logEvent({
 		type: "info",
 		text: `The trade deadline is ${daysLeft <= 1 ? "tomorrow" : `in ${daysLeft} days`}. ${featureOn("tradeMarket") ? `See who AI teams are shopping on the <a href="${helpers.leagueUrl(["trade_market"])}">Trade Market</a>.` : ""}`.trim(),

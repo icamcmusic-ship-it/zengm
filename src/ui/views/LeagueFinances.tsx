@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
@@ -146,6 +147,7 @@ const LeagueFinances = ({ season, teams }: View<"leagueFinances">) => {
 
 	return (
 		<>
+			<MoreLinks type="finances" page="league_finances" />
 			<p>
 				{salaryCapType !== "none" ? (
 					<>

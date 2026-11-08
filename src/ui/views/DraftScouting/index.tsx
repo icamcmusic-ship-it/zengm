@@ -17,6 +17,7 @@ const DraftScouting = ({
 	scoutingStatus,
 }: View<"draftScouting">) => {
 	const regeneratorOn = useFeatureOn("ratingsRegenerator");
+	const [selectedOffset, setSelectedOffset] = useState(0);
 	const collegeStatsOn = useFeatureOn("collegeStats");
 	const draftBoardOn = useFeatureOn("draftBoard");
 	const { challengeNoRatings, draftType, godMode } = useLocal([
@@ -48,6 +49,9 @@ const DraftScouting = ({
 	} else {
 		seasonsToDisplay = seasons;
 	}
+
+	const activeOffset =
+		selectedOffset < seasonsToDisplay.length ? selectedOffset : 0;
 
 	return (
 		<>
@@ -111,10 +115,32 @@ const DraftScouting = ({
 				</div>
 			) : null}
 
+			{seasonsToDisplay.length > 1 ? (
+				<ul className="nav nav-tabs mb-3 d-xxl-none">
+					{seasonsToDisplay.map((info, offset) => (
+						<li className="nav-item" key={info.season}>
+							<button
+								type="button"
+								className={`nav-link${offset === activeOffset ? " active" : ""}`}
+								onClick={() => {
+									setSelectedOffset(offset);
+								}}
+							>
+								{info.season}
+							</button>
+						</li>
+					))}
+				</ul>
+			) : null}
+
 			<div className="row">
 				{seasonsToDisplay.map((info, offset) => {
+					// Narrower than xxl, the classes are tabs (each table needs the full width); side by side above that
 					return (
-						<div key={info.season} className="col-md-4 col-sm-6">
+						<div
+							key={info.season}
+							className={`col-xxl-4${offset === activeOffset ? "" : " d-none d-xxl-block"}`}
+						>
 							<DraftClass
 								challengeNoRatings={challengeNoRatings}
 								fantasyDraft={fantasyDraft}
