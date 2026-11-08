@@ -23,6 +23,7 @@ import { TeamLogoInline } from "./TeamLogoInline.tsx";
 import { useKeyboardShortcuts } from "../util/keyboardShortcuts.ts";
 import { gradientStyleFactory } from "../util/gradientStyleFactory.ts";
 import { useLocal } from "../util/local.ts";
+import { getBoxScorePbpView } from "../../common/pbpSettings.ts";
 import {
 	TEAM_NUMS_DISPLAY_ORDER,
 	teamsInDisplayOrder,
@@ -1082,7 +1083,25 @@ const PlayoffRecord = ({
 	);
 };
 
-// Basketball box scores of games with a stored play-by-play get a second tab with it
+// Games whose play-by-play was revealed with the button, remembered for this browser session
+const PBP_REVEALED_KEY = "box-score-pbp-revealed";
+const revealedPbp = new Set<string>();
+try {
+	const stored = sessionStorage.getItem(PBP_REVEALED_KEY);
+	if (stored) {
+		for (const key of JSON.parse(stored)) {
+			revealedPbp.add(key);
+		}
+	}
+} catch {}
+const revealPbp = (key: string) => {
+	revealedPbp.add(key);
+	try {
+		sessionStorage.setItem(PBP_REVEALED_KEY, JSON.stringify([...revealedPbp]));
+	} catch {}
+};
+
+// Basketball box scores of games with a stored play-by-play get a second tab with it (or, with "Show on button press", a button that makes it)
 const BoxScorePlayByPlayTabsBasketball = ({
 	boxScore,
 	boxScoreElement,
@@ -1093,6 +1112,48 @@ const BoxScorePlayByPlayTabsBasketball = ({
 	const [tab, setTab] = useLocalStorageState<"box" | "pbp">("box-score-tab", {
 		defaultValue: "box",
 	});
+	const { lid, pbpBoxScore: mode } = useLocal(["lid", "pbpBoxScore"]);
+	const revealKey = `${lid}:${boxScore.gid}`;
+	const [revealed, setRevealed] = useState(() => revealedPbp.has(revealKey));
+	useEffect(() => {
+		setRevealed(revealedPbp.has(revealKey));
+	}, [revealKey]);
+
+	const view = getBoxScorePbpView({
+		hasEvents: !!boxScore.pbp,
+		mode,
+		revealed,
+	});
+
+	if (view === "none") {
+		return boxScoreElement;
+	}
+
+	if (view !== "tab") {
+		return (
+			<>
+				{view === "button" ? (
+					<button
+						className="btn btn-secondary btn-sm mb-3"
+						onClick={() => {
+							revealPbp(revealKey);
+							setRevealed(true);
+							setTab("pbp");
+						}}
+						type="button"
+					>
+						Show play-by-play
+					</button>
+				) : (
+					<p className="text-body-secondary mb-3">
+						No play-by-play was saved for this game.
+					</p>
+				)}
+				{boxScoreElement}
+			</>
+		);
+	}
+
 	return (
 		<>
 			<ul className="nav nav-tabs mb-3">
@@ -1263,7 +1324,7 @@ export const BoxScoreWrapper = ({
 				</div>
 				<TeamLogo season={boxScore.season} t={t1} />
 			</div>
-			{BoxScorePlayByPlayTabs && !live && boxScore.pbp ? (
+			{BoxScorePlayByPlayTabs && !live ? (
 				<BoxScorePlayByPlayTabs
 					boxScore={boxScore}
 					boxScoreElement={

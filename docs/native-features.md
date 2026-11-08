@@ -37,6 +37,7 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
 
 - **Where:** the live game view (_Play → … → Watch game_, or _Watch game_ on the schedule).
 - **What:** varied, ratings-aware wording for every play (shot types, passes, fouls with personal and team foul counts, bonus situations, runs, milestones, quarter summaries). It only changes the text: game results are identical with or without it (covered by `outcomeInvariance.test.ts`).
+- **Settings (Game Simulation):** _Show Play-by-Play in Live Games_ (on; off hides the live feed, score/clock/box score still update), _Box Score Play-by-Play_ (_Always show_ as a tab, or _Show on button press_: text is only made after pressing _Show play-by-play_, remembered per game for the browser session) and _Save Play-by-Play_ (_All games_, _My team's games only_, _None_; replaces the old on/off `storePlayByPlay`, which is kept in step and still means _None_ when off). Helpers and tests: `src/common/pbpSettings.ts`.
 - **Known limits:** the wording assumes 12-minute quarters for clock-based phrases. Elam ending and shootout events keep the original wording.
 
 ## Draft Scouting: College stats and Regenerate ratings

@@ -1882,11 +1882,36 @@ export const settings: Setting[] = (
 		},
 		{
 			category: "Game Simulation",
-			key: "storePlayByPlay",
-			name: "Save Play-by-Play",
+			key: "pbpLiveGame",
+			name: "Show Play-by-Play in Live Games",
 			type: "bool",
 			description:
-				"Keep each game's play-by-play with its box score, to read or replay later. Uses about 7 KB of storage per game, and it is deleted along with the box score.",
+				"Show the play-by-play feed when watching a game live. When off, the score, clock and box score still update live.",
+		},
+		{
+			category: "Game Simulation",
+			key: "pbpBoxScore",
+			name: "Box Score Play-by-Play",
+			type: "string",
+			values: [
+				{ key: "always", value: "Always show" },
+				{ key: "button", value: "Show on button press" },
+			],
+			description:
+				"Show a saved game's play-by-play as a box score tab, or only after pressing a button.",
+		},
+		{
+			category: "Game Simulation",
+			key: "pbpStore",
+			name: "Save Play-by-Play",
+			type: "string",
+			values: [
+				{ key: "all", value: "All games" },
+				{ key: "user", value: "My team's games only" },
+				{ key: "none", value: "None" },
+			],
+			description:
+				"Keep a game's play-by-play with its box score, to read or replay later. Uses about 7 KB of storage per game, and it is deleted along with the box score. Live games always show their play-by-play while you watch.",
 		},
 		{
 			category: "Game Simulation",

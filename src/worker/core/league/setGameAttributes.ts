@@ -41,6 +41,11 @@ const setGameAttributes = async (
 		gameAttributes.lowestDifficulty = gameAttributes.difficulty;
 	}
 
+	// GameSim records events for storage when storePlayByPlay is on, so keep it in step with the storage scope
+	if (gameAttributes.pbpStore !== undefined) {
+		gameAttributes.storePlayByPlay = gameAttributes.pbpStore !== "none";
+	}
+
 	if (gameAttributes.injuries) {
 		// Test if it's the same as default
 		if (

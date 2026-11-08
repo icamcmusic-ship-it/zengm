@@ -967,6 +967,17 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					storePlayByPlay: {
 						type: "boolean",
 					},
+					pbpLiveGame: {
+						type: "boolean",
+					},
+					pbpBoxScore: {
+						type: "string",
+						enum: ["always", "button"],
+					},
+					pbpStore: {
+						type: "string",
+						enum: ["all", "user", "none"],
+					},
 					technicalFouls: {
 						type: "boolean",
 					},

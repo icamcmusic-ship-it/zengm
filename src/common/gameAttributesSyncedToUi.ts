@@ -22,6 +22,8 @@ export const gameAttributesSyncedToUi = [
 	"numGames",
 	"numPeriods",
 	"numWatchColors",
+	"pbpBoxScore",
+	"pbpLiveGame",
 	"phase",
 	"quarterLength",
 	"salaryCap",
