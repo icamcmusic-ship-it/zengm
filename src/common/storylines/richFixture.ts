@@ -1,5 +1,6 @@
 // A busier fake league for the storyline tests: the plain fixture plus awards, injuries, relatives, a Hall of Famer, a few huge box scores and odd team seasons, so most kinds have something to find.
 import { makeLeague } from "../wrapped/fixture.ts";
+import { addDeals } from "../wrapped/fixtureDeals.ts";
 import type { WLeague } from "../wrapped/types.ts";
 
 export const makeRichLeague = (numSeasons = 30): WLeague => {
@@ -81,5 +82,15 @@ export const makeRichLeague = (numSeasons = 30): WLeague => {
 			g.overtimes = 3;
 		}
 	}
-	return L;
+	// One franchise moves and another is renamed halfway through
+	const mid = seasons[Math.floor(seasons.length / 2)]!;
+	for (const t of L.teamSeasons) {
+		if (t.tid === 5 && t.season >= mid) {
+			t.region = "Newport";
+		}
+		if (t.tid === 6 && t.season >= mid + 2) {
+			t.name = "Comets";
+		}
+	}
+	return addDeals(L, { seed: "rich-deals", perSeason: 4 });
 };

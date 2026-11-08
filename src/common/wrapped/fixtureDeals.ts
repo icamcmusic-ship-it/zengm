@@ -127,7 +127,29 @@ export const addDeals = (
 			const phase = during ? 2 : k % 2 === 0 ? 7 : 5;
 			pa.moves.push({ season: at, tid: b, type: "trade", fromTid: a, phase, eid: id });
 			pb.moves.push({ season: at, tid: a, type: "trade", fromTid: b, phase, eid: id });
+			// A blockbuster now and then: picks pile on to one side
+			if (k === 3) {
+				for (const yr of [s + 2, s + 3, s + 3]) {
+					gotA.push({ dpid: dpid++, season: yr, round: 2, originalTid: b });
+				}
+			}
 			trades.push({ eid: id, season: at, phase, tids: [a, b], got: [gotA, gotB] });
+			// And one player gets flipped again the same summer
+			if (k === 2 && !during) {
+				const c = tids[(tids.indexOf(b) + 1) % tids.length]!;
+				if (c !== a) {
+					const id2 = eid++;
+					move(pa, at, b, c);
+					pa.moves.push({ season: at, tid: c, type: "trade", fromTid: b, phase: 8, eid: id2 });
+					trades.push({
+						eid: id2,
+						season: at,
+						phase: 8,
+						tids: [b, c],
+						got: [[{ dpid: dpid++, season: s + 2, round: 2, originalTid: c }], [asset(pa)]],
+					});
+				}
+			}
 		}
 	}
 

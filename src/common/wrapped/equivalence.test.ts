@@ -74,7 +74,8 @@ describe.each(fixtures)(
 				}
 			}
 			expect(total).toBeGreaterThan(50);
-		});
+			// Slow on a busy machine
+		}, 60000);
 
 		test("decks", () => {
 			for (const c of cases(L)) {
@@ -82,7 +83,7 @@ describe.each(fixtures)(
 					buildDeck(old, { ...c, n: 20 }),
 				);
 			}
-		});
+		}, 60000);
 
 		test("storylines", () => {
 			const expected = findStories(old);

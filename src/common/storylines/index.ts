@@ -39,6 +39,7 @@ import {
 import { GAME_KINDS } from "./kindsGames.ts";
 import { PLAYER_KINDS } from "./kindsPlayers.ts";
 import { TEAM_KINDS } from "./kindsTeams.ts";
+import { DEAL_KINDS } from "./kindsDeals.ts";
 
 export { overlapsSeason, plainText, pLink, spanOf, stints, tLink };
 export type { Story, StoryShape } from "./kit.ts";
@@ -1428,6 +1429,7 @@ export const ALL_KINDS: Kind[] = [
 	...PLAYER_KINDS,
 	...TEAM_KINDS,
 	...GAME_KINDS,
+	...DEAL_KINDS,
 ];
 
 export const kindSlug = (kind: string) =>
