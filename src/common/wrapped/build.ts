@@ -19,6 +19,9 @@ import { X_PLAYER } from "./topics/xplayer.ts";
 import { X_TEAM } from "./topics/xteam.ts";
 import { X_SEASON } from "./topics/xseason.ts";
 import { X_ALL } from "./topics/xall.ts";
+import { DEAL_SEASON } from "./topics/dealsSeason.ts";
+import { DEAL_TEAM } from "./topics/dealsTeam.ts";
+import { DEAL_ALL, DEAL_PLAYER } from "./topics/dealsPeople.ts";
 
 // The first topic sets, and the extra ones ported from the Explorer later
 export const BASE_TOPICS: Record<WrappedMode, Topic[]> = {
@@ -35,11 +38,27 @@ export const EXTRA_TOPICS: Record<WrappedMode, Topic[]> = {
 	all: X_ALL,
 };
 
+// Front-office topics: trades, contracts, releases, lotteries and the draft (they need the trades, contracts and lotteries in the snapshot)
+export const DEAL_TOPICS: Record<WrappedMode, Topic[]> = {
+	season: DEAL_SEASON,
+	team: DEAL_TEAM,
+	player: DEAL_PLAYER,
+	all: DEAL_ALL,
+};
+
 export const TOPICS: Record<WrappedMode, Topic[]> = {
-	season: [...BASE_TOPICS.season, ...EXTRA_TOPICS.season],
-	team: [...BASE_TOPICS.team, ...EXTRA_TOPICS.team],
-	player: [...BASE_TOPICS.player, ...EXTRA_TOPICS.player],
-	all: [...BASE_TOPICS.all, ...EXTRA_TOPICS.all],
+	season: [
+		...BASE_TOPICS.season,
+		...EXTRA_TOPICS.season,
+		...DEAL_TOPICS.season,
+	],
+	team: [...BASE_TOPICS.team, ...EXTRA_TOPICS.team, ...DEAL_TOPICS.team],
+	player: [
+		...BASE_TOPICS.player,
+		...EXTRA_TOPICS.player,
+		...DEAL_TOPICS.player,
+	],
+	all: [...BASE_TOPICS.all, ...EXTRA_TOPICS.all, ...DEAL_TOPICS.all],
 };
 
 const runTopic = (t: Topic, ctx: TopicCtx, out: Slide[]) => {
