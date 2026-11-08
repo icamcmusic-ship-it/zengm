@@ -142,15 +142,15 @@ export const POSITION_CENTROIDS: Record<Pos, [number, number]> = {
 };
 
 export const POSITION_BIAS: Record<Pos, number> = {
-	PG: -0.006,
-	G: -0.004,
-	SG: 0.005,
-	GF: 0.015,
-	SF: 0.02,
-	F: 0.026,
-	PF: -0.019,
-	FC: 0.007,
-	C: -0.041,
+	PG: 0.018,
+	G: 0.011,
+	SG: 0.008,
+	GF: 0.022,
+	SF: 0.015,
+	F: 0.028,
+	PF: -0.03,
+	FC: 0.015,
+	C: -0.044,
 };
 
 // Ball skills count a bit less than size: the skill axis is noisier (a big can have a few good passing years)

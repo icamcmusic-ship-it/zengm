@@ -42,11 +42,15 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 	"position fit",
 	async () => {
 		resetG();
+		// Reproducible sample
+		const seeded = new Rng("pos-fit-random");
+		const realRandom = Math.random;
+		Math.random = () => seeded.random();
 		const out: string[] = [];
 		const rng = new Rng("pos-fit-v1");
 		// Careers: players developed season by season, so the sample covers every age and stickiness can be measured
 		const careers = [];
-		while (careers.length < 1500) {
+		while (careers.length < 3000) {
 			const p = generate(-1, 19, 2025, false, DEFAULT_LEVEL);
 			p.born.year = p.ratings[0].season - 19;
 			await develop(p, 0, true);
@@ -98,8 +102,28 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 			return c;
 		};
 		if (process.env.FIT) {
-			for (let it = 0; it < 300; it++) {
-				const c = share();
+			// Fit on sticky careers: the shares players actually end up with
+			const cax = careers.map((rs) =>
+				rs.map((r) => ({ a: positionAxes(r), keep: ovrFn(r) >= 38 })),
+			);
+			const stickyShare = () => {
+				const c = {};
+				let n = 0;
+				for (const rs of cax) {
+					let prev;
+					for (const x of rs) {
+						prev = improvedPosition(x.a, prev, bias);
+						if (x.keep) {
+							c[prev] = (c[prev] ?? 0) + 1;
+							n++;
+						}
+					}
+				}
+				for (const k of Object.keys(c)) c[k] /= n;
+				return c;
+			};
+			for (let it = 0; it < 400; it++) {
+				const c = stickyShare();
 				for (const p of POSITIONS) {
 					bias[p] += 0.02 * Math.log((target[p] ?? 1e-4) / (c[p] ?? 1e-4));
 				}
@@ -245,6 +269,7 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 		out.push(
 			`archetypes old: ${pairings((r) => positionOf(r))} | new: ${pairings((r) => improvedPosition(positionAxes(r)))}`,
 		);
+		Math.random = realRandom;
 		mkdirSync("/tmp/claude-0", { recursive: true });
 		writeFileSync("/tmp/claude-0/position-fit.txt", out.join("\n") + "\n");
 	},
