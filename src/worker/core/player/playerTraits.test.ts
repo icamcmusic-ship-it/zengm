@@ -218,11 +218,16 @@ describe("generation, settings and storage", () => {
 			pid: 3,
 		};
 		g.setWithoutSavingToDB("playerTraits", false);
+		assert.strictEqual(player.getTraitInjuryRateMultiplier(p), 1);
 		assert.isUndefined(player.getSimTraitEffects(p));
 		assert.isUndefined(player.getPlayerTraitsForUI(p));
 		g.setWithoutSavingToDB("playerTraits", true);
 		const e = player.getSimTraitEffects(p)!;
 		assert.isFalse(e.neutral);
+		assert.strictEqual(
+			player.getTraitInjuryRateMultiplier(p),
+			e.injuryRateMultiplier,
+		);
 		assert.isAtLeast(e.injuryRateMultiplier, 0.7);
 		assert.isAtMost(e.injuryRateMultiplier, 1.3);
 	});

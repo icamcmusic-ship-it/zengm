@@ -36,6 +36,7 @@ import {
 	getPlayerTraitScores,
 	getPlayerTraitsForUI,
 	getSimTraitEffects,
+	getTraitInjuryRateMultiplier,
 	initTraits,
 	setTraitScores,
 } from "./traits.ts";
@@ -101,6 +102,7 @@ export default {
 	getPlayerTraitScores,
 	getPlayerTraitsForUI,
 	getSimTraitEffects,
+	getTraitInjuryRateMultiplier,
 	initTraits,
 	setTraitScores,
 	genWeight,

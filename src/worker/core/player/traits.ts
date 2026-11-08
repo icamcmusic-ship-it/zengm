@@ -96,6 +96,12 @@ export const getSimTraitEffects = (
 	return traitEffects(getPlayerTraitScores(p, season));
 };
 
+// For the injury code: multiply a player's injury rate by this. 1 when the Player Traits setting is off, so injuries are exactly as before. Mean 1 across a league, 0.7-1.3 for one player.
+export const getTraitInjuryRateMultiplier = (
+	p: TraitPlayer,
+	season = g.get("season"),
+) => getSimTraitEffects(p, season)?.injuryRateMultiplier ?? 1;
+
 // Preseason development: traits drift a little each year (mean-reverting random walk, deterministic). Age and experience effects are already part of the scores themselves.
 export const developTraits = (
 	p: TraitPlayer & { pid: number },

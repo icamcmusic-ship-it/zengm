@@ -46,6 +46,12 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
   - Setting: **League Settings → Events → Generate College Stats** does this automatically for every new draft class.
 - **Regenerate ratings:** rebuilds prospects into specialized builds (Floor General, Stretch Big, Rim Protector, …) without changing overall, potential or height. Scope: whole class, selected prospects or one prospect. Settings include seed, variation, class flavor and strength, builds per class, archetype diversity, specialization and rookie caps, each lockable; per-player reroll and rating locks; preview with diffs; _Apply_, _Undo last apply_ (until reload) and _Restore originals_ (survives reloads).
 
+## Player traits
+
+- **Where:** player pages (Traits section), Draft Scouting (Traits column), Advanced Player Search (Traits filters and columns), Customize Player in God Mode (trait sliders). Setting: **Game Simulation > Player Traits** (on for new basketball leagues, off for existing ones).
+- **What:** twelve 0-100 traits (clutch, consistency, durability, shot discipline, off-ball movement, screens, hustle, foul discipline, recovery, handle under pressure, late-game IQ, leadership) derived from ratings, age, experience and a stored per-player random component. Prospects' traits are estimates that sharpen with scouting and with seasons played. The effects are small and average out league-wide; see `docs/player-traits.md` for the sim hook API and calibration.
+- **Known limits:** the game simulation does not read traits yet (the pure interface is in place); until then the traits are display-only.
+
 ## Customize Player: Regenerate build
 
 - **Where:** a player page → _Edit_ (`/l/:lid/customize_player/:pid`), _Regenerate build_ button (opens a dialog).
