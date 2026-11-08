@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { isUrlFeatureOn, useFeatureSwitches } from "../util/nativeFeatures.ts";
 import {
 	NO_LOTTERY_DRAFT_TYPES,
 	REAL_PLAYERS_INFO,
@@ -71,6 +72,9 @@ export const MoreLinks = (
 	const { keepSelfLink, page } = props;
 
 	const { godMode, season: currentSeason } = useLocal(["godMode", "season"]);
+
+	// Re-render when a League extras switch changes, so links to disabled features drop out
+	useFeatureSwitches();
 
 	let links: {
 		url: string | Readonly<LeagueUrlParts>;
@@ -441,6 +445,7 @@ export const MoreLinks = (
 		<p>
 			More:{" "}
 			{links
+				.filter(({ url }) => isUrlFeatureOn(url))
 				.filter(({ url }) => {
 					if (keepSelfLink) {
 						return true;

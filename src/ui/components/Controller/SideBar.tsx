@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { memo, type ReactNode, useCallback, useEffect, useState } from "react";
 import { helpers } from "../../util/helpers.ts";
 import { localActions, useLocal } from "../../util/local.ts";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import type {
 	MenuItemLink,
 	MenuItemHeader,
@@ -132,6 +133,10 @@ const MenuItem = ({
 	pathname?: string;
 	root: boolean;
 }) => {
+	const featureOn = useFeatureOn(
+		menuItem.type === "link" ? menuItem.feature : undefined,
+	);
+
 	if (menuItem.type === "text") {
 		return null;
 	}
@@ -150,6 +155,10 @@ const MenuItem = ({
 		}
 
 		if (menuItem.godMode && !godMode) {
+			return null;
+		}
+
+		if (!featureOn) {
 			return null;
 		}
 

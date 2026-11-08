@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { defineView, keepType } from "../util/defineView.ts";
 import { getStoryState } from "../util/storylinesData.ts";
 import {
@@ -44,6 +45,10 @@ export default defineView({
 	// Whether the page is showing its placeholder, which it replaces once the league history is ready
 	keepPrevOutput: { loading: keepType<boolean>() },
 	load: async ({ inputs, updateEvents, prevInputs, prevOutput }) => {
+		const featureOff = featureOffError("storylines");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return { errorMessage: "Storylines are only available for basketball." };
 		}

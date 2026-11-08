@@ -1,6 +1,7 @@
 import { idb } from "../db/index.ts";
 import { changeLog } from "../db/changeLog.ts";
 import { g, helpers, lock, local, logEvent, toUI } from "./index.ts";
+import { featureOn, featureOption } from "./nativeFeatures.ts";
 import { getWrapped, memoize, yieldToWorker } from "./wrappedData.ts";
 import {
 	applyNativeRules,
@@ -129,6 +130,7 @@ const announce = async (
 	list: { d: AchievementDef; entry: UnlockLogEntry }[],
 ) => {
 	let shown = 0;
+	const toasts = featureOption<boolean>("featureAchievementToasts");
 	for (const { d, entry } of list) {
 		const who = entry.who ? ` ${escapeHtml(entry.who)}.` : "";
 		const text = `Achievement unlocked: <a href="${pageUrl(d)}">${escapeHtml(d.name)}</a> <span class="badge ${RARITY_CLASS[d.rarity]}">${RARITY_LABEL[d.rarity]}</span> ${escapeHtml(d.desc)}${who}`;
@@ -142,7 +144,7 @@ const announce = async (
 			pids: entry.pid !== undefined ? [entry.pid] : [],
 			tids: entry.tid !== undefined ? [entry.tid] : [],
 			score: RARITY_SCORE[d.rarity],
-			showNotification: toast,
+			showNotification: toast && toasts,
 			saveToDb: true,
 		});
 	}
@@ -159,6 +161,7 @@ const announce = async (
 			type: "achievement",
 			text: `${rest} more achievement${rest === 1 ? "" : "s"} unlocked (${parts.join(", ")}). <a href="${helpers.leagueUrl(["league_achievements", "recent"])}">See them all.</a>`,
 			saveToDb: false,
+			showNotification: toasts,
 		});
 	}
 };
@@ -170,7 +173,7 @@ const isFresh = () =>
 
 // Compare the current results with what was announced before, announce the difference and remember it. Returns the new unlocks.
 export const checkLeagueAchievements = async (): Promise<AchievementDef[]> => {
-	if (__SPORT !== "basketball") {
+	if (!featureOn("leagueAchievements")) {
 		return [];
 	}
 	const lid = g.get("lid");
@@ -247,7 +250,8 @@ const busy = () =>
 
 // Ask for a check soon. Called after games and phase changes; cheap, and safe to call often: checks are debounced, never overlap, and wait while games are being simmed in bulk.
 export const scheduleLeagueAchievementsCheck = (delay = 1500) => {
-	if (__SPORT !== "basketball") {
+	// League extras: no background checks while the feature is off
+	if (!featureOn("leagueAchievements")) {
 		return;
 	}
 	clearTimeout(timer);

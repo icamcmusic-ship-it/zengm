@@ -1,3 +1,4 @@
+import { featureOption } from "../../util/nativeFeatures.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import { finances, player, realRosters } from "../index.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
@@ -60,11 +61,7 @@ const genPlayers = async (
 	}
 
 	// Optionally give the new prospects college stats and honors. Only for prospects who don't already have some, because this is also called to top off a class that was imported
-	if (
-		__SPORT === "basketball" &&
-		!forceScrubs &&
-		g.get("generateCollegeStats")
-	) {
+	if (!forceScrubs && featureOption<boolean>("generateCollegeStats")) {
 		await generateCollegeStats({
 			draftYear,
 			seed: `${g.get("lid")}-${draftYear}-auto`,

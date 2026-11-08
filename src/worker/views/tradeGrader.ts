@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { defineView } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { g } from "../util/index.ts";
@@ -38,6 +39,10 @@ export default defineView({
 	id: "tradeGrader",
 	processInputs,
 	load: async ({ inputs, updateEvents, prevInputs }) => {
+		const featureOff = featureOffError("tradeGrader");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return {
 				errorMessage: "The Trade grader is only available for basketball.",
@@ -106,9 +111,7 @@ export default defineView({
 				.sort((a, b) => b.eid - a.eid || a.i - b.i);
 		} else if (tab === "season") {
 			seasonTrades = G.trades.filter(
-				(t) =>
-					t.season === season &&
-					(team === "all" || t.tids.includes(team)),
+				(t) => t.season === season && (team === "all" || t.tids.includes(team)),
 			);
 			const gap = (t: (typeof G.trades)[number]) =>
 				t.sides[0].net === null ? -1 : Math.abs(t.sides[0].net);

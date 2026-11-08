@@ -3,6 +3,7 @@ import { memo, useCallback, useId, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { Dropdown, Nav } from "react-bootstrap";
 import { helpers } from "../util/helpers.ts";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 import type {
 	MenuItemLink,
 	MenuItemHeader,
@@ -135,6 +136,10 @@ const MenuItem = ({
 	openID?: string;
 	root: boolean;
 }) => {
+	const featureOn = useFeatureOn(
+		menuItem.type === "link" ? menuItem.feature : undefined,
+	);
+
 	if (menuItem.type === "text") {
 		return <Dropdown.Header>{menuItem.text}</Dropdown.Header>;
 	}
@@ -153,6 +158,10 @@ const MenuItem = ({
 		}
 
 		if (menuItem.godMode && !godMode) {
+			return null;
+		}
+
+		if (!featureOn) {
 			return null;
 		}
 

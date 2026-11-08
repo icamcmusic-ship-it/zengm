@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { defineView, keepType } from "../util/defineView.ts";
@@ -38,6 +39,10 @@ export default defineView({
 	// Whether the page is showing its placeholder, which it replaces once the league history is ready
 	keepPrevOutput: { loading: keepType<boolean>() },
 	load: async ({ inputs, updateEvents, prevInputs, prevOutput }) => {
+		const featureOff = featureOffError("wrapped");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return { errorMessage: "Wrapped is only available for basketball." };
 		}
@@ -77,7 +82,11 @@ export default defineView({
 		const seasons = X.seasons.filter((s) => X.lines(s).length > 0).reverse();
 		const latest = seasons[0] ?? X.L.season;
 		const teamOptions = X.teamsIn(latest)
-			.map((t) => ({ tid: t.tid, label: `${t.region} ${t.name}`, abbrev: t.abbrev }))
+			.map((t) => ({
+				tid: t.tid,
+				label: `${t.region} ${t.name}`,
+				abbrev: t.abbrev,
+			}))
 			.sort((x, y) => x.label.localeCompare(y.label));
 		const playerOptions = [...X.L.players]
 			.map((p) => ({ p, ws: X.career(p).ws }))
@@ -87,7 +96,9 @@ export default defineView({
 			.map(({ p }) => ({
 				pid: p.pid,
 				label: p.name,
-				seasons: [...new Set(X.careerRows(p).map((r) => r.season))].sort((x, y) => y - x),
+				seasons: [...new Set(X.careerRows(p).map((r) => r.season))].sort(
+					(x, y) => y - x,
+				),
 			}));
 		const base = {
 			seasons,
@@ -120,12 +131,21 @@ export default defineView({
 		const both = m.both.slice(0, MAX_BOTH);
 		const onlyA = m.onlyA.slice(0, MAX_ONLY);
 		const onlyB = m.onlyB.slice(0, MAX_ONLY);
-		const shown: Slide[] = [...both.flatMap((p) => [p.a, p.b]), ...onlyA, ...onlyB];
+		const shown: Slide[] = [
+			...both.flatMap((p) => [p.a, p.b]),
+			...onlyA,
+			...onlyB,
+		];
 
 		// Pictures for every player and team on the slides
-		const pids = [...new Set(shown.map((s) => s.pid).filter((x) => x !== undefined))];
+		const pids = [
+			...new Set(shown.map((s) => s.pid).filter((x) => x !== undefined)),
+		];
 		const playersRaw = await idb.merged.players.getAll({ pids });
-		const faces: Record<number, { face: any; imgURL: string; tid: number; season: number }> = {};
+		const faces: Record<
+			number,
+			{ face: any; imgURL: string; tid: number; season: number }
+		> = {};
 		for (const p of playersRaw) {
 			const slide = shown.find((s) => s.pid === p.pid);
 			faces[p.pid] = {
@@ -137,10 +157,17 @@ export default defineView({
 		}
 		const teams: Record<
 			string,
-			{ abbrev: string; region: string; name: string; colors: [string, string, string]; imgURL?: string }
+			{
+				abbrev: string;
+				region: string;
+				name: string;
+				colors: [string, string, string];
+				imgURL?: string;
+			}
 		> = {};
 		for (const s of shown) {
-			const t = s.tid !== undefined ? X.teamAny(s.tid, s.season ?? latest) : undefined;
+			const t =
+				s.tid !== undefined ? X.teamAny(s.tid, s.season ?? latest) : undefined;
 			if (t) {
 				teams[`${t.tid}`] = {
 					abbrev: t.abbrev,

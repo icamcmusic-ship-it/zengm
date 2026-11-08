@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { idb } from "../db/index.ts";
 import { changeLog } from "../db/changeLog.ts";
 import { g } from "../util/index.ts";
@@ -86,6 +87,10 @@ export default defineView({
 	id: "jerseyNumbersTeams",
 	processInputs,
 	load: async ({ inputs, updateEvents, prevInputs }) => {
+		const featureOff = featureOffError("frivolities");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (
 			prevInputs !== undefined &&
 			JSON.stringify(prevInputs) === JSON.stringify(inputs) &&

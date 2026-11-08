@@ -5,6 +5,10 @@ import {
 	DEFAULT_STADIUM_CAPACITY,
 } from "./constants.ts";
 import { registerGlobal } from "./registerGlobal.ts";
+import {
+	nativeFeatureDefaults,
+	nativeFeatureKeysOtherSports,
+} from "./nativeFeatures.ts";
 import { bySport } from "./sportFunctions.ts";
 import {
 	type AwardSettingIndividual,
@@ -157,6 +161,9 @@ for (const [sport, keys] of Object.entries(gameAttributesKeysSportSpecific)) {
 			}
 		}
 	}
+}
+for (const key of nativeFeatureKeysOtherSports()) {
+	gameAttributesKeysOtherSports.add(key as GameAttributeKey);
 }
 
 // Define awards up here mostly for achievements, we need to know what the default awards are for some categories across sports
@@ -485,6 +492,9 @@ export const defaultAwardsHockey = {
 };
 
 export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
+	// League extras (src/common/nativeFeatures.ts)
+	...nativeFeatureDefaults,
+
 	phase: 0,
 	nextPhase: undefined, // Used only for fantasy draft
 	playerBioInfo: undefined,

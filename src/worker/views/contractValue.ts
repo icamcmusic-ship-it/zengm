@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { defineView } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { g } from "../util/index.ts";
@@ -50,6 +51,10 @@ export default defineView({
 	id: "contractValue",
 	processInputs,
 	load: async ({ inputs, updateEvents, prevInputs }) => {
+		const featureOff = featureOffError("contractValue");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return {
 				errorMessage: "Contract value is only available for basketball.",
@@ -83,8 +88,7 @@ export default defineView({
 			lastDone: cv.lastDone,
 			currentSeason: g.get("season"),
 			unknownCount: cv.unknownCount,
-			rate:
-				season === "all" ? null : (cv.rate.get(season) ?? null),
+			rate: season === "all" ? null : (cv.rate.get(season) ?? null),
 			hasData: cv.rows.length > 0,
 			bySeasonRows: undefined as
 				| Record<Metric, ReturnType<typeof valueSeasons>>
@@ -134,7 +138,10 @@ export default defineView({
 			const payroll = new Map(
 				cv.teamSeasons.map((t) => [`${t.tid}|${t.season}`, t.payroll]),
 			);
-			const groups = new Map<string, NonNullable<typeof out.deadGroups>[number]>();
+			const groups = new Map<
+				string,
+				NonNullable<typeof out.deadGroups>[number]
+			>();
 			let paid = 0;
 			let owed = 0;
 			const releases = new Set<string>();

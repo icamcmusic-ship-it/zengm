@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { defineView, keepType } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import { getWrappedStatus, isBulkSimming } from "../util/wrappedData.ts";
@@ -73,6 +74,10 @@ export default defineView({
 	processInputs,
 	keepPrevOutput: { loading: keepType<boolean>() },
 	load: async ({ inputs, updateEvents, prevInputs, prevOutput }) => {
+		const featureOff = featureOffError("leagueAchievements");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return {
 				errorMessage: "League achievements are only available for basketball.",

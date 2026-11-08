@@ -1,4 +1,5 @@
 import { DataTable } from "../components/DataTable/index.tsx";
+import FeatureLinks from "../components/FeatureLinks.tsx";
 import { MoreLinks } from "../components/MoreLinks.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
@@ -107,7 +108,7 @@ const HistoryAll = ({ awards, seasons }: View<"historyAll">) => {
 		...(__SPORT === "basketball"
 			? [
 					{
-						desc: "Newspaper, Wrapped and Storylines for the season",
+						desc: "Newspaper, Wrapped, Storylines and Timeline for the season",
 						title: "Read",
 						sortType: "name" as const,
 					},
@@ -150,26 +151,17 @@ const HistoryAll = ({ awards, seasons }: View<"historyAll">) => {
 				runnerUpEl,
 				...(__SPORT === "basketball"
 					? [
-							<>
-								<a href={helpers.leagueUrl(["newspaper", "all", s.season])}>
-									Newspaper
-								</a>
-								{" | "}
-								<a href={helpers.leagueUrl(["wrapped", "season", s.season])}>
-									Wrapped
-								</a>
-								{" | "}
-								<a
-									href={helpers.leagueUrl([
-										"storylines",
-										"all",
-										"all",
-										s.season,
-									])}
-								>
-									Storylines
-								</a>
-							</>,
+							<FeatureLinks
+								links={[
+									{ url: ["newspaper", "all", s.season], text: "Newspaper" },
+									{ url: ["wrapped", "season", s.season], text: "Wrapped" },
+									{
+										url: ["storylines", "all", "all", s.season],
+										text: "Storylines",
+									},
+									{ url: ["timeline", s.season, s.season], text: "Timeline" },
+								]}
+							/>,
 						]
 					: []),
 				...awards.map(({ shortName }) => {

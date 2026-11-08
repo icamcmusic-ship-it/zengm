@@ -1,9 +1,14 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { defineView } from "../util/defineView.ts";
 import hype from "../api/hype.ts";
 
 export default defineView({
 	id: "hype",
 	load: async ({ updateEvents }) => {
+		const featureOff = featureOffError("hype");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (__SPORT !== "basketball") {
 			return {
 				errorMessage: "Games to Watch is only available for basketball.",

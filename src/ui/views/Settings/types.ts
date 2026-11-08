@@ -1,3 +1,5 @@
+import type { NativeFeatureSettingKey } from "../../../common/nativeFeatures.ts";
+
 export type Key =
 	| "numGames"
 	| "numGamesDiv"
@@ -176,7 +178,8 @@ export type Key =
 	| "footballOvertimePlayoffs"
 	| "easterEggPlayers"
 	| "generateCollegeStats"
-	| "fakeAgeProb";
+	| "fakeAgeProb"
+	| NativeFeatureSettingKey;
 
 export type Category =
 	| "New League"
@@ -201,7 +204,8 @@ export type Category =
 	| "Game Modes"
 	| "Players"
 	| "Real Players"
-	| "UI";
+	| "UI"
+	| "League extras";
 
 export type FieldType =
 	| "bool"

@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { HypeLite } from "../../common/hype/types.ts";
 import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
+import { useFeatureOption } from "../util/nativeFeatures.ts";
 
 const TOKEN = /\[\[p:(\d+)\|([^\]]*)]]/g;
 
@@ -63,9 +64,11 @@ export const HypeBadge = ({
 // Hype of games by gid, computed in the worker when needed. Keeps the previous answer while a new one loads.
 export const useHypeGids = (gids: number[]) => {
 	const [data, setData] = useState<Record<number, HypeLite>>({});
-	const key = gids.join(",");
+	// League extras: no hype on schedules and box scores when it's turned off
+	const on = useFeatureOption<boolean>("featureHypeSchedule");
+	const key = on ? gids.join(",") : "";
 	useEffect(() => {
-		if (__SPORT !== "basketball" || gids.length === 0) {
+		if (!on || gids.length === 0) {
 			return;
 		}
 		let cancelled = false;
@@ -84,7 +87,7 @@ export const useHypeGids = (gids: number[]) => {
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [key]);
-	return data;
+	return on ? data : {};
 };
 
 const verdictClass = (kind: string) =>

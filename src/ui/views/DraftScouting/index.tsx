@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import DraftClass from "./DraftClass.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { View } from "../../../common/types.ts";
@@ -9,6 +10,7 @@ import { RegenerateRatingsButton } from "../../components/RegenerateRatings/Rege
 const PAGE_SIZE = 3;
 
 const DraftScouting = ({ fantasyDraft, seasons }: View<"draftScouting">) => {
+	const regeneratorOn = useFeatureOn("ratingsRegenerator");
 	const { challengeNoRatings, draftType, godMode } = useLocal([
 		"challengeNoRatings",
 		"draftType",
@@ -49,7 +51,9 @@ const DraftScouting = ({ fantasyDraft, seasons }: View<"draftScouting">) => {
 				further in the future, the more uncertainty there is in their estimates.
 			</p>
 
-			<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
+			{regeneratorOn ? (
+				<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
+			) : null}
 
 			{pagination ? (
 				<div className="d-flex flex-row-reverse">

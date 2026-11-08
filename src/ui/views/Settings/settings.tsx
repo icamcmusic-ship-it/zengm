@@ -27,6 +27,10 @@ import type {
 import { parseCurrencyFormat } from "../../util/parseCurrencyFormat.ts";
 import { getDraftTypeDescription } from "../DraftLottery.tsx";
 import { bySport } from "../../../common/sportFunctions.ts";
+import {
+	NATIVE_FEATURES,
+	type NativeFeatureDef,
+} from "../../../common/nativeFeatures.ts";
 
 const REAL_DRAFT_RATINGS_INFO: Record<
 	RealDraftRatings,
@@ -73,6 +77,43 @@ const getSingleModeWeights = (selectedMode: RealDraftRatings) =>
 export const descriptions = {
 	difficulty:
 		"Increasing difficulty makes AI teams more reluctant to trade with you, makes players less likely to sign with you, and makes it harder to turn a profit.",
+};
+
+// Settings form entries of the League extras registry (src/common/nativeFeatures.ts)
+const nativeFeatureSettings = (): Setting[] => {
+	const out: Setting[] = [];
+	const defs: readonly NativeFeatureDef[] = NATIVE_FEATURES;
+	for (const f of defs) {
+		out.push({
+			category: "League extras",
+			key: f.key as Key,
+			name: f.name,
+			type: "bool",
+			description: f.description,
+		});
+		for (const o of f.options ?? []) {
+			out.push({
+				category: "League extras",
+				key: o.key as Key,
+				name: o.name,
+				type: o.type,
+				decoration: o.decoration,
+				description: `${f.name}: ${o.description}`,
+				validator: (value: unknown) => {
+					if (typeof value !== "number") {
+						return;
+					}
+					if (o.min !== undefined && value < o.min) {
+						throw new Error(`Value cannot be less than ${o.min}`);
+					}
+					if (o.max !== undefined && value > o.max) {
+						throw new Error(`Value cannot be greater than ${o.max}`);
+					}
+				},
+			});
+		}
+	}
+	return out;
 };
 
 type GodModeRequired = "always" | "existingLeagueOnly" | undefined;
@@ -1240,14 +1281,6 @@ export const settings: Setting[] = (
 						description:
 							'When enabled there is a very rare chance for an "Easter egg" player to appear, one of a few select notable historical figures.',
 					},
-					{
-						category: "Events",
-						key: "generateCollegeStats",
-						name: "Generate College Stats",
-						type: "bool",
-						description:
-							"When enabled, each new draft class gets generated college stats and honors for its prospects, shown on their player pages. Pro stats and experience are not affected. You can also do this by hand for any class on the Draft Scouting page.",
-					},
 				]
 			: []),
 		{
@@ -1871,22 +1904,6 @@ export const settings: Setting[] = (
 					throw new Error("Value cannot be less than 0");
 				}
 			},
-		},
-		{
-			category: "Game Simulation",
-			key: "technicalFouls",
-			name: "Technical & Flagrant Fouls",
-			type: "bool",
-			description:
-				"Rare technical fouls (1 FT, possession unchanged), flagrant fouls (2 FTs and the ball) and ejections in the game simulation.",
-		},
-		{
-			category: "Game Simulation",
-			key: "storePlayByPlay",
-			name: "Save Play-by-Play",
-			type: "bool",
-			description:
-				"Keep each game's play-by-play with its box score, to read or replay later. Uses about 7 KB of storage per game, and it is deleted along with the box score.",
 		},
 		{
 			category: "Game Simulation",
@@ -3191,5 +3208,8 @@ export const settings: Setting[] = (
 				return JSON.stringify(value);
 			},
 		},
+
+		// League extras: one switch per native feature plus its options, all from the registry
+		...nativeFeatureSettings(),
 	] as Setting[]
 ).filter((setting) => !gameAttributesKeysOtherSports.has(setting.key as any));

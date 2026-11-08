@@ -1,3 +1,4 @@
+import { featureOn } from "../util/nativeFeatures.ts";
 import {
 	PLAYER,
 	PLAYER_STATS_TABLES,
@@ -581,7 +582,9 @@ export default defineView({
 			const leaders = await player.getLeaders(topStuff.pRaw);
 
 			// Contract value index by season, when it's quick to get (basketball only)
-			const valueIndex = await playerValueIndex(topStuff.pid);
+			const valueIndex = featureOn("contractValue")
+				? await playerValueIndex(topStuff.pid)
+				: undefined;
 
 			return {
 				...topStuff,

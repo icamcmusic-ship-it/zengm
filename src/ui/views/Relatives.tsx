@@ -1,4 +1,5 @@
 import useTitleBar from "../hooks/useTitleBar.tsx";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 import { helpers } from "../util/helpers.ts";
 import { getCols } from "../../common/getCols.ts";
 import { DataTable } from "../components/DataTable/index.tsx";
@@ -10,6 +11,7 @@ import { useLocal } from "../util/local.ts";
 import { last } from "../../common/utils.ts";
 
 const Relatives = ({ pid, players, stats }: View<"relatives">) => {
+	const familyTreesOn = useFeatureOn("frivolities") && __SPORT === "basketball";
 	const target =
 		pid !== undefined ? players.find((p) => p.pid === pid) : undefined;
 
@@ -149,7 +151,7 @@ const Relatives = ({ pid, players, stats }: View<"relatives">) => {
 					<a href={helpers.leagueUrl(["frivolities", "relatives"])}>
 						All Players With Relatives
 					</a>
-					{__SPORT === "basketball" ? (
+					{familyTreesOn ? (
 						<>
 							{" "}
 							|{" "}
@@ -169,7 +171,7 @@ const Relatives = ({ pid, players, stats }: View<"relatives">) => {
 				<p>
 					These are the players with a relative in the league. Click "Details"
 					for a player to see {helpers.pronoun(gender, "his")} relatives.
-					{__SPORT === "basketball" ? (
+					{familyTreesOn ? (
 						<>
 							{" "}
 							See the{" "}

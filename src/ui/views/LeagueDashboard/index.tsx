@@ -10,6 +10,7 @@ import Headlines from "./Headlines.tsx";
 import GamesToWatch from "./GamesToWatch.tsx";
 import RecentAchievements from "./RecentAchievements.tsx";
 import { useLocal } from "../../util/local.ts";
+import { useFeatureOn, useFeatureOption } from "../../util/nativeFeatures.ts";
 
 const LeagueDashboard = ({
 	att,
@@ -51,6 +52,68 @@ const LeagueDashboard = ({
 	const { luxuryPayroll, salaryCap, salaryCapType, season, userTid } = useLocal(
 		["luxuryPayroll", "salaryCap", "salaryCapType", "season", "userTid"],
 	);
+
+	// League extras
+	const showHype = useFeatureOption<boolean>("featureHypeDashboard");
+	const showAchievements = useFeatureOption<boolean>(
+		"featureAchievementsDashboard",
+	);
+	const newspaperOn = useFeatureOn("newspaper");
+	const wrappedOn = useFeatureOn("wrapped");
+	const storylinesOn = useFeatureOn("storylines");
+	const timelineOn = useFeatureOn("timeline");
+	const recordsLinks = [
+		...(newspaperOn
+			? [
+					{
+						key: "newspaper",
+						node: (
+							<a href={helpers.leagueUrl(["newspaper"])}>» Latest newspaper</a>
+						),
+					},
+				]
+			: []),
+		...(wrappedOn
+			? [
+					{
+						key: "wrapped",
+						node: <a href={helpers.leagueUrl(["wrapped"])}>» Latest Wrapped</a>,
+					},
+				]
+			: []),
+		...(storylinesOn
+			? [
+					{
+						key: "storylines",
+						node: (
+							<>
+								<a href={helpers.leagueUrl(["storylines"])}>» Top storylines</a>
+								{" | "}
+								<a
+									href={helpers.leagueUrl([
+										"storylines",
+										"team",
+										helpers.getTeamUrlPart(userTid),
+									])}
+								>
+									your team
+								</a>
+							</>
+						),
+					},
+				]
+			: []),
+		...(timelineOn
+			? [
+					{
+						key: "timeline",
+						node: (
+							<a href={helpers.leagueUrl(["timeline"])}>» League timeline</a>
+						),
+					},
+				]
+			: []),
+	];
 
 	return (
 		<>
@@ -192,45 +255,29 @@ const LeagueDashboard = ({
 					/>
 				</div>
 				<div className="col-xl-5 col-lg-4 mb-3">
-					<GamesToWatch
-						refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
-					/>
+					{showHype ? (
+						<GamesToWatch
+							refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
+						/>
+					) : null}
 					<Headlines
 						events={events}
 						season={season}
 						teams={teams}
 						userTid={userTid}
 					/>
-					<RecentAchievements
-						refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
-					/>
-					{__SPORT === "basketball" ? (
+					{showAchievements ? (
+						<RecentAchievements
+							refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
+						/>
+					) : null}
+					{recordsLinks.length > 0 ? (
 						<div className="mt-3">
 							<h2>From the records</h2>
 							<ul className="list-unstyled mb-0">
-								<li>
-									<a href={helpers.leagueUrl(["newspaper"])}>
-										» Latest newspaper
-									</a>
-								</li>
-								<li>
-									<a href={helpers.leagueUrl(["wrapped"])}>» Latest Wrapped</a>
-								</li>
-								<li>
-									<a href={helpers.leagueUrl(["storylines"])}>
-										» Top storylines
-									</a>
-									{" | "}
-									<a
-										href={helpers.leagueUrl([
-											"storylines",
-											"team",
-											helpers.getTeamUrlPart(userTid),
-										])}
-									>
-										your team
-									</a>
-								</li>
+								{recordsLinks.map((link) => (
+									<li key={link.key}>{link.node}</li>
+								))}
 							</ul>
 						</div>
 					) : null}

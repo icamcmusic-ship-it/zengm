@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { idb } from "../db/index.ts";
 import { changeLog } from "../db/changeLog.ts";
 import { g } from "../util/index.ts";
@@ -83,6 +84,10 @@ const loadGames = async () => {
 export default defineView({
 	id: "homeCourt",
 	load: async ({ updateEvents }) => {
+		const featureOff = featureOffError("frivolities");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (
 			!updateEvents.has("firstRun") &&
 			!updateEvents.has("newPhase") &&

@@ -1,9 +1,9 @@
 import clsx from "clsx";
+import FeatureLinks from "../../components/FeatureLinks.tsx";
 import { RecordAndPlayoffs } from "../../components/RecordAndPlayoffs.tsx";
 import type { View } from "../../../common/types.ts";
 import { useState } from "react";
 import { onEnterOrSpace } from "../../util/onEnterOrSpace.ts";
-import { helpers } from "../../util/helpers.ts";
 
 const ExpandableNote = ({ note }: { note: string | undefined }) => {
 	const [expand, setExpand] = useState(false);
@@ -84,39 +84,23 @@ const Seasons = ({
 					) : null}
 					{recordAndPlayoffs}
 					{__SPORT === "basketball" ? (
-						<span className="ms-2 small">
-							<a
-								href={helpers.leagueUrl([
-									"newspaper",
-									`${h.abbrev}_${h.tid}`,
-									h.season,
-								])}
-							>
-								Newspaper
-							</a>
-							{" | "}
-							<a
-								href={helpers.leagueUrl([
-									"wrapped",
-									"team",
-									h.season,
-									`${h.abbrev}_${h.tid}`,
-								])}
-							>
-								Wrapped
-							</a>
-							{" | "}
-							<a
-								href={helpers.leagueUrl([
-									"storylines",
-									"team",
-									`${h.abbrev}_${h.tid}`,
-									h.season,
-								])}
-							>
-								Storylines
-							</a>
-						</span>
+						<FeatureLinks
+							className="ms-2 small"
+							links={[
+								{
+									url: ["newspaper", `${h.abbrev}_${h.tid}`, h.season],
+									text: "Newspaper",
+								},
+								{
+									url: ["wrapped", "team", h.season, `${h.abbrev}_${h.tid}`],
+									text: "Wrapped",
+								},
+								{
+									url: ["storylines", "team", `${h.abbrev}_${h.tid}`, h.season],
+									text: "Storylines",
+								},
+							]}
+						/>
 					) : null}
 				</div>
 				<ExpandableNote note={h.note} />

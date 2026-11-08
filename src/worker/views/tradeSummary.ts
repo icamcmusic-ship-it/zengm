@@ -1,3 +1,4 @@
+import { featureOn } from "../util/nativeFeatures.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import type {
 	DiscriminateUnion,
@@ -635,7 +636,7 @@ export default defineView({
 						open: boolean;
 				  }[]
 				| undefined;
-			if (__SPORT === "basketball") {
+			if (featureOn("tradeGrader")) {
 				try {
 					const graded = await gradeOneTrade(event);
 					if (graded) {
