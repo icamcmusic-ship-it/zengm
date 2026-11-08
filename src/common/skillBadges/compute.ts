@@ -50,7 +50,9 @@ export const conditionMet = (
 	condition: BadgeCondition,
 ) => {
 	const value = badgeComposite(ratings, condition);
-	return condition.dir === "below" ? value <= condition.cutoff : value >= condition.cutoff;
+	return condition.dir === "below"
+		? value <= condition.cutoff
+		: value >= condition.cutoff;
 };
 
 export const hasBadge = (ratings: BadgeRatings, def: SkillBadgeDef) =>

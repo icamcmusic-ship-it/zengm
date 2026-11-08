@@ -60,7 +60,15 @@ describe("skill badges", () => {
 		assert.include(getSkillBadges(shooter), "Cs");
 		const rim = { ...base, hgt: 95, jmp: 85, diq: 70 };
 		assert.include(getSkillBadges(rim), "Bk");
-		const bad = { ...base, hgt: 10, stre: 10, spd: 10, jmp: 10, diq: 5, ft: 10 };
+		const bad = {
+			...base,
+			hgt: 10,
+			stre: 10,
+			spd: 10,
+			jmp: 10,
+			diq: 5,
+			ft: 10,
+		};
 		assert.include(getSkillBadges(bad), "Ld");
 		assert.include(getSkillBadges(bad), "Hk");
 		const bigBrick = { ...base, hgt: 85, tp: 15, fg: 20, ft: 25 };

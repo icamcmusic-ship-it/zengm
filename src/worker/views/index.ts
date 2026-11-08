@@ -121,3 +121,4 @@ export { default as jerseyNumbersTeams } from "./jerseyNumbersTeams.ts";
 export { default as familyTrees } from "./familyTrees.ts";
 export { default as leagueEconomics } from "./leagueEconomics.ts";
 export { default as homeCourt } from "./homeCourt.ts";
+export { default as skillBadges } from "./skillBadges.ts";

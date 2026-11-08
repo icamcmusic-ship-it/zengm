@@ -157,8 +157,7 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		label: "Dk",
 		name: "Dunker",
 		group: "scoring",
-		meaning:
-			"Explosive above the rim: posterizes defenders and finishes lobs.",
+		meaning: "Explosive above the rim: posterizes defenders and finishes lobs.",
 		conditions: [
 			c(
 				[
@@ -174,7 +173,8 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		label: "Tr",
 		name: "Transition runner",
 		group: "scoring",
-		meaning: "Runs the floor and the fast break, with the legs to do it all game.",
+		meaning:
+			"Runs the floor and the fast break, with the legs to do it all game.",
 		conditions: [
 			c(
 				[
@@ -357,7 +357,8 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		label: "Ph",
 		name: "Physical presence",
 		group: "physical",
-		meaning: "Strong and big: sets bruising screens and wins the physical battles.",
+		meaning:
+			"Strong and big: sets bruising screens and wins the physical battles.",
 		conditions: [
 			c(
 				[
@@ -414,7 +415,8 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		label: "Ld",
 		name: "Liability defender",
 		group: "flag",
-		meaning: "Defensive ratings are well below normal: opponents will target him.",
+		meaning:
+			"Defensive ratings are well below normal: opponents will target him.",
 		flag: true,
 		conditions: [
 			c(
