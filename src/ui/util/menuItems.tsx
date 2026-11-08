@@ -104,6 +104,34 @@ const leagueAchievementsLinks: MenuItemLink[] =
 			]
 		: [];
 
+// Coaching staff (basketball only, page explains how to enable it if the setting is off)
+const staffLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "staff" || pageID === "coach",
+					league: true,
+					commandPalette: true,
+					path: ["staff"],
+					text: "Coaching Staff",
+				},
+			]
+		: [];
+const coachesLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "coaches",
+					league: true,
+					commandPalette: true,
+					path: ["coaches"],
+					text: "Coaches",
+				},
+			]
+		: [];
+
 // Game hype and record chases (basketball only)
 const hypeLinks: MenuItemLink[] =
 	__SPORT === "basketball"
@@ -317,6 +345,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			...newspaperLinks,
 			...hypeLinks,
+			...coachesLinks,
 			{
 				type: "link",
 				league: true,
@@ -405,6 +434,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["team_finances"],
 				text: "Finances",
 			},
+			...staffLinks,
 			{
 				type: "link",
 				active: (pageID) => pageID === "teamHistory",

@@ -115,6 +115,7 @@ const gameAttributesKeysSportSpecific = {
 		"easterEggPlayers",
 		"generateCollegeStats",
 		"rerandomizeDraftClassRatings",
+		"coachingStaff",
 	]),
 	football: new Set<GameAttributeKey>([
 		"fantasyPoints",
@@ -745,6 +746,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	rerandomizeDraftClassRatings: false,
 	draftClassRegenSettings: undefined,
 	draftBoardAutoDraft: true,
+	// New leagues get a coaching staff. Existing leagues are set to false in the version 76 DB migration
+	coachingStaff: true,
 	fakeAgeProb: 0.01,
 	awards: [
 		defaultAwards.mvp,

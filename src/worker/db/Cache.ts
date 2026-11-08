@@ -39,6 +39,8 @@ import type {
 	SeasonLeaders,
 	SavedTradingBlock,
 	NonEmptyArray,
+	Coach,
+	CoachWithoutKey,
 	Awards,
 } from "../../common/types.ts";
 import type { IDBPTransaction } from "@dumbmatter/idb";
@@ -54,6 +56,7 @@ type Status = "empty" | "error" | "filling" | "full";
 export type Store =
 	| "allStars"
 	| "awards"
+	| "coaches"
 	| "draftLotteryResults"
 	| "draftPicks"
 	| "events"
@@ -75,6 +78,7 @@ export type Store =
 	| "teams"
 	| "trade";
 type Index =
+	| "coachesByTid"
 	| "draftPicksBySeason"
 	| "draftPicksByTid"
 	| "playersByDraftYearRetiredYear"
@@ -87,6 +91,7 @@ type Index =
 export const STORES: Store[] = [
 	"allStars",
 	"awards",
+	"coaches",
 	"draftLotteryResults",
 	"draftPicks",
 	"events",
@@ -313,6 +318,18 @@ export const storeInfos: Record<Store, StoreInfo> = {
 		pkType: "string",
 		autoIncrement: false,
 		getData: (tx) => tx.objectStore("savedTrades").getAll(),
+	},
+	coaches: {
+		pk: "cid",
+		pkType: "number",
+		autoIncrement: true,
+		getData: (tx) => tx.objectStore("coaches").getAll(),
+		indexes: [
+			{
+				name: "coachesByTid",
+				key: ["tid"],
+			},
+		],
 	},
 	savedTradingBlock: {
 		pk: "rid",
@@ -579,6 +596,8 @@ class Cache {
 
 	savedTradingBlock: StoreAPI<SavedTradingBlock, SavedTradingBlock, number>;
 
+	coaches: StoreAPI<CoachWithoutKey, Coach, number, "coachesByTid">;
+
 	schedule: StoreAPI<ScheduleGameWithoutKey, ScheduleGame, number>;
 
 	scheduledEvents: StoreAPI<ScheduledEventWithoutKey, ScheduledEvent, number>;
@@ -633,6 +652,7 @@ class Cache {
 		this.playoffSeries = new StoreAPI(this, "playoffSeries");
 		this.savedTrades = new StoreAPI(this, "savedTrades");
 		this.savedTradingBlock = new StoreAPI(this, "savedTradingBlock");
+		this.coaches = new StoreAPI(this, "coaches");
 		this.schedule = new StoreAPI(this, "schedule");
 		this.scheduledEvents = new StoreAPI(this, "scheduledEvents");
 		this.seasonLeaders = new StoreAPI(this, "seasonLeaders");

@@ -188,6 +188,7 @@ export type Key =
 	| "generateCollegeStats"
 	| "scoutingSystem"
 	| "rerandomizeDraftClassRatings"
+	| "coachingStaff"
 	| "fakeAgeProb";
 
 export type Category =

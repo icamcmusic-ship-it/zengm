@@ -42,6 +42,7 @@ import type {
 	GameAttributeWithHistory,
 	GameAttributesLeagueWithHistory,
 	SavedTrade,
+	Coach,
 	SavedTradingBlock,
 	Awards,
 } from "../../common/types.ts";
@@ -137,6 +138,14 @@ export interface LeagueDB extends DBSchema {
 	savedTrades: {
 		key: string;
 		value: SavedTrade;
+	};
+	coaches: {
+		key: number;
+		value: Coach;
+		autoIncrementKeyPath: "cid";
+		indexes: {
+			tid: number;
+		};
 	};
 	savedTradingBlock: {
 		key: 0;
@@ -653,6 +662,17 @@ const create = (db: IDBPDatabase<LeagueDB>) => {
 	db.createObjectStore("savedTradingBlock", {
 		keyPath: "rid",
 	});
+
+	createCoachesStore(db);
+};
+
+// Coaching staff, added in version 76
+const createCoachesStore = (db: IDBPDatabase<LeagueDB>) => {
+	const coachesStore = db.createObjectStore("coaches", {
+		keyPath: "cid",
+		autoIncrement: true,
+	});
+	coachesStore.createIndex("tid", "tid");
 };
 
 // Only players who are still owed money by a team that released them have owedByTids, so this index is only those, which is what payroll needs
@@ -1760,6 +1780,16 @@ const migrate = async ({
 		createOwedByTidsIndex(transaction.objectStore("players"));
 		await migrate75(transaction);
 		db.deleteObjectStore("releasedPlayers" as any);
+	}
+
+	if (oldVersion < 76) {
+		createCoachesStore(db);
+
+		// Existing leagues keep the coaching budget slider. The "Coaching staff" setting defaults to on only for new leagues, and staff are generated if a user turns it on later.
+		await transaction.objectStore("gameAttributes").put({
+			key: "coachingStaff",
+			value: false,
+		});
 	}
 
 	// Next update - do similar to `oldVersion < 71` above for numPlayoffRounds and draftType, from loadGameAttributes

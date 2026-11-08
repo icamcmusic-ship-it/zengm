@@ -1,5 +1,6 @@
 import { csvFormat, csvFormatRows } from "d3-dsv";
 import type {
+	CoachRole,
 	Contract,
 	ContractTerms,
 	FlatContractInfo,
@@ -43,6 +44,7 @@ import {
 	freeAgents,
 	season,
 } from "../core/index.ts";
+import * as staff from "../core/staff/index.ts";
 import { idb } from "../db/index.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import {
@@ -2896,6 +2898,23 @@ const generateCollegeStatsAllClasses = async (options: {
 	const output = await draft.generateCollegeStatsAllClasses(options);
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 	return output;
+const staffAction = async (
+	action:
+		| { type: "hire"; cid: number; role: CoachRole; years: number }
+		| { type: "fire"; cid: number }
+		| { type: "extend"; cid: number; years: number },
+) => {
+	const tid = g.get("userTid");
+	let buyout;
+	if (action.type === "hire") {
+		await staff.userHire({ ...action, tid });
+	} else if (action.type === "fire") {
+		buyout = await staff.userFire({ cid: action.cid, tid });
+	} else {
+		await staff.userExtend({ ...action, tid });
+	}
+	await toUI("realtimeUpdate", [["staff", "teamFinances"]]);
+	return { buyout };
 };
 
 const removeCollegeStats = async (draftYear: number) => {
@@ -4444,6 +4463,11 @@ const updateBudget = async ({
 	}
 
 	for (const key of helpers.keys(budgetLevels)) {
+		// With a coaching staff, the coaching level is set by the staff
+		if (key === "coaching" && staff.staffEnabled()) {
+			continue;
+		}
+
 		// Check for NaN before updating
 		if (!Number.isNaN(budgetLevels[key])) {
 			t.budget[key] = budgetLevels[key];
@@ -4536,6 +4560,9 @@ const updateGameAttributesGodMode = async (
 	const currentRealPlayerDeterminism = g.get("realPlayerDeterminism");
 
 	await league.setGameAttributes(gameAttributes);
+
+	// Turning on the coaching staff in an existing league generates staffs
+	await staff.ensureStaff();
 
 	if (repeatSeason !== currentRepeatSeasonType) {
 		await league.setRepeatSeason(repeatSeason);
@@ -5985,6 +6012,7 @@ const api = {
 		updateDraftBoard,
 		setDraftBoardAutoDraft,
 		getDraftDayInfo,
+		staffAction,
 		idbCacheFlush,
 		importPlayers,
 		importPlayersGetReal,

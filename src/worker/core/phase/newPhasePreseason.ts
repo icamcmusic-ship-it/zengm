@@ -12,6 +12,7 @@ import {
 	team,
 } from "../index.ts";
 import { idb } from "../../db/index.ts";
+import * as staff from "../staff/index.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import type {
 	Conditions,
@@ -347,6 +348,9 @@ const newPhasePreseason = async (
 	if (scoutingLevel === undefined) {
 		throw new Error("scoutingLevel should be defined");
 	}
+
+	// With a coaching staff, the coaching budget level follows the staff (overriding the AI budget changes above)
+	await staff.onPreseason();
 
 	const coachingLevels: Record<number, number> = {};
 	for (const t of teams) {

@@ -913,6 +913,9 @@ export type GameAttributesLeague = {
 	// Saved from the Regenerate ratings modal ("save as league default"), used by rerandomizeDraftClassRatings
 	draftClassRegenSettings: Record<string, unknown> | undefined;
 	draftBoardAutoDraft: boolean;
+
+	// Basketball only. Real coaching staff (coaches with ratings and contracts) instead of the coaching budget slider
+	coachingStaff: boolean;
 	fakeAgeProb: number;
 };
 
@@ -2604,6 +2607,8 @@ export type UpdateEvent =
 	| "playoffs"
 	| "savedTrades"
 	| "scheduledEvents"
+	// Coaching staff changes
+	| "staff"
 	| "retiredJerseys"
 	| "team"
 	| "teamFinances"
@@ -2819,3 +2824,4 @@ export type DraftBoardEntry = {
 	tier?: number;
 	note?: string;
 };
+export type * from "./types.staff.ts";
