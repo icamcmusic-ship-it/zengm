@@ -164,7 +164,7 @@ describe("award odds", () => {
 });
 
 describe("lottery what-if", () => {
-	test("NBA 2019 odds, exact and simulated", async () => {
+	test("NBA 2019 odds, exact and simulated", () => {
 		const info = getWhatIfChances({
 			draftType: "nba2019",
 			numLotteryTeams: 14,
@@ -183,7 +183,7 @@ describe("lottery what-if", () => {
 		assert.strictEqual(out.sample.length, 14);
 	});
 
-	test("current format keeps the given chances", async () => {
+	test("current format keeps the given chances", () => {
 		const info = getWhatIfChances({
 			draftType: "current",
 			numLotteryTeams: 3,

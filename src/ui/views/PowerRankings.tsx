@@ -141,6 +141,16 @@ const PowerRankings = ({
 
 	const cols = getCols(colNames);
 
+	if (__SPORT === "basketball") {
+		for (const [colName, col] of Iterator.zip([colNames, cols], {
+			mode: "strict",
+		})) {
+			if (colName.startsWith("rating:")) {
+				col.sortSequence = ["asc", "desc"];
+			}
+		}
+	}
+
 	// Monte Carlo odds, after AvgAge (see worker/core/seasonOdds)
 	if (seasonOdds) {
 		const index = colNames.indexOf("AvgAge") + 1;
@@ -156,16 +166,6 @@ const PowerRankings = ({
 				title: "Title",
 			},
 		);
-	}
-
-	if (__SPORT === "basketball") {
-		for (const [colName, col] of Iterator.zip([colNames, cols], {
-			mode: "strict",
-		})) {
-			if (colName.startsWith("rating:")) {
-				col.sortSequence = ["asc", "desc"];
-			}
-		}
 	}
 
 	const rows = teams.map((t) => {
