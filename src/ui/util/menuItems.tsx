@@ -1083,6 +1083,15 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
+				active: (pageID) => pageID === "faceStyleGallery",
+				league: true,
+				nonLeague: true,
+				commandPalette: true,
+				path: "/face_style_gallery",
+				text: "Face Style Gallery",
+			},
+			{
+				type: "link",
 				active: (pageID) => pageID === "awardSettings",
 				league: true,
 				commandPalette: true,
