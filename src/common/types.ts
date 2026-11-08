@@ -258,6 +258,47 @@ export type DraftPickWithoutKey = {
 	season: DraftPickSeason;
 	note?: string;
 	noteBool?: 1; // Keep in sync with note - for indexing
+
+	// Draft pick conditions (featureDraftPickConditions), see common/draftPickConditions.ts
+	protection?: DraftPickProtection;
+	swap?: DraftPickSwapRight;
+};
+
+export type DraftPickProtectionThen =
+	| "unprotected"
+	| "secondRound"
+	| "extinguish";
+
+// The pick goes to tid (the team that traded it away) if it lands in the top `top` picks of its round. Then next
+// season's pick of the same original team is owed instead, protected top rollover[0], and so on. When rollover runs out
+// and the pick was protected again, `then` applies to the following season.
+export type DraftPickProtection = {
+	tid: number;
+	top: number;
+	rollover: number[];
+	then: DraftPickProtectionThen;
+};
+
+// Team tid has the right to swap its own pick (same season and round) for this one, if this one is better
+export type DraftPickSwapRight = {
+	tid: number;
+};
+
+export type PickConditionSpec =
+	| {
+			type: "protection";
+			top: number;
+			rollover: number[];
+			then: DraftPickProtectionThen;
+	  }
+	| {
+			type: "swap";
+	  };
+
+// A condition added to a pick in a trade. dpid is a pick sent by the team whose TradeTeam holds this, tid is the team receiving it
+export type TradePickCondition = PickConditionSpec & {
+	dpid: number;
+	tid?: number;
 };
 
 export type DraftPick = {
@@ -297,6 +338,12 @@ type TradeEventAsset =
 			season: DraftPickSeason;
 			round: number;
 			originalTid: number;
+
+			// Text of the condition added in this trade, like "top 10 protected"
+			condition?: string;
+
+			// Only the right to swap picks was traded, not the pick itself
+			swap?: true;
 	  };
 
 export type TradeEventTeams = [
@@ -1019,7 +1066,8 @@ export type LogEventType =
 	| "contractOption"
 	| "extension"
 	| "tradeRequest"
-	| "holdout";
+	| "holdout"
+	| "draftPickCondition";
 
 // https://stackoverflow.com/a/57103940/786644
 export type DistributiveOmit<T, K extends keyof T> = T extends any
@@ -2562,6 +2610,11 @@ type TradeSummaryTeam = {
 		round: number;
 		pick: number;
 		desc: string;
+
+		// Condition added in this trade, and whether one can be added
+		condition?: PickConditionSpec;
+		conditionText?: string;
+		canHaveCondition?: boolean;
 	}[];
 	total: number;
 	trade: PlayerFiltered<{
@@ -2581,6 +2634,7 @@ export type TradeSummary = {
 export type TradeTeam = {
 	dpids: number[];
 	dpidsExcluded: number[];
+	pickConditions?: TradePickCondition[];
 	pids: number[];
 	pidsExcluded: number[];
 	tid: number;

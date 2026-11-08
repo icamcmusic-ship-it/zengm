@@ -1,4 +1,5 @@
 import { DEFAULT_TEAM_COLORS, PLAYER } from "../../common/constants.ts";
+import { draftPickConditionText } from "../../common/draftPickConditions.ts";
 import { helpers as commonHelpers } from "../../common/helpers.ts";
 import { idb } from "../db/index.ts";
 import g from "./g.ts";
@@ -325,6 +326,12 @@ const pickDesc = async (dp: DraftPick, short?: "short") => {
 			const record = commonHelpers.formatRecord(teamSeason);
 			extras.push(record);
 		}
+	}
+
+	if (dp.protection || dp.swap) {
+		extras.push(
+			draftPickConditionText(dp, (tid) => g.get("teamInfoCache")[tid]?.abbrev),
+		);
 	}
 
 	let desc = `${season} ${commonHelpers.ordinal(dp.round)}`;

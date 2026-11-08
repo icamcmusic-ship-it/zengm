@@ -6,7 +6,11 @@ import { toWorker } from "../../util/toWorker.ts";
 import { useLocal } from "../../util/local.ts";
 import { realtimeUpdate } from "../../util/realtimeUpdate.ts";
 import { PHASE } from "../../../common/constants.ts";
-import type { View } from "../../../common/types.ts";
+import type { PickConditionSpec, View } from "../../../common/types.ts";
+import { PickConditionEditor } from "../../components/PickConditionEditor.tsx";
+import { SafeHtml } from "../../components/SafeHtml.tsx";
+import { conditionSpecText } from "../../../common/draftPickConditions.ts";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import type { MultiTeamAsset } from "../../../worker/core/trade/multiTeam.ts";
 import type { TradeExplanation } from "../../../worker/core/trade/explain.ts";
 import { Explanation } from "../Trade/Explanation.tsx";
@@ -82,6 +86,7 @@ const TradeThree = ({
 	const tidsKey = tids.join("-");
 
 	const [assets, setAssets] = useState<MultiTeamAsset[]>([]);
+	const pickConditionsOn = useFeatureOn("draftPickConditions");
 	const [evaluation, setEvaluation] = useState<Evaluation | undefined>();
 	const [result, setResult] = useState<
 		| {
@@ -149,8 +154,28 @@ const TradeThree = ({
 			if (toTid === undefined) {
 				return others;
 			}
-			return [...others, { type, id, fromTid, toTid }];
+			// Keep the pick's condition if it still goes somewhere
+			const condition = prev.find(
+				(asset) => assetKey(asset.type, asset.id) === assetKey(type, id),
+			)?.condition;
+			return [
+				...others,
+				{ type, id, fromTid, toTid, ...(condition ? { condition } : {}) },
+			];
 		});
+	};
+
+	const setCondition = (dpid: number, spec: PickConditionSpec | null) => {
+		setResult(undefined);
+		setAssets((prev) =>
+			prev.map((asset) => {
+				if (asset.type !== "pick" || asset.id !== dpid) {
+					return asset;
+				}
+				const { condition, ...rest } = asset;
+				return spec ? { ...rest, condition: spec } : rest;
+			}),
+		);
 	};
 
 	const destinationOf = (type: "player" | "pick", id: number) =>
@@ -301,7 +326,39 @@ const TradeThree = ({
 												destinationOf("pick", dp.dpid) !== undefined,
 										})}
 									>
-										<td>{dp.desc}</td>
+										<td>
+											<SafeHtml dirty={dp.desc} />
+											{(() => {
+												const asset = validAssets.find(
+													(a) => a.type === "pick" && a.id === dp.dpid,
+												);
+												if (!asset) {
+													return null;
+												}
+												return (
+													<>
+														{asset.condition ? (
+															<span className="badge bg-warning text-dark ms-1">
+																{conditionSpecText(
+																	asset.condition,
+																	teams.find((t2) => t2.tid === asset.toTid)
+																		?.abbrev,
+																)}
+															</span>
+														) : null}
+														{pickConditionsOn && dp.canHaveCondition ? (
+															<PickConditionEditor
+																key={JSON.stringify(asset.condition ?? null)}
+																condition={asset.condition}
+																onChange={(spec) => {
+																	setCondition(dp.dpid, spec);
+																}}
+															/>
+														) : null}
+													</>
+												);
+											})()}
+										</td>
 										<td style={{ width: 100 }}>
 											<DestinationSelect
 												fromTid={t.tid}

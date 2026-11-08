@@ -659,6 +659,39 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 								},
 							],
 						},
+						// Draft pick conditions (featureDraftPickConditions)
+						protection: {
+							type: "object",
+							properties: {
+								tid: {
+									type: "integer",
+								},
+								top: {
+									type: "integer",
+									minimum: 1,
+								},
+								rollover: {
+									type: "array",
+									items: {
+										type: "integer",
+										minimum: 1,
+									},
+								},
+								then: {
+									enum: ["unprotected", "secondRound", "extinguish"],
+								},
+							},
+							required: ["tid", "top", "rollover", "then"],
+						},
+						swap: {
+							type: "object",
+							properties: {
+								tid: {
+									type: "integer",
+								},
+							},
+							required: ["tid"],
+						},
 					},
 					required: ["tid", "originalTid", "round", "season"],
 				},

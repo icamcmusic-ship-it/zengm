@@ -2,6 +2,7 @@ import { player } from "../index.ts";
 import { idb } from "../../db/index.ts";
 import type { DraftPick, Player, TradeTeams } from "../../../common/types.ts";
 import isUntradable from "./isUntradable.ts";
+import { getTradePickConditions } from "../../../common/draftPickConditions.ts";
 import { helpers } from "../../util/index.ts";
 import { COMPOSITE_WEIGHTS, POSITIONS } from "../../../common/constants.ts";
 import { last } from "../../../common/utils.ts";
@@ -203,6 +204,7 @@ const tryAddAsset = async (
 			dpidsAdd: userDpids,
 			dpidsRemove: otherDpids,
 			tradingPartnerTid: teams[0].tid,
+			pickConditions: getTradePickConditions(teams),
 		});
 	}
 
@@ -364,6 +366,7 @@ const makeItWork = async (
 		pidsRemove: teams[1].pids,
 		dpidsAdd: teams[0].dpids,
 		dpidsRemove: teams[1].dpids,
+		pickConditions: getTradePickConditions(teams),
 		tradingPartnerTid: teams[0].tid,
 	});
 
@@ -396,6 +399,7 @@ const makeItWork = async (
 				pidsRemove: prevTeams[1].pids,
 				dpidsAdd: prevTeams[0].dpids,
 				dpidsRemove: prevTeams[1].dpids,
+				pickConditions: getTradePickConditions(prevTeams),
 				tradingPartnerTid: prevTeams[0].tid,
 			});
 
@@ -414,6 +418,7 @@ const makeItWork = async (
 			pidsRemove: newTeams[1].pids,
 			dpidsAdd: newTeams[0].dpids,
 			dpidsRemove: newTeams[1].dpids,
+			pickConditions: getTradePickConditions(newTeams),
 			tradingPartnerTid: newTeams[0].tid,
 		});
 

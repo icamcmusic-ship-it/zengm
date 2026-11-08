@@ -1,4 +1,5 @@
 import { PHASE } from "../../../common/constants.ts";
+import { getTradePickConditions } from "../../../common/draftPickConditions.ts";
 import { team } from "../index.ts";
 import { g } from "../../util/index.ts";
 import clear from "./clear.ts";
@@ -53,6 +54,7 @@ const propose = async (forceTrade: boolean = false) => {
 		pidsRemove: teams[1].pids,
 		dpidsAdd: teams[0].dpids,
 		dpidsRemove: teams[1].dpids,
+		pickConditions: getTradePickConditions(teams),
 		tradingPartnerTid: g.get("userTid"),
 	});
 

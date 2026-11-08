@@ -19,6 +19,8 @@ type PickAsset = {
 	season: DraftPickSeason;
 	round: number;
 	originalTid: number;
+	condition?: string;
+	swap?: true;
 };
 
 export const assetIsPlayer = (
@@ -74,8 +76,12 @@ const formatPick = async (
 		}
 	}
 
+	if (dp.condition !== undefined && !dp.swap) {
+		details.push(dp.condition);
+	}
+
 	// Has the draft already happened? If so, fill in the player
-	const p = await getPlayerFromPick(dp);
+	const p = dp.swap ? undefined : await getPlayerFromPick(dp);
 	if (p) {
 		details.push(
 			`became <a href="${helpers.leagueUrl(["player", p.pid])}">${
@@ -91,6 +97,11 @@ const formatPick = async (
 		seasonDescription = `${tradeSeason} expansion draft`;
 	} else {
 		seasonDescription = dp.season;
+	}
+	if (dp.swap) {
+		return `the right to swap ${seasonDescription} ${helpers.ordinal(dp.round)} round picks${
+			details.length > 0 ? ` (${details.join(", ")})` : ""
+		}`;
 	}
 	return `a ${seasonDescription} ${helpers.ordinal(dp.round)} round pick${
 		details.length > 0 ? ` (${details.join(", ")})` : ""

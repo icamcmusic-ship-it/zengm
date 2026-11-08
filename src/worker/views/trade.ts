@@ -1,4 +1,5 @@
 import { bySport } from "../../common/sportFunctions.ts";
+import { getTradePickConditions } from "../../common/draftPickConditions.ts";
 import { player, team, trade } from "../core/index.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
@@ -78,6 +79,7 @@ const validateTeams = async () => {
 			pidsRemove: teams[1].pids,
 			dpidsAdd: teams[0].dpids,
 			dpidsRemove: teams[1].dpids,
+			pickConditions: getTradePickConditions(teams),
 			tradingPartnerTid: g.get("userTid"),
 		})
 		.then((dv) => {

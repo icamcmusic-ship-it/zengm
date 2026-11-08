@@ -15,7 +15,10 @@ import type {
 	FlatContractInfo,
 	PlayerInjury,
 	DraftPick,
+	DraftPickProtection,
+	DraftPickProtectionThen,
 	Team,
+	TradePickCondition,
 } from "../../../common/types.ts";
 import { getNumPicksPerRound } from "../trade/getPickValues.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
@@ -53,6 +56,10 @@ type Asset =
 			dp: DraftPick;
 			draftPick: number;
 			draftYear: number;
+
+			// Draft pick conditions: chance a protected pick conveys, and whether this is just the right to swap picks
+			probConvey?: number;
+			swap?: true;
 	  };
 
 const zscore = (value: number) =>
@@ -676,20 +683,16 @@ const getPickProbs = async (
 	return pickProbs;
 };
 
-const getPickInfo = async (
+// Probability of each pick in the round (index 0 is the 1st pick of the round) and the estimated overall pick number
+const getPickDistribution = async (
 	cache: ValueChangeCache,
 	dp: DraftPick,
-	rookieSalaries: number[],
+	season: number,
 	pidsAdd: number[],
 	pidsRemove: number[],
 	tid: number,
 	tradingPartnerTid?: number,
-): Promise<Asset> => {
-	const season =
-		dp.season === "fantasy" || dp.season === "expansion"
-			? g.get("season")
-			: dp.season;
-
+) => {
 	const pickNumber = await getPickNumber(
 		cache,
 		dp,
@@ -700,7 +703,8 @@ const getPickInfo = async (
 		tradingPartnerTid,
 	);
 
-	const numPicksBeforeRound = getNumPicksPerRound() * (dp.round - 1);
+	const numPicksPerRound = getNumPicksPerRound();
+	const numPicksBeforeRound = numPicksPerRound * (dp.round - 1);
 
 	// After the regular season is over, we don't need to project the order of teams going into this season's draft
 	let currentPickProbs;
@@ -720,47 +724,234 @@ const getPickInfo = async (
 		}
 	}
 
-	let estPick;
-	let value;
 	if (pickNumber.type === "known" || typeof dp.season !== "number") {
 		// We know where this pick is, or it's some weird draft where the normal rules don't apply
-		estPick =
-			numPicksBeforeRound +
-			(pickNumber.type === "known"
+		const pick =
+			pickNumber.type === "known"
 				? pickNumber.pick
 				: helpers.bound(
 						Math.round(
 							pickNumber.slot + pickNumber.bias + pickNumber.userTradeShift,
 						),
 						1,
-						getNumPicksPerRound(),
-					));
-		value = Math.max(MIN_PICK_VALUE, getPickValue(cache, season, estPick));
-	} else {
-		// We don't know where this pick will be, so consider all the possibilities
-		// userTradeShift is there because the user has a lot of control over where its picks wind up, and knows more than the AI about how good teams will be. Neither of those matter when the draft order is random.
-		const userTradeShift =
-			getRoundOrderRule(g.get("draftType"), dp.round) === "random"
-				? 0
-				: pickNumber.userTradeShift;
+						numPicksPerRound,
+					);
+		return {
+			known: true,
+			estPick: numPicksBeforeRound + pick,
+			numPicksBeforeRound,
+			pickProbs: undefined,
+		};
+	}
 
-		const pickProbs = shiftProbs(
-			currentPickProbs ?? (await getPickProbs(cache, dp, pickNumber)),
-			userTradeShift,
+	// We don't know where this pick will be, so consider all the possibilities
+	// userTradeShift is there because the user has a lot of control over where its picks wind up, and knows more than the AI about how good teams will be. Neither of those matter when the draft order is random.
+	const userTradeShift =
+		getRoundOrderRule(g.get("draftType"), dp.round) === "random"
+			? 0
+			: pickNumber.userTradeShift;
+
+	const pickProbs = shiftProbs(
+		currentPickProbs ?? (await getPickProbs(cache, dp, pickNumber)),
+		userTradeShift,
+	);
+
+	let pick = 0;
+	for (const [i, prob] of pickProbs.entries()) {
+		pick += prob * (i + 1);
+	}
+
+	return {
+		known: false,
+		estPick: numPicksBeforeRound + Math.round(pick),
+		numPicksBeforeRound,
+		pickProbs,
+	};
+};
+
+// How much of a pick's value is kept when it is protected, for what's owed instead. A rollover is a later (and also protected) pick, so it's discounted
+const PROTECTED_FALLBACK_FACTOR: Record<DraftPickProtectionThen, number> = {
+	unprotected: 0.75,
+	secondRound: 0.12,
+	extinguish: 0,
+};
+
+// Trade value of a pick with a protection: the pick conveys only outside of the protected range, otherwise something else is owed later
+export const protectedTradeValue = (
+	pickProbs: number[],
+	tradeValues: number[],
+	protection: Pick<DraftPickProtection, "top" | "rollover" | "then">,
+) => {
+	let conveyed = 0;
+	let probProtected = 0;
+	let total = 0;
+	for (const [i, prob] of pickProbs.entries()) {
+		total += prob * tradeValues[i]!;
+		if (i + 1 <= protection.top) {
+			probProtected += prob;
+		} else {
+			conveyed += prob * tradeValues[i]!;
+		}
+	}
+	const fallbackFactor =
+		protection.rollover.length > 0
+			? 0.6
+			: PROTECTED_FALLBACK_FACTOR[protection.then];
+	return {
+		tradeValue: conveyed + probProtected * fallbackFactor * total,
+		probConvey: 1 - probProtected,
+	};
+};
+
+// Expected trade value of the better (or worse) of two independent picks
+export const swapTradeValue = (
+	probsA: number[],
+	tradeValuesA: number[],
+	probsB: number[],
+	tradeValuesB: number[],
+	type: "max" | "min",
+) => {
+	let value = 0;
+	for (const [i, probA] of probsA.entries()) {
+		if (probA <= 0) {
+			continue;
+		}
+		for (const [j, probB] of probsB.entries()) {
+			if (probB <= 0) {
+				continue;
+			}
+			const a = tradeValuesA[i]!;
+			const b = tradeValuesB[j]!;
+			value +=
+				probA * probB * (type === "max" ? Math.max(a, b) : Math.min(a, b));
+		}
+	}
+	return value;
+};
+
+const getPickInfo = async (
+	cache: ValueChangeCache,
+	dp: DraftPick,
+	rookieSalaries: number[],
+	pidsAdd: number[],
+	pidsRemove: number[],
+	tid: number,
+	tradingPartnerTid?: number,
+	condition?: TradePickCondition,
+): Promise<Asset> => {
+	const season =
+		dp.season === "fantasy" || dp.season === "expansion"
+			? g.get("season")
+			: dp.season;
+
+	const dist = await getPickDistribution(
+		cache,
+		dp,
+		season,
+		pidsAdd,
+		pidsRemove,
+		tid,
+		tradingPartnerTid,
+	);
+	const { estPick, numPicksBeforeRound } = dist;
+
+	const roundTradeValues = (probs: number[]) =>
+		probs.map((_prob, i) =>
+			getPickTradeValue(cache, season, numPicksBeforeRound + i + 1),
 		);
+	const asProbs = (d: typeof dist) => {
+		if (d.pickProbs) {
+			return d.pickProbs;
+		}
+		const probs = new Array<number>(getNumPicksPerRound()).fill(0);
+		probs[
+			helpers.bound(d.estPick - d.numPicksBeforeRound - 1, 0, probs.length - 1)
+		] = 1;
+		return probs;
+	};
 
+	let value;
+	if (dist.pickProbs) {
 		let tradeValue = 0;
-		let pick = 0;
-		for (const [i, prob] of pickProbs.entries()) {
+		for (const [i, prob] of dist.pickProbs.entries()) {
 			if (prob > 0) {
 				tradeValue +=
 					prob * getPickTradeValue(cache, season, numPicksBeforeRound + i + 1);
-				pick += prob * (i + 1);
 			}
 		}
-
-		estPick = numPicksBeforeRound + Math.round(pick);
 		value = tradeValueToValue(tradeValue);
+	} else {
+		value = Math.max(MIN_PICK_VALUE, getPickValue(cache, season, estPick));
+	}
+
+	// Draft pick conditions: a new one from this trade, or one already on the pick
+	let probConvey: number | undefined;
+	let swapWithTid: number | undefined;
+	let swapType: "max" | "min" | undefined;
+	if (condition?.type === "swap" && condition.tid !== undefined) {
+		// Only the right to swap is traded
+		swapWithTid = condition.tid;
+		swapType = "max";
+	} else if (!condition && dp.swap) {
+		// This pick carries another team's swap right, so it's worth the worse of the two
+		swapWithTid = dp.swap.tid;
+		swapType = "min";
+	}
+	const protection =
+		condition?.type === "protection" ? condition : dp.protection;
+	if (
+		typeof dp.season === "number" &&
+		(protection || swapWithTid !== undefined)
+	) {
+		const probs = asProbs(dist);
+		const tradeValues = roundTradeValues(probs);
+		if (protection) {
+			const result = protectedTradeValue(probs, tradeValues, protection);
+			value = tradeValueToValue(result.tradeValue);
+			probConvey = result.probConvey;
+		} else if (swapWithTid !== undefined && swapType !== undefined) {
+			const otherPick = (
+				await idb.cache.draftPicks.indexGetAll("draftPicksByTid", swapWithTid)
+			).find(
+				(dp2) =>
+					dp2.originalTid === swapWithTid &&
+					dp2.season === dp.season &&
+					dp2.round === dp.round,
+			);
+			if (otherPick) {
+				const otherProbs = asProbs(
+					await getPickDistribution(
+						cache,
+						otherPick,
+						season,
+						pidsAdd,
+						pidsRemove,
+						tid,
+						tradingPartnerTid,
+					),
+				);
+				const otherTradeValues = roundTradeValues(otherProbs);
+				const better = swapTradeValue(
+					probs,
+					tradeValues,
+					otherProbs,
+					otherTradeValues,
+					swapType,
+				);
+				if (swapType === "max") {
+					// What the swap adds on top of the team's own pick
+					let own = 0;
+					for (const [i, prob] of otherProbs.entries()) {
+						own += prob * otherTradeValues[i]!;
+					}
+					value = tradeValueToValue(Math.max(0, better - own));
+				} else {
+					value = tradeValueToValue(better);
+				}
+			} else if (swapType === "max") {
+				value = 0;
+			}
+		}
 	}
 
 	let contractValue = getContractValue(
@@ -775,6 +966,11 @@ const getPickInfo = async (
 		getPickValue(cache, season, estPick),
 	);
 	contractValue = Math.max(0, contractValue);
+	if (swapType === "max") {
+		contractValue = 0;
+	} else if (probConvey !== undefined) {
+		contractValue *= probConvey;
+	}
 
 	// Ensure there are no tied pick values
 	value -= estPick * 1e-10;
@@ -793,6 +989,8 @@ const getPickInfo = async (
 		age: 20,
 		draftPick: estPick,
 		draftYear: season,
+		probConvey,
+		swap: swapType === "max" ? true : undefined,
 	};
 };
 
@@ -806,6 +1004,7 @@ const getPicks = async ({
 	dpidsRemove,
 	tid,
 	tradingPartnerTid,
+	pickConditions,
 }: {
 	cache: ValueChangeCache;
 	add: Asset[];
@@ -816,7 +1015,12 @@ const getPicks = async ({
 	dpidsRemove: number[];
 	tid: number;
 	tradingPartnerTid?: number;
+	pickConditions?: TradePickCondition[];
 }) => {
+	const conditionsByDpid = new Map(
+		(pickConditions ?? []).map((c) => [c.dpid, c]),
+	);
+
 	// For each draft pick, estimate its value based on the recent performance of the team
 	if (dpidsAdd.length > 0 || dpidsRemove.length > 0) {
 		const rookieSalaries = draft.getRookieSalaries();
@@ -835,6 +1039,7 @@ const getPicks = async ({
 				pidsRemove,
 				tid,
 				tradingPartnerTid,
+				conditionsByDpid.get(dpid),
 			);
 			add.push(pickInfo);
 		}
@@ -853,6 +1058,7 @@ const getPicks = async ({
 				pidsRemove,
 				tid,
 				tradingPartnerTid,
+				conditionsByDpid.get(dpid),
 			);
 			remove.push(pickInfo);
 		}
@@ -1169,6 +1375,9 @@ type EvaluateArgs = {
 	dpidsAdd: number[];
 	dpidsRemove: number[];
 	tradingPartnerTid: number | undefined;
+
+	// New draft pick conditions in this trade (see getTradePickConditions)
+	pickConditions?: TradePickCondition[];
 };
 
 // tradingPartnerTid is currently just used to determine if this is a trade with the user, so additional fuzz can be applied
@@ -1304,6 +1513,7 @@ export class ValueChangeCalculator {
 			dpidsAdd,
 			dpidsRemove,
 			tradingPartnerTid,
+			pickConditions,
 		}: EvaluateArgs,
 		details?: { add: AssetValueDetail[]; remove: AssetValueDetail[] },
 	): Promise<number> {
@@ -1342,6 +1552,7 @@ export class ValueChangeCalculator {
 			dpidsRemove,
 			tid,
 			tradingPartnerTid,
+			pickConditions,
 		});
 
 		// console.log("ADD");

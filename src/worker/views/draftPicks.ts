@@ -1,4 +1,5 @@
 import { idb } from "../db/index.ts";
+import { draftPickConditionText } from "../../common/draftPickConditions.ts";
 import { g, helpers } from "../util/index.ts";
 import type { DraftPick } from "../../common/types.ts";
 import { defineView } from "../util/defineView.ts";
@@ -144,6 +145,10 @@ export const processDraftPicks = async (draftPicksRaw: DraftPick[]) => {
 			},
 			projectedPick,
 			trades,
+			conditionText:
+				dp.protection || dp.swap
+					? draftPickConditionText(dp, (tid) => teams[tid]?.abbrev)
+					: undefined,
 		});
 	}
 
@@ -162,7 +167,8 @@ export default defineView({
 			tid !== prevInputs?.tid
 		) {
 			const draftPicksRaw = (await idb.cache.draftPicks.getAll()).filter(
-				(dp) => dp.tid === tid || dp.originalTid === tid,
+				(dp) =>
+					dp.tid === tid || dp.originalTid === tid || dp.swap?.tid === tid,
 			);
 
 			const draftPicksProcessed = await processDraftPicks(draftPicksRaw);
@@ -175,6 +181,9 @@ export default defineView({
 					draftPicks.push(dp);
 				} else if (dp.originalTid === tid) {
 					draftPicksOutgoing.push(dp);
+				} else if (dp.swap?.tid === tid) {
+					// Swap right on another team's pick
+					draftPicks.push(dp);
 				}
 			}
 
