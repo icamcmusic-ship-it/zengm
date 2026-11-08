@@ -64,7 +64,11 @@ const JerseyNumbersTeams = ({
 			desc: `${valueStat} wearing this number for this team`,
 			sortType: "number",
 		},
-		{ title: "Yrs", desc: "His seasons in it", sortType: "number" },
+		{
+			title: "Years",
+			desc: "His seasons in it (sorted by how many)",
+			sortType: "number",
+		},
 		{ title: "Also Wore It", sortType: "string" },
 		{ title: "Wearers", sortType: "number" },
 		{

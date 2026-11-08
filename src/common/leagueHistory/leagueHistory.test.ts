@@ -279,6 +279,20 @@ describe("pick value", () => {
 		assert.strictEqual(V.undrafted.mean, 5);
 	});
 
+	test("the strictest maturity that keeps 3 classes", () => {
+		const V2 = buildPickValue(
+			league(players, fourTeams(2020, 2032), { season: 2032 }),
+		)!;
+		assert.strictEqual(V2.mature, 10);
+		assert.strictEqual(V2.classes, 3);
+		// In 2028, 8+ seasons leaves only the 2020 class, so it takes 6+ (all three)
+		const V3 = buildPickValue(
+			league(players, fourTeams(2020, 2028), { season: 2028 }),
+		)!;
+		assert.strictEqual(V3.mature, 6);
+		assert.strictEqual(V3.classes, 3);
+	});
+
 	test("no mature class", () => {
 		assert.isNull(
 			buildPickValue(

@@ -2,7 +2,7 @@
 //
 // - Career win shares are regular season. A drafted player who never played counts as 0.
 // - Hit rates leave out players whose outcome is unknown rather than counting them as misses. "Starter" (a season of 20+ games, starting at least half of them) needs games started on file for that season (starts covering 90%+ of its team games). "All-Star" is a no only if he played a season in which All-Stars were named.
-// - Classes before the league's first season (partial) and classes without enough seasons played since are left out. A class needs 10 seasons if that leaves at least 20 picks, else 8, 6 or 4.
+// - Classes before the league's first season (partial) and classes without enough seasons played since are left out. A class needs 10 seasons if that leaves at least 3 classes, else 8, 6 or 4 (and at least 20 picks).
 
 import type { WLeague, WPlayer } from "../wrapped/types.ts";
 import {
@@ -209,15 +209,20 @@ export const buildPickValue = (L: WLeague): PickValue | null => {
 		}
 	}
 	const years = [...classSize.keys()].sort((a, b) => a - b);
+	// The most seasons that still leaves 3+ classes; failing that, the most that leaves 20+ picks
 	let mature: number | undefined;
 	let use: number[] = [];
-	for (const m of MATURE_STEPS) {
-		use = years.filter((y) => y <= lastComplete - m);
-		const n = use.reduce((sum, y) => sum + classSize.get(y)!, 0);
-		if (n >= 20) {
-			mature = m;
-			break;
-		}
+	const options = MATURE_STEPS.map((m) => {
+		const ys = years.filter((y) => y <= lastComplete - m);
+		const n = ys.reduce((sum, y) => sum + classSize.get(y)!, 0);
+		return { m, ys, n };
+	});
+	const pick =
+		options.find((o) => o.ys.length >= 3 && o.n >= 20) ??
+		options.find((o) => o.n >= 20);
+	if (pick) {
+		mature = pick.m;
+		use = pick.ys;
 	}
 	if (mature === undefined || use.length === 0) {
 		return null;
