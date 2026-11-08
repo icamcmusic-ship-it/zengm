@@ -227,6 +227,10 @@ export const getDefaultSettings = () => {
 		),
 		// Off by default for existing leagues, on for new ones
 		technicalFouls: true,
+		contractOptions: true,
+		contractExtensions: true,
+		tradeRequests: true,
+		holdoutFrequency: 1,
 		playerMoodTraits: unwrapGameAttribute(
 			defaultGameAttributes,
 			"playerMoodTraits",

@@ -29,6 +29,30 @@ import { SaveTrade } from "../../components/SaveTrade.tsx";
 import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { ActionButton } from "../../components/ActionButton.tsx";
 
+// Players who asked to be traded are flagged, since AI teams know he wants out and offer less
+const withTradeRequestBadge = <T extends { value: ReactNode }>(
+	cell: T,
+	tradeRequest: boolean,
+): T => {
+	if (!tradeRequest) {
+		return cell;
+	}
+	return {
+		...cell,
+		value: (
+			<>
+				{cell.value}
+				<span
+					className="badge text-bg-danger ms-1"
+					title="Requested a trade. AI teams know he wants out, so they offer less for him."
+				>
+					Trade request
+				</span>
+			</>
+		),
+	};
+};
+
 export type OfferType = Awaited<
 	ReturnType<(typeof api)["main"]["getTradingBlockOffers"]>
 >[0] & {
@@ -724,16 +748,19 @@ const TradingBlock = ({
 						/>
 					),
 				},
-				wrappedPlayerNameLabels({
-					pid: p.pid,
-					injury: p.injury,
-					jerseyNumber: p.jerseyNumber,
-					skills: p.ratings.skills,
-					defaultWatch: p.watch,
-					firstName: p.firstName,
-					firstNameShort: p.firstNameShort,
-					lastName: p.lastName,
-				}),
+				withTradeRequestBadge(
+					wrappedPlayerNameLabels({
+						pid: p.pid,
+						injury: p.injury,
+						jerseyNumber: p.jerseyNumber,
+						skills: p.ratings.skills,
+						defaultWatch: p.watch,
+						firstName: p.firstName,
+						firstNameShort: p.firstNameShort,
+						lastName: p.lastName,
+					}),
+					p.tradeRequest,
+				),
 				p.ratings.pos,
 				p.age,
 				!challengeNoRatings ? p.ratings.ovr : null,

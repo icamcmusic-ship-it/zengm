@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { wrappedFreeAgentMarket } from "../components/FreeAgentMarket.tsx";
 import { dropdownOptions } from "../hooks/useDropdownOptions.tsx";
 import { PHASE, PHASE_TEXT } from "../../common/constants.ts";
 import { DataTable } from "../components/DataTable/index.tsx";
@@ -108,6 +109,7 @@ const signedFreeAgentWrapped = (
 
 const FreeAgents = ({
 	capSpace,
+	market,
 	challengeNoFreeAgents,
 	freeAgencySeason,
 	numRosterSpots,
@@ -184,6 +186,12 @@ const FreeAgents = ({
 		"Pot",
 		...stats.map((stat) => `stat:${stat}`),
 		"Mood",
+		{
+			title: "Market",
+			desc: "AI teams interested in signing him, and the chance he signs with one of them on the next day (click for details)",
+			sortSequence: ["desc", "asc"] as const,
+			sortType: "number" as const,
+		},
 		askingForText,
 		"Exp",
 		"Actions",
@@ -279,6 +287,9 @@ const FreeAgents = ({
 							maxWidth: true,
 							p,
 						})
+					: undefined,
+				p.freeAgentType === "available"
+					? wrappedFreeAgentMarket(market[p.pid], p.mood.user.contractAmount)
 					: undefined,
 				wrappedContractAmount(p, p.contract.amount),
 				wrappedContractExp(p),

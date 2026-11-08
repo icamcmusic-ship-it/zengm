@@ -1,3 +1,10 @@
+import type { ContractTerms } from "../../common/types.ts";
+import {
+	describeContractTerms,
+	getContractTermsFactor,
+	GUARANTEE_LEVELS,
+	normalizeContractTerms,
+} from "../../common/contractTerms.ts";
 import { Modal } from "./Modal.tsx";
 import clsx from "clsx";
 import { OverlayTrigger, Tooltip } from "react-bootstrap";
@@ -24,12 +31,14 @@ const SignButton = ({
 	exp,
 	disabledReason,
 	onSuccess,
+	terms,
 }: {
 	p: { name: string; pid: number };
 	amount: number;
 	exp: number;
 	disabledReason: string | undefined;
 	onSuccess: () => void;
+	terms?: ContractTerms;
 }) => {
 	const button = (
 		<button
@@ -40,6 +49,7 @@ const SignButton = ({
 					pid: p.pid,
 					amount: Math.round(amount * 1000),
 					exp,
+					terms,
 				});
 				if (typeof response === "string") {
 					showNotification({
@@ -81,6 +91,8 @@ const widthStyle = { maxWidth: 575 };
 const NegotiationHeader = ({
 	capSpace,
 	challengeNoRatings,
+	currentContract,
+	extension,
 	payroll,
 	p,
 	resigning,
@@ -89,6 +101,8 @@ const NegotiationHeader = ({
 	t,
 }: Pick<
 	NegotaitionModalProps,
+	| "currentContract"
+	| "extension"
 	| "capSpace"
 	| "challengeNoRatings"
 	| "payroll"
@@ -161,7 +175,11 @@ const NegotiationHeader = ({
 							: null}
 					</div>
 					<div>
-						{resigning ? "Re-signing" : "Free Agent"}
+						{extension
+							? `Extension (current contract: ${currentContract ? `${helpers.formatCurrency(currentContract.amount, "M")} thru ${currentContract.exp}` : "none"})`
+							: resigning
+								? "Re-signing"
+								: "Free Agent"}
 						{message ? (
 							<HelpPopover className="ms-1">{message}</HelpPopover>
 						) : null}
@@ -183,17 +201,97 @@ const NegotiationHeader = ({
 	);
 };
 
-const Negotiation = ({
-	contractOptions,
-	close,
-	p,
-}: Pick<NegotaitionModalProps, "contractOptions" | "p"> & {
-	close: () => void;
+const ContractTermsControls = ({
+	terms,
+	setTerms,
+}: {
+	terms: ContractTerms;
+	setTerms: (terms: ContractTerms) => void;
 }) => {
 	return (
+		<div className="d-flex flex-wrap gap-2 mb-2" style={widthStyle}>
+			<div className="input-group input-group-sm" style={{ width: "auto" }}>
+				<span className="input-group-text">Option</span>
+				<select
+					className="form-select"
+					value={terms.option ?? "none"}
+					onChange={(event) => {
+						const value = event.target.value;
+						setTerms({
+							...terms,
+							option:
+								value === "player" || value === "team" ? value : undefined,
+						});
+					}}
+				>
+					<option value="none">None</option>
+					<option value="player">Player option (-5%)</option>
+					<option value="team">Team option (+10%)</option>
+				</select>
+			</div>
+			<div className="input-group input-group-sm" style={{ width: "auto" }}>
+				<span className="input-group-text">Guaranteed after year 1</span>
+				<select
+					className="form-select"
+					value={terms.guaranteed ?? 1}
+					onChange={(event) => {
+						const value = Number.parseFloat(event.target.value);
+						setTerms({
+							...terms,
+							guaranteed: value < 1 ? value : undefined,
+						});
+					}}
+				>
+					{GUARANTEE_LEVELS.map((level) => (
+						<option key={level} value={level}>
+							{Math.round(level * 100)}%
+							{level < 1 ? ` (+${Math.round(20 * (1 - level))}%)` : ""}
+						</option>
+					))}
+				</select>
+			</div>
+			<HelpPopover>
+				An option is on the final season. With a player option, he decides
+				whether to stay for that season, so he'll take a bit less. With a team
+				option, you decide, so he wants more. If you release a player, you only
+				owe the guaranteed part of seasons after the current one. Options and
+				guarantees only apply to contracts of at least 2 years.
+			</HelpPopover>
+		</div>
+	);
+};
+
+const Negotiation = ({
+	contractOptions,
+	contractTermsEnabled,
+	close,
+	p,
+}: Pick<
+	NegotaitionModalProps,
+	"contractOptions" | "contractTermsEnabled" | "p"
+> & {
+	close: () => void;
+}) => {
+	const [terms, setTerms] = useState<ContractTerms>({});
+	return (
 		<>
+			{contractTermsEnabled ? (
+				<ContractTermsControls terms={terms} setTerms={setTerms} />
+			) : null}
 			<div className="list-group" style={widthStyle}>
-				{contractOptions.map((contract, i) => {
+				{contractOptions.map((contractRaw, i) => {
+					const rowTerms = contractTermsEnabled
+						? normalizeContractTerms(terms, contractRaw.years)
+						: undefined;
+					const contract = {
+						...contractRaw,
+						amount:
+							Math.round(
+								contractRaw.amount *
+									getContractTermsFactor(rowTerms, contractRaw.years) *
+									100,
+							) / 100,
+					};
 					return (
 						<div
 							key={i}
@@ -205,6 +303,11 @@ const Negotiation = ({
 								<b>{helpers.formatCurrency(contract.amount, "M")}</b>/year for{" "}
 								{contract.years} {helpers.plural("year", contract.years)}{" "}
 								(through {contract.exp})
+								{rowTerms ? (
+									<div className="small text-body-secondary">
+										{describeContractTerms(rowTerms, contract.exp)}
+									</div>
+								) : null}
 							</div>
 
 							<SignButton
@@ -213,6 +316,7 @@ const Negotiation = ({
 								exp={contract.exp}
 								disabledReason={contract.disabledReason}
 								onSuccess={close}
+								terms={rowTerms}
 							/>
 						</div>
 					);

@@ -1475,6 +1475,43 @@ export const settings: Setting[] = (
 			type: "bool",
 		},
 		{
+			category: "Contracts",
+			key: "contractOptions",
+			name: "Contract Options & Guarantees",
+			type: "bool",
+			description:
+				"Contracts can have a player or team option on their final season, and later seasons can be partially guaranteed, which lowers what a team owes if it releases the player. Players decide on their options based on mood and market value, and teams decide on team options, at the start of the re-signing phase.",
+		},
+		{
+			category: "Contracts",
+			key: "contractExtensions",
+			name: "In-Season Contract Extensions",
+			type: "bool",
+			description:
+				"Players in the last two seasons of their contracts can be extended during the preseason and regular season. AI teams extend some of their own players too.",
+		},
+		{
+			category: "Contracts",
+			key: "tradeRequests",
+			name: "Trade Requests",
+			type: "bool",
+			description:
+				"Very unhappy good players on AI-controlled or user teams can publicly ask to be traded, which lowers their trade value until they are traded or their mood improves.",
+		},
+		{
+			category: "Contracts",
+			key: "holdoutFrequency",
+			name: "Holdout Frequency",
+			type: "float",
+			description:
+				"How often very unhappy players under contract hold out and miss games, relative to the default (1). 0 means players never hold out.",
+			validator: (value) => {
+				if (value < 0) {
+					throw new Error("Value cannot be less than 0");
+				}
+			},
+		},
+		{
 			category: "Rookie Contracts",
 			key: "rookiesCanRefuse",
 			name: "Can Refuse After Rookie Contract",

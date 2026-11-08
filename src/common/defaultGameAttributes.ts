@@ -551,6 +551,11 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	draftAges: [19, 22],
 	defaultStadiumCapacity: DEFAULT_STADIUM_CAPACITY,
 	playersRefuseToNegotiate: true,
+	// Off for existing leagues (and tests), new leagues turn them on (see views/newLeague.ts)
+	contractOptions: false,
+	contractExtensions: false,
+	tradeRequests: false,
+	holdoutFrequency: 0,
 	allStarGame: 0.7,
 	allStarNum: 12,
 	allStarType: "byConf",

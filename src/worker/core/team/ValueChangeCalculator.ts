@@ -1,4 +1,8 @@
 import { getCurrentContract } from "../../../common/contracts.ts";
+import {
+	hasActiveTradeRequest,
+	TRADE_REQUEST_VALUE_FACTOR,
+} from "../contract/unrest.ts";
 import { contractToSummary } from "../contract/index.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import { PHASE } from "../../../common/constants.ts";
@@ -274,6 +278,11 @@ const getPlayers = async ({
 		let fudgedValue = value;
 		if (fudgedValue > 0) {
 			fudgedValue *= fudgeFactor;
+
+			// A team gets less for a player who publicly asked out
+			if (hasActiveTradeRequest(p)) {
+				fudgedValue *= TRADE_REQUEST_VALUE_FACTOR;
+			}
 		}
 
 		const contract = getContractForValuation(p);

@@ -1,5 +1,6 @@
 import { PHASE } from "../../../common/constants.ts";
-import { g, helpers, logEvent } from "../../util/index.ts";
+import { g, helpers, local, logEvent } from "../../util/index.ts";
+import { pickAiContractTerms } from "../contract/options.ts";
 import type { Phase, Player, FlatContractInfo } from "../../../common/types.ts";
 import genJerseyNumber from "./genJerseyNumber.ts";
 import setJerseyNumber from "./setJerseyNumber.ts";
@@ -40,6 +41,18 @@ const sign = async (
 	};
 	if (contractInput.rookie) {
 		contractSummary.rookie = true;
+	}
+	if (g.get("contractOptions") && !contractSummary.rookie) {
+		const aiTeam =
+			!g.get("userTids").includes(tid) ||
+			!!local.autoPlayUntil ||
+			g.get("spectator");
+		const terms =
+			contractInput.terms ??
+			(aiTeam ? pickAiContractTerms(p, contractSummary) : undefined);
+		if (terms) {
+			contractSummary.terms = { ...terms };
+		}
 	}
 
 	// Sigh, don't know why this is needed, but people tell me that sometimes the #1 pick has a massively negative contract

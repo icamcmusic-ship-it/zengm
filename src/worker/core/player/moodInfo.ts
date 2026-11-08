@@ -3,7 +3,7 @@ import { g, helpers } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
 import moodComponents from "./moodComponents.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
-import type { Player } from "../../../common/types.ts";
+import type { MoodComponents, Player } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
 import { uniformSeed } from "../../../common/random.ts";
@@ -20,9 +20,13 @@ const moodInfo = async (
 	tid: number,
 	overrides: {
 		contractAmount?: number;
+
+		// For "what if" projections, like the mood panel on the player page. Changes the components before anything else uses them.
+		adjustComponents?: (components: MoodComponents) => void;
 	} = {},
 ) => {
 	const components = await moodComponents(p, tid);
+	overrides.adjustComponents?.(components);
 	let probWilling = 0;
 
 	// What he's asking for, or his current contract if he's not asking for anything

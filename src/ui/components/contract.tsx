@@ -144,6 +144,51 @@ export const ContractExp = ({
 			}
 		>
 			{override ?? p.contract.exp}
+			{override === undefined ? (
+				<ContractTermsBadge terms={p.contract.terms} exp={p.contract.exp} />
+			) : null}
+		</span>
+	);
+};
+
+// Small marker after the expiration year for an option or partial guarantee
+export const ContractTermsBadge = ({
+	terms,
+	exp,
+}: {
+	terms: FormattedContract["terms"];
+	exp: number | undefined;
+}) => {
+	if (!terms) {
+		return null;
+	}
+
+	const label = [
+		terms.option === "player" ? "PO" : terms.option === "team" ? "TO" : null,
+		terms.guaranteed !== undefined
+			? `${Math.round(terms.guaranteed * 100)}%G`
+			: null,
+	]
+		.filter((x) => x !== null)
+		.join(" ");
+	const title = [
+		terms.option
+			? `${terms.option === "player" ? "Player" : "Team"} option on ${exp}`
+			: null,
+		terms.guaranteed !== undefined
+			? `Seasons after the first are ${Math.round(terms.guaranteed * 100)}% guaranteed`
+			: null,
+	]
+		.filter((x) => x !== null)
+		.join(". ");
+
+	return (
+		<span
+			className="badge text-bg-secondary ms-1 align-text-top"
+			style={{ fontSize: "0.65em" }}
+			title={title}
+		>
+			{label}
 		</span>
 	);
 };

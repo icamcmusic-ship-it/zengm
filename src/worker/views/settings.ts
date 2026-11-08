@@ -45,6 +45,10 @@ type Key =
 	| "draftType"
 	| "draftAges"
 	| "playersRefuseToNegotiate"
+	| "contractOptions"
+	| "contractExtensions"
+	| "tradeRequests"
+	| "holdoutFrequency"
 	| "allStarGame"
 	| "allStarNum"
 	| "allStarType"
@@ -265,6 +269,10 @@ export const getInitialSettings = (): Settings => {
 		draftType: g.get("draftType"),
 		draftAges: g.get("draftAges"),
 		playersRefuseToNegotiate: g.get("playersRefuseToNegotiate"),
+		contractOptions: g.get("contractOptions"),
+		contractExtensions: g.get("contractExtensions"),
+		tradeRequests: g.get("tradeRequests"),
+		holdoutFrequency: g.get("holdoutFrequency"),
 		allStarGame: g.get("allStarGame"),
 		allStarNum: g.get("allStarNum"),
 		allStarType: g.get("allStarType"),

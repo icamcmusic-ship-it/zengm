@@ -68,6 +68,15 @@ const handleRelease = async (
 			gender,
 			"his",
 		)} contract expires in ${p.contract.exp}.`;
+
+		// Partial guarantees and team options lower what's owed
+		const terms = p.contract.terms;
+		if (terms?.guaranteed !== undefined) {
+			releaseMessage += ` Only ${Math.round(terms.guaranteed * 100)}% of ${helpers.pronoun(gender, "his")} salary after this season is guaranteed, so that's all you'd owe for those seasons.`;
+		}
+		if (terms?.option === "team") {
+			releaseMessage += ` You would not owe the ${p.contract.exp} team option season.`;
+		}
 	}
 
 	const proceed = await confirm(releaseMessage, {
