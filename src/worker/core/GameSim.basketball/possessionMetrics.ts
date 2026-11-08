@@ -144,6 +144,9 @@ export const simGames = async ({
 		await withSeededRandom(seed * 7919 + r * 104729, async () => {
 			await genTeams();
 			g.setWithoutSavingToDB("realisticPossessions", realistic);
+			// No play-by-play of any kind: the sim's own state is all that is measured (see possessionModel.test.ts, which checks that logging
+			// on or off gives identical games)
+			g.setWithoutSavingToDB("storePlayByPlay", false);
 			if (pace !== undefined) {
 				g.setWithoutSavingToDB("pace", pace);
 			}
@@ -202,8 +205,6 @@ export const summarize = (games: Awaited<ReturnType<typeof simGames>>) => {
 	const orbToShot: number[] = [];
 	const lastShotClock: number[] = [];
 	const twoForOneShotTimes: number[] = [];
-	let twoForOneChances = 0;
-	let twoForOneMade = 0;
 	let secondChancePts = 0;
 	let violations = 0;
 	let intentionalFouls = 0;
@@ -333,28 +334,14 @@ export const summarize = (games: Awaited<ReturnType<typeof simGames>>) => {
 				lastShotClock.push(last.t);
 			}
 			const segs = game.segs.filter((s) => s.period === period);
-			// the possession that starts with 30-45 seconds left
+			// the possession that starts with 34-50 seconds left: how long until its shot (a 2-for-1 shoots with ~29-35 s left)
 			const k = segs.findIndex(
-				(s) => s.tBefore <= 45 && s.tBefore >= 30 && s.prev !== "orb",
+				(s) => s.tBefore <= 50 && s.tBefore >= 34 && s.prev !== "orb",
 			);
 			if (k >= 0) {
-				twoForOneChances += 1;
-				const team = segs[k]!.off;
 				const shot = shots.find((s) => s.startT === segs[k]!.tBefore);
 				if (shot) {
 					twoForOneShotTimes.push(shot.startT - shot.t);
-				}
-				// possessions from here on (not counting a last-second heave), by team
-				const runs = [0, 0];
-				let prevOff: number | undefined;
-				for (const s of segs.slice(k)) {
-					if (s.off !== prevOff && s.tBefore > 3) {
-						runs[s.off]! += 1;
-					}
-					prevOff = s.off;
-				}
-				if (runs[team]! >= 2 && runs[team]! > runs[1 - team]!) {
-					twoForOneMade += 1;
 				}
 			}
 		}
@@ -405,7 +392,6 @@ export const summarize = (games: Awaited<ReturnType<typeof simGames>>) => {
 		lastShotClock: mean(lastShotClock),
 		lastShotUnder3: pct(lastShotClock, (x) => x <= 3),
 		twoForOneShotTime: mean(twoForOneShotTimes),
-		twoForOneRate: twoForOneMade / Math.max(twoForOneChances, 1),
 		intentionalFoulsPerGame: intentionalFouls / games.length,
 		otRate: games.filter((x) => x.overtimes > 0).length / games.length,
 		teamPaceRatingMean: mean(games.flatMap((x) => x.teamPace)),

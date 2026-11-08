@@ -120,6 +120,32 @@ export const shotClockMakeFactor = (shotClockLeft: number) => {
 	return factor / SHOT_CLOCK_MAKE_NORM;
 };
 
+/* Player/team "traits" that change possessions, as inputs derived from RATINGS (composite ratings and the like), computed inside GameSim from
+   the roster on the court. Nothing here reads play-by-play events; the sim never depends on them. 1 means no effect, so adding a trait is
+   filling in its derivation (e.g. clutch from a rating) and using the field where the sim already has a hook:
+   - shotDiscipline: scales the chance a late-clock crisis ends in a violation (1 = average; below 1 = finds a shot)
+   - clutch: scales shot quality in the last 2 minutes of a close 4th quarter/overtime (applied to probMake)
+   - consistency: scales how spread out a team's half-court search times are (lower = steadier possession lengths)
+   - durability: scales injury rate (hook: GameSim.injuries)
+   Nothing derives them from ratings yet, so every value is 1 and games are as they would be without traits. */
+export type Traits = {
+	shotDiscipline: number;
+	clutch: number;
+	consistency: number;
+	durability: number;
+};
+export const NEUTRAL_TRAITS: Traits = {
+	shotDiscipline: 1,
+	clutch: 1,
+	consistency: 1,
+	durability: 1,
+};
+export const deriveTraits = (
+	_compositeRating: Record<string, number>,
+): Traits => {
+	return { ...NEUTRAL_TRAITS };
+};
+
 // Standard normal
 const gaussian = () => {
 	let u = 0;

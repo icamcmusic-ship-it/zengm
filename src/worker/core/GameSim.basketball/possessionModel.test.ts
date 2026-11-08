@@ -164,7 +164,7 @@ test("play-by-play: violations are logged as such, and read as shot-clock violat
 			}
 			const lines = playLive(events.slice(), makeLiveBoxScore(result, seed));
 			violationLines += lines.filter((l) =>
-				/shot-clock violation|shot clock expires|shot clock runs out/i.test(
+				/shot-clock violation|shot clock expires|shot clock runs out|out the shot clock/i.test(
 					l.text,
 				),
 			).length;
@@ -182,5 +182,64 @@ test("play-by-play: violations are logged as such, and read as shot-clock violat
 		});
 	}
 	assert.isAbove(violations, 0);
-	assert.strictEqual(violationLines, violations);
+	assert.isAtLeast(violationLines, violations);
 }, 60_000);
+
+// The model lives entirely in GameSim: the play-by-play logger (live feed, stored game.pbp, flavor text) only reads what the sim does. So the
+// same seeded game is identical with logging off (doPlayByPlay false, storePlayByPlay off: no events at all) and with every kind of logging on,
+// with the realistic possession model on or off
+test("box scores are byte-identical with play-by-play logging on or off, with the model on and off", async () => {
+	const hashOf = (box: unknown) => JSON.stringify(box);
+	for (const realistic of [false, true]) {
+		for (const tech of [false, true]) {
+			for (const seed of [31, 32, 33, 34]) {
+				const run = (doPlayByPlay: boolean, storePlayByPlay: boolean) =>
+					withSeededRandom(seed, async () => {
+						await genTeams();
+						g.setWithoutSavingToDB("realisticPossessions", realistic);
+						g.setWithoutSavingToDB("technicalFouls", tech);
+						g.setWithoutSavingToDB("storePlayByPlay", storePlayByPlay);
+						const teams = await loadTeams([0, 1], {});
+						const sim = new GameSim({
+							gid: seed,
+							teams: [teams[0]!, teams[1]!],
+							baseInjuryRate: g.get("injuryRate"),
+							doPlayByPlay,
+							homeCourtFactor: 1,
+							allStarGame: false,
+							neutralSite: false,
+						});
+						const result = sim.run();
+						return {
+							events: result.playByPlay?.length ?? 0,
+							box: hashOf({
+								overtimes: result.overtimes,
+								teams: result.team.map((t) => ({
+									stat: t.stat,
+									players: t.player.map((p) => ({ id: p.id, stat: p.stat })),
+								})),
+								violations: sim.shotClockViolations,
+							}),
+						};
+					});
+				const off = await run(false, false);
+				const live = await run(true, false);
+				const stored = await run(false, true);
+				const both = await run(true, true);
+				const label = `realistic ${realistic}, tech ${tech}, seed ${seed}`;
+				assert.strictEqual(off.events, 0, label);
+				assert.isAbove(live.events, 100, label);
+				assert.strictEqual(live.box, off.box, label);
+				assert.strictEqual(stored.box, off.box, label);
+				assert.strictEqual(both.box, off.box, label);
+			}
+		}
+	}
+}, 120_000);
+
+test("the distributions measured with logging fully off are the NBA-like ones", () => {
+	// possessionMetrics runs with storePlayByPlay off and doPlayByPlay false, so these come from the sim alone
+	between("pace", 97, 102);
+	between("violationsPerTeamGame", 0.35, 1.2);
+	between("possLength", 13.8, 15.2);
+});

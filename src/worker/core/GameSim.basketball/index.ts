@@ -37,6 +37,9 @@ import {
 	SHOT_CLOCK_RESET_ORB,
 	shotClockMakeFactor,
 	teamPaceFactor,
+	deriveTraits,
+	NEUTRAL_TRAITS,
+	type Traits,
 	TOV_SCALE,
 } from "./possessionModel.ts";
 
@@ -256,6 +259,8 @@ class GameSim extends GameSimBase {
 	shotClock = SHOT_CLOCK_FULL;
 	shotClockViolations: [number, number] = [0, 0];
 	teamPaceFactor: [number, number] = [1, 1];
+	// Ratings-derived inputs (see possessionModel.ts Traits), refreshed with the team composite ratings
+	traits: [Traits, Traits] = [{ ...NEUTRAL_TRAITS }, { ...NEUTRAL_TRAITS }];
 	possTimeScale = 1;
 	gameClockFactor = 1;
 	// The current segment of the possession followed a shot or free throw attempt (for the shot clock reset when it goes out off the defense)
@@ -908,6 +913,10 @@ class GameSim extends GameSimBase {
 		this.isClockRunning = true; // Set after computing dtIinbound!
 		if (this.realPoss) {
 			this.resetShotClock();
+			this.traits = [
+				deriveTraits(this.team[0].compositeRating),
+				deriveTraits(this.team[1].compositeRating),
+			];
 		}
 
 		const clockFactor = this.getClockFactor();
@@ -1905,8 +1914,8 @@ class GameSim extends GameSimBase {
 			return "maintainLead" as const;
 		}
 
-		// 2-for-1: with ~30-45 s left, shoot early enough to get the ball back for the last shot
-		if (this.t >= 32 && this.t <= 47) {
+		// 2-for-1: with ~34-50 s left, shoot with ~29-35 s left, early enough to get the ball back for the last shot
+		if (this.t >= 34 && this.t <= 50) {
 			return "twoForOne" as const;
 		}
 	}
@@ -1941,7 +1950,11 @@ class GameSim extends GameSimBase {
 	// How likely a late-clock crisis ends in a violation rather than a forced shot: ball handling and the defense's pressure, through the same
 	// ratings as the turnover chance (~1 for an average matchup)
 	violationTendency() {
-		return helpers.bound(this.probTov() / 0.13, 0.5, 1.8);
+		return helpers.bound(
+			(this.traits[this.o].shotDiscipline * this.probTov()) / 0.13,
+			0.5,
+			1.8,
+		);
 	}
 
 	// When the shot goes up (seconds from now), or that the shot clock runs out first
@@ -2010,7 +2023,7 @@ class GameSim extends GameSimBase {
 					backcourt *= 0.7;
 				} else if (clockFactor === "maintainLead") {
 					// Milk the shot clock
-					mean += 5;
+					mean += 4;
 				}
 				shotAt = backcourt + drawHalfCourtSearch(k * mean);
 			}
@@ -2025,7 +2038,7 @@ class GameSim extends GameSimBase {
 			// Hold for the last shot, going with ~1-4 s left
 			shotAt = tLeft - uniform(1, Math.min(4.5, tLeft - 0.5));
 		} else if (clockFactor === "twoForOne" && Math.random() < 0.7) {
-			const target = tLeft - uniform(26, 33);
+			const target = tLeft - uniform(29, 35);
 			if (target >= 1.5) {
 				shotAt = Math.min(shotAt, target);
 			}
@@ -2440,6 +2453,14 @@ class GameSim extends GameSimBase {
 				// Early-clock shots are better, late-clock shots are contested (only while the shot clock is on)
 				if (this.realPoss && !putBack && this.t > this.shotClock) {
 					probMake *= shotClockMakeFactor(this.shotClock);
+				}
+				if (
+					this.realPoss &&
+					this.t <= 120 &&
+					this.team[0].stat.ptsQtrs.length >= this.numPeriods &&
+					Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <= 5
+				) {
+					probMake *= this.traits[this.o].clutch;
 				}
 			}
 		}

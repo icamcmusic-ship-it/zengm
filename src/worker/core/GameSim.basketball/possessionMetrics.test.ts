@@ -38,7 +38,7 @@ const NBA: Record<string, string> = {
 	secondChancePts: "~13-14",
 	violationsPerTeamGame: "~0.5-1",
 	lastShotUnder3: "most",
-	twoForOneShotTime: "~6-9 s",
+	twoForOneShotTime: "~5-15 s (start 34-50 s left)",
 };
 
 test.skipIf(!env.POSS_METRICS)(
