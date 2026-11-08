@@ -5683,6 +5683,17 @@ const upsertCustomizedPlayer = async (
 	// Save to database, adding pid if it doesn't already exist
 	await idb.cache.players.put(p);
 
+	// Basketball player traits: new players get seeds from the league seed and pid now that the pid is known, edited ones keep (and repair) theirs
+	if (__SPORT === "basketball" && typeof p.pid === "number") {
+		const pWithPid = p as Player;
+		const changed = pWithPid.traits
+			? player.ensureTraits(pWithPid)
+			: (player.initTraits(pWithPid), true);
+		if (changed) {
+			await idb.cache.players.put(pWithPid);
+		}
+	}
+
 	// Only after pid is known - update current relatives
 	for (const rel of p.relatives) {
 		const p2 = await idb.merged.players.get(rel.pid);

@@ -241,6 +241,7 @@ export const getDefaultSettings = () => {
 		contractExtensions: true,
 		tradeRequests: true,
 		holdoutFrequency: 1,
+		playerTraits: __SPORT === "basketball",
 		playerMoodTraits: unwrapGameAttribute(
 			defaultGameAttributes,
 			"playerMoodTraits",

@@ -674,6 +674,10 @@ export type GameAttributesLeague = {
 	realisticPossessions: boolean;
 	// Basketball: re-injury risk, minutes restrictions after injuries, load management, back-to-back effects, injury-prone players
 	injuryDepth: boolean;
+	// Basketball: player traits (clutch, durability, ...) that the game sim reads, see src/common/playerTraits and docs/player-traits.md
+	playerTraits: boolean;
+	// Seed for the stored trait components, set once when a league is created (0 in older leagues)
+	playerTraitsSeed: number;
 	equalizeRegions: boolean;
 	fantasyPoints?: "standard" | "ppr" | "halfPpr";
 	forceRetireAge: number;
@@ -1473,6 +1477,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	pos?: string; // Only in players from custom league files
 	ptModifier: number;
 	ratings: NonEmptyArray<PlayerRatings>;
+
+	// Basketball only: the stored random components of the player traits (see common/playerTraits). Created at player generation and lazily; scores are derived from these plus ratings.
+	traits?: PlayerTraits;
 
 	// Set by "Regenerate ratings": the build (archetype) the player's ratings were rebuilt around, plus the ratings from before the first regeneration so another regeneration never compounds on the last
 	ratingsBuild?: StoredRatingsBuild;
@@ -2367,6 +2374,7 @@ import type { UndoLog } from "../worker/util/UndoLog.ts";
 import type { LeagueUrlParts } from "../ui/router/types.ts";
 import type { StoredRatingsBuild } from "./ratingsBuilds/types.ts";
 import type { StoredArchetype } from "./archetypes/types.ts";
+import type { PlayerTraits } from "./playerTraits/types.ts";
 
 type TeamStatsPlus = Record<TeamStatAttrBaseball, number> &
 	Record<TeamStatAttrByPosBaseball, number[]> &

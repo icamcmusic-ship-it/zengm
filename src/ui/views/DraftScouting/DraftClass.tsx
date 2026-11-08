@@ -67,6 +67,13 @@ export const ScoutCell = ({
 		</span>
 	);
 };
+import { TraitBadges } from "../../components/PlayerTraits/TraitBadges.tsx";
+import {
+	TRAIT_DEFINITIONS,
+	TRAIT_KEYS,
+	isTraitKey,
+	type TraitKey,
+} from "../../../common/playerTraits/index.ts";
 
 const DraftClass = ({
 	challengeNoRatings,
@@ -97,6 +104,10 @@ const DraftClass = ({
 		!challengeNoRatings &&
 		players.some((p) => p.archetype !== undefined);
 
+	// Only when the Player Traits setting is on (basketball)
+	const showTraits = !challengeNoRatings && players.some((p) => p.traits);
+	const [traitColumn, setTraitColumn] = useState<TraitKey | "">("");
+
 	const cols = getCols(["#", "Name", "Pos", "Age", "Ovr", "Pot"]);
 	if (showArchetype) {
 		cols.push({
@@ -115,6 +126,19 @@ const DraftClass = ({
 			desc: "Ovr and pot ranges from your scouts, with their confidence. Assign a scout (1 point) or attend a workout (3 points) to narrow them. Hover for notes.",
 			sortType: "number",
 		});
+	}
+	if (showTraits) {
+		if (traitColumn) {
+			// One trait as a sortable number, instead of the badges
+			cols.push(...getCols([`trait:${traitColumn}`]));
+		} else {
+			cols.push({
+				title: "Traits",
+				desc: "Notable player traits as far as your scouts can tell. A ? means an estimate, see the player page for the range.",
+				sortType: "number",
+				sortSequence: ["desc", "asc"],
+			});
+		}
 	}
 
 	const rows: DataTableRow<"player">[] = players.map((p) => {
@@ -156,6 +180,29 @@ const DraftClass = ({
 									/>
 								),
 							},
+						]
+					: []),
+				...(showTraits
+					? [
+							traitColumn
+								? (() => {
+										const t = p.traits?.find((t) => t.key === traitColumn);
+										return t
+											? {
+													value: `${t.exact ? "" : "~"}${t.estimate}`,
+													sortValue: t.estimate,
+												}
+											: null;
+									})()
+								: p.traits
+									? {
+											value: <TraitBadges traits={p.traits} max={1} />,
+											sortValue: p.traits.reduce(
+												(sum, t) => sum + Math.abs(t.estimate - 50),
+												0,
+											),
+										}
+									: null,
 						]
 					: []),
 			],
@@ -283,10 +330,31 @@ const DraftClass = ({
 				</div>
 			) : null}
 
+			{showTraits ? (
+				<div className="mb-2">
+					<select
+						className="form-select form-select-sm w-auto"
+						aria-label="Show trait column"
+						value={traitColumn}
+						onChange={(event) => {
+							const value = event.target.value;
+							setTraitColumn(isTraitKey(value) ? value : "");
+						}}
+					>
+						<option value="">Trait column: none</option>
+						{TRAIT_KEYS.map((key) => (
+							<option key={key} value={key}>
+								{TRAIT_DEFINITIONS[key].name}
+							</option>
+						))}
+					</select>
+				</div>
+			) : null}
+
 			<DataTable
 				cols={cols}
 				defaultSort={[0, "asc"]}
-				name={`DraftScouting:${offset}`}
+				name={`DraftScouting:${offset}${showTraits ? ":traits" : ""}${traitColumn ? ":col" : ""}`}
 				rows={rows}
 			/>
 		</>

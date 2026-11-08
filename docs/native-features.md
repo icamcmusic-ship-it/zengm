@@ -66,6 +66,11 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
 - **Where:** the player page (_Archetype_ line with a why popover and career history, replacing _Build_), Draft Scouting (_Archetype_ column), Advanced Player Search (_Archetype_ filter), the roster page (_Roster composition_ panel with balance warnings) and League → _Archetypes_ (`/l/:lid/archetypes`: counts, best players, trends).
 - **Regenerate ratings:** prospects can be aimed at an archetype (per prospect, or a class pool). It uses the same solver, so overall, potential and height stay exact; the preview shows the archetype the new ratings actually derive to (a check mark when it is the one asked for). The 447 builds are still available under _Advanced: build_.
 - **Known limits:** archetypes use scouting-fuzzed ratings (like skills and positions), so they can differ slightly from the true ones; aiming at a very specific archetype succeeds about four times in five at a given overall.
+## Player traits
+
+- **Where:** player pages (Traits section), Draft Scouting (Traits column), Advanced Player Search (Traits filters and columns), Customize Player in God Mode (trait sliders). Setting: **Game Simulation > Player Traits** (on for new basketball leagues, off for existing ones).
+- **What:** twelve 0-100 traits (clutch, consistency, durability, shot discipline, off-ball movement, screens, hustle, foul discipline, recovery, handle under pressure, late-game IQ, leadership) derived from ratings, age, experience and a stored per-player random component. Prospects' traits are estimates that sharpen with scouting and with seasons played. The effects are small and average out league-wide; see `docs/player-traits.md` for the sim hook API and calibration.
+- **Known limits:** the game simulation does not read traits yet (the pure interface is in place); until then the traits are display-only.
 
 ## Customize Player: Regenerate build
 

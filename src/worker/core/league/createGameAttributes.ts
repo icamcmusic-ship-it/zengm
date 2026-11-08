@@ -125,6 +125,14 @@ const createGameAttributes = async (
 		}
 	}
 
+	// Basketball player traits: every new league gets its own seed for the stored trait components (leagues from before this existed keep 0)
+	if (
+		__SPORT === "basketball" &&
+		gameAttributesInput?.playerTraitsSeed === undefined
+	) {
+		gameAttributes.playerTraitsSeed = Math.floor(Math.random() * 2 ** 31) + 1;
+	}
+
 	// Can't get fired for the first two seasons
 	if (gameAttributesInput?.gracePeriodEnd === undefined) {
 		const inputPhase =

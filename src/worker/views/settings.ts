@@ -98,6 +98,7 @@ type Key =
 	| "technicalFouls"
 	| "realisticPossessions"
 	| "injuryDepth"
+	| "playerTraits"
 	| "playerMoodTraits"
 	| "numPlayersOnCourt"
 	| "numDraftRounds"
@@ -334,6 +335,7 @@ export const getInitialSettings = (): Settings => {
 		technicalFouls: g.get("technicalFouls"),
 		realisticPossessions: g.get("realisticPossessions"),
 		injuryDepth: g.get("injuryDepth"),
+		playerTraits: g.get("playerTraits"),
 		playerMoodTraits: g.get("playerMoodTraits"),
 		numPlayersOnCourt: g.get("numPlayersOnCourt"),
 		numDraftRounds: g.get("numDraftRounds"),

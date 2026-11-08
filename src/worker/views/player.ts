@@ -1,4 +1,8 @@
 import {
+	getTraitViewContext,
+	getTraitsForView,
+} from "../util/playerTraitsView.ts";
+import {
 	PLAYER,
 	PLAYER_STATS_TABLES,
 	RATINGS,
@@ -592,8 +596,15 @@ export default defineView({
 			// Contract value index by season, when it's quick to get (basketball only)
 			const valueIndex = await playerValueIndex(topStuff.pid);
 
+			// Basketball player traits (estimates only, for prospects and rookies), undefined if the setting is off
+			const playerTraits = getTraitsForView(
+				topStuff.pRaw,
+				await getTraitViewContext(),
+			);
+
 			return {
 				...topStuff,
+				playerTraits,
 				events,
 				feats,
 				leaders,

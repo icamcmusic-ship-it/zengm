@@ -1988,6 +1988,18 @@ export const settings: Setting[] = (
 			description:
 				"Rare technical fouls (1 FT, possession unchanged), flagrant fouls (2 FTs and the ball) and ejections in the game simulation.",
 		},
+		...(__SPORT === "basketball"
+			? [
+					{
+						category: "Game Simulation",
+						key: "playerTraits",
+						name: "Player Traits",
+						type: "bool",
+						description:
+							"Hidden and visible traits (clutch, consistency, durability, shot discipline, off-ball movement, screening, hustle, foul discipline, recovery, handling under pressure, late-game IQ, leadership) that nudge how players perform in games. They are derived from ratings plus a stored random component, and average out league-wide. Shown on player pages and the draft scouting page.",
+					} as const,
+				]
+			: []),
 		{
 			category: "Injuries",
 			key: "injuryDepth",

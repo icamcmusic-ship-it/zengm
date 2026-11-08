@@ -30,6 +30,16 @@ import genContract from "./genContract.ts";
 import genFuzz from "./genFuzz.ts";
 import genJerseyNumber from "./genJerseyNumber.ts";
 import genMoodTraits from "./genMoodTraits.ts";
+import {
+	developTraits,
+	ensureTraits,
+	getPlayerTraitScores,
+	getPlayerTraitsForUI,
+	getSimTraitEffects,
+	getTraitInjuryRateMultiplier,
+	initTraits,
+	setTraitScores,
+} from "./traits.ts";
 import genRandomFreeAgent from "./genRandomFreeAgent.ts";
 import genWeight from "./genWeight.ts";
 import generate from "./generate.ts";
@@ -87,6 +97,14 @@ export default {
 	genJerseyNumber,
 	genRandomFreeAgent,
 	genMoodTraits,
+	developTraits,
+	ensureTraits,
+	getPlayerTraitScores,
+	getPlayerTraitsForUI,
+	getSimTraitEffects,
+	getTraitInjuryRateMultiplier,
+	initTraits,
+	setTraitScores,
 	genWeight,
 	generate,
 	getLeaders,

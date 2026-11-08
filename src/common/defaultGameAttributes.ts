@@ -43,6 +43,7 @@ export const gameAttributesKeysGameState: GameAttributeKey[] = [
 	"autoExpand",
 	"tradeProposalsSeed",
 	"aiTradeOffers",
+	"playerTraitsSeed",
 ];
 export const gameAttributesKeysTeams: GameAttributeKey[] = ["confs", "divs"];
 export const gameAttributesCache: GameAttributeKey[] = [
@@ -99,6 +100,8 @@ const gameAttributesKeysSportSpecific = {
 		"technicalFouls",
 		"realisticPossessions",
 		"injuryDepth",
+		"playerTraits",
+		"playerTraitsSeed",
 		"randomDebutsForever",
 		"realDraftRatings",
 		"numPlayersDunk",
@@ -622,6 +625,9 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	realisticPossessions: false,
 	// Off for existing leagues (and tests); new leagues turn it on (see views/newLeague.ts)
 	injuryDepth: false,
+	// Off for existing leagues, on for new ones (see views/newLeague.ts)
+	playerTraits: false,
+	playerTraitsSeed: 0,
 	playerMoodTraits: true,
 	numPlayersOnCourt: 5,
 	aiJerseyRetirement: true,

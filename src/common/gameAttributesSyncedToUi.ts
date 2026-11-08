@@ -25,6 +25,7 @@ export const gameAttributesSyncedToUi = [
 	"pbpBoxScore",
 	"pbpLiveGame",
 	"phase",
+	"playerTraits",
 	"quarterLength",
 	"salaryCap",
 	"salaryCapType",

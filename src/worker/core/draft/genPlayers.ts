@@ -58,6 +58,12 @@ const genPlayers = async (
 		await player.addRelatives(p);
 
 		await player.updateValues(p);
+
+		// Seeds for the player traits, from the league seed and pid
+		if (__SPORT === "basketball") {
+			player.initTraits(p as any);
+			await idb.cache.players.put(p as any);
+		}
 	}
 
 	// Optionally give the new prospects college/overseas stats and honors. Only for prospects who don't already have some, because this is also called to top off a class that was imported

@@ -1207,6 +1207,11 @@ const finalizeActivePlayers = async ({
 			}
 		}
 
+		// Basketball player traits: seeds from the league seed and pid, unless the league file already has them
+		if (__SPORT === "basketball") {
+			player.ensureTraits(p);
+		}
+
 		await player.updateValues(p);
 	}
 

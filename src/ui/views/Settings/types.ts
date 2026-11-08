@@ -82,6 +82,7 @@ export type Key =
 	| "technicalFouls"
 	| "realisticPossessions"
 	| "injuryDepth"
+	| "playerTraits"
 	| "playerMoodTraits"
 	| "numPlayersOnCourt"
 	| "numDraftRounds"
