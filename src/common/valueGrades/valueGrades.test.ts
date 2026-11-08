@@ -556,3 +556,64 @@ describe("contract value", () => {
 		expect(cy.up).toBe(1);
 	});
 });
+
+describe("trade grader: playoffs and titles", () => {
+	// In-season 2020 trade: team 0 gets player 1, who plays the 2020 playoffs for them and wins the title
+	const make = () => {
+		const p1 = player(1, {
+			rows: [
+				row(2020, 1, 1),
+				row(2020, 0, 2),
+				row(2020, 0, 1.5, { playoffs: true, gp: 16 }),
+				row(2021, 0, 3),
+			],
+			transactions: [
+				{ type: "trade", tid: 0, season: 2020, phase: 1, eid: 10 },
+			],
+		});
+		const p2 = player(2, {
+			rows: [row(2020, 0, 1), row(2020, 1, 1)],
+			transactions: [
+				{ type: "trade", tid: 1, season: 2020, phase: 1, eid: 10 },
+			],
+		});
+		return league({
+			season: 2022,
+			players: [p1, p2],
+			teamSeasons: [
+				{ tid: 0, season: 2020, won: 60, lost: 22, champ: true },
+				{ tid: 1, season: 2020, won: 30, lost: 52 },
+				{ tid: 0, season: 2021, won: 50, lost: 32 },
+			],
+			trades: [
+				{
+					eid: 10,
+					season: 2020,
+					phase: 1,
+					tids: [0, 1],
+					assets: [
+						[{ pid: 1, name: "P1", statsIndex: p1.rows[1]!.i }],
+						[{ pid: 2, name: "P2", statsIndex: p2.rows[1]!.i }],
+					],
+				},
+			],
+		});
+	};
+
+	test("playoff win shares count by default and not in regular-season mode", () => {
+		const all = gradeTrades(make()).trades[0]!;
+		const rs = gradeTrades(make(), { playoffs: false }).trades[0]!;
+		expect(all.sides[0].got.total).toBe(6.5);
+		expect(rs.sides[0].got.total).toBe(5);
+		expect(all.sides[0].got.now).toBe(3.5);
+	});
+
+	test("titles won with the pieces, in either mode", () => {
+		for (const playoffs of [true, false]) {
+			const t = gradeTrades(make(), { playoffs }).trades[0]!;
+			expect(t.sides[0].titles).toEqual([2020]);
+			expect(t.sides[0].items[0]!.titles).toEqual([2020]);
+			expect(t.sides[1].titles).toEqual([]);
+		}
+	});
+});

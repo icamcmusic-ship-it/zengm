@@ -8,6 +8,8 @@ import {
 	gradeTrade,
 	gradeTrades,
 	makeCtx,
+	DEFAULT_GRADE_OPTIONS,
+	type GradeOptions,
 	type GradeTrade,
 	type TradeGrades,
 } from "../../common/valueGrades/tradeGrader.ts";
@@ -123,12 +125,17 @@ const toVTeamSeason = (ts: {
 	season: number;
 	won: number;
 	lost: number;
-}): VTeamSeason => ({
-	tid: ts.tid,
-	season: ts.season,
-	won: ts.won,
-	lost: ts.lost,
-});
+	playoffRoundsWon: number;
+}): VTeamSeason => {
+	const numRounds = g.get("numGamesPlayoffSeries", ts.season).length;
+	return {
+		tid: ts.tid,
+		season: ts.season,
+		won: ts.won,
+		lost: ts.lost,
+		champ: numRounds > 0 && ts.playoffRoundsWon === numRounds,
+	};
+};
 
 const loadTeamSeasons = async (s: State) => {
 	const season = g.get("season");
@@ -314,9 +321,12 @@ const memo = <T>(snap: Snapshot, key: string, f: () => T): T => {
 	return snap.memo.get(key) as T;
 };
 
-export const tradeGradesOf = (snap: Snapshot) =>
-	memo(snap, "grades", () => {
-		const G = gradeTrades(snap.L);
+export const tradeGradesOf = (
+	snap: Snapshot,
+	opts: GradeOptions = DEFAULT_GRADE_OPTIONS,
+) =>
+	memo(snap, `grades|${opts.playoffs ? "all" : "rs"}`, () => {
+		const G = gradeTrades(snap.L, opts);
 		return {
 			...G,
 			byEid: new Map(G.trades.map((t) => [t.eid, t])),
@@ -326,9 +336,10 @@ export const tradeGradesOf = (snap: Snapshot) =>
 export const contractValueOf = (snap: Snapshot) =>
 	memo(snap, "contracts", () => computeContractValue(snap.L));
 
-export const getTradeGrades = async (): Promise<
-	TradeGrades & { byEid: Map<number, GradeTrade> }
-> => tradeGradesOf(await getValueSnapshot());
+export const getTradeGrades = async (
+	opts: GradeOptions = DEFAULT_GRADE_OPTIONS,
+): Promise<TradeGrades & { byEid: Map<number, GradeTrade> }> =>
+	tradeGradesOf(await getValueSnapshot(), opts);
 
 export const getContractValue = async (): Promise<ContractValue> =>
 	contractValueOf(await getValueSnapshot());
@@ -379,6 +390,7 @@ export const playerValueIndex = async (pid: number) => {
 // Grade one trade straight from the database, reading only the players and picks in it. For the trade summary page, so it doesn't need the whole snapshot.
 export const gradeOneTrade = async (
 	event: EventBBGM,
+	opts: GradeOptions = DEFAULT_GRADE_OPTIONS,
 ): Promise<GradeTrade | undefined> => {
 	const t = toVTrade(event);
 	if (!t) {
@@ -386,7 +398,7 @@ export const gradeOneTrade = async (
 	}
 	const snap = peekValueSnapshot();
 	if (snap && snap.sig === signature()) {
-		return tradeGradesOf(snap).byEid.get(t.eid);
+		return tradeGradesOf(snap, opts).byEid.get(t.eid);
 	}
 
 	const pids = new Set<number>();
@@ -425,7 +437,12 @@ export const gradeOneTrade = async (
 		phase: g.get("phase"),
 		players,
 		trades: [...trades.values()],
-		teamSeasons: [],
+		// (only the titles of the two teams, for the "titles won" note)
+		teamSeasons: (
+			await idb.merged.teamSeasons.getAll(undefined, {
+				filter: (ts) => ts.playoffRoundsWon > 0 && t.tids.includes(ts.tid),
+			})
+		).map(toVTeamSeason),
 	};
-	return gradeTrade(makeCtx(L), t);
+	return gradeTrade(makeCtx(L, opts), t);
 };

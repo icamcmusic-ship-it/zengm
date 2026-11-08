@@ -8,6 +8,16 @@ import PickText from "./PickText.tsx";
 import type { PlayerOutcome } from "../../../worker/views/tradeSummary.ts";
 import { TradeGradeBadge } from "../../components/TradeGradeBadge.tsx";
 import { useLocal } from "../../util/local.ts";
+import { TitlesNote, TRADE_GRADER_WS_KEY } from "../TradeGrader.tsx";
+
+// The win shares the Trade grader was last set to count (regular season and playoffs unless it was switched)
+const wsPref = (): "all" | "rs" => {
+	try {
+		return localStorage.getItem(TRADE_GRADER_WS_KEY) === "rs" ? "rs" : "all";
+	} catch {
+		return "all";
+	}
+};
 
 const Outcome = ({ outcome }: { outcome: PlayerOutcome }) => {
 	if (!outcome) {
@@ -104,6 +114,8 @@ const TradeSummary = ({
 		title: "Trade Summary",
 	});
 	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
+	const ws = wsPref();
+	const shown = grades?.map((x) => (ws === "rs" ? { ...x, ...x.rs } : x));
 
 	return (
 		<>
@@ -131,7 +143,7 @@ const TradeSummary = ({
 									{t.region} {t.name}
 								</a>{" "}
 								received:
-								{grades?.[i] ? (
+								{shown?.[i] ? (
 									<>
 										{" "}
 										<a
@@ -139,13 +151,15 @@ const TradeSummary = ({
 												"trade_grader",
 												"team",
 												`${t.abbrev}_${t.tid}`,
+												"all",
+												ws,
 											])}
 										>
 											<TradeGradeBadge
-												grade={grades[i].g}
+												grade={shown[i].g}
 												title={
-													grades[i].g
-														? `Trade grade: ${Math.round((grades[i].share ?? 0) * 100)}% of the regular-season win shares in the deal went to the ${t.name}${grades[i].open ? " (still playing out)" : ""}`
+													shown[i].g
+														? `Trade grade: ${Math.round((shown[i].share ?? 0) * 100)}% of the ${ws === "all" ? "regular season and playoff" : "regular-season"} win shares in the deal went to the ${t.name}${shown[i].open ? " (still playing out)" : ""}`
 														: undefined
 												}
 											/>
@@ -153,6 +167,11 @@ const TradeSummary = ({
 									</>
 								) : null}
 							</h2>
+							{shown?.[i]?.titles.length ? (
+								<div className="mb-2 small">
+									<TitlesNote titles={shown[i].titles} standalone />
+								</div>
+							) : null}
 							{t.assets.length === 0 ? (
 								<div className="mb-2">Nothing!</div>
 							) : null}

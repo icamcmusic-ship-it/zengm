@@ -136,6 +136,7 @@ export const routeInfos = {
 	"/l/:lid/trade_grader/:tab": "tradeGrader",
 	"/l/:lid/trade_grader/:tab/:team": "tradeGrader",
 	"/l/:lid/trade_grader/:tab/:team/:season": "tradeGrader",
+	"/l/:lid/trade_grader/:tab/:team/:season/:ws": "tradeGrader",
 	"/l/:lid/contract_value": "contractValue",
 	"/l/:lid/contract_value/:tab": "contractValue",
 	"/l/:lid/contract_value/:tab/:team": "contractValue",

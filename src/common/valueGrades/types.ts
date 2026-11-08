@@ -80,6 +80,8 @@ export type VTeamSeason = {
 	season: number;
 	won: number;
 	lost: number;
+	// Won the title
+	champ?: boolean;
 };
 
 export type VLeague = {

@@ -113,6 +113,8 @@ export type GradeItem = {
 	living: boolean;
 	// For a flipped pick, the trade it went out in
 	flipEid: number | null;
+	// Seasons the team won the title with him playing for it in the playoffs
+	titles: number[];
 };
 
 export type GradeSide = {
@@ -131,6 +133,8 @@ export type GradeSide = {
 	unknown: boolean;
 	partial: boolean;
 	open: boolean;
+	// Titles won with the pieces received (seasons, oldest first)
+	titles: number[];
 };
 
 export type GradeTrade = {
@@ -178,9 +182,16 @@ export type TradeGrades = {
 	seasons: number[];
 };
 
+// Which win shares count: the regular season only, or the regular season and the playoffs (the default)
+export type GradeOptions = { playoffs: boolean };
+export const DEFAULT_GRADE_OPTIONS: GradeOptions = { playoffs: true };
+
 type Ctx = {
 	cur: number;
 	phase: number;
+	playoffs: boolean;
+	// "tid|season" of each title
+	champs: Set<string>;
 	players: Map<number, VPlayer>;
 	byDpid: Map<number, VPlayer>;
 	byPickKey: Map<string, VPlayer>;
@@ -194,7 +205,10 @@ const isNum = (x: unknown): x is number =>
 const pickKey = (season: number | string, round: number, originalTid: number) =>
 	`${season}|${round}|${originalTid}`;
 
-export const makeCtx = (L: VLeague): Ctx => {
+export const makeCtx = (
+	L: VLeague,
+	opts: GradeOptions = DEFAULT_GRADE_OPTIONS,
+): Ctx => {
 	const players = new Map<number, VPlayer>();
 	const byDpid = new Map<number, VPlayer>();
 	const byPickKey = new Map<string, VPlayer>();
@@ -229,9 +243,17 @@ export const makeCtx = (L: VLeague): Ctx => {
 			}
 		}
 	}
+	const champs = new Set<string>();
+	for (const ts of L.teamSeasons) {
+		if (ts.champ) {
+			champs.add(`${ts.tid}|${ts.season}`);
+		}
+	}
 	return {
 		cur: L.season,
 		phase: L.phase,
+		playoffs: opts.playoffs,
+		champs,
 		players,
 		byDpid,
 		byPickKey,
@@ -246,6 +268,8 @@ type Stint = {
 	unknown: number;
 	seasons: number;
 	living: boolean;
+	// Seasons he played in the playoffs for the team
+	playoffSeasons: number[];
 };
 
 // Win shares a player produced for team tid from a start (a trade or his draft) until he left, split at season h
@@ -260,6 +284,7 @@ export const stintFor = (
 		statsIndex?: number;
 	},
 	h: number,
+	opts: GradeOptions = { playoffs: false },
 ): Stint => {
 	const from = start.phase > PHASE.PLAYOFFS ? start.season + 1 : start.season;
 
@@ -322,8 +347,19 @@ export const stintFor = (
 	let known = 0;
 	let unknown = 0;
 	const seasons = new Set<number>();
+	const playoffSeasons = new Set<number>();
 	for (const r of p.rows) {
-		if (r.playoffs) {
+		if (r.playoffs && !opts.playoffs) {
+			// (not counted, but still a title he was there for)
+			if (
+				r.tid === tid &&
+				r.season >= from &&
+				r.season <= endSeason &&
+				(firstIndex === null || r.i >= firstIndex) &&
+				(r.gp === null || r.gp > 0)
+			) {
+				playoffSeasons.add(r.season);
+			}
 			continue;
 		}
 		if (firstIndex !== null ? r.i < firstIndex : r.season < from) {
@@ -351,6 +387,9 @@ export const stintFor = (
 		known += 1;
 		if (r.gp === null || r.gp > 0) {
 			seasons.add(r.season);
+			if (r.playoffs) {
+				playoffSeasons.add(r.season);
+			}
 		}
 		if (r.season <= h) {
 			now += r.ws;
@@ -358,12 +397,21 @@ export const stintFor = (
 			later += r.ws;
 		}
 	}
-	return { now, later, known, unknown, seasons: seasons.size, living };
+	return {
+		now,
+		later,
+		known,
+		unknown,
+		seasons: seasons.size,
+		living,
+		playoffSeasons: [...playoffSeasons].sort((a, b) => a - b),
+	};
 };
 
-const fromStint = (w: Stint) => {
+const fromStint = (ctx: Ctx, tid: number, w: Stint) => {
 	const none = w.unknown > 0 && w.known === 0;
 	return {
+		titles: w.playoffSeasons.filter((s) => ctx.champs.has(`${tid}|${s}`)),
 		now: none ? null : r1(w.now),
 		later: none ? null : r1(w.later),
 		total: none ? null : r1(w.now + w.later),
@@ -407,6 +455,7 @@ const pickItem = (
 		partial: false,
 		living: false,
 		flipEid: null,
+		titles: [],
 	};
 	const p =
 		ctx.byDpid.get(a.dpid) ??
@@ -425,13 +474,14 @@ const pickItem = (
 				tid,
 				{ type: "draft", season: p.draft.year, phase: PHASE.DRAFT },
 				h,
+				ctx,
 			);
 			return {
 				...base,
 				how: "drafted",
 				pid: p.pid,
 				name: p.name,
-				...fromStint(w),
+				...fromStint(ctx, tid, w),
 			};
 		}
 		return {
@@ -481,6 +531,7 @@ export const gradeTrade = (ctx: Ctx, t: VTrade): GradeTrade => {
 					partial: false,
 					living: false,
 					flipEid: null,
+					titles: [],
 				};
 			}
 			const w = stintFor(
@@ -494,6 +545,7 @@ export const gradeTrade = (ctx: Ctx, t: VTrade): GradeTrade => {
 					statsIndex: a.statsIndex,
 				},
 				h,
+				ctx,
 			);
 			return {
 				kind: "player",
@@ -502,7 +554,7 @@ export const gradeTrade = (ctx: Ctx, t: VTrade): GradeTrade => {
 				name: p.name,
 				pick: null,
 				flipEid: null,
-				...fromStint(w),
+				...fromStint(ctx, tid, w),
 			};
 		});
 		const got = { now: 0, later: 0, total: 0 };
@@ -524,6 +576,9 @@ export const gradeTrade = (ctx: Ctx, t: VTrade): GradeTrade => {
 				open = true;
 			}
 		}
+		const titles = [...new Set(items.flatMap((x) => x.titles))].sort(
+			(a, b) => a - b,
+		);
 		got.now = r1(got.now);
 		got.later = r1(got.later);
 		got.total = r1(got.total);
@@ -543,6 +598,7 @@ export const gradeTrade = (ctx: Ctx, t: VTrade): GradeTrade => {
 			unknown,
 			partial: partial || unknown,
 			open,
+			titles,
 		};
 	}) as [GradeSide, GradeSide];
 	for (const s of sides) {
@@ -645,8 +701,11 @@ export const reportCards = (sides: GradeSide[]): ReportCard[] => {
 	return out.sort((a, b) => b.net - a.net || a.tid - b.tid);
 };
 
-export const gradeTrades = (L: VLeague): TradeGrades => {
-	const ctx = makeCtx(L);
+export const gradeTrades = (
+	L: VLeague,
+	opts: GradeOptions = DEFAULT_GRADE_OPTIONS,
+): TradeGrades => {
+	const ctx = makeCtx(L, opts);
 	const trades = L.trades
 		.toSorted((a, b) => a.eid - b.eid)
 		.map((t) => gradeTrade(ctx, t));

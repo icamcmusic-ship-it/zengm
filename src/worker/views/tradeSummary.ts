@@ -633,20 +633,40 @@ export default defineView({
 						net: number | null;
 						partial: boolean;
 						open: boolean;
+						titles: number[];
+						// Regular season only
+						rs: {
+							g: string | null;
+							share: number | null;
+							got: number | null;
+							net: number | null;
+						};
 				  }[]
 				| undefined;
 			if (__SPORT === "basketball") {
 				try {
-					const graded = await gradeOneTrade(event);
-					if (graded) {
-						grades = graded.sides.map((s) => ({
-							g: s.grade?.g ?? null,
-							share: s.grade?.share ?? null,
-							got: s.unknown ? null : s.got.total,
-							net: s.net,
-							partial: s.partial,
-							open: s.open,
-						}));
+					// Both ways of counting win shares, as the Trade grader's toggle (the page shows the one picked there)
+					const graded = await gradeOneTrade(event, { playoffs: true });
+					const gradedRs = await gradeOneTrade(event, { playoffs: false });
+					if (graded && gradedRs) {
+						grades = graded.sides.map((s, i) => {
+							const rs = gradedRs.sides[i]!;
+							return {
+								g: s.grade?.g ?? null,
+								share: s.grade?.share ?? null,
+								got: s.unknown ? null : s.got.total,
+								net: s.net,
+								partial: s.partial,
+								open: s.open,
+								titles: s.titles,
+								rs: {
+									g: rs.grade?.g ?? null,
+									share: rs.grade?.share ?? null,
+									got: rs.unknown ? null : rs.got.total,
+									net: rs.net,
+								},
+							};
+						});
 					}
 				} catch (error) {
 					console.error(error);
