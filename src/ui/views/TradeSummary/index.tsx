@@ -6,6 +6,7 @@ import { PHASE, PHASE_TEXT } from "../../../common/constants.ts";
 import Charts from "./Charts.tsx";
 import PickText from "./PickText.tsx";
 import type { PlayerOutcome } from "../../../worker/views/tradeSummary.ts";
+import { TradeGradeBadge } from "../../components/TradeGradeBadge.tsx";
 import { useLocal } from "../../util/local.ts";
 
 const Outcome = ({ outcome }: { outcome: PlayerOutcome }) => {
@@ -91,6 +92,7 @@ const Outcome = ({ outcome }: { outcome: PlayerOutcome }) => {
 };
 
 const TradeSummary = ({
+	grades,
 	phase,
 	season,
 	seasonsToPlot,
@@ -129,6 +131,27 @@ const TradeSummary = ({
 									{t.region} {t.name}
 								</a>{" "}
 								received:
+								{grades?.[i] ? (
+									<>
+										{" "}
+										<a
+											href={helpers.leagueUrl([
+												"trade_grader",
+												"team",
+												`${t.abbrev}_${t.tid}`,
+											])}
+										>
+											<TradeGradeBadge
+												grade={grades[i].g}
+												title={
+													grades[i].g
+														? `Trade grade: ${Math.round((grades[i].share ?? 0) * 100)}% of the regular-season win shares in the deal went to the ${t.name}${grades[i].open ? " (still playing out)" : ""}`
+														: undefined
+												}
+											/>
+										</a>
+									</>
+								) : null}
 							</h2>
 							{t.assets.length === 0 ? (
 								<div className="mb-2">Nothing!</div>

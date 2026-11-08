@@ -7,6 +7,11 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { g } from "../util/index.ts";
 import { validateTeam } from "../util/processInputs.ts";
 import { validateSeason } from "../util/processInputs.ts";
+import {
+	getValueSnapshot,
+	peekValueSnapshot,
+	tradeGradesOf,
+} from "../util/valueData.ts";
 
 const processInputs = (params: RouteParams<"transactions">) => {
 	let season: number | "all";
@@ -74,8 +79,21 @@ export default defineView({
 
 			events.reverse(); // Newest first
 
+			// Trade grader grades for trade rows (basketball only), from the snapshot if one was already built, so this page never waits for it
+			const snap = peekValueSnapshot();
+			const gradesByEid = snap ? tradeGradesOf(snap).byEid : undefined;
+			if (
+				__SPORT === "basketball" &&
+				events.some((event) => event.type === "trade")
+			) {
+				// Build it for next time, without waiting
+				getValueSnapshot().catch(() => {});
+			}
+
 			const events2 = [];
 			for (const event of events) {
+				const graded =
+					event.type === "trade" ? gradesByEid?.get(event.eid) : undefined;
 				events2.push({
 					eid: event.eid,
 					type: event.type,
@@ -84,6 +102,12 @@ export default defineView({
 					tids: event.tids,
 					season: event.season,
 					score: event.score,
+					grades: graded
+						? graded.sides.map((side) => ({
+								tid: side.tid,
+								g: side.grade?.g ?? null,
+							}))
+						: undefined,
 				});
 			}
 

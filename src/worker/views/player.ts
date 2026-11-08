@@ -8,6 +8,7 @@ import {
 } from "../../common/constants.ts";
 import { player } from "../core/index.ts";
 import { idb } from "../db/index.ts";
+import { peekPlayerValueIndex } from "../util/valueData.ts";
 import { g, helpers } from "../util/index.ts";
 import type {
 	MenuItemHeader,
@@ -579,12 +580,16 @@ export default defineView({
 
 			const leaders = await player.getLeaders(topStuff.pRaw);
 
+			// Contract value index by season, when it was already computed (basketball only)
+			const valueIndex = peekPlayerValueIndex(topStuff.pid);
+
 			return {
 				...topStuff,
 				events,
 				feats,
 				leaders,
 				ratings: RATINGS,
+				valueIndex,
 			};
 		}
 	},
