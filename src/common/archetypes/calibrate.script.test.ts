@@ -7,6 +7,8 @@ import { ARCHETYPES, scoreAll } from "./classify.ts";
 import { buildNorms } from "./match.ts";
 import { sampleLeague } from "./sample.testutil.ts";
 
+const BIAS_MAX = 0.25;
+
 test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 	"write norms",
 	async () => {
@@ -14,14 +16,15 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 		const norms = buildNorms(sample, ARCHETYPES);
 		const round = (xs: number[]) =>
 			xs.map((x) => Math.round(x * 10000) / 10000);
-		// Even out the shares with small additive nudges on the z score
+		// Nudge the shares toward even with small additive steps on the z score. Kept small (|bias| <= 0.25): correctness, which the
+		// position prior and height gate decide, matters more than evenness, so the bias only trims archetypes that are far off
 		const bias: Record<string, number> = {};
 		for (const a of ARCHETYPES) {
 			bias[a.id] = 0;
 		}
 		const nRare = ARCHETYPES.filter((a) => a.rare).length;
 		const total = ARCHETYPES.length - nRare + nRare * 0.15;
-		for (let iter = 0; iter < 25; iter++) {
+		for (let iter = 0; iter < 20; iter++) {
 			const counts: Record<string, number> = {};
 			for (const p of sample) {
 				const best = scoreAll(p.ratings, { ...norms, bias }).scored[0]!.a.id;
@@ -31,8 +34,8 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 				const target = (a.rare ? 0.15 : 1) / total;
 				const actual = Math.max(0.0004, (counts[a.id] ?? 0) / sample.length);
 				bias[a.id] = Math.min(
-					0.6,
-					Math.max(-0.6, bias[a.id]! + 0.25 * Math.log(target / actual)),
+					BIAS_MAX,
+					Math.max(-BIAS_MAX, bias[a.id]! + 0.15 * Math.log(target / actual)),
 				);
 			}
 		}

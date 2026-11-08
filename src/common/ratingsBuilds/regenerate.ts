@@ -7,6 +7,7 @@ import {
 	classify,
 } from "../archetypes/classify.ts";
 import { gateFactor } from "../archetypes/score.ts";
+import { positionOf, posPrior } from "../archetypes/position.ts";
 import { scoreAll } from "../archetypes/classify.ts";
 import type { Norms } from "../archetypes/types.ts";
 import { scoutingEffectCutoff, scoutingEffectStddev } from "../budgetLevels.ts";
@@ -233,9 +234,15 @@ export const regenerateClass = (
 		// Aiming at an archetype: a forced one, else drawn from the class's archetype pool (least used first) if he fits one
 		let targetId: string | undefined = lock?.archetype;
 		if (!targetId && !lock?.build && s.archetypePool.length > 0) {
+			const basePos = positionOf(base);
 			const fits = s.archetypePool.filter((id) => {
 				const a = NEW_ARCHETYPES.find((x) => x.id === id);
-				return a && gateFactor(base.hgt, a.hgt) >= 0.6;
+				// Inside its height gate and not ruled out by his position (a guard is never aimed at a big archetype)
+				return (
+					a &&
+					gateFactor(base.hgt, a.hgt) >= 0.6 &&
+					posPrior(a.group, a.pos, basePos) !== null
+				);
 			});
 			if (fits.length > 0) {
 				const arng = prng.child("archetypePool");

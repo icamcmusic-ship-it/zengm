@@ -14,7 +14,6 @@ export type ArchetypeLabelInfo = {
 	season?: number;
 	live?: boolean;
 	why?: { label: string; z: number; want: number }[];
-	history?: { season: number; label: string; through: number; from?: string }[];
 };
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
@@ -42,7 +41,7 @@ export const ArchetypeWhy = ({
 }: {
 	info: Pick<
 		ArchetypeLabelInfo,
-		"desc" | "why" | "tier" | "conf" | "season" | "live" | "history"
+		"desc" | "why" | "tier" | "conf" | "season" | "live"
 	>;
 }) => (
 	<div className="archetype-popover">
@@ -66,19 +65,6 @@ export const ArchetypeWhy = ({
 					? `Set in the ${info.season} preseason.`
 					: ""}
 		</div>
-		{info.history && info.history.length > 1 ? (
-			<div className="mt-2">
-				<div className="fw-bold">History</div>
-				<ul className="mb-0 ps-3">
-					{info.history.map((h) => (
-						<li key={h.season}>
-							{h.season}
-							{h.through > h.season ? `–${h.through}` : ""}: {h.label}
-						</li>
-					))}
-				</ul>
-			</div>
-		) : null}
 	</div>
 );
 

@@ -4,12 +4,14 @@ import { DEFAULT_NORMS } from "./norms.data.ts";
 import { matchZ } from "./match.ts";
 import { prepare, rawMatch } from "./score.ts";
 import { ovrPercentile } from "./norms.ts";
+import { isPos, positionOf, posPrior } from "./position.ts";
 import type {
 	Archetype,
 	ArchetypeRatings,
 	Classification,
 	DimKey,
 	Norms,
+	Pos,
 	SkillLabel,
 	Tier,
 	Why,
@@ -31,6 +33,9 @@ export const HYBRID_Z = 0.15;
 // The archetype he had keeps the label unless another is better by more than this
 export const STICKY_Z = 0.2;
 
+// Score of an archetype his position rules out: below anything a real fit can reach, but finite
+export const BLOCKED_Z = -99;
+
 export type Scored = { a: Archetype; raw: number; z: number };
 
 // Score every archetype for one player, best first. An archetype's score is how exceptional the fit is among the league's
@@ -39,20 +44,33 @@ export const scoreAll = (
 	ratings: ArchetypeRatings,
 	norms: Norms = DEFAULT_NORMS,
 	archetypes: Archetype[] = ARCHETYPES,
-): { scored: Scored[]; z: Record<DimKey, number>; skills: SkillLabel[] } => {
+	position?: Pos,
+): {
+	scored: Scored[];
+	z: Record<DimKey, number>;
+	skills: SkillLabel[];
+	pos: Pos;
+} => {
 	const p = prepare(ratings, norms);
+	const pos = position ?? positionOf(ratings);
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
 		const raw = rawMatch(a, p.z, p.hgt, p.skills);
+		const prior = posPrior(a.group, a.pos, pos);
+		if (prior === null) {
+			scored.push({ a, raw, z: BLOCKED_Z });
+			continue;
+		}
 		const table = norms.match[a.id];
 		const z =
 			(table ? matchZ(table, raw) : raw * 4 - 2) -
 			(a.rare ? RARE_PENALTY : 0) +
+			prior +
 			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0);
 		scored.push({ a, raw, z });
 	}
 	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
-	return { scored, z: p.z, skills: p.skills };
+	return { scored, z: p.z, skills: p.skills, pos };
 };
 
 export const TIER_NAMES: Record<Tier, string> = {
@@ -119,6 +137,8 @@ export type ClassifyOptions = {
 	// The archetype he had before: kept unless a new one beats it by more than the stickiness margin
 	previousId?: string;
 	stickiness?: number;
+	// His position (as the game shows it); read from the ratings when not given
+	pos?: string;
 };
 
 export const classify = (
@@ -126,7 +146,12 @@ export const classify = (
 	opts: ClassifyOptions = {},
 ): Classification => {
 	const norms = opts.norms ?? DEFAULT_NORMS;
-	const { scored, z } = scoreAll(ratings, norms);
+	const { scored, z } = scoreAll(
+		ratings,
+		norms,
+		ARCHETYPES,
+		isPos(opts.pos) ? opts.pos : undefined,
+	);
 	let first = scored[0]!;
 	const sticky = opts.stickiness ?? STICKY_Z;
 	if (opts.previousId && opts.previousId !== first.a.id) {

@@ -7,7 +7,6 @@ import {
 	classify,
 	currentEntry,
 	explain,
-	historyOf,
 	toStored,
 	viewOf,
 	withEntry,
@@ -79,7 +78,10 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 	}
 	const norms =
 		rows.length >= MIN_LEAGUE_FOR_NORMS
-			? { ...buildNorms(rows, ARCHETYPES), bias: DEFAULT_NORMS.bias }
+			? {
+					...buildNorms(rows, ARCHETYPES, DEFAULT_NORMS),
+					bias: DEFAULT_NORMS.bias,
+				}
 			: DEFAULT_NORMS;
 	normsCache = { key, norms };
 	return norms;
@@ -109,7 +111,9 @@ export const classifyPlayer = (
 		return undefined;
 	}
 	const row = last(p.ratings) as any;
-	return classify(ratings, { norms, ovr: row.ovr, previousId });
+	// His position as the game shows it is the prior, so the fuzzed ratings scouts see cannot push him into a group his
+	// listed position rules out
+	return classify(ratings, { norms, ovr: row.ovr, previousId, pos: row.pos });
 };
 
 // Write this season's entry (replacing one for the same season). Returns true if the primary archetype changed.
@@ -223,7 +227,6 @@ export type PlayerArchetypeInfo = {
 	season?: number;
 	live: boolean;
 	why: { label: string; z: number; want: number }[];
-	history: ReturnType<typeof historyOf>;
 };
 
 // Everything the player page shows. A non-prospect with no entry gets one stored here, once.
@@ -269,7 +272,6 @@ export const archetypeInfoForPlayer = async (
 		season: found.stored ? v.season : undefined,
 		live: !found.stored,
 		why,
-		history: historyOf(p.archetypes),
 	};
 };
 

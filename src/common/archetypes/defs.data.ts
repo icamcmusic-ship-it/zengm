@@ -8,6 +8,7 @@ import type {
 	ArchetypeFamily,
 	ArchetypeGroup,
 	DimKey,
+	Pos,
 	SkillLabel,
 } from "./types.ts";
 
@@ -15,6 +16,8 @@ type Opts = {
 	req?: SkillLabel[];
 	bonus?: SkillLabel[];
 	rare?: true;
+	// Position prior overrides (see position.ts)
+	pos?: Partial<Record<Pos, number | null>>;
 	tags?: string[];
 };
 
@@ -42,6 +45,7 @@ const make =
 		req: opts.req,
 		bonus: opts.bonus,
 		rare: opts.rare,
+		pos: opts.pos,
 		tags: [group, family, ...(opts.tags ?? [])],
 	});
 
@@ -951,4 +955,257 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		{ three: 1.5, mid: 1.5, ft: 2, rim: 1 },
 		"A big with an all-around jumper.",
 	),
+	// ------------------------------------------------- Added in v2 (new ids; existing ids are never renamed)
+	G(
+		"Two-Way Point",
+		"defender",
+		[0, 46],
+		{ pss: 2, dper: 2, diq: 1.5, stl: 1.5, drb: 1 },
+		"Runs the offense and hounds the other point guard.",
+		{ bonus: ["Ps", "Dp"], tags: ["two-way"] },
+	),
+	G(
+		"Explosive Playmaker",
+		"playmaker",
+		[0, 46],
+		{ pss: 2, ath: 2.5, rim: 1.5, drb: 1.5, usg: 1 },
+		"A point guard who creates with speed and power at the rim.",
+		{ bonus: ["A", "Ps"], tags: ["athletic"] },
+	),
+	G(
+		"Post-Up Guard",
+		"scorer",
+		[28, 50],
+		{ post: 2.5, stre: 2, mid: 1.5, usg: 1, spd: -0.5 },
+		"Backs smaller guards down and scores over them.",
+		{ bonus: ["Po"], pos: { GF: 0 }, tags: ["post"] },
+	),
+	G(
+		"Bulldog Guard",
+		"hustle",
+		[0, 36],
+		{ stre: 2, dper: 1.5, reb: 1.5, end: 1.5, hgt: -1 },
+		"Undersized and tough: wins loose balls and battles bigger players.",
+		{ tags: ["tough"] },
+	),
+	G(
+		"Drive-and-Kick Guard",
+		"slasher",
+		[0, 46],
+		{ drb: 2, pss: 2, rim: 1.5, spd: 1.5, mid: -0.5 },
+		"Collapses the defense off the dribble and sprays it out.",
+		{ bonus: ["B"], tags: ["penetration"] },
+	),
+	G(
+		"Game Manager",
+		"balanced",
+		[0, 48],
+		{ oiq: 2.5, diq: 1.5, pss: 1.5, three: 1, usg: -1, ath: -1.5 },
+		"Not flashy or athletic, but smart and mistake-free.",
+		{ tags: ["iq", "veteran"] },
+	),
+	G(
+		"Volume Shooter",
+		"shooter",
+		[0, 50],
+		{ three: 3, usg: 1.5, drb: 1, ft: 1, mid: -0.5 },
+		"Fires away from deep on high volume.",
+		{ req: ["3"], tags: ["volume"] },
+	),
+	G(
+		"Movement Shooter",
+		"shooter",
+		[0, 52],
+		{ three: 2.5, spd: 1.5, end: 2, ft: 1.5, drb: -0.5 },
+		"Never stops running off screens for catch-and-shoot threes.",
+		{ bonus: ["3"], pos: { GF: 0, SF: -0.5 }, tags: ["off-ball"] },
+	),
+	W(
+		"Corner Specialist",
+		"shooter",
+		[24, 64],
+		{ three: 3, usg: -2, drb: -1.5, pss: -1, ft: 1 },
+		"Lives in the corner and only takes open threes.",
+		{ req: ["3"], pos: { G: 0, PF: -0.2 }, tags: ["spacing", "low-usage"] },
+	),
+	W(
+		"Rim-Running Wing",
+		"athlete",
+		[26, 64],
+		{ rim: 2.5, spd: 2, end: 1.5, oiq: 1, usg: -1, drb: -1 },
+		"Beats everyone down the floor for easy layups.",
+		{ bonus: ["A"], tags: ["transition"] },
+	),
+	W(
+		"Sixth-Man Scorer",
+		"scorer",
+		[18, 62],
+		{ usg: 3, mid: 1.5, three: 1.5, drb: 1.5, dper: -1, diq: -1.5 },
+		"Instant offense off the bench who gives some of it back on defense.",
+		{ bonus: ["V"], pos: { PG: -0.3, G: 0 }, tags: ["bench", "volume"] },
+	),
+	W(
+		"Post-Up Wing",
+		"scorer",
+		[30, 64],
+		{ post: 2.5, mid: 1.5, stre: 1.5, usg: 1 },
+		"Uses his size on the block against smaller wings.",
+		{ bonus: ["Po"], tags: ["post"] },
+	),
+	W(
+		"Passing-Lane Thief",
+		"hustle",
+		[24, 64],
+		{ stl: 3, spd: 1.5, diq: 1.5, jmp: 1, usg: -0.5 },
+		"Jumps passing lanes and turns steals into runouts.",
+		{ tags: ["steals"] },
+	),
+	W(
+		"Two-Way Slasher",
+		"slasher",
+		[24, 64],
+		{ rim: 2, dper: 2, ath: 1.5, draw: 1, three: -0.5 },
+		"Attacks the rim on offense, guards the other team's best wing on defense.",
+		{ bonus: ["A", "Dp"], tags: ["two-way"] },
+	),
+	W(
+		"Junkyard Wing",
+		"hustle",
+		[28, 66],
+		{ stre: 2, reb: 2, dint: 1, end: 1.5, usg: -1.5 },
+		"Physical, scrappy wing who does the dirty work.",
+		{ tags: ["tough"] },
+	),
+	F(
+		"Combo Forward",
+		"balanced",
+		[44, 74],
+		{ three: 1.5, post: 1.5, mid: 1.5, reb: 1, usg: 1 },
+		"Plays either forward spot: scores inside and out.",
+		{ pos: { GF: -0.2 }, tags: ["versatile"] },
+	),
+	F(
+		"Jumbo Playmaker",
+		"playmaker",
+		[52, 84],
+		{ pss: 3, hgt: 1.5, reb: 1.5, oiq: 1.5, drb: 1, post: 0.5 },
+		"A big forward who runs the offense from the elbow or in transition.",
+		{ req: ["Ps"], pos: { C: 0 }, tags: ["jumbo"] },
+	),
+	F(
+		"Pick-and-Pop Four",
+		"shooter",
+		[46, 76],
+		{ mid: 2.5, ft: 1.5, three: 1, usg: 0.5, rim: -0.5 },
+		"Sets the screen and steps out for the jumper.",
+		{ tags: ["spacing"] },
+	),
+	F(
+		"3-and-D Forward",
+		"defender",
+		[44, 76],
+		{ three: 2, dint: 1.5, dper: 1, diq: 1.5, usg: -1 },
+		"Spaces the floor and guards both forward spots.",
+		{ bonus: ["3", "Di"], tags: ["two-way", "spacing"] },
+	),
+	F(
+		"High-Post Hub",
+		"playmaker",
+		[46, 78],
+		{ pss: 2, oiq: 2, mid: 1.5, post: 1.5, ath: -0.5 },
+		"Offense runs through his passing from the high post.",
+		{ bonus: ["Ps"], tags: ["iq"] },
+	),
+	F(
+		"Double-Double Forward",
+		"rebounder",
+		[44, 78],
+		{ reb: 2.5, post: 2, usg: 1.5, stre: 1 },
+		"Scores and rebounds in bulk every night.",
+		{ bonus: ["R", "Po"], tags: ["volume"] },
+	),
+	F(
+		"Tweener Forward",
+		"hustle",
+		[40, 58],
+		{ reb: 1.5, ath: 1.5, stre: 1.5, dper: 1, end: 1, hgt: -1 },
+		"Too small for a four, too rugged for a three, and makes it work.",
+		{ pos: { GF: 0, SF: 0 }, tags: ["tough"] },
+	),
+	C(
+		"Defensive Specialist Big",
+		"defender",
+		[54, 100],
+		{ dint: 2.5, diq: 2.5, reb: 1, usg: -3, ft: -1, three: -1 },
+		"On the floor for his defense alone.",
+		{ bonus: ["Di"], tags: ["low-usage"] },
+	),
+	C(
+		"Stretch Rim Protector",
+		"defender",
+		[52, 100],
+		{ blk: 3, three: 2, dint: 1, usg: -0.5 },
+		"Blocks shots at one end and spaces the floor at the other.",
+		{ req: ["Di"], bonus: ["3"], tags: ["two-way", "spacing"] },
+	),
+	C(
+		"Microwave Big",
+		"scorer",
+		[54, 100],
+		{ usg: 2.5, post: 1.5, mid: 1.5, rim: 1, end: -1.5, diq: -1, dint: -1 },
+		"A bench big who comes in to score and not much else.",
+		{ tags: ["bench", "volume"] },
+	),
+	C(
+		"Small-Ball Five",
+		"athlete",
+		[46, 64],
+		{ reb: 2, dint: 1.5, spd: 1.5, ath: 1.5, blk: 1, hgt: -1 },
+		"An undersized center who makes up for it with motor and quickness.",
+		{ pos: { F: 0, SF: -0.8 }, tags: ["small-ball"] },
+	),
+	C(
+		"Double-Double Big",
+		"rebounder",
+		[54, 100],
+		{ reb: 3, post: 2, usg: 1.5, dint: 1 },
+		"Twenty and ten: a post scorer who owns the glass.",
+		{ req: ["R"], bonus: ["Po"], tags: ["volume"] },
+	),
+	C(
+		"Drop-Coverage Big",
+		"defender",
+		[58, 100],
+		{ blk: 2.5, reb: 2, dint: 1.5, spd: -2, ath: -1 },
+		"Slow-footed but walls off the paint.",
+		{ tags: ["paint"] },
+	),
+	C(
+		"Stretch Rebounder",
+		"shooter",
+		[54, 100],
+		{ three: 2, reb: 2.5, ft: 1 },
+		"Stretches the floor and still cleans the glass.",
+		{ bonus: ["3", "R"], tags: ["spacing"] },
+	),
 ];
+
+// Position prior overrides for archetypes defined above, kept apart so the table above stays readable
+const POS_OVERRIDES: Record<string, Partial<Record<Pos, number | null>>> = {
+	"big-guard": { GF: 0, SF: -0.3 },
+	"tall-playmaker": { GF: 0, SF: 0 },
+	"point-forward": { PG: -0.3, G: -0.2, PF: 0, FC: -0.6 },
+	"unicorn-wing": { PF: 0, FC: -0.3, C: -0.5 },
+	"small-ball-four": { SG: -0.8, GF: 0 },
+	"versatile-big-wing": { GF: 0 },
+	"unicorn-forward": { C: 0 },
+	"point-center": { F: 0 },
+	"switchable-center": { F: 0 },
+	"rim-running-shooter": { F: 0 },
+};
+for (const d of ARCHETYPE_DEFS) {
+	const o = POS_OVERRIDES[d.id];
+	if (o) {
+		d.pos = { ...o, ...d.pos };
+	}
+}
