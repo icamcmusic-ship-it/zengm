@@ -66,6 +66,8 @@ export type CollegeSeason = {
 	season: number;
 	// 0 = freshman ... 3 = senior
 	classIndex: number;
+	// Age that season, if known
+	age?: number;
 	school: string;
 	conference: string | undefined;
 	// Level of competition, 0-100

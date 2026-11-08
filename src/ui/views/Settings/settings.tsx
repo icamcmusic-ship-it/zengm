@@ -678,6 +678,26 @@ export const settings: Setting[] = (
 			description:
 				"NBA-like tournament to determine the lowest seeded playoff teams.",
 		},
+		...(__SPORT === "basketball"
+			? [
+					{
+						category: "Draft",
+						key: "rerandomizeDraftClassRatings",
+						name: "Re-randomize ratings when a new draft class is created",
+						type: "bool",
+						description:
+							"When enabled, every newly created draft class (each season's new class, and all classes at league creation) is run through Regenerate ratings, using the settings saved with \"Save as league default\" in the Regenerate ratings dialog (or the defaults: class flavor drawn from the seed, heights, overall and potential kept). Seeded from the league and the class year, so it is deterministic. Runs before college/overseas stats are generated. Drafted players are never touched.",
+					},
+					{
+						category: "Draft",
+						key: "generateCollegeStats",
+						name: "Auto-generate college/overseas stats for new draft classes",
+						type: "bool",
+						description:
+							"When enabled, every new draft class gets generated college or overseas (pro club abroad) stats and honors: all classes at league creation, each season's new class, fantasy/expansion/custom-generated classes, and prospects of imported classes who have none. Shown on player pages tagged College or Overseas. Pro stats and experience are not affected. You can also do this by hand on the Draft Scouting page.",
+					},
+				]
+			: []),
 		{
 			category: "Draft",
 			key: "draftType",
@@ -1252,6 +1272,14 @@ export const settings: Setting[] = (
 				);
 			},
 		},
+		{
+			category: "Events",
+			key: "scoutingSystem",
+			name: "Scouting System",
+			type: "bool",
+			description:
+				"When enabled, your scouting budget gives you scouting points every season to spend on individual draft prospects (assign a scout or attend a workout) on the Draft Scouting page. Each one narrows how far off your view of that prospect's ratings can be and gives a scout report with confidence ranges. Prospects you don't scout keep the normal rating fuzz.",
+		},
 		...(__SPORT === "basketball"
 			? [
 					{
@@ -1261,14 +1289,6 @@ export const settings: Setting[] = (
 						type: "bool",
 						description:
 							'When enabled there is a very rare chance for an "Easter egg" player to appear, one of a few select notable historical figures.',
-					},
-					{
-						category: "Events",
-						key: "generateCollegeStats",
-						name: "Generate College Stats",
-						type: "bool",
-						description:
-							"When enabled, each new draft class gets generated college stats and honors for its prospects, shown on their player pages. Pro stats and experience are not affected. You can also do this by hand for any class on the Draft Scouting page.",
 					},
 				]
 			: []),

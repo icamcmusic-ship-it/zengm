@@ -186,6 +186,8 @@ export type Key =
 	| "footballOvertimePlayoffs"
 	| "easterEggPlayers"
 	| "generateCollegeStats"
+	| "scoutingSystem"
+	| "rerandomizeDraftClassRatings"
 	| "fakeAgeProb";
 
 export type Category =

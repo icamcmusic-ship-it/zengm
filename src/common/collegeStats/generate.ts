@@ -6,6 +6,7 @@ import {
 	unknownSchool,
 	type School,
 } from "./colleges.helpers.ts";
+import { getLeagueEnv } from "./overseas.ts";
 import { Rng, clamp } from "./rng.ts";
 import type { CollegeProspect, CollegeResult, CollegeSeason } from "./types.ts";
 
@@ -112,6 +113,8 @@ export const generateCollegeClass = (
 						gameMinutes: school.gameMinutes,
 						noise,
 						pos: p.pos,
+						proEnv: getLeagueEnv(school.name),
+						age: p.age - k,
 					}),
 				);
 			}

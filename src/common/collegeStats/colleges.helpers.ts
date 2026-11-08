@@ -1,3 +1,4 @@
+import { getLeagueEnv } from "./overseas.ts";
 import { COLLEGES, CONFERENCES, NON_NCAA, type Region } from "./colleges.ts";
 import type { Rng } from "./rng.ts";
 
@@ -185,7 +186,7 @@ export const getSchool = (name: string): School | undefined => {
 			strength: other.strength,
 			nonCollege: true,
 			idle: !!other.idle,
-			gameMinutes: name === "NBA G League" ? 48 : 40,
+			gameMinutes: getLeagueEnv(name)?.gameMinutes ?? 40,
 		};
 	}
 };

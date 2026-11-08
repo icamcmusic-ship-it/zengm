@@ -1,12 +1,13 @@
 import { COLLEGE_AWARD_PREFIX } from "../preDraft.ts";
 import { CONFERENCES } from "./colleges.ts";
+import { PRO_BARS, getProHonorTypes, isProLeague } from "./overseas.ts";
 import { clamp, type Rng } from "./rng.ts";
 import type { CollegeHonor, CollegeSeason } from "./types.ts";
 
 /**
  * Honors for college seasons. The Workshop ranks every prospect against every returning player in Division I and hands out about a hundred honors. Here a prospect's season is judged against fixed bars (what it takes to make an all-conference team, an All-America team, and so on) that were set so a typical 70 prospect class gets about what the Workshop's does: a dozen or so conference players of the year, one or two consensus first team All-Americans, and an all-conference season for about a quarter of the non-freshmen. The same bars apply to earlier seasons, so a sophomore season that would have made the first team is an all-conference season on his record.
  *
- * Ported, in a simplified form: the six national player of the year awards (each with its own electorate noise), consensus All-America teams, AP honorable mention, finalists, national defensive players of the year, position awards, and per conference: player, defensive player and freshman of the year, all-conference first and second teams, all-freshman and all-defensive teams. Not ported: team trophies (national and tournament champions), tournament teams, sixth man and most improved awards, coach awards, academic honors, honors for pro clubs abroad.
+ * Ported, in a simplified form: the six national player of the year awards (each with its own electorate noise), consensus All-America teams, AP honorable mention, finalists, national defensive players of the year, position awards, and per conference: player, defensive player and freshman of the year, all-conference first and second teams, all-freshman and all-defensive teams. Not ported: team trophies (national and tournament champions), tournament teams, sixth man and most improved awards, coach awards, academic honors. Pro clubs abroad (and the G League) get league honors from overseas.ts: MVP, All-League teams, Best Young Player / Rising Star, All-Defensive.
  */
 
 type Entry = {
@@ -88,6 +89,25 @@ export const getHonors = (
 		for (const season of entry.seasons) {
 			const gp = season.stats.gp ?? 0;
 			const mpg = gp > 0 ? (season.stats.min ?? 0) / gp : 0;
+			// Pro clubs (overseas and G League): league honors against the league's own bars
+			if (season.conference === undefined && isProLeague(season.school)) {
+				if (
+					gp >= Math.min(PRO_BARS.minGp, season.teamGames / 2) &&
+					mpg >= PRO_BARS.minMpg * (season.gameMinutes / 40)
+				) {
+					const adj = season.score * (1 + 0.006 * (season.strength - 80));
+					for (const type of getProHonorTypes(
+						season.school,
+						adj,
+						season.defScore,
+						season.age ?? 20,
+						rng.normal(0, 0.6),
+					)) {
+						add(output.get(entry.key)!, season.season, type);
+					}
+				}
+				continue;
+			}
 			// Honors are for players who played, and only for colleges
 			if (
 				season.conference === undefined ||

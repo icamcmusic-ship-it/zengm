@@ -17,6 +17,7 @@ import type { DataTableRow } from "../../components/DataTable/index.tsx";
 import { arrayMove } from "@dnd-kit/sortable";
 import { groupByUnique } from "../../../common/utils.ts";
 import { StickyDraftInfo } from "./StickyDraftInfo.tsx";
+import { DraftDayModal } from "./DraftDayModal.tsx";
 import { wrappedDraftAbbrev } from "../../components/DraftAbbrev.tsx";
 import { RosterComposition } from "../../components/RosterComposition.tsx";
 import { confirm } from "../../util/confirm.tsx";
@@ -72,6 +73,7 @@ const Draft = ({
 	const [drafting, setDrafting] = useState(false);
 
 	const [editDraftOrder, setEditDraftOrder] = useState(false);
+	const [showDraftDay, setShowDraftDay] = useState(false);
 	const [sortedDpids, setSortedDpids] = useState<number[] | undefined>(
 		undefined,
 	);
@@ -491,6 +493,28 @@ const Draft = ({
 	return (
 		<>
 			<MoreLinks type="draft" page="draft" draftType={draftType} />
+			{!fantasyDraft && !expansionDraft && !spectator ? (
+				<>
+					<div className="mb-2 d-flex gap-2">
+						<button
+							className="btn btn-light-bordered btn-sm"
+							onClick={() => setShowDraftDay(true)}
+						>
+							Draft-day trades &amp; team boards
+						</button>
+						<a
+							className="btn btn-light-bordered btn-sm"
+							href={helpers.leagueUrl(["draft_board"])}
+						>
+							My draft board
+						</a>
+					</div>
+					<DraftDayModal
+						show={showDraftDay}
+						onHide={() => setShowDraftDay(false)}
+					/>
+				</>
+			) : null}
 			<StickyDraftInfo
 				challengeNoRatings={challengeNoRatings}
 				drafted={draftedSorted}

@@ -497,9 +497,13 @@ export const getDefaultSettings = () => {
 			defaultGameAttributes,
 			"easterEggPlayers",
 		),
-		generateCollegeStats: unwrapGameAttribute(
+		// On by default for new leagues, while leagues created before this setting existed keep it off (the gameAttributes default)
+		generateCollegeStats: true,
+		// Per-prospect scouting, on by default for new leagues
+		scoutingSystem: true,
+		rerandomizeDraftClassRatings: unwrapGameAttribute(
 			defaultGameAttributes,
-			"generateCollegeStats",
+			"rerandomizeDraftClassRatings",
 		),
 		fakeAgeProb: unwrapGameAttribute(defaultGameAttributes, "fakeAgeProb"),
 

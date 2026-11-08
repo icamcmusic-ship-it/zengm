@@ -452,6 +452,23 @@ export const RegenerateRatingsModal = ({
 						<button
 							type="button"
 							className="btn btn-sm btn-light-bordered"
+							onClick={async () => {
+								await toWorker(
+									"regenerateRatings",
+									"saveLeagueDefaultSettings",
+									{ ...settings },
+								);
+								setStatus(
+									'Saved as this league\'s default, used by "Re-randomize ratings when a new draft class is created" (League Settings > Draft).',
+								);
+							}}
+							title="Use these settings when new draft classes are re-randomized automatically (League Settings > Draft)"
+						>
+							Save as league default
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-light-bordered"
 							disabled={!preview?.canUndo}
 							onClick={undo}
 							title="Undo the last Apply (until the page is reloaded)"

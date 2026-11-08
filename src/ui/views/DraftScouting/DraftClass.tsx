@@ -10,6 +10,63 @@ import type { DataTableRow } from "../../components/DataTable/index.tsx";
 import { downloadFile } from "../../util/downloadFile.ts";
 import { LeagueFileUpload } from "../../components/LeagueFileUpload.tsx";
 import { CollegeStats } from "./CollegeStats.tsx";
+import { showNotification } from "../../util/showNotification.ts";
+
+type ScoutReport = NonNullable<
+	View<"draftScouting">["seasons"][0]["players"][0]["scoutReport"]
+>;
+
+export const ScoutCell = ({
+	pid,
+	report,
+	remaining,
+}: {
+	pid: number;
+	report: ScoutReport;
+	remaining: number | undefined;
+}) => {
+	const badge =
+		report.confidence === "Low"
+			? "text-bg-secondary"
+			: report.confidence === "Medium"
+				? "text-bg-info"
+				: "text-bg-success";
+	const scout = async (type: "scout" | "workout") => {
+		const { error } = await toWorker("main", "scoutProspect", { pid, type });
+		if (error) {
+			showNotification({ type: "error", text: error });
+		}
+	};
+	return (
+		<span className="text-nowrap" title={report.notes.join("\n")}>
+			<span className={`badge ${badge} fw-normal me-1`}>
+				{report.confidence}
+			</span>
+			{report.ovr[0]}-{report.ovr[1]} / {report.pot[0]}-{report.pot[1]}
+			{remaining !== undefined ? (
+				<>
+					{" "}
+					<button
+						className="btn btn-light-bordered btn-xs"
+						disabled={remaining < 1}
+						title="Assign a scout (1 point)"
+						onClick={() => scout("scout")}
+					>
+						Scout
+					</button>{" "}
+					<button
+						className="btn btn-light-bordered btn-xs"
+						disabled={remaining < 3}
+						title="Attend a workout (3 points)"
+						onClick={() => scout("workout")}
+					>
+						Workout
+					</button>
+				</>
+			) : null}
+		</span>
+	);
+};
 
 const DraftClass = ({
 	challengeNoRatings,
@@ -19,7 +76,9 @@ const DraftClass = ({
 	offset,
 	players,
 	season,
+	scoutingRemaining,
 }: {
+	scoutingRemaining?: number;
 	challengeNoRatings: boolean;
 	fantasyDraft: boolean;
 	godMode: boolean;
@@ -42,6 +101,17 @@ const DraftClass = ({
 			title: "Build",
 			desc: "Build (archetype) from Regenerate ratings",
 			sortType: "string",
+		});
+	}
+	const showScouting =
+		!challengeNoRatings &&
+		!fantasyDraft &&
+		players.some((p) => p.scoutReport !== undefined);
+	if (showScouting) {
+		cols.push({
+			title: "Scout report",
+			desc: "Ovr and pot ranges from your scouts, with their confidence. Assign a scout (1 point) or attend a workout (3 points) to narrow them. Hover for notes.",
+			sortType: "number",
 		});
 	}
 
@@ -70,6 +140,21 @@ const DraftClass = ({
 				!challengeNoRatings ? p.ovr : null,
 				!challengeNoRatings ? p.pot : null,
 				...(showBuild ? [p.build ?? ""] : []),
+				...(showScouting && p.scoutReport
+					? [
+							{
+								sortValue:
+									p.scoutReport.numScouts + 3 * p.scoutReport.numWorkouts,
+								value: (
+									<ScoutCell
+										pid={p.pid}
+										report={p.scoutReport}
+										remaining={scoutingRemaining}
+									/>
+								),
+							},
+						]
+					: []),
 			],
 		};
 	});

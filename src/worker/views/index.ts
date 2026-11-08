@@ -26,6 +26,7 @@ export { default as draftHistory } from "./draftHistory.ts";
 export { default as draftLottery } from "./draftLottery.ts";
 export { default as draftPicks } from "./draftPicks.ts";
 export { default as draftScouting } from "./draftScouting.ts";
+export { default as draftBoard } from "./draftBoard.ts";
 export { default as draftTeamHistory } from "./draftTeamHistory.ts";
 export { default as editAwardWinners } from "./editAwardWinners.ts";
 export { default as eightyTwoZeroDraft } from "./eightyTwoZeroDraft.ts";
