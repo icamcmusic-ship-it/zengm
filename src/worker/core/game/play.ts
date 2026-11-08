@@ -332,7 +332,8 @@ const play = async (
 		// If there was a play by play done for one of these games, get it
 		if (gidOneGame !== undefined && playByPlay) {
 			for (const result of results) {
-				if (result.playByPlay !== undefined) {
+				// (other games can have their events too, when play-by-play is stored with box scores)
+				if (result.playByPlay !== undefined && result.gid === gidOneGame) {
 					raw = {
 						gidOneGame,
 						playByPlay: result.playByPlay,

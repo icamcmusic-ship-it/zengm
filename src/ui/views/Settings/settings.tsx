@@ -1874,6 +1874,22 @@ export const settings: Setting[] = (
 		},
 		{
 			category: "Game Simulation",
+			key: "technicalFouls",
+			name: "Technical & Flagrant Fouls",
+			type: "bool",
+			description:
+				"Rare technical fouls (1 FT, possession unchanged), flagrant fouls (2 FTs and the ball) and ejections in the game simulation.",
+		},
+		{
+			category: "Game Simulation",
+			key: "storePlayByPlay",
+			name: "Save Play-by-Play",
+			type: "bool",
+			description:
+				"Keep each game's play-by-play with its box score, to read or replay later. Uses about 7 KB of storage per game, and it is deleted along with the box score.",
+		},
+		{
+			category: "Game Simulation",
 			key: "foulsUntilBonus",
 			name: "# Fouls Until Bonus",
 			godModeRequired: "always",

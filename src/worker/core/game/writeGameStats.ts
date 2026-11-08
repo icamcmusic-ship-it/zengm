@@ -14,6 +14,7 @@ import { headToHead, season } from "../index.ts";
 import getWinner from "../../../common/getWinner.ts";
 import formatScoreWithShootout from "../../../common/formatScoreWithShootout.ts";
 import { getBestPlayerBoxScore } from "../../../common/getBestPlayerBoxScore.ts";
+import { encodePlayByPlay } from "../../../common/pbpFlavor/store.ts";
 
 const allStarMVP = async (
 	game: Game,
@@ -233,6 +234,13 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	};
 	if (results.forceWin !== undefined) {
 		gameStats.forceWin = results.forceWin;
+	}
+	if (
+		__SPORT === "basketball" &&
+		results.playByPlay !== undefined &&
+		g.get("storePlayByPlay")
+	) {
+		gameStats.pbp = encodePlayByPlay(results.playByPlay);
 	}
 	if (results.neutralSite) {
 		gameStats.neutralSite = true;

@@ -62,6 +62,8 @@ type PlayByPlayEventInputScore =
 			t: TeamNum;
 			pid: number;
 			clock: number;
+			// The free throw of a technical foul (possession does not change)
+			tech?: boolean;
 	  };
 
 type PlayByPlayEventInputNoScore =
@@ -73,10 +75,41 @@ type PlayByPlayEventInputNoScore =
 				| "drb"
 				| "orb"
 				| "foulOut"
-				| "injury"
-				| "missFt";
+				| "injury";
 			t: TeamNum;
 			pid: number;
+			clock: number;
+	  }
+	| {
+			type: "missFt";
+			t: TeamNum;
+			pid: number;
+			clock: number;
+			// The free throw of a technical foul (possession does not change)
+			tech?: boolean;
+	  }
+	| {
+			// A technical foul on a player (pid) or on the bench/coach (pid undefined). num is how many he has this game
+			type: "techFoul";
+			t: TeamNum;
+			pid: number | undefined;
+			num: number;
+			clock: number;
+	  }
+	| {
+			type: "flagrantFoul";
+			t: TeamNum;
+			pid: number;
+			pidShooting: number;
+			level: 1 | 2;
+			clock: number;
+	  }
+	| {
+			// A player (or, with pid undefined, the coach) is ejected
+			type: "ejection";
+			t: TeamNum;
+			pid: number | undefined;
+			reason: "flagrant2" | "flagrants" | "techs";
 			clock: number;
 	  }
 	| {
@@ -230,15 +263,71 @@ const isScoringPlay = (
 	return scoringTypes.has(event.type);
 };
 
+// The stats a stored play-by-play needs (the running box score of the text). The others (minutes, shot zones, gp) are only logged for the live view
+export const STORED_STATS = new Set([
+	"fg",
+	"fga",
+	"tp",
+	"tpa",
+	"ft",
+	"fta",
+	"orb",
+	"drb",
+	"ast",
+	"tov",
+	"stl",
+	"blk",
+	"ba",
+	"pf",
+	"pts",
+	"gs",
+	"sPts",
+	"sAtt",
+]);
+
+// Clocks are logged to the hundredth of a second, so that a stored play-by-play (src/common/pbpStore.basketball.ts) holds exactly what the
+// live view saw
+const round2 = (x: number) =>
+	Number.isFinite(x) ? Math.round(x * 100) / 100 : x;
+
 class BasketballPlayByPlayLogger extends PlayByPlayLoggerBase<PlayByPlayEventOutput> {
 	private period = 1;
-	constructor(active: boolean) {
+
+	// false when the events are only logged to be stored with the box score (no live view): then only the stats the text needs are logged
+	live: boolean;
+
+	constructor(active: boolean, live: boolean = active) {
 		super(active);
+		this.live = live;
+	}
+
+	override logStat(
+		t: TeamNum,
+		pid: number | undefined | null,
+		s: string,
+		amt: number,
+	) {
+		if (!this.live && !STORED_STATS.has(s)) {
+			return;
+		}
+		super.logStat(t, pid, s, amt);
 	}
 
 	logEvent(event: PlayByPlayEventInput) {
 		if (!this.active) {
 			return;
+		}
+
+		const anyEvent = event as any;
+		if (typeof anyEvent.clock === "number" || typeof anyEvent.poss === "number") {
+			event = { ...event };
+			const e2 = event as any;
+			if (typeof e2.clock === "number") {
+				e2.clock = round2(e2.clock);
+			}
+			if (typeof e2.poss === "number") {
+				e2.poss = round2(e2.poss);
+			}
 		}
 
 		if (event.type === "period" || event.type === "overtime") {
