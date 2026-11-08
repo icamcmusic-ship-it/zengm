@@ -18,8 +18,10 @@ const int = (v: number) => String(Math.round(v));
 const pct = (v: number) => `${fmt1(v)}%`;
 const sgn = (v: number) => signed(v, 1);
 
-const desc = (items: Item[]) => items.toSorted((a, b) => b.v - a.v || a.id - b.id);
-const asc = (items: Item[]) => items.toSorted((a, b) => a.v - b.v || a.id - b.id);
+const desc = (items: Item[]) =>
+	items.toSorted((a, b) => b.v - a.v || a.id - b.id);
+const asc = (items: Item[]) =>
+	items.toSorted((a, b) => a.v - b.v || a.id - b.id);
 
 const players = (
 	list: NPPlayer[],
@@ -58,9 +60,11 @@ const teams = (
 const boxed = (p: NPPlayer) =>
 	p.boxGp !== undefined && p.gp > 0 && p.boxGp >= p.gp * 0.8;
 
-const winPct = (w: number, l: number) => (w + l > 0 ? (100 * w) / (w + l) : undefined);
+const winPct = (w: number, l: number) =>
+	w + l > 0 ? (100 * w) / (w + l) : undefined;
 
-const lastN = (t: NPTeam) => t.hist?.toSorted((a, b) => b.season - a.season) ?? [];
+const lastN = (t: NPTeam) =>
+	t.hist?.toSorted((a, b) => b.season - a.season) ?? [];
 
 const specs: RankSpec[] = [
 	// ---- Players ----
@@ -568,10 +572,14 @@ const specs: RankSpec[] = [
 		endWord: "unluckiest",
 		items: (c) =>
 			desc(
-				teams(c, (t) => {
-					const e = c.pyth(t);
-					return e === undefined ? undefined : t.won - e;
-				}, 10),
+				teams(
+					c,
+					(t) => {
+						const e = c.pyth(t);
+						return e === undefined ? undefined : t.won - e;
+					},
+					10,
+				),
 			),
 		note: (c) =>
 			"Expected wins come from points scored and allowed (the Pythagorean method); the gap is the part of the record the margins do not explain.",
@@ -679,13 +687,18 @@ const specs: RankSpec[] = [
 		topic: "franchise wins",
 		unit: "wins",
 		col: "Wins",
-		lead: (c) => `Franchise wins through ${c.pre ? c.season - 1 : c.season} (current teams):`,
+		lead: (c) =>
+			`Franchise wins through ${c.pre ? c.season - 1 : c.season} (current teams):`,
 		fmt: (v) => Math.round(v).toLocaleString("en-US"),
 		items: (c) =>
 			desc(
 				teams(
 					c,
-					(t) => (t.hist?.length ?? 0) >= 3 ? (t.hist ?? []).reduce((a, h) => a + h.won, 0) + (c.pre ? 0 : t.won) : undefined,
+					(t) =>
+						(t.hist?.length ?? 0) >= 3
+							? (t.hist ?? []).reduce((a, h) => a + h.won, 0) +
+								(c.pre ? 0 : t.won)
+							: undefined,
 					0,
 				),
 			),
@@ -821,8 +834,9 @@ const specs: RankSpec[] = [
 				teams(
 					c,
 					(t) =>
-						(t.hist ?? []).filter((h) => h.playoffRoundsWon === c.f.numRounds - 1)
-							.length +
+						(t.hist ?? []).filter(
+							(h) => h.playoffRoundsWon === c.f.numRounds - 1,
+						).length +
 						(c.done && t.playoffRoundsWon === c.f.numRounds - 1 ? 1 : 0),
 					0,
 				),
@@ -857,7 +871,17 @@ const specs: RankSpec[] = [
 		unit: "a year",
 		col: "Salary",
 		fmt: (v) => money(v),
-		items: (c) => desc(players(c.f.players, (p) => p.contractAmount, (p) => p.contractExp !== undefined ? `(through ${p.contractExp})` : undefined)),
+		items: (c) =>
+			desc(
+				players(
+					c.f.players,
+					(p) => p.contractAmount,
+					(p) =>
+						p.contractExp !== undefined
+							? `(through ${p.contractExp})`
+							: undefined,
+				),
+			),
 	},
 	{
 		id: "r-expiring",
@@ -876,7 +900,8 @@ const specs: RankSpec[] = [
 						(p) => p.contractExp !== undefined && p.contractExp <= c.season,
 					),
 					(p) => p.ovr,
-					(p) => (p.contractAmount ? `(${money(p.contractAmount)})` : undefined),
+					(p) =>
+						p.contractAmount ? `(${money(p.contractAmount)})` : undefined,
 				),
 			),
 	},

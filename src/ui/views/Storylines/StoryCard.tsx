@@ -49,7 +49,10 @@ export const StoryCard = ({
 				</p>
 				<div className="d-flex flex-wrap gap-1 mb-2">
 					{s.evidence.map(([k, v]) => (
-						<span key={k} className="badge text-bg-secondary fw-normal">
+						<span
+							key={k}
+							className="badge bg-body-tertiary text-body border fw-normal"
+						>
 							{k}: <b>{v}</b>
 						</span>
 					))}

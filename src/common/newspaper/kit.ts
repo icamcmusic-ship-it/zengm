@@ -287,7 +287,11 @@ export const rankPage = (spec: RankSpec): PageDef => {
 					if (rest.length > 0) {
 						out.push(
 							P(
-								r.pick(["Behind them: ", "Next on the list: ", "Rounding out the top six: "]),
+								r.pick([
+									"Behind them: ",
+									"Next on the list: ",
+									"Rounding out the top six: ",
+								]),
 								...andList(
 									rest.map((it) => [who(c, it), ` (${spec.fmt(it.v)})`]),
 								),
@@ -325,7 +329,11 @@ export const rankPage = (spec: RankSpec): PageDef => {
 									? [
 											[String(i + 1)],
 											[who(c, it)],
-											[c.team(teamId(c, it) ?? -1) ? c.tl(teamId(c, it)!, c.team(teamId(c, it)!)?.abbrev) : (it.note ?? "–")],
+											[
+												c.team(teamId(c, it) ?? -1)
+													? c.tl(teamId(c, it)!, c.team(teamId(c, it)!)?.abbrev)
+													: (it.note ?? "–"),
+											],
 											[spec.fmt(it.v)],
 										]
 									: [[String(i + 1)], [who(c, it)], [spec.fmt(it.v)]],
@@ -373,7 +381,13 @@ export const rankPage = (spec: RankSpec): PageDef => {
 												it.note ? ` ${it.note}` : "",
 											]
 										: [it.note ?? "–"]
-									: [c.pre ? (c.team(it.id)?.prev ? record(c.team(it.id)!.prev!) : "–") : recOf(c, it)],
+									: [
+											c.pre
+												? c.team(it.id)?.prev
+													? record(c.team(it.id)!.prev!)
+													: "–"
+												: recOf(c, it),
+										],
 								[spec.fmt(it.v)],
 							]),
 							[0, 3],

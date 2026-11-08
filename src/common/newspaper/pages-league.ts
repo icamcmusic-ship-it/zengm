@@ -20,7 +20,9 @@ const diff = (t: NPTeam) =>
 
 const gb = (a: NPTeam, b: NPTeam) => (a.won - b.won + (b.lost - a.lost)) / 2;
 const gbText = (g: number) =>
-	g === 0 ? "level" : `${g % 1 ? g.toFixed(1) : g} ${g === 1 ? "game" : "games"}`;
+	g === 0
+		? "level"
+		: `${g % 1 ? g.toFixed(1) : g} ${g === 1 ? "game" : "games"}`;
 
 // ---- Power rankings in tiers -----------------------------------------------
 
@@ -52,7 +54,11 @@ addPage(
 				return undefined;
 			}
 			const n = order.length;
-			const cuts = [Math.ceil(n * 0.2), Math.ceil(n * 0.5), Math.ceil(n * 0.75)];
+			const cuts = [
+				Math.ceil(n * 0.2),
+				Math.ceil(n * 0.5),
+				Math.ceil(n * 0.75),
+			];
 			const names = c.pre
 				? ["Favorites", "Dark horses", "Middle of the pack", "Long shots"]
 				: c.done
@@ -60,8 +66,14 @@ addPage(
 					: ["Contenders", "In the hunt", "On the bubble", "Looking ahead"];
 			const tiers: Tier[] = [
 				{ name: names[0]!, teams: order.slice(0, cuts[0]).map((x) => x.t) },
-				{ name: names[1]!, teams: order.slice(cuts[0], cuts[1]).map((x) => x.t) },
-				{ name: names[2]!, teams: order.slice(cuts[1], cuts[2]).map((x) => x.t) },
+				{
+					name: names[1]!,
+					teams: order.slice(cuts[0], cuts[1]).map((x) => x.t),
+				},
+				{
+					name: names[2]!,
+					teams: order.slice(cuts[1], cuts[2]).map((x) => x.t),
+				},
 				{ name: names[3]!, teams: order.slice(cuts[2]).map((x) => x.t) },
 			];
 			return { order, tiers };
@@ -138,7 +150,11 @@ addPage(
 											[c.tl(x2.t.tid, c.tfull(x2.t.tid))],
 											[record(x2.t)],
 											[diff(x2.t) !== undefined ? signed(diff(x2.t)!) : "–"],
-											[c.ovrRank(x2.t.tid) ? ordinal(c.ovrRank(x2.t.tid)!) : "–"],
+											[
+												c.ovrRank(x2.t.tid)
+													? ordinal(c.ovrRank(x2.t.tid)!)
+													: "–",
+											],
 										],
 							),
 							c.pre ? [0, 2] : [0, 2, 3],
@@ -261,7 +277,10 @@ addPage(
 
 const perConf = (c: Ctx) =>
 	c.f.numPlayoffTeams
-		? Math.max(1, Math.round(c.f.numPlayoffTeams / Math.max(1, c.f.confs.length)))
+		? Math.max(
+				1,
+				Math.round(c.f.numPlayoffTeams / Math.max(1, c.f.confs.length)),
+			)
 		: undefined;
 
 const confRows = (c: Ctx, cid: number) =>
@@ -282,13 +301,13 @@ addPage(
 			if (!n || c.f.gp < 10) {
 				return undefined;
 			}
-			const groups = (c.f.confs.length > 1 ? c.f.confs : [{ cid: -1, name: "League" }]).map(
-				(conf) => ({
-					name: conf.name,
-					cut: n,
-					rows: conf.cid === -1 ? c.rows : confRows(c, conf.cid),
-				}),
-			);
+			const groups = (
+				c.f.confs.length > 1 ? c.f.confs : [{ cid: -1, name: "League" }]
+			).map((conf) => ({
+				name: conf.name,
+				cut: n,
+				rows: conf.cid === -1 ? c.rows : confRows(c, conf.cid),
+			}));
 			if (groups.some((g) => g.rows.length <= g.cut + 1)) {
 				return undefined;
 			}
@@ -349,7 +368,10 @@ addPage(
 					for (const g of x.groups) {
 						const slice = g.rows.slice(Math.max(0, g.cut - 4), g.cut + 4);
 						const lastIn = g.rows[g.cut - 1]!;
-						out.push({ type: "sub", text: x.groups.length > 1 ? g.name : "The line" });
+						out.push({
+							type: "sub",
+							text: x.groups.length > 1 ? g.name : "The line",
+						});
 						out.push(
 							table(
 								["", "Team", "W-L", "GB of the line"],
@@ -360,7 +382,13 @@ addPage(
 										[String(idx + 1)],
 										[c.tl(t.tid, c.tfull(t.tid))],
 										[record(t)],
-										[idx < g.cut ? (behind === 0 ? "on the line" : `+${gbText(-behind).replace("level", "0")}`) : gbText(behind)],
+										[
+											idx < g.cut
+												? behind === 0
+													? "on the line"
+													: `+${gbText(-behind).replace("level", "0")}`
+												: gbText(behind),
+										],
 									];
 								}),
 								[0, 2, 3],
@@ -411,7 +439,8 @@ addPage(
 			if (!c.f.playIn || c.f.gp < 10) {
 				return undefined;
 			}
-			const groups = c.f.confs.length > 1 ? c.f.confs : [{ cid: -1, name: "League" }];
+			const groups =
+				c.f.confs.length > 1 ? c.f.confs : [{ cid: -1, name: "League" }];
 			const zones = groups.map((g) => ({
 				name: g.name,
 				rows: (g.cid === -1 ? c.rows : confRows(c, g.cid)).slice(6, 10),
@@ -488,7 +517,10 @@ addPage(
 				],
 				build: (x, r, c) => [
 					P(
-						c.T(`Here is who is on top of the ${x.divs.length} divisions, led by the ${x.divs.toSorted((a, b) => winp(b.rows[0]!) - winp(a.rows[0]!))[0]!.rows[0]!.name} at ${record(x.divs.toSorted((a, b) => winp(b.rows[0]!) - winp(a.rows[0]!))[0]!.rows[0]!)}.`, `Here is who finished on top of the ${x.divs.length} divisions, led by the ${x.divs.toSorted((a, b) => winp(b.rows[0]!) - winp(a.rows[0]!))[0]!.rows[0]!.name} at ${record(x.divs.toSorted((a, b) => winp(b.rows[0]!) - winp(a.rows[0]!))[0]!.rows[0]!)}.`),
+						c.T(
+							`Here is who is on top of the ${x.divs.length} divisions, led by the ${x.divs.toSorted((a, b) => winp(b.rows[0]!) - winp(a.rows[0]!))[0]!.rows[0]!.name} at ${record(x.divs.toSorted((a, b) => winp(b.rows[0]!) - winp(a.rows[0]!))[0]!.rows[0]!)}.`,
+							`Here is who finished on top of the ${x.divs.length} divisions, led by the ${x.divs.toSorted((a, b) => winp(b.rows[0]!) - winp(a.rows[0]!))[0]!.rows[0]!.name} at ${record(x.divs.toSorted((a, b) => winp(b.rows[0]!) - winp(a.rows[0]!))[0]!.rows[0]!)}.`,
+						),
 					),
 					{
 						type: "list",
@@ -562,7 +594,10 @@ addPage(
 			if (c.f.confs.length !== 2 || !c.f.h2h || c.f.gp < 10) {
 				return undefined;
 			}
-			const [a, b] = c.f.confs as [{ cid: number; name: string }, { cid: number; name: string }];
+			const [a, b] = c.f.confs as [
+				{ cid: number; name: string },
+				{ cid: number; name: string },
+			];
 			let aw = 0;
 			let bw = 0;
 			for (const h of c.f.h2h) {
@@ -777,10 +812,23 @@ addPage(
 				return undefined;
 			}
 			const full = h2h
-				.map((h) => ({ a: c.team(h.a), b: c.team(h.b), aw: h.aw, bw: h.bw, margin: h.margin }))
+				.map((h) => ({
+					a: c.team(h.a),
+					b: c.team(h.b),
+					aw: h.aw,
+					bw: h.bw,
+					margin: h.margin,
+				}))
 				.filter(
-					(h): h is { a: NPTeam; b: NPTeam; aw: number; bw: number; margin: number } =>
-						h.a !== undefined && h.b !== undefined,
+					(
+						h,
+					): h is {
+						a: NPTeam;
+						b: NPTeam;
+						aw: number;
+						bw: number;
+						margin: number;
+					} => h.a !== undefined && h.b !== undefined,
 				);
 			const sweeps = full
 				.filter((h) => (h.aw === 0 || h.bw === 0) && h.aw + h.bw >= 3)
@@ -879,12 +927,14 @@ addPage(
 						),
 						{
 							type: "list",
-							items: x.close.slice(1, 5).map((y) => [
-								c.tl(y.a.tid),
-								` ${y.aw}, `,
-								c.tl(y.b.tid),
-								` ${y.bw}`,
-							]),
+							items: x.close
+								.slice(1, 5)
+								.map((y) => [
+									c.tl(y.a.tid),
+									` ${y.aw}, `,
+									c.tl(y.b.tid),
+									` ${y.bw}`,
+								]),
 						},
 					];
 				},
@@ -904,9 +954,7 @@ addPage(
 				build: (x, r, c) => [
 					P(
 						`${plural(x.renewed.length, "playoff series")} ${c.T("repeat", "repeated")} a pairing from the ${c.season - 1} postseason: `,
-						...andList(
-							x.renewed.map((s) => [c.tl(s.a), " and ", c.tl(s.b)]),
-						),
+						...andList(x.renewed.map((s) => [c.tl(s.a), " and ", c.tl(s.b)])),
 						".",
 					),
 				],
@@ -914,4 +962,3 @@ addPage(
 		],
 	}),
 );
-

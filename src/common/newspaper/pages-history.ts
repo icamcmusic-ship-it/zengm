@@ -1,13 +1,7 @@
 // History pages: the draft class of five years ago, where the stars of ten years ago are now, the MVP ledger, a look back, the title ledger, record chases, worst-to-first and franchise milestones.
 
 import { Ctx, P } from "./ctx.ts";
-import {
-	ALL_EDS,
-	SEASON_EDS,
-	addPage,
-	arcPage,
-	table,
-} from "./kit.ts";
+import { ALL_EDS, SEASON_EDS, addPage, arcPage, table } from "./kit.ts";
 import {
 	andList,
 	fmt1,
@@ -44,7 +38,9 @@ addPage(
 				],
 				build: (x, r, c) => {
 					const ws = x.picks.reduce((a, p) => a + p.ws, 0);
-					const active = x.picks.filter((p) => !p.retired && p.tid >= -1 && p.seasons > 0).length;
+					const active = x.picks.filter(
+						(p) => !p.retired && p.tid >= -1 && p.seasons > 0,
+					).length;
 					const years = c.season - x.year;
 					// The same sentence every time; the variation pass swaps it for an alternative
 					const lead = `${years} years on, the ${x.year} draft has produced ${fmt1(ws)} career win shares from ${x.picks.length} picks; ${active} of them are still playing.`;
@@ -52,20 +48,22 @@ addPage(
 						P(lead),
 						table(
 							["Pick", "Player", "Drafted by", "Now", "Career WS", "Points"],
-							x.picks.slice(0, 10).map((p) => [
-								[`${p.round}-${p.pick}`],
-								[c.pl(p.pid)],
-								[c.tl(p.draftTid, c.team(p.draftTid)?.abbrev)],
-								[
-									p.retired
-										? "retired"
-										: p.tid >= 0
-											? c.team(p.tid)?.abbrev ?? "active"
-											: "free agent",
-								],
-								[fmt1(p.ws)],
-								[grp(p.pts)],
-							]),
+							x.picks
+								.slice(0, 10)
+								.map((p) => [
+									[`${p.round}-${p.pick}`],
+									[c.pl(p.pid)],
+									[c.tl(p.draftTid, c.team(p.draftTid)?.abbrev)],
+									[
+										p.retired
+											? "retired"
+											: p.tid >= 0
+												? (c.team(p.tid)?.abbrev ?? "active")
+												: "free agent",
+									],
+									[fmt1(p.ws)],
+									[grp(p.pts)],
+								]),
 							[4, 5],
 						),
 					];
@@ -167,7 +165,9 @@ addPage(
 					`Staying power: the ${x.year} leaders`,
 				],
 				build: (x, r, c) => {
-					const alive = x.list.filter((p) => !p.retired && p.nowPpg !== undefined);
+					const alive = x.list.filter(
+						(p) => !p.retired && p.nowPpg !== undefined,
+					);
 					const gone = x.list.filter((p) => p.retired);
 					return [
 						P(
@@ -223,12 +223,14 @@ addPage(
 					),
 					table(
 						["Season", "MVP", "Team", "Age"],
-						x.list.slice(0, 8).map((m) => [
-							[String(m.season)],
-							[c.pl(m.pid, m.name)],
-							[c.tl(m.tid, c.team(m.tid)?.abbrev)],
-							[m.age ? String(m.age) : "–"],
-						]),
+						x.list
+							.slice(0, 8)
+							.map((m) => [
+								[String(m.season)],
+								[c.pl(m.pid, m.name)],
+								[c.tl(m.tid, c.team(m.tid)?.abbrev)],
+								[m.age ? String(m.age) : "–"],
+							]),
 						[0, 3],
 					),
 				],
@@ -245,7 +247,10 @@ addPage(
 				heads: (x, c) => {
 					const counts = new Map<number, { n: number; name: string }>();
 					for (const m of x.list) {
-						counts.set(m.pid, { n: (counts.get(m.pid)?.n ?? 0) + 1, name: m.name });
+						counts.set(m.pid, {
+							n: (counts.get(m.pid)?.n ?? 0) + 1,
+							name: m.name,
+						});
 					}
 					const top = [...counts.values()].toSorted((a, b) => b.n - a.n)[0]!;
 					return [
@@ -256,7 +261,10 @@ addPage(
 					];
 				},
 				build: (x, r, c) => {
-					const counts = new Map<number, { n: number; name: string; years: number[] }>();
+					const counts = new Map<
+						number,
+						{ n: number; name: string; years: number[] }
+					>();
 					for (const m of x.list) {
 						const cur = counts.get(m.pid) ?? { n: 0, name: m.name, years: [] };
 						cur.n += 1;
@@ -293,7 +301,9 @@ addPage(
 					`MVP ages, from youngest to oldest`,
 				],
 				build: (x, r, c) => {
-					const aged = x.list.filter((m) => m.age).toSorted((a, b) => a.age! - b.age!);
+					const aged = x.list
+						.filter((m) => m.age)
+						.toSorted((a, b) => a.age! - b.age!);
 					const young = aged[0]!;
 					const old = aged.at(-1)!;
 					return [
@@ -314,14 +324,21 @@ addPage(
 // ---- A look back --------------------------------------------------------------------
 
 addPage(
-	arcPage<{ year: number; champ?: NonNullable<Ctx["f"]["champions"]>[number]; mvp?: NonNullable<Ctx["f"]["mvps"]>[number]; best?: { t: NPTeam; won: number; lost: number } }>({
+	arcPage<{
+		year: number;
+		champ?: NonNullable<Ctx["f"]["champions"]>[number];
+		mvp?: NonNullable<Ctx["f"]["mvps"]>[number];
+		best?: { t: NPTeam; won: number; lost: number };
+	}>({
 		id: "years-ago",
 		section: "history",
 		kicker: "Looking back",
 		eds: ALL_EDS,
 		beat: "features",
 		prep: (c) => {
-			const year = [10, 7, 5].map((n) => c.season - n).find((y) => y >= c.f.firstSeason);
+			const year = [10, 7, 5]
+				.map((n) => c.season - n)
+				.find((y) => y >= c.f.firstSeason);
 			if (year === undefined) {
 				return undefined;
 			}
@@ -370,7 +387,10 @@ addPage(
 					if (x.mvp) {
 						items.push({
 							lead: "MVP:",
-							segs: [c.pl(x.mvp.pid, x.mvp.name), x.mvp.age ? `, ${x.mvp.age}.` : "."],
+							segs: [
+								c.pl(x.mvp.pid, x.mvp.name),
+								x.mvp.age ? `, ${x.mvp.age}.` : ".",
+							],
 						});
 					}
 					if (x.best) {
@@ -402,7 +422,9 @@ addPage(
 		eds: ALL_EDS,
 		beat: "league",
 		prep: (c) => {
-			const champs = (c.f.champions ?? []).filter((x) => x.season >= c.season - 10);
+			const champs = (c.f.champions ?? []).filter(
+				(x) => x.season >= c.season - 10,
+			);
 			return champs.length >= 5 ? { champs } : undefined;
 		},
 		arcs: [
@@ -457,14 +479,18 @@ addPage(
 // ---- Record chase ------------------------------------------------------------------------
 
 addPage(
-	arcPage<{ top: { t: NPTeam; season: number; won: number; lost: number }[]; best?: NPTeam }>({
+	arcPage<{
+		top: { t: NPTeam; season: number; won: number; lost: number }[];
+		best?: NPTeam;
+	}>({
 		id: "record-book",
 		section: "history",
 		kicker: "The record book",
 		eds: SEASON_EDS,
 		beat: "numbers",
 		prep: (c) => {
-			const all: { t: NPTeam; season: number; won: number; lost: number }[] = [];
+			const all: { t: NPTeam; season: number; won: number; lost: number }[] =
+				[];
 			for (const t of c.f.teams) {
 				for (const h of t.hist ?? []) {
 					all.push({ t, season: h.season, won: h.won, lost: h.lost });
@@ -490,7 +516,9 @@ addPage(
 					const beats = b && winp(b) > winp(x.top[0]!);
 					return [
 						P(
-							b ? `This season's best team, the ` : "The best regular season on file is the ",
+							b
+								? `This season's best team, the `
+								: "The best regular season on file is the ",
 							b ? c.tl(b.tid) : "",
 							b
 								? ` (${record(b)}), ${c.T("is", "was")} ${beats ? "ahead of" : "behind"} the record of ${x.top[0]!.won}-${x.top[0]!.lost}${c.done ? "" : `, with ${b.gp} games played`}, set by the ${x.top[0]!.season} `
@@ -579,14 +607,21 @@ addPage(
 // ---- Franchise win milestones -------------------------------------------------------------
 
 addPage(
-	arcPage<{ marks: { t: NPTeam; total: number; mark: number; crossed: boolean }[] }>({
+	arcPage<{
+		marks: { t: NPTeam; total: number; mark: number; crossed: boolean }[];
+	}>({
 		id: "franchise-marks",
 		section: "history",
 		kicker: "Franchise marks",
 		eds: SEASON_EDS,
 		beat: "numbers",
 		prep: (c) => {
-			const marks: { t: NPTeam; total: number; mark: number; crossed: boolean }[] = [];
+			const marks: {
+				t: NPTeam;
+				total: number;
+				mark: number;
+				crossed: boolean;
+			}[] = [];
 			for (const t of c.f.teams) {
 				if ((t.hist?.length ?? 0) < 5) {
 					continue;
@@ -598,11 +633,21 @@ addPage(
 				if (crossedMark > 0 && before < crossedMark && now >= crossedMark) {
 					marks.push({ t, total: now, mark: crossedMark, crossed: true });
 				} else if (step * Math.ceil(now / step) - now <= 40) {
-					marks.push({ t, total: now, mark: step * Math.ceil(now / step), crossed: false });
+					marks.push({
+						t,
+						total: now,
+						mark: step * Math.ceil(now / step),
+						crossed: false,
+					});
 				}
 			}
 			return marks.length > 0
-				? { marks: marks.toSorted((a, b) => Number(b.crossed) - Number(a.crossed) || b.mark - a.mark) }
+				? {
+						marks: marks.toSorted(
+							(a, b) =>
+								Number(b.crossed) - Number(a.crossed) || b.mark - a.mark,
+						),
+					}
 				: undefined;
 		},
 		arcs: [
@@ -625,12 +670,14 @@ addPage(
 					),
 					{
 						type: "list",
-						items: x.marks.slice(0, 6).map((m) => [
-							c.tl(m.t.tid, c.tfull(m.t.tid)),
-							m.crossed
-								? ` ${c.T("have passed", "passed")} ${grp(m.mark)} wins (${grp(m.total)} in all)`
-								: ` ${c.T("stand", "stood")} at ${grp(m.total)}, ${m.mark - m.total} short of ${grp(m.mark)}`,
-						]),
+						items: x.marks
+							.slice(0, 6)
+							.map((m) => [
+								c.tl(m.t.tid, c.tfull(m.t.tid)),
+								m.crossed
+									? ` ${c.T("have passed", "passed")} ${grp(m.mark)} wins (${grp(m.total)} in all)`
+									: ` ${c.T("stand", "stood")} at ${grp(m.total)}, ${m.mark - m.total} short of ${grp(m.mark)}`,
+							]),
 					},
 				],
 			},
@@ -641,7 +688,15 @@ addPage(
 // ---- The all-time list on the move ------------------------------------------------------------
 
 addPage(
-	arcPage<{ rows: { pid: number; name: string; was: number; now: number; pts: number }[] }>({
+	arcPage<{
+		rows: {
+			pid: number;
+			name: string;
+			was: number;
+			now: number;
+			pts: number;
+		}[];
+	}>({
 		id: "rankings-move",
 		section: "history",
 		kicker: "All-time rankings",

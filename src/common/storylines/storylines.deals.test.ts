@@ -27,10 +27,14 @@ describe("front-office storylines", () => {
 
 	test("clean text that ends a sentence", () => {
 		for (const s of deal) {
-			const text = plainText(`${s.headline} ${s.body} ${s.evidence.flat().join(" ")}`);
+			const text = plainText(
+				`${s.headline} ${s.body} ${s.evidence.flat().join(" ")}`,
+			);
 			expect(text, s.id).not.toMatch(/\b(undefined|NaN|null|Infinity)\b/);
 			expect(text, s.id).not.toMatch(/ {2}|\[\[|]]|\${|\.\./);
-			expect(text, s.id).not.toMatch(/\b1 (seasons|games|wins|titles|years|trades|picks)\b/);
+			expect(text, s.id).not.toMatch(
+				/\b1 (seasons|games|wins|titles|years|trades|picks)\b/,
+			);
 			expect(s.body.endsWith("."), s.id).toBe(true);
 		}
 	});
@@ -40,9 +44,24 @@ describe("front-office storylines", () => {
 		expect(bodies.some((b) => /^\w[^.?]*\? /.test(b))).toBe(true);
 		expect(bodies.some((b) => /^\d{4}: /.test(b))).toBe(true);
 		expect(bodies.some((b) => b.startsWith("Tale of the tape."))).toBe(true);
-		expect(qaBody([["Who?", "Him."], ["When?", "Then."]])).toBe("Who? Him. When? Then.");
-		expect(timelineBody([[2020, "drafted"], [2022, "traded"]])).toBe("2020: drafted. 2022: traded.");
-		expect(tapeBody("Tape", [["A", "1"], ["B", "2"]])).toBe("Tape. A: 1. B: 2.");
+		expect(
+			qaBody([
+				["Who?", "Him."],
+				["When?", "Then."],
+			]),
+		).toBe("Who? Him. When? Then.");
+		expect(
+			timelineBody([
+				[2020, "drafted"],
+				[2022, "traded"],
+			]),
+		).toBe("2020: drafted. 2022: traded.");
+		expect(
+			tapeBody("Tape", [
+				["A", "1"],
+				["B", "2"],
+			]),
+		).toBe("Tape. A: 1. B: 2.");
 	});
 
 	test("deterministic", () => {
@@ -51,17 +70,31 @@ describe("front-office storylines", () => {
 
 	test("unfinished season: no title or playoff claims from the new kinds", () => {
 		const L = { ...wrappedRich(10), currentComplete: false };
-		const out = findStories(L).filter((s) => names.has(s.kind) && s.season === L.season);
+		const out = findStories(L).filter(
+			(s) => names.has(s.kind) && s.season === L.season,
+		);
 		for (const s of out) {
 			expect(s.shape, s.id).not.toBe("playoffs");
-			expect(plainText(`${s.headline} ${s.body}`), s.id).not.toMatch(/champions?|title|playoff/i);
+			expect(plainText(`${s.headline} ${s.body}`), s.id).not.toMatch(
+				/champions?|title|playoff/i,
+			);
 		}
 	});
 
 	test("a league without trades, contracts or lotteries finds none of the kinds that need them", () => {
 		// These only need the draft, team seasons and transactions
-		const ok = new Set(["Relocation", "Homegrown champion", "Champion built by trade", "Drafted, traded, back again", "Draft steal", "Draft bust", "The one they passed on"]);
-		const out = findStories(makeLeague(8)).filter((s) => names.has(s.kind) && !ok.has(s.kind));
+		const ok = new Set([
+			"Relocation",
+			"Homegrown champion",
+			"Champion built by trade",
+			"Drafted, traded, back again",
+			"Draft steal",
+			"Draft bust",
+			"The one they passed on",
+		]);
+		const out = findStories(makeLeague(8)).filter(
+			(s) => names.has(s.kind) && !ok.has(s.kind),
+		);
 		expect(out).toEqual([]);
 	});
 });

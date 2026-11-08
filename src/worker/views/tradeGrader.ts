@@ -29,7 +29,9 @@ const processInputs = (params: RouteParams<"tradeGrader">) => {
 			season = s;
 		}
 	}
-	return { tab, team, season };
+	// Which win shares grade the trades: regular season and playoffs (default) or the regular season only
+	const ws: "all" | "rs" = params.ws === "rs" ? "rs" : "all";
+	return { tab, team, season, ws };
 };
 
 const LIMIT = 100;
@@ -51,13 +53,14 @@ export default defineView({
 				updateEvents.has("playerMovement") ||
 				inputs.tab !== prevInputs?.tab ||
 				inputs.team !== prevInputs?.team ||
-				inputs.season !== prevInputs?.season
+				inputs.season !== prevInputs?.season ||
+				inputs.ws !== prevInputs?.ws
 			)
 		) {
 			return;
 		}
 
-		const G = await getTradeGrades();
+		const G = await getTradeGrades({ playoffs: inputs.ws === "all" });
 		const { tab, team } = inputs;
 		let season = inputs.season;
 		if (tab === "season" && season === "all") {
@@ -106,9 +109,7 @@ export default defineView({
 				.sort((a, b) => b.eid - a.eid || a.i - b.i);
 		} else if (tab === "season") {
 			seasonTrades = G.trades.filter(
-				(t) =>
-					t.season === season &&
-					(team === "all" || t.tids.includes(team)),
+				(t) => t.season === season && (team === "all" || t.tids.includes(team)),
 			);
 			const gap = (t: (typeof G.trades)[number]) =>
 				t.sides[0].net === null ? -1 : Math.abs(t.sides[0].net);
@@ -122,6 +123,7 @@ export default defineView({
 			tab,
 			team,
 			season,
+			ws: inputs.ws,
 			seasons: G.seasons,
 			numTrades: G.trades.length,
 			numSides: allSides.length,

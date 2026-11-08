@@ -123,7 +123,9 @@ const leagueValue: Topic = ({ X, season, soFar }) => {
 				: `Production was expensive this year`,
 		],
 		hero: { text: fmtNum(v, 2), unit: "win shares per $1M" },
-		lines: [`${ordinal(w.rank)}-${w.high ? "best" : "worst"} rate of ${vals.length} seasons`],
+		lines: [
+			`${ordinal(w.rank)}-${w.high ? "best" : "worst"} rate of ${vals.length} seasons`,
+		],
 		facts: [`rate|${season}`],
 	});
 };
@@ -144,7 +146,9 @@ const nextClass: Topic = ({ X, season }) => {
 		kicker: "Contracts running out",
 		season,
 		pid: list[0]!.l.pid,
-		heads: [`${plural(list.length, "contract")} end this season, led by ${list[0]!.l.name}'s`],
+		heads: [
+			`${plural(list.length, "contract")} end this season, led by ${list[0]!.l.name}'s`,
+		],
 		list: list.slice(0, 5).map((x) => ({
 			name: x.l.name,
 			value: money(x.sal),
@@ -221,8 +225,18 @@ const teamValue: Topic = ({ X, season, tid, soFar }) => {
 		pid: best.l.pid,
 		heads: [`${best.l.name} gave the most per dollar`],
 		list: [
-			{ name: best.l.name, value: `${fmtNum(best.v, 2)} WS/$1M`, sub: money(best.sal), pid: best.l.pid },
-			{ name: worst.l.name, value: `${fmtNum(worst.v, 2)} WS/$1M`, sub: money(worst.sal), pid: worst.l.pid },
+			{
+				name: best.l.name,
+				value: `${fmtNum(best.v, 2)} WS/$1M`,
+				sub: money(best.sal),
+				pid: best.l.pid,
+			},
+			{
+				name: worst.l.name,
+				value: `${fmtNum(worst.v, 2)} WS/$1M`,
+				sub: money(worst.sal),
+				pid: worst.l.pid,
+			},
 		],
 		lines: ["Best and worst value on the roster"],
 		facts: [`t-value|${tid}|${season}`],
@@ -263,7 +277,9 @@ const franchiseTopSalary: Topic = ({ X, season, tid }) => {
 };
 
 const lotteryHistory: Topic = ({ X, season, tid }) => {
-	const rows = lotteryRows(X).filter((r) => r.tid === tid && r.season <= season);
+	const rows = lotteryRows(X).filter(
+		(r) => r.tid === tid && r.season <= season,
+	);
 	if (rows.length < 3) {
 		return null;
 	}
@@ -280,8 +296,13 @@ const lotteryHistory: Topic = ({ X, season, tid }) => {
 		heads: [
 			`${plural(rows.length, "trip")} to the lottery, ${net >= 0 ? "up" : "down"} ${plural(Math.abs(net), "spot")} in all`,
 		],
-		hero: { text: `${net >= 0 ? "+" : ""}${net}`, unit: "spots from lottery luck" },
-		lines: [wins > 0 ? `${plural(wins, "lottery win")}` : "Never won the top pick"],
+		hero: {
+			text: `${net >= 0 ? "+" : ""}${net}`,
+			unit: "spots from lottery luck",
+		},
+		lines: [
+			wins > 0 ? `${plural(wins, "lottery win")}` : "Never won the top pick",
+		],
 		facts: [`t-lothist|${tid}`],
 	});
 };
@@ -295,7 +316,10 @@ const homegrownNow: Topic = ({ X, season, tid }) => {
 	const share = own.length / ls.length;
 	const all = X.teamsIn(season).map((t) => {
 		const x = X.teamLines(t.tid, season);
-		return x.length > 0 ? x.filter((l) => X.players.get(l.pid)!.draft.tid === t.tid).length / x.length : 0;
+		return x.length > 0
+			? x.filter((l) => X.players.get(l.pid)!.draft.tid === t.tid).length /
+					x.length
+			: 0;
 	});
 	const w = twoWay(all, share);
 	if (w.score < 0.4) {
@@ -314,7 +338,10 @@ const homegrownNow: Topic = ({ X, season, tid }) => {
 				? `${own.length} of ${ls.length} players were the team's own picks`
 				: `Only ${own.length} of ${ls.length} players were drafted here`,
 		],
-		hero: { text: `${own.length}/${ls.length}`, unit: "own draft picks on the roster" },
+		hero: {
+			text: `${own.length}/${ls.length}`,
+			unit: "own draft picks on the roster",
+		},
 		lines: [`${ordinal(w.rank)}-${w.high ? "most" : "fewest"} in the league`],
 		facts: [`t-owndrafted|${tid}|${season}`],
 	});
@@ -343,9 +370,15 @@ const playerValue: Topic = ({ X, season, pid, soFar }) => {
 		kicker: w.high ? "A bargain" : "Pricey",
 		pid,
 		season,
-		heads: [w.high ? `One of the best values in the league` : `Not much back for the money`],
+		heads: [
+			w.high
+				? `One of the best values in the league`
+				: `Not much back for the money`,
+		],
 		hero: { text: fmtNum(v, 2), unit: "win shares per $1M" },
-		lines: [`${ordinal(w.rank)}-${w.high ? "best" : "worst"} of ${list.length} paid players`],
+		lines: [
+			`${ordinal(w.rank)}-${w.high ? "best" : "worst"} of ${list.length} paid players`,
+		],
 		facts: [`perdollar|${pid}|${season}`],
 	});
 };
@@ -396,7 +429,10 @@ const moneyLeft: Topic = ({ X, season, pid }) => {
 		pid,
 		season,
 		heads: [`${money(sum(left))} left on his deal after this season`],
-		hero: { text: money(sum(left)), unit: `over ${plural(left.length, "more season")}` },
+		hero: {
+			text: money(sum(left)),
+			unit: `over ${plural(left.length, "more season")}`,
+		},
 		lines: [],
 		facts: [`left|${pid}|${season}`],
 	});
@@ -405,7 +441,9 @@ const moneyLeft: Topic = ({ X, season, pid }) => {
 const priceTag: Topic = ({ X, season, pid }) => {
 	const e = tradesWith(X, pid!, season)
 		.map((x) => {
-			const i = x.t.got.findIndex((side) => side.some((a) => isPlayerAsset(a) && a.pid === pid));
+			const i = x.t.got.findIndex((side) =>
+				side.some((a) => isPlayerAsset(a) && a.pid === pid),
+			);
 			return { x, gave: x.t.got[1 - i]!.length, to: x.t.tids[i]! };
 		})
 		.sort((a, b) => b.gave - a.gave || a.x.t.eid - b.x.t.eid)[0];
@@ -421,7 +459,9 @@ const priceTag: Topic = ({ X, season, pid }) => {
 		pid,
 		season,
 		tid: e.to,
-		heads: [`The ${X.teamName(e.to, e.x.t.season)} gave up ${e.gave} assets to get him`],
+		heads: [
+			`The ${X.teamName(e.to, e.x.t.season)} gave up ${e.gave} assets to get him`,
+		],
 		hero: { text: `${e.gave}`, unit: "players and picks" },
 		lines: [`In ${e.x.t.season}`],
 		facts: [`trade|${e.x.t.eid}`],
@@ -429,7 +469,9 @@ const priceTag: Topic = ({ X, season, pid }) => {
 };
 
 const tradedStar: Topic = ({ X, season }) => {
-	let best: { pid: number; ws: number; s: number; from: number; to: number } | undefined;
+	let best:
+		| { pid: number; ws: number; s: number; from: number; to: number }
+		| undefined;
 	for (const t of X.L.trades ?? []) {
 		if (t.season > season) {
 			continue;
@@ -440,7 +482,13 @@ const tradedStar: Topic = ({ X, season }) => {
 					const p = X.players.get(a.pid);
 					const ws = p ? careerWs(p, season) : 0;
 					if (!best || ws > best.ws) {
-						best = { pid: a.pid, ws, s: t.season, from: t.tids[1 - i]!, to: t.tids[i]! };
+						best = {
+							pid: a.pid,
+							ws,
+							s: t.season,
+							from: t.tids[1 - i]!,
+							to: t.tids[i]!,
+						};
 					}
 				}
 			}
@@ -458,9 +506,14 @@ const tradedStar: Topic = ({ X, season }) => {
 		kicker: "Nobody is untouchable",
 		season: best.s,
 		pid: best.pid,
-		heads: [`Even ${p.name} got traded`, `The greatest player ever traded: ${p.name}`],
+		heads: [
+			`Even ${p.name} got traded`,
+			`The greatest player ever traded: ${p.name}`,
+		],
 		hero: { text: ws1(best.ws), unit: "career win shares" },
-		lines: [`${best.s}: from the ${X.teamName(best.from, best.s)} to the ${X.teamName(best.to, best.s)}`],
+		lines: [
+			`${best.s}: from the ${X.teamName(best.from, best.s)} to the ${X.teamName(best.to, best.s)}`,
+		],
 		facts: [`a-dstar`],
 	});
 };
@@ -493,8 +546,16 @@ const teamValueAll: Topic = ({ X, season }) => {
 		kicker: "Thrifty",
 		season,
 		tid: list[0]!.t,
-		heads: [`The ${X.teamName(list[0]!.t, season)} got the most for their money`],
-		list: list.slice(0, 5).map((x) => ({ name: X.teamName(x.t, season), value: `${fmtNum(x.v, 2)} WS/$1M`, tid: x.t })),
+		heads: [
+			`The ${X.teamName(list[0]!.t, season)} got the most for their money`,
+		],
+		list: list
+			.slice(0, 5)
+			.map((x) => ({
+				name: X.teamName(x.t, season),
+				value: `${fmtNum(x.v, 2)} WS/$1M`,
+				tid: x.t,
+			})),
 		lines: ["All-time win shares per $1M of salary"],
 		facts: [`a-value`],
 	});
@@ -521,7 +582,9 @@ const longShot: Topic = ({ X }) => {
 		kicker: "Against the odds",
 		season: x.r.season,
 		tid: x.r.tid,
-		heads: [`The ${X.teamName(x.r.tid, x.r.season)} won the ${x.r.season} lottery with ${fmtNum(x.odds * 100, 1)}% odds`],
+		heads: [
+			`The ${X.teamName(x.r.tid, x.r.season)} won the ${x.r.season} lottery with ${fmtNum(x.odds * 100, 1)}% odds`,
+		],
 		hero: { text: `${fmtNum(x.odds * 100, 1)}%`, unit: "chance, and they won" },
 		lines: [`They started at #${x.r.slot}`],
 		facts: [`lottery|${x.r.season}|${x.r.tid}`],
@@ -532,7 +595,11 @@ const undraftedEarner: Topic = ({ X, season }) => {
 	const by = new Map<number, number>();
 	for (const r of contractRows(X, season)) {
 		if (r.p.draft.round === 0) {
-			const paid = sum(r.c.amounts.filter((_, i) => r.c.start + i <= Math.min(season, r.playedTo)));
+			const paid = sum(
+				r.c.amounts.filter(
+					(_, i) => r.c.start + i <= Math.min(season, r.playedTo),
+				),
+			);
 			by.set(r.p.pid, (by.get(r.p.pid) ?? 0) + paid);
 		}
 	}
@@ -585,7 +652,9 @@ const tradedPickStar: Topic = ({ X, season }) => {
 			`The best player ever taken with a traded pick: ${x.p.name}`,
 		],
 		hero: { text: ws1(x.ws), unit: "career win shares" },
-		lines: [`${x.p.draft.year}, pick ${x.p.draft.pick}, by the ${X.teamName(x.p.draft.tid, x.p.draft.year)}`],
+		lines: [
+			`${x.p.draft.year}, pick ${x.p.draft.pick}, by the ${X.teamName(x.p.draft.tid, x.p.draft.year)}`,
+		],
 		facts: [`a-pickstar`],
 	});
 };
@@ -601,7 +670,9 @@ const salaryRankSeason: Topic = ({ X, season }) => {
 	const hist = X.seasons
 		.filter((s) => s <= season)
 		.map((s) => {
-			const x = paidLines(X, s).map((y) => y.sal).sort((a, b) => b - a);
+			const x = paidLines(X, s)
+				.map((y) => y.sal)
+				.sort((a, b) => b - a);
 			return x.length >= 20 ? sum(x.slice(0, 10)) / sum(x) : undefined;
 		})
 		.filter((x): x is number => x !== undefined);
@@ -624,8 +695,13 @@ const salaryRankSeason: Topic = ({ X, season }) => {
 				? `The ten best-paid players took ${fmtNum(share * 100, 0)}% of the money`
 				: `Salaries were spread out: the top ten took ${fmtNum(share * 100, 0)}%`,
 		],
-		hero: { text: `${fmtNum(share * 100, 0)}%`, unit: "of salary to the top ten" },
-		lines: [`${ordinal(w.rank)}-${w.high ? "most" : "least"} top-heavy of ${hist.length} seasons`],
+		hero: {
+			text: `${fmtNum(share * 100, 0)}%`,
+			unit: "of salary to the top ten",
+		},
+		lines: [
+			`${ordinal(w.rank)}-${w.high ? "most" : "least"} top-heavy of ${hist.length} seasons`,
+		],
 		facts: [`paytop10|${season}`],
 	});
 };

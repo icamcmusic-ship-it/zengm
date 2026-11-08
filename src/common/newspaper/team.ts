@@ -4,7 +4,18 @@
 import { Ctx, P } from "./ctx.ts";
 import { table } from "./kit.ts";
 import { champFacts, seriesOf, sides } from "./front.ts";
-import { andList, capFirst, fmt1, money, ordinal, plural, poss, record, signed, winp } from "./text.ts";
+import {
+	andList,
+	capFirst,
+	fmt1,
+	money,
+	ordinal,
+	plural,
+	poss,
+	record,
+	signed,
+	winp,
+} from "./text.ts";
 import type { Article, Block, NPPlayer, NPTeam, Seg } from "./types.ts";
 
 export const teamLead = (c: Ctx, tid: number): Article | undefined => {
@@ -347,7 +358,9 @@ export const teamRookies = (c: Ctx, tid: number): Article | undefined => {
 	if (rookies.length > 0) {
 		body.push(
 			P(
-				c.pre ? "First-year players on the roster: " : `${plural(rookies.length, "rookie")} ${c.T("have", "had")} a role: `,
+				c.pre
+					? "First-year players on the roster: "
+					: `${plural(rookies.length, "rookie")} ${c.T("have", "had")} a role: `,
 				...andList(
 					rookies
 						.slice(0, 4)
@@ -493,29 +506,82 @@ export const teamRanks = (c: Ctx, tid: number): Article | undefined => {
 		return all.filter((v) => (high ? v > mine : v < mine)).length + 1;
 	};
 	const n = c.f.teams.length;
-	const rows: { label: string; value: string; rank: number | undefined }[] = c.pre
-		? [
-				{ label: "Roster rating", value: fmt1(c.teamOvr(tid) ?? 0), rank: c.ovrRank(tid) },
-			]
-		: [
-				{ label: "Win percentage", value: `.${Math.round(winp(t) * 1000)}`, rank: rank((x) => (x.gp > 0 ? winp(x) : undefined)) },
-				{ label: "Points scored", value: t.pts !== undefined ? fmt1(t.pts) : "", rank: rank((x) => x.pts) },
-				{ label: "Points allowed", value: t.oppPts !== undefined ? fmt1(t.oppPts) : "", rank: rank((x) => x.oppPts, false) },
-				{
-					label: "Point differential",
-					value: t.pts !== undefined && t.oppPts !== undefined ? signed(t.pts - t.oppPts) : "",
-					rank: rank((x) => (x.pts !== undefined && x.oppPts !== undefined ? x.pts - x.oppPts : undefined)),
-				},
-				{ label: "At home", value: `${t.wonHome}-${t.lostHome}`, rank: rank((x) => (x.wonHome + x.lostHome > 0 ? x.wonHome / (x.wonHome + x.lostHome) : undefined)) },
-				{ label: "On the road", value: `${t.wonAway}-${t.lostAway}`, rank: rank((x) => (x.wonAway + x.lostAway > 0 ? x.wonAway / (x.wonAway + x.lostAway) : undefined)) },
-				{
-					label: "Close games",
-					value: t.close ? `${t.close.w}-${t.close.l}` : "",
-					rank: t.close && t.close.w + t.close.l >= 6 ? rank((x) => (x.close && x.close.w + x.close.l >= 6 ? x.close.w / (x.close.w + x.close.l) : undefined)) : undefined,
-				},
-				{ label: "Roster rating", value: fmt1(c.teamOvr(tid) ?? 0), rank: c.ovrRank(tid) },
-			];
-	const shown = rows.filter((x) => x.value !== "" && x.rank !== undefined && x.value !== "0.0");
+	const rows: { label: string; value: string; rank: number | undefined }[] =
+		c.pre
+			? [
+					{
+						label: "Roster rating",
+						value: fmt1(c.teamOvr(tid) ?? 0),
+						rank: c.ovrRank(tid),
+					},
+				]
+			: [
+					{
+						label: "Win percentage",
+						value: `.${Math.round(winp(t) * 1000)}`,
+						rank: rank((x) => (x.gp > 0 ? winp(x) : undefined)),
+					},
+					{
+						label: "Points scored",
+						value: t.pts !== undefined ? fmt1(t.pts) : "",
+						rank: rank((x) => x.pts),
+					},
+					{
+						label: "Points allowed",
+						value: t.oppPts !== undefined ? fmt1(t.oppPts) : "",
+						rank: rank((x) => x.oppPts, false),
+					},
+					{
+						label: "Point differential",
+						value:
+							t.pts !== undefined && t.oppPts !== undefined
+								? signed(t.pts - t.oppPts)
+								: "",
+						rank: rank((x) =>
+							x.pts !== undefined && x.oppPts !== undefined
+								? x.pts - x.oppPts
+								: undefined,
+						),
+					},
+					{
+						label: "At home",
+						value: `${t.wonHome}-${t.lostHome}`,
+						rank: rank((x) =>
+							x.wonHome + x.lostHome > 0
+								? x.wonHome / (x.wonHome + x.lostHome)
+								: undefined,
+						),
+					},
+					{
+						label: "On the road",
+						value: `${t.wonAway}-${t.lostAway}`,
+						rank: rank((x) =>
+							x.wonAway + x.lostAway > 0
+								? x.wonAway / (x.wonAway + x.lostAway)
+								: undefined,
+						),
+					},
+					{
+						label: "Close games",
+						value: t.close ? `${t.close.w}-${t.close.l}` : "",
+						rank:
+							t.close && t.close.w + t.close.l >= 6
+								? rank((x) =>
+										x.close && x.close.w + x.close.l >= 6
+											? x.close.w / (x.close.w + x.close.l)
+											: undefined,
+									)
+								: undefined,
+					},
+					{
+						label: "Roster rating",
+						value: fmt1(c.teamOvr(tid) ?? 0),
+						rank: c.ovrRank(tid),
+					},
+				];
+	const shown = rows.filter(
+		(x) => x.value !== "" && x.rank !== undefined && x.value !== "0.0",
+	);
 	if (shown.length < 3) {
 		return undefined;
 	}
@@ -580,17 +646,19 @@ export const teamFranchise = (c: Ctx, tid: number): Article | undefined => {
 			),
 			table(
 				["Season", "Record", "Result"],
-				hist.slice(0, 10).map((h) => [
-					[String(h.season)],
-					[record(h)],
-					[
-						h.playoffRoundsWon < 0
-							? "missed the playoffs"
-							: h.playoffRoundsWon >= c.f.numRounds
-								? "champions"
-								: `lost in the ${c.roundPhrase(h.playoffRoundsWon)}`,
-					],
-				]),
+				hist
+					.slice(0, 10)
+					.map((h) => [
+						[String(h.season)],
+						[record(h)],
+						[
+							h.playoffRoundsWon < 0
+								? "missed the playoffs"
+								: h.playoffRoundsWon >= c.f.numRounds
+									? "champions"
+									: `lost in the ${c.roundPhrase(h.playoffRoundsWon)}`,
+						],
+					]),
 			),
 		],
 	};
@@ -650,7 +718,9 @@ export const teamRoster = (c: Ctx, tid: number): Article | undefined => {
 				c.pre ? [2] : [2, 4],
 			),
 			t.payroll
-				? P(`Contracts on the roster add up to ${money(t.payroll)}${c.f.salaryCap ? `, ${t.payroll > c.f.salaryCap ? `${money(t.payroll - c.f.salaryCap)} over` : `${money(c.f.salaryCap - t.payroll)} under`} the ${money(c.f.salaryCap)} cap` : ""}.`)
+				? P(
+						`Contracts on the roster add up to ${money(t.payroll)}${c.f.salaryCap ? `, ${t.payroll > c.f.salaryCap ? `${money(t.payroll - c.f.salaryCap)} over` : `${money(c.f.salaryCap - t.payroll)} under`} the ${money(c.f.salaryCap)} cap` : ""}.`,
+					)
 				: P(""),
 		],
 	};
@@ -663,13 +733,22 @@ export const teamRecordBook = (c: Ctx, tid: number): Article | undefined => {
 	}
 	const items: { lead: string; segs: Seg[] }[] = [];
 	if (t.bestStreak) {
-		items.push({ lead: "Longest winning streak:", segs: [`${t.bestStreak} games.`] });
+		items.push({
+			lead: "Longest winning streak:",
+			segs: [`${t.bestStreak} games.`],
+		});
 	}
 	if (t.worstStreak) {
-		items.push({ lead: "Longest losing streak:", segs: [`${t.worstStreak} games.`] });
+		items.push({
+			lead: "Longest losing streak:",
+			segs: [`${t.worstStreak} games.`],
+		});
 	}
 	if (t.close && t.close.w + t.close.l >= 4) {
-		items.push({ lead: "Games decided by five or fewer:", segs: [`${t.close.w}-${t.close.l}.`] });
+		items.push({
+			lead: "Games decided by five or fewer:",
+			segs: [`${t.close.w}-${t.close.l}.`],
+		});
 	}
 	if (t.ot && t.ot.w + t.ot.l >= 1) {
 		items.push({ lead: "In overtime:", segs: [`${t.ot.w}-${t.ot.l}.`] });
@@ -732,33 +811,50 @@ export const teamLetter = (c: Ctx, tid: number): Article | undefined => {
 
 // Links to other editions: the league paper, this team's other issues and the division rivals
 export const teamBackIssues = (c: Ctx, tid: number): Article | undefined => {
-  const t = c.team(tid);
-  if (!t) {
-    return undefined;
-  }
-  const items: Seg[][] = [
-    [{ paper: { team: "all", season: c.season }, t: `The ${c.season} league edition` }],
-  ];
-  if (c.season > c.f.firstSeason) {
-    items.push([{ paper: { team: tid, season: c.season - 1 }, t: `The ${t.name} local edition of ${c.season - 1}` }]);
-    items.push([{ paper: { team: "all", season: c.season - 1 }, t: `The ${c.season - 1} league edition` }]);
-  }
-  const rivals = c.f.teams.filter((x) => x.did === t.did && x.tid !== tid);
-  if (rivals.length > 0) {
-    items.push([
-      "Division rivals' local editions: ",
-      ...andList(
-        rivals.map((x) => [{ paper: { team: x.tid, season: c.season }, t: x.name } as Seg]),
-      ),
-    ]);
-  }
-  return {
-    id: "team-back-issues",
-    type: "team-back-issues",
-    size: "brief",
-    kicker: "In the archive",
-    head: `More from the ${t.name} desk`,
-    byline: c.byline("local"),
-    body: [{ type: "list", items }],
-  };
+	const t = c.team(tid);
+	if (!t) {
+		return undefined;
+	}
+	const items: Seg[][] = [
+		[
+			{
+				paper: { team: "all", season: c.season },
+				t: `The ${c.season} league edition`,
+			},
+		],
+	];
+	if (c.season > c.f.firstSeason) {
+		items.push([
+			{
+				paper: { team: tid, season: c.season - 1 },
+				t: `The ${t.name} local edition of ${c.season - 1}`,
+			},
+		]);
+		items.push([
+			{
+				paper: { team: "all", season: c.season - 1 },
+				t: `The ${c.season - 1} league edition`,
+			},
+		]);
+	}
+	const rivals = c.f.teams.filter((x) => x.did === t.did && x.tid !== tid);
+	if (rivals.length > 0) {
+		items.push([
+			"Division rivals' local editions: ",
+			...andList(
+				rivals.map((x) => [
+					{ paper: { team: x.tid, season: c.season }, t: x.name } as Seg,
+				]),
+			),
+		]);
+	}
+	return {
+		id: "team-back-issues",
+		type: "team-back-issues",
+		size: "brief",
+		kicker: "In the archive",
+		head: `More from the ${t.name} desk`,
+		byline: c.byline("local"),
+		body: [{ type: "list", items }],
+	};
 };

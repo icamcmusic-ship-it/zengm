@@ -24,8 +24,13 @@ const lastName = (n: string) => {
 	return xs.at(-1) ?? n;
 };
 
-const pick = <T,>(r: Rng, xs: (T | null | undefined | false)[]): T | undefined => {
-	const ok = xs.filter((x): x is T => x !== null && x !== undefined && x !== false);
+const pick = <T>(
+	r: Rng,
+	xs: (T | null | undefined | false)[],
+): T | undefined => {
+	const ok = xs.filter(
+		(x): x is T => x !== null && x !== undefined && x !== false,
+	);
 	return ok.length > 0 ? r.pick(ok) : undefined;
 };
 
@@ -67,7 +72,9 @@ export const playerSeason = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 		[
 			`${capFirst(c.R("he is averaging ", "he averaged "))}${lw}${kp && kp <= 20 ? `, ${kp === 1 ? "the league's best scoring average" : `${ordinal(kp)} in the league in scoring`}` : ""}. `,
 		],
-		[`The line: ${lw}${kp && kp <= 20 ? ` (${ordinal(kp)} in scoring)` : ""}. `],
+		[
+			`The line: ${lw}${kp && kp <= 20 ? ` (${ordinal(kp)} in scoring)` : ""}. `,
+		],
 		[
 			`${ln} ${c.R("is putting up", "put up")} ${lw} a game${kp && kp <= 10 ? `; ${kp > 1 ? `only ${plural(kp - 1, "player")} scored more` : "nobody scored more"}` : ""}. `,
 		],
@@ -75,7 +82,9 @@ export const playerSeason = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 	const s3: Seg[] | undefined =
 		kw && kw <= 30 && p.ws > 0
 			? (pick<Seg[]>(r, [
-					[`${poss(ln)} ${fmt1(p.ws)} win shares ${c.R("rank", "ranked")} ${ordinal(kw)} in the league. `],
+					[
+						`${poss(ln)} ${fmt1(p.ws)} win shares ${c.R("rank", "ranked")} ${ordinal(kw)} in the league. `,
+					],
 					[
 						`By win shares (${fmt1(p.ws)}) he ${c.R("is", "was")} the league's ${kw === 1 ? "most productive player" : `${ordinal(kw)}-most productive player`}. `,
 					],
@@ -87,7 +96,9 @@ export const playerSeason = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 		const d = p.pts - pl.pts;
 		s4 =
 			Math.abs(d) < 0.5
-				? [`His scoring held steady from ${c.season - 1} (${fmt1(pl.pts)} a game). `]
+				? [
+						`His scoring held steady from ${c.season - 1} (${fmt1(pl.pts)} a game). `,
+					]
 				: [
 						pick<string>(r, [
 							`That is ${d > 0 ? "up" : "down"} from ${fmt1(pl.pts)} points a game in ${c.season - 1}. `,
@@ -95,7 +106,13 @@ export const playerSeason = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 						])!,
 					];
 	}
-	const kids = [...s1, ...s2, ...(r.chance(0.5) ? [...(s3 ?? []), ...(s4 ?? [])] : [...(s4 ?? []), ...(s3 ?? [])])];
+	const kids = [
+		...s1,
+		...s2,
+		...(r.chance(0.5)
+			? [...(s3 ?? []), ...(s4 ?? [])]
+			: [...(s4 ?? []), ...(s3 ?? [])]),
+	];
 	return { kids, keys: [fmt1(p.pts)] };
 };
 
@@ -116,13 +133,23 @@ export const playerCareer = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 		hon.push(h.mvp === 1 ? "an MVP award" : plural(h.mvp, "MVP award"));
 	}
 	if (h?.allStar) {
-		hon.push(h.allStar === 1 ? "an All-Star selection" : plural(h.allStar, "All-Star selection"));
+		hon.push(
+			h.allStar === 1
+				? "an All-Star selection"
+				: plural(h.allStar, "All-Star selection"),
+		);
 	}
 	if (h?.allLeague && !h.mvp) {
-		hon.push(h.allLeague === 1 ? "an All-League team" : plural(h.allLeague, "All-League team"));
+		hon.push(
+			h.allLeague === 1
+				? "an All-League team"
+				: plural(h.allLeague, "All-League team"),
+		);
 	}
 	if (h?.titles) {
-		hon.push(h.titles === 1 ? "a championship" : plural(h.titles, "championship"));
+		hon.push(
+			h.titles === 1 ? "a championship" : plural(h.titles, "championship"),
+		);
 	}
 	const honTxt =
 		hon.length === 0
@@ -149,8 +176,13 @@ export const playerCareer = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 };
 
 // A player's best night: the biggest feat of the season, else his highest-scoring game on file
-export const bestFeat = (c: Ctx, pid?: number, tid?: number): NPFeat | undefined => {
-	const score = (f: NPFeat) => f.pts + 1.2 * f.trb + 1.5 * f.ast + 2 * (f.stl + f.blk);
+export const bestFeat = (
+	c: Ctx,
+	pid?: number,
+	tid?: number,
+): NPFeat | undefined => {
+	const score = (f: NPFeat) =>
+		f.pts + 1.2 * f.trb + 1.5 * f.ast + 2 * (f.stl + f.blk);
 	return c.f.feats
 		.filter(
 			(f) =>
@@ -174,7 +206,9 @@ const featWords = (f: NPFeat) => {
 	if (f.blk >= 4) {
 		xs.push(`${f.blk} blocks`);
 	}
-	return xs.length === 1 ? xs[0]! : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
+	return xs.length === 1
+		? xs[0]!
+		: `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
 };
 
 export const playerNight = (c: Ctx, pid: number, r: Rng): Para | undefined => {
@@ -244,7 +278,9 @@ export const playerRank = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 	}
 	const list = ranks.map((x) => `${ordinal(x.rank)} in ${x.label}`);
 	const joined =
-		list.length === 2 ? `${list[0]} and ${list[1]}` : `${list[0]}, ${list[1]} and ${list[2]}`;
+		list.length === 2
+			? `${list[0]} and ${list[1]}`
+			: `${list[0]}, ${list[1]} and ${list[2]}`;
 	const kids = pick<string>(r, [
 		`Among qualified players ${lastName(p.name)} ${c.R("ranks", "ranked")} ${joined}. `,
 		`Across the league he ${c.R("is", "was")} ${joined}. `,
@@ -262,7 +298,9 @@ export const playerShare = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 	if (tot <= 5) {
 		return undefined;
 	}
-	const next = mates.filter((x) => x.pid !== pid).toSorted((a, b) => b.ws - a.ws)[0];
+	const next = mates
+		.filter((x) => x.pid !== pid)
+		.toSorted((a, b) => b.ws - a.ws)[0];
 	const pc = Math.round((100 * p.ws) / tot);
 	const tn = c.tn(p.tid);
 	const top = !next || p.ws >= next.ws;
@@ -270,7 +308,9 @@ export const playerShare = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 		? pick<Seg[]>(r, [
 				[
 					`He ${c.R("accounts", "accounted")} for ${pc}% of the ${poss(tn)} win shares (${fmt1(p.ws)} of ${fmt1(tot)})${next ? "; the next-best teammate, " : ". "}`,
-					...(next ? [c.pl(next.pid), `, ${c.R("has", "had")} ${fmt1(next.ws)}. `] : []),
+					...(next
+						? [c.pl(next.pid), `, ${c.R("has", "had")} ${fmt1(next.ws)}. `]
+						: []),
 				],
 				[
 					`${fmt1(p.ws)} of the ${poss(tn)} ${fmt1(tot)} win shares ${c.R("are", "were")} his, ${pc}% of the total${next ? ". Next on the roster: " : ". "}`,
@@ -334,7 +374,8 @@ const gbOf = (a: NPTeam, b: NPTeam) => (a.won - b.won + (b.lost - a.lost)) / 2;
 const gbWords = (v: number) =>
 	`${Math.abs(v) % 1 ? Math.abs(v).toFixed(1) : Math.abs(v)} ${Math.abs(v) === 1 ? "game" : "games"}`;
 // "3 games behind", or "level with them" when there is no gap
-const behind = (v: number) => (v === 0 ? "level with them" : `${gbWords(v)} behind`);
+const behind = (v: number) =>
+	v === 0 ? "level with them" : `${gbWords(v)} behind`;
 
 export const teamSeason = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 	const t = c.team(tid);
@@ -355,7 +396,10 @@ export const teamSeason = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 					: k > nT / 2
 						? `the ${ordinal(nT - k + 1)}-worst record of ${nT} teams`
 						: `${ordinal(k)} of ${nT} teams`;
-	const pd = t.pts !== undefined && t.oppPts !== undefined ? t.pts - t.oppPts : undefined;
+	const pd =
+		t.pts !== undefined && t.oppPts !== undefined
+			? t.pts - t.oppPts
+			: undefined;
 	const s1 = c.regDone
 		? pick<Seg[]>(r, [
 				[
@@ -389,7 +433,9 @@ export const teamSeason = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 	const s2: Seg[] | undefined =
 		pd !== undefined
 			? pd < 0
-				? [`${c.R("Opponents are outscoring the " + t.name + " by ", "Opponents outscored the " + t.name + " by ")}${fmt1(-pd)} points a game. `]
+				? [
+						`${c.R("Opponents are outscoring the " + t.name + " by ", "Opponents outscored the " + t.name + " by ")}${fmt1(-pd)} points a game. `,
+					]
 				: [
 						pick<string>(r, [
 							`The ${t.name} ${c.R("are outscoring", "outscored")} opponents by ${fmt1(pd)} points a game. `,
@@ -461,19 +507,34 @@ export const teamRace = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 };
 
 export const teamCore = (c: Ctx, tid: number, r: Rng): Para | undefined => {
-	const tl3 = c.teamPlayers(tid).filter((x) => x.gp >= 5).slice(0, 3);
+	const tl3 = c
+		.teamPlayers(tid)
+		.filter((x) => x.gp >= 5)
+		.slice(0, 3);
 	if (tl3.length < 3 || tl3[0]!.ws <= 1) {
 		return undefined;
 	}
-	const it = (x: NPPlayer): Seg[] => [c.pl(x.pid), ` (${fmt1(x.ws)} win shares, ${fmt1(x.pts)} points a game)`];
-	const list: Seg[] = [...it(tl3[0]!), ", ", ...it(tl3[1]!), " and ", ...it(tl3[2]!)];
+	const it = (x: NPPlayer): Seg[] => [
+		c.pl(x.pid),
+		` (${fmt1(x.ws)} win shares, ${fmt1(x.pts)} points a game)`,
+	];
+	const list: Seg[] = [
+		...it(tl3[0]!),
+		", ",
+		...it(tl3[1]!),
+		" and ",
+		...it(tl3[2]!),
+	];
 	const tn = c.tn(tid);
 	const lead = pick<string>(r, [
 		`Three players ${c.R("are carrying", "carried")} the ${tn}: `,
 		`The ${poss(tn)} top three by win shares: `,
 		`For the ${tn}, most of the work ${c.R("comes", "came")} from `,
 	])!;
-	return { kids: [lead, ...list, ". "], keys: [`${fmt1(tl3[0]!.ws)} win shares`] };
+	return {
+		kids: [lead, ...list, ". "],
+		keys: [`${fmt1(tl3[0]!.ws)} win shares`],
+	};
 };
 
 export const teamNight = (c: Ctx, tid: number, r: Rng): Para | undefined => {
@@ -573,7 +634,13 @@ export const teamPost = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 	}
 	const tn = t.name;
 	const path = seriesOf(c, tid);
-	const step = (round: number, opp: number, w: number, l: number, won: boolean) =>
+	const step = (
+		round: number,
+		opp: number,
+		w: number,
+		l: number,
+		won: boolean,
+	) =>
 		won
 			? pick<string>(r, [
 					`beat the ${c.tn(opp)} ${w}-${l} in the ${c.roundPhrase(round)}`,
@@ -590,7 +657,9 @@ export const teamPost = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 		const steps = path
 			.map(({ s, round }) => {
 				const { me, opp } = sides(s, tid);
-				return opp && me ? step(round, opp.tid, me.won, opp.won, t.playoffRoundsWon > round) : undefined;
+				return opp && me
+					? step(round, opp.tid, me.won, opp.won, t.playoffRoundsWon > round)
+					: undefined;
 			})
 			.filter((x): x is string => x !== undefined);
 		if (steps.length === 0) {
@@ -613,7 +682,10 @@ export const teamPost = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 				lead,
 				...(star?.po
 					? [
-							pick<string>(r, ["Their top playoff scorer was ", "Their leading playoff scorer: "])!,
+							pick<string>(r, [
+								"Their top playoff scorer was ",
+								"Their leading playoff scorer: ",
+							])!,
 							c.pl(star.pid),
 							` (${fmt1(star.po.pts)} points a game in ${plural(star.po.gp, "game")}). `,
 						]
@@ -636,9 +708,13 @@ export const teamPost = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 			if (round < c.f.currentRound) {
 				out.push(step(round, opp.tid, me.won, opp.won, me.won > opp.won));
 			} else if (me.won === opp.won) {
-				out.push(`are level ${me.won}-${opp.won} with the ${c.tn(opp.tid)} in the ${rd}`);
+				out.push(
+					`are level ${me.won}-${opp.won} with the ${c.tn(opp.tid)} in the ${rd}`,
+				);
 			} else {
-				out.push(`${me.won > opp.won ? "lead" : "trail"} the ${c.tn(opp.tid)} ${Math.max(me.won, opp.won)}-${Math.min(me.won, opp.won)} in the ${rd}`);
+				out.push(
+					`${me.won > opp.won ? "lead" : "trail"} the ${c.tn(opp.tid)} ${Math.max(me.won, opp.won)}-${Math.min(me.won, opp.won)} in the ${rd}`,
+				);
 			}
 		}
 		return out.length > 0
@@ -701,7 +777,11 @@ export const teamDraft = (c: Ctx, tid: number, r: Rng): Para | undefined => {
 		`The ${poss(tn)} ${c.season} draft: `,
 	])!;
 	return {
-		kids: [lead, ...list, picks.length > 3 ? `, among ${plural(picks.length, "pick")}. ` : ". "],
+		kids: [
+			lead,
+			...list,
+			picks.length > 3 ? `, among ${plural(picks.length, "pick")}. ` : ". ",
+		],
 		keys: [],
 	};
 };
@@ -746,7 +826,10 @@ export const tradeSince = (c: Ctx, tr: NPTrade, r: Rng): Para | undefined => {
 				]) ?? []),
 			);
 		} else {
-			kids.push(c.pl(x.p.pid), ` ${c.R("has", "had")} ${fmt1(x.p.pts)} a game in ${plural(x.p.gp, "game")} for the ${tn}. `);
+			kids.push(
+				c.pl(x.p.pid),
+				` ${c.R("has", "had")} ${fmt1(x.p.pts)} a game in ${plural(x.p.gp, "game")} for the ${tn}. `,
+			);
 		}
 	}
 	return { kids, keys: [] };

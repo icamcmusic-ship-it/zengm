@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { createContext, Fragment, use, type ReactNode } from "react";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import { useLocal } from "../util/local.ts";
@@ -14,6 +14,17 @@ import type {
 } from "../../common/valueGrades/tradeGrader.ts";
 import { EVEN } from "../../common/valueGrades/tradeGrader.ts";
 import { PHASE } from "../../common/constants.ts";
+
+// Which win shares grade the trades ("all": regular season and playoffs, "rs": regular season only), carried in the URL
+export const TRADE_GRADER_WS_KEY = "tradeGraderWs";
+const WsContext = createContext<"all" | "rs">("all");
+
+// A Trade Grader URL that keeps the win shares choice
+const useGraderUrl = () => {
+	const ws = use(WsContext);
+	return (tab: string, team: string, season = "all") =>
+		helpers.leagueUrl(["trade_grader", tab, team, season, ws]);
+};
 
 const TABS = [
 	{ id: "best", label: "Biggest wins & losses" },
@@ -37,10 +48,11 @@ const netClass = (v: number | null | undefined) =>
 				? "text-danger"
 				: undefined;
 
-const col = (
-	title: string,
-	o: Partial<Col> = {},
-): Col => ({ title, sortSequence: ["desc", "asc"], ...o });
+const col = (title: string, o: Partial<Col> = {}): Col => ({
+	title,
+	sortSequence: ["desc", "asc"],
+	...o,
+});
 
 const useTeams = () => {
 	const { teamInfoCache } = useLocal(["teamInfoCache"]);
@@ -129,6 +141,29 @@ const ItemView = ({
 	);
 };
 
+// Titles the team won with what it received (whatever win shares are counted)
+export const TitlesNote = ({
+	titles,
+	standalone,
+}: {
+	titles: number[] | undefined;
+	standalone?: boolean;
+}) => {
+	if (!titles || titles.length === 0) {
+		return null;
+	}
+	return (
+		<span
+			className="text-success text-nowrap"
+			title="Seasons the team won the title with a player it got in this trade playing for it in the playoffs"
+		>
+			{standalone ? "Won" : " · won"}{" "}
+			{titles.length === 1 ? "the title" : `${titles.length} titles`} with them
+			({titles.join(", ")})
+		</span>
+	);
+};
+
 const Items = ({
 	side,
 	abbrev,
@@ -147,6 +182,7 @@ const Items = ({
 					<ItemView item={x} abbrev={abbrev} />
 				</Fragment>
 			))}
+			<TitlesNote titles={side.titles} />
 		</>
 	);
 };
@@ -171,6 +207,7 @@ const SidesTable = ({
 	defaultSort: [number, "asc" | "desc"];
 }) => {
 	const { abbrev, teamPart } = useTeams();
+	const graderUrl = useGraderUrl();
 	const cols: Col[] = [
 		col("Grade", { sortType: "number" }),
 		...(noTeam ? [] : [col("Team", { sortSequence: ["asc", "desc"] })]),
@@ -181,7 +218,10 @@ const SidesTable = ({
 			sortType: "number",
 			desc: "Win shares the arrivals produced in the season the trade was made for",
 		}),
-		col("After", { sortType: "number", desc: "Win shares in the seasons after" }),
+		col("After", {
+			sortType: "number",
+			desc: "Win shares in the seasons after",
+		}),
 		col("Total", { sortType: "number" }),
 		col("Gave", {
 			sortType: "number",
@@ -200,14 +240,7 @@ const SidesTable = ({
 			...(noTeam
 				? []
 				: [
-						<a
-							key="t"
-							href={helpers.leagueUrl([
-								"trade_grader",
-								"team",
-								teamPart(s.tid),
-							])}
-						>
+						<a key="t" href={graderUrl("team", teamPart(s.tid))}>
 							{abbrev(s.tid)}
 						</a>,
 					]),
@@ -235,13 +268,14 @@ const SidesTable = ({
 			{ value: s.unknown ? "?" : n1(s.got.later), sortValue: s.got.later },
 			{
 				value: (
-					<b>
-						{s.unknown ? "?" : `${n1(s.got.total)}${s.partial ? "*" : ""}`}
-					</b>
+					<b>{s.unknown ? "?" : `${n1(s.got.total)}${s.partial ? "*" : ""}`}</b>
 				),
 				sortValue: s.got.total,
 			},
-			{ value: n1(s.net === null ? null : s.gave.total), sortValue: s.gave.total },
+			{
+				value: n1(s.net === null ? null : s.gave.total),
+				sortValue: s.gave.total,
+			},
 			{
 				value: <span className={netClass(s.net)}>{sgn(s.net)}</span>,
 				sortValue: s.net,
@@ -284,6 +318,7 @@ const CardsTable = ({
 	noCount?: boolean;
 }) => {
 	const { abbrev, full, teamPart } = useTeams();
+	const graderUrl = useGraderUrl();
 	const cols: Col[] = [
 		col("Team", { sortSequence: ["asc", "desc"] }),
 		col("Grade", {
@@ -305,11 +340,7 @@ const CardsTable = ({
 		key: c.tid,
 		data: [
 			{
-				value: (
-					<a href={helpers.leagueUrl(["trade_grader", "team", teamPart(c.tid)])}>
-						{full(c.tid)}
-					</a>
-				),
+				value: <a href={graderUrl("team", teamPart(c.tid))}>{full(c.tid)}</a>,
 				sortValue: abbrev(c.tid),
 			},
 			{
@@ -349,7 +380,13 @@ const CardsTable = ({
 	);
 };
 
-const NetBars = ({ years, label }: { years: { season: number; net: number }[]; label: string }) => {
+const NetBars = ({
+	years,
+	label,
+}: {
+	years: { season: number; net: number }[];
+	label: string;
+}) => {
 	const max = Math.max(1, ...years.map((y) => Math.abs(y.net)));
 	return (
 		<div role="img" aria-label={label} style={{ maxWidth: 560 }}>
@@ -390,13 +427,12 @@ const NetBars = ({ years, label }: { years: { season: number; net: number }[]; l
 
 const SideCell = ({ s }: { s: GradeSide }) => {
 	const { abbrev, teamPart } = useTeams();
+	const graderUrl = useGraderUrl();
 	return (
 		<div>
 			<div>
 				<TradeGradeBadge grade={s.grade?.g} title={gradeTitle(s)} />{" "}
-				<a href={helpers.leagueUrl(["trade_grader", "team", teamPart(s.tid)])}>
-					{abbrev(s.tid)}
-				</a>{" "}
+				<a href={graderUrl("team", teamPart(s.tid))}>{abbrev(s.tid)}</a>{" "}
 				<span className="text-body-secondary">
 					{s.unknown ? "?" : n1(s.got.total)} WS
 				</span>
@@ -408,9 +444,18 @@ const SideCell = ({ s }: { s: GradeSide }) => {
 	);
 };
 
-const SeasonTrades = ({ trades, season }: { trades: GradeTrade[]; season: number }) => {
+const SeasonTrades = ({
+	trades,
+	season,
+}: {
+	trades: GradeTrade[];
+	season: number;
+}) => {
 	const cols: Col[] = [
-		col("Gap", { sortType: "number", desc: "Net win shares between the sides" }),
+		col("Gap", {
+			sortType: "number",
+			desc: "Net win shares between the sides",
+		}),
 		col("Side", { sortSequence: [] }),
 		col("Side", { sortSequence: [] }),
 		col("", { sortSequence: [] }),
@@ -459,6 +504,7 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 		teamRank,
 		teamSides,
 		seasonTrades,
+		ws,
 	} = props;
 	const { full, teamPart } = useTeams();
 
@@ -466,7 +512,7 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 		title: "Trade Grader",
 		dropdown: {
 			view: "tradeGrader",
-			params: { tab },
+			params: { tab, ws },
 			fields: [
 				{
 					key: "team",
@@ -500,12 +546,20 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 					<p className="text-body-secondary">
 						Most win shares gained over what was given up.
 					</p>
-					<SidesTable name="TradeGraderWins" sides={wins} defaultSort={[9, "desc"]} />
+					<SidesTable
+						name="TradeGraderWins"
+						sides={wins}
+						defaultSort={[9, "desc"]}
+					/>
 					<h2 className="mt-3">Biggest losses{where}</h2>
 					<p className="text-body-secondary">
 						Most win shares given away over what came back.
 					</p>
-					<SidesTable name="TradeGraderLosses" sides={losses} defaultSort={[9, "asc"]} />
+					<SidesTable
+						name="TradeGraderLosses"
+						sides={losses}
+						defaultSort={[9, "asc"]}
+					/>
 				</>
 			);
 	} else if (tab === "cards") {
@@ -516,8 +570,8 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 				<>
 					<p className="text-body-secondary">
 						Each team's graded trades: its average grade, how many it won, lost
-						or broke even on, and the win shares it got against what it gave
-						up. Click a team for its full report.
+						or broke even on, and the win shares it got against what it gave up.
+						Click a team for its full report.
 					</p>
 					<CardsTable name="TradeGraderCards" cards={cards} />
 				</>
@@ -653,10 +707,20 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 			);
 	}
 
+	const wsUrl = (w: "all" | "rs") =>
+		helpers.leagueUrl([
+			"trade_grader",
+			tab,
+			teamUrl,
+			season === "all" ? "all" : String(season),
+			w,
+		]);
+
 	return (
-		<>
+		<WsContext value={ws}>
 			<p>
-				Every trade graded A+ to F for each side by the regular-season win
+				Every trade graded A+ to F for each side by the{" "}
+				{ws === "all" ? "regular season and playoff" : "regular-season"} win
 				shares what it received produced for it: players from the trade until
 				they left, and a draft pick as the player it was used on, while he
 				played there. An even trade is a B for both sides. A pick traded on
@@ -676,8 +740,11 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 							href={helpers.leagueUrl([
 								"trade_grader",
 								t.id,
-								t.id === "team" && team === "all" ? teamPart(props.userTid) : teamUrl,
+								t.id === "team" && team === "all"
+									? teamPart(props.userTid)
+									: teamUrl,
 								t.id === "season" ? String(season) : "all",
+								ws,
 							])}
 						>
 							{t.label}
@@ -685,9 +752,36 @@ const TradeGrader = (props: View<"tradeGrader">) => {
 					</li>
 				))}
 			</ul>
+			<div
+				className="btn-group mb-3"
+				role="group"
+				aria-label="Win shares counted"
+			>
+				<a
+					className={`btn btn-sm btn-outline-secondary${ws === "all" ? " active" : ""}`}
+					href={wsUrl("all")}
+					onClick={() => setWsPref("all")}
+				>
+					Regular season + playoffs
+				</a>
+				<a
+					className={`btn btn-sm btn-outline-secondary${ws === "rs" ? " active" : ""}`}
+					href={wsUrl("rs")}
+					onClick={() => setWsPref("rs")}
+				>
+					Regular season only
+				</a>
+			</div>
 			{body}
-		</>
+		</WsContext>
 	);
+};
+
+// Remembered so the Trade Summary page grades the same way
+const setWsPref = (ws: "all" | "rs") => {
+	try {
+		localStorage.setItem(TRADE_GRADER_WS_KEY, ws);
+	} catch {}
 };
 
 export default TradeGrader;

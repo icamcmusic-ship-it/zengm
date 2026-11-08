@@ -105,7 +105,8 @@ export const careerBefore = (
 	if (gp === 0) {
 		return undefined;
 	}
-	const trb = sumRows(rows, "orb") + sumRows(rows, "drb") || sumRows(rows, "trb");
+	const trb =
+		sumRows(rows, "orb") + sumRows(rows, "drb") || sumRows(rows, "trb");
 	return {
 		gp,
 		pts: Math.round(sumRows(rows, "pts")),
@@ -125,7 +126,13 @@ export const honorsBefore = (
 	p: Pick<Player, "awards">,
 	season: number,
 ): NPHonors => {
-	const out: NPHonors = { mvp: 0, dpoy: 0, allStar: 0, allLeague: 0, titles: 0 };
+	const out: NPHonors = {
+		mvp: 0,
+		dpoy: 0,
+		allStar: 0,
+		allLeague: 0,
+		titles: 0,
+	};
 	for (const a of getProAwards(p) as any[]) {
 		if (a.season >= season) {
 			continue;
@@ -161,7 +168,14 @@ export type GameAggregates = {
 	>;
 	players: Map<
 		number,
-		{ dd: number; td: number; g30: number; g40: number; hi: number; boxGp: number }
+		{
+			dd: number;
+			td: number;
+			g30: number;
+			g40: number;
+			hi: number;
+			boxGp: number;
+		}
 	>;
 	h2h: NPHeadToHead[];
 };

@@ -81,11 +81,20 @@ const lopsided: Kind = {
 				bodies: [
 					`In ${s} the ${tLink(X, W.tid, s)} got ${sideText(X, e, w)} from the ${tLink(X, Lo.tid, s)} for ${sideText(X, e, l)}. What they got produced ${ws1(W.ws)} win shares for them; what they gave up produced ${ws1(Lo.ws)} for the other side.`,
 					tapeBody("Tale of the tape", [
-						[X.teamName(W.tid, s), `${sideText(X, e, w)}, ${ws1(W.ws)} win shares`],
-						[X.teamName(Lo.tid, s), `${sideText(X, e, l)}, ${ws1(Lo.ws)} win shares`],
+						[
+							X.teamName(W.tid, s),
+							`${sideText(X, e, w)}, ${ws1(W.ws)} win shares`,
+						],
+						[
+							X.teamName(Lo.tid, s),
+							`${sideText(X, e, l)}, ${ws1(Lo.ws)} win shares`,
+						],
 					]),
 					qaBody([
-						["Who won the trade?", `The ${tLink(X, W.tid, s)}, by ${ws1(e.margin)} win shares.`],
+						[
+							"Who won the trade?",
+							`The ${tLink(X, W.tid, s)}, by ${ws1(e.margin)} win shares.`,
+						],
 						["What did they get?", `${sideText(X, e, w)}.`],
 						["What did it cost them?", `${sideText(X, e, l)}.`],
 					]),
@@ -141,7 +150,10 @@ const salaryDump: Kind = {
 					bodies: [
 						`The ${tLink(X, tid, s)} sent ${assetText(X, gave)} (${money(sentPay)} a year) to the ${tLink(X, e.t.tids[1 - i]!, s)} and took back ${money(gotPay)}. They went from ${plural(before, "win")} to ${after} the next season.`,
 						qaBody([
-							["What went out?", `${assetText(X, gave)}, ${money(sentPay)} a year in salary.`],
+							[
+								"What went out?",
+								`${assetText(X, gave)}, ${money(sentPay)} a year in salary.`,
+							],
 							["What came back?", `${assetText(X, got)}, ${money(gotPay)}.`],
 							["And then?", `${plural(before, "win")} became ${after}.`],
 						]),
@@ -190,9 +202,17 @@ const deadlineDeal: Kind = {
 					bodies: [
 						`The ${tLink(X, side.tid, s)} traded for ${pLink(star)} during the ${s} season. He gave them ${ws1(star.ws)} win shares the rest of the way, and they won ${plural(t.playoffRoundsWon, "playoff round")}${won ? ", and the title" : ""}.`,
 						timelineBody([
-							[s, `the ${tLink(X, side.tid, s)} trade ${sideText(X, e, (1 - i) as 0 | 1)} for ${pLink(star)}`],
+							[
+								s,
+								`the ${tLink(X, side.tid, s)} trade ${sideText(X, e, (1 - i) as 0 | 1)} for ${pLink(star)}`,
+							],
 							["The rest of the season", `${ws1(star.ws)} win shares`],
-							["The playoffs", won ? "champions" : `${plural(t.playoffRoundsWon, "round")} won`],
+							[
+								"The playoffs",
+								won
+									? "champions"
+									: `${plural(t.playoffRoundsWon, "round")} won`,
+							],
 						]),
 					],
 					evidence: [
@@ -249,12 +269,16 @@ const starSwap: Kind = {
 	find: (X) => {
 		const out: Draft[] = [];
 		for (const e of allEvals(X)) {
-			const stars = e.t.got.map((side) =>
-				side
-					.filter(isPlayerAsset)
-					.map((a) => ({ a, l: X.line(a.pid, e.t.season) ?? X.line(a.pid, e.t.season - 1) }))
-					.filter((x) => x.l && x.l.ws >= 7)
-					.sort((a, b) => b.l!.ws - a.l!.ws)[0],
+			const stars = e.t.got.map(
+				(side) =>
+					side
+						.filter(isPlayerAsset)
+						.map((a) => ({
+							a,
+							l: X.line(a.pid, e.t.season) ?? X.line(a.pid, e.t.season - 1),
+						}))
+						.filter((x) => x.l && x.l.ws >= 7)
+						.sort((a, b) => b.l!.ws - a.l!.ws)[0],
 			);
 			if (!stars[0] || !stars[1]) {
 				continue;
@@ -273,8 +297,14 @@ const starSwap: Kind = {
 				bodies: [
 					`In ${s} the ${tLink(X, e.t.tids[0], s)} and the ${tLink(X, e.t.tids[1], s)} swapped stars: ${pLink(a)} went one way, ${pLink(b)} the other. Afterwards, ${a.name} gave his new team ${ws1(e.sides[0].got.find((g) => g.pid === a.pid)?.ws ?? 0)} win shares and ${b.name} gave his ${ws1(e.sides[1].got.find((g) => g.pid === b.pid)?.ws ?? 0)}.`,
 					tapeBody("Tale of the tape", [
-						[a.name, `${ws1(e.sides[0].got.find((g) => g.pid === a.pid)?.ws ?? 0)} win shares for the ${X.teamName(e.t.tids[0], s)}`],
-						[b.name, `${ws1(e.sides[1].got.find((g) => g.pid === b.pid)?.ws ?? 0)} win shares for the ${X.teamName(e.t.tids[1], s)}`],
+						[
+							a.name,
+							`${ws1(e.sides[0].got.find((g) => g.pid === a.pid)?.ws ?? 0)} win shares for the ${X.teamName(e.t.tids[0], s)}`,
+						],
+						[
+							b.name,
+							`${ws1(e.sides[1].got.find((g) => g.pid === b.pid)?.ws ?? 0)} win shares for the ${X.teamName(e.t.tids[1], s)}`,
+						],
 					]),
 				],
 				evidence: [
@@ -328,13 +358,19 @@ const partners: Kind = {
 						list
 							.toSorted((x, y) => x.t.season - y.t.season || x.t.eid - y.t.eid)
 							.slice(0, 6)
-							.map((e) => [e.t.season, `the ${X.teamName(e.t.tids[0], e.t.season)} got ${sideText(X, e, 0)}`]),
+							.map((e) => [
+								e.t.season,
+								`the ${X.teamName(e.t.tids[0], e.t.season)} got ${sideText(X, e, 0)}`,
+							]),
 					),
 				],
 				evidence: [
 					["Trades", `${list.length}`],
 					["Seasons", span(first, last)],
-					["Net", `${ws1(Math.abs(netA))} WS to the ${X.teamName(ahead, last)}`],
+					[
+						"Net",
+						`${ws1(Math.abs(netA))} WS to the ${X.teamName(ahead, last)}`,
+					],
 				],
 			});
 		}
@@ -348,7 +384,12 @@ const pickGotAway: Kind = {
 		const out: Draft[] = [];
 		for (const p of players(X)) {
 			const orig = p.draftOriginalTid;
-			if (orig === undefined || orig < 0 || orig === p.draft.tid || p.draft.round < 1) {
+			if (
+				orig === undefined ||
+				orig < 0 ||
+				orig === p.draft.tid ||
+				p.draft.round < 1
+			) {
 				continue;
 			}
 			const ws = careerWs(p, X.L.season);
@@ -356,8 +397,10 @@ const pickGotAway: Kind = {
 				continue;
 			}
 			const y = p.draft.year;
-			const t = (X.L.trades ?? []).findLast(
-				(x) => x.got.some((side) => side.some((a) => !isPlayerAsset(a) && a.dpid === p.draftDpid)),
+			const t = (X.L.trades ?? []).findLast((x) =>
+				x.got.some((side) =>
+					side.some((a) => !isPlayerAsset(a) && a.dpid === p.draftDpid),
+				),
 			);
 			out.push({
 				key: `${p.pid}`,
@@ -375,13 +418,23 @@ const pickGotAway: Kind = {
 				bodies: [
 					`${pLink(p)} was drafted ${ordinal(p.draft.pick)}${p.draft.round > 1 ? ` in round ${p.draft.round}` : ""} in ${y} by the ${tLink(X, p.draft.tid, y)} with a pick that had belonged to the ${tLink(X, orig, y)}${t ? `, traded away in ${t.season}` : ""}. He has ${ws1(ws)} career win shares.`,
 					timelineBody([
-						...(t ? ([[t.season, `the ${X.teamName(orig, t.season)} trade the pick`]] as [number, string][]) : []),
+						...(t
+							? ([
+									[
+										t.season,
+										`the ${X.teamName(orig, t.season)} trade the pick`,
+									],
+								] as [number, string][])
+							: []),
 						[y, `the ${tLink(X, p.draft.tid, y)} use it on ${pLink(p)}`],
 						["Since", `${ws1(ws)} win shares`],
 					]),
 				],
 				evidence: [
-					["Pick", `${p.draft.round > 1 ? `R${p.draft.round} ` : ""}#${p.draft.pick}, ${y}`],
+					[
+						"Pick",
+						`${p.draft.round > 1 ? `R${p.draft.round} ` : ""}#${p.draft.pick}, ${y}`,
+					],
 					["Original owner", X.teamName(orig, y)],
 					["Career WS", ws1(ws)],
 				],
@@ -415,7 +468,14 @@ const twiceInAYear: Kind = {
 			if (!p) {
 				continue;
 			}
-			const stops = list.map((e) => e.t.tids[e.t.got.findIndex((side) => side.some((a) => isPlayerAsset(a) && a.pid === pid))]!);
+			const stops = list.map(
+				(e) =>
+					e.t.tids[
+						e.t.got.findIndex((side) =>
+							side.some((a) => isPlayerAsset(a) && a.pid === pid),
+						)
+					]!,
+			);
 			out.push({
 				key: k,
 				kind: "Traded twice in a year",
@@ -424,10 +484,15 @@ const twiceInAYear: Kind = {
 				score: 10 + list.length * 6,
 				pids: [pid],
 				tids: stops,
-				heads: [`${p.name} was traded ${list.length} times in ${s}`, `No time to unpack for ${p.name}`],
+				heads: [
+					`${p.name} was traded ${list.length} times in ${s}`,
+					`No time to unpack for ${p.name}`,
+				],
 				bodies: [
 					`${pLink(p)} was traded ${list.length} times in ${s}: to the ${stops.map((t) => tLink(X, t, s)).join(", then the ")}.`,
-					timelineBody(list.map((e, j) => [s, `traded to the ${tLink(X, stops[j]!, s)}`])),
+					timelineBody(
+						list.map((e, j) => [s, `traded to the ${tLink(X, stops[j]!, s)}`]),
+					),
 				],
 				evidence: [
 					["Trades", `${list.length}`],
@@ -466,7 +531,10 @@ const pickHaul: Kind = {
 				score: 6 + n * 4,
 				pids: [],
 				tids: [tid],
-				heads: [`The ${X.teamName(tid, s)} collected ${n} draft picks in ${s}`, `Building through the draft: the ${X.teamName(tid, s)}`],
+				heads: [
+					`The ${X.teamName(tid, s)} collected ${n} draft picks in ${s}`,
+					`Building through the draft: the ${X.teamName(tid, s)}`,
+				],
 				bodies: [
 					`The ${tLink(X, tid, s)} took in ${n} draft picks by trade in ${s}.`,
 					qaBody([
@@ -509,7 +577,10 @@ const tradeBait: Kind = {
 				score: 6 + seasons.length * 5,
 				pids: [pid],
 				tids: [],
-				heads: [`${p.name} has been traded ${seasons.length} times`, `Always in the deal: ${p.name}`],
+				heads: [
+					`${p.name} has been traded ${seasons.length} times`,
+					`Always in the deal: ${p.name}`,
+				],
 				bodies: [
 					`${pLink(p)} was traded ${seasons.length} times between ${seasons[0]} and ${seasons.at(-1)}.`,
 					timelineBody(seasons.map((s) => [s, "traded"])),
@@ -543,11 +614,17 @@ const signedAndWon: Kind = {
 				score: 15 + l.ws * 2,
 				pids: [r.p.pid],
 				tids: [r.tid],
-				heads: [`${r.p.name} signed, and the title followed`, `The free agent who finished the job`],
+				heads: [
+					`${r.p.name} signed, and the title followed`,
+					`The free agent who finished the job`,
+				],
 				bodies: [
 					`${pLink(r.p)} signed with the ${tLink(X, r.tid, s)} for ${money(r.avg)} a year before the ${s} season, gave them ${ws1(l.ws)} win shares and won the title in his first year.`,
 					timelineBody([
-						[s - 1, `signs with the ${tLink(X, r.tid, s)}, ${money(r.avg)} a year`],
+						[
+							s - 1,
+							`signs with the ${tLink(X, r.tid, s)}, ${money(r.avg)} a year`,
+						],
 						[s, `${ws1(l.ws)} win shares, champions`],
 					]),
 				],
@@ -573,7 +650,14 @@ const contractYear: Kind = {
 			const next = r.p.contracts?.[r.i + 1];
 			const now = X.line(r.p.pid, end);
 			const prev = X.line(r.p.pid, end - 1);
-			if (!next || r.c.ended || !now || !prev || !X.decided(end) || r.c.amounts.length < 2) {
+			if (
+				!next ||
+				r.c.ended ||
+				!now ||
+				!prev ||
+				!X.decided(end) ||
+				r.c.amounts.length < 2
+			) {
 				continue;
 			}
 			const d = now.ws - prev.ws;
@@ -590,12 +674,18 @@ const contractYear: Kind = {
 				score: 10 + d * 2 + (nextAvg / r.avg) * 2,
 				pids: [r.p.pid],
 				tids: [now.tid],
-				heads: [`${r.p.name} timed his best year perfectly`, `A contract year that paid: ${r.p.name}`],
+				heads: [
+					`${r.p.name} timed his best year perfectly`,
+					`A contract year that paid: ${r.p.name}`,
+				],
 				bodies: [
 					`In the last season of his deal, ${pLink(r.p)} went from ${ws1(prev.ws)} to ${ws1(now.ws)} win shares. His next contract paid ${money(nextAvg)} a year, up from ${money(r.avg)}.`,
 					timelineBody([
 						[end - 1, `${ws1(prev.ws)} win shares`],
-						[end, `${ws1(now.ws)} win shares in the final year of his contract`],
+						[
+							end,
+							`${ws1(now.ws)} win shares in the final year of his contract`,
+						],
 						[next.start, `a new deal at ${money(nextAvg)} a year`],
 					]),
 				],
@@ -639,12 +729,21 @@ const paydayDip: Kind = {
 				score: 8 + d * 2,
 				pids: [r.p.pid],
 				tids: [now.tid],
-				heads: [`${r.p.name} got paid, then fell off`, `After the raise, a step back for ${r.p.name}`],
+				heads: [
+					`${r.p.name} got paid, then fell off`,
+					`After the raise, a step back for ${r.p.name}`,
+				],
 				bodies: [
 					`${pLink(r.p)} went from ${money(oldAvg)} to ${money(r.avg)} a year in ${s}, and from ${ws1(prev.ws)} win shares to ${ws1(now.ws)}.`,
 					qaBody([
-						["How big was the raise?", `${money(oldAvg)} to ${money(r.avg)} a year.`],
-						["And the production?", `${ws1(prev.ws)} win shares the year before, ${ws1(now.ws)} after.`],
+						[
+							"How big was the raise?",
+							`${money(oldAvg)} to ${money(r.avg)} a year.`,
+						],
+						[
+							"And the production?",
+							`${ws1(prev.ws)} win shares the year before, ${ws1(now.ws)} after.`,
+						],
 					]),
 				],
 				evidence: [
@@ -659,9 +758,15 @@ const paydayDip: Kind = {
 
 const bigBoard = (X: LeagueIndex) =>
 	X.cached("sl|deals|big", () => {
-		const list = contractRows(X, X.L.season).filter((r) => r.c.amounts.length >= 3 && r.end <= X.L.season && r.seasons > 0);
+		const list = contractRows(X, X.L.season).filter(
+			(r) => r.c.amounts.length >= 3 && r.end <= X.L.season && r.seasons > 0,
+		);
 		const avgs = list.map((r) => r.avg).sort((a, b) => b - a);
-		return { list, cut: avgs[Math.floor(avgs.length / 10)] ?? Infinity, mid: avgs[Math.floor(avgs.length / 2)] ?? 0 };
+		return {
+			list,
+			cut: avgs[Math.floor(avgs.length / 10)] ?? Infinity,
+			mid: avgs[Math.floor(avgs.length / 2)] ?? 0,
+		};
 	});
 
 const bargain: Kind = {
@@ -683,11 +788,17 @@ const bargain: Kind = {
 				score: 8 + per * 2,
 				pids: [r.p.pid],
 				tids: r.tid !== undefined ? [r.tid] : [],
-				heads: [`${r.p.name}'s contract was a steal`, `${ws1(r.ws)} win shares for ${money(r.total)}`],
+				heads: [
+					`${r.p.name}'s contract was a steal`,
+					`${ws1(r.ws)} win shares for ${money(r.total)}`,
+				],
 				bodies: [
 					`${pLink(r.p)} played ${span(r.c.start, r.playedTo)} on a ${money(r.avg)}-a-year contract and gave ${ws1(r.ws)} win shares, ${ws1(per)} a season.`,
 					tapeBody("The deal", [
-						["Cost", `${money(r.total)} over ${plural(r.c.amounts.length, "season")}`],
+						[
+							"Cost",
+							`${money(r.total)} over ${plural(r.c.amounts.length, "season")}`,
+						],
 						["Return", `${ws1(r.ws)} win shares`],
 					]),
 				],
@@ -720,11 +831,17 @@ const albatross: Kind = {
 				score: 8 + r.total / 10000 - per * 2,
 				pids: [r.p.pid],
 				tids: r.tid !== undefined ? [r.tid] : [],
-				heads: [`${r.p.name}'s deal never paid off`, `${money(r.total)} for ${ws1(r.ws)} win shares`],
+				heads: [
+					`${r.p.name}'s deal never paid off`,
+					`${money(r.total)} for ${ws1(r.ws)} win shares`,
+				],
 				bodies: [
 					`${pLink(r.p)} signed for ${money(r.avg)} a year starting in ${r.c.start}${r.tid !== undefined ? ` with the ${tLink(X, r.tid, r.c.start)}` : ""}, one of the biggest deals of the league, and produced ${ws1(r.ws)} win shares over ${plural(r.seasons, "season")} on it.`,
 					qaBody([
-						["What did it cost?", `${money(r.total)} over ${plural(r.c.amounts.length, "season")}.`],
+						[
+							"What did it cost?",
+							`${money(r.total)} over ${plural(r.c.amounts.length, "season")}.`,
+						],
 						["What did it buy?", `${ws1(r.ws)} win shares.`],
 					]),
 				],
@@ -755,7 +872,10 @@ const deadMoney: Kind = {
 				score: 6 + r.owed / 3000,
 				pids: [r.p.pid],
 				tids: [r.tid],
-				heads: [`The ${X.teamName(r.tid, r.season)} paid ${r.p.name} to go away`, `${money(r.owed)} for a player no longer there`],
+				heads: [
+					`The ${X.teamName(r.tid, r.season)} paid ${r.p.name} to go away`,
+					`${money(r.owed)} for a player no longer there`,
+				],
 				bodies: [
 					`The ${tLink(X, r.tid, r.season)} released ${pLink(r.p)} in ${r.season} with ${money(r.owed)} still to pay over ${plural(r.yearsLeft, "season")}.`,
 				],
@@ -774,7 +894,9 @@ const cutAndThrived: Kind = {
 	find: (X) => {
 		const out: Draft[] = [];
 		for (const r of releases(X, X.L.season)) {
-			const after = r.p.stats.filter((x) => x.season > r.season && x.tid !== r.tid && x.gp > 0);
+			const after = r.p.stats.filter(
+				(x) => x.season > r.season && x.tid !== r.tid && x.gp > 0,
+			);
 			const best = after.toSorted((a, b) => b.ws - a.ws)[0];
 			if (!best || best.ws < 5 || !X.decided(best.season)) {
 				continue;
@@ -788,12 +910,18 @@ const cutAndThrived: Kind = {
 				score: 8 + best.ws * 2,
 				pids: [r.p.pid],
 				tids: [r.tid, best.tid],
-				heads: [`Released, then a ${ws1(best.ws)}-win-share season: ${r.p.name}`, `The ${X.teamName(r.tid, r.season)} gave up on ${r.p.name} too soon`],
+				heads: [
+					`Released, then a ${ws1(best.ws)}-win-share season: ${r.p.name}`,
+					`The ${X.teamName(r.tid, r.season)} gave up on ${r.p.name} too soon`,
+				],
 				bodies: [
 					`The ${tLink(X, r.tid, r.season)} released ${pLink(r.p)} in ${r.season}. In ${best.season} he gave the ${tLink(X, best.tid, best.season)} ${ws1(best.ws)} win shares.`,
 					timelineBody([
 						[r.season, `released by the ${tLink(X, r.tid, r.season)}`],
-						[best.season, `${ws1(best.ws)} win shares for the ${tLink(X, best.tid, best.season)}`],
+						[
+							best.season,
+							`${ws1(best.ws)} win shares for the ${tLink(X, best.tid, best.season)}`,
+						],
 					]),
 				],
 				evidence: [
@@ -830,10 +958,14 @@ const loyal: Kind = {
 					score: 6 + starts.length * 5,
 					pids: [p.pid],
 					tids: [tid],
-					heads: [`${p.name} kept re-signing with the ${X.teamName(tid, starts.at(-1)!)}`],
+					heads: [
+						`${p.name} kept re-signing with the ${X.teamName(tid, starts.at(-1)!)}`,
+					],
 					bodies: [
 						`${pLink(p)} re-signed with the ${tLink(X, tid, starts.at(-1)!)} ${starts.length} times, with new deals starting in ${starts.join(", ")}.`,
-						timelineBody(starts.map((s) => [s, "a new deal with the same team"])),
+						timelineBody(
+							starts.map((s) => [s, "a new deal with the same team"]),
+						),
 					],
 					evidence: [["Re-signings", `${starts.length}`]],
 				});
@@ -860,7 +992,10 @@ const rookieDealStar: Kind = {
 				score: 8 + r.ws / 2,
 				pids: [r.p.pid],
 				tids: r.tid !== undefined ? [r.tid] : [],
-				heads: [`${r.p.name} was a star on a rookie contract`, `${ws1(r.ws)} win shares before his first big deal`],
+				heads: [
+					`${r.p.name} was a star on a rookie contract`,
+					`${ws1(r.ws)} win shares before his first big deal`,
+				],
 				bodies: [
 					`On his rookie deal (${money(r.total)} in all), ${pLink(r.p)} produced ${ws1(r.ws)} win shares from ${span(r.c.start, r.playedTo)}.`,
 				],
@@ -886,7 +1021,10 @@ const spree: Kind = {
 			const cur = by.get(k) ?? { n: 0, total: 0, ws: 0 };
 			cur.n += 1;
 			cur.total += r.avg;
-			cur.ws += X.line(r.p.pid, r.c.start)?.tid === r.tid ? (X.line(r.p.pid, r.c.start)?.ws ?? 0) : 0;
+			cur.ws +=
+				X.line(r.p.pid, r.c.start)?.tid === r.tid
+					? (X.line(r.p.pid, r.c.start)?.ws ?? 0)
+					: 0;
 			by.set(k, cur);
 		}
 		const out: Draft[] = [];
@@ -894,7 +1032,13 @@ const spree: Kind = {
 			const [tid, s] = k.split("|").map(Number) as [number, number];
 			const before = winsIn(X, tid, s - 1);
 			const after = winsIn(X, tid, s);
-			if (v.n < 3 || v.total < 30000 || before === undefined || after === undefined || !X.decided(s)) {
+			if (
+				v.n < 3 ||
+				v.total < 30000 ||
+				before === undefined ||
+				after === undefined ||
+				!X.decided(s)
+			) {
 				continue;
 			}
 			const d = after - before;
@@ -939,7 +1083,12 @@ const lotteryLuck: Kind = {
 			if (r.jump < 3 && !(r.pick === 1 && r.slot >= 3)) {
 				continue;
 			}
-			const p = draftClass(X, r.season).find((x) => x.draft.round === 1 && x.draft.pick === r.pick && x.draft.tid === r.tid);
+			const p = draftClass(X, r.season).find(
+				(x) =>
+					x.draft.round === 1 &&
+					x.draft.pick === r.pick &&
+					x.draft.tid === r.tid,
+			);
 			const ws = p ? careerWs(p, X.L.season) : 0;
 			out.push({
 				key: `${r.season}|${r.tid}`,
@@ -949,13 +1098,24 @@ const lotteryLuck: Kind = {
 				score: 6 + r.jump * 4 + (r.pick === 1 ? 8 : 0) + ws / 5,
 				pids: p ? [p.pid] : [],
 				tids: [r.tid],
-				heads: [`The ${X.teamName(r.tid, r.season)} jumped from #${r.slot} to #${r.pick}`, `Lottery night belonged to the ${X.teamName(r.tid, r.season)}`],
+				heads: [
+					`The ${X.teamName(r.tid, r.season)} jumped from #${r.slot} to #${r.pick}`,
+					`Lottery night belonged to the ${X.teamName(r.tid, r.season)}`,
+				],
 				bodies: [
 					`The ${tLink(X, r.tid, r.season)} went into the ${r.season} lottery at #${r.slot} and came out with the #${r.pick} pick${p ? `, which they used on ${pLink(p)} (${ws1(ws)} career win shares so far)` : ""}.`,
 					timelineBody([
-						[r.season, `the ${tLink(X, r.tid, r.season)} enter the lottery at #${r.slot}`],
+						[
+							r.season,
+							`the ${tLink(X, r.tid, r.season)} enter the lottery at #${r.slot}`,
+						],
 						["Lottery night", `they get #${r.pick}`],
-						...(p ? ([["Draft night", `they take ${pLink(p)}`]] as [string, string][]) : []),
+						...(p
+							? ([["Draft night", `they take ${pLink(p)}`]] as [
+									string,
+									string,
+								][])
+							: []),
 					]),
 				],
 				evidence: [
@@ -984,7 +1144,10 @@ const lotteryHeartbreak: Kind = {
 				score: 6 - r.jump * 4,
 				pids: [],
 				tids: [r.tid],
-				heads: [`The ${X.teamName(r.tid, r.season)} fell from #${r.slot} to #${r.pick}`, `Bad luck on lottery night for the ${X.teamName(r.tid, r.season)}`],
+				heads: [
+					`The ${X.teamName(r.tid, r.season)} fell from #${r.slot} to #${r.pick}`,
+					`Bad luck on lottery night for the ${X.teamName(r.tid, r.season)}`,
+				],
 				bodies: [
 					`The ${tLink(X, r.tid, r.season)} had the #${r.slot} spot going into the ${r.season} lottery and left with the #${r.pick} pick.`,
 				],
@@ -1001,7 +1164,9 @@ const lotteryHeartbreak: Kind = {
 const classRanks = (X: LeagueIndex, year: number) =>
 	X.cached(`sl|deals|cls|${year}`, () => {
 		const cls = draftClass(X, year);
-		const ws = cls.map((p) => ({ p, ws: careerWs(p, X.L.season) })).sort((a, b) => b.ws - a.ws || a.p.pid - b.p.pid);
+		const ws = cls
+			.map((p) => ({ p, ws: careerWs(p, X.L.season) }))
+			.sort((a, b) => b.ws - a.ws || a.p.pid - b.p.pid);
 		return ws.map((x, i) => ({ ...x, rank: i + 1, pick: overallPick(X, x.p) }));
 	});
 
@@ -1010,7 +1175,11 @@ const draftBust: Kind = {
 	find: (X) => {
 		const out: Draft[] = [];
 		for (const p of players(X)) {
-			if (p.draft.round !== 1 || p.draft.pick > 3 || p.draft.year > X.L.season - 5) {
+			if (
+				p.draft.round !== 1 ||
+				p.draft.pick > 3 ||
+				p.draft.year > X.L.season - 5
+			) {
 				continue;
 			}
 			const cls = classRanks(X, p.draft.year);
@@ -1029,7 +1198,10 @@ const draftBust: Kind = {
 				score: 8 + (4 - p.draft.pick) * 4 + top.ws / 6,
 				pids: [p.pid, top.p.pid],
 				tids: [p.draft.tid],
-				heads: [`${p.name} went No. ${p.draft.pick} and never delivered`, `The ${y} draft: ${p.name} at No. ${p.draft.pick}`],
+				heads: [
+					`${p.name} went No. ${p.draft.pick} and never delivered`,
+					`The ${y} draft: ${p.name} at No. ${p.draft.pick}`,
+				],
 				bodies: [
 					`The ${tLink(X, p.draft.tid, y)} took ${pLink(p)} with the No. ${p.draft.pick} pick in ${y}. He has ${ws1(me.ws)} career win shares, ${ordinal(me.rank)} in his class; ${pLink(top.p)}, taken ${ordinal(top.pick)}, leads it with ${ws1(top.ws)}.`,
 					tapeBody(`The ${y} draft`, [
@@ -1052,7 +1224,9 @@ const draftSteal: Kind = {
 	kind: "Draft steal",
 	find: (X) => {
 		const out: Draft[] = [];
-		const years = [...new Set(players(X).map((p) => p.draft.year))].filter((y) => y <= X.L.season - 3);
+		const years = [...new Set(players(X).map((p) => p.draft.year))].filter(
+			(y) => y <= X.L.season - 3,
+		);
 		for (const y of years) {
 			const cls = classRanks(X, y);
 			if (cls.length < 8) {
@@ -1071,12 +1245,18 @@ const draftSteal: Kind = {
 					score: 8 + (x.pick - x.rank) + x.ws / 4,
 					pids: [x.p.pid],
 					tids: [x.p.draft.tid],
-					heads: [`${x.p.name}: picked ${ordinal(x.pick)}, ${x.rank === 1 ? "the best" : `${ordinal(x.rank)}-best`} of his class`, `${x.pick - 1} picks before ${x.p.name}`],
+					heads: [
+						`${x.p.name}: picked ${ordinal(x.pick)}, ${x.rank === 1 ? "the best" : `${ordinal(x.rank)}-best`} of his class`,
+						`${x.pick - 1} picks before ${x.p.name}`,
+					],
 					bodies: [
 						`${pLink(x.p)} was the ${ordinal(x.pick)} pick of the ${y} draft, by the ${tLink(X, x.p.draft.tid, y)}. With ${ws1(x.ws)} career win shares he ranks ${ordinal(x.rank)} in the class.`,
 						qaBody([
 							["Where was he picked?", `${ordinal(x.pick)}, in ${y}.`],
-							["Where would he go now?", `${ordinal(x.rank)}, by career win shares.`],
+							[
+								"Where would he go now?",
+								`${ordinal(x.rank)}, by career win shares.`,
+							],
 						]),
 					],
 					evidence: [
@@ -1095,7 +1275,9 @@ const passedOver: Kind = {
 	kind: "The one they passed on",
 	find: (X) => {
 		const out: Draft[] = [];
-		const years = [...new Set(players(X).map((p) => p.draft.year))].filter((y) => y <= X.L.season - 4);
+		const years = [...new Set(players(X).map((p) => p.draft.year))].filter(
+			(y) => y <= X.L.season - 4,
+		);
 		for (const y of years) {
 			const cls = classRanks(X, y);
 			const no1 = cls.find((x) => x.pick === 1);
@@ -1112,7 +1294,10 @@ const passedOver: Kind = {
 				score: 8 + (top.ws - no1.ws) / 3,
 				pids: [no1.p.pid, top.p.pid],
 				tids: [no1.p.draft.tid],
-				heads: [`The ${X.teamName(no1.p.draft.tid, y)} took ${no1.p.name} over ${top.p.name}`, `The ${y} draft, redone`],
+				heads: [
+					`The ${X.teamName(no1.p.draft.tid, y)} took ${no1.p.name} over ${top.p.name}`,
+					`The ${y} draft, redone`,
+				],
 				bodies: [
 					`With the first pick in ${y}, the ${tLink(X, no1.p.draft.tid, y)} took ${pLink(no1.p)} (${ws1(no1.ws)} career win shares). ${pLink(top.p)}, the ${ordinal(top.pick)} pick, has ${ws1(top.ws)}.`,
 					tapeBody(`The ${y} draft`, [
@@ -1138,7 +1323,9 @@ const relocation: Kind = {
 		const out: Draft[] = [];
 		const tids = [...new Set(X.L.teamSeasons.map((t) => t.tid))];
 		for (const tid of tids) {
-			const rows = X.L.teamSeasons.filter((t) => t.tid === tid).sort((a, b) => a.season - b.season);
+			const rows = X.L.teamSeasons
+				.filter((t) => t.tid === tid)
+				.sort((a, b) => a.season - b.season);
 			for (let i = 1; i < rows.length; i++) {
 				const a = rows[i - 1]!;
 				const b = rows[i]!;
@@ -1163,15 +1350,27 @@ const relocation: Kind = {
 					pids: [],
 					tids: [tid],
 					heads: moved
-						? [`The ${a.region} ${a.name} moved to ${b.region}`, `A new home: the ${b.region} ${b.name}`]
-						: [`The ${a.region} ${a.name} became the ${b.region} ${b.name}`, `New name in ${b.region}`],
+						? [
+								`The ${a.region} ${a.name} moved to ${b.region}`,
+								`A new home: the ${b.region} ${b.name}`,
+							]
+						: [
+								`The ${a.region} ${a.name} became the ${b.region} ${b.name}`,
+								`New name in ${b.region}`,
+							],
 					bodies: [
 						moved
 							? `After ${a.season}, the ${a.region} ${a.name} left for ${b.region} and became the ${tLink(X, tid, b.season)}. They won ${fmtNum(wp(before) * 100, 0)}% of their games in their last seasons in ${a.region} and ${fmtNum(wp(after) * 100, 0)}% in their first in ${b.region}.`
 							: `In ${b.season} the ${a.region} ${a.name} took a new name: the ${tLink(X, tid, b.season)}.`,
 						timelineBody([
-							[a.season, `last season as the ${a.region} ${a.name}, ${a.won}-${a.lost}`],
-							[b.season, `first season as the ${tLink(X, tid, b.season)}, ${b.won}-${b.lost}`],
+							[
+								a.season,
+								`last season as the ${a.region} ${a.name}, ${a.won}-${a.lost}`,
+							],
+							[
+								b.season,
+								`first season as the ${tLink(X, tid, b.season)}, ${b.won}-${b.lost}`,
+							],
 						]),
 					],
 					evidence: [
@@ -1216,7 +1415,9 @@ const stillPaying: Kind = {
 				score: 5 + v.owed / 2500,
 				pids: v.names.map((p) => p.pid),
 				tids: [tid],
-				heads: [`The ${X.teamName(tid, s)} paid ${money(v.owed)} to players they had cut`],
+				heads: [
+					`The ${X.teamName(tid, s)} paid ${money(v.owed)} to players they had cut`,
+				],
 				bodies: [
 					`In ${s} the ${tLink(X, tid, s)} still owed ${money(v.owed)} to ${plural(v.names.length, "released player")}: ${v.names.map(pLink).join(", ")}.`,
 				],
@@ -1258,9 +1459,15 @@ const builtByTrade: Kind = {
 				score: 10 + (ws / total) * 30,
 				pids: viaTrade.map((l) => l.pid).slice(0, 4),
 				tids: [c.tid],
-				heads: [`The ${s} champions were built by trade`, `Traded for, then champions`],
+				heads: [
+					`The ${s} champions were built by trade`,
+					`Traded for, then champions`,
+				],
 				bodies: [
-					`${fmtNum((ws / total) * 100, 0)}% of the win shares of the ${s} champion ${tLink(X, c.tid, s)} came from players they had traded for: ${viaTrade.slice(0, 4).map((l) => pLink(l)).join(", ")}.`,
+					`${fmtNum((ws / total) * 100, 0)}% of the win shares of the ${s} champion ${tLink(X, c.tid, s)} came from players they had traded for: ${viaTrade
+						.slice(0, 4)
+						.map((l) => pLink(l))
+						.join(", ")}.`,
 				],
 				evidence: [
 					["From trades", `${fmtNum((ws / total) * 100, 0)}%`],
@@ -1296,9 +1503,15 @@ const homegrownChamp: Kind = {
 				score: 10 + (ws / total) * 30,
 				pids: own.map((l) => l.pid).slice(0, 4),
 				tids: [c.tid],
-				heads: [`The ${s} champions drafted their own`, `A title built through the draft`],
+				heads: [
+					`The ${s} champions drafted their own`,
+					`A title built through the draft`,
+				],
 				bodies: [
-					`The ${s} champion ${tLink(X, c.tid, s)} got ${fmtNum((ws / total) * 100, 0)}% of their win shares from players they drafted: ${own.slice(0, 4).map((l) => pLink(l)).join(", ")}.`,
+					`The ${s} champion ${tLink(X, c.tid, s)} got ${fmtNum((ws / total) * 100, 0)}% of their win shares from players they drafted: ${own
+						.slice(0, 4)
+						.map((l) => pLink(l))
+						.join(", ")}.`,
 				],
 				evidence: [
 					["From own picks", `${fmtNum((ws / total) * 100, 0)}%`],
@@ -1322,7 +1535,17 @@ const tradedBeforeBreakout: Kind = {
 						continue;
 					}
 					const before = X.line(g.pid, e.at - 1);
-					const best = Math.max(0, ...p.stats.filter((r) => r.season >= e.at && r.tid === e.sides[i].tid && X.decided(r.season)).map((r) => r.ws));
+					const best = Math.max(
+						0,
+						...p.stats
+							.filter(
+								(r) =>
+									r.season >= e.at &&
+									r.tid === e.sides[i].tid &&
+									X.decided(r.season),
+							)
+							.map((r) => r.ws),
+					);
 					if (!before || before.ws > 4 || best < 10) {
 						continue;
 					}
@@ -1336,7 +1559,9 @@ const tradedBeforeBreakout: Kind = {
 						score: 10 + best * 2,
 						pids: [g.pid],
 						tids: [from, e.sides[i].tid],
-						heads: [`The ${X.teamName(from, e.t.season)} traded ${p.name} just before he took off`],
+						heads: [
+							`The ${X.teamName(from, e.t.season)} traded ${p.name} just before he took off`,
+						],
 						bodies: [
 							`${pLink(p)} had ${ws1(before.ws)} win shares the season before the ${tLink(X, from, e.t.season)} traded him to the ${tLink(X, e.sides[i].tid, e.t.season)} in ${e.t.season}. With his new team he had a season of ${ws1(best)}.`,
 						],
@@ -1362,7 +1587,12 @@ const draftedTradedBack: Kind = {
 				continue;
 			}
 			const away = p.moves.find((m) => m.type === "trade" && m.fromTid === tid);
-			const back = away ? p.moves.find((m) => m.tid === tid && m.season > away.season && m.type !== "draft") : undefined;
+			const back = away
+				? p.moves.find(
+						(m) =>
+							m.tid === tid && m.season > away.season && m.type !== "draft",
+					)
+				: undefined;
 			if (!away || !back) {
 				continue;
 			}

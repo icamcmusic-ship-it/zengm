@@ -1,7 +1,14 @@
 // Player pages: milestones, draft value, positions, team leaders, one-man teams and depth, the clubs, injuries, rookies and awards coverage.
 
 import { Ctx, P } from "./ctx.ts";
-import { DONE_ONLY, PLAYED, SEASON_EDS, addPage, arcPage, table } from "./kit.ts";
+import {
+	DONE_ONLY,
+	PLAYED,
+	SEASON_EDS,
+	addPage,
+	arcPage,
+	table,
+} from "./kit.ts";
 import { andList, fmt1, plural, record } from "./text.ts";
 import type { NPPlayer, Seg } from "./types.ts";
 
@@ -18,7 +25,14 @@ const STAT_WORD: Record<Stat, string> = {
 };
 
 const thresholds = (stat: Stat, total: number) => {
-	const step = stat === "pts" ? (total < 10000 ? 1000 : 2500) : stat === "trb" ? 1000 : 500;
+	const step =
+		stat === "pts"
+			? total < 10000
+				? 1000
+				: 2500
+			: stat === "trb"
+				? 1000
+				: 500;
 	return step;
 };
 
@@ -42,7 +56,12 @@ const milestoneData = (c: Ctx) => {
 			const now = Math.round(before + p[stat] * p.gp);
 			const step = thresholds(stat, now);
 			const mark = Math.floor(now / step) * step;
-			if (mark > 0 && before < mark && now >= mark && mark >= (stat === "pts" ? 1000 : 500)) {
+			if (
+				mark > 0 &&
+				before < mark &&
+				now >= mark &&
+				mark >= (stat === "pts" ? 1000 : 500)
+			) {
 				crossed.push({ p, stat, mark, before, now });
 			}
 			const next = (Math.floor(now / step) + 1) * step;
@@ -91,12 +110,14 @@ addPage(
 					),
 					{
 						type: "list",
-						items: x.crossed.slice(0, 8).map((m) => [
-							c.pl(m.p.pid),
-							` (`,
-							c.tl(m.p.tid, c.team(m.p.tid)?.abbrev),
-							`): ${m.mark.toLocaleString("en-US")} career ${STAT_WORD[m.stat]} (${m.before.toLocaleString("en-US")} before the season, ${m.now.toLocaleString("en-US")} now)`,
-						]),
+						items: x.crossed
+							.slice(0, 8)
+							.map((m) => [
+								c.pl(m.p.pid),
+								` (`,
+								c.tl(m.p.tid, c.team(m.p.tid)?.abbrev),
+								`): ${m.mark.toLocaleString("en-US")} career ${STAT_WORD[m.stat]} (${m.before.toLocaleString("en-US")} before the season, ${m.now.toLocaleString("en-US")} now)`,
+							]),
 					},
 				],
 			},
@@ -114,14 +135,19 @@ addPage(
 				},
 				build: (x, r, c) => [
 					P(
-						c.T("Players close to a round career number:", "Players who ended the season within sight of a round career number:"),
+						c.T(
+							"Players close to a round career number:",
+							"Players who ended the season within sight of a round career number:",
+						),
 					),
 					{
 						type: "list",
-						items: x.near.slice(0, 8).map((m) => [
-							c.pl(m.p.pid),
-							`: ${m.now.toLocaleString("en-US")} career ${STAT_WORD[m.stat]}, ${(m.mark - m.now).toLocaleString("en-US")} from ${m.mark.toLocaleString("en-US")}`,
-						]),
+						items: x.near
+							.slice(0, 8)
+							.map((m) => [
+								c.pl(m.p.pid),
+								`: ${m.now.toLocaleString("en-US")} career ${STAT_WORD[m.stat]}, ${(m.mark - m.now).toLocaleString("en-US")} from ${m.mark.toLocaleString("en-US")}`,
+							]),
 					},
 				],
 			},
@@ -132,7 +158,9 @@ addPage(
 // ---- Draft value: steals and slow starts -------------------------------------
 
 const slotOf = (p: NPPlayer, c: Ctx) =>
-	p.draftRound > 0 ? p.draftPick + (p.draftRound - 1) * Math.max(30, c.f.teams.length) : undefined;
+	p.draftRound > 0
+		? p.draftPick + (p.draftRound - 1) * Math.max(30, c.f.teams.length)
+		: undefined;
 
 addPage(
 	arcPage<{
@@ -153,7 +181,9 @@ addPage(
 			);
 			const withSlot = young
 				.map((p) => ({ p, slot: slotOf(p, c) }))
-				.filter((x): x is { p: NPPlayer; slot: number } => x.slot !== undefined);
+				.filter(
+					(x): x is { p: NPPlayer; slot: number } => x.slot !== undefined,
+				);
 			const steals = withSlot
 				.filter((x) => x.slot > 20)
 				.toSorted((a, b) => b.p.ws - a.p.ws)
@@ -236,7 +266,14 @@ addPage(
 
 addPage(
 	arcPage<{
-		rows: { pos: string; n: number; pts: number; trb: number; ast: number; top: NPPlayer }[];
+		rows: {
+			pos: string;
+			n: number;
+			pts: number;
+			trb: number;
+			ast: number;
+			top: NPPlayer;
+		}[];
 	}>({
 		id: "positions",
 		section: "players",
@@ -311,7 +348,10 @@ addPage(
 		prep: (c) => {
 			const rows = c.rows
 				.map((t) => ({ t, p: c.teamPlayers(t.tid)[0] }))
-				.filter((x): x is { t: (typeof c.rows)[number]; p: NPPlayer } => x.p !== undefined);
+				.filter(
+					(x): x is { t: (typeof c.rows)[number]; p: NPPlayer } =>
+						x.p !== undefined,
+				);
 			return rows.length >= 8 ? { rows } : undefined;
 		},
 		photo: (x) => x.rows[0]?.p.pid,
@@ -327,10 +367,10 @@ addPage(
 				build: (x, r, c) => [
 					P(
 						c.cycle("team-leaders-intro", [
-						`The most productive player on every roster by win shares${c.done ? "" : " so far"}, teams in order of record; ${x.rows[0]!.p.name} leads all ${x.rows.length} with ${fmt1(x.rows.toSorted((a, b) => b.p.ws - a.p.ws)[0]!.p.ws)}.`,
-						`${x.rows.length} teams, ${x.rows.length} leaders: the top name by win shares on each roster, best record first.`,
-						`Every roster has one player who ${c.T("does", "did")} the most, and here is each of them by win shares.`,
-					]),
+							`The most productive player on every roster by win shares${c.done ? "" : " so far"}, teams in order of record; ${x.rows[0]!.p.name} leads all ${x.rows.length} with ${fmt1(x.rows.toSorted((a, b) => b.p.ws - a.p.ws)[0]!.p.ws)}.`,
+							`${x.rows.length} teams, ${x.rows.length} leaders: the top name by win shares on each roster, best record first.`,
+							`Every roster has one player who ${c.T("does", "did")} the most, and here is each of them by win shares.`,
+						]),
 					),
 					table(
 						["Team", "W-L", "Leader", "WS", "PTS/REB/AST"],
@@ -353,7 +393,13 @@ addPage(
 
 addPage(
 	arcPage<{
-		rows: { tid: number; top: NPPlayer; share: number; total: number; top3: number }[];
+		rows: {
+			tid: number;
+			top: NPPlayer;
+			share: number;
+			total: number;
+			top3: number;
+		}[];
 	}>({
 		id: "depth",
 		section: "teams",
@@ -393,7 +439,9 @@ addPage(
 					];
 				},
 				build: (x, r, c) => {
-					const sorted = x.rows.toSorted((a, b) => b.share - a.share).slice(0, 5);
+					const sorted = x.rows
+						.toSorted((a, b) => b.share - a.share)
+						.slice(0, 5);
 					const y = sorted[0]!;
 					return [
 						P(
@@ -470,11 +518,21 @@ addPage(
 				["8 assists a game", (p) => p.ast >= 8],
 				["2 steals a game", (p) => p.stl >= 2],
 				["2 blocks a game", (p) => p.blk >= 2],
-				["20-5-5 (points, rebounds, assists)", (p) => p.pts >= 20 && p.trb >= 5 && p.ast >= 5],
-				["50-40-80 shooting", (p) => p.fgp >= 50 && p.tpp >= 40 && (p.ftp ?? 0) >= 80 && p.tp >= 0.5],
+				[
+					"20-5-5 (points, rebounds, assists)",
+					(p) => p.pts >= 20 && p.trb >= 5 && p.ast >= 5,
+				],
+				[
+					"50-40-80 shooting",
+					(p) =>
+						p.fgp >= 50 && p.tpp >= 40 && (p.ftp ?? 0) >= 80 && p.tp >= 0.5,
+				],
 			];
 			const clubs = defs
-				.map(([name, f]) => ({ name, members: q.filter(f).toSorted((a, b) => b.ws - a.ws) }))
+				.map(([name, f]) => ({
+					name,
+					members: q.filter(f).toSorted((a, b) => b.ws - a.ws),
+				}))
 				.filter((x) => x.members.length > 0);
 			return clubs.length >= 3 ? { clubs } : undefined;
 		},
@@ -490,7 +548,10 @@ addPage(
 				],
 				build: (x, r, c) => [
 					P(
-						c.T(`${x.clubs.length} clubs have members so far; the players at these marks:`, `${x.clubs.length} clubs had members; the players who finished at these marks:`),
+						c.T(
+							`${x.clubs.length} clubs have members so far; the players at these marks:`,
+							`${x.clubs.length} clubs had members; the players who finished at these marks:`,
+						),
 					),
 					{
 						type: "notebook",
@@ -498,7 +559,11 @@ addPage(
 							lead: `${club.name} (${club.members.length}):`,
 							segs: andList(
 								club.members.slice(0, 6).map((p) => [c.pl(p.pid)]),
-							).concat(club.members.length > 6 ? [` and ${club.members.length - 6} more.`] : ["."]),
+							).concat(
+								club.members.length > 6
+									? [` and ${club.members.length - 6} more.`]
+									: ["."],
+							),
 						})),
 					},
 				],
@@ -535,7 +600,9 @@ addPage(
 				.slice(0, 6);
 			return {
 				byTeam,
-				longest: list.toSorted((a, b) => b.gamesRemaining - a.gamesRemaining).slice(0, 5),
+				longest: list
+					.toSorted((a, b) => b.gamesRemaining - a.gamesRemaining)
+					.slice(0, 5),
 			};
 		},
 		photo: (x) => x.longest[0]?.pid,
@@ -582,12 +649,14 @@ addPage(
 					),
 					{
 						type: "list",
-						items: x.longest.slice(1).map((i) => [
-							c.pl(i.pid, i.name),
-							` (`,
-							c.tl(i.tid, c.team(i.tid)?.abbrev),
-							`): ${i.type.toLowerCase()}, ${plural(i.gamesRemaining, "game")} left`,
-						]),
+						items: x.longest
+							.slice(1)
+							.map((i) => [
+								c.pl(i.pid, i.name),
+								` (`,
+								c.tl(i.tid, c.team(i.tid)?.abbrev),
+								`): ${i.type.toLowerCase()}, ${plural(i.gamesRemaining, "game")} left`,
+							]),
 					},
 				],
 			},
@@ -644,10 +713,7 @@ addPage(
 							[b.name],
 							...[0, 1, 2].map((i): Seg[] =>
 								b.order[i]
-									? [
-											c.pl(b.order[i]!.pid),
-											` (${short(b.order[i]!)})`,
-										]
+									? [c.pl(b.order[i]!.pid), ` (${short(b.order[i]!)})`]
 									: ["–"],
 							),
 						]),
@@ -685,7 +751,9 @@ addPage(
 );
 
 addPage(
-	arcPage<{ conf: { name: string; award: string; pid: number; tid: number }[] }>({
+	arcPage<{
+		conf: { name: string; award: string; pid: number; tid: number }[];
+	}>({
 		id: "conf-awards",
 		section: "awards",
 		kicker: "By conference",
@@ -694,7 +762,12 @@ addPage(
 		prep: (c) => {
 			const conf = c.f.awards
 				.filter((a) => a.group !== undefined)
-				.map((a) => ({ name: a.group!, award: a.name, pid: a.pid, tid: a.tid }));
+				.map((a) => ({
+					name: a.group!,
+					award: a.name,
+					pid: a.pid,
+					tid: a.tid,
+				}));
 			return conf.length >= 1 ? { conf } : undefined;
 		},
 		photo: (x) => x.conf[0]?.pid,
@@ -733,7 +806,11 @@ addPage(
 );
 
 addPage(
-	arcPage<{ snubs: NPPlayer[]; teamCount: { tid: number; n: number }[]; pids: Set<number> }>({
+	arcPage<{
+		snubs: NPPlayer[];
+		teamCount: { tid: number; n: number }[];
+		pids: Set<number>;
+	}>({
 		id: "all-league-notes",
 		section: "awards",
 		kicker: "All-League notes",
@@ -814,7 +891,10 @@ addPage(
 					),
 					table(
 						["Team", "All-League players"],
-						x.teamCount.map((y) => [[c.tl(y.tid, c.tfull(y.tid))], [String(y.n)]]),
+						x.teamCount.map((y) => [
+							[c.tl(y.tid, c.tfull(y.tid))],
+							[String(y.n)],
+						]),
 						[1],
 					),
 				],
@@ -822,4 +902,3 @@ addPage(
 		],
 	}),
 );
-

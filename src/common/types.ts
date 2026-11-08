@@ -418,6 +418,7 @@ export type Game = {
 	numGamesToWinSeries?: number;
 	numPeriods?: number; // Optional only for legacy, otherwise it's the number of periods in the game, defined at the start
 	numPlayersOnCourt?: number;
+	quarterLength?: number; // Minutes per period when the game was played (missing for older games)
 	playoffs?: boolean;
 	overtimes: number;
 	scoringSummary?: unknown;
@@ -662,6 +663,22 @@ export type GameAttributesLeague = {
 	gameOver: boolean;
 	gender: "female" | "male";
 	goatFormula?: string;
+	// League achievements already announced and their log (basketball, see worker/util/leagueAchievementsStore.ts). Kept with the league so export/import carries it
+	leagueAchievements?: {
+		v: 1;
+		startingSeason: number;
+		seen: Record<string, [number, number]>;
+		log: {
+			id: string;
+			season: number;
+			phase: number;
+			who?: string;
+			pid?: number;
+			tid?: number;
+			at?: number;
+			quiet?: boolean;
+		}[];
+	};
 	goatSeasonFormula?: string;
 	godMode: boolean;
 	godModeInPast: boolean;

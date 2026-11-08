@@ -18,10 +18,10 @@ export const RARITY_CLASS = {
 } as const;
 
 export const RARITY_HINT = {
-	common: "About once a season or every other season in real NBA history",
-	rare: "Once or twice every 3 to 7 years",
-	legendary: "Once or twice a decade at most",
-	impossible: "Once in a lifetime, or never done in real NBA history",
+	common: "More than once every two seasons in a typical simulated league",
+	rare: "Once every 2 to 7 seasons in a typical simulated league",
+	legendary: "Once every 7 to 40 seasons in a typical simulated league",
+	impossible: "Rarer than once in 40 seasons, or never seen in simulated leagues",
 } as const;
 
 // Who/where/when of an occurrence, resolved against the league, for the page and notifications

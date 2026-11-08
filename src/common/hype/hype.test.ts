@@ -546,3 +546,28 @@ describe("post-game verdict", () => {
 		expect(h.verdict).toBeNull();
 	});
 });
+
+describe("star power of finished games", () => {
+	const starText = (raw: HRaw, gid: number) => {
+		const h = hypeForGame(raw, targetOfGame(storedGame(raw, gid)!));
+		return JSON.stringify(h).match(/Star power:[^"]*/)?.[0] ?? "";
+	};
+	test("uses each player's ratings of the game's season, not later ones", () => {
+		const raw = makeRaw();
+		const gm = raw.games.find((x) => !x.playoffs)!;
+		const before = starText(raw, gm.gid);
+		const pid = gm.teams[0].players[0]!.pid;
+		const p = raw.players.find((x) => x.pid === pid)!;
+		const name = p.name;
+		// a later season's (current) rating changes nothing
+		for (const x of raw.players) {
+			x.ovrBySeason = { ...x.ovrBySeason, [SEASON + 3]: 99 };
+		}
+		expect(starText(raw, gm.gid)).toBe(before);
+		// that season's rating does
+		p.ovrBySeason = { ...p.ovrBySeason, [SEASON]: 99 };
+		const after = starText(raw, gm.gid);
+		expect(after).toContain(`${name.split(" ").at(-1)}`);
+		expect(after).toContain("(99)");
+	});
+});

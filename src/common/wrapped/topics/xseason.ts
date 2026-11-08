@@ -21,70 +21,121 @@ import { PLAYER_DEFS } from "./xplayer.ts";
 // Leaders in the newer stats
 // ---------------------------------------------------------------------------------------------
 
-const LEADS: Record<string, { kicker: string; heads: (n: string, v: number) => string[]; low?: boolean }> = {
+const LEADS: Record<
+	string,
+	{ kicker: string; heads: (n: string, v: number) => string[]; low?: boolean }
+> = {
 	"p-plusminus": {
 		kicker: "Best plus-minus",
-		heads: (n, v) => [`${n}’s team won his minutes by ${fmtNum(v, 1)} a game`, `The plus-minus king: ${n}`],
+		heads: (n, v) => [
+			`${n}’s team won his minutes by ${fmtNum(v, 1)} a game`,
+			`The plus-minus king: ${n}`,
+		],
 	},
 	"p-ortg": {
 		kicker: "Best offensive rating",
-		heads: (n, v) => [`${n} had the league’s best offensive rating: ${fmtNum(v, 0)}`, `The most efficient offense on the floor: ${n}`],
+		heads: (n, v) => [
+			`${n} had the league’s best offensive rating: ${fmtNum(v, 0)}`,
+			`The most efficient offense on the floor: ${n}`,
+		],
 	},
 	"p-drtg": {
 		kicker: "Best defensive rating",
-		heads: (n, v) => [`${n} held opponents to ${fmtNum(-v, 0)} per 100 possessions`, `The best defender by rating: ${n}`],
+		heads: (n, v) => [
+			`${n} held opponents to ${fmtNum(-v, 0)} per 100 possessions`,
+			`The best defender by rating: ${n}`,
+		],
 	},
 	"p-usage": {
 		kicker: "Highest usage",
-		heads: (n, v) => [`The offense ran through ${n}: ${fmtNum(v, 0)}% usage`, `${n} used the most possessions in the league`],
+		heads: (n, v) => [
+			`The offense ran through ${n}: ${fmtNum(v, 0)}% usage`,
+			`${n} used the most possessions in the league`,
+		],
 	},
 	"p-ftpct": {
 		kicker: "Best free-throw shooter",
-		heads: (n, v) => [`${n} led the league at the line: ${fmtNum(v * 100, 1)}%`, `The best free-throw shooter: ${n}`],
+		heads: (n, v) => [
+			`${n} led the league at the line: ${fmtNum(v * 100, 1)}%`,
+			`The best free-throw shooter: ${n}`,
+		],
 	},
 	"p-3pct": {
 		kicker: "Best three-point shooter",
-		heads: (n, v) => [`${n} shot ${fmtNum(v * 100, 1)}% from three`, `The deadliest shooter from deep: ${n}`],
+		heads: (n, v) => [
+			`${n} shot ${fmtNum(v * 100, 1)}% from three`,
+			`The deadliest shooter from deep: ${n}`,
+		],
 	},
 	"p-ws48": {
 		kicker: "Wins per minute",
-		heads: (n) => [`${n} added wins faster than anyone`, `The most efficient winner: ${n}`],
+		heads: (n) => [
+			`${n} added wins faster than anyone`,
+			`The most efficient winner: ${n}`,
+		],
 	},
 	"p-stocks": {
 		kicker: "Best defensive playmaker",
-		heads: (n, v) => [`${n} made ${fmtNum(v, 1)} steals and blocks a game`, `Disruptor in chief: ${n}`],
+		heads: (n, v) => [
+			`${n} made ${fmtNum(v, 1)} steals and blocks a game`,
+			`Disruptor in chief: ${n}`,
+		],
 	},
 	"p-dd": {
 		kicker: "Double-double machine",
-		heads: (n, v) => [`${n} led the league with ${fmtNum(v)} double-doubles`, `The double-double leader: ${n}`],
+		heads: (n, v) => [
+			`${n} led the league with ${fmtNum(v)} double-doubles`,
+			`The double-double leader: ${n}`,
+		],
 	},
 	"p-td": {
 		kicker: "Triple-double leader",
-		heads: (n, v) => [`${n} had ${fmtNum(v)} triple-doubles`, `Triple-double king: ${n}`],
+		heads: (n, v) => [
+			`${n} had ${fmtNum(v)} triple-doubles`,
+			`Triple-double king: ${n}`,
+		],
 	},
 	"p-orb": {
 		kicker: "Offensive glass",
-		heads: (n, v) => [`${n} grabbed ${fmtNum(v, 1)} offensive rebounds a game`, `Second chances belonged to ${n}`],
+		heads: (n, v) => [
+			`${n} grabbed ${fmtNum(v, 1)} offensive rebounds a game`,
+			`Second chances belonged to ${n}`,
+		],
 	},
 	"p-fta": {
 		kicker: "Most free throws",
-		heads: (n, v) => [`${n} went to the line ${fmtNum(v, 1)} times a game`, `The foul-drawer: ${n}`],
+		heads: (n, v) => [
+			`${n} went to the line ${fmtNum(v, 1)} times a game`,
+			`The foul-drawer: ${n}`,
+		],
 	},
 	"p-ratio": {
 		kicker: "Best ball security",
-		heads: (n, v) => [`${n} had ${fmtNum(v, 1)} assists per turnover`, `The safest hands: ${n}`],
+		heads: (n, v) => [
+			`${n} had ${fmtNum(v, 1)} assists per turnover`,
+			`The safest hands: ${n}`,
+		],
 	},
 	"p-vorp": {
 		kicker: "Most value over replacement",
-		heads: (n, v) => [`${n} led the league in VORP: ${fmtNum(v, 1)}`, `The most valuable by VORP: ${n}`],
+		heads: (n, v) => [
+			`${n} led the league in VORP: ${fmtNum(v, 1)}`,
+			`The most valuable by VORP: ${n}`,
+		],
 	},
 	"p-mpg": {
 		kicker: "The workhorse",
-		heads: (n, v) => [`${n} played the most minutes a game: ${fmtNum(v, 1)}`, `${n} barely came off the floor`],
+		heads: (n, v) => [
+			`${n} played the most minutes a game: ${fmtNum(v, 1)}`,
+			`${n} barely came off the floor`,
+		],
 	},
 	"p-efg": {
 		kicker: "Most efficient shooter",
-		heads: (n, v) => [`${n} had the highest effective FG%: ${fmtNum(v * 100, 1)}`, `Ruthless efficiency: ${n}`],
+		heads: (n, v) => [
+			`${n} had the highest effective FG%: ${fmtNum(v * 100, 1)}`,
+			`Ruthless efficiency: ${n}`,
+		],
 	},
 };
 
@@ -109,7 +160,11 @@ const leaders: Topic = (ctx) => {
 
 type SeasonVal = { season: number; v: number };
 
-const leagueBoard = (X: X, key: string, f: (season: number) => number | undefined): SeasonVal[] =>
+const leagueBoard = (
+	X: X,
+	key: string,
+	f: (season: number) => number | undefined,
+): SeasonVal[] =>
 	X.cached(`lg|${key}`, () => {
 		const out: SeasonVal[] = [];
 		for (const s of X.seasons) {
@@ -144,14 +199,18 @@ const leagueSlide = (
 		return null;
 	}
 	const vals = board.map((b) => b.v);
-	const w = o.lo ? twoWay(vals, me.v) : { high: true, rank: rankOf(vals, me.v) };
+	const w = o.lo
+		? twoWay(vals, me.v)
+		: { high: true, rank: rankOf(vals, me.v) };
 	const score = rankScore(w.rank, vals.length) * o.w;
 	// A short history says little, so cap the score
 	const cap = Math.min(1, 0.35 + vals.length * 0.04);
 	if (score * cap < 0.12) {
 		return null;
 	}
-	const others = board.filter((b) => b.season !== season && (w.high ? b.v >= me.v : b.v <= me.v)).sort((a, b) => b.season - a.season)[0];
+	const others = board
+		.filter((b) => b.season !== season && (w.high ? b.v >= me.v : b.v <= me.v))
+		.sort((a, b) => b.season - a.season)[0];
 	return mk({
 		id: o.id,
 		group: o.group,
@@ -159,13 +218,17 @@ const leagueSlide = (
 		score: score * cap,
 		kicker: o.kicker,
 		season,
-		heads: w.high ? o.hi(me.v, w.rank, vals.length) : o.lo!(me.v, w.rank, vals.length),
+		heads: w.high
+			? o.hi(me.v, w.rank, vals.length)
+			: o.lo!(me.v, w.rank, vals.length),
 		hero: { text: o.show(me.v), unit: o.unit },
 		lines: [
 			w.rank === 1
 				? `The ${w.high ? "highest" : "lowest"} of ${plural(vals.length, "season")} in league history`
 				: `${nth(w.rank, w.high ? "highest" : "lowest")} of ${plural(vals.length, "season")}`,
-			others ? `Last season this ${w.high ? "high" : "low"}: ${others.season}` : null,
+			others
+				? `Last season this ${w.high ? "high" : "low"}: ${others.season}`
+				: null,
 			...(o.lines?.(me.v) ?? []),
 		],
 	});
@@ -176,7 +239,8 @@ const teamGames = (X: X, season: number) => {
 	return ts.reduce((a, t) => a + t.gp, 0);
 };
 
-const sumLines = (X: X, season: number, f: (l: SeasonLine) => number) => X.lines(season).reduce((a, l) => a + f(l), 0);
+const sumLines = (X: X, season: number, f: (l: SeasonLine) => number) =>
+	X.lines(season).reduce((a, l) => a + f(l), 0);
 
 const leagueHistory: Topic = ({ X, season }) => {
 	const out: (Slide | null)[] = [];
@@ -193,8 +257,14 @@ const leagueHistory: Topic = ({ X, season }) => {
 			f: perGame((l) => l.tp),
 			show: (v) => fmtNum(v, 1),
 			unit: "threes per team per game",
-			hi: (v) => [`Teams made ${fmtNum(v, 1)} threes a game`, `The three-ball took over`],
-			lo: (v) => [`Just ${fmtNum(v, 1)} threes a game per team`, `Not much shooting from deep`],
+			hi: (v) => [
+				`Teams made ${fmtNum(v, 1)} threes a game`,
+				`The three-ball took over`,
+			],
+			lo: (v) => [
+				`Just ${fmtNum(v, 1)} threes a game per team`,
+				`Not much shooting from deep`,
+			],
 			w: 0.9,
 		}),
 		leagueSlide(X, season, {
@@ -209,8 +279,14 @@ const leagueHistory: Topic = ({ X, season }) => {
 			},
 			show: (v) => pct(v),
 			unit: "league true shooting",
-			hi: (v) => [`The league shot ${pct(v)} true shooting`, `Offense was never this efficient`],
-			lo: (v) => [`A league-wide shooting slump: ${pct(v)}`, `Buckets were hard to come by`],
+			hi: (v) => [
+				`The league shot ${pct(v)} true shooting`,
+				`Offense was never this efficient`,
+			],
+			lo: (v) => [
+				`A league-wide shooting slump: ${pct(v)}`,
+				`Buckets were hard to come by`,
+			],
 			w: 0.85,
 		}),
 		leagueSlide(X, season, {
@@ -225,8 +301,14 @@ const leagueHistory: Topic = ({ X, season }) => {
 			},
 			show: (v) => fmtNum(v, 1),
 			unit: "points per team per game",
-			hi: (v) => [`Teams averaged ${fmtNum(v, 1)} points a game`, `Points were everywhere`],
-			lo: (v) => [`Teams scored just ${fmtNum(v, 1)} a game`, `A defensive slog of a season`],
+			hi: (v) => [
+				`Teams averaged ${fmtNum(v, 1)} points a game`,
+				`Points were everywhere`,
+			],
+			lo: (v) => [
+				`Teams scored just ${fmtNum(v, 1)} a game`,
+				`A defensive slog of a season`,
+			],
 			w: 0.85,
 		}),
 		leagueSlide(X, season, {
@@ -237,8 +319,14 @@ const leagueHistory: Topic = ({ X, season }) => {
 			f: perGame((l) => l.fta),
 			show: (v) => fmtNum(v, 1),
 			unit: "free-throw attempts per team per game",
-			hi: (v) => [`Teams shot ${fmtNum(v, 1)} free throws a game`, `The whistles were busy`],
-			lo: (v) => [`Teams got to the line just ${fmtNum(v, 1)} times a game`, `The whistle stayed in pockets`],
+			hi: (v) => [
+				`Teams shot ${fmtNum(v, 1)} free throws a game`,
+				`The whistles were busy`,
+			],
+			lo: (v) => [
+				`Teams got to the line just ${fmtNum(v, 1)} times a game`,
+				`The whistle stayed in pockets`,
+			],
 			w: 0.7,
 		}),
 		leagueSlide(X, season, {
@@ -249,8 +337,14 @@ const leagueHistory: Topic = ({ X, season }) => {
 			f: perGame((l) => l.ast),
 			show: (v) => fmtNum(v, 1),
 			unit: "assists per team per game",
-			hi: (v) => [`Teams averaged ${fmtNum(v, 1)} assists a game`, `The ball moved more than ever`],
-			lo: (v) => [`Only ${fmtNum(v, 1)} assists per team per game`, `Isolation basketball ruled`],
+			hi: (v) => [
+				`Teams averaged ${fmtNum(v, 1)} assists a game`,
+				`The ball moved more than ever`,
+			],
+			lo: (v) => [
+				`Only ${fmtNum(v, 1)} assists per team per game`,
+				`Isolation basketball ruled`,
+			],
 			w: 0.7,
 		}),
 		leagueSlide(X, season, {
@@ -261,8 +355,14 @@ const leagueHistory: Topic = ({ X, season }) => {
 			f: perGame((l) => l.tov),
 			show: (v) => fmtNum(v, 1),
 			unit: "turnovers per team per game",
-			hi: (v) => [`${fmtNum(v, 1)} turnovers per team per game`, `Sloppy basketball all season`],
-			lo: (v) => [`Only ${fmtNum(v, 1)} turnovers per team per game`, `The cleanest basketball in league history`],
+			hi: (v) => [
+				`${fmtNum(v, 1)} turnovers per team per game`,
+				`Sloppy basketball all season`,
+			],
+			lo: (v) => [
+				`Only ${fmtNum(v, 1)} turnovers per team per game`,
+				`The cleanest basketball in league history`,
+			],
 			w: 0.6,
 		}),
 		leagueSlide(X, season, {
@@ -278,8 +378,14 @@ const leagueHistory: Topic = ({ X, season }) => {
 			},
 			show: (v) => pct(v, 1),
 			unit: "home teams won",
-			hi: (v) => [`Home teams won ${pct(v, 1)} of the time`, `Home court mattered more than ever`],
-			lo: (v) => [`Home teams won only ${pct(v, 1)}`, `Home court meant very little`],
+			hi: (v) => [
+				`Home teams won ${pct(v, 1)} of the time`,
+				`Home court mattered more than ever`,
+			],
+			lo: (v) => [
+				`Home teams won only ${pct(v, 1)}`,
+				`Home court meant very little`,
+			],
 			w: 0.8,
 		}),
 		leagueSlide(X, season, {
@@ -290,12 +396,20 @@ const leagueHistory: Topic = ({ X, season }) => {
 			f: (s) => {
 				const ts = X.teamsIn(s).filter((t) => (t.gpHome ?? 0) > 10);
 				const gp = ts.reduce((a, t) => a + (t.gpHome ?? 0), 0);
-				return gp > 100 ? ts.reduce((a, t) => a + (t.att ?? 0), 0) / gp : undefined;
+				return gp > 100
+					? ts.reduce((a, t) => a + (t.att ?? 0), 0) / gp
+					: undefined;
 			},
 			show: (v) => fmtNum(v, 0),
 			unit: "fans per game, league-wide",
-			hi: (v) => [`The average crowd: ${fmtNum(v, 0)} fans`, `Arenas were filling up`],
-			lo: (v) => [`The average crowd shrank to ${fmtNum(v, 0)}`, `Empty seats around the league`],
+			hi: (v) => [
+				`The average crowd: ${fmtNum(v, 0)} fans`,
+				`Arenas were filling up`,
+			],
+			lo: (v) => [
+				`The average crowd shrank to ${fmtNum(v, 0)}`,
+				`Empty seats around the league`,
+			],
 			w: 0.7,
 		}),
 		leagueSlide(X, season, {
@@ -304,13 +418,23 @@ const leagueHistory: Topic = ({ X, season }) => {
 			theme: "money",
 			kicker: "The money",
 			f: (s) => {
-				const ts = X.teamsIn(s).filter((t) => isNum(t.payroll) && t.payroll > 0);
-				return ts.length >= 6 && X.decided(s) ? ts.reduce((a, t) => a + t.payroll!, 0) / ts.length : undefined;
+				const ts = X.teamsIn(s).filter(
+					(t) => isNum(t.payroll) && t.payroll > 0,
+				);
+				return ts.length >= 6 && X.decided(s)
+					? ts.reduce((a, t) => a + t.payroll!, 0) / ts.length
+					: undefined;
 			},
 			show: (v) => money(v),
 			unit: "average payroll",
-			hi: (v) => [`The average team spent ${money(v)}`, `Payrolls hit a new level`],
-			lo: (v) => [`The average payroll was only ${money(v)}`, `Teams kept the checkbook closed`],
+			hi: (v) => [
+				`The average team spent ${money(v)}`,
+				`Payrolls hit a new level`,
+			],
+			lo: (v) => [
+				`The average payroll was only ${money(v)}`,
+				`Teams kept the checkbook closed`,
+			],
 			w: 0.6,
 		}),
 	);
@@ -321,7 +445,12 @@ const leagueHistory: Topic = ({ X, season }) => {
 // Teams across the league
 // ---------------------------------------------------------------------------------------------
 
-const bestOf = (X: X, season: number, f: (t: WTeamSeason) => number | undefined, low = false) => {
+const bestOf = (
+	X: X,
+	season: number,
+	f: (t: WTeamSeason) => number | undefined,
+	low = false,
+) => {
 	const rows = X.teamsIn(season)
 		.map((t) => ({ t, v: f(t) }))
 		.filter((x): x is { t: WTeamSeason; v: number } => isNum(x.v))
@@ -351,7 +480,10 @@ const homeRoad: Topic = ({ X, season }) => {
 		}
 		const board = all.map(f).filter(isNum);
 		const rank = rankOf(board, top.v);
-		const rec = label === "home" ? `${top.t.wonHome}-${top.t.lostHome}` : `${top.t.wonAway}-${top.t.lostAway}`;
+		const rec =
+			label === "home"
+				? `${top.t.wonHome}-${top.t.lostHome}`
+				: `${top.t.wonAway}-${top.t.lostAway}`;
 		out.push(
 			mk({
 				id,
@@ -362,13 +494,22 @@ const homeRoad: Topic = ({ X, season }) => {
 				tid: top.t.tid,
 				season,
 				heads: [
-					label === "home" ? `${top.t.region} ${top.t.name}: ${rec} at home` : `${top.t.region} ${top.t.name} won ${rec} on the road`,
-					label === "home" ? `The toughest place to play: ${top.t.region}` : `The best road team: ${top.t.region} ${top.t.name}`,
+					label === "home"
+						? `${top.t.region} ${top.t.name}: ${rec} at home`
+						: `${top.t.region} ${top.t.name} won ${rec} on the road`,
+					label === "home"
+						? `The toughest place to play: ${top.t.region}`
+						: `The best road team: ${top.t.region} ${top.t.name}`,
 				],
-				hero: { text: rec, unit: label === "home" ? "home record" : "road record" },
+				hero: {
+					text: rec,
+					unit: label === "home" ? "home record" : "road record",
+				},
 				lines: [
 					`${nth(rank, "best")} ${label} record of ${fmtNum(board.length)} team seasons`,
-					rows[1] ? `Next best: ${X.teamName(rows[1].t.tid, season)}, ${label === "home" ? `${rows[1].t.wonHome}-${rows[1].t.lostHome}` : `${rows[1].t.wonAway}-${rows[1].t.lostAway}`}` : null,
+					rows[1]
+						? `Next best: ${X.teamName(rows[1].t.tid, season)}, ${label === "home" ? `${rows[1].t.wonHome}-${rows[1].t.lostHome}` : `${rows[1].t.wonAway}-${rows[1].t.lostAway}`}`
+						: null,
 				],
 			}),
 		);
@@ -380,14 +521,22 @@ const payrollRace: Topic = ({ X, season, soFar }) => {
 	if (soFar) {
 		return null;
 	}
-	const rows = bestOf(X, season, (t) => (isNum(t.payroll) && t.payroll > 0 ? t.payroll : undefined));
+	const rows = bestOf(X, season, (t) =>
+		isNum(t.payroll) && t.payroll > 0 ? t.payroll : undefined,
+	);
 	if (rows.length < 6) {
 		return null;
 	}
 	const top = rows[0]!;
 	const bot = rows.at(-1)!;
-	const topRank = [...X.teamsIn(season)].sort((a, b) => wpOf(b) - wpOf(a)).findIndex((t) => t.tid === top.t.tid) + 1;
-	const botRank = [...X.teamsIn(season)].sort((a, b) => wpOf(b) - wpOf(a)).findIndex((t) => t.tid === bot.t.tid) + 1;
+	const topRank =
+		[...X.teamsIn(season)]
+			.sort((a, b) => wpOf(b) - wpOf(a))
+			.findIndex((t) => t.tid === top.t.tid) + 1;
+	const botRank =
+		[...X.teamsIn(season)]
+			.sort((a, b) => wpOf(b) - wpOf(a))
+			.findIndex((t) => t.tid === bot.t.tid) + 1;
 	const ratio = top.v / Math.max(1, bot.v);
 	return mk({
 		id: "s-paygap",
@@ -397,10 +546,23 @@ const payrollRace: Topic = ({ X, season, soFar }) => {
 		kicker: "Big spenders and penny-pinchers",
 		tid: top.t.tid,
 		season,
-		heads: [`${fmtNum(ratio, 1)} times more: the biggest and smallest payrolls`, `${X.teamName(top.t.tid, season)} outspent everyone`],
+		heads: [
+			`${fmtNum(ratio, 1)} times more: the biggest and smallest payrolls`,
+			`${X.teamName(top.t.tid, season)} outspent everyone`,
+		],
 		list: [
-			{ name: `${X.teamName(top.t.tid, season)} (biggest)`, value: money(top.v), sub: `${ordinal(topRank)} in the standings`, tid: top.t.tid },
-			{ name: `${X.teamName(bot.t.tid, season)} (smallest)`, value: money(bot.v), sub: `${ordinal(botRank)} in the standings`, tid: bot.t.tid },
+			{
+				name: `${X.teamName(top.t.tid, season)} (biggest)`,
+				value: money(top.v),
+				sub: `${ordinal(topRank)} in the standings`,
+				tid: top.t.tid,
+			},
+			{
+				name: `${X.teamName(bot.t.tid, season)} (smallest)`,
+				value: money(bot.v),
+				sub: `${ordinal(botRank)} in the standings`,
+				tid: bot.t.tid,
+			},
 		],
 	});
 };
@@ -410,7 +572,12 @@ const topSalaries: Topic = ({ X, season, soFar }) => {
 		return null;
 	}
 	const rows = X.lines(season)
-		.map((l) => ({ l, v: (X.players.get(l.pid)?.paid ?? []).filter((x) => x.season === season).reduce((a, x) => a + x.amount, 0) }))
+		.map((l) => ({
+			l,
+			v: (X.players.get(l.pid)?.paid ?? [])
+				.filter((x) => x.season === season)
+				.reduce((a, x) => a + x.amount, 0),
+		}))
 		.filter((x) => x.v > 0)
 		.sort((a, b) => b.v - a.v);
 	if (rows.length < 20) {
@@ -420,7 +587,11 @@ const topSalaries: Topic = ({ X, season, soFar }) => {
 		X.seasons.map((s) =>
 			Math.max(
 				0,
-				...X.lines(s).map((l) => (X.players.get(l.pid)?.paid ?? []).filter((x) => x.season === s).reduce((a, x) => a + x.amount, 0)),
+				...X.lines(s).map((l) =>
+					(X.players.get(l.pid)?.paid ?? [])
+						.filter((x) => x.season === s)
+						.reduce((a, x) => a + x.amount, 0),
+				),
 			),
 		),
 	);
@@ -434,8 +605,13 @@ const topSalaries: Topic = ({ X, season, soFar }) => {
 		pid: rows[0]!.l.pid,
 		tid: rows[0]!.l.tid,
 		season,
-		heads: [`${rows[0]!.l.name} earned the most: ${money(rows[0]!.v)}`, `The highest salary of the year: ${rows[0]!.l.name}`],
-		list: rows.slice(0, 5).map((x) => ({ name: x.l.name, value: money(x.v), pid: x.l.pid })),
+		heads: [
+			`${rows[0]!.l.name} earned the most: ${money(rows[0]!.v)}`,
+			`The highest salary of the year: ${rows[0]!.l.name}`,
+		],
+		list: rows
+			.slice(0, 5)
+			.map((x) => ({ name: x.l.name, value: money(x.v), pid: x.l.pid })),
 		lines: [rank === 1 ? "The highest top salary in league history" : null],
 	});
 };
@@ -443,7 +619,9 @@ const topSalaries: Topic = ({ X, season, soFar }) => {
 const ratingsTop: Topic = ({ X, season }) => {
 	const rows = X.lines(season)
 		.map((l) => ({ l, ovr: X.players.get(l.pid)?.ovr[season] }))
-		.filter((x): x is { l: SeasonLine; ovr: number } => isNum(x.ovr) && x.l.gp >= 10)
+		.filter(
+			(x): x is { l: SeasonLine; ovr: number } => isNum(x.ovr) && x.l.gp >= 10,
+		)
 		.sort((a, b) => b.ovr - a.ovr);
 	if (rows.length < 20) {
 		return null;
@@ -459,9 +637,23 @@ const ratingsTop: Topic = ({ X, season }) => {
 		pid: top.l.pid,
 		tid: top.l.tid,
 		season,
-		heads: [`${top.l.name} was the league’s highest-rated player at ${top.ovr}`, `The top ratings of ${season}`],
-		list: rows.slice(0, 5).map((x) => ({ name: x.l.name, value: `${x.ovr}`, sub: X.teamName(x.l.tid, season), pid: x.l.pid })),
-		lines: [mvp && mvp.pid !== top.l.pid ? `The MVP, ${mvp.name}, was rated ${X.players.get(mvp.pid)?.ovr[season] ?? "–"}` : null],
+		heads: [
+			`${top.l.name} was the league’s highest-rated player at ${top.ovr}`,
+			`The top ratings of ${season}`,
+		],
+		list: rows
+			.slice(0, 5)
+			.map((x) => ({
+				name: x.l.name,
+				value: `${x.ovr}`,
+				sub: X.teamName(x.l.tid, season),
+				pid: x.l.pid,
+			})),
+		lines: [
+			mvp && mvp.pid !== top.l.pid
+				? `The MVP, ${mvp.name}, was rated ${X.players.get(mvp.pid)?.ovr[season] ?? "–"}`
+				: null,
+		],
 	});
 };
 
@@ -471,7 +663,12 @@ const biggestLeap: Topic = ({ X, season }) => {
 			const p = X.players.get(l.pid)!;
 			const a = p.ovr[season - 1];
 			const b = p.ovr[season];
-			return { l, d: isNum(a) && isNum(b) && l.gp >= 20 ? b - a : undefined, a, b };
+			return {
+				l,
+				d: isNum(a) && isNum(b) && l.gp >= 20 ? b - a : undefined,
+				a,
+				b,
+			};
 		})
 		.filter((x): x is typeof x & { d: number } => isNum(x.d))
 		.sort((a, b) => b.d - a.d);
@@ -489,9 +686,21 @@ const biggestLeap: Topic = ({ X, season }) => {
 		pid: top.l.pid,
 		tid: top.l.tid,
 		season,
-		heads: [`${top.l.name} jumped ${top.d} points in rating`, `The year’s biggest rating leap: ${top.l.name}`],
-		list: rows.slice(0, 4).map((x) => ({ name: x.l.name, value: `+${x.d}`, sub: `${x.a} to ${x.b}`, pid: x.l.pid })),
-		lines: [down.d <= -4 ? `The biggest drop: ${down.l.name}, ${down.d}` : null],
+		heads: [
+			`${top.l.name} jumped ${top.d} points in rating`,
+			`The year’s biggest rating leap: ${top.l.name}`,
+		],
+		list: rows
+			.slice(0, 4)
+			.map((x) => ({
+				name: x.l.name,
+				value: `+${x.d}`,
+				sub: `${x.a} to ${x.b}`,
+				pid: x.l.pid,
+			})),
+		lines: [
+			down.d <= -4 ? `The biggest drop: ${down.l.name}, ${down.d}` : null,
+		],
 	});
 };
 
@@ -510,7 +719,10 @@ const movers: Topic = ({ X, season }) => {
 		pid: top[0]!.pid,
 		tid: top[0]!.tid,
 		season,
-		heads: [`${plural(rows.length, "player")} played for more than one team`, `Trades and moves reshaped the season`],
+		heads: [
+			`${plural(rows.length, "player")} played for more than one team`,
+			`Trades and moves reshaped the season`,
+		],
 		list: top.slice(0, 4).map((l) => ({
 			name: l.name,
 			value: `${fmtNum(l.ppg, 1)} PPG`,
@@ -545,9 +757,14 @@ const worldSeason: Topic = ({ X, season }) => {
 		score: 0.3 + Math.min(0.2, n / 80),
 		kicker: "Around the world",
 		season,
-		heads: [`Players from ${n} different places`, `A league of ${n} birthplaces`],
+		heads: [
+			`Players from ${n} different places`,
+			`A league of ${n} birthplaces`,
+		],
 		hero: { text: `${n}`, unit: "birthplaces" },
-		list: sorted.slice(0, 5).map(([k, v]) => ({ name: k, value: plural(v, "player") })),
+		list: sorted
+			.slice(0, 5)
+			.map(([k, v]) => ({ name: k, value: plural(v, "player") })),
 		lines: [`${plural(foreign, "player")} came from outside ${sorted[0]![0]}`],
 	});
 };
@@ -573,8 +790,13 @@ const colleges: Topic = ({ X, season }) => {
 		score: 0.3,
 		kicker: "Where they went to school",
 		season,
-		heads: [`${sorted[0]![0]} had ${sorted[0]![1]} players in the league`, `The college pipeline: ${sorted[0]![0]}`],
-		list: sorted.slice(0, 5).map(([k, v]) => ({ name: k, value: plural(v, "player") })),
+		heads: [
+			`${sorted[0]![0]} had ${sorted[0]![1]} players in the league`,
+			`The college pipeline: ${sorted[0]![0]}`,
+		],
+		list: sorted
+			.slice(0, 5)
+			.map(([k, v]) => ({ name: k, value: plural(v, "player") })),
 		lines: [`${plural(total, "player")} listed a college`],
 	});
 };
@@ -585,7 +807,12 @@ const ironmen: Topic = ({ X, season, soFar }) => {
 	}
 	const rows = X.lines(season).filter((l) => {
 		const t = X.team(l.tid, season);
-		return t && l.tids.length === 1 && l.gp >= t.won + t.lost + t.tied + t.otl && t.gp >= 20;
+		return (
+			t &&
+			l.tids.length === 1 &&
+			l.gp >= t.won + t.lost + t.tied + t.otl &&
+			t.gp >= 20
+		);
 	});
 	if (rows.length < 1) {
 		return null;
@@ -600,8 +827,17 @@ const ironmen: Topic = ({ X, season, soFar }) => {
 		pid: top[0]!.pid,
 		tid: top[0]!.tid,
 		season,
-		heads: [`${plural(rows.length, "player")} played every game`, `${top[0]!.name} did not miss a game`],
-		list: top.slice(0, 4).map((l) => ({ name: l.name, value: `${fmtNum(l.mpg, 1)} MPG`, pid: l.pid })),
+		heads: [
+			`${plural(rows.length, "player")} played every game`,
+			`${top[0]!.name} did not miss a game`,
+		],
+		list: top
+			.slice(0, 4)
+			.map((l) => ({
+				name: l.name,
+				value: `${fmtNum(l.mpg, 1)} MPG`,
+				pid: l.pid,
+			})),
 	});
 };
 
@@ -609,12 +845,16 @@ const benchStar: Topic = ({ X, season, soFar }) => {
 	if (soFar) {
 		return null;
 	}
-	const rows = X.qualified(season).filter((l) => l.gs <= l.gp * 0.15 && l.gp >= 30);
+	const rows = X.qualified(season).filter(
+		(l) => l.gs <= l.gp * 0.15 && l.gp >= 30,
+	);
 	if (rows.length < 3) {
 		return null;
 	}
 	const top = [...rows].sort((a, b) => b.ppg - a.ppg);
-	const all = X.allQualified().filter((l) => l.gs <= l.gp * 0.15 && l.gp >= 30).map((l) => l.ppg);
+	const all = X.allQualified()
+		.filter((l) => l.gs <= l.gp * 0.15 && l.gp >= 30)
+		.map((l) => l.ppg);
 	const rank = rankOf(all, top[0]!.ppg);
 	return mk({
 		id: "s-bench",
@@ -625,9 +865,18 @@ const benchStar: Topic = ({ X, season, soFar }) => {
 		pid: top[0]!.pid,
 		tid: top[0]!.tid,
 		season,
-		heads: [`${top[0]!.name} was the league’s top bench scorer`, `${fmtNum(top[0]!.ppg, 1)} a game without starting`],
+		heads: [
+			`${top[0]!.name} was the league’s top bench scorer`,
+			`${fmtNum(top[0]!.ppg, 1)} a game without starting`,
+		],
 		hero: { text: fmtNum(top[0]!.ppg, 1), unit: "PPG off the bench" },
-		list: top.slice(1, 4).map((l) => ({ name: l.name, value: `${fmtNum(l.ppg, 1)} PPG`, pid: l.pid })),
+		list: top
+			.slice(1, 4)
+			.map((l) => ({
+				name: l.name,
+				value: `${fmtNum(l.ppg, 1)} PPG`,
+				pid: l.pid,
+			})),
 	});
 };
 
@@ -637,7 +886,9 @@ const efficient: Topic = ({ X, season }) => {
 		return null;
 	}
 	const top = [...rows].sort((a, b) => b.tsPct - a.tsPct);
-	const all = X.allQualified().filter((l) => l.ppg >= 18).map((l) => l.tsPct);
+	const all = X.allQualified()
+		.filter((l) => l.ppg >= 18)
+		.map((l) => l.tsPct);
 	const rank = rankOf(all, top[0]!.tsPct);
 	return mk({
 		id: "s-efficient",
@@ -648,9 +899,18 @@ const efficient: Topic = ({ X, season }) => {
 		pid: top[0]!.pid,
 		tid: top[0]!.tid,
 		season,
-		heads: [`${top[0]!.name} scored ${fmtNum(top[0]!.ppg, 1)} a night on ${pct(top[0]!.tsPct)} true shooting`, `The most efficient high-volume scorer: ${top[0]!.name}`],
+		heads: [
+			`${top[0]!.name} scored ${fmtNum(top[0]!.ppg, 1)} a night on ${pct(top[0]!.tsPct)} true shooting`,
+			`The most efficient high-volume scorer: ${top[0]!.name}`,
+		],
 		hero: { text: pct(top[0]!.tsPct), unit: "true shooting" },
-		list: top.slice(1, 4).map((l) => ({ name: l.name, value: `${pct(l.tsPct)} on ${fmtNum(l.ppg, 1)}`, pid: l.pid })),
+		list: top
+			.slice(1, 4)
+			.map((l) => ({
+				name: l.name,
+				value: `${pct(l.tsPct)} on ${fmtNum(l.ppg, 1)}`,
+				pid: l.pid,
+			})),
 		lines: [`Among players averaging 18 or more points`],
 		note: "TS%: true shooting, scoring efficiency counting threes and free throws",
 	});
@@ -683,15 +943,29 @@ const scoringRace: Topic = ({ X, season }) => {
 		group: "s-leader-race",
 		theme: "scoring",
 		score: w.score * 0.7,
-		kicker: w.high ? "A runaway scoring title" : "A photo finish for the scoring title",
+		kicker: w.high
+			? "A runaway scoring title"
+			: "A photo finish for the scoring title",
 		pid: a.pid,
 		tid: a.tid,
 		season,
 		heads: w.high
-			? [`${a.name} won the scoring title by ${fmtNum(gap, 1)} points a game`, `Nobody was close to ${a.name}`]
-			: [`${a.name} edged ${b.name} for the scoring title by ${fmtNum(gap, 2)}`, `The closest scoring race`],
-		list: [a, b, rows[2]!].map((l) => ({ name: l.name, value: `${fmtNum(l.ppg, 1)} PPG`, pid: l.pid })),
-		lines: [`${nth(w.rank, w.high ? "biggest" : "smallest")} margin of ${fmtNum(gaps.length)} seasons`],
+			? [
+					`${a.name} won the scoring title by ${fmtNum(gap, 1)} points a game`,
+					`Nobody was close to ${a.name}`,
+				]
+			: [
+					`${a.name} edged ${b.name} for the scoring title by ${fmtNum(gap, 2)}`,
+					`The closest scoring race`,
+				],
+		list: [a, b, rows[2]!].map((l) => ({
+			name: l.name,
+			value: `${fmtNum(l.ppg, 1)} PPG`,
+			pid: l.pid,
+		})),
+		lines: [
+			`${nth(w.rank, w.high ? "biggest" : "smallest")} margin of ${fmtNum(gaps.length)} seasons`,
+		],
 	});
 };
 
@@ -700,13 +974,18 @@ const deepRoster: Topic = ({ X, season }) => {
 	if (teams.length < 6) {
 		return null;
 	}
-	const count = (tid: number, season2: number, min: number) => X.teamLines(tid, season2).filter((l) => l.gp >= 20 && l.ppg >= min).length;
-	const rows = teams.map((t) => ({ t, n: count(t.tid, season, 10) })).sort((a, b) => b.n - a.n);
+	const count = (tid: number, season2: number, min: number) =>
+		X.teamLines(tid, season2).filter((l) => l.gp >= 20 && l.ppg >= min).length;
+	const rows = teams
+		.map((t) => ({ t, n: count(t.tid, season, 10) }))
+		.sort((a, b) => b.n - a.n);
 	const top = rows[0]!;
 	if (top.n < 5) {
 		return null;
 	}
-	const all = X.L.teamSeasons.filter((t) => t.gp > 0).map((t) => count(t.tid, t.season, 10));
+	const all = X.L.teamSeasons
+		.filter((t) => t.gp > 0)
+		.map((t) => count(t.tid, t.season, 10));
 	const rank = rankOf(all, top.n);
 	return mk({
 		id: "s-deep",
@@ -716,7 +995,10 @@ const deepRoster: Topic = ({ X, season }) => {
 		kicker: "The deepest roster",
 		tid: top.t.tid,
 		season,
-		heads: [`${plural(top.n, "player")} scored 10 or more for the ${X.teamName(top.t.tid, season)}`, `Depth chart: ${top.t.region} ${top.t.name}`],
+		heads: [
+			`${plural(top.n, "player")} scored 10 or more for the ${X.teamName(top.t.tid, season)}`,
+			`Depth chart: ${top.t.region} ${top.t.name}`,
+		],
 		hero: { text: `${top.n}`, unit: "players averaging 10+" },
 		lines: [`${top.t.won}-${top.t.lost} on the year`],
 	});
@@ -727,15 +1009,25 @@ const oneMan: Topic = ({ X, season }) => {
 	const share = (tid: number, s: number) => {
 		const r = X.teamLines(tid, s);
 		const tot = r.reduce((a, l) => a + l.pts, 0);
-		return r.length >= 5 && tot > 0 ? Math.max(...r.map((l) => l.pts)) / tot : undefined;
+		return r.length >= 5 && tot > 0
+			? Math.max(...r.map((l) => l.pts)) / tot
+			: undefined;
 	};
-	const rows = teams.map((t) => ({ t, v: share(t.tid, season) })).filter((x): x is { t: WTeamSeason; v: number } => isNum(x.v)).sort((a, b) => b.v - a.v);
+	const rows = teams
+		.map((t) => ({ t, v: share(t.tid, season) }))
+		.filter((x): x is { t: WTeamSeason; v: number } => isNum(x.v))
+		.sort((a, b) => b.v - a.v);
 	if (rows.length < 6 || rows[0]!.v < 0.25) {
 		return null;
 	}
-	const all = X.L.teamSeasons.filter((t) => t.gp > 0).map((t) => share(t.tid, t.season)).filter(isNum);
+	const all = X.L.teamSeasons
+		.filter((t) => t.gp > 0)
+		.map((t) => share(t.tid, t.season))
+		.filter(isNum);
 	const rank = rankOf(all, rows[0]!.v);
-	const star = [...X.teamLines(rows[0]!.t.tid, season)].sort((a, b) => b.pts - a.pts)[0]!;
+	const star = [...X.teamLines(rows[0]!.t.tid, season)].sort(
+		(a, b) => b.pts - a.pts,
+	)[0]!;
 	return mk({
 		id: "s-oneman",
 		group: "s-teams",
@@ -745,15 +1037,24 @@ const oneMan: Topic = ({ X, season }) => {
 		pid: star.pid,
 		tid: rows[0]!.t.tid,
 		season,
-		heads: [`${star.name} scored ${pct(rows[0]!.v, 0)} of his team’s points`, `The ${rows[0]!.t.name} ran everything through ${star.name}`],
+		heads: [
+			`${star.name} scored ${pct(rows[0]!.v, 0)} of his team’s points`,
+			`The ${rows[0]!.t.name} ran everything through ${star.name}`,
+		],
 		hero: { text: pct(rows[0]!.v, 0), unit: "of the team’s points" },
-		lines: [`${nth(rank, "highest")} share of ${fmtNum(all.length)} team seasons`],
+		lines: [
+			`${nth(rank, "highest")} share of ${fmtNum(all.length)} team seasons`,
+		],
 	});
 };
 
 const teamAges: Topic = ({ X, season }) => {
 	const rows = X.teamsIn(season)
-		.map((t) => ({ t, v: wavg(X.teamLines(t.tid, season), (l) => l.age), n: X.teamLines(t.tid, season).length }))
+		.map((t) => ({
+			t,
+			v: wavg(X.teamLines(t.tid, season), (l) => l.age),
+			n: X.teamLines(t.tid, season).length,
+		}))
 		.filter((x) => x.n >= 5)
 		.sort((a, b) => a.v - b.v);
 	if (rows.length < 6) {
@@ -769,10 +1070,23 @@ const teamAges: Topic = ({ X, season }) => {
 		kicker: "Youngest and oldest",
 		tid: young.t.tid,
 		season,
-		heads: [`The ${young.t.name} were the youngest team, the ${old.t.name} the oldest`, `${fmtNum(old.v - young.v, 1)} years between the youngest and oldest rosters`],
+		heads: [
+			`The ${young.t.name} were the youngest team, the ${old.t.name} the oldest`,
+			`${fmtNum(old.v - young.v, 1)} years between the youngest and oldest rosters`,
+		],
 		list: [
-			{ name: `${X.teamName(young.t.tid, season)} (youngest)`, value: `${fmtNum(young.v, 1)}`, sub: `${young.t.won}-${young.t.lost}`, tid: young.t.tid },
-			{ name: `${X.teamName(old.t.tid, season)} (oldest)`, value: `${fmtNum(old.v, 1)}`, sub: `${old.t.won}-${old.t.lost}`, tid: old.t.tid },
+			{
+				name: `${X.teamName(young.t.tid, season)} (youngest)`,
+				value: `${fmtNum(young.v, 1)}`,
+				sub: `${young.t.won}-${young.t.lost}`,
+				tid: young.t.tid,
+			},
+			{
+				name: `${X.teamName(old.t.tid, season)} (oldest)`,
+				value: `${fmtNum(old.v, 1)}`,
+				sub: `${old.t.won}-${old.t.lost}`,
+				tid: old.t.tid,
+			},
 		],
 		lines: ["Average age, weighted by minutes played"],
 	});
@@ -792,9 +1106,15 @@ const hypeTeam: Topic = ({ X, season }) => {
 		kicker: "Hottest ticket",
 		tid: top.t.tid,
 		season,
-		heads: [`No team had more hype than the ${X.teamName(top.t.tid, season)}`, `The city was buzzing: ${top.t.region}`],
+		heads: [
+			`No team had more hype than the ${X.teamName(top.t.tid, season)}`,
+			`The city was buzzing: ${top.t.region}`,
+		],
 		hero: { text: fmtNum(top.v * 100, 0), unit: "hype out of 100" },
-		lines: [`${top.t.won}-${top.t.lost} on the court`, rows[1] ? `Next: ${X.teamName(rows[1].t.tid, season)}` : null],
+		lines: [
+			`${top.t.won}-${top.t.lost} on the court`,
+			rows[1] ? `Next: ${X.teamName(rows[1].t.tid, season)}` : null,
+		],
 	});
 };
 
@@ -826,10 +1146,21 @@ const luckTeam: Topic = ({ X, season, soFar }) => {
 		kicker: "Lucky and unlucky",
 		tid: lucky.t.tid,
 		season,
-		heads: [`${X.teamName(lucky.t.tid, season)} won ${fmtNum(lucky.d, 1)} more games than their scoring suggested`, `The luckiest team of ${season}`],
+		heads: [
+			`${X.teamName(lucky.t.tid, season)} won ${fmtNum(lucky.d, 1)} more games than their scoring suggested`,
+			`The luckiest team of ${season}`,
+		],
 		list: [
-			{ name: `${X.teamName(lucky.t.tid, season)} (luckiest)`, value: `+${fmtNum(lucky.d, 1)}`, tid: lucky.t.tid },
-			{ name: `${X.teamName(unlucky.t.tid, season)} (unluckiest)`, value: `${fmtNum(unlucky.d, 1)}`, tid: unlucky.t.tid },
+			{
+				name: `${X.teamName(lucky.t.tid, season)} (luckiest)`,
+				value: `+${fmtNum(lucky.d, 1)}`,
+				tid: lucky.t.tid,
+			},
+			{
+				name: `${X.teamName(unlucky.t.tid, season)} (unluckiest)`,
+				value: `${fmtNum(unlucky.d, 1)}`,
+				tid: unlucky.t.tid,
+			},
 		],
 		note: "Expected wins come from the Pythagorean formula: points scored and allowed",
 	});
@@ -840,7 +1171,9 @@ const marginVsRecord: Topic = ({ X, season }) => {
 	if (ts.length < 6) {
 		return null;
 	}
-	const byMargin = [...ts].sort((a, b) => (b.pts - b.oppPts) / b.gp - (a.pts - a.oppPts) / a.gp);
+	const byMargin = [...ts].sort(
+		(a, b) => (b.pts - b.oppPts) / b.gp - (a.pts - a.oppPts) / a.gp,
+	);
 	const byRecord = [...ts].sort((a, b) => wpOf(b) - wpOf(a));
 	const m = byMargin[0]!;
 	const r = byRecord[0]!;
@@ -855,10 +1188,23 @@ const marginVsRecord: Topic = ({ X, season }) => {
 		kicker: "The best team on paper",
 		tid: m.tid,
 		season,
-		heads: [`The ${X.teamName(m.tid, season)} had the best scoring margin, not the best record`, `Best margin: ${m.region} ${m.name}`],
+		heads: [
+			`The ${X.teamName(m.tid, season)} had the best scoring margin, not the best record`,
+			`Best margin: ${m.region} ${m.name}`,
+		],
 		list: [
-			{ name: `${X.teamName(m.tid, season)} (best margin)`, value: `+${fmtNum((m.pts - m.oppPts) / m.gp, 1)}`, sub: `${m.won}-${m.lost}`, tid: m.tid },
-			{ name: `${X.teamName(r.tid, season)} (best record)`, value: `${r.won}-${r.lost}`, sub: `+${fmtNum((r.pts - r.oppPts) / r.gp, 1)}`, tid: r.tid },
+			{
+				name: `${X.teamName(m.tid, season)} (best margin)`,
+				value: `+${fmtNum((m.pts - m.oppPts) / m.gp, 1)}`,
+				sub: `${m.won}-${m.lost}`,
+				tid: m.tid,
+			},
+			{
+				name: `${X.teamName(r.tid, season)} (best record)`,
+				value: `${r.won}-${r.lost}`,
+				sub: `+${fmtNum((r.pts - r.oppPts) / r.gp, 1)}`,
+				tid: r.tid,
+			},
 		],
 	});
 };
@@ -888,12 +1234,22 @@ const bubbleRace: Topic = ({ X, season }) => {
 		tid: first.tid,
 		season,
 		heads: [
-			gap <= 0 ? `The ${first.name} missed the playoffs with a better record than ${last.name}` : `Just ${plural(gap, "win")} separated ${last.name} from ${first.name}`,
+			gap <= 0
+				? `The ${first.name} missed the playoffs with a better record than ${last.name}`
+				: `Just ${plural(gap, "win")} separated ${last.name} from ${first.name}`,
 			`The thinnest line of the season`,
 		],
 		list: [
-			{ name: `${X.teamName(last.tid, season)} (last in)`, value: `${last.won}-${last.lost}`, tid: last.tid },
-			{ name: `${X.teamName(first.tid, season)} (first out)`, value: `${first.won}-${first.lost}`, tid: first.tid },
+			{
+				name: `${X.teamName(last.tid, season)} (last in)`,
+				value: `${last.won}-${last.lost}`,
+				tid: last.tid,
+			},
+			{
+				name: `${X.teamName(first.tid, season)} (first out)`,
+				value: `${first.won}-${first.lost}`,
+				tid: first.tid,
+			},
 		],
 	});
 };
@@ -922,7 +1278,12 @@ const teamLists: Topic = ({ X, season }) => {
 		const rows: SlideListRow[] = list.slice(0, 5).map((pid) => {
 			const p = X.players.get(pid)!;
 			const l = X.line(pid, season);
-			return { name: p.name, value: l ? `${fmtNum(l.ppg, 1)} PPG` : "", pid, sub: l ? X.teamName(l.tid, season) : undefined };
+			return {
+				name: p.name,
+				value: l ? `${fmtNum(l.ppg, 1)} PPG` : "",
+				pid,
+				sub: l ? X.teamName(l.tid, season) : undefined,
+			};
 		});
 		// A team with two of the five
 		const byTeam = new Map<number, number>();
@@ -944,7 +1305,11 @@ const teamLists: Topic = ({ X, season }) => {
 				season,
 				heads: [`The ${season} ${label}`, `Named to the ${label}`],
 				list: rows,
-				lines: [top && top[1] >= 2 ? `${X.teamName(top[0], season)} placed ${top[1]} players` : null],
+				lines: [
+					top && top[1] >= 2
+						? `${X.teamName(top[0], season)} placed ${top[1]} players`
+						: null,
+				],
 				facts: [`teamlist|${id}|${season}`],
 			}),
 		);
@@ -978,8 +1343,17 @@ const allStarTeams: Topic = ({ X, season }) => {
 		kicker: "The All-Star Game",
 		tid: top[0],
 		season,
-		heads: [`${X.teamName(top[0], season)} sent ${top[1].length} players to the All-Star Game`, `${plural(pids.length, "All-Star")} in all`],
-		list: rows.slice(0, 4).map(([t, ps]) => ({ name: X.teamName(t, season), value: `${ps.length}`, tid: t })),
+		heads: [
+			`${X.teamName(top[0], season)} sent ${top[1].length} players to the All-Star Game`,
+			`${plural(pids.length, "All-Star")} in all`,
+		],
+		list: rows
+			.slice(0, 4)
+			.map(([t, ps]) => ({
+				name: X.teamName(t, season),
+				value: `${ps.length}`,
+				tid: t,
+			})),
 		lines: [none > 0 ? `${plural(none, "team")} had no All-Star` : null],
 	});
 };
@@ -1011,10 +1385,22 @@ const mvpFlavor: Topic = ({ X, season }) => {
 				pid: wsLeader.pid,
 				tid: wsLeader.tid,
 				season,
-				heads: [`${wsLeader.name} led in win shares, but ${p.name} won MVP`, `The MVP was not the win-shares leader`],
+				heads: [
+					`${wsLeader.name} led in win shares, but ${p.name} won MVP`,
+					`The MVP was not the win-shares leader`,
+				],
 				list: [
-					{ name: `${wsLeader.name} (most win shares)`, value: `${fmtNum(wsLeader.ws, 1)} WS`, pid: wsLeader.pid },
-					{ name: `${p.name} (MVP)`, value: `${fmtNum(l.ws, 1)} WS`, sub: `${ordinal(rank)} in the league`, pid: p.pid },
+					{
+						name: `${wsLeader.name} (most win shares)`,
+						value: `${fmtNum(wsLeader.ws, 1)} WS`,
+						pid: wsLeader.pid,
+					},
+					{
+						name: `${p.name} (MVP)`,
+						value: `${fmtNum(l.ws, 1)} WS`,
+						sub: `${ordinal(rank)} in the league`,
+						pid: p.pid,
+					},
 				],
 			}),
 		);
@@ -1043,9 +1429,16 @@ const mvpFlavor: Topic = ({ X, season }) => {
 					pid: p.pid,
 					tid: l.tid,
 					season,
-					heads: [`${p.name} was ${l.age} when he won MVP`, w.high ? `The oldest MVP in league history` : `The youngest MVP in league history`].slice(0, w.rank === 1 ? 2 : 1),
+					heads: [
+						`${p.name} was ${l.age} when he won MVP`,
+						w.high
+							? `The oldest MVP in league history`
+							: `The youngest MVP in league history`,
+					].slice(0, w.rank === 1 ? 2 : 1),
 					hero: { text: `${l.age}`, unit: "years old" },
-					lines: [`${nth(w.rank, w.high ? "oldest" : "youngest")} of ${plural(ages.length, "MVP")} so far`],
+					lines: [
+						`${nth(w.rank, w.high ? "oldest" : "youngest")} of ${plural(ages.length, "MVP")} so far`,
+					],
 				}),
 			);
 		}
@@ -1060,7 +1453,11 @@ const champStories: Topic = ({ X, season }) => {
 	}
 	const out: Slide[] = [];
 	const titles = X.titlesOf(c.tid, season);
-	if (titles.length === 1 && X.seasons.length >= 5 && X.seasons[0]! < season - 3) {
+	if (
+		titles.length === 1 &&
+		X.seasons.length >= 5 &&
+		X.seasons[0]! < season - 3
+	) {
 		out.push(
 			mk({
 				id: "s-newchamp",
@@ -1070,7 +1467,10 @@ const champStories: Topic = ({ X, season }) => {
 				kicker: "A new champion",
 				tid: c.tid,
 				season,
-				heads: [`First title ever for the ${X.teamName(c.tid, season)}`, `A new name on the trophy`],
+				heads: [
+					`First title ever for the ${X.teamName(c.tid, season)}`,
+					`A new name on the trophy`,
+				],
 				hero: { text: "No. 1", unit: "title" },
 				lines: [`${c.won}-${c.lost} in the regular season`],
 				facts: [`champ|${season}`],
@@ -1096,7 +1496,11 @@ const champStories: Topic = ({ X, season }) => {
 				kicker: run === 2 ? "Back to back" : "A dynasty",
 				tid: c.tid,
 				season,
-				heads: [run === 2 ? `Back-to-back for the ${X.teamName(c.tid, season)}` : `${run} straight titles for the ${X.teamName(c.tid, season)}`],
+				heads: [
+					run === 2
+						? `Back-to-back for the ${X.teamName(c.tid, season)}`
+						: `${run} straight titles for the ${X.teamName(c.tid, season)}`,
+				],
 				hero: { text: `${run}`, unit: "straight titles" },
 				lines: [`${c.won}-${c.lost} in the regular season`],
 				facts: [`champ|${season}`],
@@ -1134,10 +1538,19 @@ const champStories: Topic = ({ X, season }) => {
 					tid: c.tid,
 					season,
 					heads: w2.high
-						? [`The ${X.teamName(c.tid, season)} went ${w}-${l} through the playoffs`, `A dominant march to the title`]
-						: [`The ${X.teamName(c.tid, season)} survived at ${w}-${l}`, `The narrowest path to a title`],
+						? [
+								`The ${X.teamName(c.tid, season)} went ${w}-${l} through the playoffs`,
+								`A dominant march to the title`,
+							]
+						: [
+								`The ${X.teamName(c.tid, season)} survived at ${w}-${l}`,
+								`The narrowest path to a title`,
+							],
 					hero: { text: `${w}-${l}`, unit: "in playoff games" },
-					lines: [swept > 0 ? `${plural(swept, "sweep")} on the way` : null, `${nth(w2.rank, w2.high ? "most dominant" : "closest")} title run of ${hist.length}`],
+					lines: [
+						swept > 0 ? `${plural(swept, "sweep")} on the way` : null,
+						`${nth(w2.rank, w2.high ? "most dominant" : "closest")} title run of ${hist.length}`,
+					],
 					facts: [`champ|${season}`],
 				}),
 			);
@@ -1145,7 +1558,9 @@ const champStories: Topic = ({ X, season }) => {
 	}
 	// Payroll and seed of the champion
 	if (isNum(c.payroll) && c.payroll > 0 && X.decided(season)) {
-		const teams = X.teamsIn(season).filter((t) => isNum(t.payroll) && t.payroll > 0);
+		const teams = X.teamsIn(season).filter(
+			(t) => isNum(t.payroll) && t.payroll > 0,
+		);
 		if (teams.length >= 6) {
 			const rank = rankOf(
 				teams.map((t) => t.payroll!),
@@ -1163,8 +1578,12 @@ const champStories: Topic = ({ X, season }) => {
 						season,
 						heads:
 							rank <= 2
-								? [`The champions also had the ${rank === 1 ? "biggest" : "second-biggest"} payroll`]
-								: [`The champions had just the ${ordinal(rank)}-highest payroll of ${teams.length}`],
+								? [
+										`The champions also had the ${rank === 1 ? "biggest" : "second-biggest"} payroll`,
+									]
+								: [
+										`The champions had just the ${ordinal(rank)}-highest payroll of ${teams.length}`,
+									],
 						hero: { text: money(c.payroll), unit: "champion payroll" },
 						lines: [`${X.teamName(c.tid, season)}`],
 						facts: [`champ|${season}`],
@@ -1194,14 +1613,16 @@ const chalk: Topic = ({ X, season }) => {
 				}
 				total += 1;
 				const homeWon = m.home.won > m.away.won;
-				if ((m.home.seed < m.away.seed) === homeWon) {
+				if (m.home.seed < m.away.seed === homeWon) {
 					fav += 1;
 				}
 			}
 		}
 		return total >= 4 ? fav / total : undefined;
 	};
-	const board = X.decidedSeasons().map((s) => rate(s)).filter(isNum);
+	const board = X.decidedSeasons()
+		.map((s) => rate(s))
+		.filter(isNum);
 	const mine = rate(season);
 	if (!isNum(mine) || board.length < 4) {
 		return null;
@@ -1211,7 +1632,9 @@ const chalk: Topic = ({ X, season }) => {
 		return null;
 	}
 	const ps = X.series(season)!;
-	const total = ps.rounds.flat().filter((m) => m.away && m.home.seed !== m.away.seed).length;
+	const total = ps.rounds
+		.flat()
+		.filter((m) => m.away && m.home.seed !== m.away.seed).length;
 	const favWon = Math.round(mine * total);
 	return mk({
 		id: "s-chalk",
@@ -1221,10 +1644,18 @@ const chalk: Topic = ({ X, season }) => {
 		kicker: w.high ? "Chalk" : "Chaos",
 		season,
 		heads: w.high
-			? [`The higher seed won ${favWon} of ${total} playoff series`, `The playoffs went to form`]
-			: [`Only ${favWon} of ${total} series went to the higher seed`, `Chaos in the playoffs`],
+			? [
+					`The higher seed won ${favWon} of ${total} playoff series`,
+					`The playoffs went to form`,
+				]
+			: [
+					`Only ${favWon} of ${total} series went to the higher seed`,
+					`Chaos in the playoffs`,
+				],
 		hero: { text: pct(mine, 0), unit: "series won by the higher seed" },
-		lines: [`${nth(w.rank, w.high ? "most predictable" : "wildest")} playoffs of ${board.length}`],
+		lines: [
+			`${nth(w.rank, w.high ? "most predictable" : "wildest")} playoffs of ${board.length}`,
+		],
 	});
 };
 
@@ -1233,7 +1664,14 @@ const gameSevens: Topic = ({ X, season }) => {
 	if (!ps || !X.decided(season)) {
 		return null;
 	}
-	const sev: { round: number; a: number; b: number; w: number; l: number; ri: number }[] = [];
+	const sev: {
+		round: number;
+		a: number;
+		b: number;
+		w: number;
+		l: number;
+		ri: number;
+	}[] = [];
 	for (const [ri, round] of ps.rounds.entries()) {
 		for (const m of round) {
 			if (!m.away) {
@@ -1261,7 +1699,9 @@ const gameSevens: Topic = ({ X, season }) => {
 		tid: finals?.a ?? sev[0]!.a,
 		season,
 		heads: [
-			finals ? `The finals went the distance` : `${plural(sev.length, "series", "series")} went the distance`,
+			finals
+				? `The finals went the distance`
+				: `${plural(sev.length, "series", "series")} went the distance`,
 			`Winner take all`,
 		],
 		list: sev.slice(0, 4).map((s) => ({
@@ -1280,7 +1720,8 @@ const reign: Topic = ({ X, season }) => {
 	];
 	const out: Slide[] = [];
 	for (const [what, noun, f] of cats) {
-		const lead = (s: number) => [...X.qualified(s)].sort((a, b) => f(b) - f(a))[0];
+		const lead = (s: number) =>
+			[...X.qualified(s)].sort((a, b) => f(b) - f(a))[0];
 		const me = lead(season);
 		if (!me) {
 			continue;
@@ -1305,7 +1746,10 @@ const reign: Topic = ({ X, season }) => {
 					pid: me.pid,
 					tid: me.tid,
 					season,
-					heads: [`${run} straight years leading the league in ${noun}: ${me.name}`, `${me.name} owns ${what}`],
+					heads: [
+						`${run} straight years leading the league in ${noun}: ${me.name}`,
+						`${me.name} owns ${what}`,
+					],
 					hero: { text: `${run}`, unit: `straight ${what} titles` },
 					lines: [`${fmtNum(f(me), 1)} per game this season`],
 					facts: [`reign|${what}|${me.pid}`],
@@ -1328,7 +1772,13 @@ const milestones: Topic = ({ X, season, soFar }) => {
 		["blocks", (c) => c.blk, [1000, 1500, 2000]],
 		["three-pointers", (c) => c.tp, [1000, 1500, 2000, 2500]],
 	];
-	const hits: { p: string; pid: number; tid: number; noun: string; mark: number }[] = [];
+	const hits: {
+		p: string;
+		pid: number;
+		tid: number;
+		noun: string;
+		mark: number;
+	}[] = [];
 	for (const l of X.lines(season)) {
 		const p = X.players.get(l.pid)!;
 		const before = X.career(p, season - 1);
@@ -1354,8 +1804,17 @@ const milestones: Topic = ({ X, season, soFar }) => {
 		pid: hits[0]!.pid,
 		tid: hits[0]!.tid,
 		season,
-		heads: [`${plural(hits.length, "career milestone")} crossed this season`, `${hits[0]!.p} passed ${fmtNum(hits[0]!.mark)} career ${hits[0]!.noun}`],
-		list: hits.slice(0, 5).map((h) => ({ name: h.p, value: `${fmtNum(h.mark)} ${h.noun}`, pid: h.pid })),
+		heads: [
+			`${plural(hits.length, "career milestone")} crossed this season`,
+			`${hits[0]!.p} passed ${fmtNum(hits[0]!.mark)} career ${hits[0]!.noun}`,
+		],
+		list: hits
+			.slice(0, 5)
+			.map((h) => ({
+				name: h.p,
+				value: `${fmtNum(h.mark)} ${h.noun}`,
+				pid: h.pid,
+			})),
 	});
 };
 
@@ -1377,7 +1836,10 @@ const draftTop: Topic = ({ X, season }) => {
 		kicker: `The ${season} draft`,
 		pid: picks[0]!.pid,
 		season,
-		heads: [`${picks[0]!.name} went No. 1 in the ${season} draft`, `The top of the ${season} draft`],
+		heads: [
+			`${picks[0]!.name} went No. 1 in the ${season} draft`,
+			`The top of the ${season} draft`,
+		],
 		list: picks.slice(0, 5).map((p) => ({
 			name: p.name,
 			value: `No. ${p.draft.pick}`,
@@ -1395,7 +1857,13 @@ const absences: Topic = ({ X, season, soFar }) => {
 	const rows = X.lines(season)
 		.map((l) => {
 			const p = X.players.get(l.pid)!;
-			return { l, ovr: p.ovr[season], games: p.injuries.filter((i) => i.season === season).reduce((a, i) => a + i.games, 0) };
+			return {
+				l,
+				ovr: p.ovr[season],
+				games: p.injuries
+					.filter((i) => i.season === season)
+					.reduce((a, i) => a + i.games, 0),
+			};
 		})
 		.filter((x) => x.games >= 30 && isNum(x.ovr))
 		.sort((a, b) => b.ovr! - a.ovr!);
@@ -1412,14 +1880,29 @@ const absences: Topic = ({ X, season, soFar }) => {
 		pid: top.l.pid,
 		tid: top.l.tid,
 		season,
-		heads: [`${top.l.name}, one of the best, lost ${top.games} games to injury`, `The stars who missed the most time`],
-		list: rows.slice(0, 4).map((x) => ({ name: x.l.name, value: `${x.games} games`, sub: `rated ${x.ovr}`, pid: x.l.pid })),
+		heads: [
+			`${top.l.name}, one of the best, lost ${top.games} games to injury`,
+			`The stars who missed the most time`,
+		],
+		list: rows
+			.slice(0, 4)
+			.map((x) => ({
+				name: x.l.name,
+				value: `${x.games} games`,
+				sub: `rated ${x.ovr}`,
+				pid: x.l.pid,
+			})),
 	});
 };
 
 const injuredPlayers: Topic = ({ X, season }) => {
 	const rows = X.L.players
-		.map((p) => ({ p, g: p.injuries.filter((i) => i.season === season).reduce((a, i) => a + i.games, 0) }))
+		.map((p) => ({
+			p,
+			g: p.injuries
+				.filter((i) => i.season === season)
+				.reduce((a, i) => a + i.games, 0),
+		}))
 		.filter((x) => x.g > 0)
 		.sort((a, b) => b.g - a.g);
 	if (rows.length < 10 || rows[0]!.g < 40) {
@@ -1437,12 +1920,17 @@ const injuredPlayers: Topic = ({ X, season }) => {
 		pid: top.p.pid,
 		tid: l?.tid,
 		season,
-		heads: [`${fmtNum(total)} games were lost to injuries`, `${top.p.name} missed the most time: ${plural(top.g, "game")}`],
+		heads: [
+			`${fmtNum(total)} games were lost to injuries`,
+			`${top.p.name} missed the most time: ${plural(top.g, "game")}`,
+		],
 		hero: { text: fmtNum(total), unit: "player-games lost" },
 		list: rows.slice(0, 4).map((x) => ({
 			name: x.p.name,
 			value: plural(x.g, "game"),
-			sub: x.p.injuries.filter((i) => i.season === season).sort((a, b) => b.games - a.games)[0]?.type,
+			sub: x.p.injuries
+				.filter((i) => i.season === season)
+				.sort((a, b) => b.games - a.games)[0]?.type,
 			pid: x.p.pid,
 		})),
 	});
@@ -1482,13 +1970,29 @@ const rareLow: Topic = ({ X, season }) => {
 		tid: best.tid,
 		season,
 		heads: w.high
-			? [`${best.won - worst.won} wins separated the best and worst teams`, `A league of haves and have-nots`]
-			: [`Only ${best.won - worst.won} wins between best and worst`, `A very tight league`],
+			? [
+					`${best.won - worst.won} wins separated the best and worst teams`,
+					`A league of haves and have-nots`,
+				]
+			: [
+					`Only ${best.won - worst.won} wins between best and worst`,
+					`A very tight league`,
+				],
 		list: [
-			{ name: `${X.teamName(best.tid, season)} (best)`, value: `${best.won}-${best.lost}`, tid: best.tid },
-			{ name: `${X.teamName(worst.tid, season)} (worst)`, value: `${worst.won}-${worst.lost}`, tid: worst.tid },
+			{
+				name: `${X.teamName(best.tid, season)} (best)`,
+				value: `${best.won}-${best.lost}`,
+				tid: best.tid,
+			},
+			{
+				name: `${X.teamName(worst.tid, season)} (worst)`,
+				value: `${worst.won}-${worst.lost}`,
+				tid: worst.tid,
+			},
 		],
-		lines: [`${nth(w.rank, w.high ? "widest" : "narrowest")} spread of ${board.length} seasons`],
+		lines: [
+			`${nth(w.rank, w.high ? "widest" : "narrowest")} spread of ${board.length} seasons`,
+		],
 	});
 };
 

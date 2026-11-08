@@ -11,7 +11,10 @@ const L = makeRichLeague(10);
 const X = new LeagueIndex(L);
 const season = L.season - 1;
 
-const ctxFor = (mode: WrappedMode, extra: { tid?: number; pid?: number } = {}) => ({
+const ctxFor = (
+	mode: WrappedMode,
+	extra: { tid?: number; pid?: number } = {},
+) => ({
 	X,
 	mode,
 	season,
@@ -48,7 +51,10 @@ describe("quiz questions", () => {
 describe("planItems", () => {
 	const cands = candidates(ctxFor("season"));
 	test("quiz block sits mid-deck, score before the summary", () => {
-		const items = planItems(cands, "season", 16, "s", { quiz: true, noSpoil: false });
+		const items = planItems(cands, "season", 16, "s", {
+			quiz: true,
+			noSpoil: false,
+		});
 		const ids = items.map((s) => s.id);
 		const nq = ids.filter((i) => /^quiz\d$/.test(i)).length;
 		expect(nq).toBe(quizCount(16, cands.filter((s) => s.quiz).length));
@@ -60,12 +66,21 @@ describe("planItems", () => {
 		expect(first).toBeLessThan(ids.length - 3);
 	});
 	test("quiz off leaves no quiz slides", () => {
-		const items = planItems(cands, "season", 16, "s", { quiz: false, noSpoil: false });
+		const items = planItems(cands, "season", 16, "s", {
+			quiz: false,
+			noSpoil: false,
+		});
 		expect(items.some((s) => s.quiz || s.id === "quizscore")).toBe(false);
 	});
 	test("no spoilers holds the champion until just before the summary", () => {
-		const open = planItems(cands, "season", 16, "s", { quiz: true, noSpoil: false });
-		const hidden = planItems(cands, "season", 16, "s", { quiz: true, noSpoil: true });
+		const open = planItems(cands, "season", 16, "s", {
+			quiz: true,
+			noSpoil: false,
+		});
+		const hidden = planItems(cands, "season", 16, "s", {
+			quiz: true,
+			noSpoil: true,
+		});
 		const ids = hidden.map((s) => s.id);
 		expect(open.map((s) => s.id).indexOf("champ")).toBeLessThan(5);
 		expect(ids.indexOf("champ")).toBeGreaterThan(ids.indexOf("quizscore"));

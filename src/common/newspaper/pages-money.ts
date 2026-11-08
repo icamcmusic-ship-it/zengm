@@ -1,13 +1,7 @@
 // Money and moves: free agency, the trade scorecard, bargains and burdens, the luxury tax line and the transaction wire.
 
 import { Ctx, P } from "./ctx.ts";
-import {
-	ALL_EDS,
-	PLAYED,
-	addPage,
-	arcPage,
-	table,
-} from "./kit.ts";
+import { ALL_EDS, PLAYED, addPage, arcPage, table } from "./kit.ts";
 import { andList, capFirst, fmt1, money, plural, word } from "./text.ts";
 import type { NPPlayer, NPTrade, NPTradeAsset } from "./types.ts";
 
@@ -143,7 +137,9 @@ addPage(
 					};
 				})
 				.filter((x) => x.stars[0] || x.stars[1])
-				.toSorted((p, q) => Math.abs(q.ws[0] - q.ws[1]) - Math.abs(p.ws[0] - p.ws[1]))
+				.toSorted(
+					(p, q) => Math.abs(q.ws[0] - q.ws[1]) - Math.abs(p.ws[0] - p.ws[1]),
+				)
 				.slice(0, 5);
 			return cards.length >= 1 ? { cards } : undefined;
 		},
@@ -176,7 +172,10 @@ addPage(
 							([0, 1] as const).map((i) => [
 								[c.tl(card.tr.tids[i], c.tfull(card.tr.tids[i]))],
 								card.stars[i]
-									? [c.pl(card.stars[i]!.pid), ` (${fmt1(card.stars[i]!.pts)} ppg)`]
+									? [
+											c.pl(card.stars[i]!.pid),
+											` (${fmt1(card.stars[i]!.pts)} ppg)`,
+										]
 									: ["picks and depth"],
 								[fmt1(card.ws[i])],
 							]),
@@ -200,7 +199,10 @@ addPage(
 		beat: "moves",
 		prep: (c) => {
 			const paid = c.f.players.filter(
-				(p) => p.contractAmount !== undefined && p.contractAmount > 0 && p.gp >= Math.max(10, c.f.gp * 0.4),
+				(p) =>
+					p.contractAmount !== undefined &&
+					p.contractAmount > 0 &&
+					p.gp >= Math.max(10, c.f.gp * 0.4),
 			);
 			if (paid.length < 20) {
 				return undefined;
@@ -308,7 +310,9 @@ addPage(
 				cap,
 				tax,
 				over: tax
-					? withPay.filter((x) => x.payroll > tax).toSorted((a, b) => b.payroll - a.payroll)
+					? withPay
+							.filter((x) => x.payroll > tax)
+							.toSorted((a, b) => b.payroll - a.payroll)
 					: [],
 				space: withPay
 					.filter((x) => x.payroll < cap)
@@ -330,10 +334,9 @@ addPage(
 					P(
 						`The luxury tax line ${c.T("is", "was")} ${money(x.tax!)}, and ${plural(x.over.length, "team")} ${c.T(x.over.length === 1 ? "is" : "are", x.over.length === 1 ? "was" : "were")} above it: `,
 						...andList(
-							x.over.slice(0, 5).map((y) => [
-								c.tl(y.tid),
-								` (${money(y.payroll)})`,
-							]),
+							x.over
+								.slice(0, 5)
+								.map((y) => [c.tl(y.tid), ` (${money(y.payroll)})`]),
 						),
 						".",
 					),
@@ -415,12 +418,14 @@ addPage(
 											],
 										]
 									: []),
-								...c.f.trades.slice(0, 1).map((tr) => [
-									`A trade: the `,
-									c.tl(tr.tids[0]),
-									` and `,
-									c.tl(tr.tids[1]),
-								]),
+								...c.f.trades
+									.slice(0, 1)
+									.map((tr) => [
+										`A trade: the `,
+										c.tl(tr.tids[0]),
+										` and `,
+										c.tl(tr.tids[1]),
+									]),
 							],
 						},
 						{

@@ -1,8 +1,5 @@
 import type { LeagueIndex } from "../../common/wrapped/league.ts";
-import {
-	findStoriesAsync,
-	type Story,
-} from "../../common/storylines/index.ts";
+import { findStoriesAsync, type Story } from "../../common/storylines/index.ts";
 import { buildThreads, type Thread } from "../../common/storylines/threads.ts";
 import { whyOf, type WhySection } from "../../common/storylines/why.ts";
 import {

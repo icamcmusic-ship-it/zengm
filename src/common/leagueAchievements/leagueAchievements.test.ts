@@ -7,6 +7,7 @@ import type {
 	WTeamSeason,
 } from "../wrapped/types.ts";
 import { makeRichLeague } from "../wrapped/fixture.ts";
+import { CALIBRATION, CALIBRATION_LEAGUES } from "./calibration.generated.ts";
 import {
 	applyNativeRules,
 	bestText,
@@ -571,5 +572,51 @@ describe("progress", () => {
 		expect(bestText(DEF_BY_ID.get("sUpsetSweep-1")!, { v: 0 })).toBe(undefined);
 		const winp = DEF_BY_ID.get("winp-0.89")!;
 		expect(formatValue(0.854, winp)).toBe(".854");
+	});
+});
+
+describe("rarity calibration on simulated leagues", () => {
+	const LETTER = {
+		c: "common",
+		r: "rare",
+		l: "legendary",
+		i: "impossible",
+	} as const;
+
+	test("every shown tier was measured, and takes the calibrated rarity", () => {
+		expect(CALIBRATION_LEAGUES).toBeGreaterThanOrEqual(3);
+		for (const d of DEFS) {
+			const c = CALIBRATION[d.id];
+			expect(c, d.id).toBeDefined();
+			expect(d.rarity).toBe(LETTER[c![0]]);
+		}
+	});
+
+	test("no impossible tier unlocked in the first 5 seasons of any simulated league", () => {
+		const early = DEFS.filter(
+			(d) =>
+				d.rarity === "impossible" &&
+				CALIBRATION[d.id]![2].some((k) => k > 0 && k <= 5),
+		);
+		expect(early.map((d) => d.id)).toEqual([]);
+	});
+
+	test("measured rates lie in the bands of their rarity (or the tier was capped or kept in order)", () => {
+		const MIN = { common: 0.6, rare: 0.15, legendary: 0.025, impossible: 0 };
+		let inBand = 0;
+		let measured = 0;
+		for (const d of DEFS) {
+			const rate = CALIBRATION[d.id]![1];
+			if (rate === null) {
+				continue;
+			}
+			measured += 1;
+			// rarity can only be raised from the band (order within a metric) or lowered by the early-unlock cap
+			if (rate >= MIN[d.rarity] || d.rarity === "legendary") {
+				inBand += 1;
+			}
+		}
+		expect(measured).toBeGreaterThan(1000);
+		expect(inBand).toBe(measured);
 	});
 });

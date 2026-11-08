@@ -339,6 +339,23 @@ const TALLY_LABEL = {
 	TOV: "TOV",
 };
 
+// Same wording and weights as the original shootout lines, picked with the session's seeded generator
+export const shootoutShotText = (rng: Rng, made: boolean, female: boolean) => {
+	const he = female ? "She" : "He";
+	const texts = made
+		? ["It's good!", "Swish!", "It rattles around but goes in!"]
+		: ["It rims out!", `${he} bricks it!`, `${he} misses everything, airball!`];
+	const weights = made ? [1, 0.25, 0.25] : [1, 0.1, 0.01];
+	let r = rng.random() * (weights[0]! + weights[1]! + weights[2]!);
+	for (let i = 0; i < texts.length; i++) {
+		r -= weights[i]!;
+		if (r < 0) {
+			return texts[i]!;
+		}
+	}
+	return texts[0]!;
+};
+
 export class FlavorSession {
 	private gid: number;
 	private numPeriods: number;
@@ -629,6 +646,9 @@ export class FlavorSession {
 					e.type === "pfTP"
 				) {
 					res = this.onFoul(rng, ev, score);
+				} else if (e.type === "shootoutShot") {
+					// (worded from this session's seeded generator, so a replay reads the same as the live game)
+					res = { text: shootoutShotText(rng, !!ev.made, this.female) };
 				} else if (e.type === "foulOut") {
 					this.fouledOut.add(ev.pid);
 					res = {

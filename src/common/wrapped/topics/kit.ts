@@ -226,9 +226,7 @@ export const leaderSlide = (
 		lines: [
 			`${nth(rank, low ? "lowest" : "highest")} of ${fmtNum(vals.length)} qualified seasons`,
 			last ? `Last one this good: ${last.name}, ${last.season}` : null,
-			second
-				? `Runner-up: ${second.name}, ${d.show(d.val(second)!)}`
-				: null,
+			second ? `Runner-up: ${second.name}, ${d.show(d.val(second)!)}` : null,
 		],
 		note: d.note,
 		facts: [`lb|${d.id}|${r.pid}`],

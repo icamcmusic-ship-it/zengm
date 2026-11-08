@@ -449,7 +449,8 @@ export const getText = (
 							`${he} rockets one down the line... and it's foul.`,
 							"A swing and a miss",
 							"He makes contact, but it falls short",
-						])[event.flavor]
+						]
+				)[event.flavor]
 			}`;
 			break;
 		}

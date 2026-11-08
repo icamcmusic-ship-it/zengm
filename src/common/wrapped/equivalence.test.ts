@@ -39,7 +39,12 @@ const fixtures: [string, WLeague][] = [
 	["small", makeLeague(6)],
 	["big", makeBigLeague({ numSeasons: 14, seed: "eq" })],
 	// With trades, contracts and lotteries, so the front-office topics and storylines are covered too
-	["deals", addDeals(makeBigLeague({ numSeasons: 10, seed: "deals" }), { perSeason: 6 })],
+	[
+		"deals",
+		addDeals(makeBigLeague({ numSeasons: 10, seed: "deals" }), {
+			perSeason: 6,
+		}),
+	],
 	[
 		"in progress",
 		{ ...makeBigLeague({ numSeasons: 6, seed: "ip" }), currentComplete: false },

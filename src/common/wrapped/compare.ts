@@ -209,7 +209,10 @@ const finishText = (X: LeagueIndex, tid: number, season: number) => {
 	}
 	return {
 		v: t.playoffRoundsWon,
-		t: t.playoffRoundsWon === n - 1 ? "Lost the finals" : `Lost in round ${t.playoffRoundsWon + 1}`,
+		t:
+			t.playoffRoundsWon === n - 1
+				? "Lost the finals"
+				: `Lost in round ${t.playoffRoundsWon + 1}`,
 	};
 };
 
@@ -220,12 +223,22 @@ export const statRows = (X: LeagueIndex, A: Side, B: Side): StatRow[] => {
 	if (A.k === "p") {
 		const la = X.line(A.id!, A.season);
 		const lb = X.line(B.id!, B.season);
-		const team = (l: typeof la, s: number) => (l ? (X.teamAny(l.tid, s)?.abbrev ?? "–") : "–");
+		const team = (l: typeof la, s: number) =>
+			l ? (X.teamAny(l.tid, s)?.abbrev ?? "–") : "–";
 		rows.push(
-			{ label: "Team", a: team(la, A.season), b: team(lb, B.season), better: null },
+			{
+				label: "Team",
+				a: team(la, A.season),
+				b: team(lb, B.season),
+				better: null,
+			},
 			row("Games", la?.gp, lb?.gp, N(la?.gp), N(lb?.gp)),
 		);
-		const pairs: [string, (l: NonNullable<typeof la>) => number | undefined, number][] = [
+		const pairs: [
+			string,
+			(l: NonNullable<typeof la>) => number | undefined,
+			number,
+		][] = [
 			["Minutes per game", (l) => l.mpg, 1],
 			["Points per game", (l) => l.ppg, 1],
 			["Rebounds per game", (l) => l.rpg, 1],
@@ -242,29 +255,59 @@ export const statRows = (X: LeagueIndex, A: Side, B: Side): StatRow[] => {
 			const vb = lb ? f(lb) : undefined;
 			rows.push(row(label, va, vb, N(va, d), N(vb, d)));
 		}
-		const aw = (pid: number, s: number) =>
-			[...new Set(X.players.get(pid)?.awards.filter((x) => x.season === s && (X.decided(s) || x.type === "All-Star")).map((x) => x.type))];
+		const aw = (pid: number, s: number) => [
+			...new Set(
+				X.players
+					.get(pid)
+					?.awards.filter(
+						(x) => x.season === s && (X.decided(s) || x.type === "All-Star"),
+					)
+					.map((x) => x.type),
+			),
+		];
 		const wa = aw(A.id!, A.season);
 		const wb = aw(B.id!, B.season);
 		if (wa.length > 0 || wb.length > 0) {
-			rows.push({ label: "Awards", a: wa.length ? wa.join(", ") : "None", b: wb.length ? wb.join(", ") : "None", better: null });
+			rows.push({
+				label: "Awards",
+				a: wa.length ? wa.join(", ") : "None",
+				b: wb.length ? wb.join(", ") : "None",
+				better: null,
+			});
 		}
 	} else if (A.k === "t") {
 		const ta = X.team(A.id!, A.season);
 		const tb = X.team(B.id!, B.season);
-		const rec = (t: typeof ta) => (t ? `${t.won}-${t.lost}${t.tied ? `-${t.tied}` : ""}${t.otl ? `-${t.otl}` : ""}` : "–");
-		const wp = (t: typeof ta) => (t && t.won + t.lost + t.tied > 0 ? winPct(t.won, t.lost, t.tied) : undefined);
+		const rec = (t: typeof ta) =>
+			t
+				? `${t.won}-${t.lost}${t.tied ? `-${t.tied}` : ""}${t.otl ? `-${t.otl}` : ""}`
+				: "–";
+		const wp = (t: typeof ta) =>
+			t && t.won + t.lost + t.tied > 0
+				? winPct(t.won, t.lost, t.tied)
+				: undefined;
 		rows.push(
 			row("Record", wp(ta), wp(tb), rec(ta), rec(tb)),
-			row("Win %", wp(ta), wp(tb), isNum(wp(ta)) ? fmtWinp(wp(ta)!) : "–", isNum(wp(tb)) ? fmtWinp(wp(tb)!) : "–"),
+			row(
+				"Win %",
+				wp(ta),
+				wp(tb),
+				isNum(wp(ta)) ? fmtWinp(wp(ta)!) : "–",
+				isNum(wp(tb)) ? fmtWinp(wp(tb)!) : "–",
+			),
 		);
-		const mg = (t: typeof ta) => (t && t.gp > 0 ? (t.pts - t.oppPts) / t.gp : undefined);
-		const sg = (v: number | undefined) => (isNum(v) ? `${v >= 0 ? "+" : ""}${fmtNum(v, 1)}` : "–");
-		rows.push(row("Point margin per game", mg(ta), mg(tb), sg(mg(ta)), sg(mg(tb))));
+		const mg = (t: typeof ta) =>
+			t && t.gp > 0 ? (t.pts - t.oppPts) / t.gp : undefined;
+		const sg = (v: number | undefined) =>
+			isNum(v) ? `${v >= 0 ? "+" : ""}${fmtNum(v, 1)}` : "–";
+		rows.push(
+			row("Point margin per game", mg(ta), mg(tb), sg(mg(ta)), sg(mg(tb))),
+		);
 		const fa = finishText(X, A.id!, A.season);
 		const fb = finishText(X, B.id!, B.season);
 		rows.push(row("Playoffs", fa.v, fb.v, fa.t, fb.t));
-		const star = (tid: number, s: number) => [...X.teamLines(tid, s)].sort((x, y) => y.ws - x.ws)[0];
+		const star = (tid: number, s: number) =>
+			[...X.teamLines(tid, s)].sort((x, y) => y.ws - x.ws)[0];
 		const sa = star(A.id!, A.season);
 		const sb = star(B.id!, B.season);
 		rows.push({
@@ -274,21 +317,52 @@ export const statRows = (X: LeagueIndex, A: Side, B: Side): StatRow[] => {
 			better: null,
 		});
 		if (isNum(ta?.payroll) && isNum(tb?.payroll)) {
-			rows.push(row("Payroll", ta!.payroll!, tb!.payroll!, `$${fmtNum(ta!.payroll! / 1000, 1)}M`, `$${fmtNum(tb!.payroll! / 1000, 1)}M`, true));
+			rows.push(
+				row(
+					"Payroll",
+					ta!.payroll!,
+					tb!.payroll!,
+					`$${fmtNum(ta!.payroll! / 1000, 1)}M`,
+					`$${fmtNum(tb!.payroll! / 1000, 1)}M`,
+					true,
+				),
+			);
 		}
 	} else {
 		const champ = (s: number) => {
 			const c = X.champion(s);
 			return c ? X.teamName(c.tid, s) : "–";
 		};
-		rows.push({ label: "Champion", a: champ(A.season), b: champ(B.season), better: null });
-		const mvp = (s: number) => X.awardWinner(s, "Most Valuable Player")?.name ?? "–";
-		rows.push({ label: "MVP", a: mvp(A.season), b: mvp(B.season), better: null });
+		rows.push({
+			label: "Champion",
+			a: champ(A.season),
+			b: champ(B.season),
+			better: null,
+		});
+		const mvp = (s: number) =>
+			X.awardWinner(s, "Most Valuable Player")?.name ?? "–";
+		rows.push({
+			label: "MVP",
+			a: mvp(A.season),
+			b: mvp(B.season),
+			better: null,
+		});
 		const teams = (s: number) => X.teamsIn(s).filter((t) => t.gp > 0);
 		const na = teams(A.season).length;
 		const nb = teams(B.season).length;
-		rows.push(row("Teams", na || undefined, nb || undefined, N(na || undefined), N(nb || undefined)));
-		const best = (s: number) => [...teams(s)].sort((x, y) => winPct(y.won, y.lost, y.tied) - winPct(x.won, x.lost, x.tied))[0];
+		rows.push(
+			row(
+				"Teams",
+				na || undefined,
+				nb || undefined,
+				N(na || undefined),
+				N(nb || undefined),
+			),
+		);
+		const best = (s: number) =>
+			[...teams(s)].sort(
+				(x, y) => winPct(y.won, y.lost, y.tied) - winPct(x.won, x.lost, x.tied),
+			)[0];
 		const ba = best(A.season);
 		const bb = best(B.season);
 		rows.push(
@@ -305,8 +379,17 @@ export const statRows = (X: LeagueIndex, A: Side, B: Side): StatRow[] => {
 			const g = ts.reduce((a, t) => a + t.gp, 0);
 			return g > 0 ? ts.reduce((a, t) => a + t.pts, 0) / g : undefined;
 		};
-		rows.push(row("Points per team per game", ppg(A.season), ppg(B.season), N(ppg(A.season), 1), N(ppg(B.season), 1)));
-		const lead = (s: number) => [...X.qualified(s)].sort((x, y) => y.ppg - x.ppg)[0];
+		rows.push(
+			row(
+				"Points per team per game",
+				ppg(A.season),
+				ppg(B.season),
+				N(ppg(A.season), 1),
+				N(ppg(B.season), 1),
+			),
+		);
+		const lead = (s: number) =>
+			[...X.qualified(s)].sort((x, y) => y.ppg - x.ppg)[0];
 		const la = lead(A.season);
 		const lb = lead(B.season);
 		rows.push({

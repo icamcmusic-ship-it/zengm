@@ -925,7 +925,15 @@ export const retireStories = (c: Ctx): Article[] => {
 				honors.length
 					? P(`${poss(top.name)} résumé: ${honors.join(", ")}.`)
 					: P(`He piled up ${fmt1(top.ws)} career win shares.`),
-				top.hof ? P(c.cycle("hof-line", [`${top.name} has already been voted into the Hall of Fame.`, `The Hall of Fame vote is already in: ${top.name} is a member.`, `${top.name}, age ${top.age}, goes into the record books and the Hall of Fame at once.`])) : P(""),
+				top.hof
+					? P(
+							c.cycle("hof-line", [
+								`${top.name} has already been voted into the Hall of Fame.`,
+								`The Hall of Fame vote is already in: ${top.name} is a member.`,
+								`${top.name}, age ${top.age}, goes into the record books and the Hall of Fame at once.`,
+							]),
+						)
+					: P(""),
 			],
 		},
 	];

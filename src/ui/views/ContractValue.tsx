@@ -137,7 +137,11 @@ const SeasonsTable = ({
 	const data = rows.map((r) => ({
 		key: `${r.pid}-${r.season}`,
 		data: [
-			{ value: playerLink(r.pid, r.name), sortValue: r.name, searchValue: r.name },
+			{
+				value: playerLink(r.pid, r.name),
+				sortValue: r.name,
+				searchValue: r.name,
+			},
 			r.season,
 			{ value: teamLink(r.tid, r.season), sortValue: abbrev(r.tid) },
 			{ value: money(r.amount), sortValue: r.amount },
@@ -195,7 +199,10 @@ const DealsTable = ({
 		col("Years", { sortType: "number" }),
 		col("Deal", { sortSequence: ["asc", "desc"] }),
 		col("Per year", { sortType: "number" }),
-		col("Paid", { sortType: "number", desc: "Paid so far (completed seasons)" }),
+		col("Paid", {
+			sortType: "number",
+			desc: "Paid so far (completed seasons)",
+		}),
 		col("WS", { sortType: "number" }),
 		col("WS/$M", { sortType: "number" }),
 		col("Surplus", { sortType: "number" }),
@@ -205,7 +212,10 @@ const DealsTable = ({
 		}),
 		...(cost
 			? [
-					col("Dead $", { sortType: "number", desc: "Paid or owed after he was released" }),
+					col("Dead $", {
+						sortType: "number",
+						desc: "Paid or owed after he was released",
+					}),
 					col("Over value", {
 						sortType: "number",
 						desc: "Paid beyond what the same win shares cost at the league rate, plus dead money",
@@ -216,7 +226,11 @@ const DealsTable = ({
 	const data = deals.map((c) => ({
 		key: `${c.pid}-${c.start}`,
 		data: [
-			{ value: playerLink(c.pid, c.name), sortValue: c.name, searchValue: c.name },
+			{
+				value: playerLink(c.pid, c.name),
+				sortValue: c.name,
+				searchValue: c.name,
+			},
 			c.tids.map(abbrev).join(" "),
 			{
 				value: (
@@ -258,7 +272,13 @@ const DealsTable = ({
 		],
 	}));
 	const sortCol =
-		metric === "cost" ? 11 : metric === "surplus" ? 8 : metric === "perM" ? 7 : 9;
+		metric === "cost"
+			? 11
+			: metric === "surplus"
+				? 8
+				: metric === "perM"
+					? 7
+					: 9;
 	return (
 		<DataTable
 			cols={cols}
@@ -321,7 +341,11 @@ const ContractValue = (props: View<"contractValue">) => {
 		(season !== "all" ? ` in ${season}` : "");
 
 	const metricPicker = (
-		<div className="btn-group mb-2 flex-wrap" role="group" aria-label="Value measure">
+		<div
+			className="btn-group mb-2 flex-wrap"
+			role="group"
+			aria-label="Value measure"
+		>
 			{METRICS.map((m) => (
 				<button
 					key={m.id}
@@ -408,7 +432,12 @@ const ContractValue = (props: View<"contractValue">) => {
 				/>
 			</>
 		);
-	} else if (tab === "dead" && props.deadTeams && props.deadGroups && props.deadTotals) {
+	} else if (
+		tab === "dead" &&
+		props.deadTeams &&
+		props.deadGroups &&
+		props.deadTotals
+	) {
 		const t = props.deadTotals;
 		body =
 			props.deadGroups.length === 0 && props.deadTeams.length === 0 ? (
@@ -416,9 +445,20 @@ const ContractValue = (props: View<"contractValue">) => {
 			) : (
 				<>
 					<div className="d-flex flex-wrap gap-4 mb-3">
-						<Stat label="Releases with money owed" value={t.releases.toLocaleString()} />
-						<Stat label="Dead money paid" value={money(t.paid)} sub={`through ${lastDone}`} />
-						<Stat label="Still owed" value={money(t.owed)} sub="this season and later" />
+						<Stat
+							label="Releases with money owed"
+							value={t.releases.toLocaleString()}
+						/>
+						<Stat
+							label="Dead money paid"
+							value={money(t.paid)}
+							sub={`through ${lastDone}`}
+						/>
+						<Stat
+							label="Still owed"
+							value={money(t.owed)}
+							sub="this season and later"
+						/>
 					</div>
 					<h2>Dead money by team</h2>
 					<DataTable
@@ -441,8 +481,8 @@ const ContractValue = (props: View<"contractValue">) => {
 											<>
 												<b>{money(r.owed)}</b>
 												<div className="small text-body-secondary">
-													{r.owedPlayers} player{r.owedPlayers === 1 ? "" : "s"}, through{" "}
-													{r.lastOwed}
+													{r.owedPlayers} player{r.owedPlayers === 1 ? "" : "s"}
+													, through {r.lastOwed}
 												</div>
 											</>
 										) : (
@@ -483,7 +523,9 @@ const ContractValue = (props: View<"contractValue">) => {
 										<>
 											{g.season}
 											{g.owed ? (
-												<span className="badge text-bg-secondary ms-1">owed</span>
+												<span className="badge text-bg-secondary ms-1">
+													owed
+												</span>
 											) : null}
 										</>
 									),
@@ -491,7 +533,8 @@ const ContractValue = (props: View<"contractValue">) => {
 								},
 								{ value: <b>{money(g.total)}</b>, sortValue: g.total },
 								{
-									value: g.share === null ? "–" : `${(100 * g.share).toFixed(1)}%`,
+									value:
+										g.share === null ? "–" : `${(100 * g.share).toFixed(1)}%`,
 									sortValue: g.share,
 								},
 								{
@@ -501,7 +544,9 @@ const ContractValue = (props: View<"contractValue">) => {
 												<span key={p.pid}>
 													{i > 0 ? ", " : null}
 													{playerLink(p.pid, p.name)}{" "}
-													<span className="text-body-secondary">{money(p.amount)}</span>
+													<span className="text-body-secondary">
+														{money(p.amount)}
+													</span>
 												</span>
 											))}
 										</>
@@ -529,9 +574,21 @@ const ContractValue = (props: View<"contractValue">) => {
 								value={helpers.ordinal(mine.rank)}
 								sub={`of ${rows.length} teams${season !== "all" ? ` in ${season}` : ""}`}
 							/>
-							<Stat label="Value index" value={<IndexCell v={mine.index} />} sub="100 = league rate" />
-							<Stat label="Paid" value={money(mine.payroll)} sub={`${mine.seasons} season${mine.seasons === 1 ? "" : "s"}`} />
-							<Stat label="Win shares bought" value={n1(mine.ws)} sub={`${sgn(mine.surplus)} vs the league rate`} />
+							<Stat
+								label="Value index"
+								value={<IndexCell v={mine.index} />}
+								sub="100 = league rate"
+							/>
+							<Stat
+								label="Paid"
+								value={money(mine.payroll)}
+								sub={`${mine.seasons} season${mine.seasons === 1 ? "" : "s"}`}
+							/>
+							<Stat
+								label="Win shares bought"
+								value={n1(mine.ws)}
+								sub={`${sgn(mine.surplus)} vs the league rate`}
+							/>
 						</div>
 					) : null}
 					<h2>
@@ -548,14 +605,23 @@ const ContractValue = (props: View<"contractValue">) => {
 						cols={[
 							col("#", { sortType: "number" }),
 							col("Team", { sortSequence: ["asc", "desc"] }),
-							col("Value", { sortType: "number", desc: "Value index (100 = league rate)" }),
+							col("Value", {
+								sortType: "number",
+								desc: "Value index (100 = league rate)",
+							}),
 							col("Paid", { sortType: "number" }),
 							col("WS", { sortType: "number" }),
-							col("vs rate", { sortType: "number", desc: "Win shares above what the league rate buys with that payroll" }),
+							col("vs rate", {
+								sortType: "number",
+								desc: "Win shares above what the league rate buys with that payroll",
+							}),
 							col("Dead $", { sortType: "number" }),
 							col("Win%", { sortType: "number" }),
 							...(season === "all"
-								? [col("Seasons", { sortType: "number" }), col("Best / worst year", { sortSequence: [] })]
+								? [
+										col("Seasons", { sortType: "number" }),
+										col("Best / worst year", { sortSequence: [] }),
+									]
 								: []),
 						]}
 						defaultSort={[2, "desc"]}
@@ -571,7 +637,11 @@ const ContractValue = (props: View<"contractValue">) => {
 								{ value: n1(r.ws), sortValue: r.ws },
 								{
 									value: (
-										<span className={r.surplus >= 0 ? "text-success" : "text-danger"}>
+										<span
+											className={
+												r.surplus >= 0 ? "text-success" : "text-danger"
+											}
+										>
 											{sgn(r.surplus)}
 										</span>
 									),
@@ -625,7 +695,10 @@ const ContractValue = (props: View<"contractValue">) => {
 										{ value: <IndexCell v={t.index} />, sortValue: t.index },
 										{ value: money(t.payroll), sortValue: t.payroll },
 										{ value: n1(t.ws), sortValue: t.ws },
-										{ value: t.dead > 0 ? money(t.dead) : "–", sortValue: t.dead },
+										{
+											value: t.dead > 0 ? money(t.dead) : "–",
+											sortValue: t.dead,
+										},
 										{
 											value: t.won === null ? "–" : `${t.won}-${t.lost}`,
 											sortValue: t.won,
@@ -659,8 +732,8 @@ const ContractValue = (props: View<"contractValue">) => {
 					<h2>Biggest bargain of each season{filterText}</h2>
 					<p className="text-body-secondary small">
 						The player-season with the most win shares above what the league
-						rate buys for his salary, and the worst big-money season (top 15%
-						of salaries).
+						rate buys for his salary, and the worst big-money season (top 15% of
+						salaries).
 					</p>
 					<DataTable
 						cols={[
@@ -724,9 +797,21 @@ const ContractValue = (props: View<"contractValue">) => {
 			) : (
 				<>
 					<div className="d-flex flex-wrap gap-4 mb-3">
-						<Stat label="Albatross contracts" value={list.length.toLocaleString()} sub="top 20% salaries, under the league rate" />
-						<Stat label="Money over value" value={money(props.albatrossTotal)} sub="paid beyond what the production was worth" />
-						<Stat label="Worst" value={playerLink(list[0]!.pid, list[0]!.name)} sub={money(list[0]!.cost)} />
+						<Stat
+							label="Albatross contracts"
+							value={list.length.toLocaleString()}
+							sub="top 20% salaries, under the league rate"
+						/>
+						<Stat
+							label="Money over value"
+							value={money(props.albatrossTotal)}
+							sub="paid beyond what the production was worth"
+						/>
+						<Stat
+							label="Worst"
+							value={playerLink(list[0]!.pid, list[0]!.name)}
+							sub={money(list[0]!.cost)}
+						/>
 					</div>
 					<p className="text-body-secondary small">
 						Big deals ranked by money over value: what was paid beyond what the
@@ -750,20 +835,36 @@ const ContractValue = (props: View<"contractValue">) => {
 			col("Last year", { sortType: "number" }),
 			col("Age", { sortType: "number" }),
 			col("Deal", { sortType: "number" }),
-			col("Before", { sortType: "number", desc: "WS/48 in the deal's earlier seasons" }),
-			col("Contract yr", { sortType: "number", desc: "WS/48 in the last season of the deal" }),
+			col("Before", {
+				sortType: "number",
+				desc: "WS/48 in the deal's earlier seasons",
+			}),
+			col("Contract yr", {
+				sortType: "number",
+				desc: "WS/48 in the last season of the deal",
+			}),
 			col("Change", { sortType: "number" }),
-			col("Next yr", { sortType: "number", desc: "WS/48 the season after (the new deal)" }),
+			col("Next yr", {
+				sortType: "number",
+				desc: "WS/48 the season after (the new deal)",
+			}),
 		];
 		const toRows = (rows: typeof r.jumps) =>
 			rows.map((x) => ({
 				key: `${x.deal.pid}-${x.season}`,
 				data: [
-					{ value: playerLink(x.deal.pid, x.deal.name), sortValue: x.deal.name, searchValue: x.deal.name },
+					{
+						value: playerLink(x.deal.pid, x.deal.name),
+						sortValue: x.deal.name,
+						searchValue: x.deal.name,
+					},
 					{ value: teamLink(x.tid, x.season), sortValue: abbrev(x.tid) },
 					x.season,
 					x.age,
-					{ value: `${money(x.deal.amount)} × ${x.deal.years}`, sortValue: x.deal.years },
+					{
+						value: `${money(x.deal.amount)} × ${x.deal.years}`,
+						sortValue: x.deal.years,
+					},
 					{ value: f3(x.before), sortValue: x.before },
 					{ value: f3(x.final), sortValue: x.final },
 					{
@@ -786,13 +887,21 @@ const ContractValue = (props: View<"contractValue">) => {
 			) : (
 				<>
 					<div className="d-flex flex-wrap gap-4 mb-3">
-						<Stat label="Contract years" value={r.n.toLocaleString()} sub="last seasons of multi-year deals" />
+						<Stat
+							label="Contract years"
+							value={r.n.toLocaleString()}
+							sub="last seasons of multi-year deals"
+						/>
 						<Stat
 							label="Better than the deal's earlier years"
 							value={`${Math.round((100 * r.up) / r.n)}%`}
 							sub={`${r.up} of ${r.n}`}
 						/>
-						<Stat label="WS/48" value={`${f3(r.meanBefore)} → ${f3(r.meanFinal)}`} sub="earlier years → contract year" />
+						<Stat
+							label="WS/48"
+							value={`${f3(r.meanBefore)} → ${f3(r.meanFinal)}`}
+							sub="earlier years → contract year"
+						/>
 						{r.nAfter > 0 ? (
 							<Stat
 								label="The season after"
@@ -809,9 +918,23 @@ const ContractValue = (props: View<"contractValue">) => {
 						is signed.
 					</p>
 					<h2>Biggest contract-year jumps</h2>
-					<DataTable cols={cols} defaultSort={[7, "desc"]} name="ContractValueCyJumps" pagination={r.jumps.length > 15} rows={toRows(r.jumps)} small />
+					<DataTable
+						cols={cols}
+						defaultSort={[7, "desc"]}
+						name="ContractValueCyJumps"
+						pagination={r.jumps.length > 15}
+						rows={toRows(r.jumps)}
+						small
+					/>
 					<h2 className="mt-3">Biggest contract-year slumps</h2>
-					<DataTable cols={cols} defaultSort={[7, "asc"]} name="ContractValueCySlumps" pagination={r.slumps.length > 15} rows={toRows(r.slumps)} small />
+					<DataTable
+						cols={cols}
+						defaultSort={[7, "asc"]}
+						name="ContractValueCySlumps"
+						pagination={r.slumps.length > 15}
+						rows={toRows(r.slumps)}
+						small
+					/>
 				</>
 			);
 	}
@@ -819,12 +942,17 @@ const ContractValue = (props: View<"contractValue">) => {
 	return (
 		<>
 			<p>
-				What teams paid their players against the regular-season win shares
-				they got back. The league rate is the win shares per dollar the whole
-				league got that season
-				{props.rate !== null ? ` (${props.rate.toFixed(2)} WS per $1M in ${season})` : ""}
+				What teams paid their players against the regular-season win shares they
+				got back. The league rate is the win shares per dollar the whole league
+				got that season
+				{props.rate !== null
+					? ` (${props.rate.toFixed(2)} WS per $1M in ${season})`
+					: ""}
 				; a value index of 100 is that rate. Only completed seasons count
-				{lastDone < currentSeason ? ` (${currentSeason} is still being played)` : ""}.
+				{lastDone < currentSeason
+					? ` (${currentSeason} is still being played)`
+					: ""}
+				.
 				{unknownCount > 0
 					? ` ${unknownCount.toLocaleString()} player-season${unknownCount === 1 ? "" : "s"} with no win shares on record ${unknownCount === 1 ? "is" : "are"} left out (unknown, not zero).`
 					: null}{" "}
@@ -835,7 +963,12 @@ const ContractValue = (props: View<"contractValue">) => {
 					<li key={t.id} className="nav-item">
 						<a
 							className={`nav-link${t.id === tab ? " active" : ""}`}
-							href={helpers.leagueUrl(["contract_value", t.id, teamUrl, String(season)])}
+							href={helpers.leagueUrl([
+								"contract_value",
+								t.id,
+								teamUrl,
+								String(season),
+							])}
 						>
 							{t.label}
 						</a>

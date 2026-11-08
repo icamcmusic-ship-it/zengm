@@ -397,7 +397,12 @@ export type NewsFacts = {
 	then?: { year: number; list: NPThen[] };
 	careerBoard?: NPCareerRow[];
 	// Counts for the transaction wire
-	wire?: { trades: number; freeAgents: number; reSigned: number; releases: number };
+	wire?: {
+		trades: number;
+		freeAgents: number;
+		reSigned: number;
+		releases: number;
+	};
 	// This season's draft lottery, in the order before it (worst team first)
 	lottery?: NPLotteryRow[];
 	// Players released this season

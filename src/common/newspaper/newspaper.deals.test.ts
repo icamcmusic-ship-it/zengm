@@ -9,7 +9,8 @@ import { ruleOf } from "./vary.ts";
 const EDITIONS: EditionId[] = ["preseason", "midseason", "playoffs", "final"];
 const BAD = /undefined|NaN|\[object|Infinity|\bnull\b/;
 
-const types = (p: Paper) => p.sections.flatMap((s) => s.articles.map((a) => a.type ?? a.id));
+const types = (p: Paper) =>
+	p.sections.flatMap((s) => s.articles.map((a) => a.type ?? a.id));
 
 // A league in its first preseason: no history, no stats, no transactions
 const brandNew = (season = 2005): NewsFacts => {
@@ -17,7 +18,13 @@ const brandNew = (season = 2005): NewsFacts => {
 	return {
 		...f,
 		firstSeason: season,
-		teams: f.teams.map((t) => ({ ...t, hist: [], prev: undefined, titles: [], firstSeason: season })),
+		teams: f.teams.map((t) => ({
+			...t,
+			hist: [],
+			prev: undefined,
+			titles: [],
+			firstSeason: season,
+		})),
 		players: f.players.map((p) => ({
 			...p,
 			career: undefined,
@@ -58,7 +65,11 @@ describe("front-office and preview pages", () => {
 				assert.notMatch(paperText(p), BAD, `${ed} ${season}`);
 				if (season % 5 === 0) {
 					for (const tid of [0, 4]) {
-						assert.notMatch(paperText(buildPaper(f, tid)), BAD, `${ed} ${season} ${tid}`);
+						assert.notMatch(
+							paperText(buildPaper(f, tid)),
+							BAD,
+							`${ed} ${season} ${tid}`,
+						);
 					}
 				}
 			}
@@ -71,11 +82,17 @@ describe("front-office and preview pages", () => {
 		const rules = new Set<string>();
 		for (const ed of EDITIONS) {
 			for (let season = 2008; season < 2034; season++) {
-				const p = buildPaper(makeFixture(ed, season), undefined, { vary: false });
+				const p = buildPaper(makeFixture(ed, season), undefined, {
+					vary: false,
+				});
 				for (const s of p.sections) {
 					for (const a of s.articles) {
 						const b = a.body[0];
-						if (b?.type === "p" && b.segs.length === 1 && typeof b.segs[0] === "string") {
+						if (
+							b?.type === "p" &&
+							b.segs.length === 1 &&
+							typeof b.segs[0] === "string"
+						) {
 							const r = ruleOf(segsText(b.segs));
 							if (r) {
 								rules.add(r);
@@ -86,7 +103,18 @@ describe("front-office and preview pages", () => {
 			}
 		}
 		assert.isAtLeast(rules.size, 20, [...rules].join(","));
-		for (const id of ["deadline-lead", "deadline", "wire-contracts", "contracts-best", "contracts-paid", "draft-top", "ledger", "ledger-net", "drought", "franchise-wins"]) {
+		for (const id of [
+			"deadline-lead",
+			"deadline",
+			"wire-contracts",
+			"contracts-best",
+			"contracts-paid",
+			"draft-top",
+			"ledger",
+			"ledger-net",
+			"drought",
+			"franchise-wins",
+		]) {
 			assert.ok(rules.has(id), id);
 		}
 	});
@@ -101,7 +129,10 @@ describe("front-office and preview pages", () => {
 				for (let j = 0; j < a.sections[i]!.articles.length; j++) {
 					const x = a.sections[i]!.articles[j]!;
 					const y = b.sections[i]!.articles[j]!;
-					if (DEAL_PAGE_IDS.includes(x.type ?? "") && JSON.stringify(x.body[0]) !== JSON.stringify(y.body[0])) {
+					if (
+						DEAL_PAGE_IDS.includes(x.type ?? "") &&
+						JSON.stringify(x.body[0]) !== JSON.stringify(y.body[0])
+					) {
 						changed += 1;
 					}
 				}
@@ -120,9 +151,15 @@ describe("front-office and preview pages", () => {
 			const t = types(p);
 			const preview = t.filter((x) => x.startsWith("preview-"));
 			assert.isAtLeast(preview.length, 4, t.join(","));
-			assert.isAtLeast(p.sections.reduce((a, s) => a + s.articles.length, 0), 15);
+			assert.isAtLeast(
+				p.sections.reduce((a, s) => a + s.articles.length, 0),
+				15,
+			);
 			// Facts only: no results claimed
-			assert.notMatch(text, /\b(won|beat|defeated) the \d{4}\b|champions? in \d{4}/);
+			assert.notMatch(
+				text,
+				/\b(won|beat|defeated) the \d{4}\b|champions? in \d{4}/,
+			);
 		}
 	});
 

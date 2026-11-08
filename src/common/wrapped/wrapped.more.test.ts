@@ -164,7 +164,13 @@ describe("decks with the extra topics", () => {
 		const X3 = new LeagueIndex(L3);
 		const ids = new Set<string>();
 		for (let pid = 0; pid < 80; pid += 2) {
-			for (const s of candidates({ X: X3, mode: "player", season: L3.season, pid, soFar: false })) {
+			for (const s of candidates({
+				X: X3,
+				mode: "player",
+				season: L3.season,
+				pid,
+				soFar: false,
+			})) {
 				expect(isBadText(JSON.stringify(s))).toBe(false);
 				ids.add(s.id);
 			}

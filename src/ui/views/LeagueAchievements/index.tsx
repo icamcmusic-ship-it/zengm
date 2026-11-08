@@ -310,8 +310,8 @@ const Summary = ({ data }: { data: LoadedData }) => {
 							})}
 						</div>
 						<div className="small text-body-secondary mt-2">
-							Counting the league’s own seasons from {data.own}. Rarity is
-							calibrated on real NBA history.
+							Counting the league’s own seasons from {data.own}. Rarity is how
+							often a tier happens in simulated random-players leagues.
 						</div>
 					</div>
 				</div>

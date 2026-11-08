@@ -229,9 +229,7 @@ const toWPlayer = (p: Player): WPlayer => ({
 		// When and by whom it was signed: the signing transaction, or the draft for a rookie contract
 		const tr =
 			c.eid !== undefined
-				? (p.transactions ?? []).find(
-						(t) => "eid" in t && t.eid === c.eid,
-					)
+				? (p.transactions ?? []).find((t) => "eid" in t && t.eid === c.eid)
 				: undefined;
 		const payTid = c.payments?.find((x) => x.tid >= 0)?.tid;
 		return {
@@ -868,10 +866,7 @@ const loadTrades = async (
 	for (let s = g.get("startingSeason"); s <= currentSeason; s++) {
 		const count = inCache(s)
 			? undefined
-			: await idb.league
-					.transaction("events")
-					.store.index("season")
-					.count(s);
+			: await idb.league.transaction("events").store.index("season").count(s);
 		const e = c.trades.get(s);
 		let list: WTrade[];
 		if (

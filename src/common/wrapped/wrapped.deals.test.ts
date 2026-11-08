@@ -31,7 +31,12 @@ const subjects = (mode: WrappedMode) => {
 const fire = (mode: WrappedMode, x = X) => {
 	const slides: Slide[] = [];
 	for (const sub of subjects(mode)) {
-		const ctx = { X: x, mode, soFar: mode !== "all" && !x.decided(sub.season), ...sub };
+		const ctx = {
+			X: x,
+			mode,
+			soFar: mode !== "all" && !x.decided(sub.season),
+			...sub,
+		};
 		for (const t of DEAL_TOPICS[mode]) {
 			const r = t(ctx);
 			slides.push(...(Array.isArray(r) ? r : r ? [r] : []));
@@ -49,13 +54,17 @@ describe("front-office topics", () => {
 			for (const id of mine) {
 				ids.add(id);
 			}
-			expect(mine.size).toBeGreaterThanOrEqual({ season: 25, team: 25, player: 15, all: 20 }[mode]);
+			expect(mine.size).toBeGreaterThanOrEqual(
+				{ season: 25, team: 25, player: 15, all: 20 }[mode],
+			);
 			for (const s of slides) {
 				expect(isClean(s), s.id).toBe(true);
 				expect(isBadText(JSON.stringify(s)), s.id).toBe(false);
 				expect(s.score, s.id).toBeGreaterThanOrEqual(0);
 				expect(s.score, s.id).toBeLessThanOrEqual(1);
-				expect(JSON.stringify(s), s.id).not.toMatch(/\b1 (seasons|trades|players|picks|teams)\b| {2}/);
+				expect(JSON.stringify(s), s.id).not.toMatch(
+					/\b1 (seasons|trades|players|picks|teams)\b| {2}/,
+				);
 			}
 		});
 	}
@@ -72,7 +81,9 @@ describe("front-office topics", () => {
 				for (const f of s.facts ?? []) {
 					const m = /^trade\|(\d+)$/.exec(f);
 					if (m) {
-						expect(byEid.get(Number(m[1]))!.season, s.id).toBeLessThanOrEqual(season);
+						expect(byEid.get(Number(m[1]))!.season, s.id).toBeLessThanOrEqual(
+							season,
+						);
 					}
 				}
 			}
@@ -94,7 +105,9 @@ describe("front-office topics", () => {
 	test("the champion's trade slide is a spoiler", () => {
 		let seen = 0;
 		for (const season of X.decidedSeasons()) {
-			const s = candidates({ X, mode: "season", season, soFar: false }).find((x) => x.id === "s-d-champ");
+			const s = candidates({ X, mode: "season", season, soFar: false }).find(
+				(x) => x.id === "s-d-champ",
+			);
 			if (s) {
 				seen += 1;
 				expect(s.spoiler, `${season}`).toBe(true);
@@ -106,7 +119,29 @@ describe("front-office topics", () => {
 	test("in-progress season: nothing that needs the season to be over", () => {
 		const L2 = { ...makeRichLeague(8), currentComplete: false };
 		const X2 = new LeagueIndex(L2);
-		const done = ["s-d-best", "s-d-deadline", "s-d-champ", "s-d-allstar", "s-fa-best", "s-fa-bust", "s-ct-year", "s-ct-dip", "s-ct-rookie", "t-d-ledger", "t-d-best", "t-d-worst", "t-d-acquired", "t-d-departed", "t-fa-best", "p-d-cost", "p-ct-year", "p-ct-rookie", "s-cheapstar", "s-toppaid", "p-perdollar"];
+		const done = [
+			"s-d-best",
+			"s-d-deadline",
+			"s-d-champ",
+			"s-d-allstar",
+			"s-fa-best",
+			"s-fa-bust",
+			"s-ct-year",
+			"s-ct-dip",
+			"s-ct-rookie",
+			"t-d-ledger",
+			"t-d-best",
+			"t-d-worst",
+			"t-d-acquired",
+			"t-d-departed",
+			"t-fa-best",
+			"p-d-cost",
+			"p-ct-year",
+			"p-ct-rookie",
+			"s-cheapstar",
+			"s-toppaid",
+			"p-perdollar",
+		];
 		for (const mode of ["season", "team", "player"] as const) {
 			for (const s of fire(mode, X2).filter((x) => x.season === L2.season)) {
 				expect(done, s.id).not.toContain(s.id);
@@ -122,7 +157,14 @@ describe("front-office topics", () => {
 			["all", {}],
 		] as const) {
 			const a = buildDeck(L, { mode, season: L.season - 2, ...extra, n: 30 });
-			expect(buildDeck(makeRichLeague(12), { mode, season: L.season - 2, ...extra, n: 30 })).toEqual(a);
+			expect(
+				buildDeck(makeRichLeague(12), {
+					mode,
+					season: L.season - 2,
+					...extra,
+					n: 30,
+				}),
+			).toEqual(a);
 			const groups = new Map<string, number>();
 			for (const s of a.slides) {
 				groups.set(s.group, (groups.get(s.group) ?? 0) + 1);
