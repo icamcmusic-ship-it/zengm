@@ -1,3 +1,4 @@
+import type { LeagueEnv } from "./overseas.ts";
 import { COMPOSITE_WEIGHTS } from "../constants.basketball.ts";
 import { calculateAdvanced } from "./advanced.ts";
 import { clamp, type Rng } from "./rng.ts";
@@ -145,6 +146,9 @@ export type SeasonContext = {
 	// Fraction of the average Division I rotation player's talent this season is against; only a small shift in efficiency
 	era?: number;
 	pos: string;
+	// For a season at a pro club (overseas or G League): the league's pace, minutes and season length, and his age that season
+	proEnv?: LeagueEnv;
+	age?: number;
 };
 
 const emptyBox = (): GameBox => ({
@@ -231,7 +235,16 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const compAdj = -0.0032 * (ctx.strength - 70) * 0.5;
 
 	// Games, availability and minutes
-	const teamGames = Math.round(clamp(rng.normal(34.5, 2.4 * noise), 28, 41));
+	const proEnv = ctx.proEnv;
+	const teamGames = proEnv
+		? Math.round(
+				clamp(
+					rng.normal(proEnv.games, 2 * noise),
+					Math.max(8, proEnv.games - 8),
+					proEnv.games + 8,
+				),
+			)
+		: Math.round(clamp(rng.normal(34.5, 2.4 * noise), 28, 41));
 	let missed =
 		rng.random() < 0.34 ? Math.round(Math.abs(rng.normal(0, 3.5)) + 1) : 0;
 	missed = Math.min(missed, 18);
@@ -241,7 +254,17 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		[-1.8, -0.6, 0.3, 0.7][clamp(c, 0, 3)]! +
 		0.025 * (ratings.endu - 45) +
 		rng.normal(0, 2.3 * noise);
-	const mpg = clamp(mpgBase, 7, 37.5 * (gameMinutes / 40));
+	// A teenager at a pro club does not play college star minutes
+	const proCap = proEnv
+		? (ctx.age ?? 21) <= 20 && proEnv.youthCap !== undefined
+			? proEnv.youthCap
+			: proEnv.mpgCap
+		: Infinity;
+	const mpg = clamp(
+		proEnv ? mpgBase - 6 * (gameMinutes / 40) : mpgBase,
+		7,
+		Math.min(proCap, 37.5 * (gameMinutes / 40)),
+	);
 	const dnp = mpg < 17 ? Math.round(rng.random() * 5) : 0;
 	const gp = Math.max(4, teamGames - missed - dnp);
 	const gs = Math.round(
@@ -253,7 +276,11 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const zUsage = (usageComp - TYPICAL.usage) / TYPICAL.usageSd;
 	const zU = 0.5 * zUsage + 0.5 * z;
 	const usg = clamp(
-		0.262 + 0.038 * zU + 0.0045 * (c - 1.5) + rng.normal(0, 0.02 * noise),
+		0.262 +
+			(proEnv?.usageShift ?? 0) +
+			0.038 * zU +
+			0.0045 * (c - 1.5) +
+			rng.normal(0, 0.02 * noise),
 		0.13,
 		0.37,
 	);
@@ -414,7 +441,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		const box = emptyBox();
 		box.min = m;
 
-		const poss = usg * PACE * t * ln(0.17);
+		const poss = usg * (proEnv?.pace ?? PACE) * t * ln(0.17);
 		box.tov = rng.poisson(poss * tovRate * ln(0.1));
 		const chances = poss * CHANCE_MULT;
 		const fga = Math.max(
@@ -563,6 +590,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	return {
 		season: ctx.season,
 		classIndex: c,
+		age: ctx.age,
 		school: ctx.school,
 		conference: ctx.conference,
 		strength: ctx.strength,

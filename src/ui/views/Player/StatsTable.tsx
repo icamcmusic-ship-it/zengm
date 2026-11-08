@@ -1,3 +1,4 @@
+import { getPreDraftLabel } from "../../../common/collegeStats/overseas.ts";
 import { useState } from "react";
 import type {
 	PlayerAward,
@@ -273,7 +274,8 @@ export const StatsTable = ({
 	const rows = [];
 
 	for (const [i, ps] of collegeRows.entries()) {
-		const teamName = ps.teamName === "" ? "College" : ps.teamName;
+		const label = getPreDraftLabel(ps.teamName);
+		const teamName = ps.teamName === "" ? label : ps.teamName;
 		const psAny = ps as any;
 		rows.push({
 			key: `college-${i}`,
@@ -286,9 +288,9 @@ export const StatsTable = ({
 							{ps.season}{" "}
 							<span
 								className="badge text-bg-secondary fw-normal"
-								title="College season, from before he was drafted. Not part of his career totals."
+								title={`${label === "College" ? "College" : "Pro club"} season, from before he was drafted. Not part of his career totals.`}
 							>
-								College
+								{label}
 							</span>
 						</>
 					),
@@ -296,7 +298,7 @@ export const StatsTable = ({
 				{
 					searchValue: teamName,
 					sortValue: teamName,
-					value: <span title="College">{teamName}</span>,
+					value: <span title={label}>{teamName}</span>,
 				},
 				ps.age,
 				...stats.map((stat) =>

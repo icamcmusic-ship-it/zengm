@@ -1243,10 +1243,10 @@ export const settings: Setting[] = (
 					{
 						category: "Events",
 						key: "generateCollegeStats",
-						name: "Generate College Stats",
+						name: "Auto-generate pre-draft stats & honors",
 						type: "bool",
 						description:
-							"When enabled, each new draft class gets generated college stats and honors for its prospects, shown on their player pages. Pro stats and experience are not affected. You can also do this by hand for any class on the Draft Scouting page.",
+							"When enabled, every draft class gets generated college or overseas (pro club abroad) stats and honors for its prospects: the classes made when the league is created, each new class every season, fantasy/expansion/custom-generated classes, and prospects of imported classes who have none. Shown on player pages tagged College or Overseas. Pro stats and experience are not affected. You can also do this by hand for any class on the Draft Scouting page.",
 					},
 				]
 			: []),

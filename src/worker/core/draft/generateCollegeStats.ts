@@ -145,3 +145,27 @@ export const removeCollegeStats = async (draftYear: number) => {
 	}
 	return { numPlayers };
 };
+
+/**
+ * When the "Auto-generate pre-draft stats & honors" setting is on, give every prospect of every future draft class (or only the given years) who has no pre-draft stats yet his college/overseas stats and honors. Used at league creation, after a class is generated or imported, and for random debuts classes.
+ */
+export const autoGenerateCollegeStats = async (draftYears?: number[]) => {
+	if (__SPORT !== "basketball" || !g.get("generateCollegeStats")) {
+		return;
+	}
+	let years = draftYears;
+	if (!years) {
+		const prospects = await idb.cache.players.indexGetAll(
+			"playersByTid",
+			PLAYER.UNDRAFTED,
+		);
+		years = [...new Set(prospects.map((p) => p.draft.year))];
+	}
+	for (const draftYear of years.sort((a, b) => a - b)) {
+		await generateCollegeStats({
+			draftYear,
+			seed: `${g.get("lid")}-${draftYear}-auto`,
+			onlyMissing: true,
+		});
+	}
+};

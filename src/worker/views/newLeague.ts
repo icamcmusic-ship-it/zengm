@@ -483,10 +483,8 @@ export const getDefaultSettings = () => {
 			defaultGameAttributes,
 			"easterEggPlayers",
 		),
-		generateCollegeStats: unwrapGameAttribute(
-			defaultGameAttributes,
-			"generateCollegeStats",
-		),
+		// On by default for new leagues, while leagues created before this setting existed keep it off (the gameAttributes default)
+		generateCollegeStats: true,
 		fakeAgeProb: unwrapGameAttribute(defaultGameAttributes, "fakeAgeProb"),
 
 		// This can be undefined, but if the setting is ever displayed to the user, it should have a value
