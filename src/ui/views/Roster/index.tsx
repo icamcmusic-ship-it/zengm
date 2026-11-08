@@ -307,6 +307,7 @@ const Roster = ({
 					jerseyNumber: p.stats.jerseyNumber,
 					season,
 					skills: p.ratings.skills,
+					badges: p.ratings.badges,
 					defaultWatch: p.watch,
 					firstName: p.firstName,
 					firstNameShort: p.firstNameShort,

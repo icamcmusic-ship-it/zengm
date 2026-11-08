@@ -401,13 +401,15 @@ const TopStuff = ({
 			</div>
 		);
 	} else {
-		let skills;
+		let ratingsRow;
 		if (season !== undefined) {
-			skills = player.ratings.find((row) => row.season === season)?.skills;
+			ratingsRow = player.ratings.find((row) => row.season === season);
 		}
-		if (!skills) {
-			skills = last(player.ratings).skills;
+		if (!ratingsRow?.skills) {
+			ratingsRow = last(player.ratings);
 		}
+		const skills = ratingsRow.skills;
+		const badges = ratingsRow.badges;
 
 		statusInfo = (
 			<div className="d-flex align-items-center">
@@ -417,6 +419,7 @@ const TopStuff = ({
 				<SkillsBlock
 					className={injured ? undefined : "skills-alone"}
 					skills={skills}
+					badges={badges}
 				/>
 				<WatchBlock
 					className="ms-2"

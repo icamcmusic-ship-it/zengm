@@ -1655,6 +1655,8 @@ type PlayerRatingsPlus = Record<PlayerRatingKey, number> & {
 	pot: number;
 	season: number;
 	skills: string[];
+	// Extended skill badges, basketball only (see common/skillBadges)
+	badges: string[];
 	tid: number | undefined;
 
 	// Not in basketball

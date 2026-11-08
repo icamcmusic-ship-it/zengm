@@ -127,6 +127,13 @@ Unlike the pages above, these work in **all sports** (the trade code is shared).
 - **Storage:** `coaches` object store (key `cid`, index `tid`), included in league export under _All team data_.
 - **For other features:** `src/worker/core/staff/data.ts` has `getTeamCoachStyle(tid)` (for team strategy / game sim later), `getCoachingCarousel(season)`, `getHeadCoachForSeason(tid, season)` and `getCoachAwards(type)`.
 - **Known limits:** no in-game effects yet (style is exposed only). Scouts and trainers are not modeled. With the budget disabled, every team gets the average development effect, as with the slider. Mid-season hires get the whole season's record.
+## Extended skill badges
+
+- **Where:** badges after the original skills in player tables (roster, player ratings, player stats, free agents, draft, draft scouting, trade, trading block, watch list, upcoming free agents, advanced search), the player page header and ratings table. Legend and leaders: Frivolities, Player Rankings, _Skill Badges_ (`/l/:lid/frivolities/skill_badges[/:badge]`).
+- **What:** 25 extra badges computed from current (fuzzed) ratings: 20 positive (Cs catch-and-shoot, Pu off-dribble, Mr mid-range, FT free-throw ace, Fn rim finisher, Dk dunker, Tr transition, FG floor general, Cn connector, Sf ball-secure, Fd foul drawer, St pickpocket, Bk shot blocker, Sw switchable, Pa point-of-attack, Or offensive glass, Ph physical, Af athletic freak, Fit iron lungs, Hi high IQ) and 5 dashed warning flags (Ld liability defender, Pb poor-shooting big, To turnover-prone, Fp foul-prone, Hk hack-a target). Hover for the meaning and threshold. Each is roughly 15-40 players per 30-team league.
+- **Display-only:** not stored in `ratings.skills`, never used by the sim. The pure code is in `src/common/skillBadges/` (definitions, `getSkillBadges`, `badgeScore`) with no UI or play-by-play dependency, so a later traits layer can reuse the composites.
+- **Settings:** _Extended skill badges_ (Off / Compact: up to 3 then +N / All) on the Skill Badges page, stored in this browser; default Compact. Advanced Player Search: Bio field _Badges_ with "contains" (e.g. `Bk`).
+- **Known limits:** cutoffs were calibrated on generated leagues. Clutch and injury-proneness are skipped (not derivable from ratings).
 
 ## Performance
 

@@ -158,7 +158,7 @@ export default defineView({
 					"watch",
 					"awards",
 				],
-				ratings: ["skills", "pos", "season"],
+				ratings: ["skills", "badges", "pos", "season"],
 				stats: ["abbrev", "tid", "jerseyNumber", "season", ...actualStats],
 				tid,
 				statType: playerStatType,
@@ -211,6 +211,7 @@ export default defineView({
 							...pRest,
 							pos: ratings.pos,
 							skills: ratings.skills,
+							badges: ratings.badges,
 						},
 					];
 				});
@@ -242,6 +243,7 @@ export default defineView({
 								...pRest,
 								pos: ratings.pos,
 								skills: ratings.skills,
+								badges: ratings.badges,
 								stats,
 							};
 						});
@@ -276,6 +278,7 @@ export default defineView({
 								...pRest,
 								pos: getBestPos({ ratings, stats: allStats }, tid),
 								skills: undefined,
+								badges: undefined,
 								stats,
 							},
 						];

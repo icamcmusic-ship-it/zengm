@@ -3102,6 +3102,10 @@ const cols: {
 		desc: "Archetype, derived from his ratings",
 		sortType: "string",
 	},
+	Badges: {
+		desc: "Extended skill badges (see Frivolities > Skill Badges)",
+		sortType: "string",
+	},
 	College: {},
 	Compare: {
 		sortSequence: [],

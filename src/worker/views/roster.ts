@@ -240,6 +240,7 @@ export default defineView({
 				"dovr",
 				"dpot",
 				"skills",
+				"badges",
 				"pos",
 				"ovrs",
 			] as const;

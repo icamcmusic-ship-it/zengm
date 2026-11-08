@@ -210,7 +210,7 @@ const Player2 = ({
 										</MaybeBold>
 									) : null,
 								),
-								<SkillsBlock className="skills-alone" skills={r.skills} />,
+								<SkillsBlock className="skills-alone" skills={r.skills} badges={r.badges} />,
 								wrappedSeasonAwards({
 									awards: awardsBySeason.get(r.season),
 									season: r.season,

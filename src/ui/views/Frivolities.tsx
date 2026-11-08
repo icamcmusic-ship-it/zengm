@@ -187,6 +187,16 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 		},
 	],
 	"Player Rankings": [
+		...(__SPORT === "basketball"
+			? ([
+					{
+						urlParts: ["skill_badges"],
+						name: "Skill Badges",
+						description:
+							"Legend of the extended skill badges (Cs, Pu, Bk, Sw and more) with league counts, and the top players for each.",
+					},
+				] as FrivolityInfo[])
+			: []),
 		{
 			urlParts: ["most", "no_ring"],
 			name: "Best Players Without a Ring",

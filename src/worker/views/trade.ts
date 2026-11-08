@@ -110,7 +110,7 @@ export default defineView({
 			"untradable",
 			"jerseyNumber",
 		] as const;
-		const ratings = ["ovr", "pot", "skills", "pos"] as const;
+		const ratings = ["ovr", "pot", "skills", "badges", "pos"] as const;
 		const stats = bySport({
 			baseball: ["gp", "keyStats", "war"],
 			basketball: ["gp", "min", "pts", "trb", "ast", "per"],

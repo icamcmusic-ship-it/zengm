@@ -2535,7 +2535,7 @@ export const augmentOffers = async (offers: TradeTeams[]) => {
 							"jerseyNumber",
 							"draft",
 						],
-						ratings: ["ovr", "pot", "skills", "pos"],
+						ratings: ["ovr", "pot", "skills", "badges", "pos"],
 						stats,
 						season: g.get("season"),
 						tid,

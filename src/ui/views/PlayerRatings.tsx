@@ -111,6 +111,7 @@ const PlayerRatings = ({
 					injury: p.injury,
 					season,
 					skills: p.ratings.skills,
+					badges: p.ratings.badges,
 					jerseyNumber: p.stats.jerseyNumber,
 					defaultWatch: p.watch,
 					firstName: p.firstName,

@@ -28,6 +28,8 @@ type Props = {
 	season?: number;
 
 	skills?: string[];
+	// Extended skill badges, basketball only
+	badges?: string[];
 	style?: {
 		[key: string]: string;
 	};
@@ -156,6 +158,7 @@ export const PlayerNameLabels = (props: Props) => {
 		pos,
 		season,
 		skills,
+		badges,
 		style,
 		tid,
 		defaultWatch,
@@ -250,6 +253,7 @@ export const PlayerNameLabels = (props: Props) => {
 			<InjuryIcon injury={injury} />
 			<SkillsBlock
 				skills={skills}
+				badges={badges}
 				numSkillsBeforeTruncate={numSkillsBeforeTruncate}
 			/>
 			{pid !== undefined ? (

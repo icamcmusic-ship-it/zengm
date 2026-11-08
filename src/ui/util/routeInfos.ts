@@ -210,6 +210,8 @@ export const routeInfos = {
 	"/l/:lid/frivolities/family_trees/:pid": "familyTrees",
 	"/l/:lid/frivolities/economics": "leagueEconomics",
 	"/l/:lid/frivolities/home_court": "homeCourt",
+	"/l/:lid/frivolities/skill_badges": "skillBadges",
+	"/l/:lid/frivolities/skill_badges/:badge": "skillBadges",
 	"/l/:lid/all_star": "allStar",
 	"/l/:lid/all_star/teams": "allStarTeams",
 	"/l/:lid/all_star/teams/:season": "allStarTeams",

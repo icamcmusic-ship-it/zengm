@@ -490,6 +490,45 @@ table {
 	vertical-align: 2%;
 }
 
+// Extended skill badges (common/skillBadges): small tinted chips after the original skills
+.skill-badges {
+	margin-left: 2px;
+	white-space: nowrap;
+}
+.skill-badge {
+	--badge-color: #6c757d;
+	display: inline-block;
+	padding: 0 3px;
+	margin-left: 3px;
+	border: 1px solid color-mix(in srgb, var(--badge-color) 55%, transparent);
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--badge-color) 14%, transparent);
+	color: var(--badge-color);
+	font-weight: 600;
+	line-height: 14px;
+	text-decoration: none;
+	vertical-align: 5%;
+	&.btn {
+		border-width: 1px;
+		box-shadow: none;
+	}
+}
+.skill-badge-shooting { --badge-color: #2f7fd8; }
+.skill-badge-scoring { --badge-color: #d9730d; }
+.skill-badge-playmaking { --badge-color: #1f9d55; }
+.skill-badge-defense { --badge-color: #8e44ad; }
+.skill-badge-rebounding { --badge-color: #a0522d; }
+.skill-badge-physical { --badge-color: #c0392b; }
+.skill-badge-mental { --badge-color: #16899e; }
+.skill-badge-more { --badge-color: #6c757d; }
+// Warning flags: dashed outline, so they read differently from the positive badges
+.skill-badge-flag {
+	--badge-color: #c0392b;
+	border-style: dashed;
+	background: transparent;
+	font-style: italic;
+}
+
 .skills-alone {
 	margin-left: -4px;
 	vertical-align: 2%;

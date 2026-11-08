@@ -54,7 +54,7 @@ export default defineView({
 						"jerseyNumber",
 						"draft",
 					],
-					ratings: ["ovr", "pot", "skills", "pos"],
+					ratings: ["ovr", "pot", "skills", "badges", "pos"],
 					stats,
 					season: g.get("season"),
 					tid: g.get("userTid"),

@@ -194,6 +194,7 @@ const PlayerStats = ({
 					injury: p.injury,
 					season: numericSeason,
 					skills: p.skills,
+					badges: p.badges,
 					jerseyNumber: p.stats.jerseyNumber,
 					defaultWatch: p.watch,
 					firstName: p.firstName,
