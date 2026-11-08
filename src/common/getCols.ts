@@ -1,5 +1,8 @@
 import type { Col } from "../ui/components/DataTable/index.tsx";
 import { bySport } from "./sportFunctions.ts";
+import { TRAIT_DEFINITIONS } from "./playerTraits/definitions.ts";
+import { TRAIT_KEYS } from "./playerTraits/types.ts";
+import { TRAIT_SHORT } from "./playerTraits/ui.ts";
 
 type ColTemp = Omit<Col, "title"> & {
 	title?: string;
@@ -819,6 +822,18 @@ const sportSpecificCols = bySport<{
 		},
 	},
 	basketball: {
+		// Player traits, 0-100 (only shown with the Player Traits setting)
+		...Object.fromEntries(
+			TRAIT_KEYS.map((key) => [
+				`trait:${key}`,
+				{
+					desc: `${TRAIT_DEFINITIONS[key].name} (trait, 0-100)`,
+					sortSequence: ["desc", "asc"],
+					sortType: "number",
+					title: TRAIT_SHORT[key],
+				} satisfies ColTemp,
+			]),
+		),
 		"rating:fg": {
 			desc: "Mid Range",
 			sortSequence: ["desc", "asc"],

@@ -497,16 +497,15 @@ describe("effects: mean-zero scores give no net effect (Monte Carlo)", () => {
 
 describe("scouting", () => {
 	test("prospects are uncertain, better scouting is less so, pros reveal over time", () => {
-		const prospect = (rank: number, key: any) =>
+		const prospect = (level: number, key: any) =>
 			traitUncertainty({
 				key,
 				isProspect: true,
 				experience: 0,
-				scoutingRank: rank,
-				numTeams: 30,
+				scoutingLevel: level,
 			});
-		assert.isBelow(prospect(1, "clutch"), prospect(30, "clutch"));
-		assert.isAbove(prospect(15, "clutch"), prospect(15, "hustle"));
+		assert.isBelow(prospect(100, "clutch"), prospect(1, "clutch"));
+		assert.isAbove(prospect(34, "clutch"), prospect(34, "hustle"));
 		const pro = (experience: number, key: any) =>
 			traitUncertainty({ key, isProspect: false, experience });
 		assert.isAbove(pro(0, "clutch"), pro(1, "clutch"));

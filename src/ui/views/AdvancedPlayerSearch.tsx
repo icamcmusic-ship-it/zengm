@@ -259,9 +259,15 @@ const Filters = ({
 		});
 	};
 
+	const { playerTraits } = useLocal(["playerTraits"]);
+
 	let statTypes = [
 		{ key: "bio", label: "Bio" },
 		{ key: "ratings", label: "Ratings" },
+		...(__SPORT === "basketball" &&
+		(playerTraits || filters.some((filter) => filter.category === "traits"))
+			? [{ key: "traits", label: "Traits" }]
+			: []),
 		...Object.entries(PLAYER_STATS_TABLES).map(([key, info]) => {
 			const label =
 				key === "regular" && __SPORT === "basketball"
@@ -420,9 +426,15 @@ const ShowStatTypes = ({
 }) => {
 	const statTypesAdv = dropdownOptions.statTypesAdv;
 
+	const { playerTraits } = useLocal(["playerTraits"]);
+
 	const allStatTypes = [
 		{ key: "bio", label: "Bio" },
 		{ key: "ratings", label: "Ratings" },
+		...(__SPORT === "basketball" &&
+		(playerTraits || showStatTypes.includes("traits"))
+			? [{ key: "traits", label: "Traits" }]
+			: []),
 		...(__SPORT === "basketball"
 			? [
 					{ key: "regular", label: "Traditional Stats" },
@@ -638,6 +650,13 @@ const AdvancedPlayerSearch = (props: View<"advancedPlayerSearch">) => {
 						return info;
 					}),
 				);
+			} else if (statType === "traits") {
+				uniqueStatTypeInfos.push(
+					...keys.traits.map((key) => {
+						const info = allFilters.traits!.options[key]!;
+						return info;
+					}),
+				);
 			} else {
 				uniqueStatTypeInfos.push(
 					...keys.stats.map((key) => {
@@ -730,6 +749,8 @@ const AdvancedPlayerSearch = (props: View<"advancedPlayerSearch">) => {
 							return value;
 						} else if (info.category === "ratings") {
 							return showRatings ? value : null;
+						} else if (info.category === "traits") {
+							return showRatings ? (value ?? null) : null;
 						} else {
 							if (
 								__SPORT === "basketball" &&

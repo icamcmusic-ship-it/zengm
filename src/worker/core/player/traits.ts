@@ -122,16 +122,16 @@ export type PlayerTraitsForUI = {
 	exactScores?: Record<TraitKey, number>;
 };
 
-// Everything the UI needs about a player's traits. scoutingRank is the user team's scouting budget rank (1 is best). Without God Mode, prospects get estimates with uncertainty and young pros' hidden traits are partly hidden.
+// Everything the UI needs about a player's traits. scoutingLevel is the user team's scouting budget level. Without God Mode, prospects get estimates with uncertainty and young pros' hidden traits are partly hidden.
 export const getPlayerTraitsForUI = (
 	p: TraitPlayer & { pid: number },
 	{
-		scoutingRank,
+		scoutingLevel,
 		season = g.get("season"),
 		godMode = !!g.get("godMode"),
 		includeExact = false,
 	}: {
-		scoutingRank?: number;
+		scoutingLevel?: number;
 		season?: number;
 		godMode?: boolean;
 		includeExact?: boolean;
@@ -151,8 +151,7 @@ export const getPlayerTraitsForUI = (
 				key,
 				isProspect,
 				experience,
-				scoutingRank,
-				numTeams: g.get("numActiveTeams"),
+				scoutingLevel,
 				godMode,
 			}),
 			leagueSeed: getLeagueTraitSeed(),

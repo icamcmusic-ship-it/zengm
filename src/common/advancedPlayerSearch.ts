@@ -6,6 +6,8 @@ import {
 import type { Col } from "../ui/components/DataTable/index.tsx";
 import type { AdvancedPlayerSearchPlayer } from "../worker/api/advancedPlayerSearch.ts";
 import { getNumericStat } from "./statValue.ts";
+import { TRAIT_DEFINITIONS } from "./playerTraits/definitions.ts";
+import { TRAIT_KEYS, type TraitKey } from "./playerTraits/types.ts";
 
 type AdvancedPlayerSearchField = {
 	category: string;
@@ -166,6 +168,21 @@ const allFiltersTemp: Record<
 	},
 };
 
+// Basketball only, and only shown when the Player Traits setting is on. Scores are the 0-100 estimates the user can see.
+if (__SPORT === "basketball") {
+	const traitOptions: Record<string, MinimalAdvancedPlayerSearchField> = {};
+	for (const key of TRAIT_KEYS) {
+		traitOptions[key] = {
+			colKey: `trait:${key}`,
+			valueType: "numeric",
+			getValue: (p) => p.traitScores?.[key],
+			workerFieldOverride: null,
+			colOverrides: { desc: TRAIT_DEFINITIONS[key].name },
+		};
+	}
+	allFiltersTemp.traits = { options: traitOptions };
+}
+
 const processStatsTable = (
 	statsTable: (typeof PLAYER_STATS_TABLES)[string],
 ) => {
@@ -235,7 +252,11 @@ for (const [category, { options }] of Object.entries(allFilters)) {
 }
 
 export const getStatsTableByType = (statTypePlus: string) => {
-	if (statTypePlus === "bio" || statTypePlus === "ratings") {
+	if (
+		statTypePlus === "bio" ||
+		statTypePlus === "ratings" ||
+		statTypePlus === "traits"
+	) {
 		return;
 	}
 
@@ -259,6 +280,9 @@ export const getStatsTableByType = (statTypePlus: string) => {
 };
 
 export const getStats = (statTypePlus: string) => {
+	if (statTypePlus === "traits") {
+		return [...TRAIT_KEYS];
+	}
 	if (statTypePlus === "ratings") {
 		return ["ovr", "pot", ...RATINGS];
 	} else if (statTypePlus === "bio") {
@@ -280,6 +304,7 @@ export const getExtraStatTypeKeys = (
 	const attrs = [];
 	const ratings = [];
 	const stats = [];
+	const traits: TraitKey[] = [];
 
 	for (const statType of showStatTypes) {
 		if (statType === "bio") {
@@ -302,6 +327,8 @@ export const getExtraStatTypeKeys = (
 			}
 		} else if (statType === "ratings") {
 			ratings.push(...RATINGS);
+		} else if (statType === "traits") {
+			traits.push(...TRAIT_KEYS);
 		} else {
 			stats.push(...getStats(statType));
 		}
@@ -311,5 +338,6 @@ export const getExtraStatTypeKeys = (
 		attrs,
 		ratings,
 		stats,
+		traits,
 	};
 };

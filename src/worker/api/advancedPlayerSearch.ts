@@ -21,6 +21,11 @@ import { validateTeam, type SeasonType } from "../util/processInputs.ts";
 import type { processInputs } from "../views/advancedPlayerSearch.ts";
 import { actualPhase } from "../util/actualPhase.ts";
 import { player } from "../core/index.ts";
+import {
+	getTraitScoresByPid,
+	getTraitViewContext,
+} from "../util/playerTraitsView.ts";
+import type { TraitKey } from "../../common/playerTraits/index.ts";
 
 const getPlayers = async (
 	// Ignored if seasonRange is set
@@ -33,6 +38,7 @@ const getPlayers = async (
 	playoffs: SeasonType = "regularSeason",
 	statType: PlayerStatType = "perGame",
 	seasonRange?: [number, number],
+	traitScoresByPid?: Map<number, Record<TraitKey, number>>,
 ) => {
 	let tid: number | undefined;
 	if (tidInput !== undefined && tidInput < 0) {
@@ -102,6 +108,7 @@ const getPlayers = async (
 
 				return {
 					...p,
+					traitScores: traitScoresByPid?.get(p.pid),
 					ratings: maxBy(ratings, (row) => row.ovr) ?? last(ratings),
 					stats: {
 						...totals,
@@ -141,6 +148,7 @@ const getPlayers = async (
 		return [
 			{
 				...p,
+				traitScores: traitScoresByPid?.get(p.pid),
 				// stats can be undefined for a rookie with showRookies and without showNoStats
 				stats: {
 					...p.stats,
@@ -171,6 +179,8 @@ export const advancedPlayerSearch = async ({
 	for (const filter of filters) {
 		if (filter.category === "ratings") {
 			extraRatings.push(filter.key as PlayerRatingAttr);
+		} else if (filter.category === "traits") {
+			// Computed separately, see needTraits
 		} else if (filter.category === "bio") {
 			const filterInfo = allFilters[filter.category]!.options[filter.key];
 			if (filterInfo && filterInfo.workerFieldOverride !== null) {
@@ -191,6 +201,13 @@ export const advancedPlayerSearch = async ({
 	extraAttrs = unique(extraAttrs);
 	extraRatings = unique(extraRatings);
 	extraStats = unique(extraStats);
+
+	// Player traits are only computed when they are filtered on or shown
+	const traitContext = await getTraitViewContext();
+	const needTraits =
+		traitContext.enabled &&
+		(filters.some((filter) => filter.category === "traits") ||
+			showStatTypes.includes("traits"));
 
 	let seasonRange: [number, number] | undefined;
 	if (singleSeason === "totals" && seasonStart !== seasonEnd) {
@@ -247,6 +264,9 @@ export const advancedPlayerSearch = async ({
 		actualSeasonEnd,
 		seasonRangeType,
 	)) {
+		const traitScoresByPid = needTraits
+			? getTraitScoresByPid(players, traitContext)
+			: undefined;
 		const playersFormatted = await getPlayers(
 			// Math.min is for draft prospects in future seasons
 			Math.min(season, seasonEnd),
@@ -258,6 +278,7 @@ export const advancedPlayerSearch = async ({
 			playoffs,
 			statType,
 			seasonRange,
+			traitScoresByPid,
 		);
 
 		for (const p of playersFormatted) {

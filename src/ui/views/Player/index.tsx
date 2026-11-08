@@ -7,6 +7,7 @@ import { getCols } from "../../../common/getCols.ts";
 import type { View } from "../../../common/types.ts";
 import { SeasonIcons } from "../../components/SeasonIcons.tsx";
 import TopStuff from "./TopStuff.tsx";
+import { PlayerTraitsSection } from "./Traits.tsx";
 import { wrappedSalaryPayers } from "./SalaryPayers.tsx";
 import { PLAYER } from "../../../common/constants.ts";
 import HideableSection from "../../components/HideableSection.tsx";
@@ -31,6 +32,7 @@ const Player2 = ({
 	jerseyNumberInfos,
 	leaders,
 	player,
+	playerTraits,
 	randomDebutsForeverPids,
 	ratings,
 	retired,
@@ -216,6 +218,10 @@ const Player2 = ({
 					})}
 				/>
 			</HideableSection>
+
+			{playerTraits && showRatings ? (
+				<PlayerTraitsSection playerTraits={playerTraits} />
+			) : null}
 
 			<div className="row">
 				<div className="col-6 col-md-3">

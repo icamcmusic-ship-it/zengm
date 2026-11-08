@@ -175,6 +175,8 @@ export default defineView({
 					};
 					p.contracts = [];
 					delete p.owedByTids;
+					// A clone is a different person, so he gets his own traits when saved
+					delete p.traits;
 					contractSeasons = undefined;
 				}
 			}
@@ -224,6 +226,14 @@ export default defineView({
 				originalTid,
 				p,
 				playerMoodTraits: g.get("playerMoodTraits"),
+				// For the traits editor (basketball, Player Traits setting on)
+				traitsInfo:
+					__SPORT === "basketball" && g.get("playerTraits")
+						? {
+								leagueSeed: g.get("playerTraitsSeed"),
+								season: g.get("season"),
+							}
+						: undefined,
 				playersRelativesList,
 				teams,
 			};

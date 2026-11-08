@@ -21,6 +21,7 @@ import { helpers } from "../../util/helpers.ts";
 import { showNotification } from "../../util/showNotification.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import RatingsForm from "./RatingsForm.tsx";
+import { TraitsForm } from "./TraitsForm.tsx";
 import { RegenerateBuild } from "./RegenerateBuild.tsx";
 import RelativesForm from "./RelativesForm.tsx";
 import type {
@@ -1604,6 +1605,27 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 							pos={p.pos ?? autoPos}
 							ratingsRow={p.ratings[r]}
 						/>
+
+						{props.traitsInfo ? (
+							<TraitsForm
+								age={props.traitsInfo.season - p.born.year}
+								experience={
+									p.tid === PLAYER.UNDRAFTED
+										? 0
+										: Math.max(0, props.traitsInfo.season - p.draft.year)
+								}
+								leagueSeed={props.traitsInfo.leagueSeed}
+								pid={p.pid}
+								ratings={p.ratings[r] as any}
+								traits={p.traits}
+								onChange={(traits) => {
+									setState((prevState) => ({
+										...prevState,
+										p: { ...prevState.p, traits },
+									}));
+								}}
+							/>
+						) : null}
 
 						<h2>Relatives</h2>
 

@@ -7,8 +7,17 @@ import { last } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
 import { hasPreDraftStats } from "../../common/preDraft.ts";
+import {
+	getTraitViewContext,
+	getTraitsForView,
+	type TraitViewContext,
+} from "../util/playerTraitsView.ts";
 
-const getSeason = async (playersAll: Player[], season: number) => {
+const getSeason = async (
+	playersAll: Player[],
+	season: number,
+	traitContext: TraitViewContext,
+) => {
 	const playersAllFiltered = playersAll.filter((p) => p.draft.year === season);
 	const players = await player.formatAll(playersAllFiltered, {
 		attrs: ["pid", "firstName", "lastName", "age", "valueFuzz", "watch"],
@@ -24,6 +33,14 @@ const getSeason = async (playersAll: Player[], season: number) => {
 		playersAllFiltered.map((p) => [p.pid, p.ratingsBuild?.name]),
 	);
 
+	// Player traits as far as the scouts can tell (estimates), if the setting is on
+	const traitsByPid = new Map(
+		playersAllFiltered.map((p) => [
+			p.pid,
+			getTraitsForView(p, traitContext)?.traits,
+		]),
+	);
+
 	const players2 = addFirstNameShort(
 		players.map((pa, i) => {
 			const ratings = last(pa.ratings);
@@ -35,6 +52,7 @@ const getSeason = async (playersAll: Player[], season: number) => {
 				age: pa.age,
 				watch: pa.watch,
 				build: buildByPid.get(pa.pid),
+				traits: traitsByPid.get(pa.pid),
 
 				// Ratings - just take the only entry
 				ovr: ratings.ovr,
@@ -86,9 +104,10 @@ export default defineView({
 				}
 			}
 
+			const traitContext = await getTraitViewContext();
 			const seasons: Awaited<ReturnType<typeof getSeason>>[] = [];
 			for (let season = firstSeason; season <= maxDraftYear; season++) {
-				seasons.push(await getSeason(players, season));
+				seasons.push(await getSeason(players, season, traitContext));
 			}
 
 			return {

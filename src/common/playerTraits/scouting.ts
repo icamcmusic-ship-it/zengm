@@ -1,3 +1,8 @@
+import {
+	BUDGET_LEVEL_SCALE,
+	DEFAULT_LEVEL,
+	levelToEffect,
+} from "../budgetLevels.ts";
 import { Rng } from "../ratingsBuilds/rng.ts";
 import { TRAIT_DEFINITIONS } from "./definitions.ts";
 import type { TraitKey } from "./types.ts";
@@ -14,16 +19,14 @@ export const traitUncertainty = ({
 	key,
 	isProspect,
 	experience,
-	scoutingRank,
-	numTeams,
+	scoutingLevel,
 	godMode,
 }: {
 	key: TraitKey;
 	isProspect: boolean;
 	experience: number;
-	// 1 is the best scouting budget in the league
-	scoutingRank?: number;
-	numTeams?: number;
+	// The user team's scouting budget level (getLevelLastThree). Default level gives 1x, the best level 0.6x, the worst 1.4x.
+	scoutingLevel?: number;
 	godMode?: boolean;
 }) => {
 	if (godMode) {
@@ -31,10 +34,9 @@ export const traitUncertainty = ({
 	}
 	const hidden = TRAIT_DEFINITIONS[key].visibility === "hidden";
 	if (isProspect) {
-		const teams = Math.max(2, numTeams ?? 30);
-		const rank = Math.min(Math.max(scoutingRank ?? (teams + 1) / 2, 1), teams);
-		// Best scouting 0.6x, worst 1.4x
-		const mult = 0.6 + (0.8 * (rank - 1)) / (teams - 1);
+		const effect =
+			levelToEffect(scoutingLevel ?? DEFAULT_LEVEL) / BUDGET_LEVEL_SCALE;
+		const mult = Math.max(0.6, Math.min(1.4, 1 - 0.4 * effect));
 		return (hidden ? PROSPECT_SD_HIDDEN : PROSPECT_SD_VISIBLE) * mult;
 	}
 	if (!hidden) {

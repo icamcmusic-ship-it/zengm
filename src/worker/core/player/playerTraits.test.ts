@@ -261,7 +261,7 @@ describe("generation, settings and storage", () => {
 			pid: 11,
 		};
 		const ui = player.getPlayerTraitsForUI(prospect, {
-			scoutingRank: 15,
+			scoutingLevel: 34,
 			godMode: false,
 			includeExact: true,
 		})!;
@@ -273,7 +273,7 @@ describe("generation, settings and storage", () => {
 		// Same reading every time
 		assert.deepStrictEqual(
 			player.getPlayerTraitsForUI(prospect, {
-				scoutingRank: 15,
+				scoutingLevel: 34,
 				godMode: false,
 			})!.scores,
 			ui.scores,
