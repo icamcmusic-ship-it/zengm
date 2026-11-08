@@ -7,8 +7,13 @@ import { PLAYER } from "../../common/constants.ts";
 import {
 	BADGE_GROUP_NAMES,
 	BADGE_RATING_KEYS,
+	COMBO_TIER_NAMES,
 	SKILL_BADGES,
+	SKILL_COMBOS,
 	badgeScore,
+	getDisplayBadges,
+	parseToken,
+	skillMargin,
 	conditionMet as matches,
 	pickBadgeRatings,
 	type BadgeRatings,
@@ -18,7 +23,8 @@ import type { RouteParams } from "../../ui/router/types.ts";
 const processInputs = (params: RouteParams<"skillBadges">) => {
 	const label =
 		params.badge !== undefined &&
-		SKILL_BADGES.some((def) => def.label === params.badge)
+		(SKILL_BADGES.some((def) => def.label === params.badge) ||
+			SKILL_COMBOS.some((def) => def.label === params.badge))
 			? params.badge
 			: undefined;
 	return { label };
@@ -59,7 +65,7 @@ export default defineView({
 		]);
 		const formatted = await player.formatAll(playersAll, {
 			attrs: ["pid", "firstName", "lastName", "age", "tid", "abbrev", "injury"],
-			ratings: [...BADGE_RATING_KEYS, "ovr", "pos"],
+			ratings: [...BADGE_RATING_KEYS, "ovr", "pos", "skills"],
 			season: g.get("season"),
 			showNoStats: true,
 			showRookies: true,
@@ -75,6 +81,7 @@ export default defineView({
 			abbrev: string;
 			tid: number;
 			ratings: BadgeRatings;
+			display: string[];
 		};
 		const rows: Row[] = [];
 		for (const p of formatted) {
@@ -89,6 +96,7 @@ export default defineView({
 					abbrev: p.abbrev,
 					tid: p.tid,
 					ratings,
+					display: getDisplayBadges(ratings, p.ratings.skills ?? []),
 				});
 			}
 		}
@@ -128,8 +136,57 @@ export default defineView({
 			};
 		});
 
+		const combos = SKILL_COMBOS.map((def) => {
+			const holders = rows
+				.flatMap((r) => {
+					const token = r.display.find(
+						(t) => parseToken(t).label === def.label,
+					);
+					if (token === undefined) {
+						return [];
+					}
+					// Same rule as comboTier: the weakest consumed component
+					const margin = Math.min(
+						...def.all.map((c) => skillMargin(r.ratings, c)),
+						...(def.any ?? [])
+							.map((c) => skillMargin(r.ratings, c))
+							.filter((m) => m >= 0),
+					);
+					return [{ row: r, score: margin, tier: parseToken(token).tier }];
+				})
+				.sort((a, b) => b.score - a.score || b.row.ovr - a.row.ovr);
+			const toLeader = ({ row, score, tier }: (typeof holders)[number]) => ({
+				pid: row.pid,
+				name: row.name,
+				pos: row.pos,
+				ovr: row.ovr,
+				age: row.age,
+				abbrev: row.abbrev,
+				tid: row.tid,
+				score: Math.round(score * 100),
+				tier: COMBO_TIER_NAMES[tier - 1]!,
+			});
+			return {
+				label: def.label,
+				name: def.name,
+				meaning: def.meaning,
+				components:
+					def.all.join(" + ") + (def.any ? ` + (${def.any.join(" or ")})` : ""),
+				count: holders.length,
+				tierCounts: COMBO_TIER_NAMES.map(
+					(_, i) => holders.filter((h) => h.tier === i + 1).length,
+				),
+				leaders: holders.slice(0, LEADERS).map(toLeader),
+				list:
+					inputs.label === def.label
+						? holders.slice(0, LIST_SIZE).map(toLeader)
+						: [],
+			};
+		});
+
 		return {
 			label: inputs.label,
+			combos,
 			numPlayers: rows.length,
 			numTeams: g.get("numActiveTeams"),
 			userTid: g.get("userTid"),

@@ -22,7 +22,7 @@ import { getPayrollSeason } from "../../util/getPayrollSeason.ts";
 import { last } from "../../../common/utils.ts";
 import {
 	BADGE_RATING_KEYS,
-	getSkillBadges,
+	getDisplayBadges,
 } from "../../../common/skillBadges/index.ts";
 import {
 	getPreDraftStats,
@@ -555,7 +555,7 @@ const processAttrs = (
 	}
 };
 
-// Extended skill badges (display only, see common/skillBadges). Uses the same fuzzed ratings the user sees.
+// Extended skill badges and combos (display only, see common/skillBadges). Uses the same fuzzed ratings the user sees.
 const getBadgesForRatingsRow = (pr: any, fuzz: boolean | undefined) => {
 	const r: any = {};
 	for (const key of BADGE_RATING_KEYS) {
@@ -565,7 +565,7 @@ const getBadgesForRatingsRow = (pr: any, fuzz: boolean | undefined) => {
 		}
 		r[key] = fuzz && key !== "hgt" ? player.fuzzRating(v, pr.fuzz) : v;
 	}
-	return getSkillBadges(r);
+	return getDisplayBadges(r, pr.skills ?? []);
 };
 
 const processRatings = (

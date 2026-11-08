@@ -189,23 +189,6 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		],
 	},
 	{
-		label: "FG",
-		name: "Floor general",
-		group: "playmaking",
-		meaning:
-			"Elite passing, handle and court vision: runs the offence like a point guard.",
-		conditions: [
-			c(
-				[
-					["pss", 1.2],
-					["oiq", 1],
-					["drb", 0.6],
-				],
-				0.68,
-			),
-		],
-	},
-	{
 		label: "Cn",
 		name: "Connector",
 		group: "playmaking",
@@ -287,35 +270,6 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 					["diq", 0.5],
 				],
 				0.6,
-			),
-		],
-	},
-	{
-		label: "Sw",
-		name: "Switchable defender",
-		group: "defense",
-		meaning:
-			"Good against both perimeter players and bigs, so he can guard anyone after a switch.",
-		conditions: [
-			c(
-				[
-					["hgt", 0.5],
-					["stre", 0.5],
-					["spd", 2],
-					["jmp", 0.5],
-					["diq", 1],
-				],
-				0.6,
-			),
-			c(
-				[
-					["hgt", 2.5],
-					["stre", 1],
-					["spd", 0.5],
-					["jmp", 0.5],
-					["diq", 2],
-				],
-				0.46,
 			),
 		],
 	},
@@ -410,9 +364,200 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		],
 	},
 
-	// Warning flags: useful for decisions, shown in a distinct style
 	{
-		label: "Ld",
+		label: "Sb",
+		name: "Stretch big",
+		group: "shooting",
+		meaning: "A big who can space the floor from three.",
+		conditions: [
+			c(
+				[
+					["tp", 1],
+					["oiq", 0.2],
+				],
+				0.51,
+			),
+			c([["hgt", 1]], 0.58),
+		],
+	},
+	{
+		label: "Hp",
+		name: "High-post shooter",
+		group: "shooting",
+		meaning: "A tall shooter who is comfortable from the elbows and mid-range.",
+		conditions: [
+			c(
+				[
+					["fg", 1],
+					["hgt", 0.7],
+					["ft", 0.3],
+				],
+				0.6,
+			),
+		],
+	},
+	{
+		label: "Cl",
+		name: "Closer",
+		group: "scoring",
+		meaning:
+			"Shot-making touch and poise: trusted with the ball late in games.",
+		conditions: [
+			c(
+				[
+					["oiq", 1],
+					["fg", 0.8],
+					["ft", 0.8],
+					["tp", 0.4],
+				],
+				0.64,
+			),
+		],
+	},
+	{
+		label: "Is",
+		name: "Isolation scorer",
+		group: "scoring",
+		meaning: "Can get a bucket on his own one-on-one.",
+		conditions: [
+			c(
+				[
+					["drb", 1],
+					["fg", 0.8],
+					["ins", 0.6],
+					["oiq", 0.8],
+					["spd", 0.4],
+				],
+				0.63,
+			),
+		],
+	},
+	{
+		label: "Bu",
+		name: "Bully",
+		group: "scoring",
+		meaning: "Uses strength to bully smaller defenders on the way to the rim.",
+		conditions: [
+			c(
+				[
+					["stre", 1.5],
+					["ins", 1],
+					["drb", 0.5],
+					["dnk", 0.5],
+				],
+				0.62,
+			),
+		],
+	},
+	{
+		label: "Ab",
+		name: "Ankle breaker",
+		group: "playmaking",
+		meaning: "Shifty handle that shakes defenders off the dribble.",
+		conditions: [
+			c(
+				[
+					["drb", 1.5],
+					["spd", 1],
+					["oiq", 0.3],
+				],
+				0.69,
+			),
+		],
+	},
+	{
+		label: "Pt",
+		name: "Post playmaker",
+		group: "playmaking",
+		meaning:
+			"Passes well out of the post: finds cutters and shooters from the block.",
+		conditions: [
+			c(
+				[
+					["pss", 1],
+					["ins", 0.8],
+					["hgt", 0.8],
+					["oiq", 0.6],
+				],
+				0.58,
+			),
+		],
+	},
+	{
+		label: "Tw",
+		name: "Two-way wing",
+		group: "defense",
+		meaning: "Defends and shoots: the classic three-and-D wing.",
+		conditions: [
+			c(
+				[
+					["tp", 1],
+					["diq", 1],
+					["spd", 0.6],
+					["hgt", 0.3],
+				],
+				0.6,
+			),
+		],
+	},
+	{
+		label: "Dr",
+		name: "Defensive rebounder",
+		group: "rebounding",
+		meaning: "Ends possessions by securing the defensive glass.",
+		conditions: [
+			c(
+				[
+					["reb", 1.5],
+					["hgt", 1],
+					["diq", 0.8],
+					["stre", 0.4],
+				],
+				0.64,
+			),
+		],
+	},
+	{
+		label: "Hu",
+		name: "Hustler",
+		group: "mental",
+		meaning:
+			"Plays hard every possession: loose balls, deflections and second efforts.",
+		conditions: [
+			c(
+				[
+					["endu", 1],
+					["diq", 0.8],
+					["reb", 0.6],
+					["spd", 0.6],
+				],
+				0.6,
+			),
+		],
+	},
+	{
+		label: "Gg",
+		name: "Glue guy",
+		group: "mental",
+		meaning: "Solid at a bit of everything, makes lineups work.",
+		conditions: [
+			c(
+				[
+					["oiq", 1],
+					["diq", 1],
+					["pss", 0.6],
+					["reb", 0.6],
+					["drb", 0.4],
+					["tp", 0.4],
+				],
+				0.6,
+			),
+		],
+	},
+
+	// Warning flags: same look as every other badge, told apart only by their lower-case label
+	{
+		label: "ld",
 		name: "Liability defender",
 		group: "flag",
 		meaning:
@@ -433,7 +578,7 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		],
 	},
 	{
-		label: "Pb",
+		label: "pb",
 		name: "Poor-shooting big",
 		group: "flag",
 		meaning:
@@ -453,7 +598,7 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		],
 	},
 	{
-		label: "To",
+		label: "to",
 		name: "Turnover-prone",
 		group: "flag",
 		meaning: "Poor handle and instincts: likely to give the ball away.",
@@ -471,7 +616,7 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		],
 	},
 	{
-		label: "Fp",
+		label: "fp",
 		name: "Foul-prone",
 		group: "flag",
 		meaning: "Low defensive IQ and mobility: picks up fouls easily.",
@@ -489,12 +634,48 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		],
 	},
 	{
-		label: "Hk",
+		label: "hk",
 		name: "Hack-a target",
 		group: "flag",
 		meaning: "A very poor free-throw shooter.",
 		flag: true,
 		conditions: [c([["ft", 1]], 0.25, "below")],
+	},
+	{
+		label: "ns",
+		name: "Non-shooter",
+		group: "flag",
+		meaning: "A guard or wing with no outside shot: defenses can sag off him.",
+		flag: true,
+		conditions: [
+			c(
+				[
+					["tp", 1],
+					["fg", 0.4],
+				],
+				0.33,
+				"below",
+			),
+			c([["hgt", 1]], 0.5, "below"),
+		],
+	},
+	{
+		label: "sl",
+		name: "Slow-footed",
+		group: "flag",
+		meaning:
+			"Lacks foot speed: struggles to stay in front and to run the floor.",
+		flag: true,
+		conditions: [
+			c(
+				[
+					["spd", 1],
+					["jmp", 0.3],
+				],
+				0.3,
+				"below",
+			),
+		],
 	},
 ];
 
@@ -504,3 +685,89 @@ export const SKILL_BADGES: SkillBadgeDef[] =
 
 export const SKILL_BADGES_BY_LABEL: Record<string, SkillBadgeDef> =
 	Object.fromEntries(SKILL_BADGES.map((def) => [def.label, def]));
+
+// The built-in skills from ratings.skills. Combos may consume them at display time only, ratings.skills itself (and the sim) never changes.
+export const ORIGINAL_SKILL_LABELS = [
+	"3",
+	"A",
+	"B",
+	"Di",
+	"Dp",
+	"Po",
+	"Ps",
+	"R",
+	"V",
+];
+
+export type SkillComboDef = {
+	label: string;
+	name: string;
+	meaning: string;
+	// Every one of these is needed...
+	all: string[];
+	// ...plus at least one of these, if given
+	any?: string[];
+};
+
+export const COMBO_TIER_NAMES = ["Bronze", "Silver", "Gold"] as const;
+
+// Applied in this order. Each consumed component disappears from the display and is replaced by the combo, so a component can only feed the first combo that matches.
+const ALL_BASKETBALL_COMBOS: SkillComboDef[] = [
+	{
+		label: "Sw",
+		name: "Switchable defender",
+		meaning:
+			"Both an interior (Di) and a perimeter (Dp) defender, so he can guard anyone after a switch.",
+		all: ["Dp", "Di"],
+	},
+	{
+		label: "Es",
+		name: "Elite shooter",
+		meaning:
+			"Three point shooter (3) who is also a catch-and-shoot (Cs) or off-dribble (Pu) specialist.",
+		all: ["3"],
+		any: ["Cs", "Pu"],
+	},
+	{
+		label: "FG",
+		name: "Floor general",
+		meaning: "Passer (Ps) and ball handler (B): runs the offence.",
+		all: ["Ps", "B"],
+	},
+	{
+		label: "In",
+		name: "Interior force",
+		meaning: "Post scorer (Po) who also finishes at the rim (Fn).",
+		all: ["Po", "Fn"],
+	},
+	{
+		label: "Rp",
+		name: "Rim protector",
+		meaning: "Interior defender (Di) and shot blocker (Bk).",
+		all: ["Di", "Bk"],
+	},
+	{
+		label: "Bm",
+		name: "Board master",
+		meaning: "Rebounder (R) who also crashes the offensive glass (Or).",
+		all: ["R", "Or"],
+	},
+	{
+		label: "Hd",
+		name: "Hounding defender",
+		meaning: "Pickpocket (St) and point-of-attack defender (Pa).",
+		all: ["St", "Pa"],
+	},
+	{
+		label: "Ex",
+		name: "Explosive athlete",
+		meaning: "Athlete (A) and athletic freak (Af).",
+		all: ["A", "Af"],
+	},
+];
+
+export const SKILL_COMBOS: SkillComboDef[] =
+	__SPORT === "basketball" ? ALL_BASKETBALL_COMBOS : [];
+
+export const SKILL_COMBOS_BY_LABEL: Record<string, SkillComboDef> =
+	Object.fromEntries(SKILL_COMBOS.map((def) => [def.label, def]));
