@@ -4,6 +4,7 @@ import makeItWork from "./makeItWork.ts";
 import summary from "./summary.ts";
 import get from "./get.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
+import explain from "./explain.ts";
 
 /**
  * Make a trade work
@@ -17,6 +18,17 @@ const makeItWorkTrade = async () => {
 	const tr = await get();
 	const teams0 = tr.teams;
 	const valueChangeCalculator = new ValueChangeCalculator();
+	// Explain why the AI didn't like the original offer, if it didn't
+	let explanation;
+	try {
+		const explanation0 = await explain(teams0);
+		if (!explanation0.accepts) {
+			explanation = explanation0;
+		}
+	} catch (error) {
+		console.error(error);
+	}
+
 	const teams = await makeItWork(helpers.deepCopy(teams0), {
 		holdUserConstant: false,
 		valueChangeCalculator,
@@ -25,6 +37,7 @@ const makeItWorkTrade = async () => {
 	if (!teams) {
 		return {
 			changed: false,
+			explanation,
 			message: `${
 				g.get("teamInfoCache")[teams0[1].tid]?.region
 			} GM: "I can't afford to give up so much."`,
@@ -61,6 +74,7 @@ const makeItWorkTrade = async () => {
 	if (s.warning) {
 		return {
 			changed: updated,
+		explanation,
 			message: `${
 				g.get("teamInfoCache")[teams[1].tid]?.region
 			} GM: "Something like this would work if you can figure out how to get it done without breaking the salary cap rules."`,
@@ -69,6 +83,7 @@ const makeItWorkTrade = async () => {
 
 	return {
 		changed: updated,
+		explanation,
 		message: `${
 			g.get("teamInfoCache")[teams[1].tid]?.region
 		} GM: "How does this sound?"`,

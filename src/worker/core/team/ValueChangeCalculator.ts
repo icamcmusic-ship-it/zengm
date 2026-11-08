@@ -33,6 +33,7 @@ import type { TeamSeasonRecord } from "./getHypotheticalTeam.ts";
 type Asset =
 	| {
 			type: "player";
+			pid?: number;
 			value: number;
 			contractValue: number;
 			injury: PlayerInjury;
@@ -279,6 +280,7 @@ const getPlayers = async ({
 		const contract = getContractForValuation(p);
 		remove.push({
 			type: "player",
+			pid: p.pid,
 			value: fudgedValue,
 			contractValue: getContractValue(contract, value),
 			injury: p.injury,
@@ -300,6 +302,7 @@ const getPlayers = async ({
 			const contract = getContractForValuation(p);
 			add.push({
 				type: "player",
+				pid: p.pid,
 				value,
 				contractValue: getContractValue(contract, value),
 				injury: p.injury,
@@ -890,11 +893,43 @@ const getPicks = async ({
 	}
 };
 
+// Per-asset breakdown of sumValues, used to explain trade decisions (see trade/explain.ts)
+export type AssetValueDetail = {
+	type: "player" | "pick";
+	pid?: number;
+	dpid?: number;
+	age: number;
+
+	// For picks, the estimated pick number and draft year
+	draftPick?: number;
+	draftYear?: number;
+
+	// Value before any adjustments, in the units of player value z-scores
+	baseValue: number;
+
+	// Multiplier from team strategy (rebuilding/contending), 1 if none
+	strategyFactor: number;
+
+	// Value removed because of injury (only for incoming assets)
+	injuryPenalty: number;
+
+	// Contract value, as computed by getContractValue (negative means overpaid)
+	contractValue: number;
+
+	// Weight of contract value for this team's strategy
+	contractsFactor: number;
+
+	// Final value after all adjustments, and the same thing on the trade value scale that gets summed
+	adjustedValue: number;
+	tradeValue: number;
+};
+
 const sumValues = (
 	players: Asset[],
 	strategy: string,
 	tid: number,
 	includeInjuries = false,
+	details?: AssetValueDetail[],
 ) => {
 	if (players.length === 0) {
 		return 0;
@@ -905,6 +940,9 @@ const sumValues = (
 
 	return players.reduce((memo, p) => {
 		let playerValue = p.value;
+		const baseValue = p.value;
+		let strategyFactor = 1;
+		let injuryPenalty = 0;
 
 		const treatAsFutureDraftPick =
 			p.type === "pick" && (season !== p.draftYear || phase <= PHASE.PLAYOFFS);
@@ -950,7 +988,12 @@ const sumValues = (
 			}
 		}
 
+		if (baseValue !== 0) {
+			strategyFactor = playerValue / baseValue;
+		}
+
 		// Normalize for injuries
+		const valueBeforeInjury = playerValue;
 		if (includeInjuries && tid !== g.get("userTid")) {
 			if (p.injury.gamesRemaining > 75) {
 				playerValue -= playerValue * 0.75;
@@ -958,6 +1001,8 @@ const sumValues = (
 				playerValue -= (playerValue * p.injury.gamesRemaining) / 100;
 			}
 		}
+
+		injuryPenalty = valueBeforeInjury - playerValue;
 
 		// Really bad players will just get no PT, but don't to count them as 0 because then AI thinks it can't find a trade
 		if (playerValue < 0) {
@@ -972,7 +1017,27 @@ const sumValues = (
 			playerValue = Math.max(0, playerValue);
 		}
 
-		return memo + valueToTradeValue(playerValue);
+		const tradeValue = valueToTradeValue(playerValue);
+
+		if (details) {
+			details.push({
+				type: p.type,
+				pid: p.type === "player" ? p.pid : undefined,
+				dpid: p.type === "pick" ? p.dp.dpid : undefined,
+				draftPick: p.type === "pick" ? p.draftPick : undefined,
+				draftYear: p.type === "pick" ? p.draftYear : undefined,
+				age: p.age,
+				baseValue,
+				strategyFactor,
+				injuryPenalty,
+				contractValue: p.contractValue,
+				contractsFactor,
+				adjustedValue: playerValue,
+				tradeValue,
+			});
+		}
+
+		return memo + tradeValue;
 	}, 0);
 };
 
@@ -1088,6 +1153,15 @@ type ToUpdate = {
 	teams: false | "all" | number[];
 };
 
+type EvaluateArgs = {
+	tid: number;
+	pidsAdd: number[];
+	pidsRemove: number[];
+	dpidsAdd: number[];
+	dpidsRemove: number[];
+	tradingPartnerTid: number | undefined;
+};
+
 // tradingPartnerTid is currently just used to determine if this is a trade with the user, so additional fuzz can be applied
 export class ValueChangeCalculator {
 	private cache: ValueChangeCache | undefined;
@@ -1195,21 +1269,35 @@ export class ValueChangeCalculator {
 		}
 	}
 
-	async evaluate({
-		tid,
-		pidsAdd,
-		pidsRemove,
-		dpidsAdd,
-		dpidsRemove,
-		tradingPartnerTid,
-	}: {
-		tid: number;
-		pidsAdd: number[];
-		pidsRemove: number[];
-		dpidsAdd: number[];
-		dpidsRemove: number[];
-		tradingPartnerTid: number | undefined;
-	}): Promise<number> {
+	async evaluate(args: EvaluateArgs): Promise<number> {
+		return this.evaluateInternal(args);
+	}
+
+	// Same as evaluate, but also returns how much each asset contributed, for explaining the decision to the user
+	async explain(args: EvaluateArgs) {
+		const add: AssetValueDetail[] = [];
+		const remove: AssetValueDetail[] = [];
+		const dv = await this.evaluateInternal(args, { add, remove });
+		const t = await idb.cache.teams.get(args.tid);
+		return {
+			dv,
+			strategy: t?.strategy ?? "rebuilding",
+			add,
+			remove,
+		};
+	}
+
+	private async evaluateInternal(
+		{
+			tid,
+			pidsAdd,
+			pidsRemove,
+			dpidsAdd,
+			dpidsRemove,
+			tradingPartnerTid,
+		}: EvaluateArgs,
+		details?: { add: AssetValueDetail[]; remove: AssetValueDetail[] },
+	): Promise<number> {
 		if (!this.cache) {
 			this.cache = await this.init();
 		} else if (this.toUpdate.draft || this.toUpdate.teams) {
@@ -1248,11 +1336,17 @@ export class ValueChangeCalculator {
 		});
 
 		// console.log("ADD");
-		const valuesAdd = sumValues(add, strategy, tid, true);
+		const valuesAdd = sumValues(add, strategy, tid, true, details?.add);
 		// console.log("Total", valuesAdd);
 
 		// console.log("REMOVE");
-		const valuesRemove = sumValues(remove, strategy, tid);
+		const valuesRemove = sumValues(
+			remove,
+			strategy,
+			tid,
+			false,
+			details?.remove,
+		);
 		// console.log("Total", valuesRemove);
 
 		return valuesAdd - valuesRemove;

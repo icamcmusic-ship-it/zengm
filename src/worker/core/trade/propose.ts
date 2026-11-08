@@ -8,6 +8,7 @@ import get from "./get.ts";
 import { idb } from "../../db/index.ts";
 import { hashSavedTrade } from "../../../common/hashSavedTrade.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
+import explain from "./explain.ts";
 
 /**
  * Proposes the current trade in the database.
@@ -25,6 +26,7 @@ const propose = async (forceTrade: boolean = false) => {
 	) {
 		return {
 			accepted: false as const,
+			explanation: undefined,
 			message: `Error! You're not allowed to make trades ${
 				g.get("phase") === PHASE.AFTER_TRADE_DEADLINE
 					? "after the trade deadline"
@@ -42,7 +44,7 @@ const propose = async (forceTrade: boolean = false) => {
 	const s = await summary(teams);
 
 	if (s.warning && !forceTrade) {
-		return { accepted: false as const, message: null };
+		return { accepted: false as const, message: null, explanation: undefined };
 	}
 
 	const dv = await new ValueChangeCalculator().evaluate({
@@ -78,6 +80,7 @@ const propose = async (forceTrade: boolean = false) => {
 			accepted: true as const,
 			message: 'Trade accepted! "Nice doing business with you!"',
 			undo,
+			explanation: undefined,
 		};
 	}
 
@@ -92,7 +95,19 @@ const propose = async (forceTrade: boolean = false) => {
 		message = "What, are you crazy?!";
 	}
 
-	return { accepted: false as const, message: `Trade rejected! "${message}"` };
+	let explanation;
+	try {
+		explanation = await explain(teams);
+	} catch (error) {
+		// Explanation is just extra info, never block the trade response on it
+		console.error(error);
+	}
+
+	return {
+		accepted: false as const,
+		message: `Trade rejected! "${message}"`,
+		explanation,
+	};
 };
 
 export default propose;

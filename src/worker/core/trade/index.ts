@@ -1,6 +1,7 @@
 import betweenAiTeams from "./betweenAiTeams.ts";
 import clear from "./clear.ts";
 import create from "./create.ts";
+import explain from "./explain.ts";
 import get from "./get.ts";
 import getOtherTid from "./getOtherTid.ts";
 import getPickValues from "./getPickValues.ts";
@@ -16,6 +17,7 @@ export default {
 	betweenAiTeams,
 	clear,
 	create,
+	explain,
 	get,
 	getOtherTid,
 	getPickValues,

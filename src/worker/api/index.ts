@@ -5451,7 +5451,10 @@ const createTrade = async (teams: TradeTeams) => {
 };
 
 const proposeTrade = async (forceTrade: boolean, conditions: Conditions) => {
-	const { accepted, message, undo } = await trade.propose(forceTrade);
+	const result = await trade.propose(forceTrade);
+	const { accepted, message } = result;
+	const undo = result.accepted ? result.undo : undefined;
+	const explanation = result.explanation;
 	await toUI("realtimeUpdate", []);
 
 	let undoKey;
@@ -5465,6 +5468,7 @@ const proposeTrade = async (forceTrade: boolean, conditions: Conditions) => {
 
 	return {
 		accepted,
+		explanation,
 		message,
 		undoKey,
 	};

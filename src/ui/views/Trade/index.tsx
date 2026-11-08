@@ -12,6 +12,8 @@ import type { TradeTeams, View } from "../../../common/types.ts";
 import clsx from "clsx";
 import { SaveTrade } from "../../components/SaveTrade.tsx";
 import { showUndoNotification } from "../../components/UndoNotification.tsx";
+import { Explanation } from "./Explanation.tsx";
+import type { TradeExplanation } from "../../../worker/core/trade/explain.ts";
 
 export type HandleToggle = (
 	userOrOther: "other" | "user",
@@ -51,6 +53,7 @@ const Trade = (props: View<"trade">) => {
 	const [state, setState] = useState({
 		accepted: false,
 		asking: false,
+		explanation: undefined as TradeExplanation | undefined,
 		forceTrade: false,
 		message: null as string | null,
 		prevTeams: undefined as TradeTeams | undefined,
@@ -65,6 +68,7 @@ const Trade = (props: View<"trade">) => {
 		setState((prevState) => ({
 			...prevState,
 			accepted: false,
+			explanation: undefined,
 			message: null,
 			prevTeams: undefined,
 		}));
@@ -164,6 +168,7 @@ const Trade = (props: View<"trade">) => {
 		setState((prevState) => ({
 			...prevState,
 			accepted: false,
+			explanation: undefined,
 			message: null,
 			prevTeams: undefined,
 		}));
@@ -210,11 +215,12 @@ const Trade = (props: View<"trade">) => {
 			...prevState,
 			accepted: false,
 			asking: true,
+			explanation: undefined,
 			message: null,
 			prevTeams: undefined,
 		}));
 
-		const { changed, message } = await toWorker(
+		const { changed, explanation, message } = await toWorker(
 			"main",
 			"tradeCounterOffer",
 			undefined,
@@ -227,6 +233,7 @@ const Trade = (props: View<"trade">) => {
 		setState((prevState) => ({
 			...prevState,
 			asking: false,
+			explanation,
 			message,
 			prevTeams: newPrevTeams,
 		}));
@@ -236,6 +243,7 @@ const Trade = (props: View<"trade">) => {
 		setState((prevState) => ({
 			...prevState,
 			accepted: false,
+			explanation: undefined,
 			message: null,
 			prevTeams: undefined,
 		}));
@@ -275,7 +283,7 @@ const Trade = (props: View<"trade">) => {
 	} = props;
 
 	const handleClickPropose = async () => {
-		const { accepted, message, undoKey } = await toWorker(
+		const { accepted, explanation, message, undoKey } = await toWorker(
 			"main",
 			"proposeTrade",
 			state.forceTrade,
@@ -284,6 +292,7 @@ const Trade = (props: View<"trade">) => {
 		setState((prevState) => ({
 			...prevState,
 			accepted,
+			explanation,
 			message,
 			prevTeams: undefined,
 		}));
@@ -507,6 +516,9 @@ const Trade = (props: View<"trade">) => {
 									)}
 								>
 									{state.message}
+									{state.explanation ? (
+										<Explanation explanation={state.explanation} />
+									) : null}
 									{state.prevTeams ? (
 										<div className="mt-1 text-end">
 											<button
