@@ -49,6 +49,22 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 			name: "Draft Class Rankings",
 			description: "All draft classes, ranked from best to worst.",
 		},
+		...(__SPORT === "basketball"
+			? ([
+					{
+						urlParts: ["redraft"],
+						name: "Redraft",
+						description:
+							"Every draft class re-ordered by career win shares, with each class's steals and busts.",
+					},
+					{
+						urlParts: ["pick_value"],
+						name: "Draft Pick Value",
+						description:
+							"What each pick has produced: typical careers and how often it becomes a starter or All-Star.",
+					},
+				] as FrivolityInfo[])
+			: []),
 	],
 	"Player Bios": [
 		{
@@ -70,10 +86,26 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 				"See which jersey numbers have been used by the most successful pro players.",
 		},
 		{
+			urlParts: ["jersey_numbers", "teams"],
+			name: "Jersey Numbers by Team",
+			description:
+				"The best player in each number for each team, retired numbers and numbers due to be retired.",
+		},
+		{
 			urlParts: ["relatives"],
 			name: "Relatives",
 			description: "See the family relationships between players.",
 		},
+		...(__SPORT === "basketball"
+			? ([
+					{
+						urlParts: ["family_trees"],
+						name: "Family Trees",
+						description:
+							"Families of related players, their careers side by side and family records.",
+					},
+				] as FrivolityInfo[])
+			: []),
 		{
 			urlParts: ["tragic_deaths"],
 			name: "Tragic Deaths",
@@ -82,6 +114,18 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 		},
 	],
 	Teams: [
+		{
+			urlParts: ["economics"],
+			name: "League Economics",
+			description:
+				"Payroll inequality, luxury tax bills, payroll growth and whether money buys titles.",
+		},
+		{
+			urlParts: ["home_court"],
+			name: "Home Court",
+			description:
+				"What playing at home is worth, by season, era and team, and in the playoffs.",
+		},
 		{
 			urlParts: ["roster_continuity"],
 			name: "Roster Continuity",

@@ -235,6 +235,12 @@ export const MoreLinks = (
 				name: "Draft Pick Notes",
 			},
 		];
+		if (__SPORT === "basketball") {
+			links.push(
+				{ url: ["frivolities", "redraft"], name: "Redraft" },
+				{ url: ["frivolities", "pick_value"], name: "Pick Value" },
+			);
+		}
 	} else if (props.type === "awards") {
 		const { season } = props;
 
@@ -343,6 +349,8 @@ export const MoreLinks = (
 			},
 			{ url: ["season_preview"], name: "Season Previews" },
 			{ url: ["notes", "teamSeason"], name: "Team Notes" },
+			{ url: ["frivolities", "economics"], name: "Economics" },
+			{ url: ["frivolities", "home_court"], name: "Home Court" },
 		];
 
 		if (__SPORT === "basketball") {
