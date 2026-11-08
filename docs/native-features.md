@@ -6,6 +6,21 @@ Most of it is **basketball only**: in Football, Hockey and Baseball GM the menu 
 
 `:lid` below is the league id, as in `/l/1/...`.
 
+## Where the pages live
+
+Pages that belong with an original BBGM page are reached from that page's _More_ links (and the command palette, Ctrl+K), not from a menu item of their own. Their URLs did not change, so old links and bookmarks keep working. The list is `src/ui/util/consolidatedPages.ts`.
+
+| Page                                         | Now under (_More_ links of)                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Trade Market, Trade Grader                   | Trade, Trading Block, Trade Proposals, Saved Trades (Trade Grader also from Transactions grades) |
+| Contract Value, League Economics, Home Court | League Finances                                                                                  |
+| Timeline, League Achievements, Coaches       | League Stats / League History group (Head-to-Head, Team Records, ...)                            |
+| Archetypes, Skill Badges                     | Player Ratings, Rating Distributions                                                             |
+| Games to Watch                               | Daily Schedule (plus dashboard card and schedule badges)                                         |
+| Draft Board, Redraft, Pick Value             | Draft pages (Draft Scouting, Lottery, History, ...)                                              |
+| Coaching Staff                               | team pages (Roster, Finances, ...) and the Team menu                                             |
+| 3-team trade                                 | link on the Trade page                                                                           |
+
 ## Feature index
 
 | Feature                                                            | Where                                                            | Sports | Switch (League Extras)      | Default new / existing league |
