@@ -30,13 +30,16 @@ const TIMEOUTS_STOP_CLOCK = 2; // [minutes]
 const TIP_IN_ONLY_LIMIT = 0.2; // [seconds] - only tip-ins from an inbound with less than this much time
 
 // Technical and flagrant fouls (the technicalFouls setting). Rates are per chance: a tech can follow any dead ball, a flagrant can happen
-// on any half-court possession. Tuned so a game has about 0.4 technicals, 0.08 flagrant 1s and 0.005 flagrant 2s (see technicalFouls.test.ts)
-const PROB_TECH_PER_DEAD_BALL = 0.0042;
-// Of technicals, the share called on the bench (the coach) rather than a player on the floor
-const PROB_TECH_BENCH = 0.2;
-const PROB_FLAGRANT_PER_POSSESSION = 0.00042;
-// Of flagrant fouls, the share that are flagrant 2 (an ejection)
-const PROB_FLAGRANT_2 = 0.06;
+// on any half-court possession. Tuned so a game has about 0.4 technicals, 0.08 flagrant 1s and 0.005 flagrant 2s (see technicalFouls.test.ts,
+// which also changes them to test rare cases)
+export const TECHNICAL_FOUL_RATES = {
+	techPerDeadBall: 0.0029,
+	// Of technicals, the share called on the bench (the coach) rather than a player on the floor
+	techBench: 0.2,
+	flagrantPerPossession: 0.0005,
+	// Of flagrant fouls, the share that are flagrant 2 (an ejection)
+	flagrant2: 0.06,
+};
 
 type ShotType =
 	| "atRim"
@@ -1635,7 +1638,7 @@ class GameSim extends GameSimBase {
 			this.techFouls &&
 			clockFactor !== "intentionalFoul" &&
 			this.t > 10 &&
-			Math.random() < PROB_FLAGRANT_PER_POSSESSION * g.get("foulRateFactor")
+			Math.random() < TECHNICAL_FOUL_RATES.flagrantPerPossession * g.get("foulRateFactor")
 		) {
 			return this.doFlagrantFoul(shooter);
 		}
@@ -2752,7 +2755,12 @@ class GameSim extends GameSimBase {
 
 	// Free throws with no rebound after them: a technical's (by the other team, possession unchanged) or a flagrant's (the ball goes back to the
 	// fouled team)
-	shootFreeThrowsDeadBall(t: TeamNum, p: PlayerGameSim, amount: number, tech: boolean) {
+	shootFreeThrowsDeadBall(
+		t: TeamNum,
+		p: PlayerGameSim,
+		amount: number,
+		tech: boolean,
+	) {
 		const ftp = helpers.bound(
 			g.get("ftAccuracyFactor") * p.compositeRating.shootingFT * 0.6 + 0.45,
 			0,
@@ -2826,13 +2834,13 @@ class GameSim extends GameSimBase {
 		}
 		// Players argue calls more than they argue anything else
 		const factor = outcome === "nonShootingFoul" || outcome === "ft" ? 2 : 1;
-		if (Math.random() >= PROB_TECH_PER_DEAD_BALL * factor) {
+		if (Math.random() >= TECHNICAL_FOUL_RATES.techPerDeadBall * factor) {
 			return;
 		}
 
 		const t: TeamNum = Math.random() < 0.5 ? 0 : 1;
 		const other: TeamNum = t === 0 ? 1 : 0;
-		const bench = Math.random() < PROB_TECH_BENCH;
+		const bench = Math.random() < TECHNICAL_FOUL_RATES.techBench;
 		const p = bench ? undefined : this.pickPlayer("fouling", t, 1);
 
 		// Coaches are keyed by team number, players by themselves
@@ -2884,7 +2892,7 @@ class GameSim extends GameSimBase {
 
 		const t = this.d;
 		const fouler = this.pickPlayer("fouling", t, 1);
-		const level: 1 | 2 = Math.random() < PROB_FLAGRANT_2 ? 2 : 1;
+		const level: 1 | 2 = Math.random() < TECHNICAL_FOUL_RATES.flagrant2 ? 2 : 1;
 		this.recordStat(t, fouler, "pf");
 		this.foulsThisQuarter[t] += 1;
 		if (this.t <= 2 * 60) {

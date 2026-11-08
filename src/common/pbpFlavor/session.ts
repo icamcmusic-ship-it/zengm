@@ -18,6 +18,8 @@ import {
 import {
 	crowdLine,
 	endOfPeriod,
+	ejectionText,
+	flagrantFoul,
 	foulOutText,
 	freeThrow,
 	heaveText,
@@ -27,6 +29,8 @@ import {
 	quarterNote,
 	shootingFoul,
 	substitution,
+	technicalFoul,
+	technicalFreeThrow,
 	timeoutText,
 	tipOff,
 	type Trip,
@@ -365,6 +369,10 @@ export class FlavorSession {
 	private ato: [boolean, boolean] = [false, false];
 	private injured = new Set<number>();
 	private fouledOut = new Set<number>();
+	private ejected = new Set<number>();
+	// the type of the last event worded, and whether it was a dunk (for the wording of a technical foul)
+	private lastType: string | undefined;
+	private lastDunk = false;
 	private foulTrouble = new Set<number>();
 	private seen = new Map<
 		number,
@@ -604,8 +612,16 @@ export class FlavorSession {
 					res = this.onSteal(rng, ev, score);
 				} else if (e.type === "orb" || e.type === "drb") {
 					res = this.onRebound(rng, ev);
+				} else if ((e.type === "ft" || e.type === "missFt") && ev.tech) {
+					res = this.onTechFt(rng, ev, dPts, score, future);
 				} else if (e.type === "ft" || e.type === "missFt") {
 					res = this.onFt(rng, ev, dPts, score, future);
+				} else if (e.type === "techFoul") {
+					res = this.onTechFoul(rng, ev, future);
+				} else if (e.type === "flagrantFoul") {
+					res = this.onFlagrant(rng, ev);
+				} else if (e.type === "ejection") {
+					res = this.onEjection(rng, ev);
 				} else if (
 					e.type === "pfNonShooting" ||
 					e.type === "pfBonus" ||
@@ -649,6 +665,14 @@ export class FlavorSession {
 				"The scoreboard briefly shows the wrong score; it's fixed during the stoppage.",
 			]);
 			res.note = [res.note, odd].filter(Boolean).join(" ");
+		}
+		if (typeof res === "object") {
+			this.lastType = e.type;
+			this.lastDunk =
+				MADE[e.type] !== undefined &&
+				/dunk|slam|jam|flush|throws it down|hammers|tomahawk|posteriz/i.test(
+					res.text,
+				);
 		}
 		return typeof res === "object" ? this.cleanResult(res, undefined) : res;
 	}
@@ -1405,13 +1429,16 @@ export class FlavorSession {
 				this.trip = null;
 			}
 		}
-		if (made && lastOfTrip) {
+		const keepBall = !!trip?.keepBall;
+		if (made && lastOfTrip && !keepBall) {
 			this.startKind = "make";
-		} else if (!made && lastOfTrip) {
+		} else if (lastOfTrip) {
 			this.startKind = "dead";
 		}
 		this.lastShot =
-			lastOfTrip && !made ? { p, three: false, ft: true, t } : undefined;
+			lastOfTrip && !made && !keepBall
+				? { p, three: false, ft: true, t }
+				: undefined;
 		const res: FlavorResult = { text: "" };
 		const notes = made
 			? this.scoreNotes(rng, {
@@ -1434,6 +1461,116 @@ export class FlavorSession {
 		return this.cleanResult(res, {});
 	}
 
+	// ---- technical and flagrant fouls, ejections ----
+	private onTechFoul(
+		rng: Rng,
+		ev: any,
+		future: readonly any[] | undefined,
+	): FlavorResult {
+		const t: 0 | 1 = ev.t;
+		const p = ev.pid === undefined ? undefined : this.pl(ev.pid);
+		let shooter: FPlayer | undefined;
+		for (const f of future ?? []) {
+			if ((f.type === "ft" || f.type === "missFt") && f.tech) {
+				shooter = this.pl(f.pid);
+				break;
+			}
+			if (!isStatEvent(f) && f.type !== "ejection" && f.type !== "sub") {
+				break;
+			}
+		}
+		const text = technicalFoul(rng, p, this.the(t), ev.num ?? 1, {
+			afterDunk: this.lastDunk,
+			afterFoul:
+				this.lastType !== undefined &&
+				(this.lastType.startsWith("pf") || this.lastType === "missFt"),
+			shooter,
+		});
+		this.ato = [false, false];
+		return { text, ptype: "technical" };
+	}
+
+	private onTechFt(
+		rng: Rng,
+		ev: any,
+		dPts: [number, number],
+		score: [number, number],
+		future: readonly any[] | undefined,
+	): FlavorResult {
+		const made = ev.type === "ft";
+		const p = this.pl(ev.pid);
+		const t: 0 | 1 = ev.t;
+		const o: 0 | 1 = t === 0 ? 1 : 0;
+		const margin = score[t] - (dPts[t] || 0) - score[o];
+		const res: FlavorResult = { text: "" };
+		const notes = made
+			? this.scoreNotes(rng, {
+					t,
+					p,
+					pts: 1,
+					margin,
+					clock: ev.clock,
+					wow: false,
+					future,
+					three: false,
+					andOne: false,
+					ast: undefined,
+					fg: false,
+				})
+			: [];
+		res.text = this.tally(technicalFreeThrow(rng, p, made), ev, { p });
+		this.finishNotes(res, notes);
+		return this.cleanResult(res, {});
+	}
+
+	private onFlagrant(rng: Rng, ev: any): FlavorResult {
+		const f = this.pl(ev.pid);
+		const shooter = this.pl(ev.pidShooting);
+		const defT: 0 | 1 = ev.t;
+		const offT: 0 | 1 = defT === 0 ? 1 : 0;
+		this.teamFouls[defT] += 1;
+		const pf = this.host.stat(f.pid)?.pf ?? 0;
+		this.checkFoulTrouble(f, pf);
+		const tag = `P${pf}, team foul ${this.teamFouls[defT]}`;
+		const level: 1 | 2 = ev.level === 2 ? 2 : 1;
+		this.startKind = "dead";
+		this.lastReb = undefined;
+		this.defReb = undefined;
+		this.stealer = undefined;
+		this.lastShot = undefined;
+		this.pending = undefined;
+		this.trip = {
+			shooter,
+			n: 2,
+			i: 0,
+			m: 0,
+			three: false,
+			andOne: false,
+			intentional: false,
+			bonus: false,
+			fouler: f,
+			keepBall: true,
+		};
+		this.ato = [false, false];
+		return {
+			text: flagrantFoul(rng, f, shooter, tag, level, this.the(offT)),
+			danger: level === 2,
+			ptype: level === 2 ? "flagrant2" : "flagrant1",
+		};
+	}
+
+	private onEjection(rng: Rng, ev: any): FlavorResult {
+		const p = ev.pid === undefined ? undefined : this.pl(ev.pid);
+		if (p) {
+			this.ejected.add(p.pid);
+		}
+		return {
+			text: ejectionText(rng, p, this.the(ev.t), ev.reason),
+			danger: true,
+			ptype: "ejection",
+		};
+	}
+
 	// ---- substitutions, timeouts, the rest ----
 	private onSub(rng: Rng, ev: any): FlavorResult {
 		const on: number[] = ev.pids ?? [];
@@ -1446,6 +1583,7 @@ export class FlavorSession {
 			foulTrouble: this.foulTrouble,
 			injured: this.injured,
 			fouledOut: this.fouledOut,
+			ejected: this.ejected,
 		});
 		for (const pid of off) {
 			this.foulTrouble.delete(pid);

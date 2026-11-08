@@ -63,7 +63,10 @@ const SCHEMAS: [string, Field[]][] = [
 	["fgaMidRange", [T, P, C, POSS]],
 	["fgaTp", [T, P, C, ["desperation", "b"], POSS]],
 	["missTp", [T, P, C]],
-	["fgAtRim", [T, P, C, ["pidDefense", "p"], ["pidAst", "p"], ["pidFoul", "p"], PERIOD]],
+	[
+		"fgAtRim",
+		[T, P, C, ["pidDefense", "p"], ["pidAst", "p"], ["pidFoul", "p"], PERIOD],
+	],
 	["missMidRange", [T, P, C]],
 	["fgMidRange", [T, P, C, ["pidAst", "p"], ["pidFoul", "p"], PERIOD]],
 	["tp", [T, P, C, ["pidAst", "p"], ["pidFoul", "p"], PERIOD]],
@@ -81,7 +84,10 @@ const SCHEMAS: [string, Field[]][] = [
 	["outOfBounds", [T, ["on", "e:offense,defense"], C]],
 	["timeouts", [["timeouts", "a"]]],
 	["blkAtRim", [T, P, C]],
-	["fgAtRimAndOne", [T, P, C, ["pidDefense", "p"], ["pidAst", "p"], ["pidFoul", "p"], PERIOD]],
+	[
+		"fgAtRimAndOne",
+		[T, P, C, ["pidDefense", "p"], ["pidAst", "p"], ["pidFoul", "p"], PERIOD],
+	],
 	["fgMidRangeAndOne", [T, P, C, ["pidAst", "p"], ["pidFoul", "p"], PERIOD]],
 	["fgLowPostAndOne", [T, P, C, ["pidAst", "p"], ["pidFoul", "p"], PERIOD]],
 	["tpAndOne", [T, P, C, ["pidAst", "p"], ["pidFoul", "p"], PERIOD]],
@@ -108,10 +114,7 @@ const SCHEMAS: [string, Field[]][] = [
 	["overtime", [C, PERIOD]],
 	["gameOver", []],
 	["timeout", [T, ["numLeft", "n"], ["advancesBall", "b"], C]],
-	[
-		"endOfPeriod",
-		[T, ["reason", "e:runOutClock,noShot,intentionalFoul"], C],
-	],
+	["endOfPeriod", [T, ["reason", "e:runOutClock,noShot,intentionalFoul"], C]],
 	["elamActive", [["target", "n"]]],
 	["shootoutStart", [["rounds", "n"], C]],
 	["shootoutTeam", [T, P]],
@@ -201,7 +204,11 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 			for (const p of team?.player ?? []) {
 				if (typeof p?.id === "number" && !index.has(p.id)) {
 					index.set(p.id, players.length);
-					players.push({ pid: p.id, t: t === 1 ? 1 : 0, ratings: p.pbpRatings });
+					players.push({
+						pid: p.id,
+						t: t === 1 ? 1 : 0,
+						ratings: p.pbpRatings,
+					});
 				}
 			}
 		}

@@ -5,13 +5,17 @@ import {
 	useState,
 	useRef,
 	type CSSProperties,
+	type ReactNode,
 } from "react";
 import { PHASE, STARTING_NUM_TIMEOUTS } from "../../common/constants.ts";
 import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
 import { realtimeUpdate } from "../util/realtimeUpdate.ts";
 import { BoxScore } from "./BoxScore.tsx";
+import { BoxScorePlayByPlay } from "./BoxScorePlayByPlay.basketball.tsx";
+import useLocalStorageState from "use-local-storage-state";
 import { range } from "../../common/utils.ts";
+import { bySport } from "../../common/sportFunctions.ts";
 import getWinner from "../../common/getWinner.ts";
 import { OverlayTrigger, Popover } from "react-bootstrap";
 import Note from "../views/Player/Note.tsx";
@@ -1078,6 +1082,57 @@ const PlayoffRecord = ({
 	);
 };
 
+// Basketball box scores of games with a stored play-by-play get a second tab with it
+const BoxScorePlayByPlayTabsBasketball = ({
+	boxScore,
+	boxScoreElement,
+}: {
+	boxScore: any;
+	boxScoreElement: ReactNode;
+}) => {
+	const [tab, setTab] = useLocalStorageState<"box" | "pbp">("box-score-tab", {
+		defaultValue: "box",
+	});
+	return (
+		<>
+			<ul className="nav nav-tabs mb-3">
+				{(
+					[
+						["box", "Box Score"],
+						["pbp", "Play-by-Play"],
+					] as const
+				).map(([key, label]) => (
+					<li className="nav-item" key={key}>
+						<button
+							className={clsx("nav-link", tab === key ? "active" : undefined)}
+							onClick={() => {
+								setTab(key);
+							}}
+							type="button"
+						>
+							{label}
+						</button>
+					</li>
+				))}
+			</ul>
+			{tab === "pbp" ? (
+				<div className="mb-3">
+					<BoxScorePlayByPlay boxScore={boxScore} />
+				</div>
+			) : (
+				boxScoreElement
+			)}
+		</>
+	);
+};
+
+const BoxScorePlayByPlayTabs = bySport({
+	baseball: undefined,
+	basketball: BoxScorePlayByPlayTabsBasketball,
+	football: undefined,
+	hockey: undefined,
+});
+
 export const BoxScoreWrapper = ({
 	abbrev,
 	boxScore,
@@ -1208,12 +1263,26 @@ export const BoxScoreWrapper = ({
 				</div>
 				<TeamLogo season={boxScore.season} t={t1} />
 			</div>
-			<BoxScore
-				boxScore={boxScore}
-				Row={Row}
-				forceRowUpdate={forceRowUpdate}
-				sportState={sportState}
-			/>
+			{BoxScorePlayByPlayTabs && !live && boxScore.pbp ? (
+				<BoxScorePlayByPlayTabs
+					boxScore={boxScore}
+					boxScoreElement={
+						<BoxScore
+							boxScore={boxScore}
+							Row={Row}
+							forceRowUpdate={forceRowUpdate}
+							sportState={sportState}
+						/>
+					}
+				/>
+			) : (
+				<BoxScore
+					boxScore={boxScore}
+					Row={Row}
+					forceRowUpdate={forceRowUpdate}
+					sportState={sportState}
+				/>
+			)}
 			Attendance: {helpers.numberWithCommas(boxScore.att)}
 			{boxScore.neutralSite ? (
 				<>

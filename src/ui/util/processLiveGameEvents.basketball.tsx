@@ -339,6 +339,28 @@ const getText = (
 				Three FTs for {getName(event.pidShooting)}
 			</>,
 		];
+	} else if (event.type === "techFoul") {
+		texts = [
+			event.pid === undefined
+				? "Technical foul on the bench"
+				: `Technical foul on ${getName(event.pid)}`,
+		];
+	} else if (event.type === "flagrantFoul") {
+		texts = [
+			<>
+				Flagrant {event.level} foul on {getName(event.pid)}
+				{formatLiveGameStat(playersByPid[event.pid], "pf")}
+				<br />
+				Two FTs and the ball for {getName(event.pidShooting)}
+			</>,
+		];
+	} else if (event.type === "ejection") {
+		texts = [
+			<span className="text-danger">
+				{event.pid === undefined ? "The coach" : getName(event.pid)} has been
+				ejected
+			</span>,
+		];
 	} else if (event.type === "foulOut") {
 		texts = [
 			<span className="text-danger">{getName(event.pid)} fouled out</span>,
@@ -467,6 +489,7 @@ const newPossessionTypes: Record<string, boolean> = {
 	tov: false,
 	timeout: true,
 	endOfPeriod: true,
+	flagrantFoul: false,
 };
 
 // Mutates boxScore!!!
@@ -499,6 +522,8 @@ const processLiveGameEvents = ({
 	let text;
 	let t: 0 | 1 | undefined;
 	let textOnly = false;
+	// the event that was worded (the stored play-by-play filters on its players)
+	let textEvent: PlayByPlayEventOutput | undefined;
 
 	while (!stop && events.length > 0) {
 		const e = events.shift();
@@ -606,6 +631,7 @@ const processLiveGameEvents = ({
 			const silent = fr === "silent";
 			if (!silent) {
 				text = getText(e, boxScore, fr === undefined ? undefined : fr);
+				textEvent = e;
 				t = eventT;
 				textOnly =
 					e.type === "gameOver" ||
@@ -648,7 +674,8 @@ const processLiveGameEvents = ({
 				boxScore.time = time;
 			}
 
-			if (Object.hasOwn(newPossessionTypes, eAny.type)) {
+			// (a technical's free throw doesn't change possession)
+			if (Object.hasOwn(newPossessionTypes, eAny.type) && !eAny.tech) {
 				boxScore.possession = newPossessionTypes[eAny.type]
 					? eventT
 					: eventT === 0
@@ -668,6 +695,7 @@ const processLiveGameEvents = ({
 		t,
 		text,
 		textOnly,
+		event: textEvent,
 	};
 };
 

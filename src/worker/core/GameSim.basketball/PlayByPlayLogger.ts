@@ -319,7 +319,10 @@ class BasketballPlayByPlayLogger extends PlayByPlayLoggerBase<PlayByPlayEventOut
 		}
 
 		const anyEvent = event as any;
-		if (typeof anyEvent.clock === "number" || typeof anyEvent.poss === "number") {
+		if (
+			typeof anyEvent.clock === "number" ||
+			typeof anyEvent.poss === "number"
+		) {
 			event = { ...event };
 			const e2 = event as any;
 			if (typeof e2.clock === "number") {
