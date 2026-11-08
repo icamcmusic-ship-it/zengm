@@ -413,7 +413,7 @@ const Trade = (props: View<"trade">) => {
 		<>
 			<div className="row">
 				<div className="col-md-9">
-					<div className="d-flex mb-2 align-items-center">
+					<div className="d-flex flex-wrap row-gap-1 mb-2 align-items-center">
 						<div className="btn-group">
 							<button
 								className="btn btn-light-bordered btn-xs"

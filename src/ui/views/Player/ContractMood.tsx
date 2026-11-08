@@ -317,7 +317,7 @@ export const ContractMood = ({
 				</div>
 			) : null}
 			<div className="row">
-				<div className="col-md-6 col-xl-4">
+				<div className="col-md-6 col-xxl-4">
 					<ContractDetails
 						data={data}
 						onChange={() => setCounter((x) => x + 1)}
@@ -363,7 +363,7 @@ export const ContractMood = ({
 						</div>
 					) : null}
 				</div>
-				<div className="col-md-6 col-xl-4">
+				<div className="col-md-6 col-xxl-4">
 					<h3 className="h5">What would make him re-sign?</h3>
 					<table className="table table-sm mb-2" style={{ width: "auto" }}>
 						<thead>
@@ -403,7 +403,7 @@ export const ContractMood = ({
 						</tbody>
 					</table>
 				</div>
-				<div className="col-md-12 col-xl-4">
+				<div className="col-md-12 col-xxl-4">
 					<h3 className="h5">Mood history</h3>
 					<MoodHistory history={data.moodHistory} />
 				</div>
