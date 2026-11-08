@@ -7,6 +7,7 @@ import {
 	endContractEarly,
 	setContractDemandFromCurrentContract,
 } from "../contract/index.ts";
+import { applyReleaseGuarantees } from "../contract/options.ts";
 import { getNumPlayersTradedAwayNormalizedAll } from "./getNumPlayersTradedAwayNormalized.ts";
 
 /**
@@ -36,6 +37,11 @@ const release = async (p: Player, justDrafted: boolean) => {
 				reason: "released",
 				tid: p.tid,
 			});
+
+			// Partially guaranteed seasons and team options are not owed in full
+			if (contract.endedEarly) {
+				applyReleaseGuarantees(contract);
+			}
 		}
 	}
 

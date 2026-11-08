@@ -1,4 +1,5 @@
 import { idb } from "../db/index.ts";
+import { hasActiveTradeRequest } from "../core/contract/unrest.ts";
 import { g, helpers } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { bySport } from "../../common/sportFunctions.ts";
@@ -36,7 +37,10 @@ export default defineView({
 				"playersByTid",
 				g.get("userTid"),
 			);
-			const userRoster = addFirstNameShort(
+			const tradeRequestPids = new Set(
+				userRosterAll.filter(hasActiveTradeRequest).map((p) => p.pid),
+			);
+			const userRosterFormatted = addFirstNameShort(
 				await player.formatAll(userRosterAll, {
 					attrs: [
 						"pid",
@@ -59,6 +63,10 @@ export default defineView({
 					fuzz: true,
 				}),
 			);
+			const userRoster = userRosterFormatted.map((p) => ({
+				...p,
+				tradeRequest: tradeRequestPids.has(p.pid),
+			}));
 
 			const userPicks = await idb.merged.draftPicks.getAll({
 				tid: g.get("userTid"),

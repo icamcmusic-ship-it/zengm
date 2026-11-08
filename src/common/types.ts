@@ -745,6 +745,14 @@ export type GameAttributesLeague = {
 	phase: Phase;
 	playerBioInfo?: PlayerBioInfo;
 	playersRefuseToNegotiate: boolean;
+	// Player/team options and partially guaranteed contracts
+	contractOptions: boolean;
+	// In-season contract extensions for players in the last seasons of their contracts
+	contractExtensions: boolean;
+	// Very unhappy stars ask to be traded
+	tradeRequests: boolean;
+	// How often unhappy players hold out, 0 is never and 1 is the default
+	holdoutFrequency: number;
 	playoffsByConf: boolean;
 	playoffsNumTeamsDiv: number;
 	playoffsReseed: boolean;
@@ -983,7 +991,11 @@ export type LogEventType =
 	| "luxuryTax"
 	| "luxuryTaxDist"
 	| "minPayroll"
-	| "undo";
+	| "undo"
+	| "contractOption"
+	| "extension"
+	| "tradeRequest"
+	| "holdout";
 
 // https://stackoverflow.com/a/57103940/786644
 export type DistributiveOmit<T, K extends keyof T> = T extends any
@@ -1069,6 +1081,9 @@ export type Negotiation = {
 	pid: number;
 	tid: number;
 	resigning: boolean;
+
+	// In-season extension for a player under contract. Never saved to the database, it's created whenever it's needed, like a free agent negotiation. amount and exp are what he asks for, before mood.
+	extension?: FlatContractInfo;
 };
 
 export type Option = {
@@ -1176,6 +1191,37 @@ export type FlatContractInfo = {
 	amount: number;
 	exp: number;
 	rookie?: true; // If present, this is (or signing it would make) a rookie contract. Could be either a rookie scale auto sign, or negotiated.
+
+	// Option and guarantee terms, only with the contractOptions setting. Missing means no option and fully guaranteed.
+	terms?: ContractTerms;
+};
+
+export type ContractOptionType = "player" | "team";
+
+// Terms that can be negotiated on top of amount and exp
+export type ContractTerms = {
+	// Option on the final season. The player (or team) decides at the start of the re-signing phase before that season whether to keep it.
+	option?: ContractOptionType;
+
+	// Fraction (0 to 1) of every season after the first that is guaranteed. A team that releases the player only owes the guaranteed part of those seasons. Missing means 1.
+	guaranteed?: number;
+};
+
+export type ContractOption = {
+	type: ContractOptionType;
+	season: number;
+	decision?: "exercised" | "declined";
+};
+
+export type ContractExtension = {
+	// When it was signed
+	season: number;
+	phase: Phase;
+
+	// First season added by the extension
+	firstSeason: number;
+	amount: number;
+	eid?: number;
 };
 
 // "unknown" is for contracts where the type can't be determined, like contracts migrated from before contracts were tracked, or a rookie contract with an extension merged into it.
@@ -1214,6 +1260,38 @@ export type Contract = {
 	amounts: number[]; // One per season, so exp = start + amounts.length - 1
 	payments: ContractPayment[]; // Actually paid, added to every game
 	endedEarly?: ContractEndedEarly;
+
+	// See ContractTerms. All optional, so contracts from before these existed need no migration.
+	option?: ContractOption;
+
+	// Guaranteed amount for each season, same length as amounts. Missing means fully guaranteed.
+	guaranteed?: number[];
+
+	// In-season extensions, which append seasons to amounts
+	extensions?: ContractExtension[];
+};
+
+export type MoodSnapshot = {
+	season: number;
+	phase: Phase;
+	tid: number;
+	// Rounded to 0.1, without custom items (which are included in sum)
+	components: Omit<MoodComponents, "custom">;
+	sum: number;
+	probWilling: number;
+};
+
+export type TradeRequest = {
+	season: number;
+	phase: Phase;
+	tid: number;
+};
+
+export type Holdout = {
+	season: number;
+	tid: number;
+	gamesRemaining: number;
+	gamesMissed: number;
 };
 
 export type PlayerFeatWithoutKey = {
@@ -1315,6 +1393,15 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 
 	// Every contract the player signed, oldest first. If he's on a team, his current contract is the last one, unless it ended early.
 	contracts: Contract[];
+
+	// Mood snapshots for players on teams, a couple per season (see contract/moodHistory.ts)
+	moodHistory?: MoodSnapshot[];
+
+	// Public trade request, until he's traded or his mood improves
+	tradeRequest?: TradeRequest;
+
+	// Holding out (missing games) over his contract
+	holdout?: Holdout;
 
 	customMoodItems?: {
 		amount: number;

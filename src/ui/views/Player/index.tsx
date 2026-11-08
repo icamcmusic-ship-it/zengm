@@ -8,6 +8,7 @@ import { getCols } from "../../../common/getCols.ts";
 import type { View } from "../../../common/types.ts";
 import { SeasonIcons } from "../../components/SeasonIcons.tsx";
 import TopStuff from "./TopStuff.tsx";
+import { ContractMood } from "./ContractMood.tsx";
 import { wrappedSalaryPayers } from "./SalaryPayers.tsx";
 import { PLAYER } from "../../../common/constants.ts";
 import HideableSection from "../../components/HideableSection.tsx";
@@ -123,6 +124,8 @@ const Player2 = ({
 				teamURL={teamURL}
 				willingToSign={willingToSign}
 			/>
+
+			{!retired ? <ContractMood pid={player.pid} refreshKey={player} /> : null}
 
 			{statTables.map(({ name, onlyShowIf, stats, superCols }) => (
 				<StatsTable

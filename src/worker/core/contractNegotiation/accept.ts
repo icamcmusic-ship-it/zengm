@@ -6,6 +6,90 @@ import type { Negotiation, FlatContractInfo } from "../../../common/types.ts";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { actualPhase } from "../../util/actualPhase.ts";
 import { getContractDemand } from "../contract/index.ts";
+import type { ContractTerms } from "../../../common/types.ts";
+import {
+	getContractExp,
+	getCurrentContract,
+} from "../../../common/contracts.ts";
+import {
+	extendContract,
+	getExtensionIneligibleReason,
+} from "../contract/extension.ts";
+
+const acceptExtension = async ({
+	negotiation,
+	amount,
+	exp,
+	dryRun,
+	terms,
+}: {
+	negotiation: Negotiation;
+	amount: number;
+	exp: number;
+	dryRun: boolean;
+	terms?: ContractTerms;
+}): Promise<string | undefined | (() => Promise<boolean>)> => {
+	const tid = g.get("userTid");
+	const p = await idb.cache.players.get(negotiation.pid);
+	if (!p) {
+		return "Invalid pid";
+	}
+	const reason = getExtensionIneligibleReason(p, tid);
+	if (reason !== undefined) {
+		return reason;
+	}
+	const contract = getCurrentContract(p)!;
+	const firstSeason = getContractExp(contract) + 1;
+	if (exp < firstSeason) {
+		return "An extension must add at least one season.";
+	}
+
+	const mood = await player.moodInfo(p, tid, { contractAmount: amount });
+	if (!mood.willing) {
+		return "Player is no longer willing to negotiate.";
+	}
+
+	// With a hard cap, the extension has to fit under the cap in its first season. With a soft cap, teams can always extend their own players, like re-signing them.
+	if (g.get("salaryCapType") === "hard") {
+		const payroll = await team.getPayroll(tid, firstSeason);
+		if (
+			payroll + amount - 1 > g.get("salaryCap") &&
+			amount - 1 > g.get("minContract")
+		) {
+			return "This extension would put you over the hard cap in its first season.";
+		}
+	}
+
+	if (dryRun) {
+		return;
+	}
+
+	const rollbackInfo = {
+		contracts: helpers.deepCopy(p.contracts),
+		holdout: p.holdout,
+		tradeRequest: p.tradeRequest,
+	};
+	const eid = await extendContract(p, { amount, exp, terms });
+	await idb.cache.players.put(p);
+
+	return async () => {
+		const p = await idb.cache.players.get(negotiation.pid);
+		if (!p || p.tid !== tid) {
+			return false;
+		}
+		Object.assign(p, rollbackInfo);
+		if (!p.holdout) {
+			delete p.holdout;
+		}
+		if (!p.tradeRequest) {
+			delete p.tradeRequest;
+		}
+		await idb.cache.players.put(p);
+		await idb.cache.events.delete(eid);
+		void toUI("realtimeUpdate", [["playerMovement"]]);
+		return true;
+	};
+};
 
 /**
  * Accept the player's offer.
@@ -24,14 +108,26 @@ const accept = async <
 	amount,
 	exp,
 	dryRun,
+	terms,
 }: {
 	negotiation: Negotiation;
 	amount: number;
 	exp: number;
 	dryRun: DryRun;
+	terms?: ContractTerms;
 }) => {
 	const salaryCapType = g.get("salaryCapType");
 	const tid = g.get("userTid");
+
+	if (negotiation.extension) {
+		return acceptExtension({
+			negotiation,
+			amount,
+			exp,
+			dryRun,
+			terms,
+		}) as Promise<SuccessReturn | string>;
+	}
 
 	if (salaryCapType !== "none") {
 		const payroll = await team.getPayroll(tid);
@@ -79,6 +175,9 @@ const accept = async <
 		amount,
 		exp,
 	};
+	if (terms && g.get("contractOptions")) {
+		contract.terms = terms;
+	}
 	if (getContractDemand(p).rookie && phase === PHASE.RESIGN_PLAYERS) {
 		// Not sure if the phase condition is necessary. The purpose of this is for hard cap rookies with rookie contract scale.
 		contract.rookie = true;

@@ -1,6 +1,7 @@
 import { csvFormat, csvFormatRows } from "d3-dsv";
 import type {
 	Contract,
+	ContractTerms,
 	FlatContractInfo,
 	PlayerStatAttr,
 } from "../../common/types.ts";
@@ -182,6 +183,8 @@ import {
 } from "../core/contract/index.ts";
 import { getContractExp, getCurrentContract } from "../../common/contracts.ts";
 import { getContractStartSeason } from "../util/getContractStartSeason.ts";
+import * as contractPanel from "../core/contract/playerPanel.ts";
+import * as contractOptionsCore from "../core/contract/options.ts";
 import getRealTeamPlayerData from "../core/league/create/getRealTeamPlayerData.ts";
 import * as z from "zod";
 import { defaultTragicDeaths } from "../util/defaultTragicDeaths.ts";
@@ -223,10 +226,12 @@ const acceptContractNegotiation = async ({
 	pid,
 	amount,
 	exp,
+	terms,
 }: {
 	pid: number;
 	amount: number;
 	exp: number;
+	terms?: ContractTerms;
 }) => {
 	const negotiation = await contractNegotiation.get(pid);
 	if (typeof negotiation === "string") {
@@ -238,6 +243,7 @@ const acceptContractNegotiation = async ({
 		amount,
 		exp,
 		dryRun: false,
+		terms,
 	});
 
 	// string response is an error message
@@ -1987,6 +1993,24 @@ const getLeagues = () => {
 	return idb.meta.getAll("leagues");
 };
 
+const getPlayerContractPanel = (pid: number) => {
+	return contractPanel.getPlayerContractPanel(pid);
+};
+
+const decideTeamOption = async ({
+	pid,
+	decision,
+}: {
+	pid: number;
+	decision: "exercised" | "declined";
+}) => {
+	const error = await contractOptionsCore.userDecideTeamOption(pid, decision);
+	if (error === undefined) {
+		await toUI("realtimeUpdate", [["playerMovement"]]);
+	}
+	return error;
+};
+
 const getNegotiationProps = async (pid: number) => {
 	const userTid = g.get("userTid");
 
@@ -2028,6 +2052,21 @@ const getNegotiationProps = async (pid: number) => {
 		mood: await player.moodInfos(p2),
 	};
 
+	// For an extension, he's asking for a new deal starting after his current contract, not his current contract
+	const extension = negotiation.extension;
+	let currentContract;
+	if (extension) {
+		const mood = await player.moodInfo(p2, userTid, {
+			contractAmount: extension.amount,
+		});
+		currentContract = { ...p.contract };
+		p.mood.user = { ...p.mood.user, ...mood };
+		p.contract = {
+			amount: mood.contractAmount / 1000,
+			exp: extension.exp,
+		};
+	}
+
 	const contractOptions = await generateContractOptions(
 		negotiation,
 		{
@@ -2035,6 +2074,8 @@ const getNegotiationProps = async (pid: number) => {
 			exp: p.contract.exp,
 		},
 		p.ratings.ovr,
+		extension && currentContract ? currentContract.exp + 1 : undefined,
+		extension ? g.get("maxContractLength") : undefined,
 	);
 	if (contractOptions.length === 0 && g.get("phase") === PHASE.RESIGN_PLAYERS) {
 		const t = await idb.cache.teams.get(userTid);
@@ -2068,6 +2109,9 @@ const getNegotiationProps = async (pid: number) => {
 		payroll: payroll / 1000,
 		p,
 		resigning: negotiation.resigning,
+		extension: !!extension,
+		currentContract,
+		contractTermsEnabled: g.get("contractOptions"),
 		salaryCap: g.get("salaryCap") / 1000,
 		t,
 	};
@@ -5802,6 +5846,8 @@ const api = {
 		getLeagueName,
 		getLeagues,
 		getNegotiationProps,
+		getPlayerContractPanel,
+		decideTeamOption,
 		getNumPlayoffTeams,
 		getPlayerGraphStat,
 		getPlayersCommandPalette,

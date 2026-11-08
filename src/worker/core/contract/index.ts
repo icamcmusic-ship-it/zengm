@@ -12,6 +12,8 @@ import type {
 	FlatContractInfo,
 	PlayerWithoutKey,
 } from "../../../common/types.ts";
+import { normalizeContractTerms } from "../../../common/contractTerms.ts";
+import type { ContractTerms } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
@@ -279,7 +281,33 @@ export const createContract = ({
 	if (eid !== undefined) {
 		output.eid = eid;
 	}
+	applyContractTerms(output, contract.terms);
 	return output;
+};
+
+// Option and guarantee terms from a negotiation. Terms that don't apply (like for a 1 season contract) are ignored.
+export const applyContractTerms = (
+	contract: Pick<Contract, "amounts" | "start" | "guaranteed" | "option">,
+	termsInput: ContractTerms | undefined,
+) => {
+	const terms = normalizeContractTerms(termsInput, contract.amounts.length);
+	if (!terms) {
+		return;
+	}
+
+	if (terms.option) {
+		contract.option = {
+			type: terms.option,
+			season: getContractExp(contract),
+		};
+	}
+
+	if (terms.guaranteed !== undefined) {
+		const guaranteed = terms.guaranteed;
+		contract.guaranteed = contract.amounts.map((amount, i) =>
+			i === 0 ? amount : Math.round(amount * guaranteed),
+		);
+	}
 };
 
 // Add a new contract for a player, replacing his contract demand

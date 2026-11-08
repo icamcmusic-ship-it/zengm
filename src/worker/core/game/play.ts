@@ -1,4 +1,5 @@
 import { ALL_STAR_GAME_ONLY, PHASE } from "../../../common/constants.ts";
+import * as contractHooks from "../contract/hooks.ts";
 import {
 	GameSim,
 	allStar,
@@ -334,6 +335,7 @@ const play = async (
 			) {
 				await freeAgents.decreaseDemands();
 				await freeAgents.autoSign();
+				await contractHooks.afterDay();
 			}
 			if (phase === PHASE.REGULAR_SEASON) {
 				await trade.betweenAiTeams();

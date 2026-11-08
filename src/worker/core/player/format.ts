@@ -1,3 +1,4 @@
+import { getTermsFromContract } from "../../../common/contractTerms.ts";
 import { PLAYER, PHASE } from "../../../common/constants.ts";
 import { player, trade } from "../index.ts";
 import { g, helpers } from "../../util/index.ts";
@@ -386,6 +387,11 @@ const processAttrs = (
 							season: remaining.start + i,
 							amount: amount / 1000, // [millions of dollars]
 						}));
+					}
+
+					const terms = getTermsFromContract(currentContract);
+					if (terms) {
+						contract.terms = terms;
 					}
 				}
 

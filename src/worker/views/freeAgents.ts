@@ -11,6 +11,7 @@ import { bySport } from "../../common/sportFunctions.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { helpers } from "../util/index.ts";
 import { validateSeason } from "../util/processInputs.ts";
+import { getFreeAgentMarket } from "../core/freeAgents/market.ts";
 
 const processInputs = (params: RouteParams<"freeAgents">) => {
 	if (g.get("phase") === PHASE.RESIGN_PLAYERS) {
@@ -286,8 +287,15 @@ export default defineView({
 				showRookies: true,
 			});
 
+			// Which AI teams are interested in each available free agent
+			const market =
+				season === "current"
+					? await getFreeAgentMarket(playersByType.available)
+					: {};
+
 			return {
 				capSpace,
+				market,
 				challengeNoFreeAgents: g.get("challengeNoFreeAgents"),
 				freeAgencySeason,
 				numRosterSpots: g.get("maxRosterSize") - userPlayers.length,

@@ -2,6 +2,12 @@ import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { player } from "../index.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, lock } from "../../util/index.ts";
+import type { Negotiation } from "../../../common/types.ts";
+import { getCurrentContract } from "../../../common/contracts.ts";
+import {
+	getExtensionDemand,
+	getExtensionIneligibleReason,
+} from "../contract/extension.ts";
 
 /**
  * Start a new contract negotiation with a player.
@@ -16,7 +22,7 @@ const create = async (
 	pid: number,
 	resigning: boolean,
 	tid: number = g.get("userTid"),
-) => {
+): Promise<string | Negotiation> => {
 	if (
 		g.get("phase") > PHASE.AFTER_TRADE_DEADLINE &&
 		g.get("phase") <= PHASE.RESIGN_PLAYERS &&
@@ -38,6 +44,30 @@ const create = async (
 		throw new Error("Invalid pid");
 	}
 
+	// Extension for a player under contract with this team
+	if (p.tid === tid && tid >= 0 && !resigning) {
+		const reason = getExtensionIneligibleReason(p, tid);
+		if (reason !== undefined) {
+			return reason;
+		}
+		const contract = getCurrentContract(p)!;
+		const extension = getExtensionDemand(p, contract);
+		const moodInfo = await player.moodInfo(p, tid, {
+			contractAmount: extension.amount,
+		});
+		if (!moodInfo.willing) {
+			return `<a href="${helpers.leagueUrl(["player", p.pid])}">${
+				p.firstName
+			} ${p.lastName}</a> doesn't want to talk about an extension right now.`;
+		}
+		return {
+			pid,
+			tid,
+			resigning: false,
+			extension,
+		};
+	}
+
 	if (p.tid !== PLAYER.FREE_AGENT) {
 		return `${p.firstName} ${p.lastName} is not a free agent.`;
 	}
@@ -51,7 +81,7 @@ const create = async (
 		}
 	}
 
-	const negotiation = {
+	const negotiation: Negotiation = {
 		pid,
 		tid,
 		resigning,

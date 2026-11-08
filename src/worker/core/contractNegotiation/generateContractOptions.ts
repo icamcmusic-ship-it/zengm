@@ -10,17 +10,21 @@ export const generateContractOptions = async (
 	negotiation: Negotiation,
 	contract: FlatContractInfo,
 	ovr: number,
+	// First season of the contract, different from the default for an extension
+	startSeasonOverride?: number,
+	// Lengths that can be offered, for an extension which adds seasons to a contract that already has some
+	maxLength?: number,
 ) => {
 	let growthFactor = 0.15;
 
 	// Modulate contract amounts based on last digit of ovr (add some deterministic noise)
 	growthFactor += (ovr % 10) * 0.01 - 0.05;
-	const startSeason = getContractStartSeason();
+	const startSeason = startSeasonOverride ?? getContractStartSeason();
 	let found: number | undefined;
 
 	const allowedLengths = range(
 		g.get("minContractLength"),
-		g.get("maxContractLength") + 1,
+		(maxLength ?? g.get("maxContractLength")) + 1,
 	);
 
 	const contractOptions: {

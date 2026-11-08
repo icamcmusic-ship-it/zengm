@@ -1,4 +1,5 @@
 import { allStar, player, season, team } from "../index.ts";
+import { isHoldingOut } from "../contract/unrest.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import type { Player, Conditions } from "../../../common/types.ts";
@@ -290,7 +291,8 @@ export const processTeam = async (
 					p.injury.gamesRemaining > 0 &&
 					p.injury.gamesRemaining <= playThroughInjuries,
 			},
-			injured: p.injury.gamesRemaining > playThroughInjuries,
+			// Holding out counts as injured, so he doesn't play
+			injured: p.injury.gamesRemaining > playThroughInjuries || isHoldingOut(p),
 			jerseyNumber,
 			ptModifier: p.ptModifier,
 			ovrs: rating.ovrs,
