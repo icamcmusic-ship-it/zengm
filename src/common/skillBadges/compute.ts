@@ -1,7 +1,6 @@
 import { COMPOSITE_WEIGHTS, SKILLS } from "../constants.ts";
 import {
 	BADGE_GROUP_NAMES,
-	COMBO_TIER_NAMES,
 	ORIGINAL_SKILL_LABELS,
 	SKILL_BADGES,
 	SKILL_COMBOS,
@@ -12,6 +11,7 @@ import {
 	type BadgeRatings,
 	type BadgeRatingKey,
 	type SkillBadgeDef,
+	type SkillComboDef,
 } from "./definitions.ts";
 
 export const BADGE_RATING_KEYS: BadgeRatingKey[] = [
@@ -63,7 +63,7 @@ export const conditionMet = (
 export const hasBadge = (ratings: BadgeRatings, def: SkillBadgeDef) =>
 	def.conditions.every((cond) => conditionMet(ratings, cond));
 
-// The main composite of a badge (0-1), used to rank leaders. For flags, higher is "more of a problem".
+// The main composite of a badge (0-1), used to rank leaders.
 export const badgeScore = (ratings: BadgeRatings, def: SkillBadgeDef) => {
 	const cond = def.conditions[0]!;
 	const value = badgeComposite(ratings, cond);
@@ -85,7 +85,7 @@ const cache = new Map<string, string[]>();
 const MAX_CACHE = 50000;
 
 /**
- * Pure function: ratings in, badge labels out (positives first in definition order, then flags). Deterministic, no side effects besides the memo cache. Returned arrays are shared, do not mutate.
+ * Pure function: ratings in, badge labels out (in definition order). Deterministic, no side effects besides the memo cache. Returned arrays are shared, do not mutate.
  */
 export const getSkillBadges = (ratings: BadgeRatings): string[] => {
 	if (SKILL_BADGES.length === 0) {
@@ -186,42 +186,33 @@ export const skillMargin = (ratings: BadgeRatings, label: string) => {
 	);
 };
 
-// Combo tier from the weakest consumed component's margin past its cutoff
-export const COMBO_TIER_CUTOFFS = [0.04, 0.08];
-export const comboTier = (ratings: BadgeRatings, components: string[]) => {
-	const margin = Math.min(...components.map((c) => skillMargin(ratings, c)));
-	let tier = 1;
-	for (const cutoff of COMBO_TIER_CUTOFFS) {
-		if (margin >= cutoff) {
-			tier += 1;
-		}
-	}
-	return tier;
-};
-
-// A combo token is its label followed by one "+" per tier above Bronze, e.g. "Sw", "Sw+", "Sw++"
-export const comboToken = (label: string, tier: number) =>
-	`${label}${"+".repeat(Math.max(0, tier - 1))}`;
-
-export const parseToken = (token: string) => {
-	const match = /^(.*?)(\+*)$/.exec(token)!;
-	return { label: match[1]!, tier: match[2]!.length + 1 };
-};
-
 /** Hover text: just the name, like the original skills' title. */
-export const badgeTitle = (token: string) => {
-	const { label, tier } = parseToken(token);
-	const combo = SKILL_COMBOS_BY_LABEL[label];
-	if (combo) {
-		return `${combo.name} (${COMBO_TIER_NAMES[tier - 1]})`;
+export const badgeTitle = (label: string) =>
+	SKILL_COMBOS_BY_LABEL[label]?.name ??
+	SKILL_BADGES_BY_LABEL[label]?.name ??
+	SKILLS[label] ??
+	label;
+
+/** Which of a combo's parts a player has (what it replaced for him). */
+export const comboParts = (def: SkillComboDef, available: Set<string>) => {
+	if (!def.all.every((c) => available.has(c))) {
+		return undefined;
 	}
-	return SKILL_BADGES_BY_LABEL[label]?.name ?? SKILLS[label] ?? label;
+	const anyHit = def.any?.filter((c) => available.has(c)) ?? [];
+	if (def.any && anyHit.length < (def.minAny ?? 1)) {
+		return undefined;
+	}
+	return [
+		...def.all,
+		...anyHit,
+		...(def.extra?.filter((c) => available.has(c)) ?? []),
+	];
 };
 
 const displayCache = new Map<string, string[]>();
 
 /**
- * THE display function: given (fuzzed) ratings and the player's original ratings.skills, returns the extended tokens to show after the original skills: combos first (with tier), then remaining positive badges, then warning flags. Original skills consumed by a combo are hidden by visibleOriginalSkills. ratings.skills itself is never changed.
+ * THE display function: given (fuzzed) ratings and the player's original ratings.skills, returns the extended labels to show: combos first (one greedy pass, largest first, each part used once), then remaining badges. Original skills consumed by a combo are hidden by visibleOriginalSkills. ratings.skills itself is never changed.
  */
 export const getDisplayBadges = (
 	ratings: BadgeRatings,
@@ -243,20 +234,21 @@ export const getDisplayBadges = (
 	const available = new Set([...skills, ...extended]);
 	const combos: string[] = [];
 	for (const combo of SKILL_COMBOS) {
-		if (!combo.all.every((c) => available.has(c))) {
+		const consumed = comboParts(combo, available);
+		if (!consumed) {
 			continue;
 		}
-		const anyHit = combo.any?.filter((c) => available.has(c)) ?? [];
-		if (combo.any && anyHit.length === 0) {
-			continue;
-		}
-		const consumed = [...combo.all, ...anyHit];
 		for (const c of consumed) {
 			available.delete(c);
 		}
-		combos.push(comboToken(combo.label, comboTier(ratings, consumed)));
+		// A level 2 combo can absorb level 1 combos, so the new one is available for later combos
+		available.add(combo.label);
+		combos.push(combo.label);
 	}
-	const result = [...combos, ...extended.filter((b) => available.has(b))];
+	const result = [
+		...combos.filter((c) => available.has(c)),
+		...extended.filter((b) => available.has(b)),
+	];
 
 	if (displayCache.size >= MAX_CACHE) {
 		displayCache.clear();
@@ -269,10 +261,20 @@ export const getDisplayBadges = (
 export const visibleOriginalSkills = (skills: string[], tokens: string[]) => {
 	const consumed = new Set<string>();
 	for (const token of tokens) {
-		const combo = SKILL_COMBOS_BY_LABEL[parseToken(token).label];
-		if (combo) {
-			for (const c of [...combo.all, ...(combo.any ?? [])]) {
-				consumed.add(c);
+		const stack = [token];
+		while (stack.length > 0) {
+			const combo = SKILL_COMBOS_BY_LABEL[stack.pop()!];
+			if (combo) {
+				for (const c of [
+					...combo.all,
+					...(combo.any ?? []),
+					...(combo.extra ?? []),
+				]) {
+					if (!consumed.has(c)) {
+						consumed.add(c);
+						stack.push(c);
+					}
+				}
 			}
 		}
 	}
@@ -285,22 +287,19 @@ export const MAX_VISIBLE_BADGES = 7;
 
 export type DisplayItem = { token: string; original: boolean };
 
-/** Everything shown next to a player's name, in priority order: combos, remaining original skills, positive badges, warning flags. */
+/** Everything shown next to a player's name, in priority order: combos, remaining original skills, other badges. */
 export const orderDisplayItems = (
 	skills: string[],
 	tokens: string[],
 ): DisplayItem[] => {
 	const combos: DisplayItem[] = [];
 	const positives: DisplayItem[] = [];
-	const flags: DisplayItem[] = [];
 	for (const token of tokens) {
-		const { label } = parseToken(token);
-		const target = SKILL_COMBOS_BY_LABEL[label]
-			? combos
-			: SKILL_BADGES_BY_LABEL[label]?.flag
-				? flags
-				: positives;
-		target.push({ token, original: false });
+		const label = token;
+		(SKILL_COMBOS_BY_LABEL[label] ? combos : positives).push({
+			token,
+			original: false,
+		});
 	}
 	return [
 		...combos,
@@ -309,7 +308,6 @@ export const orderDisplayItems = (
 			original: true,
 		})),
 		...positives,
-		...flags,
 	];
 };
 

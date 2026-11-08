@@ -19,7 +19,11 @@ const Leaders = ({ b }: { b: Badge | Combo }) => (
 				{i > 0 ? ", " : ""}
 				<PlayerCell p={p} />{" "}
 				<span className="text-body-secondary">
-					{"tier" in p ? `${p.tier}, +${p.score}` : p.score}
+					{"parts" in p ? (
+						<span title={`Replaces ${p.parts}`}>+{p.score}</span>
+					) : (
+						p.score
+					)}
 				</span>
 			</span>
 		))}
@@ -44,18 +48,18 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 				skills (3, A, B, Di, Dp, Po, Ps, R, V). They are shown right after the
 				built-in skills, in the same style; hover one to see its name. Scores
 				are on a 0-100 scale; a badge is awarded when the score passes its
-				threshold. Warning flags have lower-case labels. Counts are among{" "}
-				{numPlayers} players on teams or in free agency.
+				threshold. Counts are among {numPlayers} players on teams or in free
+				agency.
 			</p>
 			<p>
-				<b>Combos:</b> when a player has every skill or badge of a combo, they
-				are replaced by the single combo badge (for example Dp + Di shows as
-				Sw). A combo's tier comes from how far past its cutoff the weakest part
-				is: Bronze (shown as e.g. <span className="skill ms-0">Sw</span>
-				), Silver (<span className="skill ms-0">Sw+</span>, 4+ points past) or
-				Gold (<span className="skill ms-0">Sw++</span>, 8+ points). Only the
-				display changes: the built-in skills used by the game simulation stay
-				the same. Badge counts below are before combining.
+				<b>Combos:</b> related skills and badges collapse into one named badge,
+				so players show fewer badges without losing information. For example Dp
+				+ Di shows as <span className="skill ms-0">Sw</span> (Switchable
+				defender). Combos are applied in one pass, biggest first, and each skill
+				or badge is used at most once. Only the display changes: the built-in
+				skills used by the game simulation stay the same. Badge counts below are
+				before combining; hover a leader's margin to see what the combo replaced
+				for him.
 			</p>
 			{selected ? (
 				<div className="mb-4">
@@ -125,7 +129,7 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 							{ title: "Team" },
 							{ title: "Age", sortType: "number" },
 							{ title: "Ovr", sortType: "number" },
-							{ title: "Tier" },
+							{ title: "Replaces" },
 							{
 								title: "Margin",
 								sortType: "number",
@@ -144,7 +148,7 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 								p.abbrev,
 								p.age,
 								p.ovr,
-								p.tier,
+								p.parts,
 								p.score,
 							],
 							classNames: { "table-info": p.tid === userTid },
@@ -163,11 +167,7 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 							{ title: "Replaces" },
 							{ title: "Meaning", sortType: "string" },
 							{ title: "Players", sortType: "number" },
-							{
-								title: "B/S/G",
-								desc: "Players at Bronze / Silver / Gold tier",
-							},
-							{ title: "Top 5 (tier, margin)", noSearch: true },
+							{ title: "Top 5 (margin)", noSearch: true },
 						]}
 						defaultSort={[4, "desc"]}
 						name="SkillBadges:combos"
@@ -190,11 +190,10 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 									searchValue: b.label,
 									sortValue: b.label,
 								},
-								b.name,
+								b.level === 2 ? `${b.name} (level 2)` : b.name,
 								b.components,
 								b.meaning,
 								b.count,
-								b.tierCounts.join(" / "),
 								{
 									value: <Leaders b={b} />,
 									searchValue: b.leaders.map((p) => p.name).join(" "),

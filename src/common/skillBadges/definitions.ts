@@ -26,8 +26,7 @@ export type BadgeGroup =
 	| "defense"
 	| "rebounding"
 	| "physical"
-	| "mental"
-	| "flag";
+	| "mental";
 
 // A composite is a weighted average of ratings on a 0-1 scale (same maths as compositeRating, without fuzz).
 export type BadgeComposite = {
@@ -48,7 +47,6 @@ export type SkillBadgeDef = {
 	meaning: string;
 	// All conditions must hold. The first one is the "main" composite, used for ranking leaders.
 	conditions: BadgeCondition[];
-	flag?: boolean;
 };
 
 const c = (
@@ -70,7 +68,6 @@ export const BADGE_GROUP_NAMES: Record<BadgeGroup, string> = {
 	rebounding: "Rebounding",
 	physical: "Physical",
 	mental: "Mental",
-	flag: "Warning flags",
 };
 
 // Cutoffs were calibrated on randomly generated 30-team leagues, see skillBadges.test.ts (calibration report is skipped by default).
@@ -554,129 +551,6 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 			),
 		],
 	},
-
-	// Warning flags: same look as every other badge, told apart only by their lower-case label
-	{
-		label: "ld",
-		name: "Liability defender",
-		group: "flag",
-		meaning:
-			"Defensive ratings are well below normal: opponents will target him.",
-		flag: true,
-		conditions: [
-			c(
-				[
-					["hgt", 1],
-					["stre", 1],
-					["spd", 1],
-					["jmp", 0.5],
-					["diq", 2],
-				],
-				0.39,
-				"below",
-			),
-		],
-	},
-	{
-		label: "pb",
-		name: "Poor-shooting big",
-		group: "flag",
-		meaning:
-			"Tall with little shooting touch: clogs the floor and can be fouled for free.",
-		flag: true,
-		conditions: [
-			c(
-				[
-					["tp", 1],
-					["fg", 1],
-					["ft", 1],
-				],
-				0.3,
-				"below",
-			),
-			c([["hgt", 1]], 0.6),
-		],
-	},
-	{
-		label: "to",
-		name: "Turnover-prone",
-		group: "flag",
-		meaning: "Poor handle and instincts: likely to give the ball away.",
-		flag: true,
-		conditions: [
-			c(
-				[
-					["drb", 1],
-					["oiq", 1.2],
-					["pss", 0.3],
-				],
-				0.335,
-				"below",
-			),
-		],
-	},
-	{
-		label: "fp",
-		name: "Foul-prone",
-		group: "flag",
-		meaning: "Low defensive IQ and mobility: picks up fouls easily.",
-		flag: true,
-		conditions: [
-			c(
-				[
-					[50, 3],
-					["hgt", 1],
-					["diq", -1],
-					["spd", -1],
-				],
-				0.705,
-			),
-		],
-	},
-	{
-		label: "hk",
-		name: "Hack-a target",
-		group: "flag",
-		meaning: "A very poor free-throw shooter.",
-		flag: true,
-		conditions: [c([["ft", 1]], 0.25, "below")],
-	},
-	{
-		label: "ns",
-		name: "Non-shooter",
-		group: "flag",
-		meaning: "A guard or wing with no outside shot: defenses can sag off him.",
-		flag: true,
-		conditions: [
-			c(
-				[
-					["tp", 1],
-					["fg", 0.4],
-				],
-				0.33,
-				"below",
-			),
-			c([["hgt", 1]], 0.5, "below"),
-		],
-	},
-	{
-		label: "sl",
-		name: "Slow-footed",
-		group: "flag",
-		meaning:
-			"Lacks foot speed: struggles to stay in front and to run the floor.",
-		flag: true,
-		conditions: [
-			c(
-				[
-					["spd", 1],
-					["jmp", 0.3],
-				],
-				0.3,
-				"below",
-			),
-		],
-	},
 ];
 
 // Other sports have different ratings, so they get no extended badges
@@ -705,14 +579,128 @@ export type SkillComboDef = {
 	meaning: string;
 	// Every one of these is needed...
 	all: string[];
-	// ...plus at least one of these, if given
+	// ...plus at least minAny of these (default 1). Every one present is absorbed too, so minAny 0 means "optional extras".
 	any?: string[];
+	minAny?: number;
+	// Absorbed too when present, but never required
+	extra?: string[];
+	// Level 2 combos group level 1 combos (and badges) into a broader one. All level 1 combos are tried first.
+	level?: 2;
 };
 
-export const COMBO_TIER_NAMES = ["Bronze", "Silver", "Gold"] as const;
+// Minimum number of parts a combo needs; within a level, bigger combos are tried first
+export const comboSize = (def: SkillComboDef) =>
+	def.all.length + (def.any ? (def.minAny ?? 1) : 0);
 
-// Applied in this order. Each consumed component disappears from the display and is replaced by the combo, so a component can only feed the first combo that matches.
+// One greedy pass, largest combos first (ties in this order), each skill or badge used at most once
 const ALL_BASKETBALL_COMBOS: SkillComboDef[] = [
+	{
+		label: "PS",
+		name: "Pure shooter",
+		meaning:
+			"Shoots it from everywhere: three point shooter (3), off-dribble (Pu), mid-range (Mr) and free throws (FT); also absorbs Cs and Hp.",
+		all: ["3", "Pu", "Mr", "FT"],
+		any: ["Cs", "Hp"],
+		minAny: 0,
+	},
+	{
+		label: "Mc",
+		name: "Maestro",
+		meaning:
+			"Runs everything: passer (Ps), ball handler (B), plus ball-secure (Sf) and/or ankle breaker (Ab).",
+		all: ["Ps", "B"],
+		any: ["Sf", "Ab"],
+		minAny: 1,
+	},
+	{
+		label: "Da",
+		name: "Defensive anchor",
+		meaning:
+			"Guards inside and out and erases shots: Dp, Di and Bk; also absorbs St and Pa.",
+		all: ["Dp", "Di", "Bk"],
+		any: ["St", "Pa"],
+		minAny: 0,
+	},
+	{
+		label: "Ib",
+		name: "Interior beast",
+		meaning:
+			"Owns the paint: post scorer (Po), rim finisher (Fn) and dunker (Dk); also absorbs Bu.",
+		all: ["Po", "Fn", "Dk"],
+		any: ["Bu"],
+		minAny: 0,
+	},
+	{
+		label: "Bm",
+		name: "Board master",
+		meaning: "Rebounder (R) on both glasses: Or and Dr.",
+		all: ["R", "Or", "Dr"],
+	},
+	{
+		label: "Sp",
+		name: "Sharpshooter",
+		meaning:
+			"Three point shooter (3) who is automatic from the line (FT); also absorbs Cs.",
+		all: ["3", "FT"],
+		any: ["Cs"],
+		minAny: 0,
+	},
+	{
+		label: "Sn",
+		name: "Spot-up sniper",
+		meaning: "Three point shooter (3) and catch-and-shoot specialist (Cs).",
+		all: ["3", "Cs"],
+	},
+	{
+		label: "Sm",
+		name: "Shot maker",
+		meaning: "Off-dribble (Pu) and mid-range (Mr) shot maker; also absorbs Hp.",
+		all: ["Pu", "Mr"],
+		any: ["Hp"],
+		minAny: 0,
+	},
+	{
+		label: "Pk",
+		name: "Pick-and-pop big",
+		meaning: "Stretch big (Sb) who also shoots from the high post (Hp).",
+		all: ["Sb", "Hp"],
+	},
+	{
+		label: "Pf",
+		name: "Paint finisher",
+		meaning: "Post scorer (Po) and rim finisher (Fn).",
+		all: ["Po", "Fn"],
+	},
+	{
+		label: "Pw",
+		name: "Power finisher",
+		meaning: "Dunker (Dk) who also bullies (Bu) or finishes (Fn) inside.",
+		all: ["Dk"],
+		any: ["Bu", "Fn"],
+		minAny: 1,
+	},
+	{
+		label: "FG",
+		name: "Floor general",
+		meaning: "Passer (Ps) and ball handler (B).",
+		all: ["Ps", "B"],
+	},
+	{
+		label: "Bw",
+		name: "Ball wizard",
+		meaning: "Ball handler (B) and ankle breaker (Ab); also absorbs Sf.",
+		all: ["B", "Ab"],
+		any: ["Sf"],
+		minAny: 0,
+	},
+	{
+		label: "Fb",
+		name: "Facilitating big",
+		meaning: "Post playmaker (Pt) who is also a passer (Ps) or connector (Cn).",
+		all: ["Pt"],
+		any: ["Ps", "Cn"],
+		minAny: 1,
+	},
 	{
 		label: "Sw",
 		name: "Switchable defender",
@@ -721,53 +709,166 @@ const ALL_BASKETBALL_COMBOS: SkillComboDef[] = [
 		all: ["Dp", "Di"],
 	},
 	{
-		label: "Es",
-		name: "Elite shooter",
-		meaning:
-			"Three point shooter (3) who is also a catch-and-shoot (Cs) or off-dribble (Pu) specialist.",
-		all: ["3"],
-		any: ["Cs", "Pu"],
-	},
-	{
-		label: "FG",
-		name: "Floor general",
-		meaning: "Passer (Ps) and ball handler (B): runs the offence.",
-		all: ["Ps", "B"],
-	},
-	{
-		label: "In",
-		name: "Interior force",
-		meaning: "Post scorer (Po) who also finishes at the rim (Fn).",
-		all: ["Po", "Fn"],
-	},
-	{
 		label: "Rp",
 		name: "Rim protector",
 		meaning: "Interior defender (Di) and shot blocker (Bk).",
 		all: ["Di", "Bk"],
 	},
 	{
-		label: "Bm",
-		name: "Board master",
-		meaning: "Rebounder (R) who also crashes the offensive glass (Or).",
-		all: ["R", "Or"],
+		label: "Pl",
+		name: "Perimeter lockdown",
+		meaning:
+			"Point-of-attack defender (Pa) who is also a pickpocket (St), perimeter defender (Dp) or two-way wing (Tw).",
+		all: ["Pa"],
+		any: ["St", "Dp", "Tw"],
+		minAny: 1,
 	},
 	{
-		label: "Hd",
-		name: "Hounding defender",
-		meaning: "Pickpocket (St) and point-of-attack defender (Pa).",
-		all: ["St", "Pa"],
+		label: "3D",
+		name: "3-and-D wing",
+		meaning: "Three point shooter (3) who is also a two-way wing (Tw).",
+		all: ["3", "Tw"],
+	},
+	{
+		label: "Oc",
+		name: "Offensive crasher",
+		meaning:
+			"Offensive glass (Or) plus rebounder (R) or defensive rebounder (Dr).",
+		all: ["Or"],
+		any: ["R", "Dr"],
+		minAny: 1,
+	},
+	{
+		label: "Gc",
+		name: "Glass cleaner",
+		meaning: "Rebounder (R) and defensive rebounder (Dr).",
+		all: ["R", "Dr"],
 	},
 	{
 		label: "Ex",
 		name: "Explosive athlete",
-		meaning: "Athlete (A) and athletic freak (Af).",
+		meaning: "Athlete (A) and athletic freak (Af); also absorbs Tr.",
 		all: ["A", "Af"],
+		any: ["Tr"],
+		minAny: 0,
+	},
+	{
+		label: "Py",
+		name: "Physical specialist",
+		meaning:
+			"Physical presence (Ph) plus iron lungs (Fit), athlete (A) or athletic freak (Af).",
+		all: ["Ph"],
+		any: ["Fit", "A", "Af"],
+		minAny: 1,
+	},
+	{
+		label: "Gt",
+		name: "Go-to scorer",
+		meaning:
+			"Any two of volume scorer (V), isolation scorer (Is), closer (Cl) and foul drawer (Fd).",
+		all: [],
+		any: ["V", "Is", "Cl", "Fd"],
+		minAny: 2,
+	},
+	{
+		label: "Gl",
+		name: "Glue guy",
+		meaning:
+			"Any two of high IQ (Hi), glue guy (Gg), hustler (Hu) and connector (Cn).",
+		all: [],
+		any: ["Hi", "Gg", "Hu", "Cn"],
+		minAny: 2,
+	},
+	{
+		label: "Mo",
+		name: "Motor",
+		meaning:
+			"Any two of transition runner (Tr), iron lungs (Fit) and hustler (Hu).",
+		all: [],
+		any: ["Tr", "Fit", "Hu"],
+		minAny: 2,
+	},
+	{
+		label: "Sc",
+		name: "Scoring machine",
+		meaning:
+			"Scores every way: any two scoring combos (PS, Sp, Sn, Sm, Pk, Ib, Pf, Pw, Gt, 3D).",
+		all: [],
+		any: ["PS", "Sp", "Sn", "Sm", "Pk", "Ib", "Pf", "Pw", "Gt", "3D"],
+		minAny: 2,
+		extra: [
+			"Mr",
+			"Pu",
+			"Cs",
+			"FT",
+			"Hp",
+			"Dk",
+			"Fn",
+			"Bu",
+			"Fd",
+			"Cl",
+			"Is",
+			"V",
+			"3",
+			"Po",
+		],
+		level: 2,
+	},
+	{
+		label: "Dm",
+		name: "Defensive menace",
+		meaning: "Any two defensive combos (Da, Sw, Rp, Pl).",
+		all: [],
+		any: ["Da", "Sw", "Rp", "Pl"],
+		minAny: 2,
+		extra: ["St", "Pa", "Tw", "Bk", "Di", "Dp"],
+		level: 2,
+	},
+	{
+		label: "Pe",
+		name: "Playmaking engine",
+		meaning: "Any two playmaking combos (Mc, FG, Bw, Fb).",
+		all: [],
+		any: ["Mc", "FG", "Bw", "Fb"],
+		minAny: 2,
+		extra: ["Sf", "Ab", "Cn", "Pt", "Ps", "B"],
+		level: 2,
+	},
+	{
+		label: "Pr",
+		name: "Physical marvel",
+		meaning:
+			"Any two of explosive athlete (Ex), physical specialist (Py) and motor (Mo).",
+		all: [],
+		any: ["Ex", "Py", "Mo"],
+		minAny: 2,
+		extra: ["Tr", "Fit", "A", "Af", "Ph", "Hu"],
+		level: 2,
+	},
+	{
+		label: "Rg",
+		name: "Rebounding giant",
+		meaning:
+			"Board master (Bm), offensive crasher (Oc) or glass cleaner (Gc) who is also a rim protector (Rp) or defensive anchor (Da).",
+		all: [],
+		any: ["Bm", "Oc", "Gc", "Rp", "Da"],
+		minAny: 2,
+		extra: ["Or", "Dr", "R", "Bk", "Di"],
+		level: 2,
 	},
 ];
 
 export const SKILL_COMBOS: SkillComboDef[] =
-	__SPORT === "basketball" ? ALL_BASKETBALL_COMBOS : [];
+	__SPORT === "basketball"
+		? ALL_BASKETBALL_COMBOS.map((def, i) => ({ def, i }))
+				.sort(
+					(a, b) =>
+						(a.def.level ?? 1) - (b.def.level ?? 1) ||
+						comboSize(b.def) - comboSize(a.def) ||
+						a.i - b.i,
+				)
+				.map(({ def }) => def)
+		: [];
 
 export const SKILL_COMBOS_BY_LABEL: Record<string, SkillComboDef> =
 	Object.fromEntries(SKILL_COMBOS.map((def) => [def.label, def]));

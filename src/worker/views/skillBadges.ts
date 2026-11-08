@@ -7,12 +7,12 @@ import { PLAYER } from "../../common/constants.ts";
 import {
 	BADGE_GROUP_NAMES,
 	BADGE_RATING_KEYS,
-	COMBO_TIER_NAMES,
 	SKILL_BADGES,
 	SKILL_COMBOS,
 	badgeScore,
+	comboParts,
 	getDisplayBadges,
-	parseToken,
+	getSkillBadges,
 	skillMargin,
 	conditionMet as matches,
 	pickBadgeRatings,
@@ -82,6 +82,7 @@ export default defineView({
 			tid: number;
 			ratings: BadgeRatings;
 			display: string[];
+			skills: string[];
 		};
 		const rows: Row[] = [];
 		for (const p of formatted) {
@@ -97,6 +98,7 @@ export default defineView({
 					tid: p.tid,
 					ratings,
 					display: getDisplayBadges(ratings, p.ratings.skills ?? []),
+					skills: p.ratings.skills ?? [],
 				});
 			}
 		}
@@ -122,7 +124,6 @@ export default defineView({
 				group: def.group,
 				groupName: BADGE_GROUP_NAMES[def.group],
 				meaning: def.meaning,
-				flag: !!def.flag,
 				thresholds: def.conditions.map(
 					(cond) =>
 						`${cond.dir === "below" ? "<=" : ">="} ${Math.round(cond.cutoff * 100)}`,
@@ -139,23 +140,28 @@ export default defineView({
 		const combos = SKILL_COMBOS.map((def) => {
 			const holders = rows
 				.flatMap((r) => {
-					const token = r.display.find(
-						(t) => parseToken(t).label === def.label,
-					);
-					if (token === undefined) {
+					if (!r.display.includes(def.label)) {
 						return [];
 					}
-					// Same rule as comboTier: the weakest consumed component
+					// What it replaced for him, and how far past its cutoff the weakest part is
+					const parts =
+						comboParts(
+							def,
+							new Set([...r.skills, ...getSkillBadges(r.ratings)]),
+						) ?? def.all;
 					const margin = Math.min(
-						...def.all.map((c) => skillMargin(r.ratings, c)),
-						...(def.any ?? [])
-							.map((c) => skillMargin(r.ratings, c))
-							.filter((m) => m >= 0),
+						...parts.map((c) => skillMargin(r.ratings, c)),
 					);
-					return [{ row: r, score: margin, tier: parseToken(token).tier }];
+					return [
+						{
+							row: r,
+							score: margin,
+							parts,
+						},
+					];
 				})
 				.sort((a, b) => b.score - a.score || b.row.ovr - a.row.ovr);
-			const toLeader = ({ row, score, tier }: (typeof holders)[number]) => ({
+			const toLeader = ({ row, score, parts }: (typeof holders)[number]) => ({
 				pid: row.pid,
 				name: row.name,
 				pos: row.pos,
@@ -164,18 +170,25 @@ export default defineView({
 				abbrev: row.abbrev,
 				tid: row.tid,
 				score: Math.round(score * 100),
-				tier: COMBO_TIER_NAMES[tier - 1]!,
+				parts: parts.join(" + "),
 			});
 			return {
 				label: def.label,
 				name: def.name,
 				meaning: def.meaning,
-				components:
-					def.all.join(" + ") + (def.any ? ` + (${def.any.join(" or ")})` : ""),
+				components: [
+					...def.all,
+					...(def.any
+						? [
+								def.minAny === 0
+									? `optional ${def.any.join("/")}`
+									: `${def.minAny ?? 1}+ of ${def.any.join("/")}`,
+							]
+						: []),
+					...(def.extra ? [`absorbs ${def.extra.join("/")}`] : []),
+				].join(" + "),
+				level: def.level ?? 1,
 				count: holders.length,
-				tierCounts: COMBO_TIER_NAMES.map(
-					(_, i) => holders.filter((h) => h.tier === i + 1).length,
-				),
 				leaders: holders.slice(0, LEADERS).map(toLeader),
 				list:
 					inputs.label === def.label
