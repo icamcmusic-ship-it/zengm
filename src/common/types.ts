@@ -651,6 +651,12 @@ export type GameAttributesLeague = {
 	elamPoints: number;
 	// Basketball: store each game's play-by-play with its box score
 	storePlayByPlay: boolean;
+	// Basketball: show the play-by-play feed in the live game view
+	pbpLiveGame: boolean;
+	// Basketball: box score play-by-play tab always, or only after pressing a button
+	pbpBoxScore: import("./pbpSettings.ts").PbpBoxScoreMode;
+	// Basketball: which games keep their play-by-play (storePlayByPlay false still means none, for old leagues)
+	pbpStore: import("./pbpSettings.ts").PbpStoreScope;
 	// Basketball: technical and flagrant fouls, ejections in the game sim
 	technicalFouls: boolean;
 	realisticPossessions: boolean;

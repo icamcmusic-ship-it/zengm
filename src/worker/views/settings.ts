@@ -1,3 +1,4 @@
+import { getPbpStoreScope } from "../../common/pbpSettings.ts";
 import { g } from "../util/index.ts";
 import type {
 	GameAttributesLeague,
@@ -85,7 +86,9 @@ type Key =
 	| "elamMinutes"
 	| "elamOvertime"
 	| "elamPoints"
-	| "storePlayByPlay"
+	| "pbpLiveGame"
+	| "pbpBoxScore"
+	| "pbpStore"
 	| "technicalFouls"
 	| "realisticPossessions"
 	| "injuryDepth"
@@ -307,7 +310,12 @@ export const getInitialSettings = (): Settings => {
 		elamMinutes: g.get("elamMinutes"),
 		elamOvertime: g.get("elamOvertime"),
 		elamPoints: g.get("elamPoints"),
-		storePlayByPlay: g.get("storePlayByPlay"),
+		pbpLiveGame: g.get("pbpLiveGame"),
+		pbpBoxScore: g.get("pbpBoxScore"),
+		pbpStore: getPbpStoreScope({
+			pbpStore: g.get("pbpStore"),
+			storePlayByPlay: g.get("storePlayByPlay"),
+		}),
 		technicalFouls: g.get("technicalFouls"),
 		realisticPossessions: g.get("realisticPossessions"),
 		injuryDepth: g.get("injuryDepth"),

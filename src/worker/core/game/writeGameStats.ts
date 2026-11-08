@@ -1,3 +1,4 @@
+import { getPbpStoreScope, shouldStorePbp } from "../../../common/pbpSettings.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { updatePlayerAwards } from "../awards/awardsByPlayer.ts";
 import { idb } from "../../db/index.ts";
@@ -239,7 +240,14 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	if (
 		__SPORT === "basketball" &&
 		results.playByPlay !== undefined &&
-		g.get("storePlayByPlay")
+		shouldStorePbp(
+			getPbpStoreScope({
+				pbpStore: g.get("pbpStore"),
+				storePlayByPlay: g.get("storePlayByPlay"),
+			}),
+			[results.team[0].id, results.team[1].id],
+			g.get("userTids"),
+		)
 	) {
 		gameStats.pbp = encodePlayByPlay(results.playByPlay);
 	}

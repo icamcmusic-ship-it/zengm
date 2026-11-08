@@ -19,6 +19,7 @@ import { toWorker } from "../../util/toWorker.ts";
 import type { View } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import useLocalStorageState from "use-local-storage-state";
+import { useLocal } from "../../util/local.ts";
 import { DEFAULT_SPORT_STATE as DEFAULT_SPORT_STATE_BASEBALL } from "../../util/processLiveGameEvents.baseball.tsx";
 import { DEFAULT_SPORT_STATE as DEFAULT_SPORT_STATE_FOOTBALL } from "../../util/processLiveGameEvents.football.tsx";
 import { processLiveGameEvents } from "../../util/processLiveGameEvents.ts";
@@ -281,6 +282,9 @@ const getNavigateWarning = (exhibition: boolean | undefined) => {
 export const LiveGame = (props: View<"liveGame">) => {
 	const [paused, setPaused] = useState(false);
 	const pausedRef = useRef(paused);
+	// Basketball setting: with the feed off, the score, clock and box score still update live
+	const showPlayByPlay = useLocal(["pbpLiveGame"]).pbpLiveGame !== false;
+
 	const [speed, setSpeed] = useLocalStorageState("live-game-speed", {
 		defaultValue: String(DEFAULT_SPEED),
 	});
@@ -1067,14 +1071,16 @@ export const LiveGame = (props: View<"liveGame">) => {
 												</button>
 											))
 										: null}
-									<button
-										className="btn btn-light-bordered"
-										onClick={() => {
-											playByPlayDiv.current?.scrollIntoView();
-										}}
-									>
-										Plays
-									</button>
+									{showPlayByPlay ? (
+										<button
+											className="btn btn-light-bordered"
+											onClick={() => {
+												playByPlayDiv.current?.scrollIntoView();
+											}}
+										>
+											Plays
+										</button>
+									) : null}
 								</div>
 							</div>
 						</div>
@@ -1118,11 +1124,13 @@ export const LiveGame = (props: View<"liveGame">) => {
 								title="Speed"
 							/>
 						</div>
-						<PlayByPlay
-							boxScore={boxScore.current}
-							entries={playByPlayEntries.current}
-							playByPlayDivRef={playByPlayDiv}
-						/>
+						{showPlayByPlay ? (
+							<PlayByPlay
+								boxScore={boxScore.current}
+								entries={playByPlayEntries.current}
+								playByPlayDivRef={playByPlayDiv}
+							/>
+						) : null}
 					</div>
 				</div>
 			</div>

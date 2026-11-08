@@ -221,10 +221,9 @@ export const getDefaultSettings = () => {
 		elamMinutes: unwrapGameAttribute(defaultGameAttributes, "elamMinutes"),
 		elamOvertime: unwrapGameAttribute(defaultGameAttributes, "elamOvertime"),
 		elamPoints: unwrapGameAttribute(defaultGameAttributes, "elamPoints"),
-		storePlayByPlay: unwrapGameAttribute(
-			defaultGameAttributes,
-			"storePlayByPlay",
-		),
+		pbpLiveGame: unwrapGameAttribute(defaultGameAttributes, "pbpLiveGame"),
+		pbpBoxScore: unwrapGameAttribute(defaultGameAttributes, "pbpBoxScore"),
+		pbpStore: unwrapGameAttribute(defaultGameAttributes, "pbpStore"),
 		// Off by default for existing leagues, on for new ones
 		technicalFouls: true,
 		// Off by default for existing leagues, on for new ones

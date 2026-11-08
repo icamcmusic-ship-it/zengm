@@ -92,6 +92,9 @@ const gameAttributesKeysSportSpecific = {
 		"elamOvertime",
 		"elamPoints",
 		"storePlayByPlay",
+		"pbpLiveGame",
+		"pbpBoxScore",
+		"pbpStore",
 		"technicalFouls",
 		"realisticPossessions",
 		"injuryDepth",
@@ -598,6 +601,9 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	elamOvertime: false,
 	elamPoints: 8,
 	storePlayByPlay: true,
+	pbpLiveGame: true,
+	pbpBoxScore: "always",
+	pbpStore: "all",
 	// Off for existing leagues (and tests), so their games play out as before; new leagues turn it on (see views/newLeague.ts)
 	technicalFouls: false,
 	// The realistic possession model (shot clock, transition, late-clock shots, end-of-period clock management; see

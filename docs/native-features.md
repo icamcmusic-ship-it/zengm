@@ -49,6 +49,8 @@ This fork adds a set of pages and tools to Basketball GM that used to live in th
 
 - **Where:** League menu → _Trade Grader_, `/l/:lid/trade_grader[/:tab/:team/:season/:ws]`; grades also show on Trade Summary and the transactions list.
 - **What:** each side of every trade graded by the win shares what it received produced for it. A toggle counts **regular season + playoffs** (default, `ws` = `all`) or **regular season only** (`rs`); Trade Summary follows the last choice made on the grader (per browser). Each side notes the titles its team won with a player it received playing for it in those playoffs.
+- **Settings (Game Simulation):** _Show Play-by-Play in Live Games_ (on; off hides the live feed, score/clock/box score still update), _Box Score Play-by-Play_ (_Always show_ as a tab, or _Show on button press_: text is only made after pressing _Show play-by-play_, remembered per game for the browser session) and _Save Play-by-Play_ (_All games_, _My team's games only_, _None_; replaces the old on/off `storePlayByPlay`, which is kept in step and still means _None_ when off). Helpers and tests: `src/common/pbpSettings.ts`.
+- **Known limits:** the wording assumes 12-minute quarters for clock-based phrases. Elam ending and shootout events keep the original wording.
 
 ## Draft Scouting: College stats and Regenerate ratings
 
