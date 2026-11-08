@@ -1,6 +1,14 @@
 // The ratings regenerator: rebuild a class (or one player) into varied, specialized builds without changing anyone's
 // overall. Pure and deterministic: same seed + settings + inputs = same results.
 
+import { archetypeToBuild, personalizeSeed } from "../archetypes/target.ts";
+import {
+	ARCHETYPES as NEW_ARCHETYPES,
+	classify,
+} from "../archetypes/classify.ts";
+import { gateFactor } from "../archetypes/score.ts";
+import { scoreAll } from "../archetypes/classify.ts";
+import type { Norms } from "../archetypes/types.ts";
 import { scoutingEffectCutoff, scoutingEffectStddev } from "../budgetLevels.ts";
 import { Rng, clamp } from "./rng.ts";
 import {
@@ -33,6 +41,9 @@ export type PlayerLock = {
 
 	// Force this build
 	build?: string;
+
+	// Aim at this archetype (an id from src/common/archetypes) instead of drawing a build
+	archetype?: string;
 
 	// Pinned ratings: taken literally and never shifted
 	ratings?: Partial<Record<RatingKey, number>>;
@@ -72,6 +83,11 @@ export type PlayerResult = {
 	before: PlayerState;
 	after: PlayerState;
 	build: { name: string; tags: string[] };
+
+	// The archetype his new ratings derive to (what the UI shows), and the one that was aimed at, if any
+	derived: { id: string; name: string; label: string; secondaryId?: string };
+	// matched: he derives to it as his primary archetype; inLabel: it is his primary or his hybrid partner
+	target?: { id: string; name: string; matched: boolean; inLabel: boolean };
 
 	// The overall he was asked to be built to
 	targetOvr: number;
@@ -118,6 +134,16 @@ const state = (
 	hgtInches,
 });
 
+const derivedOf = (ratings: BuildRatings, norms?: Norms) => {
+	const c = classify(ratings, { norms });
+	return {
+		id: c.id,
+		name: c.name,
+		label: c.label,
+		secondaryId: c.secondary?.id,
+	};
+};
+
 const clampPot = (pot: number, ovr: number) => clamp(Math.round(pot), ovr, 100);
 
 // Seeded scouting fuzz, the same distribution as the game's genFuzz
@@ -132,6 +158,7 @@ export const regenerateClass = (
 	F: Formulas,
 	inputs: PlayerInput[],
 	settingsInput: Partial<BuildSettings>,
+	opts: { norms?: Norms } = {},
 ): ClassResult => {
 	const s = normalizeSettings(settingsInput);
 	const rng = new Rng(s.seed);
@@ -162,6 +189,7 @@ export const regenerateClass = (
 		length: inputs.length,
 	});
 	const buildCounts: Record<string, number> = {};
+	const poolUsed: Record<string, number> = {};
 
 	for (const [rank, { p, i }] of order.entries()) {
 		const lock = p.lock;
@@ -202,7 +230,34 @@ export const regenerateClass = (
 			counts,
 		);
 		const forced = lock?.build ? archetypeByName(lock.build) : undefined;
-		const arch = forced ?? rolled;
+		// Aiming at an archetype: a forced one, else drawn from the class's archetype pool (least used first) if he fits one
+		let targetId: string | undefined = lock?.archetype;
+		if (!targetId && !lock?.build && s.archetypePool.length > 0) {
+			const fits = s.archetypePool.filter((id) => {
+				const a = NEW_ARCHETYPES.find((x) => x.id === id);
+				return a && gateFactor(base.hgt, a.hgt) >= 0.6;
+			});
+			if (fits.length > 0) {
+				const arng = prng.child("archetypePool");
+				const pick = arng.weighted(
+					fits,
+					(id) => 1 / (1 + (poolUsed[id] ?? 0)) ** 2,
+				);
+				poolUsed[pick] = (poolUsed[pick] ?? 0) + 1;
+				targetId = pick;
+			}
+		}
+		let aimed = !forced && targetId ? archetypeToBuild(targetId) : undefined;
+		if (aimed && targetId) {
+			aimed = archetypeToBuild(
+				targetId,
+				personalizeSeed(targetId, base, (r) => F.ovr(r), opts.norms),
+			);
+		}
+		if (!aimed) {
+			targetId = undefined;
+		}
+		const arch = forced ?? aimed ?? rolled;
 		counts.n[arch.name] = (counts.n[arch.name] ?? 0) + 1;
 		if (rank < TOP_OF_BOARD) {
 			counts.top[arch.name] = (counts.top[arch.name] ?? 0) + 1;
@@ -220,14 +275,60 @@ export const regenerateClass = (
 			pinned = Object.keys(pins).length > 0 ? pins : null;
 		}
 
-		const built = rebuildRatings(F, prng, base, targetOvr, arch, pinned, {
-			specialization: s.specialization,
-			buildNoise: s.buildNoise,
-			skillCap: s.skillCap,
-			physCap: s.physCap,
-			signatureSkills: s.signatureSkills,
-			fuzz: p.fuzz,
-		});
+		const run = (specialization: number, rng: Rng, using = arch) =>
+			rebuildRatings(F, rng, base, targetOvr, using, pinned, {
+				specialization,
+				buildNoise: s.buildNoise,
+				skillCap: s.skillCap,
+				physCap: s.physCap,
+				signatureSkills: s.signatureSkills,
+				fuzz: p.fuzz,
+			});
+		let built = run(s.specialization, prng);
+
+		// An aimed archetype is checked against what the ratings now derive to. If it missed, lean in harder (and re-jitter)
+		// a few times and keep the attempt that fits the target best.
+		let matched = false;
+		if (aimed && targetId && !lock?.skip) {
+			const fit = (r: BuildRatings) => {
+				const sc = scoreAll(r, opts.norms).scored;
+				const i = sc.findIndex((x) => x.a.id === targetId);
+				return { matched: i === 0, z: sc[i]!.z - sc[0]!.z };
+			};
+			let best = fit(built.ratings);
+			matched = best.matched;
+			// What the solver did to his ratings (caps, the overall) is then corrected for: the missing push is added to the offsets
+			const acc: Partial<Record<RatingKey, number>> = { ...aimed!.o };
+			for (let n = 0; n < 4; n++) {
+				if (matched) {
+					break;
+				}
+				const corr = personalizeSeed(
+					targetId,
+					built.ratings,
+					(r) => F.ovr(r),
+					opts.norms,
+					300,
+					{},
+				);
+				for (const k of Object.keys(corr) as RatingKey[]) {
+					acc[k] = (acc[k] ?? 0) + corr[k]! * (1 + 0.35 * n);
+				}
+				const attempt = run(
+					Math.max(s.specialization, 1),
+					prng.child(`aim${n}`),
+					archetypeToBuild(targetId, { ...acc })!,
+				);
+				const f = fit(attempt.ratings);
+				const closer =
+					attempt.ovr === built.ovr || attempt.shortfall <= built.shortfall;
+				if (closer && (f.matched || f.z > best.z)) {
+					built = attempt;
+					best = f;
+					matched = f.matched;
+				}
+			}
+		}
 		const ovr = F.ovr(built.ratings);
 
 		let fuzz = p.fuzz;
@@ -278,6 +379,18 @@ export const regenerateClass = (
 			before,
 			after,
 			build: { name: arch.name, tags: arch.tags },
+			derived: derivedOf(after.ratings, opts.norms),
+			target:
+				aimed && targetId
+					? {
+							id: targetId,
+							name: aimed.name,
+							matched,
+							inLabel:
+								matched ||
+								derivedOf(after.ratings, opts.norms).secondaryId === targetId,
+						}
+					: undefined,
 			targetOvr,
 			ovrShortfall: skipped ? 0 : built.shortfall,
 			changed,
@@ -300,11 +413,17 @@ export const regenerateOne = (
 	F: Formulas,
 	input: PlayerInput,
 	settingsInput: Partial<BuildSettings>,
+	opts: { norms?: Norms } = {},
 ): PlayerResult => {
-	const result = regenerateClass(F, [input], {
-		...settingsInput,
-		buildsPerClass: 0,
-		diversity: settingsInput.diversity ?? 100,
-	});
+	const result = regenerateClass(
+		F,
+		[input],
+		{
+			...settingsInput,
+			buildsPerClass: 0,
+			diversity: settingsInput.diversity ?? 100,
+		},
+		opts,
+	);
 	return result.results[0]!;
 };

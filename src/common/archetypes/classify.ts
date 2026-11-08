@@ -1,0 +1,156 @@
+import { ARCHETYPE_DEFS } from "./defs.data.ts";
+import { DIM_LABELS, DIM_RATINGS, DIMS } from "./composites.ts";
+import { DEFAULT_NORMS } from "./norms.data.ts";
+import { matchZ } from "./match.ts";
+import { prepare, rawMatch } from "./score.ts";
+import { ovrPercentile } from "./norms.ts";
+import type {
+	Archetype,
+	ArchetypeRatings,
+	Classification,
+	DimKey,
+	Norms,
+	SkillLabel,
+	Tier,
+	Why,
+} from "./types.ts";
+
+export const ARCHETYPES: Archetype[] = ARCHETYPE_DEFS.map((d) => ({
+	...d,
+	prior: 1,
+}));
+const BY_ID = new Map(ARCHETYPES.map((a) => [a.id, a]));
+export const archetypeById = (id: string) => BY_ID.get(id);
+export const archetypeByName = (name: string) =>
+	ARCHETYPES.find((a) => a.name === name);
+
+// Rare "unicorn" types need to be that much more exceptional a fit to be picked
+export const RARE_PENALTY = 0.5;
+// A runner-up this close (in standard deviations of fit) from a different family makes a hybrid
+export const HYBRID_Z = 0.15;
+// The archetype he had keeps the label unless another is better by more than this
+export const STICKY_Z = 0.2;
+
+export type Scored = { a: Archetype; raw: number; z: number };
+
+// Score every archetype for one player, best first. An archetype's score is how exceptional the fit is among the league's
+// players of his size (so every archetype gets its share), ties break on id so the order is deterministic.
+export const scoreAll = (
+	ratings: ArchetypeRatings,
+	norms: Norms = DEFAULT_NORMS,
+	archetypes: Archetype[] = ARCHETYPES,
+): { scored: Scored[]; z: Record<DimKey, number>; skills: SkillLabel[] } => {
+	const p = prepare(ratings, norms);
+	const scored: Scored[] = [];
+	for (const a of archetypes) {
+		const raw = rawMatch(a, p.z, p.hgt, p.skills);
+		const table = norms.match[a.id];
+		const z =
+			(table ? matchZ(table, raw) : raw * 4 - 2) -
+			(a.rare ? RARE_PENALTY : 0) +
+			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0);
+		scored.push({ a, raw, z });
+	}
+	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
+	return { scored, z: p.z, skills: p.skills };
+};
+
+export const TIER_NAMES: Record<Tier, string> = {
+	franchise: "Franchise",
+	star: "Star",
+	starter: "Starter",
+	rotation: "Rotation",
+	bench: "Bench",
+	fringe: "Fringe",
+};
+
+export const tierFromPercentile = (pct: number): Tier =>
+	pct >= 0.993
+		? "franchise"
+		: pct >= 0.96
+			? "star"
+			: pct >= 0.8
+				? "starter"
+				: pct >= 0.5
+					? "rotation"
+					: pct >= 0.2
+						? "bench"
+						: "fringe";
+
+const whyOf = (a: Archetype, z: Record<DimKey, number>): Why[] => {
+	const rows: Why[] = [];
+	for (const dim of DIMS) {
+		const w = a.w[dim];
+		if (w === undefined || dim === "hgt") {
+			continue;
+		}
+		// Contribution: how much of the wanted direction he actually has
+		rows.push({
+			dim,
+			label: DIM_LABELS[dim],
+			z: Math.round(z[dim] * 100) / 100,
+			want: w,
+			ratings: DIM_RATINGS[dim],
+		});
+	}
+	const hgt = a.w.hgt;
+	rows.sort((x, y) => {
+		const cx = x.want * x.z;
+		const cy = y.want * y.z;
+		return cy !== cx ? cy - cx : x.dim < y.dim ? -1 : 1;
+	});
+	void hgt;
+	return rows.slice(0, 3);
+};
+
+export type ClassifyOptions = {
+	norms?: Norms;
+	ovr?: number;
+	// The archetype he had before: kept unless a new one beats it by more than the stickiness margin
+	previousId?: string;
+	stickiness?: number;
+};
+
+export const classify = (
+	ratings: ArchetypeRatings,
+	opts: ClassifyOptions = {},
+): Classification => {
+	const norms = opts.norms ?? DEFAULT_NORMS;
+	const { scored, z } = scoreAll(ratings, norms);
+	let first = scored[0]!;
+	const sticky = opts.stickiness ?? STICKY_Z;
+	if (opts.previousId && opts.previousId !== first.a.id) {
+		const prev = scored.find((s) => s.a.id === opts.previousId);
+		if (prev && prev.z >= first.z - sticky) {
+			first = prev;
+		}
+	}
+	const rest = scored.filter((s) => s.a.id !== first.a.id);
+	const second = rest[0]!;
+	// A hybrid names the best runner-up from a different family
+	const partner = rest.find((s) => s.a.family !== first.a.family)!;
+	const secondary =
+		partner.z >= first.z - HYBRID_Z
+			? { id: partner.a.id, name: partner.a.name }
+			: null;
+	const confidence = Math.max(0, Math.min(1, (first.z - second.z) / 0.5));
+	const tier =
+		opts.ovr !== undefined
+			? tierFromPercentile(ovrPercentile(norms, opts.ovr))
+			: null;
+	const a = first.a;
+	return {
+		id: a.id,
+		name: a.name,
+		group: a.group,
+		family: a.family,
+		desc: a.desc,
+		tags: a.tags,
+		secondary,
+		score: Math.round(first.raw * 1000) / 1000,
+		confidence: Math.round(confidence * 100) / 100,
+		tier,
+		why: whyOf(a, z),
+		label: secondary ? `${a.name} / ${secondary.name}` : a.name,
+	};
+};
