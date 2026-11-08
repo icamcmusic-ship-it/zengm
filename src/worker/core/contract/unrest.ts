@@ -7,6 +7,7 @@ import type { Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
 import { randInt } from "../../../common/random.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 import moodInfo from "../player/moodInfo.ts";
 import { sumMoodComponents } from "./moodHistory.ts";
 import { estimateMarketValue, playerLink, teamLink } from "./options.ts";
@@ -154,7 +155,7 @@ export const shouldHoldOut = ({
 // Before the regular season, some unhappy underpaid players hold out
 export const startHoldouts = async () => {
 	const frequency = g.get("holdoutFrequency");
-	if (!(frequency > 0)) {
+	if (!featureOn("holdouts") || !(frequency > 0)) {
 		return;
 	}
 

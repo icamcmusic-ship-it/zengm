@@ -123,29 +123,31 @@ const RowDetail = ({
 						<SkillsBlock skills={row.skills[1]} />
 					</span>
 				</div>
-				<label className="d-flex align-items-center gap-2">
-					<span>Archetype</span>
-					<select
-						className="form-select form-select-sm"
-						style={{ maxWidth: "16rem" }}
-						value={lock.archetype ?? ""}
-						onChange={(event) =>
-							setLock({
-								...lock,
-								archetype: event.target.value || undefined,
-								build: event.target.value ? undefined : lock.build,
-							})
-						}
-						aria-label="Target archetype"
-					>
-						<option value="">Auto</option>
-						{lock.archetype &&
-						!eligibleArch.some((a) => a.id === lock.archetype) ? (
-							<option value={lock.archetype}>{lock.archetype}</option>
-						) : null}
-						<ArchetypeOptions list={eligibleArch} />
-					</select>
-				</label>
+				{archetypes.length > 0 ? (
+					<label className="d-flex align-items-center gap-2">
+						<span>Archetype</span>
+						<select
+							className="form-select form-select-sm"
+							style={{ maxWidth: "16rem" }}
+							value={lock.archetype ?? ""}
+							onChange={(event) =>
+								setLock({
+									...lock,
+									archetype: event.target.value || undefined,
+									build: event.target.value ? undefined : lock.build,
+								})
+							}
+							aria-label="Target archetype"
+						>
+							<option value="">Auto</option>
+							{lock.archetype &&
+							!eligibleArch.some((a) => a.id === lock.archetype) ? (
+								<option value={lock.archetype}>{lock.archetype}</option>
+							) : null}
+							<ArchetypeOptions list={eligibleArch} />
+						</select>
+					</label>
+				) : null}
 				<details>
 					<summary className="text-body-secondary">Advanced: build</summary>
 					<label className="d-flex align-items-center gap-2 mt-1">
@@ -548,11 +550,13 @@ export const RegenerateRatingsModal = ({
 								className="border rounded p-3"
 								style={{ maxHeight: "68vh", overflowY: "auto" }}
 							>
-								<ArchetypePoolPicker
-									list={archetypes}
-									value={settings.archetypePool}
-									onChange={(ids) => update({ archetypePool: ids })}
-								/>
+								{archetypes.length > 0 ? (
+									<ArchetypePoolPicker
+										list={archetypes}
+										value={settings.archetypePool}
+										onChange={(ids) => update({ archetypePool: ids })}
+									/>
+								) : null}
 								<SettingsForm
 									settings={settings}
 									update={update}

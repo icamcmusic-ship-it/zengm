@@ -1,3 +1,4 @@
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import clsx from "clsx";
 import { Fragment, useState } from "react";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
@@ -69,6 +70,7 @@ const Draft = ({
 		"userTids",
 	]);
 	const expansionDraft = phase === PHASE.EXPANSION_DRAFT;
+	const draftBoardOn = useFeatureOn("draftBoard");
 
 	const [drafting, setDrafting] = useState(false);
 
@@ -497,24 +499,28 @@ const Draft = ({
 			<MoreLinks type="draft" page="draft" draftType={draftType} />
 			{!fantasyDraft && !expansionDraft && !spectator ? (
 				<>
-					<div className="mb-2 d-flex gap-2">
-						<button
-							className="btn btn-light-bordered btn-sm"
-							onClick={() => setShowDraftDay(true)}
-						>
-							Draft-day trades &amp; team boards
-						</button>
-						<a
-							className="btn btn-light-bordered btn-sm"
-							href={helpers.leagueUrl(["draft_board"])}
-						>
-							My draft board
-						</a>
-					</div>
-					<DraftDayModal
-						show={showDraftDay}
-						onHide={() => setShowDraftDay(false)}
-					/>
+					{draftBoardOn ? (
+						<>
+							<div className="mb-2 d-flex gap-2">
+								<button
+									className="btn btn-light-bordered btn-sm"
+									onClick={() => setShowDraftDay(true)}
+								>
+									Draft-day trades &amp; team boards
+								</button>
+								<a
+									className="btn btn-light-bordered btn-sm"
+									href={helpers.leagueUrl(["draft_board"])}
+								>
+									My draft board
+								</a>
+							</div>
+							<DraftDayModal
+								show={showDraftDay}
+								onHide={() => setShowDraftDay(false)}
+							/>
+						</>
+					) : null}
 				</>
 			) : null}
 			<StickyDraftInfo

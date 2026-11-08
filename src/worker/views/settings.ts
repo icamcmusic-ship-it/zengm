@@ -1,4 +1,3 @@
-import { getPbpStoreScope } from "../../common/pbpSettings.ts";
 import { g } from "../util/index.ts";
 import type {
 	GameAttributesLeague,
@@ -278,8 +277,6 @@ export const getInitialSettings = (): Settings => {
 		minContractLength: g.get("minContractLength"),
 		maxContractLength: g.get("maxContractLength"),
 		aiTradesFactor: g.get("aiTradesFactor"),
-		aiTradesNeedBased: g.get("aiTradesNeedBased"),
-		aiTradeOffersFrequency: g.get("aiTradeOffersFrequency"),
 		injuryRate: g.get("injuryRate"),
 		homeCourtAdvantage: g.get("homeCourtAdvantage"),
 		rookieContractLengths: g.get("rookieContractLengths"),
@@ -295,10 +292,6 @@ export const getInitialSettings = (): Settings => {
 		draftType: g.get("draftType"),
 		draftAges: g.get("draftAges"),
 		playersRefuseToNegotiate: g.get("playersRefuseToNegotiate"),
-		contractOptions: g.get("contractOptions"),
-		contractExtensions: g.get("contractExtensions"),
-		tradeRequests: g.get("tradeRequests"),
-		holdoutFrequency: g.get("holdoutFrequency"),
 		allStarGame: g.get("allStarGame"),
 		allStarNum: g.get("allStarNum"),
 		allStarType: g.get("allStarType"),
@@ -339,15 +332,6 @@ export const getInitialSettings = (): Settings => {
 		elamMinutes: g.get("elamMinutes"),
 		elamOvertime: g.get("elamOvertime"),
 		elamPoints: g.get("elamPoints"),
-		pbpLiveGame: g.get("pbpLiveGame"),
-		pbpBoxScore: g.get("pbpBoxScore"),
-		pbpStore: getPbpStoreScope({
-			pbpStore: g.get("pbpStore"),
-			storePlayByPlay: g.get("storePlayByPlay"),
-		}),
-		realisticPossessions: g.get("realisticPossessions"),
-		injuryDepth: g.get("injuryDepth"),
-		playerTraits: g.get("playerTraits"),
 		playerMoodTraits: g.get("playerMoodTraits"),
 		numPlayersOnCourt: g.get("numPlayersOnCourt"),
 		numDraftRounds: g.get("numDraftRounds"),
@@ -450,9 +434,6 @@ export const getInitialSettings = (): Settings => {
 		footballOvertime: g.get("footballOvertime"),
 		footballOvertimePlayoffs: g.get("footballOvertimePlayoffs"),
 		easterEggPlayers: g.get("easterEggPlayers"),
-		scoutingSystem: g.get("scoutingSystem"),
-		rerandomizeDraftClassRatings: g.get("rerandomizeDraftClassRatings"),
-		coachingStaff: g.get("coachingStaff"),
 		fakeAgeProb: g.get("fakeAgeProb"),
 
 		// League extras (src/common/nativeFeatures.ts)

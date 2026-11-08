@@ -1,3 +1,4 @@
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { PHASE } from "../../../common/constants.ts";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
@@ -50,6 +51,8 @@ const TradeSideText = ({
 };
 
 const Trade = (props: View<"trade">) => {
+	const marketOn = useFeatureOn("tradeMarket");
+	const threeOn = useFeatureOn("threeTeamTrades");
 	const [state, setState] = useState({
 		accepted: false,
 		asking: false,
@@ -451,18 +454,22 @@ const Trade = (props: View<"trade">) => {
 							{otl > 0 ? <>-{otl}</> : null}
 							{tied > 0 ? <>-{tied}</> : null}, {strategy}
 						</div>
-						<a
-							className="ms-auto me-2 text-nowrap"
-							href={helpers.leagueUrl(["trade_market"])}
-						>
-							Trade market
-						</a>
-						<a
-							className="me-2 text-nowrap"
-							href={helpers.leagueUrl(["trade_three"])}
-						>
-							3-team trade
-						</a>
+						{marketOn ? (
+							<a
+								className="ms-auto me-2 text-nowrap"
+								href={helpers.leagueUrl(["trade_market"])}
+							>
+								Trade market
+							</a>
+						) : null}
+						{threeOn ? (
+							<a
+								className={`${marketOn ? "" : "ms-auto "}me-2 text-nowrap`}
+								href={helpers.leagueUrl(["trade_three"])}
+							>
+								3-team trade
+							</a>
+						) : null}
 						<SaveTrade
 							tradeTeams={[
 								{

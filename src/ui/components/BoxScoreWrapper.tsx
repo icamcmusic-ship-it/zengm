@@ -1,3 +1,4 @@
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 import clsx from "clsx";
 import {
 	useCallback,
@@ -1113,6 +1114,7 @@ const BoxScorePlayByPlayTabsBasketball = ({
 		defaultValue: "box",
 	});
 	const { lid, pbpBoxScore: mode } = useLocal(["lid", "pbpBoxScore"]);
+	const on = useFeatureOn("pbpBoxScore");
 	const revealKey = `${lid}:${boxScore.gid}`;
 	const [revealed, setRevealed] = useState(() => revealedPbp.has(revealKey));
 	useEffect(() => {
@@ -1125,7 +1127,7 @@ const BoxScorePlayByPlayTabsBasketball = ({
 		revealed,
 	});
 
-	if (view === "none") {
+	if (!on || view === "none") {
 		return boxScoreElement;
 	}
 

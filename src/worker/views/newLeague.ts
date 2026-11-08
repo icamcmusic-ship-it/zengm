@@ -72,10 +72,8 @@ export const getDefaultSettings = () => {
 			defaultGameAttributes,
 			"aiTradesFactor",
 		),
-		aiTradesNeedBased: unwrapGameAttribute(
-			defaultGameAttributes,
-			"aiTradesNeedBased",
-		),
+		// Off by default for existing leagues, on for new ones
+		aiTradesNeedBased: true,
 		aiTradeOffersFrequency: unwrapGameAttribute(
 			defaultGameAttributes,
 			"aiTradeOffersFrequency",
@@ -512,6 +510,10 @@ export const getDefaultSettings = () => {
 			"rerandomizeDraftClassRatings",
 		),
 		coachingStaff: unwrapGameAttribute(defaultGameAttributes, "coachingStaff"),
+		draftBoardAutoDraft: unwrapGameAttribute(
+			defaultGameAttributes,
+			"draftBoardAutoDraft",
+		),
 		fakeAgeProb: unwrapGameAttribute(defaultGameAttributes, "fakeAgeProb"),
 
 		// League extras (src/common/nativeFeatures.ts)

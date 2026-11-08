@@ -1,3 +1,4 @@
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import {
 	ARCHETYPES,
@@ -113,6 +114,9 @@ export const classifyPlayer = (
 
 // Write this season's entry (replacing one for the same season). Returns true if the primary archetype changed.
 export const storeArchetype = (p: Player, norms: Norms): boolean => {
+	if (!featureOn("archetypes")) {
+		return false;
+	}
 	const c = classifyPlayer(p, norms, currentEntry(p.archetypes)?.id);
 	if (!c) {
 		return false;
@@ -125,7 +129,7 @@ export const storeArchetype = (p: Player, norms: Norms): boolean => {
 
 // Everyone at the start of a preseason (after development): the label that holds until the next one
 export const updateArchetypesForPreseason = async (players: Player[]) => {
-	if (__SPORT !== "basketball") {
+	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
 		return;
 	}
 	const norms = await getLeagueNorms(true);
@@ -140,7 +144,7 @@ export const updateArchetypesForPreseason = async (players: Player[]) => {
 
 // New league: everyone gets a first entry
 export const initArchetypesForNewLeague = async () => {
-	if (__SPORT !== "basketball") {
+	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
 		return;
 	}
 	const players = await idb.cache.players.indexGetAll("playersByTid", [
@@ -164,6 +168,9 @@ export const archetypeFor = (
 ):
 	| { view: ArchetypeView; stored: boolean; classification?: Classification }
 	| undefined => {
+	if (!featureOn("archetypes")) {
+		return undefined;
+	}
 	const isProspect =
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
 	const entry = isProspect ? undefined : currentEntry(p.archetypes);
@@ -186,6 +193,9 @@ export const archetypeLabelAt = (
 	season: number,
 	norms: Norms,
 ): string | undefined => {
+	if (!featureOn("archetypes")) {
+		return undefined;
+	}
 	const isProspect =
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
 	if (!isProspect) {
@@ -220,7 +230,7 @@ export type PlayerArchetypeInfo = {
 export const archetypeInfoForPlayer = async (
 	p: Player,
 ): Promise<PlayerArchetypeInfo | undefined> => {
-	if (__SPORT !== "basketball") {
+	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
 		return undefined;
 	}
 	const norms = await getLeagueNorms();

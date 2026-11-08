@@ -61,6 +61,7 @@ const setup = async () => {
 	g.setWithoutSavingToDB("contractOptions", true);
 	g.setWithoutSavingToDB("contractExtensions", true);
 	g.setWithoutSavingToDB("tradeRequests", true);
+	g.setWithoutSavingToDB("featureHoldouts", true);
 	g.setWithoutSavingToDB("holdoutFrequency", 1);
 	g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
 
@@ -630,6 +631,12 @@ describe("trade requests and holdouts", () => {
 
 		// Off when frequency is 0
 		g.setWithoutSavingToDB("holdoutFrequency", 0);
+		await startHoldouts();
+		assert.isFalse(isHoldingOut(p));
+
+		// Off with the switch (League Extras)
+		g.setWithoutSavingToDB("holdoutFrequency", 1);
+		g.setWithoutSavingToDB("featureHoldouts", false);
 		await startHoldouts();
 		assert.isFalse(isHoldingOut(p));
 	});

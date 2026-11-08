@@ -1,3 +1,4 @@
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import {
 	ARCHETYPES,
@@ -594,8 +595,9 @@ export const restoreOriginalRatings = async ({
 	return { restored };
 };
 
+// With the Archetypes switch off the regenerator has no archetype targets (only builds)
 export const getArchetypeTargets = () =>
-	ARCHETYPE_LIST.map((a) => ({
+	(featureOn("archetypes") ? ARCHETYPE_LIST : []).map((a) => ({
 		id: a.id,
 		name: a.name,
 		group: a.group,

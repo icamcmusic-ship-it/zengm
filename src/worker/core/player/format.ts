@@ -29,6 +29,7 @@ import {
 	getProAwards,
 	getProStats,
 } from "../../../common/preDraft.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { getCurrentContract } from "../../../common/contracts.ts";
 import {
 	getContractSummary,
@@ -636,7 +637,9 @@ const processRatings = (
 				row.skills = helpers.deepCopy(pr.skills);
 			} else if (attr === "badges") {
 				row.badges =
-					__SPORT === "basketball" ? getBadgesForRatingsRow(pr, fuzz) : [];
+					__SPORT === "basketball" && featureOn("skillBadges")
+						? getBadgesForRatingsRow(pr, fuzz)
+						: [];
 			} else if (attr === "dovr" || attr === "dpot") {
 				// Handle dovr and dpot - if there are previous ratings, calculate the fuzzed difference
 				const cat = attr === "dovr" ? "ovr" : "pot";

@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
@@ -26,6 +27,10 @@ export default defineView({
 		};
 	},
 	load: async ({ inputs, updateEvents, prevInputs }) => {
+		const featureOff = featureOffError("draftBoard");
+		if (featureOff) {
+			return featureOff;
+		}
 		const inputSeason = inputs.season;
 		if (
 			!updateEvents.has("firstRun") &&

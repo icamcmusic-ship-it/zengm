@@ -1,3 +1,4 @@
+import { featureOffError } from "../util/nativeFeatures.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { player } from "../core/index.ts";
@@ -17,6 +18,10 @@ import { orderBy } from "../../common/utils.ts";
 export default defineView({
 	id: "tradeMarket",
 	load: async ({ updateEvents }) => {
+		const featureOff = featureOffError("tradeMarket");
+		if (featureOff) {
+			return featureOff;
+		}
 		if (
 			!updateEvents.has("firstRun") &&
 			!updateEvents.has("playerMovement") &&

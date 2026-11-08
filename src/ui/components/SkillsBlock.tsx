@@ -8,12 +8,14 @@ import {
 	selectBadgesForMode,
 } from "../../common/skillBadges/compute.ts";
 import { useBadgeMode } from "../util/badgeSettings.ts";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 
 const ExtendedBadges = ({ badges }: { badges: string[] }) => {
 	const mode = useBadgeMode();
+	const on = useFeatureOn("skillBadges");
 	const { shown, hidden } = selectBadgesForMode(badges, mode);
 	const tooltipId = useId();
-	if (shown.length === 0) {
+	if (!on || shown.length === 0) {
 		return null;
 	}
 	return (

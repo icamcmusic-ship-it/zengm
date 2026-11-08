@@ -1,5 +1,6 @@
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { team } from "../index.ts";
 import getSchedule from "../season/getSchedule.ts";
@@ -23,7 +24,7 @@ let cache:
 	| undefined;
 
 const isAvailable = () => {
-	if (__SPORT !== "basketball") {
+	if (__SPORT !== "basketball" || !featureOn("seasonOdds")) {
 		return false;
 	}
 	const phase = g.get("phase");

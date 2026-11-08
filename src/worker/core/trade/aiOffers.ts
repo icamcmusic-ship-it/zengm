@@ -14,6 +14,7 @@ import isUntradable from "./isUntradable.ts";
 import makeItWork from "./makeItWork.ts";
 import summary from "./summary.ts";
 import { choice } from "../../../common/random.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 // AI teams sending trade offers to the user during the season
 
@@ -91,6 +92,7 @@ export const getDailyOfferProbability = (frequency: number) =>
 
 const canReceiveOffers = () => {
 	return (
+		featureOn("aiTradeOffers") &&
 		g.get("aiTradeOffersFrequency") > 0 &&
 		g.get("aiTradesFactor") > 0 &&
 		!g.get("spectator") &&
@@ -333,7 +335,7 @@ const deadlineNotice = async () => {
 	deadlineNoticeSeasons.add(season);
 	await logEvent({
 		type: "info",
-		text: `The trade deadline is ${daysLeft <= 1 ? "tomorrow" : `in ${daysLeft} days`}. See who AI teams are shopping on the <a href="${helpers.leagueUrl(["trade_market"])}">Trade Market</a>.`,
+		text: `The trade deadline is ${daysLeft <= 1 ? "tomorrow" : `in ${daysLeft} days`}. ${featureOn("tradeMarket") ? `See who AI teams are shopping on the <a href="${helpers.leagueUrl(["trade_market"])}">Trade Market</a>.` : ""}`.trim(),
 		saveToDb: false,
 		tids: [g.get("userTid")],
 	});

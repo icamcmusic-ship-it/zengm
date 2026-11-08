@@ -13,6 +13,7 @@ import type {
 import { player, team } from "../index.ts";
 import { last } from "../../../common/utils.ts";
 import { choice } from "../../../common/random.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { prepareWholeRoster } from "../team/ovr.ts";
 import { getDraftAdjustment, getTeamNeeds } from "./draftNeeds.ts";
 
@@ -198,7 +199,11 @@ const runPicks = async (
 
 			// Basketball: a small need/strategy adjustment on top of value (see draftNeeds.ts)
 			let adjustments: number[] | undefined;
-			if (!DRAFT_BY_TEAM_OVR && !g.get("userTids").includes(dp.tid)) {
+			if (
+				!DRAFT_BY_TEAM_OVR &&
+				featureOn("aiDraftNeeds") &&
+				!g.get("userTids").includes(dp.tid)
+			) {
 				const t = await idb.cache.teams.get(dp.tid);
 				const needs = getTeamNeeds(teamPlayers);
 				adjustments = playersAll.map((p) =>
@@ -225,7 +230,9 @@ const runPicks = async (
 
 			// The user's own draft board, when auto drafting for the user
 			const boardPick =
-				g.get("userTids").includes(dp.tid) && g.get("draftBoardAutoDraft")
+				g.get("userTids").includes(dp.tid) &&
+				featureOn("draftBoard") &&
+				g.get("draftBoardAutoDraft")
 					? getDraftBoardPick(playersAll)
 					: undefined;
 

@@ -5,6 +5,7 @@ import { defineView } from "../util/defineView.ts";
 import { validateSeasonOnly } from "../util/processInputs.ts";
 import { team } from "../core/index.ts";
 import { PHASE } from "../../common/constants.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 import { awardWinProbs } from "../core/seasonOdds/awardOdds.ts";
 
 export default defineView({
@@ -32,6 +33,7 @@ export default defineView({
 			const phase = g.get("phase");
 			if (
 				__SPORT === "basketball" &&
+				featureOn("seasonOdds") &&
 				inputs.season === g.get("season") &&
 				(phase === PHASE.REGULAR_SEASON || phase === PHASE.AFTER_TRADE_DEADLINE)
 			) {

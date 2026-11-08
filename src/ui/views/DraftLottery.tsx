@@ -36,6 +36,7 @@ import { ResponsiveTableWrapper } from "../components/ResponsiveTableWrapper.tsx
 import { DraftAbbrev } from "../components/DraftAbbrev.tsx";
 import { HelpPopover } from "../components/HelpPopover.tsx";
 import { DraftLotteryWhatIf } from "./DraftLotteryWhatIf.tsx";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 
 type MyDraftType = DraftType | "dummy";
 export const getDraftTypeDescription = (
@@ -951,6 +952,9 @@ const ColaTable = ({
 };
 
 const DraftLottery = (props: Props) => {
+	// The what-if simulator belongs to the Season Odds switch in basketball (the other sports have no such switch)
+	const seasonOddsOn = useFeatureOn("seasonOdds");
+	const whatIfOn = __SPORT !== "basketball" || seasonOddsOn;
 	useTitleBar({
 		title: NO_LOTTERY_DRAFT_TYPES.has(props.draftType as any)
 			? "Draft Order"
@@ -992,7 +996,7 @@ const DraftLottery = (props: Props) => {
 
 			<DraftLotteryTable {...props} />
 
-			{props.type !== "completed" && props.draftLotteryResult ? (
+			{whatIfOn && props.type !== "completed" && props.draftLotteryResult ? (
 				<DraftLotteryWhatIf
 					key={props.season}
 					draftLotteryResult={props.draftLotteryResult}

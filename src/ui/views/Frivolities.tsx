@@ -201,6 +201,7 @@ export const frivolities: Record<Category, FrivolityInfo[]> = {
 			? ([
 					{
 						urlParts: ["skill_badges"],
+						feature: "skillBadges",
 						name: "Skill Badges",
 						description:
 							"Legend of the extended skill badges (Cs, Pu, Bk, Sw and more) with league counts, and the top players for each.",

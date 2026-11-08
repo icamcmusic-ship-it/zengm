@@ -17,7 +17,7 @@ export const nativeFeatureEnabled = (
 	get: (key: string) => unknown,
 ) => nativeFeatureEnabledForSport(id, get, __SPORT);
 
-export const nativeFeatureOption = <T extends boolean | number>(
+export const nativeFeatureOption = <T extends boolean | number | string>(
 	key: NativeFeatureOptionKey,
 	get: (key: string) => unknown,
 ) => nativeFeatureOptionForSport<T>(key, get, __SPORT);

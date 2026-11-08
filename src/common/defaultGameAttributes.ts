@@ -539,7 +539,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	numGamesPlayoffSeries: wrapFromStart([7, 7, 7, 7]),
 	numPlayoffByes: wrapFromStart(0),
 	aiTradesFactor: 1,
-	aiTradesNeedBased: true,
+	// Off for existing leagues (and tests); new leagues turn it on (see views/newLeague.ts)
+	aiTradesNeedBased: false,
 	aiTradeOffersFrequency: 1,
 	aiTradeOffers: [],
 	stopOnInjury: false,
@@ -579,7 +580,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	contractOptions: false,
 	contractExtensions: false,
 	tradeRequests: false,
-	holdoutFrequency: 0,
+	// Scales how often holdouts happen when the Holdouts switch (League extras) is on
+	holdoutFrequency: 1,
 	allStarGame: 0.7,
 	allStarNum: 12,
 	allStarType: "byConf",

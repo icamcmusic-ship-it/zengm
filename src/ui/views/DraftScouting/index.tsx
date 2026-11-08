@@ -18,6 +18,7 @@ const DraftScouting = ({
 }: View<"draftScouting">) => {
 	const regeneratorOn = useFeatureOn("ratingsRegenerator");
 	const collegeStatsOn = useFeatureOn("collegeStats");
+	const draftBoardOn = useFeatureOn("draftBoard");
 	const { challengeNoRatings, draftType, godMode } = useLocal([
 		"challengeNoRatings",
 		"draftType",
@@ -63,8 +64,14 @@ const DraftScouting = ({
 					<b>Scouting points:</b> {scoutingStatus.remaining} of{" "}
 					{scoutingStatus.total} left this season (from your scouting budget).
 					Assign a scout (1 point) or attend a workout (3 points) to narrow a
-					prospect's ratings. Rank prospects on your{" "}
-					<a href={helpers.leagueUrl(["draft_board"])}>Draft Board</a>.
+					prospect's ratings.
+					{draftBoardOn ? (
+						<>
+							{" "}
+							Rank prospects on your{" "}
+							<a href={helpers.leagueUrl(["draft_board"])}>Draft Board</a>.
+						</>
+					) : null}
 				</p>
 			) : null}
 

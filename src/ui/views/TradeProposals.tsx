@@ -1,3 +1,4 @@
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 import { PHASE } from "../../common/constants.ts";
 import { helpers } from "../util/helpers.ts";
 import useTitleBar from "../hooks/useTitleBar.tsx";
@@ -17,6 +18,7 @@ import { ActionButton } from "../components/ActionButton.tsx";
 import useTradeOffersSwitch from "../hooks/useTradeOffersSwitch.tsx";
 
 const TradeProposals = ({ aiOffers, offers, seed }: View<"tradeProposals">) => {
+	const marketOn = useFeatureOn("tradeMarket");
 	const {
 		challengeNoRatings,
 		challengeNoTrades,
@@ -125,8 +127,14 @@ const TradeProposals = ({ aiOffers, offers, seed }: View<"tradeProposals">) => {
 					<p>
 						AI teams made these offers on their own, for players on your{" "}
 						<a href={helpers.leagueUrl(["trading_block"])}>trading block</a> or
-						players they need. They expire after a while. See also the{" "}
-						<a href={helpers.leagueUrl(["trade_market"])}>trade market</a>.
+						players they need. They expire after a while.
+						{marketOn ? (
+							<>
+								{" "}
+								See also the{" "}
+								<a href={helpers.leagueUrl(["trade_market"])}>trade market</a>.
+							</>
+						) : null}
 					</p>
 					{aiOffers.map((offer, i) => {
 						return (

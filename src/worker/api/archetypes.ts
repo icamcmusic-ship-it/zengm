@@ -1,5 +1,6 @@
 // Worker API for archetypes: a team's roster composition and the league landscape. Everything uses the STORED archetype
 // of each player (set at the start of each preseason), with a live reading for prospects and players without one yet.
+import { featureOn } from "../util/nativeFeatures.ts";
 import { PLAYER } from "../../common/constants.ts";
 import {
 	archetypeById,
@@ -46,7 +47,7 @@ export const archetypeRoster = async ({
 }: {
 	tid: number;
 }): Promise<ArchetypeRoster> => {
-	if (__SPORT !== "basketball") {
+	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
 		return { enabled: false, composition: EMPTY_COMPOSITION, players: [] };
 	}
 	const norms = await getLeagueNorms();
@@ -112,7 +113,7 @@ export type ArchetypeLandscape = {
 
 export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 	const season = g.get("season");
-	if (__SPORT !== "basketball") {
+	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
 		return {
 			enabled: false,
 			season,

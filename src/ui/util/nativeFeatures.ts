@@ -22,7 +22,7 @@ export const useFeatureOn = (id: NativeFeatureId | undefined) =>
 		id === undefined ? true : nativeFeatureEnabled(id, getter(state)),
 	);
 
-export const useFeatureOption = <T extends boolean | number>(
+export const useFeatureOption = <T extends boolean | number | string>(
 	key: NativeFeatureOptionKey,
 ) => local((state) => nativeFeatureOption<T>(key, getter(state)));
 
@@ -51,6 +51,18 @@ export const featureForUrl = (
 			return "contractValue";
 		case "timeline":
 			return "timeline";
+		case "trade_market":
+			return "tradeMarket";
+		case "trade_three":
+			return "threeTeamTrades";
+		case "draft_board":
+			return "draftBoard";
+		case "archetypes":
+			return "archetypes";
+		case "staff":
+		case "coach":
+		case "coaches":
+			return "coachingStaff";
 		case "frivolities":
 			if (
 				second === "redraft" ||
@@ -61,6 +73,9 @@ export const featureForUrl = (
 				(second === "jersey_numbers" && url[2] === "teams")
 			) {
 				return "frivolities";
+			}
+			if (second === "skill_badges") {
+				return "skillBadges";
 			}
 			return undefined;
 		default:

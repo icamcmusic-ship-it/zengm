@@ -97,6 +97,7 @@ const nativeFeatureSettings = (): Setting[] => {
 				key: o.key as Key,
 				name: o.name,
 				type: o.type,
+				...(o.values ? { values: [...o.values] } : {}),
 				decoration: o.decoration,
 				description: `${f.name}: ${o.description}`,
 				validator: (value: unknown) => {
@@ -719,26 +720,7 @@ export const settings: Setting[] = (
 			description:
 				"NBA-like tournament to determine the lowest seeded playoff teams.",
 		},
-		...(__SPORT === "basketball"
-			? [
-					{
-						category: "Draft",
-						key: "rerandomizeDraftClassRatings",
-						name: "Re-randomize ratings when a new draft class is created",
-						type: "bool",
-						description:
-							'When enabled, every newly created draft class (each season\'s new class, and all classes at league creation) is run through Regenerate ratings, using the settings saved with "Save as league default" in the Regenerate ratings dialog (or the defaults: class flavor drawn from the seed, heights, overall and potential kept). Seeded from the league and the class year, so it is deterministic. Runs before college/overseas stats are generated. Drafted players are never touched.',
-					},
-					{
-						category: "Draft",
-						key: "generateCollegeStats",
-						name: "Auto-generate college/overseas stats for new draft classes",
-						type: "bool",
-						description:
-							"When enabled, every new draft class gets generated college or overseas (pro club abroad) stats and honors: all classes at league creation, each season's new class, fantasy/expansion/custom-generated classes, and prospects of imported classes who have none. Shown on player pages tagged College or Overseas. Pro stats and experience are not affected. You can also do this by hand on the Draft Scouting page.",
-					},
-				]
-			: []),
+		...(__SPORT === "basketball" ? [] : []),
 		{
 			category: "Draft",
 			key: "draftType",
@@ -1168,35 +1150,7 @@ export const settings: Setting[] = (
 				</>
 			),
 		},
-		...(__SPORT === "basketball"
-			? ([
-					{
-						category: "Finances",
-						key: "coachingStaff",
-						name: "Coaching Staff",
-						type: "bool",
-						descriptionLong: (
-							<>
-								<p>
-									When enabled, every team has a real coaching staff (head coach
-									plus player development, offense and defense assistants) with
-									ratings, styles and contracts, instead of the coaching budget
-									slider. Their salaries are paid as coaching expenses (not
-									against the salary cap), and the staff's player development
-									ability replaces the coaching budget's effect on player
-									progression.
-								</p>
-								<p>
-									Every offseason after the playoffs there is a coaching market
-									where contracts expire, coaches retire, teams fire and hire,
-									and Coach of the Year is awarded. Turning this on in an
-									existing league generates staffs for every team.
-								</p>
-							</>
-						),
-					},
-				] satisfies Setting[])
-			: []),
+		...(__SPORT === "basketball" ? ([] satisfies Setting[]) : []),
 		{
 			category: "Finances",
 			key: "softCapTradeSalaryMatch",
@@ -1231,28 +1185,6 @@ export const settings: Setting[] = (
 			type: "float",
 			description:
 				"The baseline rate of trades between AI teams is multiplied by this number. Anything beyond 100 will be both absurd and ridiculously slow.",
-		},
-		{
-			category: "Events",
-			key: "aiTradesNeedBased",
-			name: "Need-Based AI-to-AI Trades",
-			godModeRequired: "always",
-			type: "bool",
-			description:
-				"When enabled, many AI-to-AI trades are driven by team needs: contenders buy veterans before the trade deadline, rebuilding teams sell veterans for picks and young players, and teams over the tax dump salary into cap space. The reason is written into the trade's transaction text. When disabled, AI teams only make the classic random value-for-value trades.",
-		},
-		{
-			category: "Events",
-			key: "aiTradeOffersFrequency",
-			name: "AI Trade Offers To You",
-			type: "float",
-			description:
-				"How often AI teams send you trade offers during the season, roughly the number of offers per 10 games. Offers target players on your trading block or your team's needs and show up in your inbox and on the Trade Proposals page. 0 disables them.",
-			validator: (value) => {
-				if (value < 0) {
-					throw new Error("Value cannot be less than 0");
-				}
-			},
 		},
 		{
 			category: "Events",
@@ -1341,14 +1273,6 @@ export const settings: Setting[] = (
 					/>
 				);
 			},
-		},
-		{
-			category: "Events",
-			key: "scoutingSystem",
-			name: "Scouting System",
-			type: "bool",
-			description:
-				"When enabled, your scouting budget gives you scouting points every season to spend on individual draft prospects (assign a scout or attend a workout) on the Draft Scouting page. Each one narrows how far off your view of that prospect's ratings can be and gives a scout report with confidence ranges. Prospects you don't scout keep the normal rating fuzz.",
 		},
 		...(__SPORT === "basketball"
 			? [
@@ -1585,43 +1509,6 @@ export const settings: Setting[] = (
 			name: "Players Can Refuse To Negotiate",
 			godModeRequired: "always",
 			type: "bool",
-		},
-		{
-			category: "Contracts",
-			key: "contractOptions",
-			name: "Contract Options & Guarantees",
-			type: "bool",
-			description:
-				"Contracts can have a player or team option on their final season, and later seasons can be partially guaranteed, which lowers what a team owes if it releases the player. Players decide on their options based on mood and market value, and teams decide on team options, at the start of the re-signing phase.",
-		},
-		{
-			category: "Contracts",
-			key: "contractExtensions",
-			name: "In-Season Contract Extensions",
-			type: "bool",
-			description:
-				"Players in the last two seasons of their contracts can be extended during the preseason and regular season. AI teams extend some of their own players too.",
-		},
-		{
-			category: "Contracts",
-			key: "tradeRequests",
-			name: "Trade Requests",
-			type: "bool",
-			description:
-				"Very unhappy good players on AI-controlled or user teams can publicly ask to be traded, which lowers their trade value until they are traded or their mood improves.",
-		},
-		{
-			category: "Contracts",
-			key: "holdoutFrequency",
-			name: "Holdout Frequency",
-			type: "float",
-			description:
-				"How often very unhappy players under contract hold out and miss games, relative to the default (1). 0 means players never hold out.",
-			validator: (value) => {
-				if (value < 0) {
-					throw new Error("Value cannot be less than 0");
-				}
-			},
 		},
 		{
 			category: "Rookie Contracts",
@@ -2021,67 +1908,7 @@ export const settings: Setting[] = (
 				}
 			},
 		},
-		...(__SPORT === "basketball"
-			? [
-					{
-						category: "Game Simulation",
-						key: "playerTraits",
-						name: "Player Traits",
-						type: "bool",
-						description:
-							"Hidden and visible traits (clutch, consistency, durability, shot discipline, off-ball movement, screening, hustle, foul discipline, recovery, handling under pressure, late-game IQ, leadership) that nudge how players perform in games. They are derived from ratings plus a stored random component, and average out league-wide. Shown on player pages and the draft scouting page.",
-					} as const,
-				]
-			: []),
-		{
-			category: "Injuries",
-			key: "injuryDepth",
-			name: "Injury Depth",
-			type: "bool",
-			description:
-				"Players returning from injury play under a minutes restriction and have a higher re-injury risk (often the same body part) for a while, some players are injury prone, the second night of a back-to-back is a little riskier and tiring, and teams can rest players on back-to-backs (load management). League-wide injury totals stay about the same.",
-		},
-		{
-			category: "Game Simulation",
-			key: "realisticPossessions",
-			name: "Realistic Possession Model",
-			type: "bool",
-			description:
-				"Possessions play out like in the NBA: a 24-second shot clock (14 after an offensive rebound), fast breaks and half-court possessions, late-clock shots and shot-clock violations, holding for the last shot, 2-for-1s, and intentional fouling late in games. Box score averages stay about the same.",
-		},
-		{
-			category: "Game Simulation",
-			key: "pbpLiveGame",
-			name: "Show Play-by-Play in Live Games",
-			type: "bool",
-			description:
-				"Show the play-by-play feed when watching a game live. When off, the score, clock and box score still update live.",
-		},
-		{
-			category: "Game Simulation",
-			key: "pbpBoxScore",
-			name: "Box Score Play-by-Play",
-			type: "string",
-			values: [
-				{ key: "always", value: "Always show" },
-				{ key: "button", value: "Show on button press" },
-			],
-			description:
-				"Show a saved game's play-by-play as a box score tab, or only after pressing a button.",
-		},
-		{
-			category: "Game Simulation",
-			key: "pbpStore",
-			name: "Save Play-by-Play",
-			type: "string",
-			values: [
-				{ key: "all", value: "All games" },
-				{ key: "user", value: "My team's games only" },
-				{ key: "none", value: "None" },
-			],
-			description:
-				"Keep a game's play-by-play with its box score, to read or replay later. Uses about 7 KB of storage per game, and it is deleted along with the box score. Live games always show their play-by-play while you watch.",
-		},
+		...(__SPORT === "basketball" ? [] : []),
 		{
 			category: "Game Simulation",
 			key: "foulsUntilBonus",

@@ -1,3 +1,4 @@
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { useState } from "react";
 import clsx from "clsx";
 import type {
@@ -29,6 +30,10 @@ export const Explanation = ({
 	defaultOpen?: boolean;
 }) => {
 	const [open, setOpen] = useState(defaultOpen);
+	const on = useFeatureOn("tradeExplain");
+	if (!on) {
+		return null;
+	}
 
 	const receive = explanation.assets.filter((a) => a.direction === "receive");
 	const give = explanation.assets.filter((a) => a.direction === "give");
