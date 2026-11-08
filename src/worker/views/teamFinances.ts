@@ -245,6 +245,7 @@ export default defineView({
 				contractTotals,
 				salariesSeasons,
 				otherTeamTicketPrices,
+				coachingStaff: __SPORT === "basketball" && !!g.get("coachingStaff"),
 			};
 		}
 	},

@@ -1,0 +1,778 @@
+// Links are built by hand rather than with helpers.leagueUrl, because typing this module through the route types is circular (views -> staff -> routes).
+
+// Coaching staff: generation, offseason market, hiring/firing, records and awards.
+// Basketball only, and only when the coachingStaff setting is enabled. Development effects work by keeping t.budget.coaching equal to the staff's equivalent budget level, so everything that reads coaching levels (getLevelLastThree -> player development) uses the staff automatically.
+
+import { PHASE } from "../../../common/constants.ts";
+import { gauss, randInt, truncGauss } from "../../../common/random.ts";
+import {
+	COACH_FREE_AGENT,
+	COACH_RETIRED,
+	COACH_ROLES,
+	COACH_ROLE_NAMES,
+	coachOvr,
+	coachSalaryDemand,
+	staffDevScore,
+	staffDevScoreToLevel,
+} from "../../../common/staff.ts";
+import type {
+	Coach,
+	CoachRatings,
+	CoachRole,
+	CoachStyle,
+	CoachTransactionType,
+	CoachWithoutKey,
+	Team,
+} from "../../../common/types.ts";
+import { idb } from "../../db/index.ts";
+import { g, helpers, local, logEvent } from "../../util/index.ts";
+import { generateFace } from "../../util/face.ts";
+import name from "../player/name.ts";
+
+export const staffEnabled = () =>
+	__SPORT === "basketball" && !!g.get("coachingStaff");
+
+const bound = (x: number) => helpers.bound(Math.round(x), 1, 100);
+
+// Season that a contract signed now starts in
+const contractStartSeason = () =>
+	g.get("phase") > PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
+
+const genStyle = (): CoachStyle => {
+	const r = () => helpers.bound(Math.round(gauss(0, 0.45) * 100) / 100, -1, 1);
+	return { pace: r(), threes: r(), defense: r(), rotation: r() };
+};
+
+export const generateCoach = async ({
+	role,
+	young,
+}: {
+	role: CoachRole;
+	young?: boolean;
+}): Promise<CoachWithoutKey> => {
+	const { country, firstName, lastName, race } = await name();
+
+	const base = () => truncGauss(42, 9, 15, 85);
+	const ratings: CoachRatings = {
+		dev: base(),
+		off: base(),
+		def: base(),
+		mot: base(),
+	};
+	if (role === "head") {
+		ratings.off += gauss(9, 4);
+		ratings.def += gauss(9, 4);
+		ratings.mot += gauss(9, 4);
+	} else {
+		ratings[role] += gauss(15, 5);
+	}
+	if (young) {
+		for (const key of helpers.keys(ratings)) {
+			ratings[key] -= 4;
+		}
+	}
+	for (const key of helpers.keys(ratings)) {
+		ratings[key] = bound(ratings[key]);
+	}
+
+	const age = young
+		? randInt(29, 42)
+		: role === "head"
+			? randInt(38, 66)
+			: randInt(31, 62);
+
+	return {
+		firstName,
+		lastName,
+		born: {
+			year: g.get("season") - age,
+			loc: country,
+		},
+		face: generateFace({ race }),
+		tid: COACH_FREE_AGENT,
+		role,
+		ratings,
+		style: genStyle(),
+		contract: {
+			amount: coachSalaryDemand(ratings, role, g.get("salaryCap")),
+			exp: contractStartSeason() + randInt(1, 3),
+		},
+		stats: [],
+		awards: [],
+		transactions: [],
+	};
+};
+
+const addTransaction = (
+	c: CoachWithoutKey,
+	tid: number,
+	role: CoachRole,
+	type: CoachTransactionType,
+) => {
+	c.transactions.push({
+		season: g.get("season"),
+		phase: g.get("phase"),
+		tid,
+		role,
+		type,
+	});
+};
+
+export const getTeamStaff = async (tid: number) => {
+	const coaches = await idb.cache.coaches.indexGetAll("coachesByTid", tid);
+	const staff: Partial<Record<CoachRole, Coach>> = {};
+	for (const c of coaches) {
+		staff[c.role] = c;
+	}
+	return staff;
+};
+
+export const getStaffPayroll = async (tid: number) => {
+	const coaches = await idb.cache.coaches.indexGetAll("coachesByTid", tid);
+	let total = 0;
+	for (const c of coaches) {
+		total += c.contract.amount;
+	}
+	return total;
+};
+
+export const getStaffLevel = async (tid: number) => {
+	const staff = await getTeamStaff(tid);
+	return staffDevScoreToLevel(
+		staffDevScore({
+			head: staff.head?.ratings,
+			dev: staff.dev?.ratings,
+			off: staff.off?.ratings,
+			def: staff.def?.ratings,
+		}),
+	);
+};
+
+// Keep t.budget.coaching equal to the staff's level, which is what is recorded in teamSeason.expenseLevels and used for player development
+export const syncBudget = async (t: Team, alsoInitial?: boolean) => {
+	const level = await getStaffLevel(t.tid);
+	t.budget.coaching = level;
+	if (alsoInitial) {
+		t.initialBudget.coaching = level;
+	}
+	await idb.cache.teams.put(t);
+	return level;
+};
+
+const syncAllBudgets = async (alsoInitial?: boolean) => {
+	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	for (const t of teams) {
+		await syncBudget(t, alsoInitial);
+	}
+};
+
+const userControlsTeam = (tid: number) =>
+	g.get("userTids").includes(tid) &&
+	!local.autoPlayUntil &&
+	!g.get("spectator");
+
+const logHeadCoachEvent = async (text: string, tid: number) => {
+	await logEvent({
+		type: "info",
+		text,
+		showNotification: false,
+		tids: [tid],
+		score: 0,
+	});
+};
+
+const teamLink = (tid: number) => {
+	const info = g.get("teamInfoCache")[tid];
+	if (!info) {
+		return "a team";
+	}
+	return `the <a href="/l/${g.get("lid")}/staff/${info.abbrev}_${tid}">${info.region} ${info.name}</a>`;
+};
+
+const coachLink = (c: Coach) =>
+	`<a href="/l/${g.get("lid")}/coach/${c.cid}">${c.firstName} ${c.lastName}</a>`;
+
+export const hire = async (
+	c: Coach,
+	tid: number,
+	role: CoachRole,
+	years?: number,
+) => {
+	c.tid = tid;
+	c.role = role;
+	c.contract = {
+		amount: coachSalaryDemand(c.ratings, role, g.get("salaryCap")),
+		exp: contractStartSeason() + (years ?? randInt(2, 4)) - 1,
+	};
+	addTransaction(c, tid, role, "hired");
+	await idb.cache.coaches.put(c);
+	if (role === "head") {
+		await logHeadCoachEvent(
+			`${teamLink(tid)} hired ${coachLink(c)} as head coach.`,
+			tid,
+		);
+	}
+};
+
+// Half of what's left on the contract, paid now as a coaching expense
+export const getBuyout = (c: Coach) => {
+	const season = g.get("season");
+	const remaining =
+		c.contract.exp - season + (g.get("phase") <= PHASE.PLAYOFFS ? 0.5 : 0);
+	return Math.round(Math.max(0, remaining) * c.contract.amount * 0.5);
+};
+
+export const fire = async (c: Coach) => {
+	const tid = c.tid;
+	const buyout = getBuyout(c);
+	if (buyout > 0) {
+		const teamSeason = await idb.cache.teamSeasons.indexGet(
+			"teamSeasonsBySeasonTid",
+			[g.get("season"), tid],
+		);
+		if (teamSeason) {
+			teamSeason.expenses.coaching += buyout;
+			teamSeason.cash -= buyout;
+			await idb.cache.teamSeasons.put(teamSeason);
+		}
+	}
+	addTransaction(c, tid, c.role, "fired");
+	c.tid = COACH_FREE_AGENT;
+	await idb.cache.coaches.put(c);
+	if (c.role === "head") {
+		await logHeadCoachEvent(
+			`${teamLink(tid)} fired head coach ${coachLink(c)}.`,
+			tid,
+		);
+	}
+	return buyout;
+};
+
+// How much an AI team is willing to pay, relative to the average salary for the role. Bigger markets pay more, like budget levels.
+const spendFactor = (popRank: number) => {
+	const numTeams = Math.max(2, g.get("numActiveTeams"));
+	return 0.75 + 0.75 * (1 - (popRank - 1) / (numTeams - 1));
+};
+
+// Fill every vacancy, best available coach the team is willing to pay
+export const fillVacancies = async ({
+	includeUser,
+}: {
+	includeUser: boolean;
+}) => {
+	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	const salaryCap = g.get("salaryCap");
+	const numTeams = teams.length;
+	const hired: { c: Coach; tid: number }[] = [];
+
+	const allCoaches = await idb.cache.coaches.getAll();
+	const freeAgents = allCoaches.filter((c) => c.tid === COACH_FREE_AGENT);
+	const filled = new Set<string>();
+	for (const c of allCoaches) {
+		if (c.tid >= 0) {
+			filled.add(`${c.tid}-${c.role}`);
+		}
+	}
+
+	const ordered = teams
+		.map((t) => ({
+			t,
+			key: t.pop * gauss(1, 0.25),
+		}))
+		.sort((a, b) => b.key - a.key);
+	const popRanks = new Map<number, number>();
+	for (const [i, row] of [...ordered]
+		.sort((a, b) => b.t.pop - a.t.pop)
+		.entries()) {
+		popRanks.set(row.t.tid, i + 1);
+	}
+
+	for (const role of COACH_ROLES) {
+		for (const { t } of ordered) {
+			if (filled.has(`${t.tid}-${role}`)) {
+				continue;
+			}
+			if (!includeUser && userControlsTeam(t.tid)) {
+				continue;
+			}
+
+			let available = freeAgents.filter((c) => c.tid === COACH_FREE_AGENT);
+			if (available.length === 0) {
+				const c = await generateCoach({ role });
+				const cid = await idb.cache.coaches.add(c);
+				const coach = (await idb.cache.coaches.get(cid))!;
+				freeAgents.push(coach);
+				available = [coach];
+			}
+
+			const maxSpend =
+				coachSalaryDemand(
+					{ dev: 60, off: 60, def: 60, mot: 60 },
+					role,
+					salaryCap,
+				) *
+				spendFactor(popRanks.get(t.tid) ?? numTeams / 2) *
+				1.15;
+
+			let best: Coach | undefined;
+			let bestScore = -Infinity;
+			let cheapest: Coach | undefined;
+			for (const c of available) {
+				const demand = coachSalaryDemand(c.ratings, role, salaryCap);
+				if (
+					!cheapest ||
+					demand < coachSalaryDemand(cheapest.ratings, role, salaryCap)
+				) {
+					cheapest = c;
+				}
+				if (demand > maxSpend) {
+					continue;
+				}
+				// Former employees who were just fired by this team are not rehired
+				const lastTx = c.transactions.at(-1);
+				if (
+					lastTx &&
+					lastTx.tid === t.tid &&
+					lastTx.type === "fired" &&
+					lastTx.season >= g.get("season") - 1
+				) {
+					continue;
+				}
+				const score = coachOvr(c.ratings, role) + gauss(0, 2);
+				if (score > bestScore) {
+					bestScore = score;
+					best = c;
+				}
+			}
+			const choice = best ?? cheapest!;
+			await hire(choice, t.tid, role);
+			filled.add(`${t.tid}-${role}`);
+			hired.push({ c: choice, tid: t.tid });
+		}
+	}
+
+	return hired;
+};
+
+// Keep a pool of free agent coaches for every role
+const replenishPool = async () => {
+	const coaches = await idb.cache.coaches.getAll();
+	const numTeams = g.get("numActiveTeams");
+	for (const role of COACH_ROLES) {
+		const vacancies =
+			numTeams - coaches.filter((c) => c.tid >= 0 && c.role === role).length;
+		const pool = coaches.filter(
+			(c) => c.tid === COACH_FREE_AGENT && c.role === role,
+		).length;
+		const target = Math.max(0, vacancies) + Math.ceil(numTeams / 3) + 3;
+		for (let i = pool; i < target; i++) {
+			await idb.cache.coaches.add(
+				await generateCoach({ role, young: Math.random() < 0.6 }),
+			);
+		}
+	}
+};
+
+// Generate staffs for every team, for a new league or when the setting is turned on. Does nothing if staff already exist.
+export const ensureStaff = async () => {
+	if (!staffEnabled()) {
+		return false;
+	}
+	const coaches = await idb.cache.coaches.getAll();
+	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	const needsStaff =
+		coaches.length === 0 ||
+		teams.some((t) => !coaches.some((c) => c.tid === t.tid));
+	if (!needsStaff) {
+		return false;
+	}
+
+	const firstTime = coaches.length === 0;
+
+	// Candidate pool, about 2x the number of jobs, so the market sorts better coaches onto richer teams
+	for (const role of COACH_ROLES) {
+		const num = Math.round(teams.length * 1.8) + 4;
+		for (let i = 0; i < num; i++) {
+			const c = await generateCoach({ role });
+			if (firstTime) {
+				// Existing coaches have some history with their team
+				c.contract.exp = contractStartSeason() + randInt(0, 3);
+			}
+			await idb.cache.coaches.add(c);
+		}
+	}
+
+	await fillVacancies({ includeUser: true });
+
+	// Initial hires shouldn't show up as a coaching carousel
+	if (firstTime) {
+		for (const c of await idb.cache.coaches.getAll()) {
+			c.transactions = [];
+			await idb.cache.coaches.put(c);
+		}
+	}
+
+	// Trim the leftover pool, keeping the best for each role
+	const leftovers = (await idb.cache.coaches.getAll()).filter(
+		(c) => c.tid === COACH_FREE_AGENT,
+	);
+	for (const role of COACH_ROLES) {
+		const sorted = leftovers
+			.filter((c) => c.role === role)
+			.sort((a, b) => coachOvr(b.ratings, role) - coachOvr(a.ratings, role));
+		for (const c of sorted.slice(Math.ceil(teams.length / 3) + 3)) {
+			await idb.cache.coaches.delete(c.cid);
+		}
+	}
+
+	await syncAllBudgets(firstTime);
+	return true;
+};
+
+const getRecord = async (season: number, tid: number) => {
+	const ts = await idb.cache.teamSeasons.indexGet("teamSeasonsBySeasonTid", [
+		season,
+		tid,
+	]);
+	return ts;
+};
+
+const winPct = (r: {
+	won: number;
+	lost: number;
+	tied?: number;
+	otl?: number;
+}) => {
+	const gp = r.won + r.lost + (r.tied ?? 0) + (r.otl ?? 0);
+	return gp > 0 ? (r.won + 0.5 * (r.tied ?? 0)) / gp : 0;
+};
+
+// Record the season for every employed coach. Coaches who were hired mid-season get the full team record (simple, and how the record follows whoever was in charge at the end).
+const recordSeason = async () => {
+	const season = g.get("season");
+	const coaches = (await idb.cache.coaches.getAll()).filter((c) => c.tid >= 0);
+	for (const c of coaches) {
+		if (c.stats.some((row) => row.season === season)) {
+			continue;
+		}
+		const ts = await getRecord(season, c.tid);
+		if (!ts) {
+			continue;
+		}
+		c.stats.push({
+			season,
+			tid: c.tid,
+			role: c.role,
+			won: ts.won,
+			lost: ts.lost,
+			tied: ts.tied,
+			otl: ts.otl,
+			playoffRoundsWon: ts.playoffRoundsWon,
+		});
+		await idb.cache.coaches.put(c);
+	}
+};
+
+export const COACH_OF_THE_YEAR = "Coach of the Year";
+
+// Best record, with a bonus for improvement over last season and for playoff success
+export const coachOfTheYear = async () => {
+	const season = g.get("season");
+	const heads = (await idb.cache.coaches.getAll()).filter(
+		(c) => c.tid >= 0 && c.role === "head",
+	);
+	let best: Coach | undefined;
+	let bestScore = -Infinity;
+	for (const c of heads) {
+		const row = c.stats.find((r) => r.season === season && r.tid === c.tid);
+		if (!row || row.won + row.lost === 0) {
+			continue;
+		}
+		const prev = (
+			await idb.merged.teamSeasons.getAll({
+				tid: c.tid,
+				seasons: [season - 1, season - 1],
+			})
+		)[0];
+		const prevPct = prev && prev.won + prev.lost > 0 ? winPct(prev) : 0.5;
+		const pct = winPct(row);
+		const score =
+			pct +
+			0.6 * (pct - prevPct) +
+			0.02 * row.playoffRoundsWon +
+			gauss(0, 0.01);
+		if (score > bestScore) {
+			bestScore = score;
+			best = c;
+		}
+	}
+	if (
+		best &&
+		!best.awards.some(
+			(a) => a.season === season && a.type === COACH_OF_THE_YEAR,
+		)
+	) {
+		best.awards.push({ season, type: COACH_OF_THE_YEAR });
+		await idb.cache.coaches.put(best);
+		await logEvent({
+			type: "award",
+			text: `${coachLink(best)} of ${teamLink(best.tid)} won the ${COACH_OF_THE_YEAR} award.`,
+			showNotification: false,
+			tids: [best.tid],
+			score: 10,
+		});
+	}
+	return best;
+};
+
+const age = (c: CoachWithoutKey) => g.get("season") - c.born.year;
+
+const progress = (c: Coach) => {
+	const a = age(c);
+	const mu = a < 45 ? 1.2 : a < 58 ? 0.2 : -1.2;
+	for (const key of helpers.keys(c.ratings)) {
+		c.ratings[key] = bound(c.ratings[key] + gauss(mu, 1.5));
+	}
+};
+
+const tenure = (c: Coach) => {
+	let n = 0;
+	for (let i = c.stats.length - 1; i >= 0; i--) {
+		if (c.stats[i]!.tid !== c.tid) {
+			break;
+		}
+		n += 1;
+	}
+	return n;
+};
+
+const retire = async (c: Coach) => {
+	const tid = c.tid;
+	if (tid >= 0) {
+		addTransaction(c, tid, c.role, "retired");
+		if (c.role === "head") {
+			await logHeadCoachEvent(
+				`Head coach ${coachLink(c)} of ${teamLink(tid)} retired.`,
+				tid,
+			);
+		}
+	}
+	c.tid = COACH_RETIRED;
+	c.retiredYear = g.get("season");
+	await idb.cache.coaches.put(c);
+};
+
+// The offseason coaching market, run right after the playoffs
+export const runOffseason = async () => {
+	if (!staffEnabled()) {
+		return;
+	}
+	await ensureStaff();
+
+	const season = g.get("season");
+	await recordSeason();
+	await coachOfTheYear();
+
+	const coaches = (await idb.cache.coaches.getAll()).filter(
+		(c) => c.tid !== COACH_RETIRED,
+	);
+	for (const c of coaches) {
+		progress(c);
+
+		// Retirement
+		const a = age(c) + 1;
+		const lastJob = c.transactions.findLast(
+			(tx) => tx.type === "hired",
+		)?.season;
+		const unemployedLong =
+			c.tid === COACH_FREE_AGENT &&
+			(lastJob === undefined || lastJob < season - 2) &&
+			c.stats.length > 0;
+		const retireProb =
+			(a >= 62 ? (a - 61) * 0.07 : 0) +
+			(unemployedLong ? 0.35 : 0) +
+			(a > 75 ? 1 : 0);
+		if (Math.random() < retireProb) {
+			await retire(c);
+			continue;
+		}
+
+		if (c.tid < 0) {
+			await idb.cache.coaches.put(c);
+			continue;
+		}
+
+		const ts = await getRecord(season, c.tid);
+		const pct = ts ? winPct(ts) : 0.5;
+		const ovr = coachOvr(c.ratings, c.role);
+
+		if (c.contract.exp <= season) {
+			// Expiring contract
+			let reSign;
+			if (userControlsTeam(c.tid)) {
+				// User extends on the staff page before this, otherwise they leave
+				reSign = false;
+			} else if (c.role === "head") {
+				reSign =
+					pct >= 0.45 || ovr >= 62 ? Math.random() < 0.8 : Math.random() < 0.25;
+			} else {
+				reSign = ovr >= 50 ? Math.random() < 0.75 : Math.random() < 0.3;
+			}
+			if (reSign) {
+				c.contract = {
+					amount: coachSalaryDemand(c.ratings, c.role, g.get("salaryCap")),
+					exp: season + randInt(2, 4),
+				};
+				addTransaction(c, c.tid, c.role, "reSigned");
+				await idb.cache.coaches.put(c);
+			} else {
+				const tid = c.tid;
+				addTransaction(c, tid, c.role, "left");
+				c.tid = COACH_FREE_AGENT;
+				await idb.cache.coaches.put(c);
+				if (c.role === "head") {
+					await logHeadCoachEvent(
+						`Head coach ${coachLink(c)} left ${teamLink(tid)} when his contract expired.`,
+						tid,
+					);
+				}
+			}
+			continue;
+		}
+
+		// AI firings. The owner doesn't wait forever.
+		if (!userControlsTeam(c.tid)) {
+			let fireProb = 0;
+			if (c.role === "head") {
+				const t = tenure(c);
+				if (t >= 2 && pct < 0.4) {
+					fireProb = 0.55;
+				} else if (t >= 1 && pct < 0.3) {
+					fireProb = 0.4;
+				} else if (
+					t >= 3 &&
+					c.stats.slice(-3).every((r) => r.playoffRoundsWon < 0) &&
+					pct < 0.5
+				) {
+					fireProb = 0.3;
+				}
+			} else if (ovr < 40) {
+				fireProb = 0.3;
+			}
+			if (Math.random() < fireProb) {
+				await fire(c);
+				continue;
+			}
+		}
+
+		await idb.cache.coaches.put(c);
+	}
+
+	await replenishPool();
+	await fillVacancies({ includeUser: false });
+	await syncAllBudgets();
+};
+
+// Before the regular season, anyone who still has a vacancy (including the user) gets one filled automatically
+export const onPreseason = async () => {
+	if (!staffEnabled()) {
+		return;
+	}
+	await ensureStaff();
+	const hired = await fillVacancies({ includeUser: true });
+	for (const { c, tid } of hired) {
+		if (g.get("userTids").includes(tid)) {
+			await logEvent({
+				type: "info",
+				text: `Your vacant ${COACH_ROLE_NAMES[c.role]} job was filled by ${coachLink(c)}.`,
+				saveToDb: false,
+				showNotification: true,
+			});
+		}
+	}
+	await syncAllBudgets();
+};
+
+// User actions
+
+const getUserCoach = async (cid: number) => {
+	const c = await idb.cache.coaches.get(cid);
+	if (!c) {
+		throw new Error("Invalid coach");
+	}
+	return c;
+};
+
+export const userHire = async ({
+	cid,
+	role,
+	years,
+	tid,
+}: {
+	cid: number;
+	role: CoachRole;
+	years: number;
+	tid: number;
+}) => {
+	if (!staffEnabled()) {
+		throw new Error("Coaching staff is disabled");
+	}
+	const c = await getUserCoach(cid);
+	if (c.tid !== COACH_FREE_AGENT) {
+		throw new Error("That coach is not available");
+	}
+	const staff = await getTeamStaff(tid);
+	if (staff[role]) {
+		throw new Error(
+			`You already have a ${COACH_ROLE_NAMES[role]}. Fire him first.`,
+		);
+	}
+	await hire(c, tid, role, helpers.bound(Math.round(years), 1, 5));
+	const t = await idb.cache.teams.get(tid);
+	if (t) {
+		await syncBudget(t);
+	}
+};
+
+export const userFire = async ({ cid, tid }: { cid: number; tid: number }) => {
+	const c = await getUserCoach(cid);
+	if (c.tid !== tid) {
+		throw new Error("That coach is not on your staff");
+	}
+	const buyout = await fire(c);
+	const t = await idb.cache.teams.get(tid);
+	if (t) {
+		await syncBudget(t);
+	}
+	return buyout;
+};
+
+export const userExtend = async ({
+	cid,
+	tid,
+	years,
+}: {
+	cid: number;
+	tid: number;
+	years: number;
+}) => {
+	const c = await getUserCoach(cid);
+	if (c.tid !== tid) {
+		throw new Error("That coach is not on your staff");
+	}
+	c.contract = {
+		amount: coachSalaryDemand(c.ratings, c.role, g.get("salaryCap")),
+		exp:
+			Math.max(c.contract.exp, contractStartSeason() - 1) +
+			helpers.bound(Math.round(years), 1, 5),
+	};
+	addTransaction(c, tid, c.role, "reSigned");
+	await idb.cache.coaches.put(c);
+};
+
+export {
+	getCoachAwards,
+	getCoachingCarousel,
+	getHeadCoachForSeason,
+	getTeamCoachStyle,
+} from "./data.ts";

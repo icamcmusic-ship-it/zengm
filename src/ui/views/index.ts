@@ -130,3 +130,6 @@ export { default as JerseyNumbersTeams } from "./LeagueHistory/JerseyNumbersTeam
 export { default as FamilyTrees } from "./LeagueHistory/FamilyTrees.tsx";
 export { default as LeagueEconomics } from "./LeagueHistory/LeagueEconomics.tsx";
 export { default as HomeCourt } from "./LeagueHistory/HomeCourt.tsx";
+export { default as Staff } from "./Staff/index.tsx";
+export { default as Coach } from "./Coach.tsx";
+export { default as Coaches } from "./Coaches.tsx";

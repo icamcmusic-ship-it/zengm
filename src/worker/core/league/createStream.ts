@@ -93,6 +93,7 @@ import { getNewAwardsByPlayer } from "../../db/migrations/73/getNewAwardsByPlaye
 import { migrateScheduledEvents74 } from "../../db/migrations/74/migrate.ts";
 import { unwrapGameAttribute } from "../../../common/unwrapGameAttribute.ts";
 import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
+import { ensureStaff } from "../staff/index.ts";
 
 export type TeamInfo = TeamBasic & {
 	disabled?: boolean;
@@ -1918,6 +1919,16 @@ const afterDBStream = async ({
 			}
 		}
 	}
+
+	// Coaching staff. League files from before version 76 keep the coaching budget slider, like existing leagues do in the DB migration
+	if (
+		__SPORT === "basketball" &&
+		fromFile.version !== undefined &&
+		fromFile.version < 76
+	) {
+		await league.setGameAttributes({ coachingStaff: false });
+	}
+	await ensureStaff();
 
 	// Memorials
 	if (!fileHasPlayers && !g.get("playerBioInfo")) {

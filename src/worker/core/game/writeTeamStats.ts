@@ -10,6 +10,7 @@ import {
 	getBaseAttendance,
 } from "./attendance.ts";
 import { levelToAmount } from "../../../common/budgetLevels.ts";
+import { getStaffPayroll, staffEnabled } from "../staff/index.ts";
 import getWinner from "../../../common/getWinner.ts";
 import { getAdjustedTicketPrice } from "../../../common/getAdjustedTicketPrice.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
@@ -102,7 +103,9 @@ const writeTeamStats = async (results: GameResults) => {
 			scoutingPaid =
 				levelToAmount(t.budget.scouting, salaryCap) / g.get("numGames");
 			coachingPaid =
-				levelToAmount(t.budget.coaching, salaryCap) / g.get("numGames");
+				(staffEnabled()
+					? await getStaffPayroll(t.tid)
+					: levelToAmount(t.budget.coaching, salaryCap)) / g.get("numGames");
 			healthPaid =
 				levelToAmount(t.budget.health, salaryCap) / g.get("numGames");
 			facilitiesPaid =

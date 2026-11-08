@@ -862,6 +862,9 @@ export type GameAttributesLeague = {
 
 	// Basketball only. Generate college stats and honors for each new draft class as it is created
 	generateCollegeStats: boolean;
+
+	// Basketball only. Real coaching staff (coaches with ratings and contracts) instead of the coaching budget slider
+	coachingStaff: boolean;
 	fakeAgeProb: number;
 };
 
@@ -2438,6 +2441,8 @@ export type UpdateEvent =
 	| "playoffs"
 	| "savedTrades"
 	| "scheduledEvents"
+	// Coaching staff changes
+	| "staff"
 	| "retiredJerseys"
 	| "team"
 	| "teamFinances"
@@ -2637,3 +2642,5 @@ export type SavedTradingBlock = {
 };
 
 export type TeamNum = 0 | 1;
+
+export type * from "./types.staff.ts";

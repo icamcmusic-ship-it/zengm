@@ -1107,6 +1107,35 @@ export const settings: Setting[] = (
 				</>
 			),
 		},
+		...(__SPORT === "basketball"
+			? ([
+					{
+						category: "Finances",
+						key: "coachingStaff",
+						name: "Coaching Staff",
+						type: "bool",
+						descriptionLong: (
+							<>
+								<p>
+									When enabled, every team has a real coaching staff (head coach
+									plus player development, offense and defense assistants) with
+									ratings, styles and contracts, instead of the coaching budget
+									slider. Their salaries are paid as coaching expenses (not
+									against the salary cap), and the staff's player development
+									ability replaces the coaching budget's effect on player
+									progression.
+								</p>
+								<p>
+									Every offseason after the playoffs there is a coaching market
+									where contracts expire, coaches retire, teams fire and hire,
+									and Coach of the Year is awarded. Turning this on in an
+									existing league generates staffs for every team.
+								</p>
+							</>
+						),
+					},
+				] satisfies Setting[])
+			: []),
 		{
 			category: "Finances",
 			key: "softCapTradeSalaryMatch",

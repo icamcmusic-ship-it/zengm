@@ -145,13 +145,14 @@ const BudgetEffect = ({ type, level }: { type: BudgetKey; level: number }) => {
 
 const FinancesForm = ({
 	autoTicketPrice,
+	coachingStaff,
 	gameSimInProgress,
 	otherTeamTicketPrices,
 	t,
 	tid,
 }: Pick<
 	View<"teamFinances">,
-	"autoTicketPrice" | "otherTeamTicketPrices" | "t" | "tid"
+	"autoTicketPrice" | "coachingStaff" | "otherTeamTicketPrices" | "t" | "tid"
 > & {
 	gameSimInProgress: boolean;
 }) => {
@@ -357,7 +358,9 @@ const FinancesForm = ({
 
 					const formDisabledKey =
 						formDisabled ||
-						(expenseCategory.key === "scouting" && challengeNoRatings);
+						(expenseCategory.key === "scouting" && challengeNoRatings) ||
+						// Set by the coaching staff instead
+						(expenseCategory.key === "coaching" && coachingStaff);
 
 					return (
 						<div key={expenseCategory.key}>
@@ -414,7 +417,19 @@ const FinancesForm = ({
 										</button>
 									</div>
 									<div>Average of last 3 seasons: {levelThree}</div>
-									<div>
+									{expenseCategory.key === "coaching" && coachingStaff ? (
+										<div>
+											Set by your{" "}
+											<a href={helpers.leagueUrl(["staff"])}>coaching staff</a>
+										</div>
+									) : null}
+									<div
+										className={
+											expenseCategory.key === "coaching" && coachingStaff
+												? "d-none"
+												: undefined
+										}
+									>
 										Current annual cost:{" "}
 										{Number.isNaN(levelInt)
 											? "???"
@@ -720,6 +735,7 @@ const highlightZeroNegative = (amount: number) => {
 
 const TeamFinances = ({
 	autoTicketPrice,
+	coachingStaff,
 	barData,
 	contractTotals,
 	contracts,
@@ -1024,6 +1040,7 @@ const TeamFinances = ({
 						<FinancesForm
 							key={tid}
 							autoTicketPrice={autoTicketPrice}
+							coachingStaff={coachingStaff}
 							gameSimInProgress={gameSimInProgress}
 							otherTeamTicketPrices={otherTeamTicketPrices}
 							t={t}

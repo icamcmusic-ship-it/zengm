@@ -75,7 +75,7 @@ const categories: Category[] = [
 			{
 				name: "teams",
 				title: "All team data",
-				desc: "All team info and stats.",
+				desc: "All team info and stats, including the coaching staff.",
 				default: true,
 			},
 		],
@@ -292,7 +292,7 @@ const getExportInfo = (
 	const storesByKey = {
 		players: ["players", "awards"],
 		teamsBasic: ["teams", "gameAttributes"],
-		teams: ["teamSeasons", "teamStats"],
+		teams: ["teamSeasons", "teamStats", "coaches"],
 		headToHead: ["headToHeads"],
 		schedule: ["schedule", "playoffSeries"],
 		draftPicks: ["draftPicks"],
