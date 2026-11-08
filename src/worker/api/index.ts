@@ -5444,6 +5444,15 @@ const upsertCustomizedPlayer = async (
 	const prevPlayer =
 		p.pid !== undefined ? await idb.merged.players.get(p.pid) : undefined;
 	p.contracts = prevPlayer ? helpers.deepCopy(prevPlayer.contracts) : [];
+
+	// Without God Mode the UI never gets trait seeds (they'd reveal hidden traits), and can't edit them anyway
+	if (prevPlayer && !g.get("godMode")) {
+		if (prevPlayer.traits) {
+			p.traits = helpers.deepCopy(prevPlayer.traits);
+		} else {
+			delete p.traits;
+		}
+	}
 	applyCustomizedContract(p, originalTid, contractInput, contractSeasons);
 	updateOwedByTids(p);
 

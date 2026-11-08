@@ -69,6 +69,7 @@ export const ScoutCell = ({
 	);
 };
 import { TraitBadges } from "../../components/PlayerTraits/TraitBadges.tsx";
+import { formatTraitReading } from "../../../common/playerTraits/index.ts";
 import {
 	TRAIT_DEFINITIONS,
 	TRAIT_KEYS,
@@ -191,7 +192,7 @@ const DraftClass = ({
 										const t = p.traits?.find((t) => t.key === traitColumn);
 										return t
 											? {
-													value: `${t.exact ? "" : "~"}${t.estimate}`,
+													value: formatTraitReading(t),
 													sortValue: t.estimate,
 												}
 											: null;

@@ -26,7 +26,6 @@ import {
 	getTraitScoresByPid,
 	getTraitViewContext,
 } from "../util/playerTraitsView.ts";
-import type { TraitKey } from "../../common/playerTraits/index.ts";
 
 const getPlayers = async (
 	// Ignored if seasonRange is set
@@ -39,7 +38,7 @@ const getPlayers = async (
 	playoffs: SeasonType = "regularSeason",
 	statType: PlayerStatType = "perGame",
 	seasonRange?: [number, number],
-	traitScoresByPid?: Map<number, Record<TraitKey, number>>,
+	traitScoresByPid?: ReturnType<typeof getTraitScoresByPid>,
 ) => {
 	let tid: number | undefined;
 	if (tidInput !== undefined && tidInput < 0) {
@@ -118,7 +117,8 @@ const getPlayers = async (
 						rawP && norms0
 							? archetypeLabelAt(rawP, peak.season, norms0)
 							: undefined,
-					traitScores: traitScoresByPid?.get(p.pid),
+					traitScores: traitScoresByPid?.get(p.pid)?.scores,
+					traitDisplay: traitScoresByPid?.get(p.pid)?.display,
 					ratings: peak,
 					stats: {
 						...totals,
@@ -167,7 +167,8 @@ const getPlayers = async (
 			{
 				...p,
 				archetype: archetypeOf(p.pid, season),
-				traitScores: traitScoresByPid?.get(p.pid),
+				traitScores: traitScoresByPid?.get(p.pid)?.scores,
+				traitDisplay: traitScoresByPid?.get(p.pid)?.display,
 				// stats can be undefined for a rookie with showRookies and without showNoStats
 				stats: {
 					...p.stats,

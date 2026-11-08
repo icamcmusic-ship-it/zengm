@@ -3,7 +3,10 @@ import { g } from "./index.ts";
 import type { Player } from "../../common/types.ts";
 import type { PlayerTraitsForUI } from "../core/player/traits.ts";
 import { DEFAULT_LEVEL } from "../../common/budgetLevels.ts";
-import type { TraitKey } from "../../common/playerTraits/index.ts";
+import {
+	formatTraitReading,
+	type TraitKey,
+} from "../../common/playerTraits/index.ts";
 
 export type TraitViewContext = {
 	enabled: boolean;
@@ -42,19 +45,29 @@ export const getTraitsForView = (
 	});
 };
 
-// pid -> the estimated 0-100 scores, for tables
+// pid -> the estimated 0-100 scores (for filtering and sorting) and how to show each one (exact score, or a range with "?" while it isn't known), for tables
 export const getTraitScoresByPid = (
 	players: Player[],
 	context: TraitViewContext,
 ) => {
-	const output = new Map<number, Record<TraitKey, number>>();
+	const output = new Map<
+		number,
+		{
+			scores: Record<TraitKey, number>;
+			display: Record<TraitKey, string>;
+		}
+	>();
 	if (!context.enabled) {
 		return output;
 	}
 	for (const p of players) {
 		const info = getTraitsForView(p, context);
 		if (info) {
-			output.set(p.pid, info.scores);
+			const display = {} as Record<TraitKey, string>;
+			for (const t of info.traits) {
+				display[t.key] = formatTraitReading(t);
+			}
+			output.set(p.pid, { scores: info.scores, display });
 		}
 	}
 	return output;

@@ -2,6 +2,7 @@ import {
 	TRAIT_DEFINITIONS,
 	TRAIT_KEYS,
 	TRAIT_LEVEL_LABELS,
+	formatTraitReading,
 	traitDescription,
 	traitLevel,
 	type ScoutedTrait,
@@ -18,7 +19,7 @@ export const TraitBar = ({ trait }: { trait: ScoutedTrait }) => {
 			<div className="d-flex justify-content-between align-items-baseline">
 				<span title={def.description}>
 					<b>{def.name}</b>
-					{def.visibility === "hidden" ? (
+					{def.visibility === "hidden" && !trait.exact ? (
 						<span
 							className="text-body-secondary ms-1"
 							title="Hidden trait: only shows up over time"
@@ -28,48 +29,51 @@ export const TraitBar = ({ trait }: { trait: ScoutedTrait }) => {
 					) : null}
 				</span>
 				<span className="text-body-secondary small">
-					{trait.exact ? null : "~"}
-					{trait.estimate}
-					{trait.exact ? null : ` (${trait.low}-${trait.high})`} ·{" "}
-					{TRAIT_LEVEL_LABELS[level]}
+					{formatTraitReading(trait)}
+					{trait.exact ? ` · ${TRAIT_LEVEL_LABELS[level]}` : null}
 				</span>
 			</div>
 			<div
 				className="position-relative bg-body-secondary rounded"
 				style={{ height: 8 }}
 				role="progressbar"
-				aria-valuenow={trait.estimate}
+				aria-valuenow={trait.exact ? trait.estimate : undefined}
+				aria-valuetext={formatTraitReading(trait)}
 				aria-valuemin={0}
 				aria-valuemax={100}
 				aria-label={def.name}
 			>
-				{trait.exact ? null : (
+				{trait.exact ? (
 					<div
-						className="position-absolute rounded bg-body-tertiary border"
+						className={`position-absolute rounded ${barClass(trait.estimate)}`}
+						style={{
+							left: 0,
+							width: `${trait.estimate}%`,
+							height: 8,
+						}}
+					/>
+				) : (
+					// Only the range the scouts can vouch for, no point estimate
+					<div
+						className="position-absolute rounded bg-secondary opacity-50"
 						style={{
 							left: `${trait.low}%`,
 							width: `${Math.max(1, trait.high - trait.low)}%`,
 							height: 8,
 						}}
-						title="Scouting uncertainty range"
+						title="Scouting range"
 					/>
 				)}
-				<div
-					className={`position-absolute rounded ${barClass(trait.estimate)}`}
-					style={{
-						left: 0,
-						width: `${trait.estimate}%`,
-						height: 8,
-						opacity: trait.exact ? 1 : 0.6,
-					}}
-				/>
 				<div
 					className="position-absolute bg-body"
 					style={{ left: "50%", width: 1, height: 8 }}
 				/>
 			</div>
 			<div className="small text-body-secondary">
-				{traitDescription(trait.key, trait.estimate)}. {def.description}
+				{trait.exact
+					? `${traitDescription(trait.key, trait.estimate)}. `
+					: "Not fully known yet. "}
+				{def.description}
 			</div>
 		</div>
 	);
