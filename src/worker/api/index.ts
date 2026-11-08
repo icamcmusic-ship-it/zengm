@@ -2831,6 +2831,15 @@ const setDraftBoardAutoDraft = async (draftBoardAutoDraft: boolean) => {
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 
+const generateCollegeStatsAllClasses = async (options: {
+	seed: string;
+	onlyMissing: boolean;
+}) => {
+	const output = await draft.generateCollegeStatsAllClasses(options);
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return output;
+};
+
 const removeCollegeStats = async (draftYear: number) => {
 	const output = await draft.removeCollegeStats(draftYear);
 	await toUI("realtimeUpdate", [["playerMovement"]]);
@@ -5805,6 +5814,7 @@ const api = {
 		handleUploadedDraftClass,
 		generateCollegeStats,
 		removeCollegeStats,
+		generateCollegeStatsAllClasses,
 		scoutProspect,
 		updateDraftBoard,
 		setDraftBoardAutoDraft,

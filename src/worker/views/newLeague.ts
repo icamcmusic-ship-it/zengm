@@ -487,6 +487,10 @@ export const getDefaultSettings = () => {
 		generateCollegeStats: true,
 		// Per-prospect scouting, on by default for new leagues
 		scoutingSystem: true,
+		rerandomizeDraftClassRatings: unwrapGameAttribute(
+			defaultGameAttributes,
+			"rerandomizeDraftClassRatings",
+		),
 		fakeAgeProb: unwrapGameAttribute(defaultGameAttributes, "fakeAgeProb"),
 
 		// This can be undefined, but if the setting is ever displayed to the user, it should have a value

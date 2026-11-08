@@ -3,7 +3,7 @@ import { finances, player, realRosters } from "../index.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
-import { autoGenerateCollegeStats } from "./generateCollegeStats.ts";
+import { processNewDraftClasses } from "./generateCollegeStats.ts";
 
 const genPlayers = async (
 	draftYear: number,
@@ -38,7 +38,7 @@ const genPlayers = async (
 				draftYear,
 				currentRealPlayers,
 			);
-			await autoGenerateCollegeStats();
+			await processNewDraftClasses();
 			return;
 		}
 	}
@@ -61,7 +61,10 @@ const genPlayers = async (
 	}
 
 	// Optionally give the new prospects college/overseas stats and honors. Only for prospects who don't already have some, because this is also called to top off a class that was imported
-	await autoGenerateCollegeStats([draftYear]);
+	// Ratings are re-randomized only for a class that was generated here from scratch, not an imported one being topped off
+	await processNewDraftClasses([draftYear], {
+		rerandomize: existingPlayers.length === 0,
+	});
 
 	// Easter eggs!
 	if (__SPORT === "basketball" && !forceScrubs && g.get("easterEggPlayers")) {

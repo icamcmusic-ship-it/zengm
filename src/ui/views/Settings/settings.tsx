@@ -678,6 +678,26 @@ export const settings: Setting[] = (
 			description:
 				"NBA-like tournament to determine the lowest seeded playoff teams.",
 		},
+		...(__SPORT === "basketball"
+			? [
+					{
+						category: "Draft",
+						key: "rerandomizeDraftClassRatings",
+						name: "Re-randomize ratings when a new draft class is created",
+						type: "bool",
+						description:
+							"When enabled, every newly created draft class (each season's new class, and all classes at league creation) is run through Regenerate ratings, using the settings saved with \"Save as league default\" in the Regenerate ratings dialog (or the defaults: class flavor drawn from the seed, heights, overall and potential kept). Seeded from the league and the class year, so it is deterministic. Runs before college/overseas stats are generated. Drafted players are never touched.",
+					},
+					{
+						category: "Draft",
+						key: "generateCollegeStats",
+						name: "Auto-generate college/overseas stats for new draft classes",
+						type: "bool",
+						description:
+							"When enabled, every new draft class gets generated college or overseas (pro club abroad) stats and honors: all classes at league creation, each season's new class, fantasy/expansion/custom-generated classes, and prospects of imported classes who have none. Shown on player pages tagged College or Overseas. Pro stats and experience are not affected. You can also do this by hand on the Draft Scouting page.",
+					},
+				]
+			: []),
 		{
 			category: "Draft",
 			key: "draftType",
@@ -1247,14 +1267,6 @@ export const settings: Setting[] = (
 						type: "bool",
 						description:
 							'When enabled there is a very rare chance for an "Easter egg" player to appear, one of a few select notable historical figures.',
-					},
-					{
-						category: "Events",
-						key: "generateCollegeStats",
-						name: "Auto-generate pre-draft stats & honors",
-						type: "bool",
-						description:
-							"When enabled, every draft class gets generated college or overseas (pro club abroad) stats and honors for its prospects: the classes made when the league is created, each new class every season, fantasy/expansion/custom-generated classes, and prospects of imported classes who have none. Shown on player pages tagged College or Overseas. Pro stats and experience are not affected. You can also do this by hand for any class on the Draft Scouting page.",
 					},
 				]
 			: []),

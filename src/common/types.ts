@@ -863,6 +863,9 @@ export type GameAttributesLeague = {
 	// Basketball only. Generate college stats and honors for each new draft class as it is created
 	generateCollegeStats: boolean;
 	scoutingSystem: boolean;
+	rerandomizeDraftClassRatings: boolean;
+	// Saved from the Regenerate ratings modal ("save as league default"), used by rerandomizeDraftClassRatings
+	draftClassRegenSettings: Record<string, unknown> | undefined;
 	draftBoardAutoDraft: boolean;
 	fakeAgeProb: number;
 };

@@ -239,7 +239,7 @@ export const getProspects = async (draftYear: number) => {
 };
 
 const defaultSettings = async (settings: Partial<BuildSettings>) => {
-	if (settings.scoutingLevel !== undefined) {
+	if (settings.scoutingLevel !== undefined || settings.fuzz !== "regenerate") {
 		return settings;
 	}
 	// Needed only for regenerating fuzz
@@ -656,4 +656,131 @@ export const previewRegenerateSingle = async (
 			applied: r.after.ratings,
 		},
 	};
+};
+
+// All upcoming draft classes BBGM holds prospects for, oldest first
+export const getProspectDraftYears = async () => {
+	const players = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		PLAYER.UNDRAFTED,
+	);
+	return [...new Set(players.map((p) => p.draft.year))].sort((a, b) => a - b);
+};
+
+// Each class gets its own seed derived from the chosen one, so a class's result doesn't depend on which other classes exist
+export const classSeed = (seed: string, draftYear: number) =>
+	`${seed}|${draftYear}`;
+
+export type AllClassesSummary = {
+	draftYear: number;
+	numPlayers: number;
+	numChanged: number;
+	numOvrChanged: number;
+	flavor: string | undefined;
+}[];
+
+// Preview summary for every upcoming class at once
+export const previewRegenerateAllClasses = async ({
+	settings,
+}: {
+	settings: Partial<BuildSettings>;
+}): Promise<{ classes: AllClassesSummary; canUndo: boolean }> => {
+	const classes: AllClassesSummary = [];
+	for (const draftYear of await getProspectDraftYears()) {
+		const preview = await previewRegenerate({
+			draftYear,
+			settings: {
+				...settings,
+				seed: classSeed(settings.seed ?? "regen", draftYear),
+			},
+			locks: {},
+			pids: null,
+		});
+		classes.push({
+			draftYear,
+			numPlayers: preview.numPlayers,
+			numChanged: preview.numChanged,
+			numOvrChanged: preview.numOvrChanged,
+			flavor: preview.flavor?.label,
+		});
+	}
+	return { classes, canUndo: canUndo() };
+};
+
+const applyToClass = async (
+	draftYear: number,
+	settings: Partial<BuildSettings>,
+	onlyWithoutBuild: boolean,
+	entries: UndoEntry[] | undefined,
+) => {
+	const players = await getProspects(draftYear);
+	const pids = onlyWithoutBuild
+		? players.filter((p) => !p.ratingsBuild).map((p) => p.pid)
+		: null;
+	if (pids && pids.length === 0) {
+		return 0;
+	}
+	const seed = classSeed(settings.seed ?? "regen", draftYear);
+	const { players: all, inputs, result, inScope } = await compute({
+		draftYear,
+		settings: { ...settings, seed },
+		locks: {},
+		pids,
+	});
+	let applied = 0;
+	for (const [i, p] of all.entries()) {
+		const r = result.results[i]!;
+		if (!inScope.has(p.pid) || r.skipped) {
+			continue;
+		}
+		entries?.push(snapshot(p));
+		await writeResult(p, r, inputs[i]!.resolved, seed);
+		applied++;
+	}
+	return applied;
+};
+
+// Apply the same settings to every upcoming class. One Undo covers all of them
+export const applyRegenerateAllClasses = async ({
+	settings,
+}: {
+	settings: Partial<BuildSettings>;
+}) => {
+	const entries: UndoEntry[] = [];
+	const classes: { draftYear: number; applied: number }[] = [];
+	for (const draftYear of await getProspectDraftYears()) {
+		classes.push({
+			draftYear,
+			applied: await applyToClass(draftYear, settings, false, entries),
+		});
+	}
+	undoStack = { lid: g.get("lid"), draftYear: -1, entries };
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return { classes };
+};
+
+export const restoreOriginalRatingsAllClasses = async () => {
+	let restored = 0;
+	for (const draftYear of await getProspectDraftYears()) {
+		restored += (await restoreOriginalRatings({ draftYear, pids: null }))
+			.restored;
+	}
+	return { restored };
+};
+
+/**
+ * For the "Re-randomize ratings when a new draft class is created" setting: regenerate the prospects of one class who were never regenerated, with the league's saved regenerator settings (or the defaults), seeded from the league and the class year. Not undoable, no UI update (it runs inside class creation).
+ */
+export const autoRegenerateClass = (
+	draftYear: number,
+	saved: Partial<BuildSettings> | undefined,
+) => {
+	if (__SPORT !== "basketball") {
+		return Promise.resolve(0);
+	}
+	const settings: Partial<BuildSettings> = {
+		...saved,
+		seed: saved?.seed || `league-${g.get("lid")}`,
+	};
+	return applyToClass(draftYear, settings, true, undefined);
 };

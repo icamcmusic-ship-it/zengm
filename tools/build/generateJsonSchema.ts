@@ -1665,6 +1665,18 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					generateCollegeStats: {
 						type: "boolean",
 					},
+					rerandomizeDraftClassRatings: {
+						type: "boolean",
+					},
+					scoutingSystem: {
+						type: "boolean",
+					},
+					draftBoardAutoDraft: {
+						type: "boolean",
+					},
+					draftClassRegenSettings: {
+						type: "object",
+					},
 					fakeAgeProb: {
 						type: "number",
 						minimum: 0,

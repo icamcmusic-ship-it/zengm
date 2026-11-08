@@ -5,6 +5,7 @@ import type { View } from "../../../common/types.ts";
 import { MoreLinks } from "../../components/MoreLinks.tsx";
 import { useLocal } from "../../util/local.ts";
 import { helpers } from "../../util/helpers.ts";
+import { AllClassesPanel } from "../../components/RegenerateRatings/AllClassesPanel.tsx";
 import { RegenerateRatingsButton } from "../../components/RegenerateRatings/RegenerateRatingsButton.tsx";
 
 const PAGE_SIZE = 3;
@@ -65,6 +66,9 @@ const DraftScouting = ({
 			) : null}
 
 			<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
+			{!fantasyDraft ? (
+				<AllClassesPanel seasons={seasons.map((info) => info.season)} />
+			) : null}
 
 			{pagination ? (
 				<div className="d-flex flex-row-reverse">

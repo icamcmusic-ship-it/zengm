@@ -108,6 +108,7 @@ const gameAttributesKeysSportSpecific = {
 		"forceHistoricalRosters",
 		"easterEggPlayers",
 		"generateCollegeStats",
+		"rerandomizeDraftClassRatings",
 	]),
 	football: new Set<GameAttributeKey>([
 		"fantasyPoints",
@@ -719,6 +720,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	easterEggPlayers: true,
 	generateCollegeStats: false,
 	scoutingSystem: false,
+	rerandomizeDraftClassRatings: false,
+	draftClassRegenSettings: undefined,
 	draftBoardAutoDraft: true,
 	fakeAgeProb: 0.01,
 	awards: [

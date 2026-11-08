@@ -7,6 +7,8 @@ import genPlayers from "./genPlayers.ts";
 import {
 	generateCollegeStats,
 	autoGenerateCollegeStats,
+	processNewDraftClasses,
+	generateCollegeStatsAllClasses,
 	removeCollegeStats,
 } from "./generateCollegeStats.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
@@ -26,6 +28,8 @@ export default {
 	genPlayersWithoutSaving,
 	generateCollegeStats,
 	autoGenerateCollegeStats,
+	processNewDraftClasses,
+	generateCollegeStatsAllClasses,
 	removeCollegeStats,
 	getOrder,
 	getRookieContractLength,

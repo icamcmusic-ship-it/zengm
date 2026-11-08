@@ -1885,7 +1885,7 @@ const afterDBStream = async ({
 	});
 
 	// College/overseas stats for every draft class the league starts with (setting "Auto-generate pre-draft stats & honors")
-	await draft.autoGenerateCollegeStats();
+	await draft.processNewDraftClasses();
 
 	if (!extraFromStream.hasEvents) {
 		await logEvent({

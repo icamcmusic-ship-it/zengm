@@ -10,6 +10,7 @@ import { hasPreDraftStats } from "../../../common/preDraft.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { player } from "../index.ts";
+import { autoRegenerateClass } from "./regenerateRatings.ts";
 import {
 	makeBlankPreDraftStatsRow,
 	replacePreDraftAwards,
@@ -147,10 +148,25 @@ export const removeCollegeStats = async (draftYear: number) => {
 };
 
 /**
- * When the "Auto-generate pre-draft stats & honors" setting is on, give every prospect of every future draft class (or only the given years) who has no pre-draft stats yet his college/overseas stats and honors. Used at league creation, after a class is generated or imported, and for random debuts classes.
+ * What happens to a newly created draft class (each season's new class, all classes at league creation, imported or topped off classes), in this order since stats depend on ratings:
+ * 1. "Re-randomize ratings when a new draft class is created": prospects never regenerated get rebuilt with the league's saved regenerator settings
+ * 2. "Auto-generate college/overseas stats for new draft classes": prospects without pre-draft stats get them
+ * Both are seeded from the league and the class year, and only ever touch undrafted prospects. draftYears defaults to every class with prospects.
  */
-export const autoGenerateCollegeStats = async (draftYears?: number[]) => {
-	if (__SPORT !== "basketball" || !g.get("generateCollegeStats")) {
+export const processNewDraftClasses = async (
+	draftYears?: number[],
+	options?: {
+		// false for a class that was imported and only topped off, so imported ratings are kept
+		rerandomize?: boolean;
+	},
+) => {
+	if (__SPORT !== "basketball") {
+		return;
+	}
+	const rerandomize =
+		g.get("rerandomizeDraftClassRatings") && options?.rerandomize !== false;
+	const stats = g.get("generateCollegeStats");
+	if (!rerandomize && !stats) {
 		return;
 	}
 	let years = draftYears;
@@ -162,10 +178,52 @@ export const autoGenerateCollegeStats = async (draftYears?: number[]) => {
 		years = [...new Set(prospects.map((p) => p.draft.year))];
 	}
 	for (const draftYear of years.sort((a, b) => a - b)) {
-		await generateCollegeStats({
+		if (rerandomize) {
+			await autoRegenerateClass(
+				draftYear,
+				g.get("draftClassRegenSettings") as any,
+			);
+		}
+		if (stats) {
+			await generateCollegeStats({
+				draftYear,
+				seed: `${g.get("lid")}-${draftYear}-auto`,
+				onlyMissing: true,
+			});
+		}
+	}
+};
+
+// Kept for callers of the old name
+export const autoGenerateCollegeStats = processNewDraftClasses;
+
+/**
+ * The "all classes" button on Draft Scouting: college/overseas stats for every upcoming class, each with its own seed derived from the given one. onlyMissing keeps prospects who already have stats.
+ */
+export const generateCollegeStatsAllClasses = async ({
+	seed,
+	onlyMissing,
+}: {
+	seed: string;
+	onlyMissing: boolean;
+}) => {
+	const prospects = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		PLAYER.UNDRAFTED,
+	);
+	const years = [...new Set(prospects.map((p) => p.draft.year))].sort(
+		(a, b) => a - b,
+	);
+	const classes = [];
+	for (const draftYear of years) {
+		classes.push({
 			draftYear,
-			seed: `${g.get("lid")}-${draftYear}-auto`,
-			onlyMissing: true,
+			...(await generateCollegeStats({
+				draftYear,
+				seed: `${seed}|${draftYear}`,
+				onlyMissing,
+			})),
 		});
 	}
+	return { classes };
 };

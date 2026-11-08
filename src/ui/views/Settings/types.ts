@@ -177,6 +177,7 @@ export type Key =
 	| "easterEggPlayers"
 	| "generateCollegeStats"
 	| "scoutingSystem"
+	| "rerandomizeDraftClassRatings"
 	| "fakeAgeProb";
 
 export type Category =
