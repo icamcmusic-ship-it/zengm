@@ -10,6 +10,12 @@ import {
 	trade,
 } from "../index.ts";
 import loadTeams from "./loadTeams.ts";
+import {
+	dailyTick as injuryDepthDailyTick,
+	isInjuryDepthEnabled,
+	onHealed as injuryDepthOnHealed,
+	setSimDay as injuryDepthSetSimDay,
+} from "../player/injuryDepth.ts";
 import updatePlayoffSeries from "./updatePlayoffSeries.ts";
 import writeGameStats from "./writeGameStats.ts";
 import writePlayerStats, {
@@ -145,6 +151,25 @@ const play = async (
 			}
 		}
 
+		// injuryDepth setting: remember each team's last game day, for back-to-backs
+		if (isInjuryDepthEnabled()) {
+			for (const result of results) {
+				if (typeof result.day !== "number") {
+					continue;
+				}
+				for (const t of result.team) {
+					const teamSeason = await idb.cache.teamSeasons.indexGet(
+						"teamSeasonsByTidSeason",
+						[t.id, g.get("season")],
+					);
+					if (teamSeason && teamSeason.lastGameDay !== result.day) {
+						teamSeason.lastGameDay = result.day;
+						await idb.cache.teamSeasons.put(teamSeason);
+					}
+				}
+			}
+		}
+
 		// Delete finished games from schedule
 		for (const { gid } of results) {
 			await idb.cache.schedule.delete(gid);
@@ -191,6 +216,7 @@ const play = async (
 			]);
 
 			const playersToSave = [];
+			const injuryDepthEnabled = isInjuryDepthEnabled();
 			for (const p of players) {
 				let changed = false;
 
@@ -212,9 +238,16 @@ const play = async (
 					changed = true;
 				}
 
+				if (injuryDepthEnabled && injuryDepthDailyTick(p)) {
+					changed = true;
+				}
+
 				// Is it already over?
 				if (p.injury.type !== "Healthy" && p.injury.gamesRemaining <= 0) {
 					const score = p.injury.score;
+					if (injuryDepthEnabled) {
+						injuryDepthOnHealed(p);
+					}
 					p.injury = {
 						type: "Healthy",
 						gamesRemaining: 0,
@@ -614,6 +647,7 @@ const play = async (
 				tids.add(matchup.awayTid);
 			}
 
+			injuryDepthSetSimDay(schedule[0]?.day);
 			const teams = await loadTeams(Array.from(tids), conditions); // Play games
 
 			await cbSimGames(schedule, teams, dayOver);

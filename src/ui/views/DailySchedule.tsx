@@ -11,6 +11,7 @@ import { ScoreBox } from "../components/ScoreBox/index.tsx";
 import { HypeLine, useHypeGids } from "../components/GameHype.tsx";
 
 const DailySchedule = ({
+	backToBack,
 	cid,
 	cids,
 	completed,
@@ -41,7 +42,14 @@ const DailySchedule = ({
 		phase,
 		season: currentSeason,
 		userTid,
-	} = useLocal(["gameSimInProgress", "phase", "season", "userTid"]);
+		teamInfoCache,
+	} = useLocal([
+		"gameSimInProgress",
+		"phase",
+		"season",
+		"teamInfoCache",
+		"userTid",
+	]);
 
 	const hype = useHypeGids(
 		[...upcoming, ...completed]
@@ -179,6 +187,18 @@ const DailySchedule = ({
 												actions={actions}
 											/>
 											<HypeLine h={hype[game.gid]} className="mt-1" />
+											{backToBack?.[game.gid] ? (
+												<div
+													className="mt-1 small text-body-secondary"
+													data-testid="back-to-back"
+												>
+													<span className="badge bg-secondary">B2B</span> Second
+													night of a back-to-back for{" "}
+													{backToBack[game.gid]!.map(
+														(tid) => teamInfoCache[tid]?.abbrev ?? "",
+													).join(" and ")}
+												</div>
+											) : null}
 											<ForceWin allowTie={allowTie} game={game} />
 										</div>
 									);

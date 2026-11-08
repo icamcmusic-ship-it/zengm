@@ -12,6 +12,7 @@ import { helpers } from "../util/helpers.ts";
 import { HypeLine, useHypeGids } from "../components/GameHype.tsx";
 
 const Schedule = ({
+	backToBack,
 	canLiveSimFirstGame,
 	completed,
 	elam,
@@ -173,6 +174,19 @@ const Schedule = ({
 										actions={actions}
 									/>
 									<HypeLine h={hype[game.gid]} className="mt-1" />
+									{backToBack?.[game.gid]?.includes(tid) ? (
+										<div
+											className="mt-1 small text-body-secondary"
+											data-testid="back-to-back"
+											title="Second night of a back-to-back: a little more fatigue and injury risk, and some teams rest veterans"
+										>
+											<span className="badge bg-secondary">B2B</span> Second
+											night of a back-to-back
+											{backToBack[game.gid]!.length > 1
+												? " for both teams"
+												: null}
+										</div>
+									) : null}
 									<ForceWin
 										key={forceWinKey}
 										allowTie={allowTie}

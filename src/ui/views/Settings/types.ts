@@ -72,6 +72,7 @@ export type Key =
 	| "elamPoints"
 	| "storePlayByPlay"
 	| "technicalFouls"
+	| "injuryDepth"
 	| "playerMoodTraits"
 	| "numPlayersOnCourt"
 	| "numDraftRounds"

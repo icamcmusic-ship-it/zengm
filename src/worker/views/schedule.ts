@@ -19,6 +19,7 @@ import { getProcessedGames } from "../util/getProcessedGames.ts";
 import { defineView, keepType, type ViewArgs } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
+import { getBackToBackGids } from "../core/season/getBackToBackGids.ts";
 
 const processInputs = (params: RouteParams<"schedule">) => {
 	const tid = validateTeam(params.team);
@@ -501,7 +502,13 @@ const updateUpcoming = async ({
 
 		const topPlayers = await getTopPlayers<[any, any]>(inputs.tid, 2);
 
+		// Second night of a back-to-back, for the B2B markers
+		const backToBack: Record<number, number[]> = Object.fromEntries(
+			await getBackToBackGids(),
+		);
+
 		return {
+			backToBack,
 			canLiveSimFirstGame,
 			elam: g.get("elam"),
 			elamASG: g.get("elamASG"),

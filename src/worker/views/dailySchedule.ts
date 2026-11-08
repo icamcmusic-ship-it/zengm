@@ -7,6 +7,7 @@ import { PHASE } from "../../common/constants.ts";
 import { makeResponsiveDropdownOption } from "../../common/makeResponsiveDropdownOption.tsx";
 import { env } from "../util/env.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { getBackToBackGids } from "../core/season/getBackToBackGids.ts";
 import { validateSeason } from "../util/processInputs.ts";
 
 const processInputs = (params: RouteParams<"dailySchedule">) => {
@@ -267,8 +268,15 @@ export default defineView({
 
 			const topPlayers = await getTopPlayers(undefined, 1, info.day);
 
+			// Second night of a back-to-back, for the B2B markers
+			const backToBack: Record<number, number[]> =
+				info.upcoming.length > 0
+					? Object.fromEntries(await getBackToBackGids())
+					: {};
+
 			return {
 				...info,
+				backToBack,
 				elam: g.get("elam"),
 				elamASG: g.get("elamASG"),
 				season: inputs.season,

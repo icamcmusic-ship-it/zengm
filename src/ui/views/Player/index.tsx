@@ -1,6 +1,7 @@
 import { DataTable } from "../../components/DataTable/index.tsx";
 import { dropdownOptions } from "../../hooks/useDropdownOptions.tsx";
 import Injuries from "./Injuries.tsx";
+import InjuryHealth from "./InjuryHealth.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import { helpers } from "../../util/helpers.ts";
 import { getCols } from "../../../common/getCols.ts";
@@ -376,6 +377,7 @@ const Player2 = ({
 				<div className="col-md-6 col-lg-4">
 					<HideableSection title="Injuries">
 						<Injuries injuries={player.injuries} showRatings={showRatings} />
+						<InjuryHealth info={player.healthInfo} pid={player.pid} />
 					</HideableSection>
 				</div>
 				<div className="col-md-6 col-lg-8">

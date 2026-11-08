@@ -652,6 +652,8 @@ export type GameAttributesLeague = {
 	storePlayByPlay: boolean;
 	// Basketball: technical and flagrant fouls, ejections in the game sim
 	technicalFouls: boolean;
+	// Basketball: re-injury risk, minutes restrictions after injuries, load management, back-to-back effects, injury-prone players
+	injuryDepth: boolean;
 	equalizeRegions: boolean;
 	fantasyPoints?: "standard" | "ppr" | "halfPpr";
 	forceRetireAge: number;
@@ -1321,6 +1323,10 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 		ovrDrop?: number;
 		potDrop?: number;
 	}[];
+	// injuryDepth setting: state after returning from an injury
+	health?: PlayerHealth;
+	// injuryDepth setting: rest this player on the second night of back-to-backs
+	loadManagement?: boolean;
 	jerseyNumber?: string; // Should be undefined only for a player who has never been on a team, or a player signed to his first team before the preseason
 	lastName: string;
 	moodTraits: MoodTrait[];
@@ -2154,6 +2160,9 @@ export type Team = {
 				restricted1?: true; // True if team got the top pick last year
 				restricted5?: 1 | 2; // Number of prior seasons in a row that team got a top 5 pick (2 is max to track, undefined is 0)
 		  };
+
+	// injuryDepth setting: rest older/injury-prone players on the second night of back-to-backs
+	loadManagement?: boolean;
 };
 
 export type TeamAttr = keyof Team;
@@ -2269,6 +2278,8 @@ export type TeamStatType = "perGame" | "totals";
 
 export type TeamSeasonWithoutKey = {
 	rid?: number;
+	// injuryDepth setting: day of the team's most recent game, for back-to-backs
+	lastGameDay?: number;
 	tid: number;
 	season: number;
 	gpHome: number; // Includes playoff games! Used for attendance average
@@ -2358,6 +2369,15 @@ export type TeamSeasonWithoutKey = {
 
 	// Only used in historical leagues when realStats="all"
 	srID?: string;
+};
+
+export type PlayerHealth = {
+	// Games left under a minutes restriction, and how many it started with
+	restrict: number;
+	restrictTotal: number;
+	// Games left with raised re-injury risk, and the body part that was hurt
+	returnGames: number;
+	bodyPart: string;
 };
 
 export type TeamSeason = TeamSeasonWithoutKey & {

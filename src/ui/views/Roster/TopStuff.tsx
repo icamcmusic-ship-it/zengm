@@ -5,6 +5,7 @@ import { helpers } from "../../util/helpers.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import InstructionsAndSortButtons from "./InstructionsAndSortButtons.tsx";
 import PlayThroughInjurySliders from "./PlayThroughInjuriesSliders.tsx";
+import LoadManagementToggle from "./LoadManagementToggle.tsx";
 import { type LocalStateUI, type View } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import Note from "../Player/Note.tsx";
@@ -353,6 +354,13 @@ const TopStuff = ({
 							{showTradingBlock ? (
 								<div>
 									<PlayThroughInjurySliders key={tid} t={t} />
+									{t.injuryDepth ? (
+										<LoadManagementToggle
+											key={`lm-${tid}`}
+											tid={tid}
+											initialValue={!!t.loadManagement}
+										/>
+									) : null}
 								</div>
 							) : null}
 						</>

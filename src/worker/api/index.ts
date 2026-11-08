@@ -4520,6 +4520,41 @@ const updateOptions = async (
 	await toUI("realtimeUpdate", [["options"]]);
 };
 
+// injuryDepth setting: rest a player (pid) or a team's veterans (tid) on the second night of back-to-backs
+const setLoadManagement = async ({
+	pid,
+	tid,
+	value,
+}: {
+	pid?: number;
+	tid?: number;
+	value: boolean;
+}) => {
+	if (pid !== undefined) {
+		const p = await idb.cache.players.get(pid);
+		if (p) {
+			if (value) {
+				p.loadManagement = true;
+			} else {
+				delete p.loadManagement;
+			}
+			await idb.cache.players.put(p);
+		}
+	}
+	if (tid !== undefined) {
+		const t = await idb.cache.teams.get(tid);
+		if (t) {
+			if (value) {
+				t.loadManagement = true;
+			} else {
+				delete t.loadManagement;
+			}
+			await idb.cache.teams.put(t);
+		}
+	}
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+};
+
 const updatePlayThroughInjuries = async ({
 	tid,
 	value,
@@ -5810,6 +5845,7 @@ const api = {
 		updateMultiTeamMode,
 		updateOptions,
 		updatePlayThroughInjuries,
+		setLoadManagement,
 		updatePlayerWatch,
 		updatePlayersWatch,
 		updatePlayingTime,
