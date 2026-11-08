@@ -567,6 +567,8 @@ describe("progress", () => {
 		expect(bestText(high, { v: 54 })).toBe("54 of 60 points");
 		expect(bestText(low, { v: 72 })).toBe("72 points (needs 60 or fewer)");
 		expect(bestText(high, null)).toBe(undefined);
+		// Nothing yet toward a one-off is not "0 of 1"
+		expect(bestText(DEF_BY_ID.get("sUpsetSweep-1")!, { v: 0 })).toBe(undefined);
 		const winp = DEF_BY_ID.get("winp-0.89")!;
 		expect(formatValue(0.854, winp)).toBe(".854");
 	});

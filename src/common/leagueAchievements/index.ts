@@ -229,6 +229,10 @@ export const bestText = (d: AchievementDef, best: Best | null | undefined) => {
 	if (!best || !Number.isFinite(best.v)) {
 		return undefined;
 	}
+	// "0 of 1": nothing yet
+	if (!d.low && best.v === 0 && d.t === 1) {
+		return undefined;
+	}
 	const v = formatValue(best.v, d);
 	const t = formatValue(d.t, d);
 	const unit =

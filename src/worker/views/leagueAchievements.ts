@@ -136,7 +136,9 @@ export default defineView({
 				}
 			} else {
 				item.best = bestText(d, r.best);
-				item.bestWho = whoOf(look, d, r.best);
+				if (item.best) {
+					item.bestWho = whoOf(look, d, r.best);
+				}
 			}
 			return item;
 		});
