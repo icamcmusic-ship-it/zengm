@@ -1,3 +1,4 @@
+import { veteranExperienceCurve } from "./veteran.ts";
 import { completeTraitSeeds, seedKey } from "./seeds.ts";
 import {
 	TRAIT_KEYS,
@@ -50,6 +51,7 @@ const RATING_WEIGHTS: Record<TraitKey, TraitRatings> = {
 	handle: { drb: 0.45, pss: 0.25, oiq: 0.2, spd: 0.1 },
 	lateGameIq: { oiq: 0.5, diq: 0.3, pss: 0.2 },
 	leadership: { oiq: 0.3, diq: 0.2, pss: 0.2, endu: 0.1, stre: 0.1, drb: 0.1 },
+	veteranSavvy: { oiq: 0.4, diq: 0.4, pss: 0.2 },
 };
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -60,6 +62,7 @@ const contextPart = (
 	key: TraitKey,
 	age: number,
 	experience: number,
+	proSeasons: number = experience,
 ): number => {
 	switch (key) {
 		case "clutch":
@@ -84,6 +87,12 @@ const contextPart = (
 				1.2 * (Math.min(experience, 12) - NEUTRAL_EXPERIENCE) +
 				0.3 * (clamp(age, 20, 36) - NEUTRAL_AGE)
 			);
+		case "veteranSavvy":
+			// Pro seasons played, plateau at 9 (see veteran.ts)
+			return (
+				veteranExperienceCurve(proSeasons) -
+				veteranExperienceCurve(NEUTRAL_EXPERIENCE)
+			);
 		default:
 			// offBall, screen and handle do not change with age or experience, only through the ratings
 			return 0;
@@ -106,6 +115,7 @@ export const CALIBRATION_OFFSETS: Record<TraitKey, number> = {
 	handle: -2,
 	lateGameIq: -3.6,
 	leadership: -5,
+	veteranSavvy: -4.5,
 };
 
 export const ratingPart = (key: TraitKey, ratings: TraitRatings) => {
@@ -132,7 +142,7 @@ export const scoreOne = (
 		50 +
 		CALIBRATION_OFFSETS[key] +
 		ratingPart(key, ratings) +
-		contextPart(key, age, experience) +
+		contextPart(key, age, experience, context.proSeasons ?? experience) +
 		SEED_SD * seed;
 	return clamp(Math.round(raw), 0, 100);
 };
@@ -182,7 +192,7 @@ export const seedForScore = (
 		50 +
 		CALIBRATION_OFFSETS[key] +
 		ratingPart(key, ratings) +
-		contextPart(key, age, experience);
+		contextPart(key, age, experience, context.proSeasons ?? experience);
 	return (wantedScore - rest) / SEED_SD;
 };
 

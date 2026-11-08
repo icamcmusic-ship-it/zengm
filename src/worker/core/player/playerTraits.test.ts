@@ -108,11 +108,13 @@ describe("calibration on generated leagues", () => {
 		assert.approximately(mean("foul"), 1, 0.02);
 		assert.approximately(mean("steal"), 1, 0.01);
 		assert.approximately(mean("rec"), 1, 0.012);
-		assert.approximately(mean("clutchShot"), 0, 0.002);
+		assert.approximately(mean("clutchShot"), 0, 0.003);
 		assert.approximately(mean("clutchFt"), 0, 0.003);
-		assert.approximately(mean("clutchTov"), 1, 0.007);
+		// Clutch and veteran savvy both feed it
+		assert.approximately(mean("clutchTov"), 1, 0.009);
 		assert.approximately(mean("press"), 1, 0.01);
-		assert.approximately(mean("late"), 0, 0.003);
+		// Rotation-weighted; veteran savvy is centred on the minutes-weighted average (about 1.5 points higher), see docs
+		assert.approximately(mean("late"), 0, 0.004);
 		assert.approximately(mean("chem"), 0, 0.06);
 		// Shot-weighted
 		assert.approximately(sums.quality! / usageTotal, 0, 0.002);

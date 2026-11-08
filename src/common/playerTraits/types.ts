@@ -13,6 +13,7 @@ export const TRAIT_KEYS = [
 	"handle",
 	"lateGameIq",
 	"leadership",
+	"veteranSavvy",
 ] as const;
 
 export type TraitKey = (typeof TRAIT_KEYS)[number];
@@ -51,6 +52,8 @@ export type TraitContext = {
 	age?: number;
 	// Seasons played in the pros. Default 3 (neutral).
 	experience?: number;
+	// Completed pro seasons played (pre-draft rows excluded). Default: experience. Only veteran savvy reads it.
+	proSeasons?: number;
 };
 
 // A game situation, used by the situational hooks. timeLeft is seconds left in the current period.

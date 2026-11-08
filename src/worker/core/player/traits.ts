@@ -10,6 +10,10 @@ import {
 	traitScores,
 	traitUncertainty,
 	clampSeed,
+	proSeasonsPlayed,
+	teamMentoring,
+	mentorBonuses,
+	MENTEE_MAX_AGE,
 	TRAIT_KEYS,
 	type PlayerTraits,
 	type ScoutedTrait,
@@ -29,6 +33,12 @@ type TraitPlayer = {
 	draft: { year: number; tid?: number };
 	tid?: number;
 	ratings: NonEmptyArray<{ season: number } & TraitRatings>;
+	stats?: {
+		season: number;
+		tid?: number;
+		playoffs?: boolean;
+		gp?: number;
+	}[];
 };
 
 export const traitsEnabled = () =>
@@ -44,6 +54,22 @@ export const getTraitExperience = (p: TraitPlayer, season = g.get("season")) =>
 		: Math.max(0, season - (p.draft.year ?? season));
 
 const getAge = (p: TraitPlayer, season: number) => season - p.born.year;
+
+// Completed pro seasons played (veteran savvy). Prospects 0.
+export const getTraitProSeasons = (p: TraitPlayer, season = g.get("season")) =>
+	p.tid === PLAYER.UNDRAFTED
+		? 0
+		: proSeasonsPlayed({
+				p,
+				season,
+				startingSeason: g.get("startingSeason"),
+			});
+
+const getContext = (p: TraitPlayer, season: number) => ({
+	age: getAge(p, season),
+	experience: getTraitExperience(p, season),
+	proSeasons: getTraitProSeasons(p, season),
+});
 
 // Seeds for a player, without writing anything. Missing seeds are derived from the league seed and pid, so the answer is the same every time.
 export const getTraitSeeds = (p: TraitPlayer) =>
@@ -79,10 +105,7 @@ export const getPlayerTraitScores = (
 	season = g.get("season"),
 ): TraitScores => {
 	const ratings = last(p.ratings);
-	return traitScores(ratings, getTraitSeeds(p), {
-		age: getAge(p, season),
-		experience: getTraitExperience(p, season),
-	});
+	return traitScores(ratings, getTraitSeeds(p), getContext(p, season));
 };
 
 // For the game sim: the effects for a player, or undefined when the Player Traits setting is off (the sim must then behave exactly as it did before traits existed). The sim should call this once per player per game, not per possession.
@@ -185,10 +208,7 @@ export const setTraitScores = (
 ) => {
 	const seeds = { ...getTraitSeeds(p) };
 	const ratings = last(p.ratings);
-	const context = {
-		age: getAge(p, season),
-		experience: getTraitExperience(p, season),
-	};
+	const context = getContext(p, season);
 	for (const key of TRAIT_KEYS) {
 		const score = wanted[key];
 		if (score === undefined || !Number.isFinite(score)) {
@@ -199,4 +219,45 @@ export const setTraitScores = (
 		);
 	}
 	p.traits = seeds;
+};
+
+/**
+ * Mentoring (veteran savvy), for newPhasePreseason before players develop. players: every non-retired player, ratings still last season's. newSeason: the season being
+ * started. Returns pid -> progression bonus (ovr points in expectation, +-0.5) for young players (age <= 23 in newSeason) on a team; pass it to player.develop. Centered
+ * so the league-wide average over those players is 0 (no rating inflation). Empty when the setting is off.
+ */
+export const getMentorBonuses = (
+	players: (TraitPlayer & { pid: number; tid: number })[],
+	newSeason: number,
+) => {
+	const output = new Map<number, number>();
+	if (!traitsEnabled()) {
+		return output;
+	}
+	const scoresByTid = new Map<number, number[]>();
+	const menteesByTid = new Map<number, number>();
+	for (const p of players) {
+		if (p.tid < 0) {
+			continue;
+		}
+		if (newSeason - p.born.year <= MENTEE_MAX_AGE) {
+			menteesByTid.set(p.tid, (menteesByTid.get(p.tid) ?? 0) + 1);
+		} else {
+			const score = getPlayerTraitScores(p, newSeason - 1).veteranSavvy;
+			const list = scoresByTid.get(p.tid) ?? [];
+			list.push(score);
+			scoresByTid.set(p.tid, list);
+		}
+	}
+	const raw = new Map<number, number>();
+	for (const [tid, scores] of scoresByTid) {
+		raw.set(tid, teamMentoring(scores));
+	}
+	const byTid = mentorBonuses(raw, menteesByTid);
+	for (const p of players) {
+		if (p.tid >= 0 && newSeason - p.born.year <= MENTEE_MAX_AGE) {
+			output.set(p.pid, byTid.get(p.tid) ?? 0);
+		}
+	}
+	return output;
 };

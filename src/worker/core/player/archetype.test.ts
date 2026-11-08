@@ -197,7 +197,7 @@ describe("stored archetypes", () => {
 describe("wiring", () => {
 	test("the preseason phase stores archetypes after development, and new leagues initialise them", () => {
 		const src = preseasonSource as string;
-		const dev = src.indexOf("player.develop(p, 1, false");
+		const dev = src.indexOf("await player.develop(");
 		const hook = src.indexOf("updateArchetypesForPreseason(players)");
 		assert.ok(dev > 0 && hook > dev, "hook runs after the development loop");
 		assert.ok(
