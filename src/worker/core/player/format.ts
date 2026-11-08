@@ -20,6 +20,10 @@ import { actualPhase } from "../../util/actualPhase.ts";
 import { getPayrollSeason } from "../../util/getPayrollSeason.ts";
 import { last } from "../../../common/utils.ts";
 import {
+	BADGE_RATING_KEYS,
+	getSkillBadges,
+} from "../../../common/skillBadges/index.ts";
+import {
 	getPreDraftStats,
 	getProAwards,
 	getProStats,
@@ -544,6 +548,19 @@ const processAttrs = (
 	}
 };
 
+// Extended skill badges (display only, see common/skillBadges). Uses the same fuzzed ratings the user sees.
+const getBadgesForRatingsRow = (pr: any, fuzz: boolean | undefined) => {
+	const r: any = {};
+	for (const key of BADGE_RATING_KEYS) {
+		const v = pr[key];
+		if (typeof v !== "number") {
+			return [];
+		}
+		r[key] = fuzz && key !== "hgt" ? player.fuzzRating(v, pr.fuzz) : v;
+	}
+	return getSkillBadges(r);
+};
+
 const processRatings = (
 	output: any,
 	p: Player,
@@ -611,6 +628,9 @@ const processRatings = (
 		for (const attr of ratings) {
 			if (attr === "skills") {
 				row.skills = helpers.deepCopy(pr.skills);
+			} else if (attr === "badges") {
+				row.badges =
+					__SPORT === "basketball" ? getBadgesForRatingsRow(pr, fuzz) : [];
 			} else if (attr === "dovr" || attr === "dpot") {
 				// Handle dovr and dpot - if there are previous ratings, calculate the fuzzed difference
 				const cat = attr === "dovr" ? "ovr" : "pot";
@@ -697,6 +717,8 @@ const processRatings = (
 			for (const attr of ratings) {
 				if (attr === "skills") {
 					row.skills = [];
+				} else if (attr === "badges") {
+					row.badges = [];
 				} else if (attr === "age") {
 					row.age = season - p.born.year;
 				} else if (attr === "pos") {

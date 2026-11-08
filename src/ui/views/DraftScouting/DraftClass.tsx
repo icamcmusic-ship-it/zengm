@@ -60,6 +60,7 @@ const DraftClass = ({
 					pid: p.pid,
 					season,
 					skills: p.skills,
+					badges: p.badges,
 					defaultWatch: p.watch,
 					firstName: p.firstNameShort,
 					firstNameShort: p.firstNameShort,

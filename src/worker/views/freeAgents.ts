@@ -199,7 +199,7 @@ export default defineView({
 						"jerseyNumber",
 						"draft",
 					],
-					ratings: ["ovr", "pot", "skills", "pos"],
+					ratings: ["ovr", "pot", "skills", "badges", "pos"],
 					stats: freeAgentStats,
 					season: season === "current" ? g.get("season") : freeAgencySeason,
 					showNoStats: true,

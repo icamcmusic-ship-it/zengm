@@ -9,7 +9,7 @@ import {
 	type SkillBadgeDef,
 } from "./definitions.ts";
 
-const KEYS: BadgeRatingKey[] = [
+export const BADGE_RATING_KEYS: BadgeRatingKey[] = [
 	"hgt",
 	"stre",
 	"spd",
@@ -85,7 +85,7 @@ export const getSkillBadges = (ratings: BadgeRatings): string[] => {
 		return [];
 	}
 	let key = "";
-	for (const k of KEYS) {
+	for (const k of BADGE_RATING_KEYS) {
 		key += `${Math.round(ratings[k])},`;
 	}
 	const cached = cache.get(key);
@@ -108,7 +108,7 @@ export const pickBadgeRatings = (
 	row: Partial<Record<BadgeRatingKey, number>>,
 ): BadgeRatings | undefined => {
 	const out: any = {};
-	for (const k of KEYS) {
+	for (const k of BADGE_RATING_KEYS) {
 		const v = row[k];
 		if (typeof v !== "number") {
 			return undefined;

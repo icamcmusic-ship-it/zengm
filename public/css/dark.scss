@@ -451,3 +451,8 @@ $highlight-leader-color: lighten($yellow, 18%);
 	--editable-input-color: #fff !important;
 	--editable-input-label-color: #aaa !important;
 }
+
+// Extended skill badges: brighter on dark backgrounds
+.skill-badge {
+	filter: brightness(1.35);
+}

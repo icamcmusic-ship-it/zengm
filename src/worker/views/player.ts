@@ -101,6 +101,7 @@ export const getPlayer = async <
 			"pot",
 			...RATINGS,
 			"skills",
+			"badges",
 			"pos",
 			"injuryIndex",
 		],

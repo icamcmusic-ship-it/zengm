@@ -1,4 +1,4 @@
-// Not a real test: prints badge counts per generated league. Run with BADGE_CALIBRATE=1 and look at the output (use --reporter=verbose).
+// Not a real test: prints badge counts per generated league. Unskip it and look at the output (use --reporter=verbose).
 import { describe, test } from "vitest";
 import { PLAYER } from "../constants.ts";
 import { resetG } from "../../test/helpers.ts";
@@ -7,7 +7,7 @@ import { DEFAULT_LEVEL } from "../budgetLevels.ts";
 import { last, range } from "../utils.ts";
 import { SKILL_BADGES, getSkillBadges } from "./index.ts";
 
-describe.skipIf(!process.env.BADGE_CALIBRATE)("calibration", () => {
+describe.skip("calibration", () => {
 	test("print", async () => {
 		resetG();
 		const counts: Record<string, number> = {};

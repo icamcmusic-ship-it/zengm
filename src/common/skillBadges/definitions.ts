@@ -74,7 +74,7 @@ export const BADGE_GROUP_NAMES: Record<BadgeGroup, string> = {
 };
 
 // Cutoffs were calibrated on randomly generated 30-team leagues, see skillBadges.test.ts (calibration report is skipped by default).
-export const SKILL_BADGES: SkillBadgeDef[] = [
+const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 	{
 		label: "Cs",
 		name: "Catch-and-shoot specialist",
@@ -495,6 +495,10 @@ export const SKILL_BADGES: SkillBadgeDef[] = [
 		conditions: [c([["ft", 1]], 0.25, "below")],
 	},
 ];
+
+// Other sports have different ratings, so they get no extended badges
+export const SKILL_BADGES: SkillBadgeDef[] =
+	__SPORT === "basketball" ? ALL_BASKETBALL_BADGES : [];
 
 export const SKILL_BADGES_BY_LABEL: Record<string, SkillBadgeDef> =
 	Object.fromEntries(SKILL_BADGES.map((def) => [def.label, def]));

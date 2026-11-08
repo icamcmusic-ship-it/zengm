@@ -3098,6 +3098,10 @@ const cols: {
 		sortSequence: ["desc", "asc"],
 		sortType: "number",
 	},
+	Badges: {
+		desc: "Extended skill badges (see Frivolities > Skill Badges)",
+		sortType: "string",
+	},
 	College: {},
 	Compare: {
 		sortSequence: [],

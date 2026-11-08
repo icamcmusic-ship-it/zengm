@@ -58,7 +58,7 @@ export default defineView({
 				"watch",
 				"jerseyNumber",
 			],
-			ratings: ["ovr", "pot", "skills", "pos"],
+			ratings: ["ovr", "pot", "skills", "badges", "pos"],
 			stats,
 			season: g.get("season"),
 			showNoStats: true,

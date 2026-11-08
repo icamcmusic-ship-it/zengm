@@ -105,6 +105,18 @@ const allFiltersTemp: Record<
 					return p.age;
 				},
 			},
+			...(__SPORT === "basketball"
+				? {
+						// Extended skill badges (common/skillBadges), as a space-separated list of labels; use "contains"
+						badges: {
+							colKey: "Badges",
+							valueType: "string",
+							getValue: (p) =>
+								(p.ratings as { badges?: string[] }).badges?.join(" ") ?? "",
+							workerFieldOverride: null,
+						} as MinimalAdvancedPlayerSearchField,
+					}
+				: {}),
 			jerseyNumber: {
 				colKey: "stat:jerseyNumber",
 				valueType: "string",
