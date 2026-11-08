@@ -67,9 +67,8 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 						<span className="skill ms-0">{selected.label}</span> {selected.name}
 					</h2>
 					<p>
-						{selected.meaning} Threshold: score{" "}
-						{selected.thresholds.join(" and ")}. {selected.count} players have
-						it.{" "}
+						{selected.meaning} Threshold: {selected.thresholds.join(" and ")}.{" "}
+						{selected.count} players have it.{" "}
 						<a href={helpers.leagueUrl(["frivolities", "skill_badges"])}>
 							Back to all badges
 						</a>

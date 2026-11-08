@@ -145,23 +145,24 @@ describe("skill badges", () => {
 	});
 
 	test("greedy pass: largest combos first, each part used once, deterministic", () => {
-		// Dp + Di + Bk: the 3-part Defensive anchor wins over Sw and Rp
+		// Dp + Di + Bk: Sw always wins Dp + Di, Bk stays (Rp needs the Di)
 		const big = { ...base, hgt: 75, jmp: 80 };
 		const anchor = getDisplayBadges(big, ["Di", "Dp"]);
-		assert.include(anchor, "Da");
-		assert.notInclude(anchor, "Sw");
+		assert.include(anchor, "Sw");
+		assert.include(anchor, "Bk");
 		assert.notInclude(anchor, "Rp");
-		assert.notInclude(anchor, "Bk");
+		// Without Dp, Di + Bk is a Rim protector
+		assert.include(getDisplayBadges(big, ["Di"]), "Rp");
 		assert.deepStrictEqual(getDisplayBadges({ ...big }, ["Di", "Dp"]), anchor);
 		// Shooting family: 3 + FT (+ Cs) is a Sharpshooter, Cs is absorbed
-		const shooter = { ...base, tp: 95, ft: 90, oiq: 80 };
+		const shooter = { ...base, tp: 85, ft: 85 };
 		const sharp = getDisplayBadges(shooter, ["3"]);
 		assert.include(sharp, "Sp");
 		assert.notInclude(sharp, "Cs");
 		assert.notInclude(sharp, "FT");
 		assert.deepStrictEqual(visibleOriginalSkills(["3"], sharp), []);
-		// Without the 3 skill, the badges stay as they are
-		assert.include(getDisplayBadges(shooter, []), "Cs");
+		// Without the 3 skill there is no Sharpshooter
+		assert.notInclude(getDisplayBadges(shooter, []), "Sp");
 		// Ps + B: Floor general
 		assert.deepStrictEqual(getDisplayBadges(base, ["B", "Ps"]), ["FG"]);
 		// Glue guy needs any two of Hi, Gg, Hu, Cn
@@ -182,6 +183,37 @@ describe("skill badges", () => {
 		]);
 	});
 
+	test("player traits badges need visible trait scores", () => {
+		const traits = {
+			clutch: 90,
+			lateGameIq: 90,
+			leadership: 90,
+			consistency: 90,
+		};
+		// No traits (setting off, or hidden and not yet known): no trait badges
+		for (const b of getSkillBadges(base)) {
+			assert.isUndefined(SKILL_BADGES_BY_LABEL[b]!.traitConditions);
+		}
+		assert.notInclude(getSkillBadges(base, {}), "Ch");
+		const withTraits = getSkillBadges(base, traits);
+		assert.includeMembers(withTraits, ["Ch", "Lg", "Ld", "Rl"]);
+		// Clutch + late-game IQ -> Closer; Leader + Mr. Reliable -> Captain
+		const display = getDisplayBadges(base, [], traits);
+		assert.include(display, "Ce");
+		assert.include(display, "Cp");
+		assert.notInclude(display, "Ch");
+		assert.notInclude(display, "Ld");
+		// Trait + ratings badges need both
+		assert.notInclude(getSkillBadges(base, { durability: 99 }), "Im");
+		assert.include(
+			getSkillBadges({ ...base, endu: 80 }, { durability: 99 }),
+			"Im",
+		);
+		// Hustler: by ratings, or by the hustle trait
+		assert.include(getSkillBadges(base, { hustle: 99 }), "Hu");
+		assert.strictEqual(badgeTitle("Ce"), "Closer");
+	});
+
 	test("league distribution is sensible", async () => {
 		resetG();
 		const players = await createRandomPlayers({
@@ -199,13 +231,18 @@ describe("skill badges", () => {
 			for (const b of getSkillBadges(r)) {
 				counts[b] = (counts[b] ?? 0) + 1;
 			}
-			for (const t of getDisplayBadges(r, r.skills)) {
+			const shown = getDisplayBadges(r, r.skills);
+			// Dp + Di always shows as Sw
+			if (r.skills.includes("Dp") && r.skills.includes("Di")) {
+				assert.include(shown, "Sw");
+			}
+			for (const t of shown) {
 				comboCounts[t] = (comboCounts[t] ?? 0) + 1;
 			}
 		}
 		assert.isAbove(n, 300);
 		const scale = n / 540;
-		for (const def of SKILL_BADGES) {
+		for (const def of SKILL_BADGES.filter((d) => !d.traitConditions)) {
 			const count = (counts[def.label] ?? 0) / scale;
 			assert.isAtLeast(count, 8, `${def.label} too rare: ${count}`);
 			assert.isAtMost(count, 70, `${def.label} too common: ${count}`);

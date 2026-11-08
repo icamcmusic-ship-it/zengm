@@ -1,3 +1,5 @@
+import type { TraitKey } from "../playerTraits/types.ts";
+
 // Extended skill badges (basketball only). These are DISPLAY-ONLY: they are never stored in ratings.skills and never feed the game sim unless a later layer opts in. Everything here is pure data so it can be reused from the worker, the sim or the UI.
 
 export type BadgeRatingKey =
@@ -26,7 +28,8 @@ export type BadgeGroup =
 	| "defense"
 	| "rebounding"
 	| "physical"
-	| "mental";
+	| "mental"
+	| "traits";
 
 // A composite is a weighted average of ratings on a 0-1 scale (same maths as compositeRating, without fuzz).
 export type BadgeComposite = {
@@ -47,7 +50,13 @@ export type SkillBadgeDef = {
 	meaning: string;
 	// All conditions must hold. The first one is the "main" composite, used for ranking leaders.
 	conditions: BadgeCondition[];
+	// Player traits badges: these visible trait scores (0-100) must all be at least the cutoff too. Never awarded when traits are off or hidden.
+	traitConditions?: { trait: TraitKey; cutoff: number }[];
+	// Also awarded (instead of by ratings) when this trait is high enough
+	traitAlternative?: { trait: TraitKey; cutoff: number };
 };
+
+export type BadgeTraits = Partial<Record<TraitKey, number>>;
 
 const c = (
 	pairs: [BadgeRatingKey | 50, number][],
@@ -68,6 +77,7 @@ export const BADGE_GROUP_NAMES: Record<BadgeGroup, string> = {
 	rebounding: "Rebounding",
 	physical: "Physical",
 	mental: "Mental",
+	traits: "Player traits",
 };
 
 // Cutoffs were calibrated on randomly generated 30-team leagues, see skillBadges.test.ts (calibration report is skipped by default).
@@ -395,7 +405,7 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 	},
 	{
 		label: "Cl",
-		name: "Closer",
+		name: "Poised scorer",
 		group: "scoring",
 		meaning:
 			"Shot-making touch and poise: trusted with the ball late in games.",
@@ -517,6 +527,7 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 	{
 		label: "Hu",
 		name: "Hustler",
+		traitAlternative: { trait: "hustle", cutoff: 61 },
 		group: "mental",
 		meaning:
 			"Plays hard every possession: loose balls, deflections and second efforts.",
@@ -550,6 +561,120 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 				0.6,
 			),
 		],
+	},
+
+	// Player traits badges (only with the Player traits setting on, from what the user can see of the traits)
+	{
+		label: "Ch",
+		name: "Clutch performer",
+		group: "traits",
+		meaning: "Rises to the moment in close games late (clutch trait).",
+		conditions: [],
+		traitConditions: [{ trait: "clutch", cutoff: 54 }],
+	},
+	{
+		label: "Rl",
+		name: "Mr. Reliable",
+		group: "traits",
+		meaning: "Same player every night (consistency trait).",
+		conditions: [],
+		traitConditions: [{ trait: "consistency", cutoff: 55 }],
+	},
+	{
+		label: "Im",
+		name: "Iron man",
+		group: "traits",
+		meaning: "Durable and tireless: durability trait plus endurance.",
+		conditions: [c([["endu", 1]], 0.55)],
+		traitConditions: [{ trait: "durability", cutoff: 62 }],
+	},
+	{
+		label: "Sd",
+		name: "Smart shooter",
+		group: "traits",
+		meaning:
+			"Takes good shots and can make them: shot discipline trait plus shooting.",
+		conditions: [
+			c(
+				[
+					["tp", 1],
+					["fg", 1],
+					["ft", 0.5],
+				],
+				0.55,
+			),
+		],
+		traitConditions: [{ trait: "shotDiscipline", cutoff: 48 }],
+	},
+	{
+		label: "Cu",
+		name: "Cutter",
+		group: "traits",
+		meaning:
+			"Always moving without the ball, finds easy looks (off-ball trait).",
+		conditions: [],
+		traitConditions: [{ trait: "offBall", cutoff: 66 }],
+	},
+	{
+		label: "Ss",
+		name: "Screen setter",
+		group: "traits",
+		meaning: "Sets hard, smart screens that free teammates (screen trait).",
+		conditions: [],
+		traitConditions: [{ trait: "screen", cutoff: 57 }],
+	},
+	{
+		label: "Dd",
+		name: "Disciplined defender",
+		group: "traits",
+		meaning:
+			"Defends without fouling: foul discipline trait plus defensive IQ.",
+		conditions: [c([["diq", 1]], 0.55)],
+		traitConditions: [{ trait: "foulDiscipline", cutoff: 60 }],
+	},
+	{
+		label: "Hh",
+		name: "Pressure-proof handler",
+		group: "traits",
+		meaning:
+			"Keeps the ball safe under pressure: handle trait plus ball security.",
+		conditions: [
+			c(
+				[
+					["drb", 1],
+					["oiq", 1.2],
+					["pss", 0.3],
+				],
+				0.58,
+			),
+		],
+		traitConditions: [{ trait: "handle", cutoff: 50 }],
+	},
+	{
+		label: "Lg",
+		name: "Late-game IQ",
+		group: "traits",
+		meaning:
+			"Makes the right decisions at the end of games (late-game IQ trait).",
+		conditions: [],
+		traitConditions: [{ trait: "lateGameIq", cutoff: 48 }],
+	},
+	{
+		label: "Ld",
+		name: "Leader",
+		group: "traits",
+		meaning:
+			"Makes teammates better and keeps the locker room together (leadership trait).",
+		conditions: [],
+		traitConditions: [{ trait: "leadership", cutoff: 42 }],
+	},
+	{
+		label: "Rc",
+		name: "Quick recovery",
+		group: "traits",
+		meaning: "Bounces back fast from fatigue (recovery trait).",
+		conditions: [],
+		traitConditions: [{ trait: "recovery", cutoff: 41 }],
 	},
 ];
 
@@ -611,15 +736,6 @@ const ALL_BASKETBALL_COMBOS: SkillComboDef[] = [
 		all: ["Ps", "B"],
 		any: ["Sf", "Ab"],
 		minAny: 1,
-	},
-	{
-		label: "Da",
-		name: "Defensive anchor",
-		meaning:
-			"Guards inside and out and erases shots: Dp, Di and Bk; also absorbs St and Pa.",
-		all: ["Dp", "Di", "Bk"],
-		any: ["St", "Pa"],
-		minAny: 0,
 	},
 	{
 		label: "Ib",
@@ -718,9 +834,9 @@ const ALL_BASKETBALL_COMBOS: SkillComboDef[] = [
 		label: "Pl",
 		name: "Perimeter lockdown",
 		meaning:
-			"Point-of-attack defender (Pa) who is also a pickpocket (St), perimeter defender (Dp) or two-way wing (Tw).",
+			"Point-of-attack defender (Pa) who is also a pickpocket (St), perimeter defender (Dp), two-way wing (Tw) or disciplined defender (Dd).",
 		all: ["Pa"],
-		any: ["St", "Dp", "Tw"],
+		any: ["St", "Dp", "Tw", "Dd"],
 		minAny: 1,
 	},
 	{
@@ -756,9 +872,9 @@ const ALL_BASKETBALL_COMBOS: SkillComboDef[] = [
 		label: "Py",
 		name: "Physical specialist",
 		meaning:
-			"Physical presence (Ph) plus iron lungs (Fit), athlete (A) or athletic freak (Af).",
+			"Physical presence (Ph) plus iron lungs (Fit), athlete (A), athletic freak (Af) or screen setter (Ss).",
 		all: ["Ph"],
-		any: ["Fit", "A", "Af"],
+		any: ["Fit", "A", "Af", "Ss"],
 		minAny: 1,
 	},
 	{
@@ -792,11 +908,22 @@ const ALL_BASKETBALL_COMBOS: SkillComboDef[] = [
 		label: "Sc",
 		name: "Scoring machine",
 		meaning:
-			"Scores every way: any two scoring combos (PS, Sp, Sn, Sm, Pk, Ib, Pf, Pw, Gt, 3D).",
+			"Scores every way: any three scoring combos or badges (PS, Sp, Sn, Sm, Pk, Ib, Pf, Pw, Gt, 3D, Ce and single shooting/finishing/scoring badges); also absorbs V, 3 and Po.",
 		all: [],
-		any: ["PS", "Sp", "Sn", "Sm", "Pk", "Ib", "Pf", "Pw", "Gt", "3D"],
-		minAny: 2,
-		extra: [
+		any: [
+			"PS",
+			"Sp",
+			"Sn",
+			"Sm",
+			"Pk",
+			"Ib",
+			"Pf",
+			"Pw",
+			"Gt",
+			"3D",
+			"Ce",
+			"Sd",
+			"Cu",
 			"Mr",
 			"Pu",
 			"Cs",
@@ -808,52 +935,89 @@ const ALL_BASKETBALL_COMBOS: SkillComboDef[] = [
 			"Fd",
 			"Cl",
 			"Is",
-			"V",
-			"3",
-			"Po",
 		],
+		minAny: 3,
+		extra: ["V", "3", "Po"],
 		level: 2,
 	},
 	{
 		label: "Dm",
 		name: "Defensive menace",
-		meaning: "Any two defensive combos (Da, Sw, Rp, Pl).",
+		meaning:
+			"Any three defensive combos or badges: Rp, Pl, 3D, Dd, Bk, St, Tw, Pa, Di (a Di already in Sw stays there). Never absorbs Sw.",
 		all: [],
-		any: ["Da", "Sw", "Rp", "Pl"],
-		minAny: 2,
-		extra: ["St", "Pa", "Tw", "Bk", "Di", "Dp"],
+		any: ["Rp", "Pl", "3D", "Dd", "Bk", "St", "Tw", "Pa", "Di"],
+		minAny: 3,
+		extra: ["Pa"],
 		level: 2,
 	},
 	{
 		label: "Pe",
 		name: "Playmaking engine",
-		meaning: "Any two playmaking combos (Mc, FG, Bw, Fb).",
+		meaning:
+			"Any three playmaking combos or badges (Mc, FG, Bw, Fb, Hh, Cn, Pt, Sf, Ab).",
 		all: [],
-		any: ["Mc", "FG", "Bw", "Fb"],
-		minAny: 2,
-		extra: ["Sf", "Ab", "Cn", "Pt", "Ps", "B"],
+		any: ["Mc", "FG", "Bw", "Fb", "Hh", "Cn", "Pt", "Sf", "Ab"],
+		minAny: 3,
+		extra: ["Ps", "B"],
 		level: 2,
 	},
 	{
 		label: "Pr",
 		name: "Physical marvel",
 		meaning:
-			"Any two of explosive athlete (Ex), physical specialist (Py) and motor (Mo).",
+			"Any three physical combos or badges: Ex, Py, Mo, Im, Ih, Fit, A, Af, Ph, Tr, Rc.",
 		all: [],
-		any: ["Ex", "Py", "Mo"],
-		minAny: 2,
-		extra: ["Tr", "Fit", "A", "Af", "Ph", "Hu"],
+		any: ["Ex", "Py", "Mo", "Im", "Ih", "Fit", "A", "Af", "Ph", "Tr", "Rc"],
+		minAny: 3,
+		extra: ["Rc", "Ih", "Tr", "Fit", "A", "Af", "Ph", "Hu"],
 		level: 2,
 	},
 	{
 		label: "Rg",
 		name: "Rebounding giant",
 		meaning:
-			"Board master (Bm), offensive crasher (Oc) or glass cleaner (Gc) who is also a rim protector (Rp) or defensive anchor (Da).",
+			"Any three rebounding/rim combos or badges: Bm, Oc, Gc, Rp, Bk, Or, Dr, R.",
 		all: [],
-		any: ["Bm", "Oc", "Gc", "Rp", "Da"],
-		minAny: 2,
-		extra: ["Or", "Dr", "R", "Bk", "Di"],
+		any: ["Bm", "Oc", "Gc", "Rp", "Bk", "Or", "Dr", "R"],
+		minAny: 3,
+		extra: ["Or", "Dr", "R"],
+		level: 2,
+	},
+	{
+		label: "Ce",
+		name: "Closer",
+		meaning:
+			"Clutch performer (Ch) with late-game IQ (Lg); also absorbs poised scorer (Cl).",
+		all: ["Ch", "Lg"],
+		any: ["Cl"],
+		minAny: 0,
+	},
+	{
+		label: "Cp",
+		name: "Captain",
+		meaning:
+			"Leader (Ld) who is also a glue guy (Gl), high IQ (Hi), glue guy badge (Gg) or Mr. Reliable (Rl); absorbs those and Hu, Lg.",
+		all: ["Ld"],
+		any: ["Gl", "Hi", "Gg", "Rl"],
+		extra: ["Rl", "Hi", "Gg", "Hu", "Lg"],
+		level: 2,
+	},
+	{
+		label: "Ih",
+		name: "Iron horse",
+		meaning: "Iron man (Im) with quick recovery (Rc) or Mr. Reliable (Rl).",
+		all: ["Im"],
+		any: ["Rc", "Rl"],
+	},
+	{
+		label: "Sv",
+		name: "Savvy pro",
+		meaning:
+			"Does the little things right: any three of Mr. Reliable (Rl), disciplined defender (Dd), smart shooter (Sd), pressure-proof handler (Hh), cutter (Cu), screen setter (Ss), late-game IQ (Lg) and high IQ (Hi).",
+		all: [],
+		any: ["Rl", "Dd", "Sd", "Hh", "Cu", "Ss", "Lg", "Hi"],
+		minAny: 3,
 		level: 2,
 	},
 ];

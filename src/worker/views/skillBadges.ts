@@ -1,4 +1,6 @@
 import { featureOffError } from "../util/nativeFeatures.ts";
+import { TRAIT_DEFINITIONS } from "../../common/playerTraits/definitions.ts";
+import { getTraitViewContext } from "../util/playerTraitsView.ts";
 import { idb } from "../db/index.ts";
 import { player } from "../core/index.ts";
 import { g } from "../util/index.ts";
@@ -14,7 +16,8 @@ import {
 	getDisplayBadges,
 	getSkillBadges,
 	skillMargin,
-	conditionMet as matches,
+	hasBadge,
+	type BadgeTraits,
 	pickBadgeRatings,
 	type BadgeRatings,
 } from "../../common/skillBadges/index.ts";
@@ -81,12 +84,24 @@ export default defineView({
 			abbrev: string;
 			tid: number;
 			ratings: BadgeRatings;
+			traits: BadgeTraits | undefined;
 			display: string[];
 			skills: string[];
 		};
 		const rows: Row[] = [];
+		const traitContext = await getTraitViewContext();
+		const playersByPid = new Map(playersAll.map((p) => [p.pid, p]));
 		for (const p of formatted) {
 			const ratings = pickBadgeRatings(p.ratings as any);
+			const fullPlayer = playersByPid.get(p.pid);
+			const traits =
+				traitContext.enabled && fullPlayer
+					? player.getBadgeTraits(
+							fullPlayer as any,
+							g.get("season"),
+							traitContext.scoutingLevel,
+						)
+					: undefined;
 			if (ratings) {
 				rows.push({
 					pid: p.pid,
@@ -97,16 +112,19 @@ export default defineView({
 					abbrev: p.abbrev,
 					tid: p.tid,
 					ratings,
-					display: getDisplayBadges(ratings, p.ratings.skills ?? []),
+					traits,
+					display: getDisplayBadges(ratings, p.ratings.skills ?? [], traits),
 					skills: p.ratings.skills ?? [],
 				});
 			}
 		}
 
-		const badges = SKILL_BADGES.map((def) => {
+		const badges = SKILL_BADGES.filter(
+			(def) => traitContext.enabled || !def.traitConditions,
+		).map((def) => {
 			const holders = rows
-				.filter((r) => def.conditions.every((cond) => matches(r.ratings, cond)))
-				.map((r) => ({ row: r, score: badgeScore(r.ratings, def) }))
+				.filter((r) => hasBadge(r.ratings, def, r.traits))
+				.map((r) => ({ row: r, score: badgeScore(r.ratings, def, r.traits) }))
 				.sort((a, b) => b.score - a.score || b.row.ovr - a.row.ovr);
 			const toLeader = ({ row, score }: (typeof holders)[number]) => ({
 				pid: row.pid,
@@ -124,10 +142,21 @@ export default defineView({
 				group: def.group,
 				groupName: BADGE_GROUP_NAMES[def.group],
 				meaning: def.meaning,
-				thresholds: def.conditions.map(
-					(cond) =>
-						`${cond.dir === "below" ? "<=" : ">="} ${Math.round(cond.cutoff * 100)}`,
-				),
+				thresholds: [
+					...(def.traitConditions ?? []).map(
+						(cond) =>
+							`${TRAIT_DEFINITIONS[cond.trait].name} trait >= ${cond.cutoff}`,
+					),
+					...def.conditions.map(
+						(cond) =>
+							`score ${cond.dir === "below" ? "<=" : ">="} ${Math.round(cond.cutoff * 100)}`,
+					),
+					...(def.traitAlternative
+						? [
+								`(or ${TRAIT_DEFINITIONS[def.traitAlternative.trait].name} trait >= ${def.traitAlternative.cutoff})`,
+							]
+						: []),
+				],
 				count: holders.length,
 				leaders: holders.slice(0, LEADERS).map(toLeader),
 				list:
@@ -147,10 +176,10 @@ export default defineView({
 					const parts =
 						comboParts(
 							def,
-							new Set([...r.skills, ...getSkillBadges(r.ratings)]),
+							new Set([...r.skills, ...getSkillBadges(r.ratings, r.traits)]),
 						) ?? def.all;
 					const margin = Math.min(
-						...parts.map((c) => skillMargin(r.ratings, c)),
+						...parts.map((c) => skillMargin(r.ratings, c, r.traits)),
 					);
 					return [
 						{

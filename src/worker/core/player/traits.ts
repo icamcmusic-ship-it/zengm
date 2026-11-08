@@ -10,6 +10,7 @@ import {
 	traitScores,
 	traitUncertainty,
 	clampSeed,
+	TRAIT_DEFINITIONS,
 	TRAIT_KEYS,
 	type PlayerTraits,
 	type ScoutedTrait,
@@ -199,4 +200,23 @@ export const setTraitScores = (
 		);
 	}
 	p.traits = seeds;
+};
+
+// For skill badges: the trait scores the user can see. Visible traits use the shown estimate; hidden traits only once they are known exactly (otherwise left out, so no badge can leak them). Undefined when traits are off.
+export const getBadgeTraits = (
+	p: TraitPlayer & { pid: number },
+	season: number,
+	scoutingLevel?: number,
+): Partial<Record<TraitKey, number>> | undefined => {
+	const info = getPlayerTraitsForUI(p, { season, scoutingLevel });
+	if (!info) {
+		return undefined;
+	}
+	const out: Partial<Record<TraitKey, number>> = {};
+	for (const t of info.traits) {
+		if (t.exact || TRAIT_DEFINITIONS[t.key].visibility === "visible") {
+			out[t.key] = t.estimate;
+		}
+	}
+	return out;
 };

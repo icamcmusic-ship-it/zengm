@@ -12,28 +12,43 @@ import {
 	getSkillBadges,
 	orderDisplayItems,
 } from "./index.ts";
+import { completeTraitSeeds, traitScores } from "../playerTraits/index.ts";
 
 describe.skip("calibration", () => {
 	test("print", async () => {
 		resetG();
 		const counts: Record<string, number> = {};
-		const players = await createRandomPlayers({
-			activeTids: range(30),
-			onlyFreeAgents: false,
-			scoutingLevel: DEFAULT_LEVEL,
-			teams: range(30).map((tid) => ({ tid })),
-		});
+		// Three leagues, to smooth the noise
+		const players = [];
+		for (let i = 0; i < 3; i++) {
+			players.push(
+				...(await createRandomPlayers({
+					activeTids: range(30),
+					onlyFreeAgents: false,
+					scoutingLevel: DEFAULT_LEVEL,
+					teams: range(30).map((tid) => ({ tid })),
+				})),
+			);
+		}
 		const rows = players
 			.filter((p) => p.tid >= PLAYER.FREE_AGENT)
-			.map((p) => last(p.ratings) as any)
+			.map((p) => {
+				const r = last(p.ratings) as any;
+				r.traitScores = traitScores(
+					r,
+					completeTraitSeeds(p.traits, "calibration", p.pid ?? 0),
+					{ age: r.season - p.born.year, experience: 4 },
+				);
+				return r;
+			})
 			.sort((a, b) => b.ovr - a.ovr);
 		const groups: Record<
 			string,
 			{ n: number; before: number; after: number; over7: number }
 		> = {};
 		for (const [i, r] of rows.entries()) {
-			const raw = getSkillBadges(r);
-			const display = getDisplayBadges(r, r.skills);
+			const raw = getSkillBadges(r, r.traitScores);
+			const display = getDisplayBadges(r, r.skills, r.traitScores);
 			for (const b of raw) {
 				counts[b] = (counts[b] ?? 0) + 1;
 			}
@@ -50,7 +65,7 @@ describe.skip("calibration", () => {
 						.join(" "),
 				);
 			}
-			const group = i < 30 ? "stars" : i < 150 ? "starters" : "bench";
+			const group = i < 90 ? "stars" : i < 450 ? "starters" : "bench";
 			const before = r.skills.length + raw.length;
 			const after = orderDisplayItems(r.skills, display).length;
 			const g = (groups[group] ??= { n: 0, before: 0, after: 0, over7: 0 });

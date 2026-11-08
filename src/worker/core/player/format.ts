@@ -556,7 +556,11 @@ const processAttrs = (
 };
 
 // Extended skill badges and combos (display only, see common/skillBadges). Uses the same fuzzed ratings the user sees.
-const getBadgesForRatingsRow = (pr: any, fuzz: boolean | undefined) => {
+const getBadgesForRatingsRow = (
+	pr: any,
+	fuzz: boolean | undefined,
+	p: Player,
+) => {
 	const r: any = {};
 	for (const key of BADGE_RATING_KEYS) {
 		const v = pr[key];
@@ -565,7 +569,12 @@ const getBadgesForRatingsRow = (pr: any, fuzz: boolean | undefined) => {
 		}
 		r[key] = fuzz && key !== "hgt" ? player.fuzzRating(v, pr.fuzz) : v;
 	}
-	return getDisplayBadges(r, pr.skills ?? []);
+	// Only the latest ratings row: trait scores are for the player now
+	const traits =
+		pr === last(p.ratings)
+			? player.getBadgeTraits(p as any, pr.season)
+			: undefined;
+	return getDisplayBadges(r, pr.skills ?? [], traits);
 };
 
 const processRatings = (
@@ -638,7 +647,7 @@ const processRatings = (
 			} else if (attr === "badges") {
 				row.badges =
 					__SPORT === "basketball" && featureOn("skillBadges")
-						? getBadgesForRatingsRow(pr, fuzz)
+						? getBadgesForRatingsRow(pr, fuzz, p)
 						: [];
 			} else if (attr === "dovr" || attr === "dpot") {
 				// Handle dovr and dpot - if there are previous ratings, calculate the fuzzed difference

@@ -1,4 +1,6 @@
 import { COMPOSITE_WEIGHTS, SKILLS } from "../constants.ts";
+import { TRAIT_DEFINITIONS } from "../playerTraits/definitions.ts";
+import { TRAIT_KEYS, type TraitKey } from "../playerTraits/types.ts";
 import {
 	BADGE_GROUP_NAMES,
 	ORIGINAL_SKILL_LABELS,
@@ -9,6 +11,7 @@ import {
 	type BadgeComposite,
 	type BadgeCondition,
 	type BadgeRatings,
+	type BadgeTraits,
 	type BadgeRatingKey,
 	type SkillBadgeDef,
 	type SkillComboDef,
@@ -60,20 +63,52 @@ export const conditionMet = (
 		: value >= condition.cutoff;
 };
 
-export const hasBadge = (ratings: BadgeRatings, def: SkillBadgeDef) =>
-	def.conditions.every((cond) => conditionMet(ratings, cond));
+const traitsMet = (
+	traits: BadgeTraits | undefined,
+	conds: { trait: TraitKey; cutoff: number }[],
+) =>
+	conds.every((cond) => {
+		const value = traits?.[cond.trait];
+		return value !== undefined && value >= cond.cutoff;
+	});
+
+/** traits: the visible 0-100 trait scores (missing = unknown/hidden/off, so trait badges are not awarded). */
+export const hasBadge = (
+	ratings: BadgeRatings,
+	def: SkillBadgeDef,
+	traits?: BadgeTraits,
+) => {
+	if (def.traitConditions && !traitsMet(traits, def.traitConditions)) {
+		return false;
+	}
+	if (def.conditions.every((cond) => conditionMet(ratings, cond))) {
+		return true;
+	}
+	return (
+		def.traitAlternative !== undefined &&
+		traitsMet(traits, [def.traitAlternative])
+	);
+};
 
 // The main composite of a badge (0-1), used to rank leaders.
-export const badgeScore = (ratings: BadgeRatings, def: SkillBadgeDef) => {
+export const badgeScore = (
+	ratings: BadgeRatings,
+	def: SkillBadgeDef,
+	traits?: BadgeTraits,
+) => {
+	const traitCond = def.traitConditions?.[0];
+	if (traitCond) {
+		return (traits?.[traitCond.trait] ?? 0) / 100;
+	}
 	const cond = def.conditions[0]!;
 	const value = badgeComposite(ratings, cond);
 	return cond.dir === "below" ? 1 - value : value;
 };
 
-const compute = (ratings: BadgeRatings) => {
+const compute = (ratings: BadgeRatings, traits?: BadgeTraits) => {
 	const out: string[] = [];
 	for (const def of SKILL_BADGES) {
-		if (hasBadge(ratings, def)) {
+		if (hasBadge(ratings, def, traits)) {
 			out.push(def.label);
 		}
 	}
@@ -87,11 +122,25 @@ const MAX_CACHE = 50000;
 /**
  * Pure function: ratings in, badge labels out (in definition order). Deterministic, no side effects besides the memo cache. Returned arrays are shared, do not mutate.
  */
-export const getSkillBadges = (ratings: BadgeRatings): string[] => {
+const traitsKey = (traits: BadgeTraits | undefined) => {
+	if (!traits) {
+		return "";
+	}
+	let key = "";
+	for (const k of TRAIT_KEYS) {
+		key += `${traits[k] ?? ""},`;
+	}
+	return key;
+};
+
+export const getSkillBadges = (
+	ratings: BadgeRatings,
+	traits?: BadgeTraits,
+): string[] => {
 	if (SKILL_BADGES.length === 0) {
 		return [];
 	}
-	let key = "";
+	let key = traitsKey(traits) + "|";
 	for (const k of BADGE_RATING_KEYS) {
 		key += `${Math.round(ratings[k])},`;
 	}
@@ -99,7 +148,7 @@ export const getSkillBadges = (ratings: BadgeRatings): string[] => {
 	if (cached) {
 		return cached;
 	}
-	const result = compute(ratings);
+	const result = compute(ratings, traits);
 	if (cache.size >= MAX_CACHE) {
 		cache.clear();
 	}
@@ -137,10 +186,21 @@ export const describeBadge = (label: string) => {
 		const combo = SKILL_COMBOS_BY_LABEL[label];
 		return combo ? `${combo.name}: ${combo.meaning}` : label;
 	}
-	const rules = def.conditions
-		.map((cond) => `${cond.dir === "below" ? "<=" : ">="} ${fmt(cond.cutoff)}`)
-		.join(" and ");
-	return `${def.name}: ${def.meaning} (score ${rules} of 100; ${BADGE_GROUP_NAMES[def.group]})`;
+	const rules = [
+		...(def.traitConditions ?? []).map(
+			(cond) => `${TRAIT_DEFINITIONS[cond.trait].name} trait >= ${cond.cutoff}`,
+		),
+		...def.conditions.map(
+			(cond) =>
+				`score ${cond.dir === "below" ? "<=" : ">="} ${fmt(cond.cutoff)}`,
+		),
+		...(def.traitAlternative
+			? [
+					`or ${TRAIT_DEFINITIONS[def.traitAlternative.trait].name} trait >= ${def.traitAlternative.cutoff}`,
+				]
+			: []),
+	].join(" and ");
+	return `${def.name}: ${def.meaning} (${rules}; ${BADGE_GROUP_NAMES[def.group]})`;
 };
 
 const ORIGINAL_COMPOSITES: Record<
@@ -169,7 +229,11 @@ for (const { ratings, weights, skill } of Object.values(
 }
 
 // How far (0-1 composite points) a player is past the cutoff of a skill or badge
-export const skillMargin = (ratings: BadgeRatings, label: string) => {
+export const skillMargin = (
+	ratings: BadgeRatings,
+	label: string,
+	traits?: BadgeTraits,
+) => {
 	const original = ORIGINAL_COMPOSITES[label];
 	if (original) {
 		return badgeComposite(ratings, original.composite) - original.cutoff;
@@ -183,6 +247,9 @@ export const skillMargin = (ratings: BadgeRatings, label: string) => {
 			const value = badgeComposite(ratings, cond);
 			return cond.dir === "below" ? cond.cutoff - value : value - cond.cutoff;
 		}),
+		...(def.traitConditions ?? []).map(
+			(cond) => ((traits?.[cond.trait] ?? 0) - cond.cutoff) / 100,
+		),
 	);
 };
 
@@ -217,11 +284,12 @@ const displayCache = new Map<string, string[]>();
 export const getDisplayBadges = (
 	ratings: BadgeRatings,
 	skills: string[],
+	traits?: BadgeTraits,
 ): string[] => {
 	if (SKILL_BADGES.length === 0) {
 		return [];
 	}
-	let key = skills.join(",") + "|";
+	let key = skills.join(",") + "|" + traitsKey(traits) + "|";
 	for (const k of BADGE_RATING_KEYS) {
 		key += `${Math.round(ratings[k])},`;
 	}
@@ -230,7 +298,7 @@ export const getDisplayBadges = (
 		return cached;
 	}
 
-	const extended = getSkillBadges(ratings);
+	const extended = getSkillBadges(ratings, traits);
 	const available = new Set([...skills, ...extended]);
 	const combos: string[] = [];
 	for (const combo of SKILL_COMBOS) {
