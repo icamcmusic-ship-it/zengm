@@ -22,6 +22,7 @@ import { last } from "../../common/utils.ts";
 import { getTeamInfoBySeason } from "../util/getTeamInfoBySeason.ts";
 import { isPreDraftStatsRow } from "../../common/preDraft.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { gradeOneTrade } from "../util/valueData.ts";
 
 const processInputs = (params: RouteParams<"tradeSummary">) => {
 	return {
@@ -623,6 +624,35 @@ export default defineView({
 			const pointsFormula = g.get("pointsFormula");
 			const usePts = pointsFormula !== "";
 
+			// Trade grader letter grades (basketball only), one per team
+			let grades:
+				| {
+						g: string | null;
+						share: number | null;
+						got: number | null;
+						net: number | null;
+						partial: boolean;
+						open: boolean;
+				  }[]
+				| undefined;
+			if (__SPORT === "basketball") {
+				try {
+					const graded = await gradeOneTrade(event);
+					if (graded) {
+						grades = graded.sides.map((s) => ({
+							g: s.grade?.g ?? null,
+							share: s.grade?.share ?? null,
+							got: s.unknown ? null : s.got.total,
+							net: s.net,
+							partial: s.partial,
+							open: s.open,
+						}));
+					}
+				} catch (error) {
+					console.error(error);
+				}
+			}
+
 			return {
 				teams,
 				season: event.season,
@@ -635,6 +665,7 @@ export default defineView({
 				}),
 				seasonsToPlot,
 				usePts,
+				grades,
 			};
 		}
 	},

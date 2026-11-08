@@ -178,6 +178,7 @@ export const MoreLinks = (
 							: ["storylines", "team", team, season],
 					name: "Storylines",
 				},
+				{ url: ["trade_grader", "team", team], name: "Trade Report Card" },
 			);
 		}
 

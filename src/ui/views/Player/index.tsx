@@ -40,6 +40,7 @@ const Player2 = ({
 	teamJersey,
 	teamName,
 	teamURL,
+	valueIndex,
 	willingToSign,
 }: View<"player">) => {
 	const { challengeNoRatings, season: currentSeason } = useLocal([
@@ -243,13 +244,29 @@ const Player2 = ({
 					<HideableSection title="Salaries">
 						<DataTable
 							className="datatable-negative-margin-top mb-3"
-							cols={getCols(["Year", "Team", "Amount"])}
+							cols={getCols([
+								"Year",
+								"Team",
+								"Amount",
+								...(valueIndex && Object.keys(valueIndex).length > 0
+									? [
+											{
+												title: "Value",
+												desc: "Value index: win shares per dollar against the league rate that season (100 = average). See Contract Value",
+												sortType: "number" as const,
+											},
+										]
+									: []),
+							])}
 							defaultSort={[0, "asc"]}
 							footer={{
 								data: [
 									"Total",
 									null,
 									helpers.formatCurrency(player.salariesTotal, "M"),
+									...(valueIndex && Object.keys(valueIndex).length > 0
+										? [null]
+										: []),
 								],
 							}}
 							hideAllControls
@@ -273,6 +290,27 @@ const Player2 = ({
 										},
 										wrappedSalaryPayers(s),
 										wrappedCurrency(s.amount, "M"),
+										...(valueIndex && Object.keys(valueIndex).length > 0
+											? [
+													valueIndex[s.season] !== undefined ? (
+														<a
+															href={helpers.leagueUrl([
+																"contract_value",
+																"seasons",
+																"all",
+																s.season,
+															])}
+															className={
+																valueIndex[s.season]! >= 1
+																	? "text-success"
+																	: "text-danger"
+															}
+														>
+															{Math.round(valueIndex[s.season]! * 100)}
+														</a>
+													) : null,
+												]
+											: []),
 									],
 									classNames:
 										s.type === "current"

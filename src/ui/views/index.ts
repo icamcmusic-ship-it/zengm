@@ -122,3 +122,5 @@ export { default as WrappedCompare } from "./WrappedCompare.tsx";
 export { default as Storylines } from "./Storylines/index.tsx";
 export { default as Hype } from "./Hype.tsx";
 export { default as LeagueAchievements } from "./LeagueAchievements/index.tsx";
+export { default as TradeGrader } from "./TradeGrader.tsx";
+export { default as ContractValue } from "./ContractValue.tsx";

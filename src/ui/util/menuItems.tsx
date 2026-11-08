@@ -119,6 +119,29 @@ const hypeLinks: MenuItemLink[] =
 			]
 		: [];
 
+// Trade grades and contract value (basketball only)
+const valueLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "tradeGrader",
+					league: true,
+					commandPalette: true,
+					path: ["trade_grader"],
+					text: "Trade Grader",
+				},
+				{
+					type: "link",
+					active: (pageID) => pageID === "contractValue",
+					league: true,
+					commandPalette: true,
+					path: ["contract_value"],
+					text: "Contract Value",
+				},
+			]
+		: [];
+
 export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 	{
 		type: "link",
@@ -463,6 +486,7 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["saved_trades"],
 				text: "Saved Trades",
 			},
+			...valueLinks,
 			{
 				type: "link",
 				active: (pageID) =>
