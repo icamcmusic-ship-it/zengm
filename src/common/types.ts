@@ -421,6 +421,8 @@ export type Game = {
 	playoffs?: boolean;
 	overtimes: number;
 	scoringSummary?: unknown;
+	// Basketball: the play-by-play, compact (see src/common/pbpStore.basketball.ts)
+	pbp?: string;
 	season: number;
 	teams: [GameTeam, GameTeam];
 	won: {
@@ -646,6 +648,10 @@ export type GameAttributesLeague = {
 	elamMinutes: number;
 	elamOvertime: boolean;
 	elamPoints: number;
+	// Basketball: store each game's play-by-play with its box score
+	storePlayByPlay: boolean;
+	// Basketball: technical and flagrant fouls, ejections in the game sim
+	technicalFouls: boolean;
 	equalizeRegions: boolean;
 	fantasyPoints?: "standard" | "ppr" | "halfPpr";
 	forceRetireAge: number;

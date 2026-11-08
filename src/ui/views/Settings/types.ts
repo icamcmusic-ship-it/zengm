@@ -70,6 +70,8 @@ export type Key =
 	| "elamMinutes"
 	| "elamOvertime"
 	| "elamPoints"
+	| "storePlayByPlay"
+	| "technicalFouls"
 	| "playerMoodTraits"
 	| "numPlayersOnCourt"
 	| "numDraftRounds"

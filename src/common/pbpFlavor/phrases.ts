@@ -384,7 +384,8 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 	add(dw / 3, "dunk", 2, n + " flushes it off the catch");
 	// a poster: over a named defender, the and-one's fouler when there is one; only the elite leapers
 	if (D) {
-		const pw = dw * TIER.r * gate(Math.min(r.dnk, r.jmp, r.stre), 62) * 6;
+		// (about 0.3 posters a game, as in the Explorer: strength helps but a great leaper doesn't need to be a bruiser)
+		const pw = dw * TIER.r * gate(Math.min(r.dnk, r.jmp, r.stre + 10), 62) * 12;
 		for (const t of [
 			" posterizes " + dn,
 			" dunks all over " + dn,
@@ -1588,13 +1589,19 @@ export function tovText(rng: any, e: any, ctx: any) {
 		const bw = (ctx.press ? 4 : 1) * (r.drb < 50 ? 1.5 : 1) * 0.12;
 		for (const t of [
 			n + " is called for a backcourt violation",
-			"8-second violation: " +
-				n +
-				" can't get it past half court" +
-				(ctx.press ? " against the press" : ""),
 			n + " steps back over half court: backcourt violation",
 		]) {
 			add(bw, t);
+		}
+		// (only when the possession has lasted long enough for one)
+		if (ctx.gap >= 7.5) {
+			add(
+				bw,
+				"8-second violation: " +
+					n +
+					" can't get it past half court" +
+					(ctx.press ? " against the press" : ""),
+			);
 		}
 		if (ctx.press) {
 			add(0.6, "the full-court press traps " + n + " and he throws it away");
@@ -1607,27 +1614,43 @@ export function tovText(rng: any, e: any, ctx: any) {
 		}
 	}
 	// a long possession that ends without a shot. (BBGM's sim never lets the shot clock run out, so only a turnover deep into the clock reads
-	// as a violation; a little earlier it is "with the shot clock winding down".)
+	// as a violation; a little earlier it is "with the shot clock winding down". Never a violation when it was not one: the session only sets
+	// shotClock when the shot clock was on and nearly out.)
 	if (e.shotClock) {
 		rows.length = 0;
-	}
-	if (ctx.gap >= 12 || e.shotClock) {
-		const w = e.shotClock ? 1 : Math.min(1, (ctx.gap - 11) / 8);
-		for (const t of [
-			"shot-clock violation: the trap leaves " + n + " without a shot",
-			"shot-clock violation: " + n + " can't get a shot off",
-			n +
-				"'s shot misses the rim entirely as the shot clock runs out: violation",
-			"the shot clock expires with the ball in " + n + "'s hands",
-		]) {
-			add(0.45 * w, t);
+		const viol: [number, string][] = [
+			[1, "shot-clock violation: " + n + " can't get a shot off"],
+			[1, "the shot clock expires with the ball in " + n + "'s hands"],
+			[0.8, "shot-clock violation: " + n + " is left holding the ball"],
+			[0.6, n + " airballs as the shot clock runs out: violation"],
+			[
+				0.6,
+				"the defense takes away every look, and " +
+					n +
+					" is stuck with the ball when the shot clock expires",
+			],
+			[
+				0.5,
+				n + " dribbles out the shot clock looking for an opening: violation",
+			],
+		];
+		if (ctx.press) {
+			viol.push([
+				0.8,
+				"shot-clock violation: the trap leaves " + n + " without a shot",
+			]);
 		}
+		for (const [w, t] of viol) {
+			add(w, t);
+		}
+	} else if (ctx.gap >= 12) {
+		const w = Math.min(1, (ctx.gap - 11) / 8);
 		for (const t of [
 			"with the shot clock winding down, " + n + " throws it away",
 			n + " forces a pass late in the shot clock and turns it over",
 			n + " is stuck with the shot clock running down and loses the ball",
 		]) {
-			add(e.shotClock ? 0 : 0.5 * w, t);
+			add(0.5 * w, t);
 		}
 	}
 	// The sim says whether the ball went out of bounds: only wordings that match are used

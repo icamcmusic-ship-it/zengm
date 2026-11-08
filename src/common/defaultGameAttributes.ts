@@ -91,6 +91,8 @@ const gameAttributesKeysSportSpecific = {
 		"elamMinutes",
 		"elamOvertime",
 		"elamPoints",
+		"storePlayByPlay",
+		"technicalFouls",
 		"randomDebutsForever",
 		"realDraftRatings",
 		"numPlayersDunk",
@@ -593,6 +595,9 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	elamMinutes: 4,
 	elamOvertime: false,
 	elamPoints: 8,
+	storePlayByPlay: true,
+	// Off for existing leagues (and tests), so their games play out as before; new leagues turn it on (see views/newLeague.ts)
+	technicalFouls: false,
 	playerMoodTraits: true,
 	numPlayersOnCourt: 5,
 	aiJerseyRetirement: true,

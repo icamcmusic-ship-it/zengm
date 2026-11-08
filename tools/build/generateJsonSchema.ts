@@ -964,6 +964,12 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 						type: "integer",
 						minimum: 0,
 					},
+					storePlayByPlay: {
+						type: "boolean",
+					},
+					technicalFouls: {
+						type: "boolean",
+					},
 					equalizeRegions: {
 						type: "boolean",
 					},

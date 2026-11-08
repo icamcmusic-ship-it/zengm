@@ -85,6 +85,8 @@ type Key =
 	| "elamMinutes"
 	| "elamOvertime"
 	| "elamPoints"
+	| "storePlayByPlay"
+	| "technicalFouls"
 	| "playerMoodTraits"
 	| "numPlayersOnCourt"
 	| "numDraftRounds"
@@ -303,6 +305,8 @@ export const getInitialSettings = (): Settings => {
 		elamMinutes: g.get("elamMinutes"),
 		elamOvertime: g.get("elamOvertime"),
 		elamPoints: g.get("elamPoints"),
+		storePlayByPlay: g.get("storePlayByPlay"),
+		technicalFouls: g.get("technicalFouls"),
 		playerMoodTraits: g.get("playerMoodTraits"),
 		numPlayersOnCourt: g.get("numPlayersOnCourt"),
 		numDraftRounds: g.get("numDraftRounds"),

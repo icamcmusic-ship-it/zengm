@@ -221,6 +221,12 @@ export const getDefaultSettings = () => {
 		elamMinutes: unwrapGameAttribute(defaultGameAttributes, "elamMinutes"),
 		elamOvertime: unwrapGameAttribute(defaultGameAttributes, "elamOvertime"),
 		elamPoints: unwrapGameAttribute(defaultGameAttributes, "elamPoints"),
+		storePlayByPlay: unwrapGameAttribute(
+			defaultGameAttributes,
+			"storePlayByPlay",
+		),
+		// Off by default for existing leagues, on for new ones
+		technicalFouls: true,
 		playerMoodTraits: unwrapGameAttribute(
 			defaultGameAttributes,
 			"playerMoodTraits",

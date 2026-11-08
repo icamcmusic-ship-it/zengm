@@ -29,6 +29,18 @@ const TIMEOUTS_STOP_CLOCK = 2; // [minutes]
 
 const TIP_IN_ONLY_LIMIT = 0.2; // [seconds] - only tip-ins from an inbound with less than this much time
 
+// Technical and flagrant fouls (the technicalFouls setting). Rates are per chance: a tech can follow any dead ball, a flagrant can happen
+// on any half-court possession. Tuned so a game has about 0.4 technicals, 0.08 flagrant 1s and 0.005 flagrant 2s (see technicalFouls.test.ts,
+// which also changes them to test rare cases)
+export const TECHNICAL_FOUL_RATES = {
+	techPerDeadBall: 0.0029,
+	// Of technicals, the share called on the bench (the coach) rather than a player on the floor
+	techBench: 0.2,
+	flagrantPerPossession: 0.0005,
+	// Of flagrant fouls, the share that are flagrant 2 (an ejection)
+	flagrant2: 0.06,
+};
+
 type ShotType =
 	| "atRim"
 	| "ft"
@@ -210,6 +222,13 @@ class GameSim extends GameSimBase {
 	lastOrbPlayer: PlayerGameSim | undefined;
 
 	ratingArrayCache: number[];
+
+	// Technical and flagrant fouls, ejections (the technicalFouls setting). When it is off, nothing here is ever used, so the sim's random
+	// numbers are exactly what they were before this existed
+	techFouls: boolean;
+	ejected = new Set<PlayerGameSim>();
+	techs = new Map<PlayerGameSim | number, number>();
+	flagrants = new Map<PlayerGameSim, number>();
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -246,7 +265,13 @@ class GameSim extends GameSimBase {
 			baseInjuryRate,
 			neutralSite,
 		});
-		this.playByPlay = new PlayByPlayLogger(doPlayByPlay);
+		// Every game logs its events when they are stored with the box score (only what the text needs, if nobody watches it live)
+		const storePlayByPlay = !!g.get("storePlayByPlay");
+		this.playByPlay = new PlayByPlayLogger(
+			doPlayByPlay || storePlayByPlay,
+			doPlayByPlay,
+		);
+		this.techFouls = !!g.get("technicalFouls") && !allStarGame;
 
 		this.team = teams; // If a team plays twice in a day, this needs to be a deep copy
 
@@ -847,6 +872,10 @@ class GameSim extends GameSimBase {
 		const possessionTime = dtInbound + this.possessionLength;
 		this.updatePlayingTime(possessionTime);
 
+		if (this.techFouls) {
+			this.maybeTechnicalFoul(outcome);
+		}
+
 		// Nobody can get hurt if no time elapsed, otherwise a player could be injured immediately after subbing in, with 0 minutes played
 		const injuries = possessionTime > 0 ? this.injuries() : false;
 
@@ -1000,6 +1029,7 @@ class GameSim extends GameSimBase {
 					// Injured or fouled out players can't play
 					if (
 						p.injured ||
+						this.ejected.has(p) ||
 						(!includeFouledOut &&
 							foulsNeededToFoulOut > 0 &&
 							p.stat.pf >= foulsNeededToFoulOut)
@@ -1340,7 +1370,7 @@ class GameSim extends GameSimBase {
 				if (playersOnCourt.includes(p)) {
 					p.stat.min += min;
 					this.team[t].stat.min += min;
-					if (this.playByPlay.active) {
+					if (this.playByPlay.active && this.playByPlay.live) {
 						this.playByPlay.logStat(t, p.id, "min", min);
 					}
 
@@ -1602,6 +1632,17 @@ class GameSim extends GameSimBase {
 		}
 
 		const shooter = this.pickPlayer("usage", this.o, 1.25);
+
+		// Flagrant foul? (only with the technicalFouls setting, so otherwise no random number is drawn here)
+		if (
+			this.techFouls &&
+			clockFactor !== "intentionalFoul" &&
+			this.t > 10 &&
+			Math.random() <
+				TECHNICAL_FOUL_RATES.flagrantPerPossession * g.get("foulRateFactor")
+		) {
+			return this.doFlagrantFoul(shooter);
+		}
 
 		// Non-shooting foul?
 		if (
@@ -2711,6 +2752,191 @@ class GameSim extends GameSimBase {
 		if (this.t <= 2 * 60) {
 			this.foulsLastTwoMinutes[t] += 1;
 		}
+	}
+
+	// Free throws with no rebound after them: a technical's (by the other team, possession unchanged) or a flagrant's (the ball goes back to the
+	// fouled team)
+	shootFreeThrowsDeadBall(
+		t: TeamNum,
+		p: PlayerGameSim,
+		amount: number,
+		tech: boolean,
+	) {
+		const ftp = helpers.bound(
+			g.get("ftAccuracyFactor") * p.compositeRating.shootingFT * 0.6 + 0.45,
+			0,
+			0.95,
+		);
+		for (let i = 0; i < amount; i++) {
+			this.recordStat(t, p, "fta");
+			if (Math.random() < ftp) {
+				this.recordStat(t, p, "ft");
+				this.recordStat(t, p, "pts");
+				this.playByPlay.logEvent({
+					type: "ft",
+					t,
+					pid: p.id,
+					clock: this.t,
+					...(tech ? { tech: true } : {}),
+				});
+				this.recordLastScore(t, p, "ft");
+				if (this.elamDone) {
+					break;
+				}
+			} else {
+				this.playByPlay.logEvent({
+					type: "missFt",
+					t,
+					pid: p.id,
+					clock: this.t,
+					...(tech ? { tech: true } : {}),
+				});
+			}
+		}
+	}
+
+	eject(
+		t: TeamNum,
+		p: PlayerGameSim,
+		reason: "flagrant2" | "flagrants" | "techs",
+		shooter?: PlayerGameSim,
+	) {
+		this.ejected.add(p);
+		this.playByPlay.logEvent({
+			type: "ejection",
+			t,
+			pid: p.id,
+			reason,
+			clock: this.t,
+		});
+		if (this.playersOnCourt[t].includes(p)) {
+			// Force substitutions now, like a foul out
+			this.updatePlayersOnCourt({
+				shooter,
+			});
+			this.updateSynergy();
+		}
+	}
+
+	// After a possession: maybe a technical foul at the dead ball. One free throw for the other team, possession unchanged
+	maybeTechnicalFoul(outcome: PossessionOutcome) {
+		if (this.t <= 0 || this.elamDone) {
+			return;
+		}
+		const deadBall =
+			outcome === "fg" ||
+			outcome === "ft" ||
+			outcome === "nonShootingFoul" ||
+			outcome === "timeout" ||
+			outcome === "outOfBoundsDefense" ||
+			outcome === "outOfBoundsOffense";
+		if (!deadBall) {
+			return;
+		}
+		// Players argue calls more than they argue anything else
+		const factor = outcome === "nonShootingFoul" || outcome === "ft" ? 2 : 1;
+		if (Math.random() >= TECHNICAL_FOUL_RATES.techPerDeadBall * factor) {
+			return;
+		}
+
+		const t: TeamNum = Math.random() < 0.5 ? 0 : 1;
+		const other: TeamNum = t === 0 ? 1 : 0;
+		const bench = Math.random() < TECHNICAL_FOUL_RATES.techBench;
+		const p = bench ? undefined : this.pickPlayer("fouling", t, 1);
+
+		// Coaches are keyed by team number, players by themselves
+		const key = p ?? t;
+		const num = (this.techs.get(key) ?? 0) + 1;
+		this.techs.set(key, num);
+
+		this.playByPlay.logEvent({
+			type: "techFoul",
+			t,
+			pid: p?.id,
+			num,
+			clock: this.t,
+		});
+
+		if (num >= 2) {
+			if (p) {
+				this.eject(t, p, "techs");
+			} else {
+				this.playByPlay.logEvent({
+					type: "ejection",
+					t,
+					pid: undefined,
+					reason: "techs",
+					clock: this.t,
+				});
+			}
+		}
+
+		// The best free throw shooter on the floor takes it
+		const shooter = maxBy(
+			this.playersOnCourt[other],
+			(p2) => p2.compositeRating.shootingFT,
+		);
+		if (shooter) {
+			this.shootFreeThrowsDeadBall(other, shooter, 1, true);
+		}
+	}
+
+	// A flagrant foul by the defense: a personal (and team) foul, two free throws, and the fouled team keeps the ball. A flagrant 2, or a
+	// second flagrant, ejects the fouler
+	doFlagrantFoul(shooter: PlayerGameSim): PossessionOutcome {
+		const maxDt = Math.max(
+			0.5,
+			Math.min(this.t - 1, SHOT_CLOCK - this.possessionLength),
+		);
+		this.advanceClockSeconds(uniform(Math.min(1, maxDt), maxDt));
+		this.isClockRunning = false;
+
+		const t = this.d;
+		const fouler = this.pickPlayer("fouling", t, 1);
+		const level: 1 | 2 = Math.random() < TECHNICAL_FOUL_RATES.flagrant2 ? 2 : 1;
+		this.recordStat(t, fouler, "pf");
+		this.foulsThisQuarter[t] += 1;
+		if (this.t <= 2 * 60) {
+			this.foulsLastTwoMinutes[t] += 1;
+		}
+
+		this.playByPlay.logEvent({
+			type: "flagrantFoul",
+			t,
+			pid: fouler.id,
+			pidShooting: shooter.id,
+			level,
+			clock: this.t,
+		});
+
+		const numFlagrants = (this.flagrants.get(fouler) ?? 0) + 1;
+		this.flagrants.set(fouler, numFlagrants);
+
+		const foulsNeededToFoulOut = g.get("foulsNeededToFoulOut");
+		if (level === 2) {
+			this.eject(t, fouler, "flagrant2", shooter);
+		} else if (numFlagrants >= 2) {
+			this.eject(t, fouler, "flagrants", shooter);
+		} else if (
+			foulsNeededToFoulOut > 0 &&
+			fouler.stat.pf >= foulsNeededToFoulOut
+		) {
+			this.playByPlay.logEvent({
+				type: "foulOut",
+				t,
+				pid: fouler.id,
+				clock: this.t,
+			});
+			this.updatePlayersOnCourt({
+				shooter,
+			});
+			this.updateSynergy();
+		}
+
+		this.shootFreeThrowsDeadBall(this.o, shooter, 2, false);
+
+		// The offense keeps the ball, inbounding in the frontcourt
+		return "nonShootingFoul";
 	}
 
 	doReb() {

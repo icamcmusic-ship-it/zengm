@@ -26,6 +26,8 @@ export type Trip = {
 	intentional: boolean;
 	bonus: boolean;
 	fouler: FPlayer | undefined;
+	// a flagrant foul's free throws: the fouled team keeps the ball after them, there is no rebound
+	keepBall?: boolean;
 };
 
 const ORD = ["first", "second", "third", "fourth"];
@@ -277,6 +279,7 @@ export const substitution = (
 		foulTrouble: Set<number>;
 		injured: Set<number>;
 		fouledOut: Set<number>;
+		ejected?: Set<number>;
 	},
 ) => {
 	const bits = pairs.map(([a, b]) => ({ a, b }));
@@ -289,6 +292,12 @@ export const substitution = (
 			return pickV(rng, [
 				`${a.name} comes in for the injured ${b.name}.`,
 				`${b.name} is replaced by ${a.name} after the injury.`,
+			]);
+		}
+		if (why.ejected?.has(b.pid)) {
+			return pickV(rng, [
+				`${a.name} takes the place of the ejected ${b.name}.`,
+				`${a.name} checks in for ${b.name}, who has been tossed.`,
 			]);
 		}
 		if (why.fouledOut.has(b.pid)) {
@@ -647,3 +656,125 @@ export const pickOnCourt = (
 	w: (p: FPlayer) => number,
 ) => weighted(rng, ps, w);
 export { R100, clockOf };
+
+// A technical foul at a dead ball: on a player (p) or on the bench (p undefined). One free throw for the other team, possession unchanged
+export const technicalFoul = (
+	rng: Rng,
+	p: FPlayer | undefined,
+	team: string,
+	num: number,
+	opts: {
+		afterDunk: boolean;
+		afterFoul: boolean;
+		shooter: FPlayer | undefined;
+	},
+) => {
+	let call: string;
+	if (!p) {
+		call = pickV(rng, [
+			`Technical foul on the ${bare(team)} bench`,
+			`The ${bare(team)} coach is hit with a technical after a long word with the officials`,
+			`Technical foul on the ${bare(team)} coach for arguing the call`,
+			`The ${bare(team)} bench is warned, then given a technical`,
+		]);
+	} else {
+		const n = p.name;
+		const rows: [number, string][] = [
+			[1, `Technical foul on ${n} for arguing the call`],
+			[1, `${n} is given a technical for complaining to the officials`],
+			[0.7, `${n} says a little too much to the referee: technical foul`],
+			[0.6, `Technical foul on ${n} for taunting`],
+			[0.5, `${n} picks up a technical for an exchange with his defender`],
+			[
+				opts.afterFoul ? 1.2 : 0,
+				`${n} can't believe the call and is hit with a technical`,
+			],
+			[opts.afterDunk ? 1 : 0, `${n} hangs on the rim and draws a technical`],
+			[0.3, `${n} slams the ball down in frustration: technical foul`],
+		];
+		call = pickW(rng, rows)![1];
+	}
+	const second =
+		num >= 2
+			? p
+				? ` That's his second technical.`
+				: ` That's the second one on the bench.`
+			: "";
+	const ft = opts.shooter
+		? ` ${opts.shooter.name} ${pickV(rng, ["will shoot the free throw", "goes to the line for one", "takes the technical free throw"])}.`
+		: "";
+	return `${call}.${second}${ft}`;
+};
+
+// A flagrant foul: two free throws and the ball for the fouled team
+export const flagrantFoul = (
+	rng: Rng,
+	f: FPlayer,
+	shooter: FPlayer,
+	tag: string,
+	level: 1 | 2,
+	ballTeam: string,
+) => {
+	const n = f.name;
+	const s = shooter.name;
+	const play = pickV(rng, [
+		`${n} wraps up ${s} on the drive with no play on the ball`,
+		`${n} swings through and catches ${s} high`,
+		`${n} takes ${s} down hard in transition`,
+		`${n} shoves ${s} in the back on the way to the rim`,
+		`${n} undercuts ${s} as he goes up`,
+	]);
+	const call =
+		level === 2
+			? pickV(rng, [
+					"After a review, it's a flagrant 2",
+					"The officials go to the monitor and upgrade it to a flagrant 2",
+					"Flagrant foul, penalty 2",
+				])
+			: pickV(rng, [
+					"After a review, it's a flagrant 1",
+					"The officials review it: flagrant foul, penalty 1",
+					"It's ruled a flagrant 1",
+				]);
+	return `${play}. ${call} (${tag}). Two free throws for ${s}, and ${ballTeam} keep the ball.`;
+};
+
+export const ejectionText = (
+	rng: Rng,
+	p: FPlayer | undefined,
+	team: string,
+	reason: string,
+) => {
+	if (!p) {
+		return pickV(rng, [
+			`The ${bare(team)} coach is ejected and heads to the locker room.`,
+			`Two technicals: the ${bare(team)} coach has been tossed.`,
+		]);
+	}
+	const n = p.name;
+	if (reason === "techs") {
+		return pickV(rng, [
+			`${n} has been ejected after his second technical.`,
+			`Two technicals: ${n} is tossed and heads to the locker room.`,
+		]);
+	}
+	if (reason === "flagrants") {
+		return `${n} has been ejected: that's his second flagrant foul of the game.`;
+	}
+	return pickV(rng, [
+		`${n} has been ejected.`,
+		`${n} is ejected from the game and heads to the locker room.`,
+	]);
+};
+
+export const technicalFreeThrow = (rng: Rng, p: FPlayer, made: boolean) =>
+	made
+		? pickV(rng, [
+				`${p.name} makes the technical free throw.`,
+				`${p.name} converts the technical free throw.`,
+				`${p.name} hits the free throw for the technical.`,
+			])
+		: pickV(rng, [
+				`${p.name} misses the technical free throw.`,
+				`${p.name} can't convert the technical free throw.`,
+			]);

@@ -287,7 +287,7 @@ test("special plays happen at about the rates of the League Explorer's play-by-p
 		alleyOop >= 0.3 && alleyOop <= 3,
 		`alley-oops per game: ${alleyOop}`,
 	);
-	assert.isTrue(poster >= 0.03 && poster <= 1.5, `posters per game: ${poster}`);
+	assert.isTrue(poster >= 0.15 && poster <= 0.8, `posters per game: ${poster}`);
 	assert.isTrue(shotClock <= 1, `shot-clock violations per game: ${shotClock}`);
 	assert.isTrue(dunks >= 1 && dunks <= 20, `dunks per game: ${dunks}`);
 	assert.isTrue(charges >= 0.3 && charges <= 6, `charges per game: ${charges}`);
