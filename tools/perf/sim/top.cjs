@@ -4,24 +4,31 @@ const prof = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const N = Number(process.argv[3] ?? 40);
 const filter = process.argv[4];
 const nodes = new Map(prof.nodes.map((n) => [n.id, n]));
-const parent = new Map();
-for (const n of prof.nodes)
-	for (const c of n.children ?? []) parent.set(c, n.id);
-const self = new Map();
+const parentOf = new Map();
+for (const n of prof.nodes) {
+	for (const c of n.children ?? []) {
+		parentOf.set(c, n.id);
+	}
+}
+const selfTime = new Map();
 const dt = prof.timeDeltas;
-for (let i = 0; i < prof.samples.length; i++)
-	self.set(prof.samples[i], (self.get(prof.samples[i]) ?? 0) + (dt[i] ?? 0));
+for (let i = 0; i < prof.samples.length; i++) {
+	selfTime.set(
+		prof.samples[i],
+		(selfTime.get(prof.samples[i]) ?? 0) + (dt[i] ?? 0),
+	);
+}
 const key = (n) =>
 	`${n.callFrame.functionName || "(anon)"} ${n.callFrame.url.replace(/.*\/src\//, "").replace(/.*node_modules\//, "nm/")}:${n.callFrame.lineNumber + 1}`;
 const selfBy = new Map(),
 	inclBy = new Map();
 let total = 0;
-for (const [id, t] of self) {
+for (const [id, t] of selfTime) {
 	total += t;
 	const n = nodes.get(id);
 	selfBy.set(key(n), (selfBy.get(key(n)) ?? 0) + t);
 	const seen = new Set();
-	for (let cur = id; cur !== undefined; cur = parent.get(cur)) {
+	for (let cur = id; cur !== undefined; cur = parentOf.get(cur)) {
 		const k = key(nodes.get(cur));
 		if (!seen.has(k)) {
 			seen.add(k);

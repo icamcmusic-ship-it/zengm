@@ -25,15 +25,18 @@ const groups = {
 const sum = (r) => {
 	const out = {};
 	const t = process.env.WALL ? r.times : (r.cpu ?? r.times);
-	for (const [g, keys] of Object.entries(groups))
+	for (const [g, keys] of Object.entries(groups)) {
 		out[g] = keys.reduce((a, k) => a + (t[k] ?? 0), 0);
+	}
 	out.total = out.season + out.playoffs + out.offseason;
 	return out;
 };
 const label = (r) => (r.feature ? `+${r.feature}` : r.mode);
 const load = (file) => {
 	const m = new Map();
-	for (const r of read(file)) m.set(label(r), { ...sum(r), hash: r.hash });
+	for (const r of read(file)) {
+		m.set(label(r), { ...sum(r), hash: r.hash });
+	}
 	return m;
 };
 const a = load(process.argv[2]);
@@ -57,10 +60,12 @@ for (const k of rows) {
 	const isFeature = k.startsWith("+");
 	const cells = cols.map((c) => {
 		const v = isFeature && off ? r[c] - off[c] : r[c];
-		if (!b) return fmt(v).padStart(8);
+		if (!b) {
+			return fmt(v).padStart(8);
+		}
 		const rb = b.get(k);
 		const offB = b.get("off");
-		const vb = rb ? (isFeature && offB ? rb[c] - offB[c] : rb[c]) : NaN;
+		const vb = rb ? (isFeature && offB ? rb[c] - offB[c] : rb[c]) : Number.NaN;
 		return `${fmt(vb)}→${fmt(v)}`.padStart(16);
 	});
 	console.log(`${k.padEnd(26)}${cells.join("")}`);
