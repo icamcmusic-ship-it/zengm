@@ -23,6 +23,8 @@ Pages that belong with an original BBGM page are tabs of that page: a tab bar at
 | Player Ratings   | Ratings, Archetypes, Skill Badges               |
 | League History   | History, Timeline, Coaches                      |
 | Daily Schedule   | Schedule, Games to Watch                        |
+| Head-to-Head     | Head-to-Head, Rivalries                         |
+| Playoffs         | Playoffs, Series Recaps                         |
 
 Other pages are still reached from _More_ links: League Achievements (League Stats / History group) and Coaching Staff (team pages and the Team menu).
 
@@ -38,6 +40,8 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Trade grader](#trade-grader)                                       | League → Trade Grader, trade summaries                           | bball  | `featureTradeGrader`                      | on / on                       |
 | [Contract value](#contract-value)                                   | League → Contract Value, player pages                            | bball  | `featureContractValue`                    | on / on                       |
 | [League timeline](#league-timeline)                                 | League → Timeline                                                | bball  | `featureTimeline`                         | on / on                       |
+| [Rivalries](#rivalries)                                             | Head-to-Head → Rivalries tab, team history pages                 | bball  | `featureRivalries`                        | on / on                       |
+| [Series recaps](#series-recaps)                                     | Playoffs → Series Recaps tab, bracket, news                      | bball  | `featureSeriesRecaps`                     | on / on                       |
 | [Unretirements](#unretirements)                                     | background, at the start of free agency                          | bball  | `featureUnretire`                         | off / off                     |
 | [Play-by-play flavor](#play-by-play)                                | live game                                                        | bball  | `featurePbpFlavor`                        | on / on                       |
 | [Live play-by-play](#play-by-play)                                  | live game                                                        | bball  | `pbpLiveGame`                             | on / on                       |
@@ -187,6 +191,19 @@ League menu → _Contract Value_: a value index, bargains and albatrosses, and t
 - **Where:** League menu → _Timeline_, `/l/:lid/timeline[/:from[/:to]]`; linked from the dashboard ("From the records") and from each season row of League → History.
 - **What:** season by season (newest first): champions (with the finals result), MVPs and Finals MVPs, the newspaper's front page lead, the top 3 storylines, league achievements unlocked, records (best/worst regular season record in league history so far, single-game scoring records), the 3 biggest trades (by the trade event's importance) and comebacks. Every entry links to its source page (playoffs, player, newspaper edition, storylines season, achievement, box score, trade summary). Filters: season range (navigates), kinds (remembered per browser), team and a text search.
 - **Known limits:** headlines are computed for at most the 25 latest seasons of the range (finished seasons are cached in memory). Entries from Newspaper, Storylines and League Achievements are left out while those features are off (the page says which). Storylines need the Wrapped snapshot: on a first visit they appear when it's ready. Achievements come from the saved unlock log, so ones unlocked before achievements were tracked in the league don't show.
+
+### Rivalries
+
+- **Where:** _Rivalries_ tab of Head-to-Head, `/l/:lid/rivalries[/:tidA-:tidB]`; the _Rivals_ card on Team History; League Stats' More links.
+- **What:** one rivalry score per pair of teams (`src/common/rivalries`, gathered by `src/worker/util/rivalries.ts`): playoff meetings weighted by round (Finals most), series length and upsets; even regular season head-to-head; close games (3 points or fewer, or overtime) from stored box scores; same division (or conference); star duels (a 25+ point scorer on both sides in a playoff game); a bonus for a meeting last season and back-to-back meetings. Everything decays with a 6 season half-life. Tiers: Mild, Simmering (10+), Heated (22+), Bitter (40+). The page shows the top rivalries, Finals rivals, every Finals matchup and, for one pair, generated lines and a season-by-season timeline (record, running edge, playoff series, score).
+- **Shared score:** the hype "rivalry" reason (`hypeRivalryPoints`) and the "Playoff rivalry" storyline use the same score.
+- **Known limits:** close games and star duels only count seasons whose box scores are kept. Teams are by tid, so a relocated franchise stays one team.
+
+### Series recaps
+
+- **Where:** _Series Recaps_ tab of Playoffs, `/l/:lid/series_recaps[/:season[/:tidA-:tidB]]`; a _Recap_ link on every started series of the bracket; Rivalries timeline and Finals matchups link to them.
+- **What:** per series (`src/common/seriesRecap`): headline and generated text, result with seeds, game by game (score, margin, overtime, running series score, box score links), series leaders and series MVP (best game score per game on the winning side), turning points (biggest win, biggest fourth-quarter comeback, overtime games, the swing game, the closeout, stored clutch plays), upsets by seed and comebacks in the series (down 3-1, ...). When a series ends the news item ("X defeated Y in the 1st round, 4-3") gets a line about a comeback, upset or sweep and a recap link, and is kept in the news for every round.
+- **Known limits:** needs the series' box scores; older seasons whose box scores were deleted show only the result.
 
 ### Unretirements
 

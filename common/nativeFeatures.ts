@@ -533,6 +533,24 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "rivalries",
+		key: "featureRivalries",
+		name: "Rivalries",
+		description:
+			"A rivalry score for every pair of teams (playoff meetings by round, close games, division, star duels, recent history), the Rivalries tab of Head-to-Head with Finals matchups and a rivalry timeline, and a rivals card on team history pages.",
+		default: true,
+		sports: BBGM,
+	},
+	{
+		id: "seriesRecaps",
+		key: "featureSeriesRecaps",
+		name: "Series Recaps",
+		description:
+			"A generated recap of every playoff series (game by game, leaders, series MVP, turning points, upsets and comebacks), the Series Recaps tab of Playoffs, recap links in the bracket and a news item when a series ends.",
+		default: true,
+		sports: BBGM,
+	},
+	{
 		id: "unretire",
 		key: "featureUnretire",
 		name: "Unretirements",

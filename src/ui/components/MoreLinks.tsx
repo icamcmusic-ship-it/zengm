@@ -386,6 +386,7 @@ export const MoreLinks = (
 		if (__SPORT === "basketball") {
 			links.push(
 				{ url: ["timeline"], name: "Timeline" },
+				{ url: ["rivalries"], name: "Rivalries" },
 				{ url: ["league_achievements"], name: "League Achievements" },
 				{ url: ["coaches"], name: "Coaches" },
 				{ url: ["frivolities", "economics"], name: "Economics" },

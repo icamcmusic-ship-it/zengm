@@ -47,6 +47,10 @@ export const featureForUrl = (
 			return "leagueAchievements";
 		case "trade_grader":
 			return "tradeGrader";
+		case "rivalries":
+			return "rivalries";
+		case "series_recaps":
+			return "seriesRecaps";
 		case "contract_value":
 			return "contractValue";
 		case "timeline":

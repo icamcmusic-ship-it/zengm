@@ -811,7 +811,11 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "leagueStats",
+				// Head-to-Head (and its Rivalries tab) is reached from League Stats' More links
+				active: (pageID) =>
+					pageID === "leagueStats" ||
+					pageID === "headToHeadAll" ||
+					pageID === "rivalries",
 				league: true,
 				commandPalette: true,
 				path: ["league_stats"],

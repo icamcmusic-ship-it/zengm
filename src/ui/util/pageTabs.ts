@@ -118,6 +118,24 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 		},
 	],
 	[
+		{ id: "headToHeadAll", name: "Head-to-Head", url: ["head2head_all"] },
+		{
+			id: "rivalries",
+			name: "Rivalries",
+			url: ["rivalries"],
+			basketballOnly: true,
+		},
+	],
+	[
+		{ id: "playoffs", name: "Playoffs", url: ["playoffs"] },
+		{
+			id: "seriesRecaps",
+			name: "Series Recaps",
+			url: ["series_recaps"],
+			basketballOnly: true,
+		},
+	],
+	[
 		{ id: "dailySchedule", name: "Schedule", url: ["daily_schedule"] },
 		{
 			id: "hype",
