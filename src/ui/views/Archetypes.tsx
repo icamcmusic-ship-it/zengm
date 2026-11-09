@@ -11,13 +11,7 @@ import type { View } from "../../common/types.ts";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
-const Archetypes = ({
-	byGroup,
-	rows,
-	season,
-	total,
-	trend,
-}: View<"archetypes">) => {
+const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 	useTitleBar({ title: "Archetype Landscape" });
 
 	const cols = [
@@ -111,43 +105,6 @@ const Archetypes = ({
 				rows={tableRows}
 				nonfluid
 			/>
-
-			<h2 className="mt-4">Trends</h2>
-			{trend.length < 2 ? (
-				<p className="text-body-secondary">
-					Trends appear once players have saved labels from two or more
-					preseasons.
-				</p>
-			) : (
-				<div className="table-responsive">
-					<table className="table table-sm table-striped w-auto">
-						<thead>
-							<tr>
-								<th>Season</th>
-								{GROUPS.map((g) => (
-									<th key={g}>{GROUP_INFO[g].label}</th>
-								))}
-								<th>Most common</th>
-							</tr>
-						</thead>
-						<tbody>
-							{trend.map((t) => (
-								<tr key={t.season}>
-									<td>{t.season}</td>
-									{GROUPS.map((g) => (
-										<td key={g}>
-											{t.total > 0 ? pct(t.groups[g] / t.total) : ""}
-										</td>
-									))}
-									<td>
-										{t.top.map((x) => `${x.name} (${x.count})`).join(", ")}
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			)}
 		</>
 	);
 };

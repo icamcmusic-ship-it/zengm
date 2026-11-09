@@ -1,4 +1,5 @@
 import { buildBaseNorms, probit } from "./norms.ts";
+import { positionOf, posPrior } from "./position.ts";
 import { gateFactor, prepare, rawMatch } from "./score.ts";
 import type { Archetype, ArchetypeRatings, Norms } from "./types.ts";
 
@@ -49,18 +50,33 @@ export const matchZ = (table: number[], score: number) => {
 export const buildNorms = (
 	rows: { ratings: ArchetypeRatings; ovr?: number }[],
 	archetypes: Archetype[],
+	// Tables to use for archetypes with too few peers in this league (the built-in reference league)
+	fallback?: Norms,
 ): Norms => {
 	const base = buildBaseNorms(rows);
-	const prepared = rows.map((r) => prepare(r.ratings, { ...base, match: {} }));
+	const prepared = rows.map((r) => ({
+		...prepare(r.ratings, { ...base, match: {} }),
+		pos: positionOf(r.ratings),
+	}));
 	const match: Norms["match"] = {};
 	for (const a of archetypes) {
 		const inGate = prepared
-			.filter((p) => gateFactor(p.hgt, a.hgt) >= 0.9)
+			// His peers: players inside the height gate at positions the archetype allows
+			.filter(
+				(p) =>
+					gateFactor(p.hgt, a.hgt) >= 0.9 &&
+					(posPrior(a.group, a.pos, p.pos) ?? -Infinity) > -1,
+			)
 			.map((p) => rawMatch(a, p.z, p.hgt, p.skills))
 			.sort((x, y) => x - y);
-		// Too few players fit the gate (a tiny league): fall back to everyone
+		// Too few peers (a small league, or a very rare body type): reuse the reference league's table rather than read him
+		// against everyone, which would make any player look like an exceptional fit for an archetype nobody in the league has
+		if (inGate.length < 40 && fallback?.match[a.id]) {
+			match[a.id] = fallback.match[a.id]!;
+			continue;
+		}
 		const vals =
-			inGate.length >= 40
+			inGate.length >= 8
 				? inGate
 				: prepared
 						.map((p) => rawMatch(a, p.z, p.hgt, p.skills))

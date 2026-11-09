@@ -6,7 +6,6 @@ import {
 	archetypeById,
 	compositionOf,
 	landscapeOf,
-	viewOf,
 	type ArchetypeGroup,
 	type Composition,
 	type Landscape,
@@ -102,13 +101,6 @@ export type ArchetypeLandscape = {
 		share: number;
 		top: ArchetypeTopPlayer[];
 	}[];
-	// Per preseason: how many players had each group's archetypes, and the three most common archetypes
-	trend: {
-		season: number;
-		total: number;
-		groups: Record<ArchetypeGroup, number>;
-		top: { name: string; count: number }[];
-	}[];
 };
 
 export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
@@ -120,7 +112,6 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 			total: 0,
 			byGroup: { guard: 0, wing: 0, forward: 0, big: 0 },
 			rows: [],
-			trend: [],
 		};
 	}
 	const norms = await getLeagueNorms();
@@ -149,48 +140,6 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 	const landscape = landscapeOf(rated, 3);
 	const byPid = new Map(rated.map((r) => [r.pid, r]));
 
-	// Trend from every stored entry (retired players included, as far as the cache holds them)
-	const all = await idb.cache.players.getAll();
-	const bySeason = new Map<
-		number,
-		{
-			groups: Record<ArchetypeGroup, number>;
-			ids: Map<string, number>;
-			total: number;
-		}
-	>();
-	for (const p of all) {
-		for (const e of p.archetypes ?? []) {
-			const v = viewOf(e);
-			if (!v) {
-				continue;
-			}
-			let s = bySeason.get(e.season);
-			if (!s) {
-				s = {
-					groups: { guard: 0, wing: 0, forward: 0, big: 0 },
-					ids: new Map(),
-					total: 0,
-				};
-				bySeason.set(e.season, s);
-			}
-			s.groups[v.group]++;
-			s.total++;
-			s.ids.set(v.id, (s.ids.get(v.id) ?? 0) + 1);
-		}
-	}
-	const trend = [...bySeason.entries()]
-		.sort((a, b) => a[0] - b[0])
-		.map(([s, v]) => ({
-			season: s,
-			total: v.total,
-			groups: v.groups,
-			top: [...v.ids.entries()]
-				.sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
-				.slice(0, 3)
-				.map(([id, count]) => ({ name: archetypeById(id)!.name, count })),
-		}));
-
 	return {
 		enabled: true,
 		season,
@@ -213,7 +162,6 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 				};
 			}),
 		})),
-		trend,
 	};
 };
 

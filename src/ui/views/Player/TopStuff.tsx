@@ -622,15 +622,6 @@ const TopStuff = ({
 										</span>
 									) : null}
 									<br />
-									{player.archetype.history.length > 1 ? (
-										<>
-											Archetype history:{" "}
-											{player.archetype.history
-												.map((h) => `${h.season} ${h.label}`)
-												.join(", ")}
-											<br />
-										</>
-									) : null}
 								</>
 							) : null}
 							Experience:{" "}

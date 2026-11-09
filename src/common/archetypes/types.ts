@@ -32,6 +32,9 @@ export type DimKey =
 
 export type ArchetypeGroup = "guard" | "wing" | "forward" | "big";
 
+// BBGM basketball positions
+export type Pos = "PG" | "G" | "SG" | "GF" | "SF" | "F" | "PF" | "FC" | "C";
+
 // Families are used to avoid pairing an archetype with a near-duplicate as its secondary one
 export type ArchetypeFamily =
 	| "playmaker"
@@ -72,6 +75,8 @@ export type ArchetypeDef = {
 	bonus?: SkillLabel[];
 	// Rare "unicorn" types are not expected to be filled in every league
 	rare?: true;
+	// Position prior overrides on top of the group's (see position.ts): z nudge per position, null = never
+	pos?: Partial<Record<Pos, number | null>>;
 	tags: string[];
 };
 
