@@ -4,6 +4,7 @@ import {
 	archetypeById,
 	combineArchetypeDescs,
 } from "./classify.ts";
+import { isPos, namesContradict } from "./position.ts";
 export { combineArchetypeDescs };
 import type {
 	ArchetypeFamily,
@@ -64,15 +65,29 @@ export type ArchetypeView = {
 	season: number;
 };
 
-// A stored entry as the UI shows it; null if its archetype no longer exists
+// A stored entry as the UI shows it; null if its archetype no longer exists (an id from an older version), or, given his
+// position, if the archetype is no longer allowed there (entries stored before positions were a hard gate). The caller
+// then reads him live until his next preseason stores a valid one. A secondary that is gone, not allowed at his position
+// or names another position than the primary is dropped.
 export const viewOf = (
 	e: StoredArchetype | undefined,
+	pos?: unknown,
 ): ArchetypeView | null => {
 	const a = e ? archetypeById(e.id) : undefined;
 	if (!e || !a) {
 		return null;
 	}
-	const b = e.secondary ? archetypeById(e.secondary) : undefined;
+	if (isPos(pos) && !a.positions.includes(pos)) {
+		return null;
+	}
+	let b = e.secondary ? archetypeById(e.secondary) : undefined;
+	if (
+		b &&
+		(namesContradict(a.name, b.name) ||
+			(isPos(pos) && !b.positions.includes(pos)))
+	) {
+		b = undefined;
+	}
 	return {
 		id: a.id,
 		name: a.name,

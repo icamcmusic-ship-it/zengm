@@ -28,7 +28,18 @@ import {
 	type ArchetypeRatings,
 } from "./index.ts";
 import { sampleLeague } from "./sample.testutil.ts";
-import { HARD_BLOCK, POSITIONS, positionOf, posPrior } from "./position.ts";
+import {
+	HARD_BLOCK,
+	POSITIONS,
+	archetypePrior,
+	nameContradictsPosition,
+	namePositions,
+	namesContradict,
+	positionFor,
+	positionOf,
+	positionWordOf,
+	posPrior,
+} from "./position.ts";
 import { buildNorms } from "./match.ts";
 import { coverOf } from "./score.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
@@ -58,7 +69,7 @@ const R = (o: Partial<ArchetypeRatings>): ArchetypeRatings => ({
 
 describe("archetype table", () => {
 	test("size, unique ids, valid profiles", () => {
-		assert.ok(ARCHETYPES.length >= 205 && ARCHETYPES.length <= 240);
+		assert.ok(ARCHETYPES.length >= 225 && ARCHETYPES.length <= 320);
 		assert.strictEqual(
 			new Set(ARCHETYPES.map((a) => a.id)).size,
 			ARCHETYPES.length,
@@ -341,15 +352,19 @@ describe("position prior", () => {
 	test("every position allows at least two groups, and hard blocks hold", () => {
 		for (const ps of POSITIONS) {
 			const groups = new Set(
-				ARCHETYPES.filter((a) => posPrior(a.group, a.pos, ps) !== null).map(
-					(a) => a.group,
-				),
+				ARCHETYPES.filter(
+					(a) =>
+						!a.tags.includes("universal") && archetypePrior(a, ps) !== null,
+				).map((a) => a.group),
 			);
 			assert.ok(groups.size >= 2, ps);
 		}
 		for (const a of ARCHETYPES) {
+			if (a.tags.includes("universal")) {
+				continue;
+			}
 			for (const ps of HARD_BLOCK[a.group]) {
-				assert.strictEqual(posPrior(a.group, a.pos, ps), null, a.id + ps);
+				assert.strictEqual(archetypePrior(a, ps), null, a.id + ps);
 			}
 		}
 		for (const ps of ["PG", "G", "SG"] as const) {
@@ -382,7 +397,10 @@ describe("position prior", () => {
 				classify(fuzzed),
 			]) {
 				const shownPos = ps;
-				if (HARD_BLOCK[c.group].includes(shownPos)) {
+				if (
+					!c.tags.includes("universal") &&
+					HARD_BLOCK[c.group].includes(shownPos)
+				) {
 					bad++;
 					if (ex.length < 5) {
 						ex.push(`${shownPos} ${c.id}`);
@@ -499,7 +517,10 @@ describe("position prior", () => {
 				families.includes(c.family) && groups.includes(c.group),
 				`${label} (${positionOf(r)}) -> ${c.id} (${c.group}/${c.family})`,
 			);
-			assert.ok(!HARD_BLOCK[c.group].includes(positionOf(r)));
+			assert.ok(
+				c.tags.includes("universal") ||
+					!HARD_BLOCK[c.group].includes(positionOf(r)),
+			);
 		});
 	}
 });
@@ -573,7 +594,7 @@ describe("targeting an archetype with the regenerator", () => {
 				(a) =>
 					r.hgt >= a.hgt[0] + 2 &&
 					r.hgt <= a.hgt[1] - 2 &&
-					(posPrior(a.group, a.pos, ps) ?? -9) > -1,
+					(archetypePrior(a, ps) ?? -9) > -1,
 			);
 			if (fits.length === 0 || ovr < 38) {
 				continue;
@@ -631,6 +652,183 @@ describe("targeting an archetype with the regenerator", () => {
 			`match ${derivedMatch}/${inputs.length} loose ${loose} ${misses.join(" ")}`,
 		);
 	}, 300000);
+});
+
+describe("positions are a hard gate", () => {
+	test("every archetype lists its positions; the name agrees, the group allows them, and only a few are universal", () => {
+		const universal = ARCHETYPES.filter((a) => a.tags.includes("universal"));
+		assert.ok(universal.length >= 5 && universal.length <= 15);
+		for (const a of ARCHETYPES) {
+			assert.ok(a.positions.length > 0, a.id);
+			assert.strictEqual(new Set(a.positions).size, a.positions.length, a.id);
+			for (const ps of a.positions) {
+				assert.ok(POSITIONS.includes(ps), a.id);
+				assert.ok(!nameContradictsPosition(a.name, ps), `${a.name} at ${ps}`);
+				if (!universal.includes(a)) {
+					assert.notStrictEqual(posPrior(a.group, a.pos, ps), null, a.id + ps);
+				}
+			}
+			// Universal labels are role labels: their names name no position
+			if (universal.includes(a)) {
+				assert.strictEqual(namePositions(a.name), null, a.id);
+				assert.strictEqual(a.positions.length, POSITIONS.length, a.id);
+			} else {
+				assert.ok(a.positions.length < POSITIONS.length, a.id);
+			}
+		}
+		// Every position keeps a real choice of skill sets
+		for (const ps of POSITIONS) {
+			const regular = ARCHETYPES.filter(
+				(a) => a.positions.includes(ps) && !a.age && !a.level,
+			);
+			assert.ok(regular.length >= 45, `${ps} ${regular.length}`);
+			assert.ok(new Set(regular.map((a) => a.family)).size >= 9, ps);
+		}
+	});
+
+	test("what a name says about position", () => {
+		assert.deepStrictEqual(namePositions("Lockdown Guard"), ["PG", "G", "SG"]);
+		assert.deepStrictEqual(namePositions("Backup Point Guard"), ["PG", "G"]);
+		assert.deepStrictEqual(namePositions("Point of Attack Defender"), null);
+		assert.deepStrictEqual(namePositions("Point Forward"), [
+			"GF",
+			"SF",
+			"F",
+			"PF",
+		]);
+		assert.deepStrictEqual(namePositions("Two-Way Point Forward"), [
+			"GF",
+			"SF",
+			"F",
+			"PF",
+		]);
+		assert.deepStrictEqual(namePositions("Point Center"), ["FC", "C"]);
+		assert.deepStrictEqual(namePositions("Switchable Center"), ["FC", "C"]);
+		assert.deepStrictEqual(namePositions("Stretch Five"), ["FC", "C"]);
+		assert.deepStrictEqual(namePositions("Switchable Big"), ["PF", "FC", "C"]);
+		assert.deepStrictEqual(namePositions("Big Guard"), ["PG", "G", "SG"]);
+		assert.deepStrictEqual(namePositions("Versatile Big Wing"), [
+			"SG",
+			"GF",
+			"SF",
+			"F",
+		]);
+		assert.deepStrictEqual(namePositions("Stretch Four"), ["F", "PF", "FC"]);
+		assert.deepStrictEqual(namePositions("Switchable Forward"), [
+			"SF",
+			"F",
+			"PF",
+			"FC",
+		]);
+		assert.strictEqual(namePositions("Glue Guy"), null);
+		assert.strictEqual(positionWordOf("Point Forward"), "forward");
+		assert.strictEqual(positionWordOf("Stretch Four"), "forward");
+		assert.strictEqual(positionWordOf("Rim Protector"), null);
+		assert.ok(namesContradict("Switchable Forward", "Switchable Center"));
+		assert.ok(namesContradict("Two-Way Wing", "Lockdown Guard"));
+		assert.ok(namesContradict("Stretch Four", "Switchable Big"));
+		assert.ok(!namesContradict("Stretch Four", "Switchable Forward"));
+		assert.ok(!namesContradict("Rim Protector", "Switchable Big"));
+		assert.ok(!namesContradict("Glue Guy", "Switchable Center"));
+		assert.ok(nameContradictsPosition("Switchable Center", "PF"));
+		assert.ok(!nameContradictsPosition("Switchable Big", "PF"));
+	});
+
+	test("over a generated league at every position: primary and secondary pass the gate, never contradict, and the name fits", async () => {
+		const lg = (await league()).slice(0, 1500);
+		let n = 0;
+		for (const p of lg) {
+			const own = positionFor(p.ratings, true);
+			// His own position, and every other one he could be listed at (custom positions, an old league's)
+			for (const ps of [own, ...POSITIONS.filter((x) => x !== own)].slice(
+				0,
+				n % 3 === 0 ? POSITIONS.length : 1,
+			)) {
+				n++;
+				const c = classify(p.ratings, { pos: ps, age: p.age });
+				const a = archetypeById(c.id)!;
+				assert.ok(a.positions.includes(ps), `${ps} ${c.label}`);
+				assert.ok(!nameContradictsPosition(c.name, ps), `${ps} ${c.label}`);
+				if (c.secondary) {
+					const b = archetypeById(c.secondary.id)!;
+					assert.ok(b.positions.includes(ps), `${ps} ${c.label}`);
+					assert.ok(!namesContradict(c.name, b.name), `${ps} ${c.label}`);
+				}
+				// A previous label his position no longer allows is never kept, however sticky
+				const blocked = ARCHETYPES.find((x) => !x.positions.includes(ps))!;
+				const again = classify(p.ratings, {
+					pos: ps,
+					age: p.age,
+					previousId: blocked.id,
+					stickiness: 99,
+				});
+				assert.ok(archetypeById(again.id)!.positions.includes(ps), ps);
+			}
+		}
+	}, 120000);
+
+	test("the reported case: a PF is never a Switchable Center, nor 'Switchable Forward / Switchable Center'", () => {
+		// A 6-9 power forward who switches: once read as "Switchable Forward / Switchable Center"
+		const r = R({
+			hgt: 61,
+			stre: 58,
+			spd: 53,
+			jmp: 41,
+			endu: 56,
+			ins: 52,
+			dnk: 51,
+			ft: 40,
+			fg: 37,
+			tp: 30,
+			oiq: 45,
+			diq: 54,
+			drb: 41,
+			pss: 42,
+			reb: 50,
+		});
+		const sc = scoreAll(r, DEFAULT_NORMS, ARCHETYPES, "PF", 28).scored;
+		assert.ok(sc.find((s) => s.a.id === "switchable-center")!.z < -50);
+		for (const ps of ["PF", "FC", "C"] as const) {
+			const c = classify(r, { pos: ps, age: 28 });
+			assert.ok(
+				!c.secondary || !namesContradict(c.name, c.secondary.name),
+				c.label,
+			);
+			assert.ok(ps !== "PF" || !/Center/.test(c.label), c.label);
+		}
+	});
+
+	test("stored entries from before the gate: unknown ids, labels his position no longer allows, contradictory hybrids", () => {
+		const e = {
+			season: 2025,
+			id: "switchable-forward",
+			secondary: "switchable-center",
+		};
+		// The contradictory secondary is dropped wherever it is shown
+		assert.strictEqual(viewOf(e)?.label, "Switchable Forward");
+		assert.strictEqual(viewOf(e, "PF")?.label, "Switchable Forward");
+		// A primary his position does not allow is no view at all: the caller reads him live until the next preseason
+		assert.strictEqual(
+			viewOf({ season: 2025, id: "switchable-center" }, "PF"),
+			null,
+		);
+		assert.strictEqual(
+			viewOf({ season: 2025, id: "switchable-center" }, "C")?.label,
+			"Switchable Center",
+		);
+		// A removed archetype, as primary or secondary
+		assert.strictEqual(viewOf({ season: 2025, id: "no-such-archetype" }), null);
+		assert.strictEqual(
+			viewOf({ season: 2025, id: "rim-protector", secondary: "gone" }, "C")
+				?.label,
+			"Rim Protector",
+		);
+		// The renamed archetype keeps its id
+		assert.strictEqual(
+			viewOf({ season: 2025, id: "switch-big" })?.name,
+			"Switchable Big",
+		);
+	});
 });
 
 describe("storage helpers", () => {

@@ -1,5 +1,5 @@
 import { buildBaseNorms, probit } from "./norms.ts";
-import { isPos, positionOf, posPrior } from "./position.ts";
+import { archetypePrior, isPos, positionOf } from "./position.ts";
 import { gateFactor, prepare, rawMatch } from "./score.ts";
 import type { Archetype, ArchetypeRatings, Norms } from "./types.ts";
 
@@ -74,7 +74,7 @@ export const buildNorms = (
 			.filter(
 				(p) =>
 					gateFactor(p.hgt, a.hgt) >= 0.9 &&
-					(posPrior(a.group, a.pos, p.pos) ?? -Infinity) > -1,
+					(archetypePrior(a, p.pos) ?? -Infinity) > -1,
 			)
 			.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.level))
 			.sort((x, y) => x - y);

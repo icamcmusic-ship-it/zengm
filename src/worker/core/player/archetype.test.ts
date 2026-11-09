@@ -6,7 +6,9 @@ import { assert, beforeEach, describe, test } from "vitest";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import {
+	ARCHETYPES,
 	DEFAULT_NORMS,
+	archetypeById,
 	currentEntry,
 	historyOf,
 	toStored,
@@ -180,6 +182,39 @@ describe("stored archetypes", () => {
 			undefined,
 		);
 		assert.deepStrictEqual(augmented.archetypes, p.archetypes);
+	});
+
+	test("an entry stored before positions were a hard gate (or for a removed archetype) is read live, then replaced at the next preseason", async () => {
+		await initArchetypesForNewLeague();
+		const norms = await getLeagueNorms();
+		const p = (await idb.cache.players.indexGetAll("playersByTid", 2))[0]!;
+		const row = last(p.ratings) as any;
+		const entrySeason = currentEntry(p.archetypes)!.season;
+		// An archetype his listed position does not allow, with a contradictory hybrid partner, as an older version stored it
+		const wrong = ARCHETYPES.find(
+			(a) => !a.tags.includes("universal") && !a.positions.includes(row.pos),
+		)!;
+		p.archetypes = [
+			{ season: entrySeason, id: wrong.id, secondary: "switchable-center" },
+		];
+		const shown = archetypeFor(p, norms)!;
+		assert.strictEqual(shown.stored, false);
+		assert.ok(archetypeById(shown.view.id)!.positions.includes(row.pos));
+		// A removed archetype reads live too
+		p.archetypes = [{ season: entrySeason, id: "removed-in-v3" }];
+		assert.strictEqual(archetypeFor(p, norms)!.stored, false);
+
+		// The next preseason stores a valid one, whatever the stickiness of the old id
+		p.archetypes = [{ season: entrySeason, id: wrong.id }];
+		g.setWithoutSavingToDB("season", g.get("season") + 1);
+		player.addRatingsRow(p, DEFAULT_LEVEL);
+		await player.develop(p, 1, false, 0);
+		await updateArchetypesForPreseason([p]);
+		const e = currentEntry(p.archetypes)!;
+		const pos = (last(p.ratings) as any).pos;
+		assert.ok(e.season > entrySeason);
+		assert.ok(archetypeById(e.id)!.positions.includes(pos), `${e.id} ${pos}`);
+		assert.ok(viewOf(e, pos), e.id);
 	});
 
 	test("storeArchetype is sticky for the previous label on a tiny change", async () => {

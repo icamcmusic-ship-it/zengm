@@ -20,9 +20,16 @@ import { ARCHETYPES, classify, scoreAll } from "./classify.ts";
 import { compositeValues } from "./composites.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import { probit, rawZ } from "./norms.ts";
-import { HARD_BLOCK, positionFor } from "./position.ts";
+import {
+	HARD_BLOCK,
+	nameContradictsPosition,
+	namesContradict,
+	positionFor,
+} from "./position.ts";
 
 const OUT = process.env.ARCH_DIAG_OUT ?? "/tmp/claude-0/arch-diag.txt";
+// ARCH_DIAG_DUMP=file: every labelled player as JSON rows [population, name, pos, age, label], to compare two versions
+const DUMP = process.env.ARCH_DIAG_DUMP ? [] : undefined;
 
 // Independent audit of what a label promises: [name pattern, check(ratings, absolute z per dim), what is wrong]
 const AUDIT = [
@@ -330,6 +337,9 @@ const analyse = (label, players, out) => {
 	let audited = 0;
 	let auditBad = 0;
 	let hyb = 0;
+	let nameBad = 0;
+	let hybBad = 0;
+	const nameEx = [];
 	const badBy = {};
 	const badEx = [];
 	const gapEx = [];
@@ -359,9 +369,23 @@ const analyse = (label, players, out) => {
 				);
 		}
 		if (c.secondary) hyb++;
+		// The label's name must not say he plays another position, and a hybrid's two names must not contradict
+		if (
+			nameContradictsPosition(c.name, ps) ||
+			(c.secondary && nameContradictsPosition(c.secondary.name, ps))
+		) {
+			nameBad++;
+			if (nameEx.length < 6) nameEx.push(`${ps} ${c.label}`);
+		}
+		if (c.secondary && namesContradict(c.name, c.secondary.name)) {
+			hybBad++;
+			if (nameEx.length < 12) nameEx.push(`hybrid ${ps} ${c.label}`);
+		}
+		if (DUMP) DUMP.push([label, p.name ?? "", ps, p.age, c.label]);
 		posTab[ps] ??= {};
 		posTab[ps][c.group] = (posTab[ps][c.group] ?? 0) + 1;
-		if (HARD_BLOCK[c.group].includes(ps)) hard++;
+		if (!c.tags.includes("universal") && HARD_BLOCK[c.group].includes(ps))
+			hard++;
 		const a = absZ(p.ratings);
 		const sz = sizeZ(a);
 		let checked = false;
@@ -402,6 +426,9 @@ const analyse = (label, players, out) => {
 		`audit mismatches: ${pct(auditBad, n)}% of all players (${auditBad}/${audited} audited labels = ${pct(auditBad, audited)}%)`,
 	);
 	descriptor(rows, out);
+	out.push(
+		`names: position-name contradictions ${nameBad}, contradictory hybrid labels ${hybBad}${nameEx.length ? ` [${nameEx.join("; ")}]` : ""}`,
+	);
 	out.push(
 		`position: hard conflicts ${hard}; hybrids ${pct(hyb, n)}%; pos x group ${JSON.stringify(posTab)}`,
 	);
@@ -617,6 +644,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 		);
 		mkdirSync(dirname(OUT), { recursive: true });
 		writeFileSync(OUT, out.join("\n") + "\n");
+		if (DUMP) writeFileSync(process.env.ARCH_DIAG_DUMP, JSON.stringify(DUMP));
 	},
 	1800000,
 );

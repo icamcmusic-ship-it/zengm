@@ -50,6 +50,9 @@ export const ratingsForArchetype = (
 	return out;
 };
 
+// His position as the game shows it now
+const posNow = (p: Player): unknown => (last(p.ratings) as any)?.pos;
+
 let normsCache: { key: string; norms: Norms } | undefined;
 
 export const resetArchetypeNorms = () => {
@@ -192,7 +195,8 @@ export const archetypeFor = (
 	const isProspect =
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
 	const entry = isProspect ? undefined : currentEntry(p.archetypes);
-	const v = viewOf(entry);
+	// An entry his position no longer allows (stored by an older version) is read live until the next preseason
+	const v = viewOf(entry, posNow(p));
 	if (v) {
 		return { view: v, stored: true };
 	}
@@ -217,7 +221,10 @@ export const archetypeLabelAt = (
 	const isProspect =
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
 	if (!isProspect) {
-		const v = viewOf(currentEntry(p.archetypes, season));
+		const v = viewOf(
+			currentEntry(p.archetypes, season),
+			(p.ratings as any[]).findLast((r) => r.season <= season)?.pos,
+		);
 		if (v) {
 			return v.label;
 		}
@@ -253,7 +260,12 @@ export const archetypeInfoForPlayer = async (
 	const norms = await getLeagueNorms();
 	const isProspect =
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
-	if (!isProspect && p.tid !== PLAYER.RETIRED && !currentEntry(p.archetypes)) {
+	// No entry yet, or one that is no longer valid for his position (or an archetype that no longer exists): store a new one
+	if (
+		!isProspect &&
+		p.tid !== PLAYER.RETIRED &&
+		!viewOf(currentEntry(p.archetypes), posNow(p))
+	) {
 		const cached = await idb.cache.players.get(p.pid);
 		if (cached) {
 			storeArchetype(cached, norms);

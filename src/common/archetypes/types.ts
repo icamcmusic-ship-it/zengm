@@ -83,6 +83,8 @@ export type ArchetypeDef = {
 	age?: [number, number];
 	// Rare "unicorn" types are not expected to be filled in every league
 	rare?: true;
+	// The positions he must play to get this label (a hard gate). All nine for the few universal (role) archetypes.
+	positions: Pos[];
 	// Position prior overrides on top of the group's (see position.ts): z nudge per position, null = never
 	pos?: Partial<Record<Pos, number | null>>;
 	tags: string[];
