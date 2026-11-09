@@ -43,6 +43,10 @@ export const featureForUrl = (
 			return "storylines";
 		case "hype":
 			return "hype";
+		case "best_games":
+			return "bestGames";
+		case "award_vote":
+			return "awardVote";
 		case "league_achievements":
 			return "leagueAchievements";
 		case "trade_grader":

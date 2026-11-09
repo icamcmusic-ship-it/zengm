@@ -103,6 +103,42 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "bestGames",
+		key: "featureBestGames",
+		name: "Best Games & Top Plays",
+		description:
+			"The season's and all-time best games ranked by the post-game rating, with the reasons, and the top plays (game-winners, buzzer-beaters, big blocks, runs) from saved play-by-play, or from the clutch plays when no play-by-play is saved.",
+		default: true,
+		sports: BBGM,
+	},
+	{
+		id: "awardVote",
+		key: "featureAwardVote",
+		name: "Award Vote",
+		description:
+			"A simulated media vote (100 voters, NBA ballot points, voter noise and narratives) for MVP, DPOY, ROY, 6MOY, MIP and the All-League teams: a projected vote during the season and the full breakdown for past seasons. Does not change who wins unless the option below is on.",
+		default: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "featureAwardVoteStore",
+				name: "Save Award Votes",
+				description:
+					"When awards are given, save the simulated vote with them so past seasons show the same breakdown.",
+				type: "bool",
+				default: true,
+			},
+			{
+				key: "featureAwardVoteDecides",
+				name: "Simulated Vote Decides Awards",
+				description:
+					"Give MVP, DPOY, ROY, 6MOY, MIP and other league-wide player awards to the winner of the simulated vote instead of the best formula score.",
+				type: "bool",
+				default: false,
+			},
+		],
+	},
+	{
 		id: "leagueAchievements",
 		key: "featureLeagueAchievements",
 		name: "League Achievements",

@@ -23,9 +23,10 @@ Pages that belong with an original BBGM page are tabs of that page: a tab bar at
 | Jersey Numbers   | League, By Team                                 |
 | Player Ratings   | Ratings, Archetypes, Skill Badges               |
 | League History   | History, Timeline, Coaches                      |
-| Daily Schedule   | Schedule, Games to Watch                        |
+| Daily Schedule   | Schedule, Games to Watch, Best Games            |
 | Head-to-Head     | Head-to-Head, Rivalries                         |
 | Playoffs         | Playoffs, Series Recaps                         |
+| Award Races      | Award Races, Award Vote                         |
 
 Other pages are still reached from _More_ links: League Achievements (League Stats / History group) and Coaching Staff (team pages and the Team menu).
 
@@ -37,6 +38,8 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Wrapped](#wrapped)                                                 | League → Wrapped                                                 | bball  | `featureWrapped`                          | on / on                       |
 | [Storylines](#storylines)                                           | League → Storylines                                              | bball  | `featureStorylines`                       | on / on                       |
 | [Games to Watch](#games-to-watch-hype)                              | League → Games to Watch, dashboard, schedules                    | bball  | `featureHype`                             | on / on                       |
+| [Best games & top plays](#best-games--top-plays)                    | Daily Schedule → Best Games tab                                  | bball  | `featureBestGames`                        | on / on                       |
+| [Award vote](#award-vote)                                           | Award Races → Award Vote tab                                     | bball  | `featureAwardVote`                        | on / on                       |
 | [League achievements](#league-achievements)                         | League → League achievements, dashboard                          | bball  | `featureLeagueAchievements`               | on / on                       |
 | [Trade grader](#trade-grader)                                       | League → Trade Grader, trade summaries                           | bball  | `featureTradeGrader`                      | on / on                       |
 | [Contract value](#contract-value)                                   | League → Contract Value, player pages                            | bball  | `featureContractValue`                    | on / on                       |
@@ -173,6 +176,19 @@ Tests in `src/common/nativeFeatures.test.ts` check that every key has a default 
 - **Scale:** raw points map to 0–100 through percentile knots measured on simulated games, so both scores spread over the range: about half of all games under 50, one in twenty 85 or more, one in twenty 20 or less (playoff games sit higher). The tables are `src/common/hype/calibration.generated.ts`, made by `tools/hypeCalibration/calibrate.ts` from seasons simmed in node by `src/worker/util/hypeCalibration.test.ts` (off unless `HYPE_CAL_OUT` is set; see the file headers); `bbgm.hypeCalibrationDump(season)` in the worker console dumps a real league's season in the same format.
 - **Verdict:** _Better than billed_ when the rating beat the hype by 20+, _Didn't live up to it_ when it fell 20+ short, else _Lived up_ (rating 50+) or _A quiet one_; the text gives both numbers and the biggest reasons (plus what happened to the pre-game story lines).
 - **Known limits:** record chases need a few seasons of history. Schedule badges are only computed for the next 8 games. Career highs are not detected (box scores of whole careers are not kept); late-game flow is read from period scores and clutch plays, not play-by-play. The calibration leagues are random-players leagues simmed with the default settings.
+
+### Best games & top plays
+
+- **Where:** _Best Games_ tab of Daily Schedule, `/l/:lid/best_games/:season` (`all` for all time).
+- **What:** the season's (or all time's) best games ranked by the Games to Watch post-game rating (`src/common/hype`, the box score's "How it played out" score) with its reasons, and the top plays: game-winners, buzzer-beaters, late go-ahead and tying shots, defensive stops (blocks and steals in the last 24 seconds of a one-possession game), posters, alley-oops, dunks, chase-down blocks, pick-sixes, heaves, and the plays that capped big runs. Plays are read from the saved play-by-play (`storePlayByPlay`) and worded by the play-by-play flavor layer, so they read like they did live; games without saved play-by-play contribute their clutch plays from the box score instead (with play-by-play saving off, all plays come from there). Ported from League Explorer's bestgames.js / topplays.js / pbp-analysis.js; code in `src/common/bestPlays` and `src/worker/util/bestGamesData.ts`.
+- **Known limits:** for speed, play-by-play is read for at most 120 games a season (the best-rated ones and every game with a clutch play). All time = the best of each season with stored box scores.
+
+### Award vote
+
+- **Where:** _Award Vote_ tab of Award Races, `/l/:lid/award_vote/:season`.
+- **What:** a simulated media vote for every league-wide regular-season award (MVP, DPOY, ROY, 6MOY, MIP, All-League, All-Defensive, All-Rookie and custom ones): 100 voters, NBA ballot points (MVP 10-7-5-3-1, other player awards 5-3-1, team awards 5/3/1 for a 1st/2nd/3rd team vote), each voter weighing the award formula, team record and scoring differently, plus availability, fatigue with the defending winner, a shared media narrative per candidate (moves the whole electorate together) and personal noise, all in units of the spread of the candidates' scores (`VOTE_PARAMS`). Calibrated on 20 seasons of a real simulated league (`awardVoteDump.test.ts` dumps, `awardVote.calibration.test.ts` reports): the MVP winner's first-place votes are typically 55–97 (median 72), unanimous votes are rare, the runner-up often gets 15–40 first-place votes, and 8–14 players get votes. Shows votes per place, points, ballot share and the narratives that helped or hurt. During the season it is the projected vote if the season ended today. Ported from League Explorer's awardvote.js; code in `src/common/awardVote` and `src/worker/core/awards/simVote.ts`.
+- **Saved votes:** with `featureAwardVoteStore` (on) the vote is saved with the season's awards (`awards.simVote`) when they are given, so past seasons show the same breakdown; seasons without one show a vote reconstructed from the winners.
+- **Deciding awards:** off by default, the vote is nudged to agree with the formula's winners and never changes who wins. With `featureAwardVoteDecides` on, individual league-wide awards go to the vote's winner (team awards still use the formula).
 
 ### League achievements
 

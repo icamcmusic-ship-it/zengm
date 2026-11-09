@@ -9,6 +9,8 @@ export const CONSOLIDATED_PAGES = [
 	{ path: "timeline", home: "history_all", moreLinks: "league" },
 	{ path: "archetypes", home: "player_ratings", moreLinks: "playerRatings" },
 	{ path: "hype", home: "daily_schedule", moreLinks: "schedule" },
+	{ path: "best_games", home: "daily_schedule", moreLinks: "schedule" },
+	{ path: "award_vote", home: "award_races", moreLinks: "awards" },
 	{ path: "draft_board", home: "draft_scouting", moreLinks: "draft" },
 	{ path: "mock_draft", home: "draft_scouting", moreLinks: "draft" },
 ] as const;
