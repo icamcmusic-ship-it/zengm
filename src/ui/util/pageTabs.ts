@@ -125,6 +125,21 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 			url: ["hype"],
 			basketballOnly: true,
 		},
+		{
+			id: "bestGames",
+			name: "Best Games",
+			url: ["best_games"],
+			basketballOnly: true,
+		},
+	],
+	[
+		{ id: "awardRaces", name: "Award Races", url: ["award_races"] },
+		{
+			id: "awardVote",
+			name: "Award Vote",
+			url: ["award_vote"],
+			basketballOnly: true,
+		},
 	],
 ];
 

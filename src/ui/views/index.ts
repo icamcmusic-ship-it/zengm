@@ -126,6 +126,8 @@ export { default as WrappedCompare } from "./WrappedCompare.tsx";
 export { default as Storylines } from "./Storylines/index.tsx";
 export { default as Archetypes } from "./Archetypes.tsx";
 export { default as Hype } from "./Hype.tsx";
+export { default as BestGames } from "./BestGames.tsx";
+export { default as AwardVote } from "./AwardVote.tsx";
 export { default as Timeline } from "./Timeline.tsx";
 export { default as LeagueExtras } from "./LeagueExtras.tsx";
 export { default as FaceStyleGallery } from "./FaceStyleGallery.tsx";

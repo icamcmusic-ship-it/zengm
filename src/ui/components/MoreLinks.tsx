@@ -277,6 +277,7 @@ export const MoreLinks = (
 		if (__SPORT === "basketball") {
 			const y = season ?? currentSeason;
 			links.push(
+				{ url: ["award_vote", season], name: "Award Vote" },
 				{ url: ["newspaper", "all", y], name: "Newspaper" },
 				{ url: ["wrapped", "season", y], name: "Wrapped" },
 				{ url: ["storylines", "all", "all", y], name: "Storylines" },
@@ -412,7 +413,10 @@ export const MoreLinks = (
 	} else if (props.type === "schedule") {
 		links = [{ url: ["schedule"], name: "Team Schedule" }];
 		if (__SPORT === "basketball") {
-			links.push({ url: ["hype"], name: "Games to Watch" });
+			links.push(
+				{ url: ["hype"], name: "Games to Watch" },
+				{ url: ["best_games"], name: "Best Games" },
+			);
 		}
 	} else if (props.type === "globalSettings") {
 		links = [

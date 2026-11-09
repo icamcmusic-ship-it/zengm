@@ -241,6 +241,34 @@ export const awardsSchema = z.object({
 	bestRecordDivs: z.record(z.number(), z.number()), // <did, tid>
 
 	awards: z.array(awardSchema),
+
+	// League extras (Award Vote): the simulated media vote saved when the awards were given, see src/common/awardVote
+	simVote: z
+		.array(
+			z.object({
+				shortName: z.string(),
+				name: z.string(),
+				kind: z.enum(["mvp", "player", "team"]),
+				voters: z.number(),
+				points: z.array(z.number()),
+				places: z.array(z.string()),
+				rows: z.array(
+					z.object({
+						pid: z.number(),
+						tid: z.number(),
+						name: z.string(),
+						rank: z.number(),
+						votes: z.array(z.number()),
+						first: z.number(),
+						pts: z.number(),
+						share: z.number(),
+						narratives: z.array(z.string()),
+						tm: z.number().optional(),
+					}),
+				),
+			}),
+		)
+		.optional(),
 });
 
 export type Award = z.infer<typeof awardSchema>;
