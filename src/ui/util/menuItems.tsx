@@ -12,6 +12,7 @@ import type {
 	MenuItemText,
 } from "../../common/types.ts";
 import { frivolities } from "../views/Frivolities.tsx";
+import { isFrivolitiesTabPage } from "./pageTabs.ts";
 import { takeScreenshot } from "./takeScreenshot.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 
@@ -938,7 +939,8 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				: []),
 			{
 				type: "link",
-				active: (pageID) => pageID === "frivolities",
+				active: (pageID) =>
+					pageID === "frivolities" || isFrivolitiesTabPage(pageID),
 				league: true,
 				commandPalette: true,
 				path: ["frivolities"],

@@ -110,14 +110,16 @@ const PickValueLoaded = ({
 			V
 				? V.slots
 						.filter((s) => s.n > 0)
-						.map((s): ChartRow => ({
-							x: s.pick,
-							mean: s.mean,
-							median: s.median,
-							p25: s.p25,
-							p75: s.p75,
-							n: s.n,
-						}))
+						.map(
+							(s): ChartRow => ({
+								x: s.pick,
+								mean: s.mean,
+								median: s.median,
+								p25: s.p25,
+								p75: s.p75,
+								n: s.n,
+							}),
+						)
 				: [],
 		[V],
 	);
@@ -160,7 +162,6 @@ const PickValueLoaded = ({
 				{V.classes === 1 ? "" : "es"}, {V.numPicks} picks with {V.mature}+
 				seasons played since). Career regular season win shares; a pick who
 				never played counts as 0. More:{" "}
-				<a href={helpers.leagueUrl(["frivolities", "redraft"])}>Redraft</a> |{" "}
 				<a href={helpers.leagueUrl(["frivolities", "draft_position"])}>
 					Best Player at Every Pick
 				</a>

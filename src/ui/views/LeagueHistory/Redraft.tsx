@@ -208,10 +208,6 @@ const RedraftLoaded = (props: Loaded) => {
 				today. More:{" "}
 				<a href={helpers.leagueUrl(["draft_history", cls.year])}>
 					{cls.year} Draft History
-				</a>{" "}
-				|{" "}
-				<a href={helpers.leagueUrl(["frivolities", "pick_value"])}>
-					Draft Pick Value
 				</a>
 			</p>
 

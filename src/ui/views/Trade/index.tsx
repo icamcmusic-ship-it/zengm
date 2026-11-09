@@ -52,7 +52,6 @@ const TradeSideText = ({
 };
 
 const Trade = (props: View<"trade">) => {
-	const threeOn = useFeatureOn("threeTeamTrades");
 	const pickConditionsOn = useFeatureOn("draftPickConditions");
 	const [state, setState] = useState({
 		accepted: false,
@@ -456,15 +455,8 @@ const Trade = (props: View<"trade">) => {
 							{otl > 0 ? <>-{otl}</> : null}
 							{tied > 0 ? <>-{tied}</> : null}, {strategy}
 						</div>
-						{threeOn ? (
-							<a
-								className="ms-auto me-2 text-nowrap"
-								href={helpers.leagueUrl(["trade_three"])}
-							>
-								3-team trade
-							</a>
-						) : null}
 						<SaveTrade
+							className="ms-auto"
 							tradeTeams={[
 								{
 									pids: userPids,
