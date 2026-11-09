@@ -6,7 +6,7 @@ import fs from "node:fs";
 import GameSim from "../GameSim.basketball/index.ts";
 import { player, team } from "../index.ts";
 import loadTeams from "../game/loadTeams.ts";
-import { g, helpers } from "../../util/index.ts";
+import { g, helpers, local } from "../../util/index.ts";
 import { resetCache, resetG } from "../../../test/helpers.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { range } from "../../../common/utils.ts";
@@ -53,6 +53,8 @@ const run = (seed: number) =>
 		g.setWithoutSavingToDB("season", 2013);
 		g.setWithoutSavingToDB("expandedRatings" as any, false);
 		await resetCache({});
+		// Other test files sharing this worker can leave league state behind (player value normalization)
+		local.reset();
 
 		// New league players and draft prospects, developed a few seasons
 		const players: any[] = [
