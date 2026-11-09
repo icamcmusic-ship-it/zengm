@@ -2577,13 +2577,18 @@ export const augmentOffers = async (offers: TradeTeams[]) => {
 				dpidsUser: offerRaw[0].dpids,
 				payroll,
 				pickConditions: offerRaw[1].pickConditions,
+				pickConditionsUser: offerRaw[0].pickConditions,
 				picks: await formatPicks(
 					tid,
 					offerRaw[1].dpids,
 					offerRaw[1].pickConditions,
 				),
 				players: await formatPlayers(tid, offerRaw[1].pids),
-				picksUser: await formatPicks(g.get("userTid"), offerRaw[0].dpids),
+				picksUser: await formatPicks(
+					g.get("userTid"),
+					offerRaw[0].dpids,
+					offerRaw[0].pickConditions,
+				),
 				playersUser: await formatPlayers(g.get("userTid"), offerRaw[0].pids),
 				summary: await getSummary(offerRaw),
 			};

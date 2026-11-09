@@ -8,6 +8,8 @@ import type {
 } from "../../../common/types.ts";
 import isUntradable from "./isUntradable.ts";
 import {
+	getAcceptableProtections,
+	getProtectionLoosenings,
 	getTradePickConditions,
 	validatePickConditionSpec,
 } from "../../../common/draftPickConditions.ts";
@@ -43,7 +45,65 @@ type AssetPick = AssetBase & {
 	// AI pick conditions: the AI team gives this pick with a protection, or only the right to swap it
 	condition?: PickConditionSpec;
 };
-type Asset = AssetPlayer | AssetPick;
+// AI asks to change the terms on a pick the other team (teams[0]) already gives in this trade: loosen/remove its protection, or accept a new one
+type AssetPickTerms = AssetBase & {
+	type: "pickTerms";
+	dpid: number;
+	condition: PickConditionSpec | undefined;
+};
+type Asset = AssetPlayer | AssetPick | AssetPickTerms;
+
+// Replace the condition on one of teams[0]'s picks
+const applyPickTerms = (
+	teams: TradeTeams,
+	asset: Pick<AssetPickTerms, "dpid" | "condition">,
+) => {
+	const others = (teams[0].pickConditions ?? []).filter(
+		(c) => c.dpid !== asset.dpid,
+	);
+	const pickConditions = asset.condition
+		? [...others, { ...asset.condition, dpid: asset.dpid, tid: teams[1].tid }]
+		: others;
+	if (pickConditions.length > 0) {
+		teams[0].pickConditions = pickConditions;
+	} else {
+		delete teams[0].pickConditions;
+	}
+};
+
+// Changes the AI team (teams[1]) can ask for on teams[0]'s picks already in the trade. When it wants more, loosen protections the other team put on its picks; when it's getting more than it needs, accept a protection on an incoming 1st round pick.
+export const getPickTermsVariants = async (
+	teams: TradeTeams,
+	wantsMore: boolean,
+) => {
+	const variants: { dpid: number; condition: PickConditionSpec | undefined }[] =
+		[];
+	const numPicksPerRound = getNumPicksPerRound();
+	for (const dpid of teams[0].dpids) {
+		const existing = teams[0].pickConditions?.find((c) => c.dpid === dpid);
+		if (wantsMore) {
+			if (existing?.type === "protection") {
+				for (const condition of getProtectionLoosenings(existing)) {
+					variants.push({ dpid, condition });
+				}
+			}
+		} else if (!existing) {
+			const dp = await idb.cache.draftPicks.get(dpid);
+			if (!dp) {
+				continue;
+			}
+			for (const condition of getAcceptableProtections(numPicksPerRound)) {
+				if (
+					validatePickConditionSpec(condition, dp, numPicksPerRound) ===
+					undefined
+				) {
+					variants.push({ dpid, condition });
+				}
+			}
+		}
+	}
+	return variants;
+};
 
 // Protections the AI uses on its own 1st round picks: varying top-N, rollovers, and what happens when they run out
 export const AI_PROTECTION_MENU: Omit<
@@ -277,6 +337,22 @@ const tryAddAsset = async (
 		}
 	}
 
+	// Ask for different terms on the other team's picks (draftPickConditions setting). Giving back value through new protections on the user's picks is only for when the user's side can change.
+	if (featureOn("draftPickConditions")) {
+		const wantsMore = prevDv <= 0;
+		if (wantsMore || !holdUserConstant) {
+			for (const v of await getPickTermsVariants(teams, wantsMore)) {
+				assets.push({
+					type: "pickTerms",
+					dv: 0,
+					score: 0,
+					tid: teams[0].tid,
+					...v,
+				});
+			}
+		}
+	}
+
 	// If there are no more to try, stop
 	if (assets.length === 0) {
 		return;
@@ -290,7 +366,11 @@ const tryAddAsset = async (
 		const otherDpids = teams[1].dpids.slice();
 		let pickConditions = getTradePickConditions(teams);
 
-		if (asset.type === "player") {
+		if (asset.type === "pickTerms") {
+			const newTeams = helpers.deepCopy(teams);
+			applyPickTerms(newTeams, asset);
+			pickConditions = getTradePickConditions(newTeams);
+		} else if (asset.type === "player") {
 			if (asset.tid === teams[0].tid) {
 				userPids.push(asset.p.pid);
 			} else {
@@ -440,7 +520,9 @@ const tryAddAsset = async (
 	}
 
 	const newTeams = helpers.deepCopy(teams);
-	if (asset.type === "player") {
+	if (asset.type === "pickTerms") {
+		applyPickTerms(newTeams, asset);
+	} else if (asset.type === "player") {
 		if (asset.tid === newTeams[0].tid) {
 			newTeams[0].pids.push(asset.p.pid);
 		} else {

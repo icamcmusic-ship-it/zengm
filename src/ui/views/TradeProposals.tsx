@@ -95,9 +95,11 @@ const TradeProposals = ({ aiOffers, offers, seed }: View<"tradeProposals">) => {
 		pidsUser: number[];
 		tid: number;
 		pickConditions?: TradePickCondition[];
+		pickConditionsUser?: TradePickCondition[];
 	}) => {
 		await toWorker("actions", "tradeFor", {
 			otherPickConditions: offer.pickConditions,
+			userPickConditions: offer.pickConditionsUser,
 			otherDpids: offer.dpids,
 			otherPids: offer.pids,
 			tid: offer.tid,
