@@ -72,6 +72,7 @@ import {
 	type PlayerWithoutKey,
 	type UpdateEvent,
 	type UpdateEvents,
+	type TradePickCondition,
 	type TradeTeams,
 	type PickConditionSpec,
 	type MinimalPlayerRatings,
@@ -173,7 +174,10 @@ import * as draftDay from "../core/draft/draftDay.ts";
 import { actualPhase } from "../util/actualPhase.ts";
 import { getCol } from "../../common/getCol.ts";
 import { getCols } from "../../common/getCols.ts";
-import { validatePickConditionSpec } from "../../common/draftPickConditions.ts";
+import {
+	conditionSpecText,
+	validatePickConditionSpec,
+} from "../../common/draftPickConditions.ts";
 import { getNumPicksPerRound } from "../core/trade/getPickValues.ts";
 import { formatScheduleForEditor } from "../views/scheduleEditor.ts";
 import type { KeyboardShortcutsLocal } from "../../ui/util/keyboardShortcuts.ts";
@@ -2504,15 +2508,25 @@ export const augmentOffers = async (offers: TradeTeams[]) => {
 				throw new Error("No team found");
 			}
 
-			const formatPicks = async (tid: number, dpids: number[]) => {
+			const formatPicks = async (
+				tid: number,
+				dpids: number[],
+				pickConditions?: TradePickCondition[],
+			) => {
 				let picks = await idb.merged.draftPicks.getAll({ tid });
 				picks = picks.filter((dp) => dpids.includes(dp.dpid));
 
 				return await Promise.all(
 					picks.map(async (dp) => {
+						let desc = await helpers.pickDesc(dp, "short");
+						// AI offers can give picks with a new protection or only swap rights
+						const condition = pickConditions?.find((c) => c.dpid === dp.dpid);
+						if (condition) {
+							desc += ` (${conditionSpecText(condition)})`;
+						}
 						return {
 							...dp,
-							desc: await helpers.pickDesc(dp, "short"),
+							desc,
 						};
 					}),
 				);
@@ -2562,7 +2576,12 @@ export const augmentOffers = async (offers: TradeTeams[]) => {
 				pidsUser: offerRaw[0].pids,
 				dpidsUser: offerRaw[0].dpids,
 				payroll,
-				picks: await formatPicks(tid, offerRaw[1].dpids),
+				pickConditions: offerRaw[1].pickConditions,
+				picks: await formatPicks(
+					tid,
+					offerRaw[1].dpids,
+					offerRaw[1].pickConditions,
+				),
 				players: await formatPlayers(tid, offerRaw[1].pids),
 				picksUser: await formatPicks(g.get("userTid"), offerRaw[0].dpids),
 				playersUser: await formatPlayers(g.get("userTid"), offerRaw[0].pids),

@@ -3,7 +3,7 @@ import { useFeatureOn } from "../util/nativeFeatures.ts";
 import { PHASE } from "../../common/constants.ts";
 import { helpers } from "../util/helpers.ts";
 import useTitleBar from "../hooks/useTitleBar.tsx";
-import type { View } from "../../common/types.ts";
+import type { TradePickCondition, View } from "../../common/types.ts";
 import { SummaryTeam } from "./Trade/Summary.tsx";
 import { toWorker } from "../util/toWorker.ts";
 import { useLocal } from "../util/local.ts";
@@ -94,8 +94,10 @@ const TradeProposals = ({ aiOffers, offers, seed }: View<"tradeProposals">) => {
 		pids: number[];
 		pidsUser: number[];
 		tid: number;
+		pickConditions?: TradePickCondition[];
 	}) => {
 		await toWorker("actions", "tradeFor", {
+			otherPickConditions: offer.pickConditions,
 			otherDpids: offer.dpids,
 			otherPids: offer.pids,
 			tid: offer.tid,

@@ -1,4 +1,6 @@
-import { featureOffError } from "../util/nativeFeatures.ts";
+import { featureOffError, featureOn } from "../util/nativeFeatures.ts";
+import { validatePickConditionSpec } from "../../common/draftPickConditions.ts";
+import { getNumPicksPerRound } from "../core/trade/getPickValues.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { player } from "../core/index.ts";
@@ -9,6 +11,9 @@ import {
 	AVAILABLE_THRESHOLD,
 	getAskingPrice,
 	getAvailability,
+	getProtectedPickNote,
+	MARKET_PROTECTION,
+	withProtectedNote,
 } from "../core/trade/market.ts";
 import { ValueChangeCalculator } from "../core/team/ValueChangeCalculator.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
@@ -40,6 +45,23 @@ export default defineView({
 		const valueChangeCalculator = new ValueChangeCalculator({ quick: true });
 
 		const rows = [];
+
+		// The user's next 1st round pick without conditions, to price a protected one
+		const userFirst = orderBy(
+			(
+				await idb.cache.draftPicks.indexGetAll("draftPicksByTid", userTid)
+			).filter(
+				(dp) =>
+					dp.round === 1 &&
+					typeof dp.season === "number" &&
+					validatePickConditionSpec(
+						{ type: "protection", ...MARKET_PROTECTION },
+						dp,
+						getNumPicksPerRound(),
+					) === undefined,
+			),
+			"season",
+		)[0];
 		for (const t of teams) {
 			const players = orderBy(
 				await idb.cache.players.indexGetAll("playersByTid", t.tid),
@@ -91,6 +113,40 @@ export default defineView({
 				}));
 			}
 
+			// Draft pick conditions: how much a protected first from the user counts for, compared to an unprotected one
+			let protectedNote = "";
+			if (featureOn("draftPickConditions") && userFirst) {
+				const unprotected = await valueChangeCalculator.evaluate({
+					tid: t.tid,
+					pidsAdd: [],
+					pidsRemove: [],
+					dpidsAdd: [userFirst.dpid],
+					dpidsRemove: [],
+					tradingPartnerTid: userTid,
+				});
+				const protectedValue = await valueChangeCalculator.evaluate({
+					tid: t.tid,
+					pidsAdd: [],
+					pidsRemove: [],
+					dpidsAdd: [userFirst.dpid],
+					dpidsRemove: [],
+					tradingPartnerTid: userTid,
+					pickConditions: [
+						{
+							type: "protection",
+							...MARKET_PROTECTION,
+							dpid: userFirst.dpid,
+							tid: t.tid,
+						},
+					],
+				});
+				protectedNote = getProtectedPickNote(
+					protectedValue,
+					unprotected,
+					MARKET_PROTECTION.top,
+				);
+			}
+
 			const formatted = addFirstNameShort(
 				await player.formatAll(
 					available.map((row) => row.p),
@@ -131,7 +187,10 @@ export default defineView({
 					strategy: t.strategy,
 					availability: row.availability.score,
 					reasons: row.availability.reasons,
-					askingPrice: getAskingPrice(loss, pickValue, t.strategy),
+					askingPrice: withProtectedNote(
+						getAskingPrice(loss, pickValue, t.strategy),
+						protectedNote,
+					),
 				});
 			}
 		}

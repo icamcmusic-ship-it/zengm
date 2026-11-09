@@ -142,3 +142,30 @@ export const getAskingPrice = (
 		text: `Very high: a haul of ${wants}`,
 	};
 };
+
+// The protection used to price a protected first round pick on the Trade Market (draftPickConditions setting)
+export const MARKET_PROTECTION = {
+	top: 5,
+	rollover: [5],
+	then: "unprotected" as const,
+};
+
+// protectedValue and unprotectedValue: how much the team gains from getting the pick with and without the protection
+export const getProtectedPickNote = (
+	protectedValue: number,
+	unprotectedValue: number,
+	top: number,
+) => {
+	if (!(unprotectedValue > 0) || !(protectedValue > 0)) {
+		return "";
+	}
+	const pct = Math.round(
+		(100 * Math.min(protectedValue, unprotectedValue)) / unprotectedValue,
+	);
+	return `They'd take a top ${top} protected first as about ${pct}% of an unprotected one.`;
+};
+
+export const withProtectedNote = (askingPrice: AskingPrice, note: string) =>
+	note === "" || askingPrice.tier === "low"
+		? askingPrice
+		: { ...askingPrice, text: `${askingPrice.text}. ${note}` };

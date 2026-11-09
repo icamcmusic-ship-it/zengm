@@ -82,6 +82,14 @@ export const getDraftAdjustment = (
 	return Math.max(-MAX_ADJUSTMENT, Math.min(MAX_ADJUSTMENT, adj));
 };
 
+// Player traits: a prospect's trait factor (getAiTraitValueFactor, about 1 +- 0.07) as value points, capped so traits only break near-ties
+export const DRAFT_TRAIT_MAX_ADJ = 1.5;
+export const getDraftTraitAdjustment = (value: number, traitFactor: number) =>
+	Math.max(
+		-DRAFT_TRAIT_MAX_ADJ,
+		Math.min(DRAFT_TRAIT_MAX_ADJ, Math.max(0, value) * (traitFactor - 1)),
+	);
+
 export const getNeedLabels = (needs: TeamNeeds) => {
 	const names: Record<Group, string> = {
 		G: "Guard",

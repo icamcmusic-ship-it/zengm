@@ -2,7 +2,11 @@ import { PHASE } from "../../common/constants.ts";
 import { draft, game, season, trade } from "../core/index.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers, toUI, updateStatus } from "../util/index.ts";
-import type { Conditions, TradeTeams } from "../../common/types.ts";
+import type {
+	Conditions,
+	TradePickCondition,
+	TradeTeams,
+} from "../../common/types.ts";
 
 type TradeForOptions = {
 	dpid?: number;
@@ -12,6 +16,8 @@ type TradeForOptions = {
 	tid?: number;
 	userDpids?: number[];
 	userPids?: number[];
+	// Conditions on the other team's picks (an AI trade offer with protections or swap rights)
+	otherPickConditions?: TradePickCondition[];
 };
 
 const tradeFor = async (arg: TradeForOptions, conditions: Conditions) => {
@@ -87,6 +93,13 @@ const tradeFor = async (arg: TradeForOptions, conditions: Conditions) => {
 				pidsExcluded: [],
 				dpids: arg.otherDpids,
 				dpidsExcluded: [],
+				...(arg.otherPickConditions && arg.otherPickConditions.length > 0
+					? {
+							pickConditions: arg.otherPickConditions.filter((c) =>
+								arg.otherDpids!.includes(c.dpid),
+							),
+						}
+					: {}),
 			},
 		];
 	} else if (arg.tid !== undefined) {

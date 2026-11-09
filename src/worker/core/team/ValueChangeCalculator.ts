@@ -21,6 +21,11 @@ import type {
 	TradePickCondition,
 } from "../../../common/types.ts";
 import { getNumPicksPerRound } from "../trade/getPickValues.ts";
+import {
+	countMentees,
+	getAiTraitValueFactor,
+	traitsEnabled,
+} from "../player/traits.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { groupByUnique, last } from "../../../common/utils.ts";
 import {
@@ -275,6 +280,15 @@ const getPlayers = async ({
 	// Get players to remove
 	const players = await idb.cache.players.indexGetAll("playersByTid", tid);
 
+	// Player traits (setting): a small, bounded adjustment, the same for players coming in and going out so there is nothing to arbitrage. 1 with the setting off
+	const traitsOn = traitsEnabled();
+	const strategy = traitsOn
+		? (await idb.cache.teams.get(tid))?.strategy
+		: undefined;
+	const numYoung = traitsOn ? countMentees(players) : 0;
+	const traitFactor = (p: Player) =>
+		traitsOn ? getAiTraitValueFactor(p, { strategy, numYoung }) : 1;
+
 	for (const p of players) {
 		if (!pidsRemove.includes(p.pid)) {
 			continue;
@@ -285,7 +299,7 @@ const getPlayers = async ({
 		// Only apply fudge factor to positive assets
 		let fudgedValue = value;
 		if (fudgedValue > 0) {
-			fudgedValue *= fudgeFactor;
+			fudgedValue *= fudgeFactor * traitFactor(p);
 
 			// A team gets less for a player who publicly asked out
 			if (hasActiveTradeRequest(p)) {
@@ -319,7 +333,7 @@ const getPlayers = async ({
 			add.push({
 				type: "player",
 				pid: p.pid,
-				value,
+				value: value > 0 ? value * traitFactor(p) : value,
 				contractValue: getContractValue(contract, value),
 				injury: p.injury,
 				age: g.get("season") - p.born.year,
@@ -781,6 +795,8 @@ export const protectedTradeValue = (
 	pickProbs: number[],
 	tradeValues: number[],
 	protection: Pick<DraftPickProtection, "top" | "rollover" | "then">,
+	// Probability that what's owed instead (rollover pick or 2nd round pick) actually exists when it's due. If the original team no longer owns that pick, the obligation is extinguished
+	probFallbackDelivered: number = 1,
 ) => {
 	let conveyed = 0;
 	let probProtected = 0;
@@ -798,9 +814,57 @@ export const protectedTradeValue = (
 			? 0.6
 			: PROTECTED_FALLBACK_FACTOR[protection.then];
 	return {
-		tradeValue: conveyed + probProtected * fallbackFactor * total,
+		tradeValue:
+			conveyed + probProtected * fallbackFactor * probFallbackDelivered * total,
 		probConvey: 1 - probProtected,
 	};
+};
+
+// Chance that a pick still owned by the right team now will still be there when it's needed (it could be traded away later, which extinguishes a rollover or lapses a swap)
+export const CONDITION_SURVIVE_PROB = 0.9;
+
+// Probability that the pick owed instead of a protected one (rollover or 2nd round conversion) will be delivered. fallbackOwnerTid is the team that keeps the protected pick.
+export const getFallbackDeliveredProb = (
+	dp: Pick<DraftPick, "season" | "round" | "originalTid">,
+	protection: Pick<DraftPickProtection, "rollover" | "then">,
+	fallbackOwnerTid: number,
+	allPicks: DraftPick[],
+	tradedDpids: Set<number>,
+) => {
+	if (typeof dp.season !== "number") {
+		return 1;
+	}
+	let round;
+	if (protection.rollover.length > 0 || protection.then === "unprotected") {
+		round = dp.round;
+	} else if (protection.then === "secondRound") {
+		round = 2;
+	} else {
+		// Extinguished anyway
+		return 1;
+	}
+	const season = dp.season + 1;
+	const target = allPicks.find(
+		(x) =>
+			x.season === season &&
+			x.originalTid === dp.originalTid &&
+			x.round === round,
+	);
+	if (!target) {
+		// Not generated yet (beyond the future draft horizon), so it will be created with the original team
+		return allPicks.some((x) => x.season === season)
+			? 0
+			: CONDITION_SURVIVE_PROB;
+	}
+	if (
+		target.tid !== fallbackOwnerTid ||
+		target.protection ||
+		target.swap ||
+		tradedDpids.has(target.dpid)
+	) {
+		return 0;
+	}
+	return CONDITION_SURVIVE_PROB;
 };
 
 // Expected trade value of the better (or worse) of two independent picks
@@ -838,6 +902,7 @@ const getPickInfo = async (
 	tid: number,
 	tradingPartnerTid?: number,
 	condition?: TradePickCondition,
+	tradedDpids: Set<number> = new Set(),
 ): Promise<Asset> => {
 	const season =
 		dp.season === "fantasy" || dp.season === "expansion"
@@ -906,7 +971,22 @@ const getPickInfo = async (
 		const probs = asProbs(dist);
 		const tradeValues = roundTradeValues(probs);
 		if (protection) {
-			const result = protectedTradeValue(probs, tradeValues, protection);
+			// For a new condition, the team giving the pick away keeps it if protected. For an existing one, protection.tid is that team
+			const fallbackOwnerTid =
+				condition?.type === "protection" ? dp.tid : (protection.tid ?? dp.tid);
+			const probFallbackDelivered = getFallbackDeliveredProb(
+				dp,
+				protection,
+				fallbackOwnerTid,
+				await idb.cache.draftPicks.getAll(),
+				tradedDpids,
+			);
+			const result = protectedTradeValue(
+				probs,
+				tradeValues,
+				protection,
+				probFallbackDelivered,
+			);
 			value = tradeValueToValue(result.tradeValue);
 			probConvey = result.probConvey;
 		} else if (swapWithTid !== undefined && swapType !== undefined) {
@@ -918,7 +998,12 @@ const getPickInfo = async (
 					dp2.season === dp.season &&
 					dp2.round === dp.round,
 			);
-			if (otherPick) {
+			if (otherPick && tradedDpids.has(otherPick.dpid)) {
+				// The swapping team's own pick is moving in this trade, so the swap would lapse
+				if (swapType === "max") {
+					value = 0;
+				}
+			} else if (otherPick) {
 				const otherProbs = asProbs(
 					await getPickDistribution(
 						cache,
@@ -944,9 +1029,19 @@ const getPickInfo = async (
 					for (const [i, prob] of otherProbs.entries()) {
 						own += prob * otherTradeValues[i]!;
 					}
-					value = tradeValueToValue(Math.max(0, better - own));
+					value = tradeValueToValue(
+						CONDITION_SURVIVE_PROB * Math.max(0, better - own),
+					);
 				} else {
-					value = tradeValueToValue(better);
+					// The swap could still lapse, then this is just the pick itself
+					let unswapped = 0;
+					for (const [i, prob] of probs.entries()) {
+						unswapped += prob * tradeValues[i]!;
+					}
+					value = tradeValueToValue(
+						CONDITION_SURVIVE_PROB * better +
+							(1 - CONDITION_SURVIVE_PROB) * unswapped,
+					);
 				}
 			} else if (swapType === "max") {
 				value = 0;
@@ -1021,6 +1116,8 @@ const getPicks = async ({
 		(pickConditions ?? []).map((c) => [c.dpid, c]),
 	);
 
+	const tradedDpids = new Set([...dpidsAdd, ...dpidsRemove]);
+
 	// For each draft pick, estimate its value based on the recent performance of the team
 	if (dpidsAdd.length > 0 || dpidsRemove.length > 0) {
 		const rookieSalaries = draft.getRookieSalaries();
@@ -1040,6 +1137,7 @@ const getPicks = async ({
 				tid,
 				tradingPartnerTid,
 				conditionsByDpid.get(dpid),
+				tradedDpids,
 			);
 			add.push(pickInfo);
 		}
@@ -1059,6 +1157,7 @@ const getPicks = async ({
 				tid,
 				tradingPartnerTid,
 				conditionsByDpid.get(dpid),
+				tradedDpids,
 			);
 			remove.push(pickInfo);
 		}

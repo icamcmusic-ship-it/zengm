@@ -16,6 +16,8 @@ import {
 	mentorBonuses,
 	MENTEE_MAX_AGE,
 	TRAIT_KEYS,
+	aiTraitContractFactor,
+	aiTraitValueFactor,
 	type PlayerTraits,
 	type ScoutedTrait,
 	type TraitEffects,
@@ -283,3 +285,65 @@ export const getMentorBonuses = (
 	}
 	return output;
 };
+
+const HIDDEN_TRAIT_KEYS: ReadonlySet<TraitKey> = new Set(
+	TRAIT_KEYS.filter((key) => TRAIT_DEFINITIONS[key].visibility === "hidden"),
+);
+
+/**
+ * AI valuation: multiply a player's (positive) value by this. Exactly 1 when the Player Traits setting is off. AI teams know pros' true traits (they have
+ * scouts and medical staff), but a draft prospect is only known through the same fixed scouting error the default-budget user sees, with hidden traits
+ * counting half. Bounded to +-AI_TRAIT_MAX_ADJ and centered at 1 (see common/playerTraits/aiValue.ts).
+ */
+export const getAiTraitValueFactor = (
+	p: TraitPlayer & { pid: number },
+	{
+		strategy,
+		numYoung,
+		contract = false,
+		season = g.get("season"),
+	}: {
+		strategy?: "contending" | "rebuilding";
+		numYoung?: number;
+		// Contract demands: damped, no team context
+		contract?: boolean;
+		season?: number;
+	} = {},
+) => {
+	if (!traitsEnabled()) {
+		return 1;
+	}
+	const isProspect = p.tid === PLAYER.UNDRAFTED;
+	let scores = getPlayerTraitScores(p, season);
+	if (isProspect) {
+		const experience = getTraitExperience(p, season);
+		const scouted = {} as TraitScores;
+		for (const key of TRAIT_KEYS) {
+			scouted[key] = scoutTrait({
+				key,
+				trueScore: scores[key],
+				sd: traitUncertainty({ key, isProspect, experience }),
+				leagueSeed: getLeagueTraitSeed(),
+				pid: p.pid,
+			}).estimate;
+		}
+		scores = scouted;
+	}
+	const context = {
+		age: getAge(p, season),
+		strategy,
+		numYoung,
+		isProspect,
+		hiddenKeys: HIDDEN_TRAIT_KEYS,
+	};
+	const ratings = last(p.ratings);
+	return contract
+		? aiTraitContractFactor(scores, ratings, context)
+		: aiTraitValueFactor(scores, ratings, context);
+};
+
+// Number of a team's players young enough to be mentored, for getAiTraitValueFactor
+export const countMentees = (
+	players: { born: { year: number } }[],
+	season = g.get("season"),
+) => players.filter((p) => season - p.born.year <= MENTEE_MAX_AGE).length;
