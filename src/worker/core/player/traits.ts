@@ -17,8 +17,10 @@ import {
 	mentorBonuses,
 	MENTEE_MAX_AGE,
 	TRAIT_KEYS,
-	aiTraitContractFactor,
-	aiTraitValueFactor,
+	aiTraitContractFactorFromSum,
+	aiTraitSumFromZs,
+	aiTraitValueFactorFromSum,
+	residualTraitZs,
 	type PlayerTraits,
 	type ScoutedTrait,
 	type TraitEffects,
@@ -301,29 +303,19 @@ const HIDDEN_TRAIT_KEYS: ReadonlySet<TraitKey> = new Set(
 	TRAIT_KEYS.filter((key) => TRAIT_DEFINITIONS[key].visibility === "hidden"),
 );
 
-/**
- * AI valuation: multiply a player's (positive) value by this. Exactly 1 when the Player Traits setting is off. AI teams know pros' true traits (they have
- * scouts and medical staff), but a draft prospect is only known through the same fixed scouting error the default-budget user sees, with hidden traits
- * counting half. Bounded to +-AI_TRAIT_MAX_ADJ and centered at 1 (see common/playerTraits/aiValue.ts).
- */
-export const getAiTraitValueFactor = (
+type AiTraitValueOptions = {
+	strategy?: "contending" | "rebuilding";
+	numYoung?: number;
+	// Contract demands: damped, no team context
+	contract?: boolean;
+	season?: number;
+};
+
+// The part of getAiTraitValueFactor that only depends on the player (not on the team valuing him)
+const prepareAiTraitValue = (
 	p: TraitPlayer & { pid: number },
-	{
-		strategy,
-		numYoung,
-		contract = false,
-		season = g.get("season"),
-	}: {
-		strategy?: "contending" | "rebuilding";
-		numYoung?: number;
-		// Contract demands: damped, no team context
-		contract?: boolean;
-		season?: number;
-	} = {},
+	season: number,
 ) => {
-	if (!traitsEnabled()) {
-		return 1;
-	}
 	const isProspect = p.tid === PLAYER.UNDRAFTED;
 	let scores = getPlayerTraitScores(p, season);
 	if (isProspect) {
@@ -340,17 +332,77 @@ export const getAiTraitValueFactor = (
 		}
 		scores = scouted;
 	}
-	const context = {
+	return {
+		scores,
+		zs: residualTraitZs(scores, last(p.ratings)),
 		age: getAge(p, season),
+		isProspect,
+	};
+};
+
+const aiTraitValueFromPrepared = (
+	prepared: ReturnType<typeof prepareAiTraitValue>,
+	{ strategy, numYoung, contract = false }: AiTraitValueOptions,
+) => {
+	const sum = aiTraitSumFromZs(prepared.zs, prepared.scores, {
+		age: prepared.age,
 		strategy,
 		numYoung,
-		isProspect,
+		isProspect: prepared.isProspect,
 		hiddenKeys: HIDDEN_TRAIT_KEYS,
-	};
-	const ratings = last(p.ratings);
+	});
 	return contract
-		? aiTraitContractFactor(scores, ratings, context)
-		: aiTraitValueFactor(scores, ratings, context);
+		? aiTraitContractFactorFromSum(sum)
+		: aiTraitValueFactorFromSum(sum);
+};
+
+/**
+ * AI valuation: multiply a player's (positive) value by this. Exactly 1 when the Player Traits setting is off. AI teams know pros' true traits (they have
+ * scouts and medical staff), but a draft prospect is only known through the same fixed scouting error the default-budget user sees, with hidden traits
+ * counting half. Bounded to +-AI_TRAIT_MAX_ADJ and centered at 1 (see common/playerTraits/aiValue.ts).
+ */
+export const getAiTraitValueFactor = (
+	p: TraitPlayer & { pid: number },
+	options: AiTraitValueOptions = {},
+) => {
+	if (!traitsEnabled()) {
+		return 1;
+	}
+	return aiTraitValueFromPrepared(
+		prepareAiTraitValue(p, options.season ?? g.get("season")),
+		options,
+	);
+};
+
+// getAiTraitValueFactor with the per-player part remembered (per player object). Only for a short scope in which
+// nobody's ratings or traits change (one AI trade pass, one free agency pass, one view request): AI trades and free
+// agency value the same players many times over, for many teams.
+export const makeAiTraitValueFactorCache = () => {
+	const cache = new WeakMap<
+		object,
+		Map<string, ReturnType<typeof prepareAiTraitValue>>
+	>();
+	return (
+		p: TraitPlayer & { pid: number },
+		options: AiTraitValueOptions = {},
+	) => {
+		if (!traitsEnabled()) {
+			return 1;
+		}
+		const season = options.season ?? g.get("season");
+		const key = `${season}|${p.tid === PLAYER.UNDRAFTED ? 1 : 0}`;
+		let byKey = cache.get(p);
+		if (!byKey) {
+			byKey = new Map();
+			cache.set(p, byKey);
+		}
+		let prepared = byKey.get(key);
+		if (!prepared) {
+			prepared = prepareAiTraitValue(p, season);
+			byKey.set(key, prepared);
+		}
+		return aiTraitValueFromPrepared(prepared, options);
+	};
 };
 
 // Number of a team's players young enough to be mentored, for getAiTraitValueFactor
