@@ -6,6 +6,21 @@ Most of it is **basketball only**: in Football, Hockey and Baseball GM the menu 
 
 `:lid` below is the league id, as in `/l/1/...`.
 
+## Where the pages live
+
+Pages that belong with an original BBGM page are reached from that page's _More_ links (and the command palette, Ctrl+K), not from a menu item of their own. Their URLs did not change, so old links and bookmarks keep working. The list is `src/ui/util/consolidatedPages.ts`.
+
+| Page                                         | Now under (_More_ links of)                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Trade Market, Trade Grader                   | Trade, Trading Block, Trade Proposals, Saved Trades (Trade Grader also from Transactions grades) |
+| Contract Value, League Economics, Home Court | League Finances                                                                                  |
+| Timeline, League Achievements, Coaches       | League Stats / League History group (Head-to-Head, Team Records, ...)                            |
+| Archetypes, Skill Badges                     | Player Ratings, Rating Distributions                                                             |
+| Games to Watch                               | Daily Schedule (plus dashboard card and schedule badges)                                         |
+| Draft Board, Redraft, Pick Value             | Draft pages (Draft Scouting, Lottery, History, ...)                                              |
+| Coaching Staff                               | team pages (Roster, Finances, ...) and the Team menu                                             |
+| 3-team trade                                 | link on the Trade page                                                                           |
+
 ## Feature index
 
 | Feature                                                            | Where                                                            | Sports | Switch (League Extras)      | Default new / existing league |
@@ -147,7 +162,7 @@ Tests in `src/common/nativeFeatures.test.ts` check that every key has a default 
 ### Trade grader
 
 - **Where:** League menu → _Trade Grader_, `/l/:lid/trade_grader[/:tab/:team/:season/:ws]`; grades also show on Trade Summary and the transactions list.
-- **What:** each side of every trade graded by the win shares what it received produced for it. A toggle counts **regular season + playoffs** (default, `ws` = `all`) or **regular season only** (`rs`); Trade Summary follows the last choice made on the grader (per browser). Each side notes the titles its team won with a player it received playing for it in those playoffs.
+- **What:** each side of every trade graded by the win shares what it received produced for it. A toggle counts **regular season + playoffs** (default, `ws` = `all`) or **regular season only** (`rs`); Trade Summary and the grades on the Transactions list follow the last choice made on the grader (per browser). Each side notes the titles its team won with a player it received playing for it in those playoffs.
 
 ### Contract value
 
@@ -212,7 +227,7 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **What:** 1,000 Monte Carlo simulations of the rest of the season in the worker: each remaining game is decided from team strength (team rating from the current roster, ignoring injuries of 10 days or less, blended with point margin as games are played) plus home court, playoffs are seeded with the game's own playoff code, then the play-in and the bracket are played out. Gives projected record, playoff and play-in odds, seed distribution, reaching the semifinals/finals and title odds. During the playoffs it plays out the remaining series from the current state. Results are cached and refreshed after each day of games, trades, signings or injuries (about 0.2 s per refresh), and only when a page that shows them asks.
 - **Award races:** each candidate's award score (BBGM's award scoring) is projected to the end of the regular season with noise that shrinks as the season goes on, and the winner drawn 5,000 times.
 - **Lottery what-if:** move teams up or down the lottery order (chances stay with the slot) or pick another lottery format, then _Run lottery_ for exact odds (where fast enough), a 20,000-lottery simulation (hover a cell) and one sample draw.
-- **Known limits:** current season only. Tiebreakers are approximated (random among tied teams) and playoff reseeding is ignored. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats; in the other sports it belongs to no switch and is always there.
+- **Known limits:** current season only. Tiebreakers are approximated (random among tied teams) and playoff reseeding is ignored. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats; in the other sports (no Season Odds there) it goes with the _Extra frivolities_ switch.
 
 ## Players
 
@@ -222,7 +237,7 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Stored per preseason:** the label is saved on the player (`p.archetypes`, one entry per season) when the preseason phase begins, after development, so it holds all season and his history of changes is kept (it travels in league files). New leagues get a first entry for everyone; older leagues and players without an entry fall back to a live reading (stored the first time the player page is opened). Prospects are always read live, since their ratings can be regenerated. With the switch off nothing is stored or computed.
 - **Where:** the player page (_Archetype_ line with a why popover and career history, replacing _Build_), Draft Scouting (_Archetype_ column), Advanced Player Search (_Archetype_ filter), the roster page (_Roster composition_ panel with balance warnings) and League → _Archetypes_ (`/l/:lid/archetypes`: counts, best players, trends).
 - **Regenerate ratings:** prospects can be aimed at an archetype (per prospect, or a class pool). It uses the same solver, so overall, potential and height stay exact; the preview shows the archetype the new ratings actually derive to (a check mark when it is the one asked for). The 447 builds are still available under _Advanced: build_.
-- **Known limits:** archetypes use scouting-fuzzed ratings (like skills and positions), so they can differ slightly from the true ones; aiming at a very specific archetype succeeds about four times in five at a given overall. With the switch off, the Advanced Player Search still lists an (empty) Archetype column.
+- **Known limits:** archetypes use scouting-fuzzed ratings (like skills and positions), so they can differ slightly from the true ones; aiming at a very specific archetype succeeds about four times in five at a given overall.
 
 ### Extended skill badges
 
@@ -283,11 +298,11 @@ Unlike most of the pages above, these work in **all sports** (the trade code is 
 ## Coaching staff
 
 - **Where:** Team menu → _Coaching Staff_ (`/l/:lid/staff`, `/l/:lid/staff/:team`), League menu → _Coaches_ (`/l/:lid/coaches[/:season]`: head coaches, the season's coaching carousel, Coach of the Year history), and a page per coach (`/l/:lid/coach/:cid`). Team Finances links to the staff instead of offering the coaching slider.
-- **What:** every team has a head coach and three assistants (player development, offense, defense) with ratings (development, offense, defense, motivation), a style (pace, threes, defense, rotation, each -1 to 1), age and a contract. Salaries are paid as coaching expenses (not against the salary cap). The staff's development score is turned into an equivalent coaching budget level, so it replaces the coaching budget's effect on progs, calibrated so the league average matches the default budget (see `staff.test.ts`). After the playoffs each season: records are written to each coach, Coach of the Year is awarded, coaches age/improve/retire, contracts expire, AI teams fire (losing head coaches especially) and hire from the pool (bigger markets pay more). Your expiring coaches leave unless you _Extend_ them; firing pays half the remaining contract as a buyout. Any vacancy still open in the preseason is filled automatically.
+- **What:** every team has a head coach and three assistants (player development, offense, defense) with ratings (development, offense, defense, motivation), a style (pace, threes, defense, rotation, each -1 to 1), age and a contract. Salaries are paid as coaching expenses (not against the salary cap). The staff's development score is turned into an equivalent coaching budget level, so it replaces the coaching budget's effect on progs, calibrated so the league average matches the default budget (see `staff.test.ts`). After the playoffs each season: records are written to each coach (a coach hired or fired during the season gets only the games he was in charge of), Coach of the Year is awarded, coaches age/improve/retire, contracts expire, AI teams fire (losing head coaches especially) and hire from the pool (bigger markets pay more). Your expiring coaches leave unless you _Extend_ them; firing pays half the remaining contract as a buyout. Any vacancy still open in the preseason is filled automatically.
 - **Setting:** `coachingStaff` (basketball only). On by default for new leagues; existing leagues (DB version 76 migration) and league files from before version 76 keep the slider until it's turned on, which generates staffs.
 - **Storage:** `coaches` object store (key `cid`, index `tid`), included in league export under _All team data_.
 - **For other features:** `src/worker/core/staff/data.ts` has `getTeamCoachStyle(tid)` (for team strategy / game sim later), `getCoachingCarousel(season)`, `getHeadCoachForSeason(tid, season)` and `getCoachAwards(type)`.
-- **Known limits:** no in-game effects yet (style is exposed only). Scouts and trainers are not modeled. With the budget disabled, every team gets the average development effect, as with the slider. Mid-season hires get the whole season's record.
+- **Known limits:** no in-game effects yet (style is exposed only). Scouts and trainers are not modeled. With the budget disabled, every team gets the average development effect, as with the slider.
 
 ## Known limits (all features)
 
@@ -295,7 +310,6 @@ Unlike most of the pages above, these work in **all sports** (the trade code is 
 - The Wrapped, Storylines and Timeline pages share a whole-history snapshot that takes a while the first time in a big league.
 - The league-wide averages with player traits, the possession model or injury depth on stay about the same as with them off, but individual games and seasons are of course different; use the switches (off) to replay the old behaviour.
 - Existing leagues keep playing as before until the game-affecting switches (possession model, traits, injury depth, contracts, trades, drafting, coaching staff) are turned on in League Extras. Games already played replay unchanged.
-- The Advanced Player Search still lists an (empty) Archetype column and filter when the Archetypes switch is off.
 - Draft board and scouting need prospects: the Draft Board is empty in a league without upcoming classes.
 
 ## Performance

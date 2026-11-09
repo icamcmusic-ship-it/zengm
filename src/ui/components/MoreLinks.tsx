@@ -25,7 +25,7 @@ export const MoreLinks = (
 		  }
 		| {
 				type: "playerRatings";
-				season: number;
+				season?: number;
 		  }
 		| {
 				type: "playerStats";
@@ -64,6 +64,12 @@ export const MoreLinks = (
 		| {
 				type: "playerNotes";
 		  }
+		| {
+				type: "trade";
+		  }
+		| {
+				type: "finances";
+		  }
 	) & {
 		page: string;
 		keepSelfLink?: boolean;
@@ -94,6 +100,9 @@ export const MoreLinks = (
 				url: ["team_finances", team],
 				name: "Finances",
 			},
+			...(__SPORT === "basketball"
+				? [{ url: ["staff", team] as const, name: "Coaching Staff" }]
+				: []),
 			{
 				url: ["game_log", team, season],
 				name: "Game Log",
@@ -285,14 +294,26 @@ export const MoreLinks = (
 
 		links = [
 			{
-				url: ["player_ratings", season],
+				url:
+					season === undefined
+						? ["player_ratings"]
+						: ["player_ratings", season],
 				name: "Main Ratings",
 			},
 			{
-				url: ["player_rating_dists", season],
+				url:
+					season === undefined
+						? ["player_rating_dists"]
+						: ["player_rating_dists", season],
 				name: "Rating Distributions",
 			},
 		];
+		if (__SPORT === "basketball") {
+			links.push(
+				{ url: ["archetypes"], name: "Archetypes" },
+				{ url: ["frivolities", "skill_badges"], name: "Skill Badges" },
+			);
+		}
 	} else if (props.type === "playerStats") {
 		const { season, statType } = props;
 		links = [
@@ -358,12 +379,16 @@ export const MoreLinks = (
 			},
 			{ url: ["season_preview"], name: "Season Previews" },
 			{ url: ["notes", "teamSeason"], name: "Team Notes" },
-			{ url: ["frivolities", "economics"], name: "Economics" },
-			{ url: ["frivolities", "home_court"], name: "Home Court" },
+			{ url: ["league_finances"], name: "League Finances" },
 		];
 
 		if (__SPORT === "basketball") {
 			links.push(
+				{ url: ["timeline"], name: "Timeline" },
+				{ url: ["league_achievements"], name: "League Achievements" },
+				{ url: ["coaches"], name: "Coaches" },
+				{ url: ["frivolities", "economics"], name: "Economics" },
+				{ url: ["frivolities", "home_court"], name: "Home Court" },
 				{ url: ["newspaper"], name: "Newspaper" },
 				{ url: ["wrapped"], name: "Wrapped" },
 				{ url: ["storylines"], name: "Storylines" },
@@ -385,6 +410,9 @@ export const MoreLinks = (
 		];
 	} else if (props.type === "schedule") {
 		links = [{ url: ["schedule"], name: "Team Schedule" }];
+		if (__SPORT === "basketball") {
+			links.push({ url: ["hype"], name: "Games to Watch" });
+		}
 	} else if (props.type === "globalSettings") {
 		links = [
 			{ url: "/settings", name: "Global Settings" },
@@ -437,6 +465,27 @@ export const MoreLinks = (
 			{ url: ["notes", "player"], name: "Player Notes" },
 			{ url: ["watch_list"], name: "Watch List" },
 		];
+	} else if (props.type === "trade") {
+		links = [
+			{ url: ["trade"], name: "Trade" },
+			{ url: ["trading_block"], name: "Trading Block" },
+			{ url: ["trade_proposals"], name: "Trade Proposals" },
+			{ url: ["trade_market"], name: "Trade Market" },
+			{ url: ["saved_trades"], name: "Saved Trades" },
+			{ url: ["transactions", "all"], name: "Transactions" },
+		];
+		if (__SPORT === "basketball") {
+			links.push({ url: ["trade_grader"], name: "Trade Grader" });
+		}
+	} else if (props.type === "finances") {
+		links = [{ url: ["league_finances"], name: "League Finances" }];
+		if (__SPORT === "basketball") {
+			links.push(
+				{ url: ["contract_value"], name: "Contract Value" },
+				{ url: ["frivolities", "economics"], name: "Economics" },
+				{ url: ["frivolities", "home_court"], name: "Home Court" },
+			);
+		}
 	} else {
 		throw new Error("Invalid MoreLinks type");
 	}
@@ -455,7 +504,8 @@ export const MoreLinks = (
 						return true;
 					}
 					const key = typeof url === "string" ? url : url[0];
-					return key !== page;
+					const fullKey = typeof url === "string" ? url : url.join("/");
+					return key !== page && fullKey !== page;
 				})
 				.map(({ className, url, name }, i) => {
 					return (

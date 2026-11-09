@@ -620,6 +620,7 @@ const SettingsForm = ({
 					showGodModeSettings={showGodModeSettings}
 					state={state}
 					visibleCategories={visibleCategories}
+					expandAll={filterText !== "" && /\S/.test(filterText)}
 				/>
 
 				<StickyBottomButtons isInsideModal={isInsideModal}>

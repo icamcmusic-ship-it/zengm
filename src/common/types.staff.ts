@@ -80,6 +80,15 @@ export type CoachWithoutKey = {
 	}[];
 	transactions: CoachTransaction[];
 	retiredYear?: number;
+	// The team's record when he was hired during a season, so his season row only counts the games he coached
+	hiredRecord?: {
+		season: number;
+		tid: number;
+		won: number;
+		lost: number;
+		tied: number;
+		otl: number;
+	};
 };
 
 export type Coach = CoachWithoutKey & {

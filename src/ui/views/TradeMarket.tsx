@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import { DataTable } from "../components/DataTable/index.tsx";
 import type { DataTableRow } from "../components/DataTable/index.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
@@ -124,6 +125,7 @@ const TradeMarket = ({
 
 	return (
 		<>
+			<MoreLinks type="trade" page="trade_market" />
 			<p>
 				Players AI teams are willing to move, based on their strategy
 				(contending or rebuilding), the player's age, contract and role on the

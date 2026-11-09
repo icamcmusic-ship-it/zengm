@@ -8,6 +8,8 @@ const categories: {
 	name: Category;
 	helpText?: ReactNode;
 	appendNumTeams?: boolean;
+	// Starts collapsed (expanded while filtering)
+	collapsible?: boolean;
 }[] = [
 	{
 		name: "New League",
@@ -184,6 +186,34 @@ const categories: {
 				work.
 			</p>
 		),
+	},
+	{
+		name: "League extras: History & Stories",
+		collapsible: true,
+	},
+	{
+		name: "League extras: Game Simulation",
+		collapsible: true,
+	},
+	{
+		name: "League extras: Players",
+		collapsible: true,
+	},
+	{
+		name: "League extras: Contracts",
+		collapsible: true,
+	},
+	{
+		name: "League extras: Trades",
+		collapsible: true,
+	},
+	{
+		name: "League extras: Draft",
+		collapsible: true,
+	},
+	{
+		name: "League extras: Team",
+		collapsible: true,
 	},
 ];
 

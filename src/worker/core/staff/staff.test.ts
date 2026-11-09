@@ -219,6 +219,44 @@ describe("coaching staff", () => {
 			carousel.some((m) => m.type === "hired" && m.cid === best.cid),
 		);
 	});
+
+	test("a coach hired during the season gets only the games he coached", async () => {
+		await ensureStaff();
+		const tid = g.get("userTid");
+		const t = (await idb.cache.teams.get(tid))!;
+		const ts = team.genSeasonRow(t);
+		ts.won = 10;
+		ts.lost = 20;
+		await idb.cache.teamSeasons.add(ts);
+
+		const old = (await getTeamStaff(tid)).off!;
+		await userFire({ cid: old.cid, tid });
+		const fired = (await idb.cache.coaches.get(old.cid))!;
+		const firedRow = fired.stats.find((r) => r.season === g.get("season"))!;
+		assert.strictEqual(firedRow.won, 10);
+		assert.strictEqual(firedRow.lost, 20);
+
+		const next = (await idb.cache.coaches.getAll()).find(
+			(c) => c.tid === COACH_FREE_AGENT && c.cid !== old.cid,
+		)!;
+		await userHire({ cid: next.cid, role: "off", years: 2, tid });
+
+		ts.won = 40;
+		ts.lost = 42;
+		await idb.cache.teamSeasons.put(ts);
+		g.setWithoutSavingToDB("phase", PHASE.DRAFT_LOTTERY);
+		for (const t2 of await idb.cache.teams.getAll()) {
+			if (t2.tid !== tid) {
+				await idb.cache.teamSeasons.add(team.genSeasonRow(t2));
+			}
+		}
+		await runOffseason();
+		const row = (await idb.cache.coaches.get(next.cid))!.stats.find(
+			(r) => r.season === g.get("season"),
+		)!;
+		assert.strictEqual(row.won, 30);
+		assert.strictEqual(row.lost, 22);
+	});
 });
 
 // Over many simulated offseasons, the staff-based coaching levels should give about the same league-wide development as the default AI coaching budgets do, with a similar spread between teams

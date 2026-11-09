@@ -273,10 +273,17 @@ const speedToMs = (speed: number) => {
 	return 4000 / 1.2 ** speed;
 };
 
-const getNavigateWarning = (exhibition: boolean | undefined) => {
-	return exhibition
-		? "If you navigate away from this page, you won't be able to see this box score again."
-		: "If you navigate away from this page, you won't be able to see these play-by-play results again. The results of this game are already final, though.";
+const getNavigateWarning = (
+	exhibition: boolean | undefined,
+	showPlayByPlay: boolean,
+) => {
+	if (exhibition) {
+		return "If you navigate away from this page, you won't be able to see this box score again.";
+	}
+	// Without the feed there are no play-by-play results on screen to lose, just the rest of the live view
+	return showPlayByPlay
+		? "If you navigate away from this page, you won't be able to see these play-by-play results again. The results of this game are already final, though."
+		: "If you navigate away from this page, you won't be able to watch the rest of this game live. The results of this game are already final, though.";
 };
 
 export const LiveGame = (props: View<"liveGame">) => {
@@ -314,7 +321,10 @@ export const LiveGame = (props: View<"liveGame">) => {
 
 	const playByPlayEntries = useRef<PlayByPlayEntryInfo[]>([]);
 
-	const navigateWarning = getNavigateWarning(boxScore.current.exhibition);
+	const navigateWarning = getNavigateWarning(
+		boxScore.current.exhibition,
+		showPlayByPlay,
+	);
 
 	const { setDirty } = useBlocker({
 		message: navigateWarning,

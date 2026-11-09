@@ -1,3 +1,4 @@
+import { CONSOLIDATED_PATHS } from "./consolidatedPages.ts";
 import { toWorker } from "./toWorker.ts";
 import {
 	DAILY_SCHEDULE,
@@ -5,7 +6,11 @@ import {
 	REAL_PLAYERS_INFO,
 	WEBSITE_ROOT,
 } from "../../common/constants.ts";
-import type { MenuItemLink, MenuItemHeader } from "../../common/types.ts";
+import type {
+	MenuItemLink,
+	MenuItemHeader,
+	MenuItemText,
+} from "../../common/types.ts";
 import { frivolities } from "../views/Frivolities.tsx";
 import { takeScreenshot } from "./takeScreenshot.ts";
 import { bySport } from "../../common/sportFunctions.ts";
@@ -211,7 +216,7 @@ const valueLinks: MenuItemLink[] =
 			]
 		: [];
 
-export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
+const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 	{
 		type: "link",
 		active: (pageID) => pageID === "dashboard",
@@ -1161,3 +1166,23 @@ export const menuItems: (MenuItemLink | MenuItemHeader)[] = [
 		],
 	},
 ];
+
+// Pages that moved under an original BBGM page leave the side menu (they stay in the command palette)
+const consolidate = <T extends MenuItemLink | MenuItemHeader | MenuItemText>(
+	item: T,
+): T => {
+	if (item.type === "header") {
+		return { ...item, children: item.children.map(consolidate) };
+	}
+	if (
+		item.type === "link" &&
+		Array.isArray(item.path) &&
+		CONSOLIDATED_PATHS.has(String(item.path[0]))
+	) {
+		return { ...item, commandPaletteOnly: true };
+	}
+	return item;
+};
+
+export const menuItems: (MenuItemLink | MenuItemHeader)[] =
+	menuItemsRaw.map(consolidate);

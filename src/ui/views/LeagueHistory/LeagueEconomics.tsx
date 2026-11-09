@@ -1,3 +1,4 @@
+import { MoreLinks } from "../../components/MoreLinks.tsx";
 import { useMemo } from "react";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import { helpers } from "../../util/helpers.ts";
@@ -253,6 +254,7 @@ const LeagueEconomics = ({
 
 	return (
 		<>
+			<MoreLinks type="finances" page="frivolities/economics" />
 			<p>
 				Payroll inequality, luxury tax bills, payroll growth and whether the
 				biggest payroll wins. Payrolls are as of the end of each season. More:{" "}

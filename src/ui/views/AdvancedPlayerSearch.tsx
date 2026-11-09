@@ -1,3 +1,4 @@
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 import {
 	useEffectEvent,
 	useLayoutEffect,
@@ -260,6 +261,7 @@ const Filters = ({
 	};
 
 	const { playerTraits } = useLocal(["playerTraits"]);
+	const archetypesOn = useFeatureOn("archetypes");
 
 	let statTypes = [
 		{ key: "bio", label: "Bio" },
@@ -332,8 +334,14 @@ const Filters = ({
 											width: 150,
 										}}
 									>
-										{Object.values(allFilters[filter.category]!.options).map(
-											(row, i) => {
+										{Object.values(allFilters[filter.category]!.options)
+											.filter(
+												(row) =>
+													row.key !== "archetype" ||
+													archetypesOn ||
+													filter.key === "archetype",
+											)
+											.map((row, i) => {
 												const col = getCol(row.colKey, row.colOverrides);
 												return (
 													<option key={i} value={row.key} title={col.desc}>
@@ -341,8 +349,7 @@ const Filters = ({
 														{col.desc !== undefined ? ` (${col.desc})` : null}
 													</option>
 												);
-											},
-										)}
+											})}
 									</select>
 								</div>
 								<div className="d-flex gap-2">
@@ -531,6 +538,7 @@ const DEFAULT_COLS = [
 ];
 
 const AdvancedPlayerSearch = (props: View<"advancedPlayerSearch">) => {
+	const archetypesOn = useFeatureOn("archetypes");
 	const { challengeNoRatings, season: currentSeason } = useLocal([
 		"challengeNoRatings",
 		"season",
@@ -638,10 +646,12 @@ const AdvancedPlayerSearch = (props: View<"advancedPlayerSearch">) => {
 			const keys = getExtraStatTypeKeys([statType]);
 			if (statType === "bio") {
 				uniqueStatTypeInfos.push(
-					...keys.attrs.map((key) => {
-						const info = allFilters.bio!.options[key]!;
-						return info;
-					}),
+					...keys.attrs
+						.map((key) => {
+							const info = allFilters.bio!.options[key]!;
+							return info;
+						})
+						.filter((info) => info.key !== "archetype" || archetypesOn),
 				);
 			} else if (statType === "ratings") {
 				uniqueStatTypeInfos.push(
@@ -675,7 +685,7 @@ const AdvancedPlayerSearch = (props: View<"advancedPlayerSearch">) => {
 		});
 
 		return { uniqueColFiltersWithInfo, uniqueStatTypeInfos };
-	}, [rendered.filters, rendered.showStatTypes]);
+	}, [rendered.filters, rendered.showStatTypes, archetypesOn]);
 
 	const cols = getCols([
 		...DEFAULT_COLS,

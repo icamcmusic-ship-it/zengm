@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import {
 	DataTable,
 	type DataTableRow,
@@ -78,6 +79,7 @@ const Archetypes = ({
 
 	return (
 		<>
+			<MoreLinks type="playerRatings" page="archetypes" />
 			<p>
 				Archetypes are derived from each player's ratings (not assigned), and
 				saved at the start of every preseason, so a player's label holds for the

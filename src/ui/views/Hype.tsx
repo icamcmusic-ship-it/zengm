@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
 import { HypeGameRow, HypeText } from "../components/GameHype.tsx";
@@ -15,6 +16,7 @@ const Hype = ({ chases, days, recent }: View<"hype">) => {
 
 	return (
 		<>
+			<MoreLinks type="schedule" page="hype" />
 			<p>
 				A must-watch score from 0 to 100 for every upcoming game, built from
 				what is known before tip-off: the standings and playoff races, series

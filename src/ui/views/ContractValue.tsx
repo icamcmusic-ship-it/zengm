@@ -1,3 +1,4 @@
+import { MoreLinks } from "../components/MoreLinks.tsx";
 import { useState, type ReactNode } from "react";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
@@ -941,6 +942,7 @@ const ContractValue = (props: View<"contractValue">) => {
 
 	return (
 		<>
+			<MoreLinks type="finances" page="contract_value" />
 			<p>
 				What teams paid their players against the regular-season win shares they
 				got back. The league rate is the win shares per dollar the whole league
