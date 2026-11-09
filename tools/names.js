@@ -119,16 +119,82 @@ const getOverrides = () => {
 
 const { femaleNames, groups, overrides } = getOverrides();
 
+// Additional names in names-manual/extra (same file format as names-manual), added on top of everything else.
+// fixes.json there merges misspellings into the right spelling and removes bad entries.
+const getExtras = () => {
+	const dir = path.join(import.meta.dirname, "names-manual/extra");
+	const extras = { first: {}, last: {} };
+	for (const filename of fs.readdirSync(dir).sort()) {
+		if (!filename.endsWith(".csv")) {
+			continue;
+		}
+		const match = /^country-(.+)-(first|last)\.csv$/.exec(filename);
+		if (!match) {
+			throw new Error(`Unexpected filename "extra/${filename}"`);
+		}
+		const [, country, firstOrLast] = match;
+		const rows = csvParse(fs.readFileSync(path.join(dir, filename), "utf8"));
+		const object = {};
+		for (const row of rows) {
+			const count = Number.parseInt(row.Frequency);
+			if (Number.isNaN(count) || object[row.Name] !== undefined) {
+				throw new Error(
+					`Bad or duplicate row in extra/${filename}: ${row.Name}`,
+				);
+			}
+			object[row.Name] = count;
+		}
+		extras[firstOrLast][country] = object;
+	}
+	const fixes = JSON.parse(
+		fs.readFileSync(path.join(dir, "fixes.json"), "utf8"),
+	);
+	return { extras, fixes };
+};
+
+const { extras, fixes } = getExtras();
+
 const fnsByCountry = combineNames([
 	basketball.fnsByCountry,
 	football.fnsByCountry,
 	overrides.first,
+	extras.first,
 ]);
 const lnsByCountry = combineNames([
 	basketball.lnsByCountry,
 	football.lnsByCountry,
 	overrides.last,
+	extras.last,
 ]);
+
+const namesByKind = { first: fnsByCountry, last: lnsByCountry };
+for (const [country, kinds] of Object.entries(fixes.merge)) {
+	for (const [firstOrLast, merges] of Object.entries(kinds)) {
+		const names = namesByKind[firstOrLast][country];
+		for (const [from, to] of Object.entries(merges)) {
+			if (names[from] === undefined) {
+				throw new Error(
+					`fixes.json: ${country} ${firstOrLast} "${from}" not found`,
+				);
+			}
+			names[to] = (names[to] ?? 0) + names[from];
+			delete names[from];
+		}
+	}
+}
+for (const [country, kinds] of Object.entries(fixes.remove)) {
+	for (const [firstOrLast, removes] of Object.entries(kinds)) {
+		const names = namesByKind[firstOrLast][country];
+		for (const name of removes) {
+			if (names[name] === undefined) {
+				throw new Error(
+					`fixes.json: ${country} ${firstOrLast} "${name}" not found`,
+				);
+			}
+			delete names[name];
+		}
+	}
+}
 
 const { dropped, namesByCountry } = filterAndOutput(fnsByCountry, lnsByCountry);
 
@@ -140,7 +206,7 @@ countriesBasketball.Taiwan = 3;
 const filename = path.join(import.meta.dirname, "../data/names.json");
 fs.writeFileSync(
 	filename,
-	JSONstringifyOrder({ countries: namesByCountry, groups }, "\t"),
+	`${JSONstringifyOrder({ countries: namesByCountry, groups }, "\t")}\n`,
 );
 console.log(`Wrote data to ${filename}`);
 
@@ -150,7 +216,7 @@ const filenameFemale = path.join(
 );
 fs.writeFileSync(
 	filenameFemale,
-	JSONstringifyOrder({ countries: femaleNames }, "\t"),
+	`${JSONstringifyOrder({ countries: femaleNames }, "\t")}\n`,
 );
 console.log(`Wrote data to ${filenameFemale}`);
 

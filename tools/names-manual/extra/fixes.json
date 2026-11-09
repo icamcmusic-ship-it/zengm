@@ -1,0 +1,41 @@
+{
+	"_comment": "Applied by tools/names.js after combining all sources. merge: misspelled/miscased name -> correct spelling (counts are added). remove: names dropped from a country's pool (female names in male lists, garbled entries, cities, heads of state).",
+	"merge": {
+		"USA": {
+			"first": {
+				"Aj": "AJ",
+				"Cam'ron": "Cam'Ron",
+				"Da'shawn": "Da'Shawn",
+				"Ej": "EJ",
+				"Ja'len": "Ja'Len",
+				"JamesOn": "Jameson",
+				"Tre'von": "Tre'Von"
+			},
+			"last": {
+				"El-amin": "El-Amin",
+				"Mcintosh": "McIntosh",
+				"Mclean": "McLean"
+			}
+		}
+	},
+	"remove": {
+		"USA": {
+			"first": ["J"]
+		},
+		"China": {
+			"last": ["Krassenstein", "Luoyang", "Meschery", "Wuhan", "Zedong", "Zemin"]
+		},
+		"Cyprus": {
+			"first": ["Margarita"]
+		},
+		"Egypt": {
+			"first": ["Aymn", "Bebti", "Bedario", "Chatuluka", "Chaths", "Chibale", "Chigaru", "Dods", "Kamuzu", "Kaphiri", "Kasiya", "Kasto", "Male", "Nafty", "Nizsm", "Psamtic", "Qeb", "Redore", "Sharky", "Teremun", "Tsekani", "Ufa", "Usi"]
+		},
+		"French Guiana": {
+			"first": ["Marie"]
+		},
+		"Guadeloupe": {
+			"first": ["Annick", "Denise", "Monique"]
+		}
+	}
+}

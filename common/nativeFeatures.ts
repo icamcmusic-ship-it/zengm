@@ -533,6 +533,28 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "hyphenatedNames",
+		key: "featureHyphenatedNames",
+		name: "Hyphenated Last Names",
+		description:
+			"Some new American players get a hyphenated last name made of two common surnames, like Smith-Jones. Only affects players generated while it is on.",
+		default: false,
+		defaultNewLeague: true,
+		options: [
+			{
+				key: "hyphenatedNamesRate",
+				name: "Hyphenated Last Name Rate",
+				description:
+					"Percentage of new American players with a hyphenated last name.",
+				type: "float",
+				decoration: "percent",
+				default: 1,
+				min: 0,
+				max: 100,
+			},
+		],
+	},
+	{
 		id: "unretire",
 		key: "featureUnretire",
 		name: "Unretirements",

@@ -102,6 +102,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	archetypes: "League extras: Players",
 	skillBadges: "League extras: Players",
 	unretire: "League extras: Players",
+	hyphenatedNames: "League extras: Players",
 	contractOptions: "League extras: Contracts",
 	contractExtensions: "League extras: Contracts",
 	tradeRequests: "League extras: Contracts",
