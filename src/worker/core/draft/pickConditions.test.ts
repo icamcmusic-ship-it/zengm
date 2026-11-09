@@ -487,4 +487,54 @@ describe("with a league", () => {
 		assert.strictEqual(s2.tid, 1);
 		assert.isUndefined(s2.swap);
 	});
+
+	test("a trade can't be undone once the draft order settled a condition in it", async () => {
+		await idb.cache.trade.put({
+			rid: 0,
+			teams: [
+				{ tid: 0, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+				{ tid: 1, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+			],
+		});
+		const protectedDpid = dpids[0]![1]!;
+		const undo = await processTrade(
+			[
+				{
+					tid: 0,
+					pids: [],
+					pidsExcluded: [],
+					dpids: [protectedDpid],
+					dpidsExcluded: [],
+					pickConditions: [
+						{
+							type: "protection",
+							dpid: protectedDpid,
+							top: 5,
+							rollover: [],
+							then: "extinguish",
+						},
+					],
+				},
+				{ tid: 1, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+			],
+			undefined,
+		);
+
+		// Draft order: conveys, so the pick stays with team 1 but its protection is gone
+		const dp = (await idb.cache.draftPicks.get(protectedDpid))!;
+		dp.pick = 20;
+		resolvePickConditionsPure({
+			draftPicks: [dp],
+			futurePicks: [],
+			teamName,
+		});
+		await idb.cache.draftPicks.put(dp);
+
+		const result = await undo();
+		assert.isString(result);
+		const after = (await idb.cache.draftPicks.get(protectedDpid))!;
+		assert.strictEqual(after.tid, 1);
+		dp.pick = 0;
+		await idb.cache.draftPicks.put(dp);
+	});
 });

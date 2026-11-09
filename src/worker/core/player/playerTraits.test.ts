@@ -3,7 +3,7 @@ import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { g, helpers } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
-import { draft, player, team } from "../index.ts";
+import { draft, finances, player, team } from "../index.ts";
 import { getTraitSeeds } from "./traits.ts";
 import customizePlayer from "../../views/customizePlayer.ts";
 import createRandomPlayers from "../league/create/createRandomPlayers.ts";
@@ -368,6 +368,38 @@ describe("generation, settings and storage", () => {
 			godMode: true,
 		}).get(13)!;
 		assert.strictEqual(god.display.clutch, String(god.scores.clutch));
+	});
+
+	test("trait badges use the user's scouting level, matching the trait readings shown", async () => {
+		g.setWithoutSavingToDB("playerTraits", true);
+		g.setWithoutSavingToDB("playerTraitsSeed", 6);
+		g.setWithoutSavingToDB("godMode", false);
+		idb.league = mockIDBLeague();
+		const teams = helpers.getTeamsDefault().slice(0, 2).map(team.generate);
+		await resetCache({ players: [], teams });
+		await player.loadBadgeScoutingLevel();
+		const level = await finances.getLevelLastThree("scouting", {
+			tid: g.get("userTid"),
+		});
+		assert.isTrue(Object.is(player.getBadgeScoutingLevel(), level));
+
+		const prospect: any = {
+			...player.generate(PLAYER.UNDRAFTED, 19, 2026, false, DEFAULT_LEVEL),
+			pid: 11,
+		};
+		for (const scoutingLevel of [1, 75]) {
+			const shown = player.getPlayerTraitsForUI(prospect, { scoutingLevel })!;
+			const badgeTraits = player.getBadgeTraits(
+				prospect,
+				g.get("season"),
+				scoutingLevel,
+			)!;
+			for (const t of shown.traits) {
+				if (badgeTraits[t.key] !== undefined) {
+					assert.strictEqual(badgeTraits[t.key], t.estimate);
+				}
+			}
+		}
 	});
 
 	test("Customize Player only sends trait seeds in God Mode", async () => {

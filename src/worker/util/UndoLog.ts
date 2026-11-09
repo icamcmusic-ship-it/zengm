@@ -1,5 +1,5 @@
-// Return true for success, false for failure
-type Undo = () => Promise<boolean>;
+// Return true for success, false for failure, or a string explaining why it can't be undone
+export type Undo = () => Promise<boolean | string>;
 
 type InvalidateOn = "advanceDay" | "leagueChange" | "newPhase";
 

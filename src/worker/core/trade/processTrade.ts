@@ -39,6 +39,8 @@ const processTrade = async (
 	);
 	const swapDpids = new Set<number>();
 	const conditionedDpids: number[] = [];
+	// Picks in the trade that carry a protection or swap afterwards, new or not. Once the draft order resolves those, the trade can't be undone
+	const dpidsWithConditions = new Set<number>();
 
 	const teams: TradeEventTeams = [
 		{
@@ -188,6 +190,9 @@ const processTrade = async (
 			if (!swapDpids.has(dpid)) {
 				dp.tid = tids[k];
 			}
+			if (dp.protection || dp.swap) {
+				dpidsWithConditions.add(dpid);
+			}
 			draftPicksToSave.push(dp);
 
 			teams[k].assets.push({
@@ -273,7 +278,14 @@ const processTrade = async (
 			? await idb.cache.savedTrades.get(initialHash)
 			: undefined;
 
-	const undo = async () => {
+	const undo = async (): Promise<boolean | string> => {
+		for (const dpid of dpidsWithConditions) {
+			const dp = await idb.cache.draftPicks.get(dpid);
+			if (dp && !dp.protection && !dp.swap) {
+				return "This trade can't be undone, because the draft order already settled the protection or swap on a pick in it.";
+			}
+		}
+
 		// Collect assets
 		const players: [Player[], Player[]] = [[], []];
 		const draftPicks: [DraftPick[], DraftPick[]] = [[], []];
