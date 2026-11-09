@@ -178,4 +178,18 @@ export const TRAIT_DEFINITIONS: Record<TraitKey, TraitDefinition> = {
 		badgeLow: "Withdrawn",
 		growth: "Grows with experience and age.",
 	},
+	veteranSavvy: {
+		key: "veteranSavvy",
+		name: "Veteran savvy",
+		description:
+			"Knows the tricks of the trade from years in the league, and passes them on.",
+		effect:
+			"Small boosts to end-of-game decisions, ball security, clutch shooting and foul discipline, and to team chemistry. Young teammates (23 and under) develop a little faster next to savvy veterans, a little slower without them.",
+		visibility: "visible",
+		low: "Green",
+		high: "Savvy veteran",
+		badgeHigh: "Vet savvy",
+		badgeLow: "Green",
+		growth: "Grows with each pro season played, levels off after 8-10.",
+	},
 };

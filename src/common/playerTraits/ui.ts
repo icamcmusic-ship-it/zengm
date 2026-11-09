@@ -112,6 +112,7 @@ export const TRAIT_SHORT: Record<TraitKey, string> = {
 	handle: "HUP",
 	lateGameIq: "LIQ",
 	leadership: "Ldr",
+	veteranSavvy: "Vet",
 };
 
 export const isTraitKey = (x: unknown): x is TraitKey =>

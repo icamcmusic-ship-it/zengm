@@ -38,6 +38,14 @@ export const EFFECT_AMPLITUDES = {
 	lateGameDecision: 0.12,
 	// Maximum team chemistry bonus (a fraction added to every team composite rating)
 	chemistryTeam: 0.015,
+	// Veteran savvy: small extra amounts added on top of the hooks above (same units)
+	veteranLateGame: 0.04,
+	veteranClutchShot: 0.012,
+	veteranClutchFt: 0.015,
+	veteranClutchTurnover: 0.05,
+	veteranPressureTurnover: 0.05,
+	veteranFoul: 0.06,
+	veteranChemistry: 0.35,
 } as const;
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -133,7 +141,9 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		handle: traitZ(scores.handle),
 		lateGameIq: traitZ(scores.lateGameIq),
 		leadership: traitZ(scores.leadership),
+		veteranSavvy: traitZ(scores.veteranSavvy),
 	};
+	const vet = z.veteranSavvy;
 
 	const varianceScale = 1 - A.variance * z.consistency;
 
@@ -141,10 +151,15 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		neutral,
 		scores,
 		clutchShotModifier: (s) =>
-			A.clutchShot * z.clutch * clutchSituationWeight(s),
-		clutchFtModifier: (s) => A.clutchFt * z.clutch * clutchSituationWeight(s),
+			(A.clutchShot * z.clutch + A.veteranClutchShot * vet) *
+			clutchSituationWeight(s),
+		clutchFtModifier: (s) =>
+			(A.clutchFt * z.clutch + A.veteranClutchFt * vet) *
+			clutchSituationWeight(s),
 		clutchTurnoverMult: (s) =>
-			1 - A.clutchTurnover * z.clutch * clutchSituationWeight(s),
+			1 -
+			(A.clutchTurnover * z.clutch + A.veteranClutchTurnover * vet) *
+				clutchSituationWeight(s),
 		gameFormShotDelta: (gameZ) => A.gameFormSd * varianceScale * gameZ,
 		shotSelectionBias: (usage) => {
 			const u = clamp(usage, 0, 1);
@@ -154,19 +169,26 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 			};
 		},
 		pressureTurnoverMult: (pressure) =>
-			1 - A.pressureTurnover * z.handle * clamp(pressure, 0, 1),
+			1 -
+			(A.pressureTurnover * z.handle + A.veteranPressureTurnover * vet) *
+				clamp(pressure, 0, 1),
 		lateGameDecisionQuality: (s) =>
-			A.lateGameDecision * z.lateGameIq * lateGameSituationWeight(s),
+			(A.lateGameDecision * z.lateGameIq + A.veteranLateGame * vet) *
+			lateGameSituationWeight(s),
 		varianceScale,
 		injuryRateMultiplier: 1 - A.injury * z.durability,
 		spacingContribution: A.spacing * z.offBall,
 		screenContribution: A.screenSynergy * z.screen,
 		screenShotDelta: A.screenShot * z.screen,
 		looseBallBonus: 1 + A.hustle * z.hustle,
-		foulProneness: 1 - A.foul * z.foulDiscipline,
+		foulProneness: 1 - A.foul * z.foulDiscipline - A.veteranFoul * vet,
 		gambleStealMultiplier: 1 - A.gambleSteal * z.foulDiscipline,
 		energyRecoveryRate: 1 + A.recovery * z.recovery,
-		chemistryContribution: z.leadership,
+		chemistryContribution: clamp(
+			z.leadership + A.veteranChemistry * vet,
+			-1,
+			1,
+		),
 	};
 };
 

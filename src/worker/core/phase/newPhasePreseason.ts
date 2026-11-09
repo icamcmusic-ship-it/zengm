@@ -449,6 +449,12 @@ const newPhasePreseason = async (
 		}
 	}
 
+	// Player traits: mentoring of young players by savvy veteran teammates (empty map when the setting is off)
+	const mentorBonuses =
+		repeatSeason || __SPORT !== "basketball"
+			? new Map<number, number>()
+			: player.getMentorBonuses(players as any, newSeason);
+
 	// Loop through all non-retired players
 	for (const p of players) {
 		if (__SPORT === "hockey" && p.numConsecutiveGamesG !== undefined) {
@@ -492,7 +498,20 @@ const newPhasePreseason = async (
 		} else {
 			// Update ratings
 			player.addRatingsRow(p, scoutingLevel);
-			await player.develop(p, 1, false, coachingLevels[p.tid]);
+			const mentorBonus = mentorBonuses.get(p.pid);
+			await player.develop(
+				p,
+				1,
+				false,
+				coachingLevels[p.tid],
+				false,
+				mentorBonus === undefined
+					? undefined
+					: {
+							bonus: mentorBonus,
+							seed: `mentor|${g.get("playerTraitsSeed") ?? 0}|${p.pid}|${newSeason}`,
+						},
+			);
 			player.developTraits(p as any, newSeason);
 		}
 

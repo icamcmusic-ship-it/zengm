@@ -1,12 +1,12 @@
 # Player traits (basketball)
 
-Twelve 0-100 traits per player that the pure game sim can read directly. Nothing here depends on play-by-play: the sim computes with the numbers, the play-by-play only describes the results. The traits are wired into the game sim (see "How the sim uses the traits"). Basketball only, behind the league setting **Player Traits** (`playerTraits`; off for existing leagues, on for new ones).
+Thirteen 0-100 traits per player that the pure game sim can read directly. Nothing here depends on play-by-play: the sim computes with the numbers, the play-by-play only describes the results. The traits are wired into the game sim (see "How the sim uses the traits"). Basketball only, behind the league setting **Player Traits** (`playerTraits`; off for existing leagues, on for new ones).
 
 Code: `src/common/playerTraits/` (pure, no worker/DB/`g` access) and `src/worker/core/player/traits.ts` (reads `g` and the player). Calibration test: `src/worker/core/player/playerTraits.test.ts`. Pure tests: `src/common/playerTraits/*.test.ts`.
 
 ## Data model
 
-- `p.traits` holds one small random component per trait (`clutchSeed`, `consistencySeed`, `durabilitySeed`, `shotDisciplineSeed`, `offBallSeed`, `screenSeed`, `hustleSeed`, `foulDisciplineSeed`, `recoverySeed`, `handleSeed`, `lateGameIqSeed`, `leadershipSeed`): roughly standard normal, two decimals, within +-3 when generated (+-8 allowed from the God Mode editor).
+- `p.traits` holds one small random component per trait (`clutchSeed`, `consistencySeed`, `durabilitySeed`, `shotDisciplineSeed`, `offBallSeed`, `screenSeed`, `hustleSeed`, `foulDisciplineSeed`, `recoverySeed`, `handleSeed`, `lateGameIqSeed`, `leadershipSeed`, `veteranSavvySeed`): roughly standard normal, two decimals, within +-3 when generated (+-8 allowed from the God Mode editor).
 - The 0-100 score is **derived, never stored**: `score = 50 + calibration offset + rating part + age/experience part + 12 * seed`, rounded and clamped. The rating part is `0.9 * sum(weight * (rating - league rotation average))`. So ratings changes flow through, and existing leagues need no migration: a missing `p.traits` (or a missing key) is derived on the fly from league seed + pid and written the first time the player is touched (`ensureTraits`).
 - League seed: game attribute `playerTraitsSeed` (set once at league creation, 0 for older leagues). Seeds are `hash(leagueSeed, pid, trait)`, so deterministic and independent per trait. New draft prospects get them in `genPlayers`, league creation players in `finalizeActivePlayers`, God Mode created players on save.
 - League export/import carries `p.traits` and the `playerTraits`/`playerTraitsSeed` game attributes with no extra code (whole player rows are exported). Junk in a hand-edited file is repaired by `ensureTraits`.
@@ -28,8 +28,19 @@ Code: `src/common/playerTraits/` (pure, no worker/DB/`g` access) and `src/worker
 | `handle`         | Handle under pressure | visible    | drb, pss, oiq, spd                                            |
 | `lateGameIq`     | Late-game IQ          | hidden     | oiq, diq, pss; grows with experience                          |
 | `leadership`     | Leadership            | hidden     | oiq, diq, pss, endu, stre, drb; grows with experience and age |
+| `veteranSavvy`   | Veteran savvy         | visible    | oiq, diq, pss; grows with pro seasons played, plateau at 9    |
 
 Visibility only matters for scouting (below). The sim always uses the true scores.
+
+## Veteran savvy (13th trait)
+
+Code: `src/common/playerTraits/veteran.ts` (pure), `getTraitProSeasons` / `getMentorBonuses` in `src/worker/core/player/traits.ts`, the `mentor` argument of `player.develop`. Tests: `src/common/playerTraits/veteran.test.ts`.
+
+- **Score:** `50 - 4.5 + 0.9 * (0.4 oiq + 0.4 diq + 0.2 pss vs reference) + curve(proSeasons) - curve(4) + 12 * seed`. `curve(n) = 30 * (1 - (1 - min(n, 9) / 9)^2)`: 0 for a rookie, ~16 after 3 seasons, ~27 after 6, flat at 30 from 9. Pro seasons = completed regular seasons with gp > 0 from `getProStats` (pre-draft/college rows excluded, current season excluded); seasons between the draft year and the league's `startingSeason` with no stats row count as played (random-players leagues have no stats before the league starts). Prospects 0.
+- **Sim effects** (added on top of the existing hooks, so `GameSim` needed no change; z as usual): late-game decision quality `+0.04 z`, clutch shot `+0.012 z` and clutch FT `+0.015 z` (times the clutch weight), clutch turnovers `-0.05 z` (times clutch weight), pressure turnovers `-0.05 z` (times pressure), foul proneness `-0.06 z` (so `foulProneness` is now within 0.69-1.31), chemistry contribution `+0.35 z` (clamped to +-1). Amplitudes `veteran*` in `EFFECT_AMPLITUDES`.
+- **Mentoring:** at each preseason (`newPhasePreseason`, not in repeat-season mode), every team's raw mentoring is `0.5 * min(1, (s1 + 0.5 s2) / 0.75)` where s1, s2 are the two best `max(0, z - 0.25)` among its players over 23 (scores of the season just finished). Each young player (age <= 23 in the new season, on a team) gets his team's raw value minus the mean over all such players in the league, so the bonus averages exactly 0 over mentees and is within +-0.5. `player.develop(p, 1, false, coaching, false, {bonus, seed})` applies it after the normal development: with probability |bonus| (seeded by `mentor|leagueSeed|pid|season`, no Math.random) every rating but height moves one point in its direction, about one ovr point. So the expected ovr change is the bonus, deterministic, and nothing at all happens with the setting off.
+- **Scouting:** visible trait: prospects have the visible-trait uncertainty, exact (sd 0) from the rookie season on.
+- **Badges:** `veteranSavvyBadgeScore(score)` (0 below 60, 1 at 90) is exported for the skill badge system; no badge is added here.
 
 ## API for the sim
 
@@ -56,7 +67,7 @@ Every hook is linear in `z = clamp((score - 50) / 40, -1, 1)`, so 50 is exactly 
 | `screenContribution`             | add to the team's `synergy.off` per player on the court                                                                                | 0        | +-0.06                                                     |
 | `screenShotDelta`                | add to make probability of his own shots that come off a screen/roll/pop                                                               | 0        | +-0.02                                                     |
 | `looseBallBonus`                 | multiply his weight in loose-ball, deflection, off-ball steal and charge-drawn events                                                  | 1        | 0.8-1.2                                                    |
-| `foulProneness`                  | multiply his personal foul probability                                                                                                 | 1        | 0.75-1.25                                                  |
+| `foulProneness`                  | multiply his personal foul probability                                                                                                 | 1        | 0.69-1.31 (incl. veteran savvy)                            |
 | `gambleStealMultiplier`          | multiply his steal probability (gamblers steal more, stay-at-home players less)                                                        | 1        | 0.88-1.12                                                  |
 | `energyRecoveryRate`             | multiply the energy he regains per minute on the bench (the `min * 0.094` term)                                                        | 1        | 0.85-1.15                                                  |
 | `pressureTurnoverMult(pressure)` | `pressure` 0-1 (defence's pressure on the ball handler); multiply his turnover probability                                             | 1        | 0.8-1.2 at pressure 1                                      |
@@ -126,6 +137,8 @@ The sim level check is `playerTraitsSim.test.ts` / `traitsMetrics.ts`: the same 
 
 (Standard error of a difference at 10,000 games: about 0.15% for points, 0.17% for FG%, 0.2% for the 3PA rate, 0.33% for TOV%, 0.4% for FTA, 2.6% for injuries.) The effects themselves, same run: top-third clutch players' make probability in clutch time +1.9 points, bottom third -0.9 (designed: +-0.04 times z times the situation weight); gunners (bottom third of shot discipline) take 12.2 -> 12.7 shots per 36 minutes at 44.5% -> 43.8%, disciplined players 14.3 -> 13.8 at 43.5% -> 44.3%; the sd of per-game FG% grows by 0.0043 for volatile players and 0.0032 for steady ones.
 
+Veteran savvy check (5,000 games off vs on, 13 traits, offset -4.5): minutes-weighted mean veteran savvy score 49.8 (other traits 49.5-50.6); points 105.39 -> 105.36 (-0.03%), FG% 0.4388 -> 0.4402 (+0.33%), 3PA rate -0.7%, TOV% 0.1409 -> 0.1421 (+0.9%), FT% -0.08%, FTA +0.2%, fouls 19.28 -> 19.31 (+0.17%), injuries -3.1% (standard errors about 1.4x the 10,000-game ones above). Mentoring, 3 generated leagues x 12 preseasons of development (same random streams with mentoring off and on): league mean ovr difference after 12 seasons +0.003, +0.051, +0.018 (mean +0.02), i.e. no inflation.
+
 If the ratings generator or the league's age mix changes a lot, rerun the calibration (temporary test printing mean scores, minutes-weighted over the sim's players) and update `CALIBRATION_OFFSETS` and `REFERENCE_RATINGS`.
 
 ## Scouting uncertainty
@@ -137,6 +150,6 @@ Prospects' traits are partly hidden. `traitUncertainty` gives an sd in score poi
 - Player page: **Traits** section (badges, bars with scouting range, plain-language descriptions, "How traits affect games").
 - Draft Scouting: a **Traits** column with badges (`?` for estimates) and an optional single trait column.
 - Advanced Player Search: a **Traits** category for filters (`trait:<key>` columns, 0-100) and for "show" columns.
-- Customize Player (God Mode): sliders for all twelve scores; they move the stored seeds so the score lands on the chosen value.
+- Customize Player (God Mode): sliders for all thirteen scores; they move the stored seeds so the score lands on the chosen value.
 - Table columns `trait:<key>` exist in `getCols` for any table that wants them.
 - Settings: Game Simulation > **Player Traits**.

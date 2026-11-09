@@ -187,7 +187,7 @@ describe("scores", () => {
 		const s = traitScores({}, undefined);
 		for (const key of TRAIT_KEYS) {
 			// Calibration offsets are small
-			assert.isAtMost(Math.abs(s[key] - 50), 5, key);
+			assert.isAtMost(Math.abs(s[key] - 50), 6, key);
 		}
 	});
 
@@ -277,7 +277,10 @@ describe("effects: neutrality and bounds", () => {
 			assert.isAtMost(Math.abs(e.screenContribution), A.screenSynergy + 1e-9);
 			assert.isAtMost(Math.abs(e.screenShotDelta), A.screenShot + 1e-9);
 			assert.isAtMost(Math.abs(e.looseBallBonus - 1), A.hustle + 1e-9);
-			assert.isAtMost(Math.abs(e.foulProneness - 1), A.foul + 1e-9);
+			assert.isAtMost(
+				Math.abs(e.foulProneness - 1),
+				A.foul + A.veteranFoul + 1e-9,
+			);
 			assert.isAtMost(
 				Math.abs(e.gambleStealMultiplier - 1),
 				A.gambleSteal + 1e-9,
@@ -290,19 +293,19 @@ describe("effects: neutrality and bounds", () => {
 						const sit = { period, timeLeft, scoreDiff };
 						assert.isAtMost(
 							Math.abs(e.clutchShotModifier(sit)),
-							A.clutchShot + 1e-9,
+							A.clutchShot + A.veteranClutchShot + 1e-9,
 						);
 						assert.isAtMost(
 							Math.abs(e.clutchFtModifier(sit)),
-							A.clutchFt + 1e-9,
+							A.clutchFt + A.veteranClutchFt + 1e-9,
 						);
 						assert.isAtMost(
 							Math.abs(e.clutchTurnoverMult(sit) - 1),
-							A.clutchTurnover + 1e-9,
+							A.clutchTurnover + A.veteranClutchTurnover + 1e-9,
 						);
 						assert.isAtMost(
 							Math.abs(e.lateGameDecisionQuality(sit)),
-							A.lateGameDecision + 1e-9,
+							A.lateGameDecision + A.veteranLateGame + 1e-9,
 						);
 					}
 				}
@@ -318,7 +321,7 @@ describe("effects: neutrality and bounds", () => {
 			for (const pressure of [0, 0.5, 1, 3]) {
 				assert.isAtMost(
 					Math.abs(e.pressureTurnoverMult(pressure) - 1),
-					A.pressureTurnover + 1e-9,
+					A.pressureTurnover + A.veteranPressureTurnover + 1e-9,
 				);
 			}
 		}

@@ -16,6 +16,11 @@ import type {
 	MinimalPlayerRatings,
 	NonEmptyArray,
 } from "../../../common/types.ts";
+import {
+	applyMentorBonus,
+	MENTOR_RATING_KEYS,
+} from "../../../common/playerTraits/veteran.ts";
+import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import genWeight from "./genWeight.ts";
 import potEstimator from "./potEstimator.ts";
 import { TOO_MANY_TEAMS_TOO_SLOW } from "../season/getInitialNumGamesConfDivSettings.ts";
@@ -147,6 +152,8 @@ const develop = async (
 	newPlayer: boolean = false,
 	coachingLevel: number = DEFAULT_LEVEL,
 	skipPot: boolean = false, // Only for making testing or core/debug faster
+	// Basketball player traits: mentoring by savvy veterans (ovr points in expectation, see getMentorBonuses). 0 = none, nothing drawn
+	mentor?: { bonus: number; seed: string },
 ) => {
 	const ratings = last(p.ratings);
 	let age = ratings.season - p.born.year;
@@ -160,6 +167,20 @@ const develop = async (
 		if (!ratings.locked) {
 			await developSeason(ratings, age, p.srID, coachingLevel, false);
 		}
+	}
+
+	if (
+		__SPORT === "basketball" &&
+		mentor &&
+		mentor.bonus !== 0 &&
+		!ratings.locked
+	) {
+		applyMentorBonus(
+			ratings as any,
+			mentor.bonus,
+			new Rng(mentor.seed).random(),
+			MENTOR_RATING_KEYS,
+		);
 	}
 
 	// years===0 condition is so editing locked player in God Mode will update ovr and pot
