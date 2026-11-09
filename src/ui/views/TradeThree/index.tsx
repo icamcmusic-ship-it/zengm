@@ -218,6 +218,25 @@ const TradeThree = ({
 		}
 	};
 
+	const [askingAi, setAskingAi] = useState(false);
+	const askAi = async () => {
+		setAskingAi(true);
+		const response = await toWorker(
+			"main",
+			"makeItWorkMultiTeamTrade",
+			multiTeamTrade,
+		);
+		setAskingAi(false);
+		if (response.changed) {
+			setAssets(response.trade.assets);
+		}
+		setResult({
+			accepted: false,
+			message: response.message,
+			explanations: [],
+		});
+	};
+
 	const explanations = result?.explanations ?? evaluation?.explanations ?? [];
 
 	return (
@@ -345,6 +364,18 @@ const TradeThree = ({
 																		?.abbrev,
 																)}
 															</span>
+														) : null}
+														{asset.condition?.type === "protection" &&
+														asset.condition.amend &&
+														!dp.canHaveCondition ? (
+															<button
+																className="btn btn-link btn-sm p-0 ms-1"
+																onClick={() => {
+																	setCondition(dp.dpid, null);
+																}}
+															>
+																keep existing
+															</button>
 														) : null}
 														{pickConditionsOn && dp.canHaveCondition ? (
 															<PickConditionEditor
@@ -474,6 +505,16 @@ const TradeThree = ({
 					>
 						Propose trade
 					</ActionButton>
+					{pickConditionsOn ? (
+						<ActionButton
+							disabled={askingAi || validAssets.length === 0}
+							onClick={askAi}
+							processing={askingAi}
+							variant="secondary"
+						>
+							What would make this work?
+						</ActionButton>
+					) : null}
 					<button
 						className="btn btn-secondary"
 						onClick={() => {

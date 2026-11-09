@@ -12,7 +12,16 @@ import {
 import { resetCache, resetG } from "../../../test/helpers.ts";
 import { g } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
-import makeItWork, { getPickTermsVariants } from "./makeItWork.ts";
+import makeItWork, {
+	getPickTermsVariants,
+	withStartingProtections,
+} from "./makeItWork.ts";
+import {
+	makeItWorkMulti,
+	validateAssets,
+	type MultiTeamTrade,
+} from "./multiTeam.ts";
+import { validatePickConditionSpec } from "../../../common/draftPickConditions.ts";
 import type { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 
 const dp = (x: Partial<DraftPick> & { dpid: number }): DraftPick => ({
@@ -174,5 +183,150 @@ describe("AI asking for terms on the other team's picks", () => {
 		});
 		const c = teams?.[0].pickConditions?.find((c) => c.dpid === 1);
 		assert.strictEqual(c?.type, "protection");
+	});
+
+	test("starting protections on picks the AI asks for", async () => {
+		const always = await withStartingProtections(tradeTeams(), () => 0);
+		assert.strictEqual(always[0].pickConditions?.[0]?.type, "protection");
+		assert.strictEqual(always[0].pickConditions?.[0]?.tid, 1);
+		const never = await withStartingProtections(tradeTeams(), () => 0.99);
+		assert.isUndefined(never[0].pickConditions);
+		g.setWithoutSavingToDB("featureDraftPickConditions", false);
+		const off = await withStartingProtections(tradeTeams(), () => 0);
+		assert.isUndefined(off[0].pickConditions);
+	});
+
+	test("validation of changes to a stored protection", () => {
+		const pick = dp({
+			dpid: 3,
+			tid: 2,
+			protection: { tid: 0, top: 10, rollover: [], then: "unprotected" },
+		});
+		const amend = {
+			type: "protection" as const,
+			top: 5,
+			rollover: [],
+			then: "unprotected" as const,
+			amend: true as const,
+		};
+		// Protecting team in the trade
+		assert.isUndefined(
+			validatePickConditionSpec(amend, pick, 30, {
+				participants: [0, 1, 2],
+				toTid: 1,
+			}),
+		);
+		assert.isUndefined(
+			validatePickConditionSpec({ ...amend, top: 0 }, pick, 30, {
+				participants: [0, 1, 2],
+				toTid: 1,
+			}),
+		);
+		// Protecting team not in the trade, or no info (2-team Trade page)
+		assert.isDefined(
+			validatePickConditionSpec(amend, pick, 30, {
+				participants: [1, 2],
+				toTid: 1,
+			}),
+		);
+		assert.isDefined(validatePickConditionSpec(amend, pick, 30));
+		// Pick going back to the protecting team
+		assert.isDefined(
+			validatePickConditionSpec(amend, pick, 30, {
+				participants: [0, 2],
+				toTid: 0,
+			}),
+		);
+		// Nothing to change
+		assert.isDefined(
+			validatePickConditionSpec(amend, { ...pick, protection: undefined }, 30, {
+				participants: [0, 1, 2],
+				toTid: 1,
+			}),
+		);
+		// A new condition still can't go on a protected pick
+		assert.isDefined(
+			validatePickConditionSpec({ ...amend, amend: undefined }, pick, 30),
+		);
+	});
+
+	describe("3-team trades", () => {
+		// Team 1 wants dpid 1 (new protection) and dpid 3 (stored protection held by the user) protected at most top maxTop
+		const multiCalculator = (maxTop: number) =>
+			({
+				evaluate: (args: {
+					tid: number;
+					pickConditions?: TradePickCondition[];
+				}) => {
+					if (args.tid !== 1) {
+						return Promise.resolve(1);
+					}
+					let dv = 1;
+					for (const [dpid, storedTop] of [
+						[1, 0],
+						[3, 10],
+					] as const) {
+						const c = args.pickConditions?.find((c) => c.dpid === dpid);
+						const top = c?.type === "protection" ? c.top : storedTop;
+						if (top > maxTop) {
+							dv -= 2;
+						}
+						dv -= top / 100;
+					}
+					return Promise.resolve(dv);
+				},
+			}) as unknown as ValueChangeCalculator;
+
+		beforeEach(async () => {
+			await idb.cache.draftPicks.put(
+				dp({
+					dpid: 3,
+					tid: 2,
+					originalTid: 2,
+					protection: { tid: 0, top: 10, rollover: [], then: "unprotected" },
+				}),
+			);
+		});
+
+		test("asks to loosen a new protection and a stored one held by the user", async () => {
+			const trade: MultiTeamTrade = {
+				tids: [0, 1, 2],
+				assets: [
+					{
+						type: "pick",
+						id: 1,
+						fromTid: 0,
+						toTid: 1,
+						condition: {
+							type: "protection",
+							top: 10,
+							rollover: [],
+							then: "unprotected",
+						},
+					},
+					{ type: "pick", id: 3, fromTid: 2, toTid: 1 },
+				],
+			};
+			assert.isUndefined(await validateAssets(trade));
+			const result = await makeItWorkMulti(trade, 0, multiCalculator(5));
+			assert.isTrue(result.changed);
+			const c1 = result.trade.assets.find((a) => a.id === 1)!.condition;
+			const c3 = result.trade.assets.find((a) => a.id === 3)!.condition;
+			assert.strictEqual(c1?.type === "protection" && c1.top, 5);
+			assert.isTrue(c3?.type === "protection" && c3.amend && c3.top === 5);
+			assert.isUndefined(await validateAssets(result.trade));
+			assert.include(result.message, "lowered to top 5");
+			assert.include(result.message, "existing top 10 protection");
+		});
+
+		test("nothing to change", async () => {
+			const trade: MultiTeamTrade = {
+				tids: [0, 1, 2],
+				assets: [{ type: "pick", id: 1, fromTid: 0, toTid: 1 }],
+			};
+			const result = await makeItWorkMulti(trade, 0, multiCalculator(-1));
+			assert.isFalse(result.changed);
+			assert.strictEqual(result.trade, trade);
+		});
 	});
 });

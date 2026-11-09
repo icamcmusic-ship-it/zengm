@@ -20,6 +20,9 @@ const MAX_ROLLOVER = 4;
 export const protectionText = (
 	p: Pick<DraftPickProtection, "top" | "rollover" | "then">,
 ) => {
+	if (p.top <= 0) {
+		return "unprotected";
+	}
 	const parts = [`top ${p.top} protected`];
 	for (const top of p.rollover) {
 		parts.push(`top ${top}`);
@@ -30,6 +33,11 @@ export const protectionText = (
 
 export const conditionSpecText = (spec: PickConditionSpec, abbrev?: string) => {
 	if (spec.type === "protection") {
+		if (spec.amend) {
+			return spec.top <= 0
+				? "protection removed"
+				: `protection changed to ${protectionText(spec)}`;
+		}
 		return protectionText(spec);
 	}
 	return abbrev ? `swap rights to ${abbrev}` : "swap rights";
@@ -64,9 +72,37 @@ export const validatePickConditionSpec = (
 		pick?: number;
 	},
 	numPicksPerRound: number,
+	// For changing a protection already on the pick (spec.amend): the teams in the trade, and the team receiving the pick
+	amendInfo?: { participants: number[]; toTid: number | undefined },
 ): string | undefined => {
 	if (typeof dp.season !== "number") {
 		return "Only picks in a regular draft can have conditions.";
+	}
+	if (spec.type === "protection" && spec.amend) {
+		const protection = dp.protection as { tid?: number } | undefined;
+		if (!protection || protection.tid === undefined) {
+			return "This pick has no protection to change.";
+		}
+		if (dp.pick !== undefined && dp.pick > 0) {
+			return "The draft order is already set.";
+		}
+		if (
+			!amendInfo ||
+			!amendInfo.participants.includes(protection.tid) ||
+			protection.tid === amendInfo.toTid
+		) {
+			return "Only the team holding the protection can change it, so it has to be in the trade.";
+		}
+		if (spec.top <= 0) {
+			return spec.top === 0 && spec.rollover.length === 0
+				? undefined
+				: "Invalid protection.";
+		}
+		return validatePickConditionSpec(
+			{ ...spec, amend: undefined },
+			{ ...dp, protection: undefined, swap: undefined },
+			numPicksPerRound,
+		);
 	}
 	if (dp.protection || dp.swap) {
 		return "This pick already has a condition.";
@@ -129,7 +165,22 @@ const ASK_TOPS = [1, 3, 5, 8, 10, 14];
 // shorter rollover, "unprotected" fallback, lower top-N, and finally no protection at all (undefined)
 export const getProtectionLoosenings = (
 	spec: ProtectionSpec,
+	// Loosening a protection already stored on the pick: the results replace it, and removing it is top 0
+	amend?: boolean,
 ): (ProtectionSpec | undefined)[] => {
+	if (amend) {
+		return getProtectionLoosenings({ ...spec, amend: undefined }).map((x) =>
+			x
+				? { ...x, amend: true as const }
+				: {
+						type: "protection" as const,
+						top: 0,
+						rollover: [],
+						then: "unprotected" as const,
+						amend: true as const,
+					},
+		);
+	}
 	const out: (ProtectionSpec | undefined)[] = [];
 	if (spec.rollover.length > 0) {
 		out.push({ ...spec, rollover: spec.rollover.slice(0, -1) });
@@ -167,6 +218,25 @@ export const pickConditionChangeText = (
 	after: PickConditionSpec | undefined,
 	pickText: string,
 ) => {
+	if (after?.type === "protection" && after.amend) {
+		// before is the protection stored on the pick
+		const removed = after.top <= 0;
+		if (before?.type === "protection") {
+			if (removed) {
+				return `They want the existing top ${before.top} protection on ${pickText} removed.`;
+			}
+			if (
+				after.top < before.top &&
+				after.then === before.then &&
+				after.rollover.length === before.rollover.length
+			) {
+				return `They want the existing top ${before.top} protection on ${pickText} lowered to top ${after.top}.`;
+			}
+		}
+		return removed
+			? `They want the existing protection on ${pickText} removed.`
+			: `They want the existing protection on ${pickText} changed to ${protectionText(after)}.`;
+	}
 	if (before?.type === "protection" && !after) {
 		return `They want the top ${before.top} protection on ${pickText} removed.`;
 	}

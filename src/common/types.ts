@@ -290,6 +290,8 @@ export type PickConditionSpec =
 			top: number;
 			rollover: number[];
 			then: DraftPickProtectionThen;
+			// Replaces the protection already stored on the pick (from an earlier trade), instead of adding a new one. top 0 removes it. Only allowed when the team holding that protection is in the trade.
+			amend?: true;
 	  }
 	| {
 			type: "swap";

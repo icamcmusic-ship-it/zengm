@@ -962,8 +962,16 @@ const getPickInfo = async (
 		swapWithTid = dp.swap.tid;
 		swapType = "min";
 	}
+	// An amended protection replaces the stored one (top 0 removes it)
+	const amended = condition?.type === "protection" && condition.amend;
 	const protection =
-		condition?.type === "protection" ? condition : dp.protection;
+		condition?.type === "protection"
+			? amended
+				? condition.top > 0
+					? { ...condition, tid: dp.protection?.tid }
+					: undefined
+				: condition
+			: dp.protection;
 	if (
 		typeof dp.season === "number" &&
 		(protection || swapWithTid !== undefined)
@@ -973,7 +981,9 @@ const getPickInfo = async (
 		if (protection) {
 			// For a new condition, the team giving the pick away keeps it if protected. For an existing one, protection.tid is that team
 			const fallbackOwnerTid =
-				condition?.type === "protection" ? dp.tid : (protection.tid ?? dp.tid);
+				condition?.type === "protection" && !amended
+					? dp.tid
+					: (protection.tid ?? dp.tid);
 			const probFallbackDelivered = getFallbackDeliveredProb(
 				dp,
 				protection,

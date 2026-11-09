@@ -185,6 +185,49 @@ export const getConditionVariants = async (
 	return variants;
 };
 
+// Chance that a 1st round pick the AI asks for starts out protected, in AI offers and AI-AI trades, so the AI can then ask to loosen the protection (or keep it) as part of balancing the trade
+export const STARTING_PROTECTION_PROB = 0.35;
+
+// Start some of teams[0]'s 1st round picks with a protection from the AI menu (draftPickConditions setting)
+export const withStartingProtections = async (
+	teams: TradeTeams,
+	random: () => number = Math.random,
+): Promise<TradeTeams> => {
+	if (!featureOn("draftPickConditions")) {
+		return teams;
+	}
+	const numPicksPerRound = getNumPicksPerRound();
+	const menu = AI_PROTECTION_MENU.filter(
+		(spec) =>
+			spec.top < numPicksPerRound / 2 &&
+			spec.rollover.every((top) => top < numPicksPerRound / 2),
+	);
+	if (menu.length === 0) {
+		return teams;
+	}
+	const newTeams = helpers.deepCopy(teams);
+	for (const dpid of newTeams[0].dpids) {
+		if (newTeams[0].pickConditions?.some((c) => c.dpid === dpid)) {
+			continue;
+		}
+		const dp = await idb.cache.draftPicks.get(dpid);
+		if (!dp || random() >= STARTING_PROTECTION_PROB) {
+			continue;
+		}
+		const spec = {
+			type: "protection" as const,
+			...menu[Math.floor(random() * menu.length)]!,
+		};
+		if (validatePickConditionSpec(spec, dp, numPicksPerRound) === undefined) {
+			newTeams[0].pickConditions = [
+				...(newTeams[0].pickConditions ?? []),
+				{ ...spec, rollover: [...spec.rollover], dpid, tid: newTeams[1].tid },
+			];
+		}
+	}
+	return newTeams;
+};
+
 // Add either the highest value asset or the lowest value one that makes the trade good for the AI team.
 const tryAddAsset = async (
 	teams: TradeTeams,

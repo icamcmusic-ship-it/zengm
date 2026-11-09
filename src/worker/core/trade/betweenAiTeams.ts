@@ -1,7 +1,7 @@
 import { idb } from "../../db/index.ts";
 import { g, helpers, local } from "../../util/index.ts";
 import isUntradable from "./isUntradable.ts";
-import makeItWork from "./makeItWork.ts";
+import makeItWork, { withStartingProtections } from "./makeItWork.ts";
 import processTrade from "./processTrade.ts";
 import summary from "./summary.ts";
 import type { Player, TradeTeams } from "../../../common/types.ts";
@@ -115,7 +115,7 @@ const attempt = async (valueChangeCalculator: ValueChangeCalculator) => {
 		},
 	];
 
-	const teams = await makeItWork(teams0, {
+	const teams = await makeItWork(await withStartingProtections(teams0), {
 		holdUserConstant: false,
 		maxAssetsToAdd: 5,
 		valueChangeCalculator,
