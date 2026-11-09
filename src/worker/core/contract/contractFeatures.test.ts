@@ -641,3 +641,21 @@ describe("trade requests and holdouts", () => {
 		assert.isFalse(isHoldingOut(p));
 	});
 });
+
+describe("getContractDemand fallback", () => {
+	test("fills in a missing demand instead of throwing", async () => {
+		const { getContractDemand } = await import("./index.ts");
+		const { g } = await import("../../util/index.ts");
+		const p: any = {
+			pid: 1,
+			firstName: "Tomislav",
+			lastName: "Basljan",
+			tid: -1,
+			contracts: [],
+		};
+		const demand = getContractDemand(p);
+		assert.strictEqual(demand.amount, g.get("minContract"));
+		assert.ok(demand.exp >= g.get("season"));
+		assert.strictEqual(p.contractDemand, demand);
+	});
+});

@@ -134,7 +134,7 @@ export type Classification = {
 	desc: string;
 	tags: string[];
 	// null when no second archetype is close enough to call him a hybrid
-	secondary: { id: string; name: string } | null;
+	secondary: { id: string; name: string; desc: string } | null;
 	// 0..1: how well the ratings match the primary profile
 	score: number;
 	// 0..1: margin of the primary over the runner-up

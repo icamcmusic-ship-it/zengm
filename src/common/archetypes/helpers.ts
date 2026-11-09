@@ -1,5 +1,10 @@
 // Pure helpers the UI and the worker views share: how an archetype is stored on a player, shown, aggregated and warned about.
-import { ARCHETYPES, archetypeById } from "./classify.ts";
+import {
+	ARCHETYPES,
+	archetypeById,
+	combineArchetypeDescs,
+} from "./classify.ts";
+export { combineArchetypeDescs };
 import type {
 	ArchetypeFamily,
 	ArchetypeGroup,
@@ -76,7 +81,7 @@ export const viewOf = (
 		label: b ? `${a.name} / ${b.name}` : a.name,
 		group: a.group,
 		family: a.family,
-		desc: a.desc,
+		desc: combineArchetypeDescs(a.desc, b?.desc),
 		tier: e.tier,
 		conf: e.conf,
 		season: e.season,

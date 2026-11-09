@@ -696,3 +696,17 @@ describe("storage helpers", () => {
 		assert.strictEqual(compositionOf([]).warnings.length, 0);
 	});
 });
+
+describe("combo archetype descriptions", () => {
+	test("joins both descriptions into one sentence", async () => {
+		const { combineArchetypeDescs } = await import("./classify.ts");
+		assert.strictEqual(
+			combineArchetypeDescs(
+				"Hounds ball handlers and picks pockets.",
+				"Spaces the floor from the corners.",
+			),
+			"Hounds ball handlers and picks pockets, and also spaces the floor from the corners.",
+		);
+		assert.strictEqual(combineArchetypeDescs("Scores.", undefined), "Scores.");
+	});
+});
