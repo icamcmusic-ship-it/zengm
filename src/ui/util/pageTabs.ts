@@ -143,6 +143,11 @@ export const getTabGroup = (pageID: string | undefined) =>
 export const tabHostPageID = (pageID: string | undefined) =>
 	getTabGroup(pageID)?.[0]!.id;
 
+// Whether a page is a tab of a Frivolities page (like Relatives or Jersey Numbers), which have no side menu item of
+// their own, so the side menu's Frivolities item is highlighted on them and their tabs
+export const isFrivolitiesTabPage = (pageID: string | undefined) =>
+	getTabGroup(pageID)?.[0]!.url[0] === "frivolities";
+
 const urlKey = (url: readonly unknown[]) =>
 	url.filter((part) => typeof part === "string").join("/");
 

@@ -222,10 +222,6 @@ const JerseyNumbersTeams = ({
 				The best player to wear each number for each team, every retired number
 				with what its honoree did in it, and the numbers that look due to be
 				retired. More:{" "}
-				<a href={helpers.leagueUrl(["frivolities", "jersey_numbers"])}>
-					Jersey Numbers (league-wide)
-				</a>{" "}
-				|{" "}
 				<a
 					href={helpers.leagueUrl([
 						"frivolities",

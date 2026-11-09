@@ -53,13 +53,15 @@ const LeagueEconomics = ({
 
 	const payrollRows = useMemo(
 		() =>
-			seasons.map((s): ChartRow => ({
-				x: s.season,
-				mean: s.mean,
-				max: s.max,
-				min: s.min,
-				gini: s.gini,
-			})),
+			seasons.map(
+				(s): ChartRow => ({
+					x: s.season,
+					mean: s.mean,
+					max: s.max,
+					min: s.min,
+					gini: s.gini,
+				}),
+			),
 		[seasons],
 	);
 
@@ -257,8 +259,7 @@ const LeagueEconomics = ({
 			<MoreLinks type="finances" page="frivolities/economics" />
 			<p>
 				Payroll inequality, luxury tax bills, payroll growth and whether the
-				biggest payroll wins. Payrolls are as of the end of each season. More:{" "}
-				<a href={helpers.leagueUrl(["league_finances"])}>League Finances</a>
+				biggest payroll wins. Payrolls are as of the end of each season.
 			</p>
 
 			{summary && last ? (

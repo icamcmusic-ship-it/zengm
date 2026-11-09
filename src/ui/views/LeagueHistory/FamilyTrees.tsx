@@ -267,8 +267,7 @@ const FamilyTreesLoaded = ({
 		<>
 			<p>
 				{related} players with relatives in the league, in {numFamilies} famil
-				{numFamilies === 1 ? "y" : "ies"}. Regular season stats. More:{" "}
-				<a href={helpers.leagueUrl(["frivolities", "relatives"])}>Relatives</a>
+				{numFamilies === 1 ? "y" : "ies"}. Regular season stats.
 			</p>
 
 			{requestedPid !== undefined && selected === undefined ? (

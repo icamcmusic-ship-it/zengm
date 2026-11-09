@@ -167,22 +167,6 @@ export const genView = (
 					are <span className="text-success">highlighted in green</span>. Hall
 					of Famers are <span className="text-danger">highlighted in red</span>.
 				</p>
-				{type === "jerseyNumbers" ? (
-					<p>
-						More:{" "}
-						<a
-							href={helpers.leagueUrl([
-								"frivolities",
-								"jersey_numbers",
-								"teams",
-							])}
-						>
-							Jersey Numbers by Team
-						</a>{" "}
-						(best player in each number for each team, retired numbers and
-						numbers to retire)
-					</p>
-				) : null}
 				<DataTable
 					cols={cols}
 					defaultSort={[type === "jerseyNumbers" ? 7 : 6, "desc"]}

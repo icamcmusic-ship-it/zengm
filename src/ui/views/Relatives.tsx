@@ -171,16 +171,6 @@ const Relatives = ({ pid, players, stats }: View<"relatives">) => {
 				<p>
 					These are the players with a relative in the league. Click "Details"
 					for a player to see {helpers.pronoun(gender, "his")} relatives.
-					{familyTreesOn ? (
-						<>
-							{" "}
-							See the{" "}
-							<a href={helpers.leagueUrl(["frivolities", "family_trees"])}>
-								Family Trees
-							</a>{" "}
-							for whole families and family records.
-						</>
-					) : null}
 				</p>
 			)}
 

@@ -1,12 +1,22 @@
-import { assert, test } from "vitest";
+import { assert, test, vi } from "vitest";
 import {
 	getTabGroup,
+	isFrivolitiesTabPage,
 	isTabOfSamePage,
 	PAGE_TAB_GROUPS,
 	tabHostPageID,
 	tabsForSport,
 } from "./pageTabs.ts";
+import type {
+	MenuItemHeader,
+	MenuItemLink,
+	MenuItemText,
+} from "../../common/types.ts";
 import { routeInfos } from "./routeInfos.ts";
+
+// menuItems imports the game worker and the router, which need a browser
+vi.mock("./promiseWorker.ts", () => ({ promiseWorker: {} }));
+vi.mock("../router/index.ts", () => ({ default: {} }));
 
 test("every tab URL is a route of its own view, so old links land on the tab", () => {
 	const routes = routeInfos as Record<string, string>;
@@ -74,4 +84,48 @@ test("More links to other tabs of the same page are dropped", () => {
 	);
 	assert.isFalse(isTabOfSamePage(["roster"], "player_ratings"));
 	assert.isFalse(isTabOfSamePage("/settings", "player_ratings"));
+});
+
+test("Frivolities tab pages are recognized, other tab pages are not", () => {
+	for (const id of [
+		"relatives",
+		"familyTrees",
+		"frivolitiesJerseyNumbers",
+		"jerseyNumbersTeams",
+	]) {
+		assert.isTrue(isFrivolitiesTabPage(id), id);
+	}
+	for (const id of ["homeCourt", "redraft", "skillBadges", "frivolities"]) {
+		assert.isFalse(isFrivolitiesTabPage(id), id);
+	}
+	assert.isFalse(isFrivolitiesTabPage(undefined));
+});
+
+test("every tab page highlights a visible side menu item, like SideBar does", async () => {
+	vi.stubGlobal("CSS", { supports: () => false });
+	const { menuItems } = await import("./menuItems.tsx");
+	const links: MenuItemLink[] = [];
+	const walk = (
+		items: readonly (MenuItemLink | MenuItemHeader | MenuItemText)[],
+	) => {
+		for (const item of items) {
+			if (item.type === "header" && !item.commandPaletteOnly) {
+				walk(item.children);
+			} else if (item.type === "link" && !item.commandPaletteOnly) {
+				links.push(item);
+			}
+		}
+	};
+	walk(menuItems);
+	for (const group of PAGE_TAB_GROUPS) {
+		for (const tab of group) {
+			const host = tabHostPageID(tab.id);
+			const active = links.filter(
+				(link) =>
+					link.active?.(tab.id, undefined) ||
+					(host !== undefined && link.active?.(host, undefined)),
+			);
+			assert.isAtLeast(active.length, 1, tab.id);
+		}
+	}
 });
