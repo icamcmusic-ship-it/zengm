@@ -16,7 +16,8 @@ for (const [i, c] of [...ALPHABET].entries()) {
 	CHAR_VALUE[c] = i;
 }
 
-const VERSION = 1;
+// 2: each player also has his temper score (player traits, for the trash talk; 0 = none). Version 1 strings still decode
+const VERSION = 2;
 
 // Stats, most common first. Keep in sync with STORED_STATS in GameSim.basketball/PlayByPlayLogger.ts. Never reorder: stored games use these
 const STATS = [
@@ -410,6 +411,12 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 		} else {
 			head.num(0);
 		}
+		const temper = p.ratings?.["temper"];
+		head.num(
+			typeof temper === "number" && Number.isFinite(temper)
+				? Math.max(0, Math.round(temper)) + 1
+				: 0,
+		);
 	}
 
 	return head.out + body.out;
@@ -421,7 +428,7 @@ export const decodePlayByPlay = (
 ): { players: StoredPlayer[]; events: any[] } => {
 	const r = new Reader(s);
 	const version = r.num();
-	if (version !== VERSION) {
+	if (version !== VERSION && version !== 1) {
 		throw new Error(`Unknown stored play-by-play version ${version}`);
 	}
 	const numPlayers = r.num();
@@ -437,6 +444,13 @@ export const decodePlayByPlay = (
 				if (v > 0) {
 					ratings[key] = v - 1;
 				}
+			}
+		}
+		if (version >= 2) {
+			const temper = r.num();
+			if (temper > 0) {
+				ratings ??= {};
+				ratings["temper"] = temper - 1;
 			}
 		}
 		players.push({ pid, t, ratings });

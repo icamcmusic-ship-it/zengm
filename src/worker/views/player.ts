@@ -191,7 +191,7 @@ export const getPlayer = async <
 export const getCommon = async (
 	pid: number | undefined,
 	season: number | undefined,
-	view: "player" | "player_game_log" | "player_pre_draft",
+	view: "player" | "player_game_log" | "player_pre_draft" | "player_traits",
 ) => {
 	if (pid === undefined) {
 		// https://stackoverflow.com/a/59923262/786644
@@ -410,7 +410,9 @@ export const getCommon = async (
 					? ["player_game_log", p2.pid, season]
 					: view === "player_pre_draft"
 						? ["player_pre_draft", p2.pid]
-						: ["player", p2.pid];
+						: view === "player_traits"
+							? ["player_traits", p2.pid]
+							: ["player", p2.pid];
 
 			return {
 				type: "link",

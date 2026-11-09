@@ -279,13 +279,26 @@ export const runPopModel = async ({
 				PLAYER.FREE_AGENT,
 				Infinity,
 			]);
+			// Like newPhasePreseason: work ethic and aging curve (player traits)
+			const traitDevelopment = player.getTraitDevelopment(
+				players as any,
+				season + 1,
+			);
 			for (const p of players) {
 				const h = levelHistory.get(p.tid);
 				const level = h
 					? h.reduce((a, b) => a + b, 0) / h.length
 					: DEFAULT_LEVEL;
 				player.addRatingsRow(p, DEFAULT_LEVEL);
-				await player.develop(p, 1, false, level);
+				await player.develop(
+					p,
+					1,
+					false,
+					level,
+					false,
+					undefined,
+					traitDevelopment.get(p.pid),
+				);
 				player.developTraits(p as any, season + 1);
 				await player.updateValues(p);
 				await idb.cache.players.put(p);

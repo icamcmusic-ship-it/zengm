@@ -56,6 +56,7 @@ const makeFlavorSession = (initEvent: unknown, boxScore: any) => {
 			abbrev: t.abbrev ?? "",
 		})) as [{ name: string; abbrev: string }, { name: string; abbrev: string }],
 		players: playersFromInitEvent(initEvent),
+		context: { playoffs: !!boxScore.playoffs },
 	});
 };
 

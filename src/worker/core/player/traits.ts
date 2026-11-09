@@ -21,6 +21,17 @@ import {
 	aiTraitSumFromZs,
 	aiTraitValueFactorFromSum,
 	residualTraitZs,
+	scoreOne,
+	agingCurveDelta,
+	agingCurveForPlayer,
+	centerDevelopment,
+	egoTradeRequestMoodShift,
+	egoTradeRequestProbMult,
+	lockerRoomMood,
+	workEthicZ,
+	AGING_CURVE_INFO,
+	type AgingCurve,
+	type TraitDevelopment,
 	type PlayerTraits,
 	type ScoutedTrait,
 	type TraitEffects,
@@ -151,6 +162,12 @@ export const developTraits = (
 
 export type PlayerTraitsForUI = {
 	enabled: true;
+	// The aging curve is secret: only set for a retired player (revealed on retirement), never for anyone else
+	agingCurve?: {
+		curve: AgingCurve;
+		name: string;
+		description: string;
+	};
 	// What to show (estimates for prospects)
 	traits: ScoutedTrait[];
 	scores: Record<TraitKey, number>;
@@ -201,10 +218,78 @@ export const getPlayerTraitsForUI = (
 	}
 	return {
 		enabled: true,
+		agingCurve: getRevealedAgingCurve(p),
 		traits,
 		scores,
 		isProspect,
 		exactScores: includeExact ? exact : undefined,
+	};
+};
+
+// The aging curve, for the worker only (development). Never send this to the UI: use getRevealedAgingCurve
+const getAgingCurve = (p: { pid?: number }) =>
+	agingCurveForPlayer(getLeagueTraitSeed(), p.pid ?? 0);
+
+// The aging curve as the user may see it: only once he has retired (otherwise undefined, also in God Mode)
+export const getRevealedAgingCurve = (p: TraitPlayer & { pid: number }) => {
+	if (!traitsEnabled() || p.tid !== PLAYER.RETIRED) {
+		return undefined;
+	}
+	const curve = getAgingCurve(p);
+	return { curve, ...AGING_CURVE_INFO[curve] };
+};
+
+/**
+ * Work ethic and aging curve, for newPhasePreseason before players develop. players: every player developing this preseason, ratings still
+ * last season's. newSeason: the season being started. Returns pid -> development plan to pass to player.develop, centered on these players so
+ * the league as a whole develops exactly as much as without traits (no rating inflation). Empty when the setting is off.
+ */
+export const getTraitDevelopment = (
+	players: (TraitPlayer & { pid: number })[],
+	newSeason: number,
+): Map<number, TraitDevelopment> => {
+	if (!traitsEnabled()) {
+		return new Map();
+	}
+	const rows = players.map((p) => {
+		const age = newSeason - p.born.year;
+		const score = getPlayerTraitScores(p, newSeason - 1).workEthic;
+		return {
+			pid: p.pid,
+			age,
+			workEthicZ: workEthicZ(score),
+			agingDelta: agingCurveDelta(getAgingCurve(p), age),
+		};
+	});
+	return centerDevelopment(rows);
+};
+
+// Ego score from the seed alone (ego has no ratings or age part), cheap enough for mood, which runs often
+export const getEgoScore = (p: TraitPlayer) =>
+	scoreOne("ego", {}, getTraitSeeds(p).egoSeed);
+
+// The "Locker room" mood component for a player on (or considering) team tid, from his would-be teammates' egos. 0 when traits are off.
+export const getLockerRoomMood = (
+	p: { pid: number },
+	teammates: TraitPlayer[],
+) => {
+	if (!traitsEnabled()) {
+		return 0;
+	}
+	return lockerRoomMood(
+		teammates.filter((p2) => p2.pid !== p.pid).map((p2) => getEgoScore(p2)),
+	);
+};
+
+// Trade requests: his ego moves the mood at which he asks and the chance he asks. Neutral when traits are off.
+export const getEgoTradeRequestInfo = (p: TraitPlayer) => {
+	if (!traitsEnabled()) {
+		return { moodShift: 0, probMult: 1 };
+	}
+	const ego = getEgoScore(p);
+	return {
+		moodShift: egoTradeRequestMoodShift(ego),
+		probMult: egoTradeRequestProbMult(ego),
 	};
 };
 
@@ -410,3 +495,38 @@ export const countMentees = (
 	players: { born: { year: number } }[],
 	season = g.get("season"),
 ) => players.filter((p) => season - p.born.year <= MENTEE_MAX_AGE).length;
+
+/**
+ * Trait scores by season, for the Traits page: his current personality (seeds) with the ratings, age and experience of each season, so it
+ * shows how his ratings and age moved the traits. Only for the keys given (the ones the user can see exactly right now, so nothing leaks).
+ * Seeds themselves are not stored per season.
+ */
+export const getTraitHistory = (
+	p: TraitPlayer & { pid: number },
+	keys: TraitKey[],
+) => {
+	if (!traitsEnabled() || keys.length === 0) {
+		return [];
+	}
+	const seeds = getTraitSeeds(p);
+	const bySeason = new Map<number, TraitRatings & { season: number }>();
+	for (const row of p.ratings) {
+		if (row.season >= p.draft.year) {
+			bySeason.set(row.season, row);
+		}
+	}
+	const output: {
+		season: number;
+		age: number;
+		scores: Partial<TraitScores>;
+	}[] = [];
+	for (const [season, ratings] of bySeason) {
+		const all = traitScores(ratings, seeds, getContext(p, season));
+		const scores: Partial<TraitScores> = {};
+		for (const key of keys) {
+			scores[key] = all[key];
+		}
+		output.push({ season, age: getAge(p, season), scores });
+	}
+	return output.sort((a, b) => a.season - b.season);
+};

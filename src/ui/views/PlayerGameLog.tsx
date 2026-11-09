@@ -1,8 +1,6 @@
 import useTitleBar from "../hooks/useTitleBar.tsx";
-import { dropdownOptions } from "../hooks/useDropdownOptions.tsx";
 import type { View } from "../../common/types.ts";
 import TopStuff from "./Player/TopStuff.tsx";
-import { getProfileDropdownOptions, getProfileUrl } from "./Player/common.tsx";
 import { helpers } from "../util/helpers.ts";
 import { getCols } from "../../common/getCols.ts";
 import { DataTable } from "../components/DataTable/index.tsx";
@@ -11,6 +9,7 @@ import type { DataTableRow } from "../components/DataTable/index.tsx";
 import clsx from "clsx";
 import { InjuryIcon } from "../components/InjuryIcon.tsx";
 import { useLocal } from "../util/local.ts";
+import { getProfileUrl, usePlayerProfileOptions } from "./Player/common.tsx";
 
 type DecisionPlayer = {
 	w: number;
@@ -168,6 +167,7 @@ const PlayerGameLog = ({
 	stats,
 	superCols,
 }: View<"playerGameLog">) => {
+	const profileOptions = usePlayerProfileOptions(player);
 	useTitleBar({
 		title: player.name,
 		customMenu,
@@ -175,9 +175,7 @@ const PlayerGameLog = ({
 			fields: [
 				{
 					key: "profile",
-					options:
-						getProfileDropdownOptions(player) ??
-						dropdownOptions.playerProfile.slice(0, 2),
+					options: profileOptions,
 					value: "gameLog",
 				},
 				{

@@ -37,6 +37,8 @@ const componentText = (
 				return `Happy with ${helpers.pronoun(gender, "his")} playing time`;
 			case "rookieContract":
 				return "Eager to sign first non-rookie contract";
+			case "lockerRoom":
+				return "Enjoys the team-first locker room";
 			case "relatives":
 				return `Wants to play with ${helpers.pronoun(gender, "his")} ${helpers.plural("relative", value / 2)}`;
 		}
@@ -61,6 +63,8 @@ const componentText = (
 			throw new Error("Should never happen");
 		case "relatives":
 			throw new Error("Should never happen");
+		case "lockerRoom":
+			return "Put off by the egos in the locker room";
 	}
 };
 

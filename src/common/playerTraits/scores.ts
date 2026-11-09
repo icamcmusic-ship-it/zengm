@@ -52,6 +52,11 @@ const RATING_WEIGHTS: Record<TraitKey, TraitRatings> = {
 	lateGameIq: { oiq: 0.5, diq: 0.3, pss: 0.2 },
 	leadership: { oiq: 0.3, diq: 0.2, pss: 0.2, endu: 0.1, stre: 0.1, drb: 0.1 },
 	veteranSavvy: { oiq: 0.4, diq: 0.4, pss: 0.2 },
+	// Personality: not tied to ratings at all
+	workEthic: {},
+	bigGame: {},
+	ego: {},
+	temper: {},
 };
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -87,6 +92,8 @@ const contextPart = (
 				1.2 * (Math.min(experience, 12) - NEUTRAL_EXPERIENCE) +
 				0.3 * (clamp(age, 20, 36) - NEUTRAL_AGE)
 			);
+		case "temper":
+			return 0.4 * (clamp(age, 20, 36) - NEUTRAL_AGE);
 		case "veteranSavvy":
 			// Pro seasons played, plateau at 9 (see veteran.ts)
 			return (
@@ -94,7 +101,7 @@ const contextPart = (
 				veteranExperienceCurve(NEUTRAL_EXPERIENCE)
 			);
 		default:
-			// offBall, screen and handle do not change with age or experience, only through the ratings
+			// offBall, screen, handle, workEthic, bigGame and ego do not change with age or experience, only through the ratings
 			return 0;
 	}
 };
@@ -116,6 +123,11 @@ export const CALIBRATION_OFFSETS: Record<TraitKey, number> = {
 	lateGameIq: -3.6,
 	leadership: -5,
 	veteranSavvy: -4.5,
+	// Pure personality (no ratings part), so the average on the court is already 50
+	workEthic: 0,
+	bigGame: 0,
+	ego: 0,
+	temper: 0,
 };
 
 // RATING_WEIGHTS as arrays, in the same order, so ratingPart (hot: every trait score) skips Object.entries. Same arithmetic, same results.

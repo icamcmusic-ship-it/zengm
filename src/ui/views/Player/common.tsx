@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { helpers } from "../../util/helpers.ts";
 import { dropdownOptions } from "../../hooks/useDropdownOptions.tsx";
 import { PLAYER } from "../../../common/constants.ts";
+import { useLocal } from "../../util/local.ts";
 import type { LeagueUrlParts } from "../../router/types.ts";
 
 export const SeasonLink = ({
@@ -45,30 +46,46 @@ export const MaybeBold = ({
 
 // He has a College/Overseas page: pre-draft stats, honors or a college season (basketball)
 export const hasPreDraftInfo = (player: {
-	preDraftStats: unknown[];
-	earlierHonors: unknown[];
+	preDraftStats?: unknown[];
+	earlierHonors?: unknown[];
 	collegeSeason?: unknown;
 }) =>
 	__SPORT === "basketball" &&
-	(player.preDraftStats.length > 0 ||
-		player.earlierHonors.length > 0 ||
+	((player.preDraftStats?.length ?? 0) > 0 ||
+		(player.earlierHonors?.length ?? 0) > 0 ||
 		!!player.collegeSeason);
 
-/**
- * The player profile dropdown (Overview, Game Log, College/Overseas): Game Log only once he is in the league, College/Overseas only with pre-draft info. undefined when there is nothing to switch between.
- */
-export const getProfileDropdownOptions = (player: {
+type ProfilePlayer = {
 	tid: number;
-	preDraftStats: unknown[];
-	earlierHonors: unknown[];
+	preDraftStats?: unknown[];
+	earlierHonors?: unknown[];
 	collegeSeason?: unknown;
-}) => {
+};
+
+/**
+ * The player profile dropdown (Overview, Game Log, College/Overseas, Traits): Game Log only once he is in the league, College/Overseas only with pre-draft info, Traits only with the Player Traits setting on. undefined when there is nothing to switch between.
+ */
+export const getProfileDropdownOptions = (
+	player: ProfilePlayer | undefined,
+	playerTraits = false,
+) => {
 	const options = dropdownOptions.playerProfile.filter(
 		(option) =>
-			(option.key !== "gameLog" || player.tid !== PLAYER.UNDRAFTED) &&
-			(option.key !== "preDraft" || hasPreDraftInfo(player)),
+			(option.key !== "gameLog" ||
+				!player ||
+				player.tid !== PLAYER.UNDRAFTED) &&
+			(option.key !== "preDraft" || (!!player && hasPreDraftInfo(player))) &&
+			(option.key !== "traits" || playerTraits),
 	);
 	return options.length > 1 ? options : undefined;
+};
+
+export const usePlayerProfileOptions = (player?: ProfilePlayer) => {
+	const { playerTraits } = useLocal(["playerTraits"]);
+	return (
+		getProfileDropdownOptions(player, !!playerTraits) ??
+		dropdownOptions.playerProfile.filter((o) => o.key === "overview")
+	);
 };
 
 export const getProfileUrl = (
@@ -82,5 +99,10 @@ export const getProfileUrl = (
 	if (profile === "preDraft") {
 		return ["player_pre_draft", pid];
 	}
+	if (profile === "traits") {
+		return ["player_traits", pid];
+	}
 	return ["player", pid];
 };
+
+export const playerProfileUrl = getProfileUrl;

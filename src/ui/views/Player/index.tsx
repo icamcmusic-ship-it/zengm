@@ -8,7 +8,7 @@ import type { View } from "../../../common/types.ts";
 import { SeasonIcons } from "../../components/SeasonIcons.tsx";
 import TopStuff from "./TopStuff.tsx";
 import { ContractMood } from "./ContractMood.tsx";
-import { PlayerTraitsSection } from "./Traits.tsx";
+import { PlayerTraitsSummary } from "./Traits.tsx";
 import { wrappedSalaryPayers } from "./SalaryPayers.tsx";
 import { PLAYER } from "../../../common/constants.ts";
 import { ProProjectionSection } from "../../components/ProProjection.tsx";
@@ -58,8 +58,8 @@ const Player2 = ({
 		"season",
 	]);
 	const showRatings = !challengeNoRatings || retired;
-
-	const profileOptions = getProfileDropdownOptions(player);
+	const traitsOn = useLocal(["playerTraits"]).playerTraits;
+	const profileOptions = getProfileDropdownOptions(player, !!traitsOn);
 	useTitleBar({
 		title: player.name,
 		customMenu,
@@ -233,7 +233,7 @@ const Player2 = ({
 			</HideableSection>
 
 			{playerTraits && showRatings ? (
-				<PlayerTraitsSection playerTraits={playerTraits} />
+				<PlayerTraitsSummary pid={player.pid} playerTraits={playerTraits} />
 			) : null}
 
 			<div className="row">

@@ -14,6 +14,10 @@ export const TRAIT_KEYS = [
 	"lateGameIq",
 	"leadership",
 	"veteranSavvy",
+	"workEthic",
+	"bigGame",
+	"ego",
+	"temper",
 ] as const;
 
 export type TraitKey = (typeof TRAIT_KEYS)[number];

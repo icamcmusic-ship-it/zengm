@@ -46,6 +46,21 @@ export const EFFECT_AMPLITUDES = {
 	veteranPressureTurnover: 0.05,
 	veteranFoul: 0.06,
 	veteranChemistry: 0.35,
+	// Big-game: in every playoff game (the whole game, not just clutch time), additive make probability on his shots and free throws, and
+	// fractional change to his turnover probability
+	bigGameShot: 0.025,
+	bigGameFt: 0.025,
+	bigGameTurnover: 0.1,
+	// Temper: fractional change to his share of technical fouls (and the rate of technicals while he is on the court), and of flagrant fouls
+	// (negative z = hothead = more)
+	temperTech: 0.6,
+	temperFlagrant: 0.5,
+	// Temper: late-game composure, added on top of the clutch hooks (same units)
+	temperClutchShot: 0.015,
+	temperClutchFt: 0.02,
+	temperClutchTurnover: 0.06,
+	// Ego: added to his chemistryContribution (team-first lifts the team's on-court chemistry, divas lower it)
+	egoChemistry: 0.4,
 } as const;
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -122,8 +137,18 @@ export type TraitEffects = {
 	gambleStealMultiplier: number;
 	/** Multiply the energy he regains per minute on the bench. 0.85-1.15. Neutral 1. */
 	energyRecoveryRate: number;
-	/** His leadership, -1 to 1, for teamChemistryBonus. Neutral 0. */
+	/** His leadership (plus savvy and ego), -1 to 1, for teamChemistryBonus. Neutral 0. */
 	chemistryContribution: number;
+	/** Big-game: add to the make probability of his shots in a playoff game. +-0.025. Neutral 0. Only applied in playoff games. */
+	bigGameShotDelta: number;
+	/** Big-game: add to his free throw probability in a playoff game. +-0.025. Neutral 0. */
+	bigGameFtDelta: number;
+	/** Big-game: multiply his turnover probability in a playoff game. 0.9-1.1. Neutral 1. */
+	bigGameTurnoverMult: number;
+	/** Temper: multiply the technical foul rate while he is on the court and his share of the technicals. 0.4-1.6 (hothead is higher). Neutral 1. */
+	techProneness: number;
+	/** Temper: multiply the flagrant foul rate while he defends and his share of them. 0.5-1.5. Neutral 1. */
+	flagrantProneness: number;
 };
 
 const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
@@ -142,8 +167,12 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		lateGameIq: traitZ(scores.lateGameIq),
 		leadership: traitZ(scores.leadership),
 		veteranSavvy: traitZ(scores.veteranSavvy),
+		bigGame: traitZ(scores.bigGame),
+		ego: traitZ(scores.ego),
+		temper: traitZ(scores.temper),
 	};
 	const vet = z.veteranSavvy;
+	const temper = z.temper;
 
 	const varianceScale = 1 - A.variance * z.consistency;
 
@@ -151,14 +180,20 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		neutral,
 		scores,
 		clutchShotModifier: (s) =>
-			(A.clutchShot * z.clutch + A.veteranClutchShot * vet) *
+			(A.clutchShot * z.clutch +
+				A.veteranClutchShot * vet +
+				A.temperClutchShot * temper) *
 			clutchSituationWeight(s),
 		clutchFtModifier: (s) =>
-			(A.clutchFt * z.clutch + A.veteranClutchFt * vet) *
+			(A.clutchFt * z.clutch +
+				A.veteranClutchFt * vet +
+				A.temperClutchFt * temper) *
 			clutchSituationWeight(s),
 		clutchTurnoverMult: (s) =>
 			1 -
-			(A.clutchTurnover * z.clutch + A.veteranClutchTurnover * vet) *
+			(A.clutchTurnover * z.clutch +
+				A.veteranClutchTurnover * vet +
+				A.temperClutchTurnover * temper) *
 				clutchSituationWeight(s),
 		gameFormShotDelta: (gameZ) => A.gameFormSd * varianceScale * gameZ,
 		shotSelectionBias: (usage) => {
@@ -185,10 +220,15 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		gambleStealMultiplier: 1 - A.gambleSteal * z.foulDiscipline,
 		energyRecoveryRate: 1 + A.recovery * z.recovery,
 		chemistryContribution: clamp(
-			z.leadership + A.veteranChemistry * vet,
+			z.leadership + A.veteranChemistry * vet + A.egoChemistry * z.ego,
 			-1,
 			1,
 		),
+		bigGameShotDelta: A.bigGameShot * z.bigGame,
+		bigGameFtDelta: A.bigGameFt * z.bigGame,
+		bigGameTurnoverMult: 1 - A.bigGameTurnover * z.bigGame,
+		techProneness: 1 - A.temperTech * temper,
+		flagrantProneness: 1 - A.temperFlagrant * temper,
 	};
 };
 

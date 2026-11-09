@@ -287,21 +287,35 @@ describe("effects: neutrality and bounds", () => {
 			);
 			assert.isAtMost(Math.abs(e.energyRecoveryRate - 1), A.recovery + 1e-9);
 			assert.isAtMost(Math.abs(e.chemistryContribution), 1);
+			assert.isAtMost(Math.abs(e.bigGameShotDelta), A.bigGameShot + 1e-9);
+			assert.isAtMost(Math.abs(e.bigGameFtDelta), A.bigGameFt + 1e-9);
+			assert.isAtMost(
+				Math.abs(e.bigGameTurnoverMult - 1),
+				A.bigGameTurnover + 1e-9,
+			);
+			assert.isAtMost(Math.abs(e.techProneness - 1), A.temperTech + 1e-9);
+			assert.isAtMost(
+				Math.abs(e.flagrantProneness - 1),
+				A.temperFlagrant + 1e-9,
+			);
 			for (const period of [1, 4, 5, 7]) {
 				for (const timeLeft of [0, 30, 120, 300, 720]) {
 					for (const scoreDiff of [-30, -9, -3, 0, 3, 9, 30]) {
 						const sit = { period, timeLeft, scoreDiff };
 						assert.isAtMost(
 							Math.abs(e.clutchShotModifier(sit)),
-							A.clutchShot + A.veteranClutchShot + 1e-9,
+							A.clutchShot + A.veteranClutchShot + A.temperClutchShot + 1e-9,
 						);
 						assert.isAtMost(
 							Math.abs(e.clutchFtModifier(sit)),
-							A.clutchFt + A.veteranClutchFt + 1e-9,
+							A.clutchFt + A.veteranClutchFt + A.temperClutchFt + 1e-9,
 						);
 						assert.isAtMost(
 							Math.abs(e.clutchTurnoverMult(sit) - 1),
-							A.clutchTurnover + A.veteranClutchTurnover + 1e-9,
+							A.clutchTurnover +
+								A.veteranClutchTurnover +
+								A.temperClutchTurnover +
+								1e-9,
 						);
 						assert.isAtMost(
 							Math.abs(e.lateGameDecisionQuality(sit)),

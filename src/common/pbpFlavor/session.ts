@@ -57,6 +57,7 @@ import {
 	type ShotKind,
 } from "./calls.ts";
 import { VarietyMemory, pickV, setVariety, weighted } from "./variety.ts";
+import { TrashTalk, applyTrashTalk, tempersFromPlayers } from "./trashTalk.ts";
 import {
 	bare,
 	cap,
@@ -119,6 +120,8 @@ export type FlavorInit = {
 		t: 0 | 1;
 		ratings?: Record<string, number>;
 	}[];
+	// Game context for the trash talk (trashTalk.ts)
+	context?: { playoffs?: boolean; rivalry?: boolean };
 };
 
 // The init event the sim sends first: both teams, with each player's name, position and raw ratings
@@ -471,8 +474,13 @@ export class FlavorSession {
 	private scheme: [string, string] = ["man", "man"];
 	// a rare stoppage, at most one a game
 	private oddity: boolean;
+	// Trash talk from hotheads (the Temper player trait), see trashTalk.ts
+	private trash: TrashTalk;
+	private context: NonNullable<FlavorInit["context"]>;
 
 	constructor(init: FlavorInit) {
+		this.trash = new TrashTalk(init.gid, tempersFromPlayers(init.players));
+		this.context = init.context ?? {};
 		this.gid = init.gid;
 		this.numPeriods = init.numPeriods;
 		this.quarterLength = init.quarterLength;
@@ -619,6 +627,7 @@ export class FlavorSession {
 		];
 		this.prevScore = [score[0], score[1]];
 		const ev: any = e;
+		const pendingShooter = this.pending?.pid;
 		let res: FlavorResult | "silent" | undefined;
 
 		switch (e.type) {
@@ -725,6 +734,18 @@ export class FlavorSession {
 				"The scoreboard briefly shows the wrong score; it's fixed during the stoppage.",
 			]);
 			res.note = [res.note, odd].filter(Boolean).join(" ");
+		}
+		if (typeof res === "object" && this.trash.active) {
+			applyTrashTalk(this.trash, ev, res, {
+				idx: this.idx,
+				pendingShooter,
+				pl: (pid) => this.pl(pid),
+				floor: (t) => this.floor(t),
+				score,
+				late: this.finalPeriod(),
+				run: this.run,
+				...this.context,
+			});
 		}
 		if (typeof res === "object") {
 			this.lastType = e.type;

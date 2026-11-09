@@ -364,6 +364,8 @@ export const dropdownOptions = {
 		{ key: "overview", label: "Overview" },
 		{ key: "gameLog", label: "Game Log" },
 		{ key: "preDraft", label: "College/Overseas" },
+		// Only offered with the Player Traits setting on (see usePlayerProfileOptions)
+		{ key: "traits", label: "Traits" },
 	],
 	playoffs: makeOptions(dropdownKeys.playoffs, playoffsLabels),
 	playoffsCombined: makeOptions(dropdownKeys.playoffsCombined, playoffsLabels),
