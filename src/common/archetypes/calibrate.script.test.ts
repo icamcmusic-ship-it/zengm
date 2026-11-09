@@ -88,8 +88,10 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 				const t = lifecycle(a)
 					? Math.max(actual, target[a.id]!)
 					: target[a.id]!;
+				// Lifecycle and broad (generic) labels are never pushed up: an underused broad label means players got a
+				// more specific one
 				bias[a.id] = Math.min(
-					lifecycle(a) ? 0 : BIAS_MAX,
+					lifecycle(a) || a.tags.includes("generic") ? 0 : BIAS_MAX,
 					Math.max(
 						a.tags.includes("role") || lifecycle(a) ? 2 * BIAS_MIN : BIAS_MIN,
 						bias[a.id]! + 0.15 * Math.log(t / actual),

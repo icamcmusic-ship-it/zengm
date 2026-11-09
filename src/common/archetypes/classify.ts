@@ -2,7 +2,18 @@ import { ARCHETYPE_DEFS } from "./defs.data.ts";
 import { DIM_LABELS, DIM_RATINGS, DIMS } from "./composites.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import { matchZ } from "./match.ts";
-import { levelPenalty, needPenalty, prepare, rawMatch } from "./score.ts";
+import {
+	coverOf,
+	genericPenalty,
+	levelPenalty,
+	needPenaltyOf,
+	needShortfall,
+	prepare,
+	rawMatch,
+	standoutBonus,
+	standoutsOf,
+	type Standout,
+} from "./score.ts";
 import { ovrPercentile } from "./norms.ts";
 import { isPos, positionOf, posPrior } from "./position.ts";
 import type {
@@ -33,8 +44,11 @@ export const RARE_PENALTY = 0.5;
 export const STAR_BONUS = 0.5;
 // A runner-up this close (in standard deviations of fit) from a different family makes a hybrid
 export const HYBRID_Z = 0.15;
+// How much farther a runner-up may be when it names a standout skill of his the primary does not (per z of standout)
+export const SECONDARY_K = 0.4;
+const SECONDARY_REACH = 0.3;
 // The archetype he had keeps the label unless another is better by more than this
-export const STICKY_Z = 0.4;
+export const STICKY_Z = 0.5;
 
 // Score of an archetype his position rules out: below anything a real fit can reach, but finite
 export const BLOCKED_Z = -99;
@@ -55,9 +69,11 @@ export const scoreAll = (
 	z: Record<DimKey, number>;
 	skills: SkillLabel[];
 	pos: Pos;
+	standouts: Standout[];
 } => {
-	const p = prepare(ratings, norms);
+	const p = { ...prepare(ratings, norms), age };
 	const pos = position ?? positionOf(ratings);
+	const standouts = standoutsOf(p);
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
 		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.level);
@@ -73,13 +89,16 @@ export const scoreAll = (
 			continue;
 		}
 		const table = norms.match[a.id];
+		const short = needShortfall(a, p);
 		const z =
 			(table ? matchZ(table, raw) : raw * 4 - 2) -
 			(a.rare ? RARE_PENALTY : 0) +
 			(a.tags.includes("star") ? STAR_BONUS : 0) +
 			prior +
-			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0) -
-			needPenalty(a, p) -
+			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0) +
+			standoutBonus(a, standouts, needShortfall(a, p, true)) -
+			genericPenalty(a, standouts) -
+			needPenaltyOf(short) -
 			levelPenalty(a, p.level) -
 			(a.age && age !== undefined
 				? 0.6 * Math.max(0, a.age[0] - age, age - a.age[1])
@@ -87,7 +106,7 @@ export const scoreAll = (
 		scored.push({ a, raw, z });
 	}
 	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
-	return { scored, z: p.z, skills: p.skills, pos };
+	return { scored, z: p.z, skills: p.skills, pos, standouts };
 };
 
 export const TIER_NAMES: Record<Tier, string> = {
@@ -165,7 +184,7 @@ export const classify = (
 	opts: ClassifyOptions = {},
 ): Classification => {
 	const norms = opts.norms ?? DEFAULT_NORMS;
-	const { scored, z } = scoreAll(
+	const { scored, z, standouts } = scoreAll(
 		ratings,
 		norms,
 		ARCHETYPES,
@@ -182,10 +201,30 @@ export const classify = (
 	}
 	const rest = scored.filter((s) => s.a.id !== first.a.id);
 	const second = rest[0]!;
-	// A hybrid names the best runner-up from a different family
-	const partner = rest.find((s) => s.a.family !== first.a.family)!;
+	// A hybrid names the best runner-up from a different family, preferring one that names a standout skill of his the
+	// primary leaves out (a shooter who also defends is a "... / Lockdown Wing")
+	const primaryCover = coverOf(first.a);
+	const adds = (s: Scored) => {
+		const c = coverOf(s.a);
+		let t = 0;
+		for (const { k, s: v } of standouts) {
+			t += v * Math.max(0, (c[k] ?? 0) - (primaryCover[k] ?? 0));
+		}
+		return SECONDARY_K * t;
+	};
+	let partner: Scored | undefined;
+	let partnerZ = -Infinity;
+	for (const s of rest) {
+		if (s.z < first.z - HYBRID_Z - SECONDARY_REACH) {
+			break;
+		}
+		if (s.a.family !== first.a.family && s.z + adds(s) > partnerZ) {
+			partner = s;
+			partnerZ = s.z + adds(s);
+		}
+	}
 	const secondary =
-		partner.z >= first.z - HYBRID_Z
+		partner && partnerZ >= first.z - HYBRID_Z
 			? { id: partner.a.id, name: partner.a.name }
 			: null;
 	const confidence = Math.max(0, Math.min(1, (first.z - second.z) / 0.5));

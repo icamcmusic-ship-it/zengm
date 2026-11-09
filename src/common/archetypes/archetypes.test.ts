@@ -30,6 +30,7 @@ import {
 import { sampleLeague } from "./sample.testutil.ts";
 import { HARD_BLOCK, POSITIONS, positionOf, posPrior } from "./position.ts";
 import { buildNorms } from "./match.ts";
+import { coverOf } from "./score.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import pos from "../../worker/core/player/pos.ts";
 
@@ -57,7 +58,7 @@ const R = (o: Partial<ArchetypeRatings>): ArchetypeRatings => ({
 
 describe("archetype table", () => {
 	test("size, unique ids, valid profiles", () => {
-		assert.ok(ARCHETYPES.length >= 170 && ARCHETYPES.length <= 200);
+		assert.ok(ARCHETYPES.length >= 205 && ARCHETYPES.length <= 240);
 		assert.strictEqual(
 			new Set(ARCHETYPES.map((a) => a.id)).size,
 			ARCHETYPES.length,
@@ -106,6 +107,41 @@ describe("classification", () => {
 		const noSkill = scoreAll(R({ hgt: 30, tp: 20, ft: 85, fg: 70 }));
 		assert.ok(!noSkill.skills.includes("3"));
 		assert.ok(noSkill.scored.find((s) => s.a.id === "sharpshooter")!.z < row.z);
+	});
+
+	test("the label names his standout skills (primary, or the hybrid partner)", () => {
+		// [what he is, ratings, the skill classes the label must feature]
+		const cases: [string, Partial<ArchetypeRatings>, string[]][] = [
+			[
+				"shooter who defends",
+				{ hgt: 45, tp: 85, ft: 78, diq: 82, spd: 72, ins: 40, dnk: 45 },
+				["shoot", "perD"],
+			],
+			[
+				"rebounding, passing big",
+				{ hgt: 66, reb: 88, pss: 78, oiq: 72, stre: 65, tp: 25, spd: 40 },
+				["pass", "reb"],
+			],
+			[
+				"lob catcher who blocks shots",
+				{ hgt: 68, dnk: 88, jmp: 88, diq: 70, tp: 15, fg: 30, pss: 35 },
+				["finish", "rimD"],
+			],
+		];
+		for (const [label, o, want] of cases) {
+			const c = classify(R(o));
+			const cover = { ...coverOf(archetypeById(c.id)!) };
+			if (c.secondary) {
+				for (const [k, v] of Object.entries(
+					coverOf(archetypeById(c.secondary.id)!),
+				)) {
+					cover[k] = Math.max(cover[k] ?? 0, v);
+				}
+			}
+			for (const k of want) {
+				assert.ok((cover[k] ?? 0) > 0, `${label}: ${c.label} lacks ${k}`);
+			}
+		}
 	});
 
 	test("tiny rating changes do not flap the archetype when the previous one is kept sticky", () => {

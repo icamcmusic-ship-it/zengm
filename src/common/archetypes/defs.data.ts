@@ -379,6 +379,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[24, 66],
 		{ diq: 3, dper: 2, stl: 1.5, reb: 0.5, usg: -1.5 },
 		"Reads the game on defense, ordinary on offense.",
+		{ need: { dper: 0 } },
 	),
 	W(
 		"Do-It-All Wing",
@@ -1042,9 +1043,14 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Corner Specialist",
 		"shooter",
 		[24, 64],
-		{ three: 3, usg: -2, drb: -1.5, pss: -1, ft: 1 },
+		{ three: 3, usg: -2.5, drb: -1.5, pss: -1, ft: 1 },
 		"Lives in the corner and only takes open threes.",
-		{ req: ["3"], pos: { G: 0, PF: -0.2 }, tags: ["spacing", "low-usage"] },
+		// A shooting guard who spots up reads as a guard shooter (Spot-Up Guard, Sharpshooter) first
+		{
+			req: ["3"],
+			pos: { G: 0, SG: -0.2, PF: -0.2 },
+			tags: ["spacing", "low-usage"],
+		},
 	),
 	W(
 		"Rim-Running Wing",
@@ -1299,6 +1305,8 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		{ three: 2, ft: 1.5, oiq: 0.5 },
 		"A young shooter whose stroke is ahead of the rest of his game.",
 		{
+			// Lower than a developed shooter's floor, but a real stroke all the same
+			need: { three: 0.3 },
 			level: [-9, -1.2],
 			age: [0, 24],
 			pos: { PG: -0.3, G: 0 },
@@ -1603,6 +1611,182 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 			tags: ["star"],
 		},
 	),
+	// ----------------------------------- Added in v5: standout-skill combinations no archetype named (two-way, rebounding
+	// playmakers, lob-and-block bigs, inside-out scorers, ...), found by an audit of each player's top skills against his label
+	G(
+		"Two-Way Combo Guard",
+		"defender",
+		[0, 46],
+		{ drb: 2, dper: 2, diq: 1.5, usg: 1.5, mid: 1, stl: 1 },
+		"Creates his own shot and guards the other team's best guard.",
+		{ need: { drb: 0.3, dper: 0.2 }, tags: ["two-way"] },
+	),
+	G(
+		"Two-Way Slashing Guard",
+		"slasher",
+		[0, 46],
+		{ rim: 2, ath: 2, dper: 2, blk: 1, diq: 1 },
+		"An athlete at both ends: attacks the rim and blocks shots from the backcourt.",
+		{ need: { ath: 0.3, dper: 0.1 }, tags: ["two-way", "athletic"] },
+	),
+	G(
+		"Triple-Double Threat",
+		"playmaker",
+		[0, 50],
+		{ pss: 2.5, reb: 2.5, rim: 1.5, ath: 1, usg: 1 },
+		"Fills the stat sheet: pushes it off the defensive glass and makes plays.",
+		{ need: { pss: 0.3 }, pos: { GF: 0 } },
+	),
+	W(
+		"Two-Way Stretch Wing",
+		"shooter",
+		[40, 66],
+		{ three: 2.5, blk: 2, dper: 1.5, diq: 1, hgt: 1, usg: -0.5 },
+		"A long wing who spaces the floor and blocks shots from the weak side.",
+		{ need: { blk: 0.2 }, tags: ["two-way", "spacing"] },
+	),
+	W(
+		"Two-Way Athlete",
+		"athlete",
+		[30, 64],
+		{ rim: 2, blk: 2, ath: 2, jmp: 1.5, dper: 1 },
+		"Finishes above the rim and blocks shots at the other end.",
+		{ need: { ath: 0.5 }, tags: ["two-way", "athletic"] },
+	),
+	W(
+		"Rebounding Playmaker",
+		"playmaker",
+		[36, 64],
+		{ pss: 2.5, reb: 2.5, drb: 1, oiq: 1 },
+		"Grabs the board and starts the break himself: a wing who rebounds and passes like a guard.",
+		{ pos: { PG: -0.3, G: -0.2 } },
+	),
+	W(
+		"Post Playmaker",
+		"playmaker",
+		[32, 62],
+		{ post: 2.5, pss: 2.5, stre: 1, oiq: 1, usg: 1 },
+		"Backs smaller defenders down and passes out of the post.",
+		{ pos: { PG: -0.3, G: -0.1 } },
+	),
+	W(
+		"Athletic Scorer",
+		"scorer",
+		[24, 62],
+		{ ath: 2, mid: 2, usg: 2, rim: 1, three: 1 },
+		"An explosive athlete who also has a pull-up game.",
+		{ pos: { PG: -0.3, G: -0.1 } },
+	),
+	W(
+		"Two-Way Creator",
+		"defender",
+		[36, 64],
+		{ drb: 2, dper: 2, usg: 1.5, diq: 1.5, pss: 1 },
+		"Runs isolations on one end and takes the toughest assignment on the other.",
+		{ need: { drb: 0.3 }, tags: ["two-way"] },
+	),
+	W(
+		"Rebounding Stopper",
+		"defender",
+		[28, 64],
+		{ reb: 2.5, dper: 2, diq: 1.5, stre: 1, usg: -1 },
+		"Guards the perimeter and still finishes the possession with the rebound.",
+		{ tags: ["defense"] },
+	),
+	F(
+		"Playmaking Stretch Four",
+		"playmaker",
+		[48, 76],
+		{ pss: 2.5, three: 2.5, oiq: 1.5, hgt: 0.5 },
+		"Spaces the floor from the four and makes the extra pass.",
+		{ tags: ["spacing"] },
+	),
+	F(
+		"Lob-and-Block Forward",
+		"athlete",
+		[46, 76],
+		{ rim: 2.5, blk: 2.5, jmp: 2, ath: 1, usg: -1 },
+		"Catches lobs on one end and blocks shots on the other.",
+		{ need: { ath: 0.3, blk: 0.4 }, tags: ["two-way", "athletic"] },
+	),
+	F(
+		"Grab-and-Go Forward",
+		"athlete",
+		[44, 74],
+		{ reb: 2, drb: 2, ath: 2, pss: 1, spd: 1 },
+		"Grabs the rebound and leads the break himself.",
+		{ need: { drb: 0.2 } },
+	),
+	F(
+		"Inside-Out Forward",
+		"scorer",
+		[44, 76],
+		{ post: 2.5, mid: 2.5, usg: 1, ft: 1 },
+		"Scores on the block and turns to face up from mid-range.",
+		{ needFor: { post: 0.35 } },
+	),
+	C(
+		"Lob-and-Block Big",
+		"athlete",
+		[54, 100],
+		{ rim: 2.5, blk: 2.5, jmp: 2, ath: 1, reb: 1, usg: -1 },
+		"Runs the floor for lobs and protects the rim at the other end.",
+		{ need: { blk: 0.5 }, tags: ["two-way", "athletic"] },
+	),
+	C(
+		"Glass-Cleaning Playmaker",
+		"playmaker",
+		[54, 100],
+		{ pss: 2.5, reb: 2.5, oiq: 1.5, post: 1 },
+		"Owns the defensive glass and runs the offense from the elbow.",
+	),
+	C(
+		"Defensive Quarterback",
+		"defender",
+		[52, 100],
+		{ pss: 2, dper: 2, diq: 2, dint: 1.5, drb: 1 },
+		"Calls out the coverages, switches onto anyone and starts the offense.",
+		{ need: { pss: 0.3 }, pos: { F: 0 }, tags: ["two-way", "switch"] },
+	),
+	C(
+		"Inside-Out Big",
+		"scorer",
+		[54, 100],
+		{ post: 2.5, three: 2, mid: 1, usg: 1 },
+		"Scores on the block and steps out to the three-point line.",
+		{ need: { three: 0.3 }, needFor: { post: 0.35 }, tags: ["spacing"] },
+	),
+	C(
+		"Perimeter Big",
+		"skilled",
+		[54, 100],
+		{ drb: 2, dper: 2, mid: 1.5, spd: 1 },
+		"Handles it and guards in space like a forward.",
+		{ need: { drb: 0.2 }, tags: ["switch"] },
+	),
+	C(
+		"Playmaking Stretch Big",
+		"playmaker",
+		[54, 100],
+		{ pss: 2.5, three: 2.5, oiq: 1.5 },
+		"Passes like a guard and pulls his man out to the three-point line.",
+		{ pos: { F: 0 }, tags: ["spacing"] },
+	),
+	// A raw prospect who already blocks shots (else he reads as a Project Big)
+	C(
+		"Shot-Blocking Prospect",
+		"defender",
+		[54, 100],
+		{ blk: 2.5, jmp: 1, hgt: 1, oiq: -0.5 },
+		"Blocks shots already; the rest of his game is years away.",
+		{
+			// Real shot blocking already, not just a prospect's size
+			need: { blk: 0.55 },
+			level: [-9, -1.2],
+			age: [0, 24],
+			tags: ["prospect", "raw"],
+		},
+	),
 ];
 
 // What a name promises, on the league-wide scale: a label is only given when the skill its name names is really there.
@@ -1627,7 +1811,10 @@ const NAME_NEEDS: [
 	[/Rebound|Glass|Double-Double|Putback/, {}, { reb: 0.45 }],
 	[/Post|Interior Scorer|Paint Beast/, {}, { post: 0.35 }],
 	[/Slash|Penetrator/, { drb: -0.2 }, { rim: 0.1 }],
-	[/Athletic|High-Flyer|Explosive|Rim-Running|Lob Threat/, { ath: 0.5 }],
+	[
+		/Athletic|High-Flyer|Explosive|Rim-Running|Rim Runner|Lob Threat/,
+		{ ath: 0.5 },
+	],
 	// A defensive label also needs the defense, not just the instincts
 	[/Thief|Pest|Hawk/, { dper: 0.05 }],
 	[/Handles|Shot Creator|Shot-Creating/, { drb: 0.6 }],
@@ -1663,10 +1850,47 @@ const POS_OVERRIDES: Record<string, Partial<Record<Pos, number | null>>> = {
 	"point-center": { F: 0 },
 	"switchable-center": { F: 0 },
 	"rim-running-shooter": { F: 0 },
+	// A shooting power forward is a Stretch Four
+	"stretch-wing": { PF: -1, FC: -1.5 },
 };
 for (const d of ARCHETYPE_DEFS) {
 	const o = POS_OVERRIDES[d.id];
 	if (o) {
 		d.pos = { ...o, ...d.pos };
+	}
+}
+
+// Broad labels that name no particular skill (or only volume): when he has a standout skill, a label that names it wins
+// over these by a margin (see GENERIC_K in classify.ts)
+const GENERIC = new Set([
+	"combo-guard",
+	"steady-guard",
+	"backup-point-guard",
+	"journeyman-guard",
+	"scoring-wing",
+	"sixth-man-scorer",
+	"rotation-wing",
+	"connector-wing",
+	"glue-guy",
+	"do-it-all-wing",
+	"journeyman-wing",
+	"scoring-forward",
+	"combo-forward",
+	"role-forward",
+	"glue-forward",
+	"swiss-army-knife",
+	"tweener-forward",
+	"journeyman-forward",
+	"scoring-big",
+	"complete-big",
+	"role-big",
+	"backup-center",
+	"journeyman-big",
+	"developmental-wing",
+	"developmental-forward",
+]);
+for (const d of ARCHETYPE_DEFS) {
+	if (GENERIC.has(d.id)) {
+		d.tags.push("generic");
 	}
 }
