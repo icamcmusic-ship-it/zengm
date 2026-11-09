@@ -1092,14 +1092,6 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "leagueExtras",
-				league: true,
-				commandPalette: true,
-				path: ["league_extras"],
-				text: "League Extras",
-			},
-			{
-				type: "link",
 				active: (pageID) => pageID === "faceStyleGallery",
 				league: true,
 				nonLeague: true,

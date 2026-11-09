@@ -4568,6 +4568,11 @@ const updateGameAttributes = async (
 	gameAttributes: Partial<GameAttributesLeague>,
 ) => {
 	await league.setGameAttributes(gameAttributes);
+	if (gameAttributes.coachingStaff) {
+		// Turning on the coaching staff from the League Extras tab generates staffs, like League Settings does
+		await staff.ensureStaff();
+		await idb.cache.flush();
+	}
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 const updateGameAttributesGodMode = async (

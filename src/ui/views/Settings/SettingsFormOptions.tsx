@@ -12,7 +12,7 @@ import {
 	type NumPlayoffTeamsInfo,
 	type State,
 } from "./SettingsForm.tsx";
-import type { Decoration, FieldType, Key, Values } from "./types.ts";
+import type { Category, Decoration, FieldType, Key, Values } from "./types.ts";
 import { helpers } from "../../util/helpers.ts";
 import { CurrencyInputGroup } from "../../components/CurrencyInputGroup.tsx";
 
@@ -350,6 +350,7 @@ const SettingsFormOptions = ({
 	state,
 	visibleCategories,
 	expandAll,
+	categoryTitle,
 }: {
 	disabled: boolean;
 	gameSimPreset: string;
@@ -364,6 +365,7 @@ const SettingsFormOptions = ({
 	state: State;
 	visibleCategories: ReturnType<typeof getVisibleCategories>;
 	expandAll?: boolean;
+	categoryTitle?: (name: Category) => string;
 }) => {
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
@@ -396,13 +398,13 @@ const SettingsFormOptions = ({
 									<span className="me-1" style={{ fontSize: "0.7em" }}>
 										<CollapseArrow open={!collapsed} />
 									</span>
-									{category.name}{" "}
+									{categoryTitle?.(category.name) ?? category.name}{" "}
 									<span className="text-body-secondary fs-6">
 										({category.settings.length})
 									</span>
 								</button>
 							) : (
-								category.name
+								(categoryTitle?.(category.name) ?? category.name)
 							)}
 							{category.appendNumTeams ? (
 								<span

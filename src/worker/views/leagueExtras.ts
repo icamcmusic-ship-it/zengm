@@ -1,5 +1,5 @@
-// League extras: the native feature switches and options (common/nativeFeatures.ts), on a page of their own. The same
-// settings are also in League Settings, in the League extras category.
+// League extras: the native feature switches and options (common/nativeFeatures.ts), the League Extras tab of League
+// Settings.
 import { defineView } from "../util/defineView.ts";
 import { getInitialSettings } from "./settings.ts";
 

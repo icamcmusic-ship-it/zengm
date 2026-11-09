@@ -11,6 +11,10 @@ export type PageTab = {
 
 export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 	[
+		{ id: "settings", name: "League Settings", url: ["settings"] },
+		{ id: "leagueExtras", name: "League Extras", url: ["league_extras"] },
+	],
+	[
 		{ id: "tradingBlock", name: "Trading Block", url: ["trading_block"] },
 		{ id: "tradeMarket", name: "Trade Market", url: ["trade_market"] },
 	],

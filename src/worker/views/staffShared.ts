@@ -10,7 +10,7 @@ import { g } from "../util/index.ts";
 
 export const STAFF_DISABLED_MESSAGE =
 	__SPORT === "basketball"
-		? "The coaching staff is turned off in this league. You can turn it on in League Extras (Tools menu)."
+		? "The coaching staff is turned off in this league. You can turn it on in League Settings → League Extras."
 		: "The coaching staff is only available for basketball.";
 
 export const staffViewEnabled = () =>
