@@ -6,6 +6,7 @@ import processTrade from "./processTrade.ts";
 import summary from "./summary.ts";
 import type { Player, TradeTeams } from "../../../common/types.ts";
 import { choice } from "../../../common/random.ts";
+import { getTradePickConditions } from "../../../common/draftPickConditions.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
 import getPayrolls from "../team/getPayrolls.ts";
@@ -118,6 +119,7 @@ const attempt = async (valueChangeCalculator: ValueChangeCalculator) => {
 		holdUserConstant: false,
 		maxAssetsToAdd: 5,
 		valueChangeCalculator,
+		aiPickConditions: true,
 	});
 
 	if (!teams) {
@@ -148,6 +150,7 @@ const attempt = async (valueChangeCalculator: ValueChangeCalculator) => {
 		dpidsAdd: teams[1].dpids,
 		dpidsRemove: teams[0].dpids,
 		tradingPartnerTid: undefined,
+		pickConditions: getTradePickConditions(teams),
 	});
 	if (Math.abs(dv2) > 15) {
 		return false;
@@ -382,6 +385,7 @@ export const needAttempt = async (
 		holdUserConstant,
 		maxAssetsToAdd: 4,
 		valueChangeCalculator,
+		aiPickConditions: true,
 	});
 	if (!teams) {
 		return fail("makeItWorkFailed");
@@ -407,6 +411,7 @@ export const needAttempt = async (
 		dpidsAdd: teams[1].dpids,
 		dpidsRemove: teams[0].dpids,
 		tradingPartnerTid: undefined,
+		pickConditions: getTradePickConditions(teams),
 	});
 	if (dvMain < (kind === "salaryDump" ? -4 : -1)) {
 		return fail("mainTeamRejects");

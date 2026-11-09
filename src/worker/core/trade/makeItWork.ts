@@ -1,8 +1,18 @@
 import { player } from "../index.ts";
 import { idb } from "../../db/index.ts";
-import type { DraftPick, Player, TradeTeams } from "../../../common/types.ts";
+import type {
+	DraftPick,
+	PickConditionSpec,
+	Player,
+	TradeTeams,
+} from "../../../common/types.ts";
 import isUntradable from "./isUntradable.ts";
-import { getTradePickConditions } from "../../../common/draftPickConditions.ts";
+import {
+	getTradePickConditions,
+	validatePickConditionSpec,
+} from "../../../common/draftPickConditions.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+import { getNumPicksPerRound } from "./getPickValues.ts";
 import { helpers } from "../../util/index.ts";
 import { COMPOSITE_WEIGHTS, POSITIONS } from "../../../common/constants.ts";
 import { last } from "../../../common/utils.ts";
@@ -30,8 +40,90 @@ type AssetPlayer = AssetBase & {
 type AssetPick = AssetBase & {
 	type: "draftPick";
 	dp: DraftPick;
+	// AI pick conditions: the AI team gives this pick with a protection, or only the right to swap it
+	condition?: PickConditionSpec;
 };
 type Asset = AssetPlayer | AssetPick;
+
+// Protections the AI uses on its own 1st round picks: varying top-N, rollovers, and what happens when they run out
+export const AI_PROTECTION_MENU: Omit<
+	Extract<PickConditionSpec, { type: "protection" }>,
+	"type"
+>[] = [
+	{ top: 3, rollover: [3], then: "unprotected" },
+	{ top: 4, rollover: [], then: "secondRound" },
+	{ top: 5, rollover: [5, 3], then: "unprotected" },
+	{ top: 8, rollover: [5], then: "secondRound" },
+	{ top: 10, rollover: [], then: "secondRound" },
+	{ top: 10, rollover: [8], then: "extinguish" },
+	{ top: 14, rollover: [10, 5], then: "unprotected" },
+];
+
+// Among trades the AI likes, a rebuilding team's protected pick counts as if its dv was this much smaller
+const REBUILDING_PROTECTION_PREFERENCE = 0.6;
+
+// How many of the AI team's picks get condition variants per step (keeps this fast, it runs for AI-AI trades every day)
+const MAX_VARIANT_PICKS = 2;
+
+// Condition variants of the AI team's (teams[1]) own future picks: a protected version of 1st round picks, and the right to swap
+export const getConditionVariants = async (
+	teams: TradeTeams,
+	aiPicks: DraftPick[],
+	random: () => number = Math.random,
+) => {
+	const numPicksPerRound = getNumPicksPerRound();
+	const existing = new Set([
+		...(teams[1].pickConditions ?? []).map((c) => c.dpid),
+		...teams[1].dpids,
+		...teams[1].dpidsExcluded,
+	]);
+	const partnerPicks = await idb.cache.draftPicks.indexGetAll(
+		"draftPicksByTid",
+		teams[0].tid,
+	);
+	const menu = AI_PROTECTION_MENU.filter(
+		(spec) =>
+			spec.top < numPicksPerRound / 2 &&
+			spec.rollover.every((top) => top < numPicksPerRound / 2),
+	);
+
+	const candidates = aiPicks.filter((dp) => !existing.has(dp.dpid));
+	// Random subset, so different trades get different structures
+	candidates.sort(() => random() - 0.5);
+
+	const variants: { dp: DraftPick; condition: PickConditionSpec }[] = [];
+	for (const dp of candidates.slice(0, MAX_VARIANT_PICKS)) {
+		if (dp.round === 1 && menu.length > 0) {
+			const spec = {
+				type: "protection" as const,
+				...menu[Math.floor(random() * menu.length)]!,
+			};
+			if (validatePickConditionSpec(spec, dp, numPicksPerRound) === undefined) {
+				variants.push({ dp, condition: spec });
+			}
+		}
+
+		// A swap needs the partner to own its own pick in that draft, not already in this trade
+		const partnerOwn = partnerPicks.find(
+			(x) =>
+				x.originalTid === teams[0].tid &&
+				x.season === dp.season &&
+				x.round === dp.round &&
+				!x.protection &&
+				!x.swap &&
+				!teams[0].dpids.includes(x.dpid),
+		);
+		const swapSpec = { type: "swap" as const };
+		if (
+			partnerOwn &&
+			dp.originalTid === teams[1].tid &&
+			validatePickConditionSpec(swapSpec, dp, numPicksPerRound) === undefined
+		) {
+			variants.push({ dp, condition: swapSpec });
+		}
+	}
+	return variants;
+};
 
 // Add either the highest value asset or the lowest value one that makes the trade good for the AI team.
 const tryAddAsset = async (
@@ -41,6 +133,7 @@ const tryAddAsset = async (
 	prevDv: number,
 	firstTry: boolean,
 	lookingFor?: LookingFor,
+	aiPickConditions?: boolean,
 ): Promise<TradeTeams | undefined> => {
 	let assets: Asset[] = [];
 
@@ -169,6 +262,19 @@ const tryAddAsset = async (
 				dp,
 			});
 		}
+
+		if (aiPickConditions) {
+			assets.push(
+				...(await getConditionVariants(teams, draftPicks)).map((v) => ({
+					type: "draftPick" as const,
+					dv: 0,
+					score: 0,
+					tid: teams[1].tid,
+					dp: v.dp,
+					condition: v.condition,
+				})),
+			);
+		}
 	}
 
 	// If there are no more to try, stop
@@ -182,6 +288,7 @@ const tryAddAsset = async (
 		const otherPids = teams[1].pids.slice();
 		const userDpids = teams[0].dpids.slice();
 		const otherDpids = teams[1].dpids.slice();
+		let pickConditions = getTradePickConditions(teams);
 
 		if (asset.type === "player") {
 			if (asset.tid === teams[0].tid) {
@@ -194,6 +301,12 @@ const tryAddAsset = async (
 				userDpids.push(asset.dp.dpid);
 			} else {
 				otherDpids.push(asset.dp.dpid);
+				if (asset.condition) {
+					pickConditions = [
+						...pickConditions,
+						{ ...asset.condition, dpid: asset.dp.dpid, tid: teams[0].tid },
+					];
+				}
 			}
 		}
 
@@ -204,7 +317,7 @@ const tryAddAsset = async (
 			dpidsAdd: userDpids,
 			dpidsRemove: otherDpids,
 			tradingPartnerTid: teams[0].tid,
-			pickConditions: getTradePickConditions(teams),
+			pickConditions,
 		});
 	}
 
@@ -220,6 +333,18 @@ const tryAddAsset = async (
 	if (assets.length === 0) {
 		return;
 	}
+
+	// Rebuilding teams would rather protect their picks: among assets that work, a protected pick sorts as if its dv was smaller
+	const rebuilding =
+		aiPickConditions &&
+		(await idb.cache.teams.get(teams[1].tid))?.strategy === "rebuilding";
+	const sortDv = (asset: Asset) =>
+		rebuilding &&
+		asset.type === "draftPick" &&
+		asset.condition?.type === "protection" &&
+		asset.dv > 0
+			? asset.dv * REBUILDING_PROTECTION_PREFERENCE
+			: asset.dv;
 
 	// Sort the assets such that the best assets are listed first. Why best and not worst? Because we already got rid of assets that are so good they would make the trade negative value for the AI. So the AI wants to offer the best asset of its remaining assets, otherwise the trade will remain too unbalanced.
 	let lookingForSort = false;
@@ -271,7 +396,7 @@ const tryAddAsset = async (
 		if (prevDv > 0) {
 			// If prevDv>0, then we're looking for the best asset that keeps dv above 0, which is just the lowest value of dv in this array because above we already filtered out the ones that move this trade negative.
 			// High dv means the trade is highly favorable to the AI, so this is sorting from the best asset (lowest dv) to the worst asset (high dv). AI wants to give up the most possible (best asset) while still minimizing dv (so the trade is favorable to them, but at least semi-close to favorable for the other team too).
-			assets.sort((a, b) => a.dv - b.dv);
+			assets.sort((a, b) => sortDv(a) - sortDv(b));
 		} else {
 			// Otherwise, we're looking to go from negative dv to positive dv. This could be all in one shot (pick the lowest positive dv) or it could require multiple assets (pick the highest negative dv, and then next iteration maybe it can get to positive dv).
 			const positiveDv = [];
@@ -283,7 +408,7 @@ const tryAddAsset = async (
 					negativeDv.push(asset);
 				}
 			}
-			positiveDv.sort((a, b) => a.dv - b.dv);
+			positiveDv.sort((a, b) => sortDv(a) - sortDv(b));
 			negativeDv.sort((a, b) => b.dv - a.dv);
 			assets = [...positiveDv, ...negativeDv];
 		}
@@ -326,6 +451,12 @@ const tryAddAsset = async (
 			newTeams[0].dpids.push(asset.dp.dpid);
 		} else {
 			newTeams[1].dpids.push(asset.dp.dpid);
+			if (asset.condition) {
+				newTeams[1].pickConditions = [
+					...(newTeams[1].pickConditions ?? []),
+					{ ...asset.condition, dpid: asset.dp.dpid, tid: newTeams[0].tid },
+				];
+			}
 		}
 	}
 
@@ -350,11 +481,14 @@ const makeItWork = async (
 		lookingFor,
 		maxAssetsToAdd = Infinity,
 		valueChangeCalculator,
+		aiPickConditions = false,
 	}: {
 		holdUserConstant: boolean;
 		lookingFor?: LookingFor;
 		maxAssetsToAdd?: number;
 		valueChangeCalculator: ValueChangeCalculator;
+		// Let the AI team (teams[1]) give its 1st round picks with protections, or only swap rights (draftPickConditions setting)
+		aiPickConditions?: boolean;
 	},
 ): Promise<TradeTeams | undefined> => {
 	let initialSign: -1 | 1;
@@ -388,6 +522,7 @@ const makeItWork = async (
 			prevDv,
 			added === 0,
 			lookingFor,
+			aiPickConditions && featureOn("draftPickConditions"),
 		);
 
 		if (!newTeams) {
@@ -443,6 +578,7 @@ const makeItWork = async (
 						holdUserConstant,
 						maxAssetsToAdd: newMaxAssetsToAdd,
 						valueChangeCalculator,
+						aiPickConditions,
 					});
 				}
 				return newTeams;

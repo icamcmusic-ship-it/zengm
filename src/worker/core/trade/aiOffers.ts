@@ -230,6 +230,7 @@ export const buildAiOffer = async (
 		holdUserConstant: true,
 		maxAssetsToAdd: 4,
 		valueChangeCalculator,
+		aiPickConditions: true,
 	});
 	if (!teams || teams[1].pids.length + teams[1].dpids.length === 0) {
 		return;

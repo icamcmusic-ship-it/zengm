@@ -11,6 +11,7 @@ import { randInt, shuffle, uniform } from "../../../common/random.ts";
 import { getCumulativeWeights } from "./getCumulativeWeights.ts";
 import { getInSeasonContractExp } from "./decreaseDemands.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
+import { getAiTraitValueFactor, traitsEnabled } from "../player/traits.ts";
 
 const TEMP = 0.35;
 const LEARNING_RATE = 0.5;
@@ -121,6 +122,8 @@ const normalizeContractDemands = async ({
 		);
 	}
 
+	const traitsOn = traitsEnabled();
+
 	// Store contracts here, so they can be edited without editing player object (for including dummy players in pool)
 	const playerInfos = players.map((p) => {
 		let dummy = false;
@@ -133,7 +136,12 @@ const normalizeContractDemands = async ({
 			dummy = true;
 		}
 
-		const value = (p.value < 0 ? -1 : 1) * p.value ** 2;
+		// Player traits (setting): teams bid a little more for durable, savvy players and a little less for injury prone ones. Damped, and centered so the overall pay level doesn't move. 1 with the setting off
+		const traitFactor =
+			traitsOn && p.value > 0
+				? getAiTraitValueFactor(p, { contract: true })
+				: 1;
+		const value = (p.value < 0 ? -1 : 1) * (p.value * traitFactor) ** 2;
 
 		return {
 			pid: p.pid,

@@ -15,7 +15,16 @@ import { last } from "../../../common/utils.ts";
 import { choice } from "../../../common/random.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { prepareWholeRoster } from "../team/ovr.ts";
-import { getDraftAdjustment, getTeamNeeds } from "./draftNeeds.ts";
+import {
+	getDraftAdjustment,
+	getDraftTraitAdjustment,
+	getTeamNeeds,
+} from "./draftNeeds.ts";
+import {
+	countMentees,
+	getAiTraitValueFactor,
+	traitsEnabled,
+} from "../player/traits.ts";
 
 // Top ranked prospect on the user's draft board who is still available
 export const getDraftBoardPick = <T extends { draftBoard?: { rank?: number } }>(
@@ -208,6 +217,24 @@ const runPicks = async (
 				const needs = getTeamNeeds(teamPlayers);
 				adjustments = playersAll.map((p) =>
 					getDraftAdjustment(p, needs, t?.strategy),
+				);
+			}
+
+			// Player traits (setting): what the scouts can read of a prospect's traits, a bounded nudge of at most DRAFT_TRAIT_MAX_ADJ value points
+			if (
+				!DRAFT_BY_TEAM_OVR &&
+				traitsEnabled() &&
+				!g.get("userTids").includes(dp.tid)
+			) {
+				const t = await idb.cache.teams.get(dp.tid);
+				const numYoung = countMentees(teamPlayers);
+				adjustments = playersAll.map(
+					(p, i) =>
+						(adjustments?.[i] ?? 0) +
+						getDraftTraitAdjustment(
+							p.value,
+							getAiTraitValueFactor(p, { strategy: t?.strategy, numYoung }),
+						),
 				);
 			}
 

@@ -6,3 +6,4 @@ export * from "./effects.ts";
 export * from "./scouting.ts";
 export * from "./ui.ts";
 export * from "./veteran.ts";
+export * from "./aiValue.ts";

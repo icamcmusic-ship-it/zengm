@@ -9,6 +9,7 @@ import type {
 import { last } from "../../../common/utils.ts";
 import {
 	draftPickConditionText,
+	getTradePickConditions,
 	parseRollover,
 	protectionText,
 	validatePickConditionSpec,
@@ -18,10 +19,13 @@ import { idb } from "../../db/index.ts";
 import { g, helpers, local } from "../../util/index.ts";
 import { player, team } from "../index.ts";
 import {
+	CONDITION_SURVIVE_PROB,
+	getFallbackDeliveredProb,
 	protectedTradeValue,
 	swapTradeValue,
 	ValueChangeCalculator,
 } from "../team/ValueChangeCalculator.ts";
+import makeItWork, { getConditionVariants } from "../trade/makeItWork.ts";
 import processTrade from "../trade/processTrade.ts";
 import { resolvePickConditionsPure } from "./pickConditions.ts";
 
@@ -35,6 +39,8 @@ const dp = (x: Partial<DraftPick> & { dpid: number }): DraftPick => ({
 });
 
 const teamName = (tid: number) => `T${tid}`;
+
+const AI_PICK_TIDS = [0];
 
 describe("resolvePickConditionsPure", () => {
 	test("protected pick conveys when outside the protection", () => {
@@ -465,5 +471,185 @@ describe("with a league", () => {
 		const s2 = (await idb.cache.draftPicks.get(swapDpid))!;
 		assert.strictEqual(s2.tid, 1);
 		assert.isUndefined(s2.swap);
+	});
+
+	test("a rollover the original team can't deliver is valued like an extinguished obligation", async () => {
+		const dpid = dpids[2]![1]!;
+		const rollover: TradePickCondition = {
+			type: "protection",
+			dpid,
+			top: 14,
+			rollover: [10],
+			then: "unprotected",
+		};
+		const extinguish: TradePickCondition = {
+			type: "protection",
+			dpid,
+			top: 14,
+			rollover: [],
+			then: "extinguish",
+		};
+		const beyondHorizon = await evaluate(15, dpid, [rollover]);
+		const extinguished = await evaluate(15, dpid, [extinguish]);
+		assert.isAbove(beyondHorizon, extinguished);
+
+		// Next year's pick already belongs to someone else, so nothing can roll over
+		const nextDpid = await idb.cache.draftPicks.add({
+			tid: 7,
+			originalTid: 2,
+			round: 1,
+			pick: 0,
+			season: g.get("season") + 1,
+		});
+		const traded = await evaluate(15, dpid, [rollover]);
+		assert.closeTo(traded, extinguished, 1e-6);
+
+		// Owned, so it's worth something again
+		const next = (await idb.cache.draftPicks.get(nextDpid))!;
+		next.tid = 2;
+		await idb.cache.draftPicks.put(next);
+		const owned = await evaluate(15, dpid, [rollover]);
+		assert.isAbove(owned, extinguished);
+
+		await idb.cache.draftPicks.delete(nextDpid);
+	});
+
+	test("getFallbackDeliveredProb", () => {
+		const season = 2030;
+		const base = { season, round: 1, originalTid: 4 };
+		const prot = { rollover: [5], then: "unprotected" as const };
+		const next = dp({ dpid: 50, season: season + 1, originalTid: 4, tid: 4 });
+		const next2 = dp({
+			dpid: 51,
+			season: season + 1,
+			originalTid: 4,
+			tid: 4,
+			round: 2,
+		});
+		assert.strictEqual(
+			getFallbackDeliveredProb(base, prot, 4, [next], new Set()),
+			CONDITION_SURVIVE_PROB,
+		);
+		// Being traded away in this same trade
+		assert.strictEqual(
+			getFallbackDeliveredProb(base, prot, 4, [next], new Set([50])),
+			0,
+		);
+		// Owned by another team
+		assert.strictEqual(
+			getFallbackDeliveredProb(base, prot, 4, [{ ...next, tid: 9 }], new Set()),
+			0,
+		);
+		// 2nd round conversion looks at the 2nd round pick
+		assert.strictEqual(
+			getFallbackDeliveredProb(
+				base,
+				{ rollover: [], then: "secondRound" },
+				4,
+				[next, { ...next2, tid: 9 }],
+				new Set(),
+			),
+			0,
+		);
+		// Not generated yet
+		assert.strictEqual(
+			getFallbackDeliveredProb(base, prot, 4, [], new Set()),
+			CONDITION_SURVIVE_PROB,
+		);
+		const probs = [0.5, 0.5];
+		const values = [10, 2];
+		const full = protectedTradeValue(probs, values, {
+			top: 1,
+			rollover: [1],
+			then: "unprotected",
+		});
+		const none = protectedTradeValue(
+			probs,
+			values,
+			{ top: 1, rollover: [1], then: "unprotected" },
+			0,
+		);
+		assert.closeTo(none.tradeValue, 1, 1e-9);
+		assert.isAbove(full.tradeValue, none.tradeValue);
+	});
+
+	test("AI condition variants: protections on its 1sts and swap rights", async () => {
+		const teams: TradeTeams = [
+			{ tid: 3, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+			{ tid: 0, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+		];
+		const aiPicks = await idb.cache.draftPicks.indexGetAll(
+			"draftPicksByTid",
+			0,
+		);
+		let i = 0;
+		const variants = await getConditionVariants(teams, aiPicks, () => {
+			i += 1;
+			return (i * 0.37) % 1;
+		});
+		const protections = variants.filter(
+			(v) => v.condition.type === "protection",
+		);
+		const swaps = variants.filter((v) => v.condition.type === "swap");
+		assert.isAbove(protections.length, 0);
+		assert.isAbove(swaps.length, 0);
+		for (const v of protections) {
+			assert.strictEqual(v.dp.round, 1);
+			assert.isUndefined(
+				validatePickConditionSpec(v.condition, v.dp, g.get("numActiveTeams")),
+			);
+		}
+		for (const v of variants) {
+			assert.include(AI_PICK_TIDS, v.dp.tid);
+		}
+
+		// Partner already trading its own pick: no swap on that pick
+		const partnerPick = dpids[3]![1]!;
+		const variants2 = await getConditionVariants(
+			[{ ...teams[0], dpids: [partnerPick] }, teams[1]],
+			aiPicks.filter((dp) => dp.round === 1),
+		);
+		assert.isFalse(variants2.some((v) => v.condition.type === "swap"));
+	});
+
+	test("makeItWork with AI pick conditions gives a trade the AI likes, with valid conditions", async () => {
+		const valueChangeCalculator = new ValueChangeCalculator();
+		const players3 = await idb.cache.players.indexGetAll("playersByTid", 3);
+		for (let k = 0; k < 5; k++) {
+			const teams = await makeItWork(
+				[
+					{
+						tid: 3,
+						pids: [players3[k]!.pid],
+						pidsExcluded: [],
+						dpids: [],
+						dpidsExcluded: [],
+					},
+					{ tid: 0, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+				],
+				{
+					holdUserConstant: true,
+					valueChangeCalculator,
+					aiPickConditions: true,
+				},
+			);
+			if (!teams) {
+				continue;
+			}
+			for (const c of teams[1].pickConditions ?? []) {
+				assert.include(teams[1].dpids, c.dpid);
+				assert.strictEqual(c.tid, 3);
+			}
+			const dv = await valueChangeCalculator.evaluate({
+				tid: 0,
+				pidsAdd: teams[0].pids,
+				pidsRemove: teams[1].pids,
+				dpidsAdd: teams[0].dpids,
+				dpidsRemove: teams[1].dpids,
+				tradingPartnerTid: 3,
+				pickConditions: getTradePickConditions(teams),
+			});
+			assert.isAbove(dv, 0);
+		}
 	});
 });

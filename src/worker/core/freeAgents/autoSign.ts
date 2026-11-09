@@ -1,6 +1,11 @@
 import { PLAYER } from "../../../common/constants.ts";
 import { player, team } from "../index.ts";
 import getBest from "./getBest.ts";
+import {
+	countMentees,
+	getAiTraitValueFactor,
+	traitsEnabled,
+} from "../player/traits.ts";
 import { getContractDemand } from "../contract/index.ts";
 import { idb } from "../../db/index.ts";
 import { g, local } from "../../util/index.ts";
@@ -73,7 +78,21 @@ const autoSign = async () => {
 
 		// Ignore roster size, will drop bad player if necessary in checkRosterSizes, and getBest won't sign min contract player unless under the roster limit
 		const payroll = await team.getPayroll(t.tid);
-		const p = getBest(playersOnRoster, playersSorted, payroll);
+		// Player traits (setting): this team's small trait adjustment to value, e.g. contenders and young rosters like savvy veterans, everyone avoids injury prone players
+		let playersForTeam = playersSorted;
+		if (traitsEnabled()) {
+			const numYoung = countMentees(playersOnRoster);
+			playersForTeam = orderBy(
+				playersSorted,
+				(p) =>
+					p.value *
+					(p.value > 0
+						? getAiTraitValueFactor(p, { strategy: t.strategy, numYoung })
+						: 1),
+				"desc",
+			);
+		}
+		const p = getBest(playersOnRoster, playersForTeam, payroll);
 		if (p) {
 			// Remove from list of free agents
 			playersSorted = playersSorted.filter((p2) => p2 !== p);
