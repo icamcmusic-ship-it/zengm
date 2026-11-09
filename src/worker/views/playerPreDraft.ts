@@ -83,12 +83,15 @@ const overallPick = (p: Player) =>
 		? (p.draft.round - 1) * Math.max(1, g.get("numActiveTeams")) + p.draft.pick
 		: undefined;
 
-const STATS_PER_GAME = PLAYER_STATS_TABLES.regular!.stats.filter(
-	(stat) => !stat.endsWith("Max"),
-);
-const STATS_ADVANCED = PLAYER_STATS_TABLES.advanced!.stats.filter(
-	(stat) => stat !== "onOff100" && stat !== "pm100",
-);
+// Computed on first use: the regular/advanced stats tables only exist in basketball, and this module is loaded in every sport
+const statsPerGame = () =>
+	(PLAYER_STATS_TABLES.regular?.stats ?? []).filter(
+		(stat) => !stat.endsWith("Max"),
+	);
+const statsAdvanced = () =>
+	(PLAYER_STATS_TABLES.advanced?.stats ?? []).filter(
+		(stat) => stat !== "onOff100" && stat !== "pm100",
+	);
 
 const formatTable = async (
 	pRaw: Player,
@@ -286,9 +289,9 @@ const getPreDraftInfo = async (pRaw: Player) => {
 	}
 
 	const [perGame, totals, advanced] = await Promise.all([
-		formatTable(pRaw, STATS_PER_GAME, "perGame"),
-		formatTable(pRaw, STATS_PER_GAME, "totals"),
-		formatTable(pRaw, STATS_ADVANCED, "perGame"),
+		formatTable(pRaw, statsPerGame(), "perGame"),
+		formatTable(pRaw, statsPerGame(), "totals"),
+		formatTable(pRaw, statsAdvanced(), "perGame"),
 	]);
 
 	const prospect = isProspect(pRaw);
@@ -495,8 +498,8 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		perGame,
 		totals,
 		advanced,
-		statsPerGame: STATS_PER_GAME,
-		statsAdvanced: STATS_ADVANCED,
+		statsPerGame: statsPerGame(),
+		statsAdvanced: statsAdvanced(),
 		seasons,
 		honors,
 		summary,
