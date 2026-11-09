@@ -257,6 +257,10 @@ export const getDefaultSettings = () => {
 			defaultGameAttributes,
 			"numDraftRounds",
 		),
+		numDraftClasses: unwrapGameAttribute(
+			defaultGameAttributes,
+			"numDraftClasses",
+		),
 		tradeDeadline: unwrapGameAttribute(defaultGameAttributes, "tradeDeadline"),
 		difficulty: unwrapGameAttribute(defaultGameAttributes, "difficulty"),
 		stopOnInjury: unwrapGameAttribute(defaultGameAttributes, "stopOnInjury"),

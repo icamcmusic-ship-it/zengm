@@ -943,6 +943,22 @@ export const settings: Setting[] = (
 		},
 		{
 			category: "Draft",
+			key: "numDraftClasses",
+			name: "# Future Draft Classes",
+			description:
+				"How many upcoming draft classes are kept generated. After each draft, a new class is added in the preseason (and whenever there are fewer than this).",
+			type: "int",
+			validator: (value) => {
+				if (value < 1) {
+					throw new Error("Value cannot be less than 1");
+				}
+				if (value > 20) {
+					throw new Error("Value cannot be greater than 20");
+				}
+			},
+		},
+		{
+			category: "Draft",
 			key: "draftAges",
 			name: "Age of Draft Prospects",
 			godModeRequired: "always",

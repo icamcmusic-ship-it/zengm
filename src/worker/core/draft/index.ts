@@ -17,6 +17,7 @@ import getRookieContractLength from "./getRookieContractLength.ts";
 import getRookieSalaries from "./getRookieSalaries.ts";
 import runPicks from "./runPicks.ts";
 import selectPlayer from "./selectPlayer.ts";
+import topUpDraftClasses from "./topUpDraftClasses.ts";
 
 export default {
 	afterPicks,
@@ -36,4 +37,5 @@ export default {
 	getRookieSalaries,
 	runPicks,
 	selectPlayer,
+	topUpDraftClasses,
 };

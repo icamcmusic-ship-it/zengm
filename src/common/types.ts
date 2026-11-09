@@ -787,6 +787,7 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	numActiveTeams: number;
 	numDraftPicksCurrent?: number;
 	numDraftRounds: number;
+	numDraftClasses: number;
 	numGames: number;
 	numGamesDiv: number | null;
 	numGamesConf: number | null;

@@ -88,6 +88,7 @@ export type Key =
 	| "playerMoodTraits"
 	| "numPlayersOnCourt"
 	| "numDraftRounds"
+	| "numDraftClasses"
 	| "tradeDeadline"
 	| "difficulty"
 	| "stopOnInjuryGames"

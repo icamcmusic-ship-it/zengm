@@ -573,6 +573,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	],
 	draftLotteryCustomNumPicks: 4,
 	numDraftRounds: 2,
+	// Upcoming draft classes kept generated (stock BBGM: 3)
+	numDraftClasses: 7,
 	draftAges: [19, 22],
 	defaultStadiumCapacity: DEFAULT_STADIUM_CAPACITY,
 	playersRefuseToNegotiate: true,
