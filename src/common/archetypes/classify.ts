@@ -2,7 +2,7 @@ import { ARCHETYPE_DEFS } from "./defs.data.ts";
 import { DIM_LABELS, DIM_RATINGS, DIMS } from "./composites.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import { matchZ } from "./match.ts";
-import { prepare, rawMatch } from "./score.ts";
+import { levelPenalty, needPenalty, prepare, rawMatch } from "./score.ts";
 import { ovrPercentile } from "./norms.ts";
 import { isPos, positionOf, posPrior } from "./position.ts";
 import type {
@@ -31,7 +31,7 @@ export const RARE_PENALTY = 0.5;
 // A runner-up this close (in standard deviations of fit) from a different family makes a hybrid
 export const HYBRID_Z = 0.15;
 // The archetype he had keeps the label unless another is better by more than this
-export const STICKY_Z = 0.2;
+export const STICKY_Z = 0.4;
 
 // Score of an archetype his position rules out: below anything a real fit can reach, but finite
 export const BLOCKED_Z = -99;
@@ -45,6 +45,8 @@ export const scoreAll = (
 	norms: Norms = DEFAULT_NORMS,
 	archetypes: Archetype[] = ARCHETYPES,
 	position?: Pos,
+	// His age, when known: age-gated archetypes (veterans) need it
+	age?: number,
 ): {
 	scored: Scored[];
 	z: Record<DimKey, number>;
@@ -55,9 +57,15 @@ export const scoreAll = (
 	const pos = position ?? positionOf(ratings);
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
-		const raw = rawMatch(a, p.z, p.hgt, p.skills);
+		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.level);
 		const prior = posPrior(a.group, a.pos, pos);
-		if (prior === null) {
+		if (
+			prior === null ||
+			(a.age &&
+				(age === undefined
+					? a.age[0] >= 30
+					: age < a.age[0] - 1 || age > a.age[1] + 1))
+		) {
 			scored.push({ a, raw, z: BLOCKED_Z });
 			continue;
 		}
@@ -66,7 +74,12 @@ export const scoreAll = (
 			(table ? matchZ(table, raw) : raw * 4 - 2) -
 			(a.rare ? RARE_PENALTY : 0) +
 			prior +
-			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0);
+			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0) -
+			needPenalty(a, p) -
+			levelPenalty(a, p.level) -
+			(a.age && age !== undefined
+				? 0.6 * Math.max(0, a.age[0] - age, age - a.age[1])
+				: 0);
 		scored.push({ a, raw, z });
 	}
 	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
@@ -139,6 +152,8 @@ export type ClassifyOptions = {
 	stickiness?: number;
 	// His position (as the game shows it); read from the ratings when not given
 	pos?: string;
+	// His age, when known (veteran archetypes need it)
+	age?: number;
 };
 
 export const classify = (
@@ -151,6 +166,7 @@ export const classify = (
 		norms,
 		ARCHETYPES,
 		isPos(opts.pos) ? opts.pos : undefined,
+		opts.age,
 	);
 	let first = scored[0]!;
 	const sticky = opts.stickiness ?? STICKY_Z;

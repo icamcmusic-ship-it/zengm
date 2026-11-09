@@ -19,18 +19,21 @@ export type SamplePlayer = {
 export const sampleLeague = async (
 	n: number,
 	seed: string,
+	// Years of development: 0..maxYears (default: a whole league, 19 to 32 year olds)
+	maxYears = 13,
+	minOvr = 38,
 ): Promise<SamplePlayer[]> => {
 	resetG();
 	const rng = new Rng(seed);
 	const out: SamplePlayer[] = [];
 	while (out.length < n) {
-		const k = rng.int(0, 13);
+		const k = rng.int(0, maxYears);
 		const p = generate(-1, 19, 2025 - k, false, DEFAULT_LEVEL);
 		await develop(p as any, k, true);
 		const row = p.ratings.at(-1) as any;
 		const o = ovr(row);
 		// Roughly who is on an NBA-style roster or a bench: drop the hopeless
-		if (o < 38) {
+		if (o < minOvr) {
 			continue;
 		}
 		const ratings = {} as ArchetypeRatings;

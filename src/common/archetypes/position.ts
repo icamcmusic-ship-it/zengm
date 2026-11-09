@@ -237,7 +237,8 @@ export const GROUP_POS_PRIOR: Record<
 		F: 0,
 		PF: 0,
 		FC: 0,
-		C: -0.4,
+		// A "... Forward" label reads wrong on a center: only when no big archetype fits
+		C: -0.8,
 	},
 	big: {
 		PG: null,

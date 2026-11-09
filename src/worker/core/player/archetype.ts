@@ -116,7 +116,18 @@ export const classifyPlayer = (
 	const row = last(p.ratings) as any;
 	// His position as the game shows it is the prior, so the fuzzed ratings scouts see cannot push him into a group his
 	// listed position rules out
-	return classify(ratings, { norms, ovr: row.ovr, previousId, pos: row.pos });
+	// His age picks out veterans (and keeps a 30 year old from reading as a raw prospect)
+	const age =
+		typeof row.season === "number" && typeof p.born?.year === "number"
+			? row.season - p.born.year
+			: undefined;
+	return classify(ratings, {
+		norms,
+		ovr: row.ovr,
+		previousId,
+		pos: row.pos,
+		age,
+	});
 };
 
 // Write this season's entry (replacing one for the same season). Returns true if the primary archetype changed.

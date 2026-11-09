@@ -16,6 +16,10 @@ type Opts = {
 	req?: SkillLabel[];
 	bonus?: SkillLabel[];
 	rare?: true;
+	need?: Partial<Record<DimKey, number>>;
+	needFor?: Partial<Record<DimKey, number>>;
+	level?: [number, number];
+	age?: [number, number];
 	// Position prior overrides (see position.ts)
 	pos?: Partial<Record<Pos, number | null>>;
 	tags?: string[];
@@ -45,6 +49,10 @@ const make =
 		req: opts.req,
 		bonus: opts.bonus,
 		rare: opts.rare,
+		need: opts.need,
+		needFor: opts.needFor,
+		level: opts.level,
+		age: opts.age,
 		pos: opts.pos,
 		tags: [group, family, ...(opts.tags ?? [])],
 	});
@@ -164,7 +172,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Quick Penetrator",
 		"slasher",
 		[0, 44],
-		{ spd: 3, drb: 2, rim: 1.5, draw: 2, three: -0.5 },
+		{ spd: 3, drb: 2, rim: 2, draw: 2, three: -0.5 },
 		"Blows by defenders and gets to the line.",
 	),
 	G(
@@ -245,9 +253,9 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Handles Wizard",
 		"playmaker",
 		[0, 44],
-		{ drb: 3.5, spd: 2, pss: 1 },
+		{ drb: 3.5, spd: 2, pss: 1, oiq: 0.5 },
 		"A dribbling artist.",
-		{ req: ["B"] },
+		{ req: ["B"], need: { drb: 1.1, oiq: -0.5 } },
 	),
 	G(
 		"Score-First Point",
@@ -1058,7 +1066,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[24, 64],
 		{ stl: 3, spd: 1.5, diq: 1.5, jmp: 1, usg: -0.5 },
 		"Jumps passing lanes and turns steals into runouts.",
-		{ tags: ["steals"] },
+		{ need: { diq: 0.2 }, tags: ["steals"] },
 	),
 	W(
 		"Two-Way Slasher",
@@ -1188,7 +1196,387 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Stretches the floor and still cleans the glass.",
 		{ bonus: ["3", "R"], tags: ["spacing"] },
 	),
+	// ------------------------------------------------ Added: role players, raw prospects, veterans and two-way gaps
+	// Raw prospects: well below the league overall (level gate), defined by what is already there (athleticism, size)
+	G(
+		"Raw Athletic Guard",
+		"athlete",
+		[0, 46],
+		{ ath: 2.5, spd: 2, jmp: 1, oiq: -1 },
+		"All quickness and bounce, the skills are still years away.",
+		{
+			need: { ath: 0.6, jmp: 0.5 },
+			level: [-9, -1.2],
+			age: [0, 24],
+			tags: ["prospect", "raw"],
+		},
+	),
+	G(
+		"Developmental Point Guard",
+		"playmaker",
+		[0, 46],
+		{ pss: 2, drb: 1.5, oiq: 1, ath: 0.5 },
+		"A raw point guard with a feel for the game to build on.",
+		{ level: [-9, -1.2], age: [0, 24], tags: ["prospect", "raw"] },
+	),
+	W(
+		"Raw Athletic Wing",
+		"athlete",
+		[24, 64],
+		{ ath: 2.5, jmp: 2, spd: 1, oiq: -1 },
+		"Long, springy and unpolished: a tools-first project.",
+		{
+			need: { ath: 0.6 },
+			level: [-9, -1.2],
+			age: [0, 24],
+			tags: ["prospect", "raw"],
+		},
+	),
+	W(
+		"Developmental Wing",
+		"balanced",
+		[24, 64],
+		{ three: 1, dper: 1, oiq: 1, ath: 0.5 },
+		"A young wing who does a bit of everything, none of it well yet.",
+		{ level: [-9, -1.2], age: [0, 24], tags: ["prospect", "raw"] },
+	),
+	F(
+		"Raw Athletic Forward",
+		"athlete",
+		[44, 76],
+		{ ath: 2.5, jmp: 2, reb: 1, oiq: -1 },
+		"A forward who wins on athleticism alone for now.",
+		{
+			need: { ath: 0.6 },
+			level: [-9, -1.2],
+			age: [0, 24],
+			tags: ["prospect", "raw"],
+		},
+	),
+	F(
+		"Developmental Forward",
+		"balanced",
+		[44, 76],
+		{ reb: 1, stre: 1, dint: 1, oiq: 0.5 },
+		"A raw forward with a frame to grow into.",
+		{ level: [-9, -1.2], age: [0, 24], tags: ["prospect", "raw"] },
+	),
+	C(
+		"Raw Athletic Big",
+		"athlete",
+		[54, 100],
+		{ ath: 2.5, jmp: 2, blk: 1, oiq: -1 },
+		"A big who runs and jumps but has little feel yet.",
+		{
+			need: { ath: 0.6 },
+			level: [-9, -1.2],
+			age: [0, 24],
+			tags: ["prospect", "raw"],
+		},
+	),
+	C(
+		"Project Big",
+		"rebounder",
+		[56, 100],
+		{ hgt: 1.5, reb: 1.5, stre: 1, ath: -0.5 },
+		"Size you cannot teach and everything else still to learn.",
+		{ level: [-9, -1.2], age: [0, 24], tags: ["prospect", "raw"] },
+	),
+	W(
+		"Shooting Prospect",
+		"shooter",
+		[18, 64],
+		{ three: 2, ft: 1.5, oiq: 0.5 },
+		"A young shooter whose stroke is ahead of the rest of his game.",
+		{
+			level: [-9, -1.2],
+			age: [0, 24],
+			pos: { PG: -0.3, G: 0 },
+			tags: ["prospect", "raw"],
+		},
+	),
+	W(
+		"Defensive Prospect",
+		"defender",
+		[24, 66],
+		{ dper: 2, diq: 1.5, stl: 1, ath: 0.5 },
+		"Already competes on defense; the offense will come or it will not.",
+		{ level: [-9, -1.2], age: [0, 24], tags: ["prospect", "raw"] },
+	),
+	G(
+		"Scoring Prospect",
+		"scorer",
+		[0, 48],
+		{ usg: 2, drb: 1.5, mid: 1, three: 1 },
+		"A young bucket hunter, still learning when not to shoot.",
+		{ level: [-9, -1.2], age: [0, 24], tags: ["prospect", "raw"] },
+	),
+	C(
+		"Stretch Big Prospect",
+		"shooter",
+		[54, 100],
+		{ three: 2, ft: 1, mid: 1, stre: -0.5 },
+		"A young big with a soft touch who needs to fill out.",
+		{ level: [-9, -1.2], age: [0, 24], tags: ["prospect", "raw"] },
+	),
+	// Journeymen: fringe players of any age, below the league's level without a standout skill
+	G(
+		"Journeyman Guard",
+		"balanced",
+		[0, 46],
+		{ usg: -1, drb: 0.5, pss: 0.5, end: 0.5 },
+		"Bounces between benches and ten-day contracts, ready when called.",
+		{ level: [-9, -1.0], tags: ["role", "fringe"] },
+	),
+	W(
+		"Journeyman Wing",
+		"balanced",
+		[26, 64],
+		{ usg: -1, dper: 0.5, three: 0.5, end: 0.5 },
+		"A fringe wing who fills a roster spot and plays hard.",
+		{ level: [-9, -1.0], tags: ["role", "fringe"] },
+	),
+	F(
+		"Journeyman Forward",
+		"balanced",
+		[44, 76],
+		{ usg: -1, reb: 0.5, stre: 0.5, end: 0.5 },
+		"An end-of-bench forward who knows his role.",
+		{ level: [-9, -1.0], tags: ["role", "fringe"] },
+	),
+	C(
+		"Journeyman Big",
+		"balanced",
+		[54, 100],
+		{ usg: -1, reb: 0.5, dint: 0.5, hgt: 0.5 },
+		"Size for the end of the bench, five fouls to give.",
+		{ level: [-9, -1.0], tags: ["role", "fringe"] },
+	),
+	// Veterans: the legs are going, the craft is not (age 31+)
+	G(
+		"Veteran Floor Leader",
+		"playmaker",
+		[0, 48],
+		{ oiq: 2, pss: 2, ath: -1.5, ft: 1 },
+		"A savvy veteran who runs the offense on smarts, not speed.",
+		{ age: [31, 50], need: { pss: 0.2 }, tags: ["veteran"] },
+	),
+	G(
+		"Crafty Veteran Guard",
+		"scorer",
+		[0, 48],
+		{ oiq: 2, mid: 1.5, three: 1.5, ath: -2, ft: 1 },
+		"Gets his shots with pace, pump fakes and footwork.",
+		{ age: [31, 50], tags: ["veteran"] },
+	),
+	W(
+		"Veteran Wing",
+		"balanced",
+		[24, 66],
+		{ oiq: 2, diq: 2, three: 1, ath: -2 },
+		"Has seen it all: always in the right spot at both ends.",
+		{ age: [31, 50], tags: ["veteran"] },
+	),
+	F(
+		"Veteran Forward",
+		"hustle",
+		[44, 76],
+		{ diq: 2, oiq: 1.5, stre: 1.5, reb: 1, ath: -2 },
+		"A grizzled forward who wins with strength and positioning.",
+		{ age: [31, 50], tags: ["veteran"] },
+	),
+	C(
+		"Veteran Big",
+		"defender",
+		[54, 100],
+		{ diq: 2, oiq: 1.5, dint: 1.5, reb: 1, ath: -2 },
+		"A wily old big: verticality, angles and the occasional flop.",
+		{ age: [31, 50], tags: ["veteran"] },
+	),
+	// Role players: rotation guys who are not exceptional at anything in particular
+	G(
+		"Backup Point Guard",
+		"playmaker",
+		[0, 46],
+		{ pss: 1.5, drb: 1, usg: -1.5, oiq: 0.5 },
+		"Keeps the second unit organized and the turnovers down.",
+		{ tags: ["role", "bench"] },
+	),
+	G(
+		"Steady Guard",
+		"balanced",
+		[0, 48],
+		{ usg: -1.5, oiq: 1, diq: 1, end: 0.5 },
+		"Rarely spectacular, rarely a liability.",
+		{ tags: ["role", "bench"] },
+	),
+	W(
+		"Rotation Wing",
+		"balanced",
+		[24, 66],
+		{ usg: -2, dper: 0.5, three: 0.5, end: 0.5 },
+		"Fills minutes on the wing without hurting you.",
+		{ tags: ["role", "bench"] },
+	),
+	W(
+		"Connector Wing",
+		"playmaker",
+		[24, 66],
+		{ pss: 1.5, oiq: 1.5, usg: -1.5, three: 0.5 },
+		"Moves the ball on time and keeps the offense flowing.",
+		{ need: { pss: 0 }, tags: ["role"] },
+	),
+	C(
+		"Backup Center",
+		"balanced",
+		[54, 100],
+		{ usg: -1.5, reb: 0.5, dint: 0.5, end: -0.5 },
+		"Soaks up minutes in the middle when the starter sits.",
+		{ tags: ["role", "bench"] },
+	),
+	// Two-way and defensive gaps
+	G(
+		"Point of Attack Defender",
+		"defender",
+		[0, 48],
+		{ dper: 2.5, spd: 2, stl: 1.5, end: 1, usg: -1 },
+		"Picks up full court and fights over every screen.",
+		{ need: { diq: -0.2 }, tags: ["defense"] },
+	),
+	W(
+		"Long Wing Defender",
+		"defender",
+		[40, 66],
+		{ dper: 2, blk: 2, hgt: 1, diq: 1.5, usg: -1 },
+		"Length everywhere: contests on the perimeter and at the rim.",
+		{ tags: ["defense"] },
+	),
+	F(
+		"Switchable Forward",
+		"defender",
+		[44, 74],
+		{ dper: 2, dint: 2, spd: 1.5, diq: 1.5 },
+		"Guards one through four without giving anything up.",
+		{ tags: ["defense", "switch"] },
+	),
+	F(
+		"Two-Way Point Forward",
+		"playmaker",
+		[46, 74],
+		{ pss: 2, dper: 1.5, dint: 1.5, drb: 1, diq: 1, hgt: 0.5 },
+		"Runs the offense and guards the other team's best forward.",
+		{ need: { pss: 0.3 }, tags: ["two-way"] },
+	),
+	C(
+		"Two-Way Stretch Big",
+		"defender",
+		[54, 100],
+		{ three: 2, dint: 2, diq: 1.5, blk: 1 },
+		"Spaces the floor on offense and holds the paint on defense.",
+		{ tags: ["spacing", "defense"] },
+	),
+	C(
+		"Mobile Rim Protector",
+		"defender",
+		[54, 100],
+		{ blk: 2.5, spd: 2, ath: 1.5, dper: 1 },
+		"Blocks shots and can still step out on the perimeter.",
+		{ tags: ["defense", "switch"] },
+	),
+	// Scoring and creation gaps
+	W(
+		"Three-Level Scorer",
+		"scorer",
+		[24, 64],
+		{ rim: 2, mid: 2, three: 2, usg: 1.5 },
+		"Scores at the rim, from mid-range and from deep.",
+		{ tags: ["volume"] },
+	),
+	G(
+		"Undersized Scorer",
+		"scorer",
+		[0, 30],
+		{ usg: 2.5, three: 1.5, drb: 1.5, hgt: -1.5, spd: 1 },
+		"Small, fearless and always looking for his shot.",
+		{ tags: ["volume"] },
+	),
+	G(
+		"Transition Guard",
+		"athlete",
+		[0, 48],
+		{ spd: 2.5, rim: 1.5, end: 1.5, three: 0.5, pss: 0.5 },
+		"Pushes the pace and lives in the open floor.",
+		{ tags: ["transition"] },
+	),
+	F(
+		"Bully Forward",
+		"slasher",
+		[44, 76],
+		{ stre: 2.5, rim: 2, usg: 1.5, draw: 1.5 },
+		"Bullies his way to the rim through smaller defenders.",
+		{ tags: ["paint"] },
+	),
+	F(
+		"Rim-Running Four",
+		"athlete",
+		[46, 76],
+		{ rim: 2.5, spd: 2, ath: 1.5, usg: -1 },
+		"Beats the bigs down the floor for dunks.",
+		{ tags: ["transition"] },
+	),
+	C(
+		"Short-Roll Playmaker",
+		"playmaker",
+		[54, 100],
+		{ pss: 2, rim: 1.5, mid: 1.5, oiq: 1.5 },
+		"Catches in the short roll and makes the right play.",
+		{ tags: ["playmaking"] },
+	),
 ];
+
+// What a name promises, on the league-wide scale: a label is only given when the skill its name names is really there.
+// [name pattern, floors on the absolute z of each dimension]
+const NAME_NEEDS: [
+	RegExp,
+	Partial<Record<DimKey, number>>,
+	Partial<Record<DimKey, number>>?,
+][] = [
+	[/Shoot|Sniper|3-and-D|Stretch|Corner|Spot-Up|Pick-and-Pop/, { three: 0.3 }],
+	[
+		/Rim Protector|Swat|Shot-Block|Anchor|Shot Blocker/,
+		{ blk: 0.6 },
+		// Not just tall: at least an ordinary shot blocker for his size
+		{ blk: 0 },
+	],
+	[
+		/Floor General|Playmak|Pass-First|Point (Forward|Center)|Hub|Jumbo/,
+		{ pss: 0.5 },
+	],
+	[/Lockdown|Defensive|Stopper|Pest|Hawk|Thief|Two-Way|Switch/, { diq: 0 }],
+	[/Rebound|Glass|Double-Double|Putback/, {}, { reb: 0.35 }],
+	[/Post|Interior Scorer|Paint Beast/, {}, { post: 0.35 }],
+	[/Slash|Penetrator/, {}, { rim: 0.05 }],
+	[/Athletic|High-Flyer|Explosive|Rim-Running|Lob Threat/, { ath: 0.4 }],
+	[/Handles|Shot Creator|Shot-Creating/, { drb: 0.6 }],
+];
+// A raw prospect's label promises less: the floors are lower by this much
+const PROSPECT_SLACK = 0.2;
+for (const d of ARCHETYPE_DEFS) {
+	for (const [re, need, needFor] of NAME_NEEDS) {
+		if (re.test(d.name)) {
+			const floors = Object.fromEntries(
+				Object.entries(need).map(([k, v]) => [
+					k,
+					d.level ? v - PROSPECT_SLACK : v,
+				]),
+			);
+			d.need = { ...floors, ...d.need };
+			if (needFor) {
+				d.needFor = { ...needFor, ...d.needFor };
+			}
+		}
+	}
+}
 
 // Position prior overrides for archetypes defined above, kept apart so the table above stays readable
 const POS_OVERRIDES: Record<string, Partial<Record<Pos, number | null>>> = {
