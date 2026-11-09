@@ -1949,8 +1949,7 @@ const afterDBStream = async ({
 		__SPORT === "basketball" &&
 		g.get("expandedRatings") &&
 		(await idb.cache.players.getAll()).some(
-			(p) =>
-				p.tid !== PLAYER.RETIRED && !hasExpandedRatings(p.ratings.at(-1)!),
+			(p) => p.tid !== PLAYER.RETIRED && !hasExpandedRatings(p.ratings.at(-1)!),
 		)
 	) {
 		await updateExpandedRatingsForLeague();

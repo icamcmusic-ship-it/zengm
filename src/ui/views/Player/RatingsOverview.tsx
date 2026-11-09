@@ -217,8 +217,7 @@ export const RatingsOverview = ({
 									label: (
 										<>
 											<span className="d-md-none">Def</span>
-											<span className="d-none d-md-inline">Defensive</span>{" "}
-											IQ
+											<span className="d-none d-md-inline">Defensive</span> IQ
 										</>
 									),
 									rating: "diq",

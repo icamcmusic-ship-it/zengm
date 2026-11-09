@@ -27,7 +27,10 @@ afterAll(() => {
 const print = (label: string, off: Totals, on: Totals) => {
 	const a = summarizeTotals(off);
 	const b = summarizeTotals(on);
-	const lines = [`${label} (${off.teamGames / 2} games)`, "stat\toff\ton\tdiff"];
+	const lines = [
+		`${label} (${off.teamGames / 2} games)`,
+		"stat\toff\ton\tdiff",
+	];
 	for (const key of Object.keys(a) as (keyof typeof a)[]) {
 		lines.push(
 			`${key}\t${a[key].toFixed(2)}\t${b[key].toFixed(2)}\t${(b[key] - a[key]).toFixed(2)}`,

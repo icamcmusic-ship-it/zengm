@@ -3003,7 +3003,9 @@ class GameSim extends GameSimBase {
 			type === "tipIn"
 		) {
 			factor *= helpers.bound(
-				1 - EXPANDED_FINISH_OVER * (p.compositeRating.length - EXPANDED_LENGTH_REF),
+				1 -
+					EXPANDED_FINISH_OVER *
+						(p.compositeRating.length - EXPANDED_LENGTH_REF),
 				0.7,
 				1.3,
 			);

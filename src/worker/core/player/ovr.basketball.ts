@@ -5,9 +5,7 @@ import { expandedRatingsApply } from "./expandedRatings.ts";
 // diq is the average of perimeter and interior defense then, so its term covers them.
 const WNG_SHARE = 0.25;
 
-const ovr = (
-	ratings: Record<RatingKey, number> & { wng?: number },
-): number => {
+const ovr = (ratings: Record<RatingKey, number> & { wng?: number }): number => {
 	const hgt = expandedRatingsApply(ratings)
 		? (1 - WNG_SHARE) * ratings.hgt + WNG_SHARE * ratings.wng!
 		: ratings.hgt;

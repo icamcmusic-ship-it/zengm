@@ -161,7 +161,8 @@ export const wrapNewValueIfCurrentlyWrapped = <
 
 // Expanded ratings: read by player ovr/skills, which can't import this file (see expandedRatingsSwitch.ts)
 setExpandedRatingsGetter(
-	() => Object.hasOwn(g, "expandedRatings") && g.get("expandedRatings") === true,
+	() =>
+		Object.hasOwn(g, "expandedRatings") && g.get("expandedRatings") === true,
 );
 
 export default g;

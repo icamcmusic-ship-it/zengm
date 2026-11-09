@@ -86,7 +86,9 @@ test.skipIf(!process.env.EXPANDED_DIST)(
 			}
 			if (expanded) {
 				const e = EXPANDED_COMPOSITE_WEIGHTS.length;
-				const xs = rs.map((r) => compositeRating(r, e.ratings, e.weights, false));
+				const xs = rs.map((r) =>
+					compositeRating(r, e.ratings, e.weights, false),
+				);
 				out.push(`  length\texp ${mean(xs).toFixed(4)}\t${sd(xs).toFixed(4)}`);
 			}
 		}

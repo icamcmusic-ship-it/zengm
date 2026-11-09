@@ -78,15 +78,10 @@ describe("derivation", () => {
 	});
 
 	test("table keys", () => {
-		assert.deepStrictEqual(insertExpandedRatingKeys(["hgt", "stre", "diq", "drb"]), [
-			"hgt",
-			"wng",
-			"stre",
-			"diq",
-			"pdef",
-			"idef",
-			"drb",
-		]);
+		assert.deepStrictEqual(
+			insertExpandedRatingKeys(["hgt", "stre", "diq", "drb"]),
+			["hgt", "wng", "stre", "diq", "pdef", "idef", "drb"],
+		);
 	});
 });
 
@@ -209,7 +204,12 @@ describe("skill badges", () => {
 			pdef: 30,
 			idef: 80,
 		});
-		const shortLeaper = getSkillBadges({ ...base, wng: 45, pdef: 70, idef: 35 });
+		const shortLeaper = getSkillBadges({
+			...base,
+			wng: 45,
+			pdef: 70,
+			idef: 35,
+		});
 		assert.isFalse(stock.includes("Bk") && !longRimProtector.includes("Bk"));
 		assert.isTrue(longRimProtector.includes("Bk"));
 		assert.isFalse(shortLeaper.includes("Bk"));

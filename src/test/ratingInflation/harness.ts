@@ -258,12 +258,10 @@ export const summarize = async (
 		pfPerGame: gp > 0 ? r2(pf / gp) : Number.NaN,
 		fgAtRimPct: fgaAtRim > 0 ? r2((100 * fgAtRim) / fgaAtRim) : Number.NaN,
 		fgaAtRimPerGame: gp > 0 ? r2(fgaAtRim / gp) : Number.NaN,
-		skillsDi: players.filter((p) =>
-			p.ratings.at(-1)!.skills.includes("Di"),
-		).length,
-		skillsDp: players.filter((p) =>
-			p.ratings.at(-1)!.skills.includes("Dp"),
-		).length,
+		skillsDi: players.filter((p) => p.ratings.at(-1)!.skills.includes("Di"))
+			.length,
+		skillsDp: players.filter((p) => p.ratings.at(-1)!.skills.includes("Dp"))
+			.length,
 		skillsR: players.filter((p) => p.ratings.at(-1)!.skills.includes("R"))
 			.length,
 	};

@@ -111,7 +111,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `realisticPossessions`                                                                                    | on / off                                                        |                                                                                                              |
 | `playerTraits`, `playerTraitsSeed`                                                                        | on / off; seed random / 0                                       | the seed is set once at league creation                                                                      |
 | `injuryDepth`                                                                                             | on / off                                                        |                                                                                                              |
-| `expandedRatings`                                                                                         | on / off                                                        | turning it on in an existing league derives the new ratings from the current ones                          |
+| `expandedRatings`                                                                                         | on / off                                                        | turning it on in an existing league derives the new ratings from the current ones                            |
 | `contractOptions`, `contractExtensions`, `tradeRequests`                                                  | on / off                                                        |                                                                                                              |
 | `featureHoldouts` + `holdoutFrequency`                                                                    | on / off; 1 / 1                                                 | frequency scales how often holdouts happen                                                                   |
 | `aiTradesNeedBased`                                                                                       | on / off                                                        | the classic random AI-to-AI trades stay on in every league (_AI-to-AI Trades Factor_ in the Events category) |
@@ -233,6 +233,7 @@ League menu → _Contract Value_: a value index, bargains and albatrosses, and t
 - **What:** active players within reach of a career mark (points, rebounds, assists, steals, blocks, threes, games; ladders like 10,000/12,500/... points) or of the next player above them in the all-time top 100, with the need, their pace and the projected game (game number, day and opponent from the schedule; "next season, about game N" beyond it). Horizon: this season or a season and a half. Recently reached milestones with the game they came in.
 - **News:** milestones of your players are news (with a notification, `featureMilestoneNotifications`); big ones (20,000 points, 10,000 rebounds, ...) are news for anyone. Pre-game "needs N for X career" lines stay with Games to Watch.
 - **How:** pace is this season's per-game rate (last season's before 10 games, else career) times the share of the team's games he plays. The same after-games check as the Records Book finds the exact game a mark was reached in.
+
 ### Rivalries
 
 - **Where:** _Rivalries_ tab of Head-to-Head, `/l/:lid/rivalries[/:tidA-:tidB]`; the _Rivals_ card on Team History; League Stats' More links.
@@ -312,7 +313,21 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Ovr:** a quarter of height's weight goes to wingspan; diq is the defense average. League ovr/pot distributions are unchanged (wng averages hgt).
 - **Existing leagues:** turning the setting on derives the ratings deterministically (seeded by pid) for every player who isn't retired: wingspan from height plus how much he rebounds and leaps for his height, plus noise; the defense split from speed, height, strength and ball handling plus noise, around his current diq (so diq doesn't change). Then ovr, pot and skills are recomputed. Retired players' old rows are derived when shown. Real player leagues and league files without the ratings get them the same way at league creation. Turning it off ignores the stored ratings (and recomputes ovr/skills).
 - **UI:** Player Ratings columns (Wng after Hgt, PDf/IDf after dIQ), player page (Wingspan with the physical ratings, Perimeter D/Interior D in place of Defensive IQ), ratings history, the ratings popover, Compare Players, Draft Scouting (Wng exact, PDf/IDf with scouting fuzz), Customize Player (God Mode editing; diq follows the two defense ratings). Skill badges (Pickpocket, Point-of-attack, Two-way wing read perimeter defense; Shot blocker and Defensive rebounder interior defense and length; Offensive rebounder and Finisher length), the Di/Dp/R skills and archetype composites use the new ratings. College stats: steals read perimeter defense, blocks interior defense and length. The ratings regenerator keeps a prospect's wingspan relative to height and his defense split. League files: optional `wng`, `pdef`, `idef` in ratings rows.
-- **Calibration:** `GameSim.basketball/expandedRatingsSim.test.ts` (`EXPANDED_METRICS=1` for the table), `player/expandedRatingsDist.script.test.ts` (`EXPANDED_DIST=1`, rating and composite distributions and skill cutoffs), and the rating inflation harness config `expanded`.
+- **Calibration** (per team game, setting off vs on):
+
+  | stat | same rosters, 3000 games, off / on | full engine, 3 seeds × 10 seasons, off / on |
+  | ---- | ---------------------------------- | ------------------------------------------- |
+  | pts  | 105.88 / 105.98                    | 105.11 / 105.12                             |
+  | fg%  | 44.10 / 44.12                      | 44.07 / 44.01                               |
+  | 3p%  | 34.96 / 35.18                      | 34.83 / 34.70                               |
+  | trb  | 46.39 / 46.38                      | 46.36 / 46.47                               |
+  | tov  | 16.15 / 16.04                      | 16.24 / 16.18                               |
+  | stl  | 7.28 / 7.19                        | 7.34 / 7.32                                 |
+  | blk  | 5.09 / 5.14                        | 4.96 / 5.05                                 |
+
+  Ratings (population model, 3 seeds × 30 seasons): mean ovr 50.08 / 49.86, pot 56.74 / 56.53, top-10 ovr 72.31 / 71.75.
+
+- **Tests and tools:** `GameSim.basketball/expandedRatingsSim.test.ts` (`EXPANDED_METRICS=1` for the table), `player/expandedRatingsDist.script.test.ts` (`EXPANDED_DIST=1`, rating and composite distributions and skill cutoffs), and the rating inflation harness config `expanded`.
 
 ### Season odds
 

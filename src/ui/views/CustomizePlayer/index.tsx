@@ -42,10 +42,7 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { useLocal } from "../../util/local.ts";
 import clsx from "clsx";
 import type { StoredRatingsBuild } from "../../../common/ratingsBuilds/types.ts";
-import {
-	blendDiq,
-	EXPANDED_RATINGS,
-} from "../../../common/expandedRatings.ts";
+import { blendDiq, EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 
 // In the form, the contract fields are the player's current contract or contract demand
 type PlayerWithContract = PlayerWithoutKey & {
