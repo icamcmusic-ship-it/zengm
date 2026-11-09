@@ -220,6 +220,24 @@ describe("coaching staff", () => {
 		);
 	});
 
+	test("user hiring or firing re-levels every team against the new league average", async () => {
+		await ensureStaff();
+		const tid = g.get("userTid");
+		const assertAllSynced = async () => {
+			for (const t of await idb.cache.teams.getAll()) {
+				assert.strictEqual(t.budget.coaching, await getStaffLevel(t.tid));
+			}
+		};
+		const head = (await getTeamStaff(tid)).head!;
+		await userFire({ cid: head.cid, tid });
+		await assertAllSynced();
+		const best = (await idb.cache.coaches.getAll())
+			.filter((c) => c.tid === COACH_FREE_AGENT && c.cid !== head.cid)
+			.sort((a, b) => b.ratings.dev - a.ratings.dev)[0]!;
+		await userHire({ cid: best.cid, role: "head", years: 2, tid });
+		await assertAllSynced();
+	});
+
 	test("a coach hired during the season gets only the games he coached", async () => {
 		await ensureStaff();
 		const tid = g.get("userTid");

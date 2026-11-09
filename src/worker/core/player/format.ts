@@ -572,7 +572,11 @@ const getBadgesForRatingsRow = (
 	// Only the latest ratings row: trait scores are for the player now
 	const traits =
 		pr === last(p.ratings)
-			? player.getBadgeTraits(p as any, pr.season)
+			? player.getBadgeTraits(
+					p as any,
+					pr.season,
+					player.getBadgeScoutingLevel(),
+				)
 			: undefined;
 	return getDisplayBadges(r, pr.skills ?? [], traits);
 };
@@ -1638,6 +1642,19 @@ const getAbbrevsNeeded = ({
  * @param {string=} options.statType What type of stats to return, 'perGame', 'per36', or 'totals' (default is 'perGame).
  * @return {Object|Array.<Object>} Filtered player object or array of filtered player objects, depending on the first argument.
  */
+// Trait-based skill badges need the user's scouting level, which can only be read asynchronously
+const loadBadgeScoutingLevelIfNeeded = async (options: {
+	ratings?: readonly string[];
+}) => {
+	if (
+		__SPORT === "basketball" &&
+		options.ratings?.includes("badges") &&
+		featureOn("skillBadges")
+	) {
+		await player.loadBadgeScoutingLevel();
+	}
+};
+
 export const formatAll = async <Options extends PlayerFormatOptions>(
 	players: Player[],
 	optionsInput: Options &
@@ -1645,6 +1662,7 @@ export const formatAll = async <Options extends PlayerFormatOptions>(
 ): Promise<PlayerFiltered<Options>[]> => {
 	const options = normalizeOptions(optionsInput);
 	const { season, seasonRange, tid } = options;
+	await loadBadgeScoutingLevelIfNeeded(options);
 
 	// Preload any abbrevs we need for past seasons, so we don't need to make all functions async and do it on demand
 	let abbrevsCache: AbbrevsCache | undefined;
@@ -1702,6 +1720,7 @@ export const formatAll = async <Options extends PlayerFormatOptions>(
 // Loads the abbrevs that formatting with these options might need, for createFormatter. Since the players are not known ahead of time, this loads abbrevs for every team season (or every team in options.season, if that's the only season abbrevs are needed for), rather than just the ones for specific players.
 export const loadAbbrevs = async (optionsInput: PlayerFormatOptions) => {
 	const options = normalizeOptions(optionsInput);
+	await loadBadgeScoutingLevelIfNeeded(options);
 	const abbrevsNeeded = getAbbrevsNeeded(options);
 	if (!abbrevsNeeded.any) {
 		return;

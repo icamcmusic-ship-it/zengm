@@ -1,3 +1,4 @@
+import { finances } from "../index.ts";
 import { g } from "../../util/index.ts";
 import {
 	completeTraitSeeds,
@@ -225,6 +226,16 @@ export const setTraitScores = (
 	}
 	p.traits = seeds;
 };
+
+// The user team's scouting level, for trait-based skill badges in player.format (which is synchronous per player). Loaded
+// by loadBadgeScoutingLevel before formatting, so badges use the same trait estimates as the trait ranges the user sees.
+let badgeScoutingLevel: number | undefined;
+export const loadBadgeScoutingLevel = async () => {
+	badgeScoutingLevel = traitsEnabled()
+		? await finances.getLevelLastThree("scouting", { tid: g.get("userTid") })
+		: undefined;
+};
+export const getBadgeScoutingLevel = () => badgeScoutingLevel;
 
 // For skill badges: the trait scores the user can see. Visible traits use the shown estimate; hidden traits only once they are known exactly (otherwise left out, so no badge can leak them). Undefined when traits are off.
 export const getBadgeTraits = (

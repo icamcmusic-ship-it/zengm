@@ -190,6 +190,27 @@ describe("resolvePickConditionsPure", () => {
 		assert.strictEqual(t3Pick.tid, 3);
 		assert.include(result.messages[0]!.text, "kept their own");
 	});
+
+	test("swap right on a pick the swapping team now owns just goes away, with no lapsed message", () => {
+		const pick = dp({
+			dpid: 1,
+			tid: 3,
+			originalTid: 0,
+			pick: 2,
+			swap: { tid: 3 },
+		});
+		const own = dp({ dpid: 2, tid: 3, originalTid: 3, pick: 20 });
+		const { changed, messages } = resolvePickConditionsPure({
+			draftPicks: [pick, own],
+			futurePicks: [],
+			teamName,
+		});
+		assert.isUndefined(pick.swap);
+		assert.strictEqual(pick.tid, 3);
+		assert.strictEqual(own.tid, 3);
+		assert.deepEqual(changed, [pick]);
+		assert.lengthOf(messages, 0);
+	});
 });
 
 describe("condition helpers", () => {
@@ -651,5 +672,55 @@ describe("with a league", () => {
 			});
 			assert.isAbove(dv, 0);
 		}
+	});
+
+	test("a trade can't be undone once the draft order settled a condition in it", async () => {
+		await idb.cache.trade.put({
+			rid: 0,
+			teams: [
+				{ tid: 0, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+				{ tid: 1, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+			],
+		});
+		const protectedDpid = dpids[0]![1]!;
+		const undo = await processTrade(
+			[
+				{
+					tid: 0,
+					pids: [],
+					pidsExcluded: [],
+					dpids: [protectedDpid],
+					dpidsExcluded: [],
+					pickConditions: [
+						{
+							type: "protection",
+							dpid: protectedDpid,
+							top: 5,
+							rollover: [],
+							then: "extinguish",
+						},
+					],
+				},
+				{ tid: 1, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+			],
+			undefined,
+		);
+
+		// Draft order: conveys, so the pick stays with team 1 but its protection is gone
+		const dp = (await idb.cache.draftPicks.get(protectedDpid))!;
+		dp.pick = 20;
+		resolvePickConditionsPure({
+			draftPicks: [dp],
+			futurePicks: [],
+			teamName,
+		});
+		await idb.cache.draftPicks.put(dp);
+
+		const result = await undo();
+		assert.isString(result);
+		const after = (await idb.cache.draftPicks.get(protectedDpid))!;
+		assert.strictEqual(after.tid, 1);
+		dp.pick = 0;
+		await idb.cache.draftPicks.put(dp);
 	});
 });

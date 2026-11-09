@@ -464,7 +464,7 @@ export const processMulti = async (trade: MultiTeamTrade) => {
 	// processTrade's undo resets the trade page to the leg, so remember what was there
 	const tradeBefore = helpers.deepCopy(await get());
 
-	const undos: (() => Promise<boolean>)[] = [];
+	const undos: Awaited<ReturnType<typeof processTrade>>[] = [];
 	for (const leg of legs) {
 		undos.push(await processTrade(leg, undefined, { note }));
 	}
@@ -480,9 +480,19 @@ export const processMulti = async (trade: MultiTeamTrade) => {
 	}
 
 	return async () => {
-		let ok = true;
+		// Check every leg before undoing any, so the trade is never half undone
+		for (const undo of undos) {
+			const check = await undo({ dryRun: true });
+			if (check !== true) {
+				return check;
+			}
+		}
+		let ok: boolean | string = true;
 		for (const undo of undos.toReversed()) {
-			ok = (await undo()) && ok;
+			const result = await undo();
+			if (result !== true && ok === true) {
+				ok = result;
+			}
 		}
 		await idb.cache.trade.put(tradeBefore);
 		return ok;

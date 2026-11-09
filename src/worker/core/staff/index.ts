@@ -803,10 +803,8 @@ export const userHire = async ({
 		);
 	}
 	await hire(c, tid, role, helpers.bound(Math.round(years), 1, 5));
-	const t = await idb.cache.teams.get(tid);
-	if (t) {
-		await syncBudget(t);
-	}
+	// The league's average staff changed too, so every team's level is relative to the new average
+	await syncAllBudgets();
 };
 
 export const userFire = async ({ cid, tid }: { cid: number; tid: number }) => {
@@ -815,10 +813,8 @@ export const userFire = async ({ cid, tid }: { cid: number; tid: number }) => {
 		throw new Error("That coach is not on your staff");
 	}
 	const buyout = await fire(c);
-	const t = await idb.cache.teams.get(tid);
-	if (t) {
-		await syncBudget(t);
-	}
+	// The league's average staff changed too, so every team's level is relative to the new average
+	await syncAllBudgets();
 	return buyout;
 };
 

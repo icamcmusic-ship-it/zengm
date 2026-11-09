@@ -15,11 +15,12 @@ const UndoNotification = ({ actionName = "action", undoKey, title }: Props) => {
 	const [status, setStatus] = useState<"init" | "waiting" | "success" | "fail">(
 		"init",
 	);
+	const [failReason, setFailReason] = useState<string | undefined>();
 
 	if (status === "success") {
 		return `${helpers.upperCaseFirstLetter(actionName)} undone`;
 	} else if (status === "fail") {
-		return `Failed to undo ${actionName}`;
+		return failReason ?? `Failed to undo ${actionName}`;
 	} else {
 		return (
 			<div
@@ -45,7 +46,10 @@ const UndoNotification = ({ actionName = "action", undoKey, title }: Props) => {
 							try {
 								result = await toWorker("undoLog", "undo", undoKey);
 							} finally {
-								if (result) {
+								if (typeof result === "string") {
+									setFailReason(result);
+									setStatus("fail");
+								} else if (result) {
 									setStatus("success");
 								} else {
 									setStatus("fail");
