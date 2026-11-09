@@ -1,6 +1,6 @@
 // Calibrates the game hype engine on the season snapshots that sim.cjs saved: the distribution of single-game player lines (for rarity) and of the raw pre-game and post-game points (for the 0-100 scale). Writes src/common/hype/calibration.generated.ts.
 //
-//   node tools/hypeCalibration/calibrate.ts <dir with season JSON files> [--dry]
+//   node tools/hypeCalibration/calibrate.ts <dirs with season JSON files> [--lines=<dir>] [--dry]
 //
 // Lines are measured first and written, then the games are rated with those line tables (rarity feeds the post-game points), so run it once; --dry prints the distributions without writing. The scale knots are the raw points at fixed percentiles of all games (regular season and playoffs).
 import fs from "node:fs";
@@ -12,12 +12,19 @@ import { hypeForGame, targetOfGame } from "../../src/common/hype/index.ts";
 import type { HRaw } from "../../src/common/hype/types.ts";
 import { gmsc } from "../../src/common/hype/util.ts";
 
-const [dir, flag] = process.argv.slice(2);
-const dry = flag === "--dry";
-const files = fs
-	.readdirSync(dir!)
-	.filter((f) => f.endsWith(".json"))
-	.sort();
+const args = process.argv.slice(2);
+const dry = args.includes("--dry");
+const dirs = args.filter((x) => !x.startsWith("--"));
+// --lines=<dir>: measure the single-game line tables on that directory only (seasons of a real league, from bbgm.hypeCalibrationDump), rate games from all directories
+const linesDir = args.find((x) => x.startsWith("--lines="))?.slice(8);
+const list = (d: string) =>
+	fs
+		.readdirSync(d)
+		.filter((f) => f.endsWith(".json"))
+		.sort()
+		.map((f) => path.join(d, f));
+const files = [...dirs, ...(linesDir ? [linesDir] : [])].flatMap(list);
+const lineFiles = linesDir ? list(linesDir) : files;
 
 const quantile = (sorted: number[], q: number) => {
 	if (!sorted.length) {
@@ -36,8 +43,8 @@ for (const k of LINE_STATS) {
 	vals[k] = [];
 }
 let games = 0;
-for (const f of files) {
-	const raw: HRaw = JSON.parse(fs.readFileSync(path.join(dir!, f), "utf8"));
+for (const f of lineFiles) {
+	const raw: HRaw = JSON.parse(fs.readFileSync(f, "utf8"));
 	for (const g of raw.games) {
 		if (g.playoffs || g.playIn) {
 			continue;
@@ -86,7 +93,7 @@ Object.assign(CAL, { tail, mean });
 const pre: number[] = [];
 const post: number[] = [];
 for (const f of files) {
-	const raw: HRaw = JSON.parse(fs.readFileSync(path.join(dir!, f), "utf8"));
+	const raw: HRaw = JSON.parse(fs.readFileSync(f, "utf8"));
 	for (const g of storedGames(raw)) {
 		const h = hypeForGame(raw, targetOfGame(g));
 		if (h?.post && !h.post.note) {

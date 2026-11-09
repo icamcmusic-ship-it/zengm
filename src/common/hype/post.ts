@@ -672,9 +672,11 @@ type Fact = { pol: number; w: number; text: string; story: boolean };
 
 // "Decided by 2" -> "decided by 2" (a player token stays as is)
 const lower = (t: string) =>
-	/^(\[\[|[A-Z][a-z]*[A-Z]|[A-Z]{2})/.test(t)
-		? t
-		: t.charAt(0).toLowerCase() + t.slice(1);
+	/^(Decided|Final|Went|Upset|Within|Lower|Ended|Snapped|Tied|Star|A|An|Blowout|Over|Ugly|Sloppy|Low|Winner|The|Two|Lead)\b/.test(
+		t,
+	)
+		? t.charAt(0).toLowerCase() + t.slice(1)
+		: t;
 
 const capital = (t: string) =>
 	t.startsWith("[[") ? t : t.charAt(0).toUpperCase() + t.slice(1);

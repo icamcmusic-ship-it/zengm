@@ -774,3 +774,41 @@ describe("game rating calibration", () => {
 		expect(rarity("ast", 12, 1.5)).toBeGreaterThan(rarity("ast", 12));
 	});
 });
+
+describe("stars out", () => {
+	test("an injured star who sat out lowers the hype and is named", () => {
+		const gm = regular[200]!;
+		const bl = gm.teams[0].players[0]!;
+		const raw: HRaw = {
+			...raw0,
+			games: raw0.games.map((g) =>
+				g.gid === gm.gid
+					? {
+							...g,
+							teams: [
+								{
+									...g.teams[0],
+									players: g.teams[0].players.map((p) =>
+										p.pid === bl.pid ? { ...p, inj: true, min: 0 } : p,
+									),
+								},
+								g.teams[1],
+							],
+						}
+					: g,
+			),
+		};
+		raw.players = raw0.players.map((p) =>
+			p.pid === bl.pid
+				? { ...p, ovrBySeason: { ...p.ovrBySeason, [SEASON]: 95 } }
+				: p,
+		);
+		const h = hypeForGame(raw, targetOfGame(storedGame(raw, gm.gid)!))!;
+		const r = h.pre.reasons.find((x) => x.k === "injury");
+		expect(r?.pts).toBeLessThan(0);
+		expect(r?.text).toContain(bl.name);
+		expect(h.pre.reasons.every((x) => !x.text.includes("undefined"))).toBe(
+			true,
+		);
+	});
+});

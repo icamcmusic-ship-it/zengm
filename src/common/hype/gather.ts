@@ -544,7 +544,7 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 	const away = teamState(raw, idx, t.awayTid, t, game, seedOf(t.awayTid));
 	home.b2b = playedDayBefore(idx, t.homeTid, t);
 	away.b2b = playedDayBefore(idx, t.awayTid, t);
-	const out: HGameInput["out"] = [];
+	const outStars: HGameInput["out"] = [];
 	const players = [t.homeTid, t.awayTid].map((tid, ti): HListed[] => {
 		if (game) {
 			const out: HListed[] = [];
@@ -556,7 +556,7 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 				if (bl.inj && !(bl.min > 0)) {
 					const ovr = p.ovrBySeason[raw.season];
 					if (ovr !== undefined) {
-						out.push({ pid: p.pid, name: p.name, tid, ovr });
+						outStars.push({ pid: p.pid, name: p.name, tid, ovr });
 					}
 					continue;
 				}
@@ -568,7 +568,7 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 		for (const p of raw.players) {
 			const ovr = p.ovrBySeason[raw.season];
 			if (p.tid === tid && outPids.has(p.pid) && ovr !== undefined) {
-				out.push({ pid: p.pid, name: p.name, tid, ovr });
+				outStars.push({ pid: p.pid, name: p.name, tid, ovr });
 			}
 		}
 		return raw.players
@@ -595,7 +595,7 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 		records: raw.records,
 		starCut: raw.records?.starCut[raw.season] ?? null,
 		env: envFor(idx, t),
-		out,
+		out: outStars,
 		linesFrom: raw.linesComplete ? raw.season : Number.POSITIVE_INFINITY,
 		teamName,
 	};
