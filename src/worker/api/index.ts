@@ -23,6 +23,7 @@ import {
 import { isGoldActive } from "../../common/isGoldActive.ts";
 import actions from "./actions.ts";
 import hype from "./hype.ts";
+import recordsBook from "./recordsBook.ts";
 import archetypes from "./archetypes.ts";
 import { getLeagueNorms, storeArchetype } from "../core/player/archetype.ts";
 import * as awardSettings from "./awardSettings.ts";
@@ -6081,6 +6082,7 @@ const api = {
 	hype,
 	leagueFileUpload,
 	playMenu,
+	recordsBook,
 	regenerateRatings,
 	toolsMenu,
 	undoLog,

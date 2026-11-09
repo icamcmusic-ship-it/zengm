@@ -9,6 +9,7 @@ import type { View } from "../../../common/types.ts";
 import Headlines from "./Headlines.tsx";
 import GamesToWatch from "./GamesToWatch.tsx";
 import RecentAchievements from "./RecentAchievements.tsx";
+import MilestoneWatch from "./MilestoneWatch.tsx";
 import { useLocal } from "../../util/local.ts";
 import { useFeatureOn, useFeatureOption } from "../../util/nativeFeatures.ts";
 
@@ -55,6 +56,9 @@ const LeagueDashboard = ({
 
 	// League extras
 	const showHype = useFeatureOption<boolean>("featureHypeDashboard");
+	const showMilestones = useFeatureOption<boolean>(
+		"featureMilestonesDashboard",
+	);
 	const showAchievements = useFeatureOption<boolean>(
 		"featureAchievementsDashboard",
 	);
@@ -266,6 +270,11 @@ const LeagueDashboard = ({
 						teams={teams}
 						userTid={userTid}
 					/>
+					{showMilestones ? (
+						<MilestoneWatch
+							refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
+						/>
+					) : null}
 					{showAchievements ? (
 						<RecentAchievements
 							refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}

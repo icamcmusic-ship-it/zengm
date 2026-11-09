@@ -22,7 +22,8 @@ Pages that belong with an original BBGM page are tabs of that page: a tab bar at
 | Relatives        | Relatives, Family Trees                             |
 | Jersey Numbers   | League, By Team                                     |
 | Player Ratings   | Ratings, Archetypes, Skill Badges                   |
-| League History   | History, Timeline, Coaches                          |
+| League History   | History, Timeline, Coaches, Records Book            |
+| Player Stats     | Stats, Milestones                                   |
 | Daily Schedule   | Schedule, Games to Watch, Best Games                |
 | Head-to-Head     | Head-to-Head, Rivalries                             |
 | Playoffs         | Playoffs, Series Recaps                             |
@@ -44,6 +45,8 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Trade grader](#trade-grader)                                       | League → Trade Grader, trade summaries                           | bball  | `featureTradeGrader`                      | on / on                       |
 | [Contract value](#contract-value)                                   | League → Contract Value, player pages                            | bball  | `featureContractValue`                    | on / on                       |
 | [League timeline](#league-timeline)                                 | League → Timeline                                                | bball  | `featureTimeline`                         | on / on                       |
+| [Records book](#records-book)                                       | League History → Records Book, news                              | bball  | `featureRecordsBook`                      | on / on                       |
+| [Milestones](#milestones)                                           | Player Stats → Milestones, dashboard, news                       | bball  | `featureMilestones`                       | on / on                       |
 | [Rivalries](#rivalries)                                             | Head-to-Head → Rivalries tab, team history pages                 | bball  | `featureRivalries`                        | on / on                       |
 | [Series recaps](#series-recaps)                                     | Playoffs → Series Recaps tab, bracket, news                      | bball  | `featureSeriesRecaps`                     | on / on                       |
 | [Unretirements](#unretirements)                                     | background, at the start of free agency                          | bball  | `featureUnretire`                         | off / off                     |
@@ -214,6 +217,20 @@ League menu → _Contract Value_: a value index, bargains and albatrosses, and t
 - **What:** season by season (newest first): champions (with the finals result), MVPs and Finals MVPs, the newspaper's front page lead, the top 3 storylines, league achievements unlocked, records (best/worst regular season record in league history so far, single-game scoring records), the 3 biggest trades (by the trade event's importance) and comebacks. Every entry links to its source page (playoffs, player, newspaper edition, storylines season, achievement, box score, trade summary). Filters: season range (navigates), kinds (remembered per browser), team and a text search.
 - **Known limits:** headlines are computed for at most the 25 latest seasons of the range (finished seasons are cached in memory). Entries from Newspaper, Storylines and League Achievements are left out while those features are off (the page says which). Storylines need the Wrapped snapshot: on a first visit they appear when it's ready. Achievements come from the saved unlock log, so ones unlocked before achievements were tracked in the league don't show.
 
+### Records book
+
+- **Where:** League History → _Records Book_ tab, `/l/:lid/records_book[/:team]` (league, or one franchise from the team dropdown).
+- **What:** top 10 lists of career totals (points, rebounds, assists, steals, blocks, threes, games, seasons), single-season totals and per-game averages (70% of the team's games), single-game highs, playoffs (career, one playoffs, single game) and team seasons (most wins and losses, best and worst record, longest winning and losing streaks). Holders link to player, team and box score pages; active players get a badge, marks set this season are highlighted, records broken this season are flagged with the previous holder (and listed at the top), and season records show their progression. Franchise totals, award counts and feats are left to the stock Team Records, Awards Records and Statistical Feats pages (linked).
+- **News:** with _Record News_ (`featureRecordsNews`) on, a news item and notification when a league record is broken: career total (once the old record is meaningful, e.g. 10,000 points), single-season total, single-game high or wins in a season beating a mark from an earlier season, winning streak longer than any before (10+).
+- **How:** players are read once per league, season and phase and the cache's players are laid over them on each request. Single-game highs (league top 10, franchise top 3) and streaks need box scores, so they are kept as games are played in the `recordsBook` game attribute (export/import carries it); a check runs after each day of games (debounced, waits out bulk sims) and works from the box scores it hasn't seen. A league without the attribute starts from the box scores it still has, quietly (a league in its first season starts empty, so its games count from the first day).
+- **Known limits:** single-game highs and streaks only cover games simmed while box scores existed; real-history imports have no older box scores. If old box scores are deleted before a check runs (a whole offseason auto-played), those games are missed.
+
+### Milestones
+
+- **Where:** Player Stats → _Milestones_ tab, `/l/:lid/milestones[/:team[/:horizon]]`; dashboard card _Milestone Watch_ for your team (`featureMilestonesDashboard`).
+- **What:** active players within reach of a career mark (points, rebounds, assists, steals, blocks, threes, games; ladders like 10,000/12,500/... points) or of the next player above them in the all-time top 100, with the need, their pace and the projected game (game number, day and opponent from the schedule; "next season, about game N" beyond it). Horizon: this season or a season and a half. Recently reached milestones with the game they came in.
+- **News:** milestones of your players are news (with a notification, `featureMilestoneNotifications`); big ones (20,000 points, 10,000 rebounds, ...) are news for anyone. Pre-game "needs N for X career" lines stay with Games to Watch.
+- **How:** pace is this season's per-game rate (last season's before 10 games, else career) times the share of the team's games he plays. The same after-games check as the Records Book finds the exact game a mark was reached in.
 ### Rivalries
 
 - **Where:** _Rivalries_ tab of Head-to-Head, `/l/:lid/rivalries[/:tidA-:tidB]`; the _Rivals_ card on Team History; League Stats' More links.
