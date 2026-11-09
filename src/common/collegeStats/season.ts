@@ -267,9 +267,15 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	);
 	const dnp = mpg < 17 ? Math.round(rng.random() * 5) : 0;
 	const gp = Math.max(4, teamGames - missed - dnp);
-	const gs = Math.round(
-		gp * clamp((mpg - 17) / 11, 0, 1) * (0.9 + 0.1 * rng.random()),
-	);
+	// Full-time starters start every game they play (bar a rare one off the bench); part-time starters vary
+	const startShare = clamp((mpg - 17) / 11, 0, 1);
+	const gs =
+		startShare >= 1
+			? gp - (rng.random() < 0.15 ? 1 : 0)
+			: Math.min(
+					gp,
+					Math.round(gp * startShare * (0.85 + 0.3 * rng.random())),
+				);
 
 	// Usage: the share of his team's scoring chances he finishes while on the floor
 	const usageComp = composite(ratings, "usage");
