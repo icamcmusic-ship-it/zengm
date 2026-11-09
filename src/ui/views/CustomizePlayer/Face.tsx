@@ -1,6 +1,10 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { PlayerPicture } from "../../components/PlayerPicture.tsx";
 import clsx from "clsx";
+import { FORK_FACE_PARTS } from "../../../common/faceParts.ts";
+
+// The fork's own parts (common/faceParts.ts) are not in the facesjs editor, so they are set here
+const FORK_FEATURES = [...new Set(FORK_FACE_PARTS.map((part) => part.feature))];
 
 export const Face = ({
 	face,
@@ -88,6 +92,49 @@ export const Face = ({
 						Edit raw JSON
 					</button>
 				</div>
+				{parsedFace ? (
+					<details className="mt-2">
+						<summary>Fork parts</summary>
+						<div className="d-flex flex-wrap gap-2 mt-1">
+							{FORK_FEATURES.map((feature) => {
+								const current = parsedFace[feature]?.id;
+								const ids = FORK_FACE_PARTS.filter(
+									(part) => part.feature === feature,
+								).map((part) => part.id);
+								return (
+									<label key={feature} className="small">
+										{feature}
+										<select
+											className="form-select form-select-sm"
+											value={ids.includes(current) ? current : ""}
+											onChange={(event) => {
+												if (event.target.value === "") {
+													return;
+												}
+												onChange(
+													JSON.stringify({
+														...parsedFace,
+														[feature]: {
+															...parsedFace[feature],
+															id: event.target.value,
+														},
+													}),
+												);
+											}}
+										>
+											<option value="">{current ?? "-"}</option>
+											{ids.map((id) => (
+												<option key={id} value={id}>
+													{id}
+												</option>
+											))}
+										</select>
+									</label>
+								);
+							})}
+						</div>
+					</details>
+				) : null}
 				{editJson ? (
 					<textarea
 						className="form-control mt-2"

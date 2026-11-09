@@ -1,33 +1,8 @@
-// UI side of the fork's face parts (common/faceParts.ts): the browser setting that registers the example parts at startup.
-import {
-	FORK_FACE_PARTS_SETTING,
-	registerForkFaceParts,
-} from "../../common/faceParts.ts";
-import { safeLocalStorage } from "./safeLocalStorage.ts";
-
-export const getForkFacePartsSetting = () => {
-	try {
-		return safeLocalStorage.getItem(FORK_FACE_PARTS_SETTING) === "1";
-	} catch {
-		return false;
-	}
-};
-
-export const setForkFacePartsSetting = (on: boolean) => {
-	try {
-		if (on) {
-			safeLocalStorage.setItem(FORK_FACE_PARTS_SETTING, "1");
-		} else {
-			safeLocalStorage.removeItem(FORK_FACE_PARTS_SETTING);
-		}
-	} catch {}
-	if (on) {
-		registerForkFaceParts();
-	}
-};
+// UI side of the fork's face parts (common/faceParts.ts). The parts are always registered at startup (append-only, so
+// facesjs' own faces draw exactly as before): a league with the League Extras "Fork face parts" switch on gives new
+// players fork part ids, and those faces have to draw in every browser that opens the league or its exported file.
+import { registerForkFaceParts } from "../../common/faceParts.ts";
 
 export const initForkFaceParts = () => {
-	if (getForkFacePartsSetting()) {
-		registerForkFaceParts();
-	}
+	registerForkFaceParts();
 };

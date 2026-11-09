@@ -8,19 +8,26 @@
 // on a face whose config names it (set by hand, or by future fork code).
 //
 // Fork ids are prefixed "fork-" so they can't clash with future facesjs ids.
+import type { FaceConfig } from "facesjs";
 import { svgs, svgsIndex } from "facesjs";
+import { NATIVE_FACE_PARTS } from "./faceParts.native.ts";
 
 export type FacePartFeature =
 	| "accessories"
+	| "body"
+	| "ear"
 	| "eye"
+	| "eyeLine"
 	| "eyebrow"
 	| "facialHair"
 	| "glasses"
 	| "hair"
 	| "hairBg"
 	| "head"
+	| "miscLine"
 	| "mouth"
-	| "nose";
+	| "nose"
+	| "smileLine";
 
 export type FacePart = {
 	feature: FacePartFeature;
@@ -74,7 +81,7 @@ export const isFacePartRegistered = (feature: FacePartFeature, id: string) =>
 
 export const registeredFaceParts = () => [...registered.values()];
 
-// Example parts (proof of the registry): simple hair styles, drawn like facesjs' "short" (fill $[hairColor], black outline)
+// Example parts (proof of the registry), then the fork's male part catalog (faceParts.native.ts)
 export const FORK_FACE_PARTS: readonly FacePart[] = [
 	{
 		feature: "hair",
@@ -91,6 +98,7 @@ export const FORK_FACE_PARTS: readonly FacePart[] = [
 		id: "fork-buzz",
 		svg: '<path fill="$[hairColor]" fill-opacity=".55" d="M60 300v-10c0-5 10-20 15-25s5-55 15-65c25-30 60-40 110-40s85 10 110 40c10 10 10 60 15 65s15 20 15 25v10h-6c-2-30-14-120-134-120S68 270 66 300z"/>',
 	},
+	...NATIVE_FACE_PARTS,
 ];
 
 export const registerForkFaceParts = () => {
@@ -102,3 +110,49 @@ export const registerForkFaceParts = () => {
 // Browser setting (UI only, default off): whether the fork's example parts are registered in this browser at startup, so faces
 // that name them render them. The Face style gallery shows them either way.
 export const FORK_FACE_PARTS_SETTING = "forkFaceParts";
+
+// Random generation (League Extras "Fork face parts", worker side): after facesjs' generate() picks a male face, each
+// feature is swapped for a fork part with a modest probability, so fork parts mix in with facesjs' own. Optional features
+// (facial hair, glasses, lines, ...) are only swapped when facesjs already gave the face one, so how often a face has
+// glasses or a beard is unchanged.
+export const FORK_PART_WEIGHTS: Record<FacePartFeature, number> = {
+	accessories: 0.3,
+	body: 0.15,
+	ear: 0.15,
+	eye: 0.15,
+	eyeLine: 0.3,
+	eyebrow: 0.15,
+	facialHair: 0.15,
+	glasses: 0.3,
+	hair: 0.12,
+	hairBg: 0.3,
+	head: 0.15,
+	miscLine: 0.3,
+	mouth: 0.15,
+	nose: 0.15,
+	smileLine: 0.3,
+};
+
+export const addRandomForkParts = (
+	face: FaceConfig,
+	random: () => number = Math.random,
+	exclude: (part: FacePart) => boolean = () => false,
+) => {
+	const byFeature = new Map<FacePartFeature, FacePart[]>();
+	for (const part of FORK_FACE_PARTS) {
+		if (!exclude(part)) {
+			const list = byFeature.get(part.feature) ?? [];
+			list.push(part);
+			byFeature.set(part.feature, list);
+		}
+	}
+	for (const [feature, parts] of byFeature) {
+		const current = (face as any)[feature] as { id: string } | undefined;
+		if (!current || current.id === "none" || random() >= FORK_PART_WEIGHTS[feature]) {
+			continue;
+		}
+		const part = parts[Math.floor(random() * parts.length)]!;
+		(face as any)[feature] = { ...current, id: part.id };
+	}
+	return face;
+};

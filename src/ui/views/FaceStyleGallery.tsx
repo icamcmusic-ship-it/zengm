@@ -10,23 +10,24 @@ import {
 	registerForkFaceParts,
 	type FacePartFeature,
 } from "../../common/faceParts.ts";
-import {
-	getForkFacePartsSetting,
-	setForkFacePartsSetting,
-} from "../util/faceParts.ts";
 import { DEFAULT_JERSEY } from "../../common/constants.ts";
 
 const FEATURES: FacePartFeature[] = [
 	"hair",
 	"hairBg",
+	"head",
+	"ear",
 	"eye",
 	"eyebrow",
-	"facialHair",
-	"accessories",
-	"glasses",
-	"head",
-	"mouth",
 	"nose",
+	"mouth",
+	"facialHair",
+	"glasses",
+	"accessories",
+	"body",
+	"eyeLine",
+	"smileLine",
+	"miscLine",
 ];
 
 // Skin and hair colours of the sample faces (light to dark skin; black, brown, blond and red hair)
@@ -71,7 +72,6 @@ const FaceStyleGallery = () => {
 
 	const [feature, setFeature] = useState<FacePartFeature>("hair");
 	const [samples, setSamples] = useState(makeSamples);
-	const [forkOn, setForkOn] = useState(getForkFacePartsSetting);
 
 	const builtin = builtinFacePartIds(feature);
 	const fork = FORK_FACE_PARTS.filter((part) => part.feature === feature).map(
@@ -104,25 +104,11 @@ const FaceStyleGallery = () => {
 			<p>
 				Every option of a face feature on {SAMPLES.length} sample faces, to
 				check how parts overlap. Parts marked <i>fork</i> are this fork's own
-				additions; they are only added after facesjs' own options, never replace
-				one, and new players never get them at random.
+				additions; they are only added after facesjs' own options and never
+				replace one. New male players get them mixed in at random when League
+				Extras → Fork Face Parts is on (off by default). In a player's face
+				editor (Customize Player), the Fork parts menu sets them by hand.
 			</p>
-			<div className="form-check form-switch mb-3">
-				<input
-					className="form-check-input"
-					type="checkbox"
-					id="fork-face-parts"
-					checked={forkOn}
-					onChange={(event) => {
-						setForkFacePartsSetting(event.target.checked);
-						setForkOn(event.target.checked);
-					}}
-				/>
-				<label className="form-check-label" htmlFor="fork-face-parts">
-					Use the fork's extra face parts in this browser (faces that name one
-					draw it; off by default)
-				</label>
-			</div>
 			<div className="d-flex flex-wrap gap-2 mb-3">
 				<div className="btn-group flex-wrap">
 					{FEATURES.map((f) => (
