@@ -11,6 +11,9 @@ export const RECENT = 32;
 export class VarietyMemory {
 	counts = new Map<string, number>();
 	recent: string[] = [];
+	// how many phrases have been picked, and when each was last picked (for the rarer lines, kept out for longer: see usedWithin)
+	seq = 0;
+	lastUse = new Map<string, number>();
 	private nameRegex: RegExp | undefined;
 
 	constructor(names: string[] = []) {
@@ -30,7 +33,11 @@ export class VarietyMemory {
 	key(t: string) {
 		let k = String(t);
 		if (this.nameRegex) {
+			// ("Harris' crossover" and "De La Cruz's crossover" are the same phrase)
 			k = k.replace(this.nameRegex, "N");
+			if (k.includes("N's")) {
+				k = k.replaceAll(/\bN's\b/g, "N'");
+			}
 		}
 		return k.replaceAll(/\d+/g, "#");
 	}
@@ -72,7 +79,13 @@ export const varyW = (t: string) => {
 	);
 };
 
-const isRecent = (t: string) => active.recent.includes(active.key(t));
+export const isRecent = (t: string) => active.recent.includes(active.key(t));
+
+// Was this phrase picked within the last n picks? (a set play or a move is noticed if it comes back too soon)
+export const usedWithin = (t: string, n: number) => {
+	const last = active.lastUse.get(active.key(t));
+	return last !== undefined && active.seq - last < n;
+};
 
 // A weighted pick that skips the recently used phrases whenever a phrase not used recently has any weight
 export const weightedVaried = <T>(
@@ -91,6 +104,8 @@ export const weightedVaried = <T>(
 export const varyUse = (t: string) => {
 	const k = active.key(t);
 	active.counts.set(k, (active.counts.get(k) ?? 0) + 1);
+	active.seq += 1;
+	active.lastUse.set(k, active.seq);
 	active.recent.push(k);
 	if (active.recent.length > RECENT) {
 		active.recent.shift();

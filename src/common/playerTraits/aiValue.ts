@@ -9,19 +9,25 @@ import type { TraitKey, TraitRatings, TraitScores } from "./types.ts";
 
 // How much each trait matters to a GM. Durability (injury proneness / iron man) matters most. Sums to 1.
 export const AI_TRAIT_WEIGHTS: Record<TraitKey, number> = {
-	durability: 0.25,
-	veteranSavvy: 0.1,
-	leadership: 0.1,
-	clutch: 0.08,
-	shotDiscipline: 0.08,
-	consistency: 0.06,
-	offBall: 0.06,
-	hustle: 0.06,
-	lateGameIq: 0.05,
-	screen: 0.04,
-	foulDiscipline: 0.04,
-	recovery: 0.04,
-	handle: 0.04,
+	durability: 0.21,
+	veteranSavvy: 0.08,
+	leadership: 0.08,
+	clutch: 0.065,
+	shotDiscipline: 0.065,
+	consistency: 0.05,
+	offBall: 0.05,
+	hustle: 0.05,
+	lateGameIq: 0.04,
+	screen: 0.035,
+	foulDiscipline: 0.035,
+	recovery: 0.035,
+	handle: 0.035,
+	// Work ethic is about future development: worth more for young players (see aiTraitSumFromZs)
+	workEthic: 0.07,
+	bigGame: 0.04,
+	ego: 0.035,
+	temper: 0.025,
+	// The aging curve is not a trait key and is never valued by the AI (it is secret, see agingCurve.ts)
 };
 
 // Maximum fractional change to value, at the extremes
@@ -93,6 +99,17 @@ export const aiTraitSumFromZs = (
 					weight *= 1 + 0.15 * Math.min(numYoung, 5);
 				}
 			}
+		}
+		if (key === "workEthic") {
+			// Matters for how much a young player will still improve, little for a veteran
+			if (context.age <= 24) {
+				weight *= 1.5;
+			} else if (context.age >= 30) {
+				weight *= 0.4;
+			}
+		} else if (key === "bigGame" && context.strategy === "contending") {
+			// Contenders care about the playoffs
+			weight *= 1.5;
 		}
 		if (context.isProspect && context.hiddenKeys?.has(key)) {
 			weight *= 0.5;

@@ -37,7 +37,7 @@ const HEIGHT_TABLE = [
 		b: 0.7,
 		share3: 0.177,
 		ftr: 0.431,
-		ftPct: 0.684,
+		ftPct: 0.7,
 		rimPct: 0.69,
 		midPct: 0.371,
 		tov: 0.174,
@@ -46,7 +46,7 @@ const HEIGHT_TABLE = [
 		b: 0.95,
 		share3: 0.085,
 		ftr: 0.511,
-		ftPct: 0.665,
+		ftPct: 0.68,
 		rimPct: 0.715,
 		midPct: 0.396,
 		tov: 0.172,
@@ -152,6 +152,58 @@ export type SeasonContext = {
 	// From the college season model (ncaa.ts): his team's games, the last postseasonGames of them being the conference and NCAA tournament games, which he always plays
 	teamGames?: number;
 	postseasonGames?: number;
+	// Also from the college season model: how many of his team's regular season games were conference games (played after the non-conference games)
+	confGames?: number;
+};
+
+// A stretch of games (non-conference, conference) summed up
+export type SplitLine = Pick<
+	GameBox,
+	| "min"
+	| "pts"
+	| "orb"
+	| "drb"
+	| "ast"
+	| "stl"
+	| "blk"
+	| "tov"
+	| "fg"
+	| "fga"
+	| "tp"
+	| "tpa"
+	| "ft"
+	| "fta"
+	| "pf"
+> & { gp: number };
+
+export const sumSplit = (boxes: GameBox[]): SplitLine => {
+	const out: SplitLine = {
+		gp: boxes.length,
+		min: 0,
+		pts: 0,
+		orb: 0,
+		drb: 0,
+		ast: 0,
+		stl: 0,
+		blk: 0,
+		tov: 0,
+		fg: 0,
+		fga: 0,
+		tp: 0,
+		tpa: 0,
+		ft: 0,
+		fta: 0,
+		pf: 0,
+	};
+	for (const box of boxes) {
+		for (const key of Object.keys(out) as (keyof SplitLine)[]) {
+			if (key !== "gp") {
+				out[key] += box[key];
+			}
+		}
+	}
+	out.min = Math.round(out.min);
+	return out;
 };
 
 const emptyBox = (): GameBox => ({
@@ -235,7 +287,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		Math.exp(rng.normal(0, sd * noise) - 0.5 * (sd * noise) ** 2);
 
 	// How good the schedule is. Harder leagues shave efficiency a little
-	const compAdj = -0.0032 * (ctx.strength - 70) * 0.5;
+	const compAdj = -0.0022 * (ctx.strength - 70) * 0.5;
 
 	// Games, availability and minutes
 	const proEnv = ctx.proEnv;
@@ -266,7 +318,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			: proEnv.mpgCap
 		: Infinity;
 	const mpg = clamp(
-		proEnv ? mpgBase - 6 * (gameMinutes / 40) : mpgBase,
+		proEnv ? mpgBase + proEnv.minShift * (gameMinutes / 40) : mpgBase,
 		7,
 		Math.min(proCap, 37.5 * (gameMinutes / 40)),
 	);
@@ -320,7 +372,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const willing = ratings.tp >= 30 ? 1 : Math.max(0, ratings.tp) / 30;
 	const share3 = clamp(
 		byHeight("share3", b) *
-			clamp(0.35 + 0.65 * (ratings.tp / 38), 0.1, 1.9) *
+			clamp(0.5 + 0.5 * (ratings.tp / 38), 0.1, 1.6) *
 			willing +
 			rng.normal(0, 0.025 * noise),
 		0,
@@ -353,11 +405,12 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		loadAdj +
 		0.04 +
 		rng.normal(0, 0.008 * noise);
+	// D1 shoots about 34%; even the best shooting prospects rarely sustain much over 40%
 	const tpPct = clamp(
-		0.352 +
-			0.0033 * (ratings.tp - 38) +
-			0.0007 * (ratings.oiq - 40) +
-			0.8 * eff,
+		0.336 +
+			0.003 * (ratings.tp - 38) +
+			0.0005 * (ratings.oiq - 40) +
+			0.35 * eff,
 		0.15,
 		0.5,
 	);
@@ -405,24 +458,27 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		0.4,
 		13,
 	);
+	// Drafted D1 players average about 1.5 steals per 40 minutes, guards more
 	const stl40 = clamp(
-		0.55 +
-			0.02 * (ratings.spd - 40) +
-			0.012 * ((ratings.pdef ?? ratings.diq) - 40) +
-			(ratings.wng === undefined ? 0 : 0.006 * (ratings.wng - ratings.hgt)) +
-			rng.normal(0, 0.18 * noise),
-		0.3,
-		3.4,
+		1.15 +
+			0.025 * (ratings.spd - 40) +
+			0.02 * ((ratings.pdef ?? ratings.diq) - 40) +
+			(ratings.wng === undefined ? 0 : 0.006 * (ratings.wng - ratings.hgt)) -
+			0.35 * b +
+			rng.normal(0, 0.22 * noise),
+		0.4,
+		4,
 	);
+	// Drafted D1 bigs block about 2.5 shots per 40 minutes
 	const blk40 = clamp(
-		-0.4 +
-			0.052 * (ratings.hgt - 30) +
+		-0.35 +
+			0.075 * (ratings.hgt - 30) +
 			0.012 * (ratings.jmp - 40) +
 			0.01 * ((ratings.idef ?? ratings.diq) - 40) +
 			(ratings.wng === undefined ? 0 : 0.03 * (ratings.wng - ratings.hgt)) +
 			rng.normal(0, 0.25 * noise),
 		0.05,
-		5.5,
+		6,
 	);
 	const foulComp = composite(ratings, "fouling");
 	const pf40 = clamp(
@@ -444,7 +500,26 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	let qd = 0;
 	let fxf = 0;
 
+	// With the college season model: the regular season games he played split into non-conference (first) and conference games, in proportion to his team's schedule. Conference opponents are tougher than the average non-conference one
+	const regularPlayed = gp - postseasonGames;
+	const regularTeam = teamGames - postseasonGames;
+	const nonConfPlayed =
+		ctx.confGames !== undefined && regularTeam > 0
+			? Math.round(
+					(regularPlayed * Math.max(0, regularTeam - ctx.confGames)) /
+						regularTeam,
+				)
+			: undefined;
+
 	for (let game = 0; game < gp; game++) {
+		const oppAdj =
+			nonConfPlayed === undefined
+				? 0
+				: game < nonConfPlayed
+					? 0.012
+					: game < regularPlayed
+						? -0.008
+						: -0.012;
 		const m = clamp(
 			rng.normal(mpg, sdMin * noise + 0.1),
 			3,
@@ -471,10 +546,10 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			shareLow / (shareLow + shareMidOfTwos),
 		);
 		box.fgaMidRange = twoA - box.fgaAtRim - box.fgaLowPost;
-		box.tp = rng.binomial(box.tpa, tpPct);
-		box.fgAtRim = rng.binomial(box.fgaAtRim, rimPct);
-		box.fgLowPost = rng.binomial(box.fgaLowPost, lowPct);
-		box.fgMidRange = rng.binomial(box.fgaMidRange, midPct);
+		box.tp = rng.binomial(box.tpa, tpPct + 0.5 * oppAdj);
+		box.fgAtRim = rng.binomial(box.fgaAtRim, rimPct + oppAdj);
+		box.fgLowPost = rng.binomial(box.fgaLowPost, lowPct + oppAdj);
+		box.fgMidRange = rng.binomial(box.fgaMidRange, midPct + oppAdj);
 		box.fg = box.tp + box.fgAtRim + box.fgLowPost + box.fgMidRange;
 		box.ft = rng.binomial(box.fta, ftPct);
 		box.pts =
@@ -615,6 +690,14 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		defScore,
 		...(postseasonGames > 0
 			? { postseasonBoxes: boxes.slice(boxes.length - postseasonGames) }
+			: {}),
+		...(nonConfPlayed !== undefined
+			? {
+					splits: {
+						nonConf: sumSplit(boxes.slice(0, nonConfPlayed)),
+						conf: sumSplit(boxes.slice(nonConfPlayed, regularPlayed)),
+					},
+				}
 			: {}),
 	};
 };

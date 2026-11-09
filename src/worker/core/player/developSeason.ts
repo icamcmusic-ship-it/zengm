@@ -13,6 +13,7 @@ import {
 	developExpandedRatings,
 	expandedRatingsApply,
 } from "./expandedRatings.ts";
+import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 
 // Cache for performance
 let groupedRatings: Record<string, Ratings> | undefined;
@@ -71,6 +72,7 @@ export const developSeasonSync = (
 	age: number,
 	coachingLevel: number,
 	realPlayerDeterminismInfo: RealPlayerDeterminismInfo | undefined,
+	traitDev?: TraitDevelopment,
 ) => {
 	// Expanded ratings (basketball): developed after the stock ratings, from diq's change. Off: not touched, no random numbers drawn.
 	const expanded =
@@ -79,7 +81,12 @@ export const developSeasonSync = (
 
 	bySport({
 		baseball: developSeasonBaseball(ratings as any, age, coachingLevel),
-		basketball: developSeasonBasketball(ratings as any, age, coachingLevel),
+		basketball: developSeasonBasketball(
+			ratings as any,
+			age,
+			coachingLevel,
+			traitDev,
+		),
 		football: developSeasonFootball(ratings as any, age, coachingLevel),
 		hockey: developSeasonHockey(ratings as any, age, coachingLevel),
 	});
@@ -117,10 +124,17 @@ export const developSeason = async (
 	srID: string | undefined,
 	coachingLevel: number,
 	forPot: boolean,
+	traitDev?: TraitDevelopment,
 ) => {
 	const realPlayerDeterminismInfo = await getRealPlayerDeterminismInfo(
 		srID,
 		forPot,
 	);
-	developSeasonSync(ratings, age, coachingLevel, realPlayerDeterminismInfo);
+	developSeasonSync(
+		ratings,
+		age,
+		coachingLevel,
+		realPlayerDeterminismInfo,
+		traitDev,
+	);
 };

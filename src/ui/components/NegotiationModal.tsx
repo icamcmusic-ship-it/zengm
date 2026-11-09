@@ -273,6 +273,7 @@ const Negotiation = ({
 	close: () => void;
 }) => {
 	const [terms, setTerms] = useState<ContractTerms>({});
+	const { minContract } = useLocal(["minContract"]);
 	return (
 		<>
 			{contractTermsEnabled ? (
@@ -283,14 +284,20 @@ const Negotiation = ({
 					const rowTerms = contractTermsEnabled
 						? normalizeContractTerms(terms, contractRaw.years)
 						: undefined;
+					// Without terms, keep the exact amount, since rounding it could turn a minimum contract (like $1.157M) into slightly more than the minimum, which can't be signed over the cap. With terms, round to the nearest $10k, but never below the minimum.
+					const termsFactor = getContractTermsFactor(
+						rowTerms,
+						contractRaw.years,
+					);
 					const contract = {
 						...contractRaw,
 						amount:
-							Math.round(
-								contractRaw.amount *
-									getContractTermsFactor(rowTerms, contractRaw.years) *
-									100,
-							) / 100,
+							termsFactor === 1
+								? contractRaw.amount
+								: Math.max(
+										minContract / 1000,
+										Math.round(contractRaw.amount * termsFactor * 100) / 100,
+									),
 					};
 					return (
 						<div

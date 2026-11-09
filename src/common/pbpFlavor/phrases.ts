@@ -993,6 +993,17 @@ export function alleyOop(rng: any, e: any, ctx: any, trans: any) {
 		add(1, n + " skies for the alley-oop from " + an);
 		add(0.8, n + " cuts backdoor and flushes the lob from " + an);
 		add(
+			0.7,
+			an +
+				" spots " +
+				n +
+				" sneaking along the baseline and lobs it up for the slam",
+		);
+		add(
+			0.7,
+			n + " slips the screen and catches the lob from " + an + " for the jam",
+		);
+		add(
 			TIER.r * gate(Math.min(r.jmp, r.dnk), 76) * 3,
 			n + " catches " + an + "'s lob with one hand and flushes it",
 		);
@@ -1008,6 +1019,10 @@ export function alleyOop(rng: any, e: any, ctx: any, trans: any) {
 		add(1, an + " floats a lob to the rim and " + n + " lays it in");
 		add(1, n + " catches the lob from " + an + " and kisses it off the glass");
 		add(1, n + " finishes an alley-oop layup from " + an);
+		add(
+			0.7,
+			an + " throws it up and " + n + " lays in the alley-oop over the defense",
+		);
 	}
 	ctx.ptype = trans ? "fastbreak-oop" : "alleyoop";
 	ctx.wow = dunk;
@@ -1779,9 +1794,25 @@ export function tovText(rng: any, e: any, ctx: any) {
 		n + " picks up his dribble and shuffles his feet: travel",
 		n + " is called for a travel on the gather",
 		n + " gets caught in the air and has to come down with it: traveling",
+		n + " hop-steps into a travel",
+		n + " takes one step too many on the gather: traveling",
+		n + " travels trying to split the double team",
+		n + " shuffles his feet on the catch and is called for a travel",
 	]) {
 		add(0.35, t);
 	}
+	add(
+		r.hgt >= 65 ? 0.4 : 0.1,
+		n + " drags his pivot foot on the block: traveling",
+	);
+	add(
+		r.drb < 55 ? 0.35 : 0.12,
+		n + " picks up his dribble, then puts it back on the floor: double dribble",
+	);
+	add(
+		r.drb >= 60 ? 0.25 : 0.1,
+		n + " is called for carrying on the hesitation",
+	);
 	if (r.hgt >= 65) {
 		add(0.4, n + " travels in the post");
 	}
@@ -1806,6 +1837,11 @@ export function tovText(rng: any, e: any, ctx: any) {
 				D.name + " draws the charge on " + n,
 				n + " barrels into " + D.name + ": offensive foul",
 				n + " shoves off " + D.name + " to create space: offensive foul",
+				D.name +
+					" slides over from the weak side and takes the charge from " +
+					n,
+				D.name + " stands his ground, and " + n + " runs him over: charge",
+				D.name + " beats " + n + " to the spot and draws the offensive foul",
 			]) {
 				add(0.45 * fw, t, { foul: 1, drawer: D, charge: !/shoves/.test(t) });
 			}
@@ -1819,8 +1855,17 @@ export function tovText(rng: any, e: any, ctx: any) {
 			n + " lowers his shoulder on the drive: offensive foul",
 			n + " is called for a moving screen",
 			n + " hooks his defender on the drive: offensive foul",
+			n + " extends a hip on the screen: illegal screen",
+			n + " is called for an illegal screen setting the pick",
 		]) {
 			add(0.3 * fw, t, tag);
+		}
+		if (D) {
+			add(
+				0.3 * fw,
+				n + " sets a moving screen on " + D.name + ": offensive foul",
+				{ foul: 1, drawer: D },
+			);
 		}
 		if (ctx.trans) {
 			add(fw, n + " is called for a charge in transition", tag);
@@ -1837,9 +1882,12 @@ export function tovText(rng: any, e: any, ctx: any) {
 	add(
 		r.hgt >= 65 ? 0.4 : 0.12,
 		n +
-			(rng.random() < 0.5
-				? " is called for three seconds"
-				: " is called for a three-second violation"),
+			pickV(rng, [
+				" is called for three seconds",
+				" is called for a three-second violation",
+				" camps in the lane too long: three seconds",
+				" lingers in the paint and gets whistled for three seconds",
+			]),
 	);
 	// bringing the ball up: an 8-second call, a backcourt violation (more against a press, more from a weak handler)
 	if ((ctx.inbound || ctx.defReb) && !ctx.trans && !ctx.lastReb) {
@@ -1991,6 +2039,10 @@ export function rebText(
 				? p.name + " wins the scramble for another possession"
 				: p.name + " fights his way to the offensive rebound",
 			p.name + " crashes from the weak side and grabs it",
+			p.name + " wins the battle under the rim for the offensive board",
+			p.name + " out-muscles everyone for the offensive rebound",
+			p.name + " fights through the box-out and tips it to himself",
+			p.name + " keeps it alive with a tap and then grabs it",
 		]);
 	}
 	return pickV(rng, [
@@ -2014,5 +2066,10 @@ export function rebText(
 			? p.name + " skies over everyone for the board"
 			: p.name + " sneaks in for the defensive rebound",
 		p.name + " comes down with it",
+		p.name + " puts a body on his man and secures the board",
+		p.name + " seals off the lane and grabs it",
+		p.name + " walls off his man for the rebound",
+		p.name + " carves out space and pulls down the rebound",
+		p.name + " boxes out and lets the ball come to him",
 	]);
 }

@@ -451,6 +451,7 @@ describe("mood history and projections", () => {
 			rookieContract: 0,
 			difficulty: 0,
 			relatives: 0,
+			lockerRoom: 0,
 			custom: [{ amount: 1, text: "x" }],
 		};
 		assert.closeTo(sumMoodComponents(components), 0.23, 1e-9);

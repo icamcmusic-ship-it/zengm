@@ -9,6 +9,7 @@ import { g, helpers, logEvent } from "../../util/index.ts";
 import { randInt } from "../../../common/random.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import moodInfo from "../player/moodInfo.ts";
+import { getEgoTradeRequestInfo } from "../player/traits.ts";
 import { sumMoodComponents } from "./moodHistory.ts";
 import { estimateMarketValue, playerLink, teamLink } from "./options.ts";
 
@@ -50,11 +51,14 @@ export const shouldRequestTrade = ({
 	moodSum,
 	isStar,
 	signedThisSeason,
+	moodShift = 0,
 }: {
 	moodSum: number;
 	isStar: boolean;
 	signedThisSeason: boolean;
-}) => isStar && !signedThisSeason && moodSum <= TRADE_REQUEST_MOOD;
+	// Player traits (ego): a diva asks sooner (positive), a team-first player later
+	moodShift?: number;
+}) => isStar && !signedThisSeason && moodSum <= TRADE_REQUEST_MOOD + moodShift;
 
 // Check for new trade requests, and withdraw old ones that no longer apply. Called about once a week during the regular season.
 export const updateTradeRequests = async () => {
@@ -108,13 +112,16 @@ export const updateTradeRequests = async () => {
 				));
 
 		const mood = await moodInfo(p, p.tid);
+		// Player traits: ego (neutral with the setting off)
+		const ego = getEgoTradeRequestInfo(p as any);
 		if (
 			shouldRequestTrade({
 				moodSum: sumMoodComponents(mood.components),
 				isStar: true,
 				signedThisSeason: !!signedThisSeason,
+				moodShift: ego.moodShift,
 			}) &&
-			Math.random() < TRADE_REQUEST_PROB
+			Math.random() < TRADE_REQUEST_PROB * ego.probMult
 		) {
 			p.tradeRequest = {
 				season,

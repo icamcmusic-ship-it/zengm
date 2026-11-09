@@ -690,6 +690,41 @@ const ALL_BASKETBALL_BADGES: SkillBadgeDef[] = [
 		conditions: [],
 		traitConditions: [{ trait: "recovery", cutoff: 41 }],
 	},
+	{
+		label: "Gr",
+		name: "Gym rat",
+		group: "traits",
+		meaning:
+			"Works on his game all summer: develops more and has fewer bad years (work ethic trait).",
+		conditions: [],
+		traitConditions: [{ trait: "workEthic", cutoff: 70 }],
+	},
+	{
+		label: "Bi",
+		name: "Big-game player",
+		group: "traits",
+		meaning: "Plays his best in the playoffs (big-game trait).",
+		conditions: [],
+		traitConditions: [{ trait: "bigGame", cutoff: 68 }],
+	},
+	{
+		label: "Tf",
+		name: "Team-first",
+		group: "traits",
+		meaning:
+			"Low-ego glue guy who keeps teammates happy and the chemistry good (ego trait).",
+		conditions: [],
+		traitConditions: [{ trait: "ego", cutoff: 70 }],
+	},
+	{
+		label: "Ck",
+		name: "Cool head",
+		group: "traits",
+		meaning:
+			"Never loses his cool: few technicals and composed late in games (temper trait).",
+		conditions: [],
+		traitConditions: [{ trait: "temper", cutoff: 70 }],
+	},
 ];
 
 // Other sports have different ratings, so they get no extended badges

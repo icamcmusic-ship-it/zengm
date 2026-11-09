@@ -192,4 +192,57 @@ export const TRAIT_DEFINITIONS: Record<TraitKey, TraitDefinition> = {
 		badgeLow: "Green",
 		growth: "Grows with each pro season played, levels off after 8-10.",
 	},
+	workEthic: {
+		key: "workEthic",
+		name: "Work ethic",
+		description: "How hard he works on his game in the offseason.",
+		effect:
+			"Each preseason: young players with a strong work ethic improve a little more, and every player's bad development years are smaller. Lazy players improve less and drop more. Centered on the league, so overall ratings do not drift up.",
+		visibility: "hidden",
+		low: "Coasts in the offseason",
+		high: "Gym rat",
+		badgeHigh: "Gym rat",
+		badgeLow: "Lazy summers",
+		growth: "Little change.",
+	},
+	bigGame: {
+		key: "bigGame",
+		name: "Big-game",
+		description:
+			"Rises (or shrinks) when the stakes are highest: the playoffs.",
+		effect:
+			"In every playoff game, the whole game: better (or worse) shooting and free throws and fewer (or more) turnovers. No effect in the regular season.",
+		visibility: "hidden",
+		low: "Shrinks in the playoffs",
+		high: "Big-game riser",
+		badgeHigh: "Big-game",
+		badgeLow: "Shrinks",
+		growth: "Little change.",
+	},
+	ego: {
+		key: "ego",
+		name: "Ego (locker room)",
+		description: "Team-first glue guy, or a diva who needs the spotlight.",
+		effect:
+			"Team-first players lift their teammates' mood and the team's chemistry on the court; divas drag both down and are quicker to ask for a trade when unhappy.",
+		visibility: "hidden",
+		low: "Diva",
+		high: "Team-first",
+		badgeHigh: "Glue guy",
+		badgeLow: "Diva",
+		growth: "Little change.",
+	},
+	temper: {
+		key: "temper",
+		name: "Temper",
+		description: "Keeps his cool, or loses it with the refs and opponents.",
+		effect:
+			"Hotheads pick up more technical and flagrant fouls (and ejections) with the Technical Fouls setting on, and lose composure late in close games: worse clutch shooting, free throws and ball security. Even-keeled players the opposite.",
+		visibility: "visible",
+		low: "Hothead",
+		high: "Even-keeled",
+		badgeHigh: "Cool head",
+		badgeLow: "Hothead",
+		growth: "Calms down a little with age.",
+	},
 };

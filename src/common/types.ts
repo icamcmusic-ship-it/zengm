@@ -1152,6 +1152,8 @@ export type MoodComponents = {
 	rookieContract: number;
 	difficulty: number;
 	relatives: number;
+	// Player traits: teammates' egos (team-first players lift it, divas drag it down). 0 with the setting off
+	lockerRoom: number;
 	custom?: {
 		text: string;
 		amount: number;

@@ -29,6 +29,12 @@ Code: `src/common/playerTraits/` (pure, no worker/DB/`g` access) and `src/worker
 | `lateGameIq`     | Late-game IQ          | hidden     | oiq, diq, pss; grows with experience                          |
 | `leadership`     | Leadership            | hidden     | oiq, diq, pss, endu, stre, drb; grows with experience and age |
 | `veteranSavvy`   | Veteran savvy         | visible    | oiq, diq, pss; grows with pro seasons played, plateau at 9    |
+| `workEthic`      | Work ethic            | hidden     | none (personality)                                            |
+| `bigGame`        | Big-game              | hidden     | none (personality)                                            |
+| `ego`            | Ego (locker room)     | hidden     | none (personality)                                            |
+| `temper`         | Temper                | visible    | none (personality); calms 0.4/year after 27                   |
+
+Plus one secret, non-key "trait": the **aging curve** (below), never shown until retirement.
 
 Visibility only matters for scouting (below). The sim always uses the true scores.
 
@@ -41,6 +47,19 @@ Code: `src/common/playerTraits/veteran.ts` (pure), `getTraitProSeasons` / `getMe
 - **Mentoring:** at each preseason (`newPhasePreseason`, not in repeat-season mode), every team's raw mentoring is `0.5 * min(1, (s1 + 0.5 s2) / 0.75)` where s1, s2 are the two best `max(0, z - 0.25)` among its players over 23 (scores of the season just finished). Each young player (age <= 23 in the new season, on a team) gets his team's raw value minus the mean over all such players in the league, so the bonus averages exactly 0 over mentees and is within +-0.5. `player.develop(p, 1, false, coaching, false, {bonus, seed})` applies it after the normal development: with probability |bonus| (seeded by `mentor|leagueSeed|pid|season`, no Math.random) every rating but height moves one point in its direction, about one ovr point. So the expected ovr change is the bonus, deterministic, and nothing at all happens with the setting off.
 - **Scouting:** visible trait: prospects have the visible-trait uncertainty, exact (sd 0) from the rookie season on.
 - **Badges:** `veteranSavvyBadgeScore(score)` (0 below 60, 1 at 90) is exported for the skill badge system; no badge is added here.
+
+## Work ethic, aging curve, big-game, ego, temper
+
+Personality traits: no ratings part, calibration offset 0 (so the minutes-weighted average is 50), seeds like the others (`workEthicSeed`, `bigGameSeed`, `egoSeed`, `temperSeed`; generated deterministically from league seed + pid, backfilled by `completeTraitSeeds` in existing leagues without moving the other seeds, drifting yearly). Code: `common/playerTraits/development.ts`, `ego.ts`, `effects.ts`; `getTraitDevelopment`, `getLockerRoomMood`, `getEgoTradeRequestInfo`, `getRevealedAgingCurve` in `worker/core/player/traits.ts`. Tests: `worker/core/player/traitsFive.test.ts`, `worker/core/GameSim.basketball/traitsFive.test.ts`.
+
+- **Work ethic** (development, preseason only): adds `z` (24 and under) or `0.5 z` (older) rating points to the yearly base change in `developSeason.basketball.ts`, and multiplies the negative part of the year's random noise by `1 - 0.35 z` (smaller bad-roll drops for gym rats, bigger for lazy players). z is centered on the players developing that preseason (`centerDevelopment`), so the league's average development is unchanged (no rating inflation; checked by `ratingInflation.test.ts`, whose population model now applies it, and by a same-random-numbers with/without test). Same random numbers as without traits. Pot and pro projections never use it.
+- **Aging curve (secret):** early bloomer (20%), late bloomer (20%), aged gracefully (15%), normal (45%). Adds an age-dependent amount to the yearly base change (early: +2 at 21 and under, -1 at 26-30; late: -1.5 young, +1.5 at 26-29; graceful: +1 to +1.75 from 30), centered at every age over the shares and again over the league each preseason. **Never stored on the player** (derived from `agingCurve|leagueSeed|pid`), so it is not in `p.traits`, exports, pRaw, Customize Player or any view; pot/projections ignore it; the AI does not value it (weight 0, not a trait key); no badge. `getPlayerTraitsForUI` includes it only for a retired player (also not in God Mode): the Traits page shows it with "Revealed on retirement".
+- **Big-game:** in every playoff game (the whole game, `GameSim.bigGame`, not the all-star game): shot make probability `+0.025 z`, free throws `+0.025 z`, his turnovers `x (1 - 0.1 z)`. Nothing in the regular season.
+- **Ego:** on-court chemistry contribution `+0.4 z`; a new mood component **Locker room** (`MoodComponents.lockerRoom`) for every player = sum over his would-be teammates (not himself) of `0.6 z`, bounded to -2.5..1.5, 0 with the setting off; trade requests: a star asks at mood `<= -5 - 1.5 z` and with chance `0.25 x (1 - 0.6 z)`.
+- **Temper** (visible): technical foul rate `x` the mean `1 - 0.6 z` of all players on the court, his share of technicals and flagrants (on top of the foul weight) `x (1 - 0.6 z)`, flagrant rate `x` the defense's mean `1 - 0.5 z` (only with the Technical Fouls setting); late-game composure added to the clutch hooks: shot `+0.015 z`, FT `+0.02 z`, turnovers `-0.06 z` (times clutch weight).
+- **Trash talk (play-by-play text only):** hotheads (temper below 45; more the lower) sometimes talk after a dunk, and-one, three or block, jaw with an opponent after a foul (both hotheads: "words exchanged", refs separating them), and a technical on a player who has been talking (or a real hothead) gets a lead-in ("... has been chirping all night..."). More in the playoffs, a rivalry (when the caller passes it), a close game late, during a big run and once a game is heated; at most 3 lines per player, 8 events apart, no line repeated by a player. `common/pbpFlavor/trashTalk.ts`, one hook in `session.ts`; it uses its own seeded flavor generator stream (never Math.random), so games and the rest of the wording are unchanged. The temper score goes to the text as `pbpRatings.temper` (only with traits on) and is kept in stored play-by-play (store format version 2; version 1 still decodes). Tests: `GameSim.basketball/trashTalk.test.ts`.
+- **AI value weights:** work ethic 0.07 (x1.5 at 24 and under, x0.4 at 30+), big-game 0.04 (x1.5 for contenders), ego 0.035, temper 0.025; the others scaled down so the weights still sum to 1.
+- **Badges:** Gr gym rat (work ethic >= 70), Bi big-game player (>= 68), Tf team-first (ego >= 70), Ck cool head (temper >= 70); hidden traits only once known exactly.
 
 ## API for the sim
 
@@ -60,7 +79,7 @@ Every hook is linear in `z = clamp((score - 50) / 40, -1, 1)`, so 50 is exactly 
 | `clutchShotModifier(sit)`        | add to a field goal's make probability                                                                                                 | 0        | +-0.04                                                     |
 | `clutchFtModifier(sit)`          | add to a free throw's make probability                                                                                                 | 0        | +-0.05                                                     |
 | `clutchTurnoverMult(sit)`        | multiply turnover probability                                                                                                          | 1        | 0.85-1.15                                                  |
-| `gameFormShotDelta(gameZ)`       | add to his shot make probability; `gameZ` is one standard normal draw per player per game                                              | 0        | +-0.03 * varianceScale * gameZ                             |
+| `gameFormShotDelta(gameZ)`       | add to his shot make probability; `gameZ` is one standard normal draw per player per game                                              | 0        | +-0.03 _ varianceScale _ gameZ                             |
 | `varianceScale`                  | already inside `gameFormShotDelta`; use for any other per-game noise                                                                   | 1        | 0.6-1.4                                                    |
 | `shotSelectionBias(usage)`       | `usage` = composite usage 0-1. Multiply his shot-attempt weight by `attemptWeightMult`, add `shotQualityDelta` to his make probability | `{1, 0}` | weight 0.6-1.4, quality +-0.06 at usage 1                  |
 | `spacingContribution`            | add to the team's `synergy.off` for each such player on the court (before `synergyFactor`)                                             | 0        | +-0.06                                                     |
@@ -147,9 +166,9 @@ Prospects' traits are partly hidden. `traitUncertainty` gives an sd in score poi
 
 ## UI
 
-- Player page: **Traits** section (badges, bars with scouting range, plain-language descriptions, "How traits affect games").
+- Player page: a short **Traits** line on the Overview (badges and a link), and its own **Traits** sub-page (`/l/:lid/player_traits/:pid`, in the player page dropdown next to Overview and Game Log): badges, bars with scouting range, descriptions, what each exactly known trait means for him in numbers (`traitEffectSummary`), a trait history table (his current personality with each season's ratings, age and experience; exactly known traits only) and "How traits affect games". The aging curve appears there only once he has retired.
 - Draft Scouting: a **Traits** column with badges (`?` for estimates) and an optional single trait column.
 - Advanced Player Search: a **Traits** category for filters (`trait:<key>` columns, 0-100) and for "show" columns.
-- Customize Player (God Mode): sliders for all thirteen scores; they move the stored seeds so the score lands on the chosen value.
+- Customize Player (God Mode): sliders for all seventeen scores; they move the stored seeds so the score lands on the chosen value.
 - Table columns `trait:<key>` exist in `getCols` for any table that wants them.
 - Settings: Game Simulation > **Player Traits**.
