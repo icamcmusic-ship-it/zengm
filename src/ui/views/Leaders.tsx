@@ -164,6 +164,7 @@ const Leaders = ({
 											injury={p.injury}
 											season={numericSeason}
 											skills={p.skills}
+											badges={p.badges}
 											defaultWatch={p.watch}
 											firstName={p.firstName}
 											firstNameShort={p.firstNameShort}

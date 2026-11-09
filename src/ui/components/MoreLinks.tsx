@@ -324,6 +324,9 @@ export const MoreLinks = (
 				name: "Stat Distributions",
 			},
 		];
+		if (__SPORT === "basketball") {
+			links.push({ url: ["milestones"], name: "Milestones" });
+		}
 
 		if (season === undefined || page !== "player_stats") {
 			links.unshift({
@@ -387,6 +390,7 @@ export const MoreLinks = (
 		if (__SPORT === "basketball") {
 			links.push(
 				{ url: ["timeline"], name: "Timeline" },
+				{ url: ["records_book"], name: "Records Book" },
 				{ url: ["rivalries"], name: "Rivalries" },
 				{ url: ["league_achievements"], name: "League Achievements" },
 				{ url: ["coaches"], name: "Coaches" },

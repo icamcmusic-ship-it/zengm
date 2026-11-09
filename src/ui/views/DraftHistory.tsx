@@ -14,7 +14,7 @@ import { orderBy } from "../../common/utils.ts";
 import type { DataTableRow } from "../components/DataTable/index.tsx";
 import { wrappedDraftAbbrev } from "../components/DraftAbbrev.tsx";
 import { downloadFile } from "../util/downloadFile.ts";
-import { SkillsBlock } from "../components/SkillsBlock.tsx";
+import { wrappedSkillsBlock } from "../components/SkillsBlock.tsx";
 import { getCol } from "../../common/getCol.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 
@@ -332,9 +332,7 @@ const DraftHistory = ({
 				p.draft.age,
 				showRatings ? p.draft.ovr : null,
 				showRatings ? p.draft.pot : null,
-				<span className="skills-alone">
-					<SkillsBlock skills={p.draft.skills} />
-				</span>,
+				wrappedSkillsBlock({ skills: p.draft.skills, badges: p.draftBadges }),
 				<a
 					href={helpers.leagueUrl([
 						"roster",
@@ -346,15 +344,14 @@ const DraftHistory = ({
 				wrappedAgeAtDeath(p.currentAge, p.ageAtDeath),
 				showRatings ? p.currentOvr : null,
 				showRatings ? p.currentPot : null,
-				<span className="skills-alone">
-					<SkillsBlock skills={p.currentSkills} />
-				</span>,
+				wrappedSkillsBlock({
+					skills: p.currentSkills,
+					badges: p.currentBadges,
+				}),
 				p.peakAge,
 				showRatings ? p.peakOvr : null,
 				showRatings ? p.peakPot : null,
-				<span className="skills-alone">
-					<SkillsBlock skills={p.peakSkills} />
-				</span>,
+				wrappedSkillsBlock({ skills: p.peakSkills, badges: p.peakBadges }),
 				...stats.map((stat) => helpers.roundStat(p.careerStats[stat], stat)),
 			],
 			classNames: {

@@ -100,6 +100,7 @@ const getRows = ({
 				pid: p.pid,
 				season,
 				skills: pr ? pr.skills : [],
+				badges: pr ? pr.badges : undefined,
 				defaultWatch: p.watch,
 				firstName: p.firstName,
 				firstNameShort: p.firstNameShort,

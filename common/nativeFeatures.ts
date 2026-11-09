@@ -589,6 +589,51 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "recordsBook",
+		key: "featureRecordsBook",
+		name: "Records Book",
+		description:
+			"League and franchise records (career, season, single game, playoffs, team seasons and streaks) on a League History tab, kept as games are played.",
+		default: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "featureRecordsNews",
+				name: "Record News",
+				description:
+					"A news item and notification when a league record (career, season, single game, wins, winning streak) is broken.",
+				type: "bool",
+				default: true,
+			},
+		],
+	},
+	{
+		id: "milestones",
+		key: "featureMilestones",
+		name: "Milestones",
+		description:
+			"Career milestones and all-time rank passes within reach, with the projected game, on a Player Stats tab and a dashboard card.",
+		default: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "featureMilestonesDashboard",
+				name: "Milestones on Dashboard",
+				description: "Show your players' upcoming milestones on the dashboard.",
+				type: "bool",
+				default: true,
+			},
+			{
+				key: "featureMilestoneNotifications",
+				name: "Milestone Notifications",
+				description:
+					"Pop up a notification when one of your players reaches a career milestone.",
+				type: "bool",
+				default: true,
+			},
+		],
+	},
+	{
 		id: "rivalries",
 		key: "featureRivalries",
 		name: "Rivalries",

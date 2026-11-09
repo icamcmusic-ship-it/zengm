@@ -207,6 +207,7 @@ const getProcessedPlayers = async (
 			dovr: number;
 			pot: number;
 			skills: string[];
+			badges?: string[];
 		}>;
 		stats: StatsRow[];
 

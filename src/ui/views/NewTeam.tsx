@@ -76,6 +76,7 @@ const PlayerList = ({
 							season={season}
 							pos={p.ratings.pos}
 							skills={p.ratings.skills}
+							badges={p.ratings.badges}
 							defaultWatch={p.watch}
 							firstName={p.firstName}
 							lastName={p.lastName}

@@ -55,6 +55,7 @@ const StartingLineup = ({
 										jerseyNumber={p.jerseyNumber}
 										pid={p.pid}
 										skills={p.ratings.skills}
+										badges={p.ratings.badges}
 										defaultWatch={p.watch}
 										firstName={p.firstName}
 										firstNameShort={p.firstNameShort}

@@ -89,6 +89,7 @@ export default defineView({
 						ovr: ratings.ovr as number,
 						pot: ratings.pot as number,
 						skills: ratings.skills as string[],
+						badges: (ratings as any).badges as string[] | undefined,
 						pos: ratings.pos as string,
 						valueRank: i + 1,
 						build: p.ratingsBuild?.name,

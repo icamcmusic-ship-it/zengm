@@ -555,6 +555,9 @@ const processAttrs = (
 	}
 };
 
+const badgesWithSkills = () =>
+	__SPORT === "basketball" && featureOn("skillBadges");
+
 // Extended skill badges and combos (display only, see common/skillBadges). Uses the same fuzzed ratings the user sees.
 const getBadgesForRatingsRow = (
 	pr: any,
@@ -580,6 +583,18 @@ const getBadgesForRatingsRow = (
 			: undefined;
 	return getDisplayBadges(r, pr.skills ?? [], traits);
 };
+
+// For views that show skills from raw ratings rows (not through format): the extended badges to show with them, or
+// undefined when that League Extra is off. Call prepareSkillBadges once before, for the user's scouting level.
+export const getSkillBadgesForRow = (
+	p: Player,
+	pr: Player["ratings"][number],
+	fuzz = true,
+): string[] | undefined =>
+	badgesWithSkills() ? getBadgesForRatingsRow(pr, fuzz, p) : undefined;
+
+export const prepareSkillBadges = () =>
+	loadBadgeScoutingLevelIfNeeded({ ratings: ["badges"] });
 
 const processRatings = (
 	output: any,
@@ -648,11 +663,14 @@ const processRatings = (
 		for (const attr of ratings) {
 			if (attr === "skills") {
 				row.skills = helpers.deepCopy(pr.skills);
+				// Wherever skills are shown, the extended badges are shown with them (League Extras switch)
+				if (badgesWithSkills()) {
+					row.badges = getBadgesForRatingsRow(pr, fuzz, p);
+				}
 			} else if (attr === "badges") {
-				row.badges =
-					__SPORT === "basketball" && featureOn("skillBadges")
-						? getBadgesForRatingsRow(pr, fuzz, p)
-						: [];
+				row.badges = badgesWithSkills()
+					? getBadgesForRatingsRow(pr, fuzz, p)
+					: [];
 			} else if (attr === "dovr" || attr === "dpot") {
 				// Handle dovr and dpot - if there are previous ratings, calculate the fuzzed difference
 				const cat = attr === "dovr" ? "ovr" : "pot";
@@ -739,6 +757,9 @@ const processRatings = (
 			for (const attr of ratings) {
 				if (attr === "skills") {
 					row.skills = [];
+					if (badgesWithSkills()) {
+						row.badges = [];
+					}
 				} else if (attr === "badges") {
 					row.badges = [];
 				} else if (attr === "age") {
@@ -1648,7 +1669,8 @@ const loadBadgeScoutingLevelIfNeeded = async (options: {
 }) => {
 	if (
 		__SPORT === "basketball" &&
-		options.ratings?.includes("badges") &&
+		(options.ratings?.includes("badges") ||
+			options.ratings?.includes("skills")) &&
 		featureOn("skillBadges")
 	) {
 		await player.loadBadgeScoutingLevel();

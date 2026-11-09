@@ -794,6 +794,7 @@ const TeamFinances = ({
 				jerseyNumber: p.jerseyNumber,
 				pid: p.pid,
 				skills: p.skills,
+				badges: p.badges,
 				style: { fontStyle: p.released ? "italic" : "normal" },
 				defaultWatch: p.watch,
 				firstName: p.firstName,

@@ -128,12 +128,16 @@ export default defineView({
 				currentOvr: p.tid !== PLAYER.RETIRED ? currentPr.ovr : null,
 				currentPot: p.tid !== PLAYER.RETIRED ? currentPr.pot : null,
 				currentSkills: p.tid !== PLAYER.RETIRED ? currentPr.skills : [],
+				currentBadges: p.tid !== PLAYER.RETIRED ? currentPr.badges : undefined,
 				pos: currentPr.pos,
 
 				peakAge: peakPr.season - p.born.year,
 				peakOvr: peakPr.ovr,
 				peakPot: peakPr.pot,
 				peakSkills: peakPr.skills,
+				peakBadges: peakPr.badges,
+				// Extended skill badges from the ratings when he was drafted, shown with draft.skills
+				draftBadges: p.ratings[0].badges,
 
 				// Stats
 				careerStats: p.careerStats,

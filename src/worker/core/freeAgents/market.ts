@@ -99,7 +99,10 @@ export const getFreeAgentMarket = async (freeAgents: Player[]) => {
 				continue;
 			}
 
-			const roster = await idb.cache.players.indexGetAll("playersByTid", t.tid);
+			// A copy, since players are added to it below
+			const roster = [
+				...(await idb.cache.players.indexGetAll("playersByTid", t.tid)),
+			];
 			let payroll = await getPayroll(t.tid);
 			let available = sorted;
 			const probActs = getProbTeamActs(t.strategy);

@@ -304,6 +304,7 @@ const Depth = ({
 							injury: p.injury,
 							jerseyNumber: p.stats.jerseyNumber,
 							skills: p.ratings.skills,
+							badges: p.ratings.badges,
 							defaultWatch: p.watch,
 							firstName: p.firstName,
 							firstNameShort: p.firstNameShort,

@@ -2,6 +2,7 @@ import * as z from "zod";
 import type { IsExact } from "conditional-type-checks";
 import type { FaceConfig } from "facesjs";
 import type { ReactNode } from "react";
+import type { RBState } from "./recordsBook.ts";
 import type * as views from "../worker/views/index.ts";
 
 import {
@@ -753,6 +754,8 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 			quiet?: boolean;
 		}[];
 	};
+	// Records Book single-game highs, streaks and record holders (basketball, see worker/util/recordsBookData.ts)
+	recordsBook?: RBState;
 	goatSeasonFormula?: string;
 	godMode: boolean;
 	godModeInPast: boolean;
@@ -1900,9 +1903,16 @@ type PlayerRatingsPart<
 > = {
 	// Never empty, because player.formatAll filters out players with no ratings rows
 	ratings: Season extends number
-		? Pick<PlayerRatingsPlus, Ratings[number]>
-		: NonEmptyArray<Pick<PlayerRatingsPlus, Ratings[number]>>;
+		? PlayerRatingsPick<Ratings>
+		: NonEmptyArray<PlayerRatingsPick<Ratings>>;
 };
+
+// Wherever skills are requested, the extended skill badges come with them when that League Extra is on (basketball)
+type PlayerRatingsPick<Ratings extends Readonly<PlayerRatingAttr[]>> = Pick<
+	PlayerRatingsPlus,
+	Ratings[number]
+> &
+	("skills" extends Ratings[number] ? { badges?: string[] } : unknown);
 
 // For a single season, stats can be undefined if showRookies kept a player with no stats rows. showNoStats prevents that by adding an empty row
 type PlayerStatsSingleUndefined<

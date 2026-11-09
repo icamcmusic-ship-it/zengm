@@ -273,7 +273,8 @@ const TradeThree = ({
 
 			<div className="row">
 				{teams.map((t) => (
-					<div key={t.tid} className="col-lg-4 mb-3">
+					// Two per row: three side by side leave each player table too narrow for its Send menu, even at desktop widths
+					<div key={t.tid} className="col-xl-6 mb-3">
 						<h2>
 							{t.name}{" "}
 							<span className="text-body-secondary fs-6">
@@ -307,6 +308,7 @@ const TradeThree = ({
 													injury={p.injury}
 													jerseyNumber={p.jerseyNumber}
 													skills={p.ratings.skills}
+													badges={p.ratings.badges}
 													firstName={p.firstName}
 													firstNameShort={p.firstNameShort}
 													lastName={p.lastName}

@@ -24,6 +24,10 @@ import { getTeamInfoBySeason } from "../util/getTeamInfoBySeason.ts";
 import { isPreDraftStatsRow } from "../../common/preDraft.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { gradeOneTrade } from "../util/valueData.ts";
+import {
+	getSkillBadgesForRow,
+	prepareSkillBadges,
+} from "../core/player/format.ts";
 
 const processInputs = (params: RouteParams<"tradeSummary">) => {
 	return {
@@ -306,6 +310,7 @@ const getActualPlayerInfo = async (
 		pot: player.fuzzRating(ratings.pot, ratings.fuzz),
 		retiredYear: p.retiredYear,
 		skills: ratings.skills,
+		badges: getSkillBadgesForRow(p, ratings),
 		stat,
 		statTeam,
 		watch: p.watch ?? 0,
@@ -425,6 +430,7 @@ type CommonActualPlayer = {
 	pot: number;
 	retiredYear: number;
 	skills: string[];
+	badges?: string[];
 	watch: number;
 	stat: number;
 	statTeam: number;
@@ -571,6 +577,7 @@ export default defineView({
 			updateEvents.has("playerMovement") ||
 			eid !== prevInputs?.eid
 		) {
+			await prepareSkillBadges();
 			const event = await idb.merged.events.get(eid);
 			if (
 				!event ||

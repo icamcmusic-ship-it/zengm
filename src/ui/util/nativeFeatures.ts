@@ -59,6 +59,10 @@ export const featureForUrl = (
 			return "contractValue";
 		case "timeline":
 			return "timeline";
+		case "records_book":
+			return "recordsBook";
+		case "milestones":
+			return "milestones";
 		case "trade_market":
 			return "tradeMarket";
 		case "trade_offers":
