@@ -303,6 +303,10 @@ class GameSim extends GameSimBase {
 	// What the traits of the players on the court mean for the realistic possession model (see possessionModel.ts Traits), refreshed every
 	// possession
 	traits: [Traits, Traits] = [{ ...NEUTRAL_TRAITS }, { ...NEUTRAL_TRAITS }];
+	// Player traits: a playoff game, where the big-game trait applies (the whole game)
+	bigGame = false;
+	// Player traits: picking the player who gets a technical or flagrant foul (temper weighs in, see traitPickWeight)
+	pickingTechFoul = false;
 	possTimeScale = 1;
 	gameClockFactor = 1;
 	// The current segment of the possession followed a shot or free throw attempt (for the shot clock reset when it goes out off the defense)
@@ -414,6 +418,8 @@ class GameSim extends GameSimBase {
 		this.elamTarget = 0;
 
 		this.fatigueFactor = 0.055;
+
+		this.bigGame = g.get("phase") === PHASE.PLAYOFFS && !allStarGame;
 
 		if (g.get("phase") === PHASE.PLAYOFFS) {
 			this.fatigueFactor /= 1.85;
@@ -1377,9 +1383,13 @@ class GameSim extends GameSimBase {
 	traitTurnoverMult(offense: TeamNum) {
 		const sit = this.traitSituation(offense);
 		const pressure = this.traitPressure(offense);
+		const bigGame = this.bigGame;
 		return this.traitMean(
 			offense,
-			(e) => e.clutchTurnoverMult(sit) * e.pressureTurnoverMult(pressure),
+			(e) =>
+				e.clutchTurnoverMult(sit) *
+				e.pressureTurnoverMult(pressure) *
+				(bigGame ? e.bigGameTurnoverMult : 1),
 			1,
 		);
 	}
@@ -1395,6 +1405,9 @@ class GameSim extends GameSimBase {
 		let delta = e.gameFormShotDelta(p.gameZ ?? 0);
 		delta += e.shotSelectionBias(p.compositeRating.usage).shotQualityDelta;
 		delta += e.clutchShotModifier(this.traitSituation(this.o));
+		if (this.bigGame) {
+			delta += e.bigGameShotDelta;
+		}
 		if (
 			passer !== undefined &&
 			(type === "midRange" || type === "threePointer" || type === "atRim")
@@ -1414,7 +1427,10 @@ class GameSim extends GameSimBase {
 			case "usage":
 				return e.shotSelectionBias(p.compositeRating.usage).attemptWeightMult;
 			case "fouling":
-				return e.foulProneness;
+				// Technical and flagrant fouls: temper too
+				return this.pickingTechFoul
+					? e.foulProneness * e.techProneness
+					: e.foulProneness;
 			case "stealing":
 				return e.gambleStealMultiplier * e.looseBallBonus;
 			case "rebounding":
@@ -1422,10 +1438,34 @@ class GameSim extends GameSimBase {
 			case "turnovers":
 				return (
 					e.clutchTurnoverMult(this.traitSituation(t)) *
-					e.pressureTurnoverMult(this.traitPressure(t))
+					e.pressureTurnoverMult(this.traitPressure(t)) *
+					(this.bigGame ? e.bigGameTurnoverMult : 1)
 				);
 			default:
 				return 1;
+		}
+	}
+
+	// Technical and flagrant fouls (the technicalFouls setting): multiply the rate by the average temper of team t's players on the court
+	// (techProneness or flagrantProneness, 1 for an average temper). Exactly 1 with traits off
+	traitTemperRate(t: TeamNum, type: "tech" | "flagrant") {
+		if (!this.traitsOn) {
+			return 1;
+		}
+		return this.traitMean(
+			t,
+			type === "tech" ? (e) => e.techProneness : (e) => e.flagrantProneness,
+			1,
+		);
+	}
+
+	// Who gets a technical or flagrant foul: like any foul, plus temper with traits on. Same random numbers either way
+	pickTechFouler(t: TeamNum) {
+		this.pickingTechFoul = true;
+		try {
+			return this.pickPlayer("fouling", t, 1);
+		} finally {
+			this.pickingTechFoul = false;
 		}
 	}
 
@@ -1870,7 +1910,9 @@ class GameSim extends GameSimBase {
 			clockFactor !== "intentionalFoul" &&
 			this.t > 10 &&
 			Math.random() <
-				TECHNICAL_FOUL_RATES.flagrantPerPossession * g.get("foulRateFactor")
+				TECHNICAL_FOUL_RATES.flagrantPerPossession *
+					g.get("foulRateFactor") *
+					this.traitTemperRate(this.d, "flagrant")
 		) {
 			return this.doFlagrantFoul(shooter);
 		}
@@ -2339,7 +2381,9 @@ class GameSim extends GameSimBase {
 			clockFactor !== "intentionalFoul" &&
 			this.t > 10 &&
 			Math.random() <
-				TECHNICAL_FOUL_RATES.flagrantPerPossession * g.get("foulRateFactor")
+				TECHNICAL_FOUL_RATES.flagrantPerPossession *
+					g.get("foulRateFactor") *
+					this.traitTemperRate(this.d, "flagrant")
 		) {
 			return this.doFlagrantFoul(shooter);
 		}
@@ -3488,7 +3532,9 @@ class GameSim extends GameSimBase {
 			g.get("ftAccuracyFactor") * p.compositeRating.shootingFT * 0.6 + 0.45;
 		if (this.traitsOn && p.traitEffects) {
 			return helpers.bound(
-				base + p.traitEffects.clutchFtModifier(this.traitSituation(t)),
+				base +
+					p.traitEffects.clutchFtModifier(this.traitSituation(t)) +
+					(this.bigGame ? p.traitEffects.bigGameFtDelta : 0),
 				0,
 				0.95,
 			);
@@ -3687,14 +3733,20 @@ class GameSim extends GameSimBase {
 		}
 		// Players argue calls more than they argue anything else
 		const factor = outcome === "nonShootingFoul" || outcome === "ft" ? 2 : 1;
-		if (Math.random() >= TECHNICAL_FOUL_RATES.techPerDeadBall * factor) {
+		// Player traits: hotheads on the court mean more technicals (exactly 1 with the setting off)
+		const temper =
+			(this.traitTemperRate(0, "tech") + this.traitTemperRate(1, "tech")) / 2;
+		if (
+			Math.random() >=
+			TECHNICAL_FOUL_RATES.techPerDeadBall * factor * temper
+		) {
 			return;
 		}
 
 		const t: TeamNum = Math.random() < 0.5 ? 0 : 1;
 		const other: TeamNum = t === 0 ? 1 : 0;
 		const bench = Math.random() < TECHNICAL_FOUL_RATES.techBench;
-		const p = bench ? undefined : this.pickPlayer("fouling", t, 1);
+		const p = bench ? undefined : this.pickTechFouler(t);
 
 		// Coaches are keyed by team number, players by themselves
 		const key = p ?? t;
@@ -3744,7 +3796,7 @@ class GameSim extends GameSimBase {
 		this.isClockRunning = false;
 
 		const t = this.d;
-		const fouler = this.pickPlayer("fouling", t, 1);
+		const fouler = this.pickTechFouler(t);
 		const level: 1 | 2 = Math.random() < TECHNICAL_FOUL_RATES.flagrant2 ? 2 : 1;
 		this.recordStat(t, fouler, "pf");
 		this.foulsThisQuarter[t] += 1;

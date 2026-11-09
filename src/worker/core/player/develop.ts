@@ -21,6 +21,7 @@ import {
 	MENTOR_RATING_KEYS,
 } from "../../../common/playerTraits/veteran.ts";
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
+import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 import genWeight from "./genWeight.ts";
 import potEstimator from "./potEstimator.ts";
 import { TOO_MANY_TEAMS_TOO_SLOW } from "../season/getInitialNumGamesConfDivSettings.ts";
@@ -154,6 +155,8 @@ const develop = async (
 	skipPot: boolean = false, // Only for making testing or core/debug faster
 	// Basketball player traits: mentoring by savvy veterans (ovr points in expectation, see getMentorBonuses). 0 = none, nothing drawn
 	mentor?: { bonus: number; seed: string },
+	// Basketball player traits: work ethic and aging curve (see getTraitDevelopment). Only for one season of development
+	traitDev?: TraitDevelopment,
 ) => {
 	const ratings = last(p.ratings);
 	let age = ratings.season - p.born.year;
@@ -165,7 +168,14 @@ const develop = async (
 		}
 
 		if (!ratings.locked) {
-			await developSeason(ratings, age, p.srID, coachingLevel, false);
+			await developSeason(
+				ratings,
+				age,
+				p.srID,
+				coachingLevel,
+				false,
+				__SPORT === "basketball" && years === 1 ? traitDev : undefined,
+			);
 		}
 	}
 

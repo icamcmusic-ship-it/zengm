@@ -325,6 +325,8 @@ export const processTeam = async (
 			const traitEffects = player.getSimTraitEffects(p);
 			if (traitEffects) {
 				(p2 as any).traitEffects = traitEffects;
+				// Temper, for the trash talk in the play-by-play text only (pbpFlavor/trashTalk.ts)
+				(p2 as any).pbpRatings.temper = traitEffects.scores.temper;
 			}
 		}
 

@@ -6,6 +6,7 @@ import type {
 } from "../../../common/types.basketball.ts";
 import { coachingEffect } from "../../../common/budgetLevels.ts";
 import { uniform, realGauss } from "../../../common/random.ts";
+import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 
 type RatingFormula = {
 	ageModifier: (age: number) => number;
@@ -171,7 +172,11 @@ const ratingsFormulas: Record<Exclude<RatingKey, "hgt">, RatingFormula> = {
 // Cached for performance, since developSeason is called a lot in monteCarloPot
 const ratingsFormulasEntries = helpers.entries(ratingsFormulas);
 
-const calcBaseChange = (age: number, coachingLevel: number): number => {
+const calcBaseChange = (
+	age: number,
+	coachingLevel: number,
+	traitDev?: TraitDevelopment,
+): number => {
 	let val: number;
 
 	if (age <= 21) {
@@ -195,13 +200,23 @@ const calcBaseChange = (age: number, coachingLevel: number): number => {
 	}
 
 	// Noise
+	let noise;
 	if (age <= 23) {
-		val += helpers.bound(realGauss(0, 5), -4, 20);
+		noise = helpers.bound(realGauss(0, 5), -4, 20);
 	} else if (age <= 25) {
-		val += helpers.bound(realGauss(0, 5), -4, 10);
+		noise = helpers.bound(realGauss(0, 5), -4, 10);
 	} else {
-		val += helpers.bound(realGauss(0, 3), -2, 4);
+		noise = helpers.bound(realGauss(0, 3), -2, 4);
 	}
+
+	// Player traits (work ethic, aging curve), only in the preseason with the setting on. Same random numbers as without them
+	if (traitDev) {
+		if (noise < 0) {
+			noise *= traitDev.dropScale;
+		}
+		val += traitDev.baseChangeDelta;
+	}
+	val += noise;
 
 	val *= 1 + (val > 0 ? 1 : -1) * coachingEffect(coachingLevel);
 
@@ -212,6 +227,8 @@ const developSeason = (
 	ratings: PlayerRatings,
 	age: number,
 	coachingLevel: number,
+	// Player traits development (work ethic, aging curve), see common/playerTraits/development.ts. Never passed for pot estimates
+	traitDev?: TraitDevelopment,
 ) => {
 	// In young players, height can sometimes increase
 	if (age <= 21) {
@@ -226,7 +243,7 @@ const developSeason = (
 		}
 	}
 
-	const baseChange = calcBaseChange(age, coachingLevel);
+	const baseChange = calcBaseChange(age, coachingLevel, traitDev);
 
 	for (const [key, formula] of ratingsFormulasEntries) {
 		const ageModifier = formula.ageModifier(age);

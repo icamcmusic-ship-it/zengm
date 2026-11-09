@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 import { helpers } from "../../util/helpers.ts";
+import { dropdownOptions } from "../../hooks/useDropdownOptions.tsx";
+import { useLocal } from "../../util/local.ts";
+import type { LeagueUrlParts } from "../../router/types.ts";
 
 export const SeasonLink = ({
 	className,
@@ -38,4 +41,26 @@ export const MaybeBold = ({
 	}
 
 	return children;
+};
+
+// The player page's sub-pages (Overview, Game Log, Traits) for the title bar dropdown. Traits only with the Player Traits setting on
+export const usePlayerProfileOptions = () => {
+	const { playerTraits } = useLocal(["playerTraits"]);
+	return dropdownOptions.playerProfile.filter(
+		(option) => option.key !== "traits" || playerTraits,
+	);
+};
+
+export const playerProfileUrl = (
+	profile: string,
+	pid: number,
+	gameLogSeason: number,
+): LeagueUrlParts => {
+	if (profile === "gameLog") {
+		return ["player_game_log", pid, gameLogSeason];
+	}
+	if (profile === "traits") {
+		return ["player_traits", pid];
+	}
+	return ["player", pid];
 };

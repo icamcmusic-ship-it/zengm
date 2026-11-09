@@ -1,3 +1,4 @@
+import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 import {
 	PLAYER,
 	DEFAULT_PLAY_THROUGH_INJURIES,
@@ -456,6 +457,12 @@ const newPhasePreseason = async (
 			? new Map<number, number>()
 			: player.getMentorBonuses(players as any, newSeason);
 
+	// Player traits: work ethic and aging curve, centered on the league (empty map when the setting is off)
+	const traitDevelopment =
+		repeatSeason || __SPORT !== "basketball"
+			? new Map<number, TraitDevelopment>()
+			: player.getTraitDevelopment(players as any, newSeason);
+
 	// Loop through all non-retired players
 	for (const p of players) {
 		if (__SPORT === "hockey" && p.numConsecutiveGamesG !== undefined) {
@@ -512,6 +519,7 @@ const newPhasePreseason = async (
 							bonus: mentorBonus,
 							seed: `mentor|${g.get("playerTraitsSeed") ?? 0}|${p.pid}|${newSeason}`,
 						},
+				traitDevelopment.get(p.pid),
 			);
 			player.developTraits(p as any, newSeason);
 		}

@@ -10,6 +10,7 @@ import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts"
 import { getContractExp } from "../../../common/contracts.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
 import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
+import { getLockerRoomMood, traitsEnabled } from "./traits.ts";
 
 // A player whose rookie contract just expired, while his team can re-sign him. That's during the re-signing phase, or before then for a player still on his team, which includes when AI teams re-sign players in newPhaseResignPlayers before the phase is updated.
 const isResigningAfterRookieContract = (p: Player) => {
@@ -140,6 +141,7 @@ const moodComponents = async (
 		rookieContract: 0,
 		difficulty: 0,
 		relatives: 0,
+		lockerRoom: 0,
 	};
 
 	if (p.customMoodItems) {
@@ -345,14 +347,31 @@ const moodComponents = async (
 		}
 	}
 
+	// Teammates (only loaded when needed)
+	let teamPlayers: Player[] | undefined;
+	const getTeamPlayers = async () => {
+		teamPlayers ??= await idb.cache.players.indexGetAll("playersByTid", tid);
+		return teamPlayers;
+	};
+
 	{
 		// Relatives
 		if (p.relatives.length > 0) {
 			const relativePids = new Set(p.relatives.map((relative) => relative.pid));
-			const players = await idb.cache.players.indexGetAll("playersByTid", tid);
+			const players = await getTeamPlayers();
 			const teamPids = new Set(players.map((p) => p.pid));
 			const relativesOnTeam = teamPids.intersection(relativePids);
 			components.relatives = 2 * relativesOnTeam.size;
+		}
+	}
+
+	{
+		// LOCKER ROOM: player traits, his would-be teammates' egos
+		if (traitsEnabled()) {
+			components.lockerRoom = getLockerRoomMood(
+				p,
+				(await getTeamPlayers()) as any,
+			);
 		}
 	}
 

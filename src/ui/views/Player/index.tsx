@@ -1,5 +1,4 @@
 import { DataTable } from "../../components/DataTable/index.tsx";
-import { dropdownOptions } from "../../hooks/useDropdownOptions.tsx";
 import Injuries from "./Injuries.tsx";
 import InjuryHealth from "./InjuryHealth.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
@@ -9,13 +8,19 @@ import type { View } from "../../../common/types.ts";
 import { SeasonIcons } from "../../components/SeasonIcons.tsx";
 import TopStuff from "./TopStuff.tsx";
 import { ContractMood } from "./ContractMood.tsx";
-import { PlayerTraitsSection } from "./Traits.tsx";
+import { PlayerTraitsSummary } from "./Traits.tsx";
 import { wrappedSalaryPayers } from "./SalaryPayers.tsx";
 import { PLAYER } from "../../../common/constants.ts";
 import { ProProjectionSection } from "../../components/ProProjection.tsx";
 import HideableSection from "../../components/HideableSection.tsx";
 import { StatsTable } from "./StatsTable.tsx";
-import { highlightLeaderText, MaybeBold, SeasonLink } from "./common.tsx";
+import {
+	highlightLeaderText,
+	MaybeBold,
+	playerProfileUrl,
+	SeasonLink,
+	usePlayerProfileOptions,
+} from "./common.tsx";
 import { wrappedTeamAbbrevLink } from "../../components/TeamAbbrevLink.tsx";
 import { wrappedCurrency } from "../../components/wrappedCurrency.ts";
 import { groupAwards } from "../../util/groupAwards.ts";
@@ -54,6 +59,7 @@ const Player2 = ({
 		"season",
 	]);
 	const showRatings = !challengeNoRatings || retired;
+	const profileOptions = usePlayerProfileOptions();
 
 	useTitleBar({
 		title: player.name,
@@ -64,15 +70,11 @@ const Player2 = ({
 						fields: [
 							{
 								key: "profile",
-								options: dropdownOptions.playerProfile,
+								options: profileOptions,
 								value: "overview",
 							},
 						],
 						urlOverride: ({ profile }) => {
-							if (profile !== "gameLog") {
-								return ["player", player.pid];
-							}
-
 							let gameLogSeason;
 							if (player.stats.length > 0) {
 								gameLogSeason = player.stats.at(-1)!.season;
@@ -82,7 +84,11 @@ const Player2 = ({
 								gameLogSeason = currentSeason;
 							}
 
-							return ["player_game_log", player.pid, gameLogSeason];
+							return playerProfileUrl(
+								profile as string,
+								player.pid,
+								gameLogSeason,
+							);
 						},
 					}
 				: undefined,
@@ -234,7 +240,7 @@ const Player2 = ({
 			</HideableSection>
 
 			{playerTraits && showRatings ? (
-				<PlayerTraitsSection playerTraits={playerTraits} />
+				<PlayerTraitsSummary pid={player.pid} playerTraits={playerTraits} />
 			) : null}
 
 			<div className="row">

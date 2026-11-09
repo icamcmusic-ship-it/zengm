@@ -9,6 +9,7 @@ import loadDataBasketball from "../realRosters/loadData.basketball.ts";
 import type { Ratings } from "../realRosters/loadData.basketball.ts";
 import limitRating from "./limitRating.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
+import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 
 // Cache for performance
 let groupedRatings: Record<string, Ratings> | undefined;
@@ -67,10 +68,16 @@ export const developSeasonSync = (
 	age: number,
 	coachingLevel: number,
 	realPlayerDeterminismInfo: RealPlayerDeterminismInfo | undefined,
+	traitDev?: TraitDevelopment,
 ) => {
 	bySport({
 		baseball: developSeasonBaseball(ratings as any, age, coachingLevel),
-		basketball: developSeasonBasketball(ratings as any, age, coachingLevel),
+		basketball: developSeasonBasketball(
+			ratings as any,
+			age,
+			coachingLevel,
+			traitDev,
+		),
 		football: developSeasonFootball(ratings as any, age, coachingLevel),
 		hockey: developSeasonHockey(ratings as any, age, coachingLevel),
 	});
@@ -101,10 +108,17 @@ export const developSeason = async (
 	srID: string | undefined,
 	coachingLevel: number,
 	forPot: boolean,
+	traitDev?: TraitDevelopment,
 ) => {
 	const realPlayerDeterminismInfo = await getRealPlayerDeterminismInfo(
 		srID,
 		forPot,
 	);
-	developSeasonSync(ratings, age, coachingLevel, realPlayerDeterminismInfo);
+	developSeasonSync(
+		ratings,
+		age,
+		coachingLevel,
+		realPlayerDeterminismInfo,
+		traitDev,
+	);
 };
