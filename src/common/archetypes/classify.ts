@@ -31,6 +31,17 @@ import type {
 	Why,
 } from "./types.ts";
 
+// One description for a combo archetype: "Hounds ball handlers and picks pockets, and also spaces the floor from the corners."
+export const combineArchetypeDescs = (primary: string, secondary?: string) => {
+	if (!secondary || secondary === primary) {
+		return primary;
+	}
+	const a = primary.trim().replace(/[!.]+$/, "");
+	const b = secondary.trim();
+	const bLower = /^[A-Z][a-z]/.test(b) ? b[0]!.toLowerCase() + b.slice(1) : b;
+	return `${a}, and also ${bLower.endsWith(".") ? bLower : `${bLower}.`}`;
+};
+
 export const ARCHETYPES: Archetype[] = ARCHETYPE_DEFS.map((d) => ({
 	...d,
 	prior: 1,
@@ -248,7 +259,7 @@ export const classify = (
 		partner &&
 		partnerZ >= first.z - HYBRID_Z &&
 		(adds(partner) >= SECONDARY_MIN || partner.z >= first.z - HYBRID_TIE_Z)
-			? { id: partner.a.id, name: partner.a.name }
+			? { id: partner.a.id, name: partner.a.name, desc: partner.a.desc }
 			: null;
 	const confidence = Math.max(0, Math.min(1, (first.z - second.z) / 0.5));
 	const tier =
@@ -261,7 +272,7 @@ export const classify = (
 		name: a.name,
 		group: a.group,
 		family: a.family,
-		desc: a.desc,
+		desc: combineArchetypeDescs(a.desc, secondary?.desc),
 		tags: a.tags,
 		secondary,
 		score: Math.round(first.raw * 1000) / 1000,
