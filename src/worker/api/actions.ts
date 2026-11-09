@@ -18,6 +18,8 @@ type TradeForOptions = {
 	userPids?: number[];
 	// Conditions on the other team's picks (an AI trade offer with protections or swap rights)
 	otherPickConditions?: TradePickCondition[];
+	// Conditions on the user's picks (an AI offer that accepts a protection on a pick it receives)
+	userPickConditions?: TradePickCondition[];
 };
 
 const tradeFor = async (arg: TradeForOptions, conditions: Conditions) => {
@@ -86,6 +88,13 @@ const tradeFor = async (arg: TradeForOptions, conditions: Conditions) => {
 				pidsExcluded: [],
 				dpids: arg.userDpids,
 				dpidsExcluded: [],
+				...(arg.userPickConditions && arg.userPickConditions.length > 0
+					? {
+							pickConditions: arg.userPickConditions.filter((c) =>
+								arg.userDpids!.includes(c.dpid),
+							),
+						}
+					: {}),
 			},
 			{
 				tid: arg.tid,

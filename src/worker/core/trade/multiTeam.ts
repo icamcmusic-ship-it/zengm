@@ -16,6 +16,8 @@ import processTrade from "./processTrade.ts";
 import get from "./get.ts";
 import {
 	conditionSpecText,
+	getProtectionLoosenings,
+	pickConditionChangeText,
 	validatePickConditionSpec,
 } from "../../../common/draftPickConditions.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
@@ -233,6 +235,7 @@ export const validateAssets = async (trade: MultiTeamTrade) => {
 					asset.condition,
 					dp,
 					getNumPicksPerRound(),
+					{ participants: trade.tids, toTid: asset.toTid },
 				);
 				if (error) {
 					return error;
@@ -549,4 +552,222 @@ export const proposeMulti = async (
 		explanations,
 		undo,
 	};
+};
+
+// Value change for one team in a multi-team trade
+const evaluateTeam = (
+	trade: MultiTeamTrade,
+	tid: number,
+	userTid: number,
+	valueChangeCalculator: ValueChangeCalculator,
+) => {
+	const flow = getTeamFlows(trade).find((flow) => flow.tid === tid)!;
+	return valueChangeCalculator.evaluate({
+		tid,
+		pidsAdd: flow.pidsIn,
+		pidsRemove: flow.pidsOut,
+		dpidsAdd: flow.dpidsIn,
+		dpidsRemove: flow.dpidsOut,
+		tradingPartnerTid: userTid,
+		pickConditions: getMultiPickConditions(trade),
+	});
+};
+
+// Changes an AI team in a multi-team trade can ask for on the terms of picks it receives: loosen a protection added in this trade, or one already stored on the pick when the user's team holds it (the user agrees by accepting; an AI team holding it would lose value it isn't paid for)
+export const getMultiPickTermsCandidates = async (
+	trade: MultiTeamTrade,
+	userTid: number,
+	aiTids: number[],
+) => {
+	const candidates: {
+		dpid: number;
+		before: PickConditionSpec | undefined;
+		condition: PickConditionSpec | undefined;
+	}[] = [];
+	for (const asset of trade.assets) {
+		if (asset.type !== "pick" || !aiTids.includes(asset.toTid)) {
+			continue;
+		}
+		const dp = await idb.cache.draftPicks.get(asset.id);
+		if (!dp) {
+			continue;
+		}
+		const c = asset.condition;
+		if (c?.type === "protection" && !c.amend) {
+			for (const condition of getProtectionLoosenings(c)) {
+				candidates.push({ dpid: asset.id, before: c, condition });
+			}
+		} else if (
+			dp.protection &&
+			dp.protection.tid === userTid &&
+			(!c || (c.type === "protection" && c.amend && c.top > 0))
+		) {
+			const current = c?.type === "protection" ? c : dp.protection;
+			const stored = { type: "protection" as const, ...dp.protection };
+			for (const condition of getProtectionLoosenings(
+				{
+					type: "protection",
+					top: current.top,
+					rollover: current.rollover,
+					then: current.then,
+				},
+				true,
+			)) {
+				candidates.push({ dpid: asset.id, before: stored, condition });
+			}
+		}
+	}
+	return candidates;
+};
+
+const withCondition = (
+	trade: MultiTeamTrade,
+	dpid: number,
+	condition: PickConditionSpec | undefined,
+): MultiTeamTrade => ({
+	...trade,
+	assets: trade.assets.map((asset) => {
+		if (asset.type !== "pick" || asset.id !== dpid) {
+			return asset;
+		}
+		const { condition: _old, ...rest } = asset;
+		return condition ? { ...rest, condition } : rest;
+	}),
+});
+
+// "What would make this work?" for a multi-team trade: AI teams that don't like it ask for the smallest changes to the terms of picks they receive (draftPickConditions setting)
+export const makeItWorkMulti = async (
+	trade0: MultiTeamTrade,
+	userTid: number,
+	valueChangeCalculator = new ValueChangeCalculator(),
+): Promise<{ trade: MultiTeamTrade; changed: boolean; message: string }> => {
+	const aiTids = trade0.tids.filter((tid) => tid !== userTid);
+	const allDvs = async (trade: MultiTeamTrade) => {
+		const dvs = [];
+		for (const tid of aiTids) {
+			dvs.push(await evaluateTeam(trade, tid, userTid, valueChangeCalculator));
+		}
+		return dvs;
+	};
+
+	let trade = trade0;
+	let dvs = await allDvs(trade);
+	if (dvs.every((dv) => dv > 0)) {
+		return {
+			trade,
+			changed: false,
+			message: "Every AI team already likes this trade.",
+		};
+	}
+	if (!featureOn("draftPickConditions")) {
+		return {
+			trade,
+			changed: false,
+			message: "The AI teams don't see a way to make this work.",
+		};
+	}
+
+	// Each step takes the change that works with the smallest gain for the AI teams, or else the smallest change that reduces how far the unhappy teams are from accepting, so the result is the smallest set of changes that works
+	const MAX_STEPS = 8;
+	const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+	const deficit = (xs: number[]) => sum(xs.map((dv) => Math.min(dv, 0)));
+	for (let step = 0; step < MAX_STEPS; step++) {
+		const candidates = await getMultiPickTermsCandidates(
+			trade,
+			userTid,
+			aiTids,
+		);
+		let best:
+			| { trade: MultiTeamTrade; dvs: number[]; works: boolean; gain: number }
+			| undefined;
+		for (const candidate of candidates) {
+			const newTrade = withCondition(
+				trade,
+				candidate.dpid,
+				candidate.condition,
+			);
+			if ((await validateAssets(newTrade)) !== undefined) {
+				continue;
+			}
+			const newDvs = await allDvs(newTrade);
+			const works = newDvs.every((dv) => dv > 0);
+			if (!works && deficit(newDvs) <= deficit(dvs)) {
+				continue;
+			}
+			const gain = sum(newDvs) - sum(dvs);
+			if (
+				!best ||
+				(works && !best.works) ||
+				(works === best.works && gain < best.gain)
+			) {
+				best = { trade: newTrade, dvs: newDvs, works, gain };
+			}
+		}
+		if (!best) {
+			break;
+		}
+		trade = best.trade;
+		dvs = best.dvs;
+		if (best.works) {
+			break;
+		}
+	}
+
+	if (trade === trade0 || !dvs.every((dv) => dv > 0)) {
+		return {
+			trade: trade0,
+			changed: false,
+			message:
+				"The AI teams don't see a way to make this work by changing pick terms. Try adding more assets.",
+		};
+	}
+
+	return {
+		trade,
+		changed: true,
+		message: (await getMultiPickTermsMessages(trade0, trade, userTid)).join(
+			" ",
+		),
+	};
+};
+
+export const getMultiPickTermsMessages = async (
+	trade0: MultiTeamTrade,
+	trade: MultiTeamTrade,
+	userTid: number,
+) => {
+	const messages: string[] = [];
+	for (const asset of trade.assets) {
+		if (asset.type !== "pick") {
+			continue;
+		}
+		const asset0 = trade0.assets.find(
+			(a) => a.type === "pick" && a.id === asset.id,
+		);
+		if (JSON.stringify(asset0?.condition) === JSON.stringify(asset.condition)) {
+			continue;
+		}
+		const dp = await idb.cache.draftPicks.get(asset.id);
+		if (!dp) {
+			continue;
+		}
+		const desc = await helpers.pickDesc(dp, "short");
+		const pickText =
+			asset.fromTid === userTid
+				? `your ${desc}`
+				: `the ${g.get("teamInfoCache")[asset.fromTid]?.abbrev ?? "???"} ${desc}`;
+		const isAmend =
+			asset.condition?.type === "protection" && asset.condition.amend;
+		const before =
+			isAmend && dp.protection
+				? { type: "protection" as const, ...dp.protection }
+				: asset0?.condition;
+		const text = pickConditionChangeText(before, asset.condition, pickText);
+		if (text) {
+			messages.push(
+				`${getName(asset.toTid)}: ${text.replace(/^They /, "We ")}`,
+			);
+		}
+	}
+	return messages;
 };

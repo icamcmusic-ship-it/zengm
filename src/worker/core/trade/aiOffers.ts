@@ -1,3 +1,4 @@
+import { conditionSpecText } from "../../../common/draftPickConditions.ts";
 import { PHASE } from "../../../common/constants.ts";
 import type { AiTradeOffer, TradeTeams } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
@@ -11,7 +12,7 @@ import {
 import { league } from "../index.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import isUntradable from "./isUntradable.ts";
-import makeItWork from "./makeItWork.ts";
+import makeItWork, { withStartingProtections } from "./makeItWork.ts";
 import summary from "./summary.ts";
 import { choice } from "../../../common/random.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
@@ -226,7 +227,7 @@ export const buildAiOffer = async (
 	];
 
 	// Only the AI team adds assets: it's their offer for your player
-	const teams = await makeItWork(teams0, {
+	const teams = await makeItWork(await withStartingProtections(teams0), {
 		holdUserConstant: true,
 		maxAssetsToAdd: 4,
 		valueChangeCalculator,
@@ -251,6 +252,13 @@ export const buildAiOffer = async (
 		const dp = await idb.cache.draftPicks.get(target.candidate.id);
 		if (dp) {
 			assetName = `your ${await helpers.pickDesc(dp, "short")}`;
+			// The offer may come with a protection on your pick
+			const condition = teams[0].pickConditions?.find(
+				(c) => c.dpid === dp.dpid,
+			);
+			if (condition) {
+				assetName += ` (${conditionSpecText(condition)})`;
+			}
 		}
 	}
 

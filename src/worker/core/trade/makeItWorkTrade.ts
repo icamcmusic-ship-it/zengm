@@ -6,6 +6,29 @@ import get from "./get.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import explain from "./explain.ts";
 import tryProtections from "./tryProtections.ts";
+import {
+	getPickConditionChanges,
+	pickConditionChangeText,
+} from "../../../common/draftPickConditions.ts";
+
+// Text for each change the AI asks for on the conditions of the user's picks, like "They want the top 10 protection on your 2027 1st round pick lowered to top 5."
+export const getPickTermsMessages = async (
+	teams0: Parameters<typeof getPickConditionChanges>[0],
+	teams: Parameters<typeof getPickConditionChanges>[1],
+) => {
+	const messages: string[] = [];
+	for (const change of getPickConditionChanges(teams0, teams)) {
+		const dp = await idb.cache.draftPicks.get(change.dpid);
+		const pickText = dp
+			? `your ${await helpers.pickDesc(dp, "short")}`
+			: "your pick";
+		const text = pickConditionChangeText(change.before, change.after, pickText);
+		if (text) {
+			messages.push(text);
+		}
+	}
+	return messages;
+};
 
 /**
  * Make a trade work
@@ -88,7 +111,20 @@ const makeItWorkTrade = async () => {
 			updated = true;
 			break;
 		}
+
+		if (
+			JSON.stringify(teams[i].pickConditions ?? []) !==
+			JSON.stringify(teams0[i].pickConditions ?? [])
+		) {
+			updated = true;
+			break;
+		}
 	}
+
+	// Changes the AI asks for on the conditions of the user's picks
+	const termsMessages = await getPickTermsMessages(teams0[0], teams[0]);
+	const termsSuffix =
+		termsMessages.length > 0 ? ` ${termsMessages.join(" ")}` : "";
 
 	if (updated) {
 		const tr2 = await get();
@@ -102,7 +138,7 @@ const makeItWorkTrade = async () => {
 			explanation,
 			message: `${
 				g.get("teamInfoCache")[teams[1].tid]?.region
-			} GM: "Something like this would work if you can figure out how to get it done without breaking the salary cap rules."`,
+			} GM: "Something like this would work if you can figure out how to get it done without breaking the salary cap rules."${termsSuffix}`,
 		};
 	}
 
@@ -111,7 +147,7 @@ const makeItWorkTrade = async () => {
 		explanation,
 		message: `${
 			g.get("teamInfoCache")[teams[1].tid]?.region
-		} GM: "How does this sound?"`,
+		} GM: "How does this sound?"${termsSuffix}`,
 	};
 };
 

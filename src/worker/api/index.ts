@@ -158,6 +158,7 @@ import type { LookingFor } from "../core/trade/makeItWork.ts";
 import { dismissAiOffer } from "../core/trade/aiOffers.ts";
 import {
 	evaluateMulti,
+	makeItWorkMulti,
 	proposeMulti,
 	type MultiTeamTrade,
 } from "../core/trade/multiTeam.ts";
@@ -2577,13 +2578,18 @@ export const augmentOffers = async (offers: TradeTeams[]) => {
 				dpidsUser: offerRaw[0].dpids,
 				payroll,
 				pickConditions: offerRaw[1].pickConditions,
+				pickConditionsUser: offerRaw[0].pickConditions,
 				picks: await formatPicks(
 					tid,
 					offerRaw[1].dpids,
 					offerRaw[1].pickConditions,
 				),
 				players: await formatPlayers(tid, offerRaw[1].pids),
-				picksUser: await formatPicks(g.get("userTid"), offerRaw[0].dpids),
+				picksUser: await formatPicks(
+					g.get("userTid"),
+					offerRaw[0].dpids,
+					offerRaw[0].pickConditions,
+				),
 				playersUser: await formatPlayers(g.get("userTid"), offerRaw[0].pids),
 				summary: await getSummary(offerRaw),
 			};
@@ -3276,6 +3282,10 @@ const importPlayersGetReal = async (param: unknown, conditions: Conditions) => {
 	}
 
 	return players;
+};
+
+const makeItWorkMultiTeamTrade = (multiTeamTrade: MultiTeamTrade) => {
+	return makeItWorkMulti(multiTeamTrade, g.get("userTid"));
 };
 
 const evaluateMultiTeamTrade = (multiTeamTrade: MultiTeamTrade) => {
@@ -6104,6 +6114,7 @@ const api = {
 		importPlayersGetReal,
 		dismissAiTradeOffer,
 		evaluateMultiTeamTrade,
+		makeItWorkMultiTeamTrade,
 		proposeMultiTeamTrade,
 		incrementTradeProposalsSeed,
 		init,

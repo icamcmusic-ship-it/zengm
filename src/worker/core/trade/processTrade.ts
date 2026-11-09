@@ -11,6 +11,7 @@ import {
 } from "../../util/index.ts";
 import {
 	type DraftPick,
+	type DraftPickProtection,
 	type Player,
 	type Team,
 	type TeamSeason,
@@ -39,6 +40,8 @@ const processTrade = async (
 	);
 	const swapDpids = new Set<number>();
 	const conditionedDpids: number[] = [];
+	// Picks whose existing protection was changed in this trade, with the protection before
+	const amendedProtections = new Map<number, DraftPickProtection>();
 	// Picks in the trade that carry a protection or swap afterwards, new or not. Once the draft order resolves those, the trade can't be undone
 	const dpidsWithConditions = new Set<number>();
 
@@ -171,7 +174,31 @@ const processTrade = async (
 			}
 			const condition = conditions.get(dpid);
 			let conditionText;
-			if (condition && !dp.protection && !dp.swap) {
+			if (
+				condition?.type === "protection" &&
+				condition.amend &&
+				dp.protection
+			) {
+				// Change the protection already on the pick, agreed with the team holding it
+				amendedProtections.set(dpid, { ...dp.protection });
+				if (condition.top > 0) {
+					dp.protection = {
+						tid: dp.protection.tid,
+						top: condition.top,
+						rollover: [...condition.rollover],
+						then: condition.then,
+					};
+					conditionText = `protection changed to ${protectionText(dp.protection)}`;
+				} else {
+					delete dp.protection;
+					conditionText = "protection removed";
+				}
+			} else if (
+				condition &&
+				!(condition.type === "protection" && condition.amend) &&
+				!dp.protection &&
+				!dp.swap
+			) {
 				conditionedDpids.push(dpid);
 				if (condition.type === "protection") {
 					dp.protection = {
@@ -282,6 +309,12 @@ const processTrade = async (
 	const undo = async ({ dryRun = false }: { dryRun?: boolean } = {}): Promise<
 		boolean | string
 	> => {
+		for (const dpid of amendedProtections.keys()) {
+			const dp = await idb.cache.draftPicks.get(dpid);
+			if (dp && dp.pick > 0) {
+				return "This trade can't be undone, because the draft order is already set for a pick whose protection it changed.";
+			}
+		}
 		for (const dpid of dpidsWithConditions) {
 			const dp = await idb.cache.draftPicks.get(dpid);
 			if (dp && !dp.protection && !dp.swap) {
@@ -343,6 +376,10 @@ const processTrade = async (
 				if (conditionedDpids.includes(dp.dpid)) {
 					delete dp.protection;
 					delete dp.swap;
+				}
+				const before = amendedProtections.get(dp.dpid);
+				if (before) {
+					dp.protection = { ...before, rollover: [...before.rollover] };
 				}
 			}
 			await idb.cache.draftPicks.putAll(draftPicks[i]);

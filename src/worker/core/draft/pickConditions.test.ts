@@ -723,4 +723,100 @@ describe("with a league", () => {
 		dp.pick = 0;
 		await idb.cache.draftPicks.put(dp);
 	});
+
+	test("changing a stored protection: valuation, process and undo", async () => {
+		// Team 5's 1st, owned by team 4, protected for team 5
+		const dpid = dpids[5]![1]!;
+		const dp = (await idb.cache.draftPicks.get(dpid))!;
+		dp.tid = 4;
+		dp.protection = { tid: 5, top: 10, rollover: [], then: "unprotected" };
+		await idb.cache.draftPicks.put(dp);
+
+		const amend = (top: number): TradePickCondition => ({
+			type: "protection",
+			dpid,
+			top,
+			rollover: [],
+			then: "unprotected",
+			amend: true,
+		});
+		const stored = await evaluate(15, dpid);
+		const lowered = await evaluate(15, dpid, [amend(5)]);
+		const removed = await evaluate(15, dpid, [amend(0)]);
+		assert.isAtLeast(lowered, stored);
+		assert.isAbove(removed, stored);
+		assert.isAtLeast(removed, lowered);
+
+		for (const top of [5, 0]) {
+			const undo = await processTrade(
+				[
+					{
+						tid: 4,
+						pids: [],
+						pidsExcluded: [],
+						dpids: [dpid],
+						dpidsExcluded: [],
+						pickConditions: [amend(top)],
+					},
+					{ tid: 6, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+				],
+				undefined,
+			);
+			const after = (await idb.cache.draftPicks.get(dpid))!;
+			assert.strictEqual(after.tid, 6);
+			if (top > 0) {
+				assert.deepEqual(after.protection, {
+					tid: 5,
+					top,
+					rollover: [],
+					then: "unprotected",
+				});
+			} else {
+				assert.isUndefined(after.protection);
+			}
+			const event = (await idb.cache.events.getAll()).at(-1)!;
+			if (event.type === "trade") {
+				assert.isTrue(
+					event.teams!.some((t) =>
+						t.assets.some(
+							(a) => "dpid" in a && a.condition?.startsWith("protection"),
+						),
+					),
+				);
+			}
+
+			assert.isTrue(await undo());
+			const restored = (await idb.cache.draftPicks.get(dpid))!;
+			assert.strictEqual(restored.tid, 4);
+			assert.deepEqual(restored.protection, {
+				tid: 5,
+				top: 10,
+				rollover: [],
+				then: "unprotected",
+			});
+		}
+
+		// Can't undo once the draft order is set
+		const undo = await processTrade(
+			[
+				{
+					tid: 4,
+					pids: [],
+					pidsExcluded: [],
+					dpids: [dpid],
+					dpidsExcluded: [],
+					pickConditions: [amend(0)],
+				},
+				{ tid: 6, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+			],
+			undefined,
+		);
+		const settled = (await idb.cache.draftPicks.get(dpid))!;
+		settled.pick = 4;
+		await idb.cache.draftPicks.put(settled);
+		assert.isString(await undo({ dryRun: true }));
+		settled.pick = 0;
+		await idb.cache.draftPicks.put(settled);
+		assert.isTrue(await undo());
+	});
 });
