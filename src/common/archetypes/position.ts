@@ -1,4 +1,9 @@
-import type { ArchetypeGroup, ArchetypeRatings, Pos } from "./types.ts";
+import type {
+	ArchetypeDef,
+	ArchetypeGroup,
+	ArchetypeRatings,
+	Pos,
+} from "./types.ts";
 
 const POS_VALUES: Record<Pos, number> = {
 	PG: 0,
@@ -274,4 +279,86 @@ export const posPrior = (
 		return override[pos] as number | null;
 	}
 	return GROUP_POS_PRIOR[group][pos];
+};
+
+// An archetype's position prior for a player at `pos`: null when its allowed positions (a hard gate) leave him out, else
+// the group's soft nudge (with the archetype's overrides). Universal archetypes have no group nudge.
+export const archetypePrior = (
+	a: Pick<ArchetypeDef, "group" | "pos" | "positions" | "tags">,
+	pos: Pos,
+): number | null => {
+	if (!a.positions.includes(pos)) {
+		return null;
+	}
+	if (a.tags.includes("universal")) {
+		return (a.pos?.[pos] as number | undefined) ?? 0;
+	}
+	return posPrior(a.group, a.pos, pos);
+};
+
+// ---- What a label's NAME says about position ----
+// A label must not name a position the player does not play: "... Center" is for FC/C, "... Guard" for PG/G/SG, and so on.
+// Every rule that matches narrows the set. The two named exceptions are taken out of the name once matched (so a "Point
+// Forward" is not also read as a "Point" guard or a plain "Forward").
+export type PosWord = "guard" | "wing" | "forward" | "big";
+
+const NAME_RULES: [RegExp, Pos[], PosWord, true?][] = [
+	// Explicit exceptions: a point forward is a forward who runs the offense, a point center a center who does
+	[/\bPoint Forward\b/, ["GF", "SF", "F", "PF"], "forward", true],
+	[/\bPoint Center\b/, ["FC", "C"], "big", true],
+	// "Point of Attack" is a defensive role, not the position
+	[/\bPoint\b(?! of\b)/, ["PG", "G"], "guard"],
+	[/\bGuard\b/, ["PG", "G", "SG"], "guard"],
+	[/\bWing\b/, ["SG", "GF", "SF", "F"], "wing"],
+	[/\bFour\b/, ["F", "PF", "FC"], "forward"],
+	[/\bForward\b/, ["SF", "F", "PF", "FC"], "forward"],
+	[/\b(?:Center|Five)\b/, ["FC", "C"], "big"],
+	// "Big" as the noun: a "Big Guard" or a "Big Wing" is a tall guard or wing
+	[/\bBig\b(?! (?:Guard|Wing)\b)/, ["PF", "FC", "C"], "big"],
+];
+
+const nameInfoCache = new Map<
+	string,
+	{ positions: Pos[] | null; word: PosWord | null }
+>();
+const nameInfo = (name: string) => {
+	let info = nameInfoCache.get(name);
+	if (!info) {
+		let rest = name;
+		let positions: Pos[] | null = null;
+		let word: PosWord | null = null;
+		for (const [re, ps, w, takeOut] of NAME_RULES) {
+			if (re.test(rest)) {
+				if (takeOut) {
+					rest = rest.replace(re, " ");
+				}
+				positions = positions ? positions.filter((p) => ps.includes(p)) : ps;
+				word ??= w;
+			}
+		}
+		info = { positions, word };
+		nameInfoCache.set(name, info);
+	}
+	return info;
+};
+
+// The positions a label's name allows (null: the name names no position)
+export const namePositions = (name: string): Pos[] | null =>
+	nameInfo(name).positions;
+
+// The position a label's name names, as a family: "Lockdown Guard" -> guard, "Stretch Four" -> forward, "Point Center" -> big
+export const positionWordOf = (name: string): PosWord | null =>
+	nameInfo(name).word;
+
+// Does the name say he plays somewhere else?
+export const nameContradictsPosition = (name: string, pos: Pos) => {
+	const ps = namePositions(name);
+	return ps !== null && !ps.includes(pos);
+};
+
+// Two labels that name different positions ("Switchable Forward / Switchable Center") cannot describe one player
+export const namesContradict = (a: string, b: string) => {
+	const x = positionWordOf(a);
+	const y = positionWordOf(b);
+	return x !== null && y !== null && x !== y;
 };
