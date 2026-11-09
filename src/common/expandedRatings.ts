@@ -193,7 +193,7 @@ export const EXPANDED_COMPOSITE_WEIGHTS: CompositeWeights<
 		weights: [1.5, 0.6, 0.1, 0.1, 2, 0.5, 0.5],
 		skill: {
 			label: "R",
-			cutoff: 0.615,
+			cutoff: 0.62,
 		},
 	},
 	stealing: {
@@ -221,7 +221,7 @@ export const EXPANDED_COMPOSITE_WEIGHTS: CompositeWeights<
 		weights: [0.25, 0.5, 0.25, 1.75, 0.5, 1.5],
 		skill: {
 			label: "Dp",
-			cutoff: 0.6,
+			cutoff: 0.607,
 		},
 	},
 	jumpBall: {
