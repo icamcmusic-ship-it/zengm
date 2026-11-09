@@ -179,6 +179,10 @@ describe.skipIf(!ENABLED)("sim stress", () => {
 			},
 		);
 		await league.loadGameAttributes();
+		// SIM_STRESS_SAVE_EVERY_DAY=1: the saveEveryDay setting (save after every play request)
+		if (env.SIM_STRESS_SAVE_EVERY_DAY) {
+			await league.setGameAttributes({ saveEveryDay: true });
+		}
 		// Not spectator mode, so everything that involves the user's team (AI trade offers, holdouts, ...) runs too
 
 		// SIM_STRESS_WRITES=1: what each flush writes (records per store, and where player writes come from)
@@ -313,8 +317,12 @@ describe.skipIf(!ENABLED)("sim stress", () => {
 						.map(([k, v]) => `${v} ${k}`)
 						.join("; ")}`,
 				);
-				for (const k of Object.keys(flushStats)) {delete flushStats[k];}
-				for (const k of Object.keys(putCallers)) {delete putCallers[k];}
+				for (const k of Object.keys(flushStats)) {
+					delete flushStats[k];
+				}
+				for (const k of Object.keys(putCallers)) {
+					delete putCallers[k];
+				}
 			}
 			log(`  cache: ${sizes.join(", ")}`);
 			// Which parts of the player objects are big (all of them are written to the database after almost every day)

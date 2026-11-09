@@ -2879,6 +2879,14 @@ export const settings: Setting[] = (
 		},
 		{
 			category: "General",
+			key: "saveEveryDay",
+			name: "Save After Every Simmed Day",
+			type: "bool",
+			description:
+				"Off (faster): when you play a day or a few days at a time, the game saves at most every few seconds, so simming doesn't get slower as your league gets older. If the browser crashes or the tab is closed within a few seconds of a sim, the last day may be lost. On: save after every request to play games, like older versions did.",
+		},
+		{
+			category: "General",
 			key: "saveOldBoxScores",
 			name: "Save Old Box Scores",
 			type: "custom",

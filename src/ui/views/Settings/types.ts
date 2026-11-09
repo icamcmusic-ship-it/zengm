@@ -92,6 +92,7 @@ export type Key =
 	| "difficulty"
 	| "stopOnInjuryGames"
 	| "stopOnInjury"
+	| "saveEveryDay"
 	| "aiJerseyRetirement"
 	| "tiebreakers"
 	| "pointsFormula"
