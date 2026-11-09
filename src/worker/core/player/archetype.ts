@@ -24,6 +24,7 @@ import { g } from "../../util/index.ts";
 import { applyFuzz, getFuzz } from "./fuzzRating.ts";
 import ovr from "./ovr.ts";
 import posFn from "./pos.ts";
+import { expandedRatingsOn, useExpandedRatings } from "./expandedRatings.ts";
 
 // The archetype a player has is DERIVED from his ratings (src/common/archetypes), but it is STORED on him (p.archetypes) at
 // the start of every preseason, so what the UI shows stays fixed between preseasons. Prospects, and players who have no entry
@@ -46,6 +47,13 @@ export const ratingsForArchetype = (
 	const out = {} as ArchetypeRatings;
 	for (const key of RATING_KEYS) {
 		out[key] = key === "hgt" ? row[key] : applyFuzz(row[key], fuzz);
+	}
+	// Expanded ratings, when the setting is on: interior/perimeter defense for the defensive labels, wingspan for rim protection and
+	// length (wingspan is a measurement, never fuzzed)
+	if (useExpandedRatings(row)) {
+		out.wng = row.wng;
+		out.pdef = applyFuzz(row.pdef, fuzz);
+		out.idef = applyFuzz(row.idef, fuzz);
 	}
 	return out;
 };
@@ -102,6 +110,16 @@ export const fuzzedArchetypeLabel = (
 	const shown = {} as ArchetypeRatings;
 	for (const key of RATING_KEYS) {
 		shown[key] = key === "hgt" ? ratings[key] : applyFuzz(ratings[key], f);
+	}
+	if (
+		typeof ratings.wng === "number" &&
+		typeof ratings.pdef === "number" &&
+		typeof ratings.idef === "number" &&
+		expandedRatingsOn()
+	) {
+		shown.wng = ratings.wng;
+		shown.pdef = applyFuzz(ratings.pdef, f);
+		shown.idef = applyFuzz(ratings.idef, f);
 	}
 	// His position comes from the true ratings, as the game shows it
 	return classify(shown, { norms, pos: posFn(ratings as any) }).label;

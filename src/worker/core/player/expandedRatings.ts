@@ -1,26 +1,16 @@
 // Worker side of expanded ratings (the expandedRatings setting; shared parts in common/expandedRatings.ts). Nothing here draws a random
 // number or changes anything while the setting is off.
+
+import { realGauss, uniform } from "../../../common/random.ts";
 import {
 	blendDiq,
 	fillExpandedRatings,
 	hasExpandedRatings,
 	insertExpandedRatingKeys,
 } from "../../../common/expandedRatings.ts";
-import { g, helpers } from "../../util/index.ts";
-import { realGauss, uniform } from "../../../common/random.ts";
+import { expandedRatingsOn } from "./expandedRatingsSwitch.ts";
 
-// Hot path (ovr, monteCarloPot), so a plain game attribute read rather than the registry lookup. Missing attribute = off, the registry
-// default for existing leagues.
-export const expandedRatingsOn = (): boolean => {
-	if (__SPORT !== "basketball") {
-		return false;
-	}
-	try {
-		return g.get("expandedRatings") === true;
-	} catch {
-		return false;
-	}
-};
+export { expandedRatingsOn };
 
 // Whether these ratings should be read with the expanded formulas
 export const useExpandedRatings = (r: Record<string, any>) =>
@@ -87,7 +77,7 @@ export const developExpandedRatings = (
 
 	const shift =
 		splitAging(age) * uniform(0.4, 1.4) +
-		helpers.bound(realGauss(0, 1), -2.5, 2.5);
+		Math.min(2.5, Math.max(-2.5, realGauss(0, 1)));
 	setDefenseSplit(r, r.pdef - r.idef - 2 * Math.round(shift));
 };
 

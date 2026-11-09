@@ -4,13 +4,6 @@ import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import type { Player, Conditions } from "../../../common/types.ts";
 import {
-	compositeWeightsFor,
-	deriveExpandedRatings,
-	expandedRatingsSeed,
-	hasExpandedRatings,
-} from "../../../common/expandedRatings.ts";
-import { expandedRatingsOn } from "../player/expandedRatings.ts";
-import {
 	COMPOSITE_WEIGHTS,
 	DEFAULT_PLAY_THROUGH_INJURIES,
 	PHASE,
@@ -20,6 +13,13 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { getProStats } from "../../../common/preDraft.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
 import { applyInjuryDepth } from "./injuryDepthTeam.ts";
+import {
+	compositeWeightsFor,
+	deriveExpandedRatings,
+	expandedRatingsSeed,
+	hasExpandedRatings,
+} from "../../../common/expandedRatings.ts";
+import { expandedRatingsOn } from "../player/expandedRatings.ts";
 
 const MAX_NUM_PLAYERS_PACE = 7;
 

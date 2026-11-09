@@ -23,11 +23,11 @@ import {
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import genWeight from "./genWeight.ts";
 import potEstimator from "./potEstimator.ts";
-import { ensureExpandedRatings, syncDefenseToDiq } from "./expandedRatings.ts";
 import { TOO_MANY_TEAMS_TOO_SLOW } from "../season/getInitialNumGamesConfDivSettings.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
+import { ensureExpandedRatings, syncDefenseToDiq } from "./expandedRatings.ts";
 
 // ovrs and pots only exist in sports with position-specific ratings, and there they have a value for every position
 const getRatingByPos = (

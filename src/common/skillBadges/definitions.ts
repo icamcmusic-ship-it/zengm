@@ -19,7 +19,12 @@ export type BadgeRatingKey =
 	| "pss"
 	| "reb";
 
-export type BadgeRatings = Record<BadgeRatingKey, number>;
+export type BadgeRatings = Record<BadgeRatingKey, number> & {
+	// Expanded ratings (the expandedRatings setting), only passed when it's on: see EXPANDED_BADGE_SUBS
+	wng?: number;
+	pdef?: number;
+	idef?: number;
+};
 
 export type BadgeGroup =
 	| "shooting"
@@ -37,7 +42,16 @@ export type BadgeComposite = {
 	weights: number[];
 };
 
+// Expanded ratings: in these badges, defensive IQ reads the matching defense rating and part of height's weight goes to wingspan
+// (when the ratings have them, i.e. the setting is on)
+export type BadgeExpandedSub = {
+	diq?: "pdef" | "idef";
+	// Share of height's weight given to wingspan
+	wng?: number;
+};
+
 export type BadgeCondition = BadgeComposite & {
+	xr?: BadgeExpandedSub;
 	// "above": composite >= cutoff, "below": composite <= cutoff
 	dir?: "above" | "below";
 	cutoff: number;
@@ -1036,3 +1050,24 @@ export const SKILL_COMBOS: SkillComboDef[] =
 
 export const SKILL_COMBOS_BY_LABEL: Record<string, SkillComboDef> =
 	Object.fromEntries(SKILL_COMBOS.map((def) => [def.label, def]));
+
+export const EXPANDED_BADGE_SUBS: Record<string, BadgeExpandedSub> = {
+	// Pickpocket, point-of-attack defender, two-way wing: perimeter defense
+	St: { diq: "pdef" },
+	Pa: { diq: "pdef" },
+	Tw: { diq: "pdef" },
+	// Shot blocker: interior defense and length
+	Bk: { diq: "idef", wng: 0.4 },
+	// Rebounders and finishers: length
+	Dr: { diq: "idef", wng: 0.3 },
+	Or: { wng: 0.3 },
+	Fn: { wng: 0.25 },
+};
+for (const def of SKILL_BADGES) {
+	const sub = EXPANDED_BADGE_SUBS[def.label];
+	if (sub) {
+		for (const cond of def.conditions) {
+			cond.xr = sub;
+		}
+	}
+}

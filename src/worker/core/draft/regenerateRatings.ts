@@ -1,9 +1,4 @@
 import { featureOn } from "../../util/nativeFeatures.ts";
-import {
-	ensureExpandedRatings,
-	setDefenseSplit,
-	useExpandedRatings,
-} from "../player/expandedRatings.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import {
 	ARCHETYPES,
@@ -36,6 +31,11 @@ import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import fuzzRating from "../player/fuzzRating.ts";
 import { ratingsBuildFormulas as F } from "../player/ratingsBuildFormulas.ts";
 import updateValues from "../player/updateValues.ts";
+import {
+	ensureExpandedRatings,
+	setDefenseSplit,
+	useExpandedRatings,
+} from "../player/expandedRatings.ts";
 
 // "Regenerate ratings": rebuilds draft prospects (and, through Customize Player, any player) into varied, specialized
 // builds without changing anyone's overall. The engine is pure (src/common/ratingsBuilds); this is the plumbing that reads

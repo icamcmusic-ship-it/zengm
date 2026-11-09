@@ -1,5 +1,4 @@
 import { PLAYER, PHASE } from "../../common/constants.ts";
-import { ensureExpandedRatings } from "../core/player/expandedRatings.ts";
 import { finances, player } from "../core/index.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
@@ -20,6 +19,7 @@ import { defineView } from "../util/defineView.ts";
 import { last, orderBy } from "../../common/utils.ts";
 import { upgradeFace } from "../util/face.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { ensureExpandedRatings } from "../core/player/expandedRatings.ts";
 
 const processInputs = (params: RouteParams<"customizePlayer">) => {
 	let pid: number | null = null;

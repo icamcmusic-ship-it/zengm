@@ -1,5 +1,4 @@
 import { PHASE, PLAYER } from "../../../common/constants.ts";
-import { useExpandedRatings } from "../player/expandedRatings.ts";
 import {
 	RATING_KEYS,
 	forwardProject,
@@ -26,6 +25,7 @@ import {
 } from "../player/normalizePreDraft.ts";
 import { last } from "../../../common/utils.ts";
 import type { Player } from "../../../common/types.ts";
+import { useExpandedRatings } from "../player/expandedRatings.ts";
 
 const getProspects = async (draftYear: number) => {
 	// In a fantasy draft the prospects are temporary and there's no point

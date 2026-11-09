@@ -70,7 +70,6 @@ import skills from "./skills.ts";
 import stats from "./stats.ts";
 import updateOvrMeanStd from "./updateOvrMeanStd.ts";
 import updateValues from "./updateValues.ts";
-import updateExpandedRatingsForLeague from "./updateExpandedRatingsForLeague.ts";
 import value from "./value.ts";
 import valueCombineOvrPot from "./valueCombineOvrPot.ts";
 
@@ -141,7 +140,6 @@ export default {
 	stats,
 	updateOvrMeanStd,
 	updateValues,
-	updateExpandedRatingsForLeague,
 	value,
 	valueCombineOvrPot,
 };

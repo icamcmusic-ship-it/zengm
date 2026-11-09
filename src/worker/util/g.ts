@@ -9,6 +9,7 @@ import { actualPhase } from "./actualPhase.ts";
 import { gameAttributeHasHistory } from "../../common/gameAttributeHasHistory.ts";
 import helpers from "./helpers.ts";
 import { last } from "../../common/utils.ts";
+import { setExpandedRatingsGetter } from "../core/player/expandedRatingsSwitch.ts";
 
 // This will get filled by values from IndexedDB
 const g: GameAttributes & {
@@ -157,5 +158,10 @@ export const wrapNewValueIfCurrentlyWrapped = <
 
 	return cloned;
 };
+
+// Expanded ratings: read by player ovr/skills, which can't import this file (see expandedRatingsSwitch.ts)
+setExpandedRatingsGetter(
+	() => Object.hasOwn(g, "expandedRatings") && g.get("expandedRatings") === true,
+);
 
 export default g;

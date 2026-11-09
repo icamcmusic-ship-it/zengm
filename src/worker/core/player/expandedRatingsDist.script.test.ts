@@ -8,9 +8,9 @@ import createRandomPlayers from "../league/create/createRandomPlayers.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { range } from "../../../common/utils.ts";
 import { COMPOSITE_WEIGHTS } from "../../../common/constants.ts";
-import { EXPANDED_COMPOSITE_WEIGHTS } from "../../../common/expandedRatings.ts";
 import compositeRating from "./compositeRating.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
+import { EXPANDED_COMPOSITE_WEIGHTS } from "../../../common/expandedRatings.ts";
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const sd = (xs) => {

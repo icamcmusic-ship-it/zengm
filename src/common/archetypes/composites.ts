@@ -1,5 +1,11 @@
 import { COMPOSITE_WEIGHTS } from "../constants.basketball.ts";
-import type { ArchetypeRatings, DimKey, SkillLabel } from "./types.ts";
+import type {
+	ArchetypeRatings,
+	DimKey,
+	RatingKey,
+	SkillLabel,
+} from "./types.ts";
+import { compositeWeightsFor } from "../expandedRatings.ts";
 
 export const DIMS: DimKey[] = [
 	"usg",
@@ -71,7 +77,7 @@ export const DIM_LABELS: Record<DimKey, string> = {
 	hgt: "Height",
 };
 
-export const DIM_RATINGS: Record<DimKey, (keyof ArchetypeRatings)[]> = {
+export const DIM_RATINGS: Record<DimKey, RatingKey[]> = {
 	usg: ["ins", "dnk", "fg", "tp"],
 	drb: ["drb", "spd"],
 	pss: ["pss", "oiq", "drb"],
@@ -113,15 +119,25 @@ const composite = (
 	return Math.min(1, Math.max(0, num / den));
 };
 
+// Expanded ratings (setting on, see ArchetypeRatings): the game's composites with wingspan and perimeter/interior defense
+const weightsFor = (r: ArchetypeRatings) =>
+	compositeWeightsFor(
+		COMPOSITE_WEIGHTS,
+		typeof r.wng === "number" &&
+			typeof r.pdef === "number" &&
+			typeof r.idef === "number",
+	);
+
 export const compositeValues = (r: ArchetypeRatings) => {
 	const out = {} as Record<DimKey, number>;
+	const weights = weightsFor(r);
 	for (const dim of DIMS) {
 		const comp = COMPOSITE_OF[dim];
 		if (comp) {
-			const c = COMPOSITE_WEIGHTS[comp]!;
+			const c = weights[comp]!;
 			out[dim] = composite(r, c.ratings, c.weights);
 		} else {
-			out[dim] = r[dim as keyof ArchetypeRatings] / 100;
+			out[dim] = r[dim as RatingKey] / 100;
 		}
 	}
 	return out;
@@ -130,7 +146,7 @@ export const compositeValues = (r: ArchetypeRatings) => {
 // BBGM's skills (3, A, B, Di, Dp, Po, Ps, R, V) from the ratings, the game's own cutoffs
 export const skillsOf = (r: ArchetypeRatings): SkillLabel[] => {
 	const sk: SkillLabel[] = [];
-	for (const c of Object.values(COMPOSITE_WEIGHTS)) {
+	for (const c of Object.values(weightsFor(r))) {
 		if (
 			c.skill &&
 			composite(r, c.ratings, c.weights) > (c.skill.cutoff ?? 0.61)

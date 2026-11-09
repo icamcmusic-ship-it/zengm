@@ -1,10 +1,4 @@
 import { csvFormat, csvFormatRows } from "d3-dsv";
-import {
-	ensureExpandedRatings,
-	expandedRatingsOn,
-	ratingsKeysForView,
-	syncDefenseToDiq,
-} from "../core/player/expandedRatings.ts";
 import type {
 	CoachRole,
 	Contract,
@@ -257,6 +251,13 @@ import {
 } from "../core/draft/lotteryWhatIf.ts";
 import type { DraftType as DraftTypeWhatIf } from "../../common/types.ts";
 import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
+import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
+import {
+	ensureExpandedRatings,
+	expandedRatingsOn,
+	ratingsKeysForView,
+	syncDefenseToDiq,
+} from "../core/player/expandedRatings.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -4606,7 +4607,7 @@ const updateGameAttributes = async (
 	const expandedChanged = expandedRatingsChanged(gameAttributes);
 	await league.setGameAttributes(gameAttributes);
 	if (expandedChanged) {
-		await player.updateExpandedRatingsForLeague();
+		await updateExpandedRatingsForLeague();
 		await idb.cache.flush();
 	}
 	if (gameAttributes.coachingStaff) {
@@ -4675,7 +4676,7 @@ const updateGameAttributesGodMode = async (
 	await league.setGameAttributes(gameAttributes);
 
 	if (expandedChanged) {
-		await player.updateExpandedRatingsForLeague();
+		await updateExpandedRatingsForLeague();
 	}
 
 	// Turning on the coaching staff in an existing league generates staffs

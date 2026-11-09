@@ -1,5 +1,4 @@
 import { featureOn } from "../util/nativeFeatures.ts";
-import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 import {
 	getTraitViewContext,
 	getTraitsForView,
@@ -38,6 +37,7 @@ import { getGroupPrefix } from "../core/awards/prefixes.ts";
 import type { LeagueUrlParts } from "../../ui/router/types.ts";
 import { getHealthInfo } from "../core/player/getHealthInfo.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 
 export const processInputs = (
 	params: RouteParams<"player"> | RouteParams<"relatives">,

@@ -1,5 +1,4 @@
 import { PLAYER, RATINGS } from "../../common/constants.ts";
-import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 import { idb } from "../db/index.ts";
 import type {
 	Player,
@@ -20,6 +19,7 @@ import { bySport } from "../../common/sportFunctions.ts";
 import { getTeamInfoBySeason } from "../util/getTeamInfoBySeason.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { player } from "../core/index.ts";
+import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 
 const processInputs = (params: RouteParams<"comparePlayers">) => {
 	const players: {

@@ -49,7 +49,6 @@ import {
 import g, { wrapNewValueIfCurrentlyWrapped } from "../../util/g.ts";
 import type { Settings } from "../../views/settings.ts";
 import { getAutoTicketPriceByTid } from "../game/attendance.ts";
-import { hasExpandedRatings } from "../../../common/expandedRatings.ts";
 import addRelatives from "../realRosters/addRelatives.ts";
 import loadDataBasketball from "../realRosters/loadData.basketball.ts";
 import addDraftProspects from "./create/addDraftProspects.ts";
@@ -96,6 +95,8 @@ import { migrateScheduledEvents74 } from "../../db/migrations/74/migrate.ts";
 import { unwrapGameAttribute } from "../../../common/unwrapGameAttribute.ts";
 import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
 import { ensureStaff } from "../staff/index.ts";
+import updateExpandedRatingsForLeague from "../player/updateExpandedRatingsForLeague.ts";
+import { hasExpandedRatings } from "../../../common/expandedRatings.ts";
 
 export type TeamInfo = TeamBasic & {
 	disabled?: boolean;
@@ -1952,7 +1953,7 @@ const afterDBStream = async ({
 				p.tid !== PLAYER.RETIRED && !hasExpandedRatings(p.ratings.at(-1)!),
 		)
 	) {
-		await player.updateExpandedRatingsForLeague();
+		await updateExpandedRatingsForLeague();
 	}
 
 	// Memorials

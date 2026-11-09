@@ -1,9 +1,4 @@
 import { getTermsFromContract } from "../../../common/contractTerms.ts";
-import {
-	fillExpandedRatings,
-	hasExpandedRatings,
-	isExpandedRatingKey,
-} from "../../../common/expandedRatings.ts";
 import { PLAYER, PHASE } from "../../../common/constants.ts";
 import { player, trade } from "../index.ts";
 import { g, helpers } from "../../util/index.ts";
@@ -41,6 +36,12 @@ import {
 	getRemainingContractSeasons,
 	isFlatContract,
 } from "../contract/index.ts";
+import {
+	fillExpandedRatings,
+	hasExpandedRatings,
+	isExpandedRatingKey,
+} from "../../../common/expandedRatings.ts";
+import { useExpandedRatings } from "./expandedRatings.ts";
 
 type PlayerFormatOptionsRequired = Required<
 	Omit<PlayerFormatOptions, "season" | "seasonRange" | "seasonType" | "tid">
@@ -576,6 +577,12 @@ const getBadgesForRatingsRow = (
 			return [];
 		}
 		r[key] = fuzz && key !== "hgt" ? player.fuzzRating(v, pr.fuzz) : v;
+	}
+	// Expanded ratings, when the setting is on (wingspan is a measurement, never fuzzed)
+	if (useExpandedRatings(pr)) {
+		r.wng = pr.wng;
+		r.pdef = fuzz ? player.fuzzRating(pr.pdef, pr.fuzz) : pr.pdef;
+		r.idef = fuzz ? player.fuzzRating(pr.idef, pr.fuzz) : pr.idef;
 	}
 	// Only the latest ratings row: trait scores are for the player now
 	const traits =

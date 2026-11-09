@@ -3,7 +3,13 @@ import type { RatingKey } from "../types.basketball.ts";
 export type { RatingKey };
 
 // The ratings an archetype is derived from (true or fuzzed, the engine does not care)
-export type ArchetypeRatings = Record<RatingKey, number>;
+export type ArchetypeRatings = Record<RatingKey, number> & {
+	// Expanded ratings (the expandedRatings setting), only when it's on: the defense, rebounding, blocking and finishing composites
+	// then read wingspan and perimeter/interior defense, like the game sim
+	wng?: number;
+	pdef?: number;
+	idef?: number;
+};
 
 // The dimensions an archetype profile is written over: BBGM's own composite ratings plus a few raw ratings
 export type DimKey =

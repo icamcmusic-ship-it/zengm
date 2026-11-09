@@ -2,10 +2,10 @@ import { fillExpandedRatings } from "../../../common/expandedRatings.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import { idb } from "../../db/index.ts";
 import { helpers } from "../../util/index.ts";
-import { expandedRatingsOn } from "./expandedRatings.ts";
 import ovr from "./ovr.ts";
 import skills from "./skills.ts";
 import updateValues from "./updateValues.ts";
+import { expandedRatingsOn } from "./expandedRatings.ts";
 
 // The setting was turned on or off in a league: fill in the new ratings (on) and recompute the current ovr, pot and skills of every
 // player who isn't retired (ovr reads wingspan and the skills read the new composites when on). Retired players' old rows are derived

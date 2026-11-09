@@ -20,11 +20,11 @@ import { buffOvrDH } from "./depth.ts";
 import { actualPhase } from "../util/actualPhase.ts";
 import { player, season } from "../core/index.ts";
 import { bySport } from "../../common/sportFunctions.ts";
-import { insertExpandedRatingKeys } from "../../common/expandedRatings.ts";
-import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
 import { validateSeason } from "../util/processInputs.ts";
+import { insertExpandedRatingKeys } from "../../common/expandedRatings.ts";
+import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 
 export const processInputs = (
 	params: RouteParams<"playerBios"> | RouteParams<"playerRatings">,

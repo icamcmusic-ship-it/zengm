@@ -22,10 +22,6 @@ import { helpers } from "../../util/helpers.ts";
 import { showNotification } from "../../util/showNotification.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import RatingsForm from "./RatingsForm.tsx";
-import {
-	blendDiq,
-	EXPANDED_RATINGS,
-} from "../../../common/expandedRatings.ts";
 import { TraitsForm } from "./TraitsForm.tsx";
 import { RegenerateBuild } from "./RegenerateBuild.tsx";
 import RelativesForm from "./RelativesForm.tsx";
@@ -46,6 +42,10 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { useLocal } from "../../util/local.ts";
 import clsx from "clsx";
 import type { StoredRatingsBuild } from "../../../common/ratingsBuilds/types.ts";
+import {
+	blendDiq,
+	EXPANDED_RATINGS,
+} from "../../../common/expandedRatings.ts";
 
 // In the form, the contract fields are the player's current contract or contract demand
 type PlayerWithContract = PlayerWithoutKey & {
