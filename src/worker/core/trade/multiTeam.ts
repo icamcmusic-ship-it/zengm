@@ -6,7 +6,6 @@ import type {
 	TradeTeams,
 } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import type { Undo } from "../../util/UndoLog.ts";
 import { g, helpers } from "../../util/index.ts";
 import { player, team } from "../index.ts";
 import { getContractSummary } from "../contract/index.ts";
@@ -465,7 +464,7 @@ export const processMulti = async (trade: MultiTeamTrade) => {
 	// processTrade's undo resets the trade page to the leg, so remember what was there
 	const tradeBefore = helpers.deepCopy(await get());
 
-	const undos: Undo[] = [];
+	const undos: Awaited<ReturnType<typeof processTrade>>[] = [];
 	for (const leg of legs) {
 		undos.push(await processTrade(leg, undefined, { note }));
 	}
@@ -481,7 +480,13 @@ export const processMulti = async (trade: MultiTeamTrade) => {
 	}
 
 	return async () => {
-		// If a leg can't be undone, report its reason
+		// Check every leg before undoing any, so the trade is never half undone
+		for (const undo of undos) {
+			const check = await undo({ dryRun: true });
+			if (check !== true) {
+				return check;
+			}
+		}
 		let ok: boolean | string = true;
 		for (const undo of undos.toReversed()) {
 			const result = await undo();

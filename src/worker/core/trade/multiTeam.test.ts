@@ -236,5 +236,34 @@ describe("three-team trades", () => {
 			assert.strictEqual((await idb.cache.players.get(b0!))!.tid, 1);
 			assert.strictEqual((await idb.cache.players.get(c0!))!.tid, 2);
 		});
+
+		test("a 3-team trade with one leg that can't be undone is not undone at all", async () => {
+			g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+			const players = await idb.cache.players.getAll();
+			const byTid = (tid: number) =>
+				players.filter((p) => p.tid === tid).map((p) => p.pid);
+			const [a0] = byTid(0);
+			const [b0] = byTid(1);
+			const [c0] = byTid(2);
+			const undo = await processMulti({
+				tids: [0, 1, 2],
+				assets: [
+					{ type: "player", id: a0!, fromTid: 0, toTid: 1 },
+					{ type: "player", id: b0!, fromTid: 1, toTid: 2 },
+					{ type: "player", id: c0!, fromTid: 2, toTid: 0 },
+				],
+			});
+
+			// Team 2 moves the player it got on, so the 1-2 leg can't be undone
+			const pb = (await idb.cache.players.get(b0!))!;
+			pb.tid = 3;
+			await idb.cache.players.put(pb);
+
+			assert.notStrictEqual(await undo(), true);
+			// Nothing was undone
+			assert.strictEqual((await idb.cache.players.get(a0!))!.tid, 1);
+			assert.strictEqual((await idb.cache.players.get(b0!))!.tid, 3);
+			assert.strictEqual((await idb.cache.players.get(c0!))!.tid, 0);
+		});
 	});
 });

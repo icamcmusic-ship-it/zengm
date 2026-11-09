@@ -278,7 +278,10 @@ const processTrade = async (
 			? await idb.cache.savedTrades.get(initialHash)
 			: undefined;
 
-	const undo = async (): Promise<boolean | string> => {
+	// dryRun: only check whether it can be undone (true, false, or a reason), changing nothing
+	const undo = async ({ dryRun = false }: { dryRun?: boolean } = {}): Promise<
+		boolean | string
+	> => {
 		for (const dpid of dpidsWithConditions) {
 			const dp = await idb.cache.draftPicks.get(dpid);
 			if (dp && !dp.protection && !dp.swap) {
@@ -313,6 +316,10 @@ const processTrade = async (
 					return false;
 				}
 			}
+		}
+
+		if (dryRun) {
+			return true;
 		}
 
 		// Revert trade
