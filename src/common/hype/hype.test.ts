@@ -26,6 +26,7 @@ import {
 	makeRaw,
 } from "./fixture.ts";
 import { postScore, preScore, rarity } from "./calibration.ts";
+import { evalLine } from "./post.ts";
 
 const raw0 = makeRaw();
 const regular = raw0.games.filter((g) => !g.playoffs);
@@ -650,6 +651,80 @@ describe("game rating calibration", () => {
 		const h = rate(r, early.gid);
 		expect(h.post!.score).toBeGreaterThanOrEqual(88);
 		expect(plainText(h.post!.reasons[0]!.text)).toMatch(/60 points/);
+	});
+
+	test("good but not great lines barely count, historic ones dominate", () => {
+		// judged against the calibration leagues (no scoring environment of its own yet)
+		const I = { env: undefined } as unknown as Parameters<typeof evalLine>[0];
+		const pts = (
+			pts: number,
+			trb: number,
+			ast: number,
+			more: Partial<HBoxLine> = {},
+		) =>
+			evalLine(
+				I,
+				{
+					pid: 1,
+					name: "X",
+					min: 38,
+					pts,
+					trb,
+					ast,
+					stl: 1,
+					blk: 0,
+					tp: 2,
+					tpa: 6,
+					fg: Math.round(pts / 2.4),
+					fga: Math.round(pts / 1.25),
+					ft: 4,
+					fta: 5,
+					tov: 3,
+					...more,
+				},
+				0,
+			).pts;
+		// star nights that most games have someone close to: nothing, or next to it
+		for (const [a, b, c] of [
+			[25, 5, 5],
+			[28, 8, 6],
+			[30, 4, 3],
+			[22, 4, 12],
+			[30, 10, 3],
+			[35, 5, 4],
+			[15, 10, 10],
+			[30, 12, 12],
+		] as const) {
+			expect(pts(a, b, c)).toBeLessThanOrEqual(1.5);
+		}
+		expect(pts(40, 6, 4)).toBeLessThan(5);
+		// correlated stats are not added up: a 30-12-12 triple-double is less than a 45-point game
+		expect(pts(30, 12, 12)).toBeLessThan(pts(45, 6, 4));
+		expect(pts(50, 7, 5)).toBeGreaterThanOrEqual(10);
+		expect(pts(60, 8, 5)).toBeGreaterThan(2.5 * pts(50, 7, 5));
+		expect(pts(14, 4, 21, { tov: 2 })).toBeGreaterThan(
+			pts(14, 4, 21, { tov: 7 }),
+		);
+	});
+
+	test("only the best two lines count", () => {
+		const g = late;
+		const many = patchGame(g.gid, (x) => ({
+			...x,
+			teams: [
+				{
+					...x.teams[0],
+					players: x.teams[0].players.map((p, i) =>
+						i < 4 ? { ...p, min: 38, pts: 38, fg: 14, fga: 26 } : p,
+					),
+				},
+				x.teams[1],
+			],
+		}));
+		const h = rate(many, g.gid);
+		expect(
+			h.post!.reasons.filter((r) => r.k === "star" || r.k === "duel").length,
+		).toBeLessThanOrEqual(2);
 	});
 
 	test("a deciding game (Game 7 style) won in overtime on a game-winner is legendary, before and after", () => {
