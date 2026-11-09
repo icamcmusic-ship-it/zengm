@@ -117,6 +117,7 @@ type Key =
 	| "tradeDeadline"
 	| "difficulty"
 	| "stopOnInjury"
+	| "saveEveryDay"
 	| "stopOnInjuryGames"
 	| "aiJerseyRetirement"
 	| "numPeriods"
@@ -340,6 +341,7 @@ export const getInitialSettings = (): Settings => {
 		tradeDeadline: g.get("tradeDeadline"),
 		difficulty: g.get("difficulty"),
 		stopOnInjury: g.get("stopOnInjury"),
+		saveEveryDay: g.get("saveEveryDay"),
 		stopOnInjuryGames: g.get("stopOnInjuryGames"),
 		aiJerseyRetirement: g.get("aiJerseyRetirement"),
 		numPeriods: g.get("numPeriods"),

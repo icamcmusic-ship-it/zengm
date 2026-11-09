@@ -179,7 +179,47 @@ describe.skipIf(!ENABLED)("sim stress", () => {
 			},
 		);
 		await league.loadGameAttributes();
+		// SIM_STRESS_SAVE_EVERY_DAY=1: the saveEveryDay setting (save after every play request)
+		if (env.SIM_STRESS_SAVE_EVERY_DAY) {
+			await league.setGameAttributes({ saveEveryDay: true });
+		}
 		// Not spectator mode, so everything that involves the user's team (AI trade offers, holdouts, ...) runs too
+
+		// SIM_STRESS_WRITES=1: what each flush writes (records per store, and where player writes come from)
+		const flushStats: Record<string, number> = {};
+		const putCallers: Record<string, number> = {};
+		if (env.SIM_STRESS_WRITES) {
+			const cache = idb.cache as any;
+			const origFlush = cache.flush.bind(cache);
+			cache.flush = async (...args: any[]) => {
+				flushStats.flushes = (flushStats.flushes ?? 0) + 1;
+				for (const [store, set] of Object.entries(cache._dirtyRecords)) {
+					flushStats[store] =
+						(flushStats[store] ?? 0) + (set as Set<unknown>).size;
+				}
+				const c0 = cpuMs();
+				try {
+					return await origFlush(...args);
+				} finally {
+					flushStats.cpuMs = Math.round((flushStats.cpuMs ?? 0) + cpuMs() - c0);
+				}
+			};
+			for (const m of ["put", "putAll"]) {
+				const orig = cache.players[m].bind(cache.players);
+				cache.players[m] = (x: any) => {
+					const n = m === "put" ? 1 : [...x].length;
+					const frame =
+						(new Error().stack ?? "")
+							.split("\n")
+							.slice(2)
+							.find((l: string) => l.includes("/src/") && !l.includes("/db/"))
+							?.replace(/.*\/src\//, "")
+							.replace(/\)$/, "") ?? "?";
+					putCallers[frame] = (putCallers[frame] ?? 0) + n;
+					return orig(x);
+				};
+			}
+		}
 
 		const t0 = performance.now();
 		const start = g.get("season");
@@ -209,7 +249,13 @@ describe.skipIf(!ENABLED)("sim stress", () => {
 				const before = `${g.get("phase")}|${await season.getDaysLeftSchedule()}|${local.playingUntilEndOfRound}`;
 				const schedule = await season.getSchedule();
 				await fixUserRoster();
-				await step(`play day ${numDays}`, () => game.play(1, {}));
+				// SIM_STRESS_BULK=1: the whole regular season and the whole playoffs in one request each, like "Until end of regular season"
+				const numDaysToPlay = env.SIM_STRESS_BULK
+					? g.get("phase") === PHASE.PLAYOFFS
+						? 100
+						: await season.getDaysLeftSchedule()
+					: 1;
+				await step(`play day ${numDays}`, () => game.play(numDaysToPlay, {}));
 				numDays += 1;
 				if (env.SIM_STRESS_VIEWS && numDays % 10 === 0) {
 					await loadViews();
@@ -262,6 +308,22 @@ describe.skipIf(!ENABLED)("sim stress", () => {
 				);
 				session.disconnect();
 			}
+			if (env.SIM_STRESS_WRITES) {
+				log(`  flushed records: ${JSON.stringify(flushStats)}`);
+				log(
+					`  player writes: ${Object.entries(putCallers)
+						.sort((a, b) => b[1] - a[1])
+						.slice(0, 12)
+						.map(([k, v]) => `${v} ${k}`)
+						.join("; ")}`,
+				);
+				for (const k of Object.keys(flushStats)) {
+					delete flushStats[k];
+				}
+				for (const k of Object.keys(putCallers)) {
+					delete putCallers[k];
+				}
+			}
 			log(`  cache: ${sizes.join(", ")}`);
 			// Which parts of the player objects are big (all of them are written to the database after almost every day)
 			const fieldSizes: Record<string, number> = {};
@@ -284,6 +346,28 @@ describe.skipIf(!ENABLED)("sim stress", () => {
 				`season ${start + i}: ${numDays} days, ${faDays} free agency days, ${Math.round((performance.now() - ts) / 1000)} s (${Math.round((cpuMs() - cs) / 1000)} s CPU), heap ${Math.round((globalThis as any).process.memoryUsage().heapUsed / 1e6)} MB`,
 			);
 		}
+		// Outcome check, as in simBenchmark.test.ts
+		const players = await idb.cache.players.getAll();
+		const teamSeasons = await idb.cache.teamSeasons.getAll();
+		const state = JSON.stringify([
+			players
+				.map((p) => [
+					p.pid,
+					p.tid,
+					(p as any).contract?.amount,
+					(p as any).contract?.exp,
+					p.value,
+					last(p.ratings).ovr,
+					p.injury.type,
+				])
+				.sort((a, b) => (a[0] as number) - (b[0] as number)),
+			teamSeasons.map((ts) => [ts.tid, ts.season, ts.won, ts.lost]),
+		]);
+		let hash = 0;
+		for (let i = 0; i < state.length; i++) {
+			hash = (Math.imul(hash, 31) + state.charCodeAt(i)) | 0;
+		}
+		log(`hash ${hash}`);
 		for (const [id, t] of Object.entries(viewTotals)) {
 			log(
 				`view ${id} after a simmed day: mean ${Math.round(t.ms / t.n)} ms, max ${Math.round(t.max)} ms (${t.n} loads)`,

@@ -863,6 +863,7 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	softCapTradeSalaryMatch: number;
 	sonRate: number;
 	startingSeason: number;
+	saveEveryDay: boolean;
 	stopOnInjury: boolean;
 	stopOnInjuryGames: number;
 	tiebreakers: (keyof typeof TIEBREAKERS)[];

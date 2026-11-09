@@ -20,7 +20,7 @@ let dbPromise: Promise<CacheDB | undefined> | undefined;
 
 // Opening can wait forever when another tab has an older version open (the upgrade is blocked until it closes). Then
 // there's just no cache for this session, rather than every operation waiting for TIMEOUT_MS first
-const OPEN_TIMEOUT_MS = 3000;
+const OPEN_TIMEOUT_MS = 10000;
 
 const getDb = () => {
 	dbPromise ??= (async () => {
