@@ -342,4 +342,24 @@ describe("coaching staff development calibration", () => {
 		);
 		assert.isAbove(pool.length, 10);
 	}, 120_000);
+
+	test("league-average development effect doesn't drift over decades (rating inflation)", async () => {
+		await ensureStaff();
+		const yearlyMeans: number[] = [];
+		for (let i = 0; i < 30; i++) {
+			const effects: number[] = [];
+			for (const t of await idb.cache.teams.getAll()) {
+				effects.push(levelToEffect(await getStaffLevel(t.tid)));
+			}
+			yearlyMeans.push(effects.reduce((a, b) => a + b, 0) / effects.length);
+			await finishSeason();
+			await runOffseason();
+			await nextSeason();
+		}
+		// With a fixed reference, the mean started around -0.2 and climbed to +0.2 after ~20 seasons, as the coach pool's
+		// ratings drifted. Normalized by the league average staff, it stays centered (like AI coaching budgets).
+		for (const m of yearlyMeans) {
+			assert.isBelow(Math.abs(m), 0.08);
+		}
+	}, 120_000);
 });
