@@ -125,7 +125,7 @@ type CompositeRating =
 	| "turnovers"
 	| "usage"
 	| "jumpBall";
-// Expanded ratings calibration (see docs/expanded-ratings.md): keeps league blocks and field goal percentages the same as with the
+// Expanded ratings calibration (see docs/native-features.md, Expanded ratings): keeps league blocks and field goal percentages the same as with the
 // setting off
 const EXPANDED_BLK_FACTOR = 1.07;
 const EXPANDED_BLK_JUMPER_FACTOR = 0.9;
@@ -313,7 +313,7 @@ class GameSim extends GameSimBase {
 	// What the traits of the players on the court mean for the realistic possession model (see possessionModel.ts Traits), refreshed every
 	// possession
 	traits: [Traits, Traits] = [{ ...NEUTRAL_TRAITS }, { ...NEUTRAL_TRAITS }];
-	// Expanded ratings (the expandedRatings setting, see docs/expanded-ratings.md): wingspan and perimeter/interior defense. loadTeams then
+	// Expanded ratings (the expandedRatings setting, see docs/native-features.md, Expanded ratings): wingspan and perimeter/interior defense. loadTeams then
 	// gives every player a "length" composite (and the defense, rebounding and finishing composites read the new ratings). Off: nothing
 	// below is used, games play out exactly as before
 	expandedRatings: boolean;
@@ -2993,7 +2993,7 @@ class GameSim extends GameSimBase {
 
 	// Expanded ratings: block probability. Shots at the rim and in the post are blocked more by long, interior defenses (the blocking
 	// composite reads wingspan and interior defense) and less when the shooter is long himself (finishing over defenders); jump shots
-	// a little less. Calibrated so league blocks stay the same (docs/expanded-ratings.md).
+	// a little less. Calibrated so league blocks stay the same (docs/native-features.md, Expanded ratings).
 	probBlkExpanded(p: PlayerGameSim, type: ShotType) {
 		let factor = EXPANDED_BLK_FACTOR;
 		if (

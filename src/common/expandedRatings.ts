@@ -1,4 +1,4 @@
-// Expanded ratings (basketball, the expandedRatings setting, see docs/expanded-ratings.md): three more player ratings,
+// Expanded ratings (basketball, the expandedRatings setting, see docs/native-features.md, Expanded ratings): three more player ratings,
 //
 // - wng: wingspan / length, on the same scale as hgt (a player with an average ape index has wng = hgt). Set at generation, then
 //   essentially fixed (it can only grow a little before 21, with height).
@@ -180,7 +180,7 @@ export const wingspanInches = (
 ) => Math.round(heightInInches + 4 + ((wng - hgt) * 27) / 100);
 
 // Composite ratings with the setting on. Only the ones that change are listed; everything else uses COMPOSITE_WEIGHTS. Weights were
-// chosen so each composite has about the same league average as the stock one (see docs/expanded-ratings.md for the calibration).
+// chosen so each composite has about the same league average as the stock one (see docs/native-features.md, Expanded ratings for the calibration).
 export const EXPANDED_COMPOSITE_WEIGHTS: CompositeWeights<
 	RatingKey | ExpandedRatingKey
 > = {

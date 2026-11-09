@@ -24,7 +24,7 @@ import { g } from "../../util/index.ts";
 import { applyFuzz, getFuzz } from "./fuzzRating.ts";
 import ovr from "./ovr.ts";
 import posFn from "./pos.ts";
-import { expandedRatingsOn, useExpandedRatings } from "./expandedRatings.ts";
+import { expandedRatingsOn, expandedRatingsApply } from "./expandedRatings.ts";
 
 // The archetype a player has is DERIVED from his ratings (src/common/archetypes), but it is STORED on him (p.archetypes) at
 // the start of every preseason, so what the UI shows stays fixed between preseasons. Prospects, and players who have no entry
@@ -50,7 +50,7 @@ export const ratingsForArchetype = (
 	}
 	// Expanded ratings, when the setting is on: interior/perimeter defense for the defensive labels, wingspan for rim protection and
 	// length (wingspan is a measurement, never fuzzed)
-	if (useExpandedRatings(row)) {
+	if (expandedRatingsApply(row)) {
 		out.wng = row.wng;
 		out.pdef = applyFuzz(row.pdef, fuzz);
 		out.idef = applyFuzz(row.idef, fuzz);

@@ -34,7 +34,7 @@ import updateValues from "../player/updateValues.ts";
 import {
 	ensureExpandedRatings,
 	setDefenseSplit,
-	useExpandedRatings,
+	expandedRatingsApply,
 } from "../player/expandedRatings.ts";
 
 // "Regenerate ratings": rebuilds draft prospects (and, through Customize Player, any player) into varied, specialized
@@ -464,7 +464,7 @@ export const writeResult = async (
 	const row = last(p.ratings) as PlayerRatings;
 	// Expanded ratings: he keeps his wingspan relative to his height and his perimeter/interior defense split
 	ensureExpandedRatings(p);
-	const expanded = useExpandedRatings(row);
+	const expanded = expandedRatingsApply(row);
 	const wngOffset = expanded ? row.wng! - row.hgt : 0;
 	const defenseSplit = expanded ? row.pdef! - row.idef! : 0;
 	for (const key of RATING_KEYS) {

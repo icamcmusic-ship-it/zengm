@@ -1,4 +1,5 @@
 // @ts-nocheck (diagnostic script)
+/* eslint-disable no-undef */
 // Distributions of the expanded ratings and of the composites with and without them, in a generated league. Run with
 // EXPANDED_DIST=1 vitest --run --project basketball <this file>
 import { test } from "vitest";
@@ -48,7 +49,9 @@ test.skipIf(!process.env.EXPANDED_DIST)(
 			const rs = rows.filter((x) => x.expanded === expanded).map((x) => x.r);
 			out.push(`expanded ${expanded}: n ${rs.length}`);
 			for (const k of ["ovr", "pot", "hgt", "wng", "diq", "pdef", "idef"]) {
-				if (rs[0][k] === undefined) continue;
+				if (rs[0][k] === undefined) {
+					continue;
+				}
 				const xs = rs.map((r) => r[k]);
 				out.push(`  ${k}\t${mean(xs).toFixed(2)}\t${sd(xs).toFixed(2)}`);
 			}

@@ -2,7 +2,7 @@ import compositeRating from "./compositeRating.ts";
 import type { MinimalPlayerRatings } from "../../../common/types.ts";
 import { COMPOSITE_WEIGHTS } from "../../../common/constants.ts";
 import { compositeWeightsFor } from "../../../common/expandedRatings.ts";
-import { useExpandedRatings } from "./expandedRatings.ts";
+import { expandedRatingsApply } from "./expandedRatings.ts";
 
 const hasSkill = (
 	ratings: MinimalPlayerRatings,
@@ -30,7 +30,7 @@ const skills = (playerRatings: MinimalPlayerRatings) => {
 		__SPORT === "basketball"
 			? compositeWeightsFor(
 					COMPOSITE_WEIGHTS,
-					useExpandedRatings(playerRatings as any),
+					expandedRatingsApply(playerRatings as any),
 				)
 			: COMPOSITE_WEIGHTS;
 

@@ -1,5 +1,5 @@
 import type { RatingKey } from "../../../common/types.basketball.ts";
-import { useExpandedRatings } from "./expandedRatings.ts";
+import { expandedRatingsApply } from "./expandedRatings.ts";
 
 // Expanded ratings: a quarter of height's weight goes to wingspan (wng averages hgt, so the league's ovr distribution doesn't move).
 // diq is the average of perimeter and interior defense then, so its term covers them.
@@ -8,7 +8,7 @@ const WNG_SHARE = 0.25;
 const ovr = (
 	ratings: Record<RatingKey, number> & { wng?: number },
 ): number => {
-	const hgt = useExpandedRatings(ratings)
+	const hgt = expandedRatingsApply(ratings)
 		? (1 - WNG_SHARE) * ratings.hgt + WNG_SHARE * ratings.wng!
 		: ratings.hgt;
 

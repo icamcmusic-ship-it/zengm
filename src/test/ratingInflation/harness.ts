@@ -371,7 +371,7 @@ export const runLeague = async ({
 }) => {
 	// The full engine reads the meta database (scheduled events), so it needs an IndexedDB. Only installed here, so that
 	// importing this file (from skipped script tests too) doesn't change the globals other tests see.
-	if (typeof (globalThis as any).IDBRequest === "undefined") {
+	if ((globalThis as any).IDBRequest === undefined) {
 		// @ts-expect-error (no types for the side-effect entry point)
 		await import("fake-indexeddb/auto");
 	}

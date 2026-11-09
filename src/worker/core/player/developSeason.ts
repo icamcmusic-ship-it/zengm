@@ -11,7 +11,7 @@ import limitRating from "./limitRating.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import {
 	developExpandedRatings,
-	useExpandedRatings,
+	expandedRatingsApply,
 } from "./expandedRatings.ts";
 
 // Cache for performance
@@ -74,7 +74,7 @@ export const developSeasonSync = (
 ) => {
 	// Expanded ratings (basketball): developed after the stock ratings, from diq's change. Off: not touched, no random numbers drawn.
 	const expanded =
-		__SPORT === "basketball" && useExpandedRatings(ratings as any);
+		__SPORT === "basketball" && expandedRatingsApply(ratings as any);
 	const hgtBefore = ratings.hgt;
 
 	bySport({

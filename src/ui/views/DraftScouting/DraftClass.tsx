@@ -111,7 +111,21 @@ const DraftClass = ({
 	const showTraits = !challengeNoRatings && players.some((p) => p.traits);
 	const [traitColumn, setTraitColumn] = useState<TraitKey | "">("");
 
-	const cols = getCols(["#", "Name", "Pos", "Age", "Ovr", "Pot"]);
+	// Expanded ratings (the expandedRatings setting): wingspan and the two defense ratings, as the scouts see them
+	const showExpanded =
+		__SPORT === "basketball" &&
+		!challengeNoRatings &&
+		players.some((p) => p.expanded !== undefined);
+
+	const cols = getCols([
+		"#",
+		"Name",
+		"Pos",
+		"Age",
+		"Ovr",
+		"Pot",
+		...(showExpanded ? ["rating:wng", "rating:pdef", "rating:idef"] : []),
+	]);
 	if (showArchetype) {
 		cols.push({
 			title: "Archetype",
@@ -169,6 +183,13 @@ const DraftClass = ({
 				p.age,
 				!challengeNoRatings ? p.ovr : null,
 				!challengeNoRatings ? p.pot : null,
+				...(showExpanded
+					? [
+							p.expanded?.wng ?? null,
+							p.expanded?.pdef ?? null,
+							p.expanded?.idef ?? null,
+						]
+					: []),
 				...(showArchetype ? [p.archetype ?? ""] : []),
 				...(showScouting && p.scoutReport
 					? [

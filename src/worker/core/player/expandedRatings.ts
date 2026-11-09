@@ -13,7 +13,7 @@ import { expandedRatingsOn } from "./expandedRatingsSwitch.ts";
 export { expandedRatingsOn };
 
 // Whether these ratings should be read with the expanded formulas
-export const useExpandedRatings = (r: Record<string, any>) =>
+export const expandedRatingsApply = (r: Record<string, any>) =>
 	expandedRatingsOn() && hasExpandedRatings(r);
 
 const limit = (x: number) => (x > 100 ? 100 : x < 0 ? 0 : Math.round(x));
@@ -23,7 +23,7 @@ const limit = (x: number) => (x > 100 ? 100 : x < 0 ? 0 : Math.round(x));
 export const setDefenseSplit = (r: Record<string, any>, split: number) => {
 	const diq = r.diq as number;
 	let pdef = limit(diq + Math.round(split / 2));
-	let idef = limit(2 * diq - pdef);
+	const idef = limit(2 * diq - pdef);
 	if (2 * diq - pdef !== idef) {
 		// idef was clamped, move the rest back to pdef
 		pdef = limit(2 * diq - idef);

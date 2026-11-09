@@ -25,7 +25,7 @@ import {
 } from "../player/normalizePreDraft.ts";
 import { last } from "../../../common/utils.ts";
 import type { Player } from "../../../common/types.ts";
-import { useExpandedRatings } from "../player/expandedRatings.ts";
+import { expandedRatingsApply } from "../player/expandedRatings.ts";
 
 const getProspects = async (draftYear: number) => {
 	// In a fantasy draft the prospects are temporary and there's no point
@@ -50,7 +50,7 @@ export const toCollegeProspect = (
 		ratings[key] = (ratingsRow as any)[key];
 	}
 	// Expanded ratings: steals and blocks read perimeter/interior defense and wingspan
-	if (useExpandedRatings(ratingsRow as any)) {
+	if (expandedRatingsApply(ratingsRow as any)) {
 		const r = ratingsRow as any;
 		ratings.wng = r.wng;
 		ratings.pdef = r.pdef;
