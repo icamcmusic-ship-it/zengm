@@ -12,6 +12,7 @@ export const routeInfos = {
 	"/settings": "globalSettings",
 	"/settings/default": "defaultNewLeagueSettings",
 	"/settings/keyboard": "keyboardShortcuts",
+	"/face_style_gallery": "faceStyleGallery",
 	"/dropbox": "dropbox",
 	"/exhibition": "exhibition",
 	"/exhibition/game": "exhibitionGame",

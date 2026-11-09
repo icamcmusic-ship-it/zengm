@@ -1,3 +1,4 @@
+// (Headless alternative without a browser or dev server: src/worker/util/leagueAchievementsCalibration.test.ts, same output.)
 // Sims a new random-players basketball league season by season in a headless browser and records the League achievements tally (bbgm.leagueAchievementsTally, see src/worker/util/leagueAchievements.ts) after every completed season. The output is the input of calibrate.ts.
 //
 //   node --run dev   (a dev server, basketball, on PORT)
