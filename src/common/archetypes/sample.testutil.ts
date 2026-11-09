@@ -25,6 +25,24 @@ export const sampleLeague = async (
 ): Promise<SamplePlayer[]> => {
 	resetG();
 	const rng = new Rng(seed);
+	// BBGM's generator draws from Math.random: seed it too, so a sample (and norms built from it) is the same every run.
+	// Not vi.spyOn: a spy records every call.
+	const ratingsRng = new Rng(`${seed}-random`);
+	const random = Math.random;
+	Math.random = () => ratingsRng.random();
+	try {
+		return await sample(n, rng, maxYears, minOvr);
+	} finally {
+		Math.random = random;
+	}
+};
+
+const sample = async (
+	n: number,
+	rng: Rng,
+	maxYears: number,
+	minOvr: number,
+): Promise<SamplePlayer[]> => {
 	const out: SamplePlayer[] = [];
 	while (out.length < n) {
 		const k = rng.int(0, maxYears);

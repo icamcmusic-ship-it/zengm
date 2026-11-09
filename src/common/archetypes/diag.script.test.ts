@@ -19,7 +19,7 @@ import ovrFn from "../../worker/core/player/ovr.ts";
 import { ARCHETYPES, classify, scoreAll } from "./classify.ts";
 import { compositeValues } from "./composites.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
-import { rawZ } from "./norms.ts";
+import { probit, rawZ } from "./norms.ts";
 import { HARD_BLOCK, positionFor } from "./position.ts";
 
 const OUT = process.env.ARCH_DIAG_OUT ?? "/tmp/claude-0/arch-diag.txt";
@@ -96,6 +96,231 @@ const sizeZ = (a) => {
 	return z;
 };
 
+// Descriptor agreement: an independent "standout skills" reading of each player (his composite ratings ranked against
+// the population's players at his position, as z) against what his label (primary + secondary) features. A label
+// features a skill class when its profile weights it >= 2 (in full) or >= 1.5 (half).
+const CLASSES = [
+	["shoot", ["three"]],
+	["mid", ["mid"]],
+	["finish", ["rim", "draw"]],
+	["post", ["post"]],
+	["handle", ["drb"]],
+	["pass", ["pss"]],
+	["reb", ["reb"]],
+	["rimD", ["blk", "dint"]],
+	["perD", ["dper", "stl"]],
+	["ath", ["ath"]],
+	// Not a skill class: defensive IQ, so a defensive standout can be told from speed or size alone
+	["iq", ["diq"]],
+];
+const DIM2CLASS = {
+	three: "shoot",
+	mid: "mid",
+	rim: "finish",
+	draw: "finish",
+	post: "post",
+	drb: "handle",
+	pss: "pass",
+	reb: "reb",
+	blk: "rimD",
+	dint: "rimD",
+	dper: "perD",
+	stl: "perD",
+	ath: "ath",
+	spd: "ath",
+	jmp: "ath",
+};
+const claimsOf = (a) => {
+	const c = {};
+	for (const [d, w] of Object.entries(a.w)) {
+		const k = DIM2CLASS[d];
+		if (!k) continue;
+		const v = w >= 2 ? 1 : w >= 1.5 ? 0.5 : 0;
+		if (v > (c[k] ?? 0)) c[k] = v;
+	}
+	if ((a.w.diq ?? 0) >= 2) {
+		const k = a.group === "big" ? "rimD" : "perD";
+		c[k] = Math.max(c[k] ?? 0, 0.5);
+	}
+	return c;
+};
+const BUCKET = {
+	PG: "PG",
+	G: "PG",
+	SG: "SG",
+	GF: "W",
+	SF: "W",
+	F: "F",
+	PF: "F",
+	FC: "C",
+	C: "C",
+};
+const peerZ = (players) => {
+	const vals = players.map((p) => compositeValues(p.ratings));
+	const by = {};
+	players.forEach((p, i) => (by[BUCKET[p.dpos]] ??= []).push(i));
+	const zs = players.map(() => ({}));
+	for (const idx of Object.values(by)) {
+		for (const [k, dims] of CLASSES) {
+			for (const d of dims) {
+				const sorted = idx.map((i) => vals[i][d]).sort((x, y) => x - y);
+				for (const i of idx) {
+					const v = vals[i][d];
+					let lo = 0;
+					let hi = sorted.length;
+					while (lo < hi) {
+						const m = (lo + hi) >> 1;
+						if (sorted[m] < v) lo = m + 1;
+						else hi = m;
+					}
+					let hi2 = lo;
+					while (hi2 < sorted.length && sorted[hi2] === v) hi2++;
+					const z = probit(
+						Math.min(0.995, Math.max(0.005, (lo + hi2) / 2 / sorted.length)),
+					);
+					zs[i][k] = Math.max(zs[i][k] ?? -9, z);
+				}
+			}
+		}
+	}
+	return zs;
+};
+const OFF = new Set(["shoot", "mid", "finish", "post", "handle", "pass"]);
+const DEF = new Set(["rimD", "perD"]);
+// rows: { p, c (classification), scored } with p.dpos set
+const descriptor = (rows, out) => {
+	const zs = peerZ(rows.map((r) => r.p));
+	const claims = new Map(ARCHETYPES.map((a) => [a.id, claimsOf(a)]));
+	let nStand = 0,
+		agree = 0,
+		better = 0,
+		top1 = 0,
+		top1Hit = 0,
+		lacks = 0;
+	const f = {
+		sh: 0,
+		shMiss: 0,
+		pb: 0,
+		pbMiss: 0,
+		tw: 0,
+		twMiss: 0,
+		pb2: 0,
+		pb2Miss: 0,
+		tw2: 0,
+		tw2Miss: 0,
+	};
+	const betterBy = {};
+	rows.forEach((r, i) => {
+		const z = zs[i];
+		// Star labels (by design for a level of play, not a skill pair) are left out of the three checks below
+		const star = r.c.tags.includes("star");
+		const cl = { ...claims.get(r.c.id) };
+		if (r.c.secondary)
+			for (const [k, v] of Object.entries(claims.get(r.c.secondary.id)))
+				cl[k] = Math.max(cl[k] ?? 0, 0.75 * v);
+		if (
+			Object.entries(claims.get(r.c.id)).some(
+				([k, v]) => v >= 1 && z[k] < -0.25,
+			)
+		)
+			lacks++;
+		const stand = Object.entries(z)
+			.filter(([k, v]) => v >= 1 && k !== "iq")
+			.sort((x, y) => y[1] - x[1]);
+		const top = stand.slice(0, 2).map(([k]) => k);
+		const cov = (c) => top.reduce((t, k) => t + (c[k] ?? 0), 0) / top.length;
+		if (top.length) {
+			nStand++;
+			const c0 = cov(cl);
+			agree += c0;
+			const bestZ = r.scored.find((s) => s.a.id === r.c.id).z;
+			for (const s of r.scored) {
+				if (s.z < bestZ - 0.5) break;
+				if (s.a.id === r.c.id) continue;
+				const ca = claims.get(s.a.id);
+				if (Object.entries(ca).some(([k, v]) => v >= 1 && z[k] < 0)) continue;
+				if (cov(ca) >= c0 + 0.49) {
+					better++;
+					betterBy[r.c.id] = (betterBy[r.c.id] ?? 0) + 1;
+					break;
+				}
+			}
+		}
+		if (stand.length && stand[0][1] >= 1.25) {
+			top1++;
+			if (cl[stand[0][0]]) top1Hit++;
+		}
+		if (!star && z.shoot >= 1.5 && r.p.ratings.tp >= 70) {
+			f.sh++;
+			if (!cl.shoot) f.shMiss++;
+		}
+		if (
+			!star &&
+			(BUCKET[r.p.dpos] === "C" || BUCKET[r.p.dpos] === "F") &&
+			z.pass >= 1.5 &&
+			r.p.ratings.pss >= 55
+		) {
+			f.pb++;
+			if (!cl.pass) f.pbMiss++;
+		}
+		const t2 = stand.slice(0, 2).filter(([, v]) => v >= 1.2);
+		if (
+			!star &&
+			t2.length === 2 &&
+			t2.some(([k]) => OFF.has(k)) &&
+			t2.some(([k]) => DEF.has(k))
+		) {
+			f.tw++;
+			const o = Object.keys(cl).some((k) => OFF.has(k) && cl[k] >= 0.5);
+			const d =
+				Object.keys(cl).some((k) => DEF.has(k) && cl[k] >= 0.5) ||
+				/Two-Way|Defend|3-and-D/.test(r.c.label);
+			if (!(o && d)) f.twMiss++;
+		}
+		// Stricter readings of the two checks above. A passing big: a PF/FC/C whose passing is one of his top two standouts.
+		// A two-way player: his top two standouts are a skill on offense (finishing only off the center spots) and a real
+		// defensive one (with at least his peers' defensive IQ, not speed or size alone).
+		if (
+			!star &&
+			["PF", "FC", "C"].includes(r.p.dpos) &&
+			r.p.ratings.pss >= 55 &&
+			top.includes("pass") &&
+			z.pass >= 1.5
+		) {
+			f.pb2++;
+			if (!cl.pass) f.pb2Miss++;
+		}
+		const off2 = (k) =>
+			OFF.has(k) && (k !== "finish" || BUCKET[r.p.dpos] !== "C");
+		if (
+			!star &&
+			t2.length === 2 &&
+			t2.some(([k]) => off2(k)) &&
+			t2.some(([k]) => DEF.has(k)) &&
+			z.iq >= 0
+		) {
+			f.tw2++;
+			const o = Object.keys(cl).some((k) => OFF.has(k) && cl[k] >= 0.5);
+			const d =
+				Object.keys(cl).some((k) => DEF.has(k) && cl[k] >= 0.5) ||
+				/Two-Way|Defend|3-and-D/.test(r.c.label);
+			if (!(o && d)) f.tw2Miss++;
+		}
+	});
+	out.push(
+		`descriptor agreement: ${pct(agree, nStand)}% of top-2 standout skills (vs position peers) named by the label; top standout named ${pct(top1Hit, top1)}%; better fit available ${pct(better, nStand)}%; label features a skill he is below his peers at ${pct(lacks, rows.length)}%`,
+	);
+	out.push(
+		`  elite shooters not labelled shooters ${f.shMiss}/${f.sh}; passing bigs not labelled playmakers ${f.pbMiss}/${f.pb}; two-way players labelled one-way ${f.twMiss}/${f.tw}; stricter: passing bigs ${f.pb2Miss}/${f.pb2}, two-way ${f.tw2Miss}/${f.tw2}; hybrids ${pct(rows.filter((r) => r.c.secondary).length, rows.length)}%; most "better fit": ${Object.entries(
+			betterBy,
+		)
+			.sort((x, y) => y[1] - x[1])
+			.slice(0, 8)
+			.map(([k, v]) => `${k} ${v}`)
+			.join(", ")}`,
+	);
+};
+
 const pct = (x, n) => ((100 * x) / Math.max(1, n)).toFixed(2);
 
 const analyse = (label, players, out) => {
@@ -110,6 +335,7 @@ const analyse = (label, players, out) => {
 	const gapEx = [];
 	const lowZBy = {};
 	const posTab = {};
+	const rows = [];
 	for (const p of players) {
 		const ps = p.pos ?? positionFor(p.ratings, true);
 		const { scored } = scoreAll(
@@ -121,6 +347,8 @@ const analyse = (label, players, out) => {
 		);
 		const c = classify(p.ratings, { pos: ps, age: p.age });
 		const best = scored.find((s) => s.a.id === c.id);
+		p.dpos = ps;
+		rows.push({ p, c, scored });
 		counts[c.id] = (counts[c.id] ?? 0) + 1;
 		zs.push(best.z);
 		if (best.z < 0) {
@@ -173,6 +401,7 @@ const analyse = (label, players, out) => {
 	out.push(
 		`audit mismatches: ${pct(auditBad, n)}% of all players (${auditBad}/${audited} audited labels = ${pct(auditBad, audited)}%)`,
 	);
+	descriptor(rows, out);
 	out.push(
 		`position: hard conflicts ${hard}; hybrids ${pct(hyb, n)}%; pos x group ${JSON.stringify(posTab)}`,
 	);
@@ -204,7 +433,23 @@ const analyse = (label, players, out) => {
 	return { counts, unused };
 };
 
-const genPlayers = async (n, seed, minAge, maxAge, minOvr) => {
+// BBGM's generator draws from Math.random: seed it too, so every population (and the metrics) are the same run to run
+const seeded = async (seed, f) => {
+	const r = new Rng(`${seed}-random`);
+	// Not vi.spyOn: a spy records every call, millions of them here
+	const orig = Math.random;
+	Math.random = () => r.random();
+	try {
+		return await f();
+	} finally {
+		Math.random = orig;
+	}
+};
+
+const genPlayers = (n, seed, minAge, maxAge, minOvr) =>
+	seeded(seed, () => genPlayers1(n, seed, minAge, maxAge, minOvr));
+
+const genPlayers1 = async (n, seed, minAge, maxAge, minOvr) => {
 	resetG();
 	const rng = new Rng(seed);
 	const out = [];
@@ -275,45 +520,47 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 		if (real.length) analyse("real NBA ratings 2016-2025", real, out);
 		void all;
 		// Stability: the same players season after season, with stickiness and sticky improved positions as the game uses them
-		resetG();
-		const rng2 = new Rng("diag-flap");
 		const trans = {};
 		let life = 0;
 		let changes = 0,
 			steps = 0,
 			groupChanges = 0;
-		for (let i = 0; i < 3000; i++) {
-			const p = generate(-1, 19, 2025 - rng2.int(0, 6), false, DEFAULT_LEVEL);
-			const dev = rng2.int(0, 6);
-			await develop(p, dev, true);
-			let prev;
-			let prevPos;
-			for (let y = 0; y < 5; y++) {
-				await develop(p, 1, false);
-				const row = p.ratings.at(-1);
-				if (ovrFn(row) < 38) continue;
-				const r = ratingsOfRow(row);
-				prevPos = positionFor(r, true, prevPos);
-				const c = classify(r, {
-					previousId: prev?.id,
-					pos: prevPos,
-					age: 20 + dev + y,
-				});
-				if (prev) {
-					steps++;
-					if (prev.id !== c.id) {
-						changes++;
-						const k = `${prev.id}>${c.id}`;
-						trans[k] = (trans[k] ?? 0) + 1;
-						const lifecycle = (x) =>
-							x.tags.includes("raw") || x.tags.includes("veteran");
-						if (lifecycle(prev) || lifecycle(c)) life++;
+		await seeded("diag-flap", async () => {
+			resetG();
+			const rng2 = new Rng("diag-flap");
+			for (let i = 0; i < 6000; i++) {
+				const p = generate(-1, 19, 2025 - rng2.int(0, 6), false, DEFAULT_LEVEL);
+				const dev = rng2.int(0, 6);
+				await develop(p, dev, true);
+				let prev;
+				let prevPos;
+				for (let y = 0; y < 5; y++) {
+					await develop(p, 1, false);
+					const row = p.ratings.at(-1);
+					if (ovrFn(row) < 38) continue;
+					const r = ratingsOfRow(row);
+					prevPos = positionFor(r, true, prevPos);
+					const c = classify(r, {
+						previousId: prev?.id,
+						pos: prevPos,
+						age: 20 + dev + y,
+					});
+					if (prev) {
+						steps++;
+						if (prev.id !== c.id) {
+							changes++;
+							const k = `${prev.id}>${c.id}`;
+							trans[k] = (trans[k] ?? 0) + 1;
+							const lifecycle = (x) =>
+								x.tags.includes("raw") || x.tags.includes("veteran");
+							if (lifecycle(prev) || lifecycle(c)) life++;
+						}
+						if (prev.group !== c.group) groupChanges++;
 					}
-					if (prev.group !== c.group) groupChanges++;
+					prev = c;
 				}
-				prev = c;
 			}
-		}
+		});
 		out.push(
 			`\n=== stability: archetype changes ${pct(changes, steps)}% of seasons, group changes ${pct(groupChanges, steps)}% (${steps} player-seasons); of the changes, ${pct(life, changes)}% are lifecycle (raw prospect -> developed, -> veteran). Top: ${Object.entries(
 				trans,
