@@ -7,7 +7,7 @@ import {
 	classify,
 } from "../archetypes/classify.ts";
 import { gateFactor } from "../archetypes/score.ts";
-import { positionOf, posPrior } from "../archetypes/position.ts";
+import { isPos, positionOf, posPrior } from "../archetypes/position.ts";
 import { scoreAll } from "../archetypes/classify.ts";
 import type { Norms } from "../archetypes/types.ts";
 import { scoutingEffectCutoff, scoutingEffectStddev } from "../budgetLevels.ts";
@@ -135,8 +135,9 @@ const state = (
 	hgtInches,
 });
 
-const derivedOf = (ratings: BuildRatings, norms?: Norms) => {
-	const c = classify(ratings, { norms });
+// Read with the game's position for these ratings (F.pos follows the league's position setting)
+const derivedOf = (F: Formulas, ratings: BuildRatings, norms?: Norms) => {
+	const c = classify(ratings, { norms, pos: F.pos(ratings) });
 	return {
 		id: c.id,
 		name: c.name,
@@ -234,7 +235,8 @@ export const regenerateClass = (
 		// Aiming at an archetype: a forced one, else drawn from the class's archetype pool (least used first) if he fits one
 		let targetId: string | undefined = lock?.archetype;
 		if (!targetId && !lock?.build && s.archetypePool.length > 0) {
-			const basePos = positionOf(base);
+			const fPos = F.pos(base);
+			const basePos = isPos(fPos) ? fPos : positionOf(base);
 			const fits = s.archetypePool.filter((id) => {
 				const a = NEW_ARCHETYPES.find((x) => x.id === id);
 				// Inside its height gate and not ruled out by his position (a guard is never aimed at a big archetype)
@@ -386,7 +388,7 @@ export const regenerateClass = (
 			before,
 			after,
 			build: { name: arch.name, tags: arch.tags },
-			derived: derivedOf(after.ratings, opts.norms),
+			derived: derivedOf(F, after.ratings, opts.norms),
 			target:
 				aimed && targetId
 					? {
@@ -395,7 +397,8 @@ export const regenerateClass = (
 							matched,
 							inLabel:
 								matched ||
-								derivedOf(after.ratings, opts.norms).secondaryId === targetId,
+								derivedOf(F, after.ratings, opts.norms).secondaryId ===
+									targetId,
 						}
 					: undefined,
 			targetOvr,
