@@ -198,16 +198,30 @@ export const getContractSummaryOrThrow = (
 	return summary;
 };
 
-// For players who always have a contract demand, like free agents and draft prospects
+// For players who always have a contract demand, like free agents and draft prospects. If one is missing (an older save, or a path that forgot to set it), it is filled in from his current contract or the minimum instead of throwing, so a league can never get stuck on it.
 export const getContractDemand = (
 	p: Pick<
 		PlayerWithoutKey,
 		"contractDemand" | "firstName" | "lastName" | "pid"
-	>,
+	> &
+		Partial<Pick<PlayerWithoutKey, "contracts" | "tid">>,
 ) => {
 	if (!p.contractDemand) {
-		throw new Error(
-			`No contract demand for ${p.firstName} ${p.lastName} (pid ${p.pid})`,
+		const contract =
+			p.contracts && p.tid !== undefined
+				? getCurrentContract(p as Pick<PlayerWithoutKey, "contracts" | "tid">)
+				: undefined;
+		const startSeason = getContractStartSeason();
+		const minExp = startSeason + Math.max(1, g.get("minContractLength")) - 1;
+		if (contract) {
+			const { amount, exp } = contractToSummary(contract);
+			p.contractDemand = { amount, exp: Math.max(exp, minExp) };
+		} else {
+			p.contractDemand = { amount: g.get("minContract"), exp: minExp };
+		}
+		console.warn(
+			`No contract demand for ${p.firstName} ${p.lastName} (pid ${p.pid}), filled in`,
+			p.contractDemand,
 		);
 	}
 	return p.contractDemand;
