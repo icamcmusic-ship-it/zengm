@@ -184,6 +184,27 @@ describe("resolvePickConditionsPure", () => {
 		assert.strictEqual(t3Pick.tid, 3);
 		assert.include(result.messages[0]!.text, "kept their own");
 	});
+
+	test("swap right on a pick the swapping team now owns just goes away, with no lapsed message", () => {
+		const pick = dp({
+			dpid: 1,
+			tid: 3,
+			originalTid: 0,
+			pick: 2,
+			swap: { tid: 3 },
+		});
+		const own = dp({ dpid: 2, tid: 3, originalTid: 3, pick: 20 });
+		const { changed, messages } = resolvePickConditionsPure({
+			draftPicks: [pick, own],
+			futurePicks: [],
+			teamName,
+		});
+		assert.isUndefined(pick.swap);
+		assert.strictEqual(pick.tid, 3);
+		assert.strictEqual(own.tid, 3);
+		assert.deepEqual(changed, [pick]);
+		assert.lengthOf(messages, 0);
+	});
 });
 
 describe("condition helpers", () => {

@@ -40,7 +40,11 @@ export const resolvePickConditionsPure = ({
 			(x) =>
 				x.originalTid === swapTid && x.round === dp.round && x.tid === swapTid,
 		);
-		if (!own || dp.tid === swapTid || dp.pick <= 0 || own.pick <= 0) {
+		if (dp.tid === swapTid) {
+			// The swapping team already owns this pick (it was traded to them), so there's nothing to swap
+			continue;
+		}
+		if (!own || dp.pick <= 0 || own.pick <= 0) {
 			messages.push({
 				text: `The right of the ${teamName(swapTid)} to swap ${dp.season} ${helpers.ordinal(dp.round)} round picks with the ${teamName(dp.tid)} lapsed, because the picks involved are no longer available.`,
 				tids: [swapTid, dp.tid],
