@@ -1,0 +1,62 @@
+[
+	{
+		"seed": 4000,
+		"ratings": "b822325c1289b488b3f4b79fe56e29b3caa88bef1cd13a3f83d19458b107f203",
+		"composites": "69902c01cbca323d50a6f903481f023504eeaa7bac5a732170f00b905de89b56",
+		"box": "281041a20c9c3d5fff8a600789f2f0f082d04460ce37b795feb45e94c327a710",
+		"pts": [
+			92,
+			116
+		]
+	},
+	{
+		"seed": 4053,
+		"ratings": "264337563e06f8a11442c834ae2ed8276c1bd074f4c08fb751c4f001b56c6c9f",
+		"composites": "de67c4c0484703c4791cc5a1ec766579e1318367393dc2acc8d2fa8ad6023281",
+		"box": "7e41f0504e51be7b293525b94e04c50a590f9e0446a328f3e012954b89d5f69a",
+		"pts": [
+			62,
+			114
+		]
+	},
+	{
+		"seed": 4106,
+		"ratings": "d676acfafa1c25a7635b835f9623ed5a84758bf11ec31c68ae04fff35fdd0a03",
+		"composites": "be33cafb6f5564e55a13d597d8dba2f185e3f9ed9046224d56eda75ce9376e2f",
+		"box": "1d5aaa1c964286690f2d72352eb44e57fb63a1e775e3a821a27faef95a0a0421",
+		"pts": [
+			96,
+			116
+		]
+	},
+	{
+		"seed": 4159,
+		"ratings": "58e4e9f27e14ed8a91cee34671c81554f0433a720eee0caaee56b64caf6da671",
+		"composites": "cf83ee66bb3059d2e8c8f9a7dc1a8eb90285834eeb747611547d5453db06bc21",
+		"box": "64ec6e474116a84229414a1b4f6edbfc9db882a00387bc29068946ec36e87060",
+		"pts": [
+			90,
+			115
+		]
+	},
+	{
+		"seed": 4212,
+		"ratings": "266d152fe6e42be058f5c488b89b5d81430d76f4c5d0870045ea4e9d132871cd",
+		"composites": "7f7e89395962a57663aee62ac4587135ec0db85bf23ce800e7608b2234e75f17",
+		"box": "1782a6326e86b20c4b6050ef8dd9b28ccc7d6ebed033f91986fe640557a11b6d",
+		"pts": [
+			104,
+			96
+		]
+	},
+	{
+		"seed": 4265,
+		"ratings": "7b4cdbb9585365335f602fa773cd9accadf2479dc14ea2137aa5583aac6b9b33",
+		"composites": "536cc35197b764100bededc1aad3ca1237a93f6a28fcb6cc4f75ca2517240a95",
+		"box": "d04073f9599cf0522d1187204743b8395675ddc8b67f5d62e9b20e33122c0580",
+		"pts": [
+			99,
+			98
+		]
+	}
+]
