@@ -105,6 +105,7 @@ export const routeInfos = {
 	"/l/:lid/player/:pid": "player",
 	"/l/:lid/player_game_log/:pid": "playerGameLog",
 	"/l/:lid/player_game_log/:pid/:season": "playerGameLog",
+	"/l/:lid/player_pre_draft/:pid": "playerPreDraft",
 	"/l/:lid/negotiation": "negotiationList",
 	"/l/:lid/player_rating_dists": "playerRatingDists",
 	"/l/:lid/player_rating_dists/:season": "playerRatingDists",

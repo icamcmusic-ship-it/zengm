@@ -306,6 +306,20 @@ describe("generateCollegeClass with a college season", () => {
 				const sum = ncaa.games.reduce((total, game) => total + game[key], 0);
 				assert.isAtMost(sum, last.stats[key]!);
 			}
+			// Non-conference + conference + postseason = his season
+			const splits = ncaa.splits!;
+			assert.strictEqual(
+				splits.nonConf.gp + splits.conf.gp + ncaa.games.length,
+				last.stats.gp,
+			);
+			for (const key of ["pts", "ast", "fga", "tp"] as const) {
+				const post = ncaa.games.reduce((total, game) => total + game[key], 0);
+				assert.strictEqual(
+					splits.nonConf[key] + splits.conf[key] + post,
+					last.stats[key],
+				);
+			}
+			assert.isAtMost(splits.conf.gp, team.confW + team.confL);
 			if (ncaa.games.length > 0) {
 				numWithGames += 1;
 			}

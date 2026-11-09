@@ -363,6 +363,7 @@ export const dropdownOptions = {
 	playerProfile: [
 		{ key: "overview", label: "Overview" },
 		{ key: "gameLog", label: "Game Log" },
+		{ key: "preDraft", label: "College/Overseas" },
 	],
 	playoffs: makeOptions(dropdownKeys.playoffs, playoffsLabels),
 	playoffsCombined: makeOptions(dropdownKeys.playoffsCombined, playoffsLabels),
