@@ -3,7 +3,7 @@
  * prospects as the AI and the user see them, each team's needs, and a per-season cache of the projections.
  */
 import { DRAFT_BY_TEAM_OVR, PHASE, PLAYER } from "../../../common/constants.ts";
-import { last, orderBy } from "../../../common/utils.ts";
+import { last } from "../../../common/utils.ts";
 import type { DraftPick, Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
@@ -12,7 +12,12 @@ import { player } from "../index.ts";
 import { canBeDrafted } from "./canBeDrafted.ts";
 import { getNeedLabels, getTeamNeeds } from "./draftNeeds.ts";
 import genOrder, { NotEnoughTeamsError } from "./genOrder.ts";
-import { runMockDraft, type MockSlot, type MockTeam } from "./mockDraft.ts";
+import {
+	pickConditionsDryRun,
+	runMockDraft,
+	type MockSlot,
+	type MockTeam,
+} from "./mockDraft.ts";
 import {
 	fuzzedRatings,
 	projectProspect,
@@ -48,69 +53,69 @@ const getSlots = async (
 		"draftPicksBySeason",
 		season,
 	);
-	const toSlots = (picks: DraftPick[]) =>
-		orderBy(
-			picks.filter((dp) => dp.pick > 0 && dp.round <= MOCK_ROUNDS),
-			["round", "pick"],
-		).map((dp) => ({
-			dpid: dp.dpid,
-			round: dp.round,
-			pick: dp.pick,
-			tid: dp.tid,
-			originalTid: dp.originalTid,
-		}));
 
-	// Lottery done (or no lottery): the real order, minus picks already made
+	let ordered: DraftPick[] | undefined;
+	let source: OrderSource = "draftOrder";
+
 	if (existing.length > 0 && existing.every((dp) => dp.pick > 0)) {
-		return { slots: toSlots(existing), source: "draftOrder" };
-	}
-
-	// Before the lottery: one simulated lottery, like the projected Draft Lottery page (nothing is saved)
-	try {
-		const { draftPicks } = await genOrder(true);
-		return { slots: toSlots(draftPicks), source: "lotteryProjection" };
-	} catch (error) {
-		if (!(error instanceof NotEnoughTeamsError)) {
-			throw error;
+		// Lottery done (or no lottery): the real order, minus picks already made
+		ordered = existing;
+	} else {
+		// Before the lottery: one simulated lottery, like the projected Draft Lottery page (nothing is saved)
+		try {
+			ordered = (await genOrder(true)).draftPicks;
+			source = "lotteryProjection";
+		} catch (error) {
+			if (!(error instanceof NotEnoughTeamsError)) {
+				throw error;
+			}
 		}
 	}
 
-	// Fallback: worst record first, every round
-	const teamSeasons = await idb.cache.teamSeasons.indexGetAll(
-		"teamSeasonsBySeasonTid",
-		[[season], [season, "Z"]],
-	);
-	const winp = new Map(
-		teamSeasons.map((ts) => [
-			ts.tid,
-			helpers.calcWinp({
-				won: ts.won,
-				lost: ts.lost,
-				tied: ts.tied,
-				otl: ts.otl,
-			}),
-		]),
-	);
-	const sorted = [...existing].sort(
-		(a, b) =>
-			a.round - b.round ||
-			(winp.get(a.originalTid) ?? 0.5) - (winp.get(b.originalTid) ?? 0.5),
-	);
-	const counts: Record<number, number> = {};
-	return {
-		slots: sorted
-			.filter((dp) => dp.round <= MOCK_ROUNDS)
+	if (!ordered) {
+		// Fallback: worst record first, every round
+		source = "records";
+		const teamSeasons = await idb.cache.teamSeasons.indexGetAll(
+			"teamSeasonsBySeasonTid",
+			[[season], [season, "Z"]],
+		);
+		const winp = new Map(
+			teamSeasons.map((ts) => [
+				ts.tid,
+				helpers.calcWinp({
+					won: ts.won,
+					lost: ts.lost,
+					tied: ts.tied,
+					otl: ts.otl,
+				}),
+			]),
+		);
+		const counts: Record<number, number> = {};
+		ordered = [...existing]
+			.sort(
+				(a, b) =>
+					a.round - b.round ||
+					(winp.get(a.originalTid) ?? 0.5) - (winp.get(b.originalTid) ?? 0.5),
+			)
 			.map((dp) => {
 				counts[dp.round] = (counts[dp.round] ?? 0) + 1;
-				return {
-					dpid: dp.dpid,
-					round: dp.round,
-					pick: counts[dp.round]!,
-					tid: dp.tid,
-					originalTid: dp.originalTid,
-				};
-			}),
-		source: "records",
+				return { ...dp, pick: counts[dp.round]! };
+			});
+	}
+
+	// Protections and swaps, as a dry run (still pending before the lottery; already resolved after it)
+	const futurePicks = (await idb.cache.draftPicks.getAll()).filter(
+		(dp) => typeof dp.season === "number" && dp.season > season,
+	);
+	const teamInfoCache = g.get("teamInfoCache");
+	return {
+		slots: pickConditionsDryRun({
+			draftPicks: ordered,
+			futurePicks,
+			shortName: (tid) => teamInfoCache[tid]?.abbrev ?? "???",
+			rounds: MOCK_ROUNDS,
+		}),
+		source,
 	};
 };
 

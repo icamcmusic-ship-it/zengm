@@ -7,6 +7,9 @@
  * Ported in spirit from the Draft Workshop's mock draft (bbgmdraft js/pro.js), but with BBGM's own teams, pick order and
  * AI draft logic instead of invented ones.
  */
+import type { DraftPick } from "../../../common/types.ts";
+import { helpers } from "../../../common/helpers.ts";
+import { resolvePickConditionsPure } from "./pickConditions.ts";
 import {
 	getDraftAdjustment,
 	getDraftTraitAdjustment,
@@ -37,6 +40,47 @@ export type MockSlot = {
 	pick: number;
 	tid: number;
 	originalTid: number;
+	// What a protection or swap did to this pick
+	note?: string;
+};
+
+/**
+ * Pick protections and swaps for an order (picks with their pick numbers), as a dry run: the same resolution as the real
+ * draft (resolvePickConditionsPure, also used by genOrder), on copies, so nothing is saved and no news is logged. Returns
+ * the slots of the first `rounds` rounds in order, with who ends up holding each pick and a note on what happened.
+ */
+export const pickConditionsDryRun = ({
+	draftPicks,
+	futurePicks,
+	shortName,
+	rounds,
+}: {
+	draftPicks: DraftPick[];
+	futurePicks: DraftPick[];
+	shortName: (tid: number) => string;
+	rounds: number;
+}): MockSlot[] => {
+	const picks = helpers.deepCopy(draftPicks);
+	let notes = new Map<DraftPick, string>();
+	if (picks.some((dp) => dp.protection || dp.swap)) {
+		({ notes } = resolvePickConditionsPure({
+			draftPicks: picks,
+			futurePicks: helpers.deepCopy(futurePicks),
+			teamName: shortName,
+			shortName,
+		}));
+	}
+	return picks
+		.filter((dp) => dp.pick > 0 && dp.round <= rounds)
+		.sort((a, b) => a.round - b.round || a.pick - b.pick)
+		.map((dp) => ({
+			dpid: dp.dpid,
+			round: dp.round,
+			pick: dp.pick,
+			tid: dp.tid,
+			originalTid: dp.originalTid,
+			note: notes.get(dp),
+		}));
 };
 
 export type MockPick = MockSlot & {

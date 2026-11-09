@@ -85,8 +85,9 @@ const MockDraft = ({ season, phase, userTids }: View<"mockDraft">) => {
 					? " (need-based drafting is off in League Extras, so value only)"
 					: ""}
 				, with a little randomness. Pick order:{" "}
-				{result ? SOURCES[result.source] : "…"}. Pro projections are simulated
-				careers from the ratings your scouts see.
+				{result ? SOURCES[result.source] : "…"}. Pick protections and swaps are
+				applied. Pro projections are simulated careers from the ratings your
+				scouts see.
 			</p>
 			<div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
 				<button className="btn btn-primary" disabled={running} onClick={run}>
@@ -174,6 +175,11 @@ const MockDraft = ({ season, phase, userTids }: View<"mockDraft">) => {
 													{" "}
 													via {pick.originalAbbrev}
 												</span>
+											) : null}
+											{pick.note ? (
+												<div className="small text-warning-emphasis">
+													{pick.note}
+												</div>
 											) : null}
 											{pick.teamStrategy ? (
 												<div className="text-body-secondary small">

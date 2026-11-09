@@ -1,5 +1,11 @@
 import { assert, describe, test } from "vitest";
-import { runMockDraft, type MockProspect, type MockTeam } from "./mockDraft.ts";
+import {
+	pickConditionsDryRun,
+	runMockDraft,
+	type MockProspect,
+	type MockTeam,
+} from "./mockDraft.ts";
+import type { DraftPick } from "../../../common/types.ts";
 import { projectProspect, summarizeCareers } from "./proProjection.ts";
 import genRatings from "../player/genRatings.ts";
 import { resetG } from "../../../test/helpers.ts";
@@ -140,5 +146,87 @@ describe("pro projections", () => {
 		assert.isAtMost(b.bustPct, a.bustPct);
 		assert.isAtLeast(a.peakHigh, a.peak);
 		assert.isAtMost(a.peakLow, a.peak);
+	});
+});
+
+describe("pickConditionsDryRun", () => {
+	const dp = (x: Partial<DraftPick> & { dpid: number }): DraftPick => ({
+		tid: x.originalTid ?? 0,
+		originalTid: 0,
+		round: 1,
+		pick: 0,
+		season: 2025,
+		...x,
+	});
+	const shortName = (tid: number) => `T${tid}`;
+
+	test("protection stays or conveys, swap executes, nothing is mutated", () => {
+		const draftPicks = [
+			// T1 owes T5 a top 3 protected pick, landed #2: stays
+			dp({
+				dpid: 1,
+				originalTid: 1,
+				tid: 5,
+				pick: 2,
+				protection: { tid: 1, top: 3, rollover: [], then: "extinguish" },
+			}),
+			// T2 owes T6 a top 3 protected pick, landed #4: conveys
+			dp({
+				dpid: 2,
+				originalTid: 2,
+				tid: 6,
+				pick: 4,
+				protection: { tid: 2, top: 3, rollover: [], then: "extinguish" },
+			}),
+			// T7 can swap with T3; T3's #1 beats T7's #5
+			dp({ dpid: 3, originalTid: 3, pick: 1, swap: { tid: 7 } }),
+			dp({ dpid: 4, originalTid: 7, pick: 5 }),
+			dp({ dpid: 5, originalTid: 8, pick: 3 }),
+			dp({ dpid: 6, originalTid: 8, round: 3, pick: 1 }),
+		];
+		const before = JSON.stringify(draftPicks);
+		const slots = pickConditionsDryRun({
+			draftPicks,
+			futurePicks: [],
+			shortName,
+			rounds: 2,
+		});
+		assert.strictEqual(JSON.stringify(draftPicks), before);
+		assert.deepStrictEqual(
+			slots.map((s) => [s.pick, s.tid]),
+			[
+				[1, 7],
+				[2, 1],
+				[3, 8],
+				[4, 6],
+				[5, 3],
+			],
+		);
+		assert.include(slots[0]!.note, "swapped: T7 get it from T3");
+		assert.include(slots[1]!.note, "top 3 protected");
+		assert.include(slots[1]!.note, "stays with T1");
+		assert.include(slots[3]!.note, "conveyed to T6");
+		assert.isUndefined(slots[2]!.note);
+		assert.include(slots[4]!.note, "swapped: T3 get it from T7");
+	});
+
+	test("rollover goes to a copy of the future pick, not the real one", () => {
+		const future = dp({ dpid: 9, originalTid: 1, season: 2026 });
+		const slots = pickConditionsDryRun({
+			draftPicks: [
+				dp({
+					dpid: 1,
+					originalTid: 1,
+					tid: 5,
+					pick: 1,
+					protection: { tid: 1, top: 5, rollover: [], then: "unprotected" },
+				}),
+			],
+			futurePicks: [future],
+			shortName,
+			rounds: 2,
+		});
+		assert.strictEqual(slots[0]!.tid, 1);
+		assert.strictEqual(future.tid, 1);
 	});
 });
