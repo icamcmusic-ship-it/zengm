@@ -249,12 +249,11 @@ const STANDOUT_CAP = 1.2;
 const STANDOUT_FADE = 1.2;
 const STANDOUT_LIFT = 0.7;
 const DEF_IQ_ROOM = 1;
-export const standoutsOf = (p: Prepared): Standout[] => {
-	const vals: [string, number][] = [];
-	let top = -Infinity;
-	// A player well below the league's level (a raw prospect, a journeyman) is read partly against himself: his best
-	// skills stand out among players like him
+// His level at each skill class, for his size: the best of its dimensions, read partly against himself when he is well
+// below the league's level (a raw prospect, a journeyman: his best skills stand out among players like him)
+export const classValues = (p: Prepared): Record<string, number> => {
 	const lift = STANDOUT_LIFT * Math.max(0, -p.level);
+	const vals: Record<string, number> = {};
 	for (const [k, dims] of Object.entries(SKILL_CLASSES)) {
 		let v = -Infinity;
 		for (const d of dims) {
@@ -265,9 +264,17 @@ export const standoutsOf = (p: Prepared): Standout[] => {
 		if (k === "perD" || k === "rimD") {
 			v = Math.min(v, p.sz.diq + DEF_IQ_ROOM);
 		}
-		vals.push([k, v + lift]);
-		top = Math.max(top, v + lift);
+		vals[k] = v + lift;
 	}
+	return vals;
+};
+
+export const standoutsOf = (
+	p: Prepared,
+	cv: Record<string, number> = classValues(p),
+): Standout[] => {
+	const vals = Object.entries(cv);
+	const top = Math.max(...vals.map(([, v]) => v));
 	const out: Standout[] = [];
 	for (const [k, v] of vals) {
 		const s =
@@ -302,6 +309,77 @@ export const standoutBonus = (a: Archetype, st: Standout[], shortfall = 0) => {
 		b += s * (c[k] ?? 0);
 	}
 	return STANDOUT_K * b * (1 - shortfall / SHORTFALL_FADE);
+};
+
+// Fades a bonus out with any defining-skill shortfall (strict: without a prospect's slack); never for lifecycle labels
+const qualifies = (a: Archetype, shortfall: number) =>
+	shortfall >= SHORTFALL_FADE || isLowLevel(a) || a.age
+		? 0
+		: 1 - shortfall / SHORTFALL_FADE;
+
+// A two-way player: his best skill on offense and his best on defense are both well above ordinary for his size. The
+// standouts above are relative to his own best (a great scorer's good defense fades out), so the pair is read apart:
+// a label that features both sides gets TWO_WAY_K per z of the weaker side.
+// A big body (hgt rating): finishing is his size more than a skill, passing a rare one
+const BIG_HGT = 55;
+const TWO_WAY_OFF = ["shoot", "mid", "post", "handle", "pass", "finish"];
+const TWO_WAY_DEF = ["perD", "rimD"];
+const TWO_WAY_OFF_FROM = 0.5;
+const TWO_WAY_DEF_FROM = 0.3;
+export const TWO_WAY_K = 0.6;
+export const twoWayBonus = (
+	a: Archetype,
+	cv: Record<string, number>,
+	hgt: number,
+	shortfall = 0,
+) => {
+	const q = qualifies(a, shortfall);
+	if (q === 0) {
+		return 0;
+	}
+	const c = coverOf(a);
+	const side = (classes: string[], from: number) => {
+		let best = 0;
+		for (const k of classes) {
+			// Finishing is a big man's size, not a skill on offense
+			if (k === "finish" && hgt >= BIG_HGT) {
+				continue;
+			}
+			best = Math.max(
+				best,
+				(c[k] ?? 0) * Math.min(1, Math.max(0, cv[k]! - from)),
+			);
+		}
+		return best;
+	};
+	return (
+		TWO_WAY_K *
+		q *
+		Math.min(
+			side(TWO_WAY_OFF, TWO_WAY_OFF_FROM),
+			side(TWO_WAY_DEF, TWO_WAY_DEF_FROM),
+		)
+	);
+};
+
+// Passing is rare for a big body: a big who passes well gets a label that says so (Point Center, Playmaking Big, ...)
+const PASSING_BIG_FROM = 0.6;
+export const PASSING_BIG_K = 0.4;
+export const passingBigBonus = (
+	a: Archetype,
+	cv: Record<string, number>,
+	hgt: number,
+	shortfall = 0,
+) => {
+	if (hgt < BIG_HGT) {
+		return 0;
+	}
+	return (
+		PASSING_BIG_K *
+		qualifies(a, shortfall) *
+		(coverOf(a).pass ?? 0) *
+		Math.min(1, Math.max(0, cv.pass! - PASSING_BIG_FROM))
+	);
 };
 
 // A broad label pays for each standout skill of his it does not name

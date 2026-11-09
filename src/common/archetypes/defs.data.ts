@@ -332,7 +332,8 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[24, 62],
 		{ usg: 3, mid: 2, drb: 2, three: 1.5, draw: 1 },
 		"Gets his own shot against set defenses.",
-		{ bonus: ["V"] },
+		// A real handle, even for a prospect
+		{ bonus: ["V"], need: { drb: 0.75 } },
 	),
 	W(
 		"Stretch Wing",
@@ -423,7 +424,8 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[24, 66],
 		{ three: 2.5, ft: 2, usg: -2, oiq: 1 },
 		"Catch-and-shoot only.",
-		{ bonus: ["3"] },
+		// The shot is all he does, so it must be a real one
+		{ bonus: ["3"], need: { three: 0.4 } },
 	),
 	W(
 		"Mid-Range Wing",
@@ -1491,7 +1493,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[46, 74],
 		{ pss: 2, dper: 1.5, dint: 1.5, drb: 1, diq: 1, hgt: 0.5 },
 		"Runs the offense and guards the other team's best forward.",
-		{ need: { pss: 0.3 }, tags: ["two-way"] },
+		{ need: { pss: 0.45 }, tags: ["two-way"] },
 	),
 	C(
 		"Two-Way Stretch Big",
@@ -1713,8 +1715,8 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Grab-and-Go Forward",
 		"athlete",
 		[44, 74],
-		{ reb: 2, drb: 2, ath: 2, pss: 1, spd: 1 },
-		"Grabs the rebound and leads the break himself.",
+		{ reb: 2, drb: 2, ath: 2, pss: 1.5, spd: 1 },
+		"Grabs the rebound and leads the break himself, looking to make the play.",
 		{ need: { drb: 0.2 } },
 	),
 	F(

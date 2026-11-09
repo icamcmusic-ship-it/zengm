@@ -123,6 +123,16 @@ describe("classification", () => {
 				["pass", "reb"],
 			],
 			[
+				"passing center",
+				{ hgt: 70, pss: 80, oiq: 75, drb: 55, reb: 60, tp: 30, spd: 40 },
+				["pass"],
+			],
+			[
+				"lockdown guard who shoots",
+				{ hgt: 30, tp: 80, ft: 75, diq: 80, spd: 75, ins: 35, dnk: 40 },
+				["shoot", "perD"],
+			],
+			[
 				"lob catcher who blocks shots",
 				{ hgt: 68, dnk: 88, jmp: 88, diq: 70, tp: 15, fg: 30, pss: 35 },
 				["finish", "rimD"],

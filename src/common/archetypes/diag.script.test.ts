@@ -110,6 +110,8 @@ const CLASSES = [
 	["rimD", ["blk", "dint"]],
 	["perD", ["dper", "stl"]],
 	["ath", ["ath"]],
+	// Not a skill class: defensive IQ, so a defensive standout can be told from speed or size alone
+	["iq", ["diq"]],
 ];
 const DIM2CLASS = {
 	three: "shoot",
@@ -195,7 +197,18 @@ const descriptor = (rows, out) => {
 		top1 = 0,
 		top1Hit = 0,
 		lacks = 0;
-	const f = { sh: 0, shMiss: 0, pb: 0, pbMiss: 0, tw: 0, twMiss: 0 };
+	const f = {
+		sh: 0,
+		shMiss: 0,
+		pb: 0,
+		pbMiss: 0,
+		tw: 0,
+		twMiss: 0,
+		pb2: 0,
+		pb2Miss: 0,
+		tw2: 0,
+		tw2Miss: 0,
+	};
 	const betterBy = {};
 	rows.forEach((r, i) => {
 		const z = zs[i];
@@ -212,7 +225,7 @@ const descriptor = (rows, out) => {
 		)
 			lacks++;
 		const stand = Object.entries(z)
-			.filter(([, v]) => v >= 1)
+			.filter(([k, v]) => v >= 1 && k !== "iq")
 			.sort((x, y) => y[1] - x[1]);
 		const top = stand.slice(0, 2).map(([k]) => k);
 		const cov = (c) => top.reduce((t, k) => t + (c[k] ?? 0), 0) / top.length;
@@ -264,12 +277,41 @@ const descriptor = (rows, out) => {
 				/Two-Way|Defend|3-and-D/.test(r.c.label);
 			if (!(o && d)) f.twMiss++;
 		}
+		// Stricter readings of the two checks above. A passing big: a PF/FC/C whose passing is one of his top two standouts.
+		// A two-way player: his top two standouts are a skill on offense (finishing only off the center spots) and a real
+		// defensive one (with at least his peers' defensive IQ, not speed or size alone).
+		if (
+			!star &&
+			["PF", "FC", "C"].includes(r.p.dpos) &&
+			r.p.ratings.pss >= 55 &&
+			top.includes("pass") &&
+			z.pass >= 1.5
+		) {
+			f.pb2++;
+			if (!cl.pass) f.pb2Miss++;
+		}
+		const off2 = (k) =>
+			OFF.has(k) && (k !== "finish" || BUCKET[r.p.dpos] !== "C");
+		if (
+			!star &&
+			t2.length === 2 &&
+			t2.some(([k]) => off2(k)) &&
+			t2.some(([k]) => DEF.has(k)) &&
+			z.iq >= 0
+		) {
+			f.tw2++;
+			const o = Object.keys(cl).some((k) => OFF.has(k) && cl[k] >= 0.5);
+			const d =
+				Object.keys(cl).some((k) => DEF.has(k) && cl[k] >= 0.5) ||
+				/Two-Way|Defend|3-and-D/.test(r.c.label);
+			if (!(o && d)) f.tw2Miss++;
+		}
 	});
 	out.push(
 		`descriptor agreement: ${pct(agree, nStand)}% of top-2 standout skills (vs position peers) named by the label; top standout named ${pct(top1Hit, top1)}%; better fit available ${pct(better, nStand)}%; label features a skill he is below his peers at ${pct(lacks, rows.length)}%`,
 	);
 	out.push(
-		`  elite shooters not labelled shooters ${f.shMiss}/${f.sh}; passing bigs not labelled playmakers ${f.pbMiss}/${f.pb}; two-way players labelled one-way ${f.twMiss}/${f.tw}; most "better fit": ${Object.entries(
+		`  elite shooters not labelled shooters ${f.shMiss}/${f.sh}; passing bigs not labelled playmakers ${f.pbMiss}/${f.pb}; two-way players labelled one-way ${f.twMiss}/${f.tw}; stricter: passing bigs ${f.pb2Miss}/${f.pb2}, two-way ${f.tw2Miss}/${f.tw2}; hybrids ${pct(rows.filter((r) => r.c.secondary).length, rows.length)}%; most "better fit": ${Object.entries(
 			betterBy,
 		)
 			.sort((x, y) => y[1] - x[1])

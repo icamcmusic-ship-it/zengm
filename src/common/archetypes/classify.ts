@@ -10,8 +10,11 @@ import {
 	needShortfall,
 	prepare,
 	rawMatch,
+	classValues,
+	passingBigBonus,
 	standoutBonus,
 	standoutsOf,
+	twoWayBonus,
 	type Standout,
 } from "./score.ts";
 import { ovrPercentile } from "./norms.ts";
@@ -47,11 +50,26 @@ export const HYBRID_Z = 0.15;
 // How much farther a runner-up may be when it names a standout skill of his the primary does not (per z of standout)
 export const SECONDARY_K = 0.4;
 const SECONDARY_REACH = 0.3;
+const SECONDARY_MIN = 0.2;
+const HYBRID_TIE_Z = 0.05;
 // The archetype he had keeps the label unless another is better by more than this
-export const STICKY_Z = 0.5;
+export const STICKY_Z = 0.55;
 
 // Score of an archetype his position rules out: below anything a real fit can reach, but finite
 export const BLOCKED_Z = -99;
+
+// What a label earns for naming what stands out about him (score.ts): his top skills, both sides of a two-way game, a
+// big's passing
+const signatureBonus = (
+	a: Archetype,
+	standouts: Standout[],
+	cv: Record<string, number>,
+	hgt: number,
+	strictShortfall: number,
+) =>
+	standoutBonus(a, standouts, strictShortfall) +
+	twoWayBonus(a, cv, hgt, strictShortfall) +
+	passingBigBonus(a, cv, hgt, strictShortfall);
 
 export type Scored = { a: Archetype; raw: number; z: number };
 
@@ -73,7 +91,8 @@ export const scoreAll = (
 } => {
 	const p = { ...prepare(ratings, norms), age };
 	const pos = position ?? positionOf(ratings);
-	const standouts = standoutsOf(p);
+	const cv = classValues(p);
+	const standouts = standoutsOf(p, cv);
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
 		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.level);
@@ -96,7 +115,7 @@ export const scoreAll = (
 			(a.tags.includes("star") ? STAR_BONUS : 0) +
 			prior +
 			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0) +
-			standoutBonus(a, standouts, needShortfall(a, p, true)) -
+			signatureBonus(a, standouts, cv, p.hgt, needShortfall(a, p, true)) -
 			genericPenalty(a, standouts) -
 			needPenaltyOf(short) -
 			levelPenalty(a, p.level) -
@@ -223,8 +242,12 @@ export const classify = (
 			partnerZ = s.z + adds(s);
 		}
 	}
+	// A single strong label reads best: a partner only when it names a standout the primary does not, or it is all but
+	// tied with the primary
 	const secondary =
-		partner && partnerZ >= first.z - HYBRID_Z
+		partner &&
+		partnerZ >= first.z - HYBRID_Z &&
+		(adds(partner) >= SECONDARY_MIN || partner.z >= first.z - HYBRID_TIE_Z)
 			? { id: partner.a.id, name: partner.a.name }
 			: null;
 	const confidence = Math.max(0, Math.min(1, (first.z - second.z) / 0.5));
