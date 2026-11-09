@@ -55,6 +55,8 @@ export const nonShootingFoul = (
 			`${n} grabs ${s} right away`,
 			`${n} wraps up ${s} on purpose`,
 			`Intentional foul by ${n} on ${s}`,
+			`${n} sends ${s} to the line as the clock stops`,
+			`${n} gets the foul in on ${s} right away`,
 		]);
 		return `${call} (${tag}).${opts.bonus ? "" : ` ${ball} ball on the side.`}`;
 	}
@@ -73,6 +75,14 @@ export const nonShootingFoul = (
 		],
 		[r.hgt >= 65 ? 0.6 : 0.1, `${n} leans on the post player`],
 		[r.spd >= 60 ? 0.5 : 0.1, `${n} is a step slow and fouls on the drive`],
+		[0.8, `${n} reaches in on the drive`],
+		[0.7, `Holding foul on ${n} in the post`],
+		[0.6, `${n} gets tangled up with his man off the ball`],
+		[0.6, `${n} is called for a body foul on the drive`],
+		[0.5, `${n} draws the whistle with an arm bar`],
+		[0.5, `${n} hip-checks the cutter`],
+		[r.hgt >= 62 ? 0.6 : 0.2, `${n} is whistled for a push on the rebound`],
+		[r.diq >= 60 ? 0.4 : 0.15, `${n} takes a foul to stop the break`],
 	];
 	const x = pickW(rng, rows)!;
 	if (opts.bonus && opts.shooter) {
@@ -85,7 +95,7 @@ export const nonShootingFoul = (
 		]);
 		return `${x[1]} (${tag}). ${state}, so ${opts.shooter.name} ${pickV(rng, ["heads to the line", "goes to the line for two", "will shoot two"])}.`;
 	}
-	return `${x[1]} (${tag}). ${pickV(rng, [`Side out, ${ball} ball.`, `${cap(ballTeam)} inbound from the sideline.`, `Baseline inbound for ${ballTeam}.`, `${ball} ball.`])}`;
+	return `${x[1]} (${tag}). ${pickV(rng, [`Side out, ${ball} ball.`, `${cap(ballTeam)} inbound from the sideline.`, `Baseline inbound for ${ballTeam}.`, `${ball} ball.`, `${cap(ballTeam)} keep it.`, `${ball} will inbound.`])}`;
 };
 
 // A shooting foul: the shooter, the fouler and what it was on
@@ -105,6 +115,9 @@ export const shootingFoul = (
 				[" gets fouled behind the arc", "by"],
 				[" is hit on the arm on a three", "by"],
 				[" is fouled on the three-point attempt", "by"],
+				[" gets bumped on the landing of a three", "by"],
+				[" is fouled by the closeout on a three", "by"],
+				[" gets hit on the wrist from deep", "by"],
 			]
 		: r.ins >= 60
 			? [
@@ -113,6 +126,8 @@ export const shootingFoul = (
 					[" gets hacked going up", "by"],
 					[" is fouled on the drive", "by"],
 					[" gets wrapped up on the way to the rim", "by"],
+					[" gets hammered on the drop step", "by"],
+					[" draws the foul with an up-fake in the post", "on"],
 				]
 			: [
 					[" is fouled on the drive", "by"],
@@ -120,13 +135,27 @@ export const shootingFoul = (
 					[" gets fouled on a jumper", "by"],
 					[" draws contact at the rim", "from"],
 					[" is fouled going to the basket", "by"],
+					[" is hacked on the arm going up", "by"],
+					[" gets hit on the floater", "by"],
+					[" draws the foul on a pump fake", "on"],
+					[" is fouled on the pull-up", "by"],
 				];
 	const [what, prep] = how[Math.floor(rng.random() * how.length)]!;
 	const text = what + (f ? ` ${prep} ${f.name} (${tag})` : "");
 	const tail =
 		n === 3
-			? pickV(rng, [" Three shots.", " He heads to the line for three."])
-			: pickV(rng, [" Two shots.", " Two at the line.", " He'll shoot two."]);
+			? pickV(rng, [
+					" Three shots.",
+					" He heads to the line for three.",
+					" Three free throws coming.",
+				])
+			: pickV(rng, [
+					" Two shots.",
+					" Two at the line.",
+					" He'll shoot two.",
+					" Two free throws coming.",
+					" He'll go to the line for two.",
+				]);
 	return shooter.name + text + "." + tail;
 };
 
@@ -137,11 +166,16 @@ const nerveLine = (rng: Rng, made: boolean) =>
 				"He doesn't flinch.",
 				"Cool as can be with the game this tight.",
 				"Steady at the line with everything on the line.",
+				"Ice in his veins.",
+				"Nothing but net with the building holding its breath.",
+				"Just another free throw, to hear him tell it.",
 			])
 		: pickV(rng, [
 				"The pressure shows.",
 				"He can't convert with the game this tight.",
 				"A costly miss at this stage.",
+				"That one could haunt him.",
+				"The door stays open.",
 			]);
 
 // One free throw
@@ -163,11 +197,14 @@ export const freeThrow = (
 						`${n} makes the free throw`,
 						`${n} sinks a free throw`,
 						`${n} hits from the line`,
+						`${n} drops in a free throw`,
+						`${n} knocks down the free throw`,
 					])
 				: pickV(rng, [
 						`${n} misses the free throw`,
 						`${n} can't convert at the line`,
 						`${n}'s free throw rims out`,
+						`${n}'s free throw is off the front rim`,
 					])) +
 			"." +
 			nerve
@@ -187,11 +224,14 @@ export const freeThrow = (
 						`${n} makes the and-one free throw`,
 						`${n} converts the free throw`,
 						`${n} hits the bonus free throw for the ${word}-point play`,
+						`${n} finishes the old-fashioned ${word}-point play`,
+						`${n} adds the free throw to complete the and-one`,
 					])
 				: pickV(rng, [
 						`${n} misses the and-one free throw`,
 						`${n} can't convert the free throw`,
 						`${n}'s and-one free throw rims out`,
+						`${n} leaves the and-one free throw short`,
 					])) +
 			"." +
 			nerve
@@ -211,6 +251,8 @@ export const freeThrow = (
 					r.ft < 55
 						? `${n} gets a friendly roll on the ${ord} free throw`
 						: `${n} steps up and hits the ${ord}`,
+					`${n} drops in the ${ord} free throw`,
+					`${n} is good on the ${ord}`,
 				])
 			: pickV(rng, [
 					`${n} misses the ${ord} free throw`,
@@ -218,6 +260,8 @@ export const freeThrow = (
 					`${n}'s ${ord} free throw rims out`,
 					`${n} clanks the ${ord} one`,
 					`${n}'s ${ord} free throw is off the back rim`,
+					`${n} leaves the ${ord} one short`,
+					`${n}'s ${ord} free throw rattles out`,
 				]);
 	} else if (m === total) {
 		// every shot made
@@ -229,11 +273,14 @@ export const freeThrow = (
 						`${n} knocks down the second, 2 for 2`,
 						`${n} swishes the second; both fall`,
 						`${n} calmly hits the second to make both`,
+						`${n} is perfect at the line, 2 for 2`,
+						`${n} drops in the second for two more`,
 					])
 				: pickV(rng, [
 						`${n} makes the third: all 3 free throws are good`,
 						`${n} drains the third and hits all 3`,
 						`${n} knocks down the third, 3 for 3`,
+						`${n} is perfect on all three`,
 					]);
 	} else if (made) {
 		text = pickV(rng, [
@@ -280,6 +327,8 @@ export const substitution = (
 		injured: Set<number>;
 		fouledOut: Set<number>;
 		ejected?: Set<number>;
+		// players who have been subbed out earlier in the game
+		back?: Set<number>;
 	},
 ) => {
 	const bits = pairs.map(([a, b]) => ({ a, b }));
@@ -310,13 +359,32 @@ export const substitution = (
 			]);
 		}
 		return pickV(rng, [
+			...(why.back?.has(a.pid)
+				? [
+						`${a.name} returns for ${b.name}.`,
+						`${a.name} is back in for ${b.name}.`,
+						`${a.name} heads back to the scorer's table and checks in for ${b.name}.`,
+					]
+				: []),
 			`${a.name} checks in for ${b.name}.`,
 			`${a.name} subs in for ${b.name}.`,
 			`${a.name} replaces ${b.name}.`,
 			`${b.name} heads to the bench; ${a.name} checks in.`,
+			`${a.name} comes on for ${b.name}.`,
+			`${b.name} gets a breather; ${a.name} in.`,
+			`${a.name} in, ${b.name} out.`,
+			`${a.name} reports in for ${b.name}.`,
 		]);
 	}
-	return `${bare(teamName)} substitution: ${bits.map(({ a, b }) => `${a.name} in for ${b ? b.name : "a teammate"}`).join(", ")}.`;
+	const list = bits
+		.map(({ a, b }) => `${a.name} in for ${b ? b.name : "a teammate"}`)
+		.join(", ");
+	return pickV(rng, [
+		`${bare(teamName)} substitution: ${list}.`,
+		`Changes for ${teamName}: ${list}.`,
+		`Lineup changes for ${teamName}: ${list}.`,
+		`Fresh legs for ${teamName}: ${list}.`,
+	]);
 };
 
 export const timeoutText = (
@@ -340,21 +408,31 @@ export const timeoutText = (
 		why = pickV(rng, [
 			", to set up the last shot",
 			", to draw up a play with the game tied",
+			", to draw up the final possession",
 		]);
 	} else {
 		why = opts.advancesBall
-			? pickV(rng, ["", ", to set up a play", ", to draw something up"])
+			? pickV(rng, [
+					"",
+					", to set up a play",
+					", to draw something up",
+					", to advance the ball",
+				])
 			: pickV(rng, [
 					"",
 					", to catch their breath",
 					", to talk it over",
 					", to set up a play",
+					", to regroup",
+					", to settle things down",
+					", to get everyone on the same page",
 				]);
 	}
 	const adv = opts.advancesBall
 		? pickV(rng, [
 				" They'll advance the ball to the frontcourt.",
 				" The ball is moved up to half court.",
+				" They'll inbound in the frontcourt.",
 			])
 		: "";
 	return `Timeout, ${bare(team)}${why} (${left}).${adv}`;
@@ -543,6 +621,7 @@ export const endOfPeriod = (
 			`${Team} dribble out the clock.`,
 			`${Team} run out the clock.`,
 			`${Team} hold the ball and let the clock run out.`,
+			`${Team} are happy to let the final seconds tick away.`,
 		]);
 	}
 	if (reason === "noShot") {
@@ -557,12 +636,15 @@ export const endOfPeriod = (
 			`${Team} can't get a shot off before the horn.`,
 			`Time runs out with ${team} still setting up.`,
 			`${Team} are still looking for a shot when the horn sounds.`,
+			`${Team} get caught without a look as the horn goes.`,
+			`The horn beats ${team} to the shot.`,
 		]);
 	}
 	return pickV(rng, [
 		"The clock runs out while the defense tries to foul.",
 		"Time expires before the defense can get the whistle.",
 		"The horn sounds as the defense reaches in; no foul in time.",
+		"The defense can't get the foul in before the horn.",
 	]);
 };
 
@@ -573,6 +655,8 @@ export const heaveText = (rng: Rng, p: FPlayer, made: boolean) => {
 			`${n} launches from beyond half court as the horn sounds and banks it in! The bench goes wild.`,
 			`${n} heaves it from 45 feet at the horn, and it drops! The arena explodes.`,
 			`${n} catches, takes two dribbles and lets it fly from the opposite foul line at the horn. Nothing but net!`,
+			`${n} throws it up from three-quarters court at the horn, and it's good! Unbelievable!`,
+			`${n} lets one go from the far hash mark as time expires, and it banks in! Pandemonium!`,
 		]);
 	}
 	return pickV(rng, [
@@ -581,6 +665,8 @@ export const heaveText = (rng: Rng, p: FPlayer, made: boolean) => {
 		`${n} launches from just past half court as the horn sounds; it's off the mark.`,
 		`${n} lets one fly from 40 feet with the clock running out; it clanks off the rim.`,
 		`${possessive(n)} heave from the far side of half court is wide.`,
+		`${possessive(n)} long two-handed heave at the horn falls short.`,
+		`${n} chucks one from 60 feet at the buzzer; not close.`,
 	]);
 };
 
@@ -589,6 +675,8 @@ export const injuryText = (rng: Rng, p: FPlayer) =>
 		`${p.name} was injured!`,
 		`${p.name} goes down and has to leave the game with an injury.`,
 		`${p.name} is helped off the floor; it looks like an injury.`,
+		`${p.name} is down and holding his leg; he'll head to the locker room.`,
+		`${p.name} limps to the bench with an apparent injury.`,
 	]);
 
 export const tipOff = (
@@ -599,14 +687,28 @@ export const tipOff = (
 	overtime: boolean,
 ) => {
 	const lead = overtime ? "Overtime tip: " : "Tip-off: ";
-	return (
-		lead +
-		pickV(rng, [
-			`${a.name} and ${b.name} jump; ${winnerTeam} get the ball.`,
-			`${a.name} wins the tip over ${b.name}, and ${winnerTeam} have it.`,
+	// (the taller or bouncier one is expected to win it: an upset reads like one)
+	const reach = (p: FPlayer) => p.R.hgt * 2 + p.R.jmp;
+	const upset = reach(b) - reach(a) >= 25;
+	const rows: [number, string][] = [
+		[1, `${a.name} and ${b.name} jump; ${winnerTeam} get the ball.`],
+		[1, `${a.name} wins the tip over ${b.name}, and ${winnerTeam} have it.`],
+		[
+			1,
 			`${a.name} out-leaps ${b.name} and taps it to a teammate: ${winnerTeam} ball.`,
-		])
-	);
+		],
+		[
+			0.8,
+			`${a.name} controls the tip against ${b.name}; ${winnerTeam} start with it.`,
+		],
+		[0.8, `${a.name} gets up first and flicks it back to ${winnerTeam}.`],
+		[
+			upset ? 2 : 0,
+			`${a.name} times it perfectly and steals the tip from the taller ${b.name}.`,
+		],
+		[upset ? 0 : 0.6, `${a.name} wins the jump cleanly over ${b.name}.`],
+	];
+	return lead + pickW(rng, rows)![1];
 };
 
 export const foulOutText = (_rng: Rng, p: FPlayer, fouls: number | undefined) =>
@@ -629,7 +731,21 @@ export const quarterNote = (
 				? `${a} lead ${sa}-${sb}`
 				: `${b} lead ${sb}-${sa}`;
 	const which = label === "overtime" ? "overtime" : `the ${label}`;
-	return pickV(rng, [`End of ${which}: ${lead}.`, `${lead} after ${which}.`]);
+	// "After one", "At the half", "After three" in a four-quarter game
+	const short =
+		label === "first quarter"
+			? "After one"
+			: label === "second quarter" || label === "first half"
+				? "At the half"
+				: label === "third quarter"
+					? "After three"
+					: undefined;
+	return pickV(rng, [
+		`End of ${which}: ${lead}.`,
+		`${lead} after ${which}.`,
+		...(short ? [`${short}: ${lead}.`] : []),
+		...(label === "overtime" ? [] : [`That's ${which}. ${lead}.`]),
+	]);
 };
 
 export const crowdLine = (rng: Rng, kind: "wow" | "tight", team: string) =>
@@ -642,12 +758,18 @@ export const crowdLine = (rng: Rng, kind: "wow" | "tight", team: string) =>
 				"Oohs and aahs from the crowd.",
 				"That'll be on the highlight reel.",
 				`${cap(team)} bench goes wild.`,
+				"That brought the house down.",
+				"The building is shaking.",
+				`${cap(team)} bench is waving towels.`,
+				"Phones come out all over the arena for the replay.",
 			])
 		: pickV(rng, [
 				"The noise is deafening.",
 				"Nobody in the building is sitting down now.",
 				"The crowd is roaring.",
 				"You can feel the tension in the building.",
+				"Fans are standing in every corner of the arena.",
+				"Every possession feels enormous now.",
 			]);
 
 export const pickOnCourt = (
@@ -773,8 +895,10 @@ export const technicalFreeThrow = (rng: Rng, p: FPlayer, made: boolean) =>
 				`${p.name} makes the technical free throw.`,
 				`${p.name} converts the technical free throw.`,
 				`${p.name} hits the free throw for the technical.`,
+				`${p.name} drops in the technical free throw.`,
 			])
 		: pickV(rng, [
 				`${p.name} misses the technical free throw.`,
 				`${p.name} can't convert the technical free throw.`,
+				`${p.name} leaves the technical free throw short.`,
 			]);

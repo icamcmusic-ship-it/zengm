@@ -17,6 +17,7 @@ const PLAY_BADGE: Record<string, string> = {
 	stop: "text-bg-primary",
 	goAhead: "text-bg-warning",
 	tying: "text-bg-warning",
+	dagger: "text-bg-warning",
 };
 
 const BestGames = ({

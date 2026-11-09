@@ -13,6 +13,7 @@ export type TopPlayKind =
 	| "buzzer"
 	| "goAhead"
 	| "tying"
+	| "dagger"
 	| "stop"
 	| "poster"
 	| "oop"
@@ -22,6 +23,9 @@ export type TopPlayKind =
 	| "run"
 	| "deep"
 	| "andOne"
+	| "putback"
+	| "fastBreak"
+	| "shotClock"
 	| "clutch";
 
 export const TOP_PLAY_LABELS: Record<TopPlayKind, string> = {
@@ -29,6 +33,7 @@ export const TOP_PLAY_LABELS: Record<TopPlayKind, string> = {
 	buzzer: "Buzzer-beater",
 	goAhead: "Go-ahead",
 	tying: "Tying shot",
+	dagger: "Dagger",
 	stop: "Defensive stop",
 	poster: "Poster",
 	oop: "Alley-oop",
@@ -38,6 +43,9 @@ export const TOP_PLAY_LABELS: Record<TopPlayKind, string> = {
 	run: "Run capper",
 	deep: "Deep shot",
 	andOne: "And-one",
+	putback: "Putback",
+	fastBreak: "Fast break",
+	shotClock: "Shot-clock beater",
 	clutch: "Clutch",
 };
 
@@ -48,6 +56,7 @@ const ORDER: TopPlayKind[] = [
 	"stop",
 	"goAhead",
 	"tying",
+	"dagger",
 	"poster",
 	"oop",
 	"block",
@@ -55,6 +64,9 @@ const ORDER: TopPlayKind[] = [
 	"run",
 	"deep",
 	"andOne",
+	"putback",
+	"fastBreak",
+	"shotClock",
 	"steal",
 	"clutch",
 ];
@@ -305,6 +317,40 @@ export const playsFromPbp = (
 					tag("oop", 4.5);
 				} else if (fr.ptype === "heave") {
 					tag("deep", 4);
+				}
+				// The flavor layer's derived play types: the kind of shot (from the sim's zone and the words picked) and what else it was
+				const shot = fr.shot;
+				const ftags = new Set(fr.tags ?? []);
+				if (shot === "heave") {
+					tag("deep", 5);
+				} else if (shot === "logo-three") {
+					tag("deep", 2.5);
+				} else if (shot === "deep-three") {
+					tag("deep", 1.5);
+				} else if (shot === "alley-oop") {
+					tag("oop", 4.5);
+				} else if (shot === "dunk" || shot === "putback-dunk") {
+					tag("dunk", 3);
+				}
+				if (shot === "putback-dunk" || shot === "tip-in") {
+					tag("putback", shot === "putback-dunk" ? 2 : 1.2);
+				}
+				if (
+					fr.ptype === "pick6" ||
+					fr.ptype === "2on1" ||
+					fr.ptype === "coast" ||
+					fr.ptype === "fastbreak-oop"
+				) {
+					tag("fastBreak", fr.ptype === "pick6" ? 2 : 1.5);
+				}
+				if (ftags.has("shot-clock")) {
+					tag("shotClock", 1.5);
+				}
+				if (ftags.has("buzzer") && clock <= 3) {
+					tag("buzzer", last ? 5 : 3.5);
+				}
+				if (ftags.has("dagger")) {
+					tag("dagger", 4);
 				}
 			}
 			if (e.type.endsWith("AndOne")) {

@@ -1,8 +1,12 @@
 import type { Rng } from "./rng.ts";
 
-/* Variety: a phrase used before in the same game is less likely to come up again (names are ignored when comparing), and one of the last
-   few picked is almost never picked again right away. One memory per live game (see FlavorSession); the session makes its own memory the
+/* Variety: a phrase used before in the same game is less likely to come up again (names and numbers are ignored when comparing), and one
+   of the last RECENT phrases picked is never picked again while the list it comes from has another phrase to offer (when every phrase of a
+   short list was used recently, the least recent ones are merely unlikely). One memory per live game (see FlavorSession); the session makes its own memory the
    active one before it words anything. */
+
+// How many of the last phrases picked (all kinds of lines together: about the last 8 to 12 lines) are kept out of the next picks
+export const RECENT = 32;
 
 export class VarietyMemory {
 	counts = new Map<string, number>();
@@ -16,6 +20,11 @@ export class VarietyMemory {
 			.map((n) => n.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`));
 		this.nameRegex =
 			escaped.length > 0 ? new RegExp(escaped.join("|"), "g") : undefined;
+	}
+
+	// The text with every player and team name taken out
+	stripNames(t: string) {
+		return this.nameRegex ? t.replace(this.nameRegex, "N") : t;
 	}
 
 	key(t: string) {
@@ -63,11 +72,27 @@ export const varyW = (t: string) => {
 	);
 };
 
+const isRecent = (t: string) => active.recent.includes(active.key(t));
+
+// A weighted pick that skips the recently used phrases whenever a phrase not used recently has any weight
+export const weightedVaried = <T>(
+	rng: Rng,
+	items: readonly T[],
+	w: (x: T) => number,
+	text: (x: T) => string,
+): T | null => {
+	const fresh = items.filter((x) => w(x) > 0 && !isRecent(text(x)));
+	if (fresh.length > 0) {
+		return weighted(rng, fresh, (x) => w(x) * varyW(text(x)));
+	}
+	return weighted(rng, items, (x) => w(x) * varyW(text(x)));
+};
+
 export const varyUse = (t: string) => {
 	const k = active.key(t);
 	active.counts.set(k, (active.counts.get(k) ?? 0) + 1);
 	active.recent.push(k);
-	if (active.recent.length > 4) {
+	if (active.recent.length > RECENT) {
 		active.recent.shift();
 	}
 };
@@ -77,7 +102,13 @@ export const pickV = (rng: Rng, arr: readonly string[]): string => {
 	if (arr.length === 0) {
 		return "";
 	}
-	const x = weighted(rng, arr, varyW) ?? arr[0]!;
+	const x =
+		weightedVaried(
+			rng,
+			arr,
+			() => 1,
+			(y) => y,
+		) ?? arr[0]!;
 	varyUse(x);
 	return x;
 };
@@ -91,7 +122,13 @@ export const pickW = <R extends [number, string, ...any[]]>(
 	if (o.length === 0) {
 		return null;
 	}
-	const x = weighted(rng, o, (y) => y[0] * varyW(y[1])) ?? o[0]!;
+	const x =
+		weightedVaried(
+			rng,
+			o,
+			(y) => y[0],
+			(y) => y[1],
+		) ?? o[0]!;
 	varyUse(x[1]);
 	return x;
 };
