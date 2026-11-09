@@ -28,6 +28,9 @@ export const archetypeByName = (name: string) =>
 
 // Rare "unicorn" types need to be that much more exceptional a fit to be picked
 export const RARE_PENALTY = 0.5;
+// Star archetypes (gated on an overall level well above the league's and on elite usage) win over the generic scorer labels
+// every star also fits, so the league's best players are told apart by what makes them elite
+export const STAR_BONUS = 0.5;
 // A runner-up this close (in standard deviations of fit) from a different family makes a hybrid
 export const HYBRID_Z = 0.15;
 // The archetype he had keeps the label unless another is better by more than this
@@ -73,6 +76,7 @@ export const scoreAll = (
 		const z =
 			(table ? matchZ(table, raw) : raw * 4 - 2) -
 			(a.rare ? RARE_PENALTY : 0) +
+			(a.tags.includes("star") ? STAR_BONUS : 0) +
 			prior +
 			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0) -
 			needPenalty(a, p) -
