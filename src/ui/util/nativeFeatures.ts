@@ -69,6 +69,8 @@ export const featureForUrl = (
 			return "draftBoard";
 		case "mock_draft":
 			return "mockDraft";
+		case "college_overseas":
+			return "collegeSeason";
 		case "archetypes":
 			return "archetypes";
 		case "staff":

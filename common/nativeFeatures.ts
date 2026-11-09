@@ -493,6 +493,16 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "collegeSeason",
+		key: "featureCollegeSeason",
+		name: "College Season & March Madness",
+		description:
+			"With college stats, a light college season for each draft class's draft year: conference standings, AP Top 25, conference tournaments and the 68-team NCAA tournament, with prospects' teams, tournament games and honors on their pre-draft record (Draft Scouting → College/Overseas tab).",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "ratingsRegenerator",
 		key: "featureRatingsRegenerator",
 		name: "Ratings Regenerator",
