@@ -69,7 +69,6 @@ const POINTS = {
 };
 
 // Noise as a fraction of the spread of the candidates' scores
-const NOISE = { mvp: 0.6, player: 0.7, team: 0.5 };
 
 const hashString = (s: string) => {
 	let h = 2166136261;
@@ -117,42 +116,66 @@ const zOf = (xs: (number | undefined)[]) => {
 	return xs.map((x) => (x === undefined ? 0 : (x - m) / s));
 };
 
-type Narrative = {
-	label: string;
-	// Weight of the narrative for this award kind, in score standard deviations per z of the input
-	weight: number;
-	z: number[];
+// The voting model, per kind of award. All weights are in units of the spread of the candidates' formula scores (the
+// standard deviation of the top 10), so they mean the same for every award formula.
+//   noise     each voter's own noise on each candidate
+//   stats     how much voters disagree on the formula itself (sd of a voter's weight on it, around 1)
+//   team, box, avail, fatigue
+//             weights of team record, scoring (box-score buzz), games played and fatigue with the defending winner;
+//             each voter's taste for team record and scoring varies (sd taste)
+//   media     the media narrative: one shared story per candidate (the same for every voter, so it moves the whole
+//             electorate together), which voters buy into to a different degree
+export type VoteParams = {
+	noise: number;
+	stats: number;
+	team: number;
+	box: number;
+	avail: number;
+	fatigue: number;
+	taste: number;
+	media: number;
 };
 
-const narrativesFor = (
-	input: VoteAwardInput,
-	cands: VoteCandidate[],
-): Narrative[] => {
-	const isMvp = input.kind === "mvp";
-	const out: Narrative[] = [
-		{
-			label: "Team success",
-			weight: isMvp ? 0.35 : input.kind === "team" ? 0.12 : 0.08,
-			z: zOf(cands.map((c) => c.teamWinp)),
-		},
-		{
-			label: "Scoring buzz",
-			weight: input.kind === "player" ? 0.15 : 0.2,
-			z: zOf(cands.map((c) => c.pts)),
-		},
-		{
-			label: "Availability",
-			weight: 0.15,
-			z: zOf(cands.map((c) => c.gpFrac)),
-		},
-		{
-			label: "Voter fatigue",
-			weight: isMvp ? 0.3 : 0.15,
-			z: cands.map((c) => (c.defending ? -1 : 0)),
-		},
-	];
-	return out;
+export const VOTE_PARAMS: Record<VoteAwardInput["kind"], VoteParams> = {
+	mvp: {
+		noise: 0.35,
+		stats: 0.35,
+		team: 0.35,
+		box: 0.2,
+		avail: 0.15,
+		fatigue: 0.3,
+		taste: 0.8,
+		media: 0.45,
+	},
+	player: {
+		noise: 0.55,
+		stats: 0.4,
+		team: 0.1,
+		box: 0.2,
+		avail: 0.15,
+		fatigue: 0.15,
+		taste: 0.8,
+		media: 0.55,
+	},
+	team: {
+		noise: 0.35,
+		stats: 0.3,
+		team: 0.15,
+		box: 0.2,
+		avail: 0.15,
+		fatigue: 0,
+		taste: 0.8,
+		media: 0.35,
+	},
 };
+
+const NARRATIVES = [
+	"Team success",
+	"Scoring buzz",
+	"Availability",
+	"Voter fatigue",
+	"Media narrative",
+] as const;
 
 const tally = (
 	input: VoteAwardInput,
@@ -160,36 +183,47 @@ const tally = (
 	voters: number,
 	shift: number[],
 	seed: number,
+	params: VoteParams,
 ) => {
 	const rand = seededRandom(seed);
 	const kind = input.kind;
 	const scores = cands.map((c) => c.score);
 	const spread = sd(scores.slice(0, 10));
-	const noise = NOISE[kind] * spread;
-	const narr = narrativesFor(input, cands);
+	const zTeam = zOf(cands.map((c) => c.teamWinp));
+	const zBox = zOf(cands.map((c) => c.pts));
+	const zAvail = zOf(cands.map((c) => c.gpFrac));
+	// The shared media story of each candidate, partly following team success
+	const story = cands.map((_, i) => 0.85 * gauss(rand) + 0.3 * zTeam[i]!);
 	const pointsBase = POINTS[kind];
 	const numTeams = kind === "team" ? Math.max(1, input.numTeams ?? 1) : 0;
 	const teamSize = kind === "team" ? Math.max(1, input.teamSize ?? 5) : 0;
 	const numPlaces = kind === "team" ? numTeams : pointsBase.length;
 	const votes = cands.map(() => new Array<number>(numPlaces).fill(0));
 	const pts = cands.map(() => 0);
-	const narrSum = cands.map(() => narr.map(() => 0));
+	const narrSum = cands.map(() => NARRATIVES.map(() => 0));
 	const teamPoints = pointsBase.slice(0, numTeams);
-	if (kind === "team" && numTeams > teamPoints.length) {
-		while (teamPoints.length < numTeams) {
-			teamPoints.push(1);
-		}
+	while (kind === "team" && teamPoints.length < numTeams) {
+		teamPoints.push(1);
 	}
+	const P = params;
 	for (let v = 0; v < voters; v++) {
-		// Each voter's taste for each narrative, around 1
-		const taste = narr.map(() => Math.max(0, 1 + 0.6 * gauss(rand)));
+		// This voter's criteria
+		const wStats = Math.max(0.2, 1 + P.stats * gauss(rand));
+		const wTeam = P.team * Math.max(0, 1 + P.taste * gauss(rand));
+		const wBox = P.box * Math.max(0, 1 + P.taste * gauss(rand));
+		const wMedia = P.media * Math.max(0, 1 + 0.5 * gauss(rand));
 		const util = cands.map((c, i) => {
-			let u = c.score + shift[i]! + noise * gauss(rand);
-			for (let k = 0; k < narr.length; k++) {
-				const n = narr[k]!;
-				const d = n.weight * taste[k]! * n.z[i]! * spread;
-				u += d;
-				narrSum[i]![k]! += d;
+			const parts = [
+				wTeam * zTeam[i]!,
+				wBox * zBox[i]!,
+				P.avail * zAvail[i]!,
+				c.defending ? -P.fatigue : 0,
+				wMedia * story[i]!,
+			];
+			let u = wStats * c.score + shift[i]! + P.noise * spread * gauss(rand);
+			for (let k = 0; k < parts.length; k++) {
+				u += parts[k]! * spread;
+				narrSum[i]![k]! += parts[k]!;
 			}
 			return u;
 		});
@@ -222,7 +256,6 @@ const tally = (
 		votes,
 		pts,
 		narrSum,
-		narr,
 		points: kind === "team" ? teamPoints : pointsBase,
 	};
 };
@@ -272,7 +305,11 @@ const disagreements = (
 
 export const simulateVote = (
 	input: VoteAwardInput,
-	{ voters = NUM_VOTERS, seed = 0 }: { voters?: number; seed?: number } = {},
+	{
+		voters = NUM_VOTERS,
+		seed = 0,
+		params,
+	}: { voters?: number; seed?: number; params?: VoteParams } = {},
 ): SimVote | undefined => {
 	const cands = input.candidates.filter((c) => Number.isFinite(c.score));
 	if (cands.length === 0) {
@@ -281,7 +318,8 @@ export const simulateVote = (
 	const fullSeed = hashString(`${seed}|${input.shortName}`);
 	const spread = sd(cands.map((c) => c.score).slice(0, 10));
 	const shift = cands.map(() => 0);
-	let res = tally(input, cands, voters, shift, fullSeed);
+	const P = params ?? VOTE_PARAMS[input.kind];
+	let res = tally(input, cands, voters, shift, fullSeed, P);
 	let order = rankRows(cands, res.pts, res.votes);
 	for (let iter = 0; iter < 40; iter++) {
 		const bad = disagreements(input, cands, order);
@@ -291,7 +329,7 @@ export const simulateVote = (
 		for (const i of bad) {
 			shift[i]! += 0.15 * spread;
 		}
-		res = tally(input, cands, voters, shift, fullSeed);
+		res = tally(input, cands, voters, shift, fullSeed, P);
 		order = rankRows(cands, res.pts, res.votes);
 	}
 
@@ -303,12 +341,12 @@ export const simulateVote = (
 		.map((i, r) => {
 			const c = cands[i]!;
 			const narratives: string[] = [];
-			res.narr.forEach((n, k) => {
-				const avg = res.narrSum[i]![k]! / voters / spread;
+			NARRATIVES.forEach((label, k) => {
+				const avg = res.narrSum[i]![k]! / voters;
 				if (avg >= 0.08) {
-					narratives.push(`+${n.label}`);
+					narratives.push(`+${label}`);
 				} else if (avg <= -0.08) {
-					narratives.push(`-${n.label}`);
+					narratives.push(`-${label}`);
 				}
 			});
 			const row: VoteRow = {

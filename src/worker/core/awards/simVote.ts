@@ -11,6 +11,9 @@ import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { processAwards } from "./processAwards.ts";
 
+// Candidates per individual award in the vote (the stored award keeps its top 5)
+export const VOTE_CANDIDATES = 15;
+
 type Players = Awaited<ReturnType<typeof processAwards>>["players"];
 
 // Awards a media vote makes sense for: league-wide, regular season
@@ -102,7 +105,7 @@ export const voteInputs = async ({
 					.sort(
 						(a, b) => b.scores[award.shortName]! - a.scores[award.shortName]!,
 					)
-					.slice(0, 5)
+					.slice(0, 8)
 					.map((p) => p.pid);
 				pids = [...pids, ...extra];
 			}
@@ -137,11 +140,11 @@ export const runVotes = (inputs: VoteAwardInput[], season: number) =>
 		.map((input) => simulateVote(input, { seed: season }))
 		.filter((x) => x !== undefined);
 
-// A season's simulated vote computed from scratch (the live race, or a past season without a stored vote)
-export const computeSimVotes = async (
+// A season's vote inputs computed from scratch (the live race, or a past season without a stored vote)
+export const computeVoteInputs = async (
 	season: number,
 	respect: boolean,
-): Promise<SimVote[]> => {
+): Promise<VoteAwardInput[]> => {
 	const awards = g
 		.get("awards")
 		.filter((a) => a.group === undefined && a.statRange === undefined);
@@ -149,7 +152,7 @@ export const computeSimVotes = async (
 		awards,
 		extraStatRanges: [],
 		extraStats: [],
-		numPlayersPerIndividualAward: 10,
+		numPlayersPerIndividualAward: VOTE_CANDIDATES,
 		season,
 		statOverridesByMatchup: undefined,
 	});
@@ -178,14 +181,19 @@ export const computeSimVotes = async (
 			}
 		}
 	}
-	const inputs = await voteInputs({
+	return voteInputs({
 		season,
 		realizedAwards: realizedAwards.flat(),
 		players,
 		respect,
 	});
-	return runVotes(inputs, season);
 };
+
+export const computeSimVotes = async (
+	season: number,
+	respect: boolean,
+): Promise<SimVote[]> =>
+	runVotes(await computeVoteInputs(season, respect), season);
 
 // Reorder individual award winners by the simulated vote (only when "use simulated vote to decide awards" is on)
 export const applyVoteToWinners = (awards: Award[], votes: SimVote[]) => {

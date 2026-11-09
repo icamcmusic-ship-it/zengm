@@ -11,7 +11,12 @@ import { orderTeams } from "../../util/orderTeams.ts";
 import { leaderAwardCategories } from "../../../common/awards.ts";
 import { team } from "../index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
-import { applyVoteToWinners, runVotes, voteInputs } from "./simVote.ts";
+import {
+	VOTE_CANDIDATES,
+	applyVoteToWinners,
+	runVotes,
+	voteInputs,
+} from "./simVote.ts";
 import type { SimVote } from "../../../common/awardVote/index.ts";
 
 const teamAwards = async (
@@ -117,7 +122,7 @@ export const doAwards = async (conditions: Conditions) => {
 		awards: g.get("awards"),
 		// League extras (Award Vote): more candidates for the simulated vote, cut back to the stored number below
 		numPlayersPerIndividualAward: awardVoteOn
-			? 10
+			? VOTE_CANDIDATES
 			: NUM_PLAYERS_TO_STORE_PER_INDIVIDUAL_AWARD,
 		season,
 		statOverridesByMatchup: undefined,
