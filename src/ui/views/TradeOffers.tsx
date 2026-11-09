@@ -166,8 +166,8 @@ const TradeOffers = ({
 				<a href={helpers.leagueUrl(["trading_block"])}>trading block</a> or
 				anyone else they want. New offers arrive during the regular season
 				(until the trade deadline) and the offseason. They expire after{" "}
-				{expiration} days, when the phase changes, or when either roster
-				changes.
+				{expiration} days, when the phase changes, when a player or pick in the
+				offer moves, or when the other team loses a player.
 			</p>
 			{tradingClosed ? (
 				<p className="alert alert-warning d-inline-block">

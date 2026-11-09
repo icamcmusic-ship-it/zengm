@@ -12,6 +12,7 @@ import {
 	getOfferAge,
 	getPhaseOfferProbability,
 	requestAiOffers,
+	rosterKeyStillValid,
 	getOfferReasonText,
 	pruneAiOffers,
 	type OfferTargetCandidate,
@@ -150,6 +151,13 @@ describe("AI trade offers to the user", () => {
 			false,
 		);
 		assert.strictEqual(target?.reason, "contenderNeed");
+	});
+
+	test("roster changes: losing a player expires, signing one doesn't", () => {
+		assert.isTrue(rosterKeyStillValid("1,2,3", "1,2,3"));
+		assert.isTrue(rosterKeyStillValid("1,2,3", "1,2,3,4"));
+		assert.isFalse(rosterKeyStillValid("1,2,3", "1,3,4"));
+		assert.isTrue(rosterKeyStillValid("", "1"));
 	});
 
 	test("offer age by phase", () => {

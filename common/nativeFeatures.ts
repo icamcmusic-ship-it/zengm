@@ -377,7 +377,7 @@ export const NATIVE_FEATURES = [
 		key: "featureAiTradeOffers",
 		name: "AI Trade Offers To You",
 		description:
-			"AI teams send you trade offers during the season (until the trade deadline) and the offseason, for players on your trading block or any players/picks that fit their needs. They replace Trade Proposals with a Trade Offers inbox (accept, negotiate, decline, request offers), with an inbox message and notification for each new offer.",
+			"AI teams send you trade offers during the season (until the trade deadline) and the offseason, for players on your trading block or any players/picks that fit their needs. They replace Trade Proposals with a Trade Offers inbox (accept, negotiate, decline, request offers), with an notification for each new offer.",
 		default: false,
 		defaultNewLeague: true,
 		options: [
@@ -395,7 +395,7 @@ export const NATIVE_FEATURES = [
 				key: "aiTradeOffersExpiration",
 				name: "AI Trade Offers Expiration",
 				description:
-					"Offers expire after this many days (your games in the regular season, days of free agency). They also expire when the phase changes, when the AI team's roster changes or when a player/pick in the offer moves.",
+					"Offers expire after this many days (your games in the regular season, days of free agency). They also expire when the phase changes, when the AI team loses a player or when a player/pick in the offer moves.",
 				type: "int",
 				default: 15,
 				min: 1,

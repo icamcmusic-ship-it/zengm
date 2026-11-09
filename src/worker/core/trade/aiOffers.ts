@@ -1,14 +1,9 @@
+import { getContractSummary } from "../contract/index.ts";
 import { conditionSpecText } from "../../../common/draftPickConditions.ts";
 import { PHASE } from "../../../common/constants.ts";
 import type { AiTradeOffer, TradeTeams } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import {
-	g,
-	helpers,
-	local,
-	logEvent,
-	updatePlayMenu,
-} from "../../util/index.ts";
+import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { league } from "../index.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import isUntradable from "./isUntradable.ts";
@@ -148,6 +143,14 @@ const getRosterKey = async (tid: number) => {
 		.join(",");
 };
 
+export const rosterKeyStillValid = (before: string, now: string) => {
+	const nowPids = new Set(now.split(","));
+	return before
+		.split(",")
+		.filter((pid) => pid !== "")
+		.every((pid) => nowPids.has(pid));
+};
+
 export const offersEnabled = () =>
 	featureOn("aiTradeOffers") &&
 	!g.get("spectator") &&
@@ -198,10 +201,11 @@ export const pruneAiOffers = async () => {
 			continue;
 		}
 
-		// The AI team's roster changed (trade, signing, release) since the offer was made
+		// The AI team lost a player (trade, release) since the offer was made. Signings don't count, since AI teams sign
+		// fill-in players all the time when someone gets hurt
 		if (
 			offer.rosterKey !== undefined &&
-			offer.rosterKey !== (await getRosterKey(offer.tid))
+			!rosterKeyStillValid(offer.rosterKey, await getRosterKey(offer.tid))
 		) {
 			continue;
 		}
@@ -228,6 +232,68 @@ export const pruneAiOffers = async () => {
 
 	if (keep.length !== offers.length) {
 		await league.setGameAttributes({ aiTradeOffers: keep });
+	}
+};
+
+// makeItWork with only the AI team adding assets. When the result breaks the salary cap rules (common, since the user's
+// team is often over the cap and AI teams like to send salary back), try again with the AI team's players that are
+// too expensive to match left out, so it pays in cheaper players and picks instead
+export const makeAiOfferWork = async (
+	teams0: TradeTeams,
+	valueChangeCalculator: ValueChangeCalculator,
+	maxAssetsToAdd: number,
+) => {
+	const run = async (input: TradeTeams) => {
+		const teams = await makeItWork(await withStartingProtections(input), {
+			holdUserConstant: true,
+			maxAssetsToAdd,
+			valueChangeCalculator,
+			aiPickConditions: true,
+		});
+		if (!teams || teams[1].pids.length + teams[1].dpids.length === 0) {
+			return { teams: undefined, warning: false };
+		}
+		const s = await summary(teams);
+		return { teams, warning: !!s.warning };
+	};
+
+	const first = await run(teams0);
+	if (first.teams && !first.warning) {
+		return first.teams;
+	}
+	if (!first.warning) {
+		return;
+	}
+
+	let userSalary = 0;
+	for (const pid of teams0[0].pids) {
+		const p = await idb.cache.players.get(pid);
+		userSalary += p ? (getContractSummary(p)?.amount ?? 0) : 0;
+	}
+	const salaryCapType = g.get("salaryCapType");
+	const limit =
+		salaryCapType === "none"
+			? Infinity
+			: salaryCapType === "hard"
+				? userSalary
+				: (userSalary * g.get("softCapTradeSalaryMatch")) / 100 + 100;
+	const aiPlayers = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		teams0[1].tid,
+	);
+	// Any single player over the limit breaks the rule on his own
+	const tooExpensive = aiPlayers
+		.filter((p) => (getContractSummary(p)?.amount ?? 0) > limit)
+		.map((p) => p.pid);
+	const second = await run([
+		teams0[0],
+		{
+			...teams0[1],
+			pidsExcluded: [...teams0[1].pidsExcluded, ...tooExpensive],
+		},
+	]);
+	if (second.teams && !second.warning) {
+		return second.teams;
 	}
 };
 
@@ -305,18 +371,8 @@ export const buildAiOffer = async (
 	];
 
 	// Only the AI team adds assets: it's their offer for your player
-	const teams = await makeItWork(await withStartingProtections(teams0), {
-		holdUserConstant: true,
-		maxAssetsToAdd: 4,
-		valueChangeCalculator,
-		aiPickConditions: true,
-	});
-	if (!teams || teams[1].pids.length + teams[1].dpids.length === 0) {
-		return;
-	}
-
-	const s = await summary(teams);
-	if (s.warning) {
+	const teams = await makeAiOfferWork(teams0, valueChangeCalculator, 4);
+	if (!teams) {
 		return;
 	}
 
@@ -384,23 +440,15 @@ export const addAiOffer = async (
 	].slice(0, MAX_PENDING_OFFERS);
 	await league.setGameAttributes({ aiTradeOffers: newOffers });
 
+	// A notification only, no inbox message: unread messages stop the game from being played, which would be spam here
 	if (notify) {
-		const teamInfo = g.get("teamInfoCache")[tid];
 		const url = helpers.leagueUrl(["trade_offers"]);
-		await idb.cache.messages.add({
-			read: false,
-			from: teamInfo ? `${teamInfo.region} GM` : "AI GM",
-			year: g.get("season"),
-			subject: "Trade offer",
-			text: `<p>${built.reason}</p><p><a href="${url}">See the offer on the Trade Offers page.</a></p>`,
-		});
 		await logEvent({
 			type: "info",
-			text: `${built.reason} <a href="${url}">View offer</a>`,
+			text: `Trade offer: ${built.reason} <a href="${url}">View offer</a>`,
 			saveToDb: false,
 			tids: [g.get("userTid")],
 		});
-		await updatePlayMenu();
 	}
 
 	return offer;
@@ -465,7 +513,7 @@ const sendRandomOffer = async () => {
 	const valueChangeCalculator = new ValueChangeCalculator({ quick: true });
 
 	// A few tries, since not every team can make a sensible offer
-	for (let i = 0; i < 3; i++) {
+	for (let i = 0; i < 5; i++) {
 		const tid = choice(tids);
 		if (tid === undefined) {
 			return;
@@ -583,17 +631,12 @@ export const requestAiOffers = async (pids: number[], dpids: number[]) => {
 			},
 			{ tid, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
 		];
-		const teams = await makeItWork(await withStartingProtections(teams0), {
-			holdUserConstant: true,
-			maxAssetsToAdd: 4 + pids.length + dpids.length,
+		const teams = await makeAiOfferWork(
+			teams0,
 			valueChangeCalculator,
-			aiPickConditions: true,
-		});
-		if (!teams || teams[1].pids.length + teams[1].dpids.length === 0) {
-			continue;
-		}
-		const s = await summary(teams);
-		if (s.warning) {
+			4 + pids.length + dpids.length,
+		);
+		if (!teams) {
 			continue;
 		}
 
