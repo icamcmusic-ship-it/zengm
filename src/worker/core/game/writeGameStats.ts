@@ -19,6 +19,7 @@ import getWinner from "../../../common/getWinner.ts";
 import formatScoreWithShootout from "../../../common/formatScoreWithShootout.ts";
 import { getBestPlayerBoxScore } from "../../../common/getBestPlayerBoxScore.ts";
 import { encodePlayByPlay } from "../../../common/pbpFlavor/store.ts";
+import { clutchFlavorText } from "../../../common/pbpFlavor/clutch.ts";
 
 const allStarMVP = async (
 	game: Game,
@@ -367,6 +368,19 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	}
 
 	// We want text at the beginning, because adding game information is redundant when attached to the box score. Later notify about events
+	// Basketball: the flavor wording, built from the sim's own clutch-play record (works without play-by-play logging)
+	for (const [i, clutchPlay] of results.clutchPlays.entries()) {
+		if (clutchPlay.meta) {
+			clutchPlay.text = clutchFlavorText(
+				clutchPlay.meta,
+				results.gid,
+				i,
+				(p) =>
+					`<a href="${helpers.leagueUrl(["player", p.pid])}">${p.name}</a>`,
+			);
+		}
+	}
+
 	for (const clutchPlay of results.clutchPlays) {
 		// @ts-expect-error
 		gameStats.clutchPlays.push(`${clutchPlay.text}.`);

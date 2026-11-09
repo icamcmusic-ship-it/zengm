@@ -63,7 +63,10 @@ const stableStringify = (x: unknown): string =>
 const boxScoreOf = (result: ReturnType<GameSim["run"]>) => {
 	return {
 		overtimes: result.overtimes,
-		clutchPlays: result.clutchPlays.map((c) => c.text),
+		// (game-saving defensive plays are a newer, text-only record: left out so the hashes still compare with the pre-change sim)
+		clutchPlays: result.clutchPlays
+			.filter((c) => c.meta?.kind !== "defense")
+			.map((c) => c.text),
 		teams: result.team.map((t) => ({
 			id: t.id,
 			stat: t.stat,
