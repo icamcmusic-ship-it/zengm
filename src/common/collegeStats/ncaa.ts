@@ -1,3 +1,4 @@
+import type { SplitLine } from "./season.ts";
 import { COLLEGES } from "./colleges.ts";
 import { getSchool } from "./colleges.helpers.ts";
 import { Rng, clamp } from "./rng.ts";
@@ -736,6 +737,8 @@ export type ProspectNcaaSummary = {
 	ncaa?: string;
 	// Postseason games he played. Empty for a prospect whose stats were not generated with the season (imported ones)
 	games: ProspectNcaaGame[];
+	// His regular season split into non-conference and conference games. Only for stats generated since splits were added
+	splits?: { nonConf: SplitLine; conf: SplitLine };
 };
 
 // What is stored on a prospect: enough to rebuild the whole season (seed + every prospect's school and boost) and his own summary

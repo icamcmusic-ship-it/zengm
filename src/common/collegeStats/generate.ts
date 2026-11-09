@@ -143,6 +143,9 @@ export const generateCollegeClass = (
 									teamGames:
 										ncaaSeason.teams[team]!.w + ncaaSeason.teams[team]!.l,
 									postseasonGames: postseason.length,
+									confGames:
+										ncaaSeason.teams[team]!.confW +
+										ncaaSeason.teams[team]!.confL,
 								}
 							: {}),
 					}),
@@ -156,10 +159,15 @@ export const generateCollegeClass = (
 			const games = postseason.map(({ event, round, game }, i) =>
 				toGameLine(ncaaSeason, team, event, round, game, boxes[i]),
 			);
+			const splits = last?.splits;
 			if (last) {
 				delete last.postseasonBoxes;
+				delete last.splits;
 			}
-			summaries.set(p.key, getTeamSummary(ncaaSeason, team, games));
+			summaries.set(p.key, {
+				...getTeamSummary(ncaaSeason, team, games),
+				...(splits ? { splits } : {}),
+			});
 			ncaaEntries.push({ key: p.key, school: school.name, games });
 		}
 

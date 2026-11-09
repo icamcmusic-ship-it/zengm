@@ -45,24 +45,24 @@ const POSITION_AWARDS: Record<string, string> = {
 	C: "Kareem Abdul-Jabbar Award",
 };
 
-// Bars on strength-adjusted game score per game
+// Bars on strength-adjusted game score per game (raised with the steal/block recalibration of season.ts)
 export const BARS = {
-	consensusFirst: 18.5,
-	consensusSecond: 17,
-	honorableMention: 15,
-	finalist: 19,
-	top20: 17.5,
-	nationalPoy: 21,
-	positionAward: 17.5,
-	defNationalPoy: 6.1,
-	confPoy: { high: 16.5, mid: 14.8, low: 13.2 },
-	confFirst: { high: 14.2, mid: 12.6, low: 11 },
-	confSecond: { high: 12.2, mid: 10.6, low: 9.2 },
+	consensusFirst: 20,
+	consensusSecond: 18.2,
+	honorableMention: 15.7,
+	finalist: 20.2,
+	top20: 18.2,
+	nationalPoy: 22.2,
+	positionAward: 18.2,
+	defNationalPoy: 7.9,
+	confPoy: { high: 17.2, mid: 15.5, low: 13.9 },
+	confFirst: { high: 14.9, mid: 13.3, low: 11.7 },
+	confSecond: { high: 12.9, mid: 11.3, low: 9.9 },
 	// Freshman bars sit below the matching conference bars
 	freshmanOfYear: 1.5,
 	allFreshman: 3.5,
-	confDpoy: 5.5,
-	allDefensive: 5,
+	confDpoy: 7.2,
+	allDefensive: 6.5,
 	minGp: 14,
 	minMpg: 16,
 };

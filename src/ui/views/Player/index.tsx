@@ -1,5 +1,4 @@
 import { DataTable } from "../../components/DataTable/index.tsx";
-import { dropdownOptions } from "../../hooks/useDropdownOptions.tsx";
 import Injuries from "./Injuries.tsx";
 import InjuryHealth from "./InjuryHealth.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
@@ -15,7 +14,13 @@ import { PLAYER } from "../../../common/constants.ts";
 import { ProProjectionSection } from "../../components/ProProjection.tsx";
 import HideableSection from "../../components/HideableSection.tsx";
 import { StatsTable } from "./StatsTable.tsx";
-import { highlightLeaderText, MaybeBold, SeasonLink } from "./common.tsx";
+import {
+	getProfileDropdownOptions,
+	getProfileUrl,
+	highlightLeaderText,
+	MaybeBold,
+	SeasonLink,
+} from "./common.tsx";
 import { wrappedTeamAbbrevLink } from "../../components/TeamAbbrevLink.tsx";
 import { wrappedCurrency } from "../../components/wrappedCurrency.ts";
 import { groupAwards } from "../../util/groupAwards.ts";
@@ -25,8 +30,7 @@ import { SafeHtml } from "../../components/SafeHtml.tsx";
 import { useLocal } from "../../util/local.ts";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
-import { COLLEGE_AWARD_PREFIX } from "../../../common/preDraft.ts";
-import { CollegeSeasonSection } from "./CollegeSeasonSection.tsx";
+import { PreDraftSummary } from "./PreDraftSummary.tsx";
 
 const Player2 = ({
 	bestPos,
@@ -55,43 +59,36 @@ const Player2 = ({
 	]);
 	const showRatings = !challengeNoRatings || retired;
 
+	const profileOptions = getProfileDropdownOptions(player);
 	useTitleBar({
 		title: player.name,
 		customMenu,
-		dropdown:
-			player.tid !== PLAYER.UNDRAFTED
-				? {
-						fields: [
-							{
-								key: "profile",
-								options: dropdownOptions.playerProfile,
-								value: "overview",
-							},
-						],
-						urlOverride: ({ profile }) => {
-							if (profile !== "gameLog") {
-								return ["player", player.pid];
-							}
-
-							let gameLogSeason;
-							if (player.stats.length > 0) {
-								gameLogSeason = player.stats.at(-1)!.season;
-							} else if (player.ratings.length > 0) {
-								gameLogSeason = last(player.ratings).season;
-							} else {
-								gameLogSeason = currentSeason;
-							}
-
-							return ["player_game_log", player.pid, gameLogSeason];
+		dropdown: profileOptions
+			? {
+					fields: [
+						{
+							key: "profile",
+							options: profileOptions,
+							value: "overview",
 						},
-					}
-				: undefined,
+					],
+					urlOverride: ({ profile }) => {
+						let gameLogSeason;
+						if (player.stats.length > 0) {
+							gameLogSeason = player.stats.at(-1)!.season;
+						} else if (player.ratings.length > 0) {
+							gameLogSeason = last(player.ratings).season;
+						} else {
+							gameLogSeason = currentSeason;
+						}
+
+						return getProfileUrl(String(profile), player.pid, gameLogSeason);
+					},
+				}
+			: undefined,
 	});
 
 	const awardsGrouped = groupAwards(player.awards);
-
-	// Honors from before he was drafted, kept separate from pro awards
-	const earlierHonorsGrouped = groupAwards(player.earlierHonors);
 
 	let hasLeader = false;
 	for (const row of Object.values(leaders)) {
@@ -130,6 +127,8 @@ const Player2 = ({
 			/>
 
 			{!retired ? <ContractMood pid={player.pid} refreshKey={player} /> : null}
+
+			<PreDraftSummary player={player} />
 
 			{player.tid === PLAYER.UNDRAFTED ? (
 				<ProProjectionSection pid={player.pid} />
@@ -364,40 +363,6 @@ const Player2 = ({
 					</HideableSection>
 				</div>
 			</div>
-
-			{earlierHonorsGrouped.length > 0 || player.collegeSeason ? (
-				<div className="row">
-					{player.collegeSeason ? (
-						<div className="col-12 col-lg-8 order-lg-last">
-							<CollegeSeasonSection summary={player.collegeSeason} />
-						</div>
-					) : null}
-					{earlierHonorsGrouped.length > 0 ? (
-						<div className="col-12 col-md-6 col-lg-4">
-							<HideableSection
-								title="Earlier honors"
-								description="From before he was drafted, so not counted as pro awards."
-							>
-								<table className="table table-nonfluid table-striped table-borderless table-sm player-awards">
-									<tbody>
-										{earlierHonorsGrouped.map((a, i) => {
-											return (
-												<tr key={i}>
-													<td>
-														{a.count > 1 ? `${a.count}x ` : null}
-														{a.type.replace(COLLEGE_AWARD_PREFIX, "")} (
-														{Object.values(a.seasons).flat().join(", ")})
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</HideableSection>
-						</div>
-					) : null}
-				</div>
-			) : null}
 
 			<div className="row" style={{ marginBottom: "-1rem" }}>
 				<div className="col-md-6 col-lg-4">

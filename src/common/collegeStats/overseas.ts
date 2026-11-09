@@ -13,6 +13,8 @@ export type LeagueEnv = {
 	games: number;
 	// The usage a young player gets at a pro club, relative to a college star's role
 	usageShift: number;
+	// Minutes lost relative to a college role: the stronger the league, the less a prospect plays (a teenager in the EuroLeague averages about 15 minutes)
+	minShift: number;
 };
 
 const env = (
@@ -22,30 +24,39 @@ const env = (
 	mpgCap: number,
 	games: number,
 	usageShift = -0.035,
-): LeagueEnv => ({ pace, gameMinutes, youthCap, mpgCap, games, usageShift });
+	minShift = -6,
+): LeagueEnv => ({
+	pace,
+	gameMinutes,
+	youthCap,
+	mpgCap,
+	games,
+	usageShift,
+	minShift,
+});
 
 export const LEAGUE_ENV: Record<string, LeagueEnv> = {
-	EuroLeague: env(70, 40, 22, 32, 36, -0.05),
-	"NBA G League": env(103, 48, 30, 38, 48, -0.02),
-	"Liga ACB": env(72, 40, 20, 32, 36, -0.045),
+	EuroLeague: env(70, 40, 18, 30, 36, -0.06, -11),
+	"NBA G League": env(103, 48, 30, 38, 48, -0.02, -2),
+	"Liga ACB": env(72, 40, 18, 30, 36, -0.05, -10),
 	NBL: env(76, 40, 24, 34, 30),
 	"Chinese CBA": env(82, 48, 26, 38, 46),
 	"LNB Pro A": env(74, 40, 24, 33, 34),
-	EuroCup: env(72, 40, 24, 33, 32),
+	EuroCup: env(72, 40, 22, 32, 32, -0.04, -8),
 	"Basketball Bundesliga": env(76, 40, 24, 33, 34),
 	"Adriatic League": env(74, 40, 26, 34, 30),
-	NBL1: env(82, 40, 30, 36, 22, -0.01),
+	NBL1: env(82, 40, 30, 36, 22, -0.01, -1),
 	"Basketball Champions League": env(73, 40, 24, 33, 32),
-	"Turkish BSL": env(74, 40, 22, 32, 32, -0.045),
-	"Greek Basket League": env(71, 40, 22, 32, 28, -0.045),
+	"Turkish BSL": env(74, 40, 20, 31, 32, -0.045, -9),
+	"Greek Basket League": env(71, 40, 20, 31, 28, -0.045, -8),
 	"Israeli Premier League": env(78, 40, 24, 33, 30),
 	"Japan B.League": env(76, 40, 26, 34, 60),
 	"Brazil NBB": env(78, 40, 26, 34, 34),
-	"Basketball Africa League": env(76, 40, 28, 34, 12, -0.02),
-	CEBL: env(84, 40, 30, 35, 20, -0.02),
-	"Italian LBA": env(73, 40, 22, 32, 32, -0.045),
+	"Basketball Africa League": env(76, 40, 28, 34, 12, -0.02, -3),
+	CEBL: env(84, 40, 30, 35, 20, -0.02, -2),
+	"Italian LBA": env(73, 40, 20, 31, 32, -0.045, -8),
 	"Lithuanian LKL": env(74, 40, 22, 32, 36),
-	"VTB United League": env(76, 40, 24, 33, 34),
+	"VTB United League": env(76, 40, 22, 32, 34, -0.04, -8),
 	"Polish PLK": env(76, 40, 26, 34, 30),
 	"BNXT League": env(76, 40, 26, 34, 32),
 	"Korean KBL": env(78, 40, 26, 34, 54),
@@ -115,12 +126,12 @@ export const getPreDraftLabel = (
 
 // Bars on strength-adjusted game score per game (pro box scores run lower than college ones: fewer minutes, slower pace)
 export const PRO_BARS = {
-	mvp: 15.5,
-	allLeagueFirst: 13,
-	allLeagueSecond: 11,
-	risingStar: 8,
-	bestYoungPlayer: 9.5,
-	allDefensive: 4.2,
+	mvp: 16,
+	allLeagueFirst: 13.5,
+	allLeagueSecond: 11.5,
+	risingStar: 8.5,
+	bestYoungPlayer: 10,
+	allDefensive: 5.5,
 	minGp: 10,
 	minMpg: 12,
 };

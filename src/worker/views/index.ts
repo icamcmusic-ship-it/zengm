@@ -78,6 +78,7 @@ export { default as player } from "./player.ts";
 export { default as playerBios } from "./playerBios.ts";
 export { default as playerFeats } from "./playerFeats.ts";
 export { default as playerGameLog } from "./playerGameLog.ts";
+export { default as playerPreDraft } from "./playerPreDraft.ts";
 export { default as playerRatingDists } from "./playerRatingDists.ts";
 export { default as playerRatings } from "./playerRatings.ts";
 export { default as playerStatDists } from "./playerStatDists.ts";

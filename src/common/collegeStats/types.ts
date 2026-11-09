@@ -1,4 +1,5 @@
 import type { ProspectNcaaSummary } from "./ncaa.ts";
+import type { SplitLine } from "./season.ts";
 
 export const RATING_KEYS = [
 	"hgt",
@@ -84,6 +85,8 @@ export type CollegeSeason = {
 	defScore: number;
 	// With the college season model: his box scores in his team's postseason games (the last games of the season), in order
 	postseasonBoxes?: GameBox[];
+	// With the college season model: his regular season, non-conference and conference games
+	splits?: { nonConf: SplitLine; conf: SplitLine };
 };
 
 export type CollegeHonor = {

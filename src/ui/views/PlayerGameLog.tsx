@@ -2,6 +2,7 @@ import useTitleBar from "../hooks/useTitleBar.tsx";
 import { dropdownOptions } from "../hooks/useDropdownOptions.tsx";
 import type { View } from "../../common/types.ts";
 import TopStuff from "./Player/TopStuff.tsx";
+import { getProfileDropdownOptions, getProfileUrl } from "./Player/common.tsx";
 import { helpers } from "../util/helpers.ts";
 import { getCols } from "../../common/getCols.ts";
 import { DataTable } from "../components/DataTable/index.tsx";
@@ -174,7 +175,9 @@ const PlayerGameLog = ({
 			fields: [
 				{
 					key: "profile",
-					options: dropdownOptions.playerProfile,
+					options:
+						getProfileDropdownOptions(player) ??
+						dropdownOptions.playerProfile.slice(0, 2),
 					value: "gameLog",
 				},
 				{
@@ -188,9 +191,7 @@ const PlayerGameLog = ({
 				},
 			],
 			urlOverride: ({ profile, season }) =>
-				profile === "gameLog"
-					? ["player_game_log", player.pid, season]
-					: ["player", player.pid],
+				getProfileUrl(String(profile), player.pid, Number(season)),
 		},
 	});
 

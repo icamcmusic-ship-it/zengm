@@ -1,0 +1,653 @@
+import { PLAYER, PLAYER_STATS_TABLES } from "../../common/constants.ts";
+import { idb } from "../db/index.ts";
+import { g } from "../util/index.ts";
+import { defineView } from "../util/defineView.ts";
+import { player } from "../core/index.ts";
+import { getCommon } from "./player.ts";
+import type { RouteParams } from "../../ui/router/types.ts";
+import { getCollegeSeason } from "../core/draft/collegeSeason.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
+import {
+	COLLEGE_AWARD_PREFIX,
+	getPreDraftAwards,
+	getPreDraftStats,
+	getProStats,
+} from "../../common/preDraft.ts";
+import {
+	PRO_SHORT,
+	getLeagueEnv,
+	getPreDraftLabel,
+} from "../../common/collegeStats/overseas.ts";
+import { getSchool } from "../../common/collegeStats/colleges.helpers.ts";
+import {
+	getTeamIndex,
+	ncaaResultText,
+	type NcaaSeason,
+	type ProspectNcaaSummary,
+} from "../../common/collegeStats/ncaa.ts";
+import type { SplitLine } from "../../common/collegeStats/season.ts";
+import { Rng } from "../../common/collegeStats/rng.ts";
+import {
+	SIMILARITY_RATINGS,
+	combinePercentiles,
+	estimateRecord,
+	getClub,
+	getCombine,
+	getHeadCoach,
+	getRecruiting,
+	getStockTimeline,
+	prospectDistance,
+	type CombineResults,
+	type TeamRecord,
+} from "../../common/collegeStats/profile.ts";
+import type { MinimalPlayerRatings, Player } from "../../common/types.ts";
+
+type PlayerRatings = MinimalPlayerRatings & Record<string, any>;
+
+const CLASS_NAMES = ["Fr.", "So.", "Jr.", "Sr.", "Gr."];
+
+// His ratings row in his draft year: the last one from before he became a pro
+const draftRatings = (p: Player): PlayerRatings | undefined =>
+	p.ratings.findLast((r) => r.season <= p.draft.year) ??
+	(p.tid === PLAYER.UNDRAFTED ? p.ratings.at(-1) : undefined);
+
+const isProspect = (p: Player) =>
+	p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
+
+const combineFor = (p: Player): CombineResults | undefined => {
+	const r = draftRatings(p);
+	if (!r) {
+		return undefined;
+	}
+	const wingspan = (r as any).wingspan ?? (r as any).wng;
+	return getCombine({
+		pid: p.pid,
+		heightInches: p.hgt,
+		weight: p.weight,
+		ratings: {
+			hgt: r.hgt,
+			stre: r.stre,
+			spd: r.spd,
+			jmp: r.jmp,
+			endu: r.endu,
+			wingspan: typeof wingspan === "number" ? wingspan : undefined,
+		},
+	});
+};
+
+const getNumPicks = () =>
+	Math.max(1, g.get("numActiveTeams")) * Math.max(1, g.get("numDraftRounds"));
+
+const overallPick = (p: Player) =>
+	p.draft.round > 0
+		? (p.draft.round - 1) * Math.max(1, g.get("numActiveTeams")) + p.draft.pick
+		: undefined;
+
+const STATS_PER_GAME = PLAYER_STATS_TABLES.regular!.stats.filter(
+	(stat) => !stat.endsWith("Max"),
+);
+const STATS_ADVANCED = PLAYER_STATS_TABLES.advanced!.stats.filter(
+	(stat) => stat !== "onOff100" && stat !== "pm100",
+);
+
+const formatTable = async (
+	pRaw: Player,
+	stats: string[],
+	statType: "perGame" | "totals",
+) => {
+	const rawRows = getPreDraftStats(pRaw).filter((row) => !row.playoffs);
+	const formatted: any = await player.format(pRaw, {
+		stats: ["season", "age", ...stats] as any[],
+		seasonType: "regularSeason",
+		statType,
+		preDraftStats: "only",
+		mergeStats: "none",
+	});
+	if (!formatted || formatted.stats.length !== rawRows.length) {
+		return {
+			rows: [] as Record<string, any>[],
+			career: undefined as Record<string, any> | undefined,
+		};
+	}
+	return {
+		rows: (formatted.stats as Record<string, any>[])
+			.map(
+				(row, i): Record<string, any> => ({
+					...row,
+					teamName: rawRows[i]!.teamName ?? pRaw.college ?? "",
+				}),
+			)
+			.filter((row) => (row.gp ?? 0) > 0),
+		career: formatted.careerStats as Record<string, any> | undefined,
+	};
+};
+
+export type SplitRow = {
+	name: string;
+	record?: [number, number];
+	line: SplitLine;
+	estimated?: boolean;
+};
+
+const addLines = (lines: SplitLine[]): SplitLine => {
+	const out = { ...lines[0]! };
+	for (const key of Object.keys(out) as (keyof SplitLine)[]) {
+		out[key] = lines.reduce((sum, line) => sum + line[key], 0);
+	}
+	return out;
+};
+
+const gameLine = (games: ProspectNcaaSummary["games"]): SplitLine => ({
+	gp: games.length,
+	min: games.reduce((a, x) => a + x.min, 0),
+	pts: games.reduce((a, x) => a + x.pts, 0),
+	orb: 0,
+	drb: games.reduce((a, x) => a + x.trb, 0),
+	ast: games.reduce((a, x) => a + x.ast, 0),
+	stl: games.reduce((a, x) => a + x.stl, 0),
+	blk: games.reduce((a, x) => a + x.blk, 0),
+	tov: games.reduce((a, x) => a + x.tov, 0),
+	fg: games.reduce((a, x) => a + x.fg, 0),
+	fga: games.reduce((a, x) => a + x.fga, 0),
+	tp: games.reduce((a, x) => a + x.tp, 0),
+	tpa: games.reduce((a, x) => a + x.tpa, 0),
+	ft: games.reduce((a, x) => a + x.ft, 0),
+	fta: games.reduce((a, x) => a + x.fta, 0),
+	pf: 0,
+});
+
+/**
+ * Non-conference, conference, conference tournament and NCAA tournament splits of his draft year season. Stats generated before splits were stored get the regular season split by his team's schedule (marked estimated).
+ */
+const getSplits = (
+	summary: ProspectNcaaSummary,
+	seasonRow: Record<string, number> | undefined,
+	pid: number,
+): SplitRow[] => {
+	const conf = summary.games.filter((game) => game.event === "conf");
+	const ncaa = summary.games.filter((game) => game.event === "ncaa");
+	const wl = (games: typeof conf): [number, number] => [
+		games.filter((x) => x.won).length,
+		games.filter((x) => !x.won).length,
+	];
+	const post = wl(summary.games);
+	const regularTeam = summary.w + summary.l - summary.games.length;
+	const nonConfRecord: [number, number] = [
+		summary.w - summary.confW - post[0],
+		summary.l - summary.confL - post[1],
+	];
+	const output: SplitRow[] = [];
+	let nonConf = summary.splits?.nonConf;
+	let confLine = summary.splits?.conf;
+	let estimated = false;
+	if ((!nonConf || !confLine) && seasonRow && regularTeam > 0) {
+		// Regular season = season - postseason, split by his team's schedule
+		const postLine = gameLine(summary.games);
+		const regular: SplitLine = {
+			gp: Math.max(0, seasonRow.gp! - postLine.gp),
+			min: Math.max(0, seasonRow.min! - postLine.min),
+			pts: Math.max(0, seasonRow.pts! - postLine.pts),
+			orb: 0,
+			// Game lines only have total rebounds, kept in drb
+			drb: Math.max(0, seasonRow.drb! + seasonRow.orb! - postLine.drb),
+			ast: Math.max(0, seasonRow.ast! - postLine.ast),
+			stl: Math.max(0, seasonRow.stl! - postLine.stl),
+			blk: Math.max(0, seasonRow.blk! - postLine.blk),
+			tov: Math.max(0, seasonRow.tov! - postLine.tov),
+			fg: Math.max(0, seasonRow.fg! - postLine.fg),
+			fga: Math.max(0, seasonRow.fga! - postLine.fga),
+			tp: Math.max(0, seasonRow.tp! - postLine.tp),
+			tpa: Math.max(0, seasonRow.tpa! - postLine.tpa),
+			ft: Math.max(0, seasonRow.ft! - postLine.ft),
+			fta: Math.max(0, seasonRow.fta! - postLine.fta),
+			pf: seasonRow.pf!,
+		};
+		const share =
+			(nonConfRecord[0] + nonConfRecord[1]) / Math.max(1, regularTeam);
+		const rng = new Rng(`splits|${pid}`);
+		const ncGp = Math.round(regular.gp * share);
+		nonConf = { ...regular };
+		confLine = { ...regular };
+		for (const key of Object.keys(regular) as (keyof SplitLine)[]) {
+			const part =
+				key === "gp"
+					? ncGp
+					: Math.round(
+							regular[key] *
+								(regular.gp > 0 ? ncGp / regular.gp : 0) *
+								(1 +
+									(key === "pts" || key === "fg" ? 0.04 : 0) +
+									rng.normal(0, 0.03)),
+						);
+			nonConf[key] = Math.min(regular[key], Math.max(0, part));
+			confLine[key] = regular[key] - nonConf[key];
+		}
+		nonConf.fg = Math.min(nonConf.fg, nonConf.fga);
+		nonConf.tp = Math.min(nonConf.tp, nonConf.tpa, nonConf.fg);
+		nonConf.ft = Math.min(nonConf.ft, nonConf.fta);
+		confLine.fg = regular.fg - nonConf.fg;
+		confLine.tp = regular.tp - nonConf.tp;
+		confLine.ft = regular.ft - nonConf.ft;
+		estimated = true;
+	}
+	if (nonConf && confLine) {
+		output.push(
+			{
+				name: "Non-conference",
+				record: nonConfRecord,
+				line: nonConf,
+				estimated,
+			},
+			{
+				name: `${summary.conf} (regular season)`,
+				record: [summary.confW, summary.confL],
+				line: confLine,
+				estimated,
+			},
+		);
+	}
+	if (conf.length > 0) {
+		output.push({
+			name: `${summary.conf} Tournament`,
+			record: wl(conf),
+			line: gameLine(conf),
+		});
+	}
+	if (ncaa.length > 0) {
+		output.push({
+			name: "NCAA Tournament",
+			record: wl(ncaa),
+			line: gameLine(ncaa),
+		});
+	}
+	if (output.length > 1 && nonConf && confLine) {
+		output.push({
+			name: "Postseason",
+			record: post,
+			line: addLines([gameLine(summary.games)]),
+		});
+	}
+	return output;
+};
+
+const getPreDraftInfo = async (pRaw: Player) => {
+	const draftYear = pRaw.draft.year;
+	const rawRows = getPreDraftStats(pRaw).filter((row) => !row.playoffs);
+	const honors = getPreDraftAwards(pRaw).map((award) => ({
+		season: award.season,
+		type: award.type!.replace(COLLEGE_AWARD_PREFIX, ""),
+	}));
+	const summary = featureOn("collegeSeason")
+		? pRaw.collegeSeason?.summary
+		: undefined;
+
+	if (rawRows.length === 0 && honors.length === 0 && !summary) {
+		return undefined;
+	}
+
+	const [perGame, totals, advanced] = await Promise.all([
+		formatTable(pRaw, STATS_PER_GAME, "perGame"),
+		formatTable(pRaw, STATS_PER_GAME, "totals"),
+		formatTable(pRaw, STATS_ADVANCED, "perGame"),
+	]);
+
+	const prospect = isProspect(pRaw);
+	const rDraft = draftRatings(pRaw);
+	const fuzz = prospect ? (rDraft?.fuzz ?? 0) : 0;
+
+	// Season by season: where, coach, team record
+	const ncaaSeasons = new Map<number, NcaaSeason | undefined>();
+	const getNcaaSeason = async (season: number) => {
+		if (!featureOn("collegeSeason")) {
+			return undefined;
+		}
+		if (!ncaaSeasons.has(season)) {
+			ncaaSeasons.set(season, (await getCollegeSeason(season))?.season);
+		}
+		return ncaaSeasons.get(season);
+	};
+
+	let collegeIndex = 0;
+	const seasons = [];
+	for (const row of rawRows) {
+		const teamName = row.teamName ?? pRaw.college ?? "";
+		const label = getPreDraftLabel(teamName);
+		const school = getSchool(teamName);
+		const isNcaa = !!school && !school.nonCollege;
+		const env = getLeagueEnv(teamName);
+		const club = isNcaa ? undefined : getClub(teamName, pRaw.pid);
+		const coachKey = club ? `${teamName}|${club}` : teamName;
+		const coach = getHeadCoach(coachKey, row.season, label === "Overseas");
+
+		let record: TeamRecord | undefined;
+		let apRank: number | undefined;
+		let ncaa: string | undefined;
+		let confRank: { rank: number; size: number } | undefined;
+		if (isNcaa && summary && summary.season === row.season) {
+			record = {
+				w: summary.w,
+				l: summary.l,
+				confW: summary.confW,
+				confL: summary.confL,
+				estimated: false,
+			};
+			apRank = summary.apRank;
+			ncaa = ncaaResultText(summary);
+			confRank = { rank: summary.confRank, size: summary.confSize };
+		} else if (isNcaa) {
+			const ncaaSeason = await getNcaaSeason(row.season);
+			const team = ncaaSeason ? getTeamIndex(ncaaSeason, teamName) : -1;
+			// A season simulated after his stats were generated can have played fewer games than he did; then the estimate, which covers his games
+			if (
+				ncaaSeason &&
+				team >= 0 &&
+				ncaaSeason.teams[team]!.w + ncaaSeason.teams[team]!.l >= (row.gp ?? 0)
+			) {
+				const t = ncaaSeason.teams[team]!;
+				record = {
+					w: t.w,
+					l: t.l,
+					confW: t.confW,
+					confL: t.confL,
+					estimated: false,
+				};
+				apRank = t.apRank;
+				ncaa =
+					t.ncaa !== undefined
+						? `${t.ncaa === "Champion" ? "National Champion" : t.ncaa} (seed ${t.ncaaSeed})`
+						: undefined;
+				const conf = ncaaSeason.conferences.find((c) => c.name === t.conf);
+				confRank = { rank: t.confRank, size: conf?.standings.length ?? 0 };
+			}
+		}
+		record ??= estimateRecord({
+			team: coachKey,
+			season: row.season,
+			strength: school?.strength ?? 60,
+			gp: row.gp ?? 0,
+			conference: isNcaa ? school.conference : undefined,
+		});
+
+		seasons.push({
+			season: row.season,
+			teamName,
+			label,
+			classYear: isNcaa ? CLASS_NAMES[Math.min(collegeIndex++, 4)] : undefined,
+			conference: isNcaa ? school.conference : undefined,
+			league: isNcaa ? undefined : teamName,
+			leagueShort: isNcaa ? undefined : (PRO_SHORT[teamName] ?? teamName),
+			club,
+			strength: school?.strength,
+			leagueGames: env?.games,
+			coach,
+			record,
+			apRank,
+			ncaa,
+			confRank,
+			gp: row.gp ?? 0,
+			gs: row.gs ?? 0,
+		});
+	}
+
+	// Recruiting, for a player who went to an NCAA school
+	const firstNcaa = seasons.find((s) => s.conference !== undefined);
+	const recruiting =
+		firstNcaa && rDraft
+			? getRecruiting({
+					pid: pRaw.pid,
+					pot: rDraft.pot,
+					ovr: rDraft.ovr,
+					pos: rDraft.pos,
+					firstCollegeSeason: firstNcaa.season,
+				})
+			: undefined;
+
+	// His draft class, for combine ranks and the draft board
+	const classPlayers = (await idb.merged.players.getAll({ draftYear })).filter(
+		(p) => p.draft.year === draftYear && p.ratings.length > 0,
+	);
+	if (!classPlayers.some((p) => p.pid === pRaw.pid)) {
+		classPlayers.push(pRaw);
+	}
+
+	const combine = combineFor(pRaw);
+	let combineInfo;
+	if (combine) {
+		const all: CombineResults[] = [];
+		for (const p of classPlayers) {
+			const c = p.pid === pRaw.pid ? combine : combineFor(p);
+			if (c) {
+				all.push(c);
+			}
+		}
+		combineInfo = {
+			results: combine,
+			percentiles: combinePercentiles(combine, all),
+			n: all.length,
+			// Without a wingspan rating, wingspan comes from length in the hgt rating
+			wingspanRating:
+				rDraft !== undefined &&
+				typeof ((rDraft as any).wingspan ?? (rDraft as any).wng) === "number",
+		};
+	}
+
+	// Draft stock
+	const numPicks = getNumPicks();
+	let finalPick: number;
+	let drafted = false;
+	const pick = overallPick(pRaw);
+	if (pick !== undefined) {
+		finalPick = pick;
+		drafted = true;
+	} else if (!prospect) {
+		// Went undrafted
+		finalPick = numPicks + 10;
+		drafted = true;
+	} else {
+		// Where the board has him now: by value, as teams draft
+		const board = classPlayers
+			.filter(isProspect)
+			.sort((a, b) => b.valueFuzz - a.valueFuzz);
+		finalPick = board.findIndex((p) => p.pid === pRaw.pid) + 1;
+		if (finalPick <= 0) {
+			finalPick = numPicks + 10;
+		}
+	}
+	const stock = getStockTimeline({
+		pid: pRaw.pid,
+		seasons: rawRows.map((row) => row.season),
+		finalPick,
+		numPicks,
+		recruitRank: recruiting?.nationalRank,
+		drafted,
+	});
+
+	// Similar prospects from past classes in this league
+	let comps: Awaited<ReturnType<typeof getComps>> = [];
+	if (rDraft) {
+		comps = await getComps(pRaw, rDraft, fuzz);
+	}
+
+	const splits =
+		summary && summary.games
+			? getSplits(
+					summary,
+					rawRows.findLast((row) => row.season === summary.season) as any,
+					pRaw.pid,
+				)
+			: [];
+
+	return {
+		draftYear,
+		drafted,
+		draft:
+			pick !== undefined
+				? {
+						round: pRaw.draft.round,
+						pick: pRaw.draft.pick,
+						overall: pick,
+						abbrev: g.get("teamInfoCache")[pRaw.draft.tid]?.abbrev ?? "",
+						tid: pRaw.draft.tid,
+					}
+				: undefined,
+		projectedPick: !drafted && finalPick <= numPicks ? finalPick : undefined,
+		numPicks,
+		perGame,
+		totals,
+		advanced,
+		statsPerGame: STATS_PER_GAME,
+		statsAdvanced: STATS_ADVANCED,
+		seasons,
+		honors,
+		summary,
+		splits,
+		recruiting,
+		combine: combineInfo,
+		stock,
+		comps,
+	};
+};
+
+const getComps = async (pRaw: Player, rDraft: PlayerRatings, fuzz: number) => {
+	const draftYear = pRaw.draft.year;
+	const fuzzed = (x: number) => (fuzz ? player.fuzzRating(x, fuzz) : x);
+	const mine = {
+		ratings: Object.fromEntries(
+			SIMILARITY_RATINGS.map((key) => [
+				key,
+				key === "hgt" ? rDraft.hgt : fuzzed((rDraft as any)[key]),
+			]),
+		),
+		age: draftYear - pRaw.born.year,
+		pos: rDraft.pos,
+		ovr: fuzzed(rDraft.ovr),
+	};
+
+	const candidates: { p: Player; distance: number; r: PlayerRatings }[] = [];
+	const firstSeason = g.get("startingSeason");
+	for (
+		let year = draftYear - 1;
+		year >= Math.max(firstSeason, draftYear - 25);
+		year--
+	) {
+		const players = await idb.merged.players.getAll({ draftYear: year });
+		for (const p of players) {
+			if (p.draft.year !== year || isProspect(p)) {
+				continue;
+			}
+			// Only players whose draft year ratings exist (drafted while this league was running)
+			const r = p.ratings.find((row) => row.season === year);
+			if (!r) {
+				continue;
+			}
+			const distance = prospectDistance(mine, {
+				ratings: r as any,
+				age: year - p.born.year,
+				pos: r.pos,
+				ovr: r.ovr,
+			});
+			candidates.push({ p, distance, r });
+		}
+	}
+	candidates.sort((a, b) => a.distance - b.distance);
+
+	const output = [];
+	for (const { p, distance, r } of candidates.slice(0, 5)) {
+		const formatted = await player.format(p, {
+			attrs: ["pid", "name", "tid", "abbrev"],
+			stats: ["gp", "pts", "trb", "ast", "per", "ws"],
+			seasonType: "regularSeason",
+		});
+		const proSeasons = new Set(
+			getProStats(p)
+				.filter((row) => !row.playoffs && (row.gp ?? 0) > 0)
+				.map((row) => row.season),
+		).size;
+		const preDraft = getPreDraftStats(p).filter((row) => !row.playoffs);
+		const lastPre = preDraft.at(-1);
+		let peakOvr = 0;
+		for (const row of p.ratings) {
+			if (row.season > p.draft.year) {
+				peakOvr = Math.max(peakOvr, row.ovr);
+			}
+		}
+		const countAwards = (type: string) =>
+			p.awards.filter((a) => a.type === type).length;
+		output.push({
+			pid: p.pid,
+			name: `${p.firstName} ${p.lastName}`,
+			draftYear: p.draft.year,
+			pick: overallPick(p),
+			draftAbbrev:
+				p.draft.round > 0
+					? (g.get("teamInfoCache")[p.draft.tid]?.abbrev ?? "")
+					: undefined,
+			pos: r.pos,
+			age: p.draft.year - p.born.year,
+			ovrAtDraft: r.ovr,
+			potAtDraft: r.pot,
+			school: lastPre?.teamName ?? p.college ?? "",
+			similarity: Math.max(0, Math.round(100 - 3 * distance)),
+			proSeasons,
+			peakOvr: peakOvr > 0 ? peakOvr : undefined,
+			career: formatted?.careerStats as
+				| {
+						gp: number;
+						pts: number;
+						trb: number;
+						ast: number;
+						per: number;
+						ws: number;
+				  }
+				| undefined,
+			allStar: countAwards("All-Star"),
+			mvp: countAwards("Most Valuable Player"),
+			retired: p.tid === PLAYER.RETIRED,
+		});
+	}
+	return output;
+};
+
+const processInputs = (params: RouteParams<"playerPreDraft">) => {
+	return {
+		pid: params.pid !== undefined ? Number.parseInt(params.pid) : undefined,
+	};
+};
+
+export default defineView({
+	id: "playerPreDraft",
+	processInputs,
+	load: async ({ inputs, updateEvents, prevInputs }) => {
+		if (
+			updateEvents.has("firstRun") ||
+			updateEvents.has("playerMovement") ||
+			prevInputs?.pid !== inputs.pid
+		) {
+			const topStuff = await getCommon(
+				inputs.pid,
+				undefined,
+				"player_pre_draft",
+			);
+			if (topStuff.type === "error") {
+				// https://stackoverflow.com/a/59923262/786644
+				const returnValue = {
+					errorMessage: topStuff.errorMessage,
+				};
+				return returnValue;
+			}
+
+			const preDraft =
+				__SPORT === "basketball"
+					? await getPreDraftInfo(topStuff.pRaw)
+					: undefined;
+
+			// The raw player stays in the worker (hidden trait seeds, etc.)
+			const { pRaw: _pRaw, ...topStuffForUI } = topStuff;
+
+			return {
+				...topStuffForUI,
+				preDraft,
+			};
+		}
+	},
+});
