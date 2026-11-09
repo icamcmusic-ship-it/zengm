@@ -41,6 +41,7 @@ import {
 	type TeamRecord,
 } from "../../common/collegeStats/profile.ts";
 import type { MinimalPlayerRatings, Player } from "../../common/types.ts";
+import { expandedRatingsApply } from "../core/player/expandedRatings.ts";
 
 type PlayerRatings = MinimalPlayerRatings & Record<string, any>;
 
@@ -59,7 +60,9 @@ const combineFor = (p: Player): CombineResults | undefined => {
 	if (!r) {
 		return undefined;
 	}
-	const wingspan = (r as any).wingspan ?? (r as any).wng;
+	// wng is on the hgt scale, so what matters is how far it is from his height rating. Only with the setting on: a row can keep wng from
+	// when the setting was on before
+	const wingspanGap = expandedRatingsApply(r) ? r.wng - r.hgt : undefined;
 	return getCombine({
 		pid: p.pid,
 		heightInches: p.hgt,
@@ -70,7 +73,7 @@ const combineFor = (p: Player): CombineResults | undefined => {
 			spd: r.spd,
 			jmp: r.jmp,
 			endu: r.endu,
-			wingspan: typeof wingspan === "number" ? wingspan : undefined,
+			wingspanGap,
 		},
 	});
 };
@@ -428,9 +431,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 			percentiles: combinePercentiles(combine, all),
 			n: all.length,
 			// Without a wingspan rating, wingspan comes from length in the hgt rating
-			wingspanRating:
-				rDraft !== undefined &&
-				typeof ((rDraft as any).wingspan ?? (rDraft as any).wng) === "number",
+			wingspanRating: rDraft !== undefined && expandedRatingsApply(rDraft),
 		};
 	}
 

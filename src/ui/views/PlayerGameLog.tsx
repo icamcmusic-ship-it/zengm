@@ -167,7 +167,7 @@ const PlayerGameLog = ({
 	stats,
 	superCols,
 }: View<"playerGameLog">) => {
-	const profileOptions = usePlayerProfileOptions(player);
+	const profileOptions = usePlayerProfileOptions(player, "gameLog");
 	useTitleBar({
 		title: player.name,
 		customMenu,

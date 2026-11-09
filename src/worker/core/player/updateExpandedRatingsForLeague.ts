@@ -5,7 +5,7 @@ import { helpers } from "../../util/index.ts";
 import ovr from "./ovr.ts";
 import skills from "./skills.ts";
 import updateValues from "./updateValues.ts";
-import { expandedRatingsOn } from "./expandedRatings.ts";
+import { expandedRatingsOn, syncDefenseToDiq } from "./expandedRatings.ts";
 
 // The setting was turned on or off in a league: fill in the new ratings (on) and recompute the current ovr, pot and skills of every
 // player who isn't retired (ovr reads wingspan and the skills read the new composites when on). Retired players' old rows are derived
@@ -20,10 +20,13 @@ const updateExpandedRatingsForLeague = async () => {
 		if (p.tid === PLAYER.RETIRED) {
 			continue;
 		}
+		const r = p.ratings.at(-1)! as any;
 		if (on) {
 			fillExpandedRatings(p);
+			// Turned back on after a spell off: the rows kept the old perimeter/interior defense while diq developed on its own, so move
+			// them to his current diq (keeping his split), or the sim would use stale defense ratings
+			syncDefenseToDiq(r);
 		}
-		const r = p.ratings.at(-1)! as any;
 		if (!r.locked) {
 			const oldOvr = r.ovr;
 			r.ovr = ovr(r);

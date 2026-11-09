@@ -178,6 +178,43 @@ describe("turning the setting on in an existing league", () => {
 	});
 });
 
+describe("turning the setting off and on again", () => {
+	test("defense ratings follow diq's development while it was off", async () => {
+		await withSeed(5, async () => {
+			await setup(true);
+			const players = range(20).map((i) => {
+				const p: any = player.generate(i % 2, 25, 2018, true, DEFAULT_LEVEL);
+				p.pid = i;
+				return p;
+			});
+			for (const p of players) {
+				await player.develop(p, 0);
+			}
+			await resetCache({ players });
+			g.setWithoutSavingToDB("expandedRatings", false);
+			await updateExpandedRatingsForLeague();
+			// A season off: diq develops without them, the next row is a copy of the old one
+			const splits = new Map<number, number>();
+			for (const p of await idb.cache.players.getAll()) {
+				const r = p.ratings.at(-1) as any;
+				splits.set(p.pid, r.pdef - r.idef);
+				r.diq = Math.min(90, r.diq + 12);
+			}
+			g.setWithoutSavingToDB("expandedRatings", true);
+			await updateExpandedRatingsForLeague();
+			for (const p of await idb.cache.players.getAll()) {
+				const r = p.ratings.at(-1) as any;
+				assert.strictEqual(blendDiq(r.pdef, r.idef), r.diq, `pid ${p.pid}`);
+				assert.isAtMost(
+					Math.abs(r.pdef - r.idef - splits.get(p.pid)!),
+					1,
+					`pid ${p.pid}`,
+				);
+			}
+		});
+	});
+});
+
 describe("skill badges", () => {
 	test("perimeter/interior defense and length drive the defensive badges when present", () => {
 		const base = {
