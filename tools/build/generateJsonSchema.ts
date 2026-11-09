@@ -1473,6 +1473,9 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					startingSeason: {
 						type: "integer",
 					},
+					saveEveryDay: {
+						type: "boolean",
+					},
 					stopOnInjury: {
 						type: "boolean",
 					},

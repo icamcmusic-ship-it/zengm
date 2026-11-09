@@ -3,7 +3,12 @@ import { TRAIT_KEYS, type PlayerTraits, type TraitKey } from "./types.ts";
 
 export const SEED_LIMIT = 8;
 
-export const seedKey = (key: TraitKey) => `${key}Seed` as const;
+// Looked up rather than built every time (hot: every trait of every player in every game)
+const SEED_KEYS = Object.fromEntries(
+	TRAIT_KEYS.map((key) => [key, `${key}Seed`]),
+) as { [K in TraitKey]: `${K}Seed` };
+export const seedKey = <K extends TraitKey>(key: K): `${K}Seed` =>
+	SEED_KEYS[key] ?? `${key}Seed`;
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
@@ -15,16 +20,29 @@ const drawSeed = (rng: Rng) =>
 	clampSeed(Math.max(-3, Math.min(3, rng.normal(0, 1))));
 
 // Deterministic: the same league seed and pid always give the same traits. Each trait has its own stream, so adding a trait later never moves the others.
+// Pure, and hot (every trait score of a player without stored seeds), so remembered. Bounded: cleared when full.
+const generatedCache = new Map<string, Required<PlayerTraits>>();
+const GENERATED_CACHE_MAX = 20000;
+
 export const generateTraitSeeds = (
 	leagueSeed: number | string,
 	pid: number,
 ): Required<PlayerTraits> => {
+	const cacheKey = `${leagueSeed}|${pid}`;
+	const cached = generatedCache.get(cacheKey);
+	if (cached) {
+		return { ...cached };
+	}
 	const traits: Partial<Record<string, number>> = {};
 	for (const key of TRAIT_KEYS) {
 		traits[seedKey(key)] = drawSeed(
 			new Rng(`traits|${leagueSeed}|${pid}|${key}`),
 		);
 	}
+	if (generatedCache.size >= GENERATED_CACHE_MAX) {
+		generatedCache.clear();
+	}
+	generatedCache.set(cacheKey, { ...traits } as Required<PlayerTraits>);
 	return traits as Required<PlayerTraits>;
 };
 
@@ -34,11 +52,21 @@ export const completeTraitSeeds = (
 	leagueSeed: number | string,
 	pid: number,
 ): Required<PlayerTraits> => {
-	const generated = generateTraitSeeds(leagueSeed, pid);
 	if (!traits) {
-		return generated;
+		return generateTraitSeeds(leagueSeed, pid);
 	}
-	const output = { ...generated };
+	// Usually every seed is stored, then nothing needs generating
+	let complete = true;
+	for (const key of TRAIT_KEYS) {
+		const value = traits[seedKey(key)];
+		if (typeof value !== "number" || !Number.isFinite(value)) {
+			complete = false;
+			break;
+		}
+	}
+	const output = (
+		complete ? {} : generateTraitSeeds(leagueSeed, pid)
+	) as Required<PlayerTraits>;
 	for (const key of TRAIT_KEYS) {
 		const value = traits[seedKey(key)];
 		if (typeof value === "number" && Number.isFinite(value)) {

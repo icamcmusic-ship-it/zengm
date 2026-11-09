@@ -2,20 +2,27 @@
 //
 //   Real-league seasons (headless, default settings): HYPE_LEAGUE_OUT=<dir> vitest run --project basketball src/worker/util/hypeCalibrationLeague.test.ts, then --lines=<dir>
 //
-//   node tools/hypeCalibration/calibrate.ts <dirs with season JSON files> [--lines=<dir>] [--dry]
+//   node tools/hypeCalibration/calibrate.ts <dirs with season JSON files> [--lines=<dir>] [--dry] [--keep-pre]
 //
-// Lines are measured first and written, then the games are rated with those line tables (rarity feeds the post-game points), so run it once; --dry prints the distributions without writing. The scale knots are the raw points at fixed percentiles of all games (regular season and playoffs).
+// Lines are measured first (survival tables per stat, then of the combined line index built on them), then the games are rated with those line tables (rarity feeds the post-game points), so run it once; --dry prints the distributions without writing. The scale knots are the raw points at fixed percentiles of all games (regular season and playoffs).
 import fs from "node:fs";
 import path from "node:path";
-import { LINE_STATS, PCT, TAIL } from "../../src/common/hype/calibration.ts";
+import {
+	LINE_STATS,
+	LINE_STEP,
+	PCT,
+} from "../../src/common/hype/calibration.ts";
 import { CAL } from "../../src/common/hype/calibration.generated.ts";
 import { storedGames } from "../../src/common/hype/gather.ts";
 import { hypeForGame, targetOfGame } from "../../src/common/hype/index.ts";
-import type { HRaw } from "../../src/common/hype/types.ts";
+import { lineIndex } from "../../src/common/hype/post.ts";
+import type { HBoxLine, HRaw } from "../../src/common/hype/types.ts";
 import { gmsc } from "../../src/common/hype/util.ts";
 
 const args = process.argv.slice(2);
 const dry = args.includes("--dry");
+// --keep-pre: leave the pre-game scale as it is (refit only the game rating)
+const keepPre = args.includes("--keep-pre");
 const dirs = args.filter((x) => !x.startsWith("--"));
 // --lines=<dir>: measure the single-game line tables on that directory only (seasons of a real league, from bbgm.hypeCalibrationDump), rate games from all directories
 const linesDir = args.find((x) => x.startsWith("--lines="))?.slice(8);
@@ -44,6 +51,7 @@ const vals: Record<string, number[]> = {};
 for (const k of LINE_STATS) {
 	vals[k] = [];
 }
+const boxLines: HBoxLine[] = [];
 let games = 0;
 for (const f of lineFiles) {
 	const raw: HRaw = JSON.parse(fs.readFileSync(f, "utf8"));
@@ -55,6 +63,7 @@ for (const f of lineFiles) {
 		for (const t of g.teams) {
 			for (const p of t.players) {
 				if (p.min > 0) {
+					boxLines.push(p);
 					for (const k of LINE_STATS) {
 						vals[k]!.push(k === "gmsc" ? gmsc(p) : p[k]);
 					}
@@ -63,15 +72,49 @@ for (const f of lineFiles) {
 		}
 	}
 }
-const tail: Record<string, number[]> = {};
+const lines = boxLines.length;
+const r2 = (x: number) => Math.round(x * 100) / 100;
+// -log10 of the share of values at least each bucket (value / step, rounded down), up to the last bucket that at least MIN values reach; and the rarity per bucket past it, fitted from where 100 values were left (the tail steepens)
+const MIN = 10;
+const survival = (v: number[], step: number) => {
+	const count: number[] = [];
+	for (const x of v) {
+		const i = Math.max(0, Math.floor(x / step + 1e-9));
+		count[i] = (count[i] ?? 0) + 1;
+	}
+	const atLeast: number[] = [];
+	let acc = 0;
+	for (let i = count.length - 1; i >= 0; i--) {
+		acc += count[i] ?? 0;
+		atLeast[i] = acc;
+	}
+	const end = atLeast.findLastIndex((n) => n >= MIN);
+	const t = atLeast.slice(0, end + 1).map((n) => r2(-Math.log10(n / v.length)));
+	const from = Math.max(
+		0,
+		atLeast.findIndex((n) => n <= 100),
+	);
+	const slope = end > from ? (t[end]! - t[from]!) / (end - from) : 0.5;
+	return { t, slope: Math.round(slope * 1000) / 1000 };
+};
+const surv: Record<string, number[]> = {};
+const slope: Record<string, number> = {};
 const mean: Record<string, number> = {};
 for (const k of LINE_STATS) {
-	const v = vals[k]!.sort((a, b) => a - b);
-	tail[k] = TAIL.map((f) => r1(quantile(v, 1 - f)));
+	const v = vals[k]!;
+	const x = survival(v, 1);
+	surv[k] = x.t;
+	slope[k] = x.slope;
 	mean[k] = Math.round((v.reduce((s, x) => s + x, 0) / v.length) * 1000) / 1000;
 }
-const lines = vals.pts!.length;
-console.log({ games, lines, tail, mean });
+// the combined line index, measured with those tables
+Object.assign(CAL, { surv, slope });
+const line = survival(
+	boxLines.map((p) => lineIndex(p).c),
+	LINE_STEP,
+).t;
+const perGame = r2(Math.log10(lines / games));
+console.log({ games, lines, surv, slope, mean, line, perGame });
 
 const write = (
 	pre: number[],
@@ -82,16 +125,19 @@ const write = (
 export const CAL: {
 	pre: number[];
 	post: number[];
-	tail: Record<string, number[]>;
+	surv: Record<string, number[]>;
+	slope: Record<string, number>;
+	line: number[];
+	perGame: number;
 	mean: Record<string, number>;
 	n: { games: number; lines: number };
-} = ${JSON.stringify({ pre, post, tail, mean, n }, null, "\t")};
+} = ${JSON.stringify({ pre, post, surv, slope, line, perGame, mean, n }, null, "\t")};
 `;
 	fs.writeFileSync("src/common/hype/calibration.generated.ts", out);
 };
 
 // 2. games, rated with the new line tables (CAL is the live object the engine reads)
-Object.assign(CAL, { tail, mean });
+Object.assign(CAL, { line, perGame, mean });
 const pre: number[] = [];
 const post: number[] = [];
 for (const f of files) {
@@ -118,5 +164,5 @@ const preK = knots(pre);
 const postK = knots(post);
 console.log({ rated: pre.length, preK, postK });
 if (!dry) {
-	write(preK, postK, { games: pre.length, lines });
+	write(keepPre ? CAL.pre : preK, postK, { games: pre.length, lines });
 }

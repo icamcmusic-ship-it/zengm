@@ -206,4 +206,28 @@ defaultRaces["Vietnam"] = defaultRaces["China"]!;
 defaultRaces["Virgin Islands"] = defaultRaces["South Africa"]!;
 defaultRaces["Wales"] = defaultRaces["Germany"]!;
 
+// Countries added with the fork's extra names (tools/names-manual/extra)
+defaultRaces["Barbados"] = defaultRaces["Nigeria"]!;
+defaultRaces["Belize"] = defaultRaces["South Africa"]!;
+defaultRaces["Bermuda"] = defaultRaces["Nigeria"]!;
+defaultRaces["Burkina Faso"] = defaultRaces["Nigeria"]!;
+defaultRaces["Curaçao"] = defaultRaces["South Africa"]!;
+defaultRaces["Fiji"] = defaultRaces["India"]!;
+defaultRaces["Guyana"] = defaultRaces["South Africa"]!;
+defaultRaces["Iraq"] = defaultRaces["Turkey"]!;
+defaultRaces["Jordan"] = defaultRaces["Turkey"]!;
+defaultRaces["Lebanon"] = defaultRaces["Turkey"]!;
+defaultRaces["Malaysia"] = defaultRaces["China"]!;
+defaultRaces["Martinique"] = defaultRaces["South Africa"]!;
+defaultRaces["Mongolia"] = defaultRaces["China"]!;
+defaultRaces["Rwanda"] = defaultRaces["Nigeria"]!;
+defaultRaces["Somalia"] = defaultRaces["Nigeria"]!;
+defaultRaces["Syria"] = defaultRaces["Turkey"]!;
+defaultRaces["Tanzania"] = defaultRaces["Nigeria"]!;
+defaultRaces["Togo"] = defaultRaces["Nigeria"]!;
+defaultRaces["Tonga"] = defaultRaces["India"]!;
+defaultRaces["Tunisia"] = defaultRaces["Morocco"]!;
+defaultRaces["Uganda"] = defaultRaces["Nigeria"]!;
+defaultRaces["Zimbabwe"] = defaultRaces["Nigeria"]!;
+
 export default defaultRaces;

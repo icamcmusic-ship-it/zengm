@@ -58,10 +58,22 @@ export const residualTraitZ = (
 		1,
 	);
 
-// Weighted sum of residual trait z's, about -1 to 1
-export const aiTraitSum = (
+// residualTraitZ of every trait. Only depends on the player, so it can be computed once and reused for every team context.
+export const residualTraitZs = (
 	scores: TraitScores,
 	ratings: TraitRatings,
+): Record<TraitKey, number> => {
+	const zs = {} as Record<TraitKey, number>;
+	for (const key of Object.keys(AI_TRAIT_WEIGHTS) as TraitKey[]) {
+		zs[key] = residualTraitZ(key, scores[key], ratings);
+	}
+	return zs;
+};
+
+// aiTraitSum from precomputed residualTraitZs
+export const aiTraitSumFromZs = (
+	zs: Record<TraitKey, number>,
+	scores: TraitScores,
 	context: AiTraitContext,
 ) => {
 	let sum = 0;
@@ -85,25 +97,34 @@ export const aiTraitSum = (
 		if (context.isProspect && context.hiddenKeys?.has(key)) {
 			weight *= 0.5;
 		}
-		sum += weight * residualTraitZ(key, scores[key], ratings);
+		sum += weight * zs[key];
 	}
 	return sum;
 };
+
+// Weighted sum of residual trait z's, about -1 to 1
+export const aiTraitSum = (
+	scores: TraitScores,
+	ratings: TraitRatings,
+	context: AiTraitContext,
+) => aiTraitSumFromZs(residualTraitZs(scores, ratings), scores, context);
+
+export const aiTraitValueFactorFromSum = (sum: number) =>
+	1 + AI_TRAIT_MAX_ADJ * clamp(sum / SATURATION, -1, 1);
+
+export const aiTraitContractFactorFromSum = (sum: number) =>
+	1 + CONTRACT_TRAIT_SHARE * (aiTraitValueFactorFromSum(sum) - 1);
 
 // Multiply a positive player value by this. 1 +- AI_TRAIT_MAX_ADJ
 export const aiTraitValueFactor = (
 	scores: TraitScores,
 	ratings: TraitRatings,
 	context: AiTraitContext,
-) =>
-	1 +
-	AI_TRAIT_MAX_ADJ *
-		clamp(aiTraitSum(scores, ratings, context) / SATURATION, -1, 1);
+) => aiTraitValueFactorFromSum(aiTraitSum(scores, ratings, context));
 
 // Same, for contract demands (league-wide, no team context), damped
 export const aiTraitContractFactor = (
 	scores: TraitScores,
 	ratings: TraitRatings,
 	context: AiTraitContext,
-) =>
-	1 + CONTRACT_TRAIT_SHARE * (aiTraitValueFactor(scores, ratings, context) - 1);
+) => aiTraitContractFactorFromSum(aiTraitSum(scores, ratings, context));

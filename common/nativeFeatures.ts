@@ -103,6 +103,42 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "bestGames",
+		key: "featureBestGames",
+		name: "Best Games & Top Plays",
+		description:
+			"The season's and all-time best games ranked by the post-game rating, with the reasons, and the top plays (game-winners, buzzer-beaters, big blocks, runs) from saved play-by-play, or from the clutch plays when no play-by-play is saved.",
+		default: true,
+		sports: BBGM,
+	},
+	{
+		id: "awardVote",
+		key: "featureAwardVote",
+		name: "Award Vote",
+		description:
+			"A simulated media vote (100 voters, NBA ballot points, voter noise and narratives) for MVP, DPOY, ROY, 6MOY, MIP and the All-League teams: a projected vote during the season and the full breakdown for past seasons. Does not change who wins unless the option below is on.",
+		default: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "featureAwardVoteStore",
+				name: "Save Award Votes",
+				description:
+					"When awards are given, save the simulated vote with them so past seasons show the same breakdown.",
+				type: "bool",
+				default: true,
+			},
+			{
+				key: "featureAwardVoteDecides",
+				name: "Simulated Vote Decides Awards",
+				description:
+					"Give MVP, DPOY, ROY, 6MOY, MIP and other league-wide player awards to the winner of the simulated vote instead of the best formula score.",
+				type: "bool",
+				default: false,
+			},
+		],
+	},
+	{
 		id: "leagueAchievements",
 		key: "featureLeagueAchievements",
 		name: "League Achievements",
@@ -457,6 +493,16 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "collegeSeason",
+		key: "featureCollegeSeason",
+		name: "College Season & March Madness",
+		description:
+			"With college stats, a light college season for each draft class's draft year: conference standings, AP Top 25, conference tournaments and the 68-team NCAA tournament, with prospects' teams, tournament games and honors on their pre-draft record (Draft Scouting → College/Overseas tab).",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "ratingsRegenerator",
 		key: "featureRatingsRegenerator",
 		name: "Ratings Regenerator",
@@ -516,6 +562,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "mockDraft",
+		key: "featureMockDraft",
+		name: "Mock Draft",
+		description:
+			"A two-round mock draft of the current class on Draft Scouting (each team picks by its own needs and strategy, in its real pick order), and simulated pro careers for prospects (peak ovr, star/starter/bust odds), also on the prospect's player page.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "frivolities",
 		key: "featureFrivolities",
 		name: "Extra Frivolities",
@@ -531,6 +587,46 @@ export const NATIVE_FEATURES = [
 			"A season-by-season timeline of champions, MVPs, headlines, storylines, achievements, records and trades.",
 		default: true,
 		sports: BBGM,
+	},
+	{
+		id: "rivalries",
+		key: "featureRivalries",
+		name: "Rivalries",
+		description:
+			"A rivalry score for every pair of teams (playoff meetings by round, close games, division, star duels, recent history), the Rivalries tab of Head-to-Head with Finals matchups and a rivalry timeline, and a rivals card on team history pages.",
+		default: true,
+		sports: BBGM,
+	},
+	{
+		id: "seriesRecaps",
+		key: "featureSeriesRecaps",
+		name: "Series Recaps",
+		description:
+			"A generated recap of every playoff series (game by game, leaders, series MVP, turning points, upsets and comebacks), the Series Recaps tab of Playoffs, recap links in the bracket and a news item when a series ends.",
+		default: true,
+		sports: BBGM,
+	},
+	{
+		id: "hyphenatedNames",
+		key: "featureHyphenatedNames",
+		name: "Hyphenated Last Names",
+		description:
+			"Some new American players get a hyphenated last name made of two common surnames, like Smith-Jones. Only affects players generated while it is on.",
+		default: false,
+		defaultNewLeague: true,
+		options: [
+			{
+				key: "hyphenatedNamesRate",
+				name: "Hyphenated Last Name Rate",
+				description:
+					"Percentage of new American players with a hyphenated last name.",
+				type: "float",
+				decoration: "percent",
+				default: 1,
+				min: 0,
+				max: 100,
+			},
+		],
 	},
 	{
 		id: "unretire",

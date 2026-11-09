@@ -4,6 +4,7 @@ import {
 	PHASE,
 } from "../../../common/constants.ts";
 import {
+	draft,
 	finances,
 	freeAgents,
 	league,
@@ -628,6 +629,9 @@ const newPhasePreseason = async (
 		newSeason,
 		PHASE.PRESEASON,
 	);
+
+	// A new draft class for the year that just came into range, plus any other missing ones
+	await draft.topUpDraftClasses(newSeason, PHASE.PRESEASON);
 
 	// No ads during multi season auto sim
 	if (env.enableLogging && !local.autoPlayUntil) {

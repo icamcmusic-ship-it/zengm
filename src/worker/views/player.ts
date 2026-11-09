@@ -163,6 +163,11 @@ export const getPlayer = async <
 		preDraftStats: preDraftStats.filter((row) => (row.gp ?? 0) > 0),
 		earlierHonors,
 
+		// His team's college season in his draft year (conference tournaments, March Madness)
+		collegeSeason: featureOn("collegeSeason")
+			? pRaw.collegeSeason?.summary
+			: undefined,
+
 		// Injury history by body part, and the injuryDepth setting's state (see core/player/injuryDepth.ts)
 		healthInfo: getHealthInfo(pRaw),
 

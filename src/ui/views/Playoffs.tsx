@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { range } from "../../common/utils.ts";
 import { PlayoffMatchup } from "../components/PlayoffMatchup.tsx";
 import { useLocal } from "../util/local.ts";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 
 type TeamToEdit = View<"playoffs">["teamsToEdit"][number];
 
@@ -34,6 +35,15 @@ const Playoffs = ({
 		},
 	});
 	const { userTid } = useLocal(["userTid"]);
+	const recapsOn = useFeatureOn("seriesRecaps");
+	const recapUrl = (x: { home: { tid: number }; away?: { tid: number } }) =>
+		recapsOn && x.away
+			? helpers.leagueUrl([
+					"series_recaps",
+					season,
+					`${Math.min(x.home.tid, x.away.tid)}-${Math.max(x.home.tid, x.away.tid)}`,
+				])
+			: undefined;
 
 	const [editing, setEditing] = useState(false);
 	const [teamsEdited, setTeamsEdited] = useState(teamsToEdit);
@@ -209,6 +219,11 @@ const Playoffs = ({
 											<PlayoffMatchup
 												bannerForWinner={finals}
 												numGamesToWinSeries={numGamesToWinSeries[m.matchup[0]]}
+												recapUrl={
+													series[m.matchup[0]]?.[m.matchup[1]]
+														? recapUrl(series[m.matchup[0]]![m.matchup[1]]!)
+														: undefined
+												}
 												season={season}
 												series={series[m.matchup[0]]![m.matchup[1]]}
 												userTid={userTid}

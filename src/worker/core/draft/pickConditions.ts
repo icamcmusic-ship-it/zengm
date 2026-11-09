@@ -14,18 +14,26 @@ const ordinalPick = (dp: DraftPick) =>
 
 // Resolve protections and swaps on this draft's picks, after their pick numbers are known. Mutates the picks.
 // futurePicks are the picks of later drafts, where rollovers and conversions go. Returns the picks that changed and
-// what happened, for the news feed. Pure, so it's easy to test.
+// what happened, for the news feed, and a short note per pick of this draft (for the Mock Draft, which runs this on
+// copies as a dry run). Pure, so it's easy to test.
 export const resolvePickConditionsPure = ({
 	draftPicks,
 	futurePicks,
 	teamName,
+	shortName = teamName,
 }: {
 	draftPicks: DraftPick[];
 	futurePicks: DraftPick[];
 	teamName: (tid: number) => string;
+	shortName?: (tid: number) => string;
 }) => {
 	const changed = new Set<DraftPick>();
 	const messages: PickConditionMessage[] = [];
+	const notes = new Map<DraftPick, string>();
+	const addNote = (pick: DraftPick, note: string) => {
+		const prev = notes.get(pick);
+		notes.set(pick, prev ? `${prev}; ${note}` : note);
+	};
 
 	// Swaps first. Each swap compares a pick with the swapping team's own pick in the same round
 	for (const dp of draftPicks) {
@@ -45,6 +53,7 @@ export const resolvePickConditionsPure = ({
 			continue;
 		}
 		if (!own || dp.pick <= 0 || own.pick <= 0) {
+			addNote(dp, `swap right of ${shortName(swapTid)} lapsed`);
 			messages.push({
 				text: `The right of the ${teamName(swapTid)} to swap ${dp.season} ${helpers.ordinal(dp.round)} round picks with the ${teamName(dp.tid)} lapsed, because the picks involved are no longer available.`,
 				tids: [swapTid, dp.tid],
@@ -58,12 +67,21 @@ export const resolvePickConditionsPure = ({
 			dp.tid = swapTid;
 			own.tid = otherTid;
 			changed.add(own);
+			addNote(
+				dp,
+				`swapped: ${shortName(swapTid)} get it from ${shortName(otherTid)}`,
+			);
+			addNote(
+				own,
+				`swapped: ${shortName(otherTid)} get it from ${shortName(swapTid)}`,
+			);
 			messages.push({
 				text: `The ${teamName(swapTid)} exercised their right to swap picks with the ${teamName(otherTid)}: they get the #${dp.pick} pick and give up the #${own.pick} pick in the ${dp.season} ${helpers.ordinal(dp.round)} round.`,
 				tids: [swapTid, otherTid],
 				dpids: [dp.dpid, own.dpid],
 			});
 		} else {
+			addNote(dp, `${shortName(swapTid)} declined the swap`);
 			messages.push({
 				text: `The ${teamName(swapTid)} kept their own #${own.pick} pick instead of swapping for the #${dp.pick} pick of the ${teamName(dp.tid)} in the ${dp.season} ${helpers.ordinal(dp.round)} round.`,
 				tids: [swapTid, dp.tid],
@@ -87,6 +105,10 @@ export const resolvePickConditionsPure = ({
 		const desc = `${protectionText(prot)} ${ordinalPick(dp)} of the ${teamName(dp.originalTid)}`;
 
 		if (dp.pick <= 0 || dp.pick > prot.top) {
+			addNote(
+				dp,
+				`${protectionText(prot)}, conveyed to ${shortName(holderTid)}`,
+			);
 			messages.push({
 				text: `The ${desc} conveyed to the ${teamName(holderTid)}.`,
 				tids: [holderTid, prot.tid],
@@ -97,6 +119,10 @@ export const resolvePickConditionsPure = ({
 
 		// Protected, so the original team keeps it
 		dp.tid = prot.tid;
+		addNote(
+			dp,
+			`${protectionText(prot)}, stays with ${shortName(prot.tid)} (owed to ${shortName(holderTid)})`,
+		);
 		let owed = "";
 		const findFuture = (round: number) =>
 			futurePicks.find(
@@ -148,7 +174,7 @@ export const resolvePickConditionsPure = ({
 		});
 	}
 
-	return { changed: Array.from(changed), messages };
+	return { changed: Array.from(changed), messages, notes };
 };
 
 // Called from genOrder once the pick numbers of this draft are set

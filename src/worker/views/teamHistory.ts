@@ -1,3 +1,5 @@
+import { featureOn } from "../util/nativeFeatures.ts";
+import { loadRivalries } from "../util/rivalries.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
 import type { TeamSeason, Player } from "../../common/types.ts";
@@ -436,8 +438,28 @@ export default defineView({
 				};
 			});
 
+			// Rivals card (Rivalries feature)
+			const rivals = featureOn("rivalries")
+				? (await loadRivalries())
+						.filter(
+							(e) =>
+								(e.a === inputs.tid || e.b === inputs.tid) && e.score.score > 0,
+						)
+						.slice(0, 5)
+						.map((e) => ({
+							key: e.key,
+							tid: e.a === inputs.tid ? e.b : e.a,
+							score: e.score.score,
+							tier: e.score.tier,
+							seriesWon: e.a === inputs.tid ? e.seriesA : e.seriesB,
+							seriesLost: e.a === inputs.tid ? e.seriesB : e.seriesA,
+							finals: e.finals,
+						}))
+				: undefined;
+
 			return {
 				...teamHistory,
+				rivals,
 				players,
 				stats: historyStats,
 				tid: inputs.tid,

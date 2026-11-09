@@ -3,6 +3,8 @@ import { chaseCtx } from "./pre.ts";
 import { recLabel } from "./chases.ts";
 import {
 	calMean,
+	lineRarity,
+	linesPerGame,
 	postScore,
 	rarity,
 	rarityText,
@@ -98,14 +100,6 @@ const eraScale = (I: HGameInput, k: LineStat) => {
 	return clamp(calMean(k) / m, 0.5, 2);
 };
 
-// Points for a line that a share 10^-r of lines reach: nothing below the top 2%, then quickly more. Past about 1 in 20,000 lines (a few a season in a real league; the line tables end there) it climbs steeply, so a once-in-many-seasons line (60 points) tops the scale on its own.
-const rarePts = (r: number) =>
-	r < 1.7
-		? 0
-		: 6.5 * (r - 1.7) +
-			2.5 * Math.max(0, r - 3.5) ** 2 +
-			15 * Math.max(0, r - 4.3) ** 2;
-
 // Below these a stat is never special, whatever the scoring environment
 const FLOOR: Record<StatKey, number> = {
 	pts: 20,
@@ -114,15 +108,6 @@ const FLOOR: Record<StatKey, number> = {
 	stl: 3,
 	blk: 3,
 	tp: 4,
-};
-
-export type LineEval = {
-	p: HBoxLine;
-	tid: number;
-	pts: number;
-	gs: number;
-	gsR: number;
-	text: string;
 };
 
 const WORD: Record<StatKey, [string, string]> = {
@@ -134,104 +119,134 @@ const WORD: Record<StatKey, [string, string]> = {
 	tp: ["three", "threes"],
 };
 
-// How special a single line is: the rarity of each stat (and of the whole line by game score) in the league's distribution, plus the classic feats
-export const evalLine = (I: HGameInput, p: HBoxLine, tid: number): LineEval => {
-	const parts: { pts: number; r: number; k: string; text: string }[] = [];
+// Typical true shooting of a 30-point line (big scoring nights come on good shooting: half of them are at 70% or better), the reference for "efficient"
+const TS_BIG = 0.7;
+
+type Part = { k: StatKey; r: number; text: string };
+type Feat = { c: number; text: string };
+
+// One number for how impressive a line is, in rarity units (about -log10 of the share of lines this good): the rarest stat in full, the next two at a half and a quarter (counting only what is past the top 10%, so ordinary numbers next to a big one add nothing), and the classic feats as small bumps. Correlated pieces are not added up in full: the index is turned into the line's real rarity by lineRarity (measured on the calibration leagues), so a 30-12-12 night is judged by how often lines that good really happen. Game score (efficiency, turnovers) is the floor.
+export const lineIndex = (
+	p: HBoxLine,
+	scale: (k: LineStat) => number = () => 1,
+) => {
+	const parts: Part[] = [];
 	for (const k of ["pts", "trb", "ast", "stl", "blk", "tp"] as const) {
 		const v = p[k];
-		if (v < FLOOR[k]) {
+		if (!(v >= FLOOR[k])) {
 			continue;
 		}
-		const r = rarity(k, v, eraScale(I, k));
-		const w = k === "pts" ? 1.15 : k === "tp" ? 0.8 : 1;
-		const x = w * rarePts(r);
-		if (x > 0) {
-			let text = `${v} ${WORD[k][v === 1 ? 0 : 1]}`;
-			if (k === "ast" && known(p.tov)) {
-				text += ` (${plural(p.tov, "turnover")})`;
+		let r = rarity(k, v, scale(k));
+		let text = `${v} ${WORD[k][v === 1 ? 0 : 1]}`;
+		if (k === "pts") {
+			// scoring efficiency against what big scorers usually shoot
+			const ts = tsPct(p);
+			if (ts !== null && v >= 25) {
+				r += clamp(1.5 * (ts - TS_BIG), -0.25, 0.25);
+				if (ts >= 0.75) {
+					text +=
+						known(p.fg) && known(p.fga)
+							? ` on ${p.fg}-of-${p.fga} shooting`
+							: ` on ${Math.round(ts * 100)}% true shooting`;
+				}
 			}
-			if (k === "tp" && known(p.tpa) && p.tpa > 0) {
+		} else if (k === "ast" && known(p.tov)) {
+			// assists without turnovers
+			r += clamp(0.1 * (3 - p.tov), -0.3, 0.3);
+			text =
+				v >= 15 && p.tov <= 3
+					? `${v} assists against only ${plural(p.tov, "turnover")}`
+					: `${text} (${plural(p.tov, "turnover")})`;
+		} else if (k === "tp") {
+			// threes are the most common way to a big number
+			r *= 0.8;
+			if (known(p.tpa) && p.tpa > 0) {
 				text = `${v}-of-${p.tpa} from three`;
 			}
-			parts.push({ pts: x, r, k, text });
 		}
+		parts.push({ k, r, text });
 	}
-	const gs = gmsc(p);
-	const gsR = rarity("gmsc", gs, eraScale(I, "gmsc"));
-	const feats: { pts: number; text: string }[] = [];
+	parts.sort((a, b) => b.r - a.r);
+	const ex = (i: number) => Math.max(0, (parts[i]?.r ?? 0) - 1);
+	let c = ex(0) + 0.5 * ex(1) + 0.25 * ex(2);
+
+	const feats: Feat[] = [];
 	const cats = [p.pts, p.trb, p.ast, p.stl, p.blk];
 	const tens = cats.filter((x) => x >= 10).length;
-	const fives = cats.filter((x) => x >= 5).length;
 	const line = `${p.pts} pts, ${p.trb} reb, ${p.ast} ast${p.stl >= 5 ? `, ${p.stl} stl` : ""}${p.blk >= 5 ? `, ${p.blk} blk` : ""}`;
 	if (tens >= 4) {
-		feats.push({ pts: 20, text: `a quadruple-double (${line})` });
+		feats.push({ c: 1.5, text: `a quadruple-double (${line})` });
 	} else if (tens >= 3) {
-		feats.push({
-			pts:
-				5 +
-				(p.pts >= 30 ? 4 : 0) +
-				(p.pts >= 20 && p.trb >= 15 && p.ast >= 15 ? 4 : 0),
-			text: `a triple-double (${line})`,
-		});
+		feats.push({ c: 0.3, text: `a triple-double (${line})` });
 	}
-	if (fives === 5) {
+	if (cats.every((x) => x >= 5)) {
 		feats.push({
-			pts: 7,
+			c: 1,
 			text: `a five-by-five (${line}, ${p.stl} stl, ${p.blk} blk)`,
 		});
 	}
 	if (p.pts >= 20 && p.trb >= 20) {
-		feats.push({
-			pts: 6 + Math.min(6, (p.pts - 20) / 3 + (p.trb - 20) / 2),
-			text: `a ${p.pts}-${p.trb} game`,
-		});
+		feats.push({ c: 0.2, text: `a ${p.pts}-${p.trb} game` });
 	}
-	if (p.ast >= 15 && known(p.tov) && p.tov <= 3) {
+	if (known(p.fg) && known(p.fga) && p.fga >= 10 && p.fg === p.fga) {
 		feats.push({
-			pts: 4 + (p.ast - 15) * 0.8 + (3 - p.tov) * 1.2,
-			text: `${p.ast} assists against only ${plural(p.tov, "turnover")}`,
-		});
-	}
-	const ts = tsPct(p);
-	if (ts !== null && p.pts >= 28 && ts >= 0.7) {
-		feats.push({
-			pts: 3 + (p.pts - 28) * 0.25 + (ts - 0.7) * 30,
-			text: `${p.pts} points on ${Math.round(ts * 100)}% true shooting${known(p.fg) && known(p.fga) ? ` (${p.fg}-of-${p.fga})` : ""}`,
-		});
-	}
-	if (known(p.fg) && known(p.fga) && p.fga >= 8 && p.fg === p.fga) {
-		feats.push({
-			pts: 3 + (p.fga - 8) * 0.8,
+			c: 0.3,
 			text: `a perfect ${p.fg}-of-${p.fga} shooting night`,
 		});
 	}
+	feats.sort((a, b) => b.c - a.c);
+	// feats stack with diminishing weight too
+	feats.forEach((x, i) => (c += x.c * (i === 0 ? 1 : 0.5)));
+	const gs = gmsc(p);
+	const gsR = rarity("gmsc", gs, scale("gmsc"));
+	c = Math.max(c, gsR - 1);
 	if (known(p.tov) && p.tov >= 10) {
-		feats.push({ pts: -2, text: `${p.tov} turnovers` });
+		c -= 0.2;
 	}
-	parts.sort((a, b) => b.pts - a.pts);
-	feats.sort((a, b) => b.pts - a.pts);
-	// the best stat counts in full, the rest less, and the whole line at least as much as its game score rarity says
-	let pts = 0;
-	parts.forEach((x, i) => (pts += x.pts * (i === 0 ? 1 : 0.45)));
-	pts = Math.max(pts, rarePts(gsR));
-	feats.forEach((x, i) => (pts += x.pts * (i === 0 ? 1 : 0.5)));
-	// a season best in the league so far (only once enough of the season is stored)
+	return { c: Math.max(0, c), parts, feats, gs, gsR, line };
+};
+
+// Points for the best line in a game that one in 10^g games has: next to nothing for what most games have (g below 0.2, about three games in five), then faster and faster. A 40-point night (about 1 in 4 games) adds a little, a 50-point game (about 1 in 40) about what a close finish does, one of the season's few biggest lines (1 in 1,000 games) a thriller's worth, and a once-in-many-seasons line (60 points) tops the scale on its own in a close game.
+export const linePts = (g: number) => {
+	const x = g - 0.2;
+	return x <= 0 ? 0 : 6 * x + 3 * x ** 2 + 2 * Math.max(0, g - 1.5) ** 2;
+};
+
+export type LineEval = {
+	p: HBoxLine;
+	tid: number;
+	// line rarity (log10), and the same per game
+	r: number;
+	g: number;
+	pts: number;
+	gs: number;
+	gsR: number;
+	text: string;
+};
+
+// How special a single line is: its combined rarity among all lines, then how often a game has one like it
+export const evalLine = (I: HGameInput, p: HBoxLine, tid: number): LineEval => {
+	const L = lineIndex(p, (k) => eraScale(I, k));
+	const r = lineRarity(L.c);
+	const g = r - linesPerGame();
+	let pts = linePts(g);
+	// a season best in the league so far (only once enough of the season is stored, and only for a big number)
 	const E = I.env;
+	const top = L.parts[0];
 	let best = "";
-	if (E && E.n >= 150 && parts[0] && parts[0].r >= 2) {
-		const k = parts[0].k as StatKey;
-		const prev = E.best[k];
-		if (known(prev) && p[k] > prev) {
-			pts += 4;
-			best = `, the most ${WORD[k][1]} in a game this season`;
+	if (E && E.n >= 150 && top && top.r >= 2.5 && pts > 0) {
+		const prev = E.best[top.k];
+		if (known(prev) && p[top.k] > prev) {
+			pts += 3;
+			best = `, the most ${WORD[top.k][1]} in a game this season`;
 		}
 	}
 	pts = Math.min(75, pts);
 	const bits: string[] = [];
-	if (feats[0] && feats[0].pts > 0) {
-		bits.push(feats[0].text);
+	if (L.feats[0]) {
+		bits.push(L.feats[0].text);
 	}
-	for (const x of parts) {
+	for (const x of L.parts) {
 		if (bits.length >= 2) {
 			break;
 		}
@@ -240,11 +255,10 @@ export const evalLine = (I: HGameInput, p: HBoxLine, tid: number): LineEval => {
 		}
 	}
 	if (!bits.length) {
-		bits.push(line);
+		bits.push(L.line);
 	}
-	const r = Math.max(gsR, parts[0]?.r ?? 0);
 	const text = `${pl(p)}: ${bits.join(", ")}${best}${r >= 3 ? ` (a ${rarityText(r)} line)` : ""}`;
-	return { p, tid, pts, gs, gsR, text };
+	return { p, tid, r, g, pts, gs: L.gs, gsR: L.gsR, text };
 };
 
 export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
@@ -279,13 +293,14 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 	const W = nm(I, res.winTid);
 	const po = I.playoffs || I.playIn;
 
-	// final margin: close games up, blowouts down
+	// final margin: close games up, blowouts down (an overtime game was tied after regulation, which the overtime already counts, so its final margin counts half)
+	const otHalf = res.overtimes > 0 ? 0.5 : 1;
 	if (margin === 0) {
 		add("margin", 14, "Ended in a tie");
 	} else if (margin <= 9) {
 		add(
 			"margin",
-			22 * Math.exp(-(margin - 1) / 4) - 1,
+			otHalf * (22 * Math.exp(-(margin - 1) / 4) - 1),
 			margin <= 3 ? `Decided by ${margin}` : `Final margin ${margin}`,
 		);
 	} else if (margin >= 15) {
@@ -320,7 +335,8 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 				`Tied at ${F.ties === 1 ? "one period break" : `${F.ties} period breaks`}`,
 			);
 		}
-		if (F.deficit >= 8 && margin > 0) {
+		const comeback = F.deficit >= 8 && margin > 0;
+		if (comeback) {
 			const late = F.deficitAt >= 2;
 			add(
 				"comeback",
@@ -345,8 +361,9 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 				);
 			}
 		}
-		if (F.lateLeader < 0 && margin > 0 && !res.overtimes) {
-			add("late", 6, `${W} trailed going into the fourth and won it late`);
+		// (a comeback from 8 or more already counts it)
+		if (F.lateLeader < 0 && margin > 0 && !res.overtimes && !comeback) {
+			add("late", 5, `${W} trailed going into the fourth and won it late`);
 		}
 	}
 
@@ -365,7 +382,8 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 		) {
 			cl += 13;
 		} else if (/force/i.test(s)) {
-			cl += /buzzer|no time/i.test(s) ? 10 : 7;
+			// the overtime it forced is counted already
+			cl += /buzzer|no time/i.test(s) ? 7 : 4;
 		} else if (/shootout/i.test(s)) {
 			cl += 8;
 		} else {
@@ -381,32 +399,20 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 		);
 	}
 
-	// individual lines
+	// individual lines: the best one counts, a second big one (a duel when it came from the other side) at 40%, nothing else (a game always has some good lines)
 	const evals = res.teams
 		.flatMap((t) =>
 			t.players.filter((p) => p.min > 0).map((p) => evalLine(I, p, t.tid)),
 		)
-		.sort((x, y) => y.pts - x.pts || x.p.pid - y.p.pid);
-	evals
-		.filter((x) => x.pts >= 1.5)
-		.slice(0, 3)
-		.forEach((x, i) => add("star", x.pts * [1, 0.6, 0.35][i]!, x.text));
-
-	// duel: the best line on each side, both big
-	const bestOf = res.teams.map(
-		(t) =>
-			evals
-				.filter((x) => x.tid === t.tid)
-				.sort((a, b) => b.gs - a.gs || a.p.pid - b.p.pid)[0],
-	);
-	if (bestOf[0] && bestOf[1]) {
-		const lo = Math.min(bestOf[0].gsR, bestOf[1].gsR);
-		if (lo >= 1.4) {
-			const [h, a] = bestOf;
+		.sort((x, y) => y.pts - x.pts || y.r - x.r || x.p.pid - y.p.pid);
+	const [first, second] = evals;
+	if (first && first.pts > 0) {
+		add("star", first.pts, first.text);
+		if (second && second.pts > 0) {
 			add(
-				"duel",
-				Math.min(14, 7 * (lo - 1.1)),
-				`Star duel: ${pl(a.p)} ${a.p.pts} pts, ${a.p.trb} reb, ${a.p.ast} ast vs ${pl(h.p)} ${h.p.pts} pts, ${h.p.trb} reb, ${h.p.ast} ast`,
+				second.tid === first.tid ? "star" : "duel",
+				0.4 * second.pts,
+				second.tid === first.tid ? second.text : `Star duel: ${second.text}`,
 			);
 		}
 	}

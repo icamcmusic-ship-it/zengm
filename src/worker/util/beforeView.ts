@@ -1,5 +1,5 @@
 import { Cache, connectLeague, idb } from "../db/index.ts";
-import { league } from "../core/index.ts";
+import { draft, league } from "../core/index.ts";
 import {
 	g,
 	helpers,
@@ -179,6 +179,19 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 		return;
 	}
 	await updatePlayMenu();
+	if (loadingNewLid !== newLid) {
+		return;
+	}
+
+	// Existing leagues: fill in any missing upcoming draft classes (numDraftClasses, 7 unless changed)
+	try {
+		const generated = await draft.topUpDraftClasses();
+		if (generated.length > 0) {
+			await idb.cache.flush();
+		}
+	} catch (error) {
+		console.error(error);
+	}
 	if (loadingNewLid !== newLid) {
 		return;
 	}

@@ -4,12 +4,18 @@ import {
 	forwardProject,
 	generateCollegeClass,
 	type CollegeProspect,
+	type NcaaSeason,
 	type Ratings,
 } from "../../../common/collegeStats/index.ts";
+import {
+	buildNcaaSeasonForClass,
+	storeCollegeSeasonMarkers,
+	type ClassNcaaSeason,
+} from "./collegeSeason.ts";
 import { hasPreDraftStats } from "../../../common/preDraft.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
-import { featureOption } from "../../util/nativeFeatures.ts";
+import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import { player } from "../index.ts";
 import { autoRegenerateClass } from "./regenerateRatings.ts";
 import {
@@ -33,7 +39,10 @@ const getProspects = async (draftYear: number) => {
 const getFirstDraftYear = () =>
 	g.get("season") + (g.get("phase") >= PHASE.RESIGN_PLAYERS ? 1 : 0);
 
-const toCollegeProspect = (p: Player, draftYear: number): CollegeProspect => {
+export const toCollegeProspect = (
+	p: Player,
+	draftYear: number,
+): CollegeProspect => {
 	const ratingsRow = last(p.ratings);
 	const ratings = {} as Ratings;
 	for (const key of RATING_KEYS) {
@@ -82,16 +91,37 @@ export const generateCollegeStats = async ({
 		return { numPlayers: 0, numSeasons: 0, numHonors: 0 };
 	}
 
-	let players = await getProspects(draftYear);
+	const classPlayers = await getProspects(draftYear);
+	let players = classPlayers;
 	if (onlyMissing) {
 		players = players.filter((p) => !hasPreDraftStats(p));
 	}
 
 	const prospects = players.map((p) => toCollegeProspect(p, draftYear));
-	const results = generateCollegeClass(prospects, {
+	const options = {
 		seed,
 		draftYear,
 		fillBlankColleges: fillBlankColleges ?? true,
+	};
+
+	// College season (conference tournaments, March Madness) of the draft year, built from every prospect in the class
+	let ncaa: ClassNcaaSeason | undefined;
+	if (featureOn("collegeSeason") && players.length > 0) {
+		ncaa = await buildNcaaSeasonForClass({
+			draftYear,
+			seed,
+			classPlayers,
+			targets: players,
+			targetProspects: prospects,
+			options,
+			reuse: !!onlyMissing,
+		});
+	}
+	const ncaaSeason: NcaaSeason | undefined = ncaa?.season;
+
+	const results = generateCollegeClass(prospects, {
+		...options,
+		ncaaSeason,
 	});
 	const resultsByKey = new Map(results.map((result) => [result.key, result]));
 
@@ -126,6 +156,13 @@ export const generateCollegeStats = async ({
 		await idb.cache.players.put(p);
 	}
 
+	await storeCollegeSeasonMarkers({
+		draftYear,
+		ncaa,
+		targets: players,
+		results: resultsByKey,
+	});
+
 	return { numPlayers: players.length, numSeasons, numHonors };
 };
 
@@ -138,9 +175,14 @@ export const removeCollegeStats = async (draftYear: number) => {
 	for (const p of players) {
 		const stats = replacePreDraftStats(p.stats, [], draftYear);
 		const awards = replacePreDraftAwards(p.awards, [], draftYear);
-		if (stats.length !== p.stats.length || awards.length !== p.awards.length) {
+		if (
+			stats.length !== p.stats.length ||
+			awards.length !== p.awards.length ||
+			p.collegeSeason
+		) {
 			p.stats = stats;
 			p.awards = awards;
+			delete p.collegeSeason;
 			numPlayers += 1;
 			await idb.cache.players.put(p);
 		}

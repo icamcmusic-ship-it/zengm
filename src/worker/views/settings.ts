@@ -113,9 +113,11 @@ type Key =
 	| "playerMoodTraits"
 	| "numPlayersOnCourt"
 	| "numDraftRounds"
+	| "numDraftClasses"
 	| "tradeDeadline"
 	| "difficulty"
 	| "stopOnInjury"
+	| "saveEveryDay"
 	| "stopOnInjuryGames"
 	| "aiJerseyRetirement"
 	| "numPeriods"
@@ -335,9 +337,11 @@ export const getInitialSettings = (): Settings => {
 		playerMoodTraits: g.get("playerMoodTraits"),
 		numPlayersOnCourt: g.get("numPlayersOnCourt"),
 		numDraftRounds: g.get("numDraftRounds"),
+		numDraftClasses: g.get("numDraftClasses"),
 		tradeDeadline: g.get("tradeDeadline"),
 		difficulty: g.get("difficulty"),
 		stopOnInjury: g.get("stopOnInjury"),
+		saveEveryDay: g.get("saveEveryDay"),
 		stopOnInjuryGames: g.get("stopOnInjuryGames"),
 		aiJerseyRetirement: g.get("aiJerseyRetirement"),
 		numPeriods: g.get("numPeriods"),

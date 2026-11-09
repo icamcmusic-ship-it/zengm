@@ -52,6 +52,8 @@ import {
 import { last } from "../../../common/utils.ts";
 import { advStats } from "../../util/advStats.ts";
 
+const FLUSH_COALESCE_MS = 5000;
+
 /**
  * Play one or more days of games.
  *
@@ -97,7 +99,14 @@ const play = async (
 
 		if (!local.autoPlayUntil && !newPhaseCalled) {
 			await updateStatus("Saving...");
-			await idb.cache.flush();
+			// Playing a day at a time, this would otherwise write every player who played after every day. Unless the
+			// saveEveryDay setting is on, a few seconds of those are saved together (the auto flush saves the rest once the
+			// sim stops)
+			if (g.get("saveEveryDay")) {
+				await idb.cache.flush();
+			} else {
+				await idb.cache.flushUnlessRecent(FLUSH_COALESCE_MS);
+			}
 		}
 		await updateStatus();
 
@@ -338,8 +347,8 @@ const play = async (
 				await contractHooks.afterDay();
 			}
 			if (phase === PHASE.REGULAR_SEASON) {
-				await trade.betweenAiTeams();
-				await trade.aiOffers();
+				// AI-to-AI trades and AI offers are background activity: a bug in them must not stop the season
+				await trade.runAiTradesSafely();
 			}
 		}
 
@@ -712,7 +721,15 @@ const play = async (
 		const canStartGames = lock.canStartGames();
 
 		if (canStartGames) {
-			await cbRunDay();
+			try {
+				await cbRunDay();
+			} catch (error) {
+				// Otherwise the game looks stuck: still "Playing...", and the play menu only offers Stop
+				await lock.set("gameSim", false);
+				await updateStatus();
+				await updatePlayMenu();
+				throw error;
+			}
 		}
 	} else {
 		await cbRunDay();

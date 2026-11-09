@@ -176,6 +176,11 @@ import formatPlayerFactory from "../core/realRosters/formatPlayerFactory.ts";
 import { applyRealPlayerPhotos } from "../core/league/processPlayerNewLeague.ts";
 import * as scouting from "../core/draft/scouting.ts";
 import * as draftDay from "../core/draft/draftDay.ts";
+import {
+	getMockDraft,
+	getProProjections as getProProjectionsCore,
+} from "../core/draft/mockDraftData.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 import { actualPhase } from "../util/actualPhase.ts";
 import { getCol } from "../../common/getCol.ts";
 import { getCols } from "../../common/getCols.ts";
@@ -2911,6 +2916,22 @@ const updateDraftBoard = async (
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 };
 
+const runMockDraft = () => {
+	if (!featureOn("mockDraft")) {
+		throw new Error("Mock Draft is turned off");
+	}
+	return getMockDraft();
+};
+
+const getProProjections = (pids: number[]) => {
+	if (!featureOn("mockDraft")) {
+		return Promise.resolve(
+			{} as Awaited<ReturnType<typeof getProProjectionsCore>>,
+		);
+	}
+	return getProProjectionsCore(pids);
+};
+
 const getDraftDayInfo = async (otherTid: number | undefined) => {
 	const boards = await draftDay.getAITeamBoards();
 	const tid = otherTid ?? boards[0]?.tid;
@@ -4568,6 +4589,11 @@ const updateGameAttributes = async (
 	gameAttributes: Partial<GameAttributesLeague>,
 ) => {
 	await league.setGameAttributes(gameAttributes);
+	if (gameAttributes.coachingStaff) {
+		// Turning on the coaching staff from the League Extras tab generates staffs, like League Settings does
+		await staff.ensureStaff();
+		await idb.cache.flush();
+	}
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 const updateGameAttributesGodMode = async (
@@ -4629,6 +4655,9 @@ const updateGameAttributesGodMode = async (
 
 	// Turning on the coaching staff in an existing league generates staffs
 	await staff.ensureStaff();
+
+	// Raising the number of future draft classes generates the missing ones now
+	await draft.topUpDraftClasses();
 
 	if (repeatSeason !== currentRepeatSeasonType) {
 		await league.setRepeatSeason(repeatSeason);
@@ -6137,6 +6166,8 @@ const api = {
 		scoutProspect,
 		updateDraftBoard,
 		setDraftBoardAutoDraft,
+		runMockDraft,
+		getProProjections,
 		getDraftDayInfo,
 		staffAction,
 		idbCacheFlush,

@@ -917,6 +917,21 @@ class Cache {
 	}
 
 	// Take current contents in database and write to disk
+	// When the last flush finished, for flushUnlessRecent
+	_lastFlushEnd = -Infinity;
+
+	// Flush, unless the last flush was less than ms ago. Then the pending writes are left for the auto flush, which saves
+	// them within AUTO_FLUSH_INTERVAL once nothing is going on. For saving after every request in a series of quick
+	// requests (like playing one day at a time): every flush writes every changed player in full, including his whole
+	// career, so flushing after each one gets slower and slower as the league gets older.
+	async flushUnlessRecent(ms: number) {
+		if (performance.now() - this._lastFlushEnd < ms) {
+			this._dirty = this._dirty || this._hasPendingWrites();
+			return;
+		}
+		await this.flush();
+	}
+
 	async flush(storesToCheck = STORES) {
 		if (!local.autoSave) {
 			return;
@@ -993,6 +1008,7 @@ class Cache {
 
 		// Recompute rather than setting to false, because there may be new writes that happened while waiting for the transaction, or dirty stores not in storesToCheck
 		this._dirty = this._hasPendingWrites();
+		this._lastFlushEnd = performance.now();
 
 		if (updateLastPlayed) {
 			// Update lastPlayed

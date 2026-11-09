@@ -2,6 +2,7 @@ import { uniform, choice } from "../../../common/random.ts";
 import type { Race } from "../../../common/types.ts";
 import { local } from "../../util/index.ts";
 import { loadNames } from "../../util/loadNames.ts";
+import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 
 const getFromCumSumArray = <T extends string>(array: [T, number][]) => {
 	const rand = uniform(0, array.at(-1)![1]);
@@ -162,6 +163,58 @@ export const withState = (country: string) => {
 	return country;
 };
 
+// Hyphenated last names (League Extras "Hyphenated Last Names"): a second surname drawn from the same frequency table
+// is joined to the first one, like "Smith-Jones"
+const HYPHENATED_LAST_NAME_COUNTRIES = new Set(["USA"]);
+export const HYPHENATED_LAST_NAME_MAX_LENGTH = 15;
+
+// Real players' hyphenated names, in either order, so a random player doesn't get one by chance
+const HYPHENATED_BLOCKED = new Set(
+	[
+		"Abdul-Jabbar",
+		"Caldwell-Pope",
+		"Gilgeous-Alexander",
+		"Hollis-Jefferson",
+		"Kidd-Gilchrist",
+		"Robinson-Earl",
+		"Jackson-Davis",
+		"Walker-Kimbrough",
+	].flatMap((name) => {
+		const [a, b] = name.split("-");
+		return [name, `${b}-${a}`];
+	}),
+);
+
+const canHyphenate = (name: string) =>
+	// No names that are already compound ("St. John", "Van Dyke", "Smith-Jones") or carry a suffix
+	/^[A-Z]['A-Za-z]+$/.test(name);
+
+// Try a few draws for a second surname that pairs well with the first, else keep the plain last name
+export const hyphenateLastName = (
+	lastName: string,
+	drawLastName: () => string,
+) => {
+	if (!canHyphenate(lastName)) {
+		return lastName;
+	}
+
+	for (let i = 0; i < 10; i++) {
+		const other = drawLastName();
+		const combined = `${lastName}-${other}`;
+		if (
+			canHyphenate(other) &&
+			// "Johnson-Johnston", "Smith-Smith"
+			other.slice(0, 4).toLowerCase() !== lastName.slice(0, 4).toLowerCase() &&
+			combined.length <= HYPHENATED_LAST_NAME_MAX_LENGTH &&
+			!HYPHENATED_BLOCKED.has(combined)
+		) {
+			return combined;
+		}
+	}
+
+	return lastName;
+};
+
 const name = async (
 	countryOverride?: string,
 ): Promise<{
@@ -212,7 +265,16 @@ const name = async (
 	if (!lastCountry || lastCountry.length === 0) {
 		throw new Error(`No last names found for ${country}`);
 	}
-	const lastName = getFromCumSumArray(lastCountry);
+	let lastName = getFromCumSumArray(lastCountry);
+	if (
+		HYPHENATED_LAST_NAME_COUNTRIES.has(country) &&
+		featureOn("hyphenatedNames") &&
+		Math.random() < featureOption<number>("hyphenatedNamesRate") / 100
+	) {
+		lastName = hyphenateLastName(lastName, () =>
+			getFromCumSumArray(lastCountry),
+		);
+	}
 
 	let college = "";
 	const colleges = infoCountry.colleges ?? playerBioInfo.default.colleges;

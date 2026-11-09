@@ -264,7 +264,7 @@ export const NATIVE_FACE_PARTS: readonly FacePart[] = [
 	{
 		feature: "glasses",
 		id: "fork-goggles",
-		svg: `<path fill="$[primary]" stroke="#000" stroke-width="3" d="M48 296h304v24H48z"/><path fill="rgba(200,220,240,.35)" stroke="#111" stroke-width="7" d="M94 290c30-8 66-8 90 0 10 4 10 36 0 42-24 10-60 10-90 0-10-6-10-38 0-42Zm212 0c-30-8-66-8-90 0-10 4-10 36 0 42 24 10 60 10 90 0 10-6 10-38 0-42Z"/><path fill="none" stroke="#111" stroke-width="7" d="M184 304c8-4 24-4 32 0"/>`,
+		svg: `<path fill="$[primary]" stroke="#000" stroke-width="3" d="M54 299h40v18H54zm252 0h40v18h-40z"/><path fill="rgba(200,220,240,.35)" stroke="#111" stroke-width="7" d="M94 290c30-8 66-8 90 0 10 4 10 36 0 42-24 10-60 10-90 0-10-6-10-38 0-42Zm212 0c-30-8-66-8-90 0-10 4-10 36 0 42 24 10 60 10 90 0 10-6 10-38 0-42Z"/><path fill="none" stroke="#111" stroke-width="7" d="M184 304c8-4 24-4 32 0"/>`,
 	},
 	{
 		feature: "glasses",

@@ -10,6 +10,14 @@ import {
 import { orderTeams } from "../../util/orderTeams.ts";
 import { leaderAwardCategories } from "../../../common/awards.ts";
 import { team } from "../index.ts";
+import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
+import {
+	VOTE_CANDIDATES,
+	applyVoteToWinners,
+	runVotes,
+	voteInputs,
+} from "./simVote.ts";
+import type { SimVote } from "../../../common/awardVote/index.ts";
 
 const teamAwards = async (
 	teamsUnsorted: TeamFiltered<
@@ -78,6 +86,7 @@ const NUM_PLAYERS_TO_STORE_PER_INDIVIDUAL_AWARD = 5;
 
 export const doAwards = async (conditions: Conditions) => {
 	const season = g.get("season");
+	const awardVoteOn = __SPORT === "basketball" && featureOn("awardVote");
 
 	const teams = await team.getFormattedAll({
 		attrs: ["tid"],
@@ -111,7 +120,10 @@ export const doAwards = async (conditions: Conditions) => {
 
 	const { players, realizedAwards } = await processAwards({
 		awards: g.get("awards"),
-		numPlayersPerIndividualAward: NUM_PLAYERS_TO_STORE_PER_INDIVIDUAL_AWARD,
+		// League extras (Award Vote): more candidates for the simulated vote, cut back to the stored number below
+		numPlayersPerIndividualAward: awardVoteOn
+			? VOTE_CANDIDATES
+			: NUM_PLAYERS_TO_STORE_PER_INDIVIDUAL_AWARD,
 		season,
 		statOverridesByMatchup: undefined,
 
@@ -120,6 +132,34 @@ export const doAwards = async (conditions: Conditions) => {
 		extraStats: leaderAwardCategories.map((row) => row.stat),
 	});
 	const flatRealizedAwards = realizedAwards.flat();
+
+	let simVote: SimVote[] | undefined;
+	if (awardVoteOn) {
+		const decides = featureOption<boolean>("featureAwardVoteDecides") === true;
+		simVote = runVotes(
+			await voteInputs({
+				season,
+				realizedAwards: flatRealizedAwards,
+				players,
+				respect: !decides,
+			}),
+			season,
+		);
+		if (decides) {
+			applyVoteToWinners(flatRealizedAwards, simVote);
+		}
+		for (const award of flatRealizedAwards) {
+			if (award.numTeams === undefined) {
+				award.winner = award.winner.slice(
+					0,
+					NUM_PLAYERS_TO_STORE_PER_INDIVIDUAL_AWARD,
+				);
+			}
+		}
+		if (featureOption<boolean>("featureAwardVoteStore") === false) {
+			simVote = undefined;
+		}
+	}
 
 	const awardsByPlayer = [
 		...getAwardsByPlayer(flatRealizedAwards, players),
@@ -139,6 +179,7 @@ export const doAwards = async (conditions: Conditions) => {
 		season,
 		...bestRecords,
 		awards: flatRealizedAwards,
+		...(simVote && simVote.length > 0 ? { simVote } : {}),
 	};
 	await idb.cache.awards.put(awards);
 };

@@ -118,14 +118,29 @@ export const CALIBRATION_OFFSETS: Record<TraitKey, number> = {
 	veteranSavvy: -4.5,
 };
 
+// RATING_WEIGHTS as arrays, in the same order, so ratingPart (hot: every trait score) skips Object.entries. Same arithmetic, same results.
+const RATING_WEIGHT_ENTRIES = Object.fromEntries(
+	Object.entries(RATING_WEIGHTS).map(([key, weights]) => [
+		key,
+		Object.entries(weights).map(
+			([rating, weight]) =>
+				[
+					rating as keyof TraitRatings,
+					weight as number,
+					REFERENCE_RATINGS[rating as keyof TraitRatings],
+				] as const,
+		),
+	]),
+) as unknown as Record<
+	TraitKey,
+	readonly (readonly [keyof TraitRatings, number, number])[]
+>;
+
 export const ratingPart = (key: TraitKey, ratings: TraitRatings) => {
 	let total = 0;
-	const weights = RATING_WEIGHTS[key];
-	for (const [rating, weight] of Object.entries(weights)) {
-		const r =
-			ratings[rating as keyof TraitRatings] ??
-			REFERENCE_RATINGS[rating as keyof TraitRatings];
-		total += weight * (r - REFERENCE_RATINGS[rating as keyof TraitRatings]);
+	for (const [rating, weight, reference] of RATING_WEIGHT_ENTRIES[key]) {
+		const r = ratings[rating] ?? reference;
+		total += weight * (r - reference);
 	}
 	return RATING_SCALE * total;
 };

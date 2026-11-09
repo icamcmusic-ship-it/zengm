@@ -1,3 +1,5 @@
+import type { ProspectNcaaSummary } from "./ncaa.ts";
+
 export const RATING_KEYS = [
 	"hgt",
 	"stre",
@@ -80,6 +82,8 @@ export type CollegeSeason = {
 	// Used by the honors model
 	score: number;
 	defScore: number;
+	// With the college season model: his box scores in his team's postseason games (the last games of the season), in order
+	postseasonBoxes?: GameBox[];
 };
 
 export type CollegeHonor = {
@@ -93,4 +97,6 @@ export type CollegeResult = {
 	school: string;
 	seasons: CollegeSeason[];
 	honors: CollegeHonor[];
+	// With the college season model, for a prospect at an NCAA school: his team's season and his postseason games
+	ncaa?: ProspectNcaaSummary;
 };
