@@ -18,6 +18,23 @@ const hasActiveNegotiation = async (tid: number, pid: number) => {
 // A free agent asking for the minimum signs with anyone, unless he really hates the team (sum of mood components below this). Then it's the normal willingness check, which still gets easier the longer he's unsigned.
 export const MIN_CONTRACT_REFUSE_MOOD = -8;
 
+// How much he hates the team, for MIN_CONTRACT_REFUSE_MOOD. Trades and playing time count no more than any other single component (-2), since they're unbounded below, and otherwise a team that made a lot of trades (often a team over the cap, which can only sign minimum contracts) would see every minimum free agent refuse it just for that. Stock BBGM never lets a minimum free agent refuse, so this should only happen when nearly everything about the team is bad.
+export const getMinContractHateMood = (components: MoodComponents) => {
+	let sum = 0;
+	for (const key of helpers.keys(components)) {
+		if (key === "custom") {
+			for (const row of components.custom!) {
+				sum += row.amount;
+			}
+		} else if (key === "playingTime" || key === "trades") {
+			sum += Math.max(components[key], -2);
+		} else {
+			sum += components[key];
+		}
+	}
+	return sum;
+};
+
 const moodInfo = async (
 	p: Player,
 	tid: number,
@@ -126,9 +143,9 @@ const moodInfo = async (
 		!g.get("playersRefuseToNegotiate") ||
 		rookie ||
 		firstSeasonAfterExpansionOverride ||
-		(contractAmount === g.get("minContract") &&
+		(contractAmount <= g.get("minContract") &&
 			p.tid === PLAYER.FREE_AGENT &&
-			sumComponents > MIN_CONTRACT_REFUSE_MOOD)
+			getMinContractHateMood(components) > MIN_CONTRACT_REFUSE_MOOD)
 	) {
 		probWilling = 1;
 		willing = true;

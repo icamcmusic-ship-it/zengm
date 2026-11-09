@@ -144,9 +144,9 @@ const decreaseDemands = async () => {
 		contractDemand.amount = helpers.roundContract(contractDemand.amount);
 
 		if (unwanted && market && p.value >= market.replacementValue) {
-			// A good player priced out of the market (asking for more than his share of AI teams' cap space) comes down only as far as what that team could pay. Not rounded, so he fits.
+			// A good player priced out of the market (asking for more than his share of AI teams' cap space) comes down only as far as what that team could pay. Not rounded, so he fits. But if that's barely more than the minimum, he just takes the minimum like anyone else close to it. Otherwise he'd sit a few thousand dollars above the minimum (like $1.205M with a $1.2M minimum), which over the cap teams can't sign since only exact minimum contracts are allowed over the cap.
 			const marketAmount = market.getMarket(p);
-			if (marketAmount >= minContract) {
+			if (marketAmount >= minContract * 1.1) {
 				contractDemand.amount = Math.max(
 					contractDemand.amount,
 					Math.floor(marketAmount),

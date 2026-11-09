@@ -16,6 +16,7 @@ import {
 } from "../components/contract.tsx";
 import { wrappedPlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import { range } from "../../common/utils.ts";
+import { getAffordFilter } from "../../common/freeAgentsAffordFilter.ts";
 import type { DropdownOption } from "../hooks/useDropdownOptions.tsx";
 import type { FreeAgentTransaction } from "../../worker/views/freeAgents.ts";
 import {
@@ -211,11 +212,11 @@ const FreeAgents = ({
 	let showAffordablePlayersFilterApplied = false;
 	if (showShowPlayersAffordButton && dataTableHandle) {
 		askingForIndex = colKeys.lastIndexOf(askingForText);
-		if (capSpace * 1000 > minContract && !challengeNoFreeAgents) {
-			askingForFilter = `<${capSpace}`;
-		} else {
-			askingForFilter = `<${minContract / 1000}`;
-		}
+		askingForFilter = getAffordFilter({
+			capSpace,
+			challengeNoFreeAgents,
+			minContract,
+		});
 
 		const enableFilters = dataTableHandle.getEnableFilters();
 		if (enableFilters) {
