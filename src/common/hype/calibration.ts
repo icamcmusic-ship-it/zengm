@@ -24,6 +24,17 @@ export const rawToScore = (raw: number, knots: readonly number[]): number => {
 	return 100;
 };
 
+// Soft cap for regular-season games: scores up to SOFT_CAP are unchanged, above it they flatten out and can reach
+// only about 90, so the very top of the scale is left for the playoffs.
+const SOFT_CAP = 80;
+const SOFT_ROOM = 12;
+export const regularSeasonCap = (score: number) =>
+	score <= SOFT_CAP
+		? score
+		: Math.round(
+				SOFT_CAP + SOFT_ROOM * (1 - Math.exp(-(score - SOFT_CAP) / SOFT_ROOM)),
+			);
+
 export const preScore = (raw: number) => rawToScore(raw, CAL.pre);
 export const postScore = (raw: number) => rawToScore(raw, CAL.post);
 

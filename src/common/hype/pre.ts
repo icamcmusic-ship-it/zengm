@@ -20,7 +20,7 @@ import type {
 	Pre,
 	Reason,
 } from "./types.ts";
-import { preScore } from "./calibration.ts";
+import { preScore, regularSeasonCap } from "./calibration.ts";
 import { clamp, known, label, pl } from "./util.ts";
 
 const winPct = (w: number, l: number) => (w + 2) / (w + l + 4);
@@ -431,7 +431,8 @@ export const preHype = (I: HGameInput): Pre => {
 	reasons.sort(
 		(x, y) => Math.abs(y.pts) - Math.abs(x.pts) || (x.text < y.text ? -1 : 1),
 	);
-	const score = preScore(raw);
+	const uncapped = preScore(raw);
+	const score = I.playoffs || I.playIn ? uncapped : regularSeasonCap(uncapped);
 	return {
 		score,
 		raw: Math.round(raw * 10) / 10,

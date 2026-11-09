@@ -18,7 +18,12 @@ import {
 	type Standout,
 } from "./score.ts";
 import { ovrPercentile } from "./norms.ts";
-import { isPos, positionOf, posPrior } from "./position.ts";
+import {
+	archetypePrior,
+	isPos,
+	namesContradict,
+	positionOf,
+} from "./position.ts";
 import type {
 	Archetype,
 	ArchetypeRatings,
@@ -63,6 +68,14 @@ export const SECONDARY_K = 0.4;
 const SECONDARY_REACH = 0.3;
 const SECONDARY_MIN = 0.2;
 const HYBRID_TIE_Z = 0.05;
+// A hybrid partner from another positional group (a wing label next to a forward one) needs to be this much closer
+export const CROSS_GROUP_Z = 0.05;
+const crossGroupPenalty = (a: Archetype, b: Archetype) =>
+	a.group === b.group ||
+	a.tags.includes("universal") ||
+	b.tags.includes("universal")
+		? 0
+		: CROSS_GROUP_Z;
 // The archetype he had keeps the label unless another is better by more than this
 export const STICKY_Z = 0.55;
 
@@ -107,7 +120,7 @@ export const scoreAll = (
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
 		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.level);
-		const prior = posPrior(a.group, a.pos, pos);
+		const prior = archetypePrior(a, pos);
 		if (
 			prior === null ||
 			(a.age &&
@@ -225,7 +238,8 @@ export const classify = (
 	const sticky = opts.stickiness ?? STICKY_Z;
 	if (opts.previousId && opts.previousId !== first.a.id) {
 		const prev = scored.find((s) => s.a.id === opts.previousId);
-		if (prev && prev.z >= first.z - sticky) {
+		// Never one his position (or age) now rules out, however sticky
+		if (prev && prev.z > BLOCKED_Z && prev.z >= first.z - sticky) {
 			first = prev;
 		}
 	}
@@ -248,9 +262,18 @@ export const classify = (
 		if (s.z < first.z - HYBRID_Z - SECONDARY_REACH) {
 			break;
 		}
-		if (s.a.family !== first.a.family && s.z + adds(s) > partnerZ) {
+		// Never a label that names another position than the primary's ("Switchable Forward / Switchable Center"), and
+		// one from the primary's own positional group (or a universal one) is preferred
+		if (
+			s.a.family === first.a.family ||
+			namesContradict(first.a.name, s.a.name)
+		) {
+			continue;
+		}
+		const v = s.z + adds(s) - crossGroupPenalty(first.a, s.a);
+		if (v > partnerZ) {
 			partner = s;
-			partnerZ = s.z + adds(s);
+			partnerZ = v;
 		}
 	}
 	// A single strong label reads best: a partner only when it names a standout the primary does not, or it is all but

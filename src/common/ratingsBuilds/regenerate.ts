@@ -7,7 +7,7 @@ import {
 	classify,
 } from "../archetypes/classify.ts";
 import { gateFactor } from "../archetypes/score.ts";
-import { isPos, positionOf, posPrior } from "../archetypes/position.ts";
+import { archetypePrior, isPos, positionOf } from "../archetypes/position.ts";
 import { scoreAll } from "../archetypes/classify.ts";
 import type { Norms } from "../archetypes/types.ts";
 import { scoutingEffectCutoff, scoutingEffectStddev } from "../budgetLevels.ts";
@@ -243,7 +243,7 @@ export const regenerateClass = (
 				return (
 					a &&
 					gateFactor(base.hgt, a.hgt) >= 0.6 &&
-					posPrior(a.group, a.pos, basePos) !== null
+					archetypePrior(a, basePos) !== null
 				);
 			});
 			if (fits.length > 0) {
