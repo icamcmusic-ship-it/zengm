@@ -3,7 +3,7 @@ import { player, team } from "../index.ts";
 import getBest from "./getBest.ts";
 import {
 	countMentees,
-	getAiTraitValueFactor,
+	makeAiTraitValueFactorCache,
 	traitsEnabled,
 } from "../player/traits.ts";
 import { getContractDemand } from "../contract/index.ts";
@@ -32,6 +32,9 @@ const autoSign = async () => {
 
 	// List of free agents, sorted by value
 	let playersSorted = orderBy(players, "value", "desc");
+
+	// Player traits: the same free agents are valued by every team, so remember their trait factors
+	const getTraitFactor = makeAiTraitValueFactorCache();
 
 	// Randomly order teams
 	const teams = await idb.cache.teams.getAll();
@@ -82,15 +85,18 @@ const autoSign = async () => {
 		let playersForTeam = playersSorted;
 		if (traitsEnabled()) {
 			const numYoung = countMentees(playersOnRoster);
-			playersForTeam = orderBy(
-				playersSorted,
-				(p) =>
+			// Computed once per player, not in every comparison of the sort
+			const values = new Map<(typeof players)[number], number>();
+			for (const p of playersSorted) {
+				values.set(
+					p,
 					p.value *
-					(p.value > 0
-						? getAiTraitValueFactor(p, { strategy: t.strategy, numYoung })
-						: 1),
-				"desc",
-			);
+						(p.value > 0
+							? getTraitFactor(p, { strategy: t.strategy, numYoung })
+							: 1),
+				);
+			}
+			playersForTeam = orderBy(playersSorted, (p) => values.get(p)!, "desc");
 		}
 		const p = getBest(playersOnRoster, playersForTeam, payroll);
 		if (p) {

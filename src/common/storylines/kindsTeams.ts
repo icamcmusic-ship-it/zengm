@@ -1,5 +1,6 @@
 // More storyline kinds, about teams: seasons, runs, finals, rosters and rivalries. Playoff and title facts only for decided seasons.
 
+import { rivalryScore, type RivalSeries } from "../rivalries/index.ts";
 import type { SeasonLine } from "../wrapped/league.ts";
 import type { WPlayer, WTeamSeason } from "../wrapped/types.ts";
 import {
@@ -1231,10 +1232,10 @@ export const TEAM_KINDS: Kind[] = [
 			const out: Draft[] = [];
 			const meets = new Map<
 				string,
-				{ season: number; w: number; l: number; a: number }[]
+				{ season: number; w: number; l: number; a: number; r: RivalSeries }[]
 			>();
 			for (const s of X.decidedSeasons()) {
-				X.series(s)?.rounds.forEach((round) => {
+				X.series(s)?.rounds.forEach((round, ri, rounds) => {
 					for (const m of round) {
 						if (!m.away) {
 							continue;
@@ -1244,7 +1245,23 @@ export const TEAM_KINDS: Kind[] = [
 						const k = `${a.tid}|${b.tid}`;
 						meets.set(k, [
 							...(meets.get(k) ?? []),
-							{ season: s, w: a.won, l: b.won, a: a.tid },
+							{
+								season: s,
+								w: a.won,
+								l: b.won,
+								a: a.tid,
+								r: {
+									season: s,
+									round: ri,
+									numRounds: rounds.length,
+									winner: a.won > b.won ? a.tid : b.tid,
+									loser: a.won > b.won ? b.tid : a.tid,
+									wWon: Math.max(a.won, b.won),
+									wLost: Math.min(a.won, b.won),
+									wSeed: a.won > b.won ? a.seed : b.seed,
+									lSeed: a.won > b.won ? b.seed : a.seed,
+								},
+							},
 						]);
 					}
 				});
@@ -1261,7 +1278,18 @@ export const TEAM_KINDS: Kind[] = [
 					kind: "Playoff rivalry",
 					shape: "playoffs",
 					season: last.season,
-					score: 15 + list.length * 5,
+					// The rivalry score (common/rivalries), as of the pair's last meeting
+					score:
+						15 +
+						Math.round(
+							rivalryScore({
+								a,
+								b,
+								season: last.season,
+								series: list.map((x) => x.r),
+								rs: [],
+							}).score / 2,
+						),
 					pids: [],
 					tids: [a, b],
 					heads: [

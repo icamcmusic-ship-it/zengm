@@ -5,6 +5,8 @@ import season from "../season/index.ts";
 import { findSeries } from "./writeGameStats.ts";
 import getWinner from "../../../common/getWinner.ts";
 import formatScoreWithShootout from "../../../common/formatScoreWithShootout.ts";
+import { seriesEndNote } from "../../../common/seriesRecap/index.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 const updatePlayoffSeries = async (
 	results: GameResults,
@@ -143,6 +145,33 @@ const updatePlayoffSeries = async (
 						},
 					)
 				: `${numGamesToWinSeries}-${loserWon}`;
+			// Series Recaps: a line about the series and a link to its recap, kept in the news for every round
+			let recapText = "";
+			let recapNote = "";
+			const recapsOn =
+				__SPORT === "basketball" &&
+				featureOn("seriesRecaps") &&
+				playoffSeries.currentRound >= 0 &&
+				numGamesToWinSeries > 1;
+			if (recapsOn) {
+				const gameWinners: boolean[] = [];
+				for (const gid of series.gids ?? []) {
+					const game = await idb.cache.games.get(gid);
+					if (game) {
+						gameWinners.push(game.won.tid === winnerTid);
+					}
+				}
+				const w = winnerTid === series.home.tid ? series.home : series.away;
+				const l = winnerTid === series.home.tid ? series.away : series.home;
+				recapNote = seriesEndNote(w, l, gameWinners, w.cid === l.cid);
+				const note = recapNote;
+				recapText = `${note ? ` ${note}` : ""} <a href="${helpers.leagueUrl([
+					"series_recaps",
+					g.get("season"),
+					`${Math.min(winnerTid, loserTid)}-${Math.max(winnerTid, loserTid)}`,
+				])}">Series recap</a>`;
+			}
+
 			const showNotification =
 				series.away.tid === g.get("userTid") ||
 				series.home.tid === g.get("userTid") ||
@@ -163,11 +192,12 @@ const updatePlayoffSeries = async (
 						g.get("season"),
 					])}">${
 						g.get("teamInfoCache")[loserTid]?.name
-					}</a> in the ${currentRoundText}, ${score}.`,
+					}</a> in the ${currentRoundText}, ${score}.${recapText}`,
 					showNotification,
 					tids: [winnerTid, loserTid],
-					score: 10,
-					saveToDb,
+					// A comeback, upset or sweep is big news
+					score: recapNote ? 20 : 10,
+					saveToDb: saveToDb || recapsOn,
 				},
 				conditions,
 			);

@@ -337,8 +337,11 @@ const newPhaseResignPlayers = async (
 			await idb.cache.players.put(p);
 		}
 
-		// Generate a new draft class, while leaving existing players in that draft class in place
+		// Fill the oldest new year to a full class, while leaving existing players in that draft class in place (stock behavior)
 		await draft.genPlayers(g.get("season") + 3);
+
+		// And any other missing upcoming classes, up to the numDraftClasses setting
+		await draft.topUpDraftClasses(g.get("season"), PHASE.RESIGN_PLAYERS);
 	}
 
 	// Delete any old undrafted players that still somehow exist

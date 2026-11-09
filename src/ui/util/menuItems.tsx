@@ -640,6 +640,24 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				league: true,
 				commandPalette: true,
 				commandPaletteOnly: true,
+				feature: "mockDraft",
+				path: ["mock_draft"],
+				text: "Mock Draft",
+			},
+			{
+				type: "link",
+				league: true,
+				commandPalette: true,
+				commandPaletteOnly: true,
+				feature: "collegeSeason",
+				path: ["college_overseas"],
+				text: "College/Overseas (March Madness)",
+			},
+			{
+				type: "link",
+				league: true,
+				commandPalette: true,
+				commandPaletteOnly: true,
 				path: ["draft_team_history"],
 				text: "Draft Team History",
 			},
@@ -811,7 +829,11 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
-				active: (pageID) => pageID === "leagueStats",
+				// Head-to-Head (and its Rivalries tab) is reached from League Stats' More links
+				active: (pageID) =>
+					pageID === "leagueStats" ||
+					pageID === "headToHeadAll" ||
+					pageID === "rivalries",
 				league: true,
 				commandPalette: true,
 				path: ["league_stats"],
@@ -1089,14 +1111,6 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPalette: true,
 				path: ["settings"],
 				text: "League Settings",
-			},
-			{
-				type: "link",
-				active: (pageID) => pageID === "leagueExtras",
-				league: true,
-				commandPalette: true,
-				path: ["league_extras"],
-				text: "League Extras",
 			},
 			{
 				type: "link",

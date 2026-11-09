@@ -43,10 +43,18 @@ export const featureForUrl = (
 			return "storylines";
 		case "hype":
 			return "hype";
+		case "best_games":
+			return "bestGames";
+		case "award_vote":
+			return "awardVote";
 		case "league_achievements":
 			return "leagueAchievements";
 		case "trade_grader":
 			return "tradeGrader";
+		case "rivalries":
+			return "rivalries";
+		case "series_recaps":
+			return "seriesRecaps";
 		case "contract_value":
 			return "contractValue";
 		case "timeline":
@@ -63,6 +71,10 @@ export const featureForUrl = (
 			return "threeTeamTrades";
 		case "draft_board":
 			return "draftBoard";
+		case "mock_draft":
+			return "mockDraft";
+		case "college_overseas":
+			return "collegeSeason";
 		case "archetypes":
 			return "archetypes";
 		case "staff":

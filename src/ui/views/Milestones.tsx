@@ -107,7 +107,7 @@ const Milestones = ({
 				<a href={helpers.leagueUrl(["records_book"])}>Records Book</a>.
 			</p>
 			<div className="row">
-				<div className="col-xl-8 mb-3">
+				<div className="col-xxl-8 mb-3">
 					<h2>Up next</h2>
 					{rows.length === 0 ? (
 						<p>No one is within reach right now.</p>
@@ -145,16 +145,15 @@ const Milestones = ({
 											<td>
 												{chaseText(r)}
 												{r.target.kind === "rank" ? (
-													<span className="text-body-secondary small">
-														{" "}
-														(passing{" "}
+													<span className="text-body-secondary small d-block">
+														passing{" "}
 														<a
 															href={helpers.leagueUrl(["player", r.target.pid])}
 														>
 															{r.target.name}
 														</a>
 														{r.target.active ? <ActiveMark /> : null},{" "}
-														{fmt(r.target.v)})
+														{fmt(r.target.v)}
 													</span>
 												) : null}
 											</td>
@@ -173,7 +172,7 @@ const Milestones = ({
 						</div>
 					)}
 				</div>
-				<div className="col-xl-4 mb-3">
+				<div className="col-xxl-4 mb-3">
 					<h2>Recently reached</h2>
 					{reached.length === 0 ? (
 						<p>No milestones reached this season yet.</p>

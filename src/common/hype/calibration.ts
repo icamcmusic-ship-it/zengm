@@ -38,33 +38,41 @@ export const LINE_STATS = [
 ] as const;
 export type LineStat = (typeof LINE_STATS)[number];
 
-// Tail fractions of the line tables: CAL.tail[k][i] is the value that a fraction TAIL[i] of all player lines (players who played) reach
-export const TAIL = [1e-1, 3e-2, 1e-2, 3e-3, 1e-3, 3e-4, 1e-4, 3e-5];
-
-// Rarity of a line: -log10 of the share of lines at least this good (2 = top 1%, 4 = one in 10,000). The value is first scaled to the calibration's scoring environment (era-aware: 12 assists in a slow, low-assist league count like 13.5 in the calibration's). Past the table's end, extrapolated along its last step.
-export const rarity = (k: LineStat, v: number, scale = 1): number => {
-	const t = CAL.tail[k];
-	if (!t || !Number.isFinite(v) || v <= 0) {
+// Survival tables (calibration.generated.ts): CAL.surv[k][v] is -log10 of the share of player lines (players who played, regular season) with stat k at least v, for v = 0, 1, 2, ... (game score rounded down, negative as 0), up to the last value at least 10 lines of the calibration leagues reached; CAL.slope[k] is the rarity per unit past that end (fitted on the thin tail). Exact for the small counts (5 steals is the share of lines with 5 or more, not a quantile that ties with 4).
+const survAt = (t: readonly number[], slope: number, x: number) => {
+	if (!t.length || !(x > 0)) {
 		return 0;
 	}
-	const x = v * (Number.isFinite(scale) && scale > 0 ? scale : 1);
-	const lg = TAIL.map((f) => -Math.log10(f));
-	if (x < t[0]!) {
-		return t[0]! > 0 ? Math.max(0, lg[0]! * (x / t[0]!)) : 0;
-	}
-	for (let i = 1; i < t.length; i++) {
-		if (x < t[i]!) {
-			const f = (x - t[i - 1]!) / Math.max(1e-9, t[i]! - t[i - 1]!);
-			return lg[i - 1]! + f * (lg[i]! - lg[i - 1]!);
-		}
-	}
 	const n = t.length;
-	const step = Math.max(0.5, t[n - 1]! - t[n - 2]!);
-	return Math.min(
-		9,
-		lg[n - 1]! + ((x - t[n - 1]!) / step) * (lg[n - 1]! - lg[n - 2]!),
+	if (x >= n - 1) {
+		return Math.min(9, t[n - 1]! + slope * (x - (n - 1)));
+	}
+	const i = Math.floor(x);
+	return t[i]! + (x - i) * (t[i + 1]! - t[i]!);
+};
+
+// Rarity of a single stat in a line: -log10 of the share of lines at least this good (2 = top 1%, 4 = one in 10,000). The value is first scaled to the calibration's scoring environment (era-aware: 12 assists in a slow, low-assist league count like 13.5 in the calibration's).
+export const rarity = (k: LineStat, v: number, scale = 1): number => {
+	const t = CAL.surv[k];
+	if (!t || !Number.isFinite(v)) {
+		return 0;
+	}
+	return survAt(
+		t,
+		CAL.slope[k] ?? 0.5,
+		v * (Number.isFinite(scale) && scale > 0 ? scale : 1),
 	);
 };
+
+// Step of the combined line index table
+export const LINE_STEP = 0.1;
+
+// Rarity of a whole line from its combined index (lineIndex in post.ts, already in rarity units): CAL.line[i] is -log10 of the share of lines whose index is at least i * LINE_STEP. Past the table's end one more unit of index is one more order of magnitude.
+export const lineRarity = (c: number): number =>
+	survAt(CAL.line, LINE_STEP, c / LINE_STEP);
+
+// How many lines a game has, as log10 (a line that one in 10^r lines reaches shows up about once in 10^(r - perGame) games)
+export const linesPerGame = () => CAL.perGame;
 
 // "a 1-in-2,000 line" for rarity >= 3, "top 1%" style below
 export const rarityText = (r: number) => {

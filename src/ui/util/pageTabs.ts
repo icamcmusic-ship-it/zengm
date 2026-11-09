@@ -11,6 +11,10 @@ export type PageTab = {
 
 export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 	[
+		{ id: "settings", name: "League Settings", url: ["settings"] },
+		{ id: "leagueExtras", name: "League Extras", url: ["league_extras"] },
+	],
+	[
 		{ id: "tradingBlock", name: "Trading Block", url: ["trading_block"] },
 		{ id: "tradeMarket", name: "Trade Market", url: ["trade_market"] },
 	],
@@ -66,6 +70,18 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 	[
 		{ id: "draftScouting", name: "Scouting", url: ["draft_scouting"] },
 		{ id: "draftBoard", name: "Draft Board", url: ["draft_board"] },
+		{
+			id: "mockDraft",
+			name: "Mock Draft",
+			url: ["mock_draft"],
+			basketballOnly: true,
+		},
+		{
+			id: "collegeOverseas",
+			name: "College/Overseas",
+			url: ["college_overseas"],
+			basketballOnly: true,
+		},
 	],
 	[
 		{ id: "relatives", name: "Relatives", url: ["frivolities", "relatives"] },
@@ -133,11 +149,44 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 		},
 	],
 	[
+		{ id: "headToHeadAll", name: "Head-to-Head", url: ["head2head_all"] },
+		{
+			id: "rivalries",
+			name: "Rivalries",
+			url: ["rivalries"],
+			basketballOnly: true,
+		},
+	],
+	[
+		{ id: "playoffs", name: "Playoffs", url: ["playoffs"] },
+		{
+			id: "seriesRecaps",
+			name: "Series Recaps",
+			url: ["series_recaps"],
+			basketballOnly: true,
+		},
+	],
+	[
 		{ id: "dailySchedule", name: "Schedule", url: ["daily_schedule"] },
 		{
 			id: "hype",
 			name: "Games to Watch",
 			url: ["hype"],
+			basketballOnly: true,
+		},
+		{
+			id: "bestGames",
+			name: "Best Games",
+			url: ["best_games"],
+			basketballOnly: true,
+		},
+	],
+	[
+		{ id: "awardRaces", name: "Award Races", url: ["award_races"] },
+		{
+			id: "awardVote",
+			name: "Award Vote",
+			url: ["award_vote"],
 			basketballOnly: true,
 		},
 	],

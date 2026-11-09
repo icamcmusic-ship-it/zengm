@@ -127,9 +127,30 @@ const SCHEMAS: [string, Field[]][] = [
 const SCHEMA_BY_TYPE = new Map(
 	SCHEMAS.map(([type, fields], i) => [
 		type,
-		{ code: FIRST_EVENT_CODE + i, fields },
+		{
+			code: FIRST_EVENT_CODE + i,
+			fields,
+			// For encoding (hot: every event of every game when play-by-play is stored)
+			keys: new Set(fields.map(([key]) => key)),
+		},
 	]),
 );
+// "e:a,b,c" enum kinds, split once
+const enumValues = new Map<string, string[]>();
+const getEnumValues = (kind: string) => {
+	let values = enumValues.get(kind);
+	if (!values) {
+		values = kind.slice(2).split(",");
+		enumValues.set(kind, values);
+	}
+	return values;
+};
+const STAT_INDEX = new Map<unknown, number>();
+for (const [i, stat] of STATS.entries()) {
+	if (!STAT_INDEX.has(stat)) {
+		STAT_INDEX.set(stat, i);
+	}
+}
 
 export type StoredPlayer = {
 	pid: number;
@@ -142,17 +163,18 @@ const isInt = (x: unknown): x is number =>
 const isHundredths = (x: number) =>
 	Number.isFinite(x) && Math.round(x * 100) / 100 === x;
 
+// Appends to a string (V8 makes that cheap), rather than collecting one-character strings to join
 class Writer {
-	out: string[] = [];
+	out = "";
 	num(v: number) {
 		while (v >= 32) {
-			this.out.push(ALPHABET[32 + (v % 32)]!);
+			this.out += ALPHABET[32 + (v % 32)]!;
 			v = Math.floor(v / 32);
 		}
-		this.out.push(ALPHABET[v]!);
+		this.out += ALPHABET[v]!;
 	}
 	raw(s: string) {
-		this.out.push(s);
+		this.out += s;
 	}
 }
 
@@ -232,9 +254,9 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 		return i + 1;
 	};
 
-	const fits = (e: any, fields: Field[]) => {
-		for (const key of Object.keys(e)) {
-			if (key !== "type" && !fields.some(([k]) => k === key)) {
+	const fits = (e: any, fields: Field[], keys: Set<string>) => {
+		for (const key in e) {
+			if (key !== "type" && !keys.has(key)) {
 				if (e[key] !== undefined) {
 					return false;
 				}
@@ -273,7 +295,7 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 					return false;
 				}
 			} else {
-				if (v !== undefined && !kind.slice(2).split(",").includes(v)) {
+				if (v !== undefined && !getEnumValues(kind).includes(v)) {
 					return false;
 				}
 			}
@@ -287,7 +309,7 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 		}
 
 		if (e.type === "stat") {
-			const s = STATS.indexOf(e.s);
+			const s = STAT_INDEX.get(e.s) ?? -1;
 			if (s < 0) {
 				continue;
 			}
@@ -324,7 +346,7 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 			}
 		} else {
 			const schema = SCHEMA_BY_TYPE.get(e.type);
-			if (schema && fits(e, schema.fields)) {
+			if (schema && fits(e, schema.fields, schema.keys)) {
 				body.num(schema.code);
 				for (const [key, kind] of schema.fields) {
 					const v = e[key];
@@ -354,9 +376,7 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 							body.num(key === "timeouts" ? x : ref(x));
 						}
 					} else {
-						body.num(
-							v === undefined ? 0 : kind.slice(2).split(",").indexOf(v) + 1,
-						);
+						body.num(v === undefined ? 0 : getEnumValues(kind).indexOf(v) + 1);
 					}
 				}
 				continue;
@@ -392,7 +412,7 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 		}
 	}
 
-	return head.out.join("") + body.out.join("");
+	return head.out + body.out;
 };
 
 // The string back to the players (in the sim's roster order) and the events, as the sim logged them (minus the stats left out)

@@ -23,8 +23,9 @@ import type {
 import { getNumPicksPerRound } from "../trade/getPickValues.ts";
 import {
 	countMentees,
-	getAiTraitValueFactor,
+	makeAiTraitValueFactorCache,
 	traitsEnabled,
+	type getAiTraitValueFactor,
 } from "../player/traits.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { groupByUnique, last } from "../../../common/utils.ts";
@@ -255,6 +256,7 @@ const getPlayers = async ({
 	pidsRemove,
 	tid,
 	tradingPartnerTid,
+	getTraitFactor,
 }: {
 	add: Asset[];
 	remove: Asset[];
@@ -262,6 +264,7 @@ const getPlayers = async ({
 	pidsRemove: number[];
 	tid: number;
 	tradingPartnerTid?: number;
+	getTraitFactor: typeof getAiTraitValueFactor;
 }) => {
 	const season = g.get("season");
 	const phase = g.get("phase");
@@ -287,7 +290,7 @@ const getPlayers = async ({
 		: undefined;
 	const numYoung = traitsOn ? countMentees(players) : 0;
 	const traitFactor = (p: Player) =>
-		traitsOn ? getAiTraitValueFactor(p, { strategy, numYoung }) : 1;
+		traitsOn ? getTraitFactor(p, { strategy, numYoung }) : 1;
 
 	for (const p of players) {
 		if (!pidsRemove.includes(p.pid)) {
@@ -683,13 +686,18 @@ const getPickProbs = async (
 		pickEstimates.season,
 	);
 
+	if (slotProbs.length !== slotPickProbs.length) {
+		throw new TypeError("Iterators had different lengths");
+	}
+
+	// Plain loops (hot: AI trades evaluate picks constantly), in the same order as before, so the same sums
 	const pickProbs = new Array<number>(slotProbs.length).fill(0);
-	for (const [slotProb, probs] of Iterator.zip([slotProbs, slotPickProbs], {
-		mode: "strict",
-	})) {
+	for (let j = 0; j < slotProbs.length; j++) {
+		const slotProb = slotProbs[j]!;
 		if (slotProb > 0) {
-			for (const [i, prob] of probs.entries()) {
-				pickProbs[i]! += slotProb * prob;
+			const probs = slotPickProbs[j]!;
+			for (let i = 0; i < probs.length; i++) {
+				pickProbs[i]! += slotProb * probs[i]!;
 			}
 		}
 	}
@@ -1501,6 +1509,10 @@ export class ValueChangeCalculator {
 		teams: "all",
 	};
 
+	// Player traits: a player's trait factor, remembered for the life of this calculator (one AI trade pass, one view
+	// request), since the same players are valued over and over
+	private getTraitFactor = makeAiTraitValueFactorCache();
+
 	constructor({ quick = false }: { quick?: boolean } = {}) {
 		this.quick = quick;
 	}
@@ -1650,6 +1662,7 @@ export class ValueChangeCalculator {
 			pidsRemove,
 			tid,
 			tradingPartnerTid,
+			getTraitFactor: this.getTraitFactor,
 		});
 		await getPicks({
 			cache: this.cache,

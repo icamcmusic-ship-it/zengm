@@ -89,6 +89,10 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	timeline: "League extras: History & Stories",
 	recordsBook: "League extras: History & Stories",
 	milestones: "League extras: History & Stories",
+	rivalries: "League extras: History & Stories",
+	seriesRecaps: "League extras: History & Stories",
+	bestGames: "League extras: History & Stories",
+	awardVote: "League extras: History & Stories",
 	tradeGrader: "League extras: History & Stories",
 	contractValue: "League extras: History & Stories",
 	frivolities: "League extras: History & Stories",
@@ -114,10 +118,12 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	tradeMarket: "League extras: Trades",
 	threeTeamTrades: "League extras: Trades",
 	collegeStats: "League extras: Draft",
+	collegeSeason: "League extras: Draft",
 	ratingsRegenerator: "League extras: Draft",
 	scoutingSystem: "League extras: Draft",
 	draftBoard: "League extras: Draft",
 	aiDraftNeeds: "League extras: Draft",
+	mockDraft: "League extras: Draft",
 	coachingStaff: "League extras: Team",
 };
 
@@ -940,6 +946,22 @@ export const settings: Setting[] = (
 			validator: (value) => {
 				if (value < 0) {
 					throw new Error("Value cannot be less than 0");
+				}
+			},
+		},
+		{
+			category: "Draft",
+			key: "numDraftClasses",
+			name: "# Future Draft Classes",
+			description:
+				"How many upcoming draft classes are kept generated. After each draft, a new class is added in the preseason (and whenever there are fewer than this).",
+			type: "int",
+			validator: (value) => {
+				if (value < 1) {
+					throw new Error("Value cannot be less than 1");
+				}
+				if (value > 20) {
+					throw new Error("Value cannot be greater than 20");
 				}
 			},
 		},

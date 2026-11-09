@@ -341,8 +341,8 @@ const play = async (
 				await contractHooks.afterDay();
 			}
 			if (phase === PHASE.REGULAR_SEASON) {
-				await trade.betweenAiTeams();
-				await trade.aiOffers();
+				// AI-to-AI trades and AI offers are background activity: a bug in them must not stop the season
+				await trade.runAiTradesSafely();
 			}
 		}
 
@@ -715,7 +715,15 @@ const play = async (
 		const canStartGames = lock.canStartGames();
 
 		if (canStartGames) {
-			await cbRunDay();
+			try {
+				await cbRunDay();
+			} catch (error) {
+				// Otherwise the game looks stuck: still "Playing...", and the play menu only offers Stop
+				await lock.set("gameSim", false);
+				await updateStatus();
+				await updatePlayMenu();
+				throw error;
+			}
 		}
 	} else {
 		await cbRunDay();

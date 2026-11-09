@@ -32,7 +32,7 @@ export const featureOffError = (id: NativeFeatureId) => {
 	const f = getNativeFeature(id);
 	return {
 		errorMessage: nativeFeatureAvailableInSport(f, __SPORT)
-			? `${f.name} is turned off for this league. You can turn it on in League Extras (Tools menu).`
+			? `${f.name} is turned off for this league. You can turn it on in League Settings → League Extras.`
 			: `${f.name} is not available in this sport.`,
 	};
 };
