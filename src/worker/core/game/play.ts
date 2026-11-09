@@ -24,6 +24,7 @@ import writePlayerStats, {
 } from "./writePlayerStats.ts";
 import writeTeamStats from "./writeTeamStats.ts";
 import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
+import { scheduleRecordsCheck } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
 import {
 	g,
@@ -122,6 +123,8 @@ const play = async (
 
 		// League achievements unlocked by these games
 		scheduleLeagueAchievementsCheck();
+		// Records Book and Milestones: records broken, milestones reached
+		scheduleRecordsCheck();
 	};
 
 	// Saves a vector of results objects for a day, as is output from cbSimGames

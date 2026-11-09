@@ -142,3 +142,5 @@ export { default as Staff } from "./Staff/index.tsx";
 export { default as Coach } from "./Coach.tsx";
 export { default as Coaches } from "./Coaches.tsx";
 export { default as SkillBadges } from "./SkillBadges.tsx";
+export { default as RecordsBook } from "./RecordsBook.tsx";
+export { default as Milestones } from "./Milestones.tsx";

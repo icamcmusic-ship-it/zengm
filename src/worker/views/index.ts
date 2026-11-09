@@ -132,3 +132,5 @@ export { default as staff } from "./staff.ts";
 export { default as coach } from "./coach.ts";
 export { default as coaches } from "./coaches.ts";
 export { default as skillBadges } from "./skillBadges.ts";
+export { default as recordsBook } from "./recordsBook.ts";
+export { default as milestones } from "./milestones.ts";

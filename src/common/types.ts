@@ -2,6 +2,7 @@ import * as z from "zod";
 import type { IsExact } from "conditional-type-checks";
 import type { FaceConfig } from "facesjs";
 import type { ReactNode } from "react";
+import type { RBState } from "./recordsBook.ts";
 import type * as views from "../worker/views/index.ts";
 
 import {
@@ -753,6 +754,8 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 			quiet?: boolean;
 		}[];
 	};
+	// Records Book single-game highs, streaks and record holders (basketball, see worker/util/recordsBookData.ts)
+	recordsBook?: RBState;
 	goatSeasonFormula?: string;
 	godMode: boolean;
 	godModeInPast: boolean;

@@ -87,6 +87,8 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	hype: "League extras: History & Stories",
 	leagueAchievements: "League extras: History & Stories",
 	timeline: "League extras: History & Stories",
+	recordsBook: "League extras: History & Stories",
+	milestones: "League extras: History & Stories",
 	tradeGrader: "League extras: History & Stories",
 	contractValue: "League extras: History & Stories",
 	frivolities: "League extras: History & Stories",

@@ -7,6 +7,8 @@ export const CONSOLIDATED_PAGES = [
 	{ path: "contract_value", home: "league_finances", moreLinks: "finances" },
 	{ path: "coaches", home: "history_all", moreLinks: "league" },
 	{ path: "timeline", home: "history_all", moreLinks: "league" },
+	{ path: "records_book", home: "history_all", moreLinks: "league" },
+	{ path: "milestones", home: "player_stats", moreLinks: "playerStats" },
 	{ path: "archetypes", home: "player_ratings", moreLinks: "playerRatings" },
 	{ path: "hype", home: "daily_schedule", moreLinks: "schedule" },
 	{ path: "draft_board", home: "draft_scouting", moreLinks: "draft" },
