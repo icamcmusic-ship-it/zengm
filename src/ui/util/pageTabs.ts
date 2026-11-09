@@ -66,6 +66,12 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 	[
 		{ id: "draftScouting", name: "Scouting", url: ["draft_scouting"] },
 		{ id: "draftBoard", name: "Draft Board", url: ["draft_board"] },
+		{
+			id: "mockDraft",
+			name: "Mock Draft",
+			url: ["mock_draft"],
+			basketballOnly: true,
+		},
 	],
 	[
 		{ id: "relatives", name: "Relatives", url: ["frivolities", "relatives"] },

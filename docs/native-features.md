@@ -17,7 +17,7 @@ Pages that belong with an original BBGM page are tabs of that page: a tab bar at
 | Transactions     | Transactions, Trade Grader                      |
 | League Finances  | Finances, Contract Value, Economics, Home Court |
 | Draft History    | Draft History, Redraft, Pick Value              |
-| Draft Scouting   | Scouting, Draft Board                           |
+| Draft Scouting   | Scouting, Draft Board, Mock Draft               |
 | Relatives        | Relatives, Family Trees                         |
 | Jersey Numbers   | League, By Team                                 |
 | Player Ratings   | Ratings, Archetypes, Skill Badges               |
@@ -67,6 +67,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Scouting system](#draft-scouting)                                  | Draft Scouting                                                   | all    | `scoutingSystem`                          | on / off                      |
 | [Draft board](#draft-board-and-ai-drafting)                         | Draft Board, Draft page                                          | all    | `featureDraftBoard`                       | on / on                       |
 | [AI drafts by need](#draft-board-and-ai-drafting)                   | AI draft picks                                                   | bball  | `featureAiDraftNeeds`                     | on / off                      |
+| [Mock draft](#draft-board-and-ai-drafting)                          | Draft Scouting (Mock Draft tab), prospect player page            | bball  | `featureMockDraft`                        | on / off                      |
 | [Extra frivolities](#extra-frivolities)                             | Frivolities                                                      | all    | `featureFrivolities`                      | on / on                       |
 | [Face style gallery](#face-style-gallery-and-extra-face-parts)      | Tools → Face Style Gallery                                       | all    | browser setting on the page (extra parts) | off (gallery always shown)    |
 | [Draft pick protections & swaps](#draft-pick-protections-and-swaps) | Trade, 3-team trade, Draft Picks, transactions                   | all    | `featureDraftPickConditions`              | on / off                      |
@@ -106,6 +107,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `scoutingSystem`                                                                                          | on / off                                                        |                                                                                                              |
 | `draftBoardAutoDraft`                                                                                     | on / on                                                         | option of the Draft Board                                                                                    |
 | `featureAiDraftNeeds`                                                                                     | on / off                                                        |                                                                                                              |
+| `featureMockDraft`                                                                                        | on / off                                                        |                                                                                                              |
 | `featureDraftPickConditions`                                                                              | on / off                                                        | existing conditions on picks are still resolved when it's off                                                |
 
 ### Adding a toggle (for developers)
@@ -350,6 +352,7 @@ _Draft Pick Protections & Swaps_ (`featureDraftPickConditions`, all sports; on f
 
 - **Draft Board** (_Draft Board_): `/l/:lid/draft_board[/:season]`, linked from Draft Scouting and the Draft page. Rank your prospects, give them tiers and notes next to their pre-draft stats, builds and scout reports. Option _Auto Draft From My Board_: when auto drafting for you, the top-ranked available prospect on your board is picked. The Draft page also has a _Draft-day trades & team boards_ window (trades through the trade API, each AI team's needs and board).
 - **AI drafts by need** (_AI Drafts by Need_, basketball): AI picks get a small need (guard, wing, big) and strategy (contenders want players who are ready, rebuilding teams want ceiling) adjustment on top of value, at most about 2 value points (`draftNeeds.ts`; value still decides most picks). Off: the old pure-value drafting.
+- **Mock draft** (_Mock Draft_, basketball): `/l/:lid/mock_draft`, a tab of Draft Scouting. A two-round mock draft of the current class (until its draft is over; during the draft, the remaining picks). Each team picks the way the AI does in `runPicks.ts`: value plus the need/strategy adjustment (when _AI Drafts by Need_ is on) and the player-traits nudge (when traits are on), with the same weighted random choice. The order is the league's draft order with traded picks once the lottery is done, otherwise one simulated lottery (like the projected Draft Lottery page; protections and swaps are not applied). Each pick shows why (best available, fills a need, ceiling or ready-now, traits, reach or steal against your scouting list); _Rerun_ draws again; your picks are highlighted. Pro projections: 120 careers per prospect run with the game's own development (`developSeasonSync`) from his ratings as your scouts see them, with a simple out-of-the-league rule, giving the median and 10th-90th percentile peak ovr and star (65+) / starter (58+) / bust (under 50 or gone within 4 seasons) odds, ported from the Draft Workshop. Cached per league, season and ratings in the worker; shown on the Mock Draft tab and as a _Pro projection_ section on a prospect's player page (`mockDraft.ts`, `proProjection.ts`, `mockDraftData.ts`).
 
 ### Customize Player: Regenerate build
 
