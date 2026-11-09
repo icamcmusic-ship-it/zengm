@@ -129,3 +129,30 @@ test("every tab page highlights a visible side menu item, like SideBar does", as
 		}
 	}
 });
+
+test("League Extras is a tab of League Settings, with no menu or command palette item of its own", async () => {
+	vi.stubGlobal("CSS", { supports: () => false });
+	assert.strictEqual(tabHostPageID("leagueExtras"), "settings");
+	assert.deepEqual(
+		tabsForSport(getTabGroup("settings")!, "hockey").map((tab) => tab.id),
+		["settings", "leagueExtras"],
+	);
+
+	const { menuItems } = await import("./menuItems.tsx");
+	const paths: unknown[] = [];
+	const walk = (
+		items: readonly (MenuItemLink | MenuItemHeader | MenuItemText)[],
+	) => {
+		for (const item of items) {
+			if (item.type === "header") {
+				walk(item.children);
+			} else if (item.type === "link") {
+				paths.push(item.path);
+			}
+		}
+	};
+	walk(menuItems);
+	assert.isFalse(
+		paths.some((path) => JSON.stringify(path)?.includes("league_extras")),
+	);
+});

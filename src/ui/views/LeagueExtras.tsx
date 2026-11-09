@@ -4,21 +4,24 @@ import SettingsForm from "./Settings/SettingsForm.tsx";
 import { showNotification } from "../util/showNotification.ts";
 import { toWorker } from "../util/toWorker.ts";
 import { useBlocker } from "../hooks/useBlocker.ts";
-import { helpers } from "../util/helpers.ts";
 import {
 	nativeFeatureKeysOtherSports,
 	NATIVE_FEATURE_SETTING_KEYS,
 } from "../../common/nativeFeatures.ts";
-import type { Key } from "./Settings/types.ts";
+import type { Category, Key } from "./Settings/types.ts";
 
 const otherSports = new Set<string>(nativeFeatureKeysOtherSports());
 const shown = NATIVE_FEATURE_SETTING_KEYS.filter(
 	(key) => !otherSports.has(key),
 ) as Key[];
 
-// The League extras category of League Settings on its own page
+// "League extras: Players" -> "Players", since the whole tab is League extras
+const categoryTitle = (name: Category) =>
+	name === "League extras" ? "General" : name.replace(/^League extras: /, "");
+
+// The League Extras tab of League Settings (the League Settings tab leaves these settings out)
 const LeagueExtras = ({ initialSettings }: View<"leagueExtras">) => {
-	useTitleBar({ title: "League Extras" });
+	useTitleBar({ title: "League Settings" });
 
 	const { setDirty } = useBlocker();
 
@@ -27,14 +30,14 @@ const LeagueExtras = ({ initialSettings }: View<"leagueExtras">) => {
 			<p>
 				Turn this fork's extra features on or off for this league. A feature
 				that is off disappears from the menus, links and dashboard, and its
-				background work stops. These are also in{" "}
-				<a href={helpers.leagueUrl(["settings"])}>League Settings</a>.
+				background work stops.
 			</p>
 			<SettingsForm
 				initialSettings={initialSettings}
 				settingsShown={shown}
 				hideShortcuts
 				hideGodModeToggle
+				categoryTitle={categoryTitle}
 				onUpdateExtra={() => {
 					setDirty(true);
 				}}

@@ -6,7 +6,7 @@ import { showNotification } from "../../util/showNotification.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import { localActions } from "../../util/local.ts";
 import { settings } from "./settings.tsx";
-import type { Key, Values } from "./types.ts";
+import type { Category, Key, Values } from "./types.ts";
 import type { Settings } from "../../../worker/views/settings.ts";
 import type {
 	GameAttributesLeague,
@@ -268,6 +268,7 @@ const SettingsForm = ({
 	alwaysShowGodModeSettings,
 	isInsideModal,
 	hideGodModeToggle,
+	categoryTitle,
 }: {
 	onCancel?: () => void;
 	onCancelDefaultSetting?: (key: Key) => void;
@@ -284,6 +285,9 @@ const SettingsForm = ({
 	alwaysShowGodModeSettings?: boolean;
 	isInsideModal?: boolean;
 	hideGodModeToggle?: boolean;
+
+	// Heading shown for a category, if not its name
+	categoryTitle?: (name: Category) => string;
 
 	// Used to filter diplayed settings, for the DefaultSettings page
 	settingsShown?: Readonly<Key[]>;
@@ -621,6 +625,7 @@ const SettingsForm = ({
 					state={state}
 					visibleCategories={visibleCategories}
 					expandAll={filterText !== "" && /\S/.test(filterText)}
+					categoryTitle={categoryTitle}
 				/>
 
 				<StickyBottomButtons isInsideModal={isInsideModal}>

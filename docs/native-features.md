@@ -12,6 +12,7 @@ Pages that belong with an original BBGM page are tabs of that page: a tab bar at
 
 | Page (first tab) | Tabs                                            |
 | ---------------- | ----------------------------------------------- |
+| League Settings  | League Settings, League Extras                  |
 | Trading Block    | Trading Block, Trade Market                     |
 | Trade            | 2 teams, 3 teams                                |
 | Transactions     | Transactions, Trade Grader                      |
@@ -75,14 +76,14 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 
 ## League extras (feature toggles)
 
-- **Where:** Tools → _League Extras_ (`/l/:lid/league_extras`), and the _League extras_ category at the bottom of League Settings (and of the New League form). Same settings in both places.
+- **Where:** the _League Extras_ tab of League Settings (`/l/:lid/league_extras`; Tools → League Settings, then the tab). There is no separate menu or command palette item. The _League Settings_ tab leaves these settings out, and each tab saves only its own settings. The New League form still has them in its _League extras_ categories at the bottom.
 - **What:** an on/off switch for every feature above, plus the options of some. A feature that is off disappears from the menus, the command palette, _More_ links, history/team/player page links and the dashboard, its pages show "turned off" if opened directly, and its background work stops (no hype computed, no achievement checks, no season odds simulations, no AI offers, no archetype updates, ...).
 - **Options** (shown with their feature): hype _on Dashboard_ / _on Schedules and Box Scores_; achievement _Notifications_ / _on Dashboard_; box score play-by-play _Always show_ or _Show on button press_; _Games to Save Play-by-Play For_ (all games, my team's games, none); _Holdout Frequency_; _AI Trade Offers Frequency_ and _Expiration_; _Generate Pre-Draft Stats Automatically_; _Re-randomize New Draft Classes_; _Auto Draft From My Board_; unretirement chance, minimum age and ovr boost.
 - **Sports:** basketball-only switches are hidden in the other sports (Extra Frivolities, the contract features and the trade features show there).
 
 ### Settings table
 
-Every setting the features add. "New / existing" is the value for a new league and for a league made before the setting existed. All of these are in League Extras (and League Settings → League extras) unless a row says otherwise.
+Every setting the features add. "New / existing" is the value for a new league and for a league made before the setting existed. All of these are in League Settings → League Extras unless a row says otherwise.
 
 | Key                                                                                                       | New / existing                                                  | Notes                                                                                                        |
 | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -290,7 +291,7 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 
 ### Player, team and history pages
 
-- Player pages: college rows (tagged _College_) in the stats tables, an _Earlier honors_ box, _Wrapped_ and _Storylines_ buttons, the _Archetype_ line, the _Traits_ section, badges and the _Contract & Mood_ panel.
+- Player pages: college rows (tagged _College_) in the stats tables, an _Earlier honors_ box, _Wrapped_ and _Storylines_ buttons, the _Archetype_ line, the _Traits_ section, badges and the _Contract & Mood_ panel (collapsed by default).
 - Team pages (_More_ links), League → History, History (all seasons) and Team History rows link to the Newspaper, Wrapped and Storylines for that team/season.
 
 ## Contracts, mood and player unrest
@@ -299,7 +300,7 @@ Unlike most of the pages above, these work in every sport. Switches are in Leagu
 
 - **Options and partial guarantees** (_Contract Options & Guarantees_): the negotiation window has _Option_ (player option −5%, team option +10%) and _Guaranteed after year 1_ (100/75/50/0%, up to +20%) pickers for contracts of 2+ years. AI teams put terms in some of their deals too. Options are decided at the start of the re-signing phase: players opt out when the market pays more (or they're unhappy and wouldn't lose much), teams keep a team option if the player is worth about what he'd be paid. A declined option makes the contract expire then, so the player can be re-signed like any expiring contract. You can exercise or decline your own team option early from the player page. Releasing a player only owes the guaranteed part of seasons after the current one, and not an undecided team option. Contracts show a _PO_/_TO_/_%G_ badge next to the expiration year.
 - **Extensions** (_In-Season Contract Extensions_): players in the last 2 seasons of their contracts can be extended in the preseason and regular season, from _Negotiate extension_ on the player page. The new seasons are added after the current ones, so this season's payroll doesn't change. Willingness comes from mood. AI teams extend some good players in their final season. Extensions can be undone like signings.
-- **Mood transparency** (always on): the player page _Contract & Mood_ panel shows contract seasons with guaranteed amounts and options, release cost, a _What would make him re-sign?_ table (projected willingness if the team wins, after a deep playoff run, with a bigger role, with no more trades, or all of these), and mood history with sparklines. Mood is snapshotted at the trade deadline, at the end of the regular season and after the playoffs (up to 30 per player, in `p.moodHistory`).
+- **Mood transparency** (always on): the player page _Contract & Mood_ panel (collapsed by default with a one-line mood / willingness summary in its header; click the header to expand, and the choice is remembered in this browser; trade request and holdout notices stay visible) shows contract seasons with guaranteed amounts and options, release cost, a _What would make him re-sign?_ table (projected willingness if the team wins, after a deep playoff run, with a bigger role, with no more trades, or all of these), and mood history with sparklines. Mood is snapshotted at the trade deadline, at the end of the regular season and after the playoffs (up to 30 per player, in `p.moodHistory`).
 - **Free agent demands** (always on): during free agency and the season, a free agent with no market comes down faster than the stock daily decrease (which is tiny next to modern salaries). Below replacement level (the median AI team's last-man value) he gives up half of what he asks above the minimum each day in the regular season (12% a day in free agency), so he's at the minimum within about 5 days. A better player who asks more than his share of AI cap space (the best free agent is matched with the most cap space any AI team with a roster spot has, the second best with the second most, ...) gives up 35% a day (8% in free agency, so about a week in the season), but not below that cap space, so players a team could still pay keep their price. Over-the-cap AI teams only sign minimum contracts in either cap mode; with no salary cap only below-replacement players drop fast. A free agent at the minimum still refuses a team he really hates (mood components summing below -8) until enough days unsigned bring him around. Code: `freeAgents/decreaseDemands.ts` (`getDemandMarket`); `FA_METRICS=1` on `decreaseDemands.test.ts` prints a day-by-day table.
 - **Free agent market** (always on): the Free Agents page _Market_ column shows how many AI teams are interested and the chance he signs elsewhere on the next day; click it for each team's interest (top target, next in line, fallback), the per-day chance and the most likely team. This mirrors how AI teams sign free agents (each day, a team that doesn't skip signs the best player it can fit).
 - **Trade requests** (_Trade Requests_): very unhappy stars (top 15% by value) can ask to be traded, checked about weekly in the regular season. It's in the news, AI teams value him 15% lower when trading him away, and the trading block shows a _Trade request_ badge. Requests end when he's traded, extended, or happy again.

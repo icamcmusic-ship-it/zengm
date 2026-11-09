@@ -3,6 +3,7 @@ import { PHASE_TEXT } from "../../../common/constants.ts";
 import { optionLabel } from "../../../common/contractTerms.ts";
 import type { MoodSnapshot } from "../../../common/types.ts";
 import type api from "../../../worker/api/index.ts";
+import CollapseArrow from "../../components/CollapseArrow.tsx";
 import { HelpPopover } from "../../components/HelpPopover.tsx";
 import {
 	NegotiationModal,
@@ -12,6 +13,7 @@ import { helpers } from "../../util/helpers.ts";
 import { showNotification } from "../../util/showNotification.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import { useLocal } from "../../util/local.ts";
+import { usePersistedOpen } from "../../util/persistedOpen.ts";
 
 type PanelData = NonNullable<
 	Awaited<ReturnType<typeof api.main.getPlayerContractPanel>>
@@ -265,6 +267,8 @@ export const ContractMood = ({
 	const [counter, setCounter] = useState(0);
 	const { spectator } = useLocal(["spectator"]);
 	const negotiationModal = useNegotiaionModal();
+	// Collapsed by default, remembered per browser (the stock mood info at the top of the page stays visible)
+	const [open, toggleOpen] = usePersistedOpen("playerContractMoodOpen", false);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -288,7 +292,25 @@ export const ContractMood = ({
 	return (
 		<div className="mb-3">
 			<h2>
-				Contract &amp; Mood{" "}
+				<button
+					type="button"
+					className="btn btn-link p-0 text-reset text-decoration-none"
+					style={{ fontSize: "inherit", fontWeight: "inherit" }}
+					aria-expanded={open}
+					data-testid="contract-mood-toggle"
+					onClick={toggleOpen}
+				>
+					<span className="me-1" style={{ fontSize: "0.7em" }}>
+						<CollapseArrow open={open} />
+					</span>
+					Contract &amp; Mood
+				</button>{" "}
+				{!open && base ? (
+					<span className="text-body-secondary fs-6 fw-normal me-1">
+						(mood {base.sum > 0 ? "+" : ""}
+						{base.sum}, {formatProb(base.probWilling)} willing to re-sign)
+					</span>
+				) : null}
 				<HelpPopover>
 					<p>
 						The projections show how his willingness to re-sign would change if
@@ -316,7 +338,7 @@ export const ContractMood = ({
 					holdout.
 				</div>
 			) : null}
-			<div className="row">
+			<div className="row" hidden={!open}>
 				<div className="col-md-6 col-xxl-4">
 					<ContractDetails
 						data={data}
