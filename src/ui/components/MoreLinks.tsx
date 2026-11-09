@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { isTabOfSamePage } from "../util/pageTabs.ts";
 import { isUrlFeatureOn, useFeatureSwitches } from "../util/nativeFeatures.ts";
 import {
 	NO_LOTTERY_DRAFT_TYPES,
@@ -490,36 +491,39 @@ export const MoreLinks = (
 		throw new Error("Invalid MoreLinks type");
 	}
 
-	if (links.length === 0) {
+	const shownLinks = links
+		.filter(({ url }) => isUrlFeatureOn(url))
+		// Other tabs of this page are in its tab bar
+		.filter(({ url }) => !isTabOfSamePage(url, page))
+		.filter(({ url }) => {
+			if (keepSelfLink) {
+				return true;
+			}
+			const key = typeof url === "string" ? url : url[0];
+			const fullKey = typeof url === "string" ? url : url.join("/");
+			return key !== page && fullKey !== page;
+		});
+
+	if (shownLinks.length === 0) {
 		return null;
 	}
 
 	return (
 		<p>
 			More:{" "}
-			{links
-				.filter(({ url }) => isUrlFeatureOn(url))
-				.filter(({ url }) => {
-					if (keepSelfLink) {
-						return true;
-					}
-					const key = typeof url === "string" ? url : url[0];
-					const fullKey = typeof url === "string" ? url : url.join("/");
-					return key !== page && fullKey !== page;
-				})
-				.map(({ className, url, name }, i) => {
-					return (
-						<Fragment key={url[0] + String(i)}>
-							{i > 0 ? " | " : null}
-							<a
-								className={className}
-								href={typeof url === "string" ? url : helpers.leagueUrl(url)}
-							>
-								{name}
-							</a>
-						</Fragment>
-					);
-				})}
+			{shownLinks.map(({ className, url, name }, i) => {
+				return (
+					<Fragment key={url[0] + String(i)}>
+						{i > 0 ? " | " : null}
+						<a
+							className={className}
+							href={typeof url === "string" ? url : helpers.leagueUrl(url)}
+						>
+							{name}
+						</a>
+					</Fragment>
+				);
+			})}
 		</p>
 	);
 };

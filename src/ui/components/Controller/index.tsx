@@ -12,6 +12,7 @@ import { Notifications } from "./Notifications.tsx";
 import { SideBar } from "./SideBar.tsx";
 import { Skyscraper } from "./Skyscraper.tsx";
 import { TitleBar } from "./TitleBar.tsx";
+import { PageTabs } from "../PageTabs.tsx";
 import { useViewData } from "../../util/viewManager.tsx";
 import api from "../../api/index.ts";
 import { ErrorBoundary } from "../ErrorBoundary.tsx";
@@ -108,6 +109,7 @@ export const Controller = () => {
 								<Header />
 								<main id="actual-actual-content" className="clearfix">
 									<ErrorBoundary key={idLoaded}>
+										{inLeague && !popup ? <PageTabs pageID={idLoaded} /> : null}
 										{Component ? (
 											<KeepPreviousRenderWhileUpdating updating={updating}>
 												<Component {...data} />

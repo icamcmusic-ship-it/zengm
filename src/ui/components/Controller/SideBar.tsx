@@ -1,3 +1,4 @@
+import { tabHostPageID } from "../../util/pageTabs.ts";
 import clsx from "clsx";
 import { memo, type ReactNode, useCallback, useEffect, useState } from "react";
 import { helpers } from "../../util/helpers.ts";
@@ -137,6 +138,9 @@ const MenuItem = ({
 		menuItem.type === "link" ? menuItem.feature : undefined,
 	);
 
+	// On a tab of a page (util/pageTabs.ts), highlight that page
+	const hostPageID = tabHostPageID(pageID);
+
 	if (menuItem.type === "text") {
 		return null;
 	}
@@ -168,7 +172,12 @@ const MenuItem = ({
 			<li className="nav-item">
 				<a
 					className={clsx("nav-link", {
-						active: menuItem.active ? menuItem.active(pageID, pathname) : false,
+						active: menuItem.active
+							? menuItem.active(pageID, pathname) ||
+								(hostPageID !== undefined &&
+									hostPageID !== pageID &&
+									menuItem.active(hostPageID, pathname))
+							: false,
 						"god-mode": menuItem.godMode,
 					})}
 					{...anchorProps}

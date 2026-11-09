@@ -8,18 +8,23 @@ Most of it is **basketball only**: in Football, Hockey and Baseball GM the menu 
 
 ## Where the pages live
 
-Pages that belong with an original BBGM page are reached from that page's _More_ links (and the command palette, Ctrl+K), not from a menu item of their own. Their URLs did not change, so old links and bookmarks keep working. The list is `src/ui/util/consolidatedPages.ts`.
+Pages that belong with an original BBGM page are tabs of that page: a tab bar at the top of the page (it scrolls sideways on a phone) switches between them. Each tab keeps its own URL, which is the page's old URL, so old links, bookmarks and the command palette (Ctrl+K) land on the right tab. Tabs of a League Extras feature that is off are hidden, and the side menu highlights the host page on any of its tabs. The tab list is `src/ui/util/pageTabs.ts`; `src/ui/util/consolidatedPages.ts` lists the pages kept out of the side menu.
 
-| Page                                         | Now under (_More_ links of)                                                                      |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Trade Market, Trade Grader                   | Trade, Trading Block, Trade Proposals, Saved Trades (Trade Grader also from Transactions grades) |
-| Contract Value, League Economics, Home Court | League Finances                                                                                  |
-| Timeline, League Achievements, Coaches       | League Stats / League History group (Head-to-Head, Team Records, ...)                            |
-| Archetypes, Skill Badges                     | Player Ratings, Rating Distributions                                                             |
-| Games to Watch                               | Daily Schedule (plus dashboard card and schedule badges)                                         |
-| Draft Board, Redraft, Pick Value             | Draft pages (Draft Scouting, Lottery, History, ...)                                              |
-| Coaching Staff                               | team pages (Roster, Finances, ...) and the Team menu                                             |
-| 3-team trade                                 | link on the Trade page                                                                           |
+| Page (first tab) | Tabs                                            |
+| ---------------- | ----------------------------------------------- |
+| Trading Block    | Trading Block, Trade Market                     |
+| Trade            | 2 teams, 3 teams                                |
+| Transactions     | Transactions, Trade Grader                      |
+| League Finances  | Finances, Contract Value, Economics, Home Court |
+| Draft History    | Draft History, Redraft, Pick Value              |
+| Draft Scouting   | Scouting, Draft Board                           |
+| Relatives        | Relatives, Family Trees                         |
+| Jersey Numbers   | League, By Team                                 |
+| Player Ratings   | Ratings, Archetypes, Skill Badges               |
+| League History   | History, Timeline, Coaches                      |
+| Daily Schedule   | Schedule, Games to Watch                        |
+
+Other pages are still reached from _More_ links: League Achievements (League Stats / History group) and Coaching Staff (team pages and the Team menu).
 
 ## Feature index
 
