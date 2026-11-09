@@ -47,6 +47,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Rivalries](#rivalries)                                             | Head-to-Head → Rivalries tab, team history pages                 | bball  | `featureRivalries`                        | on / on                       |
 | [Series recaps](#series-recaps)                                     | Playoffs → Series Recaps tab, bracket, news                      | bball  | `featureSeriesRecaps`                     | on / on                       |
 | [Unretirements](#unretirements)                                     | background, at the start of free agency                          | bball  | `featureUnretire`                         | off / off                     |
+| [Hyphenated last names](#names)                                     | player generation (new USA players)                              | all    | `featureHyphenatedNames`                  | on / off                      |
 | [Play-by-play flavor](#play-by-play)                                | live game                                                        | bball  | `featurePbpFlavor`                        | on / on                       |
 | [Live play-by-play](#play-by-play)                                  | live game                                                        | bball  | `pbpLiveGame`                             | on / on                       |
 | [Box score play-by-play](#play-by-play)                             | box scores                                                       | bball  | `featurePbpBoxScore`                      | on / on                       |
@@ -293,6 +294,12 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Known limits:** current season only. Tiebreakers are approximated (random among tied teams) and playoff reseeding is ignored. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats; in the other sports (no Season Odds there) it goes with the _Extra frivolities_ switch.
 
 ## Players
+
+### Names
+
+- **Name data:** player names come from `data/names.json`, built by `node tools/names.js` from real athletes' names (`tools/names-manual/basketball.json`, `football.json`), the upstream per-country CSVs in `tools/names-manual` and the fork's additions in `tools/names-manual/extra`: more USA first names (modern 1995-2008 birth-cohort names, Black American, Hispanic and trendy names, with weights in the athlete-count units) and surnames (Hispanic, Asian, European and other Census surnames missing from the athlete data), more names for small country pools (Kosovo, French Guiana, South Sudan, ...) and new countries (Tunisia, Lebanon, Rwanda, Barbados, Malaysia, ...; their basketball birth-country weights are in `src/worker/data/defaultCountries.ts`, races in `defaultRaces.ts`). `extra/fixes.json` merges miscased spellings (`Aj` into `AJ`, `Mclean` into `McLean`) and removes bad entries (female names in male lists, garbled names, cities). Regenerate `data/names.json` after editing any of them.
+- **Hyphenated last names** (League Extras, on for new leagues, off for existing ones): with the chosen rate (default 1%), a new USA player's last name is joined to a second surname drawn from the same frequency table, like "Smith-Jones". Pairs are skipped when either part is already compound (spaces, hyphens, suffixes), when both start alike ("Johnson-Johnston"), when the result is over 15 characters, or when it is a real NBA player's hyphenated name. Existing players are never renamed; relatives inherit the full hyphenated name. Names are only split on spaces anywhere in the UI, so "J. Smith-Jones", sorting, search and the families pages treat it as one last name.
+- **Code:** `src/worker/core/player/name.ts`, `tools/names.js`.
 
 ### Archetypes
 
