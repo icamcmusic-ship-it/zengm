@@ -900,6 +900,24 @@ const sportSpecificCols = bySport<{
 			sortType: "number",
 			title: "dIQ",
 		},
+		"rating:wng": {
+			desc: "Wingspan (length)",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "Wng",
+		},
+		"rating:pdef": {
+			desc: "Perimeter Defense",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "PDf",
+		},
+		"rating:idef": {
+			desc: "Interior Defense",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "IDf",
+		},
 		"stat:2pp": {
 			desc: "Two Point Percentage",
 			sortSequence: ["desc", "asc"],

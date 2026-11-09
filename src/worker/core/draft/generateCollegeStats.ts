@@ -1,4 +1,5 @@
 import { PHASE, PLAYER } from "../../../common/constants.ts";
+import { useExpandedRatings } from "../player/expandedRatings.ts";
 import {
 	RATING_KEYS,
 	forwardProject,
@@ -47,6 +48,13 @@ export const toCollegeProspect = (
 	const ratings = {} as Ratings;
 	for (const key of RATING_KEYS) {
 		ratings[key] = (ratingsRow as any)[key];
+	}
+	// Expanded ratings: steals and blocks read perimeter/interior defense and wingspan
+	if (useExpandedRatings(ratingsRow as any)) {
+		const r = ratingsRow as any;
+		ratings.wng = r.wng;
+		ratings.pdef = r.pdef;
+		ratings.idef = r.idef;
 	}
 
 	const ageNow = getFirstDraftYear() - p.born.year;

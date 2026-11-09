@@ -28,8 +28,11 @@ const compositeRating = (
 			}
 
 			if (fuzz) {
-				// Don't fuzz height
-				factor = component === "hgt" ? rating : applyFuzz(rating, fuzzValue);
+				// Don't fuzz height (or wingspan, a measurement too)
+				factor =
+					component === "hgt" || component === "wng"
+						? rating
+						: applyFuzz(rating, fuzzValue);
 			} else {
 				factor = rating;
 			}

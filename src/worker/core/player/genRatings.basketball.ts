@@ -8,6 +8,20 @@ import type {
 } from "../../../common/types.basketball.ts";
 import { heightDist, randInt, realGauss } from "../../../common/random.ts";
 import { assertDefined } from "../../../common/utils.ts";
+import {
+	blendDiq,
+	defenseSplitBase,
+	DEFENSE_SPLIT_NOISE,
+	WINGSPAN_NOISE,
+} from "../../../common/expandedRatings.ts";
+import { expandedRatingsOn, setDefenseSplit } from "./expandedRatings.ts";
+
+// Expanded ratings: how much more perimeter than interior defense each player type has, on top of what his speed and size say
+const typeDefenseSplit: Record<"point" | "wing" | "big", number> = {
+	point: 2,
+	wing: 1,
+	big: -1.5,
+};
 
 const typeFactors: Record<
 	"point" | "wing" | "big",
@@ -142,7 +156,7 @@ const genRatings = (
 		);
 	}
 
-	const ratings = {
+	const ratings: PlayerRatings = {
 		stre: rawRatings.stre,
 		spd: rawRatings.spd,
 		jmp: rawRatings.jmp,
@@ -165,6 +179,19 @@ const genRatings = (
 		season,
 		skills: [],
 	};
+
+	// Expanded ratings: wingspan around height, and diq split into perimeter and interior defense. Only with the setting on, so with it
+	// off no extra random numbers are drawn.
+	if (expandedRatingsOn()) {
+		ratings.wng = limitRating(Math.round(realGauss(hgt, WINGSPAN_NOISE)));
+		const split =
+			2 *
+			(defenseSplitBase(ratings) +
+				typeDefenseSplit[type] +
+				realGauss(0, DEFENSE_SPLIT_NOISE));
+		setDefenseSplit(ratings, split);
+		ratings.diq = blendDiq(ratings.pdef!, ratings.idef!);
+	}
 
 	return {
 		heightInInches,

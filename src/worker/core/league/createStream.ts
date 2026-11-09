@@ -49,6 +49,7 @@ import {
 import g, { wrapNewValueIfCurrentlyWrapped } from "../../util/g.ts";
 import type { Settings } from "../../views/settings.ts";
 import { getAutoTicketPriceByTid } from "../game/attendance.ts";
+import { hasExpandedRatings } from "../../../common/expandedRatings.ts";
 import addRelatives from "../realRosters/addRelatives.ts";
 import loadDataBasketball from "../realRosters/loadData.basketball.ts";
 import addDraftProspects from "./create/addDraftProspects.ts";
@@ -1941,6 +1942,18 @@ const afterDBStream = async ({
 		await league.setGameAttributes({ coachingStaff: false });
 	}
 	await ensureStaff();
+
+	// Expanded ratings: players from real rosters or a league file without them get them derived (and ovr/pot/skills recomputed)
+	if (
+		__SPORT === "basketball" &&
+		g.get("expandedRatings") &&
+		(await idb.cache.players.getAll()).some(
+			(p) =>
+				p.tid !== PLAYER.RETIRED && !hasExpandedRatings(p.ratings.at(-1)!),
+		)
+	) {
+		await player.updateExpandedRatingsForLeague();
+	}
 
 	// Memorials
 	if (!fileHasPlayers && !g.get("playerBioInfo")) {

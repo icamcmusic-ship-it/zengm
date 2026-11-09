@@ -1,4 +1,5 @@
 import { PLAYER, RATINGS } from "../../common/constants.ts";
+import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 import { idb } from "../db/index.ts";
 import type {
 	Player,
@@ -103,7 +104,7 @@ const getRatingsByPositions = (
 			return new Set(ratings);
 		},
 		basketball: () => {
-			return new Set(RATINGS);
+			return new Set(ratingsKeysForView(RATINGS));
 		},
 		football: () => {
 			const ratings: PlayerRatingKey[] = ["hgt", "stre", "spd", "endu"];
@@ -158,7 +159,9 @@ const getRatingsByPositions = (
 	return [
 		"ovr",
 		"pot",
-		...RATINGS.filter((rating) => sportSpecific.has(rating)),
+		...ratingsKeysForView(RATINGS).filter((rating) =>
+			sportSpecific.has(rating),
+		),
 	];
 };
 
@@ -365,7 +368,7 @@ const getPlayer = async (
 			"contract",
 			"salariesTotal",
 		],
-		ratings: ["season", "pos", "ovr", "pot", ...RATINGS],
+		ratings: ["season", "pos", "ovr", "pot", ...ratingsKeysForView(RATINGS)],
 		stats: allStats,
 		seasonType: playoffs,
 		showNoStats: true,

@@ -90,6 +90,11 @@ export type PlayerRatings = {
 	skills: string[];
 	stre: number;
 	tp: number;
+	// Expanded ratings (the expandedRatings setting, see common/expandedRatings.ts): wingspan, perimeter and interior defense. Missing in
+	// leagues that never had the setting on.
+	wng?: number;
+	pdef?: number;
+	idef?: number;
 };
 
 export type RatingKey =

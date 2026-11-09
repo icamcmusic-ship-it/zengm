@@ -1708,7 +1708,9 @@ export type PlayerRatingKey =
 	| RatingKeyBaseball
 	| RatingKeyBasketball
 	| RatingKeyFootball
-	| RatingKeyHockey;
+	| RatingKeyHockey
+	// Basketball expanded ratings (the expandedRatings setting)
+	| ExpandedRatingKey;
 
 type PlayerRatingsPlus = Record<PlayerRatingKey, number> & {
 	abbrev: string;
@@ -2448,6 +2450,7 @@ import type { LeagueUrlParts } from "../ui/router/types.ts";
 import type { StoredRatingsBuild } from "./ratingsBuilds/types.ts";
 import type { StoredArchetype } from "./archetypes/types.ts";
 import type { PlayerTraits } from "./playerTraits/types.ts";
+import type { ExpandedRatingKey } from "./expandedRatings.ts";
 
 type TeamStatsPlus = Record<TeamStatAttrBaseball, number> &
 	Record<TeamStatAttrByPosBaseball, number[]> &

@@ -1,4 +1,5 @@
 import { PLAYER, PHASE } from "../../common/constants.ts";
+import { ensureExpandedRatings } from "../core/player/expandedRatings.ts";
 import { finances, player } from "../core/index.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
@@ -130,6 +131,12 @@ export default defineView({
 
 				// Copy because the player is edited below
 				p = helpers.deepCopy(p2);
+
+				// Expanded ratings: a player who doesn't have them yet (retired before the setting was turned on) gets them derived, so they
+				// can be edited
+				if (__SPORT === "basketball") {
+					ensureExpandedRatings(p);
+				}
 
 				contract = getContractSummary(p2);
 

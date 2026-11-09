@@ -1,6 +1,8 @@
 import compositeRating from "./compositeRating.ts";
 import type { MinimalPlayerRatings } from "../../../common/types.ts";
 import { COMPOSITE_WEIGHTS } from "../../../common/constants.ts";
+import { compositeWeightsFor } from "../../../common/expandedRatings.ts";
+import { useExpandedRatings } from "./expandedRatings.ts";
 
 const hasSkill = (
 	ratings: MinimalPlayerRatings,
@@ -23,7 +25,16 @@ const hasSkill = (
 const skills = (playerRatings: MinimalPlayerRatings) => {
 	const sk: string[] = [];
 
-	for (const { ratings, skill, weights } of Object.values(COMPOSITE_WEIGHTS)) {
+	// Expanded ratings: the defense, rebounding and finishing composites read wingspan and perimeter/interior defense
+	const compositeWeights =
+		__SPORT === "basketball"
+			? compositeWeightsFor(
+					COMPOSITE_WEIGHTS,
+					useExpandedRatings(playerRatings as any),
+				)
+			: COMPOSITE_WEIGHTS;
+
+	for (const { ratings, skill, weights } of Object.values(compositeWeights)) {
 		if (skill) {
 			if (hasSkill(playerRatings, ratings, weights, skill.cutoff)) {
 				sk.push(skill.label);

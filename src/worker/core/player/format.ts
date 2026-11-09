@@ -1,4 +1,9 @@
 import { getTermsFromContract } from "../../../common/contractTerms.ts";
+import {
+	fillExpandedRatings,
+	hasExpandedRatings,
+	isExpandedRatingKey,
+} from "../../../common/expandedRatings.ts";
 import { PLAYER, PHASE } from "../../../common/constants.ts";
 import { player, trade } from "../index.ts";
 import { g, helpers } from "../../util/index.ts";
@@ -657,6 +662,20 @@ const processRatings = (
 		];
 	}
 
+	// Expanded ratings asked for but not stored in some rows (a retired player from before the setting was turned on): derived for display
+	if (
+		__SPORT === "basketball" &&
+		ratings.some(isExpandedRatingKey) &&
+		!playerRatings.every(hasExpandedRatings)
+	) {
+		const filled = p.ratings.map((pr) => ({ ...pr }));
+		fillExpandedRatings({ ...p, ratings: filled });
+		playerRatings = playerRatings.map((pr) => {
+			const i = p.ratings.indexOf(pr);
+			return i >= 0 ? filled[i] : pr;
+		});
+	}
+
 	output.ratings = playerRatings.map((pr) => {
 		const row: any = {};
 
@@ -736,6 +755,7 @@ const processRatings = (
 				attr !== "fuzz" &&
 				attr !== "season" &&
 				attr !== "hgt" &&
+				attr !== "wng" &&
 				attr !== "pos" &&
 				attr !== "injuryIndex"
 			) {

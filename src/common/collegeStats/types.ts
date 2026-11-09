@@ -19,7 +19,12 @@ export const RATING_KEYS = [
 ] as const;
 
 export type RatingKey = (typeof RATING_KEYS)[number];
-export type Ratings = Record<RatingKey, number>;
+export type Ratings = Record<RatingKey, number> & {
+	// Expanded ratings (the expandedRatings setting), only when it's on
+	wng?: number;
+	pdef?: number;
+	idef?: number;
+};
 
 // What the engine needs to know about a prospect. Nothing here is changed by generation.
 export type CollegeProspect = {

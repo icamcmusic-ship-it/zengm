@@ -23,6 +23,7 @@ import {
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import genWeight from "./genWeight.ts";
 import potEstimator from "./potEstimator.ts";
+import { ensureExpandedRatings, syncDefenseToDiq } from "./expandedRatings.ts";
 import { TOO_MANY_TEAMS_TOO_SLOW } from "../season/getInitialNumGamesConfDivSettings.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
@@ -155,6 +156,12 @@ const develop = async (
 	// Basketball player traits: mentoring by savvy veterans (ovr points in expectation, see getMentorBonuses). 0 = none, nothing drawn
 	mentor?: { bonus: number; seed: string },
 ) => {
+	// Expanded ratings: a player made without them (real player, imported, custom, ratings builds) gets them derived now. No-op with the
+	// setting off.
+	if (__SPORT === "basketball") {
+		ensureExpandedRatings(p);
+	}
+
 	const ratings = last(p.ratings);
 	let age = ratings.season - p.born.year;
 
@@ -181,6 +188,7 @@ const develop = async (
 			new Rng(mentor.seed).random(),
 			MENTOR_RATING_KEYS,
 		);
+		syncDefenseToDiq(ratings as any);
 	}
 
 	// years===0 condition is so editing locked player in God Mode will update ovr and pot

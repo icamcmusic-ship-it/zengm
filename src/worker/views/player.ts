@@ -1,4 +1,5 @@
 import { featureOn } from "../util/nativeFeatures.ts";
+import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 import {
 	getTraitViewContext,
 	getTraitsForView,
@@ -106,7 +107,7 @@ export const getPlayer = async <
 			"age",
 			"ovr",
 			"pot",
-			...RATINGS,
+			...ratingsKeysForView(RATINGS),
 			"skills",
 			"badges",
 			"pos",
@@ -619,7 +620,7 @@ export default defineView({
 				events,
 				feats,
 				leaders,
-				ratings: RATINGS,
+				ratings: ratingsKeysForView(RATINGS),
 				valueIndex,
 			};
 		}

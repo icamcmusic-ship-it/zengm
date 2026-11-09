@@ -127,7 +127,9 @@ const genRatings = (sport: Sport) => {
 
 	// These should be validated for their numeric value, but not required because different versions of the schema might not have them
 	const oldRatings = sport === "basketball" ? ["blk", "stl"] : [];
-	const newRatings = sport === "basketball" ? ["diq", "oiq"] : [];
+	// wng, pdef and idef: expanded ratings (the expandedRatings setting), only in leagues that have had it on
+	const newRatings =
+		sport === "basketball" ? ["diq", "oiq", "wng", "pdef", "idef"] : [];
 
 	for (const rating of [...ratings, ...oldRatings, ...newRatings]) {
 		properties[rating] = {
