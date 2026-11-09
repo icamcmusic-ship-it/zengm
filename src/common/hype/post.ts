@@ -98,9 +98,13 @@ const eraScale = (I: HGameInput, k: LineStat) => {
 	return clamp(calMean(k) / m, 0.5, 2);
 };
 
-// Points for a line that a share 10^-r of lines reach: nothing below the top 2%, then quickly more
+// Points for a line that a share 10^-r of lines reach: nothing below the top 2%, then quickly more. Past about 1 in 20,000 lines (a few a season in a real league; the line tables end there) it climbs steeply, so a once-in-many-seasons line (60 points) tops the scale on its own.
 const rarePts = (r: number) =>
-	r < 1.7 ? 0 : 6.5 * (r - 1.7) + 2.5 * Math.max(0, r - 3.5) ** 2;
+	r < 1.7
+		? 0
+		: 6.5 * (r - 1.7) +
+			2.5 * Math.max(0, r - 3.5) ** 2 +
+			15 * Math.max(0, r - 4.3) ** 2;
 
 // Below these a stat is never special, whatever the scoring environment
 const FLOOR: Record<StatKey, number> = {
