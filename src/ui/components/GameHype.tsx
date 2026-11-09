@@ -1,3 +1,4 @@
+import { usePersistedOpen } from "../util/persistedOpen.ts";
 // Game hype pieces shared by the dashboard card, the schedule badges, the Games to Watch page and the box score panel (basketball only)
 import clsx from "clsx";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
@@ -229,6 +230,7 @@ export const HypeLine = ({
 // The panel under a box score: hype before the game and, for a finished game, whether it lived up to it
 export const GameHype = ({ gid }: { gid: number }) => {
 	const data = useHypeGids(__SPORT === "basketball" && gid >= 0 ? [gid] : []);
+	const [open, toggle] = usePersistedOpen("gameHypeOpen", false);
 	const h = data[gid];
 	if (__SPORT !== "basketball" || !h) {
 		return null;
@@ -236,41 +238,69 @@ export const GameHype = ({ gid }: { gid: number }) => {
 	return (
 		<div className="card mt-3 mb-3">
 			<div className="card-body">
-				<h3 className="card-title h5 d-flex flex-wrap align-items-baseline gap-2">
-					Game hype
+				<h3 className="card-title h5 d-flex flex-wrap align-items-baseline gap-2 mb-0">
+					<button
+						type="button"
+						className="btn btn-link p-0 text-reset text-decoration-none fw-bold"
+						onClick={toggle}
+						aria-expanded={open}
+					>
+						<span className="me-1">{open ? "▾" : "▸"}</span>
+						Game hype
+					</button>
 					<HypeBadge
 						score={h.score}
 						label={h.label}
 						title={`Pre-game hype ${h.score} out of 100`}
 					/>
-					<small className="text-body-secondary fs-6">before tip-off</small>
-				</h3>
-				{h.series ? <p className="mb-2">{h.series}</p> : null}
-				{h.reasons.length > 0 ? (
-					<Reasons reasons={h.reasons} />
-				) : (
-					<p className="mb-0">Nothing special on paper going in.</p>
-				)}
-				{h.completed && h.post ? (
-					<div className="mt-3">
-						<div className="d-flex flex-wrap align-items-baseline gap-2">
-							<b>How it played out</b>
+					{h.completed && h.post ? (
+						<>
+							<small className="text-body-secondary fs-6">game rating</small>
 							<HypeBadge
 								score={h.post.score}
 								label={h.post.label}
 								title={`Game rating ${h.post.score} out of 100`}
 							/>
-						</div>
-						{h.verdict ? (
-							<p className={clsx("mb-1 fw-bold", verdictClass(h.verdict.kind))}>
-								<HypeText text={h.verdict.text} />
-							</p>
-						) : null}
-						{h.post.note ? (
-							<p className="text-body-secondary mb-0">{h.post.note}</p>
+						</>
+					) : (
+						<small className="text-body-secondary fs-6">before tip-off</small>
+					)}
+				</h3>
+				{open ? (
+					<div className="mt-2">
+						{h.series ? <p className="mb-2">{h.series}</p> : null}
+						{h.reasons.length > 0 ? (
+							<Reasons reasons={h.reasons} />
 						) : (
-							<Reasons reasons={h.post.reasons} max={6} />
+							<p className="mb-0">Nothing special on paper going in.</p>
 						)}
+						{h.completed && h.post ? (
+							<div className="mt-3">
+								<div className="d-flex flex-wrap align-items-baseline gap-2">
+									<b>How it played out</b>
+									<HypeBadge
+										score={h.post.score}
+										label={h.post.label}
+										title={`Game rating ${h.post.score} out of 100`}
+									/>
+								</div>
+								{h.verdict ? (
+									<p
+										className={clsx(
+											"mb-1 fw-bold",
+											verdictClass(h.verdict.kind),
+										)}
+									>
+										<HypeText text={h.verdict.text} />
+									</p>
+								) : null}
+								{h.post.note ? (
+									<p className="text-body-secondary mb-0">{h.post.note}</p>
+								) : (
+									<Reasons reasons={h.post.reasons} max={6} />
+								)}
+							</div>
+						) : null}
 					</div>
 				) : null}
 			</div>
