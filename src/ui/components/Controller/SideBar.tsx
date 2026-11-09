@@ -137,6 +137,9 @@ const MenuItem = ({
 	const featureOn = useFeatureOn(
 		menuItem.type === "link" ? menuItem.feature : undefined,
 	);
+	const replacingFeatureOn = useFeatureOn(
+		menuItem.type === "link" ? menuItem.featureOff : undefined,
+	);
 
 	// On a tab of a page (util/pageTabs.ts), highlight that page
 	const hostPageID = tabHostPageID(pageID);
@@ -162,7 +165,12 @@ const MenuItem = ({
 			return null;
 		}
 
-		if (!featureOn) {
+		if (
+			!featureOn ||
+			(menuItem.type === "link" &&
+				menuItem.featureOff !== undefined &&
+				replacingFeatureOn)
+		) {
 			return null;
 		}
 

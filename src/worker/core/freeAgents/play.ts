@@ -51,6 +51,7 @@ async function play(
 				await recomputeLocalUITeamOvrs();
 				await updateStatus(helpers.daysLeft(true));
 				await trade.betweenAiTeams();
+				await trade.aiOffers();
 				await play(numDays - 1, conditions, false);
 			} else {
 				await cbNoDays();

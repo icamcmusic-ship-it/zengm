@@ -130,6 +130,10 @@ const getResultsGroupedDefault = ({
 			return false;
 		}
 
+		if (menuItem.featureOff && isFeatureOn(menuItem.featureOff)) {
+			return false;
+		}
+
 		return true;
 	};
 

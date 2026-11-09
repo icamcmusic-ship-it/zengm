@@ -50,6 +50,7 @@ export const routeInfos = {
 	"/l/:lid/free_agents/:type/:season": "freeAgents",
 	"/l/:lid/trade": "trade",
 	"/l/:lid/trading_block": "tradingBlock",
+	"/l/:lid/trade_offers": "tradeOffers",
 	"/l/:lid/trade_proposals": "tradeProposals",
 	"/l/:lid/trade_market": "tradeMarket",
 	"/l/:lid/trade_three": "tradeThree",

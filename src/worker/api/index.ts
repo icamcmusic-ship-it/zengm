@@ -155,7 +155,11 @@ import getWinner from "../../common/getWinner.ts";
 import formatScoreWithShootout from "../../common/formatScoreWithShootout.ts";
 import { getStats } from "../../common/advancedPlayerSearch.ts";
 import type { LookingFor } from "../core/trade/makeItWork.ts";
-import { dismissAiOffer } from "../core/trade/aiOffers.ts";
+import {
+	acceptAiOffer,
+	dismissAiOffer,
+	requestAiOffers,
+} from "../core/trade/aiOffers.ts";
 import {
 	evaluateMulti,
 	makeItWorkMulti,
@@ -3319,6 +3323,32 @@ const dismissAiTradeOffer = async (id: number) => {
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 
+const acceptAiTradeOffer = async (id: number) => {
+	const result = await acceptAiOffer(id);
+	let undoKey;
+	if (result.accepted && result.undo) {
+		undoKey = local.undoLog.add(result.undo, [
+			"advanceDay",
+			"leagueChange",
+			"newPhase",
+		]);
+	}
+	await toUI("realtimeUpdate", [["gameAttributes", "playerMovement"]]);
+	return { accepted: result.accepted, message: result.message, undoKey };
+};
+
+const requestAiTradeOffers = async ({
+	pids,
+	dpids,
+}: {
+	pids: number[];
+	dpids: number[];
+}) => {
+	const count = await requestAiOffers(pids, dpids);
+	await toUI("realtimeUpdate", [["gameAttributes"]]);
+	return count;
+};
+
 const incrementTradeProposalsSeed = async () => {
 	await league.setGameAttributes({
 		tradeProposalsSeed: g.get("tradeProposalsSeed") + 1,
@@ -6117,6 +6147,8 @@ const api = {
 		makeItWorkMultiTeamTrade,
 		proposeMultiTeamTrade,
 		incrementTradeProposalsSeed,
+		acceptAiTradeOffer,
+		requestAiTradeOffers,
 		init,
 		initGold,
 		loadRetiredPlayers,

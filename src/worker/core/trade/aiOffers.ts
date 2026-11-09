@@ -1,27 +1,40 @@
+import { getContractSummary } from "../contract/index.ts";
 import { conditionSpecText } from "../../../common/draftPickConditions.ts";
 import { PHASE } from "../../../common/constants.ts";
 import type { AiTradeOffer, TradeTeams } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import {
-	g,
-	helpers,
-	local,
-	logEvent,
-	updatePlayMenu,
-} from "../../util/index.ts";
+import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { league } from "../index.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import isUntradable from "./isUntradable.ts";
 import makeItWork, { withStartingProtections } from "./makeItWork.ts";
 import summary from "./summary.ts";
 import { choice } from "../../../common/random.ts";
-import { featureOn } from "../../util/nativeFeatures.ts";
+import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
+import create from "./create.ts";
+import propose from "./propose.ts";
 
-// AI teams sending trade offers to the user during the season
+// AI teams sending trade offers to the user (Trade Offers page). Offers arrive during the regular season (until the
+// trade deadline) and in the offseason trading phases, for players on the user's trading block or players/picks AI
+// teams want for their own needs. The user can also request offers for specific assets.
 
-// Offers older than this many of the user's games are dropped
+// Default for aiTradeOffersExpiration: offers older than this many "days" (user games in the regular season, days of
+// free agency) are dropped. In the other offseason phases offers last until the phase changes.
 export const OFFER_EXPIRATION_GAMES = 15;
-export const MAX_PENDING_OFFERS = 5;
+export const MAX_PENDING_OFFERS = 8;
+export const MAX_REQUESTED_OFFERS = 3;
+
+// Chance that an offer is about the trading block (when it has something on it) rather than an unsolicited ask
+export const TRADING_BLOCK_SHARE = 0.6;
+
+// Phases in which AI teams send offers on their own
+export const OFFER_PHASES: readonly number[] = [
+	PHASE.REGULAR_SEASON,
+	PHASE.DRAFT_LOTTERY,
+	PHASE.AFTER_DRAFT,
+	PHASE.RESIGN_PLAYERS,
+	PHASE.FREE_AGENCY,
+];
 
 export type OfferTargetCandidate = {
 	kind: "player" | "pick";
@@ -41,6 +54,7 @@ export const chooseOfferTarget = (
 	strategy: "contending" | "rebuilding",
 	candidates: OfferTargetCandidate[],
 	random: (weights: number[]) => number,
+	blockFirst: boolean = true,
 ): OfferTarget | undefined => {
 	const pickWeighted = (rows: OfferTargetCandidate[]) => {
 		if (rows.length === 0) {
@@ -51,9 +65,11 @@ export const chooseOfferTarget = (
 	};
 
 	const block = candidates.filter((c) => c.onTradingBlock);
-	const fromBlock = pickWeighted(block);
-	if (fromBlock) {
-		return { candidate: fromBlock, reason: "tradingBlock" };
+	if (blockFirst) {
+		const fromBlock = pickWeighted(block);
+		if (fromBlock) {
+			return { candidate: fromBlock, reason: "tradingBlock" };
+		}
 	}
 
 	const players = candidates.filter((c) => c.kind === "player");
@@ -87,9 +103,59 @@ export const getOfferReasonText = (
 	return `The rebuilding ${teamName} are looking for young talent and picks, and want ${assetName}.`;
 };
 
-// Probability of an offer on a given day of the regular season. aiTradeOffersFrequency is roughly offers per 10 games
+// Probability of an offer on a given day of the regular season or free agency. aiTradeOffersFrequency is roughly offers per 10 games
 export const getDailyOfferProbability = (frequency: number) =>
 	helpers.bound(frequency / 10, 0, 1);
+
+// Probability of an offer when one of the other offseason trading phases starts
+export const getPhaseOfferProbability = (frequency: number) =>
+	helpers.bound(frequency / 2, 0, 1);
+
+export const getOfferExpiration = () => {
+	const value = featureOption<number>("aiTradeOffersExpiration");
+	return typeof value === "number" && value > 0
+		? value
+		: OFFER_EXPIRATION_GAMES;
+};
+
+// How many "days" old an offer is, in the current phase. undefined means the phase has no days (offer lasts until
+// the phase changes)
+export const getOfferAge = (
+	offer: Pick<AiTradeOffer, "gp" | "daysLeft">,
+	phase: number,
+	gp: number,
+	daysLeft: number,
+) => {
+	if (phase === PHASE.REGULAR_SEASON) {
+		return gp - offer.gp;
+	}
+	if (phase === PHASE.FREE_AGENCY && offer.daysLeft !== undefined) {
+		return offer.daysLeft - daysLeft;
+	}
+	return undefined;
+};
+
+const getRosterKey = async (tid: number) => {
+	const players = await idb.cache.players.indexGetAll("playersByTid", tid);
+	return players
+		.map((p) => p.pid)
+		.sort((a, b) => a - b)
+		.join(",");
+};
+
+export const rosterKeyStillValid = (before: string, now: string) => {
+	const nowPids = new Set(now.split(","));
+	return before
+		.split(",")
+		.filter((pid) => pid !== "")
+		.every((pid) => nowPids.has(pid));
+};
+
+export const offersEnabled = () =>
+	featureOn("aiTradeOffers") &&
+	!g.get("spectator") &&
+	!g.get("challengeNoTrades") &&
+	!g.get("gameOver");
 
 const canReceiveOffers = () => {
 	return (
@@ -102,7 +168,7 @@ const canReceiveOffers = () => {
 		!g.get("otherTeamsWantToHire") &&
 		!g.get("forceHistoricalRosters") &&
 		!local.autoPlayUntil &&
-		g.get("phase") === PHASE.REGULAR_SEASON
+		OFFER_PHASES.includes(g.get("phase"))
 	);
 };
 
@@ -122,13 +188,24 @@ export const pruneAiOffers = async () => {
 	}
 
 	const gp = await getUserGp();
+	const expiration = getOfferExpiration();
 	const keep: AiTradeOffer[] = [];
 	for (const offer of offers) {
+		const age = getOfferAge(offer, g.get("phase"), gp, g.get("daysLeft"));
 		if (
 			offer.season !== g.get("season") ||
 			offer.phase !== g.get("phase") ||
-			gp - offer.gp > OFFER_EXPIRATION_GAMES ||
+			(age !== undefined && age >= expiration) ||
 			offer.teams[0].tid !== g.get("userTid")
+		) {
+			continue;
+		}
+
+		// The AI team lost a player (trade, release) since the offer was made. Signings don't count, since AI teams sign
+		// fill-in players all the time when someone gets hurt
+		if (
+			offer.rosterKey !== undefined &&
+			!rosterKeyStillValid(offer.rosterKey, await getRosterKey(offer.tid))
 		) {
 			continue;
 		}
@@ -155,6 +232,68 @@ export const pruneAiOffers = async () => {
 
 	if (keep.length !== offers.length) {
 		await league.setGameAttributes({ aiTradeOffers: keep });
+	}
+};
+
+// makeItWork with only the AI team adding assets. When the result breaks the salary cap rules (common, since the user's
+// team is often over the cap and AI teams like to send salary back), try again with the AI team's players that are
+// too expensive to match left out, so it pays in cheaper players and picks instead
+export const makeAiOfferWork = async (
+	teams0: TradeTeams,
+	valueChangeCalculator: ValueChangeCalculator,
+	maxAssetsToAdd: number,
+) => {
+	const run = async (input: TradeTeams) => {
+		const teams = await makeItWork(await withStartingProtections(input), {
+			holdUserConstant: true,
+			maxAssetsToAdd,
+			valueChangeCalculator,
+			aiPickConditions: true,
+		});
+		if (!teams || teams[1].pids.length + teams[1].dpids.length === 0) {
+			return { teams: undefined, warning: false };
+		}
+		const s = await summary(teams);
+		return { teams, warning: !!s.warning };
+	};
+
+	const first = await run(teams0);
+	if (first.teams && !first.warning) {
+		return first.teams;
+	}
+	if (!first.warning) {
+		return;
+	}
+
+	let userSalary = 0;
+	for (const pid of teams0[0].pids) {
+		const p = await idb.cache.players.get(pid);
+		userSalary += p ? (getContractSummary(p)?.amount ?? 0) : 0;
+	}
+	const salaryCapType = g.get("salaryCapType");
+	const limit =
+		salaryCapType === "none"
+			? Infinity
+			: salaryCapType === "hard"
+				? userSalary
+				: (userSalary * g.get("softCapTradeSalaryMatch")) / 100 + 100;
+	const aiPlayers = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		teams0[1].tid,
+	);
+	// Any single player over the limit breaks the rule on his own
+	const tooExpensive = aiPlayers
+		.filter((p) => (getContractSummary(p)?.amount ?? 0) > limit)
+		.map((p) => p.pid);
+	const second = await run([
+		teams0[0],
+		{
+			...teams0[1],
+			pidsExcluded: [...teams0[1].pidsExcluded, ...tooExpensive],
+		},
+	]);
+	if (second.teams && !second.warning) {
+		return second.teams;
 	}
 };
 
@@ -201,10 +340,15 @@ export const buildAiOffer = async (
 		})),
 	];
 
-	const target = chooseOfferTarget(t.strategy, candidates, (weights) => {
-		const indexes = weights.map((_, i) => i);
-		return choice(indexes, (i) => weights[i]!);
-	});
+	const target = chooseOfferTarget(
+		t.strategy,
+		candidates,
+		(weights) => {
+			const indexes = weights.map((_, i) => i);
+			return choice(indexes, (i) => weights[i]!);
+		},
+		Math.random() < TRADING_BLOCK_SHARE,
+	);
 	if (!target) {
 		return;
 	}
@@ -227,18 +371,8 @@ export const buildAiOffer = async (
 	];
 
 	// Only the AI team adds assets: it's their offer for your player
-	const teams = await makeItWork(await withStartingProtections(teams0), {
-		holdUserConstant: true,
-		maxAssetsToAdd: 4,
-		valueChangeCalculator,
-		aiPickConditions: true,
-	});
-	if (!teams || teams[1].pids.length + teams[1].dpids.length === 0) {
-		return;
-	}
-
-	const s = await summary(teams);
-	if (s.warning) {
+	const teams = await makeAiOfferWork(teams0, valueChangeCalculator, 4);
+	if (!teams) {
 		return;
 	}
 
@@ -268,12 +402,20 @@ export const buildAiOffer = async (
 	return {
 		teams,
 		reason: getOfferReasonText(target.reason, teamName, assetName),
+		source:
+			target.reason === "tradingBlock"
+				? ("tradingBlock" as const)
+				: ("unsolicited" as const),
 	};
 };
 
 export const addAiOffer = async (
 	tid: number,
-	built: { teams: TradeTeams; reason: string },
+	built: {
+		teams: TradeTeams;
+		reason: string;
+		source?: AiTradeOffer["source"];
+	},
 	notify: boolean,
 ) => {
 	const offers = g.get("aiTradeOffers");
@@ -284,6 +426,9 @@ export const addAiOffer = async (
 		season: g.get("season"),
 		phase: g.get("phase"),
 		gp: await getUserGp(),
+		daysLeft: g.get("daysLeft"),
+		rosterKey: await getRosterKey(tid),
+		source: built.source,
 		teams: built.teams,
 		reason: built.reason,
 	};
@@ -295,23 +440,15 @@ export const addAiOffer = async (
 	].slice(0, MAX_PENDING_OFFERS);
 	await league.setGameAttributes({ aiTradeOffers: newOffers });
 
+	// A notification only, no inbox message: unread messages stop the game from being played, which would be spam here
 	if (notify) {
-		const teamInfo = g.get("teamInfoCache")[tid];
-		const url = helpers.leagueUrl(["trade_proposals"]);
-		await idb.cache.messages.add({
-			read: false,
-			from: teamInfo ? `${teamInfo.region} GM` : "AI GM",
-			year: g.get("season"),
-			subject: "Trade offer",
-			text: `<p>${built.reason}</p><p><a href="${url}">See the offer on the Trade Proposals page.</a></p>`,
-		});
+		const url = helpers.leagueUrl(["trade_offers"]);
 		await logEvent({
 			type: "info",
-			text: `${built.reason} <a href="${url}">View offer</a>`,
+			text: `Trade offer: ${built.reason} <a href="${url}">View offer</a>`,
 			saveToDb: false,
 			tids: [g.get("userTid")],
 		});
-		await updatePlayMenu();
 	}
 
 	return offer;
@@ -369,7 +506,47 @@ const deadlineNotice = async () => {
 	});
 };
 
-// Called every day during the regular season
+const sendRandomOffer = async () => {
+	const tids = (await idb.cache.teams.getAll())
+		.filter((t) => !t.disabled && !g.get("userTids").includes(t.tid))
+		.map((t) => t.tid);
+	const valueChangeCalculator = new ValueChangeCalculator({ quick: true });
+
+	// A few tries, since not every team can make a sensible offer
+	for (let i = 0; i < 5; i++) {
+		const tid = choice(tids);
+		if (tid === undefined) {
+			return;
+		}
+		const built = await buildAiOffer(tid, valueChangeCalculator);
+		if (built) {
+			await addAiOffer(tid, built, true);
+			return;
+		}
+	}
+};
+
+// Called when a new phase starts: drop offers from the old phase, and maybe send one at the start of an offseason
+// trading phase (free agency days have their own daily roll)
+export const aiOffersAtPhase = async (phase: number) => {
+	if (g.get("aiTradeOffers").length > 0) {
+		await pruneAiOffers();
+	}
+	if (
+		!canReceiveOffers() ||
+		phase === PHASE.REGULAR_SEASON ||
+		phase === PHASE.FREE_AGENCY
+	) {
+		return;
+	}
+	if (
+		Math.random() < getPhaseOfferProbability(g.get("aiTradeOffersFrequency"))
+	) {
+		await sendRandomOffer();
+	}
+};
+
+// Called every day during the regular season and free agency
 const aiOffers = async () => {
 	if (
 		g.get("phase") === PHASE.REGULAR_SEASON &&
@@ -387,28 +564,139 @@ const aiOffers = async () => {
 	await pruneAiOffers();
 
 	if (
+		g.get("phase") !== PHASE.REGULAR_SEASON &&
+		g.get("phase") !== PHASE.FREE_AGENCY
+	) {
+		return;
+	}
+
+	if (
 		Math.random() >= getDailyOfferProbability(g.get("aiTradeOffersFrequency"))
 	) {
 		return;
 	}
 
+	await sendRandomOffer();
+};
+
+const tradingAllowedNow = () => {
+	const phase = g.get("phase");
+	return !(
+		(phase >= PHASE.AFTER_TRADE_DEADLINE && phase <= PHASE.PLAYOFFS) ||
+		phase === PHASE.FANTASY_DRAFT ||
+		phase === PHASE.EXPANSION_DRAFT
+	);
+};
+
+// The old trading block "what would you give for these" as a request: AI teams answer with offers in the inbox
+export const requestAiOffers = async (pids: number[], dpids: number[]) => {
+	if (!offersEnabled() || !tradingAllowedNow()) {
+		return 0;
+	}
+	if (pids.length === 0 && dpids.length === 0) {
+		return 0;
+	}
+	await pruneAiOffers();
+
+	const userTid = g.get("userTid");
 	const tids = (await idb.cache.teams.getAll())
 		.filter((t) => !t.disabled && !g.get("userTids").includes(t.tid))
 		.map((t) => t.tid);
-	const valueChangeCalculator = new ValueChangeCalculator({ quick: true });
+	const valueChangeCalculator = new ValueChangeCalculator();
 
-	// A few tries, since not every team can make a sensible offer
-	for (let i = 0; i < 3; i++) {
-		const tid = choice(tids);
-		if (tid === undefined) {
-			return;
-		}
-		const built = await buildAiOffer(tid, valueChangeCalculator);
-		if (built) {
-			await addAiOffer(tid, built, true);
-			return;
+	const names: string[] = [];
+	for (const pid of pids) {
+		const p = await idb.cache.players.get(pid);
+		if (p) {
+			names.push(`${p.firstName} ${p.lastName}`);
 		}
 	}
+	for (const dpid of dpids) {
+		const dp = await idb.cache.draftPicks.get(dpid);
+		if (dp) {
+			names.push(`your ${await helpers.pickDesc(dp, "short")}`);
+		}
+	}
+	const assetText = names.length > 0 ? names.join(", ") : "your assets";
+
+	const built: { tid: number; teams: TradeTeams; dv: number }[] = [];
+	for (const tid of tids) {
+		const teams0: TradeTeams = [
+			{
+				tid: userTid,
+				pids: [...pids],
+				pidsExcluded: [],
+				dpids: [...dpids],
+				dpidsExcluded: [],
+			},
+			{ tid, pids: [], pidsExcluded: [], dpids: [], dpidsExcluded: [] },
+		];
+		const teams = await makeAiOfferWork(
+			teams0,
+			valueChangeCalculator,
+			4 + pids.length + dpids.length,
+		);
+		if (!teams) {
+			continue;
+		}
+
+		// Rank offers by how much they give, from the user's point of view
+		const dv = await valueChangeCalculator.evaluate({
+			tid: userTid,
+			pidsAdd: teams[1].pids,
+			pidsRemove: teams[0].pids,
+			dpidsAdd: teams[1].dpids,
+			dpidsRemove: teams[0].dpids,
+			tradingPartnerTid: tid,
+		});
+		built.push({ tid, teams, dv });
+	}
+
+	built.sort((a, b) => b.dv - a.dv);
+	const best = built.slice(0, MAX_REQUESTED_OFFERS);
+	// Add worst first, so the best offer ends up on top
+	for (const row of [...best].reverse()) {
+		const teamInfo = g.get("teamInfoCache")[row.tid];
+		const teamName = teamInfo ? `${teamInfo.region} ${teamInfo.name}` : "???";
+		await addAiOffer(
+			row.tid,
+			{
+				teams: row.teams,
+				reason: `You asked around about ${assetText}. The ${teamName} answered with this offer.`,
+				source: "requested",
+			},
+			false,
+		);
+	}
+
+	return best.length;
+};
+
+export const acceptAiOffer = async (id: number) => {
+	await pruneAiOffers();
+	const offer = g.get("aiTradeOffers").find((offer) => offer.id === id);
+	if (!offer) {
+		return {
+			accepted: false as const,
+			message: "This offer is no longer available.",
+			undo: undefined,
+		};
+	}
+
+	await create(helpers.deepCopy(offer.teams));
+	const result = await propose(false);
+	if (result.accepted) {
+		await dismissAiOffer(id);
+		await pruneAiOffers();
+		return result;
+	}
+	return {
+		accepted: false as const,
+		message:
+			result.message ??
+			"The trade can't be completed as offered. Try negotiating instead.",
+		undo: undefined,
+	};
 };
 
 export const dismissAiOffer = async (id: number) => {

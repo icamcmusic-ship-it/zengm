@@ -1,7 +1,5 @@
 import { MoreLinks } from "../components/MoreLinks.tsx";
-import { useFeatureOn } from "../util/nativeFeatures.ts";
 import { PHASE } from "../../common/constants.ts";
-import { helpers } from "../util/helpers.ts";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { TradePickCondition, View } from "../../common/types.ts";
 import { SummaryTeam } from "./Trade/Summary.tsx";
@@ -18,8 +16,7 @@ import { useState } from "react";
 import { ActionButton } from "../components/ActionButton.tsx";
 import useTradeOffersSwitch from "../hooks/useTradeOffersSwitch.tsx";
 
-const TradeProposals = ({ aiOffers, offers, seed }: View<"tradeProposals">) => {
-	const marketOn = useFeatureOn("tradeMarket");
+const TradeProposals = ({ offers, seed }: View<"tradeProposals">) => {
 	const {
 		challengeNoRatings,
 		challengeNoTrades,
@@ -127,60 +124,6 @@ const TradeProposals = ({ aiOffers, offers, seed }: View<"tradeProposals">) => {
 	return (
 		<>
 			<MoreLinks type="trade" page="trade_proposals" />
-			{aiOffers.length > 0 ? (
-				<>
-					<h2>Offers sent to you</h2>
-					<p>
-						AI teams made these offers on their own, for players on your{" "}
-						<a href={helpers.leagueUrl(["trading_block"])}>trading block</a> or
-						players they need. They expire after a while.
-						{marketOn ? (
-							<>
-								{" "}
-								See also the{" "}
-								<a href={helpers.leagueUrl(["trade_market"])}>trade market</a>.
-							</>
-						) : null}
-					</p>
-					{aiOffers.map((offer, i) => {
-						return (
-							<Offer
-								key={offer.id}
-								challengeNoRatings={challengeNoRatings}
-								onNegotiate={() => {
-									handleNegotiate(offer);
-								}}
-								onRemove={async () => {
-									await toWorker("main", "dismissAiTradeOffer", offer.id);
-								}}
-								salaryCap={salaryCap}
-								salaryCapType={salaryCapType}
-								teamInfo={teamInfoCache[offer.tid]!}
-								hideTopTeamOvrs
-								first={i === 0}
-								{...offer}
-							>
-								<p className="mb-2 text-body-secondary">{offer.reason}</p>
-								<div className="d-flex gap-5">
-									{offer.summary.teams.map((t, j) => {
-										return (
-											<div key={j}>
-												<SummaryTeam
-													hideFinanceInfo
-													showInlinePlayerInfo
-													summary={offer.summary}
-													t={t}
-												/>
-											</div>
-										);
-									})}
-								</div>
-							</Offer>
-						);
-					})}
-					<h2 className="mt-4">Proposals</h2>
-				</>
-			) : null}
 			<p>
 				These are trade proposals from up to 5 AI teams. New teams will appear
 				here every 10 games.

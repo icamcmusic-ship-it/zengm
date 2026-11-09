@@ -139,6 +139,9 @@ const MenuItem = ({
 	const featureOn = useFeatureOn(
 		menuItem.type === "link" ? menuItem.feature : undefined,
 	);
+	const replacingFeatureOn = useFeatureOn(
+		menuItem.type === "link" ? menuItem.featureOff : undefined,
+	);
 
 	if (menuItem.type === "text") {
 		return <Dropdown.Header>{menuItem.text}</Dropdown.Header>;
@@ -161,7 +164,12 @@ const MenuItem = ({
 			return null;
 		}
 
-		if (!featureOn) {
+		if (
+			!featureOn ||
+			(menuItem.type === "link" &&
+				menuItem.featureOff !== undefined &&
+				replacingFeatureOn)
+		) {
 			return null;
 		}
 

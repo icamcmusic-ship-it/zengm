@@ -9,6 +9,7 @@ import { shuffle, uniformSeed, choice } from "../../common/random.ts";
 import { ValueChangeCalculator } from "../core/team/ValueChangeCalculator.ts";
 import { orderBy } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 
 const getOffers = async (seed: number) => {
 	const NUM_OFFERS = 5;
@@ -155,6 +156,11 @@ export const addInlinePlayerInfo = <T extends AugmentedOffer>(offer: T) => {
 export default defineView({
 	id: "tradeProposals",
 	load: async ({ updateEvents }) => {
+		// With AI trade offers on, the Trade Offers inbox replaces this page. Old links still work
+		if (featureOn("aiTradeOffers")) {
+			return { redirectUrl: helpers.leagueUrl(["trade_offers"]) };
+		}
+
 		if (
 			updateEvents.has("firstRun") ||
 			updateEvents.has("playerMovement") ||
@@ -181,21 +187,7 @@ export default defineView({
 				addInlinePlayerInfo(offer),
 			);
 
-			// Offers AI teams sent on their own, see trade/aiOffers.ts
-			const aiOffersRaw = g
-				.get("aiTradeOffers")
-				.filter((offer) => offer.teams[0].tid === g.get("userTid"));
-			const aiOffersAugmented = await augmentOffers(
-				aiOffersRaw.map((offer) => offer.teams),
-			);
-			const aiOffers = aiOffersAugmented.map((offer, i) => ({
-				...addInlinePlayerInfo(offer),
-				id: aiOffersRaw[i]!.id,
-				reason: aiOffersRaw[i]!.reason,
-			}));
-
 			return {
-				aiOffers,
 				offers,
 				seed,
 			};
