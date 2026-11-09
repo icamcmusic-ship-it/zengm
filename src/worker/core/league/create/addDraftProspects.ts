@@ -16,11 +16,14 @@ const addDraftProspects = async ({
 	);
 
 	const seasonOffset = g.get("phase") >= PHASE.RESIGN_PLAYERS ? 1 : 0;
-	const requiredYears = [
-		g.get("season") + seasonOffset,
-		g.get("season") + seasonOffset + 1,
-		g.get("season") + seasonOffset + 2,
-	];
+	const requiredYears = [];
+	const numDraftClasses = Math.max(
+		3,
+		Math.round(g.get("numDraftClasses") ?? 3),
+	);
+	for (let i = 0; i < numDraftClasses; i++) {
+		requiredYears.push(g.get("season") + seasonOffset + i);
+	}
 	for (const year of requiredYears) {
 		if (!draftProspectsByDraftYear.has(year)) {
 			draftProspectsByDraftYear.set(year, []);

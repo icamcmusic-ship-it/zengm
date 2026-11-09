@@ -4630,6 +4630,9 @@ const updateGameAttributesGodMode = async (
 	// Turning on the coaching staff in an existing league generates staffs
 	await staff.ensureStaff();
 
+	// Raising the number of future draft classes generates the missing ones now
+	await draft.topUpDraftClasses();
+
 	if (repeatSeason !== currentRepeatSeasonType) {
 		await league.setRepeatSeason(repeatSeason);
 	}
