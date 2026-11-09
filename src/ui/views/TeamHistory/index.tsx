@@ -8,6 +8,7 @@ import { MoreLinks } from "../../components/MoreLinks.tsx";
 import HideableSection from "../../components/HideableSection.tsx";
 import { useLocal } from "../../util/local.ts";
 import { Championships } from "./Championships.tsx";
+import { Rivals } from "./Rivals.tsx";
 import useLocalStorageState from "use-local-storage-state";
 import clsx from "clsx";
 
@@ -19,6 +20,7 @@ const TeamHistory = ({
 	players,
 	playoffAppearances,
 	retiredJerseyNumbers,
+	rivals,
 	stats,
 	tid,
 	totalLost,
@@ -126,6 +128,11 @@ const TeamHistory = ({
 						userTid={userTid}
 					/>
 					<Championships history={seasonsHistory} />
+					{rivals && rivals.length > 0 ? (
+						<HideableSection title="Rivals" className="mb-3">
+							<Rivals rivals={rivals} />
+						</HideableSection>
+					) : null}
 					<HideableSection title="Players">
 						<Players
 							godMode={godMode}

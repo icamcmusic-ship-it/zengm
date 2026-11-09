@@ -143,3 +143,5 @@ export { default as Staff } from "./Staff/index.tsx";
 export { default as Coach } from "./Coach.tsx";
 export { default as Coaches } from "./Coaches.tsx";
 export { default as SkillBadges } from "./SkillBadges.tsx";
+export { default as Rivalries } from "./Rivalries.tsx";
+export { default as SeriesRecaps } from "./SeriesRecaps.tsx";

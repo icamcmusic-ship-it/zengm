@@ -1,5 +1,6 @@
 // Pre-game hype: how much a game is worth watching, from what was known before tip-off.
 // Every ingredient adds points (shown as a reason with its contribution); the sum is squashed to 0-100.
+import { hypeRivalryPoints } from "../rivalries/index.ts";
 import { chaseText, findChases, type ChaseCtx } from "./chases.ts";
 import {
 	heaters,
@@ -260,13 +261,28 @@ export const preHype = (I: HGameInput): Pre => {
 		)
 		.sort((x, y) => x.season - y.season);
 	if (meets.length) {
-		const recent = meets.filter((x) => x.season >= season - 5);
 		const lastYear = meets.find((x) => x.season === season - 1);
-		let pts =
-			Math.min(14, 2 * meets.length + 3 * recent.length) + (lastYear ? 4 : 0);
-		if (I.playoffs && meets.some((x) => x.season >= season - 3)) {
-			pts += 3;
-		}
+		// Same rivalry score as the Rivalries page (common/rivalries)
+		const pts = hypeRivalryPoints(
+			meets.map((x) => {
+				const homeWon = x.home.won >= (x.away?.won ?? 0);
+				const w = homeWon ? x.home : x.away!;
+				const l = homeWon ? x.away! : x.home;
+				return {
+					season: x.season,
+					round: x.round,
+					numRounds: x.numRounds,
+					winner: w.tid,
+					loser: l.tid,
+					wWon: w.won,
+					wLost: l.won,
+					wSeed: w.seed,
+					lSeed: l.seed,
+				};
+			}),
+			season,
+			!!I.playoffs,
+		);
 		const n = meets.length;
 		add(
 			"rivalry",

@@ -225,6 +225,7 @@ export const PlayoffMatchup = ({
 	expandTeamNames = false,
 	extraHighlight,
 	numGamesToWinSeries = 7,
+	recapUrl,
 	season,
 	series,
 	userTid,
@@ -234,6 +235,8 @@ export const PlayoffMatchup = ({
 	expandTeamNames?: boolean;
 	extraHighlight?: boolean;
 	numGamesToWinSeries?: number;
+	// Link to the series recap (Series Recaps feature)
+	recapUrl?: string;
 	season: number;
 	series?: {
 		away?: SeriesTeam;
@@ -300,6 +303,18 @@ export const PlayoffMatchup = ({
 					editing={editing}
 				/>
 			</ul>
+			{recapUrl &&
+			series.away &&
+			(series.home.won > 0 || series.away.won > 0) ? (
+				<a
+					className="position-absolute small"
+					data-testid="series-recap-link"
+					href={recapUrl}
+					style={{ bottom: 2, right: 4, fontSize: "0.7rem" }}
+				>
+					Recap
+				</a>
+			) : null}
 			{bannerTeam ? (
 				<ChampionshipBanner
 					className="w-100"
