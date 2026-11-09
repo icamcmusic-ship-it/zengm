@@ -516,6 +516,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "mockDraft",
+		key: "featureMockDraft",
+		name: "Mock Draft",
+		description:
+			"A two-round mock draft of the current class on Draft Scouting (each team picks by its own needs and strategy, in its real pick order), and simulated pro careers for prospects (peak ovr, star/starter/bust odds), also on the prospect's player page.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "frivolities",
 		key: "featureFrivolities",
 		name: "Extra Frivolities",

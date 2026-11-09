@@ -124,6 +124,7 @@ export const routeInfos = {
 	"/l/:lid/draft_scouting/:season": "draftScouting",
 	"/l/:lid/draft_board": "draftBoard",
 	"/l/:lid/draft_board/:season": "draftBoard",
+	"/l/:lid/mock_draft": "mockDraft",
 	"/l/:lid/watch_list": "watchList",
 	"/l/:lid/watch_list/:statType": "watchList",
 	"/l/:lid/watch_list/:statType/:playoffs": "watchList",

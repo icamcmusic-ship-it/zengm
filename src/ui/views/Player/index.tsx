@@ -12,6 +12,7 @@ import { ContractMood } from "./ContractMood.tsx";
 import { PlayerTraitsSection } from "./Traits.tsx";
 import { wrappedSalaryPayers } from "./SalaryPayers.tsx";
 import { PLAYER } from "../../../common/constants.ts";
+import { ProProjectionSection } from "../../components/ProProjection.tsx";
 import HideableSection from "../../components/HideableSection.tsx";
 import { StatsTable } from "./StatsTable.tsx";
 import { highlightLeaderText, MaybeBold, SeasonLink } from "./common.tsx";
@@ -128,6 +129,10 @@ const Player2 = ({
 			/>
 
 			{!retired ? <ContractMood pid={player.pid} refreshKey={player} /> : null}
+
+			{player.tid === PLAYER.UNDRAFTED ? (
+				<ProProjectionSection pid={player.pid} />
+			) : null}
 
 			{statTables.map(({ name, onlyShowIf, stats, superCols }) => (
 				<StatsTable

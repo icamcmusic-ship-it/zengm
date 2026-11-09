@@ -116,6 +116,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	scoutingSystem: "League extras: Draft",
 	draftBoard: "League extras: Draft",
 	aiDraftNeeds: "League extras: Draft",
+	mockDraft: "League extras: Draft",
 	coachingStaff: "League extras: Team",
 };
 
