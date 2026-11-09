@@ -766,7 +766,10 @@ const AdvancedPlayerSearch = (props: View<"advancedPlayerSearch">) => {
 							}
 							// A range with "?" until the trait is known, sorted by the estimate
 							return {
-								value: p.traitDisplay?.[info.key] ?? value,
+								value:
+									(p.traitDisplay as Record<string, string> | undefined)?.[
+										info.key
+									] ?? value,
 								sortValue: value,
 							};
 						} else {

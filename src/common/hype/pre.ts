@@ -144,7 +144,7 @@ export const preHype = (I: HGameInput): Pre => {
 				}
 			}
 			// the league's best: marquee matchups and top seed battles; its worst: tank races
-			const all = I.standings
+			const all = (I.standings ?? [])
 				.map((x) => ({ tid: x.tid, wp: winPct(x.won, x.lost) }))
 				.sort((x, y) => y.wp - x.wp || x.tid - y.tid);
 			const lr = (tid: number) => all.findIndex((x) => x.tid === tid) + 1;

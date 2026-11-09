@@ -76,7 +76,7 @@ describe.skipIf(!OUT)("hype calibration seasons", () => {
 			const loaded = await loadTeams(range(N), {});
 			const ovrOf = new Map<number, number>();
 			for (const p of players) {
-				ovrOf.set(p.pid, p.ratings.at(-1)!.ovr);
+				ovrOf.set(p.pid!, p.ratings.at(-1)!.ovr);
 			}
 			const sorted = [...ovrOf.values()].sort((a, b) => b - a);
 			const cut = sorted[Math.max(4, Math.round(sorted.length * 0.03))]!;
@@ -126,28 +126,30 @@ describe.skipIf(!OUT)("hype calibration seasons", () => {
 							tid,
 							pts: pts[i]!,
 							ptsQtrs: [...t.stat.ptsQtrs],
-							ovr: t.ovr,
+							ovr: (t as unknown as { ovr: number }).ovr,
 							won: playoffs ? undefined : rec[tid]!.won,
 							lost: playoffs ? undefined : rec[tid]!.lost,
 							tied: 0,
 							otl: 0,
-							players: t.player.map((p): HBoxLine => ({
-								pid: p.id,
-								name: p.name,
-								min: fin(p.stat.min),
-								pts: fin(p.stat.pts),
-								trb: fin(p.stat.orb) + fin(p.stat.drb),
-								ast: fin(p.stat.ast),
-								stl: fin(p.stat.stl),
-								blk: fin(p.stat.blk),
-								tp: fin(p.stat.tp),
-								tpa: fin(p.stat.tpa),
-								fg: fin(p.stat.fg),
-								fga: fin(p.stat.fga),
-								ft: fin(p.stat.ft),
-								fta: fin(p.stat.fta),
-								tov: fin(p.stat.tov),
-							})),
+							players: t.player.map(
+								(p): HBoxLine => ({
+									pid: p.id,
+									name: p.name,
+									min: fin(p.stat.min),
+									pts: fin(p.stat.pts),
+									trb: fin(p.stat.orb) + fin(p.stat.drb),
+									ast: fin(p.stat.ast),
+									stl: fin(p.stat.stl),
+									blk: fin(p.stat.blk),
+									tp: fin(p.stat.tp),
+									tpa: fin(p.stat.tpa),
+									fg: fin(p.stat.fg),
+									fga: fin(p.stat.fga),
+									ft: fin(p.stat.ft),
+									fta: fin(p.stat.fta),
+									tov: fin(p.stat.tov),
+								}),
+							),
 						};
 					};
 					games.push({
@@ -228,26 +230,28 @@ describe.skipIf(!OUT)("hype calibration seasons", () => {
 					teams,
 					games,
 					linesComplete: true,
-					players: players.map((p): HPlayerRaw => ({
-						pid: p.pid,
-						name: `${p.firstName} ${p.lastName}`,
-						tid: p.tid,
-						draft: {
-							year: p.draft.year,
-							round: p.draft.round,
-							pick: p.draft.pick,
-						},
-						rows: [],
-						ovrBySeason: Object.fromEntries(
-							range(first, first + numSeasons).map((x) => [
-								x,
-								ovrOf.get(p.pid)!,
-							]),
-						),
-						allStar: [],
-						moves: [],
-						released: [],
-					})),
+					players: players.map(
+						(p): HPlayerRaw => ({
+							pid: p.pid!,
+							name: `${p.firstName} ${p.lastName}`,
+							tid: p.tid,
+							draft: {
+								year: p.draft.year,
+								round: p.draft.round,
+								pick: p.draft.pick,
+							},
+							rows: [],
+							ovrBySeason: Object.fromEntries(
+								range(first, first + numSeasons).map((x) => [
+									x,
+									ovrOf.get(p.pid!)!,
+								]),
+							),
+							allStar: [],
+							moves: [],
+							released: [],
+						}),
+					),
 					series: series.slice(),
 					records: {
 						seasonLeague: {},

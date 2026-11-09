@@ -3332,7 +3332,10 @@ class GameSim extends GameSimBase {
 	}
 
 	// Flavor metadata for the scoring play at this.lastScoringPlay[i] (only reads what the sim already recorded)
-	scoringMeta(i: number, kind: "winner" | "tying" | "forceOT"): ClutchMeta {
+	scoringMeta(
+		i: number,
+		kind: "winner" | "tying" | "forceOT",
+	): Extract<ClutchMeta, { kind: "winner" | "tying" | "forceOT" }> {
 		const play = this.lastScoringPlay[i]!;
 		const prev = this.lastScoringPlay[i - 1];
 		let finish: "and1" | "and1Three" | "twoFt" | "threeFt" | undefined;

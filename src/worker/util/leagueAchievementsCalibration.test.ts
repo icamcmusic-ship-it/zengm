@@ -7,6 +7,7 @@
 // It creates a random-players league (the same path as the smoke test), keeps every season's box scores and records the League
 // achievements tally after every completed season, writing the same JSON as sim.cjs (the input of calibrate.ts).
 import "fake-indexeddb/auto";
+// @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { writeFileSync } from "node:fs";
 import { describe, test } from "vitest";
 import { LEAGUE_DATABASE_VERSION, PHASE } from "../../common/constants.ts";
