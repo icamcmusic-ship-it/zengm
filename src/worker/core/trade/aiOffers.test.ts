@@ -4,15 +4,21 @@ import { idb } from "../../db/index.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { beforeTests } from "./testHelpers.ts";
 import {
+	acceptAiOffer,
 	addAiOffer,
 	buildAiOffer,
 	chooseOfferTarget,
 	getDailyOfferProbability,
+	getOfferAge,
+	getPhaseOfferProbability,
+	requestAiOffers,
 	getOfferReasonText,
 	pruneAiOffers,
 	type OfferTargetCandidate,
 } from "./aiOffers.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
+import { team } from "../index.ts";
+import { helpers } from "../../util/index.ts";
 
 const first = () => 0;
 
@@ -131,5 +137,153 @@ describe("AI trade offers to the user", () => {
 				assert.strictEqual((await idb.cache.players.get(pid))!.tid, 1);
 			}
 		}
+	});
+
+	test("unsolicited offers can skip the trading block", () => {
+		const target = chooseOfferTarget(
+			"contending",
+			[
+				...candidates,
+				{ kind: "player", id: 3, age: 26, value: 40, onTradingBlock: true },
+			],
+			first,
+			false,
+		);
+		assert.strictEqual(target?.reason, "contenderNeed");
+	});
+
+	test("offer age by phase", () => {
+		assert.strictEqual(
+			getOfferAge({ gp: 3, daysLeft: 30 }, PHASE.REGULAR_SEASON, 10, 0),
+			7,
+		);
+		assert.strictEqual(
+			getOfferAge({ gp: 0, daysLeft: 30 }, PHASE.FREE_AGENCY, 0, 25),
+			5,
+		);
+		// Old offers without daysLeft, and phases without days, last until the phase changes
+		assert.isUndefined(getOfferAge({ gp: 0 }, PHASE.FREE_AGENCY, 0, 25));
+		assert.isUndefined(
+			getOfferAge({ gp: 0, daysLeft: 30 }, PHASE.AFTER_DRAFT, 0, 25),
+		);
+		assert.strictEqual(getPhaseOfferProbability(1), 0.5);
+		assert.strictEqual(getPhaseOfferProbability(0), 0);
+	});
+
+	test("offers expire when the AI team's roster changes", async () => {
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		g.setWithoutSavingToDB("aiTradeOffers", []);
+		const userPlayers = await idb.cache.players.indexGetAll(
+			"playersByTid",
+			g.get("userTid"),
+		);
+		const aiPlayers = await idb.cache.players.indexGetAll("playersByTid", 1);
+		await addAiOffer(
+			1,
+			{
+				teams: [
+					{
+						tid: g.get("userTid"),
+						pids: [userPlayers[0]!.pid],
+						pidsExcluded: [],
+						dpids: [],
+						dpidsExcluded: [],
+					},
+					{
+						tid: 1,
+						pids: [aiPlayers[0]!.pid],
+						pidsExcluded: [],
+						dpids: [],
+						dpidsExcluded: [],
+					},
+				],
+				reason: "test",
+				source: "unsolicited",
+			},
+			false,
+		);
+		assert.strictEqual(g.get("aiTradeOffers")[0]!.source, "unsolicited");
+		await pruneAiOffers();
+		assert.strictEqual(g.get("aiTradeOffers").length, 1);
+
+		// A player not in the offer leaves the AI team
+		const other = aiPlayers.at(-1)!;
+		other.tid = 2;
+		await idb.cache.players.put(other);
+		await pruneAiOffers();
+		assert.strictEqual(g.get("aiTradeOffers").length, 0);
+		other.tid = 1;
+		await idb.cache.players.put(other);
+	});
+
+	test("requested offers land in the inbox and can be accepted", async () => {
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		g.setWithoutSavingToDB("aiTradeOffers", []);
+		g.setWithoutSavingToDB("featureAiTradeOffers" as any, true);
+		// The shared trade test league has no teams in the cache
+		for (const t of helpers.getTeamsDefault().slice(0, 3)) {
+			if (!(await idb.cache.teams.get(t.tid))) {
+				await idb.cache.teams.put(
+					team.generate({ ...t, strategy: "contending" }),
+				);
+				await idb.cache.teamSeasons.put(team.genSeasonRow(t));
+			}
+		}
+		const userPlayers = await idb.cache.players.indexGetAll(
+			"playersByTid",
+			g.get("userTid"),
+		);
+		const pid = userPlayers[0]!.pid;
+		const count = await requestAiOffers([pid], []);
+		assert.isAtMost(count, 3);
+		const offers = g.get("aiTradeOffers");
+		assert.strictEqual(offers.length, count);
+		for (const offer of offers) {
+			assert.strictEqual(offer.source, "requested");
+			assert.deepEqual(offer.teams[0].pids, [pid]);
+		}
+
+		g.setWithoutSavingToDB("aiTradeOffers", []);
+		const best = [...userPlayers].sort((a, b) => b.value - a.value)[0]!;
+		const aiPlayers = await idb.cache.players.indexGetAll("playersByTid", 1);
+		const worst = [...aiPlayers].sort((a, b) => a.value - b.value)[0]!;
+		const offer = await addAiOffer(
+			1,
+			{
+				teams: [
+					{
+						tid: g.get("userTid"),
+						pids: [best.pid],
+						pidsExcluded: [],
+						dpids: [],
+						dpidsExcluded: [],
+					},
+					{
+						tid: 1,
+						pids: [worst.pid],
+						pidsExcluded: [],
+						dpids: [],
+						dpidsExcluded: [],
+					},
+				],
+				reason: "test",
+			},
+			false,
+		);
+		// The test league has no player values, so the AI turns it down. Accepting still goes through the normal trade
+		// proposal with the offer's assets, and a turned down offer stays in the inbox
+		const result = await acceptAiOffer(offer.id);
+		const tr = await idb.cache.trade.get(0);
+		assert.deepEqual(tr!.teams[0].pids, [best.pid]);
+		assert.deepEqual(tr!.teams[1].pids, [worst.pid]);
+		if (result.accepted) {
+			assert.strictEqual((await idb.cache.players.get(best.pid))!.tid, 1);
+			assert.strictEqual(g.get("aiTradeOffers").length, 0);
+		} else {
+			assert.strictEqual(g.get("aiTradeOffers").length, 1);
+		}
+
+		const missing = await acceptAiOffer(12345);
+		assert.isFalse(missing.accepted);
 	});
 });

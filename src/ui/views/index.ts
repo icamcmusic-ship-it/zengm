@@ -111,6 +111,7 @@ export { default as TeamStatDists } from "./TeamStatDists.tsx";
 export { default as TeamStats } from "./TeamStats.tsx";
 export { default as TragicDeaths } from "./TragicDeaths.tsx";
 export { default as Trade } from "./Trade/index.tsx";
+export { default as TradeOffers } from "./TradeOffers.tsx";
 export { default as TradeProposals } from "./TradeProposals.tsx";
 export { default as TradeMarket } from "./TradeMarket.tsx";
 export { default as TradeThree } from "./TradeThree/index.tsx";

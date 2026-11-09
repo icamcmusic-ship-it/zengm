@@ -8,7 +8,7 @@ const LODASH_BLACKLIST = [/^lodash$/, /^lodash-es/, /^lodash\//];
 
 const BLACKLIST = {
 	ui: [...LODASH_BLACKLIST, /\/worker/],
-	worker: [...LODASH_BLACKLIST, /\/ui/, /^react/],
+	worker: [...LODASH_BLACKLIST, /\/ui\//, /^react/],
 };
 
 const buildFile = async (

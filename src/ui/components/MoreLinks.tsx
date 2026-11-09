@@ -470,6 +470,7 @@ export const MoreLinks = (
 		links = [
 			{ url: ["trade"], name: "Trade" },
 			{ url: ["trading_block"], name: "Trading Block" },
+			{ url: ["trade_offers"], name: "Trade Offers" },
 			{ url: ["trade_proposals"], name: "Trade Proposals" },
 			{ url: ["trade_market"], name: "Trade Market" },
 			{ url: ["saved_trades"], name: "Saved Trades" },

@@ -69,6 +69,9 @@ type OfferProps = {
 	hideTopTeamOvrs?: boolean;
 	onNegotiate: () => void;
 	onRemove?: () => void;
+	// Extra buttons next to Negotiate (Trade Offers: Accept, Decline)
+	actions?: ReactNode;
+	removeTitle?: string;
 	teamInfo: {
 		abbrev: string;
 		name: string;
@@ -167,6 +170,7 @@ const OfferPlayers = ({
 
 export const Offer = (props: OfferProps) => {
 	const {
+		actions,
 		challengeNoRatings,
 		children,
 		dpids,
@@ -178,6 +182,7 @@ export const Offer = (props: OfferProps) => {
 		payroll,
 		pids,
 		pidsUser,
+		removeTitle,
 		salaryCap,
 		salaryCapType,
 		strategy,
@@ -224,7 +229,7 @@ export const Offer = (props: OfferProps) => {
 					<button
 						type="button"
 						className="btn-close ms-4"
-						title="Remove trade from list"
+						title={removeTitle ?? "Remove trade from list"}
 						onClick={onRemove}
 					/>
 				) : null}
@@ -262,13 +267,16 @@ export const Offer = (props: OfferProps) => {
 				<p className="text-danger">{summary.warning}</p>
 			) : null}
 
-			<button
-				type="submit"
-				className="btn btn-light-bordered mb-4"
-				onClick={onNegotiate}
-			>
-				Negotiate
-			</button>
+			<div className="d-flex gap-2 mb-4">
+				<button
+					type="submit"
+					className="btn btn-light-bordered"
+					onClick={onNegotiate}
+				>
+					Negotiate
+				</button>
+				{actions}
+			</div>
 		</div>
 	);
 };

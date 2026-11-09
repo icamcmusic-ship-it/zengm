@@ -53,6 +53,8 @@ export const featureForUrl = (
 			return "timeline";
 		case "trade_market":
 			return "tradeMarket";
+		case "trade_offers":
+			return "aiTradeOffers";
 		case "trade_three":
 			return "threeTeamTrades";
 		case "draft_board":
@@ -83,9 +85,23 @@ export const featureForUrl = (
 	}
 };
 
+// Stock pages that a League extra replaces: hidden while that feature is on
+export const featureOffForUrl = (
+	url: readonly unknown[] | string,
+): NativeFeatureId | undefined => {
+	if (typeof url !== "string" && url[0] === "trade_proposals") {
+		return "aiTradeOffers";
+	}
+	return undefined;
+};
+
 export const isUrlFeatureOn = (url: readonly unknown[] | string) => {
 	const feature = featureForUrl(url);
-	return feature === undefined || isFeatureOn(feature);
+	const replacedBy = featureOffForUrl(url);
+	return (
+		(feature === undefined || isFeatureOn(feature)) &&
+		(replacedBy === undefined || !isFeatureOn(replacedBy))
+	);
 };
 
 // Reactive: re-renders when any League extras switch changes

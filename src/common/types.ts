@@ -1104,6 +1104,8 @@ export type MenuItemLink = {
 	godMode?: true;
 	// League extras feature (common/nativeFeatures.ts): hidden when it is turned off
 	feature?: NativeFeatureId;
+	// Stock page replaced by a League extras feature: hidden when it is turned on
+	featureOff?: NativeFeatureId;
 	nonLeague?: true;
 	commandPalette?: true;
 	commandPaletteOnly?: true;
@@ -2655,6 +2657,15 @@ export type AiTradeOffer = {
 
 	// Number of games the user's team had played when the offer was made, used to expire offers
 	gp: number;
+
+	// g.daysLeft when the offer was made, used to expire offers during free agency. Missing in old leagues
+	daysLeft?: number;
+
+	// The AI team's roster (sorted pids) when the offer was made. A changed roster expires the offer
+	rosterKey?: string;
+
+	// Why the offer was made. Missing in old leagues
+	source?: "tradingBlock" | "unsolicited" | "requested";
 
 	teams: TradeTeams;
 	reason: string;
