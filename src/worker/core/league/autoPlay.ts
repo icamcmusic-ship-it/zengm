@@ -97,7 +97,8 @@ const autoPlay = async (conditions: Conditions = {}) => {
 		await phase.newPhase(PHASE.FREE_AGENCY, conditions);
 	} else if (currentPhase === PHASE.FREE_AGENCY) {
 		// Purposely call without await, to break up the promise chain. Otherwise the promise chain uses too much memory after many seasons (like 50+)
-		freeAgents.play(g.get("daysLeft"), conditions);
+		// An error there would otherwise leave auto play running forever, with only Stop in the play menu
+		freeAgents.play(g.get("daysLeft"), conditions).catch(cleanupAutoPlay);
 	} else {
 		throw new Error(`Unknown phase: ${currentPhase}`);
 	}
@@ -147,7 +148,8 @@ export const startAutoPlay = (
 	};
 	void lock.updateWorkerBusy();
 
-	autoPlay(conditions);
+	// Not awaited, so an error has to end auto play here (otherwise the game looks stuck, still auto playing)
+	autoPlay(conditions).catch(cleanupAutoPlay);
 
 	// Do this rather than awaiting autoPlay because autoPlay promise chain gets too big (see freeAgents.play call)
 	return promise;

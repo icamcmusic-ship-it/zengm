@@ -1111,7 +1111,10 @@ class Cache {
 					return [val];
 				}
 
-				return val;
+				// A copy, because this array is the index itself: a caller that pushed a player onto its "roster" would put him
+				// in that team's index entry, and then signing him for that team would not refresh the index (put only refreshes
+				// it when the row is missing from its key), leaving him listed as a free agent too
+				return val.slice();
 			}
 
 			return [];
