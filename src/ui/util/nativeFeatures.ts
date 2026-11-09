@@ -59,6 +59,8 @@ export const featureForUrl = (
 			return "threeTeamTrades";
 		case "draft_board":
 			return "draftBoard";
+		case "college_overseas":
+			return "collegeSeason";
 		case "archetypes":
 			return "archetypes";
 		case "staff":

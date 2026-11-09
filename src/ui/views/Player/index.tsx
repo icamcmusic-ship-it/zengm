@@ -25,6 +25,7 @@ import { useLocal } from "../../util/local.ts";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
 import { COLLEGE_AWARD_PREFIX } from "../../../common/preDraft.ts";
+import { CollegeSeasonSection } from "./CollegeSeasonSection.tsx";
 
 const Player2 = ({
 	bestPos,
@@ -359,30 +360,37 @@ const Player2 = ({
 				</div>
 			</div>
 
-			{earlierHonorsGrouped.length > 0 ? (
+			{earlierHonorsGrouped.length > 0 || player.collegeSeason ? (
 				<div className="row">
-					<div className="col-12 col-md-6 col-lg-4">
-						<HideableSection
-							title="Earlier honors"
-							description="From before he was drafted, so not counted as pro awards."
-						>
-							<table className="table table-nonfluid table-striped table-borderless table-sm player-awards">
-								<tbody>
-									{earlierHonorsGrouped.map((a, i) => {
-										return (
-											<tr key={i}>
-												<td>
-													{a.count > 1 ? `${a.count}x ` : null}
-													{a.type.replace(COLLEGE_AWARD_PREFIX, "")} (
-													{Object.values(a.seasons).flat().join(", ")})
-												</td>
-											</tr>
-										);
-									})}
-								</tbody>
-							</table>
-						</HideableSection>
-					</div>
+					{player.collegeSeason ? (
+						<div className="col-12 col-lg-8 order-lg-last">
+							<CollegeSeasonSection summary={player.collegeSeason} />
+						</div>
+					) : null}
+					{earlierHonorsGrouped.length > 0 ? (
+						<div className="col-12 col-md-6 col-lg-4">
+							<HideableSection
+								title="Earlier honors"
+								description="From before he was drafted, so not counted as pro awards."
+							>
+								<table className="table table-nonfluid table-striped table-borderless table-sm player-awards">
+									<tbody>
+										{earlierHonorsGrouped.map((a, i) => {
+											return (
+												<tr key={i}>
+													<td>
+														{a.count > 1 ? `${a.count}x ` : null}
+														{a.type.replace(COLLEGE_AWARD_PREFIX, "")} (
+														{Object.values(a.seasons).flat().join(", ")})
+													</td>
+												</tr>
+											);
+										})}
+									</tbody>
+								</table>
+							</HideableSection>
+						</div>
+					) : null}
 				</div>
 			) : null}
 

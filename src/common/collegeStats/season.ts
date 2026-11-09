@@ -149,6 +149,9 @@ export type SeasonContext = {
 	// For a season at a pro club (overseas or G League): the league's pace, minutes and season length, and his age that season
 	proEnv?: LeagueEnv;
 	age?: number;
+	// From the college season model (ncaa.ts): his team's games, the last postseasonGames of them being the conference and NCAA tournament games, which he always plays
+	teamGames?: number;
+	postseasonGames?: number;
 };
 
 const emptyBox = (): GameBox => ({
@@ -236,7 +239,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 
 	// Games, availability and minutes
 	const proEnv = ctx.proEnv;
-	const teamGames = proEnv
+	const drawnTeamGames = proEnv
 		? Math.round(
 				clamp(
 					rng.normal(proEnv.games, 2 * noise),
@@ -245,6 +248,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 				),
 			)
 		: Math.round(clamp(rng.normal(34.5, 2.4 * noise), 28, 41));
+	const teamGames = ctx.teamGames ?? drawnTeamGames;
+	const postseasonGames = Math.min(ctx.postseasonGames ?? 0, teamGames);
 	let missed =
 		rng.random() < 0.34 ? Math.round(Math.abs(rng.normal(0, 3.5)) + 1) : 0;
 	missed = Math.min(missed, 18);
@@ -266,7 +271,10 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		Math.min(proCap, 37.5 * (gameMinutes / 40)),
 	);
 	const dnp = mpg < 17 ? Math.round(rng.random() * 5) : 0;
-	const gp = Math.max(4, teamGames - missed - dnp);
+	const gp = Math.min(
+		teamGames,
+		Math.max(4, postseasonGames + 2, teamGames - missed - dnp),
+	);
 	const gs = Math.round(
 		gp * clamp((mpg - 17) / 11, 0, 1) * (0.9 + 0.1 * rng.random()),
 	);
@@ -531,7 +539,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		}
 	}
 
-	const minAvailable = (teamGames - missed) * gameMinutes;
+	const minAvailable = Math.max(gp, teamGames - missed) * gameMinutes;
 	const stats: Record<string, number> = {
 		gp,
 		gs,
@@ -600,6 +608,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		max: { ...max, ...maxExtra },
 		score: gmscPerGame,
 		defScore,
+		...(postseasonGames > 0
+			? { postseasonBoxes: boxes.slice(boxes.length - postseasonGames) }
+			: {}),
 	};
 };
 

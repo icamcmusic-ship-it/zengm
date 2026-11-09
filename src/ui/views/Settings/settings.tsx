@@ -112,6 +112,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	tradeMarket: "League extras: Trades",
 	threeTeamTrades: "League extras: Trades",
 	collegeStats: "League extras: Draft",
+	collegeSeason: "League extras: Draft",
 	ratingsRegenerator: "League extras: Draft",
 	scoutingSystem: "League extras: Draft",
 	draftBoard: "League extras: Draft",

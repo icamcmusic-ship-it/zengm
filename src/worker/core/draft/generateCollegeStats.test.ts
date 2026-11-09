@@ -275,3 +275,60 @@ describe("setting for new draft classes", () => {
 		}
 	});
 });
+
+describe("college season (featureCollegeSeason)", () => {
+	test("prospects carry their team's season, it can be rebuilt, and onlyMissing keeps it", async () => {
+		idb.league = mockIDBLeague();
+		g.setWithoutSavingToDB("featureCollegeSeason" as any, true);
+		await generateCollegeStats({ draftYear: SEASON, seed: "abc" });
+
+		const players = await getProspects();
+		const marked = players.filter((p) => p.collegeSeason);
+		// Duke, Kansas, Gonzaga, and blank colleges of American-born prospects
+		assert(marked.length >= (players.length * 2) / 3, `${marked.length}`);
+		const { getCollegeSeason } = await import("./collegeSeason.ts");
+		const built = (await getCollegeSeason(SEASON))!;
+		assert.strictEqual(built.players.length, marked.length);
+		for (const p of marked) {
+			const stored = p.collegeSeason!;
+			assert.strictEqual(stored.season, SEASON);
+			assert.strictEqual(stored.seed, "abc");
+			const team = built.season.teams.find((t) => t.school === stored.school)!;
+			assert.strictEqual(stored.summary.w, team.w);
+			assert.strictEqual(stored.summary.ncaa, team.ncaa);
+			const row = p.stats.find(
+				(r) => r.season === SEASON && r.tid === PLAYER.DOES_NOT_EXIST,
+			) as any;
+			assert.strictEqual(row.teamName, stored.school);
+			assert.isAtLeast(row.gp, stored.summary.games.length);
+			const pts = stored.summary.games.reduce((sum, game) => sum + game.pts, 0);
+			assert.isAtMost(pts, row.pts);
+		}
+
+		// A new prospect only gets stats: the season doesn't change
+		const before = JSON.stringify(built.season);
+		const newcomer = { ...structuredClone(prospects[1]!), pid: 1000 };
+		newcomer.stats = [];
+		newcomer.awards = [];
+		await idb.cache.players.put(newcomer);
+		await generateCollegeStats({
+			draftYear: SEASON,
+			seed: "other",
+			onlyMissing: true,
+		});
+		const p1000 = (await idb.cache.players.get(1000))!;
+		assert.strictEqual(p1000.collegeSeason?.seed, "abc");
+		assert.strictEqual(p1000.collegeSeason?.boost, 0);
+		assert.strictEqual(
+			JSON.stringify((await getCollegeSeason(SEASON))!.season),
+			before,
+		);
+
+		await removeCollegeStats(SEASON);
+		assert.strictEqual(
+			(await getProspects()).filter((p) => p.collegeSeason).length,
+			0,
+		);
+		assert.isUndefined(await getCollegeSeason(SEASON));
+	});
+});
