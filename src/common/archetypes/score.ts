@@ -38,6 +38,10 @@ export const gateFactor = (
 // Level gate (his overall level, the mean of his size-adjusted skills, in z): softer than the height gate
 const LEVEL_SOFT = 0.3;
 // Outside the level gate the fit z is cut too (a table can be mostly near zero, which would read a miss as ordinary)
+// A level gate below the league's (raw prospects, journeymen), as opposed to a star's gate above it
+export const isLowLevel = (a: Archetype) =>
+	a.level !== undefined && a.level[1] <= 0;
+
 export const levelPenalty = (a: Archetype, level: number) =>
 	a.level ? 3 * (1 - gateFactor(level, a.level, LEVEL_SOFT)) : 0;
 
@@ -66,7 +70,7 @@ const LEVEL_SLACK_FROM = -0.6;
 
 export const needShortfall = (a: Archetype, p: Prepared) => {
 	let short = 0;
-	const slack = a.level
+	const slack = isLowLevel(a)
 		? 0
 		: LEVEL_SLACK * Math.max(0, LEVEL_SLACK_FROM - p.level);
 	for (const dim of DIMS) {
@@ -76,7 +80,7 @@ export const needShortfall = (a: Archetype, p: Prepared) => {
 		}
 		short += Math.max(0, 0.1 * w - 0.1 - p.z[dim]);
 		// A raw prospect is read against himself only: his skills are not there yet in league terms
-		if (!a.level) {
+		if (!isLowLevel(a)) {
 			short += Math.max(0, 0.1 * (w - 2) - 0.05 - slack - p.sz[dim]);
 		}
 	}

@@ -233,7 +233,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[0, 48],
 		{ usg: 3, rim: 1.5, mid: 2, three: 1.5, draw: 1.5, pss: -1 },
 		"Scoring is the only job.",
-		{ bonus: ["V"] },
+		{ bonus: ["V"], need: { usg: 1.2 } },
 	),
 	G(
 		"Foul Merchant",
@@ -730,9 +730,18 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Rim Protector",
 		"defender",
 		[54, 100],
-		{ blk: 3, dint: 3, diq: 2, jmp: 1, usg: -1 },
+		{
+			blk: 3,
+			dint: 3,
+			reb: 1.5,
+			hgt: 1.5,
+			stre: 1,
+			mid: -1,
+			three: -1,
+			usg: -1,
+		},
 		"Alters everything at the rim.",
-		{ req: ["Di"] },
+		{ req: ["Di"], need: { blk: 1, dint: 0.8 } },
 	),
 	C(
 		"Glass Cleaner",
@@ -770,9 +779,9 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Point Center",
 		"playmaker",
 		[54, 100],
-		{ pss: 3, drb: 1.5, oiq: 2, hgt: 1 },
+		{ pss: 3, oiq: 2, drb: 1, hgt: 0.5, usg: 0.5 },
 		"A big who runs the offense from the elbow.",
-		{ req: ["Ps"], rare: true },
+		{ bonus: ["Ps"], need: { pss: 0.8 } },
 	),
 	C(
 		"Defensive Anchor",
@@ -807,7 +816,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Energy Big",
 		"hustle",
 		[54, 100],
-		{ end: 3, reb: 2, blk: 1.5, ath: 1.5, usg: -1.5 },
+		{ end: 3, reb: 2, ath: 1.5, spd: 1, usg: -1.5 },
 		"Runs the floor and does the dirty work.",
 	),
 	C(
@@ -831,6 +840,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[54, 100],
 		{ blk: 3.5, jmp: 2, dint: 1.5, usg: -1.5, oiq: -1 },
 		"Blocked shots, not much else.",
+		{ need: { blk: 1.7 }, needFor: { blk: 1.2 } },
 	),
 	C(
 		"Putback Big",
@@ -885,11 +895,11 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 	),
 	C(
 		"Rim-Running Shooter",
-		"unicorn",
-		[58, 100],
-		{ blk: 2, dint: 2, three: 2, ft: 1, pss: 1 },
-		"Protects the rim and spaces the floor.",
-		{ rare: true },
+		"athlete",
+		[54, 100],
+		{ three: 2, rim: 2, spd: 1.5, ath: 1.5, usg: -0.5 },
+		"Beats his man down the floor, then pops out for threes in the half court.",
+		{ tags: ["spacing", "transition"] },
 	),
 	C(
 		"Offensive Hub",
@@ -1326,7 +1336,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[0, 46],
 		{ usg: -1, drb: 0.5, pss: 0.5, end: 0.5 },
 		"Bounces between benches and ten-day contracts, ready when called.",
-		{ level: [-9, -1.0], tags: ["role", "fringe"] },
+		{ level: [-9, -1.0], age: [0, 33], tags: ["role", "fringe"] },
 	),
 	W(
 		"Journeyman Wing",
@@ -1334,7 +1344,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[26, 64],
 		{ usg: -1, dper: 0.5, three: 0.5, end: 0.5 },
 		"A fringe wing who fills a roster spot and plays hard.",
-		{ level: [-9, -1.0], tags: ["role", "fringe"] },
+		{ level: [-9, -1.15], age: [0, 33], tags: ["role", "fringe"] },
 	),
 	F(
 		"Journeyman Forward",
@@ -1342,7 +1352,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[44, 76],
 		{ usg: -1, reb: 0.5, stre: 0.5, end: 0.5 },
 		"An end-of-bench forward who knows his role.",
-		{ level: [-9, -1.0], tags: ["role", "fringe"] },
+		{ level: [-9, -1.0], age: [0, 33], tags: ["role", "fringe"] },
 	),
 	C(
 		"Journeyman Big",
@@ -1350,7 +1360,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[54, 100],
 		{ usg: -1, reb: 0.5, dint: 0.5, hgt: 0.5 },
 		"Size for the end of the bench, five fouls to give.",
-		{ level: [-9, -1.0], tags: ["role", "fringe"] },
+		{ level: [-9, -1.0], age: [0, 33], tags: ["role", "fringe"] },
 	),
 	// Veterans: the legs are going, the craft is not (age 31+)
 	G(
@@ -1385,6 +1395,14 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"A grizzled forward who wins with strength and positioning.",
 		{ age: [31, 50], tags: ["veteran"] },
 	),
+	W(
+		"Veteran Defender",
+		"defender",
+		[30, 66],
+		{ diq: 3, stre: 1, ath: -2, usg: -1, three: -0.5 },
+		"Lost a step, not the instincts: still takes the toughest assignment for a few minutes a night.",
+		{ age: [32, 50], needFor: { diq: 0.6 }, tags: ["veteran", "defense"] },
+	),
 	C(
 		"Veteran Big",
 		"defender",
@@ -1413,8 +1431,8 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 	W(
 		"Rotation Wing",
 		"balanced",
-		[24, 66],
-		{ usg: -2, dper: 0.5, three: 0.5, end: 0.5 },
+		[32, 58],
+		{ usg: -2.5, dper: 0.5, three: 0.5, end: 0.5 },
 		"Fills minutes on the wing without hurting you.",
 		{ tags: ["role", "bench"] },
 	),
@@ -1481,7 +1499,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[54, 100],
 		{ blk: 2.5, spd: 2, ath: 1.5, dper: 1 },
 		"Blocks shots and can still step out on the perimeter.",
-		{ tags: ["defense", "switch"] },
+		{ need: { blk: 1.2 }, tags: ["defense", "switch"] },
 	),
 	// Scoring and creation gaps
 	W(
@@ -1532,6 +1550,59 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Catches in the short roll and makes the right play.",
 		{ tags: ["playmaking"] },
 	),
+	// Stars: elite, high-usage players read by what makes them elite, not just by how much they score
+	F(
+		"Playmaking Superstar",
+		"playmaker",
+		[44, 76],
+		{ usg: 2.5, pss: 2.5, oiq: 2.5, post: 1.5, mid: 1, stre: 1, reb: 1 },
+		"The offense and the decisions run through him, and he scores on top of it.",
+		{
+			need: { usg: 2.1, pss: 1.1, oiq: 1.8, post: 1.5, mid: 1.5 },
+			level: [1.2, 9],
+			tags: ["star"],
+		},
+	),
+	F(
+		"Athletic Superstar",
+		"athlete",
+		[44, 76],
+		{ usg: 2.5, ath: 2.5, rim: 2, spd: 1.5, reb: 1.5, draw: 1 },
+		"An overwhelming athlete who lives at the rim and on the glass.",
+		{ need: { usg: 2, ath: 1.2, rim: 1.5 }, level: [1.1, 9], tags: ["star"] },
+	),
+	F(
+		"Elite Shotmaker",
+		"scorer",
+		[48, 70],
+		{ usg: 2.5, mid: 3, ft: 2.5, hgt: 1, three: 0.5 },
+		"A tall scorer who can get a clean look over anyone from anywhere.",
+		{ need: { usg: 2, mid: 1.8, ft: 1 }, level: [1.1, 9], tags: ["star"] },
+	),
+	F(
+		"Two-Way Superstar",
+		"defender",
+		[44, 76],
+		{ usg: 2.5, dper: 2, dint: 2, diq: 2, mid: 1 },
+		"Carries the scoring load and still guards the other team's best player.",
+		{
+			need: { usg: 2.1, diq: 0.8, dper: 0.6, dint: 0.8, mid: 1.2 },
+			level: [1.2, 9],
+			tags: ["star"],
+		},
+	),
+	C(
+		"Dominant Big",
+		"scorer",
+		[60, 100],
+		{ usg: 2.5, post: 2.5, draw: 2, ft: 1.5, drb: 1, hgt: 1 },
+		"A franchise big who draws double teams and fouls on every touch.",
+		{
+			need: { usg: 2, post: 1.8, draw: 1.5, reb: 1.5 },
+			level: [1.1, 9],
+			tags: ["star"],
+		},
+	),
 ];
 
 // What a name promises, on the league-wide scale: a label is only given when the skill its name names is really there.
@@ -1553,10 +1624,12 @@ const NAME_NEEDS: [
 		{ pss: 0.5 },
 	],
 	[/Lockdown|Defensive|Stopper|Pest|Hawk|Thief|Two-Way|Switch/, { diq: 0 }],
-	[/Rebound|Glass|Double-Double|Putback/, {}, { reb: 0.35 }],
+	[/Rebound|Glass|Double-Double|Putback/, {}, { reb: 0.45 }],
 	[/Post|Interior Scorer|Paint Beast/, {}, { post: 0.35 }],
-	[/Slash|Penetrator/, {}, { rim: 0.05 }],
-	[/Athletic|High-Flyer|Explosive|Rim-Running|Lob Threat/, { ath: 0.4 }],
+	[/Slash|Penetrator/, { drb: -0.2 }, { rim: 0.1 }],
+	[/Athletic|High-Flyer|Explosive|Rim-Running|Lob Threat/, { ath: 0.5 }],
+	// A defensive label also needs the defense, not just the instincts
+	[/Thief|Pest|Hawk/, { dper: 0.05 }],
 	[/Handles|Shot Creator|Shot-Creating/, { drb: 0.6 }],
 ];
 // A raw prospect's label promises less: the floors are lower by this much
@@ -1567,7 +1640,7 @@ for (const d of ARCHETYPE_DEFS) {
 			const floors = Object.fromEntries(
 				Object.entries(need).map(([k, v]) => [
 					k,
-					d.level ? v - PROSPECT_SLACK : v,
+					d.level && d.level[1] <= 0 ? v - PROSPECT_SLACK : v,
 				]),
 			);
 			d.need = { ...floors, ...d.need };
