@@ -62,7 +62,7 @@ const step = async (name: string, f: () => Promise<unknown>) => {
 	}
 };
 
-const loadView = async (id: string, params: Record<string, unknown> = {}) => {
+const loadView = (id: string, params: Record<string, unknown> = {}) => {
 	const view = (views as any)[id];
 	const inputs = view.processInputs ? view.processInputs(params, {}) : {};
 	return view.load({
