@@ -36,6 +36,26 @@ import {
 	type Trip,
 } from "./plays.ts";
 import { Rng } from "./rng.ts";
+import {
+	beatClockText,
+	bigCall,
+	classifyShot,
+	doubleDouble,
+	droughtLine,
+	heatCheckNote,
+	homeCrowd,
+	hotLine,
+	lateClockMiss,
+	pointsMilestone,
+	runEndedLine,
+	runLine,
+	secondChanceLead,
+	streakLine,
+	tripleDouble,
+	tripleDoubleWatch,
+	type CallKind,
+	type ShotKind,
+} from "./calls.ts";
 import { VarietyMemory, pickV, setVariety, weighted } from "./variety.ts";
 import {
 	bare,
@@ -76,6 +96,11 @@ export type FlavorResult = {
 	keepText?: boolean;
 	// The kind of play, for tests and tuning ("alleyoop", "poster", "pick6", "chasedown"...)
 	ptype?: string;
+	// A shot's kind ("corner-three", "floater", "putback-dunk"...): from the sim's shot zone and the words picked for it
+	shot?: ShotKind;
+	// What else the play was, where the sim's events say so: "and-one", "transition", "second-chance", "buzzer", "shot-clock",
+	// "heat-check", "clutch", "assisted", "dagger"
+	tags?: string[];
 };
 
 export type FlavorInit = {
@@ -321,6 +346,9 @@ const ATTEMPT_KIND: Record<string, Attempt["kind"]> = {
 
 type StartKind = "make" | "dead" | "steal" | "drb" | "orb" | "tov";
 
+// What a scoring play turned out to be, filled in by scoreNotes
+type ScoreFlags = { winner?: boolean; dagger?: boolean; clutch?: boolean };
+
 const isStatEvent = (e: any) => e && e.type === "stat";
 const isStructural = (e: any) =>
 	e &&
@@ -413,15 +441,27 @@ export class FlavorSession {
 	];
 	private hot = new Map<number, number>();
 	private hotSaid = new Set<number>();
+	private fireSaid = new Set<number>();
+	private tdWatchSaid = new Set<number>();
+	// players who have been subbed out, so coming back in reads as a return
+	private benched = new Set<number>();
 	private lastScoreAbs: [number | undefined, number | undefined] = [
 		undefined,
 		undefined,
 	];
-	private run: { t: 0 | 1 | undefined; S: number; O: number; said: number } = {
+	private run: {
+		t: 0 | 1 | undefined;
+		S: number;
+		O: number;
+		said: number;
+		// when the run started (seconds of game time)
+		start: number | undefined;
+	} = {
 		t: undefined,
 		S: 0,
 		O: 0,
 		said: 0,
+		start: undefined,
 	};
 	private twoForOne = false;
 	private lastShotSaid = false;
@@ -690,7 +730,7 @@ export class FlavorSession {
 			this.lastType = e.type;
 			this.lastDunk =
 				MADE[e.type] !== undefined &&
-				/dunk|slam|jam|flush|throws it down|hammers|tomahawk|posteriz/i.test(
+				/dunk|slam|jam|flush|throws it down|hammers|tomahawk|posteriz|windmill|rocks the rim/i.test(
 					res.text,
 				);
 		}
@@ -743,6 +783,21 @@ export class FlavorSession {
 				man: "go back to man-to-man",
 			}[this.scheme[ti]];
 			notes.push(`${cap(this.the(ti))} ${look}.`);
+		}
+		// now and then, who leads the scoring so far
+		if (notes.length < 2 && rng.random() < 0.35) {
+			const top = [...this.players.values()]
+				.map((p) => ({ p, pts: this.host.stat(p.pid)?.pts ?? 0 }))
+				.sort((a, b) => b.pts - a.pts || a.p.pid - b.p.pid)[0];
+			if (top && top.pts >= 8) {
+				notes.push(
+					pickV(rng, [
+						`${top.p.name} leads all scorers with ${top.pts}.`,
+						`${top.p.name} has a game-high ${top.pts} so far.`,
+						`${top.p.name} has been the best player on the floor: ${top.pts} points.`,
+					]),
+				);
+			}
 		}
 		if (ev.type === "overtime") {
 			const n = this.period - this.numPeriods;
@@ -905,6 +960,9 @@ export class FlavorSession {
 		const fouler = ev.pidFoul === undefined ? undefined : this.pl(ev.pidFoul);
 		const pts = dPts[t] || (meta.three ? 3 : 2);
 		const fake = att?.kind === "fake";
+		// (an offensive rebound started this possession; his streak of made field goals before this one)
+		const secondChance = this.startKind === "orb";
+		const hotBefore = this.hot.get(p.pid) ?? 0;
 		const play: any = {
 			k: "fg",
 			made: true,
@@ -927,15 +985,24 @@ export class FlavorSession {
 			!!att?.desperation &&
 			(att.clock ?? 99) <= 2.5 &&
 			lastAction;
+		ctx.secondChance = secondChance && !meta.putback;
+		ctx.made = true;
+		ctx.beatClock = !lastAction && this.lateInShotClock(att);
+		ctx.beatClockText = () => beatClockText(rng);
 		let text: string;
+		let core: string;
+		let buzzer = heave;
 		if (heave) {
 			text = heaveText(rng, p, true);
+			core = text;
 			ctx.ptype = "heave-made";
 			ctx.wow = true;
 		} else if (meta.tip) {
 			text = this.tipIn(rng, play, att, true);
+			core = text;
 		} else if (fake) {
 			text = this.deepTwo(rng, play, true);
+			core = text;
 		} else {
 			ctx.shotEnd = undefined;
 			let t0 = madeShot(rng, play, ctx);
@@ -946,6 +1013,7 @@ export class FlavorSession {
 					: t0.length;
 			const tail = t0.slice(cut);
 			t0 = t0.slice(0, cut);
+			core = t0;
 			if (meta.andOne) {
 				const f = fouler;
 				const hit = /contact|hit|bump|foul/.test(t0);
@@ -1000,8 +1068,13 @@ export class FlavorSession {
 					" at the buzzer",
 					" as the horn sounds",
 					" just before the horn",
+					" with time expiring",
+					" as the clock hits zero",
 				]);
 				ctx.wow = true;
+				buzzer = true;
+			} else if (lastAction && (att?.clock ?? 99) <= 3) {
+				buzzer = true;
 			}
 			text += ".";
 		}
@@ -1029,7 +1102,17 @@ export class FlavorSession {
 		}
 		this.afterPlay("make", t, ctx);
 		const margin = score[t] - pts - score[o];
-		const res: FlavorResult = { text: "", ptype: ctx.ptype };
+		const shot = classifyShot(this.variety.stripNames(core), {
+			three: meta.three && !fake,
+			zone: play.zone,
+			putback: meta.putback,
+			inboundTip: meta.tip,
+			fake,
+			ptype: ctx.ptype,
+		});
+		const heatCheck = meta.three && !fake && !heave && hotBefore >= 3;
+		const flags: ScoreFlags = {};
+		const res: FlavorResult = { text: "", ptype: ctx.ptype, shot };
 		const notes = this.scoreNotes(rng, {
 			t,
 			p,
@@ -1042,13 +1125,97 @@ export class FlavorSession {
 			andOne: meta.andOne,
 			ast,
 			fg: true,
+			flags,
 		});
+		if (heatCheck && rng.random() < 0.55) {
+			// (the heat check says how many in a row: no second line about his streak)
+			for (let i = notes.length - 1; i >= 0; i--) {
+				if (/straight|in a row|can't miss|on fire/.test(notes[i]!)) {
+					notes.splice(i, 1);
+				}
+			}
+			notes.unshift(heatCheckNote(rng, p.name, hotBefore, true));
+			notes.length = Math.min(notes.length, 2);
+		}
 		res.text = this.tally(text, ev, { p, ast });
 		this.rememberFoul(ev);
 		this.lastShot = undefined;
 		res.text = this.leadIn(rng, res.text, t, ev, att, ctx);
 		this.finishNotes(res, notes);
+		// an announcer's call for the big ones
+		const call = this.callFor(rng, {
+			flags,
+			heave,
+			buzzer,
+			heatCheck,
+			shot,
+			ptype: ctx.ptype,
+			wow: !!ctx.wow,
+		});
+		if (call) {
+			res.note = [call, res.note].filter(Boolean).join(" ");
+		}
+		res.tags = [
+			meta.andOne && "and-one",
+			ctx.trans && "transition",
+			(secondChance || meta.putback) && "second-chance",
+			buzzer && "buzzer",
+			ctx.beatClockSaid && "shot-clock",
+			heatCheck && "heat-check",
+			flags.clutch && "clutch",
+			flags.dagger && "dagger",
+			ast && "assisted",
+		].filter((x): x is string => typeof x === "string");
 		return this.cleanResult(res, ctx);
+	}
+
+	// A shot late in the shot clock: the possession had lasted 21.5 seconds or more, and the shot clock was on (the game clock had at least 24
+	// seconds left when the possession started)
+	private lateInShotClock(att: Attempt | undefined) {
+		return (
+			!!att &&
+			att.poss !== undefined &&
+			att.poss >= 21.5 &&
+			Number.isFinite(att.clock) &&
+			att.clock + att.poss >= 24
+		);
+	}
+
+	private callFor(
+		rng: Rng,
+		o: {
+			flags: ScoreFlags;
+			heave: boolean;
+			buzzer: boolean;
+			heatCheck: boolean;
+			shot: ShotKind;
+			ptype: string | undefined;
+			wow: boolean;
+		},
+	): string | undefined {
+		const rows: [CallKind, number][] = [];
+		if (o.flags.winner) {
+			rows.push(["winner", 0.8]);
+		} else if (o.heave) {
+			rows.push(["heave", 0.9]);
+		} else if (o.ptype === "poster") {
+			rows.push(["poster", 0.6]);
+		} else if (o.shot === "logo-three" || o.shot === "deep-three") {
+			rows.push(["deep", 0.5]);
+		} else if (o.buzzer) {
+			rows.push(["buzzer", 0.5]);
+		} else if (o.shot === "alley-oop" && o.wow) {
+			rows.push(["oop", 0.4]);
+		} else if (o.shot === "dunk" && o.wow) {
+			rows.push(["dunk", 0.35]);
+		} else if (o.heatCheck) {
+			rows.push(["heat", 0.3]);
+		}
+		const x = rows[0];
+		if (!x || rng.random() >= x[1]) {
+			return undefined;
+		}
+		return bigCall(rng, x[0]);
 	}
 
 	private rememberFoul(_ev: any) {
@@ -1120,7 +1287,10 @@ export class FlavorSession {
 		const blocker = blocked ? this.pl(ev.pid) : undefined;
 		const fake = att?.kind === "fake";
 		const three = meta.three && !fake;
+		const secondChance = this.startKind === "orb";
+		const hotBefore = shooter ? (this.hot.get(shooter.pid) ?? 0) : 0;
 		const ctx = this.baseCtx(rng, shotT, att?.poss, shooter, ev);
+		ctx.secondChance = secondChance && !meta.putback;
 		// a miss by the player who just rebounded is a putback attempt
 		const play: any = {
 			k: "fg",
@@ -1133,6 +1303,8 @@ export class FlavorSession {
 		};
 		const lastAction = this.endsPeriodNext(future);
 		let text: string;
+		let core: string | undefined;
+		let lateClock = false;
 		let ptype: string | undefined;
 		if (!shooter) {
 			text = `${cap(pickV(rng, [`blocked by ${blocker!.name}`, `${blocker!.name} gets a hand on it`, `${blocker!.name} swats it away`]))}.`;
@@ -1168,8 +1340,17 @@ export class FlavorSession {
 			}
 			const trans =
 				!!ctx.trans && !(ctx.lastReb && ctx.lastReb.pid === shooter.pid);
+			core = missText(rng, play, ctx);
+			// a forced shot late in the shot clock
+			lateClock =
+				!blocked &&
+				!lastAction &&
+				this.lateInShotClock(att) &&
+				!/shot clock|wide-open/.test(core) &&
+				rng.random() < 0.4;
 			text =
-				missText(rng, play, ctx) +
+				core +
+				(lateClock ? lateClockMiss(rng) : "") +
 				(blocked ? `; ${blockText(rng, blocker, three, trans, ctx)}` : "") +
 				".";
 			ptype = ctx.ptype;
@@ -1180,22 +1361,50 @@ export class FlavorSession {
 			this.lastShot = { p: shooter, three, t: shotT };
 		}
 		this.afterPlay("miss", shotT, ctx);
-		if (shooter && !blocked) {
-			// a miss ends his hot streak
+		if (shooter) {
+			// a miss (or a blocked shot) ends his hot streak
 			this.hot.set(shooter.pid, 0);
 		}
 		const notes: string[] = [];
-		// a block by a big or a chase-down earns a reaction now and then
+		// the heat check that missed
+		const heatCheck = !!shooter && three && hotBefore >= 3;
+		if (heatCheck && shooter && rng.random() < 0.4) {
+			notes.push(heatCheckNote(rng, shooter.name, hotBefore, false));
+		}
+		// a block by a big or a chase-down earns a call or a reaction now and then
 		if (
 			blocked &&
 			(ctx.wow || ctx.ptype === "chasedown") &&
-			notes.length === 0 &&
-			rng.random() < 0.45
+			notes.length === 0
 		) {
-			notes.push(crowdLine(rng, "wow", this.the(ev.t)));
+			const r = rng.random();
+			if (r < 0.3) {
+				notes.push(
+					bigCall(rng, ctx.ptype === "chasedown" ? "chasedown" : "block"),
+				);
+			} else if (r < 0.55) {
+				notes.push(crowdLine(rng, "wow", this.the(ev.t)));
+			}
 		}
 		this.ato = [false, false];
 		const res: FlavorResult = { text: "", ptype: ptype ?? ctx.ptype };
+		if (shooter) {
+			res.shot = classifyShot(this.variety.stripNames(core ?? text), {
+				three,
+				zone: play.zone,
+				putback: meta.putback,
+				inboundTip: meta.tip,
+				fake,
+				ptype: res.ptype,
+			});
+		}
+		res.tags = [
+			blocked && "blocked",
+			ctx.trans && "transition",
+			(secondChance || meta.putback) && "second-chance",
+			lateClock && "shot-clock",
+			heatCheck && "heat-check",
+		].filter((x): x is string => typeof x === "string");
 		res.text = this.tally(text, ev, { p: shooter, blk: blocker });
 		if (shooter && !blocked && !/heave|horn/.test(text)) {
 			res.text = this.leadIn(rng, res.text, shotT, ev, att, ctx);
@@ -1203,7 +1412,7 @@ export class FlavorSession {
 		void score;
 		this.finishNotes(res, notes);
 		if (blocker) {
-			this.milestoneNotes(res, [blocker]);
+			this.milestoneNotes(rng, res, [blocker]);
 		}
 		return this.cleanResult(res, ctx);
 	}
@@ -1280,7 +1489,7 @@ export class FlavorSession {
 		const notes: string[] = [];
 		this.ato = [false, false];
 		this.finishNotes(res, notes);
-		this.milestoneNotes(res, [stealer]);
+		this.milestoneNotes(rng, res, [stealer]);
 		return this.cleanResult(res, ctx);
 	}
 
@@ -1319,7 +1528,7 @@ export class FlavorSession {
 		this.lastShot = undefined;
 		this.trip = null;
 		const res: FlavorResult = { text: this.tally(text, ev, { p }) };
-		this.milestoneNotes(res, [p]);
+		this.milestoneNotes(rng, res, [p]);
 		this.ato = [false, false];
 		return this.cleanResult(res, {});
 	}
@@ -1613,9 +1822,11 @@ export class FlavorSession {
 			injured: this.injured,
 			fouledOut: this.fouledOut,
 			ejected: this.ejected,
+			back: this.benched,
 		});
 		for (const pid of off) {
 			this.foulTrouble.delete(pid);
+			this.benched.add(pid);
 		}
 		return { text };
 	}
@@ -1771,6 +1982,15 @@ export class FlavorSession {
 				return lead("Holding for the last shot, ");
 			}
 		}
+		// a second chance off an offensive rebound (not a putback, which says so itself)
+		if (
+			ctx.secondChance &&
+			!ctx.trans &&
+			!/putback|offensive|second|tip|board|rebound/.test(text) &&
+			rng.random() < 0.25
+		) {
+			return lead(secondChanceLead(rng, !!ctx.made));
+		}
 		return text;
 	}
 
@@ -1789,6 +2009,7 @@ export class FlavorSession {
 			andOne: boolean;
 			ast: FPlayer | undefined;
 			fg: boolean;
+			flags?: ScoreFlags;
 		},
 	): string[] {
 		const { t, p, pts } = o;
@@ -1809,26 +2030,39 @@ export class FlavorSession {
 			// the other side scored too much: that run is over
 			if (run.O > 4 || run.O * 3 > run.S) {
 				if (run.said > 0) {
-					ended = `That ends ${run.S >= 11 && /^(8|11|18)/.test(String(run.S)) ? "an" : "a"} ${run.S}-${run.O - pts} run by ${this.the(opp)}.`;
+					ended = runEndedLine(
+						rng,
+						this.the(t),
+						this.the(opp),
+						`${run.S}-${run.O - pts}`,
+					);
 				}
 				run.t = t;
 				run.S = pts;
 				run.O = 0;
 				run.said = 0;
+				run.start = abs;
 			}
 		} else {
 			run.t = t;
 			run.S = pts;
 			run.O = 0;
 			run.said = 0;
+			run.start = abs;
 		}
 		let runNote = "";
 		if (run.t === t && run.S >= 10 && run.S >= run.said + 4 && !o.andOne) {
 			run.said = run.S;
-			runNote = pickV(rng, [
-				`That's ${/^(8|11|18)/.test(String(run.S)) ? "an" : "a"} ${run.S}-${run.O} run for ${this.the(t)}.`,
-				`${cap(this.the(t))} have ${run.S} of the last ${run.S + run.O} points.`,
-			]);
+			runNote = runLine(
+				rng,
+				this.the(t),
+				run.S,
+				run.O,
+				abs !== undefined && run.start !== undefined
+					? abs - run.start
+					: undefined,
+				clockOf,
+			);
 		}
 
 		// ---- the player's streak ----
@@ -1844,7 +2078,7 @@ export class FlavorSession {
 		let streakNote = "";
 		if (st.pts >= 8 && !st.said) {
 			st.said = true;
-			streakNote = `${p.name} has scored ${st.pts} straight for ${this.the(t)}.`;
+			streakNote = streakLine(rng, p.name, st.pts, this.the(t));
 		}
 
 		// ---- a drought that just ended ----
@@ -1853,7 +2087,7 @@ export class FlavorSession {
 		if (abs !== undefined) {
 			if (last !== undefined && abs - last >= 180) {
 				const d = clockOf(abs - last);
-				droughtNote = `That ends ${/^(8|11|18)\b/.test(d) ? "an" : "a"} ${d} drought for ${this.the(t)}.`;
+				droughtNote = droughtLine(rng, d, this.the(t));
 			}
 			this.lastScoreAbs[t] = abs;
 		}
@@ -1865,7 +2099,10 @@ export class FlavorSession {
 			this.hot.set(p.pid, h);
 			if (h >= 4 && !this.hotSaid.has(p.pid)) {
 				this.hotSaid.add(p.pid);
-				hotNote = `${p.name} is heating up: ${h} straight makes.`;
+				hotNote = hotLine(rng, p.name, h);
+			} else if (h >= 6 && !this.fireSaid.has(p.pid)) {
+				this.fireSaid.add(p.pid);
+				hotNote = hotLine(rng, p.name, h);
 			}
 		}
 
@@ -1875,9 +2112,11 @@ export class FlavorSession {
 		this.qPts.set(p.pid, qp);
 		if (qp >= 10 && qp - pts < 10 && rng.random() < 0.6) {
 			const per = this.numPeriods === 2 ? "half" : "quarter";
+			const which = this.period > this.numPeriods ? "period" : per;
 			tenNote = pickV(rng, [
-				`That's 10 in the ${this.period > this.numPeriods ? "period" : per} for ${p.name}.`,
-				`${p.name} has 10 in the ${this.period > this.numPeriods ? "period" : per} already.`,
+				`That's 10 in the ${which} for ${p.name}.`,
+				`${p.name} has 10 in the ${which} already.`,
+				`${p.name} is taking over this ${which}: 10 points and counting.`,
 			]);
 		}
 
@@ -1941,7 +2180,37 @@ export class FlavorSession {
 				clutch.push(
 					`That puts ${this.the(t)} ahead for good, and there's a free throw coming.`,
 				);
+			} else if (
+				!ahead.sawOvertime &&
+				secs <= 90 &&
+				marginBefore >= 1 &&
+				marginBefore <= 3 &&
+				marginAfter >= 4 &&
+				minDiff > 0
+			) {
+				// a one-possession game made a two-possession game, and it stays that way
+				if (o.flags) {
+					o.flags.dagger = true;
+				}
+				clutch.push(
+					pickV(rng, [
+						`That might be the dagger, and ${this.the(t)} lead by ${marginAfter}.`,
+						`${p.name} with the dagger. It's a ${marginAfter}-point game.`,
+						`That's a two-possession game now, ${score[t]}-${score[opp]}.`,
+					]),
+				);
 			}
+			if (clutch.length > 0 && o.flags) {
+				o.flags.winner = clutch.some((c) => /game-winner/.test(c));
+			}
+		}
+		if (
+			o.flags &&
+			this.finalPeriod() &&
+			(o.clock ?? 999) <= 120 &&
+			Math.abs(marginAfter - pts) <= 5
+		) {
+			o.flags.clutch = true;
 		}
 
 		// ---- the lead changes hands in a close finish ----
@@ -1969,18 +2238,31 @@ export class FlavorSession {
 			this.finalPeriod() &&
 			(o.clock ?? 999) <= 120 &&
 			Math.abs(marginAfter) <= 3;
+		// (the home team is the first one, except in an exhibition between named teams)
+		const homeKnown = !this.noArticle;
 		if (o.wow && rng.random() < 0.45) {
-			crowdNote = crowdLine(rng, "wow", this.the(t));
+			crowdNote =
+				homeKnown && rng.random() < 0.4
+					? homeCrowd(rng, t === 0, "wow", this.the(t))
+					: crowdLine(rng, "wow", this.the(t));
 		} else if (o.fg && late && this.crowdN < 2 && rng.random() < 0.3) {
 			this.crowdN += 1;
-			crowdNote = crowdLine(rng, "tight", this.the(t));
+			crowdNote =
+				homeKnown && rng.random() < 0.4
+					? homeCrowd(rng, t === 0, "tight", this.the(t))
+					: crowdLine(rng, "tight", this.the(t));
+		} else if (runNote && homeKnown && rng.random() < 0.3) {
+			crowdNote = homeCrowd(rng, t === 0, "run", this.the(t));
 		}
 
 		if (ended) {
 			out.push(ended);
 		}
 		out.push(...clutch);
-		const mil = this.milestones([p, o.ast].filter((x): x is FPlayer => !!x));
+		const mil = this.milestones(
+			rng,
+			[p, o.ast].filter((x): x is FPlayer => !!x),
+		);
 		out.push(...mil);
 		for (const n of [
 			runNote,
@@ -1998,8 +2280,15 @@ export class FlavorSession {
 		return out.slice(0, 2);
 	}
 
-	private milestones(ps: FPlayer[]): string[] {
+	private milestones(rng: Rng, ps: FPlayer[]): string[] {
 		const notes: string[] = [];
+		const LABEL = {
+			PTS: "points",
+			REB: "rebounds",
+			AST: "assists",
+			STL: "steals",
+			BLK: "blocks",
+		} as const;
 		for (const p of ps) {
 			const st = this.host.stat(p.pid);
 			if (!st) {
@@ -2028,6 +2317,7 @@ export class FlavorSession {
 					.pop() ?? p.name;
 			const firstHalf =
 				this.numPeriods >= 4 && this.period <= this.numPeriods / 2;
+			const secondHalf = this.period > this.numPeriods / 2;
 			const nameIdx =
 				[...this.players.values()].filter(
 					(q) => q.name.split(" ").pop() === last,
@@ -2036,53 +2326,98 @@ export class FlavorSession {
 			let said = false;
 			for (const m of [30, 40, 50, 60]) {
 				if (before.PTS < m && now.PTS >= m) {
-					notes.push(`That's ${m} for ${short}.`);
+					const gameHigh = [...this.players.values()].every(
+						(q) =>
+							q.pid === p.pid || (this.host.stat(q.pid)?.pts ?? 0) < now.PTS,
+					);
+					notes.push(pointsMilestone(rng, short, m, now.PTS === m, gameHigh));
 					said = true;
 				}
 			}
-			const tens = [now.PTS, now.REB, now.AST, now.STL, now.BLK].filter(
-				(v) => v >= 10,
-			).length;
+			const keys = ["PTS", "REB", "AST", "STL", "BLK"] as const;
+			const tens = keys.filter((k) => now[k] >= 10);
+			const line = (ks: readonly (typeof keys)[number][]) =>
+				ks.map((k) => `${now[k]} ${LABEL[k]}`);
 			const nextState = { ...now, dd: before.dd, td: before.td };
-			if (tens >= 3 && !before.td) {
+			if (tens.length >= 3 && !before.td) {
 				nextState.td = true;
 				nextState.dd = true;
-				notes.push(`That's a triple-double for ${p.name}.`);
-			} else if (tens >= 2 && !before.dd) {
+				const l = line(tens.slice(0, 3));
+				notes.push(tripleDouble(rng, p.name, `${l[0]}, ${l[1]} and ${l[2]}`));
+			} else if (tens.length >= 2 && !before.dd) {
 				nextState.dd = true;
-				notes.push(`Double-double for ${p.name}.`);
+				const l = line(tens.slice(0, 2));
+				notes.push(doubleDouble(rng, p.name, l[0]!, l[1]!));
 			} else if (!said && firstHalf && before.PTS < 20 && now.PTS >= 20) {
 				notes.push(
-					p.pid % 2 === 0
-						? `${short} already has 20, and it's still the first half.`
-						: `20 points before halftime for ${short}.`,
+					pickV(rng, [
+						`${short} already has 20, and it's still the first half.`,
+						`20 points before halftime for ${short}.`,
+						`${short} has 20 and there's still time left in the half.`,
+					]),
 				);
 			} else if (before.BLK < 5 && now.BLK >= 5) {
 				notes.push(
-					p.pid % 2 === 0
-						? `That's 5 blocks for ${short}.`
-						: `${short} is protecting the rim: 5 blocks now.`,
+					pickV(rng, [
+						`That's 5 blocks for ${short}.`,
+						`${short} is protecting the rim: 5 blocks now.`,
+						`Block number 5 for ${short}.`,
+					]),
 				);
 			} else if (before.STL < 5 && now.STL >= 5) {
 				notes.push(
-					p.pid % 2 === 0
-						? `That's 5 steals for ${short}.`
-						: `${short} has 5 steals already.`,
+					pickV(rng, [
+						`That's 5 steals for ${short}.`,
+						`${short} has 5 steals already.`,
+						`${short} has his hands in everything: 5 steals.`,
+					]),
 				);
 			} else if (before.AST < 10 && now.AST >= 10 && notes.length === 0) {
 				notes.push(
-					p.pid % 2 === 0
-						? `That's 10 assists for ${short}.`
-						: `${short} reaches double figures in assists.`,
+					pickV(rng, [
+						`That's 10 assists for ${short}.`,
+						`${short} reaches double figures in assists.`,
+						`Assist number 10 for ${short}.`,
+					]),
 				);
+			} else if (before.REB < 15 && now.REB >= 15 && notes.length === 0) {
+				notes.push(
+					pickV(rng, [
+						`That's 15 rebounds for ${short}.`,
+						`${short} is cleaning the glass: 15 boards.`,
+					]),
+				);
+			}
+			// Triple-double watch: two of points, rebounds and assists in double figures in the second half, the third at 7 to 9
+			if (
+				!nextState.td &&
+				secondHalf &&
+				notes.length === 0 &&
+				!this.tdWatchSaid.has(p.pid)
+			) {
+				const big3 = ["PTS", "REB", "AST"] as const;
+				const missing = big3.filter((k) => now[k] < 10);
+				const m = missing[0];
+				if (missing.length === 1 && m && now[m] >= 7) {
+					this.tdWatchSaid.add(p.pid);
+					const need = 10 - now[m];
+					notes.push(
+						tripleDoubleWatch(
+							rng,
+							short,
+							need,
+							need === 1 ? LABEL[m].slice(0, -1) : LABEL[m],
+						),
+					);
+				}
 			}
 			this.seen.set(p.pid, nextState);
 		}
 		return notes;
 	}
 
-	private milestoneNotes(res: FlavorResult, ps: FPlayer[]) {
-		const m = this.milestones(ps);
+	private milestoneNotes(rng: Rng, res: FlavorResult, ps: FPlayer[]) {
+		const m = this.milestones(rng, ps);
 		if (m.length > 0) {
 			res.note = [res.note, ...m].filter(Boolean).join(" ");
 		}
