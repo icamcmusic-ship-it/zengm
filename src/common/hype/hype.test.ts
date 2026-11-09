@@ -649,8 +649,19 @@ describe("game rating calibration", () => {
 			}),
 		);
 		const h = rate(r, early.gid);
-		expect(h.post!.score).toBeGreaterThanOrEqual(88);
+		// regular season: at the top of the soft cap (only playoff games go higher)
+		expect(h.post!.score).toBeGreaterThanOrEqual(86);
+		expect(h.post!.score).toBeLessThanOrEqual(90);
 		expect(plainText(h.post!.reasons[0]!.text)).toMatch(/60 points/);
+	});
+
+	test("regular-season scores are soft capped, playoff scores are not", async () => {
+		const { regularSeasonCap } = await import("./calibration.ts");
+		expect(regularSeasonCap(50)).toBe(50);
+		expect(regularSeasonCap(80)).toBe(80);
+		expect(regularSeasonCap(90)).toBeLessThan(90);
+		expect(regularSeasonCap(100)).toBeLessThanOrEqual(90);
+		expect(regularSeasonCap(100)).toBeGreaterThan(regularSeasonCap(95));
 	});
 
 	test("good but not great lines barely count, historic ones dominate", () => {

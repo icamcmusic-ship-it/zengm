@@ -6,6 +6,7 @@ import {
 	lineRarity,
 	linesPerGame,
 	postScore,
+	regularSeasonCap,
 	rarity,
 	rarityText,
 	type LineStat,
@@ -273,7 +274,9 @@ export const postHype = (I: HGameInput, res: HResult, pre: Pre): Post => {
 		reasons.sort(
 			(x, y) => Math.abs(y.pts) - Math.abs(x.pts) || (x.text < y.text ? -1 : 1),
 		);
-		const score = empty ? 0 : postScore(raw);
+		const uncapped = empty ? 0 : postScore(raw);
+		const score =
+			I.playoffs || I.playIn ? uncapped : regularSeasonCap(uncapped);
 		return {
 			score,
 			raw: Math.round(raw * 10) / 10,
