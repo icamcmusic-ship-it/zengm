@@ -577,7 +577,7 @@ const ctxNow = async () => {
 		season,
 		numGames: (s: number) => g.get("numGames", s) as number,
 		teamGamesNow: Math.max(0, ...games.values()),
-		regularSeasonDone: g.get("phase") > PHASE.REGULAR_SEASON,
+		regularSeasonDone: g.get("phase") >= PHASE.PLAYOFFS,
 	};
 };
 
@@ -639,7 +639,8 @@ export const getMilestones = async ({
 		teamGamesByTid(),
 		idb.cache.schedule.getAll(),
 	]);
-	const inSeason = phase <= PHASE.REGULAR_SEASON;
+	// After the trade deadline is still the regular season
+	const inSeason = phase < PHASE.PLAYOFFS;
 	const remaining = (t: number) =>
 		inSeason ? Math.max(0, numGames - (gamesByTid.get(t) ?? 0)) : 0;
 	const maxRemaining = Math.max(0, ...[...gamesByTid.keys()].map(remaining));

@@ -4,7 +4,7 @@ import { emptyState } from "../../common/recordsBook.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../test/helpers.ts";
 import { idb } from "../db/index.ts";
 import { g } from "./index.ts";
-import { recordsCheckNow } from "./recordsBookData.ts";
+import { getMilestones, recordsCheckNow } from "./recordsBookData.ts";
 
 const statsRow = (season: number, tid: number, gp: number, pts: number) => ({
 	season,
@@ -121,4 +121,28 @@ test("the first check starts from the stored games quietly, later checks announc
 	// Nothing new: no news again
 	await recordsCheckNow();
 	assert.strictEqual((await idb.cache.events.getAll()).length, texts.length);
+});
+
+test("after the trade deadline, a milestone still projects to a game this season", async () => {
+	g.setWithoutSavingToDB("numGames", 82);
+	await resetCache({
+		players: [
+			player(1, 0, [statsRow(2015, 0, 82, 8590), statsRow(2016, 0, 70, 1400)]),
+		],
+		teamSeasons: [
+			{ tid: 0, season: 2016, won: 35, lost: 35 },
+			{ tid: 1, season: 2016, won: 35, lost: 35 },
+		] as any,
+	});
+	await idb.cache.schedule.addAll([
+		{ gid: 10, day: 100, homeTid: 0, awayTid: 1 },
+		{ gid: 11, day: 101, homeTid: 1, awayTid: 0 },
+	] as any);
+	for (const phase of [PHASE.REGULAR_SEASON, PHASE.AFTER_TRADE_DEADLINE]) {
+		g.setWithoutSavingToDB("phase", phase);
+		const { rows } = (await getMilestones({ horizon: "season" })) as any;
+		const row = rows.find((r: any) => r.pid === 1 && r.target.mark === 10000);
+		assert.isDefined(row, `phase ${phase}`);
+		assert.strictEqual(row.when.type, "game", `phase ${phase}`);
+	}
 });
