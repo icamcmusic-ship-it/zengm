@@ -18,10 +18,14 @@ type CacheDB = IDBPDatabase<unknown>;
 
 let dbPromise: Promise<CacheDB | undefined> | undefined;
 
+// Opening can wait forever when another tab has an older version open (the upgrade is blocked until it closes). Then
+// there's just no cache for this session, rather than every operation waiting for TIMEOUT_MS first
+const OPEN_TIMEOUT_MS = 3000;
+
 const getDb = () => {
 	dbPromise ??= (async () => {
 		try {
-			return (await openDB(DB_NAME, 2, {
+			const opening = openDB(DB_NAME, 2, {
 				upgrade(db) {
 					for (const name of ["meta", "players", "games", "teams"]) {
 						if (!db.objectStoreNames.contains(name)) {
@@ -29,7 +33,19 @@ const getDb = () => {
 						}
 					}
 				},
-			})) as unknown as CacheDB;
+				// Another tab wants to upgrade: get out of its way (the next operation opens it again)
+				blocking() {
+					void opening.then((db) => db.close());
+					dbPromise = undefined;
+				},
+			});
+			const timeout = new Promise<undefined>((resolve) => {
+				const t = setTimeout(() => resolve(undefined), OPEN_TIMEOUT_MS);
+				(t as { unref?: () => void }).unref?.();
+			});
+			return (await Promise.race([opening, timeout])) as unknown as
+				| CacheDB
+				| undefined;
 		} catch {
 			return undefined;
 		}

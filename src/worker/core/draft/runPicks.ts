@@ -22,7 +22,7 @@ import {
 } from "./draftNeeds.ts";
 import {
 	countMentees,
-	getAiTraitValueFactor,
+	makeAiTraitValueFactorCache,
 	traitsEnabled,
 } from "../player/traits.ts";
 
@@ -115,6 +115,9 @@ const runPicks = async (
 
 	await lock.set("drafting", true);
 	const pids: number[] = [];
+
+	// Player traits: nobody's ratings change during the draft, so each prospect's trait factor is computed once
+	const getTraitFactor = makeAiTraitValueFactorCache();
 	let draftPicks = await getOrder();
 
 	const expansionDraft = g.get("expansionDraft");
@@ -233,7 +236,7 @@ const runPicks = async (
 						(adjustments?.[i] ?? 0) +
 						getDraftTraitAdjustment(
 							p.value,
-							getAiTraitValueFactor(p, { strategy: t?.strategy, numYoung }),
+							getTraitFactor(p, { strategy: t?.strategy, numYoung }),
 						),
 				);
 			}

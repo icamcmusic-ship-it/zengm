@@ -503,6 +503,21 @@ const envFor = (idx: Index, t: Target): HEnv => {
 	};
 };
 
+// For an upcoming game every stored game counts, so the environment is the same for all of them: computed once per
+// index (it goes through every stored game, and Games to Watch asks for many upcoming games after every simmed day)
+const upcomingEnvCache = new WeakMap<Index, HEnv>();
+const envForCached = (idx: Index, t: Target): HEnv => {
+	if (t.completed) {
+		return envFor(idx, t);
+	}
+	let env = upcomingEnvCache.get(idx);
+	if (!env) {
+		env = envFor(idx, t);
+		upcomingEnvCache.set(idx, env);
+	}
+	return env;
+};
+
 // Did the team play the day before? (regular season, from the stored games)
 const playedDayBefore = (idx: Index, tid: number, t: Target) => {
 	if (t.playoffs || t.playIn || !(t.day > 1)) {
@@ -594,7 +609,7 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 		seriesState: state,
 		records: raw.records,
 		starCut: raw.records?.starCut[raw.season] ?? null,
-		env: envFor(idx, t),
+		env: envForCached(idx, t),
 		out: outStars,
 		linesFrom: raw.linesComplete ? raw.season : Number.POSITIVE_INFINITY,
 		teamName,

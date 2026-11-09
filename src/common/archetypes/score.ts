@@ -68,32 +68,52 @@ export type Prepared = {
 const LEVEL_SLACK = 0.5;
 const LEVEL_SLACK_FROM = -0.6;
 
-export const needShortfall = (a: Archetype, p: Prepared) => {
-	let short = 0;
-	const slack = isLowLevel(a)
-		? 0
-		: LEVEL_SLACK * Math.max(0, LEVEL_SLACK_FROM - p.level);
-	for (const dim of DIMS) {
-		const w = a.w[dim];
-		if (w === undefined || w < NEED_W || NOT_A_SKILL.has(dim)) {
-			continue;
+// The per-archetype part of needShortfall (hot: every archetype for every player), computed once per archetype object.
+// Same terms in the same order, so the same results.
+type NeedTerms = {
+	low: boolean;
+	defining: { dim: DimKey; w: number }[];
+	need: [DimKey, number][];
+	needFor: [DimKey, number][];
+};
+const needTermsCache = new WeakMap<Archetype, NeedTerms>();
+const getNeedTerms = (a: Archetype) => {
+	let cached = needTermsCache.get(a);
+	if (!cached) {
+		const defining: NeedTerms["defining"] = [];
+		for (const dim of DIMS) {
+			const w = a.w[dim];
+			if (w === undefined || w < NEED_W || NOT_A_SKILL.has(dim)) {
+				continue;
+			}
+			defining.push({ dim, w });
 		}
+		cached = {
+			low: isLowLevel(a),
+			defining,
+			need: Object.entries(a.need ?? {}) as [DimKey, number][],
+			needFor: Object.entries(a.needFor ?? {}) as [DimKey, number][],
+		};
+		needTermsCache.set(a, cached);
+	}
+	return cached;
+};
+
+export const needShortfall = (a: Archetype, p: Prepared) => {
+	const { low, defining, need, needFor } = getNeedTerms(a);
+	let short = 0;
+	const slack = low ? 0 : LEVEL_SLACK * Math.max(0, LEVEL_SLACK_FROM - p.level);
+	for (const { dim, w } of defining) {
 		short += Math.max(0, 0.1 * w - 0.1 - p.z[dim]);
 		// A raw prospect is read against himself only: his skills are not there yet in league terms
-		if (!isLowLevel(a)) {
+		if (!low) {
 			short += Math.max(0, 0.1 * (w - 2) - 0.05 - slack - p.sz[dim]);
 		}
 	}
-	for (const [dim, floor] of Object.entries(a.need ?? {}) as [
-		DimKey,
-		number,
-	][]) {
+	for (const [dim, floor] of need) {
 		short += Math.max(0, floor - slack - p.abs[dim]);
 	}
-	for (const [dim, floor] of Object.entries(a.needFor ?? {}) as [
-		DimKey,
-		number,
-	][]) {
+	for (const [dim, floor] of needFor) {
 		short += Math.max(0, floor - slack - p.sz[dim]);
 	}
 	return short;
@@ -104,6 +124,39 @@ export const needPenalty = (a: Archetype, p: Prepared) => {
 	return s > 0.02 ? NEED_STEP + NEED_K * s : NEED_K * s;
 };
 
+// The per-archetype part of rawMatch (hot: every archetype for every player), computed once per archetype object. Same
+// terms in the same order, so the same results.
+type MatchTerm = {
+	dim: DimKey;
+	imp: number;
+	target: number;
+	w: number | undefined;
+};
+const matchTermsCache = new WeakMap<
+	Archetype,
+	{ terms: MatchTerm[]; den: number }
+>();
+const getMatchTerms = (a: Archetype) => {
+	let cached = matchTermsCache.get(a);
+	if (!cached) {
+		const terms: MatchTerm[] = [];
+		let den = 0;
+		for (const dim of DIMS) {
+			const w = a.w[dim];
+			// Height is a gate, it only counts when the archetype names it
+			if (dim === "hgt" && w === undefined) {
+				continue;
+			}
+			const imp = BASE_IMPORTANCE + Math.abs(w ?? 0);
+			terms.push({ dim, imp, target: (w ?? 0) * TARGET_SCALE, w });
+			den += imp;
+		}
+		cached = { terms, den };
+		matchTermsCache.set(a, cached);
+	}
+	return cached;
+};
+
 // How well one player's ratings fit one archetype's profile, 0..1. Absolute: not yet read against the league.
 export const rawMatch = (
 	a: Archetype,
@@ -112,21 +165,13 @@ export const rawMatch = (
 	skills: SkillLabel[],
 	level = 0,
 ) => {
+	const { terms, den } = getMatchTerms(a);
 	let num = 0;
-	let den = 0;
-	for (const dim of DIMS) {
-		const w = a.w[dim];
-		// Height is a gate, it only counts when the archetype names it
-		if (dim === "hgt" && w === undefined) {
-			continue;
-		}
-		const imp = BASE_IMPORTANCE + Math.abs(w ?? 0);
-		const target = (w ?? 0) * TARGET_SCALE;
+	for (const { dim, imp, target, w } of terms) {
 		// Being even better than the profile asks at a skill it wants (or even lower where it wants low) costs little: an
 		// elite shooter is still a shooter
 		const over = w !== undefined && w !== 0 && (z[dim] - target) * w > 0;
 		num += imp * (over ? OVERSHOOT : 1) * (z[dim] - target) ** 2;
-		den += imp;
 	}
 	let score = (1 / (1 + num / den)) * gateFactor(hgt, a.hgt);
 	if (a.level) {
