@@ -7,6 +7,10 @@ import { defineView } from "../util/defineView.ts";
 import { getPayrollSeason } from "../util/getPayrollSeason.ts";
 import { getAutoTicketPriceByTid } from "../core/game/attendance.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
+import {
+	getSkillBadgesForRow,
+	prepareSkillBadges,
+} from "../core/player/format.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateOption, validateTeam } from "../util/processInputs.ts";
 import { dropdownKeys } from "../../common/dropdownKeys.ts";
@@ -58,6 +62,16 @@ export default defineView({
 				maxContractExp - season + 1,
 			);
 
+			// Extended skill badges, shown with the skills (League Extras switch)
+			await prepareSkillBadges();
+			const badgesByPid = new Map<number, string[] | undefined>();
+			for (const contract of contractsRaw) {
+				const p = await idb.cache.players.get(contract.pid);
+				if (p) {
+					badgesByPid.set(p.pid, getSkillBadgesForRow(p, p.ratings.at(-1)!));
+				}
+			}
+
 			// Convert contract objects into table rows
 			const contractTotals = Array(numSeasons).fill(0);
 			const contracts = addFirstNameShort(
@@ -77,6 +91,7 @@ export default defineView({
 						firstName: contract.firstName,
 						lastName: contract.lastName,
 						skills: contract.skills,
+						badges: badgesByPid.get(contract.pid),
 						pos: contract.pos,
 						injury: contract.injury,
 						jerseyNumber: contract.jerseyNumber,

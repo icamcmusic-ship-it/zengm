@@ -1,5 +1,6 @@
 import { player, team } from "../core/index.ts";
 import { idb } from "../db/index.ts";
+import { addBoxScoreBadges } from "./gameLog.ts";
 import { g, helpers } from "../util/index.ts";
 import {
 	makeAbbrevsUnique,
@@ -214,6 +215,7 @@ export default defineView({
 
 			// Copy because boxScoreToLiveSim modifies the box score
 			const boxScore = helpers.deepCopy(boxScoreRaw);
+			await addBoxScoreBadges(boxScore.teams as any, boxScore.season);
 
 			const allStarGame =
 				boxScore.teams[0].tid === -1 || boxScore.teams[1].tid === -1;

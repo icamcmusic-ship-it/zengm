@@ -185,6 +185,7 @@ const TradeSummary = ({
 													pos={asset.pos}
 													season={season}
 													skills={asset.skills}
+													badges={asset.badges}
 													defaultWatch={asset.watch}
 													legacyName={asset.name}
 												/>
@@ -243,6 +244,7 @@ const TradeSummary = ({
 													pid={asset.pid}
 													pos={asset.pos}
 													skills={asset.skills}
+													badges={asset.badges}
 													defaultWatch={asset.watch}
 													legacyName={asset.name}
 												/>

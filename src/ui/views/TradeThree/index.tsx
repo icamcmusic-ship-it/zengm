@@ -308,6 +308,7 @@ const TradeThree = ({
 													injury={p.injury}
 													jerseyNumber={p.jerseyNumber}
 													skills={p.ratings.skills}
+													badges={p.ratings.badges}
 													firstName={p.firstName}
 													firstNameShort={p.firstNameShort}
 													lastName={p.lastName}

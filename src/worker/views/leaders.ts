@@ -708,6 +708,7 @@ export type Leader = {
 	season: number | undefined;
 	stat: number;
 	skills: string[] | undefined;
+	badges?: string[];
 	tid: number;
 	userTeam: boolean;
 	watch: number;
@@ -843,6 +844,7 @@ export default defineView({
 						p,
 						playerStats,
 						skills: undefined,
+						badges: undefined,
 						// Shitty handling of career totals, only computed if needed because it's slow
 						getTeamAndPos: () => {
 							const { bestPos, legacyTid } = processPlayersHallOfFame([p])[0]!;
@@ -875,6 +877,7 @@ export default defineView({
 					p,
 					playerStats: p.stats,
 					skills: p.ratings.skills,
+					badges: p.ratings.badges,
 					getTeamAndPos: () => ({
 						abbrev: p.stats.abbrev,
 						pos: p.ratings.pos,
@@ -888,7 +891,7 @@ export default defineView({
 				if (!info) {
 					return;
 				}
-				const { p, playerStats, skills, getTeamAndPos } = info;
+				const { p, playerStats, skills, badges, getTeamAndPos } = info;
 
 				for (const [cat, outputCat] of Iterator.zip(
 					[categories, outputCategories],
@@ -947,6 +950,7 @@ export default defineView({
 									: undefined,
 							stat: value,
 							skills,
+							badges,
 							tid,
 							userTeam: userTid === tid,
 							watch: p.watch,

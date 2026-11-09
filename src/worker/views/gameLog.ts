@@ -1,4 +1,8 @@
 import { idb } from "../db/index.ts";
+import {
+	getSkillBadgesForRow,
+	prepareSkillBadges,
+} from "../core/player/format.ts";
 import { g, helpers } from "../util/index.ts";
 import type { AllStars, Game } from "../../common/types.ts";
 import {
@@ -137,6 +141,38 @@ export const makeAbbrevsUnique = <T extends { abbrev: string }>(
 	}
 };
 
+// Extended skill badges for the players in a box score (their skills are from the time of the game), when that League
+// Extra is on
+export const addBoxScoreBadges = async (
+	teams: { players: { pid: number; badges?: string[] }[] }[],
+	season: number,
+) => {
+	if (__SPORT !== "basketball") {
+		return;
+	}
+	await prepareSkillBadges();
+	for (const t of teams) {
+		for (const bp of t.players) {
+			const p =
+				(await idb.cache.players.get(bp.pid)) ??
+				(await idb.merged.players.get(bp.pid));
+			if (!p) {
+				continue;
+			}
+			const pr = p.ratings.findLast((r) => r.season <= season) ?? p.ratings[0];
+			if (!pr) {
+				continue;
+			}
+			const badges = getSkillBadgesForRow(p, pr);
+			if (badges === undefined) {
+				// Switch off
+				return;
+			}
+			bp.badges = badges;
+		}
+	}
+};
+
 /**
  * Generate a box score.
  *
@@ -185,6 +221,7 @@ const boxScore = async (gid: number) => {
 		});
 	}
 	makeAbbrevsUnique(game.teams as any);
+	await addBoxScoreBadges(game.teams as any, game.season);
 
 	const wonInd = game.won.tid === game.teams[0].tid ? 0 : 1;
 	const lostInd = wonInd === 0 ? 1 : 0;

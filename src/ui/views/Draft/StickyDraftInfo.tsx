@@ -239,6 +239,7 @@ export const StickyDraftInfo = ({
 													pid={prevPick.pid}
 													injury={prevPick.injury}
 													skills={prevPick.ratings.skills}
+													badges={prevPick.ratings.badges}
 													defaultWatch={prevPick.watch}
 													firstName={prevPick.firstName}
 													firstNameShort={prevPick.firstNameShort}

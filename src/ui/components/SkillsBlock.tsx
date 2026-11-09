@@ -123,3 +123,23 @@ export const SkillsBlock = ({
 		</span>
 	);
 };
+
+// A table cell with only skills: sorted and searched by the skills and extended badges shown (badges are only sent when that League Extra is on)
+export const wrappedSkillsBlock = ({
+	skills,
+	badges,
+}: {
+	skills: string[] | undefined;
+	badges?: string[];
+}) => {
+	const text = [...(skills ?? []), ...(badges ?? [])].join(" ");
+	return {
+		value: (
+			<span className="skills-alone">
+				<SkillsBlock skills={skills} badges={badges} />
+			</span>
+		),
+		sortValue: text,
+		searchValue: text,
+	};
+};

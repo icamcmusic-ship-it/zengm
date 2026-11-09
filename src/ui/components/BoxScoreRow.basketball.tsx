@@ -71,6 +71,7 @@ const BoxScoreRow = ({
 					jerseyNumber={p.jerseyNumber}
 					pid={p.pid}
 					skills={p.skills}
+					badges={p.badges}
 					legacyName={p.name}
 					disableNameLink={exhibition}
 					season={season}

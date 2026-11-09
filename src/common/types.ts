@@ -1903,9 +1903,16 @@ type PlayerRatingsPart<
 > = {
 	// Never empty, because player.formatAll filters out players with no ratings rows
 	ratings: Season extends number
-		? Pick<PlayerRatingsPlus, Ratings[number]>
-		: NonEmptyArray<Pick<PlayerRatingsPlus, Ratings[number]>>;
+		? PlayerRatingsPick<Ratings>
+		: NonEmptyArray<PlayerRatingsPick<Ratings>>;
 };
+
+// Wherever skills are requested, the extended skill badges come with them when that League Extra is on (basketball)
+type PlayerRatingsPick<Ratings extends Readonly<PlayerRatingAttr[]>> = Pick<
+	PlayerRatingsPlus,
+	Ratings[number]
+> &
+	("skills" extends Ratings[number] ? { badges?: string[] } : unknown);
 
 // For a single season, stats can be undefined if showRookies kept a player with no stats rows. showNoStats prevents that by adding an empty row
 type PlayerStatsSingleUndefined<

@@ -84,6 +84,7 @@ const PlayerBios = ({ players, season, stats, team }: View<"playerBios">) => {
 					injury: p.injury,
 					season,
 					skills: p.ratings.skills,
+					badges: p.ratings.badges,
 					defaultWatch: p.watch,
 					firstName: p.firstName,
 					firstNameShort: p.firstNameShort,

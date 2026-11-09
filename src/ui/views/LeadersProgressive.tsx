@@ -106,6 +106,7 @@ const LeadersProgressive = ({
 										season,
 										defaultWatch: p.watch,
 										skills: p.skills,
+										badges: p.badges,
 										jerseyNumber: p.jerseyNumber,
 										firstName: p.firstName,
 										firstNameShort: p.firstNameShort,

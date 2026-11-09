@@ -73,6 +73,7 @@ const Injuries = ({ injuries, season, stats, team }: View<"injuries">) => {
 					pid: p.pid,
 					season: typeof season === "number" ? season : undefined,
 					skills: p.ratings.skills,
+					badges: p.ratings.badges,
 					defaultWatch: p.watch,
 					firstName: p.firstName,
 					firstNameShort: p.firstNameShort,

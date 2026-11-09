@@ -175,6 +175,7 @@ export default defineView({
 									lastName: p.lastName,
 									pid: p.pid,
 									skills: p.ratings.skills,
+									badges: p.ratings.badges,
 									stat: value,
 									userTeam: g.get("userTid", season) === p.stats.tid,
 									watch: p.watch,
