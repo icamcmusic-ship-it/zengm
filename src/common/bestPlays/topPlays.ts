@@ -26,6 +26,12 @@ export type TopPlayKind =
 	| "putback"
 	| "fastBreak"
 	| "shotClock"
+	| "chaseDown"
+	| "ankles"
+	| "euroStep"
+	| "spinMove"
+	| "charge"
+	| "hustle"
 	| "clutch";
 
 export const TOP_PLAY_LABELS: Record<TopPlayKind, string> = {
@@ -46,6 +52,12 @@ export const TOP_PLAY_LABELS: Record<TopPlayKind, string> = {
 	putback: "Putback",
 	fastBreak: "Fast break",
 	shotClock: "Shot-clock beater",
+	chaseDown: "Chase-down block",
+	ankles: "Ankle-breaker",
+	euroStep: "Euro step",
+	spinMove: "Spin move",
+	charge: "Charge taken",
+	hustle: "Hustle play",
 	clutch: "Clutch",
 };
 
@@ -59,14 +71,20 @@ const ORDER: TopPlayKind[] = [
 	"dagger",
 	"poster",
 	"oop",
+	"chaseDown",
+	"ankles",
 	"block",
 	"dunk",
 	"run",
+	"euroStep",
+	"spinMove",
 	"deep",
 	"andOne",
 	"putback",
 	"fastBreak",
 	"shotClock",
+	"charge",
+	"hustle",
 	"steal",
 	"clutch",
 ];
@@ -243,7 +261,21 @@ export const playsFromPbp = (
 			if (e.pid !== undefined) {
 				let s = stats.get(e.pid);
 				if (!s) {
-					s = { pts: 0, ast: 0, trb: 0, stl: 0, blk: 0, tov: 0, pf: 0 };
+					s = {
+						pts: 0,
+						ast: 0,
+						trb: 0,
+						stl: 0,
+						blk: 0,
+						tov: 0,
+						pf: 0,
+						fg: 0,
+						fga: 0,
+						tp: 0,
+						tpa: 0,
+						ft: 0,
+						fta: 0,
+					};
 					stats.set(e.pid, s);
 				}
 				const k = e.s === "orb" || e.s === "drb" ? "trb" : e.s;
@@ -343,6 +375,16 @@ export const playsFromPbp = (
 				) {
 					tag("fastBreak", fr.ptype === "pick6" ? 2 : 1.5);
 				}
+				// the move that got the shot off, and a leak-out (see pbpFlavor/actions.ts)
+				if (fr.action === "ankle-breaker") {
+					tag("ankles", 5);
+				} else if (fr.action === "euro-step") {
+					tag("euroStep", 3.5);
+				} else if (fr.action === "spin-move") {
+					tag("spinMove", 3);
+				} else if (fr.action === "leak-out") {
+					tag("fastBreak", 1.5);
+				}
 				if (ftags.has("shot-clock")) {
 					tag("shotClock", 1.5);
 				}
@@ -377,11 +419,36 @@ export const playsFromPbp = (
 				tag("goAhead", 4);
 			}
 		}
+		const action = fr && fr !== "silent" ? fr.action : undefined;
 		if (BLOCK.has(e.type)) {
 			tag("block", fr && fr !== "silent" && fr.ptype === "chasedown" ? 4 : 2.5);
+			if (action === "chase-down") {
+				tag("chaseDown", 5);
+			}
 		}
 		if (e.type === "stl") {
 			tag("steal", fr && fr !== "silent" && fr.ptype === "pick6" ? 3 : 1.2);
+			if (action === "loose-ball") {
+				tag("hustle", 3);
+			}
+		}
+		// A charge taken: the play belongs to the defender who drew it
+		if (
+			e.type === "tov" &&
+			action === "charge-taken" &&
+			fr &&
+			fr !== "silent" &&
+			fr.pidHero !== undefined &&
+			t !== undefined
+		) {
+			const d: 0 | 1 = t === 0 ? 1 : 0;
+			p.pid = fr.pidHero;
+			p.t = d;
+			tag("charge", 3.5);
+			const lead = score[d] - score[t];
+			if (last && clock <= 24 && lead >= 0 && lead <= 3) {
+				tag("stop", 6 + (24 - clock) / 8);
+			}
 		}
 		// Defensive stops late in a one-possession game
 		if (

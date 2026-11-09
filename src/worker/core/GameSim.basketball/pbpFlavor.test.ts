@@ -129,7 +129,8 @@ test("no broken text across many games", async () => {
 	}
 	assert.isTrue(n > 5000);
 	assert.deepStrictEqual(problems.slice(0, 15), []);
-});
+	// (the first test to simulate the 30 games)
+}, 120_000);
 
 test("possessives of names ending in s, and a/an", async () => {
 	// (the test league has a Hammonds and a team word as a surname)

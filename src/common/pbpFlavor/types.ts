@@ -80,6 +80,10 @@ export const clockOf = (sec: number) => {
 export const aRun = (label: string) =>
 	`${/^(8|11|18)\b/.test(label) || /^8\d\b/.test(label) ? "an" : "a"} ${label} run`;
 
+// "a 12-point lead" but "an 18-point lead"
+export const aNum = (n: number) =>
+	/^(8|11|18|8\d)$/.test(String(n)) ? "an" : "a";
+
 // "Hammonds'" but "Smith's"
 export const poss = (name: string) =>
 	/s$/i.test(name) ? `${name}'` : `${name}'s`;
