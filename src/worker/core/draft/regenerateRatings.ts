@@ -597,15 +597,18 @@ export const restoreOriginalRatings = async ({
 
 // With the Archetypes switch off the regenerator has no archetype targets (only builds)
 export const getArchetypeTargets = () =>
-	(featureOn("archetypes") ? ARCHETYPE_LIST : []).map((a) => ({
-		id: a.id,
-		name: a.name,
-		group: a.group,
-		desc: a.desc,
-		min: a.hgt[0],
-		max: a.hgt[1],
-		rare: !!a.rare,
-	}));
+	(featureOn("archetypes") ? ARCHETYPE_LIST : [])
+		// Veteran archetypes need an age a prospect does not have
+		.filter((a) => !(a.age && a.age[0] >= 30))
+		.map((a) => ({
+			id: a.id,
+			name: a.name,
+			group: a.group,
+			desc: a.desc,
+			min: a.hgt[0],
+			max: a.hgt[1],
+			rare: !!a.rare,
+		}));
 
 export const getBuildList = () =>
 	ARCHETYPES.map((a) => ({

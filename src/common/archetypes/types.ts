@@ -73,6 +73,14 @@ export type ArchetypeDef = {
 	// Skills the player must have (a missing one costs a lot) and skills that help
 	req?: SkillLabel[];
 	bonus?: SkillLabel[];
+	// Floors on the league-wide z of a dimension (his skill in absolute terms): a label must deliver what its name promises
+	need?: Partial<Record<DimKey, number>>;
+	// The same, on the z for his size (rebounding, post scoring and finishing are judged against players his height)
+	needFor?: Partial<Record<DimKey, number>>;
+	// Gate on his overall level (mean size-adjusted skill z, soft): raw prospects are well below the league
+	level?: [number, number];
+	// Gate on age, applied when his age is known. When it is not, a veteran archetype (minimum age 30+) is never picked
+	age?: [number, number];
 	// Rare "unicorn" types are not expected to be filled in every league
 	rare?: true;
 	// Position prior overrides on top of the group's (see position.ts): z nudge per position, null = never

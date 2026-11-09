@@ -177,16 +177,22 @@ export const LEVEL_SHARE = 0.5;
 export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 	const v = compositeValues(r);
 	const z = {} as Record<DimKey, number>;
+	// Absolute (league-wide) z, and z for his size before his level is taken out
+	const abs = {} as Record<DimKey, number>;
+	const sz = {} as Record<DimKey, number>;
 	const hz = rawZ(norms.q.hgt, v.hgt);
 	for (const dim of DIMS) {
 		const raw = rawZ(norms.q[dim], v[dim]);
+		abs[dim] = raw;
 		if (dim === "hgt") {
 			z[dim] = raw;
+			sz[dim] = raw;
 			continue;
 		}
 		const b = norms.beta[dim];
 		const adj = (raw - b * hz) / Math.max(Math.sqrt(1 - b * b), SHRINK_FLOOR);
 		z[dim] = clampZ(adj);
+		sz[dim] = z[dim];
 	}
 	let level = 0;
 	for (const dim of CORE_DIMS) {
@@ -198,7 +204,7 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 			z[dim] = clampZ(z[dim] - LEVEL_SHARE * level);
 		}
 	}
-	return { z, level, hgtZ: hz };
+	return { z, level, hgtZ: hz, abs, sz };
 };
 
 export const ovrPercentile = (norms: Norms, ovr: number) =>
