@@ -411,8 +411,9 @@ export type CombineRatings = {
 	spd: number;
 	jmp: number;
 	endu: number;
-	// A wingspan rating, when the league has one (0-100, 50 = typical +3.5" ape index)
-	wingspan?: number;
+	// Wingspan rating minus height rating (expanded ratings, when the setting is on). wng is on the hgt scale (100 rating points = 27
+	// inches), so 0 is a typical +3.5" ape index whatever his height.
+	wingspanGap?: number;
 };
 
 export type CombineResults = {
@@ -458,8 +459,8 @@ export const getCombine = ({
 	// Inches of "length" in the hgt rating beyond his height (genRatings adds -1, 0 or 1 inch)
 	const length = clamp((ratings.hgt * 27) / 100 + 66 - heightInches, -1.5, 1.5);
 	const ape =
-		ratings.wingspan !== undefined
-			? 3.5 + (ratings.wingspan - 50) * 0.12 + rng.normal(0, 0.6)
+		ratings.wingspanGap !== undefined
+			? 3.5 + (ratings.wingspanGap * 27) / 100 + rng.normal(0, 0.6)
 			: 3.5 + 1.6 * length + rng.normal(0, 1.7);
 	const wingspan = roundTo(heightNoShoes + ape, 0.25);
 	const standingReach = roundTo(

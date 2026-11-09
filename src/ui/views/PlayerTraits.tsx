@@ -2,7 +2,6 @@ import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
 import TopStuff from "./Player/TopStuff.tsx";
 import { useLocal } from "../util/local.ts";
-import { PLAYER } from "../../common/constants.ts";
 import { last } from "../../common/utils.ts";
 import HideableSection from "../components/HideableSection.tsx";
 import { TraitBadges } from "../components/PlayerTraits/TraitBadges.tsx";
@@ -40,35 +39,29 @@ const PlayerTraits = ({
 		"season",
 	]);
 	const showRatings = !challengeNoRatings || retired;
-	const profileOptions = usePlayerProfileOptions(player);
+	const profileOptions = usePlayerProfileOptions(player, "traits");
 
 	useTitleBar({
 		title: player.name,
 		customMenu,
-		dropdown:
-			player.tid !== PLAYER.UNDRAFTED
-				? {
-						fields: [
-							{
-								key: "profile",
-								options: profileOptions,
-								value: "traits",
-							},
-						],
-						urlOverride: ({ profile }) => {
-							const gameLogSeason =
-								player.stats.at(-1)?.season ??
-								(player.ratings.length > 0
-									? last(player.ratings).season
-									: currentSeason);
-							return playerProfileUrl(
-								profile as string,
-								player.pid,
-								gameLogSeason,
-							);
-						},
-					}
-				: undefined,
+		// Prospects too: they have Overview and usually College/Overseas to switch to
+		dropdown: {
+			fields: [
+				{
+					key: "profile",
+					options: profileOptions,
+					value: "traits",
+				},
+			],
+			urlOverride: ({ profile }) => {
+				const gameLogSeason =
+					player.stats.at(-1)?.season ??
+					(player.ratings.length > 0
+						? last(player.ratings).season
+						: currentSeason);
+				return playerProfileUrl(profile as string, player.pid, gameLogSeason);
+			},
+		},
 	});
 
 	const topStuff = (
@@ -94,8 +87,9 @@ const PlayerTraits = ({
 			<>
 				{topStuff}
 				<p>
-					Player traits are turned off in this league. They can be turned on in
-					the league settings.
+					{__SPORT === "basketball"
+						? "Player traits are turned off in this league. They can be turned on in the league settings."
+						: "Player traits are only available in Basketball GM."}
 				</p>
 			</>
 		);

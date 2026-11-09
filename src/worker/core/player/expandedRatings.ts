@@ -37,8 +37,14 @@ export const setDefenseSplit = (r: Record<string, any>, split: number) => {
 };
 
 // After something changed diq directly (development, real player determinism, a God Mode edit of diq), move pdef and idef with it
+// With the setting off nothing is touched (stale values left from when it was on can't move diq at the 0/100 clamps), and turning it
+// back on syncs them (updateExpandedRatingsForLeague).
 export const syncDefenseToDiq = (r: Record<string, any>) => {
-	if (typeof r.pdef !== "number" || typeof r.idef !== "number") {
+	if (
+		!expandedRatingsOn() ||
+		typeof r.pdef !== "number" ||
+		typeof r.idef !== "number"
+	) {
 		return;
 	}
 	if (blendDiq(r.pdef, r.idef) !== r.diq) {

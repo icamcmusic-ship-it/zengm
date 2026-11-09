@@ -135,6 +135,36 @@ describe("profile extras", () => {
 		assert.strictEqual(combinePercentiles(all[0]!, all).heightNoShoes.pct, 0);
 	});
 
+	test("combine: wingspan rating is read relative to height (wng is on the hgt scale)", () => {
+		// A 7-footer with an average wingspan for his height (wng = hgt) has a normal ape index, not a huge one
+		const apes = [];
+		for (let pid = 0; pid < 50; pid++) {
+			const c = getCombine({
+				pid,
+				heightInches: 84,
+				weight: 250,
+				ratings: { ...ratings, hgt: 70, wingspanGap: 0 },
+			});
+			apes.push(c.wingspan - c.heightNoShoes);
+		}
+		const mean = apes.reduce((a, b) => a + b, 0) / apes.length;
+		assert.isAbove(mean, 2.5);
+		assert.isBelow(mean, 4.5);
+		const long = getCombine({
+			pid: 1,
+			heightInches: 78,
+			weight: 210,
+			ratings: { ...ratings, wingspanGap: 20 },
+		});
+		const short = getCombine({
+			pid: 1,
+			heightInches: 78,
+			weight: 210,
+			ratings: { ...ratings, wingspanGap: -20 },
+		});
+		assert.isAbove(long.wingspan - short.wingspan, 9);
+	});
+
 	test("draft stock ends where he went", () => {
 		const points = getStockTimeline({
 			pid: 3,

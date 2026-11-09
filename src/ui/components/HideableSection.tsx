@@ -77,7 +77,8 @@ const HideableSection = ({
 						{hideableSectionButton}
 					</div>
 				)}
-				{show ? <div className="text-nowrap">{description}</div> : null}
+				{/* Wraps only when it doesn't fit on a line of its own (long descriptions on a phone) */}
+				{show ? <div style={{ maxWidth: "100%" }}>{description}</div> : null}
 			</div>
 			{show ? children : null}
 		</>

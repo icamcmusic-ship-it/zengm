@@ -9,8 +9,7 @@ import { getCols } from "../../../common/getCols.ts";
 import { DataTable } from "../../components/DataTable/index.tsx";
 import HideableSection from "../../components/HideableSection.tsx";
 import { CollegeSeasonSection } from "../Player/CollegeSeasonSection.tsx";
-import { getProfileDropdownOptions, getProfileUrl } from "../Player/common.tsx";
-import { dropdownOptions } from "../../hooks/useDropdownOptions.tsx";
+import { getProfileUrl, usePlayerProfileOptions } from "../Player/common.tsx";
 import { last } from "../../../common/utils.ts";
 import { SchoolBadge, Stars, StockChart } from "./parts.tsx";
 import type { CombineResults } from "../../../common/collegeStats/profile.ts";
@@ -621,6 +620,7 @@ const PlayerPreDraft = ({
 		"season",
 	]);
 	const showRatings = !challengeNoRatings || retired;
+	const profileOptions = usePlayerProfileOptions(player, "preDraft");
 
 	useTitleBar({
 		title: player.name,
@@ -629,10 +629,7 @@ const PlayerPreDraft = ({
 			fields: [
 				{
 					key: "profile",
-					options: getProfileDropdownOptions(player) ?? [
-						dropdownOptions.playerProfile[0]!,
-						dropdownOptions.playerProfile[2]!,
-					],
+					options: profileOptions,
 					value: "preDraft",
 				},
 			],
@@ -670,7 +667,9 @@ const PlayerPreDraft = ({
 
 			{!preDraft ? (
 				<p data-testid="pre-draft-none">
-					No college or overseas record before the draft.{" "}
+					{__SPORT === "basketball"
+						? "No college or overseas record before the draft."
+						: "The College/Overseas page is only available in Basketball GM."}{" "}
 					<a href={helpers.leagueUrl(["player", player.pid])}>
 						Back to overview
 					</a>

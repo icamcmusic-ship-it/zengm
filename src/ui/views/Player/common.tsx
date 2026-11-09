@@ -75,17 +75,26 @@ export const getProfileDropdownOptions = (
 				!player ||
 				player.tid !== PLAYER.UNDRAFTED) &&
 			(option.key !== "preDraft" || (!!player && hasPreDraftInfo(player))) &&
-			(option.key !== "traits" || playerTraits),
+			(option.key !== "traits" || (__SPORT === "basketball" && playerTraits)),
 	);
 	return options.length > 1 ? options : undefined;
 };
 
-export const usePlayerProfileOptions = (player?: ProfilePlayer) => {
+// For the profile pages other than Overview: current is the page's own key, always kept (also where the page doesn't apply, like
+// Traits in another sport or with the setting off) so the dropdown shows where you are
+export const usePlayerProfileOptions = (
+	player: ProfilePlayer | undefined,
+	current: "overview" | "gameLog" | "preDraft" | "traits",
+) => {
 	const { playerTraits } = useLocal(["playerTraits"]);
-	return (
-		getProfileDropdownOptions(player, !!playerTraits) ??
-		dropdownOptions.playerProfile.filter((o) => o.key === "overview")
+	const keys = new Set(
+		(
+			getProfileDropdownOptions(player, !!playerTraits) ??
+			dropdownOptions.playerProfile.filter((o) => o.key === "overview")
+		).map((o) => o.key),
 	);
+	keys.add(current);
+	return dropdownOptions.playerProfile.filter((o) => keys.has(o.key));
 };
 
 export const getProfileUrl = (
