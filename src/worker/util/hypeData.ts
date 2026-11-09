@@ -109,6 +109,12 @@ const toHGame = (gm: Game, playInGids: Set<number>): HGame => {
 			stl: finite(p.stl) ?? 0,
 			blk: finite(p.blk) ?? 0,
 			tp: finite(p.tp) ?? 0,
+			tpa: finite(p.tpa),
+			fg: finite(p.fg),
+			fga: finite(p.fga),
+			ft: finite(p.ft),
+			fta: finite(p.fta),
+			tov: finite(p.tov),
 		})),
 	});
 	return {
@@ -474,4 +480,17 @@ export const hypeChases = async (limit = 25): Promise<ChaseRow[]> => {
 		{ ...raw, players: players.map((p) => toRaw(p, rel)) },
 		limit,
 	);
+};
+
+// For tools/hypeCalibration (from the console: bbgm.hypeCalibrationDump(season)): the season snapshot with every player of the stored games, to calibrate the engine offline
+export const hypeCalibrationDump = async (season: number): Promise<HRaw> => {
+	const games = await idb.merged.games.getAll({ season });
+	const pids = [
+		...new Set(
+			games.flatMap((gm) =>
+				gm.teams.flatMap((t) => t.players.map((p: any) => p.pid as number)),
+			),
+		),
+	];
+	return getHypeRaw(season, { pids });
 };

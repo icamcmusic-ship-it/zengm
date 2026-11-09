@@ -106,7 +106,16 @@ export const Reasons = ({
 }) => (
 	<ul className="mb-0 ps-3">
 		{reasons.slice(0, max).map((r, i) => (
-			<li key={i}>
+			<li
+				key={i}
+				className={r.pts < 0 ? "text-body-secondary" : undefined}
+				title={`${r.pts > 0 ? "+" : ""}${r.pts} points`}
+			>
+				{r.pts < 0 ? (
+					<span className="text-danger" aria-label="lowers the score">
+						−{" "}
+					</span>
+				) : null}
 				<HypeText text={r.text} />
 			</li>
 		))}
@@ -260,7 +269,7 @@ export const GameHype = ({ gid }: { gid: number }) => {
 						{h.post.note ? (
 							<p className="text-body-secondary mb-0">{h.post.note}</p>
 						) : (
-							<Reasons reasons={h.post.reasons} max={4} />
+							<Reasons reasons={h.post.reasons} max={6} />
 						)}
 					</div>
 				) : null}

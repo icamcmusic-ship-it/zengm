@@ -1,5 +1,8 @@
 // Builds the engine's input for one game from a season snapshot (HRaw): the state of the league just before the game, using only games played before it.
+import { LINE_STATS } from "./calibration.ts";
+import { gmsc, known } from "./util.ts";
 import type {
+	HEnv,
 	HGame,
 	HGameInput,
 	HLine,
@@ -398,27 +401,120 @@ const listedFor = (
 	};
 };
 
-const envFor = (idx: Index, t: Target) => {
+const envFor = (idx: Index, t: Target): HEnv => {
 	let n = 0;
 	let sum = 0;
 	let sq = 0;
 	let hiTeam = 0;
+	let hiTeamTp = 0;
+	let nLines = 0;
+	const tot: Record<string, number> = {};
+	const best: Record<string, number> = {};
+	let fgN = 0;
+	let fgS = 0;
+	let fgQ = 0;
+	let tvN = 0;
+	let tvS = 0;
+	let tvQ = 0;
 	for (const g of idx.sorted) {
 		if (g.playoffs || g.playIn || !isBefore(g, t)) {
 			continue;
 		}
-		const tot = g.teams[0].pts + g.teams[1].pts;
-		if (!tot) {
+		const all = g.teams[0].pts + g.teams[1].pts;
+		if (!all) {
 			continue;
 		}
 		n++;
-		sum += tot;
-		sq += tot * tot;
-		hiTeam = Math.max(hiTeam, g.teams[0].pts, g.teams[1].pts);
+		sum += all;
+		sq += all * all;
+		for (const tm of g.teams) {
+			hiTeam = Math.max(hiTeam, tm.pts);
+			let tp = 0;
+			let fg = 0;
+			let fga = 0;
+			let tov = 0;
+			let shoot = true;
+			let tovOk = true;
+			for (const p of tm.players) {
+				tp += p.tp;
+				if (known(p.fg) && known(p.fga)) {
+					fg += p.fg;
+					fga += p.fga;
+				} else {
+					shoot = false;
+				}
+				if (known(p.tov)) {
+					tov += p.tov;
+				} else {
+					tovOk = false;
+				}
+				if (!(p.min > 0)) {
+					continue;
+				}
+				nLines++;
+				for (const k of LINE_STATS) {
+					const v = k === "gmsc" ? gmsc(p) : p[k];
+					tot[k] = (tot[k] ?? 0) + v;
+					if (v > (best[k] ?? Number.NEGATIVE_INFINITY)) {
+						best[k] = v;
+					}
+				}
+			}
+			hiTeamTp = Math.max(hiTeamTp, tp);
+			if (shoot && fga > 0) {
+				const x = fg / fga;
+				fgN++;
+				fgS += x;
+				fgQ += x * x;
+			}
+			if (tovOk && tm.players.length) {
+				tvN++;
+				tvS += tov;
+				tvQ += tov * tov;
+			}
+		}
 	}
+	const ms = (N: number, S: number, Q: number) =>
+		N >= 20
+			? {
+					mean: S / N,
+					sd: Math.sqrt(Math.max(0, Q / N - (S / N) ** 2)),
+				}
+			: null;
 	const mean = n ? sum / n : 0;
 	const sd = n > 1 ? Math.sqrt(Math.max(0, sq / n - mean * mean)) : 0;
-	return { n, mean, sd, hiTeam };
+	const per: Record<string, number> = {};
+	if (nLines) {
+		for (const k of LINE_STATS) {
+			per[k] = (tot[k] ?? 0) / nLines;
+		}
+	}
+	return {
+		n,
+		mean,
+		sd,
+		hiTeam,
+		hiTeamTp,
+		nLines,
+		per,
+		best,
+		fgp: ms(fgN, fgS, fgQ),
+		tov: ms(tvN, tvS, tvQ),
+	};
+};
+
+// Did the team play the day before? (regular season, from the stored games)
+const playedDayBefore = (idx: Index, tid: number, t: Target) => {
+	if (t.playoffs || t.playIn || !(t.day > 1)) {
+		return false;
+	}
+	return idx.sorted.some(
+		(g) =>
+			!g.playoffs &&
+			!g.playIn &&
+			g.day === t.day - 1 &&
+			(g.teams[0].tid === tid || g.teams[1].tid === tid),
+	);
 };
 
 export const targetOfGame = (g: HGame): Target => ({
@@ -446,12 +542,22 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 				: undefined;
 	const home = teamState(raw, idx, t.homeTid, t, game, seedOf(t.homeTid));
 	const away = teamState(raw, idx, t.awayTid, t, game, seedOf(t.awayTid));
+	home.b2b = playedDayBefore(idx, t.homeTid, t);
+	away.b2b = playedDayBefore(idx, t.awayTid, t);
+	const outStars: HGameInput["out"] = [];
 	const players = [t.homeTid, t.awayTid].map((tid, ti): HListed[] => {
 		if (game) {
 			const out: HListed[] = [];
 			for (const bl of game.teams[ti]!.players) {
 				const p = playersOf(raw).get(bl.pid);
-				if (!p || (bl.inj && !(bl.min > 0))) {
+				if (!p) {
+					continue;
+				}
+				if (bl.inj && !(bl.min > 0)) {
+					const ovr = p.ovrBySeason[raw.season];
+					if (ovr !== undefined) {
+						outStars.push({ pid: p.pid, name: p.name, tid, ovr });
+					}
 					continue;
 				}
 				out.push(listedFor(raw, idx, p, tid, t));
@@ -459,6 +565,12 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 			return out;
 		}
 		const outPids = new Set(raw.out?.[tid] ?? []);
+		for (const p of raw.players) {
+			const ovr = p.ovrBySeason[raw.season];
+			if (p.tid === tid && outPids.has(p.pid) && ovr !== undefined) {
+				outStars.push({ pid: p.pid, name: p.name, tid, ovr });
+			}
+		}
 		return raw.players
 			.filter((p) => p.tid === tid && !outPids.has(p.pid))
 			.map((p) => listedFor(raw, idx, p, tid, t));
@@ -482,7 +594,8 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 		seriesState: state,
 		records: raw.records,
 		starCut: raw.records?.starCut[raw.season] ?? null,
-		env: t.completed ? envFor(idx, t) : null,
+		env: envFor(idx, t),
+		out: outStars,
 		linesFrom: raw.linesComplete ? raw.season : Number.POSITIVE_INFINITY,
 		teamName,
 	};

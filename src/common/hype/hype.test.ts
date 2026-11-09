@@ -8,6 +8,7 @@ import {
 	storedGame,
 	targetOfGame,
 	withActiveCareers,
+	type HBoxLine,
 	type HGame,
 	type HRaw,
 	type Target,
@@ -24,6 +25,7 @@ import {
 	SEASON,
 	makeRaw,
 } from "./fixture.ts";
+import { postScore, preScore, rarity } from "./calibration.ts";
 
 const raw0 = makeRaw();
 const regular = raw0.games.filter((g) => !g.playoffs);
@@ -71,8 +73,13 @@ describe("hype engine", () => {
 			expect(a.pre.score).toBeGreaterThanOrEqual(0);
 			expect(a.pre.score).toBeLessThanOrEqual(100);
 			expect(a.post!.score).toBeLessThanOrEqual(100);
-			const pts = a.pre.reasons.map((r) => r.pts);
-			expect([...pts].sort((x, y) => y - x)).toEqual(pts);
+			// reasons by size of contribution, up or down, and they add up to the raw points (every contributor is listed)
+			for (const x of [a.pre, a.post!]) {
+				const pts = x.reasons.map((r) => Math.abs(r.pts));
+				expect([...pts].sort((p, q) => q - p)).toEqual(pts);
+				const sum = x.reasons.reduce((s, r) => s + r.pts, 0);
+				expect(Math.abs(sum - x.raw)).toBeLessThan(0.5);
+			}
 			for (const r of a.pre.reasons) {
 				expect(plainText(r.text)).not.toMatch(/\[\[|]]/);
 				expect(r.text.length).toBeGreaterThan(3);
@@ -512,7 +519,8 @@ describe("post-game verdict", () => {
 		expect(h.pre.score).toBeGreaterThanOrEqual(50);
 		expect(h.post!.score).toBeGreaterThanOrEqual(60);
 		expect(h.verdict!.kind).toBe("lived");
-		expect(h.verdict!.text).toMatch(/overtime|buzzer|decided by 2/);
+		expect(h.verdict!.text).toMatch(/overtime|buzzer|decided by 2/i);
+		expect(h.verdict!.text).toMatch(/^[^(]+\(hype \d+, game \d+/);
 		expect(isBadText(h.verdict!.text)).toBe(false);
 	});
 
@@ -528,7 +536,8 @@ describe("post-game verdict", () => {
 		}));
 		const h = hypeForGame(r, targetOfGame(storedGame(r, g0.gid)!))!;
 		expect(h.verdict!.kind).toBe("fizzled");
-		expect(h.post!.score).toBeLessThan(50);
+		expect(h.post!.score).toBeLessThan(25);
+		expect(h.post!.reasons[0]!.pts).toBeLessThan(0);
 		expect(h.verdict!.text).toMatch(/won by 40/);
 	});
 
@@ -569,5 +578,237 @@ describe("star power of finished games", () => {
 		const after = starText(raw, gm.gid);
 		expect(after).toContain(`${name.split(" ").at(-1)}`);
 		expect(after).toContain("(99)");
+	});
+});
+
+describe("game rating calibration", () => {
+	const late = regular.at(-20)!;
+	const rate = (r: HRaw, gid: number) =>
+		hypeForGame(r, targetOfGame(storedGame(r, gid)!))!;
+	const patchGame = (gid: number, patch: (g: HGame) => HGame): HRaw => ({
+		...raw0,
+		games: raw0.games.map((g) => (g.gid === gid ? patch(g) : g)),
+	});
+	// one player's line replaced (team 0, his first box score line)
+	const withLine = (g: HGame, line: Partial<HBoxLine>): HGame => ({
+		...g,
+		teams: [
+			{
+				...g.teams[0],
+				players: g.teams[0].players.map((p, i) =>
+					i === 0 ? { ...p, min: 40, ...line } : p,
+				),
+			},
+			g.teams[1],
+		],
+	});
+	const close = (g: HGame, a: number, b: number): HGame => ({
+		...g,
+		overtimes: 0,
+		clutch: [],
+		teams: [
+			{ ...g.teams[0], pts: a, ptsQtrs: undefined },
+			{ ...g.teams[1], pts: b, ptsQtrs: undefined },
+		],
+	});
+	const mid = rate(raw0, late.gid).post!.score;
+
+	test("21 assists and 2 turnovers in a close game rates high, and is listed", () => {
+		const r = patchGame(late.gid, (g) =>
+			withLine(close(g, 108, 106), {
+				pts: 14,
+				ast: 21,
+				tov: 2,
+				trb: 5,
+				fg: 6,
+				fga: 12,
+				ft: 2,
+				fta: 2,
+			}),
+		);
+		const h = rate(r, late.gid);
+		expect(h.post!.score).toBeGreaterThanOrEqual(80);
+		expect(h.post!.score).toBeGreaterThan(mid);
+		const top = h.post!.reasons.slice(0, 3).map((x) => plainText(x.text));
+		expect(top.join("\n")).toMatch(/21 assists against only 2 turnovers/);
+	});
+
+	test("a 60-point game is near the top of the scale", () => {
+		const r = patchGame(late.gid, (g) =>
+			withLine(close(g, 121, 112), {
+				pts: 60,
+				fg: 21,
+				fga: 33,
+				ft: 12,
+				fta: 13,
+				tp: 6,
+				tpa: 11,
+			}),
+		);
+		const h = rate(r, late.gid);
+		expect(h.post!.score).toBeGreaterThanOrEqual(88);
+		expect(plainText(h.post!.reasons[0]!.text)).toMatch(/60 points/);
+	});
+
+	test("a deciding game (Game 7 style) won in overtime on a game-winner is legendary, before and after", () => {
+		// a series that went the distance: its last game is winner-takes-all
+		const s = raw0.series.find(
+			(x) =>
+				x.season === SEASON &&
+				x.away &&
+				x.home.won === x.numToWin &&
+				x.away.won === x.numToWin - 1,
+		)!;
+		const gid = s.gids.at(-1)!;
+		const r = patchGame(gid, (g) => {
+			const hw = g.teams[0].tid === s.home.tid;
+			const p = g.teams[hw ? 0 : 1].players[0]!;
+			const [w, l] = [111, 109];
+			return {
+				...g,
+				overtimes: 1,
+				clutch: [
+					`[[p:${p.pid}|${p.name}]] made a game-winning jumper with 1.2 seconds remaining`,
+				],
+				teams: [
+					{
+						...g.teams[0],
+						pts: hw ? w : l,
+						ptsQtrs: hw ? [25, 26, 24, 27, 9] : [27, 24, 26, 25, 7],
+					},
+					{
+						...g.teams[1],
+						pts: hw ? l : w,
+						ptsQtrs: hw ? [27, 24, 26, 25, 7] : [25, 26, 24, 27, 9],
+					},
+				],
+			};
+		});
+		const h = rate(r, gid);
+		expect(h.pre.reasons[0]!.text).toMatch(/winner takes all/);
+		expect(h.pre.score).toBeGreaterThanOrEqual(90);
+		expect(h.post!.score).toBeGreaterThanOrEqual(95);
+		expect(h.verdict!.kind).toBe("lived");
+		expect(h.post!.reasons.map((x) => x.text).join("\n")).toMatch(
+			/Winner takes all|game-winning/,
+		);
+	});
+
+	test("a 40-point blowout between two bad teams rates near the bottom", () => {
+		const r = patchGame(late.gid, (g) => ({
+			...g,
+			overtimes: 0,
+			clutch: [],
+			teams: [
+				{
+					...g.teams[0],
+					pts: 130,
+					ptsQtrs: [35, 35, 30, 30],
+					won: 16,
+					lost: 46,
+				},
+				{
+					...g.teams[1],
+					pts: 90,
+					ptsQtrs: [20, 22, 24, 24],
+					won: 18,
+					lost: 45,
+				},
+			],
+		}));
+		const h = rate(r, late.gid);
+		expect(h.post!.score).toBeLessThanOrEqual(10);
+		const neg = h.post!.reasons.filter((x) => x.pts < 0).map((x) => x.text);
+		expect(neg.join("\n")).toMatch(/won by 40/);
+		expect(neg.join("\n")).toMatch(/Two losing teams/);
+	});
+
+	test("works from box score totals alone (no shooting, no turnovers, no quarters)", () => {
+		const strip: HRaw = {
+			...raw0,
+			games: raw0.games.map((g) => ({
+				...g,
+				clutch: [],
+				teams: g.teams.map((t) => ({
+					...t,
+					ptsQtrs: undefined,
+					players: t.players.map(({ fg, fga, ft, fta, tov, tpa, ...p }) => p),
+				})) as HGame["teams"],
+			})),
+		};
+		for (const g of strip.games.filter((_, i) => i % 25 === 0)) {
+			const h = rate(strip, g.gid);
+			expect(h.post!.score).toBeGreaterThanOrEqual(0);
+			expect(h.post!.score).toBeLessThanOrEqual(100);
+			expect(isBadText(allText(h))).toBe(false);
+		}
+	});
+
+	test("scores spread over the scale", () => {
+		const post = raw0.games.map((g) => rate(raw0, g.gid).post!.score);
+		const pre = raw0.games.map((g) => rate(raw0, g.gid).pre.score);
+		// (the fixture plants story lines in most games, so its pre-game hype sits higher than a real league's)
+		for (const v of [post, pre]) {
+			const s = [...v].sort((a, b) => a - b);
+			const q = (p: number) => s[Math.floor(p * (s.length - 1))]!;
+			expect(q(0.9) - q(0.1)).toBeGreaterThanOrEqual(30);
+			expect(q(0.95)).toBeGreaterThanOrEqual(70);
+			if (v === post) {
+				expect(q(0.05)).toBeLessThanOrEqual(30);
+			}
+		}
+	});
+
+	test("the scale: monotone, 0 at the bottom, 100 at the top", () => {
+		let last = -1;
+		for (let x = -100; x <= 300; x += 0.5) {
+			const s = postScore(x);
+			expect(s).toBeGreaterThanOrEqual(last);
+			last = s;
+		}
+		expect(postScore(-1000)).toBe(0);
+		expect(postScore(1000)).toBe(100);
+		expect(preScore(1000)).toBe(100);
+		// rarity grows with the value, and the era scale matters
+		expect(rarity("ast", 21)).toBeGreaterThan(rarity("ast", 15));
+		expect(rarity("ast", 12, 1.5)).toBeGreaterThan(rarity("ast", 12));
+	});
+});
+
+describe("stars out", () => {
+	test("an injured star who sat out lowers the hype and is named", () => {
+		const gm = regular[200]!;
+		const bl = gm.teams[0].players[0]!;
+		const raw: HRaw = {
+			...raw0,
+			games: raw0.games.map((g) =>
+				g.gid === gm.gid
+					? {
+							...g,
+							teams: [
+								{
+									...g.teams[0],
+									players: g.teams[0].players.map((p) =>
+										p.pid === bl.pid ? { ...p, inj: true, min: 0 } : p,
+									),
+								},
+								g.teams[1],
+							],
+						}
+					: g,
+			),
+		};
+		raw.players = raw0.players.map((p) =>
+			p.pid === bl.pid
+				? { ...p, ovrBySeason: { ...p.ovrBySeason, [SEASON]: 95 } }
+				: p,
+		);
+		const h = hypeForGame(raw, targetOfGame(storedGame(raw, gm.gid)!))!;
+		const r = h.pre.reasons.find((x) => x.k === "injury");
+		expect(r?.pts).toBeLessThan(0);
+		expect(r?.text).toContain(bl.name);
+		expect(h.pre.reasons.every((x) => !x.text.includes("undefined"))).toBe(
+			true,
+		);
 	});
 });
