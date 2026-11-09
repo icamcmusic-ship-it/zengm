@@ -97,7 +97,7 @@ export const SHOT_KINDS: readonly ShotKind[] = [
 ];
 
 const DUNK =
-	/\bdunk|\bslam|\bjams?\b|flush|throws? (?:it )?down|hammer|tomahawk|windmill|rocks the rim|posteriz|all over|on [^,]*'s head/;
+	/\bdunk|\bslam|\bjams?\b|flush|throws? (?:it )?down|hammer|tomahawk|windmill|rocks the rim|posteriz|(?<!draped )all over|on [^,]*'s head/;
 
 /* The shot's kind, from the sim's zone (rim, post, mid-range, three; putbacks and inbound tip-ins are their own events) and the words
    the shot was given. `text` is the shot alone (no pass), with the players' names already taken out, so a name like "Banks" can't

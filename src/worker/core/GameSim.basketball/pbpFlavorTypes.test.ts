@@ -7,6 +7,7 @@ import {
 	type FlavorStat,
 } from "../../../common/pbpFlavor/index.ts";
 import { SHOT_KINDS } from "../../../common/pbpFlavor/calls.ts";
+import { ACTION_KINDS } from "../../../common/pbpFlavor/actions.ts";
 import {
 	decodePlayByPlay,
 	encodePlayByPlay,
@@ -61,7 +62,21 @@ const describeAll = (
 			if (e.pid !== undefined) {
 				let s = stats.get(e.pid);
 				if (!s) {
-					s = { pts: 0, ast: 0, trb: 0, stl: 0, blk: 0, tov: 0, pf: 0 };
+					s = {
+						pts: 0,
+						ast: 0,
+						trb: 0,
+						stl: 0,
+						blk: 0,
+						tov: 0,
+						pf: 0,
+						fg: 0,
+						fga: 0,
+						tp: 0,
+						tpa: 0,
+						ft: 0,
+						fta: 0,
+					};
 					stats.set(e.pid, s);
 				}
 				const k = e.s === "orb" || e.s === "drb" ? "trb" : e.s;
@@ -320,5 +335,76 @@ test("top plays use the derived play types", async () => {
 	}
 	for (const l of ["Dunk", "Shot-clock beater", "And-one", "Block", "Steal"]) {
 		assert.isTrue(labels.has(l), `no ${l} top play in 30 games`);
+	}
+}, 120_000);
+
+test("the sets, moves, turnovers, steals and rebounds get their own kinds, and every line fills in", async () => {
+	const BAD = /undefined|NaN|\bnull\b|\[object|\${|[{}]| {2}/;
+	const actions = new Map<string, number>();
+	let lines = 0;
+	for (const g of await games()) {
+		for (const { r } of g.out) {
+			lines += 1;
+			assert.notMatch(r.text, BAD, r.text);
+			if (r.note) {
+				assert.notMatch(r.note, BAD, r.note);
+			}
+			if (r.action) {
+				assert.include(ACTION_KINDS, r.action, r.text);
+				actions.set(r.action, (actions.get(r.action) ?? 0) + 1);
+			}
+		}
+	}
+	assert.isAbove(lines, 10_000);
+	for (const a of [
+		"pick-and-roll",
+		"isolation",
+		"post-up",
+		"drive-and-kick",
+		"off-ball-screen",
+		"handoff",
+		"euro-step",
+		"spin-move",
+		"crossover",
+		"up-and-under",
+		"charge-taken",
+		"travel",
+		"loose-ball",
+		"deflection",
+		"interception",
+		"box-out",
+		"leak-out",
+	]) {
+		assert.isAbove(actions.get(a) ?? 0, 0, `no ${a} in 30 games`);
+	}
+}, 120_000);
+
+test("the new kinds of plays reach the top plays", async () => {
+	const kinds = new Set<string>();
+	for (const g of await games()) {
+		const gm = {
+			gid: g.seed,
+			season: 2025,
+			teams: [0, 1].map((i) => ({
+				name: ["Celtics", "Mavericks"][i]!,
+				abbrev: ["BOS", "DAL"][i]!,
+				pts: g.result.team[i].stat.pts,
+				players: [],
+			})) as any,
+		};
+		for (const p of playsFromPbp(gm, g.events[0], g.events)) {
+			kinds.add(p.kind);
+			if (p.kind === "charge") {
+				// (the play belongs to the defender who drew the charge)
+				const ev = g.events.find(
+					(e: any) => e.type === "tov" && e.t !== p.t && p.clock !== undefined,
+				);
+				assert.isDefined(ev);
+				assert.isDefined(p.pid);
+			}
+		}
+	}
+	for (const k of ["charge", "spinMove", "euroStep", "hustle"]) {
+		assert.isTrue(kinds.has(k), `no ${k} top play in 30 games`);
 	}
 }, 120_000);

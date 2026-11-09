@@ -12,6 +12,7 @@ import {
 	FlavorSession,
 	playersFromInitEvent,
 	type FlavorHost,
+	type FlavorInit,
 	type FlavorResult,
 } from "../../common/pbpFlavor/index.ts";
 
@@ -57,7 +58,31 @@ const makeFlavorSession = (initEvent: unknown, boxScore: any) => {
 		})) as [{ name: string; abbrev: string }, { name: string; abbrev: string }],
 		players: playersFromInitEvent(initEvent),
 		context: { playoffs: !!boxScore.playoffs },
+		...teamContext(boxScore, allStar),
 	});
+};
+
+// The records the teams bring in, or the state of a playoff series. Only a live game's box score has them as they were before the game
+// (liveGame.ts takes this game's result out); a stored game's box score has none
+const teamContext = (
+	boxScore: any,
+	allStar: boolean,
+): { records?: FlavorInit["records"]; series?: FlavorInit["series"] } => {
+	const teams = boxScore.teams;
+	if (allStar || !Array.isArray(teams) || teams.length !== 2) {
+		return {};
+	}
+	const num = (x: unknown): x is number =>
+		typeof x === "number" && Number.isFinite(x) && x >= 0;
+	if (boxScore.playoffs) {
+		const a = teams[0]?.playoffs;
+		const b = teams[1]?.playoffs;
+		return num(a?.won) && num(b?.won) ? { series: [a.won, b.won] } : {};
+	}
+	const rec = (t: any) =>
+		num(t?.won) && num(t?.lost) ? { won: t.won, lost: t.lost } : undefined;
+	const records: FlavorInit["records"] = [rec(teams[0]), rec(teams[1])];
+	return records[0] && records[1] ? { records } : {};
 };
 
 const makeFlavorHost = (boxScore: any): FlavorHost => ({
@@ -72,6 +97,12 @@ const makeFlavorHost = (boxScore: any): FlavorHost => ({
 					blk: p.blk ?? 0,
 					tov: p.tov ?? 0,
 					pf: p.pf ?? 0,
+					fg: p.fg ?? 0,
+					fga: p.fga ?? 0,
+					tp: p.tp ?? 0,
+					tpa: p.tpa ?? 0,
+					ft: p.ft ?? 0,
+					fta: p.fta ?? 0,
 				}
 			: undefined;
 	},

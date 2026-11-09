@@ -37,6 +37,7 @@ import {
 } from "./plays.ts";
 import { Rng } from "./rng.ts";
 import {
+	archetypeOf,
 	beatClockText,
 	bigCall,
 	classifyShot,
@@ -59,7 +60,28 @@ import {
 import { VarietyMemory, pickV, setVariety, weighted } from "./variety.ts";
 import { TrashTalk, applyTrashTalk, tempersFromPlayers } from "./trashTalk.ts";
 import {
+	roleNames,
+	setPlay,
+	signatureMove,
+	stealAction,
+	tovAction,
+	type ActionKind,
+	type MoveResult,
+} from "./actions.ts";
+import {
+	GameFlow,
+	ShootingNotes,
+	benchLine,
+	challengeNote,
+	ftRoutine,
+	glassNote,
+	recordsNote,
+	roleBlockNote,
+	type TeamRecord,
+} from "./color.ts";
+import {
 	bare,
+	aNum,
 	cap,
 	clockOf,
 	makeRatings,
@@ -78,6 +100,13 @@ export type FlavorStat = {
 	blk: number;
 	tov: number;
 	pf: number;
+	// Shooting, when the host keeps it (old hosts don't: the shooting lines are then left out)
+	fg?: number;
+	fga?: number;
+	tp?: number;
+	tpa?: number;
+	ft?: number;
+	fta?: number;
 };
 
 // What the session needs to know about the live game. All numbers are the live box score, already updated for the stat events that
@@ -102,6 +131,11 @@ export type FlavorResult = {
 	// What else the play was, where the sim's events say so: "and-one", "transition", "second-chance", "buzzer", "shot-clock",
 	// "heat-check", "clutch", "assisted", "dagger"
 	tags?: string[];
+	// How it came about, where the words picked say so: the set ("pick-and-roll", "isolation"...), the move ("euro-step",
+	// "ankle-breaker"...), the kind of turnover, steal or rebound ("charge-taken", "travel", "loose-ball", "box-out"...). See actions.ts
+	action?: ActionKind;
+	// The player a play belongs to when it isn't the event's own (the defender who took a charge)
+	pidHero?: number;
 };
 
 export type FlavorInit = {
@@ -122,6 +156,9 @@ export type FlavorInit = {
 	}[];
 	// Game context for the trash talk (trashTalk.ts)
 	context?: { playoffs?: boolean; rivalry?: boolean };
+	// The teams' records coming into the game, and a playoff series [team 0's wins, team 1's wins] (live games only)
+	records?: [TeamRecord | undefined, TeamRecord | undefined];
+	series?: [number, number];
 };
 
 // The init event the sim sends first: both teams, with each player's name, position and raw ratings
@@ -477,6 +514,14 @@ export class FlavorSession {
 	// Trash talk from hotheads (the Temper player trait), see trashTalk.ts
 	private trash: TrashTalk;
 	private context: NonNullable<FlavorInit["context"]>;
+	// the flow of the score, shooting lines, and the rest of the game-long colour (color.ts)
+	private flow = new GameFlow();
+	private shooting = new ShootingNotes();
+	private records: FlavorInit["records"];
+	private series: FlavorInit["series"];
+	private challengeSaid = false;
+	private routineSaid = new Set<number>();
+	private glassSaid = new Set<number>();
 
 	constructor(init: FlavorInit) {
 		this.trash = new TrashTalk(init.gid, tempersFromPlayers(init.players));
@@ -525,6 +570,119 @@ export class FlavorSession {
 							: "man";
 		}
 		this.periodLens[1] = init.quarterLength * 60;
+		this.records = init.records;
+		this.series = init.series;
+	}
+
+	// "the rim protector": how the announcer names a player a second time
+	private role(rng: Rng, p: FPlayer) {
+		return rng.pick(roleNames(p, this.female));
+	}
+
+	// Is he the kind of player an announcer would call by his role on a shooting line? (a sniper on his threes, a post scorer on his twos...)
+	private namesBy(p: FPlayer, three: boolean) {
+		const a = archetypeOf(p);
+		return three
+			? a === "sniper" || a === "stretch"
+			: a === "slasher" || a === "post" || a === "playmaker" || a === "stretch";
+	}
+
+	private half() {
+		return this.period <= Math.floor(this.numPeriods / 2) ? 1 : 2;
+	}
+
+	// The move that got a shot off: only a shot he made for himself in the half court
+	private moveFor(
+		rng: Rng,
+		play: any,
+		ctx: any,
+		att: Attempt | undefined,
+		made: boolean,
+	): MoveResult | null {
+		if (
+			!att ||
+			play.ast ||
+			ctx.trans ||
+			(ctx.lastReb && ctx.lastReb.pid === play.p.pid) ||
+			!["rim", "post", "mid", "three"].includes(att.kind)
+		) {
+			return null;
+		}
+		const zone = play.three ? "three" : (play.zone ?? "rim");
+		const D = ctx.def(play, !play.three);
+		const mv = signatureMove(rng, {
+			p: play.p,
+			zone,
+			made,
+			def: D,
+			andOne: !!play.andOne,
+		});
+		if (mv?.def) {
+			ctx.defUsed = mv.def;
+		}
+		if (mv?.wow) {
+			ctx.wow = true;
+		}
+		return mv;
+	}
+
+	// The set the offense ran, as a sentence before a half-court shot
+	private setFor(
+		rng: Rng,
+		text: string,
+		o: {
+			p: FPlayer;
+			ast: FPlayer | undefined;
+			t: 0 | 1;
+			three: boolean;
+			zone: "rim" | "post" | "mid" | undefined;
+			made: boolean;
+			line: string;
+		},
+	): { text: string; action: ActionKind } | undefined {
+		if (rng.random() >= (o.made ? 0.2 : 0.16)) {
+			return undefined;
+		}
+		const d: 0 | 1 = o.t === 0 ? 1 : 0;
+		const sp = setPlay(rng, {
+			p: o.p,
+			ast: o.ast,
+			zone: o.three ? "three" : (o.zone ?? "rim"),
+			made: o.made,
+			line: this.variety.stripNames(o.line),
+			mates: this.floor(o.t),
+			defs: this.floor(d),
+			scheme: this.scheme[d],
+			offense: this.the(o.t),
+			defense: this.the(d),
+		});
+		if (!sp) {
+			return undefined;
+		}
+		// "Smith seals his man deep in the paint. Smith (12 PTS) drop-steps...": the second time, his last name
+		let rest = cap(text);
+		const short = this.shortName(o.p);
+		if (
+			sp.text.includes(o.p.name) &&
+			rest.startsWith(o.p.name) &&
+			short !== o.p.name
+		) {
+			rest = short + rest.slice(o.p.name.length);
+		}
+		return { text: `${sp.text} ${rest}`, action: sp.action };
+	}
+
+	// His last name, when no one else in the game has it
+	private shortName(p: FPlayer) {
+		const last =
+			p.name
+				.split(" ")
+				.filter((w) => !/^(Jr\.?|Sr\.?|II|III|IV)$/.test(w))
+				.pop() ?? p.name;
+		const shared = [...this.players.values()].some(
+			(q) => q.pid !== p.pid && q.name.split(" ").includes(last),
+		);
+		return shared || last.length < 2 ? p.name : last;
 	}
 
 	// ---- small helpers ----
@@ -805,6 +963,18 @@ export class FlavorSession {
 			}[this.scheme[ti]];
 			notes.push(`${cap(this.the(ti))} ${look}.`);
 		}
+		// at the half and after three: lead changes, the largest lead
+		if (
+			notes.length < 2 &&
+			ev.type === "period" &&
+			this.period - 1 >= this.numPeriods / 2 &&
+			rng.random() < 0.45
+		) {
+			const sum = this.flow.summary(rng, [this.the(0), this.the(1)]);
+			if (sum) {
+				notes.push(sum);
+			}
+		}
 		// now and then, who leads the scoring so far
 		if (notes.length < 2 && rng.random() < 0.35) {
 			const top = [...this.players.values()]
@@ -870,9 +1040,24 @@ export class FlavorSession {
 			this.periodLens[1] = ev.clock;
 		}
 		this.startKind = "dead";
-		return {
+		const res: FlavorResult = {
 			text: tipOff(rng, a, b, this.the(ev.t), this.period > this.numPeriods),
 		};
+		if (this.period === 1 && (this.records || this.series)) {
+			// (picked without the variety memory: only live games know the records, and the rest of the game must read the same as a replay)
+			const rec = recordsNote(
+				rng,
+				[this.the(0), this.the(1)],
+				this.records ?? [undefined, undefined],
+				this.series,
+			);
+			this.records = undefined;
+			this.series = undefined;
+			if (rec) {
+				res.note = rec;
+			}
+		}
+		return res;
 	}
 
 	// ---- shots ----
@@ -1013,6 +1198,7 @@ export class FlavorSession {
 		let text: string;
 		let core: string;
 		let buzzer = heave;
+		let move: MoveResult | null = null;
 		if (heave) {
 			text = heaveText(rng, p, true);
 			core = text;
@@ -1026,7 +1212,8 @@ export class FlavorSession {
 			core = text;
 		} else {
 			ctx.shotEnd = undefined;
-			let t0 = madeShot(rng, play, ctx);
+			move = ctx.beatClock ? null : this.moveFor(rng, play, ctx, att, true);
+			let t0 = move ? move.text : madeShot(rng, play, ctx);
 			// the and-one belongs to the shot: it goes before the pass that set it up
 			const cut =
 				ctx.shotEnd !== undefined && ctx.shotEnd < t0.length
@@ -1161,7 +1348,79 @@ export class FlavorSession {
 		res.text = this.tally(text, ev, { p, ast });
 		this.rememberFoul(ev);
 		this.lastShot = undefined;
+		const plain = res.text;
 		res.text = this.leadIn(rng, res.text, t, ev, att, ctx);
+		let action: ActionKind | undefined = move?.action;
+		if (
+			ctx.trans &&
+			ast &&
+			ctx.defReb !== undefined &&
+			ctx.defReb !== p.pid &&
+			!heave &&
+			!/2-on-1|coast|alley|lob/.test(core)
+		) {
+			// off a defensive rebound: the outlet, and now and then the scorer was already gone
+			const rebounder = this.pl(ctx.defReb);
+			action = ctx.defReb === ast.pid ? "outlet" : undefined;
+			if (p.R.spd >= 52 && res.text === plain && rng.random() < 0.4) {
+				action = "leak-out";
+				res.text = `${pickV(rng, [
+					`${p.name} leaks out early.`,
+					`${p.name} is already running before ${rebounder.name} comes down with the board.`,
+					`${p.name} leaks out before the rebound is secured.`,
+					`${p.name} takes off the moment the shot goes up.`,
+					`${p.name} cheats down the floor as the shot goes up.`,
+				])} ${cap(res.text)}`;
+			}
+		} else if (
+			!move &&
+			!ctx.trans &&
+			!heave &&
+			!fake &&
+			!meta.tip &&
+			!meta.putback &&
+			!ctx.ptype &&
+			res.text === plain
+		) {
+			const sp = this.setFor(rng, res.text, {
+				p,
+				ast,
+				t,
+				three: meta.three,
+				zone: meta.zone,
+				made: true,
+				line: text,
+			});
+			if (sp) {
+				res.text = sp.text;
+				action = sp.action;
+			}
+		}
+		if (action) {
+			res.action = action;
+		}
+		// his shooting line, and the bench after an ankle-breaker
+		if (notes.length < 2 && !flags.winner) {
+			const sl = this.shooting.made(
+				rng,
+				p,
+				this.host.stat(p.pid),
+				meta.three && !fake,
+				rng.random() < 0.5 && this.namesBy(p, meta.three && !fake)
+					? this.role(rng, p)
+					: undefined,
+			);
+			if (sl) {
+				notes.push(sl);
+			}
+		}
+		if (
+			move?.action === "ankle-breaker" &&
+			notes.length < 2 &&
+			rng.random() < 0.45
+		) {
+			notes.push(benchLine(rng, "move", this.the(t), p.name));
+		}
 		this.finishNotes(res, notes);
 		// an announcer's call for the big ones
 		const call = this.callFor(rng, {
@@ -1327,6 +1586,7 @@ export class FlavorSession {
 		let core: string | undefined;
 		let lateClock = false;
 		let ptype: string | undefined;
+		let move: MoveResult | null = null;
 		if (!shooter) {
 			text = `${cap(pickV(rng, [`blocked by ${blocker!.name}`, `${blocker!.name} gets a hand on it`, `${blocker!.name} swats it away`]))}.`;
 		} else if (
@@ -1361,7 +1621,11 @@ export class FlavorSession {
 			}
 			const trans =
 				!!ctx.trans && !(ctx.lastReb && ctx.lastReb.pid === shooter.pid);
-			core = missText(rng, play, ctx);
+			move =
+				blocked || this.lateInShotClock(att)
+					? null
+					: this.moveFor(rng, play, ctx, att, false);
+			core = move ? move.text : missText(rng, play, ctx);
 			// a forced shot late in the shot clock
 			lateClock =
 				!blocked &&
@@ -1427,13 +1691,71 @@ export class FlavorSession {
 			heatCheck && "heat-check",
 		].filter((x): x is string => typeof x === "string");
 		res.text = this.tally(text, ev, { p: shooter, blk: blocker });
+		let action: ActionKind | undefined = move?.action;
 		if (shooter && !blocked && !/heave|horn/.test(text)) {
+			const plain = res.text;
 			res.text = this.leadIn(rng, res.text, shotT, ev, att, ctx);
+			if (
+				!move &&
+				core !== undefined &&
+				res.text === plain &&
+				!ctx.trans &&
+				!meta.putback &&
+				!meta.tip &&
+				!fake &&
+				!ctx.ptype &&
+				!(ctx.lastReb && ctx.lastReb.pid === shooter.pid)
+			) {
+				const sp = this.setFor(rng, res.text, {
+					p: shooter,
+					ast: undefined,
+					t: shotT,
+					three,
+					zone: meta.zone,
+					made: false,
+					line: core,
+				});
+				if (sp) {
+					res.text = sp.text;
+					action = sp.action;
+				}
+			}
+		}
+		if (ctx.ptype === "chasedown") {
+			action = "chase-down";
+		}
+		if (action) {
+			res.action = action;
 		}
 		void score;
+		if (shooter && notes.length === 0 && rng.random() < 0.6) {
+			const cold = this.shooting.missed(
+				rng,
+				shooter,
+				this.host.stat(shooter.pid),
+				this.half(),
+			);
+			if (cold) {
+				notes.push(cold);
+			}
+		}
 		this.finishNotes(res, notes);
 		if (blocker) {
 			this.milestoneNotes(rng, res, [blocker]);
+			// the rim protector, named as one now and then
+			const nb = this.host.stat(blocker.pid)?.blk ?? 0;
+			const roles = roleNames(blocker, this.female);
+			if (
+				!res.note &&
+				nb >= 2 &&
+				nb < 5 &&
+				roles.includes("the rim protector") &&
+				rng.random() < 0.3
+			) {
+				res.note = roleBlockNote(rng, "the rim protector", nb);
+			} else if (!res.note && ctx.ptype === "chasedown" && rng.random() < 0.3) {
+				res.note = benchLine(rng, "block", this.the(ev.t), blocker.name);
+			}
 		}
 		return this.cleanResult(res, ctx);
 	}
@@ -1482,7 +1804,27 @@ export class FlavorSession {
 						? "charge"
 						: "offensive-foul"
 					: undefined,
+			action: tovAction(this.variety.stripNames(s), {
+				shotClock: !!play.shotClock,
+				charge: !!ctx.chargeTaken,
+				offFoul: !!ctx.offFoulUsed,
+			}),
 		};
+		if (ctx.chargeTaken) {
+			res.pidHero = ctx.chargeTaken.pid;
+		}
+		if (ctx.chargeTaken && !/get up/.test(text) && rng.random() < 0.3) {
+			res.note = benchLine(rng, "hustle", this.the(o), ctx.chargeTaken.name);
+		} else if (
+			ctx.offFoulUsed &&
+			!this.challengeSaid &&
+			this.finalPeriod() &&
+			(ev.clock ?? 999) <= 150 &&
+			rng.random() < 0.25
+		) {
+			this.challengeSaid = true;
+			res.note = challengeNote(rng, this.the(t));
+		}
 		this.ato = [false, false];
 		return this.cleanResult(res, ctx);
 	}
@@ -1506,8 +1848,12 @@ export class FlavorSession {
 		const res: FlavorResult = {
 			text: this.tally(text, ev, { p: victim, stl: stealer }),
 			ptype: "steal",
+			action: stealAction(this.variety.stripNames(s)),
 		};
 		const notes: string[] = [];
+		if (res.action === "loose-ball" && rng.random() < 0.35) {
+			notes.push(benchLine(rng, "hustle", this.the(t), stealer.name));
+		}
 		this.ato = [false, false];
 		this.finishNotes(res, notes);
 		this.milestoneNotes(rng, res, [stealer]);
@@ -1549,7 +1895,41 @@ export class FlavorSession {
 		this.lastShot = undefined;
 		this.trip = null;
 		const res: FlavorResult = { text: this.tally(text, ev, { p }) };
+		if (
+			/box(?:es)? out|boxing out|seals|carves out|walls off|puts a body on/.test(
+				text,
+			)
+		) {
+			res.action = "box-out";
+		} else if (
+			/battle|scrum|wrestles|outfights|fights|tie-up|out-muscles/.test(text)
+		) {
+			res.action = "rebound-battle";
+		}
 		this.milestoneNotes(rng, res, [p]);
+		// the battle on the glass, once a half
+		const half = this.half();
+		if (
+			!res.note &&
+			this.period >= 2 &&
+			!this.glassSaid.has(half) &&
+			rng.random() < 0.05
+		) {
+			const reb: [number, number] = [0, 0];
+			for (const q of this.players.values()) {
+				reb[q.t] += this.host.stat(q.pid)?.trb ?? 0;
+			}
+			const lead: 0 | 1 = reb[0] >= reb[1] ? 0 : 1;
+			if (reb[lead] - reb[lead === 0 ? 1 : 0] >= 8) {
+				this.glassSaid.add(half);
+				res.note = glassNote(
+					rng,
+					this.the(lead),
+					reb[lead],
+					reb[lead === 0 ? 1 : 0],
+				);
+			}
+		}
 		this.ato = [false, false];
 		return this.cleanResult(res, {});
 	}
@@ -1653,6 +2033,17 @@ export class FlavorSession {
 				);
 			}
 		}
+		if (
+			(ev.type === "pfFG" || ev.type === "pfTP") &&
+			notes.length === 0 &&
+			!this.challengeSaid &&
+			this.finalPeriod() &&
+			(ev.clock ?? 999) <= 150 &&
+			rng.random() < 0.15
+		) {
+			this.challengeSaid = true;
+			notes.push(challengeNote(rng, this.the(defT)));
+		}
 		this.finishNotes(res, notes);
 		return this.cleanResult(res, {});
 	}
@@ -1673,6 +2064,7 @@ export class FlavorSession {
 			this.finalPeriod() && (ev.clock ?? 999) <= 120 && Math.abs(margin) <= 5;
 		const trip =
 			this.trip && this.trip.shooter.pid === p.pid ? this.trip : null;
+		const firstOfTrip = !!trip && trip.i === 0 && trip.n >= 2;
 		const text = freeThrow(rng, trip, p, made, {
 			late,
 			makesBefore: trip?.m ?? 0,
@@ -1715,6 +2107,20 @@ export class FlavorSession {
 				})
 			: [];
 		res.text = this.tally(text, ev, { p });
+		if (
+			firstOfTrip &&
+			notes.length === 0 &&
+			!this.routineSaid.has(p.pid) &&
+			rng.random() < (late ? 0.2 : 0.04)
+		) {
+			this.routineSaid.add(p.pid);
+			notes.push(ftRoutine(rng, p));
+		} else if (made && lastOfTrip && notes.length < 2) {
+			const ftLine = this.shooting.freeThrows(rng, p, this.host.stat(p.pid));
+			if (ftLine) {
+				notes.push(ftLine);
+			}
+		}
 		this.finishNotes(res, notes);
 		this.ato = [false, false];
 		return this.cleanResult(res, {});
@@ -1874,7 +2280,27 @@ export class FlavorSession {
 		this.lastShot = undefined;
 		this.lastReb = undefined;
 		this.stealer = undefined;
-		return { text: timeoutText(rng, this.the(t), ev.numLeft ?? 0, opts) };
+		const res: FlavorResult = {
+			text: timeoutText(rng, this.the(t), ev.numLeft ?? 0, opts),
+		};
+		// a big lead that has been slipping away
+		const had = this.flow.largest[t];
+		const now = score[t] - score[o];
+		if (had >= 12 && now <= 4 && rng.random() < 0.6) {
+			res.note =
+				now > 0
+					? pickV(rng, [
+							`${cap(this.the(t))} led by ${had}. It's down to ${now}.`,
+							`${cap(aNum(had))} ${had}-point lead has become ${now}, and the coach has seen enough.`,
+						])
+					: now === 0
+						? `${cap(this.the(t))} led by ${had}; it's tied now.`
+						: pickV(rng, [
+								`${cap(this.the(t))} led by ${had} and now trail by ${-now}.`,
+								`From up ${had} to down ${-now}: the coach needs answers.`,
+							]);
+		}
+		return res;
 	}
 
 	private onEndOfPeriod(rng: Rng, ev: any): FlavorResult {
@@ -2216,7 +2642,7 @@ export class FlavorSession {
 				clutch.push(
 					pickV(rng, [
 						`That might be the dagger, and ${this.the(t)} lead by ${marginAfter}.`,
-						`${p.name} with the dagger. It's a ${marginAfter}-point game.`,
+						`${p.name} with the dagger. It's ${aNum(marginAfter)} ${marginAfter}-point game.`,
 						`That's a two-possession game now, ${score[t]}-${score[opp]}.`,
 					]),
 				);
@@ -2253,6 +2679,15 @@ export class FlavorSession {
 			}
 		}
 
+		// ---- the flow of the game: lead changes, ties, comebacks, a lead slipping away, the largest lead ----
+		const flowNote = this.flow.note(rng, {
+			t,
+			score,
+			teams: [this.the(0), this.the(1)],
+			late: this.finalPeriod() && (o.clock ?? 999) <= 300,
+			change: this.flow.update(score, t),
+		});
+
 		// ---- the crowd and the bench, now and then ----
 		let crowdNote = "";
 		const late =
@@ -2287,6 +2722,7 @@ export class FlavorSession {
 		out.push(...mil);
 		for (const n of [
 			runNote,
+			flowNote,
 			leadNote,
 			streakNote,
 			droughtNote,

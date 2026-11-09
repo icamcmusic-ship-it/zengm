@@ -54,6 +54,25 @@ import {
 	type ShotKind,
 } from "./calls.ts";
 import { Rng } from "./rng.ts";
+import {
+	ACTION_KINDS,
+	roleNames,
+	setPlay,
+	signatureMove,
+	stealAction,
+	tovAction,
+} from "./actions.ts";
+import {
+	GameFlow,
+	ShootingNotes,
+	benchLine,
+	challengeNote,
+	ftRoutine,
+	glassNote,
+	ordinal,
+	recordsNote,
+	roleBlockNote,
+} from "./color.ts";
 import { VarietyMemory, setVariety } from "./variety.ts";
 import { RATING_KEYS, clockOf, type FPlayer, type Ratings } from "./types.ts";
 
@@ -557,3 +576,305 @@ test("calls, crowd, momentum and milestone lines fill in", () => {
 	);
 	assert.isAbove(archetypes.size, 4);
 }, 60_000);
+
+test("set plays, moves and the game-long colour fill in, and a move reads as its kind of shot", () => {
+	setVariety(new VarietyMemory(NAMES));
+	const rng = new Rng(4, 4);
+	const MOVE_KINDS: Record<string, ShotKind[]> = {
+		rim: ["layup", "floater", "dunk"],
+		post: ["hook", "post-move", "fadeaway", "layup"],
+		mid: KINDS_FOR.mid!,
+		three: KINDS_FOR.three!,
+	};
+	const actions = new Set<string>();
+	let moves = 0;
+	let sets = 0;
+	for (const [i, p] of players.entries()) {
+		const ast = players[(i + 1) % players.length]!;
+		const mates = [
+			ast,
+			players[(i + 2) % players.length]!,
+			players[(i + 4) % players.length]!,
+		];
+		const defs = [
+			players[(i + 3) % players.length]!,
+			players[(i + 5) % players.length]!,
+		];
+		for (const zone of ["rim", "post", "mid", "three"] as const) {
+			for (const made of [true, false]) {
+				for (let k = 0; k < 12; k++) {
+					// (a new memory now and then: a move used a few lines ago is left out)
+					if (k % 4 === 0) {
+						setVariety(new VarietyMemory(NAMES));
+					}
+					const mv = signatureMove(rng, {
+						p,
+						zone,
+						made,
+						def: k % 3 === 0 ? undefined : defs[0],
+						andOne: k % 5 === 0,
+					});
+					if (mv) {
+						moves += 1;
+						check(`move ${zone}`, mv.text);
+						assert.include(ACTION_KINDS, mv.action);
+						actions.add(mv.action);
+						assert.isTrue(mv.text.includes(p.name), mv.text);
+						if (made) {
+							const kind = classifyShot(
+								mv.text.replaceAll(p.name, "N").replaceAll(defs[0]!.name, "D"),
+								{
+									three: zone === "three",
+									zone: zone === "three" ? undefined : zone,
+									putback: false,
+									inboundTip: false,
+									fake: false,
+									ptype: undefined,
+								},
+							);
+							assert.include(MOVE_KINDS[zone]!, kind, `${mv.text} (${zone})`);
+						}
+					}
+					for (const assisted of [false, true]) {
+						if (assisted && !made) {
+							continue;
+						}
+						const sp = setPlay(rng, {
+							p,
+							ast: assisted ? ast : undefined,
+							zone,
+							made,
+							line: "N hits a shot",
+							mates,
+							defs,
+							scheme: ["man", "zone", "switch", "press"][k % 4]!,
+							offense: "the Celtics",
+							defense: "the Mavericks",
+						});
+						if (sp) {
+							sets += 1;
+							check(`set ${zone}`, sp.text);
+							assert.match(sp.text, /^[A-Z].*\.$/, sp.text);
+							assert.include(ACTION_KINDS, sp.action);
+							actions.add(sp.action);
+							// (a pass that led straight to a made shot is an assist: no pass before an unassisted make)
+							if (made && !assisted) {
+								assert.notMatch(
+									sp.text,
+									/kicks it out|hand-off|pin-down|pops out|rolls to the rim|backdoor/,
+									sp.text,
+								);
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	assert.isAbove(moves, 500);
+	assert.isAbove(sets, 500);
+	for (const a of [
+		"pick-and-roll",
+		"pick-and-pop",
+		"isolation",
+		"post-up",
+		"drive-and-kick",
+		"backdoor-cut",
+		"off-ball-screen",
+		"handoff",
+		"switch",
+		"double-team",
+		"zone",
+		"euro-step",
+		"spin-move",
+		"crossover",
+		"ankle-breaker",
+		"pump-fake",
+		"up-and-under",
+		"goaltending",
+	]) {
+		assert.isTrue(actions.has(a), `no ${a}`);
+	}
+	// a line that already names its action gets no set
+	assert.isNull(
+		setPlay(rng, {
+			p: players[5]!,
+			ast: players[6],
+			zone: "rim",
+			made: true,
+			line: "N dunks it on a pocket pass from N out of the pick-and-roll",
+			mates: players.slice(10, 14),
+			defs: players.slice(20, 25),
+			scheme: "man",
+			offense: "the Celtics",
+			defense: "the Mavericks",
+		}),
+	);
+	// what a turnover, a steal is
+	assert.strictEqual(
+		tovAction("N is called for traveling", {
+			shotClock: false,
+			charge: false,
+			offFoul: false,
+		}),
+		"travel",
+	);
+	assert.strictEqual(
+		tovAction("N camps in the lane too long: three seconds", {
+			shotClock: false,
+			charge: false,
+			offFoul: false,
+		}),
+		"three-seconds",
+	);
+	assert.strictEqual(
+		tovAction("N extends a hip on the screen: illegal screen", {
+			shotClock: false,
+			charge: false,
+			offFoul: true,
+		}),
+		"illegal-screen",
+	);
+	assert.strictEqual(
+		tovAction("D draws the charge on N", {
+			shotClock: false,
+			charge: true,
+			offFoul: true,
+		}),
+		"charge-taken",
+	);
+	assert.strictEqual(
+		stealAction("D dives on the floor for the loose ball and wins it from N"),
+		"loose-ball",
+	);
+	assert.strictEqual(
+		stealAction("D jumps the passing lane and picks off N's pass meant for M"),
+		"interception",
+	);
+
+	// the flow of the score
+	const flow = new GameFlow();
+	const notes: string[] = [];
+	const teams: [string, string] = ["the Celtics", "the Mavericks"];
+	const sc: [number, number] = [0, 0];
+	const r2 = new Rng(5, 5);
+	// the Mavericks build a big lead, then it swings back and forth
+	const plays: (0 | 1)[] = [...Array(10).fill(1), ...Array(12).fill(0)];
+	for (let i = 0; i < 40; i++) {
+		const t = i % 2 === 0 ? 1 : 0;
+		plays.push(t, t, t);
+	}
+	for (const t of plays) {
+		sc[t] += 2;
+		const change = flow.update([sc[0], sc[1]], t);
+		const n = flow.note(r2, {
+			t,
+			score: [sc[0], sc[1]],
+			teams,
+			late: true,
+			change,
+		});
+		if (n) {
+			check("flow", n);
+			notes.push(n);
+		}
+	}
+	assert.isAbove(flow.leadChanges, 6);
+	assert.isTrue(
+		notes.some((n) => /erased|turnaround|comeback|Now they lead/.test(n)),
+		notes.join(" | "),
+	);
+	assert.isTrue(
+		notes.some((n) => /lead change|changed hands/.test(n)),
+		notes.join(" | "),
+	);
+	check("flow summary", flow.summary(r2, teams) || "x");
+	assert.strictEqual(ordinal(1), "1st");
+	assert.strictEqual(ordinal(12), "12th");
+	assert.strictEqual(ordinal(22), "22nd");
+
+	// shooting lines, from the box score
+	const sh = new ShootingNotes();
+	const p = players[7]!;
+	check(
+		"hot",
+		sh.made(r2, p, { fg: 6, fga: 7, tp: 1, tpa: 2 }, false, undefined),
+	);
+	check(
+		"perfect",
+		sh.made(r2, players[8]!, { fg: 5, fga: 5 }, false, "the slasher"),
+	);
+	check(
+		"threes",
+		sh.made(
+			r2,
+			players[9]!,
+			{ fg: 5, fga: 9, tp: 4, tpa: 6 },
+			true,
+			"the sharpshooter",
+		),
+	);
+	check("cold", sh.missed(r2, p, { fg: 2, fga: 11 }, 1));
+	check("ft", sh.freeThrows(r2, p, { ft: 9, fta: 9 }));
+	// (said once; nothing to say without the stats)
+	assert.strictEqual(sh.missed(r2, p, { fg: 2, fga: 12 }, 1), "");
+	assert.strictEqual(
+		sh.made(r2, players[10]!, undefined, false, undefined),
+		"",
+	);
+	for (const q of players.slice(0, 20)) {
+		for (const f of [false, true]) {
+			for (const role of roleNames(q, f)) {
+				assert.match(role, /^the [a-z-]+( [a-z-]+)*$/, role);
+				if (f) {
+					assert.notMatch(role, /\b(man|guy)\b/, role);
+				}
+			}
+		}
+		check("routine", ftRoutine(r2, q));
+		for (const k of ["hustle", "move", "block"] as const) {
+			check("bench", benchLine(r2, k, "the Celtics", q.name));
+		}
+	}
+	check("challenge", challengeNote(r2, "the Celtics"));
+	check("glass", glassNote(r2, "the Celtics", 30, 21));
+	check("block role", roleBlockNote(r2, "the rim protector", 3));
+	check(
+		"records",
+		recordsNote(
+			r2,
+			teams,
+			[
+				{ won: 30, lost: 10 },
+				{ won: 12, lost: 28 },
+			],
+			undefined,
+		),
+	);
+	check(
+		"records",
+		recordsNote(
+			r2,
+			teams,
+			[
+				{ won: 30, lost: 10 },
+				{ won: 29, lost: 11 },
+			],
+			undefined,
+		),
+	);
+	check("series", recordsNote(r2, teams, [undefined, undefined], [2, 1]));
+	check("series", recordsNote(r2, teams, [undefined, undefined], [0, 0]));
+	assert.strictEqual(
+		recordsNote(
+			r2,
+			teams,
+			[
+				{ won: 1, lost: 0 },
+				{ won: 0, lost: 1 },
+			],
+			undefined,
+		),
+		"",
+	);
+});

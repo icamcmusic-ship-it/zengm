@@ -57,6 +57,9 @@ export const nonShootingFoul = (
 			`Intentional foul by ${n} on ${s}`,
 			`${n} sends ${s} to the line as the clock stops`,
 			`${n} gets the foul in on ${s} right away`,
+			`${n} chases down ${s} and fouls to stop the clock`,
+			`${n} reaches in on ${s} the moment he catches it`,
+			`${n} lunges at ${s} for the foul`,
 		]);
 		return `${call} (${tag}).${opts.bonus ? "" : ` ${ball} ball on the side.`}`;
 	}
@@ -426,6 +429,9 @@ export const timeoutText = (
 					", to regroup",
 					", to settle things down",
 					", to get everyone on the same page",
+					", to make an adjustment on defense",
+					", to give the starters a breather",
+					", to slow the game down",
 				]);
 	}
 	const adv = opts.advancesBall
@@ -677,6 +683,13 @@ export const injuryText = (rng: Rng, p: FPlayer) =>
 		`${p.name} is helped off the floor; it looks like an injury.`,
 		`${p.name} is down and holding his leg; he'll head to the locker room.`,
 		`${p.name} limps to the bench with an apparent injury.`,
+		`${p.name} stays down after the play, and the trainer comes out to check on him. He heads to the locker room.`,
+		`${p.name} lands awkwardly and grabs at his ankle. He's done for now.`,
+		`${p.name} comes up limping after the play and is taken out of the game.`,
+		`Play is stopped with ${p.name} down on the floor. He walks off gingerly with the trainer.`,
+		`${p.name} tweaks something on the play and heads straight to the back.`,
+		`A hush falls over the arena as ${p.name} stays down. He's helped off the court.`,
+		`${p.name} takes a knee and motions to the bench. He'll have to come out.`,
 	]);
 
 export const tipOff = (
