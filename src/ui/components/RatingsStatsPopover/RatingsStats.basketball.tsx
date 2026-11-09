@@ -7,7 +7,12 @@ type Props = {
 		pos: string;
 		ovr: number;
 		pot: number;
-	} & Record<RatingKey, number>;
+	} & Record<RatingKey, number> & {
+			// Expanded ratings (the expandedRatings setting)
+			wng?: number;
+			pdef?: number;
+			idef?: number;
+		};
 	stats: any;
 	type?: "career" | "current" | "draft" | number;
 	challengeNoRatings: boolean;
@@ -33,6 +38,14 @@ const RatingsStats = ({ challengeNoRatings, ratings, stats, type }: Props) => {
 						Hgt: {ratings.hgt}
 					</span>
 					<br />
+					{ratings.wng !== undefined ? (
+						<>
+							<span style={ratingsGradientStyle(ratings.wng)}>
+								Wng: {ratings.wng}
+							</span>
+							<br />
+						</>
+					) : null}
 					<span style={ratingsGradientStyle(ratings.stre)}>
 						Str: {ratings.stre}
 					</span>
@@ -81,9 +94,21 @@ const RatingsStats = ({ challengeNoRatings, ratings, stats, type }: Props) => {
 						oIQ: {ratings.oiq}
 					</span>
 					<br />
-					<span style={ratingsGradientStyle(ratings.diq)}>
-						dIQ: {ratings.diq}
-					</span>
+					{ratings.pdef !== undefined && ratings.idef !== undefined ? (
+						<>
+							<span style={ratingsGradientStyle(ratings.pdef)}>
+								PDf: {ratings.pdef}
+							</span>
+							<br />
+							<span style={ratingsGradientStyle(ratings.idef)}>
+								IDf: {ratings.idef}
+							</span>
+						</>
+					) : (
+						<span style={ratingsGradientStyle(ratings.diq)}>
+							dIQ: {ratings.diq}
+						</span>
+					)}
 					<br />
 					<span style={ratingsGradientStyle(ratings.drb)}>
 						Drb: {ratings.drb}

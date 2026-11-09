@@ -13,6 +13,13 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { getProStats } from "../../../common/preDraft.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
 import { applyInjuryDepth } from "./injuryDepthTeam.ts";
+import {
+	compositeWeightsFor,
+	deriveExpandedRatings,
+	expandedRatingsSeed,
+	hasExpandedRatings,
+} from "../../../common/expandedRatings.ts";
+import { expandedRatingsOn } from "../player/expandedRatings.ts";
 
 const MAX_NUM_PLAYERS_PACE = 7;
 
@@ -249,7 +256,13 @@ export const processTeam = async (
 	const playThroughInjuries = actualPlayThroughInjuries[playoffs ? 1 : 0];
 
 	let game6EliminationGameOrGame7: boolean | undefined;
-	const compositeWeights = Object.entries(COMPOSITE_WEIGHTS);
+	// Expanded ratings (basketball): the defense, rebounding and finishing composites read wingspan and perimeter/interior defense
+	const expandedRatings = __SPORT === "basketball" && expandedRatingsOn();
+	const compositeWeights = Object.entries(
+		__SPORT === "basketball"
+			? compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings)
+			: COMPOSITE_WEIGHTS,
+	);
 
 	let seasonStatsByPid;
 	if (SEASON_STATS_KEYS !== undefined) {
@@ -273,7 +286,14 @@ export const processTeam = async (
 		const jerseyNumber =
 			proStats.length > 0 ? proStats.at(-1)!.jerseyNumber : p.jerseyNumber;
 
-		const rating = last(p.ratings);
+		let rating = last(p.ratings);
+		if (expandedRatings && !hasExpandedRatings(rating)) {
+			// Not filled in yet (turned on in an old league, imported player): derive, deterministically, without saving
+			rating = {
+				...rating,
+				...deriveExpandedRatings(rating, expandedRatingsSeed(p)),
+			};
+		}
 		const playerCompositeRatings: any = {};
 		const p2 = {
 			id: p.pid,

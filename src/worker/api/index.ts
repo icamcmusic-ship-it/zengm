@@ -251,6 +251,13 @@ import {
 } from "../core/draft/lotteryWhatIf.ts";
 import type { DraftType as DraftTypeWhatIf } from "../../common/types.ts";
 import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
+import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
+import {
+	ensureExpandedRatings,
+	expandedRatingsOn,
+	ratingsKeysForView,
+	syncDefenseToDiq,
+} from "../core/player/expandedRatings.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -3569,7 +3576,7 @@ const ratingsStatsPopoverInfo = async ({
 		"pot",
 		"season",
 		"tid",
-		...RATINGS,
+		...ratingsKeysForView(RATINGS),
 		...(includeAbbrev ? (["abbrev"] as const) : []),
 	] as const;
 
@@ -4586,10 +4593,23 @@ const updateDefaultSettingsOverrides = async (
 	}
 };
 
+// Expanded ratings turned on or off: fill in / stop using the new ratings, and recompute ovr, pot and skills
+const expandedRatingsChanged = (
+	gameAttributes: Partial<GameAttributesLeague>,
+) =>
+	__SPORT === "basketball" &&
+	gameAttributes.expandedRatings !== undefined &&
+	!!gameAttributes.expandedRatings !== !!g.get("expandedRatings");
+
 const updateGameAttributes = async (
 	gameAttributes: Partial<GameAttributesLeague>,
 ) => {
+	const expandedChanged = expandedRatingsChanged(gameAttributes);
 	await league.setGameAttributes(gameAttributes);
+	if (expandedChanged) {
+		await updateExpandedRatingsForLeague();
+		await idb.cache.flush();
+	}
 	if (gameAttributes.coachingStaff) {
 		// Turning on the coaching staff from the League Extras tab generates staffs, like League Settings does
 		await staff.ensureStaff();
@@ -4651,8 +4671,13 @@ const updateGameAttributesGodMode = async (
 
 	const currentRpdPot = g.get("rpdPot");
 	const currentRealPlayerDeterminism = g.get("realPlayerDeterminism");
+	const expandedChanged = expandedRatingsChanged(gameAttributes);
 
 	await league.setGameAttributes(gameAttributes);
+
+	if (expandedChanged) {
+		await updateExpandedRatingsForLeague();
+	}
 
 	// Turning on the coaching staff in an existing league generates staffs
 	await staff.ensureStaff();
@@ -5554,6 +5579,13 @@ const upsertCustomizedPlayer = async (
 	}
 
 	p.imgURL = helpers.stripBbcode(p.imgURL);
+
+	// Expanded ratings: diq is the average of perimeter and interior defense. The form keeps them in sync when either is edited; a diq
+	// changed some other way (Regenerate build) moves both.
+	if (__SPORT === "basketball" && expandedRatingsOn()) {
+		ensureExpandedRatings(p);
+		syncDefenseToDiq(last(p.ratings));
+	}
 
 	// Fix draft and ratings season
 	if (p.tid === PLAYER.UNDRAFTED) {

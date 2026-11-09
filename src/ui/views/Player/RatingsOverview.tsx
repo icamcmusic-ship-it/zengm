@@ -25,6 +25,12 @@ export const RatingsOverview = ({
 		ratings.findLast((row) => row.season === currentSeason.season - 1) ??
 		currentSeason;
 
+	// Expanded ratings (the expandedRatings setting): wingspan with the physical ratings, and the two defense ratings in place of
+	// defensive IQ (their average)
+	const expanded =
+		typeof currentSeason.wng === "number" &&
+		typeof currentSeason.pdef === "number";
+
 	const columns = bySport<
 		Record<
 			string,
@@ -109,6 +115,14 @@ export const RatingsOverview = ({
 						label: "Height",
 						rating: "hgt",
 					},
+					...(expanded
+						? [
+								{
+									label: "Wingspan",
+									rating: "wng",
+								},
+							]
+						: []),
 					{
 						label: "Strength",
 						rating: "stre",
@@ -177,15 +191,38 @@ export const RatingsOverview = ({
 						),
 						rating: "oiq",
 					},
-					{
-						label: (
-							<>
-								<span className="d-md-none">Def</span>
-								<span className="d-none d-md-inline">Defensive</span> IQ
-							</>
-						),
-						rating: "diq",
-					},
+					...(expanded
+						? [
+								{
+									label: (
+										<>
+											<span className="d-md-none">Per</span>
+											<span className="d-none d-md-inline">Perimeter</span> D
+										</>
+									),
+									rating: "pdef",
+								},
+								{
+									label: (
+										<>
+											<span className="d-md-none">Int</span>
+											<span className="d-none d-md-inline">Interior</span> D
+										</>
+									),
+									rating: "idef",
+								},
+							]
+						: [
+								{
+									label: (
+										<>
+											<span className="d-md-none">Def</span>
+											<span className="d-none d-md-inline">Defensive</span> IQ
+										</>
+									),
+									rating: "diq",
+								},
+							]),
 					{
 						label: "Dribbling",
 						rating: "drb",

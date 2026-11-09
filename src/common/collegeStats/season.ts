@@ -83,7 +83,7 @@ export const composite = (
 		const value =
 			typeof component === "number"
 				? component
-				: ratings[component as keyof Ratings];
+				: (ratings[component as keyof Ratings] as number);
 		numerator += value * weight;
 		denominator += 100 * weight;
 	}
@@ -104,7 +104,7 @@ export const backProject = (
 	}
 	const out = { ...ratings };
 	for (const key of Object.keys(out) as (keyof Ratings)[]) {
-		if (key === "hgt") {
+		if (key === "hgt" || key === "wng") {
 			continue;
 		}
 		let shift = 0;
@@ -119,7 +119,7 @@ export const backProject = (
 			key === "spd" || key === "jmp" || key === "stre" || key === "endu"
 				? 0.55
 				: 1;
-		out[key] = Math.max(0, out[key] - shift * factor);
+		out[key] = Math.max(0, out[key]! - shift * factor);
 	}
 	return out;
 };
@@ -462,7 +462,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const stl40 = clamp(
 		1.15 +
 			0.025 * (ratings.spd - 40) +
-			0.02 * (ratings.diq - 40) -
+			0.02 * ((ratings.pdef ?? ratings.diq) - 40) +
+			(ratings.wng === undefined ? 0 : 0.006 * (ratings.wng - ratings.hgt)) -
 			0.35 * b +
 			rng.normal(0, 0.22 * noise),
 		0.4,
@@ -473,7 +474,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		-0.35 +
 			0.075 * (ratings.hgt - 30) +
 			0.012 * (ratings.jmp - 40) +
-			0.01 * (ratings.diq - 40) +
+			0.01 * ((ratings.idef ?? ratings.diq) - 40) +
+			(ratings.wng === undefined ? 0 : 0.03 * (ratings.wng - ratings.hgt)) +
 			rng.normal(0, 0.25 * noise),
 		0.05,
 		6,
@@ -711,7 +713,7 @@ export const forwardProject = (
 	}
 	const out = { ...ratings };
 	for (const key of Object.keys(out) as (keyof Ratings)[]) {
-		if (key === "hgt") {
+		if (key === "hgt" || key === "wng") {
 			continue;
 		}
 		let shift = 0;
@@ -724,7 +726,7 @@ export const forwardProject = (
 			key === "spd" || key === "jmp" || key === "stre" || key === "endu"
 				? 0.55
 				: 1;
-		out[key] = Math.min(100, out[key] + shift * factor);
+		out[key] = Math.min(100, out[key]! + shift * factor);
 	}
 	return out;
 };

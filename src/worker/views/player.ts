@@ -37,6 +37,7 @@ import { getGroupPrefix } from "../core/awards/prefixes.ts";
 import type { LeagueUrlParts } from "../../ui/router/types.ts";
 import { getHealthInfo } from "../core/player/getHealthInfo.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 
 export const processInputs = (
 	params: RouteParams<"player"> | RouteParams<"relatives">,
@@ -106,7 +107,7 @@ export const getPlayer = async <
 			"age",
 			"ovr",
 			"pot",
-			...RATINGS,
+			...ratingsKeysForView(RATINGS),
 			"skills",
 			"badges",
 			"pos",
@@ -623,7 +624,7 @@ export default defineView({
 				events,
 				feats,
 				leaders,
-				ratings: RATINGS,
+				ratings: ratingsKeysForView(RATINGS),
 				valueIndex,
 			};
 		}

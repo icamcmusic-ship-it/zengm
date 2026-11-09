@@ -36,6 +36,12 @@ import {
 	getRemainingContractSeasons,
 	isFlatContract,
 } from "../contract/index.ts";
+import {
+	fillExpandedRatings,
+	hasExpandedRatings,
+	isExpandedRatingKey,
+} from "../../../common/expandedRatings.ts";
+import { expandedRatingsApply } from "./expandedRatings.ts";
 
 type PlayerFormatOptionsRequired = Required<
 	Omit<PlayerFormatOptions, "season" | "seasonRange" | "seasonType" | "tid">
@@ -572,6 +578,12 @@ const getBadgesForRatingsRow = (
 		}
 		r[key] = fuzz && key !== "hgt" ? player.fuzzRating(v, pr.fuzz) : v;
 	}
+	// Expanded ratings, when the setting is on (wingspan is a measurement, never fuzzed)
+	if (expandedRatingsApply(pr)) {
+		r.wng = pr.wng;
+		r.pdef = fuzz ? player.fuzzRating(pr.pdef, pr.fuzz) : pr.pdef;
+		r.idef = fuzz ? player.fuzzRating(pr.idef, pr.fuzz) : pr.idef;
+	}
 	// Only the latest ratings row: trait scores are for the player now
 	const traits =
 		pr === last(p.ratings)
@@ -657,6 +669,20 @@ const processRatings = (
 		];
 	}
 
+	// Expanded ratings asked for but not stored in some rows (a retired player from before the setting was turned on): derived for display
+	if (
+		__SPORT === "basketball" &&
+		ratings.some(isExpandedRatingKey) &&
+		!playerRatings.every(hasExpandedRatings)
+	) {
+		const filled = p.ratings.map((pr) => ({ ...pr }));
+		fillExpandedRatings({ ...p, ratings: filled });
+		playerRatings = playerRatings.map((pr) => {
+			const i = p.ratings.indexOf(pr);
+			return i >= 0 ? filled[i] : pr;
+		});
+	}
+
 	output.ratings = playerRatings.map((pr) => {
 		const row: any = {};
 
@@ -736,6 +762,7 @@ const processRatings = (
 				attr !== "fuzz" &&
 				attr !== "season" &&
 				attr !== "hgt" &&
+				attr !== "wng" &&
 				attr !== "pos" &&
 				attr !== "injuryIndex"
 			) {

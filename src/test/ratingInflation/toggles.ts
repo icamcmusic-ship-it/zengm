@@ -8,6 +8,7 @@ export const TOGGLES: Record<string, Record<string, unknown>> = {
 	staffFixedRef: { coachingStaff: true },
 	allOnFixedRef: ALL_ON,
 	traits: { playerTraits: true },
+	expanded: { expandedRatings: true },
 	injuryDepth: { injuryDepth: true },
 	possessions: { realisticPossessions: true, technicalFouls: true },
 	regen: { rerandomizeDraftClassRatings: true },

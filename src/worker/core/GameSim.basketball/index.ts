@@ -125,6 +125,16 @@ type CompositeRating =
 	| "turnovers"
 	| "usage"
 	| "jumpBall";
+// Expanded ratings calibration (see docs/native-features.md, Expanded ratings): keeps league blocks and field goal percentages the same as with the
+// setting off
+const EXPANDED_BLK_FACTOR = 1.07;
+const EXPANDED_BLK_JUMPER_FACTOR = 0.9;
+const EXPANDED_FINISH_OVER = 1.5;
+const EXPANDED_LENGTH_REF = 0.5;
+const EXPANDED_INTERIOR_OFFSET = 0.006;
+const EXPANDED_PERIMETER_OFFSET = 0.008;
+const EXPANDED_STL_FACTOR = 1.01;
+
 type PlayerGameSim = {
 	id: number;
 	name: string;
@@ -303,6 +313,10 @@ class GameSim extends GameSimBase {
 	// What the traits of the players on the court mean for the realistic possession model (see possessionModel.ts Traits), refreshed every
 	// possession
 	traits: [Traits, Traits] = [{ ...NEUTRAL_TRAITS }, { ...NEUTRAL_TRAITS }];
+	// Expanded ratings (the expandedRatings setting, see docs/native-features.md, Expanded ratings): wingspan and perimeter/interior defense. loadTeams then
+	// gives every player a "length" composite (and the defense, rebounding and finishing composites read the new ratings). Off: nothing
+	// below is used, games play out exactly as before
+	expandedRatings: boolean;
 	// Player traits: a playoff game, where the big-game trait applies (the whole game)
 	bigGame = false;
 	// Player traits: picking the player who gets a technical or flagrant foul (temper weighs in, see traitPickWeight)
@@ -367,6 +381,10 @@ class GameSim extends GameSimBase {
 				}
 			}
 		}
+
+		this.expandedRatings = teams.some((t) =>
+			t.player.some((p) => p.compositeRating.length !== undefined),
+		);
 
 		// Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
 		this.numPlayersOnCourt = g.get("numPlayersOnCourt");
@@ -1633,6 +1651,7 @@ class GameSim extends GameSimBase {
 			let defense = 0;
 			let defensePerimeter = 0;
 			let blocking = 0;
+			let defenseInterior = 0;
 			for (const p of this.playersOnCourt[t]) {
 				const ratings = p.compositeRating;
 				const fatigue = this.fatigue(p.stat.energy);
@@ -1647,6 +1666,10 @@ class GameSim extends GameSimBase {
 				defensePerimeter +=
 					ratings.defensePerimeter * fatigue * perfFactor * foulLimitFactor;
 				blocking += ratings.blocking * fatigue * perfFactor * foulLimitFactor;
+				if (this.expandedRatings) {
+					defenseInterior +=
+						ratings.defenseInterior * fatigue * perfFactor * foulLimitFactor;
+				}
 			}
 
 			const ratings = this.team[t].compositeRating;
@@ -1659,6 +1682,10 @@ class GameSim extends GameSimBase {
 			ratings.defensePerimeter =
 				defensePerimeter / 5 + this.synergyFactor * synergy.def;
 			ratings.blocking = blocking / 5 + this.synergyFactor * synergy.def;
+			if (this.expandedRatings) {
+				ratings.defenseInterior =
+					defenseInterior / 5 + this.synergyFactor * synergy.def;
+			}
 
 			// Player traits: team chemistry (leadership) lifts or lowers every team composite rating a little
 			if (this.traitsOn) {
@@ -1675,6 +1702,9 @@ class GameSim extends GameSimBase {
 					ratings.defense *= factor;
 					ratings.defensePerimeter *= factor;
 					ratings.blocking *= factor;
+					if (this.expandedRatings) {
+						ratings.defenseInterior *= factor;
+					}
 				}
 			}
 		}
@@ -2514,10 +2544,11 @@ class GameSim extends GameSimBase {
 				(0.5 *
 					(this.team[this.o].compositeRating.dribbling +
 						this.team[this.o].compositeRating.passing)));
+		const prob2 = this.expandedRatings ? prob * EXPANDED_STL_FACTOR : prob;
 		return boundProb(
 			this.traitsOn
-				? prob * this.traitMean(this.d, (e) => e.gambleStealMultiplier, 1)
-				: prob,
+				? prob2 * this.traitMean(this.d, (e) => e.gambleStealMultiplier, 1)
+				: prob2,
 		);
 	}
 
@@ -2697,7 +2728,10 @@ class GameSim extends GameSimBase {
 		}
 
 		let blocked;
-		if (this.probBlk() > Math.random()) {
+		if (
+			(this.expandedRatings ? this.probBlkExpanded(p, type) : this.probBlk()) >
+			Math.random()
+		) {
 			blocked = true;
 		} else {
 			blocked = false;
@@ -2720,7 +2754,10 @@ class GameSim extends GameSimBase {
 			probAndOne *= foulFactor;
 			probMake =
 				(probMake -
-					0.25 * this.team[this.d].compositeRating.defense +
+					0.25 *
+						(this.expandedRatings
+							? this.shotDefenseExpanded(type)
+							: this.team[this.d].compositeRating.defense) +
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)) *
 				currentFatigue;
@@ -2995,6 +3032,53 @@ class GameSim extends GameSimBase {
 			g.get("blockFactor") *
 			0.2 *
 			this.team[this.d].compositeRating.blocking ** 2
+		);
+	}
+
+	// Expanded ratings: block probability. Shots at the rim and in the post are blocked more by long, interior defenses (the blocking
+	// composite reads wingspan and interior defense) and less when the shooter is long himself (finishing over defenders); jump shots
+	// a little less. Calibrated so league blocks stay the same (docs/native-features.md, Expanded ratings).
+	probBlkExpanded(p: PlayerGameSim, type: ShotType) {
+		let factor = EXPANDED_BLK_FACTOR;
+		if (
+			type === "atRim" ||
+			type === "lowPost" ||
+			type === "putBack" ||
+			type === "tipIn"
+		) {
+			factor *= helpers.bound(
+				1 -
+					EXPANDED_FINISH_OVER *
+						(p.compositeRating.length - EXPANDED_LENGTH_REF),
+				0.7,
+				1.3,
+			);
+		} else {
+			factor *= EXPANDED_BLK_JUMPER_FACTOR;
+		}
+		return this.probBlk() * factor;
+	}
+
+	// Expanded ratings: the defense a shot faces. Shots at the rim and in the post are contested by the interior defense, jump shots by
+	// the perimeter defense, each mixed with the overall team defense (calibrated to the same league average as the stock "defense")
+	shotDefenseExpanded(type: ShotType) {
+		const ratings = this.team[this.d].compositeRating;
+		if (
+			type === "atRim" ||
+			type === "lowPost" ||
+			type === "putBack" ||
+			type === "tipIn"
+		) {
+			return (
+				0.5 * ratings.defense +
+				0.5 * ratings.defenseInterior +
+				EXPANDED_INTERIOR_OFFSET
+			);
+		}
+		return (
+			0.5 * ratings.defense +
+			0.5 * ratings.defensePerimeter +
+			EXPANDED_PERIMETER_OFFSET
 		);
 	}
 

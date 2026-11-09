@@ -42,6 +42,7 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { useLocal } from "../../util/local.ts";
 import clsx from "clsx";
 import type { StoredRatingsBuild } from "../../../common/ratingsBuilds/types.ts";
+import { blendDiq, EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 
 // In the form, the contract fields are the player's current contract or contract demand
 type PlayerWithContract = PlayerWithoutKey & {
@@ -223,7 +224,7 @@ const copyValidValues = (
 	{
 		const sourceRatings = last(source.ratings);
 		const targetRatings = last(target.ratings);
-		const ratingKeys: readonly string[] = RATINGS;
+		const ratingKeys: readonly string[] = [...RATINGS, ...EXPANDED_RATINGS];
 		for (const rating of Object.keys(sourceRatings)) {
 			if (ratingKeys.includes(rating)) {
 				const val = helpers.bound(
@@ -540,10 +541,22 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 			} else if (["born", "contract", "draft", "injury"].includes(type)) {
 				p[type][field] = val;
 			} else if (type === "rating") {
-				p.ratings[p.ratings.length - 1] = {
+				const row = {
 					...p.ratings.at(-1),
 					[field]: field === "locked" ? checked : val,
 				};
+				// Expanded ratings: defensive IQ is the average of perimeter and interior defense
+				if (field === "pdef" || field === "idef") {
+					const pdef = Number.parseInt(String(row.pdef));
+					const idef = Number.parseInt(String(row.idef));
+					if (!Number.isNaN(pdef) && !Number.isNaN(idef)) {
+						row.diq = blendDiq(
+							helpers.bound(pdef, 0, 100),
+							helpers.bound(idef, 0, 100),
+						);
+					}
+				}
+				p.ratings[p.ratings.length - 1] = row;
 			} else if (type === "face") {
 				if (["eye", "hair", "mouth", "nose"].includes(field)) {
 					p[type][field].id = val;

@@ -28,6 +28,7 @@ import { TOO_MANY_TEAMS_TOO_SLOW } from "../season/getInitialNumGamesConfDivSett
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
+import { ensureExpandedRatings, syncDefenseToDiq } from "./expandedRatings.ts";
 
 // ovrs and pots only exist in sports with position-specific ratings, and there they have a value for every position
 const getRatingByPos = (
@@ -158,6 +159,12 @@ const develop = async (
 	// Basketball player traits: work ethic and aging curve (see getTraitDevelopment). Only for one season of development
 	traitDev?: TraitDevelopment,
 ) => {
+	// Expanded ratings: a player made without them (real player, imported, custom, ratings builds) gets them derived now. No-op with the
+	// setting off.
+	if (__SPORT === "basketball") {
+		ensureExpandedRatings(p);
+	}
+
 	const ratings = last(p.ratings);
 	let age = ratings.season - p.born.year;
 
@@ -191,6 +198,7 @@ const develop = async (
 			new Rng(mentor.seed).random(),
 			MENTOR_RATING_KEYS,
 		);
+		syncDefenseToDiq(ratings as any);
 	}
 
 	// years===0 condition is so editing locked player in God Mode will update ovr and pot

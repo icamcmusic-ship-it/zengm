@@ -19,6 +19,7 @@ import { defineView } from "../util/defineView.ts";
 import { last, orderBy } from "../../common/utils.ts";
 import { upgradeFace } from "../util/face.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { ensureExpandedRatings } from "../core/player/expandedRatings.ts";
 
 const processInputs = (params: RouteParams<"customizePlayer">) => {
 	let pid: number | null = null;
@@ -130,6 +131,12 @@ export default defineView({
 
 				// Copy because the player is edited below
 				p = helpers.deepCopy(p2);
+
+				// Expanded ratings: a player who doesn't have them yet (retired before the setting was turned on) gets them derived, so they
+				// can be edited
+				if (__SPORT === "basketball") {
+					ensureExpandedRatings(p);
+				}
 
 				contract = getContractSummary(p2);
 

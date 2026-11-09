@@ -5,8 +5,10 @@ import { toWorker } from "../../util/toWorker.ts";
 import { getCol } from "../../../common/getCol.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { useLocal } from "../../util/local.ts";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
+import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 
-const rows = bySport<
+const rowsStock = bySport<
 	{
 		[key: string]: string[];
 	}[][]
@@ -46,6 +48,16 @@ const rows = bySport<
 	],
 });
 
+const rowsExpanded: {
+	[key: string]: string[];
+}[][] = [
+	[
+		{ Physical: ["hgt", "wng", "stre", "spd", "jmp", "endu"] },
+		{ Shooting: ["ins", "dnk", "ft", "fg", "tp"] },
+		{ Skill: ["oiq", "pdef", "idef", "drb", "pss", "reb"] },
+	],
+];
+
 const RatingsForm = ({
 	handleChange,
 	pos,
@@ -64,6 +76,16 @@ const RatingsForm = ({
 		"godMode",
 	]);
 
+	// Expanded ratings (the expandedRatings setting): wingspan with the physical ratings, perimeter and interior defense in place of
+	// defensive IQ (their average, recomputed when either changes)
+	const expandedOn = useFeatureOn("expandedRatings");
+	const expanded =
+		__SPORT === "basketball" &&
+		expandedOn &&
+		typeof ratingsRow.wng === "number" &&
+		typeof ratingsRow.pdef === "number";
+	const rows = expanded ? rowsExpanded : rowsStock;
+
 	const [ovr, setOvr] = useState(ratingsRow.ovr);
 
 	useEffect(() => {
@@ -74,6 +96,11 @@ const RatingsForm = ({
 			};
 			for (const key of RATINGS) {
 				boundedRatings[key] = helpers.bound(boundedRatings[key], 0, 100);
+			}
+			for (const key of EXPANDED_RATINGS) {
+				if (boundedRatings[key] !== undefined) {
+					boundedRatings[key] = helpers.bound(boundedRatings[key], 0, 100);
+				}
 			}
 
 			const newOvr = await toWorker("main", "ovr", {
@@ -103,7 +130,7 @@ const RatingsForm = ({
 
 		const raw = ratingOverride ?? ratingsRow[rating];
 
-		return godMode || rating === "hgt"
+		return godMode || rating === "hgt" || rating === "wng"
 			? raw
 			: Math.round(helpers.bound(raw + ratingsRow.fuzz, 0, 100));
 	};

@@ -45,6 +45,7 @@ export const OFF: Record<string, unknown> = {
 	contractOptions: false,
 	contractExtensions: false,
 	tradeRequests: false,
+	expandedRatings: false,
 };
 
 // New-league defaults, plus the two rating-touching extras that are opt-in even for new leagues
@@ -149,7 +150,25 @@ export const summarize = async (
 	let tp = 0;
 	let tpa = 0;
 	let poss = 0;
+	let blk = 0;
+	let stl = 0;
+	let trb = 0;
+	let orb = 0;
+	let tov = 0;
+	let fta = 0;
+	let pf = 0;
+	let fgAtRim = 0;
+	let fgaAtRim = 0;
 	for (const ts of teamStats as any[]) {
+		blk += ts.blk;
+		stl += ts.stl;
+		trb += ts.orb + ts.drb;
+		orb += ts.orb;
+		tov += ts.tov;
+		fta += ts.fta;
+		pf += ts.pf;
+		fgAtRim += ts.fgAtRim;
+		fgaAtRim += ts.fgaAtRim;
 		pts += ts.pts;
 		gp += ts.gp;
 		fg += ts.fg;
@@ -230,6 +249,21 @@ export const summarize = async (
 		tpPct: tpa > 0 ? r2((100 * tp) / tpa) : Number.NaN,
 		tpaPerGame: gp > 0 ? r2(tpa / gp) : Number.NaN,
 		possPerGame: gp > 0 ? r2(poss / gp) : Number.NaN,
+		blkPerGame: gp > 0 ? r2(blk / gp) : Number.NaN,
+		stlPerGame: gp > 0 ? r2(stl / gp) : Number.NaN,
+		trbPerGame: gp > 0 ? r2(trb / gp) : Number.NaN,
+		orbPerGame: gp > 0 ? r2(orb / gp) : Number.NaN,
+		tovPerGame: gp > 0 ? r2(tov / gp) : Number.NaN,
+		ftaPerGame: gp > 0 ? r2(fta / gp) : Number.NaN,
+		pfPerGame: gp > 0 ? r2(pf / gp) : Number.NaN,
+		fgAtRimPct: fgaAtRim > 0 ? r2((100 * fgAtRim) / fgaAtRim) : Number.NaN,
+		fgaAtRimPerGame: gp > 0 ? r2(fgaAtRim / gp) : Number.NaN,
+		skillsDi: players.filter((p) => p.ratings.at(-1)!.skills.includes("Di"))
+			.length,
+		skillsDp: players.filter((p) => p.ratings.at(-1)!.skills.includes("Dp"))
+			.length,
+		skillsR: players.filter((p) => p.ratings.at(-1)!.skills.includes("R"))
+			.length,
 	};
 };
 
@@ -335,8 +369,10 @@ export const runLeague = async ({
 }) => {
 	// The full engine reads the meta database (scheduled events), so it needs an IndexedDB. Only installed here, so that
 	// importing this file (from skipped script tests too) doesn't change the globals other tests see.
-	const { indexedDB } = await import("fake-indexeddb");
-	globalThis.indexedDB ??= indexedDB;
+	if ((globalThis as any).IDBRequest === undefined) {
+		// @ts-expect-error (no types for the side-effect entry point)
+		await import("fake-indexeddb/auto");
+	}
 	const origRandom = Math.random;
 	Math.random = mulberry32(seed);
 	try {

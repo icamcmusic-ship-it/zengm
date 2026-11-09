@@ -31,6 +31,11 @@ import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import fuzzRating from "../player/fuzzRating.ts";
 import { ratingsBuildFormulas as F } from "../player/ratingsBuildFormulas.ts";
 import updateValues from "../player/updateValues.ts";
+import {
+	ensureExpandedRatings,
+	setDefenseSplit,
+	expandedRatingsApply,
+} from "../player/expandedRatings.ts";
 
 // "Regenerate ratings": rebuilds draft prospects (and, through Customize Player, any player) into varied, specialized
 // builds without changing anyone's overall. The engine is pure (src/common/ratingsBuilds); this is the plumbing that reads
@@ -457,6 +462,11 @@ export const writeResult = async (
 	seed: string,
 ) => {
 	const row = last(p.ratings) as PlayerRatings;
+	// Expanded ratings: he keeps his wingspan relative to his height and his perimeter/interior defense split
+	ensureExpandedRatings(p);
+	const expanded = expandedRatingsApply(row);
+	const wngOffset = expanded ? row.wng! - row.hgt : 0;
+	const defenseSplit = expanded ? row.pdef! - row.idef! : 0;
 	for (const key of RATING_KEYS) {
 		row[key] = r.after.ratings[key];
 	}
@@ -465,6 +475,13 @@ export const writeResult = async (
 	row.pot = r.after.pot;
 	row.pos = r.after.pos;
 	row.skills = r.after.skills;
+	if (expanded) {
+		row.wng = helpers.bound(Math.round(row.hgt + wngOffset), 0, 100);
+		setDefenseSplit(row, defenseSplit);
+		row.ovr = F.ovr(row as any);
+		row.pot = Math.max(row.pot, row.ovr);
+		row.skills = F.skills(row as any);
+	}
 	if (r.after.hgtInches !== undefined) {
 		p.hgt = r.after.hgtInches;
 	}

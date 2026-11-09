@@ -23,6 +23,8 @@ import { bySport } from "../../common/sportFunctions.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
 import { validateSeason } from "../util/processInputs.ts";
+import { insertExpandedRatingKeys } from "../../common/expandedRatings.ts";
+import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 
 export const processInputs = (
 	params: RouteParams<"playerBios"> | RouteParams<"playerRatings">,
@@ -232,7 +234,7 @@ export default defineView({
 			inputs.season !== prevInputs?.season ||
 			inputs.team !== prevInputs?.team
 		) {
-			const ratings = bySport({
+			const ratingsStock = bySport({
 				baseball: RATINGS,
 				basketball: [
 					"hgt",
@@ -291,6 +293,13 @@ export default defineView({
 					"glk",
 				],
 			} as const);
+			// Expanded ratings: wingspan and perimeter/interior defense columns
+			// (typed as the stock list: the UI only uses the keys to read the columns)
+			const ratings = (
+				expandedRatingsOn()
+					? insertExpandedRatingKeys(ratingsStock)
+					: ratingsStock
+			) as typeof ratingsStock;
 
 			const players = addFirstNameShort(
 				await getPlayers(

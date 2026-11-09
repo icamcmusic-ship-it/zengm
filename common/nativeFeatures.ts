@@ -294,6 +294,16 @@ export const NATIVE_FEATURES = [
 		existing: true,
 	},
 	{
+		id: "expandedRatings",
+		key: "expandedRatings",
+		name: "Expanded Ratings",
+		description:
+			"Three more player ratings: wingspan (length) and perimeter and interior defense, which replace the single defensive IQ in the game sim (defensive IQ stays as their average). Length helps blocks, steals, rebounds, contesting shots and finishing over defenders; perimeter defense guards ball handlers and shooters, interior defense protects the rim. League averages stay the same. Turning it on in an existing league derives the new ratings from each player's current ratings.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		key: "featureSeasonOdds",
 		name: "Season Odds",

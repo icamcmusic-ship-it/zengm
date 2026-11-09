@@ -22,6 +22,7 @@ import {
 	type BadgeRatings,
 } from "../../common/skillBadges/index.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 
 const processInputs = (params: RouteParams<"skillBadges">) => {
 	const label =
@@ -68,7 +69,12 @@ export default defineView({
 		]);
 		const formatted = await player.formatAll(playersAll, {
 			attrs: ["pid", "firstName", "lastName", "age", "tid", "abbrev", "injury"],
-			ratings: [...BADGE_RATING_KEYS, "ovr", "pos", "skills"],
+			ratings: [
+				...ratingsKeysForView(BADGE_RATING_KEYS),
+				"ovr",
+				"pos",
+				"skills",
+			],
 			season: g.get("season"),
 			showNoStats: true,
 			showRookies: true,

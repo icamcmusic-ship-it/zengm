@@ -14,6 +14,7 @@ import {
 	getTraitsForView,
 	type TraitViewContext,
 } from "../util/playerTraitsView.ts";
+import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 
 const getSeason = async (
 	playersAll: Player[],
@@ -23,7 +24,16 @@ const getSeason = async (
 	const playersAllFiltered = playersAll.filter((p) => p.draft.year === season);
 	const players = await player.formatAll(playersAllFiltered, {
 		attrs: ["pid", "firstName", "lastName", "age", "valueFuzz", "watch"],
-		ratings: ["ovr", "pot", "skills", "badges", "fuzz", "pos"],
+		ratings: [
+			"ovr",
+			"pot",
+			"skills",
+			"badges",
+			"fuzz",
+			"pos",
+			// Expanded ratings (setting on): wingspan (exact, a measurement) and the two defense ratings (with scouting fuzz)
+			...(expandedRatingsOn() ? (["wng", "pdef", "idef"] as const) : []),
+		],
 		showNoStats: true,
 		showRookies: true,
 		fuzz: true,
@@ -78,6 +88,10 @@ const getSeason = async (
 				skills: ratings.skills,
 				pos: ratings.pos,
 				badges: ratings.badges,
+				expanded:
+					typeof ratings.wng === "number"
+						? { wng: ratings.wng, pdef: ratings.pdef, idef: ratings.idef }
+						: undefined,
 				rank: i + 1,
 			};
 		}),

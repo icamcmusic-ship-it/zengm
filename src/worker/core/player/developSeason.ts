@@ -9,6 +9,10 @@ import loadDataBasketball from "../realRosters/loadData.basketball.ts";
 import type { Ratings } from "../realRosters/loadData.basketball.ts";
 import limitRating from "./limitRating.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
+import {
+	developExpandedRatings,
+	expandedRatingsApply,
+} from "./expandedRatings.ts";
 import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 
 // Cache for performance
@@ -70,6 +74,11 @@ export const developSeasonSync = (
 	realPlayerDeterminismInfo: RealPlayerDeterminismInfo | undefined,
 	traitDev?: TraitDevelopment,
 ) => {
+	// Expanded ratings (basketball): developed after the stock ratings, from diq's change. Off: not touched, no random numbers drawn.
+	const expanded =
+		__SPORT === "basketball" && expandedRatingsApply(ratings as any);
+	const hgtBefore = ratings.hgt;
+
 	bySport({
 		baseball: developSeasonBaseball(ratings as any, age, coachingLevel),
 		basketball: developSeasonBasketball(
@@ -83,6 +92,9 @@ export const developSeasonSync = (
 	});
 
 	if (!realPlayerDeterminismInfo || !groupedRatings) {
+		if (expanded) {
+			developExpandedRatings(ratings as any, age, hgtBefore);
+		}
 		return;
 	}
 
@@ -99,6 +111,10 @@ export const developSeasonSync = (
 					(1 - realPlayerDeterminism) * (ratings as any)[key],
 			);
 		}
+	}
+
+	if (expanded) {
+		developExpandedRatings(ratings as any, age, hgtBefore);
 	}
 };
 
