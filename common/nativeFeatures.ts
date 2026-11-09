@@ -286,6 +286,15 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "forkFaces",
+		key: "featureForkFaces",
+		name: "Fork Face Parts",
+		description:
+			"New male players can get the fork's own face parts (heads, eyes, hair, beards, glasses, ...) mixed in with the usual ones. See Tools → Face Style Gallery.",
+		default: false,
+		sports: BBGM,
+	},
+	{
 		id: "skillBadges",
 		key: "featureSkillBadges",
 		name: "Extended Skill Badges",

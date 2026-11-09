@@ -6,6 +6,8 @@ import g from "./g.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { registerGlobal } from "../../common/registerGlobal.ts";
+import { addRandomForkParts } from "../../common/faceParts.ts";
+import { featureOn } from "./nativeFeatures.ts";
 
 export const generateFace = (
 	options:
@@ -65,6 +67,11 @@ export const generateFace = (
 			gender,
 			...options,
 		});
+	}
+
+	// League Extras "Fork face parts": mix the fork's male parts in (off by default)
+	if (gender === "male" && featureOn("forkFaces")) {
+		addRandomForkParts(face);
 	}
 
 	return face;
