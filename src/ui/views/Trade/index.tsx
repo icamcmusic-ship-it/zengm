@@ -53,6 +53,7 @@ const TradeSideText = ({
 
 const Trade = (props: View<"trade">) => {
 	const threeOn = useFeatureOn("threeTeamTrades");
+	const pickConditionsOn = useFeatureOn("draftPickConditions");
 	const [state, setState] = useState({
 		accepted: false,
 		asking: false,
@@ -504,6 +505,30 @@ const Trade = (props: View<"trade">) => {
 				<div className="col-md-3">
 					<div className="trade-affix">
 						<Summary
+							handleCondition={
+								pickConditionsOn
+									? async (dpid, spec) => {
+											setState((prevState) => ({
+												...prevState,
+												accepted: false,
+												explanation: undefined,
+												message: null,
+												prevTeams: undefined,
+											}));
+											const error = await toWorker(
+												"main",
+												"setTradePickCondition",
+												{ dpid, spec },
+											);
+											if (error) {
+												setState((prevState) => ({
+													...prevState,
+													message: error,
+												}));
+											}
+										}
+									: undefined
+							}
 							handleToggle={handleChangeAsset}
 							ref={summaryText}
 							prevTeams={state.prevTeams}

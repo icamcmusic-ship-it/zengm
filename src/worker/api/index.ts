@@ -73,6 +73,7 @@ import {
 	type UpdateEvent,
 	type UpdateEvents,
 	type TradeTeams,
+	type PickConditionSpec,
 	type MinimalPlayerRatings,
 	type Relative,
 	type Options,
@@ -172,6 +173,8 @@ import * as draftDay from "../core/draft/draftDay.ts";
 import { actualPhase } from "../util/actualPhase.ts";
 import { getCol } from "../../common/getCol.ts";
 import { getCols } from "../../common/getCols.ts";
+import { validatePickConditionSpec } from "../../common/draftPickConditions.ts";
+import { getNumPicksPerRound } from "../core/trade/getPickValues.ts";
 import { formatScheduleForEditor } from "../views/scheduleEditor.ts";
 import type { KeyboardShortcutsLocal } from "../../ui/util/keyboardShortcuts.ts";
 import getNumPlayoffTeamsForSeason, {
@@ -5813,6 +5816,40 @@ const tradeCounterOffer = async () => {
 	return response;
 };
 
+// Add, change or remove (spec null) a condition on a pick in the current 2-team trade
+const setTradePickCondition = async ({
+	dpid,
+	spec,
+}: {
+	dpid: number;
+	spec: PickConditionSpec | null;
+}) => {
+	const tr = await trade.get();
+	const teams = helpers.deepCopy(tr.teams);
+	for (const t of teams) {
+		const conditions = (t.pickConditions ?? []).filter((c) => c.dpid !== dpid);
+		if (spec && t.dpids.includes(dpid)) {
+			conditions.push({ ...spec, dpid });
+		}
+		t.pickConditions = conditions;
+	}
+	const teams2 = await trade.updatePlayers(teams);
+	await toUI("realtimeUpdate", []);
+	if (
+		spec &&
+		!teams2.some((t) => t.pickConditions?.some((c) => c.dpid === dpid))
+	) {
+		const dp = await idb.cache.draftPicks.get(dpid);
+		const error = dp
+			? validatePickConditionSpec(spec, dp, getNumPicksPerRound())
+			: "Invalid pick.";
+		return (
+			error ??
+			"That condition isn't possible for this pick (for a swap, the other team needs its own pick in the same round)."
+		);
+	}
+};
+
 const updateTrade = async (teams: TradeTeams) => {
 	await trade.updatePlayers(teams);
 	await toUI("realtimeUpdate", []);
@@ -6115,6 +6152,7 @@ const api = {
 		updatePlayoffTeams,
 		updateTeamInfo,
 		updateTrade,
+		setTradePickCondition,
 		upgrade65,
 		upgrade65Estimate,
 		upsertCustomizedPlayer,

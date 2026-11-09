@@ -1,4 +1,9 @@
 import { idb } from "../../db/index.ts";
+import {
+	conditionSpecText,
+	getTradePickConditions,
+} from "../../../common/draftPickConditions.ts";
+import type { TradePickCondition } from "../../../common/types.ts";
 import { g, helpers } from "../../util/index.ts";
 import type { TradeTeams } from "../../../common/types.ts";
 import {
@@ -357,6 +362,7 @@ export const explainForTeam = async ({
 	payrollAfter,
 	warning,
 	valueChangeCalculator = new ValueChangeCalculator(),
+	pickConditions,
 }: {
 	tid: number;
 	pidsAdd: number[];
@@ -370,6 +376,7 @@ export const explainForTeam = async ({
 	payrollAfter?: number;
 	warning?: string | null;
 	valueChangeCalculator?: ValueChangeCalculator;
+	pickConditions?: TradePickCondition[];
 }) => {
 	const result = await valueChangeCalculator.explain({
 		tid,
@@ -378,11 +385,19 @@ export const explainForTeam = async ({
 		dpidsAdd,
 		dpidsRemove,
 		tradingPartnerTid,
+		pickConditions,
 	});
 	const names = await getNames(
 		[...pidsAdd, ...pidsRemove],
 		[...dpidsAdd, ...dpidsRemove],
 	);
+	for (const c of pickConditions ?? []) {
+		const key = `dp${c.dpid}`;
+		if (names[key] !== undefined) {
+			names[key] +=
+				` (${conditionSpecText(c, c.tid !== undefined ? g.get("teamInfoCache")[c.tid]?.abbrev : undefined)})`;
+		}
+	}
 	const teamInfo = g.get("teamInfoCache")[tid];
 
 	return buildTradeExplanation({
@@ -413,6 +428,7 @@ const explain = async (teams: TradeTeams) => {
 		dpidsAdd: teams[0].dpids,
 		dpidsRemove: teams[1].dpids,
 		tradingPartnerTid: teams[0].tid,
+		pickConditions: getTradePickConditions(teams),
 		// summary.teams[i].ovrBefore/ovrAfter are for the team receiving team i's assets
 		ovrBefore: s.teams[0].ovrBefore,
 		ovrAfter: s.teams[0].ovrAfter,

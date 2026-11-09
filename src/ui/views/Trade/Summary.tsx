@@ -1,5 +1,11 @@
 import { helpers } from "../../util/helpers.ts";
-import type { TradeTeam, TradeTeams, View } from "../../../common/types.ts";
+import type {
+	PickConditionSpec,
+	TradeTeam,
+	TradeTeams,
+	View,
+} from "../../../common/types.ts";
+import { PickConditionEditor } from "../../components/PickConditionEditor.tsx";
 import clsx from "clsx";
 import { PlayerNameLabels } from "../../components/PlayerNameLabels.tsx";
 import { ContractAmount, ContractExp } from "../../components/contract.tsx";
@@ -130,6 +136,7 @@ type SummaryPlayerWithInfo =
 	View<"tradeProposals">["offers"][number]["summary"]["teams"][number]["trade"][number];
 
 export const SummaryTeam = ({
+	handleCondition,
 	handleRemove,
 	hideFinanceInfo,
 	hideTeamOvr,
@@ -144,6 +151,12 @@ export const SummaryTeam = ({
 		| View<"trade">["summary"]
 		| View<"tradeProposals">["offers"][number]["summary"];
 	handleRemove?: (type: "player" | "pick", id: number) => void;
+
+	// Pass this to allow adding protections/swaps to picks (featureDraftPickConditions)
+	handleCondition?: (
+		dpid: number,
+		spec: PickConditionSpec | null,
+	) => void | Promise<void>;
 	hideFinanceInfo?: boolean;
 	hideTeamOvr?: boolean;
 	missingAssets?: MissingAsset[];
@@ -233,7 +246,22 @@ export const SummaryTeam = ({
 							{prevTeam && !prevTeam.dpids.includes(pick.dpid) ? (
 								<NewAssetIcon />
 							) : null}
-							<SafeHtml dirty={pick.desc} />
+							<div>
+								<SafeHtml dirty={pick.desc} />
+								{pick.conditionText ? (
+									<span className="badge bg-warning text-dark ms-1 pick-condition">
+										{pick.conditionText}
+									</span>
+								) : null}
+								{handleCondition &&
+								(pick.canHaveCondition || pick.condition) ? (
+									<PickConditionEditor
+										key={JSON.stringify(pick.condition ?? null)}
+										condition={pick.condition}
+										onChange={(spec) => handleCondition(pick.dpid, spec)}
+									/>
+								) : null}
+							</div>
 							{handleRemove ? (
 								<button
 									type="button"
@@ -301,12 +329,17 @@ export const SummaryTeam = ({
 };
 
 const Summary = ({
+	handleCondition,
 	handleToggle,
 	prevTeams,
 	ref,
 	summary,
 }: Pick<View<"trade">, "summary"> & {
 	handleToggle: HandleToggle;
+	handleCondition?: (
+		dpid: number,
+		spec: PickConditionSpec | null,
+	) => void | Promise<void>;
 	ref?: Ref<HTMLDivElement>;
 
 	// Pass this if you want to show a diff compared to a prior version of this trade
@@ -325,6 +358,7 @@ const Summary = ({
 						})}
 					>
 						<SummaryTeam
+							handleCondition={handleCondition}
 							handleRemove={(type, id) => {
 								handleToggle(userOrOther, type, "include", id);
 							}}

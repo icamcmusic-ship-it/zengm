@@ -436,6 +436,8 @@ type CommonPick = {
 	tid: number; // from originalTid
 	round: number;
 	season: DraftPickSeason;
+	condition?: string;
+	swap?: true;
 };
 
 type TradeEvent = DiscriminateUnion<EventBBGM, "type", "trade">;
@@ -520,10 +522,12 @@ export const processAssets = async (
 				tid: asset.originalTid,
 				round: asset.round,
 				season: asset.season,
+				condition: asset.condition,
+				swap: asset.swap,
 			};
 
 			// Has the draft already happened? If so, fill in the player
-			const p = await getPlayerFromPick(asset);
+			const p = asset.swap ? undefined : await getPlayerFromPick(asset);
 			if (p) {
 				const playerInfo = await getActualPlayerInfo(
 					p,

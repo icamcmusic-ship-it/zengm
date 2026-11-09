@@ -1,4 +1,5 @@
 import { featureOffError } from "../util/nativeFeatures.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
 import { player } from "../core/index.ts";
@@ -94,6 +95,12 @@ export default defineView({
 				picks.push({
 					dpid: dp.dpid,
 					desc: await helpers.pickDesc(dp, "short"),
+					canHaveCondition:
+						featureOn("draftPickConditions") &&
+						typeof dp.season === "number" &&
+						dp.pick === 0 &&
+						!dp.protection &&
+						!dp.swap,
 				});
 			}
 			const info = g.get("teamInfoCache")[tid];

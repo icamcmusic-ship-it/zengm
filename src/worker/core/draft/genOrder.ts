@@ -1,3 +1,4 @@
+import resolvePickConditions from "./pickConditions.ts";
 import genPicks from "./genPicks.ts";
 import logLotteryChances from "./logLotteryChances.ts";
 import logLotteryWinners from "./logLotteryWinners.ts";
@@ -672,6 +673,22 @@ const genOrder = async (
 	}
 
 	if (!mock) {
+		// Protections and swaps, now that pick numbers are known
+		await resolvePickConditions(draftPicks as DraftPick[]);
+		if (draftLotteryResult) {
+			let lotteryChanged = false;
+			for (const row of draftLotteryResult.result) {
+				const dp = draftPicks.find((dp) => dp.dpid === row.dpid);
+				if (dp && dp.tid !== row.tid) {
+					row.tid = dp.tid;
+					lotteryChanged = true;
+				}
+			}
+			if (lotteryChanged) {
+				await idb.cache.draftLotteryResults.put(draftLotteryResult);
+			}
+		}
+
 		for (const dp of draftPicks) {
 			await idb.cache.draftPicks.put(dp);
 		}

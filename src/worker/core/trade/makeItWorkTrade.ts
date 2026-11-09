@@ -5,6 +5,7 @@ import summary from "./summary.ts";
 import get from "./get.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import explain from "./explain.ts";
+import tryProtections from "./tryProtections.ts";
 
 /**
  * Make a trade work
@@ -27,6 +28,30 @@ const makeItWorkTrade = async () => {
 		}
 	} catch (error) {
 		console.error(error);
+	}
+
+	// First see if the AI would do it with protections on its own picks
+	if (explanation) {
+		const protectedTeams = await tryProtections(
+			helpers.deepCopy(teams0),
+			valueChangeCalculator,
+		);
+		if (protectedTeams) {
+			const s = await summary(protectedTeams);
+			if (!s.warning) {
+				const tr2 = await get();
+				tr2.teams = protectedTeams;
+				await idb.cache.trade.put(tr2);
+				const top = protectedTeams[1].pickConditions?.at(-1);
+				return {
+					changed: true,
+					explanation,
+					message: `${
+						g.get("teamInfoCache")[teams0[1].tid]?.region
+					} GM: "I can do that if our ${helpers.plural("pick", teams0[1].dpids.length)} ${teams0[1].dpids.length === 1 ? "is" : "are"} protected${top?.type === "protection" ? ` (top ${top.top}, rolling over a year, then unprotected)` : ""}."`,
+				};
+			}
+		}
 	}
 
 	const teams = await makeItWork(helpers.deepCopy(teams0), {

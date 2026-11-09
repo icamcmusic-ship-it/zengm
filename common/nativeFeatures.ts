@@ -400,6 +400,15 @@ export const NATIVE_FEATURES = [
 		default: true,
 	},
 	{
+		id: "draftPickConditions",
+		key: "featureDraftPickConditions",
+		name: "Draft Pick Protections & Swaps",
+		description:
+			"NBA-style conditions on traded draft picks: top-N protections that roll over to the next year (or convert to a 2nd round pick, or vanish), and pick swap rights. Resolved when the draft order is set. The AI values them and may offer protections in counter offers.",
+		default: false,
+		defaultNewLeague: true,
+	},
+	{
 		id: "coachingStaff",
 		key: "coachingStaff",
 		name: "Coaching Staff",

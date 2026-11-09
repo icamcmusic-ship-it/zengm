@@ -41,7 +41,20 @@ const processRows = ({
 								sortValue: -Infinity,
 							}
 						: dp.season,
-				dp.round,
+				dp.conditionText
+					? {
+							value: (
+								<>
+									{dp.round}{" "}
+									<span className="badge bg-warning text-dark">
+										{dp.conditionText}
+									</span>
+								</>
+							),
+							sortValue: dp.round,
+							searchValue: `${dp.round} ${dp.conditionText}`,
+						}
+					: dp.round,
 				dp.pick > 0 ? (
 					dp.pick
 				) : dp.projectedPick !== undefined ? (

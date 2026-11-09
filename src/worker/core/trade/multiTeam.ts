@@ -1,5 +1,10 @@
 import { PHASE } from "../../../common/constants.ts";
-import type { Player, TradeTeams } from "../../../common/types.ts";
+import type {
+	PickConditionSpec,
+	Player,
+	TradePickCondition,
+	TradeTeams,
+} from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import { player, team } from "../index.ts";
@@ -9,6 +14,12 @@ import { explainForTeam, type TradeExplanation } from "./explain.ts";
 import isUntradable from "./isUntradable.ts";
 import processTrade from "./processTrade.ts";
 import get from "./get.ts";
+import {
+	conditionSpecText,
+	validatePickConditionSpec,
+} from "../../../common/draftPickConditions.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+import { getNumPicksPerRound } from "./getPickValues.ts";
 
 // Trades with more than 2 teams (the UI does 3), where any team can send assets to any other team. Processed as one 2-team trade event per pair of teams that exchange something, so all the existing trade pages, transactions and trade summaries keep working.
 
@@ -17,7 +28,20 @@ export type MultiTeamAsset = {
 	id: number;
 	fromTid: number;
 	toTid: number;
+
+	// Draft pick condition added in this trade (picks only)
+	condition?: PickConditionSpec;
 };
+
+// The pick conditions of a multi-team trade, with the receiving team filled in
+export const getMultiPickConditions = (
+	trade: MultiTeamTrade,
+): TradePickCondition[] =>
+	trade.assets.flatMap((asset) =>
+		asset.type === "pick" && asset.condition
+			? [{ ...asset.condition, dpid: asset.id, tid: asset.toTid }]
+			: [],
+	);
 
 export type MultiTeamTrade = {
 	// First is the user's team
@@ -65,12 +89,18 @@ export const getLegs = (trade: MultiTeamTrade): TradeTeams[] => {
 				const assets = trade.assets.filter(
 					(asset) => asset.fromTid === from && asset.toTid === to,
 				);
+				const pickConditions = assets.flatMap((x) =>
+					x.type === "pick" && x.condition
+						? [{ ...x.condition, dpid: x.id, tid: to }]
+						: [],
+				);
 				return {
 					tid: from,
 					pids: assets.filter((x) => x.type === "player").map((x) => x.id),
 					pidsExcluded: [],
 					dpids: assets.filter((x) => x.type === "pick").map((x) => x.id),
 					dpidsExcluded: [],
+					...(pickConditions.length > 0 ? { pickConditions } : {}),
 				};
 			};
 			const leg: TradeTeams = [side(a, b), side(b, a)];
@@ -195,6 +225,37 @@ export const validateAssets = async (trade: MultiTeamTrade) => {
 			if (!dp || dp.tid !== asset.fromTid) {
 				return "Invalid draft pick";
 			}
+			if (asset.condition) {
+				if (!featureOn("draftPickConditions")) {
+					return "Draft pick conditions are turned off";
+				}
+				const error = validatePickConditionSpec(
+					asset.condition,
+					dp,
+					getNumPicksPerRound(),
+				);
+				if (error) {
+					return error;
+				}
+				if (asset.condition.type === "swap") {
+					const toPicks = await idb.cache.draftPicks.indexGetAll(
+						"draftPicksByTid",
+						asset.toTid,
+					);
+					if (
+						dp.originalTid === asset.toTid ||
+						!toPicks.some(
+							(dp2) =>
+								dp2.originalTid === asset.toTid &&
+								dp2.season === dp.season &&
+								dp2.round === dp.round &&
+								!dp2.swap,
+						)
+					) {
+						return "A pick swap needs the receiving team's own pick in the same round";
+					}
+				}
+			}
 		}
 	}
 	if (new Set(trade.tids).size !== trade.tids.length) {
@@ -253,6 +314,14 @@ export const summaryMulti = async (trade: MultiTeamTrade) => {
 		const salaryIn = salary(flow.pidsIn);
 		const salaryOut = salary(flow.pidsOut);
 
+		const conditionSuffix = (dpid: number) => {
+			const asset = trade.assets.find(
+				(a) => a.type === "pick" && a.id === dpid,
+			);
+			return asset?.condition
+				? ` [${conditionSpecText(asset.condition, g.get("teamInfoCache")[asset.toTid]?.abbrev)}]`
+				: "";
+		};
 		const describe = async (
 			pids: number[],
 			dpids: number[],
@@ -275,7 +344,9 @@ export const summaryMulti = async (trade: MultiTeamTrade) => {
 				rows.push({
 					type: "pick" as const,
 					id: dpid,
-					name: dp ? await helpers.pickDesc(dp, "short") : "???",
+					name: dp
+						? `${await helpers.pickDesc(dp, "short")}${conditionSuffix(dpid)}`
+						: "???",
 					contractAmount: 0,
 					contractExp: undefined,
 					otherTid: otherTid(dpid, "pick"),
@@ -362,6 +433,7 @@ export const evaluateMulti = async (
 				dpidsAdd: flow.dpidsIn,
 				dpidsRemove: flow.dpidsOut,
 				tradingPartnerTid: userTid,
+				pickConditions: getMultiPickConditions(trade),
 				ovrBefore: summaryTeam?.ovrBefore,
 				ovrAfter: summaryTeam?.ovrAfter,
 				payrollBefore:

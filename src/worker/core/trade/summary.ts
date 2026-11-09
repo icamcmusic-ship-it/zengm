@@ -1,9 +1,12 @@
 import { player, team } from "../index.ts";
+import { conditionSpecText } from "../../../common/draftPickConditions.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import type {
 	Player,
 	TradeSummary,
+	PickConditionSpec,
 	TradeTeams,
 } from "../../../common/types.ts";
 import { orderBy } from "../../../common/utils.ts";
@@ -90,9 +93,30 @@ const summary = async (teams: TradeTeams): Promise<TradeSummary> => {
 		);
 		for (const dp of picks) {
 			if (dpids[i].includes(dp.dpid)) {
+				const condition = teams[i].pickConditions?.find(
+					(c) => c.dpid === dp.dpid,
+				);
+				let conditionSpec: PickConditionSpec | undefined;
+				if (condition) {
+					const { dpid, tid, ...spec } = condition;
+					conditionSpec = spec;
+				}
 				s.teams[i].picks.push({
 					dpid: dp.dpid,
 					desc: await helpers.pickDesc(dp, "short"),
+					condition: conditionSpec,
+					conditionText: conditionSpec
+						? conditionSpecText(
+								conditionSpec,
+								g.get("teamInfoCache")[tids[i === 0 ? 1 : 0]]?.abbrev,
+							)
+						: undefined,
+					canHaveCondition:
+						featureOn("draftPickConditions") &&
+						typeof dp.season === "number" &&
+						dp.pick === 0 &&
+						!dp.protection &&
+						!dp.swap,
 					pick: dp.pick,
 					round: dp.round,
 					season: dp.season,

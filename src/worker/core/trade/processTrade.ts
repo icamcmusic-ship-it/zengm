@@ -17,6 +17,10 @@ import {
 	type TradeEventTeams,
 	type TradeTeams,
 } from "../../../common/types.ts";
+import {
+	getTradePickConditions,
+	protectionText,
+} from "../../../common/draftPickConditions.ts";
 import { getTeammateJerseyNumbers } from "../player/genJerseyNumber.ts";
 import { recomputeLocalUITeamOvrs } from "../../util/recomputeLocalUITeamOvrs.ts";
 
@@ -28,6 +32,13 @@ const processTrade = async (
 	const tids: [number, number] = [rawTeams[0].tid, rawTeams[1].tid];
 	const pids: [number[], number[]] = [rawTeams[0].pids, rawTeams[1].pids];
 	const dpids: [number[], number[]] = [rawTeams[0].dpids, rawTeams[1].dpids];
+
+	// Picks traded with a new condition. For a swap, the pick itself stays put and only the swap right moves
+	const conditions = new Map(
+		getTradePickConditions(rawTeams).map((c) => [c.dpid, c]),
+	);
+	const swapDpids = new Set<number>();
+	const conditionedDpids: number[] = [];
 
 	const teams: TradeEventTeams = [
 		{
@@ -156,7 +167,27 @@ const processTrade = async (
 			if (!dp) {
 				throw new Error("Invalid dpid");
 			}
-			dp.tid = tids[k];
+			const condition = conditions.get(dpid);
+			let conditionText;
+			if (condition && !dp.protection && !dp.swap) {
+				conditionedDpids.push(dpid);
+				if (condition.type === "protection") {
+					dp.protection = {
+						tid: tids[j],
+						top: condition.top,
+						rollover: [...condition.rollover],
+						then: condition.then,
+					};
+					conditionText = protectionText(dp.protection);
+				} else {
+					dp.swap = { tid: tids[k] };
+					swapDpids.add(dpid);
+					conditionText = "swap rights";
+				}
+			}
+			if (!swapDpids.has(dpid)) {
+				dp.tid = tids[k];
+			}
 			draftPicksToSave.push(dp);
 
 			teams[k].assets.push({
@@ -164,6 +195,8 @@ const processTrade = async (
 				season: dp.season,
 				round: dp.round,
 				originalTid: dp.originalTid,
+				...(conditionText !== undefined ? { condition: conditionText } : {}),
+				...(swapDpids.has(dpid) ? { swap: true as const } : {}),
 			});
 		}
 		await idb.cache.draftPicks.putAll(draftPicksToSave);
@@ -264,7 +297,7 @@ const processTrade = async (
 				draftPicks[i].push(dp);
 			}
 			for (const dp of draftPicks[i]) {
-				if (dp.tid !== tids[j]) {
+				if (dp.tid !== (swapDpids.has(dp.dpid) ? tids[i] : tids[j])) {
 					return false;
 				}
 			}
@@ -288,6 +321,10 @@ const processTrade = async (
 
 			for (const dp of draftPicks[i]) {
 				dp.tid = tids[i];
+				if (conditionedDpids.includes(dp.dpid)) {
+					delete dp.protection;
+					delete dp.swap;
+				}
 			}
 			await idb.cache.draftPicks.putAll(draftPicks[i]);
 		}

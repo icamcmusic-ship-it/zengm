@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { DraftPickSeason } from "../../../common/types.ts";
 import { helpers } from "../../util/helpers.ts";
 
@@ -12,6 +13,8 @@ const PickText = ({
 		season: DraftPickSeason;
 		tid: number;
 		type: "realizedPick" | "unrealizedPick";
+		condition?: string;
+		swap?: true;
 	};
 	season: number;
 }) => {
@@ -35,8 +38,13 @@ const PickText = ({
 		);
 	}
 
+	if (asset.condition !== undefined && !asset.swap) {
+		details.push(asset.condition);
+	}
+
 	return (
 		<>
+			{asset.swap ? "Right to swap " : null}
 			{asset.season === "fantasy" ? (
 				`${season} fantasy draft`
 			) : asset.season === "expansion" ? (
@@ -52,12 +60,18 @@ const PickText = ({
 					{asset.season}
 				</a>
 			)}{" "}
-			{helpers.ordinal(asset.round)} round pick
+			{helpers.ordinal(asset.round)} round {asset.swap ? "picks" : "pick"}
 			{details.length > 0 ? (
 				<>
 					{" "}
-					({details[0]}
-					{details.length > 1 ? <>, {details[1]}</> : null})
+					(
+					{details.map((detail, i) => (
+						<Fragment key={i}>
+							{i > 0 ? ", " : null}
+							{detail}
+						</Fragment>
+					))}
+					)
 				</>
 			) : null}
 		</>
