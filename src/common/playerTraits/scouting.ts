@@ -97,3 +97,8 @@ export const scoutTrait = ({
 		exact: false,
 	};
 };
+
+// How a reading is shown: the exact score once it's known, otherwise only the scouting range with a "?" (never a single number, which would look exact)
+export const formatTraitReading = (
+	t: Pick<ScoutedTrait, "estimate" | "low" | "high" | "exact">,
+) => (t.exact ? String(t.estimate) : `${t.low}-${t.high}?`);

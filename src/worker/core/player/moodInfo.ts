@@ -15,6 +15,9 @@ const hasActiveNegotiation = async (tid: number, pid: number) => {
 	);
 };
 
+// A free agent asking for the minimum signs with anyone, unless he really hates the team (sum of mood components below this). Then it's the normal willingness check, which still gets easier the longer he's unsigned.
+export const MIN_CONTRACT_REFUSE_MOOD = -8;
+
 const moodInfo = async (
 	p: Player,
 	tid: number,
@@ -123,7 +126,9 @@ const moodInfo = async (
 		!g.get("playersRefuseToNegotiate") ||
 		rookie ||
 		firstSeasonAfterExpansionOverride ||
-		(contractAmount === g.get("minContract") && p.tid === PLAYER.FREE_AGENT)
+		(contractAmount === g.get("minContract") &&
+			p.tid === PLAYER.FREE_AGENT &&
+			sumComponents > MIN_CONTRACT_REFUSE_MOOD)
 	) {
 		probWilling = 1;
 		willing = true;

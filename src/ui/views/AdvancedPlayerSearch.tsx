@@ -761,7 +761,14 @@ const AdvancedPlayerSearch = (props: View<"advancedPlayerSearch">) => {
 						} else if (info.category === "ratings") {
 							return showRatings ? value : null;
 						} else if (info.category === "traits") {
-							return showRatings ? (value ?? null) : null;
+							if (!showRatings || value === undefined) {
+								return null;
+							}
+							// A range with "?" until the trait is known, sorted by the estimate
+							return {
+								value: p.traitDisplay?.[info.key] ?? value,
+								sortValue: value,
+							};
 						} else {
 							if (
 								__SPORT === "basketball" &&

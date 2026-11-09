@@ -216,6 +216,11 @@ export default defineView({
 				contractSeasons = { start, amounts };
 			}
 
+			// Trait seeds give away the exact scores of hidden traits, so they stay in the worker unless God Mode is on. Saving restores them.
+			if (!g.get("godMode") && p) {
+				delete p.traits;
+			}
+
 			return {
 				appearanceOption,
 				contract,
@@ -227,8 +232,9 @@ export default defineView({
 				p,
 				playerMoodTraits: g.get("playerMoodTraits"),
 				// For the traits editor (basketball, Player Traits setting on)
+				// Only in God Mode: the seeds give away the exact scores of hidden traits, which scouting shouldn't reveal yet
 				traitsInfo:
-					__SPORT === "basketball" && g.get("playerTraits")
+					__SPORT === "basketball" && g.get("playerTraits") && g.get("godMode")
 						? {
 								leagueSeed: g.get("playerTraitsSeed"),
 								season: g.get("season"),

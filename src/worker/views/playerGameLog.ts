@@ -229,8 +229,11 @@ export default defineView({
 				superCols[1].colspan += 1;
 			}
 
+			// The raw player stays in the worker (hidden trait seeds, etc.)
+			const { pRaw: _pRaw, ...topStuffForUI } = topStuff;
+
 			return {
-				...topStuff,
+				...topStuffForUI,
 				showDecisionColumn,
 				gameLog,
 				numGamesPlayoffSeires: g.get("numGamesPlayoffSeries", season),

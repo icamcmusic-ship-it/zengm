@@ -605,8 +605,11 @@ export default defineView({
 				await getTraitViewContext(),
 			);
 
+			// The raw player stays in the worker: it has things the user isn't supposed to see, like the seeds that give away hidden traits
+			const { pRaw: _pRaw, ...topStuffForUI } = topStuff;
+
 			return {
-				...topStuff,
+				...topStuffForUI,
 				playerTraits,
 				events,
 				feats,

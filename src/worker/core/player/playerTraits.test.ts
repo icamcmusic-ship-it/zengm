@@ -3,15 +3,19 @@ import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { g, helpers } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
-import { draft, player } from "../index.ts";
+import { draft, player, team } from "../index.ts";
 import { getTraitSeeds } from "./traits.ts";
+import customizePlayer from "../../views/customizePlayer.ts";
 import createRandomPlayers from "../league/create/createRandomPlayers.ts";
 import createGameAttributes from "../league/createGameAttributes.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { last, range } from "../../../common/utils.ts";
 import {
+	SEASONS_TO_REVEAL,
+	TRAIT_DEFINITIONS,
 	TRAIT_KEYS,
+	formatTraitReading,
 	generateTraitSeeds,
 	seedKey,
 	traitEffects,
@@ -19,6 +23,8 @@ import {
 	traitZ,
 	type TraitSituation,
 } from "../../../common/playerTraits/index.ts";
+
+import { getTraitScoresByPid } from "../../util/playerTraitsView.ts";
 
 const sit: TraitSituation = { scoreDiff: 2, timeLeft: 90, period: 4 };
 
@@ -309,6 +315,97 @@ describe("generation, settings and storage", () => {
 			player
 				.getPlayerTraitsForUI(vet, { godMode: false })!
 				.traits.every((t) => t.exact),
+		);
+	});
+
+	test("hidden traits of young pros are ranges with a ?, never the exact score", () => {
+		g.setWithoutSavingToDB("playerTraits", true);
+		g.setWithoutSavingToDB("playerTraitsSeed", 6);
+		// One season in the league: hidden traits are still being learned, visible ones are exact
+		const rookie: any = {
+			...player.generate(0, 21, 2025, false, DEFAULT_LEVEL),
+			pid: 13,
+		};
+		const ui = player.getPlayerTraitsForUI(rookie, { godMode: false })!;
+		const truth = player.getPlayerTraitsForUI(rookie, { godMode: true })!;
+		assert.isUndefined(ui.exactScores);
+		for (const t of ui.traits) {
+			const hidden = TRAIT_DEFINITIONS[t.key].visibility === "hidden";
+			assert.strictEqual(t.exact, !hidden, t.key);
+			const shown = formatTraitReading(t);
+			if (hidden) {
+				assert.match(shown, /^\d+-\d+\?$/);
+				assert.isAtMost(t.low, t.estimate);
+				assert.isAtLeast(t.high, t.estimate);
+			} else {
+				assert.strictEqual(shown, String(truth.scores[t.key]));
+			}
+		}
+		// The estimates are readings with error, not the true scores
+		assert.isTrue(
+			ui.traits.some((t) => !t.exact && t.estimate !== truth.scores[t.key]),
+		);
+
+		// Tables get the same display strings
+		const byPid = getTraitScoresByPid([rookie], {
+			enabled: true,
+			scoutingLevel: DEFAULT_LEVEL,
+			godMode: false,
+		});
+		const row = byPid.get(13)!;
+		assert.deepStrictEqual(row.scores, ui.scores);
+		assert.match(row.display.clutch, /\?$/);
+
+		// After enough seasons, or with God Mode, they're exact
+		g.setWithoutSavingToDB("season", 2025 + SEASONS_TO_REVEAL);
+		const later = player.getPlayerTraitsForUI(rookie, { godMode: false })!;
+		assert.isTrue(later.traits.every((t) => t.exact));
+		const god = getTraitScoresByPid([rookie], {
+			enabled: true,
+			scoutingLevel: DEFAULT_LEVEL,
+			godMode: true,
+		}).get(13)!;
+		assert.strictEqual(god.display.clutch, String(god.scores.clutch));
+	});
+
+	test("Customize Player only sends trait seeds in God Mode", async () => {
+		g.setWithoutSavingToDB("playerTraits", true);
+		g.setWithoutSavingToDB("playerTraitsSeed", 6);
+		idb.league = mockIDBLeague();
+		const p: any = {
+			...player.generate(PLAYER.FREE_AGENT, 21, 2025, false, DEFAULT_LEVEL),
+			pid: 0,
+		};
+		player.initTraits(p);
+		const teams = helpers.getTeamsDefault().slice(0, 2).map(team.generate);
+		await resetCache({ players: [p], teams });
+		const load = (godMode: boolean) => {
+			g.setWithoutSavingToDB("godMode", godMode);
+			return customizePlayer.load({
+				inputs: { pid: 0, type: undefined },
+				updateEvents: new Set(["firstRun"]),
+				prevInputs: undefined,
+				prevOutput: undefined,
+			} as any) as any;
+		};
+		const normal = await load(false);
+		assert.isUndefined(normal.p.traits);
+		assert.isUndefined(normal.traitsInfo);
+		const god = await load(true);
+		assert.deepStrictEqual(god.p.traits, p.traits);
+		assert.isDefined(god.traitsInfo);
+		// The stored player is untouched
+		assert.deepStrictEqual((await idb.cache.players.get(0))!.traits, p.traits);
+	});
+
+	test("formatTraitReading", () => {
+		assert.strictEqual(
+			formatTraitReading({ estimate: 60, low: 50, high: 70, exact: false }),
+			"50-70?",
+		);
+		assert.strictEqual(
+			formatTraitReading({ estimate: 60, low: 60, high: 60, exact: true }),
+			"60",
 		);
 	});
 
