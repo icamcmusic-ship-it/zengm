@@ -51,8 +51,8 @@ export const levelPenalty = (a: Archetype, level: number) =>
 export const NEED_W = 2;
 export const NEED_K = 4;
 export const NEED_STEP = 0.1;
-// Dimensions whose weight describes a style, not a skill, so they are never gates
-const NOT_A_SKILL = new Set<DimKey>(["usg", "end", "hgt"]);
+// Dimensions whose weight describes a style or his body, not a skill, so they are never gates
+const NOT_A_SKILL = new Set<DimKey>(["usg", "end", "hgt", "len"]);
 
 export type Prepared = {
 	z: Record<DimKey, number>;
@@ -61,6 +61,8 @@ export type Prepared = {
 	level: number;
 	skills: SkillLabel[];
 	hgt: number;
+	// He has expanded ratings: perimeter/interior defense are ratings of their own and his length is known
+	expanded: boolean;
 	// His age, when known
 	age?: number;
 };
@@ -76,19 +78,41 @@ const youthOf = (age: number | undefined) =>
 
 // The per-archetype part of needShortfall (hot: every archetype for every player), computed once per archetype object.
 // Same terms in the same order, so the same results.
+// The profile weights in force: `w`, or with expanded ratings `w` with `xw` on top (and without his defensive IQ when
+// `xw` names a side of the floor)
+const weightsCache = new WeakMap<Archetype, Archetype["w"]>();
+export const weightsOf = (a: Archetype, expanded: boolean): Archetype["w"] => {
+	if (!expanded || !a.xw) {
+		return a.w;
+	}
+	let w = weightsCache.get(a);
+	if (!w) {
+		w = { ...a.w, ...a.xw };
+		if (a.xw.pdef !== undefined || a.xw.idef !== undefined) {
+			delete w.diq;
+		}
+		weightsCache.set(a, w);
+	}
+	return w;
+};
+
 type NeedTerms = {
 	low: boolean;
 	defining: { dim: DimKey; w: number }[];
 	need: [DimKey, number][];
+	cap: [DimKey, number][];
 	needFor: [DimKey, number][];
 };
 const needTermsCache = new WeakMap<Archetype, NeedTerms>();
-const getNeedTerms = (a: Archetype) => {
-	let cached = needTermsCache.get(a);
+const needTermsCacheExpanded = new WeakMap<Archetype, NeedTerms>();
+const getNeedTerms = (a: Archetype, expanded: boolean) => {
+	const cache = expanded && a.xw ? needTermsCacheExpanded : needTermsCache;
+	let cached = cache.get(a);
 	if (!cached) {
+		const weights = weightsOf(a, expanded);
 		const defining: NeedTerms["defining"] = [];
 		for (const dim of DIMS) {
-			const w = a.w[dim];
+			const w = weights[dim];
 			if (w === undefined || w < NEED_W || NOT_A_SKILL.has(dim)) {
 				continue;
 			}
@@ -98,15 +122,16 @@ const getNeedTerms = (a: Archetype) => {
 			low: isLowLevel(a),
 			defining,
 			need: Object.entries(a.need ?? {}) as [DimKey, number][],
+			cap: Object.entries(a.cap ?? {}) as [DimKey, number][],
 			needFor: Object.entries(a.needFor ?? {}) as [DimKey, number][],
 		};
-		needTermsCache.set(a, cached);
+		cache.set(a, cached);
 	}
 	return cached;
 };
 
 export const needShortfall = (a: Archetype, p: Prepared, strict = false) => {
-	const { low, defining, need, needFor } = getNeedTerms(a);
+	const { low, defining, need, cap, needFor } = getNeedTerms(a, p.expanded);
 	let short = 0;
 	const slack =
 		low || strict
@@ -123,7 +148,19 @@ export const needShortfall = (a: Archetype, p: Prepared, strict = false) => {
 		}
 	}
 	for (const [dim, floor] of need) {
+		if (dim === "len") {
+			// Length is a measurement (no slack for a prospect), and only known with expanded ratings
+			if (p.expanded) {
+				short += Math.max(0, floor - p.abs.len);
+			}
+			continue;
+		}
 		short += Math.max(0, floor - slack - p.abs[dim]);
+	}
+	for (const [dim, ceiling] of cap) {
+		if (dim !== "len" || p.expanded) {
+			short += Math.max(0, p.abs[dim] - ceiling);
+		}
 	}
 	for (const [dim, floor] of needFor) {
 		short += Math.max(0, floor - slack - p.sz[dim]);
@@ -145,29 +182,45 @@ type MatchTerm = {
 	target: number;
 	w: number | undefined;
 };
-const matchTermsCache = new WeakMap<
-	Archetype,
-	{ terms: MatchTerm[]; den: number }
->();
-const getMatchTerms = (a: Archetype) => {
-	let cached = matchTermsCache.get(a);
-	if (!cached) {
-		const terms: MatchTerm[] = [];
-		let den = 0;
-		for (const dim of DIMS) {
-			const w = a.w[dim];
-			// Height is a gate, it only counts when the archetype names it
-			if (dim === "hgt" && w === undefined) {
+type MatchTerms = { terms: MatchTerm[]; den: number };
+const matchTermsCache = new WeakMap<Archetype, [MatchTerms, MatchTerms]>();
+const buildMatchTerms = (a: Archetype, expanded: boolean): MatchTerms => {
+	const terms: MatchTerm[] = [];
+	let den = 0;
+	// A label keyed on perimeter or interior defense reads that rating in place of his defensive IQ (which is the same
+	// number without expanded ratings, and their average with them)
+	const weights = weightsOf(a, expanded);
+	const sided = weights.pdef !== undefined || weights.idef !== undefined;
+	for (const dim of DIMS) {
+		const w = weights[dim];
+		if (w === undefined) {
+			// Height is a gate, it only counts when the archetype names it. So do the two defense ratings and length
+			if (
+				dim === "hgt" ||
+				dim === "pdef" ||
+				dim === "idef" ||
+				dim === "len" ||
+				(dim === "diq" && sided)
+			) {
 				continue;
 			}
-			const imp = BASE_IMPORTANCE + Math.abs(w ?? 0);
-			terms.push({ dim, imp, target: (w ?? 0) * TARGET_SCALE, w });
-			den += imp;
+		} else if (dim === "len" && !expanded) {
+			// Length is only known with expanded ratings
+			continue;
 		}
-		cached = { terms, den };
+		const imp = BASE_IMPORTANCE + Math.abs(w ?? 0);
+		terms.push({ dim, imp, target: (w ?? 0) * TARGET_SCALE, w });
+		den += imp;
+	}
+	return { terms, den };
+};
+const getMatchTerms = (a: Archetype, expanded: boolean) => {
+	let cached = matchTermsCache.get(a);
+	if (!cached) {
+		cached = [buildMatchTerms(a, false), buildMatchTerms(a, true)];
 		matchTermsCache.set(a, cached);
 	}
-	return cached;
+	return cached[expanded ? 1 : 0];
 };
 
 // How well one player's ratings fit one archetype's profile, 0..1. Absolute: not yet read against the league.
@@ -177,8 +230,10 @@ export const rawMatch = (
 	hgt: number,
 	skills: SkillLabel[],
 	level = 0,
+	// He has expanded ratings (see Prepared)
+	expanded = false,
 ) => {
-	const { terms, den } = getMatchTerms(a);
+	const { terms, den } = getMatchTerms(a, expanded);
 	let num = 0;
 	for (const { dim, imp, target, w } of terms) {
 		// Being even better than the profile asks at a skill it wants (or even lower where it wants low) costs little: an
@@ -260,9 +315,20 @@ export const classValues = (p: Prepared): Record<string, number> => {
 			// Rim protection partly in absolute terms (as for the profile); rebounding, finishing and post play for his size
 			v = Math.max(v, p.sz[d] + (STANDOUT_ABS[d] ?? 0) * (p.abs[d] - p.sz[d]));
 		}
-		// Perimeter and interior defense need the instincts too: speed or size alone is not a standout defender
-		if (k === "perD" || k === "rimD") {
-			v = Math.min(v, p.sz.diq + DEF_IQ_ROOM);
+		// Perimeter and interior defense need the instincts too: speed or size alone is not a standout defender. With
+		// expanded ratings that is the rating for that side of the floor (without them both are his defensive IQ)
+		if (k === "perD") {
+			v = Math.min(v, p.sz.pdef + DEF_IQ_ROOM);
+			// ... and the rating is the skill itself: a slow-footed stopper is still a stopper
+			if (p.expanded) {
+				v = Math.max(v, p.sz.pdef);
+			}
+		} else if (k === "rimD") {
+			v = Math.min(v, p.sz.idef + DEF_IQ_ROOM);
+			// (for a big body: a guard's interior defense is not what a label names)
+			if (p.expanded && p.hgt >= BIG_HGT) {
+				v = Math.max(v, p.sz.idef);
+			}
 		}
 		vals[k] = v + lift;
 	}
@@ -317,27 +383,44 @@ const qualifies = (a: Archetype, shortfall: number) =>
 		? 0
 		: 1 - shortfall / SHORTFALL_FADE;
 
+// A big body (hgt rating): finishing is his size more than a skill, passing a rare one
+const BIG_HGT = 55;
+
 // A two-way player: his best skill on offense and his best on defense are both well above ordinary for his size. The
 // standouts above are relative to his own best (a great scorer's good defense fades out), so the pair is read apart:
 // a label that features both sides gets TWO_WAY_K per z of the weaker side.
-// A big body (hgt rating): finishing is his size more than a skill, passing a rare one
-const BIG_HGT = 55;
 const TWO_WAY_OFF = ["shoot", "mid", "post", "handle", "pass", "finish"];
 const TWO_WAY_DEF = ["perD", "rimD"];
 const TWO_WAY_OFF_FROM = 0.5;
 const TWO_WAY_DEF_FROM = 0.3;
 export const TWO_WAY_K = 0.6;
+// With expanded ratings his defense is a rating of its own for each side of the floor, not something read off his speed
+// or size: a defensive standout is the real thing, and the label that names both sides of his game wins by more
+export const TWO_WAY_K_EXPANDED = Number(process.env.TWK ?? 0.6);
 export const twoWayBonus = (
 	a: Archetype,
 	cv: Record<string, number>,
 	hgt: number,
 	shortfall = 0,
+	expanded = false,
 ) => {
 	const q = qualifies(a, shortfall);
 	if (q === 0) {
 		return 0;
 	}
-	const c = coverOf(a);
+	const s = twoWaySides(cv, hgt, a);
+	return (
+		(expanded ? TWO_WAY_K_EXPANDED : TWO_WAY_K) * q * Math.min(s.off, s.def)
+	);
+};
+
+// How strong each side of his game is, 0..1 (his best class on that side), as far as a label features it (or outright)
+export const twoWaySides = (
+	cv: Record<string, number>,
+	hgt: number,
+	a?: Archetype,
+) => {
+	const c = a ? coverOf(a) : undefined;
 	const side = (classes: string[], from: number) => {
 		let best = 0;
 		for (const k of classes) {
@@ -347,19 +430,15 @@ export const twoWayBonus = (
 			}
 			best = Math.max(
 				best,
-				(c[k] ?? 0) * Math.min(1, Math.max(0, cv[k]! - from)),
+				(c ? (c[k] ?? 0) : 1) * Math.min(1, Math.max(0, cv[k]! - from)),
 			);
 		}
 		return best;
 	};
-	return (
-		TWO_WAY_K *
-		q *
-		Math.min(
-			side(TWO_WAY_OFF, TWO_WAY_OFF_FROM),
-			side(TWO_WAY_DEF, TWO_WAY_DEF_FROM),
-		)
-	);
+	return {
+		off: side(TWO_WAY_OFF, TWO_WAY_OFF_FROM),
+		def: side(TWO_WAY_DEF, TWO_WAY_DEF_FROM),
+	};
 };
 
 // Passing is rare for a big body: a big who passes well gets a label that says so (Point Center, Playmaking Big, ...)
@@ -409,5 +488,6 @@ export const prepare = (ratings: ArchetypeRatings, norms: Norms): Prepared => {
 		level: v.level,
 		skills: skillsOf(ratings),
 		hgt: ratings.hgt,
+		expanded: v.expanded,
 	};
 };

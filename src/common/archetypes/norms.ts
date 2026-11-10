@@ -1,4 +1,4 @@
-import { DIMS, compositeValues } from "./composites.ts";
+import { DIMS, compositeValues, hasExpanded } from "./composites.ts";
 import type { ArchetypeRatings, DimKey, Norms } from "./types.ts";
 
 // The dimensions whose mean is "how good is he, period", used to read shape instead of level
@@ -148,7 +148,8 @@ export const buildBaseNorms = (
 	const hs = Math.sqrt(mean(hz.map((x) => (x - hm) ** 2))) || 1;
 	const beta = {} as Norms["beta"];
 	for (const dim of DIMS) {
-		if (dim === "hgt") {
+		// Length is a body measurement like height: read as is
+		if (dim === "hgt" || dim === "len") {
 			beta[dim] = 0;
 			continue;
 		}
@@ -181,15 +182,27 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 	const abs = {} as Record<DimKey, number>;
 	const sz = {} as Record<DimKey, number>;
 	const hz = rawZ(norms.q.hgt, v.hgt);
+	const expanded = hasExpanded(r);
 	for (const dim of DIMS) {
-		const raw = rawZ(norms.q[dim], v[dim]);
+		// Perimeter and interior defense are his defensive IQ when he has no expanded ratings (or the norms do not know them)
+		const src =
+			(dim === "pdef" || dim === "idef") && (!expanded || !norms.q[dim])
+				? "diq"
+				: dim;
+		if (dim === "len" && (!expanded || !norms.q.len)) {
+			abs[dim] = 0;
+			z[dim] = 0;
+			sz[dim] = 0;
+			continue;
+		}
+		const raw = rawZ(norms.q[src], v[src]);
 		abs[dim] = raw;
-		if (dim === "hgt") {
+		if (dim === "hgt" || dim === "len") {
 			z[dim] = raw;
 			sz[dim] = raw;
 			continue;
 		}
-		const b = norms.beta[dim];
+		const b = norms.beta[src];
 		const adj = (raw - b * hz) / Math.max(Math.sqrt(1 - b * b), SHRINK_FLOOR);
 		z[dim] = clampZ(adj);
 		sz[dim] = z[dim];
@@ -200,11 +213,11 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 	}
 	level /= CORE_DIMS.length;
 	for (const dim of DIMS) {
-		if (dim !== "hgt") {
+		if (dim !== "hgt" && dim !== "len") {
 			z[dim] = clampZ(z[dim] - LEVEL_SHARE * level);
 		}
 	}
-	return { z, level, hgtZ: hz, abs, sz };
+	return { z, level, hgtZ: hz, abs, sz, expanded };
 };
 
 export const ovrPercentile = (norms: Norms, ovr: number) =>

@@ -16,10 +16,18 @@ import { resetG } from "../../test/helpers.ts";
 import develop from "../../worker/core/player/develop.ts";
 import generate from "../../worker/core/player/generate.ts";
 import ovrFn from "../../worker/core/player/ovr.ts";
-import { ARCHETYPES, classify, scoreAll } from "./classify.ts";
+import { fillExpandedRatings } from "../expandedRatings.ts";
+import { g } from "../../worker/util/index.ts";
+import { ARCHETYPES, classify, defaultNorms, scoreAll } from "./classify.ts";
 import { compositeValues } from "./composites.ts";
-import { DEFAULT_NORMS } from "./norms.data.ts";
+import { buildNorms } from "./match.ts";
 import { probit, rawZ } from "./norms.ts";
+import {
+	classValues,
+	needShortfall,
+	prepare,
+	twoWaySides,
+} from "./score.ts";
 import {
 	HARD_BLOCK,
 	nameContradictsPosition,
@@ -27,6 +35,16 @@ import {
 	positionFor,
 } from "./position.ts";
 
+// ARCH_DIAG_EXPANDED=1: every population with the Expanded Ratings setting on (generated players get wingspan and
+// perimeter/interior defense from the generator, real players the derived ones a real-players league gets)
+const EXPANDED = Boolean(process.env.ARCH_DIAG_EXPANDED);
+const NORMS = defaultNorms(EXPANDED);
+const newG = () => {
+	resetG();
+	if (EXPANDED) g.setWithoutSavingToDB("expandedRatings", true);
+};
+// ARCH_DIAG_TW=file: every strict two-way player whose label is one-way, with what the engine saw
+const TW = process.env.ARCH_DIAG_TW ? [] : undefined;
 const OUT = process.env.ARCH_DIAG_OUT ?? "/tmp/claude-0/arch-diag.txt";
 // ARCH_DIAG_DUMP=file: every labelled player as JSON rows [population, name, pos, age, label], to compare two versions
 const DUMP = process.env.ARCH_DIAG_DUMP ? [] : undefined;
@@ -49,8 +67,20 @@ const AUDIT = [
 		"playmaking label, cannot pass",
 	],
 	[
-		/Lockdown|Defensive|Stopper|Pest|Hawk|Thief|Two-Way|Switch|Perimeter Lock|Point of Attack/,
-		(r, a) => r.diq >= 45 && (a.dper >= 0 || a.dint >= 0 || a.blk >= 0),
+		/Lockdown|Defensive|Defender|Disruptor|Stopper|Pest|Hawk|Thief|Two-Way|Switch|Perimeter Lock|Point of Attack/,
+		// With expanded ratings: the defense rating of the side the label names (perimeter for these names), else his better one
+		(r, a, sz, name) =>
+			(r.pdef === undefined
+				? r.diq
+				: /Lockdown|Stopper|Pest|Hawk|Thief|Disruptor|Perimeter Lock|Point of Attack/.test(
+							name,
+					  )
+					? r.pdef
+					: /Paint/.test(name)
+						? r.idef
+						: Math.max(r.pdef, r.idef)) >= 45 &&
+			// (a veteran defender is the one label about instincts that outlast the legs)
+			(/Veteran/.test(name) || a.dper >= 0 || a.dint >= 0 || a.blk >= 0),
 		"defensive label, poor defender",
 	],
 	[
@@ -73,6 +103,17 @@ const AUDIT = [
 		(r, a, sz) => sz.rim >= 0 && a.drb >= -0.3,
 		"slashing label, cannot attack the rim",
 	],
+	// Length labels: his wingspan (on the height scale) against his height
+	[
+		/Long-Armed|Rangy|Long Wing/,
+		(r) => r.wng === undefined || r.wng - r.hgt >= 3,
+		"length label, ordinary wingspan",
+	],
+	[
+		/Short-Armed/,
+		(r) => r.wng !== undefined && r.wng - r.hgt <= -3,
+		"short-armed label, ordinary wingspan",
+	],
 	[
 		/Handles|Shot Creator|Shot-Creating|Iso|Shifty/,
 		(r, a) => a.drb >= 0.5,
@@ -83,21 +124,26 @@ const AUDIT = [
 const ratingsOfRow = (row) => {
 	const r = {};
 	for (const k of RATING_KEYS) r[k] = row[k];
+	if (EXPANDED && typeof row.wng === "number") {
+		r.wng = row.wng;
+		r.pdef = row.pdef;
+		r.idef = row.idef;
+	}
 	return r;
 };
 
-const absZ = (r) => {
+const absZ = (r, norms = NORMS) => {
 	const v = compositeValues(r);
 	const z = {};
-	for (const k of Object.keys(v)) z[k] = rawZ(DEFAULT_NORMS.q[k], v[k]);
+	for (const k of Object.keys(v)) z[k] = rawZ(norms.q[k], v[k]);
 	return z;
 };
 
 // Skill for his size (height's share taken out), computed here so the audit does not depend on the engine version
-const sizeZ = (a) => {
+const sizeZ = (a, norms = NORMS) => {
 	const z = {};
 	for (const k of Object.keys(a)) {
-		const b = DEFAULT_NORMS.beta[k] ?? 0;
+		const b = norms.beta[k] ?? 0;
 		z[k] = (a[k] - b * a.hgt) / Math.max(Math.sqrt(1 - b * b), 0.55);
 	}
 	return z;
@@ -117,9 +163,13 @@ const CLASSES = [
 	["rimD", ["blk", "dint"]],
 	["perD", ["dper", "stl"]],
 	["ath", ["ath"]],
-	// Not a skill class: defensive IQ, so a defensive standout can be told from speed or size alone
+	// Not skill classes: defensive IQ, so a defensive standout can be told from speed or size alone (with expanded
+	// ratings: the perimeter and the interior defense rating, each for its side)
 	["iq", ["diq"]],
+	["pd", ["pdef"]],
+	["id", ["idef"]],
 ];
+const NOT_CLASS = new Set(["iq", "pd", "id"]);
 const DIM2CLASS = {
 	three: "shoot",
 	mid: "mid",
@@ -149,6 +199,9 @@ const claimsOf = (a) => {
 		const k = a.group === "big" ? "rimD" : "perD";
 		c[k] = Math.max(c[k] ?? 0, 0.5);
 	}
+	// A label keyed on the perimeter or the interior defense rating (defensive IQ without expanded ratings)
+	if ((a.w.pdef ?? 0) >= 2) c.perD = Math.max(c.perD ?? 0, 0.5);
+	if ((a.w.idef ?? 0) >= 2) c.rimD = Math.max(c.rimD ?? 0, 0.5);
 	return c;
 };
 const BUCKET = {
@@ -163,7 +216,11 @@ const BUCKET = {
 	C: "C",
 };
 const peerZ = (players) => {
-	const vals = players.map((p) => compositeValues(p.ratings));
+	const vals = players.map((p) => ({
+		...compositeValues(p.ratings),
+		pdef: (p.ratings.pdef ?? p.ratings.diq) / 100,
+		idef: (p.ratings.idef ?? p.ratings.diq) / 100,
+	}));
 	const by = {};
 	players.forEach((p, i) => (by[BUCKET[p.dpos]] ??= []).push(i));
 	const zs = players.map(() => ({}));
@@ -195,7 +252,7 @@ const peerZ = (players) => {
 const OFF = new Set(["shoot", "mid", "finish", "post", "handle", "pass"]);
 const DEF = new Set(["rimD", "perD"]);
 // rows: { p, c (classification), scored } with p.dpos set
-const descriptor = (rows, out) => {
+const descriptor = (rows, out, pop) => {
 	const zs = peerZ(rows.map((r) => r.p));
 	const claims = new Map(ARCHETYPES.map((a) => [a.id, claimsOf(a)]));
 	let nStand = 0,
@@ -215,8 +272,29 @@ const descriptor = (rows, out) => {
 		pb2Miss: 0,
 		tw2: 0,
 		tw2Miss: 0,
+		tw3: 0,
+		tw3Miss: 0,
 	};
 	const betterBy = {};
+	// Gaps: how well each (position, top-two standout skills) profile is named
+	const pairs = {};
+	const twLine = (kind, r, z, t2) => {
+		const bestZ = r.scored[0].z;
+		const alt = r.scored.find((s) => {
+			const ca = claims.get(s.a.id);
+			return (
+				s.z > -50 &&
+				Object.keys(ca).some((k) => OFF.has(k) && ca[k] >= 0.5) &&
+				Object.keys(ca).some((k) => DEF.has(k) && ca[k] >= 0.5)
+			);
+		});
+		const pp = { ...prepare(r.p.ratings, r.p.norms ?? NORMS), age: r.p.age };
+		const ecv = classValues(pp);
+		const sides = twoWaySides(ecv, r.p.ratings.hgt);
+		TW.push(
+			`${kind}|${pop}|${r.p.name ?? ""} ${r.p.dpos} age${r.p.age} hgt${r.p.ratings.hgt} ovr${r.p.ovr} [${t2.map(([k, v]) => `${k} ${v.toFixed(1)}`).join(", ")}; pd ${z.pd.toFixed(1)} id ${z.id.toFixed(1)}] -> ${r.c.label} (z ${bestZ.toFixed(2)}); best two-way label: ${alt ? `${alt.a.id} ${(alt.z - bestZ).toFixed(2)} short ${needShortfall(alt.a, pp, true).toFixed(2)}` : "none"}; engine cv ${t2.map(([k]) => `${k} ${ecv[k].toFixed(1)}`).join(", ")} perD ${ecv.perD.toFixed(1)} rimD ${ecv.rimD.toFixed(1)} sides ${sides.off.toFixed(1)}/${sides.def.toFixed(1)} lvl ${pp.level.toFixed(1)}`,
+		);
+	};
 	rows.forEach((r, i) => {
 		const z = zs[i];
 		// Star labels (by design for a level of play, not a skill pair) are left out of the three checks below
@@ -232,7 +310,7 @@ const descriptor = (rows, out) => {
 		)
 			lacks++;
 		const stand = Object.entries(z)
-			.filter(([k, v]) => v >= 1 && k !== "iq")
+			.filter(([k, v]) => v >= 1 && !NOT_CLASS.has(k))
 			.sort((x, y) => y[1] - x[1]);
 		const top = stand.slice(0, 2).map(([k]) => k);
 		const cov = (c) => top.reduce((t, k) => t + (c[k] ?? 0), 0) / top.length;
@@ -240,6 +318,13 @@ const descriptor = (rows, out) => {
 			nStand++;
 			const c0 = cov(cl);
 			agree += c0;
+			if (!star) {
+				const key = `${BUCKET[r.p.dpos]}:${[...top].sort().join("+")}`;
+				const e = (pairs[key] ??= { n: 0, c: 0, labels: {} });
+				e.n++;
+				e.c += c0;
+				if (c0 < 0.75) e.labels[r.c.id] = (e.labels[r.c.id] ?? 0) + 1;
+			}
 			const bestZ = r.scored.find((s) => s.a.id === r.c.id).z;
 			for (const s of r.scored) {
 				if (s.z < bestZ - 0.5) break;
@@ -303,22 +388,61 @@ const descriptor = (rows, out) => {
 			!star &&
 			t2.length === 2 &&
 			t2.some(([k]) => off2(k)) &&
-			t2.some(([k]) => DEF.has(k)) &&
-			z.iq >= 0
+			t2.some(([k]) => DEF.has(k) && (k === "perD" ? z.pd : z.id) >= 0)
 		) {
 			f.tw2++;
 			const o = Object.keys(cl).some((k) => OFF.has(k) && cl[k] >= 0.5);
 			const d =
 				Object.keys(cl).some((k) => DEF.has(k) && cl[k] >= 0.5) ||
 				/Two-Way|Defend|3-and-D/.test(r.c.label);
-			if (!(o && d)) f.tw2Miss++;
+			if (!(o && d)) {
+				f.tw2Miss++;
+				if (TW) twLine("strict", r, z, t2);
+			}
+		}
+		// A real two-way player: a skill on offense well above his peers (one of his top two) and a defense rating
+		// (perimeter or interior with expanded ratings, else defensive IQ) as far above them
+		const offTop = stand.filter(([k]) => off2(k))[0];
+		if (
+			!star &&
+			offTop &&
+			offTop[1] >= 1.2 &&
+			top.includes(offTop[0]) &&
+			Math.max(z.pd, z.id) >= 1.2
+		) {
+			f.tw3++;
+			const o = Object.keys(cl).some((k) => OFF.has(k) && cl[k] >= 0.5);
+			const d =
+				Object.keys(cl).some((k) => DEF.has(k) && cl[k] >= 0.5) ||
+				/Two-Way|Defend|3-and-D/.test(r.c.label);
+			if (!(o && d)) {
+				f.tw3Miss++;
+				if (TW) twLine("rating", r, z, stand.slice(0, 2));
+			}
 		}
 	});
 	out.push(
 		`descriptor agreement: ${pct(agree, nStand)}% of top-2 standout skills (vs position peers) named by the label; top standout named ${pct(top1Hit, top1)}%; better fit available ${pct(better, nStand)}%; label features a skill he is below his peers at ${pct(lacks, rows.length)}%`,
 	);
 	out.push(
-		`  elite shooters not labelled shooters ${f.shMiss}/${f.sh}; passing bigs not labelled playmakers ${f.pbMiss}/${f.pb}; two-way players labelled one-way ${f.twMiss}/${f.tw}; stricter: passing bigs ${f.pb2Miss}/${f.pb2}, two-way ${f.tw2Miss}/${f.tw2}; hybrids ${pct(rows.filter((r) => r.c.secondary).length, rows.length)}%; most "better fit": ${Object.entries(
+		`  least named profiles (position: standout skills, players, share named; most common labels of the unnamed): ${Object.entries(
+			pairs,
+		)
+			.filter(([, e]) => e.n >= 12)
+			.sort((x, y) => y[1].n - y[1].c - (x[1].n - x[1].c))
+			.slice(0, 28)
+			.map(
+				([k, e]) =>
+					`${k} ${e.n} ${pct(e.c, e.n)}% (${Object.entries(e.labels)
+						.sort((x, y) => y[1] - x[1])
+						.slice(0, 3)
+						.map(([id, v]) => `${id} ${v}`)
+						.join(", ")})`,
+			)
+			.join("; ")}`,
+	);
+	out.push(
+		`  elite shooters not labelled shooters ${f.shMiss}/${f.sh}; passing bigs not labelled playmakers ${f.pbMiss}/${f.pb}; two-way players labelled one-way ${f.twMiss}/${f.tw}; stricter: passing bigs ${f.pb2Miss}/${f.pb2}, two-way ${f.tw2Miss}/${f.tw2}; offense standout + defense rating standout labelled one-way ${f.tw3Miss}/${f.tw3}; hybrids ${pct(rows.filter((r) => r.c.secondary).length, rows.length)}%; most "better fit": ${Object.entries(
 			betterBy,
 		)
 			.sort((x, y) => y[1] - x[1])
@@ -350,12 +474,12 @@ const analyse = (label, players, out) => {
 		const ps = p.pos ?? positionFor(p.ratings, true);
 		const { scored } = scoreAll(
 			p.ratings,
-			DEFAULT_NORMS,
+			p.norms ?? NORMS,
 			ARCHETYPES,
 			ps,
 			p.age,
 		);
-		const c = classify(p.ratings, { pos: ps, age: p.age });
+		const c = classify(p.ratings, { pos: ps, age: p.age, norms: p.norms });
 		const best = scored.find((s) => s.a.id === c.id);
 		p.dpos = ps;
 		rows.push({ p, c, scored });
@@ -386,13 +510,14 @@ const analyse = (label, players, out) => {
 		posTab[ps][c.group] = (posTab[ps][c.group] ?? 0) + 1;
 		if (!c.tags.includes("universal") && HARD_BLOCK[c.group].includes(ps))
 			hard++;
-		const a = absZ(p.ratings);
-		const sz = sizeZ(a);
+		// (against the league he is read against)
+		const a = absZ(p.ratings, p.norms);
+		const sz = sizeZ(a, p.norms);
 		let checked = false;
 		for (const [re, ok, why] of AUDIT) {
 			if (re.test(c.name)) {
 				checked = true;
-				if (!ok(p.ratings, a, sz)) {
+				if (!ok(p.ratings, a, sz, c.name)) {
 					auditBad++;
 					badBy[c.name] = (badBy[c.name] ?? 0) + 1;
 					if (badEx.length < 25)
@@ -425,7 +550,7 @@ const analyse = (label, players, out) => {
 	out.push(
 		`audit mismatches: ${pct(auditBad, n)}% of all players (${auditBad}/${audited} audited labels = ${pct(auditBad, audited)}%)`,
 	);
-	descriptor(rows, out);
+	descriptor(rows, out, label.slice(0, 4));
 	out.push(
 		`names: position-name contradictions ${nameBad}, contradictory hybrid labels ${hybBad}${nameEx.length ? ` [${nameEx.join("; ")}]` : ""}`,
 	);
@@ -477,7 +602,7 @@ const genPlayers = (n, seed, minAge, maxAge, minOvr) =>
 	seeded(seed, () => genPlayers1(n, seed, minAge, maxAge, minOvr));
 
 const genPlayers1 = async (n, seed, minAge, maxAge, minOvr) => {
-	resetG();
+	newG();
 	const rng = new Rng(seed);
 	const out = [];
 	while (out.length < n) {
@@ -500,6 +625,15 @@ const realPlayers = () => {
 	if (!existsSync(file)) return [];
 	const d = JSON.parse(readFileSync(file, "utf8"));
 	const out = [];
+	if (EXPANDED) {
+		// As a real-players league with the setting on: derived from the other ratings, one wingspan per player
+		const bySlug = {};
+		for (const row of d.ratings) (bySlug[row.slug] ??= []).push(row);
+		for (const [slug, rows] of Object.entries(bySlug)) {
+			rows.sort((x, y) => x.season - y.season);
+			fillExpandedRatings({ srID: slug, ratings: rows });
+		}
+	}
 	for (const row of d.ratings) {
 		if (row.season < 2016 || row.season > 2025) continue;
 		const r = ratingsOfRow(row);
@@ -520,7 +654,9 @@ const realPlayers = () => {
 test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 	"diag",
 	async () => {
-		const out = [`archetypes: ${ARCHETYPES.length}`];
+		const out = [
+			`archetypes: ${ARCHETYPES.length}, expanded ratings ${EXPANDED ? "ON" : "off"}`,
+		];
 		const league = await genPlayers(6000, "diag-v2", 19, 32, 38);
 		const all = { counts: {} };
 		const r1 = analyse(
@@ -545,6 +681,28 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 		);
 		const real = realPlayers();
 		if (real.length) analyse("real NBA ratings 2016-2025", real, out);
+		// The same players as a real-players league reads them: each season against that season's own league
+		if (real.length) {
+			const bySeason = {};
+			for (const p of real) (bySeason[p.season] ??= []).push(p);
+			const own = [];
+			for (const ps of Object.values(bySeason)) {
+				const norms = {
+					...buildNorms(
+						ps.map((p) => ({
+							ratings: p.ratings,
+							ovr: p.ovr,
+							pos: positionFor(p.ratings, true),
+						})),
+						ARCHETYPES,
+						NORMS,
+					),
+					bias: NORMS.bias,
+				};
+				for (const p of ps) own.push({ ...p, norms });
+			}
+			analyse("own-league real NBA ratings 2016-2025", own, out);
+		}
 		void all;
 		// Stability: the same players season after season, with stickiness and sticky improved positions as the game uses them
 		const trans = {};
@@ -553,7 +711,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 			steps = 0,
 			groupChanges = 0;
 		await seeded("diag-flap", async () => {
-			resetG();
+			newG();
 			const rng2 = new Rng("diag-flap");
 			for (let i = 0; i < 6000; i++) {
 				const p = generate(-1, 19, 2025 - rng2.int(0, 6), false, DEFAULT_LEVEL);
@@ -645,6 +803,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 		mkdirSync(dirname(OUT), { recursive: true });
 		writeFileSync(OUT, out.join("\n") + "\n");
 		if (DUMP) writeFileSync(process.env.ARCH_DIAG_DUMP, JSON.stringify(DUMP));
+		if (TW) writeFileSync(process.env.ARCH_DIAG_TW, TW.join("\n") + "\n");
 	},
 	1800000,
 );

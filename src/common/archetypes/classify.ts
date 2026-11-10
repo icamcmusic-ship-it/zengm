@@ -1,6 +1,7 @@
 import { ARCHETYPE_DEFS } from "./defs.data.ts";
-import { DIM_LABELS, DIM_RATINGS, DIMS } from "./composites.ts";
+import { DIM_LABELS, DIM_RATINGS, DIMS, hasExpanded } from "./composites.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
+import { DEFAULT_NORMS_EXPANDED } from "./normsExpanded.data.ts";
 import { matchZ } from "./match.ts";
 import {
 	coverOf,
@@ -15,6 +16,8 @@ import {
 	standoutBonus,
 	standoutsOf,
 	twoWayBonus,
+	twoWaySides,
+	weightsOf,
 	type Standout,
 } from "./score.ts";
 import { ovrPercentile } from "./norms.ts";
@@ -47,6 +50,13 @@ export const combineArchetypeDescs = (primary: string, secondary?: string) => {
 	return `${a}, and also ${bLower.endsWith(".") ? bLower : `${bLower}.`}`;
 };
 
+// The built-in reference league: one generated with the Expanded Ratings setting on for players who have those ratings
+// (their composites, the two defense ratings and length are distributed differently), else the stock one
+export const defaultNorms = (expanded: boolean): Norms =>
+	expanded ? DEFAULT_NORMS_EXPANDED : DEFAULT_NORMS;
+export const defaultNormsFor = (ratings: ArchetypeRatings): Norms =>
+	defaultNorms(hasExpanded(ratings));
+
 export const ARCHETYPES: Archetype[] = ARCHETYPE_DEFS.map((d) => ({
 	...d,
 	prior: 1,
@@ -76,6 +86,12 @@ const crossGroupPenalty = (a: Archetype, b: Archetype) =>
 	b.tags.includes("universal")
 		? 0
 		: CROSS_GROUP_Z;
+// A two-way player (with expanded ratings, where his defense is a rating of its own) whose primary label names one side
+// of his game: the partner that names the other side may be this much farther off, and is worth this much per unit of
+// his weaker side ("Mid-Range Wing / Lockdown Wing")
+export const TWO_WAY_PARTNER_REACH = Number(process.env.TWR ?? 3);
+export const TWO_WAY_PARTNER_MIN_Z = Number(process.env.TWM ?? 0.5);
+const TWO_WAY_PARTNER_FROM = 0.4;
 // The archetype he had keeps the label unless another is better by more than this
 export const STICKY_Z = 0.55;
 
@@ -90,9 +106,10 @@ const signatureBonus = (
 	cv: Record<string, number>,
 	hgt: number,
 	strictShortfall: number,
+	expanded: boolean,
 ) =>
 	standoutBonus(a, standouts, strictShortfall) +
-	twoWayBonus(a, cv, hgt, strictShortfall) +
+	twoWayBonus(a, cv, hgt, strictShortfall, expanded) +
 	passingBigBonus(a, cv, hgt, strictShortfall);
 
 export type Scored = { a: Archetype; raw: number; z: number };
@@ -101,7 +118,7 @@ export type Scored = { a: Archetype; raw: number; z: number };
 // players of his size (so every archetype gets its share), ties break on id so the order is deterministic.
 export const scoreAll = (
 	ratings: ArchetypeRatings,
-	norms: Norms = DEFAULT_NORMS,
+	norms: Norms = defaultNormsFor(ratings),
 	archetypes: Archetype[] = ARCHETYPES,
 	position?: Pos,
 	// His age, when known: age-gated archetypes (veterans) need it
@@ -112,6 +129,10 @@ export const scoreAll = (
 	skills: SkillLabel[];
 	pos: Pos;
 	standouts: Standout[];
+	// His level at each skill class (score.ts), his height rating and whether he has expanded ratings
+	cv: Record<string, number>;
+	hgt: number;
+	expanded: boolean;
 } => {
 	const p = { ...prepare(ratings, norms), age };
 	const pos = position ?? positionOf(ratings);
@@ -119,10 +140,12 @@ export const scoreAll = (
 	const standouts = standoutsOf(p, cv);
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
-		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.level);
+		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded);
 		const prior = archetypePrior(a, pos);
 		if (
 			prior === null ||
+			// A label about his length needs a wingspan
+			(a.expanded && !p.expanded) ||
 			(a.age &&
 				(age === undefined
 					? a.age[0] >= 30
@@ -138,8 +161,15 @@ export const scoreAll = (
 			(a.rare ? RARE_PENALTY : 0) +
 			(a.tags.includes("star") ? STAR_BONUS : 0) +
 			prior +
-			((norms.bias ?? DEFAULT_NORMS.bias)?.[a.id] ?? 0) +
-			signatureBonus(a, standouts, cv, p.hgt, needShortfall(a, p, true)) -
+			((norms.bias ?? defaultNorms(p.expanded).bias)?.[a.id] ?? 0) +
+			signatureBonus(
+				a,
+				standouts,
+				cv,
+				p.hgt,
+				needShortfall(a, p, true),
+				p.expanded,
+			) -
 			genericPenalty(a, standouts) -
 			needPenaltyOf(short) -
 			levelPenalty(a, p.level) -
@@ -149,7 +179,16 @@ export const scoreAll = (
 		scored.push({ a, raw, z });
 	}
 	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
-	return { scored, z: p.z, skills: p.skills, pos, standouts };
+	return {
+		scored,
+		z: p.z,
+		skills: p.skills,
+		pos,
+		standouts,
+		cv,
+		hgt: p.hgt,
+		expanded: p.expanded,
+	};
 };
 
 export const TIER_NAMES: Record<Tier, string> = {
@@ -174,11 +213,17 @@ export const tierFromPercentile = (pct: number): Tier =>
 						? "bench"
 						: "fringe";
 
-const whyOf = (a: Archetype, z: Record<DimKey, number>): Why[] => {
+const whyOf = (
+	a: Archetype,
+	z: Record<DimKey, number>,
+	expanded: boolean,
+): Why[] => {
 	const rows: Why[] = [];
+	const weights = weightsOf(a, expanded);
 	for (const dim of DIMS) {
-		const w = a.w[dim];
-		if (w === undefined || dim === "hgt") {
+		const w = weights[dim];
+		// (length reads exactly 0 for a player without a wingspan)
+		if (w === undefined || dim === "hgt" || (dim === "len" && z.len === 0)) {
 			continue;
 		}
 		// Contribution: how much of the wanted direction he actually has
@@ -204,10 +249,10 @@ const whyOf = (a: Archetype, z: Record<DimKey, number>): Why[] => {
 export const explain = (
 	id: string,
 	ratings: ArchetypeRatings,
-	norms: Norms = DEFAULT_NORMS,
+	norms: Norms = defaultNormsFor(ratings),
 ): Why[] => {
 	const a = archetypeById(id);
-	return a ? whyOf(a, prepare(ratings, norms).z) : [];
+	return a ? whyOf(a, prepare(ratings, norms).z, hasExpanded(ratings)) : [];
 };
 
 export type ClassifyOptions = {
@@ -226,8 +271,8 @@ export const classify = (
 	ratings: ArchetypeRatings,
 	opts: ClassifyOptions = {},
 ): Classification => {
-	const norms = opts.norms ?? DEFAULT_NORMS;
-	const { scored, z, standouts } = scoreAll(
+	const norms = opts.norms ?? defaultNormsFor(ratings);
+	const { scored, z, standouts, cv, hgt, expanded } = scoreAll(
 		ratings,
 		norms,
 		ARCHETYPES,
@@ -256,18 +301,37 @@ export const classify = (
 		}
 		return SECONDARY_K * t;
 	};
+	// The side of a two-way player's game the primary leaves out, and how strong his weaker side is
+	let missing: "off" | "def" | undefined;
+	let twoWay = 0;
+	if (expanded) {
+		const all = twoWaySides(cv, hgt);
+		const named = twoWaySides(cv, hgt, first.a);
+		twoWay = Math.min(all.off, all.def);
+		if (twoWay >= TWO_WAY_PARTNER_FROM) {
+			missing =
+				named.def < 0.5 * all.def
+					? named.off < 0.5 * all.off
+						? undefined
+						: "def"
+					: named.off < 0.5 * all.off
+						? "off"
+						: undefined;
+		}
+	}
+	const completes = (s: Scored) =>
+		missing ? Math.min(twoWay, twoWaySides(cv, hgt, s.a)[missing]) : 0;
+	const allowed = (s: Scored) =>
+		// Never a label that names another position than the primary's ("Switchable Forward / Switchable Center"), and
+		// one from the primary's own positional group (or a universal one) is preferred
+		s.a.family !== first.a.family && !namesContradict(first.a.name, s.a.name);
 	let partner: Scored | undefined;
 	let partnerZ = -Infinity;
 	for (const s of rest) {
 		if (s.z < first.z - HYBRID_Z - SECONDARY_REACH) {
 			break;
 		}
-		// Never a label that names another position than the primary's ("Switchable Forward / Switchable Center"), and
-		// one from the primary's own positional group (or a universal one) is preferred
-		if (
-			s.a.family === first.a.family ||
-			namesContradict(first.a.name, s.a.name)
-		) {
+		if (!allowed(s)) {
 			continue;
 		}
 		const v = s.z + adds(s) - crossGroupPenalty(first.a, s.a);
@@ -278,12 +342,39 @@ export const classify = (
 	}
 	// A single strong label reads best: a partner only when it names a standout the primary does not, or it is all but
 	// tied with the primary
-	const secondary =
+	let secondary =
 		partner &&
 		partnerZ >= first.z - HYBRID_Z &&
 		(adds(partner) >= SECONDARY_MIN || partner.z >= first.z - HYBRID_TIE_Z)
-			? { id: partner.a.id, name: partner.a.name, desc: partner.a.desc }
-			: null;
+			? partner
+			: undefined;
+	// ... or when he is a two-way player and it names the side of his game the primary leaves out: then the partner only
+	// has to be a good fit in its own right, not a near tie
+	if (missing) {
+		let best: Scored | undefined;
+		let bestV = -Infinity;
+		for (const s of rest) {
+			if (
+				s.z < first.z - TWO_WAY_PARTNER_REACH ||
+				s.z < TWO_WAY_PARTNER_MIN_Z
+			) {
+				break;
+			}
+			const c = completes(s);
+			if (c < TWO_WAY_PARTNER_FROM || !allowed(s)) {
+				continue;
+			}
+			const v = s.z + c + adds(s) - crossGroupPenalty(first.a, s.a);
+			if (v > bestV) {
+				best = s;
+				bestV = v;
+			}
+		}
+		// (a regular partner that already names that side stays)
+		if (best && !(secondary && completes(secondary) >= TWO_WAY_PARTNER_FROM)) {
+			secondary = best;
+		}
+	}
 	const confidence = Math.max(0, Math.min(1, (first.z - second.z) / 0.5));
 	const tier =
 		opts.ovr !== undefined
@@ -295,13 +386,19 @@ export const classify = (
 		name: a.name,
 		group: a.group,
 		family: a.family,
-		desc: combineArchetypeDescs(a.desc, secondary?.desc),
+		desc: combineArchetypeDescs(a.desc, secondary?.a.desc),
 		tags: a.tags,
-		secondary,
+		secondary: secondary
+			? {
+					id: secondary.a.id,
+					name: secondary.a.name,
+					desc: secondary.a.desc,
+				}
+			: null,
 		score: Math.round(first.raw * 1000) / 1000,
 		confidence: Math.round(confidence * 100) / 100,
 		tier,
-		why: whyOf(a, z),
-		label: secondary ? `${a.name} / ${secondary.name}` : a.name,
+		why: whyOf(a, z, expanded),
+		label: secondary ? `${a.name} / ${secondary.a.name}` : a.name,
 	};
 };

@@ -3,6 +3,7 @@
 import { DEFAULT_LEVEL } from "../budgetLevels.ts";
 import { Rng } from "../ratingsBuilds/rng.ts";
 import { resetG } from "../../test/helpers.ts";
+import { g } from "../../worker/util/index.ts";
 import develop from "../../worker/core/player/develop.ts";
 import generate from "../../worker/core/player/generate.ts";
 import ovr from "../../worker/core/player/ovr.ts";
@@ -22,8 +23,13 @@ export const sampleLeague = async (
 	// Years of development: 0..maxYears (default: a whole league, 19 to 32 year olds)
 	maxYears = 13,
 	minOvr = 38,
+	// With the Expanded Ratings setting on: players come with wingspan and perimeter/interior defense
+	expanded = false,
 ): Promise<SamplePlayer[]> => {
 	resetG();
+	if (expanded) {
+		g.setWithoutSavingToDB("expandedRatings", true);
+	}
 	const rng = new Rng(seed);
 	// BBGM's generator draws from Math.random: seed it too, so a sample (and norms built from it) is the same every run.
 	// Not vi.spyOn: a spy records every call.
@@ -34,6 +40,9 @@ export const sampleLeague = async (
 		return await sample(n, rng, maxYears, minOvr);
 	} finally {
 		Math.random = random;
+		if (expanded) {
+			g.setWithoutSavingToDB("expandedRatings", false);
+		}
 	}
 };
 
@@ -57,6 +66,11 @@ const sample = async (
 		const ratings = {} as ArchetypeRatings;
 		for (const key of RATING_KEYS) {
 			ratings[key] = row[key];
+		}
+		if (typeof row.wng === "number") {
+			ratings.wng = row.wng;
+			ratings.pdef = row.pdef;
+			ratings.idef = row.idef;
 		}
 		out.push({ ratings, ovr: o, age: 19 + k, hgtInches: p.hgt });
 	}
