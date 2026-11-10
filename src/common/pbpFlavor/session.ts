@@ -59,6 +59,7 @@ import {
 } from "./calls.ts";
 import { VarietyMemory, pickV, setVariety, weighted } from "./variety.ts";
 import { TrashTalk, applyTrashTalk, tempersFromPlayers } from "./trashTalk.ts";
+import { CareerNotes, parseCareer } from "./career.ts";
 import {
 	roleNames,
 	setPlay,
@@ -153,9 +154,16 @@ export type FlavorInit = {
 		pos: string;
 		t: 0 | 1;
 		ratings?: Record<string, number>;
+		// What he had done before the game (career.ts), for the career-high and milestone calls
+		career?: readonly number[];
 	}[];
-	// Game context for the trash talk (trashTalk.ts)
-	context?: { playoffs?: boolean; rivalry?: boolean };
+	// Game context for the trash talk (trashTalk.ts) and the career calls (career.ts). rivalry: true or 1 for a heated rivalry, 2 for a
+	// bitter one; exhibition: a game whose stats don't count (the All-Star Game)
+	context?: {
+		playoffs?: boolean;
+		rivalry?: boolean | number;
+		exhibition?: boolean;
+	};
 	// The teams' records coming into the game, and a playoff series [team 0's wins, team 1's wins] (live games only)
 	records?: [TeamRecord | undefined, TeamRecord | undefined];
 	series?: [number, number];
@@ -176,10 +184,18 @@ export const playersFromInitEvent = (event: any): FlavorInit["players"] => {
 				pos: String(p.pos ?? ""),
 				t: t === 1 ? 1 : 0,
 				ratings: p.pbpRatings,
+				career: Array.isArray(p.pbpCareer) ? p.pbpCareer : undefined,
 			});
 		}
 	}
 	return out;
+};
+
+// The game context the sim sends with the init event: how heated the rivalry of the two teams is (1 heated, 2 bitter; see
+// worker/util/pbpRivalry.ts). Nothing for a game without one, or an old stored game
+export const contextFromInitEvent = (event: any): { rivalry?: number } => {
+	const r = event?.boxScore?.[0]?.pbpRivalry;
+	return typeof r === "number" && r > 0 ? { rivalry: r } : {};
 };
 
 type Attempt = {
@@ -514,6 +530,8 @@ export class FlavorSession {
 	// Trash talk from hotheads (the Temper player trait), see trashTalk.ts
 	private trash: TrashTalk;
 	private context: NonNullable<FlavorInit["context"]>;
+	// Career highs and milestones (career.ts)
+	private career: CareerNotes;
 	// the flow of the score, shooting lines, and the rest of the game-long colour (color.ts)
 	private flow = new GameFlow();
 	private shooting = new ShootingNotes();
@@ -524,8 +542,23 @@ export class FlavorSession {
 	private glassSaid = new Set<number>();
 
 	constructor(init: FlavorInit) {
-		this.trash = new TrashTalk(init.gid, tempersFromPlayers(init.players));
 		this.context = init.context ?? {};
+		const ages = new Map<number, number>();
+		if (!this.context.exhibition) {
+			for (const p of init.players) {
+				const age = parseCareer(p.career)?.age;
+				if (age !== undefined) {
+					ages.set(p.pid, age);
+				}
+			}
+		}
+		this.trash = new TrashTalk(
+			init.gid,
+			tempersFromPlayers(init.players),
+			ages,
+		);
+		this.trash.setContext(this.context);
+		this.career = new CareerNotes(init.gid, init.players, this.context);
 		this.gid = init.gid;
 		this.numPeriods = init.numPeriods;
 		this.quarterLength = init.quarterLength;
@@ -902,8 +935,12 @@ export class FlavorSession {
 				score,
 				late: this.finalPeriod(),
 				run: this.run,
-				...this.context,
+				playoffs: this.context.playoffs,
+				rivalry: this.context.rivalry,
 			});
+		}
+		if (typeof res === "object" && this.career.active) {
+			this.careerNotes(ev, res);
 		}
 		if (typeof res === "object") {
 			this.lastType = e.type;
@@ -914,6 +951,47 @@ export class FlavorSession {
 				);
 		}
 		return typeof res === "object" ? this.cleanResult(res, undefined) : res;
+	}
+
+	// Career highs and milestones for the players whose line this event changed (career.ts)
+	private careerNotes(ev: any, res: FlavorResult) {
+		const type: string = ev.type;
+		const made = MADE[type] !== undefined;
+		const ft = type === "ft";
+		if (
+			!made &&
+			!ft &&
+			type !== "orb" &&
+			type !== "drb" &&
+			type !== "stl" &&
+			!type.startsWith("blk")
+		) {
+			return;
+		}
+		const pids = [ev.pid, made ? ev.pidAst : undefined].filter(
+			(pid, i, a): pid is number =>
+				typeof pid === "number" && a.indexOf(pid) === i,
+		);
+		for (const pid of pids) {
+			const p = this.pl(pid);
+			const line = this.career.check(this.idx, p, this.host.stat(pid), {
+				late: this.finalPeriod(),
+				how:
+					pid !== ev.pid
+						? undefined
+						: ft
+							? "free throw"
+							: made
+								? MADE[type]!.three
+									? "three"
+									: "basket"
+								: undefined,
+			});
+			// (the scorer and the passer can each have one on the same play)
+			if (line) {
+				res.note = [res.note, line].filter(Boolean).join(" ");
+			}
+		}
 	}
 
 	// ---- structure ----
@@ -1872,10 +1950,15 @@ export class FlavorSession {
 				? pickV(rng, [
 						`${p.name} gets the offensive rebound off the missed free throw`,
 						`${p.name} fights for the rebound after the miss at the line and keeps it alive`,
+						`${p.name} slips in from the lane line and takes the missed free throw`,
+						`${p.name} beats the box-out on the free throw and gets it back`,
 					])
 				: pickV(rng, [
 						`${p.name} grabs the rebound off the missed free throw`,
 						`${p.name} collects the miss at the line`,
+						`${p.name} takes the missed free throw off the rim`,
+						`${p.name} has the rebound after the miss at the line`,
+						`${p.name} clears the missed free throw`,
 					]);
 		} else {
 			text = rebText(rng, p, off, !!ls?.three, ownBlock, ls?.blk);
@@ -3004,6 +3087,11 @@ export class FlavorSession {
 		}
 		this.lastPtype = out.ptype;
 		return out;
+	}
+
+	// For tests: what the trash talk and the career calls said, and when (the position of the event)
+	debugLog() {
+		return { trash: this.trash.log, career: this.career.calls, idx: this.idx };
 	}
 
 	// For tests: the last kind of play worded

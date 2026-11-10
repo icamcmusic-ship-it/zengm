@@ -158,6 +158,10 @@ export const shootingFoul = (
 					" He'll shoot two.",
 					" Two free throws coming.",
 					" He'll go to the line for two.",
+					" Two shots coming up.",
+					" He heads to the stripe for two.",
+					" A pair of free throws for him.",
+					" He'll get two from the line.",
 				]);
 	return shooter.name + text + "." + tail;
 };
@@ -202,6 +206,8 @@ export const freeThrow = (
 						`${n} hits from the line`,
 						`${n} drops in a free throw`,
 						`${n} knocks down the free throw`,
+						`${n} is good from the line`,
+						`${n} converts at the line`,
 					])
 				: pickV(rng, [
 						`${n} misses the free throw`,
@@ -256,6 +262,16 @@ export const freeThrow = (
 						: `${n} steps up and hits the ${ord}`,
 					`${n} drops in the ${ord} free throw`,
 					`${n} is good on the ${ord}`,
+					`${n} buries the ${ord} free throw`,
+					`${n}'s ${ord} free throw is good`,
+					`${n} puts the ${ord} one through`,
+					`${n} converts the ${ord}`,
+					`${n} cans the ${ord} free throw`,
+					`${n}'s ${ord} one drops`,
+					`${n} takes his time and makes the ${ord}`,
+					`${n} rattles in the ${ord} free throw`,
+					`${n}'s ${ord} free throw catches nothing but net`,
+					`${n} is on target with the ${ord}`,
 				])
 			: pickV(rng, [
 					`${n} misses the ${ord} free throw`,
@@ -265,6 +281,12 @@ export const freeThrow = (
 					`${n}'s ${ord} free throw is off the back rim`,
 					`${n} leaves the ${ord} one short`,
 					`${n}'s ${ord} free throw rattles out`,
+					`${n}'s ${ord} free throw is long`,
+					`${n} is off the mark on the ${ord}`,
+					`${n}'s ${ord} one hits the heel of the rim`,
+					`${n}'s ${ord} free throw spins out`,
+					`${n} can't get the ${ord} one to go`,
+					`${n} back-rims the ${ord} free throw`,
 				]);
 	} else if (m === total) {
 		// every shot made
@@ -278,6 +300,14 @@ export const freeThrow = (
 						`${n} calmly hits the second to make both`,
 						`${n} is perfect at the line, 2 for 2`,
 						`${n} drops in the second for two more`,
+						`${n} makes it two for two`,
+						`${n} adds the second; a clean trip to the line`,
+						`${n} buries the second too`,
+						`${n} hits the second, and that's both`,
+						`${n} takes both points from the line`,
+						`${n} is good again: two free throws, two makes`,
+						`${n}'s second one drops as well`,
+						`${n} cashes in both free throws`,
 					])
 				: pickV(rng, [
 						`${n} makes the third: all 3 free throws are good`,
@@ -289,6 +319,10 @@ export const freeThrow = (
 		text = pickV(rng, [
 			`${n} makes the ${ord}, finishing ${m} of ${total} at the line`,
 			`${n} hits the ${ord} to go ${m} of ${total}`,
+			`${n} gets the ${ord} to fall: ${m} of ${total}`,
+			`${n} salvages the trip with the ${ord}, ${m} of ${total}`,
+			`${n} makes the ${ord} this time; ${m} of ${total} at the line`,
+			`${n} knocks down the ${ord} for ${m} of ${total}`,
 		]);
 	} else if (m === 0) {
 		text = pickV(
@@ -298,6 +332,8 @@ export const freeThrow = (
 						`${n} misses the second too and comes up empty`,
 						`${n} can't hit either free throw`,
 						`${n} misses both; the second hits the front rim`,
+						`${n} leaves both free throws out there`,
+						`${n} is 0 for 2 on the trip`,
 					]
 				: [`${n} misses all 3 free throws`, `${n} comes up empty at the line`],
 		);
@@ -305,6 +341,9 @@ export const freeThrow = (
 		text = pickV(rng, [
 			`${n} misses the ${ord} and finishes ${m} of ${total}`,
 			`${n} leaves the ${ord} short; ${m} of ${total} at the line`,
+			`${n} can't add the ${ord}: ${m} of ${total}`,
+			`${n}'s ${ord} one rims out, so it's ${m} of ${total}`,
+			`${n} gives one back, missing the ${ord}; ${m} of ${total}`,
 			total === 2
 				? `${n} splits the pair at the line`
 				: `${n} misses the last one and makes ${m} of ${total}`,
@@ -377,16 +416,57 @@ export const substitution = (
 			`${b.name} gets a breather; ${a.name} in.`,
 			`${a.name} in, ${b.name} out.`,
 			`${a.name} reports in for ${b.name}.`,
+			`${b.name} takes a seat; ${a.name} is in.`,
+			`${a.name} gets the call and replaces ${b.name}.`,
+			`${b.name} comes out for a rest, and ${a.name} takes over.`,
+			`${a.name} enters the game for ${b.name}.`,
+			`${a.name} is at the scorer's table for ${b.name}.`,
+			`${b.name} sits; ${a.name} comes off the bench.`,
+			`${a.name} spells ${b.name}.`,
+			`${b.name} gets a rest. ${a.name} checks in.`,
+			`${a.name} takes over for ${b.name}.`,
+			`${a.name} off the bench for ${b.name}.`,
+			`A breather for ${b.name}: ${a.name} comes in.`,
+			`${a.name} is waved in for ${b.name}.`,
+			`${b.name} heads to the sideline, ${a.name} on.`,
+			`${a.name} gets some run in place of ${b.name}.`,
+			`${cap(teamName)} send in ${a.name} for ${b.name}.`,
+			`${cap(teamName)} go to ${a.name}; ${b.name} sits.`,
+			`${b.name} gives way to ${a.name}.`,
+			`Here comes ${a.name}, in for ${b.name}.`,
 		]);
 	}
-	const list = bits
-		.map(({ a, b }) => `${a.name} in for ${b ? b.name : "a teammate"}`)
-		.join(", ");
+	const off = (b: FPlayer | undefined) => (b ? b.name : "a teammate");
+	// (three ways to list who came in for whom, so a long night of changes doesn't read as one line over and over)
+	const style = Math.floor(rng.random() * 3);
+	const list =
+		style === 0
+			? bits.map(({ a, b }) => `${a.name} in for ${off(b)}`).join(", ")
+			: style === 1
+				? bits.map(({ a, b }) => `${a.name} for ${off(b)}`).join(", ")
+				: bits.map(({ a, b }) => `${a.name} replaces ${off(b)}`).join("; ");
+	const many = bits.length >= 3;
 	return pickV(rng, [
 		`${bare(teamName)} substitution: ${list}.`,
 		`Changes for ${teamName}: ${list}.`,
 		`Lineup changes for ${teamName}: ${list}.`,
 		`Fresh legs for ${teamName}: ${list}.`,
+		`Substitutions for ${teamName}: ${list}.`,
+		`${cap(teamName)} go to the bench: ${list}.`,
+		`${cap(teamName)} shuffle the lineup: ${list}.`,
+		`New faces for ${teamName}: ${list}.`,
+		`${cap(teamName)} make their changes: ${list}.`,
+		`Help off the bench for ${teamName}: ${list}.`,
+		`A new look for ${teamName}: ${list}.`,
+		`${cap(teamName)} swap some players: ${list}.`,
+		`The ${bare(teamName)} bench gets the call: ${list}.`,
+		`${cap(teamName)} rotate: ${list}.`,
+		many
+			? `A wave of changes for ${teamName}: ${list}.`
+			: `A couple of changes for ${teamName}: ${list}.`,
+		many
+			? `${cap(teamName)} change most of the lineup: ${list}.`
+			: `Two changes for ${teamName}: ${list}.`,
 	]);
 };
 
@@ -441,7 +521,17 @@ export const timeoutText = (
 				" They'll inbound in the frontcourt.",
 			])
 		: "";
-	return `Timeout, ${bare(team)}${why} (${left}).${adv}`;
+	const head = pickV(rng, [
+		`Timeout, ${bare(team)}`,
+		`Timeout, ${bare(team)}`,
+		`${cap(team)} call timeout`,
+		`${cap(team)} take a timeout`,
+		`${cap(team)} use a timeout`,
+		`Time out on the floor, ${bare(team)}`,
+		`${cap(team)} stop play with a timeout`,
+		`A timeout for ${team}`,
+	]);
+	return `${head}${why} (${left}).${adv}`;
 };
 
 // The ball goes out of bounds with no stat of its own
@@ -628,6 +718,11 @@ export const endOfPeriod = (
 			`${Team} run out the clock.`,
 			`${Team} hold the ball and let the clock run out.`,
 			`${Team} are happy to let the final seconds tick away.`,
+			`${Team} let the last seconds run off.`,
+			`${Team} hold it for the horn.`,
+			`No shot from ${team}: they run the clock down to zero.`,
+			`${Team} dribble it out, and that's the horn.`,
+			`${Team} are content to hold the ball as time expires.`,
 		]);
 	}
 	if (reason === "noShot") {
@@ -644,6 +739,10 @@ export const endOfPeriod = (
 			`${Team} are still looking for a shot when the horn sounds.`,
 			`${Team} get caught without a look as the horn goes.`,
 			`The horn beats ${team} to the shot.`,
+			`${Team} run out of time before they can shoot.`,
+			`${Team} never find a look, and the horn sounds.`,
+			`The clock beats ${team}: no shot.`,
+			`${Team} are a beat late; the horn sounds first.`,
 		]);
 	}
 	return pickV(rng, [
@@ -758,6 +857,16 @@ export const quarterNote = (
 		`${lead} after ${which}.`,
 		...(short ? [`${short}: ${lead}.`] : []),
 		...(label === "overtime" ? [] : [`That's ${which}. ${lead}.`]),
+		`${cap(which)} is in the books: ${lead}.`,
+		`The horn ends ${which}. ${lead}.`,
+		`${lead} at the end of ${which}.`,
+		...(short
+			? [
+					sa === sb
+						? `${short}, we're tied at ${sa}.`
+						: `${short}, it's ${sa > sb ? a : b} by ${Math.abs(sa - sb)}.`,
+				]
+			: []),
 	]);
 };
 

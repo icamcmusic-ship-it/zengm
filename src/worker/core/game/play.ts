@@ -11,6 +11,7 @@ import {
 	trade,
 } from "../index.ts";
 import loadTeams from "./loadTeams.ts";
+import { getPbpRivalryLevels, pbpRivalryLevel } from "../../util/pbpRivalry.ts";
 import {
 	dailyTick as injuryDepthDailyTick,
 	isInjuryDepthEnabled,
@@ -664,6 +665,21 @@ const play = async (
 
 			injuryDepthSetSimDay(schedule[0]?.day);
 			const teams = await loadTeams(Array.from(tids), conditions); // Play games
+
+			// How heated each matchup's rivalry is, for the wording of the play-by-play only (the sim never reads it)
+			if (__SPORT === "basketball") {
+				const levels = await getPbpRivalryLevels();
+				for (const matchup of schedule) {
+					const home = teams[matchup.homeTid] as any;
+					if (home) {
+						home.pbpRivalry = pbpRivalryLevel(
+							levels,
+							matchup.homeTid,
+							matchup.awayTid,
+						);
+					}
+				}
+			}
 
 			await cbSimGames(schedule, teams, dayOver);
 		}

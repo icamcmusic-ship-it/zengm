@@ -112,9 +112,12 @@ const pidsOf = (e: any): number[] => {
 };
 
 export const buildPlayByPlayEntries = (boxScore: any): Entry[] => {
-	const { players, events } = decodePlayByPlay(boxScore.pbp);
+	const { players, events, rivalry } = decodePlayByPlay(boxScore.pbp);
 	const box: any = makeStartingBoxScore(boxScore);
-	const queue: any[] = [storedInitEvent(players, boxScore.teams), ...events];
+	const queue: any[] = [
+		storedInitEvent(players, boxScore.teams, rivalry),
+		...events,
+	];
 	let overtimes = 0;
 	let quarters: string[] = [];
 	const entries: Entry[] = [];
