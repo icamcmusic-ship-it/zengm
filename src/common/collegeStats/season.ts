@@ -154,6 +154,13 @@ export type SeasonContext = {
 	postseasonGames?: number;
 	// Also from the college season model: how many of his team's regular season games were conference games (played after the non-conference games)
 	confGames?: number;
+	// Hooks of the career model (career.ts). Without them nothing changes
+	// Minutes per game above or below what his talent gets him (buried on the bench at a big program, the star of a small one)
+	mpgShift?: number;
+	// Usage above or below, in standard deviations
+	usageShift?: number;
+	// A season cut short (injury, medical redshirt): he plays only this many games, the first ones of the season, and none of the postseason
+	gamesCap?: number;
 };
 
 // A stretch of games (non-conference, conference) summed up
@@ -301,7 +308,10 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			)
 		: Math.round(clamp(rng.normal(34.5, 2.4 * noise), 28, 41));
 	const teamGames = ctx.teamGames ?? drawnTeamGames;
-	const postseasonGames = Math.min(ctx.postseasonGames ?? 0, teamGames);
+	const teamPostseason = Math.min(ctx.postseasonGames ?? 0, teamGames);
+	const capped = ctx.gamesCap !== undefined;
+	// His own postseason games: none when his season ended early
+	const postseasonGames = capped ? 0 : teamPostseason;
 	let missed =
 		rng.random() < 0.34 ? Math.round(Math.abs(rng.normal(0, 3.5)) + 1) : 0;
 	missed = Math.min(missed, 18);
@@ -310,7 +320,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		2.7 * z +
 		[-1.8, -0.6, 0.3, 0.7][clamp(c, 0, 3)]! +
 		0.025 * (ratings.endu - 45) +
-		rng.normal(0, 2.3 * noise);
+		rng.normal(0, 2.3 * noise) +
+		(ctx.mpgShift ?? 0);
 	// A teenager at a pro club does not play college star minutes
 	const proCap = proEnv
 		? (ctx.age ?? 21) <= 20 && proEnv.youthCap !== undefined
@@ -323,10 +334,19 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		Math.min(proCap, 37.5 * (gameMinutes / 40)),
 	);
 	const dnp = mpg < 17 ? Math.round(rng.random() * 5) : 0;
-	const gp = Math.min(
-		teamGames,
-		Math.max(4, postseasonGames + 2, teamGames - missed - dnp),
-	);
+	const gp = capped
+		? clamp(
+				Math.round(ctx.gamesCap!),
+				1,
+				Math.max(1, teamGames - teamPostseason),
+			)
+		: Math.min(
+				teamGames,
+				Math.max(4, postseasonGames + 2, teamGames - missed - dnp),
+			);
+	if (capped) {
+		missed = teamGames - gp;
+	}
 	// Full-time starters start every game they play (bar a rare one off the bench); part-time starters vary
 	const startShare = clamp((mpg - 17) / 11, 0, 1);
 	const gs =
@@ -337,7 +357,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	// Usage: the share of his team's scoring chances he finishes while on the floor
 	const usageComp = composite(ratings, "usage");
 	const zUsage = (usageComp - TYPICAL.usage) / TYPICAL.usageSd;
-	const zU = 0.5 * zUsage + 0.5 * z;
+	const zU = 0.5 * zUsage + 0.5 * z + (ctx.usageShift ?? 0);
 	const usg = clamp(
 		0.262 +
 			(proEnv?.usageShift ?? 0) +
@@ -502,13 +522,16 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 
 	// With the college season model: the regular season games he played split into non-conference (first) and conference games, in proportion to his team's schedule. Conference opponents are tougher than the average non-conference one
 	const regularPlayed = gp - postseasonGames;
-	const regularTeam = teamGames - postseasonGames;
+	const regularTeam = teamGames - teamPostseason;
 	const nonConfPlayed =
 		ctx.confGames !== undefined && regularTeam > 0
-			? Math.round(
-					(regularPlayed * Math.max(0, regularTeam - ctx.confGames)) /
-						regularTeam,
-				)
+			? capped
+				? // The first games of the season are the non-conference ones
+					Math.min(regularPlayed, Math.max(0, regularTeam - ctx.confGames))
+				: Math.round(
+						(regularPlayed * Math.max(0, regularTeam - ctx.confGames)) /
+							regularTeam,
+					)
 			: undefined;
 
 	for (let game = 0; game < gp; game++) {

@@ -23,8 +23,9 @@ export const normCdf = (x: number) => {
 export type Recruiting = {
 	classOf: number;
 	stars: number;
-	nationalRank: number;
-	posRank: number;
+	// undefined: not ranked by the recruiting services
+	nationalRank: number | undefined;
+	posRank: number | undefined;
 	pos: string;
 };
 
@@ -40,11 +41,26 @@ const RECRUIT_POS: Record<string, string> = {
 	C: "C",
 };
 
+export const getRecruitPos = (pos: string) => RECRUIT_POS[pos] ?? pos;
+
 // About how many seniors a recruiting service ranks
 const RECRUIT_POOL = 1200;
 
+export const starsForRank = (rank: number | undefined) =>
+	rank === undefined
+		? 2
+		: rank <= 25
+			? 5
+			: rank <= 150
+				? 4
+				: rank <= 500
+					? 3
+					: 2;
+
 /**
  * His ranking as a high school senior, from his potential and how good he was by the draft, with a lot of noise (recruiting rankings miss on plenty of players). A top-3 pick was nearly always a top-10 recruit, a second rounder anything from top 50 to unranked.
+ *
+ * This is what a recruiting service would say about him alone. Two players of the same high school class can come out with the same rank, so what is shown goes through resolveClassRanks, which gives every player of a class his own.
  */
 export const getRecruiting = ({
 	pid,
@@ -58,7 +74,7 @@ export const getRecruiting = ({
 	ovr: number;
 	pos: string;
 	firstCollegeSeason: number;
-}): Recruiting => {
+}): Recruiting & { nationalRank: number; posRank: number } => {
 	const rng = new Rng(`recruit|${pid}`);
 	const z =
 		0.6 * ((pot - 48) / 10) + 0.4 * ((ovr - 42) / 8) + rng.normal(0, 0.45);
@@ -67,24 +83,271 @@ export const getRecruiting = ({
 		1,
 		Math.round(above + rng.random() * Math.min(4, above)),
 	);
-	const stars =
-		nationalRank <= 25
-			? 5
-			: nationalRank <= 150
-				? 4
-				: nationalRank <= 500
-					? 3
-					: 2;
 	const posRank = Math.max(
 		1,
 		Math.round((nationalRank / 5) * (0.75 + 0.5 * rng.random())),
 	);
 	return {
 		classOf: firstCollegeSeason - 1,
-		stars,
+		stars: starsForRank(nationalRank),
 		nationalRank,
 		posRank,
-		pos: RECRUIT_POS[pos] ?? pos,
+		pos: getRecruitPos(pos),
+	};
+};
+
+/**
+ * What a recruiting service would have said about a prospect whose career has a story or a junior college start: a five-star for the bust, nothing for the player nobody ranked, further down for one who had to start at a junior college. Otherwise the plain ranking. Seeded by the player.
+ */
+export const adjustRecruitRank = ({
+	pid,
+	nationalRank,
+	story,
+	jucoStart,
+}: {
+	pid: number;
+	nationalRank: number;
+	story: string | undefined;
+	jucoStart: boolean;
+}): number | undefined => {
+	const rng = new Rng(`recruit-story|${pid}`);
+	if (story === "bust") {
+		return 2 + Math.floor(rng.random() * 21);
+	}
+	if (story === "unranked") {
+		return undefined;
+	}
+	if (story === "lateBloomer") {
+		const rank = Math.round(Math.max(nationalRank, 180) * (1.2 + rng.random()));
+		return rank > 650 ? undefined : rank;
+	}
+	if (story === "reclass") {
+		return Math.max(1, Math.round(nationalRank * (0.5 + 0.4 * rng.random())));
+	}
+	if (jucoStart) {
+		const rank = Math.round(nationalRank * 2.5 + 120 + 200 * rng.random());
+		return rank > 600 ? undefined : rank;
+	}
+	return nationalRank;
+};
+
+export type RankEntry = {
+	id: number;
+	// What he would be ranked on his own. undefined: unranked
+	rank: number | undefined;
+	// Recruiting position, and what he would be ranked at it on his own
+	pos: string;
+	posRank: number | undefined;
+	// 0: already set (stored), keeps his ranks. 1: shown before from the plain ranking, moves only for a set one. 2: being ranked now, fits around everyone else
+	priority: 0 | 1 | 2;
+};
+
+/**
+ * Rank the players of one high school class against each other, so that no two share a national rank or a rank at their position, and among players ranked together a better national rank at a position means a better position rank (a player ranked later is fitted in between when there is room). Players already ranked keep their ranks; the others take the first free rank at or after their own, in order of priority, rank and id, so adding players to a class never moves the ones ranked before.
+ */
+export const resolveClassRanks = (entries: RankEntry[]) => {
+	const output = new Map<
+		number,
+		{ nationalRank: number | undefined; posRank: number | undefined }
+	>();
+	const ordered = entries
+		.filter((e) => e.rank !== undefined)
+		.sort(
+			(a, b) => a.priority - b.priority || a.rank! - b.rank! || a.id - b.id,
+		);
+	const taken = new Set<number>();
+	for (const e of ordered) {
+		let rank = e.rank!;
+		if (e.priority > 0) {
+			while (taken.has(rank)) {
+				rank += 1;
+			}
+		}
+		taken.add(rank);
+		output.set(e.id, { nationalRank: rank, posRank: undefined });
+	}
+
+	// Position ranks, best national rank first within each priority
+	const posTaken = new Map<string, Map<number, number>>();
+	const byNational = (a: RankEntry, b: RankEntry) =>
+		output.get(a.id)!.nationalRank! - output.get(b.id)!.nationalRank! ||
+		a.id - b.id;
+	for (const priority of [0, 1, 2]) {
+		for (const e of ordered
+			.filter((x) => x.priority === priority)
+			.sort(byNational)) {
+			const mine = output.get(e.id)!;
+			// posRank -> national rank of who has it
+			const used = posTaken.get(e.pos) ?? new Map<number, number>();
+			posTaken.set(e.pos, used);
+			let rank = Math.max(1, e.posRank ?? Math.ceil(mine.nationalRank! / 5));
+			if (priority > 0 || e.posRank === undefined) {
+				rank = Math.min(rank, mine.nationalRank!);
+				// After everyone at his position ranked ahead of him nationally, and before everyone ranked behind him
+				let lo = 0;
+				let hi = Infinity;
+				for (const [posRank, national] of used) {
+					if (national < mine.nationalRank!) {
+						lo = Math.max(lo, posRank);
+					} else {
+						hi = Math.min(hi, posRank);
+					}
+				}
+				rank = Math.max(rank, lo + 1);
+				if (rank >= hi) {
+					rank = lo + 1;
+				}
+				while (used.has(rank)) {
+					rank += 1;
+				}
+			}
+			used.set(rank, mine.nationalRank!);
+			mine.posRank = rank;
+		}
+	}
+	for (const e of entries) {
+		if (e.rank === undefined) {
+			output.set(e.id, { nationalRank: undefined, posRank: undefined });
+		}
+	}
+	return output;
+};
+
+export type RecruitingExtras = {
+	// Composite rating, 0.7000-1.0000, as recruiting services average their grades
+	composite: number;
+	// How many programs offered, and the ones worth naming (the school he signed with first)
+	offerCount: number;
+	offers: string[];
+	finalists: string[];
+	committed: string;
+	signing: "early" | "late";
+	// High school all-star games and honors
+	allStar: string[];
+};
+
+const COMPOSITE_ANCHORS: [number, number][] = [
+	[1, 1],
+	[25, 0.9834],
+	[150, 0.889],
+	[500, 0.8],
+	[1200, 0.72],
+];
+
+// A fixed function of the national rank that agrees with the star bands, so a composite and a star count never contradict each other
+export const compositeForRank = (rank: number) => {
+	const r = clamp(rank, 1, 1200);
+	let k = 0;
+	while (k < COMPOSITE_ANCHORS.length - 2 && r > COMPOSITE_ANCHORS[k + 1]![0]) {
+		k += 1;
+	}
+	const [r0, c0] = COMPOSITE_ANCHORS[k]!;
+	const [r1, c1] = COMPOSITE_ANCHORS[k + 1]!;
+	const t = (Math.log(r) - Math.log(r0)) / (Math.log(r1) - Math.log(r0));
+	return Math.round((c0 + t * (c1 - c0)) * 10000) / 10000;
+};
+
+export const HS_ALL_STAR_GAMES = [
+	"High School All-American Game",
+	"National Senior All-Star Classic",
+	"Prep Hoops Summit",
+];
+
+/**
+ * The rest of a recruitment, from his (class-unique) national rank and the school he signed with: composite rating, who offered, the finalists, when he signed and the all-star games he was picked for. `programs` are the schools that could have offered, with their strength. Seeded by the player, so it is the same every time.
+ */
+export const getRecruitingExtras = ({
+	pid,
+	nationalRank,
+	committed,
+	committedStrength,
+	programs,
+	jucoStart,
+}: {
+	pid: number;
+	nationalRank: number | undefined;
+	committed: string;
+	// undefined: not a Division I program (a junior college)
+	committedStrength: number | undefined;
+	programs: { name: string; strength: number }[];
+	jucoStart?: boolean;
+}): RecruitingExtras => {
+	const rng = new Rng(`recruit-extras|${pid}`);
+	const stars = starsForRank(nationalRank);
+	const composite =
+		nationalRank !== undefined
+			? compositeForRank(nationalRank)
+			: Math.round((0.7 + 0.085 * rng.random()) * 10000) / 10000;
+
+	// Who else was in on him: programs at the level his ranking says, or the level of the school he picked if that is higher
+	const rank = nationalRank ?? 900;
+	const rankLevel =
+		95 - 40 * (Math.log10(1 + rank / 4) / Math.log10(1 + RECRUIT_POOL / 4));
+	const centre = Math.max(committedStrength ?? 0, rankLevel);
+	const near = programs.filter(
+		(x) => x.name !== committed && Math.abs(x.strength - centre) <= 9,
+	);
+	const pool =
+		near.length >= 8 ? near : programs.filter((x) => x.name !== committed);
+	let want =
+		stars >= 5
+			? 15 + Math.floor(rng.random() * 16)
+			: stars === 4
+				? 8 + Math.floor(rng.random() * 13)
+				: stars === 3
+					? 4 + Math.floor(rng.random() * 9)
+					: 1 + Math.floor(rng.random() * 5);
+	if (jucoStart) {
+		want = Math.min(want, 1 + Math.floor(rng.random() * 3));
+	}
+	want = Math.min(want, pool.length + 1);
+	const others: string[] = [];
+	const seen = new Set<string>();
+	let guard = 0;
+	while (others.length < Math.min(7, want - 1) && guard++ < 200) {
+		const pick = pool[Math.floor(rng.random() * pool.length)];
+		if (!pick || seen.has(pick.name)) {
+			continue;
+		}
+		seen.add(pick.name);
+		others.push(pick.name);
+	}
+	const offers = [committed, ...others];
+	const cut = Math.min(
+		offers.length,
+		stars >= 4
+			? 3 + Math.floor(rng.random() * 3)
+			: 2 + Math.floor(rng.random() * 3),
+	);
+	const signing = rng.random() < (stars >= 4 ? 0.7 : 0.55) ? "early" : "late";
+
+	// Picked by national rank, with a roll so the last spots are not automatic
+	const allStar: string[] = [];
+	const bar = (n: number, top: number) =>
+		nationalRank !== undefined &&
+		nationalRank <= n &&
+		rng.random() < top * (1 - 0.5 * (nationalRank / n));
+	if (bar(24, 0.95)) {
+		allStar.push(HS_ALL_STAR_GAMES[0]!);
+	}
+	if (bar(40, 0.7)) {
+		allStar.push(HS_ALL_STAR_GAMES[1]!);
+	}
+	if (bar(14, 0.6)) {
+		allStar.push(HS_ALL_STAR_GAMES[2]!);
+	}
+	if (bar(90, 0.35)) {
+		allStar.push("State Player of the Year");
+	}
+
+	return {
+		composite,
+		offerCount: want,
+		offers,
+		finalists: offers.slice(0, cut),
+		committed,
+		signing,
+		allStar,
 	};
 };
 
@@ -587,6 +850,7 @@ export const getStockTimeline = ({
 	numPicks,
 	recruitRank,
 	drafted,
+	story,
 }: {
 	pid: number;
 	// Pre-draft seasons, oldest first
@@ -597,6 +861,8 @@ export const getStockTimeline = ({
 	recruitRank: number | undefined;
 	// The last point is draft night rather than the current board
 	drafted: boolean;
+	// A career story that the timeline has to show (career.ts): where he started and how he got to where he went
+	story?: string;
 }): StockPoint[] => {
 	if (seasons.length === 0) {
 		return [];
@@ -629,7 +895,34 @@ export const getStockTimeline = ({
 		const pull = 0.45 * ((T - t) / T);
 		values[t] = lf + e + (center - lf) * pull;
 	}
-	if (recruitRank !== undefined) {
+	// A story bends the path toward where it started. How far back (0 = now, 1 = his first preseason)
+	const back = (t: number) => (T - t) / T;
+	const undrafted = Math.log(cap);
+	if (story === "bust") {
+		// A lottery pick on every board when he arrived
+		for (let t = 0; t < T; t++) {
+			const w = back(t) ** 0.7;
+			values[t] = (1 - w) * values[t]! + w * Math.log(2 + 5 * rng.random());
+		}
+	} else if (story === "unranked" || story === "lateBloomer") {
+		// On nobody's board until late
+		const exponent = story === "lateBloomer" ? 0.45 : 0.8;
+		for (let t = 0; t < T; t++) {
+			const w = back(t) ** exponent;
+			values[t] = (1 - w) * values[t]! + w * (undrafted + 0.1);
+		}
+	} else if (story === "injury") {
+		// Higher on boards before he got hurt in his last season
+		for (let t = 0; t <= T - 4; t++) {
+			values[t] = values[t]! - 0.45 - 0.25 * rng.random();
+		}
+	} else if (story === "project") {
+		// Boards never agree on a project
+		for (let t = 0; t < T; t++) {
+			values[t] = values[t]! + rng.normal(0, 0.35);
+		}
+	}
+	if (recruitRank !== undefined && story !== "unranked") {
 		// A freshman's first projection leans on how he was ranked coming out of high school
 		values[0] = 0.5 * values[0]! + 0.5 * Math.log(1 + recruitRank * 0.6);
 		values[1] = 0.75 * values[1]! + 0.25 * values[0]!;

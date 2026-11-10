@@ -135,7 +135,8 @@ describe("generateCollegeStats", () => {
 			JSON.stringify(first.map((p) => p.stats)),
 		);
 		for (const p of third) {
-			assert(p.stats.length <= 4);
+			// Four seasons of eligibility; an older international pro (career.ts) can have up to six seasons abroad
+			assert(p.stats.length <= 6);
 			assert.strictEqual(
 				new Set(p.stats.map((row) => row.season)).size,
 				p.stats.length,

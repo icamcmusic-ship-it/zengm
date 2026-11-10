@@ -298,7 +298,11 @@ describe("generateCollegeClass with a college season", () => {
 				ncaaSeason,
 				ncaaSeason.teams.indexOf(team),
 			);
-			assert.strictEqual(ncaa.games.length, post.length);
+			// A prospect whose season ended early (career.ts) missed the postseason
+			assert.strictEqual(
+				ncaa.games.length,
+				result.career?.story === "injury" ? 0 : post.length,
+			);
 			assert.isAtLeast(last.stats.gp!, ncaa.games.length);
 			assert.isAtMost(last.stats.gp!, last.teamGames);
 			// Postseason lines are part of the season totals

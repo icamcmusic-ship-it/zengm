@@ -74,11 +74,17 @@ describe("generateCollegeClass", () => {
 		});
 		for (const [i, result] of results.entries()) {
 			const p = prospects[i]!;
-			assert.strictEqual(result.seasons.length, getClassIndex(p.age) + 1);
+			// One year for each class year, ending in the draft year. A redshirt year (career.ts) has no season
+			const years = result.career!.years;
+			assert.strictEqual(years.length, getClassIndex(p.age) + 1);
+			assert.strictEqual(
+				result.seasons.length,
+				years.filter((year) => year.status !== "redshirt").length,
+			);
 			assert.strictEqual(result.seasons.at(-1)!.season, 2027);
 			assert.deepStrictEqual(
-				result.seasons.map((s) => s.season),
-				result.seasons.map((_, j) => 2027 - (result.seasons.length - 1 - j)),
+				years.map((year) => year.season),
+				years.map((_, j) => 2027 - (years.length - 1 - j)),
 			);
 		}
 	});

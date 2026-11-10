@@ -1,5 +1,6 @@
 import type { ProspectNcaaSummary } from "./ncaa.ts";
 import type { SplitLine } from "./season.ts";
+import type { PreDraftCareer } from "./career.ts";
 
 export const RATING_KEYS = [
 	"hgt",
@@ -41,6 +42,8 @@ export type CollegeProspect = {
 	college: string;
 	// Birth place, like "Chicago, IL, USA", used to guess a destination for prospects with no college
 	bornLoc: string;
+	// Listed height in inches, if known (otherwise it is read off the hgt rating). Only used to tell who is unusually tall or small
+	heightInches?: number;
 };
 
 export type GameBox = {
@@ -107,4 +110,6 @@ export type CollegeResult = {
 	honors: CollegeHonor[];
 	// With the college season model, for a prospect at an NCAA school: his team's season and his postseason games
 	ncaa?: ProspectNcaaSummary;
+	// Year by year: schools, redshirt years, transfers, and his story if he has one (career.ts). Not there for a prospect with no seasons
+	career?: PreDraftCareer;
 };
