@@ -25,7 +25,7 @@ import {
 } from "./proProjection.ts";
 import { getFuzz } from "../player/fuzzRating.ts";
 import {
-	countMentees,
+	getAiTraitTeamContext,
 	getAiTraitValueFactor,
 	traitsEnabled,
 } from "../player/traits.ts";
@@ -156,7 +156,10 @@ export const getMockDraft = async () => {
 		number,
 		{ needs: string[]; strategy: string | undefined }
 	> = {};
-	const traitContext: Record<number, { strategy: any; numYoung: number }> = {};
+	const traitContext: Record<
+		number,
+		{ strategy: any; team: ReturnType<typeof getAiTraitTeamContext> }
+	> = {};
 	for (const tid of tids) {
 		const t = await idb.cache.teams.get(tid);
 		const teamPlayers = await idb.cache.players.indexGetAll(
@@ -168,7 +171,7 @@ export const getMockDraft = async () => {
 		teamInfo[tid] = { needs: getNeedLabels(needs), strategy: t?.strategy };
 		traitContext[tid] = {
 			strategy: t?.strategy,
-			numYoung: countMentees(teamPlayers),
+			team: getAiTraitTeamContext(teamPlayers),
 		};
 	}
 

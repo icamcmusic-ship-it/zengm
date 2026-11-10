@@ -2,7 +2,6 @@ import { PLAYER } from "../../../common/constants.ts";
 import { player, team } from "../index.ts";
 import getBest from "./getBest.ts";
 import {
-	countMentees,
 	makeAiTraitValueFactorCache,
 	traitsEnabled,
 } from "../player/traits.ts";
@@ -84,7 +83,8 @@ const autoSign = async () => {
 		// Player traits (setting): this team's small trait adjustment to value, e.g. contenders and young rosters like savvy veterans, everyone avoids injury prone players
 		let playersForTeam = playersSorted;
 		if (traitsEnabled()) {
-			const numYoung = countMentees(playersOnRoster);
+			// Who is on the team: young players to mentor, and the locker room (AI teams are warier of adding another big ego or hot head)
+			const traitTeam = getTraitFactor.teamContext(playersOnRoster);
 			// Computed once per player, not in every comparison of the sort
 			const values = new Map<(typeof players)[number], number>();
 			for (const p of playersSorted) {
@@ -92,7 +92,7 @@ const autoSign = async () => {
 					p,
 					p.value *
 						(p.value > 0
-							? getTraitFactor(p, { strategy: t.strategy, numYoung })
+							? getTraitFactor(p, { strategy: t.strategy, team: traitTeam })
 							: 1),
 				);
 			}
