@@ -21,6 +21,7 @@ import {
 import { getSchool } from "../../common/collegeStats/colleges.helpers.ts";
 import {
 	getTeamIndex,
+	getTeamSummary,
 	ncaaResultText,
 	type NcaaSeason,
 	type ProspectNcaaSummary,
@@ -172,6 +173,7 @@ const getSplits = (
 ): SplitRow[] => {
 	const conf = summary.games.filter((game) => game.event === "conf");
 	const ncaa = summary.games.filter((game) => game.event === "ncaa");
+	const nit = summary.games.filter((game) => game.event === "nit");
 	const wl = (games: typeof conf): [number, number] => [
 		games.filter((x) => x.won).length,
 		games.filter((x) => !x.won).length,
@@ -266,6 +268,13 @@ const getSplits = (
 			line: gameLine(ncaa),
 		});
 	}
+	if (nit.length > 0) {
+		output.push({
+			name: "NIT",
+			record: wl(nit),
+			line: gameLine(nit),
+		});
+	}
 	if (output.length > 1 && nonConf && confLine) {
 		output.push({
 			name: "Postseason",
@@ -358,10 +367,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 					estimated: false,
 				};
 				apRank = t.apRank;
-				ncaa =
-					t.ncaa !== undefined
-						? `${t.ncaa === "Champion" ? "National Champion" : t.ncaa} (seed ${t.ncaaSeed})`
-						: undefined;
+				ncaa = ncaaResultText(getTeamSummary(ncaaSeason, team));
 				const conf = ncaaSeason.conferences.find((c) => c.name === t.conf);
 				confRank = { rank: t.confRank, size: conf?.standings.length ?? 0 };
 			}

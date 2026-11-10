@@ -1,0 +1,192 @@
+import { CONFERENCES } from "./colleges.ts";
+import type { Rng } from "./rng.ts";
+
+/**
+ * The shape of a college season (ncaa.ts). Each class's season draws one, and maybe a scoring environment, from its seed. They bend what the season is simulated with (how far apart the teams are, how much a single game swings, how many points are scored) inside realistic bounds, so seasons differ in kind and not only in names.
+ */
+
+export const NCAA_SHAPES = {
+	standard: { name: "A balanced year", weight: 22 },
+	dominant: { name: "A dominant favorite", weight: 14 },
+	wideOpen: { name: "A wide-open year", weight: 16 },
+	cinderella: { name: "The year of the mid-major", weight: 14 },
+	blueBloodDown: { name: "A down year for the blue bloods", weight: 11 },
+	loadedConference: { name: "One loaded conference", weight: 12 },
+	chalk: { name: "Chalk all the way", weight: 11 },
+} as const;
+export type NcaaShape = keyof typeof NCAA_SHAPES;
+
+export const NCAA_SCORING = {
+	normal: { name: "", weight: 70 },
+	explosion: { name: "a scoring explosion", weight: 15 },
+	slog: { name: "a defensive slog", weight: 15 },
+} as const;
+export type NcaaScoring = keyof typeof NCAA_SCORING;
+
+export type NcaaStoryline = {
+	shape: NcaaShape;
+	scoring: NcaaScoring;
+	// The conference that was loaded (loadedConference)
+	conf?: string;
+	// Team indexes the shape is about: the favorite (dominant), the mid-majors that got a lift (cinderella), the blue bloods that were down (blueBloodDown)
+	teams: number[];
+	// What the season was simulated with. Standard: 11.5 points of standard deviation in a game's margin, 141 total points a game
+	marginSd: number;
+	tourneySd: number;
+	total: number;
+	// "A wide-open year, and a defensive slog"
+	headline: string;
+	// A few sentences about the season, written after it was played
+	summary: string[];
+};
+
+export const STANDARD_MARGIN_SD = 11.5;
+// On a neutral court in March the better team wins a little more often than the regular season's swing says (seasons from before the storylines used 11.5 everywhere)
+export const STANDARD_TOURNEY_SD = 9.2;
+export const STANDARD_TOTAL = 141;
+
+export const standardStoryline = (): NcaaStoryline => ({
+	shape: "standard",
+	scoring: "normal",
+	teams: [],
+	marginSd: STANDARD_MARGIN_SD,
+	tourneySd: STANDARD_MARGIN_SD,
+	total: STANDARD_TOTAL,
+	headline: NCAA_SHAPES.standard.name,
+	summary: [],
+});
+
+const pick = <T extends string>(
+	rng: Rng,
+	table: Record<T, { weight: number }>,
+): T => {
+	const keys = Object.keys(table) as T[];
+	return rng.weighted(
+		keys,
+		keys.map((key) => table[key].weight),
+	);
+};
+
+type StoryTeam = {
+	conf: string;
+	rating: number;
+	// Program strength, 0-100
+	program: number;
+};
+
+/**
+ * Draw the season's shape and bend the team ratings for it (in place).
+ */
+export const drawStoryline = (rng: Rng, teams: StoryTeam[]): NcaaStoryline => {
+	const storyline = standardStoryline();
+	storyline.tourneySd = STANDARD_TOURNEY_SD;
+	storyline.shape = pick(rng, NCAA_SHAPES);
+	storyline.scoring = pick(rng, NCAA_SCORING);
+	const byRating = () =>
+		teams
+			.map((_, i) => i)
+			.sort((x, y) => teams[y]!.rating - teams[x]!.rating || x - y);
+	const shuffle = (list: number[]) => {
+		const output = [...list];
+		for (let i = output.length - 1; i > 0; i--) {
+			const j = Math.floor(rng.random() * (i + 1));
+			[output[i], output[j]] = [output[j]!, output[i]!];
+		}
+		return output;
+	};
+
+	switch (storyline.shape) {
+		case "dominant": {
+			// The best team pulls away from everybody
+			const [best, second] = byRating() as [number, number];
+			teams[best]!.rating = Math.max(
+				teams[best]!.rating + 1.5,
+				teams[second]!.rating + 3,
+			);
+			storyline.teams = [best];
+			storyline.marginSd *= 0.97;
+			storyline.tourneySd *= 0.97;
+			break;
+		}
+		case "wideOpen": {
+			// Nobody separates: the top of the country is squeezed together, and games swing more
+			const order = byRating();
+			const pivot = teams[order[30]!]!.rating;
+			for (const t of teams) {
+				if (t.rating > pivot) {
+					t.rating = pivot + 0.7 * (t.rating - pivot);
+				}
+			}
+			storyline.marginSd *= 1.03;
+			storyline.tourneySd *= 1.06;
+			break;
+		}
+		case "cinderella": {
+			// The leagues nobody watches are better, and a handful of their best teams are for real
+			for (const t of teams) {
+				if (CONFERENCES[t.conf]?.tier !== "high") {
+					t.rating += 1.2;
+				}
+			}
+			const mids = byRating()
+				.filter((i) => CONFERENCES[teams[i]!.conf]?.tier !== "high")
+				.slice(0, 40);
+			storyline.teams = shuffle(mids)
+				.slice(0, 6)
+				.sort((x, y) => x - y);
+			for (const i of storyline.teams) {
+				teams[i]!.rating += 3.5;
+			}
+			storyline.tourneySd *= 1.04;
+			break;
+		}
+		case "blueBloodDown": {
+			// Half of the biggest programs have nothing
+			const bluebloods = teams
+				.map((_, i) => i)
+				.sort((x, y) => teams[y]!.program - teams[x]!.program || x - y)
+				.slice(0, 14);
+			storyline.teams = shuffle(bluebloods)
+				.slice(0, 7)
+				.sort((x, y) => x - y);
+			for (const i of storyline.teams) {
+				teams[i]!.rating -= 4 + 3 * rng.random();
+			}
+			break;
+		}
+		case "loadedConference": {
+			const confs = Object.keys(CONFERENCES).filter(
+				(name) =>
+					CONFERENCES[name]!.tier === "high" &&
+					teams.some((t) => t.conf === name),
+			);
+			if (confs.length > 0) {
+				const conf = confs[Math.floor(rng.random() * confs.length)]!;
+				storyline.conf = conf;
+				for (const t of teams) {
+					if (t.conf === conf) {
+						t.rating += 2.8;
+					}
+				}
+			}
+			break;
+		}
+		case "chalk": {
+			// The better team wins more often
+			storyline.marginSd *= 0.96;
+			storyline.tourneySd *= 0.9;
+			break;
+		}
+		default:
+	}
+
+	if (storyline.scoring === "explosion") {
+		storyline.total += 8;
+	} else if (storyline.scoring === "slog") {
+		storyline.total -= 8;
+	}
+
+	const scoring = NCAA_SCORING[storyline.scoring].name;
+	storyline.headline = `${NCAA_SHAPES[storyline.shape].name}${scoring ? `, and ${scoring}` : ""}`;
+	return storyline;
+};

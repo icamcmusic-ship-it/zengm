@@ -2,42 +2,51 @@ import clsx from "clsx";
 import { useState } from "react";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import { helpers } from "../../util/helpers.ts";
-import type { View } from "../../../common/types.ts";
-import { Bracket, ProspectLinks, type BracketTeamInfo } from "./Bracket.tsx";
-
-type Props = View<"collegeOverseas">;
-type WithSeason = Extract<Props, { hasSeason: true }>;
+import { Bracket, ProspectLinks } from "./Bracket.tsx";
+import {
+	HonorList,
+	makeTeamInfo,
+	postseasonText,
+	type Props,
+	type WithSeason,
+} from "./common.tsx";
+import { Nit } from "./Nit.tsx";
+import { Polls } from "./Polls.tsx";
+import { Selection } from "./Selection.tsx";
 
 const TABS = [
 	{ key: "standings", name: "Standings" },
 	{ key: "ap", name: "AP Top 25" },
 	{ key: "conference", name: "Conference Tournaments" },
+	{ key: "selection", name: "Selection" },
 	{ key: "ncaa", name: "March Madness" },
+	{ key: "nit", name: "NIT" },
 	{ key: "overseas", name: "Overseas" },
 ] as const;
 
 const pct = (x: number | undefined) =>
 	x === undefined ? "" : `${(100 * x).toFixed(1)}%`;
 
-const postseasonText = (t: WithSeason["teams"][number]) => {
-	if (t.ncaa) {
-		return t.ncaa === "Champion"
-			? `National Champion (${t.ncaaSeed})`
-			: `NCAA ${t.ncaa} (${t.ncaaSeed})`;
-	}
-	return "";
+// The season's shape and what happened, in a few sentences
+const SeasonSummary = (props: WithSeason) => {
+	const [open, setOpen] = useState(false);
+	const { headline, summary } = props.storyline;
+	const shown = open ? summary : summary.slice(0, 2);
+	return (
+		<div className="alert alert-light border mb-3" data-testid="season-summary">
+			<b>{headline}.</b> {shown.join(" ")}{" "}
+			{summary.length > 2 ? (
+				<button
+					type="button"
+					className="btn btn-link p-0 border-0 align-baseline"
+					onClick={() => setOpen(!open)}
+				>
+					{open ? "Less" : "More"}
+				</button>
+			) : null}
+		</div>
+	);
 };
-
-const makeTeamInfo =
-	(props: WithSeason) =>
-	(team: number): BracketTeamInfo => {
-		const t = props.teams[team]!;
-		return {
-			school: t.school,
-			record: `${t.w}-${t.l}`,
-			prospects: props.prospectsBySchool[t.school] ?? [],
-		};
-	};
 
 const Standings = (props: WithSeason) => {
 	const [conf, setConf] = useState("");
@@ -75,8 +84,9 @@ const Standings = (props: WithSeason) => {
 										<th title="Conference record">Conf</th>
 										<th title="Overall record">Ovr</th>
 										<th title="Simple rating system">SRS</th>
+										<th title="NET-style ranking on Selection Sunday">NET</th>
 										<th>Conf Tourney</th>
-										<th>NCAA</th>
+										<th>Postseason</th>
 										<th>Prospects</th>
 									</tr>
 								</thead>
@@ -101,6 +111,7 @@ const Standings = (props: WithSeason) => {
 													{t.w}-{t.l}
 												</td>
 												<td>{t.srs.toFixed(1)}</td>
+												<td>{t.net.rank}</td>
 												<td className="text-nowrap">
 													{t.confTourney === "Champion" ? (
 														<b>Champion</b>
@@ -124,93 +135,6 @@ const Standings = (props: WithSeason) => {
 				))}
 			</div>
 		</>
-	);
-};
-
-const HonorList = ({
-	honors,
-	filter,
-	title,
-}: {
-	honors: WithSeason["honorWinners"];
-	filter: RegExp;
-	title: string;
-}) => {
-	const list = honors.filter((h) => filter.test(h.type));
-	if (list.length === 0) {
-		return null;
-	}
-	return (
-		<>
-			{title ? <h3>{title}</h3> : null}
-			<ul className="list-unstyled">
-				{list.map((h, i) => (
-					<li key={i}>
-						<a href={helpers.leagueUrl(["player", h.pid])}>{h.name}</a>:{" "}
-						{h.type}
-					</li>
-				))}
-			</ul>
-		</>
-	);
-};
-
-const ApPoll = (props: WithSeason) => {
-	return (
-		<div className="row">
-			<div className="col-12 col-lg-8">
-				<p className="text-body-secondary">
-					Final poll, released before the NCAA tournament. 62 voters.
-				</p>
-				<div className="table-responsive">
-					<table className="table table-striped table-borderless table-sm table-nonfluid">
-						<thead>
-							<tr>
-								<th>Rank</th>
-								<th>Team</th>
-								<th>Record</th>
-								<th>Conf</th>
-								<th>Pts</th>
-								<th>NCAA</th>
-								<th>Prospects</th>
-							</tr>
-						</thead>
-						<tbody>
-							{props.ap.map((entry, i) => {
-								const t = props.teams[entry.team]!;
-								return (
-									<tr key={entry.team}>
-										<td>{i + 1}</td>
-										<td className="text-nowrap">{t.school}</td>
-										<td>
-											{entry.w}-{entry.l}
-										</td>
-										<td className="text-nowrap">{t.conf}</td>
-										<td className="text-nowrap">
-											{entry.pts}
-											{entry.firstPlace > 0 ? ` (${entry.firstPlace})` : null}
-										</td>
-										<td className="text-nowrap">{postseasonText(t)}</td>
-										<td>
-											<ProspectLinks
-												prospects={props.prospectsBySchool[t.school] ?? []}
-											/>
-										</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
-				</div>
-			</div>
-			<div className="col-12 col-lg-4">
-				<HonorList
-					honors={props.honorWinners}
-					filter={/All-American/}
-					title="All-Americans (prospects)"
-				/>
-			</div>
-		</div>
 	);
 };
 
@@ -450,6 +374,10 @@ const CollegeOverseas = (props: Props) => {
 				))}
 			</ul>
 
+			{props.hasSeason && tab !== "overseas" ? (
+				<SeasonSummary {...props} />
+			) : null}
+
 			{tab === "overseas" ? (
 				<Overseas overseas={props.overseas} />
 			) : !props.hasSeason ? (
@@ -464,9 +392,13 @@ const CollegeOverseas = (props: Props) => {
 			) : tab === "standings" ? (
 				<Standings {...props} />
 			) : tab === "ap" ? (
-				<ApPoll {...props} />
+				<Polls {...props} />
 			) : tab === "conference" ? (
 				<ConferenceTournaments {...props} />
+			) : tab === "selection" ? (
+				<Selection {...props} />
+			) : tab === "nit" ? (
+				<Nit {...props} />
 			) : (
 				<MarchMadness {...props} />
 			)}
