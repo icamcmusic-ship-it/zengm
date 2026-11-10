@@ -20,7 +20,12 @@ const calculateValues = (data: number[]) => {
 };
 
 const scaleValue = (v: number, scale: [number, number]) => {
-	return Math.round(100 - ((v - scale[0]) / (scale[1] - scale[0])) * 100);
+	// Clamped, so a value outside the scale is drawn at the edge of the plot rather than outside of it (which would make the page wider than
+	// the window)
+	const percent = Math.round(
+		100 - ((v - scale[0]) / (scale[1] - scale[0])) * 100,
+	);
+	return Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : 100;
 };
 
 const round = (value: number) => {

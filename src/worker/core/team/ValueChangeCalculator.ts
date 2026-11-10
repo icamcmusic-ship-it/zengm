@@ -22,10 +22,8 @@ import type {
 } from "../../../common/types.ts";
 import { getNumPicksPerRound } from "../trade/getPickValues.ts";
 import {
-	countMentees,
 	makeAiTraitValueFactorCache,
 	traitsEnabled,
-	type getAiTraitValueFactor,
 } from "../player/traits.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { groupByUnique, last } from "../../../common/utils.ts";
@@ -264,7 +262,7 @@ const getPlayers = async ({
 	pidsRemove: number[];
 	tid: number;
 	tradingPartnerTid?: number;
-	getTraitFactor: typeof getAiTraitValueFactor;
+	getTraitFactor: ReturnType<typeof makeAiTraitValueFactorCache>;
 }) => {
 	const season = g.get("season");
 	const phase = g.get("phase");
@@ -288,9 +286,10 @@ const getPlayers = async ({
 	const strategy = traitsOn
 		? (await idb.cache.teams.get(tid))?.strategy
 		: undefined;
-	const numYoung = traitsOn ? countMentees(players) : 0;
+	// The team's own roster as it is now: young players to mentor, and the locker room (ego, temper) a player would join or leave
+	const traitTeam = traitsOn ? getTraitFactor.teamContext(players) : undefined;
 	const traitFactor = (p: Player) =>
-		traitsOn ? getTraitFactor(p, { strategy, numYoung }) : 1;
+		traitsOn ? getTraitFactor(p, { strategy, team: traitTeam }) : 1;
 
 	for (const p of players) {
 		if (!pidsRemove.includes(p.pid)) {

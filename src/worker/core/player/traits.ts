@@ -19,6 +19,8 @@ import {
 	TRAIT_KEYS,
 	aiTraitContractFactorFromSum,
 	aiTraitSumFromZs,
+	aiTeamTraitContext,
+	traitZ,
 	aiTraitValueFactorFromSum,
 	residualTraitZs,
 	scoreOne,
@@ -388,9 +390,17 @@ const HIDDEN_TRAIT_KEYS: ReadonlySet<TraitKey> = new Set(
 	TRAIT_KEYS.filter((key) => TRAIT_DEFINITIONS[key].visibility === "hidden"),
 );
 
+// A team's roster as the AI trait valuation sees it: who is young enough to mentor, and the ego and temper of everyone in the locker room
+export type AiTraitTeamContext = {
+	numYoung: number;
+	lockerRoom: { pid: number; egoZ: number; temperZ: number }[];
+};
+
 type AiTraitValueOptions = {
 	strategy?: "contending" | "rebuilding";
 	numYoung?: number;
+	// The team valuing him, from getAiTraitTeamContext (sets numYoung too): its locker room changes how much ego and temper matter
+	team?: AiTraitTeamContext;
 	// Contract demands: damped, no team context
 	contract?: boolean;
 	season?: number;
@@ -422,17 +432,26 @@ const prepareAiTraitValue = (
 		zs: residualTraitZs(scores, last(p.ratings)),
 		age: getAge(p, season),
 		isProspect,
+		pid: p.pid,
 	};
 };
 
 const aiTraitValueFromPrepared = (
 	prepared: ReturnType<typeof prepareAiTraitValue>,
-	{ strategy, numYoung, contract = false }: AiTraitValueOptions,
+	{ strategy, numYoung, team, contract = false }: AiTraitValueOptions,
 ) => {
 	const sum = aiTraitSumFromZs(prepared.zs, prepared.scores, {
 		age: prepared.age,
 		strategy,
-		numYoung,
+		numYoung: team?.numYoung ?? numYoung,
+		// His teammates only: if he is on this team, he does not count against (or for) himself, so the team values him the same
+		// whether he is coming or going
+		...(team
+			? aiTeamTraitContext(
+					team.lockerRoom,
+					team.lockerRoom.findIndex((t) => t.pid === prepared.pid),
+				)
+			: undefined),
 		isProspect: prepared.isProspect,
 		hiddenKeys: HIDDEN_TRAIT_KEYS,
 	});
@@ -467,14 +486,7 @@ export const makeAiTraitValueFactorCache = () => {
 		object,
 		Map<string, ReturnType<typeof prepareAiTraitValue>>
 	>();
-	return (
-		p: TraitPlayer & { pid: number },
-		options: AiTraitValueOptions = {},
-	) => {
-		if (!traitsEnabled()) {
-			return 1;
-		}
-		const season = options.season ?? g.get("season");
+	const getPrepared = (p: TraitPlayer & { pid: number }, season: number) => {
 		const key = `${season}|${p.tid === PLAYER.UNDRAFTED ? 1 : 0}`;
 		let byKey = cache.get(p);
 		if (!byKey) {
@@ -486,8 +498,62 @@ export const makeAiTraitValueFactorCache = () => {
 			prepared = prepareAiTraitValue(p, season);
 			byKey.set(key, prepared);
 		}
-		return aiTraitValueFromPrepared(prepared, options);
+		return prepared;
 	};
+	const getFactor = (
+		p: TraitPlayer & { pid: number },
+		options: AiTraitValueOptions = {},
+	) => {
+		if (!traitsEnabled()) {
+			return 1;
+		}
+		return aiTraitValueFromPrepared(
+			getPrepared(p, options.season ?? g.get("season")),
+			options,
+		);
+	};
+	// getAiTraitTeamContext, sharing the per-player work
+	getFactor.teamContext = (
+		players: (TraitPlayer & { pid: number })[],
+		season: number = g.get("season"),
+	) =>
+		teamContextFromPrepared(
+			players,
+			season,
+			players.map((p) => getPrepared(p, season).scores),
+		);
+	return getFactor;
+};
+
+const teamContextFromPrepared = (
+	players: (TraitPlayer & { pid: number })[],
+	season: number,
+	scores: TraitScores[],
+): AiTraitTeamContext => ({
+	numYoung: countMentees(players, season),
+	lockerRoom: players.map((p, i) => ({
+		pid: p.pid,
+		egoZ: traitZ(scores[i]!.ego),
+		temperZ: traitZ(scores[i]!.temper),
+	})),
+});
+
+/**
+ * A team's roster, for the `team` option of getAiTraitValueFactor: AI teams value ego and temper by who is already in the locker room (see
+ * AI_TEAM_TRAIT_CONTEXT). AI teams know their own players' true traits. undefined when the Player Traits setting is off.
+ */
+export const getAiTraitTeamContext = (
+	players: (TraitPlayer & { pid: number })[],
+	season: number = g.get("season"),
+): AiTraitTeamContext | undefined => {
+	if (!traitsEnabled()) {
+		return undefined;
+	}
+	return teamContextFromPrepared(
+		players,
+		season,
+		players.map((p) => getPlayerTraitScores(p, season)),
+	);
 };
 
 // Number of a team's players young enough to be mentored, for getAiTraitValueFactor

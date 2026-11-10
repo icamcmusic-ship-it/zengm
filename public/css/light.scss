@@ -428,6 +428,12 @@ table {
 		padding: 0;
 	}
 
+	// Let the overtime text wrap below the score, so an overtime game does not make the list wider than its column (and the page wider than
+	// the window)
+	td.game-log-cell-score {
+		white-space: normal;
+	}
+
 	td.game-log-cell a {
 		display: block;
 		// Expand to encompass normal td padding, which was set to 0 here above.
