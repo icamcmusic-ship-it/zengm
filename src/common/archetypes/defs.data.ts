@@ -16,7 +16,11 @@ type Opts = {
 	req?: SkillLabel[];
 	bonus?: SkillLabel[];
 	rare?: true;
+	// Needs expanded ratings (a label about his wingspan)
+	expanded?: true;
 	need?: Partial<Record<DimKey, number>>;
+	cap?: Partial<Record<DimKey, number>>;
+	xw?: Partial<Record<DimKey, number>>;
 	needFor?: Partial<Record<DimKey, number>>;
 	level?: [number, number];
 	age?: [number, number];
@@ -72,11 +76,14 @@ const make =
 		desc,
 		positions,
 		w,
+		xw: opts.xw,
 		hgt,
 		req: opts.req,
 		bonus: opts.bonus,
 		rare: opts.rare,
+		expanded: opts.expanded,
 		need: opts.need,
+		cap: opts.cap,
 		needFor: opts.needFor,
 		level: opts.level,
 		age: opts.age,
@@ -155,7 +162,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		GUARDS,
 		"defender",
 		[0, 48],
-		{ dper: 2.5, diq: 2, three: 1.5, pss: 1, oiq: 1 },
+		{ dper: 2.5, pdef: 2, three: 1.5, pss: 1, oiq: 1 },
 		"Good at both ends of the floor.",
 		{ bonus: ["Dp"] },
 	),
@@ -164,7 +171,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		GUARDS,
 		"defender",
 		[0, 48],
-		{ dper: 3, diq: 2.5, stl: 2, ath: 1, usg: -1 },
+		{ dper: 3, pdef: 2.5, stl: 2, ath: 1, usg: -1 },
 		"Shuts down the opposing backcourt.",
 		{ req: ["Dp"] },
 	),
@@ -173,7 +180,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		GUARDS,
 		"hustle",
 		[0, 44],
-		{ stl: 3, dper: 2, diq: 1.5, end: 1.5, usg: -1 },
+		{ stl: 3, dper: 2, pdef: 1.5, end: 1.5, usg: -1 },
 		"Hounds ball handlers and picks pockets.",
 		{ bonus: ["Dp"] },
 	),
@@ -268,7 +275,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		BACKCOURT,
 		"defender",
 		[0, 48],
-		{ stl: 2.5, pss: 2, diq: 2, dper: 2 },
+		{ stl: 2.5, pss: 2, pdef: 2, dper: 2 },
 		"Creates on defense and on offense.",
 	),
 	G(
@@ -276,7 +283,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		GUARDS,
 		"hustle",
 		[0, 48],
-		{ stl: 3, diq: 2, spd: 2, jmp: 1 },
+		{ stl: 3, pdef: 2, spd: 2, jmp: 1 },
 		"Lives in the passing lanes.",
 		{ rare: true },
 	),
@@ -353,7 +360,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		BACKCOURT,
 		"defender",
 		[0, 48],
-		{ dper: 2, stre: 1.5, usg: 1, three: 1, diq: 1.5 },
+		{ dper: 2, stre: 1.5, usg: 1, three: 1, pdef: 1.5 },
 		"Guards bigger wings and scores enough to stay on the floor.",
 	),
 
@@ -363,7 +370,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"defender",
 		[24, 62],
-		{ three: 2.5, dper: 2.5, diq: 1.5, usg: -1 },
+		{ three: 2.5, dper: 2.5, pdef: 1.5, usg: -1 },
 		"Spaces the floor and guards the best wing.",
 		{ req: ["3"], bonus: ["Dp"] },
 	),
@@ -372,7 +379,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"defender",
 		[24, 62],
-		{ dper: 2, three: 1.5, rim: 1, usg: 1, diq: 1.5, oiq: 1 },
+		{ dper: 2, three: 1.5, rim: 1, usg: 1, pdef: 1.5, oiq: 1 },
 		"Contributes on both ends without a glaring hole.",
 	),
 	W(
@@ -433,7 +440,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"defender",
 		[28, 64],
-		{ dper: 3, diq: 2.5, stre: 1.5, ath: 1, usg: -1 },
+		{ dper: 3, pdef: 2.5, stre: 1.5, ath: 1, usg: -1 },
 		"Takes the other team's best perimeter scorer.",
 		{ req: ["Dp"] },
 	),
@@ -451,7 +458,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"defender",
 		[24, 66],
-		{ diq: 3, dper: 2, stl: 1.5, reb: 0.5, usg: -1.5 },
+		{ pdef: 3, dper: 2, stl: 1.5, reb: 0.5, usg: -1.5 },
 		"Reads the game on defense, ordinary on offense.",
 		{ need: { dper: 0 } },
 	),
@@ -537,6 +544,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[40, 68],
 		{ dper: 2, dint: 1.5, diq: 2, stre: 1.5, hgt: 1 },
 		"Guards one through four.",
+		{ xw: { pdef: 2, idef: 2 } },
 	),
 	W(
 		"Scoring Slasher",
@@ -567,7 +575,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"defender",
 		[44, 66],
-		{ blk: 2, jmp: 2, diq: 2, dper: 1.5, hgt: 1 },
+		{ blk: 2, jmp: 2, diq: 2, dper: 1.5, hgt: 1, len: 1.5 },
 		"A wing who protects the rim from the weak side.",
 	),
 	W(
@@ -591,7 +599,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"hustle",
 		[24, 66],
-		{ stl: 2, diq: 1.5, end: 2, reb: 1, ath: 1 },
+		{ stl: 2, pdef: 1.5, end: 2, reb: 1, ath: 1 },
 		"Loose balls, deflections and charges.",
 	),
 	W(
@@ -702,7 +710,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		FORWARDS,
 		"defender",
 		[44, 76],
-		{ diq: 3, dint: 2, stre: 1.5, blk: 1, usg: -1.5 },
+		{ idef: 3, dint: 2, stre: 1.5, blk: 1, usg: -1.5 },
 		"Anchors the forward spots on defense.",
 		{ bonus: ["Di"] },
 	),
@@ -786,7 +794,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		FORWARDS,
 		"defender",
 		[46, 80],
-		{ stre: 3, dint: 2, diq: 1.5, usg: -1, ft: -1 },
+		{ stre: 3, dint: 2, idef: 1.5, usg: -1, ft: -1 },
 		"Physical presence and nothing fancy.",
 	),
 	F(
@@ -802,7 +810,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		FORWARDS,
 		"defender",
 		[48, 80],
-		{ blk: 3, jmp: 2, dint: 2, diq: 1 },
+		{ blk: 3, jmp: 2, dint: 2, idef: 1 },
 		"Protects the rim from the four spot.",
 		{ bonus: ["Di"] },
 	),
@@ -862,16 +870,17 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 			mid: -1,
 			three: -1,
 			usg: -1,
+			len: 0.5,
 		},
 		"Alters everything at the rim.",
-		{ req: ["Di"], need: { blk: 1, dint: 0.8 } },
+		{ xw: { idef: 2.5, len: 1.5 }, req: ["Di"], need: { blk: 1, dint: 0.8 } },
 	),
 	C(
 		"Glass Cleaner",
 		BIGS,
 		"rebounder",
 		[54, 100],
-		{ reb: 3.5, stre: 1.5, usg: -1 },
+		{ reb: 3.5, stre: 1.5, usg: -1, len: 0.5 },
 		"Elite rebounder.",
 		{ req: ["R"] },
 	),
@@ -916,7 +925,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		BIGS,
 		"defender",
 		[54, 100],
-		{ dint: 3, diq: 3, blk: 2, reb: 1.5, usg: -1.5 },
+		{ dint: 3, idef: 3, blk: 2, reb: 1.5, usg: -1.5 },
 		"The whole defense is built around him.",
 		{ bonus: ["Di", "R"] },
 	),
@@ -933,7 +942,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		BIGS,
 		"defender",
 		[54, 100],
-		{ dint: 2, post: 2, diq: 1.5, usg: 1 },
+		{ dint: 2, post: 2, idef: 1.5, usg: 1 },
 		"Scores inside and defends inside.",
 	),
 	C(
@@ -975,7 +984,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		FRONTCOURT,
 		"defender",
 		[54, 100],
-		{ blk: 3.5, jmp: 2, dint: 1.5, usg: -1.5, oiq: -1 },
+		{ blk: 3.5, jmp: 2, dint: 1.5, usg: -1.5, oiq: -1, len: 1 },
 		"Blocked shots, not much else.",
 		{ need: { blk: 1.7 }, needFor: { blk: 1.2 } },
 	),
@@ -1021,7 +1030,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		{ dper: 1.5, dint: 2, spd: 1, diq: 2, hgt: 0.5, ath: 1 },
 		"A mobile big who can guard on the perimeter.",
 		// Was "Switch Big": stored entries keep the id
-		{ id: "switch-big" },
+		{ id: "switch-big", xw: { pdef: 2, idef: 2 } },
 	),
 	C(
 		"Bruiser Center",
@@ -1061,7 +1070,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		BIGS,
 		"hustle",
 		[54, 100],
-		{ reb: 2, stre: 2, dint: 1.5, usg: -2, diq: 1, end: 1.5 },
+		{ reb: 2, stre: 2, dint: 1.5, usg: -2, idef: 1, end: 1.5 },
 		"Screens, boxes out, rebounds.",
 	),
 	C(
@@ -1079,7 +1088,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[58, 100],
 		{ dper: 2, dint: 2, spd: 2, diq: 2, hgt: 1 },
 		"Can guard all five positions.",
-		{ rare: true },
+		{ xw: { pdef: 2, idef: 2 }, rare: true },
 	),
 	C(
 		"Interior Scorer",
@@ -1137,7 +1146,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		POINT,
 		"defender",
 		[0, 46],
-		{ pss: 2, dper: 2, diq: 1.5, stl: 1.5, drb: 1 },
+		{ pss: 2, dper: 2, pdef: 1.5, stl: 1.5, drb: 1 },
 		"Runs the offense and hounds the other point guard.",
 		{ bonus: ["Ps", "Dp"], tags: ["two-way"] },
 	),
@@ -1250,7 +1259,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS_G,
 		"hustle",
 		[24, 64],
-		{ stl: 3, spd: 1.5, diq: 1.5, jmp: 1, usg: -0.5 },
+		{ stl: 3, spd: 1.5, pdef: 1.5, jmp: 1, usg: -0.5, len: 1 },
 		"Jumps passing lanes and turns steals into runouts.",
 		{ need: { diq: 0.2 }, tags: ["steals"] },
 	),
@@ -1341,7 +1350,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		BIGS,
 		"defender",
 		[54, 100],
-		{ dint: 2.5, diq: 2.5, reb: 1, usg: -3, ft: -1, three: -1 },
+		{ dint: 2.5, idef: 2.5, reb: 1, usg: -3, ft: -1, three: -1 },
 		"On the floor for his defense alone.",
 		{ bonus: ["Di"], tags: ["low-usage"] },
 	),
@@ -1352,7 +1361,12 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[52, 100],
 		{ blk: 3, three: 2, dint: 1, usg: -0.5 },
 		"Blocks shots at one end and spaces the floor at the other.",
-		{ req: ["Di"], bonus: ["3"], tags: ["two-way", "spacing"] },
+		{
+			xw: { idef: 1.5 },
+			req: ["Di"],
+			bonus: ["3"],
+			tags: ["two-way", "spacing"],
+		},
 	),
 	C(
 		"Microwave Big",
@@ -1388,7 +1402,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[58, 100],
 		{ blk: 2.5, reb: 2, dint: 1.5, spd: -2, ath: -1 },
 		"Slow-footed but walls off the paint.",
-		{ tags: ["paint"] },
+		{ xw: { idef: 1.5 }, tags: ["paint"] },
 	),
 	C(
 		"Stretch Rebounder",
@@ -1514,7 +1528,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		ANY,
 		"defender",
 		[24, 66],
-		{ dper: 2, diq: 1.5, stl: 1, ath: 0.5 },
+		{ dper: 2, pdef: 1.5, stl: 1, ath: 0.5 },
 		"Already competes on defense; the offense will come or it will not.",
 		{ level: [-9, -1.2], age: [0, 24], tags: ["prospect", "raw"] },
 	),
@@ -1689,9 +1703,10 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"defender",
 		[40, 66],
-		{ dper: 2, blk: 2, hgt: 1, diq: 1.5, usg: -1 },
+		{ dper: 2, blk: 2, hgt: 1, pdef: 1.5, usg: -1, len: 2 },
 		"Length everywhere: contests on the perimeter and at the rim.",
-		{ tags: ["defense"] },
+		// (his wingspan, when it is known)
+		{ need: { len: 0.5 }, tags: ["defense"] },
 	),
 	F(
 		"Switchable Forward",
@@ -1700,7 +1715,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[44, 74],
 		{ dper: 2, dint: 2, spd: 1.5, diq: 1.5 },
 		"Guards one through four without giving anything up.",
-		{ tags: ["defense", "switch"] },
+		{ xw: { pdef: 1.5, idef: 1.5 }, tags: ["defense", "switch"] },
 	),
 	F(
 		"Two-Way Point Forward",
@@ -1716,7 +1731,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		BIGS,
 		"defender",
 		[54, 100],
-		{ three: 2, dint: 2, diq: 1.5, blk: 1 },
+		{ three: 2, dint: 2, idef: 1.5, blk: 1 },
 		"Spaces the floor on offense and holds the paint on defense.",
 		{ tags: ["spacing", "defense"] },
 	),
@@ -1727,7 +1742,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[54, 100],
 		{ blk: 2.5, spd: 2, ath: 1.5, dper: 1 },
 		"Blocks shots and can still step out on the perimeter.",
-		{ need: { blk: 1.2 }, tags: ["defense", "switch"] },
+		{ xw: { idef: 1.5 }, need: { blk: 1.2 }, tags: ["defense", "switch"] },
 	),
 	// Scoring and creation gaps
 	W(
@@ -1824,6 +1839,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		{ usg: 2.5, dper: 2, dint: 2, diq: 2, mid: 1 },
 		"Carries the scoring load and still guards the other team's best player.",
 		{
+			xw: { pdef: 2, idef: 2 },
 			need: { usg: 2.1, diq: 0.8, dper: 0.6, dint: 0.8, mid: 1.2 },
 			level: [1.2, 9],
 			tags: ["star"],
@@ -1849,7 +1865,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		GUARDS,
 		"defender",
 		[0, 46],
-		{ drb: 2, dper: 2, diq: 1.5, usg: 1.5, mid: 1, stl: 1 },
+		{ drb: 2, dper: 2, pdef: 1.5, usg: 1.5, mid: 1, stl: 1 },
 		"Creates his own shot and guards the other team's best guard.",
 		{ need: { drb: 0.3, dper: 0.2 }, tags: ["two-way"] },
 	),
@@ -1858,7 +1874,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		GUARDS,
 		"slasher",
 		[0, 46],
-		{ rim: 2, ath: 2, dper: 2, blk: 1, diq: 1 },
+		{ rim: 2, ath: 2, dper: 2, blk: 1, pdef: 1 },
 		"An athlete at both ends: attacks the rim and blocks shots from the backcourt.",
 		{ need: { ath: 0.3, dper: 0.1 }, tags: ["two-way", "athletic"] },
 	),
@@ -1921,7 +1937,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"defender",
 		[36, 64],
-		{ drb: 2, dper: 2, usg: 1.5, diq: 1.5, pss: 1 },
+		{ drb: 2, dper: 2, usg: 1.5, pdef: 1.5, pss: 1 },
 		"Runs isolations on one end and takes the toughest assignment on the other.",
 		{ need: { drb: 0.3 }, tags: ["two-way"] },
 	),
@@ -1930,7 +1946,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		WINGS,
 		"defender",
 		[28, 64],
-		{ reb: 2.5, dper: 2, diq: 1.5, stre: 1, usg: -1 },
+		{ reb: 2.5, dper: 2, pdef: 1.5, stre: 1, usg: -1 },
 		"Guards the perimeter and still finishes the possession with the rebound.",
 		{ tags: ["defense"] },
 	),
@@ -2047,7 +2063,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		GUARDS,
 		"defender",
 		[32, 52],
-		{ dper: 2, stre: 1.5, spd: 1, diq: 1.5, hgt: 0.5, usg: -0.5 },
+		{ dper: 2, stre: 1.5, spd: 1, pdef: 1.5, hgt: 0.5, usg: -0.5 },
 		"Big and strong enough to switch onto wings, quick enough to stay with guards.",
 		{ tags: ["defense", "switch"] },
 	),
@@ -2056,7 +2072,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		GUARDS,
 		"defender",
 		[0, 50],
-		{ three: 2.5, dper: 2.5, diq: 1.5, usg: -1 },
+		{ three: 2.5, dper: 2.5, pdef: 1.5, usg: -1 },
 		"Hits open threes and takes the toughest backcourt assignment.",
 		{ req: ["3"], bonus: ["Dp"], tags: ["two-way", "spacing"] },
 	),
@@ -2094,7 +2110,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[34, 64],
 		{ dper: 2, dint: 1.5, spd: 1, stre: 1, diq: 1.5 },
 		"Guards three positions on the perimeter without giving anything up.",
-		{ tags: ["defense", "switch"] },
+		{ xw: { pdef: 1.5, idef: 1.5 }, tags: ["defense", "switch"] },
 	),
 	W(
 		"Pull-Up Wing",
@@ -2128,7 +2144,12 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[46, 76],
 		{ blk: 2.5, spd: 2, ath: 1.5, dper: 1 },
 		"Protects the rim from the forward spot and still moves like a forward.",
-		{ need: { blk: 1.2 }, needFor: { blk: 0 }, tags: ["defense"] },
+		{
+			xw: { idef: 1.5 },
+			need: { blk: 1.2 },
+			needFor: { blk: 0 },
+			tags: ["defense"],
+		},
 	),
 	F(
 		"Perimeter Four",
@@ -2144,7 +2165,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		FOURS,
 		"defender",
 		[46, 76],
-		{ dint: 2, post: 2, diq: 1.5, usg: 1 },
+		{ dint: 2, post: 2, idef: 1.5, usg: 1 },
 		"Scores on the block and defends the paint from the four spot.",
 		{ tags: ["two-way"] },
 	),
@@ -2170,7 +2191,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		["G", "SG"],
 		"defender",
 		[0, 50],
-		{ dper: 2, diq: 1.5, mid: 1.5, three: 1.5, usg: 1 },
+		{ dper: 2, pdef: 1.5, mid: 1.5, three: 1.5, usg: 1 },
 		"Carries a scoring load and still guards the other team's best guard.",
 		{ tags: ["two-way"] },
 	),
@@ -2228,6 +2249,99 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Runs the floor, finishes above the rim and spaces it in the half court.",
 		{ tags: ["spacing"] },
 	),
+	// ---- Labels the perimeter/interior defense ratings call for (without expanded ratings both are his defensive IQ)
+	W(
+		"Two-Way Shotmaker",
+		WINGS,
+		"scorer",
+		[24, 66],
+		{ mid: 2.5, dper: 2, pdef: 1.5, usg: 1, ft: 1 },
+		"Gets to his mid-range shot against anyone and guards the other team's best scorer.",
+		{ need: { dper: 0 }, tags: ["two-way"] },
+	),
+	F(
+		"Lockdown Forward",
+		FORWARDS,
+		"defender",
+		[44, 74],
+		{ dper: 3, pdef: 2.5, stre: 1, ath: 1, usg: -1 },
+		"A forward who takes the toughest perimeter assignment and stays in front of it.",
+		{ req: ["Dp"], tags: ["defense"] },
+	),
+	C(
+		"Paint Defender",
+		FRONTCOURT,
+		"defender",
+		[52, 100],
+		{ dint: 2.5, idef: 2.5, stre: 1.5, usg: -0.5 },
+		"Holds his ground in the post and walls off the paint without needing to block the shot.",
+		{ need: { idef: 0.3, dint: 0.3 }, tags: ["defense", "paint"] },
+	),
+	W(
+		"Secondary Ball Handler",
+		WINGS,
+		"playmaker",
+		[24, 66],
+		{ drb: 2, pss: 2, oiq: 1, usg: -0.5 },
+		"A wing who can bring the ball up and run a set when the point guard gives it up.",
+		{ need: { drb: 0.2, pss: 0.2 } },
+	),
+	// ---- Length: wingspan for his height. Only for players who have expanded ratings.
+	W(
+		"Long-Armed Disruptor",
+		PERIMETER,
+		"hustle",
+		[0, 66],
+		{ len: 2.5, stl: 2.5, pdef: 1.5, blk: 1, usg: -0.5 },
+		"Arms that go on forever: gets a hand on passes, dribbles and shots that looked safe.",
+		{
+			expanded: true,
+			need: { len: 1.3, stl: 0.6, pdef: 0.3, dper: 0 },
+			pos: { PG: 0, G: 0 },
+			tags: ["length", "defense"],
+		},
+	),
+	G(
+		"Rangy Guard",
+		GUARDS,
+		"athlete",
+		[0, 50],
+		{ len: 2.5, rim: 1.5, blk: 1.5, reb: 1.5 },
+		"A guard with a forward's wingspan: finishes over taller defenders, rebounds and contests shots well above his height.",
+		{ expanded: true, need: { len: 1 }, tags: ["length"] },
+	),
+	W(
+		"Rangy Wing",
+		WINGS,
+		"athlete",
+		[28, 66],
+		{ len: 2.5, rim: 2, blk: 2, reb: 1 },
+		"A wing with a huge wingspan: finishes over defenders and gets to shots a wing should not reach.",
+		{ expanded: true, need: { len: 1 }, tags: ["length"] },
+	),
+	C(
+		"Long-Armed Big",
+		BIGS,
+		"defender",
+		[46, 64],
+		{ len: 2.5, blk: 2, reb: 2, dint: 1.5, hgt: -1 },
+		"Short for a big, but his wingspan lets him rebound and protect the rim like a taller one.",
+		{ expanded: true, need: { len: 1 }, tags: ["length", "small-ball"] },
+	),
+	W(
+		"Short-Armed Shooter",
+		PERIMETER,
+		"shooter",
+		[0, 66],
+		{ len: -2.5, three: 2.5, ft: 1.5, blk: -1, stl: -0.5 },
+		"A pure shooter whose short arms limit him as a defender and a finisher.",
+		{
+			expanded: true,
+			cap: { len: -1 },
+			pos: { PG: 0, G: 0 },
+			tags: ["length", "spacing"],
+		},
+	),
 ];
 
 // What a name promises, on the league-wide scale: a label is only given when the skill its name names is really there.
@@ -2248,7 +2362,10 @@ const NAME_NEEDS: [
 		/Floor General|Playmak|Pass-First|Point (Forward|Center)|Hub|Jumbo/,
 		{ pss: 0.5 },
 	],
-	[/Lockdown|Defensive|Stopper|Pest|Hawk|Thief|Two-Way|Switch/, { diq: 0 }],
+	[
+		/Lockdown|Defensive|Defender|Stopper|Pest|Hawk|Thief|Two-Way|Switch/,
+		{ diq: 0 },
+	],
 	[/Rebound|Glass|Double-Double|Putback/, {}, { reb: 0.45 }],
 	[/Post|Interior Scorer|Paint Beast/, {}, { post: 0.35 }],
 	[/Slash|Penetrator/, { drb: -0.2 }, { rim: 0.1 }],
@@ -2279,6 +2396,30 @@ for (const d of ARCHETYPE_DEFS) {
 	}
 }
 
+// A defensive floor is on the side of the floor the label defends: the perimeter defense rating for a perimeter label, the
+// interior one for an interior label, defensive IQ (their average) for one that names both sides or neither. Without
+// expanded ratings all three are his defensive IQ.
+const defenseSideOf = (d: ArchetypeDef): "pdef" | "idef" | "diq" => {
+	const perimeter = d.w.pdef !== undefined;
+	const interior = d.w.idef !== undefined;
+	if (perimeter !== interior) {
+		return perimeter ? "pdef" : "idef";
+	}
+	if (perimeter || d.w.diq !== undefined) {
+		return "diq";
+	}
+	const per = Math.max(d.w.dper ?? 0, d.w.stl ?? 0);
+	const int = Math.max(d.w.dint ?? 0, d.w.blk ?? 0);
+	return per > int ? "pdef" : int > per ? "idef" : "diq";
+};
+for (const d of ARCHETYPE_DEFS) {
+	const side = defenseSideOf(d);
+	if (side !== "diq" && d.need?.diq !== undefined) {
+		const { diq, ...rest } = d.need;
+		d.need = { ...rest, [side]: Math.max(diq, rest[side] ?? -Infinity) };
+	}
+}
+
 // Position prior overrides for archetypes defined above, kept apart so the table above stays readable
 const POS_OVERRIDES: Record<string, Partial<Record<Pos, number | null>>> = {
 	"big-guard": { GF: 0, SF: -0.3 },
@@ -2294,6 +2435,16 @@ const POS_OVERRIDES: Record<string, Partial<Record<Pos, number | null>>> = {
 	// A shooting power forward is a Stretch Four
 	"stretch-wing": { PF: -1, FC: -1.5 },
 };
+// Big-man playmaking labels: the passing must be clearly there (a big's passing composite runs high on IQ alone)
+for (const id of [
+	"playmaking-big",
+	"glass-cleaning-playmaker",
+	"playmaking-forward",
+]) {
+	const d = ARCHETYPE_DEFS.find((x) => x.id === id)!;
+	d.need = { ...d.need, pss: 0.75 };
+}
+
 for (const d of ARCHETYPE_DEFS) {
 	const o = POS_OVERRIDES[d.id];
 	if (o) {

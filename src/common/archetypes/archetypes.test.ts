@@ -28,6 +28,7 @@ import {
 	type ArchetypeRatings,
 } from "./index.ts";
 import { sampleLeague } from "./sample.testutil.ts";
+import { fillExpandedRatings } from "../expandedRatings.ts";
 import {
 	HARD_BLOCK,
 	POSITIONS,
@@ -331,8 +332,25 @@ describe("classification", () => {
 					"veteran-defender",
 				],
 			];
+		const slugs: Record<string, string> = {
+			"LeBron James": "jamesle01",
+			"Giannis Antetokounmpo": "antetgi01",
+			"Kevin Durant": "duranke01",
+			"Joel Embiid": "embiijo01",
+			"Rudy Gobert": "goberru01",
+			"Tony Allen": "allento01",
+		};
 		for (const [name, r, p, age, id] of cases) {
 			assert.strictEqual(classify(R(r), { pos: p, age }).id, id, name);
+			// With the Expanded Ratings setting on: wingspan and perimeter/interior defense derived as a real-players league
+			// derives them (an estimated wingspan must not cost a star his star label)
+			const row: Record<string, number> = { ...R(r) };
+			fillExpandedRatings({ srID: slugs[name], ratings: [row] });
+			assert.strictEqual(
+				classify(row as ArchetypeRatings, { pos: p, age }).id,
+				id,
+				`${name} (expanded ratings)`,
+			);
 		}
 	});
 	test("tiers follow ovr percentile", () => {
@@ -540,7 +558,8 @@ describe("distribution over a generated league", () => {
 		assert.ok(max < 0.08, `max share ${max}`);
 		assert.ok(max < 0.05, `max share ${max}`);
 		// Raw prospects, journeymen and veterans need players this league does not hold (or an age)
-		const regular = ARCHETYPES.filter((a) => !a.age && !a.level);
+		// (length labels need expanded ratings, which this league does not have)
+		const regular = ARCHETYPES.filter((a) => !a.age && !a.level && !a.expanded);
 		const used = regular.filter((a) => (counts[a.id] ?? 0) > 0).length;
 		assert.ok(used >= regular.length - 8, `used ${used}/${regular.length}`);
 		// Common archetypes cut across positions: most of them hold several BBGM positions

@@ -76,7 +76,7 @@ export const buildNorms = (
 					gateFactor(p.hgt, a.hgt) >= 0.9 &&
 					(archetypePrior(a, p.pos) ?? -Infinity) > -1,
 			)
-			.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.level))
+			.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded))
 			.sort((x, y) => x - y);
 		// Too few peers (a small league, or a very rare body type): reuse the reference league's table rather than read him
 		// against everyone, which would make any player look like an exceptional fit for an archetype nobody in the league has
@@ -88,7 +88,7 @@ export const buildNorms = (
 			inGate.length >= 8
 				? inGate
 				: prepared
-						.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.level))
+						.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded))
 						.sort((x, y) => x - y);
 		match[a.id] = MATCH_Z.map((z) => {
 			const pos = Math.min(1, Math.max(0, phi(z))) * (vals.length - 1);

@@ -5,7 +5,8 @@ export type { RatingKey };
 // The ratings an archetype is derived from (true or fuzzed, the engine does not care)
 export type ArchetypeRatings = Record<RatingKey, number> & {
 	// Expanded ratings (the expandedRatings setting), only when it's on: the defense, rebounding, blocking and finishing composites
-	// then read wingspan and perimeter/interior defense, like the game sim
+	// then read wingspan and perimeter/interior defense, like the game sim, perimeter labels are keyed on pdef, interior labels on
+	// idef, and length (wingspan relative to height) is a dimension of its own
 	wng?: number;
 	pdef?: number;
 	idef?: number;
@@ -34,7 +35,12 @@ export type DimKey =
 	| "stre"
 	| "oiq"
 	| "diq"
-	| "hgt";
+	| "hgt"
+	// Perimeter and interior defense (the expanded ratings; without them both read as diq) and length: wingspan relative to
+	// height (without expanded ratings: ordinary, and never part of a match)
+	| "pdef"
+	| "idef"
+	| "len";
 
 export type ArchetypeGroup = "guard" | "wing" | "forward" | "big";
 
@@ -74,6 +80,9 @@ export type ArchetypeDef = {
 	desc: string;
 	// Profile weights, -3..+3 in "standard deviations / 0.55" (3 = elite, -3 = well below normal)
 	w: Partial<Record<DimKey, number>>;
+	// Weights that replace or add to `w` for a player who has expanded ratings: the perimeter/interior defense rating a
+	// label is really about (when it names one, his defensive IQ, their average, is left out) and his length
+	xw?: Partial<Record<DimKey, number>>;
 	// Gate on the hgt rating, both inclusive (soft: a smooth penalty outside)
 	hgt: [number, number];
 	// Skills the player must have (a missing one costs a lot) and skills that help
@@ -81,6 +90,8 @@ export type ArchetypeDef = {
 	bonus?: SkillLabel[];
 	// Floors on the league-wide z of a dimension (his skill in absolute terms): a label must deliver what its name promises
 	need?: Partial<Record<DimKey, number>>;
+	// Ceilings on the league-wide z of a dimension: a label about what he lacks (short arms)
+	cap?: Partial<Record<DimKey, number>>;
 	// The same, on the z for his size (rebounding, post scoring and finishing are judged against players his height)
 	needFor?: Partial<Record<DimKey, number>>;
 	// Gate on his overall level (mean size-adjusted skill z, soft): raw prospects are well below the league
@@ -89,6 +100,8 @@ export type ArchetypeDef = {
 	age?: [number, number];
 	// Rare "unicorn" types are not expected to be filled in every league
 	rare?: true;
+	// Only for players who have expanded ratings: the label is about his length (wingspan for his height)
+	expanded?: true;
 	// The positions he must play to get this label (a hard gate). All nine for the few universal (role) archetypes.
 	positions: Pos[];
 	// Position prior overrides on top of the group's (see position.ts): z nudge per position, null = never

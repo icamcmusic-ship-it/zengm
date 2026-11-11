@@ -4,6 +4,7 @@ export {
 	archetypeById,
 	archetypeByName,
 	classify,
+	defaultNorms,
 	explain,
 	scoreAll,
 	tierFromPercentile,
@@ -14,6 +15,7 @@ export {
 } from "./classify.ts";
 export { buildNorms } from "./match.ts";
 export { DEFAULT_NORMS } from "./norms.data.ts";
+export { DEFAULT_NORMS_EXPANDED } from "./normsExpanded.data.ts";
 export {
 	DIM_LABELS,
 	DIM_RATINGS,

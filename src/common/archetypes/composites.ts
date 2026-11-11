@@ -30,7 +30,19 @@ export const DIMS: DimKey[] = [
 	"oiq",
 	"diq",
 	"hgt",
+	"pdef",
+	"idef",
+	"len",
 ];
+
+// Dimensions of the expanded ratings. A match only counts the ones an archetype names (as for height), and length only
+// for a player who has a wingspan
+export const EXPANDED_DIMS: DimKey[] = ["pdef", "idef", "len"];
+
+export const hasExpanded = (r: ArchetypeRatings) =>
+	typeof r.wng === "number" &&
+	typeof r.pdef === "number" &&
+	typeof r.idef === "number";
 
 // Dimensions that are BBGM composite ratings, and the composite each one is
 const COMPOSITE_OF: Partial<Record<DimKey, keyof typeof COMPOSITE_WEIGHTS>> = {
@@ -75,6 +87,9 @@ export const DIM_LABELS: Record<DimKey, string> = {
 	oiq: "Offensive IQ",
 	diq: "Defensive IQ",
 	hgt: "Height",
+	pdef: "Perimeter defense rating",
+	idef: "Interior defense rating",
+	len: "Length",
 };
 
 export const DIM_RATINGS: Record<DimKey, RatingKey[]> = {
@@ -100,6 +115,10 @@ export const DIM_RATINGS: Record<DimKey, RatingKey[]> = {
 	oiq: ["oiq"],
 	diq: ["diq"],
 	hgt: ["hgt"],
+	// Without expanded ratings these are his defensive IQ (the expanded keys are not RatingKeys)
+	pdef: ["diq"],
+	idef: ["diq"],
+	len: ["hgt"],
 };
 
 // compositeRating without fuzz: a weighted mean of ratings (a number is a literal rating value), 0..1
@@ -121,12 +140,11 @@ const composite = (
 
 // Expanded ratings (setting on, see ArchetypeRatings): the game's composites with wingspan and perimeter/interior defense
 const weightsFor = (r: ArchetypeRatings) =>
-	compositeWeightsFor(
-		COMPOSITE_WEIGHTS,
-		typeof r.wng === "number" &&
-			typeof r.pdef === "number" &&
-			typeof r.idef === "number",
-	);
+	compositeWeightsFor(COMPOSITE_WEIGHTS, hasExpanded(r));
+
+// Length: wingspan relative to height, 0.5 = wingspan as long as his height rating (the average)
+const lengthOf = (r: ArchetypeRatings) =>
+	hasExpanded(r) ? Math.min(1, Math.max(0, (50 + r.wng! - r.hgt) / 100)) : 0.5;
 
 export const compositeValues = (r: ArchetypeRatings) => {
 	const out = {} as Record<DimKey, number>;
@@ -136,6 +154,10 @@ export const compositeValues = (r: ArchetypeRatings) => {
 		if (comp) {
 			const c = weights[comp]!;
 			out[dim] = composite(r, c.ratings, c.weights);
+		} else if (dim === "len") {
+			out[dim] = lengthOf(r);
+		} else if (dim === "pdef" || dim === "idef") {
+			out[dim] = (r[dim] ?? r.diq) / 100;
 		} else {
 			out[dim] = r[dim as RatingKey] / 100;
 		}
