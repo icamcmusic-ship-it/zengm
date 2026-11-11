@@ -1199,8 +1199,18 @@ export const describeProfile = (p: CoachProfile) => ({
 		"Rides his starters",
 		"Rests players on back-to-backs",
 	),
-	philosophy: dialText(p.philosophy, "Win now", "Player development"),
-	personality: dialText(p.personality, "Disciplinarian", "Players' coach"),
+	philosophy: dialText(
+		p.philosophy,
+		"Win now",
+		"Player development",
+		"Balances winning and development",
+	),
+	personality: dialText(
+		p.personality,
+		"Disciplinarian",
+		"Players' coach",
+		"Even-keeled",
+	),
 });
 
 export const strengthNames = {

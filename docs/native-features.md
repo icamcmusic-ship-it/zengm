@@ -520,7 +520,7 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 
   Spread across teams (SD of team season rates, new-league sim; off → on): 3PA rate .040 → .053 (range .157-.415), pace 1.4 → 3.0 possessions (96.5-112.0), ORB% .018 → .025, turnovers forced per 100 possessions 1.6 → 2.0, net rating 6.3 → 5.9 (systems change how teams score, not how much). By system (change vs the same rosters without coaching systems): Pace & Space +.048 3PA rate, Post −.050 3PA rate and +1.3% ORB, Seven Seconds +3.0 possessions, Isolation −1.4, Press +1.5 and Blitz +0.9 turnovers forced per 100, Drop −1.4; average net rating of every system within ±1.6 (sample noise ~±0.8). **Win impact of fit** (fits are relative to the league's rosters): 1 SD of scheme fit = +1.1 net rating per 100 possessions (+3.7% win%) with the new-league sim (6 leagues), +0.8 (+2.2%) stock.
 
-- **Speed:** SPEEDLINE
+- **Speed:** (`simBenchmark.test.ts` with `SIM_BENCH=on`, with and without `SIM_BENCH_WITHOUT=coachSystems`, 2 seeds) the rest of the regular season +1.3% CPU (+4.8% wall time, a busy machine): the league's multipliers and roster fits are computed once per day of games.
 - **Known limits:** systems are categorical (a coach runs one offense and one defense; adaptation switches them whole). Playoff adjustments look at the series score and the opponent's system, not at the box scores. The rotation hooks need Realistic Rotations. Assistants have no systems of their own beyond the coaching tree.
 
 ### Season odds
