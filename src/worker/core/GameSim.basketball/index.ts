@@ -26,6 +26,8 @@ import { choice, truncGauss, uniform } from "../../../common/random.ts";
 import {
 	lateGameSituationWeight,
 	teamChemistryBonus,
+	teamSwitchDefenseBonus,
+	lineupSizeMismatch,
 	teamLateGameDecisionQuality,
 	type TraitEffects,
 	type TraitSituation,
@@ -156,6 +158,8 @@ type PlayerGameSim = {
 	// gameZ is his game-to-game form this game, one standard normal draw per player per game (only when traitEffects exist)
 	traitEffects?: TraitEffects;
 	gameZ?: number;
+	// His height rating, for defensive versatility (size mismatches). Only set with traitEffects
+	traitHgt?: number;
 };
 type TeamGameSim = {
 	id: number;
@@ -1706,6 +1710,25 @@ class GameSim extends GameSimBase {
 						ratings.defenseInterior *= factor;
 					}
 				}
+
+				// Defensive versatility: switching against a lineup that mixes big and small players
+				const switchBonus = teamSwitchDefenseBonus(
+					this.playersOnCourt[t].map(
+						(p) => p.traitEffects?.switchDefenseContribution ?? 0,
+					),
+					lineupSizeMismatch(
+						this.playersOnCourt[oppT].map((p) => p.traitHgt ?? 50),
+					),
+				);
+				if (switchBonus !== 0) {
+					const factor = 1 + switchBonus;
+					ratings.defense *= factor;
+					ratings.defensePerimeter *= factor;
+					ratings.blocking *= factor;
+					if (this.expandedRatings) {
+						ratings.defenseInterior *= factor;
+					}
+				}
 			}
 		}
 	}
@@ -1733,7 +1756,10 @@ class GameSim extends GameSimBase {
 
 					// This used to be 0.04. Increase more to lower PT
 					p.stat.energy +=
-						-min * this.fatigueFactor * (1 - p.compositeRating.endurance);
+						-min *
+						this.fatigueFactor *
+						(1 - p.compositeRating.endurance) *
+						(p.traitEffects?.energyDrainRate ?? 1); // player traits (motor)
 
 					if (p.stat.energy < 0) {
 						p.stat.energy = 0;

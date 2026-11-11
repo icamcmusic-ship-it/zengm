@@ -2,6 +2,7 @@ import { TRAIT_DEFINITIONS } from "./definitions.ts";
 import { DEVELOPMENT_AMPLITUDES } from "./development.ts";
 import { EFFECT_AMPLITUDES, traitZ } from "./effects.ts";
 import { EGO_AMPLITUDES } from "./ego.ts";
+import { PERSONALITY_AMPLITUDES } from "./personality.ts";
 import { TRAIT_KEYS, type TraitKey, type TraitScores } from "./types.ts";
 
 export type TraitLevel = "elite" | "strong" | "average" | "weak" | "poor";
@@ -120,6 +121,11 @@ export const TRAIT_SHORT: Record<TraitKey, string> = {
 	bigGame: "BiG",
 	ego: "Ego",
 	temper: "Tmp",
+	loyalty: "Loy",
+	roleAcceptance: "Rol",
+	moneyVsWinning: "MvW",
+	motor: "Mot",
+	defensiveVersatility: "DVe",
 };
 
 export const isTraitKey = (x: unknown): x is TraitKey =>
@@ -174,5 +180,17 @@ export const traitEffectSummary = (key: TraitKey, score: number): string => {
 			return `Each teammate's mood: ${signed(EGO_AMPLITUDES.teammateMood * z, 2)}; team chemistry ${signed(A.egoChemistry * z, 2)}; chance he asks for a trade when unhappy ${rel(-EGO_AMPLITUDES.tradeRequestProb * z)}.`;
 		case "temper":
 			return `Technical fouls ${rel(-A.temperTech * z)}, flagrant fouls ${rel(-A.temperFlagrant * z)}; clutch FG ${pts(A.temperClutchShot * z)}, FT ${pts(A.temperClutchFt * z)}.`;
+		case "loyalty":
+			return `Asking price to re-sign with his team: ${rel(-PERSONALITY_AMPLITUDES.loyaltyResignDiscount * z)}; loyalty mood ${rel(PERSONALITY_AMPLITUDES.loyaltyMood * z)}; trade requests ${rel(-PERSONALITY_AMPLITUDES.loyaltyTradeRequest * z)}.`;
+		case "roleAcceptance":
+			return `Mood hit from too few minutes: ${rel(-PERSONALITY_AMPLITUDES.rolePlayingTime * z)}; trade requests over minutes ${rel(-PERSONALITY_AMPLITUDES.roleTradeRequest * z)}.`;
+		case "moneyVsWinning":
+			return z > 0
+				? `Pull of a winning team: ${rel(PERSONALITY_AMPLITUDES.winningTeamPerformance * z)}; up to ${rel(-PERSONALITY_AMPLITUDES.ringChaserDiscount * z)} off his asking price for a contender.`
+				: `Pull of a winning team: ${rel(PERSONALITY_AMPLITUDES.winningTeamPerformance * z)}; no discount for contenders.`;
+		case "motor":
+			return `Energy lost per minute on the court: ${rel(-A.motorDrain * z)}; endurance on back-to-backs ${rel(A.motorBackToBack * z)}.`;
+		case "defensiveVersatility":
+			return `Team defense while he plays, against big/small lineups: ${signed((100 * A.switchDefense * z) / 5)}% (his share of the five).`;
 	}
 };

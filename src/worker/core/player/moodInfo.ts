@@ -8,6 +8,14 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
 import { uniformSeed } from "../../../common/random.ts";
 import { getProStats } from "../../../common/preDraft.ts";
+import { getPersonalityScores, traitsEnabled } from "./traits.ts";
+import {
+	loyaltyContractMult,
+	loyaltyMoodMult,
+	ringChaserContractMult,
+	roleAcceptancePlayingTime,
+	winningTeamPerformance,
+} from "../../../common/playerTraits/personality.ts";
 
 const hasActiveNegotiation = async (tid: number, pid: number) => {
 	return (await idb.cache.negotiations.getAll()).some(
@@ -47,6 +55,24 @@ const moodInfo = async (
 ) => {
 	const components = await moodComponents(p, tid);
 	overrides.adjustComponents?.(components);
+
+	// Player traits: loyalty, role acceptance and money vs winning. The minimum contract check below uses the components from before these, so
+	// a minimum contract free agent signs exactly where he would without them (over-the-cap teams can always fill out a roster)
+	const personality = traitsEnabled() ? getPersonalityScores(p) : undefined;
+	const baseTeamPerformance = components.teamPerformance;
+	let minContractHateMood: number | undefined;
+	if (personality) {
+		minContractHateMood = getMinContractHateMood(components);
+		components.loyalty *= loyaltyMoodMult(personality.loyalty);
+		components.playingTime = roleAcceptancePlayingTime(
+			components.playingTime,
+			personality.roleAcceptance,
+		);
+		components.teamPerformance = winningTeamPerformance(
+			components.teamPerformance,
+			personality.moneyVsWinning,
+		);
+	}
 	let probWilling = 0;
 
 	// What he's asking for, or his current contract if he's not asking for anything
@@ -130,6 +156,20 @@ const moodInfo = async (
 		components.rookieContract > 0 && g.get("draftPickAutoContract");
 	if (!autoRookieContract && contractAmount > g.get("minContract")) {
 		contractAmount *= helpers.bound(1 + (0.5 * -sumComponents) / 10, 1, 1.5);
+
+		if (personality) {
+			const reSigning =
+				p.tid === tid ||
+				(resigning &&
+					p.tid === PLAYER.FREE_AGENT &&
+					(await hasActiveNegotiation(tid, p.pid)));
+			contractAmount *= reSigning
+				? loyaltyContractMult(personality.loyalty)
+				: ringChaserContractMult(
+						personality.moneyVsWinning,
+						baseTeamPerformance,
+					);
+		}
 	}
 
 	contractAmount = helpers.bound(
@@ -145,7 +185,8 @@ const moodInfo = async (
 		firstSeasonAfterExpansionOverride ||
 		(contractAmount <= g.get("minContract") &&
 			p.tid === PLAYER.FREE_AGENT &&
-			getMinContractHateMood(components) > MIN_CONTRACT_REFUSE_MOOD)
+			(minContractHateMood ?? getMinContractHateMood(components)) >
+				MIN_CONTRACT_REFUSE_MOOD)
 	) {
 		probWilling = 1;
 		willing = true;

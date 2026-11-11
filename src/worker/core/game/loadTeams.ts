@@ -359,6 +359,8 @@ export const processTeam = async (
 				(p2 as any).traitEffects = traitEffects;
 				// Temper, for the trash talk in the play-by-play text only (pbpFlavor/trashTalk.ts)
 				(p2 as any).pbpRatings.temper = traitEffects.scores.temper;
+				// Defensive versatility (size mismatches)
+				(p2 as any).traitHgt = (rating as any).hgt;
 			}
 		}
 

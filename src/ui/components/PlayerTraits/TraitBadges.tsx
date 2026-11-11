@@ -1,8 +1,11 @@
 import { useId } from "react";
 import { OverlayTrigger, Tooltip } from "react-bootstrap";
 import {
+	TRAIT_CATEGORIES,
+	TRAIT_CATEGORY_BY_KEY,
 	TRAIT_DEFINITIONS,
 	traitBadges,
+	traitStatusText,
 	type ScoutedTrait,
 	type TraitKey,
 	type TraitScores,
@@ -13,11 +16,13 @@ const Badge = ({
 	label,
 	tone,
 	uncertain,
+	trait,
 }: {
 	traitKey: TraitKey;
 	label: string;
 	tone: "good" | "bad";
 	uncertain: boolean;
+	trait: ScoutedTrait;
 }) => {
 	const id = useId();
 	const def = TRAIT_DEFINITIONS[traitKey];
@@ -25,9 +30,7 @@ const Badge = ({
 		<OverlayTrigger
 			overlay={
 				<Tooltip id={id}>
-					<b>{def.name}</b>: {tone === "good" ? def.high : def.low}.{" "}
-					{def.description}
-					{uncertain ? " Not fully known yet." : ""}
+					<b>{def.name}</b>: {traitStatusText(trait)}.
 				</Tooltip>
 			}
 		>
@@ -61,7 +64,14 @@ export const TraitBadges = ({
 			uncertain.add(t.key);
 		}
 	}
-	const badges = traitBadges(scores, { max });
+	const byKey = new Map(traits.map((t) => [t.key, t]));
+	// Most notable first, then shown grouped by category
+	const order = TRAIT_CATEGORIES.map((c) => c.key);
+	const badges = traitBadges(scores, { max }).sort(
+		(a, b) =>
+			order.indexOf(TRAIT_CATEGORY_BY_KEY[a.key]) -
+			order.indexOf(TRAIT_CATEGORY_BY_KEY[b.key]),
+	);
 	if (badges.length === 0) {
 		return null;
 	}
@@ -74,6 +84,7 @@ export const TraitBadges = ({
 					label={b.label}
 					tone={b.tone}
 					uncertain={uncertain.has(b.key)}
+					trait={byKey.get(b.key)!}
 				/>
 			))}
 		</>

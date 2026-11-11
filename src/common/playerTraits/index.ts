@@ -9,3 +9,5 @@ export * from "./veteran.ts";
 export * from "./aiValue.ts";
 export * from "./development.ts";
 export * from "./ego.ts";
+export * from "./categories.ts";
+export * from "./personality.ts";

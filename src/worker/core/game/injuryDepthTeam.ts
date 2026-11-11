@@ -20,6 +20,7 @@ export const applyInjuryDepth = (
 			compositeRating: Record<string, number>;
 			injuryRiskFactor?: number;
 			rested?: boolean;
+			traitEffects?: { backToBackEnduranceMult: number };
 		}[];
 	},
 	teamInput: { tid: number; loadManagement?: boolean },
@@ -75,7 +76,10 @@ export const applyInjuryDepth = (
 			}
 
 			if (p2.compositeRating.endurance !== undefined) {
-				p2.compositeRating.endurance *= BACK_TO_BACK_ENDURANCE;
+				p2.compositeRating.endurance *=
+					BACK_TO_BACK_ENDURANCE *
+					// Player traits (motor), 1 with the setting off
+					(p2.traitEffects?.backToBackEnduranceMult ?? 1);
 			}
 		}
 

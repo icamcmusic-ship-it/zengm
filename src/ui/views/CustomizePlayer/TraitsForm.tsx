@@ -1,6 +1,6 @@
 import {
 	TRAIT_DEFINITIONS,
-	TRAIT_KEYS,
+	TRAIT_CATEGORIES,
 	TRAIT_LEVEL_LABELS,
 	clampSeed,
 	completeTraitSeeds,
@@ -51,42 +51,48 @@ export const TraitsForm = ({
 				0-100, where 50 is a league average player. These are what the game
 				simulation uses. Hidden traits are only visible to you here.
 			</p>
-			<div className="row">
-				{TRAIT_KEYS.map((key) => {
-					const def = TRAIT_DEFINITIONS[key];
-					const id = `trait-${key}`;
-					return (
-						<div className="col-md-6 col-xl-4 mb-3" key={key}>
-							<label
-								htmlFor={id}
-								className="form-label mb-0"
-								title={def.effect}
-							>
-								<b>{def.name}</b>{" "}
-								<span className="text-body-secondary">
-									{scores[key]} · {TRAIT_LEVEL_LABELS[traitLevel(scores[key])]}
-								</span>
-							</label>
-							<input
-								id={id}
-								type="range"
-								className="form-range"
-								min={0}
-								max={100}
-								step={1}
-								disabled={disabled}
-								value={scores[key]}
-								onChange={(event) => {
-									setScore(key, Number.parseInt(event.target.value));
-								}}
-							/>
-							<div className="small text-body-secondary">
-								{def.low} / {def.high}
-							</div>
-						</div>
-					);
-				})}
-			</div>
+			{TRAIT_CATEGORIES.map((category) => (
+				<div key={category.key}>
+					<h3 className="mt-2">{category.name}</h3>
+					<div className="row">
+						{category.traits.map((key) => {
+							const def = TRAIT_DEFINITIONS[key];
+							const id = `trait-${key}`;
+							return (
+								<div className="col-md-6 col-xl-4 mb-3" key={key}>
+									<label
+										htmlFor={id}
+										className="form-label mb-0"
+										title={def.effect}
+									>
+										<b>{def.name}</b>{" "}
+										<span className="text-body-secondary">
+											{scores[key]} ·{" "}
+											{TRAIT_LEVEL_LABELS[traitLevel(scores[key])]}
+										</span>
+									</label>
+									<input
+										id={id}
+										type="range"
+										className="form-range"
+										min={0}
+										max={100}
+										step={1}
+										disabled={disabled}
+										value={scores[key]}
+										onChange={(event) => {
+											setScore(key, Number.parseInt(event.target.value));
+										}}
+									/>
+									<div className="small text-body-secondary">
+										{def.low} / {def.high}
+									</div>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			))}
 		</>
 	);
 };
