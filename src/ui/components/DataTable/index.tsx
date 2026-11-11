@@ -1,9 +1,11 @@
 import clsx, { type ClassValue } from "clsx";
 import { csvFormatRows } from "d3-dsv";
+import { DownloadPlayersModal } from "../DownloadPlayers.tsx";
 import {
 	type SyntheticEvent,
 	type ReactNode,
 	useRef,
+	useState,
 	type CSSProperties,
 	useImperativeHandle,
 	type RefCallback,
@@ -289,6 +291,29 @@ export const DataTable = <Type extends MetadataType = undefined>({
 		downloadFile(`${name}.csv`, output, "text/csv");
 	};
 
+	const [downloadPlayersPids, setDownloadPlayersPids] = useState<
+		{ pids: number[]; season?: number } | undefined
+	>();
+	const handleDownloadPlayers = () => {
+		// The players shown, with the table's filters, search and sort (all pages, not only the current one)
+		const pids: number[] = [];
+		let season: number | undefined;
+		for (const row of processRows({ cols, rankCol, rows, state })) {
+			const metadata = row.metadata as any;
+			if (metadata?.type === "player" && !pids.includes(metadata.pid)) {
+				pids.push(metadata.pid);
+				const s =
+					typeof metadata.season === "object"
+						? (metadata.season.export ?? metadata.season.default)
+						: metadata.season;
+				if (season === undefined && typeof s === "number") {
+					season = s;
+				}
+			}
+		}
+		setDownloadPlayersPids({ pids, season });
+	};
+
 	const handleResetTable = () => {
 		state.settingsCache.clear("DataTableColOrder");
 		state.settingsCache.clear("DataTableFilters");
@@ -488,6 +513,7 @@ export const DataTable = <Type extends MetadataType = undefined>({
 					},
 					stickyClass,
 				)}
+				data-datatable=""
 				ref={tableRef}
 			>
 				{hideHeader ? null : (
@@ -629,6 +655,7 @@ export const DataTable = <Type extends MetadataType = undefined>({
 									name={name}
 									onBulkSelectRows={handleBulkSelectRows}
 									onExportCSV={handleExportCSV}
+									onDownloadPlayers={handleDownloadPlayers}
 									onResetTable={handleResetTable}
 									onSearch={handleSearch}
 									onSelectColumns={handleSelectColumns}
@@ -686,6 +713,15 @@ export const DataTable = <Type extends MetadataType = undefined>({
 					) : null}
 				</div>
 			</div>
+			{downloadPlayersPids ? (
+				<DownloadPlayersModal
+					name={`${name}_players`}
+					onClose={() => setDownloadPlayersPids(undefined)}
+					pids={downloadPlayersPids.pids}
+					season={downloadPlayersPids.season}
+					show
+				/>
+			) : null}
 		</>
 	);
 };

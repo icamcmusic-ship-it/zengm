@@ -81,13 +81,39 @@ const BestGames = ({
 					{games.length === 0 ? (
 						<p>No finished games with box scores yet.</p>
 					) : (
-						<ol className="ps-4" data-testid="best-games">
+						<ol
+							className="ps-4"
+							data-testid="best-games"
+							data-csv-table=""
+							data-csv-name="Best games"
+							data-csv-cols={JSON.stringify([
+								"Season",
+								"Game",
+								"When",
+								"Rating",
+								"Label",
+							])}
+						>
 							{games.map((h) => {
 								const [home, away] = h.teams;
 								const user =
 									userTids.includes(home!.tid) || userTids.includes(away!.tid);
 								return (
-									<li key={h.gid} className="mb-3">
+									<li
+										key={h.gid}
+										className="mb-3"
+										data-csv-row={JSON.stringify([
+											h.season,
+											`${away!.abbrev} ${away!.pts}, ${home!.abbrev} ${home!.pts}`,
+											h.kind === "po"
+												? `Playoffs${h.series ? `, ${h.series}` : ""}`
+												: h.kind === "pi"
+													? "Play-in"
+													: `Day ${h.day}`,
+											h.rating,
+											h.post?.label ?? h.label,
+										])}
+									>
 										<div className="d-flex flex-wrap align-items-baseline gap-2">
 											<a
 												href={gameUrl(h)}
@@ -124,11 +150,26 @@ const BestGames = ({
 					{plays.length === 0 ? (
 						<p>No highlight plays yet.</p>
 					) : (
-						<ol className="ps-4" data-testid="top-plays">
+						<ol
+							className="ps-4"
+							data-testid="top-plays"
+							data-csv-table=""
+							data-csv-name="Top plays"
+							data-csv-cols={JSON.stringify(["Play", "Tags", "Text", "Game"])}
+						>
 							{plays.map((p, i) => {
 								const url = playUrl(p);
 								return (
-									<li key={i} className="mb-2">
+									<li
+										key={i}
+										className="mb-2"
+										data-csv-row={JSON.stringify([
+											p.label,
+											p.tags.join("; "),
+											p.text,
+											matchup(p),
+										])}
+									>
 										<span
 											className={`badge ${PLAY_BADGE[p.kind] ?? "text-bg-secondary"} me-1`}
 										>

@@ -19,6 +19,7 @@ const Controls = ({
 	name,
 	onBulkSelectRows,
 	onExportCSV,
+	onDownloadPlayers,
 	onResetTable,
 	onSearch,
 	onSelectColumns,
@@ -33,6 +34,7 @@ const Controls = ({
 	name: string;
 	onBulkSelectRows: () => void;
 	onExportCSV: () => void;
+	onDownloadPlayers?: () => void;
 	onResetTable: () => void;
 	onSearch: (a: SyntheticEvent<HTMLInputElement>) => void;
 	onSelectColumns: () => void;
@@ -153,6 +155,11 @@ const Controls = ({
 					<Dropdown.Item onClick={onExportCSV}>
 						Download spreadsheet
 					</Dropdown.Item>
+					{metadataType === "player" && onDownloadPlayers ? (
+						<Dropdown.Item onClick={onDownloadPlayers}>
+							Download players (PDF/JSON/CSV)
+						</Dropdown.Item>
+					) : null}
 					<Dropdown.Item onClick={onResetTable}>Reset table</Dropdown.Item>
 				</Dropdown.Menu>
 			</Dropdown>

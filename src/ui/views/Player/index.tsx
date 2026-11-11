@@ -1,4 +1,5 @@
 import { DataTable } from "../../components/DataTable/index.tsx";
+import { DownloadPlayerButton } from "../../components/DownloadPlayers.tsx";
 import Injuries from "./Injuries.tsx";
 import InjuryHealth from "./InjuryHealth.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
@@ -125,6 +126,8 @@ const Player2 = ({
 				teamURL={teamURL}
 				willingToSign={willingToSign}
 			/>
+
+			<DownloadPlayerButton name={player.name} pid={player.pid} />
 
 			{!retired ? <ContractMood pid={player.pid} refreshKey={player} /> : null}
 
