@@ -95,6 +95,12 @@ export type PlayerRatings = {
 	wng?: number;
 	pdef?: number;
 	idef?: number;
+	// Second step: offensive/defensive rebounding, catch-and-shoot/off-the-dribble shooting, ball security
+	oreb?: number;
+	dreb?: number;
+	csh?: number;
+	dsh?: number;
+	bsc?: number;
 };
 
 export type RatingKey =

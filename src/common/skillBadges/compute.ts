@@ -16,7 +16,11 @@ import {
 	type SkillBadgeDef,
 	type SkillComboDef,
 } from "./definitions.ts";
-import { compositeWeightsFor } from "../expandedRatings.ts";
+import {
+	compositeWeightsFor,
+	EXPANDED_RATINGS2,
+	type ExpandedRatingKey,
+} from "../expandedRatings.ts";
 
 export const BADGE_RATING_KEYS: BadgeRatingKey[] = [
 	"hgt",
@@ -37,11 +41,12 @@ export const BADGE_RATING_KEYS: BadgeRatingKey[] = [
 ];
 
 const bound = (x: number) => Math.min(1, Math.max(0, x));
+const bound100 = (x: number) => Math.min(100, Math.max(0, x));
 
 // Part of the memo keys: the expanded ratings, if any
 const expandedKey = (ratings: BadgeRatings) =>
 	typeof ratings.wng === "number"
-		? `${Math.round(ratings.wng)},${Math.round(ratings.pdef ?? 0)},${Math.round(ratings.idef ?? 0)}|`
+		? `${Math.round(ratings.wng)},${Math.round(ratings.pdef ?? 0)},${Math.round(ratings.idef ?? 0)},${ratings.oreb ?? ""},${ratings.dreb ?? ""},${ratings.csh ?? ""},${ratings.dsh ?? ""},${ratings.bsc ?? ""}|`
 		: "";
 
 // Same maths as worker compositeRating (without fuzz), but free of worker imports so the sim, worker and UI can all use it.
@@ -58,6 +63,8 @@ export const badgeComposite = (
 		xr && typeof ratings.wng === "number" && typeof ratings.pdef === "number"
 			? xr
 			: undefined;
+	// Second step ratings, when the ratings have them
+	const sub2 = sub && typeof ratings.oreb === "number" ? sub : undefined;
 	let numerator = 0;
 	let denominator = 0;
 	for (const [i, component] of components.entries()) {
@@ -67,6 +74,16 @@ export const badgeComposite = (
 				factor = ratings[sub.diq]!;
 			} else if (component === "hgt" && sub.wng) {
 				factor = (1 - sub.wng) * ratings.hgt + sub.wng * ratings.wng!;
+			}
+		}
+		if (sub2) {
+			if (component === "reb" && sub2.reb) {
+				factor = ratings[sub2.reb]!;
+			} else if ((component === "tp" || component === "fg") && sub2.shot) {
+				const gap = (ratings.csh! - ratings.dsh!) / 2;
+				factor = bound100(factor + (sub2.shot === "csh" ? gap : -gap));
+			} else if (component === "drb" && sub2.bsc) {
+				factor = (1 - sub2.bsc) * ratings.drb + sub2.bsc * ratings.bsc!;
 			}
 		}
 		const weight = weights[i] ?? 1;
@@ -186,7 +203,7 @@ export const clearSkillBadgeCache = () => {
 
 // Pass expanded ratings only when the setting is on (they're ignored otherwise only if absent)
 export const pickBadgeRatings = (
-	row: Partial<Record<BadgeRatingKey | "wng" | "pdef" | "idef", number>>,
+	row: Partial<Record<BadgeRatingKey | ExpandedRatingKey, number>>,
 ): BadgeRatings | undefined => {
 	const out: any = {};
 	for (const k of BADGE_RATING_KEYS) {
@@ -204,6 +221,11 @@ export const pickBadgeRatings = (
 		out.wng = row.wng;
 		out.pdef = row.pdef;
 		out.idef = row.idef;
+		for (const key of EXPANDED_RATINGS2) {
+			if (typeof row[key] === "number") {
+				out[key] = row[key];
+			}
+		}
 	}
 	return out;
 };

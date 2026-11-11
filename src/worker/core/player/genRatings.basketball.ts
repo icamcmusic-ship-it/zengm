@@ -9,12 +9,41 @@ import type {
 import { heightDist, randInt, realGauss } from "../../../common/random.ts";
 import { assertDefined } from "../../../common/utils.ts";
 import {
+	BALL_SECURITY_NOISE,
+	ballSecurityBase,
 	blendDiq,
 	defenseSplitBase,
 	DEFENSE_SPLIT_NOISE,
+	REBOUND_SPLIT_NOISE,
+	reboundSplitBase,
+	SHOOTING_SPLIT_NOISE,
+	shootingSplitBase,
 	WINGSPAN_NOISE,
 } from "../../../common/expandedRatings.ts";
-import { expandedRatingsOn, setDefenseSplit } from "./expandedRatings.ts";
+import {
+	expandedRatingsOn,
+	setDefenseSplit,
+	setReboundSplit,
+	setShootingSplit,
+} from "./expandedRatings.ts";
+
+// Expanded ratings (second step): how much more offensive than defensive rebounding, and catch-and-shoot than off-the-dribble
+// shooting, each player type has
+const typeReboundSplit: Record<"point" | "wing" | "big", number> = {
+	point: -1,
+	wing: 0,
+	big: 1.5,
+};
+const typeShootingSplit: Record<"point" | "wing" | "big", number> = {
+	point: -2,
+	wing: 0.5,
+	big: 1,
+};
+
+// The split bases are centered on league averages; a prospect's raw ratings (low IQ, handle and speed) would lean him to the offensive
+// glass and to catch-and-shoot, so a class is moved back to an even split on average
+const PROSPECT_REBOUND_OFFSET = -2.1;
+const PROSPECT_SHOOTING_OFFSET = -2.7;
 
 // Expanded ratings: how much more perimeter than interior defense each player type has, on top of what his speed and size say
 const typeDefenseSplit: Record<"point" | "wing" | "big", number> = {
@@ -191,6 +220,31 @@ const genRatings = (
 				realGauss(0, DEFENSE_SPLIT_NOISE));
 		setDefenseSplit(ratings, split);
 		ratings.diq = blendDiq(ratings.pdef!, ratings.idef!);
+
+		// Second step: reb stays the average of oreb and dreb, fg + tp stays csh + dsh
+		setReboundSplit(
+			ratings,
+			2 *
+				Math.round(
+					reboundSplitBase(ratings) +
+						typeReboundSplit[type] +
+						PROSPECT_REBOUND_OFFSET +
+						realGauss(0, REBOUND_SPLIT_NOISE),
+				),
+		);
+		setShootingSplit(
+			ratings,
+			2 *
+				Math.round(
+					shootingSplitBase(ratings) +
+						typeShootingSplit[type] +
+						PROSPECT_SHOOTING_OFFSET +
+						realGauss(0, SHOOTING_SPLIT_NOISE),
+				),
+		);
+		ratings.bsc = limitRating(
+			Math.round(realGauss(ballSecurityBase(ratings), BALL_SECURITY_NOISE)),
+		);
 	}
 
 	return {

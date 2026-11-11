@@ -164,6 +164,7 @@ export const summarizeTotals = (t: Totals) => {
 		fta: pg(t.fta),
 		trb: pg(t.orb + t.drb),
 		orb: pg(t.orb),
+		drb: pg(t.drb),
 		ast: pg(t.ast),
 		tov: pg(t.tov),
 		stl: pg(t.stl),

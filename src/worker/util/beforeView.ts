@@ -13,7 +13,10 @@ import type { Conditions, League } from "../../common/types.ts";
 import {
 	ERROR_MESSAGE_ONE_TAB,
 	ERROR_MESSSAGE_LEAGUE_NOT_FOUND,
+	PLAYER,
 } from "../../common/constants.ts";
+import { hasExpandedRatings } from "../../common/expandedRatings.ts";
+import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
 import { env } from "./env.ts";
 import { initUILocalGames } from "./initUILocalGames.ts";
 
@@ -194,6 +197,28 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 	}
 	if (loadingNewLid !== newLid) {
 		return;
+	}
+
+	// Expanded ratings: a league that had the setting on before its second step (offensive/defensive rebounding, catch-and-shoot/
+	// off-the-dribble, ball security) existed gets them derived now, like turning the setting on
+	if (__SPORT === "basketball" && g.get("expandedRatings") === true) {
+		try {
+			const players = await idb.cache.players.getAll();
+			if (
+				players.some(
+					(p) =>
+						p.tid !== PLAYER.RETIRED && !hasExpandedRatings(p.ratings.at(-1)!),
+				)
+			) {
+				await updateExpandedRatingsForLeague();
+				await idb.cache.flush();
+			}
+		} catch (error) {
+			console.error(error);
+		}
+		if (loadingNewLid !== newLid) {
+			return;
+		}
 	}
 
 	// If this is a Shared Worker, only one league can be open at a time

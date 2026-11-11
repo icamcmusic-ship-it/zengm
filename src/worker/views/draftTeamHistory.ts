@@ -128,7 +128,7 @@ export default defineView({
 				currentOvr: p.tid !== PLAYER.RETIRED ? currentPr.ovr : null,
 				currentPot: p.tid !== PLAYER.RETIRED ? currentPr.pot : null,
 				currentSkills: p.tid !== PLAYER.RETIRED ? currentPr.skills : [],
-				currentBadges: p.tid !== PLAYER.RETIRED ? currentPr.badges : undefined,
+				currentBadges: p.tid !== PLAYER.RETIRED ? currentPr.badges : [],
 				pos: currentPr.pos,
 
 				peakAge: peakPr.season - p.born.year,

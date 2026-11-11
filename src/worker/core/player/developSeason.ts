@@ -12,6 +12,7 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import {
 	developExpandedRatings,
 	expandedRatingsApply,
+	recordBeforeDevelop,
 } from "./expandedRatings.ts";
 import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 
@@ -78,6 +79,9 @@ export const developSeasonSync = (
 	const expanded =
 		__SPORT === "basketball" && expandedRatingsApply(ratings as any);
 	const hgtBefore = ratings.hgt;
+	if (expanded) {
+		recordBeforeDevelop(ratings as any);
+	}
 
 	bySport({
 		baseball: developSeasonBaseball(ratings as any, age, coachingLevel),

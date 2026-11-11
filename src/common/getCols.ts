@@ -918,6 +918,36 @@ const sportSpecificCols = bySport<{
 			sortType: "number",
 			title: "IDf",
 		},
+		"rating:oreb": {
+			desc: "Offensive Rebounding",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "ORb",
+		},
+		"rating:dreb": {
+			desc: "Defensive Rebounding",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "DRb",
+		},
+		"rating:csh": {
+			desc: "Catch-and-Shoot",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "C&S",
+		},
+		"rating:dsh": {
+			desc: "Off-the-Dribble Shooting",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "OTD",
+		},
+		"rating:bsc": {
+			desc: "Ball Security",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+			title: "BSc",
+		},
 		"stat:2pp": {
 			desc: "Two Point Percentage",
 			sortSequence: ["desc", "asc"],

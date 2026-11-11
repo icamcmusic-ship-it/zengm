@@ -256,7 +256,7 @@ import {
 	ensureExpandedRatings,
 	expandedRatingsOn,
 	ratingsKeysForView,
-	syncDefenseToDiq,
+	syncExpandedToCompat,
 } from "../core/player/expandedRatings.ts";
 
 const acceptContractNegotiation = async ({
@@ -5584,7 +5584,7 @@ const upsertCustomizedPlayer = async (
 	// changed some other way (Regenerate build) moves both.
 	if (__SPORT === "basketball" && expandedRatingsOn()) {
 		ensureExpandedRatings(p);
-		syncDefenseToDiq(last(p.ratings));
+		syncExpandedToCompat(last(p.ratings));
 	}
 
 	// Fix draft and ratings season

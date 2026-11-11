@@ -1,4 +1,4 @@
-import { DIMS, skillsOf } from "./composites.ts";
+import { DIMS, skillsOf, STYLE_DIMS } from "./composites.ts";
 import { zVector } from "./norms.ts";
 import type {
 	Archetype,
@@ -52,7 +52,7 @@ export const NEED_W = 2;
 export const NEED_K = 4;
 export const NEED_STEP = 0.1;
 // Dimensions whose weight describes a style or his body, not a skill, so they are never gates
-const NOT_A_SKILL = new Set<DimKey>(["usg", "end", "hgt", "len"]);
+const NOT_A_SKILL = new Set<DimKey>(["usg", "end", "hgt", "len", "cs", "orl"]);
 
 export type Prepared = {
 	z: Record<DimKey, number>;
@@ -148,17 +148,17 @@ export const needShortfall = (a: Archetype, p: Prepared, strict = false) => {
 		}
 	}
 	for (const [dim, floor] of need) {
-		if (dim === "len") {
-			// Length is a measurement (no slack for a prospect), and only known with expanded ratings
+		if (STYLE_DIMS.has(dim)) {
+			// Length is a measurement (no slack for a prospect), and only known with expanded ratings (so are the styles)
 			if (p.expanded) {
-				short += Math.max(0, floor - p.abs.len);
+				short += Math.max(0, floor - p.abs[dim]);
 			}
 			continue;
 		}
 		short += Math.max(0, floor - slack - p.abs[dim]);
 	}
 	for (const [dim, ceiling] of cap) {
-		if (dim !== "len" || p.expanded) {
+		if (!STYLE_DIMS.has(dim) || p.expanded) {
 			short += Math.max(0, p.abs[dim] - ceiling);
 		}
 	}
@@ -199,12 +199,12 @@ const buildMatchTerms = (a: Archetype, expanded: boolean): MatchTerms => {
 				dim === "hgt" ||
 				dim === "pdef" ||
 				dim === "idef" ||
-				dim === "len" ||
+				STYLE_DIMS.has(dim) ||
 				(dim === "diq" && sided)
 			) {
 				continue;
 			}
-		} else if (dim === "len" && !expanded) {
+		} else if (STYLE_DIMS.has(dim) && !expanded) {
 			// Length is only known with expanded ratings
 			continue;
 		}

@@ -28,7 +28,10 @@ import { TOO_MANY_TEAMS_TOO_SLOW } from "../season/getInitialNumGamesConfDivSett
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
-import { ensureExpandedRatings, syncDefenseToDiq } from "./expandedRatings.ts";
+import {
+	ensureExpandedRatings,
+	syncExpandedToCompat,
+} from "./expandedRatings.ts";
 
 // ovrs and pots only exist in sports with position-specific ratings, and there they have a value for every position
 const getRatingByPos = (
@@ -198,7 +201,7 @@ const develop = async (
 			new Rng(mentor.seed).random(),
 			MENTOR_RATING_KEYS,
 		);
-		syncDefenseToDiq(ratings as any);
+		syncExpandedToCompat(ratings as any);
 	}
 
 	// years===0 condition is so editing locked player in God Mode will update ovr and pot

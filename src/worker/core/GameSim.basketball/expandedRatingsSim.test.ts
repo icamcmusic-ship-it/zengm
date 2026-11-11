@@ -10,6 +10,7 @@ import {
 	type Totals,
 } from "./expandedRatingsMetrics.ts";
 import { idb } from "../../db/index.ts";
+import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 
 /*
  * Expanded ratings (the expandedRatings setting) in the game sim: league averages stay about the same with the setting on, the new ratings
@@ -73,7 +74,7 @@ test.skipIf(!env.EXPANDED_METRICS)(
 );
 
 test("league averages stay about the same with the setting on", async () => {
-	const numGames = 300;
+	const numGames = 600;
 	const a = summarizeTotals(
 		await simExpandedGames({ expanded: false, numGames, seed: 3 }),
 	);
@@ -117,9 +118,9 @@ const simOne = async (
 		if (strip) {
 			for (const p of await idb.cache.players.getAll()) {
 				for (const r of p.ratings as any[]) {
-					delete r.wng;
-					delete r.pdef;
-					delete r.idef;
+					for (const key of EXPANDED_RATINGS) {
+						delete r[key];
+					}
 				}
 			}
 		}

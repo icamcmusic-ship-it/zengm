@@ -7,6 +7,7 @@ import { range } from "../../../common/utils.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import {
 	blendDiq,
+	blendReb,
 	deriveExpandedRatings,
 	fillExpandedRatings,
 	hasExpandedRatings,
@@ -80,7 +81,7 @@ describe("derivation", () => {
 	test("table keys", () => {
 		assert.deepStrictEqual(
 			insertExpandedRatingKeys(["hgt", "stre", "diq", "drb"]),
-			["hgt", "wng", "stre", "diq", "pdef", "idef", "drb"],
+			["hgt", "wng", "stre", "diq", "pdef", "idef", "drb", "bsc"],
 		);
 	});
 });
@@ -250,5 +251,135 @@ describe("skill badges", () => {
 		assert.isFalse(stock.includes("Bk") && !longRimProtector.includes("Bk"));
 		assert.isTrue(longRimProtector.includes("Bk"));
 		assert.isFalse(shortLeaper.includes("Bk"));
+	});
+});
+
+describe("second step: rebounding, shooting, ball security", () => {
+	const compatOk = (r: any) => {
+		assert.strictEqual(blendReb(r.oreb, r.dreb), r.reb);
+		assert.strictEqual(r.csh + r.dsh, r.fg + r.tp);
+	};
+
+	test("derivation keeps reb the average of oreb/dreb and fg + tp = csh + dsh, and fills rows from before the second step", () => {
+		const r = {
+			hgt: 40,
+			stre: 45,
+			spd: 70,
+			jmp: 60,
+			reb: 41,
+			diq: 50,
+			drb: 75,
+			pss: 65,
+			oiq: 60,
+			fg: 55,
+			tp: 62,
+		};
+		const a = deriveExpandedRatings(r, "xr|9");
+		compatOk({ ...r, ...a });
+		// A fast ball handler leans off the dribble
+		assert.isBelow(a.csh, a.dsh + 6);
+
+		// A row with only the first step's ratings: those are kept
+		const row: any = { ...r, wng: 33, pdef: 55, idef: 45 };
+		assert.isFalse(hasExpandedRatings(row));
+		assert.isTrue(fillExpandedRatings({ pid: 9, ratings: [row] }));
+		assert.isTrue(hasExpandedRatings(row));
+		assert.strictEqual(row.wng, 33);
+		assert.strictEqual(row.pdef, 55);
+		compatOk(row);
+	});
+
+	test("generation and development keep the compat values in sync, league ovr unchanged", async () => {
+		await withSeed(12, async () => {
+			const ovrs: Record<string, number[]> = { off: [], on: [] };
+			for (const expanded of [false, true]) {
+				await setup(expanded);
+				for (const _i of range(300)) {
+					const p = player.generate(0, 21, 2020, true, DEFAULT_LEVEL);
+					await player.develop(p, 0, false, DEFAULT_LEVEL, true);
+					const r = p.ratings[0] as any;
+					if (expanded) {
+						compatOk(r);
+						for (let year = 0; year < 6; year++) {
+							r.season += 1;
+							await player.develop(p, 1, false, DEFAULT_LEVEL, true);
+							compatOk(r);
+						}
+					} else {
+						for (let year = 0; year < 6; year++) {
+							r.season += 1;
+							await player.develop(p, 1, false, DEFAULT_LEVEL, true);
+						}
+					}
+					ovrs[expanded ? "on" : "off"]!.push(r.ovr);
+				}
+			}
+			assert.approximately(mean(ovrs.on!), mean(ovrs.off!), 1.2);
+		});
+	});
+
+	test("turning it off and on again: the splits follow reb and fg/tp", async () => {
+		await withSeed(7, async () => {
+			await setup(true);
+			const players = range(20).map((i) => {
+				const p: any = player.generate(i % 2, 25, 2018, true, DEFAULT_LEVEL);
+				p.pid = i;
+				return p;
+			});
+			for (const p of players) {
+				await player.develop(p, 0);
+			}
+			await resetCache({ players });
+			g.setWithoutSavingToDB("expandedRatings", false);
+			await updateExpandedRatingsForLeague();
+			const splits = new Map<number, [number, number]>();
+			for (const p of await idb.cache.players.getAll()) {
+				const r = p.ratings.at(-1) as any;
+				splits.set(p.pid, [r.oreb - r.dreb, r.csh - r.dsh]);
+				r.reb = Math.min(90, r.reb + 9);
+				r.tp = Math.min(90, r.tp + 7);
+			}
+			g.setWithoutSavingToDB("expandedRatings", true);
+			await updateExpandedRatingsForLeague();
+			for (const p of await idb.cache.players.getAll()) {
+				const r = p.ratings.at(-1) as any;
+				compatOk(r);
+				const [reb, shot] = splits.get(p.pid)!;
+				assert.isAtMost(Math.abs(r.oreb - r.dreb - reb), 1);
+				assert.isAtMost(Math.abs(r.csh - r.dsh - shot), 1);
+			}
+		});
+	});
+
+	test("badges: catch-and-shoot vs off-dribble shooter, offensive vs defensive rebounder", () => {
+		const base: any = {
+			hgt: 45,
+			stre: 50,
+			spd: 55,
+			jmp: 55,
+			endu: 50,
+			ins: 40,
+			dnk: 45,
+			ft: 70,
+			fg: 62,
+			tp: 64,
+			oiq: 62,
+			diq: 45,
+			drb: 66,
+			pss: 50,
+			reb: 45,
+			wng: 45,
+			pdef: 45,
+			idef: 45,
+			oreb: 45,
+			dreb: 45,
+			bsc: 55,
+		};
+		const spotUp = getSkillBadges({ ...base, csh: 78, dsh: 48 });
+		const creator = getSkillBadges({ ...base, csh: 48, dsh: 78 });
+		assert.include(spotUp, "Cs");
+		assert.notInclude(creator, "Cs");
+		assert.include(creator, "Pu");
+		assert.notInclude(spotUp, "Pu");
 	});
 });

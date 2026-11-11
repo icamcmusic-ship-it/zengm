@@ -1,5 +1,11 @@
 import { ARCHETYPE_DEFS } from "./defs.data.ts";
-import { DIM_LABELS, DIM_RATINGS, DIMS, hasExpanded } from "./composites.ts";
+import {
+	DIM_LABELS,
+	DIM_RATINGS,
+	DIMS,
+	hasExpanded,
+	STYLE_DIMS,
+} from "./composites.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import { DEFAULT_NORMS_EXPANDED } from "./normsExpanded.data.ts";
 import { matchZ } from "./match.ts";
@@ -223,7 +229,11 @@ const whyOf = (
 	for (const dim of DIMS) {
 		const w = weights[dim];
 		// (length reads exactly 0 for a player without a wingspan)
-		if (w === undefined || dim === "hgt" || (dim === "len" && z.len === 0)) {
+		if (
+			w === undefined ||
+			dim === "hgt" ||
+			(STYLE_DIMS.has(dim) && z[dim] === 0)
+		) {
 			continue;
 		}
 		// Contribution: how much of the wanted direction he actually has

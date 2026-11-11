@@ -26,6 +26,12 @@ export type Ratings = Record<RatingKey, number> & {
 	wng?: number;
 	pdef?: number;
 	idef?: number;
+	// Second step: offensive/defensive rebounding (the ORB/DRB split), catch-and-shoot/off-the-dribble (3PA share), ball security (TOV)
+	oreb?: number;
+	dreb?: number;
+	csh?: number;
+	dsh?: number;
+	bsc?: number;
 };
 
 // What the engine needs to know about a prospect. Nothing here is changed by generation.

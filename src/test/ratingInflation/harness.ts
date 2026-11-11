@@ -155,6 +155,7 @@ export const summarize = async (
 	let trb = 0;
 	let orb = 0;
 	let tov = 0;
+	let ast = 0;
 	let fta = 0;
 	let pf = 0;
 	let fgAtRim = 0;
@@ -165,6 +166,7 @@ export const summarize = async (
 		trb += ts.orb + ts.drb;
 		orb += ts.orb;
 		tov += ts.tov;
+		ast += ts.ast;
 		fta += ts.fta;
 		pf += ts.pf;
 		fgAtRim += ts.fgAtRim;
@@ -254,6 +256,7 @@ export const summarize = async (
 		trbPerGame: gp > 0 ? r2(trb / gp) : Number.NaN,
 		orbPerGame: gp > 0 ? r2(orb / gp) : Number.NaN,
 		tovPerGame: gp > 0 ? r2(tov / gp) : Number.NaN,
+		astPerGame: gp > 0 ? r2(ast / gp) : Number.NaN,
 		ftaPerGame: gp > 0 ? r2(fta / gp) : Number.NaN,
 		pfPerGame: gp > 0 ? r2(pf / gp) : Number.NaN,
 		fgAtRimPct: fgaAtRim > 0 ? r2((100 * fgAtRim) / fgaAtRim) : Number.NaN,

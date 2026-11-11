@@ -30,6 +30,9 @@ export const RatingsOverview = ({
 	const expanded =
 		typeof currentSeason.wng === "number" &&
 		typeof currentSeason.pdef === "number";
+	// Second step: catch-and-shoot/off-the-dribble after the jump shooting ratings, ball security after dribbling, and offensive/defensive
+	// rebounding in place of rebounding (their average)
+	const expanded2 = expanded && typeof currentSeason.oreb === "number";
 
 	const columns = bySport<
 		Record<
@@ -178,6 +181,30 @@ export const RatingsOverview = ({
 						),
 						rating: "tp",
 					},
+					...(expanded2
+						? [
+								{
+									label: (
+										<>
+											<span className="d-md-none">C&amp;S</span>
+											<span className="d-none d-md-inline">
+												Catch &amp; Shoot
+											</span>
+										</>
+									),
+									rating: "csh",
+								},
+								{
+									label: (
+										<>
+											<span className="d-md-none">Off Drb</span>
+											<span className="d-none d-md-inline">Off Dribble</span>
+										</>
+									),
+									rating: "dsh",
+								},
+							]
+						: []),
 				],
 			},
 			{
@@ -227,19 +254,55 @@ export const RatingsOverview = ({
 						label: "Dribbling",
 						rating: "drb",
 					},
+					...(expanded2
+						? [
+								{
+									label: (
+										<>
+											<span className="d-md-none">Ball Sec</span>
+											<span className="d-none d-md-inline">Ball Security</span>
+										</>
+									),
+									rating: "bsc",
+								},
+							]
+						: []),
 					{
 						label: "Passing",
 						rating: "pss",
 					},
-					{
-						label: (
-							<>
-								<span className="d-md-none">Reb</span>
-								<span className="d-none d-md-inline">Rebounding</span>
-							</>
-						),
-						rating: "reb",
-					},
+					...(expanded2
+						? [
+								{
+									label: (
+										<>
+											<span className="d-md-none">O Reb</span>
+											<span className="d-none d-md-inline">Off Rebounding</span>
+										</>
+									),
+									rating: "oreb",
+								},
+								{
+									label: (
+										<>
+											<span className="d-md-none">D Reb</span>
+											<span className="d-none d-md-inline">Def Rebounding</span>
+										</>
+									),
+									rating: "dreb",
+								},
+							]
+						: [
+								{
+									label: (
+										<>
+											<span className="d-md-none">Reb</span>
+											<span className="d-none d-md-inline">Rebounding</span>
+										</>
+									),
+									rating: "reb",
+								},
+							]),
 				],
 			},
 		],

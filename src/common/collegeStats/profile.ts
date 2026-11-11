@@ -167,12 +167,15 @@ export const resolveClassRanks = (entries: RankEntry[]) => {
 		output.set(e.id, { nationalRank: rank, posRank: undefined });
 	}
 
-	// Position ranks, best national rank first within each priority
+	// Position ranks, best national rank first within each priority. Plain ranks (priority 1: prospects from before the career model, who
+	// were there before any stored ranking was set) go first: a stored ranking was fit around them when it was set, and is used as stored,
+	// so it must not move them now (it did, when stored ranks went first: an old prospect's position rank changed when a newer class got
+	// its careers)
 	const posTaken = new Map<string, Map<number, number>>();
 	const byNational = (a: RankEntry, b: RankEntry) =>
 		output.get(a.id)!.nationalRank! - output.get(b.id)!.nationalRank! ||
 		a.id - b.id;
-	for (const priority of [0, 1, 2]) {
+	for (const priority of [1, 0, 2]) {
 		for (const e of ordered
 			.filter((x) => x.priority === priority)
 			.sort(byNational)) {

@@ -1,4 +1,5 @@
 import type { LeagueEnv } from "./overseas.ts";
+import { ballSecurityBase } from "../expandedRatings.ts";
 import { COMPOSITE_WEIGHTS } from "../constants.basketball.ts";
 import { calculateAdvanced } from "./advanced.ts";
 import { clamp, type Rng } from "./rng.ts";
@@ -372,7 +373,11 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const tovComp = composite(ratings, "turnovers");
 	const tovRate = clamp(
 		byHeight("tov", b) * (1 - 0.012 * (c - 1.5)) +
-			0.1 * (tovComp - 0.44) +
+			0.1 * (tovComp - 0.44) -
+			// Expanded ratings: ball security beyond what his handle and IQ say
+			(ratings.bsc === undefined
+				? 0
+				: 0.002 * (ratings.bsc - ballSecurityBase(ratings))) +
 			rng.normal(0, 0.014 * noise),
 		0.08,
 		0.27,
@@ -393,7 +398,11 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const share3 = clamp(
 		byHeight("share3", b) *
 			clamp(0.5 + 0.5 * (ratings.tp / 38), 0.1, 1.6) *
-			willing +
+			willing *
+			// Expanded ratings: spot-up shooters take more of their shots from three, shot creators more pull-up twos
+			(ratings.csh === undefined || ratings.dsh === undefined
+				? 1
+				: clamp(1 + 0.012 * (ratings.csh - ratings.dsh), 0.7, 1.3)) +
 			rng.normal(0, 0.025 * noise),
 		0,
 		0.6,
@@ -468,7 +477,15 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		2.4,
 		17,
 	);
-	const orbShare = 0.17 + 0.13 * b;
+	const orbShare =
+		ratings.oreb === undefined || ratings.dreb === undefined
+			? 0.17 + 0.13 * b
+			: // Expanded ratings: offensive vs defensive rebounding moves the split
+				clamp(
+					0.17 + 0.13 * b + 0.006 * (ratings.oreb - ratings.dreb),
+					0.05,
+					0.5,
+				);
 	const orb40 = trb40 * orbShare;
 	const drb40 = trb40 - orb40;
 	const ast40 = clamp(

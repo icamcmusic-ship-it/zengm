@@ -1,4 +1,9 @@
-import { DIMS, compositeValues, hasExpanded } from "./composites.ts";
+import {
+	DIMS,
+	STYLE_DIMS,
+	compositeValues,
+	hasExpanded,
+} from "./composites.ts";
 import type { ArchetypeRatings, DimKey, Norms } from "./types.ts";
 
 // The dimensions whose mean is "how good is he, period", used to read shape instead of level
@@ -149,7 +154,7 @@ export const buildBaseNorms = (
 	const beta = {} as Norms["beta"];
 	for (const dim of DIMS) {
 		// Length is a body measurement like height: read as is
-		if (dim === "hgt" || dim === "len") {
+		if (dim === "hgt" || STYLE_DIMS.has(dim)) {
 			beta[dim] = 0;
 			continue;
 		}
@@ -189,7 +194,7 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 			(dim === "pdef" || dim === "idef") && (!expanded || !norms.q[dim])
 				? "diq"
 				: dim;
-		if (dim === "len" && (!expanded || !norms.q.len)) {
+		if (STYLE_DIMS.has(dim) && (!expanded || !norms.q[dim])) {
 			abs[dim] = 0;
 			z[dim] = 0;
 			sz[dim] = 0;
@@ -197,7 +202,7 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 		}
 		const raw = rawZ(norms.q[src], v[src]);
 		abs[dim] = raw;
-		if (dim === "hgt" || dim === "len") {
+		if (dim === "hgt" || STYLE_DIMS.has(dim)) {
 			z[dim] = raw;
 			sz[dim] = raw;
 			continue;
@@ -225,7 +230,7 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 	}
 	level /= CORE_DIMS.length;
 	for (const dim of DIMS) {
-		if (dim !== "hgt" && dim !== "len") {
+		if (dim !== "hgt" && !STYLE_DIMS.has(dim)) {
 			z[dim] = clampZ(z[dim] - LEVEL_SHARE * level);
 		}
 	}

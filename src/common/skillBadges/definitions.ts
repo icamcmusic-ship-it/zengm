@@ -24,6 +24,11 @@ export type BadgeRatings = Record<BadgeRatingKey, number> & {
 	wng?: number;
 	pdef?: number;
 	idef?: number;
+	oreb?: number;
+	dreb?: number;
+	csh?: number;
+	dsh?: number;
+	bsc?: number;
 };
 
 export type BadgeGroup =
@@ -48,6 +53,11 @@ export type BadgeExpandedSub = {
 	diq?: "pdef" | "idef";
 	// Share of height's weight given to wingspan
 	wng?: number;
+	// Second step: rebounding reads offensive or defensive rebounding; jump shooting (tp and fg) reads the catch-and-shoot or
+	// off-the-dribble version (fg/tp plus or minus half the csh - dsh gap); dribbling reads part ball security
+	reb?: "oreb" | "dreb";
+	shot?: "csh" | "dsh";
+	bsc?: number;
 };
 
 export type BadgeCondition = BadgeComposite & {
@@ -1094,9 +1104,15 @@ export const EXPANDED_BADGE_SUBS: Record<string, BadgeExpandedSub> = {
 	// Shot blocker: interior defense and length
 	Bk: { diq: "idef", wng: 0.4 },
 	// Rebounders and finishers: length
-	Dr: { diq: "idef", wng: 0.3 },
-	Or: { wng: 0.3 },
+	Dr: { diq: "idef", wng: 0.3, reb: "dreb" },
+	Or: { wng: 0.3, reb: "oreb" },
 	Fn: { wng: 0.25 },
+	// Catch-and-shoot specialist vs off-dribble shooter
+	Cs: { shot: "csh" },
+	Pu: { shot: "dsh" },
+	// Ball security: takes care of the ball, keeps it under pressure
+	Sf: { bsc: 0.6 },
+	Hh: { bsc: 0.6 },
 };
 for (const def of SKILL_BADGES) {
 	const sub = EXPANDED_BADGE_SUBS[def.label];

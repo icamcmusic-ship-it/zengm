@@ -15,6 +15,7 @@ import {
 	type TraitViewContext,
 } from "../util/playerTraitsView.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
+import { EXPANDED_RATINGS } from "../../common/expandedRatings.ts";
 import { getClassShape } from "../core/draft/classShape.ts";
 
 const getSeason = async (
@@ -33,7 +34,8 @@ const getSeason = async (
 			"fuzz",
 			"pos",
 			// Expanded ratings (setting on): wingspan (exact, a measurement) and the two defense ratings (with scouting fuzz)
-			...(expandedRatingsOn() ? (["wng", "pdef", "idef"] as const) : []),
+			// and the second step ratings (with scouting fuzz)
+			...(expandedRatingsOn() ? EXPANDED_RATINGS : []),
 		],
 		showNoStats: true,
 		showRookies: true,
@@ -91,7 +93,9 @@ const getSeason = async (
 				badges: ratings.badges,
 				expanded:
 					typeof ratings.wng === "number"
-						? { wng: ratings.wng, pdef: ratings.pdef, idef: ratings.idef }
+						? Object.fromEntries(
+								EXPANDED_RATINGS.map((key) => [key, ratings[key]]),
+							)
 						: undefined,
 				rank: i + 1,
 			};

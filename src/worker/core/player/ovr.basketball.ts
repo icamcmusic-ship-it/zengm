@@ -3,12 +3,21 @@ import { expandedRatingsApply } from "./expandedRatings.ts";
 
 // Expanded ratings: a quarter of height's weight goes to wingspan (wng averages hgt, so the league's ovr distribution doesn't move).
 // diq is the average of perimeter and interior defense then, so its term covers them.
+// Second step: reb is the average of oreb/dreb and fg/tp are kept (csh + dsh = fg + tp), so their terms cover them; a fifth of
+// dribbling's weight goes to ball security (bsc averages about drb over a league).
 const WNG_SHARE = 0.25;
+const BSC_SHARE = 0.2;
 
-const ovr = (ratings: Record<RatingKey, number> & { wng?: number }): number => {
-	const hgt = expandedRatingsApply(ratings)
+const ovr = (
+	ratings: Record<RatingKey, number> & { wng?: number; bsc?: number },
+): number => {
+	const expanded = expandedRatingsApply(ratings);
+	const hgt = expanded
 		? (1 - WNG_SHARE) * ratings.hgt + WNG_SHARE * ratings.wng!
 		: ratings.hgt;
+	const drb = expanded
+		? (1 - BSC_SHARE) * ratings.drb + BSC_SHARE * ratings.bsc!
+		: ratings.drb;
 
 	// See analysis/player-ovr-basketball
 	const r =
@@ -23,7 +32,7 @@ const ovr = (ratings: Record<RatingKey, number> & { wng?: number }): number => {
 		0.0726 * (ratings.tp - 47.1) +
 		0.133 * (ratings.oiq - 46.8) +
 		0.159 * (ratings.diq - 46.7) +
-		0.059 * (ratings.drb - 54.8) +
+		0.059 * (drb - 54.8) +
 		0.062 * (ratings.pss - 51.3) +
 		0.01 * (ratings.fg - 47.0) +
 		0.01 * (ratings.reb - 51.4) +
