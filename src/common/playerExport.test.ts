@@ -9,8 +9,17 @@ import {
 	toCSV,
 	type PlayerExport,
 } from "./playerExport.ts";
+// @ts-expect-error node types are not in the web tsconfig, but tests run in node
+import { readFileSync } from "node:fs";
 import { MiniPdf, pdfSafeText } from "../ui/util/miniPdf.ts";
-import { playersToPdf } from "../ui/util/playersPdf.ts";
+import { playersToPdf, playersToPdfFiles } from "../ui/util/playersPdf.ts";
+import { parseTrueType, textToGlyphs } from "../ui/util/ttf.ts";
+import { crc32, makeZip } from "../ui/util/zip.ts";
+
+const loadFonts = () => ({
+	regular: parseTrueType(readFileSync("public/fonts/DejaVuSans-latin.ttf")),
+	bold: parseTrueType(readFileSync("public/fonts/DejaVuSans-Bold-latin.ttf")),
+});
 
 const makePlayer = (overrides: Partial<PlayerExport> = {}): PlayerExport => ({
 	pid: 1,
@@ -144,6 +153,8 @@ describe("PDF", () => {
 		const bytes = await playersToPdf(
 			[makePlayer(), makePlayer({ pid: 2, tables: [] })],
 			"Test",
+			undefined,
+			null,
 		);
 		const text = new TextDecoder("latin1").decode(bytes);
 		// Player 1: overview + 2 stats pages (80 rows), player 2: overview only
@@ -151,5 +162,73 @@ describe("PDF", () => {
 		assert.include(text, "page 3 of 3");
 		assert.include(text, "page 1 of 1");
 		assert.include(text, String.raw`Per Game \(continued\)`);
+	});
+});
+
+describe("Unicode PDF font", () => {
+	const NAMES =
+		"Dončić Šarić Žižić Şengün Yılmaz Doğan Łukasz Świątek Jonušas Kėdainis Þórsson Guðmundsson Nguyễn Thị Hằng";
+
+	test("every letter of these names has its own glyph", () => {
+		const { regular, bold } = loadFonts();
+		const question = regular.cmap.get(63);
+		for (const font of [regular, bold]) {
+			for (const { glyph, code } of textToGlyphs(font, NAMES)) {
+				assert.notStrictEqual(glyph, 0);
+				if (code !== 63) {
+					assert.notStrictEqual(glyph, question);
+				}
+			}
+			// Precomposed where the font has them, not stripped to the base letter
+			const codes = textToGlyphs(font, "ễ").map((g) => g.code);
+			assert.deepStrictEqual(codes, ["ễ".codePointAt(0)]);
+		}
+	});
+
+	test("embeds the font and maps glyphs back to Unicode", () => {
+		const pdf = new MiniPdf(loadFonts());
+		pdf.addPage().text(10, 10, NAMES, { bold: true });
+		pdf.text(10, 30, NAMES);
+		const text = new TextDecoder("latin1").decode(pdf.output());
+		assert.include(text, "/FontFile2");
+		assert.include(text, "/Identity-H");
+		// ToUnicode has č (U+010D), ı (U+0131), Ł (U+0141), Þ (U+00DE), ễ (U+1EC5)
+		for (const hex of ["010d", "0131", "0141", "00de", "1ec5"]) {
+			assert.include(text, `<${hex}>`);
+		}
+		assert.notInclude(text, "/Helvetica");
+	});
+
+	test("measures with the font's widths", () => {
+		const pdf = new MiniPdf(loadFonts());
+		assert.isAbove(pdf.measure("WWWW", 10), pdf.measure("iiii", 10) * 2);
+	});
+});
+
+describe("zip", () => {
+	test("crc32", () => {
+		assert.strictEqual(
+			crc32(new TextEncoder().encode("123456789")),
+			0xcbf43926,
+		);
+	});
+
+	test("one PDF per player, stored", async () => {
+		const files = await playersToPdfFiles(
+			[makePlayer(), makePlayer({ pid: 2, name: "Luka Dončić", tables: [] })],
+			"Test",
+			undefined,
+			loadFonts(),
+		);
+		const zip = makeZip(files);
+		const view = new DataView(zip.buffer);
+		assert.strictEqual(view.getUint32(0, true), 0x04034b50);
+		const end = zip.length - 22;
+		assert.strictEqual(view.getUint32(end, true), 0x06054b50);
+		assert.strictEqual(view.getUint16(end + 10, true), 2);
+		assert.deepStrictEqual(
+			files.map((f) => f.name),
+			["1_Jo_The_Rock_ONeil.pdf", "2_Luka_Dončić.pdf"],
+		);
 	});
 });

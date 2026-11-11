@@ -16,6 +16,9 @@ import {
 	type ExportTable,
 	type PlayerExport,
 } from "../../common/playerExport.ts";
+import { PLAYER_GAME_STATS } from "../../common/constants.ts";
+import getWinner from "../../common/getWinner.ts";
+import { processPlayerStats } from "./processPlayerStats.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 import { idb } from "../db/index.ts";
 import { getPlayer } from "../views/player.ts";
@@ -97,15 +100,70 @@ const statsTables = (
 export const getPlayersForExport = async ({
 	pids,
 	season,
+	gameLog = false,
 }: {
 	pids: number[];
 	season?: number;
+	// Current season's game log, for the PDF/JSON (off by default: it's long)
+	gameLog?: boolean;
 }): Promise<PlayerExport[]> => {
 	const currentSeason = g.get("season");
 	const traitContext = await getTraitViewContext();
 	const teamInfo = g.get("teamInfoCache");
 	const ratingKeys = ratingsKeysForView(RATINGS);
 	const out: PlayerExport[] = [];
+
+	const gameStats = Array.from(
+		new Set(Object.values(PLAYER_GAME_STATS).flatMap((x) => x.stats)),
+	);
+	const pidSet = new Set(pids);
+	const games = gameLog
+		? await idb.merged.games.getAll(
+				{ season: currentSeason },
+				{
+					filter: (game) =>
+						game.teams.some((t) => t.players.some((p) => pidSet.has(p.pid))),
+				},
+			)
+		: [];
+	const abbrev = (tid: number) =>
+		tid < 0 ? "ASG" : (teamInfo[tid]?.abbrev ?? "???");
+	const gameLogTable = (pid: number): ExportTable | undefined => {
+		const rows: (string | number)[][] = [];
+		for (const game of games) {
+			const t0 = game.teams[0].players.some((p) => p.pid === pid)
+				? 0
+				: game.teams[1].players.some((p) => p.pid === pid)
+					? 1
+					: undefined;
+			if (t0 === undefined) {
+				continue;
+			}
+			const t1 = t0 === 0 ? 1 : 0;
+			const row = game.teams[t0].players.find((p) => p.pid === pid)!;
+			if (!row.min) {
+				continue;
+			}
+			const processed = processPlayerStats(row, gameStats);
+			const winner = getWinner(game.teams);
+			rows.push([
+				game.playoffs ? `PO ${game.day ?? ""}` : (game.day ?? ""),
+				abbrev(game.teams[t0].tid),
+				`${t0 === 0 ? "vs" : "@"} ${abbrev(game.teams[t1].tid)}`,
+				`${winner === t0 ? "W" : winner === t1 ? "L" : "T"} ${game.teams[t0].pts}-${game.teams[t1].pts}`,
+				...gameStats.map((stat) => cell(processed[stat])),
+			]);
+		}
+		if (rows.length === 0) {
+			return;
+		}
+		return {
+			section: "Game log",
+			title: `${currentSeason} game log`,
+			cols: ["Day", "Team", "Opp", "Result", ...gameStats],
+			rows,
+		};
+	};
 
 	for (const pid of pids) {
 		const pRaw = await idb.merged.players.get(pid);
@@ -213,6 +271,10 @@ export const getPlayersForExport = async ({
 				cols: ["Year", "Honor"],
 				rows: p.earlierHonors.map((h: any) => [h.season, h.type]),
 			});
+		}
+		const log = gameLog ? gameLogTable(pid) : undefined;
+		if (log) {
+			tables.push(log);
 		}
 		if (p.awards.length > 0) {
 			tables.push({

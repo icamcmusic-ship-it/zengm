@@ -194,95 +194,131 @@ const TradeOffers = ({
 			{offers.length === 0 ? (
 				<p className="text-body-secondary">No offers right now.</p>
 			) : null}
-			{offers.map((offer, i) => {
-				const hint = VALUE_HINT[offer.valueHint];
-				return (
-					<Offer
-						key={offer.id}
-						challengeNoRatings={challengeNoRatings}
-						onNegotiate={async () => {
-							await toWorker("actions", "tradeFor", {
-								otherPickConditions: offer.pickConditions,
-								userPickConditions: offer.pickConditionsUser,
-								otherDpids: offer.dpids,
-								otherPids: offer.pids,
-								tid: offer.tid,
-								userDpids: offer.dpidsUser,
-								userPids: offer.pidsUser,
-							});
-						}}
-						onRemove={async () => {
-							await toWorker("main", "dismissAiTradeOffer", offer.id);
-						}}
-						removeTitle="Decline offer"
-						actions={
-							<>
-								<ActionButton
-									disabled={tradingClosed || accepting !== undefined}
-									processing={accepting === offer.id}
-									processingText="Accepting"
-									onClick={async () => {
-										setAccepting(offer.id);
-										const res = await toWorker(
-											"main",
-											"acceptAiTradeOffer",
-											offer.id,
-										);
-										setAccepting(undefined);
-										setResult(res);
-									}}
-								>
-									Accept
-								</ActionButton>
-								<button
-									type="button"
-									className="btn btn-light-bordered"
-									onClick={async () => {
-										await toWorker("main", "dismissAiTradeOffer", offer.id);
-									}}
-								>
-									Decline
-								</button>
-							</>
-						}
-						salaryCap={salaryCap}
-						salaryCapType={salaryCapType}
-						teamInfo={teamInfoCache[offer.tid]!}
-						hideTopTeamOvrs
-						first={i === 0}
-						{...offer}
-					>
-						<p className="mb-2">
-							<span className="badge bg-secondary me-2">
-								{SOURCE_TEXT[offer.source]}
-							</span>
-							<span className={`fw-bold me-2 ${hint.className}`}>
-								{hint.text}
-							</span>
-							<span className="text-body-secondary">
-								{offer.expiresIn === undefined
-									? "Expires when the phase changes"
-									: `Expires in ${offer.expiresIn} day${offer.expiresIn === 1 ? "" : "s"}`}
-							</span>
-						</p>
-						<p className="mb-2 text-body-secondary">{offer.reason}</p>
-						<div className="d-flex gap-5">
-							{offer.summary.teams.map((t, j) => {
-								return (
-									<div key={j}>
-										<SummaryTeam
-											hideFinanceInfo
-											showInlinePlayerInfo
-											summary={offer.summary}
-											t={t}
-										/>
-									</div>
-								);
-							})}
-						</div>
-					</Offer>
-				);
-			})}
+			<div
+				data-csv-table=""
+				data-csv-name="Trade offers"
+				data-csv-cols={JSON.stringify([
+					"Team",
+					"Source",
+					"Value",
+					"Expires",
+					"Reason",
+					"They give",
+					"You give",
+				])}
+			>
+				{offers.map((offer, i) => {
+					const hint = VALUE_HINT[offer.valueHint];
+					const assets = (j: number) => {
+						const t = offer.summary.teams[j];
+						return t
+							? [
+									...t.trade.map((p) => p.name),
+									...t.picks.map((dp) => dp.desc),
+								].join("; ")
+							: "";
+					};
+					// teams[0] is the user's side of the summary
+					const csvRow = JSON.stringify([
+						teamInfoCache[offer.tid]?.abbrev ?? "",
+						SOURCE_TEXT[offer.source],
+						hint.text,
+						offer.expiresIn === undefined
+							? "When the phase changes"
+							: `${offer.expiresIn} days`,
+						offer.reason,
+						assets(1),
+						assets(0),
+					]);
+					return (
+						<Offer
+							key={offer.id}
+							challengeNoRatings={challengeNoRatings}
+							onNegotiate={async () => {
+								await toWorker("actions", "tradeFor", {
+									otherPickConditions: offer.pickConditions,
+									userPickConditions: offer.pickConditionsUser,
+									otherDpids: offer.dpids,
+									otherPids: offer.pids,
+									tid: offer.tid,
+									userDpids: offer.dpidsUser,
+									userPids: offer.pidsUser,
+								});
+							}}
+							onRemove={async () => {
+								await toWorker("main", "dismissAiTradeOffer", offer.id);
+							}}
+							removeTitle="Decline offer"
+							actions={
+								<>
+									<ActionButton
+										disabled={tradingClosed || accepting !== undefined}
+										processing={accepting === offer.id}
+										processingText="Accepting"
+										onClick={async () => {
+											setAccepting(offer.id);
+											const res = await toWorker(
+												"main",
+												"acceptAiTradeOffer",
+												offer.id,
+											);
+											setAccepting(undefined);
+											setResult(res);
+										}}
+									>
+										Accept
+									</ActionButton>
+									<button
+										type="button"
+										className="btn btn-light-bordered"
+										onClick={async () => {
+											await toWorker("main", "dismissAiTradeOffer", offer.id);
+										}}
+									>
+										Decline
+									</button>
+								</>
+							}
+							salaryCap={salaryCap}
+							salaryCapType={salaryCapType}
+							teamInfo={teamInfoCache[offer.tid]!}
+							hideTopTeamOvrs
+							first={i === 0}
+							{...offer}
+						>
+							<span hidden data-csv-row={csvRow} />
+							<p className="mb-2">
+								<span className="badge bg-secondary me-2">
+									{SOURCE_TEXT[offer.source]}
+								</span>
+								<span className={`fw-bold me-2 ${hint.className}`}>
+									{hint.text}
+								</span>
+								<span className="text-body-secondary">
+									{offer.expiresIn === undefined
+										? "Expires when the phase changes"
+										: `Expires in ${offer.expiresIn} day${offer.expiresIn === 1 ? "" : "s"}`}
+								</span>
+							</p>
+							<p className="mb-2 text-body-secondary">{offer.reason}</p>
+							<div className="d-flex gap-5">
+								{offer.summary.teams.map((t, j) => {
+									return (
+										<div key={j}>
+											<SummaryTeam
+												hideFinanceInfo
+												showInlinePlayerInfo
+												summary={offer.summary}
+												t={t}
+											/>
+										</div>
+									);
+								})}
+							</div>
+						</Offer>
+					);
+				})}
+			</div>
 		</>
 	);
 };

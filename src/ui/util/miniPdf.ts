@@ -1,10 +1,15 @@
-// A tiny PDF writer (text in the standard Helvetica fonts, filled rectangles, JPEG images), so "Download players" can make
-// a PDF without a PDF library in the bundle. Coordinates are in points from the top left of a US Letter page (landscape, so wide stats tables fit).
+// A tiny PDF writer (text, filled rectangles, JPEG images), so "Download players" can make a PDF without a PDF library in
+// the bundle. Text uses an embedded Unicode TrueType font when one is given (DejaVu Sans, see ttf.ts), so names like
+// Dončić, Şengün, Łukasz, Þórsson or Nguyễn come out right, and falls back to the standard Helvetica (Latin-1 only)
+// otherwise. Coordinates are in points from the top left of a US Letter page (landscape, so wide stats tables fit).
+import { measureText, textToGlyphs, type TrueTypeFont } from "./ttf.ts";
 
 export const PAGE_WIDTH = 792;
 export const PAGE_HEIGHT = 612;
 
 type Image = { bytes: Uint8Array; width: number; height: number };
+
+export type PdfFonts = { regular: TrueTypeFont; bold: TrueTypeFont };
 
 const encoder = new TextEncoder();
 
@@ -31,15 +36,72 @@ const rgb = (hex: string) => {
 		.join(" ");
 };
 
-// Average Helvetica glyph width is about 0.5em; good enough for truncating/centering
+// Average Helvetica glyph width is about 0.5em; good enough for truncating/centering without an embedded font
 export const approxTextWidth = (text: string, size: number) =>
 	text.length * size * 0.5;
+
+const hex4 = (n: number) => n.toString(16).padStart(4, "0");
+
+// ToUnicode CMap, so text in the PDF can be searched and copied
+const toUnicodeCMap = (used: Map<number, number>) => {
+	const entries = Array.from(used.entries());
+	const chunks: string[] = [];
+	for (let i = 0; i < entries.length; i += 100) {
+		const chunk = entries.slice(i, i + 100);
+		chunks.push(
+			`${chunk.length} beginbfchar\n${chunk
+				.map(([glyph, code]) => {
+					const utf16 = String.fromCodePoint(code);
+					const hex = Array.from({ length: utf16.length }, (_, j) =>
+						hex4(utf16.charCodeAt(j)),
+					).join("");
+					return `<${hex4(glyph)}> <${hex}>`;
+				})
+				.join("\n")}\nendbfchar`,
+		);
+	}
+	return `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Adobe-Identity-UCS def
+/CMapType 2 def
+1 begincodespacerange
+<0000> <FFFF>
+endcodespacerange
+${chunks.join("\n")}
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end`;
+};
 
 export class MiniPdf {
 	private pages: string[][] = [];
 	private images: Image[] = [];
 	private pageImages: number[][] = [];
 	private target = -1;
+	private fonts: PdfFonts | undefined;
+	// glyph -> Unicode code point, per font, for widths and ToUnicode
+	private used = {
+		regular: new Map<number, number>(),
+		bold: new Map<number, number>(),
+	};
+
+	constructor(fonts?: PdfFonts) {
+		this.fonts = fonts;
+	}
+
+	get unicode() {
+		return this.fonts !== undefined;
+	}
+
+	measure(text: string, size: number, bold = false) {
+		if (!this.fonts) {
+			return approxTextWidth(text, size);
+		}
+		return measureText(bold ? this.fonts.bold : this.fonts.regular, text, size);
+	}
 
 	addPage() {
 		this.pages.push([]);
@@ -72,8 +134,22 @@ export class MiniPdf {
 			color = "#000000",
 		}: { size?: number; bold?: boolean; color?: string } = {},
 	) {
+		let shown;
+		if (this.fonts) {
+			const used = bold ? this.used.bold : this.used.regular;
+			const glyphs = textToGlyphs(
+				bold ? this.fonts.bold : this.fonts.regular,
+				text,
+			);
+			for (const { glyph, code } of glyphs) {
+				used.set(glyph, code);
+			}
+			shown = `<${glyphs.map(({ glyph }) => hex4(glyph)).join("")}>`;
+		} else {
+			shown = `(${pdfSafeText(text)})`;
+		}
 		this.current.push(
-			`BT ${rgb(color)} rg /${bold ? "F2" : "F1"} ${size} Tf ${x.toFixed(1)} ${(PAGE_HEIGHT - y).toFixed(1)} Td (${pdfSafeText(text)}) Tj ET`,
+			`BT ${rgb(color)} rg /${bold ? "F2" : "F1"} ${size} Tf ${x.toFixed(1)} ${(PAGE_HEIGHT - y).toFixed(1)} Td ${shown} Tj ET`,
 		);
 		return this;
 	}
@@ -95,7 +171,6 @@ export class MiniPdf {
 	}
 
 	output(): Uint8Array<ArrayBuffer> {
-		const pages = this.pages.map((ops) => ops.join("\n"));
 		const chunks: Uint8Array[] = [];
 		const offsets: number[] = [];
 		let length = 0;
@@ -104,57 +179,111 @@ export class MiniPdf {
 			chunks.push(bytes);
 			length += bytes.length;
 		};
-
-		// Object numbers: 1 catalog, 2 pages, 3 F1, 4 F2, then images, then (page, content) pairs
-		const numImages = this.images.length;
-		const firstImage = 5;
-		const firstPage = firstImage + numImages;
-		const pageObj = (i: number) => firstPage + 2 * i;
-		const numObjects = firstPage + 2 * pages.length - 1;
-
-		const startObj = (n: number) => {
+		let numObjects = 0;
+		const alloc = () => ++numObjects;
+		const writeObj = (n: number, body: string | (string | Uint8Array)[]) => {
 			offsets[n] = length;
 			push(`${n} 0 obj\n`);
+			for (const part of Array.isArray(body) ? body : [body]) {
+				push(part);
+			}
+			push("\nendobj\n");
+		};
+		const stream = (dict: string, data: Uint8Array) => [
+			`<< ${dict} /Length ${data.length} >>\nstream\n`,
+			data,
+			"\nendstream",
+		];
+
+		push("%PDF-1.4\n%âãÏÓ\n");
+		const catalog = alloc();
+		const pagesObj = alloc();
+
+		const fontObjs: [number, number] = [alloc(), alloc()];
+		const writeFonts = () => {
+			if (!this.fonts) {
+				writeObj(
+					fontObjs[0],
+					"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+				);
+				writeObj(
+					fontObjs[1],
+					"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>",
+				);
+				return;
+			}
+			for (const [i, key] of (["regular", "bold"] as const).entries()) {
+				const font = this.fonts[key];
+				const used = this.used[key];
+				const name = key === "bold" ? "DejaVuSans-Bold" : "DejaVuSans";
+				const scale = 1000 / font.unitsPerEm;
+				const cid = alloc();
+				const descriptor = alloc();
+				const file = alloc();
+				const toUnicode = alloc();
+				const glyphs = Array.from(used.keys()).sort((a, b) => a - b);
+				const w = glyphs
+					.map((g) => `${g} [${Math.round((font.widths[g] ?? 0) * scale)}]`)
+					.join(" ");
+				writeObj(
+					fontObjs[i]!,
+					`<< /Type /Font /Subtype /Type0 /BaseFont /${name} /Encoding /Identity-H /DescendantFonts [${cid} 0 R] /ToUnicode ${toUnicode} 0 R >>`,
+				);
+				writeObj(
+					cid,
+					`<< /Type /Font /Subtype /CIDFontType2 /BaseFont /${name} /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ${descriptor} 0 R /CIDToGIDMap /Identity /DW 600 /W [${w}] >>`,
+				);
+				const [x0, y0, x1, y1] = font.bbox.map((v) => Math.round(v * scale));
+				writeObj(
+					descriptor,
+					`<< /Type /FontDescriptor /FontName /${name} /Flags 32 /FontBBox [${x0} ${y0} ${x1} ${y1}] /ItalicAngle 0 /Ascent ${Math.round(font.ascent * scale)} /Descent ${Math.round(font.descent * scale)} /CapHeight ${Math.round(font.ascent * scale)} /StemV ${key === "bold" ? 120 : 80} /FontFile2 ${file} 0 R >>`,
+				);
+				writeObj(file, stream(`/Length1 ${font.bytes.length}`, font.bytes));
+				writeObj(toUnicode, stream("", encoder.encode(toUnicodeCMap(used))));
+			}
 		};
 
-		push("%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n");
-		startObj(1);
-		push("<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
-		startObj(2);
-		push(
-			`<< /Type /Pages /Count ${pages.length} /Kids [${pages.map((_, i) => `${pageObj(i)} 0 R`).join(" ")}] >>\nendobj\n`,
-		);
-		startObj(3);
-		push(
-			"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n",
-		);
-		startObj(4);
-		push(
-			"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n",
-		);
-		this.images.forEach((image, i) => {
-			startObj(firstImage + i);
-			push(
-				`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.bytes.length} >>\nstream\n`,
+		const imageObjs = this.images.map((image) => {
+			const n = alloc();
+			writeObj(
+				n,
+				stream(
+					`/Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode`,
+					image.bytes,
+				),
 			);
-			push(image.bytes);
-			push("\nendstream\nendobj\n");
+			return n;
 		});
-		pages.forEach((content, i) => {
+
+		const pageObjs = this.pages.map((ops, i) => {
+			const page = alloc();
+			const content = alloc();
 			const xobjects = (this.pageImages[i] ?? [])
-				.map((index) => `/Im${index} ${firstImage + index} 0 R`)
+				.map((index) => `/Im${index} ${imageObjs[index]} 0 R`)
 				.join(" ");
-			startObj(pageObj(i));
-			push(
-				`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>${xobjects ? ` /XObject << ${xobjects} >>` : ""} >> /Contents ${pageObj(i) + 1} 0 R >>\nendobj\n`,
+			writeObj(
+				page,
+				`<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources << /Font << /F1 ${fontObjs[0]} 0 R /F2 ${fontObjs[1]} 0 R >>${xobjects ? ` /XObject << ${xobjects} >>` : ""} >> /Contents ${content} 0 R >>`,
 			);
-			// Content is ASCII after pdfSafeText except Latin-1 letters: write as latin1 bytes so lengths match
-			const bytes = Uint8Array.from(content, (c) => c.charCodeAt(0) & 0xff);
-			startObj(pageObj(i) + 1);
-			push(`<< /Length ${bytes.length} >>\nstream\n`);
-			push(bytes);
-			push("\nendstream\nendobj\n");
+			// Content is ASCII (hex glyph ids), or Latin-1 with the Helvetica fallback: write as latin1 bytes so lengths match
+			const text = ops.join("\n");
+			writeObj(
+				content,
+				stream(
+					"",
+					Uint8Array.from(text, (c) => c.charCodeAt(0) & 0xff),
+				),
+			);
+			return page;
 		});
+
+		// Fonts last, once every page's text has said which glyphs it uses
+		writeFonts();
+		writeObj(catalog, `<< /Type /Catalog /Pages ${pagesObj} 0 R >>`);
+		writeObj(
+			pagesObj,
+			`<< /Type /Pages /Count ${pageObjs.length} /Kids [${pageObjs.map((n) => `${n} 0 R`).join(" ")}] >>`,
+		);
 
 		const xref = length;
 		let xrefText = `xref\n0 ${numObjects + 1}\n0000000000 65535 f \n`;
@@ -163,7 +292,7 @@ export class MiniPdf {
 		}
 		push(xrefText);
 		push(
-			`trailer\n<< /Size ${numObjects + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`,
+			`trailer\n<< /Size ${numObjects + 1} /Root ${catalog} 0 R >>\nstartxref\n${xref}\n%%EOF\n`,
 		);
 
 		const out = new Uint8Array(length);

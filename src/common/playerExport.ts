@@ -83,7 +83,7 @@ export const rectangularize = (rows: string[][]) => {
 
 export const fileSafeName = (name: string) =>
 	name
-		.replaceAll(/[^\w -]+/g, "")
+		.replaceAll(/[^\p{L}\p{N}_ -]+/gu, "")
 		.trim()
 		.replaceAll(/\s+/g, "_")
 		.slice(0, 80) || "table";

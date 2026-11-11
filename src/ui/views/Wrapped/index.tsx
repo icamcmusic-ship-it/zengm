@@ -494,8 +494,44 @@ const Deck = (props: LoadedProps) => {
 		"--wrapped-dwell": `${DWELL}s`,
 	} as CSSProperties;
 
+	// The deck as a list for "Download CSV". Quiz slides give their question, and the answer only once you answered it.
+	const csvRows = slides.map((sl, n) => {
+		const answered = !sl.quiz || !!getAnswer(seed, sl.id);
+		return JSON.stringify([
+			n + 1,
+			sl.kicker,
+			sl.quiz ? sl.quiz.q : (sl.head ?? sl.heads[0] ?? ""),
+			answered && sl.hero
+				? `${sl.hero.text}${sl.hero.unit ? ` ${sl.hero.unit}` : ""}`
+				: "",
+			answered ? sl.lines.join(" ") : "",
+			answered
+				? (sl.list ?? []).map((row) => `${row.name}: ${row.value}`).join("; ")
+				: "",
+			sl.quiz && answered ? sl.quiz.answer.name : "",
+		]);
+	});
+
 	return (
 		<>
+			<div
+				hidden
+				data-csv-table=""
+				data-csv-name="Wrapped deck"
+				data-csv-cols={JSON.stringify([
+					"Slide",
+					"Kicker",
+					"Headline",
+					"Big number",
+					"Lines",
+					"List",
+					"Quiz answer",
+				])}
+			>
+				{csvRows.map((row, n) => (
+					<span key={n} data-csv-row={row} />
+				))}
+			</div>
 			{soFar ? (
 				<p className="text-body-secondary wrapped-note">
 					This season isn’t over yet, so the deck covers it so far. Awards and

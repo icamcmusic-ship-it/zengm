@@ -1,8 +1,10 @@
-// Lazy loaded by "Download players": one US Letter page per player. See common/playerExport.ts for the data.
+// Lazy loaded by "Download players": each player's profile over as many pages as it needs. See common/playerExport.ts for the data.
 import type { FaceConfig } from "facesjs";
+import { parseTrueType } from "./ttf.ts";
 import { display } from "facesjs";
 import { DEFAULT_JERSEY, DEFAULT_TEAM_COLORS } from "../../common/constants.ts";
 import {
+	fileSafeName,
 	formatHeight,
 	type ExportTable,
 	type PlayerExport,
@@ -12,6 +14,7 @@ import {
 	PAGE_HEIGHT,
 	PAGE_WIDTH,
 	approxTextWidth,
+	type PdfFonts,
 } from "./miniPdf.ts";
 
 const faceToJpeg = async (p: PlayerExport) => {
@@ -86,11 +89,26 @@ const statsLine = (stats: Record<string, number> | undefined) =>
 				.join("   ")
 		: "";
 
-const truncate = (text: string, size: number, maxWidth: number) => {
-	if (approxTextWidth(text, size) <= maxWidth) {
+// Text widths from the embedded font's metrics (or an estimate with the Helvetica fallback), set for each PDF
+let measure: (text: string, size: number, bold?: boolean) => number =
+	approxTextWidth;
+
+const truncate = (
+	text: string,
+	size: number,
+	maxWidth: number,
+	bold = false,
+) => {
+	if (measure(text, size, bold) <= maxWidth) {
 		return text;
 	}
-	const chars = Math.max(1, Math.floor(maxWidth / (size * 0.5)) - 1);
+	let chars = text.length;
+	while (
+		chars > 1 &&
+		measure(`${text.slice(0, chars)}...`, size, bold) > maxWidth
+	) {
+		chars -= 1;
+	}
 	return `${text.slice(0, chars)}...`;
 };
 
@@ -100,7 +118,7 @@ const wrap = (text: string, size: number, maxWidth: number) => {
 	let line = "";
 	for (const word of text.split(" ")) {
 		const candidate = line ? `${line} ${word}` : word;
-		if (approxTextWidth(candidate, size) > maxWidth && line) {
+		if (measure(candidate, size) > maxWidth && line) {
 			lines.push(line);
 			line = word;
 		} else {
@@ -128,7 +146,7 @@ const drawOverview = (
 	if (face) {
 		pdf.jpeg(face, MARGIN, TOP, 100, 150);
 	}
-	pdf.text(textLeft, TOP + 22, truncate(p.name, 22, RIGHT - textLeft), {
+	pdf.text(textLeft, TOP + 22, truncate(p.name, 22, RIGHT - textLeft, true), {
 		size: 22,
 		bold: true,
 	});
@@ -232,15 +250,14 @@ const KEY_COLS = 3;
 
 const colWidths = (table: ExportTable) =>
 	table.cols.map((col, i) => {
-		const longest = Math.max(
-			col.length,
-			...table.rows.map((row) => String(row[i] ?? "").length),
+		const widest = Math.max(
+			measure(col.toUpperCase(), TABLE_SIZE, true),
+			...table.rows.map((row) =>
+				measure(String(row[i] ?? ""), TABLE_SIZE, row[0] === "Career"),
+			),
 		);
-		// Long text columns (trait status, awards) wrap... no: they get capped and truncated
-		return Math.min(
-			i === table.cols.length - 1 ? 420 : 160,
-			longest * TABLE_SIZE * 0.55 + 8,
-		);
+		// Long text columns (trait status, awards) are capped and truncated
+		return Math.min(i === table.cols.length - 1 ? 420 : 160, widest + 6);
 	});
 
 // Splits a table's columns into groups that fit the page width, each starting with the key columns
@@ -323,7 +340,12 @@ class Flow {
 					this.pdf.text(
 						x + 2,
 						this.y,
-						truncate(table.cols[c]!.toUpperCase(), TABLE_SIZE, widths[c]! - 3),
+						truncate(
+							table.cols[c]!.toUpperCase(),
+							TABLE_SIZE,
+							widths[c]! - 3,
+							true,
+						),
 						{
 							size: TABLE_SIZE,
 							bold: true,
@@ -419,13 +441,54 @@ const drawPlayer = (
 	}
 	pdf.onPage(-1);
 };
-// Yields between players so a big selection doesn't freeze the page
+let fontsPromise: Promise<PdfFonts | undefined> | undefined;
+
+// The Unicode font (public/fonts, about 50 KB per weight), fetched the first time a PDF is made. Without it (offline and
+// not cached yet) the PDF falls back to Helvetica, with accents dropped.
+export const loadPdfFonts = () => {
+	if (!fontsPromise) {
+		fontsPromise = (async () => {
+			try {
+				const [regular, bold] = await Promise.all(
+					[
+						"/fonts/DejaVuSans-latin.ttf",
+						"/fonts/DejaVuSans-Bold-latin.ttf",
+					].map(async (url) => {
+						const response = await fetch(url);
+						if (!response.ok) {
+							throw new Error(`${url}: ${response.status}`);
+						}
+						return parseTrueType(await response.arrayBuffer());
+					}),
+				);
+				return { regular: regular!, bold: bold! };
+			} catch (error) {
+				console.warn("PDF font not available, using Helvetica", error);
+				fontsPromise = undefined;
+				return undefined;
+			}
+		})();
+	}
+	return fontsPromise;
+};
+
+const newPdf = (fonts: PdfFonts | undefined) => {
+	const pdf = new MiniPdf(fonts);
+	measure = (text, size, bold) => pdf.measure(text, size, bold);
+	return pdf;
+};
+
+// Yields between players so a big selection doesn't freeze the page. One PDF with every player, or (perPlayer) one PDF
+// each, for the zip.
 export const playersToPdf = async (
 	players: PlayerExport[],
 	league: string,
 	onProgress?: (done: number) => void,
+	fonts?: PdfFonts | null,
 ) => {
-	const pdf = new MiniPdf();
+	const usedFonts =
+		fonts === null ? undefined : (fonts ?? (await loadPdfFonts()));
+	const pdf = newPdf(usedFonts);
 	for (const [i, p] of players.entries()) {
 		const face = await faceToJpeg(p);
 		drawPlayer(pdf, p, face, league);
@@ -435,4 +498,28 @@ export const playersToPdf = async (
 		}
 	}
 	return pdf.output();
+};
+
+export const playersToPdfFiles = async (
+	players: PlayerExport[],
+	league: string,
+	onProgress?: (done: number) => void,
+	fonts?: PdfFonts | null,
+) => {
+	const usedFonts =
+		fonts === null ? undefined : (fonts ?? (await loadPdfFonts()));
+	const files: { name: string; bytes: Uint8Array }[] = [];
+	for (const [i, p] of players.entries()) {
+		const pdf = newPdf(usedFonts);
+		drawPlayer(pdf, p, await faceToJpeg(p), league);
+		files.push({
+			name: `${p.pid}_${fileSafeName(p.name)}.pdf`,
+			bytes: pdf.output(),
+		});
+		onProgress?.(i + 1);
+		if (i % 5 === 4) {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+		}
+	}
+	return files;
 };
