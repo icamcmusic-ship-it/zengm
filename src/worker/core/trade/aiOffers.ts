@@ -1,5 +1,8 @@
 import { getContractSummary } from "../contract/index.ts";
-import { conditionSpecText } from "../../../common/draftPickConditions.ts";
+import {
+	conditionSpecText,
+	getTradePickConditions,
+} from "../../../common/draftPickConditions.ts";
 import { PHASE } from "../../../common/constants.ts";
 import type { AiTradeOffer, TradeTeams } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
@@ -26,6 +29,11 @@ export const MAX_REQUESTED_OFFERS = 3;
 
 // Chance that an offer is about the trading block (when it has something on it) rather than an unsolicited ask
 export const TRADING_BLOCK_SHARE = 0.6;
+
+// Lowest value change for the user's team (ValueChangeCalculator, from the user's side) for an offer to be sent. Below -2 the
+// trade explanation calls a deal "not close", so an AI team would never accept it the other way around
+export const MIN_USER_DV_UNSOLICITED = -2;
+export const MIN_USER_DV_TRADING_BLOCK = -4;
 
 // Phases in which AI teams send offers on their own
 export const OFFER_PHASES: readonly number[] = [
@@ -373,6 +381,26 @@ export const buildAiOffer = async (
 	// Only the AI team adds assets: it's their offer for your player
 	const teams = await makeAiOfferWork(teams0, valueChangeCalculator, 4);
 	if (!teams) {
+		return;
+	}
+
+	// Don't send offers that are lopsided against the user by the same math the AI uses to judge its own trades (with the user's
+	// team's strategy and roster). Looser for something on the trading block, which the user wants to move
+	const userDv = await valueChangeCalculator.evaluate({
+		tid: userTid,
+		pidsAdd: teams[1].pids,
+		pidsRemove: teams[0].pids,
+		dpidsAdd: teams[1].dpids,
+		dpidsRemove: teams[0].dpids,
+		tradingPartnerTid: tid,
+		pickConditions: getTradePickConditions(teams),
+	});
+	if (
+		userDv <
+		(target.reason === "tradingBlock"
+			? MIN_USER_DV_TRADING_BLOCK
+			: MIN_USER_DV_UNSOLICITED)
+	) {
 		return;
 	}
 

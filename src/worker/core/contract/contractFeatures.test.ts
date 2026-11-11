@@ -55,6 +55,7 @@ import {
 import { combineMarket, getFreeAgentMarket } from "../freeAgents/market.ts";
 import { getPlayerContractPanel } from "./playerPanel.ts";
 import moodInfo from "../player/moodInfo.ts";
+import { getNeedInfo, needAttempt } from "../trade/betweenAiTeams.ts";
 
 const setup = async () => {
 	resetG();
@@ -433,6 +434,41 @@ describe("extensions", () => {
 		const user = await idb.cache.players.indexGetAll("playersByTid", 0);
 		assert.isTrue(user.every((p) => !getCurrentContract(p)!.extensions));
 	});
+
+	test("AI teams try to settle holdouts with an extension, but not into the luxury tax", async () => {
+		g.setWithoutSavingToDB("playersRefuseToNegotiate", false);
+		const p = await getTeamPlayer(2);
+		await setContract(p, { start: 2015, exp: 2017, amount: 1000 });
+		p.holdout = {
+			season: g.get("season"),
+			tid: 2,
+			gamesRemaining: 5,
+			gamesMissed: 0,
+		};
+		await idb.cache.players.put(p);
+		assert.isTrue(isHoldingOut(p));
+
+		// A routine extension would never happen at this probability, a holdout is tried first
+		vi.spyOn(Math, "random").mockReturnValue(0.1);
+		await aiExtensions(0);
+		const p2 = (await idb.cache.players.get(p.pid))!;
+		assert.isDefined(getCurrentContract(p2)!.extensions);
+		assert.isFalse(isHoldingOut(p2));
+		vi.restoreAllMocks();
+
+		// Routine extensions don't take a team into the luxury tax
+		for (let i = 0; i < 8; i++) {
+			const p3 = await getTeamPlayer(1, i);
+			await setContract(p3, {
+				start: 2015,
+				exp: i === 0 ? 2016 : 2020,
+				amount: i === 0 ? 1000 : g.get("luxuryPayroll") / 7,
+			});
+		}
+		await aiExtensions(1);
+		const players = await idb.cache.players.indexGetAll("playersByTid", 1);
+		assert.isTrue(players.every((p3) => !getCurrentContract(p3)!.extensions));
+	});
 });
 
 describe("mood history and projections", () => {
@@ -604,6 +640,50 @@ describe("trade requests and holdouts", () => {
 		p.customMoodItems = [{ amount: -20, text: "test" }];
 		await updateTradeRequests();
 		assert.isFalse(hasActiveTradeRequest(p));
+	});
+
+	test("AI teams shop a player who asked to be traded", async () => {
+		g.setWithoutSavingToDB("aiTradesNeedBased", true);
+		g.setWithoutSavingToDB("userTids", [0]);
+		const p = await getTeamPlayer(1);
+		p.value = 70;
+		p.gamesUntilTradable = 0;
+		p.tradeRequest = {
+			season: g.get("season"),
+			phase: PHASE.REGULAR_SEASON,
+			tid: 1,
+		};
+		await idb.cache.players.put(p);
+
+		const aiTids = [1, 2];
+		const { ctx, requesters } = await getNeedInfo(aiTids);
+		assert.strictEqual(ctx.numTradeRequests, 1);
+		assert.deepStrictEqual(
+			requesters.map((p2) => p2.pid),
+			[p.pid],
+		);
+
+		const failures: string[] = [];
+		const result = await needAttempt(
+			undefined,
+			aiTids,
+			"tradeRequest",
+			failures,
+		);
+		// Whether a deal is found depends on the partner's roster, but it is never for lack of someone to shop
+		assert.notInclude(failures, "noRequester");
+		if (result && "teams" in result) {
+			assert.strictEqual(result.kind, "tradeRequest");
+			assert.deepStrictEqual(result.teams[0].pids, [p.pid]);
+			assert.strictEqual(result.teams[1].tid, 2);
+			assert.include(result.note, "asked out");
+		}
+
+		// Off with the setting: nobody is shopped
+		g.setWithoutSavingToDB("tradeRequests", false);
+		const off = await getNeedInfo(aiTids);
+		assert.isUndefined(off.ctx.numTradeRequests);
+		assert.strictEqual(off.requesters.length, 0);
 	});
 
 	test("holdouts start before the season, count down, and end", async () => {

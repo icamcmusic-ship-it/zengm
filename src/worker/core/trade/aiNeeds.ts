@@ -3,7 +3,11 @@ import type { Phase } from "../../../common/types.ts";
 
 // Pure logic for need-driven AI-to-AI trades, kept separate from the database code in betweenAiTeams.ts so it can be tested directly
 
-export type NeedTradeKind = "deadlineBuy" | "rebuildSell" | "salaryDump";
+export type NeedTradeKind =
+	| "deadlineBuy"
+	| "rebuildSell"
+	| "salaryDump"
+	| "tradeRequest";
 
 export type TeamNeedInfo = {
 	tid: number;
@@ -28,6 +32,9 @@ export type NeedContext = {
 	salaryCap: number;
 	luxuryPayroll: number;
 	salaryCapType: "hard" | "soft" | "none";
+
+	// Players on AI teams with an active trade request (Trade Requests setting). Their teams shop them
+	numTradeRequests?: number;
 };
 
 // "At the deadline" is the stretch of the regular season leading up to the trade deadline. With no deadline, it's the second half of the season
@@ -79,7 +86,13 @@ export const getKindWeights = (
 
 	const canBuySell = buyers.length > 0 && sellers.length > 0;
 
+	// A team whose star asked out shops him, at any time trades are allowed. Strong enough that a request usually gets resolved within
+	// weeks (each one competes with the other kinds), but still only goes through if some team values him enough
+	const numRequests = ctx.numTradeRequests ?? 0;
+
 	return {
+		tradeRequest:
+			numRequests > 0 && teams.length > 1 ? Math.min(3, 1.5 * numRequests) : 0,
 		deadlineBuy: deadline && canBuySell ? 4 : 0,
 		rebuildSell: canBuySell ? (regularSeason ? 1 : 1.5) : 0,
 		salaryDump:
@@ -217,9 +230,10 @@ export const getSalaryFillerPids = ({
 };
 
 // Players a buyer would rather keep: its best players and its veterans. A contender pays with picks, prospects and depth
-export const getBuyerProtected = (players: CandidatePlayer[]) => {
+// numTop: how many of its best players it keeps (fewer when bidding for a star who asked out, who costs real talent)
+export const getBuyerProtected = (players: CandidatePlayer[], numTop = 5) => {
 	const sorted = [...players].sort((a, b) => b.value - a.value);
-	const protectedPids = new Set(sorted.slice(0, 5).map((p) => p.pid));
+	const protectedPids = new Set(sorted.slice(0, numTop).map((p) => p.pid));
 	for (const p of players) {
 		if (p.age >= 30) {
 			protectedPids.add(p.pid);
@@ -270,7 +284,7 @@ export const getRationale = ({
 }: {
 	kind: NeedTradeKind;
 
-	// Seller for deadlineBuy/rebuildSell, dumping team for salaryDump
+	// Seller for deadlineBuy/rebuildSell/tradeRequest, dumping team for salaryDump
 	mainTeam: string;
 
 	// Buyer, or team with cap space
@@ -285,6 +299,9 @@ export const getRationale = ({
 	const players = listNames(playerNames);
 	if (kind === "deadlineBuy") {
 		return `Deadline deal: the contending ${otherTeam} add ${players} for the stretch run, and the ${mainTeam} get ${describeReturn(returnTo)} in return.`;
+	}
+	if (kind === "tradeRequest") {
+		return `Trade request granted: the ${mainTeam} move ${players}, who had asked out, to the ${otherTeam} for ${describeReturn(returnTo)}.`;
 	}
 	if (kind === "rebuildSell") {
 		return `The rebuilding ${mainTeam} sell veteran ${players} for ${describeReturn(returnTo)}, and the contending ${otherTeam} load up.`;

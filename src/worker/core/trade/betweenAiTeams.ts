@@ -9,6 +9,14 @@ import { choice } from "../../../common/random.ts";
 import { getTradePickConditions } from "../../../common/draftPickConditions.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
+import { hasActiveTradeRequest } from "../contract/unrest.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+import {
+	getLegs,
+	getTeamFlows,
+	summaryMulti,
+	type MultiTeamTrade,
+} from "./multiTeam.ts";
 import getPayrolls from "../team/getPayrolls.ts";
 import {
 	capSpace,
@@ -200,7 +208,25 @@ export const getNeedInfo = async (aiTids: number[]) => {
 		salaryCapType: g.get("salaryCapType"),
 	};
 
-	return { infos, ctx };
+	// Stars on AI teams who asked to be traded (Trade Requests setting)
+	const requesters: Player[] = [];
+	if (g.get("tradeRequests")) {
+		for (const p of await idb.cache.players.indexGetAll("playersByTid", [
+			0,
+			Infinity,
+		])) {
+			if (
+				aiTids.includes(p.tid) &&
+				hasActiveTradeRequest(p) &&
+				!isUntradable(p).untradable
+			) {
+				requesters.push(p);
+			}
+		}
+		ctx.numTradeRequests = requesters.length;
+	}
+
+	return { infos, ctx, requesters };
 };
 
 const toCandidates = (players: Player[]): CandidatePlayer[] =>
@@ -241,6 +267,171 @@ const emptyTeam = (tid: number) => ({
 	tid,
 });
 
+// Chance that a buy/sell/trade request deal blocked by the buyer's salary tries a third team with cap space
+export const THREE_TEAM_PROB = 0.5;
+
+// Seller A sends player X to buyer B, who pays A in draft picks (only picks, so A's cap is not the problem). B is over the cap, so it sends
+// salary filler to team C, which has room for it, and C gets one of B's picks for its trouble if it wants one. Every team has to like its
+// part, by the usual AI math, and the salary cap rules hold for each team's total incoming and outgoing salary (summaryMulti).
+const threeTeamAttempt = async ({
+	kind,
+	seller,
+	buyer,
+	vet,
+	buyerPlayers,
+	protectedPids,
+	infos,
+	ctx,
+	valueChangeCalculator,
+}: {
+	kind: NeedTradeKind;
+	seller: TeamNeedInfo;
+	buyer: TeamNeedInfo;
+	vet: CandidatePlayer;
+	buyerPlayers: Player[];
+	protectedPids: Set<number>;
+	infos: TeamNeedInfo[];
+	ctx: NeedContext;
+	valueChangeCalculator: ValueChangeCalculator;
+}) => {
+	if (ctx.salaryCapType === "none") {
+		return;
+	}
+
+	// B pays A in picks
+	const teams = await makeItWork(
+		[
+			{ ...emptyTeam(seller.tid), pids: [vet.pid] },
+			{
+				...emptyTeam(buyer.tid),
+				pidsExcluded: buyerPlayers.map((p) => p.pid),
+			},
+		],
+		{
+			holdUserConstant: true,
+			maxAssetsToAdd: 3,
+			valueChangeCalculator,
+		},
+	);
+	if (!teams || teams[1].dpids.length === 0) {
+		return;
+	}
+
+	// B's filler, which only needs to fit B's side (incoming vet, outgoing filler)
+	const fillerPids = getSalaryFiller({
+		incoming: vet.contractAmount,
+		payroll: buyer.payroll,
+		candidates: toCandidates(buyerPlayers).filter(
+			(p) => !protectedPids.has(p.pid),
+		),
+	});
+	if (!fillerPids || fillerPids.length === 0) {
+		return;
+	}
+	const fillerSalary = toCandidates(
+		buyerPlayers.filter((p) => fillerPids.includes(p.pid)),
+	).reduce((sum, p) => sum + p.contractAmount, 0);
+
+	// C absorbs the filler into its cap space, giving nothing back. Rebuilding teams are likelier to take on salary for a pick
+	const third = choice(
+		infos.filter(
+			(t) =>
+				t.tid !== seller.tid &&
+				t.tid !== buyer.tid &&
+				capSpace(t, ctx) >= fillerSalary,
+		),
+		(t) => (t.strategy === "rebuilding" ? 2 : 1),
+	);
+	if (!third) {
+		return;
+	}
+
+	const evaluateC = (dpids: number[]) =>
+		valueChangeCalculator.evaluate({
+			tid: third.tid,
+			pidsAdd: fillerPids,
+			pidsRemove: [],
+			dpidsAdd: dpids,
+			dpidsRemove: [],
+			tradingPartnerTid: buyer.tid,
+		});
+	let dpidsToC: number[] = [];
+	if ((await evaluateC([])) <= 0) {
+		// Cheapest of B's other picks that makes it worth it for C (later seasons and 2nd rounders first)
+		const picks = (
+			await idb.cache.draftPicks.indexGetAll("draftPicksByTid", buyer.tid)
+		)
+			.filter(
+				(dp) => !teams[1].dpids.includes(dp.dpid) && !dp.protection && !dp.swap,
+			)
+			.sort((a, b) => b.round - a.round || Number(b.season) - Number(a.season));
+		for (const dp of picks) {
+			if ((await evaluateC([dp.dpid])) > 0) {
+				dpidsToC = [dp.dpid];
+				break;
+			}
+		}
+		if (dpidsToC.length === 0) {
+			return;
+		}
+	}
+
+	const trade: MultiTeamTrade = {
+		tids: [seller.tid, buyer.tid, third.tid],
+		assets: [
+			{ type: "player", id: vet.pid, fromTid: seller.tid, toTid: buyer.tid },
+			...teams[1].dpids.map((dpid) => ({
+				type: "pick" as const,
+				id: dpid,
+				fromTid: buyer.tid,
+				toTid: seller.tid,
+			})),
+			...fillerPids.map((pid) => ({
+				type: "player" as const,
+				id: pid,
+				fromTid: buyer.tid,
+				toTid: third.tid,
+			})),
+			...dpidsToC.map((dpid) => ({
+				type: "pick" as const,
+				id: dpid,
+				fromTid: buyer.tid,
+				toTid: third.tid,
+			})),
+		],
+	};
+
+	const multiSummary = await summaryMulti(trade);
+	if (multiSummary.warnings.length > 0) {
+		return;
+	}
+
+	// Each team, with what it gets and gives in the whole trade
+	for (const flow of getTeamFlows(trade)) {
+		const dv = await valueChangeCalculator.evaluate({
+			tid: flow.tid,
+			pidsAdd: flow.pidsIn,
+			pidsRemove: flow.pidsOut,
+			dpidsAdd: flow.dpidsIn,
+			dpidsRemove: flow.dpidsOut,
+			tradingPartnerTid: undefined,
+		});
+		if (dv < (flow.tid === seller.tid ? -1 : 0)) {
+			return;
+		}
+	}
+
+	const p = await idb.cache.players.get(vet.pid);
+	const name = p ? `${p.firstName} ${p.lastName}` : "a player";
+	const what =
+		kind === "tradeRequest"
+			? `move ${name}, who had asked out,`
+			: `send ${name}`;
+	const note = `Three-team deal: the ${getTeamName(seller.tid)} ${what} to the ${getTeamName(buyer.tid)} for draft picks, and the ${getTeamName(third.tid)} use their cap space to take salary from the ${getTeamName(buyer.tid)}.`;
+
+	return { kind, multi: trade, note };
+};
+
 // Build a trade (not yet processed) driven by a team need. Returns undefined if no sensible trade was found
 export const needAttempt = async (
 	valueChangeCalculator: ValueChangeCalculator = new ValueChangeCalculator({
@@ -256,7 +447,7 @@ export const needAttempt = async (
 		return undefined;
 	};
 
-	const { infos, ctx } = await getNeedInfo(aiTids);
+	const { infos, ctx, requesters } = await getNeedInfo(aiTids);
 	const kind = forceKind ?? pickKind(getKindWeights(infos, ctx), Math.random());
 	if (!kind) {
 		return fail("noKind");
@@ -268,32 +459,70 @@ export const needAttempt = async (
 	let salary: number | undefined;
 	let holdUserConstant: boolean;
 
-	if (kind === "deadlineBuy" || kind === "rebuildSell") {
-		const sellers = infos.filter((t) => isSeller(t, ctx));
-		// Better teams are more eager to buy
-		const buyers = infos.filter((t) => isBuyer(t));
-		const seller = choice(sellers);
-		const buyer = choice(
-			buyers.filter((t) => t.tid !== seller?.tid),
-			(t) => (t.winp ?? 0.5) ** 2,
-		);
-		if (!seller || !buyer) {
-			return fail("noSellerOrBuyer");
+	// A buy/sell/trade request deal blocked by the buyer's salary sometimes tries a third team with cap space
+	let threeTeamInput: Parameters<typeof threeTeamAttempt>[0] | undefined;
+	const tryThreeTeam = () => {
+		if (
+			threeTeamInput &&
+			featureOn("threeTeamTrades") &&
+			Math.random() < THREE_TEAM_PROB
+		) {
+			return threeTeamAttempt(threeTeamInput);
 		}
+	};
 
-		const sellerPlayers = (
-			await idb.cache.players.indexGetAll("playersByTid", seller.tid)
-		).filter((p) => !isUntradable(p).untradable);
-		const vets = getVeteranCandidates(toCandidates(sellerPlayers));
-		const vet = choice(vets, (p) => p.value);
-		if (!vet) {
-			return fail("noVeteran");
+	if (
+		kind === "deadlineBuy" ||
+		kind === "rebuildSell" ||
+		kind === "tradeRequest"
+	) {
+		let seller: TeamNeedInfo | undefined;
+		let buyer: TeamNeedInfo | undefined;
+		let vet: CandidatePlayer | undefined;
+		if (kind === "tradeRequest") {
+			// Shop a player who asked out to any other AI team. Contenders and winning teams are likelier buyers, but anyone can bid
+			const requester = choice(requesters, (p) => p.value);
+			seller = infos.find((t) => t.tid === requester?.tid);
+			buyer = choice(
+				infos.filter((t) => t.tid !== seller?.tid),
+				(t) => (t.strategy === "contending" ? 2 : 1) * (0.2 + (t.winp ?? 0.5)),
+			);
+			if (requester) {
+				vet = toCandidates([requester])[0];
+			}
+			if (!seller || !buyer || !vet) {
+				return fail("noRequester");
+			}
+		} else {
+			const sellers = infos.filter((t) => isSeller(t, ctx));
+			// Better teams are more eager to buy
+			const buyers = infos.filter((t) => isBuyer(t));
+			seller = choice(sellers);
+			buyer = choice(
+				buyers.filter((t) => t.tid !== seller?.tid),
+				(t) => (t.winp ?? 0.5) ** 2,
+			);
+			if (!seller || !buyer) {
+				return fail("noSellerOrBuyer");
+			}
+
+			const sellerPlayers = (
+				await idb.cache.players.indexGetAll("playersByTid", seller.tid)
+			).filter((p) => !isUntradable(p).untradable);
+			const vets = getVeteranCandidates(toCandidates(sellerPlayers));
+			vet = choice(vets, (p) => p.value);
+			if (!vet) {
+				return fail("noVeteran");
+			}
 		}
 
 		const buyerPlayers = (
 			await idb.cache.players.indexGetAll("playersByTid", buyer.tid)
 		).filter((p) => !isUntradable(p).untradable);
-		const protectedPids = getBuyerProtected(toCandidates(buyerPlayers));
+		const protectedPids = getBuyerProtected(
+			toCandidates(buyerPlayers),
+			kind === "tradeRequest" ? 2 : 5,
+		);
 
 		// A buyer over the cap has to send salary back
 		const fillerPids = getSalaryFiller({
@@ -303,8 +532,19 @@ export const needAttempt = async (
 				(p) => !protectedPids.has(p.pid),
 			),
 		});
+		threeTeamInput = {
+			kind,
+			seller,
+			buyer,
+			vet,
+			buyerPlayers,
+			protectedPids,
+			infos,
+			ctx,
+			valueChangeCalculator,
+		};
 		if (!fillerPids) {
-			return fail("noSalaryFiller");
+			return (await tryThreeTeam()) ?? fail("noSalaryFiller");
 		}
 
 		mainTid = seller.tid;
@@ -400,7 +640,7 @@ export const needAttempt = async (
 
 	const tradeSummary = await summary(teams);
 	if (tradeSummary.warning) {
-		return fail("salaryCapWarning");
+		return (await tryThreeTeam()) ?? fail("salaryCapWarning");
 	}
 
 	// The main team needs to be OK with this too. A salary dump is allowed to cost some value, that's the point of it
@@ -458,6 +698,14 @@ export const needAttempt = async (
 	return { kind, teams, note };
 };
 
+// An AI-only multi-team trade: one trade event per leg, like processMulti, with the deal's own note. No undo, and rosters are sorted
+// like after any AI-to-AI trade
+export const processMultiAi = async (trade: MultiTeamTrade, note: string) => {
+	for (const leg of getLegs(trade)) {
+		await processTrade(leg, undefined, { note });
+	}
+};
+
 // Share of AI-to-AI trade attempts that are need-driven, when that setting is enabled
 const NEED_ATTEMPT_SHARE = 0.5;
 
@@ -492,7 +740,10 @@ const betweenAiTeams = async () => {
 			if (g.get("aiTradesNeedBased") && Math.random() < NEED_ATTEMPT_SHARE) {
 				const aiTids = await getAITids();
 				const result = await needAttempt(valueChangeCalculator, aiTids);
-				if (result) {
+				if (result && "multi" in result) {
+					tradeTids = result.multi.tids;
+					await processMultiAi(result.multi, result.note);
+				} else if (result) {
 					tradeTids = [result.teams[0].tid, result.teams[1].tid];
 					await processTrade(result.teams, undefined, { note: result.note });
 				}
