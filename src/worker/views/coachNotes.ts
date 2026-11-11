@@ -10,7 +10,6 @@ import {
 	describeProfile,
 	fitLabel,
 	fitToScore,
-	rosterSchemeFit,
 } from "../../common/coachSystems.ts";
 import {
 	coachReputation,
@@ -20,7 +19,7 @@ import {
 	getTeamCoachSystem,
 } from "../core/staff/index.ts";
 import {
-	fitRatingsOf,
+	getRosterFit,
 	hotSeatLabel,
 	hotSeatNow,
 	reputationLabel,
@@ -67,10 +66,7 @@ export default defineView({
 		if (head && system) {
 			const profile = getCoachProfile(head);
 			const tree = await coachingTree(head.cid);
-			const players = (await idb.cache.players.indexGetAll("playersByTid", tid))
-				.filter((p) => p.injury.gamesRemaining === 0)
-				.sort((a, b) => b.valueNoPot - a.valueNoPot);
-			const fit = rosterSchemeFit(players.map(fitRatingsOf));
+			const fit = await getRosterFit(tid);
 			const offCoord = coaches.find((c) => c.tid === tid && c.role === "off");
 			const defCoord = coaches.find((c) => c.tid === tid && c.role === "def");
 			const rep = coachReputation(head);

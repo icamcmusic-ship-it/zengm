@@ -23,6 +23,10 @@ import {
 } from "../../../common/coachSystems.ts";
 import { fitRatingsOf } from "../staff/systems.ts";
 import { range } from "../../../common/utils.ts";
+import { resetCache, resetG } from "../../../test/helpers.ts";
+import createRandomPlayers from "../league/create/createRandomPlayers.ts";
+import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
+import { makeSeededRandom } from "../../../common/random.ts";
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const sd = (xs) => {
@@ -54,12 +58,20 @@ test.skipIf(!process.env.COACH_FIT)("scheme fit baselines", async () => {
 				).sort((a, b) => b.valueNoPot - a.valueNoPot);
 				for (const p of players.slice(0, 9)) {
 					const fit = playerSchemeFit(fitRatingsOf(p));
-					for (const s of OFFENSE_SYSTEMS) {off[s].push(fit.off[s]);}
-					for (const s of DEFENSE_SYSTEMS) {def[s].push(fit.def[s]);}
+					for (const s of OFFENSE_SYSTEMS) {
+						off[s].push(fit.off[s]);
+					}
+					for (const s of DEFENSE_SYSTEMS) {
+						def[s].push(fit.def[s]);
+					}
 				}
 				const fit = rosterSchemeFit(players.map(fitRatingsOf));
-				for (const s of OFFENSE_SYSTEMS) {tOff[s].push(fit.off[s]);}
-				for (const s of DEFENSE_SYSTEMS) {tDef[s].push(fit.def[s]);}
+				for (const s of OFFENSE_SYSTEMS) {
+					tOff[s].push(fit.off[s]);
+				}
+				for (const s of DEFENSE_SYSTEMS) {
+					tDef[s].push(fit.def[s]);
+				}
 			}
 		});
 	}
@@ -74,6 +86,63 @@ test.skipIf(!process.env.COACH_FIT)("scheme fit baselines", async () => {
 		);
 	}
 });
+
+// The same on the rosters of generated leagues (createRandomPlayers, 30 teams): the fits in standard deviations should come out 0 / 1
+test.skipIf(!process.env.COACH_FIT_LEAGUE)(
+	"scheme fit in generated leagues",
+	async () => {
+		const off = Object.fromEntries(OFFENSE_SYSTEMS.map((s) => [s, []]));
+		const def = Object.fromEntries(DEFENSE_SYSTEMS.map((s) => [s, []]));
+		const tOff = Object.fromEntries(OFFENSE_SYSTEMS.map((s) => [s, []]));
+		const tDef = Object.fromEntries(DEFENSE_SYSTEMS.map((s) => [s, []]));
+		const orig = Math.random;
+		Math.random = makeSeededRandom(3);
+		for (const rep of range(Number(process.env.COACH_REPS ?? 3))) {
+			resetG();
+			g.setWithoutSavingToDB("expandedRatings", rep % 2 === 0);
+			await resetCache({});
+			const players = await createRandomPlayers({
+				activeTids: range(30),
+				onlyFreeAgents: false,
+				scoutingLevel: DEFAULT_LEVEL,
+				teams: range(30).map((tid) => ({ tid })),
+			});
+			for (const tid of range(30)) {
+				const roster = players
+					.filter((p) => p.tid === tid)
+					.sort((a, b) => b.ratings.at(-1).ovr - a.ratings.at(-1).ovr);
+				for (const p of roster.slice(0, 9)) {
+					const fit = playerSchemeFit(fitRatingsOf(p));
+					for (const s of OFFENSE_SYSTEMS) {
+						off[s].push(fit.off[s]);
+					}
+					for (const s of DEFENSE_SYSTEMS) {
+						def[s].push(fit.def[s]);
+					}
+				}
+				const fit = rosterSchemeFit(roster.map(fitRatingsOf));
+				for (const s of OFFENSE_SYSTEMS) {
+					tOff[s].push(fit.off[s]);
+				}
+				for (const s of DEFENSE_SYSTEMS) {
+					tDef[s].push(fit.def[s]);
+				}
+			}
+		}
+		Math.random = orig;
+		for (const [name, a, b] of [
+			["off", off, tOff],
+			["def", def, tDef],
+		]) {
+			for (const s of Object.keys(a)) {
+				console.log(
+					`${name} ${s}: player mean ${f(mean(a[s]), 3)} sd ${f(sd(a[s]), 3)}, team mean ${f(mean(b[s]), 3)} sd ${f(sd(b[s]), 3)}`,
+				);
+			}
+		}
+	},
+	600_000,
+);
 
 test.skipIf(!process.env.COACH_CAL)(
 	"coaching systems calibration",
@@ -153,7 +222,9 @@ test.skipIf(!process.env.COACH_CAL)(
 		console.log("offense system | n | 3PA rate (on - off) | pace | ORB% | net");
 		for (const s of OFFENSE_SYSTEMS) {
 			const rows = byOff[s] ?? [];
-			if (rows.length === 0) {continue;}
+			if (rows.length === 0) {
+				continue;
+			}
 			const d = (k) => mean(rows.map((r) => r.on[k] - r.off[k]));
 			console.log(
 				`${OFFENSE_NAMES[s]} | ${rows.length} | ${f(d("tpaRate"))} | ${f(d("pace"), 1)} | ${f(d("orbp"))} | ${f(d("net"), 1)}`,
@@ -162,7 +233,9 @@ test.skipIf(!process.env.COACH_CAL)(
 		console.log("defense system | n | TOV forced/100 (on - off) | net");
 		for (const s of DEFENSE_SYSTEMS) {
 			const rows = byDef[s] ?? [];
-			if (rows.length === 0) {continue;}
+			if (rows.length === 0) {
+				continue;
+			}
 			const d = (k) => mean(rows.map((r) => r.on[k] - r.off[k]));
 			console.log(
 				`${DEFENSE_NAMES[s]} | ${rows.length} | ${f(d("tovForced"), 2)} | ${f(d("net"), 1)}`,

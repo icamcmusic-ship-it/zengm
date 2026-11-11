@@ -9,6 +9,7 @@ import { genTeams, withSeededRandom } from "./simLiveGameForTests.ts";
 import {
 	coachSimEffects,
 	deriveCoachProfile,
+	leagueRelativeFits,
 	normalizeCoachSims,
 	rosterSchemeFit,
 	type CoachSim,
@@ -59,6 +60,12 @@ export const genLeague = async ({
 }) => {
 	const random = makeSeededRandom(seed * 31 + 7);
 	const teams: LeagueTeam[] = [];
+	const raw: {
+		c: ReturnType<typeof randomCoach>;
+		profile: CoachProfile;
+		fit: ReturnType<typeof rosterSchemeFit>;
+		players: any[];
+	}[] = [];
 	for (const pair of range(numPairs)) {
 		await withSeededRandom(seed * 1009 + pair * 97, async () => {
 			await genTeams();
@@ -69,25 +76,34 @@ export const genLeague = async ({
 				const players = (
 					await idb.cache.players.indexGetAll("playersByTid", tid)
 				).sort((a, b) => b.valueNoPot - a.valueNoPot);
-				const fit = rosterSchemeFit(players.map(fitRatingsOf));
-				const c = randomCoach(random, teams.length);
-				const profile = deriveCoachProfile(c);
-				teams.push({
-					profile,
-					head: c.ratings,
-					offFit: fit.off[profile.off],
-					defFit: fit.def[profile.def],
-					sim: coachSimEffects({
-						profile,
-						head: c.ratings,
-						install,
-						offFit: fit.off[profile.off],
-						defFit: fit.def[profile.def],
-						style: c.style,
-					}),
+				const c = randomCoach(random, raw.length);
+				raw.push({
+					c,
+					profile: deriveCoachProfile(c),
+					fit: rosterSchemeFit(players.map(fitRatingsOf)),
 					players: structuredClone(players),
 				});
 			}
+		});
+	}
+	// Fits relative to this league's rosters, like staff/systems.ts getRosterFit
+	const rel = leagueRelativeFits(raw.map((r) => r.fit));
+	for (const [i, { c, profile, players }] of raw.entries()) {
+		const fit = rel[i]!;
+		teams.push({
+			profile,
+			head: c.ratings,
+			offFit: fit.off[profile.off],
+			defFit: fit.def[profile.def],
+			sim: coachSimEffects({
+				profile,
+				head: c.ratings,
+				install,
+				offFit: fit.off[profile.off],
+				defFit: fit.def[profile.def],
+				style: c.style,
+			}),
+			players,
 		});
 	}
 	const normalized = normalizeCoachSims(teams.map((t) => t.sim));

@@ -19,6 +19,7 @@ import {
 	rosterSchemeFit,
 	seriesAdjustment,
 	hashString,
+	leagueRelativeFits,
 	type CoachSim,
 	type FitRatings,
 	type SystemTrends,
@@ -142,8 +143,43 @@ const rosterOf = async (tid: number) => {
 		.sort((a, b) => b.valueNoPot - a.valueNoPot);
 };
 
-export const getRosterFit = async (tid: number) =>
-	rosterSchemeFit((await rosterOf(tid)).map(fitRatingsOf));
+// Every team's roster fit, relative to the league's other rosters (leagueRelativeFits). Cached until the next day of games, hire, trade
+// window... (clearCoachSystemsCache, or a new key)
+let fitsCache:
+	| {
+			key: string;
+			time: number;
+			fits: Map<number, ReturnType<typeof rosterSchemeFit>>;
+	  }
+	| undefined;
+
+const getLeagueFits = async (key?: string) => {
+	const fullKey = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}|${key}`;
+	// (without a key, for pages and the offseason: good for a few seconds, so a loop over teams computes it once)
+	if (
+		fitsCache &&
+		fitsCache.key === fullKey &&
+		(key !== undefined || Date.now() - fitsCache.time < 3000)
+	) {
+		return fitsCache.fits;
+	}
+	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	const raw = [];
+	for (const t of teams) {
+		raw.push(rosterSchemeFit((await rosterOf(t.tid)).map(fitRatingsOf)));
+	}
+	const rel = leagueRelativeFits(raw);
+	const fits = new Map(teams.map((t, i) => [t.tid, rel[i]!]));
+	fitsCache = { key: fullKey, time: Date.now(), fits };
+	return fits;
+};
+
+export const getRosterFit = async (tid: number, key?: string) => {
+	const fits = await getLeagueFits(key);
+	return (
+		fits.get(tid) ?? rosterSchemeFit((await rosterOf(tid)).map(fitRatingsOf))
+	);
+};
 
 /**
  * How well a player fits a team's head coach's systems, for mood, free agency and AI GMs. In standard deviations among rotation players (-2 bad ... 2 great); 0 with the
@@ -224,6 +260,7 @@ let leagueCache:
 
 export const clearCoachSystemsCache = () => {
 	leagueCache = undefined;
+	fitsCache = undefined;
 };
 
 // Every team's sim multipliers, normalized over the league (common/coachSystems.ts normalizeCoachSims). Cached for a day of games
@@ -241,7 +278,7 @@ export const getLeagueCoachSystems = async (day?: number) => {
 			continue;
 		}
 		const profile = getCoachProfile(head);
-		const fit = await getRosterFit(t.tid);
+		const fit = await getRosterFit(t.tid, `day${day}`);
 		const install = await installProgress(head, profile);
 		const offFit = fit.off[profile.off];
 		const defFit = fit.def[profile.def];
@@ -788,7 +825,7 @@ export const getTeamHiringContext = async (
 	return {
 		tid,
 		strategy: t?.strategy ?? "contending",
-		fit: rosterSchemeFit(roster.map(fitRatingsOf)),
+		fit: await getRosterFit(tid),
 		numYoung: roster.slice(0, 10).filter((p) => season - p.born.year <= 24)
 			.length,
 	};

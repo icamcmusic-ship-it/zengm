@@ -755,41 +755,41 @@ const weighted = (a: Attributes, needs: Partial<Attributes>) => {
 // Average raw fit of league players for each system, so a player's or team's fit is relative to what's typical for that system (measured
 // on random leagues' rotation players, coachSystems.test.ts)
 const OFFENSE_BASELINE: Record<OffenseSystem, number> = {
-	motion: 0.4427,
-	paceSpace: 0.493,
-	heliocentric: 0.4945,
-	post: 0.4685,
-	iso: 0.4934,
-	princeton: 0.44,
-	sevenSeconds: 0.518,
+	motion: 0.4757,
+	paceSpace: 0.4781,
+	heliocentric: 0.4859,
+	post: 0.4615,
+	iso: 0.4875,
+	princeton: 0.4741,
+	sevenSeconds: 0.4873,
 };
 const DEFENSE_BASELINE: Record<DefenseSystem, number> = {
-	switch: 0.5405,
-	drop: 0.5085,
-	blitz: 0.5221,
-	packPaint: 0.4821,
-	zone: 0.4558,
-	press: 0.521,
+	switch: 0.5114,
+	drop: 0.5033,
+	blitz: 0.5148,
+	packPaint: 0.5007,
+	zone: 0.4909,
+	press: 0.5088,
 };
 
 // Spread of the fits (raw, before standardizing) among rotation players and teams of generated leagues, so fits come out in standard
 // deviations (coachSystems.script.test.ts "scheme fit baselines")
 const OFFENSE_PLAYER_SD: Record<OffenseSystem, number> = {
-	motion: 0.0182,
-	paceSpace: 0.0459,
-	heliocentric: 0.0326,
-	post: 0.0965,
-	iso: 0.0302,
-	princeton: 0.0454,
-	sevenSeconds: 0.0496,
+	motion: 0.0247,
+	paceSpace: 0.0465,
+	heliocentric: 0.0347,
+	post: 0.0927,
+	iso: 0.0301,
+	princeton: 0.0477,
+	sevenSeconds: 0.0576,
 };
 const DEFENSE_PLAYER_SD: Record<DefenseSystem, number> = {
-	switch: 0.0455,
-	drop: 0.0205,
-	blitz: 0.0521,
-	packPaint: 0.0663,
-	zone: 0.0779,
-	press: 0.0649,
+	switch: 0.0481,
+	drop: 0.0391,
+	blitz: 0.0553,
+	packPaint: 0.0701,
+	zone: 0.0742,
+	press: 0.0741,
 };
 const OFFENSE_TEAM_SD: Record<OffenseSystem, number> = {
 	motion: 0.0074,
@@ -945,6 +945,34 @@ export const rosterSchemeFit = (players: FitRatings[]) => {
 		def[s] = def[s] / DEFENSE_TEAM_SD[s] - DEFENSE_TEAM_MEAN[s];
 	}
 	return { off, def };
+};
+
+type RosterFit = ReturnType<typeof rosterSchemeFit>;
+
+// Fits relative to the league: for each system, in standard deviations among the league's teams (so "a good Pace & Space roster" means
+// good compared with the other rosters in this league, whatever the era's players look like)
+export const leagueRelativeFits = (fits: RosterFit[]): RosterFit[] => {
+	const out = fits.map((f) => ({ off: { ...f.off }, def: { ...f.def } }));
+	if (fits.length < 4) {
+		return out;
+	}
+	const norm = <T extends string>(
+		keys: T[],
+		get: (f: RosterFit) => Record<T, number>,
+	) => {
+		for (const k of keys) {
+			const xs = fits.map((f) => get(f)[k]);
+			const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+			const sd =
+				Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length) || 1;
+			for (const o of out) {
+				get(o)[k] = (get(o)[k] - m) / sd;
+			}
+		}
+	};
+	norm(OFFENSE_SYSTEMS, (f) => f.off);
+	norm(DEFENSE_SYSTEMS, (f) => f.def);
+	return out;
 };
 
 // Fit (in standard deviations) as a 0-100 score for display (50 = typical, 65 = 1 SD better)

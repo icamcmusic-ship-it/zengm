@@ -26,6 +26,8 @@ const env = (globalThis as any).process.env;
 const MODE: string | undefined = env.SIM_BENCH;
 const SEED = Number(env.SIM_BENCH_SEED ?? 1);
 const FEATURE: string | undefined = env.SIM_BENCH_FEATURE;
+// With SIM_BENCH=on, a feature to leave off (to measure what one feature costs on top of all the others)
+const WITHOUT: string | undefined = env.SIM_BENCH_WITHOUT;
 
 // Let background work scheduled with setTimeout (achievements checks, ...) finish inside the phase it belongs to
 const drain = async () => {
@@ -68,7 +70,8 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 		const settings: any = getDefaultSettings();
 		if (MODE !== "stock") {
 			for (const f of NATIVE_FEATURES) {
-				settings[f.key] = MODE === "on" || f.id === FEATURE;
+				settings[f.key] =
+					(MODE === "on" && f.id !== WITHOUT) || f.id === FEATURE;
 			}
 		}
 		await league.createStream(
