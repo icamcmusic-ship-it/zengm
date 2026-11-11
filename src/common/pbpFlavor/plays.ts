@@ -263,14 +263,14 @@ export const freeThrow = (
 					`${n} drops in the ${ord} free throw`,
 					`${n} is good on the ${ord}`,
 					`${n} buries the ${ord} free throw`,
-					`${n}'s ${ord} free throw is good`,
+					`${n} is true on the ${ord} free throw`,
 					`${n} puts the ${ord} one through`,
 					`${n} converts the ${ord}`,
 					`${n} cans the ${ord} free throw`,
-					`${n}'s ${ord} one drops`,
+					`${n} gets the ${ord} one to drop`,
 					`${n} takes his time and makes the ${ord}`,
 					`${n} rattles in the ${ord} free throw`,
-					`${n}'s ${ord} free throw catches nothing but net`,
+					`${n} swishes the ${ord} one`,
 					`${n} is on target with the ${ord}`,
 				])
 			: pickV(rng, [
@@ -306,7 +306,7 @@ export const freeThrow = (
 						`${n} hits the second, and that's both`,
 						`${n} takes both points from the line`,
 						`${n} is good again: two free throws, two makes`,
-						`${n}'s second one drops as well`,
+						`${n} gets the second to drop as well`,
 						`${n} cashes in both free throws`,
 					])
 				: pickV(rng, [

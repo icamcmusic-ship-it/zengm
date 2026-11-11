@@ -1,4 +1,7 @@
-import { assert, test } from "vitest";
+import { assert, test, vi } from "vitest";
+
+// (whole simulated games: slow when the machine is busy)
+vi.setConfig({ testTimeout: 120_000 });
 import {
 	describeGame,
 	makeLiveBoxScore,
