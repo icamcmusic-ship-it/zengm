@@ -15,6 +15,7 @@ import {
 	type TraitViewContext,
 } from "../util/playerTraitsView.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
+import { getClassShape } from "../core/draft/classShape.ts";
 
 const getSeason = async (
 	playersAll: Player[],
@@ -100,6 +101,9 @@ const getSeason = async (
 	return {
 		players: players2,
 		season,
+		// Draft Class Shapes setting
+		shape:
+			__SPORT === "basketball" ? getClassShape(playersAllFiltered) : undefined,
 
 		// How many of these prospects have college stats, for the generate college stats button
 		numWithCollegeStats: playersAllFiltered.filter((p) => hasPreDraftStats(p))

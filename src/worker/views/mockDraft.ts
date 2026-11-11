@@ -2,6 +2,9 @@ import { featureOffError } from "../util/nativeFeatures.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { getMockDraftSeason } from "../core/draft/mockDraftData.ts";
+import { getClassShape } from "../core/draft/classShape.ts";
+import { idb } from "../db/index.ts";
+import { PLAYER } from "../../common/constants.ts";
 
 /**
  * Mock Draft tab of Draft Scouting. The draft itself is run on demand through the API (runMockDraft, getProProjections),
@@ -9,7 +12,7 @@ import { getMockDraftSeason } from "../core/draft/mockDraftData.ts";
  */
 export default defineView({
 	id: "mockDraft",
-	load: ({ updateEvents }) => {
+	load: async ({ updateEvents }) => {
 		const featureOff = featureOffError("mockDraft");
 		if (featureOff) {
 			return featureOff;
@@ -22,8 +25,20 @@ export default defineView({
 		) {
 			return;
 		}
+		const season = getMockDraftSeason() ?? g.get("season") + 1;
+		const prospects =
+			__SPORT === "basketball"
+				? (
+						await idb.cache.players.indexGetAll(
+							"playersByTid",
+							PLAYER.UNDRAFTED,
+						)
+					).filter((p) => p.draft.year === season)
+				: [];
 		return {
-			season: getMockDraftSeason() ?? g.get("season") + 1,
+			// Draft Class Shapes setting
+			shape: getClassShape(prospects),
+			season,
 			phase: g.get("phase"),
 			userTids: g.get("userTids"),
 		};

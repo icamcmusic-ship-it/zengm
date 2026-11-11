@@ -513,6 +513,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "draftClassShapes",
+		key: "featureDraftClassShapes",
+		name: "Draft Class Shapes",
+		description:
+			"Every draft class the game generates gets a shape (a deep class, a top-heavy one, a weak one, a generational talent, a guard-heavy or big man class, an international class, a high-upside class...) that reshapes its talent, positions, ages and origins within realistic bounds, shown on Draft Scouting. Balanced so the average class is as good as before. Imported and uploaded classes are never reshaped.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "ratingsRegenerator",
 		key: "featureRatingsRegenerator",
 		name: "Ratings Regenerator",

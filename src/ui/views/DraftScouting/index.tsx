@@ -149,6 +149,7 @@ const DraftScouting = ({
 								offset={offset}
 								players={info.players}
 								season={info.season}
+								shape={info.shape}
 								scoutingRemaining={scoutingStatus?.remaining}
 							/>
 						</div>

@@ -1169,7 +1169,9 @@ const writeSeasonSummary = (season: NcaaSeason): string[] => {
 								`Every March has a story, and this one belonged to ${run.school}. The ${run.ncaaSeed} seed out of the ${run.conf} got hot at the right time and did not cool off until the ${roundReached(run.ncaa)}${run.ncaa === "Champion" ? ", cutting down the nets at the end of it" : ""}.`,
 								`${run.school}, a ${run.ncaaSeed} seed from the ${run.conf}, became the darling of the bracket, reaching the ${roundReached(run.ncaa)}.`,
 							])
-						: `${run.school}, a ${run.ncaaSeed} seed from the ${run.conf}, came into the tournament as the hottest team in the country, but the glass slipper did not fit: it went out in the ${roundReached(run.ncaa)}.`,
+						: depth === 4
+							? `${run.school}, a ${run.ncaaSeed} seed from the ${run.conf}, came into the tournament as the hottest team in the country and pulled off its upset, but the glass slipper came off in the ${roundReached(run.ncaa)}.`
+							: `${run.school}, a ${run.ncaaSeed} seed from the ${run.conf}, came into the tournament as the hottest team in the country, but the glass slipper did not fit: it went out in the ${roundReached(run.ncaa)}.`,
 				);
 			}
 			break;

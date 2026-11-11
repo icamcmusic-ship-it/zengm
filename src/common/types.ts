@@ -1551,6 +1551,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	// Basketball: his team's college season in his draft year (conference tournaments, March Madness), see common/collegeStats/ncaa.ts
 	collegeSeason?: StoredCollegeSeason;
 
+	// Basketball, the Draft Class Shapes setting: the shape his class was given (a key of DRAFT_CLASS_SHAPES), or "pending" between being generated and being shaped
+	draftClassShape?: string;
+
 	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
 	archetypes?: StoredArchetype[];
 	real?: boolean;
