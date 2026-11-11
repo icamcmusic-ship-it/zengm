@@ -11,6 +11,7 @@ import {
 	SKILL_COMBOS,
 	badgeScore,
 	badgeTitle,
+	getComboDetails,
 	getDisplayBadges,
 	getSkillBadges,
 	capDisplayItems,
@@ -252,4 +253,51 @@ describe("skill badges", () => {
 			assert.isAtMost((comboCounts[def.label] ?? 0) / scale, 60, def.label);
 		}
 	}, 120000);
+});
+
+describe("combo details", () => {
+	test("a combo made of combos (Scoring machine) gets a finite margin from its parts, every displayed combo has its parts", () => {
+		let numNested = 0;
+		for (const hi of [80, 85, 90, 95, 100]) {
+			for (const lo of [30, 50, 70]) {
+				const r: BadgeRatings = {
+					...base,
+					ins: hi,
+					dnk: hi,
+					fg: hi,
+					tp: hi,
+					ft: hi,
+					oiq: hi,
+					drb: hi,
+					spd: hi,
+					jmp: hi,
+					pss: lo,
+					reb: lo,
+					diq: lo,
+				};
+				const skillsList = ["3", "B", "Po", "V"];
+				const display = getDisplayBadges(r, skillsList);
+				const details = getComboDetails(r, skillsList);
+				for (const label of display) {
+					const combo = SKILL_COMBOS.find((c) => c.label === label);
+					if (!combo) {
+						continue;
+					}
+					const detail = details.get(label);
+					assert.isDefined(detail, label);
+					assert.isAbove(detail!.parts.length, 0, label);
+					assert.isTrue(
+						Number.isFinite(detail!.margin),
+						`${label} ${detail!.margin}`,
+					);
+					if (
+						detail!.parts.some((c) => SKILL_COMBOS.some((x) => x.label === c))
+					) {
+						numNested += 1;
+					}
+				}
+			}
+		}
+		assert.isAbove(numNested, 0);
+	});
 });
