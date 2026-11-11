@@ -143,6 +143,7 @@ const TeamsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 		return null;
 	}
 	const estimated = preDraft.seasons.some((s) => s.record.estimated);
+	const hasNotes = preDraft.seasons.some((s) => s.notes.length > 0);
 	return (
 		<HideableSection
 			title="Teams"
@@ -167,6 +168,7 @@ const TeamsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 							<th>Postseason</th>
 							<th title="Games played">G</th>
 							<th title="Games started">GS</th>
+							{hasNotes ? <th>Notes</th> : null}
 						</tr>
 					</thead>
 					<tbody>
@@ -203,8 +205,11 @@ const TeamsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 									{s.apRank !== undefined ? `, AP #${s.apRank}` : null}
 								</td>
 								<td>{s.ncaa ?? null}</td>
-								<td>{s.gp}</td>
-								<td>{s.gs}</td>
+								<td>{s.status === "redshirt" ? "-" : s.gp}</td>
+								<td>{s.status === "redshirt" ? "-" : s.gs}</td>
+								{hasNotes ? (
+									<td className="text-nowrap">{s.notes.join("; ")}</td>
+								) : null}
 							</tr>
 						))}
 					</tbody>
@@ -523,6 +528,118 @@ const CompsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 	);
 };
 
+const RecruitingSection = ({ preDraft }: { preDraft: PreDraft }) => {
+	const r = preDraft.recruiting;
+	if (!r) {
+		return null;
+	}
+	const others = r.offers.filter((name) => name !== r.committed);
+	const more = r.offerCount - r.offers.length;
+	return (
+		<HideableSection
+			title="Recruiting"
+			description={`High school class of ${r.classOf}. Ranks are among the recruits of that class.`}
+		>
+			<dl
+				className="mb-3"
+				data-testid="pre-draft-recruiting-details"
+				style={{ maxWidth: 900 }}
+			>
+				<div className="mb-1">
+					<dt className="d-inline">Ranking: </dt>
+					<dd className="d-inline">
+						<Stars n={r.stars} />{" "}
+						{r.nationalRank !== undefined
+							? `#${r.nationalRank} nationally${r.posRank !== undefined ? `, #${r.posRank} ${r.pos}` : ""}`
+							: "Not ranked by the recruiting services"}
+					</dd>
+				</div>
+				<div className="mb-1">
+					<dt className="d-inline">Composite rating: </dt>
+					<dd className="d-inline">{r.composite.toFixed(4)}</dd>
+				</div>
+				<div className="mb-1">
+					<dt className="d-inline">Signed with: </dt>
+					<dd className="d-inline">
+						<SchoolBadge name={r.committed} /> {r.committed}
+						{r.jucoStart ? " (junior college)" : null},{" "}
+						{r.signing === "early"
+							? "early signing period (November)"
+							: "late signing period (April)"}
+						{r.reclassifiedFrom !== undefined
+							? `, after reclassifying from the class of ${r.reclassifiedFrom}`
+							: null}
+					</dd>
+				</div>
+				<div className="mb-1">
+					<dt className="d-inline">
+						{r.offerCount} {r.offerCount === 1 ? "offer" : "offers"}:{" "}
+					</dt>
+					<dd className="d-inline">
+						{others.length > 0
+							? `${[r.committed, ...others].join(", ")}${more > 0 ? ` and ${more} more` : ""}`
+							: r.committed}
+					</dd>
+				</div>
+				{r.finalists.length > 1 ? (
+					<div className="mb-1">
+						<dt className="d-inline">Finalists: </dt>
+						<dd className="d-inline">{r.finalists.join(", ")}</dd>
+					</div>
+				) : null}
+				{r.allStar.length > 0 ? (
+					<div className="mb-1">
+						<dt className="d-inline">High school honors: </dt>
+						<dd className="d-inline">{r.allStar.join(", ")}</dd>
+					</div>
+				) : null}
+			</dl>
+		</HideableSection>
+	);
+};
+
+const ScoutingReportSection = ({ preDraft }: { preDraft: PreDraft }) => {
+	const report = preDraft.scoutingReport;
+	if (!report) {
+		return null;
+	}
+	return (
+		<HideableSection
+			title="Scouting report"
+			description={`Based on: ${report.basis.replace(/^./, (c) => c.toLowerCase())}`}
+		>
+			<div data-testid="pre-draft-scouting-report" style={{ maxWidth: 900 }}>
+				<p className="mb-2">{report.summary}</p>
+				<div className="row">
+					{report.strengths.length > 0 ? (
+						<div className="col-md-6">
+							<div className="fw-bold text-success">Strengths</div>
+							<ul className="ps-3 mb-2">
+								{report.strengths.map((text, i) => (
+									<li key={i}>{text}</li>
+								))}
+							</ul>
+						</div>
+					) : null}
+					{report.weaknesses.length > 0 ? (
+						<div className="col-md-6">
+							<div className="fw-bold text-danger">Weaknesses</div>
+							<ul className="ps-3 mb-2">
+								{report.weaknesses.map((text, i) => (
+									<li key={i}>{text}</li>
+								))}
+							</ul>
+						</div>
+					) : null}
+				</div>
+				<p className="mb-3">
+					<b>Projection:</b> {report.projection}
+				</p>
+			</div>
+		</HideableSection>
+	);
+};
+
 const OverviewCards = ({
 	preDraft,
 	pid,
@@ -568,8 +685,10 @@ const OverviewCards = ({
 						High school recruit, class of {r.classOf}
 					</div>
 					<div>
-						<Stars n={r.stars} /> #{r.nationalRank} national, #{r.posRank}{" "}
-						{r.pos}
+						<Stars n={r.stars} />{" "}
+						{r.nationalRank !== undefined
+							? `#${r.nationalRank} national${r.posRank !== undefined ? `, #${r.posRank} ${r.pos}` : ""}`
+							: `Unranked ${r.pos}`}
 					</div>
 				</div>
 			) : null}
@@ -677,6 +796,16 @@ const PlayerPreDraft = ({
 			) : (
 				<>
 					<OverviewCards preDraft={preDraft} pid={player.pid} />
+					{preDraft.story ? (
+						<p
+							className="alert alert-info py-2"
+							data-testid="pre-draft-story"
+							style={{ maxWidth: 900 }}
+						>
+							<b>{preDraft.story.title}.</b> {preDraft.story.text}
+						</p>
+					) : null}
+					<ScoutingReportSection preDraft={preDraft} />
 					<TeamsSection preDraft={preDraft} />
 					<StatsSection preDraft={preDraft} />
 					<div className="row">
@@ -690,6 +819,7 @@ const PlayerPreDraft = ({
 						</div>
 					</div>
 					<SplitsSection preDraft={preDraft} />
+					<RecruitingSection preDraft={preDraft} />
 					<CombineSection preDraft={preDraft} />
 					<StockSection preDraft={preDraft} />
 					<CompsSection preDraft={preDraft} />

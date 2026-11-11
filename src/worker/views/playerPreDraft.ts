@@ -35,13 +35,32 @@ import {
 	getClub,
 	getCombine,
 	getHeadCoach,
-	getRecruiting,
+	getRecruitingExtras,
 	getStockTimeline,
+	starsForRank,
 	prospectDistance,
 	type CombineResults,
 	type TeamRecord,
 } from "../../common/collegeStats/profile.ts";
 import type { MinimalPlayerRatings, Player } from "../../common/types.ts";
+import {
+	JUCO_LEAGUE,
+	getStoryText,
+	isJuco,
+	type CareerYear,
+	type StoredPreDraftCareer,
+} from "../../common/collegeStats/career.ts";
+import { COLLEGES } from "../../common/collegeStats/colleges.ts";
+import {
+	getScoutingReport,
+	type ReportRatings,
+} from "../../common/collegeStats/scoutingReport.ts";
+import {
+	draftRatings as draftRatingsRow,
+	getHsClassRanks,
+	getRecruitBasis,
+} from "../core/draft/recruiting.ts";
+import { archetypeFor, getLeagueNorms } from "../core/player/archetype.ts";
 import { expandedRatingsApply } from "../core/player/expandedRatings.ts";
 
 type PlayerRatings = MinimalPlayerRatings & Record<string, any>;
@@ -50,8 +69,55 @@ const CLASS_NAMES = ["Fr.", "So.", "Jr.", "Sr.", "Gr."];
 
 // His ratings row in his draft year: the last one from before he became a pro
 const draftRatings = (p: Player): PlayerRatings | undefined =>
-	p.ratings.findLast((r) => r.season <= p.draft.year) ??
-	(p.tid === PLAYER.UNDRAFTED ? p.ratings.at(-1) : undefined);
+	draftRatingsRow(p);
+
+/**
+ * His stored career (schools year by year, redshirt years, story), if it still matches his stats rows: every season he has a row for is a year of it at the same school, and every year he played has a row. Rows replaced since (an edited player, an import) leave it unused, and the page falls back to what the rows say.
+ */
+const validCareer = (
+	p: Player,
+	rows: { season: number; teamName?: string }[],
+): StoredPreDraftCareer | undefined => {
+	const career = p.preDraftCareer;
+	if (!career || !Array.isArray(career.years) || career.years.length === 0) {
+		return undefined;
+	}
+	const bySeason = new Map(career.years.map((year) => [year.season, year]));
+	if (bySeason.size !== career.years.length) {
+		return undefined;
+	}
+	for (const row of rows) {
+		const year = bySeason.get(row.season);
+		if (!year || year.school !== (row.teamName ?? p.college ?? "")) {
+			return undefined;
+		}
+	}
+	const rowSeasons = new Set(rows.map((row) => row.season));
+	if (rowSeasons.size !== rows.length) {
+		return undefined;
+	}
+	for (const year of career.years) {
+		if (year.status !== "redshirt" && !rowSeasons.has(year.season)) {
+			return undefined;
+		}
+	}
+	return career;
+};
+
+let programsCache: { name: string; strength: number }[] | undefined;
+const getPrograms = () => {
+	programsCache ??= Object.keys(COLLEGES).map((name) => ({
+		name,
+		strength: getSchool(name)!.strength,
+	}));
+	return programsCache;
+};
+
+const CAREER_NOTES: Record<string, string> = {
+	redshirt: "Redshirt year (did not play)",
+	medical: "Medical redshirt",
+	injury: "Season-ending injury",
+};
 
 const isProspect = (p: Player) =>
 	p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
@@ -170,6 +236,8 @@ const getSplits = (
 	summary: ProspectNcaaSummary,
 	seasonRow: Record<string, number> | undefined,
 	pid: number,
+	// His season ended early: the team's postseason games are not his, and are not in summary.games
+	missedPostseason: boolean,
 ): SplitRow[] => {
 	const conf = summary.games.filter((game) => game.event === "conf");
 	const ncaa = summary.games.filter((game) => game.event === "ncaa");
@@ -242,7 +310,7 @@ const getSplits = (
 		output.push(
 			{
 				name: "Non-conference",
-				record: nonConfRecord,
+				record: missedPostseason ? undefined : nonConfRecord,
 				line: nonConf,
 				estimated,
 			},
@@ -322,17 +390,53 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		return ncaaSeasons.get(season);
 	};
 
+	const career = validCareer(pRaw, rawRows);
+	// With a career: every year of it, redshirt years included. Otherwise his stats rows
+	const entries: {
+		season: number;
+		teamName: string;
+		row: (typeof rawRows)[number] | undefined;
+		year: CareerYear | undefined;
+	}[] = career
+		? career.years.map((year) => ({
+				season: year.season,
+				teamName: year.school,
+				row: rawRows.find((row) => row.season === year.season),
+				year,
+			}))
+		: rawRows.map((row) => ({
+				season: row.season,
+				teamName: row.teamName ?? pRaw.college ?? "",
+				row,
+				year: undefined,
+			}));
+
 	let collegeIndex = 0;
 	const seasons = [];
-	for (const row of rawRows) {
-		const teamName = row.teamName ?? pRaw.college ?? "";
-		const label = getPreDraftLabel(teamName);
+	let prevTeam: string | undefined;
+	for (const entry of entries) {
+		const { teamName, year } = entry;
+		const row = entry.row ?? { season: entry.season, gp: 0, gs: 0 };
+		const juco = isJuco(teamName);
+		const label = juco ? ("JUCO" as const) : getPreDraftLabel(teamName);
 		const school = getSchool(teamName);
 		const isNcaa = !!school && !school.nonCollege;
 		const env = getLeagueEnv(teamName);
-		const club = isNcaa ? undefined : getClub(teamName, pRaw.pid);
+		const club = isNcaa || juco ? undefined : getClub(teamName, pRaw.pid);
 		const coachKey = club ? `${teamName}|${club}` : teamName;
 		const coach = getHeadCoach(coachKey, row.season, label === "Overseas");
+		const notes: string[] = [];
+		if (year?.move && prevTeam !== undefined && prevTeam !== teamName) {
+			notes.push(
+				year.move === "juco"
+					? `Junior college transfer from ${prevTeam}`
+					: `Transferred from ${prevTeam}`,
+			);
+		}
+		if (year?.status) {
+			notes.push(CAREER_NOTES[year.status]!);
+		}
+		prevTeam = teamName;
 
 		let record: TeamRecord | undefined;
 		let apRank: number | undefined;
@@ -375,7 +479,8 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		record ??= estimateRecord({
 			team: coachKey,
 			season: row.season,
-			strength: school?.strength ?? 60,
+			// A junior college that sends players on to Division I wins most of its games
+			strength: juco ? 74 : (school?.strength ?? 60),
 			gp: row.gp ?? 0,
 			conference: isNcaa ? school.conference : undefined,
 		});
@@ -384,10 +489,20 @@ const getPreDraftInfo = async (pRaw: Player) => {
 			season: row.season,
 			teamName,
 			label,
-			classYear: isNcaa ? CLASS_NAMES[Math.min(collegeIndex++, 4)] : undefined,
+			classYear: year
+				? year.cls
+				: isNcaa
+					? CLASS_NAMES[Math.min(collegeIndex++, 4)]
+					: undefined,
 			conference: isNcaa ? school.conference : undefined,
-			league: isNcaa ? undefined : teamName,
-			leagueShort: isNcaa ? undefined : (PRO_SHORT[teamName] ?? teamName),
+			league: isNcaa ? undefined : juco ? JUCO_LEAGUE : teamName,
+			leagueShort: isNcaa
+				? undefined
+				: juco
+					? "JUCO"
+					: (PRO_SHORT[teamName] ?? teamName),
+			status: year?.status,
+			notes,
 			club,
 			strength: school?.strength,
 			leagueGames: env?.games,
@@ -401,18 +516,36 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		});
 	}
 
-	// Recruiting, for a player who went to an NCAA school
-	const firstNcaa = seasons.find((s) => s.conference !== undefined);
-	const recruiting =
-		firstNcaa && rDraft
-			? getRecruiting({
-					pid: pRaw.pid,
-					pot: rDraft.pot,
-					ovr: rDraft.ovr,
-					pos: rDraft.pos,
-					firstCollegeSeason: firstNcaa.season,
-				})
-			: undefined;
+	// Recruiting, for a player with a US high school path (an NCAA or junior college first stop). His ranks are his own within his high
+	// school class
+	const basis = rDraft ? getRecruitBasis(pRaw) : undefined;
+	let recruiting;
+	if (basis) {
+		const ranks = (await getHsClassRanks(basis.classOf)).get(pRaw.pid);
+		const nationalRank = ranks ? ranks.nationalRank : basis.rank;
+		const committedSchool = getSchool(basis.committed);
+		recruiting = {
+			classOf: basis.classOf,
+			pos: basis.pos,
+			nationalRank,
+			posRank: ranks ? ranks.posRank : basis.posRank,
+			stars: starsForRank(nationalRank),
+			jucoStart: basis.jucoStart,
+			reclassifiedFrom:
+				career?.story === "reclass" ? basis.classOf + 1 : undefined,
+			...getRecruitingExtras({
+				pid: pRaw.pid,
+				nationalRank,
+				committed: basis.committed,
+				committedStrength:
+					committedSchool && !committedSchool.nonCollege
+						? committedSchool.strength
+						: undefined,
+				programs: getPrograms(),
+				jucoStart: basis.jucoStart,
+			}),
+		};
+	}
 
 	// His draft class, for combine ranks and the draft board
 	const classPlayers = (await idb.merged.players.getAll({ draftYear })).filter(
@@ -465,11 +598,48 @@ const getPreDraftInfo = async (pRaw: Player) => {
 	}
 	const stock = getStockTimeline({
 		pid: pRaw.pid,
-		seasons: rawRows.map((row) => row.season),
+		seasons: entries.map((entry) => entry.season),
 		finalPick,
 		numPicks,
-		recruitRank: recruiting?.nationalRank,
+		// Not ranked out of high school: nowhere near a draft board when he started
+		recruitRank: recruiting
+			? (recruiting.nationalRank ?? (career && !career.story ? 700 : undefined))
+			: undefined,
 		drafted,
+		story: career?.story,
+	});
+
+	// His story, if he is one of his class's unusual prospects
+	let story;
+	const lastEntry = entries.at(-1);
+	if (career?.story && lastEntry) {
+		const first = entries[0]!;
+		story = {
+			kind: career.story,
+			...getStoryText(career.story, {
+				hsClass: career.hsClass,
+				recruitRank: recruiting?.nationalRank,
+				heightInches: pRaw.hgt,
+				ageAtDraft: draftYear - pRaw.born.year,
+				school: lastEntry.teamName,
+				conference: seasons.at(-1)?.conference,
+				firstSeason: first.season,
+				firstAge: first.season - pRaw.born.year,
+				lastGp: lastEntry.row?.gp ?? 0,
+				lastSeason: lastEntry.season,
+			}),
+		};
+	}
+
+	const scoutingReport = await getReport(pRaw, {
+		rDraft,
+		lastSeason: seasons.findLast((x) => x.gp > 0),
+		lastRow: perGame.rows.at(-1),
+		pick: finalPick <= numPicks ? finalPick : undefined,
+		numPicks,
+		drafted,
+		prospect,
+		story: career?.story,
 	});
 
 	// Similar prospects from past classes in this league
@@ -484,6 +654,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 					summary,
 					rawRows.findLast((row) => row.season === summary.season) as any,
 					pRaw.pid,
+					career?.years.at(-1)?.status === "injury",
 				)
 			: [];
 
@@ -515,7 +686,125 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		combine: combineInfo,
 		stock,
 		comps,
+		story,
+		scoutingReport,
 	};
+};
+
+const REPORT_RATINGS = [
+	"hgt",
+	"stre",
+	"spd",
+	"jmp",
+	"endu",
+	"ins",
+	"dnk",
+	"ft",
+	"fg",
+	"tp",
+	"oiq",
+	"diq",
+	"drb",
+	"pss",
+	"reb",
+	"ovr",
+	"pot",
+] as const;
+
+/**
+ * His draft year ratings as the user's scouts see them: scouting fuzz applied to everything but height (as everywhere ratings are shown), or undefined when ratings are hidden (the no visible ratings challenge). The scouting report is written from these and never from the true ratings.
+ */
+export const getScoutedRatings = (
+	p: Player,
+	r: PlayerRatings | undefined,
+): ReportRatings | undefined => {
+	if (!r || (g.get("challengeNoRatings") && p.tid !== PLAYER.RETIRED)) {
+		return undefined;
+	}
+	const out = {} as ReportRatings;
+	for (const key of REPORT_RATINGS) {
+		const value = (r as any)[key];
+		if (typeof value !== "number") {
+			return undefined;
+		}
+		out[key] = key === "hgt" ? value : player.fuzzRating(value, r.fuzz ?? 0);
+	}
+	return out;
+};
+
+const getReport = async (
+	p: Player,
+	{
+		rDraft,
+		lastSeason,
+		lastRow,
+		pick,
+		numPicks,
+		drafted,
+		prospect,
+		story,
+	}: {
+		rDraft: PlayerRatings | undefined;
+		lastSeason:
+			| { teamName: string; club?: string; classYear?: string }
+			| undefined;
+		lastRow: Record<string, any> | undefined;
+		pick: number | undefined;
+		numPicks: number;
+		drafted: boolean;
+		prospect: boolean;
+		story: string | undefined;
+	},
+) => {
+	if (!rDraft) {
+		return undefined;
+	}
+	const ratings = getScoutedRatings(p, rDraft);
+	// The archetype label the Draft Scouting page shows (from fuzzed ratings). Only for a prospect: a pro's label is from his current ratings, not his draft year
+	const archetype =
+		prospect && ratings
+			? archetypeFor(p, await getLeagueNorms())?.view.label
+			: undefined;
+	const production =
+		lastSeason && lastRow && (lastRow.gp ?? 0) > 0
+			? {
+					team: lastSeason.club ?? lastSeason.teamName,
+					classYear: lastSeason.classYear,
+					gp: lastRow.gp,
+					min: lastRow.min,
+					pts: lastRow.pts,
+					trb: lastRow.trb,
+					ast: lastRow.ast,
+					stl: lastRow.stl,
+					blk: lastRow.blk,
+					tov: lastRow.tov,
+					fgPct: lastRow.fgp,
+					tpPct: lastRow.tpp,
+					tpa: lastRow.tpa,
+					ftPct: lastRow.ftp,
+					fta: lastRow.fta,
+				}
+			: undefined;
+	if (!ratings && !production) {
+		return undefined;
+	}
+	return getScoutingReport({
+		pid: p.pid,
+		pos: rDraft.pos,
+		age: p.draft.year - p.born.year,
+		heightInches: p.hgt,
+		ratings,
+		archetype,
+		production,
+		pick,
+		numPicks,
+		drafted,
+		looks:
+			prospect && g.get("scoutingSystem")
+				? (p.scouting ?? []).length
+				: undefined,
+		story,
+	});
 };
 
 const getComps = async (pRaw: Player, rDraft: PlayerRatings, fuzz: number) => {

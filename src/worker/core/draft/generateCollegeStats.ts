@@ -13,6 +13,7 @@ import {
 	type ClassNcaaSeason,
 } from "./collegeSeason.ts";
 import { hasPreDraftStats } from "../../../common/preDraft.ts";
+import { assignRecruitRanks } from "./recruiting.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
@@ -74,6 +75,7 @@ export const toCollegeProspect = (
 		ratings: projected,
 		college: p.college ?? "",
 		bornLoc: p.born.loc,
+		heightInches: p.hgt,
 	};
 };
 
@@ -158,10 +160,21 @@ export const generateCollegeStats = async ({
 		if (p.college === "" && result.school !== "") {
 			p.college = result.school;
 		}
+		// His years before the draft. The recruiting ranking is set below, against the rest of his high school class
+		if (result.career) {
+			p.preDraftCareer = structuredClone(result.career);
+		} else {
+			delete p.preDraftCareer;
+		}
 
 		numSeasons += rows.length;
 		numHonors += result.honors.length;
-		await idb.cache.players.put(p);
+	}
+	await assignRecruitRanks(players);
+	for (const p of players) {
+		if (resultsByKey.has(String(p.pid))) {
+			await idb.cache.players.put(p);
+		}
 	}
 
 	await storeCollegeSeasonMarkers({
@@ -186,11 +199,13 @@ export const removeCollegeStats = async (draftYear: number) => {
 		if (
 			stats.length !== p.stats.length ||
 			awards.length !== p.awards.length ||
-			p.collegeSeason
+			p.collegeSeason ||
+			p.preDraftCareer
 		) {
 			p.stats = stats;
 			p.awards = awards;
 			delete p.collegeSeason;
+			delete p.preDraftCareer;
 			numPlayers += 1;
 			await idb.cache.players.put(p);
 		}
