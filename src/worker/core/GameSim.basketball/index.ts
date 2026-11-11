@@ -52,6 +52,15 @@ import {
 } from "../../../common/coachSystems.ts";
 import { choice, truncGauss, uniform } from "../../../common/random.ts";
 import {
+	CREATION,
+	CREATION_POWER,
+	lineupSpacing,
+	SPACING,
+	spacingAround,
+	synergySpacingFactor,
+	type LineupSpacing,
+} from "./spacingCreation.ts";
+import {
 	lateGameSituationWeight,
 	teamChemistryBonus,
 	teamSwitchDefenseBonus,
@@ -156,7 +165,8 @@ type CompositeRating =
 	| "stealing"
 	| "turnovers"
 	| "usage"
-	| "jumpBall";
+	| "jumpBall"
+	| "creation";
 // Expanded ratings calibration (see docs/native-features.md, Expanded ratings): keeps league blocks and field goal percentages the same as with the
 // setting off
 const EXPANDED_BLK_FACTOR = 1.07;
@@ -413,6 +423,14 @@ class GameSim extends GameSimBase {
 	cs: [CoachSim, CoachSim] = [NEUTRAL_CS, NEUTRAL_CS];
 	// The current segment of the possession followed a shot or free throw attempt (for the shot clock reset when it goes out off the defense)
 	afterShotAttempt = false;
+	// Spacing & Shot Creation (League extras, see spacingCreation.ts): the spacing of each team's five (refreshed with the synergy, at
+	// each substitution) and the creator of the current shot. Off: nothing here is used and no extra random numbers are drawn
+	spacingCreation: boolean;
+	lineupSpacing: [LineupSpacing, LineupSpacing] = [
+		{ sum: 0, nonShooters: 0 },
+		{ sum: 0, nonShooters: 0 },
+	];
+	creator: PlayerGameSim | undefined;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -495,6 +513,10 @@ class GameSim extends GameSimBase {
 		);
 		this.expandedRatings2 = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.offRebounding !== undefined),
+		);
+		// (loadTeams adds the creation composite only with the setting on)
+		this.spacingCreation = teams.some((t) =>
+			t.player.some((p) => p.compositeRating.creation !== undefined),
 		);
 
 		// Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
@@ -1760,10 +1782,13 @@ class GameSim extends GameSimBase {
 		if (!this.traitsOn) {
 			return this.coachSys ? this.cs[t].temper : 1;
 		}
-		return (this.coachSys ? this.cs[t].temper : 1) * this.traitMean(
-			t,
-			type === "tech" ? (e) => e.techProneness : (e) => e.flagrantProneness,
-			1,
+		return (
+			(this.coachSys ? this.cs[t].temper : 1) *
+			this.traitMean(
+				t,
+				type === "tech" ? (e) => e.techProneness : (e) => e.flagrantProneness,
+				1,
+			)
 		);
 	}
 
@@ -1891,7 +1916,19 @@ class GameSim extends GameSimBase {
 					2,
 				) / 2; // Between 0 and 1, representing the perimeter skills
 
-			this.team[t].synergy.off *= 0.5 + 0.5 * perimFactor; // Defensive synergy
+			// Spacing & Shot Creation: the spacing of the five takes over part of the perimeter factor
+			if (this.spacingCreation) {
+				const spacing = lineupSpacing(this.playersOnCourt[t]);
+				this.lineupSpacing[t] = spacing;
+				this.team[t].synergy.off *=
+					0.5 +
+					0.5 *
+						((1 - SPACING.synergyShare) * perimFactor +
+							SPACING.synergyShare *
+								synergySpacingFactor(spacing, this.numPlayersOnCourt));
+			} else {
+				this.team[t].synergy.off *= 0.5 + 0.5 * perimFactor; // Defensive synergy
+			}
 
 			// Player traits: floor spacing (off-ball movement) and screening
 			if (this.traitsOn) {
@@ -2340,6 +2377,10 @@ class GameSim extends GameSimBase {
 			}
 		}
 
+		// Spacing & Shot Creation: the creator first, then the shooter
+		if (this.spacingCreation) {
+			this.creator = this.pickPlayer("creation", this.o, this.creationPower());
+		}
 		const shooter = this.pickPlayer("usage", this.o, this.usagePower());
 
 		// Flagrant foul? (only with the technicalFouls setting, so otherwise no random number is drawn here)
@@ -2467,7 +2508,10 @@ class GameSim extends GameSimBase {
 						const mgmt = this.coachSys
 							? (this.cs[this.o].foulWindow - 27) / 6
 							: 0;
-						if (((this.t - 25) / (60 - 25)) * (1 - 0.3 * mgmt) < Math.random()) {
+						if (
+							((this.t - 25) / (60 - 25)) * (1 - 0.3 * mgmt) <
+							Math.random()
+						) {
 							takeTimeout = true;
 						}
 					}
@@ -2824,6 +2868,10 @@ class GameSim extends GameSimBase {
 			return this.doOutOfBounds(1);
 		}
 
+		// Spacing & Shot Creation: the creator first, then the shooter
+		if (this.spacingCreation) {
+			this.creator = this.pickPlayer("creation", this.o, this.creationPower());
+		}
 		const shooter = this.pickPlayer("usage", this.o, this.usagePower());
 
 		// Flagrant foul? (only with the technicalFouls setting)
@@ -3038,6 +3086,7 @@ class GameSim extends GameSimBase {
 		passer,
 		tipInFromOutOfBounds,
 		putBack,
+		deferAssist = false,
 	}: {
 		currentFatigue: number;
 		lateGamePutBack: boolean;
@@ -3045,7 +3094,20 @@ class GameSim extends GameSimBase {
 		passer: PlayerGameSim | undefined;
 		tipInFromOutOfBounds: boolean;
 		putBack: boolean;
+		// Spacing & Shot Creation: decide whether the shot is assisted (and by whom) once its type is known
+		deferAssist?: boolean;
 	}) {
+		// Spacing & Shot Creation: is the shooter his own creator, and the spacing around him
+		const sc = this.spacingCreation;
+		const selfCreated =
+			sc && (this.creator === undefined || this.creator === p);
+		const spacing = sc
+			? spacingAround(
+					this.lineupSpacing[this.o],
+					p.compositeRating.spacingThreat ?? 0,
+					this.numPlayersOnCourt - 1,
+				)
+			: 0;
 		let shootingThreePointerScaled = p.compositeRating.shootingThreePointer;
 
 		// Too many players shooting 3s at the high end - scale 0.55-1.0 to 0.55-0.85
@@ -3114,10 +3176,14 @@ class GameSim extends GameSimBase {
 				0.67 *
 					shootingThreePointerScaled2 *
 					g.get("threePointTendencyFactor") *
-					(this.coachSys ? this.cs[this.o].three * this.cs[this.d].dThree : 1)
+					(this.coachSys ? this.cs[this.o].three * this.cs[this.d].dThree : 1) *
+					(sc ? (selfCreated ? CREATION.selfThree : CREATION.otherThree) : 1)
 		) {
 			// Three pointer
 			type = "threePointer";
+			if (deferAssist) {
+				passer = this.drawAssist(p, type, selfCreated);
+			}
 			fgaLogType = g.get("threePointers") ? "fgaTp" : "fgaTpFake";
 			probMissAndFoul = 0.02;
 			probMake = shootingThreePointerScaled * 0.3 + 0.36;
@@ -3145,6 +3211,10 @@ class GameSim extends GameSimBase {
 					: p.compositeRating.shootingMidRange);
 			const r2 =
 				(this.coachSys ? cso.rim * csd.dRim : 1) *
+				(sc
+					? (selfCreated ? CREATION.selfRim : 1) *
+						Math.max(0.2, 1 + SPACING.selectRim * spacing)
+					: 1) *
 				Math.random() *
 				(p.compositeRating.shootingAtRim +
 					this.synergyFactor *
@@ -3160,6 +3230,13 @@ class GameSim extends GameSimBase {
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)); // Synergy makes easy shots either more likely or less likely
 
+			if (deferAssist) {
+				passer = this.drawAssist(
+					p,
+					r1 > r2 && r1 > r3 ? "midRange" : r2 > r3 ? "atRim" : "lowPost",
+					selfCreated,
+				);
+			}
 			if (r1 > r2 && r1 > r3) {
 				// Two point jumper
 				type = "midRange";
@@ -3250,15 +3327,27 @@ class GameSim extends GameSimBase {
 				probMake += this.coachMakeDelta();
 			}
 
+			// Spacing & Shot Creation: room to drive and post up
+			if (sc) {
+				if (type === "atRim") {
+					probMake += SPACING.makeRim * (spacing - SPACING.makeCenter);
+				} else if (type === "lowPost") {
+					probMake += SPACING.makePost * (spacing - SPACING.makeCenter);
+				}
+			}
+
 			if (!tipInFromOutOfBounds) {
 				// Adjust probMake for end of quarter situations, where shot quality will be lower without much time
 				if (rushed) {
 					probMake *= Math.sqrt(this.possessionLength / 8);
 				}
 
-				// Assisted shots are easier
+				// Assisted shots are easier (Spacing & Shot Creation: more so from better passers)
 				if (passer !== undefined) {
-					probMake += 0.025;
+					probMake += sc
+						? (CREATION.bonus * passer.compositeRating.passing) /
+							CREATION.bonusPassingRef
+						: 0.025;
 				}
 
 				// Early-clock shots are better, late-clock shots are contested (only while the shot clock is on)
@@ -3280,6 +3369,7 @@ class GameSim extends GameSimBase {
 
 		return {
 			blocked,
+			passer,
 			desperation: forceThreePointer || rushed,
 			fgaLogType,
 			probAndOne,
@@ -3309,7 +3399,17 @@ class GameSim extends GameSimBase {
 
 		// Is this an "assisted" attempt (i.e. an assist will be recorded if it's made)
 		let passer: PlayerGameSim | undefined;
-		if (
+		// Spacing & Shot Creation: decided once the type of shot is known (getShotInfo), except for a tip-in off an inbound
+		let deferAssist = false;
+		if (this.spacingCreation) {
+			if (!putBack && this.numPlayersOnCourt > 1) {
+				if (tipInFromOutOfBounds) {
+					passer = this.creatorPasser(p);
+				} else {
+					deferAssist = this.t > 1;
+				}
+			}
+		} else if (
 			(tipInFromOutOfBounds ||
 				(this.t > 1 && this.probAst() > Math.random())) &&
 			!putBack &&
@@ -3378,6 +3478,15 @@ class GameSim extends GameSimBase {
 			}
 		}
 
+		const shotInfo = this.getShotInfo({
+			currentFatigue,
+			lateGamePutBack,
+			p,
+			passer,
+			tipInFromOutOfBounds,
+			putBack,
+			deferAssist,
+		});
 		const {
 			blocked,
 			desperation,
@@ -3386,14 +3495,8 @@ class GameSim extends GameSimBase {
 			probMake,
 			probMissAndFoul,
 			type,
-		} = this.getShotInfo({
-			currentFatigue,
-			lateGamePutBack,
-			p,
-			passer,
-			tipInFromOutOfBounds,
-			putBack,
-		});
+		} = shotInfo;
+		passer = shotInfo.passer;
 
 		const baseLogInformation = {
 			t: this.o,
@@ -3779,9 +3882,51 @@ class GameSim extends GameSimBase {
 			return 1.25;
 		}
 		const cs = this.cs[this.o];
+		return 1.25 * cs.usage * (this.isClutchTime() ? cs.clutchUsage : 1);
+	}
+
+	// Spacing & Shot Creation: power on the creation composite when picking the creator (the coach's usage multipliers apply)
+	creationPower() {
+		if (!this.coachSys) {
+			return CREATION_POWER;
+		}
+		const cs = this.cs[this.o];
 		return (
-			1.25 * cs.usage * (this.isClutchTime() ? cs.clutchUsage : 1)
+			CREATION_POWER * cs.usage * (this.isClutchTime() ? cs.clutchUsage : 1)
 		);
+	}
+
+	// Spacing & Shot Creation: who passes to shooter p, the creator unless he is the shooter himself
+	creatorPasser(p: PlayerGameSim) {
+		const creator = this.creator;
+		if (
+			creator !== undefined &&
+			creator !== p &&
+			this.playersOnCourt[this.o].includes(creator)
+		) {
+			return creator;
+		}
+		return this.pickPlayer("creation", this.o, this.creationPower(), p);
+	}
+
+	// Spacing & Shot Creation: is a shot of this type assisted, and by whom
+	drawAssist(p: PlayerGameSim, type: ShotType, selfCreated: boolean) {
+		const typeFactor =
+			type === "threePointer"
+				? CREATION.astThree
+				: type === "atRim"
+					? CREATION.astRim
+					: type === "lowPost"
+						? CREATION.astPost
+						: CREATION.astMid;
+		const prob =
+			this.probAst() *
+			typeFactor *
+			(selfCreated ? CREATION.astSelf : CREATION.astOther);
+		if (prob > Math.random()) {
+			return this.creatorPasser(p);
+		}
+		return undefined;
 	}
 
 	// Coaching systems: change to the make probability of a shot (scheme fit, coaching strengths, installation, late-game management, and

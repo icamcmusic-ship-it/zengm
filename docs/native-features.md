@@ -67,6 +67,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Position-aware team ratings](#position-aware-team-ratings)         | game sim (team composites)                                         | bball  | `positionalComposites`                    | on / off                      |
 | [Realistic rotations](#realistic-rotations)                         | game sim (substitutions)                                           | bball  | `realisticRotations`                      | on / off                      |
 | [Coaching systems](#coaching-systems)                               | game sim, coach market, team page, box score, Coach's notes        | bball  | `coachSystems`                            | on / off                      |
+| [Spacing & shot creation](#spacing--shot-creation)                  | game sim (drives, finishing, assists)                              | bball  | `spacingCreation`                         | on / off                      |
 | [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery              | bball  | `featureSeasonOdds`                       | on / on                       |
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes   | bball  | `featureArchetypes`                       | on / on                       |
 | [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)       | bball  | `improvedPositions`                       | on / off                      |
@@ -128,6 +129,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `positionalComposites`                                                                                    | on / off                                                        |                                                                                                              |
 | `realisticRotations`                                                                                      | on / off                                                        |                                                                                                              |
 | `coachSystems`                                                                                            | on / off                                                        | needs `coachingStaff`                                                                                        |
+| `spacingCreation`                                                                                         | on / off                                                        |                                                                                                              |
 | `contractOptions`, `contractExtensions`, `tradeRequests`                                                  | on / off                                                        |                                                                                                              |
 | `featureHoldouts` + `holdoutFrequency`                                                                    | on / off; 1 / 1                                                 | frequency scales how often holdouts happen                                                                   |
 | `aiTradesNeedBased`                                                                                       | on / off                                                        | the classic random AI-to-AI trades stay on in every league (_AI-to-AI Trades Factor_ in the Events category) |
@@ -522,6 +524,37 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 
 - **Speed:** (`simBenchmark.test.ts` with `SIM_BENCH=on`, with and without `SIM_BENCH_WITHOUT=coachSystems`, 2 seeds) the rest of the regular season +1.3% CPU (+4.8% wall time, a busy machine): the league's multipliers and roster fits are computed once per day of games.
 - **Known limits:** systems are categorical (a coach runs one offense and one defense; adaptation switches them whole). Playoff adjustments look at the series score and the opponent's system, not at the box scores. The rotation hooks need Realistic Rotations. Assistants have no systems of their own beyond the coaching tree.
+
+### Spacing & shot creation
+
+- **Setting:** `spacingCreation` (League Extras → Game Simulation). On for new leagues, off for existing leagues (off: no new composites, no extra random numbers, the same games as before: `outcomeInvariance.test.ts`). Code: `src/worker/core/GameSim.basketball/spacingCreation.ts` (constants, spacing), `GameSim.getShotInfo` / `drawAssist` / `creatorPasser`, the `creation` and `spacingThreat` composites in `game/loadTeams.ts`. Tests: `spacingCreation.test.ts`; calibration: `SM_CAL=1 SM_FEATURE=spacingCreation spacingMatchup.script.test.ts`.
+- **Why:** stock BBGM picks the shooter by usage and then, with a flat ~60% chance whatever the shot, a passer by passing^10, who adds a flat +0.025 to the make probability. Who stands around the shooter never matters, so a lineup of four non-shooters drives as easily as one of four shooters, and a three is as often assisted as a post-up.
+- **Spacing:** each player's three-point threat is his three-point composite (half catch-and-shoot with Expanded Ratings). The spacing around a shooter is the average threat of his four teammates on the floor, centered on the league (0.447), minus 0.04 for each non-shooter (threat < 0.40) beyond the first among them (two or more non-shooters = cramped; 44% of shots). It multiplies the at-rim draw of the shot selection (drives) by 1 + 2.5 × spacing, and adds 0.30 × spacing to the make probability at the rim (0.12 × in the post), centered on the spacing of the average shot at the rim. In the offensive synergy, half of the perimeter factor (dribbling + passing + three-point skills) is replaced by a spacing factor of the five (0.58 + 3 × (average threat − 0.447 − cramped penalty), 0 to 1). Lineup spacing is recomputed with the synergy, at each substitution.
+- **Creation:** a creator is picked first, by `creation` (drb + pss + 0.6 oiq, + 0.6 bsc with Expanded Ratings)^4 (the coach system's usage multipliers apply to the power, like the shooter's), then the shooter by usage as before. When the shooter is his own creator (about 20% of shots) the shot leans to a drive (at-rim draw × 1.2) and away from a three (× 0.85), and is assisted 0.35× as often (by another creator); otherwise threes × 1.05 and assisted 1.12× as often, by the creator. Whether a shot is assisted is decided once its type is known: the stock assist chance × 1.5 for threes, × 1.1 at the rim, × 0.79 post-ups and mid-range. The assisted bonus is 0.025 × the passer's passing composite / 0.525 (0.525 is the average assister), so a great passer sets up easier shots. Catch-and-shoot / off-the-dribble (Expanded Ratings) follows the assisted flag as before, so self-created jumpers lean on off-the-dribble shooting.
+- **Calibration** (4 leagues × 30 teams of generated rosters, random coaches, 2,400 games each way; new-league defaults on, coaching systems included):
+
+  | per team game       | off   | on    |
+  | ------------------- | ----- | ----- |
+  | pts                 | 102.0 | 101.8 |
+  | FG%                 | .441  | .440  |
+  | 3PA rate            | .280  | .279  |
+  | 3P%                 | .344  | .345  |
+  | AST                 | 23.98 | 23.94 |
+  | TOV                 | 15.50 | 15.51 |
+  | ORB                 | 12.02 | 12.04 |
+  | FTA                 | 20.19 | 20.20 |
+  | STL                 | 7.01  | 7.00  |
+  | BLK                 | 4.39  | 4.40  |
+  | minutes             | 241.1 | 241.0 |
+  | assisted: 3PM       | .606  | .840  |
+  | assisted: at rim    | .614  | .642  |
+  | assisted: post-up   | .615  | .479  |
+  | assisted: mid-range | .601  | .454  |
+  | assisted: all FGM   | .609  | .609  |
+
+  **A star driver** (the starter with the highest usage, 10 rosters × 6 games): with four teammates at threat 0.60 around him, 33.5% of his shots are at the rim and he makes 68.0% there; with four at 0.30, 7.5% and 59.7%.
+
+- **Known limits:** the creator is not a separate event in the play-by-play (the assister is). Spacing reads ratings, not where players stand; zone defenses do not change it.
 
 ### Season odds
 

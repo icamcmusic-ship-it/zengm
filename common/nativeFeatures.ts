@@ -389,6 +389,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "spacingCreation",
+		key: "spacingCreation",
+		name: "Spacing & Shot Creation",
+		description:
+			"Floor spacing and who creates the shot. The three-point threat of the four teammates around a driver makes drives more likely and easier to finish, and two or more non-shooters on the floor cramp the paint. Each shot has a creator (a ball handler, by dribbling, passing and offensive IQ) picked before the shooter: three-pointers are mostly assisted, shots at the rim about 60% and post-ups and mid-range jumpers about 40%, and better passers set up easier shots. League averages stay about the same.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		key: "featureSeasonOdds",
 		name: "Season Odds",

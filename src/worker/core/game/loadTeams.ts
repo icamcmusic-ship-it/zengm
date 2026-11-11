@@ -26,6 +26,11 @@ import {
 	hasExpandedRatings,
 } from "../../../common/expandedRatings.ts";
 import { expandedRatingsOn } from "../player/expandedRatings.ts";
+import {
+	CREATION_WEIGHTS,
+	CREATION_WEIGHTS_EXPANDED,
+	spacingThreat,
+} from "../GameSim.basketball/spacingCreation.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import {
 	simFixCompositeWeights,
@@ -280,6 +285,10 @@ export const processTeam = async (
 	const positionalComposites =
 		__SPORT === "basketball" &&
 		nativeFeatureEnabled("positionalComposites", (key) => g.get(key as any));
+	// Spacing & Shot Creation (basketball): creation and spacing composites, see GameSim.basketball/spacingCreation.ts
+	const spacingCreation =
+		__SPORT === "basketball" &&
+		nativeFeatureEnabled("spacingCreation", (key) => g.get(key as any));
 	const compositeWeights = Object.entries(
 		__SPORT === "basketball"
 			? simFixes
@@ -471,6 +480,15 @@ export const processTeam = async (
 			if (positionalComposites) {
 				// Position-aware team composites: who plays big (GameSim.basketball/positionalComposites.ts)
 				(p2 as any).simHgt = (rating as any).hgt;
+			}
+			if (spacingCreation) {
+				const w = expandedRatings
+					? CREATION_WEIGHTS_EXPANDED
+					: CREATION_WEIGHTS;
+				p2.compositeRating.creation =
+					player.compositeRating(rating, w.ratings, w.weights, false) *
+					injuryFactor;
+				p2.compositeRating.spacingThreat = spacingThreat(p2.compositeRating);
 			}
 			if (simFixes) {
 				// Game Sim Fixes: strong, durable players get hurt a little less
