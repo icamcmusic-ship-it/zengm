@@ -88,9 +88,7 @@ export const buildNorms = (
 			inGate.length >= 8
 				? inGate
 				: prepared
-						.map((p) =>
-							rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded),
-						)
+						.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded))
 						.sort((x, y) => x - y);
 		match[a.id] = MATCH_Z.map((z) => {
 			const pos = Math.min(1, Math.max(0, phi(z))) * (vals.length - 1);

@@ -27,9 +27,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 		// The bias is evened out over the league plus a draft class or two of raw prospects, as a league holds them
 		const prospects = (
 			await sampleLeague(1200, "norms-prospects", 0, 30, EXPANDED)
-		).map(
-			(p) => ({ ...p, pos: positionFor(p.ratings, true) }),
-		);
+		).map((p) => ({ ...p, pos: positionFor(p.ratings, true) }));
 		const biasSample = [...sample, ...prospects];
 		// Raw prospects' tables are read with prospects among the peers (else any prospect is an exceptional fit)
 		const life = buildNorms(

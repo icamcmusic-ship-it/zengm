@@ -89,8 +89,8 @@ const crossGroupPenalty = (a: Archetype, b: Archetype) =>
 // A two-way player (with expanded ratings, where his defense is a rating of its own) whose primary label names one side
 // of his game: the partner that names the other side may be this much farther off, and is worth this much per unit of
 // his weaker side ("Mid-Range Wing / Lockdown Wing")
-export const TWO_WAY_PARTNER_REACH = Number(process.env.TWR ?? 3);
-export const TWO_WAY_PARTNER_MIN_Z = Number(process.env.TWM ?? 0.5);
+export const TWO_WAY_PARTNER_REACH = 3;
+export const TWO_WAY_PARTNER_MIN_Z = 0.5;
 const TWO_WAY_PARTNER_FROM = 0.4;
 // The archetype he had keeps the label unless another is better by more than this
 export const STICKY_Z = 0.55;

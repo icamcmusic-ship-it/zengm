@@ -396,7 +396,7 @@ const TWO_WAY_DEF_FROM = 0.3;
 export const TWO_WAY_K = 0.6;
 // With expanded ratings his defense is a rating of its own for each side of the floor, not something read off his speed
 // or size: a defensive standout is the real thing, and the label that names both sides of his game wins by more
-export const TWO_WAY_K_EXPANDED = Number(process.env.TWK ?? 0.6);
+export const TWO_WAY_K_EXPANDED = 0.6;
 export const twoWayBonus = (
 	a: Archetype,
 	cv: Record<string, number>,

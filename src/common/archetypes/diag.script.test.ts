@@ -22,12 +22,7 @@ import { ARCHETYPES, classify, defaultNorms, scoreAll } from "./classify.ts";
 import { compositeValues } from "./composites.ts";
 import { buildNorms } from "./match.ts";
 import { probit, rawZ } from "./norms.ts";
-import {
-	classValues,
-	needShortfall,
-	prepare,
-	twoWaySides,
-} from "./score.ts";
+import { classValues, needShortfall, prepare, twoWaySides } from "./score.ts";
 import {
 	HARD_BLOCK,
 	nameContradictsPosition,
