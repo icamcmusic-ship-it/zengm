@@ -39,6 +39,14 @@ test.skipIf(!process.env.RUN_GUARD_DEF)(
 						const season = g.get("season");
 						await startAutoPlay(season, PHASE.DRAFT_LOTTERY, {});
 						const players = await idb.cache.players.getAll();
+						const winpByTid: Record<number, number> = {};
+						for (const ts of await idb.cache.teamSeasons.indexGetAll(
+							"teamSeasonsBySeasonTid",
+							[[season], [season, "Z"]],
+						)) {
+							const gp = ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0);
+							winpByTid[ts.tid] = gp > 0 ? ts.won / gp : 0;
+						}
 						const rows = [];
 						for (const p of players) {
 							const ps = p.stats.findLast(
@@ -55,6 +63,7 @@ test.skipIf(!process.env.RUN_GUARD_DEF)(
 								pid: p.pid,
 								name: `${p.firstName} ${p.lastName}`,
 								pos: r.pos,
+								winp: winpByTid[ps.tid],
 								hgtIn: p.hgt,
 								hgt: r.hgt,
 								ovr: r.ovr,

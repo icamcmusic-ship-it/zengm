@@ -9,9 +9,11 @@ import g from "../../util/g.ts";
 
 // The default formula is dws/3.1 + seasonFraction*winp + gp/82*(blk/4.1 + stl/1.8). Defensive win shares come mostly from
 // defensive rebounds and blocks, so bigs dominate it: a starting C averages about 2.4x the DWS of a starting PG. With the setting
-// on, DWS counts a quarter less and steals (which the setting's sim change leans to on-ball defenders) half more; blocks the same.
+// on, DWS counts a quarter less, steals (which the setting's sim change leans to on-ball defenders) 1.75x, and blocks double with a
+// small defensive rebounding term, so rim protectors still win most DPOYs while perimeter stoppers reach the All-Defensive teams.
+// Calibrated over 30 simulated seasons per expanded-ratings mode (docs/native-features.md, Perimeter defense).
 export const PERIMETER_DEFENSE_FORMULA =
-	"0.75 * dws/3.1 + seasonFraction * winp + gp / 82 * (blk / 4.1 + 1.5 * stl / 1.8)";
+	"0.75 * dws/3.1 + seasonFraction * winp + gp / 82 * (2 * blk / 4.1 + 1.75 * stl / 1.8 + 0.15 * drb)";
 
 type AwardLike = {
 	formula: string;

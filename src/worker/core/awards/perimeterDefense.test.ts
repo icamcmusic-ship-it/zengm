@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { fillAllDefensive } from "./perimeterDefense.ts";
+import { defaultAwardsBasketball } from "../../../common/defaultGameAttributes.ts";
+import {
+	fillAllDefensive,
+	PERIMETER_DEFENSE_FORMULA,
+} from "./perimeterDefense.ts";
+import { FormulaEvaluators } from "./processAwards.ts";
 
 const players = (positions: string[]) =>
 	positions.map((pos, i) => ({ pos, id: i }));
@@ -66,4 +71,13 @@ describe("fillAllDefensive", () => {
 		);
 		expect(teams[0]).toHaveLength(5);
 	});
+});
+
+test("the perimeter defense formula is valid", () => {
+	const evaluators = new FormulaEvaluators(
+		[{ ...defaultAwardsBasketball.dpoy, formula: PERIMETER_DEFENSE_FORMULA }],
+		[],
+	);
+	expect(evaluators.errorMessages).toBeUndefined();
+	expect(evaluators.variables.normal.has("drb")).toBe(true);
 });
