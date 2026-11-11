@@ -584,11 +584,18 @@ export const TWO_K_DEFS: {
 			// make up), belongs to it
 			const own =
 				ARCHETYPES.find((a) => a.name === e.name) ??
-				ARCHETYPES.find(
-					(a) =>
+				ARCHETYPES.find((a) => {
+					const n = NEW_2K.find((x) => x.name === a.name);
+					// (and most of its builds at that archetype's 2K positions: a diming center is not a Dot Dispenser)
+					return (
 						a.tags.includes("2k") &&
-						NEW_2K.find((x) => x.name === a.name)?.re.test(e.name),
-				);
+						n !== undefined &&
+						n.re.test(e.name) &&
+						e.pos2k.filter((ps) => GROUP_2K_POS[n.group].includes(ps)).length *
+							2 >
+							e.pos2k.length
+					);
+				});
 			const to = own?.id ?? best;
 			if (own) ownCount++;
 			nameTo[e.name] = to;
