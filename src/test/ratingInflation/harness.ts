@@ -46,6 +46,7 @@ export const OFF: Record<string, unknown> = {
 	contractExtensions: false,
 	tradeRequests: false,
 	expandedRatings: false,
+	perimeterDefense: false,
 };
 
 // New-league defaults, plus the two rating-touching extras that are opt-in even for new leagues
