@@ -82,6 +82,7 @@ export const toCollegeProspect = (
 		college: p.college ?? "",
 		bornLoc: p.born.loc,
 		heightInches: p.hgt,
+		...(p.draftClassShapeInjury ? { injuryHistory: true } : {}),
 	};
 };
 

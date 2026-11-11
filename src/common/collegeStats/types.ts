@@ -50,6 +50,8 @@ export type CollegeProspect = {
 	bornLoc: string;
 	// Listed height in inches, if known (otherwise it is read off the hgt rating). Only used to tell who is unusually tall or small
 	heightInches?: number;
+	// The injury-riddled draft class (Draft Class Shapes): he comes into the draft off an injury, which is likely his story
+	injuryHistory?: boolean;
 };
 
 export type GameBox = {

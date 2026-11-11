@@ -69,22 +69,34 @@ export type ArchetypeView = {
 // position, if the archetype is no longer allowed there (entries stored before positions were a hard gate). The caller
 // then reads him live until his next preseason stores a valid one. A secondary that is gone, not allowed at his position
 // or names another position than the primary is dropped.
+// What the league has on now: a label that needs player traits (or expanded ratings) is no longer valid once that setting
+// is off (undefined: not checked)
+export type ViewContext = { traits?: boolean; expanded?: boolean };
+const unavailable = (
+	a: { trait?: unknown; expanded?: true },
+	ctx: ViewContext | undefined,
+) =>
+	(a.trait !== undefined && ctx?.traits === false) ||
+	(a.expanded === true && ctx?.expanded === false);
+
 export const viewOf = (
 	e: StoredArchetype | undefined,
 	pos?: unknown,
+	ctx?: ViewContext,
 ): ArchetypeView | null => {
 	const a = e ? archetypeById(e.id) : undefined;
 	if (!e || !a) {
 		return null;
 	}
-	if (isPos(pos) && !a.positions.includes(pos)) {
+	if ((isPos(pos) && !a.positions.includes(pos)) || unavailable(a, ctx)) {
 		return null;
 	}
 	let b = e.secondary ? archetypeById(e.secondary) : undefined;
 	if (
 		b &&
 		(namesContradict(a.name, b.name) ||
-			(isPos(pos) && !b.positions.includes(pos)))
+			(isPos(pos) && !b.positions.includes(pos)) ||
+			unavailable(b, ctx))
 	) {
 		b = undefined;
 	}
