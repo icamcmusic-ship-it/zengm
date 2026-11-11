@@ -72,7 +72,7 @@ import { TraitBadges } from "../../components/PlayerTraits/TraitBadges.tsx";
 import { formatTraitReading } from "../../../common/playerTraits/index.ts";
 import {
 	TRAIT_DEFINITIONS,
-	TRAIT_KEYS,
+	TRAIT_CATEGORIES,
 	isTraitKey,
 	type TraitKey,
 } from "../../../common/playerTraits/index.ts";
@@ -366,10 +366,14 @@ const DraftClass = ({
 						}}
 					>
 						<option value="">Trait column: none</option>
-						{TRAIT_KEYS.map((key) => (
-							<option key={key} value={key}>
-								{TRAIT_DEFINITIONS[key].name}
-							</option>
+						{TRAIT_CATEGORIES.map((category) => (
+							<optgroup key={category.key} label={category.name}>
+								{category.traits.map((key) => (
+									<option key={key} value={key}>
+										{TRAIT_DEFINITIONS[key].name}
+									</option>
+								))}
+							</optgroup>
 						))}
 					</select>
 				</div>

@@ -18,6 +18,12 @@ export const TRAIT_KEYS = [
 	"bigGame",
 	"ego",
 	"temper",
+	// Added later: their seeds come from their own streams, so older leagues get them without any other trait moving
+	"loyalty",
+	"roleAcceptance",
+	"moneyVsWinning",
+	"motor",
+	"defensiveVersatility",
 ] as const;
 
 export type TraitKey = (typeof TRAIT_KEYS)[number];

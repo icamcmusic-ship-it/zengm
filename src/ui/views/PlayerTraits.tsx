@@ -10,8 +10,8 @@ import {
 	TraitEffectsHelp,
 } from "../components/PlayerTraits/TraitBars.tsx";
 import {
+	TRAIT_CATEGORIES,
 	TRAIT_DEFINITIONS,
-	TRAIT_KEYS,
 	TRAIT_SHORT,
 } from "../../common/playerTraits/index.ts";
 import { playerProfileUrl, usePlayerProfileOptions } from "./Player/common.tsx";
@@ -122,52 +122,55 @@ const PlayerTraits = ({
 				) : null}
 			</div>
 
-			{playerTraits.agingCurve ? (
-				<div
-					className="alert alert-info"
-					data-testid="aging-curve"
-					style={{ maxWidth: 700 }}
+			{TRAIT_CATEGORIES.map((category) => (
+				<HideableSection
+					key={category.key}
+					title={category.name}
+					pageName="PlayerTraits"
 				>
-					<b>Aging curve: {playerTraits.agingCurve.name}</b>{" "}
-					<span className="badge bg-secondary ms-1">
-						Revealed on retirement
-					</span>
-					<div>{playerTraits.agingCurve.description}</div>
-					<div className="small text-body-secondary">
-						Nobody knew this while he played: it is only revealed on retirement.
-					</div>
-				</div>
-			) : null}
-
-			<HideableSection title="All traits" pageName="PlayerTraits">
-				<div className="row">
-					{TRAIT_KEYS.map((key) => {
-						const trait = byKey.get(key);
-						if (!trait) {
-							return null;
-						}
-						const effect = effects[key];
-						return (
-							<div key={key} className="col-12 col-md-6 col-xl-4">
-								<TraitBar trait={trait} />
-								<div className="small mb-3" style={{ marginTop: -4 }}>
+					<div className="row" data-trait-category={category.key}>
+						{category.traits.map((key) => {
+							const trait = byKey.get(key);
+							if (!trait) {
+								return null;
+							}
+							const effect = effects[key];
+							return (
+								<div key={key} className="col-12 col-md-6 col-xl-4">
+									<TraitBar trait={trait} />
 									{effect ? (
-										<>
+										<div className="small mb-3" style={{ marginTop: -4 }}>
 											<span className="text-body-secondary">For him: </span>
 											{effect}
-										</>
+										</div>
 									) : (
-										<span className="text-body-secondary">
-											{TRAIT_DEFINITIONS[key].effect}
-										</span>
+										<div className="mb-3" />
 									)}
 								</div>
+							);
+						})}
+					</div>
+					{category.key === "physical" && playerTraits.agingCurve ? (
+						<div
+							className="alert alert-info"
+							data-testid="aging-curve"
+							style={{ maxWidth: 700 }}
+						>
+							<b>Aging curve: {playerTraits.agingCurve.name}</b>{" "}
+							<span className="badge bg-secondary ms-1">
+								Revealed on retirement
+							</span>
+							<div>{playerTraits.agingCurve.description}</div>
+							<div className="small text-body-secondary">
+								Nobody knew this while he played: it is only revealed on
+								retirement.
 							</div>
-						);
-					})}
-				</div>
-				<TraitEffectsHelp />
-			</HideableSection>
+						</div>
+					) : null}
+				</HideableSection>
+			))}
+
+			<TraitEffectsHelp />
 
 			{history.length > 0 && historyKeys.length > 0 ? (
 				<HideableSection

@@ -57,6 +57,11 @@ const RATING_WEIGHTS: Record<TraitKey, TraitRatings> = {
 	bigGame: {},
 	ego: {},
 	temper: {},
+	loyalty: {},
+	roleAcceptance: {},
+	moneyVsWinning: {},
+	motor: { endu: 0.5, spd: 0.2, stre: 0.15, jmp: 0.15 },
+	defensiveVersatility: { spd: 0.3, diq: 0.35, stre: 0.2, jmp: 0.15 },
 };
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -94,6 +99,15 @@ const contextPart = (
 			);
 		case "temper":
 			return 0.4 * (clamp(age, 20, 36) - NEUTRAL_AGE);
+		case "loyalty":
+		case "roleAcceptance":
+			// Settles down a little with age
+			return 0.4 * (clamp(age, 20, 36) - NEUTRAL_AGE);
+		case "moneyVsWinning":
+			// Veterans past 30 start chasing rings
+			return age > 30 ? 1.5 * (Math.min(age, 38) - 30) : 0;
+		case "motor":
+			return age > 30 ? -0.6 * (Math.min(age, 40) - 30) : 0;
 		case "veteranSavvy":
 			// Pro seasons played, plateau at 9 (see veteran.ts)
 			return (
@@ -128,6 +142,12 @@ export const CALIBRATION_OFFSETS: Record<TraitKey, number> = {
 	bigGame: 0,
 	ego: 0,
 	temper: 0,
+	loyalty: 0,
+	roleAcceptance: 0,
+	moneyVsWinning: 0,
+	// Top 300 by ovr in generated leagues (12 leagues), like recovery
+	motor: 0.4,
+	defensiveVersatility: -0.2,
 };
 
 // RATING_WEIGHTS as arrays, in the same order, so ratingPart (hot: every trait score) skips Object.entries. Same arithmetic, same results.

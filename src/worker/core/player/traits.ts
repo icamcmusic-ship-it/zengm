@@ -30,6 +30,7 @@ import {
 	egoTradeRequestMoodShift,
 	egoTradeRequestProbMult,
 	lockerRoomMood,
+	personalityTradeRequestProbMult,
 	workEthicZ,
 	AGING_CURVE_INFO,
 	type AgingCurve,
@@ -283,15 +284,50 @@ export const getLockerRoomMood = (
 	);
 };
 
-// Trade requests: his ego moves the mood at which he asks and the chance he asks. Neutral when traits are off.
-export const getEgoTradeRequestInfo = (p: TraitPlayer) => {
+// Loyalty, role acceptance and money vs winning, from the seed and age alone (no ratings part), cheap enough for mood, which runs often
+export const getPersonalityScores = (
+	p: TraitPlayer,
+	season = g.get("season"),
+) => {
+	const seeds = getTraitSeeds(p);
+	const context = { age: getAge(p, season) };
+	return {
+		loyalty: scoreOne("loyalty", {}, seeds.loyaltySeed, context),
+		roleAcceptance: scoreOne(
+			"roleAcceptance",
+			{},
+			seeds.roleAcceptanceSeed,
+			context,
+		),
+		moneyVsWinning: scoreOne(
+			"moneyVsWinning",
+			{},
+			seeds.moneyVsWinningSeed,
+			context,
+		),
+	};
+};
+
+// Trade requests: his ego moves the mood at which he asks and the chance he asks; loyalty and (when unhappy with his minutes) role
+// acceptance move the chance too. Neutral when traits are off.
+export const getEgoTradeRequestInfo = (
+	p: TraitPlayer,
+	{ playingTimeUnhappy = false }: { playingTimeUnhappy?: boolean } = {},
+) => {
 	if (!traitsEnabled()) {
 		return { moodShift: 0, probMult: 1 };
 	}
 	const ego = getEgoScore(p);
+	const personality = getPersonalityScores(p);
 	return {
 		moodShift: egoTradeRequestMoodShift(ego),
-		probMult: egoTradeRequestProbMult(ego),
+		probMult:
+			egoTradeRequestProbMult(ego) *
+			personalityTradeRequestProbMult(
+				personality.loyalty,
+				personality.roleAcceptance,
+				playingTimeUnhappy,
+			),
 	};
 };
 

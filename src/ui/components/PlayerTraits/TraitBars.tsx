@@ -1,10 +1,10 @@
 import {
+	TRAIT_CATEGORIES,
 	TRAIT_DEFINITIONS,
-	TRAIT_KEYS,
 	TRAIT_LEVEL_LABELS,
 	formatTraitReading,
-	traitDescription,
 	traitLevel,
+	traitStatusText,
 	type ScoutedTrait,
 } from "../../../common/playerTraits/index.ts";
 
@@ -69,29 +69,35 @@ export const TraitBar = ({ trait }: { trait: ScoutedTrait }) => {
 					style={{ left: "50%", width: 1, height: 8 }}
 				/>
 			</div>
-			<div className="small text-body-secondary">
-				{trait.exact
-					? `${traitDescription(trait.key, trait.estimate)}. `
-					: "Not fully known yet. "}
-				{def.description}
+			{/* His current status only: the general description is in the legend (and the name's tooltip) */}
+			<div className="small text-body-secondary" data-trait-status>
+				{traitStatusText(trait)}.
 			</div>
 		</div>
 	);
 };
 
+// Grouped by category (Mental, Personality, Physical, Playstyle)
 export const TraitBars = ({ traits }: { traits: ScoutedTrait[] }) => {
 	const byKey = new Map(traits.map((t) => [t.key, t]));
 	return (
-		<div className="row">
-			{TRAIT_KEYS.map((key) => {
-				const trait = byKey.get(key);
-				return trait ? (
-					<div key={key} className="col-12 col-md-6 col-xl-4">
-						<TraitBar trait={trait} />
+		<>
+			{TRAIT_CATEGORIES.map((category) => (
+				<div key={category.key} data-trait-category={category.key}>
+					<h3 className="mt-2">{category.name}</h3>
+					<div className="row">
+						{category.traits.map((key) => {
+							const trait = byKey.get(key);
+							return trait ? (
+								<div key={key} className="col-12 col-md-6 col-xl-4">
+									<TraitBar trait={trait} />
+								</div>
+							) : null;
+						})}
 					</div>
-				) : null;
-			})}
-		</div>
+				</div>
+			))}
+		</>
 	);
 };
 
@@ -105,15 +111,22 @@ export const TraitEffectsHelp = () => (
 			about the same. They shape who does what, and how close games and injuries
 			play out.
 		</p>
-		<ul>
-			{TRAIT_KEYS.map((key) => (
-				<li key={key}>
-					<b>{TRAIT_DEFINITIONS[key].name}</b>: {TRAIT_DEFINITIONS[key].effect}{" "}
-					<span className="text-body-secondary">
-						{TRAIT_DEFINITIONS[key].growth}
-					</span>
-				</li>
-			))}
-		</ul>
+		{TRAIT_CATEGORIES.map((category) => (
+			<div key={category.key}>
+				<b>{category.name}</b>
+				<ul>
+					{category.traits.map((key) => (
+						<li key={key}>
+							<b>{TRAIT_DEFINITIONS[key].name}</b>:{" "}
+							{TRAIT_DEFINITIONS[key].description}{" "}
+							{TRAIT_DEFINITIONS[key].effect}{" "}
+							<span className="text-body-secondary">
+								{TRAIT_DEFINITIONS[key].growth}
+							</span>
+						</li>
+					))}
+				</ul>
+			</div>
+		))}
 	</details>
 );

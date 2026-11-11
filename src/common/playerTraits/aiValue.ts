@@ -9,24 +9,31 @@ import type { TraitKey, TraitRatings, TraitScores } from "./types.ts";
 
 // How much each trait matters to a GM. Durability (injury proneness / iron man) matters most. Sums to 1.
 export const AI_TRAIT_WEIGHTS: Record<TraitKey, number> = {
-	durability: 0.21,
-	veteranSavvy: 0.08,
-	leadership: 0.08,
-	clutch: 0.065,
-	shotDiscipline: 0.065,
-	consistency: 0.05,
-	offBall: 0.05,
-	hustle: 0.05,
-	lateGameIq: 0.04,
-	screen: 0.035,
-	foulDiscipline: 0.035,
-	recovery: 0.035,
-	handle: 0.035,
+	durability: 0.18,
+	veteranSavvy: 0.07,
+	leadership: 0.07,
+	clutch: 0.055,
+	shotDiscipline: 0.055,
+	consistency: 0.04,
+	offBall: 0.045,
+	hustle: 0.045,
+	lateGameIq: 0.03,
+	screen: 0.03,
+	foulDiscipline: 0.03,
+	recovery: 0.03,
+	handle: 0.03,
 	// Work ethic is about future development: worth more for young players (see aiTraitSumFromZs)
-	workEthic: 0.07,
-	bigGame: 0.04,
-	ego: 0.035,
-	temper: 0.025,
+	workEthic: 0.065,
+	bigGame: 0.035,
+	ego: 0.03,
+	temper: 0.02,
+	motor: 0.04,
+	defensiveVersatility: 0.04,
+	// A team that keeps him pays less and hears fewer trade requests
+	loyalty: 0.03,
+	roleAcceptance: 0.03,
+	// Neither end is better for a team (it decides where he signs, not how he plays), so it is not valued
+	moneyVsWinning: 0,
 	// The aging curve is not a trait key and is never valued by the AI (it is secret, see agingCurve.ts)
 };
 

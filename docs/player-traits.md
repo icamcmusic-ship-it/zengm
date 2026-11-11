@@ -1,6 +1,6 @@
 # Player traits (basketball)
 
-Thirteen 0-100 traits per player that the pure game sim can read directly. Nothing here depends on play-by-play: the sim computes with the numbers, the play-by-play only describes the results. The traits are wired into the game sim (see "How the sim uses the traits"). Basketball only, behind the league setting **Player Traits** (`playerTraits`; off for existing leagues, on for new ones).
+Twenty-two 0-100 traits per player that the pure game sim can read directly. Nothing here depends on play-by-play: the sim computes with the numbers, the play-by-play only describes the results. The traits are wired into the game sim (see "How the sim uses the traits"). Basketball only, behind the league setting **Player Traits** (`playerTraits`; off for existing leagues, on for new ones).
 
 Code: `src/common/playerTraits/` (pure, no worker/DB/`g` access) and `src/worker/core/player/traits.ts` (reads `g` and the player). Calibration test: `src/worker/core/player/playerTraits.test.ts`. Pure tests: `src/common/playerTraits/*.test.ts`.
 
@@ -14,25 +14,30 @@ Code: `src/common/playerTraits/` (pure, no worker/DB/`g` access) and `src/worker
 
 ## Traits
 
-| Key              | Name                  | Visibility | Rating inputs                                                 |
-| ---------------- | --------------------- | ---------- | ------------------------------------------------------------- |
-| `clutch`         | Clutch                | hidden     | oiq, tp, ft, fg, pss; grows with experience                   |
-| `consistency`    | Consistency           | hidden     | oiq, diq, ft, endu, drb; older = steadier                     |
-| `durability`     | Durability            | hidden     | endu, stre, -hgt; falls with age                              |
-| `shotDiscipline` | Shot discipline       | visible    | oiq, ft, fg, pss; grows with experience                       |
-| `offBall`        | Off-ball movement     | visible    | oiq, spd, tp, jmp, endu                                       |
-| `screen`         | Screens and roll/pop  | visible    | stre, hgt, oiq, ins, reb                                      |
-| `hustle`         | Hustle                | visible    | endu, spd, diq, stre, jmp, reb; falls after 31                |
-| `foulDiscipline` | Foul discipline       | visible    | diq, oiq, stre, endu; grows with experience                   |
-| `recovery`       | Recovery              | hidden     | endu, stre; falls with age                                    |
-| `handle`         | Handle under pressure | visible    | drb, pss, oiq, spd                                            |
-| `lateGameIq`     | Late-game IQ          | hidden     | oiq, diq, pss; grows with experience                          |
-| `leadership`     | Leadership            | hidden     | oiq, diq, pss, endu, stre, drb; grows with experience and age |
-| `veteranSavvy`   | Veteran savvy         | visible    | oiq, diq, pss; grows with pro seasons played, plateau at 9    |
-| `workEthic`      | Work ethic            | hidden     | none (personality)                                            |
-| `bigGame`        | Big-game              | hidden     | none (personality)                                            |
-| `ego`            | Ego (locker room)     | hidden     | none (personality)                                            |
-| `temper`         | Temper                | visible    | none (personality); calms 0.4/year after 27                   |
+| Key                    | Name                  | Visibility | Rating inputs                                                 |
+| ---------------------- | --------------------- | ---------- | ------------------------------------------------------------- |
+| `clutch`               | Clutch                | hidden     | oiq, tp, ft, fg, pss; grows with experience                   |
+| `consistency`          | Consistency           | hidden     | oiq, diq, ft, endu, drb; older = steadier                     |
+| `durability`           | Durability            | hidden     | endu, stre, -hgt; falls with age                              |
+| `shotDiscipline`       | Shot discipline       | visible    | oiq, ft, fg, pss; grows with experience                       |
+| `offBall`              | Off-ball movement     | visible    | oiq, spd, tp, jmp, endu                                       |
+| `screen`               | Screens and roll/pop  | visible    | stre, hgt, oiq, ins, reb                                      |
+| `hustle`               | Hustle                | visible    | endu, spd, diq, stre, jmp, reb; falls after 31                |
+| `foulDiscipline`       | Foul discipline       | visible    | diq, oiq, stre, endu; grows with experience                   |
+| `recovery`             | Recovery              | hidden     | endu, stre; falls with age                                    |
+| `handle`               | Handle under pressure | visible    | drb, pss, oiq, spd                                            |
+| `lateGameIq`           | Late-game IQ          | hidden     | oiq, diq, pss; grows with experience                          |
+| `leadership`           | Leadership            | hidden     | oiq, diq, pss, endu, stre, drb; grows with experience and age |
+| `veteranSavvy`         | Veteran savvy         | visible    | oiq, diq, pss; grows with pro seasons played, plateau at 9    |
+| `workEthic`            | Work ethic            | hidden     | none (personality)                                            |
+| `bigGame`              | Big-game              | hidden     | none (personality)                                            |
+| `ego`                  | Ego (locker room)     | hidden     | none (personality)                                            |
+| `temper`               | Temper                | visible    | none (personality); calms 0.4/year after 27                   |
+| `loyalty`              | Loyalty               | hidden     | none (personality); +0.4/year of age around 27                |
+| `roleAcceptance`       | Role acceptance       | hidden     | none (personality); +0.4/year of age around 27                |
+| `moneyVsWinning`       | Money vs winning      | hidden     | none (personality); +1.5/year after 30 (ring chasing vets)    |
+| `motor`                | Motor                 | visible    | endu, spd, stre, jmp; falls 0.6/year after 30                 |
+| `defensiveVersatility` | Defensive versatility | visible    | spd, diq, stre, jmp                                           |
 
 Plus one secret, non-key "trait": the **aging curve** (below), never shown until retirement.
 
@@ -60,6 +65,31 @@ Personality traits: no ratings part, calibration offset 0 (so the minutes-weight
 - **Trash talk (play-by-play text only):** hotheads (temper below 45; more the lower) sometimes talk after a dunk, and-one, three or block, jaw with an opponent after a foul (both hotheads: "words exchanged", refs separating them), and a technical on a player who has been talking (or a real hothead) gets a lead-in ("... has been chirping all night..."). More in the playoffs, a rivalry (when the caller passes it), a close game late, during a big run and once a game is heated; at most 3 lines per player, 8 events apart, no line repeated by a player. `common/pbpFlavor/trashTalk.ts`, one hook in `session.ts`; it uses its own seeded flavor generator stream (never Math.random), so games and the rest of the wording are unchanged. The temper score goes to the text as `pbpRatings.temper` (only with traits on) and is kept in stored play-by-play (store format version 2; version 1 still decodes). Tests: `GameSim.basketball/trashTalk.test.ts`.
 - **AI value weights:** work ethic 0.07 (x1.5 at 24 and under, x0.4 at 30+), big-game 0.04 (x1.5 for contenders), ego 0.035, temper 0.025; the others scaled down so the weights still sum to 1.
 - **Badges:** Gr gym rat (work ethic >= 70), Bi big-game player (>= 68), Tf team-first (ego >= 70), Ck cool head (temper >= 70); hidden traits only once known exactly.
+
+## Categories and per-player text
+
+`common/playerTraits/categories.ts`. Every trait is in exactly one category (test: `categories.test.ts`):
+
+- **Mental:** clutch, late-game IQ, big-game, consistency, shot discipline, foul discipline, handle under pressure
+- **Personality:** leadership, ego, temper, work ethic, veteran savvy, loyalty, role acceptance, money vs winning
+- **Physical:** durability, recovery, motor (and the secret aging curve, shown here only after retirement)
+- **Playstyle:** off-ball movement, screens, hustle, defensive versatility
+
+The Traits page has one section per category (the aging curve in Physical), trait badges are shown in category order, the legend ("How traits affect games"), Draft Scouting's trait column picker and the God Mode sliders are grouped the same way.
+
+Each reading shows one line about **his current status** (`traitStatusText`, phrases in `TRAIT_STATUS`), never the general description (that is only in the legend and the name tooltip): exact readings by level (65+ high, 35- low, else average, e.g. clutch "Rises in the final minutes of close games" / "Plays neither better nor worse late in close games" / "Tends to shrink late in close games"); a scouting range is phrased as an estimate ("Scouts think he ..."), and a range that spans both below and above average (35 or less to 65 or more) is "Unknown: the scouts can't read this yet". Badge tooltips use the same line.
+
+## Loyalty, role acceptance, money vs winning, motor, defensive versatility
+
+Seeds `loyaltySeed`, `roleAcceptanceSeed`, `moneyVsWinningSeed`, `motorSeed`, `defensiveVersatilitySeed`: their own deterministic streams (league seed, pid, key), so existing leagues get them backfilled by `completeTraitSeeds` without any older seed moving. Personality amplitudes in `PERSONALITY_AMPLITUDES` (`common/playerTraits/personality.ts`), applied in `player/moodInfo.ts` and `contract/unrest.ts`; sim amplitudes in `EFFECT_AMPLITUDES`. All linear in z, neutral at 50. Tests: `common/playerTraits/categories.test.ts`, `worker/core/player/personalityTraits.test.ts`.
+
+- **Loyalty** (hidden): re-signing with his current team (he is on it, or a re-signing negotiation), his asking price `x (1 - 0.08 z)` (0.92-1.08); the "Loyalty" mood component `x (1 + 0.5 z)` (stays >= 0, so low loyalty mostly shrinks the stay-with-my-team bonus and he is more likely to test free agency); trade request chance `x (1 - 0.3 z)`.
+- **Role acceptance** (hidden): a negative "Playing time" mood component `x (1 - 0.5 z)` (half the penalty at 100, 1.5x at 0); trade request chance while that component is negative `x (1 - 0.4 z)`.
+- **Money vs winning** (hidden, high = winning): a positive "Team performance" mood component `x (1 + 0.5 z)`, so ring chasers are pulled more to winners (where free agents sign follows mood); a ring chaser (z > 0) asks `x (1 - 0.15 z min(teamPerformance / 2, 1))` from a winning team. A bad team is never hated more than before and nobody is charged more. Over-the-cap minimum rules are intact: the minimum contract check in `moodInfo` (`MIN_CONTRACT_REFUSE_MOOD`) uses the components from before these three traits, discounts never go below the minimum, and a minimum contract stays the minimum.
+- **Motor** (visible, Physical): energy lost per minute on the court `x (1 - 0.1 z)` (separate from endurance) and, with the injury/rest setting's back-to-backs, his endurance on the second night `x (1 + 0.05 z)` (`injuryDepthTeam.ts`).
+- **Defensive versatility** (visible, Playstyle): BBGM has no individual matchup or size-penalty model, so it works on the team defense composite: while he is on the court, the team's defense, perimeter defense, blocking (and interior defense) composites `x (1 + 0.012 * mean on-court z * mismatch)`, where mismatch = `clamp((max hgt - min hgt of the opposing lineup - 10) / 40, 0, 1)` (a big/small lineup forces switches). Pure sim: computed from ratings in `updateTeamCompositeRatings`, no random numbers, nothing from the play-by-play.
+- **AI value weights:** motor 0.04, defensive versatility 0.04, loyalty 0.03, role acceptance 0.03, money vs winning 0 (neither end is better for a team); the others scaled down so the weights still sum to 1 (average factor stays ~1, `aiValue.test.ts`; trades are symmetric because the factor depends only on the player and the valuing team).
+- **Badges:** trait badges (Loyal / Tests the market, Accepts role / Wants minutes, Ring chaser / Money first, Motor / Low motor, Switchable / Switch target) like the other traits. No new skill badges.
 
 ## API for the sim
 
@@ -166,9 +196,9 @@ Prospects' traits are partly hidden. `traitUncertainty` gives an sd in score poi
 
 ## UI
 
-- Player page: a short **Traits** line on the Overview (badges and a link), and its own **Traits** sub-page (`/l/:lid/player_traits/:pid`, in the player page dropdown next to Overview and Game Log): badges, bars with scouting range, descriptions, what each exactly known trait means for him in numbers (`traitEffectSummary`), a trait history table (his current personality with each season's ratings, age and experience; exactly known traits only) and "How traits affect games". The aging curve appears there only once he has retired.
+- Player page: a short **Traits** line on the Overview (badges and a link), and its own **Traits** sub-page (`/l/:lid/player_traits/:pid`, in the player page dropdown next to Overview and Game Log): badges, one section per category (Mental, Personality, Physical, Playstyle) with bars, scouting ranges and a one-line status for him, what each exactly known trait means for him in numbers (`traitEffectSummary`), a trait history table (his current personality with each season's ratings, age and experience; exactly known traits only) and "How traits affect games". The aging curve appears there only once he has retired.
 - Draft Scouting: a **Traits** column with badges (`?` for estimates) and an optional single trait column.
 - Advanced Player Search: a **Traits** category for filters (`trait:<key>` columns, 0-100) and for "show" columns.
-- Customize Player (God Mode): sliders for all seventeen scores; they move the stored seeds so the score lands on the chosen value.
+- Customize Player (God Mode): sliders for all twenty-two scores, grouped by category; they move the stored seeds so the score lands on the chosen value.
 - Table columns `trait:<key>` exist in `getCols` for any table that wants them.
 - Settings: Game Simulation > **Player Traits**.

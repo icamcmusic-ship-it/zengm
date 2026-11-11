@@ -245,4 +245,73 @@ export const TRAIT_DEFINITIONS: Record<TraitKey, TraitDefinition> = {
 		badgeLow: "Hothead",
 		growth: "Calms down a little with age.",
 	},
+	loyalty: {
+		key: "loyalty",
+		name: "Loyalty",
+		description:
+			"Wants to stay with his team, or likes to see what else is out there.",
+		effect:
+			"Loyal players ask for less to re-sign with their own team, are happier staying, and ask for trades less often. Disloyal players want a premium to re-sign and are more likely to test free agency.",
+		visibility: "hidden",
+		low: "Tests the market",
+		high: "Loyal",
+		badgeHigh: "Loyal",
+		badgeLow: "Tests the market",
+		growth: "Grows a little with age.",
+	},
+	roleAcceptance: {
+		key: "roleAcceptance",
+		name: "Role acceptance",
+		description: "How he takes a bench role or reduced minutes.",
+		effect:
+			"Scales how much less playing time than he expects hurts his mood, and his chance of asking for a trade over it.",
+		visibility: "hidden",
+		low: "Wants his minutes",
+		high: "Accepts any role",
+		badgeHigh: "Accepts role",
+		badgeLow: "Wants minutes",
+		growth: "Grows a little with age.",
+	},
+	moneyVsWinning: {
+		key: "moneyVsWinning",
+		name: "Money vs winning",
+		description:
+			"In free agency, whether the size of the contract or the chance to win matters more to him. High is winning.",
+		effect:
+			"Ring chasers care more about how good a team is and ask for less to join a winning team; money-first players care less about winning. The minimum contract is never affected.",
+		visibility: "hidden",
+		low: "Money first",
+		high: "Ring chaser",
+		badgeHigh: "Ring chaser",
+		badgeLow: "Money first",
+		growth: "Veterans past 30 start chasing rings.",
+	},
+	motor: {
+		key: "motor",
+		name: "Motor",
+		description:
+			"How well he holds up through heavy minutes and back-to-backs.",
+		effect:
+			"Scales how fast he tires on the court (separate from endurance), and how much a back-to-back takes out of him.",
+		visibility: "visible",
+		low: "Runs out of gas",
+		high: "Non-stop motor",
+		badgeHigh: "Motor",
+		badgeLow: "Low motor",
+		growth: "Declines slowly after 30.",
+	},
+	defensiveVersatility: {
+		key: "defensiveVersatility",
+		name: "Defensive versatility",
+		description:
+			"Can switch onto bigger and smaller players without giving up much.",
+		effect:
+			"A small bonus (or penalty) to his team's defense while he is on the court, bigger when the other lineup mixes big and small players.",
+		visibility: "visible",
+		low: "Exposed on switches",
+		high: "Switchable",
+		badgeHigh: "Switchable",
+		badgeLow: "Switch target",
+		growth: "Follows his speed, strength and defensive IQ.",
+	},
 };

@@ -113,7 +113,9 @@ export const updateTradeRequests = async () => {
 
 		const mood = await moodInfo(p, p.tid);
 		// Player traits: ego (neutral with the setting off)
-		const ego = getEgoTradeRequestInfo(p as any);
+		const ego = getEgoTradeRequestInfo(p as any, {
+			playingTimeUnhappy: mood.components.playingTime < 0,
+		});
 		if (
 			shouldRequestTrade({
 				moodSum: sumMoodComponents(mood.components),

@@ -61,6 +61,12 @@ export const EFFECT_AMPLITUDES = {
 	temperClutchTurnover: 0.06,
 	// Ego: added to his chemistryContribution (team-first lifts the team's on-court chemistry, divas lower it)
 	egoChemistry: 0.4,
+	// Motor: fractional change to the energy he loses per minute on the court (positive z = tires slower), and to his endurance on the second
+	// night of a back-to-back (only with the injury/rest setting that models back-to-backs)
+	motorDrain: 0.1,
+	motorBackToBack: 0.05,
+	// Defensive versatility: fraction added to the team's defensive composite ratings, per unit of the on-court mean z, at a full size mismatch
+	switchDefense: 0.012,
 } as const;
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -149,6 +155,12 @@ export type TraitEffects = {
 	techProneness: number;
 	/** Temper: multiply the flagrant foul rate while he defends and his share of them. 0.5-1.5. Neutral 1. */
 	flagrantProneness: number;
+	/** Motor: multiply the energy he loses per minute on the court. 0.9-1.1 (high motor is lower). Neutral 1. */
+	energyDrainRate: number;
+	/** Motor: multiply his endurance on the second night of a back-to-back. 0.95-1.05. Neutral 1. */
+	backToBackEnduranceMult: number;
+	/** Defensive versatility, -1 to 1, for teamSwitchDefenseBonus. Neutral 0. */
+	switchDefenseContribution: number;
 };
 
 const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
@@ -170,6 +182,8 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		bigGame: traitZ(scores.bigGame),
 		ego: traitZ(scores.ego),
 		temper: traitZ(scores.temper),
+		motor: traitZ(scores.motor),
+		defensiveVersatility: traitZ(scores.defensiveVersatility),
 	};
 	const vet = z.veteranSavvy;
 	const temper = z.temper;
@@ -229,6 +243,9 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		bigGameTurnoverMult: 1 - A.bigGameTurnover * z.bigGame,
 		techProneness: 1 - A.temperTech * temper,
 		flagrantProneness: 1 - A.temperFlagrant * temper,
+		energyDrainRate: 1 - A.motorDrain * z.motor,
+		backToBackEnduranceMult: 1 + A.motorBackToBack * z.motor,
+		switchDefenseContribution: z.defensiveVersatility,
 	};
 };
 
@@ -283,4 +300,39 @@ export const teamLateGameDecisionQuality = (
 		weightSum += w;
 	}
 	return weightSum > 0 ? total / weightSum : 0;
+};
+
+// Size mismatch of a lineup the defense has to switch against, 0 to 1: the spread of its players' height ratings (a lineup of five similar
+// sizes gives no mismatches, a guard-heavy lineup with a center a full one). heights: the hgt ratings of the 5 players on the court.
+export const lineupSizeMismatch = (heights: number[]) => {
+	if (heights.length < 2) {
+		return 0;
+	}
+	let lo = Infinity;
+	let hi = -Infinity;
+	for (const h of heights) {
+		lo = Math.min(lo, h);
+		hi = Math.max(hi, h);
+	}
+	return clamp((hi - lo - 10) / 40, 0, 1);
+};
+
+// Defensive versatility of a team's on-court group against an opposing lineup with this mismatch: a fraction to add to the defensive
+// composite ratings. 0 when the group is neutral, never more than +-switchDefense.
+export const teamSwitchDefenseBonus = (
+	contributions: number[],
+	mismatch: number,
+) => {
+	if (contributions.length === 0) {
+		return 0;
+	}
+	let total = 0;
+	for (const c of contributions) {
+		total += c;
+	}
+	return (
+		EFFECT_AMPLITUDES.switchDefense *
+		clamp(total / contributions.length, -1, 1) *
+		clamp(mismatch, 0, 1)
+	);
 };
