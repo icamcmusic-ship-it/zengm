@@ -67,6 +67,8 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Position-aware team ratings](#position-aware-team-ratings)         | game sim (team composites)                                         | bball  | `positionalComposites`                    | on / off                      |
 | [Realistic rotations](#realistic-rotations)                         | game sim (substitutions)                                           | bball  | `realisticRotations`                      | on / off                      |
 | [Coaching systems](#coaching-systems)                               | game sim, coach market, team page, box score, Coach's notes        | bball  | `coachSystems`                            | on / off                      |
+| [Spacing & shot creation](#spacing--shot-creation)                  | game sim (drives, finishing, assists)                              | bball  | `spacingCreation`                         | on / off                      |
+| [Matchup defense](#matchup-defense)                                 | game sim (shot defense, shot selection, steal credit)              | bball  | `matchupDefense`                          | on / off                      |
 | [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery              | bball  | `featureSeasonOdds`                       | on / on                       |
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes   | bball  | `featureArchetypes`                       | on / on                       |
 | [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)       | bball  | `improvedPositions`                       | on / off                      |
@@ -128,6 +130,8 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `positionalComposites`                                                                                    | on / off                                                        |                                                                                                              |
 | `realisticRotations`                                                                                      | on / off                                                        |                                                                                                              |
 | `coachSystems`                                                                                            | on / off                                                        | needs `coachingStaff`                                                                                        |
+| `spacingCreation`                                                                                         | on / off                                                        |                                                                                                              |
+| `matchupDefense`                                                                                          | on / off                                                        |                                                                                                              |
 | `contractOptions`, `contractExtensions`, `tradeRequests`                                                  | on / off                                                        |                                                                                                              |
 | `featureHoldouts` + `holdoutFrequency`                                                                    | on / off; 1 / 1                                                 | frequency scales how often holdouts happen                                                                   |
 | `aiTradesNeedBased`                                                                                       | on / off                                                        | the classic random AI-to-AI trades stay on in every league (_AI-to-AI Trades Factor_ in the Events category) |
@@ -523,6 +527,66 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Speed:** (`simBenchmark.test.ts` with `SIM_BENCH=on`, with and without `SIM_BENCH_WITHOUT=coachSystems`, 2 seeds) the rest of the regular season +1.3% CPU (+4.8% wall time, a busy machine): the league's multipliers and roster fits are computed once per day of games.
 - **Known limits:** systems are categorical (a coach runs one offense and one defense; adaptation switches them whole). Playoff adjustments look at the series score and the opponent's system, not at the box scores. The rotation hooks need Realistic Rotations. Assistants have no systems of their own beyond the coaching tree.
 
+### Spacing & shot creation
+
+- **Setting:** `spacingCreation` (League Extras → Game Simulation). On for new leagues, off for existing leagues (off: no new composites, no extra random numbers, the same games as before: `outcomeInvariance.test.ts`). Code: `src/worker/core/GameSim.basketball/spacingCreation.ts` (constants, spacing), `GameSim.getShotInfo` / `drawAssist` / `creatorPasser`, the `creation` and `spacingThreat` composites in `game/loadTeams.ts`. Tests: `spacingCreation.test.ts`; calibration: `SM_CAL=1 SM_FEATURE=spacingCreation spacingMatchup.script.test.ts`.
+- **Why:** stock BBGM picks the shooter by usage and then, with a flat ~60% chance whatever the shot, a passer by passing^10, who adds a flat +0.025 to the make probability. Who stands around the shooter never matters, so a lineup of four non-shooters drives as easily as one of four shooters, and a three is as often assisted as a post-up.
+- **Spacing:** each player's three-point threat is his three-point composite (half catch-and-shoot with Expanded Ratings). The spacing around a shooter is the average threat of his four teammates on the floor, centered on the league (0.447), minus 0.04 for each non-shooter (threat < 0.40) beyond the first among them (two or more non-shooters = cramped; 44% of shots). It multiplies the at-rim draw of the shot selection (drives) by 1 + 2.5 × spacing, and adds 0.30 × spacing to the make probability at the rim (0.12 × in the post), centered on the spacing of the average shot at the rim. In the offensive synergy, half of the perimeter factor (dribbling + passing + three-point skills) is replaced by a spacing factor of the five (0.58 + 3 × (average threat − 0.447 − cramped penalty), 0 to 1). Lineup spacing is recomputed with the synergy, at each substitution.
+- **Creation:** a creator is picked first, by `creation` (drb + pss + 0.6 oiq, + 0.6 bsc with Expanded Ratings)^4 (the coach system's usage multipliers apply to the power, like the shooter's), then the shooter by usage as before. When the shooter is his own creator (about 20% of shots) the shot leans to a drive (at-rim draw × 1.2) and away from a three (× 0.85), and is assisted 0.35× as often (by another creator); otherwise threes × 1.05 and assisted 1.12× as often, by the creator. Whether a shot is assisted is decided once its type is known: the stock assist chance × 1.5 for threes, × 1.1 at the rim, × 0.79 post-ups and mid-range. The assisted bonus is 0.025 × the passer's passing composite / 0.525 (0.525 is the average assister), so a great passer sets up easier shots. Catch-and-shoot / off-the-dribble (Expanded Ratings) follows the assisted flag as before, so self-created jumpers lean on off-the-dribble shooting.
+- **Calibration** (4 leagues × 30 teams of generated rosters, random coaches, 2,400 games each way; new-league defaults on, coaching systems included):
+
+  | per team game       | off   | on    |
+  | ------------------- | ----- | ----- |
+  | pts                 | 102.0 | 101.8 |
+  | FG%                 | .441  | .440  |
+  | 3PA rate            | .280  | .279  |
+  | 3P%                 | .344  | .345  |
+  | AST                 | 23.98 | 23.94 |
+  | TOV                 | 15.50 | 15.51 |
+  | ORB                 | 12.02 | 12.04 |
+  | FTA                 | 20.19 | 20.20 |
+  | STL                 | 7.01  | 7.00  |
+  | BLK                 | 4.39  | 4.40  |
+  | minutes             | 241.1 | 241.0 |
+  | assisted: 3PM       | .606  | .840  |
+  | assisted: at rim    | .614  | .642  |
+  | assisted: post-up   | .615  | .479  |
+  | assisted: mid-range | .601  | .454  |
+  | assisted: all FGM   | .609  | .609  |
+
+  **A star driver** (the starter with the highest usage, 10 rosters × 6 games): with four teammates at threat 0.60 around him, 33.5% of his shots are at the rim and he makes 68.0% there; with four at 0.30, 7.5% and 59.7%.
+
+- **Known limits:** the creator is not a separate event in the play-by-play (the assister is). Spacing reads ratings, not where players stand; zone defenses do not change it.
+
+### Matchup defense
+
+- **Setting:** `matchupDefense` (League Extras → Game Simulation). On for new leagues, off for existing leagues (off: no assignments, no extra random numbers, the same games as before: `outcomeInvariance.test.ts`). Code: `src/worker/core/GameSim.basketball/matchupDefense.ts` (assignment, mismatches, constants), `GameSim.assignMatchups` / `matchupRel` / `getShotInfo`; height and speed for the mismatches come from `game/loadTeams.ts`. Tests: `matchupDefense.test.ts`; calibration: `SM_CAL=1 spacingMatchup.script.test.ts`.
+- **Why:** stock BBGM defends every shot with the plain 5-man average of the defense composite (`0.25 × defense` in `getShotInfo`), so who guards whom never matters: a bad defender costs his team the same wherever he is, nobody can be attacked or hidden, and the defense never changes which shot is taken.
+- **Assignment:** at each substitution (with the synergy), each defense matches its five to the offense greedily over the 5×5 grid of offensive threat (the usage composite) × defender fit, best pair first: against guards and wings the perimeter defense composite (pdef with Expanded Ratings), against bigs (height 45 → 65) the interior defense composite (idef + hgt + wng), mixed in between. A Switch Everything defense (the coach's system) matches up by size only half as much.
+- **Shot defense:** `0.25 × defense` becomes `0.25 × (0.55 × matchup + 0.45 × team)`, the matchup being the team value plus how much better or worse the shooter's defender is than his teammates on the floor at that kind of shot (perimeter defense on jumpers, interior defense in the post, half and half at the rim; with fatigue), centered by shot type on the league average matchup (the best defenders guard the biggest threats, so the raw matchup favors the defense). A defender 0.10 below his lineup at the shot type gives up about 1.4 percentage points more on his man's shots.
+- **Mismatches** re-weight the existing shot-type draws: post-ups (the low post draw) × 1 + 0.6 × (height gap − 12) / 20 against a smaller defender, drives (the at-rim draw) × 1 + 0.4 × (speed gap − 14) / 25 against a slower one, both divided by their league averages so the shot mix stays the same. A defender's own Defensive Versatility trait relieves mismatches (−15% per SD), and in a Switch Everything defense the team's average versatility does (up to −60%, −30% for an average team); the same relief softens the make-probability penalty of a weak matchup. **Drop coverage** concedes pull-ups: self-created (unassisted) mid-range jumpers × 1.15 in the selection and +0.015 make probability.
+- **Steal and turnover credit:** the defensive-stop note on a turnover (the play-by-play) goes to the ball handler's actual defender instead of his court slot.
+- **Calibration** (8 leagues × 30 teams of generated rosters, random coaches, 4,800 games each way; new-league defaults on, coaching systems and Spacing & Shot Creation included):
+
+  | per team game | matchup off | matchup on |
+  | ------------- | ----------- | ---------- |
+  | pts           | 102.1       | 102.2      |
+  | FG%           | .441        | .441       |
+  | 3PA rate      | .283        | .284       |
+  | 3P%           | .346        | .348       |
+  | AST           | 24.00       | 23.93      |
+  | TOV           | 15.44       | 15.36      |
+  | ORB           | 12.03       | 11.99      |
+  | FTA           | 20.17       | 20.15      |
+  | STL           | 6.95        | 6.86       |
+  | BLK           | 4.39        | 4.42       |
+  | minutes       | 241.0       | 241.0      |
+
+  Mismatches: 20.5% of shots have a post-up size mismatch (height gap over 12), 17.4% a speed mismatch (gap over 14). **A weak defender** (a team's best perimeter starter with his defense composites −0.25, 10 rosters × 3 games): shots by the man he guards are +0.016 make probability easier than the same shooter's shots of the same type against his teammates (−0.003 when he is a good defender). **Spread of player stats** (players with 300+ minutes, SD across players): points per 36 minutes 1.46 → 1.54 (+5%); TS% .0145 → .0120 (within the noise of 40 games per player).
+
+- **Speed** (`simBenchmark.test.ts`, `SIM_BENCH=on` with and without `SIM_BENCH_WITHOUT=<feature>`, 3 seeds, CPU per game of the regular season and playoffs): Matchup Defense about +2.5%, Spacing & Shot Creation about +1% (both within the run-to-run noise of ±5%).
+- **Known limits:** the assignment is fixed between substitutions (no switching on screens or in transition, no double teams); offensive players are not steered toward the weak defender (he is exploited when his man shoots, and through mismatches), and help defense is the team's average.
+
 ### Season odds
 
 - **Where:** _Standings_ (a _Season odds_ section below the tables), _Power Rankings_ (Playoffs and Title columns), _Award Races_ (a Win% column), _Draft Lottery_ (a _What-if simulator_ below the lottery table).
@@ -778,6 +842,6 @@ Wrapped and Storylines read the whole league into a snapshot. Converted pieces t
 ## Testing
 
 - Unit tests: `node_modules/.bin/vitest --run --project basketball` (plus `football` and `baseball`, which must stay green since the features are gated).
-- Sim calibration tables (not part of the normal run): possession model `POSS_METRICS=1`, player traits `TRAITS_METRICS=1` (see the test files' headers).
+- Sim calibration tables (not part of the normal run): possession model `POSS_METRICS=1`, player traits `TRAITS_METRICS=1`, coaching systems `COACH_CAL=1`, spacing & shot creation and matchup defense `SM_CAL=1` (`spacingMatchup.script.test.ts`) (see the test files' headers).
 - AI GM audit (not part of the normal run; `AI_GMS=0` turns GM personalities off for a before/after, and with them on it also logs GM firings/hires, strategy switches and per-team trade counts): `RUN_AI_AUDIT=1 AI_SEEDS=1,2 AI_SEASONS=4 node_modules/.bin/vitest --run --project basketball src/test/ratingInflation/aiAudit.script.test.ts` simulates a league with every extra on and writes one JSON line per season (`AI_OUT`, default `/tmp/aiAudit.jsonl`): AI-AI trades (three-team, with pick conditions, for trade requests), free agent signings, re-signings, extensions, trade requests (and how many were traded), holdouts, teams over the tax/cap, dead money, roster sizes, win% and team ovr spread, mean contract (% of cap), mean ovr, and the offers AI teams would send the user right now, valued from the user's side.
 - Lint: `node_modules/.bin/eslint .` and `node_modules/.bin/tsc --build`.
