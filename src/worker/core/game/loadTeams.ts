@@ -1,4 +1,5 @@
 import { allStar, player, season, team } from "../index.ts";
+import { careerFromStats } from "../../../common/pbpFlavor/career.ts";
 import { isHoldingOut } from "../contract/unrest.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
@@ -337,6 +338,17 @@ export const processTeam = async (
 				pss: r["pss"],
 				reb: r["reb"],
 			};
+		}
+
+		// What he had done before this game (games, career and season highs, career totals), only used to word the basketball play-by-play
+		// ("that's a new career high"): see common/pbpFlavor/career.ts. The sim itself never reads it. Not for the All-Star Game, whose stats
+		// don't count
+		if (__SPORT === "basketball" && !allStarGame) {
+			(p2 as any).pbpCareer = careerFromStats(p.stats, {
+				season: g.get("season"),
+				draftYear: p.draft?.year,
+				age: p2.age,
+			});
 		}
 
 		// Player traits (the playerTraits setting): his effects on the game, computed once per game. Undefined with the setting off, and then the

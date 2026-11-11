@@ -47,6 +47,57 @@ export type AiTraitContext = {
 	isProspect?: boolean;
 	// Which keys are hidden (only used with isProspect)
 	hiddenKeys?: ReadonlySet<TraitKey>;
+	// The locker room he would join (or is in): his teammates on that team, never himself. See aiTeamTraitContext
+	numBigEgos?: number;
+	numHotHeads?: number;
+	// Sum of his teammates' ego z (what drives the "Locker room" mood component). Negative = more divas than team-first players
+	lockerRoom?: number;
+};
+
+// Team context: how much more ego and temper matter to a team, given who is already in its locker room. These scale the weight of the trait
+// in BOTH directions (a team that already has divas is warier of another one, and gets more out of a team-first player), so the factor stays
+// centered at 1, and they only depend on the player's teammates (never himself), so a team values him the same coming in and going out.
+export const AI_TEAM_TRAIT_CONTEXT = {
+	// A teammate at or below this z counts as a big ego / a hot head
+	bigEgoZ: -0.5,
+	hotHeadZ: -0.5,
+	// Extra weight on ego per big ego already on the team, and on temper per hot head (first 3 count)
+	perBigEgo: 0.4,
+	perHotHead: 0.3,
+	maxCounted: 3,
+	// A locker room whose ego z sums to this or less is fragile: a contender with one weighs ego more
+	fragileLockerRoom: -1,
+	contenderFragileEgo: 1.5,
+	// Contenders need composure (technicals and late-game mistakes cost playoff games)
+	contenderTemper: 1.4,
+	// Rebuilding teams are buying development, so a young player's work ethic is worth more to them
+	rebuildingYoungWorkEthic: 1.3,
+	// Rebuilding teams are not playing big games soon
+	rebuildingBigGame: 0.6,
+} as const;
+
+// Ego and temper z of a team's players -> the locker room context for valuing `self` (a player on the team or not). Teammates only: pass the
+// index of the player himself to leave him out.
+export const aiTeamTraitContext = (
+	teammates: { egoZ: number; temperZ: number }[],
+	selfIndex = -1,
+) => {
+	let numBigEgos = 0;
+	let numHotHeads = 0;
+	let lockerRoom = 0;
+	for (const [i, t] of teammates.entries()) {
+		if (i === selfIndex) {
+			continue;
+		}
+		if (t.egoZ <= AI_TEAM_TRAIT_CONTEXT.bigEgoZ) {
+			numBigEgos += 1;
+		}
+		if (t.temperZ <= AI_TEAM_TRAIT_CONTEXT.hotHeadZ) {
+			numHotHeads += 1;
+		}
+		lockerRoom += t.egoZ;
+	}
+	return { numBigEgos, numHotHeads, lockerRoom };
 };
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -82,6 +133,7 @@ export const aiTraitSumFromZs = (
 	scores: TraitScores,
 	context: AiTraitContext,
 ) => {
+	const C = AI_TEAM_TRAIT_CONTEXT;
 	let sum = 0;
 	for (const key of Object.keys(AI_TRAIT_WEIGHTS) as TraitKey[]) {
 		let weight = AI_TRAIT_WEIGHTS[key];
@@ -104,12 +156,35 @@ export const aiTraitSumFromZs = (
 			// Matters for how much a young player will still improve, little for a veteran
 			if (context.age <= 24) {
 				weight *= 1.5;
+				if (context.strategy === "rebuilding") {
+					weight *= C.rebuildingYoungWorkEthic;
+				}
 			} else if (context.age >= 30) {
 				weight *= 0.4;
 			}
-		} else if (key === "bigGame" && context.strategy === "contending") {
+		} else if (key === "bigGame") {
 			// Contenders care about the playoffs
-			weight *= 1.5;
+			if (context.strategy === "contending") {
+				weight *= 1.5;
+			} else if (context.strategy === "rebuilding") {
+				weight *= C.rebuildingBigGame;
+			}
+		} else if (key === "ego") {
+			// Warier of a second or third big ego
+			weight *=
+				1 + C.perBigEgo * Math.min(context.numBigEgos ?? 0, C.maxCounted);
+			if (
+				context.strategy === "contending" &&
+				(context.lockerRoom ?? 0) <= C.fragileLockerRoom
+			) {
+				weight *= C.contenderFragileEgo;
+			}
+		} else if (key === "temper") {
+			weight *=
+				1 + C.perHotHead * Math.min(context.numHotHeads ?? 0, C.maxCounted);
+			if (context.strategy === "contending") {
+				weight *= C.contenderTemper;
+			}
 		}
 		if (context.isProspect && context.hiddenKeys?.has(key)) {
 			weight *= 0.5;

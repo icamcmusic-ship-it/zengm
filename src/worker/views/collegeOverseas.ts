@@ -15,6 +15,10 @@ import {
 	isOverseasLeague,
 } from "../../common/collegeStats/overseas.ts";
 import { NCAA_REGIONS } from "../../common/collegeStats/ncaa.ts";
+import {
+	getPollHistory,
+	getWeeksAtNo1,
+} from "../../common/collegeStats/ncaaPolls.ts";
 import { last } from "../../common/utils.ts";
 import type { Player } from "../../common/types.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
@@ -23,14 +27,16 @@ export const COLLEGE_OVERSEAS_TABS = [
 	"standings",
 	"ap",
 	"conference",
+	"selection",
 	"ncaa",
+	"nit",
 	"overseas",
 ] as const;
 export type CollegeOverseasTab = (typeof COLLEGE_OVERSEAS_TABS)[number];
 
 // Tournament honors worth showing next to a name on the page
 const TOURNEY_HONOR =
-	/Tournament MVP|Final Four Most Outstanding Player|Regional Most Outstanding Player|All-American|Player of the Year$/;
+	/Tournament MVP|Most Outstanding Player|All-American|Player of the Year$/;
 
 const prospectInfo = (p: Player, draftYear: number) => {
 	const ratings = last(p.ratings);
@@ -59,7 +65,7 @@ const prospectInfo = (p: Player, draftYear: number) => {
 export type CollegeProspectInfo = ReturnType<typeof prospectInfo>;
 
 /**
- * College/Overseas page (Draft Scouting tab): the college season of a draft class's draft year (standings, AP Top 25, conference tournaments, March Madness), rebuilt from the class (see core/draft/collegeSeason.ts), and the class's prospects playing overseas.
+ * College/Overseas page (Draft Scouting tab): the college season of a draft class's draft year (its storyline, standings, the weekly AP poll, conference tournaments, the NET and the selection bubble, March Madness, the NIT), rebuilt from the class (see core/draft/collegeSeason.ts), and the class's prospects playing overseas.
  */
 export default defineView({
 	id: "collegeOverseas",
@@ -174,7 +180,7 @@ export default defineView({
 				if (
 					award.season === season &&
 					type &&
-					/Tournament MVP|Most Outstanding Player|All-Final Four|Consensus First Team All-American|Consensus Second Team All-American/.test(
+					/Tournament MVP|Most Outstanding Player|All-Final Four|NIT All-Tournament|Consensus First Team All-American|Consensus Second Team All-American/.test(
 						type,
 					)
 				) {
@@ -194,7 +200,7 @@ export default defineView({
 			hasSeason: true as const,
 			overseas,
 			numProspects: classPlayers.length,
-			teams: ncaa.teams.map((t) => ({
+			teams: ncaa.teams.map((t, i) => ({
 				school: t.school,
 				conf: t.conf,
 				w: t.w,
@@ -209,10 +215,24 @@ export default defineView({
 				ncaa: t.ncaa,
 				confTourney: t.confTourney,
 				bid: t.bid,
+				nit: t.nit,
+				nitSeed: t.nitSeed,
+				net: ncaa.net[i]!,
 			})),
 			conferences: ncaa.conferences,
 			ap: ncaa.ap,
+			polls: ncaa.polls,
+			weeksAtNo1: getWeeksAtNo1(ncaa.polls),
+			pollHistory: getPollHistory(ncaa.polls),
+			selection: ncaa.selection,
 			tournament: ncaa.tournament,
+			nit: ncaa.nit,
+			storyline: {
+				shape: ncaa.storyline.shape,
+				headline: ncaa.storyline.headline,
+				summary: ncaa.storyline.summary,
+			},
+			ppg: ncaa.ppg,
 			regions: [...NCAA_REGIONS],
 			prospectsBySchool,
 			honorWinners,

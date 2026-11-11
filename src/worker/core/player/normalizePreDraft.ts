@@ -253,6 +253,23 @@ export const prepareUploadedProspectPreDraft = (
 	// Rows from another league (or a college), with no team here. Note that this ignores tid, since no tid in a file means anything in this league.
 	p.stats = normalizePreDraftStats(p.stats, { draftYear, seasonOffset });
 
+	// His stored career (schools year by year) moves with the seasons. Its recruiting ranking was against another league's high school
+	// classes: it is set again when college stats are next generated, and derived until then
+	const career = p.preDraftCareer;
+	if (career && typeof career === "object" && Array.isArray(career.years)) {
+		for (const year of career.years) {
+			if (year && typeof year.season === "number") {
+				year.season += seasonOffset;
+			}
+		}
+		if (typeof career.hsClass === "number") {
+			career.hsClass += seasonOffset;
+		}
+		delete career.recruit;
+	} else if (career !== undefined) {
+		delete p.preDraftCareer;
+	}
+
 	// Honors before the draft. Pro awards in the file (there shouldn't be any, for a prospect) are left alone.
 	const awards: unknown[] = Array.isArray(p.awards) ? p.awards : [];
 	const isPre = (award: any) =>

@@ -1,4 +1,5 @@
 import {
+	NCAA_SEASON_VERSION,
 	getClassStats,
 	getNcaaSchools,
 	getProspectBoost,
@@ -14,6 +15,7 @@ import {
 import { COLLEGES } from "../../../common/collegeStats/colleges.ts";
 import { clamp } from "../../../common/collegeStats/rng.ts";
 import { idb } from "../../db/index.ts";
+import { g } from "../../util/index.ts";
 import { toCollegeProspect } from "./generateCollegeStats.ts";
 import type { Player } from "../../../common/types.ts";
 
@@ -24,6 +26,8 @@ import type { Player } from "../../../common/types.ts";
 export type ClassNcaaSeason = {
 	season: NcaaSeason;
 	seed: string;
+	// Version of the season simulation, stored on the prospects so the season is rebuilt the way it was made
+	version: number;
 	// pid -> what he adds to his team
 	boosts: Map<number, number>;
 	// Prospects whose stats are not being generated but who are on a team (an imported class with real stats), to get a marker too
@@ -63,8 +67,10 @@ export const buildNcaaSeasonForClass = async ({
 		: [];
 
 	let seasonSeed = seed;
+	let version = NCAA_SEASON_VERSION;
 	if (marked.length > 0) {
 		seasonSeed = marked[0]!.collegeSeason!.seed;
+		version = marked[0]!.collegeSeason!.v ?? 1;
 		for (const p of marked) {
 			contributions.push({
 				key: String(p.pid),
@@ -111,8 +117,10 @@ export const buildNcaaSeasonForClass = async ({
 			seed: seasonSeed,
 			season: draftYear,
 			contributions,
+			version,
 		}),
 		seed: seasonSeed,
+		version,
 		boosts,
 		others,
 	};
@@ -138,6 +146,7 @@ export const storeCollegeSeasonMarkers = async ({
 				school: summary.school,
 				boost: ncaa.boosts.get(p.pid) ?? 0,
 				summary,
+				...(ncaa.version > 1 ? { v: ncaa.version } : {}),
 			};
 		} else if (p.collegeSeason) {
 			delete p.collegeSeason;
@@ -159,6 +168,7 @@ export const storeCollegeSeasonMarkers = async ({
 				school: p.college,
 				boost: ncaa.boosts.get(p.pid) ?? 0,
 				summary: getTeamSummary(ncaa.season, team),
+				...(ncaa.version > 1 ? { v: ncaa.version } : {}),
 			};
 			await idb.cache.players.put(p);
 		}
@@ -183,16 +193,43 @@ export const getCollegeSeason = async (draftYear: number) => {
 	}
 	const seed = [...counts].sort((a, b) => b[1] - a[1])[0]![0];
 	const members = players.filter((p) => p.collegeSeason!.seed === seed);
-	return {
-		season: simulateNcaaSeason({
+	// Seasons stored before versions are version 1, which plays the games exactly as they were played then
+	const version = members[0]!.collegeSeason!.v ?? 1;
+	const contributions = members.map((p) => ({
+		key: String(p.pid),
+		school: p.collegeSeason!.school,
+		boost: p.collegeSeason!.boost,
+	}));
+
+	// Rebuilding takes a while (every game, 19 polls, two tournaments) and the pages that show it reload often, so keep the last few. The key is everything the season is made from
+	const key = JSON.stringify([
+		g.get("lid"),
+		draftYear,
+		seed,
+		version,
+		contributions
+			.map((c) => `${c.key}|${c.school}|${c.boost}`)
+			.sort()
+			.join(","),
+	]);
+	let season = seasonCache.get(key);
+	if (season) {
+		// Most recently used last
+		seasonCache.delete(key);
+	} else {
+		season = simulateNcaaSeason({
 			seed,
 			season: draftYear,
-			contributions: members.map((p) => ({
-				key: String(p.pid),
-				school: p.collegeSeason!.school,
-				boost: p.collegeSeason!.boost,
-			})),
-		}),
-		players: members,
-	};
+			contributions,
+			version,
+		});
+	}
+	seasonCache.set(key, season);
+	if (seasonCache.size > SEASON_CACHE_SIZE) {
+		seasonCache.delete(seasonCache.keys().next().value!);
+	}
+	return { season, players: members };
 };
+
+const SEASON_CACHE_SIZE = 8;
+const seasonCache = new Map<string, NcaaSeason>();

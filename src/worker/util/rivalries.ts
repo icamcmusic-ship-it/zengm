@@ -72,6 +72,9 @@ const topPts = (t: Game["teams"][number]) =>
 
 export const loadRivalries = async (
 	season: number = g.get("season"),
+	// storedGames false: skip the stored box scores of past seasons (their close games and star duels), for callers that can't afford to
+	// read them all (the play-by-play, see pbpRivalry.ts)
+	opts: { storedGames?: boolean } = {},
 ): Promise<RivalPair[]> => {
 	const [playoffSeries, headToHeads, teams] = await Promise.all([
 		idb.merged.playoffSeries.getAll(),
@@ -193,8 +196,12 @@ export const loadRivalries = async (
 	for (const game of await idb.cache.games.getAll()) {
 		addGame(game);
 	}
-	for await (const cursor of idb.league.transaction("games").store.iterate()) {
-		addGame(cursor.value);
+	if (opts.storedGames !== false) {
+		for await (const cursor of idb.league
+			.transaction("games")
+			.store.iterate()) {
+			addGame(cursor.value);
+		}
 	}
 	for (const [key, set] of duelSeasons) {
 		const e = map.get(key);

@@ -145,6 +145,23 @@ const width100 = {
 	width: "100%",
 };
 
+// The fixed scale, widened when this season's values fall outside it (a league with a lot more threes or a longer season than the scale
+// expects): a marker outside the scale would be drawn outside the plot and make the whole page scroll sideways. Both plots of a stat use it.
+const getScale = (stat: string, values: number[]) => {
+	const fixed = scale[stat];
+	if (!fixed) {
+		return undefined;
+	}
+	const finite = values.filter((value) => Number.isFinite(value));
+	if (finite.length === 0) {
+		return fixed;
+	}
+	return [
+		Math.min(fixed[0], Math.floor(Math.min(...finite))),
+		Math.max(fixed[1], Math.ceil(Math.max(...finite))),
+	] as [number, number];
+};
+
 const TeamStatDists = ({ season, statsAll }: View<"teamStatDists">) => {
 	useTitleBar({
 		title: "Team Stat Distributions",
@@ -175,6 +192,7 @@ const TeamStatDists = ({ season, statsAll }: View<"teamStatDists">) => {
 					{Object.entries(statsAll)
 						.filter(([stat]) => stat !== "playoffs")
 						.map(([stat, values]) => {
+							const statScale = getScale(stat, values);
 							const bbgmPlot = (
 								<tr key={`${stat}-bbgm`}>
 									<td className="pe-3 text-end">{stat}</td>
@@ -182,7 +200,7 @@ const TeamStatDists = ({ season, statsAll }: View<"teamStatDists">) => {
 										<BoxPlot
 											color="var(--bs-blue)"
 											data={values}
-											scale={scale[stat]}
+											scale={statScale}
 										/>
 									</td>
 								</tr>
@@ -198,7 +216,7 @@ const TeamStatDists = ({ season, statsAll }: View<"teamStatDists">) => {
 													color="var(--bs-green)"
 													data={proStatsAll[stat]}
 													labels={false}
-													scale={scale[stat]}
+													scale={statScale}
 												/>
 											</div>
 										</td>

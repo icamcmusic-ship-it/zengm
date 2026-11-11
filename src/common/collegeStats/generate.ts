@@ -17,6 +17,7 @@ import {
 	type ProspectNcaaGame,
 } from "./ncaa.ts";
 import { gameScore } from "./season.ts";
+import { isJuco, lagRatings, planCareer, toCareer } from "./career.ts";
 import { COLLEGE_AWARD_PREFIX } from "../preDraft.ts";
 import type {
 	CollegeProspect,
@@ -38,6 +39,9 @@ export type GenerateOptions = {
 	// The college season of the draft year (ncaa.ts). A prospect at one of its schools plays his team's games, conference and NCAA tournament games included, and gets tournament honors
 	ncaaSeason?: NcaaSeason;
 };
+
+// Game score per 40 minutes a junior college season needs for honors
+const JUCO_BARS = { allAmerican: 17.5, allRegion: 14 };
 
 // Class year (0 = freshman ... 3 = senior) from age during the draft year season
 export const getClassIndex = (age: number) => {
@@ -114,51 +118,70 @@ export const generateCollegeClass = (
 			ncaaSeason && team >= 0 ? getTeamPostseason(ncaaSeason, team) : [];
 
 		const seasons: CollegeSeason[] = [];
-		if (school && !school.idle) {
-			const classIndex = getClassIndex(p.age);
-			const numSeasons = priorSeasons ? classIndex + 1 : 1;
-			// Oldest first
-			for (let k = numSeasons - 1; k >= 0; k--) {
-				const ratings = backProject(p.ratings, k, p.age);
-				const zTalent =
-					clamp((p.ovr - classStats.mean) / classStats.sd, -2.5, 2.5) -
-					0.38 * k;
-				seasons.push(
-					simulateSeason({
-						season: draftYear - k,
-						rng,
-						ratings,
-						zTalent,
-						classIndex: classIndex - k,
-						school: school.name,
-						conference: school.conference,
-						strength: school.strength,
-						gameMinutes: school.gameMinutes,
-						noise,
-						pos: p.pos,
-						proEnv: getLeagueEnv(school.name),
-						age: p.age - k,
-						...(k === 0 && ncaaSeason && team >= 0
-							? {
-									teamGames:
-										ncaaSeason.teams[team]!.w + ncaaSeason.teams[team]!.l,
-									postseasonGames: postseason.length,
-									confGames:
-										ncaaSeason.teams[team]!.confW +
-										ncaaSeason.teams[team]!.confL,
-								}
-							: {}),
-					}),
-				);
+		const zClass = clamp((p.ovr - classStats.mean) / classStats.sd, -2.5, 2.5);
+		const plan = planCareer(p, school, {
+			seed,
+			draftYear,
+			priorSeasons,
+			z: zClass,
+			classIndex: getClassIndex(p.age),
+		});
+		// His draft year season ended early: he missed the postseason
+		let missedPostseason = false;
+		// Oldest first
+		for (const year of plan.years) {
+			if (!year.played) {
+				continue;
 			}
+			const k = year.yearsBack;
+			const ratings = lagRatings(backProject(p.ratings, k, p.age), year.lag);
+			const zTalent = zClass - 0.38 * k + year.zShift;
+			const draftYearTeam = k === 0 && ncaaSeason && team >= 0;
+			if (draftYearTeam && year.gamesCap !== undefined) {
+				missedPostseason = true;
+			}
+			seasons.push(
+				simulateSeason({
+					season: draftYear - k,
+					rng,
+					ratings,
+					zTalent,
+					classIndex: year.classIndex,
+					school: year.school,
+					conference: year.conference,
+					strength: year.strength,
+					gameMinutes: year.gameMinutes,
+					noise,
+					pos: p.pos,
+					proEnv: getLeagueEnv(year.school),
+					age: p.age - k,
+					...(year.mpgShift !== 0 ? { mpgShift: year.mpgShift } : {}),
+					...(year.usageShift !== 0 ? { usageShift: year.usageShift } : {}),
+					...(year.gamesCap !== undefined ? { gamesCap: year.gamesCap } : {}),
+					...(year.teamGames !== undefined
+						? { teamGames: year.teamGames }
+						: {}),
+					...(draftYearTeam
+						? {
+								teamGames:
+									ncaaSeason.teams[team]!.w + ncaaSeason.teams[team]!.l,
+								postseasonGames: postseason.length,
+								confGames:
+									ncaaSeason.teams[team]!.confW + ncaaSeason.teams[team]!.confL,
+							}
+						: {}),
+				}),
+			);
 		}
 
 		if (ncaaSeason && team >= 0 && school) {
 			const last = seasons.at(-1);
 			const boxes = last?.postseasonBoxes ?? [];
-			const games = postseason.map(({ event, round, game }, i) =>
-				toGameLine(ncaaSeason, team, event, round, game, boxes[i]),
-			);
+			const games = missedPostseason
+				? []
+				: postseason.map(({ event, round, game }, i) =>
+						toGameLine(ncaaSeason, team, event, round, game, boxes[i]),
+					);
 			const splits = last?.splits;
 			if (last) {
 				delete last.postseasonBoxes;
@@ -168,7 +191,9 @@ export const generateCollegeClass = (
 				...getTeamSummary(ncaaSeason, team, games),
 				...(splits ? { splits } : {}),
 			});
-			ncaaEntries.push({ key: p.key, school: school.name, games });
+			if (!missedPostseason) {
+				ncaaEntries.push({ key: p.key, school: school.name, games });
+			}
 		}
 
 		results.push({
@@ -177,12 +202,36 @@ export const generateCollegeClass = (
 			seasons,
 			honors: [],
 			pos: p.pos,
+			...(plan.years.length > 0 ? { career: toCareer(plan) } : {}),
 		});
 	}
 
 	// One stream for the class level honors (electorates), seeded so it doesn't depend on class order
 	const honorsRng = new Rng(`${seed}|${draftYear}|honors`);
 	const honors = getHonors(results, honorsRng);
+	// Junior college honors, against fixed bars like the college ones
+	for (const result of results) {
+		for (const season of result.seasons) {
+			if (!isJuco(season.school) || (season.stats.gp ?? 0) < 14) {
+				continue;
+			}
+			const type =
+				season.score >= JUCO_BARS.allAmerican
+					? "NJCAA All-American"
+					: season.score >= JUCO_BARS.allRegion
+						? "NJCAA All-Region"
+						: undefined;
+			if (type) {
+				const list = honors.get(result.key) ?? [];
+				list.push({
+					season: season.season,
+					type: `${COLLEGE_AWARD_PREFIX}${type}`,
+				});
+				list.sort((a, b) => a.season - b.season);
+				honors.set(result.key, list);
+			}
+		}
+	}
 	if (ncaaSeason) {
 		for (const [key, types] of getTourneyHonors(ncaaSeason, ncaaEntries)) {
 			const list = honors.get(key) ?? [];
@@ -251,7 +300,7 @@ export const getNcaaSchools = (
 const toGameLine = (
 	season: NcaaSeason,
 	team: number,
-	event: "conf" | "ncaa",
+	event: ProspectNcaaGame["event"],
 	round: string,
 	game: NcaaSeason["tournament"]["final"],
 	box: GameBox | undefined,
@@ -281,7 +330,7 @@ const toGameLine = (
 		event,
 		round,
 		opp: season.teams[opp]!.school,
-		...(event === "ncaa"
+		...(event !== "conf"
 			? {
 					seed: home ? game.seedA : game.seedB,
 					oppSeed: home ? game.seedB : game.seedA,

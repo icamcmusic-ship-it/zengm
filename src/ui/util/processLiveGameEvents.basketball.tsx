@@ -10,6 +10,7 @@ import { formatLiveGameStat } from "./formatLiveGameStat.ts";
 import type { PlayByPlayEvent } from "../../worker/core/GameSim/PlayByPlayLoggerBase.ts";
 import {
 	FlavorSession,
+	contextFromInitEvent,
 	playersFromInitEvent,
 	type FlavorHost,
 	type FlavorInit,
@@ -57,7 +58,12 @@ const makeFlavorSession = (initEvent: unknown, boxScore: any) => {
 			abbrev: t.abbrev ?? "",
 		})) as [{ name: string; abbrev: string }, { name: string; abbrev: string }],
 		players: playersFromInitEvent(initEvent),
-		context: { playoffs: !!boxScore.playoffs },
+		// (the rivalry and each player's career numbers come with the init event, live and stored alike)
+		context: {
+			playoffs: !!boxScore.playoffs,
+			exhibition: allStar,
+			...contextFromInitEvent(initEvent),
+		},
 		...teamContext(boxScore, allStar),
 	});
 };

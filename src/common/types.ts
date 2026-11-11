@@ -1550,6 +1550,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	draftBoard?: DraftBoardEntry;
 	// Basketball: his team's college season in his draft year (conference tournaments, March Madness), see common/collegeStats/ncaa.ts
 	collegeSeason?: StoredCollegeSeason;
+	// Basketball: his years before the draft (schools, redshirt years, transfers, junior college), his story if he is one of the class's unusual prospects, and his recruiting ranking, see common/collegeStats/career.ts. Only on prospects whose college stats were generated with the career model
+	preDraftCareer?: StoredPreDraftCareer;
 
 	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
 	archetypes?: StoredArchetype[];
@@ -2448,6 +2450,7 @@ import type {
 } from "./nativeFeatures.ts";
 import type { UndoLog } from "../worker/util/UndoLog.ts";
 import type { StoredCollegeSeason } from "./collegeStats/ncaa.ts";
+import type { StoredPreDraftCareer } from "./collegeStats/career.ts";
 import type { LeagueUrlParts } from "../ui/router/types.ts";
 import type { StoredRatingsBuild } from "./ratingsBuilds/types.ts";
 import type { StoredArchetype } from "./archetypes/types.ts";

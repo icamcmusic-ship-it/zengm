@@ -87,83 +87,94 @@ const GamesList = ({
 		return <NoGamesMessage warnAboutDelete />;
 	}
 
+	// The list is in a narrow column next to the box score. If a row is still too wide for it (very narrow column), scroll inside the list,
+	// never the page
 	return (
-		<table className="table table-striped table-borderless table-sm game-log-list">
-			<thead>
-				<tr>
-					<th>Opp</th>
-					<th>W/L</th>
-					<th>Score</th>
-				</tr>
-			</thead>
-			<tbody>
-				{gamesList.tid !== tid ? (
+		<div className="table-responsive">
+			<table className="table table-striped table-borderless table-sm game-log-list mb-0">
+				<thead>
 					<tr>
-						<td colSpan={3}>Loading...</td>
+						<th>Opp</th>
+						<th>W/L</th>
+						<th>Score</th>
 					</tr>
-				) : (
-					gamesList.games.map((gm) => {
-						const home = gm.teams[0].tid === tid;
-						const user = home ? 0 : 1;
-						const other = home ? 1 : 0;
+				</thead>
+				<tbody>
+					{gamesList.tid !== tid ? (
+						<tr>
+							<td colSpan={3}>Loading...</td>
+						</tr>
+					) : (
+						gamesList.games.map((gm) => {
+							const home = gm.teams[0].tid === tid;
+							const user = home ? 0 : 1;
+							const other = home ? 1 : 0;
 
-						const winner = getWinner(gm.teams);
-						const result = winner === user ? "W" : winner === other ? "L" : "T";
+							const winner = getWinner(gm.teams);
+							const result =
+								winner === user ? "W" : winner === other ? "L" : "T";
 
-						const overtimeText = helpers.overtimeText(
-							gm.overtimes,
-							gm.numPeriods,
-						);
-						const overtimes =
-							overtimeText === ""
-								? ""
-								: __SPORT === "baseball"
-									? ` (${overtimeText})`
-									: ` ${overtimeText}`;
+							const overtimeText = helpers.overtimeText(
+								gm.overtimes,
+								gm.numPeriods,
+							);
+							const overtimes =
+								overtimeText === ""
+									? ""
+									: __SPORT === "baseball"
+										? ` (${overtimeText})`
+										: ` ${overtimeText}`;
 
-						const oppAbbrev = gamesList.abbrevs[gm.teams[other].tid];
+							const oppAbbrev = gamesList.abbrevs[gm.teams[other].tid];
 
-						const url = helpers.leagueUrl([
-							"game_log",
-							team === "special" ? team : helpers.getTeamUrlPart(team),
-							season,
-							gm.gid,
-						]);
+							const url = helpers.leagueUrl([
+								"game_log",
+								team === "special" ? team : helpers.getTeamUrlPart(team),
+								season,
+								gm.gid,
+							]);
 
-						return (
-							<tr
-								key={gm.gid}
-								className={gm.gid === gid ? "table-info" : undefined}
-							>
-								<td className="game-log-cell">
-									<a href={url} data-no-scroll-reset>
-										{gm.neutralSite || home ? "" : "@"}
-										{oppAbbrev}
-									</a>
-								</td>
-								<td className={clsx("game-log-cell")}>
-									<a
-										href={url}
-										data-no-scroll-reset
-										className={
-											gm.forceWin !== undefined ? "alert-god-mode" : undefined
-										}
-									>
-										{result}
-									</a>
-								</td>
-								<td className="game-log-cell">
-									<a href={url} data-no-scroll-reset>
-										{formatScoreWithShootout(gm.teams[user], gm.teams[other])}
-										{overtimes}
-									</a>
-								</td>
-							</tr>
-						);
-					})
-				)}
-			</tbody>
-		</table>
+							return (
+								<tr
+									key={gm.gid}
+									className={gm.gid === gid ? "table-info" : undefined}
+								>
+									<td className="game-log-cell">
+										<a href={url} data-no-scroll-reset>
+											{gm.neutralSite || home ? "" : "@"}
+											{oppAbbrev}
+										</a>
+									</td>
+									<td className={clsx("game-log-cell")}>
+										<a
+											href={url}
+											data-no-scroll-reset
+											className={
+												gm.forceWin !== undefined ? "alert-god-mode" : undefined
+											}
+										>
+											{result}
+										</a>
+									</td>
+									<td className="game-log-cell game-log-cell-score">
+										<a href={url} data-no-scroll-reset>
+											{/* The score stays on one line, the overtime text goes to a second line when the column is too narrow for both */}
+											<span className="text-nowrap">
+												{formatScoreWithShootout(
+													gm.teams[user],
+													gm.teams[other],
+												)}
+											</span>
+											{overtimes}
+										</a>
+									</td>
+								</tr>
+							);
+						})
+					)}
+				</tbody>
+			</table>
+		</div>
 	);
 };
 

@@ -5,8 +5,8 @@ import type { Rng } from "./rng.ts";
    short list was used recently, the least recent ones are merely unlikely). One memory per live game (see FlavorSession); the session makes its own memory the
    active one before it words anything. */
 
-// How many of the last phrases picked (all kinds of lines together: about the last 8 to 12 lines) are kept out of the next picks
-export const RECENT = 32;
+// How many of the last phrases picked (all kinds of lines together: about the last 12 to 18 lines) are kept out of the next picks
+export const RECENT = 48;
 
 export class VarietyMemory {
 	counts = new Map<string, number>();

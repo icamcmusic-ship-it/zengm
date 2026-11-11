@@ -21,7 +21,6 @@ import {
 	getTeamNeeds,
 } from "./draftNeeds.ts";
 import {
-	countMentees,
 	makeAiTraitValueFactorCache,
 	traitsEnabled,
 } from "../player/traits.ts";
@@ -230,13 +229,13 @@ const runPicks = async (
 				!g.get("userTids").includes(dp.tid)
 			) {
 				const t = await idb.cache.teams.get(dp.tid);
-				const numYoung = countMentees(teamPlayers);
+				const traitTeam = getTraitFactor.teamContext(teamPlayers);
 				adjustments = playersAll.map(
 					(p, i) =>
 						(adjustments?.[i] ?? 0) +
 						getDraftTraitAdjustment(
 							p.value,
-							getTraitFactor(p, { strategy: t?.strategy, numYoung }),
+							getTraitFactor(p, { strategy: t?.strategy, team: traitTeam }),
 						),
 				);
 			}

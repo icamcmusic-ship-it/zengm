@@ -9,6 +9,15 @@ import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { range } from "../../../common/utils.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import processLiveGameEvents from "../../../ui/util/processLiveGameEvents.basketball.tsx";
+import {
+	FlavorSession,
+	contextFromInitEvent,
+	playersFromInitEvent,
+	type FlavorHost,
+	type FlavorInit,
+	type FlavorResult,
+	type FlavorStat,
+} from "../../../common/pbpFlavor/index.ts";
 
 export type Line = {
 	text: string;
@@ -247,4 +256,107 @@ export const simulateLiveGame = async (seed: number) => {
 	const boxScore: any = makeLiveBoxScore(result, seed);
 	const lines = playLive(events, boxScore);
 	return { lines, boxScore, result };
+};
+
+// Every event through one flavor session directly (no UI code), keeping the box score the way the live view and the top plays do. Returns
+// each worded event with the box score as it was at that moment, and the session (for its debug log)
+export const describeGame = (
+	gid: number,
+	initEvent: unknown,
+	events: readonly any[],
+	context?: FlavorInit["context"],
+) => {
+	const session = new FlavorSession({
+		gid,
+		numPeriods: 4,
+		quarterLength: 12,
+		female: false,
+		noArticle: false,
+		teams: [
+			{ name: "Celtics", abbrev: "BOS" },
+			{ name: "Mavericks", abbrev: "DAL" },
+		],
+		players: playersFromInitEvent(initEvent),
+		context: { ...contextFromInitEvent(initEvent), ...context },
+	});
+	const score: [number, number] = [0, 0];
+	const stats = new Map<number, FlavorStat>();
+	const onCourt: [Set<number>, Set<number>] = [new Set(), new Set()];
+	const host: FlavorHost = {
+		stat: (pid) => stats.get(pid),
+		score: () => [score[0], score[1]],
+		onCourt: (t) => [...onCourt[t]],
+	};
+	const out: {
+		idx: number;
+		type: string;
+		period: number;
+		r: FlavorResult;
+		box: Map<number, FlavorStat>;
+	}[] = [];
+	let idx = 0;
+	let period = 1;
+	for (let i = 0; i < events.length; i++) {
+		const e = events[i];
+		if (e.type === "init") {
+			continue;
+		}
+		if (e.type === "stat") {
+			if (e.s === "pts") {
+				score[e.t as 0 | 1] += e.amt;
+			}
+			if (e.pid !== undefined && e.pid !== null) {
+				let s = stats.get(e.pid);
+				if (!s) {
+					s = {
+						pts: 0,
+						ast: 0,
+						trb: 0,
+						stl: 0,
+						blk: 0,
+						tov: 0,
+						pf: 0,
+						fg: 0,
+						fga: 0,
+						tp: 0,
+						tpa: 0,
+						ft: 0,
+						fta: 0,
+					};
+					stats.set(e.pid, s);
+				}
+				const k = e.s === "orb" || e.s === "drb" ? "trb" : e.s;
+				if (k in s) {
+					(s as any)[k] += e.amt;
+				}
+				if (e.s === "gs") {
+					onCourt[e.t as 0 | 1].add(e.pid);
+				}
+			}
+			continue;
+		}
+		if (e.type === "period" || e.type === "overtime") {
+			period = e.period;
+		}
+		idx += 1;
+		const r = session.describe(e, host, events.slice(i + 1));
+		if (e.type === "sub") {
+			for (const pid of e.pidsOff) {
+				onCourt[e.t as 0 | 1].delete(pid);
+			}
+			for (const pid of e.pids) {
+				onCourt[e.t as 0 | 1].add(pid);
+			}
+		}
+		if (r && r !== "silent") {
+			out.push({
+				idx,
+				type: e.type,
+				period,
+				r,
+				box: new Map([...stats].map(([pid, s]) => [pid, { ...s }])),
+			});
+		}
+	}
+	return { out, session };
 };
