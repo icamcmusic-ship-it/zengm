@@ -628,6 +628,11 @@ const checkClass = (
 			assert.strictEqual(ncaa.nit, team.nit);
 			assert.strictEqual(ncaa.nitSeed, team.nitSeed);
 			assert.isUndefined(ncaa.ncaa);
+			// A prospect whose season ended early (career.ts) missed the postseason
+			if (result.career?.story === "injury") {
+				assert.strictEqual(nitGames.length, 0);
+				continue;
+			}
 			assert.isAtLeast(nitGames.length, 1);
 			for (const game of nitGames) {
 				assert.isDefined(game.seed);
