@@ -1,121 +1,122 @@
 {
 	"mode": "on",
+	"sim": "new-league defaults",
 	"games": 16000,
 	"ratings": [
 		{
 			"key": "hgt",
-			"margin": 0.7611,
-			"marginSE": 0.0358
+			"margin": 1.0082,
+			"marginSE": 0.0428
 		},
 		{
 			"key": "stre",
-			"margin": 0.2751,
-			"marginSE": 0.0355
+			"margin": 0.2834,
+			"marginSE": 0.0427
 		},
 		{
 			"key": "spd",
-			"margin": 0.5421,
-			"marginSE": 0.0357
+			"margin": 0.6569,
+			"marginSE": 0.0426
 		},
 		{
 			"key": "jmp",
-			"margin": 0.2582,
-			"marginSE": 0.0357
+			"margin": 0.316,
+			"marginSE": 0.0423
 		},
 		{
 			"key": "endu",
-			"margin": 0.1373,
-			"marginSE": 0.0358
+			"margin": 0.2032,
+			"marginSE": 0.0425
 		},
 		{
 			"key": "ins",
-			"margin": 0.0346,
-			"marginSE": 0.0358
+			"margin": 0.0474,
+			"marginSE": 0.0426
 		},
 		{
 			"key": "dnk",
-			"margin": 0.1711,
-			"marginSE": 0.0359
+			"margin": 0.2004,
+			"marginSE": 0.0429
 		},
 		{
 			"key": "ft",
-			"margin": 0.1948,
-			"marginSE": 0.0358
+			"margin": 0.206,
+			"marginSE": 0.0426
 		},
 		{
 			"key": "fg",
-			"margin": -0.0212,
-			"marginSE": 0.0355
+			"margin": 0.0494,
+			"marginSE": 0.0423
 		},
 		{
 			"key": "tp",
-			"margin": 0.5115,
-			"marginSE": 0.0358
+			"margin": 0.3817,
+			"marginSE": 0.0425
 		},
 		{
 			"key": "oiq",
-			"margin": 0.3024,
-			"marginSE": 0.0355
+			"margin": 0.4064,
+			"marginSE": 0.0428
 		},
 		{
 			"key": "diq",
-			"margin": -0.0061,
-			"marginSE": 0.0356
+			"margin": 0.0131,
+			"marginSE": 0.042
 		},
 		{
 			"key": "drb",
-			"margin": 0.3346,
-			"marginSE": 0.0355
+			"margin": 0.4384,
+			"marginSE": 0.0426
 		},
 		{
 			"key": "pss",
-			"margin": 0.2547,
-			"marginSE": 0.0359
+			"margin": 0.2147,
+			"marginSE": 0.0428
 		},
 		{
 			"key": "reb",
-			"margin": -0.0101,
-			"marginSE": 0.0358
+			"margin": -0.0131,
+			"marginSE": 0.0424
 		},
 		{
 			"key": "wng",
-			"margin": 0.2758,
-			"marginSE": 0.0358
+			"margin": 0.3983,
+			"marginSE": 0.0424
 		},
 		{
 			"key": "pdef",
-			"margin": 0.1693,
-			"marginSE": 0.036
+			"margin": 0.2805,
+			"marginSE": 0.0429
 		},
 		{
 			"key": "idef",
-			"margin": 0.2748,
-			"marginSE": 0.0357
+			"margin": 0.3623,
+			"marginSE": 0.0427
 		},
 		{
 			"key": "oreb",
-			"margin": 0.0732,
-			"marginSE": 0.0355
+			"margin": 0.0217,
+			"marginSE": 0.0422
 		},
 		{
 			"key": "dreb",
-			"margin": 0.084,
-			"marginSE": 0.0354
+			"margin": 0.0757,
+			"marginSE": 0.0426
 		},
 		{
 			"key": "csh",
-			"margin": 0.0285,
-			"marginSE": 0.0357
+			"margin": 0.0266,
+			"marginSE": 0.0425
 		},
 		{
 			"key": "dsh",
-			"margin": -0.0885,
-			"marginSE": 0.0355
+			"margin": -0.0192,
+			"marginSE": 0.0423
 		},
 		{
 			"key": "bsc",
-			"margin": 0.1175,
-			"marginSE": 0.0359
+			"margin": 0.2026,
+			"marginSE": 0.0426
 		}
 	]
 }

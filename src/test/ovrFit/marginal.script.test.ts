@@ -5,7 +5,7 @@
 // recomputed, so the rotation is unchanged except through endurance/fatigue). Team exposure X_r = sum_p (delta_pr / 10) * (min_p / 36),
 // i.e. "one 36-minute player +10". OLS: margin_A ~ home + (X_A - X_B); ptsA ~ X_A (offense) + X_B (defense). Also records ovr vs +/-.
 // RA_MODE=off|on  RA_ROSTERS  RA_GAMES (per roster)  RA_OUT (full output with player records)  RA_FIT_OUT (the trimmed file the fit
-// reads, default src/test/ovrFit/marginal-<mode>.json). Measured with ovrV2 off, so the rotation is the stock one:
+// reads, default src/test/ovrFit/marginal-<mode>.json). RA_SIM=defaults (default: the new-league game sim extras on) | off (stock sim). Measured with ovrV2 off, so the rotation is the stock one:
 //   RA_MODE=off RA_ROSTERS=16 RA_GAMES=1000 node_modules/.bin/vitest run --project basketball src/test/ovrFit/marginal.script.test.ts
 import { test } from "vitest";
 import { writeFileSync } from "node:fs";
@@ -19,8 +19,21 @@ import { resetCache, resetG } from "../helpers.ts";
 import { DEFAULT_LEVEL } from "../../common/budgetLevels.ts";
 import { last, range } from "../../common/utils.ts";
 import { idb } from "../../worker/db/index.ts";
+import { nativeFeatureNewLeagueDefaults } from "../../common/nativeFeatures.ts";
+
+// League extras that change the game sim (player traits stay off: generated players here have no trait seeds)
+const SIM_SETTINGS = [
+	"realisticPossessions",
+	"technicalFouls",
+	"perimeterDefense",
+	"simFixes",
+	"positionalComposites",
+	"realisticRotations",
+];
+const simDefaults = (env_: any) => (env_.RA_SIM ?? "defaults") === "defaults";
 
 const env = (globalThis as any).process?.env ?? {};
+const simDefaultsOn = simDefaults(env);
 const NUM_TEAMS = 30;
 
 const STOCK = [
@@ -182,7 +195,15 @@ test.skipIf(!env.RA_MODE)(
 					g.setWithoutSavingToDB("expandedRatings", expanded);
 					g.setWithoutSavingToDB("playerTraits", false);
 					g.setWithoutSavingToDB("ovrV2", false);
-					g.setWithoutSavingToDB("realisticPossessions", false);
+					// Game sim settings: the new-league defaults (RA_SIM=defaults, the default) or the stock sim (RA_SIM=off)
+					for (const key of SIM_SETTINGS) {
+						g.setWithoutSavingToDB(
+							key as any,
+							simDefaultsOn
+								? (nativeFeatureNewLeagueDefaults() as any)[key] === true
+								: false,
+						);
+					}
 					g.setWithoutSavingToDB("storePlayByPlay", false);
 					const players = await idb.cache.players.getAll();
 					const base = new Map<number, Record<string, number>>();
@@ -330,6 +351,7 @@ test.skipIf(!env.RA_MODE)(
 		}
 		const trimmed = {
 			mode: out.mode,
+			sim: simDefaultsOn ? "new-league defaults" : "stock",
 			games: out.games,
 			ratings: out.ratings.map((r: any) => ({
 				key: r.key,

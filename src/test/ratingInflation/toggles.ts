@@ -1,8 +1,12 @@
 import { ALL_ON } from "./harness.ts";
+import { nativeFeatureNewLeagueDefaults } from "../../common/nativeFeatures.ts";
 
 export const TOGGLES: Record<string, Record<string, unknown>> = {
 	off: {},
 	allOn: ALL_ON,
+	// A new league with the default League extras, and the same with the stock ovr formula (the ovr v2 anchor check)
+	newDefaults: nativeFeatureNewLeagueDefaults(),
+	newDefaultsStockOvr: { ...nativeFeatureNewLeagueDefaults(), ovrV2: false },
 	// Every extra except Sim-Calibrated Ovr and Realistic Aging
 	allOnStockOvrAging: { ...ALL_ON, ovrV2: false, realisticAging: false },
 	allOnOvrOnly: { ...ALL_ON, realisticAging: false },

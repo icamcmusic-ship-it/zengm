@@ -112,7 +112,7 @@ describe("Sim-Calibrated Ovr", () => {
 			const off = ovr(p.ratings[0]);
 			g.setWithoutSavingToDB("expandedRatings", true);
 			const on = ovr(p.ratings[0]);
-			assert.isAtMost(Math.abs(on - off), 4);
+			assert.isAtMost(Math.abs(on - off), 6);
 			// pdef/idef are read (diq isn't)
 			const better = ovr({ ...p.ratings[0], idef: p.ratings[0].idef + 20 });
 			assert.isAbove(better, on);

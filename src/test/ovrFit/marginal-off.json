@@ -1,81 +1,82 @@
 {
 	"mode": "off",
+	"sim": "new-league defaults",
 	"games": 16000,
 	"ratings": [
 		{
 			"key": "hgt",
-			"margin": 0.9062,
-			"marginSE": 0.0358
+			"margin": 1.1149,
+			"marginSE": 0.0416
 		},
 		{
 			"key": "stre",
-			"margin": 0.1901,
-			"marginSE": 0.0359
+			"margin": 0.3439,
+			"marginSE": 0.0418
 		},
 		{
 			"key": "spd",
-			"margin": 0.6785,
-			"marginSE": 0.036
+			"margin": 0.7085,
+			"marginSE": 0.0416
 		},
 		{
 			"key": "jmp",
-			"margin": 0.1996,
-			"marginSE": 0.0358
+			"margin": 0.3506,
+			"marginSE": 0.0418
 		},
 		{
 			"key": "endu",
-			"margin": 0.1559,
-			"marginSE": 0.0357
+			"margin": 0.1837,
+			"marginSE": 0.0418
 		},
 		{
 			"key": "ins",
-			"margin": -0.0311,
-			"marginSE": 0.0357
+			"margin": 0.0148,
+			"marginSE": 0.0415
 		},
 		{
 			"key": "dnk",
-			"margin": 0.1685,
-			"marginSE": 0.0358
+			"margin": 0.1412,
+			"marginSE": 0.0419
 		},
 		{
 			"key": "ft",
-			"margin": 0.0742,
-			"marginSE": 0.0357
+			"margin": 0.1465,
+			"marginSE": 0.0418
 		},
 		{
 			"key": "fg",
-			"margin": -0.0877,
-			"marginSE": 0.0356
+			"margin": 0.0021,
+			"marginSE": 0.0414
 		},
 		{
 			"key": "tp",
-			"margin": 0.434,
-			"marginSE": 0.0357
+			"margin": 0.4674,
+			"marginSE": 0.0418
 		},
 		{
 			"key": "oiq",
-			"margin": 0.351,
-			"marginSE": 0.0357
+			"margin": 0.4733,
+			"marginSE": 0.0416
 		},
 		{
 			"key": "diq",
-			"margin": 0.4154,
-			"marginSE": 0.0361
+			"margin": 0.4898,
+			"marginSE": 0.0413
 		},
 		{
 			"key": "drb",
-			"margin": 0.4225,
-			"marginSE": 0.0358
+			"margin": 0.5632,
+			"marginSE": 0.0418
 		},
 		{
 			"key": "pss",
-			"margin": 0.2815,
-			"marginSE": 0.0358
+			"margin": 0.2152,
+			"marginSE": 0.0417
 		},
 		{
 			"key": "reb",
-			"margin": 0.1619,
-			"marginSE": 0.0358
+			"margin": 0.1618,
+			"marginSE": 0.0415
 		}
 	]
 }

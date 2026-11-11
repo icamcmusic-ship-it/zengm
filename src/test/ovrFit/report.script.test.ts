@@ -3,7 +3,7 @@
 // Report for the Sim-Calibrated Ovr fit (docs/native-features.md): on generated leagues (other seeds than the fit), stock vs v2 ovr with
 // Expanded Ratings off and on: the league's ovr distribution, correlation with sim impact (sum of measured slope * rating), the mean
 // impact residual given ovr by position (in ovr points), and how much a player's ovr moves when Expanded Ratings is toggled.
-//   OVR_REPORT=1 node_modules/.bin/vitest run --project basketball src/test/ovrFit/report.script.test.ts
+//   OVR_REPORT=1 [REPORT_MARGINAL_DIR=dir with marginal-off/on.json of another sim configuration] node_modules/.bin/vitest run --project basketball src/test/ovrFit/report.script.test.ts
 import { test } from "vitest";
 import { readFileSync } from "node:fs";
 import { g } from "../../worker/util/index.ts";
@@ -40,7 +40,10 @@ const q = (xs: number[], p: number) =>
 
 const slopes = (mode: string) => {
 	const data = JSON.parse(
-		readFileSync(`src/test/ovrFit/marginal-${mode}.json`, "utf8"),
+		readFileSync(
+			`${env.REPORT_MARGINAL_DIR ?? "src/test/ovrFit"}/marginal-${mode}.json`,
+			"utf8",
+		),
 	);
 	return Object.fromEntries(
 		data.ratings.map((r: any) => [r.key, r.margin / 10]),
