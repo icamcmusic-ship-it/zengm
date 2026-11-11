@@ -39,6 +39,8 @@ const componentText = (
 				return "Eager to sign first non-rookie contract";
 			case "lockerRoom":
 				return "Enjoys the team-first locker room";
+			case "coachFit":
+				return "Likes the coach and fits his system";
 			case "relatives":
 				return `Wants to play with ${helpers.pronoun(gender, "his")} ${helpers.plural("relative", value / 2)}`;
 		}
@@ -65,6 +67,8 @@ const componentText = (
 			throw new Error("Should never happen");
 		case "lockerRoom":
 			return "Put off by the egos in the locker room";
+		case "coachFit":
+			return "Doesn't fit the coach's system";
 	}
 };
 

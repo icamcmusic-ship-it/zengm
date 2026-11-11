@@ -241,6 +241,13 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	if (results.forceWin !== undefined) {
 		gameStats.forceWin = results.forceWin;
 	}
+	// Coaching systems: each team's offense and defense system, for the box score header
+	for (const i of [0, 1] as const) {
+		const cs = results.team[i].coachSim;
+		if (cs) {
+			(gameStats.teams[i] as any).coachSys = { off: cs.off, def: cs.def };
+		}
+	}
 	if (
 		__SPORT === "basketball" &&
 		results.playByPlay !== undefined &&

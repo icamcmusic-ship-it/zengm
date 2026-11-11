@@ -7,6 +7,37 @@ import {
 } from "../../common/staff.ts";
 import type { Coach, CoachRole } from "../../common/types.ts";
 import { g } from "../util/index.ts";
+import { describeProfile } from "../../common/coachSystems.ts";
+import {
+	coachReputation,
+	coachSystemsEnabled,
+	getCoachProfile,
+	hotSeat,
+	hotSeatLabel,
+	reputationLabel,
+} from "../core/staff/systems.ts";
+
+// Coaching systems: a coach's identity for the coach pages (undefined with the setting off)
+const formatSystems = (c: Coach) => {
+	if (!coachSystemsEnabled()) {
+		return undefined;
+	}
+	const profile = getCoachProfile(c);
+	const rep = coachReputation(c);
+	const heat = c.role === "head" && c.tid >= 0 ? hotSeat(c) : 0;
+	return {
+		...describeProfile(profile),
+		offenseKey: profile.off,
+		defenseKey: profile.def,
+		mgmt: profile.mgmt,
+		adapt: profile.adapt,
+		mentor: profile.mentor,
+		reputation: rep,
+		reputationText: reputationLabel(rep),
+		hotSeat: heat,
+		hotSeatText: c.role === "head" && c.tid >= 0 ? hotSeatLabel(heat) : "",
+	};
+};
 
 export const STAFF_DISABLED_MESSAGE =
 	__SPORT === "basketball"
@@ -58,6 +89,7 @@ export const formatCoach = (c: Coach, roleOverride?: CoachRole) => {
 		titles,
 		numAwards: c.awards.length,
 		retiredYear: c.retiredYear,
+		systems: formatSystems(c),
 	};
 };
 

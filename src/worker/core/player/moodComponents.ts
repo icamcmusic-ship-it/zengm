@@ -10,7 +10,8 @@ import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts"
 import { getContractExp } from "../../../common/contracts.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
 import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
-import { getLockerRoomMood, traitsEnabled } from "./traits.ts";
+import { getEgoScore, getLockerRoomMood, traitsEnabled } from "./traits.ts";
+import { coachMood, coachSystemsEnabled } from "../staff/systems.ts";
 
 // A player whose rookie contract just expired, while his team can re-sign him. That's during the re-signing phase, or before then for a player still on his team, which includes when AI teams re-sign players in newPhaseResignPlayers before the phase is updated.
 const isResigningAfterRookieContract = (p: Player) => {
@@ -142,6 +143,7 @@ const moodComponents = async (
 		difficulty: 0,
 		relatives: 0,
 		lockerRoom: 0,
+		coachFit: 0,
 	};
 
 	if (p.customMoodItems) {
@@ -371,6 +373,17 @@ const moodComponents = async (
 			components.lockerRoom = getLockerRoomMood(
 				p,
 				(await getTeamPlayers()) as any,
+			);
+		}
+	}
+
+	{
+		// COACH & SYSTEM: scheme fit, the head coach's personality and reputation (coaching systems)
+		if (__SPORT === "basketball" && coachSystemsEnabled()) {
+			components.coachFit = await coachMood(
+				p,
+				tid,
+				traitsEnabled() ? getEgoScore(p as any) : undefined,
 			);
 		}
 	}

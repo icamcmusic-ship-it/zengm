@@ -360,6 +360,8 @@ const newPhasePreseason = async (
 	await ensureGms();
 
 	const coachingLevels: Record<number, number> = {};
+	// Coaching systems: the head coach's philosophy (development coaches help young players, win-now coaches veterans)
+	const headProfiles = await staff.getHeadProfiles();
 	for (const t of teams) {
 		const teamSeasons = await idb.merged.teamSeasons.getAll({
 			tid: t.tid,
@@ -515,7 +517,17 @@ const newPhasePreseason = async (
 				p,
 				1,
 				false,
-				coachingLevels[p.tid],
+				headProfiles.has(p.tid)
+					? helpers.bound(
+							coachingLevels[p.tid]! +
+								staff.philosophyLevelDelta(
+									headProfiles.get(p.tid)!,
+									newSeason - p.born.year,
+								),
+							1,
+							100,
+						)
+					: coachingLevels[p.tid],
 				false,
 				mentorBonus === undefined
 					? undefined

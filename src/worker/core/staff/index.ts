@@ -30,6 +30,19 @@ import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
 import { getAllGmWeights } from "../gm/index.ts";
+import {
+	adaptSystems,
+	annotateSeason,
+	clearCoachSystemsCache,
+	coachSystemsEnabled,
+	ensureProfiles,
+	getTeamHiringContext,
+	headCoachFitBonus,
+	hotSeatFireProb,
+	onHeadCoachHired,
+	profileForNewCoach,
+	type HiringContext,
+} from "./systems.ts";
 
 export const staffEnabled = () =>
 	__SPORT === "basketball" && !!g.get("coachingStaff");
@@ -83,7 +96,7 @@ export const generateCoach = async ({
 			? randInt(38, 66)
 			: randInt(31, 62);
 
-	return {
+	const c: CoachWithoutKey = {
 		firstName,
 		lastName,
 		born: {
@@ -103,6 +116,12 @@ export const generateCoach = async ({
 		awards: [],
 		transactions: [],
 	};
+	// Coaching systems: his systems, following the league's trends (no random draws)
+	const profile = profileForNewCoach(c);
+	if (profile) {
+		c.profile = profile;
+	}
+	return c;
 };
 
 const addTransaction = (
@@ -253,11 +272,14 @@ export const hire = async (
 	}
 	await idb.cache.coaches.put(c);
 	if (role === "head") {
+		// Coaching systems: coaching tree and installation of his systems
+		await onHeadCoachHired(c);
 		await logHeadCoachEvent(
 			`${teamLink(tid)} hired ${coachLink(c)} as head coach.`,
 			tid,
 		);
 	}
+	clearCoachSystemsCache();
 };
 
 // Half of what's left on the contract, paid now as a coaching expense
@@ -327,6 +349,8 @@ export const fillVacancies = async ({
 
 	const allCoaches = await idb.cache.coaches.getAll();
 	const freeAgents = allCoaches.filter((c) => c.tid === COACH_FREE_AGENT);
+	// Coaching systems: AI teams hire head coaches by fit (rebuilding teams development coaches, contenders tacticians)
+	const systems = coachSystemsEnabled();
 	const filled = new Set<string>();
 	for (const c of allCoaches) {
 		if (c.tid >= 0) {
@@ -380,6 +404,10 @@ export const fillVacancies = async ({
 			let best: Coach | undefined;
 			let bestScore = -Infinity;
 			let cheapest: Coach | undefined;
+			let hiringContext: HiringContext | undefined;
+			if (systems && role === "head" && !userControlsTeam(t.tid)) {
+				hiringContext = await getTeamHiringContext(t.tid);
+			}
 			for (const c of available) {
 				const demand = coachSalaryDemand(c.ratings, role, salaryCap);
 				if (
@@ -405,6 +433,10 @@ export const fillVacancies = async ({
 				let score = coachOvr(c.ratings, role) + gauss(0, 2);
 				if (gm) {
 					score += gm.coachDevWeight * (c.ratings.dev - c.ratings.mot);
+				}
+				// Coaching systems: head coaches by fit, through the GM's leanings when there is one
+				if (hiringContext) {
+					score += headCoachFitBonus(c, hiringContext, gm);
 				}
 				if (score > bestScore) {
 					bestScore = score;
@@ -471,13 +503,17 @@ export const ensureStaff = async () => {
 
 	await fillVacancies({ includeUser: true });
 
-	// Initial hires shouldn't show up as a coaching carousel
+	// Initial hires shouldn't show up as a coaching carousel (and their systems are already installed)
 	if (firstTime) {
 		for (const c of await idb.cache.coaches.getAll()) {
 			c.transactions = [];
+			if (c.profile) {
+				delete c.profile.since;
+			}
 			await idb.cache.coaches.put(c);
 		}
 	}
+	await ensureProfiles();
 
 	// Trim the leftover pool, keeping the best for each role
 	const leftovers = (await idb.cache.coaches.getAll()).filter(
@@ -655,6 +691,10 @@ export const runOffseason = async () => {
 	const season = g.get("season");
 	await recordSeason();
 	await coachOfTheYear();
+	// Coaching systems: expectation, development and systems on the season rows; league system trends
+	await ensureProfiles();
+	await annotateSeason();
+	const systems = coachSystemsEnabled();
 
 	const coaches = (await idb.cache.coaches.getAll()).filter(
 		(c) => c.tid !== COACH_RETIRED,
@@ -728,7 +768,10 @@ export const runOffseason = async () => {
 		// AI firings. The owner doesn't wait forever.
 		if (!userControlsTeam(c.tid)) {
 			let fireProb = 0;
-			if (c.role === "head") {
+			if (c.role === "head" && systems) {
+				// Coaching systems: the hot seat (results against expectations, reputation)
+				fireProb = hotSeatFireProb(c, tenure(c));
+			} else if (c.role === "head") {
 				const t = tenure(c);
 				if (t >= 2 && pct < 0.4) {
 					fireProb = 0.55;
@@ -757,9 +800,13 @@ export const runOffseason = async () => {
 		await idb.cache.coaches.put(c);
 	}
 
+	// Coaching systems: adaptable coaches move toward what their roster fits
+	await adaptSystems();
+
 	await replenishPool();
 	await fillVacancies({ includeUser: false });
 	await syncAllBudgets();
+	clearCoachSystemsCache();
 };
 
 // Before the regular season, anyone who still has a vacancy (including the user) gets one filled automatically
@@ -768,6 +815,7 @@ export const onPreseason = async () => {
 		return;
 	}
 	await ensureStaff();
+	await ensureProfiles();
 	const hired = await fillVacancies({ includeUser: true });
 	for (const { c, tid } of hired) {
 		if (g.get("userTids").includes(tid)) {
@@ -827,6 +875,7 @@ export const userFire = async ({ cid, tid }: { cid: number; tid: number }) => {
 		throw new Error("That coach is not on your staff");
 	}
 	const buyout = await fire(c);
+	clearCoachSystemsCache();
 	// The league's average staff changed too, so every team's level is relative to the new average
 	await syncAllBudgets();
 	return buyout;
@@ -861,3 +910,22 @@ export {
 	getHeadCoachForSeason,
 	getTeamCoachStyle,
 } from "./data.ts";
+
+export {
+	applyCoachSystems,
+	coachMood,
+	coachReputation,
+	coachSystemsEnabled,
+	coachingTree,
+	getCoachProfile,
+	getHeadProfiles,
+	getTeamCoachSystem,
+	getTeamHiringContext,
+	headCoachFitBonus,
+	hotSeat,
+	philosophyLevelDelta,
+	playerSystemFit,
+	playerSystemFitForTeam,
+	rankHeadCoachCandidates,
+	setExpectations,
+} from "./systems.ts";

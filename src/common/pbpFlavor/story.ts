@@ -72,6 +72,88 @@ export const parseGameContext = (
 	return { teams: [team(0), team(6)], neutral: raw[5] === 1 };
 };
 
+// Coaching systems (worker/core/staff/systems.ts applyCoachSystems): after this marker in the game context, each team's offense and defense
+// system (indexes into common/coachSystems.ts OFFENSE_SYSTEMS / DEFENSE_SYSTEMS), home team first
+const COACH_SYSTEMS_MARKER = 9101;
+const OFFENSE_KEYS = [
+	"motion",
+	"paceSpace",
+	"heliocentric",
+	"post",
+	"iso",
+	"princeton",
+	"sevenSeconds",
+] as const;
+const DEFENSE_KEYS = [
+	"switch",
+	"drop",
+	"blitz",
+	"packPaint",
+	"zone",
+	"press",
+] as const;
+export type CoachSystemsContext = [
+	{ off: (typeof OFFENSE_KEYS)[number]; def: (typeof DEFENSE_KEYS)[number] },
+	{ off: (typeof OFFENSE_KEYS)[number]; def: (typeof DEFENSE_KEYS)[number] },
+];
+
+export const parseCoachSystems = (
+	raw: unknown,
+): CoachSystemsContext | undefined => {
+	if (!Array.isArray(raw)) {
+		return undefined;
+	}
+	for (let i = 12; i + 4 < raw.length; i++) {
+		if (raw[i] === COACH_SYSTEMS_MARKER) {
+			const [o0, d0, o1, d1] = raw.slice(i + 1, i + 5);
+			const off0 = OFFENSE_KEYS[o0];
+			const def0 = DEFENSE_KEYS[d0];
+			const off1 = OFFENSE_KEYS[o1];
+			const def1 = DEFENSE_KEYS[d1];
+			if (off0 && def0 && off1 && def1) {
+				return [
+					{ off: off0, def: def0 },
+					{ off: off1, def: def1 },
+				];
+			}
+		}
+	}
+	return undefined;
+};
+
+const OFFENSE_PHRASES: Record<(typeof OFFENSE_KEYS)[number], string[]> = {
+	motion: [
+		"move the ball in their motion offense",
+		"run a read-and-react motion offense",
+	],
+	paceSpace: [
+		"play five-out, pace and space",
+		"spread the floor and fire away from three",
+	],
+	heliocentric: [
+		"run everything through the pick-and-roll",
+		"put the ball in their star's hands and spread the floor around him",
+	],
+	post: ["play inside-out through their bigs", "pound it into the post"],
+	iso: ["clear out and go one-on-one", "lean on isolation scoring"],
+	princeton: [
+		"run the Princeton offense, all cuts and passing",
+		"look for backdoor cuts",
+	],
+	sevenSeconds: [
+		"want a shot in seven seconds or less",
+		"push the pace at every chance",
+	],
+};
+const DEFENSE_PHRASES: Record<(typeof DEFENSE_KEYS)[number], string[]> = {
+	switch: ["switch everything", "switch every screen"],
+	drop: ["drop their big back to protect the rim", "play drop coverage"],
+	blitz: ["blitz the pick-and-roll", "trap the ball handler"],
+	packPaint: ["pack the paint", "wall off the lane"],
+	zone: ["sit in a zone", "play zone"],
+	press: ["press full court", "pick up full court"],
+};
+
 const STREAM = 9_000_000;
 
 // The kinds of call, for tests
@@ -93,7 +175,8 @@ export type StoryKind =
 	| "bigGame"
 	| "closer"
 	| "garbage"
-	| "benchMob";
+	| "benchMob"
+	| "system";
 
 export type StoryEnv = {
 	idx: number;
@@ -147,6 +230,8 @@ export class StoryNotes {
 	private extras = new Map<number, Partial<Record<ExtraKey, number>>>();
 	private careers = new Map<number, PbpCareer>();
 	private game: ReturnType<typeof parseGameContext>;
+	private systems: CoachSystemsContext | undefined;
+	private systemNotes = 0;
 	private said = new Set<string>();
 	private used = new Set<string>();
 	private perPlayer = new Map<number, number>();
@@ -194,6 +279,7 @@ export class StoryNotes {
 			}
 		}
 		this.game = opts.exhibition ? undefined : parseGameContext(opts.game);
+		this.systems = opts.exhibition ? undefined : parseCoachSystems(opts.game);
 		// (never in the All-Star Game: no records, no debuts, no storylines)
 		this.active = !opts.exhibition;
 	}
@@ -269,11 +355,19 @@ export class StoryNotes {
 		} else if (type === "sub") {
 			this.onSub(rng, env);
 		} else if (MADE_TYPES.has(type)) {
+			const before = this.count;
 			this.onMade(rng, env);
+			if (this.count === before) {
+				this.onSystemPlay(rng, env);
+			}
 		} else if (type.startsWith("blk")) {
 			this.onBlock(rng, env);
 		} else if (type === "stl") {
+			const before = this.count;
 			this.onSteal(rng, env);
+			if (this.count === before) {
+				this.onSystemPlay(rng, env);
+			}
 		} else if (type === "orb") {
 			this.onOrb(rng, env);
 		} else if (type === "timeout") {
@@ -354,8 +448,93 @@ export class StoryNotes {
 				this.calls.push({ idx: env.idx, pid: star.pid, kind: "bigGame" });
 			}
 		}
+		if (bits.length < 2 && this.systems) {
+			const t: 0 | 1 = rng.random() < 0.5 ? 0 : 1;
+			const s = this.systems[t];
+			const o: 0 | 1 = t === 0 ? 1 : 0;
+			const so = this.systems[o];
+			bits.push(
+				rng.pick([
+					`${cap(env.the(t))} ${rng.pick(OFFENSE_PHRASES[s.off])}; ${env.the(o)} ${rng.pick(DEFENSE_PHRASES[so.def])}.`,
+					`On the other end, ${env.the(o)} ${rng.pick(OFFENSE_PHRASES[so.off])}, and ${env.the(t)} ${rng.pick(DEFENSE_PHRASES[s.def])}.`,
+				]),
+			);
+			this.calls.push({ idx: env.idx, kind: "system" });
+		}
 		if (bits.length > 0) {
 			env.res.note = [env.res.note, ...bits].filter(Boolean).join(" ");
+		}
+	}
+
+	// Coaching systems: a play that is what a team's system is about (at most 3 a game)
+	private onSystemPlay(rng: Rng, env: StoryEnv) {
+		const sys = this.systems;
+		const tRaw: unknown = env.ev.t;
+		if (!sys || (tRaw !== 0 && tRaw !== 1) || this.systemNotes >= 3) {
+			return;
+		}
+		const t: 0 | 1 = tRaw;
+		if (!this.room(env.idx, undefined) || rng.random() > 0.25) {
+			return;
+		}
+		const o: 0 | 1 = t === 0 ? 1 : 0;
+		const type: string = env.ev.type;
+		const team = cap(env.the(t));
+		let lines: string[] | undefined;
+		if (type === "stl" && (sys[t].def === "press" || sys[t].def === "blitz")) {
+			lines =
+				sys[t].def === "press"
+					? [
+							`The full-court press forces another one for ${env.the(t)}.`,
+							`${team}' pressure pays off again.`,
+						]
+					: [
+							`${team} trap the ball handler and it pays off.`,
+							`The blitz on the pick-and-roll gets ${env.the(t)} a turnover.`,
+						];
+		} else if (
+			(type === "tp" || type === "tpAndOne") &&
+			(sys[o].def === "packPaint" || sys[o].def === "zone")
+		) {
+			lines = [
+				`That's the shot ${env.the(o)} are giving up, and ${env.the(t)} are taking it.`,
+				`${cap(env.the(o))} pack it in, so the three is there.`,
+			];
+		} else if (
+			(type === "tp" || type === "tpAndOne") &&
+			(sys[t].off === "paceSpace" || sys[t].off === "sevenSeconds")
+		) {
+			lines = [
+				`Spacing and shooting: that's how ${env.the(t)} want to play.`,
+				`Another three for ${env.the(t)}, right out of the system.`,
+			];
+		} else if (
+			(type === "fgLowPost" || type === "fgLowPostAndOne") &&
+			sys[o].def === "switch"
+		) {
+			lines = [
+				`${cap(env.the(o))} switch, and ${env.the(t)} go right at the mismatch inside.`,
+				`Hunting the mismatch after the switch, and it works.`,
+			];
+		} else if (
+			(type === "fgLowPost" || type === "fgLowPostAndOne") &&
+			sys[t].off === "post"
+		) {
+			lines = [
+				`${team} go inside, like they always do.`,
+				`Through the post again for ${env.the(t)}.`,
+			];
+		} else if (
+			(type === "fgMidRange" || type === "fgMidRangeAndOne") &&
+			sys[o].def === "drop"
+		) {
+			lines = [
+				`${cap(env.the(o))} drop back, and the pull-up is open.`,
+				`That's the mid-range jumper drop coverage concedes.`,
+			];
+		}
+		if (lines && this.record(env, "system", undefined, this.pick(rng, lines))) {
+			this.systemNotes += 1;
 		}
 	}
 

@@ -1154,6 +1154,8 @@ export type MoodComponents = {
 	relatives: number;
 	// Player traits: teammates' egos (team-first players lift it, divas drag it down). 0 with the setting off
 	lockerRoom: number;
+	// Coaching systems: his fit in the head coach's systems, the coach's personality and reputation. 0 with the setting off
+	coachFit: number;
 	custom?: {
 		text: string;
 		amount: number;

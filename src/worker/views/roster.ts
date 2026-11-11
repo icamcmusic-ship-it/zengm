@@ -14,6 +14,28 @@ import { validateTeam } from "../util/processInputs.ts";
 import { validateSeason } from "../util/processInputs.ts";
 import { validateSeasonType } from "../util/processInputs.ts";
 import { getTeamGmInfo } from "./gmShared.ts";
+import { getTeamCoachSystem } from "../core/staff/systems.ts";
+import {
+	DEFENSE_NAMES,
+	OFFENSE_NAMES,
+	fitLabel,
+} from "../../common/coachSystems.ts";
+
+const getRosterCoachSystem = async (tid: number) => {
+	const s = await getTeamCoachSystem(tid);
+	if (!s) {
+		return undefined;
+	}
+	return {
+		cid: s.cid,
+		coachName: s.name,
+		offense: OFFENSE_NAMES[s.profile.off],
+		defense: DEFENSE_NAMES[s.profile.def],
+		fit: s.fit,
+		fitText: fitLabel(s.fit),
+		install: Math.round(100 * s.install),
+	};
+};
 
 const processInputs = (params: RouteParams<"roster">) => {
 	// Fix broken links
@@ -378,6 +400,11 @@ export default defineView({
 				rank,
 				// injuryDepth setting, for the load management toggle
 				injuryDepth: __SPORT === "basketball" && !!g.get("injuryDepth"),
+				// Coaching systems: the head coach's systems and the roster's fit (current season only)
+				coachSystem:
+					__SPORT === "basketball" && inputs.season === g.get("season")
+						? await getRosterCoachSystem(inputs.tid)
+						: undefined,
 			};
 			t2.seasonAttrs.avgAge = t2.seasonAttrs.avgAge ?? team.avgAge(players);
 

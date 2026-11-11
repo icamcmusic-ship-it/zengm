@@ -296,6 +296,25 @@ const TopStuff = ({
 							</div>
 						</div>
 
+						{t.coachSystem ? (
+							<div className="mt-2" data-testid="team-coach-system">
+								<a
+									href={helpers.leagueUrl([
+										"coach_notes",
+										`${t.seasonAttrs.abbrev}_${tid}`,
+									])}
+								>
+									Offense: {t.coachSystem.offense} · Defense:{" "}
+									{t.coachSystem.defense}
+								</a>
+								<div className="text-body-secondary small">
+									Scheme fit {t.coachSystem.fit} ({t.coachSystem.fitText})
+									{t.coachSystem.install < 100
+										? `, system ${t.coachSystem.install}% installed`
+										: ""}
+								</div>
+							</div>
+						) : null}
 						{isCurrentSeason ? (
 							<div className="mt-3">{openRosterSpots} open roster spots</div>
 						) : null}

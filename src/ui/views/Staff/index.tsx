@@ -134,7 +134,11 @@ const Staff = ({
 											<b>{c.ovr}</b>
 										</td>
 										<RatingsCells c={c} />
-										<td>{c.styleText}</td>
+										<td>
+											{c.systems && c.role === "head"
+												? `${c.systems.offense} / ${c.systems.defense}`
+												: c.styleText}
+										</td>
 										<td>
 											{helpers.formatCurrency(c.contract.amount / 1000, "M")}{" "}
 											thru {c.contract.exp}
@@ -249,7 +253,11 @@ const Staff = ({
 											<b>{c.ovr}</b>
 										</td>
 										<RatingsCells c={c} />
-										<td>{c.styleText}</td>
+										<td>
+											{c.systems && c.role === "head"
+												? `${c.systems.offense} / ${c.systems.defense}`
+												: c.styleText}
+										</td>
 										<td>{helpers.formatCurrency(c.demand / 1000, "M")}</td>
 										<td>
 											{c.headSeasons > 0 ? `${c.headWon}-${c.headLost}` : null}

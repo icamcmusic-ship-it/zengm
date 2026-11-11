@@ -1,5 +1,6 @@
 import { COACH_ROLE_NAMES } from "../../common/staff.ts";
 import { idb } from "../db/index.ts";
+import { hotSeatLabel, hotSeatNow } from "../core/staff/systems.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
@@ -32,8 +33,17 @@ export default defineView({
 				return { errorMessage: "Coach not found." };
 			}
 			const abbrev = (tid: number) => g.get("teamInfoCache")[tid]?.abbrev ?? "";
+			const coach = formatCoach(c);
+			if (coach.systems && coach.systems.hotSeatText) {
+				const heat = await hotSeatNow(c);
+				coach.systems = {
+					...coach.systems,
+					hotSeat: heat,
+					hotSeatText: hotSeatLabel(heat),
+				};
+			}
 			return {
-				coach: formatCoach(c),
+				coach,
 				stats: c.stats.map((row) => ({
 					...row,
 					abbrev: abbrev(row.tid),

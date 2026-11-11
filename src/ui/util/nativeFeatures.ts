@@ -83,6 +83,8 @@ export const featureForUrl = (
 			return "coachingStaff";
 		case "front_offices":
 			return "gmPersonalities";
+		case "coach_notes":
+			return "coachSystems";
 		case "frivolities":
 			if (
 				second === "redraft" ||

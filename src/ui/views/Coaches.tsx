@@ -2,6 +2,7 @@ import { MoreLinks } from "../components/MoreLinks.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import type { View } from "../../common/types.ts";
+import { CoachesTabs } from "./CoachNotes.tsx";
 
 const MOVE_TEXT = {
 	hired: "hired",
@@ -13,6 +14,7 @@ const MOVE_TEXT = {
 
 const Coaches = ({
 	carousel,
+	coachSystems,
 	coy,
 	currentSeason,
 	headCoaches,
@@ -35,6 +37,7 @@ const Coaches = ({
 	return (
 		<>
 			<MoreLinks type="league" page="coaches" />
+			{coachSystems ? <CoachesTabs active="coaches" /> : null}
 			<h2>Head coaches</h2>
 			<div className="table-responsive">
 				<table className="table table-striped table-sm table-hover">
@@ -44,7 +47,9 @@ const Coaches = ({
 							<th>Coach</th>
 							<th>Age</th>
 							<th>Ovr</th>
-							<th>Style</th>
+							<th>{coachSystems ? "Systems" : "Style"}</th>
+							{coachSystems ? <th title="Reputation">Rep</th> : null}
+							{coachSystems ? <th>Hot seat</th> : null}
 							<th>{season} record</th>
 							<th>Career</th>
 							<th>Titles</th>
@@ -66,7 +71,22 @@ const Coaches = ({
 								</td>
 								<td>{c.age}</td>
 								<td>{c.ovr}</td>
-								<td>{c.styleText}</td>
+								<td>
+									{c.systems ? (
+										<a
+											href={helpers.leagueUrl([
+												"coach_notes",
+												`${c.abbrev}_${c.tid}`,
+											])}
+										>
+											{c.systems.offense} / {c.systems.defense}
+										</a>
+									) : (
+										c.styleText
+									)}
+								</td>
+								{coachSystems ? <td>{c.systems?.reputation}</td> : null}
+								{coachSystems ? <td>{c.systems?.hotSeatText}</td> : null}
 								<td>
 									{c.seasonWon !== undefined
 										? `${c.seasonWon}-${c.seasonLost}`
