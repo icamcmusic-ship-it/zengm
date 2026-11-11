@@ -370,23 +370,23 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Why:** small guards (PG/SG, about 6'0"-6'4") almost never made All-Defensive teams (3-4% of the slots, though they are about 30% of the players with 1500+ minutes) and never won DPOY. Three causes: the default DPOY/All-Defensive formula `dws/3.1 + seasonFraction*winp + gp/82*(blk/4.1 + stl/1.8)` is dominated by defensive win shares (built mostly from defensive rebounds and blocks: a starting C averages ~3.9 DWS, a PG ~1.6), steals were spread almost evenly over positions (the steal goes to a player picked by the stealing composite, `[50, spd, diq]`, and bigs have the higher diq), and nothing in the box score credits on-ball defense.
 - **What:**
   - **Sim (pure, no play-by-play dependence):** who is credited with a steal is weighted by the stealing composite as before times the perimeter defense composite (`PERIMETER_STEAL_POWER` in `GameSim.basketball/index.ts`). Only who gets the steal changes, not how many there are, and no random numbers are added (`outcomeInvariance` is unchanged; it runs with the setting off).
-  - **Awards:** while the DPOY or All-Defensive award still has the default formula (and no per-position formula or playoff range), its score uses `0.75 * dws/3.1 + seasonFraction * winp + gp / 82 * (blk / 4.1 + 1.5 * stl / 1.8)` (`awards/perimeterDefense.ts`). The stored award keeps the default formula (so achievements that look for it still work); an edited formula is used as written.
+  - **Awards:** while the DPOY or All-Defensive award still has the default formula (and no per-position formula or playoff range), its score uses `0.75 * dws/3.1 + seasonFraction * winp + gp / 82 * (2 * blk / 4.1 + 1.75 * stl / 1.8 + 0.15 * drb)` (`awards/perimeterDefense.ts`). The stored award keeps the default formula (so achievements that look for it still work); an edited formula is used as written.
   - **All-Defensive teams:** `oneGuard` puts the best remaining true guard (PG, SG, G) in the last slot of a team that has none; `gfc` fills each team with 2 guards, 2 forwards and a center like the NBA before 2024 (GF counts as a guard or forward, FC as a forward or center; the best players left fill a slot no one is eligible for). The Award Vote follows the realized teams.
   - Not changed: rating generation and development (with expanded ratings on, perimeter defense already leans to guards: point +12 vs center -13; with it off, diq is the all-around defense and stays big-leaning as in BBGM), skill badges (the Dp skill already goes to about 20% of rotation guards vs 2% of bigs) and archetypes.
-- **Calibration:** full engine, 2 seeds × 12 seasons each, every other setting off; guards PG/SG/G, wings GF/SF/F, bigs PF/FC/C; the 1500+ minute pool is about 30% guards, 45% wings, 25% bigs.
+- **Calibration:** full engine, every other setting off; guards PG/SG/G, wings GF/SF/F, bigs PF/FC/C; the 1500+ minute pool is about 30% guards, 45% wings, 25% bigs. "Before": setting off, 2 seeds × 12 seasons. "After": setting on, `oneGuard`, 3 seeds × 10 seasons (where the score was tuned) plus 2 held-out seeds × 6 seasons, 42 seasons per mode.
 
-  | expanded ratings off / on               | before                   | after (`oneGuard`)       |
+  | expanded ratings off / on               | before                   | after                    |
   | --------------------------------------- | ------------------------ | ------------------------ |
-  | All-Defensive slots: guards             | 4% / 3%                  | 25% / 24%                |
-  | wings                                   | 46% / 42%                | 45% / 52%                |
-  | bigs                                    | 50% / 55%                | 30% / 24%                |
-  | All-Defensive slots: 6'4" and shorter   | 4% / 3%                  | 22% / 22%                |
-  | DPOY (of 24): guard / wing / big        | 0-9-15 / 0-13-11         | 5-10-9 / 1-20-3          |
-  | stl/g, 2000+ min: guard / wing / big    | 1.10-1.10-0.94           | 1.15-1.10-0.91           |
-  | steals leader stl/g                     | 2.24 / 2.17              | 2.53 / 2.43              |
-  | league pts, stl, blk, tov per team game | 104.6, 7.39, 4.99, 16.26 | 105.1, 7.35, 5.02, 16.19 |
+  | All-Defensive slots: guards             | 4% / 3%                  | 20% / 20%                |
+  | wings                                   | 46% / 42%                | 32-33% / 28-32%          |
+  | bigs                                    | 50% / 55%                | 46-48% / 48-52%          |
+  | All-Defensive slots: 6'4" and shorter   | 4% / 3%                  | ~19% / ~17%              |
+  | DPOY guard / wing / big                 | 0% 38% 62% / 0% 54% 46%  | 2% 31% 67% / 5% 40% 55%  |
+  | stl/g, 2000+ min: guard / wing / big    | 1.10 / 1.10 / 0.94       | 1.15 / 1.10 / 0.91       |
+  | steals leader stl/g                     | 2.24 / 2.17              | ~2.5 / ~2.4              |
+  | league pts, stl, blk, tov per team game | 104.6, 7.39, 4.99, 16.26 | 105.0, 7.35, 5.03, 16.19 |
 
-  With `none` the guard share is about 10% (the formula and steals alone), with `gfc` it is 40% by construction. Known side effect: with expanded ratings on, wings win most DPOYs (they did before too, 13 of 24); bigs win fewer.
+  With `none` guards get about 10% of the slots (the formula and steals alone), with `gfc` 40% by construction. An earlier version that cut DWS and blocks (`0.6 dws`, `0.8 blk`, `1.75 stl`) gave guards 30% of the slots but let wings win 20 of 24 DPOYs with expanded ratings on; doubling blocks and adding the small rebounding term put rim protectors back on top.
 
 - **Tool:** `src/test/guardDef/guardDef.script.test.ts` (`RUN_GUARD_DEF=1`, env `GD_CONFIGS`, `GD_SEEDS`, `GD_SEASONS`, `GD_OUT`, `GD_EXTRA='{"perimeterDefense":true}'`) dumps every rotation player's position, height, defensive ratings, stats and awards per season.
 
