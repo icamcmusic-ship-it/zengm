@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DraftClassShape } from "../components/DraftClassShape.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
 import { helpers } from "../util/helpers.ts";
@@ -78,14 +79,7 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 
 	return (
 		<>
-			{shape ? (
-				<p className="draft-class-shape" data-shape={shape.key}>
-					<span className="badge text-bg-primary fw-normal me-1">
-						{shape.name}
-					</span>
-					<span className="text-body-secondary">{shape.description}</span>
-				</p>
-			) : null}
+			{shape ? <DraftClassShape shape={shape} /> : null}
 			<p>
 				Every team picks the way the AI drafts: by value plus its own needs and
 				strategy

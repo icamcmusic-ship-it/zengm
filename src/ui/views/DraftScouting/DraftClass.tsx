@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DraftClassShape } from "../../components/DraftClassShape.tsx";
 import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { DataTable } from "../../components/DataTable/index.tsx";
@@ -235,14 +236,7 @@ const DraftClass = ({
 	return (
 		<>
 			<h2>{season}</h2>
-			{shape ? (
-				<p className="draft-class-shape" data-shape={shape.key}>
-					<span className="badge text-bg-primary fw-normal me-1">
-						{shape.name}
-					</span>
-					<span className="text-body-secondary">{shape.description}</span>
-				</p>
-			) : null}
+			{shape ? <DraftClassShape shape={shape} /> : null}
 
 			{fantasyDraft ? (
 				<div className="mb-3 text-warning">

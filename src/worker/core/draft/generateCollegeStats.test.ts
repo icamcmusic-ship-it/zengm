@@ -14,6 +14,7 @@ import {
 	removeCollegeStats,
 } from "./generateCollegeStats.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
+import { NCAA_SEASON_VERSION } from "../../../common/collegeStats/ncaa.ts";
 import type { Player } from "../../../common/types.ts";
 
 const SEASON = 2026;
@@ -341,10 +342,10 @@ describe("college season (featureCollegeSeason)", () => {
 
 		// New classes are stored with the current version: NIT games count
 		const current = (await getCollegeSeason(SEASON))!;
-		assert.strictEqual(current.season.version, 3);
+		assert.strictEqual(current.season.version, NCAA_SEASON_VERSION);
 		assert.isTrue(current.season.nit.counted);
 		for (const p of current.players) {
-			assert.strictEqual(p.collegeSeason!.v, 3);
+			assert.strictEqual(p.collegeSeason!.v, NCAA_SEASON_VERSION);
 			// Version 3 stores the position, so a guards' or big men's year is rebuilt the same way
 			assert.isString(p.collegeSeason!.pos);
 			const team = current.season.teams.find(
@@ -353,7 +354,10 @@ describe("college season (featureCollegeSeason)", () => {
 			assert.strictEqual(p.collegeSeason!.summary.nit, team.nit);
 		}
 		// The same class twice is the same object (cached)
-		assert.strictEqual((await getCollegeSeason(SEASON))!.season, current.season);
+		assert.strictEqual(
+			(await getCollegeSeason(SEASON))!.season,
+			current.season,
+		);
 
 		// What an old class looks like: no version on the prospects
 		for (const p of current.players) {
