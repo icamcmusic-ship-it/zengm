@@ -1,4 +1,5 @@
 import { g, helpers } from "../../util/index.ts";
+import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import { PHASE, STARTING_NUM_TIMEOUTS } from "../../../common/constants.ts";
 import jumpBallWinnerStartsThisPeriodWithPossession from "./jumpBallWinnerStartsThisPeriodWithPossession.ts";
 import getInjuryRate from "./getInjuryRate.ts";
@@ -138,6 +139,9 @@ const EXPANDED_LENGTH_REF = 0.5;
 const EXPANDED_INTERIOR_OFFSET = 0.006;
 const EXPANDED_PERIMETER_OFFSET = 0.008;
 const EXPANDED_STL_FACTOR = 1.01;
+
+// Perimeter Defense: how much the perimeter defense composite tilts who is credited with a steal
+const PERIMETER_STEAL_POWER = 1;
 // Second step (offensive/defensive rebounding, catch-and-shoot/off-the-dribble shooting, ball security): keeps league offensive
 // rebounds, turnovers and jump shooting the same as with the setting off
 const EXPANDED_ORB_FACTOR = 1.004;
@@ -332,6 +336,9 @@ class GameSim extends GameSimBase {
 	// gives every player a "length" composite (and the defense, rebounding and finishing composites read the new ratings). Off: nothing
 	// below is used, games play out exactly as before
 	expandedRatings: boolean;
+
+	// Perimeter Defense (League extras, see docs/native-features.md): who gets credited with a steal leans to quick on-ball defenders
+	perimeterDefense: boolean;
 	// Expanded ratings, second step (offRebounding/defRebounding/ballSecurity/catchShoot/offDribble composites from loadTeams)
 	expandedRatings2: boolean;
 	// Player traits: a playoff game, where the big-game trait applies (the whole game)
@@ -398,6 +405,10 @@ class GameSim extends GameSimBase {
 				}
 			}
 		}
+
+		this.perimeterDefense = nativeFeatureEnabled("perimeterDefense", (key) =>
+			g.get(key as any),
+		);
 
 		this.expandedRatings = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.length !== undefined),
@@ -4103,6 +4114,14 @@ class GameSim extends GameSimBase {
 			}
 
 			let value = (compositeRating * this.fatigue(p.stat.energy)) ** power;
+
+			// Perimeter Defense: the steal goes more often to the on-ball, perimeter defender. Only who gets it changes, not how many
+			// steals there are, and no extra random numbers are drawn.
+			if (rating === "stealing" && this.perimeterDefense) {
+				value *=
+					(p.compositeRating.defensePerimeter * this.fatigue(p.stat.energy)) **
+					PERIMETER_STEAL_POWER;
+			}
 
 			// Player traits: shot selection, foul proneness, steals and hustle
 			if (this.traitsOn && p.traitEffects) {

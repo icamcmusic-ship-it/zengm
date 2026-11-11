@@ -192,7 +192,11 @@ test("a game with no career numbers reads the same, minus the calls", () => {
 		assert.isAbove(a.session.debugLog().career.length, 0);
 		assert.strictEqual(b.session.debugLog().career.length, 0);
 		assert.strictEqual(a.out.length, b.out.length);
-		const called = new Set(a.session.debugLog().career.map((c) => c.idx));
+		// (a rookie's debut is a storyline call, story.ts, made from the same career numbers)
+		const called = new Set([
+			...a.session.debugLog().career.map((c) => c.idx),
+			...a.session.storyCalls().map((c) => c.idx),
+		]);
 		for (const [i, x] of a.out.entries()) {
 			const y = b.out[i]!;
 			assert.strictEqual(x.r.text, y.r.text);

@@ -15,7 +15,6 @@ import { pruneEmptyWinners, showStatsByType } from "../../../common/awards.ts";
 import type {
 	Award,
 	AwardInfoIndividual,
-	AwardInfoTeam,
 	AwardPlayer,
 	Awards,
 	DistributiveOmit,
@@ -35,6 +34,11 @@ import { idb } from "../../db/index.ts";
 import { TEAM_AWARD_INFO } from "../../../common/constants.ts";
 import { hashPlayoffSeries } from "./hashPlayoffSeries.ts";
 import { awardCandidateStats } from "./getAwardCandidates.ts";
+import {
+	allDefensiveFormat,
+	fillAllDefensive,
+	perimeterDefenseFormula,
+} from "./perimeterDefense.ts";
 
 const ROUGH_MPG_NEEDED_FOR_MIP = bySport({
 	baseball: undefined,
@@ -265,6 +269,18 @@ export class FormulaEvaluators {
 				type,
 			});
 
+			// Perimeter Defense: the default defense formula scores with another one
+			const perimeterFormula = perimeterDefenseFormula(award);
+			if (perimeterFormula !== undefined) {
+				this.registerFormula({
+					award,
+					formula: perimeterFormula,
+					opoy: false,
+					pos: undefined,
+					type,
+				});
+			}
+
 			if (award.formulaByPos) {
 				for (const [pos, formula] of Object.entries(award.formulaByPos)) {
 					this.registerFormula({
@@ -398,7 +414,10 @@ export const processAwards = async ({
 
 	for (const p of players) {
 		for (const award of awards) {
-			const formula = award.formulaByPos?.[p.pos] ?? award.formula;
+			const formula =
+				award.formulaByPos?.[p.pos] ??
+				perimeterDefenseFormula(award) ??
+				award.formula;
 
 			// Used to skip based on award.formula or some hash of stuff that affects score (formula+statRange+mip) but I think it's not worth the complexity and as more features are added it'll just be a source of bugs. So now just assume shortName can be used to uniquely identify a score.
 
@@ -816,24 +835,38 @@ export const processAwards = async ({
 							};
 						} else {
 							const numPlayers = numTeams * TEAM_AWARD_INFO.numPlayersPerTeam;
-							const winnerPlayers: AwardInfoTeam["winner"][number] =
-								sortedPlayers
-									.slice(0, numPlayers)
-									.filter((p) => p.currentStats[statRange])
-									.map((p) => {
-										const tid = p.currentStats[statRange]?.tid;
-										assertDefined(tid);
+							const toWinner = (p: (typeof sortedPlayers)[number]) => {
+								const tid = p.currentStats[statRange]?.tid;
+								assertDefined(tid);
 
-										return {
-											pid: p.pid,
-											tid,
-										};
-									});
+								return {
+									pid: p.pid,
+									tid,
+								};
+							};
 
-							const winner = chunk(
-								winnerPlayers,
-								TEAM_AWARD_INFO.numPlayersPerTeam,
-							);
+							// Perimeter Defense: All-Defensive teams with guards
+							const format = allDefensiveFormat(award);
+							const winner =
+								format === "none"
+									? chunk(
+											sortedPlayers
+												.slice(0, numPlayers)
+												.filter((p) => p.currentStats[statRange])
+												.map(toWinner),
+											TEAM_AWARD_INFO.numPlayersPerTeam,
+										)
+									: fillAllDefensive(
+											sortedPlayers.filter(
+												(p) =>
+													p.currentStats[statRange] && getScore(p) > -Infinity,
+											),
+											numTeams,
+											format,
+											TEAM_AWARD_INFO.numPlayersPerTeam,
+										)
+											.filter((team) => team.length > 0)
+											.map((team) => team.map(toWinner));
 
 							// Placeholder teams if there are no or very few players
 							while (winner.length < numTeams) {

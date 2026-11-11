@@ -22,6 +22,9 @@ import { autoPlayStopsAt } from "../league/autoPlay.ts";
 
 export const FREE_AGENCY_DAYS = 30;
 
+// With a soft cap, AI teams only re-sign their best AVOID_TAX_MIN_RANK players (by value) into the luxury tax
+const AVOID_TAX_MIN_RANK = 3;
+
 const newPhaseResignPlayers = async (
 	conditions: Conditions,
 ): Promise<PhaseReturn> => {
@@ -113,7 +116,21 @@ const newPhaseResignPlayers = async (
 
 	const payrollsByTid = new Map<number, number>();
 
-	if (g.get("salaryCapType") === "hard") {
+	// Soft cap: AI teams don't re-sign role players into the luxury tax (cap health). Stars still get re-signed
+	const avoidTax = g.get("salaryCapType") === "soft" && g.get("luxuryTax") > 0;
+	const teamValueRank = new Map<number, number>();
+	if (avoidTax) {
+		const byTid = Map.groupBy(players, (p) => p.tid);
+		for (const teamPlayers of byTid.values()) {
+			for (const [i, p] of teamPlayers
+				.toSorted((a, b) => b.value - a.value)
+				.entries()) {
+				teamValueRank.set(p.pid, i);
+			}
+		}
+	}
+
+	if (g.get("salaryCapType") === "hard" || avoidTax) {
 		for (let tid = 0; tid < g.get("numTeams"); tid++) {
 			// Payroll for next season, so it doesn't include expiring contracts or unsigned draft picks. Explicit season because the phase isn't updated to RESIGN_PLAYERS until after this function, so the default payroll season would still be this season.
 			payrollsByTid.set(tid, await team.getPayroll(tid, g.get("season") + 1));
@@ -233,6 +250,16 @@ const newPhaseResignPlayers = async (
 				if (draftPick) {
 					reSignPlayer = true;
 				}
+			}
+
+			if (
+				avoidTax &&
+				!draftPick &&
+				payroll !== undefined &&
+				contract.amount + payroll > g.get("luxuryPayroll") &&
+				(teamValueRank.get(p.pid) ?? 0) >= AVOID_TAX_MIN_RANK
+			) {
+				reSignPlayer = false;
 			}
 
 			if (reSignPlayer) {

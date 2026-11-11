@@ -17,6 +17,7 @@ import { recordMoodSnapshots } from "./moodHistory.ts";
 import { decideContractOptions, pickAiContractTerms } from "./options.ts";
 import {
 	endHoldouts,
+	isHoldingOut,
 	startHoldouts,
 	updateHoldouts,
 	updateTradeRequests,
@@ -55,7 +56,10 @@ export const beforeNewPhase = async (phase: Phase) => {
 	}
 };
 
-// AI teams extend some of their good players in the last season of their contracts
+// Chance per day that an AI team tries to settle a holdout with an extension (much likelier than a routine extension: the player is sitting out)
+const HOLDOUT_EXTENSION_PROB = 0.25;
+
+// AI teams extend some of their good players in the last season of their contracts, and try to end holdouts with an extension
 export const aiExtensions = async (probPerTeam = 0.05) => {
 	if (!g.get("contractExtensions")) {
 		return;
@@ -63,22 +67,30 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 
 	const season = g.get("season");
 	const userTids = g.get("userTids");
+	const salaryCapType = g.get("salaryCapType");
 	for (let tid = 0; tid < g.get("numTeams"); tid++) {
-		if (
-			(userTids.includes(tid) && !local.autoPlayUntil && !g.get("spectator")) ||
-			Math.random() >= probPerTeam
-		) {
+		if (userTids.includes(tid) && !local.autoPlayUntil && !g.get("spectator")) {
 			continue;
 		}
 
-		const players = (await idb.cache.players.indexGetAll("playersByTid", tid))
-			.sort((a, b) => b.value - a.value)
-			.slice(0, 7);
+		const allPlayers = await idb.cache.players.indexGetAll("playersByTid", tid);
+		const holdouts = allPlayers.filter((p) => isHoldingOut(p, season));
+		const r = Math.random();
+		let players;
+		if (holdouts.length > 0 && r < HOLDOUT_EXTENSION_PROB) {
+			players = holdouts;
+		} else if (r < probPerTeam) {
+			players = allPlayers.sort((a, b) => b.value - a.value).slice(0, 7);
+		} else {
+			continue;
+		}
+
 		for (const p of players) {
 			const contract = getCurrentContract(p);
+			const holdingOut = isHoldingOut(p, season);
 			if (
 				!contract ||
-				getContractExp(contract) !== season ||
+				(getContractExp(contract) !== season && !holdingOut) ||
 				season - p.born.year > 31 ||
 				getExtensionIneligibleReason(p, tid) !== undefined
 			) {
@@ -91,10 +103,23 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 				continue;
 			}
 
-			if (g.get("salaryCapType") === "hard") {
-				const payroll = await getPayroll(tid, season + 1);
-				if (payroll + mood.contractAmount > g.get("salaryCap")) {
+			if (salaryCapType !== "none") {
+				// Payroll in the first extended season, without his current deal (which ends before it)
+				const firstNewSeason = getContractExp(contract) + 1;
+				const payroll = await getPayroll(tid, firstNewSeason);
+				const after = payroll + mood.contractAmount;
+				if (salaryCapType === "hard" && after > g.get("salaryCap")) {
 					continue;
+				}
+				// Soft cap: no routine extension that takes the team into the luxury tax. A holdout is only settled into the tax for a top-2
+				// player, who is worth paying for
+				if (salaryCapType === "soft" && after > g.get("luxuryPayroll")) {
+					const rank = allPlayers
+						.toSorted((a, b) => b.value - a.value)
+						.findIndex((p2) => p2.pid === p.pid);
+					if (!holdingOut || rank > 1) {
+						continue;
+					}
 				}
 			}
 

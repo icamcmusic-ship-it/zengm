@@ -267,7 +267,8 @@ export const pickStory = (
 	if (isNcaa && c === 3 && z >= -0.3) {
 		add("lateBloomer", 2.4);
 	}
-	if (isNcaa && c === 0) {
+	// Reclassified up a year: a young freshman, not an older one
+	if (isNcaa && c === 0 && p.age <= 19) {
 		add("reclass", 1.6);
 	}
 	add("injury", 0.6);
