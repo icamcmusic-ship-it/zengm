@@ -48,6 +48,7 @@ import {
 	season,
 } from "../core/index.ts";
 import * as staff from "../core/staff/index.ts";
+import { ensureGms } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import {
@@ -4594,13 +4595,15 @@ const updateDefaultSettingsOverrides = async (
 	}
 };
 
-// Expanded ratings turned on or off: fill in / stop using the new ratings, and recompute ovr, pot and skills
+// Expanded ratings or Sim-Calibrated Ovr turned on or off: fill in / stop using the new ratings, and recompute ovr, pot and skills
 const expandedRatingsChanged = (
 	gameAttributes: Partial<GameAttributesLeague>,
 ) =>
 	__SPORT === "basketball" &&
-	gameAttributes.expandedRatings !== undefined &&
-	!!gameAttributes.expandedRatings !== !!g.get("expandedRatings");
+	((gameAttributes.expandedRatings !== undefined &&
+		!!gameAttributes.expandedRatings !== !!g.get("expandedRatings")) ||
+		(gameAttributes.ovrV2 !== undefined &&
+			!!gameAttributes.ovrV2 !== !!g.get("ovrV2")));
 
 const updateGameAttributes = async (
 	gameAttributes: Partial<GameAttributesLeague>,
@@ -4614,6 +4617,10 @@ const updateGameAttributes = async (
 	if (gameAttributes.coachingStaff) {
 		// Turning on the coaching staff from the League Extras tab generates staffs, like League Settings does
 		await staff.ensureStaff();
+		await idb.cache.flush();
+	}
+	if (gameAttributes.featureGmPersonalities) {
+		await ensureGms();
 		await idb.cache.flush();
 	}
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
@@ -4682,6 +4689,7 @@ const updateGameAttributesGodMode = async (
 
 	// Turning on the coaching staff in an existing league generates staffs
 	await staff.ensureStaff();
+	await ensureGms();
 
 	// Raising the number of future draft classes generates the missing ones now
 	await draft.topUpDraftClasses();

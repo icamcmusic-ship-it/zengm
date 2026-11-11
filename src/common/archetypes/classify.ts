@@ -36,6 +36,8 @@ import {
 import type {
 	Archetype,
 	ArchetypeRatings,
+	ArchetypeTraitKey,
+	ArchetypeTraits,
 	Classification,
 	DimKey,
 	Norms,
@@ -118,6 +120,77 @@ const signatureBonus = (
 	twoWayBonus(a, cv, hgt, strictShortfall, expanded) +
 	passingBigBonus(a, cv, hgt, strictShortfall);
 
+// Player traits (the playerTraits setting): only the visible ones, as the user sees them. A trait-flavored label (`trait`) needs
+// its trait: without traits, or below its floor, it is never picked. Above the floor, and for the labels a trait only breaks ties for (`traitTie`), a strong trait is worth up to TRAIT_TIE_K per unit of
+// weight, from a score of TRAIT_TIE_FROM up to TRAIT_TIE_FROM + TRAIT_TIE_SPAN: small, so traits never outweigh the ratings.
+export const VISIBLE_TRAITS: ReadonlySet<string> = new Set<ArchetypeTraitKey>([
+	"shotDiscipline",
+	"offBall",
+	"screen",
+	"hustle",
+	"foulDiscipline",
+	"handle",
+	"veteranSavvy",
+	"motor",
+	"defensiveVersatility",
+]);
+export const TRAIT_TIE_K = 0.15;
+const TRAIT_TIE_FROM = 55;
+const TRAIT_TIE_SPAN = 20;
+// A trait label he qualifies for: up to this much (a stronger trait than the floor asks for counts more)
+export const TRAIT_LABEL_K = 0.25;
+const TRAIT_LABEL_SPAN = 15;
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+
+// Only the visible traits, whatever the caller passed
+export const visibleTraits = (
+	traits: Partial<Record<string, number>> | undefined,
+): ArchetypeTraits | undefined => {
+	if (!traits) {
+		return undefined;
+	}
+	const out: ArchetypeTraits = {};
+	for (const [k, v] of Object.entries(traits)) {
+		if (VISIBLE_TRAITS.has(k) && typeof v === "number" && Number.isFinite(v)) {
+			out[k as ArchetypeTraitKey] = v;
+		}
+	}
+	return out;
+};
+
+// What his traits add to (or take from) one label's fit; undefined: a trait label he cannot have (no traits)
+export const traitTerm = (
+	a: Archetype,
+	traits: ArchetypeTraits | undefined,
+): number | undefined => {
+	let t = 0;
+	if (a.trait) {
+		const s = traits?.[a.trait.key];
+		if (s === undefined) {
+			return undefined;
+		}
+		// A hard gate: the label names the trait
+		if (s < a.trait.min) {
+			return undefined;
+		}
+		t +=
+			TRAIT_LABEL_K *
+			(0.5 + 0.5 * clamp01((s - a.trait.min) / TRAIT_LABEL_SPAN));
+	}
+	if (a.traitTie && traits) {
+		for (const [k, w] of Object.entries(a.traitTie) as [
+			ArchetypeTraitKey,
+			number,
+		][]) {
+			const s = traits[k];
+			if (s !== undefined) {
+				t += TRAIT_TIE_K * w * clamp01((s - TRAIT_TIE_FROM) / TRAIT_TIE_SPAN);
+			}
+		}
+	}
+	return t;
+};
+
 export type Scored = { a: Archetype; raw: number; z: number };
 
 // Score every archetype for one player, best first. An archetype's score is how exceptional the fit is among the league's
@@ -129,6 +202,8 @@ export const scoreAll = (
 	position?: Pos,
 	// His age, when known: age-gated archetypes (veterans) need it
 	age?: number,
+	// His visible player traits (only with the playerTraits setting on): trait labels need them
+	traitsIn?: Partial<Record<string, number>>,
 ): {
 	scored: Scored[];
 	z: Record<DimKey, number>;
@@ -144,12 +219,15 @@ export const scoreAll = (
 	const pos = position ?? positionOf(ratings);
 	const cv = classValues(p);
 	const standouts = standoutsOf(p, cv);
+	const traits = visibleTraits(traitsIn);
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
 		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded);
 		const prior = archetypePrior(a, pos);
+		const trait = traitTerm(a, traits);
 		if (
 			prior === null ||
+			trait === undefined ||
 			// A label about his length needs a wingspan
 			(a.expanded && !p.expanded) ||
 			(a.age &&
@@ -167,6 +245,7 @@ export const scoreAll = (
 			(a.rare ? RARE_PENALTY : 0) +
 			(a.tags.includes("star") ? STAR_BONUS : 0) +
 			prior +
+			trait +
 			((norms.bias ?? defaultNorms(p.expanded).bias)?.[a.id] ?? 0) +
 			signatureBonus(
 				a,
@@ -275,6 +354,8 @@ export type ClassifyOptions = {
 	pos?: string;
 	// His age, when known (veteran archetypes need it)
 	age?: number;
+	// His player traits as the user sees them (only with the playerTraits setting on; hidden ones are ignored)
+	traits?: Partial<Record<string, number>>;
 };
 
 export const classify = (
@@ -288,6 +369,7 @@ export const classify = (
 		ARCHETYPES,
 		isPos(opts.pos) ? opts.pos : undefined,
 		opts.age,
+		opts.traits,
 	);
 	let first = scored[0]!;
 	const sticky = opts.stickiness ?? STICKY_Z;

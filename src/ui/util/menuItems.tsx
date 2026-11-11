@@ -141,6 +141,15 @@ const coachesLinks: MenuItemLink[] =
 					path: ["coaches"],
 					text: "Coaches",
 				},
+				{
+					type: "link",
+					active: (pageID) => pageID === "frontOffices",
+					league: true,
+					commandPalette: true,
+					feature: "gmPersonalities",
+					path: ["front_offices"],
+					text: "Front Offices",
+				},
 			]
 		: [];
 

@@ -11,6 +11,8 @@ import {
 	type AssetValueDetail,
 } from "../team/ValueChangeCalculator.ts";
 import summary from "./summary.ts";
+import { getGmWeights } from "../gm/index.ts";
+import { gmStyleLabels } from "../../../common/gmPersonality.ts";
 
 // Everything here is from the point of view of the AI team deciding on the trade. "good" means the term makes the AI team like the trade more, "bad" means less.
 export type ExplanationEffect = "good" | "bad" | "neutral";
@@ -66,6 +68,9 @@ export type BuildExplanationInput = {
 	salaryCap: number;
 	salaryCapType: "hard" | "soft" | "none";
 	warning?: string | null;
+
+	// AI GM personalities (setting): "Name (Win-now, Analytics)" for a team with a GM
+	gm?: { name: string; styleLabels: string[] };
 };
 
 const assetKey = (detail: AssetValueDetail) =>
@@ -148,6 +153,25 @@ export const explainAsset = (
 			key: "strategy",
 			text,
 			effect: flip(sf > 1 ? "good" : "bad", give),
+		});
+	}
+
+	// AI GM personalities (setting)
+	const gf = detail.gmFactor ?? 1;
+	if (Math.abs(gf - 1) > 0.001 && detail.baseValue > 0) {
+		const what =
+			detail.type === "pick"
+				? "draft picks"
+				: detail.age <= 23
+					? "young players"
+					: "veterans";
+		terms.push({
+			key: "strategy",
+			text:
+				gf > 1
+					? `Our GM values ${what} more (+${pct(gf - 1)}).`
+					: `Our GM values ${what} less (−${pct(1 - gf)}).`,
+			effect: flip(gf > 1 ? "good" : "bad", give),
 		});
 	}
 
@@ -241,6 +265,18 @@ export const buildTradeExplanation = (
 				: "We're contending: we want players who help us win now, and we don't care as much about the future.",
 		effect: "neutral",
 	});
+
+	if (input.gm) {
+		team.push({
+			key: "strategy",
+			text: `Our GM, ${input.gm.name}, ${
+				input.gm.styleLabels.length > 0
+					? `leans ${input.gm.styleLabels.map((x) => x.toLowerCase()).join(", ")}`
+					: "has no strong leanings"
+			}, which nudges how he values players, picks and contracts.`,
+			effect: "neutral",
+		});
+	}
 
 	if (input.ovrBefore !== undefined && input.ovrAfter !== undefined) {
 		const diff = input.ovrAfter - input.ovrBefore;
@@ -415,7 +451,22 @@ export const explainForTeam = async ({
 		salaryCap: g.get("salaryCap"),
 		salaryCapType: g.get("salaryCapType"),
 		warning,
+		gm: await getExplanationGm(tid),
 	});
+};
+
+// AI GM personalities (setting): the AI team's GM, if he is making the call
+const getExplanationGm = async (tid: number) => {
+	if (!(await getGmWeights(tid))) {
+		return;
+	}
+	const gm = (await idb.cache.teams.get(tid))?.gm;
+	return gm
+		? {
+				name: `${gm.firstName} ${gm.lastName}`,
+				styleLabels: gmStyleLabels(gm.traits),
+			}
+		: undefined;
 };
 
 // Explain a 2 team trade from the AI team's (teams[1]) point of view

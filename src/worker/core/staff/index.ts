@@ -29,6 +29,7 @@ import { idb } from "../../db/index.ts";
 import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 import {
 	adaptSystems,
 	annotateSeason,
@@ -370,6 +371,9 @@ export const fillVacancies = async ({
 		popRanks.set(row.t.tid, i + 1);
 	}
 
+	// AI GM personalities (setting): analytics/patient GMs lean to player development, old-school/win-now ones to motivation. Empty when off
+	const gms = await getAllGmWeights();
+
 	for (const role of COACH_ROLES) {
 		for (const { t } of ordered) {
 			if (filled.has(`${t.tid}-${role}`)) {
@@ -425,10 +429,15 @@ export const fillVacancies = async ({
 				) {
 					continue;
 				}
-				const score =
-					coachOvr(c.ratings, role) +
-					gauss(0, 2) +
-					(hiringContext ? headCoachFitBonus(c, hiringContext) : 0);
+				const gm = gms.get(t.tid);
+				let score = coachOvr(c.ratings, role) + gauss(0, 2);
+				if (gm) {
+					score += gm.coachDevWeight * (c.ratings.dev - c.ratings.mot);
+				}
+				// Coaching systems: head coaches by fit, through the GM's leanings when there is one
+				if (hiringContext) {
+					score += headCoachFitBonus(c, hiringContext, gm);
+				}
 				if (score > bestScore) {
 					bestScore = score;
 					best = c;
@@ -690,6 +699,8 @@ export const runOffseason = async () => {
 	const coaches = (await idb.cache.coaches.getAll()).filter(
 		(c) => c.tid !== COACH_RETIRED,
 	);
+	// AI GM personalities (setting): patient GMs give coaches more time, win-now ones less. Empty when off
+	const gms = await getAllGmWeights();
 	for (const c of coaches) {
 		progress(c);
 
@@ -775,6 +786,10 @@ export const runOffseason = async () => {
 				}
 			} else if (ovr < 40) {
 				fireProb = 0.3;
+			}
+			const gm = gms.get(c.tid);
+			if (gm) {
+				fireProb *= gm.coachFireFactor;
 			}
 			if (Math.random() < fireProb) {
 				await fire(c);

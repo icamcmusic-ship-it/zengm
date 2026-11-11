@@ -3,6 +3,7 @@ import { PLAYER } from "../../../common/constants.ts";
 import {
 	ARCHETYPES,
 	DEFAULT_NORMS,
+	DEFAULT_NORMS_EXPANDED,
 	buildNorms,
 	classify,
 	currentEntry,
@@ -29,6 +30,13 @@ import {
 	EXPANDED_RATINGS2,
 	hasExpandedRatings,
 } from "../../../common/expandedRatings.ts";
+import {
+	getBadgeScoutingLevel,
+	getBadgeTraits,
+	traitsEnabled,
+} from "./traits.ts";
+import { TRAIT_DEFINITIONS } from "../../../common/playerTraits/definitions.ts";
+import { TWO_K_NAMES } from "../../../common/archetypes/twoK/twoK.data.ts";
 
 // The archetype a player has is DERIVED from his ratings (src/common/archetypes), but it is STORED on him (p.archetypes) at
 // the start of every preseason, so what the UI shows stays fixed between preseasons. Prospects, and players who have no entry
@@ -65,6 +73,38 @@ export const ratingsForArchetype = (
 	return out;
 };
 
+// His player traits as the user sees them (the playerTraits setting): only visible traits, as the scouted estimate for a
+// prospect (never hidden traits or the aging curve). Undefined with traits off: trait labels are then never picked.
+export const archetypeTraits = (
+	p: Player,
+	season: number,
+): Record<string, number> | undefined => {
+	if (!traitsEnabled()) {
+		return undefined;
+	}
+	const all = getBadgeTraits(p as any, season, getBadgeScoutingLevel());
+	if (!all) {
+		return undefined;
+	}
+	const out: Record<string, number> = {};
+	for (const [k, v] of Object.entries(all)) {
+		if (
+			TRAIT_DEFINITIONS[k as keyof typeof TRAIT_DEFINITIONS]?.visibility ===
+				"visible" &&
+			typeof v === "number"
+		) {
+			out[k] = v;
+		}
+	}
+	return out;
+};
+
+// The settings a stored label depends on: one that needs player traits or expanded ratings is replaced once that is off
+const viewContext = () => ({
+	traits: traitsEnabled(),
+	expanded: expandedRatingsOn(),
+});
+
 // His position as the game shows it now
 const posNow = (p: Player): unknown => (last(p.ratings) as any)?.pos;
 
@@ -77,7 +117,8 @@ export const resetArchetypeNorms = () => {
 // The league's own distribution (everyone on a roster or in free agency), rebuilt when the season or phase moves on, or when
 // asked. A tiny league falls back to the built-in reference league.
 export const getLeagueNorms = async (force = false): Promise<Norms> => {
-	const key = `${g.get("lid")}:${g.get("season")}:${g.get("phase")}`;
+	const expanded = expandedRatingsOn();
+	const key = `${g.get("lid")}:${g.get("season")}:${g.get("phase")}:${expanded}`;
 	if (!force && normsCache?.key === key) {
 		return normsCache.norms;
 	}
@@ -96,13 +137,16 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 			});
 		}
 	}
+	// The reference league (and its calibration) for the ratings the league has: with Expanded Ratings on, the one generated
+	// with the setting on
+	const reference = expanded ? DEFAULT_NORMS_EXPANDED : DEFAULT_NORMS;
 	const norms =
 		rows.length >= MIN_LEAGUE_FOR_NORMS
 			? {
-					...buildNorms(rows, ARCHETYPES, DEFAULT_NORMS),
-					bias: DEFAULT_NORMS.bias,
+					...buildNorms(rows, ARCHETYPES, reference),
+					bias: reference.bias,
 				}
-			: DEFAULT_NORMS;
+			: reference;
 	normsCache = { key, norms };
 	return norms;
 };
@@ -153,6 +197,10 @@ export const classifyPlayer = (
 		previousId,
 		pos: row.pos,
 		age,
+		traits:
+			typeof row.season === "number"
+				? archetypeTraits(p, row.season)
+				: undefined,
 	});
 };
 
@@ -219,7 +267,7 @@ export const archetypeFor = (
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
 	const entry = isProspect ? undefined : currentEntry(p.archetypes);
 	// An entry his position no longer allows (stored by an older version) is read live until the next preseason
-	const v = viewOf(entry, posNow(p));
+	const v = viewOf(entry, posNow(p), viewContext());
 	if (v) {
 		return { view: v, stored: true };
 	}
@@ -247,6 +295,7 @@ export const archetypeLabelAt = (
 		const v = viewOf(
 			currentEntry(p.archetypes, season),
 			(p.ratings as any[]).findLast((r) => r.season <= season)?.pos,
+			viewContext(),
 		);
 		if (v) {
 			return v.label;
@@ -271,6 +320,8 @@ export type PlayerArchetypeInfo = {
 	season?: number;
 	live: boolean;
 	why: { label: string; z: number; want: number }[];
+	// NBA 2K builds that read as this archetype (twoK/convert2k.script.test.ts)
+	twoK?: string[];
 };
 
 // Everything the player page shows. A non-prospect with no entry gets one stored here, once.
@@ -287,7 +338,7 @@ export const archetypeInfoForPlayer = async (
 	if (
 		!isProspect &&
 		p.tid !== PLAYER.RETIRED &&
-		!viewOf(currentEntry(p.archetypes), posNow(p))
+		!viewOf(currentEntry(p.archetypes), posNow(p), viewContext())
 	) {
 		const cached = await idb.cache.players.get(p.pid);
 		if (cached) {
@@ -321,6 +372,7 @@ export const archetypeInfoForPlayer = async (
 		season: found.stored ? v.season : undefined,
 		live: !found.stored,
 		why,
+		twoK: TWO_K_NAMES[v.id],
 	};
 };
 

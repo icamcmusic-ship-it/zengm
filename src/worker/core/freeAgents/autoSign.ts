@@ -10,6 +10,7 @@ import { idb } from "../../db/index.ts";
 import { g, local } from "../../util/index.ts";
 import { orderBy } from "../../../common/utils.ts";
 import { shuffle } from "../../../common/random.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 
 /**
  * AI teams sign free agents.
@@ -39,6 +40,9 @@ const autoSign = async () => {
 	const teams = await idb.cache.teams.getAll();
 	shuffle(teams);
 
+	// AI GM personalities (setting): more or less active, star hunters or depth builders. Empty with the setting off
+	const gms = await getAllGmWeights();
+
 	for (const t of teams) {
 		// Skip the user's team
 		if (
@@ -58,6 +62,11 @@ const autoSign = async () => {
 			probSkip = t.strategy === "rebuilding" ? 0.9 : 0.75;
 		} else {
 			probSkip = 0.5;
+		}
+
+		const gm = gms.get(t.tid);
+		if (gm) {
+			probSkip = 1 - (1 - probSkip) * gm.faActivity;
 		}
 
 		// Skip teams sometimes
@@ -82,6 +91,7 @@ const autoSign = async () => {
 		const payroll = await team.getPayroll(t.tid);
 		// Player traits (setting): this team's small trait adjustment to value, e.g. contenders and young rosters like savvy veterans, everyone avoids injury prone players
 		let playersForTeam = playersSorted;
+		let traitValues: Map<(typeof players)[number], number> | undefined;
 		if (traitsEnabled()) {
 			// Who is on the team: young players to mentor, and the locker room (AI teams are warier of adding another big ego or hot head)
 			const traitTeam = getTraitFactor.teamContext(playersOnRoster);
@@ -97,6 +107,25 @@ const autoSign = async () => {
 				);
 			}
 			playersForTeam = orderBy(playersSorted, (p) => values.get(p)!, "desc");
+			traitValues = values;
+		}
+		if (gm && gm.faStarShift !== 0) {
+			// Star hunters lean to the expensive free agents (the stars), depth builders to cheaper ones, by up to a few value points
+			const minContract = g.get("minContract");
+			const range = Math.max(1, g.get("maxContract") - minContract);
+			const keys = new Map<(typeof players)[number], number>();
+			for (const p of playersForTeam) {
+				const amount = getContractDemand(p).amount;
+				const starness = Math.min(
+					1,
+					Math.max(-1, (2 * (amount - minContract)) / range - 1),
+				);
+				keys.set(
+					p,
+					(traitValues?.get(p) ?? p.value) + gm.faStarShift * starness,
+				);
+			}
+			playersForTeam = orderBy(playersForTeam, (p) => keys.get(p)!, "desc");
 		}
 		const p = getBest(playersOnRoster, playersForTeam, payroll);
 		if (p) {

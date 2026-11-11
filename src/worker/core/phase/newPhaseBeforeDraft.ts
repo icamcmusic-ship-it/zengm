@@ -31,6 +31,7 @@ import { env } from "../../util/env.ts";
 import { orderTeams } from "../../util/orderTeams.ts";
 import { doAwards } from "../awards/doAwards.ts";
 import * as staff from "../staff/index.ts";
+import * as gm from "../gm/index.ts";
 
 const INFLATION_GAME_ATTRIBUTES = [
 	"salaryCap",
@@ -324,6 +325,9 @@ const newPhaseBeforeDraft = async (
 	}
 
 	await doAwards(conditions);
+
+	// AI GM records, firings and the GM carousel (before the coaching market, so new GMs run it)
+	await gm.runOffseason();
 
 	// Coaching staff records, Coach of the Year, and the offseason coaching market
 	await staff.runOffseason();

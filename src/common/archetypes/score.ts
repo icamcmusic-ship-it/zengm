@@ -52,7 +52,15 @@ export const NEED_W = 2;
 export const NEED_K = 4;
 export const NEED_STEP = 0.1;
 // Dimensions whose weight describes a style or his body, not a skill, so they are never gates
-const NOT_A_SKILL = new Set<DimKey>(["usg", "end", "hgt", "len", "cs", "orl"]);
+const NOT_A_SKILL = new Set<DimKey>([
+	"usg",
+	"end",
+	"hgt",
+	"len",
+	"cs",
+	"orl",
+	"sec",
+]);
 
 export type Prepared = {
 	z: Record<DimKey, number>;

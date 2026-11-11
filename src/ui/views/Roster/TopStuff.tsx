@@ -12,6 +12,7 @@ import Note from "../Player/Note.tsx";
 import { RosterComposition } from "../../components/RosterComposition.tsx";
 import { PlusMinus } from "../../components/PlusMinus.tsx";
 import { useLocal } from "../../util/local.ts";
+import { GmCard } from "../../components/GmCard.tsx";
 
 const fontSizeLarger = { fontSize: "larger" };
 
@@ -134,6 +135,7 @@ const PayrollAndPenalties = ({
 const TopStuff = ({
 	currentSeason,
 	editable,
+	gmInfo,
 	luxuryTaxAmount,
 	minPayrollAmount,
 	openRosterSpots,
@@ -150,6 +152,7 @@ const TopStuff = ({
 }: Pick<
 	View<"roster">,
 	| "editable"
+	| "gmInfo"
 	| "luxuryTaxAmount"
 	| "minPayrollAmount"
 	| "payroll"
@@ -245,7 +248,7 @@ const TopStuff = ({
 			>
 				<div className="d-flex">
 					<div className="team-picture" style={logoStyle} />
-					<div>
+					<div style={{ minWidth: 0 }}>
 						<div>
 							<div style={fontSizeLarger}>{recordAndPlayoffs}</div>
 							{t.rank !== undefined ? (
@@ -346,6 +349,17 @@ const TopStuff = ({
 						) : null}
 						{isCurrentSeason && showTradeFor ? (
 							<div>Strategy: {t.strategy}</div>
+						) : null}
+						{gmInfo.type === "user" ? (
+							<div>General manager: You</div>
+						) : gmInfo.type === "gm" ? (
+							<div className="mt-2">
+								<GmCard
+									gm={gmInfo.gm}
+									colors={t.seasonAttrs.colors}
+									jersey={t.seasonAttrs.jersey}
+								/>
+							</div>
 						) : null}
 					</div>
 				</div>

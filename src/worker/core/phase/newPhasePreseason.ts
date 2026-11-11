@@ -15,6 +15,7 @@ import {
 } from "../index.ts";
 import { idb } from "../../db/index.ts";
 import * as staff from "../staff/index.ts";
+import { ensureGms } from "../gm/index.ts";
 import { updateArchetypesForPreseason } from "../player/archetype.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import type {
@@ -354,6 +355,9 @@ const newPhasePreseason = async (
 
 	// With a coaching staff, the coaching budget level follows the staff (overriding the AI budget changes above)
 	await staff.onPreseason();
+
+	// AI GMs for any AI team without one
+	await ensureGms();
 
 	const coachingLevels: Record<number, number> = {};
 	// Coaching systems: the head coach's philosophy (development coaches help young players, win-now coaches veterans)

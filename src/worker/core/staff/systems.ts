@@ -37,6 +37,8 @@ import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import { winProb } from "../seasonOdds/simSeason.ts";
 import teamOvr from "../team/ovr.ts";
+import { getGmWeights } from "../gm/index.ts";
+import type { GmWeights } from "../../../common/gmPersonality.ts";
 
 export const coachSystemsEnabled = () =>
 	__SPORT === "basketball" &&
@@ -794,18 +796,27 @@ export const getTeamHiringContext = async (
 
 /**
  * Bonus (in coach ovr points) an AI team gives a head coach candidate: systems that fit its roster, a development philosophy for a
- * rebuilding team or a young roster, game management and a win-now approach for a contender, and reputation. Exported for the AI GM
- * personalities, which can add their own preferences on top.
+ * rebuilding team or a young roster, game management and a win-now approach for a contender, and reputation. With AI GM personalities on,
+ * the GM's leanings scale it (gm: getGmWeights): analytics GMs weigh scheme fit more, patient GMs development coaches, win-now GMs game
+ * managers. Used by the coaching market (fillVacancies) for AI teams.
  */
-export const headCoachFitBonus = (c: CoachWithoutKey, ctx: HiringContext) => {
+export const headCoachFitBonus = (
+	c: CoachWithoutKey,
+	ctx: HiringContext,
+	gm?: GmWeights,
+) => {
 	const profile = getCoachProfile(c);
 	const fit = 0.6 * ctx.fit.off[profile.off] + 0.4 * ctx.fit.def[profile.def];
 	const rebuilding = ctx.strategy === "rebuilding" || ctx.numYoung >= 5;
+	const analytics = gm?.traits.analytics ?? 0;
+	const patience = gm?.traits.patience ?? 0;
 	return (
-		3 * fit +
+		3 * (1 + 0.5 * analytics) * fit +
 		(rebuilding
 			? 4 * profile.philosophy + 2 * profile.youth + 0.04 * (c.ratings.dev - 50)
 			: -2.5 * profile.philosophy + 0.08 * (profile.mgmt - 50)) +
+		2.5 * patience * profile.philosophy +
+		0.05 * Math.max(0, -patience) * (profile.mgmt - 50) +
 		0.08 * (coachReputation(c) - 50)
 	);
 };
@@ -816,6 +827,7 @@ export const rankHeadCoachCandidates = async (
 	candidates?: Coach[],
 ) => {
 	const ctx = await getTeamHiringContext(tid);
+	const gm = await getGmWeights(tid);
 	const list =
 		candidates ??
 		(await idb.cache.coaches.getAll()).filter(
@@ -824,8 +836,8 @@ export const rankHeadCoachCandidates = async (
 	return list
 		.map((c) => ({
 			c,
-			score: coachOvr(c.ratings, "head") + headCoachFitBonus(c, ctx),
-			bonus: headCoachFitBonus(c, ctx),
+			score: coachOvr(c.ratings, "head") + headCoachFitBonus(c, ctx, gm),
+			bonus: headCoachFitBonus(c, ctx, gm),
 		}))
 		.sort((a, b) => b.score - a.score);
 };

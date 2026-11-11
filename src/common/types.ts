@@ -2393,6 +2393,11 @@ export type Team = {
 
 	// injuryDepth setting: rest older/injury-prone players on the second night of back-to-backs
 	loadManagement?: boolean;
+
+	// featureGmPersonalities setting: the AI general manager (none for a team the user runs), and GMs who left this team and are
+	// still on the market (or retired), see core/gm
+	gm?: import("./types.gm.ts").Gm;
+	formerGms?: import("./types.gm.ts").Gm[];
 };
 
 export type TeamAttr = keyof Team;
@@ -2944,3 +2949,4 @@ export type DraftBoardEntry = {
 	note?: string;
 };
 export type * from "./types.staff.ts";
+export type * from "./types.gm.ts";

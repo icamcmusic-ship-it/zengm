@@ -95,6 +95,7 @@ import { migrateScheduledEvents74 } from "../../db/migrations/74/migrate.ts";
 import { unwrapGameAttribute } from "../../../common/unwrapGameAttribute.ts";
 import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
 import { ensureStaff } from "../staff/index.ts";
+import { ensureGms } from "../gm/index.ts";
 import updateExpandedRatingsForLeague from "../player/updateExpandedRatingsForLeague.ts";
 import { hasExpandedRatings } from "../../../common/expandedRatings.ts";
 
@@ -1944,13 +1945,19 @@ const afterDBStream = async ({
 	}
 	await ensureStaff();
 
+	// AI GM personalities
+	await ensureGms();
+
 	// Expanded ratings: players from real rosters or a league file without them get them derived (and ovr/pot/skills recomputed)
+	// Sim-Calibrated Ovr: ovrs stored in a league file or computed before the setting was applied are recomputed the same way
 	if (
 		__SPORT === "basketball" &&
-		g.get("expandedRatings") &&
-		(await idb.cache.players.getAll()).some(
-			(p) => p.tid !== PLAYER.RETIRED && !hasExpandedRatings(p.ratings.at(-1)!),
-		)
+		((g.get("expandedRatings") &&
+			(await idb.cache.players.getAll()).some(
+				(p) =>
+					p.tid !== PLAYER.RETIRED && !hasExpandedRatings(p.ratings.at(-1)!),
+			)) ||
+			g.get("ovrV2"))
 	) {
 		await updateExpandedRatingsForLeague();
 	}

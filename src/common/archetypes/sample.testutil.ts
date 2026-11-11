@@ -8,7 +8,11 @@ import develop from "../../worker/core/player/develop.ts";
 import generate from "../../worker/core/player/generate.ts";
 import ovr from "../../worker/core/player/ovr.ts";
 import { RATING_KEYS } from "../ratingsBuilds/solver.ts";
-import type { ArchetypeRatings } from "./types.ts";
+import type { ArchetypeRatings, ArchetypeTraits } from "./types.ts";
+import { generateTraitSeeds } from "../playerTraits/seeds.ts";
+import { traitScores } from "../playerTraits/scores.ts";
+import type { TraitKey } from "../playerTraits/types.ts";
+import { VISIBLE_TRAITS } from "./classify.ts";
 import { EXPANDED_RATINGS2 } from "../expandedRatings.ts";
 
 export type SamplePlayer = {
@@ -79,6 +83,28 @@ const sample = async (
 			}
 		}
 		out.push({ ratings, ovr: o, age: 19 + k, hgtInches: p.hgt });
+	}
+	return out;
+};
+
+// Visible player traits for a sample player (the playerTraits setting), as a league would give him: seeds from the league seed
+// and an index, scores from his ratings, age and years in the league. Only the visible ones, as the archetypes read them.
+export const sampleTraits = (
+	ratings: ArchetypeRatings,
+	age: number | undefined,
+	leagueSeed: string,
+	i: number,
+): ArchetypeTraits => {
+	const a = age ?? 22;
+	const scores = traitScores(ratings, generateTraitSeeds(leagueSeed, i), {
+		age: a,
+		experience: Math.max(0, a - 20),
+	});
+	const out: ArchetypeTraits = {};
+	for (const k of Object.keys(scores) as TraitKey[]) {
+		if (VISIBLE_TRAITS.has(k)) {
+			out[k as keyof ArchetypeTraits] = scores[k];
+		}
 	}
 	return out;
 };

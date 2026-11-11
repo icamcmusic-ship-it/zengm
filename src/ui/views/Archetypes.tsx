@@ -24,6 +24,11 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 		},
 		{ title: "%", desc: "Share of the league", sortType: "number" as const },
 		{
+			title: "2K builds",
+			desc: "NBA 2K builds that read as this archetype",
+			sortType: "number" as const,
+		},
+		{
 			title: "Best players",
 			sortType: "string" as const,
 			sortSequence: [] as ("asc" | "desc")[],
@@ -46,6 +51,19 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 			GROUP_INFO[r.group].label,
 			r.count,
 			{ value: pct(r.share), sortValue: r.share },
+			{
+				value:
+					r.twoK.length > 0 ? (
+						<span title={r.twoK.join(", ")}>
+							{r.twoK.slice(0, 3).join(", ")}
+							{r.twoK.length > 3 ? ` +${r.twoK.length - 3}` : ""}
+						</span>
+					) : (
+						""
+					),
+				sortValue: r.twoK.length,
+				searchValue: r.twoK.join(" "),
+			},
 			{
 				value:
 					r.top.length > 0 ? (

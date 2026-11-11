@@ -394,6 +394,7 @@ export const MoreLinks = (
 				{ url: ["rivalries"], name: "Rivalries" },
 				{ url: ["league_achievements"], name: "League Achievements" },
 				{ url: ["coaches"], name: "Coaches" },
+				{ url: ["front_offices"], name: "Front Offices" },
 				{ url: ["frivolities", "economics"], name: "Economics" },
 				{ url: ["frivolities", "home_court"], name: "Home Court" },
 				{ url: ["newspaper"], name: "Newspaper" },

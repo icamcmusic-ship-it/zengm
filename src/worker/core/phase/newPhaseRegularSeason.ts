@@ -11,6 +11,7 @@ import {
 	TWITTER_HANDLE,
 } from "../../../common/constants.ts";
 import { getMetaAttribute, putMetaAttribute } from "../../db/metaAttributes.ts";
+import { onRegularSeason as gmOnRegularSeason } from "../gm/index.ts";
 
 class GameHasYourTeamCache {
 	cache: Record<number, boolean> = {};
@@ -160,6 +161,9 @@ const newPhaseRegularSeason = async (
 		regularSeason: {},
 		playoffs: {},
 	});
+
+	// AI GMs: what's expected of each team this season
+	await gmOnRegularSeason();
 
 	if (!local.autoPlayUntil) {
 		if (g.get("season") > g.get("startingSeason") && Math.random() < 0.1) {

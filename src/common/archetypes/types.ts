@@ -49,7 +49,23 @@ export type DimKey =
 	// Expanded ratings, second step: catch-and-shoot vs off-the-dribble lean (csh - dsh) and offensive vs defensive rebounding
 	// lean (oreb - dreb). Like length: styles, only part of a match when an archetype names them and the player has them
 	| "cs"
-	| "orl";
+	| "orl"
+	// ... and ball security lean: bsc against what his handle, passing and IQ would give (a careful or a loose handler)
+	| "sec";
+
+// Player traits (the playerTraits setting) an archetype may read: only the ones the user can see (never hidden traits or the
+// aging curve), as the 0-100 score the user sees (a prospect's scouted estimate)
+export type ArchetypeTraitKey =
+	| "shotDiscipline"
+	| "offBall"
+	| "screen"
+	| "hustle"
+	| "foulDiscipline"
+	| "handle"
+	| "veteranSavvy"
+	| "motor"
+	| "defensiveVersatility";
+export type ArchetypeTraits = Partial<Record<ArchetypeTraitKey, number>>;
 
 export type ArchetypeGroup = "guard" | "wing" | "forward" | "big";
 
@@ -111,6 +127,10 @@ export type ArchetypeDef = {
 	rare?: true;
 	// Only for players who have expanded ratings: the label is about his length (wingspan for his height)
 	expanded?: true;
+	// A trait-flavored label: only with player traits on, and he needs at least this score at the trait (a shortfall costs fit)
+	trait?: { key: ArchetypeTraitKey; min: number };
+	// Visible traits that break ties toward this label (weight per trait, see TRAIT_TIE_K in classify.ts)
+	traitTie?: Partial<Record<ArchetypeTraitKey, number>>;
 	// The positions he must play to get this label (a hard gate). All nine for the few universal (role) archetypes.
 	positions: Pos[];
 	// Position prior overrides on top of the group's (see position.ts): z nudge per position, null = never

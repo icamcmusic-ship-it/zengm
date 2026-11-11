@@ -81,6 +81,8 @@ export const featureForUrl = (
 		case "coach":
 		case "coaches":
 			return "coachingStaff";
+		case "front_offices":
+			return "gmPersonalities";
 		case "coach_notes":
 			return "coachSystems";
 		case "frivolities":
