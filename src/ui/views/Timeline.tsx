@@ -234,7 +234,12 @@ const Timeline = ({
 			{shown.length === 0 ? (
 				<p>Nothing on the timeline for these filters.</p>
 			) : (
-				<div className="timeline">
+				<div
+					className="timeline"
+					data-csv-table=""
+					data-csv-name="Timeline"
+					data-csv-cols={JSON.stringify(["Season", "Kind", "Event", "Detail"])}
+				>
 					{shown.map((row) => (
 						<div key={row.season} className="mb-4" data-timeline-season>
 							<h2 className="h4 border-bottom pb-1">
@@ -244,7 +249,16 @@ const Timeline = ({
 							</h2>
 							<ul className="list-unstyled mb-0">
 								{row.items.map((item, i) => (
-									<li key={i} className="d-flex gap-2 mb-1">
+									<li
+										key={i}
+										className="d-flex gap-2 mb-1"
+										data-csv-row={JSON.stringify([
+											row.season,
+											TIMELINE_KIND_LABELS[item.kind],
+											item.title,
+											item.detail ?? "",
+										])}
+									>
 										<span
 											className={clsx(
 												"badge align-self-start mt-1",

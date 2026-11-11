@@ -10,6 +10,10 @@ import { useFeatureOption } from "../util/nativeFeatures.ts";
 const TOKEN = /\[\[p:(\d+)\|([^\]]*)]]/g;
 
 // Text with [[p:pid|Name]] tokens, as links to the players
+// Plain text of a hype string (player tokens become their names), for CSV
+export const hypePlainText = (text: string) =>
+	text.replaceAll(TOKEN, (_match, _pid, name) => name);
+
 export const HypeText = ({ text }: { text: string }) => {
 	const parts: ReactNode[] = [];
 	let last = 0;
@@ -138,14 +142,34 @@ export const HypeGameRow = ({
 	h,
 	maxReasons = 3,
 	showResult,
+	csvDay,
 }: {
 	h: HypeLite;
 	maxReasons?: number;
 	showResult?: boolean;
+	// Inside a data-csv-table list (Games to Watch page): the day label for the CSV row
+	csvDay?: string;
 }) => {
 	const [home, away] = h.teams;
 	return (
-		<div className="mb-3">
+		<div
+			className="mb-3"
+			data-csv-row={
+				csvDay === undefined
+					? undefined
+					: JSON.stringify([
+							csvDay,
+							`${away!.abbrev} at ${home!.abbrev}`,
+							`${away!.record} vs ${home!.record}`,
+							h.score,
+							h.label,
+							showResult && h.completed
+								? `${away!.abbrev} ${away!.pts}, ${home!.abbrev} ${home!.pts}`
+								: "",
+							showResult && h.verdict ? hypePlainText(h.verdict.text) : "",
+						])
+			}
+		>
 			<div className="d-flex flex-wrap align-items-baseline gap-2">
 				<b>
 					{away!.abbrev} at {home!.abbrev}

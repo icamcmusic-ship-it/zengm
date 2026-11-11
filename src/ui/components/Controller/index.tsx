@@ -1,4 +1,5 @@
 import { LazyMotion } from "framer-motion";
+import { TablesCSV } from "../TablesCSV.tsx";
 import { memo, useCallback, useEffect, type ReactNode } from "react";
 import { localActions, useLocal } from "../../util/local.ts";
 import { CommandPalette } from "../CommandPalette/index.tsx";
@@ -110,6 +111,9 @@ export const Controller = () => {
 								<main id="actual-actual-content" className="clearfix">
 									<ErrorBoundary key={idLoaded}>
 										{inLeague && !popup ? <PageTabs pageID={idLoaded} /> : null}
+										{inLeague && !popup ? (
+											<TablesCSV pageID={idLoaded} refreshKey={data} />
+										) : null}
 										{Component ? (
 											<KeepPreviousRenderWhileUpdating updating={updating}>
 												<Component {...data} />

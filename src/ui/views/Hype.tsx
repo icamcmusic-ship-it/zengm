@@ -1,7 +1,11 @@
 import { MoreLinks } from "../components/MoreLinks.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
-import { HypeGameRow, HypeText } from "../components/GameHype.tsx";
+import {
+	HypeGameRow,
+	hypePlainText,
+	HypeText,
+} from "../components/GameHype.tsx";
 import { helpers } from "../util/helpers.ts";
 
 const DAY_LABELS = [
@@ -26,7 +30,20 @@ const Hype = ({ chases, days, recent }: View<"hype">) => {
 				<a href={helpers.leagueUrl(["storylines"])}>Storylines</a>.
 			</p>
 			<div className="row">
-				<div className="col-lg-7">
+				<div
+					className="col-lg-7"
+					data-csv-table=""
+					data-csv-name="Coming up"
+					data-csv-cols={JSON.stringify([
+						"Day",
+						"Game",
+						"Records",
+						"Hype",
+						"Label",
+						"Result",
+						"Verdict",
+					])}
+				>
 					<h2>Coming up</h2>
 					{days.length === 0 ? (
 						<p>No games are scheduled right now.</p>
@@ -37,7 +54,12 @@ const Hype = ({ chases, days, recent }: View<"hype">) => {
 									{DAY_LABELS[i] ?? `Day ${d.day}`}
 								</h3>
 								{d.games.slice(0, 8).map((h) => (
-									<HypeGameRow key={h.gid} h={h} maxReasons={4} />
+									<HypeGameRow
+										key={h.gid}
+										h={h}
+										maxReasons={4}
+										csvDay={DAY_LABELS[i] ?? `Day ${d.day}`}
+									/>
 								))}
 								{d.games.length > 8 ? (
 									<div className="text-body-secondary">
@@ -56,9 +78,15 @@ const Hype = ({ chases, days, recent }: View<"hype">) => {
 							a few seasons of history to count.
 						</p>
 					) : (
-						<ul className="ps-3">
+						<ul
+							className="ps-3"
+							data-csv-table=""
+							data-csv-name="Record chases"
+							data-csv-cols={JSON.stringify(["Record chase"])}
+						>
 							{chases.map((c) => (
 								<li
+									data-csv-row={JSON.stringify([hypePlainText(c.text)])}
 									key={`${c.pid}-${c.k}-${c.scope}-${c.kind}`}
 									className="mb-1"
 								>
@@ -71,9 +99,29 @@ const Hype = ({ chases, days, recent }: View<"hype">) => {
 					{recent.length === 0 ? (
 						<p>No games played yet.</p>
 					) : (
-						recent.map((h) => (
-							<HypeGameRow key={h.gid} h={h} maxReasons={2} showResult />
-						))
+						<div
+							data-csv-table=""
+							data-csv-name="Did it live up to it"
+							data-csv-cols={JSON.stringify([
+								"Day",
+								"Game",
+								"Records",
+								"Hype",
+								"Label",
+								"Result",
+								"Verdict",
+							])}
+						>
+							{recent.map((h) => (
+								<HypeGameRow
+									key={h.gid}
+									h={h}
+									maxReasons={2}
+									showResult
+									csvDay={`Day ${h.day}`}
+								/>
+							))}
+						</div>
 					)}
 				</div>
 			</div>
