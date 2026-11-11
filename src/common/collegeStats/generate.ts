@@ -251,7 +251,7 @@ export const getNcaaSchools = (
 const toGameLine = (
 	season: NcaaSeason,
 	team: number,
-	event: "conf" | "ncaa",
+	event: ProspectNcaaGame["event"],
 	round: string,
 	game: NcaaSeason["tournament"]["final"],
 	box: GameBox | undefined,
@@ -281,7 +281,7 @@ const toGameLine = (
 		event,
 		round,
 		opp: season.teams[opp]!.school,
-		...(event === "ncaa"
+		...(event !== "conf"
 			? {
 					seed: home ? game.seedA : game.seedB,
 					oppSeed: home ? game.seedB : game.seedA,

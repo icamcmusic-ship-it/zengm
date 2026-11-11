@@ -331,4 +331,58 @@ describe("college season (featureCollegeSeason)", () => {
 		);
 		assert.isUndefined(await getCollegeSeason(SEASON));
 	});
+
+	test("a class from before season versions is rebuilt the old way, and stays that way", async () => {
+		idb.league = mockIDBLeague();
+		g.setWithoutSavingToDB("featureCollegeSeason" as any, true);
+		await generateCollegeStats({ draftYear: SEASON, seed: "abc" });
+		const { getCollegeSeason } = await import("./collegeSeason.ts");
+
+		// New classes are stored with the current version: NIT games count
+		const current = (await getCollegeSeason(SEASON))!;
+		assert.strictEqual(current.season.version, 2);
+		assert.isTrue(current.season.nit.counted);
+		for (const p of current.players) {
+			assert.strictEqual(p.collegeSeason!.v, 2);
+			const team = current.season.teams.find(
+				(t) => t.school === p.collegeSeason!.school,
+			)!;
+			assert.strictEqual(p.collegeSeason!.summary.nit, team.nit);
+		}
+		// The same class twice is the same object (cached)
+		assert.strictEqual((await getCollegeSeason(SEASON))!.season, current.season);
+
+		// What an old class looks like: no version on the prospects
+		for (const p of current.players) {
+			delete p.collegeSeason!.v;
+			await idb.cache.players.put(p);
+		}
+		const old = (await getCollegeSeason(SEASON))!;
+		assert.strictEqual(old.season.version, 1);
+		assert.isFalse(old.season.nit.counted);
+		assert.strictEqual(old.season.storyline.shape, "standard");
+		assert.strictEqual(old.season.polls.length, 19);
+
+		// A prospect added later joins the old season as it is
+		const before = JSON.stringify(old.season);
+		const newcomer = { ...structuredClone(prospects[1]!), pid: 1001 };
+		newcomer.stats = [];
+		newcomer.awards = [];
+		delete newcomer.collegeSeason;
+		await idb.cache.players.put(newcomer);
+		await generateCollegeStats({
+			draftYear: SEASON,
+			seed: "other",
+			onlyMissing: true,
+		});
+		const p1001 = (await idb.cache.players.get(1001))!;
+		assert.isDefined(p1001.collegeSeason);
+		assert.isUndefined(p1001.collegeSeason!.v);
+		assert.isUndefined(p1001.collegeSeason!.summary.nit);
+		const again = (await getCollegeSeason(SEASON))!;
+		assert.strictEqual(again.season.version, 1);
+		assert.strictEqual(JSON.stringify(again.season), before);
+
+		await removeCollegeStats(SEASON);
+	});
 });

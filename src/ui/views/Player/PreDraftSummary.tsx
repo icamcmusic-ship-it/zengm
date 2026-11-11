@@ -32,7 +32,7 @@ export const PreDraftSummary = ({
 	}
 	if (summary) {
 		parts.push(
-			`${summary.school} ${summary.w}-${summary.l}${ncaa ? `, ${ncaa === "Champion" ? "National Champion" : ncaa}` : ""}`,
+			`${summary.school} ${summary.w}-${summary.l}${ncaa ? `, ${ncaa === "Champion" ? "National Champion" : ncaa}` : summary.nit ? `, NIT ${summary.nit}` : ""}`,
 		);
 	}
 	if (player.earlierHonors.length > 0) {

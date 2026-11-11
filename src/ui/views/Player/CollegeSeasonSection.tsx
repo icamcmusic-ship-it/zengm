@@ -11,7 +11,7 @@ const ncaaResultText = (summary: ProspectNcaaSummary) =>
 const ordinal = (x: number) => helpers.ordinal(x);
 
 /**
- * His team's college season in his draft year: record, conference finish, AP rank, conference tournament and NCAA tournament results, and his postseason games.
+ * His team's college season in his draft year: record, conference finish, AP rank, conference tournament, NCAA tournament and NIT results, and his postseason games.
  */
 export const CollegeSeasonSection = ({
 	summary,
@@ -40,12 +40,21 @@ export const CollegeSeasonSection = ({
 						? `${ncaa}, ${summary.region} Region`
 						: "Did not make the tournament"}
 				</li>
+				{summary.nit !== undefined ? (
+					<li data-testid="college-season-nit">
+						<b>NIT:</b> {summary.nit} (seed {summary.nitSeed})
+					</li>
+				) : null}
 				<li>
 					<a
 						href={helpers.leagueUrl([
 							"college_overseas",
 							summary.season,
-							ncaa !== undefined ? "ncaa" : "standings",
+							ncaa !== undefined
+								? "ncaa"
+								: summary.nit !== undefined
+									? "nit"
+									: "standings",
 						])}
 					>
 						See the {summary.season} college season
@@ -75,7 +84,11 @@ export const CollegeSeasonSection = ({
 							{summary.games.map((game, i) => (
 								<tr key={i}>
 									<td className="text-nowrap">
-										{game.event === "ncaa" ? "NCAA " : `${summary.conf} `}
+										{game.event === "ncaa"
+											? "NCAA "
+											: game.event === "nit"
+												? "NIT "
+												: `${summary.conf} `}
 										{game.round}
 									</td>
 									<td className="text-nowrap">
