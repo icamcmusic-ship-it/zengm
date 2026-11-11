@@ -10,6 +10,11 @@ export type ArchetypeRatings = Record<RatingKey, number> & {
 	wng?: number;
 	pdef?: number;
 	idef?: number;
+	oreb?: number;
+	dreb?: number;
+	csh?: number;
+	dsh?: number;
+	bsc?: number;
 };
 
 // The dimensions an archetype profile is written over: BBGM's own composite ratings plus a few raw ratings
@@ -40,7 +45,11 @@ export type DimKey =
 	// height (without expanded ratings: ordinary, and never part of a match)
 	| "pdef"
 	| "idef"
-	| "len";
+	| "len"
+	// Expanded ratings, second step: catch-and-shoot vs off-the-dribble lean (csh - dsh) and offensive vs defensive rebounding
+	// lean (oreb - dreb). Like length: styles, only part of a match when an archetype names them and the player has them
+	| "cs"
+	| "orl";
 
 export type ArchetypeGroup = "guard" | "wing" | "forward" | "big";
 

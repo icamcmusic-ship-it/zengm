@@ -15,6 +15,13 @@ import { g } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { player } from "../index.ts";
 import type { Player, PlayerWithoutKey } from "../../../common/types.ts";
+import { ballSecurityBase } from "../../../common/expandedRatings.ts";
+import {
+	expandedRatingsApply,
+	setReboundSplit,
+	setShootingSplit,
+	syncExpandedToCompat,
+} from "../player/expandedRatings.ts";
 
 /**
  * Draft class shapes (see common/draftClassShape.ts). A class the game generates from scratch is marked "pending" when it is made (genPlayersWithoutSaving), and processNewDraftClasses gives it its shape before anything else happens to it (re-randomizing, college stats), so the shape is applied once and everything after builds on it. Imported, uploaded and topped-off classes are never marked, so never reshaped.
@@ -153,11 +160,24 @@ export const applyPendingShape = async (
 	for (const c of changes) {
 		const p = byPid.get(c.key)!;
 		const ratings = p.ratings.at(-1) as any;
+		// Expanded ratings: his ball security keeps its place relative to his handle and IQ, and a guard/big nudge tilts his
+		// rebounding and shooting splits (then they follow reb and fg + tp, and pdef/idef follow diq)
+		const expanded = expandedRatingsApply(ratings);
+		const bscResidual = expanded ? ratings.bsc - ballSecurityBase(ratings) : 0;
 		if (c.nudge) {
 			applyNudge(p, c.nudge);
+			if (expanded) {
+				const tilt = c.nudge === "big" ? 2 : c.nudge === "guard" ? -2 : 0;
+				setReboundSplit(ratings, ratings.oreb - ratings.dreb + tilt);
+				setShootingSplit(ratings, ratings.csh - ratings.dsh + tilt);
+			}
 		}
 		if (c.ovr !== 0) {
 			shiftToOvr(ratings, player.ovr(ratings) + c.ovr);
+		}
+		if (expanded) {
+			ratings.bsc = clampRating(ballSecurityBase(ratings) + bscResidual);
+			syncExpandedToCompat(ratings);
 		}
 		if (c.age !== 0) {
 			p.born.year -= c.age;

@@ -34,8 +34,11 @@ import updateValues from "../player/updateValues.ts";
 import {
 	ensureExpandedRatings,
 	setDefenseSplit,
+	setReboundSplit,
+	setShootingSplit,
 	expandedRatingsApply,
 } from "../player/expandedRatings.ts";
+import { ballSecurityBase } from "../../../common/expandedRatings.ts";
 
 // "Regenerate ratings": rebuilds draft prospects (and, through Customize Player, any player) into varied, specialized
 // builds without changing anyone's overall. The engine is pure (src/common/ratingsBuilds); this is the plumbing that reads
@@ -467,6 +470,10 @@ export const writeResult = async (
 	const expanded = expandedRatingsApply(row);
 	const wngOffset = expanded ? row.wng! - row.hgt : 0;
 	const defenseSplit = expanded ? row.pdef! - row.idef! : 0;
+	// ... and his rebounding and shooting splits, and his ball security relative to what his skills say
+	const reboundSplit = expanded ? row.oreb! - row.dreb! : 0;
+	const shootingSplit = expanded ? row.csh! - row.dsh! : 0;
+	const bscResidual = expanded ? row.bsc! - ballSecurityBase(row) : 0;
 	for (const key of RATING_KEYS) {
 		row[key] = r.after.ratings[key];
 	}
@@ -478,6 +485,13 @@ export const writeResult = async (
 	if (expanded) {
 		row.wng = helpers.bound(Math.round(row.hgt + wngOffset), 0, 100);
 		setDefenseSplit(row, defenseSplit);
+		setReboundSplit(row, reboundSplit);
+		setShootingSplit(row, shootingSplit);
+		row.bsc = helpers.bound(
+			Math.round(ballSecurityBase(row) + bscResidual),
+			0,
+			100,
+		);
 		row.ovr = F.ovr(row as any);
 		row.pot = Math.max(row.pot, row.ovr);
 		row.skills = F.skills(row as any);

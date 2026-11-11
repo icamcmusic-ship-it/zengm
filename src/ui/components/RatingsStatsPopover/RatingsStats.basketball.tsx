@@ -12,6 +12,11 @@ type Props = {
 			wng?: number;
 			pdef?: number;
 			idef?: number;
+			oreb?: number;
+			dreb?: number;
+			csh?: number;
+			dsh?: number;
+			bsc?: number;
 		};
 	stats: any;
 	type?: "career" | "current" | "draft" | number;
@@ -84,6 +89,18 @@ const RatingsStats = ({ challengeNoRatings, ratings, stats, type }: Props) => {
 					<span style={ratingsGradientStyle(ratings.tp)}>
 						3Pt: {ratings.tp}
 					</span>
+					{ratings.csh !== undefined && ratings.dsh !== undefined ? (
+						<>
+							<br />
+							<span style={ratingsGradientStyle(ratings.csh)}>
+								C&amp;S: {ratings.csh}
+							</span>
+							<br />
+							<span style={ratingsGradientStyle(ratings.dsh)}>
+								OTD: {ratings.dsh}
+							</span>
+						</>
+					) : null}
 				</div>
 				<div className="col-4">
 					<span style={ratingsGradientStyle(ratings.pot)}>
@@ -114,13 +131,33 @@ const RatingsStats = ({ challengeNoRatings, ratings, stats, type }: Props) => {
 						Drb: {ratings.drb}
 					</span>
 					<br />
+					{ratings.bsc !== undefined ? (
+						<>
+							<span style={ratingsGradientStyle(ratings.bsc)}>
+								BSc: {ratings.bsc}
+							</span>
+							<br />
+						</>
+					) : null}
 					<span style={ratingsGradientStyle(ratings.pss)}>
 						Pss: {ratings.pss}
 					</span>
 					<br />
-					<span style={ratingsGradientStyle(ratings.reb)}>
-						Reb: {ratings.reb}
-					</span>
+					{ratings.oreb !== undefined && ratings.dreb !== undefined ? (
+						<>
+							<span style={ratingsGradientStyle(ratings.oreb)}>
+								ORb: {ratings.oreb}
+							</span>
+							<br />
+							<span style={ratingsGradientStyle(ratings.dreb)}>
+								DRb: {ratings.dreb}
+							</span>
+						</>
+					) : (
+						<span style={ratingsGradientStyle(ratings.reb)}>
+							Reb: {ratings.reb}
+						</span>
+					)}
 				</div>
 			</div>
 		);

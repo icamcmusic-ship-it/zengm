@@ -2486,3 +2486,37 @@ for (const d of ARCHETYPE_DEFS) {
 		d.tags.push("generic");
 	}
 }
+
+// Expanded ratings, second step: shooter labels read how he gets his jumpers (catch-and-shoot vs off the dribble), rebounding labels
+// which glass he cleans. Extra weights with expanded ratings only, on top of any the label has.
+const STYLE_XW: Record<string, Partial<Record<DimKey, number>>> = {
+	"spot-up-guard": { cs: 1.5 },
+	"spot-up-wing": { cs: 1.5 },
+	"corner-specialist": { cs: 1.5 },
+	"movement-shooter": { cs: 1 },
+	"bench-sniper": { cs: 1 },
+	"3-and-d-wing": { cs: 1 },
+	"3-and-d-guard": { cs: 1 },
+	"3-and-d-forward": { cs: 1 },
+	"stretch-four": { cs: 1 },
+	"pick-and-pop-big": { cs: 1 },
+	"shot-creator": { cs: -1.5 },
+	"pull-up-specialist": { cs: -1.5 },
+	"shot-creating-wing": { cs: -1.5 },
+	"pull-up-wing": { cs: -1.5 },
+	"shot-creating-forward": { cs: -1.5 },
+	"bucket-getter": { cs: -1 },
+	"elite-shotmaker": { cs: -1 },
+	"putback-big": { orl: 2 },
+	"junkyard-wing": { orl: 1 },
+	"glass-cleaner": { orl: -1 },
+	"rebounding-stopper": { orl: -1 },
+	"grab-and-go-forward": { orl: -1.5 },
+	"glass-cleaning-playmaker": { orl: -1 },
+};
+for (const d of ARCHETYPE_DEFS) {
+	const extra = STYLE_XW[d.id];
+	if (extra) {
+		d.xw = { ...d.xw, ...extra };
+	}
+}

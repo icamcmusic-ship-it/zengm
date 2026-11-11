@@ -4,6 +4,9 @@
 import { realGauss, uniform } from "../../../common/random.ts";
 import {
 	blendDiq,
+	ballSecurityBase,
+	blendReb,
+	splitPair,
 	fillExpandedRatings,
 	hasExpandedRatings,
 	insertExpandedRatingKeys,
@@ -52,6 +55,47 @@ export const syncDefenseToDiq = (r: Record<string, any>) => {
 	}
 };
 
+// Second step: oreb/dreb around reb, csh/dsh around fg + tp
+export const setReboundSplit = (r: Record<string, any>, split: number) => {
+	const [oreb, dreb] = splitPair(2 * r.reb, split);
+	r.oreb = oreb;
+	r.dreb = dreb;
+};
+export const setShootingSplit = (r: Record<string, any>, split: number) => {
+	const [csh, dsh] = splitPair(r.fg + r.tp, split);
+	r.csh = csh;
+	r.dsh = dsh;
+};
+
+const syncReboundingToReb = (r: Record<string, any>) => {
+	if (typeof r.oreb !== "number" || typeof r.dreb !== "number") {
+		return;
+	}
+	if (blendReb(r.oreb, r.dreb) !== r.reb) {
+		setReboundSplit(r, r.oreb - r.dreb);
+	}
+};
+
+const syncShootingToFgTp = (r: Record<string, any>) => {
+	if (typeof r.csh !== "number" || typeof r.dsh !== "number") {
+		return;
+	}
+	if (r.csh + r.dsh !== r.fg + r.tp) {
+		setShootingSplit(r, r.csh - r.dsh);
+	}
+};
+
+// syncDefenseToDiq for every compat pair: diq (pdef/idef), reb (oreb/dreb), fg + tp (csh/dsh). Same rules: nothing while the setting is
+// off, turning it back on syncs.
+export const syncExpandedToCompat = (r: Record<string, any>) => {
+	if (!expandedRatingsOn()) {
+		return;
+	}
+	syncDefenseToDiq(r);
+	syncReboundingToReb(r);
+	syncShootingToFgTp(r);
+};
+
 // How much more interior than perimeter defense a player keeps as he ages (per season, before noise): perimeter defense is legs,
 // interior defense is size and positioning. Applied symmetrically, so diq (their average) ages exactly like before.
 const splitAging = (age: number) => {
@@ -85,6 +129,42 @@ export const developExpandedRatings = (
 		splitAging(age) * uniform(0.4, 1.4) +
 		Math.min(2.5, Math.max(-2.5, realGauss(0, 1)));
 	setDefenseSplit(r, r.pdef - r.idef - 2 * Math.round(shift));
+
+	if (typeof r.oreb === "number") {
+		developExpandedRatings2(r, age);
+	}
+};
+
+// Second step, after the stock ratings developed (reb, fg, tp, drb, oiq, pss moved already): oreb/dreb follow reb and csh/dsh follow
+// fg + tp keeping their split, which drifts a little (offensive rebounding is motor and legs, so with age it drifts toward defensive
+// rebounding, symmetrically, like the defense split). Ball security follows ballSecurityBase plus a drifting residual.
+const developExpandedRatings2 = (r: Record<string, any>, age: number) => {
+	const rebShift =
+		(age >= 29 ? uniform(0.3, 1.2) : 0) +
+		Math.min(2, Math.max(-2, realGauss(0, 0.8)));
+	setReboundSplit(r, r.oreb - r.dreb - 2 * Math.round(rebShift));
+
+	const shootShift = Math.min(2, Math.max(-2, realGauss(0, 0.8)));
+	setShootingSplit(r, r.csh - r.dsh + 2 * Math.round(shootShift));
+
+	// Ball security keeps its place relative to what his handle, passing and IQ say (ballSecurityBase), and that residual drifts
+	// a little each season (mean reverting, so its spread stays about the generation noise)
+	const residual = bscBefore.get(r);
+	bscBefore.delete(r);
+	if (residual !== undefined) {
+		r.bsc = limit(
+			ballSecurityBase(r) + 0.96 * residual + realGauss(0, BSC_DRIFT),
+		);
+	}
+};
+
+// His ball security relative to ballSecurityBase, recorded before the stock development (developSeasonSync)
+const BSC_DRIFT = 1.4;
+const bscBefore = new WeakMap<object, number>();
+export const recordBeforeDevelop = (r: Record<string, any>) => {
+	if (typeof r.bsc === "number") {
+		bscBefore.set(r, r.bsc - ballSecurityBase(r));
+	}
 };
 
 // Fill in missing expanded ratings (all rows) of a player, if the setting is on. Returns true if something changed.

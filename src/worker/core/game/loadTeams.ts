@@ -290,9 +290,10 @@ export const processTeam = async (
 		let rating = last(p.ratings);
 		if (expandedRatings && !hasExpandedRatings(rating)) {
 			// Not filled in yet (turned on in an old league, imported player): derive, deterministically, without saving
+			// (rows filled before the second step keep their wng/pdef/idef)
 			rating = {
-				...rating,
 				...deriveExpandedRatings(rating, expandedRatingsSeed(p)),
+				...rating,
 			};
 		}
 		const playerCompositeRatings: any = {};

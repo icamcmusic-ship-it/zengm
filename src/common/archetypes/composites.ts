@@ -5,7 +5,7 @@ import type {
 	RatingKey,
 	SkillLabel,
 } from "./types.ts";
-import { compositeWeightsFor } from "../expandedRatings.ts";
+import { compositeWeightsFor, hasExpandedRatings } from "../expandedRatings.ts";
 
 export const DIMS: DimKey[] = [
 	"usg",
@@ -33,16 +33,20 @@ export const DIMS: DimKey[] = [
 	"pdef",
 	"idef",
 	"len",
+	"cs",
+	"orl",
 ];
 
 // Dimensions of the expanded ratings. A match only counts the ones an archetype names (as for height), and length only
 // for a player who has a wingspan
-export const EXPANDED_DIMS: DimKey[] = ["pdef", "idef", "len"];
+export const EXPANDED_DIMS: DimKey[] = ["pdef", "idef", "len", "cs", "orl"];
 
-export const hasExpanded = (r: ArchetypeRatings) =>
-	typeof r.wng === "number" &&
-	typeof r.pdef === "number" &&
-	typeof r.idef === "number";
+// Styles/measurements rather than skills: only counted when an archetype names them, read on the league-wide scale, and only
+// for a player with expanded ratings
+export const STYLE_DIMS = new Set<DimKey>(["len", "cs", "orl"]);
+
+// All the expanded ratings (rows from before the second step are filled in before they get here)
+export const hasExpanded = (r: ArchetypeRatings) => hasExpandedRatings(r);
 
 // Dimensions that are BBGM composite ratings, and the composite each one is
 const COMPOSITE_OF: Partial<Record<DimKey, keyof typeof COMPOSITE_WEIGHTS>> = {
@@ -90,6 +94,8 @@ export const DIM_LABELS: Record<DimKey, string> = {
 	pdef: "Perimeter defense rating",
 	idef: "Interior defense rating",
 	len: "Length",
+	cs: "Catch-and-shoot (vs off the dribble)",
+	orl: "Offensive rebounding (vs defensive)",
 };
 
 export const DIM_RATINGS: Record<DimKey, RatingKey[]> = {
@@ -119,6 +125,8 @@ export const DIM_RATINGS: Record<DimKey, RatingKey[]> = {
 	pdef: ["diq"],
 	idef: ["diq"],
 	len: ["hgt"],
+	cs: ["tp"],
+	orl: ["reb"],
 };
 
 // compositeRating without fuzz: a weighted mean of ratings (a number is a literal rating value), 0..1
@@ -156,6 +164,14 @@ export const compositeValues = (r: ArchetypeRatings) => {
 			out[dim] = composite(r, c.ratings, c.weights);
 		} else if (dim === "len") {
 			out[dim] = lengthOf(r);
+		} else if (dim === "cs") {
+			out[dim] = hasExpanded(r)
+				? Math.min(1, Math.max(0, (50 + r.csh! - r.dsh!) / 100))
+				: 0.5;
+		} else if (dim === "orl") {
+			out[dim] = hasExpanded(r)
+				? Math.min(1, Math.max(0, (50 + r.oreb! - r.dreb!) / 100))
+				: 0.5;
 		} else if (dim === "pdef" || dim === "idef") {
 			out[dim] = (r[dim] ?? r.diq) / 100;
 		} else {

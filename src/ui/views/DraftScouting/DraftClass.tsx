@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { DataTable } from "../../components/DataTable/index.tsx";
 import { helpers } from "../../util/helpers.ts";
@@ -113,7 +114,7 @@ const DraftClass = ({
 	const showTraits = !challengeNoRatings && players.some((p) => p.traits);
 	const [traitColumn, setTraitColumn] = useState<TraitKey | "">("");
 
-	// Expanded ratings (the expandedRatings setting): wingspan and the two defense ratings, as the scouts see them
+	// Expanded ratings (the expandedRatings setting): wingspan and the other expanded ratings, as the scouts see them
 	const showExpanded =
 		__SPORT === "basketball" &&
 		!challengeNoRatings &&
@@ -126,7 +127,7 @@ const DraftClass = ({
 		"Age",
 		"Ovr",
 		"Pot",
-		...(showExpanded ? ["rating:wng", "rating:pdef", "rating:idef"] : []),
+		...(showExpanded ? EXPANDED_RATINGS.map((key) => `rating:${key}`) : []),
 	]);
 	if (showArchetype) {
 		cols.push({
@@ -186,11 +187,7 @@ const DraftClass = ({
 				!challengeNoRatings ? p.ovr : null,
 				!challengeNoRatings ? p.pot : null,
 				...(showExpanded
-					? [
-							p.expanded?.wng ?? null,
-							p.expanded?.pdef ?? null,
-							p.expanded?.idef ?? null,
-						]
+					? EXPANDED_RATINGS.map((key) => p.expanded?.[key] ?? null)
 					: []),
 				...(showArchetype ? [p.archetype ?? ""] : []),
 				...(showScouting && p.scoutReport

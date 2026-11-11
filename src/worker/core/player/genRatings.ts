@@ -7,7 +7,7 @@ import genRatingsFootball from "./genRatings.football.ts";
 import genRatingsHockey from "./genRatings.hockey.ts";
 import pos from "./pos.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
-import { syncDefenseToDiq } from "./expandedRatings.ts";
+import { syncExpandedToCompat } from "./expandedRatings.ts";
 
 const genRatings = (season: number, scoutingLevel: number) => {
 	const { heightInInches, ratings } = bySport<{
@@ -120,16 +120,17 @@ const genRatings = (season: number, scoutingLevel: number) => {
 			);
 		}
 
-		// Expanded ratings: perimeter and interior defense move with diq
+		// Expanded ratings: perimeter and interior defense move with diq, ball security with the skills; the other pairs re-split
+		// around their compat values (reb, fg + tp) in syncExpandedToCompat
 		if (__SPORT === "basketball" && typeof (ratings as any).pdef === "number") {
-			for (const rtg of ["pdef", "idef"]) {
+			for (const rtg of ["pdef", "idef", "bsc"]) {
 				(ratings as any)[rtg] = helpers.bound(
 					(ratings as any)[rtg] + scale,
 					0,
 					100,
 				);
 			}
-			syncDefenseToDiq(ratings);
+			syncExpandedToCompat(ratings);
 		}
 
 		for (const rtg of rtgsDevelopSlow) {

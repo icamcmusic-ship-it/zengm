@@ -9,6 +9,7 @@ import generate from "../../worker/core/player/generate.ts";
 import ovr from "../../worker/core/player/ovr.ts";
 import { RATING_KEYS } from "../ratingsBuilds/solver.ts";
 import type { ArchetypeRatings } from "./types.ts";
+import { EXPANDED_RATINGS2 } from "../expandedRatings.ts";
 
 export type SamplePlayer = {
 	ratings: ArchetypeRatings;
@@ -71,6 +72,11 @@ const sample = async (
 			ratings.wng = row.wng;
 			ratings.pdef = row.pdef;
 			ratings.idef = row.idef;
+			for (const key of EXPANDED_RATINGS2) {
+				if (typeof row[key] === "number") {
+					ratings[key] = row[key];
+				}
+			}
 		}
 		out.push({ ratings, ovr: o, age: 19 + k, hgtInches: p.hgt });
 	}

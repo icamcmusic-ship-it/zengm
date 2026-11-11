@@ -146,3 +146,101 @@ test("expanded ratings OFF: generation, development and games are identical to b
 	const expected = JSON.parse(fs.readFileSync(FIXTURE, "utf8"));
 	assert.deepStrictEqual(out, expected);
 }, 120000);
+
+// A league that had the setting on (both steps: wingspan, perimeter/interior defense, offensive/defensive rebounding, catch-and-shoot/
+// off-the-dribble, ball security) and turned it off: the stored ratings are ignored, so development and games are exactly those of the
+// same players without them
+const EXPANDED_KEYS = [
+	"wng",
+	"pdef",
+	"idef",
+	"oreb",
+	"dreb",
+	"csh",
+	"dsh",
+	"bsc",
+] as const;
+const strip = (p: any) => {
+	for (const r of p.ratings) {
+		for (const key of EXPANDED_KEYS) {
+			delete r[key];
+		}
+	}
+	return p;
+};
+
+const runStale = async (seed: number, keepExpanded: boolean) => {
+	const players: any[] = await withSeededRandom(seed, async () => {
+		resetG();
+		g.setWithoutSavingToDB("season", 2013);
+		g.setWithoutSavingToDB("expandedRatings" as any, true);
+		await resetCache({});
+		local.reset();
+		const out = range(26).map((i) =>
+			player.generate(i < 13 ? 0 : 1, 24, 2010, true, DEFAULT_LEVEL),
+		);
+		for (const p of out) {
+			await player.develop(p, 0, false, DEFAULT_LEVEL);
+		}
+		return out;
+	});
+	assert.isTrue(players.every((p) => typeof p.ratings.at(-1).bsc === "number"));
+	if (!keepExpanded) {
+		players.forEach(strip);
+	}
+	return withSeededRandom(seed + 1, async () => {
+		g.setWithoutSavingToDB("expandedRatings" as any, false);
+		local.reset();
+		for (let i = 0; i < 2; i++) {
+			for (const p of players) {
+				await player.develop(p, 1, false, DEFAULT_LEVEL);
+			}
+		}
+		players.forEach((p, i) => {
+			p.pid = i;
+		});
+		for (const p of players) {
+			await player.updateValues(p);
+		}
+		const teamsDefault = helpers.getTeamsDefault().slice(0, 2);
+		await resetCache({
+			players,
+			teams: teamsDefault.map(team.generate),
+			teamSeasons: teamsDefault.map((t) => team.genSeasonRow(t)),
+			teamStats: teamsDefault.map((t) => team.genStatsRow(t.tid)),
+		});
+		const teams = await loadTeams([0, 1], {});
+		const result = new GameSim({
+			gid: seed,
+			teams: [teams[0]!, teams[1]!],
+			baseInjuryRate: g.get("injuryRate"),
+			doPlayByPlay: false,
+			homeCourtFactor: 1,
+			allStarGame: false,
+			neutralSite: false,
+		}).run();
+		return {
+			ratings: hashOf(
+				players.map((p) => ({
+					ratings: strip(structuredClone(p)).ratings,
+					value: p.value,
+				})),
+			),
+			box: hashOf(
+				result.team.map((t: any) => ({
+					stat: t.stat,
+					players: t.player.map((p: any) => ({ id: p.id, stat: p.stat })),
+				})),
+			),
+		};
+	});
+};
+
+test("expanded ratings turned OFF: stored expanded ratings (both steps) change nothing", async () => {
+	for (const seed of SEEDS.slice(0, 3)) {
+		assert.deepStrictEqual(
+			await runStale(seed, true),
+			await runStale(seed, false),
+		);
+	}
+}, 120000);

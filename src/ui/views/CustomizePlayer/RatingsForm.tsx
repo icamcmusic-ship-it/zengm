@@ -58,6 +58,20 @@ const rowsExpanded: {
 	],
 ];
 
+// Second step: catch-and-shoot/off-the-dribble with the shooting ratings (fg and tp follow their sum), ball security after
+// dribbling, offensive/defensive rebounding in place of rebounding (their average)
+const rowsExpanded2: {
+	[key: string]: string[];
+}[][] = [
+	[
+		{ Physical: ["hgt", "wng", "stre", "spd", "jmp", "endu"] },
+		{ Shooting: ["ins", "dnk", "ft", "fg", "tp", "csh", "dsh"] },
+		{
+			Skill: ["oiq", "pdef", "idef", "drb", "bsc", "pss", "oreb", "dreb"],
+		},
+	],
+];
+
 const RatingsForm = ({
 	handleChange,
 	pos,
@@ -84,7 +98,11 @@ const RatingsForm = ({
 		expandedOn &&
 		typeof ratingsRow.wng === "number" &&
 		typeof ratingsRow.pdef === "number";
-	const rows = expanded ? rowsExpanded : rowsStock;
+	const rows = expanded
+		? typeof ratingsRow.oreb === "number"
+			? rowsExpanded2
+			: rowsExpanded
+		: rowsStock;
 
 	const [ovr, setOvr] = useState(ratingsRow.ovr);
 

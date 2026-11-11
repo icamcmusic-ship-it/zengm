@@ -42,7 +42,12 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { useLocal } from "../../util/local.ts";
 import clsx from "clsx";
 import type { StoredRatingsBuild } from "../../../common/ratingsBuilds/types.ts";
-import { blendDiq, EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
+import {
+	blendDiq,
+	blendReb,
+	EXPANDED_RATINGS,
+	splitPair,
+} from "../../../common/expandedRatings.ts";
 
 // In the form, the contract fields are the player's current contract or contract demand
 type PlayerWithContract = PlayerWithoutKey & {
@@ -554,6 +559,40 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 							helpers.bound(pdef, 0, 100),
 							helpers.bound(idef, 0, 100),
 						);
+					}
+				}
+				// Second step: rebounding is the average of offensive and defensive rebounding, and fg + tp = csh + dsh (editing
+				// csh/dsh moves fg and tp by the difference, editing fg/tp re-splits csh/dsh keeping their gap)
+				if (field === "oreb" || field === "dreb") {
+					const oreb = Number.parseInt(String(row.oreb));
+					const dreb = Number.parseInt(String(row.dreb));
+					if (!Number.isNaN(oreb) && !Number.isNaN(dreb)) {
+						row.reb = blendReb(
+							helpers.bound(oreb, 0, 100),
+							helpers.bound(dreb, 0, 100),
+						);
+					}
+				} else if (typeof row.csh === "number" || typeof row.csh === "string") {
+					const int = (x: unknown) => Number.parseInt(String(x));
+					const csh = int(row.csh);
+					const dsh = int(row.dsh);
+					const fg = int(row.fg);
+					const tp = int(row.tp);
+					if (![csh, dsh, fg, tp].some(Number.isNaN)) {
+						if (field === "csh" || field === "dsh") {
+							const sum =
+								helpers.bound(csh, 0, 100) + helpers.bound(dsh, 0, 100);
+							const [fg2, tp2] = splitPair(sum, fg - tp);
+							row.fg = fg2;
+							row.tp = tp2;
+						} else if (field === "fg" || field === "tp") {
+							const [csh2, dsh2] = splitPair(
+								helpers.bound(fg, 0, 100) + helpers.bound(tp, 0, 100),
+								csh - dsh,
+							);
+							row.csh = csh2;
+							row.dsh = dsh2;
+						}
 					}
 				}
 				p.ratings[p.ratings.length - 1] = row;

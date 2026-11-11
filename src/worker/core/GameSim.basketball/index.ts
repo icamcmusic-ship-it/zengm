@@ -123,6 +123,8 @@ type CompositeRating =
 	| "fouling"
 	| "passing"
 	| "rebounding"
+	| "offRebounding"
+	| "defRebounding"
 	| "stealing"
 	| "turnovers"
 	| "usage"
@@ -136,6 +138,15 @@ const EXPANDED_LENGTH_REF = 0.5;
 const EXPANDED_INTERIOR_OFFSET = 0.006;
 const EXPANDED_PERIMETER_OFFSET = 0.008;
 const EXPANDED_STL_FACTOR = 1.01;
+// Second step (offensive/defensive rebounding, catch-and-shoot/off-the-dribble shooting, ball security): keeps league offensive
+// rebounds, turnovers and jump shooting the same as with the setting off
+const EXPANDED_ORB_FACTOR = 1.004;
+// Share of the turnover denominator that is ball security (the rest is dribbling and passing, as with the setting off)
+const EXPANDED_BSC_SHARE = 0.6;
+const EXPANDED_TOV_FACTOR = 1.012;
+// How much of the catch-and-shoot / off-the-dribble gap a jumper's make probability gets (assisted: + gap / 2, unassisted: - gap / 2)
+const EXPANDED_JUMPER_STYLE = 0.32;
+const EXPANDED_JUMPER_OFFSET = 0.003;
 
 type PlayerGameSim = {
 	id: number;
@@ -321,6 +332,8 @@ class GameSim extends GameSimBase {
 	// gives every player a "length" composite (and the defense, rebounding and finishing composites read the new ratings). Off: nothing
 	// below is used, games play out exactly as before
 	expandedRatings: boolean;
+	// Expanded ratings, second step (offRebounding/defRebounding/ballSecurity/catchShoot/offDribble composites from loadTeams)
+	expandedRatings2: boolean;
 	// Player traits: a playoff game, where the big-game trait applies (the whole game)
 	bigGame = false;
 	// Player traits: picking the player who gets a technical or flagrant foul (temper weighs in, see traitPickWeight)
@@ -388,6 +401,9 @@ class GameSim extends GameSimBase {
 
 		this.expandedRatings = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.length !== undefined),
+		);
+		this.expandedRatings2 = teams.some((t) =>
+			t.player.some((p) => p.compositeRating.offRebounding !== undefined),
 		);
 
 		// Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
@@ -1656,6 +1672,9 @@ class GameSim extends GameSimBase {
 			let defensePerimeter = 0;
 			let blocking = 0;
 			let defenseInterior = 0;
+			let offRebounding = 0;
+			let defRebounding = 0;
+			let ballSecurity = 0;
 			for (const p of this.playersOnCourt[t]) {
 				const ratings = p.compositeRating;
 				const fatigue = this.fatigue(p.stat.energy);
@@ -1674,6 +1693,11 @@ class GameSim extends GameSimBase {
 					defenseInterior +=
 						ratings.defenseInterior * fatigue * perfFactor * foulLimitFactor;
 				}
+				if (this.expandedRatings2) {
+					offRebounding += ratings.offRebounding * fatigue * perfFactor;
+					defRebounding += ratings.defRebounding * fatigue * perfFactor;
+					ballSecurity += ratings.ballSecurity * fatigue * perfFactor;
+				}
 			}
 
 			const ratings = this.team[t].compositeRating;
@@ -1690,6 +1714,14 @@ class GameSim extends GameSimBase {
 				ratings.defenseInterior =
 					defenseInterior / 5 + this.synergyFactor * synergy.def;
 			}
+			if (this.expandedRatings2) {
+				ratings.offRebounding =
+					offRebounding / 5 + this.synergyFactor * synergy.reb;
+				ratings.defRebounding =
+					defRebounding / 5 + this.synergyFactor * synergy.reb;
+				ratings.ballSecurity =
+					ballSecurity / 5 + this.synergyFactor * synergy.off;
+			}
 
 			// Player traits: team chemistry (leadership) lifts or lowers every team composite rating a little
 			if (this.traitsOn) {
@@ -1703,6 +1735,11 @@ class GameSim extends GameSimBase {
 					ratings.dribbling *= factor;
 					ratings.passing *= factor;
 					ratings.rebounding *= factor;
+					if (this.expandedRatings2) {
+						ratings.offRebounding *= factor;
+						ratings.defRebounding *= factor;
+						ratings.ballSecurity *= factor;
+					}
 					ratings.defense *= factor;
 					ratings.defensePerimeter *= factor;
 					ratings.blocking *= factor;
@@ -2507,13 +2544,28 @@ class GameSim extends GameSimBase {
 	 *
 	 * @return {number} Probability from 0 to 1.
 	 */
+	// Expanded ratings: a jumper off a pass leans on catch-and-shoot, a self-created one on off-the-dribble shooting. csh and dsh average
+	// the player's fg/tp level, so this is plus or minus half their gap
+	jumpShotStyleDelta(p: PlayerGameSim, passer: PlayerGameSim | undefined) {
+		const gap = p.compositeRating.catchShoot - p.compositeRating.offDribble;
+		return (
+			EXPANDED_JUMPER_STYLE * (passer !== undefined ? gap : -gap) * 0.5 +
+			EXPANDED_JUMPER_OFFSET
+		);
+	}
+
 	probTov() {
-		const prob =
-			(g.get("turnoverFactor") *
-				(0.14 * this.team[this.d].compositeRating.defense)) /
-			(0.5 *
-				(this.team[this.o].compositeRating.dribbling +
-					this.team[this.o].compositeRating.passing));
+		const o = this.team[this.o].compositeRating;
+		const prob = this.expandedRatings2
+			? // Expanded ratings: ball security carries most of it, dribbling and passing the rest
+				(EXPANDED_TOV_FACTOR *
+					g.get("turnoverFactor") *
+					(0.14 * this.team[this.d].compositeRating.defense)) /
+				((1 - EXPANDED_BSC_SHARE) * 0.5 * (o.dribbling + o.passing) +
+					EXPANDED_BSC_SHARE * o.ballSecurity)
+			: (g.get("turnoverFactor") *
+					(0.14 * this.team[this.d].compositeRating.defense)) /
+				(0.5 * (o.dribbling + o.passing));
 		return boundProb(
 			this.traitsOn ? prob * this.traitTurnoverMult(this.o) : prob,
 		);
@@ -2703,6 +2755,9 @@ class GameSim extends GameSimBase {
 			probMissAndFoul = 0.02;
 			probMake = shootingThreePointerScaled * 0.3 + 0.36;
 			probAndOne = 0.01;
+			if (this.expandedRatings2) {
+				probMake += this.jumpShotStyleDelta(p, passer);
+			}
 
 			// Better shooting in the ASG, why not?
 			if (this.allStarGame) {
@@ -2730,6 +2785,9 @@ class GameSim extends GameSimBase {
 				probMissAndFoul = 0.07;
 				probMake = p.compositeRating.shootingMidRange * 0.32 + 0.42;
 				probAndOne = 0.05;
+				if (this.expandedRatings2) {
+					probMake += this.jumpShotStyleDelta(p, passer);
+				}
 			} else if (r2 > r3) {
 				// Dunk, fast break or half court
 				type = "atRim";
@@ -3971,13 +4029,19 @@ class GameSim extends GameSimBase {
 			return this.doOutOfBounds(0.1);
 		}
 
+		// Expanded ratings: the defense's defensive rebounding against the offense's offensive rebounding
+		const exp2 = this.expandedRatings2;
+		const dReb = exp2
+			? this.team[this.d].compositeRating.defRebounding
+			: this.team[this.d].compositeRating.rebounding;
+		const oReb = exp2
+			? EXPANDED_ORB_FACTOR * this.team[this.o].compositeRating.offRebounding
+			: this.team[this.o].compositeRating.rebounding;
 		if (
-			(0.75 * (2 + this.team[this.d].compositeRating.rebounding)) /
-				(g.get("orbFactor") *
-					(2 + this.team[this.o].compositeRating.rebounding)) >
+			(0.75 * (2 + dReb)) / (g.get("orbFactor") * (2 + oReb)) >
 			Math.random()
 		) {
-			p = this.pickPlayer("rebounding", this.d, 3);
+			p = this.pickPlayer(exp2 ? "defRebounding" : "rebounding", this.d, 3);
 			this.recordStat(this.d, p, "drb");
 			this.playByPlay.logEvent({
 				type: "drb",
@@ -3988,7 +4052,11 @@ class GameSim extends GameSimBase {
 			return "drb" as const;
 		}
 
-		this.lastOrbPlayer = this.pickPlayer("rebounding", this.o, 5);
+		this.lastOrbPlayer = this.pickPlayer(
+			exp2 ? "offRebounding" : "rebounding",
+			this.o,
+			5,
+		);
 		p = this.lastOrbPlayer;
 		this.recordStat(this.o, p, "orb");
 		this.playByPlay.logEvent({

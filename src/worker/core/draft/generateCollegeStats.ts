@@ -57,6 +57,11 @@ export const toCollegeProspect = (
 		ratings.wng = r.wng;
 		ratings.pdef = r.pdef;
 		ratings.idef = r.idef;
+		ratings.oreb = r.oreb;
+		ratings.dreb = r.dreb;
+		ratings.csh = r.csh;
+		ratings.dsh = r.dsh;
+		ratings.bsc = r.bsc;
 	}
 
 	const ageNow = getFirstDraftYear() - p.born.year;

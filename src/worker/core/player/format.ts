@@ -37,6 +37,7 @@ import {
 	isFlatContract,
 } from "../contract/index.ts";
 import {
+	EXPANDED_RATINGS2,
 	fillExpandedRatings,
 	hasExpandedRatings,
 	isExpandedRatingKey,
@@ -583,6 +584,9 @@ const getBadgesForRatingsRow = (
 		r.wng = pr.wng;
 		r.pdef = fuzz ? player.fuzzRating(pr.pdef, pr.fuzz) : pr.pdef;
 		r.idef = fuzz ? player.fuzzRating(pr.idef, pr.fuzz) : pr.idef;
+		for (const key of EXPANDED_RATINGS2) {
+			r[key] = fuzz ? player.fuzzRating(pr[key], pr.fuzz) : pr[key];
+		}
 	}
 	// Only the latest ratings row: trait scores are for the player now
 	const traits =
