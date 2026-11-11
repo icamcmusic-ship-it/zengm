@@ -40,6 +40,14 @@ import {
 	type ProjectedTeam,
 } from "./pickProbsCache.ts";
 import type { TeamSeasonRecord } from "./getHypotheticalTeam.ts";
+import {
+	gmPlayerStyleFactor,
+	gmPlayerStyleScore,
+	gmRiskFactor,
+	type GmWeights,
+} from "../../../common/gmPersonality.ts";
+import { getProStats } from "../../../common/preDraft.ts";
+import { getGmWeights } from "../gm/index.ts";
 
 type Asset =
 	| {
@@ -247,6 +255,50 @@ const getContractValue = (
 	return Math.min(contractValue, 0.1);
 };
 
+// A drafted-here or longtime (3+ seasons) player of this team
+const isLongtimePlayer = (p: Player, tid: number) => {
+	if (p.draft.tid === tid) {
+		return true;
+	}
+	const seasons = new Set<number>();
+	for (const row of getProStats(p)) {
+		if (row.tid === tid && !row.playoffs) {
+			seasons.add(row.season);
+		}
+	}
+	return seasons.size >= 3;
+};
+
+// AI GM personalities: analytics/old-school taste, risk, and loyalty (ownTid set: a player of his own team he'd give up)
+export const getGmPlayerFactor = (
+	gm: GmWeights,
+	p: Player,
+	ownTid?: number,
+) => {
+	const r = p.ratings.at(-1)!;
+	const age = g.get("season") - p.born.year;
+	const stats = getProStats(p)
+		.filter((row) => !row.playoffs)
+		.at(-1);
+	const hgt = "hgt" in r && typeof r.hgt === "number" ? r.hgt : 50;
+	let factor =
+		gmPlayerStyleFactor(
+			gm,
+			gmPlayerStyleScore({
+				age,
+				ovr: r.ovr,
+				pot: r.pot,
+				hgt,
+				per: stats?.per,
+				min: stats?.min,
+			}),
+		) * gmRiskFactor(gm, { age, ovr: r.ovr, pot: r.pot });
+	if (ownTid !== undefined && isLongtimePlayer(p, ownTid)) {
+		factor *= gm.loyaltyFactor;
+	}
+	return factor;
+};
+
 const getPlayers = async ({
 	add,
 	remove,
@@ -255,6 +307,7 @@ const getPlayers = async ({
 	tid,
 	tradingPartnerTid,
 	getTraitFactor,
+	gm,
 }: {
 	add: Asset[];
 	remove: Asset[];
@@ -263,6 +316,7 @@ const getPlayers = async ({
 	tid: number;
 	tradingPartnerTid?: number;
 	getTraitFactor: ReturnType<typeof makeAiTraitValueFactorCache>;
+	gm?: GmWeights;
 }) => {
 	const season = g.get("season");
 	const phase = g.get("phase");
@@ -291,6 +345,11 @@ const getPlayers = async ({
 	const traitFactor = (p: Player) =>
 		traitsOn ? getTraitFactor(p, { strategy, team: traitTeam }) : 1;
 
+	// AI GM personalities (setting): how this team's GM sees the player, 1 with the setting off. Loyal GMs ask more for their own
+	// longtime players, ruthless ones less
+	const gmFactor = (p: Player, own: boolean) =>
+		gm ? getGmPlayerFactor(gm, p, own ? tid : undefined) : 1;
+
 	for (const p of players) {
 		if (!pidsRemove.includes(p.pid)) {
 			continue;
@@ -301,7 +360,7 @@ const getPlayers = async ({
 		// Only apply fudge factor to positive assets
 		let fudgedValue = value;
 		if (fudgedValue > 0) {
-			fudgedValue *= fudgeFactor * traitFactor(p);
+			fudgedValue *= fudgeFactor * traitFactor(p) * gmFactor(p, true);
 
 			// A team gets less for a player who publicly asked out
 			if (hasActiveTradeRequest(p)) {
@@ -335,7 +394,7 @@ const getPlayers = async ({
 			add.push({
 				type: "player",
 				pid: p.pid,
-				value: value > 0 ? value * traitFactor(p) : value,
+				value: value > 0 ? value * traitFactor(p) * gmFactor(p, false) : value,
 				contractValue: getContractValue(contract, value),
 				injury: p.injury,
 				age: g.get("season") - p.born.year,
@@ -1261,6 +1320,7 @@ const sumValues = (
 	tid: number,
 	includeInjuries = false,
 	details?: AssetValueDetail[],
+	gm?: GmWeights,
 ) => {
 	if (players.length === 0) {
 		return 0;
@@ -1319,6 +1379,18 @@ const sumValues = (
 			}
 		}
 
+		// AI GM personalities (setting): the GM's timeline and how he values picks, on top of the team's strategy
+		if (gm && playerValue > 0) {
+			if (p.type === "pick") {
+				playerValue *= gm.pickFactor;
+			}
+			if (treatAsFutureDraftPick || p.age <= 23) {
+				playerValue *= gm.futureFactor;
+			} else if (p.age >= 29) {
+				playerValue *= gm.vetFactor;
+			}
+		}
+
 		if (baseValue !== 0) {
 			strategyFactor = playerValue / baseValue;
 		}
@@ -1326,10 +1398,17 @@ const sumValues = (
 		// Normalize for injuries
 		const valueBeforeInjury = playerValue;
 		if (includeInjuries && tid !== g.get("userTid")) {
-			if (p.injury.gamesRemaining > 75) {
-				playerValue -= playerValue * 0.75;
+			// Gamblers discount injuries less, cautious GMs more (setting)
+			if (!gm) {
+				if (p.injury.gamesRemaining > 75) {
+					playerValue -= playerValue * 0.75;
+				} else {
+					playerValue -= (playerValue * p.injury.gamesRemaining) / 100;
+				}
 			} else {
-				playerValue -= (playerValue * p.injury.gamesRemaining) / 100;
+				const share =
+					p.injury.gamesRemaining > 75 ? 0.75 : p.injury.gamesRemaining / 100;
+				playerValue -= playerValue * Math.min(0.9, share * gm.injuryFactor);
 			}
 		}
 
@@ -1340,7 +1419,8 @@ const sumValues = (
 			playerValue /= 20;
 		}
 
-		const contractsFactor = strategy === "rebuilding" ? 2 : 0.5;
+		const contractsFactor =
+			(strategy === "rebuilding" ? 2 : 0.5) * (gm?.contractsFactor ?? 1);
 		playerValue += contractsFactor * p.contractValue;
 
 		// if a player was just drafted and can be released, they shouldn't have negative value
@@ -1654,6 +1734,9 @@ export class ValueChangeCalculator {
 
 		const strategy = t.strategy;
 
+		// AI GM personalities (setting), undefined when off or for the user's team
+		const gm = await getGmWeights(tid);
+
 		await getPlayers({
 			add,
 			remove,
@@ -1662,6 +1745,7 @@ export class ValueChangeCalculator {
 			tid,
 			tradingPartnerTid,
 			getTraitFactor: this.getTraitFactor,
+			gm,
 		});
 		await getPicks({
 			cache: this.cache,
@@ -1677,7 +1761,7 @@ export class ValueChangeCalculator {
 		});
 
 		// console.log("ADD");
-		const valuesAdd = sumValues(add, strategy, tid, true, details?.add);
+		const valuesAdd = sumValues(add, strategy, tid, true, details?.add, gm);
 		// console.log("Total", valuesAdd);
 
 		// console.log("REMOVE");
@@ -1687,6 +1771,7 @@ export class ValueChangeCalculator {
 			tid,
 			false,
 			details?.remove,
+			gm,
 		);
 		// console.log("Total", valuesRemove);
 

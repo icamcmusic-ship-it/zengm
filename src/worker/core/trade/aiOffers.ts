@@ -13,6 +13,7 @@ import isUntradable from "./isUntradable.ts";
 import makeItWork, { withStartingProtections } from "./makeItWork.ts";
 import summary from "./summary.ts";
 import { choice } from "../../../common/random.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import create from "./create.ts";
 import propose from "./propose.ts";
@@ -540,9 +541,15 @@ const sendRandomOffer = async () => {
 		.map((t) => t.tid);
 	const valueChangeCalculator = new ValueChangeCalculator({ quick: true });
 
+	// AI GM personalities (setting): dealmakers call more often
+	const gms = await getAllGmWeights();
+
 	// A few tries, since not every team can make a sensible offer
 	for (let i = 0; i < 5; i++) {
-		const tid = choice(tids);
+		const tid =
+			gms.size > 0
+				? choice(tids, (tid2) => gms.get(tid2)?.tradeWeight ?? 1)
+				: choice(tids);
 		if (tid === undefined) {
 			return;
 		}

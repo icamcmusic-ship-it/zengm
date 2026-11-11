@@ -103,6 +103,14 @@ const generate = (tm: any): Team => {
 		};
 	}
 
+	// AI GM personalities: kept from league files
+	if (tm.gm) {
+		t.gm = tm.gm;
+	}
+	if (tm.formerGms) {
+		t.formerGms = tm.formerGms;
+	}
+
 	if (tm.draftLottery) {
 		t.draftLottery = tm.draftLottery;
 	}

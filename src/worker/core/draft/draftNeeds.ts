@@ -62,6 +62,8 @@ export const getDraftAdjustment = (
 	p: PlayerLike,
 	needs: TeamNeeds,
 	strategy: "contending" | "rebuilding" | undefined,
+	// AI GM personalities (setting): best available GMs care less about need, need drafters more
+	needScale = 1,
 ) => {
 	const ratings = p.ratings.at(-1)!;
 	const groups = POS_GROUPS[ratings.pos] ?? { F: 1 };
@@ -69,7 +71,7 @@ export const getDraftAdjustment = (
 	for (const [group, x] of Object.entries(groups)) {
 		need += x * needs[group as Group];
 	}
-	let adj = NEED_WEIGHT * need;
+	let adj = NEED_WEIGHT * need * needScale;
 
 	// Ready now vs ceiling, relative to a typical 12 point gap
 	const gap = ratings.pot - ratings.ovr;

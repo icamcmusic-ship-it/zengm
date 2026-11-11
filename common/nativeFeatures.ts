@@ -508,6 +508,16 @@ export const NATIVE_FEATURES = [
 		existing: true,
 	},
 	{
+		id: "gmPersonalities",
+		key: "featureGmPersonalities",
+		name: "AI GM Personalities",
+		description:
+			"Every AI team has a general manager with a name, a face and fixed leanings (win-now or patient, analytics or old-school, risk, luxury tax, draft picks, how often he trades, loyalty, free agency and draft approach) that shift its trades, signings, re-signings, draft picks, team strategy and coach hires a little. GMs are fired after sustained failure against expectations and replaced through a GM carousel (Front Offices tab of League History, team pages, news). Your team has no GM unless you're in spectator mode or auto play.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "collegeStats",
 		key: "featureCollegeStats",
 		name: "College & Overseas Stats",

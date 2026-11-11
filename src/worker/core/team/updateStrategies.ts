@@ -1,6 +1,7 @@
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { player } from "../index.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 
 /**
  * Update team strategies (contending or rebuilding) for every team in the league.
@@ -12,6 +13,9 @@ import { player } from "../index.ts";
  */
 const updateStrategies = async () => {
 	const teams = await idb.cache.teams.getAll();
+
+	// AI GM personalities (setting): win-now GMs go for it sooner and hold on longer, patient ones rebuild sooner. Empty when off
+	const gms = await getAllGmWeights();
 
 	for (const t of teams) {
 		if (t.disabled) {
@@ -75,10 +79,11 @@ const updateStrategies = async () => {
 			youngStar * 20;
 		let updated = false;
 
-		if (score > 20 && t.strategy === "rebuilding") {
+		const shift = gms.get(t.tid)?.strategyShift ?? 0;
+		if (score > 20 - shift && t.strategy === "rebuilding") {
 			t.strategy = "contending";
 			updated = true;
-		} else if (score < -20 && t.strategy === "contending") {
+		} else if (score < -20 - shift && t.strategy === "contending") {
 			t.strategy = "rebuilding";
 			updated = true;
 		}

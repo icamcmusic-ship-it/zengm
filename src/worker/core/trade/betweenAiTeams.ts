@@ -18,6 +18,7 @@ import {
 	type MultiTeamTrade,
 } from "./multiTeam.ts";
 import getPayrolls from "../team/getPayrolls.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 import {
 	capSpace,
 	getBuyerProtected,
@@ -26,6 +27,7 @@ import {
 	getSalaryDumpCandidates,
 	getSalaryFillerPids,
 	getVeteranCandidates,
+	gmTradeWeight,
 	isBuyer,
 	isSeller,
 	pickKind,
@@ -62,14 +64,21 @@ const attempt = async (valueChangeCalculator: ValueChangeCalculator) => {
 		return false;
 	}
 
-	const tid = choice(aiTids);
+	// AI GM personalities (setting): dealmakers are picked more often, quiet GMs less
+	const gms = await getAllGmWeights();
+	const weight =
+		gms.size > 0
+			? (tid2: number) => gms.get(tid2)?.tradeWeight ?? 1
+			: undefined;
+
+	const tid = weight ? choice(aiTids, weight) : choice(aiTids);
 	const otherTids = aiTids.filter((tid2) => tid !== tid2);
 
 	if (otherTids.length === 0) {
 		return false;
 	}
 
-	const otherTid = choice(otherTids);
+	const otherTid = weight ? choice(otherTids, weight) : choice(otherTids);
 	const players = (
 		await idb.cache.players.indexGetAll("playersByTid", tid)
 	).filter((p) => !isUntradable(p).untradable);
@@ -185,17 +194,28 @@ export const getNeedInfo = async (aiTids: number[]) => {
 		[[g.get("season")], [g.get("season"), "Z"]],
 	);
 
+	const gms = await getAllGmWeights();
+
 	let gpSum = 0;
 	const infos: TeamNeedInfo[] = teams.map((t) => {
 		const teamSeason = teamSeasons.find((ts) => ts.tid === t.tid);
 		const gp = teamSeason ? helpers.getTeamSeasonGp(teamSeason) : 0;
 		gpSum += gp;
-		return {
+		const info: TeamNeedInfo = {
 			tid: t.tid,
 			strategy: t.strategy,
 			payroll: payrolls[t.tid] ?? 0,
 			winp: teamSeason && gp > 0 ? helpers.calcWinp(teamSeason) : undefined,
 		};
+		const gm = gms.get(t.tid);
+		if (gm) {
+			info.gm = {
+				tradeWeight: gm.tradeWeight,
+				buyerWinpShift: gm.buyerWinpShift,
+				dumpPayrollFactor: gm.dumpPayrollFactor,
+			};
+		}
+		return info;
 	});
 
 	const ctx: NeedContext = {
@@ -485,7 +505,10 @@ export const needAttempt = async (
 			seller = infos.find((t) => t.tid === requester?.tid);
 			buyer = choice(
 				infos.filter((t) => t.tid !== seller?.tid),
-				(t) => (t.strategy === "contending" ? 2 : 1) * (0.2 + (t.winp ?? 0.5)),
+				(t) =>
+					(t.strategy === "contending" ? 2 : 1) *
+					(0.2 + (t.winp ?? 0.5)) *
+					gmTradeWeight(t),
 			);
 			if (requester) {
 				vet = toCandidates([requester])[0];
@@ -497,10 +520,12 @@ export const needAttempt = async (
 			const sellers = infos.filter((t) => isSeller(t, ctx));
 			// Better teams are more eager to buy
 			const buyers = infos.filter((t) => isBuyer(t));
-			seller = choice(sellers);
+			seller = sellers.some((t) => t.gm)
+				? choice(sellers, gmTradeWeight)
+				: choice(sellers);
 			buyer = choice(
 				buyers.filter((t) => t.tid !== seller?.tid),
-				(t) => (t.winp ?? 0.5) ** 2,
+				(t) => (t.winp ?? 0.5) ** 2 * gmTradeWeight(t),
 			);
 			if (!seller || !buyer) {
 				return fail("noSellerOrBuyer");
@@ -560,7 +585,9 @@ export const needAttempt = async (
 		];
 	} else {
 		const dumpers = infos.filter((t) => wantsToDumpSalary(t, ctx));
-		const dumper = choice(dumpers);
+		const dumper = dumpers.some((t) => t.gm)
+			? choice(dumpers, gmTradeWeight)
+			: choice(dumpers);
 		if (!dumper) {
 			return fail("noDumper");
 		}
@@ -583,8 +610,9 @@ export const needAttempt = async (
 		const receivers = infos.filter(
 			(t) => t.tid !== dumper.tid && capSpace(t, ctx) >= p.contractAmount,
 		);
-		const receiver = choice(receivers, (t) =>
-			t.strategy === "rebuilding" ? 2 : 1,
+		const receiver = choice(
+			receivers,
+			(t) => (t.strategy === "rebuilding" ? 2 : 1) * gmTradeWeight(t),
 		);
 		if (!receiver) {
 			return fail("noReceiver");

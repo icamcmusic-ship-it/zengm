@@ -188,6 +188,7 @@ export const routeInfos = {
 	"/l/:lid/coach/:cid": "coach",
 	"/l/:lid/coaches": "coaches",
 	"/l/:lid/coaches/:season": "coaches",
+	"/l/:lid/front_offices": "frontOffices",
 	"/l/:lid/newspaper": "newspaper",
 	"/l/:lid/newspaper/:team": "newspaper",
 	"/l/:lid/newspaper/:team/:season": "newspaper",

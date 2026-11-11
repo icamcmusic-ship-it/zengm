@@ -13,6 +13,7 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
 import { validateSeason } from "../util/processInputs.ts";
 import { validateSeasonType } from "../util/processInputs.ts";
+import { getTeamGmInfo } from "./gmShared.ts";
 
 const processInputs = (params: RouteParams<"roster">) => {
 	// Fix broken links
@@ -386,8 +387,15 @@ export default defineView({
 				);
 			}
 
+			// AI GM personalities (setting): the team's general manager, this season only
+			const gmInfo =
+				inputs.season === g.get("season")
+					? await getTeamGmInfo(await idb.cache.teams.get(inputs.tid))
+					: ({ type: "off" } as const);
+
 			return {
 				editable,
+				gmInfo,
 				maxRosterSize: g.get("maxRosterSize"),
 				numPlayersOnCourt: g.get("numPlayersOnCourt"),
 				luxuryTaxAmount,
