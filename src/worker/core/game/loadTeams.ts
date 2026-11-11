@@ -21,6 +21,10 @@ import {
 	hasExpandedRatings,
 } from "../../../common/expandedRatings.ts";
 import { expandedRatingsOn } from "../player/expandedRatings.ts";
+import {
+	PBP_EXPANDED_KEYS,
+	PBP_TRAIT_KEYS,
+} from "../../../common/pbpFlavor/story.ts";
 
 const MAX_NUM_PLAYERS_PACE = 7;
 
@@ -339,6 +343,34 @@ export const processTeam = async (
 				pss: r["pss"],
 				reb: r["reb"],
 			};
+			// Expanded ratings, when the setting is on (catch-and-shoot or pull-up jumpers, ball security, the offensive glass, length,
+			// perimeter and interior defense), for the same wording only (pbpFlavor/story.ts)
+			if (expandedRatings) {
+				for (const key of PBP_EXPANDED_KEYS) {
+					if (typeof r[key] === "number") {
+						(p2 as any).pbpRatings[key] = r[key];
+					}
+				}
+			}
+			// The other teams he has played for (regular season), for "facing his former team" (worker/util/pbpGameContext.ts)
+			if (!allStarGame) {
+				const tids = new Set<number>();
+				for (const row of p.stats ?? []) {
+					if (
+						row &&
+						!row.playoffs &&
+						typeof row.tid === "number" &&
+						row.tid >= 0 &&
+						row.tid !== t.id &&
+						(row.gp ?? 0) > 0
+					) {
+						tids.add(row.tid);
+					}
+				}
+				if (tids.size > 0) {
+					(p2 as any).pbpTids = [...tids];
+				}
+			}
 		}
 
 		// What he had done before this game (games, career and season highs, career totals), only used to word the basketball play-by-play
@@ -360,6 +392,13 @@ export const processTeam = async (
 				(p2 as any).traitEffects = traitEffects;
 				// Temper, for the trash talk in the play-by-play text only (pbpFlavor/trashTalk.ts)
 				(p2 as any).pbpRatings.temper = traitEffects.scores.temper;
+				// and a few more for the wording of the play-by-play (pbpFlavor/story.ts)
+				for (const key of PBP_TRAIT_KEYS) {
+					const v = (traitEffects.scores as Record<string, number>)[key];
+					if (typeof v === "number") {
+						(p2 as any).pbpRatings[key] = v;
+					}
+				}
 				// Defensive versatility (size mismatches)
 				(p2 as any).traitHgt = (rating as any).hgt;
 			}

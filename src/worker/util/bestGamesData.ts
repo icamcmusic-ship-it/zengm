@@ -85,8 +85,14 @@ const playsOfGameRaw = (gm: Game): TopPlay[] => {
 	const pbp = (gm as any).pbp;
 	if (typeof pbp === "string" && pbp.length > 0) {
 		try {
-			const { players, events, rivalry } = decodePlayByPlay(pbp);
-			const init = storedInitEvent(players, gm.teams, rivalry);
+			const decoded = decodePlayByPlay(pbp);
+			const init = storedInitEvent(
+				decoded.players,
+				gm.teams,
+				decoded.rivalry,
+				decoded.game,
+			);
+			const { events } = decoded;
 			return playsFromPbp(game, init, events);
 		} catch {
 			// Unreadable play-by-play: fall back to the clutch plays

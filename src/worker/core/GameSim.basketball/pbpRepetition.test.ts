@@ -108,6 +108,7 @@ const measureRepetition = async () => {
 			onCourt: (t) => [...onCourt[t]],
 		};
 		const recent = new Map<string, string[]>();
+		const recentNotes: string[] = [];
 		for (let i = 0; i < events.length; i++) {
 			const e = events[i];
 			if (e.type === "init") {
@@ -156,6 +157,30 @@ const measureRepetition = async () => {
 					onCourt[e.t as 0 | 1].add(pid);
 				}
 			}
+			// The second lines (milestones, runs, colour, context), whatever the play: a group of their own
+			if (r && r !== "silent" && r.note) {
+				for (const sentence of r.note.split(/(?<=[!.?])\s+/)) {
+					const shape = shapeOf(sentence);
+					if (!shape) {
+						continue;
+					}
+					let st = stats.get("notes");
+					if (!st) {
+						st = { n: 0, repeats: 0, shapes: new Set() };
+						stats.set("notes", st);
+					}
+					const prev = recentNotes;
+					st.n += 1;
+					if (prev.includes(shape)) {
+						st.repeats += 1;
+					}
+					st.shapes.add(shape);
+					prev.push(shape);
+					if (prev.length > 8) {
+						prev.shift();
+					}
+				}
+			}
 			const group = GROUPS[e.type];
 			if (!r || r === "silent" || !group) {
 				continue;
@@ -191,8 +216,11 @@ test("the common lines rarely repeat one of the last 8 of their kind", async () 
 	let repeats = 0;
 	const rows: string[] = [];
 	for (const [group, st] of [...stats].sort((a, b) => b[1].n - a[1].n)) {
-		n += st.n;
-		repeats += st.repeats;
+		// (the notes are reported on their own, not in the total)
+		if (group !== "notes") {
+			n += st.n;
+			repeats += st.repeats;
+		}
 		rows.push(
 			`${group.padEnd(14)} lines ${String(st.n).padStart(5)}  repeat-in-8 ${((100 * st.repeats) / st.n).toFixed(1).padStart(5)}%  shapes ${st.shapes.size}`,
 		);

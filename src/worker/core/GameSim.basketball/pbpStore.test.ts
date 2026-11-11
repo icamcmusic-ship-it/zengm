@@ -5,6 +5,7 @@ import {
 	storedInitEvent,
 } from "../../../common/pbpFlavor/store.ts";
 import { CAREER_LENGTH, makeCareer } from "../../../common/pbpFlavor/career.ts";
+import { EXTRA_KEYS } from "../../../common/pbpFlavor/story.ts";
 import { STORED_STATS } from "./PlayByPlayLogger.ts";
 import {
 	makeLiveBoxScore,
@@ -73,9 +74,9 @@ test("events the schema can't hold exactly are kept as JSON", () => {
 	]);
 });
 
-// A version 1 string (before player traits: no temper in the header) or a version 2 one (before the rivalry and the career numbers) made
-// from a version 3 one, by rewriting the header
-const toOldVersion = (s: string, target: 1 | 2) => {
+// A version 1 string (before player traits: no temper in the header), a version 2 one (before the rivalry and the career numbers) or a
+// version 3 one (before the game context and the extra ratings) made from a version 4 one, by rewriting the header
+const toOldVersion = (s: string, target: 1 | 2 | 3) => {
 	const ALPHABET =
 		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
 	let i = 0;
@@ -96,9 +97,17 @@ const toOldVersion = (s: string, target: 1 | 2) => {
 		return { v, text: s.slice(start, i) };
 	};
 	const version = token();
-	assert.strictEqual(version.v, 3);
+	assert.strictEqual(version.v, 4);
 	let out = String(target);
-	token(); // rivalry, not in versions 1 and 2
+	const rivalryToken = token(); // rivalry, not in versions 1 and 2
+	if (target >= 3) {
+		out += rivalryToken.text;
+	}
+	// the game context, not before version 4
+	const numGame = token().v;
+	for (let k = 0; k < numGame; k++) {
+		token();
+	}
 	const numPlayers = token();
 	out += numPlayers.text;
 	for (let p = 0; p < numPlayers.v; p++) {
@@ -116,27 +125,44 @@ const toOldVersion = (s: string, target: 1 | 2) => {
 			out += temper.text;
 		}
 		// what he had done before the game: not in versions 1 and 2
-		if (token().v === 1) {
+		const hasCareer = token();
+		if (target >= 3) {
+			out += hasCareer.text;
+		}
+		if (hasCareer.v === 1) {
 			for (let k = 0; k < CAREER_LENGTH; k++) {
-				token();
+				const x = token();
+				if (target >= 3) {
+					out += x.text;
+				}
 			}
+		}
+		// the extra ratings: not before version 4
+		const numExtras = token().v;
+		for (let k = 0; k < numExtras; k++) {
+			token();
 		}
 	}
 	return out + s.slice(i);
 };
 
-test("games stored before player traits (version 1) still decode and read", async () => {
+test("games stored before player traits (version 1), the rivalry (2) and the game context (3) still decode and read", async () => {
 	const { events, result } = await simulateGame(3);
 	const stored = encodePlayByPlay(events);
 	const now = decodePlayByPlay(stored);
 	assert.isTrue(now.players.every((p) => p.career?.length === CAREER_LENGTH));
-	for (const target of [1, 2] as const) {
+	for (const target of [1, 2, 3] as const) {
 		const old = decodePlayByPlay(toOldVersion(stored, target));
 		assert.deepStrictEqual(norm(old.events), norm(now.events));
 		assert.strictEqual(old.players.length, now.players.length);
-		assert.strictEqual(old.rivalry, 0);
+		assert.strictEqual(old.rivalry, target >= 3 ? now.rivalry : 0);
+		assert.isUndefined(old.game);
 		for (const [i, p] of old.players.entries()) {
 			assert.strictEqual(p.pid, now.players[i]!.pid);
+			if (target >= 3) {
+				assert.deepStrictEqual(p.career, now.players[i]!.career);
+				continue;
+			}
 			assert.isUndefined(p.career);
 			if (target === 1) {
 				assert.isUndefined(p.ratings?.temper);
@@ -194,4 +220,44 @@ test("the rivalry and what each player had done before the game are stored, so a
 	const notes = live.map((l) => l.note).join("\n");
 	assert.match(notes, /career high/);
 	assert.match(notes, /career (points|rebounds|assists|threes)/);
+});
+
+test("the game context and the extra ratings and traits are stored, so the storylines of a stored game read as they did live", async () => {
+	const { events, result } = await simulateGame(5);
+	// Records and streaks coming in, every player with expanded ratings and traits, a few who used to play for the other team
+	events[0].boxScore[0].pbpGame = [30, 10, 6, 1, 30, 0, 12, 28, -5, 29, 30, 0];
+	for (const [t, team] of events[0].boxScore.entries()) {
+		for (const [i, p] of team.player.entries()) {
+			const v = 40 + ((i * 17 + t * 29) % 55);
+			p.pbpRatings = {
+				...p.pbpRatings,
+				...Object.fromEntries(
+					EXTRA_KEYS.filter((k) => k !== "former").map((k, j) => [
+						k,
+						(v + j * 13) % 100,
+					]),
+				),
+				...(i % 5 === 2 ? { former: 1 } : undefined),
+			};
+		}
+	}
+	const stored = encodePlayByPlay(events);
+	const { players, events: decoded, rivalry, game } = decodePlayByPlay(stored);
+	assert.deepStrictEqual(game, events[0].boxScore[0].pbpGame);
+	assert.deepStrictEqual(
+		players.map((p) => p.ratings),
+		events[0].boxScore.flatMap((team: any) =>
+			team.player.map((p: any) => p.pbpRatings),
+		),
+	);
+	const live = playLive(events.slice(), makeLiveBoxScore(result, 5));
+	const box = makeLiveBoxScore(result, 5);
+	const replay = playLive(
+		[storedInitEvent(players, box.teams, rivalry, game), ...decoded],
+		box,
+	);
+	assert.deepStrictEqual(replay, live);
+	const notes = live.map((l) => l.note).join("\n");
+	assert.match(notes, /6-game winning streak|won 6 straight|winners of 6/);
+	assert.match(notes, /\(30-10\)/);
 });

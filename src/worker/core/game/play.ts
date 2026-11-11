@@ -12,6 +12,7 @@ import {
 } from "../index.ts";
 import loadTeams from "./loadTeams.ts";
 import { getPbpRivalryLevels, pbpRivalryLevel } from "../../util/pbpRivalry.ts";
+import { setPbpGameContext } from "../../util/pbpGameContext.ts";
 import {
 	dailyTick as injuryDepthDailyTick,
 	isInjuryDepthEnabled,
@@ -679,6 +680,8 @@ const play = async (
 						);
 					}
 				}
+				// Records, streaks and former teams, for the tip-off of the play-by-play only
+				await setPbpGameContext(schedule, teams);
 			}
 
 			await cbSimGames(schedule, teams, dayOver);
