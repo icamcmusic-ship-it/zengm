@@ -15,12 +15,22 @@ import { getProStats } from "../../../common/preDraft.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
 import { applyInjuryDepth } from "./injuryDepthTeam.ts";
 import {
+	getRestrictionFactor,
+	isBackToBack,
+	isInjuryDepthEnabled,
+} from "../player/injuryDepth.ts";
+import {
 	compositeWeightsFor,
 	deriveExpandedRatings,
 	expandedRatingsSeed,
 	hasExpandedRatings,
 } from "../../../common/expandedRatings.ts";
 import { expandedRatingsOn } from "../player/expandedRatings.ts";
+import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
+import {
+	simFixCompositeWeights,
+	simFixInjuryFactor,
+} from "../GameSim.basketball/simSettings.ts";
 import {
 	PBP_EXPANDED_KEYS,
 	PBP_TRAIT_KEYS,
@@ -263,9 +273,21 @@ export const processTeam = async (
 	let game6EliminationGameOrGame7: boolean | undefined;
 	// Expanded ratings (basketball): the defense, rebounding and finishing composites read wingspan and perimeter/interior defense
 	const expandedRatings = __SPORT === "basketball" && expandedRatingsOn();
+	// Game Sim Fixes (basketball): usage, make-probability and (expanded) fouling composites, see GameSim.basketball/simSettings.ts
+	const simFixes =
+		__SPORT === "basketball" &&
+		nativeFeatureEnabled("simFixes", (key) => g.get(key as any));
+	const positionalComposites =
+		__SPORT === "basketball" &&
+		nativeFeatureEnabled("positionalComposites", (key) => g.get(key as any));
 	const compositeWeights = Object.entries(
 		__SPORT === "basketball"
-			? compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings)
+			? simFixes
+				? simFixCompositeWeights(
+						compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings),
+						expandedRatings,
+					)
+				: compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings)
 			: COMPOSITE_WEIGHTS,
 	);
 
@@ -446,6 +468,17 @@ export const processTeam = async (
 
 		if (__SPORT === "basketball") {
 			p2.compositeRating.usage = p2.compositeRating.usage ** 1.9;
+			if (positionalComposites) {
+				// Position-aware team composites: who plays big (GameSim.basketball/positionalComposites.ts)
+				(p2 as any).simHgt = (rating as any).hgt;
+			}
+			if (simFixes) {
+				// Game Sim Fixes: strong, durable players get hurt a little less
+				(p2 as any).simInjuryFactor = simFixInjuryFactor(
+					(rating as any).stre,
+					(rating as any).endu,
+				);
+			}
 		}
 		if (SEASON_STATS_KEYS !== undefined) {
 			const pSeasonStats = seasonStatsByPid!.get(p.pid);
@@ -472,6 +505,27 @@ export const processTeam = async (
 
 	if (__SPORT === "basketball") {
 		applyInjuryDepth(t, teamInput, teamSeason, players);
+
+		// Realistic Rotations: the second night of a back-to-back plays a little more of the bench (GameSim.basketball/rotationPlanner.ts).
+		// A later batch can also set t.rotationStyle (the coach's rotation style, -1 tight ... 1 deep)
+		if (
+			!allStarGame &&
+			nativeFeatureEnabled("realisticRotations", (key) => g.get(key as any))
+		) {
+			t.backToBack = isBackToBack(teamSeason.lastGameDay);
+			// Injury Depth minutes restrictions (already in ptModifier, also a cap on the planned minutes)
+			if (isInjuryDepthEnabled()) {
+				const playersByPid = new Map(players.map((p) => [p.pid, p]));
+				for (const p2 of t.player) {
+					const restriction = getRestrictionFactor(
+						playersByPid.get(p2.id)?.health,
+					);
+					if (restriction < 1) {
+						p2.minutesRestriction = restriction;
+					}
+				}
+			}
+		}
 
 		t.pace = 0;
 
