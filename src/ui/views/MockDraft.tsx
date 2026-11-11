@@ -22,7 +22,7 @@ const SOURCES = {
 	records: "worst record first",
 } as const;
 
-const MockDraft = ({ season, phase, userTids }: View<"mockDraft">) => {
+const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 	useTitleBar({ title: `${season} Mock Draft` });
 
 	const [result, setResult] = useState<MockResult | undefined>();
@@ -78,6 +78,14 @@ const MockDraft = ({ season, phase, userTids }: View<"mockDraft">) => {
 
 	return (
 		<>
+			{shape ? (
+				<p className="draft-class-shape" data-shape={shape.key}>
+					<span className="badge text-bg-primary fw-normal me-1">
+						{shape.name}
+					</span>
+					<span className="text-body-secondary">{shape.description}</span>
+				</p>
+			) : null}
 			<p>
 				Every team picks the way the AI drafts: by value plus its own needs and
 				strategy

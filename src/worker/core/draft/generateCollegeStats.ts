@@ -1,3 +1,4 @@
+import { applyPendingShape } from "./classShape.ts";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import {
 	RATING_KEYS,
@@ -215,6 +216,7 @@ export const removeCollegeStats = async (draftYear: number) => {
 
 /**
  * What happens to a newly created draft class (each season's new class, all classes at league creation, imported or topped off classes), in this order since stats depend on ratings:
+ * 0. "Draft Class Shapes": a class generated from scratch (marked pending when it was made) gets its shape, once
  * 1. "Re-randomize ratings when a new draft class is created": prospects never regenerated get rebuilt with the league's saved regenerator settings
  * 2. "Auto-generate college/overseas stats for new draft classes": prospects without pre-draft stats get them
  * Both are seeded from the league and the class year, and only ever touch undrafted prospects. draftYears defaults to every class with prospects.
@@ -231,14 +233,6 @@ export const processNewDraftClasses = async (
 	if (__SPORT !== "basketball") {
 		return;
 	}
-	const rerandomize =
-		g.get("rerandomizeDraftClassRatings") && options?.rerandomize !== false;
-	// Also off with the College Stats switch of League Extras
-	const stats =
-		options?.stats !== false && featureOption<boolean>("generateCollegeStats");
-	if (!rerandomize && !stats) {
-		return;
-	}
 	let years = draftYears;
 	if (!years) {
 		const prospects = await idb.cache.players.indexGetAll(
@@ -247,7 +241,20 @@ export const processNewDraftClasses = async (
 		);
 		years = [...new Set(prospects.map((p) => p.draft.year))];
 	}
-	for (const draftYear of years.sort((a, b) => a - b)) {
+	years = [...years].sort((a, b) => a - b);
+	for (const draftYear of years) {
+		await applyPendingShape(draftYear);
+	}
+
+	const rerandomize =
+		g.get("rerandomizeDraftClassRatings") && options?.rerandomize !== false;
+	// Also off with the College Stats switch of League Extras
+	const stats =
+		options?.stats !== false && featureOption<boolean>("generateCollegeStats");
+	if (!rerandomize && !stats) {
+		return;
+	}
+	for (const draftYear of years) {
 		if (rerandomize) {
 			await autoRegenerateClass(
 				draftYear,

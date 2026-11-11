@@ -1553,6 +1553,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	// Basketball: his years before the draft (schools, redshirt years, transfers, junior college), his story if he is one of the class's unusual prospects, and his recruiting ranking, see common/collegeStats/career.ts. Only on prospects whose college stats were generated with the career model
 	preDraftCareer?: StoredPreDraftCareer;
 
+	// Basketball, the Draft Class Shapes setting: the shape his class was given (a key of DRAFT_CLASS_SHAPES), or "pending" between being generated and being shaped
+	draftClassShape?: string;
+
 	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
 	archetypes?: StoredArchetype[];
 	real?: boolean;

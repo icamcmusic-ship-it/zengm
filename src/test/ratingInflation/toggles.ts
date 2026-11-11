@@ -12,6 +12,7 @@ export const TOGGLES: Record<string, Record<string, unknown>> = {
 	injuryDepth: { injuryDepth: true },
 	possessions: { realisticPossessions: true, technicalFouls: true },
 	regen: { rerandomizeDraftClassRatings: true },
+	shapes: { featureDraftClassShapes: true },
 	college: { generateCollegeStats: true, featureCollegeStats: true },
 	unretire: { featureUnretire: true },
 	draftScout: { scoutingSystem: true, featureAiDraftNeeds: true },

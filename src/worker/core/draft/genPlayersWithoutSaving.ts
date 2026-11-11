@@ -6,6 +6,7 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { minBy, assertDefined } from "../../../common/utils.ts";
 import { randInt, shuffle } from "../../../common/random.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
+import { markNewClass } from "./classShape.ts";
 
 // To improve the distribution of DP ages in leagues with modified draftAges, this code will change the % of players who declare for draft each year to work better with modified draftAges settings. Previously, it was just a constant defaultFractionPerYear.
 const defaultFractionPerYear = bySport({
@@ -232,6 +233,12 @@ const genPlayersWithoutSaving = async (
 		count: players.length,
 	}));
 	console.table(table);*/
+
+	// A class made from scratch gets a shape later (the Draft Class Shapes setting, see classShape.ts). Not a class that is being topped off (imported) or filled with scrubs
+	if (existingPlayers.length === 0 && !forceScrubs) {
+		markNewClass(enteringDraft);
+	}
+
 	return enteringDraft;
 };
 

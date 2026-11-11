@@ -341,10 +341,12 @@ describe("college season (featureCollegeSeason)", () => {
 
 		// New classes are stored with the current version: NIT games count
 		const current = (await getCollegeSeason(SEASON))!;
-		assert.strictEqual(current.season.version, 2);
+		assert.strictEqual(current.season.version, 3);
 		assert.isTrue(current.season.nit.counted);
 		for (const p of current.players) {
-			assert.strictEqual(p.collegeSeason!.v, 2);
+			assert.strictEqual(p.collegeSeason!.v, 3);
+			// Version 3 stores the position, so a guards' or big men's year is rebuilt the same way
+			assert.isString(p.collegeSeason!.pos);
 			const team = current.season.teams.find(
 				(t) => t.school === p.collegeSeason!.school,
 			)!;

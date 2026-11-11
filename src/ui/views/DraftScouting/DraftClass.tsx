@@ -85,8 +85,10 @@ const DraftClass = ({
 	offset,
 	players,
 	season,
+	shape,
 	scoutingRemaining,
 }: {
+	shape?: View<"draftScouting">["seasons"][0]["shape"];
 	scoutingRemaining?: number;
 	challengeNoRatings: boolean;
 	fantasyDraft: boolean;
@@ -236,6 +238,14 @@ const DraftClass = ({
 	return (
 		<>
 			<h2>{season}</h2>
+			{shape ? (
+				<p className="draft-class-shape" data-shape={shape.key}>
+					<span className="badge text-bg-primary fw-normal me-1">
+						{shape.name}
+					</span>
+					<span className="text-body-secondary">{shape.description}</span>
+				</p>
+			) : null}
 
 			{fantasyDraft ? (
 				<div className="mb-3 text-warning">
