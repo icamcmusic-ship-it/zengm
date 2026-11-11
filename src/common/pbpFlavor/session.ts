@@ -60,6 +60,7 @@ import {
 import { VarietyMemory, pickV, setVariety, weighted } from "./variety.ts";
 import { TrashTalk, applyTrashTalk, tempersFromPlayers } from "./trashTalk.ts";
 import { CareerNotes, parseCareer } from "./career.ts";
+import { StoryNotes, parseGameContext } from "./story.ts";
 import {
 	roleNames,
 	setPlay,
@@ -163,6 +164,8 @@ export type FlavorInit = {
 		playoffs?: boolean;
 		rivalry?: boolean | number;
 		exhibition?: boolean;
+		// The teams' records, streaks and ranks coming in (worker/util/pbpGameContext.ts), from the init event
+		game?: number[];
 	};
 	// The teams' records coming into the game, and a playoff series [team 0's wins, team 1's wins] (live games only)
 	records?: [TeamRecord | undefined, TeamRecord | undefined];
@@ -193,9 +196,15 @@ export const playersFromInitEvent = (event: any): FlavorInit["players"] => {
 
 // The game context the sim sends with the init event: how heated the rivalry of the two teams is (1 heated, 2 bitter; see
 // worker/util/pbpRivalry.ts). Nothing for a game without one, or an old stored game
-export const contextFromInitEvent = (event: any): { rivalry?: number } => {
+export const contextFromInitEvent = (
+	event: any,
+): { rivalry?: number; game?: number[] } => {
 	const r = event?.boxScore?.[0]?.pbpRivalry;
-	return typeof r === "number" && r > 0 ? { rivalry: r } : {};
+	const game = event?.boxScore?.[0]?.pbpGame;
+	return {
+		...(typeof r === "number" && r > 0 ? { rivalry: r } : undefined),
+		...(Array.isArray(game) ? { game } : undefined),
+	};
 };
 
 type Attempt = {
@@ -532,6 +541,8 @@ export class FlavorSession {
 	private context: NonNullable<FlavorInit["context"]>;
 	// Career highs and milestones (career.ts)
 	private career: CareerNotes;
+	// Storylines: standings, former teams, debuts, what players are known for (story.ts)
+	private story: StoryNotes;
 	// the flow of the score, shooting lines, and the rest of the game-long colour (color.ts)
 	private flow = new GameFlow();
 	private shooting = new ShootingNotes();
@@ -559,6 +570,10 @@ export class FlavorSession {
 		);
 		this.trash.setContext(this.context);
 		this.career = new CareerNotes(init.gid, init.players, this.context);
+		this.story = new StoryNotes(init.gid, init.players, {
+			...this.context,
+			female: init.female,
+		});
 		this.gid = init.gid;
 		this.numPeriods = init.numPeriods;
 		this.quarterLength = init.quarterLength;
@@ -605,6 +620,20 @@ export class FlavorSession {
 		this.periodLens[1] = init.quarterLength * 60;
 		this.records = init.records;
 		this.series = init.series;
+		// A stored game has no records of its own: the ones stored with it (the same numbers the live game had)
+		const stored = parseGameContext(this.context.game);
+		if (
+			!this.records &&
+			!this.series &&
+			stored &&
+			!this.context.playoffs &&
+			!this.context.exhibition
+		) {
+			this.records = [
+				{ won: stored.teams[0].won, lost: stored.teams[0].lost },
+				{ won: stored.teams[1].won, lost: stored.teams[1].lost },
+			];
+		}
 	}
 
 	// "the rim protector": how the announcer names a player a second time
@@ -941,6 +970,23 @@ export class FlavorSession {
 		}
 		if (typeof res === "object" && this.career.active) {
 			this.careerNotes(ev, res);
+		}
+		if (typeof res === "object" && this.story.active) {
+			this.story.check({
+				idx: this.idx,
+				ev,
+				res,
+				pl: (pid) => this.pl(pid),
+				floor: (t) => this.floor(t),
+				stat: (pid) => this.host.stat(pid),
+				the: (t) => this.the(t),
+				score,
+				period: this.period,
+				numPeriods: this.numPeriods,
+				clock: Number.isFinite(ev.clock) ? ev.clock : undefined,
+				pendingShooter,
+				run: this.run,
+			});
 		}
 		if (typeof res === "object") {
 			this.lastType = e.type;
@@ -3090,6 +3136,11 @@ export class FlavorSession {
 	}
 
 	// For tests: what the trash talk and the career calls said, and when (the position of the event)
+	// The storyline calls made so far (story.ts), for tests
+	storyCalls() {
+		return this.story.calls;
+	}
+
 	debugLog() {
 		return { trash: this.trash.log, career: this.career.calls, idx: this.idx };
 	}

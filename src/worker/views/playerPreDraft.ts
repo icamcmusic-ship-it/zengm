@@ -587,10 +587,10 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		finalPick = numPicks + 10;
 		drafted = true;
 	} else {
-		// Where the board has him now: by value, as teams draft
+		// Where the board has him now: by value, the order the AI drafts in (and the Mock Draft shows), not the user's own fuzzed scouting list, which can put a second rounder in the lottery
 		const board = classPlayers
 			.filter(isProspect)
-			.sort((a, b) => b.valueFuzz - a.valueFuzz);
+			.sort((a, b) => b.value - a.value);
 		finalPick = board.findIndex((p) => p.pid === pRaw.pid) + 1;
 		if (finalPick <= 0) {
 			finalPick = numPicks + 10;

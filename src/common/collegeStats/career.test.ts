@@ -197,9 +197,12 @@ describe("career model", () => {
 			if (years.some((year) => year.status === "medical")) {
 				numMedical += 1;
 			}
-			// A plain career has as many years as his class year says
+			// A plain career has as many years as his class year says: the one his age says, or one fewer for a prospect with high draft stock (an older freshman, getClassIndexForStock)
 			if (p.age <= 22) {
-				assert.strictEqual(years.length, getClassIndex(p.age) + 1);
+				assert.include(
+					[getClassIndex(p.age) + 1, Math.max(1, getClassIndex(p.age))],
+					years.length,
+				);
 			}
 		}
 		const n = all().length;

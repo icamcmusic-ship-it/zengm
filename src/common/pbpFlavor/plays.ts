@@ -287,6 +287,11 @@ export const freeThrow = (
 					`${n}'s ${ord} free throw spins out`,
 					`${n} can't get the ${ord} one to go`,
 					`${n} back-rims the ${ord} free throw`,
+					`${n}'s ${ord} attempt catches the side of the rim and falls away`,
+					`${n} misfires on the ${ord}`,
+					`${n} short-arms the ${ord} free throw`,
+					`${n}'s ${ord} one rolls around and out`,
+					`No good on the ${ord} from ${n}`,
 				]);
 	} else if (m === total) {
 		// every shot made
@@ -308,6 +313,14 @@ export const freeThrow = (
 						`${n} is good again: two free throws, two makes`,
 						`${n} gets the second to drop as well`,
 						`${n} cashes in both free throws`,
+						`${n} follows it up with the second: two points at the line`,
+						`${n} knocks down the back end of the pair too`,
+						`${n} drills the second to complete a 2-for-2 trip`,
+						`${n} gets both to go down`,
+						`${n} makes the second, nothing but net`,
+						`${n} finishes off a perfect trip with the second`,
+						`${n} adds the second free throw; two for two`,
+						`${n} splashes the second as well`,
 					])
 				: pickV(rng, [
 						`${n} makes the third: all 3 free throws are good`,
@@ -323,6 +336,8 @@ export const freeThrow = (
 			`${n} salvages the trip with the ${ord}, ${m} of ${total}`,
 			`${n} makes the ${ord} this time; ${m} of ${total} at the line`,
 			`${n} knocks down the ${ord} for ${m} of ${total}`,
+			`${n} recovers to make the ${ord}: ${m} of ${total}`,
+			`${n} drops in the ${ord} after missing; ${m} of ${total}`,
 		]);
 	} else if (m === 0) {
 		text = pickV(
@@ -344,6 +359,9 @@ export const freeThrow = (
 			`${n} can't add the ${ord}: ${m} of ${total}`,
 			`${n}'s ${ord} one rims out, so it's ${m} of ${total}`,
 			`${n} gives one back, missing the ${ord}; ${m} of ${total}`,
+			`${n} rims out the ${ord}, ${m} of ${total} on the trip`,
+			`${n} can't get the ${ord} to fall and settles for ${m} of ${total}`,
+			`The ${ord} one from ${n} is off; ${m} of ${total}`,
 			total === 2
 				? `${n} splits the pair at the line`
 				: `${n} misses the last one and makes ${m} of ${total}`,
