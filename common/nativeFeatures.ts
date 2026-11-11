@@ -339,6 +339,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "positionalComposites",
+		key: "positionalComposites",
+		name: "Position-Aware Team Ratings",
+		description:
+			"In the game simulation, each player on the court counts by his role for the team's ratings: the biggest players for rim protection, blocks and rebounding, the ball handlers for ball handling, the smaller players for perimeter defense (instead of a plain 5-man average, where a guard's height protected the rim as much as a center's). League averages stay about the same.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		key: "featureSeasonOdds",
 		name: "Season Odds",

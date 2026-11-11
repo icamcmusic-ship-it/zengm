@@ -272,6 +272,9 @@ export const processTeam = async (
 	const simFixes =
 		__SPORT === "basketball" &&
 		nativeFeatureEnabled("simFixes", (key) => g.get(key as any));
+	const positionalComposites =
+		__SPORT === "basketball" &&
+		nativeFeatureEnabled("positionalComposites", (key) => g.get(key as any));
 	const compositeWeights = Object.entries(
 		__SPORT === "basketball"
 			? simFixes
@@ -460,6 +463,10 @@ export const processTeam = async (
 
 		if (__SPORT === "basketball") {
 			p2.compositeRating.usage = p2.compositeRating.usage ** 1.9;
+			if (positionalComposites) {
+				// Position-aware team composites: who plays big (GameSim.basketball/positionalComposites.ts)
+				(p2 as any).simHgt = (rating as any).hgt;
+			}
 			if (simFixes) {
 				// Game Sim Fixes: strong, durable players get hurt a little less
 				(p2 as any).simInjuryFactor = simFixInjuryFactor(

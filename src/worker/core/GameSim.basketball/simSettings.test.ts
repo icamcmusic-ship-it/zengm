@@ -5,6 +5,7 @@ import { g } from "../../util/index.ts";
 import { resetG } from "../../../test/helpers.ts";
 import { genTeams, withSeededRandom } from "./simLiveGameForTests.ts";
 import { simFixInjuryFactor } from "./simSettings.ts";
+import { positionalShares } from "./positionalComposites.ts";
 import { range } from "../../../common/utils.ts";
 
 /*
@@ -93,4 +94,39 @@ test("simFixes: composites only with the setting on, games still sane", async ()
 test("simFixes: stronger, more durable players get hurt less, the average player about as often", () => {
 	assert.isBelow(simFixInjuryFactor(70, 70), simFixInjuryFactor(40, 40));
 	assert.closeTo(simFixInjuryFactor(51.4, 51.4), 1, 1e-9);
+});
+
+test("positionalComposites: bigs get the rim protection share, ball handlers the dribbling share", () => {
+	const mk = (pos: string, hgt: number, dribbling: number) => ({
+		pos,
+		simHgt: hgt,
+		compositeRating: { dribbling },
+	});
+	const players = [
+		mk("PG", 30, 0.8),
+		mk("C", 80, 0.3),
+		mk("SF", 50, 0.5),
+		mk("SG", 35, 0.6),
+		mk("PF", 65, 0.4),
+	];
+	const shares = positionalShares(players)!;
+	assert.strictEqual(shares.interior[1], Math.max(...shares.interior));
+	assert.strictEqual(shares.perimeter[0], Math.max(...shares.perimeter));
+	assert.strictEqual(shares.ball[0], Math.max(...shares.ball));
+	for (const key of ["interior", "rebound", "perimeter", "ball"] as const) {
+		assert.closeTo(
+			shares[key].reduce((a, b) => a + b, 0),
+			5,
+			1e-9,
+		);
+	}
+	assert.isUndefined(positionalShares(players.slice(0, 4)));
+});
+
+test("positionalComposites: games still sane", async () => {
+	for (const expandedRatings of [false, true]) {
+		checkSane(
+			await simGames({ positionalComposites: true, expandedRatings }, SEEDS),
+		);
+	}
 });

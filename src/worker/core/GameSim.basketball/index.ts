@@ -6,6 +6,11 @@ import {
 	SIM_FIX_MID_RANGE,
 	SIM_FIX_PERF_FACTOR,
 } from "./simSettings.ts";
+import {
+	POSITIONAL_SCALE,
+	positionalShares,
+	type PositionalShares,
+} from "./positionalComposites.ts";
 import { PHASE, STARTING_NUM_TIMEOUTS } from "../../../common/constants.ts";
 import jumpBallWinnerStartsThisPeriodWithPossession from "./jumpBallWinnerStartsThisPeriodWithPossession.ts";
 import getInjuryRate from "./getInjuryRate.ts";
@@ -350,6 +355,15 @@ class GameSim extends GameSimBase {
 	// Game Sim Fixes (League extras, see simSettings.ts): make probabilities of mid-range and post shots, the trailing team's boost,
 	// synergy skill cutoffs with expanded ratings. Off: nothing below is used
 	simFixes: boolean;
+	// Position-aware team composites (League extras, see positionalComposites.ts): each player counts by his role for the team
+	// composites. Off: plain 5-man averages, as before
+	positionalComposites: boolean;
+	positionalSharesCache: PositionalShares = {
+		interior: [1, 1, 1, 1, 1],
+		rebound: [1, 1, 1, 1, 1],
+		perimeter: [1, 1, 1, 1, 1],
+		ball: [1, 1, 1, 1, 1],
+	};
 	// Expanded ratings, second step (offRebounding/defRebounding/ballSecurity/catchShoot/offDribble composites from loadTeams)
 	expandedRatings2: boolean;
 	// Player traits: a playoff game, where the big-game trait applies (the whole game)
@@ -423,6 +437,10 @@ class GameSim extends GameSimBase {
 
 		this.simFixes = nativeFeatureEnabled("simFixes", (key) =>
 			g.get(key as any),
+		);
+		this.positionalComposites = nativeFeatureEnabled(
+			"positionalComposites",
+			(key) => g.get(key as any),
 		);
 
 		this.expandedRatings = teams.some((t) =>
@@ -1707,7 +1725,52 @@ class GameSim extends GameSimBase {
 			let offRebounding = 0;
 			let defRebounding = 0;
 			let ballSecurity = 0;
-			for (const p of this.playersOnCourt[t]) {
+			let defenseInside = 0;
+			let defenseOutside = 0;
+			// Position-aware team composites: each player weighted by his share of the job (undefined: plain averages, as before)
+			const shares = this.positionalComposites
+				? positionalShares(this.playersOnCourt[t], this.positionalSharesCache)
+				: undefined;
+			if (shares) {
+				const S = POSITIONAL_SCALE;
+				for (const [i, p] of this.playersOnCourt[t].entries()) {
+					const ratings = p.compositeRating;
+					const fatigue = this.fatigue(p.stat.energy);
+					const pf = p.stat.pf;
+					const foulLimitFactor =
+						pf === foulLimit ? 0.9 : pf > foulLimit ? 0.75 : 1;
+					const base = fatigue * perfFactor;
+					const baseD = base * foulLimitFactor;
+					const int = shares.interior[i]!;
+					const reb = shares.rebound[i]!;
+					const per = shares.perimeter[i]!;
+					const ball = shares.ball[i]!;
+
+					dribbling += ratings.dribbling * base * ball * S.dribbling;
+					passing += ratings.passing * base;
+					rebounding += ratings.rebounding * base * reb * S.rebounding;
+					defense += ratings.defense * baseD;
+					defensePerimeter +=
+						ratings.defensePerimeter * baseD * per * S.defensePerimeter;
+					blocking += ratings.blocking * baseD * int * S.blocking;
+					if (this.expandedRatings) {
+						defenseInterior +=
+							ratings.defenseInterior * baseD * int * S.defenseInterior;
+					} else {
+						defenseInside += ratings.defense * baseD * int * S.defenseInside;
+						defenseOutside += ratings.defense * baseD * per * S.defenseOutside;
+					}
+					if (this.expandedRatings2) {
+						offRebounding +=
+							ratings.offRebounding * base * reb * S.offRebounding;
+						defRebounding +=
+							ratings.defRebounding * base * reb * S.defRebounding;
+						ballSecurity += ratings.ballSecurity * base * ball * S.ballSecurity;
+					}
+				}
+			}
+			// Plain averages (the setting off): exactly the old arithmetic
+			for (const p of shares ? [] : this.playersOnCourt[t]) {
 				const ratings = p.compositeRating;
 				const fatigue = this.fatigue(p.stat.energy);
 				const pf = p.stat.pf;
@@ -1745,6 +1808,12 @@ class GameSim extends GameSimBase {
 			if (this.expandedRatings) {
 				ratings.defenseInterior =
 					defenseInterior / 5 + this.synergyFactor * synergy.def;
+			} else if (shares) {
+				// Position-aware team composites without expanded ratings: shot defense inside and outside (see shotDefense)
+				ratings.defenseInside =
+					defenseInside / 5 + this.synergyFactor * synergy.def;
+				ratings.defenseOutside =
+					defenseOutside / 5 + this.synergyFactor * synergy.def;
 			}
 			if (this.expandedRatings2) {
 				ratings.offRebounding =
@@ -2896,7 +2965,9 @@ class GameSim extends GameSimBase {
 					0.25 *
 						(this.expandedRatings
 							? this.shotDefenseExpanded(type)
-							: this.team[this.d].compositeRating.defense) +
+							: this.positionalComposites
+								? this.shotDefensePositional(type)
+								: this.team[this.d].compositeRating.defense) +
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)) *
 				currentFatigue;
@@ -3200,6 +3271,21 @@ class GameSim extends GameSimBase {
 
 	// Expanded ratings: the defense a shot faces. Shots at the rim and in the post are contested by the interior defense, jump shots by
 	// the perimeter defense, each mixed with the overall team defense (calibrated to the same league average as the stock "defense")
+	// Position-aware team composites without expanded ratings: shots inside are defended more by the bigs, jumpers by the smaller
+	// players (half the plain team defense, half the weighted one, like shotDefenseExpanded)
+	shotDefensePositional(type: ShotType) {
+		const ratings = this.team[this.d].compositeRating;
+		if (
+			type === "atRim" ||
+			type === "lowPost" ||
+			type === "putBack" ||
+			type === "tipIn"
+		) {
+			return 0.5 * ratings.defense + 0.5 * ratings.defenseInside;
+		}
+		return 0.5 * ratings.defense + 0.5 * ratings.defenseOutside;
+	}
+
 	shotDefenseExpanded(type: ShotType) {
 		const ratings = this.team[this.d].compositeRating;
 		if (

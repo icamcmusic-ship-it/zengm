@@ -62,6 +62,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Expanded ratings](#expanded-ratings)                               | ratings tables, player pages, Customize Player, game sim         | bball  | `expandedRatings`                         | on / off                      |
 | [Perimeter defense](#perimeter-defense)                             | game sim (steals), DPOY and All-Defensive awards                 | bball  | `perimeterDefense`                        | on / off                      |
 | [Game sim fixes](#game-sim-fixes)                                   | game sim (shot selection and makes, usage, injuries)             | bball  | `simFixes`                                | on / off                      |
+| [Position-aware team ratings](#position-aware-team-ratings)         | game sim (team composites)                                       | bball  | `positionalComposites`                    | on / off                      |
 | [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery            | bball  | `featureSeasonOdds`                       | on / on                       |
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes | bball  | `featureArchetypes`                       | on / on                       |
 | [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)     | bball  | `improvedPositions`                       | on / off                      |
@@ -117,6 +118,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `expandedRatings`                                                                                         | on / off                                                        | turning it on in an existing league derives the new ratings from the current ones                            |
 | `perimeterDefense`                                                                                        | on / off                                                        | option `perimeterDefenseAllDefensive` `oneGuard`                                                             |
 | `simFixes`                                                                                                | on / off                                                        |                                                                                                              |
+| `positionalComposites`                                                                                    | on / off                                                        |                                                                                                              |
 | `contractOptions`, `contractExtensions`, `tradeRequests`                                                  | on / off                                                        |                                                                                                              |
 | `featureHoldouts` + `holdoutFrequency`                                                                    | on / off; 1 / 1                                                 | frequency scales how often holdouts happen                                                                   |
 | `aiTradesNeedBased`                                                                                       | on / off                                                        | the classic random AI-to-AI trades stay on in every league (_AI-to-AI Trades Factor_ in the Events category) |
@@ -424,6 +426,38 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
   | oiq                         | 0.33 / 0.30   | 0.49 / 0.37 |
   | ins, offense only (pts/100) | −0.01 / 0.04  | 0.14 / 0.12 |
   | fg, offense only (pts/100)  | −0.12 / −0.08 | 0.06 / 0.07 |
+
+### Position-aware team ratings
+
+- **Setting:** `positionalComposites` (League Extras → Game Simulation). On for new leagues, off for existing leagues (same results and random numbers as before). Code: `src/worker/core/GameSim.basketball/positionalComposites.ts`, `GameSim.updateTeamCompositeRatings`.
+- **Why:** the team composites the sim reads (dribbling, rebounding, blocking, perimeter/interior defense, ...) were plain 5-man averages, so a guard's height protected the rim exactly as much as a center's, and a center's handle counted as much as the point guard's.
+- **What:** the five players on the court are ranked by size (height rating plus a little for the position: C +4 ... PG −3) and by dribbling. Each counts by his share of the job (shares sum to 5, then a constant keeps the league average of each composite the same):
+  - rim protection (blocking, expanded interior defense): 1.6 / 1.3 / 1.0 / 0.65 / 0.45 from the biggest down; rebounding (and expanded offensive/defensive rebounding) 1.4 / 1.2 / 1.0 / 0.8 / 0.6;
+  - perimeter defense: the same order reversed, 0.6 ... 1.4 for the smallest;
+  - dribbling and expanded ball security: 1.5 / 1.2 / 1.0 / 0.7 / 0.6 from the best ball handler down;
+  - without expanded ratings, shots at the rim and in the post are defended by half the plain team defense and half the size-weighted one, jumpers by half the plain and half the perimeter-weighted one (like the expanded shot defense). Passing and the plain defense composite (turnovers, assists) are unchanged.
+  - Scale constants (`POSITIONAL_SCALE`): blocking 0.955, interior defense 0.954, rebounding 0.968 (offensive 0.966, defensive 0.969), dribbling 0.975, ball security 0.985, perimeter defense 0.995, inside/outside shot defense 0.986 / 1.01. Only for 5 players on the court; other counts keep plain averages.
+- **Calibration** (6 rosters × 250 games, per team game, expanded off / on):
+
+  | stat          | before                          | after                           |
+  | ------------- | ------------------------------- | ------------------------------- |
+  | pts, FG%      | 105.5 44.1 / 105.9 44.0         | 105.8 44.2 / 105.7 44.0         |
+  | 3PA rate, 3P% | .349 35.0 / .352 34.8           | .349 35.1 / .350 35.0           |
+  | AST, TOV      | 23.9 16.1 / 23.7 16.0           | 23.9 15.9 / 23.9 15.9           |
+  | ORB, DRB      | 11.6 34.7 / 11.6 34.9           | 11.5 34.7 / 11.6 34.8           |
+  | FTA, STL, BLK | 22.4 7.31 4.97 / 23.0 7.26 5.07 | 22.6 7.16 5.07 / 22.8 7.18 5.04 |
+
+  Marginal value of +10 for a 36-minute player by height group (guards hgt < 40, wings 40-54, bigs 55+; points of margin per game, ±0.09; 8,100 games each):
+
+  | expanded off / on             | before      | after       |
+  | ----------------------------- | ----------- | ----------- |
+  | hgt guards                    | 0.92 / 0.62 | 0.77 / 0.54 |
+  | hgt bigs                      | 0.88 / 0.89 | 1.08 / 0.79 |
+  | hgt guards, defense only      | 0.48 / 0.27 | 0.41 / 0.18 |
+  | hgt bigs, defense only        | 0.26 / 0.33 | 0.47 / 0.21 |
+  | drb guards                    | 0.46 / 0.18 | 0.53 / 0.34 |
+  | drb bigs                      | 0.49 / 0.43 | 0.33 / 0.32 |
+  | idef guards / bigs (expanded) | 0.33 / 0.12 | 0.28 / 0.33 |
 
 ### Season odds
 
