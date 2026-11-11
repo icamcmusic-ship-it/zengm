@@ -5,12 +5,14 @@
 
 import type {
 	ArchetypeDef,
+	ArchetypeTraitKey,
 	ArchetypeFamily,
 	ArchetypeGroup,
 	DimKey,
 	Pos,
 	SkillLabel,
 } from "./types.ts";
+import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
 
 type Opts = {
 	req?: SkillLabel[];
@@ -29,6 +31,9 @@ type Opts = {
 	tags?: string[];
 	// A stable id when the name changed (stored entries keep their id)
 	id?: string;
+	// Trait-flavored label (player traits on only) and visible traits that break ties toward it, see classify.ts
+	trait?: { key: ArchetypeTraitKey; min: number };
+	traitTie?: Partial<Record<ArchetypeTraitKey, number>>;
 };
 
 // Allowed positions: a HARD gate (an archetype is never given to a player at another position). The name must agree
@@ -88,10 +93,13 @@ const make =
 		level: opts.level,
 		age: opts.age,
 		pos: opts.pos,
+		trait: opts.trait,
+		traitTie: opts.traitTie,
 		tags: [
 			group,
 			family,
 			...(positions.length === ANY.length ? ["universal"] : []),
+			...(opts.trait ? ["trait"] : []),
 			...(opts.tags ?? []),
 		],
 	});
@@ -2342,7 +2350,381 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 			tags: ["length", "spacing"],
 		},
 	),
+	// ------------------------------------------------- Expanded ratings, second step (expandedRatings setting on only)
+	// How he gets his jumpers (catch-and-shoot vs off the dribble), which glass he cleans and how safely he handles the ball
+	G(
+		"Step-Back Shooter",
+		BACKCOURT,
+		"shooter",
+		[0, 50],
+		{ three: 2.5, drb: 2, usg: 1.5, cs: -2 },
+		"Creates his own three off the dribble: step-backs and pull-ups from deep.",
+		{ expanded: true, cap: { cs: -0.3 }, need: { drb: 0.3 } },
+	),
+	W(
+		"Step-Back Wing",
+		WINGS,
+		"shooter",
+		[24, 62],
+		{ three: 2.5, drb: 1.5, usg: 1.5, mid: 1, cs: -2 },
+		"A wing who shakes free for his own jumper off the bounce.",
+		{ expanded: true, cap: { cs: -0.3 } },
+	),
+	C(
+		"Spot-Up Big",
+		BIGS,
+		"shooter",
+		[54, 100],
+		{ three: 2.5, cs: 2, usg: -1.5, ft: 1 },
+		"A big who waits on the perimeter and lets it fly off the catch.",
+		{ expanded: true, need: { cs: 0.3, three: 0.6 } },
+	),
+	F(
+		"Spot-Up Forward",
+		FORWARDS,
+		"shooter",
+		[44, 74],
+		{ three: 2.5, cs: 2, usg: -1.5, ft: 1 },
+		"Spaces the floor from the forward spots and knocks down kick-outs.",
+		{ expanded: true, need: { cs: 0.3, three: 0.6 } },
+	),
+	F(
+		"Crash-the-Glass Forward",
+		FORWARDS,
+		"rebounder",
+		[44, 74],
+		{ reb: 2.5, orl: 2, jmp: 1.5, usg: -1 },
+		"Attacks the offensive glass for second chances.",
+		{ expanded: true, need: { orl: 0.3 }, needFor: { reb: 0.7 } },
+	),
+	F(
+		"Box-Out Forward",
+		FORWARDS,
+		"rebounder",
+		[44, 74],
+		{ reb: 2.5, orl: -2, stre: 1, diq: 1 },
+		"Boxes out and secures the defensive rebound.",
+		{ expanded: true, cap: { orl: -0.3 } },
+	),
+	G(
+		"Mistake-Free Point Guard",
+		POINT,
+		"playmaker",
+		[0, 46],
+		{ pss: 2.5, sec: 2, oiq: 1.5, usg: -1 },
+		"Runs the offense without turning it over.",
+		{ expanded: true, need: { sec: 0.4 } },
+	),
+	W(
+		"Sure-Handed Wing",
+		WINGS,
+		"balanced",
+		[24, 62],
+		{ drb: 1.5, pss: 1.5, sec: 2.5, usg: -0.5 },
+		"A secondary handler who takes care of the ball.",
+		{ expanded: true, need: { sec: 0.5 } },
+	),
+	C(
+		"Sure-Handed Big",
+		BIGS,
+		"skilled",
+		[54, 100],
+		{ pss: 1.5, sec: 2.5, oiq: 1.5, usg: -0.5 },
+		"A big who catches everything and rarely gives the ball away.",
+		{ expanded: true, need: { sec: 0.5 } },
+	),
+	G(
+		"Loose-Handle Creator",
+		BACKCOURT,
+		"scorer",
+		[0, 48],
+		{ drb: 2.5, usg: 2, spd: 1, sec: -2.5 },
+		"Creates plenty off the dribble, and coughs it up plenty too.",
+		{ expanded: true, cap: { sec: -0.4 }, need: { drb: 0.4 } },
+	),
+	G(
+		"High-Risk Playmaker",
+		BACKCOURT,
+		"playmaker",
+		[0, 50],
+		{ pss: 2.5, drb: 1.5, usg: 1, sec: -2.5 },
+		"Threads passes nobody else would try, turnovers and all.",
+		{ expanded: true, cap: { sec: -0.4 } },
+	),
+	// ------------------------------------------------- Trait-flavored labels (player traits on only, visible traits)
+	C(
+		"Hard-Screen Big",
+		BIGS,
+		"hustle",
+		[54, 100],
+		{ stre: 2, reb: 1, rim: 1, usg: -1.5 },
+		"Sets bone-rattling screens that free up the shooters.",
+		{ trait: { key: "screen", min: 65 } },
+	),
+	F(
+		"Screen Assassin",
+		FRONTCOURT,
+		"skilled",
+		[44, 76],
+		{ stre: 1.5, mid: 1.5, three: 1, usg: -1 },
+		"Screens hard, then pops for the open jumper.",
+		{ trait: { key: "screen", min: 65 } },
+	),
+	W(
+		"Backdoor Cutter",
+		WINGS_G,
+		"slasher",
+		[24, 64],
+		{ oiq: 2, rim: 2, spd: 1, usg: -1.5 },
+		"Always moving without the ball: backdoor cuts for easy layups.",
+		{ trait: { key: "offBall", min: 65 } },
+	),
+	G(
+		"Off-Screen Shooter",
+		BACKCOURT,
+		"shooter",
+		[0, 52],
+		{ three: 2.5, end: 1, spd: 1, usg: -0.5 },
+		"Comes off screens ready to fire.",
+		{ trait: { key: "offBall", min: 65 }, xw: { cs: 1 } },
+	),
+	W(
+		"Relocation Shooter",
+		WINGS,
+		"shooter",
+		[24, 64],
+		{ three: 2.5, ft: 1, oiq: 1, usg: -1.5 },
+		"Drifts into open space for the kick-out three.",
+		{ trait: { key: "offBall", min: 65 }, xw: { cs: 1 } },
+	),
+	C(
+		"High-Motor Big",
+		BIGS,
+		"hustle",
+		[54, 100],
+		{ reb: 2, end: 1.5, ath: 1, usg: -1.5 },
+		"Never stops running: rim runs, tip-outs and second efforts.",
+		{ trait: { key: "motor", min: 65 } },
+	),
+	F(
+		"High-Motor Forward",
+		FORWARDS,
+		"hustle",
+		[44, 74],
+		{ reb: 1.5, end: 1.5, ath: 1.5, usg: -1 },
+		"Plays every possession at full speed.",
+		{ trait: { key: "motor", min: 65 } },
+	),
+	G(
+		"Hustle Guard",
+		GUARDS,
+		"hustle",
+		[0, 48],
+		{ stl: 2, end: 1.5, dper: 1, usg: -1 },
+		"Dives for loose balls and takes charges.",
+		{ trait: { key: "hustle", min: 65 } },
+	),
+	W(
+		"Loose-Ball Wing",
+		WINGS,
+		"hustle",
+		[24, 64],
+		{ reb: 1.5, stl: 1.5, end: 1.5, usg: -1 },
+		"First to every loose ball and long rebound.",
+		{ trait: { key: "hustle", min: 65 } },
+	),
+	W(
+		"Switch-Everything Wing",
+		WINGS,
+		"defender",
+		[30, 64],
+		{ dper: 2, dint: 1.5, stre: 1, diq: 1 },
+		"Switches onto anyone, from point guards to bigs.",
+		{
+			trait: { key: "defensiveVersatility", min: 65 },
+			xw: { pdef: 1.5, idef: 1 },
+		},
+	),
+	C(
+		"Switch-Everything Big",
+		BIGS,
+		"defender",
+		[54, 100],
+		{ dint: 1.5, dper: 1.5, spd: 1.5, blk: 1 },
+		"A big who can switch onto guards and stay in front.",
+		{
+			trait: { key: "defensiveVersatility", min: 65 },
+			xw: { pdef: 1, idef: 1.5 },
+		},
+	),
+	G(
+		"Pressure-Proof Handler",
+		BACKCOURT,
+		"playmaker",
+		[0, 48],
+		{ drb: 2.5, pss: 1.5, oiq: 1, usg: -0.5 },
+		"Breaks the press and never gets rattled by traps.",
+		{ trait: { key: "handle", min: 65 }, xw: { sec: 1 } },
+	),
+	G(
+		"Efficient Scorer",
+		BACKCOURT,
+		"scorer",
+		[0, 52],
+		{ usg: 1.5, mid: 1.5, three: 1.5, ft: 1.5, oiq: 1 },
+		"Takes good shots and makes them.",
+		{ trait: { key: "shotDiscipline", min: 65 } },
+	),
+	C(
+		"Vertical Rim Protector",
+		BIGS,
+		"defender",
+		[54, 100],
+		{ blk: 2.5, dint: 2, usg: -1 },
+		"Walls up at the rim without fouling.",
+		{ trait: { key: "foulDiscipline", min: 65 }, xw: { idef: 1.5 } },
+	),
+	W(
+		"Disciplined Defender",
+		WINGS,
+		"defender",
+		[24, 64],
+		{ dper: 2, oiq: 0.5, usg: -1 },
+		"Stays down on fakes and guards without fouling.",
+		{ trait: { key: "foulDiscipline", min: 65 }, xw: { pdef: 2 } },
+	),
+	// ------------------------------------------------- Skill pairs no label named (diagnostics: least named profiles)
+	W(
+		"Crafty Finisher",
+		WINGS_G,
+		"slasher",
+		[24, 62],
+		{ rim: 2.5, draw: 1.5, oiq: 1, ath: -0.5 },
+		"Finishes around the rim with craft rather than bounce.",
+	),
+	F(
+		"Paint Finisher",
+		FORWARDS,
+		"slasher",
+		[44, 74],
+		{ rim: 2.5, draw: 1.5, usg: -0.5 },
+		"Converts around the basket: dump-offs, cuts and putbacks.",
+	),
+	C(
+		"Dunker-Spot Big",
+		BIGS,
+		"slasher",
+		[54, 100],
+		{ rim: 2.5, oiq: 1, usg: -1, mid: -0.5 },
+		"Lurks along the baseline for dump-offs and dunks.",
+		{ needFor: { rim: 0.7 } },
+	),
+	G(
+		"Layup Artist",
+		GUARDS,
+		"slasher",
+		[0, 46],
+		{ rim: 2.5, draw: 1.5, drb: 1, ath: -0.5 },
+		"Gets to the basket and finishes with either hand, from any angle.",
+		{ needFor: { rim: 0.6 } },
+	),
+	W(
+		"Two-Way Finisher",
+		WINGS,
+		"athlete",
+		[30, 64],
+		{ rim: 2.5, blk: 2, dint: 1, usg: -0.5 },
+		"Finishes at one end and blocks shots at the other.",
+	),
+	G(
+		"Chase-Down Guard",
+		GUARDS,
+		"athlete",
+		[0, 48],
+		{ blk: 2.5, rim: 1.5, ath: 1.5, reb: 1 },
+		"A guard who blocks shots: chase-downs and weak-side swats.",
+	),
+	G(
+		"Glass-Crashing Guard",
+		GUARDS,
+		"rebounder",
+		[0, 48],
+		{ reb: 2.5, rim: 2, stre: 1 },
+		"Crashes the boards and finishes in traffic.",
+		{ xw: { orl: 1 } },
+	),
+	W(
+		"Shifty Wing",
+		WINGS,
+		"playmaker",
+		[24, 62],
+		{ drb: 3, spd: 1.5, usg: 0.5, three: 0.5 },
+		"A wing with a guard's handle.",
+		{ need: { drb: 0.9 } },
+	),
+	F(
+		"Shifty Forward",
+		FORWARDS,
+		"playmaker",
+		[44, 74],
+		{ drb: 2.5, ath: 1.5, usg: 1 },
+		"A forward who handles like a guard in the open floor.",
+	),
+	W(
+		"Bruising Wing",
+		WINGS,
+		"skilled",
+		[28, 66],
+		{ post: 2, reb: 2, stre: 1.5 },
+		"Backs smaller wings down and owns the glass.",
+	),
+	W(
+		"Weakside Wing",
+		WINGS,
+		"defender",
+		[30, 66],
+		{ reb: 2, blk: 2, jmp: 1, usg: -0.5 },
+		"Rotates over for blocks and cleans up the defensive glass.",
+		{ needFor: { blk: 0.5, reb: 0.4 } },
+	),
+	W(
+		"Athletic Stopper",
+		WINGS,
+		"defender",
+		[24, 64],
+		{ ath: 2.5, dper: 2, usg: -1 },
+		"Uses his athleticism to smother scorers.",
+		{ xw: { pdef: 1.5 }, need: { dper: 0.3, diq: 0.3 } },
+	),
 ];
+
+// Archetypes named after NBA 2K builds (twoK/convert2k.script.test.ts): 2K concepts no label named, each the centroid profile of
+// its converted builds, at its group's positions
+const TWO_K_POSITIONS: Record<ArchetypeGroup, Pos[]> = {
+	guard: BACKCOURT,
+	wing: WINGS,
+	forward: FORWARDS,
+	big: BIGS,
+};
+for (const d of TWO_K_DEFS) {
+	ARCHETYPE_DEFS.push(
+		make(d.group)(
+			d.name,
+			TWO_K_POSITIONS[d.group],
+			d.family as ArchetypeFamily,
+			d.hgt,
+			d.w as Partial<Record<DimKey, number>>,
+			d.desc,
+			{
+				xw:
+					Object.keys(d.xw).length > 0
+						? (d.xw as Partial<Record<DimKey, number>>)
+						: undefined,
+				tags: ["2k"],
+			},
+		),
+	);
+}
 
 // What a name promises, on the league-wide scale: a label is only given when the skill its name names is really there.
 // [name pattern, floors on the absolute z of each dimension]
@@ -2351,22 +2733,37 @@ const NAME_NEEDS: [
 	Partial<Record<DimKey, number>>,
 	Partial<Record<DimKey, number>>?,
 ][] = [
-	[/Shoot|Sniper|3-and-D|Stretch|Corner|Spot-Up|Pick-and-Pop/, { three: 0.3 }],
 	[
-		/Rim Protector|Swat|Shot-Block|Anchor|Shot Blocker/,
+		/Shoot|Sniper|3-and-D|Stretch|Corner|Spot-Up|Pick-and-Pop|Step-Back/,
+		{ three: 0.3 },
+	],
+	[
+		/Rim Protector|Swat|Shot-Block|Anchor|Shot Blocker|Guardian|Erasing|Backline|Curtain/,
 		{ blk: 0.6 },
 		// Not just tall: at least an ordinary shot blocker for his size
 		{ blk: 0 },
 	],
 	[
-		/Floor General|Playmak|Pass-First|Point (Forward|Center)|Hub|Jumbo/,
+		/Floor General|Playmak|Pass-First|Point (Forward|Center)|Hub|Jumbo|Dot Dispenser|Engine/,
 		{ pss: 0.5 },
 	],
 	[
-		/Lockdown|Defensive|Defender|Stopper|Pest|Hawk|Thief|Two-Way|Switch/,
+		/Lockdown|Defensive|Defender|Stopper|Pest|Hawk|Thief|Two-Way|Switch|Clamp|Curtain/,
 		{ diq: 0 },
 	],
-	[/Rebound|Glass|Double-Double|Putback/, {}, { reb: 0.45 }],
+	[
+		/Rebound|Glass|Double-Double|Putback|Box-Out|Board|Cleaner/,
+		{},
+		{ reb: 0.45 },
+	],
+	// Finishing labels that name no athleticism: the touch around the rim must be there for his size
+	[
+		/Crafty Finisher|Paint Finisher|Two-Way Finisher|Layup|Dunker/,
+		{},
+		{ rim: 0.3 },
+	],
+	// A guard who blocks shots, for a guard
+	[/Chase-Down/, {}, { blk: 0.6 }],
 	[/Post|Interior Scorer|Paint Beast/, {}, { post: 0.35 }],
 	[/Slash|Penetrator/, { drb: -0.2 }, { rim: 0.1 }],
 	[
@@ -2375,7 +2772,10 @@ const NAME_NEEDS: [
 	],
 	// A defensive label also needs the defense, not just the instincts
 	[/Thief|Pest|Hawk/, { dper: 0.05 }],
-	[/Handles|Shot Creator|Shot-Creating/, { drb: 0.6 }],
+	[
+		/Handles|Shot Creator|Shot-Creating|Shifty|Pressure-Proof|Loose-Handle|Iso|Ankle/,
+		{ drb: 0.6 },
+	],
 ];
 // A raw prospect's label promises less: the floors are lower by this much
 const PROSPECT_SLACK = 0.2;
@@ -2513,10 +2913,83 @@ const STYLE_XW: Record<string, Partial<Record<DimKey, number>>> = {
 	"rebounding-stopper": { orl: -1 },
 	"grab-and-go-forward": { orl: -1.5 },
 	"glass-cleaning-playmaker": { orl: -1 },
+	// (fully integrated: more shooters by how they get their shots, rebounders by their glass, handlers by ball security)
+	sharpshooter: { cs: 1 },
+	"stretch-wing": { cs: 1 },
+	"stretch-five": { cs: 1 },
+	"stretch-forward": { cs: 1 },
+	"floor-spacing-point-guard": { cs: 0.5 },
+	"volume-shooter": { cs: -0.5 },
+	"scoring-combo": { cs: -0.5 },
+	"microwave-scorer": { cs: -0.5 },
+	"mid-range-maestro": { cs: -0.5 },
+	"rebounding-guard": { orl: 0.5 },
+	"energy-big": { orl: 0.5 },
+	"rebounding-forward": { orl: -0.5 },
+	"floor-general": { sec: 1 },
+	"pass-first-guard": { sec: 1 },
+	"game-manager": { sec: 1.5 },
+	"steady-guard": { sec: 1.5 },
+	"backup-point-guard": { sec: 0.5 },
+	"pick-and-roll-operator": { sec: 0.5 },
 };
 for (const d of ARCHETYPE_DEFS) {
 	const extra = STYLE_XW[d.id];
 	if (extra) {
 		d.xw = { ...d.xw, ...extra };
+	}
+}
+
+// Player traits (the playerTraits setting, visible traits only) that break ties toward a label: a strong trait is worth a
+// little fit (TRAIT_TIE_K in classify.ts per unit), never enough to beat a clearly better fit by the ratings
+const TRAIT_TIE: Record<string, Partial<Record<ArchetypeTraitKey, number>>> = {
+	"movement-shooter": { offBall: 1 },
+	"off-ball-cutter": { offBall: 1 },
+	"corner-specialist": { offBall: 0.5 },
+	"spot-up-wing": { offBall: 0.5 },
+	"spot-up-guard": { offBall: 0.5 },
+	"dirty-work-big": { screen: 1 },
+	"roll-man": { screen: 0.5 },
+	"pick-and-pop-big": { screen: 0.5 },
+	"energy-guard": { hustle: 1, motor: 1 },
+	"energy-wing": { hustle: 1, motor: 1 },
+	"energy-forward": { hustle: 1, motor: 1 },
+	"energy-big": { hustle: 1, motor: 1 },
+	"hustle-wing": { hustle: 1 },
+	"hustle-forward": { hustle: 1 },
+	"junkyard-wing": { hustle: 0.5 },
+	"defensive-pest": { hustle: 0.5 },
+	"transition-guard": { motor: 0.5 },
+	"transition-wing": { motor: 0.5 },
+	"rim-running-four": { motor: 0.5 },
+	"mobile-big": { motor: 0.5 },
+	"switchable-guard": { defensiveVersatility: 1 },
+	"switchable-wing": { defensiveVersatility: 1 },
+	"switchable-forward": { defensiveVersatility: 1 },
+	"switch-big": { defensiveVersatility: 1 },
+	"switchable-center": { defensiveVersatility: 1 },
+	"versatile-defender": { defensiveVersatility: 1 },
+	"combo-stopper": { defensiveVersatility: 0.5 },
+	"handles-wizard": { handle: 1 },
+	"floor-general": { handle: 0.5 },
+	"pick-and-roll-operator": { handle: 0.5 },
+	"secondary-ball-handler": { handle: 0.5 },
+	"game-manager": { shotDiscipline: 1, veteranSavvy: 0.5 },
+	"mid-range-maestro": { shotDiscipline: 0.5 },
+	sharpshooter: { shotDiscipline: 0.5 },
+	"rim-protector": { foulDiscipline: 0.5 },
+	"lockdown-guard": { foulDiscipline: 0.5 },
+	"lockdown-wing": { foulDiscipline: 0.5 },
+	"veteran-floor-leader": { veteranSavvy: 1 },
+	"crafty-veteran-guard": { veteranSavvy: 1 },
+	"veteran-wing": { veteranSavvy: 1 },
+	"veteran-forward": { veteranSavvy: 1 },
+	"veteran-big": { veteranSavvy: 1 },
+	"veteran-defender": { veteranSavvy: 1 },
+};
+for (const d of ARCHETYPE_DEFS) {
+	const tie = TRAIT_TIE[d.id];
+	if (tie) {
+		d.traitTie = { ...tie, ...d.traitTie };
 	}
 }

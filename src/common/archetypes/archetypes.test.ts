@@ -43,6 +43,9 @@ import {
 } from "./position.ts";
 import { buildNorms } from "./match.ts";
 import { coverOf } from "./score.ts";
+import { VISIBLE_TRAITS, visibleTraits } from "./classify.ts";
+import { TRAIT_DEFINITIONS } from "../playerTraits/definitions.ts";
+import { TWO_K_NAMES } from "./twoK/twoK.data.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import pos from "../../worker/core/player/pos.ts";
 
@@ -559,7 +562,10 @@ describe("distribution over a generated league", () => {
 		assert.ok(max < 0.05, `max share ${max}`);
 		// Raw prospects, journeymen and veterans need players this league does not hold (or an age)
 		// (length labels need expanded ratings, which this league does not have)
-		const regular = ARCHETYPES.filter((a) => !a.age && !a.level && !a.expanded);
+		// (nor do trait labels: no traits here)
+		const regular = ARCHETYPES.filter(
+			(a) => !a.age && !a.level && !a.expanded && !a.trait,
+		);
 		const used = regular.filter((a) => (counts[a.id] ?? 0) > 0).length;
 		assert.ok(used >= regular.length - 8, `used ${used}/${regular.length}`);
 		// Common archetypes cut across positions: most of them hold several BBGM positions
@@ -596,8 +602,9 @@ describe("targeting an archetype with the regenerator", () => {
 		const wanted: string[] = [];
 		const rare = new Set(ARCHETYPES.filter((a) => a.rare).map((a) => a.id));
 		// Veterans cannot be aimed at (prospects are not 31), and these players are past the raw prospect / journeyman level
+		// (nor at trait labels, which need a trait no ratings set, or labels that need expanded ratings)
 		const pickable = ARCHETYPES.filter(
-			(a) => !rare.has(a.id) && !a.age && !a.level,
+			(a) => !rare.has(a.id) && !a.age && !a.level && !a.trait && !a.expanded,
 		);
 		let i = 0;
 		while (inputs.length < 160) {
@@ -925,5 +932,91 @@ describe("combo archetype descriptions", () => {
 			"Hounds ball handlers and picks pockets, and also spaces the floor from the corners.",
 		);
 		assert.strictEqual(combineArchetypeDescs("Scores.", undefined), "Scores.");
+	});
+});
+
+describe("player traits and expanded-ratings labels", () => {
+	test("only visible traits are read, and a trait label needs its trait", () => {
+		const hidden = Object.entries(TRAIT_DEFINITIONS)
+			.filter(([, d]) => d.visibility === "hidden")
+			.map(([k]) => k);
+		for (const k of VISIBLE_TRAITS) {
+			assert.strictEqual(
+				TRAIT_DEFINITIONS[k as keyof typeof TRAIT_DEFINITIONS].visibility,
+				"visible",
+				k,
+			);
+		}
+		const all = Object.fromEntries(hidden.map((k) => [k, 99]));
+		assert.deepStrictEqual(visibleTraits(all), {});
+		const traitLabels = ARCHETYPES.filter((a) => a.trait);
+		assert.ok(traitLabels.length >= 10);
+		const big = R({ hgt: 70, stre: 85, reb: 60, ins: 55, dnk: 60 });
+		for (const traits of [undefined, { screen: 40 }]) {
+			const { scored } = scoreAll(big, undefined, undefined, "C", 27, traits);
+			for (const s of scored) {
+				if (s.a.trait) {
+					assert.ok(
+						s.a.trait.key !== "screen" || s.z === -99,
+						`${s.a.id} without the trait`,
+					);
+				}
+			}
+		}
+		const withScreen = scoreAll(big, undefined, undefined, "C", 27, {
+			screen: 90,
+		}).scored.find((s) => s.a.id === "hard-screen-big")!;
+		assert.ok(withScreen.z > -99);
+	});
+
+	test("a stored label the league's settings no longer allow is read again", () => {
+		const e = { season: 2025, id: "hard-screen-big" };
+		assert.ok(viewOf(e, "C"));
+		assert.ok(viewOf(e, "C", { traits: true }));
+		assert.strictEqual(viewOf(e, "C", { traits: false }), null);
+		const x = { season: 2025, id: "spot-up-big", secondary: "hard-screen-big" };
+		assert.strictEqual(viewOf(x, "C", { expanded: false }), null);
+		assert.strictEqual(
+			viewOf(x, "C", { expanded: true, traits: false })?.secondaryId,
+			undefined,
+		);
+	});
+
+	test("ball security, catch-and-shoot and rebounding leans only count with expanded ratings", () => {
+		const base = R({ hgt: 25, pss: 80, drb: 70, oiq: 70 });
+		const careful = {
+			...base,
+			wng: 25,
+			pdef: 50,
+			idef: 40,
+			oreb: 40,
+			dreb: 50,
+			csh: 50,
+			dsh: 50,
+			bsc: 90,
+		};
+		const loose = { ...careful, bsc: 30 };
+		const z = (r: ArchetypeRatings, id: string) =>
+			scoreAll(r, undefined, undefined, "PG", 27).scored.find(
+				(s) => s.a.id === id,
+			)!.z;
+		assert.ok(
+			z(careful, "mistake-free-point-guard") >
+				z(loose, "mistake-free-point-guard"),
+		);
+		assert.ok(
+			z(loose, "high-risk-playmaker") > z(careful, "high-risk-playmaker"),
+		);
+		// Without expanded ratings neither can be picked
+		assert.strictEqual(z(base, "mistake-free-point-guard"), -99);
+	});
+
+	test("NBA 2K builds: every alias names an archetype, every 2K archetype is one", () => {
+		for (const id of Object.keys(TWO_K_NAMES)) {
+			assert.ok(archetypeById(id), id);
+		}
+		for (const a of ARCHETYPES.filter((x) => x.tags.includes("2k"))) {
+			assert.ok(TWO_K_NAMES[a.id]?.length, a.id);
+		}
 	});
 });
