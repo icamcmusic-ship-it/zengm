@@ -2,6 +2,7 @@ export {
 	FlavorSession,
 	hasText,
 	playersFromInitEvent,
+	contextFromInitEvent,
 	type FlavorHost,
 	type FlavorInit,
 	type FlavorResult,

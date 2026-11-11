@@ -7,6 +7,7 @@
    points, rebounds...), one of the event types below with its fields in a fixed order, or, for anything the schema can't hold exactly, the
    event as JSON. Clocks are hundredths of a second, as a change from the previous clock. Players are indexes into the header. About 7 KB a
    game. */
+import { CAREER_LENGTH } from "./career.ts";
 import { RATING_KEYS } from "./types.ts";
 
 const ALPHABET =
@@ -16,8 +17,11 @@ for (const [i, c] of [...ALPHABET].entries()) {
 	CHAR_VALUE[c] = i;
 }
 
-// 2: each player also has his temper score (player traits, for the trash talk; 0 = none). Version 1 strings still decode
-const VERSION = 2;
+// 2: each player also has his temper score (player traits, for the trash talk; 0 = none).
+// 3: the header starts with how heated the teams' rivalry is (0 none, 1 heated, 2 bitter), and each player also has what he had done before
+// the game (career.ts: games played, career and season highs, career totals; a flag, then CAREER_LENGTH numbers, 0 = not known).
+// Version 1 and 2 strings still decode
+const VERSION = 3;
 
 // Stats, most common first. Keep in sync with STORED_STATS in GameSim.basketball/PlayByPlayLogger.ts. Never reorder: stored games use these
 const STATS = [
@@ -157,6 +161,7 @@ export type StoredPlayer = {
 	pid: number;
 	t: 0 | 1;
 	ratings: Record<string, number> | undefined;
+	career?: number[];
 };
 
 const isInt = (x: unknown): x is number =>
@@ -231,6 +236,10 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 						pid: p.id,
 						t: t === 1 ? 1 : 0,
 						ratings: p.pbpRatings,
+						career:
+							Array.isArray(p.pbpCareer) && p.pbpCareer.length >= CAREER_LENGTH
+								? p.pbpCareer
+								: undefined,
 					});
 				}
 			}
@@ -393,6 +402,8 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 
 	const head = new Writer();
 	head.num(VERSION);
+	const rivalry = init?.boxScore?.[0]?.pbpRivalry;
+	head.num(isInt(rivalry) ? rivalry : 0);
 	head.num(players.length);
 	for (const p of players) {
 		head.num(p.pid);
@@ -417,6 +428,15 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 				? Math.max(0, Math.round(temper)) + 1
 				: 0,
 		);
+		if (p.career) {
+			head.num(1);
+			for (let i = 0; i < CAREER_LENGTH; i++) {
+				const v = p.career[i];
+				head.num(isInt(v) ? v + 1 : 0);
+			}
+		} else {
+			head.num(0);
+		}
 	}
 
 	return head.out + body.out;
@@ -425,12 +445,13 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 // The string back to the players (in the sim's roster order) and the events, as the sim logged them (minus the stats left out)
 export const decodePlayByPlay = (
 	s: string,
-): { players: StoredPlayer[]; events: any[] } => {
+): { players: StoredPlayer[]; events: any[]; rivalry: number } => {
 	const r = new Reader(s);
 	const version = r.num();
-	if (version !== VERSION && version !== 1) {
+	if (version < 1 || version > VERSION) {
 		throw new Error(`Unknown stored play-by-play version ${version}`);
 	}
+	const rivalry = version >= 3 ? r.num() : 0;
 	const numPlayers = r.num();
 	const players: StoredPlayer[] = [];
 	for (let i = 0; i < numPlayers; i++) {
@@ -453,7 +474,14 @@ export const decodePlayByPlay = (
 				ratings["temper"] = temper - 1;
 			}
 		}
-		players.push({ pid, t, ratings });
+		let career: number[] | undefined;
+		if (version >= 3 && r.num() === 1) {
+			career = [];
+			for (let j = 0; j < CAREER_LENGTH; j++) {
+				career.push(r.num() - 1);
+			}
+		}
+		players.push(career ? { pid, t, ratings, career } : { pid, t, ratings });
 	}
 
 	const pidOf = (x: number) => (x === 0 ? undefined : players[x - 1]?.pid);
@@ -537,13 +565,15 @@ export const decodePlayByPlay = (
 		events.push(e);
 	}
 
-	return { players, events };
+	return { players, events, rivalry };
 };
 
 // The init event the live view starts from, for a stored game: players in the sim's order, with names and positions from the box score
 export const storedInitEvent = (
 	players: StoredPlayer[],
 	boxScoreTeams: readonly { players: readonly any[] }[],
+	// (how heated the rivalry was: decodePlayByPlay's rivalry)
+	rivalry = 0,
 ) => {
 	const info = new Map<number, { name: string; pos: string }>();
 	for (const t of boxScoreTeams) {
@@ -551,7 +581,13 @@ export const storedInitEvent = (
 			info.set(p.pid, { name: p.name, pos: p.pos });
 		}
 	}
-	const teams: { player: any[] }[] = [{ player: [] }, { player: [] }];
+	const teams: { player: any[]; pbpRivalry?: number }[] = [
+		{ player: [] },
+		{ player: [] },
+	];
+	if (rivalry > 0) {
+		teams[0]!.pbpRivalry = rivalry;
+	}
 	for (const p of players) {
 		const i = info.get(p.pid);
 		teams[p.t]!.player.push({
@@ -559,6 +595,7 @@ export const storedInitEvent = (
 			name: i?.name ?? "???",
 			pos: i?.pos ?? "",
 			pbpRatings: p.ratings,
+			...(p.career ? { pbpCareer: p.career } : undefined),
 		});
 	}
 	return { type: "init", boxScore: teams };

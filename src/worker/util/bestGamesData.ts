@@ -68,6 +68,7 @@ const gameForPlays = (gm: Game): GameForPlays => {
 		numPeriods: (gm as any).numPeriods ?? g.get("numPeriods"),
 		quarterLength: (gm as any).quarterLength ?? g.get("quarterLength"),
 		female: female(),
+		playoffs: !!gm.playoffs,
 		teams: [team(0), team(1)],
 		clutchPlays: gm.clutchPlays,
 	};
@@ -84,8 +85,8 @@ const playsOfGameRaw = (gm: Game): TopPlay[] => {
 	const pbp = (gm as any).pbp;
 	if (typeof pbp === "string" && pbp.length > 0) {
 		try {
-			const { players, events } = decodePlayByPlay(pbp);
-			const init = storedInitEvent(players, gm.teams);
+			const { players, events, rivalry } = decodePlayByPlay(pbp);
+			const init = storedInitEvent(players, gm.teams, rivalry);
 			return playsFromPbp(game, init, events);
 		} catch {
 			// Unreadable play-by-play: fall back to the clutch plays

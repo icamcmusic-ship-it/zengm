@@ -4,7 +4,11 @@
 // (game.clutchPlays: game-winners, shots to force overtime, defensive stops, recorded by the sim) are the plays.
 // Pure and deterministic.
 import { formatClock } from "../formatClock.ts";
-import { FlavorSession, playersFromInitEvent } from "../pbpFlavor/index.ts";
+import {
+	FlavorSession,
+	contextFromInitEvent,
+	playersFromInitEvent,
+} from "../pbpFlavor/index.ts";
 import type { FlavorHost, FlavorStat } from "../pbpFlavor/index.ts";
 import { clutchText } from "../hype/util.ts";
 
@@ -116,6 +120,7 @@ export type GameForPlays = {
 	numPeriods?: number;
 	quarterLength?: number;
 	female?: boolean;
+	playoffs?: boolean;
 	teams: [GameTeamForPlays, GameTeamForPlays];
 	clutchPlays?: string[];
 };
@@ -218,6 +223,8 @@ export const playsFromPbp = (
 			{ name: game.teams[1].name, abbrev: game.teams[1].abbrev },
 		],
 		players: playersFromInitEvent(initEvent),
+		// (as the live view and the box score word it)
+		context: { playoffs: !!game.playoffs, ...contextFromInitEvent(initEvent) },
 	});
 	const score: [number, number] = [0, 0];
 	const stats = new Map<number, FlavorStat>();

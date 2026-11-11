@@ -1344,6 +1344,10 @@ export function missText(rng: any, e: any, ctx: any) {
 			n + "'s putback attempt is off",
 			n + " can't convert the second chance",
 			n + "'s tip rolls around and out",
+			n + "'s follow shot won't go",
+			n + " can't finish the putback",
+			n + "'s tip-in try is off",
+			n + " goes back up with it and misses again",
 		]);
 	}
 	const w = (x, t) => [x, t];
@@ -1389,6 +1393,18 @@ export function missText(rng: any, e: any, ctx: any) {
 			w(0.7, n + "'s three clanks off the front rim"),
 			w(0.6, n + "'s three from above the break is off line"),
 			w(r.tp >= 78 ? 0.3 : 0, n + "'s logo three is way off"),
+			w(0.7, n + "'s three won't go"),
+			w(0.7, n + " can't connect from deep"),
+			w(0.7, n + "'s three bounces off the rim"),
+			w(0.6, n + "'s three from the wing is long"),
+			w(0.6, n + " has a good look at a three, but it's off"),
+			w(0.6, n + "'s three catches the front of the rim"),
+			w(0.6, n + " fires from deep; no good"),
+			w(0.5, n + "'s three rattles around and out"),
+			w(0.5, n + "'s three from the top is off to the left"),
+			w(0.5, n + " leaves the three short"),
+			w(0.5, n + "'s three-point try glances off the rim"),
+			w(0.4, n + " can't get the three to fall"),
 			w(r.drb >= 60 ? 0.5 : 0, n + "'s step-back three is short"),
 		])[1];
 	}
@@ -1426,6 +1442,19 @@ export function missText(rng: any, e: any, ctx: any) {
 		w(0.5, n + "'s scoop shot is off"),
 		w(0.5, n + " misses a reverse layup"),
 		w(0.5, n + "'s teardrop is too strong"),
+		w(0.7, n + "'s layup won't go"),
+		w(0.7, n + " leaves the layup short"),
+		w(0.6, n + "'s layup rims out"),
+		w(0.6, n + " can't convert in the lane"),
+		w(0.6, n + "'s shot in the paint is off"),
+		w(0.6, n + " gets to the rim but misses"),
+		w(0.5, n + "'s floater is short"),
+		w(0.5, n + "'s runner in the lane rims out"),
+		w(0.5, n + " misses from point-blank range"),
+		w(0.5, n + "'s layup spins off the rim"),
+		w(0.4, n + " puts too much on the layup"),
+		w(0.4, n + "'s driving layup is off the mark"),
+		w(0.4, n + " misses a short one in the paint"),
 		w(
 			r.dnk >= 70 ? 0.4 : 0,
 			n + " tries to throw it down but it's off the back iron",
@@ -1443,6 +1472,16 @@ export function missText(rng: any, e: any, ctx: any) {
 		w(0.7, n + "'s up-and-under rolls out"),
 		w(0.7, n + "'s turnaround from the block is off"),
 		w(0.5, n + " misses a running hook in the lane"),
+		w(0.7, n + "'s hook shot is long"),
+		w(0.7, n + " misses from the low block"),
+		w(0.6, n + "'s turnaround won't fall"),
+		w(0.6, n + " can't score over his man in the post"),
+		w(0.6, n + "'s drop-step shot rolls off"),
+		w(0.5, n + "'s jump hook is off the back rim"),
+		w(0.5, n + " misses a short turnaround"),
+		w(0.5, n + "'s shot from the block is off"),
+		w(0.4, n + " spins baseline and misses"),
+		w(0.4, n + "'s post move comes up empty"),
 	];
 	const mid = [
 		w(1, n + "'s jumper hits the front rim"),
@@ -1461,6 +1500,18 @@ export function missText(rng: any, e: any, ctx: any) {
 		w(0.7, n + "'s turnaround jumper clanks off the rim"),
 		w(0.6, n + "'s fadeaway from the baseline is long"),
 		w(0.5, n + "'s elbow jumper rattles out"),
+		w(0.7, n + " misses a mid-range jumper"),
+		w(0.7, n + "'s jumper is off the mark"),
+		w(0.6, n + "'s pull-up is short"),
+		w(0.6, n + " misses from 15 feet"),
+		w(0.6, n + "'s jumper from the wing won't go"),
+		w(0.6, n + "'s shot from the elbow bounces out"),
+		w(0.5, n + " can't get the jumper to fall"),
+		w(0.5, n + "'s jumper glances off the rim"),
+		w(0.5, n + " misses a long two"),
+		w(0.5, n + "'s baseline jumper is off the side of the rim"),
+		w(0.4, n + "'s pull-up from the wing rattles out"),
+		w(0.4, n + " leaves the jumper short"),
 	];
 	if (z === "rim") {
 		return pickW(rng, rim)[1];
@@ -1639,6 +1690,17 @@ export function tovText(rng: any, e: any, ctx: any) {
 			s + " reaches in cleanly and takes it from " + n,
 			s + " blindsides " + n + " and pokes it away",
 			s + " rips it right out of " + n + "'s hands",
+			s + " takes it away from " + n,
+			s + " comes up with a steal on " + n,
+			s + " knocks it loose from " + n + " and grabs it",
+			s + " has quick hands: he takes it from " + n,
+			s + " slaps the ball away from " + n + " and controls it",
+			s + " pokes the ball free from " + n + " and picks it up",
+			s + " times " + n + "'s dribble and swipes it",
+			s + " pressures " + n + " into coughing it up",
+			s + " strips " + n + " on the way up",
+			s + " lifts it from " + n + " near midcourt",
+			s + " pries the ball away from " + n,
 		]) {
 			add(1, t);
 		}
@@ -2012,6 +2074,8 @@ export function rebText(
 				p.name + " scoops up the loose ball after the block",
 				p.name + " collects the blocked shot",
 				p.name + " corrals the block",
+				p.name + " picks up the pieces after the block",
+				p.name + " runs down the blocked shot",
 			]);
 		}
 		return pickV(rng, [
@@ -2043,6 +2107,24 @@ export function rebText(
 			p.name + " out-muscles everyone for the offensive rebound",
 			p.name + " fights through the box-out and tips it to himself",
 			p.name + " keeps it alive with a tap and then grabs it",
+			p.name + " follows the miss and grabs it",
+			p.name + " is first to the ball: offensive rebound",
+			p.name + " gets inside position and pulls down the offensive board",
+			p.name + " reaches over the top for the offensive rebound",
+			p.name + " hauls in the miss for a second chance",
+			p.name + " tracks the ball off the rim and gets it back",
+			p.name + " slips inside for the offensive board",
+			p.name + " gives his team another look with the rebound",
+			p.name + " tips it twice and finally controls it",
+			p.name + " gets it back on the offensive glass",
+			"second chance: " + p.name + " has the rebound",
+			p.name + " beats his man to the miss",
+			three
+				? p.name + " runs down the long carom for another possession"
+				: p.name + " snares the miss right at the rim",
+			p.R.hgt >= 62
+				? p.name + " goes up over everyone for the offensive board"
+				: p.name + " darts in from the perimeter for the offensive board",
 		]);
 	}
 	return pickV(rng, [
@@ -2071,5 +2153,31 @@ export function rebText(
 		p.name + " walls off his man for the rebound",
 		p.name + " carves out space and pulls down the rebound",
 		p.name + " boxes out and lets the ball come to him",
+		p.name + " cleans it up",
+		p.name + " hauls in the rebound",
+		p.name + " has the rebound",
+		p.name + " gathers in the miss",
+		p.name + " is there for the rebound",
+		p.name + " takes it off the rim",
+		p.name + " controls the rebound",
+		p.name + " picks the miss out of the air",
+		p.name + " gets the board and looks up the floor",
+		p.name + " cradles the rebound",
+		p.name + " goes up with two hands for the board",
+		p.name + " pulls it in off the glass",
+		p.name + " tracks the miss and grabs it",
+		p.name + " reels in the rebound",
+		"rebound, " + p.name,
+		"the miss goes to " + p.name,
+		p.name + " ends up with the ball",
+		three
+			? p.name + " chases down the long carom"
+			: p.name + " grabs it in the lane",
+		p.R.reb >= 65
+			? p.name + " swallows up another rebound"
+			: p.name + " comes away with the defensive board",
+		p.R.hgt < 55
+			? p.name + " darts in to grab the rebound among the big men"
+			: p.name + " reaches up and takes it",
 	]);
 }
