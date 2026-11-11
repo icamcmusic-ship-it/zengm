@@ -105,6 +105,10 @@ export const titleSeasons = (X: LeagueIndex, p: WPlayer) =>
 export const isActive = (X: LeagueIndex, p: WPlayer) =>
 	p.retiredYear > X.L.season && p.tid >= 0;
 
+// A finished career. Not the same as !isActive: an unsigned free agent is neither (and his retiredYear is Infinity)
+export const isRetired = (X: LeagueIndex, p: WPlayer) =>
+	p.retiredYear <= X.L.season;
+
 // ---- helpers for the kinds ----
 
 export type RateKey =
