@@ -76,6 +76,46 @@ const Coach = ({ awards, coach: c, stats, transactions }: View<"coach">) => {
 						))}
 					</div>
 					<div>Style: {c.styleText}</div>
+					{c.systems ? (
+						<div data-testid="coach-systems">
+							<div>
+								Offense: <b>{c.systems.offense}</b> · Defense:{" "}
+								<b>{c.systems.defense}</b>
+							</div>
+							<div>
+								{c.systems.philosophy} · {c.systems.personality} ·{" "}
+								{c.systems.background} · Game management {c.systems.mgmt} ·
+								Adaptability {c.systems.adapt}
+							</div>
+							<div>
+								Reputation: {c.systems.reputation} ({c.systems.reputationText})
+								{c.systems.hotSeatText
+									? ` · Hot seat: ${c.systems.hotSeatText}`
+									: ""}
+								{c.systems.mentor ? (
+									<>
+										{" "}
+										· Coaching tree:{" "}
+										<a
+											href={helpers.leagueUrl(["coach", c.systems.mentor.cid])}
+										>
+											{c.systems.mentor.name}
+										</a>
+									</>
+								) : null}
+							</div>
+							{c.tid >= 0 && c.role === "head" && c.abbrev ? (
+								<a
+									href={helpers.leagueUrl([
+										"coach_notes",
+										`${c.abbrev}_${c.tid}`,
+									])}
+								>
+									Coach's notes
+								</a>
+							) : null}
+						</div>
+					) : null}
 					{c.headSeasons > 0 ? (
 						<div>
 							Head coach record: {c.headWon}-{c.headLost} in {c.headSeasons}{" "}

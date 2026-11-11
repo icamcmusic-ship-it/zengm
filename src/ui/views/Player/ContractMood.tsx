@@ -31,6 +31,7 @@ const COMPONENT_LABELS: Record<keyof MoodSnapshot["components"], string> = {
 	difficulty: "Difficulty",
 	relatives: "Relatives",
 	lockerRoom: "Locker room",
+	coachFit: "Coach & system",
 };
 
 // Tiny line chart, values plotted left to right. A dashed line marks 0.

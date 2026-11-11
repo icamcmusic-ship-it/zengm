@@ -27,6 +27,8 @@ export type RotationPlayer = {
 	ptModifier: number;
 	// Injury Depth minutes restriction (1 = none), also already in ptModifier
 	minutesRestriction?: number;
+	// Coaching systems: the coach's trust in young players or veterans (1 = none)
+	coachMinutesMult?: number;
 };
 
 export type RotationPlanOptions = {
@@ -37,6 +39,8 @@ export type RotationPlanOptions = {
 	// Hook for a coach's rotation style (a later batch): -1 a tight rotation (more minutes for the top of the roster) ... 0 normal
 	// ... 1 a deep bench. Undefined = 0
 	rotationStyle?: number;
+	// Coaching systems: minutes the starters give up on the second night of a back-to-back (rest philosophy). Undefined = 2
+	backToBackCut?: number;
 };
 
 // Minutes targets per regulation game, in the order of players (0 for injured players and the end of the bench). They sum to
@@ -75,11 +79,14 @@ export const planMinutes = (
 			const gap = p.valueNoPot - fifthValue;
 			target += STAR_BONUS * Math.max(0, Math.min(1, gap / STAR_VALUE_GAP));
 			if (options.backToBack) {
-				target -= BACK_TO_BACK_STARTER_CUT;
+				target -= options.backToBackCut ?? BACK_TO_BACK_STARTER_CUT;
 			}
 		} else if (options.backToBack && rank < 10 && !options.allStarGame) {
 			// ... and the next five get those minutes
-			target += BACK_TO_BACK_STARTER_CUT * scale;
+			target += (options.backToBackCut ?? BACK_TO_BACK_STARTER_CUT) * scale;
+		}
+		if (p.coachMinutesMult !== undefined) {
+			target *= p.coachMinutesMult;
 		}
 		// Coach style: tight rotations pull minutes toward the top 7, deep ones spread them
 		if (style !== 0) {

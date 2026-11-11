@@ -10,6 +10,7 @@ import {
 	team,
 	trade,
 } from "../index.ts";
+import * as staff from "../staff/index.ts";
 import loadTeams from "./loadTeams.ts";
 import { getPbpRivalryLevels, pbpRivalryLevel } from "../../util/pbpRivalry.ts";
 import { setPbpGameContext } from "../../util/pbpGameContext.ts";
@@ -682,6 +683,8 @@ const play = async (
 				}
 				// Records, streaks and former teams, for the tip-off of the play-by-play only
 				await setPbpGameContext(schedule, teams);
+				// Coaching systems (the coachSystems setting): each team's coach's tendencies for the sim
+				await staff.applyCoachSystems(schedule, teams);
 			}
 
 			await cbSimGames(schedule, teams, dayOver);

@@ -37,6 +37,66 @@ export type CoachSeason = {
 	tied: number;
 	otl: number;
 	playoffRoundsWon: number;
+	// Coaching systems (coachSystems setting): the season's preseason expectation (win%, from the Season Odds rating model), the
+	// development of the team's young players (average ovr change of players 24 and under, relative to the league's) and the systems used
+	expectedPct?: number;
+	dev?: number;
+	off?: OffenseSystem;
+	def?: DefenseSystem;
+};
+
+// Coaching systems (coachSystems setting, see common/coachSystems.ts)
+export type OffenseSystem =
+	| "motion"
+	| "paceSpace"
+	| "heliocentric"
+	| "post"
+	| "iso"
+	| "princeton"
+	| "sevenSeconds";
+
+export type DefenseSystem =
+	| "switch"
+	| "drop"
+	| "blitz"
+	| "packPaint"
+	| "zone"
+	| "press";
+
+export type CoachBackground = "guard" | "big" | "analytics" | "defense";
+
+// A coach's identity beyond CoachStyle. Dials are -1 to 1, mgmt/adapt 0-100. Derived deterministically from the coach (style, ratings,
+// name) when missing (getCoachProfile), so coaches from before the setting existed get one without any random draws
+export type CoachProfile = {
+	off: OffenseSystem;
+	def: DefenseSystem;
+	// -1 get back in transition ... 1 crash the offensive glass
+	crash: number;
+	// -1 disciplined, few fouls ... 1 physical, lots of fouls
+	fouls: number;
+	// -1 closes games with the system (ball movement) ... 1 gives it to the star
+	closing: number;
+	// -1 saves timeouts for the end ... 1 quick trigger
+	timeouts: number;
+	// -1 trusts veterans ... 1 trusts young players
+	youth: number;
+	// -1 rests nobody ... 1 load management on back-to-backs
+	rest: number;
+	// -1 win now ... 1 development
+	philosophy: number;
+	// -1 disciplinarian ... 1 players' coach
+	personality: number;
+	background: CoachBackground;
+	// Late-game management (timeouts, fouling, closing) 0-100
+	mgmt: number;
+	// How readily he changes his system to fit the roster, 0-100 (stubborn below ~30)
+	adapt: number;
+	// The season the current system started with the current team (installation)
+	since?: number;
+	// Preseason expectation for his team (win%, the Season Odds rating model), for the hot seat
+	expect?: { season: number; tid: number; pct: number };
+	// Coaching tree: the head coach he worked under (assistants who become head coaches)
+	mentor?: { cid: number; name: string };
 };
 
 export type CoachTransactionType =
@@ -68,6 +128,8 @@ export type CoachWithoutKey = {
 	role: CoachRole;
 	ratings: CoachRatings;
 	style: CoachStyle;
+	// Coaching systems (coachSystems setting). Missing for coaches from before it: see getCoachProfile
+	profile?: CoachProfile;
 	// Thousands of dollars per season, counts against expenses (not the salary cap)
 	contract: {
 		amount: number;

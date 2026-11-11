@@ -407,6 +407,23 @@ export type NewsFacts = {
 	lottery?: NPLotteryRow[];
 	// Players released this season
 	releases?: NPRelease[];
+	// Coaching systems (the coachSystems setting): head coaches' systems and hot seats
+	coaching?: NPCoaching;
+};
+
+export type NPCoaching = {
+	heads: {
+		tid: number;
+		cid: number;
+		name: string;
+		offense: string;
+		defense: string;
+		// 0 safe ... 1 about to be fired
+		heat: number;
+		// preseason expectation (win%), when known
+		expectedPct?: number;
+		fit: number;
+	}[];
 };
 
 export type NPLotteryRow = {

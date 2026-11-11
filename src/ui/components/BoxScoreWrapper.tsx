@@ -1,4 +1,6 @@
 import { useFeatureOn } from "../util/nativeFeatures.ts";
+import { DEFENSE_NAMES, OFFENSE_NAMES } from "../../common/coachSystems.ts";
+import type { DefenseSystem, OffenseSystem } from "../../common/types.ts";
 import clsx from "clsx";
 import {
 	useCallback,
@@ -1085,6 +1087,32 @@ const PlayoffRecord = ({
 };
 
 // Games whose play-by-play was revealed with the button, remembered for this browser session
+// Coaching systems: each team's offense and defense system (stored with the game)
+const CoachSystemsLine = ({ teams }: { teams: any[] }) => {
+	if (!teams?.[0]?.coachSys || !teams?.[1]?.coachSys) {
+		return null;
+	}
+	return (
+		<div
+			className="text-center text-body-secondary small mt-1"
+			data-testid="box-score-coach-systems"
+		>
+			{teams.map((t, i) => {
+				const off = OFFENSE_NAMES[t.coachSys.off as OffenseSystem];
+				const def = DEFENSE_NAMES[t.coachSys.def as DefenseSystem];
+				if (!off || !def) {
+					return null;
+				}
+				return (
+					<span key={i} className="d-inline-block mx-2">
+						{t.abbrev}: {off} / {def}
+					</span>
+				);
+			})}
+		</div>
+	);
+};
+
 const PBP_REVEALED_KEY = "box-score-pbp-revealed";
 const revealedPbp = new Set<string>();
 try {
@@ -1323,6 +1351,7 @@ export const BoxScoreWrapper = ({
 							t1={t1}
 						/>
 					</div>
+					<CoachSystemsLine teams={boxScore.teams} />
 				</div>
 				<TeamLogo season={boxScore.season} t={t1} />
 			</div>

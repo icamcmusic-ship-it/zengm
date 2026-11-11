@@ -1,4 +1,11 @@
 import { featureOffError } from "../util/nativeFeatures.ts";
+import {
+	coachSystemsEnabled,
+	getCoachProfile,
+	getTeamCoachSystem,
+	hotSeatNow,
+} from "../core/staff/systems.ts";
+import { DEFENSE_NAMES, OFFENSE_NAMES } from "../../common/coachSystems.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import { getCurrentContract } from "../../common/contracts.ts";
 import { buildPaper } from "../../common/newspaper/index.ts";
@@ -941,6 +948,29 @@ export const getNewsFacts = async (
 		releases,
 		...history,
 	};
+	// Coaching systems: head coaches' systems and hot seats (current season only)
+	if (season === g.get("season") && coachSystemsEnabled()) {
+		const heads: NonNullable<NewsFacts["coaching"]>["heads"] = [];
+		for (const c of await idb.cache.coaches.getAll()) {
+			if (c.tid < 0 || c.role !== "head") {
+				continue;
+			}
+			const sys = await getTeamCoachSystem(c.tid);
+			const profile = getCoachProfile(c);
+			heads.push({
+				tid: c.tid,
+				cid: c.cid,
+				name: `${c.firstName} ${c.lastName}`,
+				offense: OFFENSE_NAMES[profile.off],
+				defense: DEFENSE_NAMES[profile.def],
+				heat: await hotSeatNow(c),
+				expectedPct:
+					profile.expect?.season === season ? profile.expect.pct : undefined,
+				fit: sys?.fit ?? 50,
+			});
+		}
+		facts.coaching = { heads };
+	}
 	return { facts, logos };
 };
 

@@ -359,6 +359,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "coachSystems",
+		key: "coachSystems",
+		name: "Coaching Systems",
+		description:
+			"Head coaches run an offense system (Motion, Pace & Space, Heliocentric PnR, Post, Isolation, Princeton, Seven Seconds or Less) and a defense system (Switch Everything, Drop Coverage, Blitz, Pack the Paint, Zone, Full-Court Press) that change how their team plays: shot mix, pace, transition, usage, turnovers forced, fouls, the offensive glass, rotations and late-game management. Rosters fit systems better or worse, new systems take part of a season to install, coaches adapt, and reputation, hot seats and coaching trees drive the coaching market. League averages stay the same. Needs Coaching Staff.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		key: "featureSeasonOdds",
 		name: "Season Odds",

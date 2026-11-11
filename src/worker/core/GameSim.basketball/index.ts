@@ -46,6 +46,10 @@ import type {
 	ClutchPlayerRef,
 } from "../../../common/pbpFlavor/clutch.ts";
 import PlayByPlayLogger from "./PlayByPlayLogger.ts";
+import {
+	NEUTRAL_COACH_SIM,
+	type CoachSim,
+} from "../../../common/coachSystems.ts";
 import { choice, truncGauss, uniform } from "../../../common/random.ts";
 import {
 	lateGameSituationWeight,
@@ -202,6 +206,8 @@ type PlayerGameSim = {
 type TeamGameSim = {
 	id: number;
 	pace: number; // mean number of possessions the team likes to have in a game
+	// Coaching systems (the coachSystems setting, common/coachSystems.ts), set by staff/systems.ts applyCoachSystems. Undefined: no effect
+	coachSim?: CoachSim;
 	stat: any;
 	compositeRating: any;
 	player: PlayerGameSim[];
@@ -252,6 +258,12 @@ const getSortedIndexes = (ovrs: number[]) => {
 };
 
 const STOCK_SYNERGY_CUTOFFS = { Di: 0.57, Dp: 0.61, R: 0.61 };
+
+const NEUTRAL_CS: CoachSim = {
+	...NEUTRAL_COACH_SIM,
+	off: "motion",
+	def: "switch",
+};
 
 // Use if denominator of prob might be 0
 const boundProb = (prob: number) => helpers.bound(prob, 0.001, 0.999);
@@ -395,6 +407,10 @@ class GameSim extends GameSimBase {
 	pickingTechFoul = false;
 	possTimeScale = 1;
 	gameClockFactor = 1;
+	// Coaching systems (the coachSystems setting, see common/coachSystems.ts): each team's multipliers. When neither team has them, nothing
+	// below is used and no random numbers are drawn differently, so games play out exactly as before
+	coachSys = false;
+	cs: [CoachSim, CoachSim] = [NEUTRAL_CS, NEUTRAL_CS];
 	// The current segment of the possession followed a shot or free throw attempt (for the shot clock reset when it goes out off the defense)
 	afterShotAttempt = false;
 	skillsCountCache = new Map<
@@ -452,6 +468,14 @@ class GameSim extends GameSimBase {
 					p.gameZ = gaussian();
 				}
 			}
+		}
+
+		if (teams[0].coachSim || teams[1].coachSim) {
+			this.coachSys = true;
+			this.cs = [
+				teams[0].coachSim ?? NEUTRAL_CS,
+				teams[1].coachSim ?? NEUTRAL_CS,
+			];
 		}
 
 		this.perimeterDefense = nativeFeatureEnabled("perimeterDefense", (key) =>
@@ -516,6 +540,12 @@ class GameSim extends GameSimBase {
 				teamPaceFactor(this.team[0].pace),
 				teamPaceFactor(this.team[1].pace),
 			];
+			if (this.coachSys) {
+				this.teamPaceFactor = [
+					this.teamPaceFactor[0] * this.cs[0].pace,
+					this.teamPaceFactor[1] * this.cs[1].pace,
+				];
+			}
 		}
 
 		this.foulsThisQuarter = [0, 0];
@@ -866,6 +896,15 @@ class GameSim extends GameSimBase {
 			}
 
 			const finalPeriod = period === this.numPeriods;
+			// Coaching systems: a quick-trigger coach has used a timeout by now (to stop runs), so he has one fewer for the end
+			if (finalPeriod && this.coachSys) {
+				for (const t of teamNums) {
+					if (this.cs[t].burnTimeout && this.timeouts[t] > 1) {
+						this.timeouts[t] -= 1;
+						this.logTimeouts();
+					}
+				}
+			}
 			/*if (finalPeriod) {
 				this.setMaxTimeouts(NUM_TIMEOUTS_MAX_FINAL_PERIOD);
 			}*/
@@ -1003,7 +1042,7 @@ class GameSim extends GameSimBase {
 		const intentionalFoul =
 			offenseWinningByABit &&
 			this.team[0].stat.ptsQtrs.length >= this.numPeriods &&
-			this.t < 27 &&
+			this.t < (this.coachSys ? this.cs[this.d].foulWindow : 27) &&
 			this.t > 0.3 &&
 			this.getNumFoulsUntilBonus() <= 10;
 
@@ -1033,6 +1072,10 @@ class GameSim extends GameSimBase {
 
 		if (this.traitsOn) {
 			probability *= this.traitMean(this.d, (e) => e.foulProneness, 1);
+		}
+
+		if (this.coachSys) {
+			probability *= this.cs[this.d].foul;
 		}
 
 		return probability * g.get("foulRateFactor");
@@ -1195,14 +1238,16 @@ class GameSim extends GameSimBase {
 					injured: p.injured,
 					ptModifier: this.allStarGame ? 1 : p.ptModifier,
 					minutesRestriction: (p as any).minutesRestriction,
+					coachMinutesMult: (p as any).coachMinutesMult,
 				})),
 				{
 					playoffs,
 					backToBack: !!(t as any).backToBack,
 					numPlayersOnCourt: this.numPlayersOnCourt,
 					allStarGame: this.allStarGame,
-					// Hook for a coach's rotation style (not set yet)
+					// The coach's rotation style and rest philosophy (coaching systems, staff/systems.ts applyCoachSystems)
 					rotationStyle: (t as any).rotationStyle,
+					backToBackCut: (t as any).backToBackCut,
 				},
 			);
 			for (const [i, p] of t.player.entries()) {
@@ -1713,9 +1758,9 @@ class GameSim extends GameSimBase {
 	// (techProneness or flagrantProneness, 1 for an average temper). Exactly 1 with traits off
 	traitTemperRate(t: TeamNum, type: "tech" | "flagrant") {
 		if (!this.traitsOn) {
-			return 1;
+			return this.coachSys ? this.cs[t].temper : 1;
 		}
-		return this.traitMean(
+		return (this.coachSys ? this.cs[t].temper : 1) * this.traitMean(
 			t,
 			type === "tech" ? (e) => e.techProneness : (e) => e.flagrantProneness,
 			1,
@@ -2295,7 +2340,7 @@ class GameSim extends GameSimBase {
 			}
 		}
 
-		const shooter = this.pickPlayer("usage", this.o, 1.25);
+		const shooter = this.pickPlayer("usage", this.o, this.usagePower());
 
 		// Flagrant foul? (only with the technicalFouls setting, so otherwise no random number is drawn here)
 		if (
@@ -2326,7 +2371,10 @@ class GameSim extends GameSimBase {
 			const upperLimitMax =
 				clockFactor === "catchUp" ? 4 : clockFactor === "maintainLead" ? 8 : 6;
 			const max = Math.max(Math.min(this.t - 0.3, upperLimitMax), 0);
-			const dt = uniform(min, max);
+			let dt = uniform(min, max);
+			if (this.coachSys) {
+				dt = Math.min(dt / this.cs[this.o].pace, max);
+			}
 			this.advanceClockSeconds(dt);
 		}
 
@@ -2415,7 +2463,11 @@ class GameSim extends GameSimBase {
 						takeTimeout = true;
 					} else if (this.t < 60 && this.isClockRunning) {
 						// If time is a little low, sometimes take a timeout to advance ball
-						if ((this.t - 25) / (60 - 25) < Math.random()) {
+						// (coaching systems: better game managers use them more readily)
+						const mgmt = this.coachSys
+							? (this.cs[this.o].foulWindow - 27) / 6
+							: 0;
+						if (((this.t - 25) / (60 - 25)) * (1 - 0.3 * mgmt) < Math.random()) {
 							takeTimeout = true;
 						}
 					}
@@ -2594,7 +2646,9 @@ class GameSim extends GameSimBase {
 			// (down 3, most teams play for a stop and a three, but with the leader about to run out the clock, foul)
 			prob = shotClockOff && this.t > 10 ? 1 : 0;
 		} else if (lead <= 6) {
-			prob = this.t <= 35 ? 1 : this.t <= 60 ? 0.3 : 0;
+			// (coaching systems: better game managers start fouling at the right time, worse ones late)
+			const w = this.coachSys ? this.cs[this.d].foulWindow / 27 : 1;
+			prob = this.t <= 35 * w ? 1 : this.t <= 60 * w ? 0.3 : 0;
 		} else if (lead <= 9) {
 			prob = this.t <= 60 ? 0.5 : this.t <= 90 ? 0.15 : 0;
 		} else if (lead <= 12) {
@@ -2666,6 +2720,10 @@ class GameSim extends GameSimBase {
 				probTransition *= 0.3;
 			} else if (clockFactor === "catchUp") {
 				probTransition *= 1.5;
+			}
+			if (this.coachSys) {
+				probTransition *=
+					this.cs[this.o].transition * this.cs[this.d].oppTransition;
 			}
 			if (Math.random() < probTransition) {
 				shotAt = k * drawTransitionTime();
@@ -2766,7 +2824,7 @@ class GameSim extends GameSimBase {
 			return this.doOutOfBounds(1);
 		}
 
-		const shooter = this.pickPlayer("usage", this.o, 1.25);
+		const shooter = this.pickPlayer("usage", this.o, this.usagePower());
 
 		// Flagrant foul? (only with the technicalFouls setting)
 		if (
@@ -2866,8 +2924,11 @@ class GameSim extends GameSimBase {
 			: (g.get("turnoverFactor") *
 					(0.14 * this.team[this.d].compositeRating.defense)) /
 				(0.5 * (o.dribbling + o.passing));
+		const prob2 = this.coachSys
+			? prob * this.cs[this.o].tov * this.cs[this.d].forceTov
+			: prob;
 		return boundProb(
-			this.traitsOn ? prob * this.traitTurnoverMult(this.o) : prob,
+			this.traitsOn ? prob2 * this.traitTurnoverMult(this.o) : prob2,
 		);
 	}
 
@@ -2922,7 +2983,10 @@ class GameSim extends GameSimBase {
 				(0.5 *
 					(this.team[this.o].compositeRating.dribbling +
 						this.team[this.o].compositeRating.passing)));
-		const prob2 = this.expandedRatings ? prob * EXPANDED_STL_FACTOR : prob;
+		let prob2 = this.expandedRatings ? prob * EXPANDED_STL_FACTOR : prob;
+		if (this.coachSys) {
+			prob2 *= this.cs[this.d].stl;
+		}
 		return boundProb(
 			this.traitsOn
 				? prob2 * this.traitMean(this.d, (e) => e.gambleStealMultiplier, 1)
@@ -3047,7 +3111,10 @@ class GameSim extends GameSimBase {
 		} else if (
 			forceThreePointer ||
 			Math.random() <
-				0.67 * shootingThreePointerScaled2 * g.get("threePointTendencyFactor")
+				0.67 *
+					shootingThreePointerScaled2 *
+					g.get("threePointTendencyFactor") *
+					(this.coachSys ? this.cs[this.o].three * this.cs[this.d].dThree : 1)
 		) {
 			// Three pointer
 			type = "threePointer";
@@ -3066,7 +3133,10 @@ class GameSim extends GameSimBase {
 			probMake *= g.get("threePointAccuracyFactor");
 		} else {
 			// Game Sim Fixes: the shot selection has its own composites (see simSettings.ts)
+			const cso = this.cs[this.o];
+			const csd = this.cs[this.d];
 			const r1 =
+				(this.coachSys ? cso.mid * csd.dMid : 1) *
 				0.8 *
 				Math.random() *
 				(this.simFixes
@@ -3074,12 +3144,14 @@ class GameSim extends GameSimBase {
 						p.compositeRating.shootingMidRange)
 					: p.compositeRating.shootingMidRange);
 			const r2 =
+				(this.coachSys ? cso.rim * csd.dRim : 1) *
 				Math.random() *
 				(p.compositeRating.shootingAtRim +
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)); // Synergy makes easy shots either more likely or less likely
 
 			const r3 =
+				(this.coachSys ? cso.post * csd.dPost : 1) *
 				Math.random() *
 				((this.simFixes
 					? (p.compositeRating.shootingLowPostSelect ??
@@ -3156,6 +3228,10 @@ class GameSim extends GameSimBase {
 				foulFactor *= this.traitMean(this.d, (e) => e.foulProneness, 1);
 			}
 
+			if (this.coachSys) {
+				foulFactor *= this.cs[this.d].foul;
+			}
+
 			probMissAndFoul *= foulFactor;
 			probAndOne *= foulFactor;
 			probMake =
@@ -3169,6 +3245,10 @@ class GameSim extends GameSimBase {
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)) *
 				currentFatigue;
+
+			if (this.coachSys) {
+				probMake += this.coachMakeDelta();
+			}
 
 			if (!tipInFromOutOfBounds) {
 				// Adjust probMake for end of quarter situations, where shot quality will be lower without much time
@@ -3271,7 +3351,12 @@ class GameSim extends GameSimBase {
 						? 12
 						: 6.25;
 
-			dt = truncGauss(mean, 5, lowerLimit, upperLimit);
+			dt = truncGauss(
+				this.coachSys ? mean / this.cs[this.o].pace : mean,
+				5,
+				lowerLimit,
+				upperLimit,
+			);
 		}
 		this.advanceClockSeconds(dt);
 
@@ -3674,8 +3759,44 @@ class GameSim extends GameSimBase {
 		return (
 			((0.6 * (2 + this.team[this.o].compositeRating.passing)) /
 				(2 + this.team[this.d].compositeRating.defense)) *
-			g.get("assistFactor")
+			g.get("assistFactor") *
+			(this.coachSys ? this.cs[this.o].ast : 1)
 		);
+	}
+
+	// Coaching systems: late in a close game (final period or overtime, last 5 minutes, within 8)
+	isClutchTime() {
+		return (
+			this.team[0].stat.ptsQtrs.length >= this.numPeriods &&
+			this.t <= 300 &&
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <= 8
+		);
+	}
+
+	// Power on the usage composite when picking the shooter: 1.25 stock, more for star-centric systems and, late, for closers
+	usagePower() {
+		if (!this.coachSys) {
+			return 1.25;
+		}
+		const cs = this.cs[this.o];
+		return (
+			1.25 * cs.usage * (this.isClutchTime() ? cs.clutchUsage : 1)
+		);
+	}
+
+	// Coaching systems: change to the make probability of a shot (scheme fit, coaching strengths, installation, late-game management, and
+	// in the stock possession model an easier shot after a defensive rebound against a team that crashed the glass)
+	coachMakeDelta() {
+		const o = this.cs[this.o];
+		const d = this.cs[this.d];
+		let delta = o.make + d.dMake;
+		if (this.isClutchTime()) {
+			delta += o.clutchMake - d.clutchMake;
+		}
+		if (!this.realPoss && this.prevPossessionOutcome === "drb") {
+			delta += 0.06 * (d.oppTransition - 1);
+		}
+		return delta;
 	}
 
 	// This runs before an overtime period is played, so all these shots lead to another overtime period, not the end of the game
@@ -4377,7 +4498,12 @@ class GameSim extends GameSimBase {
 			? EXPANDED_ORB_FACTOR * this.team[this.o].compositeRating.offRebounding
 			: this.team[this.o].compositeRating.rebounding;
 		if (
-			(0.75 * (2 + dReb)) / (g.get("orbFactor") * (2 + oReb)) >
+			(0.75 * (2 + dReb)) /
+				(g.get("orbFactor") *
+					(2 + oReb) *
+					(this.coachSys
+						? this.cs[this.o].orb * this.cs[this.d].orbAllowed
+						: 1)) >
 			Math.random()
 		) {
 			p = this.pickPlayer(exp2 ? "defRebounding" : "rebounding", this.d, 3);

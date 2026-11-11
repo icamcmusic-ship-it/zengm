@@ -147,6 +147,7 @@ export { default as HomeCourt } from "./LeagueHistory/HomeCourt.tsx";
 export { default as Staff } from "./Staff/index.tsx";
 export { default as Coach } from "./Coach.tsx";
 export { default as Coaches } from "./Coaches.tsx";
+export { default as CoachNotes } from "./CoachNotes.tsx";
 export { default as SkillBadges } from "./SkillBadges.tsx";
 export { default as RecordsBook } from "./RecordsBook.tsx";
 export { default as Milestones } from "./Milestones.tsx";

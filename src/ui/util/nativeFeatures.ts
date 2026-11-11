@@ -81,6 +81,8 @@ export const featureForUrl = (
 		case "coach":
 		case "coaches":
 			return "coachingStaff";
+		case "coach_notes":
+			return "coachSystems";
 		case "frivolities":
 			if (
 				second === "redraft" ||

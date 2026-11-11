@@ -3,8 +3,10 @@ import {
 	COACH_OF_THE_YEAR,
 	getCoachAwards,
 	getCoachingCarousel,
+	coachSystemsEnabled,
 } from "../core/staff/index.ts";
 import { idb } from "../db/index.ts";
+import { hotSeatLabel, hotSeatNow } from "../core/staff/systems.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import { validateSeason } from "../util/processInputs.ts";
@@ -43,8 +45,25 @@ export default defineView({
 						seasonWon: row?.won,
 						seasonLost: row?.lost,
 					};
-				})
-				.sort((a, b) => (a.abbrev ?? "").localeCompare(b.abbrev ?? ""));
+				});
+			// Coaching systems: the hot seat with the season in progress
+			for (const [i, c] of headCoaches.entries()) {
+				const coach = coaches.find((x) => x.cid === c.cid)!;
+				if (c.systems) {
+					const heat = await hotSeatNow(coach);
+					headCoaches[i] = {
+						...c,
+						systems: {
+							...c.systems,
+							hotSeat: heat,
+							hotSeatText: hotSeatLabel(heat),
+						},
+					};
+				}
+			}
+			headCoaches.sort((a, b) =>
+				(a.abbrev ?? "").localeCompare(b.abbrev ?? ""),
+			);
 
 			const carousel = (await getCoachingCarousel(season)).map((m) => ({
 				...m,
@@ -70,6 +89,7 @@ export default defineView({
 				headCoaches,
 				carousel,
 				coy,
+				coachSystems: coachSystemsEnabled(),
 				roleNames: COACH_ROLE_NAMES,
 				userTid: g.get("userTid"),
 			};
