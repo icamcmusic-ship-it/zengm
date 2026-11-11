@@ -5,7 +5,8 @@ import type { Rng } from "./rng.ts";
  * The shape of a college season (ncaa.ts). Each class's season draws one, and maybe a scoring environment, from its seed. They bend what the season is simulated with (how far apart the teams are, how much a single game swings, how many points are scored) inside realistic bounds, so seasons differ in kind and not only in names.
  */
 
-export const NCAA_SHAPES = {
+// Version 2 seasons draw from these seven, with these weights, in this order (do not change them: a stored class replays its season from them)
+const NCAA_SHAPES_V2 = {
 	standard: { name: "A balanced year", weight: 22 },
 	dominant: { name: "A dominant favorite", weight: 14 },
 	wideOpen: { name: "A wide-open year", weight: 16 },
@@ -14,7 +15,59 @@ export const NCAA_SHAPES = {
 	loadedConference: { name: "One loaded conference", weight: 12 },
 	chalk: { name: "Chalk all the way", weight: 11 },
 } as const;
+
+// Version 3 seasons draw from all of these
+export const NCAA_SHAPES = {
+	standard: { name: "A balanced year", weight: 12 },
+	dominant: { name: "A dominant favorite", weight: 7 },
+	wideOpen: { name: "A wide-open year", weight: 8 },
+	cinderella: { name: "The year of the mid-major", weight: 7 },
+	blueBloodDown: { name: "A down year for the blue bloods", weight: 5 },
+	loadedConference: { name: "One loaded conference", weight: 6 },
+	chalk: { name: "Chalk all the way", weight: 6 },
+	rivalry: { name: "Two juggernauts", weight: 6 },
+	freshmen: { name: "The year of the freshman", weight: 5 },
+	veterans: { name: "A veterans' year", weight: 5 },
+	guards: { name: "A guards' game", weight: 5 },
+	bigs: { name: "The year of the big man", weight: 5 },
+	cinderellaRun: { name: "A Cinderella run", weight: 5 },
+	upsetWeekend: { name: "A wild first weekend", weight: 5 },
+	powerParity: { name: "Parity in the power conferences", weight: 5 },
+	fallenPowerhouse: { name: "A fallen powerhouse", weight: 5 },
+	conferenceDown: { name: "A conference down year", weight: 5 },
+	transfers: { name: "The transfer carousel", weight: 5 },
+	greatStumbles: { name: "A great team stumbles", weight: 4 },
+	paceAndSpace: { name: "Pace and space", weight: 5 },
+} as const;
 export type NcaaShape = keyof typeof NCAA_SHAPES;
+
+// Which prospects a lean shape favors (applied in ncaa.ts, from the prospects' ages and positions)
+export type NcaaLean = "young" | "old" | "guards" | "bigs";
+
+// How much more (or less) a prospect adds to his team in a lean year
+export const leanMultiplier = (
+	lean: NcaaLean | undefined,
+	age: number | undefined,
+	pos: string | undefined,
+) => {
+	if (lean === "young" && age !== undefined) {
+		return age <= 19 ? 1.45 : age >= 21 ? 0.85 : 1;
+	}
+	if (lean === "old" && age !== undefined) {
+		return age >= 22 ? 1.4 : age <= 19 ? 0.8 : 1;
+	}
+	if ((lean === "guards" || lean === "bigs") && pos !== undefined) {
+		const guard = pos === "PG" || pos === "SG" || pos === "G";
+		const big = pos === "C" || pos === "FC" || pos === "PF";
+		if (guard) {
+			return lean === "guards" ? 1.35 : 0.85;
+		}
+		if (big) {
+			return lean === "bigs" ? 1.35 : 0.85;
+		}
+	}
+	return 1;
+};
 
 export const NCAA_SCORING = {
 	normal: { name: "", weight: 70 },
@@ -38,6 +91,15 @@ export type NcaaStoryline = {
 	headline: string;
 	// A few sentences about the season, written after it was played
 	summary: string[];
+	// Version 3 only (left off otherwise, so older seasons stay exactly as they were)
+	// Prospects of one kind add more to their teams
+	lean?: NcaaLean;
+	// Rating changes in the NCAA tournament from a round on (1 = Round of 64): a hot double-digit seed, a great team fading late
+	tourneyAdj?: { team: number; bonus: number; fromRound: number }[];
+	// More swing in a game in the First Four and the first weekend
+	earlySdMult?: number;
+	// The rating changes were not known before the season (the polls are surprised)
+	hidden?: boolean;
 };
 
 export const STANDARD_MARGIN_SD = 11.5;
@@ -77,10 +139,15 @@ type StoryTeam = {
 /**
  * Draw the season's shape and bend the team ratings for it (in place).
  */
-export const drawStoryline = (rng: Rng, teams: StoryTeam[]): NcaaStoryline => {
+export const drawStoryline = (
+	rng: Rng,
+	teams: StoryTeam[],
+	version = 2,
+): NcaaStoryline => {
 	const storyline = standardStoryline();
 	storyline.tourneySd = STANDARD_TOURNEY_SD;
-	storyline.shape = pick(rng, NCAA_SHAPES);
+	storyline.shape =
+		version >= 3 ? pick(rng, NCAA_SHAPES) : pick(rng, NCAA_SHAPES_V2);
 	storyline.scoring = pick(rng, NCAA_SCORING);
 	const byRating = () =>
 		teams
@@ -175,6 +242,114 @@ export const drawStoryline = (rng: Rng, teams: StoryTeam[]): NcaaStoryline => {
 			// The better team wins more often
 			storyline.marginSd *= 0.96;
 			storyline.tourneySd *= 0.9;
+			break;
+		}
+		case "rivalry": {
+			// Two teams a class above everybody else, on a collision course
+			const [a, b, c] = byRating() as [number, number, number];
+			const third = teams[c]!.rating;
+			teams[a]!.rating = Math.max(teams[a]!.rating + 1.2, third + 3.5);
+			teams[b]!.rating = Math.max(teams[b]!.rating + 1.2, third + 3);
+			storyline.teams = [a, b];
+			storyline.tourneySd *= 0.97;
+			break;
+		}
+		case "freshmen": {
+			storyline.lean = "young";
+			break;
+		}
+		case "veterans": {
+			storyline.lean = "old";
+			storyline.marginSd *= 0.98;
+			break;
+		}
+		case "guards": {
+			storyline.lean = "guards";
+			storyline.total += 3;
+			break;
+		}
+		case "bigs": {
+			storyline.lean = "bigs";
+			storyline.total -= 3;
+			storyline.marginSd *= 0.98;
+			break;
+		}
+		case "cinderellaRun": {
+			// A double-digit seed gets hot in March (picked once the field is set, in ncaa.ts)
+			storyline.tourneyAdj = [];
+			break;
+		}
+		case "upsetWeekend": {
+			storyline.earlySdMult = 1.3;
+			break;
+		}
+		case "powerParity": {
+			// The power leagues are squeezed together: no great teams, no bad ones
+			const power = teams.filter((t) => CONFERENCES[t.conf]?.tier === "high");
+			if (power.length > 0) {
+				const mean = power.reduce((sum, t) => sum + t.rating, 0) / power.length;
+				for (const t of power) {
+					t.rating = mean + 0.6 * (t.rating - mean);
+				}
+			}
+			storyline.tourneySd *= 1.03;
+			break;
+		}
+		case "fallenPowerhouse": {
+			// One of the very biggest programs falls apart
+			const giants = teams
+				.map((_, i) => i)
+				.sort((x, y) => teams[y]!.program - teams[x]!.program || x - y)
+				.slice(0, 6);
+			const fallen = giants[Math.floor(rng.random() * giants.length)]!;
+			teams[fallen]!.rating -= 8 + 3 * rng.random();
+			storyline.teams = [fallen];
+			break;
+		}
+		case "conferenceDown": {
+			const confs = Object.keys(CONFERENCES).filter(
+				(name) =>
+					CONFERENCES[name]!.tier === "high" &&
+					teams.some((t) => t.conf === name),
+			);
+			if (confs.length > 0) {
+				const conf = confs[Math.floor(rng.random() * confs.length)]!;
+				storyline.conf = conf;
+				for (const t of teams) {
+					if (t.conf === conf) {
+						t.rating -= 3;
+					}
+				}
+			}
+			break;
+		}
+		case "transfers": {
+			// Rosters turned over everywhere, and nobody knew who was good until they played
+			for (const t of teams) {
+				t.rating += rng.normal(0, 2.6);
+			}
+			storyline.hidden = true;
+			break;
+		}
+		case "greatStumbles": {
+			// A team that looks like one of the best ever, until it is not
+			const [best, second] = byRating() as [number, number];
+			teams[best]!.rating = Math.max(
+				teams[best]!.rating + 2,
+				teams[second]!.rating + 4.5,
+			);
+			storyline.teams = [best];
+			storyline.tourneyAdj = [{ team: best, bonus: -4.5, fromRound: 4 }];
+			break;
+		}
+		case "paceAndSpace": {
+			// Everybody shoots threes: more points, more swing
+			storyline.total += 6;
+			storyline.marginSd *= 1.04;
+			storyline.tourneySd *= 1.04;
+			if (storyline.scoring === "slog") {
+				storyline.scoring = "normal";
+			}
 			break;
 		}
 		default:

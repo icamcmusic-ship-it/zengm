@@ -77,6 +77,24 @@ describe("season versions", () => {
 		}
 	});
 
+	test("a version 2 season is replayed exactly as it was before the version 3 shapes", () => {
+		// Hashes of whole version 2 seasons (one per shape it can draw) from before version 3 existed
+		const golden: [string, number, string][] = [
+			["v12", 3227951154, "blueBloodDown"],
+			["v4", 677095458, "chalk"],
+			["v6", 455341792, "cinderella"],
+			["v1", 1704710078, "dominant"],
+			["v10", 3629245502, "loadedConference"],
+			["v2", 3537848075, "standard"],
+			["v0", 5691934, "wideOpen"],
+		];
+		for (const [seed, hash, shape] of golden) {
+			const season = makeSeason(seed, 2);
+			assert.strictEqual(season.storyline.shape, shape);
+			assert.strictEqual(hashString(JSON.stringify(season)), hash, seed);
+		}
+	});
+
 	test("deterministic for both versions, and the versions differ", () => {
 		for (const version of [1, 2]) {
 			assert.deepStrictEqual(
@@ -434,7 +452,7 @@ describe("selection", () => {
 
 describe("storylines", () => {
 	test("calibration over many seeds: shapes differ, the long run stays sensible", () => {
-		const N = 320;
+		const N = 640;
 		const stats = new Map<
 			string,
 			{ n: number; oneSeed: number; no1s: number; ppg: number }
@@ -469,7 +487,7 @@ describe("storylines", () => {
 			assert.isAtLeast(storyline.tourneySd, 8);
 			assert.isAtMost(storyline.tourneySd, 11);
 			assert.isAtLeast(storyline.total, 130);
-			assert.isAtMost(storyline.total, 152);
+			assert.isAtMost(storyline.total, 156);
 			assert.isAbove(storyline.headline.length, 0);
 			assert.isAtLeast(storyline.summary.length, 4);
 			for (const sentence of storyline.summary) {
@@ -664,3 +682,100 @@ const checkClass = (
 		assert.strictEqual(numNit, 32);
 	}
 };
+
+describe("version 3 shapes", () => {
+	const POSITIONS = ["PG", "SG", "G", "GF", "SF", "F", "PF", "FC", "C"];
+	const tagged = (seed: string) => {
+		const rng = new Rng(`${seed} tags`);
+		return randomContributions(seed).map((c) => ({
+			...c,
+			age: 19 + Math.floor(rng.random() * 4),
+			pos: POSITIONS[Math.floor(rng.random() * POSITIONS.length)]!,
+		}));
+	};
+
+	test("each new shape does what it says, deterministically", () => {
+		const seen = new Set<string>();
+		for (let i = 0; i < 400 && seen.size < 20; i++) {
+			const args = {
+				seed: `v3-${i}`,
+				season: 2031,
+				contributions: tagged(`t${i}`),
+			};
+			const season = simulateNcaaSeason(args);
+			const { storyline, teams, tournament } = season;
+			seen.add(storyline.shape);
+			for (const sentence of storyline.summary) {
+				assert.notMatch(sentence, /undefined|NaN/);
+			}
+			switch (storyline.shape) {
+				case "cinderellaRun": {
+					const t = storyline.teams[0]!;
+					assert.isAtLeast(teams[t]!.ncaaSeed!, 10);
+					assert.include(storyline.summary[0]!, teams[t]!.school);
+					break;
+				}
+				case "greatStumbles":
+				case "fallenPowerhouse":
+					assert.include(
+						storyline.summary[0]!,
+						teams[storyline.teams[0]!]!.school,
+					);
+					break;
+				case "rivalry": {
+					const [a, b] = storyline.teams as [number, number];
+					const third = [...teams]
+						.map((t) => t.rating)
+						.sort((x, y) => y - x)[2]!;
+					assert.isAbove(teams[a]!.rating, third + 2.9);
+					assert.isAbove(teams[b]!.rating, third + 2.9);
+					break;
+				}
+				case "freshmen":
+				case "veterans":
+				case "guards":
+				case "bigs":
+					assert.isDefined(storyline.lean);
+					// Without the ages and positions the same season has no lean to apply
+					assert.notStrictEqual(
+						JSON.stringify(
+							simulateNcaaSeason({
+								...args,
+								contributions: randomContributions(`t${i}`),
+							}).teams.map((t) => t.rating),
+						),
+						JSON.stringify(teams.map((t) => t.rating)),
+					);
+					break;
+				case "transfers":
+					assert.isTrue(storyline.hidden);
+					break;
+				case "paceAndSpace":
+					assert.isAtLeast(storyline.total, 147);
+					break;
+				default:
+			}
+			if (i < 20) {
+				assert.deepStrictEqual(simulateNcaaSeason(args), season);
+			}
+			assert.isDefined(teams[tournament.champion]);
+		}
+		for (const shape of [
+			"rivalry",
+			"freshmen",
+			"veterans",
+			"guards",
+			"bigs",
+			"cinderellaRun",
+			"upsetWeekend",
+			"powerParity",
+			"fallenPowerhouse",
+			"conferenceDown",
+			"transfers",
+			"greatStumbles",
+			"paceAndSpace",
+		]) {
+			assert.isTrue(seen.has(shape), shape);
+		}
+	}, 300_000);
+});

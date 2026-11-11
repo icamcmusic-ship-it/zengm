@@ -1,5 +1,5 @@
 import type { SplitLine } from "./season.ts";
-import { COLLEGES } from "./colleges.ts";
+import { COLLEGES, CONFERENCES } from "./colleges.ts";
 import { getSchool } from "./colleges.helpers.ts";
 import { Rng, clamp } from "./rng.ts";
 import {
@@ -20,6 +20,7 @@ import {
 } from "./ncaaSelection.ts";
 import {
 	drawStoryline,
+	leanMultiplier,
 	standardStoryline,
 	type NcaaStoryline,
 } from "./ncaaStoryline.ts";
@@ -38,7 +39,7 @@ export type { NcaaStoryline } from "./ncaaStoryline.ts";
  * version: seasons stored before version 2 (no v on p.collegeSeason) are rebuilt as version 1, which plays every game exactly as it always did, so a class's champion, records and tournament lines never change. For those the polls, the NET, the bubble and the NIT are added around the old results (the NIT is not counted in records, because the prospects' stats were made without it). Version 2 seasons have a drawn shape, a field picked and seeded by the committee score, and NIT games that count.
  */
 
-export const NCAA_SEASON_VERSION = 2;
+export const NCAA_SEASON_VERSION = 3;
 
 export const NCAA_REGIONS = ["East", "West", "South", "Midwest"] as const;
 
@@ -51,6 +52,9 @@ export type NcaaContribution = {
 	school: string;
 	// Points per game he adds to his team
 	boost: number;
+	// Age in the draft year and position, for the seasons that favor one kind of player (version 3)
+	age?: number;
+	pos?: string;
 };
 
 export type NcaaTeam = {
@@ -381,10 +385,38 @@ export const simulateNcaaSeason = ({
 			rating: t.rating,
 			program: programs[i]!,
 		}));
-		storyline = drawStoryline(new Rng(`${seed}|${season}|shape`), storyTeams);
+		storyline = drawStoryline(
+			new Rng(`${seed}|${season}|shape`),
+			storyTeams,
+			version,
+		);
 		for (const [i, t] of teams.entries()) {
-			known[i]! += storyTeams[i]!.rating - t.rating;
+			if (!storyline.hidden) {
+				known[i]! += storyTeams[i]!.rating - t.rating;
+			}
 			t.rating = storyTeams[i]!.rating;
+		}
+		if (storyline.lean) {
+			// The prospects the year favors add more to their teams (and everybody knows it)
+			const indexBySchool = new Map(teams.map((t, i) => [t.school, i]));
+			const lift: number[] = teams.map(() => 0);
+			for (const c of contributions) {
+				const i = indexBySchool.get(c.school);
+				if (i !== undefined) {
+					lift[i]! +=
+						(leanMultiplier(storyline.lean, c.age, c.pos) - 1) * c.boost;
+				}
+			}
+			for (const [i, t] of teams.entries()) {
+				t.rating += lift[i]!;
+				known[i]! += lift[i]!;
+			}
+			storyline.teams = lift
+				.map((x, i) => [x, i] as const)
+				.filter(([x]) => x > 0.5)
+				.sort((x, y) => y[0] - x[0] || x[1] - y[1])
+				.slice(0, 4)
+				.map(([, i]) => i);
 		}
 	}
 	const reputation = teams.map((t, i) => 0.6 * t.rating + 0.4 * known[i]!);
@@ -397,6 +429,8 @@ export const simulateNcaaSeason = ({
 	let postseason = false;
 	let gameRng = rng;
 	let counted = true;
+	// Round of the NCAA tournament being played (0 = First Four), -1 outside it
+	let ncaaRound = -1;
 	let totalPoints = 0;
 	let totalGames = 0;
 
@@ -406,12 +440,29 @@ export const simulateNcaaSeason = ({
 		home: number,
 		conf: boolean,
 	): NcaaGame => {
+		let ratingA = teams[a]!.rating;
+		let ratingB = teams[b]!.rating;
+		let sd = postseason ? storyline.tourneySd : storyline.marginSd;
+		if (ncaaRound >= 0) {
+			for (const adj of storyline.tourneyAdj ?? []) {
+				if (ncaaRound >= adj.fromRound) {
+					if (adj.team === a) {
+						ratingA += adj.bonus;
+					} else if (adj.team === b) {
+						ratingB += adj.bonus;
+					}
+				}
+			}
+			if (storyline.earlySdMult !== undefined && ncaaRound <= 2) {
+				sd *= storyline.earlySdMult;
+			}
+		}
 		const result = playGame(
 			gameRng,
-			teams[a]!.rating,
-			teams[b]!.rating,
+			ratingA,
+			ratingB,
 			home,
-			postseason ? storyline.tourneySd : storyline.marginSd,
+			sd,
 			storyline.total,
 		);
 		if (!counted) {
@@ -766,7 +817,27 @@ export const simulateNcaaSeason = ({
 	const setNcaa = (t: number, round: number) => {
 		teams[t]!.ncaa = NCAA_RESULTS[round];
 	};
+	if (storyline.shape === "cinderellaRun" && storyline.tourneyAdj) {
+		// The hot double-digit seed: a 10-12 seed, from outside the power leagues when there is one
+		const runRng = new Rng(`${seed}|${season}|run`);
+		const candidates = teams
+			.map((t, i) => ({ t, i }))
+			.filter(
+				({ t }) =>
+					t.ncaaSeed !== undefined && t.ncaaSeed >= 10 && t.ncaaSeed <= 12,
+			);
+		const mids = candidates.filter(
+			({ t }) => CONFERENCES[t.conf]?.tier !== "high",
+		);
+		const pool = mids.length > 0 ? mids : candidates;
+		if (pool.length > 0) {
+			const team = pool[Math.floor(runRng.random() * pool.length)]!.i;
+			storyline.teams = [team];
+			storyline.tourneyAdj.push({ team, bonus: 10, fromRound: 0 });
+		}
+	}
 	postseason = true;
+	ncaaRound = 0;
 	for (const [i, game] of firstFour.entries()) {
 		const result = record(game.a, game.b, 0, false);
 		firstFour[i] = {
@@ -783,6 +854,7 @@ export const simulateNcaaSeason = ({
 		y: { team: number; seed: number },
 		round: number,
 	) => {
+		ncaaRound = round;
 		const game = {
 			...record(x.team, y.team, 0, false),
 			seedA: x.seed,
@@ -836,6 +908,7 @@ export const simulateNcaaSeason = ({
 	// The NIT, from its own stream: the best 32 teams left out. A regular season conference champion that is not in the NCAA tournament is in automatically. The better seed is at home until the semifinals
 	gameRng = new Rng(`${seed}|${season}|nit`);
 	counted = version >= 2;
+	ncaaRound = -1;
 	const nitPool = Array.from({ length: n }, (_, i) => i).filter(
 		(t) => teams[t]!.bid === undefined,
 	);
@@ -959,6 +1032,9 @@ const writeSeasonSummary = (season: NcaaSeason): string[] => {
 	}
 	const byBids = [...bids].sort((a, b) => b[1] - a[1]);
 	const sweet16 = teams.filter((t) => ncaaResultDepth(t.ncaa) >= 5);
+	// A choice of wording, the same every time the season is rebuilt
+	const vary = (options: string[]) =>
+		options[(season.season + tournament.champion) % options.length]!;
 
 	switch (storyline.shape) {
 		case "dominant": {
@@ -1029,6 +1105,173 @@ const writeSeasonSummary = (season: NcaaSeason): string[] => {
 			);
 			break;
 		}
+		case "rivalry": {
+			const [x, y] = storyline.teams.map((t) => teams[t]!) as [
+				NcaaTeam,
+				NcaaTeam,
+			];
+			const met =
+				(tournament.final.a === storyline.teams[0] &&
+					tournament.final.b === storyline.teams[1]) ||
+				(tournament.final.a === storyline.teams[1] &&
+					tournament.final.b === storyline.teams[0]);
+			const headToHead = met
+				? `and they met in the title game, the matchup everybody wanted since November.`
+				: x.ncaa === "Champion" || y.ncaa === "Champion"
+					? `and one of them finished the job, though the meeting in the final never came.`
+					: `but the meeting everybody waited for never happened: neither won it all.`;
+			output.push(
+				vary([
+					`It was a two-horse race. ${x.school} (${x.w}-${x.l}) and ${y.school} (${y.w}-${y.l}) were a class above the rest of the country, ${headToHead}`,
+					`Two juggernauts, ${x.school} and ${y.school}, spent the season trading the top spot (${x.w}-${x.l} and ${y.w}-${y.l}), ${headToHead}`,
+				]),
+			);
+			break;
+		}
+		case "freshmen":
+		case "veterans":
+		case "guards":
+		case "bigs": {
+			const leaders = storyline.teams.slice(0, 3).map(name);
+			const who = {
+				freshmen: ["freshmen", "one-and-done talent", "teenagers"],
+				veterans: ["seniors", "fifth-year veterans", "old heads"],
+				guards: ["guards", "ball handlers", "perimeter creators"],
+				bigs: ["big men", "post players", "rim protectors"],
+			}[storyline.shape as "freshmen"][
+				(season.season + tournament.champion) % 3
+			]!;
+			const champLed = storyline.teams.includes(tournament.champion);
+			output.push(
+				vary([
+					`It was a year for ${who}${
+						leaders.length > 0
+							? `: ${listNames(leaders)} rode theirs all season`
+							: ""
+					}${champLed ? `, and ${champ.school} rode them all the way to the title.` : "."}`,
+					`${who[0]!.toUpperCase()}${who.slice(1)} ran the sport this season${
+						leaders.length > 0
+							? `, nowhere more than at ${listNames(leaders)}`
+							: ""
+					}${champLed ? `. ${champ.school} proved the point by winning it all.` : "."}`,
+				]),
+			);
+			break;
+		}
+		case "cinderellaRun": {
+			const t = storyline.teams[0];
+			if (t !== undefined) {
+				const run = teams[t]!;
+				const depth = ncaaResultDepth(run.ncaa);
+				output.push(
+					depth >= 5
+						? vary([
+								`Every March has a story, and this one belonged to ${run.school}. The ${run.ncaaSeed} seed out of the ${run.conf} got hot at the right time and did not cool off until the ${roundReached(run.ncaa)}${run.ncaa === "Champion" ? ", cutting down the nets at the end of it" : ""}.`,
+								`${run.school}, a ${run.ncaaSeed} seed from the ${run.conf}, became the darling of the bracket, reaching the ${roundReached(run.ncaa)}.`,
+							])
+						: `${run.school}, a ${run.ncaaSeed} seed from the ${run.conf}, came into the tournament as the hottest team in the country, but the glass slipper did not fit: it went out in the ${roundReached(run.ncaa)}.`,
+				);
+			}
+			break;
+		}
+		case "upsetWeekend": {
+			let upsets = 0;
+			for (const rounds of tournament.regions) {
+				for (const game of [...rounds[0]!, ...rounds[1]!]) {
+					const ws = winner(game) === game.a ? game.seedA : game.seedB;
+					const ls = winner(game) === game.a ? game.seedB : game.seedA;
+					if (ws - ls >= 4) {
+						upsets += 1;
+					}
+				}
+			}
+			const topLeft = teams.filter(
+				(t) =>
+					t.ncaaSeed !== undefined &&
+					t.ncaaSeed <= 3 &&
+					ncaaResultDepth(t.ncaa) < 5,
+			).length;
+			output.push(
+				vary([
+					`The first weekend was chaos: ${upsets} games went to a team seeded at least four lines lower, and ${topLeft} of the twelve top-three seeds were gone before the Sweet 16.`,
+					`Brackets were busted by Saturday night. There were ${upsets} big upsets on the first weekend, and ${topLeft} top-three ${topLeft === 1 ? "seed" : "seeds"} went home early.`,
+				]),
+			);
+			break;
+		}
+		case "powerParity": {
+			const power = teams.filter((t) => CONFERENCES[t.conf]?.tier === "high");
+			const best = Math.max(
+				...power.map((t) => t.confW / Math.max(1, t.confW + t.confL)),
+			);
+			output.push(
+				vary([
+					`Every night was a fight in the power conferences. No team ran away with a league (the best conference record was ${Math.round(100 * best)}%), and the bubble was crowded with good teams.`,
+					`The power leagues beat each other up all winter: nobody won more than ${Math.round(100 * best)}% of their conference games.`,
+				]),
+			);
+			break;
+		}
+		case "fallenPowerhouse": {
+			const t = teams[storyline.teams[0]!]!;
+			output.push(
+				t.bid
+					? `${t.school} had one of its worst seasons in memory at ${t.w}-${t.l}, and only scraped into the field (it went out in the ${roundReached(t.ncaa)}).`
+					: vary([
+							`The fall of ${t.school} was the shock of the year. One of the sport's giants went ${t.w}-${t.l} and watched the tournament from home${t.nit ? ", settling for the NIT" : ""}.`,
+							`${t.school} collapsed: ${t.w}-${t.l}, no tournament, and a long offseason of questions.`,
+						]),
+			);
+			break;
+		}
+		case "conferenceDown": {
+			const conf = storyline.conf!;
+			const size = teams.filter((t) => t.conf === conf).length;
+			output.push(
+				vary([
+					`It was a down year for the ${conf}: only ${bids.get(conf) ?? 0} of its ${size} teams made the field.`,
+					`The ${conf} had nothing like its usual depth, sending just ${bids.get(conf) ?? 0} of ${size} teams to the tournament.`,
+				]),
+			);
+			break;
+		}
+		case "transfers": {
+			const pre = polls[0]?.ranked.slice(0, 10).map((r) => r.team) ?? [];
+			const finalTop = new Set(season.ap.map((e) => e.team));
+			const fell = pre.filter((t) => !finalTop.has(t)).length;
+			const risers = season.ap
+				.filter((e) => !polls[0]?.ranked.some((r) => r.team === e.team))
+				.slice(0, 2)
+				.map((e) => name(e.team));
+			output.push(
+				vary([
+					`The transfer portal turned every roster over, and the preseason poll aged badly: ${fell} of its top 10 finished unranked${risers.length > 0 ? `, while ${listNames(risers)} came from nowhere to the top of the final poll` : ""}.`,
+					`Nobody knew who was good until the games started. With rosters remade in the portal, ${fell} of the preseason top 10 fell out of the poll${risers.length > 0 ? ` and ${listNames(risers)} rose from unranked` : ""}.`,
+				]),
+			);
+			break;
+		}
+		case "greatStumbles": {
+			const t = teams[storyline.teams[0]!]!;
+			output.push(
+				t.ncaa === "Champion"
+					? `${t.school} (${t.w}-${t.l}) was talked about as one of the best teams ever, wobbled in March, and held on to win it all.`
+					: vary([
+							`${t.school} (${t.w}-${t.l}) looked like one of the great teams of all time for four months, then ran out of answers in the ${roundReached(t.ncaa)}.`,
+							`For most of the year ${t.school} was untouchable (${t.w}-${t.l}). The end came anyway, in the ${roundReached(t.ncaa)}.`,
+						]),
+			);
+			break;
+		}
+		case "paceAndSpace": {
+			output.push(
+				vary([
+					`Everybody played fast and fired away from three. Teams averaged ${season.ppg.toFixed(1)} points a game, and leads were never safe.`,
+					`It was the year the sport went small and spread the floor: ${season.ppg.toFixed(1)} points a game and threes from everywhere.`,
+				]),
+			);
+			break;
+		}
 		default:
 	}
 
@@ -1077,7 +1320,13 @@ const writeSeasonSummary = (season: NcaaSeason): string[] => {
 			`${name(winner(sixteen))} did what almost never happens: a 16 seed knocked out ${name(loser(sixteen))}, a 1 seed.`,
 		);
 	}
-	if (cinderella) {
+	if (
+		cinderella &&
+		!(
+			storyline.shape === "cinderellaRun" &&
+			storyline.teams[0] === teams.indexOf(cinderella)
+		)
+	) {
 		output.push(
 			`${cinderella.school}, ${cinderella.ncaaSeed === 11 ? "an" : "a"} ${cinderella.ncaaSeed} seed from the ${cinderella.conf}, was the Cinderella, reaching the ${roundReached(cinderella.ncaa)}.`,
 		);
@@ -1263,6 +1512,8 @@ export type StoredCollegeSeason = {
 	summary: ProspectNcaaSummary;
 	// Version of the season simulation (NCAA_SEASON_VERSION when it was made). Missing: 1
 	v?: number;
+	// His position when the season was made (version 3+), so a season that favors guards or big men is rebuilt the same way after his ratings change
+	pos?: string;
 };
 
 export const getTeamIndex = (season: NcaaSeason, school: string) =>

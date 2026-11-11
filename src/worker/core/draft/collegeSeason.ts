@@ -34,6 +34,12 @@ export type ClassNcaaSeason = {
 	others: Player[];
 };
 
+// Age and position, for the seasons that favor one kind of player (only version 3 seasons use them)
+const leanInfo = (p: Player, draftYear: number) => ({
+	age: draftYear - p.born.year,
+	pos: p.collegeSeason?.pos ?? p.ratings.at(-1)?.pos,
+});
+
 /**
  * reuse: when only some prospects get stats (onlyMissing), keep the class's existing season if there is one, so prospects who already have stats stay consistent with it. New prospects join their school's team without changing it.
  */
@@ -76,6 +82,7 @@ export const buildNcaaSeasonForClass = async ({
 				key: String(p.pid),
 				school: p.collegeSeason!.school,
 				boost: p.collegeSeason!.boost,
+				...leanInfo(p, draftYear),
 			});
 		}
 		for (const p of targets) {
@@ -99,14 +106,24 @@ export const buildNcaaSeasonForClass = async ({
 			if (school !== undefined && COLLEGES[school]) {
 				const boost = boostFor(p);
 				boosts.set(p.pid, boost);
-				contributions.push({ key: String(p.pid), school, boost });
+				contributions.push({
+					key: String(p.pid),
+					school,
+					boost,
+					...leanInfo(p, draftYear),
+				});
 			}
 		}
 		for (const p of classPlayers) {
 			if (!targetPids.has(p.pid) && p.college && COLLEGES[p.college]) {
 				const boost = boostFor(p);
 				boosts.set(p.pid, boost);
-				contributions.push({ key: String(p.pid), school: p.college, boost });
+				contributions.push({
+					key: String(p.pid),
+					school: p.college,
+					boost,
+					...leanInfo(p, draftYear),
+				});
 				others.push(p);
 			}
 		}
@@ -147,6 +164,7 @@ export const storeCollegeSeasonMarkers = async ({
 				boost: ncaa.boosts.get(p.pid) ?? 0,
 				summary,
 				...(ncaa.version > 1 ? { v: ncaa.version } : {}),
+				...(ncaa.version >= 3 ? { pos: leanInfo(p, draftYear).pos } : {}),
 			};
 		} else if (p.collegeSeason) {
 			delete p.collegeSeason;
@@ -169,6 +187,7 @@ export const storeCollegeSeasonMarkers = async ({
 				boost: ncaa.boosts.get(p.pid) ?? 0,
 				summary: getTeamSummary(ncaa.season, team),
 				...(ncaa.version > 1 ? { v: ncaa.version } : {}),
+				...(ncaa.version >= 3 ? { pos: leanInfo(p, draftYear).pos } : {}),
 			};
 			await idb.cache.players.put(p);
 		}
@@ -199,6 +218,7 @@ export const getCollegeSeason = async (draftYear: number) => {
 		key: String(p.pid),
 		school: p.collegeSeason!.school,
 		boost: p.collegeSeason!.boost,
+		...(version >= 3 ? leanInfo(p, draftYear) : {}),
 	}));
 
 	// Rebuilding takes a while (every game, 19 polls, two tournaments) and the pages that show it reload often, so keep the last few. The key is everything the season is made from
@@ -208,7 +228,7 @@ export const getCollegeSeason = async (draftYear: number) => {
 		seed,
 		version,
 		contributions
-			.map((c) => `${c.key}|${c.school}|${c.boost}`)
+			.map((c) => `${c.key}|${c.school}|${c.boost}|${c.age}|${c.pos}`)
 			.sort()
 			.join(","),
 	]);
