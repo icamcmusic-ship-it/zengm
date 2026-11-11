@@ -14,7 +14,14 @@ export type ArchetypeLabelInfo = {
 	season?: number;
 	live?: boolean;
 	why?: { label: string; z: number; want: number }[];
+	twoK?: string[];
 };
+
+// "2K: 2-Way 3-Level Scorer, Iso Savant (+12 more)": the NBA 2K builds that read as this archetype
+export const twoKText = (names: string[] | undefined, max = 6) =>
+	names && names.length > 0
+		? `2K: ${names.slice(0, max).join(", ")}${names.length > max ? ` (+${names.length - max} more)` : ""}`
+		: undefined;
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
 	<span
@@ -41,11 +48,16 @@ export const ArchetypeWhy = ({
 }: {
 	info: Pick<
 		ArchetypeLabelInfo,
-		"desc" | "why" | "tier" | "conf" | "season" | "live"
+		"desc" | "why" | "tier" | "conf" | "season" | "live" | "twoK"
 	>;
 }) => (
 	<div className="archetype-popover">
 		<p className="mb-2">{info.desc}</p>
+		{info.twoK && info.twoK.length > 0 ? (
+			<p className="mb-2 text-body-secondary" title={info.twoK.join(", ")}>
+				{twoKText(info.twoK)}
+			</p>
+		) : null}
 		{info.why && info.why.length > 0 ? (
 			<>
 				<div className="fw-bold">Why</div>

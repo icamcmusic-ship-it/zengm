@@ -16,9 +16,10 @@ import { resetG } from "../../test/helpers.ts";
 import develop from "../../worker/core/player/develop.ts";
 import generate from "../../worker/core/player/generate.ts";
 import ovrFn from "../../worker/core/player/ovr.ts";
-import { fillExpandedRatings } from "../expandedRatings.ts";
+import { EXPANDED_RATINGS2, fillExpandedRatings } from "../expandedRatings.ts";
 import { g } from "../../worker/util/index.ts";
 import { ARCHETYPES, classify, defaultNorms, scoreAll } from "./classify.ts";
+import { sampleTraits } from "./sample.testutil.ts";
 import { compositeValues } from "./composites.ts";
 import { buildNorms } from "./match.ts";
 import { probit, rawZ } from "./norms.ts";
@@ -34,6 +35,10 @@ import {
 // perimeter/interior defense from the generator, real players the derived ones a real-players league gets)
 const EXPANDED = Boolean(process.env.ARCH_DIAG_EXPANDED);
 const NORMS = defaultNorms(EXPANDED);
+// ARCH_DIAG_TRAITS=1: every player also has player traits (the playerTraits setting), visible ones as the archetypes read them
+const TRAITS = Boolean(process.env.ARCH_DIAG_TRAITS);
+const traitsFor = (p, i, pop) =>
+	TRAITS ? sampleTraits(p.ratings, p.age, `diag-traits-${pop}`, i) : undefined;
 const newG = () => {
 	resetG();
 	if (EXPANDED) g.setWithoutSavingToDB("expandedRatings", true);
@@ -47,27 +52,27 @@ const DUMP = process.env.ARCH_DIAG_DUMP ? [] : undefined;
 // Independent audit of what a label promises: [name pattern, check(ratings, absolute z per dim), what is wrong]
 const AUDIT = [
 	[
-		/Shoot|Sniper|3-and-D|Stretch|Corner|Spot-Up|Pick-and-Pop|Marksman|Gunner|Floor Spacer|Bomber/,
+		/Shoot|Sniper|3-and-D|Stretch|Corner|Spot-Up|Pick-and-Pop|Marksman|Gunner|Floor Spacer|Bomber|Step-Back/,
 		(r, a) => r.tp >= 50 || a.three >= 0.25,
 		"shooting label, cannot shoot (tp < 50)",
 	],
 	[
-		/Rim Protector|Swat|Shot-Block|Anchor|Shot Blocker|Eraser|Paint Protector/,
+		/Rim Protector|Swat|Shot-Block|Anchor|Shot Blocker|Eraser|Paint Protector|Guardian|Erasing|Backline|Curtain/,
 		(r, a) => a.blk >= 0.5 && r.hgt >= 45,
 		"rim protection label, low blk/hgt",
 	],
 	[
-		/Floor General|Playmak|Pass-First|Point (Forward|Center|God)|Hub|Table Setter|Facilitator|Jumbo/,
+		/Floor General|Playmak|Pass-First|Point (Forward|Center|God)|Hub|Table Setter|Facilitator|Jumbo|Dot Dispenser|Engine/,
 		(r, a) => a.pss >= 0.4,
 		"playmaking label, cannot pass",
 	],
 	[
-		/Lockdown|Defensive|Defender|Disruptor|Stopper|Pest|Hawk|Thief|Two-Way|Switch|Perimeter Lock|Point of Attack/,
+		/Lockdown|Defensive|Defender|Disruptor|Stopper|Pest|Hawk|Thief|Two-Way|Switch|Perimeter Lock|Point of Attack|Clamp|Curtain/,
 		// With expanded ratings: the defense rating of the side the label names (perimeter for these names), else his better one
 		(r, a, sz, name) =>
 			(r.pdef === undefined
 				? r.diq
-				: /Lockdown|Stopper|Pest|Hawk|Thief|Disruptor|Perimeter Lock|Point of Attack/.test(
+				: /Lockdown|Stopper|Pest|Hawk|Thief|Disruptor|Perimeter Lock|Point of Attack|Clamp/.test(
 							name,
 					  )
 					? r.pdef
@@ -84,7 +89,7 @@ const AUDIT = [
 		"athletic label, not athletic",
 	],
 	[
-		/Rebound|Glass|Double-Double|Putback|Board/,
+		/Rebound|Glass|Double-Double|Putback|Board|Box-Out|Cleaner/,
 		(r, a, sz) => sz.reb >= 0.3,
 		"rebounding label, poor rebounder",
 	],
@@ -110,10 +115,16 @@ const AUDIT = [
 		"short-armed label, ordinary wingspan",
 	],
 	[
-		/Handles|Shot Creator|Shot-Creating|Iso|Shifty/,
+		/Handles|Shot Creator|Shot-Creating|Iso|Shifty|Pressure-Proof|Loose-Handle|Ankle/,
 		(r, a) => a.drb >= 0.5,
 		"handle label, poor handle",
 	],
+	[
+		/Crafty Finisher|Paint Finisher|Two-Way Finisher|Layup|Dunker/,
+		(r, a, sz) => sz.rim >= 0,
+		"finishing label, cannot finish",
+	],
+	[/Chase-Down/, (r, a, sz) => sz.blk >= 0.3, "shot-blocking guard, no blocks"],
 ];
 
 const ratingsOfRow = (row) => {
@@ -123,6 +134,8 @@ const ratingsOfRow = (row) => {
 		r.wng = row.wng;
 		r.pdef = row.pdef;
 		r.idef = row.idef;
+		// (the second step: without these the row does not count as having expanded ratings at all)
+		for (const k of EXPANDED_RATINGS2) r[k] = row[k];
 	}
 	return r;
 };
@@ -465,16 +478,23 @@ const analyse = (label, players, out) => {
 	const lowZBy = {};
 	const posTab = {};
 	const rows = [];
-	for (const p of players) {
+	for (const [i, p] of players.entries()) {
 		const ps = p.pos ?? positionFor(p.ratings, true);
+		p.traits ??= traitsFor(p, i, label.slice(0, 8));
 		const { scored } = scoreAll(
 			p.ratings,
 			p.norms ?? NORMS,
 			ARCHETYPES,
 			ps,
 			p.age,
+			p.traits,
 		);
-		const c = classify(p.ratings, { pos: ps, age: p.age, norms: p.norms });
+		const c = classify(p.ratings, {
+			pos: ps,
+			age: p.age,
+			norms: p.norms,
+			traits: p.traits,
+		});
 		const best = scored.find((s) => s.a.id === c.id);
 		p.dpos = ps;
 		rows.push({ p, c, scored });
@@ -523,6 +543,15 @@ const analyse = (label, players, out) => {
 				}
 			}
 		}
+		// A trait label must deliver its trait (as the user sees it)
+		const ta = ARCHETYPES.find((x) => x.id === c.id);
+		if (ta.trait) {
+			checked = true;
+			if ((p.traits?.[ta.trait.key] ?? 0) < ta.trait.min - 5) {
+				auditBad++;
+				badBy[c.name] = (badBy[c.name] ?? 0) + 1;
+			}
+		}
 		if (checked) audited++;
 	}
 	const n = players.length;
@@ -533,7 +562,12 @@ const analyse = (label, players, out) => {
 	const over4 = shares.filter((s) => s[1] > 4);
 	// Raw prospects and veterans are not expected in every population
 	const unused = ARCHETYPES.filter(
-		(a) => !counts[a.id] && !a.age && !a.level,
+		(a) =>
+			!counts[a.id] &&
+			!a.age &&
+			!a.level &&
+			!(a.expanded && !EXPANDED) &&
+			!(a.trait && !TRAITS),
 	).map((a) => a.id);
 	const rare01 = ARCHETYPES.filter(
 		(a) => counts[a.id] && counts[a.id] / n < 0.001,
@@ -650,7 +684,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 	"diag",
 	async () => {
 		const out = [
-			`archetypes: ${ARCHETYPES.length}, expanded ratings ${EXPANDED ? "ON" : "off"}`,
+			`archetypes: ${ARCHETYPES.length}, expanded ratings ${EXPANDED ? "ON" : "off"}, player traits ${TRAITS ? "ON" : "off"}`,
 		];
 		const league = await genPlayers(6000, "diag-v2", 19, 32, 38);
 		const all = { counts: {} };
@@ -724,6 +758,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 						previousId: prev?.id,
 						pos: prevPos,
 						age: 20 + dev + y,
+						traits: traitsFor({ ratings: r, age: 20 + dev + y }, i, "flap"),
 					});
 					if (prev) {
 						steps++;
@@ -783,7 +818,11 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 		for (const p of Object.values(latest)) {
 			if (names.some((nm) => p.name.startsWith(nm + " "))) {
 				const ps = positionFor(p.ratings, true);
-				const c = classify(p.ratings, { pos: ps, age: p.age });
+				const c = classify(p.ratings, {
+					pos: ps,
+					age: p.age,
+					traits: traitsFor(p, 0, p.slug),
+				});
 				ex.push(`${p.name} ${ps}: ${c.label}`);
 			}
 		}

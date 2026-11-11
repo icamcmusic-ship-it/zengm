@@ -15,6 +15,9 @@ import { last } from "../../common/utils.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import { archetypeFor, getLeagueNorms } from "../core/player/archetype.ts";
+import { traitsEnabled } from "../core/player/traits.ts";
+import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
+import { TWO_K_NAMES } from "../../common/archetypes/twoK/twoK.data.ts";
 
 export type ArchetypeRosterPlayer = {
 	pid: number;
@@ -100,6 +103,8 @@ export type ArchetypeLandscape = {
 		count: number;
 		share: number;
 		top: ArchetypeTopPlayer[];
+		// NBA 2K builds that read as it
+		twoK: string[];
 	}[];
 };
 
@@ -145,23 +150,36 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 		season,
 		total: landscape.total,
 		byGroup: landscape.byGroup,
-		rows: landscape.byArchetype.map((r) => ({
-			id: r.id,
-			name: r.name,
-			group: r.group,
-			desc: archetypeById(r.id)!.desc,
-			count: r.count,
-			share: r.share,
-			top: r.top.map((t) => {
-				const x = byPid.get(t.pid)!;
-				return {
-					pid: t.pid,
-					name: x.name,
-					ovr: t.ovr,
-					abbrev: x.tid >= 0 ? (abbrevs.get(x.tid) ?? "") : "FA",
-				};
-			}),
-		})),
+		rows: landscape.byArchetype
+			// Labels the league's settings rule out (they need player traits or expanded ratings) are left out
+			.filter((r) => {
+				const a = archetypeById(r.id)!;
+				return (
+					r.count > 0 ||
+					!(
+						(a.trait && !traitsEnabled()) ||
+						(a.expanded && !expandedRatingsOn())
+					)
+				);
+			})
+			.map((r) => ({
+				id: r.id,
+				name: r.name,
+				group: r.group,
+				desc: archetypeById(r.id)!.desc,
+				twoK: TWO_K_NAMES[r.id] ?? [],
+				count: r.count,
+				share: r.share,
+				top: r.top.map((t) => {
+					const x = byPid.get(t.pid)!;
+					return {
+						pid: t.pid,
+						name: x.name,
+						ovr: t.ovr,
+						abbrev: x.tid >= 0 ? (abbrevs.get(x.tid) ?? "") : "FA",
+					};
+				}),
+			})),
 	};
 };
 
