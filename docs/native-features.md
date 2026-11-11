@@ -61,6 +61,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Injury depth](#injury-depth)                                       | game sim, player page, Roster, Schedule                          | bball  | `injuryDepth`                             | on / off                      |
 | [Expanded ratings](#expanded-ratings)                               | ratings tables, player pages, Customize Player, game sim         | bball  | `expandedRatings`                         | on / off                      |
 | [Perimeter defense](#perimeter-defense)                             | game sim (steals), DPOY and All-Defensive awards                 | bball  | `perimeterDefense`                        | on / off                      |
+| [Game sim fixes](#game-sim-fixes)                                   | game sim (shot selection and makes, usage, injuries)             | bball  | `simFixes`                                | on / off                      |
 | [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery            | bball  | `featureSeasonOdds`                       | on / on                       |
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes | bball  | `featureArchetypes`                       | on / on                       |
 | [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)     | bball  | `improvedPositions`                       | on / off                      |
@@ -115,6 +116,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `injuryDepth`                                                                                             | on / off                                                        |                                                                                                              |
 | `expandedRatings`                                                                                         | on / off                                                        | turning it on in an existing league derives the new ratings from the current ones                            |
 | `perimeterDefense`                                                                                        | on / off                                                        | option `perimeterDefenseAllDefensive` `oneGuard`                                                             |
+| `simFixes`                                                                                                | on / off                                                        |                                                                                                              |
 | `contractOptions`, `contractExtensions`, `tradeRequests`                                                  | on / off                                                        |                                                                                                              |
 | `featureHoldouts` + `holdoutFrequency`                                                                    | on / off; 1 / 1                                                 | frequency scales how often holdouts happen                                                                   |
 | `aiTradesNeedBased`                                                                                       | on / off                                                        | the classic random AI-to-AI trades stay on in every league (_AI-to-AI Trades Factor_ in the Events category) |
@@ -389,6 +391,39 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
   With `none` guards get about 10% of the slots (the formula and steals alone), with `gfc` 40% by construction. An earlier version that cut DWS and blocks (`0.6 dws`, `0.8 blk`, `1.75 stl`) gave guards 30% of the slots but let wings win 20 of 24 DPOYs with expanded ratings on; doubling blocks and adding the small rebounding term put rim protectors back on top.
 
 - **Tool:** `src/test/guardDef/guardDef.script.test.ts` (`RUN_GUARD_DEF=1`, env `GD_CONFIGS`, `GD_SEEDS`, `GD_SEASONS`, `GD_OUT`, `GD_EXTRA='{"perimeterDefense":true}'`) dumps every rotation player's position, height, defensive ratings, stats and awards per season.
+
+### Game sim fixes
+
+- **Setting:** `simFixes` (League Extras → Game Simulation). On for new leagues, off for existing leagues, which play exactly as before (same random numbers, `outcomeInvariance.test.ts`). Code: `src/worker/core/GameSim.basketball/simSettings.ts` (weights and constants), `game/loadTeams.ts` (composites), `GameSim.basketball/index.ts`.
+- **Why:** a ratings audit (every rating of every player perturbed by ±10 each game, the margin regressed on minutes-weighted exposure) found that inside scoring was worth about nothing and mid-range shooting less than nothing: `ins` had the biggest usage weight (1.5) and `fg` the second, so a better post scorer or mid-range shooter mostly took more of the sim's least efficient shots (post-ups ~39%, mid-range ~44%, against ~62% at the rim with many more fouls), and offensive IQ (`oiq` -0.5 in the mid-range composite) lowered the make probability of the jumpers it was meant to steer players away from.
+- **What:**
+  - **Shot selection and makes:** the mid-range and post-up choice and make use separate composites. How often he takes a jumper: `[51 const, fg, stre, oiq]` × `[0.6, 0.4, 0.2, -0.5]` (offensive IQ still steers players away from it, fg much less). Its make: `0.343 + 0.5 × [fg, stre]×[1, 0.2]` (stock `0.42 + 0.32 × shootingMidRange`). How often he posts up: stock shootingLowPost with `ins` 0.5 instead of 1 (and a constant). Its make: `0.253 + 0.5 × [hgt, stre, spd, ins, oiq]×[0.8, 0.5, 0.2, 2, 0.4]` (stock `0.34 + 0.32 × shootingLowPost`).
+  - **Usage:** `ins` 1.5 → 0.6, `fg` 1 → 0.5 (the sim only; the V skill badge keeps the stock composite).
+  - **Expanded Ratings clean-up:** who commits the fouls reads `pdef`/`idef` (−0.5 each) instead of `diq`; the synergy skill counts use the expanded skill cutoffs (Di 0.595, Dp 0.607, R 0.62) instead of the stock ones.
+  - **Injuries:** the per-possession injury rate is multiplied by `exp(-0.08 × (avg(stre, endu) − 51.4) / 10)` (±10 points ≈ ∓8%), centered on the minutes-weighted league average (mean multiplier 1.000-1.001).
+  - **Comeback boost:** the trailing team's composite boost `1 − X tanh(diff / 60)` uses X = 0.1 instead of 0.2.
+- **Calibration** (scratch scripts, 30-team random leagues, 6 rosters × 250 games, stock sim otherwise; per team game):
+
+  | expanded ratings off / on  | before                          | after                           |
+  | -------------------------- | ------------------------------- | ------------------------------- |
+  | pts                        | 105.5 / 105.9                   | 105.7 / 106.4                   |
+  | FG%                        | 44.1 / 44.0                     | 44.1 / 44.3                     |
+  | 3PA rate, 3P%              | .349 35.0 / .352 34.8           | .350 34.9 / .350 35.2           |
+  | AST, TOV                   | 23.9 16.1 / 23.7 16.0           | 23.8 16.1 / 23.9 15.8           |
+  | ORB, DRB                   | 11.6 34.7 / 11.6 34.9           | 11.7 34.6 / 11.5 34.6           |
+  | FTA, STL, BLK              | 22.4 7.31 4.97 / 23.0 7.26 5.07 | 22.9 7.23 5.11 / 22.9 7.14 5.14 |
+  | rim / post / mid FGA share | .231 .226 .194 / .231 .226 .191 | .237 .224 .189 / .237 .226 .187 |
+  | rim / post / mid FG%       | .623 .394 .443 / .625 .391 .441 | .619 .394 .441 / .625 .393 .445 |
+
+  Marginal value of +10 in one rating for a 36-minute player (points of margin per game, ±0.06; 8,100 games each):
+
+  | expanded off / on           | before        | after       |
+  | --------------------------- | ------------- | ----------- |
+  | ins                         | 0.01 / 0.05   | 0.08 / 0.15 |
+  | fg                          | −0.13 / −0.11 | 0.09 / 0.09 |
+  | oiq                         | 0.33 / 0.30   | 0.49 / 0.37 |
+  | ins, offense only (pts/100) | −0.01 / 0.04  | 0.14 / 0.12 |
+  | fg, offense only (pts/100)  | −0.12 / −0.08 | 0.06 / 0.07 |
 
 ### Season odds
 

@@ -104,6 +104,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	realisticPossessions: "League extras: Game Simulation",
 	seasonOdds: "League extras: Game Simulation",
 	perimeterDefense: "League extras: Game Simulation",
+	simFixes: "League extras: Game Simulation",
 	playerTraits: "League extras: Players",
 	injuryDepth: "League extras: Players",
 	expandedRatings: "League extras: Players",

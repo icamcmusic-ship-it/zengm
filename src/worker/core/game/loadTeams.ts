@@ -21,6 +21,11 @@ import {
 	hasExpandedRatings,
 } from "../../../common/expandedRatings.ts";
 import { expandedRatingsOn } from "../player/expandedRatings.ts";
+import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
+import {
+	simFixCompositeWeights,
+	simFixInjuryFactor,
+} from "../GameSim.basketball/simSettings.ts";
 import {
 	PBP_EXPANDED_KEYS,
 	PBP_TRAIT_KEYS,
@@ -263,9 +268,18 @@ export const processTeam = async (
 	let game6EliminationGameOrGame7: boolean | undefined;
 	// Expanded ratings (basketball): the defense, rebounding and finishing composites read wingspan and perimeter/interior defense
 	const expandedRatings = __SPORT === "basketball" && expandedRatingsOn();
+	// Game Sim Fixes (basketball): usage, make-probability and (expanded) fouling composites, see GameSim.basketball/simSettings.ts
+	const simFixes =
+		__SPORT === "basketball" &&
+		nativeFeatureEnabled("simFixes", (key) => g.get(key as any));
 	const compositeWeights = Object.entries(
 		__SPORT === "basketball"
-			? compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings)
+			? simFixes
+				? simFixCompositeWeights(
+						compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings),
+						expandedRatings,
+					)
+				: compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings)
 			: COMPOSITE_WEIGHTS,
 	);
 
@@ -446,6 +460,13 @@ export const processTeam = async (
 
 		if (__SPORT === "basketball") {
 			p2.compositeRating.usage = p2.compositeRating.usage ** 1.9;
+			if (simFixes) {
+				// Game Sim Fixes: strong, durable players get hurt a little less
+				(p2 as any).simInjuryFactor = simFixInjuryFactor(
+					(rating as any).stre,
+					(rating as any).endu,
+				);
+			}
 		}
 		if (SEASON_STATS_KEYS !== undefined) {
 			const pSeasonStats = seasonStatsByPid!.get(p.pid);

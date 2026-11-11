@@ -329,6 +329,16 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "simFixes",
+		key: "simFixes",
+		name: "Game Sim Fixes",
+		description:
+			"Small fixes to how ratings work in the game simulation: offensive IQ steers players away from mid-range jumpers instead of making them miss more, better post scorers and mid-range shooters are more efficient instead of just shooting more, strong and durable players get hurt a little less, the trailing team's comeback boost is smaller, and with Expanded Ratings perimeter and interior defense (not defensive IQ) decide who fouls and the synergy skill cutoffs match the expanded ratings. League averages stay about the same.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		key: "featureSeasonOdds",
 		name: "Season Odds",

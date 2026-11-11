@@ -1,5 +1,11 @@
 import { g, helpers } from "../../util/index.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
+import {
+	SIM_FIX_EXPANDED_SYNERGY_CUTOFFS,
+	SIM_FIX_LOW_POST,
+	SIM_FIX_MID_RANGE,
+	SIM_FIX_PERF_FACTOR,
+} from "./simSettings.ts";
 import { PHASE, STARTING_NUM_TIMEOUTS } from "../../../common/constants.ts";
 import jumpBallWinnerStartsThisPeriodWithPossession from "./jumpBallWinnerStartsThisPeriodWithPossession.ts";
 import getInjuryRate from "./getInjuryRate.ts";
@@ -228,6 +234,8 @@ const getSortedIndexes = (ovrs: number[]) => {
 	return sortedIndexes;
 };
 
+const STOCK_SYNERGY_CUTOFFS = { Di: 0.57, Dp: 0.61, R: 0.61 };
+
 // Use if denominator of prob might be 0
 const boundProb = (prob: number) => helpers.bound(prob, 0.001, 0.999);
 
@@ -339,6 +347,9 @@ class GameSim extends GameSimBase {
 
 	// Perimeter Defense (League extras, see docs/native-features.md): who gets credited with a steal leans to quick on-ball defenders
 	perimeterDefense: boolean;
+	// Game Sim Fixes (League extras, see simSettings.ts): make probabilities of mid-range and post shots, the trailing team's boost,
+	// synergy skill cutoffs with expanded ratings. Off: nothing below is used
+	simFixes: boolean;
 	// Expanded ratings, second step (offRebounding/defRebounding/ballSecurity/catchShoot/offDribble composites from loadTeams)
 	expandedRatings2: boolean;
 	// Player traits: a playoff game, where the big-game trait applies (the whole game)
@@ -407,6 +418,10 @@ class GameSim extends GameSimBase {
 		}
 
 		this.perimeterDefense = nativeFeatureEnabled("perimeterDefense", (key) =>
+			g.get(key as any),
+		);
+
+		this.simFixes = nativeFeatureEnabled("simFixes", (key) =>
 			g.get(key as any),
 		);
 
@@ -1575,15 +1590,20 @@ class GameSim extends GameSimBase {
 					// 0.61 is not always used - keep in sync with skills.js!
 
 					const r = p.compositeRating;
+					// Game Sim Fixes: the expanded Di, Dp and R composites have their own skill cutoffs
+					const cutoffs =
+						this.simFixes && this.expandedRatings
+							? SIM_FIX_EXPANDED_SYNERGY_CUTOFFS
+							: STOCK_SYNERGY_CUTOFFS;
 					skills = {
 						"3": helpers.sigmoid(r.shootingThreePointer, 15, 0.59),
 						A: helpers.sigmoid(r.athleticism, 15, 0.63),
 						B: helpers.sigmoid(r.dribbling, 15, 0.68),
-						Di: helpers.sigmoid(r.defenseInterior, 15, 0.57),
-						Dp: helpers.sigmoid(r.defensePerimeter, 15, 0.61),
+						Di: helpers.sigmoid(r.defenseInterior, 15, cutoffs.Di),
+						Dp: helpers.sigmoid(r.defensePerimeter, 15, cutoffs.Dp),
 						Po: helpers.sigmoid(r.shootingLowPost, 15, 0.61),
 						Ps: helpers.sigmoid(r.passing, 15, 0.63),
-						R: helpers.sigmoid(r.rebounding, 15, 0.61),
+						R: helpers.sigmoid(r.rebounding, 15, cutoffs.R),
 					};
 
 					this.skillsCountCache.set(p, skills);
@@ -1673,7 +1693,8 @@ class GameSim extends GameSimBase {
 			const oppT = teamNums[1 - t]!;
 			const diff = this.team[t].stat.pts - this.team[oppT].stat.pts;
 
-			const perfFactor = 1 - 0.2 * Math.tanh(diff / 60);
+			const perfFactor =
+				1 - (this.simFixes ? SIM_FIX_PERF_FACTOR : 0.2) * Math.tanh(diff / 60);
 
 			// Only update ones that are actually used
 			let dribbling = 0;
@@ -1848,7 +1869,8 @@ class GameSim extends GameSimBase {
 					const injuryRate =
 						getInjuryRate(baseRate, p.age, p.injury.gamesRemaining > 0) *
 						((p as any).injuryRiskFactor ?? 1) * // injuryDepth setting, see game/injuryDepthTeam.ts
-						(p.traitEffects?.injuryRateMultiplier ?? 1); // player traits (durability)
+						(p.traitEffects?.injuryRateMultiplier ?? 1) * // player traits (durability)
+						((p as any).simInjuryFactor ?? 1); // Game Sim Fixes: strength and endurance
 
 					if (Math.random() < injuryRate) {
 						p.injured = true;
@@ -2776,7 +2798,14 @@ class GameSim extends GameSimBase {
 			}
 			probMake *= g.get("threePointAccuracyFactor");
 		} else {
-			const r1 = 0.8 * Math.random() * p.compositeRating.shootingMidRange;
+			// Game Sim Fixes: the shot selection has its own composites (see simSettings.ts)
+			const r1 =
+				0.8 *
+				Math.random() *
+				(this.simFixes
+					? (p.compositeRating.shootingMidRangeSelect ??
+						p.compositeRating.shootingMidRange)
+					: p.compositeRating.shootingMidRange);
 			const r2 =
 				Math.random() *
 				(p.compositeRating.shootingAtRim +
@@ -2785,7 +2814,10 @@ class GameSim extends GameSimBase {
 
 			const r3 =
 				Math.random() *
-				(p.compositeRating.shootingLowPost +
+				((this.simFixes
+					? (p.compositeRating.shootingLowPostSelect ??
+						p.compositeRating.shootingLowPost)
+					: p.compositeRating.shootingLowPost) +
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)); // Synergy makes easy shots either more likely or less likely
 
@@ -2794,7 +2826,13 @@ class GameSim extends GameSimBase {
 				type = "midRange";
 				fgaLogType = "fgaMidRange";
 				probMissAndFoul = 0.07;
-				probMake = p.compositeRating.shootingMidRange * 0.32 + 0.42;
+				// Game Sim Fixes: offensive IQ only steers the shot selection above, the make is fg and strength
+				probMake = this.simFixes
+					? SIM_FIX_MID_RANGE.intercept +
+						SIM_FIX_MID_RANGE.slope *
+							(p.compositeRating.shootingMidRangeMake ??
+								p.compositeRating.shootingMidRange)
+					: p.compositeRating.shootingMidRange * 0.32 + 0.42;
 				probAndOne = 0.05;
 				if (this.expandedRatings2) {
 					probMake += this.jumpShotStyleDelta(p, passer);
@@ -2811,7 +2849,13 @@ class GameSim extends GameSimBase {
 				fgaLogType = "fgaLowPost";
 				type = "lowPost";
 				probMissAndFoul = 0.33;
-				probMake = p.compositeRating.shootingLowPost * 0.32 + 0.34;
+				// Game Sim Fixes: the make leans more on inside scoring
+				probMake = this.simFixes
+					? SIM_FIX_LOW_POST.intercept +
+						SIM_FIX_LOW_POST.slope *
+							(p.compositeRating.shootingLowPostMake ??
+								p.compositeRating.shootingLowPost)
+					: p.compositeRating.shootingLowPost * 0.32 + 0.34;
 				probAndOne = 0.15;
 			}
 			// Better shooting in the ASG, why not?
