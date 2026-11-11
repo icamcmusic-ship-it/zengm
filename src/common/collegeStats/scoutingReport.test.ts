@@ -84,6 +84,11 @@ describe("scouting report", () => {
 		const shooter = getScoutingReport(
 			input({ ratings: ratings({ tp: 75, stre: 15 }) }),
 		);
+		// A note only when the number backs the line up
+		const poorShooter = getScoutingReport(
+			input({ ratings: ratings({ tp: 10, ft: 10, fg: 10 }) }),
+		);
+		assert.notMatch(poorShooter.weaknesses.join(" "), /38\.9%|78\.4%/);
 		assert.match(shooter.strengths.join(" "), /three/i);
 		assert.match(shooter.strengths.join(" "), /38\.9% from three/);
 		assert.match(shooter.weaknesses.join(" "), /strength|frame/i);

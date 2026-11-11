@@ -521,9 +521,9 @@ export const planCareer = (
 		for (const year of played) {
 			if (year.yearsBack >= 1) {
 				// Whatever else happened to him, he was at the end of the bench
-				year.mpgShift = -(6 + 3 * year.yearsBack);
-				year.zShift = Math.min(year.zShift, 0);
-				year.usageShift -= 0.3;
+				year.mpgShift = -(11 + 3 * year.yearsBack);
+				year.zShift = Math.min(year.zShift, 0) - 0.8;
+				year.usageShift -= 0.6;
 				year.lag += 2 * year.yearsBack;
 			}
 		}
@@ -624,8 +624,8 @@ export const getStoryText = (
 			};
 		case "lateBloomer":
 			return {
-				title: "Late-blooming senior",
-				text: `Barely played for most of his college career, then broke out as a ${facts.ageAtDraft}-year-old senior in ${facts.lastSeason}. Scouts only started showing up in his last season.`,
+				title: "Late bloomer",
+				text: `Barely played for most of his college career, then broke out as a ${facts.ageAtDraft}-year-old in his last season, ${facts.lastSeason}. Scouts only started showing up in his last season.`,
 			};
 		case "project":
 			return {

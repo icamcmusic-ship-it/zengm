@@ -312,34 +312,39 @@ const TRAITS: Trait[] = [
 
 const pct = (x: number) => `${x.toFixed(1)}%`;
 
-// Something from his production that backs up (or is) a strength or weakness
+// Something from his production that backs up a strength or weakness. Only when the number agrees with the line: a scout's grade and a box score can disagree, and then the grade stands alone
 const statNote = (
 	key: string,
 	good: boolean,
 	s: ReportProduction | undefined,
 ): string | undefined => {
-	if (!s || s.gp < 8) {
+	if (!s || s.gp < 8 || s.min < 15) {
 		return undefined;
 	}
-	if (key === "three" && s.tpa >= 1) {
+	const per40 = (x: number) => (x * 40) / s.min;
+	if (key === "three" && s.tpa >= 1 && (good ? s.tpPct >= 35 : s.tpPct < 33)) {
 		return `${pct(s.tpPct)} from three on ${s.tpa.toFixed(1)} attempts a game`;
 	}
-	if (key === "midrange" && s.fta >= 1) {
+	if (
+		key === "midrange" &&
+		s.fta >= 1 &&
+		(good ? s.ftPct >= 77 : s.ftPct < 70)
+	) {
 		return `${pct(s.ftPct)} at the line`;
 	}
-	if (key === "passing") {
+	if (key === "passing" && (good ? per40(s.ast) >= 5 : per40(s.ast) < 3)) {
 		return `${s.ast.toFixed(1)} assists a game`;
 	}
-	if (key === "rebounding") {
+	if (key === "rebounding" && (good ? per40(s.trb) >= 10 : per40(s.trb) < 8)) {
 		return `${s.trb.toFixed(1)} rebounds a game`;
 	}
-	if (key === "finishing" && good) {
+	if (key === "finishing" && good && s.fgPct >= 50) {
 		return `${pct(s.fgPct)} from the field`;
 	}
-	if (key === "handle" && !good && s.tov >= 2.5) {
+	if (key === "handle" && !good && per40(s.tov) >= 3.5) {
 		return `${s.tov.toFixed(1)} turnovers a game`;
 	}
-	if (key === "defense" && good && s.stl + s.blk >= 2) {
+	if (key === "defense" && good && per40(s.stl + s.blk) >= 3) {
 		return `${s.stl.toFixed(1)} steals and ${s.blk.toFixed(1)} blocks a game`;
 	}
 };
