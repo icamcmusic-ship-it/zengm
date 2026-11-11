@@ -1,5 +1,5 @@
 import { CONFERENCES } from "./colleges.ts";
-import type { Rng } from "./rng.ts";
+import { Rng } from "./rng.ts";
 
 /**
  * The shape of a college season (ncaa.ts). Each class's season draws one, and maybe a scoring environment, from its seed. They bend what the season is simulated with (how far apart the teams are, how much a single game swings, how many points are scored) inside realistic bounds, so seasons differ in kind and not only in names.
@@ -40,6 +40,50 @@ export const NCAA_SHAPES = {
 	paceAndSpace: { name: "Pace and space", weight: 5 },
 } as const;
 export type NcaaShape = keyof typeof NCAA_SHAPES;
+
+/**
+ * Version 4: the college season of a shaped draft class (the Draft Class Shapes setting) often matches the class. A one-and-done class's college year is likely the year of the freshman, a guard-heavy class's a guards' game, and so on. The class shape is stored with the season (cs on p.collegeSeason), and whether this season matches is drawn from its own stream, so a season that does not match is drawn exactly as in version 3.
+ */
+export const CLASS_SHAPE_TIES: Record<
+	string,
+	| { shape: NcaaShape; scoring?: undefined }
+	| { scoring: NcaaScoring; shape?: undefined }
+> = {
+	oneAndDone: { shape: "freshmen" },
+	raw: { shape: "freshmen" },
+	seniors: { shape: "veterans" },
+	lateBloomers: { shape: "veterans" },
+	readyNow: { shape: "veterans" },
+	polished: { shape: "veterans" },
+	guards: { shape: "guards" },
+	pointGuards: { shape: "guards" },
+	bigs: { shape: "bigs" },
+	shooters: { shape: "paceAndSpace" },
+	stretchBigs: { shape: "paceAndSpace" },
+	midMajor: { shape: "cinderella" },
+	generational: { shape: "dominant" },
+	coHeadliners: { shape: "rivalry" },
+	noClearTop: { shape: "wideOpen" },
+	defenders: { scoring: "slog" },
+};
+export const NCAA_TIE_RATE = 0.6;
+
+export const ncaaClassTie = (
+	seed: string,
+	season: number,
+	classShape: string | undefined,
+) => {
+	const tie =
+		classShape !== undefined && Object.hasOwn(CLASS_SHAPE_TIES, classShape)
+			? CLASS_SHAPE_TIES[classShape]
+			: undefined;
+	if (!tie) {
+		return undefined;
+	}
+	return new Rng(`${seed}|${season}|classTie`).random() < NCAA_TIE_RATE
+		? tie
+		: undefined;
+};
 
 // Which prospects a lean shape favors (applied in ncaa.ts, from the prospects' ages and positions)
 export type NcaaLean = "young" | "old" | "guards" | "bigs";
@@ -100,6 +144,8 @@ export type NcaaStoryline = {
 	earlySdMult?: number;
 	// The rating changes were not known before the season (the polls are surprised)
 	hidden?: boolean;
+	// Version 4: the draft class shape this season matched (see CLASS_SHAPE_TIES)
+	classTie?: string;
 };
 
 export const STANDARD_MARGIN_SD = 11.5;
@@ -143,12 +189,23 @@ export const drawStoryline = (
 	rng: Rng,
 	teams: StoryTeam[],
 	version = 2,
+	// Version 4: the draft class shape this season matches (ncaaClassTie)
+	tie?: { key: string; shape?: NcaaShape; scoring?: NcaaScoring },
 ): NcaaStoryline => {
 	const storyline = standardStoryline();
 	storyline.tourneySd = STANDARD_TOURNEY_SD;
 	storyline.shape =
 		version >= 3 ? pick(rng, NCAA_SHAPES) : pick(rng, NCAA_SHAPES_V2);
 	storyline.scoring = pick(rng, NCAA_SCORING);
+	if (version >= 4 && tie) {
+		storyline.classTie = tie.key;
+		if (tie.shape) {
+			storyline.shape = tie.shape;
+		}
+		if (tie.scoring) {
+			storyline.scoring = tie.scoring;
+		}
+	}
 	const byRating = () =>
 		teams
 			.map((_, i) => i)

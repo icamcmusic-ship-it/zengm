@@ -2,7 +2,7 @@ import { featureOffError } from "../util/nativeFeatures.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { getMockDraftSeason } from "../core/draft/mockDraftData.ts";
-import { getClassShape } from "../core/draft/classShape.ts";
+import { getClassShapeInfo } from "../core/draft/classShape.ts";
 import { idb } from "../db/index.ts";
 import { PLAYER } from "../../common/constants.ts";
 
@@ -37,7 +37,7 @@ export default defineView({
 				: [];
 		return {
 			// Draft Class Shapes setting
-			shape: getClassShape(prospects),
+			shape: await getClassShapeInfo(prospects, season),
 			season,
 			phase: g.get("phase"),
 			userTids: g.get("userTids"),

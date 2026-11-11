@@ -202,6 +202,9 @@ export const heightFromRating = (hgt: number) => Math.round(66 + 0.27 * hgt);
 const STORY_RATE = 0.12;
 const RARE_STORY_RATE = 0.55;
 
+// How often a prospect the injury-riddled class marked has the injury story
+const SHAPE_INJURY_RATE = 0.85;
+
 type StoryContext = {
 	z: number;
 	classIndex: number;
@@ -220,6 +223,13 @@ export const pickStory = (
 	const { z, classIndex: c, isNcaa, school } = ctx;
 	if (!school || school.idle) {
 		return undefined;
+	}
+	// Marked by his draft class's shape: usually the story, from a stream of its own so nobody else's story changes
+	if (
+		p.injuryHistory &&
+		new Rng(`${seedBase}|shapeInjury`).random() < SHAPE_INJURY_RATE
+	) {
+		return "injury";
 	}
 	const rng = new Rng(`${seedBase}|story`);
 	const u = rng.random();

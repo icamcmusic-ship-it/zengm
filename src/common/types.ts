@@ -1555,6 +1555,10 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 
 	// Basketball, the Draft Class Shapes setting: the shape his class was given (a key of DRAFT_CLASS_SHAPES), or "pending" between being generated and being shaped
 	draftClassShape?: string;
+	// Version of the shapes his class was given (DRAFT_CLASS_SHAPE_VERSION when it was shaped). Missing: 1
+	draftClassShapeV?: number;
+	// The injury-riddled class: he comes into the draft off an injury (his college story)
+	draftClassShapeInjury?: boolean;
 
 	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
 	archetypes?: StoredArchetype[];

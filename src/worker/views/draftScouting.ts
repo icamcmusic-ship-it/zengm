@@ -16,7 +16,7 @@ import {
 } from "../util/playerTraitsView.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 import { EXPANDED_RATINGS } from "../../common/expandedRatings.ts";
-import { getClassShape } from "../core/draft/classShape.ts";
+import { getClassShapeInfo } from "../core/draft/classShape.ts";
 
 const getSeason = async (
 	playersAll: Player[],
@@ -107,7 +107,9 @@ const getSeason = async (
 		season,
 		// Draft Class Shapes setting
 		shape:
-			__SPORT === "basketball" ? getClassShape(playersAllFiltered) : undefined,
+			__SPORT === "basketball"
+				? await getClassShapeInfo(playersAllFiltered, season)
+				: undefined,
 
 		// How many of these prospects have college stats, for the generate college stats button
 		numWithCollegeStats: playersAllFiltered.filter((p) => hasPreDraftStats(p))

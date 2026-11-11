@@ -17,6 +17,7 @@ import { clamp } from "../../../common/collegeStats/rng.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { toCollegeProspect } from "./generateCollegeStats.ts";
+import { getClassShape } from "./classShape.ts";
 import type { Player } from "../../../common/types.ts";
 
 /**
@@ -28,6 +29,8 @@ export type ClassNcaaSeason = {
 	seed: string;
 	// Version of the season simulation, stored on the prospects so the season is rebuilt the way it was made
 	version: number;
+	// The class's shape (Draft Class Shapes), version 4+
+	classShape?: string;
 	// pid -> what he adds to his team
 	boosts: Map<number, number>;
 	// Prospects whose stats are not being generated but who are on a team (an imported class with real stats), to get a marker too
@@ -74,9 +77,11 @@ export const buildNcaaSeasonForClass = async ({
 
 	let seasonSeed = seed;
 	let version = NCAA_SEASON_VERSION;
+	let classShape = getClassShape(classPlayers)?.key as string | undefined;
 	if (marked.length > 0) {
 		seasonSeed = marked[0]!.collegeSeason!.seed;
 		version = marked[0]!.collegeSeason!.v ?? 1;
+		classShape = marked[0]!.collegeSeason!.cs;
 		for (const p of marked) {
 			contributions.push({
 				key: String(p.pid),
@@ -135,9 +140,11 @@ export const buildNcaaSeasonForClass = async ({
 			season: draftYear,
 			contributions,
 			version,
+			classShape: version >= 4 ? classShape : undefined,
 		}),
 		seed: seasonSeed,
 		version,
+		...(version >= 4 && classShape !== undefined ? { classShape } : {}),
 		boosts,
 		others,
 	};
@@ -165,6 +172,7 @@ export const storeCollegeSeasonMarkers = async ({
 				summary,
 				...(ncaa.version > 1 ? { v: ncaa.version } : {}),
 				...(ncaa.version >= 3 ? { pos: leanInfo(p, draftYear).pos } : {}),
+				...(ncaa.classShape !== undefined ? { cs: ncaa.classShape } : {}),
 			};
 		} else if (p.collegeSeason) {
 			delete p.collegeSeason;
@@ -188,6 +196,7 @@ export const storeCollegeSeasonMarkers = async ({
 				summary: getTeamSummary(ncaa.season, team),
 				...(ncaa.version > 1 ? { v: ncaa.version } : {}),
 				...(ncaa.version >= 3 ? { pos: leanInfo(p, draftYear).pos } : {}),
+				...(ncaa.classShape !== undefined ? { cs: ncaa.classShape } : {}),
 			};
 			await idb.cache.players.put(p);
 		}
@@ -227,6 +236,7 @@ export const getCollegeSeason = async (draftYear: number) => {
 		draftYear,
 		seed,
 		version,
+		members[0]!.collegeSeason!.cs ?? "",
 		contributions
 			.map((c) => `${c.key}|${c.school}|${c.boost}|${c.age}|${c.pos}`)
 			.sort()
@@ -242,6 +252,7 @@ export const getCollegeSeason = async (draftYear: number) => {
 			season: draftYear,
 			contributions,
 			version,
+			classShape: version >= 4 ? members[0]!.collegeSeason!.cs : undefined,
 		});
 	}
 	seasonCache.set(key, season);
