@@ -43,8 +43,8 @@ const sum = (table: Record<string, number>) =>
 
 describe("names data", () => {
 	test("USA has a large pool of first and last names", () => {
-		assert.isAbove(Object.keys(usa.first).length, 4500);
-		assert.isAbove(Object.keys(usa.last).length, 10500);
+		assert.isAbove(Object.keys(usa.first).length, 5000);
+		assert.isAbove(Object.keys(usa.last).length, 10800);
 	});
 
 	test("USA names are well formed", () => {
@@ -107,6 +107,41 @@ describe("names data", () => {
 				}
 			}
 		}
+	});
+
+	test("behindthename additions (extra/btn) load, stay in the low tail and are attributed", () => {
+		const dir = new URL("tools/names-manual/extra/btn/", rootUrl);
+		const files = fs.readdirSync(dir).filter((f: string) => f.endsWith(".csv"));
+		assert.isAbove(files.length, 100);
+		let added = 0;
+		for (const filename of files) {
+			const match = /^country-(.+)-(first|last)\.csv$/.exec(filename)!;
+			assert(match, filename);
+			const [, country, firstOrLast] = match as unknown as [
+				string,
+				string,
+				"first" | "last",
+			];
+			const table =
+				country === "China"
+					? names.groups.chinese![firstOrLast]
+					: names.countries[country]![firstOrLast];
+			assert(table, filename);
+			const rows = csvParse(fs.readFileSync(new URL(filename, dir), "utf8"));
+			for (const row of rows) {
+				assert.isAtLeast(table[row.Name!] ?? 0, 1, `${filename}: ${row.Name}`);
+				added += 1;
+			}
+		}
+		assert.isAbove(added, 12000);
+		// Real-athlete names still lead: new names are a small share of the biggest pools
+		assert.isAbove(usa.first.Michael!, 100);
+		const attribution = fs.readFileSync(
+			new URL("tools/names-manual/extra/ATTRIBUTION-behindthename.md", rootUrl),
+			"utf8",
+		);
+		assert.include(attribution, "CC BY-SA 4.0");
+		assert.include(attribution, "behindthename.com");
 	});
 
 	test("new countries have names", () => {

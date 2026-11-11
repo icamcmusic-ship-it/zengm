@@ -120,34 +120,45 @@ const getOverrides = () => {
 const { femaleNames, groups, overrides } = getOverrides();
 
 // Additional names in names-manual/extra (same file format as names-manual), added on top of everything else.
-// fixes.json there merges misspellings into the right spelling and removes bad entries.
+// extra/btn holds the behindthename.com additions (CC BY-SA 4.0, see extra/ATTRIBUTION-behindthename.md), kept in a separate
+// folder so they can be regenerated or removed on their own.
+// fixes.json in extra merges misspellings into the right spelling and removes bad entries.
+const EXTRA_DIRS = ["names-manual/extra", "names-manual/extra/btn"];
 const getExtras = () => {
-	const dir = path.join(import.meta.dirname, "names-manual/extra");
-	const extras = { first: {}, last: {} };
-	for (const filename of fs.readdirSync(dir).sort()) {
-		if (!filename.endsWith(".csv")) {
-			continue;
-		}
-		const match = /^country-(.+)-(first|last)\.csv$/.exec(filename);
-		if (!match) {
-			throw new Error(`Unexpected filename "extra/${filename}"`);
-		}
-		const [, country, firstOrLast] = match;
-		const rows = csvParse(fs.readFileSync(path.join(dir, filename), "utf8"));
-		const object = {};
-		for (const row of rows) {
-			const count = Number.parseInt(row.Frequency);
-			if (Number.isNaN(count) || object[row.Name] !== undefined) {
-				throw new Error(
-					`Bad or duplicate row in extra/${filename}: ${row.Name}`,
-				);
+	const extras = { first: [], last: [] };
+	for (const relDir of EXTRA_DIRS) {
+		const dir = path.join(import.meta.dirname, relDir);
+		const byKind = { first: {}, last: {} };
+		for (const filename of fs.readdirSync(dir).sort()) {
+			if (!filename.endsWith(".csv")) {
+				continue;
 			}
-			object[row.Name] = count;
+			const match = /^country-(.+)-(first|last)\.csv$/.exec(filename);
+			if (!match) {
+				throw new Error(`Unexpected filename "${relDir}/${filename}"`);
+			}
+			const [, country, firstOrLast] = match;
+			const rows = csvParse(fs.readFileSync(path.join(dir, filename), "utf8"));
+			const object = {};
+			for (const row of rows) {
+				const count = Number.parseInt(row.Frequency);
+				if (Number.isNaN(count) || object[row.Name] !== undefined) {
+					throw new Error(
+						`Bad or duplicate row in ${relDir}/${filename}: ${row.Name}`,
+					);
+				}
+				object[row.Name] = count;
+			}
+			byKind[firstOrLast][country] = object;
 		}
-		extras[firstOrLast][country] = object;
+		extras.first.push(byKind.first);
+		extras.last.push(byKind.last);
 	}
 	const fixes = JSON.parse(
-		fs.readFileSync(path.join(dir, "fixes.json"), "utf8"),
+		fs.readFileSync(
+			path.join(import.meta.dirname, "names-manual/extra/fixes.json"),
+			"utf8",
+		),
 	);
 	return { extras, fixes };
 };
@@ -158,13 +169,13 @@ const fnsByCountry = combineNames([
 	basketball.fnsByCountry,
 	football.fnsByCountry,
 	overrides.first,
-	extras.first,
+	...extras.first,
 ]);
 const lnsByCountry = combineNames([
 	basketball.lnsByCountry,
 	football.lnsByCountry,
 	overrides.last,
-	extras.last,
+	...extras.last,
 ]);
 
 const namesByKind = { first: fnsByCountry, last: lnsByCountry };
