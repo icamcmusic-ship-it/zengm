@@ -7,6 +7,11 @@ import type {
 import { coachingEffect } from "../../../common/budgetLevels.ts";
 import { uniform, realGauss } from "../../../common/random.ts";
 import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
+import { realisticAgingOn } from "./ratingsModelSwitch.ts";
+import {
+	REALISTIC_AGING_TARGETS,
+	STOCK_UNTIL,
+} from "./realisticAging.basketball.ts";
 
 type RatingFormula = {
 	ageModifier: (age: number) => number;
@@ -172,32 +177,59 @@ const ratingsFormulas: Record<Exclude<RatingKey, "hgt">, RatingFormula> = {
 // Cached for performance, since developSeason is called a lot in monteCarloPot
 const ratingsFormulasEntries = helpers.entries(ratingsFormulas);
 
+// Realistic Aging (realisticAging setting): every rating's age modifier is its target yearly change (realisticAging.basketball.ts) minus
+// the shared base change's age part, so the base change (with its noise, coaching, work ethic and the secret aging curve of Player
+// Traits) still moves every rating together on top. Same random numbers as the stock formulas.
+const realisticAgeModifier = (
+	key: Exclude<RatingKey, "hgt">,
+	formula: RatingFormula,
+	age: number,
+	hgt: number,
+) => {
+	const target = REALISTIC_AGING_TARGETS[key];
+	if (age <= (target.stockUntil ?? STOCK_UNTIL)) {
+		return formula.ageModifier(age);
+	}
+	const a = helpers.bound(Math.round(age), 19, 40);
+	let mod = target.byAge[a - 19]! - baseChangeByAge(age);
+	if (target.bigExtra !== undefined && age >= 31) {
+		// Big men's athleticism declines a little faster after 30, scaled from a wing's height (55) to a center's (70)
+		mod += target.bigExtra * helpers.bound((hgt - 55) / 15, 0, 1);
+	}
+	if (age > 40) {
+		mod += baseChangeByAge(40) - baseChangeByAge(age);
+	}
+	return mod;
+};
+
+// The age part of calcBaseChange (before noise, traits and coaching)
+const baseChangeByAge = (age: number) => {
+	if (age <= 21) {
+		return 2;
+	} else if (age <= 25) {
+		return 1;
+	} else if (age <= 27) {
+		return 0;
+	} else if (age <= 29) {
+		return -1;
+	} else if (age <= 31) {
+		return -2;
+	} else if (age <= 34) {
+		return -3;
+	} else if (age <= 40) {
+		return -4;
+	} else if (age <= 43) {
+		return -5;
+	}
+	return -6;
+};
+
 const calcBaseChange = (
 	age: number,
 	coachingLevel: number,
 	traitDev?: TraitDevelopment,
 ): number => {
-	let val: number;
-
-	if (age <= 21) {
-		val = 2;
-	} else if (age <= 25) {
-		val = 1;
-	} else if (age <= 27) {
-		val = 0;
-	} else if (age <= 29) {
-		val = -1;
-	} else if (age <= 31) {
-		val = -2;
-	} else if (age <= 34) {
-		val = -3;
-	} else if (age <= 40) {
-		val = -4;
-	} else if (age <= 43) {
-		val = -5;
-	} else {
-		val = -6;
-	}
+	let val = baseChangeByAge(age);
 
 	// Noise
 	let noise;
@@ -244,9 +276,13 @@ const developSeason = (
 	}
 
 	const baseChange = calcBaseChange(age, coachingLevel, traitDev);
+	const realistic = realisticAgingOn();
+	const hgt = ratings.hgt;
 
 	for (const [key, formula] of ratingsFormulasEntries) {
-		const ageModifier = formula.ageModifier(age);
+		const ageModifier = realistic
+			? realisticAgeModifier(key, formula, age, hgt)
+			: formula.ageModifier(age);
 		const changeLimits = formula.changeLimits(age);
 
 		ratings[key] = limitRating(

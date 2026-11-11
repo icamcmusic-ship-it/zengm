@@ -304,6 +304,26 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "ovrV2",
+		key: "ovrV2",
+		name: "Sim-Calibrated Ovr",
+		description:
+			"Player ovr weighs each rating by how much it actually helps a team win in the game sim (measured, with separate weights when Expanded Ratings is on), instead of the old formula that overrated basketball IQ, strength and endurance and underrated height, speed, ball handling and three-point shooting. The league's ovr scale stays the same; bigs gain a little and small guards lose a little. Player value leans a little less on PER. Turning it on or off recomputes every player's ovr.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "realisticAging",
+		key: "realisticAging",
+		name: "Realistic Aging",
+		description:
+			"Players age more like in the NBA: basketball IQ and free throw shooting keep improving into the late 20s, shooting holds into the early 30s, speed and jumping decline gently from about 28 and faster after 32 (a little faster for big men), and strength holds until about 30. With Expanded Ratings, old guards no longer turn into interior defenders. Secret aging curves (Player Traits) still apply on top.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "perimeterDefense",
 		key: "perimeterDefense",
 		name: "Perimeter Defense",

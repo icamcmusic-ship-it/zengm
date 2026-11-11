@@ -5,6 +5,7 @@ import valueCombineOvrPot from "./valueCombineOvrPot.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
 import { getProStats } from "../../../common/preDraft.ts";
+import { ovrV2On } from "./ratingsModelSwitch.ts";
 
 /**
  * Returns a numeric value for a given player, representing is general worth to a typical team
@@ -123,7 +124,11 @@ const value = (
 				}
 			}
 
-			current = 0.8 * ovr + 0.2 * current; // Include some part of the ratings
+			// Include some part of the ratings. Sim-Calibrated Ovr: ovr already measures sim impact, and PER flatters box-score bigs (rebounds,
+			// blocks, at-rim efficiency) over what they add to winning, so it gets half the weight
+			current = ovrV2On()
+				? 0.9 * ovr + 0.1 * current
+				: 0.8 * ovr + 0.2 * current;
 		}
 	}
 
