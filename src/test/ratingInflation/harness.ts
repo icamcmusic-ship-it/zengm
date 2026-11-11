@@ -47,6 +47,8 @@ export const OFF: Record<string, unknown> = {
 	tradeRequests: false,
 	expandedRatings: false,
 	perimeterDefense: false,
+	ovrV2: false,
+	realisticAging: false,
 };
 
 // New-league defaults, plus the two rating-touching extras that are opt-in even for new leagues
@@ -241,6 +243,43 @@ export const summarize = async (
 		age31_34: byAge(31, 34),
 		age35p: byAge(35, 50),
 		meanAge: r2(mean(rows.map((r) => r.age))),
+		// Aging (Realistic Aging): mean age of the best players, the age with the best mean ovr (ages with 10+ rostered players), and
+		// the mean age of last offseason's retirees
+		top10Age: r2(
+			mean(
+				rows
+					.toSorted((a, b) => b.ovr - a.ovr)
+					.slice(0, 10)
+					.map((r) => r.age),
+			),
+		),
+		top50Age: r2(
+			mean(
+				rows
+					.toSorted((a, b) => b.ovr - a.ovr)
+					.slice(0, 50)
+					.map((r) => r.age),
+			),
+		),
+		peakOvrAge: (() => {
+			let best = Number.NaN;
+			let bestOvr = -Infinity;
+			for (let age = 19; age <= 40; age++) {
+				const o = rows.filter((r) => r.age === age).map((r) => r.ovr);
+				if (o.length >= 10 && mean(o) > bestOvr) {
+					bestOvr = mean(o);
+					best = age;
+				}
+			}
+			return best;
+		})(),
+		retireAge: r2(
+			mean(
+				(await idb.cache.players.indexGetAll("playersByTid", PLAYER.RETIRED))
+					.filter((p) => p.retiredYear === season - 1)
+					.map((p) => season - 1 - p.born.year),
+			),
+		),
 		teamOvrSd: r2(sd(teamOvrs)),
 		teamOvrMean: r2(mean(teamOvrs)),
 		coachingMean: r2(mean(coaching)),

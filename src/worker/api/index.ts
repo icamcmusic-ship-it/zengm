@@ -4594,13 +4594,15 @@ const updateDefaultSettingsOverrides = async (
 	}
 };
 
-// Expanded ratings turned on or off: fill in / stop using the new ratings, and recompute ovr, pot and skills
+// Expanded ratings or Sim-Calibrated Ovr turned on or off: fill in / stop using the new ratings, and recompute ovr, pot and skills
 const expandedRatingsChanged = (
 	gameAttributes: Partial<GameAttributesLeague>,
 ) =>
 	__SPORT === "basketball" &&
-	gameAttributes.expandedRatings !== undefined &&
-	!!gameAttributes.expandedRatings !== !!g.get("expandedRatings");
+	((gameAttributes.expandedRatings !== undefined &&
+		!!gameAttributes.expandedRatings !== !!g.get("expandedRatings")) ||
+		(gameAttributes.ovrV2 !== undefined &&
+			!!gameAttributes.ovrV2 !== !!g.get("ovrV2")));
 
 const updateGameAttributes = async (
 	gameAttributes: Partial<GameAttributesLeague>,

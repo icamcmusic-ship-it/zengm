@@ -1,0 +1,81 @@
+{
+	"mode": "off",
+	"games": 16000,
+	"ratings": [
+		{
+			"key": "hgt",
+			"margin": 0.9062,
+			"marginSE": 0.0358
+		},
+		{
+			"key": "stre",
+			"margin": 0.1901,
+			"marginSE": 0.0359
+		},
+		{
+			"key": "spd",
+			"margin": 0.6785,
+			"marginSE": 0.036
+		},
+		{
+			"key": "jmp",
+			"margin": 0.1996,
+			"marginSE": 0.0358
+		},
+		{
+			"key": "endu",
+			"margin": 0.1559,
+			"marginSE": 0.0357
+		},
+		{
+			"key": "ins",
+			"margin": -0.0311,
+			"marginSE": 0.0357
+		},
+		{
+			"key": "dnk",
+			"margin": 0.1685,
+			"marginSE": 0.0358
+		},
+		{
+			"key": "ft",
+			"margin": 0.0742,
+			"marginSE": 0.0357
+		},
+		{
+			"key": "fg",
+			"margin": -0.0877,
+			"marginSE": 0.0356
+		},
+		{
+			"key": "tp",
+			"margin": 0.434,
+			"marginSE": 0.0357
+		},
+		{
+			"key": "oiq",
+			"margin": 0.351,
+			"marginSE": 0.0357
+		},
+		{
+			"key": "diq",
+			"margin": 0.4154,
+			"marginSE": 0.0361
+		},
+		{
+			"key": "drb",
+			"margin": 0.4225,
+			"marginSE": 0.0358
+		},
+		{
+			"key": "pss",
+			"margin": 0.2815,
+			"marginSE": 0.0358
+		},
+		{
+			"key": "reb",
+			"margin": 0.1619,
+			"marginSE": 0.0358
+		}
+	]
+}

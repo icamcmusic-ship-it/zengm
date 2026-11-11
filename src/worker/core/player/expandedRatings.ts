@@ -12,6 +12,7 @@ import {
 	insertExpandedRatingKeys,
 } from "../../../common/expandedRatings.ts";
 import { expandedRatingsOn } from "./expandedRatingsSwitch.ts";
+import { realisticAgingOn } from "./ratingsModelSwitch.ts";
 
 export { expandedRatingsOn };
 
@@ -98,9 +99,14 @@ export const syncExpandedToCompat = (r: Record<string, any>) => {
 
 // How much more interior than perimeter defense a player keeps as he ages (per season, before noise): perimeter defense is legs,
 // interior defense is size and positioning. Applied symmetrically, so diq (their average) ages exactly like before.
+// Realistic Aging: the drift stops after 31, so a guard's perimeter defense declines with his diq in his 30s instead of turning him into an
+// interior defender (idef no longer climbs to 36)
 const splitAging = (age: number) => {
 	if (age <= 27) {
 		return 0;
+	}
+	if (realisticAgingOn()) {
+		return age <= 31 ? 1 : 0;
 	}
 	if (age <= 29) {
 		return 1;
@@ -139,8 +145,10 @@ export const developExpandedRatings = (
 // fg + tp keeping their split, which drifts a little (offensive rebounding is motor and legs, so with age it drifts toward defensive
 // rebounding, symmetrically, like the defense split). Ball security follows ballSecurityBase plus a drifting residual.
 const developExpandedRatings2 = (r: Record<string, any>, age: number) => {
+	// Realistic Aging: the drift toward defensive rebounding only from 29 to 31, so dreb stops climbing in his 30s
+	const rebDrifts = realisticAgingOn() ? age >= 29 && age <= 31 : age >= 29;
 	const rebShift =
-		(age >= 29 ? uniform(0.3, 1.2) : 0) +
+		(rebDrifts ? uniform(0.3, 1.2) : 0) +
 		Math.min(2, Math.max(-2, realGauss(0, 0.8)));
 	setReboundSplit(r, r.oreb - r.dreb - 2 * Math.round(rebShift));
 

@@ -10,6 +10,7 @@ import { gameAttributeHasHistory } from "../../common/gameAttributeHasHistory.ts
 import helpers from "./helpers.ts";
 import { last } from "../../common/utils.ts";
 import { setExpandedRatingsGetter } from "../core/player/expandedRatingsSwitch.ts";
+import { setRatingsModelGetters } from "../core/player/ratingsModelSwitch.ts";
 
 // This will get filled by values from IndexedDB
 const g: GameAttributes & {
@@ -164,5 +165,12 @@ setExpandedRatingsGetter(
 	() =>
 		Object.hasOwn(g, "expandedRatings") && g.get("expandedRatings") === true,
 );
+
+// Sim-Calibrated Ovr and Realistic Aging: read by player ovr/developSeason (see ratingsModelSwitch.ts)
+setRatingsModelGetters({
+	ovrV2: () => Object.hasOwn(g, "ovrV2") && g.get("ovrV2") === true,
+	realisticAging: () =>
+		Object.hasOwn(g, "realisticAging") && g.get("realisticAging") === true,
+});
 
 export default g;
