@@ -289,6 +289,10 @@ export const processTeam = async (
 	const spacingCreation =
 		__SPORT === "basketball" &&
 		nativeFeatureEnabled("spacingCreation", (key) => g.get(key as any));
+	// Matchup Defense (basketball): height and speed for size and speed mismatches, see GameSim.basketball/matchupDefense.ts
+	const matchupDefense =
+		__SPORT === "basketball" &&
+		nativeFeatureEnabled("matchupDefense", (key) => g.get(key as any));
 	const compositeWeights = Object.entries(
 		__SPORT === "basketball"
 			? simFixes
@@ -489,6 +493,10 @@ export const processTeam = async (
 					player.compositeRating(rating, w.ratings, w.weights, false) *
 					injuryFactor;
 				p2.compositeRating.spacingThreat = spacingThreat(p2.compositeRating);
+			}
+			if (matchupDefense) {
+				(p2 as any).simHgt = (rating as any).hgt;
+				(p2 as any).simSpd = (rating as any).spd;
 			}
 			if (simFixes) {
 				// Game Sim Fixes: strong, durable players get hurt a little less

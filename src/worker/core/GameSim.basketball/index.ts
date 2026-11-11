@@ -61,6 +61,13 @@ import {
 	type LineupSpacing,
 } from "./spacingCreation.ts";
 import {
+	assignMatchups,
+	driveMismatch,
+	MATCHUP,
+	mismatchScale,
+	postMismatch,
+} from "./matchupDefense.ts";
+import {
 	lateGameSituationWeight,
 	teamChemistryBonus,
 	teamSwitchDefenseBonus,
@@ -431,6 +438,14 @@ class GameSim extends GameSimBase {
 		{ sum: 0, nonShooters: 0 },
 	];
 	creator: PlayerGameSim | undefined;
+	// Matchup Defense (League extras, see matchupDefense.ts): for each team on defense, the index of the defender guarding each offensive
+	// player (by his index on the court), assigned at each substitution, and the team's average defensive versatility. Off: nothing here is
+	// used and no extra random numbers are drawn
+	matchupDefense: boolean;
+	guards: [number[], number[]] = [[], []];
+	teamVersatility: [number, number] = [0, 0];
+	// The matchup of the last shot (for the calibration script)
+	lastMatchup = { delta: 0, post: 0, drive: 0, fitRel: 0 };
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -513,6 +528,9 @@ class GameSim extends GameSimBase {
 		);
 		this.expandedRatings2 = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.offRebounding !== undefined),
+		);
+		this.matchupDefense = nativeFeatureEnabled("matchupDefense", (key) =>
+			g.get(key as any),
 		);
 		// (loadTeams adds the creation composite only with the setting on)
 		this.spacingCreation = teams.some((t) =>
@@ -1959,6 +1977,63 @@ class GameSim extends GameSimBase {
 
 			this.team[t].synergy.reb /= 4;
 		}
+
+		if (this.matchupDefense) {
+			this.assignMatchups();
+		}
+	}
+
+	// Matchup Defense: each defense's assignments for the current lineups, and its average defensive versatility
+	assignMatchups() {
+		for (const d of teamNums) {
+			const o = teamNums[1 - d]!;
+			assignMatchups(
+				this.playersOnCourt[o],
+				this.playersOnCourt[d],
+				this.isSwitching(d),
+				this.guards[d],
+			);
+			let versatility = 0;
+			for (const p of this.playersOnCourt[d]) {
+				versatility += p.traitEffects?.switchDefenseContribution ?? 0;
+			}
+			this.teamVersatility[d] =
+				versatility / Math.max(1, this.playersOnCourt[d].length);
+		}
+	}
+
+	isSwitching(d: TeamNum) {
+		return this.team[d].coachSim?.def === "switch";
+	}
+
+	// Matchup Defense: the player guarding offensive player p (undefined if he is not on the court)
+	defenderOf(p: PlayerGameSim) {
+		const j = this.playersOnCourt[this.o].indexOf(p);
+		if (j < 0) {
+			return undefined;
+		}
+		return this.playersOnCourt[this.d][this.guards[this.d][j] ?? j];
+	}
+
+	// Matchup Defense: how much better (or worse) the shooter's defender defends this type of shot than his teammates on the court, on the
+	// scale of the team's shot defense
+	matchupRel(type: ShotType, defender: PlayerGameSim) {
+		const rating = (q: PlayerGameSim) => {
+			const r = q.compositeRating;
+			const value =
+				type === "threePointer" || type === "midRange"
+					? r.defensePerimeter
+					: type === "lowPost"
+						? r.defenseInterior
+						: 0.5 * (r.defensePerimeter + r.defenseInterior);
+			return value * this.fatigue(q.stat.energy);
+		};
+		const lineup = this.playersOnCourt[this.d];
+		let sum = 0;
+		for (const q of lineup) {
+			sum += rating(q);
+		}
+		return rating(defender) - sum / lineup.length;
 	}
 
 	// Position-aware team composites: the shares of team t's players on the court, cached until the lineup changes
@@ -2994,8 +3069,11 @@ class GameSim extends GameSimBase {
 		}
 
 		// Credited to his matchup (same slot on the court), so no random draw is needed
+		// (Matchup Defense: his actual defender)
 		const ind = this.playersOnCourt[this.o].indexOf(p);
-		const matchup = this.playersOnCourt[this.d][ind >= 0 ? ind : 0];
+		const matchup = this.matchupDefense
+			? (this.defenderOf(p) ?? this.playersOnCourt[this.d][0])
+			: this.playersOnCourt[this.d][ind >= 0 ? ind : 0];
 		if (matchup) {
 			this.noteDefensiveStop("tov", matchup, p);
 		}
@@ -3108,6 +3186,37 @@ class GameSim extends GameSimBase {
 					this.numPlayersOnCourt - 1,
 				)
 			: 0;
+		// Matchup Defense: his defender, and the size and speed mismatches (relieved by switching and versatility)
+		const md = this.matchupDefense;
+		let defender: PlayerGameSim | undefined;
+		let mismatchRelief = 1;
+		let postTilt = 1;
+		let driveTilt = 1;
+		let pullUpTilt = 1;
+		if (md) {
+			defender = this.defenderOf(p);
+			if (defender) {
+				mismatchRelief = mismatchScale(
+					defender,
+					this.isSwitching(this.d),
+					this.teamVersatility[this.d],
+				);
+				const post = mismatchRelief * postMismatch(p, defender);
+				const drive = mismatchRelief * driveMismatch(p, defender);
+				// (divided by the league average, so the league shot mix stays the same)
+				postTilt = (1 + post) / MATCHUP.postNorm;
+				driveTilt = (1 + drive) / MATCHUP.driveNorm;
+				this.lastMatchup.post = post;
+				this.lastMatchup.drive = drive;
+			}
+			if (
+				this.team[this.d].coachSim?.def === "drop" &&
+				(sc ? selfCreated : passer === undefined)
+			) {
+				pullUpTilt = MATCHUP.dropPullUpSelect;
+			}
+		}
+
 		let shootingThreePointerScaled = p.compositeRating.shootingThreePointer;
 
 		// Too many players shooting 3s at the high end - scale 0.55-1.0 to 0.55-0.85
@@ -3203,6 +3312,7 @@ class GameSim extends GameSimBase {
 			const csd = this.cs[this.d];
 			const r1 =
 				(this.coachSys ? cso.mid * csd.dMid : 1) *
+				pullUpTilt *
 				0.8 *
 				Math.random() *
 				(this.simFixes
@@ -3215,6 +3325,7 @@ class GameSim extends GameSimBase {
 					? (selfCreated ? CREATION.selfRim : 1) *
 						Math.max(0.2, 1 + SPACING.selectRim * spacing)
 					: 1) *
+				driveTilt *
 				Math.random() *
 				(p.compositeRating.shootingAtRim +
 					this.synergyFactor *
@@ -3222,6 +3333,7 @@ class GameSim extends GameSimBase {
 
 			const r3 =
 				(this.coachSys ? cso.post * csd.dPost : 1) *
+				postTilt *
 				Math.random() *
 				((this.simFixes
 					? (p.compositeRating.shootingLowPostSelect ??
@@ -3311,20 +3423,47 @@ class GameSim extends GameSimBase {
 
 			probMissAndFoul *= foulFactor;
 			probAndOne *= foulFactor;
+			const teamDefense = this.expandedRatings
+				? this.shotDefenseExpanded(type)
+				: this.positionalComposites
+					? this.shotDefensePositional(type)
+					: this.team[this.d].compositeRating.defense;
+			// Matchup Defense: partly his defender (a weak one gets attacked), partly the team (help defense)
+			let matchupDelta = 0;
+			if (md && defender) {
+				const rel = this.matchupRel(type, defender);
+				matchupDelta =
+					MATCHUP.share *
+					((rel < 0 ? rel * mismatchRelief : rel) -
+						(type === "threePointer"
+							? MATCHUP.centerThree
+							: type === "midRange"
+								? MATCHUP.centerMid
+								: type === "lowPost"
+									? MATCHUP.centerPost
+									: MATCHUP.centerRim));
+				this.lastMatchup.delta = matchupDelta;
+				this.lastMatchup.fitRel = rel;
+			}
 			probMake =
 				(probMake -
-					0.25 *
-						(this.expandedRatings
-							? this.shotDefenseExpanded(type)
-							: this.positionalComposites
-								? this.shotDefensePositional(type)
-								: this.team[this.d].compositeRating.defense) +
+					0.25 * (md ? teamDefense + matchupDelta : teamDefense) +
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)) *
 				currentFatigue;
 
 			if (this.coachSys) {
 				probMake += this.coachMakeDelta();
+			}
+
+			// Matchup Defense: drop coverage gives up pull-up jumpers
+			if (
+				md &&
+				type === "midRange" &&
+				passer === undefined &&
+				this.team[this.d].coachSim?.def === "drop"
+			) {
+				probMake += MATCHUP.dropPullUpMake;
 			}
 
 			// Spacing & Shot Creation: room to drive and post up

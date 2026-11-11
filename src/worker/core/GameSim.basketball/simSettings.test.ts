@@ -244,6 +244,8 @@ test("all three on, with every other sim extra: games still sane", async () => {
 				injuryDepth: true,
 				technicalFouls: true,
 				perimeterDefense: true,
+				spacingCreation: true,
+				matchupDefense: true,
 			},
 			SEEDS,
 		),

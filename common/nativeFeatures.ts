@@ -399,6 +399,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "matchupDefense",
+		key: "matchupDefense",
+		name: "Matchup Defense",
+		description:
+			"At each substitution, defenders are matched to the opponents by threat and fit (perimeter defenders on guards and wings, interior defenders on bigs). A shot is defended partly by the player guarding the shooter and partly by the team (help defense), so weak defenders get attacked, and size and speed mismatches lead to more post-ups and drives. Switching coaches and versatile defenders limit mismatches, drop coverage gives up pull-up jumpers. League averages stay about the same.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		key: "featureSeasonOdds",
 		name: "Season Odds",

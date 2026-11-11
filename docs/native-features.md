@@ -68,6 +68,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Realistic rotations](#realistic-rotations)                         | game sim (substitutions)                                           | bball  | `realisticRotations`                      | on / off                      |
 | [Coaching systems](#coaching-systems)                               | game sim, coach market, team page, box score, Coach's notes        | bball  | `coachSystems`                            | on / off                      |
 | [Spacing & shot creation](#spacing--shot-creation)                  | game sim (drives, finishing, assists)                              | bball  | `spacingCreation`                         | on / off                      |
+| [Matchup defense](#matchup-defense)                                 | game sim (shot defense, shot selection, steal credit)              | bball  | `matchupDefense`                          | on / off                      |
 | [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery              | bball  | `featureSeasonOdds`                       | on / on                       |
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes   | bball  | `featureArchetypes`                       | on / on                       |
 | [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)       | bball  | `improvedPositions`                       | on / off                      |
@@ -130,6 +131,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `realisticRotations`                                                                                      | on / off                                                        |                                                                                                              |
 | `coachSystems`                                                                                            | on / off                                                        | needs `coachingStaff`                                                                                        |
 | `spacingCreation`                                                                                         | on / off                                                        |                                                                                                              |
+| `matchupDefense`                                                                                          | on / off                                                        |                                                                                                              |
 | `contractOptions`, `contractExtensions`, `tradeRequests`                                                  | on / off                                                        |                                                                                                              |
 | `featureHoldouts` + `holdoutFrequency`                                                                    | on / off; 1 / 1                                                 | frequency scales how often holdouts happen                                                                   |
 | `aiTradesNeedBased`                                                                                       | on / off                                                        | the classic random AI-to-AI trades stay on in every league (_AI-to-AI Trades Factor_ in the Events category) |
@@ -556,6 +558,35 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 
 - **Known limits:** the creator is not a separate event in the play-by-play (the assister is). Spacing reads ratings, not where players stand; zone defenses do not change it.
 
+### Matchup defense
+
+- **Setting:** `matchupDefense` (League Extras → Game Simulation). On for new leagues, off for existing leagues (off: no assignments, no extra random numbers, the same games as before: `outcomeInvariance.test.ts`). Code: `src/worker/core/GameSim.basketball/matchupDefense.ts` (assignment, mismatches, constants), `GameSim.assignMatchups` / `matchupRel` / `getShotInfo`; height and speed for the mismatches come from `game/loadTeams.ts`. Tests: `matchupDefense.test.ts`; calibration: `SM_CAL=1 spacingMatchup.script.test.ts`.
+- **Why:** stock BBGM defends every shot with the plain 5-man average of the defense composite (`0.25 × defense` in `getShotInfo`), so who guards whom never matters: a bad defender costs his team the same wherever he is, nobody can be attacked or hidden, and the defense never changes which shot is taken.
+- **Assignment:** at each substitution (with the synergy), each defense matches its five to the offense greedily over the 5×5 grid of offensive threat (the usage composite) × defender fit, best pair first: against guards and wings the perimeter defense composite (pdef with Expanded Ratings), against bigs (height 45 → 65) the interior defense composite (idef + hgt + wng), mixed in between. A Switch Everything defense (the coach's system) matches up by size only half as much.
+- **Shot defense:** `0.25 × defense` becomes `0.25 × (0.55 × matchup + 0.45 × team)`, the matchup being the team value plus how much better or worse the shooter's defender is than his teammates on the floor at that kind of shot (perimeter defense on jumpers, interior defense in the post, half and half at the rim; with fatigue), centered by shot type on the league average matchup (the best defenders guard the biggest threats, so the raw matchup favors the defense). A defender 0.10 below his lineup at the shot type gives up about 1.4 percentage points more on his man's shots.
+- **Mismatches** re-weight the existing shot-type draws: post-ups (the low post draw) × 1 + 0.6 × (height gap − 12) / 20 against a smaller defender, drives (the at-rim draw) × 1 + 0.4 × (speed gap − 14) / 25 against a slower one, both divided by their league averages so the shot mix stays the same. A defender's own Defensive Versatility trait relieves mismatches (−15% per SD), and in a Switch Everything defense the team's average versatility does (up to −60%, −30% for an average team); the same relief softens the make-probability penalty of a weak matchup. **Drop coverage** concedes pull-ups: self-created (unassisted) mid-range jumpers × 1.15 in the selection and +0.015 make probability.
+- **Steal and turnover credit:** the defensive-stop note on a turnover (the play-by-play) goes to the ball handler's actual defender instead of his court slot.
+- **Calibration** (8 leagues × 30 teams of generated rosters, random coaches, 4,800 games each way; new-league defaults on, coaching systems and Spacing & Shot Creation included):
+
+  | per team game | matchup off | matchup on |
+  | ------------- | ----------- | ---------- |
+  | pts           | 102.1       | 102.2      |
+  | FG%           | .441        | .441       |
+  | 3PA rate      | .283        | .284       |
+  | 3P%           | .346        | .348       |
+  | AST           | 24.00       | 23.93      |
+  | TOV           | 15.44       | 15.36      |
+  | ORB           | 12.03       | 11.99      |
+  | FTA           | 20.17       | 20.15      |
+  | STL           | 6.95        | 6.86       |
+  | BLK           | 4.39        | 4.42       |
+  | minutes       | 241.0       | 241.0      |
+
+  Mismatches: 20.5% of shots have a post-up size mismatch (height gap over 12), 17.4% a speed mismatch (gap over 14). **A weak defender** (a team's best perimeter starter with his defense composites −0.25, 10 rosters × 3 games): shots by the man he guards are +0.016 make probability easier than the same shooter's shots of the same type against his teammates (−0.003 when he is a good defender). **Spread of player stats** (players with 300+ minutes, SD across players): points per 36 minutes 1.46 → 1.54 (+5%); TS% .0145 → .0120 (within the noise of 40 games per player).
+
+- **Speed** (`simBenchmark.test.ts`, `SIM_BENCH=on` with and without `SIM_BENCH_WITHOUT=<feature>`, 3 seeds, CPU per game of the regular season and playoffs): Matchup Defense about +2.5%, Spacing & Shot Creation about +1% (both within the run-to-run noise of ±5%).
+- **Known limits:** the assignment is fixed between substitutions (no switching on screens or in transition, no double teams); offensive players are not steered toward the weak defender (he is exploited when his man shoots, and through mismatches), and help defense is the team's average.
+
 ### Season odds
 
 - **Where:** _Standings_ (a _Season odds_ section below the tables), _Power Rankings_ (Playoffs and Title columns), _Award Races_ (a Win% column), _Draft Lottery_ (a _What-if simulator_ below the lottery table).
@@ -811,6 +842,6 @@ Wrapped and Storylines read the whole league into a snapshot. Converted pieces t
 ## Testing
 
 - Unit tests: `node_modules/.bin/vitest --run --project basketball` (plus `football` and `baseball`, which must stay green since the features are gated).
-- Sim calibration tables (not part of the normal run): possession model `POSS_METRICS=1`, player traits `TRAITS_METRICS=1` (see the test files' headers).
+- Sim calibration tables (not part of the normal run): possession model `POSS_METRICS=1`, player traits `TRAITS_METRICS=1`, coaching systems `COACH_CAL=1`, spacing & shot creation and matchup defense `SM_CAL=1` (`spacingMatchup.script.test.ts`) (see the test files' headers).
 - AI GM audit (not part of the normal run; `AI_GMS=0` turns GM personalities off for a before/after, and with them on it also logs GM firings/hires, strategy switches and per-team trade counts): `RUN_AI_AUDIT=1 AI_SEEDS=1,2 AI_SEASONS=4 node_modules/.bin/vitest --run --project basketball src/test/ratingInflation/aiAudit.script.test.ts` simulates a league with every extra on and writes one JSON line per season (`AI_OUT`, default `/tmp/aiAudit.jsonl`): AI-AI trades (three-team, with pick conditions, for trade requests), free agent signings, re-signings, extensions, trade requests (and how many were traded), holdouts, teams over the tax/cap, dead money, roster sizes, win% and team ovr spread, mean contract (% of cap), mean ovr, and the offers AI teams would send the user right now, valued from the user's side.
 - Lint: `node_modules/.bin/eslint .` and `node_modules/.bin/tsc --build`.

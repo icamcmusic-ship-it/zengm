@@ -51,7 +51,9 @@ const resetDiag = () => {
 		mismatchPost: 0,
 		mismatchDrive: 0,
 		matchShots: 0,
-		byDefQuint: [],
+		postTilt: [],
+		relByType: {},
+		driveTilt: [],
 	};
 };
 resetDiag();
@@ -102,12 +104,11 @@ proto.getShotInfo = function (args) {
 			if (m.drive > 0) {
 				diag.mismatchDrive += 1;
 			}
-			diag.byDefQuint.push({
-				pid: args.p.id,
-				fit: m.fitRel,
-				make: out.blocked ? 0 : out.probMake,
-				type: out.type,
-			});
+			diag.postTilt.push(m.post);
+			if (!out.blocked) {
+				(diag.relByType[out.type] ??= []).push(m.fitRel);
+			}
+			diag.driveTilt.push(m.drive);
 		}
 	}
 	return out;
@@ -238,9 +239,16 @@ test.skipIf(!process.env.SM_CAL)(
 				matchDeltaSd: sd(diag.matchDelta),
 				mismatchPost: diag.mismatchPost / Math.max(1, diag.matchShots),
 				mismatchDrive: diag.mismatchDrive / Math.max(1, diag.matchShots),
-				byDefQuint: diag.byDefQuint,
+				postTilt: mean(diag.postTilt),
+				driveTilt: mean(diag.driveTilt),
 			};
-			console.log(`done ${config.name}`);
+			console.log(
+				`done ${config.name}; mean matchup rel by shot type: ${Object.entries(
+					diag.relByType,
+				)
+					.map(([k, v]) => `${k} ${f(mean(v), 4)}`)
+					.join(", ")}`,
+			);
 		}
 		const names = Object.keys(out);
 		console.log(`stat | ${names.join(" | ")}`);
@@ -280,6 +288,8 @@ test.skipIf(!process.env.SM_CAL)(
 			"matchDelta",
 			"matchDeltaSd",
 			"mismatchPost",
+			"postTilt",
+			"driveTilt",
 			"mismatchDrive",
 		]) {
 			console.log(
@@ -292,31 +302,6 @@ test.skipIf(!process.env.SM_CAL)(
 		console.log(
 			`player SD TS% | ${names.map((x) => f(out[x].spread.ts, 4)).join(" | ")}`,
 		);
-		// Matchup Defense: shot make probability by how good the shooter's defender is relative to his teammates (quintiles)
-		for (const x of names) {
-			const rows = out[x].byDefQuint;
-			if (rows.length === 0) {
-				continue;
-			}
-			// residual make probability (minus the shooter's average for the shot type), by quintile of the defender's rating relative to his teammates
-			const byType = {};
-			for (const r of rows) {
-				(byType[`${r.pid} ${r.type}`] ??= []).push(r.make);
-			}
-			const typeMean = Object.fromEntries(
-				Object.entries(byType).map(([k, v]) => [k, mean(v)]),
-			);
-			const sorted = rows.toSorted((a, b) => a.fit - b.fit);
-			const q = range(5).map((i) =>
-				sorted.slice(
-					Math.floor((i * sorted.length) / 5),
-					Math.floor(((i + 1) * sorted.length) / 5),
-				),
-			);
-			console.log(
-				`${x}: make prob vs shot-type average by defender quintile (worst..best): ${q.map((r) => f(mean(r.map((y) => y.make - typeMean[`${y.pid} ${y.type}`])), 4)).join(" ")}`,
-			);
-		}
 	},
 	3_600_000,
 );
