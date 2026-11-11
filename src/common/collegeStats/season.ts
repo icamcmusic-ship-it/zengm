@@ -359,14 +359,17 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const usageComp = composite(ratings, "usage");
 	const zUsage = (usageComp - TYPICAL.usage) / TYPICAL.usageSd;
 	const zU = 0.5 * zUsage + 0.5 * z + (ctx.usageShift ?? 0);
-	const usg = clamp(
+	const usgRaw =
 		0.262 +
-			(proEnv?.usageShift ?? 0) +
-			0.038 * zU +
-			0.0045 * (c - 1.5) +
-			rng.normal(0, 0.02 * noise),
+		(proEnv?.usageShift ?? 0) +
+		0.038 * zU +
+		0.0045 * (c - 1.5) +
+		rng.normal(0, 0.02 * noise);
+	// Diminishing returns at the top: only a handful of Division I players use a third of their team's possessions
+	const usg = clamp(
+		usgRaw > 0.29 ? 0.29 + 0.55 * (usgRaw - 0.29) : usgRaw,
 		0.13,
-		0.37,
+		0.35,
 	);
 
 	// Turnovers: share of possessions
@@ -493,7 +496,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			(1 + 0.8 * (usg - 0.25)) +
 			rng.normal(0, 0.5 * noise),
 		0.4,
-		13,
+		// Even the best college passers rarely average much over 8 assists per 40 minutes
+		9.5,
 	);
 	// Drafted D1 players average about 1.5 steals per 40 minutes, guards more
 	const stl40 = clamp(

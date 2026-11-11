@@ -43,6 +43,12 @@ export type GenerateOptions = {
 // Game score per 40 minutes a junior college season needs for honors
 const JUCO_BARS = { allAmerican: 17.5, allRegion: 14 };
 
+// getClassStats has an ovr prior; pot runs about this much higher
+const POT_PRIOR_SHIFT = -10;
+
+const isCollegeSchool = (school: School | undefined) =>
+	!!school && !school.nonCollege && !school.idle;
+
 // Class year (0 = freshman ... 3 = senior) from age during the draft year season
 export const getClassIndex = (age: number) => {
 	if (age <= 19) {
@@ -56,6 +62,29 @@ export const getClassIndex = (age: number) => {
 	}
 	return 3;
 };
+
+/**
+ * Class year from age and draft stock. Age at the draft (season minus birth year) spans two class years in real life (a freshman who turns 20 before the draft is "20"), so an age maps to one of two class years, and which one follows from how high his stock is: a top prospect leaves as early as he can (an older one-and-done is 20, a sophomore with lottery stock 21), and the four-year senior is usually a prospect who was never a lottery pick.
+ * zStock is his class-relative draft stock (pot weighted, like the value teams draft by); u a uniform draw from his own stream.
+ */
+export const getClassIndexForStock = (
+	age: number,
+	zStock: number,
+	u: number,
+) => {
+	const base = getClassIndex(age);
+	if (base === 0 || age >= 23) {
+		return base;
+	}
+	// Chance he is a year younger in school than his age says: rare for an average prospect, the norm for lottery stock
+	const pYounger =
+		1 /
+		(1 + Math.exp(-3 * (zStock - (base === 1 ? 1 : base === 2 ? 1.2 : 1.4))));
+	return u < pYounger ? base - 1 : base;
+};
+
+// How far above the class average (in class standard deviations) a prospect's stock can be in a season he came back after: higher, and he would have declared then
+export const STAY_CAP = 0.55;
 
 export const getClassStats = (prospects: CollegeProspect[]) => {
 	// A small class can't tell what's typical, so it leans on a prior
@@ -89,6 +118,9 @@ export const generateCollegeClass = (
 	const priorSeasons = options.priorSeasons ?? true;
 	const noise = clamp(options.noise ?? 1, 0, 3);
 	const classStats = getClassStats(prospects);
+	const potStats = getClassStats(
+		prospects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
+	);
 
 	const results: (CollegeResult & { pos: string })[] = [];
 
@@ -119,12 +151,17 @@ export const generateCollegeClass = (
 
 		const seasons: CollegeSeason[] = [];
 		const zClass = clamp((p.ovr - classStats.mean) / classStats.sd, -2.5, 2.5);
+		const zPot = clamp((p.pot - potStats.mean) / potStats.sd, -2.5, 2.5);
+		const zStock = 0.4 * zClass + 0.6 * zPot;
+		const classRng = new Rng(`${seed}|${draftYear}|${p.key}|class`);
 		const plan = planCareer(p, school, {
 			seed,
 			draftYear,
 			priorSeasons,
 			z: zClass,
-			classIndex: getClassIndex(p.age),
+			classIndex: isCollegeSchool(school)
+				? getClassIndexForStock(p.age, zStock, classRng.random())
+				: getClassIndex(p.age),
 		});
 		// His draft year season ended early: he missed the postseason
 		let missedPostseason = false;
@@ -134,8 +171,18 @@ export const generateCollegeClass = (
 				continue;
 			}
 			const k = year.yearsBack;
-			const ratings = lagRatings(backProject(p.ratings, k, p.age), year.lag);
-			const zTalent = zClass - 0.38 * k + year.zShift;
+			// A season he came back after was not a declare-worthy one: a prospect whose stock is high now was well short of it then, and grew more since (a steeper development curve)
+			let zTalent = zClass - 0.38 * k + year.zShift;
+			let stayLag = 0;
+			if (k > 0 && year.level === "ncaa" && zTalent > STAY_CAP) {
+				const excess = zTalent - STAY_CAP;
+				zTalent = STAY_CAP + 0.25 * excess;
+				stayLag = Math.min(8, 3 * excess);
+			}
+			const ratings = lagRatings(
+				backProject(p.ratings, k, p.age),
+				year.lag + stayLag,
+			);
 			const draftYearTeam = k === 0 && ncaaSeason && team >= 0;
 			if (draftYearTeam && year.gamesCap !== undefined) {
 				missedPostseason = true;

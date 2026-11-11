@@ -2,6 +2,8 @@ import { assert, describe, test } from "vitest";
 import stats from "../../worker/core/player/stats.basketball.ts";
 import { COLLEGE_AWARD_PREFIX } from "../preDraft.ts";
 import { generateCollegeClass, getClassIndex } from "./index.ts";
+import { getClassIndexForStock } from "./generate.ts";
+import { COLLEGES } from "./colleges.ts";
 import { Rng } from "./rng.ts";
 import { RATING_KEYS, type CollegeProspect } from "./types.ts";
 
@@ -74,9 +76,12 @@ describe("generateCollegeClass", () => {
 		});
 		for (const [i, result] of results.entries()) {
 			const p = prospects[i]!;
-			// One year for each class year, ending in the draft year. A redshirt year (career.ts) has no season
+			// One year for each class year, ending in the draft year. A redshirt year (career.ts) has no season. A prospect with high stock can be a year younger in school than his age says (getClassIndexForStock)
 			const years = result.career!.years;
-			assert.strictEqual(years.length, getClassIndex(p.age) + 1);
+			assert.include(
+				[getClassIndex(p.age) + 1, Math.max(1, getClassIndex(p.age))],
+				years.length,
+			);
 			assert.strictEqual(
 				result.seasons.length,
 				years.filter((year) => year.status !== "redshirt").length,
@@ -261,5 +266,42 @@ describe("generateCollegeClass", () => {
 			draftYear: 2027,
 		});
 		assert.strictEqual(one.length, 1);
+	});
+});
+
+describe("class year and draft stock", () => {
+	test("high stock leaves early, an average prospect's class year follows his age", () => {
+		let younger = 0;
+		let youngerAvg = 0;
+		for (let i = 0; i < 1000; i++) {
+			const u = i / 1000;
+			if (getClassIndexForStock(21, 2.2, u) === 1) {
+				younger += 1;
+			}
+			if (getClassIndexForStock(21, 0, u) === 1) {
+				youngerAvg += 1;
+			}
+			assert.strictEqual(getClassIndexForStock(19, 2.5, u), 0);
+			assert.include([2, 3], getClassIndexForStock(22, 1, u));
+		}
+		assert.isAbove(younger, 900);
+		assert.isBelow(youngerAvg, 50);
+	});
+
+	test("a season he came back after was not a dominant one", () => {
+		const prospects = makeProspects(200, "stay");
+		const results = generateCollegeClass(prospects, {
+			seed: "s",
+			draftYear: 2027,
+		});
+		for (const result of results) {
+			for (const season of result.seasons.slice(0, -1)) {
+				const gp = season.stats.gp!;
+				if (gp >= 10 && season.classIndex < 3 && COLLEGES[season.school]) {
+					assert.isBelow(season.stats.pts! / gp, 24);
+					assert.isBelow(season.stats.ast! / gp, 8);
+				}
+			}
+		}
 	});
 });

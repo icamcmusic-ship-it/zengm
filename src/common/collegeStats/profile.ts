@@ -894,8 +894,9 @@ export const getStockTimeline = ({
 	values[T] = lf;
 	let e = 0;
 	for (let t = T - 1; t >= 0; t--) {
-		e += rng.normal(0, t >= T - 1 ? 0.12 : 0.2);
-		const pull = 0.45 * ((T - t) / T);
+		// Boards converge as the draft nears: small moves late, bigger ones in his early seasons
+		e += rng.normal(0, t >= T - 1 ? 0.1 : 0.07 + 0.13 * ((T - t) / T));
+		const pull = 0.3 * ((T - t) / T);
 		values[t] = lf + e + (center - lf) * pull;
 	}
 	// A story bends the path toward where it started. How far back (0 = now, 1 = his first preseason)
