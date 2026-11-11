@@ -3,7 +3,8 @@
 // AI GM audit: headless multi-season sim with every League extra on, recording what the AI teams do each season (trades, trade
 // quality, free agency, cap health, roster sizes, unrest, parity, contract levels). Run with
 // RUN_AI_AUDIT=1 npx vitest run --project basketball src/test/ratingInflation/aiAudit.script.test.ts
-// Env: AI_SEEDS (comma list, default 1), AI_SEASONS (default 4), AI_OUT (jsonl file)
+// Env: AI_SEEDS (comma list, default 1), AI_SEASONS (default 4), AI_OUT (jsonl file), AI_GMS (0 turns AI GM personalities off, for
+// before/after comparisons; with them on, also records GM firings/hires and per-team trade counts by GM style)
 import { appendFileSync } from "node:fs";
 import { test } from "vitest";
 import { PHASE } from "../../common/constants.ts";
@@ -169,18 +170,102 @@ test.skipIf(!process.env.RUN_AI_AUDIT)(
 			const origRandom = Math.random;
 			Math.random = mulberry32(seed);
 			try {
-				await createLeague({ ...ALL_ON, expandedRatings: true });
+				const gmsOn = process.env.AI_GMS !== "0";
+				await createLeague({
+					...ALL_ON,
+					expandedRatings: true,
+					featureGmPersonalities: gmsOn,
+				});
+				const tradesByTid = new Map();
+				const strategySwitches = [];
 				for (let i = 0; i < seasons; i++) {
 					const season = g.get("season");
+					const strategiesBefore = new Map(
+						(await idb.cache.teams.getAll()).map((t) => [t.tid, t.strategy]),
+					);
 					await startAutoPlay(season, PHASE.DRAFT_LOTTERY, {});
 					const mid = await inSeason(season);
 					const oq = await offerQuality();
 					await startAutoPlay(season + 1, PHASE.PRESEASON, {});
 					const ev = await eventCounts(season);
-					const row = { seed, season, ...ev, ...mid, ...oq };
+					let switches = 0;
+					for (const t of await idb.cache.teams.getAll()) {
+						if (strategiesBefore.get(t.tid) !== t.strategy) {
+							switches += 1;
+						}
+					}
+					strategySwitches.push(switches);
+					for (const e of (await idb.cache.events.getAll()).filter(
+						(e) => e.season === season && e.type === "trade",
+					)) {
+						for (const tid of e.tids ?? []) {
+							tradesByTid.set(tid, (tradesByTid.get(tid) ?? 0) + 1);
+						}
+					}
+					const gmEvents = (await idb.cache.events.getAll()).filter(
+						(e) =>
+							e.season === season &&
+							e.type === "info" &&
+							/general manager/i.test(e.text ?? ""),
+					);
+					const row = {
+						seed,
+						season,
+						gms: gmsOn,
+						...ev,
+						...mid,
+						...oq,
+						strategySwitches: switches,
+						gmFired: gmEvents.filter((e) =>
+							/fired general manager/.test(e.text),
+						).length,
+						gmHired: gmEvents.filter((e) => / hired /.test(e.text)).length,
+						gmRetired: gmEvents.filter((e) => /retired\.$/.test(e.text)).length,
+					};
 					appendFileSync(out, JSON.stringify(row) + "\n");
 					console.log(JSON.stringify(row));
 				}
+				// Per-team trade counts over the whole run, and how they line up with each GM's trade frequency leaning
+				const teams = (await idb.cache.teams.getAll()).filter(
+					(t) => !t.disabled,
+				);
+				const counts = teams.map((t) => tradesByTid.get(t.tid) ?? 0);
+				const freqs = teams.map((t) => t.gm?.traits.tradeFreq ?? 0);
+				const corr = (() => {
+					const mx = mean(counts);
+					const my = mean(freqs);
+					const sx = sd(counts);
+					const sy = sd(freqs);
+					if (sx === 0 || sy === 0) {
+						return 0;
+					}
+					return (
+						mean(counts.map((x, i) => (x - mx) * (freqs[i] - my))) / (sx * sy)
+					);
+				})();
+				const tenures = [];
+				for (const t of teams) {
+					for (const gm of [...(t.formerGms ?? []), ...(t.gm ? [t.gm] : [])]) {
+						for (const tenure of gm.tenures) {
+							tenures.push(
+								(tenure.end ?? g.get("season") - 1) - tenure.start + 1,
+							);
+						}
+					}
+				}
+				const summary = {
+					seed,
+					gms: gmsOn,
+					tradesPerTeamMean: r2(mean(counts)),
+					tradesPerTeamSd: r2(sd(counts)),
+					tradesPerTeamMin: Math.min(...counts),
+					tradesPerTeamMax: Math.max(...counts),
+					tradesVsTradeFreqCorr: r2(corr),
+					strategySwitchesPerSeason: r2(mean(strategySwitches)),
+					gmTenureMean: r2(mean(tenures)),
+				};
+				appendFileSync(out, JSON.stringify(summary) + "\n");
+				console.log(JSON.stringify(summary));
 				// Trade quality, graded by what each side got afterwards (Trade Grader). Needs a real IndexedDB, so it's skipped
 				// when the in-memory test database can't do it
 				try {

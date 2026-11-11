@@ -24,6 +24,8 @@ import {
 	makeAiTraitValueFactorCache,
 	traitsEnabled,
 } from "../player/traits.ts";
+import { getGmWeights } from "../gm/index.ts";
+import { gmDraftUpsideAdjustment } from "../../../common/gmPersonality.ts";
 
 // Top ranked prospect on the user's draft board who is still available
 export const getDraftBoardPick = <T extends { draftBoard?: { rank?: number } }>(
@@ -208,6 +210,9 @@ const runPicks = async (
 			);
 			const teamOvrDiffs = await getTeamOvrDiffs(teamPlayers, playersAll);
 
+			// AI GM personalities (setting): need vs best available, upside vs ready now. Undefined when off
+			const gm = !DRAFT_BY_TEAM_OVR ? await getGmWeights(dp.tid) : undefined;
+
 			// Basketball: a small need/strategy adjustment on top of value (see draftNeeds.ts)
 			let adjustments: number[] | undefined;
 			if (
@@ -218,8 +223,23 @@ const runPicks = async (
 				const t = await idb.cache.teams.get(dp.tid);
 				const needs = getTeamNeeds(teamPlayers);
 				adjustments = playersAll.map((p) =>
-					getDraftAdjustment(p, needs, t?.strategy),
+					getDraftAdjustment(p, needs, t?.strategy, gm?.draftNeedScale),
 				);
+			}
+
+			if (gm) {
+				const season = g.get("season");
+				adjustments = playersAll.map((p, i) => {
+					const r = p.ratings.at(-1)!;
+					return (
+						(adjustments?.[i] ?? 0) +
+						gmDraftUpsideAdjustment(gm, {
+							age: season - p.born.year,
+							ovr: r.ovr,
+							pot: r.pot,
+						})
+					);
+				});
 			}
 
 			// Player traits (setting): what the scouts can read of a prospect's traits, a bounded nudge of at most DRAFT_TRAIT_MAX_ADJ value points

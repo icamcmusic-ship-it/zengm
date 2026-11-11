@@ -29,6 +29,7 @@ import {
 	getAiTraitValueFactor,
 	traitsEnabled,
 } from "../player/traits.ts";
+import { getGmWeights } from "../gm/index.ts";
 
 const MOCK_ROUNDS = 2;
 
@@ -167,7 +168,12 @@ export const getMockDraft = async () => {
 			tid,
 		);
 		const needs = getTeamNeeds(teamPlayers);
-		teams.set(tid, { tid, needs, strategy: t?.strategy });
+		teams.set(tid, {
+			tid,
+			needs,
+			strategy: t?.strategy,
+			needScale: (await getGmWeights(tid))?.draftNeedScale,
+		});
 		teamInfo[tid] = { needs: getNeedLabels(needs), strategy: t?.strategy };
 		traitContext[tid] = {
 			strategy: t?.strategy,

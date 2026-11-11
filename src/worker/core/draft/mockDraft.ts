@@ -32,6 +32,8 @@ export type MockTeam = {
 	tid: number;
 	needs: TeamNeeds;
 	strategy: "contending" | "rebuilding" | undefined;
+	// AI GM personalities (setting): the GM's need vs best available weight, like the real draft
+	needScale?: number;
 };
 
 export type MockSlot = {
@@ -150,9 +152,13 @@ export const runMockDraft = ({
 		const team = teams.get(slot.tid);
 		const parts = pool.map((p) => {
 			const need =
-				useNeeds && team ? getDraftAdjustment(p, team.needs, undefined) : 0;
+				useNeeds && team
+					? getDraftAdjustment(p, team.needs, undefined, team.needScale)
+					: 0;
 			const needAndStrategy =
-				useNeeds && team ? getDraftAdjustment(p, team.needs, team.strategy) : 0;
+				useNeeds && team
+					? getDraftAdjustment(p, team.needs, team.strategy, team.needScale)
+					: 0;
 			const trait =
 				useTraits && p.traitFactors?.[slot.tid] !== undefined
 					? getDraftTraitAdjustment(p.value, p.traitFactors[slot.tid]!)

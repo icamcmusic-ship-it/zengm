@@ -22,6 +22,7 @@ import {
 	updateHoldouts,
 	updateTradeRequests,
 } from "./unrest.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 
 // These never stop a phase change or a day of games, they just log the error
 const safely = async (name: string, cb: () => Promise<void>) => {
@@ -68,6 +69,8 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 	const season = g.get("season");
 	const userTids = g.get("userTids");
 	const salaryCapType = g.get("salaryCapType");
+	// AI GM personalities (setting): loyal GMs extend more often, big spenders extend into the tax. Empty when off
+	const gms = await getAllGmWeights();
 	for (let tid = 0; tid < g.get("numTeams"); tid++) {
 		if (userTids.includes(tid) && !local.autoPlayUntil && !g.get("spectator")) {
 			continue;
@@ -79,7 +82,7 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 		let players;
 		if (holdouts.length > 0 && r < HOLDOUT_EXTENSION_PROB) {
 			players = holdouts;
-		} else if (r < probPerTeam) {
+		} else if (r < probPerTeam * (gms.get(tid)?.extensionFactor ?? 1)) {
 			players = allPlayers.sort((a, b) => b.value - a.value).slice(0, 7);
 		} else {
 			continue;
@@ -117,7 +120,9 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 					const rank = allPlayers
 						.toSorted((a, b) => b.value - a.value)
 						.findIndex((p2) => p2.pid === p.pid);
-					if (!holdingOut || rank > 1) {
+					const bigSpender =
+						(gms.get(tid)?.traits.taxTolerance ?? 0) >= 0.5 && rank <= 1;
+					if ((!holdingOut && !bigSpender) || rank > 1) {
 						continue;
 					}
 				}

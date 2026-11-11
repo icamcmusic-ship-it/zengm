@@ -98,6 +98,7 @@ const handleRelease = async (
 
 const Roster = ({
 	editable,
+	gmInfo,
 	luxuryTaxAmount,
 	maxRosterSize,
 	minPayrollAmount,
@@ -400,6 +401,7 @@ const Roster = ({
 			<TopStuff
 				currentSeason={currentSeason}
 				editable={editable}
+				gmInfo={gmInfo}
 				luxuryTaxAmount={luxuryTaxAmount}
 				minPayrollAmount={minPayrollAmount}
 				openRosterSpots={maxRosterSize - players.length}

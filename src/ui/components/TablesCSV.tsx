@@ -12,6 +12,7 @@ export const NATIVE_CSV_PAGES: ReadonlySet<string> = new Set([
 	"bestGames",
 	"coach",
 	"coaches",
+	"frontOffices",
 	"collegeOverseas",
 	"contractValue",
 	"draftBoard",

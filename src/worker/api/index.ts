@@ -48,6 +48,7 @@ import {
 	season,
 } from "../core/index.ts";
 import * as staff from "../core/staff/index.ts";
+import { ensureGms } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import {
@@ -4618,6 +4619,10 @@ const updateGameAttributes = async (
 		await staff.ensureStaff();
 		await idb.cache.flush();
 	}
+	if (gameAttributes.featureGmPersonalities) {
+		await ensureGms();
+		await idb.cache.flush();
+	}
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 const updateGameAttributesGodMode = async (
@@ -4684,6 +4689,7 @@ const updateGameAttributesGodMode = async (
 
 	// Turning on the coaching staff in an existing league generates staffs
 	await staff.ensureStaff();
+	await ensureGms();
 
 	// Raising the number of future draft classes generates the missing ones now
 	await draft.topUpDraftClasses();

@@ -17,6 +17,7 @@ import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import genContract from "../player/genContract.ts";
 import moodInfo from "../player/moodInfo.ts";
 import { truncateContractBefore } from "./index.ts";
+import { getGmWeights } from "../gm/index.ts";
 
 export const playerLink = (p: Pick<Player, "pid" | "firstName" | "lastName">) =>
 	`<a href="${helpers.leagueUrl(["player", p.pid])}">${p.firstName} ${p.lastName}</a>`;
@@ -103,11 +104,14 @@ export const playerOptsOut = ({
 export const teamExercises = ({
 	marketValue,
 	optionAmount,
+	gmShift = 0,
 }: {
 	marketValue: number;
 	optionAmount: number;
+	// AI GM personalities (setting): loyal GMs keep their players a bit more readily (negative), ruthless ones less
+	gmShift?: number;
 }) => {
-	return marketValue >= optionAmount * 0.9;
+	return marketValue >= optionAmount * (0.9 + gmShift);
 };
 
 // Decide options whose decision is due, at the start of the re-signing phase (before expiring contracts are handled, so a declined option makes his contract expire now)
@@ -145,7 +149,11 @@ export const decideContractOptions = async () => {
 					? `${playerLink(p)} declined his ${helpers.formatCurrency(optionAmount / 1000, "M")} player option for ${option.season} with the ${teamLink(p.tid)}, so his contract is up now.`
 					: `${playerLink(p)} exercised his ${helpers.formatCurrency(optionAmount / 1000, "M")} player option for ${option.season} with the ${teamLink(p.tid)}.`;
 		} else {
-			decision = teamExercises({ marketValue, optionAmount })
+			decision = teamExercises({
+				marketValue,
+				optionAmount,
+				gmShift: (await getGmWeights(p.tid))?.optionShift,
+			})
 				? "exercised"
 				: "declined";
 			text = `The ${teamLink(p.tid)} ${decision} their ${helpers.formatCurrency(optionAmount / 1000, "M")} team option on ${playerLink(p)} for ${option.season}${userTids.includes(p.tid) ? " (decided automatically, since you didn't decide before the re-signing phase)" : ""}.`;

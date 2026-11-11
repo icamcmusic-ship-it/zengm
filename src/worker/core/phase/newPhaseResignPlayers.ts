@@ -19,6 +19,7 @@ import { getNumPlayersTradedAwayNormalizedAll } from "../player/getNumPlayersTra
 import { bySport } from "../../../common/sportFunctions.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import { autoPlayStopsAt } from "../league/autoPlay.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 
 export const FREE_AGENCY_DAYS = 30;
 
@@ -155,6 +156,9 @@ const newPhaseResignPlayers = async (
 
 	await contractNegotiation.cancelAll();
 
+	// AI GM personalities (setting): tax tolerance moves how deep into the roster a team re-signs into the luxury tax. Empty when off
+	const gms = await getAllGmWeights();
+
 	const valueChangeCalculator = new ValueChangeCalculator();
 	for (const pid of expiringPids) {
 		// Re-fetch players, because normalizeContractDemands might have changed some objects
@@ -257,7 +261,8 @@ const newPhaseResignPlayers = async (
 				!draftPick &&
 				payroll !== undefined &&
 				contract.amount + payroll > g.get("luxuryPayroll") &&
-				(teamValueRank.get(p.pid) ?? 0) >= AVOID_TAX_MIN_RANK
+				(teamValueRank.get(p.pid) ?? 0) >=
+					AVOID_TAX_MIN_RANK + (gms.get(p.tid)?.avoidTaxRankShift ?? 0)
 			) {
 				reSignPlayer = false;
 			}

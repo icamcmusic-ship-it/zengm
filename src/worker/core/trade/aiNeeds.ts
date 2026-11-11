@@ -18,7 +18,20 @@ export type TeamNeedInfo = {
 
 	// Current season winning percentage, or undefined if no games played
 	winp: number | undefined;
+
+	// AI GM personalities (setting): this team's GM leanings, undefined when off
+	gm?: {
+		// Relative chance of being picked for a trade, average 1
+		tradeWeight: number;
+		// Added to the winning percentage a contender needs to buy (win-now GMs buy sooner)
+		buyerWinpShift: number;
+		// Multiple of the tax line his payroll can reach before he dumps salary
+		dumpPayrollFactor: number;
+	};
 };
+
+// Weight for picking this team in a need-driven trade (1 without a GM)
+export const gmTradeWeight = (t: TeamNeedInfo) => t.gm?.tradeWeight ?? 1;
 
 export type NeedContext = {
 	phase: Phase;
@@ -50,20 +63,22 @@ export const isDeadlineWindow = (ctx: NeedContext) => {
 
 // Contenders that are actually winning are buyers. Rebuilding teams, or bad teams late in the season, are sellers
 export const isBuyer = (t: TeamNeedInfo) =>
-	t.strategy === "contending" && (t.winp === undefined || t.winp >= 0.45);
+	t.strategy === "contending" &&
+	(t.winp === undefined ||
+		t.winp >= (t.gm ? 0.45 + t.gm.buyerWinpShift : 0.45));
 export const isSeller = (t: TeamNeedInfo, ctx: NeedContext) =>
 	t.strategy === "rebuilding" ||
 	(isDeadlineWindow(ctx) && t.winp !== undefined && t.winp < 0.4);
 
 // A team wants to dump salary if it pays luxury tax, or (with a hard cap) is near the cap
 export const wantsToDumpSalary = (t: TeamNeedInfo, ctx: NeedContext) => {
-	if (ctx.salaryCapType === "none") {
-		return t.payroll > ctx.luxuryPayroll;
-	}
 	if (ctx.salaryCapType === "hard") {
 		return t.payroll > 0.97 * ctx.salaryCap;
 	}
-	return t.payroll > ctx.luxuryPayroll;
+	const luxuryPayroll = t.gm
+		? ctx.luxuryPayroll * t.gm.dumpPayrollFactor
+		: ctx.luxuryPayroll;
+	return t.payroll > luxuryPayroll;
 };
 
 export const capSpace = (t: TeamNeedInfo, ctx: NeedContext) =>
