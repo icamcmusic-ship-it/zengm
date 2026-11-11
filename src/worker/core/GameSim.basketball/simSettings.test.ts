@@ -6,6 +6,11 @@ import { resetG } from "../../../test/helpers.ts";
 import { genTeams, withSeededRandom } from "./simLiveGameForTests.ts";
 import { simFixInjuryFactor } from "./simSettings.ts";
 import { positionalShares } from "./positionalComposites.ts";
+import {
+	foulTroubleSitUntil,
+	pickClosers,
+	planMinutes,
+} from "./rotationPlanner.ts";
 import { range } from "../../../common/utils.ts";
 
 /*
@@ -129,4 +134,118 @@ test("positionalComposites: games still sane", async () => {
 			await simGames({ positionalComposites: true, expandedRatings }, SEEDS),
 		);
 	}
+});
+
+const roster = (n: number) =>
+	range(n).map((i) => ({
+		valueNoPot: 70 - 2 * i,
+		injured: false,
+		ptModifier: 1,
+	}));
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+const opts = {
+	playoffs: false,
+	backToBack: false,
+	numPlayersOnCourt: 5,
+	allStarGame: false,
+};
+
+test("realisticRotations: minutes plan", () => {
+	const regular = planMinutes(roster(14), opts);
+	assert.closeTo(sum(regular), 240, 0.1);
+	assert.isAbove(regular[0]!, regular[5]!);
+	assert.strictEqual(regular[13], 0);
+
+	// Playoffs: 8-man rotation, stars around 40
+	const playoffs = planMinutes(roster(14), { ...opts, playoffs: true });
+	assert.closeTo(sum(playoffs), 240, 0.1);
+	assert.strictEqual(playoffs.filter((m) => m > 0).length, 8);
+	assert.isAtLeast(playoffs[0]!, 40);
+
+	// Back-to-back: starters a little less, the bench a little more
+	const b2b = planMinutes(roster(14), { ...opts, backToBack: true });
+	assert.closeTo(sum(b2b), 240, 0.1);
+	assert.isBelow(b2b[0]!, regular[0]!);
+	assert.isAbove(b2b[6]!, regular[6]!);
+
+	// Injured players and a minutes restriction
+	const players = roster(14);
+	players[0]!.injured = true;
+	players[1]!.ptModifier = 0.6;
+	(players[1] as any).minutesRestriction = 0.6;
+	const restricted = planMinutes(players, opts);
+	assert.strictEqual(restricted[0], 0);
+	assert.isAtMost(restricted[1]!, 36 * 0.6);
+	assert.closeTo(sum(restricted), 240, 0.1);
+
+	// Coach style hook: a tight rotation gives the top players more
+	const tight = planMinutes(roster(14), { ...opts, rotationStyle: -1 });
+	assert.isAbove(tight[3]!, regular[3]!);
+	assert.isBelow(tight[9]!, regular[9]!);
+});
+
+test("realisticRotations: foul trouble rules", () => {
+	const base = {
+		numPeriods: 4,
+		foulsNeededToFoulOut: 6,
+		quarterSeconds: 720,
+	};
+	// 2 in the 1st: until 6:00 of the 2nd
+	assert.strictEqual(foulTroubleSitUntil({ ...base, pf: 2, period: 1 }), 1080);
+	// 2 in the 2nd: fine
+	assert.isUndefined(foulTroubleSitUntil({ ...base, pf: 2, period: 2 }));
+	// 3 in the first half: until halftime
+	assert.strictEqual(foulTroubleSitUntil({ ...base, pf: 3, period: 2 }), 1440);
+	// 4 in the 3rd: until 8:00 of the 4th
+	assert.strictEqual(foulTroubleSitUntil({ ...base, pf: 4, period: 3 }), 2400);
+	assert.isUndefined(foulTroubleSitUntil({ ...base, pf: 4, period: 4 }));
+	// 5: the closing 5 minutes
+	assert.strictEqual(foulTroubleSitUntil({ ...base, pf: 5, period: 2 }), 2580);
+	// Other settings: no rules
+	assert.isUndefined(
+		foulTroubleSitUntil({ ...base, numPeriods: 2, pf: 3, period: 1 }),
+	);
+});
+
+test("realisticRotations: closers are the best valid lineup", () => {
+	const mk = (pos: string, valueNoPot: number) => ({ pos, valueNoPot });
+	// The five best are all bigs: a guard has to close
+	const candidates = [
+		mk("C", 70),
+		mk("PF", 69),
+		mk("FC", 68),
+		mk("C", 67),
+		mk("SF", 66),
+		mk("PG", 60),
+		mk("SG", 59),
+		mk("G", 50),
+	];
+	const closers = pickClosers(candidates, 5);
+	assert.strictEqual(closers.size, 5);
+	assert.isTrue(closers.has(candidates[5]!));
+	assert.isTrue(closers.has(candidates[0]!));
+});
+
+test("realisticRotations: games still sane, regular season and playoffs", async () => {
+	checkSane(await simGames({ realisticRotations: true }, SEEDS));
+	checkSane(await simGames({ realisticRotations: true }, SEEDS, true));
+});
+
+test("all three on, with every other sim extra: games still sane", async () => {
+	checkSane(
+		await simGames(
+			{
+				simFixes: true,
+				positionalComposites: true,
+				realisticRotations: true,
+				expandedRatings: true,
+				playerTraits: true,
+				realisticPossessions: true,
+				injuryDepth: true,
+				technicalFouls: true,
+				perimeterDefense: true,
+			},
+			SEEDS,
+		),
+	);
 });

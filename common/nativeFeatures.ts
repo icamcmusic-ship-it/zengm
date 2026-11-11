@@ -349,6 +349,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "realisticRotations",
+		key: "realisticRotations",
+		name: "Realistic Rotations",
+		description:
+			"Coaches plan each player's minutes at tip-off (by his value, minutes restrictions, back-to-backs; a tighter 8-man rotation with stars playing 38-42 minutes in the playoffs) and sub to stay on plan, sit players in foul trouble by NBA rules of thumb (2 fouls in the 1st quarter, 3 in the first half, 4 in the 3rd quarter, 5 until the closing minutes), close tight games with their best five, and empty the bench by value in blowouts. League minutes stay the same.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		key: "featureSeasonOdds",
 		name: "Season Odds",

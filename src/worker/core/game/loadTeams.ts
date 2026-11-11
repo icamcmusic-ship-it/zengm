@@ -15,6 +15,11 @@ import { getProStats } from "../../../common/preDraft.ts";
 import { last, assertDefined } from "../../../common/utils.ts";
 import { applyInjuryDepth } from "./injuryDepthTeam.ts";
 import {
+	getRestrictionFactor,
+	isBackToBack,
+	isInjuryDepthEnabled,
+} from "../player/injuryDepth.ts";
+import {
 	compositeWeightsFor,
 	deriveExpandedRatings,
 	expandedRatingsSeed,
@@ -500,6 +505,27 @@ export const processTeam = async (
 
 	if (__SPORT === "basketball") {
 		applyInjuryDepth(t, teamInput, teamSeason, players);
+
+		// Realistic Rotations: the second night of a back-to-back plays a little more of the bench (GameSim.basketball/rotationPlanner.ts).
+		// A later batch can also set t.rotationStyle (the coach's rotation style, -1 tight ... 1 deep)
+		if (
+			!allStarGame &&
+			nativeFeatureEnabled("realisticRotations", (key) => g.get(key as any))
+		) {
+			t.backToBack = isBackToBack(teamSeason.lastGameDay);
+			// Injury Depth minutes restrictions (already in ptModifier, also a cap on the planned minutes)
+			if (isInjuryDepthEnabled()) {
+				const playersByPid = new Map(players.map((p) => [p.pid, p]));
+				for (const p2 of t.player) {
+					const restriction = getRestrictionFactor(
+						playersByPid.get(p2.id)?.health,
+					);
+					if (restriction < 1) {
+						p2.minutesRestriction = restriction;
+					}
+				}
+			}
+		}
 
 		t.pace = 0;
 

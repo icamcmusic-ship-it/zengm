@@ -63,6 +63,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Perimeter defense](#perimeter-defense)                             | game sim (steals), DPOY and All-Defensive awards                 | bball  | `perimeterDefense`                        | on / off                      |
 | [Game sim fixes](#game-sim-fixes)                                   | game sim (shot selection and makes, usage, injuries)             | bball  | `simFixes`                                | on / off                      |
 | [Position-aware team ratings](#position-aware-team-ratings)         | game sim (team composites)                                       | bball  | `positionalComposites`                    | on / off                      |
+| [Realistic rotations](#realistic-rotations)                         | game sim (substitutions)                                         | bball  | `realisticRotations`                      | on / off                      |
 | [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery            | bball  | `featureSeasonOdds`                       | on / on                       |
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes | bball  | `featureArchetypes`                       | on / on                       |
 | [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)     | bball  | `improvedPositions`                       | on / off                      |
@@ -119,6 +120,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `perimeterDefense`                                                                                        | on / off                                                        | option `perimeterDefenseAllDefensive` `oneGuard`                                                             |
 | `simFixes`                                                                                                | on / off                                                        |                                                                                                              |
 | `positionalComposites`                                                                                    | on / off                                                        |                                                                                                              |
+| `realisticRotations`                                                                                      | on / off                                                        |                                                                                                              |
 | `contractOptions`, `contractExtensions`, `tradeRequests`                                                  | on / off                                                        |                                                                                                              |
 | `featureHoldouts` + `holdoutFrequency`                                                                    | on / off; 1 / 1                                                 | frequency scales how often holdouts happen                                                                   |
 | `aiTradesNeedBased`                                                                                       | on / off                                                        | the classic random AI-to-AI trades stay on in every league (_AI-to-AI Trades Factor_ in the Events category) |
@@ -458,6 +460,31 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
   | drb guards                    | 0.46 / 0.18 | 0.53 / 0.34 |
   | drb bigs                      | 0.49 / 0.43 | 0.33 / 0.32 |
   | idef guards / bigs (expanded) | 0.33 / 0.12 | 0.28 / 0.33 |
+
+### Realistic rotations
+
+- **Setting:** `realisticRotations` (League Extras → Game Simulation). On for new leagues, off for existing leagues (same results and random numbers as before: the substitution logic keeps its `uniform(0.9, 1.1)` draw per player and only multiplies the values). Code: `src/worker/core/GameSim.basketball/rotationPlanner.ts` (plan, rules, closers), `GameSim.updatePlayersOnCourt` / `rotationFactor`.
+- **Why:** stock substitutions are value × fatigue × noise, so minutes are noisy (SD ~5 for every rotation spot), garbage time goes by roster index, foul trouble is a soft factor and nobody closes games.
+- **What:**
+  - **Minutes plan at tip-off:** by rank in value among the healthy players, regular season 37.5 / 35.5 / 33.5 / 31 / 29 / 22.5 / 20 / 16 / 11.5 / 3.5 (planned a little above what the starters end up playing, since blowouts and foul trouble take minutes from them), +up to 2 for a star (10+ value above the team's 5th best), max 39. Playoffs: an 8-man rotation 43 / 41 / 38 / 36 / 34 / 24 / 15 / 9 (max 44). Second night of a back-to-back: starters −2, ranks 6-10 +2. `ptModifier` scales the plan (and Injury Depth's minutes restriction, already in it, also caps the plan at 36 × restriction). Then rescaled to 240.
+  - **Subbing to plan:** each player's substitution value is multiplied by `exp((target × share of regulation played − minutes) / 2.5)` (bounded), players with no planned minutes by 0.2.
+  - **Foul trouble** (4 periods and 5+ fouls to foul out; otherwise the stock factor): after his 2nd foul in the 1st quarter he sits until about 6:00 of the 2nd, 3rd in the first half until halftime, 4th in the 3rd quarter until about 8:00 of the 4th, 5th until the last 5 minutes (value × 0.05 while sitting; the plan doesn't bring him back early). Not in overtime.
+  - **Closers:** in the last 5 minutes of the 4th quarter or overtime with the margin within 10, the valid lineup (2 G or a PG, 2 F or a C) with the highest total value among the best 9 gets × 2.5, everyone else × 0.4.
+  - **Garbage time:** the blowout rule ranks the bench by value instead of roster order.
+  - **Hook:** `t.rotationStyle` (−1 tight ... 1 deep; unset = 0) on the team object loaded for the sim shifts the plan toward the top 7 or the bench, for a later coach rotation style.
+- **Calibration** (4 rosters × 250 games, stock sim otherwise). Minutes per game by rank in value (mean / SD):
+
+  | rank                | 1          | 2          | 3          | 4          | 5          | 6          | 7          | 8          | 9          | 10        | 11        |
+  | ------------------- | ---------- | ---------- | ---------- | ---------- | ---------- | ---------- | ---------- | ---------- | ---------- | --------- | --------- |
+  | regular season, off | 34.7 / 5.0 | 32.2 / 5.0 | 30.3 / 4.7 | 28.6 / 4.7 | 27.3 / 4.6 | 21.7 / 4.1 | 19.9 / 4.3 | 16.5 / 4.5 | 13.3 / 5.2 | 8.2 / 5.7 | 4.7 / 5.5 |
+  | regular season, on  | 34.5 / 4.9 | 32.5 / 4.8 | 30.9 / 4.3 | 29.0 / 4.1 | 27.4 / 3.7 | 22.3 / 3.1 | 20.4 / 3.1 | 17.0 / 2.8 | 13.5 / 2.9 | 7.6 / 3.1 | 2.4 / 4.2 |
+  | playoffs, off       | 37.1 / 5.6 | 34.1 / 5.5 | 31.8 / 5.7 | 29.7 / 5.5 | 28.0 / 5.2 | 21.6 / 4.7 | 19.1 / 4.9 | 14.8 / 5.3 | 10.8 / 5.6 | 6.2 / 5.3 | 4.0 / 5.4 |
+  | playoffs, on        | 37.6 / 6.2 | 35.7 / 6.5 | 33.6 / 6.1 | 32.2 / 5.5 | 30.8 / 5.3 | 24.0 / 3.7 | 17.9 / 3.2 | 12.9 / 3.1 | 5.4 / 5.6  | 3.8 / 4.8 | 3.2 / 5.1 |
+
+  Best player's minutes, games decided by 10 or less / more: regular season 36.2 / 33.2 off, 36.3 / 32.7 on; playoffs 39.4 / 35.5 off, 39.8 / 35.8 on. 40+ minute games per team game: 0.135 / 0.09 (regular season off / on), 0.57 / 0.85 (playoffs). Foul-outs per team game 0.127 / 0.106. Box score averages unchanged (pts 105.1 / 105.5, FG% 44.0 / 44.1, TOV 16.1 / 16.1, PF 19.1 / 19.3). About 2.5 foul-trouble sits per team game; examples: 2nd foul at Q1 0:33 → back at Q2 5:58; 3rd at Q2 4:20 → back at Q3 12:00; 4th at Q3 1:34 → back at Q4 7:55; 5th at Q3 3:05 → back at Q4 4:36.
+
+- **All three Game Simulation settings together**, with the other new-league sim extras (expanded ratings, traits, realistic possessions, injury depth, technicals, perimeter defense), per team game: pts 106.9 → 106.6, FG% 44.0 → 44.0, 3PA rate .351 → .349, AST 23.9 → 23.8, TOV 16.3 → 16.0, ORB 11.7 → 11.6, DRB 35.0 → 35.0, FTA 23.6 → 23.5, STL 7.09 → 6.96, BLK 5.15 → 4.97.
+- **Speed** (`simBenchmark.test.ts`, one season, CPU per game day including everything else): Game Sim Fixes +0%, Position-aware team ratings about +4%, Realistic Rotations about +5%.
 
 ### Season odds
 

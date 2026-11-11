@@ -7,6 +7,18 @@ import {
 	SIM_FIX_PERF_FACTOR,
 } from "./simSettings.ts";
 import {
+	CLOSER_FACTOR,
+	CLOSING_MARGIN,
+	CLOSING_SECONDS,
+	FOUL_TROUBLE_SIT_FACTOR,
+	foulTroubleSitUntil,
+	minutesDebtFactor,
+	NON_CLOSER_FACTOR,
+	pickClosers,
+	planMinutes,
+	UNPLANNED_FACTOR,
+} from "./rotationPlanner.ts";
+import {
 	POSITIONAL_SCALE,
 	positionalShares,
 	type PositionalShares,
@@ -358,12 +370,23 @@ class GameSim extends GameSimBase {
 	// Position-aware team composites (League extras, see positionalComposites.ts): each player counts by his role for the team
 	// composites. Off: plain 5-man averages, as before
 	positionalComposites: boolean;
-	positionalSharesCache: PositionalShares = {
-		interior: [1, 1, 1, 1, 1],
-		rebound: [1, 1, 1, 1, 1],
-		perimeter: [1, 1, 1, 1, 1],
-		ball: [1, 1, 1, 1, 1],
-	};
+	// Realistic Rotations (League extras, see rotationPlanner.ts): minutes targets planned at tip-off, foul trouble rules, closers,
+	// garbage time by value. Off: the stock substitution values, as before. Either way the same random numbers are drawn
+	realisticRotations: boolean;
+	// Minutes per regulation game planned for each player, his rank by value on his team, and until when (elapsed regulation seconds)
+	// he sits in foul trouble
+	minutesTargets = new Map<PlayerGameSim, number>();
+	valueRanks = new Map<PlayerGameSim, number>();
+	foulTroubleSitUntil = new Map<PlayerGameSim, number>();
+	// (game settings read once at tip-off)
+	rotationQuarterSeconds = 720;
+	rotationFoulsToFoulOut = 6;
+	// Each team's shares for its last lineup (recomputed only when the lineup changes)
+	positionalSharesCache: [
+		PositionalShares | undefined,
+		PositionalShares | undefined,
+	] = [undefined, undefined];
+	positionalSharesLineup: [PlayerGameSim[], PlayerGameSim[]] = [[], []];
 	// Expanded ratings, second step (offRebounding/defRebounding/ballSecurity/catchShoot/offDribble composites from loadTeams)
 	expandedRatings2: boolean;
 	// Player traits: a playoff game, where the big-game trait applies (the whole game)
@@ -452,6 +475,16 @@ class GameSim extends GameSimBase {
 
 		// Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
 		this.numPlayersOnCourt = g.get("numPlayersOnCourt");
+
+		this.realisticRotations = nativeFeatureEnabled(
+			"realisticRotations",
+			(key) => g.get(key as any),
+		);
+		if (this.realisticRotations) {
+			// (also set below, needed here for the first lineup)
+			this.numPeriods = g.get("numPeriods");
+			this.planRotations();
+		}
 		this.playersOnCourt = [
 			this.team[0].player.slice(0, this.numPlayersOnCourt),
 			this.team[1].player.slice(0, this.numPlayersOnCourt),
@@ -1150,6 +1183,142 @@ class GameSim extends GameSimBase {
 		return energy;
 	}
 
+	// Realistic Rotations: minutes targets for the game (rotationPlanner.ts) and each player's rank by value
+	planRotations() {
+		const playoffs = g.get("phase") === PHASE.PLAYOFFS;
+		this.rotationQuarterSeconds = g.get("quarterLength") * 60;
+		this.rotationFoulsToFoulOut = g.get("foulsNeededToFoulOut");
+		for (const t of this.team) {
+			const targets = planMinutes(
+				t.player.map((p) => ({
+					valueNoPot: p.valueNoPot,
+					injured: p.injured,
+					ptModifier: this.allStarGame ? 1 : p.ptModifier,
+					minutesRestriction: (p as any).minutesRestriction,
+				})),
+				{
+					playoffs,
+					backToBack: !!(t as any).backToBack,
+					numPlayersOnCourt: this.numPlayersOnCourt,
+					allStarGame: this.allStarGame,
+					// Hook for a coach's rotation style (not set yet)
+					rotationStyle: (t as any).rotationStyle,
+				},
+			);
+			for (const [i, p] of t.player.entries()) {
+				this.minutesTargets.set(p, targets[i]!);
+			}
+			const byValue = t.player.toSorted((a, b) => b.valueNoPot - a.valueNoPot);
+			for (const [rank, p] of byValue.entries()) {
+				this.valueRanks.set(p, rank);
+			}
+		}
+	}
+
+	// Realistic Rotations: seconds of regulation played so far (regulation length in overtime)
+	elapsedRegulationSeconds() {
+		const quarterSeconds = this.rotationQuarterSeconds;
+		const period = this.team[0].stat.ptsQtrs.length;
+		if (period > this.numPeriods) {
+			return this.numPeriods * quarterSeconds;
+		}
+		const t = this.t ?? quarterSeconds;
+		return (period - 1) * quarterSeconds + (quarterSeconds - t);
+	}
+
+	// Realistic Rotations: after a foul, does he have to sit for a while (rotationPlanner.ts foulTroubleSitUntil)
+	onPersonalFoul(p: PlayerGameSim) {
+		const sitUntil = foulTroubleSitUntil({
+			pf: p.stat.pf,
+			period: this.team[0].stat.ptsQtrs.length,
+			numPeriods: this.numPeriods,
+			foulsNeededToFoulOut: this.rotationFoulsToFoulOut,
+			quarterSeconds: this.rotationQuarterSeconds,
+		});
+		if (
+			sitUntil !== undefined &&
+			sitUntil > (this.foulTroubleSitUntil.get(p) ?? -1)
+		) {
+			this.foulTroubleSitUntil.set(p, sitUntil);
+		}
+	}
+
+	// Realistic Rotations: the closing lineup of each team, in the last minutes of a close game (undefined otherwise)
+	getClosers(): [Set<PlayerGameSim>, Set<PlayerGameSim>] | undefined {
+		const quarter = this.team[0].stat.ptsQtrs.length;
+		const closingSeconds =
+			(CLOSING_SECONDS * this.rotationQuarterSeconds) / 720;
+		if (
+			this.elamActive ||
+			quarter < this.numPeriods ||
+			this.t === undefined ||
+			this.t > Math.min(closingSeconds, CLOSING_SECONDS) ||
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) > CLOSING_MARGIN
+		) {
+			return undefined;
+		}
+		const foulsNeededToFoulOut = g.get("foulsNeededToFoulOut");
+		return teamNums.map((t) => {
+			const candidates = this.team[t].player
+				.filter(
+					(p) =>
+						!p.injured &&
+						!this.ejected.has(p) &&
+						!(foulsNeededToFoulOut > 0 && p.stat.pf >= foulsNeededToFoulOut) &&
+						(this.allStarGame || p.ptModifier > 0),
+				)
+				.sort(
+					(a, b) =>
+						b.valueNoPot * (this.allStarGame ? 1 : b.ptModifier) -
+						a.valueNoPot * (this.allStarGame ? 1 : a.ptModifier),
+				);
+			return pickClosers(candidates, this.numPlayersOnCourt);
+		}) as [Set<PlayerGameSim>, Set<PlayerGameSim>];
+	}
+
+	// Realistic Rotations: how much more or less he is wanted on the court than his value and fatigue say (not in blowouts)
+	rotationFactor(
+		p: PlayerGameSim,
+		foulLimit: number,
+		elapsed: number,
+		closers: Set<PlayerGameSim> | undefined,
+	) {
+		let factor = 1;
+		const sitUntil = this.foulTroubleSitUntil.get(p);
+		const rulesApply =
+			this.numPeriods === 4 && this.rotationFoulsToFoulOut >= 5;
+		if (rulesApply) {
+			if (
+				sitUntil !== undefined &&
+				sitUntil > elapsed &&
+				this.overtimes === 0 &&
+				!this.elamActive
+			) {
+				// Sitting: his minutes plan doesn't bring him back early, but he can still close a game
+				return FOUL_TROUBLE_SIT_FACTOR * (closers?.has(p) ? CLOSER_FACTOR : 1);
+			}
+		} else {
+			factor *= this.getFoulTroubleFactor(p, foulLimit);
+		}
+
+		if (closers) {
+			factor *= closers.has(p) ? CLOSER_FACTOR : NON_CLOSER_FACTOR;
+		} else {
+			const target = this.minutesTargets.get(p) ?? 0;
+			if (target > 0) {
+				const regulationSeconds = this.numPeriods * this.rotationQuarterSeconds;
+				factor *= minutesDebtFactor(
+					target,
+					p.stat.min,
+					elapsed / regulationSeconds,
+				);
+			} else {
+				factor *= UNPLANNED_FACTOR;
+			}
+		}
+		return factor;
+	}
+
 	getFoulTroubleLimit() {
 		const foulsNeededToFoulOut = g.get("foulsNeededToFoulOut");
 
@@ -1238,6 +1407,13 @@ class GameSim extends GameSimBase {
 
 		const foulLimit = this.getFoulTroubleLimit();
 
+		// Realistic Rotations
+		const elapsed = this.realisticRotations
+			? this.elapsedRegulationSeconds()
+			: 0;
+		const closers =
+			this.realisticRotations && !blowout ? this.getClosers() : undefined;
+
 		for (const t of teamNums) {
 			const getOvrs = (includeFouledOut: boolean) => {
 				// Overall values scaled by fatigue, etc
@@ -1267,7 +1443,12 @@ class GameSim extends GameSimBase {
 
 						// Also scale based on margin late in games, so stars play less in blowouts (this doesn't really work that well, but better than nothing)
 						if (blowout) {
-							ovr *= (i + 1) / 10;
+							// Realistic Rotations: the end of the bench by value, not by roster order
+							ovr *= this.realisticRotations
+								? (this.valueRanks.get(p)! + 1) / 10
+								: (i + 1) / 10;
+						} else if (this.realisticRotations) {
+							ovr *= this.rotationFactor(p, foulLimit, elapsed, closers?.[t]);
 						} else {
 							// If it's not a blowout, worry about foul trouble
 							const foulTroubleFactor = this.getFoulTroubleFactor(p, foulLimit);
@@ -1698,6 +1879,21 @@ class GameSim extends GameSimBase {
 		}
 	}
 
+	// Position-aware team composites: the shares of team t's players on the court, cached until the lineup changes
+	getPositionalShares(t: TeamNum) {
+		const lineup = this.playersOnCourt[t];
+		const last = this.positionalSharesLineup[t];
+		let same = last.length === lineup.length;
+		for (let i = 0; same && i < lineup.length; i++) {
+			same = last[i] === lineup[i];
+		}
+		if (!same) {
+			this.positionalSharesCache[t] = positionalShares(lineup);
+			this.positionalSharesLineup[t] = [...lineup];
+		}
+		return this.positionalSharesCache[t];
+	}
+
 	/**
 	 * Update team composite ratings.
 	 *
@@ -1729,11 +1925,13 @@ class GameSim extends GameSimBase {
 			let defenseOutside = 0;
 			// Position-aware team composites: each player weighted by his share of the job (undefined: plain averages, as before)
 			const shares = this.positionalComposites
-				? positionalShares(this.playersOnCourt[t], this.positionalSharesCache)
+				? this.getPositionalShares(t)
 				: undefined;
 			if (shares) {
 				const S = POSITIONAL_SCALE;
-				for (const [i, p] of this.playersOnCourt[t].entries()) {
+				const lineup = this.playersOnCourt[t];
+				for (let i = 0; i < lineup.length; i++) {
+					const p = lineup[i]!;
 					const ratings = p.compositeRating;
 					const fatigue = this.fatigue(p.stat.energy);
 					const pf = p.stat.pf;
@@ -4334,6 +4532,9 @@ class GameSim extends GameSimBase {
 				p.stat[s] = 1;
 			} else {
 				p.stat[s] += amt;
+				if (s === "pf" && this.realisticRotations) {
+					this.onPersonalFoul(p);
+				}
 			}
 		}
 
