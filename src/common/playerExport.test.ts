@@ -88,6 +88,10 @@ describe("CSV", () => {
 			"Records_Book_MostPoints",
 		);
 		assert.strictEqual(fileSafeName("???"), "table");
+		assert.strictEqual(
+			fileSafeName("Łukasz Dončić-Şengün Þórsson Nguyễn Kėdainis Yılmaz"),
+			"Lukasz_Doncic-Sengun_Thorsson_Nguyen_Kedainis_Yilmaz",
+		);
 	});
 
 	test("players CSV has one row per player and the union of columns", () => {
@@ -228,7 +232,7 @@ describe("zip", () => {
 		assert.strictEqual(view.getUint16(end + 10, true), 2);
 		assert.deepStrictEqual(
 			files.map((f) => f.name),
-			["1_Jo_The_Rock_ONeil.pdf", "2_Luka_Dončić.pdf"],
+			["1_Jo_The_Rock_ONeil.pdf", "2_Luka_Doncic.pdf"],
 		);
 	});
 });

@@ -17,6 +17,7 @@ import {
 	type PlayerExport,
 } from "../../common/playerExport.ts";
 import { PLAYER_GAME_STATS } from "../../common/constants.ts";
+import { getCols } from "../../common/getCols.ts";
 import getWinner from "../../common/getWinner.ts";
 import { processPlayerStats } from "./processPlayerStats.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
@@ -44,6 +45,15 @@ const pickStats = (row: Record<string, unknown> | undefined) => {
 	return out;
 };
 
+// Column titles like the player page ("FG%", "3PA"), falling back to the key
+const colTitle = (prefix: "stat" | "rating", key: string) => {
+	try {
+		return getCols([`${prefix}:${key}`])[0]!.title;
+	} catch {
+		return key;
+	}
+};
+
 const cell = (value: unknown): string | number => {
 	if (typeof value === "number") {
 		return Number.isFinite(value) ? Math.round(value * 10) / 10 : "";
@@ -65,8 +75,11 @@ const statsTables = (
 	for (const info of Object.values(PLAYER_STATS_TABLES)) {
 		const stats = getPlayerStatsTableStats(info.stats);
 		for (const playoffs of [false, true]) {
+			// Rows are regular season (playoffs false), playoffs (true) or both together ("combined"), which is left out
 			const rows = rowsAll.filter(
-				(row) => !!row.playoffs === playoffs && (row.gp ?? 0) > 0,
+				(row) =>
+					(playoffs ? row.playoffs === true : !row.playoffs) &&
+					(row.gp ?? 0) > 0,
 			);
 			if (rows.length === 0) {
 				continue;
@@ -75,7 +88,12 @@ const statsTables = (
 			tables.push({
 				section,
 				title: `${info.name}${playoffs ? " (playoffs)" : ""}`,
-				cols: ["Year", "Team", "Age", ...stats],
+				cols: [
+					"Year",
+					"Team",
+					"Age",
+					...stats.map((stat) => colTitle("stat", stat)),
+				],
 				rows: [
 					...rows.map((row) => [
 						row.season,
@@ -160,7 +178,13 @@ export const getPlayersForExport = async ({
 		return {
 			section: "Game log",
 			title: `${currentSeason} game log`,
-			cols: ["Day", "Team", "Opp", "Result", ...gameStats],
+			cols: [
+				"Day",
+				"Team",
+				"Opp",
+				"Result",
+				...gameStats.map((stat) => colTitle("stat", stat)),
+			],
 			rows,
 		};
 	};
@@ -218,7 +242,7 @@ export const getPlayersForExport = async ({
 					"Pos",
 					"Ovr",
 					"Pot",
-					...ratingKeys,
+					...ratingKeys.map((key) => colTitle("rating", key)),
 					"Skills",
 				],
 				rows: p.ratings.map((r: any) => [

@@ -81,9 +81,31 @@ export const rectangularize = (rows: string[][]) => {
 	);
 };
 
+// Letters that don't decompose into a base letter and an accent
+const TRANSLITERATE: Record<string, string> = {
+	ł: "l",
+	Ł: "L",
+	ı: "i",
+	þ: "th",
+	Þ: "Th",
+	ð: "d",
+	Ð: "D",
+	đ: "d",
+	Đ: "D",
+	ø: "o",
+	Ø: "O",
+	æ: "ae",
+	Æ: "Ae",
+	ß: "ss",
+};
+
+// ASCII only: browsers can refuse a download name with other letters (Chrome falls back to "download")
 export const fileSafeName = (name: string) =>
 	name
-		.replaceAll(/[^\p{L}\p{N}_ -]+/gu, "")
+		.normalize("NFD")
+		.replaceAll(/\p{M}/gu, "")
+		.replaceAll(/[ÆÐØÞßæðøþĐđıŁł]/g, (c) => TRANSLITERATE[c] ?? "")
+		.replaceAll(/[^\w -]+/g, "")
 		.trim()
 		.replaceAll(/\s+/g, "_")
 		.slice(0, 80) || "table";

@@ -146,10 +146,18 @@ const drawOverview = (
 	if (face) {
 		pdf.jpeg(face, MARGIN, TOP, 100, 150);
 	}
-	pdf.text(textLeft, TOP + 22, truncate(p.name, 22, RIGHT - textLeft, true), {
-		size: 22,
-		bold: true,
-	});
+	// Long names get a smaller size before they get cut
+	const nameWidth = measure(p.name, 22, true);
+	const nameSize =
+		nameWidth > RIGHT - textLeft
+			? Math.max(14, (22 * (RIGHT - textLeft)) / nameWidth)
+			: 22;
+	pdf.text(
+		textLeft,
+		TOP + 22,
+		truncate(p.name, nameSize, RIGHT - textLeft, true),
+		{ size: nameSize, bold: true },
+	);
 	const lines = [
 		[p.pos, p.team, p.injury ? `Injured: ${p.injury}` : ""],
 		[
@@ -251,7 +259,7 @@ const KEY_COLS = 3;
 const colWidths = (table: ExportTable) =>
 	table.cols.map((col, i) => {
 		const widest = Math.max(
-			measure(col.toUpperCase(), TABLE_SIZE, true),
+			measure(col, TABLE_SIZE, true),
 			...table.rows.map((row) =>
 				measure(String(row[i] ?? ""), TABLE_SIZE, row[0] === "Career"),
 			),
@@ -340,12 +348,7 @@ class Flow {
 					this.pdf.text(
 						x + 2,
 						this.y,
-						truncate(
-							table.cols[c]!.toUpperCase(),
-							TABLE_SIZE,
-							widths[c]! - 3,
-							true,
-						),
+						truncate(table.cols[c]!, TABLE_SIZE, widths[c]! - 3, true),
 						{
 							size: TABLE_SIZE,
 							bold: true,

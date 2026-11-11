@@ -126,8 +126,9 @@ export const tableLabel = (table: Element, index: number) => {
 			const heading = prev.matches("h1,h2,h3,h4,h5,.card-header")
 				? prev
 				: prev.querySelector("h1,h2,h3,h4,h5,.card-header");
-			if (heading?.textContent?.trim()) {
-				return heading.textContent.trim().slice(0, 60);
+			const text = heading ? cellText(heading) : "";
+			if (text) {
+				return text.slice(0, 60);
 			}
 			prev = prev.previousElementSibling;
 		}
