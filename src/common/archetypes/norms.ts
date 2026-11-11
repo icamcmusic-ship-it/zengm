@@ -207,9 +207,21 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 		z[dim] = clampZ(adj);
 		sz[dim] = z[dim];
 	}
+	// His overall level is read at an ordinary wingspan for his height: length is a body measurement (often only estimated,
+	// for real or older players), not how good he is, so it must not move him across a level gate (star, raw prospect)
+	const v0 =
+		expanded && r.wng !== r.hgt ? compositeValues({ ...r, wng: r.hgt }) : v;
 	let level = 0;
 	for (const dim of CORE_DIMS) {
-		level += z[dim];
+		if (v0 === v) {
+			level += z[dim];
+			continue;
+		}
+		const b = norms.beta[dim];
+		level += clampZ(
+			(rawZ(norms.q[dim], v0[dim]) - b * hz) /
+				Math.max(Math.sqrt(1 - b * b), SHRINK_FLOOR),
+		);
 	}
 	level /= CORE_DIMS.length;
 	for (const dim of DIMS) {

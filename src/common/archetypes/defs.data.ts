@@ -873,7 +873,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 			len: 0.5,
 		},
 		"Alters everything at the rim.",
-		{ xw: { idef: 2 }, req: ["Di"], need: { blk: 1, dint: 0.8 } },
+		{ xw: { idef: 2.5, len: 1.5 }, req: ["Di"], need: { blk: 1, dint: 0.8 } },
 	),
 	C(
 		"Glass Cleaner",
@@ -2257,7 +2257,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		[24, 66],
 		{ mid: 2.5, dper: 2, pdef: 1.5, usg: 1, ft: 1 },
 		"Gets to his mid-range shot against anyone and guards the other team's best scorer.",
-		{ tags: ["two-way"] },
+		{ need: { dper: 0 }, tags: ["two-way"] },
 	),
 	F(
 		"Lockdown Forward",
@@ -2296,7 +2296,7 @@ export const ARCHETYPE_DEFS: ArchetypeDef[] = [
 		"Arms that go on forever: gets a hand on passes, dribbles and shots that looked safe.",
 		{
 			expanded: true,
-			need: { len: 1, stl: 0.3, pdef: 0 },
+			need: { len: 1.3, stl: 0.6, pdef: 0.3, dper: 0 },
 			pos: { PG: 0, G: 0 },
 			tags: ["length", "defense"],
 		},
@@ -2435,6 +2435,16 @@ const POS_OVERRIDES: Record<string, Partial<Record<Pos, number | null>>> = {
 	// A shooting power forward is a Stretch Four
 	"stretch-wing": { PF: -1, FC: -1.5 },
 };
+// Big-man playmaking labels: the passing must be clearly there (a big's passing composite runs high on IQ alone)
+for (const id of [
+	"playmaking-big",
+	"glass-cleaning-playmaker",
+	"playmaking-forward",
+]) {
+	const d = ARCHETYPE_DEFS.find((x) => x.id === id)!;
+	d.need = { ...d.need, pss: 0.75 };
+}
+
 for (const d of ARCHETYPE_DEFS) {
 	const o = POS_OVERRIDES[d.id];
 	if (o) {
