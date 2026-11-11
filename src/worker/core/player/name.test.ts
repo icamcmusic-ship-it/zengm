@@ -144,6 +144,18 @@ describe("names data", () => {
 		assert.include(attribution, "behindthename.com");
 	});
 
+	test("behindthename first names are not obviously female", () => {
+		for (const [country, femaleOnly] of [
+			["Spain", ["Julia", "Fabia"]],
+			["Brazil", ["Glaucia"]],
+			["USA", ["Jada", "Jade"]],
+		] as const) {
+			for (const name of femaleOnly) {
+				assert.notProperty(names.countries[country]!.first, name, country);
+			}
+		}
+	});
+
 	test("new countries have names", () => {
 		for (const country of [
 			"Tunisia",
