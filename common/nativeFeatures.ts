@@ -304,6 +304,31 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "perimeterDefense",
+		key: "perimeterDefense",
+		name: "Perimeter Defense",
+		description:
+			"Credit for perimeter defenders: steals go more to quick on-ball defenders (league steal totals unchanged), and the default DPOY and All-Defensive formulas weigh steals more and defensive win shares (inflated by defensive rebounding) less. Awards with an edited formula are not changed.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "perimeterDefenseAllDefensive",
+				name: "All-Defensive Teams by Position",
+				description:
+					"How the All-Defensive teams are filled. Positionless: the best scores (like the NBA since 2024). One guard: at least one guard (PG, SG or G) on every team. Guards, forwards, center: 2 guards, 2 forwards and a center on every team, like the NBA before 2024 (a GF can be a guard or a forward, an FC a forward or a center).",
+				type: "string",
+				default: "oneGuard",
+				values: [
+					{ key: "none", value: "Positionless" },
+					{ key: "oneGuard", value: "One guard" },
+					{ key: "gfc", value: "Guards, forwards, center" },
+				],
+			},
+		],
+	},
+	{
 		id: "seasonOdds",
 		key: "featureSeasonOdds",
 		name: "Season Odds",
