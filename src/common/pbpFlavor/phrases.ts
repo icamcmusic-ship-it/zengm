@@ -1701,6 +1701,16 @@ export function tovText(rng: any, e: any, ctx: any) {
 			s + " strips " + n + " on the way up",
 			s + " lifts it from " + n + " near midcourt",
 			s + " pries the ball away from " + n,
+			s + " gets " + n + " to put the ball on the floor, then takes it",
+			s + " cleanly pokes it away from " + n + " and recovers",
+			s + " catches " + n + " napping and swipes it",
+			s + " sneaks up behind " + n + " and flicks it away",
+			s + " takes the ball right off " + n + "'s hip",
+			s + " beats " + n + " to the spot and strips it",
+			s + " ends " + n + "'s drive with a clean strip",
+			s + " pickpockets " + n + " on the crossover",
+			s + " gets low and pokes it off " + n + "'s knee, then grabs it",
+			s + " swats the ball away from " + n + " on the gather",
 		]) {
 			add(1, t);
 		}
@@ -1800,6 +1810,15 @@ export function tovText(rng: any, e: any, ctx: any) {
 			n + " tries to thread a pass to " + t2 + " and it skips out of bounds",
 			n + " throws a lob for " + t2 + " that sails out of bounds",
 			n + "'s bounce pass glances off " + t2 + "'s hands and out",
+			n + "'s skip pass for " + t2 + " has too much on it and goes out",
+			n +
+				" and " +
+				t2 +
+				" aren't on the same page on a backdoor cut; the pass goes out",
+			n +
+				" looks for " +
+				t2 +
+				" on the roll, and the pass bounces out of bounds",
 			"the cross-court pass from " +
 				n +
 				" for " +
@@ -1837,6 +1856,9 @@ export function tovText(rng: any, e: any, ctx: any) {
 		n + " loses his footing and steps out of bounds",
 		n + " steps on the baseline",
 		n + " fumbles the catch and it bounces out of bounds",
+		n + " bobbles the entry pass and it rolls out of bounds",
+		n + " can't corral a high pass, and it skips out of bounds",
+		n + " is trapped on the sideline and steps out",
 	]) {
 		add(0.5, t);
 	}
