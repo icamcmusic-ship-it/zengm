@@ -1300,6 +1300,9 @@ export type AssetValueDetail = {
 	// Multiplier from team strategy (rebuilding/contending), 1 if none
 	strategyFactor: number;
 
+	// Multiplier from the AI GM's timeline and pick valuation (GM personalities setting), 1 or undefined if none
+	gmFactor?: number;
+
 	// Value removed because of injury (only for incoming assets)
 	injuryPenalty: number;
 
@@ -1379,8 +1382,14 @@ const sumValues = (
 			}
 		}
 
+		if (baseValue !== 0) {
+			strategyFactor = playerValue / baseValue;
+		}
+
 		// AI GM personalities (setting): the GM's timeline and how he values picks, on top of the team's strategy
+		let gmFactor = 1;
 		if (gm && playerValue > 0) {
+			const before = playerValue;
 			if (p.type === "pick") {
 				playerValue *= gm.pickFactor;
 			}
@@ -1389,10 +1398,7 @@ const sumValues = (
 			} else if (p.age >= 29) {
 				playerValue *= gm.vetFactor;
 			}
-		}
-
-		if (baseValue !== 0) {
-			strategyFactor = playerValue / baseValue;
+			gmFactor = playerValue / before;
 		}
 
 		// Normalize for injuries
@@ -1440,6 +1446,7 @@ const sumValues = (
 				age: p.age,
 				baseValue,
 				strategyFactor,
+				gmFactor,
 				injuryPenalty,
 				contractValue: p.contractValue,
 				contractsFactor,
