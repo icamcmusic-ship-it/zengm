@@ -1,11 +1,4 @@
-import {
-	afterAll,
-	assert,
-	beforeAll,
-	beforeEach,
-	describe,
-	test,
-} from "vitest";
+import { afterAll, assert, beforeEach, describe, test } from "vitest";
 import { Rng } from "../../../common/collegeStats/rng.ts";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { resetCache, resetG } from "../../../test/helpers.ts";
@@ -100,16 +93,17 @@ const load = async (
 };
 
 // The generated classes (and the little randomness in development) from a fixed stream, so the averages below are the same every run
+// (a fresh stream for every test, so a test's numbers don't depend on which tests ran before it, e.g. with -t)
 const realRandom = Math.random;
-beforeAll(() => {
-	const rng = new Rng("classShape.test");
-	Math.random = () => rng.random();
-});
 afterAll(() => {
 	Math.random = realRandom;
 });
 
-beforeEach(() => load(0));
+beforeEach(() => {
+	const rng = new Rng("classShape.test");
+	Math.random = () => rng.random();
+	return load(0);
+});
 
 const summary = (players: Player[]) => {
 	const top = players.slice(0, SHAPE_POOL);

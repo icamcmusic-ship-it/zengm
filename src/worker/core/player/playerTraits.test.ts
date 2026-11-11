@@ -11,6 +11,7 @@ import createGameAttributes from "../league/createGameAttributes.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { last, range } from "../../../common/utils.ts";
+import { makeSeededRandom } from "../../../common/random.ts";
 import {
 	SEASONS_TO_REVEAL,
 	TRAIT_DEFINITIONS,
@@ -37,70 +38,77 @@ describe("calibration on generated leagues", () => {
 		let n = 0;
 		let usageTotal = 0;
 		let attemptTotal = 0;
-		for (let rep = 0; rep < 4; rep++) {
-			resetG();
-			g.setWithoutSavingToDB("playerTraits", true);
-			g.setWithoutSavingToDB("playerTraitsSeed", 1000 + rep);
-			const players = await createRandomPlayers({
-				activeTids: range(30),
-				onlyFreeAgents: false,
-				scoutingLevel: DEFAULT_LEVEL,
-				teams: range(30).map((tid) => ({ tid })),
-			});
-			const season = g.get("season");
-			const rotation = players
-				.filter((p) => p.tid >= 0)
-				.sort((a, b) => last(b.ratings).ovr - last(a.ratings).ovr)
-				.slice(0, 300);
-			for (const [i, p] of rotation.entries()) {
-				const pid = rep * 1000 + i;
-				const r = last(p.ratings) as any;
-				const scores = traitScores(r, generateTraitSeeds(1000 + rep, pid), {
-					age: season - p.born.year,
-					experience: Math.max(0, season - p.draft.year),
+		// Tight tolerances on means of ~1200 random players: seed the player generation so this is deterministic
+		const originalRandom = Math.random;
+		try {
+			for (let rep = 0; rep < 4; rep++) {
+				Math.random = makeSeededRandom(31 + rep);
+				resetG();
+				g.setWithoutSavingToDB("playerTraits", true);
+				g.setWithoutSavingToDB("playerTraitsSeed", 1000 + rep);
+				const players = await createRandomPlayers({
+					activeTids: range(30),
+					onlyFreeAgents: false,
+					scoutingLevel: DEFAULT_LEVEL,
+					teams: range(30).map((tid) => ({ tid })),
 				});
-				const e = traitEffects(scores);
-				for (const key of TRAIT_KEYS) {
-					add(`score:${key}`, scores[key]);
-					add(`z:${key}`, traitZ(scores[key]));
-				}
-				add("inj", e.injuryRateMultiplier);
-				add("var", e.varianceScale);
-				add("space", e.spacingContribution);
-				add("screen", e.screenContribution);
-				add("loose", e.looseBallBonus);
-				add("foul", e.foulProneness);
-				add("steal", e.gambleStealMultiplier);
-				add("rec", e.energyRecoveryRate);
-				add("clutchShot", e.clutchShotModifier(sit));
-				add("clutchFt", e.clutchFtModifier(sit));
-				add("clutchTov", e.clutchTurnoverMult(sit));
-				add("press", e.pressureTurnoverMult(0.7));
-				add("late", e.lateGameDecisionQuality(sit));
-				add("chem", e.chemistryContribution);
+				const season = g.get("season");
+				const rotation = players
+					.filter((p) => p.tid >= 0)
+					.sort((a, b) => last(b.ratings).ovr - last(a.ratings).ovr)
+					.slice(0, 300);
+				for (const [i, p] of rotation.entries()) {
+					const pid = rep * 1000 + i;
+					const r = last(p.ratings) as any;
+					const scores = traitScores(r, generateTraitSeeds(1000 + rep, pid), {
+						age: season - p.born.year,
+						experience: Math.max(0, season - p.draft.year),
+					});
+					const e = traitEffects(scores);
+					for (const key of TRAIT_KEYS) {
+						add(`score:${key}`, scores[key]);
+						add(`z:${key}`, traitZ(scores[key]));
+					}
+					add("inj", e.injuryRateMultiplier);
+					add("var", e.varianceScale);
+					add("space", e.spacingContribution);
+					add("screen", e.screenContribution);
+					add("loose", e.looseBallBonus);
+					add("foul", e.foulProneness);
+					add("steal", e.gambleStealMultiplier);
+					add("rec", e.energyRecoveryRate);
+					add("clutchShot", e.clutchShotModifier(sit));
+					add("clutchFt", e.clutchFtModifier(sit));
+					add("clutchTov", e.clutchTurnoverMult(sit));
+					add("press", e.pressureTurnoverMult(0.7));
+					add("late", e.lateGameDecisionQuality(sit));
+					add("chem", e.chemistryContribution);
 
-				// Shot selection is weighted by how many shots each player takes (about usage squared)
-				const usage = helpers.bound(
-					(r.ins * 0.2 +
-						r.dnk * 0.1 +
-						r.fg * 0.2 +
-						r.tp * 0.2 +
-						r.spd * 0.05 +
-						r.hgt * 0.05 +
-						r.drb * 0.1 +
-						r.oiq * 0.1) /
-						100,
-					0,
-					1,
-				);
-				const w = usage * usage;
-				const bias = e.shotSelectionBias(usage);
-				add("quality", bias.shotQualityDelta, w);
-				add("attempt", bias.attemptWeightMult, w);
-				usageTotal += w;
-				attemptTotal += 1;
-				n++;
+					// Shot selection is weighted by how many shots each player takes (about usage squared)
+					const usage = helpers.bound(
+						(r.ins * 0.2 +
+							r.dnk * 0.1 +
+							r.fg * 0.2 +
+							r.tp * 0.2 +
+							r.spd * 0.05 +
+							r.hgt * 0.05 +
+							r.drb * 0.1 +
+							r.oiq * 0.1) /
+							100,
+						0,
+						1,
+					);
+					const w = usage * usage;
+					const bias = e.shotSelectionBias(usage);
+					add("quality", bias.shotQualityDelta, w);
+					add("attempt", bias.attemptWeightMult, w);
+					usageTotal += w;
+					attemptTotal += 1;
+					n++;
+				}
 			}
+		} finally {
+			Math.random = originalRandom;
 		}
 		const mean = (k: string) => sums[k]! / n;
 		for (const key of TRAIT_KEYS) {

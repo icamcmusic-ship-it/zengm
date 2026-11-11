@@ -8,6 +8,11 @@ globalThis.IDBKeyRange = IDBKeyRange;
 
 overridePostMessage();
 
+// Test files share a worker (isolate: false), and many seed Math.random for a deterministic league without putting it back. Start every file with the real one, so a file's randomness never depends on which file happened to run before it in the same worker.
+const NATIVE_RANDOM = Symbol.for("zengm.nativeMathRandom");
+(globalThis as any)[NATIVE_RANDOM] ??= Math.random;
+Math.random = (globalThis as any)[NATIVE_RANDOM];
+
 globalThis.fetch = async (url: Parameters<typeof fetch>[0]) => {
 	if (typeof url !== "string") {
 		throw new Error("Not supported");
