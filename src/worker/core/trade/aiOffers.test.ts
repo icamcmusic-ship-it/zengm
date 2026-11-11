@@ -1,3 +1,4 @@
+import { getTradePickConditions } from "../../../common/draftPickConditions.ts";
 import { assert, beforeAll, describe, test } from "vitest";
 import { g } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
@@ -7,6 +8,7 @@ import {
 	acceptAiOffer,
 	addAiOffer,
 	buildAiOffer,
+	MIN_USER_DV_TRADING_BLOCK,
 	chooseOfferTarget,
 	getDailyOfferProbability,
 	getOfferAge,
@@ -137,6 +139,18 @@ describe("AI trade offers to the user", () => {
 			for (const pid of aiTeam.pids) {
 				assert.strictEqual((await idb.cache.players.get(pid))!.tid, 1);
 			}
+
+			// Never lopsided against the user, by the AI's own math from the user's side
+			const userDv = await valueChangeCalculator.evaluate({
+				tid: userTeam.tid,
+				pidsAdd: aiTeam.pids,
+				pidsRemove: userTeam.pids,
+				dpidsAdd: aiTeam.dpids,
+				dpidsRemove: userTeam.dpids,
+				tradingPartnerTid: 1,
+				pickConditions: getTradePickConditions(built.teams),
+			});
+			assert.isAtLeast(userDv, MIN_USER_DV_TRADING_BLOCK);
 		}
 	});
 

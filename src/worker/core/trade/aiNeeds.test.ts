@@ -90,10 +90,24 @@ describe("need-driven AI trades", () => {
 		assert.strictEqual(noCapSpace.salaryDump, 0);
 		assert.strictEqual(noCapSpace.rebuildSell, 0);
 		assert.isUndefined(pickKind(noCapSpace, 0.5));
+		assert.strictEqual(noCapSpace.tradeRequest, 0);
+
+		// A team with a player who asked out shops him, even with no buyers/sellers
+		const withRequest = getKindWeights(
+			[team(0, "contending", 180000), team(1, "contending", 150000)],
+			ctx({ numTradeRequests: 1 }),
+		);
+		assert.isAbove(withRequest.tradeRequest, 0);
+		assert.strictEqual(pickKind(withRequest, 0.5), "tradeRequest");
 	});
 
 	test("pickKind", () => {
-		const weights = { deadlineBuy: 1, rebuildSell: 0, salaryDump: 1 };
+		const weights = {
+			deadlineBuy: 1,
+			rebuildSell: 0,
+			salaryDump: 1,
+			tradeRequest: 0,
+		};
 		assert.strictEqual(pickKind(weights, 0.1), "deadlineBuy");
 		assert.strictEqual(pickKind(weights, 0.9), "salaryDump");
 	});
