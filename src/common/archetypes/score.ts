@@ -1,10 +1,13 @@
 import { DIMS, skillsOf, STYLE_DIMS } from "./composites.ts";
 import { zVector } from "./norms.ts";
+import { STATS_W, type StatReading } from "./stats.ts";
+import { conceptsOf } from "./twoK/concepts.ts";
 import type {
 	Archetype,
 	ArchetypeRatings,
 	DimKey,
 	Norms,
+	Pos,
 	SkillLabel,
 } from "./types.ts";
 
@@ -56,6 +59,12 @@ export type Prepared = {
 	z: Record<DimKey, number>;
 	sz: Record<DimKey, number>;
 	abs: Record<DimKey, number>;
+	// The blended reading (BLEND_W absolute standing at his position, the rest the shape of his game, plus his stats): what
+	// stands out about him and whether he has what a build's name promises
+	b: Record<DimKey, number>;
+	// The same before his stats are blended in, and his stats (score.ts classValues blends them per skill class)
+	br: Record<DimKey, number>;
+	stats?: StatReading;
 	skills: SkillLabel[];
 	hgt: number;
 	// He has expanded ratings: perimeter/interior defense are ratings of their own and his length is known
@@ -114,14 +123,15 @@ const getNeedTerms = (a: Archetype, expanded: boolean) => {
 	return cached;
 };
 
-// Every skill is read relative to his own level (norms.ts), so the floors are on the shape of his game: a label's skill
-// must stand out for HIM, whatever his overall
+// The floors are on the blended reading (score.ts BLEND_W): mostly the shape of his game, partly his absolute standing at
+// his position, so a build's requirements move with his overall (a star needs more of a skill than a scrub to be named
+// for it, but far less than in absolute terms)
 export const needShortfall = (a: Archetype, p: Prepared) => {
 	const { defining, need, cap, needFor } = getNeedTerms(a, p.expanded);
 	let short = 0;
 	for (const { dim, w } of defining) {
-		short += Math.max(0, 0.1 * w - 0.1 - p.z[dim]);
-		short += Math.max(0, 0.1 * (w - 2) - 0.05 - p.sz[dim]);
+		short += Math.max(0, 0.1 * w - 0.1 - p.b[dim]);
+		short += Math.max(0, 0.1 * (w - 2) - 0.05 - p.b[dim]);
 	}
 	for (const [dim, floor] of need) {
 		if (STYLE_DIMS.has(dim)) {
@@ -131,7 +141,7 @@ export const needShortfall = (a: Archetype, p: Prepared) => {
 			}
 			continue;
 		}
-		short += Math.max(0, floor - p.abs[dim]);
+		short += Math.max(0, floor - p.b[dim]);
 	}
 	for (const [dim, ceiling] of cap) {
 		if (!STYLE_DIMS.has(dim) || p.expanded) {
@@ -139,7 +149,7 @@ export const needShortfall = (a: Archetype, p: Prepared) => {
 		}
 	}
 	for (const [dim, floor] of needFor) {
-		short += Math.max(0, floor - p.sz[dim]);
+		short += Math.max(0, floor - p.b[dim]);
 	}
 	return short;
 };
@@ -268,39 +278,54 @@ export const coverOf = (a: Archetype) => {
 	return c;
 };
 export type Standout = { k: string; s: number };
-const STANDOUT_ABS: Partial<Record<DimKey, number>> = { blk: 0.4, dint: 0.4 };
 // How much each class stands out: how far he is above STANDOUT_FROM for his size (capped), faded out for classes well
 // below his own best. Continuous in his ratings, so a small change does not swap his standouts outright.
 const STANDOUT_FROM = 0.9;
 const STANDOUT_CAP = 1.2;
 const STANDOUT_FADE = 1.2;
 const DEF_IQ_ROOM = 1;
-// How far each skill class stands out from his own level, for his size: the best of its dimensions
+// How far each skill class stands out for him, on the blended reading (his shape, his absolute standing at his position
+// and his stats): the best of its dimensions
 export const classValues = (p: Prepared): Record<string, number> => {
 	const vals: Record<string, number> = {};
 	for (const [k, dims] of Object.entries(SKILL_CLASSES)) {
 		let v = -Infinity;
+		// What his stats say about the class (the best of its dimensions they speak to)
+		let sv = -Infinity;
 		for (const d of dims) {
-			// Rim protection partly in absolute terms (as for the profile); rebounding, finishing and post play for his size
-			v = Math.max(v, p.sz[d] + (STANDOUT_ABS[d] ?? 0) * (p.abs[d] - p.sz[d]));
+			v = Math.max(v, p.br[d]);
+		}
+		// (his defensive box plus/minus, read as his defensive IQ, speaks to either side of the floor)
+		for (const d of k === "perD" || k === "rimD"
+			? [...dims, "diq" as const]
+			: dims) {
+			const x = p.stats?.z[d];
+			if (x !== undefined) {
+				sv = Math.max(sv, x);
+			}
 		}
 		// Perimeter and interior defense need the instincts too: speed or size alone is not a standout defender. With
 		// expanded ratings that is the rating for that side of the floor (without them both are his defensive IQ)
 		if (k === "perD") {
-			v = Math.min(v, p.sz.pdef + DEF_IQ_ROOM);
+			v = Math.min(v, p.b.pdef + DEF_IQ_ROOM);
 			// ... and the rating is the skill itself: a slow-footed stopper is still a stopper
 			if (p.expanded) {
-				v = Math.max(v, p.sz.pdef);
+				v = Math.max(v, p.b.pdef);
 			}
 		} else if (k === "rimD") {
-			v = Math.min(v, p.sz.idef + DEF_IQ_ROOM);
+			v = Math.min(v, p.b.idef + DEF_IQ_ROOM);
 			// (for a big body: a guard's interior defense is not what a label names)
 			if (p.expanded && p.hgt >= BIG_HGT) {
-				v = Math.max(v, p.sz.idef);
+				v = Math.max(v, p.b.idef);
 			}
 		}
-		vals[k] = v;
+		// His stats after the ratings' checks: blocking shots or getting steals is the real thing, whatever his IQ rating
+		vals[k] =
+			p.stats && sv > -Infinity ? (1 - p.stats.w) * v + p.stats.w * sv : v;
 	}
+	// Not skill classes a label is built on, but things a name can promise: his strength, and his defense on either side
+	vals.stre = p.br.stre;
+	vals.def = Math.max(vals.perD!, vals.rimD!, p.b.diq);
 	return vals;
 };
 
@@ -308,7 +333,7 @@ export const standoutsOf = (
 	p: Prepared,
 	cv: Record<string, number> = classValues(p),
 ): Standout[] => {
-	const vals = Object.entries(cv);
+	const vals = Object.entries(cv).filter(([k]) => SKILL_CLASSES[k]);
 	const top = Math.max(...vals.map(([, v]) => v));
 	const out: Standout[] = [];
 	for (const [k, v] of vals) {
@@ -436,18 +461,329 @@ export const genericPenalty = (a: Archetype, st: Standout[]) => {
 	return GENERIC_K * t;
 };
 
-export const prepare = (ratings: ArchetypeRatings, norms: Norms): Prepared => {
-	const v = zVector(ratings, norms);
+// How a player is read beyond his ratings: his position (for the absolute reading), his age (lost athleticism), his stats
+// and whether he is a draft prospect (prospect tables)
+export type ReadOptions = {
+	pos?: Pos;
+	age?: number;
+	stats?: StatReading;
+	prospect?: boolean;
+};
+
+// Each skill is read BLEND_W on his absolute standing among players at his position and the rest on the shape of his own
+// game (relative to his level): an elite absolute skill (a point guard's three, a center's rebounding) stands out even
+// for an all-around star, while the build still mostly ignores how good he is overall
+export const BLEND_W = 0.25;
+// How much of that absolute standing (re-centred on his own level at his position: shape against his position's peers
+// rather than against his size) the profile match itself reads
+export const MATCH_ABS_W = 0.2;
+
+// Aging: from AGE_FROM, speed, jumping and endurance lost to age are discounted (AGE_STEP a year, at most AGE_MAX), so
+// a veteran keeps the build his skills still say he is
+export const AGE_FROM = 30;
+export const AGE_STEP = 2.5;
+export const AGE_MAX = 12;
+const AGE_KEYS = ["spd", "jmp", "endu"] as const;
+// (never above this, or his own value if higher: it gives back what age took, it does not make him an athlete)
+const AGE_CAP = 65;
+export const ageAdjusted = (
+	ratings: ArchetypeRatings,
+	age: number | undefined,
+): ArchetypeRatings => {
+	if (age === undefined || age <= AGE_FROM) {
+		return ratings;
+	}
+	const add = Math.min(AGE_MAX, AGE_STEP * (age - AGE_FROM));
+	const out = { ...ratings };
+	for (const k of AGE_KEYS) {
+		out[k] = Math.max(ratings[k], Math.min(ratings[k] + add, AGE_CAP));
+	}
+	return out;
+};
+
+export const prepare = (
+	ratingsIn: ArchetypeRatings,
+	norms: Norms,
+	opts: ReadOptions = {},
+): Prepared => {
+	const ratings = ageAdjusted(ratingsIn, opts.age);
+	const reading = opts.prospect && norms.prospect ? norms.prospect : norms;
+	const v = zVector(ratings, reading, opts.pos);
 	const z = { ...v.z };
 	for (const [dim, m] of Object.entries(ABS_MIX) as [DimKey, number][]) {
 		z[dim] += m * (v.abs[dim] - v.sz[dim]);
+	}
+	const b = {} as Record<DimKey, number>;
+	const st = opts.stats;
+	let statMean = 0;
+	if (st) {
+		let n = 0;
+		for (const [dim, x] of Object.entries(st.z) as [DimKey, number][]) {
+			if (dim !== "drb" && dim !== "diq") {
+				statMean += x;
+				n++;
+			}
+		}
+		statMean = n > 0 ? statMean / n : 0;
+	}
+	const br = {} as Record<DimKey, number>;
+	for (const dim of DIMS) {
+		if (dim === "hgt" || STYLE_DIMS.has(dim)) {
+			b[dim] = z[dim];
+			br[dim] = z[dim];
+			continue;
+		}
+		const rel = z[dim];
+		b[dim] = (1 - BLEND_W) * rel + BLEND_W * v.pz[dim];
+		br[dim] = b[dim];
+		z[dim] = rel + MATCH_ABS_W * (v.pz[dim] - v.pzLevel - rel);
+		// (his defensive box plus/minus only speaks to the defensive skill classes: classValues)
+		const sz = dim === "diq" ? undefined : st?.z[dim];
+		if (st && sz !== undefined) {
+			b[dim] = (1 - st.w) * b[dim] + st.w * sz;
+			z[dim] = (1 - st.w) * z[dim] + st.w * (sz - statMean);
+		}
 	}
 	return {
 		z,
 		sz: v.sz,
 		abs: v.abs,
+		b,
+		br,
+		stats: st,
 		skills: skillsOf(ratings),
 		hgt: ratings.hgt,
 		expanded: v.expanded,
 	};
+};
+
+// ---- What a build's name promises, and naming what stands out about him ----
+
+// The skill classes each concept of a 2K name (twoK/concepts.ts) promises ("def": either side of the floor, "stre": strength)
+const CONCEPT_CLASSES: Record<string, string[]> = {
+	twoWay: ["def"],
+	lockdown: ["perD"],
+	steal: ["perD"],
+	rimD: ["rimD"],
+	oreb: ["reb"],
+	reb: ["reb"],
+	outlet: ["pass"],
+	threeLevel: ["shoot", "mid"],
+	insideOut: ["shoot", "finish"],
+	catchShoot: ["shoot"],
+	shotHunt: ["shoot"],
+	midPaint: ["mid"],
+	midPost: ["mid", "post"],
+	mid: ["mid"],
+	post: ["post"],
+	paint: ["finish"],
+	slash: ["finish"],
+	finish: ["finish"],
+	dunk: ["finish"],
+	air: ["ath"],
+	lob: ["finish"],
+	run: ["ath"],
+	tempo: ["handle"],
+	creator: ["handle"],
+	pass: ["pass"],
+	tripleDouble: ["reb"],
+	strength: ["stre"],
+};
+export type Promises = {
+	// Every class the name promises
+	all: string[];
+	// What the build is first of all (its head noun, "Sharpshooter" in "Crafty Sharpshooter", and its heaviest
+	// profile weights)
+	lead: string[];
+	// The name's concept keys (twoK/concepts.ts)
+	keys: string[];
+};
+const promiseCache = new WeakMap<Archetype, Promises>();
+export const promisesOf = (a: Archetype): Promises => {
+	let p = promiseCache.get(a);
+	if (!p) {
+		const cs = conceptsOf(a.name).filter((c) => CONCEPT_CLASSES[c.key]);
+		const all = [...new Set(cs.flatMap((c) => CONCEPT_CLASSES[c.key]!))];
+		const lead = new Set(cs.length > 0 ? CONCEPT_CLASSES[cs.at(-1)!.key]! : []);
+		const max = Math.max(
+			...Object.entries(a.w)
+				.filter(([d]) => CLASS_OF.has(d as DimKey))
+				.map(([, w]) => w),
+		);
+		for (const [d, w] of Object.entries(a.w) as [DimKey, number][]) {
+			const k = CLASS_OF.get(d);
+			if (k && w >= 2 && w >= max - 0.01) {
+				lead.add(k);
+			}
+		}
+		p = { all, lead: [...lead], keys: conceptsOf(a.name).map((c) => c.key) };
+		promiseCache.set(a, p);
+	}
+	return p;
+};
+
+// A name's promises: every skill it names must be at least ordinary for him on the blended reading (PROMISE_FLOOR: a
+// build that promises what he is below average at pays heavily), and what the build is first of all must stand out
+// (LEAD_MIN, about the 70th percentile at his position for an average player; the bar moves with his level, since the
+// reading is part relative to it)
+export const PROMISE_FLOOR = 0;
+export const PROMISE_K = 2.5;
+export const PROMISE_STEP = 0.25;
+export const LEAD_MIN = 0.5;
+export const LEAD_MIN_K = 1;
+// ... and, so a label never names what is not there in his own game, each promised skill must also be at least ordinary
+// relative to his own level (`abs` and, for rebounding and post play, `sz`: the level-relative readings), not only by his
+// standing at his position or his stats
+const relCheck = (k: string, p: Prepared): number => {
+	const a = p.abs;
+	switch (k) {
+		case "shoot":
+			return a.three - 0.1;
+		case "mid":
+			return a.mid - 0.1;
+		case "rimD":
+			return a.blk - 0.1;
+		case "pass":
+			return a.pss - 0.1;
+		case "handle":
+			return a.drb - 0.1;
+		case "perD":
+		case "def":
+			return Math.max(a.diq, a.pdef, a.dper, a.stl);
+		case "ath":
+			return Math.max(a.jmp, a.ath - 0.1, a.fin - 0.3);
+		case "reb":
+			return p.sz.reb - 0.1;
+		case "post":
+			return p.sz.post - 0.1;
+		case "finish":
+			return Math.max(a.fin, a.draw - 0.1);
+		case "stre":
+			return a.stre;
+		default:
+			return 0;
+	}
+};
+export const promiseShortfall = (
+	a: Archetype,
+	cv: Record<string, number>,
+	p?: Prepared,
+): { floor: number; lead: number; rel: number } => {
+	const pr = promisesOf(a);
+	let floor = 0;
+	let rel = 0;
+	for (const k of pr.all) {
+		floor += Math.max(0, PROMISE_FLOOR - (cv[k] ?? 0));
+		if (p) {
+			rel += Math.max(0, -relCheck(k, p));
+		}
+	}
+	let lead = 0;
+	if (pr.lead.length > 0) {
+		// (one of the lead classes is enough: a "3-Level" scorer leads with his three or his mid-range)
+		lead = Math.min(
+			...pr.lead.map((k) => Math.max(0, LEAD_MIN - (cv[k] ?? 0))),
+		);
+	}
+	return { floor, lead, rel };
+};
+// (the level-relative check is a hard one, like the 2K builds' own floors: needPenaltyOf)
+export const promisePenalty = (sh: {
+	floor: number;
+	lead: number;
+	rel?: number;
+}) =>
+	(sh.floor > 0 ? PROMISE_STEP + PROMISE_K * sh.floor : 0) +
+	LEAD_MIN_K * sh.lead +
+	needPenaltyOf(sh.rel ?? 0);
+
+// Signature skills: his top one or two standouts must be named by the build, or fit its role (a handler's handle
+// in a playmaker's build). A build that leads with his top standout earns SIG_LEAD_K; one that leaves it out pays SIG_K
+// (half for the second one).
+const CONSISTENT: Record<string, string[]> = {
+	handle: ["pass", "mid"],
+	pass: ["handle"],
+	finish: ["ath", "post"],
+	ath: ["finish"],
+	post: ["finish"],
+	rimD: ["reb"],
+	reb: ["rimD"],
+	mid: ["shoot"],
+	shoot: ["mid"],
+	perD: [],
+};
+export const SIG_K = 0.5;
+export const SIG_LEAD_K = 0.5;
+// ... and a build that leads with a skill well below his best pays LEAD_GAP_K per z of the gap (beyond LEAD_GAP_FREE)
+export const LEAD_GAP_K = 1.5;
+const LEAD_GAP_FREE = 0.1;
+export const signatureTerm = (
+	a: Archetype,
+	st: Standout[],
+	cv?: Record<string, number>,
+) => {
+	let gap = 0;
+	let lead = promisesOf(a).lead;
+	// A nickname ("Fluid Four") leads with what its profile features most
+	if (lead.length === 0) {
+		const c = coverOf(a);
+		lead = Object.keys(c).filter((k) => c[k]! >= 1);
+	}
+	if (cv && lead.length === 0) {
+		// (a build that features nothing pays for his best skill in full)
+		let top = -Infinity;
+		for (const k of Object.keys(SKILL_CLASSES)) {
+			top = Math.max(top, cv[k]!);
+		}
+		gap = LEAD_GAP_K * Math.max(0, top - LEAD_GAP_FREE);
+	} else if (cv) {
+		let top = -Infinity;
+		for (const k of Object.keys(SKILL_CLASSES)) {
+			top = Math.max(top, cv[k]!);
+		}
+		const best = Math.max(...lead.map((k) => cv[k] ?? -Infinity));
+		gap = LEAD_GAP_K * Math.max(0, top - best - LEAD_GAP_FREE);
+	}
+	if (st.length === 0) {
+		return -gap;
+	}
+	const c = coverOf(a);
+	const pr = promisesOf(a);
+	const named = (k: string) =>
+		(c[k] ?? 0) >= 0.5 ||
+		pr.all.includes(k) ||
+		(CONSISTENT[k] ?? []).some((x) => (c[x] ?? 0) >= 1 || pr.all.includes(x));
+	let t = 0;
+	for (const [i, { k, s }] of st.slice(0, 2).entries()) {
+		if (!named(k)) {
+			t -= SIG_K * s * (i === 0 ? 1 : 0.5);
+		}
+	}
+	if (pr.lead.includes(st[0]!.k)) {
+		t += SIG_LEAD_K * st[0]!.s;
+	}
+	return t - gap;
+};
+
+
+// Creator or off the ball (item of his stats): usage and assist rate together (StatReading's `drb`) say whether the ball is in
+// his hands. A creator's builds (passing or handling ones) gain CREATOR_K, spot-up, 3-and-D and lockdown builds lose it, and
+// the other way round for a low-usage, low-assist player. Ratings alone: the profiles' catch-and-shoot lean (`cs`) does it.
+export const CREATOR_K = 0.6;
+const OFF_BALL_KEYS = new Set(["catchShoot", "lockdown", "steal"]);
+export const creatorTerm = (a: Archetype, st: StatReading | undefined) => {
+	const c = st?.z.drb;
+	if (c === undefined || !st) {
+		return 0;
+	}
+	const pr = promisesOf(a);
+	const creator = pr.all.includes("pass") || pr.all.includes("handle");
+	const offBall = !creator && pr.keys.some((k) => OFF_BALL_KEYS.has(k));
+	if (!creator && !offBall) {
+		return 0;
+	}
+	const scale = st.w / STATS_W;
+	const t =
+		c > 0.5 ? Math.min(1, c - 0.5) : c < -0.5 ? -Math.min(1, -c - 0.5) : 0;
+	return CREATOR_K * scale * t * (creator ? 1 : -1);
 };

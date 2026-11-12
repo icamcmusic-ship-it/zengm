@@ -71,7 +71,10 @@ test.skipIf(!process.env.RUN_ARCHETYPE_SEEDS)(
 				let s = 0;
 				for (const p of pool) {
 					const r = neutral(p.ratings, cand, p.ovr);
-					const sc = scoreAll(r, DEFAULT_NORMS, list).scored;
+					// (read as a draft prospect is: the regenerator aims prospects)
+					const sc = scoreAll(r, DEFAULT_NORMS, list, undefined, undefined, {
+						prospect: true,
+					}).scored;
 					const zt = sc.find((x) => x.a.id === a.id)!.z;
 					const other = sc.find((x) => x.a.id !== a.id)!.z;
 					s +=

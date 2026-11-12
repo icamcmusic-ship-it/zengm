@@ -49,17 +49,26 @@ export const matchZ = (table: number[], score: number) => {
 // A reference league's norms: dimension quantiles, height correlations, ovr quantiles and every archetype's match table
 export const buildNorms = (
 	// pos: his position as the game shows it (else BBGM's formula)
-	rows: { ratings: ArchetypeRatings; ovr?: number; pos?: string }[],
+	rows: {
+		ratings: ArchetypeRatings;
+		ovr?: number;
+		pos?: string;
+		age?: number;
+	}[],
 	archetypes: Archetype[],
 	// Tables to use for archetypes with too few peers in this league (the built-in reference league)
 	fallback?: Norms,
 	// Quantiles to read the rows against (default: their own)
 	baseNorms?: Omit<Norms, "match">,
 ): Norms => {
-	const base = baseNorms ?? buildBaseNorms(rows);
-	const prepared = rows.map((r) => ({
-		...prepare(r.ratings, { ...base, match: {} }),
+	const withPos = rows.map((r) => ({
+		...r,
 		pos: isPos(r.pos) ? r.pos : positionOf(r.ratings),
+	}));
+	const base = baseNorms ?? buildBaseNorms(withPos);
+	const prepared = withPos.map((r) => ({
+		...prepare(r.ratings, { ...base, match: {} }, { pos: r.pos, age: r.age }),
+		pos: r.pos,
 	}));
 	const match: Norms["match"] = {};
 	for (const a of archetypes) {
