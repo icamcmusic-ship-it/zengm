@@ -30,9 +30,11 @@ import {
 	type SchoolInterest,
 } from "../../../common/college/interest.ts";
 import {
-	homeState,
-	sameDivision,
-	schoolState,
+	distanceKm,
+	hometownCoords,
+	kmToMiles,
+	schoolCoords,
+	type LatLong,
 } from "../../../common/college/geography.ts";
 import type {
 	CollegeDeparture,
@@ -77,7 +79,8 @@ type Prospect = { p: CollegePlayer; box: RecruitingBox; kind: Kind };
 type SchoolInfo = {
 	tid: number;
 	prestige: number;
-	state: string | undefined;
+	// Campus coordinates
+	coords: LatLong | undefined;
 	coach: number;
 	winp: number;
 	// Ovr of the players who will be on the roster next season, by position group, best first
@@ -223,7 +226,7 @@ const getSchools = async (prospects: Prospect[]) => {
 		schools.set(t.tid, {
 			tid: t.tid,
 			prestige: getTeamPrestige(t as any),
-			state: schoolState(t.region),
+			coords: schoolCoords(t.region),
 			coach: await coachQuality(t.tid),
 			winp: await winPct(t.tid),
 			depth,
@@ -238,6 +241,12 @@ const getSchools = async (prospects: Prospect[]) => {
 const openSpots = (school: SchoolInfo) =>
 	COLLEGE_SCHOLARSHIPS - school.staying - school.commits;
 
+// Distance (km) from his hometown to the campus, undefined for a recruit from abroad or a school with no known location
+const homeDistanceKm = (school: SchoolInfo, p: CollegePlayer) => {
+	const home = hometownCoords(p.born.loc, p.pid);
+	return home && school.coords ? distanceKm(home, school.coords) : undefined;
+};
+
 export const getGrades = (
 	school: SchoolInfo,
 	p: CollegePlayer,
@@ -247,16 +256,10 @@ export const getGrades = (
 	const better = school.depth[posGroup(ratings.pos)]!.filter(
 		(ovr) => ovr > ratings.ovr,
 	).length;
-	const recruitState = homeState(p.born.loc);
 	return {
 		pt: playingTimeGrade(better),
 		prestige: helpers.bound((school.prestige - 35) / 65, 0, 1),
-		proximity: proximityGrade(
-			school.state,
-			recruitState ?? "",
-			sameDivision(school.state, recruitState),
-			recruitState === undefined,
-		),
+		proximity: proximityGrade(homeDistanceKm(school, p)),
 		coach: school.coach,
 		winning: school.winp,
 		nil: Math.min(1, (si?.nil ?? 0) / NIL_FULL),
@@ -1140,6 +1143,11 @@ export const prospectInfo = (
 					? ranked.slice(0, 2).map((key) => ({ key, weight: undefined }))
 					: [],
 		grades,
+		// Miles from his hometown to the user's campus
+		miles: (() => {
+			const km = homeDistanceKm(school, p);
+			return km === undefined ? undefined : Math.round(kmToMiles(km));
+		})(),
 		interest: Math.round(si?.i ?? 0),
 		offered: !!si?.o,
 		visited: !!si?.v,

@@ -10,6 +10,7 @@ import { league } from "../index.ts";
 import { autoSetTargets } from "./offseason.ts";
 import { isCollege } from "./isCollege.ts";
 import { setRedshirt } from "./redshirt.ts";
+import { respondToOffer } from "../staff/collegeCarousel.ts";
 
 const canEdit = () =>
 	isCollege() && g.get("phase") >= 0 && g.get("phase") <= PHASE.RESIGN_PLAYERS;
@@ -118,4 +119,20 @@ export const collegeAdvanceRecruitingWeek = async (
 	const done = await advanceOffseasonWeek(conditions);
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 	return done;
+};
+
+// Coaching carousel: accept or decline a job offer
+export const collegeRespondToOffer = async ({
+	tid,
+	accept,
+}: {
+	tid: number;
+	accept: boolean;
+}) => {
+	if (!isCollege() || lock.get("newPhase") || lock.get("gameSim")) {
+		return "Not now.";
+	}
+	const { error } = await respondToOffer(tid, accept);
+	await toUI("realtimeUpdate", [["staff", "playerMovement", "gameAttributes"]]);
+	return error;
 };

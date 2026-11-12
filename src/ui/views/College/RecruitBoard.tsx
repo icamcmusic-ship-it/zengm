@@ -22,6 +22,8 @@ export type BoardRow = {
 	scout: number;
 	wants: { key: Pitch; weight: number | undefined }[];
 	grades: Record<Pitch, number>;
+	// Miles from his hometown to the user's campus
+	miles?: number;
 	interest: number;
 	offered: boolean;
 	visited: boolean;

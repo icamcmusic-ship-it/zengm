@@ -21,7 +21,14 @@ import {
 	type Grades,
 	type Prefs,
 } from "./interest.ts";
-import { homeState, sameDivision, schoolState } from "./geography.ts";
+import {
+	distanceKm,
+	homeState,
+	hometownCoords,
+	schoolCoords,
+	schoolDistanceKm,
+} from "./geography.ts";
+import { COLLEGES } from "../collegeStats/colleges.ts";
 
 const grades = (value: number, overrides: Partial<Grades> = {}): Grades => ({
 	pt: value,
@@ -209,21 +216,39 @@ describe("recruiting interest model", () => {
 		assert.isAtLeast(nilBudget(35), 20);
 		assert.strictEqual(playingTimeGrade(0), 1);
 		assert.strictEqual(playingTimeGrade(10), 0);
-		assert.strictEqual(proximityGrade("Ohio", "Ohio", true, false), 1);
-		assert.isAbove(
-			proximityGrade("Ohio", "Indiana", true, false),
-			proximityGrade("Ohio", "Texas", false, false),
-		);
+		assert.strictEqual(proximityGrade(50), 1);
+		assert.closeTo(proximityGrade(500), 0.6, 0.05);
+		assert.isAbove(proximityGrade(300), proximityGrade(1500));
+		assert.isAbove(proximityGrade(4000), 0.14);
+		assert.strictEqual(proximityGrade(undefined), 0.4);
 	});
 
 	test("geography", () => {
-		assert.strictEqual(schoolState("Ohio State"), "Ohio");
-		assert.strictEqual(schoolState("West Virginia"), "West Virginia");
-		assert.strictEqual(schoolState("Arkansas"), "Arkansas");
-		assert.strictEqual(schoolState("Duke"), "North Carolina");
+		// Every school of the list has coordinates in the US
+		for (const school of Object.keys(COLLEGES)) {
+			const c = schoolCoords(school);
+			assert.isDefined(c, school);
+			assert.isTrue(
+				c![0] > 18 && c![0] < 50 && c![1] > -160 && c![1] < -66,
+				school,
+			);
+		}
+		// Durham to Chapel Hill is about 15 km, Duke to UCLA about 3,600 km
+		assert.isBelow(schoolDistanceKm("Duke", "North Carolina")!, 20);
+		assert.closeTo(schoolDistanceKm("Duke", "UCLA")!, 3600, 150);
+		assert.isUndefined(schoolDistanceKm("Duke", "Nowhere Tech"));
+		// A renamed school falls back to its state
+		assert.isDefined(schoolCoords("Ohio Northern"));
 		assert.strictEqual(homeState("Ohio, USA"), "Ohio");
+		assert.strictEqual(homeState("Ontario, Canada"), "Ontario");
 		assert.isUndefined(homeState("France"));
-		assert.isTrue(sameDivision("Ohio", "Indiana"));
-		assert.isFalse(sameDivision("Ohio", "Texas"));
+		assert.isUndefined(hometownCoords("France", 1));
+		// Hometowns: fixed per player, inside the state's radius
+		const a = hometownCoords("Ohio, USA", 17)!;
+		assert.deepEqual(hometownCoords("Ohio, USA", 17), a);
+		for (let pid = 0; pid < 200; pid++) {
+			const home = hometownCoords("Ohio, USA", pid)!;
+			assert.isBelow(distanceKm(home, [40.5, -82.6]), 185);
+		}
 	});
 });

@@ -70,6 +70,7 @@ export const getCollegeSettings = (level: CollegeLevel) => {
 		// A 68-team field with the First Four (only the 64-team bracket has one) and the NIT
 		collegeFirstFour: true,
 		collegeNit: true,
+		collegeRealignment: true,
 
 		awards: COLLEGE_AWARDS,
 
