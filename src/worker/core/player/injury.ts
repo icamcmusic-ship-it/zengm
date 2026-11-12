@@ -8,7 +8,15 @@ let prevInjuries: InjuriesSetting | undefined;
 
 let cumSums: number[] = [];
 
-const injury = (healthLevel: number): PlayerInjury => {
+// extraFactor: Front Office Budget's Medical recovery for older players (1 when off). onNeutral gets the duration the same draws give at
+// a league-average health budget, for the season review
+const injury = (
+	healthLevel: number,
+	opts?: {
+		extraFactor?: number;
+		onNeutral?: (gamesRemaining: number) => void;
+	},
+): PlayerInjury => {
 	const injuries = g.get("injuries") ?? defaultInjuries;
 
 	if (injuries !== prevInjuries) {
@@ -26,8 +34,17 @@ const injury = (healthLevel: number): PlayerInjury => {
 
 	const rand = uniform(0, cumSums.at(-1)!);
 	const i = cumSums.findIndex((cs) => cs >= rand);
+	const draw = uniform(0.25, 1.75);
 	const gamesRemaining = Math.round(
-		(1 + healthEffect(healthLevel)) * uniform(0.25, 1.75) * injuries[i]!.games,
+		opts?.extraFactor !== undefined
+			? (1 + healthEffect(healthLevel)) *
+					opts.extraFactor *
+					draw *
+					injuries[i]!.games
+			: (1 + healthEffect(healthLevel)) * draw * injuries[i]!.games,
+	);
+	opts?.onNeutral?.(
+		helpers.bound(Math.round(draw * injuries[i]!.games), 0, Infinity),
 	);
 
 	return {

@@ -760,7 +760,19 @@ class GameSim extends GameSimBase {
 			(this.team[1] as any).region,
 			(this.team[0] as any).region,
 		);
-		const travel = travelEndurance(this.travelKm);
+		let travel = travelEndurance(this.travelKm);
+		// Front Office Budget: the visitors' Travel & Sports Science scales the travel penalty (undefined when off), measured for the season
+		// review
+		const foTravelScale: number | undefined = (this.team[1] as any)
+			.foTravelScale;
+		if (foTravelScale !== undefined && travel < 1) {
+			const neutral = travel;
+			travel = 1 - (1 - neutral) * foTravelScale;
+			const t1 = this.team[1] as any;
+			t1.foFatigue ??= { penalty: 0, saved: 0 };
+			t1.foFatigue.penalty += 100 * (1 - neutral);
+			t1.foFatigue.saved += 100 * (1 - neutral) * (1 - foTravelScale);
+		}
 		for (const p of this.team[1].player) {
 			if (p.compositeRating.endurance !== undefined) {
 				p.compositeRating.endurance *= travel;
@@ -2653,6 +2665,7 @@ class GameSim extends GameSimBase {
 						((p as any).injuryRiskFactor ?? 1) * // injuryDepth setting, see game/injuryDepthTeam.ts
 						(p.traitEffects?.injuryRateMultiplier ?? 1) * // player traits (durability)
 						((p as any).simInjuryFactor ?? 1) * // Game Sim Fixes: strength and endurance
+						((p as any).medicalInjuryFactor ?? 1) * // Front Office Budget: Medical
 						// Load, Fatigue & Venue: tired players, 3 games in 4 nights
 						(this.scheduleLoad
 							? ((p as any).loadInjuryFactor ?? 1) *

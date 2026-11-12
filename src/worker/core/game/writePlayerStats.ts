@@ -11,6 +11,11 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { randInt } from "../../../common/random.ts";
 import { processPlayerStats } from "../../util/processPlayerStats.ts";
 import {
+	frontOfficeEnabled,
+	getInjuryDurationFactor,
+	recordInjury,
+} from "../frontOffice/index.ts";
+import {
 	isInjuryDepthEnabled,
 	maybeSameBodyPart,
 } from "../player/injuryDepth.ts";
@@ -40,9 +45,34 @@ const doInjury = async (
 		tid: p2.tid,
 	});
 
-	p2.injury = player.injury(healthLevel);
+	// Front Office Budget: Medical's faster recovery for older players, and the duration at an average budget for the season review
+	let neutralGames: number | undefined;
+	if (frontOfficeEnabled() && p2.tid >= 0) {
+		p2.injury = player.injury(healthLevel, {
+			extraFactor: getInjuryDurationFactor(
+				healthLevel,
+				g.get("season") - p2.born.year,
+			),
+			onNeutral: (games) => {
+				neutralGames = games;
+			},
+		});
+	} else {
+		p2.injury = player.injury(healthLevel);
+	}
 	if (isInjuryDepthEnabled()) {
+		const before = p2.injury.gamesRemaining;
 		p2.injury = maybeSameBodyPart(p2, p2.injury);
+		// (the same body part keeps the roll, scaled: scale the average-budget duration the same way)
+		if (
+			neutralGames !== undefined &&
+			before > 0 &&
+			p2.injury.gamesRemaining !== before
+		) {
+			neutralGames = Math.round(
+				(neutralGames * p2.injury.gamesRemaining) / before,
+			);
+		}
 	}
 
 	// Is this a reinjury or not?
@@ -57,6 +87,16 @@ const doInjury = async (
 			p2.injury.gamesRemaining = p.injury.gamesRemaining + reaggravateExtraDays;
 			p2.injury.type = p.injury.type;
 		}
+	}
+
+	if (neutralGames !== undefined) {
+		await recordInjury({
+			tid: p2.tid,
+			// A reaggravated injury's length doesn't depend on the budget
+			games: reaggravateExtraDays === undefined ? p2.injury.gamesRemaining : 0,
+			neutralGames: reaggravateExtraDays === undefined ? neutralGames : 0,
+			healthLevel,
+		});
 	}
 
 	// So it gets written to box score... save the old injury (if playing through injury

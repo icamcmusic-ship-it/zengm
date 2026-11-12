@@ -152,7 +152,11 @@ import {
 	getStats as teamGetStats,
 	statTypes as teamStatTypes,
 } from "../views/teamGraphs.ts";
-import { DEFAULT_LEVEL } from "../../common/budgetLevels.ts";
+import { DEFAULT_LEVEL, MAX_LEVEL } from "../../common/budgetLevels.ts";
+import {
+	frontOfficeEnabled,
+	getNewDeptLevel,
+} from "../core/frontOffice/index.ts";
 import isUntradable from "../core/trade/isUntradable.ts";
 import getWinner from "../../common/getWinner.ts";
 import formatScoreWithShootout from "../../common/formatScoreWithShootout.ts";
@@ -4631,6 +4635,7 @@ const updateBudget = async ({
 	budgetLevels,
 	adjustForInflation,
 	autoTicketPrice,
+	frontOffice,
 }: {
 	budgetLevels: {
 		coaching: number;
@@ -4641,6 +4646,8 @@ const updateBudget = async ({
 	};
 	adjustForInflation: boolean;
 	autoTicketPrice: boolean;
+	// Front Office Budget: the Analytics and Travel & Sports Science levels
+	frontOffice?: { analytics: number; travel: number };
 }) => {
 	const userTid = g.get("userTid");
 
@@ -4659,6 +4666,20 @@ const updateBudget = async ({
 		if (!Number.isNaN(budgetLevels[key])) {
 			t.budget[key] = budgetLevels[key];
 		}
+	}
+
+	if (frontOffice && frontOfficeEnabled()) {
+		const current = {
+			analytics: getNewDeptLevel(t, "analytics"),
+			travel: getNewDeptLevel(t, "travel"),
+		};
+		for (const key of helpers.keys(current)) {
+			const level = frontOffice[key];
+			if (!Number.isNaN(level)) {
+				current[key] = helpers.bound(Math.round(level), 1, MAX_LEVEL);
+			}
+		}
+		t.frontOffice = current;
 	}
 
 	if (autoTicketPrice && t.autoTicketPrice === false) {

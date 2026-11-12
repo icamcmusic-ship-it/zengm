@@ -910,6 +910,17 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "frontOffice",
+		college: false,
+		key: "featureFrontOffice",
+		name: "Front Office Budget",
+		description:
+			"Six front office departments on Team Finances (Scouting, Analytics, Medical, Travel & Sports Science, Coaching, Facilities) funded from an owner-set envelope that grows with market size: more in one means less elsewhere, and spending over the envelope costs owner mood. Analytics narrows your projection ranges in trades and free agency, sharpens the head coach's game management (with Coaching Systems) and makes AI GMs who spend on it lean analytics; Medical lowers injury rates and speeds older players' recovery on top of the health budget's shorter injuries; Travel & Sports Science softens travel, back-to-back and 3-in-4 fatigue (with Load, Fatigue & Venue or Injury Depth). Bounded, with diminishing returns, neutral at average spending. AI teams allocate by GM leanings and market size. A season review shows what your spending bought.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "frivolities",
 		key: "featureFrivolities",
 		name: "Extra Frivolities",

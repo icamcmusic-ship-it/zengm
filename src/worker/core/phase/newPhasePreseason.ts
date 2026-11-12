@@ -1,3 +1,4 @@
+import { allocateAi, frontOfficeEnabled } from "../frontOffice/index.ts";
 import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 import {
 	PLAYER,
@@ -323,15 +324,21 @@ const newPhasePreseason = async (
 		) {
 			await team.resetTicketPrice(t, popRank);
 
-			// Sometimes update budget items for AI teams
-			for (const key of [
-				"scouting",
-				"coaching",
-				"health",
-				"facilities",
-			] as const) {
-				if (Math.random() < 0.5) {
-					t.budget[key] = finances.defaultBudgetLevel(popRank);
+			if (frontOfficeEnabled()) {
+				// Front Office Budget: split the owner's spending (market size, with the usual randomness) over the departments by the
+				// GM's leanings
+				allocateAi(t, finances.defaultBudgetLevel(popRank));
+			} else {
+				// Sometimes update budget items for AI teams
+				for (const key of [
+					"scouting",
+					"coaching",
+					"health",
+					"facilities",
+				] as const) {
+					if (Math.random() < 0.5) {
+						t.budget[key] = finances.defaultBudgetLevel(popRank);
+					}
 				}
 			}
 

@@ -23,6 +23,7 @@ import { featureOn } from "../../util/nativeFeatures.ts";
 import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
 import { team } from "../index.ts";
+import { gmAnalyticsShift } from "../frontOffice/index.ts";
 import { getSeasonOdds } from "../seasonOdds/index.ts";
 import { winProb } from "../seasonOdds/simSeason.ts";
 
@@ -36,7 +37,25 @@ export const userControlsTeam = (tid: number) =>
 
 // Keyed by the traits object, which is never edited in place
 const weightsCache = new WeakMap<Gm["traits"], GmWeights>();
-const weightsOf = (gm: Gm) => {
+// Front Office Budget: a GM whose team spends on analytics leans analytics (shift 0 when off), keyed by traits and shift
+const shiftedCache = new WeakMap<
+	Gm["traits"],
+	{ shift: number; w: GmWeights }
+>();
+const weightsOf = (gm: Gm, t?: Team) => {
+	const shift = t ? gmAnalyticsShift(t) : 0;
+	if (shift !== 0) {
+		const cached = shiftedCache.get(gm.traits);
+		if (cached && cached.shift === shift) {
+			return cached.w;
+		}
+		const w = gmWeightsFromTraits({
+			...gm.traits,
+			analytics: Math.max(-1, Math.min(1, gm.traits.analytics + shift)),
+		});
+		shiftedCache.set(gm.traits, { shift, w });
+		return w;
+	}
 	let w = weightsCache.get(gm.traits);
 	if (!w) {
 		w = gmWeightsFromTraits(gm.traits);
@@ -53,7 +72,7 @@ export const getGmWeights = async (
 		return;
 	}
 	const t = await idb.cache.teams.get(tid);
-	return t?.gm ? weightsOf(t.gm) : undefined;
+	return t?.gm ? weightsOf(t.gm, t) : undefined;
 };
 
 // All AI teams' weights at once, for loops over teams
@@ -64,7 +83,7 @@ export const getAllGmWeights = async (): Promise<Map<number, GmWeights>> => {
 	}
 	for (const t of await idb.cache.teams.getAll()) {
 		if (t.gm && !t.disabled && !userControlsTeam(t.tid)) {
-			map.set(t.tid, weightsOf(t.gm));
+			map.set(t.tid, weightsOf(t.gm, t));
 		}
 	}
 	return map;

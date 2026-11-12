@@ -110,6 +110,7 @@ const signedFreeAgentWrapped = (
 
 const FreeAgents = ({
 	capExceptions,
+	analytics,
 	capSpace,
 	market,
 	signingAdvice,
@@ -187,6 +188,16 @@ const FreeAgents = ({
 		"Age",
 		"Ovr",
 		"Pot",
+		...(analytics
+			? [
+					{
+						title: "Proj",
+						desc: "Analytics projection: your analytics department's 80% range for his ovr next season (narrower with a bigger Analytics budget, Team Finances)",
+						sortSequence: ["desc", "asc"] as const,
+						sortType: "number" as const,
+					},
+				]
+			: []),
 		...stats.map((stat) => `stat:${stat}`),
 		"Mood",
 		{
@@ -305,6 +316,17 @@ const FreeAgents = ({
 				p.age,
 				!challengeNoRatings ? p.ratings.ovr : null,
 				!challengeNoRatings ? p.ratings.pot : null,
+				...(analytics
+					? [
+							analytics[p.pid]
+								? {
+										value: `${analytics[p.pid]!.lo}–${analytics[p.pid]!.hi}`,
+										sortValue:
+											(analytics[p.pid]!.lo + analytics[p.pid]!.hi) / 2,
+									}
+								: null,
+						]
+					: []),
 				...stats.map((stat) => helpers.roundStat(p.stats[stat], stat)),
 				p.freeAgentType === "available"
 					? wrappedMood({

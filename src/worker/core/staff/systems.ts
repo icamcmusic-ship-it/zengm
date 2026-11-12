@@ -5,6 +5,14 @@
 //
 // With the setting off nothing here runs (every entry point returns early), so the sim and the coaching market draw exactly the random numbers
 // they did before.
+import {
+	analyticsMgmtBoost,
+	analyticsRotationBias,
+} from "../../../common/frontOffice.ts";
+import {
+	frontOfficeEnabled,
+	getNewDeptLevelLastThree,
+} from "../frontOffice/index.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { COACH_FREE_AGENT, coachOvr } from "../../../common/staff.ts";
 import {
@@ -252,6 +260,8 @@ export type TeamCoachSystem = {
 	cid: number;
 	// his style's rotation dial (-1 tight ... 1 deep)
 	rotation: number;
+	// Front Office Budget: the analytics department's level (3-season average), undefined when off
+	analyticsLevel?: number;
 };
 
 let leagueCache:
@@ -282,6 +292,9 @@ export const getLeagueCoachSystems = async (day?: number) => {
 		const install = await installProgress(head, profile);
 		const offFit = fit.off[profile.off];
 		const defFit = fit.def[profile.def];
+		const analyticsLevel = frontOfficeEnabled()
+			? await getNewDeptLevelLastThree("analytics", { tid: t.tid, t })
+			: undefined;
 		rows.push({
 			tid: t.tid,
 			cid: head.cid,
@@ -290,8 +303,21 @@ export const getLeagueCoachSystems = async (day?: number) => {
 			install,
 			offFit,
 			defFit,
+			analyticsLevel,
 			sim: coachSimEffects({
-				profile,
+				// Front Office Budget: an analytics department sharpens the head coach's game management (the league is centered again
+				// in normalizeCoachSims). Unchanged when off
+				profile:
+					analyticsLevel !== undefined
+						? {
+								...profile,
+								mgmt: clamp(
+									profile.mgmt + analyticsMgmtBoost(analyticsLevel),
+									0,
+									100,
+								),
+							}
+						: profile,
 				head: head.ratings,
 				offCoord: coaches.find((c) => c.role === "off")?.ratings,
 				defCoord: coaches.find((c) => c.role === "def")?.ratings,
@@ -389,12 +415,17 @@ export const applyCoachSystems = async (
 					t.backToBackCut = 2 * (1 + 0.75 * profile.rest);
 				}
 				if (profile.youth !== 0) {
+					// Front Office Budget: analytics tempers the coach's age bias in the minutes plan (a weak department amplifies it)
+					const youth =
+						row.analyticsLevel !== undefined
+							? profile.youth * analyticsRotationBias(row.analyticsLevel)
+							: profile.youth;
 					for (const p of t.player) {
 						const age = p.age;
 						if (age <= 23) {
-							p.coachMinutesMult = 1 + 0.12 * profile.youth;
+							p.coachMinutesMult = 1 + 0.12 * youth;
 						} else if (age >= 31) {
-							p.coachMinutesMult = 1 - 0.08 * profile.youth;
+							p.coachMinutesMult = 1 - 0.08 * youth;
 						}
 					}
 				}
