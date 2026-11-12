@@ -316,6 +316,15 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "collegeNit",
+		key: "collegeNit",
+		name: "College NIT",
+		description:
+			"College leagues only: the NIT, a second postseason tournament for the best teams not selected for the national tournament (32 teams next to a 64-team national tournament, 16 next to a 32-team one, none when the league is too small). Regular season conference champions who lost their conference tournament get automatic bids. It is played alongside the national tournament and its champion is recorded in history. On by default for new college leagues.",
+		default: false,
+		sports: BBGM,
+	},
+	{
 		id: "realisticPossessions",
 		key: "realisticPossessions",
 		name: "Realistic Possession Model",

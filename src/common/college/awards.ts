@@ -78,7 +78,8 @@ export const COLLEGE_AWARDS: AwardSettings = [
 // A college league made before the college awards (v1) still has the pro awards: use the college ones
 export const getCollegeAwardSettings = (awards: AwardSettings) =>
 	awards.some(
-		(award) => award.shortName === "MVP" && award.name === "Most Valuable Player",
+		(award) =>
+			award.shortName === "MVP" && award.name === "Most Valuable Player",
 	)
 		? COLLEGE_AWARDS
 		: awards;

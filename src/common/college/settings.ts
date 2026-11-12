@@ -67,6 +67,9 @@ export const getCollegeSettings = (level: CollegeLevel) => {
 		collegeAutoRecruit: true,
 		// The quick sim for games without the user's team: on for the big levels (hundreds of teams)
 		collegeQuickSim: level !== "power",
+		// A 68-team field with the First Four (only the 64-team bracket has one) and the NIT
+		collegeFirstFour: true,
+		collegeNit: true,
 
 		awards: COLLEGE_AWARDS,
 

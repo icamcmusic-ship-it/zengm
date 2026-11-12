@@ -4,6 +4,7 @@ import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import type {
+	CollegeFirstFourGame,
 	CollegeNetRow,
 	CollegeSelection,
 } from "../../common/college/types.ts";
@@ -73,11 +74,13 @@ export default defineView({
 		const season = inputs.season;
 		let polls: NcaaPoll[] = [];
 		let selection: CollegeSelection | undefined;
+		let firstFour: CollegeFirstFourGame[] | undefined;
 		let net: CollegeNetRow[] = [];
 		const state = college.getCollegeState();
 		if (state && state.season === season) {
 			polls = state.polls;
 			selection = state.selection;
+			firstFour = state.firstFour;
 			const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 			net =
 				selection?.net ??
@@ -91,6 +94,7 @@ export default defineView({
 			const archive = await college.getCollegeArchive(season);
 			polls = archive?.polls ?? [];
 			selection = archive?.selection;
+			firstFour = archive?.firstFour;
 			net = selection?.net ?? [];
 		}
 
@@ -104,6 +108,7 @@ export default defineView({
 			seasons,
 			polls,
 			selection,
+			firstFour,
 			net: net.slice(0, 100),
 			teams: await getCollegeTeamNames(season),
 			userTid: g.get("userTid"),

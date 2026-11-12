@@ -2,7 +2,7 @@
 import { useState } from "react";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
-import { SeasonSelect, TeamName } from "./College/common.tsx";
+import { FirstFour, SeasonSelect, TeamName } from "./College/common.tsx";
 import { COLLEGE_REGION_NAMES } from "../../common/college/constants.ts";
 
 const Change = ({ rank, prev }: { rank: number; prev: number | undefined }) => {
@@ -27,6 +27,7 @@ const CollegePolls = ({
 	season,
 	seasons,
 	selection,
+	firstFour,
 	teams,
 	userTid,
 }: View<"collegePolls">) => {
@@ -194,6 +195,14 @@ const CollegePolls = ({
 			{tab === "selection" ? (
 				selection ? (
 					<>
+						{firstFour && firstFour.length > 0 ? (
+							<FirstFour
+								games={firstFour}
+								teams={teams}
+								season={season}
+								userTid={userTid}
+							/>
+						) : null}
 						<div className="row">
 							{COLLEGE_REGION_NAMES.slice(
 								0,
@@ -217,6 +226,14 @@ const CollegePolls = ({
 																userTid={userTid}
 																record
 															/>
+															{t.firstFour !== undefined ? (
+																<span
+																	className="badge bg-warning text-dark ms-1"
+																	title="First Four: plays in for this seed"
+																>
+																	FF
+																</span>
+															) : null}
 															{t.bid === "auto" ? (
 																<span
 																	className="badge bg-secondary ms-1"

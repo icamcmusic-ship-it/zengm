@@ -290,6 +290,29 @@ const History = (props: View<"history">) => {
 						<div className="col-sm-12 col-6">
 							{college ? (
 								<>
+									{college.nitChampion ? (
+										<>
+											<h2>NIT Champion</h2>
+											<div
+												className={`mb-3${college.nitChampion.tid === userTid ? " table-info" : ""}`}
+											>
+												<a
+													href={helpers.leagueUrl([
+														"roster",
+														`${college.nitChampion.abbrev}_${college.nitChampion.tid}`,
+														season,
+													])}
+												>
+													{college.nitChampion.region}
+												</a>{" "}
+												(
+												<a href={helpers.leagueUrl(["college_nit", season])}>
+													bracket
+												</a>
+												)
+											</div>
+										</>
+									) : null}
 									<h2>Coach of the Year</h2>
 									<div className="mb-3">
 										{college.coachOfYear ? (

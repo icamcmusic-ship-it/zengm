@@ -19,6 +19,8 @@ import { getSeasonState, validateSeason } from "../util/processInputs.ts";
 import { isCurrentSeasonComplete } from "../../common/seasons.ts";
 import { player, team } from "../core/index.ts";
 import { isCollege } from "../core/college/isCollege.ts";
+import { getCollegeState } from "../core/college/state.ts";
+import { getCollegeArchive } from "../core/college/archive.ts";
 import { COACH_OF_THE_YEAR } from "../core/staff/index.ts";
 import { getCoachAwards } from "../core/staff/data.ts";
 
@@ -297,6 +299,7 @@ export default defineView({
 							abbrev: string;
 							region: string;
 						};
+						nitChampion?: { tid: number; abbrev: string; region: string };
 				  }
 				| undefined;
 			if (isCollege()) {
@@ -304,7 +307,24 @@ export default defineView({
 					(a) => a.season === season,
 				);
 				const info = coy ? g.get("teamInfoCache")[coy.tid] : undefined;
+				const state = getCollegeState();
+				const nit =
+					state && state.season === season
+						? state.nit
+						: (await getCollegeArchive(season))?.nit;
+				const nitInfo =
+					nit?.champion !== undefined
+						? g.get("teamInfoCache")[nit.champion]
+						: undefined;
 				college = {
+					nitChampion:
+						nit?.champion !== undefined
+							? {
+									tid: nit.champion,
+									abbrev: nitInfo?.abbrev ?? "",
+									region: nitInfo?.region ?? "",
+								}
+							: undefined,
 					coachOfYear: coy
 						? {
 								cid: coy.cid,

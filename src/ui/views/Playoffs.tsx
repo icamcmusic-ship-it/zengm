@@ -1,4 +1,5 @@
 import { ResponsiveTableWrapper } from "../components/ResponsiveTableWrapper.tsx";
+import { FirstFour } from "./College/common.tsx";
 import { OpponentScouting } from "../components/ScoutingReport/index.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
@@ -15,6 +16,7 @@ type TeamToEdit = View<"playoffs">["teamsToEdit"][number];
 
 const Playoffs = ({
 	canEdit,
+	collegeFirstFour,
 	collegeRegions,
 	confNames,
 	finalMatchups,
@@ -194,6 +196,14 @@ const Playoffs = ({
 				</div>
 			) : null}
 
+			{collegeFirstFour ? (
+				<FirstFour
+					games={collegeFirstFour.games}
+					teams={collegeFirstFour.teams}
+					season={season}
+					userTid={collegeFirstFour.userTid}
+				/>
+			) : null}
 			{collegeRegions ? (
 				<h2 className="d-none d-sm-block mb-2">
 					{collegeRegions[0]}{" "}

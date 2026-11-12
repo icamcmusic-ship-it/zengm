@@ -83,6 +83,7 @@ export const descriptions = {
 const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	newspaper: "League extras: History & Stories",
 	collegeQuickSim: "League extras: Game Simulation",
+	collegeNit: "League extras: Game Simulation",
 	wrapped: "League extras: History & Stories",
 	storylines: "League extras: History & Stories",
 	hype: "League extras: History & Stories",

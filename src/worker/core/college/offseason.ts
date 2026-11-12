@@ -7,10 +7,12 @@ import {
 	classYearAbbrev,
 } from "../../../common/college/constants.ts";
 import type {
+	CollegeClassRanking,
 	CollegeCommit,
 	CollegeDeparture,
 	CollegeProDraftPick,
 	PlayerCollegeExit,
+	PlayerPortal,
 	PlayerRecruit,
 } from "../../../common/college/types.ts";
 import { getCollegeTournamentSize } from "../../../common/college/teams.ts";
@@ -26,6 +28,7 @@ import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { player, team } from "../index.ts";
 import { addContract, createContract } from "../contract/index.ts";
 import { updateCollegeArchive } from "./archive.ts";
+import { signCommitted } from "./recruiting.ts";
 import { getExpectations } from "./expectations.ts";
 import {
 	genCollegePlayer,
@@ -35,16 +38,24 @@ import {
 	starsFromQuantile,
 } from "./players.ts";
 
-type CollegePlayer = Player & {
+export type CollegePlayer = Player & {
 	classYear?: number;
 	recruit?: PlayerRecruit;
 	collegeExit?: PlayerCollegeExit;
+	portal?: PlayerPortal;
+	// Number of times he transferred (one transfer without sitting out; a player who transferred once does not enter the portal again)
+	transfers?: number;
+	redshirt?: number;
 };
 
-const playerLink = (p: { pid: number; firstName: string; lastName: string }) =>
+export const playerLink = (p: {
+	pid: number;
+	firstName: string;
+	lastName: string;
+}) =>
 	`<a href="${helpers.leagueUrl(["player", p.pid])}">${p.firstName} ${p.lastName}</a>`;
 
-const teamLink = (tid: number) => {
+export const teamLink = (tid: number) => {
 	const info = g.get("teamInfoCache")[tid];
 	return `<a href="${helpers.leagueUrl([
 		"roster",
@@ -52,13 +63,13 @@ const teamLink = (tid: number) => {
 	])}">${info?.region}</a>`;
 };
 
-const getClassYear = (p: CollegePlayer) =>
+export const getClassYear = (p: CollegePlayer) =>
 	p.classYear ?? helpers.bound(g.get("season") - p.draft.year, 1, 4);
 
-const getActiveTeams = async () =>
+export const getActiveTeams = async () =>
 	(await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 
-const getRosters = async () => {
+export const getRosters = async () => {
 	const players = (await idb.cache.players.indexGetAll("playersByTid", [
 		0,
 		Infinity,
@@ -67,11 +78,11 @@ const getRosters = async () => {
 };
 
 // G / F / C
-const posGroup = (pos: string) =>
+export const posGroup = (pos: string) =>
 	pos === "C" || pos === "FC" ? 2 : pos.includes("F") ? 1 : 0;
-const IDEAL_BY_GROUP = [5, 5, 3];
+export const IDEAL_BY_GROUP = [5, 5, 3];
 
-const groupCounts = (roster: CollegePlayer[]) => {
+export const groupCounts = (roster: CollegePlayer[]) => {
 	const counts = [0, 0, 0];
 	for (const p of roster) {
 		counts[posGroup(last(p.ratings).pos)]! += 1;
@@ -91,7 +102,7 @@ const proStock = (p: CollegePlayer) => {
 export const getNumProDraftPicks = (numTeams: number) =>
 	helpers.bound(Math.round(numTeams / 2), 4, 60);
 
-const leaveSchool = async (
+export const leaveSchool = async (
 	p: CollegePlayer,
 	exit: PlayerCollegeExit,
 	text: string,
@@ -225,7 +236,7 @@ export const doDepartures = async (conditions: Conditions) => {
 
 // ---- Transfer portal ----
 
-const seasonMinutes = (p: CollegePlayer, season: number) => {
+export const seasonMinutes = (p: CollegePlayer, season: number) => {
 	let min = 0;
 	let gp = 0;
 	for (const row of p.stats) {
@@ -471,7 +482,7 @@ export const addRecruitingClass = async () => {
 	}
 };
 
-const getRecruits = async () =>
+export const getRecruits = async () =>
 	(
 		(await idb.cache.players.indexGetAll(
 			"playersByTid",
@@ -482,14 +493,14 @@ const getRecruits = async () =>
 		.sort((a, b) => a.recruit!.rank - b.recruit!.rank);
 
 // What a school's interest is worth to a recruit, before luck: prestige and how much it needs his position
-const schoolScore = (pres: number, counts: number[], pos: string) => {
+export const schoolScore = (pres: number, counts: number[], pos: string) => {
 	const group = posGroup(pos);
 	const need = IDEAL_BY_GROUP[group]! - counts[group]!;
 	return pres + 2.5 * helpers.bound(need, -2, 3);
 };
 
 // Interest bonus for the user's targets: the staff's attention. The first targets get more of it
-const targetBonus = (priority: number, openings: number) => {
+export const targetBonus = (priority: number, openings: number) => {
 	if (priority > Math.max(3, openings * 3)) {
 		return 0;
 	}
@@ -584,7 +595,7 @@ export const autoSetTargets = async () => {
 	}
 };
 
-const enroll = async (p: CollegePlayer, tid: number) => {
+export const enroll = async (p: CollegePlayer, tid: number) => {
 	p.tid = tid;
 	p.classYear = 0;
 	p.draft.tid = -1;
@@ -641,6 +652,12 @@ export const doSigningDay = async (conditions: Conditions) => {
 	);
 	const userOpenings = info.get(userTid)?.openings ?? 0;
 
+	// Recruiting v2: verbal commitments and offers first
+	const openingsLeft = new Map(
+		[...info.entries()].map(([tid, row]) => [tid, row.openings]),
+	);
+	const v2Signed = await signCommitted(openingsLeft);
+
 	const commits: CollegeCommit[] = [];
 	const userCommits: CollegeCommit[] = [];
 	const signed = new Set<number>();
@@ -683,6 +700,13 @@ export const doSigningDay = async (conditions: Conditions) => {
 		}
 		await idb.cache.players.put(p);
 	};
+
+	for (const p of recruits) {
+		const tid = v2Signed.get(p.pid);
+		if (tid !== undefined) {
+			await sign(p, tid);
+		}
+	}
 
 	// Two passes: first the user's school only gets its targets (unless auto mode already picked them), then whoever is left looks at
 	// every school with a spot
@@ -779,8 +803,39 @@ export const doSigningDay = async (conditions: Conditions) => {
 		commits: commits.filter(
 			(c) => c.stars >= 4 || c.tid === userTid || c.rank <= 150,
 		),
+		classRankings: getClassRankings(commits),
 	});
 	return season;
+};
+
+const STAR_POINTS = [0, 0, 10, 30, 60, 100];
+
+/**
+ * Recruiting class rankings: points for every recruit by stars, a little more for the best ranked ones.
+ */
+export const getClassRankings = (
+	commits: CollegeCommit[],
+): CollegeClassRanking[] => {
+	const byTid = new Map<number, CollegeClassRanking>();
+	for (const c of commits) {
+		let row = byTid.get(c.tid);
+		if (!row) {
+			row = { tid: c.tid, rank: 0, points: 0, count: 0, stars: [0, 0, 0] };
+			byTid.set(c.tid, row);
+		}
+		row.points += STAR_POINTS[c.stars] ?? 0;
+		row.points += Math.max(0, 20 - c.rank / 25);
+		row.count += 1;
+		if (c.stars >= 3) {
+			row.stars[5 - c.stars]! += 1;
+		}
+	}
+	const rows = [...byTid.values()].sort((a, b) => b.points - a.points);
+	for (const [i, row] of rows.entries()) {
+		row.rank = i + 1;
+		row.points = Math.round(row.points);
+	}
+	return rows;
 };
 
 // ---- Preseason ----

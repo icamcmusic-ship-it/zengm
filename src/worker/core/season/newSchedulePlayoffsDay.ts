@@ -5,6 +5,8 @@ import type { PlayoffSeriesTeam } from "../../../common/types.ts";
 import { season, team } from "../index.ts";
 import { chunk, groupByUnique } from "../../../common/utils.ts";
 import { orderTeams } from "../../util/orderTeams.ts";
+import { isCollege } from "../college/isCollege.ts";
+import { getNitGames } from "../college/postseason.ts";
 
 // Play 2 home (true) then 2 away (false) and repeat, but ensure that the better team always gets the last game.
 const betterSeedHome = (numGamesPlayoffSeries: number, gameNum: number) => {
@@ -180,6 +182,11 @@ const newSchedulePlayoffsDay = async (): Promise<boolean> => {
 			if (!allStar?.score) {
 				tids.unshift([-1, -2]);
 			}
+		}
+
+		// College mode: the NIT's games of this round are played on the same day
+		if (isCollege()) {
+			tids.push(...getNitGames(rnd));
 		}
 
 		await setSchedule(tids);

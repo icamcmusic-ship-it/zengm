@@ -1,4 +1,7 @@
 import { isCollege } from "../core/college/isCollege.ts";
+import { getCollegeState } from "../core/college/state.ts";
+import { getCollegeArchive } from "../core/college/archive.ts";
+import { getCollegeTeamNames } from "./collegePolls.ts";
 import { COLLEGE_REGION_NAMES } from "../../common/college/constants.ts";
 import { season, team } from "../core/index.ts";
 import { InvalidPlayoffSettingsError } from "../core/season/genPlayoffSeries.ts";
@@ -31,6 +34,11 @@ export default defineView({
 		| {
 				canEdit: boolean;
 				collegeRegions?: string[];
+				collegeFirstFour?: {
+					games: import("../../common/college/types.ts").CollegeFirstFourGame[];
+					teams: Awaited<ReturnType<typeof getCollegeTeamNames>>;
+					userTid: number;
+				};
 				confNames: string[];
 				finalMatchups: boolean;
 				matchups: {
@@ -223,9 +231,25 @@ export default defineView({
 				isCollege() && series.length >= 3
 					? COLLEGE_REGION_NAMES.slice(0, 4)
 					: undefined;
+			let collegeFirstFour;
+			if (isCollege()) {
+				const state = getCollegeState();
+				const games =
+					state && state.season === inputs.season
+						? state.firstFour
+						: (await getCollegeArchive(inputs.season))?.firstFour;
+				if (games && games.length > 0) {
+					collegeFirstFour = {
+						games,
+						teams: await getCollegeTeamNames(inputs.season),
+						userTid: g.get("userTid"),
+					};
+				}
+			}
 
 			return {
 				canEdit,
+				collegeFirstFour,
 				collegeRegions,
 				confNames,
 				finalMatchups,

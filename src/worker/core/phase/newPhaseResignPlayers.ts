@@ -32,7 +32,7 @@ const newPhaseResignPlayers = async (
 ): Promise<PhaseReturn> => {
 	// College mode: this phase is the recruiting period before signing day
 	if (college.isCollege()) {
-		return college.newPhaseRecruiting();
+		return college.newPhaseRecruiting(conditions);
 	}
 
 	// In case some weird situation results in games still in the schedule, clear them

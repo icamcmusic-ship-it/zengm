@@ -984,6 +984,11 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	collegeLevel: "power" | "major" | "full" | undefined;
 	collegeAutoRecruit: boolean;
 	collegeState: import("./college/types.ts").CollegeState | undefined;
+	// 68-team national tournament with the First Four (new college leagues; off for leagues made before it)
+	collegeFirstFour: boolean;
+	collegeRecruiting:
+		| import("./college/types.ts").CollegeRecruitingState
+		| undefined;
 	scoutingSystem: boolean;
 	rerandomizeDraftClassRatings: boolean;
 	// Saved from the Regenerate ratings modal ("save as league default"), used by rerandomizeDraftClassRatings

@@ -771,6 +771,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	collegeLevel: undefined,
 	collegeAutoRecruit: true,
 	collegeState: undefined,
+	collegeFirstFour: false,
+	collegeRecruiting: undefined,
 	scoutingSystem: false,
 	rerandomizeDraftClassRatings: false,
 	draftClassRegenSettings: undefined,

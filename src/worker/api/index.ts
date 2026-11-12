@@ -267,7 +267,9 @@ import {
 	syncExpandedToCompat,
 } from "../core/player/expandedRatings.ts";
 import {
+	collegeAdvanceRecruitingWeek,
 	collegeAutoTargets,
+	collegeRecruitAction,
 	collegeSetAutoRecruit,
 	collegeSetRedshirt,
 	collegeSetTarget,
@@ -6249,6 +6251,8 @@ const api = {
 		collegeAutoTargets,
 		collegeSetAutoRecruit,
 		collegeSetRedshirt,
+		collegeRecruitAction,
+		collegeAdvanceRecruitingWeek,
 		collegeSetTarget,
 		createLeague: whileWorkerBusy(createLeague),
 		createTrade,

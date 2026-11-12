@@ -381,6 +381,16 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
+				active: (pageID) => pageID === "collegeNit",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				feature: "collegeNit",
+				path: ["college_nit"],
+				text: "NIT",
+			},
+			{
+				type: "link",
 				active: (pageID) => pageID === "dailySchedule",
 				league: true,
 				commandPalette: true,
@@ -573,6 +583,15 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				leagueType: "college",
 				path: ["college_recruiting"],
 				text: "Recruiting",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegePortal",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_portal"],
+				text: "Transfer Portal",
 			},
 			{
 				type: "link",
