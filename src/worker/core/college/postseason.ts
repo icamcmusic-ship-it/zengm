@@ -313,7 +313,7 @@ export const scheduleConfTournamentDay = async (state: CollegeState) => {
 	if (games.length === 0) {
 		// The conference tournaments are over: with a 68-team field, Selection now and the First Four next
 		const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
-		if (!state.firstFour && useFirstFour(teams.length)) {
+		if (!state.firstFour && firstFourOn(teams.length)) {
 			makePolls(state, REGULAR_WEEKS);
 			state.selection = makeSelection(
 				state,
@@ -483,7 +483,7 @@ export const makeSelection = (
 export const FIRST_FOUR_GAMES = 4;
 
 // Only a 64-team bracket has a First Four
-export const useFirstFour = (numTeams: number) =>
+export const firstFourOn = (numTeams: number) =>
 	!!g.get("collegeFirstFour") &&
 	getCollegeTournamentSize(numTeams) === 64 &&
 	g.get("numGamesPlayoffSeries", "current").length === 6;
@@ -667,7 +667,7 @@ export const genNationalTournament = async (conditions: Conditions) => {
 
 // ---- NIT ----
 
-export const useNit = () =>
+export const nitOn = () =>
 	nativeFeatureEnabled("collegeNit", (key) => g.get(key as any));
 
 // Size of the NIT next to a national tournament of this size: half of it, as long as there are enough teams left
@@ -685,7 +685,7 @@ export const makeNit = (
 	teams: { tid: number }[],
 	selection: CollegeSelection,
 ): CollegeNit | undefined => {
-	if (!useNit()) {
+	if (!nitOn()) {
 		return undefined;
 	}
 	const nationalSize = 2 ** g.get("numGamesPlayoffSeries", "current").length;

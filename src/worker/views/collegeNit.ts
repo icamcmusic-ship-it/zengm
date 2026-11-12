@@ -46,7 +46,7 @@ export default defineView({
 			season,
 			seasons,
 			nit,
-			enabled: college.useNit(),
+			enabled: college.nitOn(),
 			teams: await getCollegeTeamNames(season),
 			userTid: g.get("userTid"),
 		};

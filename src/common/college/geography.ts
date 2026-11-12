@@ -292,9 +292,9 @@ const SCHOOL_STATE: Record<string, string> = {
 	"Alcorn State": "Mississippi",
 };
 
-const escape = (s: string) => s.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// State names are letters and spaces only
 const STATE_REGEXES = STATE_NAMES.map(
-	(state) => [state, new RegExp(`\\b${escape(state)}\\b`)] as const,
+	(state) => [state, new RegExp(String.raw`\b${state}\b`)] as const,
 );
 
 /**

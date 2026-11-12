@@ -55,7 +55,7 @@ export {
 	genNationalTournament,
 	getNetRows,
 	getNitGames,
-	useNit,
+	nitOn,
 } from "./postseason.ts";
 export {
 	addRecruitingClass,

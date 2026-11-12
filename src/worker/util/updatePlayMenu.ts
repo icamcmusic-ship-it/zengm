@@ -121,6 +121,10 @@ const updatePlayMenu = async () => {
 			url: helpers.leagueUrl(["college_recruiting"]),
 			label: "Recruiting board",
 		},
+		collegePortal: {
+			url: helpers.leagueUrl(["college_portal"]),
+			label: "Transfer portal",
+		},
 		message: {
 			url: helpers.leagueUrl(["message"]),
 			label: "Read new message",
@@ -331,13 +335,12 @@ const updatePlayMenu = async () => {
 			collegeLabels.untilPlayoffs = "Until national tournament";
 		} else if (phase === PHASE.PLAYOFFS) {
 			collegeLabels.throughPlayoffs = "Through national tournament";
-		} else if (phase === PHASE.DRAFT_LOTTERY) {
+		} else if (phase === PHASE.DRAFT_LOTTERY || phase === PHASE.DRAFT) {
 			keys = ["untilResignPlayers"];
-			collegeLabels.untilResignPlayers =
-				"Until recruiting (departures and transfer portal)";
-		} else if (phase === PHASE.DRAFT || phase === PHASE.AFTER_DRAFT) {
-			keys = ["untilResignPlayers"];
-			collegeLabels.untilResignPlayers = "Until recruiting";
+			collegeLabels.untilResignPlayers = "Until transfer portal (departures)";
+		} else if (phase === PHASE.AFTER_DRAFT) {
+			keys = ["collegePortal", "untilResignPlayers"];
+			collegeLabels.untilResignPlayers = "Until recruiting (closes the portal)";
 		} else if (phase === PHASE.RESIGN_PLAYERS) {
 			keys = ["collegeRecruiting", "untilFreeAgency"];
 			collegeLabels.untilFreeAgency = "Until signing day";
