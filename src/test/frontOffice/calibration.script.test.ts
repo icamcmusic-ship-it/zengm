@@ -12,7 +12,11 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { test } from "vitest";
 import { PHASE } from "../../common/constants.ts";
-import { ALL_ON, createLeague, mulberry32 } from "../ratingInflation/harness.ts";
+import {
+	ALL_ON,
+	createLeague,
+	mulberry32,
+} from "../ratingInflation/harness.ts";
 import { idb } from "../../worker/db/index.ts";
 import { g, helpers, local } from "../../worker/util/index.ts";
 import { startAutoPlay } from "../../worker/core/league/autoPlay.ts";
@@ -105,10 +109,9 @@ test.skipIf(!process.env.RUN_FRONT_OFFICE_CALIBRATION)(
 										health: await finances.getLevelLastThree("health", {
 											tid: ts.tid,
 										}),
-										facilities: await finances.getLevelLastThree(
-											"facilities",
-											{ tid: ts.tid },
-										),
+										facilities: await finances.getLevelLastThree("facilities", {
+											tid: ts.tid,
+										}),
 										coaching: t?.budget.coaching,
 										analytics: await getNewDeptLevelLastThree("analytics", {
 											tid: ts.tid,
