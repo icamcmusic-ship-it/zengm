@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { toWorker } from "../../util/toWorker.ts";
 import { helpers } from "../../util/helpers.ts";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
+import { useIsCollege } from "../../util/collegeMode.ts";
 import {
 	GRADE_LETTERS,
 	gradeColor,
@@ -15,6 +16,13 @@ import {
 	type GradeRow,
 	type ScoutHover,
 } from "../../../common/scoutingReports/index.ts";
+
+// The setting is on and this is not a college league
+export const useScoutingOn = () => {
+	const on = useFeatureOn("scoutingReports");
+	const college = useIsCollege();
+	return on && !college;
+};
 
 const letterIndex = (letter: string) =>
 	Math.max(0, GRADE_LETTERS.indexOf(letter as (typeof GRADE_LETTERS)[number]));
@@ -57,7 +65,10 @@ export const GradeBadge = ({
 const GradeText = ({ text }: { text: string }) => {
 	const first = text.split(" to ")[0]!;
 	return (
-		<b style={{ color: gradeColor(letterIndex(first)) }} className="text-nowrap">
+		<b
+			style={{ color: gradeColor(letterIndex(first)) }}
+			className="text-nowrap"
+		>
 			{text}
 		</b>
 	);
@@ -154,12 +165,14 @@ export const GradeRadar = ({
 	const r = size / 2 - 30;
 	const point = (i: number, value: number) => {
 		const angle = (Math.PI * 2 * i) / keys.length - Math.PI / 2;
-		const d = (r * (0.08 + (0.92 * value) / MAX_GRADE));
+		const d = r * (0.08 + (0.92 * value) / MAX_GRADE);
 		return [c + d * Math.cos(angle), c + d * Math.sin(angle)] as const;
 	};
 	const poly = (list: GradeRow[]) =>
 		keys
-			.map((k, i) => point(i, list.find((g) => g.key === k)?.grade ?? 0).join(","))
+			.map((k, i) =>
+				point(i, list.find((g) => g.key === k)?.grade ?? 0).join(","),
+			)
 			.join(" ");
 	return (
 		<svg
@@ -269,7 +282,11 @@ export const ShotMixChart = ({
 	);
 };
 
-export const CompCards = ({ comps }: { comps: FullReport["header"]["comps"] }) => {
+export const CompCards = ({
+	comps,
+}: {
+	comps: FullReport["header"]["comps"];
+}) => {
 	if (comps.length === 0) {
 		return null;
 	}
@@ -325,14 +342,14 @@ const HoverBody = ({ hover }: { hover: ScoutHover }) => (
 
 // A small "scout" icon with the report's grades and bottom line on hover (click on touch screens)
 export const ScoutingHoverIcon = ({ pid }: { pid: number }) => {
-	const on = useFeatureOn("scoutingReports");
+	const on = useScoutingOn();
 	const [hover, setHover] = useState<ScoutHover | undefined | null>(null);
 	if (!on) {
 		return null;
 	}
 	const load = async () => {
 		if (hover === null) {
-			setHover(await toWorker("scouting", "getHover", pid));
+			setHover(await toWorker("scoutingReports", "getHover", pid));
 		}
 	};
 	return (
@@ -364,7 +381,10 @@ export const ScoutingHoverIcon = ({ pid }: { pid: number }) => {
 				onMouseEnter={load}
 				onFocus={load}
 			>
-				<span className="glyphicon glyphicon-search" style={{ fontSize: "0.8em" }} />
+				<span
+					className="glyphicon glyphicon-search"
+					style={{ fontSize: "0.8em" }}
+				/>
 			</button>
 		</OverlayTrigger>
 	);
@@ -372,7 +392,7 @@ export const ScoutingHoverIcon = ({ pid }: { pid: number }) => {
 
 // Blurbs for many players at once (trade window, free agents)
 export const useScoutingBlurbs = (pids: number[]) => {
-	const on = useFeatureOn("scoutingReports");
+	const on = useScoutingOn();
 	const key = pids.join(",");
 	const [blurbs, setBlurbs] = useState<Record<number, string>>({});
 	useEffect(() => {
@@ -383,7 +403,7 @@ export const useScoutingBlurbs = (pids: number[]) => {
 		}
 		(async () => {
 			const result = await toWorker(
-				"scouting",
+				"scoutingReports",
 				"getBlurbs",
 				key.split(",").map(Number),
 			);
@@ -435,7 +455,7 @@ export const ScoutingSummaryLine = ({ pid }: { pid: number }) => {
 	useEffect(() => {
 		let cancelled = false;
 		(async () => {
-			const result = await toWorker("scouting", "getSummary", pid);
+			const result = await toWorker("scoutingReports", "getSummary", pid);
 			if (!cancelled) {
 				setSummary(result);
 			}
@@ -461,11 +481,12 @@ export const ScoutingSummaryLine = ({ pid }: { pid: number }) => {
 
 type Opponent = Awaited<ReturnType<typeof getOpponentType>>;
 // Only for the type
-const getOpponentType = () => toWorker("scouting", "getOpponent", undefined);
+const getOpponentType = () =>
+	toWorker("scoutingReports", "getOpponent", undefined);
 
 // Playoffs: our staff's notes on the current opponent
 export const OpponentScouting = ({ season }: { season: number }) => {
-	const on = useFeatureOn("scoutingReports");
+	const on = useScoutingOn();
 	const [data, setData] = useState<Opponent | undefined>();
 	useEffect(() => {
 		let cancelled = false;
@@ -473,7 +494,7 @@ export const OpponentScouting = ({ season }: { season: number }) => {
 			return;
 		}
 		(async () => {
-			const result = await toWorker("scouting", "getOpponent", season);
+			const result = await toWorker("scoutingReports", "getOpponent", season);
 			if (!cancelled) {
 				setData(result);
 			}
@@ -486,11 +507,21 @@ export const OpponentScouting = ({ season }: { season: number }) => {
 		return null;
 	}
 	return (
-		<div className="card mb-3" style={{ maxWidth: 900 }} data-testid="opponent-scouting">
+		<div
+			className="card mb-3"
+			style={{ maxWidth: 900 }}
+			data-testid="opponent-scouting"
+		>
 			<div className="card-body">
 				<h3 className="card-title">
 					Scouting the{" "}
-					<a href={helpers.leagueUrl(["roster", `${data.opponent.abbrev}_${data.opponent.tid}`, season])}>
+					<a
+						href={helpers.leagueUrl([
+							"roster",
+							`${data.opponent.abbrev}_${data.opponent.tid}`,
+							season,
+						])}
+					>
 						{data.opponent.name}
 					</a>
 				</h3>
@@ -504,7 +535,10 @@ export const OpponentScouting = ({ season }: { season: number }) => {
 					{data.players.map((p) => (
 						<div key={p.pid} className="col-12 col-md-6">
 							<div className="border rounded p-2 h-100">
-								<a href={helpers.leagueUrl(["player_scouting", p.pid])} className="fw-bold">
+								<a
+									href={helpers.leagueUrl(["player_scouting", p.pid])}
+									className="fw-bold"
+								>
 									{p.name}
 								</a>{" "}
 								<span className="text-body-secondary">{p.pos}</span>

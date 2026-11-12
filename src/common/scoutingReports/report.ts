@@ -95,7 +95,11 @@ const BIAS_SHIFT: Record<ScoutBias, Partial<Record<GradeKey, number>>> = {
 };
 
 // How much noise a scout adds on top of what the department can see, in rating points
-export const scoutSigma = (scout: Pick<Scout, "quality">, kind: ScoutInput["kind"], match: number) =>
+export const scoutSigma = (
+	scout: Pick<Scout, "quality">,
+	kind: ScoutInput["kind"],
+	match: number,
+) =>
 	(1.2 + 5 * (1 - scout.quality)) *
 	(1 - 0.4 * match) *
 	(kind === "pro" ? 0.55 : kind === "retired" ? 0.3 : 1);
@@ -197,7 +201,9 @@ export const scoutTake = ({
 
 	// Range: what the department can't know (scouting uncertainty) plus this scout's own error, more without ratings
 	const noRatings = !input.ratings;
-	const u = Math.sqrt(input.uncertainty ** 2 + (0.8 * sigma) ** 2) + (noRatings ? 6 : 0);
+	const u =
+		Math.sqrt(input.uncertainty ** 2 + (0.8 * sigma) ** 2) +
+		(noRatings ? 6 : 0);
 	const half = 1.1 * u;
 	const grades = GRADE_KEYS.map((key) => {
 		const list = peers.scores[key];
@@ -207,8 +213,14 @@ export const scoutTake = ({
 		return {
 			key,
 			grade,
-			lo: Math.min(grade, gradeFromPercentile(percentileOf(list, scores[key] - h))),
-			hi: Math.max(grade, gradeFromPercentile(percentileOf(list, scores[key] + h))),
+			lo: Math.min(
+				grade,
+				gradeFromPercentile(percentileOf(list, scores[key] - h)),
+			),
+			hi: Math.max(
+				grade,
+				gradeFromPercentile(percentileOf(list, scores[key] + h)),
+			),
 			score: Math.round(scores[key]),
 		};
 	});
@@ -309,12 +321,18 @@ const traitObservation = (key: string, value: number, v: Voice) => {
 	const lo = value <= 35;
 	const map: Record<string, [string[], string[], string[]]> = {
 		workEthic: [
-			["First one in the gym, by every account", "Teammates rave about his routine"],
+			[
+				"First one in the gym, by every account",
+				"Teammates rave about his routine",
+			],
 			["Normal work habits", "Puts in the expected work"],
 			["Coaches question his work habits", "Has coasted at times"],
 		],
 		leadership: [
-			["A natural leader; teammates follow him", "Vocal and respected in the room"],
+			[
+				"A natural leader; teammates follow him",
+				"Vocal and respected in the room",
+			],
 			["Leads by example, quietly", "Not a vocal leader"],
 			["Not a leader yet", "Keeps to himself"],
 		],
@@ -324,7 +342,10 @@ const traitObservation = (key: string, value: number, v: Voice) => {
 			["Shrinks late in close games", "Tight in the clutch"],
 		],
 		ego: [
-			["Big ego; needs the ball and the spotlight", "Strong personality that can rub teammates wrong"],
+			[
+				"Big ego; needs the ball and the spotlight",
+				"Strong personality that can rub teammates wrong",
+			],
 			["Healthy confidence", "Confident without being a problem"],
 			["Low-maintenance, team-first", "No ego issues"],
 		],
@@ -396,22 +417,37 @@ const NEEDS_LINES: Record<GradeKey, string> = {
 const gradeOf = (grades: GradeRow[], key: GradeKey) =>
 	grades.find((g) => g.key === key)!.grade;
 
-const ROLE_SHAPES: { test: (g: (k: GradeKey) => number, group: PeerGroup) => boolean; text: string[] }[] = [
+const ROLE_SHAPES: {
+	test: (g: (k: GradeKey) => number, group: PeerGroup) => boolean;
+	text: string[];
+}[] = [
 	{
 		test: (g, grp) => grp !== "big" && g("pm") >= 9 && g("od") >= 7,
-		text: ["Primary ball handler running the pick-and-roll", "Lead creator with the ball in his hands"],
+		text: [
+			"Primary ball handler running the pick-and-roll",
+			"Lead creator with the ball in his hands",
+		],
 	},
 	{
 		test: (g) => g("cs") >= 8 && g("pd") >= 7,
-		text: ["3-and-D wing who spaces the floor and takes the toughest perimeter assignment", "Classic 3-and-D role"],
+		text: [
+			"3-and-D wing who spaces the floor and takes the toughest perimeter assignment",
+			"Classic 3-and-D role",
+		],
 	},
 	{
 		test: (g, grp) => grp === "big" && g("id") >= 8 && g("fin") >= 7,
-		text: ["Rim-running, rim-protecting center", "Vertical spacer and anchor of the defense"],
+		text: [
+			"Rim-running, rim-protecting center",
+			"Vertical spacer and anchor of the defense",
+		],
 	},
 	{
 		test: (g, grp) => grp === "big" && g("cs") >= 7,
-		text: ["Stretch big who pops and pulls rim protectors out of the paint", "Pick-and-pop big"],
+		text: [
+			"Stretch big who pops and pulls rim protectors out of the paint",
+			"Pick-and-pop big",
+		],
 	},
 	{
 		test: (g) => g("od") >= 8 && g("pm") <= 6,
@@ -419,19 +455,31 @@ const ROLE_SHAPES: { test: (g: (k: GradeKey) => number, group: PeerGroup) => boo
 	},
 	{
 		test: (g) => g("cs") >= 8,
-		text: ["Floor spacer next to a creator", "Spot-up shooter in a five-out look"],
+		text: [
+			"Floor spacer next to a creator",
+			"Spot-up shooter in a five-out look",
+		],
 	},
 	{
 		test: (g) => g("pd") >= 8 || g("id") >= 8,
-		text: ["Defensive specialist in the closing lineup", "Stopper off the bench"],
+		text: [
+			"Defensive specialist in the closing lineup",
+			"Stopper off the bench",
+		],
 	},
 	{
 		test: (g) => g("pm") >= 8,
-		text: ["Secondary playmaker who keeps the offense humming", "Backup point and connector"],
+		text: [
+			"Secondary playmaker who keeps the offense humming",
+			"Backup point and connector",
+		],
 	},
 	{
 		test: (g) => g("reb") >= 9 && g("motor") >= 7,
-		text: ["Energy big: rebounds, screens and effort", "Glass cleaner off the bench"],
+		text: [
+			"Energy big: rebounds, screens and effort",
+			"Glass cleaner off the bench",
+		],
 	},
 ];
 
@@ -466,7 +514,8 @@ const shotMixOf = (input: ScoutInput) => {
 	return parts.map((p) => ({
 		label: p.label,
 		share: Math.round((100 * p.a) / total),
-		pct: p.a > 0 && p.pct !== undefined ? Math.round(p.pct * 10) / 10 : undefined,
+		pct:
+			p.a > 0 && p.pct !== undefined ? Math.round(p.pct * 10) / 10 : undefined,
 	}));
 };
 
@@ -564,22 +613,42 @@ export const buildReport = ({
 	const selfCreated = selfCreatedOf(input, take.scores);
 	const scorerType =
 		G("od") >= 8 && G("fin") >= 7
-			? ov.pick(["a three-level scorer", "a scorer who can get it from anywhere"])
+			? ov.pick([
+					"a three-level scorer",
+					"a scorer who can get it from anywhere",
+				])
 			: G("fin") >= 8 && G("shoot") <= 5
-				? ov.pick(["an attack-the-rim scorer", "a paint scorer who lives at the basket"])
+				? ov.pick([
+						"an attack-the-rim scorer",
+						"a paint scorer who lives at the basket",
+					])
 				: G("cs") >= 8 && G("od") <= 6
-					? ov.pick(["a play-finisher who scores off the catch", "a spot-up scorer"])
+					? ov.pick([
+							"a play-finisher who scores off the catch",
+							"a spot-up scorer",
+						])
 					: G("pm") >= 9
-						? ov.pick(["a setup man first, scorer second", "a passer who scores when the defense lets him"])
-						: ov.pick(["a complementary scorer", "a secondary option on offense"]);
+						? ov.pick([
+								"a setup man first, scorer second",
+								"a passer who scores when the defense lets him",
+							])
+						: ov.pick([
+								"a complementary scorer",
+								"a secondary option on offense",
+							]);
 	offense.push(`${capFirst(scorerType)}.`);
 	if (shotMix) {
 		const top = shotMix.toSorted((a, b) => b.share - a.share)[0]!;
 		offense.push(
 			`${ov.pick(["Shot diet:", "Where his shots come from:"])} ${shotMix
 				.filter((x) => x.share > 0)
-				.map((x) => `${x.label.toLowerCase()} ${x.share}%${x.pct !== undefined ? ` (${x.pct}%)` : ""}`)
-				.join(", ")}. ${top.label === "Three" ? "Most of his work is beyond the arc." : top.label === "At rim" ? "He gets to the basket more than anywhere else." : top.label === "Mid-range" ? "Lives in the mid-range, which is a tough way to be efficient." : "A post-up player in a league that rarely posts up."}`,
+				.map(
+					(x) =>
+						`${x.label.toLowerCase()} ${x.share}%${x.pct !== undefined ? ` (${x.pct}%)` : ""}`,
+				)
+				.join(
+					", ",
+				)}. ${top.label === "Three" ? "Most of his work is beyond the arc." : top.label === "At rim" ? "He gets to the basket more than anywhere else." : top.label === "Mid-range" ? "Lives in the mid-range, which is a tough way to be efficient." : "A post-up player in a league that rarely posts up."}`,
 		);
 	}
 	offense.push(
@@ -590,7 +659,8 @@ export const buildReport = ({
 				: `About ${selfCreated}% self-created, the rest assisted (our estimate): he can do some of both.`,
 	);
 	if (s && s.min > 0 && s.gp >= 5) {
-		const usage = s.usg ?? ((s.fga + 0.44 * s.fta + s.tov) * 36 * 2.4) / Math.max(1, s.min);
+		const usage =
+			s.usg ?? ((s.fga + 0.44 * s.fta + s.tov) * 36 * 2.4) / Math.max(1, s.min);
 		offense.push(
 			usage >= 26
 				? `High usage (${usage.toFixed(1)}%): a featured option${G("bs") <= 4 ? ", and the turnovers come with it" : ""}.`
@@ -616,12 +686,18 @@ export const buildReport = ({
 	defense.push(
 		canGuard.length > 0
 			? `${dv.pick(["Can guard", "Matches up with", "Holds up against"])} ${andJoin(canGuard)}.`
-			: dv.pick(["Has to be hidden on defense.", "No natural matchup at this level yet."]),
+			: dv.pick([
+					"Has to be hidden on defense.",
+					"No natural matchup at this level yet.",
+				]),
 	);
 	const switchable = G("pd") >= 7 && G("id") >= 5 && G("ath") >= 6;
 	defense.push(
 		switchable
-			? dv.pick(["Switchable: you can put him on a screener or a ball handler.", "Can switch one through four."])
+			? dv.pick([
+					"Switchable: you can put him on a screener or a ball handler.",
+					"Can switch one through four.",
+				])
 			: G("pd") >= 7
 				? "A perimeter defender, not a switch big."
 				: G("id") >= 7
@@ -639,9 +715,15 @@ export const buildReport = ({
 	}
 	defense.push(
 		G("iq") >= 8
-			? dv.pick(["Team defense is sharp: on time with rotations and help.", "Smart team defender, a good communicator."])
+			? dv.pick([
+					"Team defense is sharp: on time with rotations and help.",
+					"Smart team defender, a good communicator.",
+				])
 			: G("iq") <= 4
-				? dv.pick(["Team defense is behind: late rotations, ball-watching.", "Loses track off the ball."])
+				? dv.pick([
+						"Team defense is behind: late rotations, ball-watching.",
+						"Loses track off the ball.",
+					])
 				: "Team defense is fine.",
 	);
 
@@ -658,7 +740,10 @@ export const buildReport = ({
 				? pv.pick(["Strong, mature frame.", "Already built like a pro."])
 				: r.stre <= 35
 					? input.age <= 21
-						? pv.pick(["Thin, but young enough to fill out.", "Wiry frame with room to add muscle."])
+						? pv.pick([
+								"Thin, but young enough to fill out.",
+								"Wiry frame with room to add muscle.",
+							])
 						: "Slight frame that may not fill out much more."
 					: "Average build.",
 		);
@@ -666,7 +751,9 @@ export const buildReport = ({
 	if (input.age <= 20 && input.kind === "prospect") {
 		physical.push("Room to grow: still among the youngest in his class.");
 	} else if (input.kind === "pro" && input.age >= 30) {
-		physical.push("Past the age where athleticism improves; expect it to slip.");
+		physical.push(
+			"Past the age where athleticism improves; expect it to slip.",
+		);
 	}
 	if (input.combine && input.combine.length > 0) {
 		const best = input.combine.toSorted((a, b) => b.pct - a.pct)[0]!;
@@ -687,7 +774,11 @@ export const buildReport = ({
 		if (t.hidden && !t.exact) {
 			intangibles.push({
 				name: t.name,
-				text: iv.pick(["Unknown: needs more looks", "Unknown: needs more looks. Ask around next season", "Unknown: needs more looks; can't tell from the outside"]),
+				text: iv.pick([
+					"Unknown: needs more looks",
+					"Unknown: needs more looks. Ask around next season",
+					"Unknown: needs more looks; can't tell from the outside",
+				]),
 				known: false,
 			});
 		} else {
@@ -711,7 +802,9 @@ export const buildReport = ({
 		for (const i of input.injuries) {
 			parts.set(i.part, (parts.get(i.part) ?? 0) + 1);
 		}
-		const repeated = [...parts.entries()].filter(([, n]) => n >= 2).map(([p]) => p.toLowerCase());
+		const repeated = [...parts.entries()]
+			.filter(([, n]) => n >= 2)
+			.map(([p]) => p.toLowerCase());
 		flags.push({
 			tone: "red",
 			text: `Injury history: ${input.injuries.length} ${input.injuries.length === 1 ? "injury" : "injuries"}, ${gamesLost} games missed (${andJoin([...parts.keys()].map((x) => x.toLowerCase()))})${repeated.length > 0 ? `; repeat ${andJoin(repeated)} problems` : ""}.`,
@@ -724,7 +817,11 @@ export const buildReport = ({
 		});
 	}
 	const shotSample = s ? s.gp * s.tpa : 0;
-	if (s && s.fta * s.gp >= (q >= 0.55 ? 25 : 50) && shotSample >= (q >= 0.55 ? 30 : 70)) {
+	if (
+		s &&
+		s.fta * s.gp >= (q >= 0.55 ? 25 : 50) &&
+		shotSample >= (q >= 0.55 ? 30 : 70)
+	) {
 		if (s.tpPct >= 37 && s.ftPct < 68) {
 			flags.push({
 				tone: "red",
@@ -738,38 +835,79 @@ export const buildReport = ({
 		}
 	}
 	if (G("bs") <= 3 && (G("pm") >= 6 || (s && s.tov >= 2.5))) {
-		flags.push({ tone: "red", text: fv.pick(["Turnovers: careless with the ball for how much he has it.", "Turnover problem that coaches will have to live with."]) });
+		flags.push({
+			tone: "red",
+			text: fv.pick([
+				"Turnovers: careless with the ball for how much he has it.",
+				"Turnover problem that coaches will have to live with.",
+			]),
+		});
 	}
 	const pre = input.preDraft;
 	if (input.kind === "prospect") {
 		if (pre && pre.gp >= 10) {
-			const prodScore = pre.min > 0 ? ((pre.pts + pre.trb + pre.ast) * 36) / pre.min : 0;
+			const prodScore =
+				pre.min > 0 ? ((pre.pts + pre.trb + pre.ast) * 36) / pre.min : 0;
 			if (input.age >= 22 && prodScore < 26) {
-				flags.push({ tone: "red", text: `Age vs production: ${input.age} years old and only ${pre.pts.toFixed(1)} points, ${pre.trb.toFixed(1)} rebounds and ${pre.ast.toFixed(1)} assists a game.` });
+				flags.push({
+					tone: "red",
+					text: `Age vs production: ${input.age} years old and only ${pre.pts.toFixed(1)} points, ${pre.trb.toFixed(1)} rebounds and ${pre.ast.toFixed(1)} assists a game.`,
+				});
 			} else if (input.age <= 19 && prodScore >= 30) {
-				flags.push({ tone: "green", text: `Produced at ${input.age}: ${pre.pts.toFixed(1)} points a game while younger than most of his competition.` });
+				flags.push({
+					tone: "green",
+					text: `Produced at ${input.age}: ${pre.pts.toFixed(1)} points a game while younger than most of his competition.`,
+				});
 			}
 			if (pre.level === "juco" || pre.level === "other") {
-				flags.push({ tone: "red", text: "Competition level: his numbers came against weak opposition." });
+				flags.push({
+					tone: "red",
+					text: "Competition level: his numbers came against weak opposition.",
+				});
 			} else if (pre.level === "overseas" && pre.min >= 18) {
-				flags.push({ tone: "green", text: `Played real minutes against grown men overseas (${pre.team}).` });
+				flags.push({
+					tone: "green",
+					text: `Played real minutes against grown men overseas (${pre.team}).`,
+				});
 			}
 		}
 		if (pre && pre.gp >= 10 && input.ratings) {
 			const tools = (take.scores.ath + take.scores.size) / 2;
-			const prodScore = pre.min > 0 ? ((pre.pts + pre.trb + pre.ast) * 36) / pre.min : 0;
+			const prodScore =
+				pre.min > 0 ? ((pre.pts + pre.trb + pre.ast) * 36) / pre.min : 0;
 			if (tools >= 60 && prodScore < 25) {
-				flags.push({ tone: "red", text: fv.pick(["Tools ahead of production: the physical gifts haven't shown up in the box score.", "All tools, not enough production yet."]) });
+				flags.push({
+					tone: "red",
+					text: fv.pick([
+						"Tools ahead of production: the physical gifts haven't shown up in the box score.",
+						"All tools, not enough production yet.",
+					]),
+				});
 			} else if (tools <= 42 && prodScore >= 32) {
-				flags.push({ tone: "green", text: fv.pick(["Production ahead of tools: he finds a way despite average physical gifts.", "Produces without elite tools, which tends to translate."]) });
+				flags.push({
+					tone: "green",
+					text: fv.pick([
+						"Production ahead of tools: he finds a way despite average physical gifts.",
+						"Produces without elite tools, which tends to translate.",
+					]),
+				});
 			}
 		}
 	}
 	if (G("pd") >= 8 && G("shoot") >= 8) {
-		flags.push({ tone: "green", text: fv.pick(["Two-way player: shoots it and defends.", "Contributes at both ends."]) });
+		flags.push({
+			tone: "green",
+			text: fv.pick([
+				"Two-way player: shoots it and defends.",
+				"Contributes at both ends.",
+			]),
+		});
 	}
 	if (G("motor") >= 10) {
-		flags.push({ tone: "green", text: "Motor and effort show up every night." });
+		flags.push({
+			tone: "green",
+			text: "Motor and effort show up every night.",
+		});
 	}
 
 	// ---- trend (pros) ----
@@ -784,7 +922,8 @@ export const buildReport = ({
 			x && x.min > 0 ? ((x.pts + x.trb + 1.5 * x.ast) * 36) / x.min : undefined;
 		const a = prod(s);
 		const b = prod(input.prevProduction);
-		const dProd = a !== undefined && b !== undefined && (s?.gp ?? 0) >= 10 ? a - b : 0;
+		const dProd =
+			a !== undefined && b !== undefined && (s?.gp ?? 0) >= 10 ? a - b : 0;
 		const score = dOvr + 0.4 * dProd;
 		trend = score >= 2.5 ? "improving" : score <= -2.5 ? "declining" : "stable";
 		trendLine =
@@ -794,7 +933,10 @@ export const buildReport = ({
 					? `Trending down${dOvr < 0 ? ` (ovr ${dOvr} since last season)` : ""}${dProd <= -2 ? ", and the numbers are slipping" : ""}.`
 					: "Holding steady.";
 		if (trend === "declining" && input.age >= 30) {
-			flags.push({ tone: "red", text: `Decline phase: ${input.age} and slipping.` });
+			flags.push({
+				tone: "red",
+				text: `Decline phase: ${input.age} and slipping.`,
+			});
 		}
 	}
 
@@ -817,8 +959,6 @@ export const buildReport = ({
 				: input.age <= 28
 					? "In his prime years; growth from here comes from skill work, not physical development."
 					: "On the back nine; the plan is to preserve what he has.",
-		);
-		development.push(
 			`Needs: ${andJoin(needs.map((g) => NEEDS_LINES[g.key]))}.`,
 		);
 		const we = input.traits?.find((t) => t.key === "workEthic");
@@ -860,19 +1000,27 @@ export const buildReport = ({
 	const fit: string[] = [];
 	const tf = input.fit;
 	if (tf && input.kind !== "retired") {
-		const strengths = grades.filter((g) => !g.sub && g.grade >= 8).map((g) => g.key);
+		const strengths = grades
+			.filter((g) => !g.sub && g.grade >= 8)
+			.map((g) => g.key);
 		const fills = strengths.filter((k) => tf.rosterNeeds.includes(k));
 		const doubles = strengths.filter((k) => tf.rosterStrengths.includes(k));
 		if (fills.length > 0) {
-			fit.push(`Fills a need for the ${tf.teamName}: ${andJoin(fills.map((k) => GRADE_LABELS[k].toLowerCase()))}.`);
+			fit.push(
+				`Fills a need for the ${tf.teamName}: ${andJoin(fills.map((k) => GRADE_LABELS[k].toLowerCase()))}.`,
+			);
 		}
 		if (doubles.length > 0 && fills.length === 0) {
-			fit.push(`Doubles up on what the ${tf.teamName} already do well (${andJoin(doubles.map((k) => GRADE_LABELS[k].toLowerCase()))}).`);
+			fit.push(
+				`Doubles up on what the ${tf.teamName} already do well (${andJoin(doubles.map((k) => GRADE_LABELS[k].toLowerCase()))}).`,
+			);
 		}
 		const expectedOvr = input.ratings?.ovr ?? 0;
 		const ahead = tf.sameGroup.filter((x) => x.ovr >= expectedOvr + 3);
 		if (!input.onUserTeam && ahead.length >= 3) {
-			fit.push(`Redundancy warning: ${andJoin(ahead.slice(0, 3).map((x) => x.name))} already play his position and are better right now.`);
+			fit.push(
+				`Redundancy warning: ${andJoin(ahead.slice(0, 3).map((x) => x.name))} already play his position and are better right now.`,
+			);
 		} else if (!input.onUserTeam && tf.sameGroup.length <= 2) {
 			fit.push(`Thin at ${noun} on our roster, so minutes would be there.`);
 		}
@@ -888,7 +1036,10 @@ export const buildReport = ({
 	let pro: FullReport["pro"];
 	const rv = v.child("pro");
 	if (input.kind === "pro") {
-		const nowTier = tierForOvr(input.ratings?.ovr ?? input.roleScale.rotation, input.roleScale);
+		const nowTier = tierForOvr(
+			input.ratings?.ovr ?? input.roleScale.rotation,
+			input.roleScale,
+		);
 		const role = capFirst(roleName(nowTier, group));
 		const idealRole = idealRoleOf(grades, group, rv);
 		let contract: string | undefined;
@@ -949,8 +1100,12 @@ export const buildReport = ({
 		.filter((g) => !g.sub)
 		.toSorted((a, b) => b.grade - a.grade)
 		.slice(0, 2)
-		.map((g) => `${GRADE_LABELS[g.key].toLowerCase()} (${gradeLetter(g.grade)})`);
-	const weakText = needs.map((g) => `${GRADE_LABELS[g.key].toLowerCase()} (${gradeLetter(g.grade)})`);
+		.map(
+			(g) => `${GRADE_LABELS[g.key].toLowerCase()} (${gradeLetter(g.grade)})`,
+		);
+	const weakText = needs.map(
+		(g) => `${GRADE_LABELS[g.key].toLowerCase()} (${gradeLetter(g.grade)})`,
+	);
 	let bottomLine: string;
 	if (input.kind === "prospect") {
 		const range = draftRangeName(take.expected, numTeams);
@@ -1036,4 +1191,3 @@ const stripTake = (t: ReturnType<typeof scoutTake>): ScoutTake => ({
 	ceiling: t.ceiling,
 	expected: t.expected,
 });
-

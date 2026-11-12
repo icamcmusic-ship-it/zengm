@@ -9,15 +9,15 @@ import {
 	scoutingReportsOn,
 } from "../core/scoutingReports/index.ts";
 
-const getHover = async (pid: number) => getScoutingHover(pid);
+const getHover = (pid: number) => getScoutingHover(pid);
 
-const getBlurbs = async (pids: number[]) => getScoutingBlurbs(pids);
+const getBlurbs = (pids: number[]) => getScoutingBlurbs(pids);
 
-const getSummary = async (pid: number) => getScoutingSummary(pid);
+const getSummary = (pid: number) => getScoutingSummary(pid);
 
-const getOpponent = async (season?: number) => getOpponentScouting(season);
+const getOpponent = (season?: number) => getOpponentScouting(season);
 
-const getPage = async ({ pid, scout }: { pid: number; scout?: number }) =>
+const getPage = ({ pid, scout }: { pid: number; scout?: number }) =>
 	scoutingReportsOn() ? getPlayerScoutingPage(pid, scout) : undefined;
 
 export default {

@@ -11,25 +11,212 @@ import type {
 } from "./types.ts";
 
 const FIRST = [
-	"Al", "Andre", "Arturo", "Barry", "Ben", "Bill", "Bo", "Brad", "Carl", "Chet", "Chris", "Clint", "Curtis", "Dale", "Dan",
-	"Darnell", "Dave", "Dennis", "Desmond", "Don", "Doug", "Earl", "Eddie", "Felipe", "Frank", "Gary", "Gene", "Glen", "Greg",
-	"Hank", "Hector", "Howard", "Ivan", "Jack", "Jamal", "Jeff", "Jerome", "Jim", "Joe", "Jorge", "Keith", "Ken", "Kevin", "Lamar",
-	"Larry", "Leon", "Lou", "Luka", "Marco", "Mark", "Marv", "Maurice", "Mel", "Mike", "Milo", "Nate", "Neil", "Nikos", "Omar",
-	"Otis", "Pat", "Paul", "Pete", "Phil", "Ray", "Reggie", "Rich", "Rick", "Rod", "Ron", "Roy", "Russ", "Sal", "Sam", "Scott",
-	"Stan", "Steve", "Ted", "Terry", "Tom", "Tony", "Vern", "Vince", "Walt", "Wes", "Will", "Yuri", "Zoran", "Ana", "Becky",
-	"Carla", "Denise", "Jen", "Kim", "Laura", "Maria", "Nina", "Rachel", "Sue", "Tanya",
+	"Al",
+	"Andre",
+	"Arturo",
+	"Barry",
+	"Ben",
+	"Bill",
+	"Bo",
+	"Brad",
+	"Carl",
+	"Chet",
+	"Chris",
+	"Clint",
+	"Curtis",
+	"Dale",
+	"Dan",
+	"Darnell",
+	"Dave",
+	"Dennis",
+	"Desmond",
+	"Don",
+	"Doug",
+	"Earl",
+	"Eddie",
+	"Felipe",
+	"Frank",
+	"Gary",
+	"Gene",
+	"Glen",
+	"Greg",
+	"Hank",
+	"Hector",
+	"Howard",
+	"Ivan",
+	"Jack",
+	"Jamal",
+	"Jeff",
+	"Jerome",
+	"Jim",
+	"Joe",
+	"Jorge",
+	"Keith",
+	"Ken",
+	"Kevin",
+	"Lamar",
+	"Larry",
+	"Leon",
+	"Lou",
+	"Luka",
+	"Marco",
+	"Mark",
+	"Marv",
+	"Maurice",
+	"Mel",
+	"Mike",
+	"Milo",
+	"Nate",
+	"Neil",
+	"Nikos",
+	"Omar",
+	"Otis",
+	"Pat",
+	"Paul",
+	"Pete",
+	"Phil",
+	"Ray",
+	"Reggie",
+	"Rich",
+	"Rick",
+	"Rod",
+	"Ron",
+	"Roy",
+	"Russ",
+	"Sal",
+	"Sam",
+	"Scott",
+	"Stan",
+	"Steve",
+	"Ted",
+	"Terry",
+	"Tom",
+	"Tony",
+	"Vern",
+	"Vince",
+	"Walt",
+	"Wes",
+	"Will",
+	"Yuri",
+	"Zoran",
+	"Ana",
+	"Becky",
+	"Carla",
+	"Denise",
+	"Jen",
+	"Kim",
+	"Laura",
+	"Maria",
+	"Nina",
+	"Rachel",
+	"Sue",
+	"Tanya",
 ];
 
 const LAST = [
-	"Abbott", "Alvarez", "Baker", "Banks", "Barlow", "Bell", "Bianchi", "Bishop", "Boyd", "Brennan", "Brooks", "Burke", "Byrd",
-	"Calloway", "Carver", "Castillo", "Chambers", "Cole", "Collins", "Crane", "Dalton", "Delgado", "Doyle", "Drake", "Dunn",
-	"Ellis", "Ferris", "Fischer", "Fleming", "Ford", "Fowler", "Gaines", "Garza", "Gibbs", "Gordon", "Graves", "Greer", "Hale",
-	"Harmon", "Hayes", "Hendricks", "Hines", "Holt", "Horvat", "Hughes", "Ivanov", "Jansen", "Jenkins", "Keane", "Kessler",
-	"Kowalski", "Lambert", "Lang", "Larkin", "Lowry", "Lucas", "Maddox", "Malone", "Marsh", "Mayfield", "McBride", "McCoy",
-	"Mercer", "Miles", "Monroe", "Moretti", "Nash", "Novak", "Oakes", "Ortega", "Owens", "Park", "Patton", "Petrovic", "Pierce",
-	"Porter", "Quinn", "Ramos", "Reyes", "Rhodes", "Riley", "Rocha", "Russo", "Sawyer", "Schultz", "Shaw", "Sims", "Sloan",
-	"Stokes", "Sutton", "Tate", "Thornton", "Tucker", "Vance", "Vargas", "Wagner", "Walsh", "Warren", "Weber", "Whitfield",
-	"Wolfe", "Yates", "Young",
+	"Abbott",
+	"Alvarez",
+	"Baker",
+	"Banks",
+	"Barlow",
+	"Bell",
+	"Bianchi",
+	"Bishop",
+	"Boyd",
+	"Brennan",
+	"Brooks",
+	"Burke",
+	"Byrd",
+	"Calloway",
+	"Carver",
+	"Castillo",
+	"Chambers",
+	"Cole",
+	"Collins",
+	"Crane",
+	"Dalton",
+	"Delgado",
+	"Doyle",
+	"Drake",
+	"Dunn",
+	"Ellis",
+	"Ferris",
+	"Fischer",
+	"Fleming",
+	"Ford",
+	"Fowler",
+	"Gaines",
+	"Garza",
+	"Gibbs",
+	"Gordon",
+	"Graves",
+	"Greer",
+	"Hale",
+	"Harmon",
+	"Hayes",
+	"Hendricks",
+	"Hines",
+	"Holt",
+	"Horvat",
+	"Hughes",
+	"Ivanov",
+	"Jansen",
+	"Jenkins",
+	"Keane",
+	"Kessler",
+	"Kowalski",
+	"Lambert",
+	"Lang",
+	"Larkin",
+	"Lowry",
+	"Lucas",
+	"Maddox",
+	"Malone",
+	"Marsh",
+	"Mayfield",
+	"McBride",
+	"McCoy",
+	"Mercer",
+	"Miles",
+	"Monroe",
+	"Moretti",
+	"Nash",
+	"Novak",
+	"Oakes",
+	"Ortega",
+	"Owens",
+	"Park",
+	"Patton",
+	"Petrovic",
+	"Pierce",
+	"Porter",
+	"Quinn",
+	"Ramos",
+	"Reyes",
+	"Rhodes",
+	"Riley",
+	"Rocha",
+	"Russo",
+	"Sawyer",
+	"Schultz",
+	"Shaw",
+	"Sims",
+	"Sloan",
+	"Stokes",
+	"Sutton",
+	"Tate",
+	"Thornton",
+	"Tucker",
+	"Vance",
+	"Vargas",
+	"Wagner",
+	"Walsh",
+	"Warren",
+	"Weber",
+	"Whitfield",
+	"Wolfe",
+	"Yates",
+	"Young",
 ];
 
 export const SPECIALTY_NAMES: Record<Specialty, string> = {
@@ -165,7 +352,11 @@ const slotChain = (
 	let year = startingSeason - rng.int(0, 7);
 	for (let index = 0; index < 999 && year <= upTo; index++) {
 		const tenure = rng.int(2, 10);
-		out.push({ id: scoutId(tid, slot, index), since: year, until: year + tenure });
+		out.push({
+			id: scoutId(tid, slot, index),
+			since: year,
+			until: year + tenure,
+		});
 		year += tenure;
 	}
 	return out;
@@ -187,6 +378,10 @@ export const getDepartment = ({
 	level: number;
 	startingSeason: number;
 }): ScoutDepartment => {
+	// No budget data (budget off, a new team): an average department
+	if (!Number.isFinite(level)) {
+		level = 34;
+	}
 	const size = departmentSize(level);
 	const quality = departmentQualityForLevel(level);
 	const scouts: Scout[] = [];
@@ -194,7 +389,13 @@ export const getDepartment = ({
 		const chain = slotChain(leagueSeed, tid, slot, startingSeason, season);
 		const current = chain.find((c) => c.since <= season && season < c.until);
 		if (current) {
-			const s = scoutFromId(leagueSeed, current.id, quality, current.since, current.until);
+			const s = scoutFromId(
+				leagueSeed,
+				current.id,
+				quality,
+				current.since,
+				current.until,
+			);
 			s.age += season - current.since;
 			scouts.push(s);
 		}
@@ -225,7 +426,9 @@ export const departmentHistory = ({
 	level: number;
 	startingSeason: number;
 }) => {
-	const quality = departmentQualityForLevel(level);
+	const quality = departmentQualityForLevel(
+		Number.isFinite(level) ? level : 34,
+	);
 	const out: Scout[] = [];
 	for (let slot = 0; slot < MAX_SCOUTS; slot++) {
 		for (const c of slotChain(leagueSeed, tid, slot, startingSeason, season)) {
@@ -249,7 +452,9 @@ export const scoutById = (
 	const c = slotChain(leagueSeed, tid, slot, startingSeason, upTo).find(
 		(x) => x.id === id,
 	);
-	return c ? scoutFromId(leagueSeed, id, levelQuality, c.since, c.until) : undefined;
+	return c
+		? scoutFromId(leagueSeed, id, levelQuality, c.since, c.until)
+		: undefined;
 };
 
 export const briefOf = (s: Scout): ScoutBrief => ({
@@ -275,7 +480,12 @@ export const qualityLabel = (q: number) =>
 // How well a scout's specialty matches a player: 1 a match (more accurate), 0 not
 export const specialtyMatch = (
 	s: Pick<Scout, "specialty">,
-	player: { kind: "prospect" | "pro" | "retired"; level?: string; athletic: boolean; shooter: boolean },
+	player: {
+		kind: "prospect" | "pro" | "retired";
+		level?: string;
+		athletic: boolean;
+		shooter: boolean;
+	},
 ) => {
 	switch (s.specialty) {
 		case "college":

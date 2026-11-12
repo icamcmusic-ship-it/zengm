@@ -25,7 +25,7 @@ import actions from "./actions.ts";
 import hype from "./hype.ts";
 import recordsBook from "./recordsBook.ts";
 import archetypes from "./archetypes.ts";
-import scouting from "./scouting.ts";
+import scoutingReports from "./scouting.ts";
 import { getLeagueNorms, storeArchetype } from "../core/player/archetype.ts";
 import * as awardSettings from "./awardSettings.ts";
 import leagueFileUpload, {
@@ -6222,7 +6222,7 @@ const api = {
 	playMenu,
 	recordsBook,
 	regenerateRatings,
-	scouting,
+	scoutingReports,
 	toolsMenu,
 	undoLog,
 	main: {

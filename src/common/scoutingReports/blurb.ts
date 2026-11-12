@@ -15,7 +15,16 @@ export type ScoutHover = {
 	byline: string;
 };
 
-const HOVER_KEYS: GradeKey[] = ["shoot", "fin", "pm", "reb", "pd", "id", "ath", "iq"];
+const HOVER_KEYS: GradeKey[] = [
+	"shoot",
+	"fin",
+	"pm",
+	"reb",
+	"pd",
+	"id",
+	"ath",
+	"iq",
+];
 
 export const hoverOf = (r: FullReport): ScoutHover => ({
 	pid: r.pid,
@@ -23,7 +32,11 @@ export const hoverOf = (r: FullReport): ScoutHover => ({
 	overall: formatGradeRange(r.overall.lo, r.overall.hi),
 	grades: HOVER_KEYS.map((key) => {
 		const g = r.grades.find((x) => x.key === key)!;
-		return { key, label: GRADE_LABELS[key], grade: formatGradeRange(g.lo, g.hi) };
+		return {
+			key,
+			label: GRADE_LABELS[key],
+			grade: formatGradeRange(g.lo, g.hi),
+		};
 	}),
 	range: r.header.rangeLine,
 	bottomLine: r.bottomLine,
@@ -74,7 +87,10 @@ export const blurbOf = (r: FullReport, pos: string) => {
 export const scoutsSplit = (
 	name: string,
 	pos: string,
-	takes: { scout: string; take: Pick<ScoutTake, "ceiling" | "expected" | "overall"> }[],
+	takes: {
+		scout: string;
+		take: Pick<ScoutTake, "ceiling" | "expected" | "overall">;
+	}[],
 	seed: string,
 ) => {
 	if (takes.length < 2) {
@@ -102,7 +118,7 @@ const aRole = (tier: number, group: ReturnType<typeof peerGroupOf>) => {
 	const name = roleName(tier, group);
 	return name === "out of the league"
 		? "a player who won't stick"
-		: `${/^[aeiouAE]/.test(name) ? "an" : "a"} ${name}`;
+		: `${/^[AEaeiou]/.test(name) ? "an" : "a"} ${name}`;
 };
 
 export type OpponentPlayer = {
@@ -135,15 +151,31 @@ export const opponentNotes = (r: FullReport, pos: string): OpponentPlayer => {
 		how.push("second chances off the offensive glass");
 	}
 	if (how.length === 0) {
-		how.push(g("shoot") >= g("fin") ? "jumpers within the offense" : "cuts and finishes inside");
+		how.push(
+			g("shoot") >= g("fin")
+				? "jumpers within the offense"
+				: "cuts and finishes inside",
+		);
 	}
 	const defend: string[] = [];
 	if (g("od") >= 8) {
-		defend.push(v.pick(["go over screens and make him a passer", "top-lock him off screens"]));
+		defend.push(
+			v.pick([
+				"go over screens and make him a passer",
+				"top-lock him off screens",
+			]),
+		);
 	} else if (g("cs") >= 8) {
-		defend.push(v.pick(["no help off him; stay attached", "run him off the line"]));
+		defend.push(
+			v.pick(["no help off him; stay attached", "run him off the line"]),
+		);
 	} else if (g("shoot") <= 5) {
-		defend.push(v.pick(["go under screens and dare him to shoot", "sag off and clog the lane"]));
+		defend.push(
+			v.pick([
+				"go under screens and dare him to shoot",
+				"sag off and clog the lane",
+			]),
+		);
 	}
 	if (g("fin") >= 8 && g("shoot") <= 6) {
 		defend.push("build a wall in transition and keep him out of the paint");
@@ -155,7 +187,9 @@ export const opponentNotes = (r: FullReport, pos: string): OpponentPlayer => {
 		defend.push("stay home on shooters when he drives; he will find them");
 	}
 	if (g("pd") <= 5 || g("id") <= 4) {
-		defend.push(`attack him on the other end${g("pd") <= 5 ? " with our guards" : " in the post"}`);
+		defend.push(
+			`attack him on the other end${g("pd") <= 5 ? " with our guards" : " in the post"}`,
+		);
 	}
 	if (defend.length === 0) {
 		defend.push("solid, no gambles; make him beat us over a long series");

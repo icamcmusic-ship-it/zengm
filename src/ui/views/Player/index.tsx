@@ -32,8 +32,10 @@ import { useLocal } from "../../util/local.ts";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
 import { PreDraftSummary } from "./PreDraftSummary.tsx";
-import { useFeatureOn } from "../../util/nativeFeatures.ts";
-import { ScoutingSummaryLine } from "../../components/ScoutingReport/index.tsx";
+import {
+	ScoutingSummaryLine,
+	useScoutingOn,
+} from "../../components/ScoutingReport/index.tsx";
 
 const Player2 = ({
 	bestPos,
@@ -62,7 +64,7 @@ const Player2 = ({
 	]);
 	const showRatings = !challengeNoRatings || retired;
 	const traitsOn = useLocal(["playerTraits"]).playerTraits;
-	const scoutingOn = useFeatureOn("scoutingReports");
+	const scoutingOn = useScoutingOn();
 	const profileOptions = getProfileDropdownOptions(
 		player,
 		!!traitsOn,

@@ -13,6 +13,11 @@ import {
 	SIMILARITY_RATINGS,
 	type CombineResults,
 } from "../../../common/collegeStats/profile.ts";
+import {
+	getContractExp,
+	getCurrentContract,
+	getNearestContractAmount,
+} from "../../../common/contracts.ts";
 import { injuryBodyPart } from "../../../common/injuryBodyPart.ts";
 import { TRAIT_DEFINITIONS } from "../../../common/playerTraits/definitions.ts";
 import {
@@ -38,7 +43,6 @@ import {
 	departmentQualityForLevel,
 } from "../../../common/scoutingReports/index.ts";
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
-import { TWO_K_NAMES } from "../../../common/archetypes/twoK/twoK.data.ts";
 import {
 	DEFENSE_NAMES,
 	OFFENSE_NAMES,
@@ -49,6 +53,7 @@ import type { Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
+import { isCollege } from "../college/isCollege.ts";
 import fuzzRating from "../player/fuzzRating.ts";
 import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import genContract from "../player/genContract.ts";
@@ -57,8 +62,9 @@ import { archetypeFor, getLeagueNorms } from "../player/archetype.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import { getUncertainty } from "../draft/scouting.ts";
 
+// Off in college leagues (no draft, contracts or trades to scout for): the pages are hidden there
 export const scoutingReportsOn = () =>
-	__SPORT === "basketball" && featureOn("scoutingReports");
+	__SPORT === "basketball" && featureOn("scoutingReports") && !isCollege();
 
 export const isProspectPlayer = (p: Pick<Player, "tid">) =>
 	p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
@@ -84,7 +90,15 @@ const RATING_KEYS = [
 	"reb",
 ] as const;
 
-const EXPANDED_FUZZED = ["pdef", "idef", "oreb", "dreb", "csh", "dsh", "bsc"] as const;
+const EXPANDED_FUZZED = [
+	"pdef",
+	"idef",
+	"oreb",
+	"dreb",
+	"csh",
+	"dsh",
+	"bsc",
+] as const;
 
 // A ratings row as the user sees it: fuzz on everything but height and wingspan (measurements), like the player page
 export const scoutedRatingsOf = (
@@ -123,7 +137,9 @@ const ratingsRowFor = (p: Player) => {
 	if (p.tid === PLAYER.RETIRED) {
 		let best = p.ratings[0] as any;
 		for (const r of p.ratings as any[]) {
-			if (fuzzRating(r.ovr, r.fuzz ?? 0) > fuzzRating(best.ovr, best.fuzz ?? 0)) {
+			if (
+				fuzzRating(r.ovr, r.fuzz ?? 0) > fuzzRating(best.ovr, best.fuzz ?? 0)
+			) {
 				best = r;
 			}
 		}
@@ -169,7 +185,10 @@ const productionFromRows = (
 	}
 	const t: Record<string, number> = {};
 	for (const key of SUM_KEYS) {
-		t[key] = rows.reduce((a, r) => a + (typeof r[key] === "number" ? r[key] : 0), 0);
+		t[key] = rows.reduce(
+			(a, r) => a + (typeof r[key] === "number" ? r[key] : 0),
+			0,
+		);
 	}
 	const gp = t.gp!;
 	if (gp <= 0) {
@@ -187,7 +206,8 @@ const productionFromRows = (
 		return w > 0 ? sum / w : undefined;
 	};
 	const pg = (x: number) => x / gp;
-	const pctOf = (made: number, att: number) => (att > 0 ? (100 * made) / att : 0);
+	const pctOf = (made: number, att: number) =>
+		att > 0 ? (100 * made) / att : 0;
 	const hasLocations = t.fgaAtRim! + t.fgaLowPost! + t.fgaMidRange! > 0;
 	return {
 		season,
@@ -220,7 +240,10 @@ const productionFromRows = (
 			: {}),
 		per: level === "pro" ? wavg("per") : undefined,
 		usg: level === "pro" ? wavg("usgp") : undefined,
-		ws48: level === "pro" && t.min! > 0 ? ((t.ows! + t.dws!) * 48) / t.min! : undefined,
+		ws48:
+			level === "pro" && t.min! > 0
+				? ((t.ows! + t.dws!) * 48) / t.min!
+				: undefined,
 	};
 };
 
@@ -268,7 +291,20 @@ export const preDraftProductionFor = (p: Player) => {
 					: "college";
 	const prod = productionFromRows(seasonRows, season, teamName ?? "", level);
 	// Pre-draft rows have no shot locations or advanced stats worth reading
-	return prod ? { ...prod, rimA: undefined, rimPct: undefined, postA: undefined, postPct: undefined, midA: undefined, midPct: undefined, per: undefined, usg: undefined, ws48: undefined } : undefined;
+	return prod
+		? {
+				...prod,
+				rimA: undefined,
+				rimPct: undefined,
+				postA: undefined,
+				postPct: undefined,
+				midA: undefined,
+				midPct: undefined,
+				per: undefined,
+				usg: undefined,
+				ws48: undefined,
+			}
+		: undefined;
 };
 
 // What the user can see of his traits: visible ones as read (estimate/range), hidden ones flagged so the report says "unknown" until known
@@ -321,7 +357,10 @@ const awardsOf = (p: Player) => {
 			out.allStar += 1;
 		} else if (/All-League/.test(name) && !/Rookie|Defensive/.test(name)) {
 			out.allLeague += 1;
-		} else if (/Most Valuable Player/.test(name) && !/Playoff|Finals|All-Star/.test(name)) {
+		} else if (
+			/Most Valuable Player/.test(name) &&
+			!/Playoff|Finals|All-Star/.test(name)
+		) {
 			out.mvp += 1;
 		} else if (/Defensive Player of the Year/.test(name)) {
 			out.dpoy += 1;
@@ -402,7 +441,9 @@ const getRoleScale = async (): Promise<RoleScale> => {
 		.sort((a, b) => b - a);
 	const n = Math.max(2, g.get("numActiveTeams"));
 	const at = (rank: number, fallback: number) =>
-		ovrs.length > 0 ? ovrs[Math.min(ovrs.length - 1, Math.max(0, Math.round(rank) - 1))]! : fallback;
+		ovrs.length > 0
+			? ovrs[Math.min(ovrs.length - 1, Math.max(0, Math.round(rank) - 1))]!
+			: fallback;
 	return {
 		franchise: Math.max(at(Math.max(3, n / 6), 70), at(1, 70) - 4),
 		allStar: at((24 * n) / 30, 62),
@@ -429,7 +470,9 @@ export const getReportCtx = async (viewerTid?: number): Promise<ReportCtx> => {
 		seed: leagueSeed(),
 		startingSeason: g.get("startingSeason"),
 		numTeams: Math.max(1, g.get("numActiveTeams")),
-		numPicks: Math.max(1, g.get("numActiveTeams")) * Math.max(1, g.get("numDraftRounds")),
+		numPicks:
+			Math.max(1, g.get("numActiveTeams")) *
+			Math.max(1, g.get("numDraftRounds")),
 		roleScale: await getRoleScale(),
 		scoutingLevel,
 		dept: getDepartment({
@@ -508,12 +551,15 @@ export const getPeers = async (
 	let players: Player[];
 	let label: string;
 	if (kind === "prospect") {
-		players = (await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)).filter(
-			(p) => p.draft.year === draftYear,
-		);
+		players = (
+			await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+		).filter((p) => p.draft.year === draftYear);
 		label = `${draftYear} draft class`;
 	} else {
-		players = await idb.cache.players.indexGetAll("playersByTid", [0, Infinity]);
+		players = await idb.cache.players.indexGetAll("playersByTid", [
+			0,
+			Infinity,
+		]);
 		label = "league";
 	}
 	let lights = players.map((p) => lightOf(p, ctx));
@@ -521,7 +567,11 @@ export const getPeers = async (
 	if (inGroup.length >= 8) {
 		lights = inGroup;
 	}
-	const table = buildPeerTable(label, lights.map((x) => x.scores), group);
+	const table = buildPeerTable(
+		label,
+		lights.map((x) => x.scores),
+		group,
+	);
 	ctx.peerCache.set(key, table);
 	return table;
 };
@@ -573,7 +623,9 @@ const getCompIndex = async (ctx: ReportCtx) => {
 		const name = `${p.firstName} ${p.lastName}`;
 		const outcome = outcomeFor(p, ctx.roleScale, ctx.season);
 		const draftPick =
-			p.draft.round > 0 ? (p.draft.round - 1) * ctx.numTeams + p.draft.pick : undefined;
+			p.draft.round > 0
+				? (p.draft.round - 1) * ctx.numTeams + p.draft.pick
+				: undefined;
 		for (const r of p.ratings as any[]) {
 			if (r.season >= ctx.season) {
 				continue;
@@ -626,7 +678,10 @@ export const compsFor = async (
 		noisy[k] = (ratings as any)[k] + rng.normal(0, 1) * 5 * (1 - quality);
 	}
 	const mine = { ratings: noisy, age, pos, ovr: ratings.ovr };
-	const pool = kind === "prospect" ? index.draft : index.pro.filter((e) => Math.abs(e.age - age) <= 1);
+	const pool =
+		kind === "prospect"
+			? index.draft
+			: index.pro.filter((e) => Math.abs(e.age - age) <= 1);
 	const scored = pool
 		.filter((e) => e.pid !== p.pid)
 		.map((e) => ({ e, d: prospectDistance(mine, e) }))
@@ -658,9 +713,23 @@ export const compsFor = async (
 // ---- the combine (prospects) ----
 
 const COMBINE_SHOW: [keyof CombineResults, string, (x: number) => string][] = [
-	["heightNoShoes", "Height", (x) => `${Math.floor(x / 12)}'${(x % 12).toFixed(2).replace(/\.?0+$/, "")}"`],
-	["wingspan", "Wingspan", (x) => `${Math.floor(x / 12)}'${(x % 12).toFixed(2).replace(/\.?0+$/, "")}"`],
-	["standingReach", "Standing reach", (x) => `${Math.floor(x / 12)}'${(x % 12).toFixed(1).replace(/\.0$/, "")}"`],
+	[
+		"heightNoShoes",
+		"Height",
+		(x) =>
+			`${Math.floor(x / 12)}'${(x % 12).toFixed(2).replace(/\.?0+$/, "")}"`,
+	],
+	[
+		"wingspan",
+		"Wingspan",
+		(x) =>
+			`${Math.floor(x / 12)}'${(x % 12).toFixed(2).replace(/\.?0+$/, "")}"`,
+	],
+	[
+		"standingReach",
+		"Standing reach",
+		(x) => `${Math.floor(x / 12)}'${(x % 12).toFixed(1).replace(/\.0$/, "")}"`,
+	],
 	["maxVert", "Max vert", (x) => `${x}"`],
 	["laneAgility", "Lane agility", (x) => `${x.toFixed(2)}s`],
 	["sprint", "Sprint", (x) => `${x.toFixed(2)}s`],
@@ -696,7 +765,10 @@ const combineFor = async (p: Player) => {
 	if (!mine) {
 		return undefined;
 	}
-	const classPlayers = await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED);
+	const classPlayers = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		PLAYER.UNDRAFTED,
+	);
 	const all = classPlayers
 		.filter((x) => x.draft.year === p.draft.year)
 		.map(combineOf)
@@ -741,7 +813,10 @@ const teamFitFor = async (
 		if (key === "shoot" || key === "cs" || key === "od" || key === "ft") {
 			continue;
 		}
-		const vals = top.map((x) => x.scores[key]).sort((a, b) => b - a).slice(0, 3);
+		const vals = top
+			.map((x) => x.scores[key])
+			.sort((a, b) => b - a)
+			.slice(0, 3);
 		if (vals.length === 0) {
 			continue;
 		}
@@ -756,7 +831,10 @@ const teamFitFor = async (
 	}
 	let systemFit: ScoutTeamFit["systemFit"];
 	if (ratings && featureOn("coachSystems") && featureOn("coachingStaff")) {
-		const coaches = await idb.cache.coaches.indexGetAll("coachesByTid", ctx.userTid);
+		const coaches = await idb.cache.coaches.indexGetAll(
+			"coachesByTid",
+			ctx.userTid,
+		);
 		const head = coaches.find((c) => c.role === "head");
 		if (head) {
 			const { getCoachProfile } = await import("../staff/systems.ts");
@@ -783,7 +861,10 @@ const developmentFor = async (ctx: ReportCtx) => {
 	if (!featureOn("coachingStaff") || ctx.userTid < 0) {
 		return undefined;
 	}
-	const coaches = await idb.cache.coaches.indexGetAll("coachesByTid", ctx.userTid);
+	const coaches = await idb.cache.coaches.indexGetAll(
+		"coachesByTid",
+		ctx.userTid,
+	);
 	const head = coaches.find((c) => c.role === "head");
 	const dev = coaches.find((c) => c.role === "dev");
 	let philosophy: number | undefined;
@@ -800,7 +881,9 @@ const developmentFor = async (ctx: ReportCtx) => {
 
 // Where our board has a prospect: by what our scouts see (valueFuzz), not the true value
 const projectedPickFor = async (p: Player) => {
-	const classPlayers = (await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED))
+	const classPlayers = (
+		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+	)
 		.filter((x) => x.draft.year === p.draft.year)
 		.sort((a, b) => b.valueFuzz - a.valueFuzz);
 	const i = classPlayers.findIndex((x) => x.pid === p.pid);
@@ -814,11 +897,20 @@ export const buildInput = async (
 ): Promise<ScoutInput> => {
 	const prospect = isProspectPlayer(p);
 	const retired = p.tid === PLAYER.RETIRED;
-	const kind: ScoutInput["kind"] = prospect ? "prospect" : retired ? "retired" : "pro";
+	const kind: ScoutInput["kind"] = prospect
+		? "prospect"
+		: retired
+			? "retired"
+			: "pro";
 	const row = ratingsRowFor(p);
 	const hidden = ratingsHidden(p);
 	const ratings = hidden ? undefined : scoutedRatingsOf(row);
-	const prevRow = !prospect && !retired ? (p.ratings as any[]).findLast((r) => r.season < (row?.season ?? ctx.season)) : undefined;
+	const prevRow =
+		!prospect && !retired
+			? (p.ratings as any[]).findLast(
+					(r) => r.season < (row?.season ?? ctx.season),
+				)
+			: undefined;
 	const prevRatings = hidden ? undefined : scoutedRatingsOf(prevRow);
 	const season = retired ? (row?.season ?? ctx.season) : ctx.season;
 	const age = (prospect ? p.draft.year : season) - p.born.year;
@@ -827,39 +919,54 @@ export const buildInput = async (
 	const cur = prospect
 		? { production: undefined, prev: undefined }
 		: retired
-			? { production: proProductionFor(p, season), prev: proProductionFor(p, season - 1) }
+			? {
+					production: proProductionFor(p, season),
+					prev: proProductionFor(p, season - 1),
+				}
 			: currentProduction(p, ctx.season);
 	const preDraft = preDraftProductionFor(p);
 	const traits = traitReadingsFor(p, ctx.scoutingLevel, ctx.season);
 	const injuries = (p.injuries ?? [])
 		.filter((i) => i.games > 0)
-		.map((i) => ({ season: i.season, type: i.type, part: injuryBodyPart(i.type), games: i.games }));
+		.map((i) => ({
+			season: i.season,
+			type: i.type,
+			part: injuryBodyPart(i.type),
+			games: i.games,
+		}));
 	const scouting = p.scouting ?? [];
 	const yearsOut = prospect ? Math.max(0, p.draft.year - ctx.season) : 0;
 	const proSeasons = proSeasonsOf(p);
 	const uncertainty = prospect
-		? getUncertainty(scouting) * (1.3 - 0.6 * departmentQualityForLevel(ctx.scoutingLevel)) + 0.7 * yearsOut
+		? getUncertainty(scouting) *
+				(1.3 - 0.6 * departmentQualityForLevel(ctx.scoutingLevel)) +
+			0.7 * yearsOut
 		: retired
 			? 0
 			: Math.max(0.4, 1.8 - 0.45 * proSeasons);
 	let archetype: string | undefined;
-	let builds2k: string[] | undefined;
 	if (ratings && featureOn("archetypes")) {
 		const found = archetypeFor(p, await getLeagueNorms());
 		if (found) {
-			archetype = found.view.label;
-			builds2k = TWO_K_NAMES[found.view.id];
+			// Only the archetype's name (no 2K build lists or "also close to")
+			archetype = found.view.name;
 		}
 	}
-	const contract =
-		!prospect && !retired && p.tid >= 0
-			? { amount: p.contract.amount, exp: p.contract.exp, rookie: p.contract.rookie }
-			: undefined;
+	const current = !prospect && !retired ? getCurrentContract(p) : undefined;
+	const contract = current
+		? {
+				amount: getNearestContractAmount(current, ctx.season),
+				exp: getContractExp(current),
+			}
+		: undefined;
 	const marketValue =
 		!prospect && !retired
 			? genContract({ ...p, value: p.valueFuzz } as any, false).amount
 			: undefined;
-	const draftPick = p.draft.round > 0 ? (p.draft.round - 1) * ctx.numTeams + p.draft.pick : undefined;
+	const draftPick =
+		p.draft.round > 0
+			? (p.draft.round - 1) * ctx.numTeams + p.draft.pick
+			: undefined;
 	const input: ScoutInput = {
 		pid: p.pid,
 		name: `${p.firstName} ${p.lastName}`,
@@ -879,12 +986,18 @@ export const buildInput = async (
 		injuries,
 		injury:
 			p.injury.gamesRemaining > 0
-				? { type: p.injury.type, part: injuryBodyPart(p.injury.type), games: p.injury.gamesRemaining }
+				? {
+						type: p.injury.type,
+						part: injuryBodyPart(p.injury.type),
+						games: p.injury.gamesRemaining,
+					}
 				: undefined,
 		combine: prospect && !light ? await combineFor(p) : undefined,
 		archetype,
-		builds2k,
-		looks: prospect && g.get("scoutingSystem") ? (p.scouting ?? []).length : undefined,
+		looks:
+			prospect && g.get("scoutingSystem")
+				? (p.scouting ?? []).length
+				: undefined,
 		uncertainty,
 		draft: {
 			year: p.draft.year,
@@ -902,7 +1015,9 @@ export const buildInput = async (
 		expandedRatings: ctx.expanded,
 		story: p.preDraftCareer?.story,
 		fit: light ? undefined : await teamFitFor(ctx, ratings, group, p.pid),
-		comps: light ? [] : await compsFor(p, ratings, age, pos, kind, ctx, ctx.dept.quality),
+		comps: light
+			? []
+			: await compsFor(p, ratings, age, pos, kind, ctx, ctx.dept.quality),
 		roleScale: ctx.roleScale,
 		development: light ? undefined : await developmentFor(ctx),
 		teamName: p.tid >= 0 ? ctx.teamNames.get(p.tid) : undefined,

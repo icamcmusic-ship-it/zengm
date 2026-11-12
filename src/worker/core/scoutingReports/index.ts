@@ -35,12 +35,14 @@ import {
 	type ScoutDepartment,
 	type Scout,
 	BIAS_NAMES,
+	SHORT_LABELS,
 	SPECIALTY_NAMES,
 	type ScoutInput,
 	type SnapStats,
 } from "../../../common/scoutingReports/index.ts";
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import type { Player, Race } from "../../../common/types.ts";
+import type { ScoutingExportPage } from "../../../common/playerExport.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { generateFace } from "../../util/face.ts";
@@ -52,7 +54,6 @@ import {
 	getPeers,
 	getReportCtx,
 	isProspectPlayer,
-	leagueSeed,
 	PHASES_WITH_SNAPSHOTS,
 	scoutingReportsOn,
 	type ReportCtx,
@@ -60,7 +61,7 @@ import {
 
 export { scoutingReportsOn, clearScoutingCache, departmentFor };
 
-const peersFor = async (input: ScoutInput, ctx: ReportCtx) =>
+const peersFor = (input: ScoutInput, ctx: ReportCtx) =>
 	getPeers(
 		ctx,
 		input.kind === "prospect" ? "prospect" : "pro",
@@ -170,7 +171,10 @@ export const getPlayerScoutingPage = async (pid: number, leadId?: number) => {
 					}),
 					overall: [
 						formatGradeRange(report.take.overall.lo, report.take.overall.hi),
-						formatGradeRange(report.secondTake.overall.lo, report.secondTake.overall.hi),
+						formatGradeRange(
+							report.secondTake.overall.lo,
+							report.secondTake.overall.hi,
+						),
 					],
 					ranges: [
 						`${roleName(report.take.floor, peerGroupOf(input.pos))} to ${roleName(report.take.ceiling, peerGroupOf(input.pos))}`,
@@ -269,7 +273,10 @@ const seededFace = (seed: string) => {
 
 const scoutCalls = async (ctx: ReportCtx) => {
 	const players = await idb.merged.players.getAll({ activeAndRetired: true });
-	const prospects = await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED);
+	const prospects = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		PLAYER.UNDRAFTED,
+	);
 	const calls: (ScoutCall & { judged: boolean })[] = [];
 	for (const p of [...players, ...prospects]) {
 		const rec = p.scoutDraft;
@@ -277,7 +284,8 @@ const scoutCalls = async (ctx: ReportCtx) => {
 			continue;
 		}
 		const retired = p.tid === PLAYER.RETIRED;
-		const judged = judgeable(rec.s, ctx.season, retired) && !isProspectPlayer(p);
+		const judged =
+			judgeable(rec.s, ctx.season, retired) && !isProspectPlayer(p);
 		let became = -1;
 		if (judged) {
 			const peakOvr = Math.max(
@@ -343,8 +351,18 @@ export const getDepartmentPage = async (tid: number) => {
 						calls: acc.calls,
 						hitRate: Math.round(100 * acc.hitRate),
 						avgError: Math.round(10 * acc.avgError) / 10,
-						best: acc.best ? trackLine(acc.best.said, acc.best.became).replace("Our scouts said", acc.best.name) : undefined,
-						worst: acc.worst ? trackLine(acc.worst.said, acc.worst.became).replace("Our scouts said", acc.worst.name) : undefined,
+						best: acc.best
+							? trackLine(acc.best.said, acc.best.became).replace(
+									"Our scouts said",
+									acc.best.name,
+								)
+							: undefined,
+						worst: acc.worst
+							? trackLine(acc.worst.said, acc.worst.became).replace(
+									"Our scouts said",
+									acc.worst.name,
+								)
+							: undefined,
 					}
 				: undefined,
 		};
@@ -354,10 +372,16 @@ export const getDepartmentPage = async (tid: number) => {
 	const moves: { season: number; text: string }[] = [];
 	for (const s of history) {
 		if (s.since > ctx.startingSeason - 1 && s.since <= ctx.season) {
-			moves.push({ season: s.since, text: `Hired ${s.name} (${SPECIALTY_NAMES[s.specialty].toLowerCase()})` });
+			moves.push({
+				season: s.since,
+				text: `Hired ${s.name} (${SPECIALTY_NAMES[s.specialty].toLowerCase()})`,
+			});
 		}
 		if (s.until <= ctx.season && s.until > ctx.startingSeason) {
-			moves.push({ season: s.until, text: `${s.name} left the department after ${s.until - s.since} seasons` });
+			moves.push({
+				season: s.until,
+				text: `${s.name} left the department after ${s.until - s.since} seasons`,
+			});
 		}
 	}
 	moves.sort((a, b) => b.season - a.season);
@@ -398,7 +422,11 @@ export const getDepartmentPage = async (tid: number) => {
 		pending: mine.filter((c) => !c.judged).length,
 		teams: teams
 			.filter((t) => !t.disabled)
-			.map((t) => ({ tid: t.tid, abbrev: t.abbrev, name: `${t.region} ${t.name}` })),
+			.map((t) => ({
+				tid: t.tid,
+				abbrev: t.abbrev,
+				name: `${t.region} ${t.name}`,
+			})),
 		userTid: g.get("userTid"),
 	};
 };
@@ -459,7 +487,9 @@ export const recordSnapshots = async (phase: number) => {
 			}
 		}
 		if (phase === PHASE.DRAFT && prospect && p.draft.year === season) {
-			const take2 = second ? scoutTake({ input, peers, scout: second }) : undefined;
+			const take2 = second
+				? scoutTake({ input, peers, scout: second })
+				: undefined;
 			const v = [take.expected, ...(take2 ? [take2.expected] : [])];
 			p.scoutDraft = {
 				s: season,
@@ -509,7 +539,10 @@ export const getOpponentScouting = async (season = g.get("season")) => {
 				continue;
 			}
 			if (s.home.tid === userTid || s.away.tid === userTid) {
-				found = { round, opp: s.home.tid === userTid ? s.away.tid : s.home.tid };
+				found = {
+					round,
+					opp: s.home.tid === userTid ? s.away.tid : s.home.tid,
+				};
 				break;
 			}
 		}
@@ -521,7 +554,9 @@ export const getOpponentScouting = async (season = g.get("season")) => {
 		return undefined;
 	}
 	const ctx = await getReportCtx();
-	const players = (await idb.cache.players.indexGetAll("playersByTid", found.opp))
+	const players = (
+		await idb.cache.players.indexGetAll("playersByTid", found.opp)
+	)
 		.filter((p) => p.injury.gamesRemaining === 0)
 		.sort((a, b) => b.valueNoPotFuzz - a.valueNoPotFuzz)
 		.slice(0, 5);
@@ -542,10 +577,14 @@ export const getOpponentScouting = async (season = g.get("season")) => {
 	if (avg("shoot") >= 8) {
 		keys.push("They shoot it: run them off the line and live with twos.");
 	} else if (avg("shoot") <= 5) {
-		keys.push("Pack the paint; they haven't shown they can make us pay from outside.");
+		keys.push(
+			"Pack the paint; they haven't shown they can make us pay from outside.",
+		);
 	}
 	if (avg("pm") >= 8) {
-		keys.push("Their passing is the engine. Pressure the handlers and stay home on shooters.");
+		keys.push(
+			"Their passing is the engine. Pressure the handlers and stay home on shooters.",
+		);
 	}
 	if (avg("reb") >= 8) {
 		keys.push("Box out: they win the glass if we let them.");
@@ -601,10 +640,18 @@ export const getScoutingSplit = async (pid: number) => {
 		const dept: ScoutDepartment = await departmentFor(t.tid);
 		const lead = dept.scouts[0];
 		if (lead) {
-			takes.push({ scout: `${t.region} ${lead.name}`, take: scoutTake({ input, peers, scout: lead }) });
+			takes.push({
+				scout: `${t.region} ${lead.name}`,
+				take: scoutTake({ input, peers, scout: lead }),
+			});
 		}
 	}
-	return scoutsSplit(input.name, input.pos, takes, `${ctx.seed}|${pid}|${ctx.season}`);
+	return scoutsSplit(
+		input.name,
+		input.pos,
+		takes,
+		`${ctx.seed}|${pid}|${ctx.season}`,
+	);
 };
 
 // The players scouts disagree on most right now (top prospects and the league's best), for a rumors feed
@@ -612,7 +659,9 @@ export const getScoutingRumors = async (limit = 3) => {
 	if (!scoutingReportsOn()) {
 		return [];
 	}
-	const prospects = (await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED))
+	const prospects = (
+		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+	)
 		.filter((p) => p.draft.year === g.get("season"))
 		.sort((a, b) => b.valueFuzz - a.valueFuzz)
 		.slice(0, 12);
@@ -633,7 +682,10 @@ export const getDraftPreviewFacts = async () => {
 		return undefined;
 	}
 	const season = g.get("season");
-	const all = await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED);
+	const all = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		PLAYER.UNDRAFTED,
+	);
 	const draftYear = g.get("phase") > PHASE.DRAFT ? season + 1 : season;
 	const prospects = all
 		.filter((p) => p.draft.year === draftYear)
@@ -670,14 +722,18 @@ export const getDraftPreviewFacts = async () => {
 	}
 	return {
 		draftYear,
-		scout: ctx.dept.scouts.find((s) => s.specialty === "college")?.name ?? ctx.dept.scouts[0]!.name,
+		scout:
+			ctx.dept.scouts.find((s) => s.specialty === "college")?.name ??
+			ctx.dept.scouts[0]!.name,
 		rows,
 	};
 };
 
 // ---- AI GMs: grades through their evaluation lens ----
 
-let lensCache: { key: string; z: Map<number, Partial<Record<GradeKey, number>>> } | undefined;
+let lensCache:
+	| { key: string; z: Map<number, Partial<Record<GradeKey, number>>> }
+	| undefined;
 
 /**
  * Draft adjustments in value points for an AI GM, from the grades his department sees through his analytics/old-school lens. The
@@ -699,7 +755,11 @@ export const gmLensAdjustments = (players: Player[], analytics: number) => {
 		const stats = GRADE_KEYS.map((k) => {
 			const vals = scores.map((s) => s[k]);
 			const mean = vals.reduce((a, b) => a + b, 0) / Math.max(1, vals.length);
-			const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, vals.length)) || 1;
+			const sd =
+				Math.sqrt(
+					vals.reduce((a, b) => a + (b - mean) ** 2, 0) /
+						Math.max(1, vals.length),
+				) || 1;
 			return { k, mean, sd };
 		});
 		players.forEach((p, i) => {
@@ -711,7 +771,66 @@ export const gmLensAdjustments = (players: Player[], analytics: number) => {
 		});
 		lensCache = { key, z };
 	}
-	return players.map((p) => gmLensAdjustment(analytics, lensCache!.z.get(p.pid) ?? {}));
+	return players.map((p) =>
+		gmLensAdjustment(analytics, lensCache!.z.get(p.pid) ?? {}),
+	);
+};
+
+// The PDF page (Download players)
+export const getScoutingExport = async (
+	pid: number,
+): Promise<ScoutingExportPage | undefined> => {
+	if (!scoutingReportsOn()) {
+		return undefined;
+	}
+	const p = await idb.merged.players.get(pid);
+	if (!p) {
+		return undefined;
+	}
+	const ctx = await getReportCtx();
+	const { report } = await reportFor(p, ctx);
+	return {
+		byline: `${report.byline.lead.name}, ${report.byline.lead.title}`,
+		overall: formatGradeRange(report.overall.lo, report.overall.hi),
+		overallGrade: report.overall.grade,
+		rangeLine: report.header.rangeLine,
+		confidence: report.header.confidence,
+		reference: report.reference,
+		archetype: report.header.archetype,
+		grades: report.grades.map((x) => ({
+			key: x.key,
+			short: SHORT_LABELS[x.key],
+			label: x.label,
+			text: formatGradeRange(x.lo, x.hi),
+			grade: x.grade,
+			lo: x.lo,
+			hi: x.hi,
+			line: x.line,
+			sub: !!x.sub,
+		})),
+		shotMix: report.shotMix?.map((m) => ({ label: m.label, share: m.share })),
+		comps: report.header.comps.map((x) => x.line),
+		flags: report.flags.map((f) => ({ text: f.text, red: f.tone === "red" })),
+		sections: [
+			...(report.pro
+				? [
+						{
+							title: "Pro report",
+							lines: [
+								`Role: ${report.pro.role}`,
+								report.pro.trendLine,
+								`Ideal role: ${report.pro.idealRole}`,
+								...(report.pro.contract ? [report.pro.contract] : []),
+							],
+						},
+					]
+				: []),
+			{ title: "Offense", lines: report.offense },
+			{ title: "Defense", lines: report.defense },
+			{ title: "Development", lines: report.development },
+		],
+		bottomLine: report.bottomLine,
+	};
 };
 
 export type { FullReport };

@@ -21,6 +21,7 @@ import "./pages-playoffs.ts";
 import "./pages-colour.ts";
 import "./pages-deals.ts";
 import "./pages-coaching.ts";
+import "./pages-scouting.ts";
 import { playInSidebar } from "./pages-league.ts";
 import { varyPaper } from "./vary.ts";
 import {

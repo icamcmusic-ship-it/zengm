@@ -1,3 +1,4 @@
+import { getScoutingExport } from "../core/scoutingReports/index.ts";
 import {
 	PLAYER,
 	PLAYER_STATS_TABLES,
@@ -394,6 +395,7 @@ export const getPlayersForExport = async ({
 					}
 				: undefined,
 			tables,
+			scouting: await getScoutingExport(pRaw.pid),
 			face: pRaw.imgURL ? undefined : pRaw.face,
 			imgURL: pRaw.imgURL || undefined,
 			colors: team?.colors,

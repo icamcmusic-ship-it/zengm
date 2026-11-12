@@ -1,4 +1,5 @@
 import { MoreLinks } from "../../components/MoreLinks.tsx";
+import { TradeScoutingBlurbs } from "../../components/ScoutingReport/index.tsx";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { PHASE } from "../../../common/constants.ts";
@@ -525,6 +526,12 @@ const Trade = (props: View<"trade">) => {
 							ref={summaryText}
 							prevTeams={state.prevTeams}
 							summary={summary}
+						/>
+
+						<TradeScoutingBlurbs
+							players={summary.teams.flatMap((team) =>
+								team.trade.map((p) => ({ pid: p.pid, name: p.name })),
+							)}
 						/>
 
 						<div ref={summaryControls}>

@@ -394,6 +394,188 @@ class Flow {
 	}
 }
 
+const gradeHex = (grade: number) => {
+	const t = Math.max(0, Math.min(1, grade / 12));
+	const stops = [
+		[198, 40, 40],
+		[239, 160, 40],
+		[200, 190, 60],
+		[85, 139, 47],
+		[46, 125, 50],
+	];
+	const pos = t * (stops.length - 1);
+	const i = Math.min(stops.length - 2, Math.floor(pos));
+	const f = pos - i;
+	return `#${stops[i]!.map((v, k) =>
+		Math.round(v + (stops[i + 1]![k]! - v) * f)
+			.toString(16)
+			.padStart(2, "0"),
+	).join("")}`;
+};
+
+const RADAR_PDF = ["shoot", "fin", "pm", "reb", "pd", "id", "ath", "iq"];
+
+// Scouting Reports: the one-page scouting card
+const drawScouting = (
+	pdf: MiniPdf,
+	p: PlayerExport,
+	sc: NonNullable<PlayerExport["scouting"]>,
+	accent: string,
+) => {
+	pdf.addPage();
+	let y = TOP + 6;
+	pdf.text(MARGIN, y + 14, `Scouting report: ${p.name}`, {
+		size: 16,
+		bold: true,
+		color: accent,
+	});
+	pdf.rect(RIGHT - 70, y - 2, 70, 30, gradeHex(sc.overallGrade));
+	pdf.text(RIGHT - 64, y + 19, truncate(sc.overall, 14, 60, true), {
+		size: 14,
+		bold: true,
+		color: "#ffffff",
+	});
+	y += 32;
+	for (const line of [
+		[p.pos, sc.archetype ?? "", `By ${sc.byline}`]
+			.filter(Boolean)
+			.join("  |  "),
+		`${sc.rangeLine}  |  Confidence: ${sc.confidence}`,
+		sc.reference,
+	]) {
+		pdf.text(MARGIN, y, truncate(line, 9, RIGHT - MARGIN - 80), {
+			size: 9,
+			color: "#444444",
+		});
+		y += 12;
+	}
+	y += 4;
+	// Grade bars, left half
+	const top = y;
+	const barX = MARGIN + 100;
+	const barW = 120;
+	for (const gr of sc.grades) {
+		const x0 = gr.sub ? MARGIN + 10 : MARGIN;
+		pdf.text(x0, y + 7, gr.label, { size: gr.sub ? 7.5 : 8.5, bold: !gr.sub });
+		pdf.rect(barX, y, barW, 8, "#eeeeee");
+		pdf.rect(
+			barX + (barW * gr.lo) / 12,
+			y,
+			Math.max(2, (barW * (gr.hi - gr.lo)) / 12),
+			8,
+			"#cfd8dc",
+		);
+		pdf.rect(
+			barX + (barW * gr.grade) / 12 - 1.5,
+			y - 1,
+			3,
+			10,
+			gradeHex(gr.grade),
+		);
+		pdf.text(barX + barW + 6, y + 7, gr.text, {
+			size: 8.5,
+			bold: true,
+			color: gradeHex(gr.grade),
+		});
+		y += 13;
+	}
+	// Radar, right
+	const cx = RIGHT - 120;
+	const cy = top + 90;
+	const R = 75;
+	const pt = (i: number, v: number) => {
+		const a = (Math.PI * 2 * i) / RADAR_PDF.length - Math.PI / 2;
+		const d = R * (0.08 + (0.92 * v) / 12);
+		return [cx + d * Math.cos(a), cy + d * Math.sin(a)] as const;
+	};
+	for (const f of [0.5, 1]) {
+		pdf.polygon(
+			RADAR_PDF.map((_, i) => pt(i, 12 * f)),
+			"#bbbbbb",
+			{ fill: false, width: 0.6 },
+		);
+	}
+	const byKey = new Map(sc.grades.map((x) => [x.key, x]));
+	pdf.polygon(
+		RADAR_PDF.map((k, i) => pt(i, byKey.get(k)?.grade ?? 0)),
+		"#90caf9",
+	);
+	pdf.polygon(
+		RADAR_PDF.map((k, i) => pt(i, byKey.get(k)?.grade ?? 0)),
+		"#1565c0",
+		{ fill: false, width: 1.2 },
+	);
+	RADAR_PDF.forEach((k, i) => {
+		const [lx, ly] = pt(i, 14.5);
+		const label = byKey.get(k)?.short ?? k;
+		pdf.text(lx - measure(label, 7) / 2, ly + 3, label, {
+			size: 7,
+			color: "#555555",
+		});
+	});
+	// Shot mix, under the radar
+	let ry = cy + R + 26;
+	if (sc.shotMix) {
+		pdf.text(cx - R, ry, "Shot mix", { size: 9, bold: true });
+		ry += 5;
+		let x = cx - R;
+		const colors = ["#0d6efd", "#6f42c1", "#fd7e14", "#20c997"];
+		sc.shotMix.forEach((m, i) => {
+			const w = (2 * R * m.share) / 100;
+			pdf.rect(x, ry, w, 10, colors[i]!);
+			x += w;
+		});
+		ry += 22;
+		pdf.text(
+			cx - R,
+			ry - 4,
+			truncate(
+				sc.shotMix.map((m) => `${m.label} ${m.share}%`).join(", "),
+				7.5,
+				2 * R + 40,
+			),
+			{ size: 7.5 },
+		);
+		ry += 8;
+	}
+	for (const comp of sc.comps.slice(0, 3)) {
+		for (const line of wrap(comp, 8, 2 * R + 40)) {
+			pdf.text(cx - R, ry, line, { size: 8 });
+			ry += 10;
+		}
+	}
+	y = Math.max(y, ry) + 8;
+	const block = (
+		title: string,
+		lines: string[],
+		color?: (i: number) => string,
+	) => {
+		if (lines.length === 0 || y > BOTTOM - 20) {
+			return;
+		}
+		pdf.text(MARGIN, y, title, { size: 10, bold: true, color: accent });
+		y += 12;
+		lines.forEach((line, i) => {
+			for (const w of wrap(line, 8.5, RIGHT - MARGIN)) {
+				if (y < BOTTOM) {
+					pdf.text(MARGIN, y, w, { size: 8.5, color: color?.(i) ?? "#000000" });
+				}
+				y += 10.5;
+			}
+		});
+		y += 4;
+	};
+	block(
+		"Flags",
+		sc.flags.map((f) => `${f.red ? "RED" : "GREEN"}: ${f.text}`),
+		(i) => (sc.flags[i]!.red ? "#c62828" : "#2e7d32"),
+	);
+	block("Bottom line", [sc.bottomLine]);
+	for (const sec of sc.sections) {
+		block(sec.title, sec.lines);
+	}
+};
+
 const drawPlayer = (
 	pdf: MiniPdf,
 	p: PlayerExport,
@@ -405,6 +587,9 @@ const drawPlayer = (
 
 	pdf.addPage();
 	drawOverview(pdf, p, face, accent);
+	if (p.scouting) {
+		drawScouting(pdf, p, p.scouting, accent);
+	}
 
 	// Each section of his profile starts on a new page, like the tabs of the player page
 	const flow = new Flow(pdf, accent);

@@ -3,7 +3,7 @@ import { helpers } from "../../util/helpers.ts";
 import { dropdownOptions } from "../../hooks/useDropdownOptions.tsx";
 import { PLAYER } from "../../../common/constants.ts";
 import { useLocal } from "../../util/local.ts";
-import { useFeatureOn } from "../../util/nativeFeatures.ts";
+import { useScoutingOn } from "../../components/ScoutingReport/index.tsx";
 import type { LeagueUrlParts } from "../../router/types.ts";
 
 export const SeasonLink = ({
@@ -91,7 +91,7 @@ export const usePlayerProfileOptions = (
 	current: "overview" | "gameLog" | "preDraft" | "traits" | "scouting",
 ) => {
 	const { playerTraits } = useLocal(["playerTraits"]);
-	const scoutingReports = useFeatureOn("scoutingReports");
+	const scoutingReports = useScoutingOn();
 	const keys = new Set(
 		(
 			getProfileDropdownOptions(player, !!playerTraits, scoutingReports) ??
