@@ -335,7 +335,7 @@ export const NATIVE_FEATURES = [
 		key: "realisticSchedule",
 		name: "Realistic Schedule Length",
 		description:
-			"The regular season is spread over about 2 days per game (82 games in about 160 days) instead of most teams playing almost every day: each team plays about every other day, with about 15 back-to-backs per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
+			"The regular season is spread over about 2 days per game (82 games in about 172 days) instead of most teams playing almost every day: each team plays about every other day, with about 14 back-to-backs and only a few 3-in-4s per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,

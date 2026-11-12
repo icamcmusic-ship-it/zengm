@@ -1,5 +1,5 @@
 // Realistic schedule length (the realisticSchedule League Extras setting, basketball): spread the regular season over
-// about 2 calendar days per game per team (82 games in ~160 days), instead of having every team play almost every day.
+// about 2 calendar days per game per team (82 games in ~172 days), instead of having every team play almost every day.
 // Each day is a set of games between teams that are rested enough:
 // - never 3 days in a row
 // - about 15 back-to-backs per 82 games (it varies a bit by team), the rest of the gaps are 1-3 days off
@@ -11,7 +11,7 @@
 
 // Calendar days per game per team, including the All-Star break and the trade deadline (the last few games usually
 // run a little past this)
-const DAYS_PER_GAME = 1.85;
+const DAYS_PER_GAME = 2;
 
 // Back-to-backs per game, NBA-like: ~14 in 82 games
 const B2B_PER_GAME = 14 / 82;
