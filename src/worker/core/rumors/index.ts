@@ -13,11 +13,6 @@ import {
 	getContractExp,
 	getCurrentContract,
 } from "../../../common/contracts.ts";
-import {
-	gmFireProb,
-	gmHotSeat,
-	gmSeasonScore,
-} from "../../../common/gmPersonality.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import {
 	addToTally,
@@ -72,7 +67,7 @@ import {
 } from "../contract/unrest.ts";
 import { getNeedLabels, getTeamNeeds } from "../draft/draftNeeds.ts";
 import { getFreeAgentMarket } from "../freeAgents/market.ts";
-import { gmEnabled, seasonScore, seasonsWithTeam } from "../gm/index.ts";
+import { gmEnabled, projectedFireProb } from "../gm/index.ts";
 import league from "../league/index.ts";
 import moodInfo from "../player/moodInfo.ts";
 import { coachSystemsEnabled, hotSeatNow } from "../staff/systems.ts";
@@ -586,6 +581,8 @@ const gatherExtension = async (ctx: Ctx): Promise<Draft[]> => {
 			rank += 1;
 			out.push({
 				type: "extension",
+				// Over the tax or a hard cap: a different bet, calibrated on its own
+				kind: blocked ? "blocked" : undefined,
 				tids: [info.tid],
 				pids: [p.pid],
 				fromTid: info.tid,
@@ -753,37 +750,15 @@ const gatherGm = async (ctx: Ctx): Promise<Draft[]> => {
 		if (!ts || gp < 10) {
 			continue;
 		}
-		const rows = seasonsWithTeam(gm, t.tid).filter(
-			(row) => row.season !== ctx.season,
-		);
-		const numGames = g.get("numGames");
-		// The season so far, projected to a full one
-		const scale = numGames / gp;
-		const current = gmSeasonScore({
+		// The season so far, projected to a full one, judged the way the owner will judge it after the playoffs (gm/index.ts)
+		const scale = g.get("numGames") / gp;
+		const fireProb = await projectedFireProb(t, ctx.teams, {
+			season: ctx.season,
 			won: ts.won * scale,
 			lost: ts.lost * scale,
 			tied: (ts.tied ?? 0) * scale,
 			otl: (ts.otl ?? 0) * scale,
-			expWon: gm.expWon,
-			numGames,
 			playoffRoundsWon: ctx.phase === PHASE.PLAYOFFS ? ts.playoffRoundsWon : -1,
-		});
-		const scores = [...rows.map(seasonScore), current];
-		let drought =
-			ctx.phase === PHASE.PLAYOFFS && ts.playoffRoundsWon >= 0 ? 0 : 1;
-		if (drought > 0) {
-			for (const row of rows.toReversed()) {
-				if (row.playoffRoundsWon >= 0) {
-					break;
-				}
-				drought += 1;
-			}
-		}
-		const fireProb = gmFireProb({
-			hotSeat: gmHotSeat(scores),
-			tenure: scores.length,
-			rebuilding: t.strategy === "rebuilding",
-			droughtSeasons: drought,
 		});
 		if (fireProb < 0.15) {
 			continue;
@@ -1122,7 +1097,7 @@ const makeRumors = async (
 				continue;
 			}
 			const { raw, weight: _weight, text, ...rest } = open[index]!;
-			const confidence = calibrate(raw, state.stats, type);
+			const confidence = calibrate(raw, state.stats, type, rest.kind);
 			const templates = rumorTemplates({
 				...text,
 				type,
@@ -1137,6 +1112,7 @@ const makeRumors = async (
 				tick: state.tick,
 				text: templates[Math.floor(random() * templates.length)]!,
 				confidence,
+				raw: Math.round(raw * 1000) / 1000,
 				status: "open",
 			};
 			if (

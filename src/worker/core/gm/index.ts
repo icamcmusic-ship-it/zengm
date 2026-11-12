@@ -339,6 +339,108 @@ const marketFactors = (teams: Team[]) => {
 	return map;
 };
 
+// The row of a season he ran (the expectations, his improvement path and rebuild credit), from its record
+const makeSeasonRow = async (
+	t: Team,
+	gm: Gm,
+	record: Pick<
+		GmSeason,
+		"season" | "won" | "lost" | "tied" | "otl" | "playoffRoundsWon"
+	>,
+) => {
+	const numGames = g.get("numGames");
+	const prevRows = judgedSeasons(gm, t.tid);
+	const prev = prevRows.at(-1);
+	const rebuilding = t.strategy === "rebuilding";
+	const first = prevRows.find((row) => row.expWon !== undefined);
+	const row: GmSeason = {
+		season: record.season,
+		tid: t.tid,
+		won: record.won,
+		lost: record.lost,
+		tied: record.tied,
+		otl: record.otl,
+		expWon: gm.expWon,
+		numGames,
+		playoffRoundsWon: record.playoffRoundsWon,
+	};
+	// Not GM when the season started (expectations are set then)
+	if (gm.expWon === undefined) {
+		row.partial = true;
+	}
+	if (first?.expWon !== undefined) {
+		row.pathExpWon =
+			Math.round(
+				gmPathExpWon({
+					baseExpWon: (first.expWon * numGames) / first.numGames,
+					numGames,
+					seasonIndex: prevRows.length,
+					rebuilding,
+				}) * 10,
+			) / 10;
+	}
+	const signals = await progressSignals(t, prev, record.won, numGames);
+	row.youth = signals.youth;
+	const rebuildWeight = gmRebuildWeight({
+		patience: gm.traits.patience,
+		rebuilding,
+	});
+	if (rebuildWeight > 0 && prev) {
+		row.progress = signals.progress;
+		row.rebuildWeight = rebuildWeight;
+	}
+	return row;
+};
+
+// The owner's chance to fire him after the playoffs, given the seasons he's judged on (gm.hotSeat is set from the same rows)
+const fireProbOf = (
+	t: Team,
+	gm: Gm,
+	rows: GmSeason[],
+	marketFactor: number,
+) => {
+	let drought = 0;
+	for (const row of rows.toReversed()) {
+		if (row.playoffRoundsWon >= 0) {
+			break;
+		}
+		drought += 1;
+	}
+	const firstExp = rows.find((row) => row.expWon !== undefined);
+	return gmFireProb({
+		hotSeat: rows.length > 0 ? gmHotSeat(rows.map(seasonScore)) : 0,
+		tenure: rows.length,
+		rebuilding: t.strategy === "rebuilding",
+		droughtSeasons: drought,
+		patience: gm.traits.patience,
+		contender:
+			firstExp?.expWon !== undefined &&
+			firstExp.expWon / firstExp.numGames >= 0.55,
+		marketFactor,
+	});
+};
+
+/**
+ * What the owner would decide if the season ended now, for the rumor mill: the season so far projected to a full one, judged like
+ * runOffseason judges it, and the chance he's fired. Read only, no random numbers
+ */
+export const projectedFireProb = async (
+	t: Team,
+	teams: Team[],
+	record: Pick<
+		GmSeason,
+		"season" | "won" | "lost" | "tied" | "otl" | "playoffRoundsWon"
+	>,
+) => {
+	const gm = t.gm;
+	if (!gm) {
+		return 0;
+	}
+	const row = await makeSeasonRow(t, gm, record);
+	const rows = [...judgedSeasons(gm, t.tid), ...(row.partial ? [] : [row])];
+	return fireProbOf(t, gm, rows, marketFactors(teams).get(t.tid) ?? 0);
+};
+
 const age = (gm: Gm) => g.get("season") - gm.born.year;
 
 // Leaves his team: fired, retired, or the user took over. He goes on the team's list of former GMs, where the carousel finds him
@@ -432,47 +534,14 @@ export const runOffseason = async () => {
 			ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0) > 0 &&
 			!gm.seasons.some((row) => row.season === season && row.tid === t.tid)
 		) {
-			const numGames = g.get("numGames");
-			const prevRows = judgedSeasons(gm, t.tid);
-			const prev = prevRows.at(-1);
-			const rebuilding = t.strategy === "rebuilding";
-			const first = prevRows.find((row) => row.expWon !== undefined);
-			const row: GmSeason = {
+			const row = await makeSeasonRow(t, gm, {
 				season,
-				tid: t.tid,
 				won: ts.won,
 				lost: ts.lost,
 				tied: ts.tied ?? 0,
 				otl: ts.otl ?? 0,
-				expWon: gm.expWon,
-				numGames,
 				playoffRoundsWon: ts.playoffRoundsWon,
-			};
-			// Not GM when the season started (expectations are set then)
-			if (gm.expWon === undefined) {
-				row.partial = true;
-			}
-			if (first?.expWon !== undefined) {
-				row.pathExpWon =
-					Math.round(
-						gmPathExpWon({
-							baseExpWon: (first.expWon * numGames) / first.numGames,
-							numGames,
-							seasonIndex: prevRows.length,
-							rebuilding,
-						}) * 10,
-					) / 10;
-			}
-			const signals = await progressSignals(t, prev, ts.won, numGames);
-			row.youth = signals.youth;
-			const rebuildWeight = gmRebuildWeight({
-				patience: gm.traits.patience,
-				rebuilding,
 			});
-			if (rebuildWeight > 0 && prev) {
-				row.progress = signals.progress;
-				row.rebuildWeight = rebuildWeight;
-			}
 			gm.seasons.push(row);
 		}
 		gm.expWon = undefined;
@@ -494,25 +563,7 @@ export const runOffseason = async () => {
 			continue;
 		}
 
-		let drought = 0;
-		for (const row of rows.toReversed()) {
-			if (row.playoffRoundsWon >= 0) {
-				break;
-			}
-			drought += 1;
-		}
-		const firstExp = rows.find((row) => row.expWon !== undefined);
-		const fireProb = gmFireProb({
-			hotSeat: gm.hotSeat ?? 0,
-			tenure: rows.length,
-			rebuilding: t.strategy === "rebuilding",
-			droughtSeasons: drought,
-			patience: gm.traits.patience,
-			contender:
-				firstExp?.expWon !== undefined &&
-				firstExp.expWon / firstExp.numGames >= 0.55,
-			marketFactor: markets.get(t.tid) ?? 0,
-		});
+		const fireProb = fireProbOf(t, gm, rows, markets.get(t.tid) ?? 0);
 		if (fireProb > 0 && Math.random() < fireProb) {
 			const won = rows.reduce((sum, row) => sum + row.won, 0);
 			const lost = rows.reduce((sum, row) => sum + row.lost, 0);

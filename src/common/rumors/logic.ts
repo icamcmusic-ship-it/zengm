@@ -1,3 +1,4 @@
+import { recalibrate } from "./calibration.ts";
 import {
 	RUMOR_LEVELS,
 	RUMOR_TYPES,
@@ -230,10 +231,12 @@ export const tradeRumorUntil = (
 const clamp01 = (x: number) => Math.max(0.01, Math.min(0.97, x));
 
 /**
- * Track record correction: (confirmed + K) / (expected + K) for a type, from the seasons on record. A league where a kind of rumor keeps
- * coming true less often than claimed (few AI trades, say) gets lower confidences from then on, and the other way around.
+ * Track record correction: (confirmed + K) / (expected + K) for a type, from the seasons on record, where expected is the sum of the
+ * model's chances (calibration.ts) before this correction. A league where a kind of rumor keeps coming true less often than the model
+ * says (few AI trades, say) gets lower confidences from then on, and the other way around. Measured against the model, not against the
+ * corrected confidences, so the correction doesn't undo itself once it works
  */
-export const CALIBRATION_K = 4;
+export const CALIBRATION_K = 10;
 export const calibrationFactor = (
 	stats: RumorState["stats"],
 	type: RumorType,
@@ -244,7 +247,7 @@ export const calibrationFactor = (
 		const tally = row[type];
 		if (tally) {
 			confirmed += tally[0];
-			expected += tally[2];
+			expected += tally[3] ?? tally[2];
 		}
 	}
 	return Math.max(
@@ -253,22 +256,39 @@ export const calibrationFactor = (
 	);
 };
 
+// The model's chance, from the raw score, then the league's correction, applied to the odds so a strong rumor can't be pushed past certain
 export const calibrate = (
 	raw: number,
 	stats: RumorState["stats"],
 	type: RumorType,
-) => Math.round(clamp01(raw * calibrationFactor(stats, type)) * 100) / 100;
+	kind?: string,
+) => {
+	const model = clamp01(recalibrate(type, kind, raw));
+	const odds = (model / (1 - model)) * calibrationFactor(stats, type);
+	return Math.round(clamp01(odds / (1 + odds)) * 100) / 100;
+};
+
+// The model's chance of a rumor, before the league's correction (old rumors without a raw score: their confidence)
+export const modelChance = (
+	rumor: Pick<Rumor, "type" | "kind" | "raw" | "confidence">,
+) =>
+	rumor.raw === undefined
+		? rumor.confidence
+		: clamp01(recalibrate(rumor.type, rumor.kind, rumor.raw));
 
 // Record a resolved rumor in the season it was made
 export const addToTally = (
 	stats: RumorState["stats"],
-	rumor: Pick<Rumor, "season" | "type" | "confidence">,
+	rumor: Pick<Rumor, "season" | "type" | "kind" | "raw" | "confidence">,
 	status: Exclude<RumorStatus, "open">,
 ) => {
 	const row = (stats[rumor.season] ??= {});
-	const tally: RumorTally = (row[rumor.type] ??= [0, 0, 0]);
+	const tally: RumorTally = (row[rumor.type] ??= [0, 0, 0, 0]);
+	// A tally from before the model's chances were recorded starts them from its confidences
+	tally[3] ??= tally[2];
 	tally[status === "confirmed" ? 0 : 1] += 1;
 	tally[2] = Math.round((tally[2] + rumor.confidence) * 100) / 100;
+	tally[3] = Math.round((tally[3] + modelChance(rumor)) * 1000) / 1000;
 };
 
 // Drop rumors older than the window (open ones from the previous season stay until they resolve) and old seasons of the record
