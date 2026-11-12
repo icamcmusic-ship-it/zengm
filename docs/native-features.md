@@ -681,6 +681,33 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Speed** (`simBenchmark.test.ts`, `SIM_BENCH=on`, seed 1, CPU of the regular season and playoffs): all on 26.7 s, without End-of-game intelligence 28.3 s, without Load, fatigue & venue 26.8 s: neither costs anything measurable (run-to-run noise ±5%).
 - **Known limits:** the crowd reads hype, not the actual attendance of the game; travel is from the visitors' home, not from where they played last; time zones and altitude are not modeled.
 
+### Realistic turnovers
+
+- **Setting:** `realisticTurnovers` (League Extras → Game Simulation). On for new leagues, off for existing leagues (off: nothing changes, the same random numbers, `outcomeInvariance.test.ts`). Code: `src/worker/core/GameSim.basketball/realisticTurnovers.ts` (constants), `GameSim.probTov` / `probStl`. Calibration: `RT_CAL=1 realisticTurnovers.script.test.ts` (whole seasons of new leagues).
+- **Why:** new leagues with the default League Extras had about 16.5–16.7 turnovers per team game (16.1 with every extra off; Game sim fixes and End-of-game intelligence add a few tenths), against 14–15 in the modern NBA.
+- **What:** each possession's turnover chance × 0.875 (in both possession models; the realistic possession model's shot-clock violation tendency reads the same chance, so violations go down a little too), and the chance that a turnover is a steal × 1.155, so steals per game stay the same and a larger share of turnovers are live-ball steals (STL/TOV .45 → .52, NBA ~.55). The possessions that no longer end in a turnover end in shots, so points go up about 1.7 per team game; pace goes down about 1 possession (a turnover ends a possession faster than a shot does).
+- **Calibration** (8 new leagues × 1 regular season each way, 9,840 games: the default league with every new-league setting, Marquee Games and the realistic schedule included; per team game):
+
+  | per team game         | off           | on            |
+  | --------------------- | ------------- | ------------- |
+  | TOV                   | 16.73         | 14.61         |
+  | STL                   | 7.54          | 7.58          |
+  | pts                   | 106.9         | 108.6         |
+  | pace                  | 103.1         | 102.2         |
+  | ORtg                  | 103.4         | 105.9         |
+  | FG%                   | .452          | .452          |
+  | FGA                   | 87.6          | 88.8          |
+  | 3PA rate              | .332          | .331          |
+  | 3P%                   | .345          | .345          |
+  | FTA                   | 23.5          | 24.2          |
+  | AST                   | 24.79         | 25.11         |
+  | ORB / DRB             | 11.31 / 34.06 | 11.49 / 34.55 |
+  | BLK                   | 5.13          | 5.20          |
+  | PF                    | 19.62         | 19.98         |
+  | shot-clock violations | 0.78          | 0.71          |
+
+- **Known limits:** one league-wide scale; who commits turnovers (ball handling, passing, pressure, coaching systems, traits) works as before.
+
 ### Season odds
 
 - **Where:** _Standings_ (a _Season odds_ section below the tables), _Power Rankings_ (Playoffs and Title columns), _Award Races_ (a Win% column), _Draft Lottery_ (a _What-if simulator_ below the lottery table).
@@ -710,11 +737,11 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
   - _Christmas_, day 66: 5 games and nothing else, with no games the day before, so every team is rested and the slate is the 5 best matchups (no team twice, no matchup that was already on opening night).
   - _MLK Day_, day 91: the 4 best matchups moved onto a regular day of games.
   - The schedule builder fills the exclusive days itself (at most that many games, the best ones first) and adds the days they cost to the season (about 2: 82 games in 172–174 days instead of 171–172). The MLK games are moved onto their day by the schedule editor (a swap with a game of the same team that day, a move, or a move after moving the game in the way), accepted only if it costs less than one 3-in-4, and pinned there; then the 3-in-4 repair runs again around them.
-- **National TV:** 3 games a week (2 in a week with a holiday slate), the best matchups that week, never two on one day, and a team's 3rd and later appearances count against it, so about 25 of 30 teams get national games and none more than about 15. Holiday games are national TV games too.
+- **National TV:** 3 games a week (2 in a week with a holiday slate), the best matchups that week, never two on one day, and a team's 3rd and later appearances count against it, so 72 national TV games a season in a 30-team league. Holiday games are national TV games too.
 - **Schedule pages:** badges under each game on Schedule and Daily Schedule (upcoming and completed): _Opening Night_ / _Christmas_ / _MLK Day_, _National TV_, _Rivalry_. The box score has a line under the attendance ("Christmas Day showcase, on national TV, a rivalry game"), and Games to Watch adds a reason (Christmas +6, Opening Night +5, MLK Day +3, national TV +2 hype points). The tags are saved with the schedule and the box score (`marquee`, `rivalry`), and the pages hide them while the setting is off.
 - **Crowd:** with _Load, fatigue & venue_ on, the home crowd term (0.5 + hype) gets +0.15 for a holiday game, +0.1 for a national TV game and +0.1 for a rivalry game, at most +0.2 together: at the 1% home court setting that is at most +0.007% of the home team's composite ratings, a few hundredths of a point of margin.
 - **Rest rules:** the same as the realistic schedule (never 3 days in a row, about 14 back-to-backs, the season length above); 3-in-4s per team 0.6–1.0 (4 seeds, against 0.2–0.7 for the same leagues without the setting).
-- **Sample** (the default league, a new league with seed 1): opening night PHI @ CHI, NYC @ ... (see the tests for the shape; slates differ by league).
+- **Sample** (the default league, a new league with the new-league settings, seed 1): opening night LA @ MIN and WAS @ BAL (rivalry); Christmas LA @ LV (rivalry), CLE @ MIN, TOR @ MON (rivalry), PHI @ NYC (rivalry), ATL @ WAS; MLK Day MON @ BAL, LV @ CLE, STL @ ATL, WAS @ MXC; 72 national TV games, 84 rivalry games, last day 174, 14.0 back-to-backs and 0.7 3-in-4s per team.
 - **Known limits:** basketball only. The schedule editor's _Regenerate_ and a saved edited schedule have no marquee games. Holidays are days of the season, not dates (BBGM has no calendar). Small leagues get smaller slates when fewer teams can play.
 
 ## Players
