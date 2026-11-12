@@ -17,7 +17,7 @@ import { g } from "../util/index.ts";
 import { archetypeFor, getLeagueNorms } from "../core/player/archetype.ts";
 import { traitsEnabled } from "../core/player/traits.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
-import { TWO_K_NAMES } from "../../common/archetypes/twoK/twoK.data.ts";
+import { TWO_K_NAMES } from "../../common/archetypes/defs.data.ts";
 
 export type ArchetypeRosterPlayer = {
 	pid: number;
@@ -26,7 +26,6 @@ export type ArchetypeRosterPlayer = {
 	ovr: number;
 	label: string;
 	group: ArchetypeGroup;
-	secondary?: string;
 	live: boolean;
 };
 
@@ -69,14 +68,12 @@ export const archetypeRoster = async ({
 			ovr: row.ovr,
 			label: found.view.label,
 			group: found.view.group,
-			secondary: found.view.secondaryName,
 			live: !found.stored,
 		});
 		rated.push({
 			pid: p.pid,
 			ovr: row.ovr,
 			archetypeId: found.view.id,
-			secondaryId: found.view.secondaryId,
 		});
 	}
 	players.sort((a, b) => b.ovr - a.ovr || a.pid - b.pid);
@@ -103,7 +100,7 @@ export type ArchetypeLandscape = {
 		count: number;
 		share: number;
 		top: ArchetypeTopPlayer[];
-		// NBA 2K builds that read as it
+		// The other NBA 2K build names it stands for
 		twoK: string[];
 	}[];
 };
