@@ -953,7 +953,7 @@ export const SHOT_FROM = 0.8;
 export const SHOT_K = 0.6;
 // (and a sniper's name, for an elite shooter, by SNIPER_K more)
 // (arch12: 1.5 -> 2, so the stars' concentration trim does not take the elite shooter's name from Curry)
-export const SNIPER_K = 2;
+export const SNIPER_K = 2.3;
 // A role's reading: half his absolute standing (absValue), half the blended reading of the same skill (mostly the shape of
 // his game), so a uniform shift of his ratings moves it little
 const roleValue = (k: string, p: Prepared) => {

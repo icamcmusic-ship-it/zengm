@@ -1010,7 +1010,7 @@ const PINNED: [string, number, string][] = [
 	["korveky01", 2021, "crafty-3-level-scorer"], // Kyle Korver
 	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook
 	["wembavi01", 2025, "shot-erasing-mid-paint-maestro"], // Victor Wembanyama
-	["doncilu01", 2025, "dime-dropping-dual-finisher"], // Luka Dončić
+	["doncilu01", 2025, "playmaking-3pt-slasher"], // Luka Dončić (arch13: his three fixed, 53 -> 71)
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
 	["adamsst01", 2025, "shot-erasing-putback-bully"], // Steven Adams
 	["allento01", 2018, "ball-hawking-mid-paint-scorer"], // Tony Allen
