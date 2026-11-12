@@ -72,7 +72,10 @@ export const realPlayer = (
 	},
 ): RealPlayer => {
 	const r = ratingsOf(row);
-	const pos = positionFor(r, true);
+	// (as the game reads him at the preseason: the stats of the seasons before, no earlier position)
+	const pos = positionFor({ ...r, season: row.season }, true, undefined, {
+		stats: (st.stats[row.slug] ?? []).filter((x) => x.season < row.season),
+	});
 	const born = d.bios[row.slug]?.bornYear;
 	return {
 		ratings: r,

@@ -3,7 +3,9 @@
 // are acceptable for him. Chosen by role: `spec` is what an acceptable build must promise ("L:x" = the build leads with x,
 // "+" = and, "|" = or; classes as in score.ts SKILL_CLASSES, "def" = either side of the floor), and the builds listed
 // are the closest ones by shape that his position allows and the spec accepts (Curry's by hand: shooting builds). arch11 added a fifth build where the reading's pick fits the role and the list had
-// missed it (mostly the new custom builds: Slashing Playmaker, Deep-Range Sniper, Pass-First Distributor).
+// missed it (mostly the new custom builds: Slashing Playmaker, Deep-Range Sniper, Pass-First Distributor); pos2 did the same
+// for seven players whose reading moved with the new positions (Young 2022, Simmons 2019, Iguodala 2016, Pippen 1994, Hill 1997,
+// Carter 2001, Ginobili 2008).
 // A tuning target (metrics.script.test.ts) and a test floor (archetypes.test.ts).
 export const GOLD: [
 	slug: string,
@@ -332,6 +334,7 @@ export const GOLD: [
 			"playmaking-3pt-creator",
 			"iso-sniper",
 			"slashing-playmaker",
+			"diming-inside-out-scorer",
 		],
 		"pass|shoot+pass|handle",
 	],
@@ -510,6 +513,7 @@ export const GOLD: [
 			"table-setting-board-enforcer",
 			"point-four",
 			"post-dimming-board-enforcer",
+			"2-way-crafty-putback-dimer",
 		],
 		"pass|finish+pass|def+pass",
 	],
@@ -610,6 +614,7 @@ export const GOLD: [
 			"ball-hawking-playshot",
 			"2-way-mid-range-menace",
 			"the-guard-dog",
+			"ball-hawking-lockdown",
 		],
 		"def|perD|pass+perD",
 	],
@@ -1058,6 +1063,7 @@ export const GOLD: [
 			"2-way-mid-paint-bully",
 			"ball-snatching-3-level-scorer",
 			"mid-paint-point-four",
+			"2-way-mid-paint-point-forward",
 		],
 		"def|perD|pass",
 	],
@@ -1181,6 +1187,7 @@ export const GOLD: [
 			"dunk-tank",
 			"rim-reaping-poster-dunker",
 			"point-four",
+			"dime-dropping-dual-finisher",
 		],
 		"pass|finish|handle",
 	],
@@ -1192,6 +1199,7 @@ export const GOLD: [
 			"high-flying-mid-range-slasher",
 			"mid-range-slasher",
 			"physical-mid-range-high-flyer",
+			"gritty-blow-by-high-flyer",
 		],
 		"ath|finish",
 	],
@@ -1249,6 +1257,7 @@ export const GOLD: [
 			"2-way-inside-out-creator",
 			"post-scoring-slasher",
 			"dime-dropping-dual-finisher",
+			"slashing-playmaker",
 		],
 		"handle|finish|pass",
 	],

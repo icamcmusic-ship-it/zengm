@@ -919,7 +919,7 @@ const PINNED: [string, number, string][] = [
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
 	["goberru01", 2025, "board-enforcing-bullmasher"], // Rudy Gobert
 	["antetgi01", 2025, "crashing-mid-paint-scorer"], // Giannis Antetokounmpo
-	["duranke01", 2025, "slashing-mid-range-maestro"], // Kevin Durant
+	["duranke01", 2025, "rim-reaping-mid-paint-scorer"], // Kevin Durant
 	["paulch01", 2025, "ball-hawking-3-and-d-point"], // Chris Paul
 	["greendr01", 2025, "lockdown-eraser"], // Draymond Green
 	["thompkl01", 2025, "crafty-sharpshooter"], // Klay Thompson
@@ -929,7 +929,7 @@ const PINNED: [string, number, string][] = [
 	["korveky01", 2021, "crafty-3-level-scorer"], // Kyle Korver
 	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook
 	["wembavi01", 2025, "shot-erasing-mid-paint-maestro"], // Victor Wembanyama
-	["doncilu01", 2025, "mid-paint-point-four"], // Luka Dončić
+	["doncilu01", 2025, "dime-dropping-dual-finisher"], // Luka Dončić
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
 	["adamsst01", 2025, "shot-erasing-putback-bully"], // Steven Adams
 	["allento01", 2018, "ball-hawking-mid-paint-scorer"], // Tony Allen

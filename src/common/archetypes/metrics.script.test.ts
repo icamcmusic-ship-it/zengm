@@ -210,6 +210,20 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 			pros: population("draft prospects, draftable (ovr>=40)", pros, out),
 			real: population("real NBA 2016-2025 (with stats)", real, out),
 		};
+		// Concentration among the real 2025 stars: the top 150 by overall
+		{
+			const top = real
+				.filter((p) => p.season === 2025)
+				.sort((a, b) => b.ovr - a.ovr)
+				.slice(0, 150);
+			const counts = {};
+			for (const p of top) {
+				const id = classify(p.ratings, read(p)).id;
+				counts[id] = (counts[id] ?? 0) + 1;
+			}
+			const [id, n] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+			out.push(`real 2025 top 150: max share ${id} ${pct(n, top.length)}%`);
+		}
 		// Perturbation: every rating but height moves by d (the same players, read again)
 		for (const dd of [3, 6]) {
 			let same = 0;
@@ -241,12 +255,14 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 				await develop(p, dev, true);
 				let prev;
 				let prevPos;
+				let prevR;
 				for (let y = 0; y < 5; y++) {
 					await develop(p, 1, false);
 					const row = p.ratings.at(-1);
 					if (ovrFn(row) < 38) continue;
 					const r = ratingsOfRow(row);
-					prevPos = positionFor(r, true, prevPos);
+					prevPos = positionFor(r, true, prevPos, { previousRatings: prevR });
+					prevR = r;
 					const c = classify(r, {
 						norms: NORMS,
 						previousId: prev?.id,

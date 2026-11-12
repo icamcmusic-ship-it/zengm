@@ -152,6 +152,8 @@ const develop = async (
 		tid: number;
 		weight: number;
 		srID?: string;
+		// Box-score stats, when loaded (improved positions read assist and usage rates)
+		stats?: unknown;
 	},
 	years: number = 1,
 	newPlayer: boolean = false,
@@ -219,7 +221,13 @@ const develop = async (
 				ratings.pos = p.pos;
 			} else {
 				// A developing player sticks to his current position (improved positions only); a new one gets a fresh one
-				ratings.pos = pos(ratings, newPlayer ? undefined : ratings.pos);
+				// (his assist and usage rates and last season's ratings: the two-season comparison)
+				ratings.pos = newPlayer
+					? pos(ratings, undefined, { stats: p.stats })
+					: pos(ratings, ratings.pos, {
+							stats: p.stats,
+							previousRatings: p.ratings.at(-2) as any,
+						});
 			}
 		} else {
 			let pos;

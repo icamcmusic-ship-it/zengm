@@ -39,7 +39,11 @@ test.skipIf(!process.env.RUN_ARCHETYPE_STATNORMS)(
 			if (!stats) continue;
 			const r = {};
 			for (const k of RATING_KEYS) r[k] = row[k];
-			rows.push({ stats, pos: positionFor(r, true) });
+			// (the position as a real-players league shows it at the preseason: with the stats of the seasons before)
+			const pos = positionFor({ ...r, season: row.season }, true, undefined, {
+				stats: (st.stats[row.slug] ?? []).filter((x) => x.season < row.season),
+			});
+			rows.push({ stats, pos });
 		}
 		const norms = buildStatNorms(rows);
 		writeFileSync(
