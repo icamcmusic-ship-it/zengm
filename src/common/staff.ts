@@ -100,7 +100,10 @@ export const staffDevScore = (
 
 // Calibration, see staff/calibration.test.ts. STAFF_DEV_SCORE_REF is roughly the league average dev score of hired staffs, so the average team gets the same development effect as the default coaching budget. STAFF_DEV_SCORE_SPREAD is the score difference that gives the maximum budget effect, chosen so the spread of effects across the league is similar to the spread of AI coaching budgets.
 export const STAFF_DEV_SCORE_REF = 57;
-export const STAFF_DEV_SCORE_SPREAD = 10.5;
+// 10.5 before the carry-over of last season's score and the smoother coach ratings (worker/core/staff STAFF_DEV_CARRY), which narrowed
+// the spread of team effects: rescaled so the spread of the 3-season effect player development uses is the same (SD 4.5% of progs,
+// docs/rating-inflation.md, staffSwing.script.test.ts)
+export const STAFF_DEV_SCORE_SPREAD = 9.0;
 
 // Inverse of levelToEffect in budgetLevels.ts
 export const effectToLevel = (effect: number) => {

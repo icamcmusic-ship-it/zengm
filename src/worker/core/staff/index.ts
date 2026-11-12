@@ -169,6 +169,47 @@ const getTeamDevScore = async (tid: number) => {
 	});
 };
 
+// Carry-over: a team's development score is this share of last season's plus the rest of its current staff's, so a new coach's effect
+// phases in (35% the first season, 58% the second, 73% the third, ...) and a team's development edge doesn't jump with every staff change.
+// STAFF_DEV_SCORE_SPREAD is set so the league-wide spread of effects is what it was without it (docs/rating-inflation.md)
+export const STAFF_DEV_CARRY = 0.65;
+
+// The season a staff's development counts for: the coming one after the playoffs
+const staffSeason = () => contractStartSeason();
+
+export const effectiveStaffDevScore = (
+	t: Pick<Team, "staffDevCarry">,
+	raw: number,
+	season: number = staffSeason(),
+) => {
+	const carry = t.staffDevCarry;
+	// (carry.season === season: committed at this offseason, which already counts for the coming season)
+	if (!carry || carry.season < season - 1) {
+		// A new league, or one from before this: the staff as it is
+		return raw;
+	}
+	return STAFF_DEV_CARRY * carry.score + (1 - STAFF_DEV_CARRY) * raw;
+};
+
+const getTeamEffectiveDevScore = async (t: Team, season?: number) =>
+	effectiveStaffDevScore(t, await getTeamDevScore(t.tid), season);
+
+// After the playoffs, before any staff change: remember the score the season was played with
+const commitDevCarry = async () => {
+	const season = g.get("season");
+	for (const t of (await idb.cache.teams.getAll()).filter((t) => !t.disabled)) {
+		if (t.staffDevCarry?.season === season) {
+			continue;
+		}
+		t.staffDevCarry = {
+			season,
+			score:
+				Math.round((await getTeamEffectiveDevScore(t, season)) * 1000) / 1000,
+		};
+		await idb.cache.teams.put(t);
+	}
+};
+
 // Average dev score of the league's current staffs, the score of an "average" staff (development effect 0). Normalizing
 // by it keeps the league-wide development effect centered as the coach pool's ratings drift over the decades, so the
 // coaching staff doesn't inflate or deflate player ratings (docs/rating-inflation.md). Only the spread across teams
@@ -183,14 +224,16 @@ export const getLeagueStaffDevScoreRef = async () => {
 	}
 	let total = 0;
 	for (const t of teams) {
-		total += await getTeamDevScore(t.tid);
+		total += await getTeamEffectiveDevScore(t);
 	}
 	return total / teams.length;
 };
 
 export const getStaffLevel = async (tid: number, ref?: number) => {
+	const t = await idb.cache.teams.get(tid);
+	const raw = await getTeamDevScore(tid);
 	return staffDevScoreToLevel(
-		await getTeamDevScore(tid),
+		t ? effectiveStaffDevScore(t, raw) : raw,
 		ref ?? (await getLeagueStaffDevScoreRef()),
 	);
 };
@@ -660,11 +703,15 @@ export const coachOfTheYear = async () => {
 
 const age = (c: CoachWithoutKey) => g.get("season") - c.born.year;
 
+// Yearly random change of each rating around the age trend. 1.5 before: a development coach's rating moved enough from one season to
+// the next to swing his team's development effect on its own (docs/rating-inflation.md)
+const COACH_PROGRESS_SD = 1;
+
 const progress = (c: Coach) => {
 	const a = age(c);
 	const mu = a < 45 ? 1.2 : a < 58 ? 0.2 : -1.2;
 	for (const key of helpers.keys(c.ratings)) {
-		c.ratings[key] = bound(c.ratings[key] + gauss(mu, 1.5));
+		c.ratings[key] = bound(c.ratings[key] + gauss(mu, COACH_PROGRESS_SD));
 	}
 };
 
@@ -703,6 +750,7 @@ export const runOffseason = async () => {
 	await ensureStaff();
 
 	const season = g.get("season");
+	await commitDevCarry();
 	await recordSeason();
 	await coachOfTheYear();
 	// Coaching systems: expectation, development and systems on the season rows; league system trends

@@ -2367,6 +2367,8 @@ export type Team = {
 
 	// Salary cap exceptions used (League Extras: Salary Cap Exceptions)
 	capExceptions?: TeamCapExceptions;
+	// Coaching staff: the development score the team played a season with, carried into the next (staff/index.ts STAFF_DEV_CARRY)
+	staffDevCarry?: { season: number; score: number };
 	depth?:
 		| {
 				QB: number[];
