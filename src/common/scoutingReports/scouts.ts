@@ -99,18 +99,6 @@ const FIRST = [
 	"Will",
 	"Yuri",
 	"Zoran",
-	"Ana",
-	"Becky",
-	"Carla",
-	"Denise",
-	"Jen",
-	"Kim",
-	"Laura",
-	"Maria",
-	"Nina",
-	"Rachel",
-	"Sue",
-	"Tanya",
 ];
 
 const LAST = [
@@ -426,11 +414,11 @@ export const departmentHistory = ({
 	level: number;
 	startingSeason: number;
 }) => {
-	const quality = departmentQualityForLevel(
-		Number.isFinite(level) ? level : 34,
-	);
+	const lvl = Number.isFinite(level) ? level : 34;
+	const quality = departmentQualityForLevel(lvl);
 	const out: Scout[] = [];
-	for (let slot = 0; slot < MAX_SCOUTS; slot++) {
+	// Only the slots the department has now
+	for (let slot = 0; slot < departmentSize(lvl); slot++) {
 		for (const c of slotChain(leagueSeed, tid, slot, startingSeason, season)) {
 			if (c.until > startingSeason - 1 && c.since <= season) {
 				out.push(scoutFromId(leagueSeed, c.id, quality, c.since, c.until));
