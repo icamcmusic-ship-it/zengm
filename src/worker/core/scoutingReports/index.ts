@@ -777,20 +777,50 @@ export const gmLensAdjustments = (players: Player[], analytics: number) => {
 };
 
 // The PDF page (Download players)
-export const getScoutingExport = async (
-	pid: number,
-): Promise<ScoutingExportPage | undefined> => {
-	if (!scoutingReportsOn()) {
-		return undefined;
+// The report as the PDF draws it. extended (the Export profile PDF set) adds what else the Scouting page shows: the two scouts'
+// takes, stock up / stock down and the track record
+export const scoutingExportFromPage = (
+	page: Pick<PlayerScoutingPage, "report"> &
+		Partial<Pick<PlayerScoutingPage, "changelog" | "comparison" | "track">>,
+	extended = false,
+): ScoutingExportPage => {
+	const { report } = page;
+	const extra: ScoutingExportPage["sections"] = [];
+	if (extended) {
+		if (page.comparison) {
+			const c = page.comparison;
+			extra.push({
+				title: `Two scouts' takes (${c.scouts[0]!.name} / ${c.scouts[1]!.name})`,
+				lines: [
+					`Overall: ${c.overall[0]} / ${c.overall[1]}`,
+					...c.rows.map((r) => `${r.label}: ${r.a} / ${r.b}`),
+					`Range: ${c.ranges[0]} / ${c.ranges[1]}`,
+				],
+			});
+		}
+		if (page.changelog && page.changelog.length > 0) {
+			extra.push({
+				title: "Stock up / stock down",
+				lines: page.changelog.flatMap((entry) => [
+					`${entry.season} ${entry.label}${entry.overall ? `: overall ${entry.overall.from} -> ${entry.overall.to}` : ""}`,
+					...entry.changes.map((c) => `- ${c.up ? "Up" : "Down"}: ${c.text}`),
+				]),
+			});
+		}
+		if (page.track) {
+			extra.push({
+				title: "Track record",
+				lines: [
+					page.track.text,
+					...(page.track.scouts.length > 0
+						? [`Scouts: ${page.track.scouts.join(", ")}`]
+						: []),
+				],
+			});
+		}
 	}
-	const p = await idb.merged.players.get(pid);
-	if (!p) {
-		return undefined;
-	}
-	const ctx = await getReportCtx();
-	const { report } = await reportFor(p, ctx);
 	return {
-		byline: `${report.byline.lead.name}, ${report.byline.lead.title}`,
+		byline: `${report.byline.lead.name}, ${report.byline.lead.title}${report.byline.second ? `; second opinion: ${report.byline.second.name}` : ""}`,
 		overall: formatGradeRange(report.overall.lo, report.overall.hi),
 		overallGrade: report.overall.grade,
 		rangeLine: report.header.rangeLine,
@@ -821,16 +851,51 @@ export const getScoutingExport = async (
 								report.pro.trendLine,
 								`Ideal role: ${report.pro.idealRole}`,
 								...(report.pro.contract ? [report.pro.contract] : []),
+								report.pro.usage,
 							],
 						},
 					]
 				: []),
+			...(report.retro
+				? [{ title: "Retrospective", lines: [report.retro] }]
+				: []),
 			{ title: "Offense", lines: report.offense },
 			{ title: "Defense", lines: report.defense },
-			{ title: "Development", lines: report.development },
-		],
+			{
+				title: "Physical profile",
+				lines: [
+					...report.physical,
+					...(report.combine ?? []).map(
+						(c) => `${c.label}: ${c.value} (${c.pct}th pct)`,
+					),
+				],
+			},
+			{
+				title: "Intangibles",
+				lines: report.intangibles.map((x) => `${x.name}: ${x.text}`),
+			},
+			{ title: "Development plan", lines: report.development },
+			{ title: "Team fit", lines: report.fit },
+			...extra,
+		].filter((section) => section.lines.length > 0),
 		bottomLine: report.bottomLine,
 	};
+};
+
+// For the PDF of "Download players"
+export const getScoutingExport = async (
+	pid: number,
+): Promise<ScoutingExportPage | undefined> => {
+	if (!scoutingReportsOn()) {
+		return undefined;
+	}
+	const p = await idb.merged.players.get(pid);
+	if (!p) {
+		return undefined;
+	}
+	const ctx = await getReportCtx();
+	const { report } = await reportFor(p, ctx);
+	return scoutingExportFromPage({ report });
 };
 
 export type { FullReport };

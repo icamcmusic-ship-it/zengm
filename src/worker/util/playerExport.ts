@@ -1,4 +1,5 @@
 import { getScoutingExport } from "../core/scoutingReports/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 import {
 	PLAYER,
 	PLAYER_STATS_TABLES,
@@ -47,15 +48,23 @@ const pickStats = (row: Record<string, unknown> | undefined) => {
 };
 
 // Column titles like the player page ("FG%", "3PA"), falling back to the key
-const colTitle = (prefix: "stat" | "rating", key: string) => {
+const colTitle = (prefix: "stat" | "rating", key: string): string => {
 	try {
 		return getCols([`${prefix}:${key}`])[0]!.title;
 	} catch {
+		// Game highs (fgMax) have the stat's own title, under a Game Highs header on the page
+		if (key.endsWith("Max") && key.length > 3) {
+			return colTitle(prefix, key.slice(0, -3));
+		}
 		return key;
 	}
 };
 
 const cell = (value: unknown): string | number => {
+	// Game highs are [value, gid, abbrev, tid, season]
+	if (Array.isArray(value)) {
+		return cell(value[0]);
+	}
 	if (typeof value === "number") {
 		return Number.isFinite(value) ? Math.round(value * 10) / 10 : "";
 	}
@@ -127,6 +136,7 @@ export const getPlayersForExport = async ({
 	gameLog?: boolean;
 }): Promise<PlayerExport[]> => {
 	const currentSeason = g.get("season");
+	const college = isCollege();
 	const traitContext = await getTraitViewContext();
 	const teamInfo = g.get("teamInfoCache");
 	const ratingKeys = ratingsKeysForView(RATINGS);
@@ -337,14 +347,17 @@ export const getPlayersForExport = async ({
 					? ratingsRow.wng
 					: undefined,
 			college: p.college || undefined,
-			draft: {
-				year: p.draft.year,
-				round: p.draft.round,
-				pick: p.draft.pick,
-				abbrev: (p.draft as any).abbrev ?? undefined,
-			},
+			// College leagues have no pro draft or contracts for their players (the pages don't show them)
+			draft: college
+				? { year: 0, round: 0, pick: 0 }
+				: {
+						year: p.draft.year,
+						round: p.draft.round,
+						pick: p.draft.pick,
+						abbrev: (p.draft as any).abbrev ?? undefined,
+					},
 			contract:
-				pRaw.tid === PLAYER.RETIRED || pRaw.tid === PLAYER.UNDRAFTED
+				college || pRaw.tid === PLAYER.RETIRED || pRaw.tid === PLAYER.UNDRAFTED
 					? undefined
 					: p.contract
 						? {
