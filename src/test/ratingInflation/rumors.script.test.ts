@@ -4,16 +4,18 @@
 // rumor came true. Run with
 // RUN_RUMORS=1 npx vitest run --project basketball src/test/ratingInflation/rumors.script.test.ts
 // Env: RUMOR_SEEDS (comma list, default 1), RUMOR_SEASONS (default 3), RUMOR_REPORT (text report, default /tmp/rumorsAudit.txt),
-// RUMOR_OUT (json file with every rumor).
+// RUMOR_OUT (json file with every rumor), RUMOR_FIT=1 (also print a calibration table fitted on these rumors' raw scores, for
+// common/rumors/calibration.ts).
 // RUMOR_FP=<file> RUMOR_ON=0|1 instead plays one season and some of the next (one seed) and writes what the AI decided, to compare
 // the mill on and off in two processes:
 // for on in 0 1; do RUN_RUMORS=1 RUMOR_FP=/tmp/fp$on.json RUMOR_ON=$on npx vitest run --project basketball src/test/ratingInflation/rumors.script.test.ts; done; cmp /tmp/fp0.json /tmp/fp1.json
 import { appendFileSync, writeFileSync } from "node:fs";
 import { test } from "vitest";
 import { PHASE } from "../../common/constants.ts";
-import { accuracyByLevel, accuracyByType } from "../../common/rumors/logic.ts";
+import { fitCalibration } from "../../common/rumors/calibration.ts";
+import { accuracyByType } from "../../common/rumors/logic.ts";
 import { renderRumorText } from "../../common/rumors/text.ts";
-import { RUMOR_TYPE_NAMES } from "../../common/rumors/types.ts";
+import { RUMOR_TYPE_NAMES, rumorLevel } from "../../common/rumors/types.ts";
 import { g, local } from "../../worker/util/index.ts";
 import { startAutoPlay } from "../../worker/core/league/autoPlay.ts";
 import { ALL_ON, createLeague, mulberry32, simFingerprint } from "./harness.ts";
@@ -32,6 +34,44 @@ const table = (rows) => {
 		);
 	}
 	log("");
+};
+
+// Claimed (mean confidence) vs observed rate per group of resolved rumors, with a 90% Wilson interval for the observed rate
+const calibrationRows = (rumors, keyOf) => {
+	const z = 1.6449;
+	const groups = new Map();
+	for (const r of rumors) {
+		if (r.status === "open") {
+			continue;
+		}
+		const key = keyOf(r);
+		const row = groups.get(key) ?? { n: 0, confirmed: 0, conf: 0 };
+		row.n += 1;
+		row.confirmed += r.status === "confirmed" ? 1 : 0;
+		row.conf += r.confidence;
+		groups.set(key, row);
+	}
+	return [...groups.entries()]
+		.sort((a, b) => a[0].localeCompare(b[0]))
+		.map(([key, { n, confirmed, conf }]) => {
+			const p = confirmed / n;
+			const d = 1 + (z * z) / n;
+			const center = (p + (z * z) / (2 * n)) / d;
+			const half =
+				(z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d;
+			const claimed = conf / n;
+			return {
+				key,
+				n,
+				claimed: Math.round(100 * claimed),
+				observed: Math.round(100 * p),
+				ci90: `${Math.round(100 * (center - half))}-${Math.round(100 * (center + half))}`,
+				inCI:
+					claimed >= center - half - 0.005 && claimed <= center + half + 0.005
+						? "yes"
+						: "NO",
+			};
+		});
 };
 
 const seeds = (process.env.RUMOR_SEEDS ?? "1").split(",").map(Number);
@@ -126,30 +166,19 @@ test.skipIf(!process.env.RUN_RUMORS || !!process.env.RUMOR_FP)(
 				local.autoPlayUntil = undefined;
 			}
 		}
-		table(accuracyByLevel(all));
-		// By type, kind and confidence (tenths)
-		const kinds = new Map();
-		for (const r of all) {
-			if (r.status === "open") {
-				continue;
-			}
-			const key = `${r.type}/${r.kind ?? ""}/${Math.floor(r.confidence * 5) / 5}`;
-			const row = kinds.get(key) ?? { n: 0, confirmed: 0, conf: 0 };
-			row.n += 1;
-			row.confirmed += r.status === "confirmed" ? 1 : 0;
-			row.conf += r.confidence;
-			kinds.set(key, row);
-		}
+		log("By confidence level");
+		table(calibrationRows(all, (r) => rumorLevel(r.confidence).key));
+		log("By type");
+		table(calibrationRows(all, (r) => r.type));
+		log("By type and level");
 		table(
-			[...kinds.entries()]
-				.sort((a, b) => a[0].localeCompare(b[0]))
-				.map(([key, row]) => ({
-					key,
-					n: row.n,
-					rate: Math.round((100 * row.confirmed) / row.n),
-					meanConf: Math.round((100 * row.conf) / row.n),
-				})),
+			calibrationRows(all, (r) => `${r.type}/${rumorLevel(r.confidence).key}`),
 		);
+		log("By type and kind");
+		table(calibrationRows(all, (r) => `${r.type}/${r.kind ?? ""}`));
+		if (process.env.RUMOR_FIT) {
+			log(JSON.stringify(fitCalibration(all)));
+		}
 		if (process.env.RUMOR_OUT) {
 			writeFileSync(process.env.RUMOR_OUT, JSON.stringify(all));
 		}

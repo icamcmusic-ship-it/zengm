@@ -20,8 +20,10 @@ import {
 	typeWeights,
 	weightedIndex,
 	MAX_RUMORS,
+	modelChance,
 	type RumorClock,
 } from "./logic.ts";
+import { recalibrate } from "./calibration.ts";
 import {
 	parseRumorText,
 	renderRumorText,
@@ -147,9 +149,15 @@ describe("Rumors: pure logic", () => {
 	test("track record: tallies, accuracy tables and the calibration correction", () => {
 		const state = emptyRumorState(1);
 		assert.strictEqual(calibrationFactor(state.stats, "shopping"), 1);
-		assert.strictEqual(calibrate(0.3, state.stats, "shopping"), 0.3);
+		// No track record: the model's chance from the calibration table
+		const model = recalibrate("shopping", "request", 0.7);
+		assert.strictEqual(
+			calibrate(0.7, state.stats, "shopping", "request"),
+			Math.round(model * 100) / 100,
+		);
 
-		// 40 shopping rumors at 30% of which only 4 came true: later ones are marked down
+		// 40 shopping rumors at 30% (no raw score: the confidence is the model's chance) of which only 4 came true: later ones are
+		// marked down, on the odds
 		for (let i = 0; i < 40; i++) {
 			addToTally(
 				state.stats,
@@ -157,10 +165,47 @@ describe("Rumors: pure logic", () => {
 				i < 4 ? "confirmed" : "busted",
 			);
 		}
-		assert.deepStrictEqual(state.stats[2026]!.shopping, [4, 36, 12]);
+		assert.deepStrictEqual(state.stats[2026]!.shopping, [4, 36, 12, 12]);
 		const factor = calibrationFactor(state.stats, "shopping");
-		assert.closeTo(factor, 8 / 16, 1e-9);
-		assert.closeTo(calibrate(0.3, state.stats, "shopping"), 0.15, 1e-9);
+		assert.closeTo(factor, (4 + 60) / (12 + 60), 1e-9);
+		const odds = (model / (1 - model)) * factor;
+		assert.closeTo(
+			calibrate(0.7, state.stats, "shopping", "request"),
+			odds / (1 + odds),
+			0.005,
+		);
+
+		// With a raw score, the tally's last entry is the model's chance, not the shown confidence, so a correction that works doesn't
+		// cancel itself out
+		addToTally(
+			state.stats,
+			rumor({ season: 2025, kind: "request", raw: 0.7, confidence: 0.1 }),
+			"busted",
+		);
+		assert.deepStrictEqual(state.stats[2025]!.shopping, [
+			0,
+			1,
+			0.1,
+			Math.round(
+				modelChance({
+					type: "shopping",
+					kind: "request",
+					raw: 0.7,
+					confidence: 0.1,
+				}) * 1000,
+			) / 1000,
+		]);
+		// A tally from before the model's chances were recorded
+		state.stats[2024] = { pick: [1, 1, 0.5] };
+		addToTally(
+			state.stats,
+			rumor({ season: 2024, type: "pick", confidence: 0.2 }),
+			"busted",
+		);
+		assert.deepStrictEqual(state.stats[2024].pick, [1, 2, 0.7, 0.7]);
+		delete state.stats[2024];
+		delete state.stats[2025];
+
 		// Other types are untouched, and the correction is bounded
 		assert.strictEqual(calibrationFactor(state.stats, "coach"), 1);
 		for (let i = 0; i < 400; i++) {
@@ -175,8 +220,8 @@ describe("Rumors: pure logic", () => {
 				"busted",
 			);
 		}
-		assert.strictEqual(calibrationFactor(state.stats, "gm"), 2.5);
-		assert.strictEqual(calibrationFactor(state.stats, "coach"), 0.25);
+		assert.strictEqual(calibrationFactor(state.stats, "gm"), 2);
+		assert.strictEqual(calibrationFactor(state.stats, "coach"), 0.5);
 		assert.isAtMost(calibrate(0.9, state.stats, "gm"), 0.97);
 		assert.isAtLeast(calibrate(0.001, state.stats, "coach"), 0.01);
 

@@ -206,6 +206,7 @@ describe("Rumors in a simulated league", () => {
 			"exp",
 			"text",
 			"confidence",
+			"raw",
 			"status",
 			"until",
 			"untilTick",

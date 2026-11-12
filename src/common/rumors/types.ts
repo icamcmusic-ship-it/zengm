@@ -47,6 +47,8 @@ export type Rumor = {
 	text: string;
 	// Chance it comes true, 0 to 1, as estimated when it was made
 	confidence: number;
+	// The model's score before calibration (see common/rumors/calibration.ts)
+	raw?: number;
 	status: RumorStatus;
 	// It is busted when the league reaches this moment (or this tick, if set) without it coming true
 	until: RumorMoment;
@@ -58,8 +60,9 @@ export type Rumor = {
 	user?: true;
 };
 
-// Per season and type: confirmed, didn't happen, sum of the confidences of both (what was expected to come true)
-export type RumorTally = [number, number, number];
+// Per season and type: confirmed, didn't happen, sum of the confidences of both (what was expected to come true), and the sum of the
+// model's chances before the league's own correction (missing in leagues from before it was recorded: then the confidences)
+export type RumorTally = [number, number, number] | [number, number, number, number];
 
 export type RumorState = {
 	// Seed of the rumor mill's own random stream. It never uses the sim's random numbers
