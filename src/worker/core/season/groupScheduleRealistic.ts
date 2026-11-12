@@ -3,11 +3,13 @@
 // Each day is a set of games between teams that are rested enough:
 // - never 3 days in a row
 // - about 15 back-to-backs per 82 games (it varies a bit by team), the rest of the gaps are 1-3 days off
-// - 3 games in 4 nights only for a team behind schedule. A season this short needs some: going without them takes
-//   ~170 days for 82 games (a back-to-back is then always between 2-day breaks), the real NBA's length
+// - 3 games in 4 nights only for a team far behind schedule, mostly in the last weeks, and then a repair pass
+//   (scheduleEditor.ts) moves single games to nearby days to remove most of them: about 0.6 per team per 82 games
 // - an All-Star break (a few days with no games and the All-Star Game in the middle) and the trade deadline on its own day
 // - home/away runs (road trips and homestands) when the remaining matchups allow it
 // Days are numbered from 1. Days with no games can be skipped (the All-Star break), the game loop never sees them.
+
+import { createScheduleEditor } from "./scheduleEditor.ts";
 
 // Calendar days per game per team, including the All-Star break and the trade deadline (the last few games usually
 // run a little past this)
@@ -40,10 +42,17 @@ const MIN_PARTNER_SCORE = -0.3;
 // and extra back-to-backs are allowed, and after OVERTIME_ANYTHING days (or a tenth of the season, if longer) even 3
 // days in a row, so it always ends
 const OVERTIME_3_IN_4 = 4;
-// Remaining games per remaining day above which a team may play 3 games in 4 nights (with a penalty)
-const NEED_3_IN_4 = 0.7;
+// Remaining games per remaining day above which a team may play 3 games in 4 nights (with a penalty): only a team
+// that would otherwise have to play every remaining day
+const NEED_3_IN_4 = 1;
 const THREE_IN_FOUR_PENALTY = 0.5;
 const OVERTIME_ANYTHING = 10;
+// The repair after the daily construction: games move up to this many days, and up to this many days per 82 games past
+// the target length (with the All-Star break and the trade deadline, about where the season ended before), but at
+// most REPAIR_MAX_EXTENSION days past where the daily construction ended
+const REPAIR_WINDOW = 12;
+const REPAIR_EXTRA_DAYS = 7;
+const REPAIR_MAX_EXTENSION = 2;
 
 export type RealisticScheduleEvents = {
 	// Fraction of the season (as in the allStarGame setting), or null for no All-Star Game
@@ -187,11 +196,7 @@ const groupScheduleRealistic = (
 			if (consecutive3 && overtime < overtimeAnything) {
 				continue;
 			}
-			if (
-				threeInFour &&
-				overtime < OVERTIME_3_IN_4 &&
-				need < NEED_3_IN_4
-			) {
+			if (threeInFour && overtime < OVERTIME_3_IN_4 && need < NEED_3_IN_4) {
 				continue;
 			}
 			eligible[t] = 1;
@@ -322,9 +327,24 @@ const groupScheduleRealistic = (
 
 	emitEvents(true);
 
+	// Then move games out of the remaining 3-in-4s (mostly in the last weeks, where the teams that fell behind catch up),
+	// up to a few days past the target length
+	const lastDay = Math.max(0, ...outDays);
+	const editor = createScheduleEditor(
+		outTids,
+		outDays,
+		Math.min(
+			lastDay + REPAIR_MAX_EXTENSION,
+			getTargetNumPlayDays(maxGames) +
+				Math.round((REPAIR_EXTRA_DAYS * maxGames) / 82),
+		),
+	);
+	editor.repairThreeInFour(REPAIR_WINDOW);
+	const repaired = editor.getSchedule();
+
 	return {
-		tids: outTids,
-		days: outDays,
+		tids: repaired.tids,
+		days: repaired.days,
 	};
 };
 
