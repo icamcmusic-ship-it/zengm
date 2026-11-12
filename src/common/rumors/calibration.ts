@@ -13,7 +13,86 @@ export type CalibrationCurve = [number, number][];
 // Keys: "type" or "type/kind"
 export type CalibrationTable = Record<string, CalibrationCurve>;
 
-export const RUMOR_CALIBRATION: CalibrationTable = {};
+// Fitted on 48 leagues x 6 seasons (~23,000 resolved rumors; GM hot seat only from the 32 leagues after fair GM job security)
+export const RUMOR_CALIBRATION: CalibrationTable = {
+	coach: [
+		[0.17, 0.18],
+		[0.258, 0.272],
+		[0.331, 0.301],
+		[0.356, 0.391],
+		[0.367, 0.494],
+		[0.375, 0.525],
+		[0.487, 0.577],
+		[0.608, 0.591],
+		[0.632, 0.65],
+	],
+	draft: [
+		[0.33, 0.279],
+		[0.5, 0.396],
+		[0.53, 0.699],
+	],
+	extension: [
+		[0.107, 0.006],
+		[0.191, 0.052],
+		[0.245, 0.065],
+		[0.329, 0.128],
+		[0.412, 0.16],
+		[0.487, 0.239],
+		[0.538, 0.301],
+		[0.633, 0.334],
+		[0.695, 0.448],
+		[0.767, 0.511],
+		[0.822, 0.652],
+		[0.831, 0.699],
+		[0.841, 0.746],
+	],
+	"extension/blocked": [[0.08, 0.228]],
+	"freeAgent/finalists": [
+		[0.087, 0.07],
+		[0.125, 0.167],
+		[0.166, 0.197],
+		[0.203, 0.265],
+		[0.231, 0.273],
+		[0.257, 0.343],
+		[0.334, 0.416],
+		[0.446, 0.429],
+		[0.599, 0.517],
+	],
+	"freeAgent/leaning": [
+		[0.056, 0.049],
+		[0.093, 0.115],
+		[0.11, 0.124],
+		[0.139, 0.154],
+		[0.166, 0.165],
+		[0.208, 0.197],
+		[0.294, 0.215],
+		[0.499, 0.25],
+	],
+	gm: [
+		[0.172, 0.079],
+		[0.206, 0.185],
+		[0.25, 0.226],
+		[0.335, 0.306],
+		[0.404, 0.486],
+		[0.456, 0.514],
+		[0.537, 0.651],
+		[0.661, 0.783],
+	],
+	"interest/request": [[0.06, 0.022]],
+	"interest/vet": [[0.028, 0.006]],
+	pick: [[0.05, 0.063]],
+	shopping: [[0.05, 0.04]],
+	"shopping/deadline": [[0.12, 0.011]],
+	"shopping/dump": [[0.08, 0.151]],
+	"shopping/rebuild": [[0.07, 0.195]],
+	"shopping/request": [[0.7, 0.402]],
+	unhappy: [
+		[0.1, 0.133],
+		[0.2, 0.339],
+		[0.5, 0.582],
+	],
+	"unhappy/holdout": [[0.2, 0.22]],
+};
 
 export const calibrationKey = (
 	type: RumorType,

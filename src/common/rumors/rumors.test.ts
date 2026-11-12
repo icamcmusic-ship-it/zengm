@@ -167,7 +167,7 @@ describe("Rumors: pure logic", () => {
 		}
 		assert.deepStrictEqual(state.stats[2026]!.shopping, [4, 36, 12, 12]);
 		const factor = calibrationFactor(state.stats, "shopping");
-		assert.closeTo(factor, (4 + 10) / (12 + 10), 1e-9);
+		assert.closeTo(factor, (4 + 60) / (12 + 60), 1e-9);
 		const odds = (model / (1 - model)) * factor;
 		assert.closeTo(
 			calibrate(0.7, state.stats, "shopping", "request"),
@@ -220,8 +220,8 @@ describe("Rumors: pure logic", () => {
 				"busted",
 			);
 		}
-		assert.strictEqual(calibrationFactor(state.stats, "gm"), 2.5);
-		assert.strictEqual(calibrationFactor(state.stats, "coach"), 0.25);
+		assert.strictEqual(calibrationFactor(state.stats, "gm"), 2);
+		assert.strictEqual(calibrationFactor(state.stats, "coach"), 0.5);
 		assert.isAtMost(calibrate(0.9, state.stats, "gm"), 0.97);
 		assert.isAtLeast(calibrate(0.001, state.stats, "coach"), 0.01);
 

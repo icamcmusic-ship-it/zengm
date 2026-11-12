@@ -236,7 +236,7 @@ const clamp01 = (x: number) => Math.max(0.01, Math.min(0.97, x));
  * says (few AI trades, say) gets lower confidences from then on, and the other way around. Measured against the model, not against the
  * corrected confidences, so the correction doesn't undo itself once it works
  */
-export const CALIBRATION_K = 10;
+export const CALIBRATION_K = 60;
 export const calibrationFactor = (
 	stats: RumorState["stats"],
 	type: RumorType,
@@ -251,8 +251,8 @@ export const calibrationFactor = (
 		}
 	}
 	return Math.max(
-		0.25,
-		Math.min(2.5, (confirmed + CALIBRATION_K) / (expected + CALIBRATION_K)),
+		0.5,
+		Math.min(2, (confirmed + CALIBRATION_K) / (expected + CALIBRATION_K)),
 	);
 };
 
