@@ -8,6 +8,9 @@ import {
 	genGmTraits,
 	gmFireProb,
 	gmHotSeat,
+	gmPathExpWon,
+	gmProgressScore,
+	gmRebuildWeight,
 	gmSeasonScore,
 	gmWeightsFromTraits,
 	type GmWeights,
@@ -136,11 +139,14 @@ const logGmEvent = async (text: string, tids: number[], score = 0) => {
 const startSeason = () =>
 	g.get("phase") > PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
 
-const hireGm = (t: Team, gm: Gm, initial?: boolean) => {
+const hireGm = (
+	t: Team,
+	gm: Gm,
+	initial?: boolean,
+	start: number = startSeason(),
+) => {
 	gm.tenures.push(
-		initial
-			? { tid: t.tid, start: startSeason(), initial: true }
-			: { tid: t.tid, start: startSeason() },
+		initial ? { tid: t.tid, start, initial: true } : { tid: t.tid, start },
 	);
 	gm.hotSeat = undefined;
 	gm.expWon = undefined;
@@ -249,6 +255,10 @@ export const seasonsWithTeam = (gm: Gm, tid: number) => {
 	);
 };
 
+// The seasons he's judged on: his own full seasons with his current team (none from before he was hired, nor one he took over midway)
+export const judgedSeasons = (gm: Gm, tid: number) =>
+	seasonsWithTeam(gm, tid).filter((row) => !row.partial);
+
 export const seasonScore = (row: GmSeason) =>
 	gmSeasonScore({
 		won: row.won,
@@ -258,7 +268,76 @@ export const seasonScore = (row: GmSeason) =>
 		expWon: row.expWon,
 		numGames: row.numGames,
 		playoffRoundsWon: row.playoffRoundsWon,
+		pathExpWon: row.pathExpWon,
+		progress: row.progress,
+		rebuildWeight: row.rebuildWeight,
 	});
+
+// Value of a team's best young players (25 and under), the core a rebuild is judged by
+const youthValue = async (tid: number) => {
+	const players = await idb.cache.players.indexGetAll("playersByTid", tid);
+	const season = g.get("season");
+	const values = players
+		.filter((p) => season - p.born.year <= 25)
+		.map((p) => p.value)
+		.sort((a, b) => b - a)
+		.slice(0, 3);
+	return values.length === 0
+		? 0
+		: values.reduce((a, b) => a + b, 0) / values.length;
+};
+
+// Progress signals for the season just finished
+const progressSignals = async (
+	t: Team,
+	prev: GmSeason | undefined,
+	won: number,
+	numGames: number,
+) => {
+	const youth = await youthValue(t.tid);
+	const picks = await idb.cache.draftPicks.indexGetAll(
+		"draftPicksByTid",
+		t.tid,
+	);
+	const season = g.get("season");
+	const numFuture = g.get("numSeasonsFutureDraftPicks");
+	const firsts = picks.filter(
+		(dp) =>
+			dp.round === 1 &&
+			typeof dp.season === "number" &&
+			dp.season > season &&
+			dp.season <= season + numFuture,
+	).length;
+	const ownFirsts = Math.min(numFuture, 4);
+	const payroll = await team.getPayroll(t.tid);
+	const salaryCap = g.get("salaryCap");
+	const scale = 82 / Math.max(1, numGames);
+	const progress = gmProgressScore({
+		youthChange: prev?.youth !== undefined ? youth - prev.youth : 0,
+		extraFirsts:
+			numFuture > 0
+				? (firsts * Math.min(numFuture, 4)) / numFuture - ownFirsts
+				: 0,
+		capRoom: (salaryCap - payroll) / Math.max(1, salaryCap),
+		winTrend: prev ? (won - prev.won) * scale : 0,
+	});
+	return { youth: Math.round(youth * 10) / 10, progress };
+};
+
+// Owner patience by market size: -1 (smallest market) to 1 (biggest)
+const marketFactors = (teams: Team[]) => {
+	const pops = teams.map((t) => t.pop ?? 1);
+	const sorted = [...pops].sort((a, b) => a - b);
+	const map = new Map<number, number>();
+	for (const t of teams) {
+		const rank = sorted.indexOf(t.pop ?? 1);
+		map.set(
+			t.tid,
+			sorted.length > 1 ? (2 * rank) / (sorted.length - 1) - 1 : 0,
+		);
+	}
+	return map;
+};
 
 const age = (gm: Gm) => g.get("season") - gm.born.year;
 
@@ -336,6 +415,7 @@ export const runOffseason = async () => {
 	const season = g.get("season");
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const vacancies: Team[] = [];
+	const markets = marketFactors(teams);
 
 	for (const t of teams) {
 		const gm = t.gm;
@@ -352,7 +432,12 @@ export const runOffseason = async () => {
 			ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0) > 0 &&
 			!gm.seasons.some((row) => row.season === season && row.tid === t.tid)
 		) {
-			gm.seasons.push({
+			const numGames = g.get("numGames");
+			const prevRows = judgedSeasons(gm, t.tid);
+			const prev = prevRows.at(-1);
+			const rebuilding = t.strategy === "rebuilding";
+			const first = prevRows.find((row) => row.expWon !== undefined);
+			const row: GmSeason = {
 				season,
 				tid: t.tid,
 				won: ts.won,
@@ -360,13 +445,39 @@ export const runOffseason = async () => {
 				tied: ts.tied ?? 0,
 				otl: ts.otl ?? 0,
 				expWon: gm.expWon,
-				numGames: g.get("numGames"),
+				numGames,
 				playoffRoundsWon: ts.playoffRoundsWon,
+			};
+			// Not GM when the season started (expectations are set then)
+			if (gm.expWon === undefined) {
+				row.partial = true;
+			}
+			if (first?.expWon !== undefined) {
+				row.pathExpWon =
+					Math.round(
+						gmPathExpWon({
+							baseExpWon: (first.expWon * numGames) / first.numGames,
+							numGames,
+							seasonIndex: prevRows.length,
+							rebuilding,
+						}) * 10,
+					) / 10;
+			}
+			const signals = await progressSignals(t, prev, ts.won, numGames);
+			row.youth = signals.youth;
+			const rebuildWeight = gmRebuildWeight({
+				patience: gm.traits.patience,
+				rebuilding,
 			});
+			if (rebuildWeight > 0 && prev) {
+				row.progress = signals.progress;
+				row.rebuildWeight = rebuildWeight;
+			}
+			gm.seasons.push(row);
 		}
 		gm.expWon = undefined;
 
-		const rows = seasonsWithTeam(gm, t.tid);
+		const rows = judgedSeasons(gm, t.tid);
 		gm.hotSeat = rows.length > 0 ? gmHotSeat(rows.map(seasonScore)) : undefined;
 
 		// Retirement
@@ -390,11 +501,17 @@ export const runOffseason = async () => {
 			}
 			drought += 1;
 		}
+		const firstExp = rows.find((row) => row.expWon !== undefined);
 		const fireProb = gmFireProb({
 			hotSeat: gm.hotSeat ?? 0,
 			tenure: rows.length,
 			rebuilding: t.strategy === "rebuilding",
 			droughtSeasons: drought,
+			patience: gm.traits.patience,
+			contender:
+				firstExp?.expWon !== undefined &&
+				firstExp.expWon / firstExp.numGames >= 0.55,
+			marketFactor: markets.get(t.tid) ?? 0,
 		});
 		if (fireProb > 0 && Math.random() < fireProb) {
 			const won = rows.reduce((sum, row) => sum + row.won, 0);
@@ -481,7 +598,8 @@ const fillVacancies = async (vacancies: Team[]) => {
 			gmid += 1;
 			text = `${teamLink(t.tid)} hired ${gmLink(gm)} as general manager, his first job running a team.`;
 		}
-		hireGm(t, gm);
+		// Hired after the playoffs, so his first season is next season (the phase may not have moved past the playoffs yet)
+		hireGm(t, gm, false, season + 1);
 		await idb.cache.teams.put(t);
 		await logGmEvent(text, [t.tid], 5);
 	}
