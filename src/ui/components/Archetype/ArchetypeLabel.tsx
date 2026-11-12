@@ -5,7 +5,6 @@ import type { ArchetypeGroup, Tier } from "../../../common/archetypes/index.ts";
 
 export type ArchetypeLabelInfo = {
 	name: string;
-	secondaryName?: string;
 	label: string;
 	desc: string;
 	group: ArchetypeGroup;
@@ -15,12 +14,14 @@ export type ArchetypeLabelInfo = {
 	live?: boolean;
 	why?: { label: string; z: number; want: number }[];
 	twoK?: string[];
+	alsoClose?: string[];
+	poorFit?: boolean;
 };
 
-// "2K: 2-Way 3-Level Scorer, Iso Savant (+12 more)": the NBA 2K builds that read as this archetype
+// "Same build: 2-Way 3-Level Scorer, Iso Savant (+12 more)": the other NBA 2K build names this archetype stands for
 export const twoKText = (names: string[] | undefined, max = 6) =>
 	names && names.length > 0
-		? `2K: ${names.slice(0, max).join(", ")}${names.length > max ? ` (+${names.length - max} more)` : ""}`
+		? `Same build in 2K: ${names.slice(0, max).join(", ")}${names.length > max ? ` (+${names.length - max} more)` : ""}`
 		: undefined;
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
@@ -39,7 +40,7 @@ export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
 	/>
 );
 
-// "up" when the player has more of it than typical for his size, "down" when the archetype wants less than typical
+// What the build wants that he has: more of it than his own average, or less where the build wants less
 const whyText = (w: { label: string; z: number; want: number }) =>
 	`${w.want < 0 ? "Low " : ""}${w.want < 0 ? w.label.toLowerCase() : w.label}`;
 
@@ -48,7 +49,15 @@ export const ArchetypeWhy = ({
 }: {
 	info: Pick<
 		ArchetypeLabelInfo,
-		"desc" | "why" | "tier" | "conf" | "season" | "live" | "twoK"
+		| "desc"
+		| "why"
+		| "tier"
+		| "conf"
+		| "season"
+		| "live"
+		| "twoK"
+		| "alsoClose"
+		| "poorFit"
 	>;
 }) => (
 	<div className="archetype-popover">
@@ -56,6 +65,11 @@ export const ArchetypeWhy = ({
 		{info.twoK && info.twoK.length > 0 ? (
 			<p className="mb-2 text-body-secondary" title={info.twoK.join(", ")}>
 				{twoKText(info.twoK)}
+			</p>
+		) : null}
+		{info.poorFit ? (
+			<p className="mb-2 text-body-secondary">
+				No build really has the shape of his ratings: this is the nearest one.
 			</p>
 		) : null}
 		{info.why && info.why.length > 0 ? (
@@ -67,6 +81,9 @@ export const ArchetypeWhy = ({
 					))}
 				</ul>
 			</>
+		) : null}
+		{info.alsoClose && info.alsoClose.length > 0 ? (
+			<p className="mb-2">Also close to: {info.alsoClose.join(", ")}</p>
 		) : null}
 		<div className="text-body-secondary">
 			{info.tier ? `${TIER_NAMES[info.tier]} tier. ` : ""}

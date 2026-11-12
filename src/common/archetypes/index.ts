@@ -9,8 +9,10 @@ export {
 	scoreAll,
 	tierFromPercentile,
 	TIER_NAMES,
-	HYBRID_Z,
 	STICKY_Z,
+	isPoorFit,
+	POOR_FIT_SCORE,
+	POOR_FIT_SHORT,
 	RARE_PENALTY,
 } from "./classify.ts";
 export { buildNorms } from "./match.ts";

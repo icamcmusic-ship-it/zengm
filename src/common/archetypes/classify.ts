@@ -10,9 +10,7 @@ import { DEFAULT_NORMS } from "./norms.data.ts";
 import { DEFAULT_NORMS_EXPANDED } from "./normsExpanded.data.ts";
 import { matchZ } from "./match.ts";
 import {
-	coverOf,
 	genericPenalty,
-	levelPenalty,
 	needPenaltyOf,
 	needShortfall,
 	prepare,
@@ -22,17 +20,11 @@ import {
 	standoutBonus,
 	standoutsOf,
 	twoWayBonus,
-	twoWaySides,
 	weightsOf,
 	type Standout,
 } from "./score.ts";
 import { ovrPercentile } from "./norms.ts";
-import {
-	archetypePrior,
-	isPos,
-	namesContradict,
-	positionOf,
-} from "./position.ts";
+import { archetypePrior, isPos, positionOf } from "./position.ts";
 import type {
 	Archetype,
 	ArchetypeRatings,
@@ -47,17 +39,6 @@ import type {
 	Why,
 } from "./types.ts";
 
-// One description for a combo archetype: "Hounds ball handlers and picks pockets, and also spaces the floor from the corners."
-export const combineArchetypeDescs = (primary: string, secondary?: string) => {
-	if (!secondary || secondary === primary) {
-		return primary;
-	}
-	const a = primary.trim().replace(/[!.]+$/, "");
-	const b = secondary.trim();
-	const bLower = /^[A-Z][a-z]/.test(b) ? b[0]!.toLowerCase() + b.slice(1) : b;
-	return `${a}, and also ${bLower.endsWith(".") ? bLower : `${bLower}.`}`;
-};
-
 // The built-in reference league: one generated with the Expanded Ratings setting on for players who have those ratings
 // (their composites, the two defense ratings and length are distributed differently), else the stock one
 export const defaultNorms = (expanded: boolean): Norms =>
@@ -65,43 +46,28 @@ export const defaultNorms = (expanded: boolean): Norms =>
 export const defaultNormsFor = (ratings: ArchetypeRatings): Norms =>
 	defaultNorms(hasExpanded(ratings));
 
-export const ARCHETYPES: Archetype[] = ARCHETYPE_DEFS.map((d) => ({
-	...d,
-	prior: 1,
-}));
+export const ARCHETYPES: Archetype[] = ARCHETYPE_DEFS;
 const BY_ID = new Map(ARCHETYPES.map((a) => [a.id, a]));
 export const archetypeById = (id: string) => BY_ID.get(id);
 export const archetypeByName = (name: string) =>
 	ARCHETYPES.find((a) => a.name === name);
 
-// Rare "unicorn" types need to be that much more exceptional a fit to be picked
+// Rare types need to be that much more exceptional a fit to be picked (no 2K build is marked rare now)
 export const RARE_PENALTY = 0.5;
-// Star archetypes (gated on an overall level well above the league's and on elite usage) win over the generic scorer labels
-// every star also fits, so the league's best players are told apart by what makes them elite
-export const STAR_BONUS = 0.5;
-// A runner-up this close (in standard deviations of fit) from a different family makes a hybrid
-export const HYBRID_Z = 0.15;
-// How much farther a runner-up may be when it names a standout skill of his the primary does not (per z of standout)
-export const SECONDARY_K = 0.4;
-const SECONDARY_REACH = 0.3;
-const SECONDARY_MIN = 0.2;
-const HYBRID_TIE_Z = 0.05;
-// A hybrid partner from another positional group (a wing label next to a forward one) needs to be this much closer
-export const CROSS_GROUP_Z = 0.05;
-const crossGroupPenalty = (a: Archetype, b: Archetype) =>
-	a.group === b.group ||
-	a.tags.includes("universal") ||
-	b.tags.includes("universal")
-		? 0
-		: CROSS_GROUP_Z;
-// A two-way player (with expanded ratings, where his defense is a rating of its own) whose primary label names one side
-// of his game: the partner that names the other side may be this much farther off, and is worth this much per unit of
-// his weaker side ("Mid-Range Wing / Lockdown Wing")
-export const TWO_WAY_PARTNER_REACH = 3;
-export const TWO_WAY_PARTNER_MIN_Z = 0.5;
-const TWO_WAY_PARTNER_FROM = 0.4;
 // The archetype he had keeps the label unless another is better by more than this
 export const STICKY_Z = 0.55;
+// Poor fit: no build his position allows really has the shape of his ratings, and the nearest one is shown. Either the
+// similarity itself is low (POOR_FIT_SCORE: set at the similarity 95% of the 2K builds have to their own archetype, see
+// twoK/build2k.script.test.ts), or the build's name promises a skill that is not among his better ones (he misses the
+// name's floors by more than POOR_FIT_SHORT z in all)
+export const POOR_FIT_SCORE = 0.5;
+export const POOR_FIT_SHORT = 0.25;
+export const isPoorFit = (c: { score: number; shortfall: number }) =>
+	c.score < POOR_FIT_SCORE || c.shortfall > POOR_FIT_SHORT;
+// How many runners-up are listed as "also close to" (never part of the label)
+export const ALTERNATES = 2;
+// A runner-up is only listed when its fit is within this much (in z) of the label's
+export const ALTERNATE_Z = 0.6;
 
 // Score of an archetype his position rules out: below anything a real fit can reach, but finite
 export const BLOCKED_Z = -99;
@@ -191,7 +157,8 @@ export const traitTerm = (
 	return t;
 };
 
-export type Scored = { a: Archetype; raw: number; z: number };
+// raw: similarity of shape, 0..1; z: how exceptional the fit is; short: how far he is from what the name promises (z)
+export type Scored = { a: Archetype; raw: number; z: number; short: number };
 
 // Score every archetype for one player, best first. An archetype's score is how exceptional the fit is among the league's
 // players of his size (so every archetype gets its share), ties break on id so the order is deterministic.
@@ -200,8 +167,6 @@ export const scoreAll = (
 	norms: Norms = defaultNormsFor(ratings),
 	archetypes: Archetype[] = ARCHETYPES,
 	position?: Pos,
-	// His age, when known: age-gated archetypes (veterans) need it
-	age?: number,
 	// His visible player traits (only with the playerTraits setting on): trait labels need them
 	traitsIn?: Partial<Record<string, number>>,
 ): {
@@ -215,27 +180,23 @@ export const scoreAll = (
 	hgt: number;
 	expanded: boolean;
 } => {
-	const p = { ...prepare(ratings, norms), age };
+	const p = prepare(ratings, norms);
 	const pos = position ?? positionOf(ratings);
 	const cv = classValues(p);
 	const standouts = standoutsOf(p, cv);
 	const traits = visibleTraits(traitsIn);
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
-		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded);
+		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
 		const prior = archetypePrior(a, pos);
 		const trait = traitTerm(a, traits);
 		if (
 			prior === null ||
 			trait === undefined ||
 			// A label about his length needs a wingspan
-			(a.expanded && !p.expanded) ||
-			(a.age &&
-				(age === undefined
-					? a.age[0] >= 30
-					: age < a.age[0] - 1 || age > a.age[1] + 1))
+			(a.expanded && !p.expanded)
 		) {
-			scored.push({ a, raw, z: BLOCKED_Z });
+			scored.push({ a, raw, z: BLOCKED_Z, short: 0 });
 			continue;
 		}
 		const table = norms.match[a.id];
@@ -243,25 +204,13 @@ export const scoreAll = (
 		const z =
 			(table ? matchZ(table, raw) : raw * 4 - 2) -
 			(a.rare ? RARE_PENALTY : 0) +
-			(a.tags.includes("star") ? STAR_BONUS : 0) +
 			prior +
 			trait +
 			((norms.bias ?? defaultNorms(p.expanded).bias)?.[a.id] ?? 0) +
-			signatureBonus(
-				a,
-				standouts,
-				cv,
-				p.hgt,
-				needShortfall(a, p, true),
-				p.expanded,
-			) -
+			signatureBonus(a, standouts, cv, p.hgt, short, p.expanded) -
 			genericPenalty(a, standouts) -
-			needPenaltyOf(short) -
-			levelPenalty(a, p.level) -
-			(a.age && age !== undefined
-				? 0.6 * Math.max(0, a.age[0] - age, age - a.age[1])
-				: 0);
-		scored.push({ a, raw, z });
+			needPenaltyOf(short);
+		scored.push({ a, raw, z, short });
 	}
 	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
 	return {
@@ -352,122 +301,41 @@ export type ClassifyOptions = {
 	stickiness?: number;
 	// His position (as the game shows it); read from the ratings when not given
 	pos?: string;
-	// His age, when known (veteran archetypes need it)
-	age?: number;
 	// His player traits as the user sees them (only with the playerTraits setting on; hidden ones are ignored)
 	traits?: Partial<Record<string, number>>;
 };
 
+// The ONE build he is most similar to. No hybrids: the runners-up are only listed as `alternates` ("also close to").
 export const classify = (
 	ratings: ArchetypeRatings,
 	opts: ClassifyOptions = {},
 ): Classification => {
 	const norms = opts.norms ?? defaultNormsFor(ratings);
-	const { scored, z, standouts, cv, hgt, expanded } = scoreAll(
+	const { scored, z, expanded } = scoreAll(
 		ratings,
 		norms,
 		ARCHETYPES,
 		isPos(opts.pos) ? opts.pos : undefined,
-		opts.age,
 		opts.traits,
 	);
 	let first = scored[0]!;
 	const sticky = opts.stickiness ?? STICKY_Z;
 	if (opts.previousId && opts.previousId !== first.a.id) {
 		const prev = scored.find((s) => s.a.id === opts.previousId);
-		// Never one his position (or age) now rules out, however sticky
+		// Never one his position now rules out, however sticky
 		if (prev && prev.z > BLOCKED_Z && prev.z >= first.z - sticky) {
 			first = prev;
 		}
 	}
 	const rest = scored.filter((s) => s.a.id !== first.a.id);
-	const second = rest[0]!;
-	// A hybrid names the best runner-up from a different family, preferring one that names a standout skill of his the
-	// primary leaves out (a shooter who also defends is a "... / Lockdown Wing")
-	const primaryCover = coverOf(first.a);
-	const adds = (s: Scored) => {
-		const c = coverOf(s.a);
-		let t = 0;
-		for (const { k, s: v } of standouts) {
-			t += v * Math.max(0, (c[k] ?? 0) - (primaryCover[k] ?? 0));
-		}
-		return SECONDARY_K * t;
-	};
-	// The side of a two-way player's game the primary leaves out, and how strong his weaker side is
-	let missing: "off" | "def" | undefined;
-	let twoWay = 0;
-	if (expanded) {
-		const all = twoWaySides(cv, hgt);
-		const named = twoWaySides(cv, hgt, first.a);
-		twoWay = Math.min(all.off, all.def);
-		if (twoWay >= TWO_WAY_PARTNER_FROM) {
-			missing =
-				named.def < 0.5 * all.def
-					? named.off < 0.5 * all.off
-						? undefined
-						: "def"
-					: named.off < 0.5 * all.off
-						? "off"
-						: undefined;
-		}
-	}
-	const completes = (s: Scored) =>
-		missing ? Math.min(twoWay, twoWaySides(cv, hgt, s.a)[missing]) : 0;
-	const allowed = (s: Scored) =>
-		// Never a label that names another position than the primary's ("Switchable Forward / Switchable Center"), and
-		// one from the primary's own positional group (or a universal one) is preferred
-		s.a.family !== first.a.family && !namesContradict(first.a.name, s.a.name);
-	let partner: Scored | undefined;
-	let partnerZ = -Infinity;
-	for (const s of rest) {
-		if (s.z < first.z - HYBRID_Z - SECONDARY_REACH) {
-			break;
-		}
-		if (!allowed(s)) {
-			continue;
-		}
-		const v = s.z + adds(s) - crossGroupPenalty(first.a, s.a);
-		if (v > partnerZ) {
-			partner = s;
-			partnerZ = v;
-		}
-	}
-	// A single strong label reads best: a partner only when it names a standout the primary does not, or it is all but
-	// tied with the primary
-	let secondary =
-		partner &&
-		partnerZ >= first.z - HYBRID_Z &&
-		(adds(partner) >= SECONDARY_MIN || partner.z >= first.z - HYBRID_TIE_Z)
-			? partner
-			: undefined;
-	// ... or when he is a two-way player and it names the side of his game the primary leaves out: then the partner only
-	// has to be a good fit in its own right, not a near tie
-	if (missing) {
-		let best: Scored | undefined;
-		let bestV = -Infinity;
-		for (const s of rest) {
-			if (
-				s.z < first.z - TWO_WAY_PARTNER_REACH ||
-				s.z < TWO_WAY_PARTNER_MIN_Z
-			) {
-				break;
-			}
-			const c = completes(s);
-			if (c < TWO_WAY_PARTNER_FROM || !allowed(s)) {
-				continue;
-			}
-			const v = s.z + c + adds(s) - crossGroupPenalty(first.a, s.a);
-			if (v > bestV) {
-				best = s;
-				bestV = v;
-			}
-		}
-		// (a regular partner that already names that side stays)
-		if (best && !(secondary && completes(secondary) >= TWO_WAY_PARTNER_FROM)) {
-			secondary = best;
-		}
-	}
-	const confidence = Math.max(0, Math.min(1, (first.z - second.z) / 0.5));
+	const second = rest[0];
+	const alternates = rest
+		.filter((s) => s.z > BLOCKED_Z && s.z >= first.z - ALTERNATE_Z)
+		.slice(0, ALTERNATES)
+		.map((s) => ({ id: s.a.id, name: s.a.name }));
+	const confidence = second
+		? Math.max(0, Math.min(1, (first.z - second.z) / 0.5))
+		: 1;
 	const tier =
 		opts.ovr !== undefined
 			? tierFromPercentile(ovrPercentile(norms, opts.ovr))
@@ -478,19 +346,15 @@ export const classify = (
 		name: a.name,
 		group: a.group,
 		family: a.family,
-		desc: combineArchetypeDescs(a.desc, secondary?.a.desc),
+		desc: a.desc,
 		tags: a.tags,
-		secondary: secondary
-			? {
-					id: secondary.a.id,
-					name: secondary.a.name,
-					desc: secondary.a.desc,
-				}
-			: null,
+		alternates,
 		score: Math.round(first.raw * 1000) / 1000,
+		fit: Math.round(first.z * 100) / 100,
+		shortfall: Math.round(first.short * 100) / 100,
 		confidence: Math.round(confidence * 100) / 100,
 		tier,
 		why: whyOf(a, z, expanded),
-		label: secondary ? `${a.name} / ${secondary.a.name}` : a.name,
+		label: a.name,
 	};
 };

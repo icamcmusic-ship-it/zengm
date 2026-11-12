@@ -306,6 +306,8 @@ const NAME_RULES: [RegExp, Pos[], PosWord, true?][] = [
 	// Explicit exceptions: a point forward is a forward who runs the offense, a point center a center who does
 	[/\bPoint Forward\b/, ["GF", "SF", "F", "PF"], "forward", true],
 	[/\bPoint Center\b/, ["FC", "C"], "big", true],
+	// (2K: a power forward who runs the offense)
+	[/\bPoint Four\b/, ["F", "PF", "FC"], "forward", true],
 	// "Point of Attack" is a defensive role, not the position
 	[/\bPoint\b(?! of\b)/, ["PG", "G"], "guard"],
 	[/\bGuard\b/, ["PG", "G", "SG"], "guard"],
@@ -313,8 +315,9 @@ const NAME_RULES: [RegExp, Pos[], PosWord, true?][] = [
 	[/\bFour\b/, ["F", "PF", "FC"], "forward"],
 	[/\bForward\b/, ["SF", "F", "PF", "FC"], "forward"],
 	[/\b(?:Center|Five)\b/, ["FC", "C"], "big"],
-	// "Big" as the noun: a "Big Guard" or a "Big Wing" is a tall guard or wing
-	[/\bBig\b(?! (?:Guard|Wing)\b)/, ["PF", "FC", "C"], "big"],
+	// "Big" as the noun: a "Big Guard" or a "Big Wing" is a tall guard or wing (and the 2K nicknames Big Glide, Big Range
+	// and Big Smooth name no position)
+	[/\bBig\b(?! (?:Guard|Wing|Glide|Range|Smooth)\b)/, ["PF", "FC", "C"], "big"],
 ];
 
 const nameInfoCache = new Map<

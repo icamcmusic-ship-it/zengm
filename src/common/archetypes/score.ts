@@ -35,21 +35,11 @@ export const gateFactor = (
 	return Math.exp(-((d / soft) ** 2));
 };
 
-// Level gate (his overall level, the mean of his size-adjusted skills, in z): softer than the height gate
-const LEVEL_SOFT = 0.3;
-// Outside the level gate the fit z is cut too (a table can be mostly near zero, which would read a miss as ordinary)
-// A level gate below the league's (raw prospects, journeymen), as opposed to a star's gate above it
-export const isLowLevel = (a: Archetype) =>
-	a.level !== undefined && a.level[1] <= 0;
-
-export const levelPenalty = (a: Archetype, level: number) =>
-	a.level ? 3 * (1 - gateFactor(level, a.level, LEVEL_SOFT)) : 0;
-
 // A label's defining skills must actually be there, not just be his relative best. Every dimension an archetype weights at
 // NEED_W or more is defining: he must be at least ordinary at it for his size (sz) and above his own norm (z), and the
 // explicit `need` floors are on the league-wide (absolute) z. Each z of shortfall costs NEED_K in fit z, plus NEED_STEP once.
 export const NEED_W = 2;
-export const NEED_K = 4;
+export const NEED_K = 6;
 export const NEED_STEP = 0.1;
 // Dimensions whose weight describes a style or his body, not a skill, so they are never gates
 const NOT_A_SKILL = new Set<DimKey>([
@@ -66,23 +56,11 @@ export type Prepared = {
 	z: Record<DimKey, number>;
 	sz: Record<DimKey, number>;
 	abs: Record<DimKey, number>;
-	level: number;
 	skills: SkillLabel[];
 	hgt: number;
 	// He has expanded ratings: perimeter/interior defense are ratings of their own and his length is known
 	expanded: boolean;
-	// His age, when known
-	age?: number;
 };
-
-// A player well below the league's level (a prospect) is held to lower absolute floors: a promising shooter for a 19 year
-// old is still a shooter
-const LEVEL_SLACK = 0.5;
-const LEVEL_SLACK_FROM = -0.6;
-// ... but only a young one (or one read as a veteran): a 30 year old journeyman's 45 three-point rating is not a promising
-// stroke. Full slack to 23, none from 27 (unknown age: full, as for draft prospects and regeneration targets)
-const youthOf = (age: number | undefined) =>
-	age === undefined ? 1 : Math.min(1, Math.max(0, (27 - age) / 4));
 
 // The per-archetype part of needShortfall (hot: every archetype for every player), computed once per archetype object.
 // Same terms in the same order, so the same results.
@@ -105,7 +83,6 @@ export const weightsOf = (a: Archetype, expanded: boolean): Archetype["w"] => {
 };
 
 type NeedTerms = {
-	low: boolean;
 	defining: { dim: DimKey; w: number }[];
 	need: [DimKey, number][];
 	cap: [DimKey, number][];
@@ -127,7 +104,6 @@ const getNeedTerms = (a: Archetype, expanded: boolean) => {
 			defining.push({ dim, w });
 		}
 		cached = {
-			low: isLowLevel(a),
 			defining,
 			need: Object.entries(a.need ?? {}) as [DimKey, number][],
 			cap: Object.entries(a.cap ?? {}) as [DimKey, number][],
@@ -138,32 +114,24 @@ const getNeedTerms = (a: Archetype, expanded: boolean) => {
 	return cached;
 };
 
-export const needShortfall = (a: Archetype, p: Prepared, strict = false) => {
-	const { low, defining, need, cap, needFor } = getNeedTerms(a, p.expanded);
+// Every skill is read relative to his own level (norms.ts), so the floors are on the shape of his game: a label's skill
+// must stand out for HIM, whatever his overall
+export const needShortfall = (a: Archetype, p: Prepared) => {
+	const { defining, need, cap, needFor } = getNeedTerms(a, p.expanded);
 	let short = 0;
-	const slack =
-		low || strict
-			? 0
-			: LEVEL_SLACK *
-				Math.max(0, LEVEL_SLACK_FROM - p.level) *
-				// A veteran label is read against his decline: the slack holds whatever his age
-				(a.age && a.age[0] >= 30 ? 1 : youthOf(p.age));
 	for (const { dim, w } of defining) {
 		short += Math.max(0, 0.1 * w - 0.1 - p.z[dim]);
-		// A raw prospect is read against himself only: his skills are not there yet in league terms
-		if (!low) {
-			short += Math.max(0, 0.1 * (w - 2) - 0.05 - slack - p.sz[dim]);
-		}
+		short += Math.max(0, 0.1 * (w - 2) - 0.05 - p.sz[dim]);
 	}
 	for (const [dim, floor] of need) {
 		if (STYLE_DIMS.has(dim)) {
-			// Length is a measurement (no slack for a prospect), and only known with expanded ratings (so are the styles)
+			// Length and the styles are only known with expanded ratings
 			if (p.expanded) {
 				short += Math.max(0, floor - p.abs[dim]);
 			}
 			continue;
 		}
-		short += Math.max(0, floor - slack - p.abs[dim]);
+		short += Math.max(0, floor - p.abs[dim]);
 	}
 	for (const [dim, ceiling] of cap) {
 		if (!STYLE_DIMS.has(dim) || p.expanded) {
@@ -171,7 +139,7 @@ export const needShortfall = (a: Archetype, p: Prepared, strict = false) => {
 		}
 	}
 	for (const [dim, floor] of needFor) {
-		short += Math.max(0, floor - slack - p.sz[dim]);
+		short += Math.max(0, floor - p.sz[dim]);
 	}
 	return short;
 };
@@ -237,7 +205,6 @@ export const rawMatch = (
 	z: Record<DimKey, number>,
 	hgt: number,
 	skills: SkillLabel[],
-	level = 0,
 	// He has expanded ratings (see Prepared)
 	expanded = false,
 ) => {
@@ -250,9 +217,6 @@ export const rawMatch = (
 		num += imp * (over ? OVERSHOOT : 1) * (z[dim] - target) ** 2;
 	}
 	let score = (1 / (1 + num / den)) * gateFactor(hgt, a.hgt);
-	if (a.level) {
-		score *= gateFactor(level, a.level, LEVEL_SOFT);
-	}
 	for (const s of a.req ?? []) {
 		if (!skills.includes(s)) {
 			score *= MISSING_REQ;
@@ -272,7 +236,7 @@ export const rawMatch = (
 export const SKILL_CLASSES: Record<string, DimKey[]> = {
 	shoot: ["three"],
 	mid: ["mid"],
-	finish: ["rim", "draw"],
+	finish: ["fin", "rim", "draw"],
 	post: ["post"],
 	handle: ["drb"],
 	pass: ["pss"],
@@ -310,12 +274,9 @@ const STANDOUT_ABS: Partial<Record<DimKey, number>> = { blk: 0.4, dint: 0.4 };
 const STANDOUT_FROM = 0.9;
 const STANDOUT_CAP = 1.2;
 const STANDOUT_FADE = 1.2;
-const STANDOUT_LIFT = 0.7;
 const DEF_IQ_ROOM = 1;
-// His level at each skill class, for his size: the best of its dimensions, read partly against himself when he is well
-// below the league's level (a raw prospect, a journeyman: his best skills stand out among players like him)
+// How far each skill class stands out from his own level, for his size: the best of its dimensions
 export const classValues = (p: Prepared): Record<string, number> => {
-	const lift = STANDOUT_LIFT * Math.max(0, -p.level);
 	const vals: Record<string, number> = {};
 	for (const [k, dims] of Object.entries(SKILL_CLASSES)) {
 		let v = -Infinity;
@@ -338,7 +299,7 @@ export const classValues = (p: Prepared): Record<string, number> => {
 				v = Math.max(v, p.sz.idef);
 			}
 		}
-		vals[k] = v + lift;
+		vals[k] = v;
 	}
 	return vals;
 };
@@ -366,15 +327,9 @@ export const standoutsOf = (
 };
 export const STANDOUT_K = 0.35;
 const SHORTFALL_FADE = 0.02;
-// Only a label he fully qualifies for gets it (no defining-skill shortfall, without the slack a raw prospect gets): it
-// must not buy back a missing skill. Raw prospect, journeyman and veteran labels are about his stage, not a skill.
+// Only a label he fully qualifies for gets it (no defining-skill shortfall): it must not buy back a missing skill
 export const standoutBonus = (a: Archetype, st: Standout[], shortfall = 0) => {
-	if (
-		st.length === 0 ||
-		shortfall >= SHORTFALL_FADE ||
-		isLowLevel(a) ||
-		a.age
-	) {
+	if (st.length === 0 || shortfall >= SHORTFALL_FADE) {
 		return 0;
 	}
 	const c = coverOf(a);
@@ -385,11 +340,9 @@ export const standoutBonus = (a: Archetype, st: Standout[], shortfall = 0) => {
 	return STANDOUT_K * b * (1 - shortfall / SHORTFALL_FADE);
 };
 
-// Fades a bonus out with any defining-skill shortfall (strict: without a prospect's slack); never for lifecycle labels
-const qualifies = (a: Archetype, shortfall: number) =>
-	shortfall >= SHORTFALL_FADE || isLowLevel(a) || a.age
-		? 0
-		: 1 - shortfall / SHORTFALL_FADE;
+// Fades a bonus out with any defining-skill shortfall
+const qualifies = (shortfall: number) =>
+	shortfall >= SHORTFALL_FADE ? 0 : 1 - shortfall / SHORTFALL_FADE;
 
 // A big body (hgt rating): finishing is his size more than a skill, passing a rare one
 const BIG_HGT = 55;
@@ -412,7 +365,7 @@ export const twoWayBonus = (
 	shortfall = 0,
 	expanded = false,
 ) => {
-	const q = qualifies(a, shortfall);
+	const q = qualifies(shortfall);
 	if (q === 0) {
 		return 0;
 	}
@@ -463,7 +416,7 @@ export const passingBigBonus = (
 	}
 	return (
 		PASSING_BIG_K *
-		qualifies(a, shortfall) *
+		qualifies(shortfall) *
 		(coverOf(a).pass ?? 0) *
 		Math.min(1, Math.max(0, cv.pass! - PASSING_BIG_FROM))
 	);
@@ -493,7 +446,6 @@ export const prepare = (ratings: ArchetypeRatings, norms: Norms): Prepared => {
 		z,
 		sz: v.sz,
 		abs: v.abs,
-		level: v.level,
 		skills: skillsOf(ratings),
 		hgt: ratings.hgt,
 		expanded: v.expanded,
