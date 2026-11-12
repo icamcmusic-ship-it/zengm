@@ -16,15 +16,16 @@ export const LOAD = {
 	// players get hurt more often and the league injury rate stays the same whatever the rotations
 	injuryTired: 4,
 
-	// 3 games in 4 nights (realistic schedule length only, about 12 per team): endurance and injury risk on the third game (on top of a
-	// back-to-back, with Injury Depth), and everyone's injury risk scaled by injuryNorm so the league rate stays the same
-	// (1 / (1 + 0.1 * 12 / 82))
+	// 3 games in 4 nights (realistic schedule length only, about 3-4 per team per 82 games): endurance and injury risk on the third
+	// game (on top of a back-to-back, with Injury Depth), and everyone's injury risk scaled by injuryNorm so the league rate stays the
+	// same (1 / (1 + 0.1 * 3.6 / 82))
 	threeInFourEndurance: 0.97,
 	threeInFourInjury: 1.1,
-	injuryNorm: 0.985,
-	// Injury Depth's back-to-back risk (x1.15) and its normalization were tuned on the old schedule (about 75 back-to-backs per team);
-	// with the realistic schedule length (about 15) it gives about 8% fewer injuries, which this puts back
-	injuryDepthRealisticSchedule: 1.087,
+	injuryNorm: 0.996,
+	// Injury Depth's back-to-back risk (x1.15) and its normalization were tuned on the old schedule (about 74 back-to-backs per team);
+	// with the realistic schedule length (about 14) it gives about 7-8% fewer injuries (the realistic schedule's own measurement and
+	// scheduleLoadSeason.script.test.ts), which this puts back
+	injuryDepthRealisticSchedule: 1.1,
 
 	// Home court: the setting's homeCourtAdvantage percentage is split into a base part and a crowd part (both scale the composite
 	// ratings, as before), and part of it goes to the referees: the home team draws more fouls (its free throw rate about +3%) and the

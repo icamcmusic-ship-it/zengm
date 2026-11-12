@@ -2,7 +2,8 @@
 /* eslint-disable no-undef */
 // Load, Fatigue & Venue over whole regular seasons of a real league (the default league with the new-league settings), with the realistic
 // schedule length on and off: in-game injuries per team game, home win%, back-to-backs and 3-in-4s per team, with scheduleLoad off and on.
-// Run with SL_SEASON=1 npx vitest run --maxWorkers=2 --project basketball --silent=false <this file> (SL_SEEDS=2 seeds per config)
+// Run with SL_SEASON=1 npx vitest run --maxWorkers=2 --project basketball --silent=false <this file> (SL_SEEDS=2 seeds per config,
+// SL_SEED0 the first seed, SL_REALISTIC_ONLY=1 for the realistic schedule length only)
 import "fake-indexeddb/auto";
 import { test } from "vitest";
 import GameSim from "./index.ts";
@@ -45,10 +46,13 @@ test.skipIf(!process.env.SL_SEASON)(
 		const seeds = Number(process.env.SL_SEEDS ?? 2);
 		const lines = [];
 		let lid = 0;
-		for (const realisticSchedule of [true, false]) {
+		for (const realisticSchedule of process.env.SL_REALISTIC_ONLY
+			? [true]
+			: [true, false]) {
 			for (const scheduleLoad of [false, true]) {
 				acc = { games: 0, home: 0, inj: 0, b2b: 0, t34: 0 };
-				for (let seed = 1; seed <= seeds; seed++) {
+				const seed0 = Number(process.env.SL_SEED0 ?? 1);
+				for (let seed = seed0; seed < seed0 + seeds; seed++) {
 					Math.random = makeSeededRandom(seed);
 					const settings: any = getDefaultSettings();
 					settings.realisticSchedule = realisticSchedule;
