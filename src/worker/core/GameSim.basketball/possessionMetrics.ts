@@ -123,12 +123,15 @@ export const simGames = async ({
 	gamesPerRoster = 25,
 	seed = 1,
 	pace,
+	settings = {},
 }: {
 	realistic: boolean;
 	numGames: number;
 	gamesPerRoster?: number;
 	seed?: number;
 	pace?: number;
+	// Other game attributes to set (League extras)
+	settings?: Record<string, unknown>;
 }) => {
 	patch();
 	const games: {
@@ -149,6 +152,9 @@ export const simGames = async ({
 			g.setWithoutSavingToDB("storePlayByPlay", false);
 			if (pace !== undefined) {
 				g.setWithoutSavingToDB("pace", pace);
+			}
+			for (const [key, value] of Object.entries(settings)) {
+				g.setWithoutSavingToDB(key as any, value as any);
 			}
 			for (let i = 0; i < gamesPerRoster && games.length < numGames; i++) {
 				const teams = await loadTeams([0, 1], {});
