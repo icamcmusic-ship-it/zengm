@@ -1,9 +1,5 @@
 import { featureOffError, featureOn } from "../util/nativeFeatures.ts";
 import {
-	getDraftPreviewFacts,
-	scoutingReportsOn,
-} from "../core/scoutingReports/index.ts";
-import {
 	coachSystemsEnabled,
 	getCoachProfile,
 	getTeamCoachSystem,
@@ -978,10 +974,7 @@ export const getNewsFacts = async (
 		}
 		facts.coaching = { heads };
 	}
-	// Scouting Reports: the draft preview page (current season only)
-	if (season === g.get("season") && scoutingReportsOn()) {
-		facts.draftPreview = await getDraftPreviewFacts();
-	}
+	// Scouting info is only shown on player pages, so no Scouting Reports draft preview page here
 	// Rumors: this season's rumors and how they turned out (only while they are in the league's rolling window)
 	if (featureOn("rumors")) {
 		const toSegs = (text: string): Seg[] =>
