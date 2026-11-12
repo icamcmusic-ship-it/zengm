@@ -1314,3 +1314,38 @@ export const leaderTables = (c: Ctx): Article | undefined => {
 };
 
 export { aOrAn };
+
+// Rumor mill (the Rumors setting): what was being said this season and how it turned out. Real rumors from the league's
+// rumor feed, not newsroom colour
+export const rumorSidebar = (c: Ctx, tid?: number): Sidebar | undefined => {
+	const rumors = (c.f.rumors ?? []).filter(
+		(r) => tid === undefined || r.tids.includes(tid),
+	);
+	if (rumors.length === 0) {
+		return undefined;
+	}
+	// Resolved ones first: a paper is about what happened
+	const sorted = [
+		...rumors.filter((r) => r.status === "confirmed"),
+		...rumors.filter((r) => r.status === "busted"),
+		...rumors.filter((r) => r.status === "open"),
+	].slice(0, 6);
+	return {
+		id: "rumors",
+		title: "Rumor mill",
+		body: [
+			{
+				type: "list",
+				items: sorted.map((r): Seg[] => [
+					...r.segs,
+					...(r.status === "open"
+						? [" (still open)"]
+						: [
+								r.status === "confirmed" ? " Confirmed: " : " Didn't happen: ",
+								...(r.outcome ?? []),
+							]),
+				]),
+			},
+		],
+	};
+};

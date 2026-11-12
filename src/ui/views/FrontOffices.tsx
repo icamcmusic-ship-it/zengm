@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
 import { MoreLinks } from "../components/MoreLinks.tsx";
 import { GmTraitBars, hotSeatClass } from "../components/GmCard.tsx";
-import { MyFace } from "../components/MyFace.tsx";
+import { StaffFace } from "../components/StaffFace.tsx";
 import { PlusMinus } from "../components/PlusMinus.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
@@ -122,7 +122,12 @@ const FrontOffices = ({
 												<div className="d-flex flex-wrap gap-3">
 													{gm.face ? (
 														<div style={{ width: 80, height: 120 }}>
-															<MyFace face={gm.face} />
+															<StaffFace
+																face={gm.face}
+																colors={row.colors}
+																age={gm.age}
+																seed={gm.gmid}
+															/>
 														</div>
 													) : null}
 													<div>

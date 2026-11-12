@@ -8,7 +8,7 @@ import {
 import type { GmTraits } from "../../common/types.ts";
 import type { FaceConfig } from "facesjs";
 import { helpers } from "../util/helpers.ts";
-import { MyFace } from "./MyFace.tsx";
+import { StaffFace } from "./StaffFace.tsx";
 
 export const GmTraitBars = ({ traits }: { traits: GmTraits }) => {
 	return (
@@ -84,11 +84,9 @@ export const hotSeatClass = (label: string) =>
 export const GmCard = ({
 	colors,
 	gm,
-	jersey,
 }: {
 	colors?: [string, string, string];
 	gm: GmCardInfo;
-	jersey?: string;
 }) => {
 	const [showTraits, setShowTraits] = useState(false);
 	return (
@@ -96,7 +94,12 @@ export const GmCard = ({
 			<div className="d-flex gap-2 align-items-start">
 				{gm.face ? (
 					<div style={{ width: 50, height: 75, flexShrink: 0 }}>
-						<MyFace face={gm.face} colors={colors} jersey={jersey} />
+						<StaffFace
+							face={gm.face}
+							colors={colors}
+							age={gm.age}
+							seed={gm.gmid}
+						/>
 					</div>
 				) : null}
 				<div>

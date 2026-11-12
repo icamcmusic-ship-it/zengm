@@ -55,6 +55,7 @@ import {
 } from "../../util/recomputeLocalUITeamOvrs.ts";
 import { last } from "../../../common/utils.ts";
 import { advStats } from "../../util/advStats.ts";
+import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
 
 const FLUSH_COALESCE_MS = 5000;
 
@@ -356,6 +357,9 @@ const play = async (
 				// AI-to-AI trades and AI offers are background activity: a bug in them must not stop the season
 				await trade.runAiTradesSafely();
 			}
+
+			// Rumors (League extras): read-only, on its own random stream. After the day's trades and signings
+			await rumorsAfterDay();
 		}
 
 		// More stuff for LeagueTopBar - update ovrs based on injuries, and (if user just played a game) update the score of the user's last game and add their next game

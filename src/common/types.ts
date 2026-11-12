@@ -1,3 +1,4 @@
+import type { RumorState } from "./rumors/types.ts";
 import * as z from "zod";
 import type { IsExact } from "conditional-type-checks";
 import type { FaceConfig } from "facesjs";
@@ -652,6 +653,10 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 
 	// Pending AI-initiated trade offers to the user
 	aiTradeOffers: AiTradeOffer[];
+
+	// Rumors (League extras): the rumor mill's rolling window and track record, undefined until the first rumor
+	rumors: RumorState | undefined;
+
 	allStarGame: number | null;
 	allStarNum: number;
 	allStarType: "draft" | "byConf" | "top";
