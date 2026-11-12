@@ -1,6 +1,7 @@
 // Draft Lottery Night & Combine setting: the staged reveal of a lottery that has already been run (the worker ran it once,
 // as without the setting). Purely presentational: the order, odds, jumps and reactions all come from the saved result.
 import clsx from "clsx";
+import type { ReactNode } from "react";
 import {
 	formatOdds,
 	getLotteryNightRows,
@@ -190,7 +191,7 @@ export const LotteryNight = ({
 	teams: Teams;
 	season: number;
 	userTid: number;
-	controls?: React.ReactNode;
+	controls?: ReactNode;
 }) => {
 	const rows = getLotteryNightRows(result, probs);
 	const byIndex = new Map(rows.map((r) => [r.index, r]));
