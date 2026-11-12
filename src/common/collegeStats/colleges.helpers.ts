@@ -186,7 +186,7 @@ export const getSchool = (name: string): School | undefined => {
 			strength: other.strength,
 			nonCollege: true,
 			idle: !!other.idle,
-			gameMinutes: getLeagueEnv(name)?.gameMinutes ?? 40,
+			gameMinutes: getLeagueEnv(name)?.gameMinutes ?? other.gameMinutes ?? 40,
 		};
 	}
 };

@@ -426,6 +426,8 @@ export const NON_NCAA: Record<
 		pro: boolean;
 		youth?: boolean;
 		idle?: boolean;
+		// Length of a game, when not 40 minutes (high school and Overtime Elite games are 32)
+		gameMinutes?: number;
 		regions: Record<Region, number>;
 	}
 > = {
@@ -584,6 +586,7 @@ export const NON_NCAA: Record<
 		w: 5,
 		pro: true,
 		youth: true,
+		gameMinutes: 32,
 		regions: {
 			usa: 1.6,
 			canada: 1.4,
@@ -736,6 +739,7 @@ export const NON_NCAA: Record<
 		w: 4,
 		pro: false,
 		youth: true,
+		gameMinutes: 32,
 		regions: {
 			usa: 1.5,
 			canada: 0.9,

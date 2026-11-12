@@ -44,7 +44,7 @@ const leanInfo = (p: Player, draftYear: number) => ({
 });
 
 /**
- * reuse: when only some prospects get stats (onlyMissing), keep the class's existing season if there is one, so prospects who already have stats stay consistent with it. New prospects join their school's team without changing it.
+ * reuse: when only some prospects get stats (onlyMissing), keep the class's existing season if there is one, so prospects who already have stats stay consistent with it. New prospects join their school's team without changing it. "all": the targets' own stored season counts too (they keep their place and boost), for remaking stats without changing the season (upgradeCollegeStats).
  */
 export const buildNcaaSeasonForClass = async ({
 	draftYear,
@@ -61,7 +61,7 @@ export const buildNcaaSeasonForClass = async ({
 	targets: Player[];
 	targetProspects: CollegeProspect[];
 	options: GenerateOptions;
-	reuse: boolean;
+	reuse: boolean | "all";
 }): Promise<ClassNcaaSeason> => {
 	const targetPids = new Set(targets.map((p) => p.pid));
 	const schools = getNcaaSchools(targetProspects, options);
@@ -71,7 +71,9 @@ export const buildNcaaSeasonForClass = async ({
 
 	const marked = reuse
 		? (await idb.merged.players.getAll({ draftYear })).filter(
-				(p) => !targetPids.has(p.pid) && p.collegeSeason?.season === draftYear,
+				(p) =>
+					(reuse === "all" || !targetPids.has(p.pid)) &&
+					p.collegeSeason?.season === draftYear,
 			)
 		: [];
 
@@ -91,7 +93,12 @@ export const buildNcaaSeasonForClass = async ({
 			});
 		}
 		for (const p of targets) {
-			boosts.set(p.pid, 0);
+			boosts.set(
+				p.pid,
+				reuse === "all" && p.collegeSeason?.season === draftYear
+					? p.collegeSeason.boost
+					: 0,
+			);
 		}
 	} else {
 		const classStats = getClassStats(
