@@ -71,7 +71,7 @@ The engine's phases are kept (so the play menu, auto play and every `phase <=` c
 
 ## What replaces finances, contracts, the draft and free agency
 
-- **Finances/contracts:** nothing. `budget: false` hides the finance pages (native). Contract columns are replaced by the class (Fr/So/Jr/Sr); negotiation, release-for-money and extension flows are unreachable.
+- **Finances/contracts:** nothing. `budget: false` hides the finance pages (native). Contract columns are replaced by the class (Fr/So/Jr/Sr); negotiation, release-for-money and extension flows are unreachable. No minimum payroll penalty or luxury tax is assessed. The forced-off League Extras stay off even if switched on in the settings (contract extensions, trade requests, contract options, need-based trades and the scouting system included), and the rumor mill has no "unhappy, could ask out" rumors.
 - **Trades:** none (pages hidden, AI trades off).
 - **Draft:** the off-screen pro draft at the Departures phase. Pro stock = a blend of current rating and potential, discounted by age. The best prospects are taken in order until the picks run out (60 for a full league, fewer for smaller ones); seniors are always in the pool, underclassmen enter only when projected high enough (certain in the lottery, a coin flip late). Drafted players leave school; the results page lists pick, player, class, school and season stats.
 - **Free agency:** none. There are never free agents in a college league. Rosters are filled by recruiting, the portal and walk-ons.
@@ -150,6 +150,7 @@ NCAA Division I is about 72 points, 44% FG, 38-39% of shots from three, 34% 3P, 
 - The bracket page shows "League Champions"; region names are not shown on the bracket (they are on the Selection tab).
 - Imported or edited college leagues are not specially handled (a league file with players skips the college roster generation).
 - The full level is slow (about 2-2.5 s per game day headless).
+- Account achievements are not checked in a college league (they are about running a pro team, and a college title would meet several for free).
 
 ### Next steps
 
