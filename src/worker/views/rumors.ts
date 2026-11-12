@@ -5,6 +5,7 @@ import {
 } from "../../common/rumors/logic.ts";
 import { RUMOR_TYPE_NAMES } from "../../common/rumors/types.ts";
 import { getRumorState } from "../core/rumors/index.ts";
+import { scoutingReportsOn } from "../core/scoutingReports/index.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { featureOffError } from "../util/nativeFeatures.ts";
@@ -38,6 +39,9 @@ export default defineView({
 
 		return {
 			rumors: state.items.toReversed(),
+			// Scouting buzz: opinions, shown in the feed but never in the track record. Only with Scouting Reports on
+			buzz: scoutingReportsOn() ? (state.buzz ?? []).toReversed() : [],
+			scoutingBuzz: scoutingReportsOn(),
 			teams,
 			userTid: g.get("userTid"),
 			season: g.get("season"),

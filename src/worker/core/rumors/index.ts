@@ -8,7 +8,7 @@
  * stream, so even a helper that draws a random number can't move the sim's sequence. AI decisions are the same with it on or off
  * (rumors.test.ts).
  */
-import { PHASE } from "../../../common/constants.ts";
+import { PHASE, PLAYER } from "../../../common/constants.ts";
 import {
 	getContractExp,
 	getCurrentContract,
@@ -16,6 +16,9 @@ import {
 import { makeSeededRandom } from "../../../common/random.ts";
 import {
 	addToTally,
+	buzzDailyRate,
+	buzzPhaseBurst,
+	buzzRoom,
 	calibrate,
 	dailyRate,
 	emptyRumorState,
@@ -44,6 +47,7 @@ import {
 import {
 	RUMOR_TYPES,
 	type Rumor,
+	type ScoutBuzz,
 	type RumorMoment,
 	type RumorState,
 	type RumorType,
@@ -71,6 +75,10 @@ import { getFreeAgentMarket } from "../freeAgents/market.ts";
 import { gmEnabled, projectedFireProb } from "../gm/index.ts";
 import league from "../league/index.ts";
 import moodInfo from "../player/moodInfo.ts";
+import {
+	getScoutingSplit,
+	scoutingReportsOn,
+} from "../scoutingReports/index.ts";
 import { coachSystemsEnabled, hotSeatNow } from "../staff/systems.ts";
 import { staffEnabled } from "../staff/index.ts";
 import {
@@ -1138,6 +1146,99 @@ const makeRumors = async (
 	return created;
 };
 
+// ---- scouting buzz: "scouts are split on X" (Scouting Reports). Opinions, kept apart from the calibrated rumors ----
+
+// Who the buzz can be about: the top of the next draft class and the league's best young players, best first (by what the user can see)
+const buzzCandidates = async () => {
+	const season = g.get("season");
+	const phase = g.get("phase");
+	const draftYear = phase > PHASE.DRAFT ? season + 1 : season;
+	const prospects = (
+		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+	)
+		.filter((p) => p.draft.year === draftYear)
+		.sort((a, b) => b.valueFuzz - a.valueFuzz)
+		.slice(0, 40);
+	const young = (
+		await idb.cache.players.indexGetAll("playersByTid", [0, Infinity])
+	)
+		.filter((p) => season - p.born.year <= 24)
+		.sort((a, b) => b.valueFuzz - a.valueFuzz)
+		.slice(0, 30);
+	return [...prospects, ...young];
+};
+
+// A player is talked about at most once per window: each third of the regular season, the run-up to the draft, the offseason. Each
+// window asks other departments (and words it differently)
+const buzzWindow = (clock: RumorClock) => {
+	if (clock.phase >= PHASE.PLAYOFFS && clock.phase <= PHASE.DRAFT) {
+		return "draft";
+	}
+	if (
+		clock.phase === PHASE.REGULAR_SEASON ||
+		clock.phase === PHASE.AFTER_TRADE_DEADLINE
+	) {
+		return `season${Math.min(2, Math.floor(clock.seasonProgress * 3))}`;
+	}
+	return "offseason";
+};
+
+const makeBuzz = async (
+	state: RumorState,
+	count: number,
+	random: () => number,
+) => {
+	const created: ScoutBuzz[] = [];
+	count = Math.min(count, buzzRoom(state, g.get("phase")));
+	if (count <= 0) {
+		return created;
+	}
+	const season = g.get("season");
+	const phase = g.get("phase");
+	const window = buzzWindow(await clockNow());
+	const taken = new Set(
+		(state.buzz ?? [])
+			.filter((b) => b.season === season && b.window === window)
+			.map((b) => b.pid),
+	);
+	const candidates = (await buzzCandidates()).filter((p) => !taken.has(p.pid));
+	let attempts = 0;
+	while (created.length < count && candidates.length > 0 && attempts < 15) {
+		attempts += 1;
+		// Better players are talked about more
+		const index = weightedIndex(
+			candidates.map((_p, i) => 1 / (i + 3)),
+			random,
+		);
+		const p = candidates.splice(index, 1)[0]!;
+		const split = await getScoutingSplit(
+			p.pid,
+			window === "season0" ? "" : `|${window}`,
+		);
+		if (!split) {
+			continue;
+		}
+		const name = playerName(p);
+		const buzz: ScoutBuzz = {
+			bid: state.nextBid ?? 0,
+			season,
+			phase,
+			window,
+			tick: state.tick,
+			pid: p.pid,
+			text: split.text.includes(name)
+				? split.text.replace(name, tokPlayer(p.pid, name))
+				: split.text,
+			high: split.high,
+			low: split.low,
+		};
+		state.nextBid = buzz.bid + 1;
+		(state.buzz ??= []).push(buzz);
+		created.push(buzz);
+	}
+	return created;
+};
+
 // One step of the rumor mill: resolve what can be resolved, then (maybe) start new rumors
 const run = async (event: "day" | "phase") => {
 	if (!rumorsEnabled() || g.get("phase") < PHASE.PRESEASON) {
@@ -1160,6 +1261,18 @@ const run = async (event: "day" | "phase") => {
 				? poisson(dailyRate(await clockNow()), random)
 				: phaseBurst(g.get("phase"));
 		created = await makeRumors(state, count, random);
+		if (scoutingReportsOn()) {
+			// Its own stream, so the buzz never changes which rumors are made
+			const buzzRandom = makeSeededRandom(
+				mixSeed(state.seed, state.tick, event === "day" ? 3 : 4),
+			);
+			Math.random = buzzRandom;
+			const buzzCount =
+				event === "day"
+					? poisson(buzzDailyRate(g.get("phase")), buzzRandom)
+					: buzzPhaseBurst(g.get("phase"));
+			await makeBuzz(state, buzzCount, buzzRandom);
+		}
 		pruneRumors(state, g.get("season"));
 	} finally {
 		Math.random = realRandom;

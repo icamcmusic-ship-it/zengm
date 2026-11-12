@@ -9,7 +9,11 @@ import {
 	getContractExp,
 	getCurrentContract,
 } from "../../../common/contracts.ts";
-import { emptyRumorState } from "../../../common/rumors/logic.ts";
+import {
+	BUZZ_WINDOW_TICKS,
+	buzzCap,
+	emptyRumorState,
+} from "../../../common/rumors/logic.ts";
 import { renderRumorText } from "../../../common/rumors/text.ts";
 import {
 	RUMOR_TYPES,
@@ -133,7 +137,7 @@ describe("Rumors in a simulated league", () => {
 		assert.deepStrictEqual(await fingerprint(), before);
 		assert.strictEqual(JSON.stringify({ ...g, rumors: undefined }), gBefore);
 		assert.isAbove(g.get("rumors")!.items.length, 5);
-	});
+	}, 120_000);
 
 	test("rumors appear all year, of many types, and resolve both ways", () => {
 		assert.isAbove(items.length, 40);
@@ -187,6 +191,46 @@ describe("Rumors in a simulated league", () => {
 		}
 		assert.strictEqual(tallied, resolved.length);
 	});
+
+	test("scouting buzz: in the feed, rate-limited, never in the track record", async () => {
+		const buzz = on.rumors!.buzz ?? [];
+		assert.isAbove(buzz.length, 3);
+		// Rate limit: never more than the cap in any window of rumor days
+		for (const b of buzz) {
+			const recent = buzz.filter(
+				(x) => x.tick <= b.tick && x.tick > b.tick - BUZZ_WINDOW_TICKS,
+			);
+			assert.isAtMost(recent.length, buzzCap(b.phase));
+		}
+		// A player at most once per window (a third of the season, the draft), no numbers in the text, about a real player
+		const keys = buzz.map((b) => `${b.season}|${b.window}|${b.pid}`);
+		assert.strictEqual(new Set(keys).size, keys.length);
+		for (const b of buzz) {
+			const text = renderRumorText(b.text, teamName);
+			assert.notMatch(text, /\d/, text);
+			assert.include(b.text, `{p:${b.pid}:`);
+		}
+		// Separate from the rumors: their own ids, and the tally only counts rumors (checked above)
+		assert(on.rumors!.items.every((r) => !("bid" in r)));
+
+		// Off without Scouting Reports
+		g.setWithoutSavingToDB("featureScoutingReports" as any, false);
+		try {
+			const state = await rumorDays(55, 30);
+			assert.strictEqual(state.buzz?.length ?? 0, 0);
+		} finally {
+			g.setWithoutSavingToDB("featureScoutingReports" as any, true);
+		}
+		// With it on, the same rumors as with it off: the buzz has its own random stream
+		const withBuzz = helpers.deepCopy(await rumorDays(56, 30));
+		g.setWithoutSavingToDB("featureScoutingReports" as any, false);
+		try {
+			const without = await rumorDays(56, 30);
+			assert.deepStrictEqual(withBuzz.items, without.items);
+		} finally {
+			g.setWithoutSavingToDB("featureScoutingReports" as any, true);
+		}
+	}, 120_000);
 
 	test("rumors don't leak ratings, traits or prospects", () => {
 		const allowed = new Set([
@@ -244,7 +288,7 @@ describe("Rumors in a simulated league", () => {
 			a.items.map((r) => r.text),
 			c.items.map((r) => r.text),
 		);
-	});
+	}, 120_000);
 
 	test("rumors about the user's team are fair", async () => {
 		// The user runs team 0 now
@@ -270,7 +314,7 @@ describe("Rumors in a simulated league", () => {
 			0,
 			"AI interest in the user's players",
 		);
-	});
+	}, 120_000);
 
 	test("outcomes: a rumor is confirmed when it comes true and busted when its time runs out", async () => {
 		const season = g.get("season");

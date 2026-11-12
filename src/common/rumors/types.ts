@@ -62,7 +62,9 @@ export type Rumor = {
 
 // Per season and type: confirmed, didn't happen, sum of the confidences of both (what was expected to come true), and the sum of the
 // model's chances before the league's own correction (missing in leagues from before it was recorded: then the confidences)
-export type RumorTally = [number, number, number] | [number, number, number, number];
+export type RumorTally =
+	| [number, number, number]
+	| [number, number, number, number];
 
 export type RumorState = {
 	// Seed of the rumor mill's own random stream. It never uses the sim's random numbers
@@ -71,7 +73,29 @@ export type RumorState = {
 	tick: number;
 	items: Rumor[];
 	stats: Record<number, Partial<Record<RumorType, RumorTally>>>;
+	// Scouting buzz (with Scouting Reports on): "scouts are split on X". Opinions with nothing to confirm, so they are kept apart from
+	// the rumors: no confidence, no status, never in the track record or its calibration. Missing in leagues from before it existed
+	buzz?: ScoutBuzz[];
+	nextBid?: number;
 };
+
+export type ScoutBuzz = {
+	bid: number;
+	season: number;
+	phase: number;
+	// Part of the season it was made in (a player is talked about once per window)
+	window: string;
+	tick: number;
+	// The player it is about
+	pid: number;
+	// Text with tokens, like a rumor's
+	text: string;
+	// The scouts with the highest and lowest take (team region and scout name)
+	high: string;
+	low: string;
+};
+
+export const SCOUT_BUZZ_NAME = "Scouting buzz";
 
 export const RUMOR_TYPE_NAMES: Record<RumorType, string> = {
 	shopping: "On the block",
