@@ -106,7 +106,9 @@ const coachQuality = async (tid: number) => {
 	return helpers.bound((r.dev + r.off + r.def + 2 * r.mot) / 500, 0, 1);
 };
 
-export const getRecruitingState = async (): Promise<CollegeRecruitingState> => {
+export const getRecruitingState = async (
+	save = true,
+): Promise<CollegeRecruitingState> => {
 	const season = g.get("season");
 	const state = g.get("collegeRecruiting");
 	if (state && state.season === season) {
@@ -127,7 +129,9 @@ export const getRecruitingState = async (): Promise<CollegeRecruitingState> => {
 		officialVisits: OFFICIAL_VISITS_PER_SEASON,
 		offseasonWeeks: 0,
 	};
-	await saveRecruitingState(fresh);
+	if (save) {
+		await saveRecruitingState(fresh);
+	}
 	return fresh;
 };
 
@@ -798,9 +802,9 @@ export const maxOffseasonWeeks = (phase: number) =>
 			? LATE_RECRUITING_WEEKS
 			: 0;
 
-export const offseasonWeeksLeft = async () => {
+export const offseasonWeeksLeft = async (known?: CollegeRecruitingState) => {
 	const phase = g.get("phase");
-	const state = await getRecruitingState();
+	const state = known ?? (await getRecruitingState());
 	const used = state.offseasonPhase === phase ? state.offseasonWeeks : 0;
 	return Math.max(0, maxOffseasonWeeks(phase) - used);
 };
@@ -1147,7 +1151,7 @@ export const getBoard = async (kind: Kind) => {
 	const prospects = await getProspects();
 	const { school } = await userSchool(prospects);
 	const teamInfoCache = g.get("teamInfoCache");
-	const state = await getRecruitingState();
+	const state = await getRecruitingState(false);
 	const list = prospects
 		.filter((pr) => pr.kind === kind)
 		.map((pr) => ({ pr, info: prospectInfo(pr, school, teamInfoCache) }));
@@ -1157,7 +1161,7 @@ export const getBoard = async (kind: Kind) => {
 		openSpots: openSpots(school),
 		offers: getUserOffers(prospects, kind),
 		offerLimit: Math.max(0, openSpots(school)) * OFFERS_PER_SPOT,
-		weeksLeft: await offseasonWeeksLeft(),
+		weeksLeft: await offseasonWeeksLeft(state),
 	};
 };
 

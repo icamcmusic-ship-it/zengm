@@ -28,7 +28,7 @@ import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { player, team } from "../index.ts";
 import { addContract, createContract } from "../contract/index.ts";
 import { updateCollegeArchive } from "./archive.ts";
-import { signCommitted } from "./recruiting.ts";
+import { getRecruitingState, signCommitted } from "./recruiting.ts";
 import { getExpectations } from "./expectations.ts";
 import {
 	genCollegePlayer,
@@ -458,9 +458,18 @@ export const getRecruitingClassSize = (
  */
 export const addRecruitingClass = async () => {
 	const season = g.get("season");
-	const existing = (
-		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
-	).filter((p) => p.draft.year === season);
+	const undrafted = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		PLAYER.UNDRAFTED,
+	);
+	// Pro draft prospects (a league made in the browser gets future draft classes) are not recruits: they go
+	const notRecruits = undrafted.filter((p) => !(p as any).recruit);
+	if (notRecruits.length > 0) {
+		await player.remove(notRecruits.map((p) => p.pid));
+	}
+	const existing = undrafted.filter(
+		(p) => p.draft.year === season && (p as any).recruit,
+	);
 	if (existing.length > 0) {
 		return;
 	}
@@ -865,6 +874,8 @@ export const onPreseason = async () => {
 
 	await updatePrestige();
 	await addRecruitingClass();
+	// This season's recruiting points
+	await getRecruitingState();
 };
 
 // Prestige follows results slowly: a great season is worth a couple of points, and every program drifts back toward where it started

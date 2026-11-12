@@ -189,7 +189,7 @@ const runLeague = async ({
 			await checkRosters(`preseason ${i}`);
 			const recruits = (
 				await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
-			).filter((p) => p.draft.year === g.get("season"));
+			).filter((p: any) => p.draft.year === g.get("season") && p.recruit);
 			assert.isAbove(recruits.length, teams.length * 3, "recruiting class");
 
 			await step("regular season", () =>
@@ -491,6 +491,12 @@ const runLeague = async ({
 				}
 			}
 			assert.strictEqual(g.get("season"), start + i + 1);
+			const board = (await loadView("collegeRecruiting", {})) as any;
+			assert.isAbove(
+				board.recruits.length,
+				0,
+				"recruiting board in the preseason",
+			);
 			assert.strictEqual(
 				(await getRecruitingState()).week,
 				0,
