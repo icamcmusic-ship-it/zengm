@@ -391,7 +391,7 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Setting:** `perimeterDefense` (League Extras → Game Simulation). On for new leagues, off for existing leagues, which play and give awards exactly as before. Option `perimeterDefenseAllDefensive`: `none` (positionless), `oneGuard` (default) or `gfc`.
 - **Why:** small guards (PG/SG, about 6'0"-6'4") almost never made All-Defensive teams (3-4% of the slots, though they are about 30% of the players with 1500+ minutes) and never won DPOY. Three causes: the default DPOY/All-Defensive formula `dws/3.1 + seasonFraction*winp + gp/82*(blk/4.1 + stl/1.8)` is dominated by defensive win shares (built mostly from defensive rebounds and blocks: a starting C averages ~3.9 DWS, a PG ~1.6), steals were spread almost evenly over positions (the steal goes to a player picked by the stealing composite, `[50, spd, diq]`, and bigs have the higher diq), and nothing in the box score credits on-ball defense.
 - **What:**
-  - **Sim (pure, no play-by-play dependence):** who is credited with a steal is weighted by the stealing composite as before times the perimeter defense composite (`PERIMETER_STEAL_POWER` in `GameSim.basketball/index.ts`). Only who gets the steal changes, not how many there are, and no random numbers are added (`outcomeInvariance` is unchanged; it runs with the setting off).
+  - **Sim (pure, no play-by-play dependence):** who is credited with a steal is weighted by the stealing composite as before times the perimeter defense composite (`PERIMETER_STEAL_POWER` in `GameSim.basketball/index.ts`), with 1.5 of the stealing composite's power of 4 taken back (`PERIMETER_STEAL_DAMPING`) so the two close composites do not pile steals on the best few defenders. Only who gets the steal changes, not how many there are, and no random numbers are added (`outcomeInvariance` is unchanged; it runs with the setting off).
   - **Awards:** while the DPOY or All-Defensive award still has the default formula (and no per-position formula or playoff range), its score uses `0.75 * dws/3.1 + seasonFraction * winp + gp / 82 * (2 * blk / 4.1 + 1.75 * stl / 1.8 + 0.15 * drb)` (`awards/perimeterDefense.ts`). The stored award keeps the default formula (so achievements that look for it still work); an edited formula is used as written.
   - **All-Defensive teams:** `oneGuard` puts the best remaining true guard (PG, SG, G) in the last slot of a team that has none; `gfc` fills each team with 2 guards, 2 forwards and a center like the NBA before 2024 (GF counts as a guard or forward, FC as a forward or center; the best players left fill a slot no one is eligible for). The Award Vote follows the realized teams.
   - Not changed: rating generation and development (with expanded ratings on, perimeter defense already leans to guards: point +12 vs center -13; with it off, diq is the all-around defense and stays big-leaning as in BBGM), skill badges (the Dp skill already goes to about 20% of rotation guards vs 2% of bigs) and archetypes.
@@ -409,6 +409,20 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
   | league pts, stl, blk, tov per team game | 104.6, 7.39, 4.99, 16.26 | 105.0, 7.35, 5.03, 16.19 |
 
   With `none` guards get about 10% of the slots (the formula and steals alone), with `gfc` 40% by construction. An earlier version that cut DWS and blocks (`0.6 dws`, `0.8 blk`, `1.75 stl`) gave guards 30% of the slots but let wings win 20 of 24 DPOYs with expanded ratings on; doubling blocks and adding the small rebounding term put rim protectors back on top.
+
+- **Steals concentration (`PERIMETER_STEAL_DAMPING`):** random-player leagues with the new-league defaults had about the NBA's team steals but too many at the top: 4-5 players at 2.0+ spg a season and a ~2.5 leader. Toggling each sim setting off (2 seeds × 2 seasons each) showed perimeter defense was the cause (stealing composite to the 4th power times the perimeter composite); traits (hustle, gambling) add a little on top, the other settings nothing. With the damping, only perimeter defense leagues change (stock play and `outcomeInvariance` are untouched); new-league defaults, 4 seeds × 2 seasons, players with 50+ games:
+
+  | new-league defaults                    | before             | after              | settings off       |
+  | -------------------------------------- | ------------------ | ------------------ | ------------------ |
+  | team stl / tov / pts per game          | 7.49 / 16.3 / 107  | 7.46 / 16.2 / 107  | 7.44 / 16.3 / 105  |
+  | steals leader spg (mean, max)          | 2.51, 2.78         | 2.18, 2.48         | 2.31, 2.59         |
+  | top-10 mean spg                        | 2.04               | 1.81               | 1.87               |
+  | players at 2.0+ / 2.5+ spg per season  | 4.5 / 0.6          | 1.5 / 0            | 2.0 / 0.25         |
+  | stl/g at 30+ mpg: guard / wing / big   | 1.38 / 1.21 / 0.99 | 1.29 / 1.15 / 0.98 | 1.17 / 1.20 / 1.10 |
+  | per 36 (1000+ min) p50 / p90 / p99     | 1.06 / 1.74 / 2.30 | 1.06 / 1.60 / 2.06 | 1.07 / 1.53 / 1.95 |
+  | All-Defensive slots guard / wing / big | 20% / 39% / 41%    | 20% / 29% / 51%    |                    |
+
+  With every extra on (traits too) the leader goes from ~2.6 to ~2.3 and the 2.0+ count from ~8 to ~2. Tool: `src/test/stealAudit/stealAudit.script.test.ts` (`RUN_STEAL_AUDIT=1`, env `SA_CONFIGS`, `SA_SEEDS`, `SA_SEASONS`, `SA_OUT`, `SA_EXTRA`, `SA_TAG`) dumps team totals and every player's steals, minutes, position and awards per season.
 
 - **Tool:** `src/test/guardDef/guardDef.script.test.ts` (`RUN_GUARD_DEF=1`, env `GD_CONFIGS`, `GD_SEEDS`, `GD_SEASONS`, `GD_OUT`, `GD_EXTRA='{"perimeterDefense":true}'`) dumps every rotation player's position, height, defensive ratings, stats and awards per season.
 
