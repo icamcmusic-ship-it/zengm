@@ -145,12 +145,46 @@ NCAA Division I is about 72 points, 44% FG, 38-39% of shots from three, 34% 3P, 
 
 ### Not in v1 / known limits
 
-- Awards are the pro ones (no All-American / conference POY naming, no conference awards). Team rating ("x/100") and ovr are on the pro scale, so college teams read low (team rating can be negative).
+- (v1) Awards were the pro ones and the team rating on the pro scale: fixed in v2.
 - No redshirts, NIL, visits/pitches, decommitments, in-season recruiting, hand-run transfer portal, conference realignment, coach career moves, NIT, First Four, pro league alongside.
 - The bracket page shows "League Champions"; region names are not shown on the bracket (they are on the Selection tab).
 - Imported or edited college leagues are not specially handled (a league file with players skips the college roster generation). A program's prestige (`t.collegePrestige`, `t.collegePrestigeBase`) is kept from the file.
 - The full level is slow (about 2-2.5 s per game day headless).
 - Account achievements are not checked in a college league (they are about running a pro team, and a college title would meet several for free).
+
+### v2: built
+
+- **Quick sim** (`college/quickSim.ts`, setting _College Quick Sim_ `collegeQuickSim`, on by default for major and full, optional for power). Games without the user's team in the regular season and the conference tournaments (except the finals) are played by a statistical model: margin = 1.04 × (home strength − away strength) + 2.2 home court + N(0, 12.9); total = 165.7 + 0.416 × (sum of strengths) + N(0, 15), where strength is team.ovr's predicted margin of the healthy, non-redshirted players; ties go to 5-minute overtimes. The box score is built to add up to the score: minutes by rotation slot, quality and endurance; team shots, free throws, rebounds, assists, steals, blocks, turnovers and fouls around the full sim's means, shared out to the players by minutes and composite ratings with exponents fitted to the full sim's per-minute rates; shot locations; injuries at the full sim's rate per minute. The result has the game sim's shape, so stats, standings, box scores, injuries, polls and NET are unchanged. Also: no mood snapshots in college, coaching systems skipped on days with no full-sim game, advanced stats every third regular season day with the quick sim on.
+- **Calibration** (one full-size season each way, `quickSimData.script.test.ts`; bounds in `quickSim.test.ts`):
+
+| | Full sim | Quick sim |
+| --- | --- | --- |
+| margin per strength point / home court / residual sd | 1.04 / 2.16 / 12.9 | 1.04 / 1.96 / 13.0 |
+| points per team, OT rate | 66.7, 3.5% | 66.6, 2.2% |
+| stronger team wins, gap 0-2 / 2-5 / 5-10 / 10-15 / 15-20 / 20-30 / 30+ | .53 / .60 / .70 / .83 / .87 / .98 / 1.00 | .56 / .62 / .72 / .84 / .91 / .96 / 1.00 |
+| team FGA, 3PA, FTA, ORB, DRB, AST, TOV, STL, BLK | 57.0, 17.7, 17.9, 8.9, 23.7, 13.9, 12.2, 6.5, 2.9 | 56.5, 17.9, 18.2, 9.0, 24.4, 13.9, 12.2, 6.4, 2.8 |
+| leaders (per game) pts top1/top10/top50 | 24.2 / 18.2 / 14.9 | 27.3 / 20.4 / 16.2 |
+| trb, ast, stl, blk top10 | 10.4, 6.4, 2.2, 1.7 | 11.2, 5.8, 2.2, 1.7 |
+| player 2P% p10/p50/p90 | .362 / .457 / .588 | .340 / .467 / .589 |
+
+  Known differences: team-to-team spread of 3PA and FTA is a bit narrower, the top scorers score a little more, the most extreme three-point shooters take fewer threes.
+- **Awards** (`common/college/awards.ts`, award settings, so the awards, history and player pages show them): Player of the Year, Defensive Player of the Year, Freshman of the Year, Most Outstanding Player (title game), conference Players of the Year and All-Conference 1st/2nd teams (group "conf"), All-American 1st/2nd/3rd teams, All-Freshman team. Coach of the Year (coaching staff) is judged against the prestige expectation. A v1 league switches to the college awards at its next awards.
+- **Team rating** on a college scale in college leagues: 88 + 0.6 × predicted margin (pro scale), so the best programs of a full league read in the high 80s and the weakest in the 40s. Player ovr stays on the usual scale.
+- **Bracket:** "National Champions" (banner, history), region names on the bracket, seeds.
+- **Redshirts:** _Redshirt_ button on the Roster page for the user's freshmen who have not played this season (preseason to the conference tournaments); a redshirted player does not play (full and quick sim), his eligibility runs a season longer and his class year does not advance. AI schools redshirt up to two deep-bench freshmen when the regular season starts.
+- **League files with players** in college mode keep their rosters (class years from age) and show a notice instead of generating college rosters.
+
+### Speed after v2 (headless, regular season)
+
+| Level | Before (full sim) | After (quick sim) |
+| --- | --- | --- |
+| power | 9-16 s | 4-5 s (quick sim on; off by default) |
+| major | 22-24 s | 9 s |
+| full | 96-135 s | 21-26 s |
+
+### Not in v2 (still to do)
+
+- First Four and the NIT; recruiting visits, pitches, NIL and in-season commitments, signing day results page; the user-run transfer portal. Recruiting and the portal still work as in v1 (targets / auto, automatic portal).
 
 ### Next steps
 
