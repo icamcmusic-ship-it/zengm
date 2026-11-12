@@ -34,6 +34,13 @@ const PRO_ONLY_PAGES = new Set([
 	"relatives",
 ]);
 
+// A league URL (parts after /l/:lid/) of a page that does not exist in the current league, if it is a college league
+export const urlHiddenInCollege = (url: unknown) =>
+	isCollegeLeague() &&
+	Array.isArray(url) &&
+	typeof url[0] === "string" &&
+	PRO_ONLY_PAGES.has(url[0]);
+
 export const isCollegeLeague = () => local.getState().leagueType === "college";
 
 export const useIsCollege = () =>
