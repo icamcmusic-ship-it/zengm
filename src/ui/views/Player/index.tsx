@@ -32,6 +32,8 @@ import { useLocal } from "../../util/local.ts";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
 import { PreDraftSummary } from "./PreDraftSummary.tsx";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
+import { ScoutingSummaryLine } from "../../components/ScoutingReport/index.tsx";
 
 const Player2 = ({
 	bestPos,
@@ -60,7 +62,12 @@ const Player2 = ({
 	]);
 	const showRatings = !challengeNoRatings || retired;
 	const traitsOn = useLocal(["playerTraits"]).playerTraits;
-	const profileOptions = getProfileDropdownOptions(player, !!traitsOn);
+	const scoutingOn = useFeatureOn("scoutingReports");
+	const profileOptions = getProfileDropdownOptions(
+		player,
+		!!traitsOn,
+		scoutingOn,
+	);
 	useTitleBar({
 		title: player.name,
 		customMenu,
@@ -238,6 +245,8 @@ const Player2 = ({
 			{playerTraits && showRatings ? (
 				<PlayerTraitsSummary pid={player.pid} playerTraits={playerTraits} />
 			) : null}
+
+			{scoutingOn ? <ScoutingSummaryLine pid={player.pid} /> : null}
 
 			<div className="row">
 				<div className="col-6 col-md-3">

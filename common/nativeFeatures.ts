@@ -707,6 +707,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "scoutingReports",
+		key: "featureScoutingReports",
+		name: "Scouting Reports",
+		description:
+			"Full scouting reports for every player, written by your scouting department (2-5 scouts made from your scouting budget, with specialties and biases): letter grades with ranges, comparisons, floor and ceiling, offense/defense breakdowns, flags, development plan, team fit and a bottom line, only from what your scouts can see. A Scouting page on every player, a printable scouting card, stock up/down history, a track record per scout, playoff opponent scouting, blurbs in trades and free agency, hover cards in the Mock Draft and Draft Board, and a draft preview in the Newspaper. Off: the short report on the College/Overseas page stays as it was.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "frivolities",
 		key: "featureFrivolities",
 		name: "Extra Frivolities",
