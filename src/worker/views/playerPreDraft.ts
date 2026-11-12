@@ -800,7 +800,7 @@ const getReport = async (
 		numPicks,
 		drafted,
 		looks:
-			prospect && g.get("scoutingSystem")
+			prospect && featureOn("scoutingSystem")
 				? (p.scouting ?? []).length
 				: undefined,
 		story,

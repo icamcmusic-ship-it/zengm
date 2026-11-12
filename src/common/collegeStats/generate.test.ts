@@ -169,7 +169,9 @@ describe("generateCollegeClass", () => {
 		const totalFta = rows.reduce((sum, s) => sum + s.stats.fta!, 0);
 		const ts = totalPts / (2 * (totalFga + 0.44 * totalFta));
 		assert(ppg > 9 && ppg < 18, `ppg ${ppg}`);
-		assert(mpg > 24 && mpg < 33, `mpg ${mpg}`);
+		// A class-average prospect is a rotation player, not a 30 minute starter (colstats round)
+		assert(mpg > 19 && mpg < 27, `mpg ${mpg}`);
+		assert(ppg > 7 && ppg < 14, `ppg ${ppg}`);
 		assert(tov > 1.2 && tov < 3.2, `tov ${tov}`);
 		assert(ts > 0.52 && ts < 0.62, `ts ${ts}`);
 	});

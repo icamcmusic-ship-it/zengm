@@ -46,6 +46,11 @@ import { coverOf } from "./score.ts";
 import { isPoorFit, POOR_FIT_SCORE } from "./classify.ts";
 import { TWO_K_NAMES } from "./defs.data.ts";
 import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
+import { CUSTOM_DEFS } from "./customDefs.data.ts";
+import { GOLD } from "./gold.data.ts";
+import { realData, realPlayer } from "./real.testutil.ts";
+import { promisesOf } from "./score.ts";
+import { statReading, STATS_W } from "./stats.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import pos from "../../worker/core/player/pos.ts";
 
@@ -89,7 +94,8 @@ describe("archetype table: every archetype is an NBA 2K build", () => {
 			assert.ok(a.hgt[0] < a.hgt[1], a.id);
 			assert.ok(a.desc.length > 5, a.id);
 			assert.ok(Object.keys(a.w).length >= 3, a.id);
-			assert.ok(a.tags.includes("2k"), a.id);
+			// (a custom build is not a 2K name)
+			assert.strictEqual(a.tags.includes("2k"), !a.custom, a.id);
 			// No lifecycle or level gates: the same build at any level
 			assert.ok(!("level" in a) && !("age" in a), a.id);
 		}
@@ -116,6 +122,23 @@ describe("archetype table: every archetype is an NBA 2K build", () => {
 });
 
 describe("classification", () => {
+	test("custom builds: twenty, not 2K names, never aliases, positions their profile is played at", () => {
+		const custom = ARCHETYPES.filter((a) => a.custom);
+		assert.strictEqual(custom.length, 20);
+		assert.strictEqual(CUSTOM_DEFS.length, 20);
+		const twoK = new Set(
+			TWO_K_DEFS.flatMap((d) => [d.name, ...d.aliases]).map((n) =>
+				n.toLowerCase(),
+			),
+		);
+		for (const a of custom) {
+			assert.ok(!twoK.has(a.name.toLowerCase()), a.name);
+			assert.strictEqual(TWO_K_NAMES[a.id], undefined, a.id);
+			assert.ok(a.positions.length >= 2, a.id);
+			assert.ok(promisesOf(a).all.length >= 1, a.id);
+		}
+	});
+
 	test("is deterministic, one build (no hybrids), alternates are other builds", () => {
 		const r = R({ pss: 85, drb: 80, oiq: 78, hgt: 25, spd: 70 });
 		const a = classify(r, { ovr: 60 });
@@ -236,41 +259,151 @@ describe("classification", () => {
 		assert.ok(poor / lg.length < 0.1, `${poor}/${lg.length}`);
 	}, 120000);
 
-	test("real players get their best 2K build", () => {
-		const d = JSON.parse(
-			readFileSync(
-				new URL(
-					"../../../data/real-player-data.basketball.json",
-					import.meta.url,
-				),
-				"utf8",
-			),
-		);
+	test("real players get their build", () => {
+		const data = realData();
 		const misses: string[] = [];
 		for (const [slug, season, want] of PINNED) {
-			const row = d.ratings.find(
+			const row = data.d.ratings.find(
 				(x: any) => x.slug === slug && x.season === season,
 			);
 			assert.ok(row, `${slug} ${season}`);
-			const r = {} as ArchetypeRatings;
-			for (const k of RATING_KEYS) {
-				r[k] = row[k];
-			}
-			const c = classify(r, { pos: positionFor(r, true) });
+			// As a real-players league reads him: his position, age and last season's stats
+			const p = realPlayer(data, row);
+			const c = classify(p.ratings, {
+				pos: p.pos,
+				age: p.age,
+				stats: p.stats,
+			});
 			if (c.id !== want) {
 				misses.push(`${slug} ${season}: ${c.id} (want ${want})`);
 			}
 			// With the Expanded Ratings setting on (wingspan and perimeter/interior defense derived as a real-players league
 			// derives them) he must still get a build allowed at his position
-			const ex: Record<string, number> = { ...r };
+			const ex: Record<string, number> = { ...p.ratings };
 			fillExpandedRatings({ srID: slug, ratings: [ex] });
 			const ce = classify(ex as ArchetypeRatings, {
-				pos: positionFor(r, true),
+				pos: p.pos,
+				age: p.age,
+				stats: p.stats,
 			});
-			assert.ok(archetypeById(ce.id)!.positions.includes(positionFor(r, true)));
+			assert.ok(archetypeById(ce.id)!.positions.includes(p.pos));
 		}
 		assert.deepStrictEqual(misses, []);
 	});
+
+	test("gold set: real players across eras get a build that fits their role", () => {
+		const data = realData();
+		let listed = 0;
+		let role = 0;
+		for (const [slug, season, ok, spec] of GOLD) {
+			const row = data.d.ratings.find(
+				(x: any) => x.slug === slug && x.season === season,
+			);
+			assert.ok(row, `${slug} ${season}`);
+			for (const id of ok) {
+				assert.ok(archetypeById(id), id);
+			}
+			const p = realPlayer(data, row);
+			const c = classify(p.ratings, {
+				pos: p.pos,
+				age: p.age,
+				stats: p.stats,
+			});
+			if (ok.includes(c.id)) {
+				listed++;
+			}
+			const pr = promisesOf(archetypeById(c.id)!);
+			if (
+				spec
+					.split("|")
+					.some((alt) =>
+						alt
+							.split("+")
+							.every((t) =>
+								t.startsWith("L:")
+									? pr.lead.includes(t.slice(2))
+									: pr.all.includes(t),
+							),
+					)
+			) {
+				role++;
+			}
+		}
+		assert.ok(GOLD.length >= 100, `${GOLD.length}`);
+		// Floors a little under the tuned rates (metrics.script.test.ts): see docs/native-features.md for why they are not
+		// higher
+		assert.ok(
+			role / GOLD.length >= GOLD_ROLE_FLOOR,
+			`role ${role}/${GOLD.length}`,
+		);
+		assert.ok(
+			listed / GOLD.length >= GOLD_LISTED_FLOOR,
+			`listed ${listed}/${GOLD.length}`,
+		);
+	});
+
+	test("stats: weight grows with minutes, none without; usage and assists read as creating", () => {
+		const st = {
+			min: 2000,
+			fga: 1200,
+			tpa: 500,
+			fta: 300,
+			astp: 40,
+			orbp: 2,
+			drbp: 12,
+			blkp: 0.5,
+			stlp: 2,
+			usgp: 32,
+		};
+		assert.strictEqual(statReading(st, "PG")!.w, STATS_W);
+		assert.ok(
+			Math.abs(statReading({ ...st, min: 500 }, "PG")!.w - STATS_W / 2) < 1e-9,
+		);
+		assert.strictEqual(statReading({ ...st, min: 0 }, "PG"), undefined);
+		assert.strictEqual(statReading(undefined, "PG"), undefined);
+		const r = statReading(st, "PG")!;
+		assert.ok(r.z.drb! > 1, `${r.z.drb}`);
+		const offBall = statReading({ ...st, astp: 5, usgp: 12 }, "PG")!;
+		assert.ok(offBall.z.drb! < -1, `${offBall.z.drb}`);
+	});
+
+	test("age: a veteran who lost speed and bounce keeps the build his skills say", async () => {
+		const lg = (await league()).filter((p) => p.age >= 24 && p.age <= 29);
+		let kept = 0;
+		let keptNoAge = 0;
+		const sample = lg.slice(0, 400);
+		for (const p of sample) {
+			const ps = positionOf(p.ratings);
+			const base = classify(p.ratings, { pos: ps, age: p.age }).id;
+			// Five years on: athleticism down, skills where they were
+			const old = { ...p.ratings };
+			for (const k of ["spd", "jmp", "endu"] as const) {
+				old[k] = Math.max(0, old[k] - 12);
+			}
+			if (classify(old, { pos: ps, age: 35 }).id === base) {
+				kept++;
+			}
+			if (classify(old, { pos: ps }).id === base) {
+				keptNoAge++;
+			}
+		}
+		assert.ok(kept > keptNoAge, `${kept} vs ${keptNoAge}`);
+		assert.ok(kept / sample.length > 0.6, `${kept}/${sample.length}`);
+	}, 120000);
+
+	test("prospects read against prospect tables spread across builds", async () => {
+		const pros = await sampleLeague(800, "prospects-spread", 0, 40);
+		const counts: Record<string, number> = {};
+		for (const p of pros) {
+			const id = classify(p.ratings, {
+				pos: positionFor(p.ratings, true),
+				prospect: true,
+			}).id;
+			counts[id] = (counts[id] ?? 0) + 1;
+		}
+		const max = Math.max(...Object.values(counts)) / pros.length;
+		assert.ok(max < 0.08, `max share ${max}`);
+	}, 120000);
 
 	test("tiers follow ovr percentile", () => {
 		assert.strictEqual(tierFromPercentile(0.999), "franchise");
@@ -420,7 +553,8 @@ describe("distribution over a generated league", () => {
 			counts[c.id] = (counts[c.id] ?? 0) + 1;
 		}
 		const max = Math.max(...Object.values(counts)) / lg.length;
-		assert.ok(max < 0.04, `max share ${max}`);
+		// (arch10: a little more room, the custom post-scoring and rebounding builds cover crowded profiles)
+		assert.ok(max < 0.05, `max share ${max}`);
 		const used = Object.keys(counts).length;
 		assert.ok(
 			used >= ARCHETYPES.length * 0.85,
@@ -710,26 +844,31 @@ describe("storage helpers", () => {
 	});
 });
 
-// [Basketball-Reference slug, season, the build he gets]: real ratings from data/, read with the position the game shows
+// Gold set floors (see the gold set test)
+const GOLD_ROLE_FLOOR = 0.6;
+const GOLD_LISTED_FLOOR = 0.4;
+
+// [Basketball-Reference slug, season, the build he gets]: real ratings from data/, read as a real-players league reads him
+// (the position the game shows, his age and the previous season's stats)
 const PINNED: [string, number, string][] = [
-	["curryst01", 2025, "inside-out-slasher"], // Stephen Curry
-	["jamesle01", 2025, "board-hunting-mid-paint-bully"], // LeBron James
+	["curryst01", 2025, "gritty-3pt-slasher"], // Stephen Curry
+	["jamesle01", 2025, "mid-range-slasher"], // LeBron James
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
 	["goberru01", 2025, "board-enforcing-bullmasher"], // Rudy Gobert
-	["antetgi01", 2025, "crashing-mid-paint-scorer"], // Giannis Antetokounmpo
-	["duranke01", 2025, "versatile-paint-finisher"], // Kevin Durant
-	["paulch01", 2025, "ball-hawking-sharpshooter"], // Chris Paul
-	["greendr01", 2025, "floor-sweeping-power-dunker"], // Draymond Green
-	["thompkl01", 2025, "crafty-sharpshooter"], // Klay Thompson
-	["embiijo01", 2025, "versatile-scorer"], // Joel Embiid
+	["antetgi01", 2025, "mid-range-slashing-cleaner"], // Giannis Antetokounmpo
+	["duranke01", 2025, "slashing-mid-range-maestro"], // Kevin Durant
+	["paulch01", 2025, "ball-hawking-3-and-d-point"], // Chris Paul
+	["greendr01", 2025, "lockdown-eraser"], // Draymond Green
+	["thompkl01", 2025, "three-level-scorer"], // Klay Thompson
+	["embiijo01", 2025, "slashing-mid-range-maestro"], // Joel Embiid
 	["lopezbr01", 2025, "backline-pick-and-popper"], // Brook Lopez
 	["capelca01", 2025, "glass-guardian-lob-threat"], // Clint Capela
-	["korveky01", 2021, "crafty-3-level-scorer"], // Kyle Korver
+	["korveky01", 2021, "crafty-walking-bucket"], // Kyle Korver
 	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook
-	["wembavi01", 2025, "crafty-walking-bucket"], // Victor Wembanyama
-	["doncilu01", 2025, "crafty-mid-post-scorer"], // Luka Dončić
+	["wembavi01", 2025, "rim-reaping-mid-paint-scorer"], // Victor Wembanyama
+	["doncilu01", 2025, "mid-paint-point-four"], // Luka Dončić
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
-	["adamsst01", 2025, "2-way-post-bully-crasher"], // Steven Adams
-	["allento01", 2018, "crafty-mid-post-scorer"], // Tony Allen
-	["drumman01", 2025, "2-way-mid-paint-cleaner"], // Andre Drummond
+	["adamsst01", 2025, "shot-erasing-putback-bully"], // Steven Adams
+	["allento01", 2018, "2-way-post-bully"], // Tony Allen
+	["drumman01", 2025, "crashing-mid-paint-scorer"], // Andre Drummond
 ];

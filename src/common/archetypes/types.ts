@@ -124,6 +124,8 @@ export type ArchetypeDef = {
 	needFor?: Partial<Record<DimKey, number>>;
 	// Rare "unicorn" types are not expected to be filled in every league
 	rare?: true;
+	// Not an NBA 2K build name: a build added for a profile no 2K build covers (customDefs.data.ts)
+	custom?: true;
 	// Only for players who have expanded ratings: the label is about his length (wingspan for his height)
 	expanded?: true;
 	// A trait-flavored label: only with player traits on, and he needs at least this score at the trait (a shortfall costs fit)
@@ -155,6 +157,8 @@ export type TwoKDef = {
 	tags: string[];
 	// How many of the 2K builds it stands for
 	builds: number;
+	// Not an NBA 2K build name (customDefs.data.ts): no "Same build in 2K" line
+	custom?: true;
 };
 
 export type Archetype = ArchetypeDef & {
@@ -174,7 +178,55 @@ export type Norms = {
 	match: Record<string, number[]>;
 	// Per archetype id: a small calibrated nudge (in z) that evens out how often each is chosen
 	bias?: Record<string, number>;
+	// Quantiles (21 points, 0%..100%) of each dimension's raw value among the reference league's players of each position
+	// bucket (PosBucket): his absolute standing among players who play his position
+	pq?: Record<PosBucket, Record<DimKey, number[]>>;
+	// Draft prospects are read against prospect tables (raw 19-year-olds: their ratings are compressed and their athleticism is
+	// ahead of their skills), so their builds spread out the way a league's do. Match tables stay the league's.
+	prospect?: Reading;
 };
+
+// The tables a player's ratings are read against
+export type Reading = Pick<Norms, "q" | "beta" | "pq">;
+
+// Position buckets for absolute (position-relative) readings and stat references: PG/G, SG, GF/SF, F/PF, FC/C
+export type PosBucket = "PG" | "SG" | "W" | "F" | "C";
+
+// Box-score stats from a season, as the archetype engine reads them (per-season totals; rates are minute-weighted)
+export type ArchetypeStats = {
+	min: number;
+	fga: number;
+	tpa: number;
+	fta: number;
+	// Shot zones (BBGM's own games only; real stats have none)
+	fgaAtRim?: number;
+	fgaLowPost?: number;
+	fgaMidRange?: number;
+	astp: number;
+	orbp: number;
+	drbp: number;
+	blkp: number;
+	stlp: number;
+	usgp: number;
+	// Defensive box plus/minus
+	dbpm?: number;
+};
+
+// Per position bucket: quantiles (21 points) of each stat feature among players with real minutes
+export type StatNorms = Record<PosBucket, Partial<Record<StatKey, number[]>>>;
+export type StatKey =
+	| "tpar"
+	| "tp36"
+	| "ftr"
+	| "rimr"
+	| "postr"
+	| "midr"
+	| "astp"
+	| "trbp"
+	| "blkp"
+	| "stlp"
+	| "dbpm"
+	| "usgp";
 
 export type Tier =
 	| "franchise"
@@ -217,6 +269,10 @@ export type Classification = {
 	why: Why[];
 	// The build's name (one name: no hybrids)
 	label: string;
+	// Not an NBA 2K build name (a custom build)
+	custom?: boolean;
+	// How much of the reading came from his box-score stats (0 = ratings only), 0..1
+	statsWeight?: number;
 };
 
 // What is stored on a player, compactly

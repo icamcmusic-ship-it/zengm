@@ -115,6 +115,21 @@ const generate = (tm: any): Team => {
 		t.draftLottery = tm.draftLottery;
 	}
 
+	// Other fork fields, kept from league files: salary cap exceptions used this league year, Injury Depth's load management
+	// switch, and a college program's prestige (college mode)
+	if (tm.capExceptions) {
+		t.capExceptions = tm.capExceptions;
+	}
+	if (typeof tm.loadManagement === "boolean") {
+		t.loadManagement = tm.loadManagement;
+	}
+	if (typeof tm.collegePrestige === "number") {
+		(t as any).collegePrestige = tm.collegePrestige;
+	}
+	if (typeof tm.collegePrestigeBase === "number") {
+		(t as any).collegePrestigeBase = tm.collegePrestigeBase;
+	}
+
 	return t;
 };
 

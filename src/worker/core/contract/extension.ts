@@ -17,6 +17,7 @@ import type {
 } from "../../../common/types.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
 import { estimateMarketValue, playerLink, teamLink } from "./options.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 // Players can be extended in the last seasons of their contracts: this many seasons left, counting the current one
 export const EXTENSION_WINDOW_SEASONS = 2;
@@ -29,7 +30,7 @@ export const getExtensionIneligibleReason = (
 	p: Pick<PlayerWithoutKey, "contracts" | "tid" | "draft" | "holdout">,
 	tid: number,
 ): string | undefined => {
-	if (!g.get("contractExtensions")) {
+	if (!featureOn("contractExtensions")) {
 		return "Contract extensions are disabled in League Settings.";
 	}
 	if (p.tid !== tid || tid < 0) {
@@ -133,7 +134,7 @@ export const extendContract = async (
 	}
 	contract.amounts.push(...newAmounts);
 
-	const normalizedTerms = g.get("contractOptions")
+	const normalizedTerms = featureOn("contractOptions")
 		? normalizeContractTerms(terms, numNewSeasons)
 		: undefined;
 	if (normalizedTerms?.option) {

@@ -13,16 +13,7 @@ export type ArchetypeLabelInfo = {
 	season?: number;
 	live?: boolean;
 	why?: { label: string; z: number; want: number }[];
-	twoK?: string[];
-	alsoClose?: string[];
-	poorFit?: boolean;
 };
-
-// "Same build: 2-Way 3-Level Scorer, Iso Savant (+12 more)": the other NBA 2K build names this archetype stands for
-export const twoKText = (names: string[] | undefined, max = 6) =>
-	names && names.length > 0
-		? `Same build in 2K: ${names.slice(0, max).join(", ")}${names.length > max ? ` (+${names.length - max} more)` : ""}`
-		: undefined;
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
 	<span
@@ -49,29 +40,11 @@ export const ArchetypeWhy = ({
 }: {
 	info: Pick<
 		ArchetypeLabelInfo,
-		| "desc"
-		| "why"
-		| "tier"
-		| "conf"
-		| "season"
-		| "live"
-		| "twoK"
-		| "alsoClose"
-		| "poorFit"
+		"desc" | "why" | "tier" | "conf" | "season" | "live"
 	>;
 }) => (
 	<div className="archetype-popover">
 		<p className="mb-2">{info.desc}</p>
-		{info.twoK && info.twoK.length > 0 ? (
-			<p className="mb-2 text-body-secondary" title={info.twoK.join(", ")}>
-				{twoKText(info.twoK)}
-			</p>
-		) : null}
-		{info.poorFit ? (
-			<p className="mb-2 text-body-secondary">
-				No build really has the shape of his ratings: this is the nearest one.
-			</p>
-		) : null}
 		{info.why && info.why.length > 0 ? (
 			<>
 				<div className="fw-bold">Why</div>
@@ -81,9 +54,6 @@ export const ArchetypeWhy = ({
 					))}
 				</ul>
 			</>
-		) : null}
-		{info.alsoClose && info.alsoClose.length > 0 ? (
-			<p className="mb-2">Also close to: {info.alsoClose.join(", ")}</p>
 		) : null}
 		<div className="text-body-secondary">
 			{info.tier ? `${TIER_NAMES[info.tier]} tier. ` : ""}
