@@ -365,11 +365,15 @@ export const generateDraftCombine = (
 	const maxVertExp = 35.2 + 3 * zJmp + 0.6 * zSpd - 0.025 * w;
 	const maxVert = roundTo(clamp(maxVertExp + 2 * nVert, 24, 46), 0.5);
 	const standingVert = roundTo(
-		clamp(maxVert - 5 + 0.3 * zStre + 1 * nStand, 19, maxVert - 1),
+		clamp(
+			maxVert - 5 + 0.3 * zStre + 1 * nStand,
+			19,
+			Math.min(40, maxVert - 1),
+		),
 		0.5,
 	);
 	const laneExp = 11.28 - 0.3 * zSpd - 0.05 * zJmp + 0.004 * w;
-	const laneAgility = round2(clamp(laneExp + 0.25 * nLane, 10, 13));
+	const laneAgility = round2(clamp(laneExp + 0.25 * nLane, 10.05, 13));
 	const shuttleExp = 3.07 - 0.1 * zSpd + 0.0012 * w;
 	const shuttle = round2(clamp(shuttleExp + 0.09 * nShuttle, 2.6, 3.7));
 	const sprintExp = 3.28 - 0.085 * zSpd + 0.001 * w;

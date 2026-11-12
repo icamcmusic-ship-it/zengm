@@ -119,8 +119,10 @@ const classPlayersOf = async (draftYear: number) => {
 export const getClassCombine = async (
 	draftYear: number,
 	playersInput?: Player[],
+	// The phase change holding it (g's phase is updated after the hooks run)
+	holdingNow?: boolean,
 ): Promise<ClassCombine> => {
-	const held = combineHeld(draftYear);
+	const held = holdingNow || combineHeld(draftYear);
 	const players = (playersInput ?? (await classPlayersOf(draftYear)))
 		.map((p) => ({ p, r: combineRatingsRow(p)! }))
 		.filter((x) => x.r)
@@ -201,7 +203,7 @@ export const afterNewPhase = async (phase: number, conditions?: Conditions) => {
 		return;
 	}
 	const season = g.get("season");
-	const c = await getClassCombine(season);
+	const c = await getClassCombine(season, undefined, true);
 	if (c.results.size === 0) {
 		return;
 	}
@@ -243,7 +245,7 @@ export const afterNewPhase = async (phase: number, conditions?: Conditions) => {
 			showNotification: false,
 			pids,
 			tids: [],
-			score: 0,
+			score: 10,
 		},
 		conditions,
 	);
@@ -284,7 +286,7 @@ export const logLotteryNightNews = (
 			showNotification: false,
 			pids: [],
 			tids,
-			score: 10,
+			score: 20,
 		},
 		conditions,
 	);
