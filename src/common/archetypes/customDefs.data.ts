@@ -29,6 +29,8 @@ const custom = (
 	group: ArchetypeGroup,
 	family: ArchetypeFamily,
 	desc: string,
+	// (ceilings on what the name says he lacks: Archetype's `cap`)
+	cap?: Dims,
 ): TwoKDef => {
 	const out: Dims = { ...w };
 	const need: Dims = {};
@@ -72,6 +74,7 @@ const custom = (
 		xw,
 		need,
 		needFor,
+		...(cap ? { cap } : {}),
 		desc,
 		tags: [...tags],
 		builds: 0,
@@ -102,6 +105,9 @@ export const CUSTOM_DEFS: TwoKDef[] = [
 		"wing",
 		"slasher",
 		"Scores in the post and finishes at the rim, without much of a handle or a jumper.",
+		// (arch12: "without much of a handle or a jumper" is part of the name's promise, so a guard who creates off the
+		// dribble or shoots is not one)
+		{ drb: 0.5, three: 0.7 },
 	),
 	custom(
 		"Slashing Cleaner",

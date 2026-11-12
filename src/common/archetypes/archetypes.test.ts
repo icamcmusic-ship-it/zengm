@@ -917,8 +917,8 @@ const PINNED: [string, number, string][] = [
 	["curryst01", 2025, "deep-range-sniper"], // Stephen Curry
 	["jamesle01", 2025, "mid-paint-point-four"], // LeBron James
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
-	["goberru01", 2025, "board-enforcing-bullmasher"], // Rudy Gobert
-	["antetgi01", 2025, "crashing-mid-paint-scorer"], // Giannis Antetokounmpo
+	["goberru01", 2025, "backline-power-finisher"], // Rudy Gobert
+	["antetgi01", 2025, "crafty-paint-finishing-cleaner"], // Giannis Antetokounmpo
 	["duranke01", 2025, "rim-reaping-mid-paint-scorer"], // Kevin Durant
 	["paulch01", 2025, "ball-hawking-3-and-d-point"], // Chris Paul
 	["greendr01", 2025, "lockdown-eraser"], // Draymond Green
@@ -933,5 +933,5 @@ const PINNED: [string, number, string][] = [
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
 	["adamsst01", 2025, "shot-erasing-putback-bully"], // Steven Adams
 	["allento01", 2018, "ball-hawking-mid-paint-scorer"], // Tony Allen
-	["drumman01", 2025, "crashing-mid-paint-scorer"], // Andre Drummond
+	["drumman01", 2025, "paint-scoring-crasher"], // Andre Drummond
 ];

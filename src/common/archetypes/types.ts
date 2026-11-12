@@ -118,7 +118,7 @@ export type ArchetypeDef = {
 	bonus?: SkillLabel[];
 	// Floors on the league-wide z of a dimension (his skill in absolute terms): a label must deliver what its name promises
 	need?: Partial<Record<DimKey, number>>;
-	// Ceilings on the league-wide z of a dimension: a label about what he lacks (short arms)
+	// Ceilings on the blended reading of a dimension (needShortfall): a label about what he lacks (no handle, no jumper)
 	cap?: Partial<Record<DimKey, number>>;
 	// The same, on the z for his size (rebounding, post scoring and finishing are judged against players his height)
 	needFor?: Partial<Record<DimKey, number>>;
@@ -153,6 +153,8 @@ export type TwoKDef = {
 	xw: Partial<Record<DimKey, number>>;
 	need: Partial<Record<DimKey, number>>;
 	needFor: Partial<Record<DimKey, number>>;
+	// Ceilings (Archetype's `cap`): what the name says he lacks
+	cap?: Partial<Record<DimKey, number>>;
 	desc: string;
 	tags: string[];
 	// How many of the 2K builds it stands for
