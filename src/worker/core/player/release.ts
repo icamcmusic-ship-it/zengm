@@ -2,7 +2,14 @@ import addToFreeAgents from "./addToFreeAgents.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
 import type { Player } from "../../../common/types.ts";
-import { getCurrentContract } from "../../../common/contracts.ts";
+import {
+	getContractExp,
+	getCurrentContract,
+} from "../../../common/contracts.ts";
+import {
+	applyStretchProvision,
+	stretchProvisionEnabled,
+} from "../contract/capExceptions.ts";
 import {
 	endContractEarly,
 	setContractDemandFromCurrentContract,
@@ -20,7 +27,13 @@ import { getNumPlayersTradedAwayNormalizedAll } from "./getNumPlayersTradedAwayN
  * @param {boolean} justDrafted True if the player was just drafted by his current team and the regular season hasn't started yet. False otherwise. If True, then the player can be released without paying his salary.
  * @return {Promise}
  */
-const release = async (p: Player, justDrafted: boolean) => {
+const release = async (
+	p: Player,
+	justDrafted: boolean,
+	// Stretch provision (setting): spread what's owed after the current season over twice the remaining seasons plus one
+	stretch: boolean = false,
+) => {
+	let stretched = false;
 	// Before his contract ends, since that's what his contract demand is based on
 	setContractDemandFromCurrentContract(p);
 
@@ -41,6 +54,9 @@ const release = async (p: Player, justDrafted: boolean) => {
 			// Partially guaranteed seasons and team options are not owed in full
 			if (contract.endedEarly) {
 				applyReleaseGuarantees(contract);
+				if (stretch && stretchProvisionEnabled()) {
+					stretched = applyStretchProvision(contract);
+				}
 			}
 		}
 	}
@@ -55,7 +71,11 @@ const release = async (p: Player, justDrafted: boolean) => {
 			g.get("teamInfoCache")[p.tid]?.name
 		}</a> released <a href="${helpers.leagueUrl(["player", p.pid])}">${
 			p.firstName
-		} ${p.lastName}</a>.`,
+		} ${p.lastName}</a>${
+			stretched
+				? `, using the stretch provision to spread what they owe him through ${getContractExp(contract!)}`
+				: ""
+		}.`,
 		showNotification: false,
 		pids: [p.pid],
 		tids: [p.tid],

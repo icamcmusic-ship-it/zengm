@@ -5,6 +5,13 @@ import g from "../../util/g.ts";
 import helpers from "../../util/helpers.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import accept from "./accept.ts";
+import type { CapExceptionType } from "../../../common/capExceptions.ts";
+import {
+	capExceptionsEnabled,
+	getSigningCapInfo,
+} from "../contract/capExceptions.ts";
+import { idb } from "../../db/index.ts";
+import getPayroll from "../team/getPayroll.ts";
 
 export const generateContractOptions = async (
 	negotiation: Negotiation,
@@ -33,6 +40,8 @@ export const generateContractOptions = async (
 		amount: number;
 		smallestAmount: boolean;
 		disabledReason?: string;
+		// Salary cap exception this contract would be signed with (setting)
+		exception?: CapExceptionType;
 	}[] = allowedLengths.map((contractLength, i) => {
 		const contractOption = {
 			exp: startSeason + contractLength - 1,
@@ -80,6 +89,13 @@ export const generateContractOptions = async (
 		return contractOption.amount * 1000 <= g.get("maxContract");
 	});
 
+	// Salary cap exceptions (setting): say which free agent contracts would use one
+	const exceptionTeam =
+		capExceptionsEnabled() && !negotiation.resigning && !negotiation.extension
+			? await idb.cache.teams.get(g.get("userTid"))
+			: undefined;
+	const payroll = exceptionTeam ? await getPayroll(g.get("userTid")) : 0;
+
 	for (const row of possible) {
 		const disabledReason = await accept({
 			negotiation,
@@ -89,6 +105,19 @@ export const generateContractOptions = async (
 		});
 		if (typeof disabledReason === "string") {
 			row.disabledReason = disabledReason;
+		} else if (
+			exceptionTeam &&
+			Math.round(row.amount * 1000) - 1 > g.get("minContract")
+		) {
+			const capInfo = getSigningCapInfo(
+				exceptionTeam,
+				payroll,
+				Math.round(row.amount * 1000),
+				row.years,
+			);
+			if (capInfo?.type === "exception") {
+				row.exception = capInfo.exception.type;
+			}
 		}
 	}
 

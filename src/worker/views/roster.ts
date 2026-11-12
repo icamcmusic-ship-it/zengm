@@ -1,3 +1,4 @@
+import { isRepeaterTaxTeam } from "../core/contract/capExceptions.ts";
 import { PHASE, POSITIONS } from "../../common/constants.ts";
 import { finances, player, season, team } from "../core/index.ts";
 import { idb } from "../db/index.ts";
@@ -287,7 +288,10 @@ export default defineView({
 					inputs.tid,
 				);
 				payroll = await team.getPayroll(inputs.tid);
-				luxuryTaxAmount = finances.getLuxuryTaxAmount(payroll);
+				luxuryTaxAmount = finances.getLuxuryTaxAmount(
+					payroll,
+					await isRepeaterTaxTeam(inputs.tid),
+				);
 				minPayrollAmount = finances.getMinPayrollAmount(payroll);
 
 				players = await player.formatAll(playersAll, {
