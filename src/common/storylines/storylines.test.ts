@@ -306,3 +306,46 @@ describe("season filter", () => {
 		}
 	});
 });
+
+describe("finished careers", () => {
+	test("an unsigned free agent is not a bust (or the best never to win) until he retires: no Infinity season", () => {
+		const L = makeLeague(6);
+		// pid 0 is a No. 1 pick; make him a weak free agent who hasn't retired
+		const p = L.players[0]!;
+		expect(p.draft.round).toBe(1);
+		expect(p.draft.pick).toBe(1);
+		p.tid = -1;
+		p.retiredYear = Infinity;
+		// ... who did nothing
+		expect(p.stats.length).toBeGreaterThan(0);
+		p.stats = p.stats.map((row) => {
+			const out: any = { ...row };
+			for (const [k, v] of Object.entries(row)) {
+				if (
+					typeof v === "number" &&
+					!["season", "tid", "gp", "min"].includes(k)
+				) {
+					out[k] = 0;
+				}
+			}
+			return out;
+		});
+		const stories = findStories(L);
+		for (const s of stories) {
+			expect(Number.isFinite(s.season), `${s.kind} ${s.id}`).toBe(true);
+			for (const x of s.span ?? []) {
+				expect(Number.isFinite(x), `${s.kind} ${s.id}`).toBe(true);
+			}
+		}
+		expect(
+			stories.some((s) => s.kind === "Bust" && s.pids.includes(p.pid)),
+		).toBe(false);
+
+		// Once he retires, he can be one
+		p.retiredYear = L.season;
+		const after = findStories(L).find(
+			(s) => s.kind === "Bust" && s.pids.includes(p.pid),
+		);
+		expect(after?.season).toBe(L.season);
+	});
+});

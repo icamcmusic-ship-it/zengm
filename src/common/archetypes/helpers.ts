@@ -1,11 +1,6 @@
 // Pure helpers the UI and the worker views share: how an archetype is stored on a player, shown, aggregated and warned about.
-import {
-	ARCHETYPES,
-	archetypeById,
-	combineArchetypeDescs,
-} from "./classify.ts";
-import { isPos, namesContradict } from "./position.ts";
-export { combineArchetypeDescs };
+import { ARCHETYPES, archetypeById } from "./classify.ts";
+import { isPos } from "./position.ts";
 import type {
 	ArchetypeFamily,
 	ArchetypeGroup,
@@ -41,9 +36,6 @@ export const toStored = (
 	c: Classification,
 ): StoredArchetype => {
 	const out: StoredArchetype = { season, id: c.id };
-	if (c.secondary) {
-		out.secondary = c.secondary.id;
-	}
 	if (c.tier) {
 		out.tier = c.tier;
 	}
@@ -54,8 +46,6 @@ export const toStored = (
 export type ArchetypeView = {
 	id: string;
 	name: string;
-	secondaryId?: string;
-	secondaryName?: string;
 	label: string;
 	group: ArchetypeGroup;
 	family: ArchetypeFamily;
@@ -67,8 +57,8 @@ export type ArchetypeView = {
 
 // A stored entry as the UI shows it; null if its archetype no longer exists (an id from an older version), or, given his
 // position, if the archetype is no longer allowed there (entries stored before positions were a hard gate). The caller
-// then reads him live until his next preseason stores a valid one. A secondary that is gone, not allowed at his position
-// or names another position than the primary is dropped.
+// then reads him live until his next preseason stores a valid one. The label is one build: a hybrid partner stored by an
+// older version is ignored.
 // What the league has on now: a label that needs player traits (or expanded ratings) is no longer valid once that setting
 // is off (undefined: not checked)
 export type ViewContext = { traits?: boolean; expanded?: boolean };
@@ -91,24 +81,13 @@ export const viewOf = (
 	if ((isPos(pos) && !a.positions.includes(pos)) || unavailable(a, ctx)) {
 		return null;
 	}
-	let b = e.secondary ? archetypeById(e.secondary) : undefined;
-	if (
-		b &&
-		(namesContradict(a.name, b.name) ||
-			(isPos(pos) && !b.positions.includes(pos)) ||
-			unavailable(b, ctx))
-	) {
-		b = undefined;
-	}
 	return {
 		id: a.id,
 		name: a.name,
-		secondaryId: b?.id,
-		secondaryName: b?.name,
-		label: b ? `${a.name} / ${b.name}` : a.name,
+		label: a.name,
 		group: a.group,
 		family: a.family,
-		desc: combineArchetypeDescs(a.desc, b?.desc),
+		desc: a.desc,
 		tier: e.tier,
 		conf: e.conf,
 		season: e.season,
@@ -188,7 +167,6 @@ export type Rated = {
 	pid: number;
 	ovr: number;
 	archetypeId: string | undefined;
-	secondaryId?: string;
 	name?: string;
 	pos?: string;
 };
@@ -279,12 +257,7 @@ export const compositionOf = (rows: Rated[], rotation = 9): Composition => {
 	if (top.length >= 5) {
 		const has = (
 			f: (a: NonNullable<ReturnType<typeof archetypeById>>) => boolean,
-		) =>
-			top.some((r) => {
-				const a = archetypeById(r.archetypeId!)!;
-				const b = r.secondaryId ? archetypeById(r.secondaryId) : undefined;
-				return f(a) || (b ? f(b) : false);
-			});
+		) => top.some((r) => f(archetypeById(r.archetypeId!)!));
 		if (!has((a) => a.family === "playmaker")) {
 			warnings.push({
 				kind: "playmaking",

@@ -175,11 +175,11 @@ export const buildBaseNorms = (
 };
 
 const SHRINK_FLOOR = 0.55;
-export const LEVEL_SHARE = 0.5;
 
-// z-scores for one player: each dimension "for his size" (height's part removed), with part of his overall level taken
-// out, so a great shooter and a poor shooter who is relatively better at shooting than anything else both read as
-// shooters. Height itself stays as is.
+// z-scores for one player: each dimension "for his size" (height's part removed) and relative to HIS OWN level (the mean
+// of his core skills is taken out in full), so the reading is the shape of his game, whatever his overall: a 45 and an 80
+// whose ratings have the same shape read the same. `abs` (league-wide) and `sz` (for his size) are relative to his own
+// level too. Height (and the style dimensions) stay as they are.
 export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 	const v = compositeValues(r);
 	const z = {} as Record<DimKey, number>;
@@ -229,9 +229,16 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 		);
 	}
 	level /= CORE_DIMS.length;
+	let absLevel = 0;
+	for (const dim of CORE_DIMS) {
+		absLevel += abs[dim];
+	}
+	absLevel /= CORE_DIMS.length;
 	for (const dim of DIMS) {
 		if (dim !== "hgt" && !STYLE_DIMS.has(dim)) {
-			z[dim] = clampZ(z[dim] - LEVEL_SHARE * level);
+			z[dim] = clampZ(z[dim] - level);
+			sz[dim] = z[dim];
+			abs[dim] = clampZ(abs[dim] - absLevel);
 		}
 	}
 	return { z, level, hgtZ: hz, abs, sz, expanded };

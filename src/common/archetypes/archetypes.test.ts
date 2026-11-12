@@ -20,7 +20,6 @@ import {
 	currentEntry,
 	historyOf,
 	landscapeOf,
-	scoreAll,
 	tierFromPercentile,
 	toStored,
 	viewOf,
@@ -35,17 +34,18 @@ import {
 	archetypePrior,
 	nameContradictsPosition,
 	namePositions,
-	namesContradict,
 	positionFor,
 	positionOf,
 	positionWordOf,
 	posPrior,
 } from "./position.ts";
 import { buildNorms } from "./match.ts";
+// @ts-expect-error node types are not in the web tsconfig, but tests run in node
+import { readFileSync } from "node:fs";
 import { coverOf } from "./score.ts";
-import { VISIBLE_TRAITS, visibleTraits } from "./classify.ts";
-import { TRAIT_DEFINITIONS } from "../playerTraits/definitions.ts";
-import { TWO_K_NAMES } from "./twoK/twoK.data.ts";
+import { isPoorFit, POOR_FIT_SCORE } from "./classify.ts";
+import { TWO_K_NAMES } from "./defs.data.ts";
+import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import pos from "../../worker/core/player/pos.ts";
 
@@ -71,9 +71,12 @@ const R = (o: Partial<ArchetypeRatings>): ArchetypeRatings => ({
 	...o,
 });
 
-describe("archetype table", () => {
-	test("size, unique ids, valid profiles", () => {
-		assert.ok(ARCHETYPES.length >= 225 && ARCHETYPES.length <= 320);
+describe("archetype table: every archetype is an NBA 2K build", () => {
+	test("size, unique ids and names, valid profiles", () => {
+		assert.ok(
+			ARCHETYPES.length >= 300 && ARCHETYPES.length <= 400,
+			`${ARCHETYPES.length}`,
+		);
 		assert.strictEqual(
 			new Set(ARCHETYPES.map((a) => a.id)).size,
 			ARCHETYPES.length,
@@ -84,85 +87,109 @@ describe("archetype table", () => {
 		);
 		for (const a of ARCHETYPES) {
 			assert.ok(a.hgt[0] < a.hgt[1], a.id);
-			assert.ok(a.desc.length > 5);
+			assert.ok(a.desc.length > 5, a.id);
 			assert.ok(Object.keys(a.w).length >= 3, a.id);
+			assert.ok(a.tags.includes("2k"), a.id);
+			// No lifecycle or level gates: the same build at any level
+			assert.ok(!("level" in a) && !("age" in a), a.id);
 		}
 		for (const g of GROUPS) {
-			assert.ok(ARCHETYPES.filter((a) => a.group === g).length >= 20);
+			assert.ok(ARCHETYPES.filter((a) => a.group === g).length >= 20, g);
+		}
+	});
+
+	test("the 2K list covers every 2K build name exactly once, as an archetype or as one of its aliases", () => {
+		const builds = JSON.parse(
+			readFileSync(new URL("./twoK/builds2k.json", import.meta.url), "utf8"),
+		).builds as { name: string }[];
+		const all = new Set(builds.map((b) => b.name));
+		const seen: string[] = [];
+		for (const d of TWO_K_DEFS) {
+			seen.push(d.name, ...d.aliases);
+		}
+		assert.strictEqual(seen.length, new Set(seen).size);
+		assert.deepStrictEqual([...new Set(seen)].sort(), [...all].sort());
+		for (const id of Object.keys(TWO_K_NAMES)) {
+			assert.ok(archetypeById(id), id);
 		}
 	});
 });
 
 describe("classification", () => {
-	test("is deterministic and carries primary, secondary, confidence, why", () => {
+	test("is deterministic, one build (no hybrids), alternates are other builds", () => {
 		const r = R({ pss: 85, drb: 80, oiq: 78, hgt: 25, spd: 70 });
 		const a = classify(r, { ovr: 60 });
 		const b = classify({ ...r }, { ovr: 60 });
 		assert.deepStrictEqual(a, b);
 		assert.ok(archetypeById(a.id));
+		assert.strictEqual(a.label, a.name);
+		assert.ok(!("secondary" in a));
+		assert.ok(a.alternates.length <= 2);
+		for (const x of a.alternates) {
+			assert.notStrictEqual(x.id, a.id);
+		}
 		assert.strictEqual(a.why.length, 3);
 		assert.ok(a.confidence >= 0 && a.confidence <= 1);
 		assert.ok(a.tier);
-		assert.ok(a.label.startsWith(a.name));
 		assert.strictEqual(a.group, "guard");
 	});
 
 	test("height gates keep a tall player out of guard archetypes and vice versa", () => {
+		// (multi-position 2K builds are in the "wing" group, so the gate is read on the build's positions)
 		const tall = classify(R({ hgt: 85, reb: 80, stre: 70, ins: 65 }));
-		assert.ok(["big", "forward"].includes(tall.group), tall.id);
+		assert.ok(archetypeById(tall.id)!.positions.includes("C"), tall.id);
+		assert.notStrictEqual(tall.group, "guard", tall.id);
 		const small = classify(R({ hgt: 8, pss: 80, drb: 80, spd: 75 }));
-		assert.strictEqual(small.group, "guard", small.id);
+		assert.ok(archetypeById(small.id)!.positions.includes("PG"), small.id);
+		assert.notStrictEqual(small.group, "big", small.id);
 	});
 
-	test("skill requirements gate: a shooter is only a Sharpshooter with the 3", () => {
-		const sc = scoreAll(R({ hgt: 30, tp: 90, ft: 85, fg: 70, oiq: 70 }));
-		const row = sc.scored.find((s) => s.a.id === "sharpshooter")!;
-		assert.ok(sc.skills.includes("3"));
-		assert.ok(row.raw > 0.3);
-		const noSkill = scoreAll(R({ hgt: 30, tp: 20, ft: 85, fg: 70 }));
-		assert.ok(!noSkill.skills.includes("3"));
-		assert.ok(noSkill.scored.find((s) => s.a.id === "sharpshooter")!.z < row.z);
-	});
+	test("level-invariant: the same shape scaled up or down reads as the same build", async () => {
+		const lg = (await league()).slice(0, 600);
+		let same = 0;
+		let n = 0;
+		for (const p of lg) {
+			const ps = positionOf(p.ratings);
+			const base = classify(p.ratings, { pos: ps }).id;
+			for (const shift of [-6, 6]) {
+				const r = { ...p.ratings };
+				for (const k of RATING_KEYS) {
+					if (k !== "hgt") {
+						r[k] = Math.max(0, Math.min(100, r[k] + shift));
+					}
+				}
+				n++;
+				if (classify(r, { pos: ps }).id === base) {
+					same++;
+				}
+			}
+		}
+		// (clamping at 0 and 100, and BBGM's composites not being linear, change the shape a little)
+		assert.ok(same / n > 0.6, `${same}/${n}`);
+	}, 120000);
 
-	test("the label names his standout skills (primary, or the hybrid partner)", () => {
+	test("the label names his standout skills", () => {
 		// [what he is, ratings, the skill classes the label must feature]
 		const cases: [string, Partial<ArchetypeRatings>, string[]][] = [
 			[
-				"shooter who defends",
-				{ hgt: 45, tp: 85, ft: 78, diq: 82, spd: 72, ins: 40, dnk: 45 },
-				["shoot", "perD"],
-			],
-			[
-				"rebounding, passing big",
-				{ hgt: 66, reb: 88, pss: 78, oiq: 72, stre: 65, tp: 25, spd: 40 },
-				["pass", "reb"],
-			],
-			[
-				"passing center",
-				{ hgt: 70, pss: 80, oiq: 75, drb: 55, reb: 60, tp: 30, spd: 40 },
-				["pass"],
-			],
-			[
-				"lockdown guard who shoots",
-				{ hgt: 30, tp: 80, ft: 75, diq: 80, spd: 75, ins: 35, dnk: 40 },
-				["shoot", "perD"],
+				"shooting guard",
+				{ hgt: 30, tp: 88, ft: 82, fg: 70, ins: 35, dnk: 30, reb: 35 },
+				["shoot"],
 			],
 			[
 				"lob catcher who blocks shots",
 				{ hgt: 68, dnk: 88, jmp: 88, diq: 70, tp: 15, fg: 30, pss: 35 },
-				["finish", "rimD"],
+				["finish"],
+			],
+			[
+				"rebounding big",
+				{ hgt: 70, reb: 90, stre: 75, tp: 20, fg: 30, pss: 35, drb: 30 },
+				["reb"],
 			],
 		];
 		for (const [label, o, want] of cases) {
 			const c = classify(R(o));
-			const cover = { ...coverOf(archetypeById(c.id)!) };
-			if (c.secondary) {
-				for (const [k, v] of Object.entries(
-					coverOf(archetypeById(c.secondary.id)!),
-				)) {
-					cover[k] = Math.max(cover[k] ?? 0, v);
-				}
-			}
+			const cover = coverOf(archetypeById(c.id)!);
 			for (const k of want) {
 				assert.ok((cover[k] ?? 0) > 0, `${label}: ${c.label} lacks ${k}`);
 			}
@@ -192,170 +219,59 @@ describe("classification", () => {
 		});
 	});
 
-	test("real stars get distinct star labels, an elite shot blocker reads as a rim protector, an old stopper as a veteran", () => {
-		// Real 2025 (Tony Allen 2018) ratings, with the position the game shows and his age
-		const cases: [string, Partial<ArchetypeRatings>, string, number, string][] =
-			[
-				[
-					"LeBron James",
-					{
-						hgt: 57,
-						stre: 84,
-						spd: 51,
-						jmp: 55,
-						endu: 59,
-						ins: 96,
-						dnk: 83,
-						ft: 54,
-						fg: 97,
-						tp: 39,
-						oiq: 84,
-						diq: 49,
-						drb: 50,
-						pss: 62,
-						reb: 71,
-					},
-					"FC",
-					41,
-					"playmaking-superstar",
-				],
-				[
-					"Giannis Antetokounmpo",
-					{
-						hgt: 70,
-						stre: 68,
-						spd: 72,
-						jmp: 51,
-						endu: 73,
-						ins: 91,
-						dnk: 95,
-						ft: 29,
-						fg: 98,
-						tp: 23,
-						oiq: 86,
-						diq: 43,
-						drb: 54,
-						pss: 54,
-						reb: 86,
-					},
-					"FC",
-					31,
-					"athletic-superstar",
-				],
-				[
-					"Kevin Durant",
-					{
-						hgt: 66,
-						stre: 69,
-						spd: 56,
-						jmp: 56,
-						endu: 54,
-						ins: 90,
-						dnk: 89,
-						ft: 65,
-						fg: 98,
-						tp: 40,
-						oiq: 80,
-						diq: 43,
-						drb: 56,
-						pss: 53,
-						reb: 52,
-					},
-					"FC",
-					37,
-					"elite-shotmaker",
-				],
-				[
-					"Joel Embiid",
-					{
-						hgt: 72,
-						stre: 51,
-						spd: 62,
-						jmp: 36,
-						endu: 51,
-						ins: 96,
-						dnk: 97,
-						ft: 67,
-						fg: 93,
-						tp: 35,
-						oiq: 65,
-						diq: 48,
-						drb: 76,
-						pss: 54,
-						reb: 76,
-					},
-					"FC",
-					31,
-					"dominant-big",
-				],
-				[
-					"Rudy Gobert",
-					{
-						hgt: 80,
-						stre: 90,
-						spd: 28,
-						jmp: 37,
-						endu: 81,
-						ins: 58,
-						dnk: 91,
-						ft: 32,
-						fg: 12,
-						tp: 0,
-						oiq: 69,
-						diq: 59,
-						drb: 34,
-						pss: 43,
-						reb: 76,
-					},
-					"C",
-					33,
-					"rim-protector",
-				],
-				[
-					"Tony Allen",
-					{
-						hgt: 51,
-						stre: 52,
-						spd: 21,
-						jmp: 7,
-						endu: 18,
-						ins: 56,
-						dnk: 58,
-						ft: 34,
-						fg: 38,
-						tp: 36,
-						oiq: 38,
-						diq: 56,
-						drb: 45,
-						pss: 41,
-						reb: 46,
-					},
-					"SF",
-					36,
-					"veteran-defender",
-				],
-			];
-		const slugs: Record<string, string> = {
-			"LeBron James": "jamesle01",
-			"Giannis Antetokounmpo": "antetgi01",
-			"Kevin Durant": "duranke01",
-			"Joel Embiid": "embiijo01",
-			"Rudy Gobert": "goberru01",
-			"Tony Allen": "allento01",
-		};
-		for (const [name, r, p, age, id] of cases) {
-			assert.strictEqual(classify(R(r), { pos: p, age }).id, id, name);
-			// With the Expanded Ratings setting on: wingspan and perimeter/interior defense derived as a real-players league
-			// derives them (an estimated wingspan must not cost a star his star label)
-			const row: Record<string, number> = { ...R(r) };
-			fillExpandedRatings({ srID: slugs[name], ratings: [row] });
+	test("every player gets a build; poor fits are flagged, not relabelled", async () => {
+		const lg = await league();
+		let poor = 0;
+		for (const p of lg) {
+			const c = classify(p.ratings, { pos: positionOf(p.ratings) });
+			assert.ok(archetypeById(c.id), c.id);
+			if (isPoorFit(c)) {
+				poor++;
+			}
 			assert.strictEqual(
-				classify(row as ArchetypeRatings, { pos: p, age }).id,
-				id,
-				`${name} (expanded ratings)`,
+				isPoorFit(c),
+				c.score < POOR_FIT_SCORE || c.shortfall > 0.25,
 			);
 		}
+		assert.ok(poor / lg.length < 0.1, `${poor}/${lg.length}`);
+	}, 120000);
+
+	test("real players get their best 2K build", () => {
+		const d = JSON.parse(
+			readFileSync(
+				new URL(
+					"../../../data/real-player-data.basketball.json",
+					import.meta.url,
+				),
+				"utf8",
+			),
+		);
+		const misses: string[] = [];
+		for (const [slug, season, want] of PINNED) {
+			const row = d.ratings.find(
+				(x: any) => x.slug === slug && x.season === season,
+			);
+			assert.ok(row, `${slug} ${season}`);
+			const r = {} as ArchetypeRatings;
+			for (const k of RATING_KEYS) {
+				r[k] = row[k];
+			}
+			const c = classify(r, { pos: positionFor(r, true) });
+			if (c.id !== want) {
+				misses.push(`${slug} ${season}: ${c.id} (want ${want})`);
+			}
+			// With the Expanded Ratings setting on (wingspan and perimeter/interior defense derived as a real-players league
+			// derives them) he must still get a build allowed at his position
+			const ex: Record<string, number> = { ...r };
+			fillExpandedRatings({ srID: slug, ratings: [ex] });
+			const ce = classify(ex as ArchetypeRatings, {
+				pos: positionFor(r, true),
+			});
+			assert.ok(archetypeById(ce.id)!.positions.includes(positionFor(r, true)));
+		}
+		assert.deepStrictEqual(misses, []);
 	});
+
 	test("tiers follow ovr percentile", () => {
 		assert.strictEqual(tierFromPercentile(0.999), "franchise");
 		assert.strictEqual(tierFromPercentile(0.97), "star");
@@ -451,97 +367,46 @@ describe("position prior", () => {
 				same++;
 			}
 		}
-		// A uniform +4 also lifts his overall level, which moves the fringe (journeyman) labels on purpose
-		assert.ok(same / lg.length > 0.77, `${same}/${lg.length}`);
+		// Builds are read relative to his own level, so a uniform +4 mostly keeps the build
+		assert.ok(same / lg.length > 0.85, `${same}/${lg.length}`);
 	}, 120000);
 
-	// Hand-made players everyone would label the same way: the family and the group must match
-	const FIXTURES: [string, Partial<ArchetypeRatings>, string[], string[]][] = [
-		[
-			"classic PG",
-			{ hgt: 25, pss: 85, drb: 80, oiq: 75, spd: 70 },
-			["playmaker"],
-			["guard"],
-		],
-		[
-			"sharpshooter",
-			{ hgt: 35, tp: 85, ft: 80, fg: 65 },
-			["shooter"],
-			["guard"],
-		],
-		[
-			"slasher",
-			{ hgt: 35, spd: 80, jmp: 80, dnk: 80, tp: 30 },
-			["slasher", "athlete"],
-			["guard"],
-		],
+	// Hand-made players everyone would label the same way: the build must feature that skill and allow his position
+	const FIXTURES: [string, Partial<ArchetypeRatings>, string][] = [
+		["classic PG", { hgt: 25, pss: 85, drb: 80, oiq: 75, spd: 70 }, "pass"],
+		["sharpshooter", { hgt: 35, tp: 85, ft: 80, fg: 65 }, "shoot"],
+		["slasher", { hgt: 35, spd: 80, jmp: 80, dnk: 80, tp: 30 }, "finish"],
 		[
 			"lockdown defender",
 			{ hgt: 38, diq: 85, spd: 75, stre: 55, ins: 35, dnk: 35, fg: 40 },
-			["defender"],
-			["guard", "wing"],
-		],
-		[
-			"3-and-D wing",
-			{ hgt: 45, tp: 80, diq: 75, spd: 65, ins: 35, dnk: 40, pss: 40, drb: 45 },
-			["defender", "shooter"],
-			["wing", "forward"],
-		],
-		[
-			"point forward",
-			{ hgt: 52, pss: 80, drb: 70, oiq: 75 },
-			["playmaker"],
-			["guard", "wing", "forward"],
-		],
-		[
-			"stretch 4",
-			{ hgt: 60, tp: 75, ft: 70, reb: 55, stre: 55, ins: 45, dnk: 45 },
-			["shooter"],
-			["forward", "big"],
+			"perD",
 		],
 		[
 			"stretch 5",
 			{ hgt: 72, tp: 75, ft: 72, ins: 45, reb: 50, jmp: 40, diq: 40 },
-			["shooter"],
-			["big"],
+			"shoot",
 		],
 		[
 			"rim protector",
 			{ hgt: 70, jmp: 70, diq: 80, stre: 60, ins: 35, fg: 30, tp: 20, ft: 40 },
-			["defender"],
-			["big"],
-		],
-		[
-			"post scorer",
-			{ hgt: 65, ins: 80, stre: 75, oiq: 65, tp: 25 },
-			["scorer"],
-			["forward", "big"],
+			"rimD",
 		],
 		[
 			"glass cleaner",
 			{ hgt: 68, reb: 85, stre: 75, tp: 20, fg: 30, ins: 40 },
-			["rebounder"],
-			["big"],
-		],
-		[
-			"lob-catching big",
-			{ hgt: 66, dnk: 85, jmp: 80, spd: 60, tp: 20, fg: 35, pss: 35 },
-			["athlete"],
-			["forward", "big"],
+			"reb",
 		],
 	];
-	for (const [label, o, families, groups] of FIXTURES) {
+	for (const [label, o, skill] of FIXTURES) {
 		test(`fixture: ${label}`, () => {
 			const r = R(o);
 			const c = classify(r);
+			const a = archetypeById(c.id)!;
 			assert.ok(
-				families.includes(c.family) && groups.includes(c.group),
-				`${label} (${positionOf(r)}) -> ${c.id} (${c.group}/${c.family})`,
+				(coverOf(a)[skill] ?? 0) > 0,
+				`${label} (${positionOf(r)}) -> ${c.id}`,
 			);
-			assert.ok(
-				c.tags.includes("universal") ||
-					!HARD_BLOCK[c.group].includes(positionOf(r)),
-			);
+			assert.ok(a.positions.includes(positionOf(r)), c.id);
 		});
 	}
 });
@@ -550,34 +415,18 @@ describe("distribution over a generated league", () => {
 	test("no archetype dominates, nearly all are used, and it is not just position", async () => {
 		const lg = await league();
 		const counts: Record<string, number> = {};
-		const cross: Record<string, Record<string, number>> = {};
 		for (const p of lg) {
 			const c = classify(p.ratings, { ovr: p.ovr });
 			counts[c.id] = (counts[c.id] ?? 0) + 1;
-			const pos = F.pos(p.ratings);
-			(cross[c.id] ??= {})[pos] = (cross[c.id]![pos] ?? 0) + 1;
 		}
 		const max = Math.max(...Object.values(counts)) / lg.length;
-		assert.ok(max < 0.08, `max share ${max}`);
-		assert.ok(max < 0.05, `max share ${max}`);
-		// Raw prospects, journeymen and veterans need players this league does not hold (or an age)
-		// (length labels need expanded ratings, which this league does not have)
-		// (nor do trait labels: no traits here)
-		const regular = ARCHETYPES.filter(
-			(a) => !a.age && !a.level && !a.expanded && !a.trait,
-		);
-		const used = regular.filter((a) => (counts[a.id] ?? 0) > 0).length;
-		assert.ok(used >= regular.length - 8, `used ${used}/${regular.length}`);
-		// Common archetypes cut across positions: most of them hold several BBGM positions
-		const common = Object.entries(counts).filter(([, n]) => n >= 15);
-		const multi = common.filter(
-			([id]) => Object.values(cross[id]!).filter((n) => n >= 3).length >= 2,
-		);
+		assert.ok(max < 0.04, `max share ${max}`);
+		const used = Object.keys(counts).length;
 		assert.ok(
-			multi.length / common.length > 0.5,
-			`${multi.length}/${common.length}`,
+			used >= ARCHETYPES.length * 0.85,
+			`used ${used}/${ARCHETYPES.length}`,
 		);
-	});
+	}, 120000);
 });
 
 describe("targeting an archetype with the regenerator", () => {
@@ -600,11 +449,8 @@ describe("targeting an archetype with the regenerator", () => {
 			.mockImplementation(() => ratingsRng.random());
 		const inputs: PlayerInput[] = [];
 		const wanted: string[] = [];
-		const rare = new Set(ARCHETYPES.filter((a) => a.rare).map((a) => a.id));
-		// Veterans cannot be aimed at (prospects are not 31), and these players are past the raw prospect / journeyman level
-		// (nor at trait labels, which need a trait no ratings set, or labels that need expanded ratings)
 		const pickable = ARCHETYPES.filter(
-			(a) => !rare.has(a.id) && !a.age && !a.level && !a.trait && !a.expanded,
+			(a) => !a.rare && !a.trait && !a.expanded,
 		);
 		let i = 0;
 		while (inputs.length < 160) {
@@ -681,34 +527,21 @@ describe("targeting an archetype with the regenerator", () => {
 });
 
 describe("positions are a hard gate", () => {
-	test("every archetype lists its positions; the name agrees, the group allows them, and only a few are universal", () => {
-		const universal = ARCHETYPES.filter((a) => a.tags.includes("universal"));
-		assert.ok(universal.length >= 5 && universal.length <= 15);
+	test("every archetype lists its 2K positions; the name agrees and the group allows them", () => {
 		for (const a of ARCHETYPES) {
 			assert.ok(a.positions.length > 0, a.id);
 			assert.strictEqual(new Set(a.positions).size, a.positions.length, a.id);
 			for (const ps of a.positions) {
 				assert.ok(POSITIONS.includes(ps), a.id);
 				assert.ok(!nameContradictsPosition(a.name, ps), `${a.name} at ${ps}`);
-				if (!universal.includes(a)) {
-					assert.notStrictEqual(posPrior(a.group, a.pos, ps), null, a.id + ps);
-				}
-			}
-			// Universal labels are role labels: their names name no position
-			if (universal.includes(a)) {
-				assert.strictEqual(namePositions(a.name), null, a.id);
-				assert.strictEqual(a.positions.length, POSITIONS.length, a.id);
-			} else {
-				assert.ok(a.positions.length < POSITIONS.length, a.id);
+				assert.ok(!HARD_BLOCK[a.group].includes(ps), `${a.name} at ${ps}`);
 			}
 		}
-		// Every position keeps a real choice of skill sets
+		// Every position keeps a real choice of builds
 		for (const ps of POSITIONS) {
-			const regular = ARCHETYPES.filter(
-				(a) => a.positions.includes(ps) && !a.age && !a.level,
-			);
-			assert.ok(regular.length >= 45, `${ps} ${regular.length}`);
-			assert.ok(new Set(regular.map((a) => a.family)).size >= 9, ps);
+			const here = ARCHETYPES.filter((a) => a.positions.includes(ps));
+			assert.ok(here.length >= 45, `${ps} ${here.length}`);
+			assert.ok(new Set(here.map((a) => a.family)).size >= 7, ps);
 		}
 	});
 
@@ -750,17 +583,14 @@ describe("positions are a hard gate", () => {
 		assert.strictEqual(positionWordOf("Point Forward"), "forward");
 		assert.strictEqual(positionWordOf("Stretch Four"), "forward");
 		assert.strictEqual(positionWordOf("Rim Protector"), null);
-		assert.ok(namesContradict("Switchable Forward", "Switchable Center"));
-		assert.ok(namesContradict("Two-Way Wing", "Lockdown Guard"));
-		assert.ok(namesContradict("Stretch Four", "Switchable Big"));
-		assert.ok(!namesContradict("Stretch Four", "Switchable Forward"));
-		assert.ok(!namesContradict("Rim Protector", "Switchable Big"));
-		assert.ok(!namesContradict("Glue Guy", "Switchable Center"));
+		assert.deepStrictEqual(namePositions("Point Four"), ["F", "PF", "FC"]);
+		assert.strictEqual(namePositions("Big Glide"), null);
+		assert.strictEqual(namePositions("Big Smooth"), null);
 		assert.ok(nameContradictsPosition("Switchable Center", "PF"));
 		assert.ok(!nameContradictsPosition("Switchable Big", "PF"));
 	});
 
-	test("over a generated league at every position: primary and secondary pass the gate, never contradict, and the name fits", async () => {
+	test("over a generated league at every position: the build passes the gate and the name fits", async () => {
 		const lg = (await league()).slice(0, 1500);
 		let n = 0;
 		for (const p of lg) {
@@ -771,20 +601,14 @@ describe("positions are a hard gate", () => {
 				n % 3 === 0 ? POSITIONS.length : 1,
 			)) {
 				n++;
-				const c = classify(p.ratings, { pos: ps, age: p.age });
+				const c = classify(p.ratings, { pos: ps });
 				const a = archetypeById(c.id)!;
 				assert.ok(a.positions.includes(ps), `${ps} ${c.label}`);
 				assert.ok(!nameContradictsPosition(c.name, ps), `${ps} ${c.label}`);
-				if (c.secondary) {
-					const b = archetypeById(c.secondary.id)!;
-					assert.ok(b.positions.includes(ps), `${ps} ${c.label}`);
-					assert.ok(!namesContradict(c.name, b.name), `${ps} ${c.label}`);
-				}
 				// A previous label his position no longer allows is never kept, however sticky
 				const blocked = ARCHETYPES.find((x) => !x.positions.includes(ps))!;
 				const again = classify(p.ratings, {
 					pos: ps,
-					age: p.age,
 					previousId: blocked.id,
 					stickiness: 99,
 				});
@@ -793,66 +617,27 @@ describe("positions are a hard gate", () => {
 		}
 	}, 120000);
 
-	test("the reported case: a PF is never a Switchable Center, nor 'Switchable Forward / Switchable Center'", () => {
-		// A 6-9 power forward who switches: once read as "Switchable Forward / Switchable Center"
-		const r = R({
-			hgt: 61,
-			stre: 58,
-			spd: 53,
-			jmp: 41,
-			endu: 56,
-			ins: 52,
-			dnk: 51,
-			ft: 40,
-			fg: 37,
-			tp: 30,
-			oiq: 45,
-			diq: 54,
-			drb: 41,
-			pss: 42,
-			reb: 50,
-		});
-		const sc = scoreAll(r, DEFAULT_NORMS, ARCHETYPES, "PF", 28).scored;
-		assert.ok(sc.find((s) => s.a.id === "switchable-center")!.z < -50);
-		for (const ps of ["PF", "FC", "C"] as const) {
-			const c = classify(r, { pos: ps, age: 28 });
-			assert.ok(
-				!c.secondary || !namesContradict(c.name, c.secondary.name),
-				c.label,
-			);
-			assert.ok(ps !== "PF" || !/Center/.test(c.label), c.label);
-		}
-	});
-
-	test("stored entries from before the gate: unknown ids, labels his position no longer allows, contradictory hybrids", () => {
-		const e = {
-			season: 2025,
-			id: "switchable-forward",
-			secondary: "switchable-center",
-		};
-		// The contradictory secondary is dropped wherever it is shown
-		assert.strictEqual(viewOf(e)?.label, "Switchable Forward");
-		assert.strictEqual(viewOf(e, "PF")?.label, "Switchable Forward");
-		// A primary his position does not allow is no view at all: the caller reads him live until the next preseason
+	test("stored entries: unknown ids, labels his position no longer allows, old hybrid partners", () => {
+		const center = ARCHETYPES.find(
+			(a) => a.positions.includes("C") && !a.positions.includes("PG"),
+		)!;
+		const guard = ARCHETYPES.find(
+			(a) => a.positions.includes("PG") && !a.positions.includes("C"),
+		)!;
+		// A hybrid partner stored by an older version is ignored
 		assert.strictEqual(
-			viewOf({ season: 2025, id: "switchable-center" }, "PF"),
-			null,
+			viewOf({ season: 2025, id: center.id, secondary: guard.id }, "C")?.label,
+			center.name,
 		);
-		assert.strictEqual(
-			viewOf({ season: 2025, id: "switchable-center" }, "C")?.label,
-			"Switchable Center",
-		);
-		// A removed archetype, as primary or secondary
+		// A build his position does not allow is no view at all: the caller reads him live until the next preseason
+		assert.strictEqual(viewOf({ season: 2025, id: center.id }, "PG"), null);
+		// A removed archetype (the old non-2K labels)
 		assert.strictEqual(viewOf({ season: 2025, id: "no-such-archetype" }), null);
+		assert.strictEqual(viewOf({ season: 2025, id: "journeyman-guard" }), null);
+		// Old ids that are 2K builds are kept
 		assert.strictEqual(
-			viewOf({ season: 2025, id: "rim-protector", secondary: "gone" }, "C")
-				?.label,
-			"Rim Protector",
-		);
-		// The renamed archetype keeps its id
-		assert.strictEqual(
-			viewOf({ season: 2025, id: "switch-big" })?.name,
-			"Switchable Big",
+			viewOf({ season: 2025, id: "walking-bucket" })?.name,
+			"Walking Bucket",
 		);
 	});
 });
@@ -865,8 +650,7 @@ describe("storage helpers", () => {
 		const list = withEntry(withEntry(undefined, e), {
 			...e,
 			season: 2027,
-			id: "sharpshooter",
-			secondary: undefined,
+			id: "walking-bucket",
 		});
 		assert.strictEqual(list.length, 2);
 		assert.strictEqual(currentEntry(list)?.season, 2027);
@@ -891,10 +675,13 @@ describe("storage helpers", () => {
 			l.byGroup.guard + l.byGroup.wing + l.byGroup.forward + l.byGroup.big,
 			40,
 		);
+		const slasher = ARCHETYPES.find(
+			(a) => a.group === "wing" && a.family === "slasher",
+		)!;
 		const same = Array.from({ length: 10 }, (_, i) => ({
 			pid: i,
 			ovr: 60 - i,
-			archetypeId: "slasher",
+			archetypeId: slasher.id,
 		}));
 		const comp = compositionOf(same);
 		const kinds = comp.warnings.map((w) => w.kind);
@@ -903,17 +690,19 @@ describe("storage helpers", () => {
 				kinds.includes("size") &&
 				kinds.includes("duplicates"),
 		);
+		const pick = (f: (a: (typeof ARCHETYPES)[number]) => boolean) =>
+			ARCHETYPES.find(f)!.id;
 		const ok = compositionOf(
 			[
-				"floor-general",
-				"sharpshooter",
-				"3-and-d-wing",
-				"stretch-four",
-				"rim-protector",
-				"glass-cleaner",
-				"slasher",
-				"glue-guy",
-				"two-way-wing",
+				pick((a) => a.group === "guard" && a.family === "playmaker"),
+				pick((a) => a.group === "guard" && a.family === "shooter"),
+				pick((a) => a.group === "wing" && a.family === "defender"),
+				pick((a) => a.group === "forward" && a.family === "shooter"),
+				pick((a) => a.group === "big" && a.family === "defender"),
+				pick((a) => a.group === "big" && a.family === "rebounder"),
+				pick((a) => a.group === "wing" && a.family === "slasher"),
+				pick((a) => a.group === "wing" && a.family === "scorer"),
+				pick((a) => a.group === "forward" && a.family === "athlete"),
 			].map((id, i) => ({ pid: i, ovr: 70 - i, archetypeId: id })),
 		);
 		assert.deepStrictEqual(ok.warnings, []);
@@ -921,102 +710,26 @@ describe("storage helpers", () => {
 	});
 });
 
-describe("combo archetype descriptions", () => {
-	test("joins both descriptions into one sentence", async () => {
-		const { combineArchetypeDescs } = await import("./classify.ts");
-		assert.strictEqual(
-			combineArchetypeDescs(
-				"Hounds ball handlers and picks pockets.",
-				"Spaces the floor from the corners.",
-			),
-			"Hounds ball handlers and picks pockets, and also spaces the floor from the corners.",
-		);
-		assert.strictEqual(combineArchetypeDescs("Scores.", undefined), "Scores.");
-	});
-});
-
-describe("player traits and expanded-ratings labels", () => {
-	test("only visible traits are read, and a trait label needs its trait", () => {
-		const hidden = Object.entries(TRAIT_DEFINITIONS)
-			.filter(([, d]) => d.visibility === "hidden")
-			.map(([k]) => k);
-		for (const k of VISIBLE_TRAITS) {
-			assert.strictEqual(
-				TRAIT_DEFINITIONS[k as keyof typeof TRAIT_DEFINITIONS].visibility,
-				"visible",
-				k,
-			);
-		}
-		const all = Object.fromEntries(hidden.map((k) => [k, 99]));
-		assert.deepStrictEqual(visibleTraits(all), {});
-		const traitLabels = ARCHETYPES.filter((a) => a.trait);
-		assert.ok(traitLabels.length >= 10);
-		const big = R({ hgt: 70, stre: 85, reb: 60, ins: 55, dnk: 60 });
-		for (const traits of [undefined, { screen: 40 }]) {
-			const { scored } = scoreAll(big, undefined, undefined, "C", 27, traits);
-			for (const s of scored) {
-				if (s.a.trait) {
-					assert.ok(
-						s.a.trait.key !== "screen" || s.z === -99,
-						`${s.a.id} without the trait`,
-					);
-				}
-			}
-		}
-		const withScreen = scoreAll(big, undefined, undefined, "C", 27, {
-			screen: 90,
-		}).scored.find((s) => s.a.id === "hard-screen-big")!;
-		assert.ok(withScreen.z > -99);
-	});
-
-	test("a stored label the league's settings no longer allow is read again", () => {
-		const e = { season: 2025, id: "hard-screen-big" };
-		assert.ok(viewOf(e, "C"));
-		assert.ok(viewOf(e, "C", { traits: true }));
-		assert.strictEqual(viewOf(e, "C", { traits: false }), null);
-		const x = { season: 2025, id: "spot-up-big", secondary: "hard-screen-big" };
-		assert.strictEqual(viewOf(x, "C", { expanded: false }), null);
-		assert.strictEqual(
-			viewOf(x, "C", { expanded: true, traits: false })?.secondaryId,
-			undefined,
-		);
-	});
-
-	test("ball security, catch-and-shoot and rebounding leans only count with expanded ratings", () => {
-		const base = R({ hgt: 25, pss: 80, drb: 70, oiq: 70 });
-		const careful = {
-			...base,
-			wng: 25,
-			pdef: 50,
-			idef: 40,
-			oreb: 40,
-			dreb: 50,
-			csh: 50,
-			dsh: 50,
-			bsc: 90,
-		};
-		const loose = { ...careful, bsc: 30 };
-		const z = (r: ArchetypeRatings, id: string) =>
-			scoreAll(r, undefined, undefined, "PG", 27).scored.find(
-				(s) => s.a.id === id,
-			)!.z;
-		assert.ok(
-			z(careful, "mistake-free-point-guard") >
-				z(loose, "mistake-free-point-guard"),
-		);
-		assert.ok(
-			z(loose, "high-risk-playmaker") > z(careful, "high-risk-playmaker"),
-		);
-		// Without expanded ratings neither can be picked
-		assert.strictEqual(z(base, "mistake-free-point-guard"), -99);
-	});
-
-	test("NBA 2K builds: every alias names an archetype, every 2K archetype is one", () => {
-		for (const id of Object.keys(TWO_K_NAMES)) {
-			assert.ok(archetypeById(id), id);
-		}
-		for (const a of ARCHETYPES.filter((x) => x.tags.includes("2k"))) {
-			assert.ok(TWO_K_NAMES[a.id]?.length, a.id);
-		}
-	});
-});
+// [Basketball-Reference slug, season, the build he gets]: real ratings from data/, read with the position the game shows
+const PINNED: [string, number, string][] = [
+	["curryst01", 2025, "inside-out-slasher"], // Stephen Curry
+	["jamesle01", 2025, "board-hunting-mid-paint-bully"], // LeBron James
+	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
+	["goberru01", 2025, "board-enforcing-bullmasher"], // Rudy Gobert
+	["antetgi01", 2025, "crashing-mid-paint-scorer"], // Giannis Antetokounmpo
+	["duranke01", 2025, "versatile-paint-finisher"], // Kevin Durant
+	["paulch01", 2025, "ball-hawking-sharpshooter"], // Chris Paul
+	["greendr01", 2025, "floor-sweeping-power-dunker"], // Draymond Green
+	["thompkl01", 2025, "crafty-sharpshooter"], // Klay Thompson
+	["embiijo01", 2025, "versatile-scorer"], // Joel Embiid
+	["lopezbr01", 2025, "backline-pick-and-popper"], // Brook Lopez
+	["capelca01", 2025, "glass-guardian-lob-threat"], // Clint Capela
+	["korveky01", 2021, "crafty-3-level-scorer"], // Kyle Korver
+	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook
+	["wembavi01", 2025, "crafty-walking-bucket"], // Victor Wembanyama
+	["doncilu01", 2025, "crafty-mid-post-scorer"], // Luka Dončić
+	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
+	["adamsst01", 2025, "2-way-post-bully-crasher"], // Steven Adams
+	["allento01", 2018, "crafty-mid-post-scorer"], // Tony Allen
+	["drumman01", 2025, "2-way-mid-paint-cleaner"], // Andre Drummond
+];

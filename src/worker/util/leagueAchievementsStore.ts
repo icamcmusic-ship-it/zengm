@@ -20,7 +20,14 @@ const LOG_MAX = 300;
 // ---- the old separate database, read once per league ----
 const LEGACY_DB_NAME = "league-achievements";
 let legacyDbPromise: Promise<IDBPDatabase<unknown> | undefined> | undefined;
+// The IDBFactory legacyDbPromise was opened with (tests swap in fresh fake ones)
+let legacyFactory: IDBFactory | undefined;
 const getLegacyDb = () => {
+	const factory = typeof indexedDB === "undefined" ? undefined : indexedDB;
+	if (factory !== legacyFactory) {
+		legacyFactory = factory;
+		legacyDbPromise = undefined;
+	}
 	legacyDbPromise ??= (async () => {
 		try {
 			if (typeof indexedDB === "undefined") {
@@ -41,6 +48,13 @@ const getLegacyDb = () => {
 };
 
 const legacyChecked = new Set<number>();
+
+// Module state is shared between test files running in the same worker
+export const resetLeagueAchievementsStoreForTests = () => {
+	legacyChecked.clear();
+	legacyDbPromise = undefined;
+	legacyFactory = undefined;
+};
 
 const readLegacy = async (lid: number): Promise<SavedState | undefined> => {
 	if (legacyChecked.has(lid)) {

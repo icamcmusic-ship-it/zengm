@@ -24,8 +24,8 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 		},
 		{ title: "%", desc: "Share of the league", sortType: "number" as const },
 		{
-			title: "2K builds",
-			desc: "NBA 2K builds that read as this archetype",
+			title: "Also in 2K as",
+			desc: "Other NBA 2K build names this archetype stands for",
 			sortType: "number" as const,
 		},
 		{
@@ -93,10 +93,13 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 		<>
 			<MoreLinks type="playerRatings" page="archetypes" />
 			<p>
-				Archetypes are derived from each player's ratings (not assigned), and
-				saved at the start of every preseason, so a player's label holds for the
-				season. Prospects and players without a saved label show a live reading.{" "}
-				{total} players in {season}.
+				Every archetype is an NBA 2K build. A player gets the one build whose
+				shape is most similar to his ratings, relative to his own level (so the
+				same build fits a bench player and a star; the tier says which), at the
+				positions the build is played at. It is saved at the start of every
+				preseason, so a player's label holds for the season. Prospects and
+				players without a saved label show a live reading. {total} players in{" "}
+				{season}.
 			</p>
 
 			<div className="d-flex flex-wrap gap-3 mb-4">

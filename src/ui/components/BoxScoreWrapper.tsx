@@ -915,8 +915,9 @@ const DetailedScore = ({
 					</a>
 				</div>
 			) : null}
-			<div className="d-sm-flex">
-				<div className="mx-xs-auto text-center">
+			{/* minWidth 0 and overflow-auto: on a phone, a long line score (baseball innings) scrolls instead of pushing Next off the screen */}
+			<div className="d-sm-flex" style={{ minWidth: 0 }}>
+				<div className="mx-xs-auto text-center overflow-auto">
 					<table className="table table-sm mb-2 mb-sm-0">
 						<thead>
 							<tr>

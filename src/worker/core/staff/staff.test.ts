@@ -1,4 +1,5 @@
-import { assert, beforeEach, describe, test } from "vitest";
+import { afterEach, assert, beforeEach, describe, test } from "vitest";
+import { makeSeededRandom } from "../../../common/random.ts";
 import { DEFAULT_LEVEL, levelToEffect } from "../../../common/budgetLevels.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { COACH_FREE_AGENT, COACH_ROLES } from "../../../common/staff.ts";
@@ -279,7 +280,47 @@ describe("coaching staff", () => {
 
 // Over many simulated offseasons, the staff-based coaching levels should give about the same league-wide development as the default AI coaching budgets do, with a similar spread between teams
 describe("coaching staff development calibration", () => {
+	// Statistical test over many random seasons: seeded so it's deterministic, regardless of what other test files in the same worker did to Math.random (isolate: false)
+	const originalRandom = Math.random;
+	afterEach(() => {
+		Math.random = originalRandom;
+	});
+
+	test("an emptied staff is refilled without deleting coaches with history", async () => {
+		Math.random = makeSeededRandom(5);
+		await setup();
+		await ensureStaff();
+		await finishSeason();
+		await runOffseason();
+		const winner = (await idb.cache.coaches.getAll()).find((c) =>
+			c.awards.some((a) => a.type === COACH_OF_THE_YEAR),
+		)!;
+		assert.isDefined(winner);
+		const numCoaches = (await idb.cache.coaches.getAll()).length;
+
+		// Everyone leaves one team (like the user's staff with expiring contracts), and the award winner is unemployed
+		for (const c of await idb.cache.coaches.getAll()) {
+			if (c.tid === 1 || c.cid === winner.cid) {
+				c.tid = COACH_FREE_AGENT;
+				if (c.cid === winner.cid) {
+					// Past his prime, so he'd be the first to go in a pool trim
+					for (const key of helpers.keys(c.ratings)) {
+						c.ratings[key] = 0;
+					}
+				}
+				await idb.cache.coaches.put(c);
+			}
+		}
+		await nextSeason();
+
+		await assertFullStaffs({ skipUser: false });
+		assert.isDefined(await idb.cache.coaches.get(winner.cid));
+		// The pool was topped up, nobody deleted
+		assert.isAtLeast((await idb.cache.coaches.getAll()).length, numCoaches);
+	});
+
 	test("league-wide progression stays realistic over simulated seasons", async () => {
+		Math.random = makeSeededRandom(20_240_601);
 		await setup();
 		await ensureStaff();
 
@@ -315,8 +356,14 @@ describe("coaching staff development calibration", () => {
 					const ovr0 = p.ratings[0].ovr;
 					const p1 = structuredClone(p);
 					const p2 = structuredClone(p);
+					// Common random numbers, so the comparison measures the level, not the noise of two independent developments
+					const devSeed = Math.floor(Math.random() * 2 ** 31);
+					const outer = Math.random;
+					Math.random = makeSeededRandom(devSeed);
 					await player.develop(p1, 1, false, staffLevel);
+					Math.random = makeSeededRandom(devSeed);
 					await player.develop(p2, 1, false, budgetLevel);
+					Math.random = outer;
 					staffChanges.push(p1.ratings[0].ovr - ovr0);
 					budgetChanges.push(p2.ratings[0].ovr - ovr0);
 				}

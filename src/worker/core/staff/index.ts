@@ -488,15 +488,22 @@ export const ensureStaff = async () => {
 
 	const firstTime = coaches.length === 0;
 
+	if (!firstTime) {
+		// A team with no staff in an existing league (expansion team, or the user's team after everyone left). Top up the pool like the offseason market does, rather than generating a whole new league's worth of candidates and then trimming the pool, which would delete coaches with history (records, awards)
+		await replenishPool();
+		await fillVacancies({ includeUser: true });
+		await ensureProfiles();
+		await syncAllBudgets(false);
+		return true;
+	}
+
 	// Candidate pool, about 2x the number of jobs, so the market sorts better coaches onto richer teams
 	for (const role of COACH_ROLES) {
 		const num = Math.round(teams.length * 1.8) + 4;
 		for (let i = 0; i < num; i++) {
 			const c = await generateCoach({ role });
-			if (firstTime) {
-				// Existing coaches have some history with their team
-				c.contract.exp = contractStartSeason() + randInt(0, 3);
-			}
+			// Existing coaches have some history with their team
+			c.contract.exp = contractStartSeason() + randInt(0, 3);
 			await idb.cache.coaches.add(c);
 		}
 	}
@@ -504,14 +511,12 @@ export const ensureStaff = async () => {
 	await fillVacancies({ includeUser: true });
 
 	// Initial hires shouldn't show up as a coaching carousel (and their systems are already installed)
-	if (firstTime) {
-		for (const c of await idb.cache.coaches.getAll()) {
-			c.transactions = [];
-			if (c.profile) {
-				delete c.profile.since;
-			}
-			await idb.cache.coaches.put(c);
+	for (const c of await idb.cache.coaches.getAll()) {
+		c.transactions = [];
+		if (c.profile) {
+			delete c.profile.since;
 		}
+		await idb.cache.coaches.put(c);
 	}
 	await ensureProfiles();
 
@@ -528,7 +533,7 @@ export const ensureStaff = async () => {
 		}
 	}
 
-	await syncAllBudgets(firstTime);
+	await syncAllBudgets(true);
 	return true;
 };
 
