@@ -253,10 +253,6 @@ const runLeague = async ({
 				teams.length / 4,
 				"in-season commitments",
 			);
-			if (env.COLLEGE_DEBUG) {
-				const all = (await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)).filter((p: any) => p.draft.year === g.get("season"));
-				console.log("DEBUG in-season", inSeason.length, "of", all.length, "user", inSeason.filter((p: any) => p.recruit.commit === g.get("userTid")).map((p: any) => p.recruit.rank), "top10", JSON.stringify(all.filter((p: any) => p.recruit.rank <= 10).map((p: any) => [p.recruit.commit, p.recruit.schools?.length, Math.round(p.recruit.schools?.[0]?.i ?? 0)])));
-			}
 			if (i === 0) {
 				assert.isTrue(
 					inSeason.some((p: any) => p.recruit.commit === g.get("userTid")),
@@ -472,10 +468,6 @@ const runLeague = async ({
 				}
 			}
 			assert.isAtLeast(kept, committed.size * 0.9, "commitments signed");
-			if (env.COLLEGE_DEBUG) {
-				const ar = await getCollegeArchive(g.get("season"));
-				console.log("DEBUG signing", committed.size, kept, "transfers", ar?.transfers?.length, "top classes", ar?.classRankings?.slice(0, 5).map((r) => [g.get("teamInfoCache")[r.tid]?.region, r.points]), "user", ar?.classRankings?.find((r) => r.tid === g.get("userTid")));
-			}
 			const rankings = (await getCollegeArchive(g.get("season")))
 				?.classRankings;
 			assert.isAbove(rankings?.length ?? 0, teams.length / 2, "class rankings");

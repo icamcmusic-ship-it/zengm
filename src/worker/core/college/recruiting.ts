@@ -321,6 +321,7 @@ const aiRecruit = (
 	budget: number,
 	officialVisitsUsed: number,
 	leaders: Map<number, number>,
+	offersOut: number,
 ) => {
 	const spots = openSpots(school);
 	if (spots <= 0) {
@@ -374,7 +375,8 @@ const aiRecruit = (
 	const nilEach = Math.round(
 		nilBudget(school.prestige) / Math.max(2, spots * 2),
 	);
-	let offers = 0;
+	// Offers already out count against the limit
+	let offers = offersOut;
 	let visits = officialVisitsUsed;
 	for (const [j, prospect] of targets.entries()) {
 		if (budget <= 0) {
@@ -389,8 +391,6 @@ const aiRecruit = (
 				continue;
 			}
 			entry.nil = nilEach;
-			offers += 1;
-		} else if (si?.o) {
 			offers += 1;
 		}
 		let action: RecruitAction;
@@ -503,10 +503,19 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 	const recruitProspects = prospects.filter((pr) => pr.kind === "recruit");
 	const portalProspects = prospects.filter((pr) => pr.kind === "portal");
 	const visitsUsed = new Map<number, number>();
-	for (const { box } of prospects) {
+	const offersOut = new Map<string, number>();
+	for (const { box, kind, p } of prospects) {
 		for (const s of box.schools ?? []) {
+			if (kind === "portal" && p.portal!.from === s.tid) {
+				// His own school's standing offer
+				continue;
+			}
 			if (s.v) {
 				visitsUsed.set(s.tid, (visitsUsed.get(s.tid) ?? 0) + 1);
+			}
+			if (s.o && (box.commit === undefined || box.commit === s.tid)) {
+				const key = `${kind}|${s.tid}`;
+				offersOut.set(key, (offersOut.get(key) ?? 0) + 1);
 			}
 		}
 	}
@@ -536,6 +545,7 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 			budget * share,
 			visitsUsed.get(school.tid) ?? 0,
 			leaders,
+			offersOut.get(`recruit|${school.tid}`) ?? 0,
 		);
 		if (portalProspects.length > 0) {
 			aiRecruit(
@@ -545,6 +555,7 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 				budget * (1 - share),
 				OFFICIAL_VISITS_PER_SEASON,
 				leaders,
+				offersOut.get(`portal|${school.tid}`) ?? 0,
 			);
 		}
 	}
@@ -638,6 +649,7 @@ export const getUserOffers = (prospects: Prospect[], kind: Kind) => {
 	return prospects.filter(
 		(pr) =>
 			pr.kind === kind &&
+			!(kind === "portal" && pr.p.portal!.from === userTid) &&
 			(pr.box.commit === undefined || pr.box.commit === userTid) &&
 			pr.box.schools?.some((s) => s.tid === userTid && s.o),
 	).length;

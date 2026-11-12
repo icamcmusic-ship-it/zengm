@@ -146,7 +146,7 @@ NCAA Division I is about 72 points, 44% FG, 38-39% of shots from three, 34% 3P, 
 ### Not in v1 / known limits
 
 - (v1) Awards were the pro ones and the team rating on the pro scale: fixed in v2.
-- No redshirts, NIL, visits/pitches, decommitments, in-season recruiting, hand-run transfer portal, conference realignment, coach career moves, NIT, First Four, pro league alongside.
+- (v1) No redshirts, NIL, visits/pitches, decommitments, in-season recruiting, hand-run transfer portal, NIT, First Four: done in v2/v3. Still not built: conference realignment, coach career moves, pro league alongside.
 - The bracket page shows "League Champions"; region names are not shown on the bracket (they are on the Selection tab).
 - Imported or edited college leagues are not specially handled (a league file with players skips the college roster generation). A program's prestige (`t.collegePrestige`, `t.collegePrestigeBase`) is kept from the file.
 - The full level is slow (about 2-2.5 s per game day headless).
@@ -157,17 +157,18 @@ NCAA Division I is about 72 points, 44% FG, 38-39% of shots from three, 34% 3P, 
 - **Quick sim** (`college/quickSim.ts`, setting _College Quick Sim_ `collegeQuickSim`, on by default for major and full, optional for power). Games without the user's team in the regular season and the conference tournaments (except the finals) are played by a statistical model: margin = 1.04 × (home strength − away strength) + 2.2 home court + N(0, 12.9); total = 165.7 + 0.416 × (sum of strengths) + N(0, 15), where strength is team.ovr's predicted margin of the healthy, non-redshirted players; ties go to 5-minute overtimes. The box score is built to add up to the score: minutes by rotation slot, quality and endurance; team shots, free throws, rebounds, assists, steals, blocks, turnovers and fouls around the full sim's means, shared out to the players by minutes and composite ratings with exponents fitted to the full sim's per-minute rates; shot locations; injuries at the full sim's rate per minute. The result has the game sim's shape, so stats, standings, box scores, injuries, polls and NET are unchanged. Also: no mood snapshots in college, coaching systems skipped on days with no full-sim game, advanced stats every third regular season day with the quick sim on.
 - **Calibration** (one full-size season each way, `quickSimData.script.test.ts`; bounds in `quickSim.test.ts`):
 
-| | Full sim | Quick sim |
-| --- | --- | --- |
-| margin per strength point / home court / residual sd | 1.04 / 2.16 / 12.9 | 1.04 / 1.96 / 13.0 |
-| points per team, OT rate | 66.7, 3.5% | 66.6, 2.2% |
-| stronger team wins, gap 0-2 / 2-5 / 5-10 / 10-15 / 15-20 / 20-30 / 30+ | .53 / .60 / .70 / .83 / .87 / .98 / 1.00 | .56 / .62 / .72 / .84 / .91 / .96 / 1.00 |
-| team FGA, 3PA, FTA, ORB, DRB, AST, TOV, STL, BLK | 57.0, 17.7, 17.9, 8.9, 23.7, 13.9, 12.2, 6.5, 2.9 | 56.5, 17.9, 18.2, 9.0, 24.4, 13.9, 12.2, 6.4, 2.8 |
-| leaders (per game) pts top1/top10/top50 | 24.2 / 18.2 / 14.9 | 27.3 / 20.4 / 16.2 |
-| trb, ast, stl, blk top10 | 10.4, 6.4, 2.2, 1.7 | 11.2, 5.8, 2.2, 1.7 |
-| player 2P% p10/p50/p90 | .362 / .457 / .588 | .340 / .467 / .589 |
+|                                                                        | Full sim                                          | Quick sim                                         |
+| ---------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------- |
+| margin per strength point / home court / residual sd                   | 1.04 / 2.16 / 12.9                                | 1.04 / 1.96 / 13.0                                |
+| points per team, OT rate                                               | 66.7, 3.5%                                        | 66.6, 2.2%                                        |
+| stronger team wins, gap 0-2 / 2-5 / 5-10 / 10-15 / 15-20 / 20-30 / 30+ | .53 / .60 / .70 / .83 / .87 / .98 / 1.00          | .56 / .62 / .72 / .84 / .91 / .96 / 1.00          |
+| team FGA, 3PA, FTA, ORB, DRB, AST, TOV, STL, BLK                       | 57.0, 17.7, 17.9, 8.9, 23.7, 13.9, 12.2, 6.5, 2.9 | 56.5, 17.9, 18.2, 9.0, 24.4, 13.9, 12.2, 6.4, 2.8 |
+| leaders (per game) pts top1/top10/top50                                | 24.2 / 18.2 / 14.9                                | 27.3 / 20.4 / 16.2                                |
+| trb, ast, stl, blk top10                                               | 10.4, 6.4, 2.2, 1.7                               | 11.2, 5.8, 2.2, 1.7                               |
+| player 2P% p10/p50/p90                                                 | .362 / .457 / .588                                | .340 / .467 / .589                                |
 
-  Known differences: team-to-team spread of 3PA and FTA is a bit narrower, the top scorers score a little more, the most extreme three-point shooters take fewer threes.
+Known differences: team-to-team spread of 3PA and FTA is a bit narrower, the top scorers score a little more, the most extreme three-point shooters take fewer threes.
+
 - **Awards** (`common/college/awards.ts`, award settings, so the awards, history and player pages show them): Player of the Year, Defensive Player of the Year, Freshman of the Year, Most Outstanding Player (title game), conference Players of the Year and All-Conference 1st/2nd teams (group "conf"), All-American 1st/2nd/3rd teams, All-Freshman team. Coach of the Year (coaching staff) is judged against the prestige expectation. A v1 league switches to the college awards at its next awards.
 - **Team rating** on a college scale in college leagues: 88 + 0.6 × predicted margin (pro scale), so the best programs of a full league read in the high 80s and the weakest in the 40s. Player ovr stays on the usual scale.
 - **Bracket:** "National Champions" (banner, history), region names on the bracket, seeds.
@@ -176,20 +177,29 @@ NCAA Division I is about 72 points, 44% FG, 38-39% of shots from three, 34% 3P, 
 
 ### Speed after v2 (headless, regular season)
 
-| Level | Before (full sim) | After (quick sim) |
-| --- | --- | --- |
-| power | 9-16 s | 4-5 s (quick sim on; off by default) |
-| major | 22-24 s | 9 s |
-| full | 96-135 s | 21-26 s |
+| Level | Before (full sim) | After (quick sim)                    |
+| ----- | ----------------- | ------------------------------------ |
+| power | 9-16 s            | 4-5 s (quick sim on; off by default) |
+| major | 22-24 s           | 9 s                                  |
+| full  | 96-135 s          | 21-26 s                              |
 
-### Not in v2 (still to do)
+### v3: built
 
-- First Four and the NIT; recruiting visits, pitches, NIL and in-season commitments, signing day results page; the user-run transfer portal. Recruiting and the portal still work as in v1 (targets / auto, automatic portal).
+- **First Four** (game attribute `collegeFirstFour`, on for new college leagues; only the 64-team bracket, i.e. the full size): Selection is made when the conference tournaments end, with 68 teams. The four lowest at-large teams and the four lowest automatic qualifiers play four play-in games (full sim, neutral court) on one more day of the conference tournament phase; the winners take their seed line. Shown on the Selection tab (an _FF_ badge on the region lists) and above the bracket. First Four games are not in the NET, polls or records shown on Selection.
+- **NIT** (League Extras _College NIT_, `collegeNit`, on for new college leagues; off for older ones): the best teams not selected (committee score), 32 next to a 64-team national tournament and 16 next to a 32-team one, none if fewer than field + 8 teams are left. Regular season conference champions (the 1 seed of the conference tournament) who lost their tournament and missed the national tournament get automatic bids. One bracket, NIT round k on the same day as national round k (so it ends first). Games without the user's team use the quick sim when it is on. Page _NIT_ (`/college_nit/:season`); the champion is in the news, the season archive and League History. NIT games count as postseason games in player and team stats.
+- **Recruiting v2** (`college/recruiting.ts`, model in `common/college/interest.ts`, see below): weekly recruiting points, actions (scout, contact, home visit, official visit, offer, NIL), pitches, interest that builds week by week, in-season commitments and decommitments for every school, signing day from the commitments, class rankings. Recruiting page tabs: Board (filters, actions, an interest bar against the top 3 schools, what each recruit wants), Commitments, Signing day (who signed where, class rankings, any past season). News items for commitments and decommitments (4-5 stars and the user's recruits). _Auto recruit_ still works: the AI spends the user's points.
+- **User-run transfer portal**: entering the Transfer portal phase, players enter the portal (bench players without minutes, a few stars at small programs, and on the user's team players unhappy with their minutes). The play menu stops in the portal phase; the Transfer Portal page lists them, and for 3 weeks (_Next portal week_, or played automatically when you move on) every school recruits them with the same points; a player commits and joins at once. The user's own players can be kept with a _Retention pitch_. When the window closes the rest pick a school with a spot, go back, or leave college. Rosters never go over 13 (commitments count). **Transfer limit, kept simple:** a player who transferred once never enters the portal again (no sitting out). After the portal, 2 late recruiting weeks in the Recruiting phase.
+- **Migration:** leagues from v1/v2 keep working: recruits without preferences get them at the next recruiting week, an in-progress offseason uses the v1 rules for whoever has no v2 data, the First Four and the NIT stay off unless turned on.
+- The phase change into the conference tournaments now saves (a reload used to lose it), and the play menu updates after it.
+
+### The interest model
+
+Each recruit has preferences over six pitches (playing time, prestige, closeness to home, coach, winning, NIL), weights adding up to 1 (a flat Dirichlet). For each school he has grades 0-1: playing time from the returning players at his position better than him, prestige, same state / census division, the head coach's ratings, win % and NIL money promised. Fit = Σ weight × grade. An action adds effort × (0.4 + 1.2 fit) × (0.5 + 3 × weight × grade of the pitch) (contact 3, home visit 9, official visit 18, offer 8, retention pitch 14), with diminishing returns towards 400. Every week a school that did nothing loses 10%, and every school he follows gains 2 × fit. He follows at most 12 schools. He commits when the school he likes best offered him, has a spot, is past 50 and leads the next by 15% (shrinking to 3% as weeks pass); he decommits when an offering school passes his by 40% or his school withdraws. Weekly points: 40 + 0.5 prestige ± 10 for the coach (the user sees about 70-95); NIL: about 1.2 × prestige - 20 thousand a season; 5 official visits a season; two offers out per open scholarship. AI schools get the same budget, target recruits their prestige can land (and portal players who would play), offer, visit their top targets with the best pitch, and move on when they fall well behind the leader.
 
 ### Next steps
 
 1. College award names and conference awards (All-Americans, conference POY, Final Four MOP).
 2. Quick-sim path for non-user games, to make the full level about as fast as power.
-3. Recruiting v2 (visits, pitches, pipelines, in-season commitments) and a user-run transfer portal; redshirts.
+3. ~~Recruiting v2 and a user-run transfer portal; redshirts~~ (done in v2/v3).
 4. Rescale team rating / ovr display for college; bracket region labels and "National Champions".
-5. The v2 list above (NIL, coach career, realignment, NIT, pro league alongside).
+5. Coach career moves, conference realignment, a pro league alongside, rivalry trophies (NIL, NIT, First Four done in v3).
