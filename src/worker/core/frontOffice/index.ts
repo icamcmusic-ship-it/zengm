@@ -7,7 +7,6 @@ import {
 	DEFAULT_LEVEL,
 	MAX_LEVEL,
 	levelToEffect,
-	scoutingEffectCutoff,
 	scoutingEffectStddev,
 } from "../../../common/budgetLevels.ts";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
@@ -41,7 +40,9 @@ export const frontOfficeEnabled = () =>
 
 // A team's level of a new department. Before it was ever set: the average of its scouting, health and facilities levels (its owner's
 // usual spending), so turning the setting on in an existing league changes nobody's tier
-export const defaultNewDeptLevel = (t: Pick<Team, "budget">) =>
+export const defaultNewDeptLevel = (t: {
+	budget: Pick<Team["budget"], "scouting" | "health" | "facilities">;
+}) =>
 	helpers.bound(
 		Math.round((t.budget.scouting + t.budget.health + t.budget.facilities) / 3),
 		1,
@@ -65,8 +66,12 @@ export const getDeptLevels = (
 	facilities: t.budget.facilities,
 });
 
-// Like finances.getLevelLastThree for the new departments: the per-game average over the last 3 seasons, missing seasons and games
-// counted at the current level
+// Like finances.getLevelLastThree for the new departments: the per-game average over the last 3 seasons. Missing seasons and games
+// played before the setting was on count at the team's initial level (like initialBudget for the old items), so a new level phases in
+// over 3 seasons instead of applying at once
+export const initialNewDeptLevel = (t: Pick<Team, "initialBudget">) =>
+	defaultNewDeptLevel({ budget: t.initialBudget });
+
 export const getNewDeptLevelLastThree = async (
 	key: FrontOfficeNewKey,
 	extra: { tid: number; t?: Team; teamSeasons?: TeamSeasonWithoutKey[] },
@@ -79,7 +84,7 @@ export const getNewDeptLevelLastThree = async (
 	if (!t) {
 		return DEFAULT_LEVEL;
 	}
-	const current = getNewDeptLevel(t, key);
+	const current = initialNewDeptLevel(t);
 	const teamSeasons =
 		extra.teamSeasons ??
 		(await idb.cache.teamSeasons.indexGetAll("teamSeasonsByTidSeason", [
@@ -340,16 +345,17 @@ export const getScoutingAccuracy = async (scoutingLevel: number) => {
 	if (prospects.length === 0 || g.get("godMode")) {
 		return;
 	}
-	// The same random draws at the league-average level: fuzz is a bounded normal scaled by the level's stddev
+	// The same random draws at the league-average level: fuzz is a normal draw times the level's stddev (then scaled for younger
+	// classes, by scouting actions and as classes age, all multiplicative), so the same draws at level 34 are fuzz times the stddev ratio.
+	// (The draws were made at the level of their time, approximated by the current 3-season level)
 	const ratio =
 		scoutingEffectStddev(DEFAULT_LEVEL) / scoutingEffectStddev(scoutingLevel);
-	const cutoff = scoutingEffectCutoff(DEFAULT_LEVEL);
 	let sum = 0;
 	let sumAvg = 0;
 	for (const p of prospects) {
 		const fuzz = p.ratings.at(-1)!.fuzz ?? 0;
 		sum += Math.abs(fuzz);
-		sumAvg += Math.min(cutoff, Math.abs(fuzz * ratio));
+		sumAvg += Math.abs(fuzz * ratio);
 	}
 	return {
 		prospects: prospects.length,

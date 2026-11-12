@@ -48,22 +48,32 @@ describe("Front Office Budget (worker)", () => {
 		assert.strictEqual(getInjuryDurationFactor(100, 34), 1);
 	});
 
-	test("new departments start at the team's usual level and follow it in the 3-season average", async () => {
+	test("new departments start at the team's usual level and phase in over 3 seasons", async () => {
 		const t = (await idb.cache.teams.get(0))!;
 		const def = defaultNewDeptLevel(t);
 		assert.strictEqual(
 			await getNewDeptLevelLastThree("analytics", { tid: 0 }),
 			def,
 		);
+		// A new level doesn't apply at once: no games at it yet
 		t.frontOffice = { analytics: 90, travel: 5 };
-		// No games recorded: every season imputed at the current level
 		assert.strictEqual(
 			await getNewDeptLevelLastThree("analytics", { tid: 0, t }),
-			90,
+			def,
 		);
+		// A full season at it: a third of the way there
+		const ts = (await idb.cache.teamSeasons.indexGet("teamSeasonsByTidSeason", [
+			0,
+			g.get("season"),
+		]))!;
+		for (let i = 0; i < 82; i++) {
+			payGame(t, ts);
+		}
+		ts.won = 41;
+		ts.lost = 41;
 		assert.strictEqual(
-			await getNewDeptLevelLastThree("travel", { tid: 0, t }),
-			5,
+			await getNewDeptLevelLastThree("analytics", { tid: 0, t }),
+			Math.round((90 + 2 * def) / 3),
 		);
 	});
 
