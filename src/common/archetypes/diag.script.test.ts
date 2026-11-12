@@ -218,7 +218,7 @@ const claimsOf = (a) => {
 };
 const BUCKET = {
 	PG: "PG",
-	G: "PG",
+	G: "SG",
 	SG: "SG",
 	GF: "W",
 	SF: "W",

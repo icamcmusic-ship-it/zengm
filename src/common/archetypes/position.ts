@@ -65,47 +65,121 @@ export const positionOf = (
 };
 
 // ---- Improved positions (league setting "Improved positions") ----
-// Two axes instead of one line: SIZE (height first, then strength, rebounding, inside scoring and rim protection) and
-// BALL SKILLS (passing, dribbling, three point shooting, speed, offensive IQ). Each raw score is turned into a percentile
-// against a fixed reference distribution (generated players, see positionFit.script.test.ts), so a position does not move
-// with the league around him. The nine positions are centroids in that square; a player gets the nearest one (minus a
-// per-position bias fitted so the overall shares stay close to the old formula's).
+// Size band first, then the role within it. Three readings of a player:
+// - LENGTH, in inches: his height plus part of his wingspan beyond it (expanded ratings), nudged by his build (strength,
+//   defensive more than offensive rebounding, interior defense and inside scoring push him up; speed and perimeter defense
+//   down). Strength and rebounding count far less than they used to, so a strong or rebounding guard stays a guard.
+// - BALL SKILLS: passing, dribbling, three, speed, offensive IQ and perimeter defense, against his overall level.
+// - PLAYMAKING ("who runs the offense"): with real minutes, his assist and usage rates (last and current season, by
+//   minutes); without, passing, dribbling, offensive IQ and ball security, against his overall level.
+// The band (guard / wing / big) comes from length, moved toward the guards for a playmaker (a 6'8" point forward is a wing,
+// not a big), with hard limits: under 6'4" never a big, 7'0" or taller never a guard. Within the band he gets the nearest
+// position centroid (length, playmaking, ball skills). Everything is on fixed scales (inches, percentiles against generated
+// players and against real NBA seasons), so positions do not drift with the league. Fitted on the real players' listed
+// positions (seasons 2000-2015, checked on 2016-2025) and on the 2025 stars, with biases for sensible shares in a random league.
 
 type PosRatings = Pick<
 	ArchetypeRatings,
 	| "hgt"
 	| "stre"
-	| "reb"
-	| "ins"
-	| "jmp"
-	| "diq"
-	| "pss"
-	| "drb"
-	| "tp"
 	| "spd"
+	| "jmp"
+	| "endu"
+	| "ins"
+	| "dnk"
+	| "ft"
+	| "fg"
+	| "tp"
 	| "oiq"
+	| "diq"
+	| "drb"
+	| "pss"
+	| "reb"
+	| "wng"
+	| "pdef"
+	| "idef"
+	| "oreb"
+	| "dreb"
+	| "bsc"
 >;
 
-export const sizeRaw = (r: PosRatings) =>
-	(4 * r.hgt +
-		0.8 * r.stre +
-		0.8 * r.reb +
-		0.4 * r.ins +
-		0.2 * r.jmp +
-		0.2 * r.diq) /
-	6.4;
+// A season's (or two seasons') regular-season playmaking stats: minutes, assist and usage percentage
+export type PositionStats = { min: number; astp: number; usgp: number };
 
-export const ballSkillsRaw = (r: PosRatings) =>
-	(1.2 * r.pss + 1 * r.drb + 0.6 * r.tp + 0.5 * r.spd + 0.4 * r.oiq) / 3.7;
+// BBGM's hgt rating spans 5'6" (0) to 7'9" (100)
+export const hgtToInches = (hgt: number) => 66 + 0.27 * hgt;
 
-// Reference quantiles (0%, 5%, ..., 100%) of the raw scores
-const SIZE_KNOTS = [
-	15.94, 31.84, 34.72, 37.06, 39.5, 41.59, 43.47, 45.06, 46.44, 47.69, 48.72,
-	49.66, 50.66, 51.75, 53.22, 55.06, 57.31, 59.28, 61.22, 64.09, 89.16,
-];
+const level = (r: PosRatings) =>
+	(r.stre +
+		r.spd +
+		r.jmp +
+		r.endu +
+		r.ins +
+		r.dnk +
+		r.ft +
+		r.fg +
+		r.tp +
+		r.oiq +
+		r.diq +
+		r.drb +
+		r.pss +
+		r.reb) /
+	14;
+
+// Share of the wingspan-minus-height gap that counts as length, and of the build
+const WINGSPAN_K = 0.264;
+const BUILD_K = 0.834;
+// Share of his overall level taken out of ball skills and playmaking (a star is good at everything)
+const LEVEL_K = 0.464;
+
+export const positionRaw = (r: PosRatings) => {
+	const lvl = level(r);
+	const wng = r.wng ?? r.hgt;
+	// Without expanded ratings: rebounding and defensive IQ stand in for the split ratings
+	const reb =
+		r.dreb !== undefined && r.oreb !== undefined
+			? 0.7 * r.dreb + 0.3 * r.oreb
+			: r.reb;
+	const idef = r.idef ?? r.diq;
+	const pdef = r.pdef ?? r.diq;
+	const build =
+		0.1 * (r.stre - lvl) +
+		0.15 * (reb - lvl) +
+		0.1 * (idef - lvl) +
+		0.05 * (r.ins - lvl) -
+		0.05 * (r.spd - lvl) -
+		0.05 * (pdef - lvl);
+	return {
+		inches: hgtToInches(r.hgt),
+		length: hgtToInches(r.hgt + WINGSPAN_K * (wng - r.hgt) + BUILD_K * build),
+		ballSkills:
+			(1.2 * r.pss +
+				1 * r.drb +
+				0.6 * r.tp +
+				0.5 * r.spd +
+				0.4 * r.oiq +
+				0.3 * pdef) /
+				4 -
+			LEVEL_K * lvl,
+		playmaking:
+			(1.4 * r.pss + 0.9 * r.drb + 0.4 * r.oiq + 0.3 * (r.bsc ?? r.drb)) / 3 -
+			LEVEL_K * lvl,
+	};
+};
+
+// Reference quantiles (0%, 5%, ..., 100%): ball skills and playmaking of generated players (ovr >= 38), and assist% + usage%/10
+// of real NBA players with 500+ minutes, 2000-2025
 const SKILL_KNOTS = [
-	30.35, 38.05, 40.19, 41.62, 42.78, 43.86, 44.81, 45.76, 46.76, 47.7, 48.65,
-	49.73, 50.92, 52.22, 53.73, 55.43, 57.49, 59.65, 61.97, 65.65, 83.14,
+	12.29, 18.58, 20.18, 21.29, 22.15, 22.91, 23.64, 24.32, 25.03, 25.73, 26.45,
+	27.25, 28.01, 28.93, 30.03, 31.21, 32.6, 34.17, 36.07, 38.82, 48,
+];
+const PLAY_KNOTS = [
+	3.88, 15.56, 17.98, 19.82, 21.38, 22.58, 23.57, 24.55, 25.48, 26.33, 27.17,
+	28.09, 29.02, 30.13, 31.25, 32.59, 34.25, 36.39, 39.17, 43.44, 55.04,
+];
+const PLAY_STAT_KNOTS = [
+	1.55, 5.8, 6.88, 7.79, 8.55, 9.21, 9.93, 10.65, 11.43, 12.25, 13.18, 14.42,
+	15.76, 17.27, 19.09, 21.25, 24.02, 26.79, 30.08, 35.07, 61.47,
 ];
 
 const percentile = (knots: number[], x: number) => {
@@ -126,81 +200,223 @@ const percentile = (knots: number[], x: number) => {
 	return 1;
 };
 
-export type PositionAxes = { size: number; skill: number };
+// Share of playmaking read from stats at PLAY_STATS_FULL_MIN minutes or more (scaled down below, none without minutes)
+const PLAY_STATS_W = 0.817;
+const PLAY_STATS_FULL_MIN = 1500;
 
-export const positionAxes = (r: PosRatings): PositionAxes => ({
-	size: percentile(SIZE_KNOTS, sizeRaw(r)),
-	skill: percentile(SKILL_KNOTS, ballSkillsRaw(r)),
-});
+// inches: his height; length: inches of size (see above); skill, play: percentiles
+export type PositionAxes = {
+	inches: number;
+	length: number;
+	skill: number;
+	play: number;
+};
 
-// [size, ball skills] percentiles
-export const POSITION_CENTROIDS: Record<Pos, [number, number]> = {
-	PG: [0.08, 0.85],
-	G: [0.15, 0.7],
-	SG: [0.25, 0.58],
-	GF: [0.38, 0.55],
-	SF: [0.5, 0.42],
-	F: [0.63, 0.5],
-	PF: [0.76, 0.28],
-	FC: [0.86, 0.45],
-	C: [0.93, 0.18],
+export const positionAxes = (
+	r: PosRatings,
+	stats?: PositionStats,
+): PositionAxes => {
+	const raw = positionRaw(r);
+	let play = percentile(PLAY_KNOTS, raw.playmaking);
+	if (
+		stats &&
+		stats.min > 0 &&
+		Number.isFinite(stats.astp) &&
+		Number.isFinite(stats.usgp)
+	) {
+		const w = PLAY_STATS_W * Math.min(1, stats.min / PLAY_STATS_FULL_MIN);
+		play =
+			(1 - w) * play +
+			w * percentile(PLAY_STAT_KNOTS, stats.astp + 0.1 * stats.usgp);
+	}
+	return {
+		inches: raw.inches,
+		length: raw.length,
+		skill: percentile(SKILL_KNOTS, raw.ballSkills),
+		play,
+	};
+};
+
+// His regular-season playmaking stats over `season` and the one before (a stats row per team stint), by minutes
+export const positionStats = (
+	rows: unknown,
+	season: number,
+): PositionStats | undefined => {
+	if (!Array.isArray(rows)) {
+		return undefined;
+	}
+	let min = 0;
+	let astp = 0;
+	let usgp = 0;
+	for (const row of rows) {
+		if (
+			row &&
+			!row.playoffs &&
+			(row.season === season || row.season === season - 1) &&
+			row.min > 0 &&
+			Number.isFinite(row.astp) &&
+			Number.isFinite(row.usgp)
+		) {
+			min += row.min;
+			astp += row.astp * row.min;
+			usgp += row.usgp * row.min;
+		}
+	}
+	return min > 0 ? { min, astp: astp / min, usgp: usgp / min } : undefined;
+};
+
+export type SizeBand = "guard" | "wing" | "big";
+
+export const BAND_POSITIONS: Record<SizeBand, Pos[]> = {
+	guard: ["PG", "G", "SG"],
+	wing: ["SG", "GF", "SF", "F"],
+	big: ["F", "PF", "FC", "C"],
+};
+
+// Band cutoffs on length minus BAND_PLAY_K inches per unit of playmaking above the median
+const GUARD_MAX = 76.726;
+const WING_MAX = 82.311;
+const BAND_PLAY_K = 5.17;
+// Hard limits, in inches of height: never a big under 6'4", never a guard at 7'0"
+const BIG_MIN_INCHES = 76;
+const GUARD_MAX_INCHES = 84;
+
+export const sizeBand = (a: PositionAxes): SizeBand => {
+	const x = a.length - BAND_PLAY_K * (a.play - 0.5);
+	const band = x < GUARD_MAX ? "guard" : x < WING_MAX ? "wing" : "big";
+	if (band === "big" && a.inches < BIG_MIN_INCHES) {
+		return "wing";
+	}
+	if (band === "guard" && a.inches >= GUARD_MAX_INCHES) {
+		return "wing";
+	}
+	return band;
+};
+
+// [length in inches, playmaking, ball skills]
+export const POSITION_CENTROIDS: Record<Pos, [number, number, number]> = {
+	PG: [74.59, 0.89, 0.65],
+	G: [75.39, 0.64, 0.68],
+	SG: [76.28, 0.42, 0.61],
+	GF: [77.99, 0.55, 0.51],
+	SF: [79.3, 0.43, 0.46],
+	F: [80.34, 0.37, 0.35],
+	PF: [82.51, 0.3, 0.27],
+	FC: [83.45, 0.43, 0.14],
+	C: [84.96, 0.28, 0.2],
 };
 
 export const POSITION_BIAS: Record<Pos, number> = {
-	PG: 0.018,
-	G: 0.011,
-	SG: 0.008,
-	GF: 0.022,
-	SF: 0.015,
-	F: 0.028,
-	PF: -0.03,
-	FC: 0.015,
-	C: -0.044,
+	PG: -0.36,
+	G: -0.39,
+	SG: -0.46,
+	GF: 0.3,
+	SF: 0.2,
+	F: -0.03,
+	PF: 0.24,
+	FC: 0.33,
+	C: -0.86,
 };
 
-// Ball skills count a bit less than size: the skill axis is noisier (a big can have a few good passing years)
-const SKILL_WEIGHT = 0.8;
+// Distance scales: inches of length, and percentile points (per 0.25) of playmaking and ball skills, weighted
+const LENGTH_SCALE = 1.472;
+const PLAY_WEIGHT = 0.976;
+const SKILL_WEIGHT = 0.299;
 
-// A re-assigned player keeps his previous position unless the best one is closer by at least this much
-export const POSITION_STICKINESS = 0.02;
+// A re-assigned player keeps his previous position unless the best one is closer by at least this much, both on this season's
+// reading and on the average of this and last season's
+export const POSITION_STICKINESS = 0.3;
 
-const posDistance = (a: PositionAxes, pos: Pos, bias: Record<Pos, number>) => {
-	const [s, k] = POSITION_CENTROIDS[pos];
-	return (a.size - s) ** 2 + SKILL_WEIGHT * (a.skill - k) ** 2 - bias[pos];
+const posDistance = (a: PositionAxes, pos: Pos) => {
+	const [l, p, k] = POSITION_CENTROIDS[pos];
+	return (
+		((a.length - l) / LENGTH_SCALE) ** 2 +
+		PLAY_WEIGHT * ((a.play - p) / 0.25) ** 2 +
+		SKILL_WEIGHT * ((a.skill - k) / 0.25) ** 2 -
+		POSITION_BIAS[pos]
+	);
 };
 
-export const improvedPosition = (
-	axes: PositionAxes,
-	previous?: unknown,
-	bias: Record<Pos, number> = POSITION_BIAS,
-	margin = POSITION_STICKINESS,
-): Pos => {
+const nearestPosition = (a: PositionAxes): Pos => {
 	let best: Pos = "F";
 	let bestD = Infinity;
-	for (const pos of POSITIONS) {
-		const d = posDistance(axes, pos, bias);
+	for (const pos of BAND_POSITIONS[sizeBand(a)]) {
+		const d = posDistance(a, pos);
 		if (d < bestD) {
 			bestD = d;
 			best = pos;
 		}
 	}
+	return best;
+};
+
+const averageAxes = (a: PositionAxes, b: PositionAxes): PositionAxes => ({
+	inches: (a.inches + b.inches) / 2,
+	length: (a.length + b.length) / 2,
+	skill: (a.skill + b.skill) / 2,
+	play: (a.play + b.play) / 2,
+});
+
+// `previous`: his current position, kept unless the new one is clearly better now and over two seasons (`previousAxes`: last
+// season's reading)
+export const improvedPosition = (
+	axes: PositionAxes,
+	previous?: unknown,
+	previousAxes?: PositionAxes,
+	margin = POSITION_STICKINESS,
+): Pos => {
+	const best = nearestPosition(axes);
 	if (isPos(previous) && previous !== best) {
-		if (posDistance(axes, previous, bias) - bestD < margin) {
-			return previous;
+		for (const a of previousAxes
+			? [axes, averageAxes(axes, previousAxes)]
+			: [axes]) {
+			if (
+				nearestPosition(a) !== best ||
+				posDistance(a, previous) - posDistance(a, best) < margin
+			) {
+				return previous;
+			}
 		}
 	}
 	return best;
 };
 
-// Position for ratings: the improved two-axis model when on (sticky to `previous`), else BBGM's formula
+export type PositionContext = {
+	// His box-score stats (rows as stored on a player): assist and usage rates of this and last regular season
+	stats?: unknown;
+	// Last season's ratings, for the two-season comparison when re-assigning
+	previousRatings?: PosRatings & { season?: number };
+};
+
+// Position for ratings: the improved model when on (sticky to `previous`), else BBGM's formula
 export const positionFor = (
-	ratings: Pick<ArchetypeRatings, keyof ArchetypeRatings>,
+	ratings: Pick<ArchetypeRatings, keyof ArchetypeRatings> & {
+		season?: number;
+	},
 	improved: boolean,
 	previous?: unknown,
-): Pos =>
-	improved
-		? improvedPosition(positionAxes(ratings), previous)
-		: positionOf(ratings);
+	context?: PositionContext,
+): Pos => {
+	if (!improved) {
+		return positionOf(ratings);
+	}
+	const season = ratings.season;
+	const axes = positionAxes(
+		ratings,
+		season === undefined ? undefined : positionStats(context?.stats, season),
+	);
+	const prev = context?.previousRatings;
+	const prevAxes =
+		prev && isPos(previous)
+			? positionAxes(
+					prev,
+					prev.season === undefined
+						? undefined
+						: positionStats(context?.stats, prev.season),
+				)
+			: undefined;
+	return improvedPosition(axes, previous, prevAxes);
+};
 
 export const isPos = (x: unknown): x is Pos =>
 	typeof x === "string" && (POSITIONS as string[]).includes(x);

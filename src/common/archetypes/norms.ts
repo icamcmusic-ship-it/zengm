@@ -13,9 +13,11 @@ import type {
 	Reading,
 } from "./types.ts";
 
+// (G reads with the shooting guards: with improved positions a G is a combo guard who is not the primary ball handler, often a
+// big scoring guard)
 export const POS_BUCKET: Record<Pos, PosBucket> = {
 	PG: "PG",
-	G: "PG",
+	G: "SG",
 	SG: "SG",
 	GF: "W",
 	SF: "W",

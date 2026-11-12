@@ -342,7 +342,7 @@ const augmentPartialPlayer = async (
 			if (p.pos !== undefined && typeof p.pos === "string") {
 				r.pos = p.pos;
 			} else {
-				r.pos = pos(r);
+				r.pos = pos(r, undefined, { stats: p.stats });
 			}
 		}
 

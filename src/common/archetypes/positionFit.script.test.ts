@@ -1,7 +1,10 @@
 /* eslint-disable no-undef, curly, unicorn/prefer-single-call */
 // @ts-nocheck
-// Fitting/diagnostics for the improved (two-axis) basketball positions. Not part of the normal run: RUN_POSITION_FIT=1
-// (writes /tmp/claude-0/position-fit.txt). Prints the reference quantile knots and the fitted centroid biases.
+// Fitting/diagnostics for the improved basketball positions (size band, then role). Not part of the normal run:
+// RUN_POSITION_FIT=1 (writes /tmp/claude-0/position-fit.txt). Prints the reference quantile knots of ball skills and
+// playmaking, shares, churn and agreement with archetypes; FIT=1 also refits POSITION_BIAS so the shares stay close to the old
+// formula's. (The centroids, band cutoffs and weights were fitted on the real players' listed positions, 2000-2015, with the
+// 2016-2025 seasons held out: position.test.ts checks them.)
 import { mkdirSync, writeFileSync } from "node:fs";
 import { test } from "vitest";
 import { DEFAULT_LEVEL } from "../budgetLevels.ts";
@@ -15,12 +18,11 @@ import {
 	POSITIONS,
 	POSITION_BIAS,
 	POSITION_CENTROIDS,
-	ballSkillsRaw,
 	improvedPosition,
 	positionAxes,
 	positionOf,
+	positionRaw,
 	posPrior,
-	sizeRaw,
 } from "./position.ts";
 
 // A pairing is forbidden when the archetype's own prior for the position is null
@@ -80,9 +82,21 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 		);
 		const all = flat.filter((r) => ovrFn(r) >= 38);
 		out.push(`rows ${all.length}`);
-		out.push(`size knots ${JSON.stringify(quantiles(all.map(sizeRaw), 20))}`);
 		out.push(
-			`skill knots ${JSON.stringify(quantiles(all.map(ballSkillsRaw), 20))}`,
+			`skill knots ${JSON.stringify(
+				quantiles(
+					all.map((r) => positionRaw(r).ballSkills),
+					20,
+				),
+			)}`,
+		);
+		out.push(
+			`play knots ${JSON.stringify(
+				quantiles(
+					all.map((r) => positionRaw(r).playmaking),
+					20,
+				),
+			)}`,
 		);
 
 		// Fit biases so the overall shares match the old formula
@@ -91,12 +105,13 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 			const ps = positionOf(r);
 			target[ps] = (target[ps] ?? 0) + 1 / all.length;
 		}
-		const bias = { ...POSITION_BIAS };
+		// (FIT mutates POSITION_BIAS in place: the model reads it)
+		const bias = POSITION_BIAS;
 		const axes = all.map((r) => positionAxes(r));
 		const share = () => {
 			const c = {};
 			for (const a of axes) {
-				const ps = improvedPosition(a, undefined, bias);
+				const ps = improvedPosition(a);
 				c[ps] = (c[ps] ?? 0) + 1 / all.length;
 			}
 			return c;
@@ -104,7 +119,11 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 		if (process.env.FIT) {
 			// Fit on sticky careers: the shares players actually end up with
 			const cax = careers.map((rs) =>
-				rs.map((r) => ({ a: positionAxes(r), keep: ovrFn(r) >= 38 })),
+				rs.map((r, i) => ({
+					a: positionAxes(r),
+					pa: i > 0 ? positionAxes(rs[i - 1]) : undefined,
+					keep: ovrFn(r) >= 38,
+				})),
 			);
 			const stickyShare = () => {
 				const c = {};
@@ -112,7 +131,7 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 				for (const rs of cax) {
 					let prev;
 					for (const x of rs) {
-						prev = improvedPosition(x.a, prev, bias);
+						prev = improvedPosition(x.a, prev, x.pa);
 						if (x.keep) {
 							c[prev] = (c[prev] ?? 0) + 1;
 							n++;
@@ -125,7 +144,7 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 			for (let it = 0; it < 400; it++) {
 				const c = stickyShare();
 				for (const p of POSITIONS) {
-					bias[p] += 0.02 * Math.log((target[p] ?? 1e-4) / (c[p] ?? 1e-4));
+					bias[p] += 0.1 * Math.log((target[p] ?? 1e-4) / (c[p] ?? 1e-4));
 				}
 			}
 			out.push(
@@ -137,7 +156,7 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 		for (let i = 0; i < all.length; i++) {
 			const ps = positionOf(all[i]);
 			mean[ps] ??= [0, 0, 0];
-			mean[ps][0] += axes[i].size;
+			mean[ps][0] += axes[i].length;
 			mean[ps][1] += axes[i].skill;
 			mean[ps][2]++;
 		}
@@ -146,7 +165,7 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 				POSITIONS.map(
 					(p) =>
 						mean[p] &&
-						`${p}:(${(mean[p][0] / mean[p][2]).toFixed(2)},${(mean[p][1] / mean[p][2]).toFixed(2)})`,
+						`${p}:(${(mean[p][0] / mean[p][2]).toFixed(1)}in,${(mean[p][1] / mean[p][2]).toFixed(2)})`,
 				).join(" "),
 		);
 		out.push(`centroids ${JSON.stringify(POSITION_CENTROIDS)}`);
@@ -177,8 +196,13 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 		let ns = 0;
 		for (const rows of careers) {
 			let prev;
-			for (const r of rows) {
-				prev = improvedPosition(positionAxes(r), prev);
+			for (let i = 0; i < rows.length; i++) {
+				const r = rows[i];
+				prev = improvedPosition(
+					positionAxes(r),
+					prev,
+					i > 0 ? positionAxes(rows[i - 1]) : undefined,
+				);
 				if (ovrFn(r) >= 38) {
 					sticky[prev] = (sticky[prev] ?? 0) + 1;
 					ns++;
@@ -197,8 +221,9 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 				n = 0;
 			for (const rows of careers) {
 				let prev;
-				for (const r of rows) {
-					const ps = f(r, prev);
+				for (let i = 0; i < rows.length; i++) {
+					const r = rows[i];
+					const ps = f(r, prev, rows[i - 1]);
 					if (prev !== undefined) {
 						n++;
 						if (ps !== prev) ch++;
@@ -209,7 +234,7 @@ test.skipIf(!process.env.RUN_POSITION_FIT)(
 			return ((100 * ch) / n).toFixed(1);
 		};
 		out.push(
-			`changes per player-season: old ${changes((r) => positionOf(r))}% | new no-stick ${changes((r) => improvedPosition(positionAxes(r)))}% | new sticky ${changes((r, prev) => improvedPosition(positionAxes(r), prev))}% | margins ${[0.005, 0.01, 0.015, 0.02, 0.03].map((m) => `${m}:${changes((r, prev) => improvedPosition(positionAxes(r), prev, undefined, m))}`).join(" ")}`,
+			`changes per player-season: old ${changes((r) => positionOf(r))}% | new no-stick ${changes((r) => improvedPosition(positionAxes(r)))}% | new sticky (two seasons) ${changes((r, prev, pr) => improvedPosition(positionAxes(r), prev, pr && positionAxes(pr)))}% | one season ${changes((r, prev) => improvedPosition(positionAxes(r), prev))}% | margins ${[0.1, 0.2, 0.3, 0.5, 1].map((m) => `${m}:${changes((r, prev, pr) => improvedPosition(positionAxes(r), prev, pr && positionAxes(pr), m))}`).join(" ")}`,
 		);
 		// Roster balance proxy: each season index, the players of that index split into 13-man teams by ovr rank (snake)
 		const balance = (f) => {

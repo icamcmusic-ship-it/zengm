@@ -11,7 +11,7 @@ import { ARCHETYPES, defaultNorms, scoreAll } from "./classify.ts";
 import { realData, realPlayer } from "./real.testutil.ts";
 
 const STAR_TARGET = 0.018;
-const STAR_SEASON_MAX = 0.035;
+const STAR_SEASON_MAX = 0.03;
 const STAR_BIAS_MIN = -1.5;
 
 test.skipIf(!process.env.RUN_ARCHETYPE_STARBIAS)(
