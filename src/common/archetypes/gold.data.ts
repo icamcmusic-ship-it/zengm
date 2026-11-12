@@ -5,7 +5,9 @@
 // are the closest ones by shape that his position allows and the spec accepts (Curry's by hand: shooting builds). arch11 added a fifth build where the reading's pick fits the role and the list had
 // missed it (mostly the new custom builds: Slashing Playmaker, Deep-Range Sniper, Pass-First Distributor); pos2 did the same
 // for seven players whose reading moved with the new positions (Young 2022, Simmons 2019, Iguodala 2016, Pippen 1994, Hill 1997,
-// Carter 2001, Ginobili 2008).
+// Carter 2001, Ginobili 2008). arch12 (hand-judged): Draymond Green 2025 also as a defensive anchor (Lockdown Eraser), Embiid
+// 2025 as a face-up scorer (Slashing Mid-Range Maestro), Westbrook 2025 as a rebounding slasher (Mid-Range Slashing Cleaner)
+// and Gilgeous-Alexander 2025 as a paint finisher (Versatile Paint Finisher).
 // A tuning target (metrics.script.test.ts) and a test floor (archetypes.test.ts).
 export const GOLD: [
 	slug: string,
@@ -100,8 +102,9 @@ export const GOLD: [
 			"board-hunting-playshot",
 			"2-way-inside-out-dime-dropper",
 			"2-way-break-starting-popper",
+			"lockdown-eraser",
 		],
-		"def+pass|perD+pass|rimD+pass|pass+reb",
+		"def+pass|perD+pass|rimD+pass|pass+reb|perD+rimD",
 	],
 	[
 		"thompkl01",
@@ -122,8 +125,9 @@ export const GOLD: [
 			"post-dimming-board-enforcer",
 			"post-scoring-cleaner",
 			"2-way-post-break-starter",
+			"slashing-mid-range-maestro",
 		],
-		"post|mid+post|post+rimD",
+		"post|mid+post|post+rimD|mid+finish",
 	],
 	[
 		"lopezbr01",
@@ -167,8 +171,9 @@ export const GOLD: [
 			"playmaking-3pt-slasher",
 			"diming-inside-out-scorer",
 			"thieving-inside-out-playmaker",
+			"mid-range-slashing-cleaner",
 		],
-		"finish+pass|pass+reb|finish+handle",
+		"finish+pass|pass+reb|finish+handle|finish+reb",
 	],
 	[
 		"wembavi01",
@@ -358,8 +363,9 @@ export const GOLD: [
 			"rim-reaping-mid-paint-scorer",
 			"mid-range-menace",
 			"2-way-mid-paint-scorer",
+			"versatile-paint-finisher",
 		],
-		"finish+mid|mid+handle|finish+handle|L:mid",
+		"finish+mid|mid+handle|finish+handle|L:mid|L:finish",
 	],
 	[
 		"davisan02",

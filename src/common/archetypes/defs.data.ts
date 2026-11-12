@@ -49,6 +49,7 @@ export const toArchetype = (d: TwoKDef): Archetype => {
 		hgt: d.hgt,
 		need: Object.keys(d.need).length > 0 ? d.need : undefined,
 		needFor: Object.keys(d.needFor).length > 0 ? d.needFor : undefined,
+		cap: d.cap,
 		traitTie: Object.keys(traitTie).length > 0 ? traitTie : undefined,
 		tags: [
 			d.group,

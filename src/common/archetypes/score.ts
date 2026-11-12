@@ -146,9 +146,10 @@ export const needShortfall = (a: Archetype, p: Prepared) => {
 		}
 		short += Math.max(0, floor - p.b[dim]);
 	}
+	// (ceilings are on the blended reading too: what the name says he lacks must not stand out about him)
 	for (const [dim, ceiling] of cap) {
 		if (!STYLE_DIMS.has(dim) || p.expanded) {
-			short += Math.max(0, p.abs[dim] - ceiling);
+			short += Math.max(0, p.b[dim] - ceiling);
 		}
 	}
 	for (const [dim, floor] of needFor) {
@@ -697,11 +698,20 @@ const relCheck = (k: string, p: Prepared): number => {
 			return 0;
 	}
 };
+// arch12: a perimeter player's rebounding rating is high for his position almost whatever his game (BBGM's real ratings give
+// most good guards one), so a name that promises rebounding ("Cleaner", "Glass", "Board") needs it to really stand out for
+// a player below BIG_HGT: REB_PERIM_MIN on the blended reading with his stats, REB_PERIM_K per z short
+export const REB_PERIM_MIN = 1.1;
+export const REB_PERIM_K = 4;
+// (without stats his ratings are all there is, and the game sim plays a rebounding guard as one: a lower bar)
+export const REB_PERIM_MIN_RATINGS = 0.3;
+// (the same for protecting the rim: a guard's or wing's blocks are rated off his size and leaping)
+const PERIM_SIZE_CLASSES = ["reb", "rimD"];
 export const promiseShortfall = (
 	a: Archetype,
 	cv: Record<string, number>,
 	p?: Prepared,
-): { floor: number; lead: number; rel: number } => {
+): { floor: number; lead: number; rel: number; reb?: number } => {
 	const pr = promisesOf(a);
 	let floor = 0;
 	let rel = 0;
@@ -722,15 +732,28 @@ export const promiseShortfall = (
 			...pr.lead.map((k) => Math.max(0, LEAD_MIN - (cv[k] ?? 0))),
 		);
 	}
-	return { floor, lead, rel };
+	let reb = 0;
+	if (p && p.hgt < BIG_HGT) {
+		for (const k of PERIM_SIZE_CLASSES) {
+			if (pr.all.includes(k)) {
+				reb += Math.max(
+					0,
+					(p.stats ? REB_PERIM_MIN : REB_PERIM_MIN_RATINGS) - (cv[k] ?? 0),
+				);
+			}
+		}
+	}
+	return { floor, lead, rel, reb };
 };
 // (the level-relative check is a hard one, like the 2K builds' own floors: needPenaltyOf)
 export const promisePenalty = (sh: {
 	floor: number;
 	lead: number;
 	rel?: number;
+	reb?: number;
 }) =>
 	(sh.floor > 0 ? PROMISE_STEP + PROMISE_K * sh.floor : 0) +
+	REB_PERIM_K * (sh.reb ?? 0) +
 	LEAD_MIN_K * sh.lead +
 	needPenaltyOf(sh.rel ?? 0);
 
@@ -859,8 +882,12 @@ export const absValue = (k: string, p: Prepared): number => {
 			sv = Math.max(sv, x);
 		}
 	}
-	return p.stats && sv > -Infinity ? (1 - p.stats.w) * v + p.stats.w * sv : v;
+	// (arch12: with the stats' boost for the classes they say most about: his assist rate is what a playmaker is, his block
+	// rate what a rim protector is, as in the blended reading)
+	const w = p.stats ? statWeightFor(CLASS_STAT_DIM[k] ?? "usg", p.stats) : 0;
+	return p.stats && sv > -Infinity ? (1 - w) * v + w * sv : v;
 };
+const CLASS_STAT_DIM: Record<string, DimKey> = { pass: "pss", rimD: "blk" };
 export const ABS_FLOOR = -1;
 export const ABS_K = 1.5;
 export const NO_SHOT_FROM = -1.1;
@@ -869,6 +896,8 @@ export const AIR_MIN = 0.3;
 export const AIR_K = 2;
 export const ELITE_SHOT_MIN = 1.9;
 export const ELITE_SHOT_K = 3;
+export const TOUCH_FROM = -1.1;
+export const TOUCH_K = 4;
 const SHOT_CLASSES = new Set(["shoot", "mid", "score"]);
 const SHOT_KEYS = new Set([
 	"threeLevel",
@@ -900,6 +929,12 @@ export const absolutePenalty = (a: Archetype, p: Prepared): number => {
 	if (SNIPER_RE.test(a.name)) {
 		t += ELITE_SHOT_K * Math.max(0, ELITE_SHOT_MIN - v("shoot"));
 	}
+	// arch12: a mid-range name needs a shooter's touch. BBGM's real ratings give a player who scores efficiently at the rim
+	// a high mid-range rating, so the mid-range alone does not make him a jumpshooter: his free throws or his three must be
+	// at least near ordinary for him (TOUCH_FROM on the blended reading), TOUCH_K per z below
+	if (pr.all.includes("mid")) {
+		t += TOUCH_K * Math.max(0, TOUCH_FROM - Math.max(p.b.ft, p.b.three));
+	}
 	return t;
 };
 
@@ -910,11 +945,15 @@ export const absolutePenalty = (a: Archetype, p: Prepared): number => {
 export const PLAY_FROM = 0.5;
 export const PLAY_K = 1.2;
 export const RIM_FROM = 0.5;
-export const RIM_K = 1.2;
+export const RIM_K = 1.0;
+// (arch12: 1.2 -> 1.0 on ratings alone and 1.8 when his block rate backs it up, so a real rim protector is named for it:
+// Davis, Gobert)
+export const RIM_K_STATS = 1.8;
 export const SHOT_FROM = 0.8;
 export const SHOT_K = 0.6;
 // (and a sniper's name, for an elite shooter, by SNIPER_K more)
-export const SNIPER_K = 1.5;
+// (arch12: 1.5 -> 2, so the stars' concentration trim does not take the elite shooter's name from Curry)
+export const SNIPER_K = 2;
 // A role's reading: half his absolute standing (absValue), half the blended reading of the same skill (mostly the shape of
 // his game), so a uniform shift of his ratings moves it little
 const roleValue = (k: string, p: Prepared) => {
@@ -957,7 +996,9 @@ export const roleTerm = (
 	if (pr.all.includes("rimD") && p.hgt >= BIG_HGT) {
 		const len = p.expanded ? 0.25 * p.abs.len : 0;
 		const rim = 0.5 * roleValue("rimD", p) + 0.25 * (p.pz.blk + p.b.blk) + len;
-		t += RIM_K * Math.min(1, Math.max(0, rim - RIM_FROM));
+		t +=
+			(p.stats ? RIM_K_STATS : RIM_K) *
+			Math.min(1, Math.max(0, rim - RIM_FROM));
 	}
 	if (SNIPER_RE.test(a.name)) {
 		t +=
