@@ -47,6 +47,7 @@ export const gameAttributesKeysGameState: GameAttributeKey[] = [
 	"autoExpand",
 	"tradeProposalsSeed",
 	"aiTradeOffers",
+	"rumors",
 	"playerTraitsSeed",
 ];
 export const gameAttributesKeysTeams: GameAttributeKey[] = ["confs", "divs"];
@@ -543,6 +544,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	aiTradesNeedBased: false,
 	aiTradeOffersFrequency: 1,
 	aiTradeOffers: [],
+	rumors: undefined,
 	// Saving after every play request makes playing one day at a time slower and slower as the league gets older
 	saveEveryDay: false,
 	stopOnInjury: false,

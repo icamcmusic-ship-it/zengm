@@ -41,6 +41,7 @@ import {
 	opinionColumn,
 	retireStories,
 	rookieStory,
+	rumorSidebar,
 	seriesRecaps,
 	signingsStory,
 	standingsSidebar,
@@ -306,11 +307,16 @@ const leaguePaper = (c: Ctx): Section[] => {
 		closeGamesStory(c),
 		...pagesFor(c, "features", 3),
 	]);
-	const moves = section("moves", "Transactions", [
-		...tradeStories(c).slice(1),
-		signingsStory(c),
-		...pagesFor(c, "money", c.pre ? 5 : 4),
-	]);
+	const moves = section(
+		"moves",
+		"Transactions",
+		[
+			...tradeStories(c).slice(1),
+			signingsStory(c),
+			...pagesFor(c, "money", c.pre ? 5 : 4),
+		],
+		[rumorSidebar(c)],
+	);
 	const draft = section("draft", "Draft", [
 		draftStory(c),
 		...pagesFor(c, "draft", 2),
@@ -364,11 +370,12 @@ const teamPaper = (c: Ctx, tid: number): Section[] => {
 		teamRecordBook(c, tid),
 		...pagesFor(c, "teams", 1),
 	]);
-	const moves = section("moves", "Transactions", [
-		...tradeStories(c, tid),
-		signingsStory(c, tid),
-		draftStory(c, tid),
-	]);
+	const moves = section(
+		"moves",
+		"Transactions",
+		[...tradeStories(c, tid), signingsStory(c, tid), draftStory(c, tid)],
+		[rumorSidebar(c, tid)],
+	);
 	const history = section("history", "History", [
 		teamFranchise(c, tid),
 		...pagesFor(c, "history", 2),

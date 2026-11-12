@@ -29,6 +29,7 @@ import { PlayerPicture } from "../../components/PlayerPicture.tsx";
 import { JerseyNumber } from "../../components/JerseyNumber.tsx";
 import { Height } from "../../components/Height.tsx";
 import { Weight } from "../../components/Weight.tsx";
+import { getShootingHand } from "../../../common/shootingHand.ts";
 import { confirm } from "../../util/confirm.tsx";
 import { realtimeUpdate } from "../../util/realtimeUpdate.ts";
 import { getCols } from "../../../common/getCols.ts";
@@ -569,6 +570,13 @@ const TopStuff = ({
 									>
 										BBRef
 									</a>
+								</>
+							) : null}
+							{__SPORT === "basketball" ? (
+								<>
+									<br />
+									Shoots:{" "}
+									{getShootingHand(player.pid) === "left" ? "Left" : "Right"}
 								</>
 							) : null}
 							<br />

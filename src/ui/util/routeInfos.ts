@@ -53,6 +53,7 @@ export const routeInfos = {
 	"/l/:lid/trade_offers": "tradeOffers",
 	"/l/:lid/trade_proposals": "tradeProposals",
 	"/l/:lid/trade_market": "tradeMarket",
+	"/l/:lid/rumors": "rumors",
 	"/l/:lid/trade_three": "tradeThree",
 	"/l/:lid/trade_three/:tids": "tradeThree",
 	"/l/:lid/saved_trades": "savedTrades",

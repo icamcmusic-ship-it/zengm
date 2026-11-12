@@ -31,6 +31,9 @@ const counts = async () => {
 describe("draft classes", () => {
 	test("sim", { timeout: 60 * 60 * 1000 }, async () => {
 		Math.random = makeSeededRandom(1);
+		// An earlier test file in this worker may have left a mock league behind
+		// @ts-expect-error
+		idb.league = undefined;
 		await league.createStream(
 			{},
 			{

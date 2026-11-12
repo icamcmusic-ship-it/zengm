@@ -424,6 +424,15 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 			},
 			{
 				type: "link",
+				active: (pageID) => pageID === "rumors",
+				league: true,
+				commandPalette: true,
+				feature: "rumors",
+				path: ["rumors"],
+				text: "Rumors",
+			},
+			{
+				type: "link",
 				active: (pageID) => pageID === "news",
 				league: true,
 				commandPalette: true,

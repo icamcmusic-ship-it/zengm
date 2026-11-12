@@ -43,6 +43,7 @@ export default defineView({
 			abbrev: string;
 			region: string;
 			name: string;
+			colors: [string, string, string];
 			user: boolean;
 			gm: FormattedGm | undefined;
 		}[] = [];
@@ -57,6 +58,7 @@ export default defineView({
 				abbrev: t.abbrev,
 				region: t.region,
 				name: t.name,
+				colors: t.colors,
 				user,
 				gm: t.gm && !user ? await formatGm(t.gm, t.tid) : undefined,
 			});

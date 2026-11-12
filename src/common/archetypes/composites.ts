@@ -40,6 +40,7 @@ export const DIMS: DimKey[] = [
 	"cs",
 	"orl",
 	"sec",
+	"fin",
 ];
 
 // Dimensions of the expanded ratings. A match only counts the ones an archetype names (as for height), and length only
@@ -109,6 +110,7 @@ export const DIM_LABELS: Record<DimKey, string> = {
 	cs: "Catch-and-shoot (vs off the dribble)",
 	orl: "Offensive rebounding (vs defensive)",
 	sec: "Ball security",
+	fin: "Finishing (layups and dunks)",
 };
 
 export const DIM_RATINGS: Record<DimKey, RatingKey[]> = {
@@ -141,6 +143,7 @@ export const DIM_RATINGS: Record<DimKey, RatingKey[]> = {
 	cs: ["tp"],
 	orl: ["reb"],
 	sec: ["drb"],
+	fin: ["dnk", "ins"],
 };
 
 // compositeRating without fuzz: a weighted mean of ratings (a number is a literal rating value), 0..1
@@ -191,6 +194,8 @@ export const compositeValues = (r: ArchetypeRatings) => {
 			out[dim] = hasExpanded(r)
 				? Math.min(1, Math.max(0, (50 + r.bsc! - ballSecurityBase(r)) / 100))
 				: 0.5;
+		} else if (dim === "fin") {
+			out[dim] = (0.6 * r.dnk + 0.4 * r.ins) / 100;
 		} else if (dim === "pdef" || dim === "idef") {
 			out[dim] = (r[dim] ?? r.diq) / 100;
 		} else {

@@ -22,6 +22,7 @@ import {
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
 import type { Player } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
+import { makeSeededRandom } from "../../../common/random.ts";
 
 const SEASON = 2026;
 const YEARS = [SEASON, SEASON + 1, SEASON + 2];
@@ -42,11 +43,18 @@ const setup = async () => {
 	if (!basePlayers) {
 		let pid = 0;
 		basePlayers = [];
-		for (const year of YEARS) {
-			const players = await genPlayersWithoutSaving(year, DEFAULT_LEVEL, []);
-			for (const p of players.slice(0, 25)) {
-				basePlayers.push({ ...p, pid: pid++ } as Player);
+		// Seeded, so the thresholds below don't depend on a random draft class
+		const originalRandom = Math.random;
+		Math.random = makeSeededRandom(2026);
+		try {
+			for (const year of YEARS) {
+				const players = await genPlayersWithoutSaving(year, DEFAULT_LEVEL, []);
+				for (const p of players.slice(0, 25)) {
+					basePlayers.push({ ...p, pid: pid++ } as Player);
+				}
 			}
+		} finally {
+			Math.random = originalRandom;
 		}
 		// One drafted player, who must never be touched
 		const drafted = structuredClone(basePlayers[0]!);

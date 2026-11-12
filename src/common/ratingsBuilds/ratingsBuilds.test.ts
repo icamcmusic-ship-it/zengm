@@ -32,20 +32,29 @@ const toBuildRatings = (r: Record<string, any>): BuildRatings => {
 const makeClass = (seed: string, n: number): PlayerInput[] => {
 	const rng = new Rng(seed);
 	const players: PlayerInput[] = [];
-	for (let i = 0; i < n; i++) {
-		const { heightInInches, ratings } = genRatings(2025, DEFAULT_LEVEL);
-		const r = toBuildRatings(ratings);
-		const ovr = F.ovr(r);
-		players.push({
-			key: `${seed}-${i}`,
-			ratings: r,
-			fuzz: ratings.fuzz,
-			ovr,
-			pot: Math.min(100, ovr + rng.int(1, 25)),
-			age: 19 + rng.int(0, 3),
-			hgtInches: heightInInches,
-			bio: { classYear: ["Freshman", "Sophomore", "Junior", "Senior"][i % 4]! },
-		});
+	// The generated ratings from the same stream too, so a class is the same every run
+	const outer = Math.random;
+	Math.random = () => rng.random();
+	try {
+		for (let i = 0; i < n; i++) {
+			const { heightInInches, ratings } = genRatings(2025, DEFAULT_LEVEL);
+			const r = toBuildRatings(ratings);
+			const ovr = F.ovr(r);
+			players.push({
+				key: `${seed}-${i}`,
+				ratings: r,
+				fuzz: ratings.fuzz,
+				ovr,
+				pot: Math.min(100, ovr + rng.int(1, 25)),
+				age: 19 + rng.int(0, 3),
+				hgtInches: heightInInches,
+				bio: {
+					classYear: ["Freshman", "Sophomore", "Junior", "Senior"][i % 4]!,
+				},
+			});
+		}
+	} finally {
+		Math.random = outer;
 	}
 	return players;
 };

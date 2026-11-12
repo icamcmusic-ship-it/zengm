@@ -12,10 +12,8 @@ import {
 	SKILL_BADGES,
 	SKILL_COMBOS,
 	badgeScore,
-	comboParts,
+	getComboDetails,
 	getDisplayBadges,
-	getSkillBadges,
-	skillMargin,
 	hasBadge,
 	type BadgeTraits,
 	pickBadgeRatings,
@@ -178,20 +176,16 @@ export default defineView({
 					if (!r.display.includes(def.label)) {
 						return [];
 					}
-					// What it replaced for him, and how far past its cutoff the weakest part is
-					const parts =
-						comboParts(
-							def,
-							new Set([...r.skills, ...getSkillBadges(r.ratings, r.traits)]),
-						) ?? def.all;
-					const margin = Math.min(
-						...parts.map((c) => skillMargin(r.ratings, c, r.traits)),
+					// What it replaced for him, and how far past its cutoff the weakest part is (a combo made of combos, like
+					// Scoring machine, uses theirs)
+					const detail = getComboDetails(r.ratings, r.skills, r.traits).get(
+						def.label,
 					);
 					return [
 						{
 							row: r,
-							score: margin,
-							parts,
+							score: detail?.margin ?? 0,
+							parts: detail?.parts ?? def.all,
 						},
 					];
 				})

@@ -3,6 +3,7 @@ import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
 import getLuxuryTaxAmount from "./getLuxuryTaxAmount.ts";
 import getMinPayrollAmount from "./getMinPayrollAmount.ts";
+import { isRepeaterTaxTeam } from "../contract/capExceptions.ts";
 
 const rosterLink = (tid: number) =>
 	`<a href="${helpers.leagueUrl([
@@ -36,7 +37,10 @@ const assessPayrollMinLuxury = async () => {
 		// Store payroll
 		teamSeason.payrollEndOfSeason = payroll;
 
-		const luxuryTaxAmount = getLuxuryTaxAmount(payroll);
+		// Repeater Luxury Tax (setting): a higher rate for teams that paid the tax in 3 of the previous 4 seasons. Always false with the setting off.
+		const repeater =
+			payroll > g.get("luxuryPayroll") && (await isRepeaterTaxTeam(tid));
+		const luxuryTaxAmount = getLuxuryTaxAmount(payroll, repeater);
 		const minPayrollAmount = getMinPayrollAmount(payroll);
 
 		if (minPayrollAmount > 0) {
@@ -72,7 +76,7 @@ const assessPayrollMinLuxury = async () => {
 				)} paid a luxury tax of ${helpers.formatCurrency(
 					luxuryTaxAmount / 1000,
 					"M",
-				)} for having a payroll above ${helpers.formatCurrency(
+				)}${repeater ? " (at the repeater rate)" : ""} for having a payroll above ${helpers.formatCurrency(
 					g.get("luxuryPayroll") / 1000,
 					"M",
 				)}.`,

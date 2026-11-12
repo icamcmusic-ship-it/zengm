@@ -281,8 +281,11 @@ export const gmDraftUpsideAdjustment = (
 	return clamp(w.draftUpside * (gap - 12 + 2 * (20 - age)), -1.5, 1.5);
 };
 
-// Job security. Each season's score is wins above the preseason expectation (per 82 games), plus playoff success, minus a little for
-// plain losing even when it was expected. Weighted towards recent seasons
+// Job security. Each season is judged against what was expected of the roster he had, not raw wins: wins above the preseason
+// expectation (per 82 games), where the expectation after his first season blends the Season Odds projection with an improvement path
+// from the roster he inherited (pathExpWon), plus playoff success, and a penalty for missing the playoffs only when he was expected to
+// make them. Plain losing on a team that was projected to lose costs nothing. When he's rebuilding (rebuildWeight > 0, from his patience
+// and the team strategy), progress signals (young core, picks, cap room, win trend) count instead of part of the results
 export const gmSeasonScore = ({
 	won,
 	lost,
@@ -291,6 +294,9 @@ export const gmSeasonScore = ({
 	expWon,
 	numGames,
 	playoffRoundsWon,
+	pathExpWon,
+	progress,
+	rebuildWeight,
 }: {
 	won: number;
 	lost: number;
@@ -299,18 +305,97 @@ export const gmSeasonScore = ({
 	expWon?: number;
 	numGames: number;
 	playoffRoundsWon: number;
+	// Expected wins on a reasonable improvement path from the roster he inherited (seasons after his first)
+	pathExpWon?: number;
+	// Rebuild progress score, in wins per 82 games
+	progress?: number;
+	// 0 (judge results only) to 1 (heavy rebuild credit)
+	rebuildWeight?: number;
 }) => {
 	const gp = won + lost + tied + otl;
 	if (gp === 0) {
 		return 0;
 	}
 	const scale = 82 / Math.max(1, numGames);
-	const exp = expWon ?? numGames / 2;
+	const projected = expWon ?? numGames / 2;
+	const exp =
+		pathExpWon === undefined ? projected : 0.6 * projected + 0.4 * pathExpWon;
 	const aboveExp = (won + 0.5 * tied - (exp * gp) / numGames) * scale;
-	const winp = (won + 0.5 * tied) / gp;
-	const playoffs = playoffRoundsWon >= 0 ? 2 + 3 * playoffRoundsWon : 0;
-	const losing = winp < 0.35 ? -3 : 0;
-	return aboveExp + playoffs + losing - 2.5;
+	const expWinp = exp / Math.max(1, numGames);
+	let playoffs = 0;
+	if (playoffRoundsWon >= 0) {
+		playoffs = 2 + 3 * playoffRoundsWon;
+	} else if (expWinp >= 0.55) {
+		// A contender that misses the playoffs
+		playoffs = -3 - 20 * (expWinp - 0.55);
+	}
+	const results = aboveExp + playoffs - 1;
+	const w = Math.max(0, Math.min(1, rebuildWeight ?? 0));
+	if (w === 0 || progress === undefined) {
+		return results;
+	}
+	// Rebuild credit: wins and playoffs matter less, progress more
+	return (1 - 0.5 * w) * results + w * progress;
+};
+
+// Expected wins on a reasonable improvement path: from what the roster he inherited was projected to win, a bad team is expected to
+// climb towards .500 over about five seasons (seven when rebuilding), a good team to stay where it was
+export const gmPathExpWon = ({
+	baseExpWon,
+	numGames,
+	seasonIndex,
+	rebuilding,
+}: {
+	baseExpWon: number;
+	numGames: number;
+	// 0 for his first season
+	seasonIndex: number;
+	rebuilding: boolean;
+}) => {
+	const target = numGames / 2;
+	if (baseExpWon >= target || seasonIndex <= 0) {
+		return baseExpWon;
+	}
+	const years = rebuilding ? 7 : 5;
+	return baseExpWon + (target - baseExpWon) * Math.min(1, seasonIndex / years);
+};
+
+// How much rebuild credit a season gets: patient GMs and rebuilding teams
+export const gmRebuildWeight = ({
+	patience,
+	rebuilding,
+}: {
+	patience: number;
+	rebuilding: boolean;
+}) => {
+	const w = (rebuilding ? 0.45 : 0) + 0.35 * Math.max(0, patience);
+	return Math.round(Math.min(0.8, w) * 100) / 100;
+};
+
+// Rebuild progress in wins per 82 games: young core value gained this season, extra first round picks, cap room and the win trend
+export const gmProgressScore = ({
+	youthChange,
+	extraFirsts,
+	capRoom,
+	winTrend,
+}: {
+	// Change in the value of his best young players (value points)
+	youthChange: number;
+	// First round picks owned in the coming seasons minus the normal number
+	extraFirsts: number;
+	// (cap - payroll) / cap
+	capRoom: number;
+	// Wins (per 82) compared to his previous season
+	winTrend: number;
+}) => {
+	const clamp2 = (x: number, lo: number, hi: number) =>
+		Math.max(lo, Math.min(hi, x));
+	const score =
+		0.6 * clamp2(youthChange, -10, 10) +
+		1.5 * clamp2(extraFirsts, -3, 3) +
+		8 * clamp2(capRoom, -0.3, 0.4) +
+		0.3 * clamp2(winTrend, -15, 15);
+	return Math.round(score * 10) / 10;
 };
 
 export const HOT_SEAT_WEIGHTS = [1, 0.6, 0.35];
@@ -328,12 +413,20 @@ export const gmHotSeat = (scores: number[]) => {
 	return Math.round(total * 10) / 10;
 };
 
-// Chance the owner fires him after the playoffs. New GMs get three seasons unless it goes very badly, and a GM who is rebuilding gets a bit more rope early on
+// Below this (relative to expectations) even a new GM can be fired: a season ~20 wins under what his roster was projected to win
+export const GM_EXTREME_HOT_SEAT = -24;
+
+// Chance the owner fires him after the playoffs. Two full seasons of honeymoon (only a truly extreme miss against expectations ends
+// it; the earliest ordinary firing is after his third), then the chance grows with how far below the threshold his job security is. Rebuilds get more rope early on, win-now GMs of
+// expected contenders less, and owners in big markets are a bit less patient
 export const gmFireProb = ({
 	hotSeat,
 	tenure,
 	rebuilding,
 	droughtSeasons,
+	patience = 0,
+	contender = false,
+	marketFactor = 0,
 }: {
 	hotSeat: number;
 	// Completed seasons with this team
@@ -341,16 +434,31 @@ export const gmFireProb = ({
 	rebuilding: boolean;
 	// Seasons in a row without the playoffs, with this GM
 	droughtSeasons: number;
+	// His timeline leaning, -1 win-now to 1 patient
+	patience?: number;
+	// Hired into a team expected to contend
+	contender?: boolean;
+	// -1 (small market, patient owner) to 1 (big market, impatient)
+	marketFactor?: number;
 }) => {
-	if (tenure < 3) {
-		return tenure >= 1 && hotSeat < -25 ? 0.25 : 0;
+	if (tenure <= 2) {
+		return tenure >= 1 && hotSeat < GM_EXTREME_HOT_SEAT ? 0.3 : 0;
 	}
-	let x = -hotSeat - (rebuilding && tenure <= 3 ? 15 : 9);
-	x += Math.max(0, droughtSeasons - 4) * 3;
+	let threshold = 9;
+	if (rebuilding && tenure <= 4) {
+		threshold += 5;
+	}
+	threshold += 3 * Math.max(0, patience) * (rebuilding ? 1 : 0.5);
+	if (contender && patience < 0) {
+		threshold += 4 * patience;
+	}
+	threshold -= 1.5 * marketFactor;
+	let x = -hotSeat - threshold;
+	x += Math.max(0, droughtSeasons - (rebuilding ? 5 : 4)) * 2.5;
 	if (x <= 0) {
 		return 0;
 	}
-	return Math.min(0.85, 0.25 + 0.04 * x);
+	return Math.min(0.85, 0.2 + 0.04 * x);
 };
 
 // Text for the hot seat meter

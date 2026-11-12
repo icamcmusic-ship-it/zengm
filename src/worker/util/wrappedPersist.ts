@@ -17,12 +17,20 @@ const DB_NAME = "wrapped-cache";
 type CacheDB = IDBPDatabase<unknown>;
 
 let dbPromise: Promise<CacheDB | undefined> | undefined;
+// The IDBFactory dbPromise was opened with. Only tests swap it (each with a fresh fake one, in workers shared between test
+// files), and a cached result from another factory, or from when there was none, would mean nothing is ever cached again
+let dbFactory: IDBFactory | undefined;
 
 // Opening can wait forever when another tab has an older version open (the upgrade is blocked until it closes). Then
 // there's just no cache for this session, rather than every operation waiting for TIMEOUT_MS first
 const OPEN_TIMEOUT_MS = 10000;
 
 const getDb = () => {
+	const factory = typeof indexedDB === "undefined" ? undefined : indexedDB;
+	if (factory !== dbFactory) {
+		dbFactory = factory;
+		dbPromise = undefined;
+	}
 	dbPromise ??= (async () => {
 		try {
 			const opening = openDB(DB_NAME, 2, {

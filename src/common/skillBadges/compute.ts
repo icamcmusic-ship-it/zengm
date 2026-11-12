@@ -392,6 +392,37 @@ export const getDisplayBadges = (
 	return result;
 };
 
+/**
+ * For each combo a player gets (the same greedy pass as getDisplayBadges): the parts it replaced and how far past its cutoff the
+ * weakest part is. A part that is itself a combo (a level 2 combo absorbs level 1 combos) counts with its own margin.
+ */
+export const getComboDetails = (
+	ratings: BadgeRatings,
+	skills: string[],
+	traits?: BadgeTraits,
+) => {
+	const available = new Set([...skills, ...getSkillBadges(ratings, traits)]);
+	const details = new Map<string, { parts: string[]; margin: number }>();
+	for (const combo of SKILL_COMBOS) {
+		const consumed = comboParts(combo, available);
+		if (!consumed) {
+			continue;
+		}
+		for (const c of consumed) {
+			available.delete(c);
+		}
+		available.add(combo.label);
+		const margins = consumed.map(
+			(c) => details.get(c)?.margin ?? skillMargin(ratings, c, traits),
+		);
+		details.set(combo.label, {
+			parts: consumed,
+			margin: margins.length > 0 ? Math.min(...margins) : 0,
+		});
+	}
+	return details;
+};
+
 /** Original skills still shown next to some display tokens (the ones not consumed by a combo in the tokens). */
 export const visibleOriginalSkills = (skills: string[], tokens: string[]) => {
 	const consumed = new Set<string>();

@@ -1,3 +1,4 @@
+import { getCapExceptionsSummary } from "../core/contract/capExceptions.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import type { Phase, Player } from "../../common/types.ts";
 import { defineView } from "../util/defineView.ts";
@@ -295,6 +296,11 @@ export default defineView({
 
 			return {
 				capSpace,
+				// Salary Cap Exceptions (setting), undefined when off
+				capExceptions:
+					season === "current"
+						? await getCapExceptionsSummary(userTid, payroll)
+						: undefined,
 				market,
 				challengeNoFreeAgents: g.get("challengeNoFreeAgents"),
 				freeAgencySeason,

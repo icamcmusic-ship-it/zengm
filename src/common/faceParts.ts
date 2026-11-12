@@ -11,6 +11,7 @@
 import type { FaceConfig } from "facesjs";
 import { svgs, svgsIndex } from "facesjs";
 import { NATIVE_FACE_PARTS } from "./faceParts.native.ts";
+import { STAFF_SUIT_PARTS } from "./faceParts.suits.ts";
 
 export type FacePartFeature =
 	| "accessories"
@@ -24,6 +25,7 @@ export type FacePartFeature =
 	| "hair"
 	| "hairBg"
 	| "head"
+	| "jersey"
 	| "miscLine"
 	| "mouth"
 	| "nose"
@@ -105,6 +107,10 @@ export const registerForkFaceParts = () => {
 	for (const part of FORK_FACE_PARTS) {
 		registerFacePart(part);
 	}
+	// Staff suits (faceParts.suits.ts): registered so coaches and GMs can be drawn in them, never given to players
+	for (const part of STAFF_SUIT_PARTS) {
+		registerFacePart(part);
+	}
 };
 
 // Browser setting (UI only, default off): whether the fork's example parts are registered in this browser at startup, so faces
@@ -127,6 +133,8 @@ export const FORK_PART_WEIGHTS: Record<FacePartFeature, number> = {
 	hair: 0.12,
 	hairBg: 0.3,
 	head: 0.15,
+	// (staff suits only, see faceParts.suits.ts)
+	jersey: 0,
 	miscLine: 0.3,
 	mouth: 0.15,
 	nose: 0.15,
@@ -148,7 +156,11 @@ export const addRandomForkParts = (
 	}
 	for (const [feature, parts] of byFeature) {
 		const current = (face as any)[feature] as { id: string } | undefined;
-		if (!current || current.id === "none" || random() >= FORK_PART_WEIGHTS[feature]) {
+		if (
+			!current ||
+			current.id === "none" ||
+			random() >= FORK_PART_WEIGHTS[feature]
+		) {
 			continue;
 		}
 		const part = parts[Math.floor(random() * parts.length)]!;

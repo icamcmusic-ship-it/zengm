@@ -1,8 +1,13 @@
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import type { View } from "../../common/types.ts";
-import { MyFace } from "../components/MyFace.tsx";
-import { COACH_RATING_NAMES } from "../../common/staff.ts";
+import {
+	CoachPortrait,
+	GradeBadge,
+	HotSeatBadge,
+	RatingBars,
+	Term,
+} from "../components/CoachUi.tsx";
 
 const TX_TEXT = {
 	hired: "Hired by",
@@ -24,18 +29,26 @@ const playoffText = (roundsWon: number, numRounds: number) => {
 		: `Won ${roundsWon} playoff round${roundsWon > 1 ? "s" : ""}`;
 };
 
-const Coach = ({ awards, coach: c, stats, transactions }: View<"coach">) => {
+const Coach = ({
+	awards,
+	coach: c,
+	colors,
+	stats,
+	transactions,
+}: View<"coach">) => {
 	useTitleBar({ title: c.name });
 
 	return (
 		<>
-			<div className="d-flex gap-3 mb-3">
-				{c.face ? (
-					<div style={{ width: 120, height: 180 }}>
-						<MyFace face={c.face} />
-					</div>
-				) : null}
-				<div>
+			<div className="d-flex flex-wrap gap-3 mb-3">
+				<CoachPortrait
+					face={c.face}
+					colors={colors}
+					age={c.age}
+					seed={c.cid}
+					width={120}
+				/>
+				<div style={{ flex: "1 1 280px", minWidth: 0 }}>
 					<div>
 						<b>
 							{c.tid >= 0
@@ -63,17 +76,15 @@ const Coach = ({ awards, coach: c, stats, transactions }: View<"coach">) => {
 							per season thru {c.contract.exp}
 						</div>
 					) : null}
-					<div>Ovr at current job: {c.ovr}</div>
 					<div>
-						{(
-							Object.keys(
-								COACH_RATING_NAMES,
-							) as (keyof typeof COACH_RATING_NAMES)[]
-						).map((key) => (
-							<span key={key} className="me-3">
-								{COACH_RATING_NAMES[key]}: <b>{c.ratings[key]}</b>
-							</span>
-						))}
+						<Term term="ovr">Overall at his job</Term>: <b>{c.ovr}</b>{" "}
+						<GradeBadge value={c.ovr} />
+					</div>
+					<div className="my-2" style={{ maxWidth: 420 }}>
+						<Term term="ratings">
+							<b>Ratings</b>
+						</Term>
+						<RatingBars ratings={c.ratings} />
 					</div>
 					<div>Style: {c.styleText}</div>
 					{c.systems ? (
@@ -88,10 +99,15 @@ const Coach = ({ awards, coach: c, stats, transactions }: View<"coach">) => {
 								Adaptability {c.systems.adapt}
 							</div>
 							<div>
-								Reputation: {c.systems.reputation} ({c.systems.reputationText})
-								{c.systems.hotSeatText
-									? ` · Hot seat: ${c.systems.hotSeatText}`
-									: ""}
+								<Term term="reputation" />: {c.systems.reputation} (
+								{c.systems.reputationText})
+								{c.systems.hotSeatText ? (
+									<>
+										{" "}
+										· <Term term="hotSeat" />{" "}
+										<HotSeatBadge text={c.systems.hotSeatText} />
+									</>
+								) : null}
 								{c.systems.mentor ? (
 									<>
 										{" "}

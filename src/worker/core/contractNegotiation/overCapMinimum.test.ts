@@ -123,6 +123,8 @@ describe("over the cap minimum contracts", () => {
 
 	test("over the cap team still can't sign above the minimum", async () => {
 		const [p] = await setup({ phase: PHASE.REGULAR_SEASON, capSpace1: 0 });
+		// This is about the cap check, not mood. Above the minimum a random player can refuse to negotiate at all (create returns an error), which made this flaky
+		g.setWithoutSavingToDB("playersRefuseToNegotiate", false);
 		p!.contractDemand!.amount = g.get("minContract") + 500;
 		const negotiation = await contractNegotiation.create(p!.pid, false);
 		if (typeof negotiation === "string") {
