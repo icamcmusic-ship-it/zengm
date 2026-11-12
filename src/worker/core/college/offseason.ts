@@ -244,7 +244,9 @@ export const doTransferPortal = async (conditions: Conditions) => {
 	const season = g.get("season");
 	const userTid = g.get("userTid");
 	const teams = await getActiveTeams();
-	const prestige = new Map(teams.map((t) => [t.tid, getTeamPrestige(t as any)]));
+	const prestige = new Map(
+		teams.map((t) => [t.tid, getTeamPrestige(t as any)]),
+	);
 	const rosters = await getRosters();
 	const numGames = g.get("numGames");
 
@@ -286,7 +288,9 @@ export const doTransferPortal = async (conditions: Conditions) => {
 
 	// Best players choose first
 	portal.sort((a, b) => last(b.p.ratings).ovr - last(a.p.ratings).ovr);
-	const size = new Map(teams.map((t) => [t.tid, (rosters.get(t.tid) ?? []).length]));
+	const size = new Map(
+		teams.map((t) => [t.tid, (rosters.get(t.tid) ?? []).length]),
+	);
 	for (const entry of portal) {
 		size.set(entry.from, size.get(entry.from)! - 1);
 	}
@@ -300,7 +304,9 @@ export const doTransferPortal = async (conditions: Conditions) => {
 			if (t.tid === from || size.get(t.tid)! >= COLLEGE_SCHOLARSHIPS) {
 				continue;
 			}
-			const roster = (rosters.get(t.tid) ?? []).filter((p2) => p2.tid === t.tid);
+			const roster = (rosters.get(t.tid) ?? []).filter(
+				(p2) => p2.tid === t.tid,
+			);
 			const better = roster.filter((p2) => last(p2.ratings).ovr > ovr).length;
 			// He goes where he would play
 			if (better > (up ? 4 : 6)) {
@@ -389,7 +395,10 @@ export const doTransferPortal = async (conditions: Conditions) => {
  * A class of high school seniors who sign at the end of the current season. Not saved: tid is PLAYER.UNDRAFTED and draft.year the current
  * season.
  */
-export const genRecruitingClass = async (numRecruits: number, numTeams: number) => {
+export const genRecruitingClass = async (
+	numRecruits: number,
+	numTeams: number,
+) => {
 	const share = getTalentShare(numTeams);
 	const recruits: PlayerWithoutKey[] = [];
 	for (let i = 0; i < numRecruits; i++) {
@@ -421,10 +430,17 @@ export const genRecruitingClass = async (numRecruits: number, numTeams: number) 
 	return scored.map((row) => row.p);
 };
 
-export const getRecruitingClassSize = (numTeams: number, numSeniors?: number) => {
+export const getRecruitingClassSize = (
+	numTeams: number,
+	numSeniors?: number,
+) => {
 	// Seniors, early entrants and a margin, so the last schools still have someone to sign
 	const leaving = numSeniors ?? Math.round(numTeams * 3.2);
-	return leaving + Math.round(getNumProDraftPicks(numTeams) * 0.6) + Math.round(numTeams * 0.5);
+	return (
+		leaving +
+		Math.round(getNumProDraftPicks(numTeams) * 0.6) +
+		Math.round(numTeams * 0.5)
+	);
 };
 
 /**
@@ -467,11 +483,7 @@ const getRecruits = async () =>
 		.sort((a, b) => a.recruit!.rank - b.recruit!.rank);
 
 // What a school's interest is worth to a recruit, before luck: prestige and how much it needs his position
-const schoolScore = (
-	pres: number,
-	counts: number[],
-	pos: string,
-) => {
+const schoolScore = (pres: number, counts: number[], pos: string) => {
 	const group = posGroup(pos);
 	const need = IDEAL_BY_GROUP[group]! - counts[group]!;
 	return pres + 2.5 * helpers.bound(need, -2, 3);
@@ -501,7 +513,9 @@ export const getRecruitingBoard = async () => {
 	for (const t of teams) {
 		const roster = rosters.get(t.tid) ?? [];
 		const staying = roster.filter(
-			(p) => getClassYear(p) < COLLEGE_ELIGIBILITY_YEARS || g.get("phase") >= PHASE.DRAFT,
+			(p) =>
+				getClassYear(p) < COLLEGE_ELIGIBILITY_YEARS ||
+				g.get("phase") >= PHASE.DRAFT,
 		).length;
 		const openings = Math.max(0, COLLEGE_SCHOLARSHIPS - staying);
 		if (t.tid === userTid) {
@@ -517,15 +531,16 @@ export const getRecruitingBoard = async () => {
 	const userPrestige = userTeam ? getTeamPrestige(userTeam as any) : 60;
 	const counts = groupCounts(
 		(rosters.get(userTid) ?? []).filter(
-			(p) => getClassYear(p) < COLLEGE_ELIGIBILITY_YEARS || g.get("phase") >= PHASE.DRAFT,
+			(p) =>
+				getClassYear(p) < COLLEGE_ELIGIBILITY_YEARS ||
+				g.get("phase") >= PHASE.DRAFT,
 		),
 	);
 
 	const board = recruits.map((p, i) => {
 		const expected = slots[Math.min(i, slots.length - 1)] ?? 50;
 		const ratings = last(p.ratings);
-		const diff =
-			schoolScore(userPrestige, counts, ratings.pos) - expected;
+		const diff = schoolScore(userPrestige, counts, ratings.pos) - expected;
 		return {
 			p,
 			expected,
@@ -762,7 +777,9 @@ export const doSigningDay = async (conditions: Conditions) => {
 	}
 
 	await updateCollegeArchive({
-		commits: commits.filter((c) => c.stars >= 4 || c.tid === userTid || c.rank <= 150),
+		commits: commits.filter(
+			(c) => c.stars >= 4 || c.tid === userTid || c.rank <= 150,
+		),
 	});
 	return season;
 };
@@ -851,7 +868,8 @@ export const getExpectationDeltas = async ({
 		.map((t) => ({ tid: t.tid, prestige: getTeamPrestige(t as any) }))
 		.sort((a, b) => a.prestige - b.prestige);
 	const index = sorted.findIndex((t) => t.tid === userTid);
-	const pct = sorted.length > 1 ? Math.max(0, index) / (sorted.length - 1) : 0.5;
+	const pct =
+		sorted.length > 1 ? Math.max(0, index) / (sorted.length - 1) : 0.5;
 	const expectedWinp = 0.3 + 0.45 * pct;
 	const gp = won + lost;
 	const winp = gp > 0 ? won / gp : 0.5;
@@ -864,8 +882,7 @@ export const getExpectationDeltas = async ({
 	if (playoffRoundsWon < 0) {
 		playoffs = expectedIn ? -0.2 : -0.02;
 	} else if (playoffRoundsWon < numRounds) {
-		playoffs =
-			(expectedIn ? 0 : 0.1) + (0.16 / numRounds) * playoffRoundsWon;
+		playoffs = (expectedIn ? 0 : 0.1) + (0.16 / numRounds) * playoffRoundsWon;
 	} else {
 		playoffs = 0.25;
 	}

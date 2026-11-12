@@ -5,9 +5,16 @@ import "fake-indexeddb/auto";
 // @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { appendFileSync } from "node:fs";
 import { assert, describe, test } from "vitest";
-import { LEAGUE_DATABASE_VERSION, PHASE, PLAYER } from "../../../common/constants.ts";
+import {
+	LEAGUE_DATABASE_VERSION,
+	PHASE,
+	PLAYER,
+} from "../../../common/constants.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
-import { getCollegeLeagueTeams, type CollegeLevel } from "../../../common/college/teams.ts";
+import {
+	getCollegeLeagueTeams,
+	type CollegeLevel,
+} from "../../../common/college/teams.ts";
 import { getCollegeSettings } from "../../../common/college/settings.ts";
 import { game, league, phase, team } from "../index.ts";
 import * as views from "../../views/index.ts";
@@ -27,7 +34,10 @@ const where = () => `season ${g.get("season")} phase ${g.get("phase")}`;
 const step = async (name: string, f: () => Promise<unknown>) => {
 	await f();
 	for (const key of ["gameSim", "newPhase", "drafting"] as const) {
-		assert.isFalse(lock.get(key), `lock ${key} still set after ${name} (${where()})`);
+		assert.isFalse(
+			lock.get(key),
+			`lock ${key} still set after ${name} (${where()})`,
+		);
 	}
 	assert.isUndefined(local.autoPlayUntil);
 };
@@ -42,7 +52,10 @@ const loadView = async (id: string, params: Record<string, unknown> = {}) => {
 		prevOutput: {},
 		conditions: {},
 	});
-	assert.isUndefined((out as any)?.errorMessage, `${id}: ${(out as any)?.errorMessage}`);
+	assert.isUndefined(
+		(out as any)?.errorMessage,
+		`${id}: ${(out as any)?.errorMessage}`,
+	);
 	return out;
 };
 
@@ -50,7 +63,10 @@ describe("college mode", () => {
 	test("seasons", { timeout: 6 * 60 * 60 * 1000 }, async () => {
 		Math.random = makeSeededRandom(7);
 		const { teams, confs, divs } = getCollegeLeagueTeams(LEVEL);
-		const settings: any = { ...getDefaultSettings(), ...getCollegeSettings(LEVEL) };
+		const settings: any = {
+			...getDefaultSettings(),
+			...getCollegeSettings(LEVEL),
+		};
 		const userTid = teams.findIndex((t) => t.region === "Duke");
 		await league.createStream(
 			{},
@@ -83,7 +99,10 @@ describe("college mode", () => {
 
 		const checkRosters = async (label: string) => {
 			for (const t of teams) {
-				const players = await idb.cache.players.indexGetAll("playersByTid", t.tid);
+				const players = await idb.cache.players.indexGetAll(
+					"playersByTid",
+					t.tid,
+				);
 				assert.isAtMost(players.length, 13, `${label}: ${t.region} roster`);
 				assert.isAtLeast(players.length, 9, `${label}: ${t.region} roster`);
 				for (const p of players) {
@@ -108,7 +127,9 @@ describe("college mode", () => {
 			).filter((p) => p.draft.year === g.get("season"));
 			assert.isAbove(recruits.length, teams.length * 3, "recruiting class");
 
-			await step("regular season", () => phase.newPhase(PHASE.REGULAR_SEASON, {}));
+			await step("regular season", () =>
+				phase.newPhase(PHASE.REGULAR_SEASON, {}),
+			);
 			const t0 = performance.now();
 			let days = 0;
 			while (g.get("phase") === PHASE.REGULAR_SEASON) {
@@ -117,7 +138,11 @@ describe("college mode", () => {
 				assert.isBelow(days, 80, where());
 			}
 			const regSeconds = (performance.now() - t0) / 1000;
-			assert.strictEqual(g.get("phase"), PHASE.AFTER_TRADE_DEADLINE, "conference tournaments");
+			assert.strictEqual(
+				g.get("phase"),
+				PHASE.AFTER_TRADE_DEADLINE,
+				"conference tournaments",
+			);
 			await loadView("collegePolls", {});
 			await loadView("collegeConfTournaments", {});
 			while (g.get("phase") === PHASE.AFTER_TRADE_DEADLINE) {
@@ -141,7 +166,9 @@ describe("college mode", () => {
 					[g.get("season"), "Z"],
 				])
 			).filter(
-				(ts) => ts.playoffRoundsWon === g.get("numGamesPlayoffSeries", "current").length,
+				(ts) =>
+					ts.playoffRoundsWon ===
+					g.get("numGamesPlayoffSeries", "current").length,
 			);
 			assert.lengthOf(champion, 1, "champion");
 
@@ -156,7 +183,8 @@ describe("college mode", () => {
 			await step("signing day", () => phase.newPhase(PHASE.FREE_AGENCY, {}));
 			await checkRosters(`after signing day ${i}`);
 			for (const t of teams) {
-				const n = (await idb.cache.players.indexGetAll("playersByTid", t.tid)).length;
+				const n = (await idb.cache.players.indexGetAll("playersByTid", t.tid))
+					.length;
 				assert.strictEqual(n, 13, `${t.region} full after signing day`);
 			}
 			await step("preseason", () => phase.newPhase(PHASE.PRESEASON, {}));
@@ -166,7 +194,19 @@ describe("college mode", () => {
 				// Stat line per team game of the regular season just played
 				const stats = await team.getFormattedAll({
 					attrs: ["tid"],
-					stats: ["gp", "pts", "fg", "fga", "tp", "tpa", "fta", "pace", "tov", "orb", "drb"],
+					stats: [
+						"gp",
+						"pts",
+						"fg",
+						"fga",
+						"tp",
+						"tpa",
+						"fta",
+						"pace",
+						"tov",
+						"orb",
+						"drb",
+					],
 					season: g.get("season") - 1,
 				});
 				const sum: Record<string, number> = {};
@@ -175,7 +215,10 @@ describe("college mode", () => {
 						sum[k] = (sum[k] ?? 0) + (v as number) * (t.stats.gp as number);
 					}
 				}
-				const gp = sum.gp! > 0 ? (stats as any[]).reduce((a, t) => a + t.stats.gp, 0) : 1;
+				const gp =
+					sum.gp! > 0
+						? (stats as any[]).reduce((a, t) => a + t.stats.gp, 0)
+						: 1;
 				const per = (k: string) => Math.round((sum[k]! / gp) * 10) / 10;
 				appendFileSync(
 					BENCH,

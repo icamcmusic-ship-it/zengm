@@ -217,7 +217,8 @@ export const createCollegePlayers = async ({
 		for (let i = 0; i < slots.length; i++) {
 			// The best players of older classes have left for the pros already
 			const top = classYear >= 3 ? 0.02 : classYear === 2 ? 0.008 : 0;
-			const quantile = (top + (1 - top) * ((i + Math.random()) / slots.length)) * share;
+			const quantile =
+				(top + (1 - top) * ((i + Math.random()) / slots.length)) * share;
 			const p = await genCollegePlayer({
 				tid: PLAYER.UNDRAFTED,
 				quantile,

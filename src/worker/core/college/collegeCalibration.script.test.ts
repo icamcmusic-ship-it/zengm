@@ -92,7 +92,10 @@ describe.skipIf(!OUT)("college calibration", () => {
 		const per = (k: string) => Math.round((sum[k]! / gp) * 10) / 10;
 		const ovrs: number[] = [];
 		for (const t of teams) {
-			const players = await idb.cache.players.indexGetAll("playersByTid", t.tid);
+			const players = await idb.cache.players.indexGetAll(
+				"playersByTid",
+				t.tid,
+			);
 			ovrs.push(
 				...players
 					.map((p) => last(p.ratings).ovr)

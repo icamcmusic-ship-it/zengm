@@ -14,6 +14,10 @@ import {
 import { runDraft } from "./actions.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { cleanupAutoPlay } from "../core/league/autoPlay.ts";
+import { isCollege } from "../core/college/isCollege.ts";
+
+// More than a conference tournament can take (16 teams: 4 rounds)
+const COLLEGE_CONF_TOURNAMENT_MAX_DAYS = 10;
 
 const getNumDaysThisRound = (playoffSeries: PlayoffSeries) => {
 	let numDaysThisRound = 0;
@@ -133,7 +137,10 @@ const playAmount = async (
 		const numDaysRemaining =
 			g.get("phase") === PHASE.PLAYOFFS
 				? await getNumDaysPlayoffs()
-				: await season.getDaysLeftSchedule();
+				: isCollege() && g.get("phase") === PHASE.AFTER_TRADE_DEADLINE
+					? // College mode: conference tournament games are scheduled one day at a time
+						COLLEGE_CONF_TOURNAMENT_MAX_DAYS
+					: await season.getDaysLeftSchedule();
 
 		if (numDaysRemaining < numDays) {
 			numDays = numDaysRemaining;
@@ -195,7 +202,10 @@ const playMenu = {
 	},
 	untilPlayoffs: async (param: unknown, conditions: Conditions) => {
 		if (g.get("phase") < PHASE.PLAYOFFS) {
-			const numDays = await season.getDaysLeftSchedule();
+			const numDays =
+				isCollege() && g.get("phase") === PHASE.AFTER_TRADE_DEADLINE
+					? COLLEGE_CONF_TOURNAMENT_MAX_DAYS
+					: await season.getDaysLeftSchedule();
 			game.play(numDays, conditions);
 		}
 	},
@@ -238,6 +248,10 @@ const playMenu = {
 		await runDraft({ type: "untilEnd" }, conditions);
 	},
 	untilResignPlayers: async (param: unknown, conditions: Conditions) => {
+		// College mode: departures, then the transfer portal, then recruiting
+		if (isCollege() && g.get("phase") === PHASE.DRAFT) {
+			await phase.newPhase(PHASE.AFTER_DRAFT, conditions);
+		}
 		if (
 			g.get("draftType") === "freeAgents" &&
 			g.get("phase") === PHASE.DRAFT_LOTTERY
@@ -285,6 +299,11 @@ const playMenu = {
 		}
 	},
 	untilPreseason: async (param: unknown, conditions: Conditions) => {
+		// College mode: there are no free agency days
+		if (isCollege() && g.get("phase") === PHASE.FREE_AGENCY) {
+			await phase.newPhase(PHASE.PRESEASON, conditions);
+			return;
+		}
 		await playAmount("untilPreseason", conditions);
 	},
 	untilRegularSeason: async (param: unknown, conditions: Conditions) => {

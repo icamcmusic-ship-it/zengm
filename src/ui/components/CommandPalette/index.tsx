@@ -135,9 +135,7 @@ const getResultsGroupedDefault = ({
 			return false;
 		}
 
-		if (
-			menuItemHiddenForLeagueType(menuItem, local.getState().leagueType)
-		) {
+		if (menuItemHiddenForLeagueType(menuItem, local.getState().leagueType)) {
 			return false;
 		}
 

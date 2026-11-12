@@ -1481,6 +1481,11 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	};
 	college: string;
 
+	// College mode (docs/college-mode.md): class year (0 = signed recruit, 1-4 = Fr-Sr), recruiting profile, how he left school
+	classYear?: number;
+	recruit?: import("./college/types.ts").PlayerRecruit;
+	collegeExit?: import("./college/types.ts").PlayerCollegeExit;
+
 	// What the player is asking for. Defined for free agents, draft prospects, and players on a team who need a new contract (unsigned draft picks, or expiring contracts while re-signing).
 	contractDemand?: FlatContractInfo & {
 		temp?: true; // Used only during league creation, to mark demands that need to be normalized

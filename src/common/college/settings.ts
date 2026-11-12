@@ -1,7 +1,5 @@
 // College mode: the settings a college league is created with. See docs/college-mode.md.
-import {
-	COLLEGE_SCHOLARSHIPS,
-} from "./constants.ts";
+import { COLLEGE_SCHOLARSHIPS } from "./constants.ts";
 import {
 	getCollegeLeagueTeams,
 	getCollegeTournamentSize,

@@ -56,9 +56,10 @@ export const getSchoolPrestige = (school: string) => {
 		return undefined;
 	}
 	const conf = CONFERENCES[row[1]];
-	return Math.round(
-		((conf?.strength ?? 60) + Math.log10(1 + row[0]) * 4 - 3) * 10,
-	) / 10;
+	return (
+		Math.round(((conf?.strength ?? 60) + Math.log10(1 + row[0]) * 4 - 3) * 10) /
+		10
+	);
 };
 
 // Generic nicknames, so no real mascot is used. Picked by a hash of the school name
@@ -146,7 +147,7 @@ const SKIP_WORDS = new Set(["of", "the", "at", "and", "&"]);
 
 const abbrevCandidates = (school: string) => {
 	const clean = school
-		.replaceAll(/[^A-Za-z& -]/g, "")
+		.replaceAll(/[^ &A-Za-z-]/g, "")
 		.replaceAll("-", " ")
 		.trim();
 	const words = clean.split(/\s+/).filter((w) => !SKIP_WORDS.has(w));
@@ -167,7 +168,10 @@ const abbrevCandidates = (school: string) => {
 			candidates.push(up(first + lastWord.slice(0, 4 - first.length || 1)));
 		}
 		if (lastWord === "State" && words.length === 2) {
-			candidates.push(up(first.slice(0, 3)) + "S", up(first.slice(0, 2)) + "ST");
+			candidates.push(
+				up(first.slice(0, 3)) + "S",
+				up(first.slice(0, 2)) + "ST",
+			);
 		}
 		if (initials.length >= 3) {
 			candidates.push(up(initials.slice(0, 4)));

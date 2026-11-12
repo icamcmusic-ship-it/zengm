@@ -276,6 +276,18 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 					path: "/new_league",
 					text: "New League > Custom",
 				},
+				...(__SPORT === "basketball"
+					? [
+							{
+								type: "link",
+								nonLeague: true,
+								commandPalette: true,
+								commandPaletteOnly: true,
+								path: "/new_league/college",
+								text: "New League > College",
+							},
+						]
+					: []),
 			] as MenuItemLink[])
 		: ([
 				{
@@ -348,6 +360,24 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				commandPalette: true,
 				path: ["playoffs"],
 				text: "Playoffs",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegePolls",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_polls"],
+				text: "Top 25 & Selection",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegeConfTournaments",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_conf_tournaments"],
+				text: "Conf. Tournaments",
 			},
 			{
 				type: "link",
@@ -526,6 +556,24 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 		league: true,
 		commandPalette: true,
 		children: [
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegeRecruiting",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_recruiting"],
+				text: "Recruiting",
+			},
+			{
+				type: "link",
+				active: (pageID) => pageID === "collegeDepartures",
+				league: true,
+				commandPalette: true,
+				leagueType: "college",
+				path: ["college_departures"],
+				text: "Departures & Arrivals",
+			},
 			{
 				type: "link",
 				active: (pageID) => pageID === "freeAgents",

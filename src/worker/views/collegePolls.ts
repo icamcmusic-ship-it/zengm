@@ -32,8 +32,7 @@ export const getCollegeTeamNames = async (season: number) => {
 				region: t.seasonAttrs.region as string,
 				won: t.seasonAttrs.won as number,
 				lost: t.seasonAttrs.lost as number,
-				conf:
-					confs.find((c) => c.cid === t.seasonAttrs.cid)?.name ?? "",
+				conf: confs.find((c) => c.cid === t.seasonAttrs.cid)?.name ?? "",
 			},
 		]),
 	) as Record<

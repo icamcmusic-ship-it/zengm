@@ -20,6 +20,7 @@ import {
 	OFFENSE_NAMES,
 	fitLabel,
 } from "../../common/coachSystems.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 
 const getRosterCoachSystem = async (tid: number) => {
 	const s = await getTeamCoachSystem(tid);
@@ -193,10 +194,13 @@ export default defineView({
 				!g.get("spectator") &&
 				__SPORT === "basketball";
 
+			// College mode: scholarships are not released or traded
+			const collegeLeague = isCollege();
 			const showRelease =
 				inputs.season === g.get("season") &&
 				inputs.tid === g.get("userTid") &&
-				!g.get("spectator");
+				!g.get("spectator") &&
+				!collegeLeague;
 
 			const seasonAttrs: TeamSeasonAttr[] = [
 				"profit",
@@ -255,6 +259,7 @@ export default defineView({
 				"latestTransaction",
 				"value",
 				"awards",
+				"classYear",
 			] as const;
 
 			const ratings = [
@@ -427,7 +432,7 @@ export default defineView({
 				numPlayersOnCourt: g.get("numPlayersOnCourt"),
 				luxuryTaxAmount,
 				minPayrollAmount,
-				payroll,
+				payroll: collegeLeague ? undefined : payroll,
 				playoffs: inputs.playoffs,
 				playoffsByConf,
 				players: addFirstNameShort(players),
@@ -440,11 +445,13 @@ export default defineView({
 				showTradeFor:
 					inputs.season === g.get("season") &&
 					inputs.tid !== g.get("userTid") &&
-					!g.get("spectator"),
+					!g.get("spectator") &&
+					!collegeLeague,
 				showTradingBlock:
 					inputs.season === g.get("season") &&
 					inputs.tid === g.get("userTid") &&
-					!g.get("spectator"),
+					!g.get("spectator") &&
+					!collegeLeague,
 				stats,
 				t: t2,
 				tid: inputs.tid,

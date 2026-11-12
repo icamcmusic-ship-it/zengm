@@ -163,13 +163,17 @@ export const newCollegeSchedule = (teams: ScheduleTeam[], numGames: number) => {
 
 	// Conference play: round r of every conference on the same day
 	const confRounds: [number, number][][] = [];
-	const maxRounds = Math.max(0, ...confRoundsByCid.map((rounds) => rounds.length));
+	const maxRounds = Math.max(
+		0,
+		...confRoundsByCid.map((rounds) => rounds.length),
+	);
 	for (let r = 0; r < maxRounds; r++) {
 		const round: [number, number][] = [];
 		for (const rounds of confRoundsByCid) {
 			// Spread a conference with fewer rounds over the whole of conference play
 			const index = Math.floor((r * rounds.length) / maxRounds);
-			const prevIndex = r === 0 ? -1 : Math.floor(((r - 1) * rounds.length) / maxRounds);
+			const prevIndex =
+				r === 0 ? -1 : Math.floor(((r - 1) * rounds.length) / maxRounds);
 			if (index !== prevIndex && rounds[index]) {
 				round.push(...rounds[index]);
 			}

@@ -196,9 +196,8 @@ export const newPhaseSigningDay = async (
  * League creation, after the players are saved: prestige on the teams, the first recruiting class, sorted rosters.
  */
 export const afterLeagueCreation = async () => {
-	const { getSchoolPrestige } = await import(
-		"../../../common/college/teams.ts"
-	);
+	const { getSchoolPrestige } =
+		await import("../../../common/college/teams.ts");
 	const teams = await idb.cache.teams.getAll();
 	for (const t of teams) {
 		const prestige = getSchoolPrestige(t.region);

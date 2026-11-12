@@ -102,6 +102,9 @@ const autoPlay = async (conditions: Conditions = {}) => {
 		await phase.newPhase(PHASE.RESIGN_PLAYERS, conditions);
 	} else if (currentPhase === PHASE.RESIGN_PLAYERS) {
 		await phase.newPhase(PHASE.FREE_AGENCY, conditions);
+	} else if (currentPhase === PHASE.FREE_AGENCY && college.isCollege()) {
+		// College mode: no free agency days
+		await phase.newPhase(PHASE.PRESEASON, conditions);
 	} else if (currentPhase === PHASE.FREE_AGENCY) {
 		// Purposely call without await, to break up the promise chain. Otherwise the promise chain uses too much memory after many seasons (like 50+)
 		// An error there would otherwise leave auto play running forever, with only Stop in the play menu

@@ -248,9 +248,7 @@ const pendingConfGames = (state: CollegeState) => {
 	for (const t of state.confTournaments ?? []) {
 		// Only the earliest round with unplayed games, so a team never plays twice in a day
 		for (const round of t.rounds) {
-			const pending = round.filter(
-				(m) => m.home >= 0 && m.away >= 0 && !m.pts,
-			);
+			const pending = round.filter((m) => m.home >= 0 && m.away >= 0 && !m.pts);
 			if (pending.length > 0) {
 				for (const m of pending) {
 					games.push([m.home, m.away]);
@@ -466,10 +464,7 @@ export const genNationalTournament = async (conditions: Conditions) => {
 			conditions,
 		);
 	}
-	if (
-		!selection.field.some((t) => t.tid === userTid) &&
-		!g.get("spectator")
-	) {
+	if (!selection.field.some((t) => t.tid === userTid) && !g.get("spectator")) {
 		const firstOut = selection.firstFourOut.includes(userTid);
 		logEvent(
 			{

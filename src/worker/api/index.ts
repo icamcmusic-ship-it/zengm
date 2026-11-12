@@ -260,6 +260,11 @@ import {
 	ratingsKeysForView,
 	syncExpandedToCompat,
 } from "../core/player/expandedRatings.ts";
+import {
+	collegeAutoTargets,
+	collegeSetAutoRecruit,
+	collegeSetTarget,
+} from "../core/college/api.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -6147,6 +6152,9 @@ const api = {
 		clearNotes,
 		clearTrade,
 		clearWatchList,
+		collegeAutoTargets,
+		collegeSetAutoRecruit,
+		collegeSetTarget,
 		createLeague: whileWorkerBusy(createLeague),
 		createTrade,
 		deleteOldData: whileWorkerBusy(deleteOldData),
