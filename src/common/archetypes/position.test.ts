@@ -305,13 +305,37 @@ describe("improved positions", () => {
 		assert.strictEqual(improvedPosition(axes, "not a position"), best);
 		assert.strictEqual(improvedPosition(axes, "PG"), best);
 		// A one-season jump is not enough when last season's reading still says the old position
-		const pgNow = { inches: 76, length: 75.5, skill: 0.6, play: 0.95 };
-		const sgBefore = { inches: 76, length: 76.5, skill: 0.6, play: 0.3 };
+		// (playmaking read from his stats)
+		const pgNow = {
+			inches: 76,
+			length: 75.5,
+			skill: 0.6,
+			play: 0.95,
+			fromStats: 1,
+		};
+		const sgBefore = {
+			inches: 76,
+			length: 76.5,
+			skill: 0.6,
+			play: 0.3,
+			fromStats: 1,
+		};
 		assert.strictEqual(improvedPosition(pgNow), "PG");
 		assert.strictEqual(improvedPosition(sgBefore), "SG");
 		assert.strictEqual(improvedPosition(pgNow, "SG"), "PG");
 		assert.strictEqual(improvedPosition(pgNow, "SG", sgBefore), "SG");
 		assert.strictEqual(improvedPosition(pgNow, "SG", pgNow), "PG");
+	});
+
+	test("arch13: read from ratings alone, a borderline point guard is a combo guard; his stats decide", () => {
+		const axes = { inches: 75, length: 75, skill: 0.65, play: 0.8 };
+		assert.strictEqual(improvedPosition({ ...axes, fromStats: 1 }), "PG");
+		assert.strictEqual(improvedPosition({ ...axes, fromStats: 0 }), "G");
+		// (a clear point guard is one either way)
+		assert.strictEqual(
+			improvedPosition({ ...axes, play: 0.97, length: 73.5, fromStats: 0 }),
+			"PG",
+		);
 	});
 
 	test("tall playmakers are not centers, small bigs are not centers", () => {

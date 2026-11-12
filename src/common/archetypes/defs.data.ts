@@ -60,6 +60,8 @@ export const toArchetype = (d: TwoKDef): Archetype => {
 		],
 		prior: 1,
 		...(d.custom ? { custom: true as const } : {}),
+		// (arch13: the all-around star build is rare by design, and never aimed at by the class archetype pool)
+		...(d.tags.includes("allAround") ? { rare: true as const } : {}),
 	};
 };
 

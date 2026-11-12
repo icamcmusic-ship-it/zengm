@@ -407,4 +407,19 @@ export const CUSTOM_DEFS: TwoKDef[] = [
 			"An elite shooter with unlimited range: the three is the weapon, whatever else he does.",
 		),
 	),
+	// arch13: the all-around star (no profile: read from his level, breadth and evenness, score.ts allAroundQuality)
+	{
+		...universal(
+			custom(
+				"Do-It-All Superstar",
+				["PG", "G", "SG", "GF", "SF", "F", "PF", "FC", "C"],
+				[0, 100],
+				{},
+				"wing",
+				"balanced",
+				"An elite all-around player: scores at every level, makes plays and defends, with no single skill that defines him.",
+			),
+		),
+		tags: ["custom", "universal", "allAround"],
+	},
 ];
