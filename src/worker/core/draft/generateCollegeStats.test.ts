@@ -166,7 +166,7 @@ describe("generateCollegeStats", () => {
 		assert(hasPreDraftStats(extra));
 	});
 
-	test("classes further out get projected ratings and their own seasons", async () => {
+	test("classes further out get their own seasons", async () => {
 		const future = (
 			await genPlayersWithoutSaving(SEASON + 2, DEFAULT_LEVEL, [])
 		).map((p, i) => ({ ...p, pid: 1000 + i, college: "Kansas" })) as Player[];

@@ -1760,6 +1760,9 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					collegeRecruiting: {
 						type: "object",
 					},
+					linkedCollege: {
+						type: "object",
+					},
 					generateCollegeStats: {
 						type: "boolean",
 					},

@@ -993,6 +993,8 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	collegeRecruiting:
 		| import("./college/types.ts").CollegeRecruitingState
 		| undefined;
+	// Pro league: the college league whose departed players become its draft classes (docs/college-mode.md)
+	linkedCollege: LinkedCollege | undefined;
 	scoutingSystem: boolean;
 	rerandomizeDraftClassRatings: boolean;
 	// Saved from the Regenerate ratings modal ("save as league default"), used by rerandomizeDraftClassRatings
@@ -1512,6 +1514,16 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	classYear?: number;
 	recruit?: import("./college/types.ts").PlayerRecruit;
 	collegeExit?: import("./college/types.ts").PlayerCollegeExit;
+	// A draft prospect imported from a linked college league: where he came from there
+	linkedCollege?: {
+		lid: number;
+		pid: number;
+		season: number;
+		school: string;
+		exit: "graduated" | "pro" | "left";
+		pick?: number;
+		classYear?: number;
+	};
 
 	// What the player is asking for. Defined for free agents, draft prospects, and players on a team who need a new contract (unsigned draft picks, or expiring contracts while re-signing).
 	contractDemand?: FlatContractInfo & {
@@ -1597,6 +1609,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	collegeSeason?: StoredCollegeSeason;
 	// Basketball: his years before the draft (schools, redshirt years, transfers, junior college), his story if he is one of the class's unusual prospects, and his recruiting ranking, see common/collegeStats/career.ts. Only on prospects whose college stats were generated with the career model
 	preDraftCareer?: StoredPreDraftCareer;
+	// Basketball: version of the college stats model his pre-draft stats were generated with (COLLEGE_STATS_VERSION in common/collegeStats/season.ts). Missing: 1, or not generated
+	collegeStatsV?: number;
 
 	// Basketball, the Draft Class Shapes setting: the shape his class was given (a key of DRAFT_CLASS_SHAPES), or "pending" between being generated and being shaped
 	draftClassShape?: string;
@@ -3036,3 +3050,11 @@ export type DraftBoardEntry = {
 };
 export type * from "./types.staff.ts";
 export type * from "./types.gm.ts";
+
+// Pro league linked to a college league (docs/college-mode.md)
+export type LinkedCollege = {
+	lid: number;
+	// Import the college league's latest departed class automatically when the season is over
+	auto: boolean;
+	imports: { collegeSeason: number; draftYear: number; num: number }[];
+};

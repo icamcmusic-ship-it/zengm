@@ -10,6 +10,7 @@ import {
 	processNewDraftClasses,
 	generateCollegeStatsAllClasses,
 	removeCollegeStats,
+	upgradeCollegeStats,
 } from "./generateCollegeStats.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
 import getOrder from "./getOrder.ts";
@@ -32,6 +33,7 @@ export default {
 	processNewDraftClasses,
 	generateCollegeStatsAllClasses,
 	removeCollegeStats,
+	upgradeCollegeStats,
 	getOrder,
 	getRookieContractLength,
 	getRookieSalaries,

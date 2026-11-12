@@ -214,20 +214,13 @@ export const weeklyBudget = (prestige: number, coachQuality = 0.5) =>
 export const nilBudget = (prestige: number) =>
 	Math.round(Math.max(20, prestige * 1.2 - 20) / 5) * 5;
 
-// Proximity grade from the school's state and the recruit's
-export const proximityGrade = (
-	schoolState: string | undefined,
-	recruitState: string,
-	sameRegion: boolean,
-	foreign: boolean,
-) => {
-	if (foreign) {
+// Proximity grade from the distance (km) between his hometown and the campus: 1 within about 100 km (60 miles), about 0.6 at 500 km,
+// 0.35 at 1,000 km, down to 0.15 across the country. A recruit from abroad (or a school with no known location) gets 0.4
+export const proximityGrade = (km: number | undefined) => {
+	if (km === undefined) {
 		return 0.4;
 	}
-	if (schoolState !== undefined && schoolState === recruitState) {
-		return 1;
-	}
-	return sameRegion ? 0.6 : 0.2;
+	return km <= 100 ? 1 : 0.15 + 0.85 * Math.exp(-(km - 100) / 600);
 };
 
 // Playing time grade from the number of returning players at his position who are better than him

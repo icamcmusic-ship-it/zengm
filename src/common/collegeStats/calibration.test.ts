@@ -147,10 +147,12 @@ describe("college stats calibration", () => {
 				assert(Number.isFinite(value));
 			}
 			if (s.tpa! >= 50) {
-				assert.isBelow(s.tp! / s.tpa!, 0.52);
+				// 50 attempts is a small sample: a 45% shooter runs above 52% about one season in eight
+				assert.isBelow(s.tp! / s.tpa!, 0.56);
 			}
 			if (s.fga! >= 100) {
-				assert.isBelow(s.fg! / s.fga!, 0.75);
+				// A low-volume big who lives at the rim can run hot over a season (his expected FG% is capped near 70%)
+				assert.isBelow(s.fg! / s.fga!, 0.8);
 			}
 		}
 	});

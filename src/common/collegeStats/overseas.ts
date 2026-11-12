@@ -37,7 +37,8 @@ const env = (
 
 export const LEAGUE_ENV: Record<string, LeagueEnv> = {
 	EuroLeague: env(70, 40, 18, 30, 36, -0.06, -11),
-	"NBA G League": env(103, 48, 30, 38, 48, -0.02, -2),
+	// A prospect in the G League is a young player on a pro roster: a top one starts (Ignite-style, about 30 minutes, 15-18 points), most come off the bench
+	"NBA G League": env(103, 48, 30, 34, 48, -0.035, -5),
 	"Liga ACB": env(72, 40, 18, 30, 36, -0.05, -10),
 	NBL: env(76, 40, 24, 34, 30),
 	"Chinese CBA": env(82, 48, 26, 38, 46),
