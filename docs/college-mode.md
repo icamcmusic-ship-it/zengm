@@ -24,20 +24,20 @@ This document is the design. The **Status** section at the end says what is buil
 
 No new object store and no database version bump.
 
-| Where | What |
-| --- | --- |
-| game attribute `leagueType` | `"pro"` (default) or `"college"` |
-| game attribute `collegeLevel` | `"power"`, `"major"` or `"full"`: which schools the league was made with (information only after creation) |
-| game attribute `collegeAutoRecruit` | bool, default true: the AI recruits for the user's school |
-| game attributes `customShotClock` + `shotClockLength`, `oneAndOne` + `oneAndOneFouls` | rule settings, any league |
-| game attribute `collegeState` | the working state of the current season: compact results log, weekly polls, conference tournament brackets, selection. Reset each preseason |
-| `awards` record of a season, key `college` | the season's archive: final polls, conference tournament brackets and champions, selection (field, bubble), conference players of the year, off-screen pro draft results, departures summary |
-| `t.collegePrestige` | program prestige, 0-100 |
-| `p.classYear` | 1-4 (Fr, So, Jr, Sr). 0 for a signed recruit who has not enrolled yet |
-| `p.recruit` | `{ stars, rank, posRank, state, offers?: tid[], committed?: tid, userTarget?: number }` for a high-school prospect and kept afterwards as his recruiting history |
-| `p.contract` | `{ amount: minContract, exp }` where `exp` is the season his eligibility ends. Never shown as money |
-| `p.tid` | on a team; `PLAYER.UNDRAFTED` = a recruit of the next class (`p.draft.year` = signing year); `PLAYER.RETIRED` = left school (graduated, turned pro, left the sport). `p.collegeExit = { season, type: "graduated" | "pro" | "left", pick? }` says how |
-| `p.transactions` / events | transfers and commitments are logged as events (`type: "freeAgent"`-style news with the school) |
+| Where                                                                                 | What                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------- |
+| game attribute `leagueType`                                                           | `"pro"` (default) or `"college"`                                                                                                                                                                                  |
+| game attribute `collegeLevel`                                                         | `"power"`, `"major"` or `"full"`: which schools the league was made with (information only after creation)                                                                                                        |
+| game attribute `collegeAutoRecruit`                                                   | bool, default true: the AI recruits for the user's school                                                                                                                                                         |
+| game attributes `customShotClock` + `shotClockLength`, `oneAndOne` + `oneAndOneFouls` | rule settings, any league                                                                                                                                                                                         |
+| game attribute `collegeState`                                                         | the working state of the current season: compact results log, weekly polls, conference tournament brackets, selection. Reset each preseason                                                                       |
+| `awards` record of a season, key `college`                                            | the season's archive: final polls, conference tournament brackets and champions, selection (field, bubble), conference players of the year, off-screen pro draft results, departures summary                      |
+| `t.collegePrestige`                                                                   | program prestige, 0-100                                                                                                                                                                                           |
+| `p.classYear`                                                                         | 1-4 (Fr, So, Jr, Sr). 0 for a signed recruit who has not enrolled yet                                                                                                                                             |
+| `p.recruit`                                                                           | `{ stars, rank, posRank, state, offers?: tid[], committed?: tid, userTarget?: number }` for a high-school prospect and kept afterwards as his recruiting history                                                  |
+| `p.contract`                                                                          | `{ amount: minContract, exp }` where `exp` is the season his eligibility ends. Never shown as money                                                                                                               |
+| `p.tid`                                                                               | on a team; `PLAYER.UNDRAFTED` = a recruit of the next class (`p.draft.year` = signing year); `PLAYER.RETIRED` = left school (graduated, turned pro, left the sport). `p.collegeExit = { season, type: "graduated" | "pro" | "left", pick? }` says how |
+| `p.transactions` / events                                                             | transfers and commitments are logged as events (`type: "freeAgent"`-style news with the school)                                                                                                                   |
 
 A recruit is a real player object (so he has a player page and ratings with the usual fog), but only **one** class exists at a time and unsigned recruits are deleted after signing day, so the database does not fill with thousands of prospects.
 
@@ -45,17 +45,17 @@ A recruit is a real player object (so he has a player page and ratings with the 
 
 The engine's phases are kept (so the play menu, auto play and every `phase <=` comparison keep working) and renamed in a college league:
 
-| Engine phase | College meaning | What happens on entering it |
-| --- | --- | --- |
-| `PRESEASON` | Preseason | new season; players develop (native progression, which is steep at 18-22); class years advance, recruits enroll; next recruiting class is generated; prestige updated; preseason AP poll |
-| `REGULAR_SEASON` | Regular season | schedule: non-conference games first, then conference play. Weekly AP poll |
-| `AFTER_TRADE_DEADLINE` | Conference tournaments | entered when the regular season schedule is empty. One bracket per conference, seeded by conference record, one round per day, neutral court. Games count in the overall record, not the conference record |
-| `PLAYOFFS` | National tournament | Selection: automatic bids (conference tournament champions) + at-large by committee score (NET-style ranking from the real results, quadrant records, SRS, record), S-curve, regions. Then the engine's own single-elimination bracket, neutral court |
-| `DRAFT_LOTTERY` | Season over | awards (national: the engine's awards, relabelled; conference players of the year), coaching carousel, job security |
-| `DRAFT` | Departures | seniors graduate; the off-screen pro draft (early entrants + seniors), results page |
-| `AFTER_DRAFT` | Transfer portal | automatic: buried players leave for minutes, schools with openings take them |
-| `RESIGN_PLAYERS` | Recruiting | the signing period: the user sets targets (or leaves auto on) |
-| `FREE_AGENCY` | Signing day | recruits commit, news; walk-ons fill what is left; unsigned recruits are removed |
+| Engine phase           | College meaning        | What happens on entering it                                                                                                                                                                                                                           |
+| ---------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PRESEASON`            | Preseason              | new season; players develop (native progression, which is steep at 18-22); class years advance, recruits enroll; next recruiting class is generated; prestige updated; preseason AP poll                                                              |
+| `REGULAR_SEASON`       | Regular season         | schedule: non-conference games first, then conference play. Weekly AP poll                                                                                                                                                                            |
+| `AFTER_TRADE_DEADLINE` | Conference tournaments | entered when the regular season schedule is empty. One bracket per conference, seeded by conference record, one round per day, neutral court. Games count in the overall record, not the conference record                                            |
+| `PLAYOFFS`             | National tournament    | Selection: automatic bids (conference tournament champions) + at-large by committee score (NET-style ranking from the real results, quadrant records, SRS, record), S-curve, regions. Then the engine's own single-elimination bracket, neutral court |
+| `DRAFT_LOTTERY`        | Season over            | awards (national: the engine's awards, relabelled; conference players of the year), coaching carousel, job security                                                                                                                                   |
+| `DRAFT`                | Departures             | seniors graduate; the off-screen pro draft (early entrants + seniors), results page                                                                                                                                                                   |
+| `AFTER_DRAFT`          | Transfer portal        | automatic: buried players leave for minutes, schools with openings take them                                                                                                                                                                          |
+| `RESIGN_PLAYERS`       | Recruiting             | the signing period: the user sets targets (or leaves auto on)                                                                                                                                                                                         |
+| `FREE_AGENCY`          | Signing day            | recruits commit, news; walk-ons fill what is left; unsigned recruits are removed                                                                                                                                                                      |
 
 ## Schedule
 
@@ -97,11 +97,11 @@ Lineups and rotations are the engine's. AI schools recruit by prestige + need as
 
 A full Division I league is 364 teams: about 5,500 games a season against 1,230 for the NBA. Three levels, chosen at creation:
 
-| Level | Schools | Tournament |
-| --- | --- | --- |
-| `power` (default) | the five power conferences (79) | 32 |
-| `major` | power + the strongest mid-major conferences (about 170) | 64 |
-| `full` | all 32 conferences (364) | 64 |
+| Level             | Schools                                                 | Tournament |
+| ----------------- | ------------------------------------------------------- | ---------- |
+| `power` (default) | the five power conferences (79)                         | 32         |
+| `major`           | power + the strongest mid-major conferences (about 170) | 64         |
+| `full`            | all 32 conferences (364)                                | 64         |
 
 All games are played by the real game sim in every level (so every player has real stats and any game can be watched). The cost per game is kept down by: play-by-play stored for the user's games only; box scores kept for the user's games and the tournament only; the League Extras that scan all teams daily (season odds, hype, achievements, records checks) off by default in a college league; one recruiting class instead of several draft classes. Measured numbers are in Status. A cheaper path for games that do not involve the user (a quick sim that still produces box-score-shaped stats) is the v2 answer for making `full` as fast as `power`.
 
@@ -113,4 +113,48 @@ All games are played by the real game sim in every level (so every player has re
 
 ## Status
 
-See the end of this file (filled in when v1 was finished).
+### v1: built and working end to end
+
+- New League → College (power / major / full), schools from the college list with generated nicknames, abbreviations and colors (no logos), 13-man rosters of 18-23 year olds in four classes, talent by prestige.
+- College rules preset: two 20-minute halves, 30-second shot clock (`customShotClock`), one-and-one from the 7th team foul and two shots from the 10th (`oneAndOne`), 5 fouls, sim tendencies calibrated (`COLLEGE_SIM_CALIBRATION`). The two rule settings work in any league; with them off the pro sim is byte-identical (`outcomeInvariance.test.ts`).
+- Season: 30 games (non-conference, then a double or single-plus round robin in conference), weekly AP Top 25 from the real results, NET with quadrants, conference tournaments (neutral court, byes for top seeds, automatic bids), Selection (committee score, S-curve, last four in / first four out), national tournament (32 or 64) with the real sim, champion in history. Conference standings come from the engine (one division per conference).
+- Awards: the engine's awards (MVP, DPOY, All-League teams, ...) run on the college season; they are not yet renamed (All-Americans) and there are no per-conference player of the year awards yet.
+- Offseason: graduation, off-screen pro draft (results page), automatic transfer portal, recruiting v1 (class with stars, rank, position rank, home; Recruiting page with targets, interest and _Auto recruit_; signing day news; walk-ons), class years advance, prestige drifts with results, recruiting class for next year.
+- Pro-only pages and links hidden (trades, free agency, draft, finances, contract/mood on roster and player pages, release/trade buttons); League Extras that need contracts, trades or a draft are forced off; the play menu and the phase names use the college calendar.
+- Coaching staff, coach carousel and hot seat run unchanged with schools; the user's owner mood (job security) compares the season with what the program's prestige predicts.
+
+### Speed (headless, `collegeSeasons.test.ts` with `COLLEGE_BENCH`, a 4-core container shared with other jobs)
+
+| Level | Schools | Seconds per regular season | Game days |
+| ----- | ------- | -------------------------- | --------- |
+| power | 79      | 9-10                       | 42        |
+| major | 145     | 22-24                      | 45        |
+| full  | 364     | 96-135                     | 51        |
+
+In the browser (production build) the power level's regular season took 8-19 s depending on machine load. Every game uses the full game sim; a cheaper path for games that do not involve the user is the main v2 item for the full level.
+
+### Stats per team game (regular season, three seasons)
+
+| Level | Pts       | FG%       | 3PA / FGA  | 3P%       | FTA       | TOV  | Pace (poss / 40 min) |
+| ----- | --------- | --------- | ---------- | --------- | --------- | ---- | -------------------- |
+| power | 72.7-73.3 | 43.7-43.8 | 41-42%     | 33.7-34.0 | 19.8      | 12.3 | 68.5                 |
+| major | 70.1-70.6 | 43.0-43.5 | 37.5-38.5% | 33.9      | 18.5-18.9 | 12.2 | 67.6                 |
+| full  | 66.7-67.6 | 42.1-42.6 | 32-34%     | 33.6      | 18.0      | 12.2 | 66.9                 |
+
+NCAA Division I is about 72 points, 44% FG, 38-39% of shots from three, 34% 3P, 19 FTA, 12 TOV, 68 possessions. The full level scores a bit low because its weakest schools have low ratings.
+
+### Not in v1 / known limits
+
+- Awards are the pro ones (no All-American / conference POY naming, no conference awards). Team rating ("x/100") and ovr are on the pro scale, so college teams read low (team rating can be negative).
+- No redshirts, NIL, visits/pitches, decommitments, in-season recruiting, hand-run transfer portal, conference realignment, coach career moves, NIT, First Four, pro league alongside.
+- The bracket page shows "League Champions"; region names are not shown on the bracket (they are on the Selection tab).
+- Imported or edited college leagues are not specially handled (a league file with players skips the college roster generation).
+- The full level is slow (about 2-2.5 s per game day headless).
+
+### Next steps
+
+1. College award names and conference awards (All-Americans, conference POY, Final Four MOP).
+2. Quick-sim path for non-user games, to make the full level about as fast as power.
+3. Recruiting v2 (visits, pitches, pipelines, in-season commitments) and a user-run transfer portal; redshirts.
+4. Rescale team rating / ovr display for college; bracket region labels and "National Champions".
+5. The v2 list above (NIL, coach career, realignment, NIT, pro league alongside).

@@ -291,9 +291,6 @@ export const doTransferPortal = async (conditions: Conditions) => {
 	const size = new Map(
 		teams.map((t) => [t.tid, (rosters.get(t.tid) ?? []).length]),
 	);
-	for (const entry of portal) {
-		size.set(entry.from, size.get(entry.from)! - 1);
-	}
 
 	const transfers: CollegeDeparture[] = [];
 	const userTexts: string[] = [];
@@ -323,10 +320,11 @@ export const doTransferPortal = async (conditions: Conditions) => {
 		}
 		if (!best) {
 			// Nobody had a spot where he would play: he stays
-			size.set(from, size.get(from)! + 1);
 			continue;
 		}
 		const to = best.tid;
+		// His spot only opens once he has somewhere to go
+		size.set(from, size.get(from)! - 1);
 		size.set(to, size.get(to)! + 1);
 		const ratings = last(p.ratings);
 		transfers.push({
