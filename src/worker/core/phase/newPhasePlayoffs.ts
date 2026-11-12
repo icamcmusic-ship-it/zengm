@@ -7,6 +7,7 @@ import type {
 	PlayoffSeries,
 } from "../../../common/types.ts";
 import { PHASE } from "../../../common/constants.ts";
+import * as college from "../college/index.ts";
 
 const newPhasePlayoffs = async (
 	conditions: Conditions,
@@ -18,11 +19,18 @@ const newPhasePlayoffs = async (
 	local.playingUntilEndOfRound = false;
 
 	// Set playoff matchups
-	const { byConf, playIns, series, tidPlayIn, tidPlayoffs } =
-		await season.genPlayoffSeries();
+	// College mode: Selection (automatic and at-large bids from the season's results) instead of the standings, with its own news
+	const collegeLeague = college.isCollege();
+	const { byConf, playIns, series, tidPlayIn, tidPlayoffs } = collegeLeague
+		? await college.genNationalTournament(conditions)
+		: await season.genPlayoffSeries();
 
 	for (const type of ["playoffs", "play-in tournament"] as const) {
-		const tids = type === "playoffs" ? tidPlayoffs : tidPlayIn;
+		const tids = collegeLeague
+			? []
+			: type === "playoffs"
+				? tidPlayoffs
+				: tidPlayIn;
 
 		for (const tid of tids) {
 			logEvent(

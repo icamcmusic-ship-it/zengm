@@ -43,6 +43,8 @@ export type NativeFeatureDef = {
 	// Only available in these sports. Omit for all sports.
 	sports?: readonly NativeFeatureSport[];
 	existing?: true;
+	// false: the feature needs contracts, trades or a draft, so it is always off in a college league (leagueType "college")
+	college?: false;
 	options?: readonly NativeOptionDef[];
 };
 
@@ -113,6 +115,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "awardVote",
+		college: false,
 		key: "featureAwardVote",
 		name: "Award Vote",
 		description:
@@ -165,6 +168,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "tradeGrader",
+		college: false,
 		key: "featureTradeGrader",
 		name: "Trade Grader",
 		description:
@@ -174,6 +178,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "contractValue",
+		college: false,
 		key: "featureContractValue",
 		name: "Contract Value",
 		description:
@@ -259,6 +264,47 @@ export const NATIVE_FEATURES = [
 		defaultNewLeague: true,
 		sports: BBGM,
 		existing: true,
+	},
+	{
+		id: "customShotClock",
+		key: "customShotClock",
+		name: "Custom Shot Clock",
+		description:
+			"Use a shot clock of another length than 24 seconds in the game simulation (30 in college basketball). After an offensive rebound it resets to 10 seconds less than the full clock. Possessions only get longer with a slower Pace setting too.",
+		default: false,
+		sports: BBGM,
+		options: [
+			{
+				key: "shotClockLength",
+				name: "Shot Clock Length",
+				description: "Seconds on the shot clock.",
+				type: "int",
+				default: 24,
+				min: 10,
+				max: 60,
+			},
+		],
+	},
+	{
+		id: "oneAndOne",
+		key: "oneAndOne",
+		name: "One-and-One Bonus",
+		description:
+			"Before the two-shot bonus (# Fouls Until Bonus), a non-shooting foul gives a one-and-one: the second free throw is only taken if the first is made. College rules: one-and-one from the 7th team foul of a half, two shots from the 10th.",
+		default: false,
+		sports: BBGM,
+		options: [
+			{
+				key: "oneAndOneFouls",
+				name: "Team Fouls Until One-and-One",
+				description:
+					"The team foul of a period from which non-shooting fouls give a one-and-one.",
+				type: "int",
+				default: 7,
+				min: 1,
+				max: 50,
+			},
+		],
 	},
 	{
 		id: "realisticPossessions",
@@ -420,6 +466,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "seasonOdds",
+		college: false,
 		key: "featureSeasonOdds",
 		name: "Season Odds",
 		description:
@@ -466,6 +513,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "contractOptions",
+		college: false,
 		key: "contractOptions",
 		name: "Contract Options & Guarantees",
 		description:
@@ -476,6 +524,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "contractExtensions",
+		college: false,
 		key: "contractExtensions",
 		name: "In-Season Contract Extensions",
 		description:
@@ -486,6 +535,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "tradeRequests",
+		college: false,
 		key: "tradeRequests",
 		name: "Trade Requests",
 		description:
@@ -496,6 +546,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "holdouts",
+		college: false,
 		key: "featureHoldouts",
 		name: "Holdouts",
 		description:
@@ -544,6 +595,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "tradeExplain",
+		college: false,
 		key: "featureTradeExplain",
 		name: "Trade Explanations",
 		description:
@@ -552,6 +604,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "aiNeedTrades",
+		college: false,
 		key: "aiTradesNeedBased",
 		name: "Need-Based AI-to-AI Trades",
 		description:
@@ -562,6 +615,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "aiTradeOffers",
+		college: false,
 		key: "featureAiTradeOffers",
 		name: "AI Trade Offers To You",
 		description:
@@ -592,6 +646,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "tradeMarket",
+		college: false,
 		key: "featureTradeMarket",
 		name: "Trade Market",
 		description:
@@ -619,6 +674,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "threeTeamTrades",
+		college: false,
 		key: "featureThreeTeamTrades",
 		name: "Three-Team Trades",
 		description: "The 3-team trade page and the link from the Trade page.",
@@ -626,6 +682,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "draftPickConditions",
+		college: false,
 		key: "featureDraftPickConditions",
 		name: "Draft Pick Protections & Swaps",
 		description:
@@ -645,6 +702,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "gmPersonalities",
+		college: false,
 		key: "featureGmPersonalities",
 		name: "AI GM Personalities",
 		description:
@@ -655,6 +713,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "collegeStats",
+		college: false,
 		key: "featureCollegeStats",
 		name: "College & Overseas Stats",
 		description:
@@ -675,6 +734,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "collegeSeason",
+		college: false,
 		key: "featureCollegeSeason",
 		name: "College Season & March Madness",
 		description:
@@ -685,6 +745,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "draftClassShapes",
+		college: false,
 		key: "featureDraftClassShapes",
 		name: "Draft Class Shapes",
 		description:
@@ -695,6 +756,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "ratingsRegenerator",
+		college: false,
 		key: "featureRatingsRegenerator",
 		name: "Ratings Regenerator",
 		description:
@@ -715,6 +777,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "scoutingSystem",
+		college: false,
 		key: "scoutingSystem",
 		name: "Scouting System",
 		description:
@@ -725,6 +788,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "draftBoard",
+		college: false,
 		key: "featureDraftBoard",
 		name: "Draft Board",
 		description:
@@ -744,6 +808,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "aiDraftNeeds",
+		college: false,
 		key: "featureAiDraftNeeds",
 		name: "AI Drafts by Need",
 		description:
@@ -754,6 +819,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "mockDraft",
+		college: false,
 		key: "featureMockDraft",
 		name: "Mock Draft",
 		description:
@@ -835,6 +901,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "seriesRecaps",
+		college: false,
 		key: "featureSeriesRecaps",
 		name: "Series Recaps",
 		description:
@@ -866,6 +933,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "unretire",
+		college: false,
 		key: "featureUnretire",
 		name: "Unretirements",
 		description:
@@ -1036,6 +1104,9 @@ export const nativeFeatureEnabledForSport = (
 ) => {
 	const f = getNativeFeature(id);
 	if (!nativeFeatureAvailableInSport(f, sport)) {
+		return false;
+	}
+	if (f.college === false && get("leagueType") === "college") {
 		return false;
 	}
 	const value = get(f.key);

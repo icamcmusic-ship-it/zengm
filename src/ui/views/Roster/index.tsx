@@ -33,6 +33,8 @@ import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { confirm } from "../../util/confirm.tsx";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { ArchetypeRosterPanel } from "../../components/Archetype/ArchetypeRosterPanel.tsx";
+import { useIsCollege } from "../../util/collegeMode.ts";
+import { classYearAbbrev } from "../../../common/college/constants.ts";
 
 const handleRelease = async (
 	p: View<"roster">["players"][number],
@@ -186,7 +188,8 @@ const Roster = ({
 
 	const profit = t.seasonAttrs !== undefined ? t.seasonAttrs.profit : 0;
 
-	const showMood = season === currentSeason;
+	const college = useIsCollege();
+	const showMood = season === currentSeason && !college;
 
 	const cols = getCols(
 		[
@@ -206,6 +209,16 @@ const Roster = ({
 			"Acquired",
 		],
 		{
+			// College mode: class year instead of a contract
+			...(college
+				? {
+						Contract: {
+							title: "Class",
+							desc: "Class year",
+							sortType: "number" as const,
+						},
+					}
+				: {}),
 			Country: {
 				title: "",
 				desc: "Country",
@@ -339,7 +352,16 @@ const Roster = ({
 				showRatings
 					? wrappedRatingWithChange(p.ratings.pot, p.ratings.dpot)
 					: null,
-				...(season === currentSeason ? [wrappedContract(p)] : []),
+				...(season === currentSeason
+					? [
+							college
+								? {
+										value: classYearAbbrev(p.classYear),
+										sortValue: p.classYear ?? 0,
+									}
+								: wrappedContract(p),
+						]
+					: []),
 				playoffs === "playoffs" ? null : p.stats.yearsWithTeam,
 				{
 					value: (

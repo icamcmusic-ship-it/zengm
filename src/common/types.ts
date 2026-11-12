@@ -978,6 +978,12 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 
 	// Basketball only. Generate college stats and honors for each new draft class as it is created
 	generateCollegeStats: boolean;
+
+	// College mode (docs/college-mode.md). leagueType is set at league creation and never changes
+	leagueType: "pro" | "college";
+	collegeLevel: "power" | "major" | "full" | undefined;
+	collegeAutoRecruit: boolean;
+	collegeState: import("./college/types.ts").CollegeState | undefined;
 	scoutingSystem: boolean;
 	rerandomizeDraftClassRatings: boolean;
 	// Saved from the Regenerate ratings modal ("save as league default"), used by rerandomizeDraftClassRatings
@@ -1123,6 +1129,8 @@ export type MenuItemLink = {
 	feature?: NativeFeatureId;
 	// Stock page replaced by a League extras feature: hidden when it is turned on
 	featureOff?: NativeFeatureId;
+	// Only in leagues of this type (college mode). Pro-only pages are listed in ui/util/collegeMode.ts instead
+	leagueType?: "college";
 	nonLeague?: true;
 	commandPalette?: true;
 	commandPaletteOnly?: true;
@@ -1490,6 +1498,11 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 		loc: string;
 	};
 	college: string;
+
+	// College mode (docs/college-mode.md): class year (0 = signed recruit, 1-4 = Fr-Sr), recruiting profile, how he left school
+	classYear?: number;
+	recruit?: import("./college/types.ts").PlayerRecruit;
+	collegeExit?: import("./college/types.ts").PlayerCollegeExit;
 
 	// What the player is asking for. Defined for free agents, draft prospects, and players on a team who need a new contract (unsigned draft picks, or expiring contracts while re-signing).
 	contractDemand?: FlatContractInfo & {

@@ -11,6 +11,7 @@ import {
 	trade,
 } from "../index.ts";
 import * as staff from "../staff/index.ts";
+import * as college from "../college/index.ts";
 import loadTeams from "./loadTeams.ts";
 import { getPbpRivalryLevels, pbpRivalryLevel } from "../../util/pbpRivalry.ts";
 import { setPbpGameContext } from "../../util/pbpGameContext.ts";
@@ -87,11 +88,16 @@ const play = async (
 		let newPhaseCalled = false;
 		if (g.get("phase") < PHASE.PLAYOFFS) {
 			if (schedule.length === 0) {
-				await phase.newPhase(
-					PHASE.PLAYOFFS,
-					conditions,
-					gidOneGame !== undefined,
-				);
+				// College mode: the conference tournaments come between the regular season and the national tournament
+				if (college.isCollege() && g.get("phase") === PHASE.REGULAR_SEASON) {
+					await phase.newPhase(PHASE.AFTER_TRADE_DEADLINE, conditions);
+				} else {
+					await phase.newPhase(
+						PHASE.PLAYOFFS,
+						conditions,
+						gidOneGame !== undefined,
+					);
+				}
 				newPhaseCalled = true;
 			}
 		} else if (playoffsOver) {
@@ -196,6 +202,11 @@ const play = async (
 
 		// Invalidate leaders cache, if it exists
 		local.seasonLeaders = undefined;
+
+		// College mode: results log, weekly poll, conference tournament brackets
+		if (college.isCollege()) {
+			await college.afterGames(results, dayOver);
+		}
 
 		if (g.get("phase") === PHASE.PLAYOFFS) {
 			// Update playoff series W/L
@@ -616,9 +627,12 @@ const play = async (
 			} else {
 				// Only do neutralSite when not forcing a win, since forcing a win uses homeCourtFactor and I don't want to worry about how that interacts with neutralSite
 				const neutralSite =
-					g.get("phase") === PHASE.PLAYOFFS &&
-					(g.get("neutralSite") === "playoffs" ||
-						(g.get("neutralSite") === "finals" && game.finals));
+					(g.get("phase") === PHASE.PLAYOFFS &&
+						(g.get("neutralSite") === "playoffs" ||
+							(g.get("neutralSite") === "finals" && game.finals))) ||
+					// College mode: conference tournaments are played on a neutral court
+					(g.get("phase") === PHASE.AFTER_TRADE_DEADLINE &&
+						college.isCollege());
 
 				const result = getResult({
 					gid: game.gid,

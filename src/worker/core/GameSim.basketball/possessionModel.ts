@@ -21,6 +21,15 @@ import { truncGauss, uniform } from "../../../common/random.ts";
 export const SHOT_CLOCK_FULL = 24;
 export const SHOT_CLOCK_RESET_ORB = 14;
 
+// What a shot clock of a custom length (the customShotClock setting) resets to after an offensive rebound: 14 of 24 (NBA), 20 of 30 (NCAA)
+export const getShotClockOrbReset = (full: number) =>
+	full >= SHOT_CLOCK_FULL
+		? full - 10
+		: Math.max(
+				Math.min(full, 8),
+				Math.round((full * SHOT_CLOCK_RESET_ORB) / SHOT_CLOCK_FULL),
+			);
+
 // Average team pace rating (TeamGameSim.pace, from loadTeams: nominally 100-115, but averaged over a roster it is ~108 +/- 0.3-0.6), so
 // teams faster than this play faster than league average
 const TEAM_PACE_RATING_MEAN = 108;
@@ -39,9 +48,16 @@ export const teamPaceFactor = (paceRating: number) => {
 // would just mean more violations, so beyond that the extra time comes off the game clock as dead time instead (like the old model, which
 // stretched every second of game clock)
 const MAX_POSS_TIME_SCALE = 1.15;
-export const paceScales = (paceFactor: number) => {
+// shotClockFull: a longer shot clock (the customShotClock setting) leaves room for longer possessions
+export const paceScales = (
+	paceFactor: number,
+	shotClockFull: number = SHOT_CLOCK_FULL,
+) => {
 	const scale = 1 / paceFactor;
-	const possTimeScale = Math.min(scale, MAX_POSS_TIME_SCALE);
+	const possTimeScale = Math.min(
+		scale,
+		(MAX_POSS_TIME_SCALE * shotClockFull) / SHOT_CLOCK_FULL,
+	);
 	return {
 		possTimeScale,
 		gameClockFactor: scale / possTimeScale,
@@ -107,9 +123,12 @@ export const TOV_SCALE = 0.95;
 // FG% by shot clock left: early (mostly transition) shots are better, late-clock shots are contested. Normalized so that the average over
 // all shots is unchanged (FG% stays calibrated); NBA: ~+5 points of FG% at 24-18, ~-8 points at 4-0
 export const SHOT_CLOCK_MAKE_NORM = 0.995;
-export const shotClockMakeFactor = (shotClockLeft: number) => {
+export const shotClockMakeFactor = (
+	shotClockLeft: number,
+	shotClockFull: number = SHOT_CLOCK_FULL,
+) => {
 	let factor;
-	if (shotClockLeft >= 18) {
+	if (shotClockLeft >= shotClockFull - 6) {
 		factor = 1.07;
 	} else if (shotClockLeft >= 7) {
 		factor = 1;

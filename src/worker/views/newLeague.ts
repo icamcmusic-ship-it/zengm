@@ -15,7 +15,8 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { getMetaAttribute } from "../db/metaAttributes.ts";
 
 const processInputs = (params: RouteParams<"newLeague">) => {
-	let type: "custom" | "random" | "real" | "legends" | "crossEra" = "custom";
+	let type: "custom" | "random" | "real" | "legends" | "crossEra" | "college" =
+		"custom";
 	let lid;
 	if (params.x === "random") {
 		type = "random";
@@ -25,6 +26,9 @@ const processInputs = (params: RouteParams<"newLeague">) => {
 		type = "legends";
 	} else if (params.x === "cross_era") {
 		type = "crossEra";
+	} else if (params.x === "college" && __SPORT === "basketball") {
+		// College mode (docs/college-mode.md)
+		type = "college";
 	} else if (params.x !== undefined) {
 		lid = Number.parseInt(params.x);
 		if (Number.isNaN(lid)) {

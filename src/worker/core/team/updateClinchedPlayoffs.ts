@@ -14,6 +14,7 @@ import {
 import { getHypotheticalTeam } from "./getHypotheticalTeam.ts";
 import { season } from "../index.ts";
 import { assertDefined } from "../../../common/utils.ts";
+import { isCollege } from "../college/isCollege.ts";
 
 type ClinchedPlayoffs = TeamSeason["clinchedPlayoffs"];
 
@@ -196,6 +197,11 @@ const updateClinchedPlayoffs = async (
 	finalStandings: boolean,
 	conditions: Conditions,
 ) => {
+	// College mode: the field is picked by the committee at the end, so nothing is clinched along the way
+	if (isCollege()) {
+		return;
+	}
+
 	const teamSeasons = await idb.cache.teamSeasons.indexGetAll(
 		"teamSeasonsBySeasonTid",
 		[[g.get("season")], [g.get("season"), "Z"]],

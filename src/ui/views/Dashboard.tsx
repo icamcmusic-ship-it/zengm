@@ -500,6 +500,16 @@ const Dashboard = ({ leagues }: View<"dashboard">) => {
 							<br />
 							<span className="dashboard-top-link-small">» Custom</span>
 						</a>
+						{__SPORT === "basketball" ? (
+							<a
+								href="/new_league/college"
+								className="btn btn-primary dashboard-top-link dashboard-top-link-new me-sm-3 mb-3"
+							>
+								New league
+								<br />
+								<span className="dashboard-top-link-small">» College</span>
+							</a>
+						) : null}
 						<a
 							href="/exhibition"
 							className="btn btn-secondary dashboard-top-link dashboard-top-link-new me-sm-3 mb-3"

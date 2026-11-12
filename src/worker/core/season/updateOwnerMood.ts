@@ -4,6 +4,7 @@ import type { OwnerMood } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { assertDefined } from "../../../common/utils.ts";
 import { team } from "../index.ts";
+import * as college from "../college/index.ts";
 
 /**
  * Update teamSeason.ownerMood based on performance this season, only for user's team.
@@ -87,6 +88,18 @@ const updateOwnerMood = async (): Promise<
 			(0.16 / numPlayoffRounds) * t.seasonAttrs.playoffRoundsWon;
 	} else {
 		deltas.playoffs = 0.2;
+	}
+
+	// College mode: the season is judged against what the program's prestige predicts
+	if (college.isCollege()) {
+		Object.assign(
+			deltas,
+			await college.getExpectationDeltas({
+				won: teamSeason.won,
+				lost: teamSeason.lost,
+				playoffRoundsWon: t.seasonAttrs.playoffRoundsWon,
+			}),
+		);
 	}
 
 	if (!teamSeason.ownerMood) {

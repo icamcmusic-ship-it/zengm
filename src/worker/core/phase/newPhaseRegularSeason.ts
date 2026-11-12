@@ -1,5 +1,6 @@
 import { league, season, team } from "../index.ts";
 import * as staff from "../staff/index.ts";
+import * as college from "../college/index.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import type { Conditions, Game, PhaseReturn } from "../../../common/types.ts";
@@ -148,10 +149,15 @@ const newPhaseRegularSeason = async (
 		active: true,
 	});
 
-	const { tids, days, dayScale } = season.newScheduleWithDays(teams);
-	await season.setSchedule(tids, days);
-	if (g.get("scheduleDayScale") !== dayScale) {
-		await league.setGameAttributes({ scheduleDayScale: dayScale });
+	if (college.isCollege()) {
+		// College mode: non-conference games, then conference play, and the season's polls start
+		await college.startRegularSeason();
+	} else {
+		const { tids, days, dayScale } = season.newScheduleWithDays(teams);
+		await season.setSchedule(tids, days);
+		if (g.get("scheduleDayScale") !== dayScale) {
+			await league.setGameAttributes({ scheduleDayScale: dayScale });
+		}
 	}
 
 	// Coaching systems: each head coach's preseason expectation, for the hot seat

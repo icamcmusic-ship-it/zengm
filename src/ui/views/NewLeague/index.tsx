@@ -62,6 +62,7 @@ import { applyRealTeamInfo } from "../../../common/applyRealTeamInfo.ts";
 import { gameAttributesArrayToObject } from "../../../common/gameAttributesArrayToObject.ts";
 import { unwrapGameAttribute } from "../../../common/unwrapGameAttribute.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
+import NewCollegeLeague from "./NewCollegeLeague.tsx";
 
 const animationVariants = {
 	visible: {
@@ -695,7 +696,7 @@ const getGenderOverride = (): GameAttributesLeague["gender"] | undefined => {
 	}
 };
 
-const NewLeague = (props: View<"newLeague">) => {
+const NewLeagueStandard = (props: View<"newLeague">) => {
 	const [startingSeason, setStartingSeason] = useState(
 		String(new Date().getFullYear()),
 	);
@@ -1806,5 +1807,13 @@ const NewLeague = (props: View<"newLeague">) => {
 		</AnimatePresence>
 	);
 };
+
+// College mode has its own short form
+const NewLeague = (props: View<"newLeague">) =>
+	props.type === "college" ? (
+		<NewCollegeLeague {...props} />
+	) : (
+		<NewLeagueStandard {...props} />
+	);
 
 export default NewLeague;

@@ -10,6 +10,7 @@ import { helpers } from "../util/helpers.ts";
 import { useLocal } from "../util/local.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import type { LeagueUrlParts } from "../router/types.ts";
+import { urlHiddenInCollege } from "../util/collegeMode.ts";
 
 export const MoreLinks = (
 	props: (
@@ -505,6 +506,8 @@ export const MoreLinks = (
 
 	const shownLinks = links
 		.filter(({ url }) => isUrlFeatureOn(url))
+		// College mode: no finances, draft picks, trades, ...
+		.filter(({ url }) => !urlHiddenInCollege(url))
 		// Other tabs of this page are in its tab bar
 		.filter(({ url }) => !isTabOfSamePage(url, page))
 		.filter(({ url }) => {

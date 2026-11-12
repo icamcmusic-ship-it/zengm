@@ -1,0 +1,68 @@
+import { assert, describe, test } from "vitest";
+import { makeSeededRandom } from "../../../common/random.ts";
+import {
+	COLLEGE_LEVELS,
+	getCollegeLeagueTeams,
+	getCollegeTournamentSize,
+} from "../../../common/college/teams.ts";
+import { newCollegeSchedule } from "./schedule.ts";
+
+describe("college mode teams and schedule", () => {
+	test("teams: unique abbrevs, one division per conference, levels nest", () => {
+		const sizes = COLLEGE_LEVELS.map((level) => {
+			const { teams, confs, divs } = getCollegeLeagueTeams(level);
+			assert.strictEqual(
+				new Set(teams.map((t) => t.abbrev)).size,
+				teams.length,
+				level,
+			);
+			assert.strictEqual(confs.length, divs.length);
+			for (const [i, t] of teams.entries()) {
+				assert.strictEqual(t.tid, i);
+				assert.strictEqual(t.cid, t.did);
+				assert.match(t.colors[0], /^#[\da-f]{6}$/);
+			}
+			return teams.length;
+		});
+		assert.deepEqual(
+			sizes,
+			[...sizes].sort((a, b) => a - b),
+		);
+		assert.strictEqual(getCollegeTournamentSize(sizes[0]!), 32);
+		assert.strictEqual(getCollegeTournamentSize(sizes[2]!), 64);
+	});
+
+	for (const level of COLLEGE_LEVELS) {
+		test(`schedule (${level}): about 30 games each, once per day, conference games first in conference`, () => {
+			Math.random = makeSeededRandom(1);
+			const { teams } = getCollegeLeagueTeams(level);
+			const { rounds, numNonConfRounds } = newCollegeSchedule(
+				teams.map((t) => ({ tid: t.tid, cid: t.cid })),
+				30,
+			);
+			const games = new Map(teams.map((t) => [t.tid, 0]));
+			const home = new Map(teams.map((t) => [t.tid, 0]));
+			const cid = new Map(teams.map((t) => [t.tid, t.cid]));
+			for (const [r, round] of rounds.entries()) {
+				const seen = new Set<number>();
+				for (const [a, b] of round) {
+					assert.isFalse(seen.has(a) || seen.has(b), `twice on day ${r}`);
+					seen.add(a);
+					seen.add(b);
+					games.set(a, games.get(a)! + 1);
+					games.set(b, games.get(b)! + 1);
+					home.set(a, home.get(a)! + 1);
+					if (r >= numNonConfRounds) {
+						assert.strictEqual(cid.get(a), cid.get(b), "conference play");
+					}
+				}
+			}
+			for (const t of teams) {
+				assert.isAtLeast(games.get(t.tid)!, 28, t.region);
+				assert.isAtMost(games.get(t.tid)!, 31, t.region);
+				assert.isAtLeast(home.get(t.tid)!, 11, t.region);
+			}
+			assert.isBelow(rounds.length, 50);
+		});
+	}
+});
