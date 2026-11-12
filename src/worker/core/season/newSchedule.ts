@@ -4,7 +4,16 @@ import { g, helpers, logEvent } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import addDaysToSchedule from "./addDaysToSchedule.ts";
 import { getRealSchedule } from "./getRealSchedule.football.ts";
-import groupScheduleRealistic from "./groupScheduleRealistic.ts";
+import groupScheduleRealistic, {
+	getExpectedSeasonLength,
+} from "./groupScheduleRealistic.ts";
+import marqueeSchedule, {
+	getHolidaySlates,
+	getRivalPairs,
+	getSlateCaps,
+	type MarqueeInput,
+} from "./marqueeSchedule.ts";
+import type { GameMarquee } from "../../../common/marquee.ts";
 import newScheduleGood from "./newScheduleGood.ts";
 
 // The realisticSchedule League Extras setting: basketball only, and not with the "group schedule into series" setting
@@ -21,7 +30,13 @@ export type NewScheduleOutput = {
 	// For the scheduleDayScale game attribute: how many days the old compact schedule would take, per day of this one.
 	// 1 for the old schedule.
 	dayScale: number;
+	// Marquee Games: each game's holiday / national TV / rivalry tags (same order as tids)
+	marquee?: (GameMarquee | undefined)[];
 };
+
+// The marqueeGames setting: only on top of the realistic schedule length
+export const marqueeGamesOn = () =>
+	realisticScheduleOn() && featureOn("marqueeGames");
 
 export const newScheduleWithDays = (
 	teams: {
@@ -32,6 +47,8 @@ export const newScheduleWithDays = (
 		tid: number;
 	}[],
 	conditions?: Conditions,
+	// Marquee Games (see marqueeGamesOn): the teams' draw, the champion and the rivalries. Without it, no marquee games
+	marqueeInput?: MarqueeInput,
 ): NewScheduleOutput => {
 	if (__SPORT === "football") {
 		const tids = getRealSchedule(teams);
@@ -81,16 +98,51 @@ export const newScheduleWithDays = (
 	);
 	const oldNumDays = oldSchedule.at(-1)?.day ?? 1;
 
+	// Marquee Games: holiday days kept light and rivalry games spread out while the schedule is built, then the marquee games placed
+	const marqueeOn = marqueeInput !== undefined && marqueeGamesOn();
+	let slates: ReturnType<typeof getHolidaySlates> = [];
+	if (marqueeOn) {
+		const counts = new Map<number, number>();
+		for (const [home, away] of tidsWithoutEvents) {
+			counts.set(home, (counts.get(home) ?? 0) + 1);
+			counts.set(away, (counts.get(away) ?? 0) + 1);
+		}
+		const maxGames = Math.max(0, ...counts.values());
+		slates = getHolidaySlates(maxGames, getExpectedSeasonLength(maxGames));
+	}
+
 	const realistic = groupScheduleRealistic(tidsWithoutEvents, {
 		allStarGame: allStarGame !== null && allStarGame >= 0 ? allStarGame : null,
 		tradeDeadline: tradeDeadline < 1 ? tradeDeadline : null,
+		...(marqueeOn
+			? {
+					slates: getSlateCaps(slates, tidsWithoutEvents, marqueeInput),
+					rivals: new Set(getRivalPairs(marqueeInput).keys()),
+				}
+			: {}),
 	});
 	const numDays = new Set(realistic.days).size;
+	const dayScale = Math.min(1, oldNumDays / numDays);
+
+	if (marqueeOn) {
+		const marquee = marqueeSchedule(
+			realistic.tids,
+			realistic.days,
+			marqueeInput,
+			slates,
+		);
+		return {
+			tids: marquee.tids,
+			days: marquee.days,
+			dayScale: Math.min(1, oldNumDays / new Set(marquee.days).size),
+			marquee: marquee.marquee,
+		};
+	}
 
 	return {
 		tids: realistic.tids,
 		days: realistic.days,
-		dayScale: Math.min(1, oldNumDays / numDays),
+		dayScale,
 	};
 };
 

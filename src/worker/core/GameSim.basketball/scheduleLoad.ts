@@ -16,12 +16,12 @@ export const LOAD = {
 	// players get hurt more often and the league injury rate stays the same whatever the rotations
 	injuryTired: 4,
 
-	// 3 games in 4 nights (realistic schedule length only, about 3-4 per team per 82 games): endurance and injury risk on the third
-	// game (on top of a back-to-back, with Injury Depth), and everyone's injury risk scaled by injuryNorm so the league rate stays the
-	// same (1 / (1 + 0.1 * 3.6 / 82))
+	// 3 games in 4 nights (realistic schedule length only, about 0.7 per team per 82 games since the schedule's repair pass, 3-4
+	// before): endurance and injury risk on the third game (on top of a back-to-back, with Injury Depth), and everyone's injury risk
+	// scaled by injuryNorm so the league rate stays the same (1 / (1 + 0.1 * 0.7 / 82))
 	threeInFourEndurance: 0.97,
 	threeInFourInjury: 1.1,
-	injuryNorm: 0.996,
+	injuryNorm: 0.999,
 	// Injury Depth's back-to-back risk (x1.15) and its normalization were tuned on the old schedule (about 74 back-to-backs per team);
 	// with the realistic schedule length (about 14) it gives about 7-8% fewer injuries (the realistic schedule's own measurement and
 	// scheduleLoadSeason.script.test.ts), which this puts back

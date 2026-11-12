@@ -101,6 +101,28 @@ export type CollegeState = {
 	firstFour?: CollegeFirstFourGame[];
 	// The NIT (setting collegeNit): a bracket like a conference tournament's (cid -1)
 	nit?: CollegeNit;
+	// Coaching carousel: open head coaching jobs offered to the user (season over until the Departures phase)
+	coachOffers?: CollegeCoachOffer[];
+};
+
+export type CollegeCoachOffer = {
+	tid: number;
+	prestige: number;
+	// Contract length
+	years: number;
+	// The school's record of the season just played
+	won: number;
+	lost: number;
+};
+
+// Conference realignment (setting collegeRealignment): a school that changed conferences in the offseason
+export type CollegeRealignmentMove = {
+	tid: number;
+	// Conference ids (g.confs) before and after
+	from: number;
+	to: number;
+	// Joined a stronger conference, or filled a spot left by one
+	reason: "upgrade" | "backfill";
 };
 
 export type CollegeNit = CollegeConfTournament & {
@@ -177,6 +199,7 @@ export type CollegeArchive = {
 	firstFour?: CollegeFirstFourGame[];
 	nit?: CollegeNit;
 	classRankings?: CollegeClassRanking[];
+	realignment?: CollegeRealignmentMove[];
 };
 
 export type PlayerRecruit = {

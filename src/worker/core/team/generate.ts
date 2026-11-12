@@ -120,6 +120,9 @@ const generate = (tm: any): Team => {
 	if (tm.capExceptions) {
 		t.capExceptions = tm.capExceptions;
 	}
+	if (tm.staffDevCarry) {
+		t.staffDevCarry = tm.staffDevCarry;
+	}
 	if (typeof tm.loadManagement === "boolean") {
 		t.loadManagement = tm.loadManagement;
 	}

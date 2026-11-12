@@ -27,6 +27,8 @@ import {
 	startConfTournaments,
 } from "./postseason.ts";
 import { newCollegeSchedule } from "./schedule.ts";
+import { realignConferences } from "./realignment.ts";
+import { expireCoachOffers } from "../staff/collegeCarousel.ts";
 import { aiRedshirts } from "./redshirt.ts";
 import {
 	closePortal,
@@ -175,10 +177,19 @@ export const archiveSeason = async () => {
 	});
 };
 
+/**
+ * Season over, after the archive and the coaching carousel: conference realignment (setting), for next season.
+ */
+export const afterSeasonOver = async () => {
+	await realignConferences();
+};
+
 export const newPhaseDepartures = async (
 	conditions: Conditions,
 ): Promise<PhaseReturn> => {
 	await idb.cache.schedule.clear();
+	// Coaching carousel: job offers the user did not take expire, and those schools hire
+	await expireCoachOffers();
 	await doDepartures(conditions);
 	await league.setGameAttributes({ otherTeamsWantToHire: false });
 	return {
@@ -250,19 +261,24 @@ export const afterLeagueCreation = async (fileHasPlayers = false) => {
 			0,
 			Infinity,
 		]);
+		let converted = 0;
 		for (const p of players as any[]) {
 			if (p.classYear === undefined) {
 				p.classYear = helpers.bound(season - p.born.year - 17, 1, 4);
 				p.draft.year = season - p.classYear;
 				await idb.cache.players.put(p);
+				converted += 1;
 			}
 		}
-		await logEvent({
-			type: "info",
-			text: "This college league was made from a league file with players: its rosters were kept as they are (class years come from the players' ages) instead of generating college rosters. Rosters larger than 13 scholarships keep their extra players until they graduate.",
-			showNotification: true,
-			saveToDb: false,
-		});
+		// Not for an exported college league imported again: its players already are college players
+		if (converted > 0) {
+			await logEvent({
+				type: "info",
+				text: "This college league was made from a league file with players: its rosters were kept as they are (class years come from the players' ages) instead of generating college rosters. Rosters larger than 13 scholarships keep their extra players until they graduate.",
+				showNotification: true,
+				saveToDb: false,
+			});
+		}
 	}
 	for (const t of teams) {
 		const prestige = getSchoolPrestige(t.region);

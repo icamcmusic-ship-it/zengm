@@ -5,9 +5,11 @@ import g from "../../util/g.ts";
 import helpers from "../../util/helpers.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import accept from "./accept.ts";
+import { contractGrowthFactor } from "./contractAmountForYears.ts";
 import type { CapExceptionType } from "../../../common/capExceptions.ts";
 import {
 	capExceptionsEnabled,
+	getAvailableCapExceptions,
 	getSigningCapInfo,
 } from "../contract/capExceptions.ts";
 import { idb } from "../../db/index.ts";
@@ -22,10 +24,7 @@ export const generateContractOptions = async (
 	// Lengths that can be offered, for an extension which adds seasons to a contract that already has some
 	maxLength?: number,
 ) => {
-	let growthFactor = 0.15;
-
-	// Modulate contract amounts based on last digit of ovr (add some deterministic noise)
-	growthFactor += (ovr % 10) * 0.01 - 0.05;
+	const growthFactor = contractGrowthFactor(ovr);
 	const startSeason = startSeasonOverride ?? getContractStartSeason();
 	let found: number | undefined;
 
@@ -42,6 +41,8 @@ export const generateContractOptions = async (
 		disabledReason?: string;
 		// Salary cap exception this contract would be signed with (setting)
 		exception?: CapExceptionType;
+		// Disabled because it is longer than the exception that would cover the amount allows (shown on the row, not only on hover)
+		exceptionTooLong?: { exception: CapExceptionType; maxYears: number };
 	}[] = allowedLengths.map((contractLength, i) => {
 		const contractOption = {
 			exp: startSeason + contractLength - 1,
@@ -105,6 +106,25 @@ export const generateContractOptions = async (
 		});
 		if (typeof disabledReason === "string") {
 			row.disabledReason = disabledReason;
+			if (exceptionTeam) {
+				const amount = Math.round(row.amount * 1000);
+				const covers = getAvailableCapExceptions(exceptionTeam, payroll).filter(
+					(exception) => amount <= exception.amount,
+				);
+				if (
+					covers.length > 0 &&
+					payroll + amount - 1 > g.get("salaryCap") &&
+					covers.every((exception) => exception.maxYears < row.years)
+				) {
+					const longest = covers.reduce((a, b) =>
+						b.maxYears > a.maxYears ? b : a,
+					);
+					row.exceptionTooLong = {
+						exception: longest.type,
+						maxYears: longest.maxYears,
+					};
+				}
+			}
 		} else if (
 			exceptionTeam &&
 			Math.round(row.amount * 1000) - 1 > g.get("minContract")

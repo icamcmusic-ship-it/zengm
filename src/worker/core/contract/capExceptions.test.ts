@@ -17,6 +17,8 @@ import { g, helpers } from "../../util/index.ts";
 import { formatEventText } from "../../util/formatEventText.ts";
 import { contractNegotiation, finances, player, team } from "../index.ts";
 import autoSign from "../freeAgents/autoSign.ts";
+import { contractAmountForYears } from "../contractNegotiation/contractAmountForYears.ts";
+import { generateContractOptions } from "../contractNegotiation/generateContractOptions.ts";
 import { getDemandMarket } from "../freeAgents/decreaseDemands.ts";
 import {
 	applyStretchProvision,
@@ -26,6 +28,7 @@ import {
 	getCapExceptionAmount,
 	getCapExceptionsSummary,
 	getLeagueYear,
+	getSigningAdvice,
 	getSigningCapInfo,
 	getStretchedAmounts,
 	isRepeaterTaxTeam,
@@ -526,6 +529,110 @@ describe("salary cap exceptions", () => {
 			const tooLong = await userSign(p!, 9000, 5, true);
 			assert.include(String(tooLong), "up to 4 years");
 			assert.isUndefined(await userSign(p!, 9000, 4, true));
+		});
+
+		test("Sign button: asking for more years than the exception allows offers the longest it allows, at his price for it", async () => {
+			await setup();
+			const payroll = g.get("salaryCap") + 1000;
+			const mle = getCapExceptionAmount("nonTaxpayerMle");
+			const exp5 = getLeagueYear() + 4;
+			const ovr = 55;
+			const priceFor = (amount: number) => (years: number) =>
+				Math.round(
+					contractAmountForYears({
+						amount: amount / 1000,
+						askedYears: 5,
+						years,
+						ovr,
+					}) * 1000,
+				);
+
+			// Cheap enough that 4 years at a higher price still fits the mid-level: offer 4 years
+			const amount = Math.round(mle * 0.8);
+			const advice = getSigningAdvice({}, payroll, {
+				amount,
+				exp: exp5,
+				amountForYears: priceFor(amount),
+			});
+			assert.strictEqual(advice?.type, "shorter");
+			if (advice?.type === "shorter") {
+				assert.strictEqual(advice.maxYears, 4);
+				assert.strictEqual(advice.askedYears, 5);
+				assert.strictEqual(advice.exp, exp5 - 1);
+				assert.strictEqual(advice.exception, "nonTaxpayerMle");
+				// He asks more per year for a shorter deal (1.15x at ovr 55)
+				assert.strictEqual(advice.amount, priceFor(amount)(4));
+				assert.isAbove(advice.amount, amount);
+				// And the shorter deal really goes through
+				assert.strictEqual(
+					getSigningCapInfo({}, payroll, advice.amount, 4)?.type,
+					"exception",
+				);
+			}
+
+			// At the full mid-level, 4 years costs more than it covers: the button is disabled with the reason
+			const tooLong = getSigningAdvice({}, payroll, {
+				amount: mle,
+				exp: exp5,
+				amountForYears: priceFor(mle),
+			});
+			assert.strictEqual(tooLong?.type, "tooLong");
+			assert.include(
+				tooLong?.type === "tooLong" ? tooLong.reason : "",
+				"only allows up to 4",
+			);
+
+			// Nothing to say when the length fits, the amount fits under the cap, the amount is the minimum, or no exception covers it
+			const ok = { amountForYears: priceFor(amount) };
+			assert.isUndefined(
+				getSigningAdvice({}, payroll, { ...ok, amount, exp: exp5 - 1 }),
+			);
+			assert.isUndefined(
+				getSigningAdvice({}, g.get("salaryCap") - amount - 10, {
+					...ok,
+					amount,
+					exp: exp5,
+				}),
+			);
+			assert.isUndefined(
+				getSigningAdvice({}, payroll, {
+					...ok,
+					amount: g.get("minContract"),
+					exp: exp5,
+				}),
+			);
+			assert.isUndefined(
+				getSigningAdvice({}, payroll, { ...ok, amount: mle * 2, exp: exp5 }),
+			);
+			set("featureCapExceptions", false);
+			assert.isUndefined(
+				getSigningAdvice({}, payroll, { ...ok, amount, exp: exp5 }),
+			);
+		});
+
+		test("negotiation: rows longer than the exception allows say so", async () => {
+			const [p] = await setup();
+			const amount = 6000;
+			p!.contractDemand = { amount, exp: getLeagueYear() + 4 };
+			await idb.cache.players.put(p!);
+			const negotiation = await contractNegotiation.create(p!.pid, false);
+			if (typeof negotiation === "string") {
+				throw new Error(negotiation);
+			}
+			const rows = await generateContractOptions(
+				negotiation,
+				{ amount: amount / 1000, exp: getLeagueYear() + 4 },
+				50,
+			);
+			const byYears = Object.fromEntries(rows.map((row) => [row.years, row]));
+			assert.isDefined(byYears[5]?.disabledReason);
+			assert.deepEqual(byYears[5]?.exceptionTooLong, {
+				exception: "nonTaxpayerMle",
+				maxYears: 4,
+			});
+			assert.isUndefined(byYears[4]?.disabledReason);
+			assert.strictEqual(byYears[4]?.exception, "nonTaxpayerMle");
+			assert.isUndefined(byYears[4]?.exceptionTooLong);
 		});
 
 		test("a dry run uses nothing", async () => {

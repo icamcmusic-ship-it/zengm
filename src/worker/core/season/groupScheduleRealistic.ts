@@ -3,11 +3,13 @@
 // Each day is a set of games between teams that are rested enough:
 // - never 3 days in a row
 // - about 15 back-to-backs per 82 games (it varies a bit by team), the rest of the gaps are 1-3 days off
-// - 3 games in 4 nights only for a team behind schedule. A season this short needs some: going without them takes
-//   ~170 days for 82 games (a back-to-back is then always between 2-day breaks), the real NBA's length
+// - 3 games in 4 nights only for a team far behind schedule, mostly in the last weeks, and then a repair pass
+//   (scheduleEditor.ts) moves single games to nearby days to remove most of them: about 0.6 per team per 82 games
 // - an All-Star break (a few days with no games and the All-Star Game in the middle) and the trade deadline on its own day
 // - home/away runs (road trips and homestands) when the remaining matchups allow it
 // Days are numbered from 1. Days with no games can be skipped (the All-Star break), the game loop never sees them.
+
+import { createScheduleEditor } from "./scheduleEditor.ts";
 
 // Calendar days per game per team, including the All-Star break and the trade deadline (the last few games usually
 // run a little past this)
@@ -40,16 +42,36 @@ const MIN_PARTNER_SCORE = -0.3;
 // and extra back-to-backs are allowed, and after OVERTIME_ANYTHING days (or a tenth of the season, if longer) even 3
 // days in a row, so it always ends
 const OVERTIME_3_IN_4 = 4;
-// Remaining games per remaining day above which a team may play 3 games in 4 nights (with a penalty)
-const NEED_3_IN_4 = 0.7;
+// Remaining games per remaining day above which a team may play 3 games in 4 nights (with a penalty): only a team
+// that would otherwise have to play every remaining day
+const NEED_3_IN_4 = 1;
 const THREE_IN_FOUR_PENALTY = 0.5;
 const OVERTIME_ANYTHING = 10;
+// The repair after the daily construction: games move up to this many days, and up to this many days per 82 games past
+// the target length (with the All-Star break and the trade deadline, about where the season ended before), but at
+// most REPAIR_MAX_EXTENSION days past where the daily construction ended
+const REPAIR_WINDOW = 12;
+const REPAIR_EXTRA_DAYS = 7;
+const REPAIR_MAX_EXTENSION = 2;
+// Marquee Games: rivals' meetings at least this fraction of the season / their number of meetings apart, or the matchup's value
+// goes down by up to this much (the partner choice, where a home/away run is worth 0.15)
+const RIVAL_SPREAD = 0.5;
+const RIVAL_SPREAD_PENALTY = 1;
 
 export type RealisticScheduleEvents = {
 	// Fraction of the season (as in the allStarGame setting), or null for no All-Star Game
 	allStarGame: number | null;
 	// Fraction of the season (as in the tradeDeadline setting), or null for no trade deadline
 	tradeDeadline: number | null;
+	// Marquee Games: days kept light for an exclusive holiday slate (at most this many games, unless a team must play), and the
+	// rivalry pairs (by "lowTid-highTid"), whose meetings are spread over the season
+	slates?: {
+		day: number;
+		numGames: number;
+		// Which matchups (by index in the input) go first that day, if given
+		priority?: readonly number[];
+	}[];
+	rivals?: ReadonlySet<string>;
 };
 
 // Days with no games around the All-Star Game (including its own day), by season length
@@ -59,6 +81,11 @@ export const getAllStarBreakLength = (numGames: number) =>
 // The number of days with games (not counting the All-Star break and trade deadline) the season aims for
 export const getTargetNumPlayDays = (numGames: number) =>
 	Math.max(1, Math.round(DAYS_PER_GAME * numGames));
+
+// About where the season ends (the target and the few days past it the repair pass may use)
+export const getExpectedSeasonLength = (numGames: number) =>
+	getTargetNumPlayDays(numGames) +
+	Math.round((REPAIR_EXTRA_DAYS * numGames) / 82);
 
 const groupScheduleRealistic = (
 	tids: [number, number][],
@@ -80,6 +107,29 @@ const groupScheduleRealistic = (
 	}
 	const used = new Uint8Array(tids.length);
 
+	// Marquee Games: meetings of each rivalry pair, and the day of their last one
+	const rivalKey = (a: number, b: number) =>
+		a < b ? `${a}-${b}` : `${b}-${a}`;
+	const rivalMeetings = new Map<string, number>();
+	const rivalLastMeeting = new Map<string, number>();
+	if (events.rivals) {
+		for (const [home, away] of tids) {
+			const key = rivalKey(home, away);
+			if (events.rivals.has(key)) {
+				rivalMeetings.set(key, (rivalMeetings.get(key) ?? 0) + 1);
+			}
+		}
+	}
+	const slateCap = new Map<number, number>();
+	const slatePriority = new Map<number, readonly number[]>();
+	const slatePairs = new Set<string>();
+	for (const { day, numGames, priority } of events.slates ?? []) {
+		slateCap.set(day, numGames);
+		if (priority) {
+			slatePriority.set(day, priority);
+		}
+	}
+
 	const rem = matchupsByTeam.map((list) => list.length);
 	const numGamesByTeam = [...rem];
 	const maxGames = Math.max(0, ...rem);
@@ -89,7 +139,15 @@ const groupScheduleRealistic = (
 		1,
 		getTargetNumPlayDays(maxGames) -
 			(events.allStarGame !== null ? breakLength : 0) -
-			(events.tradeDeadline !== null ? 1 : 0),
+			(events.tradeDeadline !== null ? 1 : 0) +
+			// Marquee Games: the days kept light for a holiday slate (and Christmas Eve) add up to about this many days without games
+			Math.round(
+				(events.slates ?? []).reduce(
+					(sum, { numGames }) =>
+						sum + Math.max(0, 1 - numGames / ((numTeams * MAX_RATE) / 2)),
+					0,
+				),
+			),
 	);
 
 	// Each team's back-to-back budget (some teams get a few more than others, as in the NBA)
@@ -165,6 +223,38 @@ const groupScheduleRealistic = (
 	// Safety valve, should never be needed
 	const maxDays = numPlayDaysTarget * 4 + tids.length + 100;
 
+	let numToday = 0;
+	const playGame = (best: number) => {
+		used[best] = 1;
+		numRemaining -= 1;
+		numToday += 1;
+		const [home, away] = tids[best]!;
+		if (rivalMeetings.size > 0) {
+			rivalLastMeeting.set(rivalKey(home, away), day);
+		}
+		outTids.push([home, away]);
+		outDays.push(day);
+		for (const [tid, isHome] of [
+			[home, 1],
+			[away, 0],
+		] as const) {
+			const team = index.get(tid)!;
+			usedToday[team] = 1;
+			rem[team]! -= 1;
+			if (last1[team] === day - 1) {
+				b2b[team]! += 1;
+			}
+			last2[team] = last1[team]!;
+			last1[team] = day;
+			if (lastHome[team] === isHome) {
+				venueStreak[team]! += 1;
+			} else {
+				lastHome[team] = isHome;
+				venueStreak[team] = 1;
+			}
+		}
+	};
+
 	while (numRemaining > 0 && day < maxDays) {
 		emitEvents(false);
 
@@ -187,11 +277,7 @@ const groupScheduleRealistic = (
 			if (consecutive3 && overtime < overtimeAnything) {
 				continue;
 			}
-			if (
-				threeInFour &&
-				overtime < OVERTIME_3_IN_4 &&
-				need < NEED_3_IN_4
-			) {
+			if (threeInFour && overtime < OVERTIME_3_IN_4 && need < NEED_3_IN_4) {
 				continue;
 			}
 			eligible[t] = 1;
@@ -237,10 +323,52 @@ const groupScheduleRealistic = (
 		if (random() < expectedGames - numGamesToday) {
 			numGamesToday += 1;
 		}
+		const cap = slateCap.get(day);
+		if (cap !== undefined) {
+			numGamesToday = Math.min(numGamesToday, cap);
+		}
 
 		order.sort((a, b) => score[b]! - score[a]!);
 
-		let numToday = 0;
+		numToday = 0;
+
+		// Marquee Games: an exclusive holiday slate is the best matchups (by the slate's priority) of the teams that can play today, and
+		// then only teams that must play
+		const priority = slatePriority.get(day);
+		if (priority) {
+			const candidates: number[] = [];
+			for (let m = 0; m < tids.length; m++) {
+				const [home, away] = tids[m]!;
+				if (
+					!used[m] &&
+					eligible[index.get(home)!] &&
+					eligible[index.get(away)!]
+				) {
+					candidates.push(m);
+				}
+			}
+			candidates.sort((a, b) => priority[b]! - priority[a]! || a - b);
+			// (a matchup already on an earlier slate goes last)
+			for (const repeat of [false, true]) {
+				for (const m of candidates) {
+					if (numToday >= numGamesToday) {
+						break;
+					}
+					const [home, away] = tids[m]!;
+					const key = rivalKey(home, away);
+					if (
+						slatePairs.has(key) === repeat &&
+						!usedToday[index.get(home)!] &&
+						!usedToday[index.get(away)!]
+					) {
+						playGame(m);
+						slatePairs.add(key);
+					}
+				}
+			}
+			numGamesToday = numToday;
+		}
+
 		for (const t of order) {
 			if (usedToday[t]) {
 				continue;
@@ -249,7 +377,11 @@ const groupScheduleRealistic = (
 			// A rested team that is behind schedule plays even on a busy day, or small leagues fall behind for good
 			const behind =
 				rem[t]! / remainingPlayDays > behindNeed && day - last1[t]! >= 2;
-			if (numToday >= numGamesToday && !mustPlay && !behind) {
+			if (
+				numToday >= numGamesToday &&
+				!mustPlay &&
+				(!behind || cap !== undefined)
+			) {
 				continue;
 			}
 
@@ -271,6 +403,18 @@ const groupScheduleRealistic = (
 					continue;
 				}
 				let value = score[u]!;
+				if (rivalMeetings.size > 0) {
+					const key = rivalKey(home, away);
+					const meetings = rivalMeetings.get(key);
+					const last = rivalLastMeeting.get(key);
+					if (meetings !== undefined && last !== undefined) {
+						const minGap = (RIVAL_SPREAD * numPlayDaysTarget) / meetings;
+						const short = minGap - (day - last);
+						if (short > 0) {
+							value -= (RIVAL_SPREAD_PENALTY * short) / minGap;
+						}
+					}
+				}
 				for (const [team, isHome] of [
 					[t, tIsHome],
 					[u, !tIsHome],
@@ -289,31 +433,7 @@ const groupScheduleRealistic = (
 				continue;
 			}
 
-			used[best] = 1;
-			numRemaining -= 1;
-			numToday += 1;
-			const [home, away] = tids[best]!;
-			outTids.push([home, away]);
-			outDays.push(day);
-			for (const [tid, isHome] of [
-				[home, 1],
-				[away, 0],
-			] as const) {
-				const team = index.get(tid)!;
-				usedToday[team] = 1;
-				rem[team]! -= 1;
-				if (last1[team] === day - 1) {
-					b2b[team]! += 1;
-				}
-				last2[team] = last1[team]!;
-				last1[team] = day;
-				if (lastHome[team] === isHome) {
-					venueStreak[team]! += 1;
-				} else {
-					lastHome[team] = isHome;
-					venueStreak[team] = 1;
-				}
-			}
+			playGame(best);
 		}
 
 		playDaysDone += 1;
@@ -322,9 +442,23 @@ const groupScheduleRealistic = (
 
 	emitEvents(true);
 
+	// Then move games out of the remaining 3-in-4s (mostly in the last weeks, where the teams that fell behind catch up),
+	// up to a few days past the target length
+	const lastDay = Math.max(0, ...outDays);
+	const editor = createScheduleEditor(
+		outTids,
+		outDays,
+		Math.min(lastDay + REPAIR_MAX_EXTENSION, getExpectedSeasonLength(maxGames)),
+	);
+	for (const [day, cap] of slateCap) {
+		editor.dayCap.set(day, cap);
+	}
+	editor.repairThreeInFour(REPAIR_WINDOW);
+	const repaired = editor.getSchedule();
+
 	return {
-		tids: outTids,
-		days: outDays,
+		tids: repaired.tids,
+		days: repaired.days,
 	};
 };
 

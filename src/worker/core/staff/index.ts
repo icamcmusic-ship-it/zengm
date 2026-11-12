@@ -32,6 +32,7 @@ import name from "../player/name.ts";
 import { getAllGmWeights } from "../gm/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { getExpectedWinps } from "../college/expectations.ts";
+import { collegeFireProb, runCollegeCarousel } from "./collegeCarousel.ts";
 import {
 	adaptSystems,
 	annotateSeason,
@@ -126,7 +127,7 @@ export const generateCoach = async ({
 	return c;
 };
 
-const addTransaction = (
+export const addTransaction = (
 	c: CoachWithoutKey,
 	tid: number,
 	role: CoachRole,
@@ -169,6 +170,47 @@ const getTeamDevScore = async (tid: number) => {
 	});
 };
 
+// Carry-over: a team's development score is this share of last season's plus the rest of its current staff's, so a new coach's effect
+// phases in (35% the first season, 58% the second, 73% the third, ...) and a team's development edge doesn't jump with every staff change.
+// STAFF_DEV_SCORE_SPREAD is set so the league-wide spread of effects is what it was without it (docs/rating-inflation.md)
+export const STAFF_DEV_CARRY = 0.65;
+
+// The season a staff's development counts for: the coming one after the playoffs
+const staffSeason = () => contractStartSeason();
+
+export const effectiveStaffDevScore = (
+	t: Pick<Team, "staffDevCarry">,
+	raw: number,
+	season: number = staffSeason(),
+) => {
+	const carry = t.staffDevCarry;
+	// (carry.season === season: committed at this offseason, which already counts for the coming season)
+	if (!carry || carry.season < season - 1) {
+		// A new league, or one from before this: the staff as it is
+		return raw;
+	}
+	return STAFF_DEV_CARRY * carry.score + (1 - STAFF_DEV_CARRY) * raw;
+};
+
+const getTeamEffectiveDevScore = async (t: Team, season?: number) =>
+	effectiveStaffDevScore(t, await getTeamDevScore(t.tid), season);
+
+// After the playoffs, before any staff change: remember the score the season was played with
+const commitDevCarry = async () => {
+	const season = g.get("season");
+	for (const t of (await idb.cache.teams.getAll()).filter((t) => !t.disabled)) {
+		if (t.staffDevCarry?.season === season) {
+			continue;
+		}
+		t.staffDevCarry = {
+			season,
+			score:
+				Math.round((await getTeamEffectiveDevScore(t, season)) * 1000) / 1000,
+		};
+		await idb.cache.teams.put(t);
+	}
+};
+
 // Average dev score of the league's current staffs, the score of an "average" staff (development effect 0). Normalizing
 // by it keeps the league-wide development effect centered as the coach pool's ratings drift over the decades, so the
 // coaching staff doesn't inflate or deflate player ratings (docs/rating-inflation.md). Only the spread across teams
@@ -183,14 +225,16 @@ export const getLeagueStaffDevScoreRef = async () => {
 	}
 	let total = 0;
 	for (const t of teams) {
-		total += await getTeamDevScore(t.tid);
+		total += await getTeamEffectiveDevScore(t);
 	}
 	return total / teams.length;
 };
 
 export const getStaffLevel = async (tid: number, ref?: number) => {
+	const t = await idb.cache.teams.get(tid);
+	const raw = await getTeamDevScore(tid);
 	return staffDevScoreToLevel(
-		await getTeamDevScore(tid),
+		t ? effectiveStaffDevScore(t, raw) : raw,
 		ref ?? (await getLeagueStaffDevScoreRef()),
 	);
 };
@@ -210,7 +254,7 @@ export const syncBudget = async (
 	return level;
 };
 
-const syncAllBudgets = async (alsoInitial?: boolean) => {
+export const syncAllBudgets = async (alsoInitial?: boolean) => {
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const ref = await getLeagueStaffDevScoreRef();
 	for (const t of teams) {
@@ -233,7 +277,7 @@ const logHeadCoachEvent = async (text: string, tid: number) => {
 	});
 };
 
-const teamLink = (tid: number) => {
+export const teamLink = (tid: number) => {
 	const info = g.get("teamInfoCache")[tid];
 	if (!info) {
 		return "a team";
@@ -241,7 +285,7 @@ const teamLink = (tid: number) => {
 	return `the <a href="/l/${g.get("lid")}/staff/${info.abbrev}_${tid}">${info.region} ${info.name}</a>`;
 };
 
-const coachLink = (c: Coach) =>
+export const coachLink = (c: Coach) =>
 	`<a href="/l/${g.get("lid")}/coach/${c.cid}">${c.firstName} ${c.lastName}</a>`;
 
 export const hire = async (
@@ -249,6 +293,8 @@ export const hire = async (
 	tid: number,
 	role: CoachRole,
 	years?: number,
+	// College carousel: its own news item instead of the plain "hired" one
+	news?: { text: string; tids: number[] },
 ) => {
 	c.tid = tid;
 	c.role = role;
@@ -276,10 +322,20 @@ export const hire = async (
 	if (role === "head") {
 		// Coaching systems: coaching tree and installation of his systems
 		await onHeadCoachHired(c);
-		await logHeadCoachEvent(
-			`${teamLink(tid)} hired ${coachLink(c)} as head coach.`,
-			tid,
-		);
+		if (news) {
+			await logEvent({
+				type: "info",
+				text: news.text,
+				showNotification: false,
+				tids: news.tids,
+				score: 10,
+			});
+		} else {
+			await logHeadCoachEvent(
+				`${teamLink(tid)} hired ${coachLink(c)} as head coach.`,
+				tid,
+			);
+		}
 	}
 	clearCoachSystemsCache();
 };
@@ -341,8 +397,11 @@ const spendFactor = (popRank: number) => {
 // Fill every vacancy, best available coach the team is willing to pay
 export const fillVacancies = async ({
 	includeUser,
+	skipTids,
 }: {
 	includeUser: boolean;
+	// College carousel: schools holding their head coaching job for an offer to the user
+	skipTids?: Set<number>;
 }) => {
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const salaryCap = g.get("salaryCap");
@@ -382,6 +441,9 @@ export const fillVacancies = async ({
 				continue;
 			}
 			if (!includeUser && userControlsTeam(t.tid)) {
+				continue;
+			}
+			if (role === "head" && skipTids?.has(t.tid)) {
 				continue;
 			}
 
@@ -660,11 +722,15 @@ export const coachOfTheYear = async () => {
 
 const age = (c: CoachWithoutKey) => g.get("season") - c.born.year;
 
+// Yearly random change of each rating around the age trend. 1.5 before: a development coach's rating moved enough from one season to
+// the next to swing his team's development effect on its own (docs/rating-inflation.md)
+const COACH_PROGRESS_SD = 1;
+
 const progress = (c: Coach) => {
 	const a = age(c);
 	const mu = a < 45 ? 1.2 : a < 58 ? 0.2 : -1.2;
 	for (const key of helpers.keys(c.ratings)) {
-		c.ratings[key] = bound(c.ratings[key] + gauss(mu, 1.5));
+		c.ratings[key] = bound(c.ratings[key] + gauss(mu, COACH_PROGRESS_SD));
 	}
 };
 
@@ -703,6 +769,7 @@ export const runOffseason = async () => {
 	await ensureStaff();
 
 	const season = g.get("season");
+	await commitDevCarry();
 	await recordSeason();
 	await coachOfTheYear();
 	// Coaching systems: expectation, development and systems on the season rows; league system trends
@@ -715,6 +782,7 @@ export const runOffseason = async () => {
 	);
 	// AI GM personalities (setting): patient GMs give coaches more time, win-now ones less. Empty when off
 	const gms = await getAllGmWeights();
+	const collegeExpected = isCollege() ? await getExpectedWinps() : undefined;
 	for (const c of coaches) {
 		progress(c);
 
@@ -748,7 +816,10 @@ export const runOffseason = async () => {
 		if (c.contract.exp <= season) {
 			// Expiring contract
 			let reSign;
-			if (userControlsTeam(c.tid)) {
+			if (userControlsTeam(c.tid) && isCollege() && c.role === "head") {
+				// College mode: the user's head coach is the user, who stays
+				reSign = true;
+			} else if (userControlsTeam(c.tid)) {
 				// User extends on the staff page before this, otherwise they leave
 				reSign = false;
 			} else if (c.role === "head") {
@@ -782,7 +853,10 @@ export const runOffseason = async () => {
 		// AI firings. The owner doesn't wait forever.
 		if (!userControlsTeam(c.tid)) {
 			let fireProb = 0;
-			if (c.role === "head" && systems) {
+			if (c.role === "head" && collegeExpected) {
+				// College mode: results against what the program's prestige expects
+				fireProb = collegeFireProb(c, tenure(c), collegeExpected);
+			} else if (c.role === "head" && systems) {
 				// Coaching systems: the hot seat (results against expectations, reputation)
 				fireProb = hotSeatFireProb(c, tenure(c));
 			} else if (c.role === "head") {
@@ -818,7 +892,9 @@ export const runOffseason = async () => {
 	await adaptSystems();
 
 	await replenishPool();
-	await fillVacancies({ includeUser: false });
+	// College mode: schools hire head coaches away from smaller programs, and make offers to the user
+	const held = isCollege() ? await runCollegeCarousel() : undefined;
+	await fillVacancies({ includeUser: false, skipTids: held });
 	await syncAllBudgets();
 	clearCoachSystemsCache();
 };

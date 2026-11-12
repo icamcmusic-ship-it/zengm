@@ -14,6 +14,7 @@ import {
 	coachingTree,
 	getBuyout,
 	getCoachProfile,
+	effectiveStaffDevScore,
 	getLeagueStaffDevScoreRef,
 	getStaffLevel,
 	getStaffPayroll,
@@ -93,11 +94,15 @@ export default defineView({
 			// Player development: the staff's score against the league's average staff
 			const devRef = await getLeagueStaffDevScoreRef();
 			const level = await getStaffLevel(tid, devRef);
-			const levelIfHired = (role: CoachRole, ratings: CoachRatings) =>
+			// Hypothetical staffs keep the team's carry-over from last season, like the real one
+			const staffTeam = await idb.cache.teams.get(tid);
+			const levelFor = (score: number) =>
 				staffDevScoreToLevel(
-					staffDevScore(ratingsByRole({ role, ratings })),
+					staffTeam ? effectiveStaffDevScore(staffTeam, score) : score,
 					devRef,
 				);
+			const levelIfHired = (role: CoachRole, ratings: CoachRatings) =>
+				levelFor(staffDevScore(ratingsByRole({ role, ratings })));
 			const activeTeams = (await idb.cache.teams.getAll()).filter(
 				(t) => !t.disabled,
 			);
@@ -125,9 +130,8 @@ export default defineView({
 								...formatCoach(c),
 								buyout: getBuyout(c),
 								// What the team's development level would be with this job vacant
-								levelIfVacant: staffDevScoreToLevel(
+								levelIfVacant: levelFor(
 									staffDevScore({ ...ratingsByRole(), [role]: undefined }),
-									devRef,
 								),
 							}
 						: undefined,

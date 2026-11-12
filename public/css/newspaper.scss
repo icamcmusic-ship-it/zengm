@@ -398,12 +398,14 @@
 
 // ---- Print edition: only the paper, in black on white ----
 
+// Scoped to pages that have the paper: this stylesheet is global, and an unscoped rule blanked every other page's printout
+// (the player Scouting page's one-page card printed as an empty sheet)
 @media print {
-	body :not(.np-paper):not(.np-paper *):not(:has(.np-paper)) {
+	body:has(.np-paper) :not(.np-paper):not(.np-paper *):not(:has(.np-paper)) {
 		display: none !important;
 	}
-	html,
-	body {
+	html:has(.np-paper),
+	body:has(.np-paper) {
 		background: #fff !important;
 		margin: 0 !important;
 		padding: 0 !important;

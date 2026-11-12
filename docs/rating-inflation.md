@@ -73,6 +73,30 @@ The staff's development score was turned into a coaching budget level against a 
 
 **Fix** (`src/common/staff.ts`, `src/worker/core/staff/index.ts`): the reference is now the league's average staff dev score at the time levels are synced (`getLeagueStaffDevScoreRef`), so the average staff has effect 0 and only the spread across teams matters, like budgets. Spread across teams is unchanged (level SD ~20). The fixed constant stays as the fallback without teams. It only applies with `coachingStaff` on (it's how that setting computes levels); with it off nothing changes. Re-measured above: league mean effect 0.000 every season, and ratings in the `staff` / `allOn` runs match `off`.
 
+### Coaching staff: year-to-year swings
+
+A team's development effect (`coachingEffect` of its staff level, the × on every player's yearly rating changes) used to jump from season to season: 43% of team-seasons have some staff change (contracts of 1-4 years, AI firings, retirements), a new development coach moved the effect all at once, and every coach's ratings moved ±1.5 a year at random. Fix (`src/worker/core/staff/index.ts`, `src/common/staff.ts`):
+
+- **Carry-over** (`STAFF_DEV_CARRY = 0.65`): the score a team's development level is computed from is 65% last season's score and 35% its current staff's, so a new coach phases in (35% the first season, 58% the second, 73% the third). Stored on the team after the playoffs, before any staff change (`t.staffDevCarry`, `{ season, score }`); a league without it (new, or from before) starts from the staff as it is. The league reference is the average of these scores, so it stays centered. The staff page's "level with him" / "if vacant" use it too.
+- **Smoother coach ratings:** the yearly random change of each coach rating around the age trend is SD 1 instead of 1.5 (`COACH_PROGRESS_SD`).
+- **Same effect size:** `STAFF_DEV_SCORE_SPREAD` 10.5 → 9.0, so the spread across teams of the 3-season effect player development uses (`getLevelLastThree`) is unchanged.
+
+Measured with the real staff market (`staffSwing.script.test.ts`, `RUN_STAFF_SWING=1`, 8 seeds × 25 offseasons after 5 of burn-in, 30 AI teams, 5040 team-seasons; effects in % of progs):
+
+|                                                         | before | after |
+| ------------------------------------------------------- | ------ | ----- |
+| team effect, SD across teams (season's staff)           | 4.75   | 4.58  |
+| team effect, 3-season average (what progs use), SD      | 4.45   | 4.48  |
+| league mean effect                                      | -0.08  | -0.02 |
+| year-to-year change of a team's effect, SD              | 2.36   | 1.09  |
+| ... teams whose staff changed                           | 3.40   | 1.35  |
+| ... teams with the same staff                           | 0.93   | 0.82  |
+| year-to-year change of the 3-season average, SD         | 1.28   | 0.85  |
+| correlation of a team's effect with last season's       | 0.875  | 0.972 |
+| year-to-year change of a coach's development rating, SD | 1.73   | 1.34  |
+
+Regression check: `staff.test.ts`, "league-average development effect doesn't drift over decades" also asserts the year-to-year correlation is above 0.93.
+
 ### Stats (full engine)
 
 Ratings feed the game sim, so a ratings drift would show up as a stats drift; with no ratings drift there is none to measure over decades. What the features do change is the stats level, from the first game, not over time (full engine, seed 1, same league):

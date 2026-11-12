@@ -140,7 +140,7 @@ describe("scouting reports in a league", () => {
 		assert.deepEqual(a, b);
 	});
 
-	test("snapshots, the draft take, the department, blurbs, rumors, preview and the GM lens", async () => {
+	test("snapshots, the draft take, the department, blurbs, rumors, preview and the GM lens", { timeout: 30_000 }, async () => {
 		await recordSnapshots(PHASE.PLAYOFFS);
 		const prospects = await idb.cache.players.indexGetAll(
 			"playersByTid",

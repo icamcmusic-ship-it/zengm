@@ -338,6 +338,11 @@ const newPhaseBeforeDraft = async (
 	// Coaching staff records, Coach of the Year, and the offseason coaching market
 	await staff.runOffseason();
 
+	// College mode: conference realignment (setting), for next season
+	if (college.isCollege()) {
+		await college.afterSeasonOver();
+	}
+
 	const teams = await team.getFormattedAll({
 		attrs: ["tid"],
 		seasonAttrs: ["playoffRoundsWon"],
