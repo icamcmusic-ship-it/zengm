@@ -642,7 +642,7 @@ export const getScoutingSplit = async (pid: number, salt = "") => {
 		const lead = dept.scouts[0];
 		if (lead) {
 			takes.push({
-				scout: `${t.region} ${lead.name}`,
+				scout: `${lead.name} (${t.region})`,
 				take: scoutTake({ input, peers, scout: lead }),
 			});
 		}

@@ -95,7 +95,8 @@ export const BuzzItem = ({ buzz }: { buzz: ScoutBuzz }) => (
 			<RumorText text={buzz.text} />
 		</div>
 		<div className="small text-body-secondary">
-			{SCOUT_BUZZ_NAME} · {when(buzz)} · high: {buzz.high}, low: {buzz.low} ·{" "}
+			{SCOUT_BUZZ_NAME} · {when(buzz)} · high grade: {buzz.high}, low:{" "}
+			{buzz.low} ·{" "}
 			<span title="Scouts disagreeing has nothing to confirm, so it has no confidence and isn't in the track record">
 				opinion, not graded
 			</span>
