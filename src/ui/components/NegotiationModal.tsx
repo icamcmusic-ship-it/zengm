@@ -333,6 +333,18 @@ const Negotiation = ({
 										Uses your {describeCapException(contract.exception)}
 									</div>
 								) : null}
+								{contract.exceptionTooLong ? (
+									<div
+										className="small text-danger"
+										data-testid="cap-exception-too-long"
+									>
+										Too long for your{" "}
+										{describeCapException(contract.exceptionTooLong.exception)}{" "}
+										(up to {contract.exceptionTooLong.maxYears}{" "}
+										{helpers.plural("year", contract.exceptionTooLong.maxYears)}
+										)
+									</div>
+								) : null}
 							</div>
 
 							<SignButton

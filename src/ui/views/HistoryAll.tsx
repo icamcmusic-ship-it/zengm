@@ -98,7 +98,7 @@ const formatTeam = (
 	};
 };
 
-const HistoryAll = ({ awards, seasons }: View<"historyAll">) => {
+const HistoryAll = ({ awards, seasons, showNit }: View<"historyAll">) => {
 	useTitleBar({ title: "League History" });
 	const { userTid } = useLocal(["userTid"]);
 	const isCollege = useIsCollege();
@@ -108,6 +108,15 @@ const HistoryAll = ({ awards, seasons }: View<"historyAll">) => {
 			"Season",
 			"League Champion",
 			"Runner Up",
+			...(showNit
+				? [
+						{
+							desc: "NIT Champion",
+							title: "NIT",
+							sortType: "name" as const,
+						},
+					]
+				: []),
 			...(__SPORT === "basketball"
 				? [
 						{
@@ -154,6 +163,7 @@ const HistoryAll = ({ awards, seasons }: View<"historyAll">) => {
 				seasonLink,
 				champEl,
 				runnerUpEl,
+				...(showNit ? [formatTeam(s.nit, s.season, userTid)] : []),
 				...(__SPORT === "basketball"
 					? [
 							<FeatureLinks

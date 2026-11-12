@@ -1,4 +1,11 @@
-import { getCapExceptionsSummary } from "../core/contract/capExceptions.ts";
+import {
+	capExceptionsEnabled,
+	getCapExceptionsSummary,
+	getSigningAdvice,
+	type SigningAdvice,
+} from "../core/contract/capExceptions.ts";
+import { contractAmountForYears } from "../core/contractNegotiation/contractAmountForYears.ts";
+import { getContractStartSeason } from "../util/getContractStartSeason.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import type { Phase, Player } from "../../common/types.ts";
 import { defineView } from "../util/defineView.ts";
@@ -276,6 +283,39 @@ export default defineView({
 				}
 			}
 
+			// Salary cap exceptions (setting): where he asks for more years than the exception that covers him allows, what the Sign
+			// button can offer instead
+			const userTeam =
+				season === "current" && capExceptionsEnabled()
+					? await idb.cache.teams.get(userTid)
+					: undefined;
+			const signingAdvice: Record<number, SigningAdvice> = {};
+			if (userTeam) {
+				const startSeason = getContractStartSeason();
+				for (const p of players) {
+					if (p.freeAgentType !== "available") {
+						continue;
+					}
+					const askedYears = p.contract.exp - startSeason + 1;
+					const advice = getSigningAdvice(userTeam, payroll, {
+						amount: p.mood.user.contractAmount,
+						exp: p.contract.exp,
+						amountForYears: (years) =>
+							Math.round(
+								contractAmountForYears({
+									amount: p.mood.user.contractAmount / 1000,
+									askedYears,
+									years,
+									ovr: p.ratings.ovr,
+								}) * 1000,
+							),
+					});
+					if (advice) {
+						signingAdvice[p.pid] = advice;
+					}
+				}
+			}
+
 			// Default sort, used for the compare players link
 			players = orderBy(players, (p) => p.contract.amount, "desc");
 
@@ -302,6 +342,7 @@ export default defineView({
 						? await getCapExceptionsSummary(userTid, payroll)
 						: undefined,
 				market,
+				signingAdvice,
 				challengeNoFreeAgents: g.get("challengeNoFreeAgents"),
 				freeAgencySeason,
 				numRosterSpots: g.get("maxRosterSize") - userPlayers.length,

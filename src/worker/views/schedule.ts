@@ -21,6 +21,8 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
 import { getDayScale } from "../core/season/scheduleDayScale.ts";
 import { getBackToBackGids } from "../core/season/getBackToBackGids.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
+import type { MarqueeKind } from "../../common/marquee.ts";
 
 const processInputs = (params: RouteParams<"schedule">) => {
 	const tid = validateTeam(params.team);
@@ -189,20 +191,26 @@ export const getUpcoming = async ({
 		};
 	};
 
+	const marqueeOn = featureOn("marqueeGames");
 	const upcoming: {
 		day: number;
 		finals?: boolean;
 		forceWin?: number | "tie";
 		gid: number;
+		marquee?: MarqueeKind;
+		rivalry?: boolean;
 		season: number;
 		teams: [ReturnType<typeof getTeam>, ReturnType<typeof getTeam>];
 	}[] = filteredSchedule.map(
-		({ awayTid, day, finals, forceWin, gid, homeTid }) => {
+		({ awayTid, day, finals, forceWin, gid, homeTid, marquee, rivalry }) => {
 			return {
 				day,
 				finals,
 				forceWin,
 				gid,
+				// Marquee Games tags (only while the setting is on)
+				...(marquee !== undefined && marqueeOn ? { marquee } : {}),
+				...(rivalry && marqueeOn ? { rivalry } : {}),
 				season: g.get("season"),
 				teams: [getTeam(homeTid, day), getTeam(awayTid, day)],
 			};

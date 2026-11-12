@@ -10,6 +10,7 @@ import { g, helpers } from "../../util/index.ts";
 import { finances, player, team } from "../index.ts";
 import {
 	COACH_OF_THE_YEAR,
+	effectiveStaffDevScore,
 	ensureStaff,
 	getCoachingCarousel,
 	getStaffLevel,
@@ -18,6 +19,7 @@ import {
 	getTeamStaff,
 	runOffseason,
 	onPreseason,
+	STAFF_DEV_CARRY,
 	userExtend,
 	userFire,
 	userHire,
@@ -239,6 +241,42 @@ describe("coaching staff", () => {
 		await assertAllSynced();
 	});
 
+	test("a new staff's development effect phases in: last season's score carries over", async () => {
+		await ensureStaff();
+		const tid = g.get("userTid");
+		// No carry in a new league: the staff as it is
+		assert.isUndefined((await idb.cache.teams.get(tid))!.staffDevCarry);
+
+		await finishSeason();
+		await runOffseason();
+		await nextSeason();
+		const t = (await idb.cache.teams.get(tid))!;
+		assert.strictEqual(t.staffDevCarry?.season, g.get("season") - 1);
+
+		// Swap in the best development coach available: the level moves toward his, but only partway
+		const raw = (await getTeamStaff(tid)).dev;
+		if (raw) {
+			await userFire({ cid: raw.cid, tid });
+		}
+		const best = (await idb.cache.coaches.getAll())
+			.filter((c) => c.tid === COACH_FREE_AGENT)
+			.sort((a, b) => b.ratings.dev - a.ratings.dev)[0]!;
+		await userHire({ cid: best.cid, role: "dev", years: 3, tid });
+		const carried = await getStaffLevel(tid);
+		const score = t.staffDevCarry!.score;
+		const effective = effectiveStaffDevScore(t, score + 10);
+		assert.closeTo(effective - score, (1 - STAFF_DEV_CARRY) * 10, 1e-9);
+		// Without the carry-over, the full jump
+		const full = await (async () => {
+			const saved = t.staffDevCarry;
+			delete t.staffDevCarry;
+			const level = await getStaffLevel(tid);
+			t.staffDevCarry = saved;
+			return level;
+		})();
+		assert.isAtLeast(full, carried);
+	});
+
 	test("a coach hired during the season gets only the games he coached", async () => {
 		await ensureStaff();
 		const tid = g.get("userTid");
@@ -411,11 +449,22 @@ describe("coaching staff development calibration", () => {
 	test("league-average development effect doesn't drift over decades (rating inflation)", async () => {
 		await ensureStaff();
 		const yearlyMeans: number[] = [];
+		// Each team's effect, season after season: a team's development edge is stable (carry-over, smooth coach ratings)
+		const pairs: [number, number][] = [];
+		let last = new Map<number, number>();
 		for (let i = 0; i < 30; i++) {
 			const effects: number[] = [];
+			const now = new Map<number, number>();
 			for (const t of await idb.cache.teams.getAll()) {
-				effects.push(levelToEffect(await getStaffLevel(t.tid)));
+				const effect = levelToEffect(await getStaffLevel(t.tid));
+				effects.push(effect);
+				now.set(t.tid, effect);
+				const prev = last.get(t.tid);
+				if (prev !== undefined && i >= 5) {
+					pairs.push([prev, effect]);
+				}
 			}
+			last = now;
 			yearlyMeans.push(effects.reduce((a, b) => a + b, 0) / effects.length);
 			await finishSeason();
 			await runOffseason();
@@ -426,5 +475,18 @@ describe("coaching staff development calibration", () => {
 		for (const m of yearlyMeans) {
 			assert.isBelow(Math.abs(m), 0.08);
 		}
+		// Year-to-year correlation of a team's effect: 0.87 before the carry-over, 0.97 with it (staffSwing.script.test.ts)
+		const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+		const xs = pairs.map((p) => p[0]);
+		const ys = pairs.map((p) => p[1]);
+		const mx = mean(xs);
+		const my = mean(ys);
+		const cov = mean(pairs.map(([x, y]) => (x - mx) * (y - my)));
+		const corr =
+			cov /
+			Math.sqrt(
+				mean(xs.map((x) => (x - mx) ** 2)) * mean(ys.map((y) => (y - my) ** 2)),
+			);
+		assert.isAbove(corr, 0.93);
 	}, 120_000);
 });

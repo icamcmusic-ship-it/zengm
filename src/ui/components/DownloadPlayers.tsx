@@ -1,6 +1,7 @@
 import { Dropdown } from "react-bootstrap";
 import { useState } from "react";
 import { Modal } from "./Modal.tsx";
+import { ExportProfileModal } from "./ExportProfile.tsx";
 import {
 	fileSafeName,
 	playersToCSVRows,
@@ -262,6 +263,7 @@ export const DownloadPlayerButton = ({
 	pid: number;
 }) => {
 	const [status, setStatus] = useState<string | undefined>();
+	const [showProfile, setShowProfile] = useState(false);
 	const run = async (format: PlayerDownloadFormat, gameLog = false) => {
 		try {
 			await downloadPlayers({
@@ -294,8 +296,20 @@ export const DownloadPlayerButton = ({
 					</Dropdown.Item>
 					<Dropdown.Item onClick={() => run("json")}>JSON</Dropdown.Item>
 					<Dropdown.Item onClick={() => run("csv")}>CSV</Dropdown.Item>
+					<Dropdown.Divider />
+					<Dropdown.Item onClick={() => setShowProfile(true)}>
+						Export profile (every page)...
+					</Dropdown.Item>
 				</Dropdown.Menu>
 			</Dropdown>
+			{showProfile ? (
+				<ExportProfileModal
+					name={name}
+					pid={pid}
+					show={showProfile}
+					onClose={() => setShowProfile(false)}
+				/>
+			) : null}
 			{status ? (
 				<span className="small text-body-secondary">{status}</span>
 			) : null}

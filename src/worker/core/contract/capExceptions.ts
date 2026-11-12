@@ -267,6 +267,92 @@ export const getSigningCapInfo = (
 	};
 };
 
+// For the Free Agents page's Sign button, which signs a free agent for what he asks: the length he asks for may be longer than any
+// exception that covers the amount allows (5 years on the 4-year mid-level). Then the longest contract an exception allows, at the
+// price he asks for that length (more per year for fewer years, like in the negotiation), or why there is none. undefined when the
+// asking contract is fine as it is (or exceptions don't apply), so the button keeps its old rules. Amounts in thousands.
+export type SigningAdvice =
+	| {
+			type: "shorter";
+			exception: CapExceptionType;
+			askedYears: number;
+			maxYears: number;
+			amount: number;
+			exp: number;
+	  }
+	| { type: "tooLong"; reason: string };
+
+export const getSigningAdvice = (
+	t: TeamExceptions,
+	payroll: number,
+	{
+		amount,
+		exp,
+		amountForYears,
+	}: {
+		amount: number;
+		exp: number;
+		// His price per year for another length, in thousands
+		amountForYears: (years: number) => number;
+	},
+): SigningAdvice | undefined => {
+	if (!capExceptionsEnabled() || amount - 1 <= g.get("minContract")) {
+		return;
+	}
+	if (payroll + amount - 1 <= g.get("salaryCap")) {
+		return;
+	}
+	const startSeason = getContractStartSeason();
+	const askedYears = exp - startSeason + 1;
+	const available = getAvailableCapExceptions(t, payroll);
+	if (pickCapException(available, amount, askedYears)) {
+		return;
+	}
+	// Only when the length is the problem: an exception big enough for what he asks, but too short
+	const coversAmount = available.filter(
+		(exception) => amount <= exception.amount,
+	);
+	if (
+		coversAmount.length === 0 ||
+		coversAmount.every((exception) => exception.maxYears >= askedYears)
+	) {
+		return;
+	}
+	let best: SigningAdvice | undefined;
+	for (const exception of available) {
+		const years = Math.min(exception.maxYears, askedYears);
+		const price = amountForYears(years);
+		if (
+			price <= exception.amount &&
+			price <= g.get("maxContract") &&
+			(best?.type !== "shorter" ||
+				years > best.maxYears ||
+				(years === best.maxYears && price < best.amount))
+		) {
+			best = {
+				type: "shorter",
+				// The one the signing will actually use
+				exception:
+					pickCapException(available, price, years)?.type ?? exception.type,
+				askedYears,
+				maxYears: years,
+				amount: price,
+				exp: startSeason + years - 1,
+			};
+		}
+	}
+	if (best) {
+		return best;
+	}
+	const maxYears = Math.max(
+		...coversAmount.map((exception) => exception.maxYears),
+	);
+	return {
+		type: "tooLong",
+		reason: `He wants ${askedYears} years, but your ${CAP_EXCEPTIONS[coversAmount[0]!.type].name} only allows up to ${maxYears}, and he asks more per year for a shorter deal than it covers.`,
+	};
+};
+
 // How far down the roster (by value, 0 = best) a free agent can be for an AI team to use an exception on him, and to go into the luxury tax for him
 const AI_MAX_RANK = 10;
 const AI_MAX_RANK_INTO_TAX = 8;

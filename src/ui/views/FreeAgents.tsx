@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useScoutingBlurbs } from "../components/ScoutingReport/index.tsx";
 import { wrappedFreeAgentMarket } from "../components/FreeAgentMarket.tsx";
 import { dropdownOptions } from "../hooks/useDropdownOptions.tsx";
 import { PHASE, PHASE_TEXT } from "../../common/constants.ts";
@@ -113,6 +112,7 @@ const FreeAgents = ({
 	capExceptions,
 	capSpace,
 	market,
+	signingAdvice,
 	challengeNoFreeAgents,
 	freeAgencySeason,
 	numRosterSpots,
@@ -161,9 +161,6 @@ const FreeAgents = ({
 		useState<DataTableHandle | null>(null);
 
 	const negotiationModal = useNegotiaionModal();
-
-	// Scouting Reports: a short blurb under each of the first free agents shown
-	const scoutBlurbs = useScoutingBlurbs(players.slice(0, 40).map((p) => p.pid));
 
 	if (
 		((phase > PHASE.AFTER_TRADE_DEADLINE && phase <= PHASE.RESIGN_PLAYERS) ||
@@ -275,7 +272,9 @@ const FreeAgents = ({
 			lastName: p.lastName,
 			season: playerInfoSeason,
 		});
-		const blurb = scoutBlurbs[p.pid];
+		// Scouting info is only shown on player pages
+		const blurb: string | undefined = undefined;
+		const advice = signingAdvice[p.pid];
 		return {
 			key: p.pid,
 			metadata: {
@@ -324,19 +323,30 @@ const FreeAgents = ({
 						? null
 						: {
 								value: (
-									<NegotiateButtons
-										canGoOverCap={salaryCapType === "none"}
-										capSpace={capSpace}
-										exceptionAmount={capExceptions?.maxAmount}
-										disabled={gameSimInProgress}
-										minContract={minContract}
-										onNegotiate={async () => {
-											await negotiationModal.negotiate(p.pid);
-										}}
-										spectator={spectator}
-										p={p}
-										willingToNegotiate={p.mood.user.willing}
-									/>
+									<>
+										<NegotiateButtons
+											canGoOverCap={salaryCapType === "none"}
+											capSpace={capSpace}
+											exceptionAmount={capExceptions?.maxAmount}
+											disabled={gameSimInProgress}
+											minContract={minContract}
+											onNegotiate={async () => {
+												await negotiationModal.negotiate(p.pid);
+											}}
+											spectator={spectator}
+											p={p}
+											willingToNegotiate={p.mood.user.willing}
+											signingAdvice={advice}
+										/>
+										{p.mood.user.willing && advice?.type === "tooLong" ? (
+											<span
+												className="small text-body-secondary text-nowrap"
+												title={advice.reason}
+											>
+												Too long for exception
+											</span>
+										) : null}
+									</>
 								),
 								classNames: "d-flex align-items-center gap-2",
 								searchValue: p.mood.user.willing

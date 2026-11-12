@@ -61,6 +61,7 @@ import {
 	type CollegePlayer,
 } from "./offseason.ts";
 import { getTeamPrestige } from "./players.ts";
+import { getContractSummary } from "../contract/index.ts";
 
 // Weeks of the transfer portal window (the Transfer portal phase) and of late recruiting (the Recruiting phase)
 export const PORTAL_WEEKS = 3;
@@ -756,7 +757,7 @@ export const userAction = async ({
 				const limit = Math.max(0, spots) * OFFERS_PER_SPOT;
 				if (getUserOffers(prospects, kind) >= limit) {
 					return spots <= 0
-						? "No open scholarships."
+						? "No open scholarships (your roster and verbal commitments fill all 13)."
 						: `You can have ${limit} offers out with ${spots} open scholarship${spots === 1 ? "" : "s"}.`;
 				}
 			}
@@ -838,6 +839,7 @@ const portalMove = async (
 	const season = g.get("season");
 	const ratings = last(p.ratings);
 	delete p.portal;
+	delete p.contractDemand;
 	p.tid = to;
 	p.gamesUntilTradable = 0;
 	if (to === from) {
@@ -951,6 +953,9 @@ export const openPortal = async (conditions: Conditions) => {
 					// His school can still keep him
 					schools: [{ tid: t.tid, i: 25, o: true }],
 				};
+				// Off a roster his scholarship ("contract") is not current any more: keep it as his demand, like any player without
+				// a team, so the pages that read a free agent's contract (mood, bios) work. Dropped when he joins a school.
+				p.contractDemand ??= getContractSummary(p);
 				p.tid = PLAYER.FREE_AGENT;
 				await idb.cache.players.put(p);
 				left += 1;

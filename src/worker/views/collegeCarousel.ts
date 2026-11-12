@@ -28,6 +28,8 @@ export type CarouselRow = {
 	tid: number;
 	// For a hire: the school he left for it this offseason
 	fromTid?: number;
+	// How he left it: hired away ("left") or fired there earlier in the offseason
+	fromType?: "left" | "fired";
 	phase: number;
 };
 
@@ -93,6 +95,13 @@ export default defineView({
 						(prev.type === "left" || prev.type === "fired") &&
 						prev.tid !== tx.tid
 							? prev.tid
+							: undefined,
+					fromType:
+						tx.type === "hired" &&
+						prev &&
+						(prev.type === "left" || prev.type === "fired") &&
+						prev.tid !== tx.tid
+							? prev.type
 							: undefined,
 					phase: tx.phase,
 				});

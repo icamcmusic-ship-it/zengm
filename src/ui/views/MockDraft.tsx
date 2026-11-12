@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScoutingHoverIcon } from "../components/ScoutingReport/index.tsx";
 import { DraftClassShape } from "../components/DraftClassShape.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
@@ -194,7 +193,6 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 											<a href={helpers.leagueUrl(["player", pick.pid])}>
 												{pick.name}
 											</a>
-											<ScoutingHoverIcon pid={pick.pid} />
 										</td>
 										<td>{pick.pos}</td>
 										<td>{pick.age}</td>

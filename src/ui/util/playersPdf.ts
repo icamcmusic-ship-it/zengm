@@ -17,7 +17,7 @@ import {
 	type PdfFonts,
 } from "./miniPdf.ts";
 
-const faceToJpeg = async (p: PlayerExport) => {
+export const faceToJpeg = async (p: PlayerExport) => {
 	if (!p.face || typeof document === "undefined") {
 		return;
 	}
@@ -93,7 +93,7 @@ const statsLine = (stats: Record<string, number> | undefined) =>
 let measure: (text: string, size: number, bold?: boolean) => number =
 	approxTextWidth;
 
-const truncate = (
+export const truncate = (
 	text: string,
 	size: number,
 	maxWidth: number,
@@ -113,7 +113,7 @@ const truncate = (
 };
 
 // Word wrap by approximate width
-const wrap = (text: string, size: number, maxWidth: number) => {
+export const wrap = (text: string, size: number, maxWidth: number) => {
 	const lines: string[] = [];
 	let line = "";
 	for (const word of text.split(" ")) {
@@ -131,12 +131,12 @@ const wrap = (text: string, size: number, maxWidth: number) => {
 	return lines;
 };
 
-const MARGIN = 36;
-const RIGHT = PAGE_WIDTH - MARGIN;
-const TOP = 52;
-const BOTTOM = PAGE_HEIGHT - 36;
+export const MARGIN = 36;
+export const RIGHT = PAGE_WIDTH - MARGIN;
+export const TOP = 52;
+export const BOTTOM = PAGE_HEIGHT - 36;
 
-const drawOverview = (
+export const drawOverview = (
 	pdf: MiniPdf,
 	p: PlayerExport,
 	face: Awaited<ReturnType<typeof faceToJpeg>>,
@@ -249,6 +249,7 @@ const drawOverview = (
 			y += 14;
 		}
 	}
+	return y;
 };
 
 const TABLE_SIZE = 7.5;
@@ -256,17 +257,31 @@ const ROW_HEIGHT = 11;
 // Year/Team/Age (or the first column) are repeated when a wide table is split into column groups
 const KEY_COLS = 3;
 
-const colWidths = (table: ExportTable) =>
-	table.cols.map((col, i) => {
+const colWidths = (table: ExportTable) => {
+	const widths = table.cols.map((col, i) => {
 		const widest = Math.max(
 			measure(col, TABLE_SIZE, true),
 			...table.rows.map((row) =>
 				measure(String(row[i] ?? ""), TABLE_SIZE, row[0] === "Career"),
 			),
 		);
-		// Long text columns (trait status, awards) are capped and truncated
+		// Long text columns are capped: the last one wraps, others are truncated
 		return Math.min(i === table.cols.length - 1 ? 420 : 160, widest + 6);
 	});
+	// A short table's last column (trait status, events) gets the rest of the page, so it wraps less
+	const others = widths.slice(0, -1).reduce((a, b) => a + b, 0);
+	const last = widths.length - 1;
+	if (last > 0 && others + widths[last]! <= RIGHT - MARGIN) {
+		const widest = Math.max(
+			...table.rows.map((row) => measure(String(row[last] ?? ""), TABLE_SIZE)),
+		);
+		widths[last] = Math.max(
+			widths[last]!,
+			Math.min(widest + 6, RIGHT - MARGIN - others),
+		);
+	}
+	return widths;
+};
 
 // Splits a table's columns into groups that fit the page width, each starting with the key columns
 const columnGroups = (widths: number[], maxWidth: number) => {
@@ -294,7 +309,7 @@ const columnGroups = (widths: number[], maxWidth: number) => {
 	return groups.map((g) => [...keyCols, ...g]);
 };
 
-class Flow {
+export class Flow {
 	y = TOP;
 	private pdf: MiniPdf;
 	private accent: string;
@@ -312,6 +327,42 @@ class Flow {
 			return true;
 		}
 		return false;
+	}
+	// Word-wrapped text, flowing onto new pages
+	paragraph(
+		text: string,
+		{
+			size = 9,
+			color = "#000000",
+			bold = false,
+		}: { size?: number; color?: string; bold?: boolean } = {},
+	) {
+		for (const line of wrap(text, size, RIGHT - MARGIN)) {
+			this.ensure(size + 4);
+			this.pdf.text(MARGIN, this.y + size, line, { size, color, bold });
+			this.y += size + 4;
+		}
+	}
+	// "Label: value" pairs in two columns
+	facts(facts: { label: string; value: string }[]) {
+		const colWidth = (RIGHT - MARGIN) / 2;
+		for (let i = 0; i < facts.length; i += 2) {
+			this.ensure(14);
+			for (const [j, f] of facts.slice(i, i + 2).entries()) {
+				const x = MARGIN + j * colWidth;
+				const label = `${f.label}: `;
+				const labelWidth = measure(label, 9, true);
+				this.pdf.text(x, this.y + 9, label, { size: 9, bold: true });
+				this.pdf.text(
+					x + labelWidth,
+					this.y + 9,
+					truncate(f.value, 9, colWidth - labelWidth - 10),
+					{ size: 9 },
+				);
+			}
+			this.y += 14;
+		}
+		this.y += 6;
 	}
 	sectionTitle(text: string) {
 		this.pdf.text(MARGIN, this.y + 10, text, {
@@ -360,8 +411,14 @@ class Flow {
 			};
 			this.ensure(16 + ROW_HEIGHT * 3);
 			drawHeader(false);
+			const lastCol = table.cols.length - 1;
 			table.rows.forEach((row, r) => {
-				if (this.ensure(ROW_HEIGHT)) {
+				// The last column (long text: trait status, events) wraps instead of being cut
+				const lastLines = cols.includes(lastCol)
+					? wrap(String(row[lastCol] ?? ""), TABLE_SIZE, widths[lastCol]! - 3)
+					: [];
+				const height = ROW_HEIGHT * Math.max(1, Math.min(6, lastLines.length));
+				if (this.ensure(height)) {
 					drawHeader(true);
 				}
 				if (r % 2 === 1) {
@@ -369,25 +426,38 @@ class Flow {
 						MARGIN,
 						this.y - 8.5,
 						RIGHT - MARGIN,
-						ROW_HEIGHT,
+						height,
 						"#f6f7f9",
 					);
 				}
 				const bold = row[0] === "Career";
 				let x = MARGIN;
 				for (const c of cols) {
-					this.pdf.text(
-						x + 2,
-						this.y,
-						truncate(String(row[c] ?? ""), TABLE_SIZE, widths[c]! - 3),
-						{
-							size: TABLE_SIZE,
-							bold,
-						},
-					);
+					if (c === lastCol && lastLines.length > 1) {
+						lastLines.slice(0, 6).forEach((line, i) => {
+							this.pdf.text(
+								x + 2,
+								this.y + i * ROW_HEIGHT,
+								i === 5 && lastLines.length > 6
+									? truncate(`${line}...`, TABLE_SIZE, widths[c]! - 3)
+									: line,
+								{ size: TABLE_SIZE, bold },
+							);
+						});
+					} else {
+						this.pdf.text(
+							x + 2,
+							this.y,
+							truncate(String(row[c] ?? ""), TABLE_SIZE, widths[c]! - 3),
+							{
+								size: TABLE_SIZE,
+								bold,
+							},
+						);
+					}
 					x += widths[c]!;
 				}
-				this.y += ROW_HEIGHT;
+				this.y += height;
 			});
 			this.y += 12;
 		}
@@ -416,7 +486,7 @@ const gradeHex = (grade: number) => {
 const RADAR_PDF = ["shoot", "fin", "pm", "reb", "pd", "id", "ath", "iq"];
 
 // Scouting Reports: the one-page scouting card
-const drawScouting = (
+export const drawScouting = (
 	pdf: MiniPdf,
 	p: PlayerExport,
 	sc: NonNullable<PlayerExport["scouting"]>,
@@ -545,21 +615,28 @@ const drawScouting = (
 		}
 	}
 	y = Math.max(y, ry) + 8;
+	// Sections flow onto more pages instead of being dropped when the first page is full
 	const block = (
 		title: string,
 		lines: string[],
 		color?: (i: number) => string,
 	) => {
-		if (lines.length === 0 || y > BOTTOM - 20) {
+		if (lines.length === 0) {
 			return;
+		}
+		if (y + 12 + 10.5 > BOTTOM) {
+			pdf.addPage();
+			y = TOP + 6;
 		}
 		pdf.text(MARGIN, y, title, { size: 10, bold: true, color: accent });
 		y += 12;
 		lines.forEach((line, i) => {
 			for (const w of wrap(line, 8.5, RIGHT - MARGIN)) {
-				if (y < BOTTOM) {
-					pdf.text(MARGIN, y, w, { size: 8.5, color: color?.(i) ?? "#000000" });
+				if (y > BOTTOM) {
+					pdf.addPage();
+					y = TOP + 6;
 				}
+				pdf.text(MARGIN, y, w, { size: 8.5, color: color?.(i) ?? "#000000" });
 				y += 10.5;
 			}
 		});
@@ -574,6 +651,7 @@ const drawScouting = (
 	for (const sec of sc.sections) {
 		block(sec.title, sec.lines);
 	}
+	return y;
 };
 
 const drawPlayer = (
@@ -582,7 +660,7 @@ const drawPlayer = (
 	face: Awaited<ReturnType<typeof faceToJpeg>>,
 	league: string,
 ) => {
-	const accent = p.colors?.[0] ?? "#1f3a5f";
+	const accent = readableAccent(p.colors?.[0]);
 	const firstPage = pdf.numPages;
 
 	pdf.addPage();
@@ -603,12 +681,28 @@ const drawPlayer = (
 		flow.table(table);
 	}
 
-	// Page headers, now that his page count is known
+	drawPageHeaders(
+		pdf,
+		firstPage,
+		`${p.name}${p.abbrev ? ` - ${p.abbrev}` : ""}`,
+		`${league} - exported from Basketball GM`,
+		accent,
+	);
+};
+
+// Page headers and footers, once a document's page count is known
+export const drawPageHeaders = (
+	pdf: MiniPdf,
+	firstPage: number,
+	title: string,
+	footer: string,
+	accent: string,
+) => {
 	const numPages = pdf.numPages - firstPage;
 	for (let i = 0; i < numPages; i++) {
 		pdf.onPage(firstPage + i);
 		pdf.rect(0, 0, PAGE_WIDTH, 6, accent);
-		pdf.text(MARGIN, 24, `${p.name}${p.abbrev ? ` - ${p.abbrev}` : ""}`, {
+		pdf.text(MARGIN, 24, truncate(title, 9, RIGHT - MARGIN - 110, true), {
 			size: 9,
 			bold: true,
 			color: "#555555",
@@ -617,18 +711,29 @@ const drawPlayer = (
 			size: 9,
 			color: "#555555",
 		});
-		pdf.text(
-			MARGIN,
-			PAGE_HEIGHT - 16,
-			`${league} - exported from Basketball GM`,
-			{
-				size: 7,
-				color: "#888888",
-			},
-		);
+		pdf.text(MARGIN, PAGE_HEIGHT - 16, truncate(footer, 7, RIGHT - MARGIN), {
+			size: 7,
+			color: "#888888",
+		});
 	}
 	pdf.onPage(-1);
 };
+
+// Team colors as headings: a light color (white, yellow) would be unreadable on white paper, so it falls back to navy
+export const readableAccent = (color: string | undefined) => {
+	const m = color
+		? /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(color)
+		: null;
+	if (!m) {
+		return "#1f3a5f";
+	}
+	const [r, g, b] = [m[1]!, m[2]!, m[3]!].map(
+		(x) => Number.parseInt(x, 16) / 255,
+	);
+	const luminance = 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+	return luminance > 0.6 ? "#1f3a5f" : `#${m[1]}${m[2]}${m[3]}`;
+};
+
 let fontsPromise: Promise<PdfFonts | undefined> | undefined;
 
 // The Unicode font (public/fonts, about 50 KB per weight), fetched the first time a PDF is made. Without it (offline and
@@ -660,7 +765,7 @@ export const loadPdfFonts = () => {
 	return fontsPromise;
 };
 
-const newPdf = (fonts: PdfFonts | undefined) => {
+export const newPdf = (fonts: PdfFonts | undefined) => {
 	const pdf = new MiniPdf(fonts);
 	measure = (text, size, bold) => pdf.measure(text, size, bold);
 	return pdf;

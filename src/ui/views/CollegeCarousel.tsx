@@ -208,6 +208,11 @@ const CollegeCarousel = ({
 													userTid={userTid}
 												/>
 											) : null}
+											{r.fromType === "fired" ? (
+												<span className="text-body-secondary ms-1">
+													(fired)
+												</span>
+											) : null}
 										</td>
 										<td className="text-end">{prestige[r.tid]}</td>
 									</tr>

@@ -1,4 +1,5 @@
 import { last } from "../../../common/utils.ts";
+import { ExportProfileButton } from "../../components/ExportProfile.tsx";
 import { ArchetypeLabel } from "../../components/Archetype/ArchetypeLabel.tsx";
 import { TIER_NAMES } from "../../../common/archetypes/index.ts";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
@@ -328,13 +329,14 @@ const TopStuff = ({
 		"userTid",
 	]);
 
-	const freeAgent = player.tid === PLAYER.FREE_AGENT;
+	const collegeLeague = useIsCollege();
+	// College: tid FREE_AGENT means the transfer portal, no contract to negotiate
+	const freeAgent = player.tid === PLAYER.FREE_AGENT && !collegeLeague;
 	const injured = player.injury.gamesRemaining > 0;
 	const showContract =
 		player.tid !== PLAYER.UNDRAFTED &&
 		player.tid !== PLAYER.UNDRAFTED_FANTASY_TEMP &&
 		player.tid !== PLAYER.RETIRED;
-	const collegeLeague = useIsCollege();
 	const showTradeFor =
 		player.tid !== userTid && player.tid >= 0 && !collegeLeague;
 	const showTradingBlock = player.tid === userTid && !collegeLeague;
@@ -683,6 +685,7 @@ const TopStuff = ({
 								Storylines
 							</a>
 						) : null}
+						<ExportProfileButton name={player.name} pid={player.pid} />
 						{godMode ? (
 							<button
 								className="btn btn-outline-god-mode"

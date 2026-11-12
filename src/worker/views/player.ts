@@ -12,6 +12,7 @@ import {
 	DEFAULT_JERSEY,
 } from "../../common/constants.ts";
 import { player } from "../core/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 import { archetypeInfoForPlayer } from "../core/player/archetype.ts";
 import { idb } from "../db/index.ts";
 import { playerValueIndex } from "../util/valueData.ts";
@@ -258,7 +259,8 @@ export const getCommon = async (
 			g.get("teamInfoCache")[p.tid]?.name
 		}`;
 	} else if (p.tid === PLAYER.FREE_AGENT) {
-		teamName = "Free Agent";
+		// College: the only free agents are players in the transfer portal
+		teamName = isCollege() ? "Transfer Portal" : "Free Agent";
 	} else if (
 		p.tid === PLAYER.UNDRAFTED ||
 		p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP
@@ -466,7 +468,9 @@ export const getCommon = async (
 	if (p.tid >= 0) {
 		teamURL = helpers.leagueUrl(["roster", `${p.abbrev}_${p.tid}`]);
 	} else if (p.tid === PLAYER.FREE_AGENT) {
-		teamURL = helpers.leagueUrl(["free_agents"]);
+		teamURL = helpers.leagueUrl([
+			isCollege() ? "college_portal" : "free_agents",
+		]);
 	} else if (
 		p.tid === PLAYER.UNDRAFTED ||
 		p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP

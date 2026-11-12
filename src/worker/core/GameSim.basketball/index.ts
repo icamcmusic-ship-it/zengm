@@ -122,6 +122,7 @@ import {
 	type Traits,
 	TOV_SCALE,
 } from "./possessionModel.ts";
+import { TURNOVERS } from "./realisticTurnovers.ts";
 
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
 // weight, before late-game IQ moves it (see applyLateGameDecision)
@@ -480,6 +481,8 @@ class GameSim extends GameSimBase {
 	// unanswered points), offense/defense substitutions in the last minute, who gets fouled on purpose, fouling when up 3, last shots and
 	// 2-for-1s in the stock possession model. Off: nothing here is used and no extra random numbers are drawn
 	smartEndgame: boolean;
+	// Realistic Turnovers (League extras, see realisticTurnovers.ts): fewer turnovers, the same steals
+	realisticTurnovers: boolean;
 	earlyTimeouts: [number, number] = [0, 0];
 	// Unanswered points by each team
 	scoringRun: [number, number] = [0, 0];
@@ -595,6 +598,11 @@ class GameSim extends GameSimBase {
 			this.earlyTimeouts = [ENDGAME.earlyTimeouts, ENDGAME.earlyTimeouts];
 			this.rotationQuarterSeconds = g.get("quarterLength") * 60;
 		}
+
+		this.realisticTurnovers = nativeFeatureEnabled(
+			"realisticTurnovers",
+			(key) => g.get(key as any),
+		);
 
 		this.scheduleLoad =
 			!allStarGame &&
@@ -769,7 +777,9 @@ class GameSim extends GameSimBase {
 		return homeCourtModifier(
 			hca,
 			crowdLevel(
-				(this.team[0] as any).crowdHype ?? 0.5,
+				// Marquee Games: holiday, national TV and rivalry games are a little louder
+				((this.team[0] as any).crowdHype ?? 0.5) +
+					((this.team[0] as any).crowdBoost ?? 0),
 				g.get("phase") === PHASE.PLAYOFFS,
 			),
 		);
@@ -3470,9 +3480,12 @@ class GameSim extends GameSimBase {
 			: (g.get("turnoverFactor") *
 					(0.14 * this.team[this.d].compositeRating.defense)) /
 				(0.5 * (o.dribbling + o.passing));
-		const prob2 = this.coachSys
+		let prob2 = this.coachSys
 			? prob * this.cs[this.o].tov * this.cs[this.d].forceTov
 			: prob;
+		if (this.realisticTurnovers) {
+			prob2 *= TURNOVERS.tovMult;
+		}
 		return boundProb(
 			this.traitsOn ? prob2 * this.traitTurnoverMult(this.o) : prob2,
 		);
@@ -3538,6 +3551,9 @@ class GameSim extends GameSimBase {
 		let prob2 = this.expandedRatings ? prob * EXPANDED_STL_FACTOR : prob;
 		if (this.coachSys) {
 			prob2 *= this.cs[this.d].stl;
+		}
+		if (this.realisticTurnovers) {
+			prob2 *= TURNOVERS.stlMult;
 		}
 		return boundProb(
 			this.traitsOn

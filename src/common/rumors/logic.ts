@@ -291,11 +291,59 @@ export const addToTally = (
 	tally[3] = Math.round((tally[3] + modelChance(rumor)) * 1000) / 1000;
 };
 
+// ---- scouting buzz (see ScoutBuzz) ----
+
+// Expected scouting buzz items on a day: a couple a week in season, more in the run-up to the draft (the playoffs)
+export const buzzDailyRate = (phase: number) => {
+	switch (phase) {
+		case REGULAR_SEASON:
+		case AFTER_TRADE_DEADLINE:
+			return 0.3;
+		case PLAYOFFS:
+			return 0.6;
+		default:
+			return 0;
+	}
+};
+
+// Scouting buzz when a phase starts: most of it at the draft lottery and the draft
+export const buzzPhaseBurst = (phase: number) => {
+	switch (phase) {
+		case REGULAR_SEASON:
+			return 1;
+		case DRAFT_LOTTERY:
+			return 3;
+		case DRAFT:
+			return 2;
+		default:
+			return 0;
+	}
+};
+
+// Cap on the buzz items made in the last BUZZ_WINDOW_TICKS rumor days (a day of games or a phase change), so it never floods the feed
+export const BUZZ_WINDOW_TICKS = 7;
+export const buzzCap = (phase: number) =>
+	phase === PLAYOFFS || phase === DRAFT_LOTTERY || phase === DRAFT ? 6 : 3;
+
+export const buzzRoom = (state: RumorState, phase: number) => {
+	const recent = (state.buzz ?? []).filter(
+		(b) => b.tick > state.tick - BUZZ_WINDOW_TICKS,
+	).length;
+	return Math.max(0, buzzCap(phase) - recent);
+};
+
+export const MAX_BUZZ = 150;
+
 // Drop rumors older than the window (open ones from the previous season stay until they resolve) and old seasons of the record
 export const pruneRumors = (state: RumorState, season: number) => {
 	state.items = state.items
 		.filter((r) => r.season > season - RUMOR_WINDOW_SEASONS)
 		.slice(-MAX_RUMORS);
+	if (state.buzz) {
+		state.buzz = state.buzz
+			.filter((b) => b.season > season - RUMOR_WINDOW_SEASONS)
+			.slice(-MAX_BUZZ);
+	}
 	for (const key of Object.keys(state.stats)) {
 		if (Number(key) <= season - STATS_SEASONS) {
 			delete state.stats[Number(key)];

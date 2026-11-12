@@ -4,6 +4,7 @@ import type { IsExact } from "conditional-type-checks";
 import type { FaceConfig } from "facesjs";
 import type { ReactNode } from "react";
 import type { RBState } from "./recordsBook.ts";
+import type { MarqueeKind } from "./marquee.ts";
 import type { CapExceptionType, TeamCapExceptions } from "./capExceptions.ts";
 import type * as views from "../worker/views/index.ts";
 
@@ -471,6 +472,9 @@ export type Game = {
 		sPts?: number;
 	};
 	neutralSite?: boolean;
+	// Marquee Games: holiday slate or national TV, and rivalry games (from the schedule)
+	marquee?: MarqueeKind;
+	rivalry?: boolean;
 	note?: string;
 	noteBool?: 1; // Keep in sync with note - for indexing
 	numGamesToWinSeries?: number;
@@ -2336,6 +2340,9 @@ export type ScheduleGameWithoutKey = {
 	forceWin?: number | "tie"; // either awayTid or homeTid, if defined
 	finals?: boolean; // Used for easily checking neutralSite "finals" setting
 	day: number; // In the playoffs the values are kind of weird
+	// Marquee Games: holiday slate or national TV, and rivalry games
+	marquee?: MarqueeKind;
+	rivalry?: boolean;
 };
 
 export type ScheduleGame = ScheduleGameWithoutKey & {
@@ -2379,6 +2386,8 @@ export type Team = {
 
 	// Salary cap exceptions used (League Extras: Salary Cap Exceptions)
 	capExceptions?: TeamCapExceptions;
+	// Coaching staff: the development score the team played a season with, carried into the next (staff/index.ts STAFF_DEV_CARRY)
+	staffDevCarry?: { season: number; score: number };
 	depth?:
 		| {
 				QB: number[];
@@ -2523,10 +2532,7 @@ import type { LeagueUrlParts } from "../ui/router/types.ts";
 import type { StoredRatingsBuild } from "./ratingsBuilds/types.ts";
 import type { StoredArchetype } from "./archetypes/types.ts";
 import type { PlayerTraits } from "./playerTraits/types.ts";
-import type {
-	ScoutDraftRecord,
-	ScoutSnap,
-} from "./scoutingReports/history.ts";
+import type { ScoutDraftRecord, ScoutSnap } from "./scoutingReports/history.ts";
 import type { ExpandedRatingKey } from "./expandedRatings.ts";
 
 type TeamStatsPlus = Record<TeamStatAttrBaseball, number> &
