@@ -998,22 +998,22 @@ The colstats audit only looked at the current draft class. A new league has seve
 - **Existing leagues:** generated stats carry `p.collegeStatsV` (`COLLEGE_STATS_VERSION`, now 2). When a league is opened (`beforeLeague`), `draft.upgradeCollegeStats` remakes every undrafted prospect with generated stats (a stored career) and no or an older stamp, class by class, with the class's own seed (the one stored with its college season, else the automatic seed) and the class's college season kept exactly (schedule, results, bracket, each prospect's place and boost). Generation is deterministic, so this is a one-time, repeatable change. Drafted players keep the stats they were drafted with, and imported rows without a stored career are not touched.
 - **Tests:** `worker/core/draft/collegeStatsUiPath.test.ts` builds seven classes the way a new league does (preseason, auto seed, the worker's `generateCollegeStats`) and reads the lines off the stored prospects: every class on the same scale, D-I levels and spread, top-5 vs the rest, the class leader in assists/blocks/rebounds/threes/steals ranks high in pss/hgt+idef/hgt+reb/tp/pdef, non-shooters and non-shooting bigs take almost no threes, pass-first guards vs rim protectors, the version stamp, and `upgradeCollegeStats` (remakes a stale class exactly from its seed, keeps its college season, leaves drafted players alone, then has nothing left to do).
 
-| New league, D-I draft-year lines, p10 / p50 / p90   | Before                 | After                  | Real D-I prospects                |
-| --------------------------------------------------- | ---------------------- | ---------------------- | --------------------------------- |
-| MPG                                                 | 15.9 / 23.8 / 30.3     | 14.8 / 21.2 / 30.0     | ~15 / 22 / 31                     |
-| PPG                                                 | 6.1 / 12.5 / 19.5      | 4.8 / 8.8 / 15.0       | ~5 / 9-10 / 16-18                 |
-| RPG                                                 | 2.6 / 4.9 / 8.5        | 1.7 / 3.9 / 7.0        | ~2 / 4 / 7                        |
-| APG                                                 | 1.3 / 3.1 / 6.0        | 0.5 / 1.7 / 3.9        | ~0.6 / 1.7 / 4                    |
-| BPG                                                 | 0.0 / 0.7 / 1.9        | 0.0 / 0.3 / 1.3        | ~0 / 0.3-0.4 / 1.5                |
-| 3P% (30+ 3PA)                                       | 28.4 / 37.5 / 45.9     | 24.5 / 33.3 / 41.1     | ~26 / 34 / 41                     |
-| FT% (30+ FTA)                                       | 64.0 / 74.1 / 85.6     | 57.4 / 69.7 / 79.3     | ~58 / 70 / 81                     |
-| 3PA rate                                            | 0.12 / 0.48 / 0.60     | 0.00 / 0.25 / 0.56     | 0 for non-shooters / ~0.3 / ~0.55 |
-| PPG p50 of the 2026 / 2029 / 2032 class             | 9.0 / 12.7 / 15.9      | 9.1 / 8.3 / 8.7        |                                   |
-| Top 5 of each class: PPG (MPG)                      | 18.3 (30.5)            | 17.2 (31.5)            | 15-22 (30-34)                     |
-| Non-shooters (tp < 30): median / max 3PA rate       | 0.30 / 0.62            | 0.02 / 0.22            |                                   |
-| Share averaging 2.5+ assists                        | 64%                    | 27%                    |                                   |
-| Correlation APG~pss, BPG~idef, RPG~reb, 3PA rate~tp | 0.67, 0.41, 0.47, 0.63 | 0.84, 0.60, 0.65, 0.94 |                                   |
-| G League PPG p50 / max                              | 14.5 / 22.6            | 10.5 / 15.6            |                                   |
+| New league, D-I draft-year lines, p10 / p50 / p90             | Before                       | After                        | Real D-I prospects                |
+| ------------------------------------------------------------- | ---------------------------- | ---------------------------- | --------------------------------- |
+| MPG                                                           | 17.1 / 24.4 / 29.7           | 15.6 / 21.6 / 30.3           | ~15 / 22 / 31                     |
+| PPG                                                           | 6.4 / 12.8 / 19.2            | 5.3 / 8.8 / 15.8             | ~5 / 9-10 / 16-18                 |
+| RPG                                                           | 2.6 / 5.4 / 8.7              | 1.8 / 3.8 / 7.4              | ~2 / 4 / 7                        |
+| APG                                                           | 1.2 / 3.1 / 5.9              | 0.5 / 1.8 / 3.8              | ~0.6 / 1.7 / 4                    |
+| BPG                                                           | 0.0 / 0.8 / 1.8              | 0.0 / 0.3 / 1.3              | ~0 / 0.3-0.4 / 1.5                |
+| 3P% (30+ 3PA)                                                 | 27.8 / 37.7 / 47.0           | 23.7 / 33.6 / 41.5           | ~26 / 34 / 41                     |
+| FT% (30+ FTA)                                                 | 63.9 / 74.4 / 86.2           | 57.2 / 69.1 / 79.6           | ~58 / 70 / 81                     |
+| 3PA rate                                                      | 0.09 / 0.48 / 0.61           | 0.00 / 0.24 / 0.56           | 0 for non-shooters / ~0.3 / ~0.55 |
+| PPG p50 of the 2026 / 2029 / 2032 class                       | 9.8 / 13.2 / 16.8            | 9.1 / 8.4 / 9.2              |                                   |
+| Top 5 of each class by ovr: PPG (MPG)                         | 20.0 (30.6)                  | 18.1 (32.8)                  | 15-22 (30-34)                     |
+| Non-shooters (tp < 30): median / max 3PA rate                 | 0.22 / 0.62                  | 0.03 / 0.26                  |                                   |
+| Share averaging 2.5+ assists                                  | 66%                          | 29%                          |                                   |
+| Correlation APG~pss, BPG~idef, RPG~reb, SPG~pdef, 3PA rate~tp | 0.66, 0.50, 0.60, 0.56, 0.70 | 0.85, 0.61, 0.64, 0.71, 0.93 |                                   |
+| G League PPG p50 / max                                        | 13.2 / 33.6                  | 7.9 / 12.0                   |                                   |
 
 ### Prospect careers: transfers, redshirts, recruiting, unusual prospects
 
