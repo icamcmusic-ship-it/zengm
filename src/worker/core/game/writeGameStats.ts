@@ -265,6 +265,12 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	if (results.neutralSite) {
 		gameStats.neutralSite = true;
 	}
+	if (results.marquee !== undefined) {
+		gameStats.marquee = results.marquee;
+	}
+	if (results.rivalry) {
+		gameStats.rivalry = true;
+	}
 	const playoffs = g.get("phase") === PHASE.PLAYOFFS;
 	if (playoffs) {
 		gameStats.playoffs = true;

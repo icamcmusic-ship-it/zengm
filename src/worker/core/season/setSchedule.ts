@@ -7,6 +7,7 @@ import type {
 import addDaysToSchedule from "./addDaysToSchedule.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { isFinals } from "./isFinals.ts";
+import type { GameMarquee } from "../../../common/marquee.ts";
 import { recomputeLocalUITeamOvrs } from "../../util/recomputeLocalUITeamOvrs.ts";
 
 const makePlayoffsKey = (game: ScheduleGameWithoutKey) =>
@@ -24,6 +25,8 @@ const setSchedule = async (
 	tids: [number, number][],
 	// Day of each game, relative to the first day, for a schedule that spells out its days (see addDaysToSchedule)
 	days?: readonly number[],
+	// Marquee Games: holiday, national TV and rivalry tags of each game
+	marquee?: readonly (GameMarquee | undefined)[],
 ) => {
 	const playoffs = g.get("phase") === PHASE.PLAYOFFS;
 
@@ -50,6 +53,17 @@ const setSchedule = async (
 		await idb.cache.games.getAll(),
 		days,
 	);
+	if (marquee) {
+		for (const [i, game] of schedule.entries()) {
+			const tags = marquee[i];
+			if (tags?.marquee !== undefined) {
+				game.marquee = tags.marquee;
+			}
+			if (tags?.rivalry) {
+				game.rivalry = true;
+			}
+		}
+	}
 	for (const game of schedule) {
 		if (playoffs) {
 			const key = makePlayoffsKey(game);

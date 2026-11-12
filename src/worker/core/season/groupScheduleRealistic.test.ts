@@ -132,8 +132,10 @@ describe("realistic schedule length", options, () => {
 			assert.isAtMost(b2b.max, 22);
 
 			const threeInFour = summarize(stats.map((s) => s.threeInFour));
-			// ~172 days leaves room for almost none (each back-to-back between 2-day breaks)
-			assert.isAtMost(threeInFour.avg, 6);
+			// ~172 days leaves room for almost none (each back-to-back between 2-day breaks): the repair pass removes
+			// most of the ones the daily construction leaves at the end of the season (~0.7 per team on average)
+			assert.isAtMost(threeInFour.avg, 1.6);
+			assert.isAtMost(threeInFour.max, 6);
 
 			// Each team plays on roughly half the days
 			const numDays = new Set(output.days).size;
@@ -142,6 +144,24 @@ describe("realistic schedule length", options, () => {
 			// Some longer breaks during the season (not counting the All-Star break)
 			assert.isAtLeast(summarize(stats.map((s) => s.maxDaysOff)).max, 3);
 		}
+	});
+
+	test("82 games: about one 3-in-4 per team or fewer, over several seeds", () => {
+		const threeInFour = [];
+		const b2b = [];
+		const lastDays = [];
+		for (let seed = 1; seed <= 6; seed++) {
+			Math.random = makeSeededRandom(seed);
+			const { stats, lastDay } = check(30, 82);
+			threeInFour.push(summarize(stats.map((s) => s.threeInFour)).avg);
+			b2b.push(summarize(stats.map((s) => s.b2b)).avg);
+			lastDays.push(lastDay);
+		}
+		assert.isAtMost(summarize(threeInFour).avg, 1);
+		assert.approximately(summarize(b2b).avg, 14, 1);
+		// Same season length as before the repair pass (170-172)
+		assert.isAtLeast(summarize(lastDays).min, 168);
+		assert.isAtMost(summarize(lastDays).max, 173);
 	});
 
 	test("All-Star break and trade deadline", () => {
@@ -196,7 +216,7 @@ describe("realistic schedule length", options, () => {
 			assert.isAtMost(b2b.avg, expectedB2B * 1.3 + 1, `${numGames}`);
 
 			const threeInFour = summarize(stats.map((s) => s.threeInFour));
-			assert.isAtMost(threeInFour.avg, (20 * numGames) / 82 + 2);
+			assert.isAtMost(threeInFour.avg, (2 * numGames) / 82 + 1);
 
 			for (const s of stats) {
 				assert.strictEqual(s.numGames, numGames);

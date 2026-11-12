@@ -1,3 +1,4 @@
+import type { MarqueeKind } from "../marquee.ts";
 // Plain-data inputs and outputs of the game hype engine (basketball). The worker reads the database into an HRaw snapshot of the season (see worker/util/hypeData.ts); tests build one by hand. Everything here is serializable.
 
 export const STAT_KEYS = ["pts", "trb", "ast", "stl", "blk", "tp"] as const;
@@ -107,6 +108,9 @@ export type HGame = {
 	teams: [HGameTeam, HGameTeam];
 	// Plain text of the clutch plays
 	clutch: string[];
+	// Marquee Games tags of the schedule
+	marquee?: MarqueeKind;
+	rivalry?: boolean;
 };
 
 export type HSeriesTeam = { tid: number; seed: number; won: number };
@@ -280,6 +284,8 @@ export type HGameInput = {
 	// The earliest season whose lines are stored in full (for "first meeting since")
 	linesFrom: number;
 	teamName: Record<number, string>;
+	// Marquee Games: a holiday slate or national TV game
+	marquee?: MarqueeKind;
 };
 
 export type Reason = { k: string; pts: number; text: string };

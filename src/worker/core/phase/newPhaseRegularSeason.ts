@@ -153,8 +153,16 @@ const newPhaseRegularSeason = async (
 		// College mode: non-conference games, then conference play, and the season's polls start
 		await college.startRegularSeason();
 	} else {
-		const { tids, days, dayScale } = season.newScheduleWithDays(teams);
-		await season.setSchedule(tids, days);
+		// Marquee Games: the teams' draw, last season's champion and the rivalries
+		const marqueeInput = season.marqueeGamesOn()
+			? await season.getMarqueeInput(teams.map((t) => t.tid))
+			: undefined;
+		const { tids, days, dayScale, marquee } = season.newScheduleWithDays(
+			teams,
+			undefined,
+			marqueeInput,
+		);
+		await season.setSchedule(tids, days, marquee);
 		if (g.get("scheduleDayScale") !== dayScale) {
 			await league.setGameAttributes({ scheduleDayScale: dayScale });
 		}
