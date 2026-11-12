@@ -7,6 +7,7 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import {
 	STAFF_DISABLED_MESSAGE,
 	formatCoach,
+	getTeamColors,
 	staffViewEnabled,
 } from "./staffShared.ts";
 
@@ -44,6 +45,7 @@ export default defineView({
 			}
 			return {
 				coach,
+				colors: c.tid >= 0 ? (await getTeamColors()).get(c.tid) : undefined,
 				stats: c.stats.map((row) => ({
 					...row,
 					abbrev: abbrev(row.tid),
