@@ -68,7 +68,12 @@ const load = async (
 	g.setWithoutSavingToDB("rerandomizeDraftClassRatings", false);
 	g.setWithoutSavingToDB("featureDraftClassShapes" as any, on);
 	while (bases.length <= base) {
+		// Each base class from its own stream, so it's the same whichever test generates it first (and with -t)
+		const outer = Math.random;
+		const rng = new Rng(`classShape.base.${bases.length}`);
+		Math.random = () => rng.random();
 		const players = await genPlayersWithoutSaving(SEASON, DEFAULT_LEVEL, []);
+		Math.random = outer;
 		bases.push(
 			players.map((p, pid) => {
 				// Half of them from the US (the test names are all international)

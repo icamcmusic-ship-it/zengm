@@ -5,6 +5,7 @@ import createRandomPlayers from "../../worker/core/league/create/createRandomPla
 import skills from "../../worker/core/player/skills.ts";
 import { DEFAULT_LEVEL } from "../budgetLevels.ts";
 import { last, range } from "../utils.ts";
+import { makeSeededRandom } from "../random.ts";
 import {
 	SKILL_BADGES,
 	SKILL_BADGES_BY_LABEL,
@@ -217,12 +218,20 @@ describe("skill badges", () => {
 
 	test("league distribution is sensible", async () => {
 		resetG();
-		const players = await createRandomPlayers({
-			activeTids: range(30),
-			onlyFreeAgents: false,
-			scoutingLevel: DEFAULT_LEVEL,
-			teams: range(30).map((tid) => ({ tid })),
-		});
+		// Seeded: the rarity floors are on a single random league
+		const outer = Math.random;
+		Math.random = makeSeededRandom(2024);
+		let players;
+		try {
+			players = await createRandomPlayers({
+				activeTids: range(30),
+				onlyFreeAgents: false,
+				scoutingLevel: DEFAULT_LEVEL,
+				teams: range(30).map((tid) => ({ tid })),
+			});
+		} finally {
+			Math.random = outer;
+		}
 		const counts: Record<string, number> = {};
 		const comboCounts: Record<string, number> = {};
 		let n = 0;
