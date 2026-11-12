@@ -4,7 +4,12 @@ import { PHASE } from "../constants.ts";
 import { GRADE_LABELS } from "./categories.ts";
 import { decodeGrades, encodeGrades, gradeLetter } from "./grades.ts";
 import { draftTierName, outcomeName, tierForOvr } from "./text.ts";
-import { GRADE_KEYS, type GradeKey, type RoleScale, type ScoutTake } from "./types.ts";
+import {
+	GRADE_KEYS,
+	type GradeKey,
+	type RoleScale,
+	type ScoutTake,
+} from "./types.ts";
 
 // One snapshot: season, phase, grades (GRADE_KEYS order, one character each), overall grade, scouting looks, and a few stats
 // (x10, rounded): 3P%, FT%, turnovers per 36, points per 36, minutes played
@@ -68,7 +73,9 @@ export const makeSnap = (
 // Add a snapshot, replacing one for the same season and phase, keeping the newest MAX_SNAPS. Returns a new array, or undefined if
 // nothing changed (same grades as the last snapshot of the same season and phase)
 export const addSnap = (snaps: ScoutSnap[] | undefined, snap: ScoutSnap) => {
-	const list = (snaps ?? []).filter((x) => !(x.s === snap.s && x.ph === snap.ph));
+	const list = (snaps ?? []).filter(
+		(x) => !(x.s === snap.s && x.ph === snap.ph),
+	);
 	const prev = (snaps ?? []).find((x) => x.s === snap.s && x.ph === snap.ph);
 	if (prev && prev.g === snap.g && prev.o === snap.o && prev.l === snap.l) {
 		return undefined;
@@ -153,7 +160,9 @@ const reasonFor = (
 		}
 	}
 	if (b.ph === PHASE.PRESEASON && b.s > a.s) {
-		return up ? "after an offseason of work" : "after a summer that didn't move him forward";
+		return up
+			? "after an offseason of work"
+			: "after a summer that didn't move him forward";
 	}
 	if (!b.x && !a.x) {
 		return up ? "as more tape came in" : "on second viewing";
@@ -216,8 +225,12 @@ export const buildChangelog = (
 		}
 		changes.sort(
 			(x, y) =>
-				Math.abs(gb[GRADE_KEYS.indexOf(y.key)]! - ga[GRADE_KEYS.indexOf(y.key)]!) -
-				Math.abs(gb[GRADE_KEYS.indexOf(x.key)]! - ga[GRADE_KEYS.indexOf(x.key)]!),
+				Math.abs(
+					gb[GRADE_KEYS.indexOf(y.key)]! - ga[GRADE_KEYS.indexOf(y.key)]!,
+				) -
+				Math.abs(
+					gb[GRADE_KEYS.indexOf(x.key)]! - ga[GRADE_KEYS.indexOf(x.key)]!,
+				),
 		);
 		out.push({
 			season: b.s,
@@ -257,8 +270,11 @@ export const outcomeTier = ({
 };
 
 // A draft take can be judged once the career has had time: 4 seasons after the draft, or retired
-export const judgeable = (draftSeason: number, season: number, retired: boolean) =>
-	retired || season - draftSeason >= 4;
+export const judgeable = (
+	draftSeason: number,
+	season: number,
+	retired: boolean,
+) => retired || season - draftSeason >= 4;
 
 export const trackLine = (said: number, became: number) =>
 	`Our scouts said: ${draftTierName(said)} → ${outcomeName(became)}`;
@@ -288,10 +304,7 @@ export const scoutAccuracy = (calls: ScoutCall[]) => {
 			hits += 1;
 		}
 		// Best call: a correct call on a player who became good (or a correct fade); worst: the biggest miss
-		if (
-			Math.abs(d) <= 1 &&
-			(!best || c.became > best.became)
-		) {
+		if (Math.abs(d) <= 1 && (!best || c.became > best.became)) {
 			best = c;
 		}
 		if (!worst || Math.abs(d) > Math.abs(worst.became - worst.said)) {
@@ -304,6 +317,7 @@ export const scoutAccuracy = (calls: ScoutCall[]) => {
 		hitRate: hits / calls.length,
 		avgError: err / calls.length,
 		best,
-		worst: worst && Math.abs(worst.became - worst.said) >= 2 ? worst : undefined,
+		worst:
+			worst && Math.abs(worst.became - worst.said) >= 2 ? worst : undefined,
 	};
 };

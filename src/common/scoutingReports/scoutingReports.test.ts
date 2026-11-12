@@ -412,3 +412,33 @@ describe("lens and rumors", () => {
 		assert.strictEqual(split.spread, 3);
 	});
 });
+
+describe("newspaper draft preview", () => {
+	test("runs in the Draft section when there are facts, and not without", async () => {
+		const { makeFixture } = await import("../newspaper/fixture.ts");
+		const { buildPaper } = await import("../newspaper/index.ts");
+		const facts = makeFixture("midseason");
+		const ids = (f: typeof facts) =>
+			buildPaper(f).sections.flatMap((s) => s.articles.map((a) => a.id));
+		assert.notInclude(ids(facts), "draft-preview");
+		const rows = [1, 2, 3, 4].map((rank) => ({
+			pid: facts.players[rank]!.pid,
+			rank,
+			name: facts.players[rank]!.name,
+			pos: "SF",
+			age: 19,
+			school: "Duke",
+			overall: "A-",
+			best: "Shooting A",
+			floor: "Rotation wing",
+			ceiling: "All-Star",
+			line: "A real talent.",
+			move: rank === 2 ? 1 : 0,
+		}));
+		const withPreview = {
+			...facts,
+			draftPreview: { draftYear: facts.season, scout: "Dale Porter", rows },
+		};
+		assert.include(ids(withPreview), "draft-preview");
+	});
+});

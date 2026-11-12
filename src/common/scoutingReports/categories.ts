@@ -25,6 +25,10 @@ export const GRADE_LABELS: Record<GradeKey, string> = {
 	motor: "Motor/intangibles",
 };
 
+// "basketball IQ", not "basketball iq"
+export const lowerLabel = (key: GradeKey) =>
+	GRADE_LABELS[key].toLowerCase().replace(/\biq\b/, "IQ");
+
 export const SHORT_LABELS: Record<GradeKey, string> = {
 	shoot: "SHT",
 	cs: "C&S",
@@ -172,7 +176,9 @@ const productionScores = (
 		out.fin = clamp(50 + 1.2 * (s.fgPct - 46) + 0.8 * (per36(s, s.fta) - 3));
 	}
 	const ast36 = per36(s, s.ast);
-	out.pm = clamp(50 + 4.5 * (ast36 - (group === "guard" ? 5 : group === "wing" ? 2.8 : 2.2)));
+	out.pm = clamp(
+		50 + 4.5 * (ast36 - (group === "guard" ? 5 : group === "wing" ? 2.8 : 2.2)),
+	);
 	const tov36 = per36(s, s.tov);
 	if (ast36 + tov36 > 0.5) {
 		// Turnovers against how much he has the ball
@@ -180,7 +186,9 @@ const productionScores = (
 		out.bs = clamp(50 - 9 * (tov36 - (0.08 * load + 0.6)));
 	}
 	const trb36 = per36(s, s.trb);
-	out.reb = clamp(50 + 3.2 * (trb36 - (group === "big" ? 10 : group === "wing" ? 6.5 : 4.5)));
+	out.reb = clamp(
+		50 + 3.2 * (trb36 - (group === "big" ? 10 : group === "wing" ? 6.5 : 4.5)),
+	);
 	const stl36 = per36(s, s.stl);
 	const blk36 = per36(s, s.blk);
 	out.pd = clamp(50 + 14 * (stl36 - 1.2));
@@ -216,7 +224,12 @@ export const categoryScores = ({
 				cs: r.csh ?? 0.6 * r.tp + 0.4 * r.fg,
 				od: r.dsh ?? 0.5 * r.fg + 0.3 * r.tp + 0.2 * r.drb,
 				ft: r.ft,
-				fin: 0.38 * r.ins + 0.32 * r.dnk + 0.12 * r.hgt + 0.1 * r.jmp + 0.08 * r.stre,
+				fin:
+					0.38 * r.ins +
+					0.32 * r.dnk +
+					0.12 * r.hgt +
+					0.1 * r.jmp +
+					0.08 * r.stre,
 				pm: 0.55 * r.pss + 0.25 * r.drb + 0.2 * r.oiq,
 				bs: r.bsc ?? 0.5 * r.drb + 0.3 * r.oiq + 0.2 * r.pss,
 				reb:
@@ -256,7 +269,9 @@ export const categoryScores = ({
 		base.motor = 0.45 * base.motor + 0.55 * avg;
 	}
 
-	const w = Math.min(0.6, productionWeight(production) * productionMult) * (r ? 1 : 2.2);
+	const w =
+		Math.min(0.6, productionWeight(production) * productionMult) *
+		(r ? 1 : 2.2);
 	if (production && w > 0) {
 		const prod = productionScores(production, group);
 		for (const [key, value] of Object.entries(prod) as [GradeKey, number][]) {

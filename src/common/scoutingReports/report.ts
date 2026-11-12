@@ -3,6 +3,7 @@
 import {
 	categoryScores,
 	GRADE_LABELS,
+	lowerLabel,
 	GROUP_NOUN,
 	OVERALL_WEIGHTS,
 	peerGroupOf,
@@ -959,7 +960,9 @@ export const buildReport = ({
 				: input.age <= 28
 					? "In his prime years; growth from here comes from skill work, not physical development."
 					: "On the back nine; the plan is to preserve what he has.",
-			`Needs: ${andJoin(needs.map((g) => NEEDS_LINES[g.key]))}.`,
+			(needs[0]?.grade ?? 0) >= 9
+				? `Polish: ${andJoin(needs.map((g) => NEEDS_LINES[g.key]))}.`
+				: `Needs: ${andJoin(needs.map((g) => NEEDS_LINES[g.key]))}.`,
 		);
 		const we = input.traits?.find((t) => t.key === "workEthic");
 		if (we) {
@@ -1007,12 +1010,12 @@ export const buildReport = ({
 		const doubles = strengths.filter((k) => tf.rosterStrengths.includes(k));
 		if (fills.length > 0) {
 			fit.push(
-				`Fills a need for the ${tf.teamName}: ${andJoin(fills.map((k) => GRADE_LABELS[k].toLowerCase()))}.`,
+				`Fills a need for the ${tf.teamName}: ${andJoin(fills.map((k) => lowerLabel(k)))}.`,
 			);
 		}
 		if (doubles.length > 0 && fills.length === 0) {
 			fit.push(
-				`Doubles up on what the ${tf.teamName} already do well (${andJoin(doubles.map((k) => GRADE_LABELS[k].toLowerCase()))}).`,
+				`Doubles up on what the ${tf.teamName} already do well (${andJoin(doubles.map((k) => lowerLabel(k)))}).`,
 			);
 		}
 		const expectedOvr = input.ratings?.ovr ?? 0;
@@ -1041,7 +1044,14 @@ export const buildReport = ({
 			input.roleScale,
 		);
 		const role = capFirst(roleName(nowTier, group));
-		const idealRole = idealRoleOf(grades, group, rv);
+		const idealRole =
+			nowTier >= 6
+				? rv.pick([
+						"Primary option: build the offense around him",
+						"Franchise centerpiece who gets the ball in big moments",
+						"First option on a contender",
+					])
+				: idealRoleOf(grades, group, rv);
 		let contract: string | undefined;
 		if (input.contract && input.marketValue !== undefined) {
 			const diff = input.marketValue - input.contract.amount;
@@ -1100,11 +1110,9 @@ export const buildReport = ({
 		.filter((g) => !g.sub)
 		.toSorted((a, b) => b.grade - a.grade)
 		.slice(0, 2)
-		.map(
-			(g) => `${GRADE_LABELS[g.key].toLowerCase()} (${gradeLetter(g.grade)})`,
-		);
+		.map((g) => `${lowerLabel(g.key)} (${gradeLetter(g.grade)})`);
 	const weakText = needs.map(
-		(g) => `${GRADE_LABELS[g.key].toLowerCase()} (${gradeLetter(g.grade)})`,
+		(g) => `${lowerLabel(g.key)} (${gradeLetter(g.grade)})`,
 	);
 	let bottomLine: string;
 	if (input.kind === "prospect") {
@@ -1114,11 +1122,17 @@ export const buildReport = ({
 			`The case for ${input.name}: ${andJoin(strengthsText)}.`,
 			`What sells us on ${input.name} is ${andJoin(strengthsText)}.`,
 		]);
-		const worry = bv.pick([
-			`The worry is ${andJoin(weakText)}.`,
-			`What has to improve: ${andJoin(weakText)}.`,
-			`He'll go as far as his ${weakText[0] ?? "weak spots"} lets him.`,
-		]);
+		const worry =
+			(needs[0]?.grade ?? 0) >= 9
+				? bv.pick([
+						`There is no real weakness; if we have to nitpick, it's ${weakText[0]}.`,
+						`Hard to find a hole: the "weakest" part of his game is ${weakText[0]}.`,
+					])
+				: bv.pick([
+						`The worry is ${andJoin(weakText)}.`,
+						`What has to improve: ${andJoin(weakText)}.`,
+						`He'll go as far as his ${GRADE_LABELS[needs[0]?.key ?? "shoot"].toLowerCase()} lets him.`,
+					]);
 		const conf =
 			confidence === "Low"
 				? " We haven't seen enough of him to be sure; more looks would tighten this."

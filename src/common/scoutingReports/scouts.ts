@@ -511,7 +511,7 @@ export const assignScouts = (
 		.map((s) => ({
 			s,
 			score:
-				specialtyMatch(s, player) * 0.6 +
+				specialtyMatch(s, player) * 1.0 +
 				s.quality +
 				// A small tie-breaker per player, so the same scout doesn't write every report
 				0.15 * new Rng(`assign|${s.id}|${pid}`).random(),

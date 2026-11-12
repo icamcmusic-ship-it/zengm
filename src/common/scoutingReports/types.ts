@@ -97,7 +97,12 @@ export type ScoutTraitReading = {
 	exact: boolean;
 };
 
-export type ScoutInjury = { season: number; type: string; part: string; games: number };
+export type ScoutInjury = {
+	season: number;
+	type: string;
+	part: string;
+	games: number;
+};
 
 export type ScoutCombine = { label: string; value: string; pct: number }[];
 
@@ -161,7 +166,14 @@ export type ScoutInput = {
 	// What his production and ratings would get on the market, thousands per year
 	marketValue?: number;
 	salaryCap: number;
-	awards: { allStar: number; allLeague: number; mvp: number; dpoy: number; champ: number; roy: number };
+	awards: {
+		allStar: number;
+		allLeague: number;
+		mvp: number;
+		dpoy: number;
+		champ: number;
+		roy: number;
+	};
 	// Retired: his best visible ovr and the season
 	peak?: { ovr: number; season: number; age: number };
 	expandedRatings: boolean;
@@ -186,10 +198,20 @@ export type ScoutTeamFit = {
 	rosterNeeds: GradeKey[];
 	rosterStrengths: GradeKey[];
 	// Coach systems (setting): his fit to the user's head coach's systems, 0-100 (50 typical)
-	systemFit?: { score: number; offense: string; defense: string; coach: string };
+	systemFit?: {
+		score: number;
+		offense: string;
+		defense: string;
+		coach: string;
+	};
 };
 
-export type Specialty = "college" | "international" | "pro" | "athletes" | "shooters";
+export type Specialty =
+	| "college"
+	| "international"
+	| "pro"
+	| "athletes"
+	| "shooters";
 
 export type ScoutBias =
 	| "none"

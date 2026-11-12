@@ -54,6 +54,7 @@ import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { isCollege } from "../college/isCollege.ts";
+import { getCoachProfile } from "../staff/systems.ts";
 import fuzzRating from "../player/fuzzRating.ts";
 import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import genContract from "../player/genContract.ts";
@@ -837,7 +838,6 @@ const teamFitFor = async (
 		);
 		const head = coaches.find((c) => c.role === "head");
 		if (head) {
-			const { getCoachProfile } = await import("../staff/systems.ts");
 			const profile = getCoachProfile(head);
 			const f = playerSchemeFit({ ...ratings });
 			systemFit = {
@@ -869,7 +869,6 @@ const developmentFor = async (ctx: ReportCtx) => {
 	const dev = coaches.find((c) => c.role === "dev");
 	let philosophy: number | undefined;
 	if (head && featureOn("coachSystems")) {
-		const { getCoachProfile } = await import("../staff/systems.ts");
 		philosophy = getCoachProfile(head).philosophy;
 	}
 	return {

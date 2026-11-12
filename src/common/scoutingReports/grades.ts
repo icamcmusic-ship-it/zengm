@@ -100,6 +100,8 @@ export const gradeColor = (grade: number) => {
 	const pos = t * (stops.length - 1);
 	const i = Math.min(stops.length - 2, Math.floor(pos));
 	const f = pos - i;
-	const c = stops[i]!.map((v, k) => Math.round(v + (stops[i + 1]![k]! - v) * f));
+	const c = stops[i]!.map((v, k) =>
+		Math.round(v + (stops[i + 1]![k]! - v) * f),
+	);
 	return `#${c.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 };

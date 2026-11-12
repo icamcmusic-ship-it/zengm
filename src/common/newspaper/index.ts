@@ -21,8 +21,8 @@ import "./pages-playoffs.ts";
 import "./pages-colour.ts";
 import "./pages-deals.ts";
 import "./pages-coaching.ts";
-import "./pages-scouting.ts";
 import { playInSidebar } from "./pages-league.ts";
+import { draftPreviewPage } from "./pages-scouting.ts";
 import { varyPaper } from "./vary.ts";
 import {
 	allLeagueBlock,
@@ -320,6 +320,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 	);
 	const draft = section("draft", "Draft", [
 		draftStory(c),
+		draftPreviewPage.build(c),
 		...pagesFor(c, "draft", 2),
 	]);
 	const numbers = section("numbers", "By the numbers", [

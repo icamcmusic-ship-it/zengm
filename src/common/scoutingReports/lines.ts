@@ -394,7 +394,11 @@ const evidence = (
 				}
 				break;
 			case "iq":
-				if (s.level === "pro" && s.per !== undefined && (good ? s.per >= 18 : s.per < 11)) {
+				if (
+					s.level === "pro" &&
+					s.per !== undefined &&
+					(good ? s.per >= 18 : s.per < 11)
+				) {
 					return `${s.per.toFixed(1)} PER`;
 				}
 				break;

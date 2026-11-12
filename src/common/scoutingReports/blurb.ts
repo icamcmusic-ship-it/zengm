@@ -1,6 +1,6 @@
 // Short forms of a scouting report: one-line blurbs (trade window, free agents), the hover card (Mock Draft, Draft Board), rumors
 // ("Scouts are split on X") and opponent scouting. Also the AI GM's evaluation lens. Pure.
-import { GRADE_LABELS, peerGroupOf } from "./categories.ts";
+import { GRADE_LABELS, lowerLabel, peerGroupOf } from "./categories.ts";
 import { formatGradeRange, gradeLetter } from "./grades.ts";
 import { capFirst, roleName, Voice } from "./text.ts";
 import type { FullReport, GradeKey, ScoutTake } from "./types.ts";
@@ -52,7 +52,7 @@ export const blurbOf = (r: FullReport, pos: string) => {
 	const group = peerGroupOf(pos);
 	const noun = group === "big" ? "big" : group === "guard" ? "guard" : "wing";
 	const parts = [
-		`${gradeLetter(r.overall.grade)} ${noun}: ${gradeLetter(best.grade)} ${GRADE_LABELS[best.key].toLowerCase()}, ${gradeLetter(worst.grade)} ${GRADE_LABELS[worst.key].toLowerCase()}.`,
+		`${gradeLetter(r.overall.grade)} ${noun}: ${gradeLetter(best.grade)} ${lowerLabel(best.key)}, ${gradeLetter(worst.grade)} ${lowerLabel(worst.key)}.`,
 	];
 	if (r.take.floor === r.take.ceiling) {
 		parts.push(`${capFirst(roleName(r.take.floor, group))}.`);
