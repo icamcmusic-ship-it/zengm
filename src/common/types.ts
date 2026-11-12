@@ -770,6 +770,9 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	godModeInPast: boolean;
 	gracePeriodEnd: number;
 	groupScheduleSeries: boolean;
+	// Realistic schedule length: old compact schedule days / days of the current season's schedule (1 for the old
+	// schedule). Daily processes run on that fraction of the days, see worker/core/season/scheduleDayScale.ts
+	scheduleDayScale: number;
 	heightFactor: number;
 	hideDisabledTeams: boolean;
 	hofFactor: number;

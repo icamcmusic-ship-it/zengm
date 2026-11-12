@@ -7,6 +7,10 @@ const addDaysToSchedule = (
 		awayTid: number;
 	}[],
 	existingGames?: Game[],
+	// Day of each game, relative to the first day of this schedule (1 is the first day), for a schedule that spells out
+	// its days (realistic schedule length). Otherwise the days come from the order of the games: a new day starts
+	// whenever a team would play twice.
+	explicitDays?: readonly number[],
 ): ScheduleGameWithoutKey[] => {
 	const dayTids = new Set<number>();
 	let prevDayAllStarGame = false;
@@ -26,6 +30,14 @@ const addDaysToSchedule = (
 				day = game.day + 1;
 			}
 		}
+	}
+
+	if (explicitDays) {
+		const offset = day - 1;
+		return games.map((game, i) => ({
+			...game,
+			day: offset + explicitDays[i]!,
+		}));
 	}
 
 	return games.map((game) => {

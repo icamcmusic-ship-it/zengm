@@ -56,6 +56,7 @@ import {
 import { last } from "../../../common/utils.ts";
 import { advStats } from "../../util/advStats.ts";
 import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
+import { getDayScale, getDayTicks } from "../season/scheduleDayScale.ts";
 
 const FLUSH_COALESCE_MS = 5000;
 
@@ -168,8 +169,9 @@ const play = async (
 			}
 		}
 
-		// injuryDepth setting: remember each team's last game day, for back-to-backs
-		if (isInjuryDepthEnabled()) {
+		// injuryDepth setting (and realistic schedule length, for the back-to-back markers): remember each team's last game
+		// day, for back-to-backs
+		if (isInjuryDepthEnabled() || getDayScale() < 1) {
 			for (const result of results) {
 				if (typeof result.day !== "number") {
 					continue;
@@ -232,12 +234,16 @@ const play = async (
 				Infinity,
 			]);
 
+			// Realistic schedule length: the daily processes run on only some days, as many as the old compact schedule
+			// had (see season/scheduleDayScale.ts). Always 1 otherwise.
+			const dayTick = (await getDayTicks()) > 0;
+
 			const playersToSave = [];
 			const injuryDepthEnabled = isInjuryDepthEnabled();
 			for (const p of players) {
 				let changed = false;
 
-				if (p.injury.gamesRemaining > 0) {
+				if (dayTick && p.injury.gamesRemaining > 0) {
 					p.injury.gamesRemaining -= 1;
 					changed = true;
 				}
@@ -255,7 +261,7 @@ const play = async (
 					changed = true;
 				}
 
-				if (injuryDepthEnabled && injuryDepthDailyTick(p)) {
+				if (dayTick && injuryDepthEnabled && injuryDepthDailyTick(p)) {
 					changed = true;
 				}
 
@@ -304,7 +310,7 @@ const play = async (
 					p.gamesUntilTradable = 0; // Initialize for old leagues
 
 					changed = true;
-				} else if (p.gamesUntilTradable > 0) {
+				} else if (dayTick && p.gamesUntilTradable > 0) {
 					p.gamesUntilTradable -= 1;
 					changed = true;
 				}
@@ -329,6 +335,7 @@ const play = async (
 
 			// Tragic deaths only happen during the regular season!
 			if (
+				dayTick &&
 				g.get("phase") !== PHASE.PLAYOFFS &&
 				Math.random() < g.get("tragicDeathRate") &&
 				!g.get("repeatSeason") &&
@@ -346,20 +353,23 @@ const play = async (
 			// Do this stuff after injuries, so autoSign knows the injury status of players for the next game
 			const phase = g.get("phase");
 			if (
-				phase === PHASE.REGULAR_SEASON ||
-				phase === PHASE.AFTER_TRADE_DEADLINE
+				dayTick &&
+				(phase === PHASE.REGULAR_SEASON ||
+					phase === PHASE.AFTER_TRADE_DEADLINE)
 			) {
 				await freeAgents.decreaseDemands();
 				await freeAgents.autoSign();
 				await contractHooks.afterDay();
 			}
-			if (phase === PHASE.REGULAR_SEASON) {
+			if (dayTick && phase === PHASE.REGULAR_SEASON) {
 				// AI-to-AI trades and AI offers are background activity: a bug in them must not stop the season
 				await trade.runAiTradesSafely();
 			}
 
 			// Rumors (League extras): read-only, on its own random stream. After the day's trades and signings
-			await rumorsAfterDay();
+			if (dayTick) {
+				await rumorsAfterDay();
+			}
 		}
 
 		// More stuff for LeagueTopBar - update ovrs based on injuries, and (if user just played a game) update the score of the user's last game and add their next game

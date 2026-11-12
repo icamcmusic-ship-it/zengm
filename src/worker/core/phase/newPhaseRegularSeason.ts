@@ -1,4 +1,4 @@
-import { season, team } from "../index.ts";
+import { league, season, team } from "../index.ts";
 import * as staff from "../staff/index.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
@@ -148,7 +148,11 @@ const newPhaseRegularSeason = async (
 		active: true,
 	});
 
-	await season.setSchedule(season.newSchedule(teams));
+	const { tids, days, dayScale } = season.newScheduleWithDays(teams);
+	await season.setSchedule(tids, days);
+	if (g.get("scheduleDayScale") !== dayScale) {
+		await league.setGameAttributes({ scheduleDayScale: dayScale });
+	}
 
 	// Coaching systems: each head coach's preseason expectation, for the hot seat
 	await staff.setExpectations();

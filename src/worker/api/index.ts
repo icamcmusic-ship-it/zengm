@@ -266,6 +266,7 @@ import {
 	syncExpandedToCompat,
 } from "../core/player/expandedRatings.ts";
 import { getRumorState } from "../core/rumors/index.ts";
+import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -3763,13 +3764,15 @@ const regenerateSchedule = async (param: unknown, conditions: Conditions) => {
 		active: true,
 	});
 
-	const tids = season.newSchedule(teams, conditions);
+	const { tids, days } = season.newScheduleWithDays(teams, conditions);
 
 	const schedule = season.addDaysToSchedule(
 		tids.map(([homeTid, awayTid]) => ({
 			homeTid,
 			awayTid,
 		})),
+		undefined,
+		days,
 	);
 
 	return formatScheduleForEditor(schedule, teams, []);
@@ -6177,6 +6180,20 @@ const setScheduleFromEditor = async ({
 			)
 			.map((game) => omit(game, ["gid", "type"])),
 	);
+
+	// Realistic schedule length: keep the daily processes calibrated to the edited schedule
+	if (
+		(g.get("scheduleDayScale") < 1 || season.realisticScheduleOn()) &&
+		(g.get("phase") === PHASE.REGULAR_SEASON ||
+			g.get("phase") === PHASE.AFTER_TRADE_DEADLINE)
+	) {
+		const dayScale = getScheduleDayScale(
+			schedule.filter((game) => game.type !== "placeholder"),
+		);
+		if (dayScale !== g.get("scheduleDayScale")) {
+			await league.setGameAttributes({ scheduleDayScale: dayScale });
+		}
+	}
 
 	// This is needed in case the upcoming game was edited/deleted
 	await initUILocalGames();

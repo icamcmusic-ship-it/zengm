@@ -17,6 +17,7 @@ const Schedule = ({
 	completed,
 	elam,
 	elamASG,
+	showDays,
 	tid,
 	ties,
 	topPlayers,
@@ -155,8 +156,37 @@ const Schedule = ({
 									? game.teams[1].tid
 									: game.teams[0].tid;
 
+							// Realistic schedule length: the day, and the days off since the team's previous game in the list
+							let dayInfo = null;
+							if (showDays) {
+								let prevDay: number | undefined;
+								for (let j = i - 1; j >= 0; j--) {
+									const prev = upcoming[j]!;
+									if (prev.teams[0].tid >= 0 && prev.teams[1].tid >= 0) {
+										prevDay = prev.day;
+										break;
+									}
+								}
+								const daysOff =
+									prevDay !== undefined && game.teams[0].tid >= 0
+										? game.day - prevDay - 1
+										: undefined;
+								dayInfo = (
+									<div
+										className="small text-body-secondary mb-1"
+										data-testid="schedule-day"
+									>
+										Day {game.day}
+										{daysOff !== undefined && daysOff > 0
+											? ` · ${daysOff} ${daysOff === 1 ? "day" : "days"} off`
+											: null}
+									</div>
+								);
+							}
+
 							return (
 								<Fragment key={game.gid}>
+									{dayInfo}
 									<ScoreBox
 										game={{
 											// Leave out forceTie, since ScoreBox wants the value for finished games
