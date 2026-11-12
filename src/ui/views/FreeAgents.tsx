@@ -113,6 +113,7 @@ const FreeAgents = ({
 	capExceptions,
 	capSpace,
 	market,
+	signingAdvice,
 	challengeNoFreeAgents,
 	freeAgencySeason,
 	numRosterSpots,
@@ -276,6 +277,7 @@ const FreeAgents = ({
 			season: playerInfoSeason,
 		});
 		const blurb = scoutBlurbs[p.pid];
+		const advice = signingAdvice[p.pid];
 		return {
 			key: p.pid,
 			metadata: {
@@ -324,19 +326,30 @@ const FreeAgents = ({
 						? null
 						: {
 								value: (
-									<NegotiateButtons
-										canGoOverCap={salaryCapType === "none"}
-										capSpace={capSpace}
-										exceptionAmount={capExceptions?.maxAmount}
-										disabled={gameSimInProgress}
-										minContract={minContract}
-										onNegotiate={async () => {
-											await negotiationModal.negotiate(p.pid);
-										}}
-										spectator={spectator}
-										p={p}
-										willingToNegotiate={p.mood.user.willing}
-									/>
+									<>
+										<NegotiateButtons
+											canGoOverCap={salaryCapType === "none"}
+											capSpace={capSpace}
+											exceptionAmount={capExceptions?.maxAmount}
+											disabled={gameSimInProgress}
+											minContract={minContract}
+											onNegotiate={async () => {
+												await negotiationModal.negotiate(p.pid);
+											}}
+											spectator={spectator}
+											p={p}
+											willingToNegotiate={p.mood.user.willing}
+											signingAdvice={advice}
+										/>
+										{p.mood.user.willing && advice?.type === "tooLong" ? (
+											<span
+												className="small text-body-secondary text-nowrap"
+												title={advice.reason}
+											>
+												Too long for exception
+											</span>
+										) : null}
+									</>
 								),
 								classNames: "d-flex align-items-center gap-2",
 								searchValue: p.mood.user.willing
