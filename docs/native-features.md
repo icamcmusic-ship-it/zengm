@@ -10,24 +10,24 @@ Most of it is **basketball only**: in Football, Hockey and Baseball GM the menu 
 
 Pages that belong with an original BBGM page are tabs of that page: a tab bar at the top of the page (it scrolls sideways on a phone) switches between them. Each tab keeps its own URL, which is the page's old URL, so old links, bookmarks and the command palette (Ctrl+K) land on the right tab. Tabs of a League Extras feature that is off are hidden, and the side menu highlights the host page on any of its tabs. The tab list is `src/ui/util/pageTabs.ts`; `src/ui/util/consolidatedPages.ts` lists the pages kept out of the side menu.
 
-| Page (first tab) | Tabs                                                    |
-| ---------------- | ------------------------------------------------------- |
-| League Settings  | League Settings, League Extras                          |
-| Trading Block    | Trading Block, Trade Market                             |
-| Trade            | 2 teams, 3 teams                                        |
-| Transactions     | Transactions, Trade Grader                              |
-| League Finances  | Finances, Contract Value, Economics, Home Court         |
-| Draft History    | Draft History, Redraft, Pick Value                      |
-| Draft Scouting   | Scouting, Draft Board, Mock Draft, College/Overseas     |
-| Relatives        | Relatives, Family Trees                                 |
-| Jersey Numbers   | League, By Team                                         |
-| Player Ratings   | Ratings, Archetypes, Skill Badges                       |
-| League History   | History, Timeline, Coaches, Front Offices, Records Book |
-| Player Stats     | Stats, Milestones                                       |
-| Daily Schedule   | Schedule, Games to Watch, Best Games                    |
-| Head-to-Head     | Head-to-Head, Rivalries                                 |
-| Playoffs         | Playoffs, Series Recaps                                 |
-| Award Races      | Award Races, Award Vote                                 |
+| Page (first tab) | Tabs                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| League Settings  | League Settings, League Extras                               |
+| Trading Block    | Trading Block, Trade Market                                  |
+| Trade            | 2 teams, 3 teams                                             |
+| Transactions     | Transactions, Trade Grader                                   |
+| League Finances  | Finances, Contract Value, Economics, Home Court              |
+| Draft History    | Draft History, Redraft, Pick Value                           |
+| Draft Scouting   | Scouting, Draft Board, Mock Draft, Combine, College/Overseas |
+| Relatives        | Relatives, Family Trees                                      |
+| Jersey Numbers   | League, By Team                                              |
+| Player Ratings   | Ratings, Archetypes, Skill Badges                            |
+| League History   | History, Timeline, Coaches, Front Offices, Records Book      |
+| Player Stats     | Stats, Milestones                                            |
+| Daily Schedule   | Schedule, Games to Watch, Best Games                         |
+| Head-to-Head     | Head-to-Head, Rivalries                                      |
+| Playoffs         | Playoffs, Series Recaps                                      |
+| Award Races      | Award Races, Award Vote                                      |
 
 Other pages are still reached from _More_ links: League Achievements (League Stats / History group) and Coaching Staff (team pages and the Team menu).
 
@@ -101,6 +101,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Draft board](#draft-board-and-ai-drafting)                         | Draft Board, Draft page                                            | all    | `featureDraftBoard`                         | on / on                       |
 | [AI drafts by need](#draft-board-and-ai-drafting)                   | AI draft picks                                                     | bball  | `featureAiDraftNeeds`                       | on / off                      |
 | [Mock draft](#draft-board-and-ai-drafting)                          | Draft Scouting (Mock Draft tab), prospect player page              | bball  | `featureMockDraft`                          | on / off                      |
+| [Draft lottery night & combine](#draft-lottery-night-and-combine)   | Draft Lottery, Draft Scouting → Combine, pre-draft page            | bball  | `featureLotteryNight`                       | on / off                      |
 | [Scouting reports](#scouting-reports)                               | player Scouting page, Scouting Department, PDF                     | bball  | `featureScoutingReports`                    | on / off                      |
 | [Extra frivolities](#extra-frivolities)                             | Frivolities                                                        | all    | `featureFrivolities`                        | on / on                       |
 | [Face style gallery](#face-style-gallery-and-extra-face-parts)      | Tools → Face Style Gallery                                         | all    | browser setting on the page (extra parts)   | off (gallery always shown)    |
@@ -1090,6 +1091,18 @@ Part of _College & Overseas Stats_ (no toggle of its own): everything here is ma
 - **Draft Board** (_Draft Board_): `/l/:lid/draft_board[/:season]`, linked from Draft Scouting and the Draft page. Rank your prospects, give them tiers and notes next to their pre-draft stats, builds and scout reports. Option _Auto Draft From My Board_: when auto drafting for you, the top-ranked available prospect on your board is picked. The Draft page also has a _Draft-day trades & team boards_ window (trades through the trade API, each AI team's needs and board).
 - **AI drafts by need** (_AI Drafts by Need_, basketball): AI picks get a small need (guard, wing, big) and strategy (contenders want players who are ready, rebuilding teams want ceiling) adjustment on top of value, at most about 2 value points (`draftNeeds.ts`; value still decides most picks). Off: the old pure-value drafting.
 - **Mock draft** (_Mock Draft_, basketball): `/l/:lid/mock_draft`, a tab of Draft Scouting. A two-round mock draft of the current class (until its draft is over; during the draft, the remaining picks). Each team picks the way the AI does in `runPicks.ts`: value plus the need/strategy adjustment (when _AI Drafts by Need_ is on) and the player-traits nudge (when traits are on), with the same weighted random choice. The order is the league's draft order with traded picks once the lottery is done, otherwise one simulated lottery (like the projected Draft Lottery page). Pick protections and swaps are resolved on that order as a dry run with the same code as the real draft (`resolvePickConditionsPure` on copies: no saves, no news), and each affected pick says what happened (swapped, protected and stays, conveyed). Each pick shows why (best available, fills a need, ceiling or ready-now, traits, reach or steal against your scouting list); _Rerun_ draws again; your picks are highlighted. Pro projections: 120 careers per prospect run with the game's own development (`developSeasonSync`) from his ratings as your scouts see them, with a simple out-of-the-league rule, giving the median and 10th-90th percentile peak ovr and star (65+) / starter (58+) / bust (under 50 or gone within 4 seasons) odds, ported from the Draft Workshop. Cached per league, season and ratings in the worker; shown on the Mock Draft tab and as a _Pro projection_ section on a prospect's player page (`mockDraft.ts`, `proProjection.ts`, `mockDraftData.ts`).
+
+### Draft lottery night and combine
+
+- **Where:** League Extras → _Draft Lottery Night & Combine_ (`featureLotteryNight`, basketball, on for new leagues, off for existing ones; hidden in college leagues). Off: the Draft Lottery page, the College/Overseas combine, scouting reports and the AI draft are exactly as before, and nothing below runs.
+- **Lottery night** (Draft Lottery page, `/l/:lid/draft_lottery`): _Start lottery night_ runs the real lottery once, in the worker, exactly as _Start lottery_ does without the setting (same code, same random numbers, same result: `draftCombine.test.ts` checks the picks and the number of draws with the setting on and off). The reveal is purely presentational: picks come out from the last lottery pick up to No. 1, every 2.5 seconds or with _Reveal next_, with _Pause_ and _Reveal all_. Each pick gets a stage card in the team's colors with its logo, "Moved up from 7th!" / "Fell from 2nd" / "Stayed at 5th", its odds of that pick going in and a one-line reaction (the AI GM by name and leanings with AI GM personalities on, otherwise the fans by the team's hype; your own team gets its own lines; the wording is chosen by a hash of season and team, no random numbers). Teams still in the running are listed with their No. 1 odds, and "Down to the final two" before the last reveal. Then a _Lottery winners and losers_ recap (biggest jumps and falls, the longest shot) that stays on the page for past lotteries, and a news item with the same summary (no notification, so it doesn't spoil the reveal). The pick table and its highlighting below work as before. Code: `common/lotteryNight.ts`, `ui/views/DraftLotteryNight.tsx`, the reveal state in `ui/views/DraftLottery.tsx`, the news in `genOrder` → `logLotteryNightNews`.
+- **Draft combine:** held at the start of the draft lottery phase (after the playoffs) for the current class, with a news item (number measured, how many skipped the drills, the best vertical, lane agility and wingspan). About 1.25 prospects per draft pick are invited (75 for 60 picks), by projected stock from their draft-year ratings. Everyone invited is measured: height with and without shoes, wingspan, standing reach, weight, body fat, hand length and width. The drills: lane agility, shuttle, 3/4 court sprint, standing and max vertical, bench press reps (185 lbs), and shooting drills (spot-up threes out of 25, off-dribble jumpers out of 25, free throws out of 20). Results come from his draft-year ratings (hgt and wng with expanded ratings, stre, spd, jmp, endu, tp/ft/fg or catch-and-shoot/off-the-dribble with expanded ratings) and listed height and weight, plus realistic noise from a small RNG seeded by pid and draft year (`common/draftCombine.ts`): the same every time, for old classes too, and the game's random numbers are never used. Nothing is stored. Some skip the drills: top-3 prospects half the time, top 8 30%, injured prospects 85%, everyone else rarely; they are still measured.
+- **Scaled to real combines** (2000s-2020s). Generated classes (8 classes, 560 prospects, `draftCombine.test.ts`), mean ± sd vs real: height without shoes 77.6 ± 3.7" (real 77.6 ± 3.3), wingspan 81.3 ± 4.3" (81.8 ± 3.9), standing reach 104.1 ± 5.1" (103.5 ± 5), body fat 7.3 ± 2.3% (7.2 ± 2.6), hand length 8.74 ± 0.51" (8.75 ± 0.45), hand width 9.49 ± 0.73" (9.5 ± 0.75), lane agility 11.38 ± 0.43 s (11.3 ± 0.45), shuttle 3.09 ± 0.13 s (3.08 ± 0.15), sprint 3.30 ± 0.11 s (3.28 ± 0.12), standing vertical 29.4 ± 4.2" (29.3 ± 3), max vertical 34.5 ± 4.0" (34.5 ± 3.7), bench 9.0 ± 4.5 reps (9 ± 5), spot-up 52% (53%), off-dribble 43% (44%), free throws 74% (75%). The test checks every mean within half a real sd, the sd within 0.55-1.6× and the 2nd/98th percentiles inside the real extremes (± half an sd).
+- **Combine tab** of Draft Scouting (`/l/:lid/draft_combine[/:season]`): a sortable table of every invited prospect (DNP for skipped drills, green/red for the top/bottom 5 of each test, an athletic score = average percentile of the agility, speed and leaping drills, and the draft pick for past classes), _Standouts_ and _Disappointments_ by athletic score with each one's best or worst test, and the top 3 per test. Measurements and drill results only: no scouting info.
+- **Player page:** the prospect's College/Overseas page (`/l/:lid/player_pre_draft/:pid`) has a _Draft Combine_ section with every result, his rank and percentile among the prospects measured (or "not invited"). It replaces the College/Overseas combine (College stats setting) while the setting is on.
+- **Feeds scouting** (Scouting Reports setting): for a prospect who was measured, the size/length grade's range shrinks to 35% and his scout's noise on it to 40%; for one who did the drills, the same for athleticism (range 50%). The physical profile gets a _Combine_ line ("Measured 6'8" without shoes, 7'1.5" wingspan (+5.5" ape index). Top-2 max vertical (40.5"), best lane agility (10.4s)", "Skipped the drills while injured"), and the athleticism and size grade lines read the combine's vertical and wingspan. Still only on player pages.
+- **AI draft:** each tested prospect has a _performance_: his drill results against what his ratings predict, about N(0, 1). Only big over/under-performers (beyond ±1) get a nudge of up to 0.75 value points (0.6 per sd beyond 1), then the nudge is centered so it averages exactly zero over the class (uninvited prospects and skippers included). AI teams add it in `runPicks` like the other draft adjustments; the mock draft uses it too ("Combine riser"). Your own picks never get it.
+- **Tests:** `src/common/draftCombine.test.ts` (same results per pid and season, no `Math.random`, skip rates, ranks, the nudge summing to zero and bounded, reveal order, jumps/falls/recap, deterministic reactions, narrower grade ranges), `src/worker/core/draftCombine/draftCombine.test.ts` (generated classes against real ranges, the nudge over a class, the lottery with the setting on and off).
 
 ### Scouting reports
 

@@ -1,6 +1,7 @@
 import { PHASE, WEBSITE_ROOT } from "../../../common/constants.ts";
 import finalize from "./finalize.ts";
 import { afterNewPhase as scoutingAfterNewPhase } from "../scoutingReports/index.ts";
+import { afterNewPhase as draftCombineAfterNewPhase } from "../draftCombine/index.ts";
 import newPhasePreseason from "./newPhasePreseason.ts";
 import newPhaseRegularSeason from "./newPhaseRegularSeason.ts";
 import newPhaseAfterTradeDeadline from "./newPhaseAfterTradeDeadline.ts";
@@ -86,6 +87,9 @@ const newPhase = async (phase: Phase, conditions: Conditions, extra?: any) => {
 
 				// Scouting Reports setting: grade snapshots / the draft take (no-op when off)
 				await scoutingAfterNewPhase(phase);
+
+				// Draft Lottery Night & Combine setting: the combine's news (no-op when off)
+				await draftCombineAfterNewPhase(phase, conditions);
 
 				await finalize(phase, conditions, result);
 			} else {

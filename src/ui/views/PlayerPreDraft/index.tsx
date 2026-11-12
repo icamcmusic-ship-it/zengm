@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { COMBINE_ROWS } from "../../../common/combineRows.ts";
+import { COMBINE_COLUMNS } from "../../../common/draftCombine.ts";
 import clsx from "clsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { View } from "../../../common/types.ts";
@@ -687,9 +688,106 @@ const OverviewCards = ({
 	);
 };
 
+// Draft Lottery Night & Combine setting: his combine (measurements, athletic testing, shooting drills) with ranks in the class
+const DraftCombineSection = ({
+	draftCombine,
+}: {
+	draftCombine: NonNullable<View<"playerPreDraft">["draftCombine"]>;
+}) => {
+	if (!draftCombine.invited) {
+		return (
+			<HideableSection title={`${draftCombine.season} Draft Combine`}>
+				<p data-testid="pre-draft-draft-combine">
+					Not invited to the {draftCombine.season} draft combine (
+					{draftCombine.n} prospects were).
+				</p>
+			</HideableSection>
+		);
+	}
+	const { result, ranks, n } = draftCombine;
+	return (
+		<HideableSection
+			title={`${draftCombine.season} Draft Combine`}
+			description={`Rank and percentile among the ${n} prospects measured at the combine.${result.skipped ? ` ${result.skipped === "injured" ? "He skipped the drills while injured." : "He skipped the athletic testing and shooting drills."}` : ""}`}
+		>
+			<div className="table-responsive">
+				<table
+					className="table table-striped table-borderless table-sm table-nonfluid"
+					data-testid="pre-draft-draft-combine"
+				>
+					<thead>
+						<tr>
+							<th>Test</th>
+							<th>Result</th>
+							<th>Rank</th>
+							<th style={{ minWidth: 100 }}>Percentile</th>
+						</tr>
+					</thead>
+					<tbody>
+						{COMBINE_COLUMNS.map((col) => {
+							const v =
+								col.key in result.measurements
+									? result.measurements[
+											col.key as keyof typeof result.measurements
+										]
+									: result.drills?.[
+											col.key as keyof NonNullable<typeof result.drills>
+										];
+							const r = ranks[col.key];
+							if (v === undefined || !r) {
+								return (
+									<tr key={col.key}>
+										<td>{col.name}</td>
+										<td className="text-body-secondary" colSpan={3}>
+											Did not participate
+										</td>
+									</tr>
+								);
+							}
+							return (
+								<tr key={col.key}>
+									<td>{col.name}</td>
+									<td className="text-nowrap">{col.format(v)}</td>
+									<td>
+										{r.rank}/{r.n}
+									</td>
+									<td>
+										{col.neutral ? null : (
+											<div className="d-flex align-items-center gap-2">
+												<div
+													className="progress flex-grow-1"
+													style={{ height: 8, minWidth: 50 }}
+												>
+													<div
+														className={clsx(
+															"progress-bar",
+															r.pct >= 75
+																? "bg-success"
+																: r.pct <= 25
+																	? "bg-danger"
+																	: "bg-secondary",
+														)}
+														style={{ width: `${Math.max(2, r.pct)}%` }}
+													/>
+												</div>
+												<span style={{ width: 28 }}>{r.pct}</span>
+											</div>
+										)}
+									</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
+			</div>
+		</HideableSection>
+	);
+};
+
 const PlayerPreDraft = ({
 	bestPos,
 	customMenu,
+	draftCombine,
 	jerseyNumberInfos,
 	player,
 	preDraft,
@@ -753,14 +851,19 @@ const PlayerPreDraft = ({
 			/>
 
 			{!preDraft ? (
-				<p data-testid="pre-draft-none">
-					{__SPORT === "basketball"
-						? "No college or overseas record before the draft."
-						: "The College/Overseas page is only available in Basketball GM."}{" "}
-					<a href={helpers.leagueUrl(["player", player.pid])}>
-						Back to overview
-					</a>
-				</p>
+				<>
+					<p data-testid="pre-draft-none">
+						{__SPORT === "basketball"
+							? "No college or overseas record before the draft."
+							: "The College/Overseas page is only available in Basketball GM."}{" "}
+						<a href={helpers.leagueUrl(["player", player.pid])}>
+							Back to overview
+						</a>
+					</p>
+					{draftCombine ? (
+						<DraftCombineSection draftCombine={draftCombine} />
+					) : null}
+				</>
 			) : (
 				<>
 					<OverviewCards preDraft={preDraft} pid={player.pid} />
@@ -789,6 +892,9 @@ const PlayerPreDraft = ({
 					<SplitsSection preDraft={preDraft} />
 					<RecruitingSection preDraft={preDraft} />
 					<CombineSection preDraft={preDraft} />
+					{draftCombine ? (
+						<DraftCombineSection draftCombine={draftCombine} />
+					) : null}
 					<StockSection preDraft={preDraft} />
 					<CompsSection preDraft={preDraft} />
 				</>

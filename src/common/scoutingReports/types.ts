@@ -152,6 +152,10 @@ export type ScoutInput = {
 	// Current injury, if any
 	injury?: { type: string; part: string; games: number };
 	combine?: ScoutCombine;
+	// Draft Lottery Night & Combine setting: what the combine measured (size) and tested (athleticism), which narrows those grades,
+	// and its lines for the report
+	combineTested?: { size: boolean; ath: boolean };
+	combineNotes?: string[];
 	archetype?: string;
 	builds2k?: string[];
 	// Scouting looks this season (scouting system), undefined without it

@@ -145,6 +145,10 @@ export const typicalAgingDelta = (age: number) =>
 													? -2.3
 													: -3;
 
+// Draft Lottery Night & Combine setting: how much of the grade range is left once the combine measured (size) or tested
+// (athleticism) him
+export const COMBINE_RANGE_MULT = { size: 0.35, ath: 0.5 } as const;
+
 const confidenceOf = (u: number) =>
 	u <= 1.5 ? "Very high" : u <= 3 ? "High" : u <= 5 ? "Medium" : "Low";
 
@@ -194,7 +198,11 @@ export const scoutTake = ({
 			Math.min(2, new Rng(`${scout.seed}|${input.pid}|${key}`).normal(0, 1)),
 		);
 		const shift = (shifts[key] ?? 0) + all;
-		scores[key] = base[key] + unit * sigma + shift;
+		// The combine measured him: a scout's read of his size/athleticism is mostly the tape measure and the stopwatch
+		const tested =
+			(key === "size" && input.combineTested?.size) ||
+			(key === "ath" && input.combineTested?.ath);
+		scores[key] = base[key] + unit * sigma * (tested ? 0.4 : 1) + shift;
 		noiseSum += unit * sigma + shift;
 	}
 	scores.shoot = 0.45 * scores.cs + 0.35 * scores.od + 0.2 * scores.ft;
@@ -209,8 +217,14 @@ export const scoutTake = ({
 	const grades = GRADE_KEYS.map((key) => {
 		const list = peers.scores[key];
 		const grade = gradeFromPercentile(percentileOf(list, scores[key]));
-		// Production-only grades are wide; sub-grades too
-		const h = half * (SUB_KEYS.has(key) ? 1.15 : 1);
+		// Production-only grades are wide; sub-grades too. Combine-measured size and tested athleticism are much narrower
+		const combineMult =
+			key === "size" && input.combineTested?.size
+				? COMBINE_RANGE_MULT.size
+				: key === "ath" && input.combineTested?.ath
+					? COMBINE_RANGE_MULT.ath
+					: 1;
+		const h = half * (SUB_KEYS.has(key) ? 1.15 : 1) * combineMult;
 		return {
 			key,
 			grade,
@@ -756,7 +770,9 @@ export const buildReport = ({
 			"Past the age where athleticism improves; expect it to slip.",
 		);
 	}
-	if (input.combine && input.combine.length > 0) {
+	if (input.combineNotes && input.combineNotes.length > 0) {
+		physical.push(`Combine: ${input.combineNotes.join(". ")}.`);
+	} else if (input.combine && input.combine.length > 0) {
 		const best = input.combine.toSorted((a, b) => b.pct - a.pct)[0]!;
 		const worst = input.combine.toSorted((a, b) => a.pct - b.pct)[0]!;
 		physical.push(
