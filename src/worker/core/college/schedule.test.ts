@@ -6,6 +6,7 @@ import {
 	getCollegeTournamentSize,
 } from "../../../common/college/teams.ts";
 import { newCollegeSchedule } from "./schedule.ts";
+import { getNitSize } from "./postseason.ts";
 
 describe("college mode teams and schedule", () => {
 	test("teams: unique abbrevs, one division per conference, levels nest", () => {
@@ -65,4 +66,14 @@ describe("college mode teams and schedule", () => {
 			assert.isBelow(rounds.length, 50);
 		});
 	}
+
+	test("NIT never has more rounds than the national tournament", () => {
+		assert.strictEqual(getNitSize(360, 64), 32);
+		assert.strictEqual(getNitSize(100, 32), 16);
+		assert.strictEqual(getNitSize(100, 16), 16);
+		// A national field cut to 8 in the settings: an 8-team NIT, played with its 3 rounds
+		assert.strictEqual(getNitSize(100, 8), 8);
+		assert.strictEqual(getNitSize(100, 4), 4);
+		assert.strictEqual(getNitSize(30, 16), 0);
+	});
 });
