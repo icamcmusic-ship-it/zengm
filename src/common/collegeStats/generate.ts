@@ -38,6 +38,8 @@ export type GenerateOptions = {
 	fillBlankColleges?: boolean;
 	// The college season of the draft year (ncaa.ts). A prospect at one of its schools plays his team's games, conference and NCAA tournament games included, and gets tournament honors
 	ncaaSeason?: NcaaSeason;
+	// The whole draft class, when only some of it is being generated (prospects missing stats, or a remake of some): where a prospect stands in his class is measured against all of it. Default: the prospects being generated
+	classProspects?: CollegeProspect[];
 };
 
 // Game score per 40 minutes a junior college season needs for honors
@@ -117,9 +119,10 @@ export const generateCollegeClass = (
 	const { seed, draftYear } = options;
 	const priorSeasons = options.priorSeasons ?? true;
 	const noise = clamp(options.noise ?? 1, 0, 3);
-	const classStats = getClassStats(prospects);
+	const classProspects = options.classProspects ?? prospects;
+	const classStats = getClassStats(classProspects);
 	const potStats = getClassStats(
-		prospects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
+		classProspects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
 	);
 
 	const results: (CollegeResult & { pos: string })[] = [];
@@ -333,7 +336,7 @@ export const getNcaaSchools = (
 	prospects: CollegeProspect[],
 	options: GenerateOptions,
 ) => {
-	const classStats = getClassStats(prospects);
+	const classStats = getClassStats(options.classProspects ?? prospects);
 	const output = new Map<string, string>();
 	for (const p of prospects) {
 		const school = pickSchool(p, options, classStats);
