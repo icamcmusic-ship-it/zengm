@@ -174,6 +174,12 @@ async function getAll(): Promise<
 }
 
 const check = async (when: AchievementWhen, conditions: Conditions) => {
+	// College mode (docs/college-mode.md): the achievements are about running a pro team (payroll, the draft, trades), and
+	// a college title would hand out several of them for free (Moneyball, No First Round Picks, ...)
+	if (__SPORT === "basketball" && g.get("leagueType") === "college") {
+		return;
+	}
+
 	try {
 		const tooEz =
 			g.get("lowestDifficulty") < DIFFICULTY.Normal ||
