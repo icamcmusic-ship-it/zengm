@@ -14,6 +14,7 @@ import { player, team } from "../index.ts";
 import { last } from "../../../common/utils.ts";
 import { choice } from "../../../common/random.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
+import { getDraftCombineNudges } from "../draftCombine/index.ts";
 import { prepareWholeRoster } from "../team/ovr.ts";
 import {
 	getDraftAdjustment,
@@ -147,6 +148,10 @@ const runPicks = async (
 	}
 	playersAll.sort((a, b) => b.value - a.value);
 
+	// Draft Lottery Night & Combine setting: a small nudge for big combine over/under-performers, averaging zero over the class
+	// (empty when off). Nobody's combine changes during the draft, so it is computed once
+	const combineNudges = await getDraftCombineNudges(playersAll);
+
 	// Called after either the draft is over or it's the user's pick
 	const afterDoneAuto = async () => {
 		await lock.set("drafting", false);
@@ -269,6 +274,16 @@ const runPicks = async (
 							p.value,
 							getTraitFactor(p, { strategy: t?.strategy, team: traitTeam }),
 						),
+				);
+			}
+
+			if (
+				!DRAFT_BY_TEAM_OVR &&
+				combineNudges.size > 0 &&
+				!g.get("userTids").includes(dp.tid)
+			) {
+				adjustments = playersAll.map(
+					(p, i) => (adjustments?.[i] ?? 0) + (combineNudges.get(p.pid) ?? 0),
 				);
 			}
 

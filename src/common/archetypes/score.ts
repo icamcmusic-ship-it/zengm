@@ -953,7 +953,7 @@ export const SHOT_FROM = 0.8;
 export const SHOT_K = 0.6;
 // (and a sniper's name, for an elite shooter, by SNIPER_K more)
 // (arch12: 1.5 -> 2, so the stars' concentration trim does not take the elite shooter's name from Curry)
-export const SNIPER_K = 2;
+export const SNIPER_K = 2.3;
 // A role's reading: half his absolute standing (absValue), half the blended reading of the same skill (mostly the shape of
 // his game), so a uniform shift of his ratings moves it little
 const roleValue = (k: string, p: Prepared) => {
@@ -1038,3 +1038,50 @@ export const STAR_FROM = 0;
 export const STAR_SPAN = 0.6;
 export const starWeight = (p: Prepared) =>
 	Math.min(1, Math.max(0, (p.pzLevel - STAR_FROM) / STAR_SPAN));
+
+// arch13: the all-around star build (Do-It-All Superstar, tag "allAround"). Generated stars who are good at nearly
+// everything have no single best 2K description: every profile names two or three of their skills and leaves the rest
+// out. This build has no profile; it is read from three things only, each faded in over a range:
+// - elite: his level at his position (pzLevel, over his core skills) from ALL_AROUND_LEVEL[0] to [1] (the top ~2% of a
+//   random league; no real 2016-2025 player gets there, their ratings are less even);
+// - broad: the number of skill classes (shooting, mid-range, finishing, post, handle, passing, both defenses, rebounding)
+//   he is at least ALL_AROUND_GOOD at on the blended reading, from ALL_AROUND_BREADTH[0] to [1], with a defensive class and
+//   three offensive ones among them;
+// - no specialty: his best class at most ALL_AROUND_GAP[1] above his fourth best (none at ALL_AROUND_GAP[0]).
+// Its score is ALL_AROUND_Z times that quality, so it only wins where no ordinary build fits him well: a specialist (an
+// elite shooter, a rim protector, a playmaker...) keeps the build that names his specialty. Never for a draft prospect.
+export const ALL_AROUND_LEVEL: [number, number] = [1.5, 1.9];
+export const ALL_AROUND_GOOD = 0.5;
+export const ALL_AROUND_BREADTH: [number, number] = [5, 7];
+export const ALL_AROUND_GAP: [number, number] = [0.6, 0.35];
+export const ALL_AROUND_Z = 2.4;
+// (what the build scores when he does not qualify at all: never his label)
+export const ALL_AROUND_MISS = 6;
+const ALL_AROUND_OFF = ["shoot", "mid", "finish", "post", "handle", "pass"];
+const ALL_AROUND_DEF = ["perD", "rimD"];
+const ALL_AROUND_CLASSES = [...ALL_AROUND_OFF, ...ALL_AROUND_DEF, "reb"];
+const fade = (x: number, from: number, to: number) =>
+	Math.min(1, Math.max(0, (x - from) / (to - from)));
+export const allAroundQuality = (
+	p: Prepared,
+	cv: Record<string, number>,
+	prospect = false,
+): number => {
+	if (prospect) {
+		return 0;
+	}
+	const good = (k: string) => cv[k]! >= ALL_AROUND_GOOD;
+	if (!ALL_AROUND_DEF.some(good) || ALL_AROUND_OFF.filter(good).length < 3) {
+		return 0;
+	}
+	const vals = ALL_AROUND_CLASSES.map((k) => cv[k]!).sort((x, y) => y - x);
+	return (
+		fade(p.pzLevel, ALL_AROUND_LEVEL[0], ALL_AROUND_LEVEL[1]) *
+		fade(
+			ALL_AROUND_CLASSES.filter(good).length,
+			ALL_AROUND_BREADTH[0],
+			ALL_AROUND_BREADTH[1],
+		) *
+		fade(vals[0]! - vals[3]!, ALL_AROUND_GAP[0], ALL_AROUND_GAP[1])
+	);
+};

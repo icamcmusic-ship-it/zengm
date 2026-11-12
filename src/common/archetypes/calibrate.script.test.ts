@@ -79,6 +79,10 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 				}
 			}
 			for (const a of ARCHETYPES) {
+				// (arch13: the all-around star build is rare by design: not pushed toward an even share)
+				if (a.tags.includes("allAround")) {
+					continue;
+				}
 				const actual = Math.max(
 					0.0004,
 					(counts[a.id] ?? 0) / biasSample.length,

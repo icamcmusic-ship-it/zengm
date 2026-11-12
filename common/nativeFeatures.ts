@@ -921,6 +921,17 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "lotteryNight",
+		college: false,
+		key: "featureLotteryNight",
+		name: "Draft Lottery Night & Combine",
+		description:
+			"The draft lottery as a lottery night: picks revealed from the last lottery pick up to No. 1 with the odds going in, jumps and falls, team reactions and a winners and losers recap (and news). A draft combine after the playoffs: measurements, athletic testing and shooting drills for every prospect (a Combine tab on Draft Scouting and on the prospect's College/Overseas page). Combine results narrow the scouting report's athleticism and size grades and give AI teams a small, class-neutral nudge for big over/under-performers.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "scoutingReports",
 		key: "featureScoutingReports",
 		name: "Scouting Reports",

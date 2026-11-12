@@ -210,6 +210,8 @@ export type PositionAxes = {
 	length: number;
 	skill: number;
 	play: number;
+	// How much of playmaking comes from his stats, 0..1 (0: read from his ratings alone)
+	fromStats?: number;
 };
 
 export const positionAxes = (
@@ -218,6 +220,7 @@ export const positionAxes = (
 ): PositionAxes => {
 	const raw = positionRaw(r);
 	let play = percentile(PLAY_KNOTS, raw.playmaking);
+	let fromStats = 0;
 	if (
 		stats &&
 		stats.min > 0 &&
@@ -228,12 +231,14 @@ export const positionAxes = (
 		play =
 			(1 - w) * play +
 			w * percentile(PLAY_STAT_KNOTS, stats.astp + 0.1 * stats.usgp);
+		fromStats = w / PLAY_STATS_W;
 	}
 	return {
 		inches: raw.inches,
 		length: raw.length,
 		skill: percentile(SKILL_KNOTS, raw.ballSkills),
 		play,
+		fromStats,
 	};
 };
 
@@ -318,6 +323,13 @@ export const POSITION_BIAS: Record<Pos, number> = {
 	C: -0.86,
 };
 
+// arch13: playmaking read from ratings alone (a generated player before his first minutes, a draft prospect) puts more
+// players at point guard than their stats later do: a random league read from ratings had 18.1% PG against 14.3% with
+// BBGM's formula (real NBA 2016-2025 listings: 12.1%), the extra ones combo guards (old formula G). Without stats, PG's
+// bias is RATINGS_ONLY_PG lower, faded out as his stats take over (`fromStats`), so a player with a full season of minutes
+// reads exactly as before.
+export const RATINGS_ONLY_PG = 1.2;
+
 // Distance scales: inches of length, and percentile points (per 0.25) of playmaking and ball skills, weighted
 const LENGTH_SCALE = 1.472;
 const PLAY_WEIGHT = 0.976;
@@ -333,7 +345,8 @@ const posDistance = (a: PositionAxes, pos: Pos) => {
 		((a.length - l) / LENGTH_SCALE) ** 2 +
 		PLAY_WEIGHT * ((a.play - p) / 0.25) ** 2 +
 		SKILL_WEIGHT * ((a.skill - k) / 0.25) ** 2 -
-		POSITION_BIAS[pos]
+		POSITION_BIAS[pos] -
+		(pos === "PG" ? -(1 - (a.fromStats ?? 0)) * RATINGS_ONLY_PG : 0)
 	);
 };
 
@@ -355,6 +368,7 @@ const averageAxes = (a: PositionAxes, b: PositionAxes): PositionAxes => ({
 	length: (a.length + b.length) / 2,
 	skill: (a.skill + b.skill) / 2,
 	play: (a.play + b.play) / 2,
+	fromStats: ((a.fromStats ?? 0) + (b.fromStats ?? 0)) / 2,
 });
 
 // `previous`: his current position, kept unless the new one is clearly better now and over two seasons (`previousAxes`: last

@@ -75,6 +75,8 @@ export const featureForUrl = (
 			return "draftBoard";
 		case "mock_draft":
 			return "mockDraft";
+		case "draft_combine":
+			return "lotteryNight";
 		case "player_scouting":
 		case "scouting_department":
 			return "scoutingReports";

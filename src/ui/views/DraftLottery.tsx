@@ -37,6 +37,8 @@ import { DraftAbbrev } from "../components/DraftAbbrev.tsx";
 import { HelpPopover } from "../components/HelpPopover.tsx";
 import { DraftLotteryWhatIf } from "./DraftLotteryWhatIf.tsx";
 import { useFeatureOn } from "../util/nativeFeatures.ts";
+import { LotteryNight } from "./DraftLotteryNight.tsx";
+import { lotteryRevealOrder } from "../../common/lotteryNight.ts";
 
 type MyDraftType = DraftType | "dummy";
 export const getDraftTypeDescription = (
@@ -154,6 +156,9 @@ type Action =
 	  }
 	| {
 			type: "revealOne";
+	  }
+	| {
+			type: "revealAll";
 	  };
 
 const reducer = (state: State, action: Action): State => {
@@ -190,6 +195,12 @@ const reducer = (state: State, action: Action): State => {
 			return {
 				...state,
 				revealState: "running",
+			};
+		case "revealAll":
+			return {
+				...state,
+				indRevealed: state.toReveal.length - 1,
+				revealState: "done",
 			};
 		case "revealOne": {
 			const indRevealed = state.indRevealed + 1;
@@ -558,7 +569,11 @@ const DraftLotteryTable = (props: Props) => {
 		dispatch({ type: "revealOne" });
 
 		if (numLeftToReveal.current >= 1) {
-			timeoutID.current = setTimeout(revealPickAuto, 1000);
+			// Lottery night: a little more suspense between picks
+			timeoutID.current = setTimeout(
+				revealPickAuto,
+				props.lotteryNightTeams ? 2500 : 1000,
+			);
 		}
 	};
 
@@ -614,6 +629,14 @@ const DraftLotteryTable = (props: Props) => {
 	const handleShowOne = () => {
 		numLeftToReveal.current -= 1;
 		dispatch({ type: "revealOne" });
+	};
+
+	const handleRevealAll = () => {
+		clearTimeout(timeoutID.current);
+		timeoutID.current = undefined;
+		numLeftToReveal.current = 0;
+		revealState.current = "done";
+		dispatch({ type: "revealAll" });
 	};
 
 	const {
@@ -705,6 +728,80 @@ const DraftLotteryTable = (props: Props) => {
 				})}
 			</>
 		) : null;
+
+	// Lottery night (setting): the staged reveal while the lottery is being revealed, the full board and recap afterwards
+	let night = null;
+	const nightTeams = props.lotteryNightTeams;
+	if (nightTeams && result && state.revealState !== "init") {
+		const n = state.toReveal.length;
+		const withPicks = result.map((row, i) => {
+			const k = state.toReveal.indexOf(i);
+			return { ...row, pick: k >= 0 ? n - k : (row.pick ?? 0) };
+		});
+		const live =
+			state.revealState === "running" || state.revealState === "paused";
+		night = (
+			<LotteryNight
+				result={withPicks}
+				order={state.toReveal}
+				numRevealed={state.indRevealed + 1}
+				probs={probs}
+				teams={nightTeams}
+				season={season}
+				userTid={userTid}
+				controls={
+					live ? (
+						<div className="d-flex flex-wrap gap-2 mb-3">
+							<button
+								className="btn btn-primary"
+								onClick={handleShowOne}
+								disabled={state.indRevealed >= n - 1}
+							>
+								Reveal next
+							</button>
+							{state.revealState === "paused" ? (
+								<button className="btn btn-secondary" onClick={handleResume}>
+									Auto reveal
+								</button>
+							) : (
+								<button className="btn btn-secondary" onClick={handlePause}>
+									Pause
+								</button>
+							)}
+							<button
+								className="btn btn-outline-secondary"
+								onClick={handleRevealAll}
+							>
+								Reveal all
+							</button>
+						</div>
+					) : null
+				}
+			/>
+		);
+	} else if (
+		nightTeams &&
+		type === "completed" &&
+		props.draftLotteryResult &&
+		props.draftLotteryResult.result.every((row) => row.pick !== undefined)
+	) {
+		const completed = props.draftLotteryResult.result as {
+			tid: number;
+			originalTid: number;
+			pick: number;
+		}[];
+		night = (
+			<LotteryNight
+				result={completed}
+				order={lotteryRevealOrder(completed)}
+				numRevealed={completed.length}
+				probs={probs}
+				teams={nightTeams}
+				season={season}
+				userTid={userTid}
+			/>
+		);
+	}
 
 	// Checking both is redundant, but TypeScript wants it
 	if (result && probs) {
@@ -808,7 +905,7 @@ const DraftLotteryTable = (props: Props) => {
 						className="btn btn-large btn-success"
 						onClick={() => startLottery()}
 					>
-						Start lottery
+						{props.lotteryNightTeams ? "Start lottery night" : "Start lottery"}
 					</button>
 				) : null}
 				{showRigButton ? (
@@ -853,7 +950,8 @@ const DraftLotteryTable = (props: Props) => {
 						</HelpPopover>
 					</div>
 				) : null}
-				{type === "readyToRun" &&
+				{!props.lotteryNightTeams &&
+				type === "readyToRun" &&
 				(state.revealState === "running" || state.revealState === "paused") ? (
 					<PlayPauseNext
 						onPlay={handleResume}
@@ -866,6 +964,8 @@ const DraftLotteryTable = (props: Props) => {
 					/>
 				) : null}
 			</div>
+			{night}
+
 			{tooSlow ? (
 				<div className="text-warning mb-3">
 					<b>Warning:</b> Computing exact odds for so many teams and picks is

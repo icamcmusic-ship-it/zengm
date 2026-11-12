@@ -8,6 +8,10 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { getCollegeSeason } from "../core/draft/collegeSeason.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import {
+	getPlayerCombine,
+	lotteryNightOn,
+} from "../core/draftCombine/index.ts";
+import {
 	COLLEGE_AWARD_PREFIX,
 	getPreDraftAwards,
 	getPreDraftStats,
@@ -683,7 +687,8 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		summary,
 		splits,
 		recruiting,
-		combine: combineInfo,
+		// Draft Lottery Night & Combine setting: its own combine (draftCombine below) replaces this one
+		combine: lotteryNightOn() ? undefined : combineInfo,
 		stock,
 		comps,
 		story,
@@ -940,12 +945,21 @@ export default defineView({
 					? await getPreDraftInfo(topStuff.pRaw)
 					: undefined;
 
+			// Draft Lottery Night & Combine setting: his combine, once it was held
+			const draftCombine =
+				__SPORT === "basketball"
+					? await getPlayerCombine(topStuff.pRaw)
+					: undefined;
+
 			// The raw player stays in the worker (hidden trait seeds, etc.)
 			const { pRaw: _pRaw, ...topStuffForUI } = topStuff;
 
 			return {
 				...topStuffForUI,
 				preDraft,
+				draftCombine: draftCombine
+					? { ...draftCombine, season: topStuff.pRaw.draft.year }
+					: undefined,
 			};
 		}
 	},

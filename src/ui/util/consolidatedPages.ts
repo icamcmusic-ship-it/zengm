@@ -16,6 +16,7 @@ export const CONSOLIDATED_PAGES = [
 	{ path: "award_vote", home: "award_races", moreLinks: "awards" },
 	{ path: "draft_board", home: "draft_scouting", moreLinks: "draft" },
 	{ path: "mock_draft", home: "draft_scouting", moreLinks: "draft" },
+	{ path: "draft_combine", home: "draft_scouting", moreLinks: "draft" },
 ] as const;
 
 export const CONSOLIDATED_PATHS: ReadonlySet<string> = new Set(

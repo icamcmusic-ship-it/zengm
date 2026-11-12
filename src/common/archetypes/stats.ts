@@ -14,6 +14,8 @@ import type {
 // Share of the reading that comes from stats at STATS_FULL_MIN minutes or more (less below, none without minutes)
 export const STATS_W = 0.3;
 export const STATS_FULL_MIN = 1000;
+export const SCORER_K = 0.3;
+const SCORER_POS = new Set<Pos>(["G", "SG", "GF"]);
 // Fewer minutes than this: too few to say anything
 const STATS_MIN_MIN = 100;
 
@@ -104,6 +106,13 @@ export const statReading = (
 	}
 	if (z.usg !== undefined && z.pss !== undefined) {
 		z.drb = (z.usg + z.pss) / 2;
+		// arch13: a scoring guard's assists. An off guard or wing with a high usage racks up assists because the ball is in
+		// his hands: his assist rate says he is a playmaker only as far as it keeps up with his usage, so passing reads
+		// SCORER_K per z of usage above his assist rate lower (Kobe Bryant and Ray Allen are scorers, not point guards, for
+		// their assists). A point guard's assists are his job, and a big's are read as they are.
+		if (SCORER_POS.has(pos)) {
+			z.pss -= SCORER_K * Math.max(0, z.usg - z.pss);
+		}
 	}
 	return Object.keys(z).length > 0 ? { w, z } : undefined;
 };
