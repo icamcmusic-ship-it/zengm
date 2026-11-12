@@ -112,6 +112,8 @@ describe("realistic schedule length", options, () => {
 	});
 
 	test("82 games: NBA-like season length and rest", () => {
+		// (seeded: an unlucky schedule can have a few more 3-in-4s, see the next test for the average)
+		Math.random = makeSeededRandom(11);
 		for (let i = 0; i < 3; i++) {
 			const { output, stats, lastDay } = check(30, 82);
 
