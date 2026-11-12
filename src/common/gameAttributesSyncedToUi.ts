@@ -3,6 +3,7 @@ import { NATIVE_FEATURE_SETTING_KEYS } from "./nativeFeatures.ts";
 export const gameAttributesSyncedToUi = [
 	"alwaysShowCountry",
 	"budget",
+	"collegeAutoRecruit",
 	"challengeNoRatings",
 	"challengeNoTrades",
 	"currencyFormat",
@@ -13,6 +14,7 @@ export const gameAttributesSyncedToUi = [
 	"godMode",
 	"hideDisabledTeams",
 	"homeCourtAdvantage",
+	"leagueType",
 	"lid",
 	"luxuryPayroll",
 	"luxuryTax",

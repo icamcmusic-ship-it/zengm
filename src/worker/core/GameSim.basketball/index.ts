@@ -92,6 +92,7 @@ import {
 	PROB_VIOLATION_IN_CRISIS,
 	SHOT_CLOCK_FULL,
 	SHOT_CLOCK_RESET_ORB,
+	getShotClockOrbReset,
 	shotClockMakeFactor,
 	teamPaceFactor,
 	deriveTraits,
@@ -100,7 +101,6 @@ import {
 	TOV_SCALE,
 } from "./possessionModel.ts";
 
-const SHOT_CLOCK = 24;
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
 // weight, before late-game IQ moves it (see applyLateGameDecision)
 const LATE_GAME_BASE_ERROR = 0.06;
@@ -378,6 +378,11 @@ class GameSim extends GameSimBase {
 	// extra random numbers are drawn, so games play out exactly as before
 	realPoss: boolean;
 	shotClock = SHOT_CLOCK_FULL;
+	// Shot clock length (the customShotClock setting; 24 unless it is on) and what it resets to after an offensive rebound
+	shotClockFull = SHOT_CLOCK_FULL;
+	shotClockOrb = SHOT_CLOCK_RESET_ORB;
+	// One-and-one bonus (the oneAndOne setting): team fouls in a period from which a non-shooting foul gives a one-and-one, undefined = off
+	oneAndOneFouls: number | undefined;
 	shotClockViolations: [number, number] = [0, 0];
 	teamPaceFactor: [number, number] = [1, 1];
 	// Player traits (the playerTraits setting, see docs/player-traits.md). When no player has trait effects, nothing here is used and no
@@ -572,8 +577,20 @@ class GameSim extends GameSimBase {
 		this.paceFactor = Math.max(this.paceFactor, 0.1);
 
 		this.realPoss = !!g.get("realisticPossessions");
+		if (g.get("customShotClock")) {
+			this.shotClockFull = helpers.bound(
+				Math.round(g.get("shotClockLength")),
+				10,
+				60,
+			);
+			this.shotClockOrb = getShotClockOrbReset(this.shotClockFull);
+			this.shotClock = this.shotClockFull;
+		}
+		if (g.get("oneAndOne")) {
+			this.oneAndOneFouls = g.get("oneAndOneFouls");
+		}
 		if (this.realPoss) {
-			const scales = paceScales(this.paceFactor);
+			const scales = paceScales(this.paceFactor, this.shotClockFull);
 			this.possTimeScale = scales.possTimeScale;
 			this.gameClockFactor = scales.gameClockFactor;
 			this.teamPaceFactor = [
@@ -2639,7 +2656,10 @@ class GameSim extends GameSimBase {
 			if (this.t < 2) {
 				dt = uniform(0, this.t);
 			} else {
-				dt = uniform(1, Math.min(this.t, SHOT_CLOCK - this.possessionLength));
+				dt = uniform(
+					1,
+					Math.min(this.t, this.shotClockFull - this.possessionLength),
+				);
 			}
 		}
 		this.advanceClockSeconds(dt);
@@ -2647,7 +2667,19 @@ class GameSim extends GameSimBase {
 
 		// In the bonus? Checks offset by 1, because the foul counter won't increment until doPf is called below
 		const numFoulsUntilBonus = this.getNumFoulsUntilBonus();
-		const inBonus = numFoulsUntilBonus <= 1;
+		let inBonus = numFoulsUntilBonus <= 1;
+
+		// One-and-one (oneAndOne setting): before the two-shot bonus, from the oneAndOneFouls-th team foul of the period
+		let oneAndOne = false;
+		if (
+			!inBonus &&
+			this.oneAndOneFouls !== undefined &&
+			this.overtimes === 0 &&
+			this.oneAndOneFouls - this.foulsThisQuarter[this.d] <= 1
+		) {
+			inBonus = true;
+			oneAndOne = true;
+		}
 
 		if (this.t <= 0) {
 			throw new Error("Clock at 0 for non-shooting foul");
@@ -2660,7 +2692,7 @@ class GameSim extends GameSimBase {
 		}
 
 		if (inBonus) {
-			return this.doFt(shooter, 2);
+			return this.doFt(shooter, 2, oneAndOne);
 		}
 
 		return "nonShootingFoul";
@@ -2672,7 +2704,7 @@ class GameSim extends GameSimBase {
 	// off, or in the old model, seconds since the possession started
 	eventPoss() {
 		if (this.realPoss && this.t > this.shotClock) {
-			return SHOT_CLOCK_FULL - this.shotClock;
+			return this.shotClockFull - this.shotClock;
 		}
 		return this.possessionLength;
 	}
@@ -2682,17 +2714,17 @@ class GameSim extends GameSimBase {
 	resetShotClock() {
 		const prev = this.prevPossessionOutcome;
 		if (prev === "orb") {
-			this.shotClock = SHOT_CLOCK_RESET_ORB;
+			this.shotClock = this.shotClockOrb;
 		} else if (prev === "nonShootingFoul") {
-			this.shotClock = Math.max(SHOT_CLOCK_RESET_ORB, this.shotClock);
+			this.shotClock = Math.max(this.shotClockOrb, this.shotClock);
 		} else if (prev === "outOfBoundsDefense") {
 			this.shotClock = this.afterShotAttempt
-				? SHOT_CLOCK_RESET_ORB
+				? this.shotClockOrb
 				: Math.max(1, this.shotClock);
 		} else if (prev === "timeout") {
 			this.shotClock = Math.max(1, this.shotClock);
 		} else {
-			this.shotClock = SHOT_CLOCK_FULL;
+			this.shotClock = this.shotClockFull;
 		}
 		this.afterShotAttempt = false;
 	}
@@ -3014,7 +3046,7 @@ class GameSim extends GameSimBase {
 			pid: p.id,
 			outOfBounds: false,
 			clock: this.t,
-			poss: SHOT_CLOCK_FULL,
+			poss: this.shotClockFull,
 			shotClock: true,
 		});
 		return "outOfBoundsOffense";
@@ -3092,7 +3124,10 @@ class GameSim extends GameSimBase {
 			clock: this.t,
 			poss: this.eventPoss(),
 			// (the play-by-play text would otherwise guess from a long possession that this was a shot-clock violation)
-			shotClock: this.realPoss && this.eventPoss() >= 17 ? false : undefined,
+			shotClock:
+				this.realPoss && this.eventPoss() >= this.shotClockFull - 7
+					? false
+					: undefined,
 		});
 		return outOfBounds ? "outOfBoundsOffense" : ("tov" as const);
 	}
@@ -3491,7 +3526,7 @@ class GameSim extends GameSimBase {
 
 				// Early-clock shots are better, late-clock shots are contested (only while the shot clock is on)
 				if (this.realPoss && !putBack && this.t > this.shotClock) {
-					probMake *= shotClockMakeFactor(this.shotClock);
+					probMake *= shotClockMakeFactor(this.shotClock, this.shotClockFull);
 				}
 
 				// Player traits: his game form, shot selection (gunners vs disciplined shooters), clutch and screens. Clamped, since the
@@ -3559,7 +3594,10 @@ class GameSim extends GameSimBase {
 
 		// Ball is already in frontcourt. How long until the shot goes up?
 		let lowerLimit = Math.min(this.t / 2, 2);
-		let upperLimit = Math.min(SHOT_CLOCK - this.possessionLength, this.t - 0.1);
+		let upperLimit = Math.min(
+			this.shotClockFull - this.possessionLength,
+			this.t - 0.1,
+		);
 		if (upperLimit < 0) {
 			lowerLimit = 0;
 			upperLimit = 0;
@@ -4454,7 +4492,8 @@ class GameSim extends GameSimBase {
 		return helpers.bound(base, 0, 0.95);
 	}
 
-	doFt(p: PlayerGameSim, amount: number) {
+	// oneAndOne: the second shot is only taken if the first one is made
+	doFt(p: PlayerGameSim, amount: number, oneAndOne: boolean = false) {
 		const ftp = this.freeThrowProb(this.o, p);
 
 		let outcome: PossessionOutcome | undefined;
@@ -4486,6 +4525,9 @@ class GameSim extends GameSimBase {
 					clock: this.t,
 				});
 				outcome = undefined;
+				if (oneAndOne) {
+					break;
+				}
 			}
 		}
 
@@ -4702,7 +4744,7 @@ class GameSim extends GameSimBase {
 	doFlagrantFoul(shooter: PlayerGameSim): PossessionOutcome {
 		const maxDt = Math.max(
 			0.5,
-			Math.min(this.t - 1, SHOT_CLOCK - this.possessionLength),
+			Math.min(this.t - 1, this.shotClockFull - this.possessionLength),
 		);
 		this.advanceClockSeconds(uniform(Math.min(1, maxDt), maxDt));
 		this.isClockRunning = false;

@@ -1737,6 +1737,20 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					easterEggPlayers: {
 						type: "boolean",
 					},
+					leagueType: {
+						type: "string",
+						enum: ["pro", "college"],
+					},
+					collegeLevel: {
+						type: "string",
+						enum: ["power", "major", "full"],
+					},
+					collegeAutoRecruit: {
+						type: "boolean",
+					},
+					collegeState: {
+						type: "object",
+					},
 					generateCollegeStats: {
 						type: "boolean",
 					},

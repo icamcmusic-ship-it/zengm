@@ -32,11 +32,12 @@ const QUADS = [
 	{ home: 160, neutral: 200, away: 240 },
 ];
 
-// site: 1 home, 0 neutral, -1 away. Returns 0-3 for Quadrant 1-4
-export const quadOf = (oppRank: number, site: number) => {
+// site: 1 home, 0 neutral, -1 away. Returns 0-3 for Quadrant 1-4. scale: the cutoffs are for about 360 teams, a smaller league (college
+// mode) passes its size / 360
+export const quadOf = (oppRank: number, site: number, scale = 1) => {
 	const key = site > 0 ? "home" : site < 0 ? "away" : "neutral";
 	for (const [i, row] of QUADS.entries()) {
-		if (oppRank <= row[key]) {
+		if (oppRank <= row[key] * scale) {
 			return i;
 		}
 	}
@@ -72,7 +73,11 @@ const solve = (own: number[], opps: number[][], iterations: number) => {
 	return values;
 };
 
-export const computeNet = (n: number, games: NetGame[]): NcaaNet[] => {
+export const computeNet = (
+	n: number,
+	games: NetGame[],
+	quadScale = 1,
+): NcaaNet[] => {
 	const effSum: number[] = Array.from({ length: n }, () => 0);
 	const resSum: number[] = Array.from({ length: n }, () => 0);
 	const opps: number[][] = Array.from({ length: n }, () => []);
@@ -138,7 +143,7 @@ export const computeNet = (n: number, games: NetGame[]): NcaaNet[] => {
 			[game.b, game.a, -game.home, !aWon],
 		] as const) {
 			const net = output[t]!;
-			net.quads[quadOf(rank[opp]!, site)]![won ? 0 : 1]! += 1;
+			net.quads[quadOf(rank[opp]!, site, quadScale)]![won ? 0 : 1]! += 1;
 			if (site < 0) {
 				if (won) {
 					net.roadW += 1;

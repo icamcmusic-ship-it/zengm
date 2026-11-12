@@ -9,6 +9,8 @@ import type {
 	MenuItemHeader,
 	MenuItemText,
 } from "../../common/types.ts";
+import { useLocal } from "../util/local.ts";
+import { menuItemHiddenForLeagueType } from "../util/collegeMode.ts";
 
 type TopMenuToggleProps = {
 	long: string;
@@ -142,6 +144,7 @@ const MenuItem = ({
 	const replacingFeatureOn = useFeatureOn(
 		menuItem.type === "link" ? menuItem.featureOff : undefined,
 	);
+	const { leagueType } = useLocal(["leagueType"]);
 
 	if (menuItem.type === "text") {
 		return <Dropdown.Header>{menuItem.text}</Dropdown.Header>;
@@ -170,6 +173,10 @@ const MenuItem = ({
 				menuItem.featureOff !== undefined &&
 				replacingFeatureOn)
 		) {
+			return null;
+		}
+
+		if (menuItemHiddenForLeagueType(menuItem, leagueType)) {
 			return null;
 		}
 

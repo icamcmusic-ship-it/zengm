@@ -53,6 +53,7 @@ import addRelatives from "../realRosters/addRelatives.ts";
 import loadDataBasketball from "../realRosters/loadData.basketball.ts";
 import addDraftProspects from "./create/addDraftProspects.ts";
 import createRandomPlayers from "./create/createRandomPlayers.ts";
+import * as college from "../college/index.ts";
 import getRealTeamPlayerData from "./create/getRealTeamPlayerData.ts";
 import createGameAttributes from "./createGameAttributes.ts";
 import initRandomDebutsForRandomPlayersLeague from "./initRandomDebutsForRandomPlayersLeague.ts";
@@ -1641,14 +1642,18 @@ const afterDBStream = async ({
 
 	const randomDebuts = isRandomDebuts(randomization);
 
+	// College mode (docs/college-mode.md): college rosters instead of pro rosters and free agents
+	const collegeLeague = college.isCollege();
 	let activePlayers = fileHasPlayers
 		? extraFromStream.activePlayers
-		: await createRandomPlayers({
-				activeTids,
-				onlyFreeAgents: randomDebuts,
-				scoutingLevel,
-				teams,
-			});
+		: collegeLeague
+			? await college.createCollegePlayers({ teams })
+			: await createRandomPlayers({
+					activeTids,
+					onlyFreeAgents: randomDebuts,
+					scoutingLevel,
+					teams,
+				});
 
 	// If players are specified for some team on import (from CustomizeTeams), replace the randomly generated players
 	const replaceTids = new Set<number>();
@@ -1779,7 +1784,7 @@ const afterDBStream = async ({
 	}
 
 	// For random debuts we don't want addDraftProspects to be called, since it will fill in with random players. However this does imply that future pick value is going to be messed up for those transition years between random debuts generations, since getPickValues does not support partial draft classes.
-	if (!randomDebuts) {
+	if (!randomDebuts && !collegeLeague) {
 		await addDraftProspects({
 			players: activePlayers,
 			scoutingLevel,
@@ -1896,6 +1901,10 @@ const afterDBStream = async ({
 	await draft.genPicks({
 		realPlayers,
 	});
+
+	if (college.isCollege() && !fileHasPlayers) {
+		await college.afterLeagueCreation();
+	}
 
 	// College/overseas stats for every draft class the league starts with (setting "Auto-generate pre-draft stats & honors")
 	await draft.processNewDraftClasses();

@@ -31,6 +31,7 @@ import {
 import { menuItems } from "../../util/menuItems.tsx";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
 import { local, useLocal } from "../../util/local.ts";
+import { menuItemHiddenForLeagueType } from "../../util/collegeMode.ts";
 import { isFeatureOn } from "../../util/nativeFeatures.ts";
 import { relativeTime } from "../../util/relativeTime.ts";
 import { router } from "../../router/index.ts";
@@ -131,6 +132,12 @@ const getResultsGroupedDefault = ({
 		}
 
 		if (menuItem.featureOff && isFeatureOn(menuItem.featureOff)) {
+			return false;
+		}
+
+		if (
+			menuItemHiddenForLeagueType(menuItem, local.getState().leagueType)
+		) {
 			return false;
 		}
 

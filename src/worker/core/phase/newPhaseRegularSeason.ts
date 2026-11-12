@@ -1,5 +1,6 @@
 import { season, team } from "../index.ts";
 import * as staff from "../staff/index.ts";
+import * as college from "../college/index.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import type { Conditions, Game, PhaseReturn } from "../../../common/types.ts";
@@ -148,7 +149,12 @@ const newPhaseRegularSeason = async (
 		active: true,
 	});
 
-	await season.setSchedule(season.newSchedule(teams));
+	if (college.isCollege()) {
+		// College mode: non-conference games, then conference play, and the season's polls start
+		await college.startRegularSeason();
+	} else {
+		await season.setSchedule(season.newSchedule(teams));
+	}
 
 	// Coaching systems: each head coach's preseason expectation, for the hot seat
 	await staff.setExpectations();
