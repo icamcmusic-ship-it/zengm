@@ -4,8 +4,9 @@
 // quality, free agency, cap health, roster sizes, unrest, parity, contract levels). Run with
 // RUN_AI_AUDIT=1 npx vitest run --project basketball src/test/ratingInflation/aiAudit.script.test.ts
 // Env: AI_SEEDS (comma list, default 1), AI_SEASONS (default 4), AI_OUT (jsonl file), AI_GMS (0 turns AI GM personalities off, for
-// before/after comparisons; with them on, also records GM firings/hires and per-team trade counts by GM style)
-import { appendFileSync } from "node:fs";
+// before/after comparisons; with them on, also records GM firings/hires and per-team trade counts by GM style), AI_CAPEX (0 turns
+// salary cap exceptions off), AI_REPEATER / AI_STRETCH (1 turns the repeater tax / stretch provision on)
+import { appendFileSync, writeFileSync } from "node:fs";
 import { test } from "vitest";
 import { PHASE } from "../../common/constants.ts";
 import { getTradePickConditions } from "../../common/draftPickConditions.ts";
@@ -74,6 +75,7 @@ const inSeason = async (season: number) => {
 		overTax: payrolls.filter((p) => p > tax).length,
 		overCap: payrolls.filter((p) => p > salaryCap).length,
 		maxPayrollCap: r2(Math.max(...payrolls) / salaryCap),
+		meanPayrollCap: r2(mean(payrolls) / salaryCap),
 		deadMoneyPerTeamCap: r2(dead / teams.length / salaryCap),
 		rosterMin: Math.min(...rosters),
 		rosterMax: Math.max(...rosters),
@@ -129,6 +131,9 @@ const eventCounts = async (season: number) => {
 	);
 	const by = (type) => events.filter((e) => e.type === type);
 	const trades = by("trade");
+	const fa = by("freeAgent");
+	const minContract = g.get("minContract");
+	const salaryCap = g.get("salaryCap");
 	const tradedPids = new Set(trades.flatMap((e) => e.pids ?? []));
 	const reqPids = new Set(by("tradeRequest").flatMap((e) => e.pids ?? []));
 	let reqTraded = 0;
@@ -148,6 +153,30 @@ const eventCounts = async (season: number) => {
 		tradesForRequests: trades.filter((e) => /asked out/i.test(e.note ?? ""))
 			.length,
 		faSignings: by("freeAgent").length,
+		// Free agent signings above the minimum, their mean and total first season salary (% of the cap), and salary cap exception use
+		faAboveMin: fa.filter((e) => e.contract?.amount > minContract).length,
+		faMeanAmountCap: r2(
+			(mean(fa.map((e) => e.contract?.amount ?? 0)) / salaryCap) * 100,
+		),
+		faTotalCap: r2(
+			fa.reduce((sum, e) => sum + (e.contract?.amount ?? 0), 0) / salaryCap,
+		),
+		faMle: fa.filter((e) => e.exception === "nonTaxpayerMle").length,
+		faTaxMle: fa.filter((e) => e.exception === "taxpayerMle").length,
+		faBiAnnual: fa.filter((e) => e.exception === "biAnnual").length,
+		faRoom: fa.filter((e) => e.exception === "room").length,
+		stretched: by("release").filter((e) => /stretch provision/.test(e.text))
+			.length,
+		luxuryTaxPaid: r2(
+			by("luxuryTax").length === 0
+				? 0
+				: by("luxuryTax").reduce(
+						(sum, e) =>
+							sum + Number(/tax of \$([0-9.]+)M/.exec(e.text)?.[1] ?? 0),
+						0,
+					),
+		),
+		repeaters: by("luxuryTax").filter((e) => /repeater/.test(e.text)).length,
 		releases: by("release").length,
 		reSigned: by("reSigned").length,
 		extensions: by("extension").length,
@@ -171,11 +200,49 @@ test.skipIf(!process.env.RUN_AI_AUDIT)(
 			Math.random = mulberry32(seed);
 			try {
 				const gmsOn = process.env.AI_GMS !== "0";
+				const capexOn = process.env.AI_CAPEX !== "0";
 				await createLeague({
 					...ALL_ON,
 					expandedRatings: true,
 					featureGmPersonalities: gmsOn,
+					// Salary cap exceptions and their sub-settings: AI_CAPEX=0 for a before/after, AI_REPEATER=1 and AI_STRETCH=1 turn the sub-settings on
+					featureCapExceptions: capexOn,
+					capExceptionsRepeaterTax: process.env.AI_REPEATER === "1",
+					capExceptionsStretch: process.env.AI_STRETCH === "1",
 				});
+				// AI_GM_DUMP: every GM's career and every team season's record, for job security analysis
+				const dumpGms = async () => {
+					if (!process.env.AI_GM_DUMP || !gmsOn) {
+						return;
+					}
+					const teams = (await idb.cache.teams.getAll()).filter(
+						(t) => !t.disabled,
+					);
+					const allTs = await idb.cache.teamSeasons.getAll();
+					writeFileSync(
+						process.env.AI_GM_DUMP,
+						JSON.stringify({
+							seed,
+							lastSeason: g.get("season") - 1,
+							teamSeasons: allTs.map((ts) => [
+								ts.tid,
+								ts.season,
+								ts.won,
+								ts.lost,
+								ts.playoffRoundsWon,
+							]),
+							gms: teams.flatMap((t) =>
+								[...(t.formerGms ?? []), ...(t.gm ? [t.gm] : [])].map((gm) => ({
+									gmid: gm.gmid,
+									name: `${gm.firstName} ${gm.lastName}`,
+									patience: gm.traits.patience,
+									tenures: gm.tenures,
+									seasons: gm.seasons,
+								})),
+							),
+						}) + "\n",
+					);
+				};
 				const tradesByTid = new Map();
 				const strategySwitches = [];
 				for (let i = 0; i < seasons; i++) {
@@ -212,6 +279,7 @@ test.skipIf(!process.env.RUN_AI_AUDIT)(
 						seed,
 						season,
 						gms: gmsOn,
+						capex: capexOn,
 						...ev,
 						...mid,
 						...oq,
@@ -224,6 +292,7 @@ test.skipIf(!process.env.RUN_AI_AUDIT)(
 					};
 					appendFileSync(out, JSON.stringify(row) + "\n");
 					console.log(JSON.stringify(row));
+					await dumpGms();
 				}
 				// Per-team trade counts over the whole run, and how they line up with each GM's trade frequency leaning
 				const teams = (await idb.cache.teams.getAll()).filter(

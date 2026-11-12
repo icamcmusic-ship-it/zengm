@@ -51,7 +51,10 @@ export type DimKey =
 	| "cs"
 	| "orl"
 	// ... and ball security lean: bsc against what his handle, passing and IQ would give (a careful or a loose handler)
-	| "sec";
+	| "sec"
+	// Finishing: layups and dunks themselves (inside scoring and dunking), without the height BBGM's at-the-rim composite
+	// is mostly made of. What a 2K "Slasher", "Finisher" or "Dunker" is about.
+	| "fin";
 
 // Player traits (the playerTraits setting) an archetype may read: only the ones the user can see (never hidden traits or the
 // aging curve), as the 0-100 score the user sees (a prospect's scouted estimate)
@@ -72,7 +75,7 @@ export type ArchetypeGroup = "guard" | "wing" | "forward" | "big";
 // BBGM basketball positions
 export type Pos = "PG" | "G" | "SG" | "GF" | "SF" | "F" | "PF" | "FC" | "C";
 
-// Families are used to avoid pairing an archetype with a near-duplicate as its secondary one
+// What the build is mostly about (roster composition warnings read it)
 export type ArchetypeFamily =
 	| "playmaker"
 	| "shooter"
@@ -119,10 +122,6 @@ export type ArchetypeDef = {
 	cap?: Partial<Record<DimKey, number>>;
 	// The same, on the z for his size (rebounding, post scoring and finishing are judged against players his height)
 	needFor?: Partial<Record<DimKey, number>>;
-	// Gate on his overall level (mean size-adjusted skill z, soft): raw prospects are well below the league
-	level?: [number, number];
-	// Gate on age, applied when his age is known. When it is not, a veteran archetype (minimum age 30+) is never picked
-	age?: [number, number];
 	// Rare "unicorn" types are not expected to be filled in every league
 	rare?: true;
 	// Only for players who have expanded ratings: the label is about his length (wingspan for his height)
@@ -136,6 +135,26 @@ export type ArchetypeDef = {
 	// Position prior overrides on top of the group's (see position.ts): z nudge per position, null = never
 	pos?: Partial<Record<Pos, number | null>>;
 	tags: string[];
+};
+
+// An archetype as twoK/build2k.script.test.ts writes it (twoK/defs2k.data.ts)
+export type TwoKDef = {
+	id: string;
+	name: string;
+	// Other 2K build names that say the same thing, or that the matcher could not tell apart from this one
+	aliases: string[];
+	group: ArchetypeGroup;
+	family: ArchetypeFamily;
+	positions: Pos[];
+	hgt: [number, number];
+	w: Partial<Record<DimKey, number>>;
+	xw: Partial<Record<DimKey, number>>;
+	need: Partial<Record<DimKey, number>>;
+	needFor: Partial<Record<DimKey, number>>;
+	desc: string;
+	tags: string[];
+	// How many of the 2K builds it stands for
+	builds: number;
 };
 
 export type Archetype = ArchetypeDef & {
@@ -183,24 +202,29 @@ export type Classification = {
 	family: ArchetypeFamily;
 	desc: string;
 	tags: string[];
-	// null when no second archetype is close enough to call him a hybrid
-	secondary: { id: string; name: string; desc: string } | null;
-	// 0..1: how well the ratings match the primary profile
+	// The next closest builds ("also close to"), never part of the label
+	alternates: { id: string; name: string }[];
+	// 0..1: how similar the shape of his ratings is to the build's profile (absolute, see POOR_FIT in classify.ts)
 	score: number;
+	// How exceptional that fit is among the league's players the build allows, with the name's floors applied (z)
+	fit: number;
+	// How far he is from what the build's name promises, in z (0 = he has it all)
+	shortfall: number;
 	// 0..1: margin of the primary over the runner-up
 	confidence: number;
 	tier: Tier | null;
 	// Top three contributions to the match
 	why: Why[];
-	// "Slasher / Floor General"
+	// The build's name (one name: no hybrids)
 	label: string;
 };
 
 // What is stored on a player, compactly
 export type StoredArchetype = {
 	season: number;
-	// Archetype id (see ARCHETYPES), secondary id when he is a hybrid
+	// Archetype id (see ARCHETYPES)
 	id: string;
+	// Entries stored before labels were a single build may carry a hybrid partner: ignored
 	secondary?: string;
 	// A short code of the tier, kept so the history reads without recomputing
 	tier?: Tier;

@@ -4,8 +4,14 @@ import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import type { Conditions, PhaseReturn } from "../../../common/types.ts";
 import { NotEnoughTeamsError } from "../draft/genOrder.ts";
+import * as college from "../college/index.ts";
 
 const newPhaseDraft = async (conditions: Conditions): Promise<PhaseReturn> => {
+	// College mode: this phase is the departures (graduation and the off-screen pro draft)
+	if (college.isCollege()) {
+		return college.newPhaseDepartures(conditions);
+	}
+
 	// In case some weird situation results in games still in the schedule, clear them
 	await idb.cache.schedule.clear();
 

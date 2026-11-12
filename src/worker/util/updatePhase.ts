@@ -8,6 +8,8 @@ import local from "./local.ts";
 import toUI from "./toUI.ts";
 import type { Conditions } from "../../common/types.ts";
 import { league } from "../core/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
+import { COLLEGE_PHASE_TEXT } from "../../common/college/constants.ts";
 
 // Calculate phase text in worker rather than UI, because here we can easily cache it in the meta database
 function updatePhase(conditions?: Conditions) {
@@ -20,6 +22,11 @@ function updatePhase(conditions?: Conditions) {
 			NO_LOTTERY_DRAFT_TYPES.has(g.get("draftType")))
 	) {
 		text = "after playoffs";
+	}
+
+	// College mode: the phases have college names
+	if (isCollege()) {
+		text = COLLEGE_PHASE_TEXT[g.get("phase")] ?? text;
 	}
 
 	const phaseText = `${g.get("season")} ${text}`;

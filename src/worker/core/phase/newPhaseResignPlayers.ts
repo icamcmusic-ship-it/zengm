@@ -20,6 +20,7 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import { autoPlayStopsAt } from "../league/autoPlay.ts";
 import { getAllGmWeights } from "../gm/index.ts";
+import * as college from "../college/index.ts";
 
 export const FREE_AGENCY_DAYS = 30;
 
@@ -29,6 +30,11 @@ const AVOID_TAX_MIN_RANK = 3;
 const newPhaseResignPlayers = async (
 	conditions: Conditions,
 ): Promise<PhaseReturn> => {
+	// College mode: this phase is the recruiting period before signing day
+	if (college.isCollege()) {
+		return college.newPhaseRecruiting();
+	}
+
 	// In case some weird situation results in games still in the schedule, clear them
 	await idb.cache.schedule.clear();
 

@@ -12,6 +12,7 @@ import { g, local, lock } from "../../util/index.ts";
 import type { Conditions, Phase } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { choice } from "../../../common/random.ts";
+import * as college from "../college/index.ts";
 
 // Depending on phase, initiate action that will lead to the next phase
 const autoPlay = async (conditions: Conditions = {}) => {
@@ -69,6 +70,12 @@ const autoPlay = async (conditions: Conditions = {}) => {
 	if (currentPhase === PHASE.PRESEASON) {
 		await phase.newPhase(PHASE.REGULAR_SEASON, conditions);
 	} else if (
+		currentPhase === PHASE.AFTER_TRADE_DEADLINE &&
+		college.isCollege()
+	) {
+		// College mode: the conference tournaments are scheduled a day at a time
+		await game.play(100, conditions);
+	} else if (
 		currentPhase === PHASE.REGULAR_SEASON ||
 		currentPhase === PHASE.AFTER_TRADE_DEADLINE
 	) {
@@ -95,6 +102,9 @@ const autoPlay = async (conditions: Conditions = {}) => {
 		await phase.newPhase(PHASE.RESIGN_PLAYERS, conditions);
 	} else if (currentPhase === PHASE.RESIGN_PLAYERS) {
 		await phase.newPhase(PHASE.FREE_AGENCY, conditions);
+	} else if (currentPhase === PHASE.FREE_AGENCY && college.isCollege()) {
+		// College mode: no free agency days
+		await phase.newPhase(PHASE.PRESEASON, conditions);
 	} else if (currentPhase === PHASE.FREE_AGENCY) {
 		// Purposely call without await, to break up the promise chain. Otherwise the promise chain uses too much memory after many seasons (like 50+)
 		// An error there would otherwise leave auto play running forever, with only Stop in the play menu

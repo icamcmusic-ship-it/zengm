@@ -1,9 +1,12 @@
 import { g } from "../../util/index.ts";
+import { REPEATER_TAX_FACTOR } from "../../../common/capExceptions.ts";
 
-const getLuxuryTaxAmount = (payroll: number) => {
+// repeater: the team pays the higher repeater rate (Repeater Luxury Tax setting, see isRepeaterTaxTeam)
+const getLuxuryTaxAmount = (payroll: number, repeater: boolean = false) => {
 	// Only apply luxury tax if hard cap is disabled!
 	if (payroll > g.get("luxuryPayroll") && g.get("salaryCapType") !== "hard") {
-		return g.get("luxuryTax") * (payroll - g.get("luxuryPayroll"));
+		const amount = g.get("luxuryTax") * (payroll - g.get("luxuryPayroll"));
+		return repeater ? REPEATER_TAX_FACTOR * amount : amount;
 	}
 
 	return 0;

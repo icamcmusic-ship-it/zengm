@@ -1,4 +1,4 @@
-import { buildBaseNorms, probit } from "./norms.ts";
+import { buildBaseNorms } from "./norms.ts";
 import { archetypePrior, isPos, positionOf } from "./position.ts";
 import { gateFactor, prepare, rawMatch } from "./score.ts";
 import type { Archetype, ArchetypeRatings, Norms } from "./types.ts";
@@ -63,12 +63,6 @@ export const buildNorms = (
 	}));
 	const match: Norms["match"] = {};
 	for (const a of archetypes) {
-		// Raw prospects and veterans are scarce in any one league (prospects are not even in it): always read against the
-		// reference league's tables, which were built with them in
-		if ((a.level || a.age) && fallback?.match[a.id]) {
-			match[a.id] = fallback.match[a.id]!;
-			continue;
-		}
 		const inGate = prepared
 			// His peers: players inside the height gate at positions the archetype allows
 			.filter(
@@ -76,7 +70,7 @@ export const buildNorms = (
 					gateFactor(p.hgt, a.hgt) >= 0.9 &&
 					(archetypePrior(a, p.pos) ?? -Infinity) > -1,
 			)
-			.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded))
+			.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.expanded))
 			.sort((x, y) => x - y);
 		// Too few peers (a small league, or a very rare body type): reuse the reference league's table rather than read him
 		// against everyone, which would make any player look like an exceptional fit for an archetype nobody in the league has
@@ -88,7 +82,7 @@ export const buildNorms = (
 			inGate.length >= 8
 				? inGate
 				: prepared
-						.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.level, p.expanded))
+						.map((p) => rawMatch(a, p.z, p.hgt, p.skills, p.expanded))
 						.sort((x, y) => x - y);
 		match[a.id] = MATCH_Z.map((z) => {
 			const pos = Math.min(1, Math.max(0, phi(z))) * (vals.length - 1);
@@ -101,6 +95,5 @@ export const buildNorms = (
 			);
 		});
 	}
-	void probit;
 	return { ...base, match };
 };

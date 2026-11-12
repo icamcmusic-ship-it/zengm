@@ -59,6 +59,7 @@ const useLocalRaw = createWithEqualityFn<LocalStateWithActions>(
 		>),
 		alwaysShowCountry: false,
 		budget: defaultGameAttributes.budget,
+		collegeAutoRecruit: true,
 		challengeNoRatings: false,
 		challengeNoTrades: false,
 		currencyFormat: defaultGameAttributes.currencyFormat,
@@ -76,6 +77,7 @@ const useLocalRaw = createWithEqualityFn<LocalStateWithActions>(
 		godMode: false,
 		hideDisabledTeams: false,
 		homeCourtAdvantage: 1,
+		leagueType: "pro",
 		keyboardShortcuts: undefined,
 		lid: undefined,
 		liveGameInProgress: false,
@@ -165,6 +167,7 @@ const useLocalRaw = createWithEqualityFn<LocalStateWithActions>(
 					godMode: false,
 					hideDisabledTeams: false,
 					homeCourtAdvantage: 1,
+					leagueType: "pro",
 
 					// Controller.tsx relies on this being undefined (or at least different than the new lid) to trigger calling beforeView.league
 					lid: undefined,

@@ -6,6 +6,7 @@ import { idb } from "../db/index.ts";
 import { g } from "./index.ts";
 import {
 	loadState,
+	resetLeagueAchievementsStoreForTests,
 	saveState,
 	type SavedState,
 } from "./leagueAchievementsStore.ts";
@@ -29,7 +30,16 @@ const state = (startingSeason: number): SavedState => ({
 	log: [{ id: "champ-1", season: 2021, phase: 3, who: "Someone" }],
 });
 
+// Test files share globals in a worker (isolate: false), so put back exactly what was there before (setup.ts defines IDBKeyRange for everyone)
+const previousGlobals = new Map<string, PropertyDescriptor | undefined>();
+
 beforeAll(() => {
+	for (const name of [...IDB_GLOBALS, "indexedDB"]) {
+		previousGlobals.set(
+			name,
+			Object.getOwnPropertyDescriptor(globalThis, name),
+		);
+	}
 	for (const name of IDB_GLOBALS) {
 		(globalThis as any)[name] = fakeIndexedDB[name];
 	}
@@ -37,14 +47,20 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-	// @ts-expect-error
-	delete globalThis.indexedDB;
-	for (const name of IDB_GLOBALS) {
-		delete (globalThis as any)[name];
+	for (const [name, descriptor] of previousGlobals) {
+		if (descriptor) {
+			Object.defineProperty(globalThis, name, descriptor);
+		} else {
+			delete (globalThis as any)[name];
+		}
 	}
+	resetLeagueAchievementsStoreForTests();
 });
 
 beforeEach(async () => {
+	resetLeagueAchievementsStoreForTests();
+	// A fresh legacy database for each test
+	globalThis.indexedDB = new fakeIndexedDB.IDBFactory();
 	resetG();
 	delete (g as any).leagueAchievements;
 	g.setWithoutSavingToDB("lid", 7);

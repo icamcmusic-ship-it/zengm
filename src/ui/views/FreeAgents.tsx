@@ -109,6 +109,7 @@ const signedFreeAgentWrapped = (
 };
 
 const FreeAgents = ({
+	capExceptions,
 	capSpace,
 	market,
 	challengeNoFreeAgents,
@@ -213,7 +214,8 @@ const FreeAgents = ({
 	if (showShowPlayersAffordButton && dataTableHandle) {
 		askingForIndex = colKeys.lastIndexOf(askingForText);
 		askingForFilter = getAffordFilter({
-			capSpace,
+			// A salary cap exception (setting) counts like that much cap space
+			capSpace: Math.max(capSpace, capExceptions?.maxAmount ?? 0),
 			challengeNoFreeAgents,
 			minContract,
 		});
@@ -303,6 +305,7 @@ const FreeAgents = ({
 									<NegotiateButtons
 										canGoOverCap={salaryCapType === "none"}
 										capSpace={capSpace}
+										exceptionAmount={capExceptions?.maxAmount}
 										disabled={gameSimInProgress}
 										minContract={minContract}
 										onNegotiate={async () => {
@@ -337,6 +340,7 @@ const FreeAgents = ({
 			{season === "current" ? (
 				<>
 					<RosterSalarySummary
+						capExceptions={capExceptions}
 						capSpace={capSpace}
 						numRosterSpots={numRosterSpots}
 						payroll={payroll}

@@ -11,6 +11,7 @@ import {
 	trade,
 } from "../index.ts";
 import * as staff from "../staff/index.ts";
+import * as college from "../college/index.ts";
 import loadTeams from "./loadTeams.ts";
 import { getPbpRivalryLevels, pbpRivalryLevel } from "../../util/pbpRivalry.ts";
 import { setPbpGameContext } from "../../util/pbpGameContext.ts";
@@ -55,6 +56,8 @@ import {
 } from "../../util/recomputeLocalUITeamOvrs.ts";
 import { last } from "../../../common/utils.ts";
 import { advStats } from "../../util/advStats.ts";
+import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
+import { getDayScale, getDayTicks } from "../season/scheduleDayScale.ts";
 
 const FLUSH_COALESCE_MS = 5000;
 
@@ -85,11 +88,16 @@ const play = async (
 		let newPhaseCalled = false;
 		if (g.get("phase") < PHASE.PLAYOFFS) {
 			if (schedule.length === 0) {
-				await phase.newPhase(
-					PHASE.PLAYOFFS,
-					conditions,
-					gidOneGame !== undefined,
-				);
+				// College mode: the conference tournaments come between the regular season and the national tournament
+				if (college.isCollege() && g.get("phase") === PHASE.REGULAR_SEASON) {
+					await phase.newPhase(PHASE.AFTER_TRADE_DEADLINE, conditions);
+				} else {
+					await phase.newPhase(
+						PHASE.PLAYOFFS,
+						conditions,
+						gidOneGame !== undefined,
+					);
+				}
 				newPhaseCalled = true;
 			}
 		} else if (playoffsOver) {
@@ -167,8 +175,9 @@ const play = async (
 			}
 		}
 
-		// injuryDepth setting: remember each team's last game day, for back-to-backs
-		if (isInjuryDepthEnabled()) {
+		// injuryDepth setting (and realistic schedule length, for the back-to-back markers): remember each team's last game
+		// day, for back-to-backs
+		if (isInjuryDepthEnabled() || getDayScale() < 1) {
 			for (const result of results) {
 				if (typeof result.day !== "number") {
 					continue;
@@ -193,6 +202,11 @@ const play = async (
 
 		// Invalidate leaders cache, if it exists
 		local.seasonLeaders = undefined;
+
+		// College mode: results log, weekly poll, conference tournament brackets
+		if (college.isCollege()) {
+			await college.afterGames(results, dayOver);
+		}
 
 		if (g.get("phase") === PHASE.PLAYOFFS) {
 			// Update playoff series W/L
@@ -231,12 +245,16 @@ const play = async (
 				Infinity,
 			]);
 
+			// Realistic schedule length: the daily processes run on only some days, as many as the old compact schedule
+			// had (see season/scheduleDayScale.ts). Always 1 otherwise.
+			const dayTick = (await getDayTicks()) > 0;
+
 			const playersToSave = [];
 			const injuryDepthEnabled = isInjuryDepthEnabled();
 			for (const p of players) {
 				let changed = false;
 
-				if (p.injury.gamesRemaining > 0) {
+				if (dayTick && p.injury.gamesRemaining > 0) {
 					p.injury.gamesRemaining -= 1;
 					changed = true;
 				}
@@ -254,7 +272,7 @@ const play = async (
 					changed = true;
 				}
 
-				if (injuryDepthEnabled && injuryDepthDailyTick(p)) {
+				if (dayTick && injuryDepthEnabled && injuryDepthDailyTick(p)) {
 					changed = true;
 				}
 
@@ -303,7 +321,7 @@ const play = async (
 					p.gamesUntilTradable = 0; // Initialize for old leagues
 
 					changed = true;
-				} else if (p.gamesUntilTradable > 0) {
+				} else if (dayTick && p.gamesUntilTradable > 0) {
 					p.gamesUntilTradable -= 1;
 					changed = true;
 				}
@@ -328,6 +346,7 @@ const play = async (
 
 			// Tragic deaths only happen during the regular season!
 			if (
+				dayTick &&
 				g.get("phase") !== PHASE.PLAYOFFS &&
 				Math.random() < g.get("tragicDeathRate") &&
 				!g.get("repeatSeason") &&
@@ -345,16 +364,22 @@ const play = async (
 			// Do this stuff after injuries, so autoSign knows the injury status of players for the next game
 			const phase = g.get("phase");
 			if (
-				phase === PHASE.REGULAR_SEASON ||
-				phase === PHASE.AFTER_TRADE_DEADLINE
+				dayTick &&
+				(phase === PHASE.REGULAR_SEASON ||
+					phase === PHASE.AFTER_TRADE_DEADLINE)
 			) {
 				await freeAgents.decreaseDemands();
 				await freeAgents.autoSign();
 				await contractHooks.afterDay();
 			}
-			if (phase === PHASE.REGULAR_SEASON) {
+			if (dayTick && phase === PHASE.REGULAR_SEASON) {
 				// AI-to-AI trades and AI offers are background activity: a bug in them must not stop the season
 				await trade.runAiTradesSafely();
+			}
+
+			// Rumors (League extras): read-only, on its own random stream. After the day's trades and signings
+			if (dayTick) {
+				await rumorsAfterDay();
 			}
 		}
 
@@ -602,9 +627,12 @@ const play = async (
 			} else {
 				// Only do neutralSite when not forcing a win, since forcing a win uses homeCourtFactor and I don't want to worry about how that interacts with neutralSite
 				const neutralSite =
-					g.get("phase") === PHASE.PLAYOFFS &&
-					(g.get("neutralSite") === "playoffs" ||
-						(g.get("neutralSite") === "finals" && game.finals));
+					(g.get("phase") === PHASE.PLAYOFFS &&
+						(g.get("neutralSite") === "playoffs" ||
+							(g.get("neutralSite") === "finals" && game.finals))) ||
+					// College mode: conference tournaments are played on a neutral court
+					(g.get("phase") === PHASE.AFTER_TRADE_DEADLINE &&
+						college.isCollege());
 
 				const result = getResult({
 					gid: game.gid,

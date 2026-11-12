@@ -8,6 +8,7 @@ import {
 	classify,
 	currentEntry,
 	explain,
+	isPoorFit,
 	toStored,
 	viewOf,
 	withEntry,
@@ -36,7 +37,7 @@ import {
 	traitsEnabled,
 } from "./traits.ts";
 import { TRAIT_DEFINITIONS } from "../../../common/playerTraits/definitions.ts";
-import { TWO_K_NAMES } from "../../../common/archetypes/twoK/twoK.data.ts";
+import { TWO_K_NAMES } from "../../../common/archetypes/defs.data.ts";
 
 // The archetype a player has is DERIVED from his ratings (src/common/archetypes), but it is STORED on him (p.archetypes) at
 // the start of every preseason, so what the UI shows stays fixed between preseasons. Prospects, and players who have no entry
@@ -184,19 +185,13 @@ export const classifyPlayer = (
 		return undefined;
 	}
 	const row = last(p.ratings) as any;
-	// His position as the game shows it is the prior, so the fuzzed ratings scouts see cannot push him into a group his
-	// listed position rules out
-	// His age picks out veterans (and keeps a 30 year old from reading as a raw prospect)
-	const age =
-		typeof row.season === "number" && typeof p.born?.year === "number"
-			? row.season - p.born.year
-			: undefined;
+	// His position as the game shows it decides which builds he may have, so the fuzzed ratings scouts see cannot push
+	// him into one his listed position rules out
 	return classify(ratings, {
 		norms,
 		ovr: row.ovr,
 		previousId,
 		pos: row.pos,
-		age,
 		traits:
 			typeof row.season === "number"
 				? archetypeTraits(p, row.season)
@@ -310,7 +305,6 @@ export const archetypeLabelAt = (
 export type PlayerArchetypeInfo = {
 	id: string;
 	name: string;
-	secondaryName?: string;
 	label: string;
 	desc: string;
 	group: ArchetypeView["group"];
@@ -320,8 +314,12 @@ export type PlayerArchetypeInfo = {
 	season?: number;
 	live: boolean;
 	why: { label: string; z: number; want: number }[];
-	// NBA 2K builds that read as this archetype (twoK/convert2k.script.test.ts)
+	// The other NBA 2K build names this archetype stands for (twoK/build2k.script.test.ts)
 	twoK?: string[];
+	// The next closest builds by his current ratings ("also close to"): never part of the label
+	alsoClose?: string[];
+	// His ratings do not really have the shape of any build his position allows: the nearest one is shown (isPoorFit)
+	poorFit?: boolean;
 };
 
 // Everything the player page shows. A non-prospect with no entry gets one stored here, once.
@@ -360,10 +358,17 @@ export const archetypeInfoForPlayer = async (
 			}))
 		: [];
 	const v = found.view;
+	// The runners-up by his current ratings, and whether the shown build is only the nearest one
+	const live = found.classification ?? classifyPlayer(p, norms, v.id);
+	const alsoClose = live
+		? [
+				...(live.id !== v.id ? [live.name] : []),
+				...live.alternates.filter((x) => x.id !== v.id).map((x) => x.name),
+			].slice(0, 2)
+		: undefined;
 	return {
 		id: v.id,
 		name: v.name,
-		secondaryName: v.secondaryName,
 		label: v.label,
 		desc: v.desc,
 		group: v.group,
@@ -373,6 +378,8 @@ export const archetypeInfoForPlayer = async (
 		live: !found.stored,
 		why,
 		twoK: TWO_K_NAMES[v.id],
+		alsoClose,
+		poorFit: live && live.id === v.id ? isPoorFit(live) : undefined,
 	};
 };
 

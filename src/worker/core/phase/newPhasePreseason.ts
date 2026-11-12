@@ -16,6 +16,7 @@ import {
 import { idb } from "../../db/index.ts";
 import * as staff from "../staff/index.ts";
 import { ensureGms } from "../gm/index.ts";
+import * as college from "../college/index.ts";
 import { updateArchetypesForPreseason } from "../player/archetype.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import type {
@@ -655,7 +656,12 @@ const newPhasePreseason = async (
 	);
 
 	// A new draft class for the year that just came into range, plus any other missing ones
-	await draft.topUpDraftClasses(newSeason, PHASE.PRESEASON);
+	if (college.isCollege()) {
+		// College mode: class years advance, prestige follows last season, next year's recruiting class
+		await college.onPreseason();
+	} else {
+		await draft.topUpDraftClasses(newSeason, PHASE.PRESEASON);
+	}
 
 	// No ads during multi season auto sim
 	if (env.enableLogging && !local.autoPlayUntil) {

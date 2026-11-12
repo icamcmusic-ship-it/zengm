@@ -10,7 +10,10 @@ import getPlayoffsByConf from "./getPlayoffsByConf.ts";
 import getSchedule from "./getSchedule.ts";
 import getSeasonLeaders from "./getSeasonLeaders.ts";
 import hasTies from "./hasTies.ts";
-import newSchedule from "./newSchedule.ts";
+import newSchedule, {
+	newScheduleWithDays,
+	realisticScheduleOn,
+} from "./newSchedule.ts";
 import newSchedulePlayoffsDay from "./newSchedulePlayoffsDay.ts";
 import setSchedule from "./setSchedule.ts";
 import updateOwnerMood from "./updateOwnerMood.ts";
@@ -30,6 +33,8 @@ export default {
 	getSeasonLeaders,
 	hasTies,
 	newSchedule,
+	newScheduleWithDays,
+	realisticScheduleOn,
 	newSchedulePlayoffsDay,
 	setSchedule,
 	updateOwnerMood,

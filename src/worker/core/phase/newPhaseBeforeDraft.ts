@@ -32,6 +32,7 @@ import { orderTeams } from "../../util/orderTeams.ts";
 import { doAwards } from "../awards/doAwards.ts";
 import * as staff from "../staff/index.ts";
 import * as gm from "../gm/index.ts";
+import * as college from "../college/index.ts";
 
 const INFLATION_GAME_ATTRIBUTES = [
 	"salaryCap",
@@ -325,6 +326,11 @@ const newPhaseBeforeDraft = async (
 	}
 
 	await doAwards(conditions);
+
+	// College mode: keep the season's polls, brackets and selection with the awards
+	if (college.isCollege()) {
+		await college.archiveSeason();
+	}
 
 	// AI GM records, firings and the GM carousel (before the coaching market, so new GMs run it)
 	await gm.runOffseason();

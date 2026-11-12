@@ -39,6 +39,8 @@ import {
 	useNegotiaionModal,
 } from "../../components/NegotiationModal.tsx";
 import { useLocal } from "../../util/local.ts";
+import { useIsCollege } from "../../util/collegeMode.ts";
+import { CollegePlayerInfo } from "../College/CollegePlayerInfo.tsx";
 
 const Relatives = ({
 	gender,
@@ -332,8 +334,10 @@ const TopStuff = ({
 		player.tid !== PLAYER.UNDRAFTED &&
 		player.tid !== PLAYER.UNDRAFTED_FANTASY_TEMP &&
 		player.tid !== PLAYER.RETIRED;
-	const showTradeFor = player.tid !== userTid && player.tid >= 0;
-	const showTradingBlock = player.tid === userTid;
+	const collegeLeague = useIsCollege();
+	const showTradeFor =
+		player.tid !== userTid && player.tid >= 0 && !collegeLeague;
+	const showTradingBlock = player.tid === userTid && !collegeLeague;
 
 	let draftInfo: ReactNode = null;
 	if (player.draft.round > 0) {
@@ -368,7 +372,10 @@ const TopStuff = ({
 	}
 
 	let contractInfo: ReactNode = null;
-	if (season !== undefined || showContract) {
+	if (collegeLeague) {
+		// College mode: class year, recruiting profile and how he left school instead of the draft and a contract
+		draftInfo = <CollegePlayerInfo player={player} />;
+	} else if (season !== undefined || showContract) {
 		let amount: ReactNode;
 		let exp;
 		if (season === undefined || season === currentSeason) {
@@ -428,9 +435,10 @@ const TopStuff = ({
 					pid={player.pid}
 					defaultWatch={player.watch}
 				/>
-				{player.tid === PLAYER.FREE_AGENT ||
-				player.tid === PLAYER.UNDRAFTED ||
-				player.tid >= PLAYER.FREE_AGENT ? (
+				{!collegeLeague &&
+				(player.tid === PLAYER.FREE_AGENT ||
+					player.tid === PLAYER.UNDRAFTED ||
+					player.tid >= PLAYER.FREE_AGENT) ? (
 					<Mood
 						className="ms-2"
 						defaultType={

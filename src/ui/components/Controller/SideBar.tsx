@@ -14,6 +14,7 @@ import { AnimatePresence, m } from "framer-motion";
 import { VIDEO_ADS, VIDEO_AD_PADDING } from "../../../common/constants.ts";
 import { menuItems } from "../../util/menuItems.tsx";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
+import { menuItemHiddenForLeagueType } from "../../util/collegeMode.ts";
 
 export const getText = (
 	text: MenuItemLink["text"],
@@ -140,6 +141,7 @@ const MenuItem = ({
 	const replacingFeatureOn = useFeatureOn(
 		menuItem.type === "link" ? menuItem.featureOff : undefined,
 	);
+	const { leagueType } = useLocal(["leagueType"]);
 
 	// On a tab of a page (util/pageTabs.ts), highlight that page
 	const hostPageID = tabHostPageID(pageID);
@@ -171,6 +173,10 @@ const MenuItem = ({
 				menuItem.featureOff !== undefined &&
 				replacingFeatureOn)
 		) {
+			return null;
+		}
+
+		if (menuItemHiddenForLeagueType(menuItem, leagueType)) {
 			return null;
 		}
 

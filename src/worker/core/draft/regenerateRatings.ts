@@ -630,14 +630,8 @@ export const restoreOriginalRatings = async ({
 // With the Archetypes switch off the regenerator has no archetype targets (only builds)
 export const getArchetypeTargets = () =>
 	(featureOn("archetypes") ? ARCHETYPE_LIST : [])
-		// Veteran archetypes need an age a prospect does not have; trait labels a trait no ratings can set, and expanded-ratings
-		// labels the setting
-		.filter(
-			(a) =>
-				!(a.age && a.age[0] >= 30) &&
-				!a.trait &&
-				!(a.expanded && !expandedRatingsOn()),
-		)
+		// Never a label that needs a trait no ratings can set, or expanded ratings with the setting off (no 2K build needs either)
+		.filter((a) => !a.trait && !(a.expanded && !expandedRatingsOn()))
 		.map((a) => ({
 			id: a.id,
 			name: a.name,

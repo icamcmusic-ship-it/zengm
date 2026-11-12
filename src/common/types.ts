@@ -1,8 +1,10 @@
+import type { RumorState } from "./rumors/types.ts";
 import * as z from "zod";
 import type { IsExact } from "conditional-type-checks";
 import type { FaceConfig } from "facesjs";
 import type { ReactNode } from "react";
 import type { RBState } from "./recordsBook.ts";
+import type { CapExceptionType, TeamCapExceptions } from "./capExceptions.ts";
 import type * as views from "../worker/views/index.ts";
 
 import {
@@ -418,6 +420,9 @@ export type EventBBGMWithoutKey =
 			score?: number;
 			contract?: FlatContractInfo;
 
+			// Salary cap exception the signing used, if any
+			exception?: CapExceptionType;
+
 			// Never defined, just for TypeScript
 			dpids?: number[];
 	  };
@@ -652,6 +657,10 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 
 	// Pending AI-initiated trade offers to the user
 	aiTradeOffers: AiTradeOffer[];
+
+	// Rumors (League extras): the rumor mill's rolling window and track record, undefined until the first rumor
+	rumors: RumorState | undefined;
+
 	allStarGame: number | null;
 	allStarNum: number;
 	allStarType: "draft" | "byConf" | "top";
@@ -761,6 +770,9 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	godModeInPast: boolean;
 	gracePeriodEnd: number;
 	groupScheduleSeries: boolean;
+	// Realistic schedule length: old compact schedule days / days of the current season's schedule (1 for the old
+	// schedule). Daily processes run on that fraction of the days, see worker/core/season/scheduleDayScale.ts
+	scheduleDayScale: number;
 	heightFactor: number;
 	hideDisabledTeams: boolean;
 	hofFactor: number;
@@ -966,6 +978,12 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 
 	// Basketball only. Generate college stats and honors for each new draft class as it is created
 	generateCollegeStats: boolean;
+
+	// College mode (docs/college-mode.md). leagueType is set at league creation and never changes
+	leagueType: "pro" | "college";
+	collegeLevel: "power" | "major" | "full" | undefined;
+	collegeAutoRecruit: boolean;
+	collegeState: import("./college/types.ts").CollegeState | undefined;
 	scoutingSystem: boolean;
 	rerandomizeDraftClassRatings: boolean;
 	// Saved from the Regenerate ratings modal ("save as league default"), used by rerandomizeDraftClassRatings
@@ -1111,6 +1129,8 @@ export type MenuItemLink = {
 	feature?: NativeFeatureId;
 	// Stock page replaced by a League extras feature: hidden when it is turned on
 	featureOff?: NativeFeatureId;
+	// Only in leagues of this type (college mode). Pro-only pages are listed in ui/util/collegeMode.ts instead
+	leagueType?: "college";
 	nonLeague?: true;
 	commandPalette?: true;
 	commandPaletteOnly?: true;
@@ -1356,6 +1376,12 @@ export type Contract = {
 
 	// In-season extensions, which append seasons to amounts
 	extensions?: ContractExtension[];
+
+	// Signed over the cap with this salary cap exception
+	exception?: CapExceptionType;
+
+	// Released with the stretch provision: amounts after the season of the release were spread over more seasons
+	stretched?: true;
 };
 
 export type MoodSnapshot = {
@@ -1472,6 +1498,11 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 		loc: string;
 	};
 	college: string;
+
+	// College mode (docs/college-mode.md): class year (0 = signed recruit, 1-4 = Fr-Sr), recruiting profile, how he left school
+	classYear?: number;
+	recruit?: import("./college/types.ts").PlayerRecruit;
+	collegeExit?: import("./college/types.ts").PlayerCollegeExit;
 
 	// What the player is asking for. Defined for free agents, draft prospects, and players on a team who need a new contract (unsigned draft picks, or expiring contracts while re-signing).
 	contractDemand?: FlatContractInfo & {
@@ -2328,6 +2359,9 @@ export type Team = {
 		number
 	>;
 	strategy: "contending" | "rebuilding";
+
+	// Salary cap exceptions used (League Extras: Salary Cap Exceptions)
+	capExceptions?: TeamCapExceptions;
 	depth?:
 		| {
 				QB: number[];

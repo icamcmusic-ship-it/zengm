@@ -218,6 +218,11 @@ import { getContractExp, getCurrentContract } from "../../common/contracts.ts";
 import { getContractStartSeason } from "../util/getContractStartSeason.ts";
 import * as contractPanel from "../core/contract/playerPanel.ts";
 import * as contractOptionsCore from "../core/contract/options.ts";
+import {
+	getCapExceptionsSummary,
+	getStretchedAmounts,
+	stretchProvisionEnabled,
+} from "../core/contract/capExceptions.ts";
 import getRealTeamPlayerData from "../core/league/create/getRealTeamPlayerData.ts";
 import * as z from "zod";
 import { defaultTragicDeaths } from "../util/defaultTragicDeaths.ts";
@@ -261,6 +266,13 @@ import {
 	ratingsKeysForView,
 	syncExpandedToCompat,
 } from "../core/player/expandedRatings.ts";
+import {
+	collegeAutoTargets,
+	collegeSetAutoRecruit,
+	collegeSetTarget,
+} from "../core/college/api.ts";
+import { getRumorState } from "../core/rumors/index.ts";
+import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -2143,6 +2155,11 @@ const getNegotiationProps = async (pid: number) => {
 
 	return {
 		capSpace: (g.get("salaryCap") - payroll) / 1000,
+		// Salary Cap Exceptions (setting), undefined when off or not a free agent signing
+		capExceptions:
+			negotiation.resigning || extension
+				? undefined
+				: await getCapExceptionsSummary(userTid, payroll),
 		challengeNoRatings: g.get("challengeNoRatings"),
 		contractOptions,
 		salaryCapType: g.get("salaryCapType"),
@@ -3381,6 +3398,32 @@ const requestAiTradeOffers = async ({
 	return count;
 };
 
+// Dashboard card: rumors about the user's team first, then the latest from around the league
+const getRumorsCard = () => {
+	if (!featureOn("rumors")) {
+		return [];
+	}
+	const userTid = g.get("userTid");
+	const season = g.get("season");
+	const items = getRumorState()
+		.items.filter(
+			(r) =>
+				r.season === season ||
+				r.status === "open" ||
+				r.resolved?.season === season,
+		)
+		.toReversed();
+	const mine = items
+		.filter((r) => r.user || r.tids.includes(userTid) || r.fromTid === userTid)
+		.slice(0, 4)
+		.map((r) => ({ ...r, user: true as const }));
+	const others = items
+		.filter((r) => !mine.some((row) => row.rid === r.rid))
+		.slice(0, Math.max(0, 5 - mine.length))
+		.map((r) => ({ ...r, user: undefined }));
+	return [...mine, ...others];
+};
+
 const incrementTradeProposalsSeed = async () => {
 	await league.setGameAttributes({
 		tradeProposalsSeed: g.get("tradeProposalsSeed") + 1,
@@ -3727,19 +3770,58 @@ const regenerateSchedule = async (param: unknown, conditions: Conditions) => {
 		active: true,
 	});
 
-	const tids = season.newSchedule(teams, conditions);
+	const { tids, days } = season.newScheduleWithDays(teams, conditions);
 
 	const schedule = season.addDaysToSchedule(
 		tids.map(([homeTid, awayTid]) => ({
 			homeTid,
 			awayTid,
 		})),
+		undefined,
+		days,
 	);
 
 	return formatScheduleForEditor(schedule, teams, []);
 };
 
-const releasePlayer = async ({ pids }: { pids: number[] }) => {
+// Stretch provision (setting): what stretching a player's contract on release would do, undefined if it's off or there is nothing to stretch
+const getStretchInfo = async (pid: number) => {
+	if (!stretchProvisionEnabled()) {
+		return;
+	}
+	const p = await idb.cache.players.get(pid);
+	const contract = p ? getCurrentContract(p) : undefined;
+	if (!p || !contract) {
+		return;
+	}
+	// Same as releasing him: only the guaranteed part of later seasons, and no undecided team option
+	const copy = helpers.deepCopy(contract);
+	contractOptionsCore.applyReleaseGuarantees(copy);
+	const stretched = getStretchedAmounts(copy);
+	if (!stretched) {
+		return;
+	}
+	const numSeasonsBefore = getContractExp(copy) - stretched.firstSeason + 1;
+	if (numSeasonsBefore < 1) {
+		return;
+	}
+	return {
+		total: stretched.total / 1000,
+		amount: stretched.amount / 1000,
+		numSeasons: stretched.numSeasons,
+		numSeasonsBefore,
+		firstSeason: stretched.firstSeason,
+		exp: stretched.exp,
+	};
+};
+
+const releasePlayer = async ({
+	pids,
+	stretch,
+}: {
+	pids: number[];
+	stretch?: boolean;
+}) => {
 	if (pids.length === 0) {
 		return;
 	}
@@ -3765,7 +3847,7 @@ const releasePlayer = async ({ pids }: { pids: number[] }) => {
 			g.get("season"),
 		);
 
-		await player.release(p, justDrafted);
+		await player.release(p, justDrafted, !!stretch);
 	}
 
 	await toUI("realtimeUpdate", [["playerMovement"]]);
@@ -6105,6 +6187,20 @@ const setScheduleFromEditor = async ({
 			.map((game) => omit(game, ["gid", "type"])),
 	);
 
+	// Realistic schedule length: keep the daily processes calibrated to the edited schedule
+	if (
+		(g.get("scheduleDayScale") < 1 || season.realisticScheduleOn()) &&
+		(g.get("phase") === PHASE.REGULAR_SEASON ||
+			g.get("phase") === PHASE.AFTER_TRADE_DEADLINE)
+	) {
+		const dayScale = getScheduleDayScale(
+			schedule.filter((game) => game.type !== "placeholder"),
+		);
+		if (dayScale !== g.get("scheduleDayScale")) {
+			await league.setGameAttributes({ scheduleDayScale: dayScale });
+		}
+	}
+
 	// This is needed in case the upcoming game was edited/deleted
 	await initUILocalGames();
 };
@@ -6149,6 +6245,9 @@ const api = {
 		clearNotes,
 		clearTrade,
 		clearWatchList,
+		collegeAutoTargets,
+		collegeSetAutoRecruit,
+		collegeSetTarget,
 		createLeague: whileWorkerBusy(createLeague),
 		createTrade,
 		deleteOldData: whileWorkerBusy(deleteOldData),
@@ -6226,6 +6325,7 @@ const api = {
 		incrementTradeProposalsSeed,
 		acceptAiTradeOffer,
 		requestAiTradeOffers,
+		getRumorsCard,
 		init,
 		initGold,
 		loadRetiredPlayers,
@@ -6238,6 +6338,7 @@ const api = {
 		regenerateDraftClass,
 		regenerateSchedule,
 		releasePlayer,
+		getStretchInfo,
 		expandVote,
 		relocateVote,
 		cloneLeague: whileWorkerBusy(cloneLeague),

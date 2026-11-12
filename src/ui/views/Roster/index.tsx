@@ -33,6 +33,8 @@ import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { confirm } from "../../util/confirm.tsx";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { ArchetypeRosterPanel } from "../../components/Archetype/ArchetypeRosterPanel.tsx";
+import { useIsCollege } from "../../util/collegeMode.ts";
+import { classYearAbbrev } from "../../../common/college/constants.ts";
 
 const handleRelease = async (
 	p: View<"roster">["players"][number],
@@ -84,8 +86,23 @@ const handleRelease = async (
 		okText: "Release player",
 	});
 	if (proceed) {
+		// Stretch provision (setting): undefined when off, just drafted or nothing is owed after this season
+		let stretch = false;
+		const stretchInfo = wasPlayerJustDrafted
+			? undefined
+			: await toWorker("main", "getStretchInfo", p.pid);
+		if (stretchInfo) {
+			stretch = await confirm(
+				`Use the stretch provision? The ${helpers.formatCurrency(stretchInfo.total, "M")} you would owe ${p.firstName} ${p.lastName} over ${stretchInfo.numSeasonsBefore} ${helpers.plural("season", stretchInfo.numSeasonsBefore)} from ${stretchInfo.firstSeason} would instead be paid (and count against the cap) as ${helpers.formatCurrency(stretchInfo.amount, "M")} a season for ${stretchInfo.numSeasons} seasons, through ${stretchInfo.exp}.`,
+				{
+					okText: "Stretch",
+					cancelText: "Don't stretch",
+				},
+			);
+		}
 		const errorMsg = await toWorker("main", "releasePlayer", {
 			pids: [p.pid],
+			stretch,
 		});
 		if (errorMsg) {
 			showNotification({
@@ -171,7 +188,8 @@ const Roster = ({
 
 	const profit = t.seasonAttrs !== undefined ? t.seasonAttrs.profit : 0;
 
-	const showMood = season === currentSeason;
+	const college = useIsCollege();
+	const showMood = season === currentSeason && !college;
 
 	const cols = getCols(
 		[
@@ -191,6 +209,16 @@ const Roster = ({
 			"Acquired",
 		],
 		{
+			// College mode: class year instead of a contract
+			...(college
+				? {
+						Contract: {
+							title: "Class",
+							desc: "Class year",
+							sortType: "number" as const,
+						},
+					}
+				: {}),
 			Country: {
 				title: "",
 				desc: "Country",
@@ -324,7 +352,16 @@ const Roster = ({
 				showRatings
 					? wrappedRatingWithChange(p.ratings.pot, p.ratings.dpot)
 					: null,
-				...(season === currentSeason ? [wrappedContract(p)] : []),
+				...(season === currentSeason
+					? [
+							college
+								? {
+										value: classYearAbbrev(p.classYear),
+										sortValue: p.classYear ?? 0,
+									}
+								: wrappedContract(p),
+						]
+					: []),
 				playoffs === "playoffs" ? null : p.stats.yearsWithTeam,
 				{
 					value: (

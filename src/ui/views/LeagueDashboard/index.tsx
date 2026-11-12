@@ -10,6 +10,7 @@ import Headlines from "./Headlines.tsx";
 import GamesToWatch from "./GamesToWatch.tsx";
 import RecentAchievements from "./RecentAchievements.tsx";
 import MilestoneWatch from "./MilestoneWatch.tsx";
+import RumorMill from "./RumorMill.tsx";
 import { useLocal } from "../../util/local.ts";
 import { useFeatureOn, useFeatureOption } from "../../util/nativeFeatures.ts";
 
@@ -56,6 +57,7 @@ const LeagueDashboard = ({
 
 	// League extras
 	const showHype = useFeatureOption<boolean>("featureHypeDashboard");
+	const showRumors = useFeatureOn("rumors");
 	const showMilestones = useFeatureOption<boolean>(
 		"featureMilestonesDashboard",
 	);
@@ -270,6 +272,11 @@ const LeagueDashboard = ({
 						teams={teams}
 						userTid={userTid}
 					/>
+					{showRumors ? (
+						<RumorMill
+							refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
+						/>
+					) : null}
 					{showMilestones ? (
 						<MilestoneWatch
 							refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}

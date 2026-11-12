@@ -1,3 +1,4 @@
+import { describeCapException } from "../../common/capExceptions.ts";
 import { PHASE } from "../../common/constants.ts";
 import type {
 	DraftPickSeason,
@@ -213,7 +214,11 @@ export const formatEventText = async (event: EventBBGM) => {
 		return `The ${teamName} ${signedOrReSigned} ${playerName} for ${helpers.formatCurrency(
 			event.contract!.amount / 1000,
 			"M",
-		)}/year through ${event.contract!.exp}.`;
+		)}/year through ${event.contract!.exp}${
+			event.type === "freeAgent" && event.exception
+				? ` using the ${describeCapException(event.exception)}`
+				: ""
+		}.`;
 	}
 
 	if (event.type === "sisyphus") {

@@ -86,8 +86,8 @@ export type PlayerResult = {
 	build: { name: string; tags: string[] };
 
 	// The archetype his new ratings derive to (what the UI shows), and the one that was aimed at, if any
-	derived: { id: string; name: string; label: string; secondaryId?: string };
-	// matched: he derives to it as his primary archetype; inLabel: it is his primary or his hybrid partner
+	derived: { id: string; name: string; label: string };
+	// matched: he derives to it; inLabel: the same (a label is one build, there are no hybrid partners any more)
 	target?: { id: string; name: string; matched: boolean; inLabel: boolean };
 
 	// The overall he was asked to be built to
@@ -142,7 +142,6 @@ const derivedOf = (F: Formulas, ratings: BuildRatings, norms?: Norms) => {
 		id: c.id,
 		name: c.name,
 		label: c.label,
-		secondaryId: c.secondary?.id,
 	};
 };
 
@@ -395,10 +394,7 @@ export const regenerateClass = (
 							id: targetId,
 							name: aimed.name,
 							matched,
-							inLabel:
-								matched ||
-								derivedOf(F, after.ratings, opts.norms).secondaryId ===
-									targetId,
+							inLabel: matched,
 						}
 					: undefined,
 			targetOvr,

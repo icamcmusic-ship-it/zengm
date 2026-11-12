@@ -211,6 +211,17 @@ const scoresWith = (changes: Partial<Record<TraitKey, number>>) => ({
 
 // A sim with trait effects on every player (neutral unless changed), the clock and score set by the caller
 const makeSim = async () => {
+	// Seeded: these tests compare exact deltas, which only hold when probabilities aren't clipped, so they must not depend on randomly generated players
+	const original = Math.random;
+	Math.random = makeSeededRandom(1);
+	try {
+		return await makeSimInner();
+	} finally {
+		Math.random = original;
+	}
+};
+
+const makeSimInner = async () => {
 	await setupLeague({
 		seed: 1,
 		traits: false,

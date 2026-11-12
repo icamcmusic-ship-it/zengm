@@ -65,6 +65,8 @@ export const featureForUrl = (
 			return "milestones";
 		case "trade_market":
 			return "tradeMarket";
+		case "rumors":
+			return "rumors";
 		case "trade_offers":
 			return "aiTradeOffers";
 		case "trade_three":

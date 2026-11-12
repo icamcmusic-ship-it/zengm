@@ -47,6 +47,7 @@ export const gameAttributesKeysGameState: GameAttributeKey[] = [
 	"autoExpand",
 	"tradeProposalsSeed",
 	"aiTradeOffers",
+	"rumors",
 	"playerTraitsSeed",
 ];
 export const gameAttributesKeysTeams: GameAttributeKey[] = ["confs", "divs"];
@@ -543,6 +544,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	aiTradesNeedBased: false,
 	aiTradeOffersFrequency: 1,
 	aiTradeOffers: [],
+	rumors: undefined,
 	// Saving after every play request makes playing one day at a time slower and slower as the league gets older
 	saveEveryDay: false,
 	stopOnInjury: false,
@@ -559,6 +561,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	forceRetireSeasons: 0,
 	minRetireAge: 26,
 	groupScheduleSeries: false,
+	scheduleDayScale: 1,
 
 	salaryCapType: "soft",
 
@@ -764,6 +767,10 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	forceHistoricalRosters: false,
 	easterEggPlayers: true,
 	generateCollegeStats: false,
+	leagueType: "pro",
+	collegeLevel: undefined,
+	collegeAutoRecruit: true,
+	collegeState: undefined,
 	scoutingSystem: false,
 	rerandomizeDraftClassRatings: false,
 	draftClassRegenSettings: undefined,

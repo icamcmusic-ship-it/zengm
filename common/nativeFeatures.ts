@@ -43,6 +43,8 @@ export type NativeFeatureDef = {
 	// Only available in these sports. Omit for all sports.
 	sports?: readonly NativeFeatureSport[];
 	existing?: true;
+	// false: the feature needs contracts, trades or a draft, so it is always off in a college league (leagueType "college")
+	college?: false;
 	options?: readonly NativeOptionDef[];
 };
 
@@ -113,6 +115,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "awardVote",
+		college: false,
 		key: "featureAwardVote",
 		name: "Award Vote",
 		description:
@@ -165,6 +168,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "tradeGrader",
+		college: false,
 		key: "featureTradeGrader",
 		name: "Trade Grader",
 		description:
@@ -174,6 +178,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "contractValue",
+		college: false,
 		key: "featureContractValue",
 		name: "Contract Value",
 		description:
@@ -261,6 +266,47 @@ export const NATIVE_FEATURES = [
 		existing: true,
 	},
 	{
+		id: "customShotClock",
+		key: "customShotClock",
+		name: "Custom Shot Clock",
+		description:
+			"Use a shot clock of another length than 24 seconds in the game simulation (30 in college basketball). After an offensive rebound it resets to 10 seconds less than the full clock. Possessions only get longer with a slower Pace setting too.",
+		default: false,
+		sports: BBGM,
+		options: [
+			{
+				key: "shotClockLength",
+				name: "Shot Clock Length",
+				description: "Seconds on the shot clock.",
+				type: "int",
+				default: 24,
+				min: 10,
+				max: 60,
+			},
+		],
+	},
+	{
+		id: "oneAndOne",
+		key: "oneAndOne",
+		name: "One-and-One Bonus",
+		description:
+			"Before the two-shot bonus (# Fouls Until Bonus), a non-shooting foul gives a one-and-one: the second free throw is only taken if the first is made. College rules: one-and-one from the 7th team foul of a half, two shots from the 10th.",
+		default: false,
+		sports: BBGM,
+		options: [
+			{
+				key: "oneAndOneFouls",
+				name: "Team Fouls Until One-and-One",
+				description:
+					"The team foul of a period from which non-shooting fouls give a one-and-one.",
+				type: "int",
+				default: 7,
+				min: 1,
+				max: 50,
+			},
+		],
+	},
+	{
 		id: "realisticPossessions",
 		key: "realisticPossessions",
 		name: "Realistic Possession Model",
@@ -281,6 +327,18 @@ export const NATIVE_FEATURES = [
 		defaultNewLeague: true,
 		sports: BBGM,
 		existing: true,
+	},
+	{
+		id: "realisticSchedule",
+		// College mode builds its own schedule (non-conference, then conference play)
+		college: false,
+		key: "realisticSchedule",
+		name: "Realistic Schedule Length",
+		description:
+			"The regular season is spread over about 2 days per game (82 games in about 160 days) instead of most teams playing almost every day: each team plays about every other day, with about 15 back-to-backs per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
 	},
 	{
 		id: "injuryDepth",
@@ -410,6 +468,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "seasonOdds",
+		college: false,
 		key: "featureSeasonOdds",
 		name: "Season Odds",
 		description:
@@ -456,6 +515,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "contractOptions",
+		college: false,
 		key: "contractOptions",
 		name: "Contract Options & Guarantees",
 		description:
@@ -466,6 +526,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "contractExtensions",
+		college: false,
 		key: "contractExtensions",
 		name: "In-Season Contract Extensions",
 		description:
@@ -476,6 +537,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "tradeRequests",
+		college: false,
 		key: "tradeRequests",
 		name: "Trade Requests",
 		description:
@@ -486,6 +548,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "holdouts",
+		college: false,
 		key: "featureHoldouts",
 		name: "Holdouts",
 		description:
@@ -506,7 +569,35 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "capExceptions",
+		key: "featureCapExceptions",
+		name: "Salary Cap Exceptions",
+		description:
+			"With a soft cap, a team over the cap can sign one free agent a season with each salary cap exception it has: the mid-level exception (9.1% of the cap, up to 4 years; a smaller taxpayer one, 3.7% and 2 years, near the luxury tax), the bi-annual exception (3.3%, 2 years, every other season) and, for teams that used cap space, the room exception (5.7%, 3 years). They are used automatically when a signing only fits that way, by AI teams too. Off: over the cap, only minimum contracts. No effect with a hard cap or no cap.",
+		default: false,
+		defaultNewLeague: true,
+		options: [
+			{
+				key: "capExceptionsRepeaterTax",
+				name: "Repeater Luxury Tax",
+				description:
+					"A team that paid the luxury tax in at least 3 of the previous 4 seasons pays it at 5/3 of the normal rate (2.5 instead of 1.5 per dollar over the line).",
+				type: "bool",
+				default: false,
+			},
+			{
+				key: "capExceptionsStretch",
+				name: "Stretch Provision",
+				description:
+					"When releasing a player, what is owed after the current season can be spread evenly over twice the remaining seasons plus one. AI teams over the luxury tax do it too.",
+				type: "bool",
+				default: false,
+			},
+		],
+	},
+	{
 		id: "tradeExplain",
+		college: false,
 		key: "featureTradeExplain",
 		name: "Trade Explanations",
 		description:
@@ -515,6 +606,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "aiNeedTrades",
+		college: false,
 		key: "aiTradesNeedBased",
 		name: "Need-Based AI-to-AI Trades",
 		description:
@@ -525,6 +617,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "aiTradeOffers",
+		college: false,
 		key: "featureAiTradeOffers",
 		name: "AI Trade Offers To You",
 		description:
@@ -555,6 +648,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "tradeMarket",
+		college: false,
 		key: "featureTradeMarket",
 		name: "Trade Market",
 		description:
@@ -562,7 +656,27 @@ export const NATIVE_FEATURES = [
 		default: true,
 	},
 	{
+		id: "rumors",
+		key: "featureRumors",
+		name: "Rumors",
+		description:
+			"A rumor mill built from what AI teams are actually planning: who is on the block, which teams are calling about whom, unhappy players, extension talks, where free agents are leaning, coaches and GMs on the hot seat, draft targets. Each rumor has a confidence and is later marked confirmed or didn't happen (Rumors tab of Transactions, dashboard card, newspaper). It never changes what AI teams do.",
+		default: false,
+		defaultNewLeague: true,
+		options: [
+			{
+				key: "rumorsNotify",
+				name: "Rumor Notifications",
+				description:
+					"Show a notification when a new rumor involves your team or one of your players.",
+				type: "bool",
+				default: true,
+			},
+		],
+	},
+	{
 		id: "threeTeamTrades",
+		college: false,
 		key: "featureThreeTeamTrades",
 		name: "Three-Team Trades",
 		description: "The 3-team trade page and the link from the Trade page.",
@@ -570,6 +684,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "draftPickConditions",
+		college: false,
 		key: "featureDraftPickConditions",
 		name: "Draft Pick Protections & Swaps",
 		description:
@@ -589,6 +704,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "gmPersonalities",
+		college: false,
 		key: "featureGmPersonalities",
 		name: "AI GM Personalities",
 		description:
@@ -599,6 +715,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "collegeStats",
+		college: false,
 		key: "featureCollegeStats",
 		name: "College & Overseas Stats",
 		description:
@@ -619,6 +736,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "collegeSeason",
+		college: false,
 		key: "featureCollegeSeason",
 		name: "College Season & March Madness",
 		description:
@@ -629,6 +747,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "draftClassShapes",
+		college: false,
 		key: "featureDraftClassShapes",
 		name: "Draft Class Shapes",
 		description:
@@ -639,6 +758,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "ratingsRegenerator",
+		college: false,
 		key: "featureRatingsRegenerator",
 		name: "Ratings Regenerator",
 		description:
@@ -659,6 +779,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "scoutingSystem",
+		college: false,
 		key: "scoutingSystem",
 		name: "Scouting System",
 		description:
@@ -669,6 +790,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "draftBoard",
+		college: false,
 		key: "featureDraftBoard",
 		name: "Draft Board",
 		description:
@@ -688,6 +810,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "aiDraftNeeds",
+		college: false,
 		key: "featureAiDraftNeeds",
 		name: "AI Drafts by Need",
 		description:
@@ -698,6 +821,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "mockDraft",
+		college: false,
 		key: "featureMockDraft",
 		name: "Mock Draft",
 		description:
@@ -789,6 +913,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "seriesRecaps",
+		college: false,
 		key: "featureSeriesRecaps",
 		name: "Series Recaps",
 		description:
@@ -820,6 +945,7 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "unretire",
+		college: false,
 		key: "featureUnretire",
 		name: "Unretirements",
 		description:
@@ -990,6 +1116,9 @@ export const nativeFeatureEnabledForSport = (
 ) => {
 	const f = getNativeFeature(id);
 	if (!nativeFeatureAvailableInSport(f, sport)) {
+		return false;
+	}
+	if (f.college === false && get("leagueType") === "college") {
 		return false;
 	}
 	const value = get(f.key);

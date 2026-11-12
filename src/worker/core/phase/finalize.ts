@@ -19,6 +19,7 @@ import { autoPlayStopsAt, cleanupAutoPlay } from "../league/autoPlay.ts";
 import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
 import { unretireAtPhase } from "./unretire.ts";
 import { aiOffersAtPhase } from "../trade/aiOffers.ts";
+import { atPhase as rumorsAtPhase } from "../rumors/index.ts";
 
 const save = async () => {
 	await updateStatus("Saving...");
@@ -49,6 +50,7 @@ const finalize = async (
 	// League extras that happen at a phase change (each one checks its own switch)
 	await unretireAtPhase(phase);
 	await aiOffersAtPhase(phase);
+	await rumorsAtPhase();
 
 	let saved = false;
 	if (phase === PHASE.PRESEASON) {

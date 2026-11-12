@@ -1,11 +1,19 @@
 import { contractNegotiation, freeAgents, player } from "../index.ts";
 import { helpers } from "../../util/index.ts";
-import type { PhaseReturn } from "../../../common/types.ts";
+import type { Conditions, PhaseReturn } from "../../../common/types.ts";
+import * as college from "../college/index.ts";
 import { idb } from "../../db/index.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import { getNumPlayersTradedAwayNormalizedAll } from "../player/getNumPlayersTradedAwayNormalized.ts";
 
-const newPhaseFreeAgency = async (): Promise<PhaseReturn> => {
+const newPhaseFreeAgency = async (
+	conditions: Conditions,
+): Promise<PhaseReturn> => {
+	// College mode: this phase is signing day
+	if (college.isCollege()) {
+		return college.newPhaseSigningDay(conditions);
+	}
+
 	// In case some weird situation results in games still in the schedule, clear them
 	await idb.cache.schedule.clear();
 

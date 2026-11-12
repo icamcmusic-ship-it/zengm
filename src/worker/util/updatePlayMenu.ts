@@ -13,6 +13,7 @@ import toUI from "./toUI.ts";
 import type { Option } from "../../common/types.ts";
 import { idb } from "../db/index.ts";
 import { bySport } from "../../common/sportFunctions.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 
 const updatePlayMenu = async () => {
 	if (__NODE_ENV === "test") {
@@ -115,6 +116,10 @@ const updatePlayMenu = async () => {
 		contractNegotiationList: {
 			url: helpers.leagueUrl(["negotiation"]),
 			label: "Continue re-signing players",
+		},
+		collegeRecruiting: {
+			url: helpers.leagueUrl(["college_recruiting"]),
+			label: "Recruiting board",
 		},
 		message: {
 			url: helpers.leagueUrl(["message"]),
@@ -315,6 +320,33 @@ const updatePlayMenu = async () => {
 		keys = ["day", "week", "untilPreseason"];
 	}
 
+	// College mode: the same phases under other names, and no free agency days
+	const collegeLabels: Partial<Record<keyof typeof allOptions, string>> = {};
+	if (isCollege()) {
+		const phase = g.get("phase");
+		if (phase === PHASE.REGULAR_SEASON) {
+			collegeLabels.untilPlayoffs = "Until conference tournaments";
+		} else if (phase === PHASE.AFTER_TRADE_DEADLINE) {
+			keys = ["day", "dayLive", "untilPlayoffs"];
+			collegeLabels.untilPlayoffs = "Until national tournament";
+		} else if (phase === PHASE.PLAYOFFS) {
+			collegeLabels.throughPlayoffs = "Through national tournament";
+		} else if (phase === PHASE.DRAFT_LOTTERY) {
+			keys = ["untilResignPlayers"];
+			collegeLabels.untilResignPlayers =
+				"Until recruiting (departures and transfer portal)";
+		} else if (phase === PHASE.DRAFT || phase === PHASE.AFTER_DRAFT) {
+			keys = ["untilResignPlayers"];
+			collegeLabels.untilResignPlayers = "Until recruiting";
+		} else if (phase === PHASE.RESIGN_PLAYERS) {
+			keys = ["collegeRecruiting", "untilFreeAgency"];
+			collegeLabels.untilFreeAgency = "Until signing day";
+		} else if (phase === PHASE.FREE_AGENCY) {
+			keys = ["untilPreseason"];
+			collegeLabels.untilPreseason = "Until next season";
+		}
+	}
+
 	const unreadMessage = await lock.unreadMessage();
 
 	if (g.get("autoRelocate")) {
@@ -355,8 +387,10 @@ const updatePlayMenu = async () => {
 	}
 
 	const someOptions: Option[] = keys.map((id) => {
+		const label = collegeLabels[id];
 		return {
 			...allOptions[id],
+			...(label !== undefined ? { label } : {}),
 			id,
 		};
 	});

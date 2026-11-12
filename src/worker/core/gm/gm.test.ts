@@ -6,7 +6,10 @@ import {
 	gmDraftUpsideAdjustment,
 	gmFireProb,
 	gmHotSeat,
+	gmPathExpWon,
 	gmPlayerStyleScore,
+	gmProgressScore,
+	gmRebuildWeight,
 	gmSeasonScore,
 	gmWeightsFromTraits,
 	NEUTRAL_GM_TRAITS,
@@ -23,6 +26,7 @@ import {
 	ensureGms,
 	getAllGmWeights,
 	getGmWeights,
+	judgedSeasons,
 	onRegularSeason,
 	runOffseason,
 } from "./index.ts";
@@ -257,6 +261,193 @@ describe("GM personality weights", () => {
 	});
 });
 
+describe("fair job security", () => {
+	const season = (won: number, expWon: number, extra = {}) =>
+		gmSeasonScore({
+			won,
+			lost: 82 - won,
+			tied: 0,
+			otl: 0,
+			expWon,
+			numGames: 82,
+			playoffRoundsWon: -1,
+			...extra,
+		});
+
+	test("a bad team that does what its roster was expected to do isn't blamed for being bad", () => {
+		const bad = season(22, 22);
+		assert.isAbove(bad, -2);
+		const hot = gmHotSeat([bad, bad, bad]);
+		for (const tenure of [1, 2, 3, 4]) {
+			assert.strictEqual(
+				gmFireProb({
+					hotSeat: hot,
+					tenure,
+					rebuilding: false,
+					droughtSeasons: tenure,
+				}),
+				0,
+			);
+		}
+		// A contender that misses the playoffs is blamed, even at its expected win total
+		assert.isBelow(season(50, 50), -3);
+	});
+
+	test("honeymoon: no firing in the first two seasons unless it's extreme against expectations", () => {
+		// 12 wins below a bad projection: bad, but not extreme
+		const poor = gmHotSeat([season(10, 22)]);
+		assert.strictEqual(
+			gmFireProb({
+				hotSeat: poor,
+				tenure: 1,
+				rebuilding: false,
+				droughtSeasons: 1,
+			}),
+			0,
+		);
+		assert.strictEqual(
+			gmFireProb({
+				hotSeat: gmHotSeat([season(10, 22), season(10, 22)]),
+				tenure: 1,
+				rebuilding: false,
+				droughtSeasons: 2,
+			}),
+			0,
+		);
+		// 30 wins under a .500 projection is extreme
+		assert.isAbove(
+			gmFireProb({
+				hotSeat: gmHotSeat([season(11, 41)]),
+				tenure: 1,
+				rebuilding: false,
+				droughtSeasons: 1,
+			}),
+			0,
+		);
+		// After the honeymoon the same sustained miss gets him fired
+		assert.isAbove(
+			gmFireProb({
+				hotSeat: gmHotSeat([season(10, 22), season(10, 22), season(10, 22)]),
+				tenure: 3,
+				rebuilding: false,
+				droughtSeasons: 3,
+			}),
+			0.3,
+		);
+	});
+
+	test("improvement path from the roster he inherited", () => {
+		assert.strictEqual(
+			gmPathExpWon({
+				baseExpWon: 20,
+				numGames: 82,
+				seasonIndex: 0,
+				rebuilding: false,
+			}),
+			20,
+		);
+		const y3 = gmPathExpWon({
+			baseExpWon: 20,
+			numGames: 82,
+			seasonIndex: 3,
+			rebuilding: false,
+		});
+		const y3r = gmPathExpWon({
+			baseExpWon: 20,
+			numGames: 82,
+			seasonIndex: 3,
+			rebuilding: true,
+		});
+		assert.isAbove(y3, y3r);
+		assert.isAbove(y3r, 20);
+		assert.isBelow(y3, 41);
+		// A good team is expected to stay good, not improve
+		assert.strictEqual(
+			gmPathExpWon({
+				baseExpWon: 55,
+				numGames: 82,
+				seasonIndex: 3,
+				rebuilding: false,
+			}),
+			55,
+		);
+	});
+
+	test("rebuild credit: progress counts for a patient GM or a rebuilding team", () => {
+		assert.strictEqual(
+			gmRebuildWeight({ patience: -0.8, rebuilding: false }),
+			0,
+		);
+		assert.isAbove(
+			gmRebuildWeight({ patience: 0.8, rebuilding: true }),
+			gmRebuildWeight({ patience: 0, rebuilding: true }),
+		);
+		const progress = gmProgressScore({
+			youthChange: 8,
+			extraFirsts: 2,
+			capRoom: 0.3,
+			winTrend: 6,
+		});
+		assert.isAbove(progress, 8);
+		assert.isBelow(
+			gmProgressScore({
+				youthChange: -6,
+				extraFirsts: -2,
+				capRoom: -0.2,
+				winTrend: -8,
+			}),
+			-5,
+		);
+		const tank = { pathExpWon: 30 };
+		const judgedOnWins = season(18, 22, tank);
+		const withCredit = season(18, 22, {
+			...tank,
+			progress,
+			rebuildWeight: 0.7,
+		});
+		assert.isAbove(withCredit, judgedOnWins + 5);
+		// No progress, no credit
+		assert.isBelow(
+			season(18, 22, { ...tank, progress: -6, rebuildWeight: 0.7 }),
+			0,
+		);
+		// Rebuilding teams get more rope after the honeymoon
+		const hot = -16;
+		assert.isBelow(
+			gmFireProb({
+				hotSeat: hot,
+				tenure: 3,
+				rebuilding: true,
+				droughtSeasons: 3,
+				patience: 0.5,
+			}),
+			gmFireProb({
+				hotSeat: hot,
+				tenure: 3,
+				rebuilding: false,
+				droughtSeasons: 3,
+			}),
+		);
+		// Win-now hires on expected contenders get a shorter leash
+		assert.isAbove(
+			gmFireProb({
+				hotSeat: -10,
+				tenure: 3,
+				rebuilding: false,
+				droughtSeasons: 0,
+				patience: -0.8,
+				contender: true,
+			}),
+			gmFireProb({
+				hotSeat: -10,
+				tenure: 3,
+				rebuilding: false,
+				droughtSeasons: 0,
+			}),
+		);
+	});
+});
+
 describe("AI GMs", () => {
 	beforeEach(async () => {
 		await setup();
@@ -321,6 +512,47 @@ describe("AI GMs", () => {
 		assert.isAbove(new Set(a).size, 20);
 	});
 
+	test("judged only on full seasons he ran: inherited and taken-over-midway seasons don't count", async () => {
+		await ensureGms();
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		await onRegularSeason();
+		const tid = 5;
+		const t0 = (await idb.cache.teams.get(tid))!;
+		const gm = t0.gm!;
+		// His predecessor's awful seasons with this team are not his
+		gm.seasons.push({
+			season: g.get("season") - 1,
+			tid,
+			won: 5,
+			lost: 77,
+			tied: 0,
+			otl: 0,
+			expWon: 41,
+			numGames: 82,
+			playoffRoundsWon: -1,
+		});
+		// He took over midway, so no expectation was set for him
+		gm.expWon = undefined;
+		await idb.cache.teams.put(t0);
+		await finishSeason((tid2) => (tid2 === tid ? 5 : 41));
+		await withRandom(1, runOffseason);
+		const t1 = (await idb.cache.teams.get(tid))!;
+		assert.strictEqual(t1.gm!.gmid, gm.gmid);
+		const row = t1.gm!.seasons.at(-1)!;
+		assert.isTrue(row.partial);
+		assert.strictEqual(judgedSeasons(t1.gm!, tid).length, 0);
+		assert.isUndefined(t1.gm!.hotSeat);
+
+		// His first full season counts, against the expectation for his roster
+		await nextSeason();
+		await onRegularSeason();
+		await finishSeason((tid2) => (tid2 === tid ? 40 : 41));
+		await withRandom(2, runOffseason);
+		const t2 = (await idb.cache.teams.get(tid))!;
+		assert.strictEqual(judgedSeasons(t2.gm!, tid).length, 1);
+		assert.isAbove(t2.gm!.hotSeat!, -5);
+	});
+
 	test("expectations, firing after sustained failure and the carousel", async () => {
 		await ensureGms();
 		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
@@ -331,9 +563,9 @@ describe("AI GMs", () => {
 		// No players, so every team is expected to win half its games
 		assert.closeTo(t0.gm!.expWon!, 41, 0.5);
 
-		// Team 5 is awful for 3 seasons, everyone else is average, and a few teams win titles
+		// Team 5 is far below expectations (but not extreme enough to end the honeymoon) for 3 seasons, everyone else is average, and a few teams win titles
 		for (let i = 0; i < 3; i++) {
-			await finishSeason((tid2) => (tid2 === tid ? 12 : 41));
+			await finishSeason((tid2) => (tid2 === tid ? 22 : 41));
 			await withRandom(i + 1, runOffseason);
 			if (i < 2) {
 				// Not fired yet: new GMs get time
