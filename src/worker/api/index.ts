@@ -2167,7 +2167,7 @@ const getNegotiationProps = async (pid: number) => {
 		resigning: negotiation.resigning,
 		extension: !!extension,
 		currentContract,
-		contractTermsEnabled: g.get("contractOptions"),
+		contractTermsEnabled: featureOn("contractOptions"),
 		salaryCap: g.get("salaryCap") / 1000,
 		t,
 	};

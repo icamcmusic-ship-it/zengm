@@ -62,7 +62,7 @@ export const shouldRequestTrade = ({
 
 // Check for new trade requests, and withdraw old ones that no longer apply. Called about once a week during the regular season.
 export const updateTradeRequests = async () => {
-	if (!g.get("tradeRequests")) {
+	if (!featureOn("tradeRequests")) {
 		return;
 	}
 

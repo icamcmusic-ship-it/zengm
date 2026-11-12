@@ -14,6 +14,7 @@ import {
 import { sumMoodComponents } from "./moodHistory.ts";
 import { getPendingOption, getReleaseCost } from "./options.ts";
 import { hasActiveTradeRequest, isHoldingOut } from "./unrest.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 type Scenario = {
 	key: string;
@@ -122,7 +123,7 @@ export const getPlayerContractPanel = async (pid: number) => {
 		g.get("phase") < PHASE.RESIGN_PLAYERS;
 
 	let extension;
-	if (onUserTeam && g.get("contractExtensions")) {
+	if (onUserTeam && featureOn("contractExtensions")) {
 		const reason = getExtensionIneligibleReason(p, userTid);
 		let demand;
 		if (reason === undefined && contract) {
@@ -143,9 +144,9 @@ export const getPlayerContractPanel = async (pid: number) => {
 		season,
 		onUserTeam,
 		settings: {
-			contractOptions: g.get("contractOptions"),
-			contractExtensions: g.get("contractExtensions"),
-			tradeRequests: g.get("tradeRequests"),
+			contractOptions: featureOn("contractOptions"),
+			contractExtensions: featureOn("contractExtensions"),
+			tradeRequests: featureOn("tradeRequests"),
 			holdoutFrequency: g.get("holdoutFrequency"),
 		},
 		contract: contractInfo,
