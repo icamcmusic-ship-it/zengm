@@ -5,7 +5,7 @@
 // RUN_AI_AUDIT=1 npx vitest run --project basketball src/test/ratingInflation/aiAudit.script.test.ts
 // Env: AI_SEEDS (comma list, default 1), AI_SEASONS (default 4), AI_OUT (jsonl file), AI_GMS (0 turns AI GM personalities off, for
 // before/after comparisons; with them on, also records GM firings/hires and per-team trade counts by GM style)
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { test } from "vitest";
 import { PHASE } from "../../common/constants.ts";
 import { getTradePickConditions } from "../../common/draftPickConditions.ts";
@@ -176,6 +176,39 @@ test.skipIf(!process.env.RUN_AI_AUDIT)(
 					expandedRatings: true,
 					featureGmPersonalities: gmsOn,
 				});
+				// AI_GM_DUMP: every GM's career and every team season's record, for job security analysis
+				const dumpGms = async () => {
+					if (!process.env.AI_GM_DUMP || !gmsOn) {
+						return;
+					}
+					const teams = (await idb.cache.teams.getAll()).filter(
+						(t) => !t.disabled,
+					);
+					const allTs = await idb.cache.teamSeasons.getAll();
+					writeFileSync(
+						process.env.AI_GM_DUMP,
+						JSON.stringify({
+							seed,
+							lastSeason: g.get("season") - 1,
+							teamSeasons: allTs.map((ts) => [
+								ts.tid,
+								ts.season,
+								ts.won,
+								ts.lost,
+								ts.playoffRoundsWon,
+							]),
+							gms: teams.flatMap((t) =>
+								[...(t.formerGms ?? []), ...(t.gm ? [t.gm] : [])].map((gm) => ({
+									gmid: gm.gmid,
+									name: `${gm.firstName} ${gm.lastName}`,
+									patience: gm.traits.patience,
+									tenures: gm.tenures,
+									seasons: gm.seasons,
+								})),
+							),
+						}) + "\n",
+					);
+				};
 				const tradesByTid = new Map();
 				const strategySwitches = [];
 				for (let i = 0; i < seasons; i++) {
@@ -224,6 +257,7 @@ test.skipIf(!process.env.RUN_AI_AUDIT)(
 					};
 					appendFileSync(out, JSON.stringify(row) + "\n");
 					console.log(JSON.stringify(row));
+					await dumpGms();
 				}
 				// Per-team trade counts over the whole run, and how they line up with each GM's trade frequency leaning
 				const teams = (await idb.cache.teams.getAll()).filter(

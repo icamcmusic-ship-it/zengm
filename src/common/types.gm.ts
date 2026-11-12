@@ -37,6 +37,15 @@ export type GmSeason = {
 	expWon?: number;
 	numGames: number;
 	playoffRoundsWon: number;
+	// Expected wins on an improvement path from the roster he inherited (seasons after his first with the team)
+	pathExpWon?: number;
+	// Rebuild progress (young core, picks, cap room, win trend) in wins per 82 games, and how much it counted
+	progress?: number;
+	rebuildWeight?: number;
+	// Value of his best young players at the end of the season, for the next season's progress
+	youth?: number;
+	// He wasn't the GM when the regular season started, so the season isn't held against him
+	partial?: boolean;
 };
 
 export type GmTenure = {
