@@ -796,6 +796,10 @@ export const onPreseason = async () => {
 		Infinity,
 	])) as CollegePlayer[];
 	for (const p of players) {
+		// Redshirt last season: the year did not count
+		if ((p as any).redshirt === season - 1 && p.classYear !== undefined) {
+			continue;
+		}
 		p.classYear = helpers.bound(
 			(p.classYear ?? season - 1 - p.draft.year) + 1,
 			1,

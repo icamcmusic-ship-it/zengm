@@ -463,8 +463,7 @@ const assignMinutes = (t: QuickTeam, gameMinutes: number) => {
 	const n = rotation.length;
 	// The better players get more of the minutes (the full sim plays its best players more than the roster order alone says)
 	const top = rotation.slice(0, 8);
-	const meanOvr =
-		top.reduce((a, p) => a + p.ovr, 0) / Math.max(1, top.length);
+	const meanOvr = top.reduce((a, p) => a + p.ovr, 0) / Math.max(1, top.length);
 	const raw = rotation.map((p, i) => {
 		const base = QS.minutes[i] ?? 0;
 		// Quality and endurance, plus game-to-game noise
@@ -753,9 +752,7 @@ export const quickSimGame = ({
 			0.15,
 			0.45,
 		);
-		const drb = nonNeg(
-			0.93 * reboundable(o) * (1 - oppOrbRate) + gauss(0, 2),
-		);
+		const drb = nonNeg(0.93 * reboundable(o) * (1 - oppOrbRate) + gauss(0, 2));
 		const fg = sum(s.fg2) + sum(s.tp);
 		const ast = Math.min(fg, nonNeg(fg * QS.astPerFg + gauss(0, 2.5)));
 		const oppTov = opp.tov.reduce((a, b) => a + b, 0);

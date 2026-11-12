@@ -2,6 +2,8 @@ import { allStar, player, season, team } from "../index.ts";
 import { careerFromStats } from "../../../common/pbpFlavor/career.ts";
 import { isHoldingOut } from "../contract/unrest.ts";
 import { idb } from "../../db/index.ts";
+import { isCollege } from "../college/isCollege.ts";
+import { isRedshirting } from "../college/redshirt.ts";
 import { g, helpers } from "../../util/index.ts";
 import type { Player, Conditions } from "../../../common/types.ts";
 import {
@@ -702,7 +704,11 @@ const loadTeams = async (tids: number[], conditions: Conditions) => {
 		}
 	} else {
 		for (const tid of tids) {
-			const players = await idb.cache.players.indexGetAll("playersByTid", tid);
+			let players = await idb.cache.players.indexGetAll("playersByTid", tid);
+			// College mode: redshirted players do not play
+			if (isCollege()) {
+				players = players.filter((p) => !isRedshirting(p));
+			}
 			const t = await idb.cache.teams.get(tid);
 
 			if (!t) {

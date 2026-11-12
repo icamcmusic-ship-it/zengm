@@ -18,8 +18,5 @@ export const getExpectations = async () => {
 
 export const getExpectedWinps = async () =>
 	new Map(
-		[...(await getExpectations())].map(([tid, row]) => [
-			tid,
-			row.expectedWinp,
-		]),
+		[...(await getExpectations())].map(([tid, row]) => [tid, row.expectedWinp]),
 	);

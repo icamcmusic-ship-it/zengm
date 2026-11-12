@@ -1,3 +1,5 @@
+import { isCollege } from "../core/college/isCollege.ts";
+import { COLLEGE_REGION_NAMES } from "../../common/college/constants.ts";
 import { season, team } from "../core/index.ts";
 import { InvalidPlayoffSettingsError } from "../core/season/genPlayoffSeries.ts";
 import { idb } from "../db/index.ts";
@@ -28,6 +30,7 @@ export default defineView({
 	}): Promise<
 		| {
 				canEdit: boolean;
+				collegeRegions?: string[];
 				confNames: string[];
 				finalMatchups: boolean;
 				matchups: {
@@ -215,8 +218,15 @@ export default defineView({
 				}));
 			}
 
+			// College mode: the national tournament's regions, in bracket order (top left, bottom left, top right, bottom right)
+			const collegeRegions =
+				isCollege() && series.length >= 3
+					? COLLEGE_REGION_NAMES.slice(0, 4)
+					: undefined;
+
 			return {
 				canEdit,
+				collegeRegions,
 				confNames,
 				finalMatchups,
 				matchups,

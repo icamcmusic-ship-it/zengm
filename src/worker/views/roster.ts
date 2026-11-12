@@ -22,6 +22,7 @@ import {
 	fitLabel,
 } from "../../common/coachSystems.ts";
 import { isCollege } from "../core/college/isCollege.ts";
+import { canRedshirt, isRedshirting } from "../core/college/redshirt.ts";
 
 const getRosterCoachSystem = async (tid: number) => {
 	const s = await getTeamCoachSystem(tid);
@@ -311,6 +312,18 @@ export default defineView({
 					fuzz: true,
 				});
 				players = await addMood(players, playersAll);
+				// College mode: redshirts (redshirting now, and whether the user can change it)
+				if (collegeLeague) {
+					const byPid = new Map(playersAll.map((p) => [p.pid, p]));
+					for (const p of players) {
+						const p2 = byPid.get(p.pid);
+						if (p2) {
+							p.redshirting = isRedshirting(p2);
+							p.canRedshirt =
+								inputs.tid === g.get("userTid") && canRedshirt(p2);
+						}
+					}
+				}
 
 				if (__SPORT === "basketball") {
 					players.sort((a, b) => a.rosterOrder - b.rosterOrder);

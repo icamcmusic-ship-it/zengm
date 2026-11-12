@@ -169,7 +169,10 @@ describe.skipIf(!OUT)("college quick sim data", () => {
 		}
 		let lines = "";
 		for (const t of teams) {
-			const players = await idb.cache.players.indexGetAll("playersByTid", t.tid);
+			const players = await idb.cache.players.indexGetAll(
+				"playersByTid",
+				t.tid,
+			);
 			for (const p of players) {
 				lines += `${JSON.stringify({
 					pid: p.pid,

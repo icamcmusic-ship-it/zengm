@@ -15,6 +15,7 @@ type TeamToEdit = View<"playoffs">["teamsToEdit"][number];
 
 const Playoffs = ({
 	canEdit,
+	collegeRegions,
 	confNames,
 	finalMatchups,
 	matchups,
@@ -193,7 +194,15 @@ const Playoffs = ({
 				</div>
 			) : null}
 
-			{(playoffsByConf === 2 || playoffsByConf === 4) && numRounds > 1 ? (
+			{collegeRegions ? (
+				<h2 className="d-none d-sm-block mb-2">
+					{collegeRegions[0]}{" "}
+					<span className="float-end">{collegeRegions[2]}</span>
+				</h2>
+			) : null}
+			{!collegeRegions &&
+			(playoffsByConf === 2 || playoffsByConf === 4) &&
+			numRounds > 1 ? (
 				<h2 className="d-none d-sm-block mb-2">
 					{confNames[playoffsByConf === 2 ? 1 : 2]}{" "}
 					<span className="float-end">{confNames[0]}</span>
@@ -265,7 +274,12 @@ const Playoffs = ({
 				</table>
 			</ResponsiveTableWrapper>
 
-			{playoffsByConf === 4 ? (
+			{collegeRegions ? (
+				<h2 className="d-none d-sm-block mb-3">
+					{collegeRegions[1]}{" "}
+					<span className="float-end">{collegeRegions[3]}</span>
+				</h2>
+			) : playoffsByConf === 4 ? (
 				<h2 className="d-none d-sm-block mb-3">
 					{confNames[3]} <span className="float-end">{confNames[1]}</span>
 				</h2>

@@ -269,6 +269,7 @@ import {
 import {
 	collegeAutoTargets,
 	collegeSetAutoRecruit,
+	collegeSetRedshirt,
 	collegeSetTarget,
 } from "../core/college/api.ts";
 import { getRumorState } from "../core/rumors/index.ts";
@@ -6247,6 +6248,7 @@ const api = {
 		clearWatchList,
 		collegeAutoTargets,
 		collegeSetAutoRecruit,
+		collegeSetRedshirt,
 		collegeSetTarget,
 		createLeague: whileWorkerBusy(createLeague),
 		createTrade,

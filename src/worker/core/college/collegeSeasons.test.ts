@@ -22,6 +22,11 @@ import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, local, lock } from "../../util/index.ts";
 import { getCollegeArchive } from "./archive.ts";
+import { setRedshirt } from "./redshirt.ts";
+import {
+	getContractExp,
+	getCurrentContract,
+} from "../../../common/contracts.ts";
 
 const env = (globalThis as any).process.env;
 const LEVEL = (env.COLLEGE_LEVEL ?? "power") as CollegeLevel;
@@ -136,6 +141,23 @@ describe("college mode", () => {
 			await step("regular season", () =>
 				phase.newPhase(PHASE.REGULAR_SEASON, {}),
 			);
+			// Redshirt one of the user's freshmen: he does not play, and keeps the year
+			let redshirtPid: number | undefined;
+			let redshirtExp: number | undefined;
+			if (i === 0) {
+				const fr = (
+					await idb.cache.players.indexGetAll("playersByTid", g.get("userTid"))
+				).find((p: any) => p.classYear === 1);
+				assert.isDefined(fr, "a freshman");
+				redshirtExp = getContractExp(getCurrentContract(fr!)!);
+				assert.isTrue(await setRedshirt(fr!, true));
+				redshirtPid = fr!.pid;
+				assert.strictEqual(
+					getContractExp(getCurrentContract(fr!)!),
+					redshirtExp! + 1,
+				);
+				redshirtExp = redshirtExp! + 1;
+			}
 			const t0 = performance.now();
 			let days = 0;
 			while (g.get("phase") === PHASE.REGULAR_SEASON) {
@@ -183,6 +205,33 @@ describe("college mode", () => {
 			);
 			assert.lengthOf(champion, 1, "champion");
 
+			// College awards
+			const awards = await idb.cache.awards.get(g.get("season"));
+			const names = new Set((awards?.awards ?? []).map((a: any) => a.name));
+			for (const name of [
+				"Player of the Year",
+				"Freshman of the Year",
+				"Defensive Player of the Year",
+				"All-American",
+				"All-Conference",
+			]) {
+				assert.isTrue(names.has(name), `award ${name}`);
+			}
+			const aa = awards!.awards.find((a: any) => a.shortName === "AA") as any;
+			assert.lengthOf(aa.winner, 3, "three All-American teams");
+			const cpoy = awards!.awards.filter((a: any) => a.shortName === "CPOY");
+			assert.isAtLeast(cpoy.length, 2, "conference players of the year");
+			await loadView("history", { season: String(g.get("season")) });
+			if (redshirtPid !== undefined) {
+				const p = await idb.cache.players.get(redshirtPid);
+				if (p && p.tid >= 0) {
+					const gp = p.stats
+						.filter((row) => row.season === g.get("season"))
+						.reduce((a, row) => a + (row.gp ?? 0), 0);
+					assert.strictEqual(gp, 0, "redshirt did not play");
+				}
+			}
+
 			await step("departures", () => phase.newPhase(PHASE.DRAFT, {}));
 			const archive = await getCollegeArchive(g.get("season"));
 			assert.isAbove(archive?.proDraft?.length ?? 0, 0, "pro draft");
@@ -199,6 +248,16 @@ describe("college mode", () => {
 				assert.strictEqual(n, 13, `${t.region} full after signing day`);
 			}
 			await step("preseason", () => phase.newPhase(PHASE.PRESEASON, {}));
+			if (i === 0 && redshirtPid !== undefined) {
+				const p = (await idb.cache.players.get(redshirtPid)) as any;
+				if (p && p.tid >= 0) {
+					assert.strictEqual(p.classYear, 1, "redshirt keeps his year");
+					assert.strictEqual(
+						getContractExp(getCurrentContract(p)!),
+						redshirtExp,
+					);
+				}
+			}
 			assert.strictEqual(g.get("season"), start + i + 1);
 
 			if (BENCH) {
