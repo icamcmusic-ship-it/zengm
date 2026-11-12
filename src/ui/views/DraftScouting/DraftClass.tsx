@@ -121,6 +121,9 @@ const DraftClass = ({
 		!challengeNoRatings &&
 		players.some((p) => p.expanded !== undefined);
 
+	// Prospects from a linked college league show their school
+	const showSchool = players.some((p) => p.linkedSchool !== undefined);
+
 	const cols = getCols([
 		"#",
 		"Name",
@@ -130,6 +133,13 @@ const DraftClass = ({
 		"Pot",
 		...(showExpanded ? EXPANDED_RATINGS.map((key) => `rating:${key}`) : []),
 	]);
+	if (showSchool) {
+		cols.push({
+			title: "School",
+			desc: "His school in the linked college league",
+			sortType: "string",
+		});
+	}
 	if (showArchetype) {
 		cols.push({
 			title: "Archetype",
@@ -190,6 +200,7 @@ const DraftClass = ({
 				...(showExpanded
 					? EXPANDED_RATINGS.map((key) => p.expanded?.[key] ?? null)
 					: []),
+				...(showSchool ? [p.linkedSchool ?? ""] : []),
 				...(showArchetype ? [p.archetype ?? ""] : []),
 				...(showScouting && p.scoutReport
 					? [

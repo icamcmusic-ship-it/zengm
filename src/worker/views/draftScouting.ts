@@ -85,6 +85,8 @@ const getSeason = async (
 				archetype: archetypeByPid.get(pa.pid)?.label,
 				archetypeGroup: archetypeByPid.get(pa.pid)?.group,
 				traits: traitsByPid.get(pa.pid),
+				// From a linked college league: his school there
+				linkedSchool: playersByPid.get(pa.pid)!.linkedCollege?.school,
 
 				// Ratings - just take the only entry
 				ovr: ratings.ovr,
@@ -121,7 +123,12 @@ const getSeason = async (
 export default defineView({
 	id: "draftScouting",
 	load: async ({ updateEvents }) => {
-		if (updateEvents.has("firstRun") || updateEvents.has("playerMovement")) {
+		if (
+			updateEvents.has("firstRun") ||
+			updateEvents.has("playerMovement") ||
+			// The linked college league card
+			updateEvents.has("gameAttributes")
+		) {
 			const fantasyDraft = g.get("phase") === PHASE.FANTASY_DRAFT;
 
 			// In fantasy draft, use temp tid
@@ -154,8 +161,24 @@ export default defineView({
 				seasons.push(await getSeason(players, season, traitContext));
 			}
 
+			// Linked college league (pro leagues only): which one, and what was imported
+			const linked = g.get("linkedCollege");
+			let linkedCollege;
+			if (linked) {
+				const meta = await idb.meta.get("leagues", linked.lid);
+				linkedCollege = {
+					...linked,
+					name: meta?.name ?? `League ${linked.lid} (deleted?)`,
+				};
+			}
+
 			return {
 				fantasyDraft,
+				linkedCollege,
+				canLink:
+					__SPORT === "basketball" &&
+					g.get("leagueType") !== "college" &&
+					!fantasyDraft,
 				seasons,
 				scoutingStatus:
 					featureOn("scoutingSystem") && !fantasyDraft

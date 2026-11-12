@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import DraftClass from "./DraftClass.tsx";
+import { LinkedCollege } from "./LinkedCollege.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { View } from "../../../common/types.ts";
 import { MoreLinks } from "../../components/MoreLinks.tsx";
@@ -12,7 +13,9 @@ import { RegenerateRatingsButton } from "../../components/RegenerateRatings/Rege
 const PAGE_SIZE = 3;
 
 const DraftScouting = ({
+	canLink,
 	fantasyDraft,
+	linkedCollege,
 	seasons,
 	scoutingStatus,
 }: View<"draftScouting">) => {
@@ -78,6 +81,8 @@ const DraftScouting = ({
 					) : null}
 				</p>
 			) : null}
+
+			{canLink ? <LinkedCollege linkedCollege={linkedCollege} /> : null}
 
 			{regeneratorOn ? (
 				<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
