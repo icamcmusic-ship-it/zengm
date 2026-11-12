@@ -30,6 +30,8 @@ import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
 import { getAllGmWeights } from "../gm/index.ts";
+import { isCollege } from "../college/isCollege.ts";
+import { getExpectedWinps } from "../college/expectations.ts";
 import {
 	adaptSystems,
 	annotateSeason,
@@ -605,6 +607,7 @@ export const coachOfTheYear = async () => {
 	const heads = (await idb.cache.coaches.getAll()).filter(
 		(c) => c.tid >= 0 && c.role === "head",
 	);
+	const collegeExpected = isCollege() ? await getExpectedWinps() : undefined;
 	let best: Coach | undefined;
 	let bestScore = -Infinity;
 	for (const c of heads) {
@@ -620,11 +623,17 @@ export const coachOfTheYear = async () => {
 		)[0];
 		const prevPct = prev && prev.won + prev.lost > 0 ? winPct(prev) : 0.5;
 		const pct = winPct(row);
-		const score =
-			pct +
-			0.6 * (pct - prevPct) +
-			0.02 * row.playoffRoundsWon +
-			gauss(0, 0.01);
+		// College mode: against what the program's prestige expects, and the national tournament counts more
+		const score = collegeExpected
+			? pct -
+				(collegeExpected.get(c.tid) ?? 0.5) +
+				0.3 * (pct - prevPct) +
+				0.05 * Math.max(0, row.playoffRoundsWon + 1) +
+				gauss(0, 0.01)
+			: pct +
+				0.6 * (pct - prevPct) +
+				0.02 * row.playoffRoundsWon +
+				gauss(0, 0.01);
 		if (score > bestScore) {
 			bestScore = score;
 			best = c;

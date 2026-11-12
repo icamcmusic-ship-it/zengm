@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import type { CSSProperties } from "react";
+import { useIsCollege } from "../util/collegeMode.ts";
 
 export const ChampionshipBanner = ({
 	className,
@@ -21,6 +22,7 @@ export const ChampionshipBanner = ({
 	};
 }) => {
 	const viewBox = hideRope ? "0 15 182 232" : "0 0 182 247";
+	const isCollege = useIsCollege();
 
 	return (
 		<div
@@ -94,7 +96,7 @@ export const ChampionshipBanner = ({
 							className="text-center"
 							style={{ fontSize: 16, lineHeight: 1 }}
 						>
-							League Champions
+							{isCollege ? "National Champions" : "League Champions"}
 						</div>
 					)}
 				</foreignObject>

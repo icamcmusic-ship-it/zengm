@@ -18,6 +18,9 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { getSeasonState, validateSeason } from "../util/processInputs.ts";
 import { isCurrentSeasonComplete } from "../../common/seasons.ts";
 import { player, team } from "../core/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
+import { COACH_OF_THE_YEAR } from "../core/staff/index.ts";
+import { getCoachAwards } from "../core/staff/data.ts";
 
 const processInputs = (params: RouteParams<"history">) => {
 	let season = validateSeason(params.season);
@@ -284,9 +287,40 @@ export default defineView({
 					g.get("numGamesPlayoffSeries", season).length,
 			);
 
+			// College mode: the Coach of the Year (staff), shown with the awards
+			let college:
+				| {
+						coachOfYear?: {
+							cid: number;
+							name: string;
+							tid: number;
+							abbrev: string;
+							region: string;
+						};
+				  }
+				| undefined;
+			if (isCollege()) {
+				const coy = (await getCoachAwards(COACH_OF_THE_YEAR)).find(
+					(a) => a.season === season,
+				);
+				const info = coy ? g.get("teamInfoCache")[coy.tid] : undefined;
+				college = {
+					coachOfYear: coy
+						? {
+								cid: coy.cid,
+								name: coy.name,
+								tid: coy.tid,
+								abbrev: info?.abbrev ?? "",
+								region: info?.region ?? "",
+							}
+						: undefined,
+				};
+			}
+
 			return {
 				awards: awardsAugmented,
 				champ,
+				college,
 				confs: g.get("confs", season),
 				invalidSeason: false as const,
 				retiredPlayers,

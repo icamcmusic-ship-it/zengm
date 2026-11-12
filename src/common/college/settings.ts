@@ -1,4 +1,5 @@
 // College mode: the settings a college league is created with. See docs/college-mode.md.
+import { COLLEGE_AWARDS } from "./awards.ts";
 import { COLLEGE_SCHOLARSHIPS } from "./constants.ts";
 import {
 	getCollegeLeagueTeams,
@@ -66,6 +67,8 @@ export const getCollegeSettings = (level: CollegeLevel) => {
 		collegeAutoRecruit: true,
 		// The quick sim for games without the user's team: on for the big levels (hundreds of teams)
 		collegeQuickSim: level !== "power",
+
+		awards: COLLEGE_AWARDS,
 
 		// Rules
 		numPeriods: 2,

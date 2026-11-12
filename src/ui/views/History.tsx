@@ -183,7 +183,7 @@ const History = (props: View<"history">) => {
 		);
 	}
 
-	const { awards, champ, confs, retiredPlayers, retiredStat } = props;
+	const { awards, champ, college, confs, retiredPlayers, retiredStat } = props;
 
 	const { teamAwards1, teamAwards2 } = splitTeamAwards(awards.teamAwards);
 
@@ -201,7 +201,7 @@ const History = (props: View<"history">) => {
 				<div className="col-md-3 col-sm-4 col-12">
 					<div className="row">
 						<div className="col-sm-12 col-6">
-							<h2>League Champs</h2>
+							<h2>{college ? "National Champions" : "League Champs"}</h2>
 							{champ ? (
 								<div>
 									<div className="mb-3">
@@ -224,7 +224,7 @@ const History = (props: View<"history">) => {
 										</span>
 										<br />
 										<a href={helpers.leagueUrl(["playoffs", season])}>
-											Playoff bracket
+											{college ? "Tournament bracket" : "Playoff bracket"}
 										</a>
 									</div>
 									{groupedIndividualAwardsPlayoffs.map((groupedAwards, i) => {
@@ -261,7 +261,7 @@ const History = (props: View<"history">) => {
 							) : (
 								<div className="mb-3">{NO_WINNER}</div>
 							)}
-							<h2>Best Record</h2>
+							<h2>{college ? "Regular Season Champions" : "Best Record"}</h2>
 							{bestRecordConfs.map(([cid, t]) =>
 								t ? (
 									<div key={cid} className="mb-3">
@@ -288,6 +288,44 @@ const History = (props: View<"history">) => {
 							)}
 						</div>
 						<div className="col-sm-12 col-6">
+							{college ? (
+								<>
+									<h2>Coach of the Year</h2>
+									<div className="mb-3">
+										{college.coachOfYear ? (
+											<span
+												className={
+													college.coachOfYear.tid === userTid
+														? "table-info"
+														: undefined
+												}
+											>
+												<a
+													href={helpers.leagueUrl([
+														"coach",
+														college.coachOfYear.cid,
+													])}
+												>
+													{college.coachOfYear.name}
+												</a>{" "}
+												(
+												<a
+													href={helpers.leagueUrl([
+														"roster",
+														`${college.coachOfYear.abbrev}_${college.coachOfYear.tid}`,
+														season,
+													])}
+												>
+													{college.coachOfYear.region}
+												</a>
+												)
+											</span>
+										) : (
+											NO_WINNER
+										)}
+									</div>
+								</>
+							) : null}
 							{awards.individualAwards.map((award, i) => {
 								return (
 									<React.Fragment key={i}>

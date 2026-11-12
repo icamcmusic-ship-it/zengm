@@ -11,6 +11,7 @@ import {
 } from "../components/PlayerNameLabels.tsx";
 import { TeamLogoInline } from "../components/TeamLogoInline.tsx";
 import { useLocal } from "../util/local.ts";
+import { useIsCollege } from "../util/collegeMode.ts";
 
 const awardName = (
 	award: {
@@ -100,28 +101,32 @@ const formatTeam = (
 const HistoryAll = ({ awards, seasons }: View<"historyAll">) => {
 	useTitleBar({ title: "League History" });
 	const { userTid } = useLocal(["userTid"]);
+	const isCollege = useIsCollege();
 
-	const cols = getCols([
-		"Season",
-		"League Champion",
-		"Runner Up",
-		...(__SPORT === "basketball"
-			? [
-					{
-						desc: "Newspaper, Wrapped, Storylines and Timeline for the season",
-						title: "Read",
-						sortType: "name" as const,
-					},
-				]
-			: []),
-		...awards.map((award) => {
-			return {
-				desc: award.name,
-				title: award.shortName,
-				sortType: "name" as const,
-			};
-		}),
-	]);
+	const cols = getCols(
+		[
+			"Season",
+			"League Champion",
+			"Runner Up",
+			...(__SPORT === "basketball"
+				? [
+						{
+							desc: "Newspaper, Wrapped, Storylines and Timeline for the season",
+							title: "Read",
+							sortType: "name" as const,
+						},
+					]
+				: []),
+			...awards.map((award) => {
+				return {
+					desc: award.name,
+					title: award.shortName,
+					sortType: "name" as const,
+				};
+			}),
+		],
+		isCollege ? { "League Champion": { title: "National Champion" } } : {},
+	);
 
 	const rows = seasons.map((s) => {
 		let seasonLink;

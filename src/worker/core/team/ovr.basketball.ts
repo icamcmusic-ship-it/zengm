@@ -1,5 +1,10 @@
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { g } from "../../util/index.ts";
+import { isCollege } from "../college/isCollege.ts";
+
+// College scale: rating = base + per point of predicted margin (pro scale, where an average pro team is 0)
+export const COLLEGE_OVR_BASE = 88;
+export const COLLEGE_OVR_PER_MOV = 0.6;
 
 const ovr = (
 	players: {
@@ -39,8 +44,11 @@ const ovr = (
 	}
 
 	// See analysis/team-ovr-basketball
+	// College mode: one scale all season (see the end)
+	const college = rating === undefined && isCollege();
+
 	let a, b, k;
-	if (playoffs) {
+	if (playoffs && !college) {
 		a = 0.6388;
 		b = -0.2245;
 		k = 157.43;
@@ -89,6 +97,17 @@ const ovr = (
 	if (rating) {
 		// In this case, we're ultimately using the value to compute a rank or some other relative score, so we don't care about the scale
 		return predictedMOV;
+	}
+
+	// College mode: college rosters are far below pro ones (a pro scale rating would be around 0 or negative). On the college scale the best
+	// programs of a full Division I league rate in the high 80s and the weakest in the 40s (docs/college-mode.md, Team rating)
+	if (college) {
+		return Math.round(
+			Math.min(
+				100,
+				Math.max(0, COLLEGE_OVR_BASE + COLLEGE_OVR_PER_MOV * predictedMOV),
+			),
+		);
 	}
 
 	// Translate from -15/15 to 0/100 scale

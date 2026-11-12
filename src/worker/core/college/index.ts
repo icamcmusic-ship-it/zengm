@@ -39,6 +39,7 @@ export { isCollege } from "./isCollege.ts";
 export { createCollegePlayers, getTeamPrestige } from "./players.ts";
 export { getCollegeArchive, updateCollegeArchive } from "./archive.ts";
 export { getCollegeState } from "./state.ts";
+export { useCollegeAwards } from "./awards.ts";
 export {
 	playQuickGames,
 	throttleAdvStats,
