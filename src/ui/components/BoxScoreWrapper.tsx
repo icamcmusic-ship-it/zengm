@@ -1,4 +1,5 @@
 import { useFeatureOn } from "../util/nativeFeatures.ts";
+import { marqueeLine } from "../../common/marquee.ts";
 import { DEFENSE_NAMES, OFFENSE_NAMES } from "../../common/coachSystems.ts";
 import type { DefenseSystem, OffenseSystem } from "../../common/types.ts";
 import clsx from "clsx";
@@ -1250,6 +1251,7 @@ export const BoxScoreWrapper = ({
 	tid?: number;
 	Row: unknown;
 }) => {
+	const marqueeOn = useFeatureOn("marqueeGames");
 	const prevPlayIndex = useRef(playIndex);
 	useEffect(() => {
 		prevPlayIndex.current = playIndex;
@@ -1381,6 +1383,12 @@ export const BoxScoreWrapper = ({
 				<>
 					<br />
 					Played at a neutral site
+				</>
+			) : null}
+			{marqueeOn && marqueeLine(boxScore) ? (
+				<>
+					<br />
+					<span data-testid="box-score-marquee">{marqueeLine(boxScore)}</span>
 				</>
 			) : null}
 			{forcedWinText}

@@ -11,9 +11,11 @@ import getSchedule from "./getSchedule.ts";
 import getSeasonLeaders from "./getSeasonLeaders.ts";
 import hasTies from "./hasTies.ts";
 import newSchedule, {
+	marqueeGamesOn,
 	newScheduleWithDays,
 	realisticScheduleOn,
 } from "./newSchedule.ts";
+import getMarqueeInput from "./getMarqueeInput.ts";
 import newSchedulePlayoffsDay from "./newSchedulePlayoffsDay.ts";
 import setSchedule from "./setSchedule.ts";
 import updateOwnerMood from "./updateOwnerMood.ts";
@@ -35,6 +37,8 @@ export default {
 	newSchedule,
 	newScheduleWithDays,
 	realisticScheduleOn,
+	marqueeGamesOn,
+	getMarqueeInput,
 	newSchedulePlayoffsDay,
 	setSchedule,
 	updateOwnerMood,

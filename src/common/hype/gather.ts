@@ -1,4 +1,5 @@
 // Builds the engine's input for one game from a season snapshot (HRaw): the state of the league just before the game, using only games played before it.
+import type { MarqueeKind } from "../marquee.ts";
 import { LINE_STATS } from "./calibration.ts";
 import { gmsc, known } from "./util.ts";
 import type {
@@ -26,6 +27,9 @@ export type Target = {
 	playIn: boolean;
 	// Finished and stored in raw.games
 	completed: boolean;
+	// Marquee Games tags
+	marquee?: MarqueeKind;
+	rivalry?: boolean;
 };
 
 const phaseRank = (g: { playoffs: boolean; playIn: boolean }) =>
@@ -540,6 +544,8 @@ export const targetOfGame = (g: HGame): Target => ({
 	playoffs: g.playoffs,
 	playIn: g.playIn,
 	completed: true,
+	...(g.marquee !== undefined ? { marquee: g.marquee } : {}),
+	...(g.rivalry ? { rivalry: true } : {}),
 });
 
 export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
@@ -613,6 +619,7 @@ export const inputFor = (raw: HRaw, t: Target): HGameInput | null => {
 		out: outStars,
 		linesFrom: raw.linesComplete ? raw.season : Number.POSITIVE_INFINITY,
 		teamName,
+		...(t.marquee !== undefined ? { marquee: t.marquee } : {}),
 	};
 };
 

@@ -126,6 +126,8 @@ const toHGame = (gm: Game, playInGids: Set<number>): HGame => {
 		overtimes: gm.overtimes ?? 0,
 		teams: [mapTeam(gm.teams[0]), mapTeam(gm.teams[1])],
 		clutch: (gm.clutchPlays ?? []).map(clutchText),
+		...(gm.marquee !== undefined ? { marquee: gm.marquee } : {}),
+		...(gm.rivalry ? { rivalry: true } : {}),
 	};
 };
 
@@ -411,6 +413,8 @@ export const upcomingTargets = async (
 			playIn,
 			completed: false,
 			season: g.get("season"),
+			...(game.marquee !== undefined ? { marquee: game.marquee } : {}),
+			...(game.rivalry ? { rivalry: true } : {}),
 		});
 	}
 	return { days: [...days.entries()].map(([day, games]) => ({ day, games })) };

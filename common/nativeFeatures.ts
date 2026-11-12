@@ -353,7 +353,18 @@ export const NATIVE_FEATURES = [
 		key: "realisticSchedule",
 		name: "Realistic Schedule Length",
 		description:
-			"The regular season is spread over about 2 days per game (82 games in about 172 days) instead of most teams playing almost every day: each team plays about every other day, with about 14 back-to-backs and only a few 3-in-4s per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
+			"The regular season is spread over about 2 days per game (82 games in about 172 days) instead of most teams playing almost every day: each team plays about every other day, with about 14 back-to-backs and at most about one 3-in-4 per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "marqueeGames",
+		college: false,
+		key: "marqueeGames",
+		name: "Marquee Games",
+		description:
+			"With Realistic Schedule Length: holiday games on fixed days of the season (an opening night doubleheader with the defending champion, a Christmas slate of 5 games with the best and most hyped teams and rivals, an MLK Day slate), 2-4 national TV games a week picked from the best matchups, and rivalry games spread over the season instead of bunched. The schedule pages, game previews and box scores show them, and marquee and rivalry games get a slightly louder home crowd (with Load, Fatigue & Venue). Takes effect with the next schedule (the next regular season).",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
@@ -513,6 +524,16 @@ export const NATIVE_FEATURES = [
 				default: true,
 			},
 		],
+	},
+	{
+		id: "realisticTurnovers",
+		key: "realisticTurnovers",
+		name: "Realistic Turnovers",
+		description:
+			"Fewer turnovers, closer to the modern NBA (about 14.5 per team game instead of about 16.5 with the other new-league settings): live-ball and dead-ball turnovers both go down, the share of them that are steals goes up so steals stay the same, and the extra possessions end in shots. Points go up by about 2 per team game, pace and the other averages stay about the same.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
 	},
 	{
 		id: "seasonOdds",

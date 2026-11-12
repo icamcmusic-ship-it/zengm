@@ -8,6 +8,7 @@ import { NoGamesMessage } from "./GameLog.tsx";
 import allowForceTie from "../../common/allowForceTie.ts";
 import { ForceWin } from "../components/ForceWin.tsx";
 import { ScoreBox } from "../components/ScoreBox/index.tsx";
+import { MarqueeBadges } from "../components/MarqueeBadges.tsx";
 import { HypeLine, useHypeGids } from "../components/GameHype.tsx";
 
 const DailySchedule = ({
@@ -186,6 +187,7 @@ const DailySchedule = ({
 												playersUpcoming={playersUpcoming}
 												actions={actions}
 											/>
+											<MarqueeBadges game={game} className="mt-1" />
 											<HypeLine h={hype[game.gid]} className="mt-1" />
 											{backToBack?.[game.gid] ? (
 												<div
@@ -222,6 +224,7 @@ const DailySchedule = ({
 											style={{ maxWidth: 510 }}
 										>
 											<ScoreBox game={game} />
+											<MarqueeBadges game={game} className="mt-1" />
 											<HypeLine h={hype[game.gid]} className="mt-1" />
 										</div>
 									);

@@ -1,6 +1,7 @@
 // Pre-game hype: how much a game is worth watching, from what was known before tip-off.
 // Every ingredient adds points (shown as a reason with its contribution); the sum is squashed to 0-100.
 import { hypeRivalryPoints } from "../rivalries/index.ts";
+import { MARQUEE_LABELS, marqueeHypePoints } from "../marquee.ts";
 import { chaseText, findChases, type ChaseCtx } from "./chases.ts";
 import {
 	heaters,
@@ -292,6 +293,17 @@ export const preHype = (I: HGameInput): Pre => {
 	}
 	if (H.did === A.did && H.cid === A.cid && H.did >= 0) {
 		add("rivalry", 2, "Division rivals");
+	}
+
+	// Marquee Games: a holiday slate or national TV
+	if (I.marquee !== undefined) {
+		add(
+			"marquee",
+			marqueeHypePoints({ marquee: I.marquee }),
+			I.marquee === "nationalTv"
+				? "On national TV"
+				: `${MARQUEE_LABELS[I.marquee]} showcase on national TV`,
+		);
 	}
 
 	// star power

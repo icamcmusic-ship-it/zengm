@@ -1,3 +1,4 @@
+import { marqueeCrowdBoost } from "../../../common/marquee.ts";
 import { ALL_STAR_GAME_ONLY, PHASE } from "../../../common/constants.ts";
 import * as contractHooks from "../contract/hooks.ts";
 import {
@@ -524,6 +525,12 @@ const play = async (
 
 			const teamsInput = [teams[game.homeTid], teams[game.awayTid]] as any;
 
+			// Marquee Games: a louder home crowd for holiday, national TV and rivalry games (Load, Fatigue & Venue's crowd)
+			const crowdBoost = marqueeCrowdBoost(game);
+			if (crowdBoost > 0 && teamsInput[0]) {
+				teamsInput[0].crowdBoost = crowdBoost;
+			}
+
 			const forceTie = game.forceWin === "tie";
 			const invalidForceTie =
 				forceTie &&
@@ -658,6 +665,18 @@ const play = async (
 					neutralSite,
 				});
 				results.push(result);
+			}
+		}
+
+		// Marquee Games: the schedule's tags go with the box score
+		const scheduleByGid = new Map(schedule.map((game) => [game.gid, game]));
+		for (const result of results) {
+			const game = scheduleByGid.get(result.gid);
+			if (game?.marquee !== undefined) {
+				result.marquee = game.marquee;
+			}
+			if (game?.rivalry) {
+				result.rivalry = true;
 			}
 		}
 

@@ -10,6 +10,7 @@ import { ForceWin } from "../components/ForceWin.tsx";
 import { ScoreBox } from "../components/ScoreBox/index.tsx";
 import { helpers } from "../util/helpers.ts";
 import { HypeLine, useHypeGids } from "../components/GameHype.tsx";
+import { MarqueeBadges } from "../components/MarqueeBadges.tsx";
 
 const Schedule = ({
 	backToBack,
@@ -203,6 +204,7 @@ const Schedule = ({
 										playersUpcomingAbbrev={topPlayers.type === "byTid"}
 										actions={actions}
 									/>
+									<MarqueeBadges game={game} className="mt-1" />
 									<HypeLine h={hype[game.gid]} className="mt-1" />
 									{backToBack?.[game.gid]?.includes(tid) ? (
 										<div
@@ -231,12 +233,16 @@ const Schedule = ({
 				<div style={{ maxWidth: 510 }} className="flex-grow-1">
 					<h2>Completed Games</h2>
 					{completed.map((game) => (
-						<ScoreBox
-							boxScoreTeamOverride={helpers.getTeamUrlPart(tid)}
-							className="mb-3"
-							key={game.gid}
-							game={game}
-						/>
+						<Fragment key={game.gid}>
+							<ScoreBox
+								boxScoreTeamOverride={helpers.getTeamUrlPart(tid)}
+								className={
+									game.marquee !== undefined || game.rivalry ? "mb-1" : "mb-3"
+								}
+								game={game}
+							/>
+							<MarqueeBadges game={game} className="mb-3" />
+						</Fragment>
 					))}
 				</div>
 			</div>

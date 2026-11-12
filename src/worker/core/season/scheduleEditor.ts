@@ -127,6 +127,8 @@ export const createScheduleEditor = (
 	}
 
 	const pinned = new Set<number>();
+	// At most this many games on a day (the exclusive holiday slates of Marquee Games)
+	const dayCap = new Map<number, number>();
 
 	// Whether a day's only game can leave it: only from the last day with games, so no empty day is left in the season
 	const canEmpty = (from: number, to: number) => {
@@ -151,6 +153,7 @@ export const createScheduleEditor = (
 			to <= lastDay &&
 			!blocked[to] &&
 			!pinned.has(i) &&
+			gamesPerDay[to]! < (dayCap.get(to) ?? Infinity) &&
 			(allowEmptyDay || gamesPerDay[from]! > 1 || canEmpty(from, to)) &&
 			!teamGameOnDay.get(home)!.has(to) &&
 			!teamGameOnDay.get(away)!.has(to)
@@ -207,8 +210,13 @@ export const createScheduleEditor = (
 	};
 
 	// Move game i to day "to" after moving the games of its teams that are in the way on that day (to their best day
-	// nearby), if the total cost goes down. Returns whether it did.
-	const tryChainMove = (i: number, to: number, window: number) => {
+	// nearby), if the total cost changes by less than maxDelta (by default: only if it goes down). Returns whether it did.
+	const tryChainMove = (
+		i: number,
+		to: number,
+		window: number,
+		maxDelta = -1e-9,
+	) => {
 		const [home, away] = tids[i]!;
 		const from = gameDays[i]!;
 		if (
@@ -228,15 +236,11 @@ export const createScheduleEditor = (
 				blockers.add(other);
 			}
 		}
-		if (blockers.size === 0) {
-			return false;
-		}
 		const undo: [number, number][] = [];
 		let total = 0;
 		let ok = true;
 		for (const other of blockers) {
-			// Not back onto the day being freed up, or where game i is (its teams are busy there anyway, but the other team
-			// of the blocking game might not be)
+			// Not back onto the day being freed up
 			let bestDay = -1;
 			let bestDelta = Infinity;
 			const otherFrom = gameDays[other]!;
@@ -260,7 +264,7 @@ export const createScheduleEditor = (
 		}
 		if (ok && canMove(i, to)) {
 			total += moveDelta(i, to);
-			if (total < -1e-9) {
+			if (total < maxDelta) {
 				move(i, to);
 				return true;
 			}
@@ -269,6 +273,82 @@ export const createScheduleEditor = (
 			move(other, day);
 		}
 		return false;
+	};
+
+	// Swapping the days of two games (each team keeps its other games): the teams that are in only one of them change
+	// days. undefined if not possible
+	const swapDelta = (i: number, j: number) => {
+		const di = gameDays[i]!;
+		const dj = gameDays[j]!;
+		if (
+			i === j ||
+			di === dj ||
+			tids[i]![0] < 0 ||
+			tids[j]![0] < 0 ||
+			pinned.has(i) ||
+			pinned.has(j)
+		) {
+			return undefined;
+		}
+		const ti = tids[i]!;
+		const tj = tids[j]!;
+		let delta = 0;
+		for (const [teams, otherTeams, from, to] of [
+			[ti, tj, di, dj],
+			[tj, ti, dj, di],
+		] as const) {
+			for (const tid of teams) {
+				if (otherTeams.includes(tid)) {
+					continue;
+				}
+				if (teamGameOnDay.get(tid)!.has(to)) {
+					return undefined;
+				}
+				const list = teamDays.get(tid)!;
+				const target = b2bTarget.get(tid)!;
+				delta +=
+					teamRestCost(replaceDay(list, from, to), target) -
+					teamRestCost(list, target);
+			}
+		}
+		return delta;
+	};
+
+	const swap = (i: number, j: number) => {
+		const di = gameDays[i]!;
+		const dj = gameDays[j]!;
+		const ti = tids[i]!;
+		const tj = tids[j]!;
+		for (const [teams, otherTeams, from, to] of [
+			[ti, tj, di, dj],
+			[tj, ti, dj, di],
+		] as const) {
+			for (const tid of teams) {
+				if (otherTeams.includes(tid)) {
+					continue;
+				}
+				teamDays.set(tid, replaceDay(teamDays.get(tid)!, from, to));
+				teamGameOnDay.get(tid)!.delete(from);
+			}
+		}
+		for (const [game, teams, day] of [
+			[i, ti, dj],
+			[j, tj, di],
+		] as const) {
+			for (const tid of teams) {
+				teamGameOnDay.get(tid)!.set(day, game);
+			}
+			gameDays[game] = day;
+		}
+	};
+
+	// Cost of every team's rest pattern (for tests and diagnostics)
+	const totalCost = () => {
+		let cost = 0;
+		for (const [tid, list] of teamDays) {
+			cost += teamRestCost(list, b2bTarget.get(tid)!);
+		}
+		return cost;
 	};
 
 	// Move games out of 3 games in 4 nights while that lowers the total cost (first improvement, until none is left)
@@ -337,10 +417,15 @@ export const createScheduleEditor = (
 		blocked,
 		lastDay,
 		pinned,
+		dayCap,
 		canMove,
 		moveDelta,
 		move,
 		bestMove,
+		tryChainMove,
+		swapDelta,
+		swap,
+		totalCost,
 		repairThreeInFour,
 		getSchedule,
 	};
