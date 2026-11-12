@@ -3,6 +3,7 @@ import { helpers } from "../../util/helpers.ts";
 import { dropdownOptions } from "../../hooks/useDropdownOptions.tsx";
 import { PLAYER } from "../../../common/constants.ts";
 import { useLocal } from "../../util/local.ts";
+import { useScoutingOn } from "../../components/ScoutingReport/index.tsx";
 import type { LeagueUrlParts } from "../../router/types.ts";
 
 export const SeasonLink = ({
@@ -68,6 +69,7 @@ type ProfilePlayer = {
 export const getProfileDropdownOptions = (
 	player: ProfilePlayer | undefined,
 	playerTraits = false,
+	scoutingReports = false,
 ) => {
 	const options = dropdownOptions.playerProfile.filter(
 		(option) =>
@@ -75,7 +77,9 @@ export const getProfileDropdownOptions = (
 				!player ||
 				player.tid !== PLAYER.UNDRAFTED) &&
 			(option.key !== "preDraft" || (!!player && hasPreDraftInfo(player))) &&
-			(option.key !== "traits" || (__SPORT === "basketball" && playerTraits)),
+			(option.key !== "traits" || (__SPORT === "basketball" && playerTraits)) &&
+			(option.key !== "scouting" ||
+				(__SPORT === "basketball" && scoutingReports)),
 	);
 	return options.length > 1 ? options : undefined;
 };
@@ -84,12 +88,13 @@ export const getProfileDropdownOptions = (
 // Traits in another sport or with the setting off) so the dropdown shows where you are
 export const usePlayerProfileOptions = (
 	player: ProfilePlayer | undefined,
-	current: "overview" | "gameLog" | "preDraft" | "traits",
+	current: "overview" | "gameLog" | "preDraft" | "traits" | "scouting",
 ) => {
 	const { playerTraits } = useLocal(["playerTraits"]);
+	const scoutingReports = useScoutingOn();
 	const keys = new Set(
 		(
-			getProfileDropdownOptions(player, !!playerTraits) ??
+			getProfileDropdownOptions(player, !!playerTraits, scoutingReports) ??
 			dropdownOptions.playerProfile.filter((o) => o.key === "overview")
 		).map((o) => o.key),
 	);
@@ -110,6 +115,9 @@ export const getProfileUrl = (
 	}
 	if (profile === "traits") {
 		return ["player_traits", pid];
+	}
+	if (profile === "scouting") {
+		return ["player_scouting", pid];
 	}
 	return ["player", pid];
 };

@@ -40,6 +40,8 @@ export type PlayerExport = {
 	awards: string[];
 	preDraft?: { team: string; season: number; stats: Record<string, number> };
 	tables: ExportTable[];
+	// Scouting Reports setting: the report as its own PDF page
+	scouting?: ScoutingExportPage;
 	face?: unknown;
 	imgURL?: string;
 	colors?: [string, string, string];
@@ -215,3 +217,30 @@ export const playersToJSON = (
 		null,
 		2,
 	);
+
+// The scouting report page of the PDF (Scouting Reports setting)
+export type ScoutingExportPage = {
+	byline: string;
+	overall: string;
+	overallGrade: number;
+	rangeLine: string;
+	confidence: string;
+	reference: string;
+	archetype?: string;
+	grades: {
+		key: string;
+		short: string;
+		label: string;
+		text: string;
+		grade: number;
+		lo: number;
+		hi: number;
+		line: string;
+		sub: boolean;
+	}[];
+	shotMix?: { label: string; share: number }[];
+	comps: string[];
+	flags: { text: string; red: boolean }[];
+	sections: { title: string; lines: string[] }[];
+	bottomLine: string;
+};

@@ -1579,6 +1579,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	ratingsBuild?: StoredRatingsBuild;
 	// Scouting the user's team did on this prospect (scouting system), one entry per scout assignment or workout
 	scouting?: ScoutingEntry[];
+	// Scouting Reports setting: compact snapshots of the user's scouts' grades (stock up/down history) and their take at the draft (track record). See common/scoutingReports/history.ts
+	scoutSnaps?: ScoutSnap[];
+	scoutDraft?: ScoutDraftRecord;
 	// The user's own draft board entry for this prospect (draft board planner)
 	draftBoard?: DraftBoardEntry;
 	// Basketball: his team's college season in his draft year (conference tournaments, March Madness), see common/collegeStats/ncaa.ts
@@ -2503,6 +2506,10 @@ import type { LeagueUrlParts } from "../ui/router/types.ts";
 import type { StoredRatingsBuild } from "./ratingsBuilds/types.ts";
 import type { StoredArchetype } from "./archetypes/types.ts";
 import type { PlayerTraits } from "./playerTraits/types.ts";
+import type {
+	ScoutDraftRecord,
+	ScoutSnap,
+} from "./scoutingReports/history.ts";
 import type { ExpandedRatingKey } from "./expandedRatings.ts";
 
 type TeamStatsPlus = Record<TeamStatAttrBaseball, number> &
