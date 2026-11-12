@@ -23,6 +23,8 @@ const getBest = <T extends PlayerWithoutKey>(
 	playersOnRoster: T[],
 	playersAvailable: T[],
 	payroll?: number,
+	// Salary cap exceptions (setting): says if the team would use an exception to sign a player who doesn't fit under the cap
+	capException?: (p: T, contract: { amount: number; exp: number }) => unknown,
 ): T | void => {
 	const maxRosterSize = g.get("maxRosterSize");
 	const minContract = g.get("minContract");
@@ -113,11 +115,15 @@ const getBest = <T extends PlayerWithoutKey>(
 	};
 
 	for (const p of playersSorted) {
-		const { amount } = getContractDemand(p);
+		const contractDemand = getContractDemand(p);
+		const { amount } = contractDemand;
 		const salaryCapCheck =
 			payroll === undefined ||
 			skipSalaryCapCheck ||
-			amount + payroll <= salaryCap;
+			amount + payroll <= salaryCap ||
+			(!!capException &&
+				amount > minContract &&
+				!!capException(p, contractDemand));
 
 		// Don't sign minimum contract players to fill out the roster
 		const shouldAddPlayerNormal = salaryCapCheck && amount > minContract;

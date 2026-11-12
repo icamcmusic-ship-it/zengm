@@ -409,6 +409,15 @@ export type NewsFacts = {
 	releases?: NPRelease[];
 	// Coaching systems (the coachSystems setting): head coaches' systems and hot seats
 	coaching?: NPCoaching;
+	// Rumors (the Rumors setting): this season's rumors still in the league's rolling window, newest first
+	rumors?: NPRumor[];
+};
+
+export type NPRumor = {
+	tids: number[];
+	segs: Seg[];
+	status: "open" | "confirmed" | "busted";
+	outcome?: Seg[];
 };
 
 export type NPCoaching = {

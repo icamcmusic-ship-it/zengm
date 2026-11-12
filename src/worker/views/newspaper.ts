@@ -1,4 +1,4 @@
-import { featureOffError } from "../util/nativeFeatures.ts";
+import { featureOffError, featureOn } from "../util/nativeFeatures.ts";
 import {
 	coachSystemsEnabled,
 	getCoachProfile,
@@ -32,7 +32,10 @@ import type {
 	NPTrade,
 	NewsFacts,
 	Paper,
+	Seg,
 } from "../../common/newspaper/types.ts";
+import { parseRumorText } from "../../common/rumors/text.ts";
+import { getRumorState } from "../core/rumors/index.ts";
 import type { Game, Player, TeamSeason } from "../../common/types.ts";
 import {
 	aggregateGames,
@@ -970,6 +973,43 @@ export const getNewsFacts = async (
 			});
 		}
 		facts.coaching = { heads };
+	}
+	// Rumors: this season's rumors and how they turned out (only while they are in the league's rolling window)
+	if (featureOn("rumors")) {
+		const toSegs = (text: string): Seg[] =>
+			parseRumorText(text).map((segment): Seg => {
+				if (segment.type === "text") {
+					return segment.text;
+				}
+				if (segment.type === "team") {
+					const t = teams.find((row) => row.tid === segment.tid);
+					return {
+						tid: segment.tid,
+						t: t ? `${t.region} ${t.name}` : "???",
+						season,
+					};
+				}
+				if (segment.type === "player") {
+					return { pid: segment.pid, t: segment.name };
+				}
+				return segment.name;
+			});
+		const rumors = getRumorState()
+			.items.filter((r) => r.season === season)
+			.toReversed()
+			.slice(0, 60)
+			.map((r) => ({
+				tids:
+					r.fromTid !== undefined && r.fromTid >= 0
+						? [...r.tids, r.fromTid]
+						: r.tids,
+				segs: toSegs(r.text),
+				status: r.status,
+				outcome: r.outcome ? toSegs(r.outcome) : undefined,
+			}));
+		if (rumors.length > 0) {
+			facts.rumors = rumors;
+		}
 	}
 	return { facts, logos };
 };

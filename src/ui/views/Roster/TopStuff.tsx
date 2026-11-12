@@ -354,11 +354,7 @@ const TopStuff = ({
 							<div>General manager: You</div>
 						) : gmInfo.type === "gm" ? (
 							<div className="mt-2">
-								<GmCard
-									gm={gmInfo.gm}
-									colors={t.seasonAttrs.colors}
-									jersey={t.seasonAttrs.jersey}
-								/>
+								<GmCard gm={gmInfo.gm} colors={t.seasonAttrs.colors} />
 							</div>
 						) : null}
 					</div>

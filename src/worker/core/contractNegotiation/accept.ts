@@ -11,6 +11,11 @@ import {
 	getContractExp,
 	getCurrentContract,
 } from "../../../common/contracts.ts";
+import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
+import {
+	getSigningCapInfo,
+	recordCapExceptionSigning,
+} from "../contract/capExceptions.ts";
 import {
 	extendContract,
 	getExtensionIneligibleReason,
@@ -102,7 +107,7 @@ const acceptExtension = async ({
  */
 const accept = async <
 	DryRun extends boolean,
-	SuccessReturn extends (DryRun extends true ? void : () => Promise<boolean>),
+	SuccessReturn extends DryRun extends true ? void : () => Promise<boolean>,
 >({
 	negotiation,
 	amount,
@@ -129,20 +134,40 @@ const accept = async <
 		}) as Promise<SuccessReturn | string>;
 	}
 
+	// Salary cap exceptions (setting, soft cap): how a free agent signing for more than the minimum counts, undefined if they don't apply
+	let capInfo: ReturnType<typeof getSigningCapInfo>;
+	let payrollBefore = 0;
+
 	if (salaryCapType !== "none") {
 		const payroll = await team.getPayroll(tid);
+		payrollBefore = payroll;
 		const birdException = negotiation.resigning && salaryCapType === "soft";
 
+		if (!birdException && amount - 1 > g.get("minContract")) {
+			const t = await idb.cache.teams.get(tid);
+			if (t) {
+				capInfo = getSigningCapInfo(
+					t,
+					payroll,
+					amount,
+					exp - getContractStartSeason() + 1,
+				);
+			}
+		}
+
 		// If this contract brings team over the salary cap, it's not a minimum contract, and it's not re-signing a current
-		// player with the Bird exception, ERROR!
+		// player with the Bird exception, ERROR! Unless a salary cap exception covers it.
 		if (
 			!birdException &&
 			payroll + amount - 1 > g.get("salaryCap") &&
-			amount - 1 > g.get("minContract")
+			amount - 1 > g.get("minContract") &&
+			capInfo?.type !== "exception"
 		) {
 			return `You cannot go over the salary cap to sign ${
 				salaryCapType === "hard" ? "players" : "free agents"
-			} to contracts higher than the minimum salary.`;
+			} to contracts higher than the minimum salary.${
+				capInfo?.type === "none" ? ` ${capInfo.reason}` : ""
+			}`;
 		}
 	}
 
@@ -195,8 +220,18 @@ const accept = async <
 			transactions: helpers.deepCopy(p.transactions),
 		};
 
-		const eid = await player.sign(p, tid, contract, phase);
+		const exception =
+			capInfo?.type === "exception" ? capInfo.exception.type : undefined;
+		const eid = await player.sign(p, tid, contract, phase, exception);
 		await idb.cache.players.put(p);
+		const undoCapException = capInfo
+			? await recordCapExceptionSigning(tid, {
+					pid: p.pid,
+					amount,
+					exception,
+					payroll: payrollBefore,
+				})
+			: undefined;
 		await cancel(negotiation.pid);
 
 		// Rollback
@@ -223,6 +258,7 @@ const accept = async <
 
 			await idb.cache.players.put(p);
 			await idb.cache.events.delete(eid);
+			await undoCapException?.();
 
 			void toUI("realtimeUpdate", [["playerMovement"]]);
 

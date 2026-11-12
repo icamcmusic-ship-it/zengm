@@ -24,6 +24,7 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 	],
 	[
 		{ id: "transactions", name: "Transactions", url: ["transactions"] },
+		{ id: "rumors", name: "Rumors", url: ["rumors"] },
 		{
 			id: "tradeGrader",
 			name: "Trade Grader",

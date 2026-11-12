@@ -6,6 +6,8 @@ import { g, local } from "../../util/index.ts";
 import { getContractDemand } from "../contract/index.ts";
 import getPayroll from "../team/getPayroll.ts";
 import getBest from "./getBest.ts";
+import { makeAiCapExceptionPicker } from "../contract/capExceptions.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 
 // How interested an AI team is in a free agent, from autoSign: every day each team (unless it skips that day) signs the best free agent it can fit, so his chances depend on where he is on each team's list
 export type MarketTier = "topTarget" | "backup" | "fallback";
@@ -82,6 +84,7 @@ export const getFreeAgentMarket = async (freeAgents: Player[]) => {
 		const sorted = orderBy(freeAgents, "value", "desc");
 		const teams = await idb.cache.teams.getAll();
 		const userTids = g.get("userTids");
+		const gms = await getAllGmWeights();
 		for (const t of teams) {
 			if (
 				t.disabled ||
@@ -107,10 +110,25 @@ export const getFreeAgentMarket = async (freeAgents: Player[]) => {
 			let available = sorted;
 			const probActs = getProbTeamActs(t.strategy);
 
+			// Salary cap exceptions (setting): like autoSign, an over the cap team may use an exception, once
+			let pickCapException = makeAiCapExceptionPicker({
+				t,
+				roster,
+				payroll,
+				gm: gms.get(t.tid),
+			});
+
 			for (const tier of TIERS) {
-				const p = getBest(roster, available, payroll);
+				const p = getBest(roster, available, payroll, pickCapException);
 				if (!p) {
 					break;
+				}
+				const demand = getContractDemand(p);
+				if (
+					demand.amount > g.get("minContract") &&
+					demand.amount + payroll > g.get("salaryCap")
+				) {
+					pickCapException = undefined;
 				}
 				const list = byPid.get(p.pid) ?? [];
 				list.push({

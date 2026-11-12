@@ -58,7 +58,11 @@ describe("faceParts", () => {
 	test("every fork part renders, recoloured, without error", () => {
 		registerForkFaceParts();
 		// A few rounds, so each part is drawn over several random faces
-		for (const part of [...FORK_FACE_PARTS, ...FORK_FACE_PARTS, ...FORK_FACE_PARTS]) {
+		for (const part of [
+			...FORK_FACE_PARTS,
+			...FORK_FACE_PARTS,
+			...FORK_FACE_PARTS,
+		]) {
 			const face = generate(undefined, { gender: "male" });
 			face.body.color = "#123456";
 			face.hair.color = "#abcdef";
@@ -93,5 +97,42 @@ describe("faceParts", () => {
 		const copy = JSON.stringify(face2);
 		addRandomForkParts(face2, () => 0.99);
 		expect(JSON.stringify(face2)).toBe(copy);
+	});
+});
+
+describe("staff suits", () => {
+	test("suits render for every body, never for players, recoloured", async () => {
+		const { STAFF_SUIT_IDS, staffFaceOverrides, greyHair } =
+			await import("./faceParts.suits.ts");
+		registerForkFaceParts();
+		for (const id of STAFF_SUIT_IDS) {
+			expect((svgs as any).jersey[id]).toBeTruthy();
+			expect(FORK_FACE_PARTS.some((part) => part.id === id)).toBe(false);
+		}
+		for (let i = 0; i < 60; i++) {
+			const face = generate(undefined, { gender: "male" });
+			const overrides = staffFaceOverrides(face, {
+				age: 30 + i,
+				colors: ["#ffffff", "#123456", "#000000"],
+				seed: i,
+			});
+			expect(STAFF_SUIT_IDS).toContain(overrides.jersey.id);
+			// The tie is never white on a white shirt
+			expect(overrides.teamColors[0]).toBe("#123456");
+			const svg = faceToSvgString(face, overrides);
+			expect(svg).not.toContain("$[");
+			expect(svg).not.toContain("NaN");
+			// Same person, same suit
+			expect(staffFaceOverrides(face, { seed: i }).jersey.id).toBe(
+				overrides.jersey.id,
+			);
+		}
+		// Generated player faces never wear one
+		for (let i = 0; i < 200; i++) {
+			const face = generate(undefined, { gender: "male" });
+			expect(STAFF_SUIT_IDS).not.toContain(face.jersey.id);
+		}
+		expect(greyHair("#000000", 1)).toBe("#c4c6ca");
+		expect(greyHair("#272421", 0)).toBe("#272421");
 	});
 });

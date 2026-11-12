@@ -1,12 +1,17 @@
 import { HelpPopover } from "./HelpPopover.tsx";
+import { CapExceptions } from "./CapExceptions.tsx";
+import type { CapExceptionsSummary } from "../../worker/core/contract/capExceptions.ts";
 import { helpers } from "../util/helpers.ts";
 import { useLocal } from "../util/local.ts";
 
 export const RosterSalarySummary = ({
+	capExceptions,
 	capSpace,
 	numRosterSpots,
 	payroll,
 }: {
+	// Salary Cap Exceptions (setting), undefined when off
+	capExceptions?: CapExceptionsSummary;
 	capSpace: number;
 	numRosterSpots: number;
 	payroll: number;
@@ -59,7 +64,11 @@ export const RosterSalarySummary = ({
 								: "After the season you can go over the salary cap to re-sign your own players. Besides that, you "}
 							can only exceed the salary cap to sign players to minimum
 							contracts ({helpers.formatCurrency(minContract / 1000, "M")}
-							/year).
+							/year)
+							{capExceptions
+								? " or with a salary cap exception (see below)"
+								: ""}
+							.
 						</p>
 					</HelpPopover>
 				</>
@@ -69,6 +78,7 @@ export const RosterSalarySummary = ({
 			<br />
 			Max contract: {helpers.formatCurrency(maxContract / 1000, "M")}
 			<br />
+			{capExceptions ? <CapExceptions capExceptions={capExceptions} /> : null}
 		</div>
 	);
 };

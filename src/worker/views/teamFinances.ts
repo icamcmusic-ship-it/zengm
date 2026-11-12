@@ -4,6 +4,10 @@ import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
 import type { TeamSeason } from "../../common/types.ts";
 import { defineView } from "../util/defineView.ts";
+import {
+	getCapExceptionsSummary,
+	isRepeaterTaxTeam,
+} from "../core/contract/capExceptions.ts";
 import { getPayrollSeason } from "../util/getPayrollSeason.ts";
 import { getAutoTicketPriceByTid } from "../core/game/attendance.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
@@ -35,7 +39,11 @@ export default defineView({
 		) {
 			const contractsRaw = await team.getContracts(inputs.tid);
 			let payroll = await team.getPayroll(contractsRaw);
-			const luxuryTaxAmount = finances.getLuxuryTaxAmount(payroll) / 1000;
+			// Repeater Luxury Tax and Salary Cap Exceptions (settings), false/undefined when off
+			const repeaterTax = await isRepeaterTaxTeam(inputs.tid);
+			const capExceptions = await getCapExceptionsSummary(inputs.tid, payroll);
+			const luxuryTaxAmount =
+				finances.getLuxuryTaxAmount(payroll, repeaterTax) / 1000;
 			const minPayrollAmount = finances.getMinPayrollAmount(payroll) / 1000;
 			payroll /= 1000;
 
@@ -252,6 +260,8 @@ export default defineView({
 				show: inputs.show,
 				minPayrollAmount,
 				luxuryTaxAmount,
+				repeaterTax,
+				capExceptions,
 				maxStadiumCapacity,
 				t,
 				barData,
