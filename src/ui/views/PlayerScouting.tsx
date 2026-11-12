@@ -20,6 +20,7 @@ import {
 // Bootstrap's lg breakpoint the radar would drop under the grades and push the card onto a second page), and colors print as shown.
 const PRINT_CSS = `@media print {
 	@page { size: letter portrait; margin: 0.4in; }
+	html { color-scheme: light !important; }
 	body :not(.scouting-card):not(.scouting-card *):not(:has(.scouting-card)) { display: none !important; }
 	html, body, body :has(.scouting-card) { height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: visible !important; }
 	.scouting-card {

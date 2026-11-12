@@ -93,7 +93,10 @@ export type PlayerProfileExport = {
 		height: string;
 		weight: number;
 		college?: string;
+		// Pro draft (year 0 in college leagues, which have none)
 		draft: PlayerExport["draft"];
+		// College leagues: "Freshman" ...
+		classYear?: string;
 		jerseyNumber?: string;
 		experience?: number;
 	};

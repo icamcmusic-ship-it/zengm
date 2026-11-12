@@ -6,6 +6,7 @@
 import { PHASE_TEXT, PLAYER } from "../../common/constants.ts";
 import { getCols } from "../../common/getCols.ts";
 import { COMBINE_ROWS } from "../../common/combineRows.ts";
+import { classYearName } from "../../common/college/constants.ts";
 import {
 	exportShowsRatings,
 	formatHeight,
@@ -200,7 +201,7 @@ export const getPlayerProfileExport = async (
 
 	// Overview: bio, the current season's ratings and stat line (the PDF draws the card)
 	if (want.has("overview")) {
-		const draft = p.draft;
+		const draft = card.draft;
 		sections.overview = section("overview", {
 			facts: [
 				...fact("Team", card.team),
@@ -219,7 +220,11 @@ export const getPlayerProfileExport = async (
 							? `${draft.year}${prospect ? " (prospect)" : ", undrafted"}`
 							: undefined,
 				),
-				...fact("Experience", retired || prospect ? undefined : p.experience),
+				...fact("Class", college ? classYearName(p.classYear) : undefined),
+				...fact(
+					"Experience",
+					retired || prospect || college ? undefined : p.experience,
+				),
 				...fact("Jersey", p.jerseyNumber),
 				...fact(
 					"Contract",
@@ -924,6 +929,7 @@ export const getPlayerProfileExport = async (
 			weight: p.weight,
 			college: p.college || undefined,
 			draft: card.draft,
+			classYear: college ? classYearName(p.classYear) : undefined,
 			jerseyNumber: p.jerseyNumber,
 			experience: p.experience,
 		},

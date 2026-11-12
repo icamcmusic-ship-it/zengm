@@ -1,4 +1,5 @@
 import { getScoutingExport } from "../core/scoutingReports/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 import {
 	PLAYER,
 	PLAYER_STATS_TABLES,
@@ -135,6 +136,7 @@ export const getPlayersForExport = async ({
 	gameLog?: boolean;
 }): Promise<PlayerExport[]> => {
 	const currentSeason = g.get("season");
+	const college = isCollege();
 	const traitContext = await getTraitViewContext();
 	const teamInfo = g.get("teamInfoCache");
 	const ratingKeys = ratingsKeysForView(RATINGS);
@@ -345,14 +347,17 @@ export const getPlayersForExport = async ({
 					? ratingsRow.wng
 					: undefined,
 			college: p.college || undefined,
-			draft: {
-				year: p.draft.year,
-				round: p.draft.round,
-				pick: p.draft.pick,
-				abbrev: (p.draft as any).abbrev ?? undefined,
-			},
+			// College leagues have no pro draft or contracts for their players (the pages don't show them)
+			draft: college
+				? { year: 0, round: 0, pick: 0 }
+				: {
+						year: p.draft.year,
+						round: p.draft.round,
+						pick: p.draft.pick,
+						abbrev: (p.draft as any).abbrev ?? undefined,
+					},
 			contract:
-				pRaw.tid === PLAYER.RETIRED || pRaw.tid === PLAYER.UNDRAFTED
+				college || pRaw.tid === PLAYER.RETIRED || pRaw.tid === PLAYER.UNDRAFTED
 					? undefined
 					: p.contract
 						? {

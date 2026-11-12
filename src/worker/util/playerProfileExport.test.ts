@@ -121,7 +121,7 @@ describe("Export profile", () => {
 			);
 			pids.freeAgent = freeAgents[0]!.pid;
 			const toRetire = players[5]!;
-			await player.retire(toRetire, [], { logRetiredEvent: false });
+			await player.retire(toRetire, {}, { logRetiredEvent: false });
 			await idb.cache.players.put(toRetire);
 			pids.retired = toRetire.pid;
 		},
@@ -169,7 +169,7 @@ describe("Export profile", () => {
 				.sort(),
 		);
 		const p = (await idb.merged.players.get(pids.prospect))!;
-		const r = p.ratings.at(-1)!;
+		const r = p.ratings.at(-1)! as any;
 		const current = (profile.sections.ratings!.data as any).current;
 		let differs = 0;
 		for (const key of ["ovr", "pot", "spd", "tp", "oiq", "diq"] as const) {
@@ -242,6 +242,26 @@ describe("Export profile", () => {
 			assert.isAbove(retired.sections.ratings!.tables.length, 0);
 		} finally {
 			await league.setGameAttributes({ challengeNoRatings: false });
+		}
+	});
+
+	test("college league: no contract, pro draft or scouting reports", async () => {
+		const before = g.get("leagueType");
+		g.setWithoutSavingToDB("leagueType", "college");
+		try {
+			const profile = await exportOf(pids.active);
+			assert.isTrue(profile.league.college);
+			assert.isUndefined(profile.sections.contract);
+			assert.isUndefined(profile.sections.scouting);
+			const skipped = profile.skipped.map((s) => s.key);
+			assert.include(skipped, "contract");
+			assert.include(skipped, "scouting");
+			assert.strictEqual(profile.player.draft.year, 0);
+			assert.isFalse(
+				profile.sections.overview!.facts.some((f) => f.label === "Contract"),
+			);
+		} finally {
+			g.setWithoutSavingToDB("leagueType", before);
 		}
 	});
 
