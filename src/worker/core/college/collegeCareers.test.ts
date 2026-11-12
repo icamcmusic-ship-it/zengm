@@ -128,7 +128,15 @@ describe("college coaching careers and realignment", () => {
 				}
 				await idb.cache.coaches.put(c);
 			}
-			const top = byPrestige.slice(-2).map((row) => row.tid);
+			// The user's season was great too
+			const userTs = (await idb.cache.teamSeasons.indexGet(
+				"teamSeasonsBySeasonTid",
+				[season, userTid],
+			))!;
+			userTs.won = 27;
+			userTs.lost = 3;
+			await idb.cache.teamSeasons.put(userTs);
+			const top = byPrestige.slice(-3).map((row) => row.tid);
 			for (const tid of top) {
 				const c = (await headOf(tid))!;
 				c.tid = COACH_FREE_AGENT;
