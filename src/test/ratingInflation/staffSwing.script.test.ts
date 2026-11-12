@@ -50,7 +50,7 @@ test.skipIf(!process.env.RUN_STAFF_SWING)(
 		const dEffChanged: number[] = [];
 		const dDev: number[] = [];
 		const dDevRole: number[] = [];
-		let realRandom = Math.random;
+		const realRandom = Math.random;
 		for (const seed of seeds) {
 			let s = seed * 7919;
 			Math.random = () => {
