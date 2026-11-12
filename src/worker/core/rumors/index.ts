@@ -70,6 +70,7 @@ import {
 	shouldHoldOut,
 	TRADE_REQUEST_MOOD,
 } from "../contract/unrest.ts";
+import { isCollege } from "../college/isCollege.ts";
 import { getNeedLabels, getTeamNeeds } from "../draft/draftNeeds.ts";
 import { getFreeAgentMarket } from "../freeAgents/market.ts";
 import { gmEnabled, seasonScore, seasonsWithTeam } from "../gm/index.ts";
@@ -243,7 +244,7 @@ const gatherShopping = (ctx: Ctx): Draft[] => {
 	if (!ctx.aiTrades) {
 		return out;
 	}
-	const needBased = !!g.get("aiTradesNeedBased");
+	const needBased = !!featureOn("aiNeedTrades");
 	const window = isDeadlineWindow(ctx.need.ctx);
 	const seen = new Set<number>();
 	const add = (p: Player, kind: string, raw: number, weight: number) => {
@@ -329,7 +330,7 @@ const gatherInterest = (ctx: Ctx): Draft[] => {
 		return out;
 	}
 	const window = isDeadlineWindow(ctx.need.ctx);
-	if (g.get("aiTradesNeedBased")) {
+	if (featureOn("aiNeedTrades")) {
 		const buyers = ctx.need.infos.filter((t) => isBuyer(t));
 		const targets: { p: Player; kind: string }[] = [];
 		for (const p of ctx.need.requesters) {
@@ -414,7 +415,7 @@ const gatherInterest = (ctx: Ctx): Draft[] => {
 // Buyers with their own next first round pick to spend
 const gatherPick = async (ctx: Ctx): Promise<Draft[]> => {
 	const out: Draft[] = [];
-	if (!ctx.aiTrades || !g.get("aiTradesNeedBased")) {
+	if (!ctx.aiTrades || !featureOn("aiNeedTrades")) {
 		return out;
 	}
 	// The next draft: this season's until it happens, then next season's
@@ -460,7 +461,11 @@ const gatherPick = async (ctx: Ctx): Promise<Draft[]> => {
 // Stars whose mood is near the point where they ask out, and (before the season) underpaid players who could hold out
 const gatherUnhappy = async (ctx: Ctx): Promise<Draft[]> => {
 	const out: Draft[] = [];
-	const requestsOn = !!g.get("tradeRequests");
+	// College mode: no contracts to hold out over and no trades to ask for
+	if (isCollege()) {
+		return out;
+	}
+	const requestsOn = !!featureOn("tradeRequests");
 	const inSeason =
 		ctx.phase === PHASE.REGULAR_SEASON ||
 		ctx.phase === PHASE.AFTER_TRADE_DEADLINE;
@@ -547,7 +552,7 @@ const gatherUnhappy = async (ctx: Ctx): Promise<Draft[]> => {
 // AI teams extend good players in the last season of their contracts who are willing to stay
 const gatherExtension = async (ctx: Ctx): Promise<Draft[]> => {
 	const out: Draft[] = [];
-	if (!g.get("contractExtensions") || ctx.phase !== PHASE.REGULAR_SEASON) {
+	if (!featureOn("contractExtensions") || ctx.phase !== PHASE.REGULAR_SEASON) {
 		return out;
 	}
 	const salaryCapType = g.get("salaryCapType");

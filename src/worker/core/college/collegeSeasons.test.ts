@@ -151,6 +151,11 @@ describe("college mode", () => {
 				assert.isBelow(days, 100, where());
 			}
 			assert.strictEqual(g.get("phase"), PHASE.PLAYOFFS);
+			// No salaries in college, so no minimum payroll penalty or luxury tax
+			const moneyEvents = (await idb.cache.events.getAll()).filter(
+				(e) => e.type === "minPayroll" || e.type === "luxuryTax",
+			);
+			assert.lengthOf(moneyEvents, 0, "payroll penalty events");
 			const ps = await idb.cache.playoffSeries.get(g.get("season"));
 			assert.isAtLeast(ps!.series[0]!.length * 2, 16);
 			await loadView("collegePolls", {});

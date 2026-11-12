@@ -230,7 +230,7 @@ export const getNeedInfo = async (aiTids: number[]) => {
 
 	// Stars on AI teams who asked to be traded (Trade Requests setting)
 	const requesters: Player[] = [];
-	if (g.get("tradeRequests")) {
+	if (featureOn("tradeRequests")) {
 		for (const p of await idb.cache.players.indexGetAll("playersByTid", [
 			0,
 			Infinity,
@@ -765,7 +765,7 @@ const betweenAiTeams = async () => {
 
 		for (let i = 0; i < numAttempts; i++) {
 			let tradeTids: number[] | false | undefined;
-			if (g.get("aiTradesNeedBased") && Math.random() < NEED_ATTEMPT_SHARE) {
+			if (featureOn("aiNeedTrades") && Math.random() < NEED_ATTEMPT_SHARE) {
 				const aiTids = await getAITids();
 				const result = await needAttempt(valueChangeCalculator, aiTids);
 				if (result && "multi" in result) {

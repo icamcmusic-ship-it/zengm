@@ -10,6 +10,7 @@ import { getPreDraftAwards, getPreDraftStats } from "../../common/preDraft.ts";
 import { getPreDraftLabel } from "../../common/collegeStats/overseas.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 
 /**
  * The user's draft board planner: one draft class, with the user's ranks, tiers and notes next to everything known about each prospect (fuzzed ratings, build, college/overseas stats and honors, scout report).
@@ -63,7 +64,7 @@ export default defineView({
 			fuzz: true,
 		});
 		const byPid = new Map(players.map((p) => [p.pid, p]));
-		const scoutingSystem = g.get("scoutingSystem");
+		const scoutingSystem = featureOn("scoutingSystem");
 
 		const prospects = addFirstNameShort(
 			formatted
