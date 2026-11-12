@@ -672,7 +672,8 @@ export const nitOn = () =>
 
 // Size of the NIT next to a national tournament of this size: half of it, as long as there are enough teams left
 export const getNitSize = (numTeams: number, nationalSize: number) => {
-	const size = nationalSize >= 64 ? 32 : 16;
+	// Never more rounds than the national tournament, whose rounds it is played with (a smaller national field set in the settings)
+	const size = Math.min(nationalSize >= 64 ? 32 : 16, nationalSize);
 	return numTeams - nationalSize - 4 >= size + 8 ? size : 0;
 };
 

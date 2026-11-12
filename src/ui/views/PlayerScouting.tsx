@@ -15,10 +15,32 @@ import {
 	ShotMixChart,
 } from "../components/ScoutingReport/index.tsx";
 
+// Print / Save as PDF: only the one-page card, on a light page in either theme. Everything else is display: none (not just
+// invisible, which kept its space and printed blank pages after the card), the card keeps its two columns at print width (below
+// Bootstrap's lg breakpoint the radar would drop under the grades and push the card onto a second page), and colors print as shown.
 const PRINT_CSS = `@media print {
-	body * { visibility: hidden !important; }
-	.scouting-card, .scouting-card * { visibility: visible !important; }
-	.scouting-card { position: absolute; left: 0; top: 0; width: 100%; border: none !important; }
+	@page { size: letter portrait; margin: 0.4in; }
+	html { color-scheme: light !important; }
+	body :not(.scouting-card):not(.scouting-card *):not(:has(.scouting-card)) { display: none !important; }
+	html, body, body :has(.scouting-card) { height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; background: #fff !important; overflow: visible !important; }
+	.scouting-card {
+		--bs-body-color: #000; --bs-body-bg: #fff; --bs-emphasis-color: #000; --bs-secondary-color: #444; --bs-tertiary-color: #666;
+		--bs-secondary-bg: #e9ecef; --bs-tertiary-bg: #f8f9fa; --bs-border-color: #999; --bs-link-color: #000; --bs-link-color-rgb: 0, 0, 0;
+		--bs-success-text-emphasis: #0a3622; --bs-danger-text-emphasis: #58151c;
+		color: #000; background: #fff; border: none !important; border-radius: 0 !important; max-width: none !important; width: 100% !important;
+		margin: 0 !important; padding: 0 !important; font-size: 10pt;
+		print-color-adjust: exact; -webkit-print-color-adjust: exact;
+	}
+	.scouting-card * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+	.scouting-card .row { --bs-gutter-x: 1rem; }
+	.scouting-card .col-lg-7 { flex: 0 0 auto; width: 58.333%; }
+	.scouting-card .col-lg-5 { flex: 0 0 auto; width: 41.667%; }
+	.scouting-card h2 { font-size: 18pt; }
+	.scouting-card h3 { font-size: 11pt; break-after: avoid; }
+	.scouting-card a { color: inherit; text-decoration: none; }
+	.scouting-card svg { max-width: 100%; height: auto; }
+	.scouting-card .border { border-color: #999 !important; }
+	.scouting-card [data-testid="scouting-comps"] > div, .scouting-card .mb-3 { break-inside: avoid; }
 	.scouting-no-print { display: none !important; }
 }`;
 

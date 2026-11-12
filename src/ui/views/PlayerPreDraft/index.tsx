@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { COMBINE_ROWS } from "../../../common/combineRows.ts";
 import clsx from "clsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { View } from "../../../common/types.ts";
@@ -12,7 +13,6 @@ import { CollegeSeasonSection } from "../Player/CollegeSeasonSection.tsx";
 import { getProfileUrl, usePlayerProfileOptions } from "../Player/common.tsx";
 import { last } from "../../../common/utils.ts";
 import { SchoolBadge, Stars, StockChart } from "./parts.tsx";
-import type { CombineResults } from "../../../common/collegeStats/profile.ts";
 
 type PreDraft = NonNullable<View<"playerPreDraft">["preDraft"]>;
 
@@ -315,38 +315,6 @@ const HonorsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 		</HideableSection>
 	);
 };
-
-const inches = (x: number) => {
-	const ft = Math.floor(x / 12);
-	const rest = x - 12 * ft;
-	return `${ft}' ${Number.isInteger(rest) ? rest : rest.toFixed(2).replace(/0$/, "")}"`;
-};
-
-const COMBINE_ROWS: {
-	key: keyof CombineResults;
-	name: string;
-	format: (x: number) => string;
-}[] = [
-	{ key: "heightNoShoes", name: "Height without shoes", format: inches },
-	{ key: "heightShoes", name: "Height with shoes", format: inches },
-	{ key: "weight", name: "Weight", format: (x) => `${x} lbs` },
-	{ key: "wingspan", name: "Wingspan", format: inches },
-	{ key: "standingReach", name: "Standing reach", format: inches },
-	{ key: "standingVert", name: "Standing vertical", format: (x) => `${x}"` },
-	{ key: "maxVert", name: "Max vertical", format: (x) => `${x}"` },
-	{
-		key: "laneAgility",
-		name: "Lane agility",
-		format: (x) => `${x.toFixed(2)} s`,
-	},
-	{ key: "shuttle", name: "Shuttle run", format: (x) => `${x.toFixed(2)} s` },
-	{
-		key: "sprint",
-		name: "3/4 court sprint",
-		format: (x) => `${x.toFixed(2)} s`,
-	},
-	{ key: "bench", name: "Bench press (185 lbs)", format: (x) => `${x} reps` },
-];
 
 const CombineSection = ({ preDraft }: { preDraft: PreDraft }) => {
 	const combine = preDraft.combine;

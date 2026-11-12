@@ -172,6 +172,10 @@ import {
 import type { LookingForState } from "../../ui/views/TradingBlock/useLookingForState.ts";
 import { getPlayer } from "../views/player.ts";
 import { getPlayersForExport } from "../util/playerExport.ts";
+import {
+	getPlayerProfileExport,
+	getPlayerProfileExportSections,
+} from "../util/playerProfileExport.ts";
 import type { NoteInfo } from "../../ui/views/Player/Note.tsx";
 import { beforeLeague, beforeNonLeague } from "../util/beforeView.ts";
 import loadData from "../core/realRosters/loadData.basketball.ts";
@@ -6295,6 +6299,8 @@ const api = {
 		getPlayerBioInfoDefaults,
 		getPlayerRangeFooterStats,
 		getPlayersForExport,
+		getPlayerProfileExport,
+		getPlayerProfileExportSections,
 		getPlayerWatch,
 		getProjectedAttendance,
 		getRandomCollege,
