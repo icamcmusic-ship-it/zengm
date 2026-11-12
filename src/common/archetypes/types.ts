@@ -178,6 +178,8 @@ export type Norms = {
 	match: Record<string, number[]>;
 	// Per archetype id: a small calibrated nudge (in z) that evens out how often each is chosen
 	bias?: Record<string, number>;
+	// The concentration trim for stars (starBias.data.ts when absent)
+	starBias?: Record<string, number>;
 	// Quantiles (21 points, 0%..100%) of each dimension's raw value among the reference league's players of each position
 	// bucket (PosBucket): his absolute standing among players who play his position
 	pq?: Record<PosBucket, Record<DimKey, number[]>>;
@@ -286,4 +288,6 @@ export type StoredArchetype = {
 	tier?: Tier;
 	// Confidence in percent
 	conf?: number;
+	// The reading's version (ARCHETYPE_READING_VERSION) when it was stored: an entry from an older reading is read again
+	v?: number;
 };

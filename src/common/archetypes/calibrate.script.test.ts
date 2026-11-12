@@ -13,7 +13,7 @@ import { sampleLeague } from "./sample.testutil.ts";
 const EXPANDED = Boolean(process.env.ARCH_EXPANDED);
 const BIAS_MAX = 0.2;
 // Overused archetypes may be trimmed a little harder than rare ones are pushed up
-const BIAS_MIN = -0.25;
+const BIAS_MIN = -0.45;
 
 test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 	"write norms",
@@ -43,7 +43,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 		const biasSample = [...sample, ...prospects];
 		const round = (xs: number[]) =>
 			xs.map((x) => Math.round(x * 10000) / 10000);
-		// Nudge the shares toward even with small additive steps on the z score. Kept small (|bias| <= 0.25): correctness, which the
+		// Nudge the shares toward even with small additive steps on the z score. Kept small (-0.45 <= bias <= 0.2): correctness, which the
 		// position gate and the name floors decide, matters more than evenness, so the bias only trims builds that are far
 		// off. Even shares within each group (guard, wing, forward, big), the group sizes as the ratings give them.
 		const bias: Record<string, number> = {};
