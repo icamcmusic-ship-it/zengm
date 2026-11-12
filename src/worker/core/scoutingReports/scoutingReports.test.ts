@@ -177,5 +177,5 @@ describe("scouting reports in a league", () => {
 		const mean = adj.reduce((a, b) => a + b, 0) / adj.length;
 		assert.isBelow(Math.abs(mean), 0.12, "no inflation");
 		assert.isTrue(adj.every((x) => Math.abs(x) <= 0.8));
-	}, 60_000);
+	});
 });
