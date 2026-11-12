@@ -411,6 +411,29 @@ export type NewsFacts = {
 	coaching?: NPCoaching;
 	// Rumors (the Rumors setting): this season's rumors still in the league's rolling window, newest first
 	rumors?: NPRumor[];
+	// Scouting Reports setting: the upcoming class as the user's scouts see it
+	draftPreview?: NPDraftPreview;
+};
+
+export type NPDraftPreview = {
+	draftYear: number;
+	scout: string;
+	rows: {
+		pid: number;
+		rank: number;
+		name: string;
+		pos: string;
+		age: number;
+		school: string;
+		overall: string;
+		best: string;
+		floor: string;
+		ceiling: string;
+		comp?: string;
+		line: string;
+		// Overall grade change since the first snapshot (stock up/down)
+		move: number;
+	}[];
 };
 
 export type NPRumor = {

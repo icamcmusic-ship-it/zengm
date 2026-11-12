@@ -161,6 +161,34 @@ export class MiniPdf {
 		return this;
 	}
 
+	// A closed polygon (filled) or an open/closed line (stroked), in page coordinates from the top left
+	polygon(
+		points: readonly (readonly [number, number])[],
+		color: string,
+		{
+			fill = true,
+			width = 1,
+			close = true,
+		}: { fill?: boolean; width?: number; close?: boolean } = {},
+	) {
+		if (points.length < 2) {
+			return this;
+		}
+		const path = points
+			.map(
+				([x, y], i) =>
+					`${x.toFixed(1)} ${(PAGE_HEIGHT - y).toFixed(1)} ${i === 0 ? "m" : "l"}`,
+			)
+			.join(" ");
+		const c = rgb(color);
+		this.current.push(
+			fill
+				? `${c} rg ${path} h f`
+				: `${c} RG ${width.toFixed(2)} w ${path}${close ? " h" : ""} S`,
+		);
+		return this;
+	}
+
 	jpeg(image: Image, x: number, y: number, w: number, h: number) {
 		const index = this.images.push(image) - 1;
 		this.pageImages[this.target]!.push(index);

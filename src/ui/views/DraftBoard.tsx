@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ScoutingHoverIcon } from "../components/ScoutingReport/index.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
 import { MoreLinks } from "../components/MoreLinks.tsx";
@@ -270,6 +271,7 @@ const DraftBoard = ({
 											firstNameShort={p.firstNameShort}
 											lastName={p.lastName}
 										/>
+										<ScoutingHoverIcon pid={p.pid} />
 									</td>
 									<td>{p.pos}</td>
 									<td>{p.age}</td>

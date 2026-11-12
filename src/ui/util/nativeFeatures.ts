@@ -75,6 +75,9 @@ export const featureForUrl = (
 			return "draftBoard";
 		case "mock_draft":
 			return "mockDraft";
+		case "player_scouting":
+		case "scouting_department":
+			return "scoutingReports";
 		case "college_overseas":
 			return "collegeSeason";
 		case "archetypes":

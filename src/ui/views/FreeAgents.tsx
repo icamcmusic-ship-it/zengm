@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useScoutingBlurbs } from "../components/ScoutingReport/index.tsx";
 import { wrappedFreeAgentMarket } from "../components/FreeAgentMarket.tsx";
 import { dropdownOptions } from "../hooks/useDropdownOptions.tsx";
 import { PHASE, PHASE_TEXT } from "../../common/constants.ts";
@@ -161,6 +162,9 @@ const FreeAgents = ({
 
 	const negotiationModal = useNegotiaionModal();
 
+	// Scouting Reports: a short blurb under each of the first free agents shown
+	const scoutBlurbs = useScoutingBlurbs(players.slice(0, 40).map((p) => p.pid));
+
 	if (
 		((phase > PHASE.AFTER_TRADE_DEADLINE && phase <= PHASE.RESIGN_PLAYERS) ||
 			phase === PHASE.FANTASY_DRAFT ||
@@ -259,6 +263,19 @@ const FreeAgents = ({
 		(season === "current" && phase < PHASE.FREE_AGENCY ? 1 : 0);
 
 	const rows: DataTableRow<"player">[] = players.map((p) => {
+		const nameLabels = wrappedPlayerNameLabels({
+			pid: p.pid,
+			injury: p.injury,
+			jerseyNumber: p.jerseyNumber,
+			skills: p.ratings.skills,
+			badges: p.ratings.badges,
+			defaultWatch: p.watch,
+			firstName: p.firstName,
+			firstNameShort: p.firstNameShort,
+			lastName: p.lastName,
+			season: playerInfoSeason,
+		});
+		const blurb = scoutBlurbs[p.pid];
 		return {
 			key: p.pid,
 			metadata: {
@@ -268,18 +285,23 @@ const FreeAgents = ({
 				playoffs: "regularSeason",
 			},
 			data: [
-				wrappedPlayerNameLabels({
-					pid: p.pid,
-					injury: p.injury,
-					jerseyNumber: p.jerseyNumber,
-					skills: p.ratings.skills,
-					badges: p.ratings.badges,
-					defaultWatch: p.watch,
-					firstName: p.firstName,
-					firstNameShort: p.firstNameShort,
-					lastName: p.lastName,
-					season: playerInfoSeason,
-				}),
+				blurb
+					? {
+							...nameLabels,
+							value: (
+								<>
+									{nameLabels.value}
+									<div
+										className="small text-body-secondary text-wrap"
+										style={{ maxWidth: 280 }}
+										data-testid="fa-scouting-blurb"
+									>
+										{blurb}
+									</div>
+								</>
+							),
+						}
+					: nameLabels,
 				p.ratings.pos,
 				p.age,
 				!challengeNoRatings ? p.ratings.ovr : null,

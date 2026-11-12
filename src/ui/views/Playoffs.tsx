@@ -1,4 +1,5 @@
 import { ResponsiveTableWrapper } from "../components/ResponsiveTableWrapper.tsx";
+import { OpponentScouting } from "../components/ScoutingReport/index.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
 import { helpers } from "../util/helpers.ts";
@@ -157,6 +158,7 @@ const Playoffs = ({
 
 	return (
 		<div style={{ maxWidth }}>
+			{finalMatchups ? <OpponentScouting season={season} /> : null}
 			{!finalMatchups ? (
 				<p>
 					This is what the playoff matchups would be if the season ended right

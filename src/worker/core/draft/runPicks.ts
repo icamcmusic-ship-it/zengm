@@ -26,6 +26,10 @@ import {
 } from "../player/traits.ts";
 import { getGmWeights } from "../gm/index.ts";
 import { gmDraftUpsideAdjustment } from "../../../common/gmPersonality.ts";
+import {
+	gmLensAdjustments,
+	scoutingReportsOn,
+} from "../scoutingReports/index.ts";
 
 // Top ranked prospect on the user's draft board who is still available
 export const getDraftBoardPick = <T extends { draftBoard?: { rank?: number } }>(
@@ -240,6 +244,14 @@ const runPicks = async (
 						})
 					);
 				});
+			}
+
+			// Scouting Reports (setting): the GM reads his scouts' grades through his analytics/old-school lens (zero-sum, bounded)
+			if (gm && scoutingReportsOn() && !g.get("userTids").includes(dp.tid)) {
+				const lens = gmLensAdjustments(playersAll, gm.traits.analytics);
+				adjustments = playersAll.map(
+					(p, i) => (adjustments?.[i] ?? 0) + lens[i]!,
+				);
 			}
 
 			// Player traits (setting): what the scouts can read of a prospect's traits, a bounded nudge of at most DRAFT_TRAIT_MAX_ADJ value points

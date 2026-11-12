@@ -92,6 +92,8 @@ export { default as PlayerFeats } from "./PlayerFeats.tsx";
 export { default as PlayerGameLog } from "./PlayerGameLog.tsx";
 export { default as PlayerPreDraft } from "./PlayerPreDraft/index.tsx";
 export { default as PlayerTraits } from "./PlayerTraits.tsx";
+export { default as PlayerScouting } from "./PlayerScouting.tsx";
+export { default as ScoutingDepartment } from "./ScoutingDepartment.tsx";
 export { default as PlayerRatingDists } from "./PlayerRatingDists.tsx";
 export { default as PlayerRatings } from "./PlayerRatings.tsx";
 export { default as PlayerStatDists } from "./PlayerStatDists.tsx";
