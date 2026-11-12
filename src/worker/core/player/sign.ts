@@ -7,6 +7,7 @@ import setJerseyNumber from "./setJerseyNumber.ts";
 import { addContract, createContract } from "../contract/index.ts";
 import { getProStats } from "../../../common/preDraft.ts";
 import type { CapExceptionType } from "../../../common/capExceptions.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 const sign = async (
 	p: Player,
@@ -45,7 +46,7 @@ const sign = async (
 	if (contractInput.rookie) {
 		contractSummary.rookie = true;
 	}
-	if (g.get("contractOptions") && !contractSummary.rookie) {
+	if (featureOn("contractOptions") && !contractSummary.rookie) {
 		const aiTeam =
 			!g.get("userTids").includes(tid) ||
 			!!local.autoPlayUntil ||

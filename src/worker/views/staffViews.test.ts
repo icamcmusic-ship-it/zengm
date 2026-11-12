@@ -1,7 +1,12 @@
 // The coaching pages' views (Coaching Staff, Coaches, coach page) in a league with a full staff, with Coaching Systems on and off
-import { assert, describe, test } from "vitest";
+import { afterAll, assert, describe, test } from "vitest";
 import { PHASE } from "../../common/constants.ts";
-import { COACH_FREE_AGENT, COACH_ROLES } from "../../common/staff.ts";
+import { makeSeededRandom } from "../../common/random.ts";
+import {
+	COACH_FREE_AGENT,
+	COACH_ROLES,
+	VACANT_RATING,
+} from "../../common/staff.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../test/helpers.ts";
 import { idb } from "../db/index.ts";
 import { g, helpers } from "../util/index.ts";
@@ -22,6 +27,8 @@ const loadView = (id: string, params: Record<string, unknown> = {}) => {
 };
 
 const setup = async (coachSystems: boolean) => {
+	// Seeded: the players and the coach pool are random
+	Math.random = makeSeededRandom(coachSystems ? 11 : 12);
 	resetG();
 	g.setWithoutSavingToDB("coachingStaff", true);
 	g.setWithoutSavingToDB("coachSystems", coachSystems);
@@ -47,6 +54,11 @@ const setup = async (coachSystems: boolean) => {
 };
 
 describe("coaching staff views", () => {
+	const realRandom = Math.random;
+	afterAll(() => {
+		Math.random = realRandom;
+	});
+
 	for (const coachSystems of [true, false]) {
 		test(`staff, coaches and coach pages load (coaching systems ${coachSystems ? "on" : "off"})`, async () => {
 			await setup(coachSystems);
@@ -92,8 +104,15 @@ describe("coaching staff views", () => {
 			}
 			for (const slot of staff.slots) {
 				assert.isDefined(slot.coach);
-				// A vacant job is never better for development than a hired coach
-				assert.isAtMost(slot.coach.levelIfVacant, staff.level);
+				// A vacant job counts as VACANT_RATING, so it is never better for development than a hired coach rated at least that
+				// (a coach can be rated below it, then the vacancy really is better)
+				const { dev, mot } = slot.coach.ratings;
+				if (
+					dev >= VACANT_RATING &&
+					(slot.role !== "head" || mot >= VACANT_RATING)
+				) {
+					assert.isAtMost(slot.coach.levelIfVacant, staff.level);
+				}
 			}
 
 			// Another team's staff: no market
@@ -133,6 +152,7 @@ describe("coaching staff views", () => {
 	}
 
 	test("pages say how to turn the coaching staff on", async () => {
+		Math.random = makeSeededRandom(13);
 		resetG();
 		g.setWithoutSavingToDB("coachingStaff", false);
 		idb.league = mockIDBLeague();

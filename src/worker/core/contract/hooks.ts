@@ -23,6 +23,7 @@ import {
 	updateTradeRequests,
 } from "./unrest.ts";
 import { getAllGmWeights } from "../gm/index.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 // These never stop a phase change or a day of games, they just log the error
 const safely = async (name: string, cb: () => Promise<void>) => {
@@ -62,7 +63,7 @@ const HOLDOUT_EXTENSION_PROB = 0.25;
 
 // AI teams extend some of their good players in the last season of their contracts, and try to end holdouts with an extension
 export const aiExtensions = async (probPerTeam = 0.05) => {
-	if (!g.get("contractExtensions")) {
+	if (!featureOn("contractExtensions")) {
 		return;
 	}
 
@@ -128,7 +129,7 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 				}
 			}
 
-			const terms = g.get("contractOptions")
+			const terms = featureOn("contractOptions")
 				? pickAiContractTerms(
 						p,
 						{ amount: mood.contractAmount, exp: demand.exp },

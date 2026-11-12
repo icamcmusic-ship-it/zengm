@@ -17,6 +17,7 @@ import {
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 import { EXPANDED_RATINGS } from "../../common/expandedRatings.ts";
 import { getClassShapeInfo } from "../core/draft/classShape.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 
 const getSeason = async (
 	playersAll: Player[],
@@ -44,7 +45,7 @@ const getSeason = async (
 	players.sort((a, b) => b.valueFuzz - a.valueFuzz);
 
 	const playersByPid = new Map(playersAllFiltered.map((p) => [p.pid, p]));
-	const scoutingSystem = g.get("scoutingSystem");
+	const scoutingSystem = featureOn("scoutingSystem");
 	// Derived from the prospects' ratings (live: their ratings can still be regenerated)
 	const norms = __SPORT === "basketball" ? await getLeagueNorms() : undefined;
 	const archetypeByPid = new Map(
@@ -157,7 +158,7 @@ export default defineView({
 				fantasyDraft,
 				seasons,
 				scoutingStatus:
-					g.get("scoutingSystem") && !fantasyDraft
+					featureOn("scoutingSystem") && !fantasyDraft
 						? await getScoutingStatus()
 						: undefined,
 			};

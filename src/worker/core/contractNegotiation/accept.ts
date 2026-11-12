@@ -20,6 +20,7 @@ import {
 	extendContract,
 	getExtensionIneligibleReason,
 } from "../contract/extension.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 const acceptExtension = async ({
 	negotiation,
@@ -200,7 +201,7 @@ const accept = async <
 		amount,
 		exp,
 	};
-	if (terms && g.get("contractOptions")) {
+	if (terms && featureOn("contractOptions")) {
 		contract.terms = terms;
 	}
 	if (getContractDemand(p).rookie && phase === PHASE.RESIGN_PLAYERS) {

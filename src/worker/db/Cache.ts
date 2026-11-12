@@ -1025,7 +1025,10 @@ class Cache {
 
 		// Only flush if cache is dirty and nothing is going on
 		if (this._dirty) {
+			// (No league database: nothing to write to. Happens in tests, where each file starts with idb.league reset while an
+			// earlier file's cache may still be dirty)
 			const skipFlush =
+				idb.league === undefined ||
 				this._status !== "full" ||
 				lock.get("gameSim") ||
 				lock.get("newPhase") ||

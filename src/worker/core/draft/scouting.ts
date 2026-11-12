@@ -6,6 +6,7 @@ import type { Player, ScoutingEntry } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import { finances, player } from "../index.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 /**
  * The scouting system: every season the user's scouting budget gives a number of scouting points to spend on individual prospects. A scout assignment or a workout shrinks that prospect's rating fuzz (what the user sees, AI teams always see true ratings), and the scout report gives confidence ranges that narrow with each one. Prospects nobody scouted keep the global fuzz from the scouting budget.
@@ -63,7 +64,7 @@ export const scoutProspect = async (
 	pid: number,
 	type: keyof typeof SCOUTING_ACTIONS,
 ): Promise<{ error?: string }> => {
-	if (!g.get("scoutingSystem")) {
+	if (!featureOn("scoutingSystem")) {
 		return { error: "The scouting system is disabled in League Settings." };
 	}
 	const p = await idb.cache.players.get(pid);
