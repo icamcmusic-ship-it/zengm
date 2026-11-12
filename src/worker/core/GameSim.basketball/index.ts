@@ -184,8 +184,11 @@ const EXPANDED_INTERIOR_OFFSET = 0.006;
 const EXPANDED_PERIMETER_OFFSET = 0.008;
 const EXPANDED_STL_FACTOR = 1.01;
 
-// Perimeter Defense: how much the perimeter defense composite tilts who is credited with a steal
+// Perimeter Defense: how much the perimeter defense composite tilts who is credited with a steal, and how much of the stealing
+// composite's power (4) it takes back. The two composites are close (speed, defense), so without the damping the pick went as about
+// the fifth power and piled steals on the best few defenders (4-5 players at 2.0+ a season, leader ~2.5)
 const PERIMETER_STEAL_POWER = 1;
+const PERIMETER_STEAL_DAMPING = 1.5;
 // Second step (offensive/defensive rebounding, catch-and-shoot/off-the-dribble shooting, ball security): keeps league offensive
 // rebounds, turnovers and jump shooting the same as with the setting off
 const EXPANDED_ORB_FACTOR = 1.004;
@@ -4858,7 +4861,9 @@ class GameSim extends GameSimBase {
 			if (rating === "stealing" && this.perimeterDefense) {
 				value *=
 					(p.compositeRating.defensePerimeter * this.fatigue(p.stat.energy)) **
-					PERIMETER_STEAL_POWER;
+						PERIMETER_STEAL_POWER /
+					(compositeRating * this.fatigue(p.stat.energy)) **
+						PERIMETER_STEAL_DAMPING;
 			}
 
 			// Player traits: shot selection, foul proneness, steals and hustle
