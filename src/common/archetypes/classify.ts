@@ -22,6 +22,9 @@ import {
 	creatorTerm,
 	signatureTerm,
 	standoutBonus,
+	absolutePenalty,
+	roleTerm,
+	starWeight,
 	type ReadOptions,
 	standoutsOf,
 	twoWayBonus,
@@ -29,6 +32,7 @@ import {
 	type Standout,
 } from "./score.ts";
 import { ovrPercentile } from "./norms.ts";
+import { STAR_BIAS } from "./starBias.data.ts";
 import { archetypePrior, isPos, positionOf } from "./position.ts";
 import type {
 	Archetype,
@@ -60,7 +64,7 @@ export const archetypeByName = (name: string) =>
 // Rare types need to be that much more exceptional a fit to be picked (no 2K build is marked rare now)
 export const RARE_PENALTY = 0.5;
 // The archetype he had keeps the label unless another is better by more than this
-export const STICKY_Z = 2.2;
+export const STICKY_Z = 2.4;
 // Poor fit: no build his position allows really has the shape of his ratings, and the nearest one is shown. Either the
 // similarity itself is low (POOR_FIT_SCORE: set at the similarity 95% of the 2K builds have to their own archetype, see
 // twoK/build2k.script.test.ts), or the build's name promises a skill that is not among his better ones (he misses the
@@ -192,6 +196,8 @@ export const scoreAll = (
 	const cv = classValues(p);
 	const standouts = standoutsOf(p, cv);
 	const traits = visibleTraits(traitsIn);
+	const star = starWeight(p);
+	const starBias = norms.starBias ?? STAR_BIAS;
 	const scored: Scored[] = [];
 	for (const a of archetypes) {
 		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
@@ -210,15 +216,22 @@ export const scoreAll = (
 		const need = needShortfall(a, p);
 		const prom = promiseShortfall(a, cv, p);
 		const short = need + prom.floor + prom.rel;
+		// (a role bonus only for a build he lives up to: it fades out as he misses its floors)
+		const role = roleTerm(a, p, cv);
+		const roleZ =
+			role > 0 ? role * Math.max(0, 1 - short / POOR_FIT_SHORT) : role;
 		const z =
 			(table ? matchZ(table, raw) : raw * 4 - 2) -
 			(a.rare ? RARE_PENALTY : 0) +
 			prior +
 			trait +
 			((norms.bias ?? defaultNorms(p.expanded).bias)?.[a.id] ?? 0) +
+			star * (starBias[a.id] ?? 0) +
 			signatureBonus(a, standouts, cv, p.hgt, need, p.expanded) +
 			signatureTerm(a, standouts, cv) +
-			creatorTerm(a, read.stats) -
+			creatorTerm(a, read.stats) +
+			roleZ -
+			absolutePenalty(a, p) -
 			genericPenalty(a, standouts) -
 			needPenaltyOf(need) -
 			promisePenalty(prom);

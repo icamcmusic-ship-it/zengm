@@ -87,12 +87,16 @@ const read = (p) => ({
 
 const population = (label, players, out) => {
 	const counts = {};
+	const poorBy = {};
 	let poor = 0;
 	for (const p of players) {
 		const c = classify(p.ratings, read(p));
 		p.c = c;
 		counts[c.id] = (counts[c.id] ?? 0) + 1;
-		if (isPoorFit(c)) poor++;
+		if (isPoorFit(c)) {
+			poor++;
+			poorBy[c.id] = (poorBy[c.id] ?? 0) + 1;
+		}
 	}
 	const n = players.length;
 	const shares = Object.entries(counts).sort((x, y) => y[1] - x[1]);
@@ -102,6 +106,10 @@ const population = (label, players, out) => {
 		`${label} (n=${n}): poor fit ${pct(poor, n)}%, max share ${shares[0][0]} ${pct(shares[0][1], n)}%, entropy ${h.toFixed(2)} (effective builds ${Math.exp(h).toFixed(0)}), used ${shares.length}; top: ${shares
 			.slice(0, 5)
 			.map(([id, k]) => `${id} ${pct(k, n)}`)
+			.join(", ")}; poor fit by build: ${Object.entries(poorBy)
+			.sort((x, y) => y[1] - x[1])
+			.slice(0, 5)
+			.map(([id, k]) => `${id} ${k}`)
 			.join(", ")}`,
 	);
 	return { poor: poor / n, max: shares[0][1] / n, h };
@@ -161,11 +169,17 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 		let hit = 0;
 		let specHit = 0;
 		const miss = [];
+		// Role fits that are not among his listed builds (candidates for the list)
+		const unlisted = [];
 		for (const [slug, season, ok, spec] of GOLD) {
 			const row = d.ratings.find((x) => x.slug === slug && x.season === season);
 			const p = realPlayer(d, st, row);
 			const c = classify(p.ratings, read(p));
 			if (ok.includes(c.id)) hit++;
+			else if (specOk(archetypeById(c.id), spec))
+				unlisted.push(
+					`${p.name} ${p.pos} -> ${c.name} [${c.id}] (listed: ${ok.join(", ")})`,
+				);
 			if (specOk(archetypeById(c.id), spec)) specHit++;
 			else
 				miss.push(
@@ -177,6 +191,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 		);
 		if (process.env.ARCH_GOLD_ONLY) {
 			out.push("gold misses:\n  " + miss.join("\n  "));
+			out.push("role fits not listed:\n  " + unlisted.join("\n  "));
 			writeFileSync(OUT, out.join("\n") + "\n");
 			return;
 		}
@@ -267,11 +282,11 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 		writeFileSync(OUT, out.join("\n") + "\n");
 		if (process.env.ARCH_SPOT) {
 			const spot = [];
-			const top = (label, ps) => {
+			const top = (label, ps, n = 50) => {
 				spot.push(
-					`=== ${label}: top 50 by overall (build; runners-up; similarity, fit z)`,
+					`=== ${label}: top ${n} by overall (build; runners-up; similarity, fit z)`,
 				);
-				for (const p of [...ps].sort((x, y) => y.ovr - x.ovr).slice(0, 50)) {
+				for (const p of [...ps].sort((x, y) => y.ovr - x.ovr).slice(0, n)) {
 					const r = read(p);
 					const c = classify(p.ratings, r);
 					const sc = scoreAll(
@@ -297,6 +312,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 				d.ratings
 					.filter((r) => r.season === 2025)
 					.map((r) => realPlayer(d, st, r)),
+				75,
 			);
 			writeFileSync(process.env.ARCH_SPOT, spot.join("\n") + "\n");
 		}

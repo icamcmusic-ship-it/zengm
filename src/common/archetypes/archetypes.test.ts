@@ -122,10 +122,72 @@ describe("archetype table: every archetype is an NBA 2K build", () => {
 });
 
 describe("classification", () => {
-	test("custom builds: twenty, not 2K names, never aliases, positions their profile is played at", () => {
+	// arch11: a user's player, a low-level, very tall big who rebounds and passes a little but cannot shoot at all (mid-range
+	// 14, three 9, free throws 16). His ratings are low and flat, so on the level-relative reading nothing looks weak; a
+	// scorer's or shooter's name must still never be his, however he is read.
+	test("a tall rebounder with no shot never gets a scoring or shooting name", () => {
+		const sample: ArchetypeRatings = {
+			hgt: 84,
+			stre: 55,
+			spd: 39,
+			jmp: 46,
+			endu: 20,
+			ins: 38,
+			dnk: 49,
+			ft: 16,
+			fg: 14,
+			tp: 9,
+			oiq: 30,
+			diq: 36,
+			drb: 34,
+			pss: 47,
+			reb: 58,
+		};
+		const expanded: ArchetypeRatings = {
+			...sample,
+			wng: 81,
+			pdef: 34,
+			idef: 38,
+			oreb: 64,
+			dreb: 52,
+			csh: 6,
+			dsh: 17,
+			bsc: 43,
+		};
+		const scoring = new Set(["score", "shoot", "mid"]);
+		for (const r of [sample, expanded]) {
+			for (const shift of [-6, 0, 6]) {
+				const shifted = { ...r };
+				for (const k of Object.keys(shifted) as (keyof ArchetypeRatings)[]) {
+					if (k !== "hgt" && k !== "wng") {
+						shifted[k] = Math.max(0, Math.min(100, shifted[k]! + shift));
+					}
+				}
+				for (const opts of [{}, { prospect: true }, { age: 22 }, { age: 33 }]) {
+					const c = classify(shifted, { pos: "C", ...opts });
+					const a = archetypeById(c.id)!;
+					const pr = promisesOf(a);
+					assert.ok(
+						!pr.all.some((k) => scoring.has(k)) &&
+							!pr.keys.some((k) =>
+								[
+									"threeLevel",
+									"insideOut",
+									"catchShoot",
+									"shotHunt",
+									"scorer",
+								].includes(k),
+							),
+						`${c.name} (${JSON.stringify(opts)}, shift ${shift})`,
+					);
+				}
+			}
+		}
+	});
+	test("custom builds: twenty-eight, not 2K names, never aliases, positions their profile is played at", () => {
 		const custom = ARCHETYPES.filter((a) => a.custom);
-		assert.strictEqual(custom.length, 20);
-		assert.strictEqual(CUSTOM_DEFS.length, 20);
+		assert.strictEqual(custom.length, 28);
+		assert.strictEqual(CUSTOM_DEFS.length, 28);
 		const twoK = new Set(
 			TWO_K_DEFS.flatMap((d) => [d.name, ...d.aliases]).map((n) =>
 				n.toLowerCase(),
@@ -154,7 +216,8 @@ describe("classification", () => {
 		assert.strictEqual(a.why.length, 3);
 		assert.ok(a.confidence >= 0 && a.confidence <= 1);
 		assert.ok(a.tier);
-		assert.strictEqual(a.group, "guard");
+		// (a guard's build, or a playmaker's open to any perimeter position)
+		assert.ok(a.group === "guard" || a.family === "playmaker", a.name);
 	});
 
 	test("height gates keep a tall player out of guard archetypes and vice versa", () => {
@@ -851,24 +914,24 @@ const GOLD_LISTED_FLOOR = 0.4;
 // [Basketball-Reference slug, season, the build he gets]: real ratings from data/, read as a real-players league reads him
 // (the position the game shows, his age and the previous season's stats)
 const PINNED: [string, number, string][] = [
-	["curryst01", 2025, "gritty-3pt-slasher"], // Stephen Curry
-	["jamesle01", 2025, "mid-range-slasher"], // LeBron James
+	["curryst01", 2025, "deep-range-sniper"], // Stephen Curry
+	["jamesle01", 2025, "mid-paint-point-four"], // LeBron James
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
 	["goberru01", 2025, "board-enforcing-bullmasher"], // Rudy Gobert
-	["antetgi01", 2025, "mid-range-slashing-cleaner"], // Giannis Antetokounmpo
+	["antetgi01", 2025, "crashing-mid-paint-scorer"], // Giannis Antetokounmpo
 	["duranke01", 2025, "slashing-mid-range-maestro"], // Kevin Durant
 	["paulch01", 2025, "ball-hawking-3-and-d-point"], // Chris Paul
 	["greendr01", 2025, "lockdown-eraser"], // Draymond Green
-	["thompkl01", 2025, "three-level-scorer"], // Klay Thompson
+	["thompkl01", 2025, "crafty-sharpshooter"], // Klay Thompson
 	["embiijo01", 2025, "slashing-mid-range-maestro"], // Joel Embiid
 	["lopezbr01", 2025, "backline-pick-and-popper"], // Brook Lopez
 	["capelca01", 2025, "glass-guardian-lob-threat"], // Clint Capela
-	["korveky01", 2021, "crafty-walking-bucket"], // Kyle Korver
+	["korveky01", 2021, "crafty-3-level-scorer"], // Kyle Korver
 	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook
-	["wembavi01", 2025, "rim-reaping-mid-paint-scorer"], // Victor Wembanyama
+	["wembavi01", 2025, "shot-erasing-mid-paint-maestro"], // Victor Wembanyama
 	["doncilu01", 2025, "mid-paint-point-four"], // Luka Dončić
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
 	["adamsst01", 2025, "shot-erasing-putback-bully"], // Steven Adams
-	["allento01", 2018, "2-way-post-bully"], // Tony Allen
+	["allento01", 2018, "ball-hawking-mid-paint-scorer"], // Tony Allen
 	["drumman01", 2025, "crashing-mid-paint-scorer"], // Andre Drummond
 ];

@@ -792,7 +792,10 @@ const realPlayers = () => {
 	// The previous season's stats, as a real-players league reads a player at the preseason
 	const st = JSON.parse(
 		readFileSync(
-			new URL("../../../data/real-player-stats.basketball.json", import.meta.url),
+			new URL(
+				"../../../data/real-player-stats.basketball.json",
+				import.meta.url,
+			),
 			"utf8",
 		),
 	);

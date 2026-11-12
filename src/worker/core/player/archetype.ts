@@ -7,6 +7,7 @@ import {
 	buildNorms,
 	classify,
 	currentEntry,
+	isStale,
 	explain,
 	toStored,
 	viewOf,
@@ -134,9 +135,11 @@ export const archetypeTraits = (
 };
 
 // The settings a stored label depends on: one that needs player traits or expanded ratings is replaced once that is off
-const viewContext = () => ({
+// (`current`: as his current label, which an entry from an older reading is not)
+const viewContext = (current = true) => ({
 	traits: traitsEnabled(),
 	expanded: expandedRatingsOn(),
+	current,
 });
 
 // His position as the game shows it now
@@ -288,7 +291,13 @@ export const storeArchetype = (p: Player, norms: Norms): boolean => {
 	if (!featureOn("archetypes")) {
 		return false;
 	}
-	const c = classifyPlayer(p, norms, currentEntry(p.archetypes)?.id);
+	// (a label from an older reading is not kept by stickiness: he is read afresh)
+	const prev = currentEntry(p.archetypes);
+	const c = classifyPlayer(
+		p,
+		norms,
+		prev && !isStale(prev) ? prev.id : undefined,
+	);
 	if (!c) {
 		return false;
 	}
@@ -374,7 +383,7 @@ export const archetypeLabelAt = (
 		const v = viewOf(
 			currentEntry(p.archetypes, season),
 			(p.ratings as any[]).findLast((r) => r.season <= season)?.pos,
-			viewContext(),
+			viewContext(season >= g.get("season")),
 		);
 		if (v) {
 			return v.label;

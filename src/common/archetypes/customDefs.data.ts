@@ -18,7 +18,7 @@ const slug = (name: string) =>
 	name
 		.toLowerCase()
 		.replace(/&/g, "and")
-		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/[^\da-z]+/g, "-")
 		.replace(/^-|-$/g, "");
 
 const custom = (
@@ -80,6 +80,12 @@ const custom = (
 };
 
 // Height bands of the clusters (hgt rating; the gate is soft)
+// No group nudge by position (a build for every position it lists)
+const universal = (d: TwoKDef): TwoKDef => ({
+	...d,
+	tags: [...d.tags, "universal"],
+});
+
 const SMALL: [number, number] = [0, 36];
 const WING: [number, number] = [33, 50];
 const SMALL_WING: [number, number] = [0, 50];
@@ -267,5 +273,132 @@ export const CUSTOM_DEFS: TwoKDef[] = [
 		"forward",
 		"scorer",
 		"An athletic forward who handles like a guard and blocks shots: raw, but rare tools.",
+	),
+	// arch11: specialists and playmakers the 2K builds miss (low-overall role players above all), and playmaking for
+	// scoring guards whose passing shows in their assist rate rather than a shot
+	universal(
+		custom(
+			"Slashing Playmaker",
+			["PG", "G", "SG", "GF", "SF", "F"],
+			[0, 58],
+			{ pss: 2.5, fin: 2, drb: 1.5, usg: 1.5, three: -0.5, mid: -1.5 },
+			"wing",
+			"playmaker",
+			"Runs the offense off the dribble: gets into the paint to score or find a teammate.",
+		),
+	),
+	custom(
+		"Pick & Roll Finisher",
+		["FC", "C"],
+		[56, 100],
+		{
+			fin: 2.5,
+			rim: 1.5,
+			stre: 1.5,
+			reb: 1,
+			three: -3,
+			mid: -2.5,
+			drb: -2,
+			usg: -1.5,
+		},
+		"big",
+		"hustle",
+		"A screen-and-roll big: sets picks, dives and finishes at the rim, with no jumper.",
+	),
+	custom(
+		"Hustle Glass Cleaner",
+		["F", "PF", "FC", "C"],
+		[48, 100],
+		{
+			reb: 3,
+			stre: 1,
+			end: 1,
+			usg: -2.5,
+			three: -2,
+			mid: -2,
+			drb: -2,
+			oiq: -1,
+		},
+		"big",
+		"rebounder",
+		"A pure rebounder: crashes the glass and does the dirty work, with no scoring game.",
+	),
+	custom(
+		"Lockdown Stopper",
+		["SG", "GF", "SF", "F"],
+		[33, 60],
+		{
+			dper: 3,
+			diq: 2,
+			stl: 1.5,
+			usg: -2.5,
+			three: -1,
+			mid: -1.5,
+			drb: -1,
+			oiq: -1,
+		},
+		"wing",
+		"defender",
+		"A defense-only wing: guards the other team's best scorer and stays out of the way on offense.",
+	),
+	custom(
+		"Pass-First Distributor",
+		["PG", "G"],
+		[0, 45],
+		{ pss: 3, oiq: 1, usg: -2, three: -1, mid: -1.5, fin: -1, ath: -1 },
+		"guard",
+		"playmaker",
+		"A backup point guard who runs the offense and moves the ball, with little scoring of his own.",
+	),
+	universal(
+		custom(
+			"Athletic Hustler",
+			["PG", "G", "SG", "GF", "SF", "F", "PF", "FC", "C"],
+			[0, 70],
+			{
+				ath: 3,
+				jmp: 3,
+				spd: 2.5,
+				end: 1,
+				oiq: -2.5,
+				mid: -2,
+				three: -1.5,
+				pss: -1.5,
+				drb: -1,
+				ft: -1,
+			},
+			"wing",
+			"athlete",
+			"A raw athlete: runs, jumps and plays hard, with the skills still to come.",
+		),
+	),
+	custom(
+		"Shot-Blocking Anchor",
+		["FC", "C"],
+		[60, 100],
+		{
+			blk: 3,
+			dint: 2,
+			reb: 1.5,
+			three: -2,
+			mid: -2,
+			drb: -2,
+			usg: -2,
+			pss: -1,
+		},
+		"big",
+		"defender",
+		"A rim protector first and last: blocks shots and anchors the paint.",
+	),
+	universal(
+		custom(
+			"Deep-Range Sniper",
+			["PG", "G", "SG", "GF", "SF", "F"],
+			[0, 60],
+			{ three: 3.5, ft: 1.5, usg: 1 },
+			"wing",
+			"shooter",
+			"An elite shooter with unlimited range: the three is the weapon, whatever else he does.",
+		),
 	),
 ];

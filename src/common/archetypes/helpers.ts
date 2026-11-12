@@ -31,11 +31,20 @@ export const GROUP_INFO: Record<
 
 export const GROUPS: ArchetypeGroup[] = ["guard", "wing", "forward", "big"];
 
+// Bumped whenever the reading changes enough that a stored label may no longer be what it would give: an entry stored by
+// an older reading (or before versions were stored) is not shown as the current label, the player is read again (and
+// stored anew), so a label from an older engine never lingers until the next preseason
+export const ARCHETYPE_READING_VERSION = 11;
+
 export const toStored = (
 	season: number,
 	c: Classification,
 ): StoredArchetype => {
-	const out: StoredArchetype = { season, id: c.id };
+	const out: StoredArchetype = {
+		season,
+		id: c.id,
+		v: ARCHETYPE_READING_VERSION,
+	};
 	if (c.tier) {
 		out.tier = c.tier;
 	}
@@ -61,7 +70,14 @@ export type ArchetypeView = {
 // older version is ignored.
 // What the league has on now: a label that needs player traits (or expanded ratings) is no longer valid once that setting
 // is off (undefined: not checked)
-export type ViewContext = { traits?: boolean; expanded?: boolean };
+// `current`: the entry is meant as his current label, so one stored by an older reading is not valid
+export type ViewContext = {
+	traits?: boolean;
+	expanded?: boolean;
+	current?: boolean;
+};
+export const isStale = (e: StoredArchetype) =>
+	(e.v ?? 0) < ARCHETYPE_READING_VERSION;
 const unavailable = (
 	a: { trait?: unknown; expanded?: true },
 	ctx: ViewContext | undefined,
@@ -78,7 +94,11 @@ export const viewOf = (
 	if (!e || !a) {
 		return null;
 	}
-	if ((isPos(pos) && !a.positions.includes(pos)) || unavailable(a, ctx)) {
+	if (
+		(isPos(pos) && !a.positions.includes(pos)) ||
+		unavailable(a, ctx) ||
+		(ctx?.current && isStale(e))
+	) {
 		return null;
 	}
 	return {
