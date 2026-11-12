@@ -16,9 +16,12 @@ import { last, assertDefined } from "../../../common/utils.ts";
 import { applyInjuryDepth } from "./injuryDepthTeam.ts";
 import {
 	getRestrictionFactor,
+	getSimDay,
 	isBackToBack,
 	isInjuryDepthEnabled,
 } from "../player/injuryDepth.ts";
+import { getDayScale } from "../season/scheduleDayScale.ts";
+import { isThreeInFour, LOAD } from "../GameSim.basketball/scheduleLoad.ts";
 import {
 	compositeWeightsFor,
 	deriveExpandedRatings,
@@ -168,6 +171,8 @@ export const processTeam = async (
 	},
 	teamSeason: {
 		lastGameDay?: number;
+		prevGameDay?: number;
+		hype?: number;
 		won: number;
 		lost: number;
 		tied: number;
@@ -532,13 +537,48 @@ export const processTeam = async (
 	if (__SPORT === "basketball") {
 		applyInjuryDepth(t, teamInput, teamSeason, players);
 
+		// Load, Fatigue & Venue (basketball): the crowd (hype), where the team is from (travel) and 3 games in 4 nights, see
+		// GameSim.basketball/scheduleLoad.ts
+		const scheduleLoad =
+			!allStarGame &&
+			nativeFeatureEnabled("scheduleLoad", (key) => g.get(key as any));
+		let threeInFour = false;
+		if (scheduleLoad) {
+			t.crowdHype = teamSeason.hype ?? 0.5;
+			t.region = (teamInput as { region?: string }).region;
+			// (only with the realistic schedule length: in the old compact schedule, and in college mode, teams play nearly every day, so
+			// almost every game would be one)
+			const realisticDays = getDayScale() < 1;
+			threeInFour =
+				realisticDays &&
+				!playoffs &&
+				isThreeInFour(
+					getSimDay(),
+					teamSeason.lastGameDay,
+					teamSeason.prevGameDay,
+				);
+			t.threeInFour = threeInFour;
+			const injuryNorm = realisticDays
+				? LOAD.injuryNorm *
+					(isInjuryDepthEnabled() ? LOAD.injuryDepthRealisticSchedule : 1)
+				: 1;
+			for (const p2 of t.player) {
+				p2.loadInjuryFactor =
+					injuryNorm * (threeInFour ? LOAD.threeInFourInjury : 1);
+				if (threeInFour && p2.compositeRating.endurance !== undefined) {
+					p2.compositeRating.endurance *= LOAD.threeInFourEndurance;
+				}
+			}
+		}
+
 		// Realistic Rotations: the second night of a back-to-back plays a little more of the bench (GameSim.basketball/rotationPlanner.ts).
 		// A later batch can also set t.rotationStyle (the coach's rotation style, -1 tight ... 1 deep)
 		if (
 			!allStarGame &&
 			nativeFeatureEnabled("realisticRotations", (key) => g.get(key as any))
 		) {
-			t.backToBack = isBackToBack(teamSeason.lastGameDay);
+			// (Load, Fatigue & Venue: so is the third game in four nights)
+			t.backToBack = isBackToBack(teamSeason.lastGameDay) || threeInFour;
 			// Injury Depth minutes restrictions (already in ptModifier, also a cap on the planned minutes)
 			if (isInjuryDepthEnabled()) {
 				const playersByPid = new Map(players.map((p) => [p.pid, p]));

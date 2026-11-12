@@ -116,8 +116,8 @@ describe("realistic schedule length", options, () => {
 			const { output, stats, lastDay } = check(30, 82);
 
 			// About 2 days per game plus the All-Star break
-			assert.isAtLeast(lastDay, 152);
-			assert.isAtMost(lastDay, 170);
+			assert.isAtLeast(lastDay, 164);
+			assert.isAtMost(lastDay, 180);
 
 			for (const s of stats) {
 				assert.strictEqual(s.numGames, 82);
@@ -132,8 +132,8 @@ describe("realistic schedule length", options, () => {
 			assert.isAtMost(b2b.max, 22);
 
 			const threeInFour = summarize(stats.map((s) => s.threeInFour));
-			// A season this short needs some: each back-to-back next to a single day off is one
-			assert.isAtMost(threeInFour.avg, 16);
+			// ~172 days leaves room for almost none (each back-to-back between 2-day breaks)
+			assert.isAtMost(threeInFour.avg, 6);
 
 			// Each team plays on roughly half the days
 			const numDays = new Set(output.days).size;
@@ -260,7 +260,7 @@ describe("newSchedule with realistic schedule length", options, () => {
 		const output = newScheduleWithDays(getTeams(30));
 		assert.ok(output.days);
 		assert.strictEqual(output.days.length, output.tids.length);
-		// ~90 old days / ~170 new days
+		// ~90 old days / ~172 new days
 		assert.isAbove(output.dayScale, 0.45);
 		assert.isBelow(output.dayScale, 0.6);
 

@@ -335,7 +335,7 @@ export const NATIVE_FEATURES = [
 		key: "realisticSchedule",
 		name: "Realistic Schedule Length",
 		description:
-			"The regular season is spread over about 2 days per game (82 games in about 160 days) instead of most teams playing almost every day: each team plays about every other day, with about 15 back-to-backs per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
+			"The regular season is spread over about 2 days per game (82 games in about 172 days) instead of most teams playing almost every day: each team plays about every other day, with about 14 back-to-backs and only a few 3-in-4s per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
@@ -465,6 +465,36 @@ export const NATIVE_FEATURES = [
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
+	},
+	{
+		id: "smartEndgame",
+		key: "smartEndgame",
+		name: "End-of-Game Intelligence",
+		description:
+			"Coaches manage the end of games: a timeout to stop an opponent's 10-0 run (each team has five extra timeouts for that, quick-trigger coaches use them sooner), offense and defense substitutions in the last minute of a close game, intentional fouls on the worst free throw shooter on the floor, a foul when up 3 with a few seconds left, holding for the last shot and 2-for-1s in every possession model, and the last timeout saved for when it matters. With Coaching Systems, better game managers do these more reliably.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "scheduleLoad",
+		key: "scheduleLoad",
+		name: "Load, Fatigue & Venue",
+		description:
+			"Tired players fade faster (the fatigue penalty steepens as energy runs low) and get hurt more often (the league injury rate stays the same), the third game in four nights wears teams down like a back-to-back, and home court is split into a base part, the crowd (bigger with a hyped team and in the playoffs) and a small referee lean (the home team gets about 3% more free throws), plus travel for the visitors. The league home win percentage stays the same on average.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "scheduleLoadRefVariance",
+				name: "Referee Crews",
+				description:
+					"Each game's referees call it a little tighter or looser than average (about ±7% fouls).",
+				type: "bool",
+				default: true,
+			},
+		],
 	},
 	{
 		id: "seasonOdds",

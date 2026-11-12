@@ -68,6 +68,27 @@ import {
 	postMismatch,
 } from "./matchupDefense.ts";
 import {
+	ENDGAME,
+	endgameRole,
+	endgameRoleScore,
+	endgameValues,
+	foulTargetWeights,
+	runTimeoutSource,
+	runTimeoutThreshold,
+	saveLastTimeout,
+	upThreeFoulProb,
+} from "./endgame.ts";
+import {
+	crowdLevel,
+	homeCourtModifier,
+	LOAD,
+	loadFatigue,
+	refLean,
+	tiredInjuryWeight,
+	travelDistance,
+	travelEndurance,
+} from "./scheduleLoad.ts";
+import {
 	lateGameSituationWeight,
 	teamChemistryBonus,
 	teamSwitchDefenseBonus,
@@ -454,6 +475,27 @@ class GameSim extends GameSimBase {
 	teamVersatility: [number, number] = [0, 0];
 	// The matchup of the last shot (for the calibration script)
 	lastMatchup = { delta: 0, post: 0, drive: 0, fitRel: 0 };
+	// End-of-Game Intelligence (League extras, see endgame.ts): run-stopping timeouts (each team's extra timeouts and the opponent's
+	// unanswered points), offense/defense substitutions in the last minute, who gets fouled on purpose, fouling when up 3, last shots and
+	// 2-for-1s in the stock possession model. Off: nothing here is used and no extra random numbers are drawn
+	smartEndgame: boolean;
+	earlyTimeouts: [number, number] = [0, 0];
+	// Unanswered points by each team
+	scoringRun: [number, number] = [0, 0];
+	// The team that has the ball next (for the substitutions at a dead ball)
+	nextOffense: TeamNum | undefined;
+	// Does each team's coach foul when up 3 (decided the first time it comes up)
+	up3Coach: [boolean | undefined, boolean | undefined] = [undefined, undefined];
+	runTimeoutNow = false;
+	// (for the tests and the calibration script)
+	endgameCounts = { runTimeouts: 0, up3Fouls: 0, odSubs: 0 };
+	// Load, Fatigue & Venue (League extras, see scheduleLoad.ts): nonlinear fatigue, injury risk with tiredness, the home court split
+	// into base, crowd and referees, travel, and the referee crew. foulMult is each team's foul rate on defense (the referees' lean and
+	// crew). Off: nothing here is used and no extra random numbers are drawn
+	scheduleLoad: boolean;
+	foulMult: [number, number] = [1, 1];
+	// The away team's trip in km (undefined without the regions' coordinates)
+	travelKm: number | undefined;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -544,6 +586,23 @@ class GameSim extends GameSimBase {
 		this.spacingCreation = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.creation !== undefined),
 		);
+
+		this.smartEndgame =
+			!allStarGame &&
+			nativeFeatureEnabled("smartEndgame", (key) => g.get(key as any));
+		if (this.smartEndgame) {
+			this.earlyTimeouts = [ENDGAME.earlyTimeouts, ENDGAME.earlyTimeouts];
+			this.rotationQuarterSeconds = g.get("quarterLength") * 60;
+		}
+
+		this.scheduleLoad =
+			!allStarGame &&
+			nativeFeatureEnabled("scheduleLoad", (key) => g.get(key as any));
+		if (this.scheduleLoad && g.get("scheduleLoadRefVariance")) {
+			// One draw per game: how tightly this crew calls it
+			const crew = Math.exp(LOAD.refSd * gaussian());
+			this.foulMult = [crew, crew];
+		}
 
 		// Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
 		this.numPlayersOnCourt = g.get("numPlayersOnCourt");
@@ -648,7 +707,13 @@ class GameSim extends GameSimBase {
 	homeCourtAdvantage(homeCourtFactor: number) {
 		const homeCourtModifier =
 			homeCourtFactor *
-			helpers.bound(1 + g.get("homeCourtAdvantage") / 100, 0.01, Infinity);
+			helpers.bound(
+				this.scheduleLoad
+					? this.loadHomeCourtModifier()
+					: 1 + g.get("homeCourtAdvantage") / 100,
+				0.01,
+				Infinity,
+			);
 
 		for (const t of teamNums) {
 			let factor;
@@ -673,6 +738,33 @@ class GameSim extends GameSimBase {
 				}
 			}
 		}
+	}
+
+	// Load, Fatigue & Venue: the base and crowd parts of the home court, and the rest of it as the referees' lean and the visitors' trip
+	loadHomeCourtModifier() {
+		const hca = g.get("homeCourtAdvantage");
+		const lean = refLean(hca);
+		this.foulMult = [
+			this.foulMult[0] * (1 - lean),
+			this.foulMult[1] * (1 + lean),
+		];
+		this.travelKm = travelDistance(
+			(this.team[1] as any).region,
+			(this.team[0] as any).region,
+		);
+		const travel = travelEndurance(this.travelKm);
+		for (const p of this.team[1].player) {
+			if (p.compositeRating.endurance !== undefined) {
+				p.compositeRating.endurance *= travel;
+			}
+		}
+		return homeCourtModifier(
+			hca,
+			crowdLevel(
+				(this.team[0] as any).crowdHype ?? 0.5,
+				g.get("phase") === PHASE.PLAYOFFS,
+			),
+		);
 	}
 
 	/**
@@ -957,7 +1049,15 @@ class GameSim extends GameSimBase {
 
 			const finalPeriod = period === this.numPeriods;
 			// Coaching systems: a quick-trigger coach has used a timeout by now (to stop runs), so he has one fewer for the end
-			if (finalPeriod && this.coachSys) {
+			// (End-of-Game Intelligence: the timeouts to stop runs are simulated instead, and at most two of the extra ones are left)
+			if (finalPeriod && this.smartEndgame) {
+				for (const t of teamNums) {
+					this.earlyTimeouts[t] = Math.min(
+						this.earlyTimeouts[t],
+						ENDGAME.maxFinalPeriod,
+					);
+				}
+			} else if (finalPeriod && this.coachSys) {
 				for (const t of teamNums) {
 					if (this.cs[t].burnTimeout && this.timeouts[t] > 1) {
 						this.timeouts[t] -= 1;
@@ -1005,6 +1105,7 @@ class GameSim extends GameSimBase {
 			this.foulsThisQuarter = [0, 0];
 			this.foulsLastTwoMinutes = [0, 0];
 			this.lastScoringPlay = [];
+			this.scoringRun = [0, 0];
 			this.t = g.get("quarterLength") * 60;
 			this.playByPlay.logEvent({
 				type: "period",
@@ -1018,6 +1119,8 @@ class GameSim extends GameSimBase {
 		this.t = 60 * this.getOvertimeLength();
 
 		this.timeouts = [NUM_TIMEOUTS_OVERTIME, NUM_TIMEOUTS_OVERTIME];
+		this.earlyTimeouts = [0, 0];
+		this.scoringRun = [0, 0];
 		this.logTimeouts();
 
 		this.lastScoringPlay = [];
@@ -1098,6 +1201,9 @@ class GameSim extends GameSimBase {
 	// Call this before running clock for possession
 	shouldIntentionalFoul() {
 		const diff = this.team[this.o].stat.pts - this.team[this.d].stat.pts;
+		if (this.smartEndgame && diff === -3 && this.shouldFoulUpThree()) {
+			return true;
+		}
 		const offenseWinningByABit = diff > 0 && diff <= 6;
 		const intentionalFoul =
 			offenseWinningByABit &&
@@ -1136,6 +1242,11 @@ class GameSim extends GameSimBase {
 
 		if (this.coachSys) {
 			probability *= this.cs[this.d].foul;
+		}
+
+		// Load, Fatigue & Venue: the referees
+		if (this.scheduleLoad) {
+			probability *= this.foulMult[this.d];
 		}
 
 		return probability * g.get("foulRateFactor");
@@ -1183,6 +1294,8 @@ class GameSim extends GameSimBase {
 			outcome === "nonShootingFoul" ||
 			outcome === "ft";
 		if (deadBall) {
+			// (the possession changes at the start of the next one, so the defense has the ball next)
+			this.nextOffense = info.type === "afterPossession" ? this.d : undefined;
 			const substitutions = this.updatePlayersOnCourt();
 
 			if (substitutions) {
@@ -1195,6 +1308,8 @@ class GameSim extends GameSimBase {
 		// Possession change
 		this.o = this.o === 1 ? 0 : 1;
 		this.d = this.o === 1 ? 0 : 1;
+		this.nextOffense = this.o;
+		this.runTimeoutNow = false;
 		this.updateTeamCompositeRatings();
 
 		const dtInbound = this.dtInbound();
@@ -1233,7 +1348,9 @@ class GameSim extends GameSimBase {
 		}
 
 		// Nobody can get hurt if no time elapsed, otherwise a player could be injured immediately after subbing in, with 0 minutes played
-		const injuries = possessionTime > 0 ? this.injuries() : false;
+		// (End-of-Game Intelligence: nor during a timeout to stop a run, which is not a possession)
+		const injuries =
+			possessionTime > 0 && !this.runTimeoutNow ? this.injuries() : false;
 
 		this.prevPossessionOutcome = outcome;
 
@@ -1267,7 +1384,7 @@ class GameSim extends GameSimBase {
 	 * @param {number} energy A player's energy level, from 0 to 1 (0 = lots of energy, 1 = none).
 	 * @return {number} Fatigue, from 0 to 1 (0 = lots of fatigue, 1 = none).
 	 */
-	fatigue(energy: number, skip?: boolean): number {
+	fatigue(energy: number, skip?: boolean, loadCurve?: boolean): number {
 		energy += 0.016;
 
 		if (energy > 1) {
@@ -1275,6 +1392,11 @@ class GameSim extends GameSimBase {
 		}
 		if (skip) {
 			return energy;
+		}
+
+		// Load, Fatigue & Venue: the shooter's penalty steepens as he tires
+		if (loadCurve && this.scheduleLoad) {
+			energy = loadFatigue(energy);
 		}
 
 		// Late in games, or in OT, fatigue matters less
@@ -1362,6 +1484,11 @@ class GameSim extends GameSimBase {
 		) {
 			return undefined;
 		}
+		// End-of-Game Intelligence: offense/defense substitutions in the last minute (without Realistic Rotations, closers only then)
+		const od = this.endgameOd();
+		if (!od && !this.realisticRotations) {
+			return undefined;
+		}
 		const foulsNeededToFoulOut = g.get("foulsNeededToFoulOut");
 		return teamNums.map((t) => {
 			const candidates = this.team[t].player
@@ -1377,8 +1504,185 @@ class GameSim extends GameSimBase {
 						b.valueNoPot * (this.allStarGame ? 1 : b.ptModifier) -
 						a.valueNoPot * (this.allStarGame ? 1 : a.ptModifier),
 				);
-			return pickClosers(candidates, this.numPlayersOnCourt);
+			return od
+				? this.pickEndgameClosers(t, candidates)
+				: pickClosers(candidates, this.numPlayersOnCourt);
 		}) as [Set<PlayerGameSim>, Set<PlayerGameSim>];
+	}
+
+	// ---- End-of-Game Intelligence (the smartEndgame setting, see endgame.ts). Only called with the setting on ----
+
+	// The coach's game management, -1 to 1 (0 without coaching systems)
+	endgameMgmt(t: TeamNum) {
+		return this.coachSys
+			? helpers.bound((this.cs[t].foulWindow - 27) / 6, -1, 1)
+			: 0;
+	}
+
+	// The last minute of a close game (final period or overtime), when teams substitute for offense and defense at dead balls
+	endgameOd() {
+		return (
+			this.smartEndgame &&
+			!this.elamActive &&
+			this.nextOffense !== undefined &&
+			this.t !== undefined &&
+			this.t <= ENDGAME.odSeconds &&
+			this.team[0].stat.ptsQtrs.length >= this.numPeriods &&
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <=
+				ENDGAME.odMargin
+		);
+	}
+
+	// The closing lineup for the situation: the team's best players, with the last spots going to free throw shooters (ahead, with the
+	// ball), shooters (behind) or defenders and rebounders (on defense). candidates are sorted best first
+	pickEndgameClosers(t: TeamNum, candidates: PlayerGameSim[]) {
+		const role = endgameRole(
+			t === this.nextOffense,
+			this.team[t].stat.pts - this.team[t === 0 ? 1 : 0].stat.pts,
+		);
+		const pool = candidates.slice(0, Math.max(9, this.numPlayersOnCourt));
+		const values = endgameValues(
+			pool.map((p) => p.valueNoPot * (this.allStarGame ? 1 : p.ptModifier)),
+			pool.map((p) => endgameRoleScore(role, p.compositeRating)),
+			this.endgameMgmt(t),
+		);
+		const picked = pickClosers(
+			pool
+				.map((p, i) => ({ pos: p.pos, valueNoPot: values[i]!, p }))
+				.sort((a, b) => b.valueNoPot - a.valueNoPot),
+			this.numPlayersOnCourt,
+		);
+		const closers = new Set<PlayerGameSim>();
+		for (const { p } of picked) {
+			closers.add(p);
+		}
+		return closers;
+	}
+
+	// A timeout is a breather for everyone on the floor
+	timeoutBreather() {
+		for (const t of teamNums) {
+			for (const p of this.playersOnCourt[t]) {
+				p.stat.energy = Math.min(1, p.stat.energy + ENDGAME.timeoutRest);
+			}
+		}
+	}
+
+	// At the start of a possession: the team with the ball stops the other team's run with a timeout
+	maybeRunTimeout(): PossessionOutcome | undefined {
+		const o = this.o;
+		const quick = this.coachSys ? this.cs[o].burnTimeout : undefined;
+		if (
+			this.elamActive ||
+			this.scoringRun[this.d] < runTimeoutThreshold(quick)
+		) {
+			return;
+		}
+		const finalPeriod = this.team[0].stat.ptsQtrs.length >= this.numPeriods;
+		if (
+			finalPeriod &&
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) >
+				ENDGAME.runMaxMargin
+		) {
+			return;
+		}
+		const source = runTimeoutSource({
+			early: this.earlyTimeouts[o],
+			late: this.timeouts[o],
+			finalPeriod,
+			overtime: this.overtimes > 0,
+			t: this.t,
+			quickTrigger: quick,
+		});
+		if (!source) {
+			return;
+		}
+		if (source === "early") {
+			this.earlyTimeouts[o] -= 1;
+		} else {
+			this.timeouts[o] -= 1;
+			this.logTimeouts();
+		}
+		this.scoringRun[this.d] = 0;
+		this.runTimeoutNow = true;
+		this.endgameCounts.runTimeouts += 1;
+		this.isClockRunning = false;
+		this.timeoutBreather();
+		this.playByPlay.logEvent({
+			type: "timeout",
+			clock: this.t,
+			t: o,
+			numLeft: this.earlyTimeouts[o] + this.timeouts[o],
+			advancesBall: false,
+		});
+		return "timeout";
+	}
+
+	// Up 3 on defense with a few seconds left: foul before a three can go up (each coach either does it or not, more often the good
+	// game managers; decided with one random number the first time it comes up)
+	shouldFoulUpThree() {
+		if (this.elamActive || this.team[0].stat.ptsQtrs.length < this.numPeriods) {
+			return false;
+		}
+		const prob = upThreeFoulProb(this.t, this.endgameMgmt(this.d));
+		if (prob <= 0) {
+			return false;
+		}
+		let coach = this.up3Coach[this.d];
+		if (coach === undefined) {
+			coach = Math.random() < prob;
+			this.up3Coach[this.d] = coach;
+		}
+		if (coach) {
+			this.endgameCounts.up3Fouls += 1;
+		}
+		return coach;
+	}
+
+	// Who the defense fouls on purpose: the worst free throw shooter it can get to (one random number, like the pick it replaces)
+	pickFoulTarget() {
+		const players = this.playersOnCourt[this.o];
+		const weights = this.ratingArray("usage", this.o, 1, this.ratingArrayCache);
+		const ftProbs = [];
+		for (let i = 0; i < this.numPlayersOnCourt; i++) {
+			ftProbs.push(this.freeThrowProb(this.o, players[i]!));
+		}
+		foulTargetWeights(weights, ftProbs, this.endgameMgmt(this.d), weights);
+		let sum = 0;
+		for (const w of weights) {
+			sum += w;
+		}
+		const rand = Math.random() * sum;
+		let runningSum = 0;
+		for (let i = 0; i < this.numPlayersOnCourt; i++) {
+			runningSum += weights[i]!;
+			if (rand < runningSum) {
+				return players[i]!;
+			}
+		}
+		return players[0]!;
+	}
+
+	// The shooter of the possession: by usage, or when the defense fouls on purpose, its target
+	pickShooter(clockFactor: ClockFactor) {
+		return this.smartEndgame && clockFactor === "intentionalFoul"
+			? this.pickFoulTarget()
+			: this.pickPlayer("usage", this.o, this.usagePower());
+	}
+
+	// The stock possession model: shoot early for a 2-for-1 (the realistic model plans it itself; the stock model already holds for
+	// the last shot). dt is when the shot would go up otherwise
+	endgameShotTime(dt: number) {
+		if (
+			Math.random() <
+			ENDGAME.twoForOneProb + ENDGAME.clockMgmt * this.endgameMgmt(this.o)
+		) {
+			const target = this.t - uniform(29, 35);
+			if (target >= 0.5) {
+				return Math.min(dt, target);
+			}
+		}
+		return dt;
 	}
 
 	// Realistic Rotations: how much more or less he is wanted on the court than his value and fatigue say (not in blowouts)
@@ -1517,7 +1821,11 @@ class GameSim extends GameSimBase {
 			? this.elapsedRegulationSeconds()
 			: 0;
 		const closers =
-			this.realisticRotations && !blowout ? this.getClosers() : undefined;
+			(this.realisticRotations || this.smartEndgame) && !blowout
+				? this.getClosers()
+				: undefined;
+		// End-of-Game Intelligence: offense/defense substitutions don't wait for a player to have been on or off the court for a while
+		const odSubs = closers !== undefined && this.endgameOd();
 
 		for (const t of teamNums) {
 			const getOvrs = (includeFouledOut: boolean) => {
@@ -1558,6 +1866,10 @@ class GameSim extends GameSimBase {
 							// If it's not a blowout, worry about foul trouble
 							const foulTroubleFactor = this.getFoulTroubleFactor(p, foulLimit);
 							ovr *= foulTroubleFactor;
+							if (closers) {
+								// (End-of-Game Intelligence without Realistic Rotations: the last minute's closers)
+								ovr *= closers[t].has(p) ? CLOSER_FACTOR : NON_CLOSER_FACTOR;
+							}
 						}
 
 						ovrs.set(p.id, ovr);
@@ -1593,7 +1905,7 @@ class GameSim extends GameSimBase {
 				if (t === this.o && p === shooter) {
 					continue;
 				}
-				if (!(p.stat.courtTime > 2) && !onCourtIsIneligible) {
+				if (!(p.stat.courtTime > 2) && !onCourtIsIneligible && !odSubs) {
 					continue;
 				}
 
@@ -1609,8 +1921,7 @@ class GameSim extends GameSimBase {
 					}
 
 					const benchIsValidAndBetter =
-						p.stat.courtTime > 2 &&
-						b.stat.benchTime > 2 &&
+						(odSubs || (p.stat.courtTime > 2 && b.stat.benchTime > 2)) &&
 						ovrs.get(b.id)! > onCourtOvr;
 					const benchIsEligible = ovrs.get(b.id) !== -Infinity;
 
@@ -1654,6 +1965,9 @@ class GameSim extends GameSimBase {
 						}
 
 						substitutions = true;
+						if (odSubs) {
+							this.endgameCounts.odSubs += 1;
+						}
 
 						// Substitute player
 						this.playersOnCourt[t][pp] = b;
@@ -2306,6 +2620,20 @@ class GameSim extends GameSimBase {
 		// Modulate by pace - since injuries are evaluated per possession, but really probably happen per minute played
 		baseRate *= 100 / g.get("pace");
 
+		// Load, Fatigue & Venue: the tired players on the court are the ones at risk (normalized over the ten on the court)
+		let tiredNorm = 1;
+		if (this.scheduleLoad) {
+			let sum = 0;
+			let n = 0;
+			for (const t of teamNums) {
+				for (const p of this.playersOnCourt[t]) {
+					sum += tiredInjuryWeight(p.stat.energy);
+					n += 1;
+				}
+			}
+			tiredNorm = n / sum;
+		}
+
 		for (const t of teamNums) {
 			for (const p of this.team[t].player) {
 				// Only players on the court can be injured
@@ -2314,7 +2642,13 @@ class GameSim extends GameSimBase {
 						getInjuryRate(baseRate, p.age, p.injury.gamesRemaining > 0) *
 						((p as any).injuryRiskFactor ?? 1) * // injuryDepth setting, see game/injuryDepthTeam.ts
 						(p.traitEffects?.injuryRateMultiplier ?? 1) * // player traits (durability)
-						((p as any).simInjuryFactor ?? 1); // Game Sim Fixes: strength and endurance
+						((p as any).simInjuryFactor ?? 1) * // Game Sim Fixes: strength and endurance
+						// Load, Fatigue & Venue: tired players, 3 games in 4 nights
+						(this.scheduleLoad
+							? ((p as any).loadInjuryFactor ?? 1) *
+								tiredInjuryWeight(p.stat.energy) *
+								tiredNorm
+							: 1);
 
 					if (Math.random() < injuryRate) {
 						p.injured = true;
@@ -2416,6 +2750,14 @@ class GameSim extends GameSimBase {
 			return "endOfPeriod";
 		}
 
+		// End-of-Game Intelligence: a timeout to stop the other team's run
+		if (this.smartEndgame) {
+			const timeout = this.maybeRunTimeout();
+			if (timeout) {
+				return timeout;
+			}
+		}
+
 		const tipInFromOutOfBounds =
 			this.t <= TIP_IN_ONLY_LIMIT && this.sideOutOfBounds();
 		const lateGamePutBack =
@@ -2476,7 +2818,7 @@ class GameSim extends GameSimBase {
 		if (this.spacingCreation) {
 			this.creator = this.pickPlayer("creation", this.o, this.creationPower());
 		}
-		const shooter = this.pickPlayer("usage", this.o, this.usagePower());
+		const shooter = this.pickShooter(clockFactor);
 
 		// Flagrant foul? (only with the technicalFouls setting, so otherwise no random number is drawn here)
 		if (
@@ -2567,8 +2909,22 @@ class GameSim extends GameSimBase {
 			const pointDifferential =
 				this.team[this.o].stat.pts - this.team[this.d].stat.pts;
 			let takeTimeout = false;
+			const smart = this.smartEndgame;
 			if (pointDifferential === 0) {
 				if (this.t <= 10) {
+					takeTimeout = true;
+				}
+			} else if (smart && pointDifferential > 0) {
+				// End-of-Game Intelligence: ahead by a basket after the other team scored, with the fouls coming: a timeout to advance the
+				// ball and put the free throw shooters in (better game managers more often)
+				if (
+					pointDifferential <= 3 &&
+					this.t <= 24 &&
+					this.t > 2 &&
+					(this.prevPossessionOutcome === "fg" ||
+						this.prevPossessionOutcome === "ft") &&
+					Math.random() < 0.5 + 0.3 * this.endgameMgmt(this.o)
+				) {
 					takeTimeout = true;
 				}
 			} else if (pointDifferential < 0) {
@@ -2594,9 +2950,18 @@ class GameSim extends GameSimBase {
 					if (this.t < 10) {
 						// If time is really low, definitely take a timeout to advance ball
 						takeTimeout = true;
-					} else if (this.t < 25 && this.isClockRunning) {
+					} else if (
+						this.t < 25 &&
+						(this.isClockRunning || (smart && pointDifferential >= -3))
+					) {
 						// If time is somewhat low, definitely take a timeout to advance ball
+						// (End-of-Game Intelligence: also after a made basket, when a three can tie or win it)
 						takeTimeout = true;
+					} else if (
+						smart &&
+						saveLastTimeout(this.timeouts[this.o], pointDifferential, this.t)
+					) {
+						// End-of-Game Intelligence: within a basket, the last timeout is kept for the final possession
 					} else if (this.t < 60 && this.isClockRunning) {
 						// If time is a little low, sometimes take a timeout to advance ball
 						// (coaching systems: better game managers use them more readily)
@@ -2617,6 +2982,9 @@ class GameSim extends GameSimBase {
 				this.isClockRunning = false;
 				this.timeouts[this.o] -= 1;
 				this.logTimeouts();
+				if (smart) {
+					this.timeoutBreather();
+				}
 				this.playByPlay.logEvent({
 					type: "timeout",
 					clock: this.t,
@@ -2789,6 +3157,9 @@ class GameSim extends GameSimBase {
 			return false;
 		}
 		const lead = this.team[this.o].stat.pts - this.team[this.d].stat.pts;
+		if (this.smartEndgame && lead === -3 && this.shouldFoulUpThree()) {
+			return true;
+		}
 		if (lead <= 0) {
 			return false;
 		}
@@ -2903,11 +3274,20 @@ class GameSim extends GameSimBase {
 		if (
 			clockFactor === "holdForLastShot" &&
 			tLeft > 1.5 &&
-			Math.random() < 0.85
+			Math.random() <
+				(this.smartEndgame
+					? ENDGAME.holdProb + ENDGAME.clockMgmt * this.endgameMgmt(this.o)
+					: 0.85)
 		) {
 			// Hold for the last shot, going with ~1-4 s left
 			shotAt = tLeft - uniform(1, Math.min(4.5, tLeft - 0.5));
-		} else if (clockFactor === "twoForOne" && Math.random() < 0.7) {
+		} else if (
+			clockFactor === "twoForOne" &&
+			Math.random() <
+				(this.smartEndgame
+					? ENDGAME.twoForOneProb + ENDGAME.clockMgmt * this.endgameMgmt(this.o)
+					: 0.7)
+		) {
 			const target = tLeft - uniform(29, 35);
 			if (target >= 1.5) {
 				shotAt = Math.min(shotAt, target);
@@ -2982,7 +3362,7 @@ class GameSim extends GameSimBase {
 		if (this.spacingCreation) {
 			this.creator = this.pickPlayer("creation", this.o, this.creationPower());
 		}
-		const shooter = this.pickPlayer("usage", this.o, this.usagePower());
+		const shooter = this.pickShooter(clockFactor);
 
 		// Flagrant foul? (only with the technicalFouls setting)
 		if (
@@ -3459,6 +3839,11 @@ class GameSim extends GameSimBase {
 				foulFactor *= this.cs[this.d].foul;
 			}
 
+			// Load, Fatigue & Venue: the referees
+			if (this.scheduleLoad) {
+				foulFactor *= this.foulMult[this.d];
+			}
+
 			probMissAndFoul *= foulFactor;
 			probAndOne *= foulFactor;
 			const teamDefense = this.expandedRatings
@@ -3492,6 +3877,17 @@ class GameSim extends GameSimBase {
 
 			if (this.coachSys) {
 				probMake += this.coachMakeDelta();
+			}
+
+			// End-of-Game Intelligence: a play drawn up in a late timeout, better from a good game manager
+			if (
+				this.smartEndgame &&
+				this.coachSys &&
+				this.prevPossessionOutcome === "timeout" &&
+				this.t <= ENDGAME.atoSeconds &&
+				this.team[0].stat.ptsQtrs.length >= this.numPeriods
+			) {
+				probMake += ENDGAME.atoMake * this.endgameMgmt(this.o);
 			}
 
 			// Matchup Defense: drop coverage gives up pull-up jumpers
@@ -3572,7 +3968,7 @@ class GameSim extends GameSimBase {
 			p = this.lastOrbPlayer;
 		}
 
-		const currentFatigue = this.fatigue(p.stat.energy);
+		const currentFatigue = this.fatigue(p.stat.energy, false, true);
 
 		// Is this an "assisted" attempt (i.e. an assist will be recorded if it's made)
 		let passer: PlayerGameSim | undefined;
@@ -3637,6 +4033,16 @@ class GameSim extends GameSimBase {
 				lowerLimit,
 				upperLimit,
 			);
+		}
+		// End-of-Game Intelligence: 2-for-1s in the stock possession model
+		if (
+			this.smartEndgame &&
+			!preTimed &&
+			!tipInFromOutOfBounds &&
+			!putBack &&
+			clockFactor === "twoForOne"
+		) {
+			dt = this.endgameShotTime(dt);
 		}
 		this.advanceClockSeconds(dt);
 
@@ -5001,6 +5407,10 @@ class GameSim extends GameSimBase {
 
 			if (s === "pts") {
 				teamStat.ptsQtrs[teamStat.ptsQtrs.length - 1] += amt;
+				if (this.smartEndgame) {
+					this.scoringRun[t] += amt;
+					this.scoringRun[t === 0 ? 1 : 0] = 0;
+				}
 
 				for (const i of [0, 1] as const) {
 					for (let j = 0; j < this.numPlayersOnCourt; j++) {
