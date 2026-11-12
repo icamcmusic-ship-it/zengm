@@ -633,7 +633,7 @@ test("on: games are still sane, with and without the other sim extras", async ()
 	}
 });
 
-test("college rules (two 20-minute halves, one-and-one, 30-second shot clock): sensible games", async () => {
+test("college rules (two 20-minute halves, one-and-one, 30-second shot clock): both settings play sensible games", async () => {
 	const college = {
 		numPeriods: 2,
 		quarterLength: 20,
@@ -647,6 +647,7 @@ test("college rules (two 20-minute halves, one-and-one, 30-second shot clock): s
 		realisticPossessions: true,
 		realisticRotations: true,
 		smartEndgame: true,
+		scheduleLoad: true,
 	};
 	let pts = 0;
 	let min = 0;

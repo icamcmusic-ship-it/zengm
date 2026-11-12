@@ -70,6 +70,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Spacing & shot creation](#spacing--shot-creation)                  | game sim (drives, finishing, assists)                              | bball  | `spacingCreation`                           | on / off                      |
 | [Matchup defense](#matchup-defense)                                 | game sim (shot defense, shot selection, steal credit)              | bball  | `matchupDefense`                            | on / off                      |
 | [End-of-game intelligence](#end-of-game-intelligence)               | game sim (timeouts, late-game substitutions and fouls, clock)      | bball  | `smartEndgame`                              | on / off                      |
+| [Load, fatigue & venue](#load-fatigue--venue)                       | game sim (fatigue, injuries, home court, referees, travel)         | bball  | `scheduleLoad`                              | on / off                      |
 | [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery              | bball  | `featureSeasonOdds`                         | on / on                       |
 | [Realistic schedule length](#realistic-schedule-length)             | schedule, Schedule, Daily Schedule, play menu                      | bball  | `realisticSchedule`                         | on / off                      |
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes   | bball  | `featureArchetypes`                         | on / on                       |
@@ -139,6 +140,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `spacingCreation`                                                                                         | on / off                                                        |                                                                                                              |
 | `matchupDefense`                                                                                          | on / off                                                        |                                                                                                              |
 | `smartEndgame`                                                                                            | on / off                                                        |                                                                                                              |
+| `scheduleLoad`                                                                                            | on / off                                                        | option `scheduleLoadRefVariance` on                                                                          |
 | `contractOptions`, `contractExtensions`, `tradeRequests`                                                  | on / off                                                        |                                                                                                              |
 | `featureHoldouts` + `holdoutFrequency`                                                                    | on / off; 1 / 1                                                 | frequency scales how often holdouts happen                                                                   |
 | `featureCapExceptions` + `capExceptionsRepeaterTax` + `capExceptionsStretch`                              | on / off; off; off                                              | soft cap only (the repeater tax also applies with no cap); the two options are off even in new leagues       |
@@ -642,6 +644,35 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
   **Close games:** games within 3 points 12.5% → 12.6%, within 5 22.1% → 22.3%, overtime 3.5% → 3.7%, home win% .587 → .593 (noise), points per team in the last 2:00 and overtime 4.75 → 4.76. The leader with a minute left wins .957 → .954 of games; leading by 1–3 then, .760 → .727 (trailing teams foul the right player and advance the ball more often). **Game managers** (each pair of rosters with a +1 and a −1 game manager, everything else neutral, swapped halfway; 9,600 games): the good manager wins .500 of all games and .525 of close ones (within 5 or overtime), against .503 / .530 with the setting off, where game management already moved when teams start fouling and take timeouts.
 
 - **Known limits:** timeouts are only for runs and the end of games (no media timeouts, no timeouts to save a possession or to ice a shooter); the offense/defense substitution is decided at dead balls only, so it doesn't happen on a live-ball change of possession.
+
+### Load, fatigue & venue
+
+- **Setting:** `scheduleLoad` (League Extras → Game Simulation), with option `scheduleLoadRefVariance` (_Referee Crews_, on). On for new leagues, off for existing leagues (off: nothing runs, no extra random numbers, the same games as before: `outcomeInvariance.test.ts`). Not in All-Star games. Code: `src/worker/core/GameSim.basketball/scheduleLoad.ts` (constants, curves), `game/loadTeams.ts` (crowd, region, 3-in-4s), `GameSim.fatigue` / `injuries` / `loadHomeCourtModifier` / `probNonShootingFoul` / `getShotInfo`, `game/play.ts` (the day of the game before last). Tests: `scheduleLoad.test.ts`; calibration: `LV_CAL=1 scheduleLoad.script.test.ts` (games), `SL_SEASON=1 scheduleLoadSeason.script.test.ts` (whole seasons, both schedule lengths).
+- **Nonlinear fatigue:** a shooter's fatigue penalty x = 1 − energy becomes 0.5 x + 0.5 x² / 0.2: the same at x = 0.2 (where the league's shots average), about half for a fresh player and steeper as he tires (at energy 0.7 the multiplier is 0.656 instead of the stock 0.716). The team composites and the substitution decisions keep the stock linear curve (in the composites, the curve moved shooting, assists and steals in ways no single center could undo), so minutes don't move.
+- **Injury risk with tiredness:** each on-court player's injury rate × exp(4 (1 − energy)), divided by the average over the ten on the court, so tired players get hurt more often (a player at energy 0.7 about 3× a fresh teammate) and the league rate is unchanged however tired the rotations are.
+- **3 games in 4 nights** (realistic schedule length only, regular season): the third game gets endurance × 0.97 and injury risk × 1.1, counts as a back-to-back for Realistic Rotations' minutes plan, and everyone's injury risk is × 0.985 so the league rate stays the same (about 13 per team per 82 games). With the old compact schedule (and in college mode) teams play nearly every day, so there are none. `teamSeason.prevGameDay` keeps the day of the game before last.
+- **Injury Depth on the realistic schedule:** Injury Depth's back-to-back risk was tuned on the old schedule (about 74 back-to-backs per team) and gave about 8% fewer injuries with the realistic one (about 15). With this setting on and the realistic schedule, the risk is × 1.087 to put that back.
+- **Home court:** the _Home Court Advantage_ setting (1%) used to scale every composite rating of the home team up and the visitors' down. Now 40% of it is a base part and 35% a crowd part (× 0.5 + hype, 0.5 to 1.5, and × 1.5 in the playoffs), both still scaling composites, and the rest goes to the referees: the home team's fouls are called × 0.97, the visitors' × 1.03 (per 1% of the setting), so the home team's free throw rate is about +4% and the visitors' −4%. **Travel:** the visitors' endurance × (1 − 0.03 × min(1, distance / 4,000 km)) by the great-circle distance between the teams' regions (`common/geographicCoordinates.ts`; nothing for a region without coordinates). There is no altitude data, so no altitude effect. Neutral sites: none of it.
+- **Referee crews** (option): one normal draw per game, the crew calls all fouls × exp(0.07 z) (about ±7%).
+- **Calibration** (16 leagues × 30 teams of generated rosters with random regions and hype, random coaches, 9,600 games each way, injuries on; new-league defaults on, End-of-game intelligence included):
+
+  | per team game | off   | on    |
+  | ------------- | ----- | ----- |
+  | pts           | 102.3 | 102.7 |
+  | FG%           | .441  | .443  |
+  | 3PA rate      | .286  | .285  |
+  | 3P%           | .347  | .348  |
+  | AST           | 24.02 | 24.03 |
+  | TOV           | 15.39 | 15.33 |
+  | ORB           | 12.02 | 12.01 |
+  | FTA           | 20.22 | 20.29 |
+  | STL           | 6.88  | 6.84  |
+  | BLK           | 4.42  | 4.42  |
+  | minutes       | 241.0 | 240.8 |
+
+  Home win% .593 → .598 (home margin +3.71 → +3.75), home FTA/FGA .230 → .241, visitors .223 → .214, in-game injuries per game .297 → .296. **Playoffs** (the bigger crowd): home win% .590 → .608, home margin +4.17 → +4.95 (8 leagues, 4,800 games). **Whole seasons** (the default league with the new-league settings, Injury Depth on, 2 seasons of 2,460 games per row, two runs: in-game injuries per team game / home win%): realistic schedule .176 / .554 off, .174–.193 / .575–.585 on (13 3-in-4s per team); old schedule .190 / .579 off, .174–.187 / .573 on. Within the noise of a season sample (about ±5% for injuries, ±1.4 points of home win%); the per-game calibration above, where the injury rate is normalized by construction, is the precise check.
+
+- **Known limits:** the crowd reads hype, not the actual attendance of the game; travel is from the visitors' home, not from where they played last; time zones and altitude are not modeled.
 
 ### Season odds
 

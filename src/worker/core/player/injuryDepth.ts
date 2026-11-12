@@ -203,6 +203,7 @@ let simDay: number | undefined;
 export const setSimDay = (day: number | undefined) => {
 	simDay = day;
 };
+export const getSimDay = () => simDay;
 
 export const isBackToBack = (lastGameDay: number | undefined) =>
 	simDay !== undefined &&

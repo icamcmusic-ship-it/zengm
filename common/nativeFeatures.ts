@@ -477,6 +477,26 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "scheduleLoad",
+		key: "scheduleLoad",
+		name: "Load, Fatigue & Venue",
+		description:
+			"Tired players fade faster (the fatigue penalty steepens as energy runs low) and get hurt more often (the league injury rate stays the same), the third game in four nights wears teams down like a back-to-back, and home court is split into a base part, the crowd (bigger with a hyped team and in the playoffs) and a small referee lean (the home team gets about 3% more free throws), plus travel for the visitors. The league home win percentage stays the same on average.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "scheduleLoadRefVariance",
+				name: "Referee Crews",
+				description:
+					"Each game's referees call it a little tighter or looser than average (about ±7% fouls).",
+				type: "bool",
+				default: true,
+			},
+		],
+	},
+	{
 		id: "seasonOdds",
 		college: false,
 		key: "featureSeasonOdds",

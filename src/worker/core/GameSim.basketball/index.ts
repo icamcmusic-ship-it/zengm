@@ -79,6 +79,16 @@ import {
 	upThreeFoulProb,
 } from "./endgame.ts";
 import {
+	crowdLevel,
+	homeCourtModifier,
+	LOAD,
+	loadFatigue,
+	refLean,
+	tiredInjuryWeight,
+	travelDistance,
+	travelEndurance,
+} from "./scheduleLoad.ts";
+import {
 	lateGameSituationWeight,
 	teamChemistryBonus,
 	teamSwitchDefenseBonus,
@@ -479,6 +489,13 @@ class GameSim extends GameSimBase {
 	runTimeoutNow = false;
 	// (for the tests and the calibration script)
 	endgameCounts = { runTimeouts: 0, up3Fouls: 0, odSubs: 0 };
+	// Load, Fatigue & Venue (League extras, see scheduleLoad.ts): nonlinear fatigue, injury risk with tiredness, the home court split
+	// into base, crowd and referees, travel, and the referee crew. foulMult is each team's foul rate on defense (the referees' lean and
+	// crew). Off: nothing here is used and no extra random numbers are drawn
+	scheduleLoad: boolean;
+	foulMult: [number, number] = [1, 1];
+	// The away team's trip in km (undefined without the regions' coordinates)
+	travelKm: number | undefined;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -576,6 +593,15 @@ class GameSim extends GameSimBase {
 		if (this.smartEndgame) {
 			this.earlyTimeouts = [ENDGAME.earlyTimeouts, ENDGAME.earlyTimeouts];
 			this.rotationQuarterSeconds = g.get("quarterLength") * 60;
+		}
+
+		this.scheduleLoad =
+			!allStarGame &&
+			nativeFeatureEnabled("scheduleLoad", (key) => g.get(key as any));
+		if (this.scheduleLoad && g.get("scheduleLoadRefVariance")) {
+			// One draw per game: how tightly this crew calls it
+			const crew = Math.exp(LOAD.refSd * gaussian());
+			this.foulMult = [crew, crew];
 		}
 
 		// Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
@@ -681,7 +707,13 @@ class GameSim extends GameSimBase {
 	homeCourtAdvantage(homeCourtFactor: number) {
 		const homeCourtModifier =
 			homeCourtFactor *
-			helpers.bound(1 + g.get("homeCourtAdvantage") / 100, 0.01, Infinity);
+			helpers.bound(
+				this.scheduleLoad
+					? this.loadHomeCourtModifier()
+					: 1 + g.get("homeCourtAdvantage") / 100,
+				0.01,
+				Infinity,
+			);
 
 		for (const t of teamNums) {
 			let factor;
@@ -706,6 +738,33 @@ class GameSim extends GameSimBase {
 				}
 			}
 		}
+	}
+
+	// Load, Fatigue & Venue: the base and crowd parts of the home court, and the rest of it as the referees' lean and the visitors' trip
+	loadHomeCourtModifier() {
+		const hca = g.get("homeCourtAdvantage");
+		const lean = refLean(hca);
+		this.foulMult = [
+			this.foulMult[0] * (1 - lean),
+			this.foulMult[1] * (1 + lean),
+		];
+		this.travelKm = travelDistance(
+			(this.team[1] as any).region,
+			(this.team[0] as any).region,
+		);
+		const travel = travelEndurance(this.travelKm);
+		for (const p of this.team[1].player) {
+			if (p.compositeRating.endurance !== undefined) {
+				p.compositeRating.endurance *= travel;
+			}
+		}
+		return homeCourtModifier(
+			hca,
+			crowdLevel(
+				(this.team[0] as any).crowdHype ?? 0.5,
+				g.get("phase") === PHASE.PLAYOFFS,
+			),
+		);
 	}
 
 	/**
@@ -1185,6 +1244,11 @@ class GameSim extends GameSimBase {
 			probability *= this.cs[this.d].foul;
 		}
 
+		// Load, Fatigue & Venue: the referees
+		if (this.scheduleLoad) {
+			probability *= this.foulMult[this.d];
+		}
+
 		return probability * g.get("foulRateFactor");
 	}
 
@@ -1320,7 +1384,7 @@ class GameSim extends GameSimBase {
 	 * @param {number} energy A player's energy level, from 0 to 1 (0 = lots of energy, 1 = none).
 	 * @return {number} Fatigue, from 0 to 1 (0 = lots of fatigue, 1 = none).
 	 */
-	fatigue(energy: number, skip?: boolean): number {
+	fatigue(energy: number, skip?: boolean, loadCurve?: boolean): number {
 		energy += 0.016;
 
 		if (energy > 1) {
@@ -1328,6 +1392,11 @@ class GameSim extends GameSimBase {
 		}
 		if (skip) {
 			return energy;
+		}
+
+		// Load, Fatigue & Venue: the shooter's penalty steepens as he tires
+		if (loadCurve && this.scheduleLoad) {
+			energy = loadFatigue(energy);
 		}
 
 		// Late in games, or in OT, fatigue matters less
@@ -2551,6 +2620,20 @@ class GameSim extends GameSimBase {
 		// Modulate by pace - since injuries are evaluated per possession, but really probably happen per minute played
 		baseRate *= 100 / g.get("pace");
 
+		// Load, Fatigue & Venue: the tired players on the court are the ones at risk (normalized over the ten on the court)
+		let tiredNorm = 1;
+		if (this.scheduleLoad) {
+			let sum = 0;
+			let n = 0;
+			for (const t of teamNums) {
+				for (const p of this.playersOnCourt[t]) {
+					sum += tiredInjuryWeight(p.stat.energy);
+					n += 1;
+				}
+			}
+			tiredNorm = n / sum;
+		}
+
 		for (const t of teamNums) {
 			for (const p of this.team[t].player) {
 				// Only players on the court can be injured
@@ -2559,7 +2642,13 @@ class GameSim extends GameSimBase {
 						getInjuryRate(baseRate, p.age, p.injury.gamesRemaining > 0) *
 						((p as any).injuryRiskFactor ?? 1) * // injuryDepth setting, see game/injuryDepthTeam.ts
 						(p.traitEffects?.injuryRateMultiplier ?? 1) * // player traits (durability)
-						((p as any).simInjuryFactor ?? 1); // Game Sim Fixes: strength and endurance
+						((p as any).simInjuryFactor ?? 1) * // Game Sim Fixes: strength and endurance
+						// Load, Fatigue & Venue: tired players, 3 games in 4 nights
+						(this.scheduleLoad
+							? ((p as any).loadInjuryFactor ?? 1) *
+								tiredInjuryWeight(p.stat.energy) *
+								tiredNorm
+							: 1);
 
 					if (Math.random() < injuryRate) {
 						p.injured = true;
@@ -3750,6 +3839,11 @@ class GameSim extends GameSimBase {
 				foulFactor *= this.cs[this.d].foul;
 			}
 
+			// Load, Fatigue & Venue: the referees
+			if (this.scheduleLoad) {
+				foulFactor *= this.foulMult[this.d];
+			}
+
 			probMissAndFoul *= foulFactor;
 			probAndOne *= foulFactor;
 			const teamDefense = this.expandedRatings
@@ -3874,7 +3968,7 @@ class GameSim extends GameSimBase {
 			p = this.lastOrbPlayer;
 		}
 
-		const currentFatigue = this.fatigue(p.stat.energy);
+		const currentFatigue = this.fatigue(p.stat.energy, false, true);
 
 		// Is this an "assisted" attempt (i.e. an assist will be recorded if it's made)
 		let passer: PlayerGameSim | undefined;
