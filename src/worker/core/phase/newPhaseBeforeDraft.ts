@@ -1,3 +1,4 @@
+import { autoImportLinkedCollegeClass } from "../draft/linkedCollege.ts";
 import { clearPaidReleasedContracts } from "../contract/index.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import { draft, player, season, team, league } from "../index.ts";
@@ -341,6 +342,10 @@ const newPhaseBeforeDraft = async (
 	// College mode: conference realignment (setting), for next season
 	if (college.isCollege()) {
 		await college.afterSeasonOver();
+	}
+	// Linked college league (pro league): its latest departed class becomes this draft's class
+	if (!college.isCollege()) {
+		await autoImportLinkedCollegeClass();
 	}
 
 	const teams = await team.getFormattedAll({
