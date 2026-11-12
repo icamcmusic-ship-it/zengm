@@ -6,12 +6,15 @@ import genJerseyNumber from "./genJerseyNumber.ts";
 import setJerseyNumber from "./setJerseyNumber.ts";
 import { addContract, createContract } from "../contract/index.ts";
 import { getProStats } from "../../../common/preDraft.ts";
+import type { CapExceptionType } from "../../../common/capExceptions.ts";
 
 const sign = async (
 	p: Player,
 	tid: number,
 	contractInput: FlatContractInfo,
 	phase: Phase,
+	// Salary cap exception this signing uses (League Extras: Salary Cap Exceptions), for the transaction text and the contract
+	exception?: CapExceptionType,
 ) => {
 	const isRookie =
 		getProStats(p).length === 0 &&
@@ -71,20 +74,22 @@ const sign = async (
 		tids: [p.tid],
 		score,
 		contract: contractSummary,
+		...(exception ? { exception } : undefined),
 	});
 
-	addContract(
-		p,
-		createContract({
-			contract: contractSummary,
-			eid,
-			type: contractSummary.rookie
-				? "rookie"
-				: resigning
-					? "reSign"
-					: "freeAgent",
-		}),
-	);
+	const contract = createContract({
+		contract: contractSummary,
+		eid,
+		type: contractSummary.rookie
+			? "rookie"
+			: resigning
+				? "reSign"
+				: "freeAgent",
+	});
+	if (exception) {
+		contract.exception = exception;
+	}
+	addContract(p, contract);
 
 	const freeAgent = !resigning && !isRookie;
 	if (freeAgent) {

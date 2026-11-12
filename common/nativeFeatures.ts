@@ -506,6 +506,33 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "capExceptions",
+		key: "featureCapExceptions",
+		name: "Salary Cap Exceptions",
+		description:
+			"With a soft cap, a team over the cap can sign one free agent a season with each salary cap exception it has: the mid-level exception (9.1% of the cap, up to 4 years; a smaller taxpayer one, 3.7% and 2 years, near the luxury tax), the bi-annual exception (3.3%, 2 years, every other season) and, for teams that used cap space, the room exception (5.7%, 3 years). They are used automatically when a signing only fits that way, by AI teams too. Off: over the cap, only minimum contracts. No effect with a hard cap or no cap.",
+		default: false,
+		defaultNewLeague: true,
+		options: [
+			{
+				key: "capExceptionsRepeaterTax",
+				name: "Repeater Luxury Tax",
+				description:
+					"A team that paid the luxury tax in at least 3 of the previous 4 seasons pays it at 5/3 of the normal rate (2.5 instead of 1.5 per dollar over the line).",
+				type: "bool",
+				default: false,
+			},
+			{
+				key: "capExceptionsStretch",
+				name: "Stretch Provision",
+				description:
+					"When releasing a player, what is owed after the current season can be spread evenly over twice the remaining seasons plus one. AI teams over the luxury tax do it too.",
+				type: "bool",
+				default: false,
+			},
+		],
+	},
+	{
 		id: "tradeExplain",
 		key: "featureTradeExplain",
 		name: "Trade Explanations",

@@ -19,6 +19,8 @@ import { PlayerPicture } from "../components/PlayerPicture.tsx";
 import { useRef, useState } from "react";
 import type api from "../../worker/api/index.ts";
 import { showSignUndo } from "./NegotiateButtons.tsx";
+import { CapExceptions } from "./CapExceptions.tsx";
+import { describeCapException } from "../../common/capExceptions.ts";
 
 type NegotaitionModalProps = Exclude<
 	Awaited<ReturnType<typeof api.main.getNegotiationProps>>,
@@ -89,6 +91,7 @@ const SignButton = ({
 const widthStyle = { maxWidth: 575 };
 
 const NegotiationHeader = ({
+	capExceptions,
 	capSpace,
 	challengeNoRatings,
 	currentContract,
@@ -103,6 +106,7 @@ const NegotiationHeader = ({
 	NegotaitionModalProps,
 	| "currentContract"
 	| "extension"
+	| "capExceptions"
 	| "capSpace"
 	| "challengeNoRatings"
 	| "payroll"
@@ -131,8 +135,9 @@ const NegotiationHeader = ({
 				</>
 			);
 		} else {
-			message =
-				"You are not allowed to go over the salary cap to sign free agents, unless it's for a minimum contract.";
+			message = capExceptions
+				? "You are not allowed to go over the salary cap to sign free agents, unless it's for a minimum contract or you use a salary cap exception (mid-level, bi-annual or room), each once a season. An exception is used automatically when a contract doesn't fit under the cap."
+				: "You are not allowed to go over the salary cap to sign free agents, unless it's for a minimum contract.";
 		}
 	} else if (salaryCapType === "hard") {
 		message =
@@ -197,6 +202,11 @@ const NegotiationHeader = ({
 					)}
 				</div>
 			</div>
+			{capExceptions ? (
+				<div className="mb-2 small" style={widthStyle}>
+					<CapExceptions capExceptions={capExceptions} />
+				</div>
+			) : null}
 		</>
 	);
 };
@@ -313,6 +323,14 @@ const Negotiation = ({
 								{rowTerms ? (
 									<div className="small text-body-secondary">
 										{describeContractTerms(rowTerms, contract.exp)}
+									</div>
+								) : null}
+								{contract.exception && contract.disabledReason === undefined ? (
+									<div
+										className="small text-body-secondary"
+										data-testid="uses-cap-exception"
+									>
+										Uses your {describeCapException(contract.exception)}
 									</div>
 								) : null}
 							</div>

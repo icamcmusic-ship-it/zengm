@@ -1,3 +1,9 @@
+import { CapExceptions } from "../../components/CapExceptions.tsx";
+import {
+	REPEATER_TAX_FACTOR,
+	REPEATER_TAX_MIN_SEASONS,
+	REPEATER_TAX_SEASONS,
+} from "../../../common/capExceptions.ts";
 import {
 	type ChangeEvent,
 	type SubmitEvent,
@@ -588,13 +594,20 @@ const FinancesForm = ({
 };
 
 const PayrollInfo = ({
+	capExceptions,
 	luxuryTaxAmount,
 	minPayrollAmount,
+	own,
 	payroll,
+	repeaterTax,
 }: Pick<
 	View<"teamFinances">,
-	"luxuryTaxAmount" | "minPayrollAmount" | "payroll"
->) => {
+	| "capExceptions"
+	| "luxuryTaxAmount"
+	| "minPayrollAmount"
+	| "payroll"
+	| "repeaterTax"
+> & { own: boolean }) => {
 	const {
 		luxuryPayroll,
 		luxuryTax,
@@ -646,6 +659,7 @@ const PayrollInfo = ({
 						,{" "}
 						<span className="text-danger">
 							projected penalty: {helpers.formatCurrency(luxuryTaxAmount, "M")}
+							{repeaterTax ? " at the repeater rate" : ""}
 						</span>
 					</>
 				) : null}
@@ -655,68 +669,87 @@ const PayrollInfo = ({
 	}
 
 	return (
-		<p>
-			The current payroll (<b>{helpers.formatCurrency(payroll, "M")}</b>) is{" "}
-			{parts.length === 1 ? (
-				parts[0]
-			) : parts.length <= 2 ? (
-				<>
-					{parts[0]} and {parts[1]}
-				</>
-			) : (
-				<>
-					{parts.slice(0, -1).map((part, i) => (
-						<Fragment key={i}>{part}, </Fragment>
-					))}
-					and {parts.at(-1)}
-				</>
-			)}
-			.{" "}
-			{salaryCapType === "hard" ? (
-				<HelpPopover title="Payroll Limits">
-					<p>
-						The salary cap is a hard cap, meaning that you cannot exceed it,
-						even when re-signing your own players or making trades. The only
-						exception is that you can always sign players to minimum contracts (
-						{helpers.formatCurrency(minContract / 1000, "M")}/year), so you are
-						never stuck with a team too small to play.
-					</p>
-					<p>
-						Teams with payrolls below the minimum payroll limit will be assessed
-						a fine equal to the difference at the end of the season.
-					</p>
-				</HelpPopover>
-			) : salaryCapType === "soft" ? (
-				<HelpPopover title="Payroll Limits">
-					<p>
-						The salary cap is a soft cap, meaning that you can exceed it to
-						re-sign your own players, to sign free agents to minimum contracts (
-						{helpers.formatCurrency(minContract / 1000, "M")}/year), and when
-						making certain trades; however, you cannot exceed the salary cap to
-						sign a free agent for more than the minimum.
-					</p>
-					<p>
-						Teams with payrolls below the minimum payroll limit will be assessed
-						a fine equal to the difference at the end of the season. Teams with
-						payrolls above the luxury tax limit will be assessed a fine equal to{" "}
-						{luxuryTax} times the difference at the end of the season.
-					</p>
-				</HelpPopover>
-			) : (
-				<HelpPopover title="Payroll Limits">
-					<p>
-						There is no salary cap, but the minimum payroll and luxury tax
-						limits still apply.
-					</p>
-					<p>
-						Teams with payrolls below the minimum payroll limit will be assessed
-						a fine equal to the difference at the end of the season. Teams with
-						payrolls above the luxury tax limit will be assessed a fine equal to{" "}
-						{luxuryTax} times the difference at the end of the season.
-					</p>
-				</HelpPopover>
-			)}
-		</p>
+		<>
+			<p>
+				The current payroll (<b>{helpers.formatCurrency(payroll, "M")}</b>) is{" "}
+				{parts.length === 1 ? (
+					parts[0]
+				) : parts.length <= 2 ? (
+					<>
+						{parts[0]} and {parts[1]}
+					</>
+				) : (
+					<>
+						{parts.slice(0, -1).map((part, i) => (
+							<Fragment key={i}>{part}, </Fragment>
+						))}
+						and {parts.at(-1)}
+					</>
+				)}
+				.{" "}
+				{salaryCapType === "hard" ? (
+					<HelpPopover title="Payroll Limits">
+						<p>
+							The salary cap is a hard cap, meaning that you cannot exceed it,
+							even when re-signing your own players or making trades. The only
+							exception is that you can always sign players to minimum contracts
+							({helpers.formatCurrency(minContract / 1000, "M")}/year), so you
+							are never stuck with a team too small to play.
+						</p>
+						<p>
+							Teams with payrolls below the minimum payroll limit will be
+							assessed a fine equal to the difference at the end of the season.
+						</p>
+					</HelpPopover>
+				) : salaryCapType === "soft" ? (
+					<HelpPopover title="Payroll Limits">
+						<p>
+							The salary cap is a soft cap, meaning that you can exceed it to
+							re-sign your own players, to sign free agents to minimum contracts
+							({helpers.formatCurrency(minContract / 1000, "M")}/year), and when
+							making certain trades; however, you cannot exceed the salary cap
+							to sign a free agent for more than the minimum
+							{capExceptions
+								? ", except once a season with each salary cap exception (below)"
+								: ""}
+							.
+						</p>
+						<p>
+							Teams with payrolls below the minimum payroll limit will be
+							assessed a fine equal to the difference at the end of the season.
+							Teams with payrolls above the luxury tax limit will be assessed a
+							fine equal to {luxuryTax} times the difference at the end of the
+							season
+							{repeaterTax
+								? ` (${Math.round(luxuryTax * REPEATER_TAX_FACTOR * 100) / 100} times for this team, which paid the tax in at least ${REPEATER_TAX_MIN_SEASONS} of the previous ${REPEATER_TAX_SEASONS} seasons)`
+								: ""}
+							.
+						</p>
+					</HelpPopover>
+				) : (
+					<HelpPopover title="Payroll Limits">
+						<p>
+							There is no salary cap, but the minimum payroll and luxury tax
+							limits still apply.
+						</p>
+						<p>
+							Teams with payrolls below the minimum payroll limit will be
+							assessed a fine equal to the difference at the end of the season.
+							Teams with payrolls above the luxury tax limit will be assessed a
+							fine equal to {luxuryTax} times the difference at the end of the
+							season.
+						</p>
+					</HelpPopover>
+				)}
+			</p>
+			{capExceptions ? (
+				<CapExceptions
+					className="mb-3"
+					capExceptions={capExceptions}
+					own={own}
+				/>
+			) : null}
+		</>
 	);
 };
 
@@ -735,6 +768,8 @@ const highlightZeroNegative = (amount: number) => {
 
 const TeamFinances = ({
 	autoTicketPrice,
+	capExceptions,
+	repeaterTax,
 	coachingStaff,
 	barData,
 	contractTotals,
@@ -767,6 +802,7 @@ const TeamFinances = ({
 		numGames,
 		salaryCap,
 		salaryCapType,
+		userTid,
 	} = useLocal([
 		"budget",
 		"gameSimInProgress",
@@ -774,6 +810,7 @@ const TeamFinances = ({
 		"numGames",
 		"salaryCap",
 		"salaryCapType",
+		"userTid",
 	]);
 
 	const cols = getCols(["Pos", "Name", "Cap%"]).concat(
@@ -872,6 +909,9 @@ const TeamFinances = ({
 			<MoreLinks type="team" page="team_finances" tid={tid} />
 
 			<PayrollInfo
+				capExceptions={capExceptions}
+				own={tid === userTid}
+				repeaterTax={repeaterTax}
 				luxuryTaxAmount={luxuryTaxAmount}
 				minPayrollAmount={minPayrollAmount}
 				payroll={payroll}

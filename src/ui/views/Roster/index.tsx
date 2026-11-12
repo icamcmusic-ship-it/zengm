@@ -84,8 +84,23 @@ const handleRelease = async (
 		okText: "Release player",
 	});
 	if (proceed) {
+		// Stretch provision (setting): undefined when off, just drafted or nothing is owed after this season
+		let stretch = false;
+		const stretchInfo = wasPlayerJustDrafted
+			? undefined
+			: await toWorker("main", "getStretchInfo", p.pid);
+		if (stretchInfo) {
+			stretch = await confirm(
+				`Use the stretch provision? The ${helpers.formatCurrency(stretchInfo.total, "M")} you would owe ${p.firstName} ${p.lastName} over ${stretchInfo.numSeasonsBefore} ${helpers.plural("season", stretchInfo.numSeasonsBefore)} from ${stretchInfo.firstSeason} would instead be paid (and count against the cap) as ${helpers.formatCurrency(stretchInfo.amount, "M")} a season for ${stretchInfo.numSeasons} seasons, through ${stretchInfo.exp}.`,
+				{
+					okText: "Stretch",
+					cancelText: "Don't stretch",
+				},
+			);
+		}
 		const errorMsg = await toWorker("main", "releasePlayer", {
 			pids: [p.pid],
+			stretch,
 		});
 		if (errorMsg) {
 			showNotification({
