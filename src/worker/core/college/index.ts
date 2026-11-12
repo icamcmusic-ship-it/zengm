@@ -27,6 +27,8 @@ import {
 	startConfTournaments,
 } from "./postseason.ts";
 import { newCollegeSchedule } from "./schedule.ts";
+import { realignConferences } from "./realignment.ts";
+import { expireCoachOffers } from "../staff/collegeCarousel.ts";
 import { aiRedshirts } from "./redshirt.ts";
 import {
 	closePortal,
@@ -175,10 +177,19 @@ export const archiveSeason = async () => {
 	});
 };
 
+/**
+ * Season over, after the archive and the coaching carousel: conference realignment (setting), for next season.
+ */
+export const afterSeasonOver = async () => {
+	await realignConferences();
+};
+
 export const newPhaseDepartures = async (
 	conditions: Conditions,
 ): Promise<PhaseReturn> => {
 	await idb.cache.schedule.clear();
+	// Coaching carousel: job offers the user did not take expire, and those schools hire
+	await expireCoachOffers();
 	await doDepartures(conditions);
 	await league.setGameAttributes({ otherTeamsWantToHire: false });
 	return {

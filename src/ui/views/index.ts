@@ -18,6 +18,7 @@ export { default as CollegeDepartures } from "./CollegeDepartures.tsx";
 export { default as CollegePolls } from "./CollegePolls.tsx";
 export { default as CollegeRecruiting } from "./CollegeRecruiting.tsx";
 export { default as CollegeNit } from "./CollegeNit.tsx";
+export { default as CollegeCarousel } from "./CollegeCarousel.tsx";
 export { default as CollegePortal } from "./CollegePortal.tsx";
 export { default as ComparePlayers } from "./ComparePlayers/index.tsx";
 export { default as Countries } from "./Countries.tsx";

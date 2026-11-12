@@ -32,6 +32,7 @@ import name from "../player/name.ts";
 import { getAllGmWeights } from "../gm/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { getExpectedWinps } from "../college/expectations.ts";
+import { collegeFireProb, runCollegeCarousel } from "./collegeCarousel.ts";
 import {
 	adaptSystems,
 	annotateSeason,
@@ -126,7 +127,7 @@ export const generateCoach = async ({
 	return c;
 };
 
-const addTransaction = (
+export const addTransaction = (
 	c: CoachWithoutKey,
 	tid: number,
 	role: CoachRole,
@@ -210,7 +211,7 @@ export const syncBudget = async (
 	return level;
 };
 
-const syncAllBudgets = async (alsoInitial?: boolean) => {
+export const syncAllBudgets = async (alsoInitial?: boolean) => {
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const ref = await getLeagueStaffDevScoreRef();
 	for (const t of teams) {
@@ -233,7 +234,7 @@ const logHeadCoachEvent = async (text: string, tid: number) => {
 	});
 };
 
-const teamLink = (tid: number) => {
+export const teamLink = (tid: number) => {
 	const info = g.get("teamInfoCache")[tid];
 	if (!info) {
 		return "a team";
@@ -241,7 +242,7 @@ const teamLink = (tid: number) => {
 	return `the <a href="/l/${g.get("lid")}/staff/${info.abbrev}_${tid}">${info.region} ${info.name}</a>`;
 };
 
-const coachLink = (c: Coach) =>
+export const coachLink = (c: Coach) =>
 	`<a href="/l/${g.get("lid")}/coach/${c.cid}">${c.firstName} ${c.lastName}</a>`;
 
 export const hire = async (
@@ -249,6 +250,8 @@ export const hire = async (
 	tid: number,
 	role: CoachRole,
 	years?: number,
+	// College carousel: its own news item instead of the plain "hired" one
+	news?: { text: string; tids: number[] },
 ) => {
 	c.tid = tid;
 	c.role = role;
@@ -276,10 +279,20 @@ export const hire = async (
 	if (role === "head") {
 		// Coaching systems: coaching tree and installation of his systems
 		await onHeadCoachHired(c);
-		await logHeadCoachEvent(
-			`${teamLink(tid)} hired ${coachLink(c)} as head coach.`,
-			tid,
-		);
+		if (news) {
+			await logEvent({
+				type: "info",
+				text: news.text,
+				showNotification: false,
+				tids: news.tids,
+				score: 10,
+			});
+		} else {
+			await logHeadCoachEvent(
+				`${teamLink(tid)} hired ${coachLink(c)} as head coach.`,
+				tid,
+			);
+		}
 	}
 	clearCoachSystemsCache();
 };
@@ -341,8 +354,11 @@ const spendFactor = (popRank: number) => {
 // Fill every vacancy, best available coach the team is willing to pay
 export const fillVacancies = async ({
 	includeUser,
+	skipTids,
 }: {
 	includeUser: boolean;
+	// College carousel: schools holding their head coaching job for an offer to the user
+	skipTids?: Set<number>;
 }) => {
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const salaryCap = g.get("salaryCap");
@@ -382,6 +398,9 @@ export const fillVacancies = async ({
 				continue;
 			}
 			if (!includeUser && userControlsTeam(t.tid)) {
+				continue;
+			}
+			if (role === "head" && skipTids?.has(t.tid)) {
 				continue;
 			}
 
@@ -715,6 +734,7 @@ export const runOffseason = async () => {
 	);
 	// AI GM personalities (setting): patient GMs give coaches more time, win-now ones less. Empty when off
 	const gms = await getAllGmWeights();
+	const collegeExpected = isCollege() ? await getExpectedWinps() : undefined;
 	for (const c of coaches) {
 		progress(c);
 
@@ -748,7 +768,10 @@ export const runOffseason = async () => {
 		if (c.contract.exp <= season) {
 			// Expiring contract
 			let reSign;
-			if (userControlsTeam(c.tid)) {
+			if (userControlsTeam(c.tid) && isCollege() && c.role === "head") {
+				// College mode: the user's head coach is the user, who stays
+				reSign = true;
+			} else if (userControlsTeam(c.tid)) {
 				// User extends on the staff page before this, otherwise they leave
 				reSign = false;
 			} else if (c.role === "head") {
@@ -782,7 +805,10 @@ export const runOffseason = async () => {
 		// AI firings. The owner doesn't wait forever.
 		if (!userControlsTeam(c.tid)) {
 			let fireProb = 0;
-			if (c.role === "head" && systems) {
+			if (c.role === "head" && collegeExpected) {
+				// College mode: results against what the program's prestige expects
+				fireProb = collegeFireProb(c, tenure(c), collegeExpected);
+			} else if (c.role === "head" && systems) {
 				// Coaching systems: the hot seat (results against expectations, reputation)
 				fireProb = hotSeatFireProb(c, tenure(c));
 			} else if (c.role === "head") {
@@ -818,7 +844,9 @@ export const runOffseason = async () => {
 	await adaptSystems();
 
 	await replenishPool();
-	await fillVacancies({ includeUser: false });
+	// College mode: schools hire head coaches away from smaller programs, and make offers to the user
+	const held = isCollege() ? await runCollegeCarousel() : undefined;
+	await fillVacancies({ includeUser: false, skipTids: held });
 	await syncAllBudgets();
 	clearCoachSystemsCache();
 };
