@@ -28,6 +28,7 @@ export { default as draftPicks } from "./draftPicks.ts";
 export { default as draftScouting } from "./draftScouting.ts";
 export { default as draftBoard } from "./draftBoard.ts";
 export { default as mockDraft } from "./mockDraft.ts";
+export { default as draftCombine } from "./draftCombine.ts";
 export { default as collegeOverseas } from "./collegeOverseas.ts";
 export { default as collegeConfTournaments } from "./collegeConfTournaments.ts";
 export { default as collegeDepartures } from "./collegeDepartures.ts";

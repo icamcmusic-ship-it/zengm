@@ -20,6 +20,8 @@ import { getDraftLotteryProbs } from "../core/draft/draftLottery.ts";
 import getNumPlayoffTeams from "../core/season/getNumPlayoffTeams.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateSeason } from "../util/processInputs.ts";
+import { lotteryNightOn } from "../core/draftCombine/index.ts";
+import { gmEnabled } from "../core/gm/index.ts";
 
 const processInputs = (params: RouteParams<"draftLottery">) => {
 	const season = validateSeason(params.season);
@@ -43,6 +45,47 @@ const filterDraftPicks = (
 		}),
 		["round", "pick"],
 	);
+};
+
+export type LotteryNightTeam = {
+	region: string;
+	name: string;
+	colors: [string, string, string];
+	imgURL?: string;
+	hype?: number;
+	gm?: { name: string; patience: number; draftUpside: number };
+};
+
+// Draft Lottery Night & Combine setting: what the reveal shows for each team (colors, logo, hype, AI GM). undefined when off
+const getLotteryNightTeams = async (season: number) => {
+	if (!lotteryNightOn()) {
+		return undefined;
+	}
+	const out: Record<number, LotteryNightTeam> = {};
+	const useGms = gmEnabled();
+	for (const t of await idb.cache.teams.getAll()) {
+		const ts = await idb.cache.teamSeasons.indexGet("teamSeasonsBySeasonTid", [
+			season,
+			t.tid,
+		]);
+		const gm =
+			useGms && t.gm && !g.get("userTids").includes(t.tid)
+				? {
+						name: `${t.gm.firstName} ${t.gm.lastName}`,
+						patience: t.gm.traits.patience,
+						draftUpside: t.gm.traits.draftUpside,
+					}
+				: undefined;
+		out[t.tid] = {
+			region: ts?.region ?? t.region,
+			name: ts?.name ?? t.name,
+			colors: ts?.colors ?? t.colors,
+			imgURL: ts?.imgURLSmall ?? ts?.imgURL ?? t.imgURLSmall ?? t.imgURL,
+			hype: ts?.hype,
+			gm,
+		};
+	}
+	return out;
 };
 
 export default defineView({
@@ -102,6 +145,7 @@ export default defineView({
 				>;
 				type: "completed" | "projected" | "readyToRun";
 				usePts: boolean;
+				lotteryNightTeams?: Record<number, LotteryNightTeam>;
 		  } & ReturnType<typeof getDraftLotteryProbs>)
 		| undefined
 	> => {
@@ -249,6 +293,9 @@ export default defineView({
 						colaOptOutAvailable: false,
 						colaOptOutStatus: false,
 						colaTable,
+						lotteryNightTeams: draftLotteryResult
+							? await getLotteryNightTeams(season)
+							: undefined,
 					};
 				}
 
@@ -364,6 +411,10 @@ export default defineView({
 				colaOptOutAvailable,
 				colaOptOutStatus,
 				colaTable,
+				lotteryNightTeams:
+					type === "readyToRun" && draftLotteryResult
+						? await getLotteryNightTeams(season)
+						: undefined,
 			};
 		}
 	},

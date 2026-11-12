@@ -2,6 +2,7 @@ import resolvePickConditions from "./pickConditions.ts";
 import genPicks from "./genPicks.ts";
 import logLotteryChances from "./logLotteryChances.ts";
 import logLotteryWinners from "./logLotteryWinners.ts";
+import { logLotteryNightNews } from "../draftCombine/index.ts";
 import divideChancesOverTiedTeams from "./divideChancesOverTiedTeams.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
@@ -687,6 +688,8 @@ const genOrder = async (
 			if (lotteryChanged) {
 				await idb.cache.draftLotteryResults.put(draftLotteryResult);
 			}
+			// Draft Lottery Night & Combine setting: winners and losers news (no-op when off)
+			logLotteryNightNews(draftLotteryResult, conditions);
 		}
 
 		for (const dp of draftPicks) {

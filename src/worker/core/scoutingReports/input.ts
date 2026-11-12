@@ -6,6 +6,13 @@ import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { getPreDraftStats } from "../../../common/preDraft.ts";
 import { getPreDraftLabel } from "../../../common/collegeStats/overseas.ts";
 import {
+	COMBINE_COLUMN_BY_KEY,
+	combineScoutNotes,
+	combineValue,
+	type CombineKey,
+} from "../../../common/draftCombine.ts";
+import { getPlayerCombine, lotteryNightOn } from "../draftCombine/index.ts";
+import {
 	COMBINE_LOWER_BETTER,
 	combinePercentiles,
 	getCombine,
@@ -35,6 +42,7 @@ import {
 	type ScoutDepartment,
 	type ScoutInput,
 	type ScoutProduction,
+	type ScoutCombine,
 	type ScoutRatings,
 	type ScoutTeamFit,
 	type ScoutTraitReading,
@@ -783,6 +791,42 @@ const combineFor = async (p: Player) => {
 	})).map(({ lowerBetter: _l, ...rest }) => rest);
 };
 
+// Draft Lottery Night & Combine setting: the combine he took part in (rows in the labels the report reads, ranks among the
+// prospects measured), what it measured and tested, and its lines for the report
+const NIGHT_COMBINE_SHOW: [CombineKey, string][] = [
+	["heightNoShoes", "Height"],
+	["wingspan", "Wingspan"],
+	["standingReach", "Standing reach"],
+	["maxVert", "Max vert"],
+	["laneAgility", "Lane agility"],
+	["sprint", "Sprint"],
+	["bench", "Bench"],
+	["spotUp", "Spot-up threes"],
+];
+const nightCombineFor = async (p: Player) => {
+	const c = await getPlayerCombine(p);
+	if (!c?.invited) {
+		return undefined;
+	}
+	const rows: ScoutCombine = [];
+	for (const [key, label] of NIGHT_COMBINE_SHOW) {
+		const v = combineValue(c.result, key);
+		const r = c.ranks[key];
+		if (v !== undefined && r) {
+			rows.push({
+				label,
+				value: COMBINE_COLUMN_BY_KEY[key].format(v),
+				pct: r.pct,
+			});
+		}
+	}
+	return {
+		combine: rows,
+		combineTested: { size: true, ath: c.result.drills !== undefined },
+		combineNotes: combineScoutNotes(c.result, c.ranks),
+	};
+};
+
 // ---- team fit ----
 
 const teamFitFor = async (
@@ -936,6 +980,10 @@ export const buildInput = async (
 	const scouting = p.scouting ?? [];
 	const yearsOut = prospect ? Math.max(0, p.draft.year - ctx.season) : 0;
 	const proSeasons = proSeasonsOf(p);
+	const nightCombine =
+		prospect && !light && lotteryNightOn()
+			? await nightCombineFor(p)
+			: undefined;
 	const uncertainty = prospect
 		? getUncertainty(scouting) *
 				(1.3 - 0.6 * departmentQualityForLevel(ctx.scoutingLevel)) +
@@ -991,7 +1039,11 @@ export const buildInput = async (
 						games: p.injury.gamesRemaining,
 					}
 				: undefined,
-		combine: prospect && !light ? await combineFor(p) : undefined,
+		...(nightCombine
+			? nightCombine
+			: {
+					combine: prospect && !light ? await combineFor(p) : undefined,
+				}),
 		archetype,
 		looks:
 			prospect && g.get("scoutingSystem")

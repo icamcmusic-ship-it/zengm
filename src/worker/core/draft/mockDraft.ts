@@ -26,6 +26,8 @@ export type MockProspect = {
 	scoutRank: number;
 	// Trait value factor for each team (tid -> factor), when player traits are on
 	traitFactors?: Record<number, number>;
+	// Draft Lottery Night & Combine setting: the AI's combine nudge (value points), as in runPicks
+	combine?: number;
 };
 
 export type MockTeam = {
@@ -163,12 +165,14 @@ export const runMockDraft = ({
 				useTraits && p.traitFactors?.[slot.tid] !== undefined
 					? getDraftTraitAdjustment(p.value, p.traitFactors[slot.tid]!)
 					: 0;
+			const combine = p.combine ?? 0;
 			return {
 				p,
 				need,
 				strategy: needAndStrategy - need,
 				trait,
-				score: Math.max(0, p.value + needAndStrategy + trait),
+				combine,
+				score: Math.max(0, p.value + needAndStrategy + trait + combine),
 			};
 		});
 		const chosen = weightedChoice(parts, (x) => x.score, random);
@@ -192,6 +196,9 @@ export const runMockDraft = ({
 		}
 		if (chosen.trait >= 0.75) {
 			reasons.push("Likes his traits");
+		}
+		if (chosen.combine >= 0.3) {
+			reasons.push("Combine riser");
 		}
 		if (reasons.length === 0) {
 			reasons.push(

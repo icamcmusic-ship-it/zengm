@@ -30,6 +30,7 @@ import {
 	traitsEnabled,
 } from "../player/traits.ts";
 import { getGmWeights } from "../gm/index.ts";
+import { getDraftCombineNudges } from "../draftCombine/index.ts";
 
 const MOCK_ROUNDS = 2;
 
@@ -194,9 +195,13 @@ export const getMockDraft = async () => {
 		formatted.map((p: any, i: number) => [p.pid, i + 1]),
 	);
 
+	// Draft Lottery Night & Combine setting: the AI's combine nudge, as in runPicks
+	const combineNudges = await getDraftCombineNudges(players, season);
+
 	const prospects = players.map((p) => ({
 		pid: p.pid,
 		value: p.value,
+		combine: combineNudges.get(p.pid),
 		ratings: p.ratings,
 		scoutRank: scoutRank.get(p.pid) ?? players.length,
 		traitFactors: useTraits
