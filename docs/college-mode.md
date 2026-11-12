@@ -148,7 +148,7 @@ NCAA Division I is about 72 points, 44% FG, 38-39% of shots from three, 34% 3P, 
 - Awards are the pro ones (no All-American / conference POY naming, no conference awards). Team rating ("x/100") and ovr are on the pro scale, so college teams read low (team rating can be negative).
 - No redshirts, NIL, visits/pitches, decommitments, in-season recruiting, hand-run transfer portal, conference realignment, coach career moves, NIT, First Four, pro league alongside.
 - The bracket page shows "League Champions"; region names are not shown on the bracket (they are on the Selection tab).
-- Imported or edited college leagues are not specially handled (a league file with players skips the college roster generation).
+- Imported or edited college leagues are not specially handled (a league file with players skips the college roster generation). A program's prestige (`t.collegePrestige`, `t.collegePrestigeBase`) is kept from the file.
 - The full level is slow (about 2-2.5 s per game day headless).
 - Account achievements are not checked in a college league (they are about running a pro team, and a college title would meet several for free).
 
