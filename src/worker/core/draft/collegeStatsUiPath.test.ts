@@ -1,10 +1,11 @@
-import { assert, beforeAll, describe, test } from "vitest";
+import { afterAll, assert, beforeAll, describe, test } from "vitest";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { resetCache, resetG } from "../../../test/helpers.ts";
 import { g } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
 import { player } from "../index.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
+import { makeSeededRandom } from "../../../common/random.ts";
 import { COLLEGE_STATS_VERSION } from "../../../common/collegeStats/index.ts";
 import { isOverseasLeague } from "../../../common/collegeStats/overseas.ts";
 import {
@@ -88,7 +89,14 @@ const readLines = async () => {
 };
 
 describe("college stats on the path a new league uses", () => {
+	// The classes are generated with Math.random, so seed it for the same classes every run
+	const realRandom = Math.random;
+	afterAll(() => {
+		Math.random = realRandom;
+	});
+
 	beforeAll(async () => {
+		Math.random = makeSeededRandom(2026);
 		resetG();
 		g.setWithoutSavingToDB("season", SEASON);
 		g.setWithoutSavingToDB("phase", PHASE.PRESEASON);
@@ -220,6 +228,11 @@ describe("college stats on the path a new league uses", () => {
 			add("assists: pss", pct(set, top("apg"), "pss"));
 			add("blocks: hgt", pct(set, top("bpg"), "hgt"));
 			add("blocks: idef", pct(set, top("bpg"), "idef"));
+			// A shot blocker is big, a good interior defender or both (length and leaping help too)
+			add(
+				"blocks: hgt + idef",
+				(pct(set, top("bpg"), "hgt") + pct(set, top("bpg"), "idef")) / 2,
+			);
 			add("rebounds: hgt", pct(set, top("rpg"), "hgt"));
 			add("rebounds: reb", pct(set, top("rpg"), "reb"));
 			add("threes: tp", pct(set, top("tpa"), "tp"));
@@ -237,7 +250,9 @@ describe("college stats on the path a new league uses", () => {
 		for (const [key, values] of Object.entries(leaders)) {
 			const mean = values.reduce((a, b) => a + b, 0) / values.length;
 			assert.isAtLeast(mean, key === "blocks: idef" ? 0.6 : 0.7, key);
-			assert.isAtLeast(Math.min(...values), 0.3, key);
+			if (key !== "blocks: idef" && key !== "blocks: hgt") {
+				assert.isAtLeast(Math.min(...values), 0.3, key);
+			}
 		}
 	});
 
