@@ -851,7 +851,7 @@ _Draft Pick Protections & Swaps_ (`featureDraftPickConditions`, all sports; on f
 ### Draft Scouting
 
 - **Where:** _Players → Draft → Draft Scouting_ (`/l/:lid/draft_scouting`).
-- **College and overseas stats** (_College & Overseas Stats_): the _College stats_ button above each draft class generates college (or overseas pro club) stats and honors for its prospects from a seed (same seed, same result), or regenerates/removes them. They show on the player page with a _College_ or _Overseas_ tag in the stats tables and an _Earlier honors_ box, and are **not** pro stats: they don't count toward experience, career totals, awards, Hall of Fame or player value. The option _Generate Pre-Draft Stats Automatically_ does it for every new draft class (all classes at league creation, each season's new class, fantasy/expansion/custom classes, and imported prospects who have none). _All draft classes_ panel: the same for every upcoming class at once (seed, only prospects without stats or replace everyone's). Class year and career shape follow draft stock (`getClassIndexForStock` in `collegeStats/generate.ts`): age at the draft spans two class years, so a high-stock prospect is a year younger in school than his age says (a 20-year-old lottery pick is an older one-and-done, a 21-year-old one a sophomore), and four-year seniors are mostly lower-ranked prospects. A college season he came back after is held below declare-worthy stock (`STAY_CAP`: class z above 0.55 compressed, the excess becoming extra rating lag), so stats grow across his seasons instead of a dominant freshman staying four years. Usage has diminishing returns above 29% (max 35%) and assists per 40 cap at 9.5. Stored classes are not rewritten; only new generation changes. The draft stock timeline's _Now_ point ranks by true value (the order the AI drafts in, as the Mock Draft does) rather than the fuzzed scouting list, and its random walk tightens toward the draft.
+- **College and overseas stats** (_College & Overseas Stats_): the _College stats_ button above each draft class generates college (or overseas pro club) stats and honors for its prospects from a seed (same seed, same result), or regenerates/removes them. They show on the player page with a _College_ or _Overseas_ tag in the stats tables and an _Earlier honors_ box, and are **not** pro stats: they don't count toward experience, career totals, awards, Hall of Fame or player value. The option _Generate Pre-Draft Stats Automatically_ does it for every new draft class (all classes at league creation, each season's new class, fantasy/expansion/custom classes, and imported prospects who have none). _All draft classes_ panel: the same for every upcoming class at once (seed, only prospects without stats or replace everyone's). Class year and career shape follow draft stock (`getClassIndexForStock` in `collegeStats/generate.ts`): age at the draft spans two class years, so a high-stock prospect is a year younger in school than his age says (a 20-year-old lottery pick is an older one-and-done, a 21-year-old one a sophomore), and four-year seniors are mostly lower-ranked prospects. A college season he came back after is held below declare-worthy stock (`STAY_CAP`: class z above 0.55 compressed, the excess becoming extra rating lag), so stats grow across his seasons instead of a dominant freshman staying four years. Usage has diminishing returns above 29% (max 34%) and assists per 40 cap at 9.5; see _College stats calibration_ below. Stored classes are not rewritten; only new generation changes. The draft stock timeline's _Now_ point ranks by true value (the order the AI drafts in, as the Mock Draft does) rather than the fuzzed scouting list, and its random walk tightens toward the draft.
 - **Regenerate ratings** (_Ratings Regenerator_): rebuilds prospects into specialized builds or archetypes (Floor General, Stretch Big, Rim Protector, …) without changing overall, potential or height. Scope: whole class, selected prospects, one prospect, or all classes at once (a preview summary per class, one _Undo last apply_ for all of them, and _Restore originals_). Settings include seed, variation, class flavor and strength, builds per class, archetype diversity, specialization and rookie caps, each lockable; per-player reroll and rating locks; preview with diffs; _Apply_, _Undo last apply_ (until reload) and _Restore originals_ (survives reloads). _Save as league default_ keeps the settings for _Re-randomize New Draft Classes_ (option; ratings first, then pre-draft stats; seeded from the league and class year; drafted players are never touched).
 - **Class shape** (_Draft Class Shapes_): under each class's year, its shape, a description and 2-4 storylines read off the class (see below).
 - **Scouting system** (_Scouting System_): your scouting budget gives you scouting points every season to spend on individual prospects: assign a scout (1 point) or attend a workout (3 points) in the _Scout report_ column. Each narrows how far off your view of that prospect's ratings can be and gives a scout report with ovr and pot ranges, a confidence and notes. Prospects you don't scout keep the normal rating fuzz.
@@ -886,6 +886,77 @@ _Draft Pick Protections & Swaps_ (`featureDraftPickConditions`, all sports; on f
 - **Versions:** `p.collegeSeason.v` is the version of the simulation the class was made with (4 now; missing = 1). Version 4 plays exactly like version 3 (a test checks whole seasons) except that a season can match its draft class's shape (`p.collegeSeason.cs`), and its summary has more wordings; version 3 seasons keep their text. Version 3 classes also store the prospect's position (`p.collegeSeason.pos`), so a guards' or big men's year is rebuilt the same way after his ratings change. A version 1 class (made before the weekly polls, the NIT and the storylines) is rebuilt playing every game exactly as it was played then, so its champion, records, final AP poll, bracket and prospects' lines do not change (a test pins this against hashes of the old output). It still gets the weekly polls, the NET, the bubble (in the order its field was really picked: SRS and record), a written summary and an NIT bracket, but its NIT games are not counted in records or prospects' stats (the tab says so), and its shape is always _a balanced year_. Prospects added later to such a class (only missing) keep it version 1.
 - **Cache:** the rebuilt season is kept per class (last 8, keyed by league, draft year, seed, version and every prospect's school and boost), so the page and player pages do not replay it on every load (about 40 ms to build).
 - **Storage:** no new store. Each prospect at an NCAA school gets `p.collegeSeason = { season, seed, school, boost, summary, v }`; the season is rebuilt exactly from the class's seed and every prospect's school and boost (`getCollegeSeason` in `worker/core/draft/collegeSeason.ts`), deterministic per seed. Generating stats for only the prospects missing them keeps the class's existing season (newcomers join with boost 0). Removing a class's college stats removes it. Engine: `common/collegeStats/ncaa.ts` (tests in `ncaa.test.ts`), stats integration in `common/collegeStats/generate.ts` (`ncaaSeason` option) and `season.ts` (`teamGames`/`postseasonGames`).
+
+### College stats calibration (colstats round)
+
+Audit of the draft-year college line of generated classes (6 classes of real BBGM prospects, expanded ratings off and on, NCAA schools with 40 minute games, 10+ games) against Division I numbers, and the fixes in `common/collegeStats/season.ts`:
+
+- **Why it looked inflated:** every prospect was a 30 minute starter (base 32 mpg, p10 25 mpg, only talent moved it by 2.7 per class SD), so the bottom of a class scored 11 ppg; per-40 rates were already about right. Now a class-average prospect is a ~22 minute rotation player and minutes come from role (4.3 per class SD of talent, freshmen -2.6 / seniors +1.6, endurance), capped at 36.5.
+- **Strengths and weaknesses:** the 3PA share is a smooth function of tp (none at tp 22 or less, the height's share at about 37, up to 1.7x for snipers, plus a little for stretch bigs) instead of a step at tp 30 that let non-shooters take a third of their shots from three; 3P% has a steeper tp slope (and leans on csh with expanded ratings, capped at 47%); FT rate reads dunk/inside aggression; rebounds read hgt, reb, jumping and wingspan (bigs 10-13 per 40); steals read perimeter D (diq) more than speed and come up to D-I levels (~1.3 per 40); blocks read jumping, interior D (diq) and wingspan more; ball security moves turnovers more; usage leans more on the scoring composite than on overall talent; the efficiency premium is a little smaller and the rim FG% cap is 78%.
+- **No change elsewhere:** the stats use their own seeded streams, so nothing about draft class generation, the game sim or ratings changes; stored seasons are not rewritten. Two story hooks in `career.ts` were retuned for the new minutes (a bust's freshman minutes boost 2.5 → 4).
+- **Tests:** `collegeStats/calibration.test.ts` (level and spread, shooting splits, size-based rebounding/blocks, rating correlations, expanded rating effects, freshmen vs seniors); `generate.test.ts` average mpg range 24-33 → 19-27.
+
+| Metric (draft-year college season, default ratings / expanded) | Before                       | After                         | Real D-I                       |
+| -------------------------------------------------------------- | ---------------------------- | ----------------------------- | ------------------------------ |
+| MPG p10/p50/p90 (max)                                          | 24.711/29.853/34.343 (39.38) | 15.815/22.147/30.344 (38.596) | ~15 / 23 / 32                  |
+| PPG p10/p50/p90 (max)                                          | 8.258/13.229/19.854 (28.1)   | 5.391/9.576/17.319 (30.638)   | ~5 / 10 / 18                   |
+| PTS/40                                                         | 13.473/18.275/22.886 (30.61) | 13.284/17.724/22.912 (31.753) | ~13 / 17 / 23                  |
+| RPG                                                            | 3.2/5.179/7.514 (10.265)     | 1.882/3.8/6.931 (9.147)       |                                |
+| REB/40                                                         | 4.436/6.958/9.941 (13.249)   | 3.838/7.146/11.066 (13.355)   | guards 4-6, bigs 10-13         |
+| APG                                                            | 0.758/2.268/4.545 (6.6)      | 0.545/1.867/4.139 (7.781)     |                                |
+| SPG                                                            | 0.297/0.719/1.306 (2.371)    | 0.323/0.719/1.297 (2.636)     |                                |
+| STL/40                                                         | 0.443/0.965/1.665 (2.762)    | 0.707/1.353/1.912 (3.337)     | ~1.3 avg                       |
+| BPG                                                            | 0.038/0.766/1.686 (2.355)    | 0/0.389/1.357 (2.467)         |                                |
+| TOV/G                                                          | 1.447/2.243/3.152 (5)        | 0.949/1.656/2.656 (4.277)     |                                |
+| FG%                                                            | 0.399/0.465/0.563 (0.663)    | 0.396/0.454/0.589 (0.683)     | ~44% (bigs 55-65%)             |
+| 3P% (30+ 3PA)                                                  | 0.261/0.331/0.403 (0.467)    | 0.254/0.345/0.391 (0.464)     | ~34%                           |
+| FT% (30+ FTA)                                                  | 0.596/0.692/0.775 (0.871)    | 0.598/0.712/0.804 (0.868)     | ~71%                           |
+| 3PA rate                                                       | 0.12/0.317/0.447 (0.521)     | 0.007/0.269/0.582 (0.638)     | ~0.38 team; 0 for non-shooters |
+| FTA rate                                                       | 0.286/0.372/0.444 (0.55)     | 0.247/0.33/0.435 (0.548)      | ~0.33                          |
+| PF/G                                                           | 2.143/2.652/3.206 (3.644)    | 1.387/2.045/2.794 (3.579)     | 2-3                            |
+| Top-14 prospects PPG / MPG                                     | 18.662 / 33.284              | 16.809 / 29.684               | 15-22 / 30-34; 6-12 / 15-25    |
+| Prospects ranked 41+ PPG / MPG                                 | 10.93 / 27.448               | 7.358 / 18.703                | 15-22 / 30-34; 6-12 / 15-25    |
+| broken: nonShooter3PA (def / exp)                              | 48 / 55                      | 6 / 10                        |                                |
+| broken: nonShooterGood3 (def / exp)                            | 5 / 3                        | 1 / 2                         |                                |
+| broken: mpgOver36 (def / exp)                                  | 10 / 7                       | 1 / 3                         |                                |
+| broken: ppgOver25 (def / exp)                                  | 2 / 2                        | 1 / 3                         |                                |
+
+| Correlation      | Before (def / exp) | After (def / exp) |
+| ---------------- | ------------------ | ----------------- | ------------- |
+| 3P% ~ tp         | 0.459 / 0.537      | 0.578 / 0.606     |
+| 3PAr ~ tp        | 0.816 / 0.779      | 0.945 / 0.925     |
+| 3PAr ~ csh       | None / 0.749       | None / 0.83       |
+| AST40 ~ pss      | 0.895 / 0.922      | 0.936 / 0.896     |
+| AST40 ~ oiq      | 0.537 / 0.542      | 0.516 / 0.481     |
+| BLK40 ~ hgt      | 0.886 / 0.874      | 0.868 / 0.841     |
+| BLK40 ~ idef/diq | 0.085 / 0.364      | 0.177 / 0.571     |
+| BLK40 ~ wng      | None / 0.872       | None / 0.842      |
+| BLK40 ~ jmp      | -0.3 / -0.254      | -0.137 / -0.214   |
+| ORB40 ~ oreb/reb | 0.5 / 0.584        | 0.528 / 0.667     |
+| REB40 ~ reb      | 0.622 / 0.658      | 0.628 / 0.649     |
+| REB40 ~ hgt      | 0.794 / 0.823      | 0.848 / 0.856     |
+| STL40 ~ pdef/diq | 0.144 / 0.564      | 0.343 / 0.586     |
+| STL40 ~ spd      | 0.745 / 0.76       | 0.469 / 0.529     |
+| FT% ~ ft         | 0.769 / 0.76       | 0.694 / 0.721     |
+| TOV% ~ bsc       | None / -0.146      | None / -0.117     |
+| TOV% ~ drb       | 0.091 / 0.04       | -0.099 / 0.105    |
+| BLK40 ~ jmp      | hgt (partial)      | 0.225 / 0.214     | 0.513 / 0.324 |
+| MPG ~ ovr        | 0.662 / 0.566      | 0.774 / 0.837     |
+| MPG ~ class      | 0.363 / 0.38       | 0.489 / 0.438     |
+| TOV40 ~ bsc      | None / 0.235       | None / 0.026      |
+| TOV40 ~ drb      | 0.381 / 0.357      | 0.072 / 0.177     |
+| PTS40 ~ ovr      | 0.724 / 0.697      | 0.709 / 0.697     |
+| PPG ~ ovr        | 0.784 / 0.753      | 0.808 / 0.825     |
+| FTr ~ dnk+ins    | 0.12 / 0.092       | 0.463 / 0.437     |
+| FG% ~ hgt        | 0.73 / 0.738       | 0.762 / 0.714     |
+
+Sample prospects (after, expanded ratings on):
+
+- #1 FC ovr 51 (Jr, NBA G League): hgt 69, tp 41, ins 42, dnk 45, pss 55, drb 51, reb 70, diq 56, wng 71, pdef 50, idef 62, csh 52, dsh 38, bsc 46 → 38.2 mpg, 30.8 pts, 12.0 reb, 6.0 ast, 2.2 stl, 3.0 blk, 5.1 tov, 58.8 FG%, 39.4 3P% (4.5 3PA), 65.9 FT%
+- #4 FC ovr 48 (Fr, Duke): hgt 68, tp 25, ins 51, dnk 58, pss 46, drb 44, reb 61, diq 47, wng 69, pdef 47, idef 47, csh 25, dsh 22, bsc 34 → 31.3 mpg, 16.8 pts, 11.8 reb, 3.6 ast, 1.8 stl, 2.8 blk, 4.6 tov, 57.5 FG%, - 3P% (0.5 3PA), 67.8 FT%
+- #11 PG ovr 42 (So, Nebraska): hgt 32, tp 52, ins 24, dnk 26, pss 73, drb 69, reb 43, diq 30, wng 37, pdef 38, idef 22, csh 48, dsh 53, bsc 70 → 24.1 mpg, 12.4 pts, 3.6 reb, 5.6 ast, 1.6 stl, 0.0 blk, 1.8 tov, 44.4 FG%, 38.8 3P% (5.4 3PA), 71.6 FT%
+- #26 FC ovr 34 (Fr, Coppin State): hgt 69, tp 27, ins 37, dnk 35, pss 50, drb 48, reb 55, diq 36, wng 61, pdef 29, idef 43, csh 30, dsh 29, bsc 40 → 24.9 mpg, 11.7 pts, 6.0 reb, 3.2 ast, 0.5 stl, 1.4 blk, 2.3 tov, 63.9 FG%, - 3P% (0.3 3PA), 63.6 FT%
+- #51 GF ovr 27 (So, Marquette): hgt 42, tp 28, ins 32, dnk 36, pss 35, drb 44, reb 39, diq 31, wng 40, pdef 37, idef 25, csh 35, dsh 26, bsc 34 → 15.0 mpg, 5.1 pts, 2.6 reb, 0.9 ast, 0.6 stl, 0.2 blk, 1.3 tov, 40.8 FG%, 20.0 3P% (1.1 3PA), 64.7 FT%
 
 ### Prospect careers: transfers, redshirts, recruiting, unusual prospects
 

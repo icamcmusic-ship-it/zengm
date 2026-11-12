@@ -367,7 +367,8 @@ describe("career model", () => {
 		}
 		assert.isAbove(
 			mean(late.map(({ result }) => mpg(last(result)))),
-			mean(late.map(({ result }) => mpg(first(result)))) + 9,
+			// +7: since the colstats round minutes are lower overall, so there is less room above the bench minutes he started with
+			mean(late.map(({ result }) => mpg(first(result)))) + 7,
 		);
 		assert.isBelow(mean(late.map(({ result }) => mpg(first(result)))), 16);
 

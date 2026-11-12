@@ -517,7 +517,7 @@ export const planCareer = (
 		// Handed the keys as a freshman, less every year since
 		for (const [i, year] of played.entries()) {
 			// Whatever else happened to him
-			year.mpgShift = i === 0 ? 2.5 : -2 - 1.5 * i;
+			year.mpgShift = i === 0 ? 4 : -2 - 1.5 * i;
 			year.zShift = Math.min(year.zShift, 0);
 		}
 	} else if (story === "unranked") {
