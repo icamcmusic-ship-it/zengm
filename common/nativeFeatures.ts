@@ -467,6 +467,36 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "smartEndgame",
+		key: "smartEndgame",
+		name: "End-of-Game Intelligence",
+		description:
+			"Coaches manage the end of games: a timeout to stop an opponent's 10-0 run (each team has five extra timeouts for that, quick-trigger coaches use them sooner), offense and defense substitutions in the last minute of a close game, intentional fouls on the worst free throw shooter on the floor, a foul when up 3 with a few seconds left, holding for the last shot and 2-for-1s in every possession model, and the last timeout saved for when it matters. With Coaching Systems, better game managers do these more reliably.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "scheduleLoad",
+		key: "scheduleLoad",
+		name: "Load, Fatigue & Venue",
+		description:
+			"Tired players fade faster (the fatigue penalty steepens as energy runs low) and get hurt more often (the league injury rate stays the same), the third game in four nights wears teams down like a back-to-back, and home court is split into a base part, the crowd (bigger with a hyped team and in the playoffs) and a small referee lean (the home team gets about 3% more free throws), plus travel for the visitors. The league home win percentage stays the same on average.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "scheduleLoadRefVariance",
+				name: "Referee Crews",
+				description:
+					"Each game's referees call it a little tighter or looser than average (about ±7% fouls).",
+				type: "bool",
+				default: true,
+			},
+		],
+	},
+	{
 		id: "seasonOdds",
 		college: false,
 		key: "featureSeasonOdds",

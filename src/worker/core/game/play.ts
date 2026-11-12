@@ -55,6 +55,7 @@ import {
 	recomputeLocalUITeamOvrs,
 } from "../../util/recomputeLocalUITeamOvrs.ts";
 import { last } from "../../../common/utils.ts";
+import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import { advStats } from "../../util/advStats.ts";
 import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
 import { getDayScale, getDayTicks } from "../season/scheduleDayScale.ts";
@@ -176,8 +177,11 @@ const play = async (
 		}
 
 		// injuryDepth setting (and realistic schedule length, for the back-to-back markers): remember each team's last game
-		// day, for back-to-backs
-		if (isInjuryDepthEnabled() || getDayScale() < 1) {
+		// day, for back-to-backs (scheduleLoad: and the one before, for 3 games in 4 nights)
+		const scheduleLoad =
+			__SPORT === "basketball" &&
+			nativeFeatureEnabled("scheduleLoad", (key) => g.get(key as any));
+		if (isInjuryDepthEnabled() || getDayScale() < 1 || scheduleLoad) {
 			for (const result of results) {
 				if (typeof result.day !== "number") {
 					continue;
@@ -188,6 +192,9 @@ const play = async (
 						[t.id, g.get("season")],
 					);
 					if (teamSeason && teamSeason.lastGameDay !== result.day) {
+						if (scheduleLoad) {
+							teamSeason.prevGameDay = teamSeason.lastGameDay;
+						}
 						teamSeason.lastGameDay = result.day;
 						await idb.cache.teamSeasons.put(teamSeason);
 					}
@@ -365,8 +372,7 @@ const play = async (
 			const phase = g.get("phase");
 			if (
 				dayTick &&
-				(phase === PHASE.REGULAR_SEASON ||
-					phase === PHASE.AFTER_TRADE_DEADLINE)
+				(phase === PHASE.REGULAR_SEASON || phase === PHASE.AFTER_TRADE_DEADLINE)
 			) {
 				await freeAgents.decreaseDemands();
 				await freeAgents.autoSign();

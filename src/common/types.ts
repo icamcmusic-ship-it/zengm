@@ -2558,6 +2558,8 @@ export type TeamSeasonWithoutKey = {
 	rid?: number;
 	// injuryDepth setting: day of the team's most recent game, for back-to-backs
 	lastGameDay?: number;
+	// scheduleLoad setting: day of the game before that one, for 3 games in 4 nights
+	prevGameDay?: number;
 	tid: number;
 	season: number;
 	gpHome: number; // Includes playoff games! Used for attendance average
