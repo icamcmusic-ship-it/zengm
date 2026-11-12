@@ -1,3 +1,8 @@
+import {
+	frontOfficeEnabled,
+	payGame,
+	recordFatigue,
+} from "../frontOffice/index.ts";
 import { payContracts } from "../contract/index.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { player, season, team } from "../index.ts";
@@ -268,8 +273,22 @@ const writeTeamStats = async (results: GameResults) => {
 			nationalTvRevenue +
 			localTvRevenue +
 			ticketRevenue;
+		// Front Office Budget: the Analytics and Travel & Sports Science departments (regular season games, like the others), and what the
+		// fatigue measurement of this game says Travel & Sports Science saved
+		let frontOfficePaid = 0;
+		if (frontOfficeEnabled()) {
+			if (g.get("phase") !== PHASE.PLAYOFFS) {
+				frontOfficePaid = payGame(t, teamSeason);
+			}
+			recordFatigue(teamSeason, (results.team[t1] as any).foFatigue);
+		}
 		const expenses =
-			salaryPaid + scoutingPaid + coachingPaid + healthPaid + facilitiesPaid;
+			salaryPaid +
+			scoutingPaid +
+			coachingPaid +
+			healthPaid +
+			facilitiesPaid +
+			frontOfficePaid;
 		teamSeason.cash += revenue - expenses;
 
 		if (t1 === 0) {

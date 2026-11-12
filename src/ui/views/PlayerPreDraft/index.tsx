@@ -707,8 +707,8 @@ const DraftCombineSection = ({
 	const { result, ranks, n } = draftCombine;
 	return (
 		<HideableSection
-			title={`${draftCombine.season} Draft Combine`}
-			description={`Rank and percentile among the ${n} prospects measured at the combine.${result.skipped ? ` ${result.skipped === "injured" ? "He skipped the drills while injured." : "He skipped the athletic testing and shooting drills."}` : ""}`}
+			title={`${draftCombine.season} Draft Combine${"early" in draftCombine && draftCombine.early ? " (early read)" : ""}`}
+			description={`${"early" in draftCombine && draftCombine.early ? "Your scouting department's early read (Front Office Budget), before the combine is held at the draft lottery. " : ""}Rank and percentile among the ${n} prospects measured at the combine.${result.skipped ? ` ${result.skipped === "injured" ? "He skipped the drills while injured." : "He skipped the athletic testing and shooting drills."}` : ""}`}
 		>
 			<div className="table-responsive">
 				<table

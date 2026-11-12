@@ -1,3 +1,4 @@
+import { addSimFatigue, type SimFatigue } from "../frontOffice/index.ts";
 import { g, local } from "../../util/index.ts";
 import type { Player } from "../../../common/types.ts";
 import {
@@ -22,6 +23,8 @@ export const applyInjuryDepth = (
 			rested?: boolean;
 			traitEffects?: { backToBackEnduranceMult: number };
 		}[];
+		foTravelScale?: number;
+		foFatigue?: SimFatigue;
 	},
 	teamInput: { tid: number; loadManagement?: boolean },
 	teamSeason: { lastGameDay?: number },
@@ -77,12 +80,19 @@ export const applyInjuryDepth = (
 
 			if (p2.compositeRating.endurance !== undefined) {
 				p2.compositeRating.endurance *=
-					BACK_TO_BACK_ENDURANCE *
+					// Front Office Budget: Travel & Sports Science scales the penalty (undefined when off)
+					(t.foTravelScale === undefined
+						? BACK_TO_BACK_ENDURANCE
+						: 1 - (1 - BACK_TO_BACK_ENDURANCE) * t.foTravelScale) *
 					// Player traits (motor), 1 with the setting off
 					(p2.traitEffects?.backToBackEnduranceMult ?? 1);
 			}
 		}
 
 		p2.ptModifier *= getRestrictionFactor(p.health);
+	}
+
+	if (backToBack && t.foTravelScale !== undefined) {
+		addSimFatigue(t, BACK_TO_BACK_ENDURANCE, t.foTravelScale);
 	}
 };

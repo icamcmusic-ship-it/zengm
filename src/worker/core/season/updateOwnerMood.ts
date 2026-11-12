@@ -4,6 +4,15 @@ import type { OwnerMood } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { assertDefined } from "../../../common/utils.ts";
 import { team } from "../index.ts";
+import {
+	newDeptsAverageAmount,
+	overspendMoodPenalty,
+} from "../../../common/frontOffice.ts";
+import {
+	frontOfficeEnabled,
+	getSeasonEnvelope,
+	getSeasonSpend,
+} from "../frontOffice/index.ts";
 import * as college from "../college/index.ts";
 
 /**
@@ -59,7 +68,17 @@ const updateOwnerMood = async (): Promise<
 			hockey: 80000,
 		});
 
-	const expectedProfit = 15 * salaryCapFactor;
+	let expectedProfit = 15 * salaryCapFactor;
+
+	// Front Office Budget: the owner expects the two new departments' average cost, and docks money mood for spending over his envelope
+	let overspendPenalty = 0;
+	if (frontOfficeEnabled()) {
+		expectedProfit -= newDeptsAverageAmount(g.get("salaryCap")) / 1000;
+		overspendPenalty = overspendMoodPenalty(
+			getSeasonSpend(teamSeason),
+			await getSeasonEnvelope(teamSeason),
+		);
+	}
 
 	const numPlayoffRounds = g.get("numGamesPlayoffSeries", "current").length;
 
@@ -77,7 +96,8 @@ const updateOwnerMood = async (): Promise<
 			(g.get("numGames") / 2),
 		playoffs: 0,
 		money: g.get("budget")
-			? (t.seasonAttrs.profit - expectedProfit) / (100 * salaryCapFactor)
+			? (t.seasonAttrs.profit - expectedProfit) / (100 * salaryCapFactor) -
+				overspendPenalty
 			: 0,
 	};
 

@@ -43,6 +43,7 @@ import { gradientStyleFactory } from "../../util/gradientStyleFactory.ts";
 import { BarGraph } from "./BarGraph.tsx";
 import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { getAdjustedTicketPrice } from "../../../common/getAdjustedTicketPrice.ts";
+import { FrontOfficeDepartments, FrontOfficeReview } from "./FrontOffice.tsx";
 
 const paddingLeft85 = { paddingLeft: 85 };
 
@@ -152,13 +153,19 @@ const BudgetEffect = ({ type, level }: { type: BudgetKey; level: number }) => {
 const FinancesForm = ({
 	autoTicketPrice,
 	coachingStaff,
+	frontOffice,
 	gameSimInProgress,
 	otherTeamTicketPrices,
 	t,
 	tid,
 }: Pick<
 	View<"teamFinances">,
-	"autoTicketPrice" | "coachingStaff" | "otherTeamTicketPrices" | "t" | "tid"
+	| "autoTicketPrice"
+	| "coachingStaff"
+	| "frontOffice"
+	| "otherTeamTicketPrices"
+	| "t"
+	| "tid"
 > & {
 	gameSimInProgress: boolean;
 }) => {
@@ -180,6 +187,8 @@ const FinancesForm = ({
 		facilities: String(t.budget.facilities),
 		health: String(t.budget.health),
 		scouting: String(t.budget.scouting),
+		analytics: String(frontOffice?.levels.analytics ?? ""),
+		travel: String(frontOffice?.levels.travel ?? ""),
 		ticketPrice: formatTicketPrice(t.budget.ticketPrice),
 		adjustForInflation: t.adjustForInflation,
 		autoTicketPrice: t.autoTicketPrice,
@@ -193,12 +202,14 @@ const FinancesForm = ({
 				facilities: String(t.budget.facilities),
 				health: String(t.budget.health),
 				scouting: String(t.budget.scouting),
+				analytics: String(frontOffice?.levels.analytics ?? ""),
+				travel: String(frontOffice?.levels.travel ?? ""),
 				ticketPrice: formatTicketPrice(t.budget.ticketPrice),
 				adjustForInflation: t.adjustForInflation,
 				autoTicketPrice: t.autoTicketPrice,
 			}));
 		}
-	}, [dirty, t]);
+	}, [dirty, t, frontOffice]);
 
 	const setStateValue = <Name extends Exclude<keyof typeof state, "saving">>(
 		name: Name,
@@ -263,6 +274,20 @@ const FinancesForm = ({
 			budgetLevels: budgetAmounts,
 			adjustForInflation: state.adjustForInflation || state.autoTicketPrice,
 			autoTicketPrice: state.autoTicketPrice,
+			frontOffice: frontOffice
+				? {
+						analytics: helpers.bound(
+							Math.round(helpers.localeParseFloat(state.analytics)),
+							1,
+							MAX_LEVEL,
+						),
+						travel: helpers.bound(
+							Math.round(helpers.localeParseFloat(state.travel)),
+							1,
+							MAX_LEVEL,
+						),
+					}
+				: undefined,
 		});
 
 		showNotification({
@@ -341,7 +366,35 @@ const FinancesForm = ({
 	return (
 		<form onSubmit={handleSubmit} className="mb-3">
 			{warningMessage}
-			<h2>
+			{frontOffice ? (
+				<FrontOfficeDepartments
+					info={frontOffice}
+					formDisabled={formDisabled}
+					disabledKeys={{
+						...(coachingStaff
+							? { coaching: "Set by your coaching staff (Staff page)" }
+							: {}),
+						...(challengeNoRatings
+							? { scouting: "No ratings challenge mode" }
+							: {}),
+					}}
+					salaryCap={salaryCap}
+					numTeams={otherTeamTicketPrices.length + 1}
+					expenseLevelsLastThree={t.expenseLevelsLastThree}
+					values={{
+						scouting: state.scouting,
+						analytics: state.analytics,
+						health: state.health,
+						travel: state.travel,
+						coaching: state.coaching,
+						facilities: state.facilities,
+					}}
+					setLevel={(dept, value) => {
+						setStateValue(dept, value);
+					}}
+				/>
+			) : null}
+			<h2 className={frontOffice ? "d-none" : undefined}>
 				Expense levels{" "}
 				<HelpPopover title="Expense levels">
 					<p>
@@ -352,7 +405,7 @@ const FinancesForm = ({
 					<p>Effects are based on your spending over the past 3 seasons.</p>
 				</HelpPopover>
 			</h2>
-			<div className="d-flex flex-column gap-3">
+			<div className={frontOffice ? "d-none" : "d-flex flex-column gap-3"}>
 				{expenseCategories.map((expenseCategory) => {
 					const level = state[expenseCategory.key];
 					const levelInt = helpers.bound(
@@ -583,7 +636,7 @@ const FinancesForm = ({
 						disabled={formDisabled || state.saving}
 						type="submit"
 					>
-						Save expense levels
+						{frontOffice ? "Save budget" : "Save expense levels"}
 						<br />
 						and ticket price
 					</button>
@@ -771,6 +824,7 @@ const TeamFinances = ({
 	capExceptions,
 	repeaterTax,
 	coachingStaff,
+	frontOffice,
 	barData,
 	contractTotals,
 	contracts,
@@ -1082,6 +1136,7 @@ const TeamFinances = ({
 							key={tid}
 							autoTicketPrice={autoTicketPrice}
 							coachingStaff={coachingStaff}
+							frontOffice={frontOffice}
 							gameSimInProgress={gameSimInProgress}
 							otherTeamTicketPrices={otherTeamTicketPrices}
 							t={t}
@@ -1090,6 +1145,8 @@ const TeamFinances = ({
 					</div>
 				) : null}
 			</div>
+
+			{budget && frontOffice ? <FrontOfficeReview info={frontOffice} /> : null}
 
 			<h2>Player Salaries</h2>
 

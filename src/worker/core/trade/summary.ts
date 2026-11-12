@@ -11,6 +11,11 @@ import type {
 } from "../../../common/types.ts";
 import { orderBy } from "../../../common/utils.ts";
 import isUntradable from "./isUntradable.ts";
+import { analyticsProjection } from "../../../common/frontOffice.ts";
+import {
+	frontOfficeEnabled,
+	getNewDeptLevelLastThree,
+} from "../frontOffice/index.ts";
 
 const getTeamOvr = async (playersRaw: Player[]) => {
 	const players = await player.formatAll(playersRaw, {
@@ -82,6 +87,27 @@ const summary = async (teams: TradeTeams): Promise<TradeSummary> => {
 			showNoStats: true,
 		});
 		s.teams[i].trade = players;
+
+		// Front Office Budget: the user's analytics projection of next season's ovr for the players he'd receive
+		if (frontOfficeEnabled() && tids[i] !== g.get("userTid")) {
+			const level = await getNewDeptLevelLastThree("analytics", {
+				tid: g.get("userTid"),
+			});
+			for (const p of s.teams[i].trade) {
+				const raw = playersOrdered.find((p2) => p2.pid === p.pid);
+				const r = raw?.ratings.at(-1);
+				if (raw && r && !g.get("challengeNoRatings")) {
+					const fuzz = g.get("godMode") ? 0 : (r.fuzz ?? 0);
+					const { lo, hi } = analyticsProjection({
+						ovr: r.ovr + fuzz,
+						fuzz,
+						age: g.get("season") - raw.born.year,
+						level,
+					});
+					p.analytics = { lo, hi };
+				}
+			}
+		}
 		s.teams[i].total = s.teams[i].trade.reduce(
 			(memo, p) => memo + p.contract.amount,
 			0,

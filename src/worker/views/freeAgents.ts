@@ -20,6 +20,11 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { helpers } from "../util/index.ts";
 import { validateSeason } from "../util/processInputs.ts";
 import { getFreeAgentMarket } from "../core/freeAgents/market.ts";
+import { analyticsProjection } from "../../common/frontOffice.ts";
+import {
+	frontOfficeEnabled,
+	getNewDeptLevelLastThree,
+} from "../core/frontOffice/index.ts";
 
 const processInputs = (params: RouteParams<"freeAgents">) => {
 	if (g.get("phase") === PHASE.RESIGN_PLAYERS) {
@@ -334,7 +339,32 @@ export default defineView({
 					? await getFreeAgentMarket(playersByType.available)
 					: {};
 
+			// Front Office Budget: the user's analytics projection of next season's ovr (80% range), undefined when off
+			let analytics: Record<number, { lo: number; hi: number }> | undefined;
+			if (
+				frontOfficeEnabled() &&
+				season === "current" &&
+				!g.get("challengeNoRatings")
+			) {
+				analytics = {};
+				const level = await getNewDeptLevelLastThree("analytics", {
+					tid: userTid,
+				});
+				for (const p of playersByType.available) {
+					const r = p.ratings.at(-1)!;
+					const fuzz = g.get("godMode") ? 0 : (r.fuzz ?? 0);
+					const { lo, hi } = analyticsProjection({
+						ovr: r.ovr + fuzz,
+						fuzz,
+						age: g.get("season") - p.born.year,
+						level,
+					});
+					analytics[p.pid] = { lo, hi };
+				}
+			}
+
 			return {
+				analytics,
 				capSpace,
 				// Salary Cap Exceptions (setting), undefined when off
 				capExceptions:

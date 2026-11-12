@@ -18,6 +18,12 @@ import {
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateOption, validateTeam } from "../util/processInputs.ts";
 import { dropdownKeys } from "../../common/dropdownKeys.ts";
+import {
+	frontOfficeEnabled,
+	getFinancesInfo,
+} from "../core/frontOffice/index.ts";
+import { departmentSize } from "../../common/scoutingReports/scouts.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 
 const processInputs = (params: RouteParams<"teamFinances">) => {
 	const show = validateOption(params.show, dropdownKeys.shows, "10");
@@ -254,7 +260,23 @@ export default defineView({
 			}
 			otherTeamTicketPrices.sort((a, b) => b - a);
 
+			// Front Office Budget (setting): the departments, the owner's envelope and the season review. Undefined when off
+			const frontOfficeInfo = frontOfficeEnabled()
+				? await getFinancesInfo(inputs.tid)
+				: undefined;
+			const frontOffice = frontOfficeInfo
+				? {
+						...frontOfficeInfo,
+						scouts: departmentSize(t.expenseLevelsLastThree.scouting),
+						scheduleLoad: featureOn("scheduleLoad"),
+						combine: featureOn("lotteryNight"),
+						injuryDepth: !!g.get("injuryDepth"),
+						coachSystems: featureOn("coachSystems") && !!g.get("coachingStaff"),
+					}
+				: undefined;
+
 			return {
+				frontOffice,
 				autoTicketPrice,
 				tid: inputs.tid,
 				show: inputs.show,

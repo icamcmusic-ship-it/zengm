@@ -216,6 +216,15 @@ export const SummaryTeam = ({
 									/>
 								) : undefined}
 							</div>
+							{"analytics" in p && p.analytics ? (
+								<div
+									className="ms-2 text-body-secondary"
+									title="Your analytics department's 80% range for his ovr next season (narrower with a bigger Analytics budget, Team Finances)"
+								>
+									Analytics projection: {p.analytics.lo}–{p.analytics.hi} ovr
+									next season
+								</div>
+							) : null}
 							{showInlinePlayerInfo && "age" in p ? (
 								<div className="ms-2">
 									{p.age} <span title="Years Old">yo</span>

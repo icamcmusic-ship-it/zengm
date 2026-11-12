@@ -1,3 +1,4 @@
+import { addSimFatigue, getSimFrontOffice } from "../frontOffice/index.ts";
 import { allStar, player, season, team } from "../index.ts";
 import { careerFromStats } from "../../../common/pbpFlavor/career.ts";
 import { isHoldingOut } from "../contract/unrest.ts";
@@ -537,6 +538,24 @@ export const processTeam = async (
 	}
 
 	if (__SPORT === "basketball") {
+		// Front Office Budget: Medical's injury rate, and Travel & Sports Science's share of the fatigue penalties (travel, 3 in 4 nights,
+		// back-to-backs) or, with neither Load, Fatigue & Venue nor Injury Depth on, a small endurance effect. Undefined when off
+		const frontOffice = allStarGame ? undefined : await getSimFrontOffice(t.id);
+		if (frontOffice) {
+			const fatigueFeatures =
+				isInjuryDepthEnabled() ||
+				nativeFeatureEnabled("scheduleLoad", (key) => g.get(key as any));
+			if (fatigueFeatures) {
+				t.foTravelScale = frontOffice.travelScale;
+			}
+			for (const p2 of t.player) {
+				p2.medicalInjuryFactor = frontOffice.injuryRateFactor;
+				if (!fatigueFeatures && p2.compositeRating.endurance !== undefined) {
+					p2.compositeRating.endurance *= frontOffice.enduranceFallback;
+				}
+			}
+		}
+
 		applyInjuryDepth(t, teamInput, teamSeason, players);
 
 		// Load, Fatigue & Venue (basketball): the crowd (hype), where the team is from (travel) and 3 games in 4 nights, see
@@ -568,8 +587,14 @@ export const processTeam = async (
 				p2.loadInjuryFactor =
 					injuryNorm * (threeInFour ? LOAD.threeInFourInjury : 1);
 				if (threeInFour && p2.compositeRating.endurance !== undefined) {
-					p2.compositeRating.endurance *= LOAD.threeInFourEndurance;
+					p2.compositeRating.endurance *=
+						t.foTravelScale === undefined
+							? LOAD.threeInFourEndurance
+							: 1 - (1 - LOAD.threeInFourEndurance) * t.foTravelScale;
 				}
+			}
+			if (threeInFour && t.foTravelScale !== undefined) {
+				addSimFatigue(t, LOAD.threeInFourEndurance, t.foTravelScale);
 			}
 		}
 

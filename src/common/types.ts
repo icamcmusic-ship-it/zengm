@@ -2390,6 +2390,9 @@ export type Team = {
 	capExceptions?: TeamCapExceptions;
 	// Coaching staff: the development score the team played a season with, carried into the next (staff/index.ts STAFF_DEV_CARRY)
 	staffDevCarry?: { season: number; score: number };
+	// Front Office Budget (League Extra): levels (1-100) of the two departments that are not budget items. Missing: the team's average
+	// level of its other departments (common/frontOffice.ts, worker/core/frontOffice)
+	frontOffice?: Record<"analytics" | "travel", number>;
 	depth?:
 		| {
 				QB: number[];
@@ -2648,6 +2651,9 @@ export type TeamSeasonWithoutKey = {
 		health: number;
 		scouting: number;
 	};
+	// Front Office Budget (League Extra): spending and levels of the two new departments (like expenses and expenseLevels), and what the
+	// spending measurably bought this season (worker/core/frontOffice)
+	frontOffice?: TeamSeasonFrontOffice;
 	payrollEndOfSeason: number;
 	ownerMood?: OwnerMood;
 	numPlayersTradedAway: number;
@@ -2726,12 +2732,38 @@ type TradeSummaryTeam = {
 		canHaveCondition?: boolean;
 	}[];
 	total: number;
-	trade: PlayerFiltered<{
+	trade: (PlayerFiltered<{
 		attrs: ["pid", "name", "contract", "draft"];
 		season: number;
 		showRookies: true;
 		showNoStats: true;
-	}>[];
+	}> &
+		// Front Office Budget: the user's analytics projection of next season's ovr, for players he'd receive
+		{ analytics?: { lo: number; hi: number } })[];
+};
+
+export type TeamSeasonFrontOffice = {
+	expenses: Record<"analytics" | "travel", number>;
+	expenseLevels: Record<"analytics" | "travel", number>;
+	// Games recorded (the setting can be turned on mid-season)
+	gpRecorded?: number;
+	review?: FrontOfficeReview;
+};
+
+// Measured during the season, each relative to the same events at league-average spending
+export type FrontOfficeReview = {
+	// In-game injuries, and games they cost
+	injuries: number;
+	injuryGames: number;
+	// Games saved on those injuries' durations (health budget + Medical recovery of 30+ players), from the same random draws
+	durationGamesSaved: number;
+	// Injuries the Medical injury rate avoided (or added, negative), sum over injuries of 1/factor - 1, and their games
+	injuriesAvoided: number;
+	injuryGamesAvoided: number;
+	// Games with a travel, back-to-back or 3-in-4 fatigue penalty, the penalties (sum of endurance %) and the part saved
+	fatigueGames: number;
+	fatiguePenalty: number;
+	fatigueSaved: number;
 };
 
 export type TradeSummary = {
