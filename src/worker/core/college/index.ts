@@ -9,7 +9,7 @@ import type {
 	PhaseReturn,
 } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers } from "../../util/index.ts";
+import { g, helpers, logEvent } from "../../util/index.ts";
 import { recomputeLocalUITeamOvrs } from "../../util/recomputeLocalUITeamOvrs.ts";
 import { league, team } from "../index.ts";
 import { updateCollegeArchive } from "./archive.ts";
@@ -26,6 +26,7 @@ import {
 	startConfTournaments,
 } from "./postseason.ts";
 import { newCollegeSchedule } from "./schedule.ts";
+import { aiRedshirts } from "./redshirt.ts";
 import {
 	getCollegeState,
 	initCollegeSeason,
@@ -39,6 +40,9 @@ export { isCollege } from "./isCollege.ts";
 export { createCollegePlayers, getTeamPrestige } from "./players.ts";
 export { getCollegeArchive, updateCollegeArchive } from "./archive.ts";
 export { getCollegeState } from "./state.ts";
+export { canRedshirt, isRedshirting, setRedshirt } from "./redshirt.ts";
+export { useCollegeAwards } from "./awards.ts";
+export { playQuickGames, throttleAdvStats, useQuickSim } from "./quickSim.ts";
 export { genNationalTournament, getNetRows } from "./postseason.ts";
 export {
 	addRecruitingClass,
@@ -68,6 +72,7 @@ export const startRegularSeason = async () => {
 		}
 	}
 	await idb.cache.schedule.addAll(games);
+	await aiRedshirts();
 	await recomputeLocalUITeamOvrs();
 	await initCollegeSeason(rounds.length);
 };
@@ -196,8 +201,30 @@ export const newPhaseSigningDay = async (
 /**
  * League creation, after the players are saved: prestige on the teams, the first recruiting class, sorted rosters.
  */
-export const afterLeagueCreation = async () => {
+export const afterLeagueCreation = async (fileHasPlayers = false) => {
 	const teams = await idb.cache.teams.getAll();
+	if (fileHasPlayers) {
+		// Players from a league file: no college roster generation. Class years from age (18 = freshman), eligibility to match, and no
+		// free agents (they become walk-ons of the schools with room, or are left out)
+		const season = g.get("season");
+		const players = await idb.cache.players.indexGetAll("playersByTid", [
+			0,
+			Infinity,
+		]);
+		for (const p of players as any[]) {
+			if (p.classYear === undefined) {
+				p.classYear = helpers.bound(season - p.born.year - 17, 1, 4);
+				p.draft.year = season - p.classYear;
+				await idb.cache.players.put(p);
+			}
+		}
+		await logEvent({
+			type: "info",
+			text: "This college league was made from a league file with players: its rosters were kept as they are (class years come from the players' ages) instead of generating college rosters. Rosters larger than 13 scholarships keep their extra players until they graduate.",
+			showNotification: true,
+			saveToDb: false,
+		});
+	}
 	for (const t of teams) {
 		const prestige = getSchoolPrestige(t.region);
 		if (prestige !== undefined && (t as any).collegePrestige === undefined) {

@@ -1902,8 +1902,10 @@ const afterDBStream = async ({
 		realPlayers,
 	});
 
-	if (college.isCollege() && !fileHasPlayers) {
-		await college.afterLeagueCreation();
+	// (a league file with players keeps its players: they get class years from their age, and the school prestige and the first recruiting
+	// class are added the same way)
+	if (college.isCollege()) {
+		await college.afterLeagueCreation(fileHasPlayers);
 	}
 
 	// College/overseas stats for every draft class the league starts with (setting "Auto-generate pre-draft stats & honors")

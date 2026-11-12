@@ -356,7 +356,39 @@ const Roster = ({
 					? [
 							college
 								? {
-										value: classYearAbbrev(p.classYear),
+										value: (
+											<>
+												{classYearAbbrev(p.classYear)}
+												{p.redshirting ? (
+													<span
+														className="badge bg-secondary ms-1"
+														title="Redshirt: does not play this season and keeps the year of eligibility"
+													>
+														RS
+													</span>
+												) : null}
+												{p.canRedshirt ? (
+													<button
+														type="button"
+														className="btn btn-xs btn-light-bordered ms-1"
+														title={
+															p.redshirting
+																? "Remove the redshirt"
+																: "Redshirt him: he sits out this season and keeps the year of eligibility"
+														}
+														onClick={() =>
+															toWorker("main", "collegeSetRedshirt", {
+																pid: p.pid,
+																redshirt: !p.redshirting,
+															})
+														}
+													>
+														{p.redshirting ? "Undo RS" : "Redshirt"}
+													</button>
+												) : null}
+											</>
+										),
+										searchValue: classYearAbbrev(p.classYear),
 										sortValue: p.classYear ?? 0,
 									}
 								: wrappedContract(p),

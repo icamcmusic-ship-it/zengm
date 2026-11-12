@@ -323,7 +323,7 @@ export const applyCoachSystems = async (
 	schedule: readonly { homeTid: number; awayTid: number; day?: number }[],
 	teams: Record<number, any>,
 ) => {
-	if (!coachSystemsEnabled()) {
+	if (!coachSystemsEnabled() || schedule.length === 0) {
 		return;
 	}
 	const league = await getLeagueCoachSystems(schedule[0]?.day);

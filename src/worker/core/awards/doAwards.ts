@@ -10,6 +10,7 @@ import {
 import { orderTeams } from "../../util/orderTeams.ts";
 import { leaderAwardCategories } from "../../../common/awards.ts";
 import { team } from "../index.ts";
+import * as college from "../college/index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import {
 	VOTE_CANDIDATES,
@@ -85,6 +86,10 @@ const teamAwards = async (
 const NUM_PLAYERS_TO_STORE_PER_INDIVIDUAL_AWARD = 5;
 
 export const doAwards = async (conditions: Conditions) => {
+	// College mode: college award names (a league from before them still has the pro awards)
+	if (college.isCollege()) {
+		await college.useCollegeAwards();
+	}
 	const season = g.get("season");
 	const awardVoteOn = __SPORT === "basketball" && featureOn("awardVote");
 

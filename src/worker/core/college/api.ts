@@ -6,6 +6,7 @@ import { g, toUI } from "../../util/index.ts";
 import { league } from "../index.ts";
 import { autoSetTargets } from "./offseason.ts";
 import { isCollege } from "./isCollege.ts";
+import { setRedshirt } from "./redshirt.ts";
 
 const canEdit = () =>
 	isCollege() && g.get("phase") >= 0 && g.get("phase") <= PHASE.RESIGN_PLAYERS;
@@ -70,4 +71,19 @@ export const collegeSetAutoRecruit = async (auto: boolean) => {
 	}
 	await league.setGameAttributes({ collegeAutoRecruit: auto });
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
+};
+
+export const collegeSetRedshirt = async ({
+	pid,
+	redshirt,
+}: {
+	pid: number;
+	redshirt: boolean;
+}) => {
+	const p = await idb.cache.players.get(pid);
+	if (!isCollege() || !p || p.tid !== g.get("userTid")) {
+		return;
+	}
+	await setRedshirt(p, redshirt);
+	await toUI("realtimeUpdate", [["playerMovement"]]);
 };

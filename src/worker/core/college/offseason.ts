@@ -26,6 +26,7 @@ import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { player, team } from "../index.ts";
 import { addContract, createContract } from "../contract/index.ts";
 import { updateCollegeArchive } from "./archive.ts";
+import { getExpectations } from "./expectations.ts";
 import {
 	genCollegePlayer,
 	getTalentShare,
@@ -795,6 +796,10 @@ export const onPreseason = async () => {
 		Infinity,
 	])) as CollegePlayer[];
 	for (const p of players) {
+		// Redshirt last season: the year did not count
+		if ((p as any).redshirt === season - 1 && p.classYear !== undefined) {
+			continue;
+		}
 		p.classYear = helpers.bound(
 			(p.classYear ?? season - 1 - p.draft.year) + 1,
 			1,
@@ -862,13 +867,10 @@ export const getExpectationDeltas = async ({
 }) => {
 	const userTid = g.get("userTid");
 	const teams = await getActiveTeams();
-	const sorted = teams
-		.map((t) => ({ tid: t.tid, prestige: getTeamPrestige(t as any) }))
-		.sort((a, b) => a.prestige - b.prestige);
-	const index = sorted.findIndex((t) => t.tid === userTid);
-	const pct =
-		sorted.length > 1 ? Math.max(0, index) / (sorted.length - 1) : 0.5;
-	const expectedWinp = 0.3 + 0.45 * pct;
+	const { pct, expectedWinp } = (await getExpectations()).get(userTid) ?? {
+		pct: 0.5,
+		expectedWinp: 0.525,
+	};
 	const gp = won + lost;
 	const winp = gp > 0 ? won / gp : 0.5;
 

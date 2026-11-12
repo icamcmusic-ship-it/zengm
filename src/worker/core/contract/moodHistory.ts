@@ -1,3 +1,4 @@
+import { isCollege } from "../college/isCollege.ts";
 import type {
 	MoodComponents,
 	MoodSnapshot,
@@ -65,6 +66,10 @@ export const addMoodSnapshot = (p: Player, snapshot: MoodSnapshot) => {
 
 // Snapshot the mood of every player on a team, for the mood history on the player page
 export const recordMoodSnapshots = async () => {
+	// College mode: no contracts, so no mood history (and thousands of players)
+	if (isCollege()) {
+		return;
+	}
 	const players = await idb.cache.players.indexGetAll("playersByTid", [
 		0,
 		Infinity,
