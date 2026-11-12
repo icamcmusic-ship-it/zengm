@@ -112,7 +112,10 @@ const newPhasePlayoffs = async (
 	await idb.cache.teamStats.addAll(teamStatsToSave);
 	await idb.cache.teamSeasons.putAll(teamSeasons);
 
-	await finances.assessPayrollMinLuxury();
+	// College mode: no salaries, so no minimum payroll penalty or luxury tax
+	if (!collegeLeague) {
+		await finances.assessPayrollMinLuxury();
+	}
 	await season.newSchedulePlayoffsDay();
 
 	// Update clinchedPlayoffs with final values
