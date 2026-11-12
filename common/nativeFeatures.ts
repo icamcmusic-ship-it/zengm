@@ -562,6 +562,25 @@ export const NATIVE_FEATURES = [
 		default: true,
 	},
 	{
+		id: "rumors",
+		key: "featureRumors",
+		name: "Rumors",
+		description:
+			"A rumor mill built from what AI teams are actually planning: who is on the block, which teams are calling about whom, unhappy players, extension talks, where free agents are leaning, coaches and GMs on the hot seat, draft targets. Each rumor has a confidence and is later marked confirmed or didn't happen (Rumors tab of Transactions, dashboard card, newspaper). It never changes what AI teams do.",
+		default: false,
+		defaultNewLeague: true,
+		options: [
+			{
+				key: "rumorsNotify",
+				name: "Rumor Notifications",
+				description:
+					"Show a notification when a new rumor involves your team or one of your players.",
+				type: "bool",
+				default: true,
+			},
+		],
+	},
+	{
 		id: "threeTeamTrades",
 		key: "featureThreeTeamTrades",
 		name: "Three-Team Trades",

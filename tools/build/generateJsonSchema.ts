@@ -777,6 +777,9 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					aiTradeOffers: {
 						type: "array",
 					},
+					rumors: {
+						type: "object",
+					},
 					allStarDunk: {
 						type: "boolean",
 					},

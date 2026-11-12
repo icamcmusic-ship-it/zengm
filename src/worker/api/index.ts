@@ -260,6 +260,7 @@ import {
 	ratingsKeysForView,
 	syncExpandedToCompat,
 } from "../core/player/expandedRatings.ts";
+import { getRumorState } from "../core/rumors/index.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -3380,6 +3381,32 @@ const requestAiTradeOffers = async ({
 	return count;
 };
 
+// Dashboard card: rumors about the user's team first, then the latest from around the league
+const getRumorsCard = () => {
+	if (!featureOn("rumors")) {
+		return [];
+	}
+	const userTid = g.get("userTid");
+	const season = g.get("season");
+	const items = getRumorState()
+		.items.filter(
+			(r) =>
+				r.season === season ||
+				r.status === "open" ||
+				r.resolved?.season === season,
+		)
+		.toReversed();
+	const mine = items
+		.filter((r) => r.user || r.tids.includes(userTid) || r.fromTid === userTid)
+		.slice(0, 4)
+		.map((r) => ({ ...r, user: true as const }));
+	const others = items
+		.filter((r) => !mine.some((row) => row.rid === r.rid))
+		.slice(0, Math.max(0, 5 - mine.length))
+		.map((r) => ({ ...r, user: undefined }));
+	return [...mine, ...others];
+};
+
 const incrementTradeProposalsSeed = async () => {
 	await league.setGameAttributes({
 		tradeProposalsSeed: g.get("tradeProposalsSeed") + 1,
@@ -6224,6 +6251,7 @@ const api = {
 		incrementTradeProposalsSeed,
 		acceptAiTradeOffer,
 		requestAiTradeOffers,
+		getRumorsCard,
 		init,
 		initGold,
 		loadRetiredPlayers,

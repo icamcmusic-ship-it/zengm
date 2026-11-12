@@ -126,6 +126,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	tradeExplain: "League extras: Trades",
 	aiNeedTrades: "League extras: Trades",
 	aiTradeOffers: "League extras: Trades",
+	rumors: "League extras: Trades",
 	tradeMarket: "League extras: Trades",
 	threeTeamTrades: "League extras: Trades",
 	collegeStats: "League extras: Draft",
