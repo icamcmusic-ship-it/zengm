@@ -8,7 +8,6 @@ import {
 	classify,
 	currentEntry,
 	explain,
-	isPoorFit,
 	toStored,
 	viewOf,
 	withEntry,
@@ -37,7 +36,20 @@ import {
 	traitsEnabled,
 } from "./traits.ts";
 import { TRAIT_DEFINITIONS } from "../../../common/playerTraits/definitions.ts";
-import { TWO_K_NAMES } from "../../../common/archetypes/defs.data.ts";
+import {
+	buildStatNorms,
+	seasonStats,
+	statReading,
+	type StatReading,
+} from "../../../common/archetypes/stats.ts";
+import { DEFAULT_STAT_NORMS } from "../../../common/archetypes/statNorms.data.ts";
+import type {
+	ArchetypeStats,
+	Pos,
+	StatNorms,
+} from "../../../common/archetypes/types.ts";
+import { isPos } from "../../../common/archetypes/position.ts";
+import { POS_BUCKET } from "../../../common/archetypes/norms.ts";
 
 // The archetype a player has is DERIVED from his ratings (src/common/archetypes), but it is STORED on him (p.archetypes) at
 // the start of every preseason, so what the UI shows stays fixed between preseasons. Prospects, and players who have no entry
@@ -45,9 +57,16 @@ import { TWO_K_NAMES } from "../../../common/archetypes/defs.data.ts";
 
 const MIN_LEAGUE_FOR_NORMS = 120;
 
-// Ratings as the user's scouts see them: scouting fuzz on everything but height, like the skills and positions shown
+// The ratings a label is read from. Scouting fuzz in BBGM is one offset added to every rating but height, so it hardly
+// changes the shape of a player's game, which is what a build is; read from the fuzzed ratings, a label could still flip
+// when a new season's fuzz is drawn. So a player's label is read from his true ratings (fuzz removed), for every team:
+// the shape barely depends on it, and the label shows no number, so it gives away little (at most a hint, through the part
+// of the reading that is his absolute standing at his position, of which way the fuzz goes). Draft prospects are the
+// exception: scouting them is part of the game, and their fuzz is large, so they are read from the ratings as the user's
+// scouts see them (`fuzzed`).
 export const ratingsForArchetype = (
 	p: Player,
+	fuzzed = p.tid === PLAYER.UNDRAFTED,
 ): ArchetypeRatings | undefined => {
 	if (__SPORT !== "basketball") {
 		return undefined;
@@ -56,7 +75,7 @@ export const ratingsForArchetype = (
 	if (!row || row.hgt === undefined) {
 		return undefined;
 	}
-	const fuzz = getFuzz(row.fuzz ?? 0);
+	const fuzz = fuzzed ? getFuzz(row.fuzz ?? 0) : 0;
 	const out = {} as ArchetypeRatings;
 	for (const key of RATING_KEYS) {
 		out[key] = key === "hgt" ? row[key] : applyFuzz(row[key], fuzz);
@@ -72,6 +91,20 @@ export const ratingsForArchetype = (
 		}
 	}
 	return out;
+};
+
+// His box-score stats for the reading: the last regular season before `season` (labels are stored at the preseason, from
+// the season just played, and a live reading uses the same season, so the two agree). None for a prospect.
+export const archetypeStats = (
+	p: Player,
+	season: number,
+): ArchetypeStats | undefined => {
+	if (p.tid === PLAYER.UNDRAFTED || !Array.isArray(p.stats)) {
+		return undefined;
+	}
+	return seasonStats(
+		(p.stats as any[]).filter((r) => !r.playoffs && r.season === season - 1),
+	);
 };
 
 // His player traits as the user sees them (the playerTraits setting): only visible traits, as the scouted estimate for a
@@ -109,7 +142,7 @@ const viewContext = () => ({
 // His position as the game shows it now
 const posNow = (p: Player): unknown => (last(p.ratings) as any)?.pos;
 
-let normsCache: { key: string; norms: Norms } | undefined;
+let normsCache: { key: string; norms: Norms; statNorms: StatNorms } | undefined;
 
 export const resetArchetypeNorms = () => {
 	normsCache = undefined;
@@ -127,15 +160,28 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 		PLAYER.FREE_AGENT,
 		Infinity,
 	]);
-	const rows: { ratings: ArchetypeRatings; ovr: number; pos?: string }[] = [];
+	const rows: {
+		ratings: ArchetypeRatings;
+		ovr: number;
+		pos?: string;
+		age?: number;
+	}[] = [];
+	const statRows: { stats: ArchetypeStats; pos: Pos }[] = [];
+	const season = g.get("season");
 	for (const p of players) {
 		const ratings = ratingsForArchetype(p);
 		if (ratings) {
+			const pos = (last(p.ratings) as any).pos;
 			rows.push({
 				ratings,
 				ovr: (last(p.ratings) as any).ovr ?? ovr(last(p.ratings) as any),
-				pos: (last(p.ratings) as any).pos,
+				pos,
+				age: season - p.born.year,
 			});
+			const st = archetypeStats(p, season);
+			if (st && isPos(pos)) {
+				statRows.push({ stats: st, pos });
+			}
 		}
 	}
 	// The reference league (and its calibration) for the ratings the league has: with Expanded Ratings on, the one generated
@@ -146,10 +192,41 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 			? {
 					...buildNorms(rows, ARCHETYPES, reference),
 					bias: reference.bias,
+					// (a league holds one draft class or two: prospects are read against the reference prospects)
+					prospect: reference.prospect,
 				}
 			: reference;
-	normsCache = { key, norms };
+	// Stat references from the league's own last season (with the shot zones its games record), when enough players have
+	// real minutes in every position bucket; else the real NBA's
+	const own = buildStatNorms(statRows);
+	const statNorms: StatNorms = {} as StatNorms;
+	for (const b of ["PG", "SG", "W", "F", "C"] as const) {
+		const n = statRows.filter(
+			(r) => r.stats.min >= 500 && POS_BUCKET[r.pos] === b,
+		).length;
+		statNorms[b] = n >= 30 ? own[b]! : DEFAULT_STAT_NORMS[b];
+	}
+	normsCache = { key, norms, statNorms };
 	return norms;
+};
+
+const currentStatNorms = () => normsCache?.statNorms ?? DEFAULT_STAT_NORMS;
+
+// How he is read beyond his ratings: his age, his stats from the last season (StatReading) and whether he is a prospect
+export const readOptionsFor = (
+	p: Player,
+	pos: Pos,
+	season: number,
+): { age?: number; stats?: StatReading; prospect?: boolean } => {
+	const prospect =
+		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
+	if (prospect) {
+		return { prospect: true };
+	}
+	return {
+		age: season - p.born.year,
+		stats: statReading(archetypeStats(p, season), pos, currentStatNorms()),
+	};
 };
 
 // The label for ratings as scouts see them (fuzzed), used where ratings are not on a stored player yet
@@ -171,8 +248,12 @@ export const fuzzedArchetypeLabel = (
 			shown[key] = applyFuzz(ratings[key]!, f);
 		}
 	}
-	// His position comes from the true ratings, as the game shows it
-	return classify(shown, { norms, pos: posFn(ratings as any) }).label;
+	// His position comes from the true ratings, as the game shows it; a prospect is read against the prospect tables
+	return classify(shown, {
+		norms,
+		pos: posFn(ratings as any),
+		prospect: true,
+	}).label;
 };
 
 export const classifyPlayer = (
@@ -185,17 +266,20 @@ export const classifyPlayer = (
 		return undefined;
 	}
 	const row = last(p.ratings) as any;
-	// His position as the game shows it decides which builds he may have, so the fuzzed ratings scouts see cannot push
-	// him into one his listed position rules out
+	const season =
+		typeof row.season === "number" ? (row.season as number) : g.get("season");
+	const pos: Pos = isPos(row.pos) ? row.pos : "F";
+	// His position as the game shows it decides which builds he may have
 	return classify(ratings, {
 		norms,
 		ovr: row.ovr,
 		previousId,
-		pos: row.pos,
+		pos: isPos(row.pos) ? row.pos : undefined,
 		traits:
 			typeof row.season === "number"
 				? archetypeTraits(p, row.season)
 				: undefined,
+		...readOptionsFor(p, pos, season),
 	});
 };
 
@@ -314,12 +398,6 @@ export type PlayerArchetypeInfo = {
 	season?: number;
 	live: boolean;
 	why: { label: string; z: number; want: number }[];
-	// The other NBA 2K build names this archetype stands for (twoK/build2k.script.test.ts)
-	twoK?: string[];
-	// The next closest builds by his current ratings ("also close to"): never part of the label
-	alsoClose?: string[];
-	// His ratings do not really have the shape of any build his position allows: the nearest one is shown (isPoorFit)
-	poorFit?: boolean;
 };
 
 // Everything the player page shows. A non-prospect with no entry gets one stored here, once.
@@ -350,22 +428,24 @@ export const archetypeInfoForPlayer = async (
 		return undefined;
 	}
 	const ratings = ratingsForArchetype(p);
+	const row = last(p.ratings) as any;
 	const why = ratings
-		? explain(found.view.id, ratings, norms).map((w) => ({
+		? explain(
+				found.view.id,
+				ratings,
+				norms,
+				readOptionsFor(
+					p,
+					isPos(row.pos) ? row.pos : "F",
+					typeof row.season === "number" ? row.season : g.get("season"),
+				),
+			).map((w) => ({
 				label: w.label,
 				z: w.z,
 				want: w.want,
 			}))
 		: [];
 	const v = found.view;
-	// The runners-up by his current ratings, and whether the shown build is only the nearest one
-	const live = found.classification ?? classifyPlayer(p, norms, v.id);
-	const alsoClose = live
-		? [
-				...(live.id !== v.id ? [live.name] : []),
-				...live.alternates.filter((x) => x.id !== v.id).map((x) => x.name),
-			].slice(0, 2)
-		: undefined;
 	return {
 		id: v.id,
 		name: v.name,
@@ -377,9 +457,6 @@ export const archetypeInfoForPlayer = async (
 		season: found.stored ? v.season : undefined,
 		live: !found.stored,
 		why,
-		twoK: TWO_K_NAMES[v.id],
-		alsoClose,
-		poorFit: live && live.id === v.id ? isPoorFit(live) : undefined,
 	};
 };
 

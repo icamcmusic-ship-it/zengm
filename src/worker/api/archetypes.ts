@@ -100,8 +100,8 @@ export type ArchetypeLandscape = {
 		count: number;
 		share: number;
 		top: ArchetypeTopPlayer[];
-		// The other NBA 2K build names it stands for
-		twoK: string[];
+		// Other names for the same archetype (never shown: the table's search finds them)
+		aliases: string[];
 	}[];
 };
 
@@ -164,7 +164,7 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 				name: r.name,
 				group: r.group,
 				desc: archetypeById(r.id)!.desc,
-				twoK: TWO_K_NAMES[r.id] ?? [],
+				aliases: TWO_K_NAMES[r.id] ?? [],
 				count: r.count,
 				share: r.share,
 				top: r.top.map((t) => {

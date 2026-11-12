@@ -21,6 +21,8 @@ import { g } from "../../util/index.ts";
 import { player } from "../index.ts";
 import {
 	archetypeFor,
+	archetypeStats,
+	ratingsForArchetype,
 	archetypeInfoForPlayer,
 	classifyPlayer,
 	getLeagueNorms,
@@ -149,6 +151,95 @@ describe("stored archetypes", () => {
 		const vet = (await idb.cache.players.indexGetAll("playersByTid", 3))[0]!;
 		assert.strictEqual(vet.archetypes, undefined);
 		assert.strictEqual(archetypeFor(vet, norms)!.stored, false);
+	});
+
+	test("scouting fuzz: a player's label is read from his true ratings, a prospect's from what the scouts see", async () => {
+		const norms = await getLeagueNorms();
+		const vet = (await idb.cache.players.indexGetAll("playersByTid", 3))[0]!;
+		const row = last(vet.ratings) as any;
+		const before = classifyPlayer(vet, norms)!.id;
+		for (const fuzz of [-6, 6]) {
+			row.fuzz = fuzz;
+			assert.strictEqual(classifyPlayer(vet, norms)!.id, before);
+			assert.strictEqual(ratingsForArchetype(vet)!.spd, row.spd);
+		}
+		const prospect = (
+			await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+		)[0]!;
+		const prow = last(prospect.ratings) as any;
+		prow.fuzz = 5;
+		assert.strictEqual(
+			ratingsForArchetype(prospect)!.spd,
+			Math.min(100, prow.spd + 5),
+		);
+	});
+
+	test("stats: last season's regular-season stats, none for a prospect", () => {
+		const p = player.generate(3, 25, season - 4, true, DEFAULT_LEVEL);
+		(p as any).stats = [
+			{
+				season: season - 1,
+				playoffs: false,
+				min: 600,
+				fga: 300,
+				tpa: 100,
+				fta: 50,
+				astp: 20,
+				orbp: 3,
+				drbp: 12,
+				blkp: 1,
+				stlp: 2,
+				usgp: 20,
+			},
+			{
+				season: season - 1,
+				playoffs: false,
+				min: 400,
+				fga: 200,
+				tpa: 50,
+				fta: 50,
+				astp: 30,
+				orbp: 3,
+				drbp: 12,
+				blkp: 1,
+				stlp: 2,
+				usgp: 24,
+			},
+			{
+				season: season - 1,
+				playoffs: true,
+				min: 100,
+				fga: 50,
+				tpa: 10,
+				fta: 5,
+				astp: 50,
+				orbp: 3,
+				drbp: 12,
+				blkp: 1,
+				stlp: 2,
+				usgp: 30,
+			},
+			{
+				season,
+				playoffs: false,
+				min: 900,
+				fga: 300,
+				tpa: 0,
+				fta: 50,
+				astp: 5,
+				orbp: 3,
+				drbp: 12,
+				blkp: 1,
+				stlp: 2,
+				usgp: 10,
+			},
+		];
+		const st = archetypeStats(p as any, season)!;
+		assert.strictEqual(st.min, 1000);
+		assert.strictEqual(st.tpa, 150);
+		assert.ok(Math.abs(st.astp - 24) < 1e-9);
+		p.tid = PLAYER.UNDRAFTED;
+		assert.strictEqual(archetypeStats(p as any, season), undefined);
 	});
 
 	test("the player page lazily stores one entry for a player who has none", async () => {

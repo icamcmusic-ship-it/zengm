@@ -28,6 +28,8 @@ import {
 	scoreAll,
 } from "./classify.ts";
 import { sampleTraits } from "./sample.testutil.ts";
+import { realSeasonStats } from "./real.testutil.ts";
+import { statReading } from "./stats.ts";
 import { compositeValues } from "./composites.ts";
 import { buildNorms } from "./match.ts";
 import { CORE_DIMS, probit, rawZ } from "./norms.ts";
@@ -612,17 +614,20 @@ const analyse = (label, players, out) => {
 	for (const [i, p] of players.entries()) {
 		const ps = p.pos ?? positionFor(p.ratings, true);
 		p.traits ??= traitsFor(p, i, label.slice(0, 8));
+		const read = { age: p.age, stats: p.stats, prospect: p.prospect };
 		const { scored } = scoreAll(
 			p.ratings,
 			p.norms ?? NORMS,
 			ARCHETYPES,
 			ps,
 			p.traits,
+			read,
 		);
 		const c = classify(p.ratings, {
 			pos: ps,
 			norms: p.norms,
 			traits: p.traits,
+			...read,
 		});
 		const best = scored.find((s) => s.a.id === c.id);
 		p.dpos = ps;
@@ -784,6 +789,13 @@ const realPlayers = () => {
 	);
 	if (!existsSync(file)) return [];
 	const d = JSON.parse(readFileSync(file, "utf8"));
+	// The previous season's stats, as a real-players league reads a player at the preseason
+	const st = JSON.parse(
+		readFileSync(
+			new URL("../../../data/real-player-stats.basketball.json", import.meta.url),
+			"utf8",
+		),
+	);
 	const out = [];
 	if (EXPANDED) {
 		// As a real-players league with the setting on: derived from the other ratings, one wingspan per player
@@ -799,6 +811,10 @@ const realPlayers = () => {
 		const r = ratingsOfRow(row);
 		out.push({
 			ratings: r,
+			stats: statReading(
+				realSeasonStats(st, row.slug, row.season - 1),
+				positionFor(r, true),
+			),
 			ovr: ovrFn(r),
 			name: `${d.bios[row.slug]?.name ?? row.slug} ${row.season}`,
 			slug: row.slug,
@@ -829,14 +845,17 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 			await genPlayers(1500, "diag-old", 32, 37, 38),
 			out,
 		);
+		// (read as the game reads a draft prospect: against the prospect tables)
+		const asProspects = (ps) =>
+			ps.map((p) => ({ ...p, prospect: true, age: undefined }));
 		await analyse(
 			"draft prospects (age 19, undeveloped, any ovr)",
-			await genPlayers(1500, "diag-pros", 19, 19, 0),
+			asProspects(await genPlayers(1500, "diag-pros", 19, 19, 0)),
 			out,
 		);
 		await analyse(
 			"draft prospects, draftable (age 19, undeveloped, ovr>=40)",
-			await genPlayers(1000, "diag-pros40", 19, 19, 40),
+			asProspects(await genPlayers(1000, "diag-pros40", 19, 19, 40)),
 			out,
 		);
 		const real = realPlayers();
@@ -887,6 +906,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 					const c = classify(r, {
 						previousId: prev?.id,
 						pos: prevPos,
+						age: 20 + dev + y,
 						traits: traitsFor({ ratings: r, age: 20 + dev + y }, i, "flap"),
 					});
 					if (prev) {
@@ -947,6 +967,8 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 				const c = classify(p.ratings, {
 					pos: ps,
 					traits: traitsFor(p, 0, p.slug),
+					age: p.age,
+					stats: p.stats,
 				});
 				ex.push(`${p.name} ${ps}: ${c.label}`);
 			}

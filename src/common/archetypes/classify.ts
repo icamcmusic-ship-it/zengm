@@ -17,7 +17,12 @@ import {
 	rawMatch,
 	classValues,
 	passingBigBonus,
+	promisePenalty,
+	promiseShortfall,
+	creatorTerm,
+	signatureTerm,
 	standoutBonus,
+	type ReadOptions,
 	standoutsOf,
 	twoWayBonus,
 	weightsOf,
@@ -55,7 +60,7 @@ export const archetypeByName = (name: string) =>
 // Rare types need to be that much more exceptional a fit to be picked (no 2K build is marked rare now)
 export const RARE_PENALTY = 0.5;
 // The archetype he had keeps the label unless another is better by more than this
-export const STICKY_Z = 0.55;
+export const STICKY_Z = 2.2;
 // Poor fit: no build his position allows really has the shape of his ratings, and the nearest one is shown. Either the
 // similarity itself is low (POOR_FIT_SCORE: set at the similarity 95% of the 2K builds have to their own archetype, see
 // twoK/build2k.script.test.ts), or the build's name promises a skill that is not among his better ones (he misses the
@@ -169,6 +174,8 @@ export const scoreAll = (
 	position?: Pos,
 	// His visible player traits (only with the playerTraits setting on): trait labels need them
 	traitsIn?: Partial<Record<string, number>>,
+	// His age, stats and whether he is a draft prospect (score.ts)
+	read: Omit<ReadOptions, "pos"> = {},
 ): {
 	scored: Scored[];
 	z: Record<DimKey, number>;
@@ -180,8 +187,8 @@ export const scoreAll = (
 	hgt: number;
 	expanded: boolean;
 } => {
-	const p = prepare(ratings, norms);
 	const pos = position ?? positionOf(ratings);
+	const p = prepare(ratings, norms, { ...read, pos });
 	const cv = classValues(p);
 	const standouts = standoutsOf(p, cv);
 	const traits = visibleTraits(traitsIn);
@@ -200,16 +207,21 @@ export const scoreAll = (
 			continue;
 		}
 		const table = norms.match[a.id];
-		const short = needShortfall(a, p);
+		const need = needShortfall(a, p);
+		const prom = promiseShortfall(a, cv, p);
+		const short = need + prom.floor + prom.rel;
 		const z =
 			(table ? matchZ(table, raw) : raw * 4 - 2) -
 			(a.rare ? RARE_PENALTY : 0) +
 			prior +
 			trait +
 			((norms.bias ?? defaultNorms(p.expanded).bias)?.[a.id] ?? 0) +
-			signatureBonus(a, standouts, cv, p.hgt, short, p.expanded) -
+			signatureBonus(a, standouts, cv, p.hgt, need, p.expanded) +
+			signatureTerm(a, standouts, cv) +
+			creatorTerm(a, read.stats) -
 			genericPenalty(a, standouts) -
-			needPenaltyOf(short);
+			needPenaltyOf(need) -
+			promisePenalty(prom);
 		scored.push({ a, raw, z, short });
 	}
 	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
@@ -288,9 +300,12 @@ export const explain = (
 	id: string,
 	ratings: ArchetypeRatings,
 	norms: Norms = defaultNormsFor(ratings),
+	read: ReadOptions = {},
 ): Why[] => {
 	const a = archetypeById(id);
-	return a ? whyOf(a, prepare(ratings, norms).z, hasExpanded(ratings)) : [];
+	return a
+		? whyOf(a, prepare(ratings, norms, read).z, hasExpanded(ratings))
+		: [];
 };
 
 export type ClassifyOptions = {
@@ -303,6 +318,11 @@ export type ClassifyOptions = {
 	pos?: string;
 	// His player traits as the user sees them (only with the playerTraits setting on; hidden ones are ignored)
 	traits?: Partial<Record<string, number>>;
+	// His age (31 and up: lost athleticism is discounted), box-score stats (StatReading, stats.ts: none for prospects or
+	// players without minutes) and whether he is a draft prospect (read against prospect tables)
+	age?: number;
+	stats?: ReadOptions["stats"];
+	prospect?: boolean;
 };
 
 // The ONE build he is most similar to. No hybrids: the runners-up are only listed as `alternates` ("also close to").
@@ -317,13 +337,19 @@ export const classify = (
 		ARCHETYPES,
 		isPos(opts.pos) ? opts.pos : undefined,
 		opts.traits,
+		{ age: opts.age, stats: opts.stats, prospect: opts.prospect },
 	);
 	let first = scored[0]!;
 	const sticky = opts.stickiness ?? STICKY_Z;
 	if (opts.previousId && opts.previousId !== first.a.id) {
 		const prev = scored.find((s) => s.a.id === opts.previousId);
-		// Never one his position now rules out, however sticky
-		if (prev && prev.z > BLOCKED_Z && prev.z >= first.z - sticky) {
+		// Never one his position now rules out, however sticky, nor one whose name he no longer lives up to
+		if (
+			prev &&
+			prev.z > BLOCKED_Z &&
+			prev.z >= first.z - sticky &&
+			prev.short <= POOR_FIT_SHORT
+		) {
 			first = prev;
 		}
 	}
@@ -356,5 +382,9 @@ export const classify = (
 		tier,
 		why: whyOf(a, z, expanded),
 		label: a.name,
+		...(a.custom ? { custom: true } : {}),
+		...(opts.stats
+			? { statsWeight: Math.round(opts.stats.w * 100) / 100 }
+			: {}),
 	};
 };

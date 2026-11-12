@@ -4,6 +4,7 @@
 // dimension (3 = far and away his best skill). Dimensions not listed are expected to be ordinary for him. So the same
 // build name fits a 45 and an 80 whose ratings have the same shape.
 
+import { CUSTOM_DEFS } from "./customDefs.data.ts";
 import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
 import type { Archetype, ArchetypeDef, Pos, TwoKDef } from "./types.ts";
 
@@ -52,15 +53,19 @@ export const toArchetype = (d: TwoKDef): Archetype => {
 		tags: [
 			d.group,
 			d.family,
-			"2k",
+			...(d.custom ? [] : ["2k"]),
 			...(d.positions.length === ALL_POSITIONS ? ["universal"] : []),
 			...d.tags,
 		],
 		prior: 1,
+		...(d.custom ? { custom: true as const } : {}),
 	};
 };
 
-export const ARCHETYPE_DEFS: Archetype[] = TWO_K_DEFS.map(toArchetype);
+// The 2K builds, then the custom ones (customDefs.data.ts)
+export const ARCHETYPE_DEFS: Archetype[] = [...TWO_K_DEFS, ...CUSTOM_DEFS].map(
+	toArchetype,
+);
 
 // The other 2K build names each archetype stands for (shown in the archetype popover and on League > Archetypes)
 export const TWO_K_NAMES: Record<string, string[]> = Object.fromEntries(

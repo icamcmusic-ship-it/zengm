@@ -24,11 +24,6 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 		},
 		{ title: "%", desc: "Share of the league", sortType: "number" as const },
 		{
-			title: "Also in 2K as",
-			desc: "Other NBA 2K build names this archetype stands for",
-			sortType: "number" as const,
-		},
-		{
 			title: "Best players",
 			sortType: "string" as const,
 			sortSequence: [] as ("asc" | "desc")[],
@@ -46,24 +41,12 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 					</span>
 				),
 				sortValue: r.name,
-				searchValue: r.name,
+				// (other names for the same archetype are not shown, but a search finds them)
+				searchValue: [r.name, ...r.aliases].join(" "),
 			},
 			GROUP_INFO[r.group].label,
 			r.count,
 			{ value: pct(r.share), sortValue: r.share },
-			{
-				value:
-					r.twoK.length > 0 ? (
-						<span title={r.twoK.join(", ")}>
-							{r.twoK.slice(0, 3).join(", ")}
-							{r.twoK.length > 3 ? ` +${r.twoK.length - 3}` : ""}
-						</span>
-					) : (
-						""
-					),
-				sortValue: r.twoK.length,
-				searchValue: r.twoK.join(" "),
-			},
 			{
 				value:
 					r.top.length > 0 ? (
@@ -93,13 +76,14 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 		<>
 			<MoreLinks type="playerRatings" page="archetypes" />
 			<p>
-				Every archetype is an NBA 2K build. A player gets the one build whose
-				shape is most similar to his ratings, relative to his own level (so the
-				same build fits a bench player and a star; the tier says which), at the
-				positions the build is played at. It is saved at the start of every
-				preseason, so a player's label holds for the season. Prospects and
-				players without a saved label show a live reading. {total} players in{" "}
-				{season}.
+				A player gets the one archetype whose shape is most similar to his game:
+				his ratings, mostly relative to his own level (so the same archetype
+				fits a bench player and a star; the tier says which), partly his
+				standing among players at his position, and his stats from last season
+				when he played real minutes, at the positions the archetype is played
+				at. It is saved at the start of every preseason, so a player's label
+				holds for the season. Prospects and players without a saved label show a
+				live reading. {total} players in {season}.
 			</p>
 
 			<div className="d-flex flex-wrap gap-3 mb-4">
