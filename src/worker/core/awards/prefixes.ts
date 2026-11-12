@@ -4,7 +4,7 @@ import type { Award, PlayerAwardBuiltIn } from "../../../common/types.ts";
 const getInitials = (string: string) => {
 	return (
 		string
-			.match(/\b\p{L}/gu)
+			.match(/\b\p{L}|\b\d+/gu)
 			?.join("")
 			.toUpperCase() ?? ""
 	);
