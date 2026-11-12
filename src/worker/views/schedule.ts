@@ -19,6 +19,7 @@ import { getProcessedGames } from "../util/getProcessedGames.ts";
 import { defineView, keepType, type ViewArgs } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
+import { getDayScale } from "../core/season/scheduleDayScale.ts";
 import { getBackToBackGids } from "../core/season/getBackToBackGids.ts";
 
 const processInputs = (params: RouteParams<"schedule">) => {
@@ -135,7 +136,8 @@ export const getUpcoming = async ({
 		// For basketball this is fast, but for other sports it's a bit slow. Could cache sometimes, depending on which players are injured (if nobody is in playThroughInjuries window). This would apply by default in the regualr season, which is what matters, since the default is 0
 		const ovr = team.ovr(playersByTid.get(tid) ?? [], {
 			accountForInjuredPlayers: {
-				numDaysInFuture: day - todayDay,
+				// Injuries heal on only some days with realistic schedule length (scheduleDayScale)
+				numDaysInFuture: Math.round((day - todayDay) * getDayScale()),
 				playThroughInjuries: getActualPlayThroughInjuries(t ?? "default"),
 			},
 
@@ -188,6 +190,7 @@ export const getUpcoming = async ({
 	};
 
 	const upcoming: {
+		day: number;
 		finals?: boolean;
 		forceWin?: number | "tie";
 		gid: number;
@@ -196,6 +199,7 @@ export const getUpcoming = async ({
 	}[] = filteredSchedule.map(
 		({ awayTid, day, finals, forceWin, gid, homeTid }) => {
 			return {
+				day,
 				finals,
 				forceWin,
 				gid,
@@ -512,6 +516,8 @@ const updateUpcoming = async ({
 			canLiveSimFirstGame,
 			elam: g.get("elam"),
 			elamASG: g.get("elamASG"),
+			// Realistic schedule length: show the day of each game and the days off before it
+			showDays: getDayScale() < 1,
 			tid: inputs.tid,
 			ties: season.hasTies("current"),
 			topPlayers,

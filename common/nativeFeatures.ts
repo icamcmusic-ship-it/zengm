@@ -283,6 +283,16 @@ export const NATIVE_FEATURES = [
 		existing: true,
 	},
 	{
+		id: "realisticSchedule",
+		key: "realisticSchedule",
+		name: "Realistic Schedule Length",
+		description:
+			"The regular season is spread over about 2 days per game (82 games in about 160 days) instead of most teams playing almost every day: each team plays about every other day, with about 15 back-to-backs per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "injuryDepth",
 		key: "injuryDepth",
 		name: "Injury Depth",

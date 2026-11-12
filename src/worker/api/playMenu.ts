@@ -14,6 +14,7 @@ import {
 import { runDraft } from "./actions.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { cleanupAutoPlay } from "../core/league/autoPlay.ts";
+import { getNumGameDaysInCalendarDays } from "../core/season/getDaysLeftSchedule.ts";
 
 const getNumDaysThisRound = (playoffSeries: PlayoffSeries) => {
 	let numDaysThisRound = 0;
@@ -137,6 +138,11 @@ const playAmount = async (
 
 		if (numDaysRemaining < numDays) {
 			numDays = numDaysRemaining;
+		}
+
+		// A week is 7 calendar days, even if some of them have no games (realistic schedule length's All-Star break)
+		if (g.get("phase") !== PHASE.PLAYOFFS && numDays > 1) {
+			numDays = await getNumGameDaysInCalendarDays(numDays);
 		}
 
 		await game.play(numDays, conditions);

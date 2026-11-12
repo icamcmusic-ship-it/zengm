@@ -17,9 +17,14 @@ const makePlayoffsKey = (game: ScheduleGameWithoutKey) =>
  *
  * @param {Array} tids A list of lists, each containing the team IDs of the home and
         away teams, respectively, for every game in the season, respectively.
+ * @param {Array} days Optional day of each game, relative to the first day.
  * @return {Promise}
  */
-const setSchedule = async (tids: [number, number][]) => {
+const setSchedule = async (
+	tids: [number, number][],
+	// Day of each game, relative to the first day, for a schedule that spells out its days (see addDaysToSchedule)
+	days?: readonly number[],
+) => {
 	const playoffs = g.get("phase") === PHASE.PLAYOFFS;
 
 	const oldPlayoffGames: Record<string, ScheduleGame> = {};
@@ -43,6 +48,7 @@ const setSchedule = async (tids: [number, number][]) => {
 			awayTid,
 		})),
 		await idb.cache.games.getAll(),
+		days,
 	);
 	for (const game of schedule) {
 		if (playoffs) {
