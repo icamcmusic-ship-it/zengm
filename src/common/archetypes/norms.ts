@@ -4,7 +4,27 @@ import {
 	compositeValues,
 	hasExpanded,
 } from "./composites.ts";
-import type { ArchetypeRatings, DimKey, Norms } from "./types.ts";
+import type {
+	ArchetypeRatings,
+	DimKey,
+	Norms,
+	Pos,
+	PosBucket,
+	Reading,
+} from "./types.ts";
+
+export const POS_BUCKET: Record<Pos, PosBucket> = {
+	PG: "PG",
+	G: "PG",
+	SG: "SG",
+	GF: "W",
+	SF: "W",
+	F: "F",
+	PF: "F",
+	FC: "C",
+	C: "C",
+};
+export const POS_BUCKETS: PosBucket[] = ["PG", "SG", "W", "F", "C"];
 
 // The dimensions whose mean is "how good is he, period", used to read shape instead of level
 export const CORE_DIMS: DimKey[] = [
@@ -130,14 +150,35 @@ const clampZ = (z: number) => Math.min(2.65, Math.max(-2.65, z));
 export const rawZ = (q: number[], v: number) =>
 	clampZ(probit(Math.min(1 - P_MIN, Math.max(P_MIN, percentile(q, v)))));
 
-// A reference league's quantiles. `rows` are the ratings (and ovr) of its players.
+// A reference league's quantiles. `rows` are the ratings (and ovr, and position) of its players.
 export const buildBaseNorms = (
-	rows: { ratings: ArchetypeRatings; ovr?: number }[],
+	rows: { ratings: ArchetypeRatings; ovr?: number; pos?: Pos }[],
 ): Omit<Norms, "match"> => {
 	const vals = rows.map((r) => compositeValues(r.ratings));
 	const q = {} as Norms["q"];
 	for (const dim of DIMS) {
 		q[dim] = quantiles(vals.map((v) => v[dim]));
+	}
+	// By position bucket (21 points), when the rows say where they play and every bucket has enough players
+	let pq: Norms["pq"];
+	if (rows.every((r) => r.pos !== undefined)) {
+		const by = {} as Record<PosBucket, Record<DimKey, number>[]>;
+		for (const [i, r] of rows.entries()) {
+			(by[POS_BUCKET[r.pos!]] ??= []).push(vals[i]!);
+		}
+		if (POS_BUCKETS.every((b) => (by[b]?.length ?? 0) >= 40)) {
+			pq = {} as NonNullable<Norms["pq"]>;
+			for (const b of POS_BUCKETS) {
+				const t = {} as Record<DimKey, number[]>;
+				for (const dim of DIMS) {
+					t[dim] = quantiles(
+						by[b]!.map((v) => v[dim]),
+						21,
+					).map((x) => Math.round(x * 10000) / 10000);
+				}
+				pq[b] = t;
+			}
+		}
 	}
 	// Correlation of each dimension's z with height's z
 	const zs = vals.map((v) => {
@@ -171,6 +212,7 @@ export const buildBaseNorms = (
 		q,
 		beta,
 		ovr: ovrs.length > 0 ? quantiles(ovrs) : [],
+		...(pq ? { pq } : {}),
 	};
 };
 
@@ -180,7 +222,12 @@ const SHRINK_FLOOR = 0.55;
 // of his core skills is taken out in full), so the reading is the shape of his game, whatever his overall: a 45 and an 80
 // whose ratings have the same shape read the same. `abs` (league-wide) and `sz` (for his size) are relative to his own
 // level too. Height (and the style dimensions) stay as they are.
-export const zVector = (r: ArchetypeRatings, norms: Norms) => {
+export const zVector = (
+	r: ArchetypeRatings,
+	norms: Reading,
+	// His position: `pz` is read against players of that position bucket (else against the whole league)
+	pos?: Pos,
+) => {
 	const v = compositeValues(r);
 	const z = {} as Record<DimKey, number>;
 	// Absolute (league-wide) z, and z for his size before his level is taken out
@@ -234,6 +281,27 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 		absLevel += abs[dim];
 	}
 	absLevel /= CORE_DIMS.length;
+	// Absolute standing among players of his position (not relative to his level): an elite three for a point guard is
+	// elite whoever else he is. Without position tables, the league-wide reading.
+	const pt = pos ? norms.pq?.[POS_BUCKET[pos]] : undefined;
+	const pz = {} as Record<DimKey, number>;
+	let pzLevel = 0;
+	for (const dim of DIMS) {
+		if (dim === "hgt" || STYLE_DIMS.has(dim)) {
+			pz[dim] = abs[dim];
+			continue;
+		}
+		const src =
+			(dim === "pdef" || dim === "idef") && (!expanded || !norms.q[dim])
+				? "diq"
+				: dim;
+		const t = pt?.[src];
+		pz[dim] = t ? rawZ(t, v[src]) : abs[dim];
+	}
+	for (const dim of CORE_DIMS) {
+		pzLevel += pz[dim];
+	}
+	pzLevel /= CORE_DIMS.length;
 	for (const dim of DIMS) {
 		if (dim !== "hgt" && !STYLE_DIMS.has(dim)) {
 			z[dim] = clampZ(z[dim] - level);
@@ -241,7 +309,7 @@ export const zVector = (r: ArchetypeRatings, norms: Norms) => {
 			abs[dim] = clampZ(abs[dim] - absLevel);
 		}
 	}
-	return { z, level, hgtZ: hz, abs, sz, expanded };
+	return { z, level, hgtZ: hz, abs, sz, expanded, pz, pzLevel };
 };
 
 export const ovrPercentile = (norms: Norms, ovr: number) =>

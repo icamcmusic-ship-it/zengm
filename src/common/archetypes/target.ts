@@ -148,7 +148,10 @@ export const personalizeSeed = (
 	let evals = 0;
 	const objective = (cand: Partial<Record<RatingKey, number>>) => {
 		evals++;
-		const sc = scoreAll(neutral(cand), norms, list).scored;
+		// (as a draft prospect is read: the seeds aim prospects)
+		const sc = scoreAll(neutral(cand), norms, list, undefined, undefined, {
+			prospect: true,
+		}).scored;
 		const zt = sc.find((x) => x.a.id === a.id)!.z;
 		// A soft maximum over the rivals, so there is a gradient before the target actually wins
 		let lse = 0;

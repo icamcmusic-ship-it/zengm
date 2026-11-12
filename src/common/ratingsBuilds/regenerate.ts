@@ -137,7 +137,8 @@ const state = (
 
 // Read with the game's position for these ratings (F.pos follows the league's position setting)
 const derivedOf = (F: Formulas, ratings: BuildRatings, norms?: Norms) => {
-	const c = classify(ratings, { norms, pos: F.pos(ratings) });
+	// (a draft prospect: read against the prospect tables, as the game shows him)
+	const c = classify(ratings, { norms, pos: F.pos(ratings), prospect: true });
 	return {
 		id: c.id,
 		name: c.name,
@@ -299,7 +300,9 @@ export const regenerateClass = (
 		let matched = false;
 		if (aimed && targetId && !lock?.skip) {
 			const fit = (r: BuildRatings) => {
-				const sc = scoreAll(r, opts.norms).scored;
+				const sc = scoreAll(r, opts.norms, undefined, undefined, undefined, {
+					prospect: true,
+				}).scored;
 				const i = sc.findIndex((x) => x.a.id === targetId);
 				return { matched: i === 0, z: sc[i]!.z - sc[0]!.z };
 			};

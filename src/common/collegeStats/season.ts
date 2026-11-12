@@ -316,12 +316,13 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	let missed =
 		rng.random() < 0.34 ? Math.round(Math.abs(rng.normal(0, 3.5)) + 1) : 0;
 	missed = Math.min(missed, 18);
+	// Role on his college team: a class-average prospect is a rotation player around 25 minutes, the best of the class are 30-34 minute stars, the bottom of the class (and young players) come off the bench. Real Division I starters rarely average more than 35
 	const mpgBase =
-		32.0 * (gameMinutes / 40) +
-		2.7 * z +
-		[-1.8, -0.6, 0.3, 0.7][clamp(c, 0, 3)]! +
-		0.025 * (ratings.endu - 45) +
-		rng.normal(0, 2.3 * noise) +
+		25.5 * (gameMinutes / 40) +
+		4.3 * z +
+		[-2.6, -0.8, 0.7, 1.6][clamp(c, 0, 3)]! +
+		0.04 * (ratings.endu - 45) +
+		rng.normal(0, 2.6 * noise) +
 		(ctx.mpgShift ?? 0);
 	// A teenager at a pro club does not play college star minutes
 	const proCap = proEnv
@@ -332,7 +333,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const mpg = clamp(
 		proEnv ? mpgBase + proEnv.minShift * (gameMinutes / 40) : mpgBase,
 		7,
-		Math.min(proCap, 37.5 * (gameMinutes / 40)),
+		Math.min(proCap, 36.5 * (gameMinutes / 40)),
 	);
 	const dnp = mpg < 17 ? Math.round(rng.random() * 5) : 0;
 	const gp = capped
@@ -358,7 +359,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	// Usage: the share of his team's scoring chances he finishes while on the floor
 	const usageComp = composite(ratings, "usage");
 	const zUsage = (usageComp - TYPICAL.usage) / TYPICAL.usageSd;
-	const zU = 0.5 * zUsage + 0.5 * z + (ctx.usageShift ?? 0);
+	const zU = 0.6 * zUsage + 0.4 * z + (ctx.usageShift ?? 0);
 	const usgRaw =
 		0.262 +
 		(proEnv?.usageShift ?? 0) +
@@ -369,7 +370,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const usg = clamp(
 		usgRaw > 0.29 ? 0.29 + 0.55 * (usgRaw - 0.29) : usgRaw,
 		0.13,
-		0.35,
+		0.34,
 	);
 
 	// Turnovers: share of possessions
@@ -380,7 +381,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			// Expanded ratings: ball security beyond what his handle and IQ say
 			(ratings.bsc === undefined
 				? 0
-				: 0.002 * (ratings.bsc - ballSecurityBase(ratings))) +
+				: 0.0035 * (ratings.bsc - ballSecurityBase(ratings))) +
 			rng.normal(0, 0.014 * noise),
 		0.08,
 		0.27,
@@ -391,17 +392,19 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const ftRate = clamp(
 		byHeight("ftr", b) * 1.0 +
 			0.32 * (drawing - (0.42 + 0.11 * b)) +
+			// Attacking the rim (dunks, post moves) gets him fouled
+			0.003 * ((ratings.dnk + ratings.ins) / 2 - 45) +
 			rng.normal(0, 0.045 * noise),
 		0.1,
 		0.75,
 	);
 
 	// Shot mix: 3PA share by height, stretched by shooting talent, and zero for someone who can't shoot
-	const willing = ratings.tp >= 30 ? 1 : Math.max(0, ratings.tp) / 30;
+	// A typical shooter (tp around 40) takes his height's share, a non-shooter (tp 25 or less) almost none, a sniper up to 1.7 times as many; a big who can shoot gets a few more on top of his height's small share
+	const willing = clamp((ratings.tp - 22) / 15, 0, 1.7);
 	const share3 = clamp(
-		byHeight("share3", b) *
-			clamp(0.5 + 0.5 * (ratings.tp / 38), 0.1, 1.6) *
-			willing *
+		(byHeight("share3", b) * willing +
+			0.004 * Math.max(0, ratings.tp - 50) * b) *
 			// Expanded ratings: spot-up shooters take more of their shots from three, shot creators more pull-up twos
 			(ratings.csh === undefined || ratings.dsh === undefined
 				? 1
@@ -435,21 +438,23 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		0.006 * (c - 1.5) +
 		compAdj +
 		loadAdj +
-		0.04 +
+		0.03 +
 		rng.normal(0, 0.008 * noise);
 	// D1 shoots about 34%; even the best shooting prospects rarely sustain much over 40%
 	const tpPct = clamp(
 		0.336 +
-			0.003 * (ratings.tp - 38) +
+			0.0042 * (ratings.tp - 40) +
 			0.0005 * (ratings.oiq - 40) +
+			// Expanded ratings: most college threes are catch-and-shoot
+			(ratings.csh === undefined ? 0 : 0.0012 * (ratings.csh - ratings.tp)) +
 			0.35 * eff,
 		0.15,
-		0.5,
+		0.47,
 	);
 	const rimPct = clamp(
 		byHeight("rimPct", b) + 0.3 * (atRimComp - (0.3 + 0.32 * b)) + eff,
 		0.4,
-		0.85,
+		0.78,
 	);
 	const lowPct = clamp(
 		0.47 + 0.0035 * (ratings.ins - 45) + 0.0004 * (ratings.hgt - 50) + eff,
@@ -472,13 +477,14 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 
 	// Everything else, per 40 minutes
 	const trb40 = clamp(
-		4 +
-			0.115 * (ratings.hgt - 30) +
-			0.08 * (ratings.reb - 30) +
-			0.4 * z * 0 +
+		3.5 +
+			0.15 * (ratings.hgt - 30) +
+			0.1 * (ratings.reb - 30) +
+			0.02 * (ratings.jmp - 50) +
+			(ratings.wng === undefined ? 0 : 0.04 * (ratings.wng - ratings.hgt)) +
 			rng.normal(0, 0.7 * noise),
 		2.4,
-		17,
+		16,
 	);
 	const orbShare =
 		ratings.oreb === undefined || ratings.dreb === undefined
@@ -501,9 +507,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	);
 	// Drafted D1 players average about 1.5 steals per 40 minutes, guards more
 	const stl40 = clamp(
-		1.15 +
-			0.025 * (ratings.spd - 40) +
-			0.02 * ((ratings.pdef ?? ratings.diq) - 40) +
+		1.65 +
+			0.016 * (ratings.spd - 40) +
+			0.03 * ((ratings.pdef ?? ratings.diq) - 40) +
 			(ratings.wng === undefined ? 0 : 0.006 * (ratings.wng - ratings.hgt)) -
 			0.35 * b +
 			rng.normal(0, 0.22 * noise),
@@ -514,9 +520,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const blk40 = clamp(
 		-0.35 +
 			0.075 * (ratings.hgt - 30) +
-			0.012 * (ratings.jmp - 40) +
-			0.01 * ((ratings.idef ?? ratings.diq) - 40) +
-			(ratings.wng === undefined ? 0 : 0.03 * (ratings.wng - ratings.hgt)) +
+			0.02 * (ratings.jmp - 40) +
+			0.022 * ((ratings.idef ?? ratings.diq) - 40) +
+			(ratings.wng === undefined ? 0 : 0.05 * (ratings.wng - ratings.hgt)) +
 			rng.normal(0, 0.25 * noise),
 		0.05,
 		6,
