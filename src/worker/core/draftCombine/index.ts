@@ -25,6 +25,7 @@ import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
+import { earlyCombineRead } from "../frontOffice/index.ts";
 
 type PlayerRatings = Player["ratings"][number] & Record<string, any>;
 
@@ -152,20 +153,31 @@ export const getClassCombine = async (
 };
 
 // One prospect's combine, with his ranks in the class. undefined when off, not held yet or not invited
+// (for the user's views and scouting reports: Front Office Budget's early read, see frontOffice/index.ts earlyCombineRead)
 export const getPlayerCombine = async (p: Player) => {
-	if (!lotteryNightOn() || !combineHeld(p.draft.year)) {
+	if (!lotteryNightOn()) {
 		return undefined;
 	}
-	const c = await getClassCombine(p.draft.year);
+	const early =
+		!combineHeld(p.draft.year) && (await earlyCombineRead(p.draft.year));
+	if (!early && !combineHeld(p.draft.year)) {
+		return undefined;
+	}
+	const c = await getClassCombine(p.draft.year, undefined, early);
 	const result = c.results.get(p.pid);
 	if (!result) {
-		return { invited: false as const, n: c.results.size };
+		return {
+			invited: false as const,
+			n: c.results.size,
+			...(early ? { early: true as const } : {}),
+		};
 	}
 	return {
 		invited: true as const,
 		result,
 		ranks: c.ranks.get(p.pid) ?? {},
 		n: c.results.size,
+		...(early ? { early: true as const } : {}),
 	};
 };
 

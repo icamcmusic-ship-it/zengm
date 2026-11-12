@@ -129,6 +129,9 @@ export const overspendMoodPenalty = (spent: number, envelope: number) => {
 const clamp = (x: number, lo: number, hi: number) =>
 	Math.max(lo, Math.min(hi, x));
 
+// Scouting with Draft Lottery Night & Combine: the scouting level (3-season average) at which your scouts read the combine early
+export const EARLY_COMBINE_LEVEL = 55;
+
 // Medical (the health budget): injury durations keep the existing healthEffect (-12% at the top to +13% at the bottom). The department
 // adds a lower injury rate (in-game injuries, -7% to +8%) and faster recovery for players 30 and older (another -10% to +11% of the
 // duration, fully from age 34)
@@ -285,7 +288,9 @@ export const deptEffectLine = (
 		scheduleLoad,
 		injuryDepth,
 		coachSystems,
+		combine,
 	}: {
+		combine?: boolean;
 		scouts?: number;
 		scheduleLoad?: boolean;
 		injuryDepth?: boolean;
@@ -294,7 +299,7 @@ export const deptEffectLine = (
 ) => {
 	const e = levelToEffect(level);
 	if (dept === "scouting") {
-		return `${scouts !== undefined ? `${scouts} scouts, ` : ""}prospect rating error ${pct(-100 * (e / 2))}`;
+		return `${scouts !== undefined ? `${scouts} scouts, ` : ""}prospect rating error ${pct(-100 * (e / 2))}${combine && level >= EARLY_COMBINE_LEVEL ? ", early combine read" : ""}`;
 	}
 	if (dept === "analytics") {
 		const parts = [

@@ -30,6 +30,7 @@ import type {
 	Team,
 	TeamSeasonWithoutKey,
 } from "../../../common/types.ts";
+import { EARLY_COMBINE_LEVEL } from "../../../common/frontOffice.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
@@ -333,6 +334,24 @@ export const allocateAi = (t: Team, targetLevel: number) => {
 
 export const gmAnalyticsShift = (t: Team) =>
 	frontOfficeEnabled() ? analyticsGmShift(getNewDeptLevel(t, "analytics")) : 0;
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Scouting: with Draft Lottery Night & Combine, a strong scouting department (3-season level EARLY_COMBINE_LEVEL+) gets its read of
+// the current class's combine measurements and drills from the playoffs on, before the combine is held at the draft lottery. The
+// combine is a pure function of each prospect, so the early read is exactly what the combine will show
+
+export const earlyCombineRead = async (draftYear: number) => {
+	if (
+		!frontOfficeEnabled() ||
+		draftYear !== g.get("season") ||
+		g.get("phase") < PHASE.PLAYOFFS ||
+		g.get("phase") >= PHASE.DRAFT_LOTTERY
+	) {
+		return false;
+	}
+	const level = await getLevelLastThree("scouting", { tid: g.get("userTid") });
+	return level >= EARLY_COMBINE_LEVEL;
+};
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 // Season review (Team Finances)

@@ -9,6 +9,7 @@ import { team } from "../index.ts";
 import {
 	allocateAi,
 	defaultNewDeptLevel,
+	earlyCombineRead,
 	frontOfficeEnabled,
 	getFinancesInfo,
 	getInjuryDurationFactor,
@@ -141,6 +142,25 @@ describe("Front Office Budget (worker)", () => {
 		];
 		const mean = levels.reduce((a, b) => a + b, 0) / levels.length;
 		assert.closeTo(mean, 40, 1.5);
+	});
+
+	test("a strong scouting department reads the combine early", async () => {
+		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		g.setWithoutSavingToDB("userTid", 0);
+		const t = (await idb.cache.teams.get(0))!;
+		t.budget.scouting = 34;
+		t.initialBudget.scouting = 34;
+		assert.isFalse(await earlyCombineRead(g.get("season")));
+		t.budget.scouting = 90;
+		t.initialBudget.scouting = 90;
+		assert.isTrue(await earlyCombineRead(g.get("season")));
+		// Only the current class, only from the playoffs until the combine
+		assert.isFalse(await earlyCombineRead(g.get("season") + 1));
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		assert.isFalse(await earlyCombineRead(g.get("season")));
+		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		g.setWithoutSavingToDB("featureFrontOffice", false);
+		assert.isFalse(await earlyCombineRead(g.get("season")));
 	});
 
 	test("Team Finances info: ranks, envelope, review", async () => {

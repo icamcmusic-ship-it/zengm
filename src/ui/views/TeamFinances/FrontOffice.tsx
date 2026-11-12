@@ -20,7 +20,7 @@ const gradientStyle = gradientStyleFactory(-0.9, -0.05, 0.05, 0.9);
 
 const DEPT_HELP: Record<FrontOfficeDept, string> = {
 	scouting:
-		"The size and quality of your scouting department (Scouting Reports) and how far off your view of draft prospects' ratings is.",
+		"The size and quality of your scouting department (Scouting Reports) and how far off your view of draft prospects' ratings is. With Draft Lottery Night & Combine, a department at level 55+ (3-season average) reads the draft combine early, from the playoffs.",
 	analytics:
 		"Narrower, more accurate projection ranges for players you could trade for or sign (Trade, Free Agents), and with Coaching Systems your head coach's game management and minutes plan.",
 	health:
@@ -74,6 +74,7 @@ export const FrontOfficeDepartments = ({
 	};
 	const options = {
 		scouts: info.scouts,
+		combine: info.combine,
 		scheduleLoad: info.scheduleLoad,
 		injuryDepth: info.injuryDepth,
 		coachSystems: info.coachSystems,

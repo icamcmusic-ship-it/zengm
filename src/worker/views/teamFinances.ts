@@ -269,6 +269,7 @@ export default defineView({
 						...frontOfficeInfo,
 						scouts: departmentSize(t.expenseLevelsLastThree.scouting),
 						scheduleLoad: featureOn("scheduleLoad"),
+						combine: featureOn("lotteryNight"),
 						injuryDepth: !!g.get("injuryDepth"),
 						coachSystems: featureOn("coachSystems") && !!g.get("coachingStaff"),
 					}
