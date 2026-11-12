@@ -328,13 +328,14 @@ const TopStuff = ({
 		"userTid",
 	]);
 
-	const freeAgent = player.tid === PLAYER.FREE_AGENT;
+	const collegeLeague = useIsCollege();
+	// College: tid FREE_AGENT means the transfer portal, no contract to negotiate
+	const freeAgent = player.tid === PLAYER.FREE_AGENT && !collegeLeague;
 	const injured = player.injury.gamesRemaining > 0;
 	const showContract =
 		player.tid !== PLAYER.UNDRAFTED &&
 		player.tid !== PLAYER.UNDRAFTED_FANTASY_TEMP &&
 		player.tid !== PLAYER.RETIRED;
-	const collegeLeague = useIsCollege();
 	const showTradeFor =
 		player.tid !== userTid && player.tid >= 0 && !collegeLeague;
 	const showTradingBlock = player.tid === userTid && !collegeLeague;

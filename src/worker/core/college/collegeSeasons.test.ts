@@ -391,6 +391,13 @@ const runLeague = async ({
 			await step("portal", () => phase.newPhase(PHASE.AFTER_DRAFT, {}));
 			const portal = await getPortalPlayers();
 			assert.isAbove(portal.length, 0, "players in the portal");
+			{
+				// His player page loads (a contract to read for the mood) and says where he is
+				const view = (await loadView("player", {
+					pid: String(portal[0]!.pid),
+				})) as any;
+				assert.strictEqual(view.teamName, "Transfer Portal");
+			}
 			for (const t of teams) {
 				const n = (await idb.cache.players.indexGetAll("playersByTid", t.tid))
 					.length;
@@ -408,8 +415,16 @@ const runLeague = async ({
 				}
 				const target = portal.find((p) => p.portal!.from !== userTid);
 				const offer = await userAction({ pid: target!.pid, action: "offer" });
+				// Verbal commitments of next year's class hold scholarships too
+				const userCommits = (
+					await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+				).filter(
+					(p: any) =>
+						p.draft.year === g.get("season") && p.recruit?.commit === userTid,
+				).length;
 				const spots =
 					13 -
+					userCommits -
 					(await idb.cache.players.indexGetAll("playersByTid", userTid)).length;
 				if (spots > 0) {
 					assert.isUndefined(offer, "portal offer");
