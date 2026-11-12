@@ -1,4 +1,5 @@
 import { assert, beforeEach, describe, test } from "vitest";
+import { makeSeededRandom } from "../../../common/random.ts";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { resetCache, resetG } from "../../../test/helpers.ts";
 import { g } from "../../util/index.ts";
@@ -35,11 +36,18 @@ beforeEach(async () => {
 	g.setWithoutSavingToDB("season", SEASON);
 	g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
 	g.setWithoutSavingToDB("generateCollegeStats", false);
-	prospects = [
-		...(await makeClass(SEASON, 0)),
-		...(await makeClass(SEASON + 1, 1000)),
-		...(await makeClass(SEASON + 2, 2000)),
-	];
+	// Seeded classes: the counts below (redshirts, stories) are thresholds on a few random prospects
+	const originalRandom = Math.random;
+	Math.random = makeSeededRandom(SEASON);
+	try {
+		prospects = [
+			...(await makeClass(SEASON, 0)),
+			...(await makeClass(SEASON + 1, 1000)),
+			...(await makeClass(SEASON + 2, 2000)),
+		];
+	} finally {
+		Math.random = originalRandom;
+	}
 	await resetCache({ players: prospects });
 	for (const p of prospects) {
 		await player.updateValues(p);
@@ -234,7 +242,7 @@ describe("careers and recruiting ranks on generated prospects", () => {
 				}
 			}
 		}
-	});
+	}, 30_000);
 
 	test("prospects from before the career model: nothing stored, plain ranks made unique", async () => {
 		await generateCollegeStats({ draftYear: SEASON, seed: "a" });

@@ -19,6 +19,7 @@ import {
 } from "../wrapped/util.ts";
 import {
 	isActive,
+	isRetired,
 	overlapsSeason,
 	plainText,
 	pLink,
@@ -854,7 +855,7 @@ const KINDS: Kind[] = [
 			const list = X.L.players
 				.filter(
 					(p) =>
-						!isActive(X, p) &&
+						isRetired(X, p) &&
 						p.stats.length > 0 &&
 						titleSeasons(X, p).length === 0,
 				)
@@ -929,7 +930,7 @@ const KINDS: Kind[] = [
 				if (
 					p.draft.round !== 1 ||
 					p.draft.pick > 3 ||
-					isActive(X, p) ||
+					!isRetired(X, p) ||
 					p.stats.length === 0
 				) {
 					continue;

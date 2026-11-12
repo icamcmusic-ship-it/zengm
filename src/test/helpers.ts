@@ -28,6 +28,8 @@ export const mockIDBLeague = (): any => {
 	};
 
 	const league = {
+		// league.close() calls this when a later test file (same worker, isolate: false) creates a real league
+		close() {},
 		get: queries.get,
 		getAll: queries.getAll,
 		transaction() {

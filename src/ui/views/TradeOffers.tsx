@@ -301,7 +301,8 @@ const TradeOffers = ({
 								</span>
 							</p>
 							<p className="mb-2 text-body-secondary">{offer.reason}</p>
-							<div className="d-flex gap-5">
+							{/* Wraps on a phone, where the two sides side by side are wider than the screen */}
+							<div className="d-flex flex-wrap column-gap-5 row-gap-2">
 								{offer.summary.teams.map((t, j) => {
 									return (
 										<div key={j}>
