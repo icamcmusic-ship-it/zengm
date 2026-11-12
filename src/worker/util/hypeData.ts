@@ -25,6 +25,7 @@ import { player, season as seasonCore, team } from "../core/index.ts";
 import { idb } from "../db/index.ts";
 import { getMaxPlayoffSeed } from "../views/standings.ts";
 import { g, helpers } from "./index.ts";
+import { featureOn } from "./nativeFeatures.ts";
 
 const finite = (x: unknown): number | undefined =>
 	typeof x === "number" && Number.isFinite(x) ? x : undefined;
@@ -126,8 +127,10 @@ const toHGame = (gm: Game, playInGids: Set<number>): HGame => {
 		overtimes: gm.overtimes ?? 0,
 		teams: [mapTeam(gm.teams[0]), mapTeam(gm.teams[1])],
 		clutch: (gm.clutchPlays ?? []).map(clutchText),
-		...(gm.marquee !== undefined ? { marquee: gm.marquee } : {}),
-		...(gm.rivalry ? { rivalry: true } : {}),
+		...(gm.marquee !== undefined && featureOn("marqueeGames")
+			? { marquee: gm.marquee }
+			: {}),
+		...(gm.rivalry && featureOn("marqueeGames") ? { rivalry: true } : {}),
 	};
 };
 
@@ -392,6 +395,7 @@ export const upcomingTargets = async (
 			? await idb.cache.playoffSeries.get(g.get("season"))
 			: undefined;
 	const playIn = !!playoffSeries && playoffSeries.currentRound === -1;
+	const marqueeOn = featureOn("marqueeGames");
 	const days = new Map<number, UpcomingGame[]>();
 	for (const game of schedule) {
 		if (game.homeTid < 0 || game.awayTid < 0) {
@@ -413,8 +417,10 @@ export const upcomingTargets = async (
 			playIn,
 			completed: false,
 			season: g.get("season"),
-			...(game.marquee !== undefined ? { marquee: game.marquee } : {}),
-			...(game.rivalry ? { rivalry: true } : {}),
+			...(game.marquee !== undefined && marqueeOn
+				? { marquee: game.marquee }
+				: {}),
+			...(game.rivalry && marqueeOn ? { rivalry: true } : {}),
 		});
 	}
 	return { days: [...days.entries()].map(([day, games]) => ({ day, games })) };

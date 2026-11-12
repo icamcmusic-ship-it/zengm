@@ -520,13 +520,16 @@ const play = async (
 	) => {
 		const results = [...quickResults];
 
+		const marqueeOn = nativeFeatureEnabled("marqueeGames", (key) =>
+			g.get(key as any),
+		);
 		for (const game of schedule) {
 			const doPlayByPlay = gidOneGame === game.gid && playByPlay;
 
 			const teamsInput = [teams[game.homeTid], teams[game.awayTid]] as any;
 
 			// Marquee Games: a louder home crowd for holiday, national TV and rivalry games (Load, Fatigue & Venue's crowd)
-			const crowdBoost = marqueeCrowdBoost(game);
+			const crowdBoost = marqueeOn ? marqueeCrowdBoost(game) : 0;
 			if (crowdBoost > 0 && teamsInput[0]) {
 				teamsInput[0].crowdBoost = crowdBoost;
 			}
