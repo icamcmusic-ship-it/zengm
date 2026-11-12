@@ -1,3 +1,4 @@
+import { schoolDistanceKm } from "../../../common/college/geography.ts";
 import { g, helpers } from "../../util/index.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import {
@@ -756,10 +757,17 @@ class GameSim extends GameSimBase {
 			this.foulMult[0] * (1 - lean),
 			this.foulMult[1] * (1 + lean),
 		];
-		this.travelKm = travelDistance(
-			(this.team[1] as any).region,
-			(this.team[0] as any).region,
-		);
+		// College mode: campus to campus (the region is the school's name)
+		this.travelKm =
+			g.get("leagueType") === "college"
+				? schoolDistanceKm(
+						(this.team[1] as any).region,
+						(this.team[0] as any).region,
+					)
+				: travelDistance(
+						(this.team[1] as any).region,
+						(this.team[0] as any).region,
+					);
 		const travel = travelEndurance(this.travelKm);
 		for (const p of this.team[1].player) {
 			if (p.compositeRating.endurance !== undefined) {

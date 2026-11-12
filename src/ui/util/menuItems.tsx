@@ -143,6 +143,16 @@ const coachesLinks: MenuItemLink[] =
 				},
 				{
 					type: "link",
+					active: (pageID) => pageID === "collegeCarousel",
+					league: true,
+					commandPalette: true,
+					leagueType: "college",
+					feature: "coachingStaff",
+					path: ["college_carousel"],
+					text: "Coaching Carousel",
+				},
+				{
+					type: "link",
 					active: (pageID) => pageID === "frontOffices",
 					league: true,
 					commandPalette: true,

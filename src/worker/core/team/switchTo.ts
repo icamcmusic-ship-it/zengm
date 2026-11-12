@@ -3,9 +3,17 @@ import { league } from "../index.ts";
 import { g, toUI } from "../../util/index.ts";
 import deleteUnreadMessages from "./deleteUnreadMessages.ts";
 import { PHASE } from "../../../common/constants.ts";
+import { isCollege } from "../college/isCollege.ts";
+import { moveUserCoach } from "../staff/collegeCarousel.ts";
+import { staffEnabled } from "../staff/index.ts";
 
 const switchTo = async (tid: number, tids?: number[]) => {
 	const prevTid = g.get("userTid");
+
+	// College mode: the user is his school's head coach, who moves with him (fired by the owner, or hired away)
+	if (isCollege() && staffEnabled()) {
+		await moveUserCoach(prevTid, tid, g.get("gameOver") ? "fired" : "left");
+	}
 
 	let gracePeriodSeasons = 2;
 	if (g.get("phase") >= PHASE.PLAYOFFS) {

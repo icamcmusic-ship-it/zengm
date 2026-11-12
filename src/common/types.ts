@@ -1597,6 +1597,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	collegeSeason?: StoredCollegeSeason;
 	// Basketball: his years before the draft (schools, redshirt years, transfers, junior college), his story if he is one of the class's unusual prospects, and his recruiting ranking, see common/collegeStats/career.ts. Only on prospects whose college stats were generated with the career model
 	preDraftCareer?: StoredPreDraftCareer;
+	// Basketball: version of the college stats model his pre-draft stats were generated with (COLLEGE_STATS_VERSION in common/collegeStats/season.ts). Missing: 1, or not generated
+	collegeStatsV?: number;
 
 	// Basketball, the Draft Class Shapes setting: the shape his class was given (a key of DRAFT_CLASS_SHAPES), or "pending" between being generated and being shaped
 	draftClassShape?: string;

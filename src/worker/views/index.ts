@@ -35,6 +35,7 @@ export { default as collegeDepartures } from "./collegeDepartures.ts";
 export { default as collegePolls } from "./collegePolls.ts";
 export { default as collegeRecruiting } from "./collegeRecruiting.ts";
 export { default as collegeNit } from "./collegeNit.ts";
+export { default as collegeCarousel } from "./collegeCarousel.ts";
 export { default as collegePortal } from "./collegePortal.ts";
 export { default as draftTeamHistory } from "./draftTeamHistory.ts";
 export { default as editAwardWinners } from "./editAwardWinners.ts";

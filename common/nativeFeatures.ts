@@ -325,6 +325,27 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "collegeRealignment",
+		key: "collegeRealignment",
+		name: "College Conference Realignment",
+		description:
+			"College leagues only: every few years (a chance each offseason), programs that have outgrown their conference move to a stronger one nearby, and the conferences they leave fill the spot with the best school of a weaker conference. The new conferences are used from the next season on: schedules, standings, conference tournaments and automatic bids. Moves are in the news and on the Coaching Carousel page. On by default for new college leagues.",
+		default: false,
+		sports: BBGM,
+		options: [
+			{
+				key: "collegeRealignmentYears",
+				name: "Years Between Realignments",
+				description:
+					"On average, one realignment every this many seasons (never two seasons in a row).",
+				type: "int",
+				default: 4,
+				min: 1,
+				max: 50,
+			},
+		],
+	},
+	{
 		id: "realisticPossessions",
 		key: "realisticPossessions",
 		name: "Realistic Possession Model",

@@ -143,6 +143,8 @@ export const routeInfos = {
 	"/l/:lid/college_departures/:season": "collegeDepartures",
 	"/l/:lid/college_recruiting": "collegeRecruiting",
 	"/l/:lid/college_recruiting/:season": "collegeRecruiting",
+	"/l/:lid/college_carousel": "collegeCarousel",
+	"/l/:lid/college_carousel/:season": "collegeCarousel",
 	"/l/:lid/college_nit": "collegeNit",
 	"/l/:lid/college_nit/:season": "collegeNit",
 	"/l/:lid/college_portal": "collegePortal",

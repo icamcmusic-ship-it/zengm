@@ -115,7 +115,22 @@ const CollegeRecruiting = ({
 							extraColumns={[
 								{ title: "Rk", render: (r) => r.rank },
 								{ title: "Stars", render: (r) => <Stars stars={r.stars} /> },
-								{ title: "From", render: (r) => r.state },
+								{
+									title: "From",
+									render: (r) => (
+										<>
+											{r.state}
+											{r.miles !== undefined ? (
+												<span
+													className="text-body-secondary ms-1"
+													title="Miles from his hometown to your campus"
+												>
+													({r.miles} mi)
+												</span>
+											) : null}
+										</>
+									),
+								},
 							]}
 							emptyText="No recruits match."
 						/>

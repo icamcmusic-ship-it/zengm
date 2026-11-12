@@ -81,6 +81,17 @@ const CollegePortal = ({
 								),
 							},
 							{ title: "Yr", render: (r) => r.classYear },
+							{
+								title: "Home",
+								render: (r) =>
+									r.miles !== undefined ? (
+										<span title="Miles from his hometown to your campus">
+											{r.miles} mi
+										</span>
+									) : (
+										"abroad"
+									),
+							},
 						]}
 						retain={(r) => r.from === userTid}
 						emptyText="Nobody left in the portal."

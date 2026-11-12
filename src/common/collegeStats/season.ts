@@ -9,6 +9,9 @@ import type { CollegeSeason, GameBox, Ratings } from "./types.ts";
  * The college season model. This is a per-player rate model, in the spirit of (and with the anchors of) the BBGM Draft Class Workshop's stat model, but without simulating a whole league of college teams around the prospect: possessions used come from a usage rate, turnovers, free throw rate, shot mix and shooting percentages come from the Workshop's height-bucketed draft-year anchors adjusted by the prospect's ratings, and the season is built game by game so that totals, season highs and double-double counts are all consistent with each other.
  */
 
+// Bumped when generation changes enough that stored prospects' stats should be made again (see upgradeCollegeStats in worker/core/draft/generateCollegeStats.ts). 2: no forward projection of classes years away, rebounds/blocks lean more on the matching ratings
+export const COLLEGE_STATS_VERSION = 2;
+
 // Division I averages (modern era), per team game
 export const PACE = 68; // possessions
 export const CHANCE_MULT = 1.147; // scoring chances per possession (offensive rebounds restart a chance)
@@ -319,7 +322,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	// Role on his college team: a class-average prospect is a rotation player around 25 minutes, the best of the class are 30-34 minute stars, the bottom of the class (and young players) come off the bench. Real Division I starters rarely average more than 35
 	const mpgBase =
 		25.5 * (gameMinutes / 40) +
-		4.3 * z +
+		4.8 * z +
 		[-2.6, -0.8, 0.7, 1.6][clamp(c, 0, 3)]! +
 		0.04 * (ratings.endu - 45) +
 		rng.normal(0, 2.6 * noise) +
@@ -333,7 +336,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const mpg = clamp(
 		proEnv ? mpgBase + proEnv.minShift * (gameMinutes / 40) : mpgBase,
 		7,
-		Math.min(proCap, 36.5 * (gameMinutes / 40)),
+		Math.min(proCap, 35.5 * (gameMinutes / 40)),
 	);
 	const dnp = mpg < 17 ? Math.round(rng.random() * 5) : 0;
 	const gp = capped
@@ -363,7 +366,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const usgRaw =
 		0.262 +
 		(proEnv?.usageShift ?? 0) +
-		0.038 * zU +
+		0.044 * zU +
 		0.0045 * (c - 1.5) +
 		rng.normal(0, 0.02 * noise);
 	// Diminishing returns at the top: only a handful of Division I players use a third of their team's possessions
@@ -409,7 +412,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			(ratings.csh === undefined || ratings.dsh === undefined
 				? 1
 				: clamp(1 + 0.012 * (ratings.csh - ratings.dsh), 0.7, 1.3)) +
-			rng.normal(0, 0.025 * noise),
+			// The random part shrinks with his willingness too, so a non-shooter stays a non-shooter
+			rng.normal(0, 0.025 * noise) * Math.min(1, willing),
 		0,
 		0.6,
 	);
@@ -454,12 +458,12 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const rimPct = clamp(
 		byHeight("rimPct", b) + 0.3 * (atRimComp - (0.3 + 0.32 * b)) + eff,
 		0.4,
-		0.78,
+		0.75,
 	);
 	const lowPct = clamp(
 		0.47 + 0.0035 * (ratings.ins - 45) + 0.0004 * (ratings.hgt - 50) + eff,
 		0.3,
-		0.7,
+		0.66,
 	);
 	const midPct = clamp(
 		byHeight("midPct", b) +
@@ -477,9 +481,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 
 	// Everything else, per 40 minutes
 	const trb40 = clamp(
-		3.5 +
+		3.2 +
 			0.15 * (ratings.hgt - 30) +
-			0.1 * (ratings.reb - 30) +
+			0.13 * (ratings.reb - 30) +
 			0.02 * (ratings.jmp - 50) +
 			(ratings.wng === undefined ? 0 : 0.04 * (ratings.wng - ratings.hgt)) +
 			rng.normal(0, 0.7 * noise),
@@ -498,7 +502,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const orb40 = trb40 * orbShare;
 	const drb40 = trb40 - orb40;
 	const ast40 = clamp(
-		(0.7 + 0.11 * (ratings.pss - 20) + 0.05 * (ratings.drb - 30)) *
+		// Bigs get fewer chances to make the assist (the ball is in a guard's hands), on top of what passing and handle say
+		(1.5 + 0.11 * (ratings.pss - 20) + 0.05 * (ratings.drb - 30) - 2.4 * b) *
 			(1 + 0.8 * (usg - 0.25)) +
 			rng.normal(0, 0.5 * noise),
 		0.4,
@@ -518,10 +523,10 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	);
 	// Drafted D1 bigs block about 2.5 shots per 40 minutes
 	const blk40 = clamp(
-		-0.35 +
-			0.075 * (ratings.hgt - 30) +
-			0.02 * (ratings.jmp - 40) +
-			0.022 * ((ratings.idef ?? ratings.diq) - 40) +
+		-0.25 +
+			0.07 * (ratings.hgt - 30) +
+			0.015 * (ratings.jmp - 40) +
+			0.045 * ((ratings.idef ?? ratings.diq) - 40) +
 			(ratings.wng === undefined ? 0 : 0.05 * (ratings.wng - ratings.hgt)) +
 			rng.normal(0, 0.25 * noise),
 		0.05,
@@ -536,7 +541,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const pm40 =
 		1.5 + 3.2 * z + rng.normal(0, 1.6 * noise) + 0.1 * (ctx.strength - 70);
 
-	// Game by game
+	// Game by game. Pace is per game, so shorter games (high school, Overtime Elite) have fewer possessions
+	const pace = proEnv?.pace ?? PACE * (gameMinutes / 40);
 	const sdMin = 0.12 * mpg + 1.5;
 	const boxes: GameBox[] = [];
 	const total = emptyBox();
@@ -579,7 +585,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		const box = emptyBox();
 		box.min = m;
 
-		const poss = usg * (proEnv?.pace ?? PACE) * t * ln(0.17);
+		const poss = usg * pace * t * ln(0.17);
 		box.tov = rng.poisson(poss * tovRate * ln(0.1));
 		const chances = poss * CHANCE_MULT;
 		const fga = Math.max(
@@ -750,33 +756,4 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 				}
 			: {}),
 	};
-};
-
-// Ratings a few years from now, for prospects in a draft class that is still years away: the same yearly growth backProject takes off
-export const forwardProject = (
-	ratings: Ratings,
-	yearsAhead: number,
-	age: number,
-) => {
-	if (yearsAhead <= 0) {
-		return ratings;
-	}
-	const out = { ...ratings };
-	for (const key of Object.keys(out) as (keyof Ratings)[]) {
-		if (key === "hgt" || key === "wng") {
-			continue;
-		}
-		let shift = 0;
-		for (let i = 0; i < yearsAhead; i++) {
-			const ageThen = age + i;
-			shift +=
-				ageThen <= 18 ? 4.2 : ageThen === 19 ? 3.2 : ageThen === 20 ? 2.4 : 1.6;
-		}
-		const factor =
-			key === "spd" || key === "jmp" || key === "stre" || key === "endu"
-				? 0.55
-				: 1;
-		out[key] = Math.min(100, out[key]! + shift * factor);
-	}
-	return out;
 };
