@@ -156,7 +156,7 @@ describe("college coaching careers and realignment", () => {
 			assert.isDefined(carousel.you);
 			assert.isAbove(carousel.rows.length, 0, "carousel moves");
 			const moves = carousel.rows.filter(
-				(r: any) => r.type === "hired" && r.fromTid !== undefined,
+				(r: any) => r.type === "hired" && r.fromType === "left",
 			);
 			// Open jobs not offered to the user go to free agents or to sitting head coaches of smaller programs, who leave them
 			for (const r of moves) {
