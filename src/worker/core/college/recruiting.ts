@@ -10,7 +10,7 @@ import {
 } from "../../../common/college/constants.ts";
 import {
 	ACTIONS,
-	MAX_INTEREST,
+	addInterest,
 	NIL_FULL,
 	PITCHES,
 	actionGain,
@@ -41,6 +41,7 @@ import type {
 } from "../../../common/college/types.ts";
 import type { Conditions } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
+import { shuffle } from "../../../common/random.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local, logEvent } from "../../util/index.ts";
 import { league, player } from "../index.ts";
@@ -257,22 +258,26 @@ export const getGrades = (
 	};
 };
 
+// A new school only gets on a full list over a school he barely follows
+const minEntry = 15;
+
 const getEntry = (box: RecruitingBox, tid: number, create: boolean) => {
 	const schools = box.schools!;
 	let si = schools.find((s) => s.tid === tid);
 	if (!si && create) {
+		const userTid = g.get("userTid");
+		if (schools.length >= MAX_SCHOOLS) {
+			// His list is full: the school he likes least drops off it (never the user's, so the user sees what he did)
+			const drop = schools
+				.filter((s) => s.tid !== userTid && s.tid !== box.commit)
+				.sort((a, b) => a.i - b.i)[0];
+			if (!drop || (tid !== userTid && drop.i > minEntry)) {
+				return undefined;
+			}
+			schools.splice(schools.indexOf(drop), 1);
+		}
 		si = { tid, i: 0 };
 		schools.push(si);
-		if (schools.length > MAX_SCHOOLS) {
-			// Make room: he stops following the school he likes least that did not offer
-			const userTid = g.get("userTid");
-			const drop = schools
-				.filter((s) => s !== si && !s.o && s.tid !== userTid)
-				.sort((a, b) => a.i - b.i)[0];
-			if (drop) {
-				schools.splice(schools.indexOf(drop), 1);
-			}
-		}
 	}
 	return si;
 };
@@ -283,11 +288,14 @@ const applyAction = (
 	action: RecruitAction,
 	pitch?: Pitch,
 ) => {
-	const si = getEntry(prospect.box, school.tid, true)!;
+	const si = getEntry(prospect.box, school.tid, true);
+	if (!si) {
+		return undefined;
+	}
 	const grades = getGrades(school, prospect.p, si);
-	si.i = Math.min(
-		MAX_INTEREST,
-		si.i + actionGain(action, prospect.box.prefs!, grades, pitch),
+	si.i = addInterest(
+		si.i,
+		actionGain(action, prospect.box.prefs!, grades, pitch),
 	);
 	si.a = true;
 	if (action === "offer") {
@@ -312,6 +320,7 @@ const aiRecruit = (
 	expected: Map<number, number>,
 	budget: number,
 	officialVisitsUsed: number,
+	leaders: Map<number, number>,
 ) => {
 	const spots = openSpots(school);
 	if (spots <= 0) {
@@ -328,17 +337,23 @@ const aiRecruit = (
 		if (box.commit !== undefined && box.commit !== school.tid) {
 			continue;
 		}
+		// A school that is well behind the leader (as of the start of the week) moves on
+		const leader = leaders.get(p.pid) ?? 0;
+		const own = box.schools?.find((s) => s.tid === school.tid)?.i ?? 0;
+		if (leader >= 25 && own < 0.75 * leader) {
+			continue;
+		}
+		const sorted = school.depth.flat().sort((a, b) => b - a);
 		if (kind === "portal") {
-			if (p.portal!.from === school.tid && school.tid !== g.get("userTid")) {
+			if (p.portal!.from === school.tid) {
 				// AI schools try to keep good players
-				if (last(p.ratings).ovr >= (school.depth.flat()[7] ?? 0)) {
+				if (last(p.ratings).ovr >= (sorted[7] ?? 0)) {
 					targets.push(prospect);
 				}
 				continue;
 			}
 			// He would play for this school
 			const ovr = last(p.ratings).ovr;
-			const sorted = school.depth.flat().sort((a, b) => b - a);
 			if (ovr < (sorted[7] ?? 0)) {
 				continue;
 			}
@@ -370,6 +385,9 @@ const aiRecruit = (
 		const pitch = bestPitch(prospect.box.prefs!, grades);
 		if (!si?.o && offers < spots * OFFERS_PER_SPOT) {
 			const entry = applyAction(prospect, school, "offer");
+			if (!entry) {
+				continue;
+			}
 			entry.nil = nilEach;
 			offers += 1;
 		} else if (si?.o) {
@@ -384,7 +402,7 @@ const aiRecruit = (
 		) {
 			action = "officialVisit";
 			visits += 1;
-		} else if (j <= spots && budget >= ACTIONS.homeVisit.cost) {
+		} else if (j < spots * 2 && budget >= ACTIONS.homeVisit.cost) {
 			action = "homeVisit";
 		} else {
 			action = "contact";
@@ -492,7 +510,16 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 			}
 		}
 	}
-	for (const school of schools.values()) {
+	const leaders = new Map(
+		prospects.map((pr) => [
+			pr.p.pid,
+			Math.max(0, ...(pr.box.schools ?? []).map((s) => s.i)),
+		]),
+	);
+	// In a random order, so no school always moves first
+	const order = [...schools.values()];
+	shuffle(order);
+	for (const school of order) {
 		if (!school.auto) {
 			continue;
 		}
@@ -508,6 +535,7 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 			expected,
 			budget * share,
 			visitsUsed.get(school.tid) ?? 0,
+			leaders,
 		);
 		if (portalProspects.length > 0) {
 			aiRecruit(
@@ -516,6 +544,7 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 				expected,
 				budget * (1 - share),
 				OFFICIAL_VISITS_PER_SEASON,
+				leaders,
 			);
 		}
 	}
@@ -547,10 +576,14 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 			}
 		}
 		if (box.commit === undefined) {
-			const tid = pickCommit(box.schools ?? [], (tid) => {
-				const school = schools.get(tid);
-				return !!school && openSpots(school) > 0;
-			});
+			const tid = pickCommit(
+				box.schools ?? [],
+				(tid) => {
+					const school = schools.get(tid);
+					return !!school && openSpots(school) > 0;
+				},
+				state.week,
+			);
 			if (tid !== undefined) {
 				const school = schools.get(tid)!;
 				await newsCommit(prospect, tid, conditions, false);

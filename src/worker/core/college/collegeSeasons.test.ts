@@ -23,6 +23,14 @@ import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, local, lock } from "../../util/index.ts";
 import { getCollegeArchive } from "./archive.ts";
 import { setRedshirt } from "./redshirt.ts";
+import { getCollegeTournamentSize } from "../../../common/college/teams.ts";
+import { getNitSize } from "./postseason.ts";
+import {
+	advanceOffseasonWeek,
+	getPortalPlayers,
+	getRecruitingState,
+	userAction,
+} from "./recruiting.ts";
 import {
 	getContractExp,
 	getCurrentContract,
@@ -66,8 +74,54 @@ const loadView = async (id: string, params: Record<string, unknown> = {}) => {
 	return out;
 };
 
-describe("college mode", () => {
-	test("seasons", { timeout: 6 * 60 * 60 * 1000 }, async () => {
+// The user's recruiting during the season: a few top recruits worked on every week
+const userRecruitingWeek = async () => {
+	const recruits = (
+		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+	)
+		.filter((p: any) => p.draft.year === g.get("season") && p.recruit)
+		.sort((a: any, b: any) => a.recruit.rank - b.recruit.rank);
+	const userTid = g.get("userTid");
+	// Recruits a school like the user's can get: past the first few dozen
+	const pool = recruits.slice(30, 60);
+	for (const p of pool.slice(0, 6)) {
+		const box = (p as any).recruit;
+		if (box.commit !== undefined && box.commit !== userTid) {
+			continue;
+		}
+		const si = box.schools?.find((s: any) => s.tid === userTid);
+		if (!si?.o) {
+			await userAction({ pid: p.pid, action: "offer" });
+		}
+		if ((box.scout ?? 0) === 0) {
+			await userAction({ pid: p.pid, action: "scout" });
+		}
+		await userAction({ pid: p.pid, action: "homeVisit", pitch: "prestige" });
+	}
+	const state = g.get("collegeRecruiting");
+	if (state && state.officialVisits > 0) {
+		const p = pool.find((p: any) => p.recruit.commit === undefined);
+		if (p) {
+			await userAction({ pid: p.pid, action: "officialVisit", pitch: "coach" });
+		}
+	}
+};
+
+const runLeague = async ({
+	level,
+	seasons,
+	lid,
+	quick,
+}: {
+	level: CollegeLevel;
+	seasons: number;
+	lid: number;
+	quick: string | undefined;
+}) => {
+	const LEVEL = level;
+	const SEASONS = seasons;
+	const QUICK = quick;
+	{
 		Math.random = makeSeededRandom(7);
 		const { teams, confs, divs } = getCollegeLeagueTeams(LEVEL);
 		const settings: any = {
@@ -91,7 +145,7 @@ describe("college mode", () => {
 				},
 				getLeagueOptions: undefined,
 				keptKeys: new Set(),
-				lid: 0,
+				lid,
 				name: "college",
 				setLeagueCreationStatus: () => {},
 				settings,
@@ -141,6 +195,17 @@ describe("college mode", () => {
 			await step("regular season", () =>
 				phase.newPhase(PHASE.REGULAR_SEASON, {}),
 			);
+			// The user recruits by hand in the first season, the AI does it after
+			await league.setGameAttributes({ collegeAutoRecruit: i > 0 });
+			const pointsBefore = (await getRecruitingState()).points;
+			if (i === 0) {
+				await userRecruitingWeek();
+				assert.isBelow(
+					(await getRecruitingState()).points,
+					pointsBefore,
+					"actions cost points",
+				);
+			}
 			// Redshirt one of the user's freshmen: he does not play, and keeps the year
 			let redshirtPid: number | undefined;
 			let redshirtExp: number | undefined;
@@ -160,10 +225,43 @@ describe("college mode", () => {
 			}
 			const t0 = performance.now();
 			let days = 0;
+			let recruitingWeek = (await getRecruitingState()).week;
 			while (g.get("phase") === PHASE.REGULAR_SEASON) {
 				await step(`day ${days}`, () => game.play(1, {}));
 				days += 1;
 				assert.isBelow(days, 80, where());
+				const week = g.get("collegeRecruiting")?.week ?? 0;
+				if (i === 0 && week > recruitingWeek) {
+					recruitingWeek = week;
+					await userRecruitingWeek();
+				}
+			}
+			// Recruiting weeks went by and recruits committed during the season, to AI schools and (working on them) the user's
+			assert.isAtLeast(
+				(await getRecruitingState()).week,
+				8,
+				"recruiting weeks in the season",
+			);
+			const inSeason = (
+				await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+			).filter(
+				(p: any) =>
+					p.draft.year === g.get("season") && p.recruit?.commit !== undefined,
+			);
+			assert.isAbove(
+				inSeason.length,
+				teams.length / 4,
+				"in-season commitments",
+			);
+			if (env.COLLEGE_DEBUG) {
+				const all = (await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)).filter((p: any) => p.draft.year === g.get("season"));
+				console.log("DEBUG in-season", inSeason.length, "of", all.length, "user", inSeason.filter((p: any) => p.recruit.commit === g.get("userTid")).map((p: any) => p.recruit.rank), "top10", JSON.stringify(all.filter((p: any) => p.recruit.rank <= 10).map((p: any) => [p.recruit.commit, p.recruit.schools?.length, Math.round(p.recruit.schools?.[0]?.i ?? 0)])));
+			}
+			if (i === 0) {
+				assert.isTrue(
+					inSeason.some((p: any) => p.recruit.commit === g.get("userTid")),
+					"a recruit committed to the user's school",
+				);
 			}
 			const regSeconds = (performance.now() - t0) / 1000;
 			assert.strictEqual(
@@ -179,6 +277,43 @@ describe("college mode", () => {
 				assert.isBelow(days, 100, where());
 			}
 			assert.strictEqual(g.get("phase"), PHASE.PLAYOFFS);
+			const tourneySize = getCollegeTournamentSize(teams.length);
+			{
+				const state = g.get("collegeState")!;
+				if (tourneySize === 64) {
+					// First Four: four games played before the bracket, losers out of it
+					assert.lengthOf(state.firstFour ?? [], 4, "First Four");
+					assert.lengthOf(state.selection!.field, 68, "68-team field");
+					const losers = state.firstFour!.map((m) => {
+						assert.isDefined(m.pts, "First Four game played");
+						return m.pts![0] > m.pts![1] ? m.away : m.home;
+					});
+					const ps0 = await idb.cache.playoffSeries.get(g.get("season"));
+					const inBracket = ps0!.series[0]!.flatMap((m) => [
+						m.home.tid,
+						m.away!.tid,
+					]);
+					assert.lengthOf(inBracket, 64, "64-team bracket");
+					for (const tid of losers) {
+						assert.notInclude(inBracket, tid, "First Four loser");
+					}
+					const autos = state.firstFour!.filter((m) => m.bid === "auto");
+					assert.lengthOf(autos, 2, "two First Four games of automatic bids");
+				} else {
+					assert.isUndefined(state.firstFour);
+				}
+				// NIT: half the national field, nobody in both
+				const nitSize = getNitSize(teams.length, tourneySize);
+				assert.lengthOf(state.nit?.seeds ?? [], nitSize, "NIT field");
+				const field = new Set(state.selection!.field.map((t) => t.tid));
+				for (const tid of state.nit?.seeds ?? []) {
+					assert.isFalse(field.has(tid), "NIT team in the national field");
+				}
+				for (const tid of state.nit?.autoBids ?? []) {
+					assert.include(state.nit!.seeds, tid, "NIT automatic bid");
+				}
+				await loadView("collegeNit", {});
+			}
 			// No salaries in college, so no minimum payroll penalty or luxury tax
 			const moneyEvents = (await idb.cache.events.getAll()).filter(
 				(e) => e.type === "minPayroll" || e.type === "luxuryTax",
@@ -204,6 +339,19 @@ describe("college mode", () => {
 					g.get("numGamesPlayoffSeries", "current").length,
 			);
 			assert.lengthOf(champion, 1, "champion");
+			{
+				const state = g.get("collegeState")!;
+				assert.isDefined(state.nit?.champion, "NIT champion");
+				const nitChampSeason = await idb.cache.teamSeasons.indexGet(
+					"teamSeasonsBySeasonTid",
+					[g.get("season"), state.nit!.champion!],
+				);
+				assert.strictEqual(
+					nitChampSeason!.playoffRoundsWon,
+					-1,
+					"NIT champion is not in the national tournament",
+				);
+			}
 
 			// College awards
 			const awards = await idb.cache.awards.get(g.get("season"));
@@ -221,7 +369,14 @@ describe("college mode", () => {
 			assert.lengthOf(aa.winner, 3, "three All-American teams");
 			const cpoy = awards!.awards.filter((a: any) => a.shortName === "CPOY");
 			assert.isAtLeast(cpoy.length, 2, "conference players of the year");
-			await loadView("history", { season: String(g.get("season")) });
+			const history = (await loadView("history", {
+				season: String(g.get("season")),
+			})) as any;
+			assert.isDefined(history.college.nitChampion, "NIT champion in history");
+			assert.isDefined(
+				(await getCollegeArchive(g.get("season")))?.nit?.champion,
+				"NIT champion archived",
+			);
 			if (redshirtPid !== undefined) {
 				const p = await idb.cache.players.get(redshirtPid);
 				if (p && p.tid >= 0) {
@@ -238,9 +393,94 @@ describe("college mode", () => {
 			assert.isAbove(archive?.polls?.length ?? 0, 10, "polls");
 			await loadView("collegeDepartures", {});
 			await step("portal", () => phase.newPhase(PHASE.AFTER_DRAFT, {}));
+			const portal = await getPortalPlayers();
+			assert.isAbove(portal.length, 0, "players in the portal");
+			for (const t of teams) {
+				const n = (await idb.cache.players.indexGetAll("playersByTid", t.tid))
+					.length;
+				assert.isAtMost(n, 13, "portal: roster limit");
+			}
+			await loadView("collegePortal", {});
+			if (i === 0) {
+				// The user recruits a portal player and makes a retention pitch on his own
+				const userTid = g.get("userTid");
+				const own = portal.find((p) => p.portal!.from === userTid);
+				if (own) {
+					assert.isUndefined(
+						await userAction({ pid: own.pid, action: "retain", pitch: "pt" }),
+					);
+				}
+				const target = portal.find((p) => p.portal!.from !== userTid);
+				const offer = await userAction({ pid: target!.pid, action: "offer" });
+				const spots =
+					13 -
+					(await idb.cache.players.indexGetAll("playersByTid", userTid)).length;
+				if (spots > 0) {
+					assert.isUndefined(offer, "portal offer");
+				}
+				for (let w = 0; w < 2; w++) {
+					assert.isTrue(await advanceOffseasonWeek(), "portal week");
+					for (const t of teams) {
+						const n = (
+							await idb.cache.players.indexGetAll("playersByTid", t.tid)
+						).length;
+						assert.isAtMost(n, 13, "portal week: roster limit");
+					}
+				}
+			}
 			await step("recruiting", () => phase.newPhase(PHASE.RESIGN_PLAYERS, {}));
+			assert.lengthOf(await getPortalPlayers(), 0, "portal closed");
+			assert.isAbove(
+				(await getCollegeArchive(g.get("season")))?.transfers?.length ?? 0,
+				0,
+				"transfers",
+			);
+			// Rosters can be short until signing day, never over the limit, and nobody is left in the portal
+			for (const t of teams) {
+				const n = (await idb.cache.players.indexGetAll("playersByTid", t.tid))
+					.length;
+				assert.isAtMost(n, 13, `after the portal: ${t.region} roster`);
+			}
+			assert.lengthOf(
+				await idb.cache.players.indexGetAll("playersByTid", PLAYER.FREE_AGENT),
+				0,
+				"free agents after the portal",
+			);
+			for (const p of await idb.cache.players.indexGetAll("playersByTid", [
+				0,
+				Infinity,
+			])) {
+				assert.isAtMost((p as any).transfers ?? 0, 1, "one transfer");
+			}
 			await loadView("collegeRecruiting", {});
+			const committed = new Map(
+				(await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED))
+					.filter(
+						(p: any) =>
+							p.draft.year === g.get("season") &&
+							p.recruit?.commit !== undefined,
+					)
+					.map((p: any) => [p.pid, p.recruit.commit as number]),
+			);
 			await step("signing day", () => phase.newPhase(PHASE.FREE_AGENCY, {}));
+			// Signing day: the commitments hold, and the class rankings are made
+			let kept = 0;
+			for (const [pid, tid] of committed) {
+				const p = await idb.cache.players.get(pid);
+				if (p?.tid === tid) {
+					kept += 1;
+				}
+			}
+			assert.isAtLeast(kept, committed.size * 0.9, "commitments signed");
+			if (env.COLLEGE_DEBUG) {
+				const ar = await getCollegeArchive(g.get("season"));
+				console.log("DEBUG signing", committed.size, kept, "transfers", ar?.transfers?.length, "top classes", ar?.classRankings?.slice(0, 5).map((r) => [g.get("teamInfoCache")[r.tid]?.region, r.points]), "user", ar?.classRankings?.find((r) => r.tid === g.get("userTid")));
+			}
+			const rankings = (await getCollegeArchive(g.get("season")))
+				?.classRankings;
+			assert.isAbove(rankings?.length ?? 0, teams.length / 2, "class rankings");
+			assert.strictEqual(rankings![0]!.rank, 1);
+			await loadView("collegeRecruiting", {});
 			await checkRosters(`after signing day ${i}`);
 			for (const t of teams) {
 				const n = (await idb.cache.players.indexGetAll("playersByTid", t.tid))
@@ -259,6 +499,11 @@ describe("college mode", () => {
 				}
 			}
 			assert.strictEqual(g.get("season"), start + i + 1);
+			assert.strictEqual(
+				(await getRecruitingState()).week,
+				0,
+				"recruiting state reset",
+			);
 
 			if (BENCH) {
 				// Stat line per team game of the regular season just played
@@ -310,5 +555,20 @@ describe("college mode", () => {
 				);
 			}
 		}
+	}
+};
+
+describe("college mode", () => {
+	test("seasons", { timeout: 6 * 60 * 60 * 1000 }, async () => {
+		await runLeague({ level: LEVEL, seasons: SEASONS, lid: 0, quick: QUICK });
 	});
+
+	// The 64-team bracket (First Four, 32-team NIT) needs the full size: one season with the quick sim
+	test.skipIf(env.COLLEGE_SKIP_FULL === "1" || LEVEL === "full")(
+		"full size: First Four and NIT",
+		{ timeout: 60 * 60 * 1000 },
+		async () => {
+			await runLeague({ level: "full", seasons: 1, lid: 1, quick: "1" });
+		},
+	);
 });

@@ -312,8 +312,8 @@ export const scheduleConfTournamentDay = async (state: CollegeState) => {
 	let games = pendingConfGames(state);
 	if (games.length === 0) {
 		// The conference tournaments are over: with a 68-team field, Selection now and the First Four next
-		if (!state.firstFour && useFirstFour()) {
-			const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+		const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+		if (!state.firstFour && useFirstFour(teams.length)) {
 			makePolls(state, REGULAR_WEEKS);
 			state.selection = makeSelection(
 				state,
@@ -482,7 +482,11 @@ export const makeSelection = (
 
 export const FIRST_FOUR_GAMES = 4;
 
-export const useFirstFour = () => !!g.get("collegeFirstFour");
+// Only a 64-team bracket has a First Four
+export const useFirstFour = (numTeams: number) =>
+	!!g.get("collegeFirstFour") &&
+	getCollegeTournamentSize(numTeams) === 64 &&
+	g.get("numGamesPlayoffSeries", "current").length === 6;
 
 // The First Four games of a selection (better committee score is the home team, on a neutral court)
 export const makeFirstFour = (

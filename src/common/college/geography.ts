@@ -288,6 +288,7 @@ const SCHOOL_STATE: Record<string, string> = {
 	Yale: "Connecticut",
 	"Youngstown State": "Ohio",
 	"Appalachian State": "North Carolina",
+	"IU Indianapolis": "Indiana",
 	"Alcorn State": "Mississippi",
 };
 

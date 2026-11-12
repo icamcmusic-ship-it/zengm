@@ -48,16 +48,16 @@ export const ACTIONS: Record<
 };
 
 // Interest at which a recruit commits to the school he likes best (if it offered him a scholarship and has a spot)
-export const COMMIT_THRESHOLD = 60;
+export const COMMIT_THRESHOLD = 50;
 // He commits only when that school leads the next one by this factor
-export const COMMIT_LEAD = 1.2;
+export const COMMIT_LEAD = 1.15;
 // A committed recruit reopens his recruitment when another school passes his school by this factor
 export const DECOMMIT_FACTOR = 1.4;
 // Weekly decay of a school's interest when it did nothing for him that week
 export const WEEKLY_DECAY = 0.9;
 // Interest a school gains every week from its fit alone (word of mouth), if he is already following it
 export const PASSIVE_GAIN = 2;
-export const MAX_INTEREST = 150;
+export const MAX_INTEREST = 400;
 // NIL money (in thousands) that maxes out the NIL grade
 export const NIL_FULL = 25;
 
@@ -130,9 +130,18 @@ export const weeklyUpdate = (
 	interest: number,
 	{ active, fitValue }: { active: boolean; fitValue: number },
 ) =>
+	addInterest(
+		active ? interest : interest * WEEKLY_DECAY,
+		PASSIVE_GAIN * fitValue,
+	);
+
+/**
+ * Add a gain to an interest: the closer to the maximum, the less it adds.
+ */
+export const addInterest = (interest: number, gain: number) =>
 	Math.min(
 		MAX_INTEREST,
-		(active ? interest : interest * WEEKLY_DECAY) + PASSIVE_GAIN * fitValue,
+		interest + gain * Math.max(0, 1 - interest / MAX_INTEREST),
 	);
 
 export type SchoolInterest = {
@@ -152,9 +161,14 @@ export type SchoolInterest = {
 /**
  * Who he commits to this week, if anyone: the school he likes best, if it offered, has a spot, is past the threshold and leads enough.
  */
+// The lead he needs shrinks as the weeks go by (he wants to settle before signing day)
+export const commitLead = (week: number) =>
+	Math.max(1.03, COMMIT_LEAD - 0.008 * week);
+
 export const pickCommit = (
 	schools: SchoolInterest[],
 	hasSpot: (tid: number) => boolean,
+	week = 0,
 ): number | undefined => {
 	const sorted = [...schools].sort((a, b) => b.i - a.i);
 	const first = sorted[0];
@@ -162,7 +176,7 @@ export const pickCommit = (
 		return undefined;
 	}
 	const second = sorted[1]?.i ?? 0;
-	if (first.i < COMMIT_LEAD * second) {
+	if (first.i < commitLead(week) * second) {
 		return undefined;
 	}
 	return hasSpot(first.tid) ? first.tid : undefined;
