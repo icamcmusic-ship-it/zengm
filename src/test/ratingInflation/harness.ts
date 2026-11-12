@@ -9,7 +9,7 @@ import { DEFAULT_LEVEL } from "../../common/budgetLevels.ts";
 import { nativeFeatureNewLeagueDefaults } from "../../common/nativeFeatures.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../test/helpers.ts";
 import { idb } from "../../worker/db/index.ts";
-import { getCurrentContract } from "../../common/contracts.ts";
+import { getContractExp, getCurrentContract } from "../../common/contracts.ts";
 import { g, helpers, local } from "../../worker/util/index.ts";
 import {
 	draft,
@@ -71,6 +71,45 @@ export const ALL_ON: Record<string, unknown> = {
 	contractOptions: true,
 	contractExtensions: true,
 	tradeRequests: true,
+};
+
+// Everything the AI decided: rosters, contracts, ratings, injuries, records, picks, coaches, GMs, every logged event, and where the
+// sim's random stream is
+export const simFingerprint = async () => {
+	const players = (await idb.cache.players.getAll())
+		.map((p) => {
+			const contract = getCurrentContract(p);
+			return [
+				p.pid,
+				p.tid,
+				JSON.stringify(contract?.amounts ?? []),
+				contract ? getContractExp(contract) : -1,
+				p.ratings.at(-1)!.ovr,
+				p.injury.gamesRemaining,
+				p.value,
+				p.tradeRequest?.tid ?? -9,
+				p.holdout?.gamesRemaining ?? -9,
+			].join(",");
+		})
+		.sort();
+	const teamSeasons = (await idb.cache.teamSeasons.getAll())
+		.map((ts) =>
+			[ts.season, ts.tid, ts.won, ts.lost, ts.playoffRoundsWon].join(","),
+		)
+		.sort();
+	const teams = (await idb.cache.teams.getAll()).map((t) =>
+		[t.tid, t.strategy, t.gm?.gmid ?? -1].join(","),
+	);
+	const events = (await idb.cache.events.getAll()).map(
+		(event) => `${event.type}|${event.season}|${event.text ?? ""}`,
+	);
+	const draftPicks = (await idb.cache.draftPicks.getAll())
+		.map((dp) => [dp.dpid, dp.tid, dp.season, dp.round].join(","))
+		.sort();
+	const coaches = (await idb.cache.coaches.getAll())
+		.map((c) => [c.cid, c.tid, c.role, c.contract.exp].join(","))
+		.sort();
+	return { players, teamSeasons, teams, events, draftPicks, coaches };
 };
 
 export const mulberry32 = (seed: number) => {

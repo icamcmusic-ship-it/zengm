@@ -12,6 +12,7 @@ import {
 } from "../../util/index.ts";
 import type { Conditions } from "../../../common/types.ts";
 import { recomputeLocalUITeamOvrs } from "../../util/recomputeLocalUITeamOvrs.ts";
+import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
 
 /**
  * Simulates one or more days of free agency.
@@ -51,6 +52,7 @@ async function play(
 				await recomputeLocalUITeamOvrs();
 				await updateStatus(helpers.daysLeft(true));
 				await trade.runAiTradesSafely();
+				await rumorsAfterDay();
 				await play(numDays - 1, conditions, false);
 			} else {
 				await cbNoDays();

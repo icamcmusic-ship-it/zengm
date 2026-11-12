@@ -485,6 +485,7 @@ export const MoreLinks = (
 			{ url: ["trade_market"], name: "Trade Market" },
 			{ url: ["saved_trades"], name: "Saved Trades" },
 			{ url: ["transactions", "all"], name: "Transactions" },
+			{ url: ["rumors"], name: "Rumors" },
 		];
 		if (__SPORT === "basketball") {
 			links.push({ url: ["trade_grader"], name: "Trade Grader" });
