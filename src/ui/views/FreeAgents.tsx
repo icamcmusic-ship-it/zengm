@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useScoutingBlurbs } from "../components/ScoutingReport/index.tsx";
 import { wrappedFreeAgentMarket } from "../components/FreeAgentMarket.tsx";
 import { dropdownOptions } from "../hooks/useDropdownOptions.tsx";
 import { PHASE, PHASE_TEXT } from "../../common/constants.ts";
@@ -162,8 +161,6 @@ const FreeAgents = ({
 
 	const negotiationModal = useNegotiaionModal();
 
-	// Scouting Reports: a short blurb under each of the first free agents shown
-	const scoutBlurbs = useScoutingBlurbs(players.slice(0, 40).map((p) => p.pid));
 
 	if (
 		((phase > PHASE.AFTER_TRADE_DEADLINE && phase <= PHASE.RESIGN_PLAYERS) ||
@@ -275,7 +272,8 @@ const FreeAgents = ({
 			lastName: p.lastName,
 			season: playerInfoSeason,
 		});
-		const blurb = scoutBlurbs[p.pid];
+		// Scouting info is only shown on player pages
+		const blurb: string | undefined = undefined;
 		return {
 			key: p.pid,
 			metadata: {
