@@ -33,13 +33,28 @@ const MODELS: Record<Dim, string[]> = {
 
 // The reported misreadings: [name, rating, direction the rating is off (+1 too high, -1 too low), why]
 const FIXES: [string, Dim, 1 | -1, string][] = [
-	["Luguentz Dort", "jmp", 1, "rated as a leaper; a strong, ground-bound stopper"],
-	["Desmond Bane", "jmp", 1, "rated as a leaper; a shooter/driver who plays below the rim"],
+	[
+		"Luguentz Dort",
+		"jmp",
+		1,
+		"rated as a leaper; a strong, ground-bound stopper",
+	],
+	[
+		"Desmond Bane",
+		"jmp",
+		1,
+		"rated as a leaper; a shooter/driver who plays below the rim",
+	],
 	["Ivica Zubac", "fg", 1, "mid-range read from a rim finisher's 2P%"],
 	["Isaiah Hartenstein", "fg", 1, "mid-range read from a rim finisher's 2P%"],
 	["Luka Dončić", "tp", -1, "three at 53 for a high-volume step-back shooter"],
 	["Herbert Jones", "fg", 1, "mid-range as the top skill of a defensive wing"],
-	["Franz Wagner", "fg", 1, "mid-range above what his shooting stats support (a driver)"],
+	[
+		"Franz Wagner",
+		"fg",
+		1,
+		"mid-range above what his shooting stats support (a driver)",
+	],
 	["Myles Turner", "dnk", 1, "elite rim finishing for a pick-and-pop big"],
 ];
 const SEASONS = [2024, 2025, 2026];
@@ -47,20 +62,46 @@ const SEASONS = [2024, 2025, 2026];
 const d = JSON.parse(readFileSync(DATA, "utf8"));
 const st = JSON.parse(readFileSync(STATS, "utf8"));
 
-const seasonTotals = (slug: string, season: number) => {
+type Totals = Record<
+	| "min"
+	| "pts"
+	| "tp"
+	| "tpa"
+	| "fga"
+	| "fg"
+	| "ft"
+	| "fta"
+	| "blkp"
+	| "stlp"
+	| "orbp"
+	| "drbp"
+	| "usgp",
+	number
+>;
+
+const seasonTotals = (slug: string, season: number): Totals | undefined => {
 	const rows = (st.stats[slug] ?? []).filter(
 		(x: any) => x.season === season && !x.playoffs,
 	);
 	if (rows.length === 0) {
 		return;
 	}
-	const t: Record<string, number> = {};
+	const t = {} as Totals;
 	for (const r of rows) {
-		for (const k of ["min", "pts", "tp", "tpa", "fga", "fg", "ft", "fta"]) {
+		for (const k of [
+			"min",
+			"pts",
+			"tp",
+			"tpa",
+			"fga",
+			"fg",
+			"ft",
+			"fta",
+		] as const) {
 			t[k] = (t[k] ?? 0) + (r[k] ?? 0);
 		}
 	}
-	for (const k of ["blkp", "stlp", "orbp", "drbp", "usgp"]) {
+	for (const k of ["blkp", "stlp", "orbp", "drbp", "usgp"] as const) {
 		t[k] =
 			rows.reduce((a: number, r: any) => a + (r[k] ?? 0) * (r.min ?? 0), 0) /
 			Math.max(1, t.min);
@@ -68,7 +109,7 @@ const seasonTotals = (slug: string, season: number) => {
 	return t;
 };
 
-const features = (hgt: number, s: Record<string, number>) => {
+const features = (hgt: number, s: Totals) => {
 	const m = s.min / 36;
 	return {
 		one: 1,

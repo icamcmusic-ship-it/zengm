@@ -93,7 +93,11 @@ describe("archetype table: every archetype is an NBA 2K build", () => {
 		for (const a of ARCHETYPES) {
 			assert.ok(a.hgt[0] < a.hgt[1], a.id);
 			assert.ok(a.desc.length > 5, a.id);
-			assert.ok(Object.keys(a.w).length >= 3, a.id);
+			// (the all-around star build has no profile: score.ts allAroundQuality)
+			assert.ok(
+				Object.keys(a.w).length >= 3 || a.tags.includes("allAround"),
+				a.id,
+			);
 			// (a custom build is not a 2K name)
 			assert.strictEqual(a.tags.includes("2k"), !a.custom, a.id);
 			// No lifecycle or level gates: the same build at any level
@@ -184,10 +188,10 @@ describe("classification", () => {
 			}
 		}
 	});
-	test("custom builds: twenty-eight, not 2K names, never aliases, positions their profile is played at", () => {
+	test("custom builds: twenty-nine, not 2K names, never aliases, positions their profile is played at", () => {
 		const custom = ARCHETYPES.filter((a) => a.custom);
-		assert.strictEqual(custom.length, 28);
-		assert.strictEqual(CUSTOM_DEFS.length, 28);
+		assert.strictEqual(custom.length, 29);
+		assert.strictEqual(CUSTOM_DEFS.length, 29);
 		const twoK = new Set(
 			TWO_K_DEFS.flatMap((d) => [d.name, ...d.aliases]).map((n) =>
 				n.toLowerCase(),
@@ -197,8 +201,85 @@ describe("classification", () => {
 			assert.ok(!twoK.has(a.name.toLowerCase()), a.name);
 			assert.strictEqual(TWO_K_NAMES[a.id], undefined, a.id);
 			assert.ok(a.positions.length >= 2, a.id);
-			assert.ok(promisesOf(a).all.length >= 1, a.id);
+			// (the all-around star build promises everything and names nothing: read apart, see below)
+			if (!a.tags.includes("allAround")) {
+				assert.ok(promisesOf(a).all.length >= 1, a.id);
+			}
 		}
+	});
+
+	test("all-around star build: only a balanced elite player, never a specialist or a prospect", () => {
+		const id = "do-it-all-superstar";
+		assert.ok(archetypeById(id));
+		// (a generated 95: elite at nearly everything)
+		const star = R({
+			hgt: 53,
+			stre: 95,
+			spd: 73,
+			jmp: 67,
+			endu: 100,
+			ins: 75,
+			dnk: 97,
+			ft: 100,
+			fg: 100,
+			tp: 100,
+			oiq: 100,
+			diq: 99,
+			drb: 86,
+			pss: 85,
+			reb: 84,
+		});
+		assert.strictEqual(classify(star, { pos: "GF", age: 28 }).id, id);
+		assert.notStrictEqual(
+			classify(star, { pos: "GF", age: 19, prospect: true }).id,
+			id,
+		);
+		// The same level spent on one thing is a specialist: an elite shooter, a playmaker, a rim protector
+		const specialists = [
+			R({
+				hgt: 40,
+				tp: 100,
+				ft: 95,
+				fg: 85,
+				oiq: 90,
+				spd: 70,
+				drb: 70,
+				pss: 60,
+				diq: 55,
+				endu: 80,
+			}),
+			R({
+				hgt: 30,
+				pss: 100,
+				drb: 95,
+				oiq: 95,
+				spd: 90,
+				tp: 70,
+				fg: 70,
+				ft: 80,
+				diq: 60,
+				endu: 80,
+			}),
+			R({
+				hgt: 75,
+				diq: 100,
+				jmp: 85,
+				reb: 95,
+				stre: 90,
+				ins: 70,
+				dnk: 85,
+				endu: 80,
+				oiq: 60,
+			}),
+		];
+		for (const r of specialists) {
+			assert.notStrictEqual(classify(r, { age: 28 }).id, id);
+		}
+		// ... and an ordinary player with the same even shape is not a star
+		const even = Object.fromEntries(
+			Object.entries(star).map(([k, v]) => [k, k === "hgt" ? v : v - 45]),
+		) as ArchetypeRatings;
+		assert.notStrictEqual(classify(even, { pos: "GF", age: 28 }).id, id);
 	});
 
 	test("is deterministic, one build (no hybrids), alternates are other builds", () => {

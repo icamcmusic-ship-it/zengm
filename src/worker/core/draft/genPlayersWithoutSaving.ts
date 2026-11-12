@@ -7,6 +7,41 @@ import { minBy, assertDefined } from "../../../common/utils.ts";
 import { randInt, shuffle } from "../../../common/random.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { markNewClass } from "./classShape.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+import { ballSecurityBase } from "../../../common/expandedRatings.ts";
+import { expandedRatingsApply } from "../player/expandedRatings.ts";
+import limitRating from "../player/limitRating.ts";
+
+// arch13: small guards in the draft. BBGM's prospect generator was tuned to the stock ovr, which flatters small guards;
+// the sim-calibrated ovr (ovrV2, on for new leagues) takes about 2-3 points from them, so far fewer 6'3" and shorter
+// prospects made the first round than in real drafts (2010-2025: 13.6% of first-rounders, about 16% of the top 60), and
+// fewer of them read as point guards. A prospect who comes into the draft at that size has made it on skill: with ovrV2
+// on, a 6'3" or shorter prospect gets SMALL_GUARD_SKILL more handle, passing and offensive IQ (half at 6'3"), the skills a
+// point guard is built on (his ball security follows them with expanded ratings).
+export const SMALL_GUARD_SKILL = 6;
+const SMALL_GUARD_MAX_INCHES = 75;
+export const smallGuardPolish = (p: PlayerWithoutKey) => {
+	if (__SPORT !== "basketball" || !featureOn("ovrV2")) {
+		return;
+	}
+	const inches = p.hgt;
+	if (inches > SMALL_GUARD_MAX_INCHES) {
+		return;
+	}
+	const k =
+		inches === SMALL_GUARD_MAX_INCHES
+			? SMALL_GUARD_SKILL / 2
+			: SMALL_GUARD_SKILL;
+	const r = p.ratings[0] as any;
+	const expanded = expandedRatingsApply(r);
+	const bscResidual = expanded ? r.bsc - ballSecurityBase(r) : 0;
+	for (const key of ["drb", "pss", "oiq"]) {
+		r[key] = limitRating(r[key] + k);
+	}
+	if (expanded) {
+		r.bsc = limitRating(ballSecurityBase(r) + bscResidual);
+	}
+};
 
 // To improve the distribution of DP ages in leagues with modified draftAges, this code will change the % of players who declare for draft each year to work better with modified draftAges settings. Previously, it was just a constant defaultFractionPerYear.
 const defaultFractionPerYear = bySport({
@@ -118,6 +153,7 @@ const genPlayersWithoutSaving = async (
 			scoutingLevel,
 			name,
 		);
+		smallGuardPolish(p);
 
 		// Just for ovr/pot
 		await player.develop(p, 0);
