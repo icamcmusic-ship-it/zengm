@@ -10,6 +10,9 @@ import { DEFAULT_NORMS } from "./norms.data.ts";
 import { DEFAULT_NORMS_EXPANDED } from "./normsExpanded.data.ts";
 import { matchZ } from "./match.ts";
 import {
+	ALL_AROUND_MISS,
+	ALL_AROUND_Z,
+	allAroundQuality,
 	genericPenalty,
 	needPenaltyOf,
 	needShortfall,
@@ -212,6 +215,23 @@ export const scoreAll = (
 			scored.push({ a, raw, z: BLOCKED_Z, short: 0 });
 			continue;
 		}
+		const bias =
+			((norms.bias ?? defaultNorms(p.expanded).bias)?.[a.id] ?? 0) +
+			star * (starBias[a.id] ?? 0);
+		// arch13: the all-around star build has no profile (score.ts, allAroundQuality)
+		if (a.tags.includes("allAround")) {
+			const q = allAroundQuality(p, cv, read.prospect);
+			scored.push({
+				a,
+				raw,
+				z:
+					q > 0
+						? ALL_AROUND_Z * q + prior + trait + bias
+						: prior + trait - ALL_AROUND_MISS,
+				short: q > 0 ? 0 : 1,
+			});
+			continue;
+		}
 		const table = norms.match[a.id];
 		const need = needShortfall(a, p);
 		const prom = promiseShortfall(a, cv, p);
@@ -225,8 +245,7 @@ export const scoreAll = (
 			(a.rare ? RARE_PENALTY : 0) +
 			prior +
 			trait +
-			((norms.bias ?? defaultNorms(p.expanded).bias)?.[a.id] ?? 0) +
-			star * (starBias[a.id] ?? 0) +
+			bias +
 			signatureBonus(a, standouts, cv, p.hgt, need, p.expanded) +
 			signatureTerm(a, standouts, cv) +
 			creatorTerm(a, read.stats) +
@@ -249,6 +268,21 @@ export const scoreAll = (
 		expanded: p.expanded,
 	};
 };
+
+// (the skills the all-around build's "why" picks his best three from)
+const ALL_AROUND_WHY: DimKey[] = [
+	"three",
+	"mid",
+	"fin",
+	"post",
+	"drb",
+	"pss",
+	"reb",
+	"dint",
+	"dper",
+	"blk",
+	"stl",
+];
 
 export const TIER_NAMES: Record<Tier, string> = {
 	franchise: "Franchise",
@@ -278,7 +312,10 @@ const whyOf = (
 	expanded: boolean,
 ): Why[] => {
 	const rows: Why[] = [];
-	const weights = weightsOf(a, expanded);
+	// (the all-around build has no profile: his three best skills)
+	const weights: Archetype["w"] = a.tags.includes("allAround")
+		? Object.fromEntries(ALL_AROUND_WHY.map((d) => [d, 1]))
+		: weightsOf(a, expanded);
 	for (const dim of DIMS) {
 		const w = weights[dim];
 		// (length reads exactly 0 for a player without a wingspan)
