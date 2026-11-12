@@ -330,6 +330,8 @@ export const NATIVE_FEATURES = [
 	},
 	{
 		id: "realisticSchedule",
+		// College mode builds its own schedule (non-conference, then conference play)
+		college: false,
 		key: "realisticSchedule",
 		name: "Realistic Schedule Length",
 		description:
