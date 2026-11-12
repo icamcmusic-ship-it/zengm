@@ -8,6 +8,8 @@ import { KEY_POSITIONS_NEEDED } from "../freeAgents/getBest.ts";
 import { getContractDemand } from "../contract/index.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
+import { stretchProvisionEnabled } from "../contract/capExceptions.ts";
+import getPayroll from "./getPayroll.ts";
 
 const dropPlayers = async (players: Player[], numToDrop: number) => {
 	// Automatically drop lowest value players until we reach g.get("maxRosterSize")
@@ -67,6 +69,12 @@ const dropPlayers = async (players: Player[], numToDrop: number) => {
 
 	players.sort((a, b) => a.value - b.value); // Lowest first
 
+	// Stretch provision (setting): AI teams paying the luxury tax spread what they owe the players they cut
+	const stretch =
+		stretchProvisionEnabled() &&
+		players.length > 0 &&
+		(await getPayroll(players[0]!.tid)) > g.get("luxuryPayroll");
+
 	const releasedPIDs = [];
 	for (const p of players) {
 		if (
@@ -102,7 +110,7 @@ const dropPlayers = async (players: Player[], numToDrop: number) => {
 			}
 		}
 
-		await player.release(p, false);
+		await player.release(p, false, stretch);
 		releasedPIDs.push(p.pid);
 
 		if (releasedPIDs.length >= numToDrop) {

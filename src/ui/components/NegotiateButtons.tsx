@@ -21,6 +21,7 @@ export const showSignUndo = ({
 export const NegotiateButtons = ({
 	canGoOverCap,
 	capSpace,
+	exceptionAmount = 0,
 	disabled,
 	minContract,
 	onNegotiate,
@@ -30,6 +31,8 @@ export const NegotiateButtons = ({
 }: {
 	canGoOverCap?: boolean;
 	capSpace: number;
+	// Largest salary (in millions) that can be signed over the cap with a salary cap exception (setting), 0 if none
+	exceptionAmount?: number;
 	disabled?: boolean;
 	minContract: number;
 	onNegotiate: () => void;
@@ -57,7 +60,8 @@ export const NegotiateButtons = ({
 		!canGoOverCap &&
 		(!!disabled ||
 			(contractAmount / 1000 > capSpace + 1 / 1000 &&
-				contractAmount / 1000 > (minContract + 1) / 1000));
+				contractAmount / 1000 > (minContract + 1) / 1000 &&
+				contractAmount / 1000 > exceptionAmount));
 	return (
 		<>
 			<button

@@ -3,6 +3,7 @@ import type { IsExact } from "conditional-type-checks";
 import type { FaceConfig } from "facesjs";
 import type { ReactNode } from "react";
 import type { RBState } from "./recordsBook.ts";
+import type { CapExceptionType, TeamCapExceptions } from "./capExceptions.ts";
 import type * as views from "../worker/views/index.ts";
 
 import {
@@ -417,6 +418,9 @@ export type EventBBGMWithoutKey =
 			phase?: Phase;
 			score?: number;
 			contract?: FlatContractInfo;
+
+			// Salary cap exception the signing used, if any
+			exception?: CapExceptionType;
 
 			// Never defined, just for TypeScript
 			dpids?: number[];
@@ -1356,6 +1360,12 @@ export type Contract = {
 
 	// In-season extensions, which append seasons to amounts
 	extensions?: ContractExtension[];
+
+	// Signed over the cap with this salary cap exception
+	exception?: CapExceptionType;
+
+	// Released with the stretch provision: amounts after the season of the release were spread over more seasons
+	stretched?: true;
 };
 
 export type MoodSnapshot = {
@@ -2325,6 +2335,9 @@ export type Team = {
 		number
 	>;
 	strategy: "contending" | "rebuilding";
+
+	// Salary cap exceptions used (League Extras: Salary Cap Exceptions)
+	capExceptions?: TeamCapExceptions;
 	depth?:
 		| {
 				QB: number[];

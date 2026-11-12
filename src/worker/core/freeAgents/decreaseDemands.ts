@@ -5,6 +5,11 @@ import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import { getContractDemand } from "../contract/index.ts";
 import type { Player } from "../../../common/types.ts";
 import getPayroll from "../team/getPayroll.ts";
+import {
+	capExceptionsEnabled,
+	getAiCapExceptionCapacity,
+} from "../contract/capExceptions.ts";
+import { getAllGmWeights } from "../gm/index.ts";
 
 // After the season has already started, free agents ask for a short contract. Very cheap players ask for the shortest possible contract, everyone else asks for an extra season.
 export const getInSeasonContractExp = (
@@ -18,13 +23,16 @@ export const getInSeasonContractExp = (
 	return contractStartSeason + 1;
 };
 
-// What the free agent market looks like for demands. A replacement-level player is the last man on a typical AI roster. Each AI team with an open roster spot can pay up to its cap space (unlimited with no salary cap), and the best free agents get the biggest cap spaces: the best one above replacement level can get the most cap space any team has, the second best the second most, and so on. AI teams over the cap only sign minimum contracts (with a soft cap, the exceptions are for the user; with a hard cap nothing else is possible), so a free agent who is below replacement level or asks for more than his share of cap space is "unwanted" and will sit unsigned unless he comes down.
+// What the free agent market looks like for demands. A replacement-level player is the last man on a typical AI roster. Each AI team with an open roster spot can pay up to its cap space (unlimited with no salary cap), and the best free agents get the biggest cap spaces: the best one above replacement level can get the most cap space any team has, the second best the second most, and so on. AI teams over the cap only sign minimum contracts (with a hard cap nothing else is possible; with a soft cap and the Salary Cap Exceptions setting, a team's biggest unused exception counts like cap space), so a free agent who is below replacement level or asks for more than his share of cap space is "unwanted" and will sit unsigned unless he comes down.
 export const getDemandMarket = async (freeAgents: Player[]) => {
 	const salaryCap = g.get("salaryCap");
 	const salaryCapType = g.get("salaryCapType");
 	const maxRosterSize = g.get("maxRosterSize");
 	const minRosterSize = g.get("minRosterSize");
 	const userTids = g.get("userTids");
+
+	const exceptions = capExceptionsEnabled();
+	const gms = exceptions ? await getAllGmWeights() : undefined;
 
 	const capSpaces: number[] = [];
 	const lastManValues: number[] = [];
@@ -42,11 +50,20 @@ export const getDemandMarket = async (freeAgents: Player[]) => {
 		if (userTids.includes(t.tid) || roster.length >= maxRosterSize) {
 			continue;
 		}
-		capSpaces.push(
-			salaryCapType === "none"
-				? Infinity
-				: salaryCap - (await getPayroll(t.tid)),
-		);
+		if (salaryCapType === "none") {
+			capSpaces.push(Infinity);
+		} else {
+			const payroll = await getPayroll(t.tid);
+			// Salary cap exceptions (setting): a team over the cap can still pay one free agent up to its biggest exception
+			capSpaces.push(
+				exceptions
+					? Math.max(
+							salaryCap - payroll,
+							getAiCapExceptionCapacity(t, payroll, gms!.get(t.tid)),
+						)
+					: salaryCap - payroll,
+			);
+		}
 	}
 	capSpaces.sort((a, b) => b - a);
 	lastManValues.sort((a, b) => a - b);

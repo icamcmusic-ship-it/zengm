@@ -11,6 +11,11 @@ import { g, local } from "../../util/index.ts";
 import { orderBy } from "../../../common/utils.ts";
 import { shuffle } from "../../../common/random.ts";
 import { getAllGmWeights } from "../gm/index.ts";
+import {
+	capExceptionsEnabled,
+	makeAiCapExceptionPicker,
+	recordCapExceptionSigning,
+} from "../contract/capExceptions.ts";
 
 /**
  * AI teams sign free agents.
@@ -127,12 +132,49 @@ const autoSign = async () => {
 			}
 			playersForTeam = orderBy(playersForTeam, (p) => keys.get(p)!, "desc");
 		}
-		const p = getBest(playersOnRoster, playersForTeam, payroll);
+		// Salary cap exceptions (setting): an over the cap team can use its mid-level, bi-annual or room exception. Undefined with the setting off.
+		const pickCapException = makeAiCapExceptionPicker({
+			t,
+			roster: playersOnRoster,
+			payroll,
+			gm,
+		});
+		const p = getBest(
+			playersOnRoster,
+			playersForTeam,
+			payroll,
+			pickCapException,
+		);
 		if (p) {
 			// Remove from list of free agents
 			playersSorted = playersSorted.filter((p2) => p2 !== p);
 
-			await player.sign(p, t.tid, getContractDemand(p), g.get("phase"));
+			const contractDemand = getContractDemand(p);
+			if (
+				capExceptionsEnabled() &&
+				contractDemand.amount > g.get("minContract")
+			) {
+				// Under the cap it uses cap space, otherwise an exception (with the contract shortened to what the exception allows)
+				const picked =
+					contractDemand.amount + payroll <= g.get("salaryCap")
+						? undefined
+						: pickCapException?.(p, contractDemand);
+				await player.sign(
+					p,
+					t.tid,
+					picked ? { ...contractDemand, exp: picked.exp } : contractDemand,
+					g.get("phase"),
+					picked?.exception.type,
+				);
+				await recordCapExceptionSigning(t.tid, {
+					pid: p.pid,
+					amount: contractDemand.amount,
+					exception: picked?.exception.type,
+					payroll,
+				});
+			} else {
+				await player.sign(p, t.tid, contractDemand, g.get("phase"));
+			}
 			await idb.cache.players.put(p);
 			await team.rosterAutoSort(t.tid);
 		}
