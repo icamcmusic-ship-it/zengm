@@ -824,26 +824,27 @@ _Rumors_ (`featureRumors`, option _Rumor Notifications_): a rumor mill, `/l/:lid
 - **Confidence and outcomes.** Each rumor has a chance to come true (long shot, speculative, solid, strong). The gatherer scores it from the same rules the AI uses (deadline window, per-day signing chances, firing probabilities, ...; the GM hot seat is judged exactly as `gm.runOffseason` will judge it, with the honeymoon, the inherited-roster path, rebuild credit, patience, contender and market leash of fair GM job security). That raw score goes through a monotone recalibration table (`common/rumors/calibration.ts`, isotonic regression fitted on the audit, per type and per kind with 150+ rumors: e.g. deadline sellers' veterans almost never move, salary dumps and rebuild veterans more often than the rules suggest, extensions over the tax are their own kind), then the league's own track record per type corrects it on the odds ((confirmed + 60) / (model's expected + 60), 0.5× to 2×; measured against the model's chances, stored as the tally's 4th entry, so a correction that works doesn't undo itself). The rumor keeps its raw score (`raw`). The wording hedges with the confidence. It is marked _Confirmed_ (traded, extended, asked out, signed there, fired, took that position, ...) or _Didn't happen_ when its window ends (trade deadline, start of the next regular season, the draft, the end of the season). The page shows the track record by confidence, type and season.
 - **Calibration** (src/test/ratingInflation/rumors.script.test.ts, 16 leagues × 6 seasons, every extra on; claimed = mean confidence, observed with its 90% Wilson interval; refit with `RUMOR_FIT=1`). Before: seeds 1-16 on the old model; after: fresh seeds 201-216, not used for the fit.
 
-| Label | Before n | Before claimed → observed (90% CI) | After n | After claimed → observed (90% CI) |
-| --- | --- | --- | --- | --- |
-| Strong | 567 | 69 → 54 (51-58) | 418 | 68 → 64 (60-68) |
-| Solid | 2683 | 47 → 45 (43-46) | 2773 | 46 → 46 (44-47) |
-| Speculative | 2111 | 24 → 23 (21-24) | 3021 | 22 → 22 (21-23) |
-| Long shot | 2325 | 7 → 11 (10-12) | 1928 | 7 → 6 (6-7) |
+| Label       | Before n | Before claimed → observed (90% CI) | After n | After claimed → observed (90% CI) |
+| ----------- | -------- | ---------------------------------- | ------- | --------------------------------- |
+| Strong      | 567      | 69 → 54 (51-58)                    | 418     | 68 → 64 (60-68)                   |
+| Solid       | 2683     | 47 → 45 (43-46)                    | 2773    | 46 → 46 (44-47)                   |
+| Speculative | 2111     | 24 → 23 (21-24)                    | 3021    | 22 → 22 (21-23)                   |
+| Long shot   | 2325     | 7 → 11 (10-12)                     | 1928    | 7 → 6 (6-7)                       |
 
-| Type | Before n | Before | After n | After |
-| --- | --- | --- | --- | --- |
-| On the block | 1145 | 19 → 22 (20-24) | 1349 | 18 → 18 (16-19) |
-| Trade interest | 364 | 4 → 1 (0-2) | 338 | 2 → 1 (0-2) |
-| Draft pick | 208 | 5 → 9 (6-12) | 243 | 6 → 7 (4-10) |
-| Unhappy player | 905 | 32 → 35 (32-37) | 899 | 35 → 34 (31-36) |
-| Extension talks | 841 | 40 → 34 (31-37) | 920 | 31 → 27 (25-30) |
-| Free agent | 1358 | 26 → 25 (23-27) | 1369 | 23 → 23 (21-25) |
-| Coach hot seat | 1142 | 39 → 40 (38-42) | 1317 | 40 → 42 (40-44) |
-| GM hot seat | 462 | 32 → 29 (26-33) | 419 | 40 → 41 (37-45) |
-| Draft target | 1261 | 41 → 35 (33-38) | 1286 | 39 → 37 (35-40) |
+| Type            | Before n | Before          | After n | After           |
+| --------------- | -------- | --------------- | ------- | --------------- |
+| On the block    | 1145     | 19 → 22 (20-24) | 1349    | 18 → 18 (16-19) |
+| Trade interest  | 364      | 4 → 1 (0-2)     | 338     | 2 → 1 (0-2)     |
+| Draft pick      | 208      | 5 → 9 (6-12)    | 243     | 6 → 7 (4-10)    |
+| Unhappy player  | 905      | 32 → 35 (32-37) | 899     | 35 → 34 (31-36) |
+| Extension talks | 841      | 40 → 34 (31-37) | 920     | 31 → 27 (25-30) |
+| Free agent      | 1358     | 26 → 25 (23-27) | 1369    | 23 → 23 (21-25) |
+| Coach hot seat  | 1142     | 39 → 40 (38-42) | 1317    | 40 → 42 (40-44) |
+| GM hot seat     | 462      | 32 → 29 (26-33) | 419     | 40 → 41 (37-45) |
+| Draft target    | 1261     | 41 → 35 (33-38) | 1286    | 39 → 37 (35-40) |
 
-  Before, strong rumors of every kind were overconfident (extensions 73 → 58, coaches 67 → 56, GMs 65 → 43, unhappy stars 64 → 41) and long shots underconfident (rebuild and salary dump sellers 6 → 20). The GM hot seat still used the pre-fair-job-security score; with it judged like the owner judges, uncorrected strong GM rumors were underconfident (66 → 80), now 73 → 71 (63-78). After, every label and every type × label cell is inside its interval except extension talks (solid 48 → 38, speculative 23 → 19), which vary from league to league more than a binomial interval allows (the fitting leagues had them on target). Scouting splits (`getScoutingSplit`) are opinions with nothing to confirm, so they aren't in the feed.
+Before, strong rumors of every kind were overconfident (extensions 73 → 58, coaches 67 → 56, GMs 65 → 43, unhappy stars 64 → 41) and long shots underconfident (rebuild and salary dump sellers 6 → 20). The GM hot seat still used the pre-fair-job-security score; with it judged like the owner judges, uncorrected strong GM rumors were underconfident (66 → 80), now 73 → 71 (63-78). After, every label and every type × label cell is inside its interval except extension talks (solid 48 → 38, speculative 23 → 19), which vary from league to league more than a binomial interval allows (the fitting leagues had them on target). Scouting splits (`getScoutingSplit`) are opinions with nothing to confirm, so they aren't in the feed.
+
 - **How many.** About 3 a week in season, about 10 a week in the last 12% of the season before the trade deadline, a burst at each phase, several a day early in free agency.
 - **No effect on the sim.** It only reads the league, from its own seeded random stream (league rumor seed + day counter; while it runs Math.random is swapped for that stream so no helper can draw from the sim's). A season played with it on and off gives the same rosters, contracts, records, coaches, events and the same next random numbers (src/worker/core/rumors/rumors.test.ts). Same seed, same rumors.
 - **No leaks.** The text has no numbers but a pick's year, no ratings, no traits, and draft rumors name the position a team needs, never a prospect.
