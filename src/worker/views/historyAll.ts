@@ -7,6 +7,9 @@ import { bySport } from "../../common/sportFunctions.ts";
 import { PlayersCache } from "../db/PlayersCache.ts";
 import { defineView } from "../util/defineView.ts";
 import { team } from "../core/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
+import { getCollegeState } from "../core/college/state.ts";
+import { getCollegeArchive } from "../core/college/archive.ts";
 
 const getAbbrev = (
 	tid: number,
@@ -227,6 +230,8 @@ export default defineView({
 					season,
 					runnerUp: undefined as FormattedTeam | undefined,
 					champ: undefined as FormattedTeam | undefined,
+					// College: NIT champion, from the season archive
+					nit: undefined as FormattedTeam | undefined,
 					awards,
 				});
 			}
@@ -312,18 +317,36 @@ export default defineView({
 				}
 			}
 
+			if (isCollege()) {
+				const state = getCollegeState();
+				for (const row of seasons) {
+					const nit =
+						state && state.season === row.season
+							? state.nit
+							: (await getCollegeArchive(row.season))?.nit;
+					if (nit?.champion !== undefined) {
+						row.nit = formatTeamWrapper(
+							{ seed: undefined, tid: nit.champion },
+							row.season,
+						);
+					}
+				}
+			}
+
 			// Count up number of championships/awards per tid/pid
 			const counts: {
 				awards: Record<string, Record<number, number>>;
 				champ: Record<number, number>;
 				runnerUp: Record<number, number>;
+				nit: Record<number, number>;
 			} = {
 				awards: {},
 				champ: {},
 				runnerUp: {},
+				nit: {},
 			};
 
-			const teamCategories = ["champ", "runnerUp"] as const;
+			const teamCategories = ["champ", "runnerUp", "nit"] as const;
 			for (const row of seasons.toReversed()) {
 				for (const category of teamCategories) {
 					if (!row[category]) {
@@ -349,6 +372,7 @@ export default defineView({
 
 			return {
 				awards: awardTypes,
+				showNit: seasons.some((row) => row.nit !== undefined),
 				seasons,
 			};
 		}
