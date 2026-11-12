@@ -47,15 +47,23 @@ const pickStats = (row: Record<string, unknown> | undefined) => {
 };
 
 // Column titles like the player page ("FG%", "3PA"), falling back to the key
-const colTitle = (prefix: "stat" | "rating", key: string) => {
+const colTitle = (prefix: "stat" | "rating", key: string): string => {
 	try {
 		return getCols([`${prefix}:${key}`])[0]!.title;
 	} catch {
+		// Game highs (fgMax) have the stat's own title, under a Game Highs header on the page
+		if (key.endsWith("Max") && key.length > 3) {
+			return colTitle(prefix, key.slice(0, -3));
+		}
 		return key;
 	}
 };
 
 const cell = (value: unknown): string | number => {
+	// Game highs are [value, gid, abbrev, tid, season]
+	if (Array.isArray(value)) {
+		return cell(value[0]);
+	}
 	if (typeof value === "number") {
 		return Number.isFinite(value) ? Math.round(value * 10) / 10 : "";
 	}

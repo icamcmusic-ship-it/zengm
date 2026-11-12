@@ -1,4 +1,5 @@
 import { last } from "../../../common/utils.ts";
+import { ExportProfileButton } from "../../components/ExportProfile.tsx";
 import { ArchetypeLabel } from "../../components/Archetype/ArchetypeLabel.tsx";
 import { TIER_NAMES } from "../../../common/archetypes/index.ts";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
@@ -683,6 +684,7 @@ const TopStuff = ({
 								Storylines
 							</a>
 						) : null}
+						<ExportProfileButton name={player.name} pid={player.pid} />
 						{godMode ? (
 							<button
 								className="btn btn-outline-god-mode"
