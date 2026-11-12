@@ -189,6 +189,19 @@ describe("college coaching careers and realignment", () => {
 			const cidsBefore = new Map(
 				(await idb.cache.teams.getAll()).map((t) => [t.tid, t.cid]),
 			);
+			// A school of the weakest conference that has outgrown it
+			{
+				const all = await idb.cache.teams.getAll();
+				const byConf = Map.groupBy(all, (t) => t.cid);
+				const avg = (cid: number) =>
+					byConf.get(cid)!.reduce((sum, t) => sum + getTeamPrestige(t), 0) /
+					byConf.get(cid)!.length;
+				const weakest = [...byConf.keys()].sort((a, b) => avg(a) - avg(b))[0]!;
+				const best = Math.max(...[...byConf.keys()].map(avg));
+				const t = byConf.get(weakest)![0]!;
+				(t as any).collegePrestige = best + 1;
+				await idb.cache.teams.put(t);
+			}
 			const realigned = await realignConferences(true);
 			assert.isAbove(realigned.length, 0, "realignment moves");
 			assert.isTrue(realigned.some((m) => m.reason === "upgrade"));

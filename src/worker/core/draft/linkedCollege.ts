@@ -11,8 +11,13 @@ import type { LinkedCollege } from "../../../common/types.ts";
 import connectLeague from "../../db/connectLeague.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
-import { league } from "../index.ts";
+import { finances, league, player } from "../index.ts";
 import handleUploadedDraftClass from "./handleUploadedDraftClass.ts";
+import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
+import { RATINGS } from "../../../common/constants.ts";
+import { syncExpandedToCompat } from "../player/expandedRatings.ts";
+import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
+import { last } from "../../../common/utils.ts";
 
 const leagueExists = async (lid: number) =>
 	!!(await idb.meta.get("leagues", lid));
@@ -96,9 +101,8 @@ const classSize = () =>
 
 /**
  * The departed players of a college league's season as a draft class file: off-screen pro draft picks in pick order, then everyone else
- * who left (seniors, and early entrants nobody picked) by pro stock. Ratings are on the same scale in both leagues (a college league's
- * players are ordinary players), so they are kept; ovr and pot are computed again for the pro league on import. College stats rows and
- * honors become pre-draft rows and honors, the school is the player's college.
+ * who left (seniors, and early entrants nobody picked) by pro stock. Ratings are copied (toProScale puts them on the pro league's scale
+ * after the import). College stats rows and honors become pre-draft rows and honors, the school is the player's college.
  */
 export const buildLinkedClassFile = async (
 	lid: number,
@@ -215,6 +219,81 @@ export const buildLinkedClassFile = async (
 	}
 };
 
+// Height and wingspan are measurements, not skills
+const SCALE_KEYS: string[] = [
+	...RATINGS.filter((key) => key !== "hgt"),
+	...EXPANDED_RATINGS.filter((key) => key !== "wng"),
+];
+
+// Every rating but height times k, so the profile (shooter, big, ...) keeps its shape and nothing is clipped at 0
+const scaled = (ratings: any, k: number) => {
+	const out = { ...ratings };
+	for (const key of SCALE_KEYS) {
+		if (typeof out[key] === "number") {
+			out[key] = player.limitRating(ratings[key] * k);
+		}
+	}
+	return out;
+};
+
+/**
+ * Put an imported class on this league's scale. A college league's ratings are ordinary ratings, but its talent is calibrated for college
+ * games (its seniors are much better than the prospects of a pro draft class), so the class is mapped by rank onto a pro class generated
+ * for the same draft (not saved): the k-th best imported prospect gets the ovr of the k-th best generated one, every rating but height
+ * scaled by the same factor. Then ovr, pot and value are computed again.
+ */
+const toProScale = async (draftYear: number, lid: number, season: number) => {
+	const imported = (
+		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+	)
+		.filter(
+			(p) =>
+				p.draft.year === draftYear &&
+				p.linkedCollege?.lid === lid &&
+				p.linkedCollege.season === season,
+		)
+		.sort((a, b) => last(b.ratings).ovr - last(a.ratings).ovr);
+	if (imported.length === 0) {
+		return;
+	}
+	const scoutingLevel = await finances.getLevelLastThree("scouting", {
+		tid: g.get("userTid"),
+	});
+	const reference = (
+		await genPlayersWithoutSaving(draftYear, scoutingLevel, [])
+	)
+		.map((p) => last(p.ratings).ovr)
+		.sort((a, b) => b - a);
+	if (reference.length === 0) {
+		return;
+	}
+	for (const [i, p] of imported.entries()) {
+		// Past the end of the reference class, keep the gap to its last prospect
+		const j = Math.min(i, reference.length - 1);
+		const target = reference[j]! - (i - j) * 0.2;
+		const ratings = last(p.ratings) as any;
+		// The factor that gives the target ovr (ovr rises with k)
+		let lo = 0.2;
+		let hi = 1.5;
+		for (let iter = 0; iter < 14; iter++) {
+			const mid = (lo + hi) / 2;
+			if (player.ovr(scaled(ratings, mid), ratings.pos) < target) {
+				lo = mid;
+			} else {
+				hi = mid;
+			}
+		}
+		const next = scaled(ratings, (lo + hi) / 2);
+		for (const key of SCALE_KEYS) {
+			ratings[key] = next[key];
+		}
+		syncExpandedToCompat(ratings);
+		await player.develop(p, 0);
+		await player.updateValues(p);
+		await idb.cache.players.put(p);
+	}
+};
+
 const saveLinked = async (linked: LinkedCollege | undefined) => {
 	await league.setGameAttributes({ linkedCollege: linked });
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
@@ -292,6 +371,7 @@ export const importLinkedCollegeClass = async ({
 		};
 	}
 	await handleUploadedDraftClass({ uploadedFile: file, draftYear });
+	await toProScale(draftYear, linked.lid, collegeSeason);
 	await saveLinked({
 		...linked,
 		imports: [
@@ -303,8 +383,7 @@ export const importLinkedCollegeClass = async ({
 		type: "info",
 		text: `The ${draftYear} draft class is the class of ${collegeSeason} from your linked college league: ${file.players.length} prospects. <a href="${helpers.leagueUrl(["draft_scouting"])}">Draft Scouting</a>`,
 		showNotification: !local.autoPlayUntil,
-		saveToDb: true,
-		score: 20,
+		saveToDb: false,
 	});
 	return { num: file.players.length, collegeSeason };
 };

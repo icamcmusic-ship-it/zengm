@@ -177,11 +177,30 @@ describe("linked college league", () => {
 				// Ratings kept, ovr/pot computed on this league's scale
 				const r = last(p.ratings);
 				assert.strictEqual(r.season, 2025);
-				assert.strictEqual((r as any).dnk, (last(college!.ratings) as any).dnk);
+				// Every rating but height scaled by the same factor (the pro scale)
+				const cr = last(college!.ratings) as any;
+				assert.strictEqual((r as any).hgt, cr.hgt);
+				if (cr.ins >= 30 && cr.oiq >= 30) {
+					assert.closeTo(
+						(r as any).ins / cr.ins,
+						(r as any).oiq / cr.oiq,
+						0.05,
+					);
+				}
 				assert.isAbove(r.pot, 0);
 				assert.isNumber(p.value);
 			}
 			assert.isAbove(withAwards, 0, "college honors kept");
+			// On the pro scale: a top prospect is not already a star, as a generated class
+			const ovrs = linked.map((p) => last(p.ratings).ovr).sort((a, b) => b - a);
+			assert.isAtMost(ovrs[0]!, 62, "best prospect ovr");
+			assert.isAtLeast(ovrs[0]!, 40, "best prospect ovr");
+			assert.isBelow(ovrs.at(-1)!, ovrs[0]!);
+			assert.isAtLeast(
+				ovrs.at(-1)!,
+				10,
+				"worst prospect ovr (a generated class goes down to about 20)",
+			);
 			assert.isDefined(
 				linked.find((p) => p.linkedCollege!.pid === firstPick.pid),
 				"the best prospect is in the class",
