@@ -621,7 +621,8 @@ export const getOpponentScouting = async (season = g.get("season")) => {
 // ---- rumors: "Scouts are split on X" (for the rumors feed; nothing here depends on it) ----
 
 // The takes of a few departments around the league on a player, all from what is publicly visible of him plus each scout's own error
-export const getScoutingSplit = async (pid: number) => {
+// salt: another set of departments and wording (the rumors feed's draft-time buzz), "" for the default
+export const getScoutingSplit = async (pid: number, salt = "") => {
 	if (!scoutingReportsOn()) {
 		return undefined;
 	}
@@ -633,7 +634,7 @@ export const getScoutingSplit = async (pid: number) => {
 	const input = await buildInput(p, ctx, { light: true });
 	const peers = await peersFor(input, ctx);
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
-	const rng = new Rng(`rumorTeams|${ctx.seed}|${pid}|${ctx.season}`);
+	const rng = new Rng(`rumorTeams|${ctx.seed}|${pid}|${ctx.season}${salt}`);
 	const picked = teams.toSorted(() => rng.random() - 0.5).slice(0, 4);
 	const takes = [];
 	for (const t of picked) {
@@ -650,7 +651,7 @@ export const getScoutingSplit = async (pid: number) => {
 		input.name,
 		input.pos,
 		takes,
-		`${ctx.seed}|${pid}|${ctx.season}`,
+		`${ctx.seed}|${pid}|${ctx.season}${salt}`,
 	);
 };
 

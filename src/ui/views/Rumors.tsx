@@ -8,8 +8,10 @@ import {
 	RUMOR_TYPES,
 	RUMOR_TYPE_NAMES,
 	rumorLevel,
+	SCOUT_BUZZ_NAME,
 	type Rumor,
 	type RumorStatus,
+	type ScoutBuzz,
 } from "../../common/rumors/types.ts";
 import type { View } from "../../common/types.ts";
 import { MoreLinks } from "../components/MoreLinks.tsx";
@@ -76,6 +78,35 @@ export const RumorItem = ({
 	);
 };
 
+// Scouting buzz: an opinion, not a prediction. No status, no confidence, not in the track record
+export const BuzzItem = ({ buzz }: { buzz: ScoutBuzz }) => (
+	<div
+		className="list-group-item px-2"
+		data-testid="scouting-buzz"
+		data-type="buzz"
+	>
+		<div>
+			<span
+				className="badge me-1 text-bg-warning"
+				title="An opinion from scouts around the league, not a prediction"
+			>
+				{SCOUT_BUZZ_NAME}
+			</span>
+			<RumorText text={buzz.text} />
+		</div>
+		<div className="small text-body-secondary">
+			{SCOUT_BUZZ_NAME} · {when(buzz)} · high: {buzz.high}, low: {buzz.low} ·{" "}
+			<span title="Scouts disagreeing has nothing to confirm, so it has no confidence and isn't in the track record">
+				opinion, not graded
+			</span>
+		</div>
+	</div>
+);
+
+type FeedItem =
+	| { kind: "rumor"; tick: number; rumor: Rumor }
+	| { kind: "buzz"; tick: number; buzz: ScoutBuzz };
+
 const AccuracyTable = ({
 	title,
 	rows,
@@ -131,7 +162,14 @@ const AccuracyTable = ({
 
 const PAGE_SIZE = 60;
 
-const Rumors = ({ accuracy, rumors, teams, userTid }: View<"rumors">) => {
+const Rumors = ({
+	accuracy,
+	buzz,
+	rumors,
+	scoutingBuzz,
+	teams,
+	userTid,
+}: View<"rumors">) => {
 	useTitleBar({ title: "Rumors" });
 
 	const [team, setTeam] = useState<"all" | "user" | number>("all");
@@ -139,8 +177,14 @@ const Rumors = ({ accuracy, rumors, teams, userTid }: View<"rumors">) => {
 	const [status, setStatus] = useState("all");
 	const [numShown, setNumShown] = useState(PAGE_SIZE);
 
-	const filtered = rumors.filter((r) => {
-		if (type !== "all" && r.type !== type) {
+	const showBuzz = type === "all" || type === "buzz";
+	const filteredBuzz =
+		showBuzz && status === "all" && team === "all" ? buzz : [];
+	const filteredRumors = rumors.filter((r) => {
+		if (type === "buzz") {
+			return false;
+		}
+		if (type !== "all" && type !== "rumors" && r.type !== type) {
 			return false;
 		}
 		if (status !== "all" && r.status !== status) {
@@ -154,6 +198,19 @@ const Rumors = ({ accuracy, rumors, teams, userTid }: View<"rumors">) => {
 		}
 		return true;
 	});
+	// Newest first, rumors and buzz together
+	const filtered: FeedItem[] = [
+		...filteredRumors.map((rumor) => ({
+			kind: "rumor" as const,
+			tick: rumor.tick,
+			rumor,
+		})),
+		...filteredBuzz.map((b) => ({
+			kind: "buzz" as const,
+			tick: b.tick,
+			buzz: b,
+		})),
+	].sort((a, b) => b.tick - a.tick);
 
 	const resolved = accuracy.bySeason.reduce(
 		(sum, row) => sum + row.confirmed + row.busted,
@@ -173,6 +230,15 @@ const Rumors = ({ accuracy, rumors, teams, userTid }: View<"rumors">) => {
 				confidence (
 				{RUMOR_LEVELS.map((level) => level.name.toLowerCase()).join(", ")}) and
 				is marked when it resolves.
+				{scoutingBuzz ? (
+					<>
+						{" "}
+						<b>{SCOUT_BUZZ_NAME}</b> items are different: scouts around the
+						league disagreeing about a player. They are opinions, not
+						predictions, so they have no confidence and aren't part of the track
+						record.
+					</>
+				) : null}
 			</p>
 
 			<div className="d-flex flex-wrap gap-2 mb-3">
@@ -213,11 +279,17 @@ const Rumors = ({ accuracy, rumors, teams, userTid }: View<"rumors">) => {
 					}}
 				>
 					<option value="all">All types</option>
+					{scoutingBuzz || buzz.length > 0 ? (
+						<option value="rumors">Rumors only (no scouting buzz)</option>
+					) : null}
 					{RUMOR_TYPES.map((key) => (
 						<option key={key} value={key}>
 							{RUMOR_TYPE_NAMES[key]}
 						</option>
 					))}
+					{scoutingBuzz || buzz.length > 0 ? (
+						<option value="buzz">{SCOUT_BUZZ_NAME}</option>
+					) : null}
 				</select>
 				<select
 					className="form-select form-select-sm w-auto"
@@ -241,15 +313,21 @@ const Rumors = ({ accuracy, rumors, teams, userTid }: View<"rumors">) => {
 				<div className="col-xl-7 col-lg-8 mb-3">
 					{filtered.length === 0 ? (
 						<p data-testid="no-rumors">
-							{rumors.length === 0
+							{rumors.length === 0 && buzz.length === 0
 								? "No rumors yet. They start once the season is under way."
 								: "No rumors match these filters."}
 						</p>
 					) : (
 						<div className="list-group list-group-flush">
-							{filtered.slice(0, numShown).map((rumor) => (
-								<RumorItem key={rumor.rid} rumor={rumor} />
-							))}
+							{filtered
+								.slice(0, numShown)
+								.map((item) =>
+									item.kind === "rumor" ? (
+										<RumorItem key={`r${item.rumor.rid}`} rumor={item.rumor} />
+									) : (
+										<BuzzItem key={`b${item.buzz.bid}`} buzz={item.buzz} />
+									),
+								)}
 						</div>
 					)}
 					{filtered.length > numShown ? (
