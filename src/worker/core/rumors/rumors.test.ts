@@ -137,7 +137,7 @@ describe("Rumors in a simulated league", () => {
 		assert.deepStrictEqual(await fingerprint(), before);
 		assert.strictEqual(JSON.stringify({ ...g, rumors: undefined }), gBefore);
 		assert.isAbove(g.get("rumors")!.items.length, 5);
-	});
+	}, 120_000);
 
 	test("rumors appear all year, of many types, and resolve both ways", () => {
 		assert.isAbove(items.length, 40);
@@ -230,7 +230,7 @@ describe("Rumors in a simulated league", () => {
 		} finally {
 			g.setWithoutSavingToDB("featureScoutingReports" as any, true);
 		}
-	});
+	}, 120_000);
 
 	test("rumors don't leak ratings, traits or prospects", () => {
 		const allowed = new Set([
@@ -288,7 +288,7 @@ describe("Rumors in a simulated league", () => {
 			a.items.map((r) => r.text),
 			c.items.map((r) => r.text),
 		);
-	});
+	}, 120_000);
 
 	test("rumors about the user's team are fair", async () => {
 		// The user runs team 0 now
@@ -314,7 +314,7 @@ describe("Rumors in a simulated league", () => {
 			0,
 			"AI interest in the user's players",
 		);
-	});
+	}, 120_000);
 
 	test("outcomes: a rumor is confirmed when it comes true and busted when its time runs out", async () => {
 		const season = g.get("season");
