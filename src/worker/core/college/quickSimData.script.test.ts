@@ -58,6 +58,22 @@ describe.skipIf(!OUT)("college quick sim data", () => {
 		await league.loadGameAttributes();
 		await phase.newPhase(PHASE.REGULAR_SEASON, {});
 		writeFileSync(`${OUT}.games.jsonl`, "");
+		// QS_PROF=1: CPU profile of the regular season (QS_OUT.cpuprofile)
+		let post: ((m: string, a?: unknown) => Promise<any>) | undefined;
+		if (env.QS_PROF) {
+			// @ts-expect-error node types are not in the web tsconfig
+			const inspector = await import("node:inspector");
+			const session = new inspector.Session();
+			session.connect();
+			post = (m, a) =>
+				new Promise((resolve, reject) =>
+					session.post(m, a, (e: unknown, r: unknown) =>
+						e ? reject(e) : resolve(r),
+					),
+				);
+			await post("Profiler.enable");
+			await post("Profiler.start");
+		}
 		const t0 = performance.now();
 		let simSeconds = 0;
 		const maxDays = Number(env.QS_DAYS ?? 999);
@@ -146,6 +162,10 @@ describe.skipIf(!OUT)("college quick sim data", () => {
 				})}\n`;
 			}
 			appendFileSync(`${OUT}.games.jsonl`, lines);
+		}
+		if (post) {
+			const { profile } = await post("Profiler.stop");
+			writeFileSync(`${OUT}.cpuprofile`, JSON.stringify(profile));
 		}
 		let lines = "";
 		for (const t of teams) {

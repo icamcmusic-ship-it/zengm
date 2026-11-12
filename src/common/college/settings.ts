@@ -64,6 +64,8 @@ export const getCollegeSettings = (level: CollegeLevel) => {
 		leagueType: "college",
 		collegeLevel: level,
 		collegeAutoRecruit: true,
+		// The quick sim for games without the user's team: on for the big levels (hundreds of teams)
+		collegeQuickSim: level !== "power",
 
 		// Rules
 		numPeriods: 2,

@@ -406,7 +406,13 @@ const play = async (
 			await recomputeLocalUITeamOvrs();
 		}
 
-		await advStats();
+		// College mode with the quick sim (hundreds of teams): advanced stats every third day of the regular season, and on its last day
+		if (
+			!college.isCollege() ||
+			!college.throttleAdvStats(results, await season.getSchedule())
+		) {
+			await advStats();
+		}
 
 		const playoffsOver =
 			g.get("phase") === PHASE.PLAYOFFS &&

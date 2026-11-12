@@ -28,6 +28,8 @@ const LEVEL = (env.COLLEGE_LEVEL ?? "power") as CollegeLevel;
 const SEASONS = Number(env.COLLEGE_SEASONS ?? 3);
 // File to append one JSON line per season to (seconds per regular season, stats per team game)
 const BENCH: string | undefined = env.COLLEGE_BENCH;
+// COLLEGE_QUICK=1/0: the quick sim on or off all along. Default: the level's default, and on from the second season (so both paths run)
+const QUICK: string | undefined = env.COLLEGE_QUICK;
 
 const where = () => `season ${g.get("season")} phase ${g.get("phase")}`;
 
@@ -66,6 +68,7 @@ describe("college mode", () => {
 		const settings: any = {
 			...getDefaultSettings(),
 			...getCollegeSettings(LEVEL),
+			...(QUICK !== undefined ? { collegeQuickSim: QUICK === "1" } : {}),
 		};
 		const userTid = teams.findIndex((t) => t.region === "Duke");
 		await league.createStream(
@@ -121,6 +124,9 @@ describe("college mode", () => {
 		const start = g.get("season");
 		for (let i = 0; i < SEASONS; i++) {
 			assert.strictEqual(g.get("phase"), PHASE.PRESEASON, where());
+			if (i === 1 && QUICK === undefined) {
+				await league.setGameAttributes({ collegeQuickSim: true });
+			}
 			await checkRosters(`preseason ${i}`);
 			const recruits = (
 				await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
@@ -239,6 +245,7 @@ describe("college mode", () => {
 						fta: per("fta"),
 						tov: per("tov"),
 						pace: per("pace"),
+						quickSim: g.get("collegeQuickSim"),
 						season: i,
 					})}\n`,
 				);

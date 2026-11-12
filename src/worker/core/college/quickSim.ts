@@ -45,37 +45,38 @@ export const QS = {
 	// Points per team per 5-minute overtime period
 	otPts: 9,
 	// Team box score means (per 40 minutes) and their noise
-	fga: 57,
+	fga: 58.5,
 	fgaSd: 4,
-	fta: 17.9,
+	fta: 17.3,
 	ftaSd: 5,
 	ftp: 0.677,
 	tpp: 0.338,
 	tov: 12.2,
 	tovSd: 3.5,
-	orbRate: 0.27,
+	orbRate: 0.255,
 	astPerFg: 0.58,
 	stlPerTov: 0.53,
 	blkPer2pa: 0.073,
 	pf: 17.2,
 	pfSd: 3.5,
 	// Share of 2-point attempts at the rim, in the low post and from mid-range, and their make rates
-	locShare: [0.17, 0.34, 0.49],
-	locMake: [0.69, 0.39, 0.43],
+	locShare: [0.14, 0.32, 0.6],
+	locMake: [1.2, 0.31, 0.44],
 	// Minutes by rotation slot (roster order of the healthy players), regulation, and the game-to-game noise
 	minutes: [26.5, 25.5, 24.5, 23, 21, 19.5, 17.5, 15, 12.5, 8.5, 4.5, 2, 0.5],
 	minutesSd: 5,
+	minutesPerOvr: 0.008,
 	// Exponents of the composite ratings in each player's share of a team stat (fitted to the full sim's per-minute rates)
 	exp: {
-		usage: 0.77,
-		drawingFouls: 1.74,
-		turnovers: 1.72,
-		orb: 2.75,
-		drb: 1.97,
-		passing: 2.05,
-		stealing: 1.9,
-		blocking: 4.43,
-		fouling: 0.67,
+		usage: 1.3,
+		drawingFouls: 2.2,
+		turnovers: 1.9,
+		orb: 3.3,
+		drb: 2.55,
+		passing: 2.8,
+		stealing: 3.9,
+		blocking: 7.4,
+		fouling: 0.94,
 	},
 };
 
@@ -120,9 +121,7 @@ export type QuickComposites = Record<QuickComposite, number>;
 let weightsCache: { key: string; weights: Record<string, any> } | undefined;
 const getWeights = () => {
 	const expanded = expandedRatingsOn();
-	const simFixes = nativeFeatureEnabled("simFixes", (key) =>
-		g.get(key as any),
-	);
+	const simFixes = nativeFeatureEnabled("simFixes", (key) => g.get(key as any));
 	const key = `${expanded}|${simFixes}`;
 	if (weightsCache?.key !== key) {
 		const base = compositeWeightsFor(COMPOSITE_WEIGHTS, expanded);
@@ -227,7 +226,7 @@ const isConfFinal = (game: ScheduleGame) => {
 
 // ---- Teams ----
 
-type QuickPlayer = {
+export type QuickPlayer = {
 	id: number;
 	pid: number;
 	name: string;
@@ -238,6 +237,7 @@ type QuickPlayer = {
 	injury: Player["injury"] & { playingThrough: boolean };
 	injured: boolean;
 	ptModifier: number;
+	ovr: number;
 	c: QuickComposites;
 	stat: Record<string, any>;
 	newInjury?: boolean;
@@ -317,8 +317,12 @@ const TEAM_STAT_KEYS = [
 	"fxf",
 ] as const;
 
-const zeroStats = (keys: readonly string[]) =>
-	Object.fromEntries(keys.map((key) => [key, 0]));
+const PLAYER_STATS_TEMPLATE: Record<string, any> = Object.fromEntries(
+	PLAYER_STAT_KEYS.map((key) => [key, 0]),
+);
+const TEAM_STATS_TEMPLATE: Record<string, any> = Object.fromEntries(
+	TEAM_STAT_KEYS.map((key) => [key, 0]),
+);
 
 /**
  * The teams of the quick sim games, without the work the full sim's loadTeams does for the play-by-play, traits and so on.
@@ -366,11 +370,12 @@ export const loadQuickTeams = async (tids: number[]) => {
 				injury: { ...p.injury, playingThrough },
 				injured: !isAvailable(p),
 				ptModifier: 1,
+				ovr: ratings.ovr,
 				c,
-				stat: zeroStats(PLAYER_STAT_KEYS),
+				stat: { ...PLAYER_STATS_TEMPLATE },
 			});
 		}
-		const stat: Record<string, any> = zeroStats(TEAM_STAT_KEYS);
+		const stat: Record<string, any> = { ...TEAM_STATS_TEMPLATE };
 		stat.ptsQtrs = [0];
 		out[tid] = {
 			id: tid,
@@ -415,30 +420,36 @@ const nonNeg = (x: number) => Math.max(0, Math.round(x));
 // Share n units among items by weight, at most cap[i] each (when given). Multinomial: each unit goes to a random item by weight.
 const share = (n: number, weights: number[], caps?: number[]) => {
 	const out = weights.map(() => 0);
+	const w = caps
+		? weights.map((x, i) => (caps[i]! > 0 ? Math.max(0, x) : 0))
+		: weights.map((x) => Math.max(0, x));
 	let total = 0;
-	for (const w of weights) {
-		total += w;
+	for (const x of w) {
+		total += x;
 	}
-	for (let k = 0; k < n; k++) {
-		let sum = 0;
-		for (const [i, w] of weights.entries()) {
-			if (!caps || out[i]! < caps[i]!) {
-				sum += w;
-			}
-		}
-		if (sum <= 0 || total <= 0) {
-			break;
-		}
-		let r = Math.random() * sum;
-		for (const [i, w] of weights.entries()) {
-			if (caps && out[i]! >= caps[i]!) {
-				continue;
-			}
-			r -= w;
-			if (r < 0) {
-				out[i]! += 1;
+	for (let k = 0; k < n && total > 1e-12; k++) {
+		let r = Math.random() * total;
+		let pick = -1;
+		for (let i = 0; i < w.length; i++) {
+			r -= w[i]!;
+			if (r < 0 && w[i]! > 0) {
+				pick = i;
 				break;
 			}
+		}
+		if (pick < 0) {
+			// Rounding at the end of the scan: the last item with weight
+			for (let i = w.length - 1; i >= 0; i--) {
+				if (w[i]! > 0) {
+					pick = i;
+					break;
+				}
+			}
+		}
+		out[pick]! += 1;
+		if (caps && out[pick]! >= caps[pick]!) {
+			total -= w[pick]!;
+			w[pick] = 0;
 		}
 	}
 	return out;
@@ -450,11 +461,17 @@ const share = (n: number, weights: number[], caps?: number[]) => {
 const assignMinutes = (t: QuickTeam, gameMinutes: number) => {
 	const rotation = t.rotation;
 	const n = rotation.length;
+	// The better players get more of the minutes (the full sim plays its best players more than the roster order alone says)
+	const top = rotation.slice(0, 8);
+	const meanOvr =
+		top.reduce((a, p) => a + p.ovr, 0) / Math.max(1, top.length);
 	const raw = rotation.map((p, i) => {
 		const base = QS.minutes[i] ?? 0;
-		// Endurance: a little more or less, plus game-to-game noise
+		// Quality and endurance, plus game-to-game noise
 		const m =
-			base * (0.85 + 0.3 * p.c.endurance) +
+			base *
+				helpers.bound(1 + QS.minutesPerOvr * (p.ovr - meanOvr), 0.6, 1.4) *
+				(0.85 + 0.3 * p.c.endurance) +
 			(base > 1 ? gauss(0, QS.minutesSd * Math.min(1, base / 20)) : 0);
 		return Math.max(0, m);
 	});
@@ -507,7 +524,11 @@ const sum = (xs: number[]) => {
 };
 
 // Weighted average of a composite over the players, by weights w
-const wAvg = (rot: QuickPlayer[], w: number[], f: (p: QuickPlayer) => number) => {
+const wAvg = (
+	rot: QuickPlayer[],
+	w: number[],
+	f: (p: QuickPlayer) => number,
+) => {
 	let num = 0;
 	let den = 0;
 	for (const [i, p] of rot.entries()) {
@@ -533,18 +554,19 @@ const shootingLine = (
 	const ftaW = rot.map(
 		(p, i) => minutes[i]! * p.c.drawingFouls ** e.drawingFouls,
 	);
-	const teamThreeShare = sum(tpaW) / Math.max(1e-9, sum(w));
+	const teamThreeShare = (1.03 * sum(tpaW)) / Math.max(1e-9, sum(w));
 	const teamFtSkill = wAvg(rot, ftaW, (p) => p.c.shootingFT);
 	const teamTpSkill = wAvg(rot, tpaW, (p) => p.c.shootingThreePointer);
 	// Free throws drawn: relative to a typical rotation (drawing fouls composite 0.41)
-	const ftaRel = (sum(ftaW) / Math.max(1e-9, sum(minutes))) / 0.41 ** e.drawingFouls;
+	const ftaRel =
+		sum(ftaW) / Math.max(1e-9, sum(minutes)) / 0.41 ** e.drawingFouls;
 
 	let fga = nonNeg(gauss(QS.fga * scale, QS.fgaSd));
 	const tpa = Math.min(fga, nonNeg(fga * teamThreeShare + gauss(0, 2)));
 	let fta = nonNeg(gauss(QS.fta * scale * ftaRel ** 0.7, QS.ftaSd));
-	const ftp = helpers.bound(QS.ftp + 0.6 * (teamFtSkill - 0.5), 0.45, 0.9);
+	const ftp = helpers.bound(QS.ftp + 0.6 * (teamFtSkill - 0.35), 0.45, 0.9);
 	let ft = Math.min(fta, nonNeg(fta * ftp + gauss(0, 1.5)));
-	const tpp = helpers.bound(QS.tpp + 0.45 * (teamTpSkill - 0.45), 0.2, 0.5);
+	const tpp = helpers.bound(QS.tpp + 0.45 * (teamTpSkill - 0.43), 0.2, 0.5);
 	let tp = Math.min(tpa, nonNeg(tpa * tpp + gauss(0, 1.5)));
 	// 2-point makes from the points left
 	let rest = pts - ft - 3 * tp;
@@ -583,7 +605,7 @@ const shootingLine = (
 	const pFta = share(fta, ftaW);
 	const pTp = share(
 		tp,
-		rot.map((p, i) => pTpa[i]! * p.c.shootingThreePointer ** 1.5),
+		rot.map((p, i) => pTpa[i]! * p.c.shootingThreePointer ** 0.9),
 		pTpa,
 	);
 	const twoSkill = rot.map(
@@ -594,7 +616,7 @@ const shootingLine = (
 	);
 	const pFg2 = share(
 		fg2,
-		rot.map((p, i) => pFga2[i]! * twoSkill[i]! ** 1.5),
+		rot.map((p, i) => pFga2[i]! * twoSkill[i]! ** 0.8),
 		pFga2,
 	);
 	const pFt = share(
@@ -706,9 +728,10 @@ export const quickSimGame = ({
 	const ftMisses = shots.map(
 		(s) => s.fta.reduce((a, b) => a + b, 0) - s.ft.reduce((a, b) => a + b, 0),
 	);
-	const reb = teams.map((t, i) =>
-		t.rotation.reduce((a, p, j) => a + minutes[i]![j]! * p.c.rebounding, 0) /
-		Math.max(1, gameMinutes * 5),
+	const reb = teams.map(
+		(t, i) =>
+			t.rotation.reduce((a, p, j) => a + minutes[i]![j]! * p.c.rebounding, 0) /
+			Math.max(1, gameMinutes * 5),
 	);
 
 	for (const [i, t] of teams.entries()) {
@@ -730,8 +753,10 @@ export const quickSimGame = ({
 			0.15,
 			0.45,
 		);
-		const drb = nonNeg(reboundable(o) * (1 - oppOrbRate) + gauss(0, 2));
-		const fg = s.fg2.reduce((a, b) => a + b, 0) + s.tp.reduce((a, b) => a + b, 0);
+		const drb = nonNeg(
+			0.93 * reboundable(o) * (1 - oppOrbRate) + gauss(0, 2),
+		);
+		const fg = sum(s.fg2) + sum(s.tp);
 		const ast = Math.min(fg, nonNeg(fg * QS.astPerFg + gauss(0, 2.5)));
 		const oppTov = opp.tov.reduce((a, b) => a + b, 0);
 		const stl = Math.min(oppTov, nonNeg(oppTov * QS.stlPerTov + gauss(0, 1.5)));
@@ -743,26 +768,38 @@ export const quickSimGame = ({
 			nonNeg(opp2pa * QS.blkPer2pa + gauss(0, 1.5)),
 		);
 		const pf = nonNeg(
-			gauss(QS.pf * scale, QS.pfSd) + 0.3 * (opp.fta.reduce((a, b) => a + b, 0) - QS.fta),
+			gauss(QS.pf * scale, QS.pfSd) + 0.3 * (sum(opp.fta) - QS.fta * scale),
 		);
 
-		const pOrb = share(orb, rot.map((p, j) => m[j]! * p.c.rebounding ** 3));
-		const pDrb = share(drb, rot.map((p, j) => m[j]! * p.c.rebounding ** 2.5));
+		const e = QS.exp;
+		const byMin = (f: (p: QuickPlayer) => number) =>
+			rot.map((p, j) => m[j]! * f(p));
+		const pOrb = share(
+			orb,
+			byMin((p) => p.c.rebounding ** e.orb),
+		);
+		const pDrb = share(
+			drb,
+			byMin((p) => p.c.rebounding ** e.drb),
+		);
 		const pAst = share(
 			ast,
-			rot.map((p, j) => m[j]! * p.c.passing ** 3.5),
+			byMin((p) => p.c.passing ** e.passing),
 		);
-		const pStl = share(stl, rot.map((p, j) => m[j]! * p.c.stealing ** 2.5));
-		const pBlk = share(blk, rot.map((p, j) => m[j]! * p.c.blocking ** 4));
+		const pStl = share(
+			stl,
+			byMin((p) => p.c.stealing ** e.stealing),
+		);
+		const pBlk = share(
+			blk,
+			byMin((p) => p.c.blocking ** e.blocking),
+		);
 		const foulCap = g.get("foulsNeededToFoulOut");
 		const pPf = share(
 			pf,
-			rot.map((p, j) => m[j]! * (0.3 + p.c.fouling)),
+			byMin((p) => p.c.fouling ** e.fouling),
 			rot.map(() => (foulCap > 0 ? foulCap : 99)),
 		);
-		// Blocked shots of this team's players: the opponent's blocks, among this team's missed 2s
-		const blockedBy = teams[o]; // (for clarity)
-		void blockedBy;
 
 		const margin = pts[i]! - pts[o]!;
 		for (const [j, p] of rot.entries()) {
@@ -791,15 +828,18 @@ export const quickSimGame = ({
 			st.pm = Math.round((margin * min) / gameMinutes + gauss(0, 2));
 			// Where the 2-point shots came from
 			const fga2 = st.fga - st.tpa;
-			const locW = [
-				0.3 + p.c.shootingAtRim,
-				0.15 + 0.6 * p.c.shootingLowPost,
-				0.3 + 0.5 * p.c.shootingMidRange,
-			];
-			const loc = share(fga2, locW);
+			const loc = share(fga2, [
+				QS.locShare[0]! * 2 * p.c.shootingAtRim,
+				QS.locShare[1]! * 2 * p.c.shootingLowPost,
+				QS.locShare[2]! * 2 * p.c.shootingMidRange,
+			]);
 			const locMade = share(
 				s.fg2[j]!,
-				[loc[0]! * 1.6, loc[1]! * 1.0, loc[2]! * 0.8],
+				[
+					loc[0]! * QS.locMake[0]!,
+					loc[1]! * QS.locMake[1]!,
+					loc[2]! * QS.locMake[2]!,
+				],
 				loc,
 			);
 			st.fgaAtRim = loc[0];
@@ -809,13 +849,19 @@ export const quickSimGame = ({
 			st.fgLowPost = locMade[1];
 			st.fgMidRange = locMade[2];
 		}
-		// Blocked attempts (ba) of the opponent's players, among their missed 2s
-		const oRot = teams[o]!.rotation;
-		const oppMissed2ByPlayer = oRot.map(
+	}
+
+	// Blocked attempts (ba): the opponent's blocks, among each team's missed 2s
+	for (const [i, t] of teams.entries()) {
+		const missed2 = t.rotation.map(
 			(p) => p.stat.fga - p.stat.tpa - (p.stat.fg - p.stat.tp),
 		);
-		const ba = share(blk, oppMissed2ByPlayer, oppMissed2ByPlayer);
-		for (const [j, p] of oRot.entries()) {
+		let oppBlk = 0;
+		for (const p of teams[1 - i]!.rotation) {
+			oppBlk += p.stat.blk;
+		}
+		const ba = share(oppBlk, missed2, missed2);
+		for (const [j, p] of t.rotation.entries()) {
 			p.stat.ba = ba[j]!;
 		}
 	}
@@ -861,10 +907,7 @@ export const quickSimGame = ({
 			lost: t.lost,
 			ovr: t.ovr,
 			stat: t.stat,
-			player: t.player.map((p) => ({
-				...p,
-				compositeRating: undefined,
-			})),
+			player: t.player,
 		})) as any,
 		clutchPlays: [],
 		playByPlay: undefined,
@@ -894,4 +937,23 @@ export const playQuickGames = async (games: ScheduleGame[]) => {
 			neutralSite,
 		}),
 	);
+};
+
+/**
+ * With the quick sim on, the regular season's advanced stats (PER, win shares, ... for thousands of players) are updated every third day
+ * and on the last day rather than every day.
+ */
+export const throttleAdvStats = (
+	results: GameResults[],
+	schedule: ScheduleGame[],
+) => {
+	if (
+		g.get("phase") !== PHASE.REGULAR_SEASON ||
+		!nativeFeatureEnabled("collegeQuickSim", (key) => g.get(key as any)) ||
+		schedule.length === 0
+	) {
+		return false;
+	}
+	const day = results.find((r) => typeof r.day === "number")?.day;
+	return day !== undefined && day % 3 !== 0;
 };
