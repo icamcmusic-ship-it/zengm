@@ -2,7 +2,10 @@
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import type { PlayerRecruit } from "../../../common/college/types.ts";
 import { idb } from "../../db/index.ts";
-import { g, toUI } from "../../util/index.ts";
+import { g, lock, toUI } from "../../util/index.ts";
+import type { Conditions } from "../../../common/types.ts";
+import type { Pitch, RecruitAction } from "../../../common/college/interest.ts";
+import { advanceOffseasonWeek, userAction } from "./recruiting.ts";
 import { league } from "../index.ts";
 import { autoSetTargets } from "./offseason.ts";
 import { isCollege } from "./isCollege.ts";
@@ -86,4 +89,33 @@ export const collegeSetRedshirt = async ({
 	}
 	await setRedshirt(p, redshirt);
 	await toUI("realtimeUpdate", [["playerMovement"]]);
+};
+
+export const collegeRecruitAction = async ({
+	pid,
+	action,
+	pitch,
+}: {
+	pid: number;
+	action: RecruitAction | "nil" | "withdraw";
+	pitch?: Pitch;
+}) => {
+	if (!isCollege()) {
+		return "Not a college league.";
+	}
+	const error = await userAction({ pid, action, pitch });
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return error;
+};
+
+export const collegeAdvanceRecruitingWeek = async (
+	_: unknown,
+	conditions: Conditions,
+) => {
+	if (!isCollege() || lock.get("newPhase") || lock.get("gameSim")) {
+		return false;
+	}
+	const done = await advanceOffseasonWeek(conditions);
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return done;
 };

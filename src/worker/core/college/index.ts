@@ -17,16 +17,24 @@ import {
 	addRecruitingClass,
 	doDepartures,
 	doSigningDay,
-	doTransferPortal,
 	onPreseason,
 } from "./offseason.ts";
 import {
 	afterConfTournamentGames,
+	afterNitGames,
+	finishNit,
 	scheduleConfTournamentDay,
 	startConfTournaments,
 } from "./postseason.ts";
 import { newCollegeSchedule } from "./schedule.ts";
 import { aiRedshirts } from "./redshirt.ts";
+import {
+	closePortal,
+	finishOffseasonWeeks,
+	openPortal,
+	recruitingWeek,
+	recruitingWeeksTo,
+} from "./recruiting.ts";
 import {
 	getCollegeState,
 	initCollegeSeason,
@@ -43,7 +51,12 @@ export { getCollegeState } from "./state.ts";
 export { canRedshirt, isRedshirting, setRedshirt } from "./redshirt.ts";
 export { useCollegeAwards } from "./awards.ts";
 export { playQuickGames, throttleAdvStats, useQuickSim } from "./quickSim.ts";
-export { genNationalTournament, getNetRows } from "./postseason.ts";
+export {
+	genNationalTournament,
+	getNetRows,
+	getNitGames,
+	nitOn,
+} from "./postseason.ts";
 export {
 	addRecruitingClass,
 	autoSetTargets,
@@ -87,6 +100,11 @@ export const afterGames = async (results: GameResults[], dayOver: boolean) => {
 	}
 	recordResults(state, results);
 	const phase = g.get("phase");
+	if (phase === PHASE.PLAYOFFS) {
+		await afterNitGames(state, results);
+		await saveCollegeState(state);
+		return;
+	}
 	if (phase === PHASE.AFTER_TRADE_DEADLINE) {
 		await afterConfTournamentGames(state, results);
 		await saveCollegeState(state);
@@ -104,6 +122,10 @@ export const afterGames = async (results: GameResults[], dayOver: boolean) => {
 				(day >= state.regDays || weekOfDay(day + 1, state.regDays) > week)
 			) {
 				makePolls(state, week);
+				await saveCollegeState(state);
+				// A recruiting week with every poll week
+				await recruitingWeeksTo(week);
+				return;
 			}
 		}
 	}
@@ -117,6 +139,7 @@ export const newPhaseConfTournaments = async (): Promise<PhaseReturn> => {
 		await saveCollegeState(state);
 	}
 	await startConfTournaments();
+	await recruitingWeek();
 	return {
 		redirect: {
 			url: helpers.leagueUrl(["college_conf_tournaments"]),
@@ -133,7 +156,13 @@ export const archiveSeason = async () => {
 	if (!state) {
 		return;
 	}
+	if (state.nit && state.nit.champion === undefined) {
+		finishNit(state);
+		await saveCollegeState(state);
+	}
 	await updateCollegeArchive({
+		firstFour: state.firstFour,
+		nit: state.nit,
 		polls: state.polls,
 		confTournaments: state.confTournaments,
 		selection: state.selection
@@ -165,14 +194,23 @@ export const newPhaseTransferPortal = async (
 	conditions: Conditions,
 ): Promise<PhaseReturn> => {
 	await idb.cache.schedule.clear();
-	await doTransferPortal(conditions);
+	await openPortal(conditions);
 	return {
+		redirect: {
+			url: helpers.leagueUrl(["college_portal"]),
+			text: "View transfer portal",
+		},
 		updateEvents: ["playerMovement"],
 	};
 };
 
-export const newPhaseRecruiting = async (): Promise<PhaseReturn> => {
+export const newPhaseRecruiting = async (
+	conditions: Conditions,
+): Promise<PhaseReturn> => {
 	await idb.cache.schedule.clear();
+	// The rest of the portal window, then whoever is left in the portal lands somewhere
+	await finishOffseasonWeeks(conditions);
+	await closePortal(conditions);
 	// A league that somehow has no class (imported, changed by hand) gets one now
 	await addRecruitingClass();
 	return {
@@ -188,6 +226,7 @@ export const newPhaseSigningDay = async (
 	conditions: Conditions,
 ): Promise<PhaseReturn> => {
 	await idb.cache.schedule.clear();
+	await finishOffseasonWeeks(conditions);
 	await doSigningDay(conditions);
 	return {
 		redirect: {

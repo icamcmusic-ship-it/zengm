@@ -254,9 +254,15 @@ const playMenu = {
 		await runDraft({ type: "untilEnd" }, conditions);
 	},
 	untilResignPlayers: async (param: unknown, conditions: Conditions) => {
-		// College mode: departures, then the transfer portal, then recruiting
+		// College mode: departures, then the transfer portal (it stays open until the user moves on), then recruiting
+		if (isCollege() && g.get("phase") === PHASE.DRAFT_LOTTERY) {
+			await phase.newPhase(PHASE.DRAFT, conditions);
+			await phase.newPhase(PHASE.AFTER_DRAFT, conditions);
+			return;
+		}
 		if (isCollege() && g.get("phase") === PHASE.DRAFT) {
 			await phase.newPhase(PHASE.AFTER_DRAFT, conditions);
+			return;
 		}
 		if (
 			g.get("draftType") === "freeAgents" &&

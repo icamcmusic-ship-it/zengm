@@ -29,7 +29,7 @@ import getInjuryRate from "../GameSim.basketball/getInjuryRate.ts";
 import { simFixCompositeWeights } from "../GameSim.basketball/simSettings.ts";
 import { expandedRatingsOn } from "../player/expandedRatings.ts";
 import { isRedshirting } from "./redshirt.ts";
-import { getCollegeState } from "./state.ts";
+import { findPending, getCollegeState, nitMatchups } from "./state.ts";
 
 // ---- Model constants (calibrated, see the Quick sim section of docs/college-mode.md) ----
 
@@ -189,7 +189,11 @@ export const useQuickSim = (game: ScheduleGame) => {
 		return false;
 	}
 	const phase = g.get("phase");
-	if (phase !== PHASE.REGULAR_SEASON && phase !== PHASE.AFTER_TRADE_DEADLINE) {
+	if (
+		phase !== PHASE.REGULAR_SEASON &&
+		phase !== PHASE.AFTER_TRADE_DEADLINE &&
+		phase !== PHASE.PLAYOFFS
+	) {
 		return false;
 	}
 	const userTids = g.get("userTids");
@@ -204,6 +208,20 @@ export const useQuickSim = (game: ScheduleGame) => {
 	}
 	if (phase === PHASE.AFTER_TRADE_DEADLINE && isConfFinal(game)) {
 		return false;
+	}
+	const state = getCollegeState();
+	// The First Four is national tournament: full sim. In the national tournament's phase, only NIT games can be quick
+	if (
+		state &&
+		phase === PHASE.AFTER_TRADE_DEADLINE &&
+		findPending(state.firstFour ?? [], game.homeTid, game.awayTid)
+	) {
+		return false;
+	}
+	if (phase === PHASE.PLAYOFFS) {
+		return (
+			!!state && !!findPending(nitMatchups(state), game.homeTid, game.awayTid)
+		);
 	}
 	return true;
 };
@@ -924,7 +942,9 @@ export const playQuickGames = async (games: ScheduleGame[]) => {
 		tids.add(game.awayTid);
 	}
 	const teams = await loadQuickTeams([...tids]);
-	const neutralSite = g.get("phase") === PHASE.AFTER_TRADE_DEADLINE;
+	const neutralSite =
+		g.get("phase") === PHASE.AFTER_TRADE_DEADLINE ||
+		(g.get("phase") === PHASE.PLAYOFFS && g.get("neutralSite") === "playoffs");
 	return games.map((game) =>
 		quickSimGame({
 			gid: game.gid,

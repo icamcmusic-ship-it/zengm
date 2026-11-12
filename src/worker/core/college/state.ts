@@ -2,6 +2,7 @@
 import { PHASE } from "../../../common/constants.ts";
 import {
 	COLLEGE_GAME,
+	isPostseasonGameType,
 	RESULT_SIZE,
 	type CollegeState,
 } from "../../../common/college/types.ts";
@@ -43,7 +44,7 @@ const pollGames = (state: CollegeState, firstDay: number): PollGame[] => {
 	const r = state.results;
 	for (let i = 0; i < r.length; i += RESULT_SIZE) {
 		const type = r[i + 5]!;
-		if (type === COLLEGE_GAME.NATIONAL) {
+		if (isPostseasonGameType(type)) {
 			continue;
 		}
 		games.push({
@@ -132,12 +133,40 @@ export const initCollegeSeason = async (regDays: number) => {
 	return saveCollegeState(state);
 };
 
-const gameType = (results: GameResults, phase: number) => {
+// A matchup not played yet between these two teams (either way round)
+export const findPending = <
+	T extends { home: number; away: number; pts?: unknown },
+>(
+	matchups: Iterable<T>,
+	a: number,
+	b: number,
+) => {
+	for (const m of matchups) {
+		if (
+			!m.pts &&
+			((m.home === a && m.away === b) || (m.home === b && m.away === a))
+		) {
+			return m;
+		}
+	}
+	return undefined;
+};
+
+export const nitMatchups = (state: CollegeState) =>
+	(state.nit?.rounds ?? []).flat();
+
+const gameType = (results: GameResults, phase: number, state: CollegeState) => {
+	const a = results.team[0].id;
+	const b = results.team[1].id;
 	if (phase === PHASE.PLAYOFFS) {
-		return COLLEGE_GAME.NATIONAL;
+		return findPending(nitMatchups(state), a, b)
+			? COLLEGE_GAME.NIT
+			: COLLEGE_GAME.NATIONAL;
 	}
 	if (phase === PHASE.AFTER_TRADE_DEADLINE) {
-		return COLLEGE_GAME.CONF_TOURNAMENT;
+		return findPending(state.firstFour ?? [], a, b)
+			? COLLEGE_GAME.FIRST_FOUR
+			: COLLEGE_GAME.CONF_TOURNAMENT;
 	}
 	return results.team[0].cid === results.team[1].cid
 		? COLLEGE_GAME.CONF
@@ -155,7 +184,7 @@ export const recordResults = (state: CollegeState, results: GameResults[]) => {
 		if (home.id < 0 || away.id < 0) {
 			continue;
 		}
-		const type = gameType(result, phase);
+		const type = gameType(result, phase, state);
 		state.results.push(
 			typeof result.day === "number" ? result.day : 0,
 			home.id,
@@ -174,7 +203,7 @@ export const getRecords = (state: CollegeState) => {
 	const l: number[] = Array.from({ length: numTeams }, () => 0);
 	const r = state.results;
 	for (let i = 0; i < r.length; i += RESULT_SIZE) {
-		if (r[i + 5] === COLLEGE_GAME.NATIONAL) {
+		if (isPostseasonGameType(r[i + 5]!)) {
 			continue;
 		}
 		const d = r[i + 3]!;

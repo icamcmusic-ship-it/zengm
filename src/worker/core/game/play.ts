@@ -92,6 +92,8 @@ const play = async (
 				// College mode: the conference tournaments come between the regular season and the national tournament
 				if (college.isCollege() && g.get("phase") === PHASE.REGULAR_SEASON) {
 					await phase.newPhase(PHASE.AFTER_TRADE_DEADLINE, conditions);
+					// The phase change skips the play menu for this phase while a sim is running
+					await updatePlayMenu();
 				} else {
 					await phase.newPhase(
 						PHASE.PLAYOFFS,
@@ -707,9 +709,7 @@ const play = async (
 			// College mode: games without the user's team can be played by the quick sim (college/quickSim.ts)
 			let quickResults: GameResults[] = [];
 			if (college.isCollege()) {
-				const quickGames = schedule.filter((game) =>
-					college.useQuickSim(game),
-				);
+				const quickGames = schedule.filter((game) => college.useQuickSim(game));
 				if (quickGames.length > 0) {
 					quickResults = await college.playQuickGames(quickGames);
 					const quickGids = new Set(quickGames.map((game) => game.gid));

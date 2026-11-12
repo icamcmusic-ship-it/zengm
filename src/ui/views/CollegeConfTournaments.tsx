@@ -2,7 +2,7 @@
 import { useState } from "react";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
-import { SeasonSelect, TeamName } from "./College/common.tsx";
+import { Bracket, SeasonSelect, TeamName } from "./College/common.tsx";
 import { confRoundName } from "../../common/collegeStats/ncaa.ts";
 
 const CollegeConfTournaments = ({
@@ -63,55 +63,13 @@ const CollegeConfTournaments = ({
 									/>
 								</p>
 							) : null}
-							<div className="d-flex flex-wrap gap-3">
-								{current.rounds.map((round, i) => (
-									<div key={i} style={{ minWidth: 220 }}>
-										<h3 className="fs-6">
-											{confRoundName(i, current.rounds.length)}
-										</h3>
-										{round.map((m, j) =>
-											m.away === -2 ? null : (
-												<div key={j} className="border rounded mb-2 p-1 small">
-													{(["home", "away"] as const).map((side, k) => {
-														const tid = m[side];
-														const seed =
-															side === "home" ? m.seedHome : m.seedAway;
-														const won =
-															m.pts !== undefined && m.pts[k]! > m.pts[1 - k]!;
-														return (
-															<div
-																key={side}
-																className={`d-flex justify-content-between${won ? " fw-bold" : ""}`}
-															>
-																<span>
-																	{seed !== undefined ? (
-																		<span className="text-body-secondary me-1">
-																			{seed}
-																		</span>
-																	) : null}
-																	{tid >= 0 ? (
-																		<TeamName
-																			teams={teams}
-																			tid={tid}
-																			season={season}
-																			userTid={userTid}
-																		/>
-																	) : (
-																		<span className="text-body-secondary">
-																			TBD
-																		</span>
-																	)}
-																</span>
-																<span>{m.pts ? m.pts[k] : ""}</span>
-															</div>
-														);
-													})}
-												</div>
-											),
-										)}
-									</div>
-								))}
-							</div>
+							<Bracket
+								rounds={current.rounds}
+								roundName={(i) => confRoundName(i, current.rounds.length)}
+								teams={teams}
+								season={season}
+								userTid={userTid}
+							/>
 						</>
 					) : null}
 				</>

@@ -8,7 +8,14 @@ export const COLLEGE_GAME = {
 	CONF: 1,
 	CONF_TOURNAMENT: 2,
 	NATIONAL: 3,
+	// The national tournament's play-in games (68-team field), before the bracket
+	FIRST_FOUR: 4,
+	NIT: 5,
 } as const;
+
+// Game types that are not part of the regular season and conference tournaments (no NET, polls or records)
+export const isPostseasonGameType = (type: number) =>
+	type >= COLLEGE_GAME.NATIONAL;
 
 // Numbers per game in CollegeState.results: day, home tid, away tid, home points minus away points, site (1 = home court, 0 = neutral), type
 export const RESULT_SIZE = 6;
@@ -54,6 +61,18 @@ export type CollegeFieldTeam = {
 	bid: "auto" | "at-large";
 	// 1 = the top overall seed
 	overall: number;
+	// In a First Four game (index into CollegeState.firstFour): two teams share this seed line until it is played
+	firstFour?: number;
+};
+
+export type CollegeFirstFourGame = {
+	home: number;
+	away: number;
+	seed: number;
+	region: number;
+	bid: "auto" | "at-large";
+	// [home, away], once played
+	pts?: [number, number];
 };
 
 export type CollegeSelection = {
@@ -78,6 +97,24 @@ export type CollegeState = {
 	pollWeek: number;
 	confTournaments?: CollegeConfTournament[];
 	selection?: CollegeSelection;
+	// 68-team field: the four play-in games, made with the selection when the conference tournaments are over
+	firstFour?: CollegeFirstFourGame[];
+	// The NIT (setting collegeNit): a bracket like a conference tournament's (cid -1)
+	nit?: CollegeNit;
+};
+
+export type CollegeNit = CollegeConfTournament & {
+	// Regular season conference champions who lost their tournament (automatic bids)
+	autoBids: number[];
+};
+
+export type CollegeClassRanking = {
+	tid: number;
+	rank: number;
+	points: number;
+	count: number;
+	// Number of 5, 4, 3 star recruits
+	stars: [number, number, number];
 };
 
 export type CollegeProDraftPick = {
@@ -137,6 +174,9 @@ export type CollegeArchive = {
 	graduated?: number;
 	transfers?: CollegeDeparture[];
 	commits?: CollegeCommit[];
+	firstFour?: CollegeFirstFourGame[];
+	nit?: CollegeNit;
+	classRankings?: CollegeClassRanking[];
 };
 
 export type PlayerRecruit = {
@@ -153,6 +193,39 @@ export type PlayerRecruit = {
 	season?: number;
 	// Joined as a walk-on rather than through recruiting
 	walkOn?: boolean;
+} & RecruitingBox;
+
+// Recruiting v2 (common/college/interest.ts), on a recruit (p.recruit) and on a player in the transfer portal (p.portal)
+export type RecruitingBox = {
+	// What he values (weights adding up to 1)
+	prefs?: import("./interest.ts").Prefs;
+	// The schools recruiting him, and how interested he is in each
+	schools?: import("./interest.ts").SchoolInterest[];
+	// Verbal commitment (before signing day)
+	commit?: number;
+	// How far the user's staff has scouted him: 0 nothing, 1 his top wants, 2 everything (exact ratings)
+	scout?: number;
+};
+
+// A player in the transfer portal (p.tid is PLAYER.FREE_AGENT while he is in it)
+export type PlayerPortal = RecruitingBox & {
+	from: number;
+	season: number;
+};
+
+// The user's recruiting this season (game attribute collegeRecruiting)
+export type CollegeRecruitingState = {
+	season: number;
+	// Recruiting weeks played this season
+	week: number;
+	budget: number;
+	points: number;
+	nilBudget: number;
+	nil: number;
+	officialVisits: number;
+	// Weeks advanced by hand in the current offseason phase (portal, late recruiting)
+	offseasonWeeks: number;
+	offseasonPhase?: number;
 };
 
 export type PlayerCollegeExit = {
