@@ -506,8 +506,10 @@ const play = async (
 		schedule: ScheduleGame[],
 		teams: Record<number, unknown>,
 		dayOver: boolean,
+		// College mode: games already played by the quick sim (college/quickSim.ts)
+		quickResults: GameResults[] = [],
 	) => {
-		const results = [];
+		const results = [...quickResults];
 
 		for (const game of schedule) {
 			const doPlayByPlay = gidOneGame === game.gid && playByPlay;
@@ -694,12 +696,26 @@ const play = async (
 				schedule = await season.getSchedule(true);
 			}
 
+			injuryDepthSetSimDay(schedule[0]?.day);
+
+			// College mode: games without the user's team can be played by the quick sim (college/quickSim.ts)
+			let quickResults: GameResults[] = [];
+			if (college.isCollege()) {
+				const quickGames = schedule.filter((game) =>
+					college.useQuickSim(game),
+				);
+				if (quickGames.length > 0) {
+					quickResults = await college.playQuickGames(quickGames);
+					const quickGids = new Set(quickGames.map((game) => game.gid));
+					schedule = schedule.filter((game) => !quickGids.has(game.gid));
+				}
+			}
+
 			for (const matchup of schedule) {
 				tids.add(matchup.homeTid);
 				tids.add(matchup.awayTid);
 			}
 
-			injuryDepthSetSimDay(schedule[0]?.day);
 			const teams = await loadTeams(Array.from(tids), conditions); // Play games
 
 			// How heated each matchup's rivalry is, for the wording of the play-by-play only (the sim never reads it)
@@ -721,7 +737,7 @@ const play = async (
 				await staff.applyCoachSystems(schedule, teams);
 			}
 
-			await cbSimGames(schedule, teams, dayOver);
+			await cbSimGames(schedule, teams, dayOver, quickResults);
 		}
 	};
 

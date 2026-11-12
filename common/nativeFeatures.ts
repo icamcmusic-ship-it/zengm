@@ -307,6 +307,15 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "collegeQuickSim",
+		key: "collegeQuickSim",
+		name: "College Quick Sim",
+		description:
+			"College leagues only: games that do not involve your team are played by a fast statistical model calibrated to the full game simulation (scores from the teams' ratings and home court, box scores shared out by minutes and roles), so a league of hundreds of schools sims several times faster. Your team's games, conference tournament finals and the national tournament always use the full simulation. On by default for the major and full levels.",
+		default: false,
+		sports: BBGM,
+	},
+	{
 		id: "realisticPossessions",
 		key: "realisticPossessions",
 		name: "Realistic Possession Model",
