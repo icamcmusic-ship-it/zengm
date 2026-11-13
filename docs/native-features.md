@@ -488,6 +488,9 @@ season). Never for an edited face. Measured over 3,000 seeds:
 - **Jerseys:** each face in the history wears the jersey of the team he played the most regular-season games for that season (a
   tie goes to the later team, where he ended the season), in that season's colours and jersey style from the team season rows
   (`getTeamInfoBySeason`, so rebrands show). Seasons with no team (retired, unsigned) wear a plain grey jersey.
+- **Retired players' "Now":** his face today, worked out at display time (no snapshot is needed): with _Age Retired Players_
+  his generated face aged to the current season with retirement aging, else his face as of retirement; headbands, bandanas,
+  eye black and goggles removed (glasses he was generated with, team-coloured or not, stay); in the plain grey jersey.
 - **Player page:** _Then and Now_ shows his first pro season, his prime (retired players only) and now; _Every season his face
   changed_ lists each one.
 - **Prime:** the pro season with his best ovr (the first, on a tie), ignoring prospect ratings and anything after he retired.
