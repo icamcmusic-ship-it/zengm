@@ -148,6 +148,29 @@ export const HAIR_STYLES: readonly HairStyle[] = [
 	{ id: "fork-frosted-tips", textures: S, rarity: "rare", age: "young" },
 	{ id: "fork-top-knot", textures: S, rarity: "rare", age: "young" },
 	{ id: "fork-mohawk", textures: S, rarity: "rare", age: "young" },
+	{ id: "fork-slick-back", textures: S, rarity: "uncommon", age: "mature" },
+	{ id: "fork-pompadour", textures: S, rarity: "uncommon" },
+	{ id: "fork-wolf-cut", textures: SC, rarity: "rare", age: "young" },
+	{
+		id: "fork-half-up-bun",
+		textures: S,
+		rarity: "rare",
+		age: "young",
+		hairBg: "fork-shoulder-length",
+	},
+	{
+		id: "fork-middle-part-long",
+		textures: SC,
+		rarity: "rare",
+		hairBg: "fork-long-wavy",
+	},
+	{
+		id: "fork-slick-back",
+		textures: S,
+		rarity: "rare",
+		hairBg: "fork-slick-back-long",
+	},
+	{ id: "short3", textures: SC, rarity: "rare", hairBg: "fork-mullet" },
 	{ id: "longHair", textures: S, rarity: "rare", hairBg: "longHair" },
 	{ id: "shaggy1", textures: S, rarity: "rare", hairBg: "shaggy" },
 	{
@@ -278,6 +301,13 @@ const pickWeighted = <T>(
 export const hairStylesFor = (texture: Texture) =>
 	HAIR_STYLES.filter((style) => style.textures.includes(texture));
 
+const GLASSES = [
+	"glasses1-primary",
+	"glasses2-black",
+	"fork-glasses-round",
+	"fork-glasses-rect",
+];
+
 // Natural hair colours stay facesjs'; a small share is bleached or dyed (younger players)
 const DYED = ["#e9d9a6", "#d8c38a", "#b5452f", "#f2efe6"];
 
@@ -335,6 +365,26 @@ export const styleFace = (
 			...extra.fork,
 			hair: DYED[Math.floor(random() * DYED.length)]!,
 		};
+	}
+
+	// Skin: some young players have a little acne (face aging takes it away in their 20s along with their teen look)
+	if (
+		age !== undefined &&
+		age <= 21 &&
+		face.miscLine.id === "none" &&
+		random() < 0.12
+	) {
+		face.miscLine.id = "fork-acne";
+	}
+
+	// Glasses: rare on players (goggles), common enough on older coaches and GMs
+	if (
+		age !== undefined &&
+		age >= 40 &&
+		face.glasses.id === "none" &&
+		random() < 0.3
+	) {
+		face.glasses.id = GLASSES[Math.floor(random() * GLASSES.length)]!;
 	}
 
 	// The fork's other parts (heads, eyes, brows, noses, mouths, ears, lines, glasses, accessories), as before

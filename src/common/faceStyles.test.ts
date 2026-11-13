@@ -61,3 +61,29 @@ describe("faceStyles", () => {
 		expect(Math.max(...counts.values())).toBeLessThan(40);
 	});
 });
+
+describe("face mask after a facial injury", () => {
+	test("while out and for the rest of the season", async () => {
+		const { wearsFaceMask } = await import("./faceRender.ts");
+		expect(
+			wearsFaceMask({ type: "Fractured Nose", gamesRemaining: 3 }, [], 2030),
+		).toBe(true);
+		expect(
+			wearsFaceMask(
+				{ type: "Healthy", gamesRemaining: 0 },
+				[{ season: 2030, type: "Fractured Orbital Socket" }],
+				2030,
+			),
+		).toBe(true);
+		expect(
+			wearsFaceMask(
+				{ type: "Healthy", gamesRemaining: 0 },
+				[{ season: 2029, type: "Fractured Nose" }],
+				2030,
+			),
+		).toBe(false);
+		expect(
+			wearsFaceMask({ type: "Sprained Ankle", gamesRemaining: 5 }, [], 2030),
+		).toBe(false);
+	});
+});

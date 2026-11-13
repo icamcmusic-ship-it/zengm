@@ -638,11 +638,15 @@ export const agedFields = (
 						? base.el
 						: genes.eyeLine;
 	}
-	if (base.ml === "none" || isForeheadLine(base.ml)) {
+	// Teen acne (faceStyles.ts) clears up after 21
+	const acne = base.ml === "fork-acne";
+	if (base.ml === "none" || isForeheadLine(base.ml) || (acne && !edited)) {
 		if (!edited || base.ml === "none") {
 			out.ml =
 				forehead === 0
-					? "none"
+					? acne && age <= 21
+						? "fork-acne"
+						: "none"
 					: forehead === 3
 						? "fork-forehead-lines"
 						: forehead === 2

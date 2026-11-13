@@ -69,3 +69,31 @@ export const prepareFaceForDisplay = (face: FaceConfig): FaceConfig => {
 	out = recolor(out, "hairBg", extra.hair, "~fd");
 	return out;
 };
+
+// Facial injuries: a clear protective mask while he's out and for the rest of the season once he's back
+const FACIAL_INJURIES = new Set([
+	"Bruised Eye",
+	"Facial Laceration",
+	"Fractured Cheekbone",
+	"Fractured Jaw",
+	"Fractured Nose",
+	"Fractured Orbital Socket",
+]);
+
+export const wearsFaceMask = (
+	injury: { type: string; gamesRemaining: number } | undefined,
+	injuries: readonly { season: number; type: string }[] | undefined,
+	season: number,
+) =>
+	(injury !== undefined &&
+		injury.gamesRemaining > 0 &&
+		FACIAL_INJURIES.has(injury.type)) ||
+	(injuries?.some(
+		(row) => row.season === season && FACIAL_INJURIES.has(row.type),
+	) ??
+		false);
+
+export const withFaceMask = (face: FaceConfig): FaceConfig => ({
+	...face,
+	glasses: { id: "facemask" },
+});
