@@ -234,14 +234,14 @@ const checkBoxScores = async (s: number) => {
 				if (p.min > 0 && !allStar) {
 					const key = `${p.pid}|${gm.playoffs ? 1 : 0}`;
 					const sum = sums.get(key) ?? {};
-					for (const k of [...STAT_KEYS, "min", "gp", "gs", "pm"]) {
+					for (const k of [...STAT_KEYS, "min", "gp", "gs", "pm", "dd", "td"]) {
 						sum[k] = (sum[k] ?? 0) + (p[k] ?? 0);
 					}
 					sums.set(key, sum);
 				} else if (p.gp && !allStar) {
 					const key = `${p.pid}|${gm.playoffs ? 1 : 0}`;
 					const sum = sums.get(key) ?? {};
-					for (const k of [...STAT_KEYS, "min", "gp", "gs", "pm"]) {
+					for (const k of [...STAT_KEYS, "min", "gp", "gs", "pm", "dd", "td"]) {
 						sum[k] = (sum[k] ?? 0) + (p[k] ?? 0);
 					}
 					sums.set(key, sum);
@@ -305,7 +305,7 @@ const checkBoxScores = async (s: number) => {
 	for (const row of statsRows) {
 		const key = `${row.pid}|${row.playoffs ? 1 : 0}`;
 		const sum = totals.get(key) ?? {};
-		for (const k of [...STAT_KEYS, "min", "gp", "gs", "pm"]) {
+		for (const k of [...STAT_KEYS, "min", "gp", "gs", "pm", "dd", "td"]) {
 			sum[k] = (sum[k] ?? 0) + ((row as any)[k] ?? 0);
 		}
 		totals.set(key, sum);
