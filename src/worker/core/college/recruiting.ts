@@ -843,7 +843,8 @@ const addTransfers = async (moves: CollegeDeparture[]) => {
 
 // The schools a portal player can pick. He entered the portal to leave, so his old school's standing offer doesn't count: it is
 // only in the running with a retention pitch (and then it has to win on interest like anyone else). Before, the standing offer
-// won most of the time at the close of the window and only about 7-30% of entrants moved
+// won most of the time at the close of the window and only about 7-30% of entrants moved. One with no offer elsewhere when the
+// window closes withdraws and stays, if his school has room
 const portalChoices = (schools: SchoolInterest[], from: number) =>
 	schools.filter((s) => s.tid !== from || s.r);
 
@@ -1034,13 +1035,19 @@ export const closePortal = async (conditions: Conditions) => {
 		const { p, box } = prospect;
 		const from = p.portal!.from;
 		const ovr = last(p.ratings).ovr;
+		const hasSpot = (tid: number) => {
+			const school = schools.get(tid);
+			return !!school && openSpots(school) > 0;
+		};
+		// The schools that offered him a scholarship (his old one only after a retention pitch), the one he likes best
 		const options = portalChoices(box.schools ?? [], from)
-			.filter((s) => {
-				const school = schools.get(s.tid);
-				return !!school && openSpots(school) > 0;
-			})
-			.sort((a, b) => (b.o ? 1.3 : 1) * b.i - (a.o ? 1.3 : 1) * a.i);
+			.filter((s) => s.o && hasSpot(s.tid))
+			.sort((a, b) => b.i - a.i);
 		let to = options[0]?.tid;
+		if (to === undefined && hasSpot(from)) {
+			// No offer: he withdraws from the portal and stays
+			to = from;
+		}
 		if (to === undefined) {
 			// Anyone with a spot where he would play
 			let best: { tid: number; score: number } | undefined;
@@ -1052,8 +1059,7 @@ export const closePortal = async (conditions: Conditions) => {
 				if (ovr < (sorted[9] ?? 0)) {
 					continue;
 				}
-				// His old school only if nobody else has a place for him
-				const score = school.prestige - (school.tid === from ? 1000 : 0);
+				const score = school.prestige;
 				if (!best || score > best.score) {
 					best = { tid: school.tid, score };
 				}
