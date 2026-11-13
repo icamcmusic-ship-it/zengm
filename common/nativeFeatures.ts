@@ -947,10 +947,20 @@ export const NATIVE_FEATURES = [
 		key: "featureScoutingReports",
 		name: "Scouting Reports",
 		description:
-			"Full scouting reports for every player, written by your scouting department (2-5 scouts made from your scouting budget, with specialties and biases): letter grades with ranges, comparisons, floor and ceiling, offense/defense breakdowns, flags, development plan, team fit and a bottom line, only from what your scouts can see. A Scouting page on every player, a printable scouting card, stock up/down history, a track record per scout, playoff opponent scouting, blurbs in trades and free agency, hover cards in the Mock Draft and Draft Board, and a draft preview in the Newspaper. Off: the short report on the College/Overseas page stays as it was.",
+			"Full scouting reports for every player, written by your scouting department (2-5 scouts made from your scouting budget, with specialties and biases): letter grades with ranges, comparisons, floor and ceiling, offense/defense breakdowns, flags, development plan, team fit and a bottom line, only from what your scouts can see. A Scouting page on every player, a printable scouting card, stock up/down history and a track record per scout. Off: the short report on the College/Overseas page stays as it was.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
+		options: [
+			{
+				key: "scoutingListSummaries",
+				name: "Scouting Summaries on Lists",
+				description:
+					"Also show short scouting summaries outside player pages: a line under each free agent, the players in a trade, hover cards in the Draft Board and Mock Draft, playoff opponent scouting and a draft preview in the Newspaper. Off: scouting reports are only on player pages.",
+				type: "bool",
+				default: false,
+			},
+		],
 	},
 	{
 		id: "frontOffice",

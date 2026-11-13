@@ -1,10 +1,10 @@
 // Scouting Reports (League Extras): the pieces of a report shown around the game. The full page is views/PlayerScouting.tsx.
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { OverlayTrigger, Popover } from "react-bootstrap";
 import clsx from "clsx";
 import { toWorker } from "../../util/toWorker.ts";
 import { helpers } from "../../util/helpers.ts";
-import { useFeatureOn } from "../../util/nativeFeatures.ts";
+import { useFeatureOn, useFeatureOption } from "../../util/nativeFeatures.ts";
 import { useIsCollege } from "../../util/collegeMode.ts";
 import {
 	GRADE_LETTERS,
@@ -22,6 +22,43 @@ export const useScoutingOn = () => {
 	const on = useFeatureOn("scoutingReports");
 	const college = useIsCollege();
 	return on && !college;
+};
+
+// The "Scouting Summaries on Lists" option: short summaries outside player pages (free agents, trades, draft hovers,
+// playoff opponents). Off by default, then scouting reports are only on player pages. Reports only use what the user's
+// scouts can see, so this respects the no visible ratings challenge too.
+export const useScoutingListsOn = () => {
+	const on = useScoutingOn();
+	const lists = useFeatureOption<boolean>("scoutingListSummaries");
+	return on && lists;
+};
+
+// A quick switch for the option, for page headers (saves the same setting as League Extras)
+export const ScoutingListsToggle = ({ className }: { className?: string }) => {
+	const on = useScoutingOn();
+	const lists = useFeatureOption<boolean>("scoutingListSummaries");
+	if (!on) {
+		return null;
+	}
+	return (
+		<div className={clsx("form-check form-switch", className)}>
+			<input
+				className="form-check-input"
+				type="checkbox"
+				id="scouting-list-summaries"
+				checked={lists}
+				data-testid="scouting-list-toggle"
+				onChange={async () => {
+					await toWorker("main", "updateGameAttributes", {
+						scoutingListSummaries: !lists,
+					});
+				}}
+			/>
+			<label className="form-check-label" htmlFor="scouting-list-summaries">
+				Show scouting summaries
+			</label>
+		</div>
+	);
 };
 
 const letterIndex = (letter: string) =>
@@ -64,10 +101,12 @@ export const GradeBadge = ({
 
 const GradeText = ({ text }: { text: string }) => {
 	const first = text.split(" to ")[0]!;
+	const color = gradeColor(letterIndex(first));
 	return (
 		<b
-			style={{ color: gradeColor(letterIndex(first)) }}
-			className="text-nowrap"
+			// --grade-color: lightened in the dark theme (dark.scss), where dark red/green text is hard to read
+			style={{ color, "--grade-color": color } as CSSProperties}
+			className="text-nowrap scout-grade-text"
 		>
 			{text}
 		</b>
@@ -342,7 +381,7 @@ const HoverBody = ({ hover }: { hover: ScoutHover }) => (
 
 // A small "scout" icon with the report's grades and bottom line on hover (click on touch screens)
 export const ScoutingHoverIcon = ({ pid }: { pid: number }) => {
-	const on = useScoutingOn();
+	const on = useScoutingListsOn();
 	const [hover, setHover] = useState<ScoutHover | undefined | null>(null);
 	if (!on) {
 		return null;
@@ -392,7 +431,7 @@ export const ScoutingHoverIcon = ({ pid }: { pid: number }) => {
 
 // Blurbs for many players at once (trade window, free agents)
 export const useScoutingBlurbs = (pids: number[]) => {
-	const on = useScoutingOn();
+	const on = useScoutingListsOn();
 	const key = pids.join(",");
 	const [blurbs, setBlurbs] = useState<Record<number, string>>({});
 	useEffect(() => {
@@ -486,7 +525,7 @@ const getOpponentType = () =>
 
 // Playoffs: our staff's notes on the current opponent
 export const OpponentScouting = ({ season }: { season: number }) => {
-	const on = useScoutingOn();
+	const on = useScoutingListsOn();
 	const [data, setData] = useState<Opponent | undefined>();
 	useEffect(() => {
 		let cancelled = false;

@@ -453,3 +453,63 @@ $highlight-leader-color: lighten($yellow, 18%);
 }
 
 // Extended skill badges: brighter on dark backgrounds
+
+// ---- Dark mode contrast (hotfix) ----
+// The app picks a whole stylesheet per theme and never sets data-bs-theme, so Bootstrap 5.3's *-text-emphasis,
+// *-bg-subtle and *-border-subtle variables kept their light theme values here: dark red/green/yellow text
+// (text-danger-emphasis is #58151c) and pale backgrounds. Use Bootstrap's own dark mode values instead.
+:root {
+	// Only the theme colors: "light" and "dark" read this stylesheet's inverted gray scale
+	@each $color in primary, secondary, success, info, warning, danger {
+		--#{$prefix}#{$color}-text-emphasis: #{map-get(
+				$theme-colors-text-dark,
+				$color
+			)};
+		--#{$prefix}#{$color}-bg-subtle: #{map-get(
+				$theme-colors-bg-subtle-dark,
+				$color
+			)};
+		--#{$prefix}#{$color}-border-subtle: #{map-get(
+				$theme-colors-border-subtle-dark,
+				$color
+			)};
+	}
+}
+
+@media screen {
+	// Red text (mood badges, negative numbers and rating changes, injuries, warnings): a light red with at least 4.5:1
+	// against the page (7.0), table stripes and hover, light bordered buttons like the mood badge (5.1) and highlighted
+	// table-info rows (5.0). lighten($red, 10) was 3.4 on buttons and highlighted rows.
+	.text-danger,
+	.watch-active-1,
+	.watch-active-1:hover {
+		color: #ff8a8a !important;
+	}
+
+	// Dark text on gray (4.69:1 white vs 3.29:1 dark): confidence and status badges
+	.text-bg-secondary {
+		color: #fff !important;
+	}
+
+	// Dark text on red was 3.4:1 (rumor "Didn't happen", trade grades, best games, timeline): the dark theme's
+	// .bg-danger red with white text (8:1)
+	.text-bg-danger {
+		background-color: darken($red, 20) !important;
+		color: #fff !important;
+	}
+
+	// White on bright orange/blue badges was 2.1:1 / 4.0:1 (schedule National TV, news filters)
+	.badge.bg-primary,
+	.badge.text-bg-primary {
+		background-color: darken($orange, 30) !important;
+		color: #fff !important;
+	}
+	.bg-darkblue {
+		background-color: darken(#007bff, 12) !important;
+	}
+
+	// Scouting letter grades as text: the grade color is set on --grade-color (red for D/F, green for A); lightened here
+	.scout-grade-text {
+		color: color-mix(in srgb, var(--grade-color) 60%, #fff) !important;
+	}
+}

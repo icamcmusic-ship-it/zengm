@@ -1,4 +1,8 @@
 import { useState } from "react";
+import {
+	ScoutingListsToggle,
+	useScoutingBlurbs,
+} from "../components/ScoutingReport/index.tsx";
 import { wrappedFreeAgentMarket } from "../components/FreeAgentMarket.tsx";
 import { dropdownOptions } from "../hooks/useDropdownOptions.tsx";
 import { PHASE, PHASE_TEXT } from "../../common/constants.ts";
@@ -163,6 +167,9 @@ const FreeAgents = ({
 
 	const negotiationModal = useNegotiaionModal();
 
+	// Scouting Reports, with the "Scouting Summaries on Lists" option on: a short blurb under each of the first free agents shown
+	const scoutBlurbs = useScoutingBlurbs(players.slice(0, 40).map((p) => p.pid));
+
 	if (
 		((phase > PHASE.AFTER_TRADE_DEADLINE && phase <= PHASE.RESIGN_PLAYERS) ||
 			phase === PHASE.FANTASY_DRAFT ||
@@ -283,8 +290,7 @@ const FreeAgents = ({
 			lastName: p.lastName,
 			season: playerInfoSeason,
 		});
-		// Scouting info is only shown on player pages
-		const blurb: string | undefined = undefined;
+		const blurb = scoutBlurbs[p.pid];
 		const advice = signingAdvice[p.pid];
 		return {
 			key: p.pid,
@@ -391,6 +397,7 @@ const FreeAgents = ({
 				<RosterComposition className="float-end mb-3" players={userPlayers} />
 			) : null}
 			<MoreLinks type="freeAgents" page="free_agents" />
+			{season === "current" ? <ScoutingListsToggle className="mb-2" /> : null}
 			{season === "current" ? (
 				<>
 					<RosterSalarySummary
