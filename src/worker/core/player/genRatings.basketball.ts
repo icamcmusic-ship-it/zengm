@@ -26,16 +26,21 @@ import {
 	setReboundSplit,
 	setShootingSplit,
 } from "./expandedRatings.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+
+type PlayerType = "point" | "scorer" | "wing" | "big";
 
 // Expanded ratings (second step): how much more offensive than defensive rebounding, and catch-and-shoot than off-the-dribble
 // shooting, each player type has
-const typeReboundSplit: Record<"point" | "wing" | "big", number> = {
+const typeReboundSplit: Record<PlayerType, number> = {
 	point: -1,
+	scorer: -0.5,
 	wing: 0,
 	big: 1.5,
 };
-const typeShootingSplit: Record<"point" | "wing" | "big", number> = {
+const typeShootingSplit: Record<PlayerType, number> = {
 	point: -2,
+	scorer: -1,
 	wing: 0.5,
 	big: 1,
 };
@@ -46,16 +51,14 @@ const PROSPECT_REBOUND_OFFSET = -2.1;
 const PROSPECT_SHOOTING_OFFSET = -2.7;
 
 // Expanded ratings: how much more perimeter than interior defense each player type has, on top of what his speed and size say
-const typeDefenseSplit: Record<"point" | "wing" | "big", number> = {
+const typeDefenseSplit: Record<PlayerType, number> = {
 	point: 2,
+	scorer: 1.5,
 	wing: 1,
 	big: -1.5,
 };
 
-const typeFactors: Record<
-	"point" | "wing" | "big",
-	Partial<Record<RatingKey, number>>
-> = {
+const typeFactors: Record<PlayerType, Partial<Record<RatingKey, number>>> = {
 	point: {
 		jmp: 1.65,
 		spd: 1.65,
@@ -66,6 +69,20 @@ const typeFactors: Record<
 		tp: 1.4,
 		oiq: 1.2,
 		endu: 1.4,
+	},
+	// Scoring guard (only with Improved Positions, see SCORER_MIX): a shooting guard's game, a shooter and athlete first, a
+	// moderate handle, and less of a passer than a wing
+	scorer: {
+		jmp: 1.45,
+		spd: 1.45,
+		dnk: 1.3,
+		drb: 1.1,
+		pss: 0.9,
+		ft: 1.5,
+		fg: 1.5,
+		tp: 1.5,
+		oiq: 1.15,
+		endu: 1.3,
 	},
 	wing: {
 		drb: 1.2,
@@ -87,6 +104,36 @@ const typeFactors: Record<
 		diq: 1.2,
 	},
 };
+
+// Shooting guards (SG fix): BBGM's three player types leave out the scoring guard, so a random league had few shooting guards
+// (5-7% at creation, 9% across careers, against about 13% of real NBA listings): its guards were small playmakers (point type:
+// passing and handle 1.5x) or wings, and more than a quarter of the 6'3"-6'6" players were drawn as bigs. With Improved
+// Positions on (the setting whose positions this is about), a scorer type (shooting, athleticism and offensive IQ up, a
+// moderate handle, a wing's passing) takes most of those bigs and wings and part of the 6'1"-6'3" point guards. So that the
+// league's talent stays where it was (mean ovr, the draft's share of small guards), wings of 6'6"-6'9" and point guards of
+// 6'1" and shorter have their type factors a little closer to 1. Per band of the height rating (66 + 0.27 * hgt inches, with
+// the wingspan draw): shares of point / scorer / big (the rest are wings), and type factor scales; taller: BBGM's mix. Tuned
+// on new random leagues against real NBA listings (docs/native-features.md, Improved positions: SG generation).
+export const SCORER_MIX: {
+	maxHgt: number;
+	point: number;
+	scorer: number;
+	big: number;
+	// A type's factors, toward 1 (undefined: as they are)
+	scale?: Partial<Record<PlayerType, number>>;
+}[] = [
+	// Up to 6'1" (BBGM: 90% point, 10% wing)
+	{ maxHgt: 27, point: 0.9, scorer: 0.05, big: 0, scale: { point: 0.9 } },
+	// 6'1"-6'3" (BBGM: the same)
+	{ maxHgt: 33, point: 0.65, scorer: 0.3, big: 0 },
+	// 6'3"-6'6" (BBGM: 3% point, 27% big, 70% wing)
+	{ maxHgt: 44, point: 0.05, scorer: 0.75, big: 0.02 },
+	// 6'6"-6'7" (BBGM: the same)
+	{ maxHgt: 48, point: 0.03, scorer: 0.3, big: 0.15, scale: { wing: 0.75 } },
+	// 6'7"-6'10" (BBGM's mix)
+	{ maxHgt: 58, point: 0.03, scorer: 0, big: 0.27, scale: { wing: 0.75 } },
+];
+const scorerMix = (hgt: number) => SCORER_MIX.find((m) => hgt <= m.maxHgt);
 
 const athleticismRatings = new Set(["stre", "spd", "jmp", "endu", "dnk"]);
 const shootingRatings = new Set(["ft", "fg", "tp"]);
@@ -112,7 +159,19 @@ const genRatings = (
 	const randType = Math.random();
 	let type: keyof typeof typeFactors;
 
-	if (hgt >= 59) {
+	const scorers = featureOn("improvedPositions") ? scorerMix(hgt) : undefined;
+	if (scorers) {
+		// Same draw as below, so with the setting off nothing changes
+		if (randType < scorers.point) {
+			type = "point";
+		} else if (randType < scorers.point + scorers.scorer) {
+			type = "scorer";
+		} else if (randType < scorers.point + scorers.scorer + scorers.big) {
+			type = "big";
+		} else {
+			type = "wing";
+		}
+	} else if (hgt >= 59) {
 		// 6'10" or taller
 		if (randType < 0.01) {
 			type = "point";
@@ -165,7 +224,11 @@ const genRatings = (
 	const factorIns = helpers.bound(realGauss(1, 0.2), 0.2, 1.2);
 
 	for (const key of helpers.keys(rawRatings)) {
-		const typeFactor = typeFactors[type][key] ?? 1;
+		let typeFactor = typeFactors[type][key] ?? 1;
+		const typeScale = scorers?.scale?.[type];
+		if (typeScale !== undefined) {
+			typeFactor = 1 + typeScale * (typeFactor - 1);
+		}
 		let factor = factorIns;
 
 		if (athleticismRatings.has(key)) {
