@@ -26,7 +26,7 @@ import {
 } from "../../../common/contracts.ts";
 import { draft, freeAgents, game, league, phase, season } from "../index.ts";
 import archetypesApi from "../../api/archetypes.ts";
-import { getRecordsBook } from "../../util/recordsBookData.ts";
+import { getMilestones, getRecordsBook } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers } from "../../util/index.ts";
@@ -676,6 +676,66 @@ const checkRecordsBook = async (s: number) => {
 			problem("records book game high", `${key} book ${top} box scores ${v}`);
 		}
 	}
+	// Milestones reached this season, at the game the check says: the career total crosses the mark in that game
+	const { reached } = await getMilestones({ horizon: "season" });
+	out(
+		`MILESTONES ${s} reached ${reached.length}, with their game ${reached.filter((m) => m.gid !== undefined).length}`,
+	);
+	const seen = new Set<string>();
+	for (const m of reached) {
+		const key = `${m.pid}|${m.k}|${m.t}`;
+		if (seen.has(key)) {
+			problem("milestone twice", key);
+		}
+		seen.add(key);
+		if (m.gid === undefined) {
+			continue;
+		}
+		const p = await idb.cache.players.get(m.pid);
+		if (!p) {
+			continue;
+		}
+		const stat = (x: any) =>
+			m.k === "trb"
+				? (x.orb ?? 0) + (x.drb ?? 0)
+				: m.k === "gp"
+					? x.min > 0
+						? 1
+						: 0
+					: (x[m.k] ?? 0);
+		let total = 0;
+		for (const row of p.stats) {
+			if (!row.playoffs && row.tid >= 0 && row.season < s) {
+				total +=
+					m.k === "gp"
+						? (row.gp ?? 0)
+						: m.k === "trb"
+							? (row.orb ?? 0) + (row.drb ?? 0)
+							: ((row as any)[m.k] ?? 0);
+			}
+		}
+		let ok = false;
+		for (const gm of games
+			.filter((x) => !x.playoffs)
+			.sort((a, b) => a.gid - b.gid)) {
+			const line = gm.teams
+				.flatMap((t) => t.players as any[])
+				.find((x) => x.pid === m.pid);
+			if (!line) {
+				continue;
+			}
+			const before = total;
+			total += stat(line);
+			if (gm.gid === m.gid) {
+				ok = before < m.t && total >= m.t;
+				break;
+			}
+		}
+		if (!ok) {
+			problem("milestone game", `${key} gid ${m.gid}`);
+		}
+	}
+
 	// Career and single season points from every player's stats rows
 	const players = await idb.merged.players.getAll();
 	let career = 0;
@@ -779,15 +839,18 @@ const checkPlayoffs = async (s: number) => {
 	}
 };
 
+// Record by record, so the whole database is never one string in memory
 const dbSize = async () => {
 	const out: Record<string, number> = {};
 	let total = 0;
 	const db = idb.league as any;
 	for (const store of db.objectStoreNames as any as string[]) {
-		const all = await db.getAll(store);
-		const mb = JSON.stringify(all).length / 1e6;
-		out[store] = r(mb, 2);
-		total += mb;
+		let bytes = 0;
+		for await (const cursor of db.transaction(store).store) {
+			bytes += JSON.stringify(cursor.value).length;
+		}
+		out[store] = r(bytes / 1e6, 2);
+		total += bytes / 1e6;
 	}
 	return { total: r(total, 1), stores: out };
 };
