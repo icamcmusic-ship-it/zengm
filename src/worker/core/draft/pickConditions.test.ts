@@ -282,6 +282,22 @@ describe("condition helpers", () => {
 		});
 		assert.isAbove(top1.tradeValue, top2.tradeValue);
 
+		// Protected nearly every season and then extinguished is worth next to nothing, not a flat share of the pick
+		const always = protectedTradeValue(probs, values, {
+			top: 3,
+			rollover: [3, 3, 3, 3],
+			then: "extinguish",
+		});
+		assert.isBelow(always.tradeValue, top2.tradeValue);
+		// A rollover is worth more than giving up the pick, less than the pick itself
+		const rolled = protectedTradeValue(probs, values, {
+			top: 2,
+			rollover: [2],
+			then: "extinguish",
+		});
+		assert.isAbove(rolled.tradeValue, top2.tradeValue);
+		assert.isBelow(rolled.tradeValue, unprotected);
+
 		// Better of two picks is at least as good as either one
 		const max = swapTradeValue(probs, values, [0, 0, 0, 1], values, "max");
 		assert.closeTo(max, 5, 1e-9);

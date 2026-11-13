@@ -24,6 +24,10 @@ const sign = async (
 
 	p.tid = tid;
 	p.numDaysFreeAgent = 0;
+	// A new deal settles a trade request or holdout (like an extension does). Otherwise a player who asked out and then re-signed with
+	// the same team would still be asking out, and be traded at a discount for it
+	delete p.tradeRequest;
+	delete p.holdout;
 	p.gamesUntilTradable = isRookie ? 0 : Math.round(0.17 * g.get("numGames")); // 14 for basketball, 3 for football
 	delete p.numPlayersTradedAwayNormalized;
 

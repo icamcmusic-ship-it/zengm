@@ -24,7 +24,7 @@ import * as college from "../college/index.ts";
 
 export const FREE_AGENCY_DAYS = 30;
 
-// With a soft cap, AI teams only re-sign their best AVOID_TAX_MIN_RANK players (by value) into the luxury tax
+// With a soft cap or no cap, AI teams only re-sign their best AVOID_TAX_MIN_RANK players (by value) into the luxury tax
 const AVOID_TAX_MIN_RANK = 3;
 
 const newPhaseResignPlayers = async (
@@ -123,8 +123,9 @@ const newPhaseResignPlayers = async (
 
 	const payrollsByTid = new Map<number, number>();
 
-	// Soft cap: AI teams don't re-sign role players into the luxury tax (cap health). Stars still get re-signed
-	const avoidTax = g.get("salaryCapType") === "soft" && g.get("luxuryTax") > 0;
+	// Soft cap or no cap: AI teams don't re-sign role players into the luxury tax (cap health). Stars still get re-signed. With no cap the
+	// tax is the only brake, and without this payrolls ran away (half the league in the tax, a team 2x the cap and $400M in debt)
+	const avoidTax = g.get("salaryCapType") !== "hard" && g.get("luxuryTax") > 0;
 	const teamValueRank = new Map<number, number>();
 	if (avoidTax) {
 		const byTid = Map.groupBy(players, (p) => p.tid);

@@ -107,7 +107,7 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 				continue;
 			}
 
-			if (salaryCapType !== "none") {
+			if (salaryCapType !== "none" || g.get("luxuryTax") > 0) {
 				// Payroll in the first extended season, without his current deal (which ends before it)
 				const firstNewSeason = getContractExp(contract) + 1;
 				const payroll = await getPayroll(tid, firstNewSeason);
@@ -115,9 +115,13 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 				if (salaryCapType === "hard" && after > g.get("salaryCap")) {
 					continue;
 				}
-				// Soft cap: no routine extension that takes the team into the luxury tax. A holdout is only settled into the tax for a top-2
-				// player, who is worth paying for
-				if (salaryCapType === "soft" && after > g.get("luxuryPayroll")) {
+				// Soft cap or no cap: no routine extension that takes the team into the luxury tax. A holdout is only settled into the tax for a
+				// top-2 player, who is worth paying for
+				if (
+					(salaryCapType === "soft" ||
+						(salaryCapType === "none" && g.get("luxuryTax") > 0)) &&
+					after > g.get("luxuryPayroll")
+				) {
 					const rank = allPlayers
 						.toSorted((a, b) => b.value - a.value)
 						.findIndex((p2) => p2.pid === p.pid);
