@@ -33,12 +33,19 @@ type PlayerRatings = Player["ratings"][number] & Record<string, any>;
 export const lotteryNightOn = () =>
 	__SPORT === "basketball" && featureOn("lotteryNight");
 
-// The combine of a class is held at the start of its draft lottery phase
+// No draft at all (draft type "No draft, rookies are free agents", or zero draft rounds): no combine either
+export const noDraft = () =>
+	g.get("draftType") === "freeAgents" || g.get("numDraftRounds") <= 0;
+
+// The combine of a class is held at the start of its draft lottery phase (not in a league without a draft: a past class's
+// combine, from before the setting changed, still counts)
 export const combineHeld = (draftYear: number) => {
 	const season = g.get("season");
+	if (draftYear < season) {
+		return true;
+	}
 	return (
-		draftYear < season ||
-		(draftYear === season && g.get("phase") >= PHASE.DRAFT_LOTTERY)
+		draftYear === season && g.get("phase") >= PHASE.DRAFT_LOTTERY && !noDraft()
 	);
 };
 
@@ -144,7 +151,8 @@ export const getClassCombine = async (
 			invited.add(p.pid);
 			results.set(p.pid, { pid: p.pid, ...p.combine! });
 		}
-	} else if (held) {
+	} else if (held && !noDraft()) {
+		// (in a league without a draft, only a combine stored before the setting changed is shown)
 		for (const [i, { p, r }] of players.entries()) {
 			if (i >= numInvites) {
 				break;
@@ -222,7 +230,7 @@ const playerLink = (p: Player) =>
 
 // News when the combine is held (start of the draft lottery phase)
 export const afterNewPhase = async (phase: number, conditions?: Conditions) => {
-	if (phase !== PHASE.DRAFT_LOTTERY || !lotteryNightOn()) {
+	if (phase !== PHASE.DRAFT_LOTTERY || !lotteryNightOn() || noDraft()) {
 		return;
 	}
 	const season = g.get("season");

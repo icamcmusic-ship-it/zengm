@@ -351,6 +351,9 @@ export const gmAnalyticsShift = (t: Team) =>
 export const earlyCombineRead = async (draftYear: number) => {
 	if (
 		!frontOfficeEnabled() ||
+		// No draft, no combine (draftCombine/index.ts noDraft)
+		g.get("draftType") === "freeAgents" ||
+		g.get("numDraftRounds") <= 0 ||
 		draftYear !== g.get("season") ||
 		g.get("phase") < PHASE.PLAYOFFS ||
 		g.get("phase") >= PHASE.DRAFT_LOTTERY

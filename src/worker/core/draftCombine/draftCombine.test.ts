@@ -172,6 +172,34 @@ describe("draft combine", () => {
 			assert.deepEqual(res2.drills, res.drills);
 		}
 	});
+
+	test("no combine in a league without a draft (free agent rookies, or zero draft rounds)", async () => {
+		const [players] = await genClasses(1);
+		for (const p of players!) {
+			p.tid = PLAYER.UNDRAFTED;
+		}
+		for (const [key, value] of [
+			["draftType", "freeAgents"],
+			["numDraftRounds", 0],
+		] as const) {
+			await resetCache({ players: players!.map((p) => ({ ...p })) });
+			g.setWithoutSavingToDB("featureLotteryNight", true);
+			g.setWithoutSavingToDB("season", 2026);
+			g.setWithoutSavingToDB("phase", PHASE.DRAFT_LOTTERY);
+			g.setWithoutSavingToDB(key, value as any);
+			await afterNewPhase(PHASE.DRAFT_LOTTERY);
+			const stored = (await idb.cache.players.getAll()).filter(
+				(p) => p.combine,
+			);
+			assert.strictEqual(stored.length, 0, key);
+			const c = await getClassCombine(2026);
+			assert.isFalse(c.held, key);
+			assert.strictEqual(c.results.size, 0, key);
+			g.setWithoutSavingToDB("phase", PHASE.DRAFT);
+			assert.strictEqual((await getDraftCombineNudges(players!)).size, 0);
+			resetG();
+		}
+	});
 });
 
 describe("lottery night", () => {
