@@ -5,6 +5,7 @@
 // build name fits a 45 and an 80 whose ratings have the same shape.
 
 import { CUSTOM_DEFS } from "./customDefs.data.ts";
+import { MERGED } from "./merges.data.ts";
 import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
 import type { Archetype, ArchetypeDef, Pos, TwoKDef } from "./types.ts";
 
@@ -65,12 +66,29 @@ export const toArchetype = (d: TwoKDef): Archetype => {
 	};
 };
 
-// The 2K builds, then the custom ones (customDefs.data.ts)
-export const ARCHETYPE_DEFS: Archetype[] = [...TWO_K_DEFS, ...CUSTOM_DEFS].map(
-	toArchetype,
-);
+// arch14: near-duplicate builds merged (merges.data.ts): the kept build takes the union of both builds' positions and height
+// gates, and the removed build's names become its aliases
+const mergeDefs = (defs: TwoKDef[]): TwoKDef[] => {
+	const byId = new Map(defs.map((d) => [d.id, { ...d }]));
+	for (const [from, to] of Object.entries(MERGED)) {
+		const a = byId.get(from);
+		const b = byId.get(to);
+		if (!a || !b) {
+			throw new Error(`Bad archetype merge ${from} -> ${to}`);
+		}
+		b.aliases = [...b.aliases, a.name, ...a.aliases];
+		b.builds += a.builds;
+		byId.delete(from);
+	}
+	return defs.filter((d) => byId.has(d.id)).map((d) => byId.get(d.id)!);
+};
+const ALL_DEFS = mergeDefs([...TWO_K_DEFS, ...CUSTOM_DEFS]);
 
-// The other 2K build names each archetype stands for (shown in the archetype popover and on League > Archetypes)
+// The 2K builds, then the custom ones (customDefs.data.ts)
+export const ARCHETYPE_DEFS: Archetype[] = ALL_DEFS.map(toArchetype);
+
+// The other build names each archetype stands for (League > Archetypes' search finds them): the 2K names that say the same
+// thing, and the builds merged into it
 export const TWO_K_NAMES: Record<string, string[]> = Object.fromEntries(
-	TWO_K_DEFS.filter((d) => d.aliases.length > 0).map((d) => [d.id, d.aliases]),
+	ALL_DEFS.filter((d) => d.aliases.length > 0).map((d) => [d.id, d.aliases]),
 );

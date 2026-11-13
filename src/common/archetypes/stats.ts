@@ -74,8 +74,17 @@ export type StatReading = {
 	z: Partial<Record<DimKey, number>>;
 };
 
+// arch14: more weight for a bigger sample. From STATS_MORE_FROM (recency-weighted) minutes, up to STATS_W_MORE more at
+// STATS_MORE_FROM + STATS_MORE_SPAN: a veteran's three seasons say more than one
+export const STATS_W_MORE = 0.05;
+export const STATS_MORE_FROM = 1500;
+export const STATS_MORE_SPAN = 2500;
 export const statsWeight = (min: number) =>
-	min < STATS_MIN_MIN ? 0 : STATS_W * Math.min(1, min / STATS_FULL_MIN);
+	min < STATS_MIN_MIN
+		? 0
+		: STATS_W * Math.min(1, min / STATS_FULL_MIN) +
+			STATS_W_MORE *
+				Math.min(1, Math.max(0, (min - STATS_MORE_FROM) / STATS_MORE_SPAN));
 
 // His stats as z at his position. `drb` (creating his own shot) reads usage and assists together: a high-usage,
 // high-assist player has the ball in his hands, a low-usage, low-assist one plays off the ball.
@@ -192,6 +201,44 @@ export const seasonStats = (
 	}
 	return out;
 };
+
+// arch14: up to three seasons, most recent first, minutes-weighted with each older season counting less (SEASON_DECAY):
+// a veteran is read from his recent seasons, not only the last one. Minutes are the recency-weighted total.
+export const SEASON_DECAY = [1, 0.5, 0.25];
+export const multiSeasonStats = (
+	seasons: Partial<Record<keyof ArchetypeStats, number>>[][],
+): ArchetypeStats | undefined => {
+	const rows: Partial<Record<keyof ArchetypeStats, number>>[] = [];
+	for (const [i, season] of seasons.slice(0, SEASON_DECAY.length).entries()) {
+		const k = SEASON_DECAY[i]!;
+		for (const r of season) {
+			const out = { ...r };
+			for (const key of [
+				"min",
+				"fga",
+				"tpa",
+				"fta",
+				"fgaAtRim",
+				"fgaLowPost",
+				"fgaMidRange",
+			] as const) {
+				const v = r[key];
+				if (typeof v === "number") {
+					out[key] = v * k;
+				}
+			}
+			rows.push(out);
+		}
+	}
+	// (a full last season speaks for itself: the older ones only fill in a small sample, an injury year or a bench role,
+	// so a player who changed his game is read as he plays now; SINGLE_SEASON_MIN)
+	const last = seasonStats(seasons[0] ?? []);
+	if (last && last.min >= SINGLE_SEASON_MIN) {
+		return last;
+	}
+	return seasonStats(rows);
+};
+export const SINGLE_SEASON_MIN = 1500;
 
 // Stat references from a league's players with real minutes (at least `minMin` in the season), by position bucket
 export const buildStatNorms = (

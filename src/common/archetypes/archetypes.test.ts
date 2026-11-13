@@ -49,8 +49,10 @@ import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
 import { CUSTOM_DEFS } from "./customDefs.data.ts";
 import { GOLD } from "./gold.data.ts";
 import { realData, realPlayer } from "./real.testutil.ts";
-import { promisesOf } from "./score.ts";
-import { statReading, STATS_W } from "./stats.ts";
+import { catchAllShortfall, promiseChecks, promisesOf } from "./score.ts";
+import { scoreAll, scoreTerms } from "./classify.ts";
+import { statReading, STATS_W, STATS_W_MORE } from "./stats.ts";
+import { MERGED, mergedId } from "./merges.data.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import pos from "../../worker/core/player/pos.ts";
 
@@ -123,6 +125,23 @@ describe("archetype table: every archetype is an NBA 2K build", () => {
 			assert.ok(archetypeById(id), id);
 		}
 	});
+
+	test("merged builds: gone from the list, their names aliases of the kept build, stored labels read as it", () => {
+		const names = new Map(
+			[...TWO_K_DEFS, ...CUSTOM_DEFS].map((d) => [d.id, d.name]),
+		);
+		for (const [from, to] of Object.entries(MERGED)) {
+			assert.strictEqual(archetypeById(from), undefined, from);
+			assert.ok(archetypeById(to), to);
+			assert.ok(TWO_K_NAMES[to]!.includes(names.get(from)!), from);
+			const v = viewOf({ season: 2025, id: from, v: 12 });
+			assert.strictEqual(v?.id, to, from);
+		}
+		assert.strictEqual(
+			ARCHETYPES.length,
+			TWO_K_DEFS.length + CUSTOM_DEFS.length - Object.keys(MERGED).length,
+		);
+	});
 });
 
 describe("classification", () => {
@@ -188,10 +207,13 @@ describe("classification", () => {
 			}
 		}
 	});
-	test("custom builds: twenty-nine, not 2K names, never aliases, positions their profile is played at", () => {
+	test("custom builds: twenty-nine (less the merged ones), not 2K names, never 2K aliases, positions their profile is played at", () => {
 		const custom = ARCHETYPES.filter((a) => a.custom);
-		assert.strictEqual(custom.length, 29);
 		assert.strictEqual(CUSTOM_DEFS.length, 29);
+		assert.strictEqual(
+			custom.length,
+			29 - CUSTOM_DEFS.filter((d) => MERGED[d.id]).length,
+		);
 		const twoK = new Set(
 			TWO_K_DEFS.flatMap((d) => [d.name, ...d.aliases]).map((n) =>
 				n.toLowerCase(),
@@ -199,7 +221,19 @@ describe("classification", () => {
 		);
 		for (const a of custom) {
 			assert.ok(!twoK.has(a.name.toLowerCase()), a.name);
-			assert.strictEqual(TWO_K_NAMES[a.id], undefined, a.id);
+			// (a custom build may carry the names of the builds merged into it: merges.data.ts)
+			for (const n of TWO_K_NAMES[a.id] ?? []) {
+				assert.ok(
+					Object.keys(MERGED).some(
+						(id) =>
+							MERGED[id] === a.id &&
+							[...TWO_K_DEFS, ...CUSTOM_DEFS].some(
+								(d) => d.id === id && (d.name === n || d.aliases.includes(n)),
+							),
+					),
+					`${a.id}: ${n}`,
+				);
+			}
 			assert.ok(a.positions.length >= 2, a.id);
 			// (the all-around star build promises everything and names nothing: read apart, see below)
 			if (!a.tags.includes("allAround")) {
@@ -419,7 +453,7 @@ describe("classification", () => {
 				age: p.age,
 				stats: p.stats,
 			});
-			if (c.id !== want) {
+			if (c.id !== mergedId(want)) {
 				misses.push(`${slug} ${season}: ${c.id} (want ${want})`);
 			}
 			// With the Expanded Ratings setting on (wingspan and perimeter/interior defense derived as a real-players league
@@ -446,7 +480,7 @@ describe("classification", () => {
 			);
 			assert.ok(row, `${slug} ${season}`);
 			for (const id of ok) {
-				assert.ok(archetypeById(id), id);
+				assert.ok(archetypeById(mergedId(id)), id);
 			}
 			const p = realPlayer(data, row);
 			const c = classify(p.ratings, {
@@ -454,7 +488,7 @@ describe("classification", () => {
 				age: p.age,
 				stats: p.stats,
 			});
-			if (ok.includes(c.id)) {
+			if (ok.map(mergedId).includes(c.id)) {
 				listed++;
 			}
 			const pr = promisesOf(archetypeById(c.id)!);
@@ -500,7 +534,13 @@ describe("classification", () => {
 			stlp: 2,
 			usgp: 32,
 		};
-		assert.strictEqual(statReading(st, "PG")!.w, STATS_W);
+		assert.strictEqual(statReading(st, "PG")!.w, STATS_W + STATS_W_MORE * 0.2);
+		// (arch14: a bigger sample, up to STATS_W_MORE more)
+		assert.strictEqual(
+			statReading({ ...st, min: 5000 }, "PG")!.w,
+			STATS_W + STATS_W_MORE,
+		);
+		assert.strictEqual(statReading({ ...st, min: 1000 }, "PG")!.w, STATS_W);
 		assert.ok(
 			Math.abs(statReading({ ...st, min: 500 }, "PG")!.w - STATS_W / 2) < 1e-9,
 		);
@@ -687,6 +727,70 @@ describe("position prior", () => {
 			assert.ok(a.positions.includes(positionOf(r)), c.id);
 		});
 	}
+});
+
+describe("name promises (arch14)", () => {
+	test("a build's holders keep what its name promises", async () => {
+		const by: Record<string, { n: number; worst: number[] }> = {};
+		for (const p of (await league()).slice(0, 2000)) {
+			const pos = positionFor(p.ratings, true);
+			const c = classify(p.ratings, { pos, age: p.age });
+			const { cv } = scoreAll(
+				p.ratings,
+				DEFAULT_NORMS,
+				ARCHETYPES,
+				pos,
+				undefined,
+				{
+					age: p.age,
+				},
+			);
+			const checks = Object.values(promiseChecks(archetypeById(c.id)!, cv));
+			const b = (by[c.id] ??= { n: 0, worst: [] });
+			b.n++;
+			b.worst.push(checks.every(Boolean) ? 1 : 0);
+		}
+		let kept = 0;
+		let n = 0;
+		for (const [id, b] of Object.entries(by)) {
+			const share = b.worst.reduce((a, x) => a + x, 0) / b.n;
+			kept += share * b.n;
+			n += b.n;
+			if (b.n >= 15) {
+				assert.ok(share >= 0.7, `${id} ${share} (${b.n})`);
+			}
+		}
+		assert.ok(kept / n >= 0.93, `${kept / n}`);
+	}, 120000);
+
+	test("catch-all builds earn their breadth: a Versatile Scorer scores at all three levels and creates", async () => {
+		let n = 0;
+		let ok = 0;
+		const players = (await league()).slice(0, 2000);
+		for (const p of players) {
+			const pos = positionFor(p.ratings, true);
+			const c = classify(p.ratings, { pos, age: p.age });
+			if (c.id !== "versatile-scorer") {
+				continue;
+			}
+			const t = scoreTerms(
+				p.ratings,
+				DEFAULT_NORMS,
+				ARCHETYPES,
+				pos,
+				undefined,
+				{
+					age: p.age,
+				},
+			);
+			n++;
+			if (catchAllShortfall(archetypeById(c.id)!, t.p, t.cv) < 0.05) {
+				ok++;
+			}
+		}
+		assert.ok(n === 0 || ok / n >= 0.9, `${ok}/${n}`);
+		assert.ok(n / players.length <= 0.01, `${n}`);
+	}, 120000);
 });
 
 describe("distribution over a generated league", () => {
@@ -997,7 +1101,7 @@ const GOLD_LISTED_FLOOR = 0.4;
 // (the position the game shows, his age and the previous season's stats)
 const PINNED: [string, number, string][] = [
 	["curryst01", 2025, "deep-range-sniper"], // Stephen Curry
-	["jamesle01", 2025, "mid-paint-point-four"], // LeBron James
+	["jamesle01", 2025, "mid-paint-bully"], // LeBron James
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
 	["goberru01", 2025, "backline-power-finisher"], // Rudy Gobert
 	["antetgi01", 2025, "crafty-paint-finishing-cleaner"], // Giannis Antetokounmpo
@@ -1007,13 +1111,13 @@ const PINNED: [string, number, string][] = [
 	["thompkl01", 2025, "crafty-sharpshooter"], // Klay Thompson
 	["embiijo01", 2025, "slashing-mid-range-maestro"], // Joel Embiid
 	["lopezbr01", 2025, "backline-pick-and-popper"], // Brook Lopez
-	["capelca01", 2025, "glass-guardian-lob-threat"], // Clint Capela
+	["capelca01", 2025, "bulldozing-glass-guardian"], // Clint Capela
 	["korveky01", 2021, "crafty-3-level-scorer"], // Kyle Korver
 	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook
 	["wembavi01", 2025, "shot-erasing-mid-paint-maestro"], // Victor Wembanyama
-	["doncilu01", 2025, "playmaking-3pt-slasher"], // Luka Dončić (arch13: his three fixed, 53 -> 71)
+	["doncilu01", 2025, "board-hunting-middy-slasher"], // Luka Dončić (arch13: his three fixed, 53 -> 71)
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
-	["adamsst01", 2025, "shot-erasing-putback-bully"], // Steven Adams
+	["adamsst01", 2025, "physical-board-enforcer"], // Steven Adams
 	["allento01", 2018, "ball-hawking-mid-paint-scorer"], // Tony Allen
 	["drumman01", 2025, "paint-scoring-crasher"], // Andre Drummond
 ];

@@ -907,35 +907,53 @@ const SHOT_KEYS = new Set([
 ]);
 const SNIPER_RE = /Snip|Sharp|Laser|Automatic|Logo|Big Range|Silk/;
 const AIR_RE = /High[ -]Fly|Aerial|Force of Nature|Explosive|Athletic|Glide/;
-export const absolutePenalty = (a: Archetype, p: Prepared): number => {
+// arch14: each part on its own, so the fitted model (model.ts) can weigh them
+export type AbsoluteParts = {
+	floor: number;
+	noShot: number;
+	air: number;
+	eliteShot: number;
+	touch: number;
+};
+export const absoluteParts = (a: Archetype, p: Prepared): AbsoluteParts => {
 	const pr = promisesOf(a);
 	// (without stats, half of it is the blended reading, so a uniform shift of his ratings moves it less)
 	const v = (k: string) => (p.stats ? absValue(k, p) : roleValue(k, p));
-	let t = 0;
+	const out: AbsoluteParts = {
+		floor: 0,
+		noShot: 0,
+		air: 0,
+		eliteShot: 0,
+		touch: 0,
+	};
 	for (const k of pr.all) {
-		t += ABS_K * Math.max(0, ABS_FLOOR - v(k));
+		out.floor += ABS_K * Math.max(0, ABS_FLOOR - v(k));
 	}
 	if (
 		pr.all.some((k) => SHOT_CLASSES.has(k)) ||
 		pr.keys.some((k) => SHOT_KEYS.has(k))
 	) {
 		const shot = Math.max(p.pz.three, p.pz.mid, p.pz.ft);
-		t += NO_SHOT_K * Math.max(0, NO_SHOT_FROM - shot);
+		out.noShot = NO_SHOT_K * Math.max(0, NO_SHOT_FROM - shot);
 	}
 	if (AIR_RE.test(a.name)) {
 		const j = Math.min(0.5 * (p.pz.jmp + p.b.jmp), p.b.jmp + 0.3);
-		t += AIR_K * Math.max(0, AIR_MIN - j);
+		out.air = AIR_K * Math.max(0, AIR_MIN - j);
 	}
 	if (SNIPER_RE.test(a.name)) {
-		t += ELITE_SHOT_K * Math.max(0, ELITE_SHOT_MIN - v("shoot"));
+		out.eliteShot = ELITE_SHOT_K * Math.max(0, ELITE_SHOT_MIN - v("shoot"));
 	}
 	// arch12: a mid-range name needs a shooter's touch. BBGM's real ratings give a player who scores efficiently at the rim
 	// a high mid-range rating, so the mid-range alone does not make him a jumpshooter: his free throws or his three must be
 	// at least near ordinary for him (TOUCH_FROM on the blended reading), TOUCH_K per z below
 	if (pr.all.includes("mid")) {
-		t += TOUCH_K * Math.max(0, TOUCH_FROM - Math.max(p.b.ft, p.b.three));
+		out.touch = TOUCH_K * Math.max(0, TOUCH_FROM - Math.max(p.b.ft, p.b.three));
 	}
-	return t;
+	return out;
+};
+export const absolutePenalty = (a: Archetype, p: Prepared): number => {
+	const x = absoluteParts(a, p);
+	return x.floor + x.noShot + x.air + x.eliteShot + x.touch;
 };
 
 // Roles his ratings and stats make plain: a ball handler or point forward who passes (passing at his position and his
@@ -977,18 +995,25 @@ const MID_OTHERS = [
 	"perD",
 	"ath",
 ];
-export const roleTerm = (
+export type RoleParts = {
+	pass: number;
+	rim: number;
+	sniper: number;
+	shoot: number;
+	mid: number;
+};
+export const roleParts = (
 	a: Archetype,
 	p: Prepared,
 	cv: Record<string, number> = classValues(p),
-): number => {
+): RoleParts => {
 	const pr = promisesOf(a);
-	let t = 0;
+	const out: RoleParts = { pass: 0, rim: 0, sniper: 0, shoot: 0, mid: 0 };
 	if (pr.all.includes("pass")) {
 		// (his assist rate, when he has one, is the real thing: read in full)
 		const pass = p.stats ? absValue("pass", p) : roleValue("pass", p);
 		// (without an assist rate, a third of it: the profile match already reads his passing)
-		t +=
+		out.pass =
 			(p.stats ? 1 : 1 / 3) *
 			PLAY_K *
 			Math.min(1, Math.max(0, pass - PLAY_FROM));
@@ -996,12 +1021,12 @@ export const roleTerm = (
 	if (pr.all.includes("rimD") && p.hgt >= BIG_HGT) {
 		const len = p.expanded ? 0.25 * p.abs.len : 0;
 		const rim = 0.5 * roleValue("rimD", p) + 0.25 * (p.pz.blk + p.b.blk) + len;
-		t +=
+		out.rim =
 			(p.stats ? RIM_K_STATS : RIM_K) *
 			Math.min(1, Math.max(0, rim - RIM_FROM));
 	}
 	if (SNIPER_RE.test(a.name)) {
-		t +=
+		out.sniper =
 			SNIPER_K *
 			Math.min(
 				1,
@@ -1013,7 +1038,8 @@ export const roleTerm = (
 			);
 	}
 	if (pr.all.includes("shoot")) {
-		t += SHOT_K * Math.min(1, Math.max(0, roleValue("shoot", p) - SHOT_FROM));
+		out.shoot =
+			SHOT_K * Math.min(1, Math.max(0, roleValue("shoot", p) - SHOT_FROM));
 	}
 	// Concentration: a good player's mid-range rating is high almost whatever his game (BBGM's real ratings give nearly
 	// every star a high one), so for a player above his position's average a mid-range build pays MID_LEVEL_K per z of his
@@ -1024,12 +1050,20 @@ export const roleTerm = (
 			other = Math.max(other, cv[k]!);
 		}
 		const lead = Math.min(1, Math.max(0, (cv.mid! - other) / MID_FREE));
-		t -=
-			MID_LEVEL_K *
+		out.mid =
+			-MID_LEVEL_K *
 			Math.min(1, Math.max(0, p.pzLevel - MID_LEVEL_FROM)) *
 			(1 - lead);
 	}
-	return t;
+	return out;
+};
+export const roleTerm = (
+	a: Archetype,
+	p: Prepared,
+	cv: Record<string, number> = classValues(p),
+): number => {
+	const x = roleParts(a, p, cv);
+	return x.pass + x.rim + x.sniper + x.shoot + x.mid;
 };
 
 // How much the stars' concentration trim (starBias.data.ts) applies to him: none at or below STAR_FROM (his mean standing
@@ -1084,4 +1118,140 @@ export const allAroundQuality = (
 		) *
 		fade(vals[0]! - vals[3]!, ALL_AROUND_GAP[0], ALL_AROUND_GAP[1])
 	);
+};
+
+// ---- arch14: does the name keep its promises? ----
+// Each skill a build's name promises (promisesOf), read on the blended scale (classValues: his shape, his standing at his
+// position and his stats): at least ordinary for him (PROMISE_MET), and an elite three for a sniper's name
+// ("Sniper", "Sharpshooter", "Laser", ...: PROMISE_ELITE). The name-promise check (namePromise.script.test.ts,
+// archetypes.test.ts) measures, per build, the share of its holders who meet each promise.
+export const PROMISE_MET = 0;
+export const PROMISE_ELITE = 0.8;
+export const promiseChecks = (
+	a: Archetype,
+	cv: Record<string, number>,
+): Record<string, boolean> => {
+	const out: Record<string, boolean> = {};
+	for (const k of promisesOf(a).all) {
+		out[k] = (cv[k] ?? 0) >= PROMISE_MET;
+	}
+	if (SNIPER_RE.test(a.name)) {
+		out.elite = (cv.shoot ?? 0) >= PROMISE_ELITE;
+	}
+	return out;
+};
+// How far he is from keeping them (z, 0 = all kept): the fitted model's `promise` weight acts on it
+export const promiseMiss = (a: Archetype, cv: Record<string, number>) => {
+	let t = 0;
+	for (const k of promisesOf(a).all) {
+		t += Math.max(0, PROMISE_MET - (cv[k] ?? 0));
+	}
+	if (SNIPER_RE.test(a.name)) {
+		t += Math.max(0, PROMISE_ELITE - (cv.shoot ?? 0));
+	}
+	return t;
+};
+
+// ---- arch14 (user request): player traits as style signals ----
+// Each group: the traits it averages (visible and hidden: the user accepts that a label may hint at hidden ones) and the
+// build names it speaks for. A build's trait term is the group's mean score minus 50, in units of 25 (clamped to +-1).
+export const TRAIT_GROUPS: { term: string; traits: string[]; re: RegExp }[] = [
+	{
+		term: "trOffBall",
+		traits: ["offBall"],
+		re: /Off-Screen|Catch & Shoot|Wing[ -]Run|Sharpshoot/,
+	},
+	{
+		term: "trScreen",
+		traits: ["screen"],
+		re: /Pick & Pop|Pick & Roll|Pick-Diving|Popper|Rim Run|Lob/,
+	},
+	{
+		term: "trHandle",
+		traits: ["handle"],
+		re: /Creat|Iso|Ankle|Shifty|Savant|Engine|Combo Guard/,
+	},
+	{
+		term: "trDefVers",
+		traits: ["defensiveVersatility"],
+		re: /Lockdown|Switch|Versatile Defender|Edge|Clamp|Two Way|Both Ends|Eliminator|Guard Dog/,
+	},
+	{
+		term: "trHustle",
+		traits: ["hustle", "motor"],
+		re: /Glass|Clean|Board|Crash|Putback|Hustle|Gritty|Grinder/,
+	},
+	{
+		term: "trShotDisc",
+		traits: ["shotDiscipline"],
+		re: /Sharp|Snip|Automatic|Laser|Shooter|Silk/,
+	},
+	{
+		term: "trClutch",
+		traits: ["clutch", "lateGameIq", "bigGame"],
+		re: /Bucket|Scorer|Iso|Shot Creator|Menace|Maestro|Engine|Shot Hunter|Cash Out/,
+	},
+	{
+		term: "trLeader",
+		traits: ["leadership", "lateGameIq"],
+		re: /Playmak|Distributor|Dot|Table|Engine|Point|Dim|Floor/,
+	},
+	{
+		term: "trIron",
+		traits: ["durability", "recovery", "workEthic"],
+		re: /Hustler|Motor|Rim Run|Tempo|Grinder|Wing Runner|Gritty/,
+	},
+];
+export const traitGroupValue = (
+	g: (typeof TRAIT_GROUPS)[number],
+	traits: Partial<Record<string, number>> | undefined,
+): number => {
+	if (!traits) {
+		return 0;
+	}
+	let t = 0;
+	let n = 0;
+	for (const k of g.traits) {
+		const v = traits[k];
+		if (typeof v === "number" && Number.isFinite(v)) {
+			t += v;
+			n++;
+		}
+	}
+	return n > 0 ? Math.min(1, Math.max(-1, (t / n - 50) / 25)) : 0;
+};
+
+// ---- arch14 (user request): catch-all builds must earn their breadth ----
+// A broad scoring name is not a default: "Versatile Scorer" needs good scoring at all three levels (rim, mid-range, three)
+// and real creation (his handle or his usage), "3-Level Scorer" the three and the mid-range, ... Each requirement is a floor
+// on the blended reading (classValues; creation: the better of his handle and his usage z), CATCH_ALL_K per z short. Not
+// fitted: it is a rule.
+export const CATCH_ALL_K = 3;
+export const CATCH_ALL: Record<string, Partial<Record<string, number>>> = {
+	"versatile-scorer": { finish: 0.4, mid: 0.4, shoot: 0.4, create: 0.4 },
+	"three-level-scorer": { shoot: 0.3, mid: 0.3, create: 0 },
+	"crafty-3-level-scorer": { shoot: 0.3, mid: 0.3 },
+	"crafty-walking-bucket": { score: 0.5, create: 0.2 },
+	"walking-bucket": { score: 0.5, create: 0.2 },
+	"mid-range-slasher": { mid: 0.3, finish: 0.3 },
+	"versatile-paint-finisher": { finish: 0.5 },
+	"mid-range-high-flyer": { mid: 0.3, ath: 0.3 },
+};
+export const creationOf = (p: Prepared, cv: Record<string, number>) =>
+	Math.max(cv.handle ?? 0, p.stats?.z.usg ?? -Infinity);
+export const catchAllShortfall = (
+	a: Archetype,
+	p: Prepared,
+	cv: Record<string, number>,
+): number => {
+	const req = CATCH_ALL[a.id];
+	if (!req) {
+		return 0;
+	}
+	let t = 0;
+	for (const [k, floor] of Object.entries(req)) {
+		const v = k === "create" ? creationOf(p, cv) : (cv[k] ?? 0);
+		t += Math.max(0, floor! - v);
+	}
+	return t;
 };
