@@ -34,6 +34,7 @@ import { doAwards } from "../awards/doAwards.ts";
 import * as staff from "../staff/index.ts";
 import * as gm from "../gm/index.ts";
 import * as college from "../college/index.ts";
+import { pruneSeasonLineups } from "../player/advStatsStorage.ts";
 
 const INFLATION_GAME_ATTRIBUTES = [
 	"salaryCap",
@@ -327,6 +328,9 @@ const newPhaseBeforeDraft = async (
 	}
 
 	await doAwards(conditions);
+
+	// Advanced Tracking Stats: the season's lineups, down to the most used ones
+	await pruneSeasonLineups();
 
 	// College mode: keep the season's polls, brackets and selection with the awards
 	if (college.isCollege()) {

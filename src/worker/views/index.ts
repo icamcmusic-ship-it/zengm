@@ -117,6 +117,7 @@ export { default as teamHistory } from "./teamHistory.ts";
 export { default as teamRecords } from "./teamRecords.ts";
 export { default as teamStatDists } from "./teamStatDists.ts";
 export { default as teamStats } from "./teamStats.ts";
+export { default as lineups } from "./lineups.ts";
 export { default as trade } from "./trade.ts";
 export { default as tradeOffers } from "./tradeOffers.ts";
 export { default as rumors } from "./rumors.ts";

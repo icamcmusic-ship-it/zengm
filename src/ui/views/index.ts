@@ -125,6 +125,7 @@ export { default as TeamHistory } from "./TeamHistory/index.tsx";
 export { default as TeamRecords } from "./TeamRecords.tsx";
 export { default as TeamStatDists } from "./TeamStatDists.tsx";
 export { default as TeamStats } from "./TeamStats.tsx";
+export { default as Lineups } from "./Lineups.tsx";
 export { default as TragicDeaths } from "./TragicDeaths.tsx";
 export { default as Trade } from "./Trade/index.tsx";
 export { default as TradeOffers } from "./TradeOffers.tsx";

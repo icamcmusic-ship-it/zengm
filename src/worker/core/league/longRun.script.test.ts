@@ -32,6 +32,12 @@ import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers } from "../../util/index.ts";
 import { agingCurveForPlayer } from "../../../common/playerTraits/development.ts";
 import { getLeagueTraitSeed } from "../player/traits.ts";
+import {
+	advStat,
+	playTypeProfile,
+	sumAdv,
+	TEAM_ADV,
+} from "../../../common/advStats.ts";
 
 const env = (globalThis as any).process.env;
 const ENABLED = !!env.LONG_RUN;
@@ -899,6 +905,88 @@ const checkPlayoffs = async (s: number) => {
 	}
 };
 
+// Advanced Tracking Stats: league-wide play types, clutch share, defended FG% spread and more for the season (undefined when off)
+const advSummary = async (season: number) => {
+	const players = await idb.merged.players.getAll({ activeSeason: season });
+	const rows = players.flatMap((p) =>
+		p.stats.filter((row) => row.season === season && !row.playoffs && row.adv),
+	);
+	if (rows.length === 0) {
+		return undefined;
+	}
+	const total = sumAdv(rows)!;
+	const profile = playTypeProfile(total)!;
+	const sd = (xs: number[]) => {
+		const m = mean(xs);
+		return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
+	};
+	const spread = (key: string, volumeKey: string, minVolume: number) => {
+		const xs = rows
+			.filter((row) => (advStat(row.adv, volumeKey) ?? 0) >= minVolume)
+			.map((row) => advStat(row.adv, key)!)
+			.filter((x) => x !== undefined);
+		return {
+			n: xs.length,
+			mean: r(mean(xs)),
+			sd: r(sd(xs), 2),
+			min: r(Math.min(...xs)),
+			max: r(Math.max(...xs)),
+		};
+	};
+	const teamRows = [];
+	for (const tid of g.get("teamInfoCache").keys()) {
+		for (const row of await idb.merged.teamStats.getAll({ tid, season })) {
+			if (!row.playoffs && row.adv) {
+				teamRows.push(row);
+			}
+		}
+	}
+	let teamSec = 0;
+	let clSec = 0;
+	let clPts = 0;
+	let pts = 0;
+	let poss = 0;
+	let clPoss = 0;
+	let numLineups = 0;
+	for (const row of teamRows) {
+		teamSec += row.min * 60;
+		clSec += row.adv.t[TEAM_ADV.clSec] ?? 0;
+		clPts += row.adv.t[TEAM_ADV.clPtsFor] ?? 0;
+		pts += row.pts;
+		poss += row.adv.t[TEAM_ADV.possFor] ?? 0;
+		clPoss += row.adv.t[TEAM_ADV.clPossFor] ?? 0;
+		numLineups += row.adv.lu.length;
+	}
+	return {
+		poss: profile.poss,
+		freq: Object.fromEntries(profile.types.map((t) => [t.key, r(t.freq ?? 0)])),
+		ppp: Object.fromEntries(
+			profile.types.map((t) => [t.key, r(t.ppp ?? 0, 3)]),
+		),
+		// Clutch: share of team minutes (on the floor, x5), possessions and points
+		clutch: {
+			minShare: r((100 * clSec) / (teamSec / 5), 2),
+			possShare: r((100 * clPoss) / poss, 2),
+			ptsShare: r((100 * clPts) / pts, 2),
+		},
+		dfgp: spread("dfgp", "dfga", 300),
+		rimDfgp: spread("rimDfgp", "rimDfga", 150),
+		onOffNet: spread("onOffNet", "ptPoss", 400),
+		cs3: {
+			share: r(advStat(total, "cs3r")!),
+			cs3p: r(advStat(total, "cs3p")!),
+			pu3p: r(advStat(total, "pu3p")!),
+		},
+		astp: {
+			rim: r(advStat(total, "astpRim")!),
+			short: r(advStat(total, "astpShort")!),
+			long: r(advStat(total, "astpLong")!),
+			three: r(advStat(total, "astp3")!),
+		},
+		lineupsPerTeam: r(numLineups / Math.max(1, teamRows.length)),
+	};
+};
+
 // Record by record, so the whole database is never one string in memory
 const dbSize = async () => {
 	const out: Record<string, number> = {};
@@ -1131,6 +1219,10 @@ describe.skipIf(!ENABLED)("long run", () => {
 				session.disconnect();
 			}
 			const old = await timed("checks", () => oldPlayers(s));
+			const adv = await timed("checks", () => advSummary(s));
+			if (adv) {
+				out(`ADV ${JSON.stringify({ season: s, ...adv })}`);
+			}
 			const offseasonCpu = cpuMs() - cs - simCpu;
 			const afterDraft = await ratingsInfo(s);
 			await idb.cache.flush();

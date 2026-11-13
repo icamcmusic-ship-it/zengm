@@ -1,6 +1,7 @@
 import { helpers as commonHelpers } from "../../common/helpers.ts";
 import { local } from "./local.ts";
 import { bySport } from "../../common/sportFunctions.ts";
+import { ADV_STAT_META } from "../../common/advStats.ts";
 import type { LeagueUrlParts } from "../router/types.ts";
 
 const leagueUrl = (components: Readonly<LeagueUrlParts>): string => {
@@ -173,6 +174,22 @@ const roundOverrides = bySport<Record<string, RoundType>>({
 		qs: "noDecimalPlace",
 	},
 	basketball: {
+		// Advanced Tracking Stats
+		...Object.fromEntries(
+			Object.entries(ADV_STAT_META).map(([key, info]) => [
+				key,
+				(
+					{
+						count: "noDecimalPlace",
+						pct: "oneDecimalPlace",
+						ppp: "twoDecimalPlaces",
+						pm: "plusMinus",
+						pmInt: "plusMinusNoDecimalPlace",
+						rating: "oneDecimalPlace",
+					} as const
+				)[info.format],
+			]),
+		),
 		gp: "noDecimalPlace",
 		gs: "noDecimalPlace",
 		min: "oneDecimalPlace",

@@ -1,3 +1,4 @@
+import { sumAdv } from "../../../common/advStats.ts";
 import { getTermsFromContract } from "../../../common/contractTerms.ts";
 import { PLAYER, PHASE } from "../../../common/constants.ts";
 import { player, trade } from "../index.ts";
@@ -868,6 +869,14 @@ const filterForCareerStats = (
 };
 
 const sumCareerStats = (careerStats: any[], attr: string) => {
+	// Advanced Tracking Stats: an array of totals, summed element by element
+	if (__SPORT === "basketball" && attr === "adv") {
+		return {
+			value: sumAdv(careerStats),
+			extraForMissingValues: undefined,
+		};
+	}
+
 	let info:
 		| {
 				type: "max";
@@ -1272,6 +1281,15 @@ const getAttrsToSum = (statsRows: any[]) => {
 		if (hasTrb) {
 			attrs.push("trb");
 		}
+	}
+
+	// Advanced Tracking Stats: rows with them may be followed by rows without (the setting turned off)
+	if (
+		__SPORT === "basketball" &&
+		!attrs.includes("adv") &&
+		statsRows.some((row) => row.adv !== undefined)
+	) {
+		attrs.push("adv");
 	}
 
 	// If these are historical stats with TOV missing in the first row, then it's possible we need a special calculation of TOV% because we need to use FGA and FTA only from rows with TOV

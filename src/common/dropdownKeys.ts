@@ -20,7 +20,17 @@ const statTypes = bySport<readonly string[]>({
 
 const statTypesAdv = bySport<readonly string[]>({
 	baseball: [...statTypes, "advanced", "gameHighs"],
-	basketball: [...statTypes, "shotLocations", "advanced", "gameHighs"],
+	basketball: [
+		...statTypes,
+		"shotLocations",
+		"advanced",
+		"playTypes",
+		"shootingSplits",
+		"trackingDefense",
+		"onOff",
+		"clutch",
+		"gameHighs",
+	],
 	football: statTypes,
 	hockey: [...statTypes, "advanced", "gameHighs"],
 });

@@ -40,12 +40,14 @@ import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
 import { PreDraftSummary } from "./PreDraftSummary.tsx";
 import { NitStats } from "./NitStats.tsx";
+import { TrackingProfile } from "./TrackingProfile.tsx";
 import {
 	ScoutingSummaryLine,
 	useScoutingOn,
 } from "../../components/ScoutingReport/index.tsx";
 
 const Player2 = ({
+	advSeasons,
 	bestPos,
 	customMenu,
 	events,
@@ -169,6 +171,8 @@ const Player2 = ({
 					leaders={leaders}
 				/>
 			))}
+
+			<TrackingProfile advSeasons={advSeasons} />
 
 			<NitStats player={player} />
 

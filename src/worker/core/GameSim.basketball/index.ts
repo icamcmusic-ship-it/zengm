@@ -125,6 +125,7 @@ import {
 	TOV_SCALE,
 } from "./possessionModel.ts";
 import { TURNOVERS } from "./realisticTurnovers.ts";
+import { AdvTracker } from "./advTracking.ts";
 
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
 // weight, before late-game IQ moves it (see applyLateGameDecision)
@@ -515,6 +516,13 @@ class GameSim extends GameSimBase {
 	foulMult: [number, number] = [1, 1];
 	// The away team's trip in km (undefined without the regions' coordinates)
 	travelKm: number | undefined;
+	// Advanced Tracking Stats (League extras, see advTracking.ts): records play types, defense, on/off, lineups and clutch stats. It never
+	// changes a game (no random numbers, nothing the sim reads). Off: undefined, and nothing is recorded. advTransition/advQuick: the
+	// realistic possession model's transition and quick putback chances for this possession segment, noted for the classifier only
+	adv: AdvTracker | undefined;
+	advTransition = false;
+	advQuick = false;
+	advThreePointers = true;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -560,6 +568,14 @@ class GameSim extends GameSimBase {
 		this.techFouls = !!g.get("technicalFouls") && !allStarGame;
 
 		this.team = teams; // If a team plays twice in a day, this needs to be a deep copy
+
+		if (
+			!allStarGame &&
+			nativeFeatureEnabled("advStats", (key) => g.get(key as any))
+		) {
+			this.adv = new AdvTracker(gid, teams, g.get("numPlayersOnCourt"));
+			this.advThreePointers = !!g.get("threePointers");
+		}
 
 		// Player traits: one normal draw per player per game for his game-to-game form, only when he has trait effects
 		this.traitsOn = false;
@@ -865,6 +881,8 @@ class GameSim extends GameSimBase {
 		this.playByPlay.logEvent({
 			type: "gameOver",
 		});
+
+		this.adv?.finish();
 
 		// Delete stuff that isn't needed before returning
 		for (const t of teamNums) {
@@ -1364,6 +1382,19 @@ class GameSim extends GameSimBase {
 		this.t -= dtInbound;
 		this.possessionLength = 0;
 		this.isClockRunning = true; // Set after computing dtIinbound!
+		this.advTransition = false;
+		this.advQuick = false;
+		if (this.adv) {
+			const period = this.team[0].stat.ptsQtrs.length;
+			this.adv.possessionStart(
+				this.o,
+				period,
+				period >= this.numPeriods &&
+					this.t <= 300 &&
+					Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <= 5,
+				this.playersOnCourt,
+			);
+		}
 		if (this.realPoss) {
 			this.resetShotClock();
 			if (this.traitsOn) {
@@ -1376,6 +1407,7 @@ class GameSim extends GameSimBase {
 
 		const clockFactor = this.applyLateGameDecision(this.getClockFactor());
 		const outcome = this.getPossessionOutcome(clockFactor);
+		this.adv?.possessionEnd();
 
 		// Swap o and d so that o will get another possession when they are swapped again at the beginning of the loop.
 		if (
@@ -1390,6 +1422,7 @@ class GameSim extends GameSimBase {
 
 		const possessionTime = dtInbound + this.possessionLength;
 		this.updatePlayingTime(possessionTime);
+		this.adv?.time(possessionTime, this.playersOnCourt);
 
 		if (this.techFouls) {
 			this.maybeTechnicalFoul(outcome);
@@ -1854,6 +1887,10 @@ class GameSim extends GameSimBase {
 		let substitutions = false;
 		let blowout = false;
 		const lateGame = this.isLateGame();
+		if (this.adv) {
+			// (the tracker re-reads the lineups at the next possession)
+			this.adv.dirty = true;
+		}
 
 		const foulsNeededToFoulOut = g.get("foulsNeededToFoulOut");
 
@@ -3300,14 +3337,12 @@ class GameSim extends GameSimBase {
 			// Inbounding with part of the shot clock used: run a set play with what is left
 			shotAt = k * drawRestartSearch(sc, clockFactor === "maintainLead");
 		} else if (prev === "orb") {
-			shotAt =
-				Math.random() < PROB_ORB_QUICK_SHOT
-					? drawOrbQuickShot()
-					: k *
-						Math.max(
-							1,
-							ORB_RESET_SEARCH_MEAN + ORB_RESET_SEARCH_SD * gaussian(),
-						);
+			const quick = Math.random() < PROB_ORB_QUICK_SHOT;
+			this.advQuick = quick;
+			shotAt = quick
+				? drawOrbQuickShot()
+				: k *
+					Math.max(1, ORB_RESET_SEARCH_MEAN + ORB_RESET_SEARCH_SD * gaussian());
 		} else {
 			let probTransition = possessionStartsInFrontcourt
 				? 0
@@ -3328,6 +3363,7 @@ class GameSim extends GameSimBase {
 			}
 			if (Math.random() < probTransition) {
 				shotAt = k * drawTransitionTime();
+				this.advTransition = true;
 			} else {
 				let backcourt = possessionStartsInFrontcourt
 					? 0
@@ -3503,6 +3539,9 @@ class GameSim extends GameSimBase {
 	doShotClockViolation(): PossessionOutcome {
 		const p = this.pickTurnoverPlayer();
 		this.recordStat(this.o, p, "tov");
+		if (this.adv) {
+			this.adv.turnover(p, false, false);
+		}
 		this.shotClockViolations[this.o] += 1;
 		this.isClockRunning = false;
 		this.playByPlay.logEvent({
@@ -3570,6 +3609,9 @@ class GameSim extends GameSimBase {
 	doTov(pOverride?: PlayerGameSim) {
 		const p = pOverride ?? this.pickTurnoverPlayer();
 		this.recordStat(this.o, p, "tov");
+		if (this.adv) {
+			this.adv.turnover(p, this.advTransition, this.advPutbackTurnover(p));
+		}
 
 		if (this.probStl() > Math.random()) {
 			return this.doStl(p);
@@ -4230,6 +4272,15 @@ class GameSim extends GameSimBase {
 			type,
 		} = shotInfo;
 		passer = shotInfo.passer;
+		if (this.adv) {
+			this.advShot(
+				p,
+				passer,
+				type,
+				possessionStartsInFrontcourt,
+				tipInFromOutOfBounds,
+			);
+		}
 
 		const baseLogInformation = {
 			t: this.o,
@@ -4347,8 +4398,58 @@ class GameSim extends GameSimBase {
 			pid: p.id,
 			clock: this.t,
 		});
+		this.adv?.shotDone(false, undefined, this.d, this.playersOnCourt[this.d]);
 
 		return this.doReb();
+	}
+
+	// Advanced Tracking Stats: the play type of the shot that is up, and its closest defender (Matchup Defense: his assignment, otherwise
+	// the defender in the same court slot, like the stock steal credit). Transition: the realistic possession model's transition chance,
+	// or in the stock model a shot within 7 s of a defensive rebound or steal. Putback: a shot right after an offensive rebound (the
+	// realistic model's quick putback chance, or within 3 s) at the rim or by the rebounder
+	advShot(
+		p: PlayerGameSim,
+		passer: PlayerGameSim | undefined,
+		type: ShotType,
+		possessionStartsInFrontcourt: boolean,
+		tipInFromOutOfBounds: boolean,
+	) {
+		const prev = this.prevPossessionOutcome;
+		const transition = this.realPoss
+			? this.advTransition
+			: !possessionStartsInFrontcourt &&
+				(prev === "stl" || prev === "drb") &&
+				this.possessionLength <= 7;
+		const quick = this.realPoss ? this.advQuick : this.possessionLength <= 3;
+		const putback =
+			prev === "orb" &&
+			(type === "putBack" ||
+				(quick && (p === this.lastOrbPlayer || type === "atRim")));
+		const j = this.playersOnCourt[this.o].indexOf(p);
+		const defender =
+			this.matchupDefense && j >= 0
+				? this.playersOnCourt[this.d][this.guards[this.d][j] ?? j]
+				: this.playersOnCourt[this.d][j >= 0 ? j : 0];
+		this.adv!.shot(
+			p,
+			passer,
+			this.spacingCreation ? this.creator : undefined,
+			type,
+			tipInFromOutOfBounds,
+			transition,
+			putback,
+			defender,
+			this.advThreePointers,
+		);
+	}
+
+	// Advanced Tracking Stats: a turnover by the offensive rebounder right after his rebound counts as a putback possession
+	advPutbackTurnover(p: PlayerGameSim) {
+		return (
+			this.prevPossessionOutcome === "orb" &&
+			p === this.lastOrbPlayer &&
+			(!this.realPoss || this.advQuick)
+		);
 	}
 
 	/**
@@ -4448,6 +4549,7 @@ class GameSim extends GameSimBase {
 
 		const p2 = this.pickPlayer("blocking", this.d, 10);
 		this.recordStat(this.d, p2, "blk");
+		this.adv?.shotDone(false, p2, this.d, this.playersOnCourt[this.d]);
 		this.noteDefensiveStop("blk", p2, p, type);
 		let blockLogType: BlockType | undefined;
 		if (type === "tipIn") {
@@ -4572,6 +4674,7 @@ class GameSim extends GameSimBase {
 			});
 		}
 		this.recordLastScore(this.o, p, type, passer, defender);
+		this.adv?.shotDone(true, undefined, this.d, this.playersOnCourt[this.d]);
 
 		if (andOne && !this.elamDone) {
 			this.doPf({ t: this.d, type: "pfAndOne", shooter: p, fouler });
@@ -5656,6 +5759,10 @@ class GameSim extends GameSimBase {
 
 		if (this.playByPlay?.active) {
 			this.playByPlay.logStat(t, p === undefined ? undefined : p.id, s, amt);
+		}
+
+		if (this.adv !== undefined && (s === "pts" || this.adv.clutch)) {
+			this.adv.stat(t, p, s, amt, this.playersOnCourt);
 		}
 	}
 }

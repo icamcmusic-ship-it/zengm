@@ -40,6 +40,44 @@ export const perimeterDefenseFormula = (award: AwardLike) =>
 		? PERIMETER_DEFENSE_FORMULA
 		: undefined;
 
+// Advanced Tracking Stats: with that setting on, the default defense formula (or the Perimeter Defense one) also counts, lightly, how
+// well the player defends shots (defended FG% and rim protection vs the league, the advDef variable from getPlayers, -1 to 1): at most
+// ±ADV_DEF_WEIGHT on a score of about 3-4 for a DPOY candidate
+export const ADV_DEF_WEIGHT = 0.15;
+
+// The formula the default defense awards are scored with, if a League extra replaces it
+export const defenseAwardFormula = (award: AwardLike) => {
+	const base = perimeterDefenseFormula(award);
+	if (
+		__SPORT === "basketball" &&
+		award.statRange === undefined &&
+		STOCK_FORMULAS.has(award.formula) &&
+		award.formulaByPos === undefined &&
+		nativeFeatureEnabled("advStats", (key) => g.get(key as any))
+	) {
+		return `${base ?? award.formula} + ${ADV_DEF_WEIGHT} * seasonFraction * advDef`;
+	}
+	return base;
+};
+
+// advDef: (league defended FG% − his) / 4 points, weighted by how many shots he defended, and the same for rim protection (/ 8 points),
+// averaged and capped at ±1
+export const advDefScore = (
+	p: { dfga?: number; dfgp?: number; rimDfga?: number; rimDfgp?: number },
+	league: { dfgp: number | undefined; rimDfgp: number | undefined },
+) => {
+	let score = 0;
+	if (p.dfga && p.dfgp !== undefined && league.dfgp !== undefined) {
+		score += (0.5 * ((league.dfgp - p.dfgp) / 4) * p.dfga) / (p.dfga + 200);
+	}
+	if (p.rimDfga && p.rimDfgp !== undefined && league.rimDfgp !== undefined) {
+		score +=
+			(0.5 * ((league.rimDfgp - p.rimDfgp) / 8) * p.rimDfga) /
+			(p.rimDfga + 150);
+	}
+	return Math.max(-1, Math.min(1, score));
+};
+
 export type AllDefensiveFormat = "none" | "oneGuard" | "gfc";
 
 // "oneGuard" wants a true guard, a GF (a wing) doesn't count

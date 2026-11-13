@@ -27,6 +27,7 @@ import {
 	processPlayerStats,
 } from "../../util/processPlayerStats.ts";
 import type { FormulaEvaluators } from "./processAwards.ts";
+import { advDefScore } from "./perimeterDefense.ts";
 
 // tid gets added from root of AwardPlayer2 - that is the only tid we need to pass in to processPlayers, because otherwise we assume we have the actual stats available
 export type StatOverridesByMatchup = Record<
@@ -72,8 +73,10 @@ const AWARD_STATS_SPECIAL = [
 	"numWonConsecutive",
 ];
 if (__SPORT === "basketball") {
-	AWARD_STATS_SPECIAL.push("teamWs");
+	AWARD_STATS_SPECIAL.push("teamWs", "advDef");
 }
+// Advanced Tracking Stats: what advDef is computed from
+const ADV_DEF_STATS = ["dfga", "dfgp", "rimDfga", "rimDfgp"];
 export const AWARD_STATS_ALL = [...AWARD_STATS, ...AWARD_STATS_SPECIAL].filter(
 	(key) => !BOTH_AWARD_STATS_SKIP.has(key),
 );
@@ -352,10 +355,14 @@ export const getPlayers = async (
 		getActiveSeasonSelector(season),
 	);
 
+	const advDef =
+		__SPORT === "basketball" && (!variables || variables.normal.has("advDef"));
 	const players = await getProcessedPlayers(
 		playersAll,
 		statRanges,
-		variables?.normal,
+		variables && advDef
+			? new Set([...variables.normal, ...ADV_DEF_STATS])
+			: variables?.normal,
 	);
 
 	// Cache some stuff for later
@@ -595,6 +602,43 @@ export const getPlayers = async (
 					}
 
 					currentStats.teamWs = totalWS[currentStats.tid] ?? 0;
+				}
+			}
+		}
+	}
+
+	// Advanced Tracking Stats: advDef, how well he defends shots compared to the league (0 without tracking stats)
+	if (advDef) {
+		for (const statRange of statRanges) {
+			if (typeof statRange === "number") {
+				continue;
+			}
+			let dfga = 0;
+			let dfgm = 0;
+			let rimDfga = 0;
+			let rimDfgm = 0;
+			for (const p of players) {
+				const cs = p.currentStats[statRange];
+				if (cs?.dfga && cs.dfgp !== undefined) {
+					dfga += cs.dfga;
+					dfgm += (cs.dfga * cs.dfgp) / 100;
+				}
+				if (cs?.rimDfga && cs.rimDfgp !== undefined) {
+					rimDfga += cs.rimDfga;
+					rimDfgm += (cs.rimDfga * cs.rimDfgp) / 100;
+				}
+			}
+			const league = {
+				dfgp: dfga > 0 ? (100 * dfgm) / dfga : undefined,
+				rimDfgp: rimDfga > 0 ? (100 * rimDfgm) / rimDfga : undefined,
+			};
+			for (const p of players) {
+				const cs = p.currentStats[statRange];
+				if (cs) {
+					cs.advDef = advDefScore(
+						cs as Record<string, number | undefined>,
+						league,
+					);
 				}
 			}
 		}
