@@ -595,6 +595,54 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "faceAging",
+		key: "featureFaceAging",
+		name: "Face Aging",
+		description:
+			"Generated faces age with the players, once a season at the preseason: rookies look young (no lines, little facial hair), beards grow in over the early 20s, hair greys and may thin or recede from the late 20s, lines appear after about 30 (sooner with heavy minutes) and faces fill out a little. Seeded from the player, so it's the same every time and never changes a game or league result. Faces edited in Customize Player stay as they are unless that player's \"Allow aging\" box is ticked. Players with an image URL are untouched. The player page shows a then-and-now and his face in past seasons.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "faceAgingSpeed",
+				name: "Face Aging Speed",
+				description: "How quickly and how strongly faces age.",
+				type: "string",
+				values: [
+					{ key: "subtle", value: "Subtle" },
+					{ key: "normal", value: "Normal" },
+					{ key: "strong", value: "Strong" },
+				],
+				default: "normal",
+			},
+			{
+				key: "faceAgingHairLoss",
+				name: "Allow Hair Loss",
+				description:
+					"Some players' hairlines recede, thin or go bald with age (a per-player tendency); the rest keep their hair.",
+				type: "bool",
+				default: true,
+			},
+			{
+				key: "faceAgingGraying",
+				name: "Allow Graying",
+				description:
+					"Hair and beards grey gradually from the mid-30s, each player at his own age and pace.",
+				type: "bool",
+				default: true,
+			},
+			{
+				key: "faceAgingRetired",
+				name: "Age Retired Players",
+				description:
+					"Keep aging retired players' faces each season too (slower preseason in long leagues).",
+				type: "bool",
+				default: false,
+			},
+		],
+	},
+	{
 		id: "skillBadges",
 		key: "featureSkillBadges",
 		name: "Extended Skill Badges",

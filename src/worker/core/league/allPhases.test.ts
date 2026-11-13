@@ -169,5 +169,20 @@ describe("all phases", () => {
 			}
 			assert.strictEqual(g.get("season"), start + i + 1);
 		}
+
+		// Face Aging: every active player with a generated face was aged at this preseason, with a face history
+		const active = await idb.cache.players.indexGetAll("playersByTid", [
+			PLAYER.FREE_AGENT,
+			Infinity,
+		]);
+		for (const p of active) {
+			if (!p.imgURL) {
+				assert.strictEqual(p.faceAging?.s, g.get("season"), `face ${p.pid}`);
+			}
+		}
+		const veteran = active.find((p) => p.draft.year < start);
+		assert.isDefined(veteran);
+		const view = await loadView("player", { pid: String(veteran!.pid) });
+		assert.isAbove(view.faceHistory.length, 0);
 	});
 });

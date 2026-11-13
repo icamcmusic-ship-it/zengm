@@ -2,6 +2,7 @@ import type { RumorState } from "./rumors/types.ts";
 import * as z from "zod";
 import type { IsExact } from "conditional-type-checks";
 import type { FaceConfig } from "facesjs";
+import type { FaceAging } from "./faceAging.ts";
 import type { ReactNode } from "react";
 import type { RBState } from "./recordsBook.ts";
 import type { MarqueeKind } from "./marquee.ts";
@@ -1567,6 +1568,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 		dpid?: number;
 	};
 	face: FaceConfig;
+	// League Extras "Face Aging": generated face, per-season snapshots and edit lock (common/faceAging.ts)
+	faceAging?: FaceAging;
 	firstName: string;
 	gamesUntilTradable: number;
 	hgt: number;

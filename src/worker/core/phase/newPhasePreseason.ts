@@ -46,6 +46,7 @@ import {
 	getCurrentContract,
 	getNearestContractAmount,
 } from "../../../common/contracts.ts";
+import { ageFacesForPreseason } from "../../util/faceAging.ts";
 
 // When a player changes teams or leaves his team at the start of a new season without a normal signing or release (repeat season, forced historical rosters), his contract just ends before this season
 const endContractBeforeNewSeason = (
@@ -586,6 +587,11 @@ const newPhasePreseason = async (
 
 	// The archetype label for the new season, now that development has happened
 	await updateArchetypesForPreseason(players);
+
+	// League Extras "Face Aging": faces a year older (seeded from pid and season, no game randomness)
+	if (!repeatSeason) {
+		await ageFacesForPreseason(players, newSeason);
+	}
 
 	if (repeatSeason?.type !== "playersAndRosters") {
 		await freeAgents.normalizeContractDemands({
