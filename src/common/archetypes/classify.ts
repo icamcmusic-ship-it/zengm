@@ -1,3 +1,4 @@
+import { isGenericBuild } from "./generic.ts";
 import { ARCHETYPE_DEFS, SCORING_DEFS } from "./defs.data.ts";
 import {
 	DIM_LABELS,
@@ -108,6 +109,16 @@ export const isPoorFit = (c: { score: number; shortfall: number }) =>
 	c.score < POOR_FIT_SCORE || c.shortfall > POOR_FIT_SHORT;
 // How many runners-up are listed as "also close to" (never part of the label)
 export const ALTERNATES = 2;
+// arch16 spot fix (user report: Wembanyama, Mobley and Kawhi all "Shot-Erasing Mid-Paint Maestro", the build over the
+// real top-150 cap): a hand bias on top of the calibrated one, for every profile of the build
+export const SPOT_BIAS: Record<string, number> = {
+	"shot-erasing-mid-paint-maestro": -0.4,
+};
+// arch16: every generic build (generic.ts) a little less likely, for its share in real players' leagues (the star trim
+// reaches only stars; the share trim only generated leagues)
+export const GENERIC_BIAS = 0.3;
+// arch16: how far below a generic best a specific build may be and still be shown instead (classify)
+export const GENERIC_FALLBACK_Z = 1.5;
 // A runner-up is only listed when its fit is within this much (in z) of the label's
 export const ALTERNATE_Z = 0.6;
 
@@ -201,7 +212,14 @@ export const traitTerm = (
 };
 
 // raw: similarity of shape, 0..1; z: how exceptional the fit is; short: how far he is from what the name promises (z)
-export type Scored = { a: Archetype; raw: number; z: number; short: number };
+export type Scored = {
+	a: Archetype;
+	raw: number;
+	z: number;
+	short: number;
+	// arch16: how far he is below the build's catch-all floors (score.ts CATCH_ALL), z
+	catchAll?: number;
+};
 
 // arch14: one build's terms for one player, before the fitted weights (model.ts): `f` per TERMS, `cls` per CLASS_FEATS,
 // `base` what is not fitted (the position prior and his traits)
@@ -213,6 +231,8 @@ export type BuildTerms = {
 	short: number;
 	blocked: boolean;
 	base: number;
+	// arch16: catch-all floors missed (score.ts catchAllShortfall)
+	catchAll?: number;
 	f: number[];
 	cls: number[];
 	fam: Family;
@@ -327,13 +347,17 @@ export const scoreTerms = (
 			});
 			continue;
 		}
-		const base = prior + trait - CATCH_ALL_K * catchAllShortfall(a, p, cv);
+		const catchAll = catchAllShortfall(a, p, cv);
+		const base = prior + trait - CATCH_ALL_K * catchAll;
 		for (const [gi, g] of TRAIT_GROUPS.entries()) {
 			if (groupVals[gi] !== 0 && g.re.test(a.name)) {
 				f[TERM_INDEX[g.term as Term]] = groupVals[gi]!;
 			}
 		}
-		const bias = calBias?.[a.id] ?? 0;
+		const bias =
+			(calBias?.[a.id] ?? 0) +
+			(SPOT_BIAS[pub.id] ?? 0) -
+			(isGenericBuild(pub) || isGenericBuild(a) ? GENERIC_BIAS : 0);
 		// (arch15: the trim is per build; a merged profile reads its build's)
 		const starB =
 			star *
@@ -363,7 +387,18 @@ export const scoreTerms = (
 		}
 		const table = norms.match[a.id];
 		const need = needShortfall(a, p);
+		// (arch16: and the name he is shown: a merged profile's holders carry the kept build's name, which arch16 re-picked
+		// to a specific one for four merges)
 		const prom = promiseShortfall(a, cv, p);
+		if (pub !== a) {
+			const q = promiseShortfall(pub, cv, p);
+			prom.floor = Math.max(prom.floor, q.floor);
+			prom.rel = Math.max(prom.rel, q.rel);
+			prom.lead = Math.max(prom.lead, q.lead);
+			if (q.reb !== undefined) {
+				prom.reb = Math.max(prom.reb ?? 0, q.reb);
+			}
+		}
 		const short = need + prom.floor + prom.rel;
 		// (a role bonus only for a build he lives up to: it fades out as he misses its floors)
 		const role = roleParts(a, p, cv);
@@ -403,7 +438,18 @@ export const scoreTerms = (
 				cls[i] = cv[k] ?? 0;
 			}
 		}
-		rows.push({ a, pub, raw, short, blocked: false, base, f, cls, fam });
+		rows.push({
+			a,
+			pub,
+			raw,
+			short,
+			blocked: false,
+			base,
+			catchAll,
+			f,
+			cls,
+			fam,
+		});
 	}
 	return {
 		rows,
@@ -513,7 +559,13 @@ export const scoreAll = (
 			: weighTerms(m, r) + (r.fam === "allAround" ? 0 : (fam[r.fam] ?? 0));
 		const prev = best.get(r.pub.id);
 		if (!prev || z > prev.z) {
-			best.set(r.pub.id, { a: r.pub, raw: r.raw, short: r.short, z });
+			best.set(r.pub.id, {
+				a: r.pub,
+				raw: r.raw,
+				short: r.short,
+				z,
+				catchAll: r.catchAll ?? 0,
+			});
 		}
 	}
 	const scored: Scored[] = [...best.values()];
@@ -708,8 +760,8 @@ export const classify = (
 	) {
 		first = runnerUp;
 	}
-	const sticky = opts.stickiness ?? STICKY_Z;
 	const previousId = opts.previousId && mergedId(opts.previousId);
+	const sticky = opts.stickiness ?? STICKY_Z;
 	if (previousId && previousId !== first.a.id) {
 		const prev = scored.find((s) => s.a.id === previousId);
 		// Never one his position now rules out, however sticky, nor one whose name he no longer lives up to
@@ -720,6 +772,29 @@ export const classify = (
 			prev.short <= POOR_FIT_SHORT
 		) {
 			first = prev;
+		}
+	}
+	// arch16: a generic build (generic.ts) is a last resort. When his best is one and a specific build is within
+	// GENERIC_FALLBACK_Z (and he lives up to its name), he gets the specific one, with a fit note
+	let fitNote: string | undefined;
+	if (isGenericBuild(first.a)) {
+		const g = first;
+		const ok = (s: Scored) =>
+			s.z > BLOCKED_Z &&
+			!isGenericBuild(s.a) &&
+			!s.a.tags.includes("allAround") &&
+			s.short <= POOR_FIT_SHORT &&
+			s.raw >= POOR_FIT_SCORE &&
+			(s.catchAll ?? 0) === 0 &&
+			// (the best of his generic build's family: a specific name from another family would say something he is not)
+			familyOf(s.a) === familyOf(g.a) &&
+			g.z - s.z < GENERIC_FALLBACK_Z;
+		// (his previous label when it is one of them, so the fallback does not flip between seasons)
+		const specific =
+			scored.find((s) => s.a.id === previousId && ok(s)) ?? scored.find(ok);
+		if (specific) {
+			first = specific;
+			fitNote = `Closest specific build; his game is broad (${nameAt(g.a, pos)})`;
 		}
 	}
 	const rest = scored.filter((s) => s.a.id !== first.a.id);
@@ -754,6 +829,7 @@ export const classify = (
 		why: whyOf(a, z, expanded),
 		label: name,
 		...(a.custom ? { custom: true } : {}),
+		...(fitNote ? { fitNote } : {}),
 		...(opts.stats
 			? { statsWeight: Math.round(opts.stats.w * 100) / 100 }
 			: {}),

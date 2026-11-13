@@ -1078,6 +1078,40 @@ const settingsFor = (config: string) => {
 };
 
 describe.skipIf(!ENABLED)("long run", () => {
+	// LONG_RUN_ARCH_DUMP=prefix (arch16): every player (rosters, free agents and draft prospects) at the preseason of the
+	// first season and after the last, with his stored archetype, ratings and stats, as `${prefix}-${season}.json`, for the
+	// archetype share checks (common/archetypes/userShares.script.test.ts)
+	const archDump = async () => {
+		if (!env.LONG_RUN_ARCH_DUMP) {
+			return;
+		}
+		const { writeFileSync } = await import(
+			/* @vite-ignore */ "node:fs" as string
+		);
+		const s = g.get("season");
+		const ps = await idb.cache.players.indexGetAll("playersByTid", [
+			PLAYER.UNDRAFTED,
+			Infinity,
+		]);
+		writeFileSync(
+			`${env.LONG_RUN_ARCH_DUMP}-${s}.json`,
+			JSON.stringify({
+				season: s,
+				players: ps.map((p) => ({
+					pid: p.pid,
+					tid: p.tid,
+					name: `${p.firstName} ${p.lastName}`,
+					born: p.born,
+					archetype: (p as any).archetypes?.at(-1),
+					ratings: p.ratings.slice(-1),
+					stats: p.stats.filter(
+						(row: any) => !row.playoffs && row.season >= s - 3,
+					),
+				})),
+			}),
+		);
+	};
+
 	test("seasons", { timeout: 24 * 60 * 60 * 1000 }, async () => {
 		Math.random = makeSeededRandom(SEED);
 		const { settings, enabledKeys } = settingsFor(CONFIG);
@@ -1109,6 +1143,7 @@ describe.skipIf(!ENABLED)("long run", () => {
 		);
 		await league.loadGameAttributes();
 
+		await archDump();
 		for (let i = 0; i < SEASONS; i++) {
 			const calib = calibrate().ms;
 			const ts = performance.now();
@@ -1295,6 +1330,7 @@ describe.skipIf(!ENABLED)("long run", () => {
 				}),
 			);
 		}
+		await archDump();
 		out(
 			`DONE problems ${problemCount}: ${JSON.stringify(Object.fromEntries(problemSeen))}`,
 		);

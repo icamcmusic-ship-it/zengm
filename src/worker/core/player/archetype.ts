@@ -9,6 +9,7 @@ import {
 	currentEntry,
 	isStale,
 	explain,
+	archetypeById,
 	toStored,
 	viewOf,
 	withEntry,
@@ -18,6 +19,8 @@ import {
 	type Norms,
 	type StoredArchetype,
 } from "../../../common/archetypes/index.ts";
+import { whyDrivers, whyLine } from "../../../common/archetypes/whyText.ts";
+import { VISIBLE_TRAITS } from "../../../common/archetypes/classify.ts";
 import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
 import type { Player } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
@@ -508,6 +511,8 @@ export type PlayerArchetypeInfo = {
 	season?: number;
 	live: boolean;
 	why: { label: string; z: number; want: number }[];
+	// arch16: one short line citing what drove the pick (common/archetypes/whyText.ts)
+	whyText?: string;
 };
 
 // Everything the player page shows. A non-prospect with no entry gets one stored here, once.
@@ -539,22 +544,39 @@ export const archetypeInfoForPlayer = async (
 	}
 	const ratings = ratingsForArchetype(p);
 	const row = last(p.ratings) as any;
-	const why = ratings
-		? explain(
-				found.view.id,
+	const season =
+		typeof row.season === "number" ? (row.season as number) : g.get("season");
+	const read = readOptionsFor(p, isPos(row.pos) ? row.pos : "F", season);
+	const rows = ratings ? explain(found.view.id, ratings, norms, read) : [];
+	const why = rows.map((w) => ({
+		label: w.label,
+		z: w.z,
+		want: w.want,
+	}));
+	// arch16: the short why line, from what drove the pick (sub-ratings, play types, traits, ratings), with the numbers the
+	// user sees (scouting fuzz as on the ratings pages; none under the no-visible-ratings challenge)
+	const a = archetypeById(found.view.id);
+	let whyText: string | undefined;
+	if (ratings && a) {
+		const traits = archetypeTraits(p, season);
+		whyText = whyLine(
+			whyDrivers({
+				a,
 				ratings,
 				norms,
-				readOptionsFor(
-					p,
-					isPos(row.pos) ? row.pos : "F",
-					typeof row.season === "number" ? row.season : g.get("season"),
-				),
-			).map((w) => ({
-				label: w.label,
-				z: w.z,
-				want: w.want,
-			}))
-		: [];
+				read,
+				rows,
+				pt: read.pt ? archetypePlayTypes(p, season) : undefined,
+				traits: traits
+					? Object.fromEntries(
+							Object.entries(traits).filter(([k]) => VISIBLE_TRAITS.has(k)),
+						)
+					: undefined,
+				shown: ratingsForArchetype(p, true),
+				hideNumbers: g.get("challengeNoRatings") && p.tid !== PLAYER.RETIRED,
+			}),
+		);
+	}
 	const v = found.view;
 	return {
 		id: v.id,
@@ -567,6 +589,7 @@ export const archetypeInfoForPlayer = async (
 		season: found.stored ? v.season : undefined,
 		live: !found.stored,
 		why,
+		...(whyText ? { whyText } : {}),
 	};
 };
 

@@ -1,3 +1,4 @@
+import { isGenericBuild } from "./generic.ts";
 import { assert, describe, test, vi } from "vitest";
 import { resetG } from "../../test/helpers.ts";
 import genRatings from "../../worker/core/player/genRatings.basketball.ts";
@@ -488,6 +489,48 @@ describe("classification", () => {
 			assert.ok(archetypeById(ce.id)!.positions.includes(p.pos));
 		}
 		assert.deepStrictEqual(misses, []);
+	});
+
+	// arch16 (user reports): Giannis is not a mid-range build, Gobert is a rim protector / roll big, Wembanyama, Mobley and
+	// Kawhi do not share one build, and no generic build (generic.ts) holds more than 2% of the real 2025 top 150
+	test("arch16 spot checks", () => {
+		const data = realData();
+		const read = (slug: string) => {
+			const row = data.d.ratings.find(
+				(x: any) => x.slug === slug && x.season === 2025,
+			);
+			const p = realPlayer(data, row);
+			return classify(p.ratings, {
+				norms: realNorms(DEFAULT_NORMS, false),
+				pos: p.pos,
+				age: p.age,
+				stats: p.stats,
+			});
+		};
+		assert.notMatch(read("antetgi01").name, /Mid|Middy/);
+		assert.strictEqual(read("goberru01").id, "backline-lob-threat");
+		const trio = ["wembavi01", "mobleev01", "leonaka01"].map((s) => read(s).id);
+		assert.strictEqual(new Set(trio).size, 3, trio.join(", "));
+		const top = data.d.ratings
+			.filter((r: any) => r.season === 2025)
+			.map((r: any) => realPlayer(data, r))
+			.sort((x, y) => y.ovr - x.ovr)
+			.slice(0, 150);
+		const counts: Record<string, number> = {};
+		for (const p of top) {
+			const c = classify(p.ratings, {
+				norms: realNorms(DEFAULT_NORMS, false),
+				pos: p.pos,
+				age: p.age,
+				stats: p.stats,
+			});
+			counts[c.id] = (counts[c.id] ?? 0) + 1;
+		}
+		for (const [id, n] of Object.entries(counts)) {
+			if (isGenericBuild(archetypeById(id))) {
+				assert.isAtMost(n / top.length, 0.02, id);
+			}
+		}
 	});
 
 	test("gold set: real players across eras get a build that fits their role", () => {
@@ -1136,7 +1179,7 @@ const PINNED: [string, number, string][] = [
 	["jamesle01", 2025, "mid-paint-point-four"], // LeBron James
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
 	["goberru01", 2025, "backline-power-finisher"], // Rudy Gobert
-	["antetgi01", 2025, "crashing-mid-paint-scorer"], // Giannis Antetokounmpo
+	["antetgi01", 2025, "crafty-paint-finishing-cleaner"], // Giannis Antetokounmpo (arch16: no jumper, not mid-range)
 	["duranke01", 2025, "crafty-mid-paint-scorer"], // Kevin Durant
 	["paulch01", 2025, "ball-hawking-3-and-d-point"], // Chris Paul
 	["greendr01", 2025, "shot-erasing-board-enforcer"], // Draymond Green
@@ -1145,7 +1188,7 @@ const PINNED: [string, number, string][] = [
 	["lopezbr01", 2025, "backline-pick-and-popper"], // Brook Lopez
 	["capelca01", 2025, "physical-defensive-rebounder"], // Clint Capela
 	["korveky01", 2021, "deep-range-sniper"], // Kyle Korver
-	["westbru01", 2025, "board-hunting-middy-slasher"], // Russell Westbrook
+	["westbru01", 2025, "slashing-playmaker"], // Russell Westbrook (arch16: a mid-range name needs a jumper)
 	["wembavi01", 2025, "shot-erasing-mid-paint-maestro"], // Victor Wembanyama
 	["doncilu01", 2025, "diming-3-level-scorer"], // Luka Dončić (arch13: his three fixed, 53 -> 71)
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges

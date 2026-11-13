@@ -291,6 +291,9 @@ export type Classification = {
 	label: string;
 	// Not an NBA 2K build name (a custom build)
 	custom?: boolean;
+	// arch16: why the label is not his very best fit (a generic build he fitted best gave way to a specific one). Data
+	// only: the UI shows name, description and why
+	fitNote?: string;
 	// How much of the reading came from his box-score stats (0 = ratings only), 0..1
 	statsWeight?: number;
 };

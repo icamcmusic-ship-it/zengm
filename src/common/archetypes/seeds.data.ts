@@ -2753,7 +2753,7 @@ export const SEEDS: Record<string, Seed> = {
 			jmp: 2,
 		},
 	},
-	"rim-reaping-poster-dunker": {
+	"backline-lob-threat": {
 		builds: [],
 		o: {
 			stre: -6,
@@ -3030,7 +3030,7 @@ export const SEEDS: Record<string, Seed> = {
 			reb: 6,
 		},
 	},
-	"slashing-dual-finisher": {
+	"blow-by-dual-finisher": {
 		builds: [
 			"Slasher",
 			"Transition Wing",
@@ -3257,7 +3257,7 @@ export const SEEDS: Record<string, Seed> = {
 			pss: -4,
 		},
 	},
-	"versatile-paint-finisher": {
+	"drive-and-rise": {
 		builds: [],
 		o: {
 			stre: -14,
@@ -3303,7 +3303,7 @@ export const SEEDS: Record<string, Seed> = {
 			endu: 2,
 		},
 	},
-	"versatile-scoring-cleaner": {
+	"board-hunting-bucket-getter": {
 		builds: ["Skinny Seven-Footer"],
 		o: {
 			stre: -14,
