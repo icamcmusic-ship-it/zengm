@@ -1,5 +1,6 @@
 import type { StoredSubInfo } from "./subRatingsGen.ts";
 import type { RumorState } from "./rumors/types.ts";
+import type { SystemTrends } from "./coachSystems.ts";
 import * as z from "zod";
 import type { IsExact } from "conditional-type-checks";
 import type { FaceConfig } from "facesjs";
@@ -2213,6 +2214,9 @@ export type Local = {
 		start: number;
 	};
 	autoSave: boolean;
+	// Coaching systems: the systems that won lately in this league, for new coaches' profiles (worker/core/staff/systems.ts). Reset with
+	// the league, so a league never uses another one's trends
+	coachSystemTrends?: SystemTrends;
 	email: string | undefined;
 	eightyTwoZeroDraft?: {
 		round: number;
