@@ -1,6 +1,8 @@
 import { team } from "../index.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers, logEvent } from "../../util/index.ts";
+import { g, helpers, local, logEvent } from "../../util/index.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+import { ownerDistribution } from "./ownerDistribution.ts";
 import getLuxuryTaxAmount from "./getLuxuryTaxAmount.ts";
 import getMinPayrollAmount from "./getMinPayrollAmount.ts";
 import { isRepeaterTaxTeam } from "../contract/capExceptions.ts";
@@ -127,6 +129,35 @@ const assessPayrollMinLuxury = async () => {
 				});
 			} else {
 				teamSeason.revenues.luxuryTaxShare = 0;
+			}
+		}
+	}
+
+	// Realistic AI Economy: AI owners take out most of the cash above a reserve, so it doesn't grow without bound
+	if (featureOn("realisticEconomy")) {
+		const userTids =
+			g.get("spectator") || local.autoPlayUntil
+				? new Set<number>()
+				: new Set(g.get("userTids"));
+		for (const teamSeason of teamSeasons) {
+			if (userTids.has(teamSeason.tid)) {
+				continue;
+			}
+			const amount = ownerDistribution(teamSeason.cash, g.get("salaryCap"));
+			if (amount > 0) {
+				teamSeason.cash -= amount;
+				logEvent({
+					type: "ownerDistribution",
+					text: `The owner of the ${rosterLink(
+						teamSeason.tid,
+					)} took a distribution of ${helpers.formatCurrency(
+						amount / 1000,
+						"M",
+					)} from the team's cash reserves.`,
+					tids: [teamSeason.tid],
+					showNotification: false,
+					score: 0,
+				});
 			}
 		}
 	}

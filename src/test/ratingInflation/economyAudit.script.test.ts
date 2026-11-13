@@ -6,7 +6,7 @@
 // front office levels, rumors, plus invalid-state checks. Run with
 // RUN_ECO_AUDIT=1 ECO_CONFIG=default npx vitest run --project basketball src/test/ratingInflation/economyAudit.script.test.ts
 // Env: ECO_CONFIG (default, hard, none, repeater, small, large, expansion, noGms), ECO_SEED (default 1), ECO_SEASONS (default 15),
-// ECO_OUT (jsonl, default /tmp/economyAudit.jsonl)
+// ECO_OUT (jsonl, default /tmp/economyAudit.jsonl), ECO_SET (JSON of extra settings)
 import { appendFileSync } from "node:fs";
 import { test } from "vitest";
 import { PHASE } from "../../common/constants.ts";
@@ -369,7 +369,11 @@ test.skipIf(!process.env.RUN_ECO_AUDIT)(
 			await import("fake-indexeddb/auto");
 		}
 		const configName = process.env.ECO_CONFIG ?? "default";
-		const config = { ...CONFIGS[configName] };
+		// ECO_SET: extra settings as JSON, e.g. '{"featureRealisticEconomy":false}'
+		const config = {
+			...CONFIGS[configName],
+			...JSON.parse(process.env.ECO_SET ?? "{}"),
+		};
 		const seed = Number(process.env.ECO_SEED ?? 1);
 		const seasons = Number(process.env.ECO_SEASONS ?? 15);
 		const out = process.env.ECO_OUT ?? "/tmp/economyAudit.jsonl";

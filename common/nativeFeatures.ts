@@ -706,6 +706,17 @@ export const NATIVE_FEATURES = [
 		existing: true,
 	},
 	{
+		id: "realisticEconomy",
+		college: false,
+		key: "featureRealisticEconomy",
+		name: "Realistic AI Economy",
+		description:
+			"AI teams keep their money and trades closer to real life: random AI-to-AI trades must be roughly fair for both teams (not just the one being asked), in leagues without a salary cap a team over the luxury tax can't take back much more salary than it sends out (125% + $100k), and teams sitting on large cash reserves spend more on their budget items (within the front office envelope when Front Office Budget is on) and pay out owner distributions, so cash stays in a realistic band. When off, the stock BBGM behaviour.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "aiTradeOffers",
 		college: false,
 		key: "featureAiTradeOffers",

@@ -50,8 +50,8 @@ const MilestoneWatch = ({ refreshKey }: { refreshKey: string }) => {
 				{card.reached.map((r, i) => (
 					<li key={`r${i}`}>
 						<span className="badge text-bg-success me-1">reached</span>
-						<a href={helpers.leagueUrl(["player", r.pid])}>{r.name}</a>:{" "}
-						{reachedText(r)}
+						<a href={helpers.leagueUrl(["player", r.pid])}>{r.name}</a>
+						{r.retired ? " (retired)" : ""}: {reachedText(r)}
 					</li>
 				))}
 				{card.upcoming.map((r, i) => (

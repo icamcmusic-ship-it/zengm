@@ -132,6 +132,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	capExceptions: "League extras: Contracts",
 	tradeExplain: "League extras: Trades",
 	aiNeedTrades: "League extras: Trades",
+	realisticEconomy: "League extras: Trades",
 	aiTradeOffers: "League extras: Trades",
 	rumors: "League extras: Trades",
 	tradeMarket: "League extras: Trades",

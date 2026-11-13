@@ -1103,6 +1103,7 @@ export type LogEventType =
 	| "upgrade"
 	| "luxuryTax"
 	| "luxuryTaxDist"
+	| "ownerDistribution"
 	| "minPayroll"
 	| "undo"
 	| "contractOption"
