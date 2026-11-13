@@ -1,5 +1,6 @@
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
+import { useLocal } from "../util/local.ts";
 import { DataTable } from "../components/DataTable/index.tsx";
 import { frivolitiesMenu } from "./Frivolities.tsx";
 import type { View } from "../../common/types.ts";
@@ -12,19 +13,39 @@ const PlayerCell = ({ p }: { p: { pid: number; name: string } }) => (
 	<a href={helpers.leagueUrl(["player", p.pid])}>{p.name}</a>
 );
 
-const Leaders = ({ b }: { b: Badge | Combo }) => (
+// No visible ratings challenge: ovr and badge scores (made from ratings) are left out of the tables, the order stays
+const NO_RATINGS_COLS = new Set(["Ovr", "Score", "Margin"]);
+const withoutRatings = <T,>(
+	hide: boolean,
+	cols: { title: string }[],
+	items: T[],
+): T[] =>
+	hide ? items.filter((_, i) => !NO_RATINGS_COLS.has(cols[i]!.title)) : items;
+
+const Leaders = ({
+	b,
+	hideScores,
+}: {
+	b: Badge | Combo;
+	hideScores: boolean;
+}) => (
 	<span className="small">
 		{b.leaders.map((p, i) => (
 			<span key={p.pid}>
 				{i > 0 ? ", " : ""}
-				<PlayerCell p={p} />{" "}
-				<span className="text-body-secondary">
-					{"parts" in p ? (
-						<span title={`Replaces ${p.parts}`}>+{p.score}</span>
-					) : (
-						p.score
-					)}
-				</span>
+				<PlayerCell p={p} />
+				{hideScores ? null : (
+					<>
+						{" "}
+						<span className="text-body-secondary">
+							{"parts" in p ? (
+								<span title={`Replaces ${p.parts}`}>+{p.score}</span>
+							) : (
+								p.score
+							)}
+						</span>
+					</>
+				)}
 			</span>
 		))}
 	</span>
@@ -35,7 +56,35 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 		title: "Skill Badges",
 		customMenu: frivolitiesMenu,
 	});
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 	const selected = badges.find((b) => b.label === label);
+	const listCols = [
+		{ title: "#", sortSequence: [] as [] },
+		{ title: "Name" },
+		{ title: "Pos" },
+		{ title: "Team" },
+		{ title: "Age", sortType: "number" as const },
+		{ title: "Ovr", sortType: "number" as const },
+		{
+			title: "Score",
+			sortType: "number" as const,
+			desc: "Badge score, 0-100",
+		},
+	];
+	const comboCols = [
+		{ title: "#", sortSequence: [] as [] },
+		{ title: "Name" },
+		{ title: "Pos" },
+		{ title: "Team" },
+		{ title: "Age", sortType: "number" as const },
+		{ title: "Ovr", sortType: "number" as const },
+		{ title: "Replaces" },
+		{
+			title: "Margin",
+			sortType: "number" as const,
+			desc: "Points past the cutoff of the weakest part",
+		},
+	];
 	const selectedCombo = combos.find((b) => b.label === label);
 
 	const groups = [...new Set(badges.map((b) => b.groupName))];
@@ -74,25 +123,13 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 						</a>
 					</p>
 					<DataTable
-						cols={[
-							{ title: "#", sortSequence: [] },
-							{ title: "Name" },
-							{ title: "Pos" },
-							{ title: "Team" },
-							{ title: "Age", sortType: "number" },
-							{ title: "Ovr", sortType: "number" },
-							{
-								title: "Score",
-								sortType: "number",
-								desc: "Badge score, 0-100",
-							},
-						]}
-						defaultSort={[6, "desc"]}
+						cols={withoutRatings(challengeNoRatings, listCols, listCols)}
+						defaultSort={challengeNoRatings ? "disableSort" : [6, "desc"]}
 						name="SkillBadges:list"
 						pagination
 						rows={selected.list.map((p, i) => ({
 							key: p.pid,
-							data: [
+							data: withoutRatings(challengeNoRatings, listCols, [
 								i + 1,
 								<PlayerCell key="n" p={p} />,
 								p.pos,
@@ -100,7 +137,7 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 								p.age,
 								p.ovr,
 								p.score,
-							],
+							]),
 							classNames: { "table-info": p.tid === userTid },
 						}))}
 					/>
@@ -121,26 +158,13 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 						</a>
 					</p>
 					<DataTable
-						cols={[
-							{ title: "#", sortSequence: [] },
-							{ title: "Name" },
-							{ title: "Pos" },
-							{ title: "Team" },
-							{ title: "Age", sortType: "number" },
-							{ title: "Ovr", sortType: "number" },
-							{ title: "Replaces" },
-							{
-								title: "Margin",
-								sortType: "number",
-								desc: "Points past the cutoff of the weakest part",
-							},
-						]}
-						defaultSort={[7, "desc"]}
+						cols={withoutRatings(challengeNoRatings, comboCols, comboCols)}
+						defaultSort={challengeNoRatings ? "disableSort" : [7, "desc"]}
 						name="SkillBadges:comboList"
 						pagination
 						rows={selectedCombo.list.map((p, i) => ({
 							key: p.pid,
-							data: [
+							data: withoutRatings(challengeNoRatings, comboCols, [
 								i + 1,
 								<PlayerCell key="n" p={p} />,
 								p.pos,
@@ -149,7 +173,7 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 								p.ovr,
 								p.parts,
 								p.score,
-							],
+							]),
 							classNames: { "table-info": p.tid === userTid },
 						}))}
 					/>
@@ -194,7 +218,7 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 								b.meaning,
 								b.count,
 								{
-									value: <Leaders b={b} />,
+									value: <Leaders b={b} hideScores={challengeNoRatings} />,
 									searchValue: b.leaders.map((p) => p.name).join(" "),
 									sortValue: b.leaders[0]?.name ?? "",
 								},
@@ -247,7 +271,7 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 									b.thresholds.join(" and "),
 									b.count,
 									{
-										value: <Leaders b={b} />,
+										value: <Leaders b={b} hideScores={challengeNoRatings} />,
 										searchValue: b.leaders.map((p) => p.name).join(" "),
 										sortValue: b.leaders[0]?.name ?? "",
 									},

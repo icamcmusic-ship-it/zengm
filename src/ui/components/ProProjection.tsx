@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toWorker } from "../util/toWorker.ts";
 import { useFeatureOn } from "../util/nativeFeatures.ts";
+import { useLocal } from "../util/local.ts";
 
 export type ProProjectionData = Awaited<
 	ReturnType<typeof getProjections>
@@ -23,14 +24,19 @@ export const verdictClass = (verdict: string) =>
 // Odds and peak in a compact form, for tables
 export const ProjectionCells = ({
 	projection,
+	hidePeak,
 }: {
 	projection: ProProjectionData | undefined;
+	// No visible ratings challenge: the peak is an ovr
+	hidePeak?: boolean;
 }) => {
 	if (!projection) {
 		return (
 			<>
-				<td className="text-body-secondary">…</td>
-				<td />
+				{hidePeak ? null : <td className="text-body-secondary">…</td>}
+				<td className={hidePeak ? "text-body-secondary" : undefined}>
+					{hidePeak ? "…" : null}
+				</td>
 				<td />
 				<td />
 			</>
@@ -38,14 +44,16 @@ export const ProjectionCells = ({
 	}
 	return (
 		<>
-			<td
-				title={`10th-90th percentile: ${projection.peakLow}-${projection.peakHigh}`}
-			>
-				{projection.peak}{" "}
-				<span className="text-body-secondary small">
-					({projection.peakLow}-{projection.peakHigh})
-				</span>
-			</td>
+			{hidePeak ? null : (
+				<td
+					title={`10th-90th percentile: ${projection.peakLow}-${projection.peakHigh}`}
+				>
+					{projection.peak}{" "}
+					<span className="text-body-secondary small">
+						({projection.peakLow}-{projection.peakHigh})
+					</span>
+				</td>
+			)}
 			<td>{pct(projection.starPct)}</td>
 			<td>{pct(projection.starterPct)}</td>
 			<td>{pct(projection.bustPct)}</td>
@@ -56,6 +64,7 @@ export const ProjectionCells = ({
 // Pro projection section of a draft prospect's player page
 export const ProProjectionSection = ({ pid }: { pid: number }) => {
 	const on = useFeatureOn("mockDraft");
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 	const [projection, setProjection] = useState<
 		ProProjectionData | undefined | null
 	>(null);
@@ -93,9 +102,12 @@ export const ProProjectionSection = ({ pid }: { pid: number }) => {
 						<span className={verdictClass(projection.verdict)}>
 							{projection.verdict.toLowerCase()}
 						</span>
-						: peak ovr {projection.peak} (range {projection.peakLow}-
-						{projection.peakHigh}) around age {projection.peakAge}, about{" "}
-						{projection.years} seasons in the league.
+						:{" "}
+						{challengeNoRatings
+							? "peak"
+							: `peak ovr ${projection.peak} (range ${projection.peakLow}-${projection.peakHigh})`}{" "}
+						around age {projection.peakAge}, about {projection.years} seasons in
+						the league.
 					</p>
 					<div className="d-flex gap-3 flex-wrap mb-1">
 						<div>
