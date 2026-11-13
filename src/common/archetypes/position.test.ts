@@ -295,8 +295,8 @@ describe("improved positions", () => {
 	});
 
 	test("sticky: keeps a close previous position, drops a far one", () => {
-		// Between the SF and F centroids
-		const axes = { inches: 79.8, length: 79.8, skill: 0.4, play: 0.4 };
+		// Between SF and F (with their biases: the F one is the lower since fixes4, so the point is nearer F's centroid)
+		const axes = { inches: 80.4, length: 80.4, skill: 0.4, play: 0.4 };
 		const best = improvedPosition(axes);
 		assert.include(["SF", "F"], best);
 		const other = best === "F" ? "SF" : "F";
