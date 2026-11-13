@@ -350,6 +350,12 @@ New parts (ids start with `fork-`; `src/common/faceParts.styles.ts`, `src/common
   `box-braids` (short, or shoulder length with `box-braids-long` behind), `braids-bun`.
 - **Thinning (face aging, selectable by hand):** `recede-light`, `widows-peak`, `recede-medium` (with the existing
   `fork-receding` as the high hairline), `thinning-crown`, `comb-over`.
+- **Medium and long:** `slick-back` (short, or long with `slick-back-long` behind), `pompadour`, `half-up-bun`,
+  `middle-part-long` (with `long-wavy` behind), `wolf-cut`, `mullet` (behind the head, with a short top).
+- **Other features:** brows `brow-unibrow` (rare), `brow-slit` (both brows: brows are mirrored), `brow-thick-straight`;
+  eyes `eye-deep`; noses `nose-upturned`, `nose-crooked`; ears `ear-cauliflower` (rare); mouth `mouth-gap` (rare); skin
+  `acne` (young players only, clears up after 21), `lip-scar`, `chin-scar`, `face-tattoo` (rare); accessories
+  `earring-studs`, `bandana` (team colour); glasses `goggles-modern`.
 - **Facial hair:** `heavy-stubble`, `patchy-stubble`, `chin-stubble`, `boxed-beard`, `lineup-beard` (sculpted),
   `beard-line` (shaved line), `huge-beard` (rare), `anchor`, `handlebar` (rare), `walrus` (rare). Greying versions of every
   beard come from the beard colour (below), not extra parts.
@@ -374,7 +380,9 @@ at roster thumbnail size and in the dark theme.
     neck beards rare).
   - _colour_: facesjs' natural colours, plus a small dyed or bleached share (3.5% up to 27, 1% after) drawn on the hair only
     (`face.fork.hair`, see the beard colour note), so the brows keep his natural colour.
-  - the fork's other parts (heads, eyes, brows, noses, mouths, ears, lines, glasses, headbands) mixed in as before.
+  - _skin and glasses_: 12% of players 21 and under get a little acne; 30% of men 40 and over (coaches, GMs) get glasses.
+  - the fork's other parts (heads, eyes, brows, noses, mouths, ears, lines, glasses, headbands) mixed in, each with its
+    rarity (unibrow, cauliflower ear, gap teeth, face tattoo and bandana rare).
 - No era curves: style frequency doesn't depend on the league's season. Seeded from the face facesjs made, so no random
   numbers are drawn and no league result changes.
 - **Face editor:** Customize Player → _More styles_ lists every fork part of every feature (hair, hair behind the head,
@@ -410,6 +418,8 @@ at roster thumbnail size and in the dark theme.
   (`h`, the first one complete): hair id and colour, facial hair id and colour, the three line slots, smile line size, fatness
   and head shave. Typically a few hundred bytes per player. The player page has a _Then and Now_ section (first season next to
   now, and every season the face changed); `faceForSeason` rebuilds any past season.
+- **Face mask:** after a facial injury (fractured nose, jaw, cheekbone or orbital socket, facial laceration, bruised eye)
+  the player page draws him in facesjs' clear face mask while he's out and for the rest of that season. Draw-time only.
 - **Coaches and GMs:** drawn aged from their age (same function, seeded by their id, beard style left alone), nothing stored.
   With the extra off they grey as before.
 - **Beard and dyed hair colour:** facesjs draws everything in one hair colour. A face with `face.fork.beard` draws its facial hair from a

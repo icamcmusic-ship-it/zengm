@@ -14,6 +14,7 @@ import { NATIVE_FACE_PARTS } from "./faceParts.native.ts";
 import { STAFF_SUIT_PARTS } from "./faceParts.suits.ts";
 import { STYLE_PARTS } from "./faceParts.styles.ts";
 import { HAIR_PARTS } from "./faceParts.hair.ts";
+import { MORE_PARTS } from "./faceParts.more.ts";
 
 export type FacePartFeature =
 	| "accessories"
@@ -106,6 +107,7 @@ export const FORK_FACE_PARTS: readonly FacePart[] = [
 	// The style expansion (faceParts.styles.ts)
 	...STYLE_PARTS,
 	...HAIR_PARTS,
+	...MORE_PARTS,
 ];
 
 export const registerForkFaceParts = () => {
@@ -146,6 +148,28 @@ export const FORK_PART_WEIGHTS: Record<FacePartFeature, number> = {
 	smileLine: 0.3,
 };
 
+const RARITY_WEIGHTS = { common: 6, uncommon: 2, rare: 0.45 } as const;
+
+// One of the parts, rarer ones less often
+const pickByRarity = (parts: FacePart[], u: number) => {
+	const weight = (part: FacePart) =>
+		RARITY_WEIGHTS[
+			(part as { rarity?: keyof typeof RARITY_WEIGHTS }).rarity ?? "common"
+		];
+	let total = 0;
+	for (const part of parts) {
+		total += weight(part);
+	}
+	let x = u * total;
+	for (const part of parts) {
+		x -= weight(part);
+		if (x < 0) {
+			return part;
+		}
+	}
+	return parts.at(-1)!;
+};
+
 export const addRandomForkParts = (
 	face: FaceConfig,
 	random: () => number = Math.random,
@@ -153,8 +177,9 @@ export const addRandomForkParts = (
 ) => {
 	const byFeature = new Map<FacePartFeature, FacePart[]>();
 	for (const part of FORK_FACE_PARTS) {
-		// Receding / thinning hair is only handed out by face aging
-		if (!exclude(part) && !(part as { agingOnly?: true }).agingOnly) {
+		// Receding / thinning hair is only handed out by face aging, acne only by its own rule
+		const flags = part as { agingOnly?: true; special?: true };
+		if (!exclude(part) && !flags.agingOnly && !flags.special) {
 			const list = byFeature.get(part.feature) ?? [];
 			list.push(part);
 			byFeature.set(part.feature, list);
@@ -169,7 +194,7 @@ export const addRandomForkParts = (
 		) {
 			continue;
 		}
-		const part = parts[Math.floor(random() * parts.length)]!;
+		const part = pickByRarity(parts, random());
 		(face as any)[feature] = { ...current, id: part.id };
 	}
 	return face;

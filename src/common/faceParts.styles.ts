@@ -11,6 +11,10 @@ import type { FacePart } from "./faceParts.ts";
 export type StylePart = FacePart & {
 	// Only given by face aging (or the user), never by random generation
 	agingOnly?: true;
+	// Given by a specific generation rule only (e.g. acne for young players), never mixed in at random
+	special?: true;
+	// How often random mixing picks it among the fork's parts of its feature (default common)
+	rarity?: "common" | "uncommon" | "rare";
 };
 
 const HAIR = 'fill="$[hairColor]" stroke="#000" stroke-width="4"';

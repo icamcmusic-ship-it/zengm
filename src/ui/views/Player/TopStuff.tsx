@@ -27,6 +27,7 @@ import { InjuryIcon } from "../../components/InjuryIcon.tsx";
 import { SkillsBlock } from "../../components/SkillsBlock.tsx";
 import { Mood } from "../../components/Mood.tsx";
 import { PlayerPicture } from "../../components/PlayerPicture.tsx";
+import { wearsFaceMask, withFaceMask } from "../../../common/faceRender.ts";
 import { JerseyNumber } from "../../components/JerseyNumber.tsx";
 import { Height } from "../../components/Height.tsx";
 import { Weight } from "../../components/Weight.tsx";
@@ -333,6 +334,8 @@ const TopStuff = ({
 	// College: tid FREE_AGENT means the transfer portal, no contract to negotiate
 	const freeAgent = player.tid === PLAYER.FREE_AGENT && !collegeLeague;
 	const injured = player.injury.gamesRemaining > 0;
+	// League Extras "Face Aging": a clear mask after a facial injury
+	const faceAgingOn = useFeatureOn("faceAging");
 	const showContract =
 		player.tid !== PLAYER.UNDRAFTED &&
 		player.tid !== PLAYER.UNDRAFTED_FANTASY_TEMP &&
@@ -535,7 +538,14 @@ const TopStuff = ({
 							}}
 						>
 							<PlayerPicture
-								face={player.face}
+								face={
+									player.face &&
+									faceAgingOn &&
+									player.tid !== PLAYER.RETIRED &&
+									wearsFaceMask(player.injury, player.injuries, currentSeason)
+										? withFaceMask(player.face)
+										: player.face
+								}
 								imgURL={player.imgURL}
 								colors={teamColors}
 								jersey={teamJersey}
