@@ -197,7 +197,9 @@ const realisticAgeModifier = (
 		mod += target.bigExtra * helpers.bound((hgt - 55) / 15, 0, 1);
 	}
 	if (age > 40) {
-		mod += baseChangeByAge(40) - baseChangeByAge(age);
+		// Past the table, the decline keeps getting steeper like the stock base change's (-5 at 41-43, -6 after). This used to have the opposite
+		// sign, so 41+ year olds declined 1-2 points a year less than at 40 and a few kept playing well into their mid 40s
+		mod += baseChangeByAge(age) - baseChangeByAge(40);
 	}
 	return mod;
 };
