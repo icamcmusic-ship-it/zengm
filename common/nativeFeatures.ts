@@ -577,6 +577,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "advStats",
+		key: "advStats",
+		name: "Advanced Tracking Stats",
+		description:
+			"The game sim records tracking-style stats as it plays (it never changes a result): play types (pick-and-roll ball handler and roll man, isolation, post-up, spot-up, cut, off screens, handoff, transition, putback) with possessions, points per possession and frequency, defended FG% and rim protection, 2PT and 3PT contests, on/off net rating, five-man lineups, assisted and unassisted makes by zone, catch-and-shoot vs pull-up threes and clutch stats. Shown on Player Stats (Play Types, Shooting Splits, Defense, On/Off, Clutch), the player page and the Lineups page. Off: nothing is recorded or stored.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		college: false,
 		key: "featureSeasonOdds",

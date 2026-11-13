@@ -1,5 +1,6 @@
 import type { Col } from "../ui/components/DataTable/index.tsx";
 import { bySport } from "./sportFunctions.ts";
+import { ADV_STAT_META } from "./advStats.ts";
 import { TRAIT_DEFINITIONS } from "./playerTraits/definitions.ts";
 import { TRAIT_KEYS } from "./playerTraits/types.ts";
 import { TRAIT_SHORT } from "./playerTraits/ui.ts";
@@ -822,6 +823,26 @@ const sportSpecificCols = bySport<{
 		},
 	},
 	basketball: {
+		// Advanced Tracking Stats (common/advStats.ts)
+		...Object.fromEntries(
+			Object.entries(ADV_STAT_META).map(([key, info]) => [
+				`stat:${key}`,
+				{
+					desc: info.desc,
+					sortSequence:
+						key === "dfgp" ||
+						key === "dfgp2" ||
+						key === "dfgp3" ||
+						key === "rimDfgp" ||
+						key === "rimDeter" ||
+						key === "onDrtg"
+							? ["asc", "desc"]
+							: ["desc", "asc"],
+					sortType: "number",
+					title: info.title,
+				} satisfies Partial<Col>,
+			]),
+		),
 		// Player traits, 0-100 (only shown with the Player Traits setting)
 		...Object.fromEntries(
 			TRAIT_KEYS.map((key) => [

@@ -6,6 +6,11 @@ import g from "./g.ts";
 import helpers from "./helpers.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { getNumericStat } from "../../common/statValue.ts";
+import {
+	advStat,
+	sumAdv,
+	type AdvStatKey,
+} from "../../common/advStats.ts";
 
 const DEFAULT_FORMULA = bySport({
 	baseball: "20 * mvp + war",
@@ -32,9 +37,41 @@ const BANNED_STAT_VARIABLES = new Set(
 	}),
 );
 
-const STAT_VARIABLES = [...stats.derived, ...stats.raw].filter(
-	(stat) => !BANNED_STAT_VARIABLES.has(stat),
-);
+// Advanced Tracking Stats (basketball): computed from the summed records of the regular seasons in range. A player without them gets
+// NaN, so a formula that uses one leaves him out
+const ADV_VARIABLES: readonly AdvStatKey[] =
+	__SPORT === "basketball"
+		? [
+				"ptPoss",
+				"ptPrbPpp",
+				"ptIsoPpp",
+				"ptPostPpp",
+				"ptSpotPpp",
+				"ptTrPpp",
+				"ptPrrPpp",
+				"dfgp",
+				"rimDfgp",
+				"con2",
+				"con3",
+				"rimDeter",
+				"onNet",
+				"onOffNet",
+				"cs3p",
+				"pu3p",
+				"clPts",
+				"clFgp",
+				"clPm",
+				"clUsgp",
+			]
+		: [];
+
+const STAT_VARIABLES = [
+	...[...stats.derived, ...stats.raw].filter(
+		(stat) => !BANNED_STAT_VARIABLES.has(stat),
+	),
+	...ADV_VARIABLES,
+];
+const ADV_VARIABLE_SET: ReadonlySet<string> = new Set(ADV_VARIABLES);
 
 // Need to maintain support for old award variables like "mvp" from before PlayerAwardBuiltIn existed
 // key is the old variable name, value is the corresponding shortName in the new award format
@@ -183,6 +220,9 @@ const evaluate = (
 	}
 
 	for (const stat of STAT_VARIABLES) {
+		if (ADV_VARIABLE_SET.has(stat)) {
+			continue;
+		}
 		const peak = `${stat}Peak`;
 		const peakPerGame = `${stat}PeakPerGame`;
 		const tot = stat;
@@ -249,7 +289,19 @@ const evaluate = (
 		}
 	}
 
+	if (ADV_VARIABLES.length > 0) {
+		const adv = sumAdv(statsRows.filter((row) => !row.playoffs));
+		const advPlayoffs = sumAdv(statsRows.filter((row) => row.playoffs));
+		for (const stat of ADV_VARIABLES) {
+			object[stat] = advStat(adv, stat) ?? Number.NaN;
+			object[`${stat}Playoffs`] = advStat(advPlayoffs, stat) ?? Number.NaN;
+		}
+	}
+
 	for (const stat of STAT_VARIABLES) {
+		if (ADV_VARIABLE_SET.has(stat)) {
+			continue;
+		}
 		const perGame = `${stat}PerGame`;
 		const playoffsPerGame = `${stat}PlayoffsPerGame`;
 		const tot = stat;
@@ -368,13 +420,17 @@ const evaluate = (
 	if (object.gp! < minGp) {
 		for (const stat of STAT_VARIABLES) {
 			object[stat] = 0;
-			object[`${stat}PerGame`] = 0;
+			if (!ADV_VARIABLE_SET.has(stat)) {
+				object[`${stat}PerGame`] = 0;
+			}
 		}
 	}
 	if (object.gpPlayoffs! < minGpPlayoffs) {
 		for (const stat of STAT_VARIABLES) {
 			object[`${stat}Playoffs`] = 0;
-			object[`${stat}PlayoffsPerGame`] = 0;
+			if (!ADV_VARIABLE_SET.has(stat)) {
+				object[`${stat}PlayoffsPerGame`] = 0;
+			}
 		}
 	}
 

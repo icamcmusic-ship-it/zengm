@@ -18,6 +18,9 @@ const myGetCol = (stat: string) => {
 	if (stat === "teamWs") {
 		return "Team total WS";
 	}
+	if (stat === "advDef") {
+		return "Advanced Tracking Stats: defended FG% and rim protection vs the league, -1 to 1 (0 without tracking stats)";
+	}
 	if (stat === "won") {
 		return "1 for winning team, 0 for losing team";
 	}

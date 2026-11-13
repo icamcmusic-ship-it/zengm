@@ -158,6 +158,14 @@ const GOATFormula = ({
 							</li>
 						))}
 					</ul>
+					{__SPORT === "basketball" ? (
+						<p>
+							Advanced Tracking Stats variables (like <code>dfgp</code>,{" "}
+							<code>onOffNet</code> and <code>ptIsoPpp</code>) come from the
+							seasons with tracking stats, take only the <code>Playoffs</code>{" "}
+							suffix, and leave out players without tracking stats.
+						</p>
+					) : null}
 					<p>
 						The above variables all are{" "}
 						{type === "career" ? "career" : "season"} totals. If you want

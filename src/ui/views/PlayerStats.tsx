@@ -11,6 +11,8 @@ import { expandFieldingStats } from "../util/expandFieldingStats.baseball.ts";
 import type { DataTableRow } from "../components/DataTable/index.tsx";
 import { PlusMinus } from "../components/PlusMinus.tsx";
 import { useLocal } from "../util/local.ts";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
+import { ADV_STAT_TYPES } from "../../common/advStats.ts";
 
 export const formatStatGameHigh = (
 	ps: any,
@@ -71,6 +73,15 @@ const PlayerStats = ({
 	superCols,
 	team,
 }: View<"playerStats">) => {
+	// Advanced Tracking Stats: its tabs only with the setting on (or when already on one)
+	const advOn = useFeatureOn("advStats");
+	const statTypeOptions = advOn
+		? dropdownOptions.statTypesAdv
+		: dropdownOptions.statTypesAdv.filter(
+				(option) =>
+					!(ADV_STAT_TYPES as readonly (string | number)[]).includes(option.key) ||
+					option.key === statType,
+			);
 	useTitleBar({
 		title: "Player Stats",
 		jumpTo: true,
@@ -94,7 +105,7 @@ const PlayerStats = ({
 				},
 				{
 					key: "statType",
-					options: dropdownOptions.statTypesAdv,
+					options: statTypeOptions,
 					value: statType,
 				},
 				{
@@ -141,6 +152,19 @@ const PlayerStats = ({
 		} else if (statType === "returns") {
 			sortCol = 13;
 		}
+	}
+
+	// Advanced Tracking Stats tabs: sort by their main volume stat
+	const advSortStat = (
+		{
+		playTypes: "ptPoss",
+		shootingSplits: "cs3a",
+		trackingDefense: "dfga",
+		clutch: "clPts",
+		} as Record<string, string | undefined>
+	)[statType];
+	if (advSortStat !== undefined && stats.includes(advSortStat as any)) {
+		sortCol = 5 + (season === "all" ? 1 : 0) + stats.indexOf(advSortStat as any);
 	}
 
 	if (__SPORT === "baseball" && statType === "fielding") {

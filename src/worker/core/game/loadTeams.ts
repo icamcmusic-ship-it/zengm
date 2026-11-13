@@ -306,6 +306,11 @@ export const processTeam = async (
 	const spacingCreation =
 		__SPORT === "basketball" &&
 		nativeFeatureEnabled("spacingCreation", (key) => g.get(key as any));
+	// Advanced Tracking Stats (basketball): a few raw ratings for the play-type classifier, see GameSim.basketball/advTracking.ts
+	const advStats =
+		__SPORT === "basketball" &&
+		!allStarGame &&
+		nativeFeatureEnabled("advStats", (key) => g.get(key as any));
 	// Matchup Defense (basketball): height and speed for size and speed mismatches, see GameSim.basketball/matchupDefense.ts
 	const matchupDefense =
 		__SPORT === "basketball" &&
@@ -551,6 +556,15 @@ export const processTeam = async (
 					// Sub-Ratings in Sim: a defender's side of a drive mismatch is his lateral quickness
 					(p2 as any).simLat = subSimLat(sp);
 				}
+			}
+			if (advStats) {
+				const r = rating as any;
+				(p2 as any).advR = {
+					hgt: r.hgt,
+					drb: r.drb,
+					pss: r.pss,
+					spd: r.spd,
+				};
 			}
 			if (simFixes) {
 				// Game Sim Fixes: strong, durable players get hurt a little less

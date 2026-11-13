@@ -18,6 +18,7 @@ import {
 import { levelToAmount } from "../../../common/budgetLevels.ts";
 import { getStaffPayroll, staffEnabled } from "../staff/index.ts";
 import getWinner from "../../../common/getWinner.ts";
+import { addTeamAdv, type TeamAdv } from "../../../common/advStats.ts";
 import { getAdjustedTicketPrice } from "../../../common/getAdjustedTicketPrice.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 
@@ -389,6 +390,15 @@ const writeTeamStats = async (results: GameResults) => {
 		}
 
 		teamStats.gp += 1;
+
+		// Advanced Tracking Stats: team totals and lineups (only with the setting on)
+		const teamAdv = (results.team[t1] as any).adv as TeamAdv | undefined;
+		if (teamAdv) {
+			const numPlayers = (results as any).numPlayersOnCourt ?? 5;
+			teamStats.adv = teamStats.adv
+				? addTeamAdv(teamStats.adv, teamAdv, numPlayers)
+				: addTeamAdv({ t: [], lu: [] }, teamAdv, numPlayers);
+		}
 
 		if (teamSeason.lastTen.length === 10 && g.get("phase") !== PHASE.PLAYOFFS) {
 			teamSeason.lastTen.pop();

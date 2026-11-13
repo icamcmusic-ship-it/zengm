@@ -1,4 +1,5 @@
 import { helpers } from "./helpers.ts";
+import { advStat, isAdvStat } from "./advStats.ts";
 import type { PlayerStatsToProcess, PlayerStatType } from "./types.ts";
 
 export type StatSumsExtra = Record<
@@ -166,6 +167,10 @@ export const processStats = (
 		} else if (statFunctions2[stat]) {
 			row[stat] = statFunctions2[stat].process(ps, bornYear);
 			scale = statFunctions2[stat].scale;
+		} else if (isAdvStat(stat)) {
+			// Advanced Tracking Stats: season (or summed) totals and rates, never per game
+			row[stat] = advStat(ps.adv, stat);
+			scale = false;
 		} else {
 			row[stat] = ps[stat];
 		}

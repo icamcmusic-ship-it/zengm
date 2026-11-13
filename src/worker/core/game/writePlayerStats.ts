@@ -11,6 +11,7 @@ import getWinner from "../../../common/getWinner.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { randInt } from "../../../common/random.ts";
 import { processPlayerStats } from "../../util/processPlayerStats.ts";
+import { addAdv } from "../../../common/advStats.ts";
 import {
 	frontOfficeEnabled,
 	getInjuryDurationFactor,
@@ -530,6 +531,11 @@ const writePlayerStats = async (
 								}
 								ps[key] += 1;
 							}
+						}
+
+						// Advanced Tracking Stats: the game's tracking stats (only with the setting on)
+						if (p.adv) {
+							ps.adv = ps.adv ? addAdv(ps.adv, p.adv) : [...p.adv];
 						}
 
 						const derivedMaxValues: Record<string, number> | undefined =

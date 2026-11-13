@@ -282,6 +282,11 @@ const statTypeLabels: Record<string, DropdownLabel | undefined> = {
 	per36: makeResponsiveDropdownOption("Per 36", "Per 36 Minutes"),
 	totals: "Totals",
 	shotLocations: "Shot Locations and Feats",
+	playTypes: "Play Types",
+	shootingSplits: "Shooting Splits",
+	trackingDefense: "Tracking Defense",
+	onOff: "On/Off",
+	clutch: "Clutch",
 
 	// Baseball
 	batting: "Batting",

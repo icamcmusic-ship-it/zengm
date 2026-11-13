@@ -37,7 +37,7 @@ import { awardCandidateStats } from "./getAwardCandidates.ts";
 import {
 	allDefensiveFormat,
 	fillAllDefensive,
-	perimeterDefenseFormula,
+	defenseAwardFormula,
 } from "./perimeterDefense.ts";
 
 const ROUGH_MPG_NEEDED_FOR_MIP = bySport({
@@ -269,8 +269,8 @@ export class FormulaEvaluators {
 				type,
 			});
 
-			// Perimeter Defense: the default defense formula scores with another one
-			const perimeterFormula = perimeterDefenseFormula(award);
+			// Perimeter Defense, Advanced Tracking Stats: the default defense formula scores with another one
+			const perimeterFormula = defenseAwardFormula(award);
 			if (perimeterFormula !== undefined) {
 				this.registerFormula({
 					award,
@@ -416,7 +416,7 @@ export const processAwards = async ({
 		for (const award of awards) {
 			const formula =
 				award.formulaByPos?.[p.pos] ??
-				perimeterDefenseFormula(award) ??
+				defenseAwardFormula(award) ??
 				award.formula;
 
 			// Used to skip based on award.formula or some hash of stuff that affects score (formula+statRange+mip) but I think it's not worth the complexity and as more features are added it'll just be a source of bugs. So now just assume shortName can be used to uniquely identify a score.

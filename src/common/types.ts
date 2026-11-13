@@ -1469,6 +1469,9 @@ type PlayerStatsCommon = {
 	season: number;
 	tid: number;
 	yearsWithTeam: number;
+
+	// Advanced Tracking Stats (basketball, common/advStats.ts): compact season totals, only with that setting on
+	adv?: number[];
 };
 
 // Input to processPlayerStats. Not just PlayerStats, it can also be a box score row, player feat, or sums of multiple rows (with extra properties like hasTot), and old rows can be missing stats or have ones that are no longer stored. So it is too varied to type precisely

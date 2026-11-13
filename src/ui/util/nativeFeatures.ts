@@ -84,6 +84,8 @@ export const featureForUrl = (
 			return "collegeSeason";
 		case "archetypes":
 			return "archetypes";
+		case "lineups":
+			return "advStats";
 		case "staff":
 		case "coach":
 		case "coaches":
