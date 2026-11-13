@@ -35,6 +35,8 @@ const OUT = process.env.ARCH_METRICS_OUT ?? "/tmp/claude-0/arch-metrics.txt";
 
 const newG = () => {
 	resetG();
+	// Generated as in a new league (Improved Positions on: the scorer guard type); ARCH_STOCK_GEN=1: BBGM's player types
+	if (!process.env.ARCH_STOCK_GEN) g.setWithoutSavingToDB("improvedPositions", true);
 	if (EXPANDED) g.setWithoutSavingToDB("expandedRatings", true);
 };
 const ratingsOfRow = (row) => {
