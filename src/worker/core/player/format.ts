@@ -43,6 +43,8 @@ import {
 	isExpandedRatingKey,
 } from "../../../common/expandedRatings.ts";
 import { expandedRatingsApply } from "./expandedRatings.ts";
+import { subRatingsOn } from "./subRatings.ts";
+import { isValidSubArray } from "../../../common/subRatings.ts";
 
 type PlayerFormatOptionsRequired = Required<
 	Omit<PlayerFormatOptions, "season" | "seasonRange" | "seasonType" | "tid">
@@ -758,6 +760,16 @@ const processRatings = (
 					}
 				} else {
 					row.tid = tidTemp ?? tidTemp2;
+				}
+			} else if (attr === "sub") {
+				// Sub-ratings (only with the setting on, and only on the rows that keep them), with scouting fuzz like the bases
+				const sub = (pr as any).sub;
+				if (subRatingsOn() && isValidSubArray(sub)) {
+					row.sub = fuzz
+						? sub.map((x: number) => player.fuzzRating(x, pr.fuzz))
+						: [...sub];
+				} else {
+					row.sub = undefined;
 				}
 			} else if (attr === "ovrs" || attr === "pots") {
 				row[attr] = player.fuzzOvrs(pr[attr], pr.fuzz);

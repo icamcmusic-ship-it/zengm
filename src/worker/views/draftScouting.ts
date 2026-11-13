@@ -1,3 +1,5 @@
+import { subRatingsOn } from "../core/player/subRatings.ts";
+import { SUB_BASES, subHighlights } from "../../common/subRatings.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
@@ -37,6 +39,8 @@ const getSeason = async (
 			// Expanded ratings (setting on): wingspan (exact, a measurement) and the two defense ratings (with scouting fuzz)
 			// and the second step ratings (with scouting fuzz)
 			...(expandedRatingsOn() ? EXPANDED_RATINGS : []),
+			// Sub-ratings (setting on): his standout and weakest, from the subs and bases with scouting fuzz
+			...(subRatingsOn() ? (["sub", ...SUB_BASES] as const) : []),
 		],
 		showNoStats: true,
 		showRookies: true,
@@ -100,6 +104,9 @@ const getSeason = async (
 								EXPANDED_RATINGS.map((key) => [key, ratings[key]]),
 							)
 						: undefined,
+				subHighlights: Array.isArray(ratings.sub)
+					? subHighlights(ratings.sub, ratings)
+					: undefined,
 				rank: i + 1,
 			};
 		}),

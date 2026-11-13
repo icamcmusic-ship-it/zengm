@@ -101,6 +101,9 @@ export type PlayerRatings = {
 	csh?: number;
 	dsh?: number;
 	bsc?: number;
+	// Sub-ratings (the subRatings setting, see common/subRatings.ts): one int per sub-rating, in the order of SUB_DEFS. Only on a
+	// player's last few rows (SUB_HISTORY), and missing in leagues that never had the setting on.
+	sub?: number[];
 };
 
 export type RatingKey =

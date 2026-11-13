@@ -1,3 +1,9 @@
+import {
+	SubRatingsToggle,
+	subRatingCells,
+	subRatingCols,
+	useSubRatingsView,
+} from "../components/SubRatingsToggle.tsx";
 import { DataTable } from "../components/DataTable/index.tsx";
 import { MoreLinks } from "../components/MoreLinks.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
@@ -48,6 +54,9 @@ const PlayerRatings = ({
 		userTid,
 	} = useLocal(["challengeNoRatings", "season", "userTid"]);
 
+	// Sub-ratings: an optional view with a column for each (remembered)
+	const subView = useSubRatingsView("playerRatings");
+
 	const ovrsPotsColNames: string[] = [];
 	if (
 		bySport({
@@ -74,6 +83,7 @@ const PlayerRatings = ({
 		"Ovr",
 		"Pot",
 		...ratings.map((rating) => `rating:${rating}`),
+		...(subView.show ? subRatingCols() : []),
 		...ovrsPotsColNames,
 	]);
 
@@ -138,6 +148,7 @@ const PlayerRatings = ({
 				showRatings ? p.ratings.ovr : null,
 				showRatings ? p.ratings.pot : null,
 				...ratings.map((rating) => (showRatings ? p.ratings[rating] : null)),
+				...(subView.show ? subRatingCells(p.ratings.sub, showRatings) : []),
 				...ovrsPotsRatings,
 			],
 			classNames: {
@@ -165,11 +176,13 @@ const PlayerRatings = ({
 				.
 			</p>
 
+			<SubRatingsToggle view={subView} />
+
 			<DataTable
 				cols={cols}
 				defaultSort={[6, "desc"]}
 				defaultStickyCols={window.mobile ? 0 : 1}
-				name="PlayerRatings"
+				name={subView.show ? "PlayerRatingsSub" : "PlayerRatings"}
 				pagination
 				rows={rows}
 			/>

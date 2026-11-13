@@ -1,3 +1,4 @@
+import type { StoredSubInfo } from "./subRatingsGen.ts";
 import type { RumorState } from "./rumors/types.ts";
 import * as z from "zod";
 import type { IsExact } from "conditional-type-checks";
@@ -1629,6 +1630,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	// The injury-riddled class: he comes into the draft off an injury (his college story)
 	draftClassShapeInjury?: boolean;
 
+	// Basketball, the subRatings setting: his sub-ratings seed, hidden growth profile and generation info (see common/subRatingsGen.ts)
+	subP?: StoredSubInfo;
+
 	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
 	archetypes?: StoredArchetype[];
 	real?: boolean;
@@ -1811,6 +1815,8 @@ type PlayerRatingsPlus = Record<PlayerRatingKey, number> & {
 	// Extended skill badges, basketball only (see common/skillBadges)
 	badges: string[];
 	tid: number | undefined;
+	// Sub-ratings, basketball only (the subRatings setting; undefined when off or on a row without them)
+	sub: number[] | undefined;
 
 	// Not in basketball
 	ovrs: Record<PositionBaseball | PositionFootball | PositionHockey, number>;

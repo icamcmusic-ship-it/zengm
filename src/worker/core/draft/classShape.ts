@@ -1,3 +1,4 @@
+import { assignClassSubs } from "../player/subRatings.ts";
 import {
 	DRAFT_CLASS_SHAPES,
 	DRAFT_CLASS_SHAPE_VERSION,
@@ -290,6 +291,8 @@ export const applyPendingShape = async (
 		await player.develop(p, 0, true);
 		await player.updateValues(p);
 	}
+	// Sub-ratings: the class's shapes again, from the reshaped ratings, ages and origins
+	assignClassSubs(pending);
 	for (const p of pending) {
 		p.draftClassShape = shape;
 		p.draftClassShapeV = DRAFT_CLASS_SHAPE_VERSION;

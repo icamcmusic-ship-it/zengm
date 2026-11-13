@@ -267,6 +267,8 @@ import {
 import type { DraftType as DraftTypeWhatIf } from "../../common/types.ts";
 import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
 import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
+import updateSubRatingsForLeague from "../core/player/updateSubRatingsForLeague.ts";
+import { ensureSubs } from "../core/player/subRatings.ts";
 import {
 	ensureExpandedRatings,
 	expandedRatingsOn,
@@ -4589,6 +4591,11 @@ const updateGameAttributes = async (
 		await updateExpandedRatingsForLeague();
 		await idb.cache.flush();
 	}
+	if (__SPORT === "basketball" && gameAttributes.subRatings) {
+		// Sub-ratings turned on: filled in from the current ratings
+		await updateSubRatingsForLeague();
+		await idb.cache.flush();
+	}
 	if (gameAttributes.coachingStaff) {
 		// Turning on the coaching staff from the League Extras tab generates staffs, like League Settings does
 		await staff.ensureStaff();
@@ -4660,6 +4667,9 @@ const updateGameAttributesGodMode = async (
 
 	if (expandedChanged) {
 		await updateExpandedRatingsForLeague();
+	}
+	if (__SPORT === "basketball" && gameAttributes.subRatings) {
+		await updateSubRatingsForLeague();
 	}
 
 	// Turning on the coaching staff in an existing league generates staffs
@@ -5554,6 +5564,12 @@ const upsertCustomizedPlayer = async (
 			delete p.traits;
 		}
 	}
+	// Sub-ratings: the UI never gets his seed and hidden growth profile
+	if (prevPlayer?.subP) {
+		p.subP = helpers.deepCopy(prevPlayer.subP);
+	} else {
+		delete p.subP;
+	}
 	applyCustomizedContract(p, originalTid, contractInput, contractSeasons);
 	updateOwedByTids(p);
 
@@ -5569,6 +5585,11 @@ const upsertCustomizedPlayer = async (
 	if (__SPORT === "basketball" && expandedRatingsOn()) {
 		ensureExpandedRatings(p);
 		syncExpandedToCompat(last(p.ratings));
+	}
+
+	// Sub-ratings: the form keeps each base equal to its subs; a base changed some other way moves its subs (keeping the shape)
+	if (__SPORT === "basketball") {
+		ensureSubs(p as any);
 	}
 
 	// Fix draft and ratings season

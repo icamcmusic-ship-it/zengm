@@ -3,6 +3,7 @@
 // entirely under the "no visible ratings" challenge (but for retired players), trait readings as the Traits page shows them
 // (ranges while unknown, never the hidden scores), the aging curve only once revealed, the scouting report as the user's scouts
 // write it. The raw player never leaves the worker. See common/playerProfileExport.ts for the format.
+import { SUB_DEFS } from "../../common/subRatings.ts";
 import { PHASE_TEXT, PLAYER } from "../../common/constants.ts";
 import { formatPlayerAwardName } from "../../common/awards.ts";
 import { getCols } from "../../common/getCols.ts";
@@ -326,6 +327,12 @@ export const getPlayerProfileExport = async (
 								"badges",
 							]) {
 								row[key] = r[key];
+							}
+							// Sub-ratings (the subRatings setting), by name, on the seasons that kept them
+							if (Array.isArray(r.sub)) {
+								row.sub = Object.fromEntries(
+									SUB_DEFS.map((d, i) => [d.key, r.sub[i]]),
+								);
 							}
 							return row;
 						}),

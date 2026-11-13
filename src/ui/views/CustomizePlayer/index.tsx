@@ -22,6 +22,11 @@ import { helpers } from "../../util/helpers.ts";
 import { showNotification } from "../../util/showNotification.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import RatingsForm from "./RatingsForm.tsx";
+import {
+	applyBaseEditToSubs,
+	applySubEdit,
+	parseSubs,
+} from "../../../common/subRatings.ts";
 import { TraitsForm } from "./TraitsForm.tsx";
 import { RegenerateBuild } from "./RegenerateBuild.tsx";
 import RelativesForm from "./RelativesForm.tsx";
@@ -245,6 +250,16 @@ const copyValidValues = (
 				}
 			} else if (rating === "locked") {
 				targetRatings.locked = sourceRatings.locked;
+			} else if (rating === "sub") {
+				// Sub-ratings: only a complete, valid set
+				const sub = parseSubs((sourceRatings as any).sub);
+				if (
+					sub &&
+					JSON.stringify(sub) !== JSON.stringify((targetRatings as any).sub)
+				) {
+					(targetRatings as any).sub = sub;
+					recomputePosOvrPot = true;
+				}
 			}
 		}
 	}
@@ -595,7 +610,14 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 						}
 					}
 				}
-				p.ratings[p.ratings.length - 1] = row;
+				p.ratings[p.ratings.length - 1] = applyBaseEditToSubs(row, field);
+			} else if (type === "subRating") {
+				// Sub-ratings: the base follows its subs (and the expanded ratings that correspond to them)
+				p.ratings[p.ratings.length - 1] = applySubEdit(
+					p.ratings.at(-1),
+					Number.parseInt(field),
+					val,
+				);
 			} else if (type === "face") {
 				if (["eye", "hair", "mouth", "nose"].includes(field)) {
 					p[type][field].id = val;

@@ -116,6 +116,8 @@ export const getPlayer = async <
 			"badges",
 			"pos",
 			"injuryIndex",
+			// Sub-ratings (basketball, the subRatings setting; undefined otherwise)
+			"sub",
 		],
 		stats: ["season", "tid", "abbrev", "age", "jerseyNumber", ...stats],
 		seasonType: ["regularSeason", "playoffs", "combined"],

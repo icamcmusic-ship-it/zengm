@@ -1,3 +1,4 @@
+import { subRatingsOn } from "../core/player/subRatings.ts";
 import { PLAYER, RATINGS } from "../../common/constants.ts";
 import { idb } from "../db/index.ts";
 import type {
@@ -368,7 +369,14 @@ const getPlayer = async (
 			"contract",
 			"salariesTotal",
 		],
-		ratings: ["season", "pos", "ovr", "pot", ...ratingsKeysForView(RATINGS)],
+		ratings: [
+			"season",
+			"pos",
+			"ovr",
+			"pot",
+			...ratingsKeysForView(RATINGS),
+			...(subRatingsOn() ? (["sub"] as const) : []),
+		],
 		stats: allStats,
 		seasonType: playoffs,
 		showNoStats: true,

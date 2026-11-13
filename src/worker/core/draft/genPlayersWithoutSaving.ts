@@ -11,6 +11,7 @@ import { featureOn } from "../../util/nativeFeatures.ts";
 import { ballSecurityBase } from "../../../common/expandedRatings.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import limitRating from "../player/limitRating.ts";
+import { assignClassSubs } from "../player/subRatings.ts";
 
 // arch13: small guards in the draft. BBGM's prospect generator was tuned to the stock ovr, which flatters small guards;
 // the sim-calibrated ovr (ovrV2, on for new leagues) takes about 2-3 points from them, so far fewer 6'3" and shorter
@@ -269,6 +270,9 @@ const genPlayersWithoutSaving = async (
 		count: players.length,
 	}));
 	console.table(table);*/
+
+	// Sub-ratings: each prospect's shape, now that his age at the draft and his origin are known (with the class caps)
+	assignClassSubs(enteringDraft);
 
 	// A class made from scratch gets a shape later (the Draft Class Shapes setting, see classShape.ts). Not a class that is being topped off (imported) or filled with scrubs
 	if (existingPlayers.length === 0 && !forceScrubs) {

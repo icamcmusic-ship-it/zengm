@@ -17,6 +17,9 @@ import {
 } from "../../common/constants.ts";
 import { hasExpandedRatings } from "../../common/expandedRatings.ts";
 import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
+import updateSubRatingsForLeague, {
+	subRatingsNeedUpdate,
+} from "../core/player/updateSubRatingsForLeague.ts";
 import { env } from "./env.ts";
 import { initUILocalGames } from "./initUILocalGames.ts";
 
@@ -227,6 +230,21 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 				)
 			) {
 				await updateExpandedRatingsForLeague();
+				await idb.cache.flush();
+			}
+		} catch (error) {
+			console.error(error);
+		}
+		if (loadingNewLid !== newLid) {
+			return;
+		}
+	}
+
+	// Sub-ratings: a league opened with the setting on gets them filled in for any player missing them (an older league, or a file)
+	if (__SPORT === "basketball" && g.get("subRatings") === true) {
+		try {
+			if (await subRatingsNeedUpdate()) {
+				await updateSubRatingsForLeague();
 				await idb.cache.flush();
 			}
 		} catch (error) {

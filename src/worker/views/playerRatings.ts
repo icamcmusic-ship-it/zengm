@@ -1,3 +1,4 @@
+import { subRatingsOn } from "../core/player/subRatings.ts";
 import {
 	PHASE,
 	RATINGS,
@@ -306,7 +307,11 @@ export default defineView({
 					inputs.season,
 					inputs.team,
 					[],
-					[...ratings, ...extraRatings],
+					[
+						...ratings,
+						...extraRatings,
+						...(subRatingsOn() ? (["sub"] as const) : []),
+					],
 					[],
 				),
 			);

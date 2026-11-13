@@ -1,3 +1,8 @@
+import {
+	subRatingCells,
+	subRatingCols,
+	useSubRatingsView,
+} from "../../components/SubRatingsToggle.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { SortType, View } from "../../../common/types.ts";
 import { PlayerNameLabels } from "../../components/PlayerNameLabels.tsx";
@@ -247,6 +252,8 @@ const ComparePlayers = ({
 	const [openRatings, setOpenRatings] = useState(true);
 	const [openStats, setOpenStats] = useState(true);
 	const [openAwards, setOpenAwards] = useState(true);
+	// Sub-ratings: an optional section (remembered)
+	const subView = useSubRatingsView("compare");
 
 	const [stickyElement, setStickyElement] = useState<HTMLElement | null>(null);
 	useManualSticky(stickyElement, -128);
@@ -479,6 +486,33 @@ const ComparePlayers = ({
 												/>
 											);
 										})}
+									</>
+								) : null}
+								{subView.available &&
+								players.some((p) => Array.isArray(p.p.ratings.sub)) ? (
+									<>
+										<HeaderRow
+											colSpan={numCols}
+											open={subView.show}
+											setOpen={() => {
+												subView.toggle();
+											}}
+										>
+											{career ? "Peak Sub-Ratings" : "Sub-Ratings"}
+										</HeaderRow>
+										{subView.show
+											? subRatingCols().map((col, j) => (
+													<InfoRow
+														key={col.title}
+														col={col}
+														values={playersToValues(
+															playersAndLegend,
+															(p) => subRatingCells(p.ratings.sub)[j] ?? "",
+														)}
+														sortType="number"
+													/>
+												))
+											: null}
 									</>
 								) : null}
 							</>

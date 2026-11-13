@@ -98,6 +98,7 @@ import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
 import { ensureStaff } from "../staff/index.ts";
 import { ensureGms } from "../gm/index.ts";
 import updateExpandedRatingsForLeague from "../player/updateExpandedRatingsForLeague.ts";
+import updateSubRatingsForLeague from "../player/updateSubRatingsForLeague.ts";
 import { hasExpandedRatings } from "../../../common/expandedRatings.ts";
 
 export type TeamInfo = TeamBasic & {
@@ -2001,6 +2002,11 @@ const afterDBStream = async ({
 			g.get("ovrV2"))
 	) {
 		await updateExpandedRatingsForLeague();
+	}
+
+	// Sub-ratings: players from real rosters or a league file without them get them derived (neutral shapes); generated players have theirs
+	if (__SPORT === "basketball") {
+		await updateSubRatingsForLeague();
 	}
 
 	// Memorials

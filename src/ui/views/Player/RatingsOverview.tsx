@@ -3,7 +3,11 @@ import { posRatings } from "../../../common/posRatings.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { ratingsGradientStyle } from "../../components/RatingsStatsPopover/ratingsGradientStyle.ts";
 import { RatingWithChange } from "../../components/RatingWithChange.tsx";
-import { type ReactNode } from "react";
+import { Fragment, type ReactNode, useState } from "react";
+import { subsOfBase } from "../../../common/subRatings.ts";
+import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
+
+const SUBS_OPEN_KEY = "playerSubRatingsOpen";
 
 export const RatingsOverview = ({
 	ratings,
@@ -32,7 +36,32 @@ export const RatingsOverview = ({
 		typeof currentSeason.pdef === "number";
 	// Second step: catch-and-shoot/off-the-dribble after the jump shooting ratings, ball security after dribbling, and offensive/defensive
 	// rebounding in place of rebounding (their average)
-	const expanded2 = expanded && typeof currentSeason.oreb === "number";
+	// Sub-ratings (the subRatings setting): the base ratings, each expanding to show its sub-ratings. The expanded ratings that the subs
+	// cover (the defense, rebounding and shooting splits, ball security) are shown through the subs.
+	const hasSub = Array.isArray(currentSeason.sub);
+	const expanded2 =
+		expanded && typeof currentSeason.oreb === "number" && !hasSub;
+	const lastSub: number[] | undefined = Array.isArray(lastSeason.sub)
+		? lastSeason.sub
+		: undefined;
+
+	// Which bases are expanded: all of them (the header toggle, remembered) or one at a time (clicking a rating)
+	const [allOpen, setAllOpen] = useState(
+		() => safeLocalStorage.getItem(SUBS_OPEN_KEY) === "1",
+	);
+	const [open, setOpen] = useState<Set<string>>(() => new Set());
+	const isOpen = (rating: string) => allOpen || open.has(rating);
+	const toggle = (rating: string) => {
+		setOpen((prev) => {
+			const next = new Set(prev);
+			if (next.has(rating)) {
+				next.delete(rating);
+			} else {
+				next.add(rating);
+			}
+			return next;
+		});
+	};
 
 	const columns = bySport<
 		Record<
@@ -218,7 +247,7 @@ export const RatingsOverview = ({
 						),
 						rating: "oiq",
 					},
-					...(expanded
+					...(expanded && !hasSub
 						? [
 								{
 									label: (
@@ -241,7 +270,9 @@ export const RatingsOverview = ({
 							]
 						: [
 								{
-									label: (
+									label: hasSub ? (
+										"Defense"
+									) : (
 										<>
 											<span className="d-md-none">Def</span>
 											<span className="d-none d-md-inline">Defensive</span> IQ
@@ -602,6 +633,22 @@ export const RatingsOverview = ({
 					</RatingWithChange>
 				</h2>
 			</div>
+			{hasSub ? (
+				<div className="small mb-1">
+					<button
+						type="button"
+						className="btn btn-link btn-sm p-0"
+						onClick={() => {
+							const next = !allOpen;
+							setAllOpen(next);
+							setOpen(new Set());
+							safeLocalStorage.setItem(SUBS_OPEN_KEY, next ? "1" : "0");
+						}}
+					>
+						{allOpen ? "Hide sub-ratings" : "Show sub-ratings"}
+					</button>
+				</div>
+			) : null}
 			<div className="d-flex justify-content-between">
 				{columns.map((column, i) => (
 					<div key={i} className={i === 0 ? undefined : "ms-2 ms-sm-5"}>
@@ -626,30 +673,93 @@ export const RatingsOverview = ({
 												: undefined;
 											const current = currentSeason[rating];
 											const paddingTop = { paddingTop: 2 };
+											const subs = hasSub ? subsOfBase(rating) : [];
+											const canOpen = subs.length > 0;
+											const opened = canOpen && isOpen(rating);
 											return (
-												<tr key={j}>
-													<td className="px-0 pb-0" style={paddingTop}>
-														<div className="flex-grow-1">
-															<div className="d-flex">
-																<span>{label}:&nbsp;</span>
-																<span className="ms-auto">{current}</span>
+												<Fragment key={j}>
+													<tr>
+														<td className="px-0 pb-0" style={paddingTop}>
+															<div className="flex-grow-1">
+																<div className="d-flex">
+																	{canOpen ? (
+																		<span
+																			className="sub-ratings-toggle"
+																			role="button"
+																			tabIndex={0}
+																			title="Show sub-ratings"
+																			onClick={() => toggle(rating)}
+																			onKeyDown={(event) => {
+																				if (
+																					event.key === "Enter" ||
+																					event.key === " "
+																				) {
+																					event.preventDefault();
+																					toggle(rating);
+																				}
+																			}}
+																		>
+																			{label}
+																			<span className="text-body-secondary">
+																				{opened ? " ▾" : " ▸"}
+																			</span>
+																			:&nbsp;
+																		</span>
+																	) : (
+																		<span>{label}:&nbsp;</span>
+																	)}
+																	<span className="ms-auto">{current}</span>
+																</div>
+																<div
+																	style={{
+																		...highlightStyle,
+																		height: 2,
+																		width: `${current < 50 ? 100 - current : current}%`,
+																		marginTop: -4,
+																	}}
+																/>
 															</div>
-															<div
-																style={{
-																	...highlightStyle,
-																	height: 2,
-																	width: `${current < 50 ? 100 - current : current}%`,
-																	marginTop: -4,
-																}}
+														</td>
+														<td className="px-0 pb-0 ps-1" style={paddingTop}>
+															<RatingWithChange
+																change={current - lastSeason[rating]}
 															/>
-														</div>
-													</td>
-													<td className="px-0 pb-0 ps-1" style={paddingTop}>
-														<RatingWithChange
-															change={current - lastSeason[rating]}
-														/>
-													</td>
-												</tr>
+														</td>
+													</tr>
+													{opened
+														? subs.map(({ i, def }) => {
+																const v = currentSeason.sub[i];
+																return (
+																	<tr key={def.key} className="small">
+																		<td className="px-0 pb-0 ps-1 ps-md-2">
+																			<div
+																				className="d-flex text-body-secondary"
+																				title={def.description}
+																			>
+																				<span>
+																					<span className="d-md-none">
+																						{def.label}
+																					</span>
+																					<span className="d-none d-md-inline">
+																						{def.name}
+																					</span>
+																					:&nbsp;
+																				</span>
+																				<span className="ms-auto">{v}</span>
+																			</div>
+																		</td>
+																		<td className="px-0 pb-0 ps-1">
+																			{lastSub ? (
+																				<RatingWithChange
+																					change={v - lastSub[i]!}
+																				/>
+																			) : null}
+																		</td>
+																	</tr>
+																);
+															})
+														: null}
+												</Fragment>
 											);
 										})}
 									</tbody>

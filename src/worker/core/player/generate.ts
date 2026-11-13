@@ -9,6 +9,7 @@ import type {
 import genWeight from "./genWeight.ts";
 import genMoodTraits from "./genMoodTraits.ts";
 import { generateFace } from "../../util/face.ts";
+import { markGenerated } from "./subRatings.ts";
 
 const generate = (
 	tid: number,
@@ -106,6 +107,11 @@ const generate = (
 		valueFuzz: 0,
 		valueNoPotFuzz: 0,
 	};
+
+	// Sub-ratings: his seed (from what was drawn above, so no random number is drawn); his shape is made at his first development
+	if (__SPORT === "basketball") {
+		markGenerated(p);
+	}
 
 	return p;
 };

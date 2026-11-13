@@ -7,6 +7,7 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { useLocal } from "../../util/local.ts";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
+import { subsOfBase } from "../../../common/subRatings.ts";
 
 const rowsStock = bySport<
 	{
@@ -72,6 +73,20 @@ const rowsExpanded2: {
 	],
 ];
 
+// Sub-ratings (the subRatings setting): the base ratings, each with its sub-ratings under it (editing a sub recomputes its base, editing a
+// base moves its subs), and wingspan with expanded ratings (the other expanded ratings follow the subs)
+const rowsSub = (expanded: boolean): { [key: string]: string[] }[][] => [
+	[
+		{
+			Physical: expanded
+				? ["hgt", "wng", "stre", "spd", "jmp", "endu"]
+				: ["hgt", "stre", "spd", "jmp", "endu"],
+		},
+		{ Shooting: ["ins", "dnk", "ft", "fg", "tp"] },
+		{ Skill: ["oiq", "diq", "drb", "pss", "reb"] },
+	],
+];
+
 const RatingsForm = ({
 	handleChange,
 	pos,
@@ -98,11 +113,19 @@ const RatingsForm = ({
 		expandedOn &&
 		typeof ratingsRow.wng === "number" &&
 		typeof ratingsRow.pdef === "number";
-	const rows = expanded
-		? typeof ratingsRow.oreb === "number"
-			? rowsExpanded2
-			: rowsExpanded
-		: rowsStock;
+	const subOn = useFeatureOn("subRatings");
+	const subs =
+		__SPORT === "basketball" &&
+		subOn &&
+		Array.isArray(ratingsRow.sub) &&
+		ratingsRow.sub.length > 0;
+	const rows = subs
+		? rowsSub(expanded)
+		: expanded
+			? typeof ratingsRow.oreb === "number"
+				? rowsExpanded2
+				: rowsExpanded
+			: rowsStock;
 
 	const [ovr, setOvr] = useState(ratingsRow.ovr);
 
@@ -193,6 +216,49 @@ const RatingsForm = ({
 																	value={fuzzRating(ratingsRow, rating)}
 																	disabled={!godMode}
 																/>
+																{subs && subsOfBase(rating).length > 0 ? (
+																	<div className="d-flex flex-wrap gap-1 mt-1 ms-2">
+																		{subsOfBase(rating).map(({ i, def }) => (
+																			<div key={def.key} style={{ width: 68 }}>
+																				<label
+																					className="form-label small text-body-secondary mb-0"
+																					htmlFor={`customize-player-sub-${def.key}`}
+																					title={def.description}
+																				>
+																					{def.name}
+																				</label>
+																				<input
+																					type="text"
+																					className="form-control form-control-sm"
+																					id={`customize-player-sub-${def.key}`}
+																					onChange={(event) => {
+																						handleChange(
+																							"subRating",
+																							String(i),
+																							event,
+																						);
+																					}}
+																					value={
+																						hideRatings
+																							? ""
+																							: godMode
+																								? ratingsRow.sub[i]
+																								: Math.round(
+																										helpers.bound(
+																											Number(
+																												ratingsRow.sub[i],
+																											) + ratingsRow.fuzz,
+																											0,
+																											100,
+																										),
+																									)
+																					}
+																					disabled={!godMode}
+																				/>
+																			</div>
+																		))}
+																	</div>
+																) : null}
 															</div>
 														);
 													})}
