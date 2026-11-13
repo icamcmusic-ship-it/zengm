@@ -50,6 +50,7 @@ export const HAIR_STYLES: readonly HairStyle[] = [
 		age: "young",
 	},
 	{ id: "fork-high-tight", textures: ALL, rarity: "uncommon" },
+	{ id: "fork-caesar", textures: ALL, rarity: "uncommon", age: "mature" },
 	{ id: "fork-line-up", textures: C, rarity: "common" },
 	{ id: "fork-line-up", textures: SC, rarity: "uncommon" },
 	{ id: "bald", textures: ALL, rarity: "uncommon", age: "mature" },
@@ -68,6 +69,7 @@ export const HAIR_STYLES: readonly HairStyle[] = [
 	{ id: "fork-flat-top", textures: C, rarity: "rare" },
 	{ id: "blowoutFade", textures: C, rarity: "uncommon", age: "young" },
 	{ id: "fork-afro-small", textures: C, rarity: "uncommon" },
+	{ id: "fork-coils-short", textures: C, rarity: "common", age: "young" },
 	{ id: "afro", textures: C, rarity: "uncommon" },
 	{ id: "afro2", textures: C, rarity: "rare" },
 	{ id: "fork-twists", textures: C, rarity: "uncommon", age: "young" },
@@ -120,11 +122,21 @@ export const HAIR_STYLES: readonly HairStyle[] = [
 	{ id: "curlyFade1", textures: CU, rarity: "common" },
 	{ id: "curlyFade2", textures: CU, rarity: "uncommon" },
 	{ id: "fork-afro-small", textures: CU, rarity: "uncommon" },
+	{ id: "fork-curly-mop", textures: CU, rarity: "uncommon", age: "young" },
+	{
+		id: "fork-curly-mop",
+		textures: CU,
+		rarity: "rare",
+		age: "young",
+		hairBg: "fork-curls-long",
+	},
 	// Straight / wavy
 	{ id: "short", textures: S, rarity: "common" },
 	{ id: "short2", textures: S, rarity: "common" },
 	{ id: "short3", textures: SC, rarity: "common" },
 	{ id: "crop", textures: S, rarity: "common" },
+	{ id: "fork-french-crop", textures: SC, rarity: "common" },
+	{ id: "fork-curtains", textures: S, rarity: "uncommon", age: "young" },
 	{ id: "crop-fade", textures: SC, rarity: "common" },
 	{ id: "crop-fade2", textures: SC, rarity: "common" },
 	{ id: "fork-edgar", textures: SC, rarity: "uncommon", age: "young" },
@@ -200,8 +212,10 @@ const FACIAL_COMMON = [
 	"fork-boxed-beard",
 	"fork-lineup-beard",
 	"fork-full-beard",
+	"fork-goatee-stubble",
 ];
 const FACIAL_RARE = [
+	"fork-fu-manchu",
 	"fork-huge-beard",
 	"fork-handlebar",
 	"fork-walrus",
@@ -241,6 +255,8 @@ const FORK_FACIAL = [
 	"fork-mustache",
 	"fork-horseshoe",
 	"fork-chin-patch",
+	"fork-goatee-stubble",
+	"fork-fu-manchu",
 ];
 
 export const facialHairRarity = (id: string): Rarity =>
