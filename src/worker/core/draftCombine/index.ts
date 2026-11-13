@@ -1,6 +1,7 @@
 // Draft Lottery Night & Combine setting (basketball), worker side: the draft combine of a class (held at the start of the draft
 // lottery phase), its news, the AI draft nudge and the lottery night news. The combine itself is a pure function of each prospect
-// (common/draftCombine.ts, its own seeded RNG), so nothing here draws from the game's random numbers and nothing is stored.
+// (common/draftCombine.ts, its own seeded RNG), so nothing here draws from the game's random numbers. When the combine is held, each
+// invited prospect's results are stored on him (p.combine), so regenerating his ratings or the class later doesn't rewrite them.
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import {
 	combineNudges,
@@ -133,7 +134,17 @@ export const getClassCombine = async (
 	);
 	const invited = new Set<number>();
 	const results = new Map<number, DraftCombineResult>();
-	if (held) {
+	// Results stored when the combine was held win; a class without any (held before they were stored) is computed live
+	const stored =
+		held && !holdingNow
+			? players.filter(({ p }) => p.combine?.season === draftYear)
+			: [];
+	if (stored.length > 0) {
+		for (const { p } of stored) {
+			invited.add(p.pid);
+			results.set(p.pid, { pid: p.pid, ...p.combine! });
+		}
+	} else if (held) {
 		for (const [i, { p, r }] of players.entries()) {
 			if (i >= numInvites) {
 				break;
@@ -218,6 +229,22 @@ export const afterNewPhase = async (phase: number, conditions?: Conditions) => {
 	const c = await getClassCombine(season, undefined, true);
 	if (c.results.size === 0) {
 		return;
+	}
+	// Store the results on the invited prospects (and clear stale ones of the uninvited, e.g. from an undone phase)
+	for (const p of c.players) {
+		const res = c.results.get(p.pid);
+		if (res) {
+			const { pid, ...rest } = res;
+			p.combine = {
+				...rest,
+				performance: Math.round(rest.performance * 1000) / 1000,
+			};
+		} else if (p.combine?.season === season) {
+			delete p.combine;
+		} else {
+			continue;
+		}
+		await idb.cache.players.put(p);
 	}
 	const byPid = new Map(c.players.map((p) => [p.pid, p]));
 	const best = (key: CombineKey) => {

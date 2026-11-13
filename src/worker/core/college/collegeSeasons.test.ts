@@ -299,7 +299,11 @@ const runLeague = async ({
 					assert.isUndefined(state.firstFour);
 				}
 				// NIT: half the national field, nobody in both
-				const nitSize = getNitSize(teams.length, tourneySize);
+				const nitSize = getNitSize(
+					teams.length,
+					tourneySize,
+					state.selection!.field.length,
+				);
 				assert.lengthOf(state.nit?.seeds ?? [], nitSize, "NIT field");
 				const field = new Set(state.selection!.field.map((t) => t.tid));
 				for (const tid of state.nit?.seeds ?? []) {
@@ -347,6 +351,39 @@ const runLeague = async ({
 					-1,
 					"NIT champion is not in the national tournament",
 				);
+				// NIT games: their own stats rows (nitStats), not the postseason stats or the team's postseason stats
+				const nitTid = state.nit!.champion!;
+				const nitPlayers = await idb.cache.players.indexGetAll(
+					"playersByTid",
+					nitTid,
+				);
+				assert.isTrue(
+					nitPlayers.some((p) =>
+						(p.nitStats ?? []).some(
+							(row) => row.season === g.get("season") && (row.gp ?? 0) > 0,
+						),
+					),
+					"NIT stats rows",
+				);
+				for (const p of nitPlayers) {
+					assert.isFalse(
+						p.stats.some(
+							(row) => row.season === g.get("season") && row.playoffs,
+						),
+						"no postseason stats from the NIT",
+					);
+				}
+				const teamStats = (await idb.cache.teamStats.getAll()).filter(
+					(row) =>
+						row.tid === nitTid &&
+						row.playoffs &&
+						row.season === g.get("season"),
+				);
+				assert.lengthOf(teamStats, 0, "no postseason team stats from the NIT");
+				const nitGames = (await idb.cache.games.getAll()).filter(
+					(gm) => gm.season === g.get("season") && gm.nit,
+				);
+				assert.isAtLeast(nitGames.length, 1, "NIT box scores tagged");
 			}
 
 			// College awards

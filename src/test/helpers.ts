@@ -69,6 +69,8 @@ export const resetCache = async (
 	data: Partial<Record<Store, Readonly<any[]>>>,
 	{ stubFlush = true }: { stubFlush?: boolean } = {},
 ) => {
+	// (the old cache's automatic flushes, if a league was made before, must stop: they would write into the next league)
+	idb.cache?.stopAutoFlush();
 	idb.cache = new Cache(); // We want these to do nothing while testing, usually
 
 	idb.cache.fill = async () => {};

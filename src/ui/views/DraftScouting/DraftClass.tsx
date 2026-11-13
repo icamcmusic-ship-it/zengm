@@ -41,7 +41,7 @@ export const ScoutCell = ({
 		}
 	};
 	return (
-		<span className="text-nowrap" title={report.notes.join("\n")}>
+		<span className="text-nowrap">
 			<span className={`badge ${badge} fw-normal me-1`}>
 				{report.confidence}
 			</span>
@@ -154,7 +154,7 @@ const DraftClass = ({
 	if (showScouting) {
 		cols.push({
 			title: "Scout report",
-			desc: "Ovr and pot ranges from your scouts, with their confidence. Assign a scout (1 point) or attend a workout (3 points) to narrow them. Hover for notes.",
+			desc: "Ovr and pot ranges from your scouts, with their confidence. Assign a scout (1 point) or attend a workout (3 points) to narrow them. Scouting notes are on each player's page.",
 			sortType: "number",
 		});
 	}

@@ -37,6 +37,9 @@ const MLK_GAMES = 4;
 const NATIONAL_TV_PER_WEEK = 3;
 // Each team's national TV games after the first few count against it, so the same teams are not on every week
 const TV_REPEAT_PENALTY = 0.12;
+// At most this share of a team's games are national TV games (holidays included). Never reached in a 30-team league (at most about
+// 11 of 82); it keeps tiny leagues (2-6 teams) from having almost every game on national TV
+const TV_MAX_SHARE = 0.15;
 
 // How much worse the rest pattern may get to put a game on a holiday (a 3-in-4 costs 10, never 3 days in a row)
 const HOLIDAY_MAX_DELTA = 12;
@@ -453,6 +456,15 @@ const marqueeSchedule = (
 
 	// National TV: the best matchups of each week (not two on one day, and not the same teams every week), on top of the holiday slates
 	const tvCount = new Map<number, number>();
+	const numGamesByTid = new Map<number, number>();
+	for (const i of gameIndexes) {
+		for (const tid of tids[i]!) {
+			numGamesByTid.set(tid, (numGamesByTid.get(tid) ?? 0) + 1);
+		}
+	}
+	const atTvCap = (tid: number) =>
+		(tvCount.get(tid) ?? 0) >=
+		Math.ceil(TV_MAX_SHARE * (numGamesByTid.get(tid) ?? 0));
 	for (const [i] of kinds) {
 		for (const tid of tids[i]!) {
 			tvCount.set(tid, (tvCount.get(tid) ?? 0) + 1);
@@ -484,6 +496,9 @@ const marqueeSchedule = (
 					continue;
 				}
 				const [home, away] = tids[i]!;
+				if (atTvCap(home) || atTvCap(away)) {
+					continue;
+				}
 				const value =
 					scoreOf.get(i)! -
 					TV_REPEAT_PENALTY *

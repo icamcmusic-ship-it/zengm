@@ -17,7 +17,12 @@ import { g } from "../../util/index.ts";
 import { draft } from "../index.ts";
 import genPlayersWithoutSaving from "../draft/genPlayersWithoutSaving.ts";
 import { loadTeamSeasons } from "../draft/testHelpers.ts";
-import { getClassCombine, getDraftCombineNudges } from "./index.ts";
+import {
+	afterNewPhase,
+	getClassCombine,
+	getDraftCombineNudges,
+} from "./index.ts";
+import { PLAYER } from "../../../common/constants.ts";
 
 const realRandom = Math.random;
 afterAll(() => {
@@ -127,6 +132,45 @@ describe("draft combine", () => {
 		g.setWithoutSavingToDB("featureLotteryNight", true);
 		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
 		assert.strictEqual((await getDraftCombineNudges(players!)).size, 0);
+	});
+
+	test("results are stored when the combine is held, so later rating changes don't rewrite them", async () => {
+		const [players] = await genClasses(1);
+		for (const p of players!) {
+			p.tid = PLAYER.UNDRAFTED;
+		}
+		await resetCache({ players: players! });
+		g.setWithoutSavingToDB("featureLotteryNight", true);
+		g.setWithoutSavingToDB("season", 2026);
+		g.setWithoutSavingToDB("phase", PHASE.DRAFT_LOTTERY);
+		const realRandomBefore = Math.random;
+		Math.random = () => {
+			throw new Error("Math.random used");
+		};
+		await afterNewPhase(PHASE.DRAFT_LOTTERY);
+		Math.random = realRandomBefore;
+		const before = await getClassCombine(2026);
+		const stored = (await idb.cache.players.getAll()).filter((p) => p.combine);
+		assert.strictEqual(stored.length, before.results.size);
+
+		// Regenerate everyone's ratings: the held combine stays as it was
+		for (const p of await idb.cache.players.getAll()) {
+			const r = p.ratings.at(-1)! as any;
+			r.jmp = Math.min(100, r.jmp + 40);
+			r.spd = Math.max(0, r.spd - 30);
+			r.pot += p.pid % 2 === 0 ? 25 : -25;
+			await idb.cache.players.put(p);
+		}
+		const after = await getClassCombine(2026);
+		assert.deepEqual(
+			[...after.invited].toSorted((a, b) => a - b),
+			[...before.invited].toSorted((a, b) => a - b),
+		);
+		for (const [pid, res] of before.results) {
+			const res2 = after.results.get(pid)!;
+			assert.deepEqual(res2.measurements, res.measurements);
+			assert.deepEqual(res2.drills, res.drills);
+		}
 	});
 });
 

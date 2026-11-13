@@ -1,3 +1,4 @@
+import { isNitGame } from "../college/postseason.ts";
 import {
 	getPbpStoreScope,
 	shouldStorePbp,
@@ -274,6 +275,9 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	const playoffs = g.get("phase") === PHASE.PLAYOFFS;
 	if (playoffs) {
 		gameStats.playoffs = true;
+		if (isNitGame(results.team[0].id, results.team[1].id)) {
+			gameStats.nit = true;
+		}
 	}
 
 	const allStarGame = results.team[0].id === -1 && results.team[1].id === -2;

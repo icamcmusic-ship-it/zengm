@@ -212,6 +212,11 @@ const EXPANDED_STL_FACTOR = 1.01;
 // the fifth power and piled steals on the best few defenders (4-5 players at 2.0+ a season, leader ~2.5)
 const PERIMETER_STEAL_POWER = 1;
 const PERIMETER_STEAL_DAMPING = 1.5;
+// ... and the top of the tail: a weight above this many times the five players' mean keeps only part of the excess, so an extreme
+// speed/defense guard (spd 99) doesn't get 3.3 steals a game (the real-life maximum is 2.5-3, leaders are usually 2-2.5). Only who
+// gets the steal changes, not how many (sweep19: leaders 2.2-3.3 -> 2.2-2.3 over seeds 1, 2, 6, 18)
+const STEAL_WEIGHT_SOFT_CAP = 1.6;
+const STEAL_WEIGHT_EXCESS = 0.4;
 // Second step (offensive/defensive rebounding, catch-and-shoot/off-the-dribble shooting, ball security): keeps league offensive
 // rebounds, turnovers and jump shooting the same as with the setting off
 const EXPANDED_ORB_FACTOR = 1.004;
@@ -5358,6 +5363,18 @@ class GameSim extends GameSimBase {
 
 			array[i] = value;
 			total += value;
+		}
+
+		if (rating === "stealing" && this.perimeterDefense && total > 0) {
+			const cap = (STEAL_WEIGHT_SOFT_CAP * total) / this.numPlayersOnCourt;
+			total = 0;
+			for (let i = 0; i < this.numPlayersOnCourt; i++) {
+				const value = array[i]!;
+				if (value > cap) {
+					array[i] = cap + STEAL_WEIGHT_EXCESS * (value - cap);
+				}
+				total += array[i]!;
+			}
 		}
 
 		// Set floor (5% of total)

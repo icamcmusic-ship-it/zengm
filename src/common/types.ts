@@ -5,6 +5,7 @@ import type { FaceConfig } from "facesjs";
 import type { ReactNode } from "react";
 import type { RBState } from "./recordsBook.ts";
 import type { MarqueeKind } from "./marquee.ts";
+import type { DraftCombineResult } from "./draftCombine.ts";
 import type { CapExceptionType, TeamCapExceptions } from "./capExceptions.ts";
 import type * as views from "../worker/views/index.ts";
 
@@ -482,6 +483,8 @@ export type Game = {
 	numPlayersOnCourt?: number;
 	quarterLength?: number; // Minutes per period when the game was played (missing for older games)
 	playoffs?: boolean;
+	// College mode: an NIT game (also playoffs, played in the national tournament's days). Its stats are not postseason stats
+	nit?: boolean;
 	overtimes: number;
 	scoringSummary?: unknown;
 	// Basketball: the play-by-play, compact (see src/common/pbpStore.basketball.ts)
@@ -777,6 +780,9 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	// Realistic schedule length: old compact schedule days / days of the current season's schedule (1 for the old
 	// schedule). Daily processes run on that fraction of the days, see worker/core/season/scheduleDayScale.ts
 	scheduleDayScale: number;
+	// Realistic schedule length: the current season's schedule is spread over the calendar (games every other day or so). Usually
+	// the same as scheduleDayScale < 1, but in a 2-3 team league the old schedule already had one game a day, so the scale stays 1
+	scheduleSpread: boolean;
 	heightFactor: number;
 	hideDisabledTeams: boolean;
 	hofFactor: number;
@@ -1603,6 +1609,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	// Scouting Reports setting: compact snapshots of the user's scouts' grades (stock up/down history) and their take at the draft (track record). See common/scoutingReports/history.ts
 	scoutSnaps?: ScoutSnap[];
 	scoutDraft?: ScoutDraftRecord;
+	// Draft Lottery Night & Combine: his results, stored when the combine of his class is held, so later changes to his ratings (or a
+	// regenerated class) don't rewrite them. Only on invited prospects. See worker/core/draftCombine
+	combine?: Omit<DraftCombineResult, "pid">;
 	// The user's own draft board entry for this prospect (draft board planner)
 	draftBoard?: DraftBoardEntry;
 	// Basketball: his team's college season in his draft year (conference tournaments, March Madness), see common/collegeStats/ncaa.ts
@@ -1627,6 +1636,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	rosterOrder: number;
 	srID?: string;
 	stats: PlayerStats[];
+	// College mode: his NIT games, apart from the national tournament's postseason stats (same rows, playoffs true). Not read by
+	// career totals, awards or records
+	nitStats?: PlayerStats[];
 	statsTids: number[];
 	tid: number;
 	transactions?: (

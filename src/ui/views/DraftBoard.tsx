@@ -304,9 +304,6 @@ const DraftBoard = ({
 												report={p.scoutReport}
 												remaining={undefined}
 											/>
-											<div className="text-body-secondary small">
-												{p.scoutReport.notes.slice(0, 2).join(". ")}
-											</div>
 										</td>
 									) : null}
 									<td>

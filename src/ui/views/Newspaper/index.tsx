@@ -286,7 +286,8 @@ const ArticlePhoto = ({ article, env }: { article: Article; env: Env }) => {
 					imgURL={photo.imgURL}
 					colors={photo.colors}
 					jersey={photo.jersey}
-					lazy
+					// (not while printing: a face that never scrolled into view would print as an empty box)
+					lazy={!env.printing}
 				/>
 			</a>
 		</figure>

@@ -350,6 +350,11 @@ const groupScheduleRealistic = (
 		if (cap !== undefined) {
 			numGamesToday = Math.min(numGamesToday, cap);
 		}
+		// The season starts on day 1: in a 2-3 team league less than one game a day is expected, so the rounding could leave the
+		// first days empty
+		if (numRemaining === tids.length && numGamesToday < 1 && cap !== 0) {
+			numGamesToday = 1;
+		}
 
 		order.sort((a, b) => score[b]! - score[a]!);
 

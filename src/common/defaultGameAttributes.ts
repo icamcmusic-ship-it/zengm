@@ -562,6 +562,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	minRetireAge: 26,
 	groupScheduleSeries: false,
 	scheduleDayScale: 1,
+	scheduleSpread: false,
 
 	salaryCapType: "soft",
 

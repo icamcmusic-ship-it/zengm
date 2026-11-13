@@ -1,3 +1,4 @@
+import { isNitGame } from "../college/postseason.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { finances, player } from "../index.ts";
 import { idb } from "../../db/index.ts";
@@ -297,6 +298,8 @@ const writePlayerStats = async (
 
 	for (const result of results) {
 		const allStarGame = result.team[0].id === -1 && result.team[1].id === -2;
+		// College mode: NIT games' stats go to their own rows (p.nitStats), not the postseason stats of the national tournament
+		const nit = playoffs && isNitGame(result.team[0].id, result.team[1].id);
 
 		const winner = getWinner([result.team[0].stat, result.team[1].stat]);
 
@@ -388,14 +391,15 @@ const writePlayerStats = async (
 					throw new Error("Invalid pid");
 				}
 
-				let psLatest = p2.stats.at(-1);
+				const statsRows = nit ? (p2.nitStats ?? []) : p2.stats;
+				let psLatest = statsRows.at(-1);
 
 				// Previously we called addStatsRow when joining a team, but now we do it dynamically
 				const addNewStatsRow =
 					!statsRowIsCurrent(psLatest, t.id, playoffs) && !allStarGame;
 				if (addNewStatsRow) {
-					player.addStatsRow(p2, g.get("season"), playoffs);
-					psLatest = p2.stats.at(-1);
+					player.addStatsRow(p2, g.get("season"), playoffs, nit);
+					psLatest = (nit ? p2.nitStats! : p2.stats).at(-1);
 				}
 
 				// Only need to write stats if player got minutes, except for minAvailable in BBGM

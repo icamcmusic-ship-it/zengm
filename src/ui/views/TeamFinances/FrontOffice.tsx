@@ -62,7 +62,9 @@ export const FrontOfficeDepartments = ({
 		levelInts[dept] = Number.isNaN(x)
 			? info.levels[dept]
 			: helpers.bound(x, 1, MAX_LEVEL);
-		planned += deptAmount(dept, levelInts[dept], salaryCap);
+		if (dept !== "coaching" || !info.coachingOutsideEnvelope) {
+			planned += deptAmount(dept, levelInts[dept], salaryCap);
+		}
 	}
 	const envelope = info.envelope;
 	const over = planned - envelope;
@@ -91,6 +93,9 @@ export const FrontOfficeDepartments = ({
 						money between departments freely; spending over the envelope costs
 						owner mood (money) at the end of the season, on top of the lower
 						profit.
+						{info.coachingOutsideEnvelope
+							? " Your coaching staff's salaries are not part of it."
+							: null}
 					</p>
 					<p>
 						Levels go from 1 to {MAX_LEVEL}. 34 is the league-average spend and
@@ -105,9 +110,9 @@ export const FrontOfficeDepartments = ({
 						Planned: <b>{helpers.formatCurrency(planned / 1000, "M")}</b> of{" "}
 						{helpers.formatCurrency(envelope / 1000, "M")} per season
 					</div>
-					<div className={over > 0 ? "text-danger" : "text-body-secondary"}>
+					<div className={penalty > 0 ? "text-danger" : "text-body-secondary"}>
 						{over > 0
-							? `${helpers.formatCurrency(over / 1000, "M")} over budget`
+							? `${helpers.formatCurrency(over / 1000, "M")} over budget${penalty > 0 ? "" : " (within what the owner allows)"}`
 							: `${helpers.formatCurrency(-over / 1000, "M")} unspent`}
 					</div>
 				</div>
@@ -121,7 +126,7 @@ export const FrontOfficeDepartments = ({
 					style={{ height: 10 }}
 				>
 					<div
-						className={`progress-bar ${over > 0 ? "bg-danger" : "bg-success"}`}
+						className={`progress-bar ${penalty > 0 ? "bg-danger" : over > 0 ? "bg-warning" : "bg-success"}`}
 						style={{
 							width: `${Math.min(100, (100 * planned) / (1.5 * envelope))}%`,
 						}}

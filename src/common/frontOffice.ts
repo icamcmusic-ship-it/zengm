@@ -106,9 +106,18 @@ export const ownerTargetLevel = (popRank: number, numTeams: number) => {
 };
 
 // The owner's front office envelope per season (thousands of dollars): every department at his target level
-export const envelopeAmount = (targetLevel: number, salaryCap: number) =>
+// (withoutCoaching: with the coaching staff on, coaching is its staff's salaries, which the budget doesn't set, so it is outside the
+// envelope and the spending measured against it)
+export const envelopeAmount = (
+	targetLevel: number,
+	salaryCap: number,
+	withoutCoaching = false,
+) =>
 	FRONT_OFFICE_DEPTS.reduce(
-		(sum, dept) => sum + deptAmount(dept, targetLevel, salaryCap),
+		(sum, dept) =>
+			withoutCoaching && dept === "coaching"
+				? sum
+				: sum + deptAmount(dept, targetLevel, salaryCap),
 		0,
 	);
 

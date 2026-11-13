@@ -19,7 +19,10 @@ import { getProcessedGames } from "../util/getProcessedGames.ts";
 import { defineView, keepType, type ViewArgs } from "../util/defineView.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
-import { getDayScale } from "../core/season/scheduleDayScale.ts";
+import {
+	getDayScale,
+	scheduleDaysSpread,
+} from "../core/season/scheduleDayScale.ts";
 import { getBackToBackGids } from "../core/season/getBackToBackGids.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import type { MarqueeKind } from "../../common/marquee.ts";
@@ -525,7 +528,7 @@ const updateUpcoming = async ({
 			elam: g.get("elam"),
 			elamASG: g.get("elamASG"),
 			// Realistic schedule length: show the day of each game and the days off before it
-			showDays: getDayScale() < 1,
+			showDays: scheduleDaysSpread(),
 			tid: inputs.tid,
 			ties: season.hasTies("current"),
 			topPlayers,
