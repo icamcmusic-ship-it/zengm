@@ -4,7 +4,7 @@
 // reference league generated with the Expanded Ratings setting on. Not part of the normal run.
 import { writeFileSync } from "node:fs";
 import { test } from "vitest";
-import { ARCHETYPES, scoreAll } from "./classify.ts";
+import { ARCHETYPES, SCORING_ARCHETYPES, scoreAll } from "./classify.ts";
 import { buildNorms } from "./match.ts";
 import { buildBaseNorms } from "./norms.ts";
 import { positionFor } from "./position.ts";
@@ -24,7 +24,8 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 		for (const p of sample) {
 			p.pos = positionFor(p.ratings, true);
 		}
-		const norms = buildNorms(sample, ARCHETYPES);
+		// (arch15: a table per scoring profile: a build merged in arch15 keeps its profile, classify.ts SCORING_ARCHETYPES)
+		const norms = buildNorms(sample, SCORING_ARCHETYPES);
 		// The bias is evened out over the league plus a draft class or two of raw prospects, as a league holds them
 		const prospects = (
 			await sampleLeague(1200, "norms-prospects", 0, 30, EXPANDED)
@@ -47,7 +48,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 		// position gate and the name floors decide, matters more than evenness, so the bias only trims builds that are far
 		// off. Even shares within each group (guard, wing, forward, big), the group sizes as the ratings give them.
 		const bias: Record<string, number> = {};
-		for (const a of ARCHETYPES) {
+		for (const a of SCORING_ARCHETYPES) {
 			bias[a.id] = 0;
 		}
 		let target: Record<string, number> | undefined;
@@ -94,6 +95,12 @@ test.skipIf(!process.env.RUN_ARCHETYPE_CALIBRATION)(
 						bias[a.id]! + 0.15 * Math.log(target[a.id]! / actual),
 					),
 				);
+			}
+			// (every profile of a build moves with it)
+			for (const sa of SCORING_ARCHETYPES) {
+				if (sa.out && sa.out !== sa.id) {
+					bias[sa.id] = bias[sa.out] ?? 0;
+				}
 			}
 		}
 		norms.bias = Object.fromEntries(

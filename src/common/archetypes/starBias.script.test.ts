@@ -8,10 +8,12 @@
 import { writeFileSync } from "node:fs";
 import { test } from "vitest";
 import { ARCHETYPES, defaultNorms, scoreAll } from "./classify.ts";
-import { realData, realPlayer } from "./real.testutil.ts";
+import { realData, realNorms, realPlayer } from "./real.testutil.ts";
+import { STAR_BIAS } from "./starBias.data.ts";
 
-const STAR_TARGET = 0.018;
-const STAR_SEASON_MAX = 0.03;
+// (arch15: 197 builds, not 341: a little more room per build)
+const STAR_TARGET = 0.03;
+const STAR_SEASON_MAX = 0.035;
 const STAR_BIAS_MIN = -1.5;
 
 test.skipIf(!process.env.RUN_ARCHETYPE_STARBIAS)(
@@ -28,8 +30,10 @@ test.skipIf(!process.env.RUN_ARCHETYPE_STARBIAS)(
 					.slice(0, 150),
 			);
 		}
-		const norms = defaultNorms(false);
-		const bias: Record<string, number> = {};
+		// (arch15: real players' sub-ratings read against each other)
+		const norms = realNorms(defaultNorms(false), false);
+		// (arch15: on top of the trim so far: a merged profile keeps its own entry, its build's applies too, classify.ts)
+		const bias: Record<string, number> = { ...STAR_BIAS };
 		for (let iter = 0; iter < 40; iter++) {
 			const counts: Record<string, number> = {};
 			// (and per season: no build above STAR_SEASON_MAX of any one season's 150)
@@ -59,7 +63,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_STARBIAS)(
 					(bias[a.id] ?? 0) +
 					(share > STAR_TARGET ? 0.4 * Math.log(STAR_TARGET / share) : 0) +
 					(top > STAR_SEASON_MAX ? 0.3 * Math.log(STAR_SEASON_MAX / top) : 0);
-				if (b < 0) {
+				if (b < (bias[a.id] ?? 0)) {
 					bias[a.id] = Math.max(STAR_BIAS_MIN, b);
 				}
 			}

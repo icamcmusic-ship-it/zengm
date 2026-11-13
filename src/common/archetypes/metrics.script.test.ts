@@ -28,7 +28,12 @@ import { GOLD } from "./gold.data.ts";
 import { mergedId } from "./merges.data.ts";
 import { positionFor } from "./position.ts";
 import { promisesOf } from "./score.ts";
-import { realPlayer as realPlayerOf } from "./real.testutil.ts";
+import {
+	realNorms,
+	realPlayer as realPlayerOf,
+	SUBS_ON,
+} from "./real.testutil.ts";
+import { ensureSubs } from "../../worker/core/player/subRatings.ts";
 
 const EXPANDED = Boolean(process.env.ARCH_EXPANDED);
 const NORMS = defaultNorms(EXPANDED);
@@ -40,8 +45,8 @@ const newG = () => {
 	if (!process.env.ARCH_STOCK_GEN)
 		g.setWithoutSavingToDB("improvedPositions", true);
 	if (EXPANDED) g.setWithoutSavingToDB("expandedRatings", true);
-	// ARCH_SUBS=1: with Sub-ratings on (archetypes don't read the subs yet: the metrics should be identical)
-	if (process.env.ARCH_SUBS) g.setWithoutSavingToDB("subRatings", true);
+	// arch15: with Sub-Ratings on (the new-league default) unless ARCH_NO_SUBS=1
+	if (SUBS_ON) g.setWithoutSavingToDB("subRatings", true);
 };
 const ratingsOfRow = (row) => {
 	const r = {};
@@ -52,6 +57,7 @@ const ratingsOfRow = (row) => {
 		r.idef = row.idef;
 		for (const k of EXPANDED_RATINGS2) r[k] = row[k];
 	}
+	if (SUBS_ON && Array.isArray(row.sub)) r.sub = row.sub;
 	return r;
 };
 const seeded = async (seed, f) => {
@@ -73,6 +79,7 @@ const genPlayers = (n, seed, minAge, maxAge, minOvr) =>
 			const k = rng.int(minAge - 19, maxAge - 19);
 			const p = generate(-1, 19, 2025 - k, false, DEFAULT_LEVEL);
 			if (k > 0) await develop(p, k, true);
+			else if (SUBS_ON) ensureSubs(p);
 			const row = p.ratings.at(-1);
 			const o = ovrFn(row);
 			if (o < minOvr) continue;
@@ -83,12 +90,14 @@ const genPlayers = (n, seed, minAge, maxAge, minOvr) =>
 
 const pct = (x, n) => ((100 * x) / Math.max(1, n)).toFixed(1);
 
+const REAL_NORMS = realNorms(NORMS, EXPANDED);
 const read = (p) => ({
 	pos: p.pos ?? positionFor(p.ratings, true),
 	age: p.age,
 	stats: p.stats,
 	prospect: p.prospect,
-	norms: NORMS,
+	// (real players' sub-ratings are read against each other, as a real-players league reads them)
+	norms: p.slug ? REAL_NORMS : NORMS,
 });
 
 const population = (label, players, out) => {
@@ -239,6 +248,9 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 					const r = { ...p.ratings };
 					for (const k of RATING_KEYS)
 						if (k !== "hgt") r[k] = Math.max(0, Math.min(100, r[k] + s));
+					// (the sub-ratings move with their bases)
+					if (r.sub)
+						r.sub = r.sub.map((x) => Math.max(0, Math.min(100, x + s)));
 					const c = classify(r, read(p));
 					n++;
 					if (c.id === p.c.id) same++;
@@ -313,7 +325,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 					const c = classify(p.ratings, r);
 					const sc = scoreAll(
 						p.ratings,
-						NORMS,
+						r.norms,
 						ARCHETYPES,
 						r.pos,
 						undefined,

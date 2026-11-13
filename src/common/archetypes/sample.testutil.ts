@@ -14,6 +14,7 @@ import { traitScores } from "../playerTraits/scores.ts";
 import type { TraitKey } from "../playerTraits/types.ts";
 import { VISIBLE_TRAITS } from "./classify.ts";
 import { EXPANDED_RATINGS2 } from "../expandedRatings.ts";
+import { SUBS_ON } from "./real.testutil.ts";
 
 export type SamplePlayer = {
 	ratings: ArchetypeRatings;
@@ -30,10 +31,16 @@ export const sampleLeague = async (
 	minOvr = 38,
 	// With the Expanded Ratings setting on: players come with wingspan and perimeter/interior defense
 	expanded = false,
+	// arch15: at least this many years of development (veterans)
+	minYears = 0,
 ): Promise<SamplePlayer[]> => {
 	resetG();
 	// As a new league generates players: with Improved Positions on, guards include the scorer type (genRatings.basketball.ts)
 	g.setWithoutSavingToDB("improvedPositions", true);
+	// arch15: with Sub-Ratings on (the new-league default) unless ARCH_NO_SUBS=1
+	if (SUBS_ON) {
+		g.setWithoutSavingToDB("subRatings", true);
+	}
 	if (expanded) {
 		g.setWithoutSavingToDB("expandedRatings", true);
 	}
@@ -44,10 +51,11 @@ export const sampleLeague = async (
 	const random = Math.random;
 	Math.random = () => ratingsRng.random();
 	try {
-		return await sample(n, rng, maxYears, minOvr);
+		return await sample(n, rng, maxYears, minOvr, minYears);
 	} finally {
 		Math.random = random;
 		g.setWithoutSavingToDB("improvedPositions", false);
+		g.setWithoutSavingToDB("subRatings", false);
 		if (expanded) {
 			g.setWithoutSavingToDB("expandedRatings", false);
 		}
@@ -59,10 +67,11 @@ const sample = async (
 	rng: Rng,
 	maxYears: number,
 	minOvr: number,
+	minYears = 0,
 ): Promise<SamplePlayer[]> => {
 	const out: SamplePlayer[] = [];
 	while (out.length < n) {
-		const k = rng.int(0, maxYears);
+		const k = rng.int(minYears, maxYears);
 		const p = generate(-1, 19, 2025 - k, false, DEFAULT_LEVEL);
 		await develop(p as any, k, true);
 		const row = p.ratings.at(-1) as any;
@@ -84,6 +93,9 @@ const sample = async (
 					ratings[key] = row[key];
 				}
 			}
+		}
+		if (SUBS_ON && Array.isArray(row.sub)) {
+			ratings.sub = row.sub;
 		}
 		out.push({ ratings, ovr: o, age: 19 + k, hgtInches: p.hgt });
 	}

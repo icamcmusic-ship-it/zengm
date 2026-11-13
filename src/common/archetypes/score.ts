@@ -1,6 +1,12 @@
 import { DIMS, skillsOf, STYLE_DIMS } from "./composites.ts";
 import { zVector } from "./norms.ts";
 import { STATS_W, type StatReading } from "./stats.ts";
+import {
+	defaultSubNorms,
+	subFeatures,
+	subLeans,
+	type StyleReading,
+} from "./subStyle.ts";
 import { conceptsOf } from "./twoK/concepts.ts";
 import type {
 	Archetype,
@@ -72,6 +78,8 @@ export type Prepared = {
 	pzLevel: number;
 	// He has expanded ratings: perimeter/interior defense are ratings of their own and his length is known
 	expanded: boolean;
+	// arch15: what his sub-ratings and play types say (subStyle.ts; empty without them)
+	style: StyleReading;
 };
 
 // The per-archetype part of needShortfall (hot: every archetype for every player), computed once per archetype object.
@@ -288,6 +296,8 @@ const STANDOUT_FROM = 0.9;
 const STANDOUT_CAP = 1.2;
 const STANDOUT_FADE = 1.2;
 const DEF_IQ_ROOM = 1;
+// arch15: how much a sub-rating lean (z) moves the skill class it belongs to
+export const SUB_CV_K: number = 0.15;
 const SCORE_FINISH_DISCOUNT = 0.3;
 // How far each skill class stands out for him, on the blended reading (his shape, his absolute standing at his position
 // and his stats): the best of its dimensions
@@ -332,6 +342,17 @@ export const classValues = (p: Prepared): Record<string, number> => {
 				)
 			: 0;
 		vals[k] = p.stats && sv > -Infinity ? (1 - sw) * v + sw * sv : v;
+	}
+	// arch15: his sub-ratings say which part of a base rating is his: blocks or interior D vs perimeter D or steals within
+	// his defense, post moves within his inside game, range within his three, handle and shot creation within his dribbling
+	// (subStyle.ts leans, against the league's spread)
+	const sub = p.style.sub;
+	if (sub && SUB_CV_K !== 0) {
+		vals.rimD! += SUB_CV_K * (0.7 * sub.blk + 0.3 * sub.idf);
+		vals.perD! += SUB_CV_K * (0.6 * sub.pdf + 0.4 * sub.stl);
+		vals.post! += SUB_CV_K * sub.pst;
+		vals.shoot! += SUB_CV_K * 0.5 * sub.rng;
+		vals.handle! += SUB_CV_K * 0.5 * (sub.hnd + sub.crt);
 	}
 	// Not skill classes a label is built on, but things a name can promise: his strength, and his defense on either side
 	vals.stre = p.br.stre;
@@ -486,6 +507,8 @@ export type ReadOptions = {
 	age?: number;
 	stats?: StatReading;
 	prospect?: boolean;
+	// arch15: his play types against his position's peers in the league (subStyle.ts ptFeatures), with tracking stats
+	pt?: StyleReading["pt"];
 };
 
 // Each skill is read BLEND_W on his absolute standing among players at his position and the rest on the shape of his own
@@ -582,7 +605,28 @@ export const prepare = (
 		pz: v.pz,
 		pzLevel: v.pzLevel,
 		expanded: v.expanded,
+		style: styleOf(ratingsIn, norms, v.expanded, opts.pt),
 	};
+};
+
+// arch15: his sub-ratings' shape against the league's (norms.sub, else the generated table) and his play types
+const styleOf = (
+	ratings: ArchetypeRatings,
+	norms: Norms,
+	expanded: boolean,
+	pt: StyleReading["pt"],
+): StyleReading => {
+	const out: StyleReading = {};
+	if (ratings.sub) {
+		const leans = subLeans(ratings, norms.sub ?? defaultSubNorms(expanded));
+		if (leans) {
+			out.sub = subFeatures(leans);
+		}
+	}
+	if (pt) {
+		out.pt = pt;
+	}
+	return out;
 };
 
 // ---- What a build's name promises, and naming what stands out about him ----
