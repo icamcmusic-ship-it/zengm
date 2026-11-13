@@ -298,7 +298,7 @@ League menu → _Contract Value_: a value index, bargains and albatrosses, and t
 
 ### Unretirements
 
-- **What:** the old console script `tools/console-scripts/unretire.js`, built in (off by default). Once a season, when free agency starts, with the chosen chance (default 10%), one random retired player who retired at the minimum age or older (default 35) comes back as a free agent with a fresh ratings row for the season, boosted by a random 3-6 ovr (settings) by raising his non-height ratings one point at a time, favouring his strengths. Dead players, and anyone who already came back (including through the script), are skipped. A news event ("… has come out of retirement and is now a free agent") is logged and shown, and the comeback appears on the timeline.
+- **What:** the old console script `tools/console-scripts/unretire.js`, built in (off by default). Once a season, when free agency starts, with the chosen chance (default 10%), one random retired player who retired at the minimum age or older (default 35) comes back as a free agent with a fresh ratings row for the season (for someone who retired at the end of this same season, that season's row is the one boosted, since free agency is still part of it), boosted by a random 3-6 ovr (settings) by raising his non-height ratings one point at a time, favouring his strengths. Dead players, and anyone who already came back (including through the script), are skipped. A news event ("… has come out of retirement and is now a free agent") is logged and shown, and the comeback appears on the timeline.
 - **Code:** `src/worker/core/phase/unretire.ts`, called from `phase/finalize.ts`.
 
 ### Extra frivolities
