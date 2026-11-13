@@ -191,7 +191,8 @@ const realisticAgeModifier = (
 		return formula.ageModifier(age);
 	}
 	const a = helpers.bound(Math.round(age), 19, 40);
-	let mod = target.byAge[a - 19]! - baseChangeByAge(age);
+	let mod =
+		target.byAge[a - 19]! - baseChangeByAge(age) + (VETERAN_EASE[a] ?? 0);
 	if (target.bigExtra !== undefined && age >= 31) {
 		// Big men's athleticism declines a little faster after 30, scaled from a wing's height (55) to a center's (70)
 		mod += target.bigExtra * helpers.bound((hgt - 55) / 15, 0, 1);
@@ -202,6 +203,15 @@ const realisticAgeModifier = (
 		mod += baseChangeByAge(age) - baseChangeByAge(40);
 	}
 	return mod;
+};
+
+// Realistic Aging: a little less decline at 32-37 (added to every rating's target), so useful veterans stay at a role player's level a
+// few seasons longer, like the NBA's 36-39 year olds
+const VETERAN_EASE: Record<number, number> = {
+	35: 0.8,
+	36: 1,
+	37: 1,
+	38: 0.6,
 };
 
 // The age part of calcBaseChange (before noise, traits and coaching)

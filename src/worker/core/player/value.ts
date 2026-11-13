@@ -5,7 +5,7 @@ import valueCombineOvrPot from "./valueCombineOvrPot.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { last } from "../../../common/utils.ts";
 import { getProStats } from "../../../common/preDraft.ts";
-import { ovrV2On } from "./ratingsModelSwitch.ts";
+import { ovrV2On, realisticAgingOn } from "./ratingsModelSwitch.ts";
 
 /**
  * Returns a numeric value for a given player, representing is general worth to a typical team
@@ -27,6 +27,9 @@ import { ovrV2On } from "./ratingsModelSwitch.ts";
  * @return {number} Value of the player, usually between 50 and 100 like overall and potential
  *     ratings.
  */
+// Realistic Aging: ages with no age discount in value (see below)
+const VETERAN_VALUE_AGES = [32, 39];
+
 const value = (
 	p: PlayerWithoutKey,
 	options: {
@@ -165,7 +168,17 @@ const value = (
 	}
 
 	// Otherwise, combine based on age
-	const combined = valueCombineOvrPot(current, potential, age);
+	let combined = valueCombineOvrPot(current, potential, age);
+	if (
+		__SPORT === "basketball" &&
+		age >= VETERAN_VALUE_AGES[0] &&
+		age <= VETERAN_VALUE_AGES[1] &&
+		realisticAgingOn()
+	) {
+		// Realistic Aging: a veteran's value is his current level with no age discount (stock: 8-10% off at 32-39), so AI teams keep and
+		// sign useful veterans like NBA teams do instead of cutting them for younger players of the same level
+		combined = current;
+	}
 
 	return combined < 0 ? Number.MIN_VALUE : combined;
 };
