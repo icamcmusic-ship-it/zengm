@@ -360,6 +360,12 @@ export const fuzzedArchetypeLabel = (
 	}).label;
 };
 
+const classifyMemo = new WeakMap<Norms, Map<string, Classification>>();
+const CLASSIFY_MEMO_MAX = 20000;
+// (JSON turns NaN and Infinity into null: keep them apart in the key)
+const memoReplacer = (_key: string, v: unknown) =>
+	typeof v === "number" && !Number.isFinite(v) ? `#${v}` : v;
+
 export const classifyPlayer = (
 	p: Player,
 	norms: Norms,
@@ -374,8 +380,7 @@ export const classifyPlayer = (
 		typeof row.season === "number" ? (row.season as number) : g.get("season");
 	const pos: Pos = isPos(row.pos) ? row.pos : "F";
 	// His position as the game shows it decides which builds he may have
-	return classify(ratings, {
-		norms,
+	const opts = {
 		ovr: row.ovr,
 		previousId,
 		pos: isPos(row.pos) ? row.pos : undefined,
@@ -384,7 +389,25 @@ export const classifyPlayer = (
 				? archetypeTraits(p, row.season)
 				: undefined,
 		...readOptionsFor(p, pos, season),
-	});
+	};
+	// classify is pure: the same reading against the same norms gives the same label. Scouting reports and views read
+	// prospects (never stored) many times a season, so memoize by everything that goes in (perf2)
+	let memo = classifyMemo.get(norms);
+	if (!memo) {
+		memo = new Map();
+		classifyMemo.set(norms, memo);
+	}
+	const key = JSON.stringify([ratings, opts], memoReplacer);
+	const cached = memo.get(key);
+	if (cached) {
+		return cached;
+	}
+	const c = classify(ratings, { norms, ...opts });
+	if (memo.size >= CLASSIFY_MEMO_MAX) {
+		memo.clear();
+	}
+	memo.set(key, c);
+	return c;
 };
 
 // Write this season's entry (replacing one for the same season). Returns true if the primary archetype changed.

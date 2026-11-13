@@ -280,6 +280,30 @@ const styleFamilyFeatures = (p: Prepared): number[] => {
 	];
 };
 
+// perf2: what scoreTerms reads of a build that does not depend on the player (its public build, family, which trait
+// groups its name matches and which class features it promises), worked out once per build
+type BuildStatic = {
+	pub: Archetype;
+	fam: Family;
+	groupMatch: boolean[];
+	clsIdx: number[];
+};
+const staticCache = new WeakMap<Archetype, BuildStatic>();
+const staticOf = (a: Archetype): BuildStatic => {
+	let st = staticCache.get(a);
+	if (!st) {
+		const all = promisesOf(a).all;
+		st = {
+			pub: publicOf(a),
+			fam: familyOf(a),
+			groupMatch: TRAIT_GROUPS.map((g) => g.re.test(a.name)),
+			clsIdx: CLASS_FEATS.flatMap((k, i) => (all.includes(k) ? [i] : [])),
+		};
+		staticCache.set(a, st);
+	}
+	return st;
+};
+
 // Every build's terms for one player (the fit reads these; scoreAll weighs them)
 export const scoreTerms = (
 	ratings: ArchetypeRatings,
@@ -301,13 +325,14 @@ export const scoreTerms = (
 	const calBias = norms.bias ?? defaultNorms(p.expanded).bias;
 	const rows: BuildTerms[] = [];
 	for (const a of scoringFor(archetypes)) {
-		const pub = publicOf(a);
+		const st = staticOf(a);
+		const pub = st.pub;
 		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
 		const prior = archetypePrior(a, pos);
 		const trait = traitTerm(a, traits);
-		const f = TERMS.map(() => 0);
-		const cls = CLASS_FEATS.map(() => 0);
-		const fam = familyOf(a);
+		const f: number[] = new Array(TERMS.length).fill(0);
+		const cls: number[] = new Array(CLASS_FEATS.length).fill(0);
+		const fam = st.fam;
 		if (
 			prior === null ||
 			trait === undefined ||
@@ -328,9 +353,9 @@ export const scoreTerms = (
 			continue;
 		}
 		const base = prior + trait - CATCH_ALL_K * catchAllShortfall(a, p, cv);
-		for (const [gi, g] of TRAIT_GROUPS.entries()) {
-			if (groupVals[gi] !== 0 && g.re.test(a.name)) {
-				f[TERM_INDEX[g.term as Term]] = groupVals[gi]!;
+		for (let gi = 0; gi < TRAIT_GROUPS.length; gi++) {
+			if (groupVals[gi] !== 0 && st.groupMatch[gi]) {
+				f[TERM_INDEX[TRAIT_GROUPS[gi]!.term as Term]] = groupVals[gi]!;
 			}
 		}
 		const bias = calBias?.[a.id] ?? 0;
@@ -397,11 +422,8 @@ export const scoreTerms = (
 		f[TERM_INDEX.promRel] = -needPenaltyOf(prom.rel);
 		f[TERM_INDEX.sub] = subTerm(a, p.style);
 		f[TERM_INDEX.playType] = ptTerm(a, p.style);
-		const all = promisesOf(a).all;
-		for (const [i, k] of CLASS_FEATS.entries()) {
-			if (all.includes(k)) {
-				cls[i] = cv[k] ?? 0;
-			}
+		for (const i of st.clsIdx) {
+			cls[i] = cv[CLASS_FEATS[i]!] ?? 0;
 		}
 		rows.push({ a, pub, raw, short, blocked: false, base, f, cls, fam });
 	}
