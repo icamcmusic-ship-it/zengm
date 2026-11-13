@@ -254,6 +254,7 @@ describe("coaching staff", () => {
 		assert.strictEqual(t.staffDevCarry?.season, g.get("season") - 1);
 
 		// Swap in the best development coach available: the level moves toward his, but only partway
+		const before = await getStaffLevel(tid);
 		const raw = (await getTeamStaff(tid)).dev;
 		if (raw) {
 			await userFire({ cid: raw.cid, tid });
@@ -274,7 +275,10 @@ describe("coaching staff", () => {
 			t.staffDevCarry = saved;
 			return level;
 		})();
-		assert.isAtLeast(full, carried);
+		// The carried level is between the old staff's and the full jump (which can be down: the best free agent is not always better
+		// than the coach he replaces; levels are rounded)
+		assert.isAtLeast(carried, Math.min(before, full) - 1);
+		assert.isAtMost(carried, Math.max(before, full) + 1);
 	});
 
 	test("a coach hired during the season gets only the games he coached", async () => {
