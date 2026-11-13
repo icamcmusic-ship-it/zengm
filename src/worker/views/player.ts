@@ -148,6 +148,49 @@ export const getPlayer = async <
 			})) as any;
 		}
 	}
+	// College mode: NIT games, kept apart from the national tournament's postseason stats
+	let nitStats: {
+		season: number;
+		abbrev: string;
+		tid: number;
+		gp: number;
+		min: number;
+		pts: number;
+		trb: number;
+		ast: number;
+		stl: number;
+		blk: number;
+		fgp: number;
+		tpp: number;
+		ftp: number;
+	}[] = [];
+	if (isCollege() && (pRaw.nitStats?.length ?? 0) > 0) {
+		const nit = await player.format(
+			{ ...pRaw, stats: pRaw.nitStats! },
+			{
+				stats: [
+					"season",
+					"tid",
+					"abbrev",
+					"gp",
+					"min",
+					"pts",
+					"trb",
+					"ast",
+					"stl",
+					"blk",
+					"fgp",
+					"tpp",
+					"ftp",
+				],
+				seasonType: "playoffs",
+				mergeStats: "none",
+			},
+		);
+		nitStats = ((nit?.stats ?? []) as typeof nitStats).filter(
+			(row) => (row.gp ?? 0) > 0,
+		);
+	}
 	const earlierHonors = getPreDraftAwards(pRaw).map((award) => ({
 		season: award.season,
 		type: award.type!,
@@ -167,6 +210,7 @@ export const getPlayer = async <
 
 		preDraftStats: preDraftStats.filter((row) => (row.gp ?? 0) > 0),
 		earlierHonors,
+		nitStats,
 
 		// His team's college season in his draft year (conference tournaments, March Madness)
 		collegeSeason: featureOn("collegeSeason")

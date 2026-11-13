@@ -75,5 +75,10 @@ describe("college mode teams and schedule", () => {
 		assert.strictEqual(getNitSize(100, 8), 8);
 		assert.strictEqual(getNitSize(100, 4), 4);
 		assert.strictEqual(getNitSize(30, 16), 0);
+		// At least NIT size + 8 teams left out of the national field (68 teams with the First Four)
+		assert.strictEqual(getNitSize(104, 64), 32);
+		assert.strictEqual(getNitSize(103, 64), 0);
+		assert.strictEqual(getNitSize(108, 64, 68), 32);
+		assert.strictEqual(getNitSize(107, 64, 68), 0);
 	});
 });

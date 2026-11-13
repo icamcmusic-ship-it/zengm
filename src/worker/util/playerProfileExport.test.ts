@@ -159,6 +159,29 @@ describe("Export profile", () => {
 		assert.isUndefined((profile.sections.traits!.data as any).agingCurve);
 	});
 
+	test("awards from the award settings (a name, no type) are named, not undefined", async () => {
+		const p = (await idb.cache.players.get(pids.active))!;
+		const before = p.awards;
+		p.awards = [
+			...p.awards,
+			{
+				season: g.get("season"),
+				name: "Most Valuable Player",
+				shortName: "MVP",
+				rank: 1,
+			} as any,
+		];
+		await idb.cache.players.put(p);
+		const profile = await exportOf(pids.active);
+		p.awards = before;
+		await idb.cache.players.put(p);
+		const awards = (profile.sections.awards!.data as any).awards as {
+			type: string;
+		}[];
+		assert.isTrue(awards.some((a) => a.type === "Most Valuable Player"));
+		assert.isFalse(awards.some((a) => a.type.includes("undefined")));
+	});
+
 	test("prospect: scouted ratings, unknown traits without scores, no game log or contract", async () => {
 		const profile = await exportOf(pids.prospect);
 		assert.strictEqual(profile.player.status, "prospect");

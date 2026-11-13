@@ -230,7 +230,11 @@ export const averageTeamStats = (
 		}
 	}
 	for (const attr of seasonAttrs) {
-		if (attr === "abbrev") {
+		// Only numbers are averaged (not abbrev, region, name, imgURLSmall, ...)
+		if (
+			attr === "abbrev" ||
+			teams.some((t) => typeof (t.seasonAttrs as any)[attr] !== "number")
+		) {
 			continue;
 		}
 		let sum = 0;

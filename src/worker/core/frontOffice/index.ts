@@ -281,9 +281,13 @@ export const getTargetLevel = async (tid: number) => {
 };
 
 // What a season's department spending was (thousands of dollars), from the recorded expenses
+// With the coaching staff on, coaching is its salaries (not a budget level), outside the owner's envelope
+const coachingOutsideEnvelope = () =>
+	__SPORT === "basketball" && !!g.get("coachingStaff");
+
 export const getSeasonSpend = (teamSeason: TeamSeasonWithoutKey) =>
 	teamSeason.expenses.scouting +
-	teamSeason.expenses.coaching +
+	(coachingOutsideEnvelope() ? 0 : teamSeason.expenses.coaching) +
 	teamSeason.expenses.health +
 	teamSeason.expenses.facilities +
 	(teamSeason.frontOffice?.expenses.analytics ?? 0) +
@@ -293,7 +297,11 @@ export const getSeasonSpend = (teamSeason: TeamSeasonWithoutKey) =>
 export const getSeasonEnvelope = async (teamSeason: TeamSeasonWithoutKey) => {
 	const target = await getTargetLevel(teamSeason.tid);
 	const gp = Math.min(helpers.getTeamSeasonGp(teamSeason), g.get("numGames"));
-	return (envelopeAmount(target, g.get("salaryCap")) * gp) / g.get("numGames");
+	return (
+		(envelopeAmount(target, g.get("salaryCap"), coachingOutsideEnvelope()) *
+			gp) /
+		g.get("numGames")
+	);
 };
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -444,7 +452,12 @@ export const getFinancesInfo = async (tid: number) => {
 		leagueAvg,
 		lastThree,
 		targetLevel: target,
-		envelope: envelopeAmount(target, g.get("salaryCap")),
+		envelope: envelopeAmount(
+			target,
+			g.get("salaryCap"),
+			coachingOutsideEnvelope(),
+		),
+		coachingOutsideEnvelope: coachingOutsideEnvelope(),
 		seasonSpend: teamSeason ? getSeasonSpend(teamSeason) : 0,
 		seasonEnvelope: teamSeason ? await getSeasonEnvelope(teamSeason) : 0,
 		review: await getReview(tid),

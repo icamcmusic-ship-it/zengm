@@ -166,6 +166,11 @@ const newPhaseRegularSeason = async (
 		if (g.get("scheduleDayScale") !== dayScale) {
 			await league.setGameAttributes({ scheduleDayScale: dayScale });
 		}
+		// Spread over the calendar (realistic schedule length), also in 2-3 team leagues where the scale stays 1
+		const spread = days !== undefined;
+		if (g.get("scheduleSpread") !== spread) {
+			await league.setGameAttributes({ scheduleSpread: spread });
+		}
 	}
 
 	// Coaching systems: each head coach's preseason expectation, for the hot seat

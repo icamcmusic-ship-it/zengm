@@ -7,6 +7,7 @@ import { getCommon } from "./player.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { getCollegeSeason } from "../core/draft/collegeSeason.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
+import { getScoutReport } from "../core/draft/scouting.ts";
 import {
 	getPlayerCombine,
 	lotteryNightOn,
@@ -693,6 +694,15 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		comps,
 		story,
 		scoutingReport,
+		// Scouting System setting: your scouts' ranges and notes on a prospect (only here and on his other pages, not on the Draft
+		// Board or Draft Scouting)
+		scoutNotes:
+			prospect &&
+			featureOn("scoutingSystem") &&
+			!g.get("challengeNoRatings") &&
+			pRaw.ratings.length > 0
+				? getScoutReport(pRaw)
+				: undefined,
 	};
 };
 
@@ -905,7 +915,16 @@ const getComps = async (pRaw: Player, rDraft: PlayerRatings, fuzz: number) => {
 				  }
 				| undefined,
 			allStar: countAwards("All-Star"),
-			mvp: countAwards("Most Valuable Player"),
+			// (an MVP from the award settings has a name and actAs, no type)
+			mvp:
+				countAwards("Most Valuable Player") +
+				p.awards.filter(
+					(a) =>
+						a.type === undefined &&
+						a.numTeams === undefined &&
+						a.rank === 1 &&
+						(a.actAs === "mvp" || a.name === "Most Valuable Player"),
+				).length,
 			retired: p.tid === PLAYER.RETIRED,
 		});
 	}

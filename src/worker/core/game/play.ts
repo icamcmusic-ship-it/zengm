@@ -59,7 +59,7 @@ import { last } from "../../../common/utils.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import { advStats } from "../../util/advStats.ts";
 import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
-import { getDayScale, getDayTicks } from "../season/scheduleDayScale.ts";
+import { getDayTicks, scheduleDaysSpread } from "../season/scheduleDayScale.ts";
 
 const FLUSH_COALESCE_MS = 5000;
 
@@ -184,7 +184,7 @@ const play = async (
 		const scheduleLoad =
 			__SPORT === "basketball" &&
 			nativeFeatureEnabled("scheduleLoad", (key) => g.get(key as any));
-		if (isInjuryDepthEnabled() || getDayScale() < 1 || scheduleLoad) {
+		if (isInjuryDepthEnabled() || scheduleDaysSpread() || scheduleLoad) {
 			for (const result of results) {
 				if (typeof result.day !== "number") {
 					continue;

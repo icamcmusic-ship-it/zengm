@@ -24,6 +24,7 @@ import type {
 	GameResults,
 	PlayoffSeries,
 } from "../../../common/types.ts";
+import { PHASE } from "../../../common/constants.ts";
 import { idb } from "../../db/index.ts";
 import { recruitingWeek } from "./recruiting.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
@@ -670,11 +671,16 @@ export const genNationalTournament = async (conditions: Conditions) => {
 export const nitOn = () =>
 	nativeFeatureEnabled("collegeNit", (key) => g.get(key as any));
 
-// Size of the NIT next to a national tournament of this size: half of it, as long as there are enough teams left
-export const getNitSize = (numTeams: number, nationalSize: number) => {
+// Size of the NIT next to a national tournament of this size: half of it, as long as at least NIT size + 8 teams are left out of the
+// national field (fieldSize: the teams selected, 68 with the First Four)
+export const getNitSize = (
+	numTeams: number,
+	nationalSize: number,
+	fieldSize = nationalSize,
+) => {
 	// Never more rounds than the national tournament, whose rounds it is played with (a smaller national field set in the settings)
 	const size = Math.min(nationalSize >= 64 ? 32 : 16, nationalSize);
-	return numTeams - nationalSize - 4 >= size + 8 ? size : 0;
+	return numTeams - fieldSize >= size + 8 ? size : 0;
 };
 
 /**
@@ -690,7 +696,7 @@ export const makeNit = (
 		return undefined;
 	}
 	const nationalSize = 2 ** g.get("numGamesPlayoffSeries", "current").length;
-	const size = getNitSize(teams.length, nationalSize);
+	const size = getNitSize(teams.length, nationalSize, selection.field.length);
 	if (size < 4) {
 		return undefined;
 	}
@@ -730,6 +736,26 @@ export const makeNit = (
 		rounds.push(Array.from({ length: size / 2 ** (rnd + 1) }, () => byeSlot()));
 	}
 	return { cid: -1, seeds, rounds, autoBids: [...autoTids] };
+};
+
+/**
+ * Whether a game being played now is an NIT game (its stats are kept apart from the national tournament's postseason stats)
+ */
+export const isNitGame = (tid0: number, tid1: number) => {
+	if (g.get("phase") !== PHASE.PLAYOFFS) {
+		return false;
+	}
+	const nit = getCollegeState()?.nit;
+	if (!nit) {
+		return false;
+	}
+	return nit.rounds.some((round) =>
+		round.some(
+			(m) =>
+				(m.home === tid0 && m.away === tid1) ||
+				(m.home === tid1 && m.away === tid0),
+		),
+	);
 };
 
 /**

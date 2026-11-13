@@ -18,9 +18,12 @@ const addStatsRow = (
 	p: PlayerWithoutKey,
 	season: number,
 	playoffs: boolean,
+	// College mode: an NIT game's row goes to p.nitStats instead (see college/postseason.ts isNitGame)
+	nit = false,
 ) => {
+	const rows = nit ? (p.nitStats ??= []) : p.stats;
 	// Never add duplicate row, such as player beign signed as FA by team who released him
-	const ps = p.stats.at(-1);
+	const ps = rows.at(-1);
 	const hasStats = statsRowIsCurrent(ps, p.tid, playoffs);
 	if (hasStats) {
 		return;
@@ -60,7 +63,7 @@ const addStatsRow = (
 	p.statsTids = Array.from(new Set(p.statsTids));
 
 	// Calculate yearsWithTeam
-	const prevStats = p.stats.findLast((row) => !row.playoffs);
+	const prevStats = rows.findLast((row) => !row.playoffs);
 	if (prevStats && prevStats.season === season - 1 && prevStats.tid === p.tid) {
 		statsRow.yearsWithTeam = prevStats.yearsWithTeam + 1;
 	}
@@ -68,7 +71,7 @@ const addStatsRow = (
 	// This ignores conflicts and assumes p.jerseyNumber is already defined. If that's a problem, call genJerseyNumber before calling addStatsRow
 	statsRow.jerseyNumber = helpers.getJerseyNumber(p);
 
-	p.stats.push(statsRow);
+	rows.push(statsRow);
 };
 
 export default addStatsRow;

@@ -4,6 +4,7 @@
 // (ranges while unknown, never the hidden scores), the aging curve only once revealed, the scouting report as the user's scouts
 // write it. The raw player never leaves the worker. See common/playerProfileExport.ts for the format.
 import { PHASE_TEXT, PLAYER } from "../../common/constants.ts";
+import { formatPlayerAwardName } from "../../common/awards.ts";
 import { getCols } from "../../common/getCols.ts";
 import { COMBINE_ROWS } from "../../common/combineRows.ts";
 import { classYearName } from "../../common/college/constants.ts";
@@ -645,7 +646,10 @@ export const getPlayerProfileExport = async (
 	if (want.has("awards")) {
 		const awards = (p.awards ?? []).map((a: any) => ({
 			season: a.season,
-			type: `${a.groupPrefix ? `${a.groupPrefix} ` : ""}${a.type}`,
+			// (awards from the awards settings have a name, no type: "All-League Team", "Rookie of the Year" in real players leagues)
+			type: formatPlayerAwardName(a, {
+				groupPrefix: a.type === undefined ? a.groupPrefix : undefined,
+			}),
 		}));
 		const honors = p.earlierHonors ?? [];
 		const jerseys = (overview.jerseyNumberInfos ?? []).map((j: any) => ({

@@ -23,7 +23,7 @@ import {
 	isBackToBack,
 	isInjuryDepthEnabled,
 } from "../player/injuryDepth.ts";
-import { getDayScale } from "../season/scheduleDayScale.ts";
+import { scheduleDaysSpread } from "../season/scheduleDayScale.ts";
 import { isThreeInFour, LOAD } from "../GameSim.basketball/scheduleLoad.ts";
 import {
 	compositeWeightsFor,
@@ -569,7 +569,7 @@ export const processTeam = async (
 			t.region = (teamInput as { region?: string }).region;
 			// (only with the realistic schedule length: in the old compact schedule, and in college mode, teams play nearly every day, so
 			// almost every game would be one)
-			const realisticDays = getDayScale() < 1;
+			const realisticDays = scheduleDaysSpread();
 			threeInFour =
 				realisticDays &&
 				!playoffs &&

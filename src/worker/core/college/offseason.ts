@@ -625,6 +625,8 @@ export const enroll = async (p: CollegePlayer, tid: number) => {
 		committed: tid,
 		season: g.get("season"),
 	};
+	// His verbal commitment is over: he signed (with that school, or elsewhere when it had no spot left)
+	delete p.recruit.commit;
 	player.setJerseyNumber(p, await player.genJerseyNumber(p));
 };
 

@@ -13,7 +13,9 @@ import {
 	getCompactNumDays,
 	getNumTicks,
 	getScheduleDayScale,
+	scheduleDaysSpread,
 } from "./scheduleDayScale.ts";
+import { PHASE } from "../../../common/constants.ts";
 
 const options = { timeout: 60_000 } as const;
 
@@ -339,6 +341,35 @@ describe("daily processes with realistic schedule length", () => {
 	test("old schedule: every day", () => {
 		assert.strictEqual(getNumTicks(50, 1), 1);
 		assert.strictEqual(getNumTicks(0, 1), 1);
+	});
+
+	test("spread schedule: also in a 2-team league, where the scale stays 1", () => {
+		resetG();
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		g.setWithoutSavingToDB("scheduleDayScale", 1);
+		g.setWithoutSavingToDB("scheduleSpread", false);
+		assert.isFalse(scheduleDaysSpread());
+		g.setWithoutSavingToDB("scheduleSpread", true);
+		assert.isTrue(scheduleDaysSpread());
+		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		assert.isFalse(scheduleDaysSpread());
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		g.setWithoutSavingToDB("scheduleSpread", false);
+		g.setWithoutSavingToDB("scheduleDayScale", 0.5);
+		assert.isTrue(scheduleDaysSpread());
+
+		// newScheduleWithDays gives days (so the spread flag) for a 2-team league, with a scale of 1
+		resetG();
+		g.setWithoutSavingToDB("realisticSchedule", true);
+		g.setWithoutSavingToDB("numGamesDiv", null);
+		g.setWithoutSavingToDB("numGamesConf", null);
+		const teams = getTeams(2);
+		g.setWithoutSavingToDB("numTeams", 2);
+		g.setWithoutSavingToDB("numActiveTeams", 2);
+		Math.random = makeSeededRandom(3);
+		const out = newScheduleWithDays(teams);
+		assert.ok(out.days);
+		assert.strictEqual(out.dayScale, 1);
 	});
 
 	test("compact number of days", () => {

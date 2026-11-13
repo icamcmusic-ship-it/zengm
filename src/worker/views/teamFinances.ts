@@ -159,7 +159,9 @@ export default defineView({
 			};
 
 			const barData = teamSeasons.slice(0, showInt).map((teamSeason) => {
-				const att = teamSeason.att / teamSeason.gpHome;
+				// (0 before the first home game, not 0 / 0)
+				const att =
+					teamSeason.gpHome > 0 ? teamSeason.att / teamSeason.gpHome : 0;
 
 				const numPlayoffRounds = g.get(
 					"numGamesPlayoffSeries",

@@ -609,6 +609,26 @@ const ScoutingReportSection = ({ preDraft }: { preDraft: PreDraft }) => {
 	);
 };
 
+// Scouting System setting: the ranges and notes of your scouts (shown only on his pages)
+const ScoutNotesSection = ({ preDraft }: { preDraft: PreDraft }) => {
+	const report = preDraft.scoutNotes;
+	if (!report) {
+		return null;
+	}
+	return (
+		<HideableSection
+			title="Your scouts"
+			description={`${report.confidence} confidence: ovr ${report.ovr[0]}-${report.ovr[1]}, pot ${report.pot[0]}-${report.pot[1]}`}
+		>
+			<ul className="ps-3 mb-3" data-testid="pre-draft-scout-notes">
+				{report.notes.map((text, i) => (
+					<li key={i}>{text}</li>
+				))}
+			</ul>
+		</HideableSection>
+	);
+};
+
 const OverviewCards = ({
 	preDraft,
 	pid,
@@ -877,6 +897,7 @@ const PlayerPreDraft = ({
 						</p>
 					) : null}
 					<ScoutingReportSection preDraft={preDraft} />
+					<ScoutNotesSection preDraft={preDraft} />
 					<TeamsSection preDraft={preDraft} />
 					<StatsSection preDraft={preDraft} />
 					<div className="row">

@@ -1,3 +1,4 @@
+import { isNitGame } from "../college/postseason.ts";
 import {
 	frontOfficeEnabled,
 	payGame,
@@ -34,6 +35,9 @@ const writeTeamStats = async (results: GameResults) => {
 	const ties = season.hasTies("current");
 
 	const winner = getWinner([results.team[0].stat, results.team[1].stat]);
+	const nit =
+		g.get("phase") === PHASE.PLAYOFFS &&
+		isNitGame(results.team[0].id, results.team[1].id);
 
 	for (const t1 of [0, 1] as const) {
 		const t2 = t1 === 1 ? 0 : 1;
@@ -483,7 +487,10 @@ const writeTeamStats = async (results: GameResults) => {
 
 		await idb.cache.teams.put(t);
 		await idb.cache.teamSeasons.put(teamSeason);
-		await idb.cache.teamStats.put(teamStats);
+		// College mode: NIT games are not postseason team stats (the NIT page has their results)
+		if (!nit) {
+			await idb.cache.teamStats.put(teamStats);
+		}
 	}
 
 	return attendance;

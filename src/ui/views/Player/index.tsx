@@ -32,6 +32,7 @@ import { useLocal } from "../../util/local.ts";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
 import { PreDraftSummary } from "./PreDraftSummary.tsx";
+import { NitStats } from "./NitStats.tsx";
 import {
 	ScoutingSummaryLine,
 	useScoutingOn,
@@ -158,6 +159,8 @@ const Player2 = ({
 					leaders={leaders}
 				/>
 			))}
+
+			<NitStats player={player} />
 
 			<HideableSection
 				title="Ratings"

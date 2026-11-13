@@ -321,6 +321,74 @@ describe("marquee games schedule", options, () => {
 			assert.deepStrictEqual(withInput, without);
 		}
 	});
+
+	test("tiny leagues: national TV capped per team, the season starts on day 1", () => {
+		for (const n of [2, 3, 4]) {
+			g.setWithoutSavingToDB("numTeams", n);
+			g.setWithoutSavingToDB("numActiveTeams", n);
+			const teams = defaultTeams().slice(0, n);
+			const input: MarqueeInput = {
+				teams: teams.map((t) => ({
+					tid: t.tid,
+					draw: t.tid / n,
+					region: t.region,
+				})),
+				champion: 0,
+				rivalries: [],
+			};
+			for (const seed of [1, 2, 3, 4, 5]) {
+				Math.random = makeSeededRandom(seed);
+				const { tids } = newScheduleGood(
+					teams.map((t) => ({
+						tid: t.tid,
+						seasonAttrs: { cid: t.cid, did: t.did },
+					})),
+				);
+				const slates = getHolidaySlates(82, getExpectedSeasonLength(82));
+				const realistic = groupScheduleRealistic(
+					tids,
+					{
+						allStarGame: 0.7,
+						tradeDeadline: 0.6,
+						slates: getSlateCaps(slates, tids, input),
+						rivals: new Set(),
+					},
+					makeSeededRandom(seed + 100),
+				);
+				const output = marqueeSchedule(
+					realistic.tids,
+					realistic.days,
+					input,
+					slates,
+				);
+				const games = output.tids
+					.map((matchup, i) => ({ matchup, i }))
+					.filter(({ matchup }) => matchup[0] >= 0);
+				assert.strictEqual(
+					Math.min(...games.map(({ i }) => output.days[i]!)),
+					1,
+					`${n} teams, seed ${seed}: first day`,
+				);
+				const tv = new Map<number, number>();
+				const numGames = new Map<number, number>();
+				for (const { matchup, i } of games) {
+					for (const tid of matchup) {
+						numGames.set(tid, (numGames.get(tid) ?? 0) + 1);
+						if (output.marquee[i]?.marquee !== undefined) {
+							tv.set(tid, (tv.get(tid) ?? 0) + 1);
+						}
+					}
+				}
+				for (const [tid, count] of tv) {
+					assert.isAtMost(
+						count,
+						Math.ceil(0.15 * numGames.get(tid)!),
+						`${n} teams, seed ${seed}`,
+					);
+				}
+			}
+		}
+	});
 });
 
 describe("marquee game effects", () => {

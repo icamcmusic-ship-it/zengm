@@ -62,7 +62,9 @@ export const FrontOfficeDepartments = ({
 		levelInts[dept] = Number.isNaN(x)
 			? info.levels[dept]
 			: helpers.bound(x, 1, MAX_LEVEL);
-		planned += deptAmount(dept, levelInts[dept], salaryCap);
+		if (dept !== "coaching" || !info.coachingOutsideEnvelope) {
+			planned += deptAmount(dept, levelInts[dept], salaryCap);
+		}
 	}
 	const envelope = info.envelope;
 	const over = planned - envelope;
@@ -91,6 +93,9 @@ export const FrontOfficeDepartments = ({
 						money between departments freely; spending over the envelope costs
 						owner mood (money) at the end of the season, on top of the lower
 						profit.
+						{info.coachingOutsideEnvelope
+							? " Your coaching staff's salaries are not part of it."
+							: null}
 					</p>
 					<p>
 						Levels go from 1 to {MAX_LEVEL}. 34 is the league-average spend and

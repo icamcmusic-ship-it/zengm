@@ -148,7 +148,8 @@ const saveState = async (state: RBState) => {
 };
 
 const toGameIn = (gm: Game): RBGameIn | undefined => {
-	if (gm.teams.length !== 2 || gm.teams.some((t) => t.tid < 0)) {
+	// (College mode: NIT games are not postseason games for the records)
+	if (gm.teams.length !== 2 || gm.teams.some((t) => t.tid < 0) || gm.nit) {
 		return undefined;
 	}
 	return {

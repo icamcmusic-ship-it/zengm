@@ -1022,6 +1022,12 @@ class Cache {
 		if (this._stopAutoFlush) {
 			return;
 		}
+		// A cache that was replaced (idb.cache = new Cache()) without stopping its automatic flushes must never write again: it would
+		// put its stale records into whatever league is open now. (Tests replace the cache all the time; the app stops it first)
+		if (idb.cache !== this) {
+			this._stopAutoFlush = true;
+			return;
+		}
 
 		// Only flush if cache is dirty and nothing is going on
 		if (this._dirty) {

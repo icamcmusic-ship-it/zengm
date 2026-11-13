@@ -12,10 +12,7 @@ import { g } from "../../util/index.ts";
 // Fraction of days that get the daily processes, in the current phase
 export const getDayScale = () => {
 	const phase = g.get("phase");
-	if (
-		phase !== PHASE.REGULAR_SEASON &&
-		phase !== PHASE.AFTER_TRADE_DEADLINE
-	) {
+	if (phase !== PHASE.REGULAR_SEASON && phase !== PHASE.AFTER_TRADE_DEADLINE) {
 		return 1;
 	}
 	let scale;
@@ -25,6 +22,23 @@ export const getDayScale = () => {
 		return 1;
 	}
 	return typeof scale === "number" && scale > 0 && scale < 1 ? scale : 1;
+};
+
+// Whether the current season's schedule is spread over the calendar (realistic schedule length), so days off, back-to-backs and
+// 3-in-4s mean something. In 2-3 team leagues the scale is 1 (the old schedule had as many days with games), so it is stored apart
+export const scheduleDaysSpread = () => {
+	if (getDayScale() < 1) {
+		return true;
+	}
+	const phase = g.get("phase");
+	if (phase !== PHASE.REGULAR_SEASON && phase !== PHASE.AFTER_TRADE_DEADLINE) {
+		return false;
+	}
+	try {
+		return g.get("scheduleSpread") === true;
+	} catch {
+		return false;
+	}
 };
 
 // How many of the day's daily processes the day that just finished gets: 0 or 1. Call after the day's games are
