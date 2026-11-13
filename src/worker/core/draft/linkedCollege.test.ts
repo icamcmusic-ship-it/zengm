@@ -20,6 +20,7 @@ import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers } from "../../util/index.ts";
 import {
+	autoImportLinkedCollegeClass,
 	getLinkableCollegeLeagues,
 	importLinkedCollegeClass,
 	setLinkedCollege,
@@ -236,6 +237,15 @@ describe("linked college league", () => {
 				assert.strictEqual(p.draft.year, 2025);
 				assert.isAbove(p.draft.pick, 0);
 			}
+
+			// The college league deleted: the import says so (and the automatic one doesn't throw)
+			await idb.meta.delete("leagues", 0);
+			assert.deepEqual(await importLinkedCollegeClass({ onlyNew: true }), {
+				error:
+					"The linked college league can't be found. It may have been deleted.",
+			});
+			await autoImportLinkedCollegeClass();
+			assert.deepEqual(await getLinkableCollegeLeagues(), []);
 		},
 	);
 });
