@@ -8,7 +8,6 @@ import {
 	Term,
 	formatSalary,
 } from "../../components/CoachUi.tsx";
-import { COACH_ROLES } from "../../../common/staff.ts";
 import {
 	COACH_ROLE_INFO,
 	COACH_TERMS,
@@ -241,7 +240,7 @@ export const Market = ({
 		<div data-testid="coach-market">
 			<div className="d-flex flex-wrap gap-2 mb-2 align-items-center">
 				<div className="btn-group flex-wrap" role="group" aria-label="Job">
-					{COACH_ROLES.map((r) => {
+					{slots.map(({ role: r }) => {
 						const s = slots.find((x) => x.role === r)!;
 						return (
 							<button

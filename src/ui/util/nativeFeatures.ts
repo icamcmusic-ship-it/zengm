@@ -80,6 +80,8 @@ export const featureForUrl = (
 		case "player_scouting":
 		case "scouting_department":
 			return "scoutingReports";
+		case "pro_scouting":
+			return "scoutingDepth";
 		case "college_overseas":
 			return "collegeSeason";
 		case "archetypes":
@@ -123,6 +125,10 @@ export const featureOffForUrl = (
 };
 
 export const isUrlFeatureOn = (url: readonly unknown[] | string) => {
+	// The Staff Report belongs to two features
+	if (typeof url !== "string" && url[0] === "staff_report") {
+		return isFeatureOn("scoutingDepth") || isFeatureOn("coachingDepth");
+	}
 	const feature = featureForUrl(url);
 	const replacedBy = featureOffForUrl(url);
 	return (

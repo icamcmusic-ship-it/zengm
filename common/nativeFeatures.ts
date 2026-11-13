@@ -1030,6 +1030,28 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "scoutingDepth",
+		college: false,
+		key: "featureScoutingDepth",
+		name: "Scouting Director & Regions",
+		description:
+			'A Director of Scouting runs your scouting department: he assigns your scouts to five regions (East, West, Midwest/South, International, G League/Prep) by specialty, and prospects in covered regions are seen more often, so the fuzz on their ratings and sub-ratings narrows over the season (tournaments, a late-season showcase and the combine give big bumps; blind spots and late risers stay uncertain). Set one priority (or Auto). He keeps your Draft Board up to date every week (lock or drag players to keep them), files pro scouting reports on other teams\' players and free agents (a Pro Scouting tab), and scouts have careers: experience, specialties, reputation from their hit rates, favourite prospects ("our guy"), poaching, promotion and retirement. Needs Scouting Reports.',
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "coachingDepth",
+		college: false,
+		key: "featureCoachingDepth",
+		name: "Coaching Staff Depth",
+		description:
+			"Three more staff jobs (shooting coach, strength & conditioning, video/analytics coordinator) with ratings, contracts and bounded effects that are neutral at average staff; development plans that the staff sets each offseason for every player from his weaknesses, archetype and role (a small shift within his yearly development toward the sub-ratings he works on, with a Development Report); and coaching careers: new coaches start as assistants and are promoted, good assistants are hired away as head coaches and carry their systems, with coaching trees. A Staff Report page each season, with delegation per area (Auto, Suggest, Manual). Needs Coaching Staff.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "frontOffice",
 		college: false,
 		key: "featureFrontOffice",

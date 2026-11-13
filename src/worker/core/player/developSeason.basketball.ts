@@ -285,13 +285,15 @@ const developSeason = (
 			: formula.ageModifier(age);
 		const changeLimits = formula.changeLimits(age);
 
+		const change = helpers.bound(
+			(baseChange + ageModifier) * uniform(0.4, 1.4),
+			changeLimits[0],
+			changeLimits[1],
+		);
+		// Coaching Staff Depth: a fixed shift of this rating's change (development plan, shooting coach, strength & conditioning)
+		const delta = traitDev?.ratingDelta?.[key];
 		ratings[key] = limitRating(
-			ratings[key] +
-				helpers.bound(
-					(baseChange + ageModifier) * uniform(0.4, 1.4),
-					changeLimits[0],
-					changeLimits[1],
-				),
+			ratings[key] + (delta === undefined ? change : change + delta),
 		);
 	}
 };

@@ -2,6 +2,7 @@ import { PHASE, WEBSITE_ROOT } from "../../../common/constants.ts";
 import finalize from "./finalize.ts";
 import { afterNewPhase as scoutingAfterNewPhase } from "../scoutingReports/index.ts";
 import { afterNewPhase as draftCombineAfterNewPhase } from "../draftCombine/index.ts";
+import { afterNewPhase as staffDepthAfterNewPhase } from "../staffDepth/index.ts";
 import newPhasePreseason from "./newPhasePreseason.ts";
 import newPhaseRegularSeason from "./newPhaseRegularSeason.ts";
 import newPhaseAfterTradeDeadline from "./newPhaseAfterTradeDeadline.ts";
@@ -90,6 +91,9 @@ const newPhase = async (phase: Phase, conditions: Conditions, extra?: any) => {
 
 				// Draft Lottery Night & Combine setting: the combine's news (no-op when off)
 				await draftCombineAfterNewPhase(phase, conditions);
+
+				// Scouting Director & Regions / Coaching Staff Depth: looks, the board, "our guy", scout careers, plan proposals (no-op when off)
+				await staffDepthAfterNewPhase(phase);
 
 				await finalize(phase, conditions, result);
 			} else {

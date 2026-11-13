@@ -21,14 +21,20 @@ const sortProspects = (prospects: Prospect[]) =>
 		return a.valueRank - b.valueRank;
 	});
 
-// Send the whole board after a change, renumbered 1..n so there are never gaps or ties
-const saveRanks = async (ranked: Prospect[], others: Prospect[] = []) => {
+// Send the whole board after a change, renumbered 1..n so there are never gaps or ties. lock: a player the user moved (with the
+// Director keeping the board, he stays where the user put him)
+const saveRanks = async (
+	ranked: Prospect[],
+	others: Prospect[] = [],
+	lock?: Set<number>,
+) => {
 	await toWorker("main", "updateDraftBoard", [
 		...ranked.map((p, i) => ({
 			pid: p.pid,
 			rank: i + 1,
 			tier: p.board.tier,
 			note: p.board.note,
+			locked: lock?.has(p.pid) ? true : undefined,
 		})),
 		...others.map((p) => ({
 			pid: p.pid,
@@ -68,6 +74,7 @@ const DraftBoard = ({
 	scoutingSystem,
 	season,
 	seasons,
+	depth,
 }: View<"draftBoard">) => {
 	const { challengeNoRatings, draftType } = useLocal([
 		"challengeNoRatings",
@@ -87,7 +94,7 @@ const DraftBoard = ({
 		const next = [...ranked];
 		next[i] = ranked[j]!;
 		next[j] = p;
-		await saveRanks(next);
+		await saveRanks(next, [], depth ? new Set([p.pid]) : undefined);
 	};
 
 	const showRatings = !challengeNoRatings;
@@ -101,6 +108,35 @@ const DraftBoard = ({
 				Ranked prospects come first, then everyone else in your scouts' order.
 				Your board is saved with the league.
 			</p>
+
+			{depth ? (
+				<div className="alert alert-info small" data-testid="director-board">
+					{depth.boardDelegation === "auto" ? (
+						<>
+							Your Director of Scouting updates this board every week from the
+							scouting reports, your priority and your needs, and your pick is
+							made from it on draft day. Players you move or lock (🔒) stay
+							where you put them.
+						</>
+					) : depth.boardDelegation === "suggest" ? (
+						<>
+							Your Director proposes board updates in the{" "}
+							<a href={helpers.leagueUrl(["staff_report"])}>Staff Report</a>.
+						</>
+					) : (
+						<>Board updates by the Director are off (Manual).</>
+					)}
+					{depth.log.length > 0 ? (
+						<ul className="mb-0 mt-1">
+							{depth.log.map((entry, i) => (
+								<li key={i}>
+									{entry.season}: {entry.lines.join(" · ")}
+								</li>
+							))}
+						</ul>
+					) : null}
+				</div>
+			) : null}
 
 			{seasons.length > 1 ? (
 				<div className="btn-group mb-3">
@@ -222,6 +258,26 @@ const DraftBoard = ({
 												>
 													✕
 												</button>
+												{depth ? (
+													<button
+														className={`btn btn-link btn-sm p-0 ms-1 ${p.board.locked ? "" : "opacity-50"}`}
+														title={
+															p.board.locked
+																? "Locked: the Director keeps him here (click to unlock)"
+																: "Lock him at this rank"
+														}
+														data-testid="board-lock"
+														onClick={() =>
+															toWorker("main", "staffDepthAction", {
+																type: "boardLock",
+																pid: p.pid,
+																locked: !p.board.locked,
+															})
+														}
+													>
+														{p.board.locked ? "🔒" : "🔓"}
+													</button>
+												) : null}
 											</>
 										) : (
 											<button
@@ -281,7 +337,14 @@ const DraftBoard = ({
 											<td>{p.pot}</td>
 										</>
 									) : null}
-									<td>{p.valueRank}</td>
+									<td>
+										{p.valueRank}
+										{depth?.confidence[p.pid] ? (
+											<div className="small text-body-secondary text-nowrap">
+												{depth.confidence[p.pid]} conf.
+											</div>
+										) : null}
+									</td>
 									<td>{p.build ?? ""}</td>
 									<td>
 										{p.preDraftLabel ? (

@@ -31,6 +31,10 @@ import {
 } from "../../../common/subRatingsGen.ts";
 import { g } from "../../util/index.ts";
 import { applyFuzz, getFuzz } from "./fuzzRating.ts";
+import { FOCUSES, tiltSubs } from "../../../common/staffDepth/devPlans.ts";
+import type { FocusKey } from "../../../common/staffDepth/types.ts";
+import { anchorAndFit } from "../../../common/subRatingsGen.ts";
+import { expandedFromSubs } from "../../../common/subRatings.ts";
 
 export const subRatingsOn = (): boolean =>
 	__SPORT === "basketball" &&
@@ -177,6 +181,42 @@ export const developRowSubs = (
 		return;
 	}
 	r.sub = developSubs(r.sub, r, before, age, p.subP);
+};
+
+// Coaching Staff Depth: a development plan's tilt inside its bases (common/staffDepth/devPlans.ts tiltSubs). The expanded ratings that
+// correspond to the subs follow (as an edit in Customize Player does), so anchoring keeps the tilt; their sums (pdef + idef, csh + dsh) are
+// unchanged. No random numbers
+export const tiltRowSubs = (
+	p: PlayerLike,
+	r: any,
+	focus: FocusKey,
+	amount: number,
+) => {
+	if (!p.subP || isPending(p.subP) || !isValidSubArray(r.sub)) {
+		return;
+	}
+	const x = tiltSubs(r.sub, focus, amount);
+	const bases = new Set(
+		FOCUSES[focus].subs.map((key) => SUB_DEFS.find((d) => d.key === key)!.base),
+	);
+	const ex = expandedFromSubs(x);
+	const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
+	if (bases.has("diq") && typeof r.pdef === "number") {
+		const sum = r.pdef + r.idef;
+		const pdef = clamp((sum + ex.defenseSplit) / 2);
+		r.pdef = pdef;
+		r.idef = sum - pdef;
+	}
+	if ((bases.has("tp") || bases.has("fg")) && typeof r.csh === "number") {
+		const sum = r.csh + r.dsh;
+		const csh = clamp((sum + ex.shootingSplit) / 2);
+		r.csh = csh;
+		r.dsh = sum - csh;
+	}
+	if (bases.has("drb") && typeof r.bsc === "number") {
+		r.bsc = clamp(ex.bsc);
+	}
+	r.sub = anchorAndFit(x, r, new Array<number>(NUM_SUBS).fill(1));
 };
 
 // After anything else changed the bases of his latest row (a bonus, an edit, an injury, the mentor bonus): subs follow

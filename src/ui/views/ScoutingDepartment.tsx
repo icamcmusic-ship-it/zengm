@@ -2,6 +2,170 @@ import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
 import { helpers } from "../util/helpers.ts";
 import { StaffFace } from "../components/StaffFace.tsx";
+import { toWorker } from "../util/toWorker.ts";
+import {
+	PRIORITY_NAMES,
+	REGION_NAMES,
+	SCOUT_REGIONS,
+} from "../../common/staffDepth/regions.ts";
+import type { ScoutRegion } from "../../common/staffDepth/types.ts";
+
+type Depth = NonNullable<View<"scoutingDepartment">["depth"]>;
+
+const OUR_GUY_WORDS = {
+	star: "became a star",
+	bust: "busted",
+	solid: "solid pro",
+};
+
+// Scouting Director & Regions: the Director, the priority, the region plan and scout careers
+const DirectorPanel = ({ depth }: { depth: Depth }) => (
+	<div className="card mb-3" data-testid="scouting-director">
+		<div className="card-body">
+			<div className="d-flex flex-wrap gap-3 align-items-center mb-2">
+				<div>
+					<div className="small text-body-secondary">Director of Scouting</div>
+					<div className="fw-bold fs-6">{depth.director.name}</div>
+					<div className="small">
+						{depth.director.quality} · age {depth.director.age} · since{" "}
+						{depth.director.since}
+						{depth.director.how === "promoted"
+							? " (promoted from scout)"
+							: depth.director.how === "poached"
+								? " (hired away from a rival)"
+								: ""}
+					</div>
+				</div>
+				{depth.isUser ? (
+					<div>
+						<label
+							className="small text-body-secondary d-block"
+							htmlFor="scouting-priority"
+						>
+							Priority
+						</label>
+						<select
+							id="scouting-priority"
+							className="form-select form-select-sm"
+							value={depth.priority}
+							onChange={(event) =>
+								toWorker("main", "staffDepthAction", {
+									type: "settings",
+									settings: { priority: event.target.value as any },
+								})
+							}
+						>
+							{Object.entries(PRIORITY_NAMES).map(([key, name]) => (
+								<option key={key} value={key}>
+									{key === "auto"
+										? `Auto (now: ${PRIORITY_NAMES[depth.effectivePriority]})`
+										: name}
+								</option>
+							))}
+						</select>
+					</div>
+				) : null}
+				{depth.isUser ? (
+					<div className="small">
+						Assignments:{" "}
+						<b>
+							{depth.delegation === "auto"
+								? "the Director's (Auto)"
+								: depth.delegation === "suggest"
+									? "kept, the Director suggests changes"
+									: "yours (Manual)"}
+						</b>
+						<br />
+						<a href={helpers.leagueUrl(["staff_report"])}>Staff Report</a>
+					</div>
+				) : null}
+			</div>
+			<div className="table-responsive">
+				<table
+					className="table table-sm small mb-0"
+					data-testid="scouting-regions"
+				>
+					<thead>
+						<tr>
+							<th>Region</th>
+							<th title="Share of the class's top talent">Talent</th>
+							<th>Coverage</th>
+						</tr>
+					</thead>
+					<tbody>
+						{depth.regions.map((r) => (
+							<tr key={r.region}>
+								<td>{r.name}</td>
+								<td>{r.importance}%</td>
+								<td>
+									<span
+										className={`badge ${r.coverage < 0.18 ? "text-bg-danger" : r.coverage < 0.3 ? "text-bg-warning" : "text-bg-success"}`}
+									>
+										{r.label}
+									</span>{" "}
+									{r.coverage.toFixed(2)}
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+);
+
+const ScoutCareer = ({
+	s,
+	isUser,
+}: {
+	s: Depth["scouts"][number];
+	isUser: boolean;
+}) => (
+	<div className="mt-1" data-testid="scout-career">
+		<div>
+			{s.experience} years in scouting
+			{s.second ? `, also ${s.second.toLowerCase()}` : ""} · reputation:{" "}
+			{s.reputationLabel}
+		</div>
+		<div className="d-flex align-items-center gap-1">
+			Region:{" "}
+			{isUser ? (
+				<select
+					className="form-select form-select-sm w-auto"
+					value={s.region}
+					onChange={(event) =>
+						toWorker("main", "staffDepthAction", {
+							type: "scoutRegion",
+							scoutId: s.id,
+							region: event.target.value as ScoutRegion,
+						})
+					}
+				>
+					{SCOUT_REGIONS.map((r) => (
+						<option key={r} value={r}>
+							{REGION_NAMES[r]}
+						</option>
+					))}
+				</select>
+			) : (
+				<b>{REGION_NAMES[s.region]}</b>
+			)}
+		</div>
+		{s.ourGuys.length > 0 ? (
+			<div>
+				Our guy:{" "}
+				{s.ourGuys.map((g, i) => (
+					<span key={`${g.pid}-${g.season}`}>
+						{i > 0 ? ", " : ""}
+						<a href={helpers.leagueUrl(["player", g.pid])}>{g.name}</a> (
+						{g.season}
+						{g.judged ? `, ${OUR_GUY_WORDS[g.judged]}` : ""})
+					</span>
+				))}
+			</div>
+		) : null}
+	</div>
+);
 
 // A team's scouting department (Scouting Reports setting)
 const ScoutingDepartment = ({
@@ -16,6 +180,7 @@ const ScoutingDepartment = ({
 	pending,
 	teams,
 	userTid,
+	depth,
 }: View<"scoutingDepartment">) => {
 	const team = teams.find((t) => t.tid === tid);
 	useTitleBar({
@@ -36,6 +201,8 @@ const ScoutingDepartment = ({
 					? "Your scouts write every scouting report you see. A bigger scouting budget means more scouts and better ones: tighter grades, earlier red flags and better comparisons."
 					: "Every team has a department; AI teams' GMs read their own scouts' grades."}
 			</p>
+
+			{depth ? <DirectorPanel depth={depth} /> : null}
 
 			<div className="row g-3 mb-3" data-testid="scouting-dept-scouts">
 				{scouts.map((s) => (
@@ -76,6 +243,12 @@ const ScoutingDepartment = ({
 											: "No draft calls on file yet"}
 									</div>
 								)}
+								{depth?.scouts.find((x) => x.id === s.id) ? (
+									<ScoutCareer
+										s={depth.scouts.find((x) => x.id === s.id)!}
+										isUser={depth.isUser}
+									/>
+								) : null}
 							</div>
 						</div>
 					</div>
@@ -104,6 +277,19 @@ const ScoutingDepartment = ({
 					))}
 				</ul>
 			)}
+
+			{depth && depth.log.length > 0 ? (
+				<>
+					<h2>Careers</h2>
+					<ul data-testid="scouting-careers">
+						{depth.log.map((m, i) => (
+							<li key={i}>
+								{m.season}: {m.text}
+							</li>
+						))}
+					</ul>
+				</>
+			) : null}
 
 			<div className="row">
 				<div className="col-12 col-md-6">

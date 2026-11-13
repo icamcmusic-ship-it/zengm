@@ -308,7 +308,8 @@ const runPicks = async (
 			const boardPick =
 				g.get("userTids").includes(dp.tid) &&
 				featureOn("draftBoard") &&
-				g.get("draftBoardAutoDraft")
+				// Scouting Director & Regions: the Director's board is the draft-day auto pick
+				(g.get("draftBoardAutoDraft") || featureOn("scoutingDepth"))
 					? getDraftBoardPick(playersAll)
 					: undefined;
 

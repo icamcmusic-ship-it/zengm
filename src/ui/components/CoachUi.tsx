@@ -109,7 +109,16 @@ export const Meter = ({
 	);
 };
 
-const RATING_KEYS: (keyof CoachRatings)[] = ["dev", "off", "def", "mot"];
+// The Coaching Staff Depth ratings (shooting, conditioning, video) are shown when the coach has them
+const RATING_KEYS: (keyof CoachRatings)[] = [
+	"dev",
+	"off",
+	"def",
+	"mot",
+	"sht",
+	"cnd",
+	"vid",
+];
 
 // The four ratings as words and small bars (not just numbers)
 export const RatingBars = ({
@@ -121,21 +130,21 @@ export const RatingBars = ({
 }) => (
 	<table className="table table-sm table-borderless mb-0 coach-rating-bars">
 		<tbody>
-			{RATING_KEYS.map((key) => (
+			{RATING_KEYS.filter((key) => ratings[key] !== undefined).map((key) => (
 				<tr key={key} className={clsx({ "fw-bold": key === highlight })}>
 					<td className="py-0 ps-0 text-body-secondary">
 						{COACH_RATING_NAMES[key]}
 					</td>
-					<td className="py-0 text-end">{ratings[key]}</td>
+					<td className="py-0 text-end">{ratings[key]!}</td>
 					<td className="py-0" style={{ width: "34%", minWidth: 50 }}>
 						<div className="progress" style={{ height: 6, marginTop: 7 }}>
 							<div
-								className={`progress-bar bg-${ratingColor(ratings[key])}`}
-								style={{ width: `${ratings[key]}%` }}
+								className={`progress-bar bg-${ratingColor(ratings[key]!)}`}
+								style={{ width: `${ratings[key]!}%` }}
 							/>
 						</div>
 					</td>
-					<td className="py-0 pe-0 text-nowrap">{ratingWord(ratings[key])}</td>
+					<td className="py-0 pe-0 text-nowrap">{ratingWord(ratings[key]!)}</td>
 				</tr>
 			))}
 		</tbody>

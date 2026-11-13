@@ -119,6 +119,7 @@ const Staff = ({
 	season,
 	slots,
 	tid,
+	depth,
 }: View<"staff">) => {
 	useTitleBar({
 		title: "Coaching Staff",
@@ -422,6 +423,14 @@ const Staff = ({
 	return (
 		<>
 			{!coachSystems ? <SystemsOffNote /> : null}
+			{depth && isUser ? (
+				<p data-testid="staff-depth-note">
+					With Coaching Staff Depth your staff also has a shooting coach, a
+					strength & conditioning coach and a video/analytics coordinator, and
+					sets every player's development plan.{" "}
+					<a href={helpers.leagueUrl(["staff_report"])}>Staff Report</a>
+				</p>
+			) : null}
 
 			{/* (clear the Download CSV menu, which floats at the top right, so the cards get the full width on a phone) */}
 			<div className="row" style={{ clear: "both" }}>

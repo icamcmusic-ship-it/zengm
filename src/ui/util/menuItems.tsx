@@ -127,6 +127,15 @@ const staffLinks: MenuItemLink[] =
 					path: ["staff"],
 					text: "Coaching Staff",
 				},
+				{
+					type: "link",
+					active: (pageID) => pageID === "staffReport",
+					league: true,
+					commandPalette: true,
+					feature: "coachingDepth",
+					path: ["staff_report"],
+					text: "Staff Report",
+				},
 			]
 		: [];
 const coachesLinks: MenuItemLink[] =
@@ -747,6 +756,15 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				feature: "lotteryNight",
 				path: ["draft_combine"],
 				text: "Draft Combine",
+			},
+			{
+				type: "link",
+				league: true,
+				commandPalette: true,
+				commandPaletteOnly: true,
+				feature: "scoutingDepth",
+				path: ["pro_scouting"],
+				text: "Pro Scouting",
 			},
 			{
 				type: "link",
