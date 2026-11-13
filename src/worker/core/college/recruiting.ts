@@ -841,10 +841,14 @@ const addTransfers = async (moves: CollegeDeparture[]) => {
 	});
 };
 
+// A player nobody offered during the window still finds a school where he would play this often when it closes (most portal
+// entrants are bench players a smaller program takes late), else he goes back to his school if it has room. With the offers made
+// during the window, about 60-80% of entrants move, like the real portal
+const LATE_PORTAL_TAKER_CHANCE = 0.6;
+
 // The schools a portal player can pick. He entered the portal to leave, so his old school's standing offer doesn't count: it is
 // only in the running with a retention pitch (and then it has to win on interest like anyone else). Before, the standing offer
-// won most of the time at the close of the window and only about 7-30% of entrants moved. One with no offer elsewhere when the
-// window closes withdraws and stays, if his school has room
+// won most of the time at the close of the window and only about 7-30% of entrants moved
 const portalChoices = (schools: SchoolInterest[], from: number) =>
 	schools.filter((s) => s.tid !== from || s.r);
 
@@ -1044,12 +1048,16 @@ export const closePortal = async (conditions: Conditions) => {
 			.filter((s) => s.o && hasSpot(s.tid))
 			.sort((a, b) => b.i - a.i);
 		let to = options[0]?.tid;
-		if (to === undefined && hasSpot(from)) {
-			// No offer: he withdraws from the portal and stays
+		if (
+			to === undefined &&
+			hasSpot(from) &&
+			Math.random() >= LATE_PORTAL_TAKER_CHANCE
+		) {
+			// Nobody recruited him and no late taker: he withdraws from the portal and stays
 			to = from;
 		}
 		if (to === undefined) {
-			// Anyone with a spot where he would play
+			// A late taker: anyone with a spot where he would play
 			let best: { tid: number; score: number } | undefined;
 			for (const school of schools.values()) {
 				if (openSpots(school) <= 0) {
