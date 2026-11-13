@@ -63,6 +63,7 @@ import {
 } from "./spacingCreation.ts";
 import {
 	assignMatchups,
+	ATTENTION,
 	driveMismatch,
 	MATCHUP,
 	mismatchScale,
@@ -474,6 +475,11 @@ class GameSim extends GameSimBase {
 		{ sum: 0, nonShooters: 0 },
 	];
 	creator: PlayerGameSim | undefined;
+	// Matchup Defense, defensive attention: each on-court player's share of the last capped draw, and the shooter of the possession with
+	// his share (for the help-defense make penalty)
+	attentionShares: number[] = [];
+	attentionShooter: PlayerGameSim | undefined;
+	attentionShooterShare = 0;
 	// Matchup Defense (League extras, see matchupDefense.ts): for each team on defense, the index of the defender guarding each offensive
 	// player (by his index on the court), assigned at each substitution, and the team's average defensive versatility. Off: nothing here is
 	// used and no extra random numbers are drawn
@@ -1702,9 +1708,23 @@ class GameSim extends GameSimBase {
 
 	// The shooter of the possession: by usage, or when the defense fouls on purpose, its target
 	pickShooter(clockFactor: ClockFactor) {
-		return this.smartEndgame && clockFactor === "intentionalFoul"
-			? this.pickFoulTarget()
-			: this.pickPlayer("usage", this.o, this.usagePower());
+		if (this.smartEndgame && clockFactor === "intentionalFoul") {
+			this.attentionShooter = undefined;
+			return this.pickFoulTarget();
+		}
+		const p = this.pickPlayer(
+			"usage",
+			this.o,
+			this.usagePower(),
+			undefined,
+			true,
+		);
+		if (this.matchupDefense) {
+			this.attentionShooter = p;
+			this.attentionShooterShare =
+				this.attentionShares[this.playersOnCourt[this.o].indexOf(p)] ?? 0;
+		}
+		return p;
 	}
 
 	// The stock possession model: shoot early for a 2-for-1 (the realistic model plans it itself; the stock model already holds for
@@ -2859,7 +2879,13 @@ class GameSim extends GameSimBase {
 
 		// Spacing & Shot Creation: the creator first, then the shooter
 		if (this.spacingCreation) {
-			this.creator = this.pickPlayer("creation", this.o, this.creationPower());
+			this.creator = this.pickPlayer(
+				"creation",
+				this.o,
+				this.creationPower(),
+				undefined,
+				true,
+			);
 		}
 		const shooter = this.pickShooter(clockFactor);
 
@@ -3403,7 +3429,13 @@ class GameSim extends GameSimBase {
 
 		// Spacing & Shot Creation: the creator first, then the shooter
 		if (this.spacingCreation) {
-			this.creator = this.pickPlayer("creation", this.o, this.creationPower());
+			this.creator = this.pickPlayer(
+				"creation",
+				this.o,
+				this.creationPower(),
+				undefined,
+				true,
+			);
 		}
 		const shooter = this.pickShooter(clockFactor);
 
@@ -3462,7 +3494,7 @@ class GameSim extends GameSimBase {
 
 	// The shot clock runs out: a turnover, and the other team inbounds the ball
 	doShotClockViolation(): PossessionOutcome {
-		const p = this.pickPlayer("turnovers", this.o, 2);
+		const p = this.pickTurnoverPlayer();
 		this.recordStat(this.o, p, "tov");
 		this.shotClockViolations[this.o] += 1;
 		this.isClockRunning = false;
@@ -3522,7 +3554,7 @@ class GameSim extends GameSimBase {
 	 * @return {string} Either "tov" or "stl" depending on whether the turnover was caused by a steal or not.
 	 */
 	doTov(pOverride?: PlayerGameSim) {
-		const p = pOverride ?? this.pickPlayer("turnovers", this.o, 2);
+		const p = pOverride ?? this.pickTurnoverPlayer();
 		this.recordStat(this.o, p, "tov");
 
 		if (this.probStl() > Math.random()) {
@@ -3937,6 +3969,16 @@ class GameSim extends GameSimBase {
 				this.team[0].stat.ptsQtrs.length >= this.numPeriods
 			) {
 				probMake += ENDGAME.atoMake * this.endgameMgmt(this.o);
+			}
+
+			// Matchup Defense, defensive attention: help defense on a shooter who carries much of his team's offense
+			if (
+				md &&
+				p === this.attentionShooter &&
+				this.attentionShooterShare > ATTENTION.makeRef
+			) {
+				probMake -=
+					ATTENTION.make * (this.attentionShooterShare - ATTENTION.makeRef);
 			}
 
 			// Matchup Defense: drop coverage gives up pull-up jumpers
@@ -5401,9 +5443,15 @@ class GameSim extends GameSimBase {
 		t: TeamNum,
 		power: number,
 		exempt?: PlayerGameSim,
+		attention?: boolean,
 	) {
 		const ratios = this.ratingArray(rating, t, power, this.ratingArrayCache);
 		const playersOnCourt = this.playersOnCourt[t];
+
+		// Matchup Defense: the defense loads up on a dominant scorer or creator
+		if (attention && this.matchupDefense) {
+			this.attentionCap(ratios);
+		}
 
 		if (exempt !== undefined) {
 			const index = playersOnCourt.indexOf(exempt);
@@ -5435,6 +5483,66 @@ class GameSim extends GameSimBase {
 		}
 
 		return playersOnCourt[0]!;
+	}
+
+	// Matchup Defense, defensive attention: the more of his team's offense one player carries, the more the defense shows him help, traps
+	// and doubles, so above a share of ATTENTION.share of the five's weight (shot or creation) only ATTENTION.excess of the rest gets
+	// through and the ball goes to his teammates. Records the shooter's share (before the cap) for the make penalty in doShot. No random
+	// numbers
+	attentionCap(weights: number[]) {
+		let total = 0;
+		for (let i = 0; i < this.numPlayersOnCourt; i++) {
+			total += weights[i]!;
+		}
+		if (total <= 0) {
+			return;
+		}
+		const cap = ATTENTION.share * total;
+		for (let i = 0; i < this.numPlayersOnCourt; i++) {
+			const w = weights[i]!;
+			this.attentionShares[i] = w / total;
+			if (w > cap) {
+				weights[i] = cap + ATTENTION.excess * (w - cap);
+			}
+		}
+	}
+
+	// Who turns it over. Stock: by the turnovers composite (carelessness), which hands most turnovers to low-rated role players. Realistic
+	// Turnovers: the ball handlers commit them, so the carelessness weight is multiplied by ball-handling responsibility (the usage
+	// composite, and the creation composite with Spacing & Shot Creation). Only who commits it changes, with one random number either way
+	pickTurnoverPlayer() {
+		if (!this.realisticTurnovers) {
+			return this.pickPlayer("turnovers", this.o, 2);
+		}
+		const t = this.o;
+		const weights = this.ratingArray(
+			"turnovers",
+			t,
+			TURNOVERS.carelessPower,
+			this.ratingArrayCache,
+		);
+		const players = this.playersOnCourt[t];
+		let sum = 0;
+		for (let i = 0; i < this.numPlayersOnCourt; i++) {
+			const p = players[i]!;
+			const fatigue = this.fatigue(p.stat.energy);
+			let handle = (p.compositeRating.usage * fatigue) ** TURNOVERS.usagePower;
+			if (p.compositeRating.creation !== undefined) {
+				handle *=
+					(p.compositeRating.creation * fatigue) ** TURNOVERS.creationPower;
+			}
+			weights[i] = weights[i]! * handle;
+			sum += weights[i]!;
+		}
+		const rand = Math.random() * sum;
+		let runningSum = 0;
+		for (let i = 0; i < this.numPlayersOnCourt; i++) {
+			runningSum += weights[i]!;
+			if (rand < runningSum) {
+				return players[i]!;
+			}
+		}
+		return players[0]!;
 	}
 
 	/**

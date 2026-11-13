@@ -53,7 +53,7 @@ export const NewsBlock = ({
 						<a href={rosterURL} className="p-1">
 							<img
 								src={teamInfo.imgURLSmall ?? teamInfo.imgURL}
-								alt=""
+								alt={teamInfo.region}
 								style={logoStyle}
 							/>
 						</a>
@@ -83,7 +83,7 @@ export const NewsBlock = ({
 					{teamInfo.imgURL || teamInfo.imgURLSmall ? (
 						<img
 							src={teamInfo.imgURLSmall ?? teamInfo.imgURL}
-							alt=""
+							alt={teamInfo.region}
 							style={logoStyle}
 						/>
 					) : (

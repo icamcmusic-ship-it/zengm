@@ -8,4 +8,9 @@ export const TURNOVERS = {
 	tovMult: 0.875,
 	// The chance that a turnover is a steal (about 1 / tovMult, so steals per game stay the same)
 	stlMult: 1.155,
+	// Who commits it (pickTurnoverPlayer): carelessness (the turnovers composite) to this power, times ball-handling responsibility, the
+	// usage composite and (with Spacing & Shot Creation) the creation composite to these powers
+	carelessPower: 1,
+	usagePower: 1.5,
+	creationPower: 0.5,
 };

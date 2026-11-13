@@ -95,7 +95,7 @@ const TeamLogo = ({
 					className="d-flex align-items-center justify-content-center"
 					style={{ height: 100, width: 120 }}
 				>
-					<img className="mw-100 mh-100" src={t.imgURL} alt="" />
+					<img className="mw-100 mh-100" src={t.imgURL} alt={t.region} />
 				</TeamNameLink>
 				<div className="mt-1 mb-3 fw-bold text-center">
 					{helpers.formatRecord(t)}

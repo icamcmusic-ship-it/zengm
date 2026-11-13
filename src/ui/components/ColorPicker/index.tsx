@@ -56,6 +56,8 @@ export const ColorPicker = ({
 		>
 			<button
 				className="btn btn-link"
+				aria-label={`Color ${hex}`}
+				title={hex}
 				disabled={disabled}
 				onClick={onClick}
 				style={{
