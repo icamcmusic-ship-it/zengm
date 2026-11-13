@@ -56,15 +56,18 @@ const getInput = (): MarqueeInput => {
 };
 
 // The schedule as newScheduleWithDays builds it with the setting on
-const build = (seed: number, input = getInput()) => {
+const build = (
+	seed: number,
+	input = getInput(),
+	events = { allStarGame: 0.7, tradeDeadline: 0.6 },
+) => {
 	Math.random = makeSeededRandom(seed);
 	const { tids } = newScheduleGood(getTeams());
 	const slates = getHolidaySlates(82, getExpectedSeasonLength(82));
 	const realistic = groupScheduleRealistic(
 		tids,
 		{
-			allStarGame: 0.7,
-			tradeDeadline: 0.6,
+			...events,
 			slates: getSlateCaps(slates, tids, input),
 			rivals: new Set(getRivalPairs(input).keys()),
 		},
@@ -175,6 +178,29 @@ describe("marquee games schedule", options, () => {
 			4,
 		);
 		assert.isAbove(mlk.length, 4);
+	});
+
+	test("Christmas on the All-Star break or the trade deadline: moved a day, still 5 games and nothing else", () => {
+		// The All-Star break (days 65-67) or the deadline (day 66) on Christmas
+		for (const events of [
+			{ allStarGame: 0.38, tradeDeadline: 0.39 },
+			{ allStarGame: 0.7, tradeDeadline: 0.385 },
+		]) {
+			for (const seed of [1, 2]) {
+				const { output } = build(seed, getInput(), events);
+				const eventDays = output.tids
+					.map((matchup, i) => (matchup[0] < 0 ? output.days[i]! : -1))
+					.filter((day) => day >= 0);
+				const christmasDay = output.holidays.christmas!;
+				assert.notInclude(eventDays, christmasDay);
+				assert.approximately(christmasDay, 66, 3);
+				const christmas = gamesOn(output, christmasDay);
+				assert.strictEqual(christmas.length, 5, JSON.stringify(events));
+				for (const { i } of christmas) {
+					assert.strictEqual(output.marquee[i]?.marquee, "christmas");
+				}
+			}
+		}
 	});
 
 	test("national TV: 2-4 games a week, not two on a day, spread over the teams", () => {

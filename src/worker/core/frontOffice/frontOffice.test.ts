@@ -159,6 +159,28 @@ describe("Front Office Budget (worker)", () => {
 		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
 		assert.isFalse(await earlyCombineRead(g.get("season")));
 		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		// Not for a class a linked college league's automatic import is about to replace
+		g.setWithoutSavingToDB("linkedCollege", {
+			lid: 9,
+			auto: true,
+			imports: [],
+		});
+		assert.isFalse(await earlyCombineRead(g.get("season")));
+		g.setWithoutSavingToDB("linkedCollege", {
+			lid: 9,
+			auto: true,
+			imports: [
+				{ collegeSeason: g.get("season"), draftYear: g.get("season"), num: 70 },
+			],
+		});
+		assert.isTrue(await earlyCombineRead(g.get("season")));
+		g.setWithoutSavingToDB("linkedCollege", {
+			lid: 9,
+			auto: false,
+			imports: [],
+		});
+		assert.isTrue(await earlyCombineRead(g.get("season")));
+		g.setWithoutSavingToDB("linkedCollege", undefined);
 		g.setWithoutSavingToDB("featureFrontOffice", false);
 		assert.isFalse(await earlyCombineRead(g.get("season")));
 	});

@@ -123,6 +123,10 @@ const generate = (tm: any): Team => {
 	if (tm.staffDevCarry) {
 		t.staffDevCarry = tm.staffDevCarry;
 	}
+	// Front Office Budget: the Analytics and Travel & Sports Science levels
+	if (tm.frontOffice) {
+		t.frontOffice = tm.frontOffice;
+	}
 	if (typeof tm.loadManagement === "boolean") {
 		t.loadManagement = tm.loadManagement;
 	}

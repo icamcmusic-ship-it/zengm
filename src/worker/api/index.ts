@@ -201,6 +201,7 @@ import {
 } from "../../common/draftPickConditions.ts";
 import { getNumPicksPerRound } from "../core/trade/getPickValues.ts";
 import { formatScheduleForEditor } from "../views/scheduleEditor.ts";
+import { fixEditedScheduleTags } from "../core/season/editedScheduleTags.ts";
 import type { KeyboardShortcutsLocal } from "../../ui/util/keyboardShortcuts.ts";
 import getNumPlayoffTeamsForSeason, {
 	getNumPlayoffTeamsRaw,
@@ -6043,13 +6044,20 @@ const setScheduleFromEditor = async ({
 		}
 	}
 
-	await idb.cache.schedule.clear();
-	await idb.cache.schedule.addAll(
+	// Marquee Games: tags of games whose teams or holiday day were edited no longer apply
+	const scheduleBefore = await idb.cache.schedule.getAll();
+	const edited = fixEditedScheduleTags(
 		schedule
 			.filter(
 				(game) => game.type !== "placeholder" && game.type !== "completed",
 			)
-			.map((game) => omit(game, ["gid", "type"])),
+			.map((game) => ({ ...game })),
+		scheduleBefore,
+	);
+
+	await idb.cache.schedule.clear();
+	await idb.cache.schedule.addAll(
+		edited.map((game) => omit(game, ["gid", "type"])),
 	);
 
 	// Realistic schedule length: keep the daily processes calibrated to the edited schedule

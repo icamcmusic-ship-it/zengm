@@ -349,6 +349,15 @@ export const earlyCombineRead = async (draftYear: number) => {
 	) {
 		return false;
 	}
+	// A linked college league's class (automatic import) replaces this class when the season is over: no early read of a class
+	// that is about to be replaced
+	const linked = g.get("linkedCollege");
+	if (
+		linked?.auto &&
+		!linked.imports.some((row) => row.draftYear === draftYear)
+	) {
+		return false;
+	}
 	const level = await getLevelLastThree("scouting", { tid: g.get("userTid") });
 	return level >= EARLY_COMBINE_LEVEL;
 };

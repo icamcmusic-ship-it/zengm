@@ -19,6 +19,8 @@ import { syncExpandedToCompat } from "../player/expandedRatings.ts";
 import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 import { last } from "../../../common/utils.ts";
 
+const ALREADY_IMPORTED = "Already imported.";
+
 const leagueExists = async (lid: number) =>
 	!!(await idb.meta.get("leagues", lid));
 
@@ -358,7 +360,7 @@ export const importLinkedCollegeClass = async ({
 				row.collegeSeason === collegeSeason || row.draftYear === draftYear,
 		)
 	) {
-		return { error: "Already imported." };
+		return { error: ALREADY_IMPORTED };
 	}
 	const file = await buildLinkedClassFile(
 		linked.lid,
@@ -397,7 +399,16 @@ export const autoImportLinkedCollegeClass = async () => {
 		return;
 	}
 	try {
-		await importLinkedCollegeClass({ onlyNew: true });
+		const result = await importLinkedCollegeClass({ onlyNew: true });
+		// The college league is behind or gone: say so, or the generated class staying would look like the link did nothing
+		if (result.error && result.error !== ALREADY_IMPORTED) {
+			await logEvent({
+				type: "info",
+				text: `The ${nextDraftYear()} draft class is not from your linked college league: ${result.error} The generated class stays. <a href="${helpers.leagueUrl(["draft_scouting"])}">Draft Scouting</a>`,
+				showNotification: !local.autoPlayUntil,
+				saveToDb: false,
+			});
+		}
 	} catch (error) {
 		console.error(error);
 	}

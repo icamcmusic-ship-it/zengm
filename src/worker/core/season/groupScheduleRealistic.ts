@@ -199,6 +199,7 @@ const groupScheduleRealistic = (
 			(force || pendingEvents[0]!.afterGames <= tids.length - numRemaining)
 		) {
 			const event = pendingEvents.shift()!;
+			const eventStart = day;
 			if (event.type === "tradeDeadline") {
 				outTids.push([-3, -3]);
 				outDays.push(day);
@@ -207,6 +208,28 @@ const groupScheduleRealistic = (
 				outTids.push([-1, -2]);
 				outDays.push(day + Math.floor(breakLength / 2));
 				day += breakLength;
+			}
+			moveSlatesOffEvent(eventStart, day);
+		}
+	};
+
+	// Marquee Games: a holiday slate on a day the trade deadline or the All-Star break took moves to the next day with games, where
+	// marqueeSchedule's holidayDay puts the holiday (the first day after the event), so that day is kept light instead. A day kept
+	// empty before a holiday (Christmas Eve) that the event took is off anyway.
+	const moveSlatesOffEvent = (start: number, end: number) => {
+		for (let d = start; d < end; d++) {
+			const cap = slateCap.get(d);
+			if (cap === undefined) {
+				continue;
+			}
+			slateCap.delete(d);
+			const priority = slatePriority.get(d);
+			slatePriority.delete(d);
+			if (cap > 0 && !slateCap.has(end)) {
+				slateCap.set(end, cap);
+				if (priority) {
+					slatePriority.set(end, priority);
+				}
 			}
 		}
 	};
