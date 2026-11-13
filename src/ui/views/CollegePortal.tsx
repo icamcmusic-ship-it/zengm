@@ -1,6 +1,7 @@
 // College mode: the transfer portal (docs/college-mode.md)
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
+import { useLocal } from "../util/local.ts";
 import { toWorker } from "../util/toWorker.ts";
 import type { View } from "../../common/types.ts";
 import { TeamName } from "./College/common.tsx";
@@ -21,6 +22,7 @@ const CollegePortal = ({
 	userTid,
 	weeksLeft,
 }: View<"collegePortal">) => {
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 	useTitleBar({ title: "Transfer Portal" });
 	const userAbbrev = teams[userTid]?.abbrev ?? "You";
 	const own = players.filter((p) => p.from === userTid);
@@ -116,7 +118,9 @@ const CollegePortal = ({
 								<tr>
 									<th>Player</th>
 									<th>Pos</th>
-									<th className="text-end">Ovr</th>
+									{challengeNoRatings ? null : (
+										<th className="text-end">Ovr</th>
+									)}
 									<th>From</th>
 									<th>To</th>
 								</tr>
@@ -137,7 +141,9 @@ const CollegePortal = ({
 											</a>
 										</td>
 										<td>{t.pos}</td>
-										<td className="text-end">{t.ovr}</td>
+										{challengeNoRatings ? null : (
+											<td className="text-end">{t.ovr}</td>
+										)}
 										<td className="text-nowrap">
 											<TeamName
 												teams={teams}

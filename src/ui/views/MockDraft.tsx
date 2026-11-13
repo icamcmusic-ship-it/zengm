@@ -3,6 +3,7 @@ import { DraftClassShape } from "../components/DraftClassShape.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
 import { helpers } from "../util/helpers.ts";
+import { useLocal } from "../util/local.ts";
 import { toWorker } from "../util/toWorker.ts";
 import {
 	ProjectionCells,
@@ -33,6 +34,7 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 	>({});
 	const [progress, setProgress] = useState<[number, number] | undefined>();
 	const runId = useRef(0);
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 
 	const run = useCallback(async () => {
 		const id = ++runId.current;
@@ -127,11 +129,19 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 								<th>Player</th>
 								<th>Pos</th>
 								<th>Age</th>
-								<th>Ovr</th>
-								<th>Pot</th>
+								{challengeNoRatings ? null : (
+									<>
+										<th>Ovr</th>
+										<th>Pot</th>
+									</>
+								)}
 								<th title="Rank on your scouting list">Board</th>
 								<th>Why</th>
-								<th title="Projected peak ovr (10th-90th percentile)">Peak</th>
+								{challengeNoRatings ? null : (
+									<th title="Projected peak ovr (10th-90th percentile)">
+										Peak
+									</th>
+								)}
 								<th>Star</th>
 								<th>Starter</th>
 								<th>Bust</th>
@@ -196,13 +206,20 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 										</td>
 										<td>{pick.pos}</td>
 										<td>{pick.age}</td>
-										<td>{pick.ovr}</td>
-										<td>{pick.pot}</td>
+										{challengeNoRatings ? null : (
+											<>
+												<td>{pick.ovr}</td>
+												<td>{pick.pot}</td>
+											</>
+										)}
 										<td>{pick.scoutRank}</td>
 										<td className="small" style={{ minWidth: 180 }}>
 											{pick.reasons.join(" · ")}
 										</td>
-										<ProjectionCells projection={projection} />
+										<ProjectionCells
+											projection={projection}
+											hidePeak={challengeNoRatings}
+										/>
 										<td
 											className={
 												projection

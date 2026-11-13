@@ -880,7 +880,40 @@ export const onPreseason = async () => {
 	await getRecruitingState();
 };
 
-// Prestige follows results slowly: a great season is worth a couple of points, and every program drifts back toward where it started
+// Prestige follows results slowly: a great season is worth a couple of points, and every program drifts back toward where it started.
+// Results are judged against the league: what a program's prestige expects is measured from the league's average prestige (not a fixed
+// level, so a league of power conference schools, all near 90, doesn't sink every season), and the results part averages zero over the
+// league (the tournament bonus would otherwise lift every program a little each season)
+export const prestigeDeltas = (
+	rows: {
+		current: number;
+		base: number;
+		winp: number;
+		playoffRoundsWon: number;
+	}[],
+	numRounds: number,
+) => {
+	if (rows.length === 0) {
+		return [];
+	}
+	const meanPrestige =
+		rows.reduce((sum, row) => sum + row.current, 0) / rows.length;
+	const results = rows.map((row) => {
+		let delta = 6 * (row.winp - 0.5);
+		if (row.playoffRoundsWon >= 0) {
+			delta += 0.5 + (2.5 * row.playoffRoundsWon) / Math.max(1, numRounds);
+		}
+		// What this prestige already expects
+		delta -= (row.current - meanPrestige) / 12;
+		return delta;
+	});
+	const meanResult =
+		results.reduce((sum, delta) => sum + delta, 0) / results.length;
+	return rows.map(
+		(row, i) => results[i]! - meanResult + 0.08 * (row.base - row.current),
+	);
+};
+
 const updatePrestige = async () => {
 	const season = g.get("season") - 1;
 	const teams = await getActiveTeams();
@@ -893,6 +926,7 @@ const updatePrestige = async () => {
 	}
 	const numRounds = g.get("numGamesPlayoffSeries", "current").length;
 	const bySeason = new Map(teamSeasons.map((ts) => [ts.tid, ts]));
+	const rows = [];
 	for (const t of teams) {
 		const ts = bySeason.get(t.tid);
 		if (!ts) {
@@ -903,18 +937,19 @@ const updatePrestige = async () => {
 			continue;
 		}
 		const current = getTeamPrestige(t as any);
-		const base = (t as any).collegePrestigeBase ?? current;
-		const winp = ts.won / gp;
-		let delta = 6 * (winp - 0.5);
-		if (ts.playoffRoundsWon >= 0) {
-			delta += 0.5 + (2.5 * ts.playoffRoundsWon) / Math.max(1, numRounds);
-		}
-		// What this prestige already expects
-		delta -= (current - 70) / 12;
-		delta += 0.08 * (base - current);
+		rows.push({
+			t,
+			current,
+			base: (t as any).collegePrestigeBase ?? current,
+			winp: ts.won / gp,
+			playoffRoundsWon: ts.playoffRoundsWon,
+		});
+	}
+	const deltas = prestigeDeltas(rows, numRounds);
+	for (const [i, { t, current, base }] of rows.entries()) {
 		(t as any).collegePrestigeBase = base;
 		(t as any).collegePrestige =
-			Math.round(helpers.bound(current + delta, 35, 100) * 10) / 10;
+			Math.round(helpers.bound(current + deltas[i]!, 35, 100) * 10) / 10;
 		await idb.cache.teams.put(t);
 	}
 };

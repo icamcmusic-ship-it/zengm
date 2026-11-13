@@ -165,12 +165,15 @@ export const runPopModel = async ({
 	seed,
 	seasons,
 	onSeason,
+	onRegularSeason,
 }: {
 	config: string;
 	settings: Record<string, unknown>;
 	seed: number;
 	seasons: number;
 	onSeason?: (s: SeasonSummary) => void;
+	// Called with the league's players (free agents and rostered) at each regular season, before it is played
+	onRegularSeason?: (players: Player[]) => Promise<void> | void;
 }) => {
 	const origRandom = Math.random;
 	Math.random = mulberry32(seed);
@@ -202,6 +205,8 @@ export const runPopModel = async ({
 				PLAYER.FREE_AGENT,
 				Infinity,
 			]);
+
+			await onRegularSeason?.(players);
 
 			// Regular season
 			await simInjuries(players);
