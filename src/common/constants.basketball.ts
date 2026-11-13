@@ -476,6 +476,7 @@ export const PLAYER_STATS_TABLES = {
 	clutch: {
 		name: "Clutch",
 		stats: [
+			"gp",
 			"clGp",
 			"clMin",
 			"clPts",

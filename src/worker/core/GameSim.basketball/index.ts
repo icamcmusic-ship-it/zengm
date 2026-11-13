@@ -522,6 +522,7 @@ class GameSim extends GameSimBase {
 	adv: AdvTracker | undefined;
 	advTransition = false;
 	advQuick = false;
+	advThreePointers = true;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -573,6 +574,7 @@ class GameSim extends GameSimBase {
 			nativeFeatureEnabled("advStats", (key) => g.get(key as any))
 		) {
 			this.adv = new AdvTracker(gid, teams, g.get("numPlayersOnCourt"));
+			this.advThreePointers = !!g.get("threePointers");
 		}
 
 		// Player traits: one normal draw per player per game for his game-to-game form, only when he has trait effects
@@ -898,7 +900,6 @@ class GameSim extends GameSimBase {
 				delete p.compositeRating;
 				delete p.traitEffects;
 				delete p.gameZ;
-				delete (p as any).advR;
 
 				// @ts-expect-error
 				delete p.ptModifier;
@@ -1886,6 +1887,10 @@ class GameSim extends GameSimBase {
 		let substitutions = false;
 		let blowout = false;
 		const lateGame = this.isLateGame();
+		if (this.adv) {
+			// (the tracker re-reads the lineups at the next possession)
+			this.adv.dirty = true;
+		}
 
 		const foulsNeededToFoulOut = g.get("foulsNeededToFoulOut");
 
@@ -4421,19 +4426,21 @@ class GameSim extends GameSimBase {
 			(type === "putBack" ||
 				(quick && (p === this.lastOrbPlayer || type === "atRim")));
 		const j = this.playersOnCourt[this.o].indexOf(p);
-		const slot = this.playersOnCourt[this.d][j >= 0 ? j : 0];
-		const defender = this.matchupDefense ? (this.defenderOf(p) ?? slot) : slot;
-		this.adv!.shot({
-			shooter: p,
+		const defender =
+			this.matchupDefense && j >= 0
+				? this.playersOnCourt[this.d][this.guards[this.d][j] ?? j]
+				: this.playersOnCourt[this.d][j >= 0 ? j : 0];
+		this.adv!.shot(
+			p,
 			passer,
-			creator: this.spacingCreation ? this.creator : undefined,
+			this.spacingCreation ? this.creator : undefined,
 			type,
 			tipInFromOutOfBounds,
 			transition,
 			putback,
 			defender,
-			threePointers: !!g.get("threePointers"),
-		});
+			this.advThreePointers,
+		);
 	}
 
 	// Advanced Tracking Stats: a turnover by the offensive rebounder right after his rebound counts as a putback possession
@@ -5754,7 +5761,7 @@ class GameSim extends GameSimBase {
 			this.playByPlay.logStat(t, p === undefined ? undefined : p.id, s, amt);
 		}
 
-		if (this.adv !== undefined) {
+		if (this.adv !== undefined && (s === "pts" || this.adv.clutch)) {
 			this.adv.stat(t, p, s, amt, this.playersOnCourt);
 		}
 	}

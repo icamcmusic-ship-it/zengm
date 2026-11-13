@@ -873,9 +873,14 @@ const advSummary = async (season: number) => {
 			max: r(Math.max(...xs)),
 		};
 	};
-	const teamRows = (await idb.cache.teamStats.getAll()).filter(
-		(row) => row.season === season && !row.playoffs && row.adv,
-	);
+	const teamRows = [];
+	for (const tid of g.get("teamInfoCache").keys()) {
+		for (const row of await idb.merged.teamStats.getAll({ tid, season })) {
+			if (!row.playoffs && row.adv) {
+				teamRows.push(row);
+			}
+		}
+	}
 	let teamSec = 0;
 	let clSec = 0;
 	let clPts = 0;
@@ -894,9 +899,7 @@ const advSummary = async (season: number) => {
 	}
 	return {
 		poss: profile.poss,
-		freq: Object.fromEntries(
-			profile.types.map((t) => [t.key, r(t.freq ?? 0)]),
-		),
+		freq: Object.fromEntries(profile.types.map((t) => [t.key, r(t.freq ?? 0)])),
 		ppp: Object.fromEntries(
 			profile.types.map((t) => [t.key, r(t.ppp ?? 0, 3)]),
 		),

@@ -162,6 +162,7 @@ const PlayerStats = ({
 			shootingSplits: "cs3a",
 			trackingDefense: "dfga",
 			clutch: "clPts",
+			onOff: "min",
 		} as Record<string, string | undefined>
 	)[statType];
 	if (advSortStat !== undefined && stats.includes(advSortStat as any)) {

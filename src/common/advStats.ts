@@ -96,7 +96,14 @@ export const ADV_LEN = NUM_PT * PT_FIELDS + 44;
 
 export const ptIndex = (pt: number, field: number) => pt * PT_FIELDS + field;
 
-export const newAdv = () => new Array<number>(ADV_LEN).fill(0);
+// (a packed array: pushed, not filled, so element access stays fast in the game sim)
+export const newAdv = () => {
+	const a: number[] = [];
+	for (let i = 0; i < ADV_LEN; i++) {
+		a.push(0);
+	}
+	return a;
+};
 
 // Adds b into a (both player arrays), in place. a may be shorter (an older layout)
 export const addAdv = (a: number[], b: readonly number[]) => {
@@ -162,6 +169,24 @@ export const pruneLineups = (
 		.slice(0, keep);
 };
 
+// Lineup row index by a hash of its pids, for each season's lineup array (rebuilt only when the array is replaced, like after a prune)
+const lineupIndexes = new WeakMap<number[][], Map<number, number[]>>();
+const lineupHash = (row: readonly number[], numPlayers: number) => {
+	let h = 0;
+	for (let i = 0; i < numPlayers; i++) {
+		h = (Math.imul(h, 1000003) + row[i]!) | 0;
+	}
+	return h;
+};
+const samePids = (a: readonly number[], b: readonly number[], n: number) => {
+	for (let i = 0; i < n; i++) {
+		if (a[i] !== b[i]) {
+			return false;
+		}
+	}
+	return true;
+};
+
 // Adds a game's team adv into a season's, in place
 export const addTeamAdv = (
 	a: TeamAdv,
@@ -171,13 +196,21 @@ export const addTeamAdv = (
 	for (let i = 0; i < b.t.length; i++) {
 		a.t[i] = (a.t[i] ?? 0) + (b.t[i] ?? 0);
 	}
-	const byKey = new Map<string, number[]>();
-	for (const row of a.lu) {
-		byKey.set(row.slice(0, numPlayers).join(","), row);
+	let byHash = lineupIndexes.get(a.lu);
+	if (!byHash) {
+		byHash = new Map();
+		for (const row of a.lu) {
+			byHash.set(lineupHash(row, numPlayers), row);
+		}
+		lineupIndexes.set(a.lu, byHash);
 	}
 	for (const row of b.lu) {
-		const key = row.slice(0, numPlayers).join(",");
-		const existing = byKey.get(key);
+		const h = lineupHash(row, numPlayers);
+		let existing = byHash.get(h);
+		if (existing && !samePids(existing, row, numPlayers)) {
+			// (a hash collision)
+			existing = a.lu.find((row2) => samePids(row2, row, numPlayers));
+		}
 		if (existing) {
 			for (let i = numPlayers; i < row.length; i++) {
 				existing[i] = (existing[i] ?? 0) + row[i]!;
@@ -185,7 +218,9 @@ export const addTeamAdv = (
 		} else {
 			const copy = [...row];
 			a.lu.push(copy);
-			byKey.set(key, copy);
+			if (!byHash.has(h)) {
+				byHash.set(h, copy);
+			}
 		}
 	}
 	if (a.lu.length > LINEUPS_MAX) {
@@ -593,7 +628,7 @@ export const ADV_STAT_META: Record<
 			format: "pm",
 		},
 		clGp: {
-			title: "G",
+			title: "CG",
 			desc: "Games with clutch minutes (last 5 minutes of the 4th quarter or overtime, margin within 5)",
 			format: "count",
 		},

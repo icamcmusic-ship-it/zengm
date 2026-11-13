@@ -4,22 +4,33 @@
 // Recording never changes a game: nothing here draws a random number (the classifier splits ambiguous plays with a hash of the game id
 // and a counter, not Math.random) or touches anything the sim reads. With the setting off the GameSim has no tracker and none of this runs.
 import {
-	ADV,
-	LU,
-	LU_FIELDS,
+	ADV as ADV_,
+	LU as LU_,
 	newAdv,
-	PT_FGA,
-	PT_FGM,
-	PT_INDEX,
-	PT_POSS,
-	PT_TOV,
-	PT_PTS,
-	ptIndex,
-	TEAM_ADV,
-	TEAM_ADV_LEN,
+	PT_FIELDS as PT_FIELDS_,
+	PT_FGA as PT_FGA_,
+	PT_FGM as PT_FGM_,
+	PT_INDEX as PT_INDEX_,
+	PT_POSS as PT_POSS_,
+	PT_TOV as PT_TOV_,
+	PT_PTS as PT_PTS_,
+	TEAM_ADV as TEAM_ADV_,
 	type PlayTypeKey,
 	type TeamAdv,
 } from "../../../common/advStats.ts";
+
+// Local copies of the layout (read once: these are read in the sim's hot path, where a module binding can cost a getter call)
+const ADV = { ...ADV_ };
+const LU = { ...LU_ };
+const TEAM_ADV = { ...TEAM_ADV_ };
+const PT_INDEX = { ...PT_INDEX_ };
+const PT_FIELDS = PT_FIELDS_;
+const PT_FGA = PT_FGA_;
+const PT_FGM = PT_FGM_;
+const PT_POSS = PT_POSS_;
+const PT_TOV = PT_TOV_;
+const PT_PTS = PT_PTS_;
+const ptIndex = (pt: number, field: number) => pt * PT_FIELDS + field;
 
 type TeamNum = 0 | 1;
 
@@ -28,8 +39,9 @@ export type AdvPlayer = {
 	id: number;
 	stat: any;
 	compositeRating: any;
-	// Raw ratings, set by loadTeams with the setting on
-	advR?: { hgt: number; drb: number; pss: number; spd: number };
+	// Raw ratings (loadTeams sets them for the play-by-play wording)
+	pbpRatings?: Record<string, number>;
+	// The player's record, set at the end of the game (the sim's player objects get no new property while it plays)
 	adv?: number[];
 };
 type AdvTeam = {
@@ -52,7 +64,13 @@ const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
 // his raw ratings (height 35 → 70, average of dribbling and passing 35 → 70, speed 40 → 80), and whether he leans to isolation (dribbling
 // over passing)
 export const roleOf = (p: AdvPlayer) => {
-	const r = p.advR ?? { hgt: 50, drb: 50, pss: 50, spd: 50 };
+	const pr = p.pbpRatings;
+	const r = {
+		hgt: pr?.hgt ?? 50,
+		drb: pr?.drb ?? 50,
+		pss: pr?.pss ?? 50,
+		spd: pr?.spd ?? 50,
+	};
 	return {
 		big: clamp01((r.hgt - 35) / 35),
 		creator: clamp01(((r.drb + r.pss) / 2 - 35) / 35),
@@ -75,19 +93,36 @@ const hashUnit = (a: number, b: number) => {
 
 type Weights = Partial<Record<PlayTypeKey, number>>;
 
+const PICK_KEYS: readonly PlayTypeKey[] = [
+	"prb",
+	"prr",
+	"iso",
+	"post",
+	"spot",
+	"cut",
+	"offs",
+	"ho",
+	"tr",
+	"pb",
+	"misc",
+];
+
 export const pickPlayType = (w: Weights, u: number): PlayTypeKey => {
 	let total = 0;
-	for (const key in w) {
-		total += Math.max(0, w[key as PlayTypeKey]!);
+	for (const key of PICK_KEYS) {
+		const v = w[key];
+		if (v !== undefined && v > 0) {
+			total += v;
+		}
 	}
 	let x = u * total;
 	let last: PlayTypeKey = "misc";
-	for (const key in w) {
-		const v = Math.max(0, w[key as PlayTypeKey]!);
-		if (v <= 0) {
+	for (const key of PICK_KEYS) {
+		const v = w[key];
+		if (v === undefined || v <= 0) {
 			continue;
 		}
-		last = key as PlayTypeKey;
+		last = key;
 		if (x < v) {
 			return last;
 		}
@@ -174,19 +209,6 @@ export const turnoverWeights = (p: Role): Weights => ({
 const isRim = (type: ShotKind) =>
 	type === "atRim" || type === "putBack" || type === "tipIn";
 
-// What the sim knows about the shot that is up
-export type ShotContext = {
-	shooter: AdvPlayer;
-	passer: AdvPlayer | undefined;
-	creator: AdvPlayer | undefined;
-	type: ShotKind;
-	tipInFromOutOfBounds: boolean;
-	transition: boolean;
-	putback: boolean;
-	defender: AdvPlayer | undefined;
-	threePointers: boolean;
-};
-
 type Current = {
 	p: AdvPlayer;
 	pt: number;
@@ -203,20 +225,40 @@ export class AdvTracker {
 	numPlayers: number;
 	counter = 0;
 	roles = new Map<AdvPlayer, Role>();
+	// Each player's record while the game is played
+	arr = new Map<AdvPlayer, number[]>();
 	// The play being recorded (from the shot until the end of the possession segment)
 	cur: Current | undefined;
+	curObj: Current = {
+		p: { id: -1, stat: {}, compositeRating: {} },
+		pt: 0,
+		type: "atRim",
+		assisted: false,
+		transition: false,
+		defender: undefined,
+		threePointer: false,
+	};
 	clutch = false;
+	// The lineups may have changed (GameSim.updatePlayersOnCourt ran)
+	dirty = true;
 	lastO: TeamNum | undefined;
 	lastPeriod = 0;
 	teamTotals: [number[], number[]] = [
-		new Array(TEAM_ADV_LEN).fill(0),
-		new Array(TEAM_ADV_LEN).fill(0),
+		[0, 0, 0, 0, 0, 0, 0],
+		[0, 0, 0, 0, 0, 0, 0],
 	];
 	oppRim: [number, number] = [0, 0];
-	lineups: [Map<string, number[]>, Map<string, number[]>] = [
+	ptsFor: [number, number] = [0, 0];
+	ptsAgainst: [number, number] = [0, 0];
+	lineups: [Map<number, number[]>, Map<number, number[]>] = [
 		new Map(),
 		new Map(),
 	];
+	lineupCollisions: [Map<string, number[]>, Map<string, number[]>] = [
+		new Map(),
+		new Map(),
+	];
+	scratch: number[] = [];
 	lineupCache: [AdvPlayer[], AdvPlayer[]] = [[], []];
 	lineupRow: [number[] | undefined, number[] | undefined] = [
 		undefined,
@@ -224,12 +266,13 @@ export class AdvTracker {
 	];
 
 	constructor(gid: number, teams: [AdvTeam, AdvTeam], numPlayers: number) {
+		const template = newAdv();
 		this.gid = gid;
 		this.teams = teams;
 		this.numPlayers = numPlayers;
 		for (const t of teams) {
 			for (const p of t.player) {
-				p.adv = newAdv();
+				this.arr.set(p, template.slice());
 			}
 		}
 	}
@@ -248,24 +291,76 @@ export class AdvTracker {
 		return hashUnit(this.gid, this.counter);
 	}
 
+	// The row of team t's current lineup (no allocation unless the lineup changed, and then only for a new lineup)
 	lineup(t: TeamNum, onCourt: AdvPlayer[]) {
 		const cache = this.lineupCache[t];
-		let same = cache.length === onCourt.length;
+		let same =
+			cache.length === onCourt.length && this.lineupRow[t] !== undefined;
 		for (let i = 0; same && i < onCourt.length; i++) {
 			same = cache[i] === onCourt[i];
 		}
-		if (!same || !this.lineupRow[t]) {
-			this.lineupCache[t] = [...onCourt];
-			const pids = onCourt.map((p) => p.id).sort((a, b) => a - b);
-			const key = pids.join(",");
-			let row = this.lineups[t].get(key);
-			if (!row) {
-				row = [...pids, ...new Array(LU_FIELDS).fill(0)];
-				this.lineups[t].set(key, row);
-			}
-			this.lineupRow[t] = row;
+		if (same) {
+			return this.lineupRow[t]!;
 		}
-		return this.lineupRow[t]!;
+		// On/off by stints: a player's on-court totals are the team's counters when he leaves minus when he came in
+		for (const p of cache) {
+			if (!onCourt.includes(p)) {
+				this.stint(t, p, 1);
+			}
+		}
+		for (const p of onCourt) {
+			if (!cache.includes(p)) {
+				this.stint(t, p, -1);
+			}
+		}
+		cache.length = onCourt.length;
+		const ids = this.scratch;
+		ids.length = onCourt.length;
+		for (let i = 0; i < onCourt.length; i++) {
+			cache[i] = onCourt[i]!;
+			// Insertion sort of the ids
+			const id = onCourt[i]!.id;
+			let j = i;
+			while (j > 0 && ids[j - 1]! > id) {
+				ids[j] = ids[j - 1]!;
+				j -= 1;
+			}
+			ids[j] = id;
+		}
+		let h = 0;
+		for (const id of ids) {
+			h = (Math.imul(h, 1000003) + id) | 0;
+		}
+		let row = this.lineups[t].get(h);
+		if (row !== undefined) {
+			for (let i = 0; i < ids.length; i++) {
+				if (row[i] !== ids[i]) {
+					// (a hash collision: look the lineup up by its ids)
+					const key = ids.join(",");
+					row = this.lineupCollisions[t].get(key);
+					if (!row) {
+						row = [...ids, 0, 0, 0, 0, 0];
+						this.lineupCollisions[t].set(key, row);
+					}
+					break;
+				}
+			}
+		} else {
+			row = [...ids, 0, 0, 0, 0, 0];
+			this.lineups[t].set(h, row);
+		}
+		this.lineupRow[t] = row;
+		return row!;
+	}
+
+	stint(t: TeamNum, p: AdvPlayer, sign: 1 | -1) {
+		const a = this.arr.get(p)!;
+		const totals = this.teamTotals[t];
+		a[ADV.possFor]! += sign * totals[TEAM_ADV.possFor]!;
+		a[ADV.possAgainst]! += sign * totals[TEAM_ADV.possAgainst]!;
+		a[ADV.ptsFor]! += sign * this.ptsFor[t];
+		a[ADV.ptsAgainst]! += sign * this.ptsAgainst[t];
+		a[ADV.oppRimOn]! += sign * this.oppRim[t];
 	}
 
 	// Start of each possession segment (simPossession): a new possession when the ball changed hands or a period started
@@ -277,26 +372,28 @@ export class AdvTracker {
 	) {
 		this.cur = undefined;
 		this.clutch = clutch;
+		// The lineups of this segment (time() and stat() use these rows, substitutions happen between segments)
+		if (this.dirty) {
+			this.lineup(0, onCourt[0]);
+			this.lineup(1, onCourt[1]);
+			this.dirty = false;
+		}
+		const rowO = this.lineupRow[o]!;
+		const rowD = this.lineupRow[o === 0 ? 1 : 0]!;
 		if (o === this.lastO && period === this.lastPeriod) {
 			return;
 		}
 		this.lastO = o;
 		this.lastPeriod = period;
 		const d: TeamNum = o === 0 ? 1 : 0;
-		for (const p of onCourt[o]) {
-			p.adv![ADV.possFor]! += 1;
-		}
-		for (const p of onCourt[d]) {
-			p.adv![ADV.possAgainst]! += 1;
-		}
 		this.teamTotals[o][TEAM_ADV.possFor]! += 1;
 		this.teamTotals[d][TEAM_ADV.possAgainst]! += 1;
 		if (clutch) {
 			this.teamTotals[o][TEAM_ADV.clPossFor]! += 1;
 			this.teamTotals[d][TEAM_ADV.clPossAgainst]! += 1;
 		}
-		this.lineup(o, onCourt[o])[this.numPlayers + LU.possFor]! += 1;
-		this.lineup(d, onCourt[d])[this.numPlayers + LU.possAgainst]! += 1;
+		rowO[this.numPlayers + LU.possFor]! += 1;
+		rowD[this.numPlayers + LU.possAgainst]! += 1;
 	}
 
 	possessionEnd() {
@@ -305,37 +402,46 @@ export class AdvTracker {
 
 	// Time played in the possession segment
 	time(seconds: number, onCourt: [AdvPlayer[], AdvPlayer[]]) {
-		for (const t of [0, 1] as const) {
-			this.lineup(t, onCourt[t])[this.numPlayers + LU.sec]! += seconds;
-			if (this.clutch) {
+		const i = this.numPlayers + LU.sec;
+		this.lineupRow[0]![i]! += seconds;
+		this.lineupRow[1]![i]! += seconds;
+		if (this.clutch) {
+			for (const t of [0, 1] as const) {
 				this.teamTotals[t][TEAM_ADV.clSec]! += seconds;
 				for (const p of onCourt[t]) {
-					p.adv![ADV.clSec]! += seconds;
+					this.arr.get(p)![ADV.clSec]! += seconds;
 				}
 			}
 		}
 	}
 
 	// A shot goes up (or a shooting foul on one): its play type
-	shot(ctx: ShotContext) {
-		const { shooter, type } = ctx;
+	shot(
+		shooter: AdvPlayer,
+		passer: AdvPlayer | undefined,
+		creator: AdvPlayer | undefined,
+		type: ShotKind,
+		tipInFromOutOfBounds: boolean,
+		transition: boolean,
+		putback: boolean,
+		defender: AdvPlayer | undefined,
+		threePointers: boolean,
+	) {
 		let key: PlayTypeKey;
-		let assisted = ctx.passer !== undefined;
-		if (type === "tipIn" && ctx.tipInFromOutOfBounds) {
+		const assisted = passer !== undefined;
+		if (type === "tipIn" && tipInFromOutOfBounds) {
 			key = "misc";
-		} else if (ctx.transition) {
+		} else if (transition) {
 			key = "tr";
-		} else if (ctx.putback) {
+		} else if (putback) {
 			key = "pb";
 		} else if (type === "lowPost") {
 			key = "post";
 		} else {
 			// With Spacing & Shot Creation the creator passed to the shooter even when no assist is credited
 			const from =
-				ctx.passer ??
-				(ctx.creator !== undefined && ctx.creator !== shooter
-					? ctx.creator
-					: undefined);
+				passer ??
+				(creator !== undefined && creator !== shooter ? creator : undefined);
 			const weights = shotWeights(
 				type,
 				this.role(shooter),
@@ -343,20 +449,18 @@ export class AdvTracker {
 			);
 			key = pickPlayType(weights, this.unit());
 		}
-		if (type === "putBack" || type === "tipIn") {
-			assisted = ctx.passer !== undefined;
-		}
 		const pt = PT_INDEX[key];
-		shooter.adv![ptIndex(pt, PT_POSS)]! += 1;
-		this.cur = {
-			p: shooter,
-			pt,
-			type,
-			assisted,
-			transition: ctx.transition,
-			defender: ctx.defender,
-			threePointer: type === "threePointer" && ctx.threePointers,
-		};
+		this.arr.get(shooter)![ptIndex(pt, PT_POSS)]! += 1;
+		// (one object reused for every shot)
+		const cur = this.curObj;
+		cur.p = shooter;
+		cur.pt = pt;
+		cur.type = type;
+		cur.assisted = assisted;
+		cur.transition = transition;
+		cur.defender = defender;
+		cur.threePointer = type === "threePointer" && threePointers;
+		this.cur = cur;
 	}
 
 	// The shot's result (not called for a missed shot that drew a foul, which is not a field goal attempt). blocker: the shot was blocked
@@ -370,7 +474,7 @@ export class AdvTracker {
 		if (!cur) {
 			return;
 		}
-		const a = cur.p.adv!;
+		const a = this.arr.get(cur.p)!;
 		a[ptIndex(cur.pt, PT_FGA)]! += 1;
 		const three = cur.type === "threePointer";
 		if (made) {
@@ -400,8 +504,8 @@ export class AdvTracker {
 
 		// Defense
 		const defender = blocker ?? cur.defender;
-		if (defender?.adv) {
-			const da = defender.adv;
+		const da = defender ? this.arr.get(defender) : undefined;
+		if (da) {
 			da[three ? ADV.dfga3 : ADV.dfga2]! += 1;
 			if (made) {
 				da[three ? ADV.dfgm3 : ADV.dfgm2]! += 1;
@@ -415,7 +519,6 @@ export class AdvTracker {
 			let protector: AdvPlayer | undefined;
 			let best = -Infinity;
 			for (const p of onCourtD) {
-				p.adv![ADV.oppRimOn]! += 1;
 				const v = p.compositeRating.blocking ?? 0;
 				if (v > best) {
 					best = v;
@@ -423,9 +526,10 @@ export class AdvTracker {
 				}
 			}
 			if (protector) {
-				protector.adv![ADV.rimDfga]! += 1;
+				const pa = this.arr.get(protector)!;
+				pa[ADV.rimDfga]! += 1;
 				if (made) {
-					protector.adv![ADV.rimDfgm]! += 1;
+					pa[ADV.rimDfgm]! += 1;
 				}
 			}
 		}
@@ -441,8 +545,9 @@ export class AdvTracker {
 			key = pickPlayType(turnoverWeights(this.role(p)), this.unit());
 		}
 		const pt = PT_INDEX[key];
-		p.adv![ptIndex(pt, PT_POSS)]! += 1;
-		p.adv![ptIndex(pt, PT_TOV)]! += 1;
+		const a = this.arr.get(p)!;
+		a[ptIndex(pt, PT_POSS)]! += 1;
+		a[ptIndex(pt, PT_TOV)]! += 1;
 		this.cur = undefined;
 	}
 
@@ -457,33 +562,33 @@ export class AdvTracker {
 		if (s === "pts") {
 			const o = t;
 			const d: TeamNum = t === 0 ? 1 : 0;
-			for (const q of onCourt[o]) {
-				q.adv![ADV.ptsFor]! += amt;
-				if (this.clutch) {
-					q.adv![ADV.clPm]! += amt;
+			this.ptsFor[o] += amt;
+			this.ptsAgainst[d] += amt;
+			if (this.clutch) {
+				for (const q of onCourt[o]) {
+					this.arr.get(q)![ADV.clPm]! += amt;
+				}
+				for (const q of onCourt[d]) {
+					this.arr.get(q)![ADV.clPm]! -= amt;
 				}
 			}
-			for (const q of onCourt[d]) {
-				q.adv![ADV.ptsAgainst]! += amt;
-				if (this.clutch) {
-					q.adv![ADV.clPm]! -= amt;
-				}
-			}
-			this.lineup(o, onCourt[o])[this.numPlayers + LU.ptsFor]! += amt;
-			this.lineup(d, onCourt[d])[this.numPlayers + LU.ptsAgainst]! += amt;
+			const rowO = this.lineupRow[o] ?? this.lineup(o, onCourt[o]);
+			const rowD = this.lineupRow[d] ?? this.lineup(d, onCourt[d]);
+			rowO[this.numPlayers + LU.ptsFor]! += amt;
+			rowD[this.numPlayers + LU.ptsAgainst]! += amt;
 			if (this.clutch) {
 				this.teamTotals[o][TEAM_ADV.clPtsFor]! += amt;
 				this.teamTotals[d][TEAM_ADV.clPtsAgainst]! += amt;
 			}
 			if (this.cur && p === this.cur.p) {
-				p.adv![ptIndex(this.cur.pt, PT_PTS)]! += amt;
+				this.arr.get(p)![ptIndex(this.cur.pt, PT_PTS)]! += amt;
 			}
 		}
 		if (!this.clutch) {
 			return;
 		}
-		if (p?.adv) {
-			const a = p.adv;
+		const a = p ? this.arr.get(p) : undefined;
+		if (a) {
 			switch (s) {
 				case "pts":
 					a[ADV.clPts]! += amt;
@@ -521,13 +626,20 @@ export class AdvTracker {
 						: undefined;
 		if (tm !== undefined) {
 			for (const q of onCourt[t]) {
-				q.adv![tm]! += amt;
+				this.arr.get(q)![tm]! += amt;
 			}
 		}
 	}
 
 	// End of the game: the players' and teams' records, on the objects the sim returns (players who didn't play get none)
 	finish() {
+		// Close the stints of the players on the court
+		for (const t of [0, 1] as const) {
+			for (const p of this.lineupCache[t]) {
+				this.stint(t, p, 1);
+			}
+			this.lineupCache[t] = [];
+		}
 		for (const t of [0, 1] as const) {
 			const d: TeamNum = t === 0 ? 1 : 0;
 			const totals = this.teamTotals[t];
@@ -540,11 +652,11 @@ export class AdvTracker {
 				0,
 			);
 			for (const p of this.teams[t].player) {
-				const a = p.adv!;
 				if (!(p.stat.min > 0)) {
-					delete p.adv;
 					continue;
 				}
+				const a = this.arr.get(p)!;
+				p.adv = a;
 				a[ADV.tmPossFor] = totals[TEAM_ADV.possFor]!;
 				a[ADV.tmPossAgainst] = totals[TEAM_ADV.possAgainst]!;
 				a[ADV.tmPtsFor] = ptsFor;
@@ -555,7 +667,10 @@ export class AdvTracker {
 			}
 			totals[TEAM_ADV.clSec] = Math.round(totals[TEAM_ADV.clSec]!);
 			const lu: number[][] = [];
-			for (const row of this.lineups[t].values()) {
+			for (const row of [
+				...this.lineups[t].values(),
+				...this.lineupCollisions[t].values(),
+			]) {
 				row[this.numPlayers + LU.sec] = Math.round(
 					row[this.numPlayers + LU.sec]!,
 				);

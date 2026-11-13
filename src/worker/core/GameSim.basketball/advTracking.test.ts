@@ -258,13 +258,13 @@ describe("play type classifier", () => {
 		id: 1,
 		stat: {},
 		compositeRating: {},
-		advR: { hgt: 25, drb: 75, pss: 70, spd: 75 },
+		pbpRatings: { hgt: 25, drb: 75, pss: 70, spd: 75 },
 	});
 	const big = roleOf({
 		id: 2,
 		stat: {},
 		compositeRating: {},
-		advR: { hgt: 75, drb: 30, pss: 35, spd: 45 },
+		pbpRatings: { hgt: 75, drb: 30, pss: 35, spd: 45 },
 	});
 	const share = (w: ReturnType<typeof shotWeights>, key: string) => {
 		let total = 0;
