@@ -247,6 +247,31 @@ test("realisticRotations: games still sane, regular season and playoffs", async 
 	checkSane(await simGames({ realisticRotations: true }, SEEDS, true));
 });
 
+test("realisticRotations: an Elam ending is closed by the rotation, not the end of the bench", async () => {
+	const benchMinutes = async (elam: boolean) => {
+		let min = 0;
+		let n = 0;
+		for (const { result } of await simGames(
+			{ realisticRotations: true, elam } as any,
+			SEEDS,
+		)) {
+			for (const t of result.team) {
+				// genTeams puts the best players first
+				for (const p of t.player.slice(9)) {
+					min += p.stat.min;
+				}
+				n += 1;
+			}
+		}
+		return min / n;
+	};
+	const off = await benchMinutes(false);
+	const on = await benchMinutes(true);
+	// It was about 6.5 more minutes a game: the untimed clock (Infinity) made everyone with planned minutes look far ahead of plan
+	assert.isBelow(on, off + 3);
+	g.setWithoutSavingToDB("elam", false);
+});
+
 test("all three on, with every other sim extra: games still sane", async () => {
 	checkSane(
 		await simGames(

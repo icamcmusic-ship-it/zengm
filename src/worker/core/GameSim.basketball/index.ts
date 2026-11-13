@@ -1481,7 +1481,9 @@ class GameSim extends GameSimBase {
 	elapsedRegulationSeconds() {
 		const quarterSeconds = this.rotationQuarterSeconds;
 		const period = this.team[0].stat.ptsQtrs.length;
-		if (period > this.numPeriods) {
+		// Overtime, or an Elam ending (untimed, the clock is Infinity): all of regulation, like overtime. Before, an Elam ending gave
+		// -Infinity, so every player with planned minutes looked far ahead of his plan and the end of the bench closed the game
+		if (period > this.numPeriods || !Number.isFinite(this.t)) {
 			return this.numPeriods * quarterSeconds;
 		}
 		const t = this.t ?? quarterSeconds;
