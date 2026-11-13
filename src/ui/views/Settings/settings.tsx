@@ -120,6 +120,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	injuryDepth: "League extras: Players",
 	expandedRatings: "League extras: Players",
 	subRatings: "League extras: Players",
+	subRatingsSim: "League extras: Players",
 	ovrV2: "League extras: Players",
 	realisticAging: "League extras: Players",
 	archetypes: "League extras: Players",
