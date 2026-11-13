@@ -327,6 +327,10 @@ export const scoutFromId = (
 	};
 };
 
+// Scouting Director & Regions (scout careers): scout id -> the season he left early (poached, promoted, retired). The slot's next scout
+// starts that season, and the rest of the chain follows from there with the same tenures. Missing: the plain seeded chains
+export type ScoutCuts = Record<number, number>;
+
 // The chain of scouts in one slot: each stays 2-10 years. The first one was hired before the league started
 const slotChain = (
 	leagueSeed: string,
@@ -334,14 +338,20 @@ const slotChain = (
 	slot: number,
 	startingSeason: number,
 	upTo: number,
+	cuts?: ScoutCuts,
 ) => {
 	const out: { id: number; since: number; until: number }[] = [];
 	const rng = new Rng(`scoutSlot|${leagueSeed}|${tid}|${slot}`);
 	let year = startingSeason - rng.int(0, 7);
 	for (let index = 0; index < 999 && year <= upTo; index++) {
-		const tenure = rng.int(2, 10);
+		let tenure = rng.int(2, 10);
+		const id = scoutId(tid, slot, index);
+		const cut = cuts?.[id];
+		if (cut !== undefined && cut > year && cut < year + tenure) {
+			tenure = cut - year;
+		}
 		out.push({
-			id: scoutId(tid, slot, index),
+			id,
 			since: year,
 			until: year + tenure,
 		});
@@ -359,12 +369,14 @@ export const getDepartment = ({
 	season,
 	level,
 	startingSeason,
+	cuts,
 }: {
 	leagueSeed: string;
 	tid: number;
 	season: number;
 	level: number;
 	startingSeason: number;
+	cuts?: ScoutCuts;
 }): ScoutDepartment => {
 	// No budget data (budget off, a new team): an average department
 	if (!Number.isFinite(level)) {
@@ -374,7 +386,14 @@ export const getDepartment = ({
 	const quality = departmentQualityForLevel(level);
 	const scouts: Scout[] = [];
 	for (let slot = 0; slot < size; slot++) {
-		const chain = slotChain(leagueSeed, tid, slot, startingSeason, season);
+		const chain = slotChain(
+			leagueSeed,
+			tid,
+			slot,
+			startingSeason,
+			season,
+			cuts,
+		);
 		const current = chain.find((c) => c.since <= season && season < c.until);
 		if (current) {
 			const s = scoutFromId(
@@ -407,19 +426,28 @@ export const departmentHistory = ({
 	season,
 	level,
 	startingSeason,
+	cuts,
 }: {
 	leagueSeed: string;
 	tid: number;
 	season: number;
 	level: number;
 	startingSeason: number;
+	cuts?: ScoutCuts;
 }) => {
 	const lvl = Number.isFinite(level) ? level : 34;
 	const quality = departmentQualityForLevel(lvl);
 	const out: Scout[] = [];
 	// Only the slots the department has now
 	for (let slot = 0; slot < departmentSize(lvl); slot++) {
-		for (const c of slotChain(leagueSeed, tid, slot, startingSeason, season)) {
+		for (const c of slotChain(
+			leagueSeed,
+			tid,
+			slot,
+			startingSeason,
+			season,
+			cuts,
+		)) {
 			if (c.until > startingSeason - 1 && c.since <= season) {
 				out.push(scoutFromId(leagueSeed, c.id, quality, c.since, c.until));
 			}
@@ -435,9 +463,10 @@ export const scoutById = (
 	startingSeason: number,
 	upTo: number,
 	levelQuality = 0.5,
+	cuts?: ScoutCuts,
 ) => {
 	const { tid, slot } = parseScoutId(id);
-	const c = slotChain(leagueSeed, tid, slot, startingSeason, upTo).find(
+	const c = slotChain(leagueSeed, tid, slot, startingSeason, upTo, cuts).find(
 		(x) => x.id === id,
 	);
 	return c

@@ -112,6 +112,8 @@ export const routeInfos = {
 	"/l/:lid/player_scouting/:pid/:scout": "playerScouting",
 	"/l/:lid/scouting_department": "scoutingDepartment",
 	"/l/:lid/scouting_department/:team": "scoutingDepartment",
+	"/l/:lid/pro_scouting": "proScouting",
+	"/l/:lid/staff_report": "staffReport",
 	"/l/:lid/negotiation": "negotiationList",
 	"/l/:lid/player_rating_dists": "playerRatingDists",
 	"/l/:lid/player_rating_dists/:season": "playerRatingDists",

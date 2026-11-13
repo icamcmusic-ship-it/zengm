@@ -1,4 +1,5 @@
 import { addSimFatigue, getSimFrontOffice } from "../frontOffice/index.ts";
+import { getConditioningInjuryFactor } from "../staffDepth/coaching.ts";
 import { allStar, player, season, team } from "../index.ts";
 import { careerFromStats } from "../../../common/pbpFlavor/career.ts";
 import { isHoldingOut } from "../contract/unrest.ts";
@@ -598,6 +599,16 @@ export const processTeam = async (
 				p2.medicalInjuryFactor = frontOffice.injuryRateFactor;
 				if (!fatigueFeatures && p2.compositeRating.endurance !== undefined) {
 					p2.compositeRating.endurance *= frontOffice.enduranceFallback;
+				}
+			}
+		}
+
+		// Coaching Staff Depth: strength & conditioning's in-game injury rate (1 when off, so nothing changes)
+		if (!allStarGame) {
+			const sc = await getConditioningInjuryFactor(t.id);
+			if (sc !== 1) {
+				for (const p2 of t.player) {
+					p2.medicalInjuryFactor = (p2.medicalInjuryFactor ?? 1) * sc;
 				}
 			}
 		}

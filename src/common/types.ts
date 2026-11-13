@@ -1619,6 +1619,10 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	combine?: Omit<DraftCombineResult, "pid">;
 	// The user's own draft board entry for this prospect (draft board planner)
 	draftBoard?: DraftBoardEntry;
+	// Scouting Director & Regions: the user's looks at a prospect this season and the fuzz narrowing applied (common/staffDepth)
+	scoutLooks?: import("./staffDepth/types.ts").ProspectLooks;
+	// Coaching Staff Depth: this season's development plan
+	devPlan?: import("./staffDepth/types.ts").PlayerDevPlan;
 	// Basketball: his team's college season in his draft year (conference tournaments, March Madness), see common/collegeStats/ncaa.ts
 	collegeSeason?: StoredCollegeSeason;
 	// Basketball: his years before the draft (schools, redshirt years, transfers, junior college), his story if he is one of the class's unusual prospects, and his recruiting ranking, see common/collegeStats/career.ts. Only on prospects whose college stats were generated with the career model
@@ -2415,6 +2419,10 @@ export type Team = {
 	// Front Office Budget (League Extra): levels (1-100) of the two departments that are not budget items. Missing: the team's average
 	// level of its other departments (common/frontOffice.ts, worker/core/frontOffice)
 	frontOffice?: Record<"analytics" | "travel", number>;
+	// Scouting Director & Regions / Coaching Staff Depth: the user's priorities, delegation, suggestions and reports (common/staffDepth)
+	staffDepth?: import("./staffDepth/types.ts").StaffDepthTeam;
+	// Scouting Director & Regions: the scouting department's careers (every team)
+	scoutCareer?: import("./staffDepth/types.ts").ScoutCareerTeam;
 	depth?:
 		| {
 				QB: number[];
@@ -3069,6 +3077,8 @@ export type DraftBoardEntry = {
 	// 1 = top tier
 	tier?: number;
 	note?: string;
+	// Scouting Director & Regions: kept where it is when the Director updates the board
+	locked?: boolean;
 };
 export type * from "./types.staff.ts";
 export type * from "./types.gm.ts";

@@ -57,6 +57,24 @@ export const COACH_ROLE_INFO: Record<
 			"Teaches the head coach's defense: 40% of the staff's defense strength (opponents' shot making), and a little (10%) of player development.",
 		keyRating: "def",
 	},
+	shoot: {
+		does: "Coaching Staff Depth: works on your players' jumpers. Better than the league's average shooting coach, your players' three-point, mid-range and free throw ratings grow up to 0.8 points a season faster (younger players most).",
+		doesSystems:
+			"Coaching Staff Depth: works on your players' jumpers. Better than the league's average shooting coach, your players' three-point, mid-range and free throw ratings grow up to 0.8 points a season faster (younger players most).",
+		keyRating: "sht",
+	},
+	sc: {
+		does: "Coaching Staff Depth: strength & conditioning. A good one slows the athletic decline of players 27 and older (speed, jumping, endurance, up to 0.7 points a season) and lowers the in-game injury rate (up to 8%).",
+		doesSystems:
+			"Coaching Staff Depth: strength & conditioning. A good one slows the athletic decline of players 27 and older (speed, jumping, endurance, up to 0.7 points a season) and lowers the in-game injury rate (up to 8%).",
+		keyRating: "cnd",
+	},
+	video: {
+		does: "Coaching Staff Depth: scouts opponents on video. With Coaching Systems on he sharpens the head coach's late-game management and his adjustments in a playoff series; otherwise he has no effect.",
+		doesSystems:
+			"Coaching Staff Depth: scouts opponents on video and feeds the head coach: his late-game management (up to ±8 on a 0-100 scale) and his adjustments in a playoff series (up to ±16).",
+		keyRating: "vid",
+	},
 };
 
 // "What does this mean?" for each concept. The title is the term used on every page

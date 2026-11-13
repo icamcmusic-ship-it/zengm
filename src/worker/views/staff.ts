@@ -2,7 +2,6 @@ import { levelToEffect, coachingEffect } from "../../common/budgetLevels.ts";
 import { PHASE } from "../../common/constants.ts";
 import {
 	COACH_FREE_AGENT,
-	COACH_ROLES,
 	COACH_ROLE_NAMES,
 	staffDevScore,
 	staffDevScoreToLevel,
@@ -27,6 +26,10 @@ import {
 	hotSeatNow,
 } from "../core/staff/systems.ts";
 import { idb } from "../db/index.ts";
+import {
+	activeCoachRoles,
+	coachingDepthOn,
+} from "../core/staffDepth/coaching.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import { validateTeam } from "../util/processInputs.ts";
@@ -75,6 +78,8 @@ export default defineView({
 			const colors = (await getTeamColors()).get(tid);
 			const systemsOn = coachSystemsEnabled();
 			const season = g.get("season");
+			// Coaching Staff Depth: the three extra jobs
+			const roles = activeCoachRoles();
 
 			const byRole: Partial<Record<CoachRole, Coach>> = {};
 			for (const c of teamCoaches) {
@@ -85,7 +90,7 @@ export default defineView({
 				ratings: CoachRatings;
 			}): Partial<Record<CoachRole, CoachRatings>> => {
 				const out: Partial<Record<CoachRole, CoachRatings>> = {};
-				for (const role of COACH_ROLES) {
+				for (const role of roles) {
 					out[role] =
 						replace?.role === role ? replace.ratings : byRole[role]?.ratings;
 				}
@@ -121,7 +126,7 @@ export default defineView({
 				def: byRole.def?.ratings,
 			};
 
-			const slots = COACH_ROLES.map((role) => {
+			const slots = roles.map((role) => {
 				const c = byRole[role];
 				return {
 					role,
@@ -210,13 +215,16 @@ export default defineView({
 				dev: [],
 				off: [],
 				def: [],
+				shoot: [],
+				sc: [],
+				video: [],
 			};
 			if (isUser) {
 				// (not one the team fired this season or last: it can't hire him back yet)
 				const fas = coaches.filter(
 					(c) => c.tid === COACH_FREE_AGENT && !firedRecentlyBy(c, tid),
 				);
-				for (const role of COACH_ROLES) {
+				for (const role of roles) {
 					const all = fas
 						.map((c) => formatCandidate(c, role))
 						.sort((a, b) => b.ovr - a.ovr);
@@ -241,7 +249,7 @@ export default defineView({
 						}
 					} else if (role === "dev") {
 						tag("Best developer", (c) => c.levelIfHired + c.ratings.dev / 1000);
-					} else {
+					} else if (role === "off" || role === "def") {
 						tag("Best tactician", (c) => c.ratings[role]);
 					}
 					candidates[role] = all.filter(
@@ -282,6 +290,8 @@ export default defineView({
 				region: info.region,
 				season,
 				slots,
+				roles,
+				depth: coachingDepthOn(),
 				tid,
 			};
 		}

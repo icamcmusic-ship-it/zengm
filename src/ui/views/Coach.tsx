@@ -35,6 +35,7 @@ const Coach = ({
 	colors,
 	stats,
 	transactions,
+	tree,
 }: View<"coach">) => {
 	useTitleBar({ title: c.name });
 
@@ -155,6 +156,75 @@ const Coach = ({
 						))}
 					</ul>
 				</>
+			) : null}
+
+			{tree ? (
+				<div data-testid="coach-tree">
+					<h2>Career and coaching tree</h2>
+					<p className="mb-1">
+						{tree.exPlayer !== undefined ? (
+							<>
+								A former{" "}
+								<a href={helpers.leagueUrl(["player", tree.exPlayer])}>
+									player
+								</a>
+								,{" "}
+							</>
+						) : null}
+						{tree.start
+							? tree.initial
+								? `with the league since its first season (${tree.start})`
+								: `started as ${tree.start.toLowerCase()} (${tree.startSeason})`
+							: "career start not recorded"}
+						{tree.promotions.map((pr) => (
+							<span key={pr.season}>
+								; {pr.season}: {pr.fromName} → {pr.toName}
+								{pr.abbrev ? ` (${pr.abbrev})` : ""}
+							</span>
+						))}
+						.
+					</p>
+					{tree.up.length > 0 ? (
+						<p className="mb-1">
+							Mentors:{" "}
+							{tree.up.map((m, i) => (
+								<span key={m.cid}>
+									{i > 0 ? " ← " : ""}
+									<a href={helpers.leagueUrl(["coach", m.cid])}>{m.name}</a>
+								</span>
+							))}
+						</p>
+					) : null}
+					{tree.down.length > 0 ? (
+						<>
+							<div className="fw-bold">Head coaches from his tree</div>
+							<ul>
+								{tree.down.map((d) => (
+									<li key={d.cid} style={{ marginLeft: (d.depth - 1) * 16 }}>
+										<a href={helpers.leagueUrl(["coach", d.cid])}>{d.name}</a> (
+										{d.role}
+										{d.abbrev ? `, ${d.abbrev}` : ""})
+									</li>
+								))}
+							</ul>
+						</>
+					) : null}
+					{tree.assistants.length > 0 ? (
+						<>
+							<div className="fw-bold">Assistants under him</div>
+							<ul className="small">
+								{tree.assistants.map((a) => (
+									<li key={a.cid}>
+										<a href={helpers.leagueUrl(["coach", a.cid])}>{a.name}</a> (
+										{a.job}, {a.seasons}{" "}
+										{a.seasons === 1 ? "season" : "seasons"})
+										{a.becameHead ? " · became a head coach" : ""}
+									</li>
+								))}
+							</ul>
+						</>
+					) : null}
+				</div>
 			) : null}
 
 			<h2>Seasons</h2>

@@ -11,6 +11,7 @@ import { getPreDraftLabel } from "../../common/collegeStats/overseas.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
+import { confidenceFromFactor } from "../../common/staffDepth/regions.ts";
 
 /**
  * The user's draft board planner: one draft class, with the user's ranks, tiers and notes next to everything known about each prospect (fuzzed ratings, build, college/overseas stats and honors, scout report).
@@ -34,6 +35,7 @@ export default defineView({
 			!updateEvents.has("firstRun") &&
 			!updateEvents.has("playerMovement") &&
 			!updateEvents.has("gameAttributes") &&
+			!updateEvents.has("staff") &&
 			inputSeason === prevInputs?.season
 		) {
 			return;
@@ -104,12 +106,35 @@ export default defineView({
 				}),
 		);
 
+		// Scouting Director & Regions: the Director keeps the board up to date (with its weekly change summaries)
+		const depthOn = featureOn("scoutingDepth");
+		const userTeam = depthOn
+			? await idb.cache.teams.get(g.get("userTid"))
+			: undefined;
+		const depth =
+			depthOn && userTeam
+				? {
+						boardDelegation:
+							userTeam.staffDepth?.delegation?.board ?? ("auto" as const),
+						log: [...(userTeam.staffDepth?.boardLog ?? [])]
+							.reverse()
+							.slice(0, 4),
+						confidence: Object.fromEntries(
+							players.map((p) => [
+								p.pid,
+								confidenceFromFactor(p.scoutLooks?.a ?? 1),
+							]),
+						),
+					}
+				: undefined;
+
 		return {
 			season,
 			seasons,
 			prospects,
 			draftBoardAutoDraft: g.get("draftBoardAutoDraft"),
 			scoutingSystem,
+			depth,
 		};
 	},
 });

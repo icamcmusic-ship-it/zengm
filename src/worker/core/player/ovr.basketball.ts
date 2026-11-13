@@ -55,6 +55,17 @@ const rawV2 = (ratings: Record<string, number>, expanded: boolean) => {
 	return r;
 };
 
+// Ovr before the fudge factor and rounding (linear in the ratings), for Coaching Staff Depth's ovr-neutral development plans
+export const ovrRaw = (
+	ratings: Record<RatingKey, number> & { wng?: number; bsc?: number },
+): number => {
+	const expanded = expandedRatingsApply(ratings);
+	if (ovrV2On()) {
+		return rawV2(ratings, expanded);
+	}
+	return ovrRawStock(ratings, expanded);
+};
+
 const ovr = (
 	ratings: Record<RatingKey, number> & { wng?: number; bsc?: number },
 ): number => {
@@ -62,7 +73,13 @@ const ovr = (
 	if (ovrV2On()) {
 		return applyFudge(rawV2(ratings, expanded));
 	}
+	return applyFudge(ovrRawStock(ratings, expanded));
+};
 
+const ovrRawStock = (
+	ratings: Record<RatingKey, number> & { wng?: number; bsc?: number },
+	expanded: boolean,
+): number => {
 	const hgt = expanded
 		? (1 - WNG_SHARE) * ratings.hgt + WNG_SHARE * ratings.wng!
 		: ratings.hgt;
@@ -89,7 +106,7 @@ const ovr = (
 		0.01 * (ratings.reb - 51.4) +
 		48.5;
 
-	return applyFudge(r);
+	return r;
 };
 
 export default ovr;

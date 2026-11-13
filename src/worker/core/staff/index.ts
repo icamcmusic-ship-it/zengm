@@ -8,7 +8,6 @@ import { gauss, randInt, truncGauss } from "../../../common/random.ts";
 import {
 	COACH_FREE_AGENT,
 	COACH_RETIRED,
-	COACH_ROLES,
 	COACH_ROLE_NAMES,
 	coachOvr,
 	coachSalaryDemand,
@@ -33,6 +32,22 @@ import { getAllGmWeights } from "../gm/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { getExpectedWinps } from "../college/expectations.ts";
 import { collegeFireProb, runCollegeCarousel } from "./collegeCarousel.ts";
+import {
+	activeCoachRoles,
+	clearDepthCache,
+	coachingCareersOn,
+	coachingDepthOn,
+	ensureDepthRatings,
+	isDepthRole,
+} from "../staffDepth/coaching.ts";
+import {
+	afterCoachingMarket,
+	exPlayerCoaches,
+	headCandidateBonus,
+	isHeadEligible,
+	onCoachHired,
+	userHiringDelegation,
+} from "../staffDepth/careers.ts";
 import {
 	adaptSystems,
 	annotateSeason,
@@ -81,8 +96,18 @@ export const generateCoach = async ({
 		ratings.off += gauss(9, 4);
 		ratings.def += gauss(9, 4);
 		ratings.mot += gauss(9, 4);
+	} else if (isDepthRole(role)) {
+		// Coaching Staff Depth: the job's own rating, from his others (no random draws) plus the specialist's edge
+		ensureDepthRatings({
+			firstName,
+			lastName,
+			born: { year: 0, loc: "" },
+			ratings,
+		} as any);
+		const key = role === "shoot" ? "sht" : role === "sc" ? "cnd" : "vid";
+		ratings[key] = ratings[key]! + gauss(15, 5);
 	} else {
-		ratings[role] += gauss(15, 5);
+		ratings[role as "dev" | "off" | "def"] += gauss(15, 5);
 	}
 	if (young) {
 		for (const key of helpers.keys(ratings)) {
@@ -90,7 +115,7 @@ export const generateCoach = async ({
 		}
 	}
 	for (const key of helpers.keys(ratings)) {
-		ratings[key] = bound(ratings[key]);
+		ratings[key] = bound(ratings[key]!);
 	}
 
 	const age = young
@@ -119,6 +144,13 @@ export const generateCoach = async ({
 		awards: [],
 		transactions: [],
 	};
+	// Coaching Staff Depth: every coach has the extra jobs' ratings, and where his career started
+	if (coachingDepthOn()) {
+		ensureDepthRatings(c);
+	}
+	if (coachingCareersOn()) {
+		c.tree = { start: role, startSeason: contractStartSeason() };
+	}
 	// Coaching systems: his systems, following the league's trends (no random draws)
 	const profile = profileForNewCoach(c);
 	if (profile) {
@@ -296,6 +328,10 @@ export const hire = async (
 	// College carousel: its own news item instead of the plain "hired" one
 	news?: { text: string; tids: number[] },
 ) => {
+	// Coaching Staff Depth: promotions, poaching and the coaching tree (before he changes jobs)
+	const depthNews = coachingCareersOn()
+		? await onCoachHired(c, tid, role)
+		: undefined;
 	c.tid = tid;
 	c.role = role;
 	c.contract = {
@@ -332,12 +368,14 @@ export const hire = async (
 			});
 		} else {
 			await logHeadCoachEvent(
-				`${teamLink(tid)} hired ${coachLink(c)} as head coach.`,
+				depthNews?.text ??
+					`${teamLink(tid)} hired ${coachLink(c)} as head coach.`,
 				tid,
 			);
 		}
 	}
 	clearCoachSystemsCache();
+	clearDepthCache();
 };
 
 // Fired by this team this season or last: it can't hire him back yet (AI teams don't, and for the user it would be an exploit:
@@ -397,6 +435,7 @@ export const fire = async (c: Coach) => {
 			tid,
 		);
 	}
+	clearDepthCache();
 	return buyout;
 };
 
@@ -410,10 +449,16 @@ const spendFactor = (popRank: number) => {
 export const fillVacancies = async ({
 	includeUser,
 	skipTids,
+	roles,
+	userAuto,
 }: {
 	includeUser: boolean;
 	// College carousel: schools holding their head coaching job for an offer to the user
 	skipTids?: Set<number>;
+	// Only these jobs (default: every job of the league)
+	roles?: CoachRole[];
+	// Coaching Staff Depth: the user's hiring is delegated (Auto), so his vacancies are filled too
+	userAuto?: boolean;
 }) => {
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const salaryCap = g.get("salaryCap");
@@ -447,12 +492,13 @@ export const fillVacancies = async ({
 	// AI GM personalities (setting): analytics/patient GMs lean to player development, old-school/win-now ones to motivation. Empty when off
 	const gms = await getAllGmWeights();
 
-	for (const role of COACH_ROLES) {
+	const depth = coachingCareersOn();
+	for (const role of roles ?? activeCoachRoles()) {
 		for (const { t } of ordered) {
 			if (filled.has(`${t.tid}-${role}`)) {
 				continue;
 			}
-			if (!includeUser && userControlsTeam(t.tid)) {
+			if (!includeUser && userControlsTeam(t.tid) && !userAuto) {
 				continue;
 			}
 			if (role === "head" && skipTids?.has(t.tid)) {
@@ -460,6 +506,18 @@ export const fillVacancies = async ({
 			}
 
 			let available = freeAgents.filter((c) => c.tid === COACH_FREE_AGENT);
+			// Coaching Staff Depth: head coaches come from former head coaches and experienced assistants, free or employed elsewhere
+			// (promotions and poaching); new coaches start as assistants
+			if (depth && role === "head") {
+				const pool = (await idb.cache.coaches.getAll()).filter(
+					(c) =>
+						(c.tid === COACH_FREE_AGENT || (c.tid >= 0 && c.role !== "head")) &&
+						isHeadEligible(c),
+				);
+				if (pool.length > 0) {
+					available = pool;
+				}
+			}
 			if (available.length === 0) {
 				const c = await generateCoach({ role });
 				const cid = await idb.cache.coaches.add(c);
@@ -501,6 +559,9 @@ export const fillVacancies = async ({
 				}
 				const gm = gms.get(t.tid);
 				let score = coachOvr(c.ratings, role) + gauss(0, 2);
+				if (depth && role === "head") {
+					score += await headCandidateBonus(c, t.tid);
+				}
 				if (gm) {
 					score += gm.coachDevWeight * (c.ratings.dev - c.ratings.mot);
 				}
@@ -514,9 +575,19 @@ export const fillVacancies = async ({
 				}
 			}
 			const choice = best ?? cheapest!;
+			const prevTid = choice.tid;
+			const prevRole = choice.role;
 			await hire(choice, t.tid, role);
 			filled.add(`${t.tid}-${role}`);
 			hired.push({ c: choice, tid: t.tid });
+			if (prevTid >= 0) {
+				// Promoted or hired away: his old job is open now
+				filled.delete(`${prevTid}-${prevRole}`);
+			}
+			const idx = freeAgents.indexOf(choice);
+			if (idx >= 0) {
+				freeAgents.splice(idx, 1);
+			}
 		}
 	}
 
@@ -527,7 +598,19 @@ export const fillVacancies = async ({
 const replenishPool = async () => {
 	const coaches = await idb.cache.coaches.getAll();
 	const numTeams = g.get("numActiveTeams");
-	for (const role of COACH_ROLES) {
+	const depth = coachingCareersOn();
+	if (depth) {
+		// Coaching Staff Depth: a few former players of the league start out as assistants
+		for (const c of await exPlayerCoaches()) {
+			await idb.cache.coaches.add(c);
+			coaches.push(c as Coach);
+		}
+	}
+	for (const role of activeCoachRoles()) {
+		if (depth && role === "head") {
+			// Coaching Staff Depth: new coaches enter as assistants, head coaches are promoted from them
+			continue;
+		}
 		const vacancies =
 			numTeams - coaches.filter((c) => c.tid >= 0 && c.role === role).length;
 		const pool = coaches.filter(
@@ -553,6 +636,34 @@ export const ensureStaff = async () => {
 		coaches.length === 0 ||
 		teams.some((t) => !coaches.some((c) => c.tid === t.tid));
 	if (!needsStaff) {
+		// Coaching Staff Depth turned on in a league with staffs: the extra jobs are filled (every team, the user's too)
+		if (
+			coachingDepthOn() &&
+			teams.some((t) =>
+				(["shoot", "sc", "video"] as const).some(
+					(role) => !coaches.some((c) => c.tid === t.tid && c.role === role),
+				),
+			)
+		) {
+			for (const c of coaches) {
+				if (ensureDepthRatings(c)) {
+					await idb.cache.coaches.put(c);
+				}
+			}
+			await replenishPool();
+			await fillVacancies({
+				includeUser: true,
+				roles: ["shoot", "sc", "video"],
+			});
+			for (const c of await idb.cache.coaches.getAll()) {
+				if (c.tid >= 0 && isDepthRole(c.role) && c.transactions.length === 1) {
+					// Not a carousel move: the jobs were just created
+					c.transactions = [];
+					await idb.cache.coaches.put(c);
+				}
+			}
+			return true;
+		}
 		return false;
 	}
 
@@ -568,12 +679,16 @@ export const ensureStaff = async () => {
 	}
 
 	// Candidate pool, about 2x the number of jobs, so the market sorts better coaches onto richer teams
-	for (const role of COACH_ROLES) {
+	for (const role of activeCoachRoles()) {
 		const num = Math.round(teams.length * 1.8) + 4;
 		for (let i = 0; i < num; i++) {
 			const c = await generateCoach({ role });
 			// Existing coaches have some history with their team
 			c.contract.exp = contractStartSeason() + randInt(0, 3);
+			if (c.tree) {
+				// Coaching Staff Depth: the league's first coaches (head coaches are made as head coaches only here)
+				c.tree.initial = true;
+			}
 			await idb.cache.coaches.add(c);
 		}
 	}
@@ -594,7 +709,7 @@ export const ensureStaff = async () => {
 	const leftovers = (await idb.cache.coaches.getAll()).filter(
 		(c) => c.tid === COACH_FREE_AGENT,
 	);
-	for (const role of COACH_ROLES) {
+	for (const role of activeCoachRoles()) {
 		const sorted = leftovers
 			.filter((c) => c.role === role)
 			.sort((a, b) => coachOvr(b.ratings, role) - coachOvr(a.ratings, role));
@@ -735,8 +850,15 @@ const COACH_PROGRESS_SD = 1;
 const progress = (c: Coach) => {
 	const a = age(c);
 	const mu = a < 45 ? 1.2 : a < 58 ? 0.2 : -1.2;
-	for (const key of helpers.keys(c.ratings)) {
+	for (const key of ["dev", "off", "def", "mot"] as const) {
 		c.ratings[key] = bound(c.ratings[key] + gauss(mu, COACH_PROGRESS_SD));
+	}
+	// Coaching Staff Depth: the extra jobs' ratings follow the same age trend (no random draws, so the other ratings draw as before)
+	for (const key of ["sht", "cnd", "vid"] as const) {
+		const v = c.ratings[key];
+		if (v !== undefined) {
+			c.ratings[key] = bound(v + mu);
+		}
 	}
 };
 
@@ -900,9 +1022,18 @@ export const runOffseason = async () => {
 	await replenishPool();
 	// College mode: schools hire head coaches away from smaller programs, and make offers to the user
 	const held = isCollege() ? await runCollegeCarousel() : undefined;
-	await fillVacancies({ includeUser: false, skipTids: held });
+	// Coaching Staff Depth: the user's vacancies are filled now when hiring is delegated (Auto)
+	await fillVacancies({
+		includeUser: false,
+		skipTids: held,
+		userAuto: coachingDepthOn() && (await userHiringDelegation()) === "auto",
+	});
+	if (coachingDepthOn()) {
+		await afterCoachingMarket();
+	}
 	await syncAllBudgets();
 	clearCoachSystemsCache();
+	clearDepthCache();
 };
 
 // Before the regular season, anyone who still has a vacancy (including the user) gets one filled automatically

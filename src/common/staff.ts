@@ -7,11 +7,18 @@ export const COACH_RETIRED = -3;
 
 export const COACH_ROLES: CoachRole[] = ["head", "dev", "off", "def"];
 
+// Coaching Staff Depth (featureCoachingDepth): the three extra jobs
+export const DEPTH_ROLES: CoachRole[] = ["shoot", "sc", "video"];
+export const ALL_COACH_ROLES: CoachRole[] = [...COACH_ROLES, ...DEPTH_ROLES];
+
 export const COACH_ROLE_NAMES: Record<CoachRole, string> = {
 	head: "Head Coach",
 	dev: "Player Development",
 	off: "Offensive Coordinator",
 	def: "Defensive Coordinator",
+	shoot: "Shooting Coach",
+	sc: "Strength & Conditioning",
+	video: "Video/Analytics Coordinator",
 };
 
 export const COACH_ROLE_ABBREVS: Record<CoachRole, string> = {
@@ -19,6 +26,9 @@ export const COACH_ROLE_ABBREVS: Record<CoachRole, string> = {
 	dev: "PD",
 	off: "OC",
 	def: "DC",
+	shoot: "SH",
+	sc: "SC",
+	video: "VA",
 };
 
 export const COACH_RATING_NAMES: Record<keyof CoachRatings, string> = {
@@ -26,12 +36,54 @@ export const COACH_RATING_NAMES: Record<keyof CoachRatings, string> = {
 	off: "Offense",
 	def: "Defense",
 	mot: "Motivation",
+	sht: "Shooting instruction",
+	cnd: "Conditioning",
+	vid: "Video & analytics",
+};
+
+// Coaching Staff Depth ratings of a coach from before it (or a coach made without it): a stable value from his other ratings and his name,
+// no random draws. 0-100
+export const depthRatingsFor = (c: {
+	ratings: CoachRatings;
+	firstName: string;
+	lastName: string;
+	born: { year: number };
+}) => {
+	const r = c.ratings;
+	const h = (salt: string) => {
+		let x = 0x811c9dc5;
+		const s = `${salt}|${c.firstName}|${c.lastName}|${c.born.year}`;
+		for (let i = 0; i < s.length; i++) {
+			x ^= s.charCodeAt(i);
+			x = Math.imul(x, 0x01000193);
+		}
+		// about N(0, 1) from 4 uniforms
+		let sum = 0;
+		for (let i = 0; i < 4; i++) {
+			x = Math.imul(x ^ (x >>> 15), 0x2c1b3c6d);
+			x = Math.imul(x ^ (x >>> 12), 0x297a2d39);
+			sum += ((x ^ (x >>> 15)) >>> 0) / 4294967296;
+		}
+		return (sum - 2) * Math.sqrt(3);
+	};
+	const b = (x: number) => Math.max(1, Math.min(100, Math.round(x)));
+	return {
+		sht: r.sht ?? b(0.35 * r.off + 0.25 * r.dev + 0.4 * 42 + 9 * h("sht")),
+		cnd: r.cnd ?? b(0.25 * r.mot + 0.15 * r.dev + 0.6 * 44 + 9 * h("cnd")),
+		vid: r.vid ?? b(0.25 * r.off + 0.25 * r.def + 0.5 * 42 + 9 * h("vid")),
+	};
 };
 
 // How good a coach is at a given job
 export const coachOvr = (ratings: CoachRatings, role: CoachRole) => {
 	let ovr;
-	if (role === "head") {
+	if (role === "shoot") {
+		ovr = 0.8 * (ratings.sht ?? 40) + 0.2 * ratings.dev;
+	} else if (role === "sc") {
+		ovr = 0.8 * (ratings.cnd ?? 40) + 0.2 * ratings.mot;
+	} else if (role === "video") {
+		ovr = 0.8 * (ratings.vid ?? 40) + 0.1 * ratings.off + 0.1 * ratings.def;
+	} else if (role === "head") {
 		ovr =
 			0.3 * ratings.off +
 			0.3 * ratings.def +
@@ -48,10 +100,13 @@ export const coachOvr = (ratings: CoachRatings, role: CoachRole) => {
 };
 
 // The role a coach is best suited for
-export const bestRole = (ratings: CoachRatings): CoachRole => {
+export const bestRole = (
+	ratings: CoachRatings,
+	roles: CoachRole[] = COACH_ROLES,
+): CoachRole => {
 	let best: CoachRole = "head";
 	let bestOvr = -Infinity;
-	for (const role of COACH_ROLES) {
+	for (const role of roles) {
 		// Head coach needs to be clearly better to count, since it's the more important job
 		const ovr = coachOvr(ratings, role) - (role === "head" ? 3 : 0);
 		if (ovr > bestOvr) {
@@ -68,6 +123,10 @@ const BASE_SALARY: Record<CoachRole, number> = {
 	dev: 3200,
 	off: 3200,
 	def: 3200,
+	// Coaching Staff Depth: smaller jobs (about $2.7M a season for all three at average ratings)
+	shoot: 900,
+	sc: 900,
+	video: 900,
 };
 
 export const coachSalaryDemand = (

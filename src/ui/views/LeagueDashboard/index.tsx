@@ -68,6 +68,9 @@ const LeagueDashboard = ({
 	const wrappedOn = useFeatureOn("wrapped");
 	const storylinesOn = useFeatureOn("storylines");
 	const timelineOn = useFeatureOn("timeline");
+	const scoutingDepthOn = useFeatureOn("scoutingDepth");
+	const coachingDepthOn = useFeatureOn("coachingDepth");
+	const staffReportOn = scoutingDepthOn || coachingDepthOn;
 	const recordsLinks = [
 		...(newspaperOn
 			? [
@@ -286,6 +289,17 @@ const LeagueDashboard = ({
 						<RecentAchievements
 							refreshKey={`${won}-${lost}-${otl}-${tied}-${playoffRoundsWon}`}
 						/>
+					) : null}
+					{staffReportOn ? (
+						<div className="mt-3" data-testid="dashboard-staff-report">
+							<h2>Your staff</h2>
+							<a href={helpers.leagueUrl(["staff_report"])}>
+								» Staff Report
+							</a>{" "}
+							<span className="text-body-secondary">
+								targets, development, fit and conditioning
+							</span>
+						</div>
 					) : null}
 					{recordsLinks.length > 0 ? (
 						<div className="mt-3">

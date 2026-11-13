@@ -49,6 +49,7 @@ import { generateFace } from "../../util/face.ts";
 import fuzzRating from "../player/fuzzRating.ts";
 import {
 	buildInput,
+	careerCutsFor,
 	clearScoutingCache,
 	departmentFor,
 	getPeers,
@@ -271,7 +272,7 @@ const seededFace = (seed: string) => {
 	}
 };
 
-const scoutCalls = async (ctx: ReportCtx) => {
+export const scoutCalls = async (ctx: ReportCtx) => {
 	const players = await idb.merged.players.getAll({ activeAndRetired: true });
 	const prospects = await idb.cache.players.indexGetAll(
 		"playersByTid",
@@ -328,6 +329,7 @@ export const getDepartmentPage = async (tid: number) => {
 		season: ctx.season,
 		level,
 		startingSeason: ctx.startingSeason,
+		cuts: await careerCutsFor(tid),
 	});
 	const calls = await scoutCalls(ctx);
 	const mine = calls.filter((c) => parseScoutId(c.scoutId).tid === tid);

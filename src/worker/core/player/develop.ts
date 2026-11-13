@@ -39,6 +39,7 @@ import {
 	pruneSubHistory,
 	subRatingsOn,
 	syncLatestSubs,
+	tiltRowSubs,
 } from "./subRatings.ts";
 
 // ovrs and pots only exist in sports with position-specific ratings, and there they have a value for every position
@@ -205,6 +206,14 @@ const develop = async (
 			);
 			if (before) {
 				developRowSubs(p as any, ratings, before, age);
+				// Coaching Staff Depth: the development plan's tilt toward its sub-ratings
+				const tilt =
+					__SPORT === "basketball" && years === 1
+						? traitDev?.subTilt
+						: undefined;
+				if (tilt) {
+					tiltRowSubs(p as any, ratings, tilt.focus, tilt.amount);
+				}
 			}
 		}
 	}

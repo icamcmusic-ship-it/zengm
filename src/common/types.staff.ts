@@ -2,7 +2,15 @@ import type { FaceConfig } from "facesjs";
 
 // Coaching staff (basketball only, gated by the coachingStaff setting)
 
-export type CoachRole = "head" | "dev" | "off" | "def";
+// shoot, sc and video: Coaching Staff Depth (featureCoachingDepth) only
+export type CoachRole =
+	| "head"
+	| "dev"
+	| "off"
+	| "def"
+	| "shoot"
+	| "sc"
+	| "video";
 
 // All 0-100
 export type CoachRatings = {
@@ -14,6 +22,11 @@ export type CoachRatings = {
 	def: number;
 	// Motivation and leadership
 	mot: number;
+	// Coaching Staff Depth: shooting instruction, strength & conditioning, video/analytics. Missing for coaches from before it (derived
+	// deterministically, see common/staffDepth/coaching.ts depthRatingsFor)
+	sht?: number;
+	cnd?: number;
+	vid?: number;
 };
 
 // Each is -1 to 1. Exposed so team strategy / game sim code can read it later (see getTeamCoachStyle), not used in GameSim yet.
@@ -142,6 +155,8 @@ export type CoachWithoutKey = {
 	}[];
 	transactions: CoachTransaction[];
 	retiredYear?: number;
+	// Coaching Staff Depth: how his career started and his coaching tree (works without Coaching Systems too)
+	tree?: CoachTree;
 	// The team's record when he was hired during a season, so his season row only counts the games he coached
 	hiredRecord?: {
 		season: number;
@@ -151,6 +166,24 @@ export type CoachWithoutKey = {
 		tied: number;
 		otl: number;
 	};
+};
+
+export type CoachTree = {
+	// The job he entered coaching in (head coaches made at league creation: "head" with initial)
+	start: CoachRole;
+	startSeason: number;
+	initial?: boolean;
+	// A former player of the league who became an assistant
+	exPlayer?: number;
+	// The head coach he last worked under before his first head coaching job
+	mentor?: { cid: number; name: string };
+	// Promotions to a bigger job (assistant to head coach, possibly at another team)
+	promotions?: {
+		season: number;
+		tid: number;
+		from: CoachRole;
+		to: CoachRole;
+	}[];
 };
 
 export type Coach = CoachWithoutKey & {

@@ -72,6 +72,7 @@ import { getPlayerTraitsForUI } from "../player/traits.ts";
 import { archetypeFor, getLeagueNorms } from "../player/archetype.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import { getUncertainty } from "../draft/scouting.ts";
+import { effectiveQuality } from "../../../common/staffDepth/regions.ts";
 
 // Off in college leagues (no draft, contracts or trades to scout for): the pages are hidden there
 export const scoutingReportsOn = () =>
@@ -491,13 +492,17 @@ export const getReportCtx = async (viewerTid?: number): Promise<ReportCtx> => {
 			Math.max(1, g.get("numDraftRounds")),
 		roleScale: await getRoleScale(),
 		scoutingLevel,
-		dept: getDepartment({
-			leagueSeed: leagueSeed(),
-			tid: userTid,
+		dept: withExperience(
+			getDepartment({
+				leagueSeed: leagueSeed(),
+				tid: userTid,
+				season,
+				level: scoutingLevel,
+				startingSeason: g.get("startingSeason"),
+				cuts: await careerCutsFor(userTid),
+			}),
 			season,
-			level: scoutingLevel,
-			startingSeason: g.get("startingSeason"),
-		}),
+		),
 		salaryCap: g.get("salaryCap"),
 		expanded: featureOn("expandedRatings"),
 		userPlayers: await idb.cache.players.indexGetAll("playersByTid", userTid),
@@ -509,15 +514,40 @@ export const getReportCtx = async (viewerTid?: number): Promise<ReportCtx> => {
 	return ctx;
 };
 
+// Scouting Director & Regions: scouts who left early (careers) and the experience they gained. Plain seeded departments when off
+export const careerCutsFor = async (tid: number) =>
+	featureOn("scoutingDepth")
+		? (await idb.cache.teams.get(tid))?.scoutCareer?.cuts
+		: undefined;
+
+export const withExperience = (dept: ScoutDepartment, season: number) => {
+	if (!featureOn("scoutingDepth") || dept.scouts.length === 0) {
+		return dept;
+	}
+	const scouts = dept.scouts.map((s) => ({
+		...s,
+		quality: effectiveQuality(s, season),
+	}));
+	return {
+		...dept,
+		scouts,
+		quality: scouts.reduce((a, s) => a + s.quality, 0) / scouts.length,
+	};
+};
+
 export const departmentFor = async (tid: number, season = g.get("season")) => {
 	const level = await getLevelLastThree("scouting", { tid });
-	return getDepartment({
-		leagueSeed: leagueSeed(),
-		tid,
+	return withExperience(
+		getDepartment({
+			leagueSeed: leagueSeed(),
+			tid,
+			season,
+			level,
+			startingSeason: g.get("startingSeason"),
+			cuts: await careerCutsFor(tid),
+		}),
 		season,
-		level,
-		startingSeason: g.get("startingSeason"),
-	});
+	);
 };
 
 // ---- light view of a player (peers, snapshots) ----
@@ -991,8 +1021,12 @@ export const buildInput = async (
 		prospect && !light && lotteryNightOn()
 			? await nightCombineFor(p)
 			: undefined;
+	// Scouting Director & Regions: the share of his fuzz his looks this season left (1 without the setting)
+	const looksFactor =
+		prospect && featureOn("scoutingDepth") && p.scoutLooks ? p.scoutLooks.a : 1;
 	const uncertainty = prospect
 		? getUncertainty(scouting) *
+				looksFactor *
 				(1.3 - 0.6 * departmentQualityForLevel(ctx.scoutingLevel)) +
 			0.7 * yearsOut
 		: retired

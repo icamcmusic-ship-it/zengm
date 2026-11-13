@@ -59,6 +59,7 @@ import { last } from "../../../common/utils.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import { advStats } from "../../util/advStats.ts";
 import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
+import { afterDay as staffDepthAfterDay } from "../staffDepth/index.ts";
 import { getDayTicks, scheduleDaysSpread } from "../season/scheduleDayScale.ts";
 
 const FLUSH_COALESCE_MS = 5000;
@@ -389,6 +390,8 @@ const play = async (
 			// Rumors (League extras): read-only, on its own random stream. After the day's trades and signings
 			if (dayTick) {
 				await rumorsAfterDay();
+				// Scouting Director & Regions: weekly looks and the board (no-op when off)
+				await staffDepthAfterDay();
 			}
 		}
 

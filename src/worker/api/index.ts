@@ -293,6 +293,12 @@ import {
 } from "../core/draft/linkedCollege.ts";
 import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
 import { faceAgingOnCustomize } from "../util/faceAging.ts";
+import * as staffDepthActions from "../core/staffDepth/actions.ts";
+import type {
+	FocusKey,
+	ScoutRegion,
+	SuggestionAction,
+} from "../../common/staffDepth/types.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -2774,14 +2780,22 @@ const updateDraftBoard = async (
 		rank?: number;
 		tier?: number;
 		note?: string;
+		// Scouting Director & Regions: keep him where he is when the Director updates the board (undefined: unchanged)
+		locked?: boolean;
 	}[],
 ) => {
-	for (const { pid, rank, tier, note } of entries) {
+	for (const { pid, rank, tier, note, locked } of entries) {
 		const p = await idb.cache.players.get(pid);
 		if (!p) {
 			continue;
 		}
-		const entry = { rank, tier, note: note || undefined };
+		const lock = (locked ?? p.draftBoard?.locked) && rank !== undefined;
+		const entry = {
+			rank,
+			tier,
+			note: note || undefined,
+			...(lock ? { locked: true } : {}),
+		};
 		if (
 			entry.rank === undefined &&
 			entry.tier === undefined &&
@@ -2852,6 +2866,40 @@ const staffAction = async (
 	}
 	await toUI("realtimeUpdate", [["staff", "teamFinances"]]);
 	return { buyout };
+};
+
+// Scouting Director & Regions / Coaching Staff Depth (Staff Report, Scouting Department, Draft Board)
+const staffDepthAction = async (
+	action:
+		| {
+				type: "settings";
+				settings: Parameters<typeof staffDepthActions.setStaffDepthSettings>[0];
+		  }
+		| { type: "devOverride"; pid: number; focus: FocusKey | null }
+		| { type: "scoutRegion"; scoutId: number; region: ScoutRegion }
+		| { type: "apply"; action: SuggestionAction; suggestionId?: string }
+		| { type: "dismiss"; id: string }
+		| { type: "boardLock"; pid: number; locked: boolean },
+) => {
+	if (action.type === "settings") {
+		await staffDepthActions.setStaffDepthSettings(action.settings);
+	} else if (action.type === "devOverride") {
+		await staffDepthActions.setDevOverride(action.pid, action.focus);
+	} else if (action.type === "scoutRegion") {
+		await staffDepthActions.setScoutRegion(action.scoutId, action.region);
+	} else if (action.type === "apply") {
+		await staffDepthActions.applyStaffAction(
+			action.action,
+			action.suggestionId,
+		);
+	} else if (action.type === "dismiss") {
+		await staffDepthActions.dismissStaffSuggestion(action.id);
+	} else {
+		await staffDepthActions.setDraftBoardLock(action.pid, action.locked);
+	}
+	await toUI("realtimeUpdate", [
+		["staff", "teamFinances", "playerMovement", "gameAttributes", "watchList"],
+	]);
 };
 
 const removeCollegeStats = async (draftYear: number) => {
@@ -6248,6 +6296,7 @@ const api = {
 		getProProjections,
 		getDraftDayInfo,
 		staffAction,
+		staffDepthAction,
 		idbCacheFlush,
 		importPlayers,
 		importPlayersGetReal,

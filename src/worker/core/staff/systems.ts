@@ -47,6 +47,7 @@ import { g, helpers } from "../../util/index.ts";
 import { winProb } from "../seasonOdds/simSeason.ts";
 import teamOvr from "../team/ovr.ts";
 import { getGmWeights } from "../gm/index.ts";
+import { getVideoBoost } from "../staffDepth/coaching.ts";
 import type { GmWeights } from "../../../common/gmPersonality.ts";
 
 export const coachSystemsEnabled = () =>
@@ -295,11 +296,20 @@ export const getLeagueCoachSystems = async (day?: number) => {
 		const analyticsLevel = frontOfficeEnabled()
 			? await getNewDeptLevelLastThree("analytics", { tid: t.tid, t })
 			: undefined;
+		// Coaching Staff Depth: the video/analytics coordinator sharpens game management and series adjustments (centered over the league)
+		const video = await getVideoBoost(t.tid);
+		const baseProfile = video
+			? {
+					...profile,
+					mgmt: clamp(profile.mgmt + video.mgmt, 0, 100),
+					adapt: clamp(profile.adapt + video.adapt, 0, 100),
+				}
+			: profile;
 		rows.push({
 			tid: t.tid,
 			cid: head.cid,
 			rotation: head.style.rotation,
-			profile,
+			profile: baseProfile,
 			install,
 			offFit,
 			defFit,
@@ -310,14 +320,14 @@ export const getLeagueCoachSystems = async (day?: number) => {
 				profile:
 					analyticsLevel !== undefined
 						? {
-								...profile,
+								...baseProfile,
 								mgmt: clamp(
-									profile.mgmt + analyticsMgmtBoost(analyticsLevel),
+									baseProfile.mgmt + analyticsMgmtBoost(analyticsLevel),
 									0,
 									100,
 								),
 							}
-						: profile,
+						: baseProfile,
 				head: head.ratings,
 				offCoord: coaches.find((c) => c.role === "off")?.ratings,
 				defCoord: coaches.find((c) => c.role === "def")?.ratings,

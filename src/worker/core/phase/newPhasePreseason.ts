@@ -1,4 +1,5 @@
 import { allocateAi, frontOfficeEnabled } from "../frontOffice/index.ts";
+import { prepareDevelopment } from "../staffDepth/coaching.ts";
 import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 import {
 	PLAYER,
@@ -478,6 +479,12 @@ const newPhasePreseason = async (
 			? new Map<number, TraitDevelopment>()
 			: player.getTraitDevelopment(players as any, newSeason);
 
+	// Coaching Staff Depth: development plans, shooting coach and strength & conditioning (undefined when off)
+	const depthDev =
+		repeatSeason || __SPORT !== "basketball"
+			? undefined
+			: await prepareDevelopment(newSeason);
+
 	// Loop through all non-retired players
 	for (const p of players) {
 		if (__SPORT === "hockey" && p.numConsecutiveGamesG !== undefined) {
@@ -544,7 +551,9 @@ const newPhasePreseason = async (
 							bonus: mentorBonus,
 							seed: `mentor|${g.get("playerTraitsSeed") ?? 0}|${p.pid}|${newSeason}`,
 						},
-				traitDevelopment.get(p.pid),
+				depthDev
+					? depthDev.devFor(p as any, traitDevelopment.get(p.pid))
+					: traitDevelopment.get(p.pid),
 			);
 			player.developTraits(p as any, newSeason);
 		}
@@ -584,6 +593,8 @@ const newPhasePreseason = async (
 			await player.updateValues(p);
 		}
 	}
+
+	await depthDev?.finish(players as any);
 
 	// The archetype label for the new season, now that development has happened
 	await updateArchetypesForPreseason(players);

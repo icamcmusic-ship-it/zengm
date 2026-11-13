@@ -155,6 +155,14 @@ export type TraitDevelopment = {
 	baseChangeDelta: number;
 	// Multiply the negative part of this year's random development noise. 1 is neutral, lower is steadier.
 	dropScale: number;
+	// Coaching Staff Depth (common/staffDepth): fixed rating points added to single ratings' yearly change after the roll (development plan,
+	// shooting coach, strength & conditioning). No random numbers
+	ratingDelta?: Record<string, number>;
+	// Coaching Staff Depth: inside the bases of this focus, sub-rating points moved onto its subs after the subs developed
+	subTilt?: {
+		focus: import("../staffDepth/types.ts").FocusKey;
+		amount: number;
+	};
 };
 
 export const NEUTRAL_TRAIT_DEVELOPMENT: TraitDevelopment = Object.freeze({
