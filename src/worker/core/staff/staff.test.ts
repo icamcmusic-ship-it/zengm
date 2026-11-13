@@ -208,10 +208,19 @@ describe("coaching staff", () => {
 		}
 		assert.isTrue(threw);
 
+		// Overpaid now: an extension doesn't cut his salary to his lower asking price
+		const overpaid = (await idb.cache.coaches.get(hired.cid))!;
+		const salary = overpaid.contract.amount * 3;
+		overpaid.contract.amount = salary;
+		await idb.cache.coaches.put(overpaid);
 		await userExtend({ cid: hired.cid, tid, years: 3 });
 		assert.strictEqual(
 			(await idb.cache.coaches.get(hired.cid))!.contract.exp,
 			g.get("season") + 4,
+		);
+		assert.strictEqual(
+			(await idb.cache.coaches.get(hired.cid))!.contract.amount,
+			salary,
 		);
 
 		const carousel = await getCoachingCarousel(g.get("season"));

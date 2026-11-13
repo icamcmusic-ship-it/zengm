@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { Fragment } from "react";
 import { helpers } from "../../util/helpers.ts";
+import { useLocal } from "../../util/local.ts";
 import type { NcaaGame } from "../../../common/collegeStats/ncaa.ts";
 
 type ProspectLink = {
@@ -27,6 +28,7 @@ export const ProspectLinks = ({
 	prefix?: string;
 	short?: boolean;
 }) => {
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 	if (prospects.length === 0) {
 		return null;
 	}
@@ -41,7 +43,7 @@ export const ProspectLinks = ({
 						{i > 0 ? ", " : null}
 						<a
 							href={helpers.leagueUrl(["player", p.pid])}
-							title={`${p.name}, ${p.pos}, ${p.ovr}/${p.pot}${p.draft ? `, drafted ${p.draft.round}-${p.draft.pick} by ${p.draft.abbrev}` : ""}`}
+							title={`${p.name}, ${p.pos}${challengeNoRatings ? "" : `, ${p.ovr}/${p.pot}`}${p.draft ? `, drafted ${p.draft.round}-${p.draft.pick} by ${p.draft.abbrev}` : ""}`}
 						>
 							{name}
 						</a>

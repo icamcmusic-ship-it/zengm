@@ -2,6 +2,7 @@
 import { useState } from "react";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
+import { useLocal } from "../util/local.ts";
 import { toWorker } from "../util/toWorker.ts";
 import type { View } from "../../common/types.ts";
 import { SeasonSelect, Stars, TeamName } from "./College/common.tsx";
@@ -30,6 +31,7 @@ const CollegeRecruiting = ({
 	weeksLeft,
 }: View<"collegeRecruiting">) => {
 	useTitleBar({ title: "Recruiting" });
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 	const [tab, setTab] = useState<"board" | "commits" | "results">(
 		!current || signingDayPassed ? "results" : "board",
 	);
@@ -210,8 +212,12 @@ const CollegeRecruiting = ({
 											<th>Stars</th>
 											<th>Rk</th>
 											<th>Pos</th>
-											<th className="text-end">Ovr</th>
-											<th className="text-end">Pot</th>
+											{challengeNoRatings ? null : (
+												<>
+													<th className="text-end">Ovr</th>
+													<th className="text-end">Pot</th>
+												</>
+											)}
 										</tr>
 									</thead>
 									<tbody>
@@ -232,8 +238,12 @@ const CollegeRecruiting = ({
 												</td>
 												<td>{p.walkOn ? "" : p.rank}</td>
 												<td>{p.pos}</td>
-												<td className="text-end">{p.ovr}</td>
-												<td className="text-end">{p.pot}</td>
+												{challengeNoRatings ? null : (
+													<>
+														<td className="text-end">{p.ovr}</td>
+														<td className="text-end">{p.pot}</td>
+													</>
+												)}
 											</tr>
 										))}
 									</tbody>

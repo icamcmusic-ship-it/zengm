@@ -1086,6 +1086,16 @@ export default defineView({
 		if (featureOff) {
 			return featureOff;
 		}
+		// A season the league hasn't played (before it started, or the future) has no paper: it used to render an empty
+		// one with a negative volume number, and a future one was cached as if it were a finished season
+		if (
+			inputs.season < g.get("startingSeason") ||
+			inputs.season > g.get("season")
+		) {
+			return {
+				errorMessage: `There is no newspaper for ${inputs.season}.`,
+			};
+		}
 		const isCurrent = inputs.season === g.get("season");
 		const inputsChanged =
 			updateEvents.has("firstRun") ||

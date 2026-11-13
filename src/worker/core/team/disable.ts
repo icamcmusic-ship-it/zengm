@@ -56,11 +56,25 @@ const disable = async (tid: number) => {
 
 	// Delete draft picks, and return traded ones to original owner
 	await draft.genPicks();
-	const draftPicks = (await idb.cache.draftPicks.getAll()).filter(
-		(dp) => dp.tid === t.tid,
-	);
-	for (const dp of draftPicks) {
-		dp.tid = dp.originalTid;
+	const draftPicks = [];
+	for (const dp of await idb.cache.draftPicks.getAll()) {
+		let changed = false;
+		if (dp.tid === t.tid) {
+			dp.tid = dp.originalTid;
+			changed = true;
+		}
+		// Draft pick conditions held by the folded team lapse, so a protected pick can't go back to a team that no longer exists
+		if (dp.protection?.tid === t.tid) {
+			delete dp.protection;
+			changed = true;
+		}
+		if (dp.swap?.tid === t.tid) {
+			delete dp.swap;
+			changed = true;
+		}
+		if (changed) {
+			draftPicks.push(dp);
+		}
 	}
 	await idb.cache.draftPicks.putAll(draftPicks);
 

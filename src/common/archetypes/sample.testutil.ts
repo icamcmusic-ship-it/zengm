@@ -32,6 +32,8 @@ export const sampleLeague = async (
 	expanded = false,
 ): Promise<SamplePlayer[]> => {
 	resetG();
+	// As a new league generates players: with Improved Positions on, guards include the scorer type (genRatings.basketball.ts)
+	g.setWithoutSavingToDB("improvedPositions", true);
 	if (expanded) {
 		g.setWithoutSavingToDB("expandedRatings", true);
 	}
@@ -45,6 +47,7 @@ export const sampleLeague = async (
 		return await sample(n, rng, maxYears, minOvr);
 	} finally {
 		Math.random = random;
+		g.setWithoutSavingToDB("improvedPositions", false);
 		if (expanded) {
 			g.setWithoutSavingToDB("expandedRatings", false);
 		}

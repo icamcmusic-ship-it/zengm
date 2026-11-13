@@ -6,6 +6,7 @@ import {
 import { GroupDot } from "../components/Archetype/ArchetypeLabel.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
+import { useLocal } from "../util/local.ts";
 import { GROUPS, GROUP_INFO } from "../../common/archetypes/index.ts";
 import type { View } from "../../common/types.ts";
 
@@ -13,6 +14,7 @@ const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
 
 const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 	useTitleBar({ title: "Archetype Landscape" });
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 
 	const cols = [
 		{ title: "Archetype", sortType: "string" as const },
@@ -58,7 +60,7 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 										{p.name}
 									</a>{" "}
 									<span className="text-body-secondary">
-										{p.ovr} {p.abbrev}
+										{challengeNoRatings ? p.abbrev : `${p.ovr} ${p.abbrev}`}
 									</span>
 								</span>
 							))}

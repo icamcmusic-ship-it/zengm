@@ -219,6 +219,8 @@ const accept = async <
 			contractDemand: helpers.deepCopy(p.contractDemand),
 			contracts: [...p.contracts],
 			transactions: helpers.deepCopy(p.transactions),
+			tradeRequest: p.tradeRequest,
+			holdout: p.holdout,
 		};
 
 		const exception =
@@ -248,6 +250,12 @@ const accept = async <
 
 			Object.assign(p, rollbackInfo);
 			p.tid = PLAYER.FREE_AGENT;
+			if (!p.tradeRequest) {
+				delete p.tradeRequest;
+			}
+			if (!p.holdout) {
+				delete p.holdout;
+			}
 
 			if (phase === PHASE.RESIGN_PLAYERS) {
 				await idb.cache.negotiations.add({

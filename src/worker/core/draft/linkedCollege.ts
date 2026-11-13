@@ -18,6 +18,8 @@ import { RATINGS } from "../../../common/constants.ts";
 import { syncExpandedToCompat } from "../player/expandedRatings.ts";
 import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 import { last } from "../../../common/utils.ts";
+import { formatPlayerAwardName } from "../../../common/awards.ts";
+import { COLLEGE_AWARD_PREFIX } from "../../../common/preDraft.ts";
 
 const ALREADY_IMPORTED = "Already imported.";
 
@@ -102,6 +104,42 @@ const classSize = () =>
 	);
 
 /**
+ * A college player's awards as pre-draft honors ({ season, type }, common/preDraft.ts): the college league's awards (Player of the Year,
+ * All-American, conference awards, ...) are award-settings awards without a type, named here, with the conference's name for a conference
+ * award, since that league's award settings and conferences don't exist in the pro league.
+ */
+export const collegeHonors = (
+	awards: any[],
+	collegeSeason: number,
+	confNames: Map<number, string>,
+) => {
+	const out: { season: number; type: string }[] = [];
+	for (const a of awards) {
+		if (!a || typeof a.season !== "number" || a.season > collegeSeason) {
+			continue;
+		}
+		let name: string | undefined;
+		if (typeof a.type === "string") {
+			name = a.type;
+		} else if (typeof a.name === "string") {
+			const groupPrefix =
+				a.group?.type === "conf" ? confNames.get(a.group.cid) : undefined;
+			name = formatPlayerAwardName(a, { groupPrefix });
+		}
+		if (!name) {
+			continue;
+		}
+		const type = name.startsWith(COLLEGE_AWARD_PREFIX)
+			? name
+			: `${COLLEGE_AWARD_PREFIX}${name}`;
+		if (!out.some((row) => row.season === a.season && row.type === type)) {
+			out.push({ season: a.season, type });
+		}
+	}
+	return out;
+};
+
+/**
  * The departed players of a college league's season as a draft class file: off-screen pro draft picks in pick order, then everyone else
  * who left (seniors, and early entrants nobody picked) by pro stock. Ratings are copied (toProScale puts them on the pro league's scale
  * after the import). College stats rows and honors become pre-draft rows and honors, the school is the player's college.
@@ -110,9 +148,38 @@ export const buildLinkedClassFile = async (
 	lid: number,
 	collegeSeason: number,
 	max: number,
+	// College pids already in this league (imported for an earlier draft): never imported twice
+	exclude: Set<number> = new Set(),
 ) => {
 	const db = await connectLeague(lid);
 	try {
+		const confsRaw = (
+			await db.transaction("gameAttributes").store.get("confs" as any)
+		)?.value;
+		const confNames = new Map<number, string>();
+		if (Array.isArray(confsRaw)) {
+			// Plain, or a history of { start, value } rows (the one in effect that season)
+			const isHistory = confsRaw.some(
+				(row: any) => row && Array.isArray(row.value),
+			);
+			const confs = isHistory
+				? (confsRaw
+						.filter(
+							(row: any) =>
+								row.start === undefined ||
+								row.start === null ||
+								row.start <= collegeSeason,
+						)
+						.at(-1)?.value ??
+					confsRaw[0]?.value ??
+					[])
+				: confsRaw;
+			for (const conf of confs) {
+				if (conf && typeof conf.cid === "number") {
+					confNames.set(conf.cid, conf.name);
+				}
+			}
+		}
 		const teams = await db.transaction("teams").store.getAll();
 		const regionByTid = new Map(teams.map((t) => [t.tid, t.region]));
 		const teamSeasons = await db
@@ -137,17 +204,20 @@ export const buildLinkedClassFile = async (
 				(exit.type === "pro" || exit.type === "graduated")
 			);
 		});
+		const numDeparted = departed.length;
+		const available = departed.filter((p: any) => !exclude.has(p.pid));
+		const numAlready = numDeparted - available.length;
 		const stock = (p: any) => {
 			const r = p.ratings.at(-1);
 			return 0.5 * r.ovr + 0.5 * r.pot;
 		};
-		departed.sort((a: any, b: any) => {
+		available.sort((a: any, b: any) => {
 			const pa = a.collegeExit.pick ?? Infinity;
 			const pb = b.collegeExit.pick ?? Infinity;
 			return pa - pb || stock(b) - stock(a);
 		});
 
-		const players = departed.slice(0, max).map((p: any) => {
+		const players = available.slice(0, max).map((p: any) => {
 			const exit = p.collegeExit as PlayerCollegeExit;
 			const ratings = { ...p.ratings.at(-1), season: collegeSeason };
 			// Computed again in the pro league (age, scouting fuzz)
@@ -182,9 +252,7 @@ export const buildLinkedClassFile = async (
 				college: lastSchool,
 				ratings: [ratings],
 				stats,
-				awards: (p.awards ?? []).filter(
-					(a: any) => typeof a.type === "string" && a.season <= collegeSeason,
-				),
+				awards: collegeHonors(p.awards ?? [], collegeSeason, confNames),
 				injury: { type: "Healthy", gamesRemaining: 0 },
 				injuries: [],
 				tid: PLAYER.UNDRAFTED,
@@ -214,7 +282,8 @@ export const buildLinkedClassFile = async (
 			startingSeason: collegeSeason,
 			gameAttributes: { season: collegeSeason },
 			players,
-			numDeparted: departed.length,
+			numDeparted,
+			numAlready,
 		};
 	} finally {
 		db.close();
@@ -296,6 +365,37 @@ const toProScale = async (draftYear: number, lid: number, season: number) => {
 	}
 };
 
+/**
+ * College pids (of league lid) of the players already in this league: drafted, on a team, retired, or prospects of another draft. The
+ * class of draftYear is left out, since an import replaces it.
+ */
+const importedCollegePids = async (lid: number, draftYear: number) => {
+	const out = new Set<number>();
+	const seen = new Set<number>();
+	const add = (p: any, fromDb: boolean) => {
+		if (p.linkedCollege?.lid !== lid) {
+			return;
+		}
+		if (p.tid === PLAYER.UNDRAFTED) {
+			// Prospects only count from the cache (one removed by an earlier import may still be in the database until it is flushed)
+			if (fromDb || p.draft.year === draftYear) {
+				return;
+			}
+		}
+		out.add(p.linkedCollege.pid);
+	};
+	for (const p of await idb.cache.players.getAll()) {
+		seen.add(p.pid);
+		add(p, false);
+	}
+	for (const p of await idb.league.getAll("players")) {
+		if (!seen.has(p.pid)) {
+			add(p, true);
+		}
+	}
+	return out;
+};
+
 const saveLinked = async (linked: LinkedCollege | undefined) => {
 	await league.setGameAttributes({ linkedCollege: linked });
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
@@ -351,6 +451,12 @@ export const importLinkedCollegeClass = async ({
 				"The linked college league can't be found. It may have been deleted.",
 		};
 	}
+	if (g.get("phase") === PHASE.DRAFT) {
+		return {
+			error:
+				"The draft is under way. The next class can be imported once it is over.",
+		};
+	}
 	const collegeSeason = latestDepartureSeason(info.season, info.phase);
 	const draftYear = nextDraftYear();
 	if (
@@ -366,7 +472,15 @@ export const importLinkedCollegeClass = async ({
 		linked.lid,
 		collegeSeason,
 		classSize(),
+		await importedCollegePids(linked.lid, draftYear),
 	);
+	// One college season is one class: once some of it is in this league (imported for an earlier draft), it is not imported again,
+	// even the players who were left out of that class
+	if (file.numAlready > 0) {
+		return {
+			error: `The college league's class of ${collegeSeason} is already in this league (imported for an earlier draft). Its next class comes after its season ${collegeSeason + 1} Departures phase.`,
+		};
+	}
 	if (file.players.length === 0) {
 		return {
 			error: `The college league has no departed players from ${collegeSeason} yet (its season ${info.season} departures happen in its Departures phase).`,

@@ -618,6 +618,23 @@ describe("trade requests and holdouts", () => {
 		);
 	});
 
+	test("re-signing settles a trade request and a holdout", async () => {
+		const p = await getTeamPlayer(1);
+		const season = g.get("season");
+		p.tradeRequest = { season, phase: PHASE.REGULAR_SEASON, tid: 1 };
+		p.holdout = { season, tid: 1, gamesRemaining: 3, gamesMissed: 0 };
+		player.addToFreeAgents(p, {});
+		await player.sign(
+			p,
+			1,
+			{ amount: g.get("minContract"), exp: season + 2 },
+			PHASE.RESIGN_PLAYERS,
+		);
+		assert.isFalse(hasActiveTradeRequest(p));
+		assert.isUndefined(p.tradeRequest);
+		assert.isUndefined(p.holdout);
+	});
+
 	test("an unhappy star requests a trade, and withdraws it when happy", async () => {
 		vi.spyOn(Math, "random").mockReturnValue(0);
 		const p = await getTeamPlayer(1);

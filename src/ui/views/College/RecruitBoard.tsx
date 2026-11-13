@@ -1,6 +1,7 @@
 // College mode: the recruiting board shared by the Recruiting and Transfer Portal pages (docs/college-mode.md)
 import { useState, type ReactNode } from "react";
 import { helpers } from "../../util/helpers.ts";
+import { useLocal } from "../../util/local.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import {
 	ACTIONS,
@@ -229,6 +230,7 @@ export const RecruitBoard = <T extends BoardRow>({
 	>("all");
 	const [pos, setPos] = useState("all");
 	const [limit, setLimit] = useState(50);
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 
 	const disabled = !canEdit || autoRecruit;
 
@@ -383,12 +385,16 @@ export const RecruitBoard = <T extends BoardRow>({
 									<th key={col.title}>{col.title}</th>
 								))}
 								<th>Pos</th>
-								<th className="text-end" title="Your staff's estimate">
-									Ovr
-								</th>
-								<th className="text-end" title="Your staff's estimate">
-									Pot
-								</th>
+								{challengeNoRatings ? null : (
+									<>
+										<th className="text-end" title="Your staff's estimate">
+											Ovr
+										</th>
+										<th className="text-end" title="Your staff's estimate">
+											Pot
+										</th>
+									</>
+								)}
 								<th>Wants</th>
 								<th>Interest (you, top 3)</th>
 								<th>Status</th>
@@ -409,13 +415,17 @@ export const RecruitBoard = <T extends BoardRow>({
 										</td>
 									))}
 									<td>{row.pos}</td>
-									<td className="text-end">
-										{row.ovr}
-										{row.scout < 2 ? (
-											<span className="text-body-secondary">?</span>
-										) : null}
-									</td>
-									<td className="text-end">{row.pot}</td>
+									{challengeNoRatings ? null : (
+										<>
+											<td className="text-end">
+												{row.ovr}
+												{row.scout < 2 ? (
+													<span className="text-body-secondary">?</span>
+												) : null}
+											</td>
+											<td className="text-end">{row.pot}</td>
+										</>
+									)}
 									<td>
 										<Wants row={row} />
 									</td>

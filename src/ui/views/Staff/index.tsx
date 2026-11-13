@@ -256,9 +256,16 @@ const Staff = ({
 						<YearsSelect years={years} setYears={setYears} />
 						<ul className="mb-0 ps-3">
 							<li>
-								A new contract at <b>{formatSalary(c.demand)} per season</b> (he
-								makes {formatSalary(c.contract.amount)} now), {years} more
-								season
+								A new contract at{" "}
+								<b>
+									{formatSalary(Math.max(c.demand, c.contract.amount))} per
+									season
+								</b>{" "}
+								from now on (he makes {formatSalary(c.contract.amount)} now
+								{c.demand < c.contract.amount
+									? " and won't take a pay cut"
+									: ""}
+								), {years} more season
 								{years > 1 ? "s" : ""} after his current deal, which runs
 								through {c.contract.exp}.
 							</li>
