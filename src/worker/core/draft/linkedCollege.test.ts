@@ -211,7 +211,11 @@ describe("linked college league", () => {
 			// Rank for rank, the class compares with a generated one on potential and on the age-adjusted value the draft AI uses
 			// (it averages about 1.5 years older: the off-screen college draft takes mostly seniors)
 			{
-				const ref = (await genPlayersWithoutSaving(2025, DEFAULT_LEVEL, [])) as any[];
+				const ref = (await genPlayersWithoutSaving(
+					2025,
+					DEFAULT_LEVEL,
+					[],
+				)) as any[];
 				const stats = (ps: any[]) => {
 					const rows = ps
 						.map((p) => {

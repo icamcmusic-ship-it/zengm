@@ -128,8 +128,11 @@ export default defineView({
 		const soFar = mode !== "all" && !X.decided(season);
 		// The slides only depend on the snapshot and which deck it is, so opening the same deck again is free
 		const cands = await wperfTime(`wrapped.candidates.${mode}`, () =>
-			memoize(built, `cands|${ratingsView}|${mode}|${season}|${tid ?? ""}|${pid ?? ""}`, () =>
-				candidatesAsync({ X, mode, season, tid, pid, soFar }, yieldToWorker),
+			memoize(
+				built,
+				`cands|${ratingsView}|${mode}|${season}|${tid ?? ""}|${pid ?? ""}`,
+				() =>
+					candidatesAsync({ X, mode, season, tid, pid, soFar }, yieldToWorker),
 			),
 		);
 

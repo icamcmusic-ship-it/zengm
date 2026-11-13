@@ -68,15 +68,19 @@ const create = async (
 };
 
 describe("hard cap at league creation", () => {
-	test("no team starts over the hard cap", { timeout: 10 * 60 * 1000 }, async () => {
-		for (const [seed, extras] of [
-			[1, false],
-			[2, true],
-		] as const) {
-			const payrolls = await create("hard", seed, extras);
-			const cap = g.get("salaryCap");
-			const over = payrolls.filter((x) => x > cap);
-			assert.deepEqual(over, []);
-		}
-	});
+	test(
+		"no team starts over the hard cap",
+		{ timeout: 10 * 60 * 1000 },
+		async () => {
+			for (const [seed, extras] of [
+				[1, false],
+				[2, true],
+			] as const) {
+				const payrolls = await create("hard", seed, extras);
+				const cap = g.get("salaryCap");
+				const over = payrolls.filter((x) => x > cap);
+				assert.deepEqual(over, []);
+			}
+		},
+	);
 });

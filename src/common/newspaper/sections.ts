@@ -862,7 +862,9 @@ export const draftStory = (c: Ctx, tid?: number): Article | undefined => {
 					? `The scouts' favorite sleeper, though, was `
 					: `The scouts' favorite by potential, though, was `,
 				c.pl(highPot.pid, highPot.name),
-				c.noRatings ? `, who went` : ` (${highPot.pot}), who went No. ${highPot.pick} in round ${highPot.round} to the `,
+				c.noRatings
+					? `, who went`
+					: ` (${highPot.pot}), who went No. ${highPot.pick} in round ${highPot.round} to the `,
 				c.tl(highPot.tid),
 				".",
 			),

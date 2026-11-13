@@ -452,17 +452,19 @@ export const topPickFeature = (c: Ctx): Article | undefined => {
 	const scout: Block | undefined = c.noRatings
 		? undefined
 		: P(
-		r.pick([
-			`On draft night ${d.name} carries an overall rating of ${d.ovr} and a potential of ${d.pot}. `,
-			`The ratings: ${d.ovr} overall now, ${d.pot} potential, at ${d.age}. `,
-		]),
-		highPot && highPot.pid !== d.pid && highPot.pot > d.pot
-			? [
-					`The highest potential in the class, though, belongs to `,
-					c.pl(highPot.pid, highPot.name),
-					` (${highPot.pot}), taken No. ${highPot.pick} in round ${highPot.round}.`,
-				]
-			: [`No one else in the ${c.season} class has a higher potential rating.`],
+				r.pick([
+					`On draft night ${d.name} carries an overall rating of ${d.ovr} and a potential of ${d.pot}. `,
+					`The ratings: ${d.ovr} overall now, ${d.pot} potential, at ${d.age}. `,
+				]),
+				highPot && highPot.pid !== d.pid && highPot.pot > d.pot
+					? [
+							`The highest potential in the class, though, belongs to `,
+							c.pl(highPot.pid, highPot.name),
+							` (${highPot.pot}), taken No. ${highPot.pick} in round ${highPot.round}.`,
+						]
+					: [
+							`No one else in the ${c.season} class has a higher potential rating.`,
+						],
 			);
 	const table: Block = {
 		type: "table",

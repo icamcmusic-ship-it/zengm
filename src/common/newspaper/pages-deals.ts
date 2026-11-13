@@ -464,11 +464,7 @@ addPage(
 								[c.pl(p.pid)],
 								[c.tl(p.tid)],
 								[money(p.contractAmount!)],
-								[
-									c.pre
-										? String(c.noRatings ? p.age : p.ovr)
-										: fmt1(p.ws),
-								],
+								[c.pre ? String(c.noRatings ? p.age : p.ovr) : fmt1(p.ws)],
 							]),
 							[2, 3],
 						),
@@ -696,9 +692,7 @@ addPage(
 							segs: [
 								`${d.age}-year-old ${d.pos || "prospect"}${d.college ? ` from ${d.college}` : ""}, to the `,
 								c.tl(d.tid),
-								c.noRatings
-									? "."
-									: `. Rated ${d.ovr} now, ${d.pot} potential.`,
+								c.noRatings ? "." : `. Rated ${d.ovr} now, ${d.pot} potential.`,
 							],
 						})),
 					},

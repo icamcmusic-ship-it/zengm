@@ -124,11 +124,15 @@ export default defineView({
 		}
 
 		// Each side's slides only depend on the snapshot and the side, so comparing again is cheap
-		const slidesA = await memoize(built, `cmp|${ratingsView}|${sideSpec(a)}`, () =>
-			sideSlidesAsync(X, a, yieldToWorker),
+		const slidesA = await memoize(
+			built,
+			`cmp|${ratingsView}|${sideSpec(a)}`,
+			() => sideSlidesAsync(X, a, yieldToWorker),
 		);
-		const slidesB = await memoize(built, `cmp|${ratingsView}|${sideSpec(b)}`, () =>
-			sideSlidesAsync(X, b, yieldToWorker),
+		const slidesB = await memoize(
+			built,
+			`cmp|${ratingsView}|${sideSpec(b)}`,
+			() => sideSlidesAsync(X, b, yieldToWorker),
 		);
 		const m = matchCands(slidesA, slidesB);
 		const both = m.both.slice(0, MAX_BOTH);

@@ -8,7 +8,8 @@ import type { EditionId } from "./types.ts";
 const EDITIONS: EditionId[] = ["preseason", "midseason", "playoffs", "final"];
 // "rated 72", "rating of 72", "72 potential", "72 ovr", "overall rating", "61→66", "72/80", "(64.3 rating", "Roster rating"
 // ("first overall pick" is fine)
-const RATING_WORDS = /\b(rated|ratings?|potential|ovr)\b|\boverall rating|\b\d{2,} overall\b/i;
+const RATING_WORDS =
+	/\b(rated|ratings?|potential|ovr)\b|\boverall rating|\b\d{2,} overall\b/i;
 const RATING_NUMBERS = /\d+\s*(→|->)\s*\d+|\b\d{2}\/\d{2}\b/;
 
 const leaks = (text: string) => {
@@ -39,8 +40,9 @@ describe("newspaper under the No Visible Player Ratings challenge", () => {
 		let found = 0;
 		for (const edition of EDITIONS) {
 			for (let season = 2018; season < 2034; season++) {
-				found += leaks(paperText(buildPaper(makeFixture(edition, season))))
-					.length;
+				found += leaks(
+					paperText(buildPaper(makeFixture(edition, season))),
+				).length;
 			}
 		}
 		assert.isAbove(found, 20);

@@ -200,8 +200,7 @@ export const viewRatings = (p: WPlayer, view: RatingsView): WPlayer => {
 				);
 	// Draft night ratings: the fuzz of his first ratings row, like the player page
 	const seasons = Object.keys(fz).map(Number);
-	const firstFuzz =
-		seasons.length > 0 ? fz[Math.min(...seasons)] : undefined;
+	const firstFuzz = seasons.length > 0 ? fz[Math.min(...seasons)] : undefined;
 	return {
 		...p,
 		ovr: bySeason(p.ovr)!,

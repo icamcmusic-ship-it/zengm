@@ -349,12 +349,13 @@ const toProScale = async (draftYear: number, lid: number, season: number) => {
 		return;
 	}
 	// The values the draft AI will see (pot from monteCarloPot), for the calibration below
-	const actualValue = (p: { born: { year: number }; ratings: any[] }) =>
-		player.valueCombineOvrPot(
-			last(p.ratings).ovr,
-			last(p.ratings).pot,
-			draftYear - p.born.year,
-		);
+	const actualValue = (p: {
+		born: { year: number };
+		ratings: { ovr: number; pot: number }[];
+	}) => {
+		const r = p.ratings.at(-1)!;
+		return player.valueCombineOvrPot(r.ovr, r.pot, draftYear - p.born.year);
+	};
 	const top = Math.min(60, imported.length, generated.length);
 	const meanTop = (values: number[]) =>
 		values
