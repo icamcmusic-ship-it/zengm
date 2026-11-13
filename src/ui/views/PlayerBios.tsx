@@ -94,16 +94,19 @@ const PlayerBios = ({ players, season, stats, team }: View<"playerBios">) => {
 					neverShowCountry: true,
 				}),
 				p.ratings.pos,
-				<a
-					href={helpers.leagueUrl([
-						"frivolities",
-						"most",
-						"jersey_number",
-						p.stats.jerseyNumber,
-					])}
-				>
-					{p.stats.jerseyNumber}
-				</a>,
+				// No link for a player without a number yet (the page needs one)
+				p.stats.jerseyNumber !== undefined ? (
+					<a
+						href={helpers.leagueUrl([
+							"frivolities",
+							"most",
+							"jersey_number",
+							p.stats.jerseyNumber,
+						])}
+					>
+						{p.stats.jerseyNumber}
+					</a>
+				) : null,
 				<a
 					href={helpers.leagueUrl([
 						"roster",
