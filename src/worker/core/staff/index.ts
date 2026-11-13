@@ -518,6 +518,9 @@ export const fillVacancies = async ({
 					available = pool;
 				}
 			}
+			// Former employees who were just fired by this team are not rehired, not even as the cheapest fallback below (the user
+			// can't rehire them either, and Auto hiring fills his jobs here)
+			available = available.filter((c) => !firedRecentlyBy(c, t.tid));
 			if (available.length === 0) {
 				const c = await generateCoach({ role });
 				const cid = await idb.cache.coaches.add(c);
@@ -551,10 +554,6 @@ export const fillVacancies = async ({
 					cheapest = c;
 				}
 				if (demand > maxSpend) {
-					continue;
-				}
-				// Former employees who were just fired by this team are not rehired
-				if (firedRecentlyBy(c, t.tid)) {
 					continue;
 				}
 				const gm = gms.get(t.tid);

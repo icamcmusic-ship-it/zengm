@@ -12,6 +12,8 @@ import {
 	COACH_OF_THE_YEAR,
 	effectiveStaffDevScore,
 	ensureStaff,
+	fillVacancies,
+	firedRecentlyBy,
 	getCoachingCarousel,
 	getStaffLevel,
 	getStaffPayroll,
@@ -243,6 +245,26 @@ describe("coaching staff", () => {
 		);
 	});
 
+	test("Auto hiring never brings back a coach the team just fired, even when he's the only one left", async () => {
+		await ensureStaff();
+		const tid = g.get("userTid");
+		const dev = (await getTeamStaff(tid)).dev!;
+		await userFire({ cid: dev.cid, tid });
+		for (const c of await idb.cache.coaches.getAll()) {
+			if (c.tid === COACH_FREE_AGENT && c.cid !== dev.cid) {
+				await idb.cache.coaches.delete(c.cid);
+			}
+		}
+		const hired = await fillVacancies({ includeUser: true });
+		assert.strictEqual(hired.length, 1);
+		const now = (await getTeamStaff(tid)).dev!;
+		assert.notStrictEqual(now.cid, dev.cid);
+		assert.strictEqual(
+			(await idb.cache.coaches.get(dev.cid))!.tid,
+			COACH_FREE_AGENT,
+		);
+	});
+
 	test("user hiring or firing re-levels every team against the new league average", async () => {
 		await ensureStaff();
 		const tid = g.get("userTid");
@@ -262,6 +284,19 @@ describe("coaching staff", () => {
 	});
 
 	test("a new staff's development effect phases in: last season's score carries over", async () => {
+		// Seeded, so the league, the fake season and the coaching market are the same every run (and whatever ran before it in
+		// the worker, isolate: false)
+		const outer = Math.random;
+		Math.random = makeSeededRandom(2_024);
+		try {
+			await setup();
+			await phasesIn();
+		} finally {
+			Math.random = outer;
+		}
+	});
+
+	const phasesIn = async () => {
 		await ensureStaff();
 		const tid = g.get("userTid");
 		// No carry in a new league: the staff as it is
@@ -279,9 +314,10 @@ describe("coaching staff", () => {
 		if (raw) {
 			await userFire({ cid: raw.cid, tid });
 		}
+		// (not the coach just fired: he can't be rehired this season or next)
 		const best = (await idb.cache.coaches.getAll())
-			.filter((c) => c.tid === COACH_FREE_AGENT)
-			.sort((a, b) => b.ratings.dev - a.ratings.dev)[0]!;
+			.filter((c) => c.tid === COACH_FREE_AGENT && !firedRecentlyBy(c, tid))
+			.sort((a, b) => b.ratings.dev - a.ratings.dev || a.cid - b.cid)[0]!;
 		await userHire({ cid: best.cid, role: "dev", years: 3, tid });
 		const carried = await getStaffLevel(tid);
 		const score = t.staffDevCarry!.score;
@@ -299,7 +335,7 @@ describe("coaching staff", () => {
 		// than the coach he replaces; levels are rounded)
 		assert.isAtLeast(carried, Math.min(before, full) - 1);
 		assert.isAtMost(carried, Math.max(before, full) + 1);
-	});
+	};
 
 	test("a coach hired during the season gets only the games he coached", async () => {
 		await ensureStaff();

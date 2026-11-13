@@ -27,8 +27,13 @@ beforeAll(async () => {
 	idb.league = undefined;
 	// And the worker's locks: a file that stopped in the middle of a game sim (a failed assertion) leaves gameSim set, and then
 	// every later game.play in the same worker returns without playing, so a later file's "play until the phase changes" loop never ends
-	const { lock } = await import("../worker/util/index.ts");
+	const { local, lock } = await import("../worker/util/index.ts");
 	lock.reset();
+	// And the league's cached state in local, as when the user switches leagues: a league simmed by an earlier file leaves its
+	// players' ovr mean and standard deviation there (updateOvrMeanStd), and player.value is scaled by them, so a file that
+	// generates players and ranks them by value (draft classes) got different values, and different tops of classes, depending
+	// on which file ran before it in the worker
+	local.reset();
 });
 
 globalThis.fetch = async (url: Parameters<typeof fetch>[0]) => {
