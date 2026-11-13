@@ -293,16 +293,28 @@ const BUILD_KEYS = Object.keys(PROSPECT_MEAN);
 // How strongly the build draw follows his ratings (the rest is the builds' real-draft weights)
 const BUILD_FIT_K = 4;
 
-type BuildInfo = { a: Archetype; norm: number; lean: number[]; weight: number };
+type BuildInfo = {
+	a: Archetype;
+	// The build's offsets on BUILD_KEYS, as a unit vector
+	u: Float64Array;
+	lean: number[];
+	weight: number;
+};
 let buildCache: BuildInfo[] | undefined;
 const getBuilds = () => {
 	if (!buildCache) {
 		buildCache = ARCHETYPES.filter((a) => a.w > 0 && a.name !== "Balanced").map(
 			(a) => {
+				const u = new Float64Array(BUILD_KEYS.length);
 				let norm = 0;
-				for (const k of BUILD_KEYS) {
+				BUILD_KEYS.forEach((k, i) => {
 					const v = (a.o as any)[k] ?? 0;
+					u[i] = v;
 					norm += v * v;
+				});
+				norm = Math.sqrt(norm) || 1;
+				for (let i = 0; i < u.length; i++) {
+					u[i]! /= norm;
 				}
 				const l = z();
 				for (const tag of a.tags) {
@@ -316,46 +328,69 @@ const getBuilds = () => {
 						addTo(l, v);
 					}
 				}
-				return {
-					a,
-					norm: Math.sqrt(norm) || 1,
-					lean: l,
-					weight: a.w * a.cal,
-				};
+				return { a, u, lean: l, weight: a.w * a.cal };
 			},
 		);
 	}
 	return buildCache;
 };
 
+// The builds whose height gate lets a player of this hgt in (cached per hgt)
+const poolCache = new Map<number, BuildInfo[]>();
+const poolFor = (hgt: number) => {
+	const h = Math.round(hgt);
+	let pool = poolCache.get(h);
+	if (!pool) {
+		const all = getBuilds();
+		pool = all.filter((b) => h >= b.a.min && h <= b.a.max);
+		if (pool.length === 0) {
+			pool = all;
+		}
+		poolCache.set(h, pool);
+	}
+	return pool;
+};
+
 // Build-first: a target build drawn by its share of real draft classes (the ratings builds' weights and height gates), tilted toward the
 // builds his ratings already look like
 export const pickBuild = (r: RatingsLike, rng: Rng) => {
-	const hgt = num(r, "hgt", 47);
-	const d: number[] = [];
+	const n = BUILD_KEYS.length;
+	const d = new Float64Array(n);
 	let mean = 0;
-	for (const k of BUILD_KEYS) {
+	for (let i = 0; i < n; i++) {
+		const k = BUILD_KEYS[i]!;
 		const v = num(r, k, PROSPECT_MEAN[k]!) - PROSPECT_MEAN[k]!;
-		d.push(v);
+		d[i] = v;
 		mean += v;
 	}
-	mean /= BUILD_KEYS.length;
+	mean /= n;
 	let dNorm = 0;
-	for (let i = 0; i < d.length; i++) {
-		d[i] = d[i]! - mean;
+	for (let i = 0; i < n; i++) {
+		d[i]! -= mean;
 		dNorm += d[i]! * d[i]!;
 	}
 	dNorm = Math.sqrt(dNorm) || 1;
-	const builds = getBuilds().filter((b) => hgt >= b.a.min && hgt <= b.a.max);
-	const pool = builds.length > 0 ? builds : getBuilds();
-	return rng.weighted(pool, (b) => {
+	const pool = poolFor(num(r, "hgt", 47));
+	const weights = new Float64Array(pool.length);
+	let total = 0;
+	for (let j = 0; j < pool.length; j++) {
+		const b = pool[j]!;
 		let dot = 0;
-		BUILD_KEYS.forEach((k, i) => {
-			dot += d[i]! * ((b.a.o as any)[k] ?? 0);
-		});
-		const cos = dot / (dNorm * b.norm);
-		return b.weight * Math.exp(BUILD_FIT_K * cos);
-	});
+		for (let i = 0; i < n; i++) {
+			dot += d[i]! * b.u[i]!;
+		}
+		const w = b.weight * Math.exp((BUILD_FIT_K * dot) / dNorm);
+		weights[j] = w;
+		total += w;
+	}
+	let x = rng.random() * total;
+	for (let j = 0; j < pool.length; j++) {
+		x -= weights[j]!;
+		if (x < 0) {
+			return pool[j]!;
+		}
+	}
+	return pool.at(-1)!;
 };
 
 export const bandLean = (r: RatingsLike) => {
