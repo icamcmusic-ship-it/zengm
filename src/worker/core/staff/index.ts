@@ -984,8 +984,13 @@ export const userExtend = async ({
 	if (c.tid !== tid) {
 		throw new Error("That coach is not on your staff");
 	}
+	// The new salary starts now (a coach contract has one amount), so he never takes a pay cut: extending an overpaid coach used to
+	// cut his salary to his lower asking price at once
 	c.contract = {
-		amount: coachSalaryDemand(c.ratings, c.role, g.get("salaryCap")),
+		amount: Math.max(
+			c.contract.amount,
+			coachSalaryDemand(c.ratings, c.role, g.get("salaryCap")),
+		),
 		exp:
 			Math.max(c.contract.exp, contractStartSeason() - 1) +
 			helpers.bound(Math.round(years), 1, 5),
