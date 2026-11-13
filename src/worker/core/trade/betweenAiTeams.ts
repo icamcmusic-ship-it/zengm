@@ -8,7 +8,10 @@ import type { Player, TradeTeams } from "../../../common/types.ts";
 import { choice } from "../../../common/random.ts";
 import { getTradePickConditions } from "../../../common/draftPickConditions.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
-import { getContractSummaryOrThrow } from "../contract/index.ts";
+import {
+	getContractSummary,
+	getContractSummaryOrThrow,
+} from "../contract/index.ts";
 import { hasActiveTradeRequest } from "../contract/unrest.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import {
@@ -18,6 +21,12 @@ import {
 	type MultiTeamTrade,
 } from "./multiTeam.ts";
 import getPayrolls from "../team/getPayrolls.ts";
+import getPayroll from "../team/getPayroll.ts";
+import {
+	FAIR_TRADE_MIN_DV,
+	FAIR_TRADE_RETRIES,
+	salaryMatchOk,
+} from "./realisticEconomy.ts";
 import { getAllGmWeights } from "../gm/index.ts";
 import {
 	capSpace,
@@ -57,7 +66,42 @@ export const getAITids = async () => {
 		.map((t) => t.tid);
 };
 
-const attempt = async (valueChangeCalculator: ValueChangeCalculator) => {
+// Realistic AI Economy, no salary cap: soft salary matching for an AI-to-AI trade (true when the extra is off or the
+// league has a cap, whose own rules apply)
+export const realisticSalaryMatchOk = async (teams: TradeTeams) => {
+	if (!featureOn("realisticEconomy") || g.get("salaryCapType") !== "none") {
+		return true;
+	}
+	const salary = async (pids: number[]) => {
+		let sum = 0;
+		for (const pid of pids) {
+			const p = await idb.cache.players.get(pid);
+			sum += p ? (getContractSummary(p)?.amount ?? 0) : 0;
+		}
+		return sum;
+	};
+	const out0 = await salary(teams[0].pids);
+	const out1 = await salary(teams[1].pids);
+	return salaryMatchOk(
+		[
+			{
+				payrollBefore: await getPayroll(teams[0].tid),
+				salaryOut: out0,
+				salaryIn: out1,
+			},
+			{
+				payrollBefore: await getPayroll(teams[1].tid),
+				salaryOut: out1,
+				salaryIn: out0,
+			},
+		],
+		g.get("luxuryPayroll"),
+	);
+};
+
+const attempt = async (
+	valueChangeCalculator: ValueChangeCalculator,
+): Promise<false | [number, number] | "unfair"> => {
 	const aiTids = await getAITids();
 
 	if (aiTids.length === 0) {
@@ -171,6 +215,16 @@ const attempt = async (valueChangeCalculator: ValueChangeCalculator) => {
 	});
 	if (Math.abs(dv2) > 15) {
 		return false;
+	}
+
+	// Realistic AI Economy: the initiating team must not lose much either (the other team gains, from makeItWork)
+	if (featureOn("realisticEconomy")) {
+		if (dv2 < FAIR_TRADE_MIN_DV) {
+			return "unfair";
+		}
+		if (!(await realisticSalaryMatchOk(teams))) {
+			return "unfair";
+		}
 	}
 
 	const finalTids: [number, number] = [teams[0].tid, teams[1].tid];
@@ -771,12 +825,24 @@ const betweenAiTeams = async () => {
 				if (result && "multi" in result) {
 					tradeTids = result.multi.tids;
 					await processMultiAi(result.multi, result.note);
-				} else if (result) {
+				} else if (result && (await realisticSalaryMatchOk(result.teams))) {
 					tradeTids = [result.teams[0].tid, result.teams[1].tid];
 					await processTrade(result.teams, undefined, { note: result.note });
 				}
 			} else {
-				tradeTids = await attempt(valueChangeCalculator);
+				const res = await attempt(valueChangeCalculator);
+				if (res === "unfair") {
+					// Realistic AI Economy: try again with other players, so trade volume stays close to stock
+					for (let j = 0; j < FAIR_TRADE_RETRIES; j++) {
+						const res2 = await attempt(valueChangeCalculator);
+						if (res2 !== "unfair") {
+							tradeTids = res2;
+							break;
+						}
+					}
+				} else {
+					tradeTids = res;
+				}
 			}
 			if (tradeTids) {
 				// Don't need to recompute draft pick value

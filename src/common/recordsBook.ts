@@ -110,6 +110,9 @@ export type RBState = {
 	v: 1;
 	// Highest gid processed
 	lastGid: number;
+	// Season the check last ran in (games of seasons from it on are read from the database, so a check delayed past
+	// the rollover still processes last season's playoffs). Missing in states saved before it was tracked.
+	lastSeason?: number;
 	// "pts|0" (regular season) or "pts|1" (playoffs) -> league top list
 	game: Record<string, RBGameHigh[]>;
 	// tid -> "pts|0" -> franchise top list
@@ -1108,9 +1111,15 @@ export const reachedThisSeason = (players: RBPlayer[], season: number) => {
 		tid: number;
 		k: RBCareerStat;
 		t: number;
+		retired?: boolean;
 	}[] = [];
 	for (const p of players) {
-		if (p.tid < -1) {
+		// Retired (or otherwise gone) players count when they played this season, e.g. retiring right after it
+		const retired = p.tid < -1;
+		const lastRow = retired
+			? p.rows.findLast((r) => r.season === season && !r.playoffs)
+			: undefined;
+		if (retired && !lastRow) {
 			continue;
 		}
 		for (const k of MILESTONE_STATS) {
@@ -1127,7 +1136,11 @@ export const reachedThisSeason = (players: RBPlayer[], season: number) => {
 				}
 			}
 			for (const t of crossed(k, before, now)) {
-				out.push({ pid: p.pid, name: p.name, tid: p.tid, k, t });
+				out.push(
+					retired
+						? { pid: p.pid, name: p.name, tid: lastRow!.tid, k, t, retired }
+						: { pid: p.pid, name: p.name, tid: p.tid, k, t },
+				);
 			}
 		}
 	}

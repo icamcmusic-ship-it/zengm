@@ -8,7 +8,7 @@
 // Single-game highs and streaks need box scores, which BBGM deletes after a while, so they are kept as games are
 // played, in the "recordsBook" game attribute (like leagueAchievements: the league's own key-value store, carried by
 // export/import). A league that never had it starts from the box scores it still has.
-import { PHASE } from "../../common/constants.ts";
+import { PHASE, PLAYER } from "../../common/constants.ts";
 import {
 	addGame,
 	buildBook,
@@ -234,6 +234,7 @@ const bootstrap = async (): Promise<RBState> => {
 		}
 	}
 	seedRecords(state, await loadPlayers(), await loadTeamSeasons());
+	state.lastSeason = g.get("season");
 	return state;
 };
 
@@ -292,12 +293,31 @@ const runCheck = async () => {
 		return;
 	}
 
-	const games = (await idb.cache.games.getAll())
+	// The cache only holds this season's games: when the check last ran in an earlier season (delayed past the
+	// rollover, e.g. last season's playoffs), catch up from the database too. States from before lastSeason was
+	// tracked look one season back.
+	const season = g.get("season");
+	const fromSeason = Math.min(state.lastSeason ?? season - 1, season);
+	const byGid = new Map<number, Game>();
+	for (let s = fromSeason; s < season; s++) {
+		for (const gm of await idb.merged.games.getAll({ season: s })) {
+			byGid.set(gm.gid, gm);
+		}
+	}
+	for (const gm of await idb.cache.games.getAll()) {
+		byGid.set(gm.gid, gm);
+	}
+	const games = [...byGid.values()]
 		.filter((gm) => gm.gid > state!.lastGid)
-		.sort((a, b) => a.gid - b.gid);
+		.sort((a, b) => a.season - b.season || a.gid - b.gid);
 	if (games.length === 0) {
+		if (state.lastSeason !== season && g.get("lid") === lid) {
+			state.lastSeason = season;
+			await saveState(state);
+		}
 		return;
 	}
+	state.lastSeason = season;
 
 	const recordsNews =
 		featureOption<boolean>("featureRecordsNews") && g.get("phase") >= 0;
@@ -623,6 +643,8 @@ export type ReachedRow = {
 	season: number;
 	day?: number;
 	gid?: number;
+	// Played this season and retired after it
+	retired?: boolean;
 };
 
 export const getMilestones = async ({
@@ -720,6 +742,8 @@ export const getMilestones = async ({
 			season: m.s,
 			day: m.day,
 			gid: m.g,
+			retired:
+				players.find((p) => p.pid === m.p)?.tid === PLAYER.RETIRED || undefined,
 		}));
 
 	return { rows, reached: [...reached, ...older].slice(0, 60), inSeason };

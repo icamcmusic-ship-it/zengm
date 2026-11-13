@@ -187,6 +187,17 @@ describe("coaching staff", () => {
 		assert.strictEqual(cashBefore - cashAfter, buyout);
 		assert.isUndefined((await getTeamStaff(tid)).dev);
 
+		// Can't rehire the coach just fired (at his lower asking price, after paying only half of the rest of his contract)
+		let rehired = false;
+		try {
+			await userHire({ cid: dev.cid, role: "dev", years: 2, tid });
+			rehired = true;
+		} catch {
+			rehired = false;
+		}
+		assert.isFalse(rehired);
+		assert.isUndefined((await getTeamStaff(tid)).dev);
+
 		const best = (await idb.cache.coaches.getAll())
 			.filter((c) => c.tid === COACH_FREE_AGENT && c.cid !== dev.cid)
 			.sort((a, b) => b.ratings.dev - a.ratings.dev)[0]!;

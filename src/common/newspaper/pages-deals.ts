@@ -454,12 +454,17 @@ addPage(
 							`${plural(list.length, "big contract")} ${c.T("end", "ended")} after ${c.season}. The largest:`,
 						),
 						table(
-							["Player", "Team", "Salary", c.pre ? "Rating" : "WS"],
+							[
+								"Player",
+								"Team",
+								"Salary",
+								c.pre ? (c.noRatings ? "Age" : "Rating") : "WS",
+							],
 							list.map((p) => [
 								[c.pl(p.pid)],
 								[c.tl(p.tid)],
 								[money(p.contractAmount!)],
-								[c.pre ? String(p.ovr) : fmt1(p.ws)],
+								[c.pre ? String(c.noRatings ? p.age : p.ovr) : fmt1(p.ws)],
 							]),
 							[2, 3],
 						),
@@ -647,7 +652,13 @@ addPage(
 				build: (x, r, c) => [
 					P(`The top of the ${c.season} first round, with each team's record:`),
 					table(
-						["Pick", "Player", "Team", "Record", "Ovr/Pot"],
+						[
+							"Pick",
+							"Player",
+							"Team",
+							"Record",
+							c.noRatings ? "Age" : "Ovr/Pot",
+						],
 						x.first
 							.slice(0, 10)
 							.map((d) => [
@@ -655,7 +666,7 @@ addPage(
 								[c.pl(d.pid, d.name)],
 								[c.tl(d.tid)],
 								[c.rec(d.tid) || "–"],
-								[`${d.ovr}/${d.pot}`],
+								[c.noRatings ? String(d.age) : `${d.ovr}/${d.pot}`],
 							]),
 						[0, 4],
 					),
@@ -681,7 +692,7 @@ addPage(
 							segs: [
 								`${d.age}-year-old ${d.pos || "prospect"}${d.college ? ` from ${d.college}` : ""}, to the `,
 								c.tl(d.tid),
-								`. Rated ${d.ovr} now, ${d.pot} potential.`,
+								c.noRatings ? "." : `. Rated ${d.ovr} now, ${d.pot} potential.`,
 							],
 						})),
 					},
@@ -1204,6 +1215,7 @@ const top8 = (c: Ctx, tid: number) =>
 addPage(
 	arcPage<{ order: { tid: number; ovr: number; best: NPPlayer }[] }>({
 		id: "preview-ratings",
+		ratings: true,
 		section: "teams",
 		kicker: "Preview",
 		eds: PRE_ONLY,
@@ -1336,6 +1348,7 @@ const profile = (c: Ctx, p: NPPlayer): Seg[] => [
 addPage(
 	arcPage<{ stars: NPPlayer[]; young: NPPlayer[]; old: NPPlayer[] }>({
 		id: "preview-profiles",
+		ratings: true,
 		section: "players",
 		kicker: "Players to know",
 		eds: PRE_ONLY,
@@ -1429,6 +1442,7 @@ const POSITIONS = ["PG", "SG", "SF", "PF", "C", "G", "GF", "F", "FC"];
 addPage(
 	arcPage<{ rows: NPPlayer[] }>({
 		id: "preview-positions",
+		ratings: true,
 		section: "players",
 		kicker: "Position by position",
 		eds: PRE_ONLY,
@@ -1481,6 +1495,7 @@ addPage(
 addPage(
 	arcPage<{ ages: { tid: number; age: number; deep: number }[] }>({
 		id: "preview-rosters",
+		ratings: true,
 		section: "teams",
 		kicker: "Roster check",
 		eds: PRE_ONLY,
@@ -1572,6 +1587,7 @@ addPage(
 addPage(
 	arcPage<{ list: NPPlayer[] }>({
 		id: "preview-rising",
+		ratings: true,
 		section: "players",
 		kicker: "Room to grow",
 		eds: PRE_ONLY,
@@ -1623,6 +1639,7 @@ addPage(
 addPage(
 	arcPage<{ moved: NPPlayer[] }>({
 		id: "preview-movers",
+		ratings: true,
 		section: "money",
 		kicker: "New uniforms",
 		eds: PRE_ONLY,

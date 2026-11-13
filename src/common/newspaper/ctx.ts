@@ -115,6 +115,8 @@ export class Ctx {
 	readonly f: NewsFacts;
 	readonly season: number;
 	readonly tid: number | undefined;
+	// No Visible Player Ratings challenge (NewsFacts.noRatings)
+	readonly noRatings: boolean;
 	private readonly teamMap = new Map<number, NPTeam>();
 	private readonly playerMap = new Map<number, NPPlayer>();
 	readonly rows: NPTeam[];
@@ -130,6 +132,7 @@ export class Ctx {
 		this.f = facts;
 		this.season = facts.season;
 		this.tid = tid;
+		this.noRatings = facts.noRatings === true;
 		for (const t of facts.teams) {
 			this.teamMap.set(t.tid, t);
 		}

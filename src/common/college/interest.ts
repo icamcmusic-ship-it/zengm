@@ -156,6 +156,8 @@ export type SchoolInterest = {
 	a?: boolean;
 	// NIL money promised (thousands)
 	nil?: number;
+	// Transfer portal, his own school: it made a retention pitch. Without one, he doesn't go back to it while another school wants him
+	r?: boolean;
 };
 
 /**

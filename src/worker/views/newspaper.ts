@@ -50,7 +50,7 @@ import {
 import type { RouteParams } from "../../ui/router/types.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import { idb } from "../db/index.ts";
-import { league, team } from "../core/index.ts";
+import { league, player, team } from "../core/index.ts";
 import getNumPlayoffTeams from "../core/season/getNumPlayoffTeams.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
@@ -63,6 +63,13 @@ const processInputs = (params: RouteParams<"newspaper">) => {
 		season: validateSeason(params.season),
 	};
 };
+
+// Ratings as the user's scouts see them (fuzzed, like the rest of the UI shows prospects and other teams' players)
+const seen = (rating: number, fuzz: number | undefined) =>
+	player.fuzzRating(rating, fuzz ?? 0);
+
+// No Visible Player Ratings challenge: the paper says it in words (part of the snapshot cache key, so toggling it rebuilds)
+const noRatings = () => !!g.get("challengeNoRatings");
 
 const getEdition = (season: number, gp: number): EditionId =>
 	pickEdition({
@@ -352,7 +359,10 @@ const getHistory = async (
 				tid: p.tid >= 0 ? p.tid : -1,
 				retired: p.retiredYear !== Infinity && p.tid === PLAYER.RETIRED,
 				ovr: ratingsFor(p, season - 1)
-					? Math.round(ratingsFor(p, season - 1)!.ovr)
+					? seen(
+							ratingsFor(p, season - 1)!.ovr,
+							ratingsFor(p, season - 1)!.fuzz,
+						)
 					: undefined,
 				pts: c?.pts ?? 0,
 				ws: c?.ws ?? 0,
@@ -374,7 +384,7 @@ const getHistory = async (
 					nowTid: p.tid,
 					retired: p.tid === PLAYER.RETIRED,
 					age: p.born.year ? season - 1 - p.born.year : undefined,
-					ovr: r ? Math.round(r.ovr) : undefined,
+					ovr: r ? seen(r.ovr, r.fuzz) : undefined,
 					nowPpg: now && now.gp >= 10 ? now.pts : undefined,
 					_p: p,
 				});
@@ -504,9 +514,9 @@ export const getNewsFacts = async (
 			tid,
 			age: season - p.born.year,
 			pos: r.pos ?? "",
-			ovr: Math.round(r.ovr),
-			pot: Math.round(r.pot),
-			prevOvr: prevR ? Math.round(prevR.ovr) : undefined,
+			ovr: seen(r.ovr, r.fuzz),
+			pot: seen(r.pot, r.fuzz),
+			prevOvr: prevR ? seen(prevR.ovr, prevR.fuzz) : undefined,
 			gp: line?.gp ?? 0,
 			min: line?.min ?? 0,
 			pts: line?.pts ?? 0,
@@ -901,8 +911,9 @@ export const getNewsFacts = async (
 				pick: p.draft.pick,
 				age: season - p.born.year,
 				pos: r?.pos ?? "",
-				ovr: Math.round(r?.ovr ?? 0),
-				pot: Math.round(r?.pot ?? 0),
+				// His draft-night ratings as the scouts saw them, not the true ones
+				ovr: r ? seen(r.ovr, r.fuzz) : 0,
+				pot: r ? seen(r.pot, r.fuzz) : 0,
 				college: p.college || undefined,
 			});
 		}
@@ -910,6 +921,7 @@ export const getNewsFacts = async (
 
 	const facts: NewsFacts = {
 		leagueName: await league.getName(),
+		noRatings: noRatings() || undefined,
 		seedKey: `${g.get("lid")}|${g.get("startingSeason")}`,
 		season,
 		edition,
@@ -1099,6 +1111,8 @@ export default defineView({
 		const isCurrent = inputs.season === g.get("season");
 		const inputsChanged =
 			updateEvents.has("firstRun") ||
+			// (the No Visible Player Ratings challenge toggled: a different snapshot, see the key below)
+			updateEvents.has("gameAttributes") ||
 			inputs.season !== prevInputs?.season ||
 			inputs.team !== prevInputs?.team;
 		const structural =
@@ -1113,7 +1127,7 @@ export default defineView({
 			};
 		}
 
-		const key = `${g.get("lid")}|${inputs.season}|${inputs.team}`;
+		const key = `${g.get("lid")}|${inputs.season}|${inputs.team}|${noRatings() ? "noRatings" : "ratings"}`;
 		const gp = isCurrent ? await currentGp(inputs.season) : 0;
 		const stamp = isCurrent
 			? `${g.get("phase")}|${g.get("gameOver") ? 1 : 0}`

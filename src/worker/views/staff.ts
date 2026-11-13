@@ -18,6 +18,7 @@ import {
 	getLeagueStaffDevScoreRef,
 	getStaffLevel,
 	getStaffPayroll,
+	firedRecentlyBy,
 } from "../core/staff/index.ts";
 import {
 	getRosterFit,
@@ -211,7 +212,10 @@ export default defineView({
 				def: [],
 			};
 			if (isUser) {
-				const fas = coaches.filter((c) => c.tid === COACH_FREE_AGENT);
+				// (not one the team fired this season or last: it can't hire him back yet)
+				const fas = coaches.filter(
+					(c) => c.tid === COACH_FREE_AGENT && !firedRecentlyBy(c, tid),
+				);
 				for (const role of COACH_ROLES) {
 					const all = fas
 						.map((c) => formatCandidate(c, role))

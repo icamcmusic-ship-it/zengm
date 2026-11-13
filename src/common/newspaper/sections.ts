@@ -75,7 +75,7 @@ export const awardStory = (c: Ctx, key: string): Article | undefined => {
 	} else if (key === "MIP" && p.prevLine) {
 		body.push(
 			P(
-				`A year ago he averaged ${fmt1(p.prevLine.pts)} points in ${plural(p.prevLine.gp, "game")}; this season it was ${fmt1(p.pts)}${p.prevOvr !== undefined ? `, and his rating climbed from ${p.prevOvr} to ${p.ovr}` : ""}.`,
+				`A year ago he averaged ${fmt1(p.prevLine.pts)} points in ${plural(p.prevLine.gp, "game")}; this season it was ${fmt1(p.pts)}${p.prevOvr !== undefined && !c.noRatings ? `, and his rating climbed from ${p.prevOvr} to ${p.ovr}` : ""}.`,
 			),
 		);
 	} else if (key === "ROY") {
@@ -380,7 +380,9 @@ export const breakoutStory = (c: Ctx): Article | undefined => {
 	const body: Block[] = [
 		P(
 			c.pl(top.pid),
-			` came into the season rated ${top.prevOvr} and ${c.T("is now", "finished at")} ${top.ovr}, the biggest jump among regulars. The ${top.age}-year-old ${c.T("is averaging", "averaged")} ${c.lineWords(top)} for the `,
+			c.noRatings
+				? ` ${c.T("is having", "had")} a breakout season, the biggest step forward among regulars. The ${top.age}-year-old ${c.T("is averaging", "averaged")} ${c.lineWords(top)} for the `
+				: ` came into the season rated ${top.prevOvr} and ${c.T("is now", "finished at")} ${top.ovr}, the biggest jump among regulars. The ${top.age}-year-old ${c.T("is averaging", "averaged")} ${c.lineWords(top)} for the `,
 			c.tl(top.tid),
 			top.prevLine
 				? `, up from ${fmt1(top.prevLine.pts)} points a year ago.`
@@ -398,7 +400,7 @@ export const breakoutStory = (c: Ctx): Article | undefined => {
 							c.pl(p.pid),
 							` (`,
 							c.tl(p.tid, c.team(p.tid)?.abbrev),
-							`, ${p.prevOvr} to ${p.ovr})`,
+							c.noRatings ? ")" : `, ${p.prevOvr} to ${p.ovr})`,
 						]),
 				),
 				".",
@@ -411,7 +413,9 @@ export const breakoutStory = (c: Ctx): Article | undefined => {
 		kicker: "Breakouts",
 		head: c.freshHead(r, [
 			`${top.name} takes the leap`,
-			`From ${top.prevOvr} to ${top.ovr}: ${poss(top.name)} breakout`,
+			c.noRatings
+				? `${poss(top.name)} breakout season`
+				: `From ${top.prevOvr} to ${top.ovr}: ${poss(top.name)} breakout`,
 			`${top.name} and the season's risers`,
 		])!,
 		byline: c.byline("features"),
@@ -443,14 +447,18 @@ export const declineStory = (c: Ctx): Article | undefined => {
 		kicker: "Father Time",
 		head: c.freshHead(r, [
 			`${top.name} shows his age`,
-			`The slide: ${top.name} drops from ${top.prevOvr} to ${top.ovr}`,
+			c.noRatings
+				? `The slide: ${top.name} loses a step`
+				: `The slide: ${top.name} drops from ${top.prevOvr} to ${top.ovr}`,
 			`Not what they were: ${top.name} and other fading stars`,
 		])!,
 		byline: c.byline("features"),
 		body: [
 			P(
 				c.pl(top.pid),
-				`, ${top.age}, ${c.T("has dropped", "dropped")} from a ${top.prevOvr} rating to ${top.ovr}`,
+				c.noRatings
+					? `, ${top.age}, ${c.T("has lost", "lost")} a step this season`
+					: `, ${top.age}, ${c.T("has dropped", "dropped")} from a ${top.prevOvr} rating to ${top.ovr}`,
 				top.prevLine && top.prevLine.pts > top.pts
 					? `, and his scoring from ${fmt1(top.prevLine.pts)} to ${fmt1(top.pts)} points a game.`
 					: ".",
@@ -463,7 +471,9 @@ export const declineStory = (c: Ctx): Article | undefined => {
 								.slice(1)
 								.map((p) => [
 									c.pl(p.pid),
-									` (${p.age}, ${p.prevOvr} to ${p.ovr})`,
+									c.noRatings
+										? ` (${p.age})`
+										: ` (${p.age}, ${p.prevOvr} to ${p.ovr})`,
 								]),
 						),
 						".",
@@ -841,16 +851,20 @@ export const draftStory = (c: Ctx, tid?: number): Article | undefined => {
 			c.tl(top.tid, c.tfull(top.tid)),
 			` took `,
 			c.pl(top.pid, top.name),
-			`, a ${ageWord} ${top.pos}${top.college ? ` out of ${top.college}` : ""} rated ${top.ovr} now with ${top.pot} potential.`,
+			`, a ${ageWord} ${top.pos}${top.college ? ` out of ${top.college}` : ""}${c.noRatings ? "" : ` rated ${top.ovr} now with ${top.pot} potential`}.`,
 		),
 	];
 	const highPot = picks.slice(1).toSorted((a, b) => b.pot - a.pot)[0];
 	if (highPot && highPot.pot > top.pot) {
 		body.push(
 			P(
-				`The scouts' favorite by potential, though, was `,
+				c.noRatings
+					? `The scouts' favorite sleeper, though, was `
+					: `The scouts' favorite by potential, though, was `,
 				c.pl(highPot.pid, highPot.name),
-				` (${highPot.pot}), who went No. ${highPot.pick} in round ${highPot.round} to the `,
+				c.noRatings
+					? `, who went`
+					: ` (${highPot.pot}), who went No. ${highPot.pick} in round ${highPot.round} to the `,
 				c.tl(highPot.tid),
 				".",
 			),
@@ -858,7 +872,14 @@ export const draftStory = (c: Ctx, tid?: number): Article | undefined => {
 	}
 	body.push({
 		type: "table",
-		head: ["Pick", "Player", "Pos", "Team", "Age", "Ovr/Pot"],
+		head: [
+			"Pick",
+			"Player",
+			"Pos",
+			"Team",
+			"Age",
+			...(c.noRatings ? [] : ["Ovr/Pot"]),
+		],
 		numCols: [4],
 		rows: picks
 			.slice(0, tid === undefined ? 14 : 6)
@@ -868,7 +889,7 @@ export const draftStory = (c: Ctx, tid?: number): Article | undefined => {
 				[d.pos],
 				[c.tl(d.tid, c.team(d.tid)?.abbrev)],
 				[String(d.age)],
-				[`${d.ovr}/${d.pot}`],
+				...(c.noRatings ? [] : [[`${d.ovr}/${d.pot}`]]),
 			]),
 	});
 	return {

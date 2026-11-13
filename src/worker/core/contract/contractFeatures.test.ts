@@ -116,6 +116,16 @@ describe("contract terms", () => {
 		assert.strictEqual(getContractTermsFactor({ option: "player" }, 3), 0.95);
 		assert.strictEqual(getContractTermsFactor({ option: "team" }, 3), 1.1);
 		assert.closeTo(getContractTermsFactor({ guaranteed: 0.5 }, 3), 1.1, 1e-9);
+		// Per season not fully guaranteed, consistent with options: 0% on one season = a team option
+		assert.closeTo(getContractTermsFactor({ guaranteed: 0 }, 2), 1.1, 1e-9);
+		assert.closeTo(getContractTermsFactor({ guaranteed: 0 }, 5), 1.4, 1e-9);
+		assert.closeTo(getContractTermsFactor({ guaranteed: 0.5 }, 5), 1.2, 1e-9);
+		// A team option's season isn't counted again
+		assert.closeTo(
+			getContractTermsFactor({ option: "team", guaranteed: 0 }, 3),
+			1.1 * 1.1,
+			1e-9,
+		);
 		assert.strictEqual(getContractTermsFactor({ option: "team" }, 1), 1);
 		assert.strictEqual(normalizeContractTerms({ guaranteed: 1 }, 3), undefined);
 		assert.strictEqual(

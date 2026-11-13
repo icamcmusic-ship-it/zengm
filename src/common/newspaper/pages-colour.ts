@@ -235,7 +235,7 @@ addPage(
 						...x.cands.flatMap((y, i): Seg[] => [
 							i > 0 ? (i === x.cands.length - 1 ? " and " : ", ") : "",
 							c.pl(y.p.pid),
-							` (${y.p.ovr} rating, `,
+							c.noRatings ? " (" : ` (${y.p.ovr} rating, `,
 							c.tl(y.t.tid),
 							` ${record(y.t)})`,
 						]),
@@ -472,6 +472,7 @@ addPage(
 addPage(
 	arcPage<{ odds: { t: NPTeam; p: number; ovr: number }[] }>({
 		id: "odds-board",
+		ratings: true,
 		section: "teams",
 		kicker: "Title odds",
 		eds: PRE_ONLY,
@@ -592,14 +593,18 @@ addPage(
 			qs.push([
 				`Can the `,
 				c.tl(rated[0]!.t.tid),
-				` live up to the best roster rating in the league (${fmt1(rated[0]!.ovr)})?`,
+				c.noRatings
+					? ` live up to the preseason hype as the deepest roster in the league?`
+					: ` live up to the best roster rating in the league (${fmt1(rated[0]!.ovr)})?`,
 			]);
 			const champ = teams.find((t) => t.titles.includes(c.season - 1));
 			if (champ) {
 				qs.push([
 					`Does the defending champion `,
 					c.tl(champ.tid),
-					` rank ${ordinal(c.ovrRank(champ.tid) ?? 0)} by roster rating hold up?`,
+					c.noRatings
+						? ` hold up for another year?`
+						: ` rank ${ordinal(c.ovrRank(champ.tid) ?? 0)} by roster rating hold up?`,
 				]);
 			}
 			const young = c.f.players
@@ -609,7 +614,9 @@ addPage(
 				qs.push([
 					`How far can `,
 					c.pl(young.pid),
-					` (${young.age}, ${young.ovr} now, ${young.pot} potential) climb?`,
+					c.noRatings
+						? ` (${young.age}) climb?`
+						: ` (${young.age}, ${young.ovr} now, ${young.pot} potential) climb?`,
 				]);
 			}
 			const old = c.f.players
@@ -619,7 +626,7 @@ addPage(
 				qs.push([
 					`Is ${old.age} too old for `,
 					c.pl(old.pid),
-					` to stay a ${old.ovr}?`,
+					c.noRatings ? ` to stay among the best?` : ` to stay a ${old.ovr}?`,
 				]);
 			}
 			const big = c.f.signings.toSorted((a, b) => b.amount - a.amount)[0];
@@ -645,8 +652,15 @@ addPage(
 					P(
 						c.cycle("five-intro", [
 							`Nothing has been played in ${c.season}, so the numbers can only ask:`,
-							`${plural(x.qs.length, "question")} the ${c.season} ratings cannot answer yet:`,
-							`Before a game is played in ${c.season}, here is what the ratings leave open:`,
+							...(c.noRatings
+								? [
+										`${plural(x.qs.length, "question")} the ${c.season} season cannot answer yet:`,
+										`Before a game is played in ${c.season}, here is what is still open:`,
+									]
+								: [
+										`${plural(x.qs.length, "question")} the ${c.season} ratings cannot answer yet:`,
+										`Before a game is played in ${c.season}, here is what the ratings leave open:`,
+									]),
 						]),
 					),
 					{ type: "list", ordered: true, items: x.qs },

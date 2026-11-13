@@ -33,7 +33,7 @@ export const normalizeContractTerms = (
 	return output;
 };
 
-// How much more (or less) a player asks for per season with these terms. A player option is worth something to him, so he takes a bit less. A team option or a partial guarantee is a risk for him, so he wants more.
+// How much more (or less) a player asks for per season with these terms (years: length of the contract). A player option is worth something to him, so he takes a bit less. A team option or a partial guarantee is a risk for him, so he wants more.
 export const getContractTermsFactor = (
 	terms: ContractTerms | undefined,
 	years: number,
@@ -50,8 +50,16 @@ export const getContractTermsFactor = (
 		factor *= 1.1;
 	}
 
+	// A partial guarantee is priced per season it covers, like an option: each season after the first that isn't fully
+	// guaranteed costs 10% times the part not guaranteed, so 0% guaranteed on one season is worth a team option. (It used to be a
+	// flat +20% at 0% however long the deal, so a long non-guaranteed deal was cheaper than a single team option per season.) A
+	// team option's season isn't owed anyway when it's declined, so it isn't counted twice
 	const guaranteed = normalized.guaranteed ?? 1;
-	factor *= 1 + 0.2 * (1 - guaranteed);
+	const seasons = Math.max(
+		0,
+		years - 1 - (normalized.option === "team" ? 1 : 0),
+	);
+	factor *= 1 + 0.1 * (1 - guaranteed) * seasons;
 
 	return factor;
 };

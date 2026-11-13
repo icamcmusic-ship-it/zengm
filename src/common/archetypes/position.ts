@@ -279,7 +279,7 @@ export const BAND_POSITIONS: Record<SizeBand, Pos[]> = {
 };
 
 // Band cutoffs on length minus BAND_PLAY_K inches per unit of playmaking above the median
-const GUARD_MAX = 76.726;
+const GUARD_MAX = 77.33;
 const WING_MAX = 82.311;
 const BAND_PLAY_K = 5.17;
 // Hard limits, in inches of height: never a big under 6'4", never a guard at 7'0"
@@ -311,16 +311,21 @@ export const POSITION_CENTROIDS: Record<Pos, [number, number, number]> = {
 	C: [84.96, 0.28, 0.2],
 };
 
+// fixes4: re-fitted (with the guard band cutoff GUARD_MAX 76.726 -> 77.33) after the sgfix generation change left GF at 7%
+// and SF/F high. Rostered player-seasons of random leagues (population model, 2 leagues x 8 seasons, sticky positions):
+// PG 13.2 -> 12.2, G 9.1 -> 9.1, SG 12.9 -> 12.8, GF 7.0 -> 14.6, SF 12.6 -> 8.9, F 16.3 -> 11.3, PF 8.7 -> 10.0,
+// FC 10.5 -> 11.2, C 9.8 -> 9.9 (real NBA listings 2016-2025: 12.1, 11.7, 12.9, 14.0, 7.9, 9.2, 8.8, 12.3, 11.1); real
+// players 82.8% -> 83.0% exact or adjacent, the 2025 star targets kept.
 export const POSITION_BIAS: Record<Pos, number> = {
-	PG: -0.36,
-	G: -0.39,
-	SG: -0.46,
-	GF: 0.3,
-	SF: 0.2,
-	F: -0.03,
-	PF: 0.24,
-	FC: 0.33,
-	C: -0.86,
+	PG: -0.27,
+	G: -0.23,
+	SG: -0.2,
+	GF: 1.12,
+	SF: -0.1,
+	F: -0.66,
+	PF: 0.34,
+	FC: 0.52,
+	C: -0.61,
 };
 
 // arch13: playmaking read from ratings alone (a generated player before his first minutes, a draft prospect) puts more

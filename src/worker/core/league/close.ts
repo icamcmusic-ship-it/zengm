@@ -1,11 +1,13 @@
 import { idb } from "../../db/index.ts";
 import { g, local, lock, updateStatus } from "../../util/index.ts";
 import { cleanupAutoPlay } from "../league/autoPlay.ts";
+import { cancelLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
 
 // Flush cache, disconnect from league database, and unset g.get("lid")
 const close = async (disconnect?: boolean) => {
 	const gameSim = lock.get("gameSim");
 	cleanupAutoPlay();
+	cancelLeagueAchievementsCheck();
 	await lock.set("stopGameSim", true);
 	await lock.set("gameSim", false);
 

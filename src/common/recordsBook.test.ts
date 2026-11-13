@@ -300,4 +300,28 @@ describe("milestones", () => {
 			[["pts", 1000]],
 		);
 	});
+
+	test("reached this season includes players who retired after it", () => {
+		const out = reachedThisSeason(
+			[
+				{
+					pid: 3,
+					name: "R",
+					tid: -3,
+					rows: [row(2024, 5, 82, 900), row(2025, 5, 10, 200)],
+				},
+				{
+					pid: 4,
+					name: "Old",
+					tid: -3,
+					rows: [row(2020, 1, 82, 900), row(2021, 1, 82, 900)],
+				},
+			],
+			2025,
+		);
+		assert.deepEqual(
+			out.map((x) => [x.pid, x.tid, x.t, x.retired]),
+			[[3, 5, 1000, true]],
+		);
+	});
 });

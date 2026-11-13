@@ -83,6 +83,8 @@ export type WPlayer = {
 	relatives: { type: string; pid: number }[];
 	// Potential by season, like ovr
 	pot?: Record<number, number>;
+	// Scouting fuzz of each season's ratings, see RatingsView in league.ts
+	fuzz?: Record<number, number>;
 	// Position by season
 	pos?: Record<number, string>;
 	// Height rating (0-100) at the end of the career so far

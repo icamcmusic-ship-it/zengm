@@ -180,7 +180,10 @@ const Milestones = ({
 						<ul className="list-unstyled">
 							{reached.map((r, i) => (
 								<li key={i} className="mb-1">
-									<a href={helpers.leagueUrl(["player", r.pid])}>{r.name}</a>{" "}
+									<a href={helpers.leagueUrl(["player", r.pid])}>{r.name}</a>
+									{r.retired ? (
+										<span className="text-body-secondary"> (retired)</span>
+									) : null}{" "}
 									<span className="text-body-secondary small">
 										{teamLink(r.tid)}
 									</span>

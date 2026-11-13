@@ -43,6 +43,7 @@ const powerOrder = (c: Ctx): { t: NPTeam; score: number }[] =>
 addPage(
 	arcPage<{ order: { t: NPTeam; score: number }[]; tiers: Tier[] }>({
 		id: "power-tiers",
+		ratings: true,
 		section: "teams",
 		kicker: "Power rankings",
 		eds: ALL_EDS,
@@ -174,6 +175,7 @@ addPage(
 		over: { t: NPTeam; rr: number; rk: number }[];
 	}>({
 		id: "hot-seat",
+		ratings: true,
 		section: "teams",
 		kicker: "On paper and in the standings",
 		eds: SEASON_EDS,

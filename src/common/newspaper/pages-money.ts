@@ -271,7 +271,9 @@ addPage(
 					{
 						type: "aside",
 						segs: [
-							"Win shares reward more than scoring, but they are one number; ratings and age matter too.",
+							c.noRatings
+								? "Win shares reward more than scoring, but they are one number; skill and age matter too."
+								: "Win shares reward more than scoring, but they are one number; ratings and age matter too.",
 						],
 					},
 				],

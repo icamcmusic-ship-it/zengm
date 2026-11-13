@@ -264,7 +264,16 @@ export const scheduleLeagueAchievementsCheck = (delay = 1500) => {
 		} catch {
 			return;
 		}
-		if (lid === undefined || busy()) {
+		// Mid league switch: the new league's attributes aren't all set yet (startingSeason among them). Its own games and phase
+		// changes will ask again
+		if (
+			lid === undefined ||
+			!local.leagueLoaded ||
+			!Object.hasOwn(g, "startingSeason")
+		) {
+			return;
+		}
+		if (busy()) {
 			// Try again once the sim is over
 			scheduleLeagueAchievementsCheck(3000);
 			return;
@@ -287,6 +296,13 @@ export const scheduleLeagueAchievementsCheck = (delay = 1500) => {
 		}
 	}, delay);
 	(timer as { unref?: () => void }).unref?.();
+};
+
+// League close (league switch, or back to the dashboard): drop a pending check, it belongs to the league being closed
+export const cancelLeagueAchievementsCheck = () => {
+	clearTimeout(timer);
+	timer = undefined;
+	again = false;
 };
 
 // For the dashboard card: the newest announcements, without running the engine

@@ -445,33 +445,37 @@ export const topPickFeature = (c: Ctx): Article | undefined => {
 			c.tl(d.tid, c.tfull(d.tid)),
 			` took `,
 			c.pl(d.pid, d.name),
-			`, a ${d.age}-year-old ${d.pos}${d.college ? ` out of ${d.college}` : ""}, rated ${d.ovr} now with ${d.pot} potential.`,
+			`, a ${d.age}-year-old ${d.pos}${d.college ? ` out of ${d.college}` : ""}${c.noRatings ? "" : `, rated ${d.ovr} now with ${d.pot} potential`}.`,
 		),
 	];
 	const highPot = c.f.draft.toSorted((a, b) => b.pot - a.pot)[0];
-	const scout: Block | undefined = P(
-		r.pick([
-			`On draft night ${d.name} carries an overall rating of ${d.ovr} and a potential of ${d.pot}. `,
-			`The ratings: ${d.ovr} overall now, ${d.pot} potential, at ${d.age}. `,
-		]),
-		highPot && highPot.pid !== d.pid && highPot.pot > d.pot
-			? [
-					`The highest potential in the class, though, belongs to `,
-					c.pl(highPot.pid, highPot.name),
-					` (${highPot.pot}), taken No. ${highPot.pick} in round ${highPot.round}.`,
-				]
-			: [`No one else in the ${c.season} class has a higher potential rating.`],
-	);
+	const scout: Block | undefined = c.noRatings
+		? undefined
+		: P(
+				r.pick([
+					`On draft night ${d.name} carries an overall rating of ${d.ovr} and a potential of ${d.pot}. `,
+					`The ratings: ${d.ovr} overall now, ${d.pot} potential, at ${d.age}. `,
+				]),
+				highPot && highPot.pid !== d.pid && highPot.pot > d.pot
+					? [
+							`The highest potential in the class, though, belongs to `,
+							c.pl(highPot.pid, highPot.name),
+							` (${highPot.pot}), taken No. ${highPot.pick} in round ${highPot.round}.`,
+						]
+					: [
+							`No one else in the ${c.season} class has a higher potential rating.`,
+						],
+			);
 	const table: Block = {
 		type: "table",
-		head: ["Pick", "Player", "Team", "Age", "Ovr/Pot"],
+		head: ["Pick", "Player", "Team", "Age", c.noRatings ? "Pos" : "Ovr/Pot"],
 		numCols: [3],
 		rows: top5.map((x) => [
 			[String(x.pick)],
 			[c.pl(x.pid, x.name)],
 			[c.tl(x.tid, c.team(x.tid)?.abbrev)],
 			[String(x.age)],
-			[`${x.ovr}/${x.pot}`],
+			[c.noRatings ? x.pos || "–" : `${x.ovr}/${x.pot}`],
 		]),
 	};
 	const head = c.freshHead(r, [
@@ -514,8 +518,12 @@ export const topPickFeature = (c: Ctx): Article | undefined => {
 			box: {
 				title: "The pick",
 				items: [
-					{ value: String(d.ovr), label: "overall rating" },
-					{ value: String(d.pot), label: "potential" },
+					...(c.noRatings
+						? [{ value: `No. ${d.pick}`, label: "overall pick" }]
+						: [
+								{ value: String(d.ovr), label: "overall rating" },
+								{ value: String(d.pot), label: "potential" },
+							]),
 					{ value: String(d.age), label: "years old" },
 					...(ts ? [{ value: record(ts), label: `${ts.name} record` }] : []),
 				],
@@ -751,14 +759,18 @@ export const breakoutFeature = (c: Ctx): Article | undefined => {
 	const intro: Block[] = [
 		P(
 			c.pl(b.pid),
-			` came into the season rated ${b.prevOvr} and ${c.R("is now", "finished at")} ${b.ovr}, the biggest jump among regulars. The ${b.age}-year-old ${c.R("is averaging", "averaged")} ${c.lineWords(b)} for the `,
+			c.noRatings
+				? ` ${c.R("is having", "had")} a breakout season, the biggest step forward among regulars. The ${b.age}-year-old ${c.R("is averaging", "averaged")} ${c.lineWords(b)} for the `
+				: ` came into the season rated ${b.prevOvr} and ${c.R("is now", "finished at")} ${b.ovr}, the biggest jump among regulars. The ${b.age}-year-old ${c.R("is averaging", "averaged")} ${c.lineWords(b)} for the `,
 			c.tl(b.tid),
 			b.prevLine ? `, up from ${fmt1(b.prevLine.pts)} points a year ago.` : ".",
 		),
 	];
 	const head = c.freshHead(r, [
 		`${b.name} takes the leap`,
-		`From ${b.prevOvr} to ${b.ovr}: ${poss(b.name)} breakout`,
+		c.noRatings
+			? `${poss(b.name)} breakout season`
+			: `From ${b.prevOvr} to ${b.ovr}: ${poss(b.name)} breakout`,
 		`The breakout: ${b.name}`,
 	])!;
 	return assemble(
@@ -787,11 +799,20 @@ export const breakoutFeature = (c: Ctx): Article | undefined => {
 					playerRank(cc, b.pid, rr),
 				),
 			],
-			quote: quoteFor(c, "riser", b.name, aOr(`${b.ovr} rating`)),
+			quote: quoteFor(
+				c,
+				"riser",
+				b.name,
+				c.noRatings ? "this level" : aOr(`${b.ovr} rating`),
+			),
 			next: breakNext(c, b.pid, r),
-			box: playerBox(c, b, [
-				{ value: `${b.prevOvr}→${b.ovr}`, label: "overall rating" },
-			]),
+			box: playerBox(
+				c,
+				b,
+				c.noRatings
+					? []
+					: [{ value: `${b.prevOvr}→${b.ovr}`, label: "overall rating" }],
+			),
 		},
 	);
 };
