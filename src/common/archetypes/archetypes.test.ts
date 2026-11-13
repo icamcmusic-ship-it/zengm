@@ -384,7 +384,8 @@ describe("classification", () => {
 			}
 			assert.ok(flips / n < 0.06, `flip rate ${flips / n}`);
 		});
-	});
+		// (may be the first test to generate the sample league)
+	}, 120000);
 
 	test("every player gets a build; poor fits are flagged, not relabelled", async () => {
 		const lg = await league();
