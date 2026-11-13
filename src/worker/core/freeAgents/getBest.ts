@@ -69,6 +69,12 @@ const getBest = <T extends PlayerWithoutKey>(
 
 	const skipSalaryCapCheck =
 		salaryCapType === "none" && Math.random() < 2 / numActiveTeams;
+	// With no salary cap, the team that skips the cap check still stays under the luxury tax line, when there is a tax. Otherwise these
+	// random signings stacked up, and half the league ended up paying the tax (a team at 1.9x the cap, $400M in debt)
+	const luxuryPayroll =
+		salaryCapType === "none" && g.get("luxuryTax") > 0
+			? g.get("luxuryPayroll")
+			: Infinity;
 
 	let keyPositionsNeededCache: Set<string> | undefined;
 	const getKeyPositionsNeeded = () => {
@@ -119,7 +125,7 @@ const getBest = <T extends PlayerWithoutKey>(
 		const { amount } = contractDemand;
 		const salaryCapCheck =
 			payroll === undefined ||
-			skipSalaryCapCheck ||
+			(skipSalaryCapCheck && amount + payroll <= luxuryPayroll) ||
 			amount + payroll <= salaryCap ||
 			(!!capException &&
 				amount > minContract &&
