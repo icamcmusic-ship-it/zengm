@@ -43,7 +43,7 @@ import type {
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import { idb } from "../../db/index.ts";
-import { g, helpers } from "../../util/index.ts";
+import { g, helpers, local } from "../../util/index.ts";
 import { winProb } from "../seasonOdds/simSeason.ts";
 import teamOvr from "../team/ovr.ts";
 import { getGmWeights } from "../gm/index.ts";
@@ -75,8 +75,6 @@ export const ensureProfiles = async () => {
 };
 
 // ---- trends: systems that won lately become more popular with new coaches ----
-
-let currentTrends: SystemTrends | undefined;
 
 export const computeSystemTrends = async (
 	season: number,
@@ -117,7 +115,9 @@ export const computeSystemTrends = async (
 
 // For newly generated coaches (generateCoach)
 export const profileForNewCoach = (c: CoachWithoutKey) =>
-	coachSystemsEnabled() ? deriveCoachProfile(c, currentTrends) : undefined;
+	coachSystemsEnabled()
+		? deriveCoachProfile(c, local.coachSystemTrends)
+		: undefined;
 
 // ---- scheme fit ----
 
@@ -725,7 +725,9 @@ export const annotateSeason = async () => {
 		c.profile = profile;
 		await idb.cache.coaches.put(c);
 	}
-	currentTrends = await computeSystemTrends(season);
+	// (in local, which is reset with the league: a module variable here outlived the league, so the first coaches of the next league
+	// opened or created in the same session got the old league's trends)
+	local.coachSystemTrends = await computeSystemTrends(season);
 };
 
 // Head coaches who aren't stubborn move toward the systems their roster fits (takes effect next season, with a new installation)
