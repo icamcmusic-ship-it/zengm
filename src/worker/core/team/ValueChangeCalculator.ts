@@ -865,7 +865,7 @@ export const protectedTradeValue = (
 	protection: Pick<DraftPickProtection, "top" | "rollover" | "then">,
 	// Probability that what's owed instead (rollover pick or 2nd round pick) actually exists when it's due. If the original team no longer owns that pick, the obligation is extinguished
 	probFallbackDelivered: number = 1,
-) => {
+): { tradeValue: number; probConvey: number } => {
 	let conveyed = 0;
 	let probProtected = 0;
 	let total = 0;
@@ -880,7 +880,7 @@ export const protectedTradeValue = (
 	// A rollover is next season's pick with the next protection in the list, valued the same way (the same team, so the same odds),
 	// discounted for the wait. Not a flat share of the pick, which made a pick protected nearly every season (top 29, then top 29, ...)
 	// worth more than half an unprotected one
-	const fallback =
+	const fallback: number =
 		protection.rollover.length > 0
 			? ROLLOVER_DISCOUNT *
 				protectedTradeValue(pickProbs, tradeValues, {
