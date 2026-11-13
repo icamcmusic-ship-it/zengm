@@ -1677,6 +1677,21 @@ The dark theme is its own stylesheet (`public/css/dark.scss`, the app never sets
 
 ## Performance
 
+**Sim speed (perf2).** Measured with the sim benchmark (`src/worker/core/game/simBenchmark.test.ts`, one season of a new
+default league, CPU time; `SIM_BENCH_PROF` with `SIM_BENCH_PROF_FROM`/`SIM_BENCH_PROF_TO` profiles only some phases,
+`SIM_BENCH_HEAP` writes sampled allocations for `tools/perf/sim/heapTop.cjs`). Every change keeps the same seed giving the
+same league: the benchmark's `hash` (rosters, contracts, ratings, records) and `hash2` (archetypes, scouting snapshots and
+draft calls, deaths, every box score with its stored play-by-play, events) match before and after, with all extras on and
+all off, and the GameSim outcome-invariance fixture is unchanged.
+
+- Scouting reports: snapshots, scout calls and the rumors' scouting split don't classify an archetype (only a full
+  report's header shows it, and a prospect's is a live classification each time).
+- Archetypes: the per-build parts of the scoring that don't depend on the player are worked out once per build, and a
+  classification is memoized by everything that goes into it.
+- Contract demands (stock): the auction's cumulative weights go into one reused buffer.
+- Killing off old retired players (start of the draft phase): one read of the retired players by the `tid` index,
+  ordered like the old scan of every player drafted in the last 110 years, so the same players get the same draws.
+
 Wrapped and Storylines read the whole league into a snapshot. Converted pieces that can't change any more (retired players, finished seasons' box scores and team seasons) are cached in a separate IndexedDB database (`wrapped-cache`), versioned by the converter code and invalidated through the league's change log, so later sessions only read what changed. Idle snapshots are evicted from memory. `tools/perf/wrapped/` holds the Playwright benchmark scripts (see the header of `bench.cjs`).
 
 ## Testing
