@@ -1,5 +1,6 @@
 // Pure helpers the UI and the worker views share: how an archetype is stored on a player, shown, aggregated and warned about.
 import { ARCHETYPES, archetypeById } from "./classify.ts";
+import { mergedId } from "./merges.data.ts";
 import { isPos } from "./position.ts";
 import type {
 	ArchetypeFamily,
@@ -34,7 +35,8 @@ export const GROUPS: ArchetypeGroup[] = ["guard", "wing", "forward", "big"];
 // Bumped whenever the reading changes enough that a stored label may no longer be what it would give: an entry stored by
 // an older reading (or before versions were stored) is not shown as the current label, the player is read again (and
 // stored anew), so a label from an older engine never lingers until the next preseason
-export const ARCHETYPE_READING_VERSION = 11;
+// arch14: 12 (the fitted reading, merged builds)
+export const ARCHETYPE_READING_VERSION = 12;
 
 export const toStored = (
 	season: number,
@@ -90,7 +92,8 @@ export const viewOf = (
 	pos?: unknown,
 	ctx?: ViewContext,
 ): ArchetypeView | null => {
-	const a = e ? archetypeById(e.id) : undefined;
+	// (a build merged into another reads as the one it was merged into: merges.data.ts)
+	const a = e ? archetypeById(mergedId(e.id)) : undefined;
 	if (!e || !a) {
 		return null;
 	}

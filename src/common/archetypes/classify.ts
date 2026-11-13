@@ -9,31 +9,47 @@ import {
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import { DEFAULT_NORMS_EXPANDED } from "./normsExpanded.data.ts";
 import { matchZ } from "./match.ts";
+import { mergedId } from "./merges.data.ts";
 import {
 	ALL_AROUND_MISS,
 	ALL_AROUND_Z,
+	LEAD_MIN_K,
+	PROMISE_K,
+	PROMISE_STEP,
+	REB_PERIM_K,
+	absoluteParts,
 	allAroundQuality,
+	classValues,
+	creatorTerm,
 	genericPenalty,
 	needPenaltyOf,
 	needShortfall,
-	prepare,
-	rawMatch,
-	classValues,
 	passingBigBonus,
-	promisePenalty,
+	prepare,
 	promiseShortfall,
-	creatorTerm,
+	promisesOf,
+	rawMatch,
+	roleParts,
 	signatureTerm,
 	standoutBonus,
-	absolutePenalty,
-	roleTerm,
-	starWeight,
-	type ReadOptions,
 	standoutsOf,
+	starWeight,
 	twoWayBonus,
 	weightsOf,
+	type Prepared,
+	type ReadOptions,
 	type Standout,
 } from "./score.ts";
+import { familyOf, FAMILIES, type Family } from "./families.ts";
+import {
+	CLASS_FEATS,
+	TERMS,
+	familyProbs,
+	type FittedModel,
+	type Term,
+} from "./model.ts";
+import { FITTED } from "./fitted.data.ts";
+import { FITTED_EXPANDED } from "./fittedExpanded.data.ts";
 import { ovrPercentile } from "./norms.ts";
 import { STAR_BIAS } from "./starBias.data.ts";
 import { archetypePrior, isPos, positionOf } from "./position.ts";
@@ -83,20 +99,6 @@ export const ALTERNATE_Z = 0.6;
 
 // Score of an archetype his position rules out: below anything a real fit can reach, but finite
 export const BLOCKED_Z = -99;
-
-// What a label earns for naming what stands out about him (score.ts): his top skills, both sides of a two-way game, a
-// big's passing
-const signatureBonus = (
-	a: Archetype,
-	standouts: Standout[],
-	cv: Record<string, number>,
-	hgt: number,
-	strictShortfall: number,
-	expanded: boolean,
-) =>
-	standoutBonus(a, standouts, strictShortfall) +
-	twoWayBonus(a, cv, hgt, strictShortfall, expanded) +
-	passingBigBonus(a, cv, hgt, strictShortfall);
 
 // Player traits (the playerTraits setting): only the visible ones, as the user sees them. A trait-flavored label (`trait`) needs
 // its trait: without traits, or below its floor, it is never picked. Above the floor, and for the labels a trait only breaks ties for (`traitTie`), a strong trait is worth up to TRAIT_TIE_K per unit of
@@ -172,8 +174,231 @@ export const traitTerm = (
 // raw: similarity of shape, 0..1; z: how exceptional the fit is; short: how far he is from what the name promises (z)
 export type Scored = { a: Archetype; raw: number; z: number; short: number };
 
+// arch14: one build's terms for one player, before the fitted weights (model.ts): `f` per TERMS, `cls` per CLASS_FEATS,
+// `base` what is not fitted (the position prior and his traits)
+export type BuildTerms = {
+	a: Archetype;
+	raw: number;
+	short: number;
+	blocked: boolean;
+	base: number;
+	f: number[];
+	cls: number[];
+	fam: Family;
+};
+const TERM_INDEX = Object.fromEntries(TERMS.map((t, i) => [t, i])) as Record<
+	Term,
+	number
+>;
+
+// What the family classifier reads about him (model.ts FAM_FEATS)
+export const familyFeatures = (
+	p: Prepared,
+	cv: Record<string, number>,
+	prospect: boolean | undefined,
+): number[] => {
+	const z = p.stats?.z ?? {};
+	return [
+		1,
+		cv.shoot!,
+		cv.mid!,
+		cv.finish!,
+		cv.post!,
+		cv.handle!,
+		cv.pass!,
+		cv.reb!,
+		cv.rimD!,
+		cv.perD!,
+		cv.ath!,
+		cv.stre!,
+		(p.hgt - 50) / 10,
+		p.pzLevel,
+		prospect ? 1 : 0,
+		z.usg ?? 0,
+		z.pss ?? 0,
+		z.three ?? 0,
+		z.reb ?? 0,
+		z.blk ?? 0,
+		z.stl ?? 0,
+		z.drb ?? 0,
+	];
+};
+
+// Every build's terms for one player (the fit reads these; scoreAll weighs them)
+export const scoreTerms = (
+	ratings: ArchetypeRatings,
+	norms: Norms = defaultNormsFor(ratings),
+	archetypes: Archetype[] = ARCHETYPES,
+	position?: Pos,
+	traitsIn?: Partial<Record<string, number>>,
+	read: Omit<ReadOptions, "pos"> = {},
+) => {
+	const pos = position ?? positionOf(ratings);
+	const p = prepare(ratings, norms, { ...read, pos });
+	const cv = classValues(p);
+	const standouts = standoutsOf(p, cv);
+	const traits = visibleTraits(traitsIn);
+	const star = starWeight(p);
+	const starBias = norms.starBias ?? STAR_BIAS;
+	const calBias = norms.bias ?? defaultNorms(p.expanded).bias;
+	const rows: BuildTerms[] = [];
+	for (const a of archetypes) {
+		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
+		const prior = archetypePrior(a, pos);
+		const trait = traitTerm(a, traits);
+		const f = TERMS.map(() => 0);
+		const cls = CLASS_FEATS.map(() => 0);
+		const fam = familyOf(a);
+		if (
+			prior === null ||
+			trait === undefined ||
+			// A label about his length needs a wingspan
+			(a.expanded && !p.expanded)
+		) {
+			rows.push({ a, raw, short: 0, blocked: true, base: 0, f, cls, fam });
+			continue;
+		}
+		const base = prior + trait;
+		const bias = calBias?.[a.id] ?? 0;
+		const starB = star * (starBias[a.id] ?? 0);
+		// arch13: the all-around star build has no profile (score.ts, allAroundQuality)
+		if (a.tags.includes("allAround")) {
+			const q = allAroundQuality(p, cv, read.prospect);
+			if (q > 0) {
+				f[TERM_INDEX.allAround] = ALL_AROUND_Z * q;
+				f[TERM_INDEX.bias] = bias;
+				f[TERM_INDEX.star] = starB;
+			} else {
+				f[TERM_INDEX.allAround] = -ALL_AROUND_MISS;
+			}
+			rows.push({
+				a,
+				raw,
+				short: q > 0 ? 0 : 1,
+				blocked: false,
+				base,
+				f,
+				cls,
+				fam,
+			});
+			continue;
+		}
+		const table = norms.match[a.id];
+		const need = needShortfall(a, p);
+		const prom = promiseShortfall(a, cv, p);
+		const short = need + prom.floor + prom.rel;
+		// (a role bonus only for a build he lives up to: it fades out as he misses its floors)
+		const role = roleParts(a, p, cv);
+		const fade = Math.max(0, 1 - short / POOR_FIT_SHORT);
+		const ab = absoluteParts(a, p);
+		f[TERM_INDEX.match] = table ? matchZ(table, raw) : raw * 4 - 2;
+		f[TERM_INDEX.rare] = a.rare ? -RARE_PENALTY : 0;
+		f[TERM_INDEX.bias] = bias;
+		f[TERM_INDEX.star] = starB;
+		f[TERM_INDEX.standout] = standoutBonus(a, standouts, need);
+		f[TERM_INDEX.twoWay] = twoWayBonus(a, cv, p.hgt, need, p.expanded);
+		f[TERM_INDEX.passBig] = passingBigBonus(a, cv, p.hgt, need);
+		f[TERM_INDEX.sig] = signatureTerm(a, standouts, cv);
+		f[TERM_INDEX.creator] = creatorTerm(a, read.stats);
+		f[TERM_INDEX.rolePass] = role.pass * fade;
+		f[TERM_INDEX.roleRim] = role.rim * fade;
+		f[TERM_INDEX.roleSniper] = role.sniper * fade;
+		f[TERM_INDEX.roleShoot] = role.shoot * fade;
+		f[TERM_INDEX.roleMid] = role.mid;
+		f[TERM_INDEX.absFloor] = -ab.floor;
+		f[TERM_INDEX.noShot] = -ab.noShot;
+		f[TERM_INDEX.air] = -ab.air;
+		f[TERM_INDEX.eliteShot] = -ab.eliteShot;
+		f[TERM_INDEX.touch] = -ab.touch;
+		f[TERM_INDEX.generic] = -genericPenalty(a, standouts);
+		f[TERM_INDEX.need] = -needPenaltyOf(need);
+		f[TERM_INDEX.promFloor] =
+			prom.floor > 0 ? -(PROMISE_STEP + PROMISE_K * prom.floor) : 0;
+		f[TERM_INDEX.promReb] = -REB_PERIM_K * (prom.reb ?? 0);
+		f[TERM_INDEX.promLead] = -LEAD_MIN_K * prom.lead;
+		f[TERM_INDEX.promRel] = -needPenaltyOf(prom.rel);
+		const all = promisesOf(a).all;
+		for (const [i, k] of CLASS_FEATS.entries()) {
+			if (all.includes(k)) {
+				cls[i] = cv[k] ?? 0;
+			}
+		}
+		rows.push({ a, raw, short, blocked: false, base, f, cls, fam });
+	}
+	return {
+		rows,
+		p,
+		pos,
+		cv,
+		standouts,
+		famX: familyFeatures(p, cv, read.prospect),
+	};
+};
+
+// The fitted model for players with or without expanded ratings (model.ts)
+export const modelFor = (expanded: boolean): FittedModel =>
+	expanded ? FITTED_EXPANDED : FITTED;
+
+// One build's score under a model, before the family terms
+export const weighTerms = (m: FittedModel, r: BuildTerms): number => {
+	let z = r.base + m.famBias[r.fam];
+	for (let i = 0; i < TERMS.length; i++) {
+		const v = r.f[i]!;
+		if (v !== 0) {
+			z += m.theta[TERMS[i]!] * v;
+		}
+	}
+	for (let i = 0; i < CLASS_FEATS.length; i++) {
+		const v = r.cls[i]!;
+		if (v !== 0) {
+			z += m.cls[CLASS_FEATS[i]!] * v;
+		}
+	}
+	return z;
+};
+
+// Family first: the classifier's probabilities over the families he has a build in, the log probability of a build's
+// family weighed in, and when one family is sure enough the others gated
+export const familyTerms = (
+	m: FittedModel,
+	rows: BuildTerms[],
+	famX: number[],
+): Partial<Record<Family, number>> => {
+	const probs = familyProbs(m, famX);
+	const open = new Set(rows.filter((r) => !r.blocked).map((r) => r.fam));
+	let sum = 0;
+	for (const [i, f] of FAMILIES.entries()) {
+		if (open.has(f)) {
+			sum += probs[i]!;
+		}
+	}
+	const out: Partial<Record<Family, number>> = {};
+	let top: Family | undefined;
+	let topP = 0;
+	for (const [i, f] of FAMILIES.entries()) {
+		if (!open.has(f)) {
+			continue;
+		}
+		const pr = probs[i]! / sum;
+		out[f] = m.gamma * Math.log(Math.max(1e-6, pr));
+		if (pr > topP) {
+			topP = pr;
+			top = f;
+		}
+	}
+	if (top && topP >= m.tau && m.gate > 0) {
+		for (const f of Object.keys(out) as Family[]) {
+			if (f !== top) {
+				out[f]! -= m.gate;
+			}
+		}
+	}
+	return out;
+};
+
 // Score every archetype for one player, best first. An archetype's score is how exceptional the fit is among the league's
-// players of his size (so every archetype gets its share), ties break on id so the order is deterministic.
+// players of his size (so every archetype gets its share), weighed by the fitted model, ties break on id so the order is
+// deterministic.
 export const scoreAll = (
 	ratings: ArchetypeRatings,
 	norms: Norms = defaultNormsFor(ratings),
@@ -183,6 +408,7 @@ export const scoreAll = (
 	traitsIn?: Partial<Record<string, number>>,
 	// His age, stats and whether he is a draft prospect (score.ts)
 	read: Omit<ReadOptions, "pos"> = {},
+	model?: FittedModel,
 ): {
 	scored: Scored[];
 	z: Record<DimKey, number>;
@@ -193,80 +419,63 @@ export const scoreAll = (
 	cv: Record<string, number>;
 	hgt: number;
 	expanded: boolean;
+	stats?: ReadOptions["stats"];
 } => {
-	const pos = position ?? positionOf(ratings);
-	const p = prepare(ratings, norms, { ...read, pos });
-	const cv = classValues(p);
-	const standouts = standoutsOf(p, cv);
-	const traits = visibleTraits(traitsIn);
-	const star = starWeight(p);
-	const starBias = norms.starBias ?? STAR_BIAS;
-	const scored: Scored[] = [];
-	for (const a of archetypes) {
-		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
-		const prior = archetypePrior(a, pos);
-		const trait = traitTerm(a, traits);
-		if (
-			prior === null ||
-			trait === undefined ||
-			// A label about his length needs a wingspan
-			(a.expanded && !p.expanded)
-		) {
-			scored.push({ a, raw, z: BLOCKED_Z, short: 0 });
-			continue;
-		}
-		const bias =
-			((norms.bias ?? defaultNorms(p.expanded).bias)?.[a.id] ?? 0) +
-			star * (starBias[a.id] ?? 0);
-		// arch13: the all-around star build has no profile (score.ts, allAroundQuality)
-		if (a.tags.includes("allAround")) {
-			const q = allAroundQuality(p, cv, read.prospect);
-			scored.push({
-				a,
-				raw,
-				z:
-					q > 0
-						? ALL_AROUND_Z * q + prior + trait + bias
-						: prior + trait - ALL_AROUND_MISS,
-				short: q > 0 ? 0 : 1,
-			});
-			continue;
-		}
-		const table = norms.match[a.id];
-		const need = needShortfall(a, p);
-		const prom = promiseShortfall(a, cv, p);
-		const short = need + prom.floor + prom.rel;
-		// (a role bonus only for a build he lives up to: it fades out as he misses its floors)
-		const role = roleTerm(a, p, cv);
-		const roleZ =
-			role > 0 ? role * Math.max(0, 1 - short / POOR_FIT_SHORT) : role;
-		const z =
-			(table ? matchZ(table, raw) : raw * 4 - 2) -
-			(a.rare ? RARE_PENALTY : 0) +
-			prior +
-			trait +
-			bias +
-			signatureBonus(a, standouts, cv, p.hgt, need, p.expanded) +
-			signatureTerm(a, standouts, cv) +
-			creatorTerm(a, read.stats) +
-			roleZ -
-			absolutePenalty(a, p) -
-			genericPenalty(a, standouts) -
-			needPenaltyOf(need) -
-			promisePenalty(prom);
-		scored.push({ a, raw, z, short });
-	}
+	const t = scoreTerms(ratings, norms, archetypes, position, traitsIn, read);
+	const m = model ?? modelFor(t.p.expanded);
+	const fam = familyTerms(m, t.rows, t.famX);
+	const scored: Scored[] = t.rows.map((r) => ({
+		a: r.a,
+		raw: r.raw,
+		short: r.short,
+		z: r.blocked ? BLOCKED_Z : weighTerms(m, r) + (fam[r.fam] ?? 0),
+	}));
 	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
 	return {
 		scored,
-		z: p.z,
-		skills: p.skills,
-		pos,
-		standouts,
-		cv,
-		hgt: p.hgt,
-		expanded: p.expanded,
+		z: t.p.z,
+		skills: t.p.skills,
+		pos: t.pos,
+		standouts: t.standouts,
+		cv: t.cv,
+		hgt: t.p.hgt,
+		expanded: t.p.expanded,
+		stats: read.stats,
 	};
+};
+
+// arch14: how far his stats back what a build's name promises (the mean z of his stats on the classes it promises), for
+// close calls between two builds
+const STAT_OF_CLASS: Record<string, DimKey> = {
+	shoot: "three",
+	mid: "mid",
+	finish: "fin",
+	post: "post",
+	handle: "drb",
+	pass: "pss",
+	reb: "reb",
+	rimD: "blk",
+	perD: "stl",
+	score: "usg",
+};
+export const statAlignment = (
+	a: Archetype,
+	stats: ReadOptions["stats"],
+): number => {
+	if (!stats) {
+		return 0;
+	}
+	let t = 0;
+	let n = 0;
+	for (const k of promisesOf(a).all) {
+		const d = STAT_OF_CLASS[k];
+		const v = d ? stats.z[d] : undefined;
+		if (v !== undefined) {
+			t += v;
+			n++;
+		}
+	}
+	return n > 0 ? t / n : 0;
 };
 
 // (the skills the all-around build's "why" picks his best three from)
@@ -373,6 +582,8 @@ export type ClassifyOptions = {
 	age?: number;
 	stats?: ReadOptions["stats"];
 	prospect?: boolean;
+	// The fitted model to weigh the reading with (default: modelFor his ratings)
+	model?: FittedModel;
 };
 
 // The ONE build he is most similar to. No hybrids: the runners-up are only listed as `alternates` ("also close to").
@@ -388,11 +599,30 @@ export const classify = (
 		isPos(opts.pos) ? opts.pos : undefined,
 		opts.traits,
 		{ age: opts.age, stats: opts.stats, prospect: opts.prospect },
+		opts.model,
 	);
+	const model = opts.model ?? modelFor(hasExpanded(ratings));
 	let first = scored[0]!;
+	// arch14: a close call (the top two within the model's tie margin) without a previous label is settled by his stats:
+	// the build whose promises his box score backs more
+	const runnerUp = scored[1];
+	if (
+		!opts.previousId &&
+		opts.stats &&
+		runnerUp &&
+		runnerUp.z > BLOCKED_Z &&
+		first.z - runnerUp.z < model.tieMargin &&
+		model.tieStatsK *
+			(statAlignment(runnerUp.a, opts.stats) -
+				statAlignment(first.a, opts.stats)) >
+			first.z - runnerUp.z
+	) {
+		first = runnerUp;
+	}
 	const sticky = opts.stickiness ?? STICKY_Z;
-	if (opts.previousId && opts.previousId !== first.a.id) {
-		const prev = scored.find((s) => s.a.id === opts.previousId);
+	const previousId = opts.previousId && mergedId(opts.previousId);
+	if (previousId && previousId !== first.a.id) {
+		const prev = scored.find((s) => s.a.id === previousId);
 		// Never one his position now rules out, however sticky, nor one whose name he no longer lives up to
 		if (
 			prev &&

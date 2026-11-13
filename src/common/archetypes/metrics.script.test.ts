@@ -25,6 +25,7 @@ import {
 	scoreAll,
 } from "./classify.ts";
 import { GOLD } from "./gold.data.ts";
+import { mergedId } from "./merges.data.ts";
 import { positionFor } from "./position.ts";
 import { promisesOf } from "./score.ts";
 import { realPlayer as realPlayerOf } from "./real.testutil.ts";
@@ -177,7 +178,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 			const row = d.ratings.find((x) => x.slug === slug && x.season === season);
 			const p = realPlayer(d, st, row);
 			const c = classify(p.ratings, read(p));
-			if (ok.includes(c.id)) hit++;
+			if (ok.map(mergedId).includes(c.id)) hit++;
 			else if (specOk(archetypeById(c.id), spec))
 				unlisted.push(
 					`${p.name} ${p.pos} -> ${c.name} [${c.id}] (listed: ${ok.join(", ")})`,

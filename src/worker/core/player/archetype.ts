@@ -39,6 +39,7 @@ import {
 import { TRAIT_DEFINITIONS } from "../../../common/playerTraits/definitions.ts";
 import {
 	buildStatNorms,
+	multiSeasonStats,
 	seasonStats,
 	statReading,
 	type StatReading,
@@ -94,9 +95,24 @@ export const ratingsForArchetype = (
 	return out;
 };
 
-// His box-score stats for the reading: the last regular season before `season` (labels are stored at the preseason, from
-// the season just played, and a live reading uses the same season, so the two agree). None for a prospect.
+// His box-score stats for the reading: the last three regular seasons before `season`, the older ones counting less
+// (stats.ts multiSeasonStats; labels are stored at the preseason, from the seasons just played, and a live reading uses the
+// same seasons, so the two agree). Shot zones come with the league's own games. None for a prospect.
 export const archetypeStats = (
+	p: Player,
+	season: number,
+): ArchetypeStats | undefined => {
+	if (p.tid === PLAYER.UNDRAFTED || !Array.isArray(p.stats)) {
+		return undefined;
+	}
+	const rows = (p.stats as any[]).filter((r) => !r.playoffs);
+	return multiSeasonStats(
+		[1, 2, 3].map((k) => rows.filter((r) => r.season === season - k)),
+	);
+};
+
+// The last regular season alone (the league's stat references are built from one season)
+const lastSeasonStats = (
 	p: Player,
 	season: number,
 ): ArchetypeStats | undefined => {
@@ -181,7 +197,7 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 				pos,
 				age: season - p.born.year,
 			});
-			const st = archetypeStats(p, season);
+			const st = lastSeasonStats(p, season);
 			if (st && isPos(pos)) {
 				statRows.push({ stats: st, pos });
 			}

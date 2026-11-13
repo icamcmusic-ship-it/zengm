@@ -50,7 +50,8 @@ import { CUSTOM_DEFS } from "./customDefs.data.ts";
 import { GOLD } from "./gold.data.ts";
 import { realData, realPlayer } from "./real.testutil.ts";
 import { promisesOf } from "./score.ts";
-import { statReading, STATS_W } from "./stats.ts";
+import { statReading, STATS_W, STATS_W_MORE } from "./stats.ts";
+import { MERGED, mergedId } from "./merges.data.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import pos from "../../worker/core/player/pos.ts";
 
@@ -123,6 +124,23 @@ describe("archetype table: every archetype is an NBA 2K build", () => {
 			assert.ok(archetypeById(id), id);
 		}
 	});
+
+	test("merged builds: gone from the list, their names aliases of the kept build, stored labels read as it", () => {
+		const names = new Map(
+			[...TWO_K_DEFS, ...CUSTOM_DEFS].map((d) => [d.id, d.name]),
+		);
+		for (const [from, to] of Object.entries(MERGED)) {
+			assert.strictEqual(archetypeById(from), undefined, from);
+			assert.ok(archetypeById(to), to);
+			assert.ok(TWO_K_NAMES[to]!.includes(names.get(from)!), from);
+			const v = viewOf({ season: 2025, id: from, v: 12 });
+			assert.strictEqual(v?.id, to, from);
+		}
+		assert.strictEqual(
+			ARCHETYPES.length,
+			TWO_K_DEFS.length + CUSTOM_DEFS.length - Object.keys(MERGED).length,
+		);
+	});
 });
 
 describe("classification", () => {
@@ -188,10 +206,13 @@ describe("classification", () => {
 			}
 		}
 	});
-	test("custom builds: twenty-nine, not 2K names, never aliases, positions their profile is played at", () => {
+	test("custom builds: twenty-nine (less the merged ones), not 2K names, never 2K aliases, positions their profile is played at", () => {
 		const custom = ARCHETYPES.filter((a) => a.custom);
-		assert.strictEqual(custom.length, 29);
 		assert.strictEqual(CUSTOM_DEFS.length, 29);
+		assert.strictEqual(
+			custom.length,
+			29 - CUSTOM_DEFS.filter((d) => MERGED[d.id]).length,
+		);
 		const twoK = new Set(
 			TWO_K_DEFS.flatMap((d) => [d.name, ...d.aliases]).map((n) =>
 				n.toLowerCase(),
@@ -199,7 +220,19 @@ describe("classification", () => {
 		);
 		for (const a of custom) {
 			assert.ok(!twoK.has(a.name.toLowerCase()), a.name);
-			assert.strictEqual(TWO_K_NAMES[a.id], undefined, a.id);
+			// (a custom build may carry the names of the builds merged into it: merges.data.ts)
+			for (const n of TWO_K_NAMES[a.id] ?? []) {
+				assert.ok(
+					Object.keys(MERGED).some(
+						(id) =>
+							MERGED[id] === a.id &&
+							[...TWO_K_DEFS, ...CUSTOM_DEFS].some(
+								(d) => d.id === id && (d.name === n || d.aliases.includes(n)),
+							),
+					),
+					`${a.id}: ${n}`,
+				);
+			}
 			assert.ok(a.positions.length >= 2, a.id);
 			// (the all-around star build promises everything and names nothing: read apart, see below)
 			if (!a.tags.includes("allAround")) {
@@ -454,7 +487,7 @@ describe("classification", () => {
 				age: p.age,
 				stats: p.stats,
 			});
-			if (ok.includes(c.id)) {
+			if (ok.map(mergedId).includes(c.id)) {
 				listed++;
 			}
 			const pr = promisesOf(archetypeById(c.id)!);
@@ -500,7 +533,13 @@ describe("classification", () => {
 			stlp: 2,
 			usgp: 32,
 		};
-		assert.strictEqual(statReading(st, "PG")!.w, STATS_W);
+		assert.strictEqual(statReading(st, "PG")!.w, STATS_W + STATS_W_MORE * 0.2);
+		// (arch14: a bigger sample, up to STATS_W_MORE more)
+		assert.strictEqual(
+			statReading({ ...st, min: 5000 }, "PG")!.w,
+			STATS_W + STATS_W_MORE,
+		);
+		assert.strictEqual(statReading({ ...st, min: 1000 }, "PG")!.w, STATS_W);
 		assert.ok(
 			Math.abs(statReading({ ...st, min: 500 }, "PG")!.w - STATS_W / 2) < 1e-9,
 		);

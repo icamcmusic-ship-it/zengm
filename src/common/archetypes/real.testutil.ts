@@ -6,7 +6,12 @@ import { readFileSync } from "node:fs";
 import { RATING_KEYS } from "../ratingsBuilds/solver.ts";
 import ovrFn from "../../worker/core/player/ovr.ts";
 import { positionFor } from "./position.ts";
-import { seasonStats, statReading, type StatReading } from "./stats.ts";
+import {
+	multiSeasonStats,
+	seasonStats,
+	statReading,
+	type StatReading,
+} from "./stats.ts";
 import type { ArchetypeRatings, ArchetypeStats, Pos } from "./types.ts";
 
 export type RealData = {
@@ -48,6 +53,20 @@ export const realSeasonStats = (
 		(st.stats[slug] ?? []).filter((r) => r.season === season && !r.playoffs),
 	);
 
+// arch14: the last three regular seasons before `season`, most recent first (stats.ts multiSeasonStats)
+export const realRecentStats = (
+	st: RealData["st"],
+	slug: string,
+	season: number,
+): ArchetypeStats | undefined =>
+	multiSeasonStats(
+		[1, 2, 3].map((k) =>
+			(st.stats[slug] ?? []).filter(
+				(r) => r.season === season - k && !r.playoffs,
+			),
+		),
+	);
+
 export type RealPlayer = {
 	ratings: ArchetypeRatings;
 	ovr: number;
@@ -82,7 +101,7 @@ export const realPlayer = (
 		ovr: ovrFn(r as any),
 		pos,
 		age: born ? row.season - born : undefined,
-		stats: statReading(realSeasonStats(st, row.slug, row.season - 1), pos),
+		stats: statReading(realRecentStats(st, row.slug, row.season), pos),
 		name: `${d.bios[row.slug]?.name ?? row.slug} ${row.season}`,
 		slug: row.slug,
 		season: row.season,
