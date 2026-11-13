@@ -15,6 +15,7 @@ import {
 	GOGGLES,
 	HAIR_NEIGHBOURS,
 	HEADBANDS,
+	offCourtFace,
 	splitStyleKey,
 	styleEventsAt,
 	textureOf,
@@ -248,6 +249,26 @@ describe("faceEvents", () => {
 		expect(retired45).toBeGreaterThan(50);
 		expect(retired65).toBeGreaterThan(retired45 * 1.5);
 		expect(staff).toBeGreaterThan(80);
+	});
+
+	test("a retired player's face today: no headband, eye black or goggles; his generated glasses stay", () => {
+		const face = makeFace(5);
+		for (const ac of ["headband", "fork-bandana", "eye-black"]) {
+			expect(
+				offCourtFace({ ...face, accessories: { id: ac } }).accessories.id,
+			).toBe("none");
+		}
+		expect(
+			offCourtFace({ ...face, accessories: { id: "fork-earring-studs" } })
+				.accessories.id,
+		).toBe("fork-earring-studs");
+		expect(
+			offCourtFace({ ...face, glasses: { id: "fork-goggles" } }).glasses.id,
+		).toBe("none");
+		expect(
+			offCourtFace({ ...face, glasses: { id: "glasses1-secondary" } }).glasses
+				.id,
+		).toBe("glasses1-secondary");
 	});
 
 	test("texture from the style or the skin", () => {

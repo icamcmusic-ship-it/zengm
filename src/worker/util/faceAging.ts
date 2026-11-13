@@ -11,7 +11,11 @@ import {
 	type FaceAging,
 	type FaceAgingOptions,
 } from "../../common/faceAging.ts";
-import { EYE_INJURIES, textureOf } from "../../common/faceEvents.ts";
+import {
+	EYE_INJURIES,
+	offCourtFace,
+	textureOf,
+} from "../../common/faceEvents.ts";
 import {
 	firstProSeason,
 	firstSeasonLabel,
@@ -297,6 +301,21 @@ export const playerFaceHistory = async (
 		}
 	}
 
+	// A retired player's "Now": his face today, not his last playing season's: retirement aging up to this season (with
+	// "Age Retired Players"; else his face as of retirement), off-court (no headband or goggles), in a plain jersey
+	if (p.tid === PLAYER.RETIRED) {
+		const now: FaceHistoryEntry = {
+			season: currentSeason,
+			face: retiredFaceNow(p, currentSeason),
+			colors: NEUTRAL_JERSEY_COLORS,
+			jersey: DEFAULT_JERSEY,
+		};
+		while (entries.length > 1 && entries.at(-1)!.season >= currentSeason) {
+			entries.pop();
+		}
+		entries.push(now);
+	}
+
 	let prime: FaceHistoryEntry | undefined;
 	if (p.tid === PLAYER.RETIRED) {
 		const season = primeSeason(p, proStart);
@@ -309,6 +328,27 @@ export const playerFaceHistory = async (
 		}
 	}
 	return prime ? { entries, prime } : { entries };
+};
+
+export const retiredFaceNow = (p: AgingPlayer, season: number) => {
+	const aging = p.faceAging;
+	let face = p.face;
+	if (
+		aging &&
+		aging.ba === undefined &&
+		featureOption<boolean>("faceAgingRetired") &&
+		p.retiredYear !== undefined
+	) {
+		face = applyAgingFields(
+			p.face,
+			agedFields(
+				aging.b,
+				{ ...agingContext(p), age: season - p.born.year },
+				faceAgingOptions(),
+			),
+		);
+	}
+	return offCourtFace(face);
 };
 
 // HoF plaques: his face in his prime (common/faceHistory.ts primeSeason), in that season's jersey

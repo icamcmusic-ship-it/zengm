@@ -399,6 +399,22 @@ export const EVERYDAY_GLASSES = [
 	"fork-glasses-rect",
 ];
 
+// A retired player's face today: on-court accessories (headbands, bandana, eye black) and goggles come off. Everyday or
+// team-coloured glasses he was generated with stay.
+export const offCourtFace = <
+	T extends { accessories: { id: string }; glasses: { id: string } },
+>(
+	face: T,
+): T => ({
+	...face,
+	accessories: ON_COURT.has(face.accessories.id)
+		? { ...face.accessories, id: "none" }
+		: face.accessories,
+	glasses: GOGGLES.includes(face.glasses.id)
+		? { ...face.glasses, id: "none" }
+		: face.glasses,
+});
+
 // Eye injuries in the injury system (worker/util/defaultInjuries.ts): goggles afterwards
 export const EYE_INJURIES = new Set([
 	"Bruised Eye",
