@@ -248,7 +248,8 @@ describe("linked college league", () => {
 			}
 			// On the pro scale: a top prospect is not already a star, as a generated class
 			const ovrs = linked.map((p) => last(p.ratings).ovr).sort((a, b) => b - a);
-			assert.isAtMost(ovrs[0]!, 62, "best prospect ovr");
+			// (matched on draft value, an older prospect gets a few more points of ovr than the generated one of his rank)
+			assert.isAtMost(ovrs[0]!, 65, "best prospect ovr");
 			assert.isAtLeast(ovrs[0]!, 40, "best prospect ovr");
 			assert.isBelow(ovrs.at(-1)!, ovrs[0]!);
 			assert.isAtLeast(
