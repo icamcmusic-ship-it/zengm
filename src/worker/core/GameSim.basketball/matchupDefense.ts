@@ -60,6 +60,8 @@ export type MatchupPlayer = {
 	};
 	simHgt?: number;
 	simSpd?: number;
+	// Sub-Ratings in Sim: lateral quickness, his speed as the defender of a drive
+	simLat?: number;
 	traitEffects?: { switchDefenseContribution: number };
 };
 
@@ -165,6 +167,8 @@ export const driveMismatch = (
 ) =>
 	MATCHUP.drive *
 	clamp01(
-		((attacker.simSpd ?? 50) - (defender.simSpd ?? 50) - MATCHUP.driveGap) /
+		((attacker.simSpd ?? 50) -
+			(defender.simLat ?? defender.simSpd ?? 50) -
+			MATCHUP.driveGap) /
 			MATCHUP.driveScale,
 	);
