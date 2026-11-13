@@ -5,6 +5,7 @@ import { UndoLog } from "./UndoLog.ts";
 const defaultLocal: Local = {
 	autoPlayUntil: undefined,
 	autoSave: true,
+	coachSystemTrends: undefined,
 	email: undefined,
 	eightyTwoZeroDraft: undefined,
 	exhibitionGamePlayers: undefined,
@@ -32,6 +33,7 @@ const local: Local & {
 } = {
 	autoPlayUntil: defaultLocal.autoPlayUntil,
 	autoSave: defaultLocal.autoSave,
+	coachSystemTrends: defaultLocal.coachSystemTrends,
 	email: defaultLocal.email,
 	eightyTwoZeroDraft: defaultLocal.eightyTwoZeroDraft,
 	exhibitionGamePlayers: defaultLocal.exhibitionGamePlayers,
@@ -58,6 +60,7 @@ const local: Local & {
 		// These variables will be reset if the user switches leagues
 		local.autoPlayUntil = defaultLocal.autoPlayUntil;
 		local.autoSave = defaultLocal.autoSave;
+		local.coachSystemTrends = defaultLocal.coachSystemTrends;
 		local.eightyTwoZeroDraft = defaultLocal.eightyTwoZeroDraft;
 		local.exhibitionGamePlayers = defaultLocal.exhibitionGamePlayers;
 		local.fantasyDraftResults = defaultLocal.fantasyDraftResults;
