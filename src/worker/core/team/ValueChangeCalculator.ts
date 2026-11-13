@@ -856,6 +856,8 @@ const PROTECTED_FALLBACK_FACTOR: Record<DraftPickProtectionThen, number> = {
 	extinguish: 0,
 };
 
+const ROLLOVER_DISCOUNT = 0.85;
+
 // Trade value of a pick with a protection: the pick conveys only outside of the protected range, otherwise something else is owed later
 export const protectedTradeValue = (
 	pickProbs: number[],
@@ -875,13 +877,20 @@ export const protectedTradeValue = (
 			conveyed += prob * tradeValues[i]!;
 		}
 	}
-	const fallbackFactor =
+	// A rollover is next season's pick with the next protection in the list, valued the same way (the same team, so the same odds),
+	// discounted for the wait. Not a flat share of the pick, which made a pick protected nearly every season (top 29, then top 29, ...)
+	// worth more than half an unprotected one
+	const fallback =
 		protection.rollover.length > 0
-			? 0.6
-			: PROTECTED_FALLBACK_FACTOR[protection.then];
+			? ROLLOVER_DISCOUNT *
+				protectedTradeValue(pickProbs, tradeValues, {
+					top: protection.rollover[0]!,
+					rollover: protection.rollover.slice(1),
+					then: protection.then,
+				}).tradeValue
+			: PROTECTED_FALLBACK_FACTOR[protection.then] * total;
 	return {
-		tradeValue:
-			conveyed + probProtected * fallbackFactor * probFallbackDelivered * total,
+		tradeValue: conveyed + probProtected * probFallbackDelivered * fallback,
 		probConvey: 1 - probProtected,
 	};
 };
