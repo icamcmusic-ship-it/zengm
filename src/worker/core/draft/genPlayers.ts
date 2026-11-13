@@ -4,6 +4,7 @@ import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
 import { processNewDraftClasses } from "./generateCollegeStats.ts";
+import { ageNewPlayerFaces } from "../../util/faceAging.ts";
 
 const genPlayers = async (
 	draftYear: number,
@@ -65,6 +66,9 @@ const genPlayers = async (
 			await idb.cache.players.put(p as any);
 		}
 	}
+
+	// League Extras "Face Aging": prospects' faces start young
+	await ageNewPlayerFaces(players as any);
 
 	// Optionally give the new prospects college/overseas stats and honors. Only for prospects who don't already have some, because this is also called to top off a class that was imported
 	// Ratings are re-randomized only for a class that was generated here from scratch, not an imported one being topped off

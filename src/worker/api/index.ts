@@ -290,6 +290,7 @@ import {
 	setLinkedCollege,
 } from "../core/draft/linkedCollege.ts";
 import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
+import { faceAgingOnCustomize } from "../util/faceAging.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -5556,6 +5557,9 @@ const upsertCustomizedPlayer = async (
 	}
 	applyCustomizedContract(p, originalTid, contractInput, contractSeasons);
 	updateOwedByTids(p);
+
+	// League Extras "Face Aging": an edited face is locked from aging unless "Allow aging" is ticked
+	faceAgingOnCustomize(p as any, prevPlayer as any, g.get("season"));
 
 	// Handle making player a FA
 	if (p.tid === PLAYER.FREE_AGENT && originalTid !== PLAYER.FREE_AGENT) {

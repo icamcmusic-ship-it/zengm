@@ -332,6 +332,7 @@ const useJerseyNumberConflictInfo = (
 
 const CustomizePlayer = (props: View<"customizePlayer">) => {
 	const regeneratorOn = useFeatureOn("ratingsRegenerator");
+	const faceAgingOn = useFeatureOn("faceAging");
 	const { godMode, minContract, phase, season } = useLocal([
 		"godMode",
 		"minContract",
@@ -1525,7 +1526,48 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 								}}
 								randomizeFace={randomizeFace}
 							/>
-						) : (
+						) : null}
+						{appearanceOption === "Cartoon Face" && faceAgingOn ? (
+							<div className="form-check mt-2">
+								<input
+									className="form-check-input"
+									type="checkbox"
+									id="customize-player-face-aging"
+									checked={(p as any).faceAging?.a === 1}
+									onChange={(event) => {
+										const checked = event.target.checked;
+										setState((prevState) => {
+											const prevAging = (prevState.p as any).faceAging;
+											const faceAging = { ...prevAging };
+											if (checked) {
+												faceAging.a = 1;
+											} else {
+												delete faceAging.a;
+											}
+											return {
+												...prevState,
+												p: {
+													...prevState.p,
+													faceAging,
+												} as any,
+											};
+										});
+									}}
+								/>
+								<label
+									className="form-check-label"
+									htmlFor="customize-player-face-aging"
+								>
+									Allow aging
+								</label>
+								<div className="form-text">
+									League Extras "Face Aging": a face changed here stays as it is
+									unless this is ticked. Ticked, it keeps aging from the edited
+									face (hairline, grey, lines; the beard style is yours).
+								</div>
+							</div>
+						) : null}
+						{appearanceOption === "Cartoon Face" ? null : (
 							<div className="my-3">
 								<label
 									className="form-label"

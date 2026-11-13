@@ -12,6 +12,7 @@ import type { FaceConfig } from "facesjs";
 import { svgs, svgsIndex } from "facesjs";
 import { NATIVE_FACE_PARTS } from "./faceParts.native.ts";
 import { STAFF_SUIT_PARTS } from "./faceParts.suits.ts";
+import { STYLE_PARTS } from "./faceParts.styles.ts";
 
 export type FacePartFeature =
 	| "accessories"
@@ -101,6 +102,8 @@ export const FORK_FACE_PARTS: readonly FacePart[] = [
 		svg: '<path fill="$[hairColor]" fill-opacity=".55" d="M60 300v-10c0-5 10-20 15-25s5-55 15-65c25-30 60-40 110-40s85 10 110 40c10 10 10 60 15 65s15 20 15 25v10h-6c-2-30-14-120-134-120S68 270 66 300z"/>',
 	},
 	...NATIVE_FACE_PARTS,
+	// The style expansion (faceParts.styles.ts)
+	...STYLE_PARTS,
 ];
 
 export const registerForkFaceParts = () => {
@@ -148,7 +151,8 @@ export const addRandomForkParts = (
 ) => {
 	const byFeature = new Map<FacePartFeature, FacePart[]>();
 	for (const part of FORK_FACE_PARTS) {
-		if (!exclude(part)) {
+		// Receding / thinning hair is only handed out by face aging
+		if (!exclude(part) && !(part as { agingOnly?: true }).agingOnly) {
 			const list = byFeature.get(part.feature) ?? [];
 			list.push(part);
 			byFeature.set(part.feature, list);

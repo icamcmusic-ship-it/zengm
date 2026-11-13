@@ -1,5 +1,7 @@
 import type { FaceConfig } from "facesjs";
 import { Face } from "facesjs/react";
+import { useMemo } from "react";
+import { prepareFaceForDisplay } from "../../common/faceRender.ts";
 import { DEFAULT_JERSEY, DEFAULT_TEAM_COLORS } from "../../common/constants.ts";
 
 const isChristmas = () => {
@@ -43,9 +45,11 @@ export const MyFace = ({
 		overrides.accessories = { id: "santa-hat" };
 	}
 
+	const displayFace = useMemo(() => prepareFaceForDisplay(face), [face]);
+
 	return (
 		<Face
-			face={face}
+			face={displayFace}
 			ignoreDisplayErrors
 			lazy={lazy}
 			overrides={overrides}

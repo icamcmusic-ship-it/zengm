@@ -39,6 +39,7 @@ import type { LeagueUrlParts } from "../../ui/router/types.ts";
 import { getHealthInfo } from "../core/player/getHealthInfo.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
+import { withRookieFace } from "../util/faceAging.ts";
 
 export const processInputs = (
 	params: RouteParams<"player"> | RouteParams<"relatives">,
@@ -676,8 +677,15 @@ export default defineView({
 			// The raw player stays in the worker: it has things the user isn't supposed to see, like the seeds that give away hidden traits
 			const { pRaw: _pRaw, ...topStuffForUI } = topStuff;
 
+			// League Extras "Face Aging": his face in each season it changed (generated faces only)
+			const faceHistory =
+				featureOn("faceAging") && !topStuff.pRaw.imgURL
+					? withRookieFace(topStuff.pRaw)
+					: [];
+
 			return {
 				...topStuffForUI,
+				faceHistory,
 				playerTraits,
 				events,
 				feats,

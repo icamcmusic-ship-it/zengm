@@ -13,6 +13,7 @@ import { PlayerTraitsSummary } from "./Traits.tsx";
 import { wrappedSalaryPayers } from "./SalaryPayers.tsx";
 import { PLAYER } from "../../../common/constants.ts";
 import { ProProjectionSection } from "../../components/ProProjection.tsx";
+import { FaceHistory } from "./FaceHistory.tsx";
 import HideableSection from "../../components/HideableSection.tsx";
 import { StatsTable } from "./StatsTable.tsx";
 import {
@@ -42,6 +43,7 @@ const Player2 = ({
 	bestPos,
 	customMenu,
 	events,
+	faceHistory,
 	feats,
 	jerseyNumberInfos,
 	leaders,
@@ -252,6 +254,13 @@ const Player2 = ({
 			) : null}
 
 			{scoutingOn ? <ScoutingSummaryLine pid={player.pid} /> : null}
+
+			<FaceHistory
+				bornYear={player.born.year}
+				colors={teamColors}
+				faceHistory={faceHistory}
+				jersey={teamJersey}
+			/>
 
 			<div className="row">
 				<div className="col-6 col-md-3">

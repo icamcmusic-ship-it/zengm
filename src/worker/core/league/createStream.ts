@@ -99,6 +99,7 @@ import { ensureStaff } from "../staff/index.ts";
 import { ensureGms } from "../gm/index.ts";
 import updateExpandedRatingsForLeague from "../player/updateExpandedRatingsForLeague.ts";
 import { hasExpandedRatings } from "../../../common/expandedRatings.ts";
+import { ageAllFacesNewLeague } from "../../util/faceAging.ts";
 
 export type TeamInfo = TeamBasic & {
 	disabled?: boolean;
@@ -2041,6 +2042,9 @@ const afterDBStream = async ({
 	await idb.cache.flush();
 	idb.cache.startAutoFlush();
 	local.leagueLoaded = true;
+
+	// League Extras "Face Aging": generated faces caught up to each player's age (prospects young, veterans older)
+	await ageAllFacesNewLeague();
 
 	// Version 65 upgrade
 	if (fromFile.version !== undefined && fromFile.version < 65) {

@@ -33,86 +33,88 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 
 ## Feature index
 
-| Feature                                                             | Where                                                              | Sports | Switch (League Extras)                      | Default new / existing league |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------ | ------ | ------------------------------------------- | ----------------------------- |
-| [Newspaper](#newspaper)                                             | League → Newspaper                                                 | bball  | `featureNewspaper`                          | on / on                       |
-| [Wrapped](#wrapped)                                                 | League → Wrapped                                                   | bball  | `featureWrapped`                            | on / on                       |
-| [Storylines](#storylines)                                           | League → Storylines                                                | bball  | `featureStorylines`                         | on / on                       |
-| [Games to Watch](#games-to-watch-hype)                              | League → Games to Watch, dashboard, schedules                      | bball  | `featureHype`                               | on / on                       |
-| [Best games & top plays](#best-games--top-plays)                    | Daily Schedule → Best Games tab                                    | bball  | `featureBestGames`                          | on / on                       |
-| [Award vote](#award-vote)                                           | Award Races → Award Vote tab                                       | bball  | `featureAwardVote`                          | on / on                       |
-| [League achievements](#league-achievements)                         | League → League achievements, dashboard                            | bball  | `featureLeagueAchievements`                 | on / on                       |
-| [Trade grader](#trade-grader)                                       | League → Trade Grader, trade summaries                             | bball  | `featureTradeGrader`                        | on / on                       |
-| [Contract value](#contract-value)                                   | League → Contract Value, player pages                              | bball  | `featureContractValue`                      | on / on                       |
-| [League timeline](#league-timeline)                                 | League → Timeline                                                  | bball  | `featureTimeline`                           | on / on                       |
-| [Records book](#records-book)                                       | League History → Records Book, news                                | bball  | `featureRecordsBook`                        | on / on                       |
-| [Milestones](#milestones)                                           | Player Stats → Milestones, dashboard, news                         | bball  | `featureMilestones`                         | on / on                       |
-| [Rivalries](#rivalries)                                             | Head-to-Head → Rivalries tab, team history pages                   | bball  | `featureRivalries`                          | on / on                       |
-| [Series recaps](#series-recaps)                                     | Playoffs → Series Recaps tab, bracket, news                        | bball  | `featureSeriesRecaps`                       | on / on                       |
-| [Unretirements](#unretirements)                                     | background, at the start of free agency                            | bball  | `featureUnretire`                           | off / off                     |
-| [Hyphenated last names](#names)                                     | player generation (new USA players)                                | all    | `featureHyphenatedNames`                    | on / off                      |
-| [Play-by-play flavor](#play-by-play)                                | live game                                                          | bball  | `featurePbpFlavor`                          | on / on                       |
-| [Live play-by-play](#play-by-play)                                  | live game                                                          | bball  | `pbpLiveGame`                               | on / on                       |
-| [Box score play-by-play](#play-by-play)                             | box scores                                                         | bball  | `featurePbpBoxScore`                        | on / on                       |
-| [Save play-by-play](#play-by-play)                                  | box scores                                                         | bball  | `storePlayByPlay`                           | on / on                       |
-| [Technical & flagrant fouls](#game-simulation-options)              | game sim                                                           | bball  | `technicalFouls`                            | on / off                      |
-| [Realistic possession model](#realistic-possession-model)           | game sim                                                           | bball  | `realisticPossessions`                      | on / off                      |
-| [Player traits](#player-traits)                                     | player page, Draft Scouting, Advanced Player Search, game sim      | bball  | `playerTraits`                              | on / off                      |
-| [Injury depth](#injury-depth)                                       | game sim, player page, Roster, Schedule                            | bball  | `injuryDepth`                               | on / off                      |
-| [Expanded ratings](#expanded-ratings)                               | ratings tables, player pages, Customize Player, game sim           | bball  | `expandedRatings`                           | on / off                      |
-| [Perimeter defense](#perimeter-defense)                             | game sim (steals), DPOY and All-Defensive awards                   | bball  | `perimeterDefense`                          | on / off                      |
-| [Sim-calibrated ovr](#sim-calibrated-ovr)                           | player ovr everywhere, player value                                | bball  | `ovrV2`                                     | on / off                      |
-| [Realistic aging](#realistic-aging)                                 | player development                                                 | bball  | `realisticAging`                            | on / off                      |
-| [Game sim fixes](#game-sim-fixes)                                   | game sim (shot selection and makes, usage, injuries)               | bball  | `simFixes`                                  | on / off                      |
-| [Position-aware team ratings](#position-aware-team-ratings)         | game sim (team composites)                                         | bball  | `positionalComposites`                      | on / off                      |
-| [Realistic rotations](#realistic-rotations)                         | game sim (substitutions)                                           | bball  | `realisticRotations`                        | on / off                      |
-| [Coaching systems](#coaching-systems)                               | game sim, coach market, team page, box score, Coach's notes        | bball  | `coachSystems`                              | on / off                      |
-| [Spacing & shot creation](#spacing--shot-creation)                  | game sim (drives, finishing, assists)                              | bball  | `spacingCreation`                           | on / off                      |
-| [Matchup defense](#matchup-defense)                                 | game sim (shot defense, shot selection, steal credit)              | bball  | `matchupDefense`                            | on / off                      |
-| [End-of-game intelligence](#end-of-game-intelligence)               | game sim (timeouts, late-game substitutions and fouls, clock)      | bball  | `smartEndgame`                              | on / off                      |
-| [Load, fatigue & venue](#load-fatigue--venue)                       | game sim (fatigue, injuries, home court, referees, travel)         | bball  | `scheduleLoad`                              | on / off                      |
-| [Realistic turnovers](#realistic-turnovers)                         | game sim (turnovers, steals)                                       | bball  | `realisticTurnovers`                        | on / off                      |
-| [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery              | bball  | `featureSeasonOdds`                         | on / on                       |
-| [Realistic schedule length](#realistic-schedule-length)             | schedule, Schedule, Daily Schedule, play menu                      | bball  | `realisticSchedule`                         | on / off                      |
-| [Marquee games](#marquee-games)                                     | schedule, Schedule, Daily Schedule, box score, Games to Watch      | bball  | `marqueeGames`                              | on / off                      |
-| [Custom shot clock](#college-mode)                                  | game sim                                                           | bball  | `customShotClock`                           | off / off (college: on)       |
-| [One-and-one bonus](#college-mode)                                  | game sim                                                           | bball  | `oneAndOne`                                 | off / off (college: on)       |
-| [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes   | bball  | `featureArchetypes`                         | on / on                       |
-| [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)       | bball  | `improvedPositions`                         | on / off                      |
-| Fork face parts                                                     | new male players' faces, Tools → Face Style Gallery                | bball  | `featureForkFaces`                          | off / off                     |
-| [Extended skill badges](#extended-skill-badges)                     | player tables, player page, Frivolities → Skill Badges             | bball  | `featureSkillBadges`                        | on / on                       |
-| [Contract options & guarantees](#contracts-mood-and-player-unrest)  | negotiation, player page                                           | all    | `contractOptions`                           | on / off                      |
-| [In-season extensions](#contracts-mood-and-player-unrest)           | player page                                                        | all    | `contractExtensions`                        | on / off                      |
-| [Trade requests](#contracts-mood-and-player-unrest)                 | player pages, trading block                                        | all    | `tradeRequests`                             | on / off                      |
-| [Holdouts](#contracts-mood-and-player-unrest)                       | before the regular season                                          | all    | `featureHoldouts`                           | on / off                      |
-| [Salary cap exceptions](#salary-cap-exceptions)                     | free agency, Free Agents, negotiation, Team Finances               | all    | `featureCapExceptions`                      | on / off                      |
-| [Trade explanations](#trades)                                       | Trade page ("Why?")                                                | all    | `featureTradeExplain`                       | on / on                       |
-| [Need-based AI trades](#trades)                                     | AI-to-AI trades                                                    | all    | `aiTradesNeedBased`                         | on / off                      |
-| [Realistic AI economy](#realistic-ai-economy)                       | AI-to-AI trades, end-of-season finances                            | bball  | `featureRealisticEconomy`                   | on / off                      |
-| [AI trade offers](#trades)                                          | inbox, Trade Offers (replaces Trade Proposals)                     | all    | `featureAiTradeOffers`                      | on / off                      |
-| [Trade market](#trades)                                             | Players → Trade Market                                             | all    | `featureTradeMarket`                        | on / on                       |
-| [Rumors](#rumors)                                                   | Transactions → Rumors tab, dashboard card, newspaper               | all    | `featureRumors`                             | on / off                      |
-| [Three-team trades](#trades)                                        | Trade → 3-team trade                                               | all    | `featureThreeTeamTrades`                    | on / on                       |
-| [AI GM personalities](#ai-gm-personalities)                         | League History → Front Offices tab, team pages, news, AI decisions | bball  | `featureGmPersonalities`                    | on / off                      |
-| [Front office budget](#front-office-budget)                         | Team → Finances, Trade, Free Agents, game sim, AI budgets          | bball  | `featureFrontOffice`                        | on / off                      |
-| [College mode](#college-mode)                                       | New League → College                                               | bball  | league type (`leagueType`), set at creation | pro / pro                     |
-| [College quick sim](#college-mode)                                  | college leagues: games without your team                           | bball  | `collegeQuickSim`                           | off / off (college: by size)  |
-| [College NIT](#college-mode)                                        | college leagues: College NIT page                                  | bball  | `collegeNit`                                | off / off (college: on)       |
-| [College realignment](#college-mode)                                | college leagues: conferences, Coaching Carousel                    | bball  | `collegeRealignment`                        | off / off (college: on)       |
-| [Coaching staff](#coaching-staff)                                   | Team → Coaching Staff, League → Coaches                            | bball  | `coachingStaff`                             | on / off (existing leagues)   |
-| [College & overseas stats](#draft-scouting)                         | Draft Scouting                                                     | bball  | `featureCollegeStats`                       | on / on (automatic: on / off) |
-| [College season & March Madness](#college-season-and-march-madness) | Draft Scouting → College/Overseas, player pages                    | bball  | `featureCollegeSeason`                      | on / off                      |
-| [Ratings regenerator](#draft-scouting)                              | Draft Scouting, Customize Player                                   | bball  | `featureRatingsRegenerator`                 | on / on                       |
-| [Draft class shapes](#draft-class-shapes)                           | Draft Scouting, Mock Draft                                         | bball  | `featureDraftClassShapes`                   | on / off                      |
-| [Scouting system](#draft-scouting)                                  | Draft Scouting                                                     | all    | `scoutingSystem`                            | on / off                      |
-| [Draft board](#draft-board-and-ai-drafting)                         | Draft Board, Draft page                                            | all    | `featureDraftBoard`                         | on / on                       |
-| [AI drafts by need](#draft-board-and-ai-drafting)                   | AI draft picks                                                     | bball  | `featureAiDraftNeeds`                       | on / off                      |
-| [Mock draft](#draft-board-and-ai-drafting)                          | Draft Scouting (Mock Draft tab), prospect player page              | bball  | `featureMockDraft`                          | on / off                      |
-| [Draft lottery night & combine](#draft-lottery-night-and-combine)   | Draft Lottery, Draft Scouting → Combine, pre-draft page            | bball  | `featureLotteryNight`                       | on / off                      |
-| [Scouting reports](#scouting-reports)                               | player Scouting page, Scouting Department, PDF                     | bball  | `featureScoutingReports`                    | on / off                      |
-| [Extra frivolities](#extra-frivolities)                             | Frivolities                                                        | all    | `featureFrivolities`                        | on / on                       |
-| [Face style gallery](#face-style-gallery-and-extra-face-parts)      | Tools → Face Style Gallery                                         | all    | browser setting on the page (extra parts)   | off (gallery always shown)    |
-| [Draft pick protections & swaps](#draft-pick-protections-and-swaps) | Trade, 3-team trade, Draft Picks, transactions                     | all    | `featureDraftPickConditions`                | on / off                      |
+| Feature                                                             | Where                                                              | Sports | Switch (League Extras)                                                                            | Default new / existing league |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------- | ----------------------------- |
+| [Newspaper](#newspaper)                                             | League → Newspaper                                                 | bball  | `featureNewspaper`                                                                                | on / on                       |
+| [Wrapped](#wrapped)                                                 | League → Wrapped                                                   | bball  | `featureWrapped`                                                                                  | on / on                       |
+| [Storylines](#storylines)                                           | League → Storylines                                                | bball  | `featureStorylines`                                                                               | on / on                       |
+| [Games to Watch](#games-to-watch-hype)                              | League → Games to Watch, dashboard, schedules                      | bball  | `featureHype`                                                                                     | on / on                       |
+| [Best games & top plays](#best-games--top-plays)                    | Daily Schedule → Best Games tab                                    | bball  | `featureBestGames`                                                                                | on / on                       |
+| [Award vote](#award-vote)                                           | Award Races → Award Vote tab                                       | bball  | `featureAwardVote`                                                                                | on / on                       |
+| [League achievements](#league-achievements)                         | League → League achievements, dashboard                            | bball  | `featureLeagueAchievements`                                                                       | on / on                       |
+| [Trade grader](#trade-grader)                                       | League → Trade Grader, trade summaries                             | bball  | `featureTradeGrader`                                                                              | on / on                       |
+| [Contract value](#contract-value)                                   | League → Contract Value, player pages                              | bball  | `featureContractValue`                                                                            | on / on                       |
+| [League timeline](#league-timeline)                                 | League → Timeline                                                  | bball  | `featureTimeline`                                                                                 | on / on                       |
+| [Records book](#records-book)                                       | League History → Records Book, news                                | bball  | `featureRecordsBook`                                                                              | on / on                       |
+| [Milestones](#milestones)                                           | Player Stats → Milestones, dashboard, news                         | bball  | `featureMilestones`                                                                               | on / on                       |
+| [Rivalries](#rivalries)                                             | Head-to-Head → Rivalries tab, team history pages                   | bball  | `featureRivalries`                                                                                | on / on                       |
+| [Series recaps](#series-recaps)                                     | Playoffs → Series Recaps tab, bracket, news                        | bball  | `featureSeriesRecaps`                                                                             | on / on                       |
+| [Unretirements](#unretirements)                                     | background, at the start of free agency                            | bball  | `featureUnretire`                                                                                 | off / off                     |
+| [Hyphenated last names](#names)                                     | player generation (new USA players)                                | all    | `featureHyphenatedNames`                                                                          | on / off                      |
+| [Play-by-play flavor](#play-by-play)                                | live game                                                          | bball  | `featurePbpFlavor`                                                                                | on / on                       |
+| [Live play-by-play](#play-by-play)                                  | live game                                                          | bball  | `featureFaceAging`, `faceAgingSpeed`, `faceAgingHairLoss`, `faceAgingGraying`, `faceAgingRetired` | on, normal, on, on, off / off | [Faces](#faces) |
+| `pbpLiveGame`                                                       | on / on                                                            |
+| [Box score play-by-play](#play-by-play)                             | box scores                                                         | bball  | `featurePbpBoxScore`                                                                              | on / on                       |
+| [Save play-by-play](#play-by-play)                                  | box scores                                                         | bball  | `storePlayByPlay`                                                                                 | on / on                       |
+| [Technical & flagrant fouls](#game-simulation-options)              | game sim                                                           | bball  | `technicalFouls`                                                                                  | on / off                      |
+| [Realistic possession model](#realistic-possession-model)           | game sim                                                           | bball  | `realisticPossessions`                                                                            | on / off                      |
+| [Player traits](#player-traits)                                     | player page, Draft Scouting, Advanced Player Search, game sim      | bball  | `playerTraits`                                                                                    | on / off                      |
+| [Injury depth](#injury-depth)                                       | game sim, player page, Roster, Schedule                            | bball  | `injuryDepth`                                                                                     | on / off                      |
+| [Expanded ratings](#expanded-ratings)                               | ratings tables, player pages, Customize Player, game sim           | bball  | `expandedRatings`                                                                                 | on / off                      |
+| [Perimeter defense](#perimeter-defense)                             | game sim (steals), DPOY and All-Defensive awards                   | bball  | `perimeterDefense`                                                                                | on / off                      |
+| [Sim-calibrated ovr](#sim-calibrated-ovr)                           | player ovr everywhere, player value                                | bball  | `ovrV2`                                                                                           | on / off                      |
+| [Realistic aging](#realistic-aging)                                 | player development                                                 | bball  | `realisticAging`                                                                                  | on / off                      |
+| [Game sim fixes](#game-sim-fixes)                                   | game sim (shot selection and makes, usage, injuries)               | bball  | `simFixes`                                                                                        | on / off                      |
+| [Position-aware team ratings](#position-aware-team-ratings)         | game sim (team composites)                                         | bball  | `positionalComposites`                                                                            | on / off                      |
+| [Realistic rotations](#realistic-rotations)                         | game sim (substitutions)                                           | bball  | `realisticRotations`                                                                              | on / off                      |
+| [Coaching systems](#coaching-systems)                               | game sim, coach market, team page, box score, Coach's notes        | bball  | `coachSystems`                                                                                    | on / off                      |
+| [Spacing & shot creation](#spacing--shot-creation)                  | game sim (drives, finishing, assists)                              | bball  | `spacingCreation`                                                                                 | on / off                      |
+| [Matchup defense](#matchup-defense)                                 | game sim (shot defense, shot selection, steal credit)              | bball  | `matchupDefense`                                                                                  | on / off                      |
+| [End-of-game intelligence](#end-of-game-intelligence)               | game sim (timeouts, late-game substitutions and fouls, clock)      | bball  | `smartEndgame`                                                                                    | on / off                      |
+| [Load, fatigue & venue](#load-fatigue--venue)                       | game sim (fatigue, injuries, home court, referees, travel)         | bball  | `scheduleLoad`                                                                                    | on / off                      |
+| [Realistic turnovers](#realistic-turnovers)                         | game sim (turnovers, steals)                                       | bball  | `realisticTurnovers`                                                                              | on / off                      |
+| [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery              | bball  | `featureSeasonOdds`                                                                               | on / on                       |
+| [Realistic schedule length](#realistic-schedule-length)             | schedule, Schedule, Daily Schedule, play menu                      | bball  | `realisticSchedule`                                                                               | on / off                      |
+| [Marquee games](#marquee-games)                                     | schedule, Schedule, Daily Schedule, box score, Games to Watch      | bball  | `marqueeGames`                                                                                    | on / off                      |
+| [Custom shot clock](#college-mode)                                  | game sim                                                           | bball  | `customShotClock`                                                                                 | off / off (college: on)       |
+| [One-and-one bonus](#college-mode)                                  | game sim                                                           | bball  | `oneAndOne`                                                                                       | off / off (college: on)       |
+| [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes   | bball  | `featureArchetypes`                                                                               | on / on                       |
+| [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)       | bball  | `improvedPositions`                                                                               | on / off                      |
+| Fork face parts                                                     | new male players' faces, Tools → Face Style Gallery                | bball  | `featureForkFaces`                                                                                | off / off                     |
+| [Face aging](#faces)                                                | players' faces each preseason, player page Then and Now, staff     | bball  | `featureFaceAging`                                                                                | on / off                      |
+| [Extended skill badges](#extended-skill-badges)                     | player tables, player page, Frivolities → Skill Badges             | bball  | `featureSkillBadges`                                                                              | on / on                       |
+| [Contract options & guarantees](#contracts-mood-and-player-unrest)  | negotiation, player page                                           | all    | `contractOptions`                                                                                 | on / off                      |
+| [In-season extensions](#contracts-mood-and-player-unrest)           | player page                                                        | all    | `contractExtensions`                                                                              | on / off                      |
+| [Trade requests](#contracts-mood-and-player-unrest)                 | player pages, trading block                                        | all    | `tradeRequests`                                                                                   | on / off                      |
+| [Holdouts](#contracts-mood-and-player-unrest)                       | before the regular season                                          | all    | `featureHoldouts`                                                                                 | on / off                      |
+| [Salary cap exceptions](#salary-cap-exceptions)                     | free agency, Free Agents, negotiation, Team Finances               | all    | `featureCapExceptions`                                                                            | on / off                      |
+| [Trade explanations](#trades)                                       | Trade page ("Why?")                                                | all    | `featureTradeExplain`                                                                             | on / on                       |
+| [Need-based AI trades](#trades)                                     | AI-to-AI trades                                                    | all    | `aiTradesNeedBased`                                                                               | on / off                      |
+| [Realistic AI economy](#realistic-ai-economy)                       | AI-to-AI trades, end-of-season finances                            | bball  | `featureRealisticEconomy`                                                                         | on / off                      |
+| [AI trade offers](#trades)                                          | inbox, Trade Offers (replaces Trade Proposals)                     | all    | `featureAiTradeOffers`                                                                            | on / off                      |
+| [Trade market](#trades)                                             | Players → Trade Market                                             | all    | `featureTradeMarket`                                                                              | on / on                       |
+| [Rumors](#rumors)                                                   | Transactions → Rumors tab, dashboard card, newspaper               | all    | `featureRumors`                                                                                   | on / off                      |
+| [Three-team trades](#trades)                                        | Trade → 3-team trade                                               | all    | `featureThreeTeamTrades`                                                                          | on / on                       |
+| [AI GM personalities](#ai-gm-personalities)                         | League History → Front Offices tab, team pages, news, AI decisions | bball  | `featureGmPersonalities`                                                                          | on / off                      |
+| [Front office budget](#front-office-budget)                         | Team → Finances, Trade, Free Agents, game sim, AI budgets          | bball  | `featureFrontOffice`                                                                              | on / off                      |
+| [College mode](#college-mode)                                       | New League → College                                               | bball  | league type (`leagueType`), set at creation                                                       | pro / pro                     |
+| [College quick sim](#college-mode)                                  | college leagues: games without your team                           | bball  | `collegeQuickSim`                                                                                 | off / off (college: by size)  |
+| [College NIT](#college-mode)                                        | college leagues: College NIT page                                  | bball  | `collegeNit`                                                                                      | off / off (college: on)       |
+| [College realignment](#college-mode)                                | college leagues: conferences, Coaching Carousel                    | bball  | `collegeRealignment`                                                                              | off / off (college: on)       |
+| [Coaching staff](#coaching-staff)                                   | Team → Coaching Staff, League → Coaches                            | bball  | `coachingStaff`                                                                                   | on / off (existing leagues)   |
+| [College & overseas stats](#draft-scouting)                         | Draft Scouting                                                     | bball  | `featureCollegeStats`                                                                             | on / on (automatic: on / off) |
+| [College season & March Madness](#college-season-and-march-madness) | Draft Scouting → College/Overseas, player pages                    | bball  | `featureCollegeSeason`                                                                            | on / off                      |
+| [Ratings regenerator](#draft-scouting)                              | Draft Scouting, Customize Player                                   | bball  | `featureRatingsRegenerator`                                                                       | on / on                       |
+| [Draft class shapes](#draft-class-shapes)                           | Draft Scouting, Mock Draft                                         | bball  | `featureDraftClassShapes`                                                                         | on / off                      |
+| [Scouting system](#draft-scouting)                                  | Draft Scouting                                                     | all    | `scoutingSystem`                                                                                  | on / off                      |
+| [Draft board](#draft-board-and-ai-drafting)                         | Draft Board, Draft page                                            | all    | `featureDraftBoard`                                                                               | on / on                       |
+| [AI drafts by need](#draft-board-and-ai-drafting)                   | AI draft picks                                                     | bball  | `featureAiDraftNeeds`                                                                             | on / off                      |
+| [Mock draft](#draft-board-and-ai-drafting)                          | Draft Scouting (Mock Draft tab), prospect player page              | bball  | `featureMockDraft`                                                                                | on / off                      |
+| [Draft lottery night & combine](#draft-lottery-night-and-combine)   | Draft Lottery, Draft Scouting → Combine, pre-draft page            | bball  | `featureLotteryNight`                                                                             | on / off                      |
+| [Scouting reports](#scouting-reports)                               | player Scouting page, Scouting Department, PDF                     | bball  | `featureScoutingReports`                                                                          | on / off                      |
+| [Extra frivolities](#extra-frivolities)                             | Frivolities                                                        | all    | `featureFrivolities`                                                                              | on / on                       |
+| [Face style gallery](#face-style-gallery-and-extra-face-parts)      | Tools → Face Style Gallery                                         | all    | browser setting on the page (extra parts)                                                         | off (gallery always shown)    |
+| [Draft pick protections & swaps](#draft-pick-protections-and-swaps) | Trade, 3-team trade, Draft Picks, transactions                     | all    | `featureDraftPickConditions`                                                                      | on / off                      |
 
 "Existing leagues" means leagues created before the setting existed (or league files without it): the switches that change how games or AI teams play are off there, so those leagues play exactly as before, and on for new leagues. The display-only features are on everywhere.
 
@@ -318,6 +320,51 @@ Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economic
 - **Setting:** _Use the fork's extra face parts in this browser_ on the gallery page (browser-local, `localStorage.forkFaceParts`, default off). On, the example parts are registered at startup, so a face that names one draws it; off, such a face draws no hair there. The gallery itself registers them while open, to show them.
 - **Licence:** facesjs is Apache-2.0 (`node_modules/facesjs/LICENSE`); the fork's parts are new SVG, not copies of facesjs art.
 - **Known limits:** groundwork only: nothing assigns fork parts to players yet (no generation, no face editor support; the external face editor doesn't know them). With a hat accessory facesjs hides hair ids it doesn't know, fork ones included. Only the UI registers parts (the worker doesn't render faces).
+
+## Faces
+
+All face work sits on top of facesjs 5 (Apache-2.0) without patching it: extra parts are registered into facesjs' part tables
+(`src/common/faceParts.ts`, append-only, ids start with `fork-`), and a draw-time layer (`src/common/faceRender.ts`) handles what
+a stored facesjs face can't express by itself. Nothing in this section uses `Math.random` or the game's random stream, so no sim
+or league result changes (the outcomeInvariance test is unchanged).
+
+### Face aging
+
+- **Setting:** League Extras _Face Aging_ (`featureFaceAging`, on for new leagues, off for existing ones), with _Face Aging Speed_
+  (`faceAgingSpeed`: subtle / normal / strong), _Allow Hair Loss_ (`faceAgingHairLoss`, on), _Allow Graying_ (`faceAgingGraying`,
+  on) and _Age Retired Players_ (`faceAgingRetired`, off: on, every living retired player is aged each preseason too, which reads
+  them all from the database).
+- **When:** once a season at the preseason (after development), and to catch faces up when a league is created and when a draft
+  class is generated (so prospects start young). Real-player image URLs are untouched; only generated faces age.
+- **How:** a pure function of the face as generated (his "adult" look), a per-player seed (pid) and his age; per-year draws are
+  keyed by (pid, season). `src/common/faceAging.ts`.
+  1. _Hairline:_ about 40% of players keep a full head of hair. The rest have a tendency and an onset age (26-35); each year after
+     it a seeded draw may take one step: light recession or a widow's peak → receding temples → a high hairline → thinning crown
+     → a horseshoe or a shaved head (with a faint stubble shadow). Some shave as soon as it thins. Buzzed heads just go bald.
+  2. _Greying:_ hair from a per-player start (32-43) over 16-29 years, the beard on its own, often earlier schedule (drawn in its
+     own colour, see below). Eyebrows follow the hair.
+  3. _Lines:_ smile lines from about 28, crow's feet from about 31, forehead lines from about 33, each deeper with the years; a
+     per-player shift of a few years, and up to three years sooner with heavy career minutes. Lines a generated face had at 19
+     are held back until their age. Freckles, scars and moles in the misc slot are kept.
+  4. _Fullness:_ a little leaner as a teenager, filling out slowly after 28 (more for heavier players and by a per-player gene).
+  5. _Facial hair:_ the generated style is his adult preference. Teens are clean or lightly stubbled; his style grows in at a
+     per-player age from 20 to 25 (heavy stubble first for full beards); after that a change of style of about the same fullness
+     every few years at most (sticky, so faces don't flip back and forth), and at 31+ some veterans go fuller or clean.
+  6. _Prospects:_ the same function at 19-21 gives them the young look: no lines, little facial hair, leaner.
+- **Edited faces:** a face changed in Customize Player (God Mode or a new player) is locked from aging. Ticking _Allow aging_ under
+  the face lets it age on from the edited face: hairline, grey, lines and fullness move from there, the beard style stays the
+  user's. Stored as `p.faceAging.e` / `.a`.
+- **Face history:** `p.faceAging` keeps the generated fields (`b`) and one snapshot per season of only the fields that changed
+  (`h`, the first one complete): hair id and colour, facial hair id and colour, the three line slots, smile line size, fatness
+  and head shave. Typically a few hundred bytes per player. The player page has a _Then and Now_ section (first season next to
+  now, and every season the face changed); `faceForSeason` rebuilds any past season.
+- **Coaches and GMs:** drawn aged from their age (same function, seeded by their id, beard style left alone), nothing stored.
+  With the extra off they grey as before.
+- **Beard colour:** facesjs draws everything in one hair colour. A face with `face.fork.beard` draws its facial hair from a
+  derived part (`<id>~fb`, registered once per style, never listed) whose hair colour placeholder is facesjs' per-feature
+  `$[faceShave]`, filled with the beard colour. The stored face keeps working in plain facesjs (it just ignores `fork`).
+- **Known limits:** the external facesjs editor (Customize Player → Face editor) drops `fork.beard`. Retired players are only
+  aged with the option on. Changing the speed changes how future seasons look, not the stored past.
 
 ## Game simulation
 
@@ -1052,34 +1099,34 @@ Audit of the draft-year college line of generated classes (6 classes of real BBG
 | broken: mpgOver36 (def / exp)                                  | 10 / 7                       | 1 / 3                         |                                |
 | broken: ppgOver25 (def / exp)                                  | 2 / 2                        | 1 / 3                         |                                |
 
-| Correlation      | Before (def / exp) | After (def / exp) |
+| Correlation | Before (def / exp) | After (def / exp) |
 | ---------------- | ------------------ | ----------------- | ------------- |
-| 3P% ~ tp         | 0.459 / 0.537      | 0.578 / 0.606     |
-| 3PAr ~ tp        | 0.816 / 0.779      | 0.945 / 0.925     |
-| 3PAr ~ csh       | None / 0.749       | None / 0.83       |
-| AST40 ~ pss      | 0.895 / 0.922      | 0.936 / 0.896     |
-| AST40 ~ oiq      | 0.537 / 0.542      | 0.516 / 0.481     |
-| BLK40 ~ hgt      | 0.886 / 0.874      | 0.868 / 0.841     |
-| BLK40 ~ idef/diq | 0.085 / 0.364      | 0.177 / 0.571     |
-| BLK40 ~ wng      | None / 0.872       | None / 0.842      |
-| BLK40 ~ jmp      | -0.3 / -0.254      | -0.137 / -0.214   |
-| ORB40 ~ oreb/reb | 0.5 / 0.584        | 0.528 / 0.667     |
-| REB40 ~ reb      | 0.622 / 0.658      | 0.628 / 0.649     |
-| REB40 ~ hgt      | 0.794 / 0.823      | 0.848 / 0.856     |
-| STL40 ~ pdef/diq | 0.144 / 0.564      | 0.343 / 0.586     |
-| STL40 ~ spd      | 0.745 / 0.76       | 0.469 / 0.529     |
-| FT% ~ ft         | 0.769 / 0.76       | 0.694 / 0.721     |
-| TOV% ~ bsc       | None / -0.146      | None / -0.117     |
-| TOV% ~ drb       | 0.091 / 0.04       | -0.099 / 0.105    |
-| BLK40 ~ jmp      | hgt (partial)      | 0.225 / 0.214     | 0.513 / 0.324 |
-| MPG ~ ovr        | 0.662 / 0.566      | 0.774 / 0.837     |
-| MPG ~ class      | 0.363 / 0.38       | 0.489 / 0.438     |
-| TOV40 ~ bsc      | None / 0.235       | None / 0.026      |
-| TOV40 ~ drb      | 0.381 / 0.357      | 0.072 / 0.177     |
-| PTS40 ~ ovr      | 0.724 / 0.697      | 0.709 / 0.697     |
-| PPG ~ ovr        | 0.784 / 0.753      | 0.808 / 0.825     |
-| FTr ~ dnk+ins    | 0.12 / 0.092       | 0.463 / 0.437     |
-| FG% ~ hgt        | 0.73 / 0.738       | 0.762 / 0.714     |
+| 3P% ~ tp | 0.459 / 0.537 | 0.578 / 0.606 |
+| 3PAr ~ tp | 0.816 / 0.779 | 0.945 / 0.925 |
+| 3PAr ~ csh | None / 0.749 | None / 0.83 |
+| AST40 ~ pss | 0.895 / 0.922 | 0.936 / 0.896 |
+| AST40 ~ oiq | 0.537 / 0.542 | 0.516 / 0.481 |
+| BLK40 ~ hgt | 0.886 / 0.874 | 0.868 / 0.841 |
+| BLK40 ~ idef/diq | 0.085 / 0.364 | 0.177 / 0.571 |
+| BLK40 ~ wng | None / 0.872 | None / 0.842 |
+| BLK40 ~ jmp | -0.3 / -0.254 | -0.137 / -0.214 |
+| ORB40 ~ oreb/reb | 0.5 / 0.584 | 0.528 / 0.667 |
+| REB40 ~ reb | 0.622 / 0.658 | 0.628 / 0.649 |
+| REB40 ~ hgt | 0.794 / 0.823 | 0.848 / 0.856 |
+| STL40 ~ pdef/diq | 0.144 / 0.564 | 0.343 / 0.586 |
+| STL40 ~ spd | 0.745 / 0.76 | 0.469 / 0.529 |
+| FT% ~ ft | 0.769 / 0.76 | 0.694 / 0.721 |
+| TOV% ~ bsc | None / -0.146 | None / -0.117 |
+| TOV% ~ drb | 0.091 / 0.04 | -0.099 / 0.105 |
+| BLK40 ~ jmp | hgt (partial) | 0.225 / 0.214 | 0.513 / 0.324 |
+| MPG ~ ovr | 0.662 / 0.566 | 0.774 / 0.837 |
+| MPG ~ class | 0.363 / 0.38 | 0.489 / 0.438 |
+| TOV40 ~ bsc | None / 0.235 | None / 0.026 |
+| TOV40 ~ drb | 0.381 / 0.357 | 0.072 / 0.177 |
+| PTS40 ~ ovr | 0.724 / 0.697 | 0.709 / 0.697 |
+| PPG ~ ovr | 0.784 / 0.753 | 0.808 / 0.825 |
+| FTr ~ dnk+ins | 0.12 / 0.092 | 0.463 / 0.437 |
+| FG% ~ hgt | 0.73 / 0.738 | 0.762 / 0.714 |
 
 Sample prospects (after, expanded ratings on):
 
