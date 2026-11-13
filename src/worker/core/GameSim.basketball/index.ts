@@ -2538,6 +2538,11 @@ class GameSim extends GameSimBase {
 					defenseInside / 5 + this.synergyFactor * synergy.def;
 				ratings.defenseOutside =
 					defenseOutside / 5 + this.synergyFactor * synergy.def;
+			} else if (this.positionalComposites) {
+				// Not 5 players on the court, so no shares: shots inside and outside face the plain team defense (these were left undefined,
+				// which made every shot's make probability NaN, so no shot ever went in)
+				ratings.defenseInside = ratings.defense;
+				ratings.defenseOutside = ratings.defense;
 			}
 			if (this.expandedRatings2) {
 				ratings.offRebounding =

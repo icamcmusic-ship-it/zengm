@@ -136,6 +136,22 @@ test("positionalComposites: games still sane", async () => {
 	}
 });
 
+test("positionalComposites: with fewer than 5 players on the court, shots still go in", async () => {
+	for (const numPlayersOnCourt of [3, 4]) {
+		const results = await simGames(
+			{ positionalComposites: true, numPlayersOnCourt } as any,
+			SEEDS.slice(0, 3),
+		);
+		for (const { result } of results) {
+			for (const t of result.team) {
+				// It was 0 of every shot: no shares, so the inside and outside shot defense were undefined and every make probability NaN
+				assert.isAbove(t.stat.fg / t.stat.fga, 0.2);
+			}
+		}
+	}
+	g.setWithoutSavingToDB("numPlayersOnCourt", 5);
+});
+
 const roster = (n: number) =>
 	range(n).map((i) => ({
 		valueNoPot: 70 - 2 * i,
