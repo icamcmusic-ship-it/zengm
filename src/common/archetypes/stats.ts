@@ -230,8 +230,15 @@ export const multiSeasonStats = (
 			rows.push(out);
 		}
 	}
+	// (a full last season speaks for itself: the older ones only fill in a small sample, an injury year or a bench role,
+	// so a player who changed his game is read as he plays now; SINGLE_SEASON_MIN)
+	const last = seasonStats(seasons[0] ?? []);
+	if (last && last.min >= SINGLE_SEASON_MIN) {
+		return last;
+	}
 	return seasonStats(rows);
 };
+export const SINGLE_SEASON_MIN = 1500;
 
 // Stat references from a league's players with real minutes (at least `minMin` in the season), by position bucket
 export const buildStatNorms = (

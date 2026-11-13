@@ -24,7 +24,14 @@ export const promiseReport = (players) => {
 	for (const p of players) {
 		const read = { age: p.age, stats: p.stats, prospect: p.prospect };
 		const c = classify(p.ratings, { norms: NORMS, pos: p.pos, ...read });
-		const { cv } = scoreAll(p.ratings, NORMS, ARCHETYPES, p.pos, undefined, read);
+		const { cv } = scoreAll(
+			p.ratings,
+			NORMS,
+			ARCHETYPES,
+			p.pos,
+			undefined,
+			read,
+		);
 		const a = ARCHETYPES.find((x) => x.id === c.id);
 		const b = (by[a.id] ??= { a, n: 0, met: {} });
 		b.n++;
@@ -33,7 +40,9 @@ export const promiseReport = (players) => {
 		}
 	}
 	return Object.values(by).map((b) => {
-		const shares = Object.fromEntries(Object.entries(b.met).map(([k, m]) => [k, m / b.n]));
+		const shares = Object.fromEntries(
+			Object.entries(b.met).map(([k, m]) => [k, m / b.n]),
+		);
 		const min = Math.min(1, ...Object.values(shares));
 		return { id: b.a.id, name: b.a.name, n: b.n, shares, min };
 	});
@@ -42,11 +51,15 @@ export const promiseReport = (players) => {
 test.skipIf(!process.env.RUN_ARCHETYPE_PROMISES)(
 	"name promises",
 	async () => {
-		const league = (await sampleLeague(3000, "metrics-league-promises", 13, 38, EXPANDED)).map((p) => ({
+		const league = (
+			await sampleLeague(3000, "metrics-league-promises", 13, 38, EXPANDED)
+		).map((p) => ({
 			...p,
 			pos: positionFor(p.ratings, true),
 		}));
-		const pros = (await sampleLeague(1000, "metrics-pros-promises", 0, 40, EXPANDED)).map((p) => ({
+		const pros = (
+			await sampleLeague(1000, "metrics-pros-promises", 0, 40, EXPANDED)
+		).map((p) => ({
 			...p,
 			age: undefined,
 			prospect: true,
@@ -83,12 +96,28 @@ test.skipIf(!process.env.RUN_ARCHETYPE_PROMISES)(
 		const out = [
 			`name promises (expanded ratings ${EXPANDED ? "ON" : "off"}): ${big.length} builds with 10+ holders, ${big.length - below.length} keep every promise for ${TARGET * 100}%+ of their holders; ${below.length} below; holders weighted by their build's worst promise: ${((100 * keptAll) / holders).toFixed(1)}%`,
 			"below the target (build, holders, share per promise):",
-			...below.map((r) => `  ${r.name} (${r.n}): ${Object.entries(r.shares).map(([k, v]) => `${k} ${(100 * v).toFixed(0)}%`).join(", ")}`),
+			...below.map(
+				(r) =>
+					`  ${r.name} (${r.n}): ${Object.entries(r.shares)
+						.map(([k, v]) => `${k} ${(100 * v).toFixed(0)}%`)
+						.join(", ")}`,
+			),
 			"all builds with 10+ holders:",
-			...big.map((r) => `  ${r.name} (${r.n}): ${Object.entries(r.shares).map(([k, v]) => `${k} ${(100 * v).toFixed(0)}%`).join(", ")}`),
-			`fewer than 10 holders: ${rep.filter((r) => r.n < 10).map((r) => `${r.name} (${r.n}, worst ${(100 * r.min).toFixed(0)}%)`).join(", ")}`,
+			...big.map(
+				(r) =>
+					`  ${r.name} (${r.n}): ${Object.entries(r.shares)
+						.map(([k, v]) => `${k} ${(100 * v).toFixed(0)}%`)
+						.join(", ")}`,
+			),
+			`fewer than 10 holders: ${rep
+				.filter((r) => r.n < 10)
+				.map((r) => `${r.name} (${r.n}, worst ${(100 * r.min).toFixed(0)}%)`)
+				.join(", ")}`,
 		];
-		writeFileSync(process.env.ARCH_PROMISES_OUT ?? "/tmp/claude-0/arch-promises.txt", out.join("\n") + "\n");
+		writeFileSync(
+			process.env.ARCH_PROMISES_OUT ?? "/tmp/claude-0/arch-promises.txt",
+			out.join("\n") + "\n",
+		);
 	},
 	1800000,
 );

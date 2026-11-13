@@ -49,8 +49,8 @@ import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
 import { CUSTOM_DEFS } from "./customDefs.data.ts";
 import { GOLD } from "./gold.data.ts";
 import { realData, realPlayer } from "./real.testutil.ts";
-import { promiseChecks, promisesOf } from "./score.ts";
-import { scoreAll } from "./classify.ts";
+import { catchAllShortfall, promiseChecks, promisesOf } from "./score.ts";
+import { scoreAll, scoreTerms } from "./classify.ts";
 import { statReading, STATS_W, STATS_W_MORE } from "./stats.ts";
 import { MERGED, mergedId } from "./merges.data.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
@@ -453,7 +453,7 @@ describe("classification", () => {
 				age: p.age,
 				stats: p.stats,
 			});
-			if (c.id !== want) {
+			if (c.id !== mergedId(want)) {
 				misses.push(`${slug} ${season}: ${c.id} (want ${want})`);
 			}
 			// With the Expanded Ratings setting on (wingspan and perimeter/interior defense derived as a real-players league
@@ -735,9 +735,16 @@ describe("name promises (arch14)", () => {
 		for (const p of (await league()).slice(0, 2000)) {
 			const pos = positionFor(p.ratings, true);
 			const c = classify(p.ratings, { pos, age: p.age });
-			const { cv } = scoreAll(p.ratings, DEFAULT_NORMS, ARCHETYPES, pos, undefined, {
-				age: p.age,
-			});
+			const { cv } = scoreAll(
+				p.ratings,
+				DEFAULT_NORMS,
+				ARCHETYPES,
+				pos,
+				undefined,
+				{
+					age: p.age,
+				},
+			);
 			const checks = Object.values(promiseChecks(archetypeById(c.id)!, cv));
 			const b = (by[c.id] ??= { n: 0, worst: [] });
 			b.n++;
@@ -754,7 +761,36 @@ describe("name promises (arch14)", () => {
 			}
 		}
 		assert.ok(kept / n >= 0.93, `${kept / n}`);
-	});
+	}, 120000);
+
+	test("catch-all builds earn their breadth: a Versatile Scorer scores at all three levels and creates", async () => {
+		let n = 0;
+		let ok = 0;
+		const players = (await league()).slice(0, 2000);
+		for (const p of players) {
+			const pos = positionFor(p.ratings, true);
+			const c = classify(p.ratings, { pos, age: p.age });
+			if (c.id !== "versatile-scorer") {
+				continue;
+			}
+			const t = scoreTerms(
+				p.ratings,
+				DEFAULT_NORMS,
+				ARCHETYPES,
+				pos,
+				undefined,
+				{
+					age: p.age,
+				},
+			);
+			n++;
+			if (catchAllShortfall(archetypeById(c.id)!, t.p, t.cv) < 0.05) {
+				ok++;
+			}
+		}
+		assert.ok(n === 0 || ok / n >= 0.9, `${ok}/${n}`);
+		assert.ok(n / players.length <= 0.01, `${n}`);
+	}, 120000);
 });
 
 describe("distribution over a generated league", () => {
@@ -1065,7 +1101,7 @@ const GOLD_LISTED_FLOOR = 0.4;
 // (the position the game shows, his age and the previous season's stats)
 const PINNED: [string, number, string][] = [
 	["curryst01", 2025, "deep-range-sniper"], // Stephen Curry
-	["jamesle01", 2025, "mid-paint-point-four"], // LeBron James
+	["jamesle01", 2025, "mid-paint-bully"], // LeBron James
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
 	["goberru01", 2025, "backline-power-finisher"], // Rudy Gobert
 	["antetgi01", 2025, "crafty-paint-finishing-cleaner"], // Giannis Antetokounmpo
@@ -1075,13 +1111,13 @@ const PINNED: [string, number, string][] = [
 	["thompkl01", 2025, "crafty-sharpshooter"], // Klay Thompson
 	["embiijo01", 2025, "slashing-mid-range-maestro"], // Joel Embiid
 	["lopezbr01", 2025, "backline-pick-and-popper"], // Brook Lopez
-	["capelca01", 2025, "glass-guardian-lob-threat"], // Clint Capela
+	["capelca01", 2025, "bulldozing-glass-guardian"], // Clint Capela
 	["korveky01", 2021, "crafty-3-level-scorer"], // Kyle Korver
 	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook
 	["wembavi01", 2025, "shot-erasing-mid-paint-maestro"], // Victor Wembanyama
-	["doncilu01", 2025, "playmaking-3pt-slasher"], // Luka Dončić (arch13: his three fixed, 53 -> 71)
+	["doncilu01", 2025, "board-hunting-middy-slasher"], // Luka Dončić (arch13: his three fixed, 53 -> 71)
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
-	["adamsst01", 2025, "shot-erasing-putback-bully"], // Steven Adams
+	["adamsst01", 2025, "physical-board-enforcer"], // Steven Adams
 	["allento01", 2018, "ball-hawking-mid-paint-scorer"], // Tony Allen
 	["drumman01", 2025, "paint-scoring-crasher"], // Andre Drummond
 ];

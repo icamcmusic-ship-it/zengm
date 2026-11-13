@@ -17,7 +17,11 @@ import {
 	PROMISE_K,
 	PROMISE_STEP,
 	REB_PERIM_K,
+	CATCH_ALL_K,
+	TRAIT_GROUPS,
 	absoluteParts,
+	catchAllShortfall,
+	traitGroupValue,
 	allAroundQuality,
 	classValues,
 	creatorTerm,
@@ -122,7 +126,7 @@ export const TRAIT_LABEL_K = 0.25;
 const TRAIT_LABEL_SPAN = 15;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
-// Only the visible traits, whatever the caller passed
+// Only the visible traits, whatever the caller passed (the trait-flavored labels and tie-breaks read these)
 export const visibleTraits = (
 	traits: Partial<Record<string, number>> | undefined,
 ): ArchetypeTraits | undefined => {
@@ -133,6 +137,21 @@ export const visibleTraits = (
 	for (const [k, v] of Object.entries(traits)) {
 		if (VISIBLE_TRAITS.has(k) && typeof v === "number" && Number.isFinite(v)) {
 			out[k as ArchetypeTraitKey] = v;
+		}
+	}
+	return out;
+};
+// arch14 (user request): the fitted trait terms read every trait, hidden ones too (score.ts TRAIT_GROUPS)
+export const allTraits = (
+	traits: Partial<Record<string, number>> | undefined,
+): Partial<Record<string, number>> | undefined => {
+	if (!traits) {
+		return undefined;
+	}
+	const out: Partial<Record<string, number>> = {};
+	for (const [k, v] of Object.entries(traits)) {
+		if (typeof v === "number" && Number.isFinite(v)) {
+			out[k] = v;
 		}
 	}
 	return out;
@@ -238,6 +257,8 @@ export const scoreTerms = (
 	const cv = classValues(p);
 	const standouts = standoutsOf(p, cv);
 	const traits = visibleTraits(traitsIn);
+	const every = allTraits(traitsIn);
+	const groupVals = TRAIT_GROUPS.map((g) => traitGroupValue(g, every));
 	const star = starWeight(p);
 	const starBias = norms.starBias ?? STAR_BIAS;
 	const calBias = norms.bias ?? defaultNorms(p.expanded).bias;
@@ -258,7 +279,12 @@ export const scoreTerms = (
 			rows.push({ a, raw, short: 0, blocked: true, base: 0, f, cls, fam });
 			continue;
 		}
-		const base = prior + trait;
+		const base = prior + trait - CATCH_ALL_K * catchAllShortfall(a, p, cv);
+		for (const [gi, g] of TRAIT_GROUPS.entries()) {
+			if (groupVals[gi] !== 0 && g.re.test(a.name)) {
+				f[TERM_INDEX[g.term as Term]] = groupVals[gi]!;
+			}
+		}
 		const bias = calBias?.[a.id] ?? 0;
 		const starB = star * (starBias[a.id] ?? 0);
 		// arch13: the all-around star build has no profile (score.ts, allAroundQuality)

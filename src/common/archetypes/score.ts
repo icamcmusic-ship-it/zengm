@@ -1022,7 +1022,8 @@ export const roleParts = (
 		const len = p.expanded ? 0.25 * p.abs.len : 0;
 		const rim = 0.5 * roleValue("rimD", p) + 0.25 * (p.pz.blk + p.b.blk) + len;
 		out.rim =
-			(p.stats ? RIM_K_STATS : RIM_K) * Math.min(1, Math.max(0, rim - RIM_FROM));
+			(p.stats ? RIM_K_STATS : RIM_K) *
+			Math.min(1, Math.max(0, rim - RIM_FROM));
 	}
 	if (SNIPER_RE.test(a.name)) {
 		out.sniper =
@@ -1147,6 +1148,110 @@ export const promiseMiss = (a: Archetype, cv: Record<string, number>) => {
 	}
 	if (SNIPER_RE.test(a.name)) {
 		t += Math.max(0, PROMISE_ELITE - (cv.shoot ?? 0));
+	}
+	return t;
+};
+
+// ---- arch14 (user request): player traits as style signals ----
+// Each group: the traits it averages (visible and hidden: the user accepts that a label may hint at hidden ones) and the
+// build names it speaks for. A build's trait term is the group's mean score minus 50, in units of 25 (clamped to +-1).
+export const TRAIT_GROUPS: { term: string; traits: string[]; re: RegExp }[] = [
+	{
+		term: "trOffBall",
+		traits: ["offBall"],
+		re: /Off-Screen|Catch & Shoot|Wing[ -]Run|Sharpshoot/,
+	},
+	{
+		term: "trScreen",
+		traits: ["screen"],
+		re: /Pick & Pop|Pick & Roll|Pick-Diving|Popper|Rim Run|Lob/,
+	},
+	{
+		term: "trHandle",
+		traits: ["handle"],
+		re: /Creat|Iso|Ankle|Shifty|Savant|Engine|Combo Guard/,
+	},
+	{
+		term: "trDefVers",
+		traits: ["defensiveVersatility"],
+		re: /Lockdown|Switch|Versatile Defender|Edge|Clamp|Two Way|Both Ends|Eliminator|Guard Dog/,
+	},
+	{
+		term: "trHustle",
+		traits: ["hustle", "motor"],
+		re: /Glass|Clean|Board|Crash|Putback|Hustle|Gritty|Grinder/,
+	},
+	{
+		term: "trShotDisc",
+		traits: ["shotDiscipline"],
+		re: /Sharp|Snip|Automatic|Laser|Shooter|Silk/,
+	},
+	{
+		term: "trClutch",
+		traits: ["clutch", "lateGameIq", "bigGame"],
+		re: /Bucket|Scorer|Iso|Shot Creator|Menace|Maestro|Engine|Shot Hunter|Cash Out/,
+	},
+	{
+		term: "trLeader",
+		traits: ["leadership", "lateGameIq"],
+		re: /Playmak|Distributor|Dot|Table|Engine|Point|Dim|Floor/,
+	},
+	{
+		term: "trIron",
+		traits: ["durability", "recovery", "workEthic"],
+		re: /Hustler|Motor|Rim Run|Tempo|Grinder|Wing Runner|Gritty/,
+	},
+];
+export const traitGroupValue = (
+	g: (typeof TRAIT_GROUPS)[number],
+	traits: Partial<Record<string, number>> | undefined,
+): number => {
+	if (!traits) {
+		return 0;
+	}
+	let t = 0;
+	let n = 0;
+	for (const k of g.traits) {
+		const v = traits[k];
+		if (typeof v === "number" && Number.isFinite(v)) {
+			t += v;
+			n++;
+		}
+	}
+	return n > 0 ? Math.min(1, Math.max(-1, (t / n - 50) / 25)) : 0;
+};
+
+// ---- arch14 (user request): catch-all builds must earn their breadth ----
+// A broad scoring name is not a default: "Versatile Scorer" needs good scoring at all three levels (rim, mid-range, three)
+// and real creation (his handle or his usage), "3-Level Scorer" the three and the mid-range, ... Each requirement is a floor
+// on the blended reading (classValues; creation: the better of his handle and his usage z), CATCH_ALL_K per z short. Not
+// fitted: it is a rule.
+export const CATCH_ALL_K = 3;
+export const CATCH_ALL: Record<string, Partial<Record<string, number>>> = {
+	"versatile-scorer": { finish: 0.4, mid: 0.4, shoot: 0.4, create: 0.4 },
+	"three-level-scorer": { shoot: 0.3, mid: 0.3, create: 0 },
+	"crafty-3-level-scorer": { shoot: 0.3, mid: 0.3 },
+	"crafty-walking-bucket": { score: 0.5, create: 0.2 },
+	"walking-bucket": { score: 0.5, create: 0.2 },
+	"mid-range-slasher": { mid: 0.3, finish: 0.3 },
+	"versatile-paint-finisher": { finish: 0.5 },
+	"mid-range-high-flyer": { mid: 0.3, ath: 0.3 },
+};
+export const creationOf = (p: Prepared, cv: Record<string, number>) =>
+	Math.max(cv.handle ?? 0, p.stats?.z.usg ?? -Infinity);
+export const catchAllShortfall = (
+	a: Archetype,
+	p: Prepared,
+	cv: Record<string, number>,
+): number => {
+	const req = CATCH_ALL[a.id];
+	if (!req) {
+		return 0;
+	}
+	let t = 0;
+	for (const [k, floor] of Object.entries(req)) {
+		const v = k === "create" ? creationOf(p, cv) : (cv[k] ?? 0);
+		t += Math.max(0, floor! - v);
 	}
 	return t;
 };

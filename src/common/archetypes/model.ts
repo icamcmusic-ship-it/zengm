@@ -36,6 +36,17 @@ export const TERMS = [
 	"promLead",
 	"promRel",
 	"allAround",
+	// arch14 (user request): his player traits (only with the Player Traits setting on; 0 without), each group's mean score
+	// above or below 50 (in units of 25) where the build's name is that style (score.ts TRAIT_GROUPS); hidden traits too
+	"trOffBall",
+	"trScreen",
+	"trHandle",
+	"trDefVers",
+	"trHustle",
+	"trShotDisc",
+	"trClutch",
+	"trLeader",
+	"trIron",
 ] as const;
 export type Term = (typeof TERMS)[number];
 
@@ -104,8 +115,15 @@ const ones = <K extends string>(keys: readonly K[], v: number) =>
 	Object.fromEntries(keys.map((k) => [k, v])) as Record<K, number>;
 
 // The hand settings: the reading as it was before arch14
+export const TRAIT_TERMS: readonly Term[] = TERMS.filter((t) =>
+	t.startsWith("tr"),
+);
+// (the trait terms did not exist before arch14: 0 in the hand settings, a moderate 0.3 the fit is regularised toward)
+export const TRAIT_PRIOR = 0.3;
 export const HAND_MODEL: FittedModel = {
-	theta: ones(TERMS, 1),
+	theta: Object.fromEntries(
+		TERMS.map((t) => [t, TRAIT_TERMS.includes(t) ? 0 : 1]),
+	) as Record<Term, number>,
 	cls: ones(CLASS_FEATS, 0),
 	famBias: ones(FAMILIES, 0),
 	famW: Object.fromEntries(

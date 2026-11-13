@@ -137,13 +137,12 @@ export const archetypeTraits = (
 	if (!all) {
 		return undefined;
 	}
+	// arch14 (user request): hidden traits too. The trait-flavored labels and tie-breaks still read only the visible ones
+	// (classify.ts visibleTraits); the fitted trait terms read every trait (score.ts TRAIT_GROUPS), so a label may hint at a
+	// hidden trait, which the user accepted
 	const out: Record<string, number> = {};
 	for (const [k, v] of Object.entries(all)) {
-		if (
-			TRAIT_DEFINITIONS[k as keyof typeof TRAIT_DEFINITIONS]?.visibility ===
-				"visible" &&
-			typeof v === "number"
-		) {
+		if (k in TRAIT_DEFINITIONS && typeof v === "number") {
 			out[k] = v;
 		}
 	}
