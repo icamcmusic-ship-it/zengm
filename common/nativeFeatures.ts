@@ -637,9 +637,17 @@ export const NATIVE_FEATURES = [
 				key: "faceAgingRetired",
 				name: "Age Retired Players",
 				description:
-					"Keep aging retired players' faces each season too (slower preseason in long leagues).",
+					"Keep aging retired players' faces each season too (slower preseason in long leagues): a little greyer and fuller every year, and glasses become more likely.",
 				type: "bool",
 				default: false,
+			},
+			{
+				key: "faceAgingStyleEvents",
+				name: "Style Events",
+				description:
+					"Now and then a player changes his hairstyle or beard (usually to a nearby style, back to his signature look, rarely shaving his head), adopts or drops a headband, wears goggles after an eye injury and glasses after retirement. Coaches and GMs change styles too. Seeded from the player, never for faces you edited.",
+				type: "bool",
+				default: true,
 			},
 		],
 	},

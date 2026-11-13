@@ -10,6 +10,7 @@ import {
 	extractAgingFields,
 	type FaceAgingOptions,
 } from "../../common/faceAging.ts";
+import { textureOf } from "../../common/faceEvents.ts";
 import { prepareFaceForDisplay } from "../../common/faceRender.ts";
 import { useFeatureOn, useFeatureOption } from "../util/nativeFeatures.ts";
 
@@ -31,11 +32,15 @@ export const StaffFace = ({
 	const [c0, c1, c2] = colors ?? [];
 
 	// League Extras "Face Aging": staff age the same way as players (hairline, grey, lines), worked out when drawn from
-	// their age, so nothing is stored. Their beard style is left alone.
+	// their id and age, so nothing is stored and a coach looks the same every time he's drawn in a season, and older the next.
+	// Coaches and GMs are their own people (not former players), so this is their whole history. With "Style Events", now
+	// and then a new hairstyle or beard and, with the years, glasses (common/faceEvents.ts); the per-age draws are keyed by
+	// age (born 0), so they don't depend on the season.
 	const agingOn = useFeatureOn("faceAging");
 	const speed = useFeatureOption<FaceAgingOptions["speed"]>("faceAgingSpeed");
 	const hairLoss = useFeatureOption<boolean>("faceAgingHairLoss");
 	const graying = useFeatureOption<boolean>("faceAgingGraying");
+	const styleEvents = useFeatureOption<boolean>("faceAgingStyleEvents");
 	const aged = agingOn && age !== undefined && seed !== undefined;
 	const drawnFace = useMemo(
 		() =>
@@ -45,13 +50,23 @@ export const StaffFace = ({
 							face,
 							agedFields(
 								extractAgingFields(face),
-								{ seed: `staff|${seed}`, age, born: 0, staff: true },
-								{ speed, hairLoss, graying },
+								{
+									seed: `staff|${seed}`,
+									age,
+									born: 0,
+									staff: true,
+									texture: textureOf(
+										face.body?.color,
+										face.hair.id,
+										face.hairBg?.id,
+									),
+								},
+								{ speed, hairLoss, graying, styleEvents },
 							),
 						)
 					: face,
 			),
-		[aged, age, face, graying, hairLoss, seed, speed],
+		[aged, age, face, graying, hairLoss, seed, speed, styleEvents],
 	);
 
 	const overrides = staffFaceOverrides(face, {

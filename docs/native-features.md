@@ -52,7 +52,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Unretirements](#unretirements)                                     | background, at the start of free agency                                         | bball  | `featureUnretire`                                                                                 | off / off                     |
 | [Hyphenated last names](#names)                                     | player generation (new USA players)                                             | all    | `featureHyphenatedNames`                                                                          | on / off                      |
 | [Play-by-play flavor](#play-by-play)                                | live game                                                                       | bball  | `featurePbpFlavor`                                                                                | on / on                       |
-| [Live play-by-play](#play-by-play)                                  | live game                                                                       | bball  | `featureFaceAging`, `faceAgingSpeed`, `faceAgingHairLoss`, `faceAgingGraying`, `faceAgingRetired` | on, normal, on, on, off / off | [Faces](#faces) |
+| [Live play-by-play](#play-by-play)                                  | live game                                                                       | bball  | `featureFaceAging`, `faceAgingSpeed`, `faceAgingHairLoss`, `faceAgingGraying`, `faceAgingRetired`, `faceAgingStyleEvents` | on, normal, on, on, off, on / off | [Faces](#faces) |
 | `pbpLiveGame`                                                       | on / on                                                                         |
 | [Box score play-by-play](#play-by-play)                             | box scores                                                                      | bball  | `featurePbpBoxScore`                                                                              | on / on                       |
 | [Save play-by-play](#play-by-play)                                  | box scores                                                                      | bball  | `storePlayByPlay`                                                                                 | on / on                       |
@@ -81,7 +81,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes                | bball  | `featureArchetypes`                                                                               | on / on                       |
 | [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)                    | bball  | `improvedPositions`                                                                               | on / off                      |
 | [New face styles](#faces)                                           | new male players' and staff faces, Tools → Face Style Gallery, Customize Player | bball  | `featureForkFaces`                                                                                | on / off                      |
-| [Face aging](#faces)                                                | players' faces each preseason, player page Then and Now, staff                  | bball  | `featureFaceAging`                                                                                | on / off                      |
+| [Face aging](#faces)                                                | players' faces each preseason, player page Then and Now, HoF plaques, compare players, staff | bball  | `featureFaceAging`                                                                                | on / off                      |
 | [Extended skill badges](#extended-skill-badges)                     | player tables, player page, Frivolities → Skill Badges                          | bball  | `featureSkillBadges`                                                                              | on / on                       |
 | [Contract options & guarantees](#contracts-mood-and-player-unrest)  | negotiation, player page                                                        | all    | `contractOptions`                                                                                 | on / off                      |
 | [In-season extensions](#contracts-mood-and-player-unrest)           | player page                                                                     | all    | `contractExtensions`                                                                              | on / off                      |
@@ -393,12 +393,12 @@ at roster thumbnail size and in the dark theme.
 
 - **Setting:** League Extras _Face Aging_ (`featureFaceAging`, on for new leagues, off for existing ones), with _Face Aging Speed_
   (`faceAgingSpeed`: subtle / normal / strong), _Allow Hair Loss_ (`faceAgingHairLoss`, on), _Allow Graying_ (`faceAgingGraying`,
-  on) and _Age Retired Players_ (`faceAgingRetired`, off: on, every living retired player is aged each preseason too, which reads
-  them all from the database).
+  on), _Age Retired Players_ (`faceAgingRetired`, off: on, every living retired player is aged each preseason too, which reads
+  them all from the database) and _Style Events_ (`faceAgingStyleEvents`, on: see below).
 - **When:** once a season at the preseason (after development), and to catch faces up when a league is created and when a draft
   class is generated (so prospects start young). Real-player image URLs are untouched; only generated faces age.
 - **How:** a pure function of the face as generated (his "adult" look), a per-player seed (pid) and his age; per-year draws are
-  keyed by (pid, season). `src/common/faceAging.ts`.
+  keyed by (pid, season). `src/common/faceAging.ts`, seeds in `src/common/faceSeed.ts`.
   1. _Hairline:_ about 40% of players keep a full head of hair. The rest have a tendency and an onset age (26-35); each year after
      it a seeded draw may take one step: light recession or a widow's peak → receding temples → a high hairline → thinning crown
      → a horseshoe or a shaved head (with a faint stubble shadow). Some shave as soon as it thins. Buzzed heads just go bald.
@@ -412,23 +412,90 @@ at roster thumbnail size and in the dark theme.
      per-player age from 20 to 25 (heavy stubble first for full beards); after that a change of style of about the same fullness
      every few years at most (sticky, so faces don't flip back and forth), and at 31+ some veterans go fuller or clean.
   6. _Prospects:_ the same function at 19-21 gives them the young look: no lines, little facial hair, leaner.
+  7. _Retired players_ (with _Age Retired Players_): every year away from the game a little greyer (+1% grey a year, up to 15%)
+     and fuller (up to +0.12 fatness), and glasses become likelier (below).
 - **Edited faces:** a face changed in Customize Player (God Mode or a new player) is locked from aging. Ticking _Allow aging_ under
-  the face lets it age on from the edited face: hairline, grey, lines and fullness move from there, the beard style stays the
-  user's. Stored as `p.faceAging.e` / `.a`.
-- **Face history:** `p.faceAging` keeps the generated fields (`b`) and one snapshot per season of only the fields that changed
-  (`h`, the first one complete): hair id and colour, facial hair id and colour, the three line slots, smile line size, fatness
-  and head shave. Typically a few hundred bytes per player. The player page has a _Then and Now_ section (first season next to
-  now, and every season the face changed); `faceForSeason` rebuilds any past season.
-- **Face mask:** after a facial injury (fractured nose, jaw, cheekbone or orbital socket, facial laceration, bruised eye)
-  the player page draws him in facesjs' clear face mask while he's out and for the rest of that season. Draw-time only.
-- **Coaches and GMs:** drawn aged from their age (same function, seeded by their id, beard style left alone), nothing stored.
-  With the extra off they grey as before.
+  the face lets it age on from the edited face: hairline, grey, lines and fullness move from there; the hair and beard style,
+  headband and glasses stay the user's (no style events). Stored as `p.faceAging.e` / `.a`.
+
+### Style and life events
+
+_Style Events_ (`faceAgingStyleEvents`, on by default under _Face Aging_; off gives exactly the faces from before it). A pure
+function of his signature look (the generated face), pid and age, in `src/common/faceEvents.ts`; every draw is keyed by (pid,
+season). Never for an edited face. Measured over 3,000 seeds:
+
+- **Hairstyle changes:** a style event happens in about 20% of active seasons (8% retired, 10% for staff), at least two seasons
+  apart, from 21: about one every six seasons in all (0.13 hair + 0.04 beard events a season). 30% of events (from 24) change
+  the beard instead.
+  - _Pulled toward his signature look:_ when he's off it, 55% of events take him back to it; otherwise he moves to a nearby
+    style, and only within two steps of his signature look (three for twists), so he stays recognisable: over ages 21-34 he
+    wears his signature look or a direct neighbour of it more than 70% of the time.
+  - _Nearby styles_ (`HAIR_NEIGHBOURS`, by hair texture): fades, line-ups and waves trade places (low ↔ high fade ↔ high and
+    tight ↔ buzz; line-up ↔ waves fade ↔ waves); twists grow into locs over the years (twists fade → twists → medium twists →
+    starter locs → long locs, never back by a step); locs worn up ↔ tied back; braids ↔ cornrows ↔ zigzag cornrows ↔ braided
+    bun; crops ↔ crop fades ↔ French crop; parted ↔ side part ↔ slick back ↔ pompadour; long hair tied up ↔ let down.
+  - _Big change_ (about 7% of hair events): he shaves his head (with a stubble shadow).
+  - _Hairline:_ events change the style the hairline then works on, so a new long style is cut back to the receding stages like
+    the old one. Once his hairline has started to go, events can only take him shorter (buzz, short fade, shaved), never grow it
+    back, and nothing is drawn behind the head.
+  - _Beard:_ back to his own beard (55% when off it) or a style of nearby fullness (one tier down 30%, same 50%, up 20%).
+- **Headbands:** sticky. Without one, 6% a season to adopt one (his own pick of the four headbands); with one, 25% a season to
+  drop it. If his signature look has a headband: 30% to put it back on, 10% to drop it. About 18% of 28-year-olds wear one.
+  Only when his signature accessory is none or a headband (earrings, bandanas and eye black are his own look). Off in
+  retirement, along with bandanas and eye black.
+- **Goggles after an eye injury** (`Bruised Eye`, `Fractured Orbital Socket`, `Lacerated Eyelid` in the injury list): from the
+  next season, for good with 35% chance (34% still wear them six seasons later), else for 1-2 seasons. 4% of veterans put
+  goggles on anyway at 33-36. Not in retirement, not over everyday glasses.
+- **Face mask:** after a facial injury (fractured nose, jaw, cheekbone or orbital socket, facial laceration, bruised eye) the
+  player page draws him in facesjs' clear face mask while he's out and for the rest of that season; Compare Players does the
+  same for the current season (`p.injury` and `p.injuries` are already loaded there). Draw-time only, never stored, so it's
+  gone the next season. Other renders (rosters, news, newspaper) don't load the injury list and draw no mask.
+- **Glasses:** everyday glasses (black, round or rectangular frames) for retired players and staff with age, a per-player draw
+  against a chance that grows from 10% at 35 to 55% at 65+, so once he has them they stay: 11% just after retiring, 32% at 50,
+  48% at 60. Active players never get everyday glasses (goggles above).
+- **Storage:** two more fields in the snapshots (`ac` accessory, `gl` glasses), stored only when they change. Faces aged before
+  them pick them up from the face at the next aging.
+
+### Face history
+
+- **Snapshots:** `p.faceAging` keeps the generated fields (`b`) and one snapshot per season of only the fields that changed
+  (`h`, the first one complete): hair id and colour, hair behind the head, facial hair id and colour, the three line slots,
+  smile line size, fatness, head shave, accessory and glasses. Typically a few hundred bytes per player. `faceForSeason`
+  rebuilds any past season.
+- **No faces from before the draft:** draft prospects are still aged (they look young on their own pages), but no snapshot is
+  stored while he's a prospect (`tid` undrafted); his first snapshot is complete. Snapshots stored by older versions for
+  prospect seasons are ignored in display.
+- **Where the history starts:** at his _first pro season_, the first season after his draft year with a regular-season stats row
+  on a team (or, for the current season, his current team): the season after he was drafted for a draftee, the season he
+  signed for an undrafted player. A prospect or an unsigned player has no history. In **college leagues** the same rule starts
+  at his first college season (recruits are prospects until they enroll), labelled "First season".
+- **Labels:** the first face is "Rookie" only for his real first pro season. A player who was already a pro when the league
+  began (drafted before the league's first draft year) is labelled "League start" (his first season is the league's first) or
+  "First season", never "Rookie". This fixes the old label, which called the first stored face (often a prospect's, years before
+  his draft) his rookie face.
+- **Before the snapshots:** a pro season before his first snapshot (face aging turned on mid-league) is worked out from his
+  generated face at that age; after a user edit the earliest snapshot stands in.
+- **Jerseys:** each face in the history wears the jersey of the team he played the most regular-season games for that season (a
+  tie goes to the later team, where he ended the season), in that season's colours and jersey style from the team season rows
+  (`getTeamInfoBySeason`, so rebrands show). Seasons with no team (retired, unsigned) wear a plain grey jersey.
+- **Player page:** _Then and Now_ shows his first pro season, his prime (retired players only) and now; _Every season his face
+  changed_ lists each one.
+- **Prime:** the pro season with his best ovr (the first, on a tie), ignoring prospect ratings and anything after he retired.
+  Used by the player page and the **Hall of Fame plaques**: with Face Aging on, the Hall of Fame page has a _Plaques_ section
+  above the table, most recent inductees first (12, then _Show all_), each in his prime face and that season's jersey. Pages
+  about him today (his player page) show his current, aged face. Compare Players shows his face in the compared season (his
+  peak season for career totals).
+- **Coaches and GMs:** they're their own people (the staff and GM features generate them; they aren't former players), so
+  they keep the current approach: drawn aged from their age when shown (same function, seeded by their id), nothing stored. The
+  per-age draws use the age alone, so a coach looks the same all season and consistently older the next. With _Style Events_
+  they get hairstyle and beard events (10% a season) and glasses with age; no headbands or goggles (they wear suits). With the
+  extra off they grey as before.
 - **Beard and dyed hair colour:** facesjs draws everything in one hair colour. A face with `face.fork.beard` draws its facial hair from a
   derived part (`<id>~fb`, registered once per style, never listed) whose hair colour placeholder is facesjs' per-feature
   `$[faceShave]`, filled with the beard colour; dyed hair (`face.fork.hair`) does the same for the hair and hairBg (`~fd`). The stored face
   keeps working in plain facesjs (it just ignores `fork`).
 - **Known limits:** the external facesjs editor (Customize Player → Face editor) drops `fork.beard`. Retired players are only
-  aged with the option on. Changing the speed changes how future seasons look, not the stored past.
+  aged with the option on. Changing the speed or style events changes how future seasons look, not the stored past.
 
 ## Game simulation
 

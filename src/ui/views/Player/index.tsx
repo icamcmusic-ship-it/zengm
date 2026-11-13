@@ -255,12 +255,7 @@ const Player2 = ({
 
 			{scoutingOn ? <ScoutingSummaryLine pid={player.pid} /> : null}
 
-			<FaceHistory
-				bornYear={player.born.year}
-				colors={teamColors}
-				faceHistory={faceHistory}
-				jersey={teamJersey}
-			/>
+			<FaceHistory bornYear={player.born.year} faceHistory={faceHistory} />
 
 			<div className="row">
 				<div className="col-6 col-md-3">

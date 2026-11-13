@@ -11,6 +11,15 @@
 //   rebuilt (faceForSeason) without storing whole faces
 // - s: last season aged; e: face edited by the user (locked from aging unless a: "allow aging" ticked)
 import type { FaceConfig } from "facesjs";
+import {
+	facialHairTier,
+	LIGHT_STUBBLE,
+	STYLE_CHANGES,
+	styleEventsAt,
+	type HairTexture,
+	type StyleEventResult,
+} from "./faceEvents.ts";
+import { seededRandom, seededUniform } from "./faceSeed.ts";
 
 export type FaceAgingFields = {
 	// hair id, hair colour
@@ -29,6 +38,10 @@ export type FaceAgingFields = {
 	// fatness, head shave (stubble shadow on a shaved head)
 	ft: number;
 	sh: string;
+	// Accessories (headbands) and glasses (goggles, everyday glasses): style and life events. Undefined in faces aged before
+	// they existed (filled in from the face at the next aging)
+	ac?: string;
+	gl?: string;
 };
 
 export type FaceAging = {
@@ -44,12 +57,15 @@ export type FaceAgingOptions = {
 	speed: "subtle" | "normal" | "strong";
 	hairLoss: boolean;
 	graying: boolean;
+	// Style and life events (common/faceEvents.ts): hairstyle and beard changes, headbands, goggles, glasses
+	styleEvents?: boolean;
 };
 
 export const DEFAULT_FACE_AGING_OPTIONS: FaceAgingOptions = {
 	speed: "normal",
 	hairLoss: true,
 	graying: true,
+	styleEvents: true,
 };
 
 // The fork's extension of a stored face: a facial hair colour of its own (beards grey on their own schedule). Drawn by
@@ -62,39 +78,9 @@ export type ForkFaceExtra = {
 export type FaceWithExtra = FaceConfig & { fork?: ForkFaceExtra };
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Seeded random numbers (never Math.random)
+// Seeded random numbers (never Math.random): common/faceSeed.ts
 
-const hashString = (s: string) => {
-	let h1 = 0xdeadbeef;
-	let h2 = 0x41c6ce57;
-	for (let i = 0; i < s.length; i++) {
-		const ch = s.charCodeAt(i);
-		h1 = Math.imul(h1 ^ ch, 2654435761);
-		h2 = Math.imul(h2 ^ ch, 1597334677);
-	}
-	h1 =
-		Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
-		Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-	h2 =
-		Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
-		Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-	return (h1 ^ h2) >>> 0;
-};
-
-// One uniform number in [0, 1) for a key
-export const seededUniform = (...key: (string | number)[]) =>
-	hashString(key.join("|")) / 4294967296;
-
-// A seeded generator for several numbers
-export const seededRandom = (...key: (string | number)[]) => {
-	let a = hashString(key.join("|"));
-	return () => {
-		a = (a + 0x6d2b79f5) | 0;
-		let t = Math.imul(a ^ (a >>> 15), 1 | a);
-		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-};
+export { facialHairTier, seededRandom, seededUniform };
 
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 const round2 = (x: number) => Math.round(x * 100) / 100;
@@ -170,74 +156,6 @@ const BUZZED = new Set([
 
 export const hairLossStageOf = (id: string) => HAIR_LOSS_STAGE[id] ?? 0;
 
-// Facial hair fullness: 0 none, 1 stubble / thin, 2 mustache / goatee / chin strap, 3 short beards, 4 full beards
-export const facialHairTier = (id: string): number => {
-	if (id === "none" || id === "") {
-		return 0;
-	}
-	if (
-		/stubble|shadow/.test(id) ||
-		[
-			"mustache-thin",
-			"goatee-thin",
-			"soul",
-			"fork-chin-patch",
-			"fork-chin-stubble",
-		].includes(id)
-	) {
-		return 1;
-	}
-	if (
-		/^(beard2|beard3|beard5|beard6|beard-point|honest-abe)/.test(id) ||
-		[
-			"fork-full-beard",
-			"fork-huge-beard",
-			"fork-boxed-beard",
-			"fork-lineup-beard",
-			"fork-beard-line",
-		].includes(id)
-	) {
-		return 4;
-	}
-	if (
-		/^(beard1|beard4|fullgoatee|logan|mutton|harley|harly|wilt|neckbeard)/.test(
-			id,
-		)
-	) {
-		return 3;
-	}
-	return 2;
-};
-
-const LIGHT_STUBBLE = "fork-stubble";
-// Beards a player may switch to now and then, by fullness
-const STYLE_CHANGES: Record<number, readonly string[]> = {
-	1: ["fork-stubble", "fork-heavy-stubble", "fork-chin-stubble", "soul"],
-	2: [
-		"goatee1",
-		"goatee2",
-		"goatee4-stache",
-		"chin-strapStache",
-		"soul-stache",
-		"mustache1",
-		"fork-anchor",
-	],
-	3: [
-		"beard1",
-		"fullgoatee",
-		"fullgoatee2",
-		"loganGoatee2Stache",
-		"fork-boxed-beard",
-	],
-	4: [
-		"beard2",
-		"beard3",
-		"fork-full-beard",
-		"fork-lineup-beard",
-		"fork-boxed-beard",
-	],
-};
-
 const isForeheadLine = (id: string) =>
 	id.startsWith("forehead") || id === "fork-forehead-lines";
 
@@ -258,6 +176,8 @@ export const extractAgingFields = (face: FaceConfig): FaceAgingFields => {
 		sl: face.smileLine.id,
 		ss: face.smileLine.size,
 		ml: face.miscLine.id,
+		ac: face.accessories?.id ?? "none",
+		gl: face.glasses?.id ?? "none",
 		ft: face.fatness,
 		sh: face.head.shave,
 	};
@@ -310,6 +230,12 @@ export const applyAgingFields = <T extends FaceConfig>(
 	if (fields.sh !== undefined) {
 		out.head.shave = fields.sh;
 	}
+	if (fields.ac !== undefined) {
+		out.accessories = { ...face.accessories, id: fields.ac };
+	}
+	if (fields.gl !== undefined) {
+		out.glasses = { ...face.glasses, id: fields.gl };
+	}
 	if ("bc" in fields) {
 		const fork = { ...out.fork };
 		if (fields.bc === undefined || fields.bc === fields.hc) {
@@ -338,6 +264,8 @@ const FIELD_KEYS: (keyof FaceAgingFields)[] = [
 	"ml",
 	"ft",
 	"sh",
+	"ac",
+	"gl",
 ];
 
 export const diffAgingFields = (
@@ -423,6 +351,10 @@ export type AgeContext = {
 	weight?: number;
 	// Staff (coaches, GMs): adults with their own styles, no rookie look
 	staff?: boolean;
+	// Style and life events: his hair texture, the season he retired, seasons with an eye injury
+	texture?: HairTexture;
+	retiredYear?: number;
+	eyeInjurySeasons?: readonly number[];
 };
 
 // Number of hair loss steps by an age (each year after the onset, a seeded draw)
@@ -443,6 +375,24 @@ const hairLossSteps = (
 		}
 	}
 	return Math.min(5, steps);
+};
+
+// First age his hairline moves (Infinity: it never does)
+const firstHairLossAge = (
+	genes: FaceGenes,
+	ctx: AgeContext,
+	factor: number,
+) => {
+	if (genes.hairLoss <= 0) {
+		return Infinity;
+	}
+	const p = clamp(genes.hairLoss * 0.42 * factor, 0, 0.9);
+	for (let a = genes.hairLossOnset; a <= 90; a++) {
+		if (seededUniform("hairLoss", ctx.seed, ctx.born + a) < p) {
+			return a;
+		}
+	}
+	return Infinity;
 };
 
 const greyAt = (genes: FaceGenes, age: number, factor: number, lead = 0) =>
@@ -577,23 +527,69 @@ export const agedFields = (
 	const edited = ctx.baseAge !== undefined;
 	const from = ctx.baseAge ?? 0;
 	const out: FaceAgingFields = { ...base };
+	const shaveShadow = () =>
+		`rgba(0,0,0,${round2(0.08 + 0.1 * seededUniform("shave", ctx.seed))})`;
+
+	// 0. Style and life events (a generated face only: an edited face's style is the user's choice). They change the style
+	// his hairline then works on, so a thinning player's new style is cut back like his old one.
+	let styled: { hi: string; hb?: string } = base;
+	let events: StyleEventResult | undefined;
+	if (options.styleEvents && !edited) {
+		events = styleEventsAt({
+			seed: ctx.seed,
+			born: ctx.born,
+			age,
+			hi: base.hi,
+			hb: base.hb,
+			beardAt: (a) => facialHairAt(base.fh, genes, ctx, a),
+			ac: base.ac,
+			gl: base.gl,
+			texture: ctx.texture ?? "straight",
+			thinningAge: options.hairLoss
+				? firstHairLossAge(genes, ctx, factor)
+				: Infinity,
+			retiredYear: ctx.retiredYear,
+			staff: ctx.staff,
+			eyeInjurySeasons: ctx.eyeInjurySeasons,
+		});
+		styled = { hi: events.hi, hb: events.hb };
+		out.hi = events.hi;
+		if (base.hb !== undefined || events.hb !== "none") {
+			out.hb = events.hb;
+		}
+		if (events.shaved) {
+			out.sh = shaveShadow();
+		}
+		if (events.ac !== undefined) {
+			out.ac = events.ac;
+		}
+		if (events.gl !== undefined) {
+			out.gl = events.gl;
+		}
+	}
 
 	// 1. Hairline: steps since the base (all of them for a generated face)
 	if (options.hairLoss) {
 		const steps =
 			hairLossSteps(genes, ctx, age, factor) -
 			(edited ? hairLossSteps(genes, ctx, from, factor) : 0);
-		const stage = Math.min(5, hairLossStageOf(base.hi) + Math.max(0, steps));
-		const { id, shaved } = hairLossId(base.hi, stage, genes);
+		const stage = Math.min(5, hairLossStageOf(styled.hi) + Math.max(0, steps));
+		const { id, shaved } = hairLossId(styled.hi, stage, genes);
 		out.hi = id;
-		if (id !== base.hi && base.hb !== undefined) {
+		if (id !== styled.hi && out.hb !== undefined) {
 			out.hb = "none";
 		}
-		if (shaved && id !== base.hi) {
+		if (shaved && id !== styled.hi) {
 			// A shaved head shows a little stubble shadow
-			out.sh = `rgba(0,0,0,${round2(0.08 + 0.1 * seededUniform("shave", ctx.seed))})`;
+			out.sh = shaveShadow();
 		}
 	}
+
+	// Retired players: a little greyer and fuller with every year away from the game
+	const retiredYears =
+		ctx.retiredYear !== undefined && !ctx.staff
+			? Math.max(0, ctx.born + age - ctx.retiredYear)
+			: 0;
 
 	// 2. Greying, hair and beard on their own schedules
 	if (options.graying) {
@@ -603,8 +599,9 @@ export const agedFields = (
 			greyAt(genes, age, factor, genes.beardLead) -
 			(edited ? greyAt(genes, from, factor, genes.beardLead) : 0);
 		const baseBeard = base.bc ?? base.hc;
-		out.hc = greyColor(base.hc, t);
-		const beard = greyColor(baseBeard, tb);
+		const extra = Math.min(0.15, retiredYears * 0.01);
+		out.hc = greyColor(base.hc, t + extra);
+		const beard = greyColor(baseBeard, tb + extra);
 		out.bc = beard === out.hc ? undefined : beard;
 	}
 
@@ -663,9 +660,15 @@ export const agedFields = (
 			0.22,
 			Math.max(0, a - 28) * 0.012 * (genes.fatGain + heavy) * factor,
 		);
+	const retiredGain = Math.min(
+		0.12,
+		retiredYears * 0.012 * (0.5 + genes.fatGain) * factor,
+	);
 	out.ft = round2(
 		clamp(
-			base.ft + (edited ? gain(age) - gain(from) : gain(age) + young),
+			base.ft +
+				(edited ? gain(age) - gain(from) : gain(age) + young) +
+				retiredGain,
 			0,
 			1,
 		),
@@ -673,7 +676,7 @@ export const agedFields = (
 
 	// 5/6. Facial hair over a career (a generated face only; an edited beard is the user's choice)
 	if (!edited) {
-		out.fh = facialHairAt(base.fh, genes, ctx, age);
+		out.fh = events ? events.fh : facialHairAt(base.fh, genes, ctx, age);
 	}
 	if (out.fh === "none") {
 		delete out.bc;
@@ -694,7 +697,11 @@ export const faceAgingLocked = (aging: FaceAging | undefined) =>
 export const ageFaceForSeason = (
 	face: FaceConfig,
 	aging: FaceAging | undefined,
-	ctx: Omit<AgeContext, "baseAge" | "age"> & { season: number },
+	ctx: Omit<AgeContext, "baseAge" | "age"> & {
+		season: number;
+		// false: age the face but keep no snapshot (draft prospects: no face from before he was drafted is ever shown)
+		record?: boolean;
+	},
 	options: FaceAgingOptions,
 ): { face: FaceConfig; aging: FaceAging } | undefined => {
 	if (faceAgingLocked(aging) || aging?.s === ctx.season) {
@@ -704,6 +711,10 @@ export const ageFaceForSeason = (
 	const state: FaceAging = aging
 		? { ...aging, h: { ...aging.h } }
 		: { b: current, h: {} };
+	// Faces aged before accessories were tracked: nothing had changed them yet, so his current ones are the generated ones
+	if (state.b.ac === undefined || state.b.gl === undefined) {
+		state.b = { ...state.b, ac: current.ac, gl: current.gl };
+	}
 	const fields = agedFields(
 		state.b,
 		{ ...ctx, age: ctx.season - ctx.born, baseAge: state.ba },
@@ -711,7 +722,7 @@ export const ageFaceForSeason = (
 	);
 	const first = Object.keys(state.h).length === 0;
 	const diff = first ? { ...fields } : diffAgingFields(current, fields);
-	if (first || Object.keys(diff).length > 0) {
+	if (ctx.record !== false && (first || Object.keys(diff).length > 0)) {
 		state.h[ctx.season] = diff;
 	}
 	state.s = ctx.season;
@@ -758,11 +769,24 @@ export const faceForSeason = (
 	if (seasons.length === 0 || season >= seasons.at(-1)!) {
 		return face;
 	}
+	// Accessories weren't in the first snapshot of faces aged before they were tracked: start from the generated ones
 	let fields: Partial<FaceAgingFields> = {};
+	if (aging.b.ac !== undefined) {
+		fields.ac = aging.b.ac;
+	}
+	if (aging.b.gl !== undefined) {
+		fields.gl = aging.b.gl;
+	}
+	let found = false;
 	for (const s of seasons) {
-		if (s > season && Object.keys(fields).length > 0) {
+		if (s > season && found) {
 			break;
 		}
+		if (!found && !("bc" in aging.h[s]!)) {
+			// The first snapshot is complete: no beard colour there means the beard was the hair's colour
+			fields.bc = undefined;
+		}
+		found = true;
 		fields = { ...fields, ...aging.h[s] };
 	}
 	return applyAgingFields(face, fields);
