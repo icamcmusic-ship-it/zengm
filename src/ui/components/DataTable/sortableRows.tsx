@@ -122,6 +122,7 @@ export const SortableHandle = ({
 					isDragged ? "cursor-grabbing" : "cursor-grab",
 				)}
 				ref={setActivatorNodeRef}
+				aria-label="Drag to reorder"
 				{...listeners}
 				{...attributes}
 			/>

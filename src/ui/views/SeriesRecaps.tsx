@@ -76,50 +76,52 @@ const SeriesRecaps = ({ recaps, season, selected }: View<"seriesRecaps">) => {
 					{selected.games.length > 0 ? (
 						<>
 							<h3 className="h5 mt-3">Game by game</h3>
-							<table className="table table-sm table-striped">
-								<thead>
-									<tr>
-										<th>Game</th>
-										<th>Away</th>
-										<th>Home</th>
-										<th>Winner</th>
-										<th>Series</th>
-									</tr>
-								</thead>
-								<tbody>
-									{selected.games.map((gm) => (
-										<tr key={gm.gid}>
-											<td>
-												<a
-													href={helpers.leagueUrl([
-														"game_log",
-														`${abbrev(gm.homeTid)}_${gm.homeTid}`,
-														season,
-														gm.gid,
-													])}
-												>
-													{gm.no}
-												</a>
-											</td>
-											<td>
-												{abbrev(gm.awayTid)} {gm.awayPts}
-											</td>
-											<td>
-												{abbrev(gm.homeTid)} {gm.homePts}
-											</td>
-											<td>
-												{abbrev(gm.winTid)} by {gm.margin}
-												{gm.overtimes > 0
-													? ` (${gm.overtimes > 1 ? gm.overtimes : ""}OT)`
-													: ""}
-											</td>
-											<td>
-												{abbrev(selected.winner.tid)} {gm.wWins}-{gm.lWins}
-											</td>
+							<div className="table-responsive">
+								<table className="table table-sm table-striped">
+									<thead>
+										<tr>
+											<th>Game</th>
+											<th>Away</th>
+											<th>Home</th>
+											<th>Winner</th>
+											<th>Series</th>
 										</tr>
-									))}
-								</tbody>
-							</table>
+									</thead>
+									<tbody>
+										{selected.games.map((gm) => (
+											<tr key={gm.gid}>
+												<td>
+													<a
+														href={helpers.leagueUrl([
+															"game_log",
+															`${abbrev(gm.homeTid)}_${gm.homeTid}`,
+															season,
+															gm.gid,
+														])}
+													>
+														{gm.no}
+													</a>
+												</td>
+												<td>
+													{abbrev(gm.awayTid)} {gm.awayPts}
+												</td>
+												<td>
+													{abbrev(gm.homeTid)} {gm.homePts}
+												</td>
+												<td>
+													{abbrev(gm.winTid)} by {gm.margin}
+													{gm.overtimes > 0
+														? ` (${gm.overtimes > 1 ? gm.overtimes : ""}OT)`
+														: ""}
+												</td>
+												<td>
+													{abbrev(selected.winner.tid)} {gm.wWins}-{gm.lWins}
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
 						</>
 					) : (
 						<p className="text-body-secondary">
@@ -148,36 +150,38 @@ const SeriesRecaps = ({ recaps, season, selected }: View<"seriesRecaps">) => {
 									</span>
 								) : null}
 							</h3>
-							<table className="table table-sm table-striped">
-								<thead>
-									<tr>
-										<th>Player</th>
-										<th>Team</th>
-										<th>GP</th>
-										<th>PTS</th>
-										<th>TRB</th>
-										<th>AST</th>
-										<th title="Game score per game">GmSc</th>
-									</tr>
-								</thead>
-								<tbody>
-									{selected.leaders.map((p) => (
-										<tr key={p.pid}>
-											<td>
-												<a href={helpers.leagueUrl(["player", p.pid])}>
-													{p.name}
-												</a>
-											</td>
-											<td>{abbrev(p.tid)}</td>
-											<td>{p.gp}</td>
-											<td>{p.pts}</td>
-											<td>{p.trb}</td>
-											<td>{p.ast}</td>
-											<td>{p.gmsc}</td>
+							<div className="table-responsive">
+								<table className="table table-sm table-striped">
+									<thead>
+										<tr>
+											<th>Player</th>
+											<th>Team</th>
+											<th>GP</th>
+											<th>PTS</th>
+											<th>TRB</th>
+											<th>AST</th>
+											<th title="Game score per game">GmSc</th>
 										</tr>
-									))}
-								</tbody>
-							</table>
+									</thead>
+									<tbody>
+										{selected.leaders.map((p) => (
+											<tr key={p.pid}>
+												<td>
+													<a href={helpers.leagueUrl(["player", p.pid])}>
+														{p.name}
+													</a>
+												</td>
+												<td>{abbrev(p.tid)}</td>
+												<td>{p.gp}</td>
+												<td>{p.pts}</td>
+												<td>{p.trb}</td>
+												<td>{p.ast}</td>
+												<td>{p.gmsc}</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
 						</>
 					) : null}
 				</div>

@@ -210,7 +210,7 @@ const summary = async (teams: TradeTeams): Promise<TradeSummary> => {
 	if (softCapCondition) {
 		// Which team is at fault?;
 		const j = ratios[0] > softCapTradeSalaryMatch ? 0 : 1;
-		s.warning = `The ${s.teams[j].name} are over the salary cap, so the players it receives must have a combined salary of less than ${softCapTradeSalaryMatch}% of the salaries of the players it trades away.  Currently, that value is ${ratios[j]}%.`;
+		s.warning = `The ${s.teams[j].name} are over the salary cap, so the players it receives must have a combined salary of less than ${softCapTradeSalaryMatch}% of the salaries of the players it trades away.  Currently, that value is ${ratios[j] === Infinity ? "infinite" : `${ratios[j]}%`}.`;
 		s.warningAmount = ratios[j];
 	} else if (hardCapCondition) {
 		const j = overCapAndIncreasing(0) ? 0 : 1;

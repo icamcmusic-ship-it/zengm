@@ -150,7 +150,8 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 						<span className="skill ms-0">{selectedCombo.label}</span>{" "}
 						{selectedCombo.name}
 					</h2>
-					<p>
+					{/* text-break: the component lists are long runs like PS/Sp/Sn/... with no spaces, wider than a phone */}
+					<p className="text-break">
 						{selectedCombo.meaning} Needs {selectedCombo.components}.{" "}
 						{selectedCombo.count} players show it.{" "}
 						<a href={helpers.leagueUrl(["frivolities", "skill_badges"])}>

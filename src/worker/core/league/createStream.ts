@@ -1616,6 +1616,12 @@ const afterDBStream = async ({
 	}
 
 	const fileHasPlayers = extraFromStream.activePlayers.length > 0;
+	// Draft classes in the league file (see processNewDraftClasses below)
+	const fileProspectYears = new Set(
+		extraFromStream.activePlayers
+			.filter((p) => p.tid === PLAYER.UNDRAFTED)
+			.map((p) => p.draft.year),
+	);
 
 	// Version 70 upgrade
 	if (fileHasPlayers) {
@@ -1916,8 +1922,24 @@ const afterDBStream = async ({
 		await college.afterLeagueCreation(fileHasPlayers);
 	}
 
-	// College/overseas stats for every draft class the league starts with (setting "Auto-generate pre-draft stats & honors")
-	await draft.processNewDraftClasses();
+	// College/overseas stats for every draft class the league starts with (setting "Auto-generate pre-draft stats & honors"). A class
+	// that came in a league file keeps its ratings: "Re-randomize ratings when a new draft class is created" is only for classes made
+	// here (otherwise every prospect a league file has would be rebuilt on import, all but his height, pot and ovr changing)
+	const prospectYears = [
+		...new Set(
+			(
+				await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+			).map((p) => p.draft.year),
+		),
+	];
+	const fileYears = prospectYears.filter((year) => fileProspectYears.has(year));
+	const newYears = prospectYears.filter((year) => !fileProspectYears.has(year));
+	if (fileYears.length > 0) {
+		await draft.processNewDraftClasses(fileYears, { rerandomize: false });
+	}
+	if (newYears.length > 0) {
+		await draft.processNewDraftClasses(newYears);
+	}
 
 	if (!extraFromStream.hasEvents) {
 		await logEvent({

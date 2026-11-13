@@ -745,6 +745,8 @@ export const EditSettings = ({
 				<button
 					type="button"
 					className="ms-auto btn btn-secondary"
+					aria-label="Move up"
+					title="Move up"
 					disabled={disabled || !canMoveUp}
 					onClick={() => {
 						move(-1);
@@ -758,6 +760,8 @@ export const EditSettings = ({
 				<button
 					type="button"
 					className="btn btn-secondary"
+					aria-label="Move down"
+					title="Move down"
 					disabled={disabled || !canMoveDown}
 					onClick={() => {
 						move(1);

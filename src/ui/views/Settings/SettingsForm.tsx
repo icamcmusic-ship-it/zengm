@@ -629,7 +629,7 @@ const SettingsForm = ({
 				/>
 
 				<StickyBottomButtons isInsideModal={isInsideModal}>
-					<div className="d-flex justify-content-between w-100">
+					<div className="d-flex flex-wrap row-gap-2 justify-content-between w-100">
 						{!hideGodModeToggle ? (
 							<div className="d-flex gap-2">
 								<button
@@ -660,7 +660,8 @@ const SettingsForm = ({
 							type="text"
 							className="form-control mx-3"
 							placeholder="Filter settings..."
-							style={{ maxWidth: 300 }}
+							// Shrinks before the buttons wrap to a second line, on phones
+							style={{ flex: "1 1 80px", minWidth: 0, maxWidth: 300 }}
 							value={filterText}
 							onChange={(event) => {
 								setFilterText(event.target.value);

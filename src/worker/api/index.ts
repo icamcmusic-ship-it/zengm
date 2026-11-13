@@ -3019,6 +3019,20 @@ const importPlayers = async ({
 		if (p.real) {
 			(p2 as any).real = p.real;
 		}
+		// Who he is, not where he played: his personality traits (otherwise new ones would be rolled from this league's seed and
+		// his new pid) and the build Regenerate Ratings gave him. ensureTraits repairs bad values when the league loads them.
+		if (p.traits && typeof p.traits === "object") {
+			(p2 as any).traits = p.traits;
+		}
+		if (p.ratingsBuild && typeof p.ratingsBuild === "object") {
+			(p2 as any).ratingsBuild = p.ratingsBuild;
+		}
+		// His archetype history goes with his ratings history (same season shift and filter below)
+		if (Array.isArray(p.archetypes)) {
+			(p2 as any).archetypes = p.archetypes.filter(
+				(row: any) => row && typeof row.season === "number",
+			);
+		}
 
 		// Only add injury if the season wasn't chaned by the user. These variables copied from ImportPlayers init
 		const exportedSeason: number | undefined =
@@ -3085,6 +3099,8 @@ const importPlayers = async ({
 			p2.ratings = [ratings];
 			adjustAndFilter("stats", currentSeason - ratingsSeason, true);
 			ratings.season = p2.draft.year;
+			// A prospect again: his archetype is read from these ratings when the league needs it
+			delete (p2 as any).archetypes;
 		} else {
 			// How many seasons to adjust player to bring him aligned with current season, as an active player at the selected age
 			const seasonOffset2 = currentSeason - (season - seasonOffset);
@@ -3095,6 +3111,16 @@ const importPlayers = async ({
 			adjustAndFilter("injuries", seasonOffset2, false);
 			adjustAndFilter("ratings", seasonOffset2, false);
 			adjustAndFilter("stats", seasonOffset2, false);
+			const archetypes: { season: number }[] | undefined = (p2 as any)
+				.archetypes;
+			if (archetypes) {
+				for (const row of archetypes) {
+					row.season += seasonOffset2;
+				}
+				(p2 as any).archetypes = archetypes.filter(
+					(row) => row.season <= currentSeason,
+				);
+			}
 
 			p2.contracts = getImportedContractHistory(
 				p,

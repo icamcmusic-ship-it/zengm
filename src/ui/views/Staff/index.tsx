@@ -790,7 +790,7 @@ const Staff = ({
 				{assistants.map(({ role, roleName, coach: c }) => {
 					const info = COACH_ROLE_INFO[role];
 					return (
-						<div className="col-md-4 mb-3" key={role}>
+						<div className="col-md-6 col-lg-4 mb-3" key={role}>
 							<div className="card h-100" data-testid={`staff-card-${role}`}>
 								<div className="card-body">
 									<h3 className="card-title h5 mb-1">{roleName}</h3>
