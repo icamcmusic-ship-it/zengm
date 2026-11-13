@@ -395,7 +395,7 @@ export const ScoreBox = memo(
 									)}
 								>
 									{imgURL ? (
-										<a href={rosterURL}>
+										<a href={rosterURL} aria-label={teamName}>
 											<TeamLogoInline
 												imgURL={imgURL}
 												includePlaceholderIfNoLogo
