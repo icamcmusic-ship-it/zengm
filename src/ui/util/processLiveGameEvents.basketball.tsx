@@ -676,7 +676,12 @@ const processLiveGameEvents = ({
 			if (!silent) {
 				text = getText(e, boxScore, fr === undefined ? undefined : fr);
 				textEvent = e;
-				t = eventT;
+				// The logo goes with the line's subject: the flavor text can start from the other side ("Smith is fouled by
+				// Jones" on Jones's foul), and then it's that player's team
+				t =
+					fr !== undefined && !fr.keepText && fr.t !== undefined
+						? fr.t
+						: eventT;
 				textOnly =
 					e.type === "gameOver" ||
 					e.type === "period" ||
