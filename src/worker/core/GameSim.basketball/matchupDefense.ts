@@ -41,6 +41,17 @@ export const MATCHUP = {
 	centerPost: -0.001,
 };
 
+// Defensive attention (attentionCap in index.ts): no player's share of the weight of the shooter or creator draw of his five gets above
+// share at full strength; only excess of the weight above it counts. Ordinary stars stay below it, so it only takes over in the compounding
+// of usage boosts (coach systems, creation, Realistic Rotations' fresher stars) that made one player take 30 shots a game
+export const ATTENTION = {
+	share: 0.3,
+	excess: 0.5,
+	// Help defense: his shots go in this much less often per unit of his share of the shooter draw (before the cap) above makeRef
+	make: 0.8,
+	makeRef: 0.32,
+};
+
 export type MatchupPlayer = {
 	compositeRating: {
 		usage: number;
