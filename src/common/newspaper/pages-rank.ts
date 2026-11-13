@@ -318,6 +318,7 @@ const specs: RankSpec[] = [
 	},
 	{
 		id: "r-gain",
+		ratings: true,
 		section: "players",
 		kicker: "Ratings watch",
 		eds: PLAYED,
@@ -339,6 +340,7 @@ const specs: RankSpec[] = [
 	},
 	{
 		id: "r-drop",
+		ratings: true,
 		section: "players",
 		kicker: "Ratings slide",
 		eds: PLAYED,
@@ -358,6 +360,7 @@ const specs: RankSpec[] = [
 	},
 	{
 		id: "r-ceiling",
+		ratings: true,
 		section: "players",
 		kicker: "High ceilings",
 		eds: ALL_EDS,
@@ -611,6 +614,7 @@ const specs: RankSpec[] = [
 	},
 	{
 		id: "r-roster-rating",
+		ratings: true,
 		section: "teams",
 		kicker: "Roster ratings",
 		eds: ALL_EDS,
@@ -625,6 +629,7 @@ const specs: RankSpec[] = [
 	},
 	{
 		id: "r-progress",
+		ratings: true,
 		section: "teams",
 		kicker: "Summer school",
 		eds: [...PRE_ONLY, "midseason"],
@@ -885,6 +890,7 @@ const specs: RankSpec[] = [
 	},
 	{
 		id: "r-expiring",
+		ratings: true,
 		section: "money",
 		kicker: "Contract year",
 		eds: ALL_EDS,

@@ -9,6 +9,7 @@ import {
 	isBulkSimming,
 	memoize,
 	yieldToWorker,
+	wrappedRatingsView,
 	type Built,
 } from "../util/wrappedData.ts";
 import {
@@ -75,7 +76,9 @@ export default defineView({
 		} else {
 			built = await getWrapped();
 		}
-		const { X } = built;
+		// The ratings the slides may quote (none under the No Visible Player Ratings challenge, fuzzed otherwise)
+		const ratingsView = wrappedRatingsView();
+		const X = built.X.withRatings(ratingsView);
 		const { a, b } = inputs;
 
 		// Choices for the picker
@@ -121,10 +124,10 @@ export default defineView({
 		}
 
 		// Each side's slides only depend on the snapshot and the side, so comparing again is cheap
-		const slidesA = await memoize(built, `cmp|${sideSpec(a)}`, () =>
+		const slidesA = await memoize(built, `cmp|${ratingsView}|${sideSpec(a)}`, () =>
 			sideSlidesAsync(X, a, yieldToWorker),
 		);
-		const slidesB = await memoize(built, `cmp|${sideSpec(b)}`, () =>
+		const slidesB = await memoize(built, `cmp|${ratingsView}|${sideSpec(b)}`, () =>
 			sideSlidesAsync(X, b, yieldToWorker),
 		);
 		const m = matchCands(slidesA, slidesB);

@@ -168,6 +168,51 @@ const sharedByGames = new WeakMap<
 
 type SeasonRows = { p: WPlayer; rows: WStat[] }[];
 
+// Which ratings the Wrapped slides may quote. The snapshot keeps the true ones (League achievements read them):
+// - "true": as they are (God Mode, or several user teams: no fuzz, like the rest of the UI)
+// - "fuzz": as the user's scouts see them, with each season's fuzz (WPlayer.fuzz), like the rest of the UI shows them
+// - "hidden": the No Visible Player Ratings challenge, no ratings at all (the slides that need one don't run)
+export type RatingsView = "true" | "fuzz" | "hidden";
+
+const fuzzed = (rating: number, fuzz: number | undefined) =>
+	Math.round(Math.min(100, Math.max(0, rating + (fuzz ?? 0))));
+
+export const viewRatings = (p: WPlayer, view: RatingsView): WPlayer => {
+	if (view === "true") {
+		return p;
+	}
+	if (view === "hidden") {
+		return {
+			...p,
+			ovr: {},
+			pot: undefined,
+			draftOvr: undefined,
+			draftPot: undefined,
+			rat: undefined,
+		};
+	}
+	const fz = p.fuzz ?? {};
+	const bySeason = (x: Record<number, number> | undefined) =>
+		x === undefined
+			? undefined
+			: Object.fromEntries(
+					Object.entries(x).map(([s, v]) => [s, fuzzed(v, fz[Number(s)])]),
+				);
+	// Draft night ratings: the fuzz of his first ratings row, like the player page
+	const seasons = Object.keys(fz).map(Number);
+	const firstFuzz =
+		seasons.length > 0 ? fz[Math.min(...seasons)] : undefined;
+	return {
+		...p,
+		ovr: bySeason(p.ovr)!,
+		pot: bySeason(p.pot),
+		draftOvr:
+			p.draftOvr === undefined ? undefined : fuzzed(p.draftOvr, firstFuzz),
+		draftPot:
+			p.draftPot === undefined ? undefined : fuzzed(p.draftPot, firstFuzz),
+	};
+};
+
 // True for an index (as opposed to the plain snapshot it is built from)
 export const isLeagueIndex = (x: WLeague | LeagueIndex): x is LeagueIndex =>
 	typeof (x as LeagueIndex).lines === "function";
@@ -194,6 +239,7 @@ export class LeagueIndex {
 	private linesCache: LinesCache | undefined;
 	private reuseLines: ((season: number) => boolean) | undefined;
 	seasons: number[];
+	private views = new Map<RatingsView, LeagueIndex>();
 
 	// linesCache and reuseLines: lines of a season for which reuseLines is true come from linesCache if they are there, and are stored there when computed
 	constructor(
@@ -443,6 +489,27 @@ export class LeagueIndex {
 			this.memo.set(key, f());
 		}
 		return this.memo.get(key) as T;
+	}
+
+	// The same index with the players' ratings as the slides may quote them (see RatingsView). Everything that doesn't depend on
+	// ratings (lines, teams, games) is shared with this index; what is memoized is not, since it may
+	withRatings(view: RatingsView): LeagueIndex {
+		if (view === "true") {
+			return this;
+		}
+		const hit = this.views.get(view);
+		if (hit) {
+			return hit;
+		}
+		const players = this.L.players.map((p) => viewRatings(p, view));
+		const y = Object.create(this) as LeagueIndex;
+		y.L = { ...this.L, players };
+		y.players = new Map(players.map((p) => [p.pid, p]));
+		y.memo = new Map();
+		y.careers = new Map();
+		y.views = new Map();
+		this.views.set(view, y);
+		return y;
 	}
 
 	// A season whose playoffs are over, so awards and the champion are known

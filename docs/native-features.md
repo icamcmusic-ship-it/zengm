@@ -208,6 +208,7 @@ Tests in `src/common/nativeFeatures.test.ts` check that every key has a default 
 
 - **Where:** League menu → _Newspaper_, `/l/:lid/newspaper`, `/l/:lid/newspaper/:team/:season` (`all` or a team like `ATL_0`). Also linked from the dashboard ("From the records"), the team pages' _More_ links (team edition), League → History and each season row of Team History.
 - **What:** a front page plus sections (Playoffs, Awards, Teams, Players, Features, Transactions, By the numbers, Opinion, Colour & letters) written from the season's results, awards, transactions and box scores. During a season it reports "so far"; after the playoffs it becomes the final edition. A team edition focuses on one franchise. Back issues link to earlier seasons. _Print edition_ gives a print-friendly layout.
+- **Ratings:** player ratings in the paper (draft stories, breakouts, previews, rosters) are the ones the user's scouts see, with scouting fuzz, like the rest of the UI (draftees included: their draft-night ratings are fuzzed). Under the _No Visible Player Ratings_ challenge no rating is quoted: stories say it in words ("a breakout season", "among the league's best players") or leave it out, pages that are only about ratings (ratings previews, roster-rating ranks, title odds, rating gains) don't run, and rating columns are dropped from tables. The challenge is part of the paper's cache key, so toggling it rebuilds the paper. Tested in `common/newspaper/newspaper.noRatings.test.ts`.
 - **Known limits:** pull quotes and letters marked _Colour_ are invented voices (the numbers are real). Player photos load lazily as you scroll (not while printing, so a photo that was never scrolled into view still prints). Very old seasons with deleted box scores get fewer game stories.
 
 ### Wrapped
@@ -216,6 +217,7 @@ Tests in `src/common/nativeFeatures.test.ts` check that every key has a default 
 - **What:** a tap-through story deck (9:16 cards) of a season, a team's year, a player's year or the whole league's history. Arrow keys, the on-card buttons, tapping the left/right of the card or swiping move between slides. Each slide can be saved or copied as a 1080×1920 PNG.
 - **Deck settings** (gear icon on the card, remembered per browser): number of slides, autoplay, **quiz** (a few "who led the league in…" questions mixed into the deck, with a score slide; on by default) and **no spoilers** (hides results that would give away the season's outcome).
 - **Compare:** a scoreboard of the main numbers (the better value is bold with ▸), the topics both have with a winner per topic, and the slides only one side has.
+- **Ratings:** the snapshot keeps true ratings (League Achievements read them) plus each season's scouting fuzz; the slides read them through `LeagueIndex.withRatings`: fuzzed like the rest of the UI (true in God Mode or with several user teams), and none at all under the _No Visible Player Ratings_ challenge, when the slides that need a rating don't run. The ratings mode is part of the memoized slides key, so toggling the challenge never shows a stale deck. Tested in `common/wrapped/wrapped.noRatings.test.ts`.
 - **Known limits:** the first visit to a big league builds a snapshot of the whole history, which can take a while (a progress placeholder shows; later visits use a cache, see _Performance_). Autoplay waits on an unanswered quiz question. A season that isn't over yet gets a "so far" deck without awards or playoffs.
 
 ### Storylines
@@ -1239,7 +1241,6 @@ Works in every sport.
 - The league-wide averages with player traits, the possession model or injury depth on stay about the same as with them off, but individual games and seasons are of course different; use the switches (off) to replay the old behaviour.
 - Existing leagues keep playing as before until the game-affecting switches (possession model, traits, injury depth, contracts, trades, drafting, coaching staff, GM personalities) are turned on in League Extras. Games already played replay unchanged.
 - Draft board and scouting need prospects: the Draft Board is empty in a league without upcoming classes.
-- The _No Visible Player Ratings_ challenge hides ovr, pot, projected peaks and badge scores on the fork's tables and player pages (Draft Scouting, Draft Board, Mock Draft, Archetypes, Skill Badges, Trade Market, Trade Offers, college pages, profile export, scouting reports), but the story features written from the league's records (Newspaper, Wrapped) still quote ratings in their text.
 
 ## Performance
 

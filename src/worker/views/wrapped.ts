@@ -10,6 +10,7 @@ import {
 	isBulkSimming,
 	memoize,
 	yieldToWorker,
+	wrappedRatingsView,
 	type Built,
 } from "../util/wrappedData.ts";
 import { candidatesAsync } from "../../common/wrapped/build.ts";
@@ -89,7 +90,9 @@ export default defineView({
 		} else {
 			built = await wperfTime("wrapped.getIndex", () => getWrapped());
 		}
-		const { X } = built;
+		// The ratings the slides may quote (none under the No Visible Player Ratings challenge, fuzzed otherwise)
+		const ratingsView = wrappedRatingsView();
+		const X = built.X.withRatings(ratingsView);
 		const { mode } = inputs;
 
 		// Default season: the latest finished one, or the current one if none has finished yet
@@ -125,7 +128,7 @@ export default defineView({
 		const soFar = mode !== "all" && !X.decided(season);
 		// The slides only depend on the snapshot and which deck it is, so opening the same deck again is free
 		const cands = await wperfTime(`wrapped.candidates.${mode}`, () =>
-			memoize(built, `cands|${mode}|${season}|${tid ?? ""}|${pid ?? ""}`, () =>
+			memoize(built, `cands|${ratingsView}|${mode}|${season}|${tid ?? ""}|${pid ?? ""}`, () =>
 				candidatesAsync({ X, mode, season, tid, pid, soFar }, yieldToWorker),
 			),
 		);

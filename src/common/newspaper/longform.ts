@@ -842,6 +842,19 @@ export const breakNext = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 	}
 	const nm = lastName(p.name);
 	const room = p.pot - p.ovr;
+	if (c.noRatings) {
+		const kids =
+			room >= 3
+				? pick<string>(r, [
+						`The scouts say there is more to come: at ${p.age}, ${nm} is still climbing. `,
+						`${nm} is ${p.age}, and by every account the climb is not finished. `,
+					])!
+				: pick<string>(r, [
+						`The scouts think ${nm} is near his ceiling at ${p.age}. `,
+						`At ${p.age}, ${nm} may already be close to as good as he gets. `,
+					])!;
+		return { kids: [kids], keys: [] };
+	}
 	const kids =
 		room >= 3
 			? pick<string>(r, [
