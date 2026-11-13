@@ -1481,7 +1481,9 @@ class GameSim extends GameSimBase {
 	elapsedRegulationSeconds() {
 		const quarterSeconds = this.rotationQuarterSeconds;
 		const period = this.team[0].stat.ptsQtrs.length;
-		if (period > this.numPeriods) {
+		// Overtime, or an Elam ending (untimed, the clock is Infinity): all of regulation, like overtime. Before, an Elam ending gave
+		// -Infinity, so every player with planned minutes looked far ahead of his plan and the end of the bench closed the game
+		if (period > this.numPeriods || !Number.isFinite(this.t)) {
 			return this.numPeriods * quarterSeconds;
 		}
 		const t = this.t ?? quarterSeconds;
@@ -2538,6 +2540,11 @@ class GameSim extends GameSimBase {
 					defenseInside / 5 + this.synergyFactor * synergy.def;
 				ratings.defenseOutside =
 					defenseOutside / 5 + this.synergyFactor * synergy.def;
+			} else if (this.positionalComposites) {
+				// Not 5 players on the court, so no shares: shots inside and outside face the plain team defense (these were left undefined,
+				// which made every shot's make probability NaN, so no shot ever went in)
+				ratings.defenseInside = ratings.defense;
+				ratings.defenseOutside = ratings.defense;
 			}
 			if (this.expandedRatings2) {
 				ratings.offRebounding =
