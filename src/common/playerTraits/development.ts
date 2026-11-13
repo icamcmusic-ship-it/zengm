@@ -121,7 +121,15 @@ const rawAgingDelta = (curve: AgingCurve, age: number) => {
 			if (age <= 31) {
 				return 1;
 			}
-			return 1.75;
+			if (age <= 35) {
+				return 1.75;
+			}
+			// Fades out: he keeps what he saved in his 30s, but from 37 he declines like everyone else. Without the fade (1.75 at every age)
+			// graceful agers barely declined at 38-41, so they were 3/4 of the league's 38+ players and the 40+ count piled up (docs/player-traits.md)
+			if (age <= 36) {
+				return 0.75;
+			}
+			return 0;
 		default:
 			return 0;
 	}

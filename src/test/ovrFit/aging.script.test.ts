@@ -1,6 +1,6 @@
 // @ts-nocheck (node-only script, like src/test/ratingInflation/pop.script.test.ts)
 /* eslint-disable */
-// Aging curves of every rating and of ovr (Realistic Aging, docs/native-features.md): N generated 19-year-olds developed to 38 with no
+// Aging curves of every rating and of ovr (Realistic Aging, docs/native-features.md): N generated 19-year-olds developed to 42 with no
 // attrition (no survivorship bias), with each secret aging curve (Player Traits) too.
 //   RA_AGING=1 RA_REALISTIC=0|1 RA_V2=0|1 RA_EXP=0|1 RA_N=3000 [RA_OUT=file.json] node_modules/.bin/vitest run --project basketball \
 //     src/test/ovrFit/aging.script.test.ts
@@ -83,7 +83,7 @@ test.skipIf(!env.RA_AGING)(
 				const rows = [{ ...r0 }];
 				const r: any = rows[0];
 				const grp = grpOf(r.hgt);
-				for (let age = 19; age <= 38; age++) {
+				for (let age = 19; age <= 42; age++) {
 					if (age > 19) {
 						// Half the players without traits, the other half with each aging curve
 						const traitDev =
@@ -159,7 +159,7 @@ test.skipIf(!env.RA_AGING)(
 			const cA = out.curves[c];
 			const pk = ages.reduce((best, a) => (cA[a] > cA[best] ? a : best), 19);
 			lines.push(
-				`curve ${c}: peak ${pk} (${cA[pk].toFixed(1)}), ovr at 23/27/31/34: ${[23, 27, 31, 34].map((a) => cA[a].toFixed(1)).join("/")}`,
+				`curve ${c}: peak ${pk} (${cA[pk].toFixed(1)}), ovr at 23/27/31/34/36/38/40/42: ${[23, 27, 31, 34, 36, 38, 40, 42].map((a) => cA[a].toFixed(1)).join("/")}`,
 			);
 		}
 		process.stdout.write(lines.join("\n") + "\n");

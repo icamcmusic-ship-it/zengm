@@ -121,6 +121,13 @@ describe("development (work ethic, aging curve)", () => {
 			agingCurveDelta("graceful", 33),
 			agingCurveDelta("normal", 33),
 		);
+		// ... but only in their 30s: from 37 on they decline like a normal player (otherwise too many 40-year-olds)
+		for (const age of [37, 39, 42]) {
+			assert.strictEqual(
+				agingCurveDelta("graceful", age),
+				agingCurveDelta("normal", age),
+			);
+		}
 	});
 
 	test("development plans are centered on the league", () => {

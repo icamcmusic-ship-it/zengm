@@ -30,6 +30,8 @@ import { getMilestones, getRecordsBook } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers } from "../../util/index.ts";
+import { agingCurveForPlayer } from "../../../common/playerTraits/development.ts";
+import { getLeagueTraitSeed } from "../player/traits.ts";
 
 const env = (globalThis as any).process.env;
 const ENABLED = !!env.LONG_RUN;
@@ -440,6 +442,7 @@ const ratingsInfo = async (s: number) => {
 	const ovrs = active.map((p) => last(p.ratings).ovr).sort((a, b) => b - a);
 	const ages: Record<string, number[]> = {};
 	const pos: Record<string, number> = {};
+	const oldRoster: Record<string, number> = {};
 	for (const p of active) {
 		const age = s - p.born.year;
 		const bucket =
@@ -453,6 +456,10 @@ const ratingsInfo = async (s: number) => {
 							? "31-34"
 							: "35+";
 		(ages[bucket] ??= []).push(last(p.ratings).ovr);
+		if (age >= 36) {
+			const k = age >= 40 ? "40+" : String(age);
+			oldRoster[k] = (oldRoster[k] ?? 0) + 1;
+		}
 		const ps = last(p.ratings).pos;
 		pos[ps] = (pos[ps] ?? 0) + 1;
 	}
@@ -514,6 +521,7 @@ const ratingsInfo = async (s: number) => {
 				.map(([k, v]) => [k, `${r(mean(v))}/${v.length}`]),
 		),
 		pos,
+		oldRoster,
 		rookiesTop5Ovr: r(
 			mean(rookies.slice(0, 5).map((p) => last(p.ratings).ovr)),
 		),
@@ -539,6 +547,58 @@ const ratingsInfo = async (s: number) => {
 		salaryCap: g.get("salaryCap"),
 		maxContracts: contracts.filter((c) => c >= g.get("maxContract")).length,
 		minContracts: contracts.filter((c) => c <= g.get("minContract")).length,
+	};
+};
+
+// Old players: by age (36, 37, 38, 39, 40+), how many played in the regular season and were on a roster at its end, their
+// minutes and ovr, and retirements by age at the end of the season. Call after the draft phase (retirements are done).
+const oldPlayers = async (s: number) => {
+	const players = await idb.merged.players.getAll({ activeSeason: s });
+	const bucket = (age: number) => (age >= 40 ? "40+" : String(age));
+	const played: Record<string, { n: number; min: number[]; ovr: number[] }> =
+		{};
+	const retired: Record<string, number> = {};
+	// Every 38+ player who played: age, ovr, career best ovr, minutes and the secret aging curve
+	const list: string[] = [];
+	for (const p of players) {
+		const age = s - p.born.year;
+		if (p.retiredYear === s) {
+			const k = age >= 40 ? "40+" : age >= 30 ? String(age) : "<30";
+			retired[k] = (retired[k] ?? 0) + 1;
+		}
+		if (age < 36) {
+			continue;
+		}
+		const rows = p.stats.filter(
+			(row) => row.season === s && !row.playoffs && row.tid >= 0,
+		);
+		const gp = rows.reduce((a, row) => a + (row.gp ?? 0), 0);
+		if (gp === 0) {
+			continue;
+		}
+		const min = rows.reduce((a, row) => a + (row.min ?? 0), 0);
+		const ovr = p.ratings.find((row) => row.season === s)?.ovr ?? Number.NaN;
+		const o = (played[bucket(age)] ??= { n: 0, min: [], ovr: [] });
+		o.n += 1;
+		o.min.push(min);
+		o.ovr.push(ovr);
+		if (age >= 38) {
+			const peak = Math.max(...p.ratings.map((row) => row.ovr));
+			const curve = agingCurveForPlayer(getLeagueTraitSeed(), p.pid);
+			list.push(`${age}/${ovr}/${peak}/${Math.round(min)}/${curve}`);
+		}
+	}
+	return {
+		played: Object.fromEntries(
+			Object.entries(played)
+				.sort()
+				.map(([k, v]) => [
+					k,
+					{ n: v.n, min: r(mean(v.min), 0), ovr: r(mean(v.ovr)) },
+				]),
+		),
+		retired,
+		list,
 	};
 };
 
@@ -1070,6 +1130,7 @@ describe.skipIf(!ENABLED)("long run", () => {
 				);
 				session.disconnect();
 			}
+			const old = await timed("checks", () => oldPlayers(s));
 			const offseasonCpu = cpuMs() - cs - simCpu;
 			const afterDraft = await ratingsInfo(s);
 			await idb.cache.flush();
@@ -1110,6 +1171,7 @@ describe.skipIf(!ENABLED)("long run", () => {
 						r1Pot: afterDraft.rookiesR1Pot,
 					},
 					archetypes,
+					old,
 				}),
 			);
 		}
