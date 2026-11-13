@@ -192,6 +192,19 @@ describe("linked college league", () => {
 				assert.isNumber(p.value);
 			}
 			assert.isAbove(withAwards, 0, "college honors kept");
+			// The college league's own awards (award settings, no type) come as named pre-draft honors
+			const honorTypes = linked.flatMap((p) => p.awards.map((a) => a.type));
+			assert.isTrue(
+				honorTypes.every((type) => type?.startsWith("College: ")),
+				JSON.stringify(honorTypes),
+			);
+			assert.isTrue(
+				honorTypes.some(
+					(type) =>
+						type!.includes("All-Conference") || type!.includes("All-American"),
+				),
+				JSON.stringify(honorTypes),
+			);
 			// On the pro scale: a top prospect is not already a star, as a generated class
 			const ovrs = linked.map((p) => last(p.ratings).ovr).sort((a, b) => b - a);
 			assert.isAtMost(ovrs[0]!, 62, "best prospect ovr");
@@ -237,6 +250,15 @@ describe("linked college league", () => {
 				assert.strictEqual(p.draft.year, 2025);
 				assert.isAbove(p.draft.pick, 0);
 			}
+
+			// The same class again for the next draft (the college league has not moved on): nobody is imported twice
+			const again = await importLinkedCollegeClass({});
+			assert.include(again.error ?? "", "already in this league");
+			assert.strictEqual(
+				(await idb.cache.players.getAll()).filter((p) => p.linkedCollege)
+					.length,
+				linked.length,
+			);
 
 			// The college league deleted: the import says so (and the automatic one doesn't throw)
 			await idb.meta.delete("leagues", 0);

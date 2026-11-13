@@ -527,10 +527,18 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 			}
 		}
 	}
+	// The school leading for each prospect. A portal player's own school is left out: its standing offer (interest 25 when he enters)
+	// would otherwise count as a lead that every other school is "well behind", so no other school ever started on him and nearly
+	// everyone in the portal went back to his school
 	const leaders = new Map(
 		prospects.map((pr) => [
 			pr.p.pid,
-			Math.max(0, ...(pr.box.schools ?? []).map((s) => s.i)),
+			Math.max(
+				0,
+				...(pr.box.schools ?? [])
+					.filter((s) => pr.kind !== "portal" || s.tid !== pr.p.portal!.from)
+					.map((s) => s.i),
+			),
 		]),
 	);
 	// In a random order, so no school always moves first
