@@ -478,12 +478,12 @@ $highlight-leader-color: lighten($yellow, 18%);
 
 @media screen {
 	// Red text (mood badges, negative numbers and rating changes, injuries, warnings): a light red with at least 4.5:1
-	// against the page (7.0), table stripes and hover, light bordered buttons like the mood badge (5.1) and highlighted
-	// table-info rows (5.0). lighten($red, 10) was 3.4 on buttons and highlighted rows.
+	// against the page (7.5), the sorted column (4.7), light bordered buttons like the mood badge (5.6) and highlighted
+	// table-info rows (5.6). lighten($red, 10) was 3.4 on buttons and highlighted rows.
 	.text-danger,
 	.watch-active-1,
 	.watch-active-1:hover {
-		color: #ff8a8a !important;
+		color: #ff9999 !important;
 	}
 
 	// Dark text on gray (4.69:1 white vs 3.29:1 dark): confidence and status badges
