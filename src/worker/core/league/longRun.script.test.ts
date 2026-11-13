@@ -1184,6 +1184,34 @@ describe.skipIf(!ENABLED)("long run", () => {
 			} catch (error) {
 				problem("archetypes landscape", (error as Error).message);
 			}
+			// LONG_RUN_DUMP=file (arch15): every player on a roster after the last season's playoffs, with his latest ratings row
+			// and his regular-season stats rows (tracking stats included), as JSON, for the archetype play-type check
+			// (common/archetypes/playTypes.script.test.ts)
+			if (env.LONG_RUN_DUMP && i === SEASONS - 1) {
+				const { writeFileSync } = await import(
+					/* @vite-ignore */ "node:fs" as string
+				);
+				const ps = await idb.cache.players.indexGetAll("playersByTid", [
+					0,
+					Infinity,
+				]);
+				writeFileSync(
+					env.LONG_RUN_DUMP,
+					JSON.stringify({
+						season: s,
+						players: ps.map((p) => ({
+							pid: p.pid,
+							tid: p.tid,
+							name: `${p.firstName} ${p.lastName}`,
+							born: p.born,
+							ratings: p.ratings.slice(-2),
+							stats: p.stats.filter(
+								(row: any) => !row.playoffs && row.season >= s - 2,
+							),
+						})),
+					}),
+				);
+			}
 			// LONG_RUN_PROF=prefix: CPU profile of the offseason of the last season
 			let session: any;
 			if (env.LONG_RUN_PROF && i === SEASONS - 1) {

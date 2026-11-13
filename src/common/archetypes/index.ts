@@ -1,6 +1,7 @@
 export * from "./types.ts";
 export {
 	ARCHETYPES,
+	SCORING_ARCHETYPES,
 	archetypeById,
 	archetypeByName,
 	classify,

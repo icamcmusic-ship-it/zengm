@@ -5,7 +5,7 @@
 // the kept one takes the union of their positions and height gates. A stored label with a removed id is read as the kept
 // one (helpers.ts viewOf) and re-read at the next reading (ARCHETYPE_READING_VERSION).
 // removed id -> kept id
-export const MERGED: Record<string, string> = {
+export const MERGED_ARCH14: Record<string, string> = {
 	"disruptive-lockdown": "edge-enforcer",
 	"backline-lockdown": "lockdown-eraser",
 	"shot-obliterating-lock": "lockdown-eraser",
@@ -42,5 +42,177 @@ export const MERGED: Record<string, string> = {
 	"2-way-skilled-stretch": "2-way-pick-and-popper",
 };
 
-// The id a stored label stands for now
-export const mergedId = (id: string): string => MERGED[id] ?? id;
+// arch15: 66 more (mergeCand.script.test.ts, arch15 scratchpad merges.md): same family, the same core promises (2-Way,
+// Physical and Scorer aside), profiles with a cosine of 0.7+ and sub-rating wants of 0.6+ (subStyle.ts), or the reading
+// could not tell them apart (top two within 0.15 z for a fifth or more of their holders); a kept build never grows past
+// about 2% of the players. Unlike arch14's, the removed build's profile is kept as one of the kept build's profiles (the
+// reading scores every profile of a build and the build takes its best: classify.ts SCORING_ARCHETYPES), so a player the
+// removed build fitted best now gets the kept one, not whatever came next
+export const MERGED_ARCH15: Record<string, string> = {
+	"2-way-pick-and-pop-cleaner": "stretch-board-enforcer",
+	"backline-power-finisher": "rim-reaping-poster-dunker",
+	"2-way-power-dunking-cleaner": "crafty-paint-finishing-cleaner",
+	"ball-hawking-lockdown": "edge-enforcer",
+	"2-way-triple-double-threat": "triple-double-threat",
+	"2-way-post-bully-crasher": "post-up-glass-cleaner",
+	"clamp-thief": "edge-enforcer",
+	"physical-clamp-thief": "lockdown-defender",
+	"blow-by-high-flyer": "yamming-force-of-nature",
+	"rim-reaping-skilled-popper": "shot-erasing-skilled-popper",
+	"ankle-snatcher": "shifty-king",
+	"2-way-blow-by-dual-finisher": "versatile-paint-finisher",
+	"backline-power-dunker": "rim-reaping-poster-dunker",
+	"gritty-bulldozer": "bulldozer",
+	"bulldozing-board-enforcer": "physical-defensive-rebounder",
+	"2-way-crafty-inside-out-scorer": "crafty-inside-out-scorer",
+	"2-way-mid-paint-point-four": "mid-paint-point-four",
+	"inside-out-crafty-slasher": "inside-out-slasher",
+	"2-way-3pt-slasher": "gritty-3pt-slasher",
+	"paint-hawking-middy-scorer": "backline-mid-range-scorer",
+	"2-way-bulldozing-cleaner": "physical-defensive-rebounder",
+	"physical-lockdown-defender": "lockdown-defender",
+	"gritty-3-level-scoring-bully": "physical-3-level-scorer",
+	"2-way-slashing-point-forward": "slashing-playmaker",
+	"athletic-high-flyer": "big-glide",
+	"shot-erasing-wing-runner": "rim-reaping-rim-runner",
+	"2-way-inside-out-bully-slasher": "gritty-3pt-slasher",
+	eliminator: "the-guard-dog",
+	"physical-2-way-middy-slasher": "2-way-mid-range-slasher",
+	"lockdown-stopper": "lockdown-defender",
+	"backline-lob-threat": "rim-reaping-poster-dunker",
+	"2-way-skilled-stretch-riser": "skilled-stretch-four",
+	"inside-out-slashing-dunker": "gritty-3pt-slasher",
+	"2-way-mid-paint-phenom": "crafty-mid-paint-scorer",
+	"physical-rim-reaper": "backline-four",
+	"physical-mid-paint-cleaner": "mid-paint-board-enforcer",
+	"aerial-guardian": "high-flying-eraser",
+	"physical-2-way-faceup-riser": "crafty-mid-paint-scorer",
+	"2-way-mid-range-scorer": "2-way-mid-range-menace",
+	"2-way-mid-paint-cleaner": "mid-paint-board-enforcer",
+	"2-way-pick-and-popper": "2-way-skilled-pick-and-popper",
+	"2-way-bulldozing-putback-pro": "physical-defensive-rebounder",
+	"2-way-crafty-3-level-dimer": "crafty-3-level-dime-dropper",
+	"ball-snatching-3-level-scorer": "ball-hawking-3-level-scorer",
+	"post-scoring-board-enforcer": "post-up-glass-cleaner",
+	"crafty-iso-sniper": "3pt-shot-hunter",
+	"2-way-rim-rocking-post-crasher": "rim-rocking-post-board-hunter",
+	"floor-sweeping-slasher": "glass-cleaning-slasher",
+	"floor-sweeping-power-dunker": "board-hunting-paint-finisher",
+	"3pt-sniping-creator": "3pt-shot-hunter",
+	"rim-reaping-mid-range-bully": "backline-mid-range-scorer",
+	"2-way-high-flying-slasher": "yamming-force-of-nature",
+	"versatile-scoring-crasher": "versatile-scoring-cleaner",
+	"versatile-post-scorer": "post-combo-guard",
+	"ball-hawking-3-and-d-point": "ball-hawking-playshot",
+	"2-way-post-break-starter": "crafty-post-playmaker",
+	"ankle-breaking-bully": "ankle-taker",
+	"physical-2-way-sharpshooter": "2-way-off-screen-shooter",
+	"2-way-dual-finisher": "versatile-paint-finisher",
+	"2-way-crafty-versatile-scorer": "walking-bucket",
+	"2-way-3-level-scorer": "gritty-3-level-scorer",
+	// (round 2: the same core promises, profile cosine 0.6+, a kept build at most about 2.2% of the players)
+	"physical-2-way-3-level-cleaner": "2-way-3-level-cleaner",
+	"wing-running-sharpshooter": "high-flying-3pt-sniper",
+	"paint-finishing-board-enforcer": "crafty-paint-finishing-cleaner",
+	"board-hunting-power-dunker": "board-hunting-paint-finisher",
+	"backline-masher": "rim-reaping-poster-dunker",
+	"physical-middy-board-enforcer": "mid-paint-board-enforcer",
+	"2-way-mid-paint-crasher": "mid-paint-board-enforcer",
+	"board-hunting-bucket-getter": "versatile-scoring-cleaner",
+	"versatile-defender": "edge-enforcer",
+	"post-scoring-cleaner": "post-up-glass-cleaner",
+	"drive-and-rise-wing": "versatile-paint-finisher",
+	"backline-mid-paint-bully": "backline-mid-range-scorer",
+	"gritty-power-slasher": "versatile-paint-finisher",
+	"2-way-blow-by-ace": "versatile-paint-finisher",
+	"2-way-mid-range-bully": "2-way-mid-range-menace",
+	"physical-disruptive-cleaner": "switch-defending-cleaner",
+	"backline-poster-dunker": "rim-reaping-poster-dunker",
+	"physical-inside-out-slasher": "gritty-3pt-slasher",
+	"lob-threat-board-enforcer": "crafty-paint-finishing-cleaner",
+	"rim-reaping-dime-dropper": "shot-erasing-table-setter",
+	"high-flying-wing-runner": "big-glide",
+	"2-way-mid-paint-point-forward": "mid-paint-point-four",
+	"gritty-slashing-dual-finisher": "versatile-paint-finisher",
+	"2-way-blow-by-bully": "versatile-paint-finisher",
+	"high-flying-slasher": "yamming-force-of-nature",
+	"slashing-cleaner": "crafty-paint-finishing-cleaner",
+	"shot-erasing-high-flyer": "rim-reaping-high-flyer",
+	"2-way-inside-out-combo-guard": "crafty-inside-out-scorer",
+	"drive-and-rise": "versatile-paint-finisher",
+	"physical-board-hunter": "physical-defensive-rebounder",
+	"rim-rocking-board-enforcer": "crafty-paint-finishing-cleaner",
+	"iso-sniper": "3pt-shot-hunter",
+	"crafty-mid-paint-cleaner": "mid-paint-board-enforcer",
+	"2-way-3-level-scoring-bully": "physical-3-level-scorer",
+	"2-way-sharpshooter": "2-way-off-screen-shooter",
+	"2-way-inside-out-scorer": "crafty-inside-out-scorer",
+	"wing-running-finisher": "yamming-force-of-nature",
+	"3-and-d-dime-dropper": "ball-hawking-playshot",
+	"2-way-middy-playmaker": "mid-paint-point-four",
+	"3pt-sniping-rim-wrecker": "gritty-3pt-slasher",
+	"ball-hawking-3pt-sniper": "edge-enforcing-3pt-sniper",
+	"2-way-iso-sniping-cleaner": "2-way-3pt-creating-cleaner",
+	"2-way-mid-paint-bully": "crafty-mid-paint-scorer",
+	"physical-iso-sniper": "3pt-shot-hunter",
+	"2-way-rim-wrecking-crasher": "crafty-paint-finishing-cleaner",
+	"2-way-3pt-sniping-lob-threat": "gritty-3pt-slasher",
+	"blow-by-dual-finisher": "slashing-dual-finisher",
+	"2-way-sharpshooting-cleaner": "stretch-board-enforcer",
+	"2-way-3-level-point-forward": "crafty-3-level-dime-dropper",
+	"crafty-3pt-sniping-creator": "3pt-shot-hunter",
+	"board-hunting-slasher": "board-hunting-paint-finisher",
+	"2-way-playmaking-slasher": "dime-dropping-dual-finisher",
+	"2-way-inside-out-bully-dimer": "2-way-inside-out-dime-dropper",
+	"paint-scoring-crasher": "crafty-paint-finishing-cleaner",
+	"2-way-paint-scoring-cleaner": "crafty-paint-finishing-cleaner",
+	"inside-out-high-flying-slasher": "inside-out-high-flyer",
+	"2-way-middy-scoring-cleaner": "mid-paint-board-enforcer",
+	"2-way-slashing-cleaner": "crafty-paint-finishing-cleaner",
+	"backline-stretch-four": "shot-erasing-skilled-popper",
+	"2-way-mid-paint-maestro-bully": "crafty-mid-paint-scorer",
+	"edge-enforcing-small-ball-four": "edge-enforcer",
+	"2-way-sharpshooting-riser": "2-way-off-screen-shooter",
+	"silk-stretch": "skilled-stretch-four",
+	"cash-out": "crafty-sharpshooter",
+	"physical-edge-enforcer": "edge-enforcer",
+	"physical-2-way-tempo-pusher": "2-way-tempo-pusher",
+	"3pt-sniping-bulldozer": "2-way-off-screen-shooter",
+	"skilled-stretch-board-enforcer": "stretch-board-enforcer",
+	"rim-reaping-mid-paint-scorer": "shot-erasing-mid-paint-maestro",
+	"power-dunking-board-enforcer": "crafty-paint-finishing-cleaner",
+	"post-bully-cleaner": "post-up-glass-cleaner",
+	"2-way-break-starting-popper": "break-starting-stretch-five",
+	"2-way-mid-paint-playmaker": "mid-paint-point-four",
+	"2-way-playmaking-creator": "playmaking-shot-creator",
+	"2-way-mid-paint-scorer": "crafty-mid-paint-scorer",
+	"shot-erasing-bulldozer": "backline-four",
+	"mid-paint-scoring-cleaner": "mid-paint-board-enforcer",
+	"board-enforcing-bullmasher": "board-hunting-paint-finisher",
+	"mid-paint-scorer": "mid-range-menace",
+	"physical-offensive-engine": "crafty-offensive-engine",
+	"2-way-disruptive-high-flyer": "edge-enforcing-rim-runner",
+	"glass-cleaning-playmaker": "triple-double-threat",
+	"physical-board-enforcer": "physical-defensive-rebounder",
+};
+
+export const MERGED: Record<string, string> = {
+	...MERGED_ARCH14,
+	...MERGED_ARCH15,
+};
+
+// arch15: every arch15 merge keeps the removed build's profile, so the kept build is open at the union of their positions
+// (and height gates); the removed build's name is its name at the position groups only the removed build was for
+// (ARCHETYPE posNames: one id, a name that fits where he plays)
+export const MERGED_UNION: ReadonlySet<string> = new Set(
+	Object.keys(MERGED_ARCH15),
+);
+
+// The id a stored label stands for now (arch15: a build merged into one that was merged later reads as the last one)
+export const mergedId = (id: string): string => {
+	let out = id;
+	for (let i = 0; i < 4 && MERGED[out]; i++) {
+		out = MERGED[out]!;
+	}
+	return out;
+};

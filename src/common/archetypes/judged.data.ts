@@ -6,6 +6,8 @@
 // metrics' seeded class; generated players carry their ratings). `split`: fixed by a hash of the key, 30% of each population
 // (league, prospects, real 2016+, real before 2016) is the held-out test set, never used to fit. Ids are post-merge
 // (merges.data.ts). Scratchpad: the judged set as markdown and JSON.
+// arch15: seven players re-judged with their sub-ratings (two in the test split: Luguentz Dort and Jalen Green 2025), where
+// a new build or one their sub-ratings back is clearly right; the arch15 scratchpad lists them (rejudged.md).
 import type { ArchetypeRatings, Pos } from "./types.ts";
 
 export type JudgedPlayer = {
@@ -1539,8 +1541,8 @@ export const JUDGED: JudgedPlayer[] = [
 		split: "tune",
 		ids: [
 			"shot-blocking-anchor",
+			"rim-reaping-rim-runner",
 			"rim-wrecking-glass-guardian",
-			"glass-guardian",
 		],
 		pos: "C",
 		slug: "robinmi01",
@@ -1896,8 +1898,8 @@ export const JUDGED: JudgedPlayer[] = [
 		split: "test",
 		ids: [
 			"inside-out-high-flying-slasher",
+			"inside-out-slasher",
 			"high-flying-slasher",
-			"inside-out-scorer",
 		],
 		pos: "G",
 		slug: "greenja05",
@@ -2056,7 +2058,7 @@ export const JUDGED: JudgedPlayer[] = [
 		key: "Herbert Jones 2025",
 		src: "real2025top",
 		split: "tune",
-		ids: ["lockdown-defender", "lockdown-eraser", "ball-hawking-lockdown"],
+		ids: ["shot-erasing-guard-dog", "lockdown-defender", "lockdown-eraser"],
 		pos: "SF",
 		slug: "joneshe01",
 		season: 2025,
@@ -2294,9 +2296,9 @@ export const JUDGED: JudgedPlayer[] = [
 		src: "real2025top",
 		split: "test",
 		ids: [
+			"3-and-d-specialist",
 			"physical-lockdown-defender",
 			"2-way-off-screen-shooter",
-			"physical-clamp-thief",
 		],
 		pos: "GF",
 		slug: "dortlu01",
@@ -6423,7 +6425,11 @@ export const JUDGED: JudgedPlayer[] = [
 		key: "P146",
 		src: "prospect",
 		split: "tune",
-		ids: ["hustle-glass-cleaner", "footer", "physical-board-enforcer"],
+		ids: [
+			"hustle-glass-cleaner",
+			"shot-erasing-bulldozer",
+			"physical-board-enforcer",
+		],
 		pos: "C",
 		ratings: {
 			hgt: 72,
@@ -6739,7 +6745,7 @@ export const JUDGED: JudgedPlayer[] = [
 		key: "P832",
 		src: "prospect",
 		split: "tune",
-		ids: ["athletic-hustler", "mid-range-high-flyer", "clamp-thief"],
+		ids: ["3-and-d-specialist", "athletic-hustler", "clamp-thief"],
 		pos: "SG",
 		ratings: {
 			hgt: 39,
@@ -7076,7 +7082,7 @@ export const JUDGED: JudgedPlayer[] = [
 		key: "P957",
 		src: "prospect",
 		split: "tune",
-		ids: ["dot-dispenser", "aerial-playmaker", "playmaking-3pt-creator"],
+		ids: ["dot-dispenser", "ball-hawking-playshot", "playmaking-3pt-creator"],
 		pos: "PG",
 		ratings: {
 			hgt: 29,

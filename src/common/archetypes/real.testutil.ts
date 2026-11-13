@@ -13,6 +13,37 @@ import {
 	type StatReading,
 } from "./stats.ts";
 import type { ArchetypeRatings, ArchetypeStats, Pos } from "./types.ts";
+import {
+	generateSubShape,
+	parseSubLean,
+	realSubShape,
+	seedFromString,
+} from "../subRatingsGen.ts";
+import { SUB_NORMS_REAL, SUB_NORMS_REAL_EXPANDED } from "./subStyle.ts";
+
+// arch15: sub-ratings as a league with the subRatings setting gives them: a real player's from his stats (the row's lean;
+// none without one), a generated player's from his generated shape (seeded by a key). ARCH_NO_SUBS=1: none (the setting off)
+export const SUBS_ON = !(globalThis as any).process?.env?.ARCH_NO_SUBS;
+export const realSubs = (row: any): number[] | undefined => {
+	const lean = parseSubLean(row.subLean);
+	if (!SUBS_ON || !lean) {
+		return undefined;
+	}
+	return realSubShape(row, seedFromString(row.slug), lean).sub;
+};
+// The league's own sub-ratings table for real players (subStyle.ts): a real-players league reads their shapes against
+// each other
+export const realNorms = <N extends object>(norms: N, expanded: boolean): N =>
+	SUBS_ON
+		? { ...norms, sub: expanded ? SUB_NORMS_REAL_EXPANDED : SUB_NORMS_REAL }
+		: norms;
+export const generatedSubs = (
+	ratings: Record<string, any>,
+	key: string,
+): number[] | undefined =>
+	SUBS_ON
+		? generateSubShape(ratings, seedFromString(`gen|${key}`)).sub
+		: undefined;
 
 export type RealData = {
 	d: { ratings: any[]; bios: Record<string, any> };
@@ -91,6 +122,10 @@ export const realPlayer = (
 	},
 ): RealPlayer => {
 	const r = ratingsOf(row);
+	const sub = realSubs(row);
+	if (sub) {
+		r.sub = sub;
+	}
 	// (as the game reads him at the preseason: the stats of the seasons before, no earlier position)
 	const pos = positionFor({ ...r, season: row.season }, true, undefined, {
 		stats: (st.stats[row.slug] ?? []).filter((x) => x.season < row.season),

@@ -36,6 +36,9 @@ export const TERMS = [
 	"promLead",
 	"promRel",
 	"allAround",
+	// arch15: his sub-ratings' shape and his play types against what the build's name says (subStyle.ts; 0 without them)
+	"sub",
+	"playType",
 	// arch14 (user request): his player traits (only with the Player Traits setting on; 0 without), each group's mean score
 	// above or below 50 (in units of 25) where the build's name is that style (score.ts TRAIT_GROUPS); hidden traits too
 	"trOffBall",
@@ -91,6 +94,24 @@ export const FAM_FEATS = [
 	"sBlk",
 	"sStl",
 	"sDrb",
+	// arch15: sub-ratings (0 without them) and play types (0 without tracking stats, weighted by his sample)
+	"fBlk",
+	"fStl",
+	"fPdf",
+	"fCs",
+	"fRng",
+	"fPst",
+	"fCon",
+	"fCrt",
+	"fVis",
+	"fSls",
+	"fMxv",
+	"ptIso",
+	"ptPrb",
+	"ptSpot",
+	"ptPost",
+	"ptPrr",
+	"ptCut",
 ] as const;
 
 export type FittedModel = {
@@ -120,9 +141,14 @@ export const TRAIT_TERMS: readonly Term[] = TERMS.filter((t) =>
 );
 // (the trait terms did not exist before arch14: 0 in the hand settings, a moderate 0.3 the fit is regularised toward)
 export const TRAIT_PRIOR = 0.3;
+// arch15: the hand weights of the sub-rating and play-type terms (the fit is regularised toward them)
+export const STYLE_PRIOR: Partial<Record<Term, number>> = {
+	sub: 0.15,
+	playType: 0.6,
+};
 export const HAND_MODEL: FittedModel = {
 	theta: Object.fromEntries(
-		TERMS.map((t) => [t, TRAIT_TERMS.includes(t) ? 0 : 1]),
+		TERMS.map((t) => [t, TRAIT_TERMS.includes(t) ? 0 : (STYLE_PRIOR[t] ?? 1)]),
 	) as Record<Term, number>,
 	cls: ones(CLASS_FEATS, 0),
 	famBias: ones(FAMILIES, 0),
@@ -142,7 +168,7 @@ export const familyProbs = (m: FittedModel, x: number[]): number[] => {
 		const w = m.famW[f];
 		let t = 0;
 		for (let i = 0; i < x.length; i++) {
-			t += w[i]! * x[i]!;
+			t += (w[i] ?? 0) * x[i]!;
 		}
 		return t;
 	});

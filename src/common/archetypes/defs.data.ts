@@ -5,7 +5,15 @@
 // build name fits a 45 and an 80 whose ratings have the same shape.
 
 import { CUSTOM_DEFS } from "./customDefs.data.ts";
-import { MERGED } from "./merges.data.ts";
+import {
+	MERGED_ARCH14,
+	MERGED_ARCH15,
+	MERGED_UNION,
+	mergedId,
+} from "./merges.data.ts";
+import { POS_NAMES } from "./posNames.data.ts";
+import { POS_GROUP } from "./posNames.ts";
+import { HARD_BLOCK, nameContradictsPosition } from "./position.ts";
 import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
 import type { Archetype, ArchetypeDef, Pos, TwoKDef } from "./types.ts";
 
@@ -52,6 +60,7 @@ export const toArchetype = (d: TwoKDef): Archetype => {
 		needFor: Object.keys(d.needFor).length > 0 ? d.needFor : undefined,
 		cap: d.cap,
 		traitTie: Object.keys(traitTie).length > 0 ? traitTie : undefined,
+		...(d.posNames ? { posNames: d.posNames } : {}),
 		tags: [
 			d.group,
 			d.family,
@@ -68,9 +77,13 @@ export const toArchetype = (d: TwoKDef): Archetype => {
 
 // arch14: near-duplicate builds merged (merges.data.ts): the kept build takes the union of both builds' positions and height
 // gates, and the removed build's names become its aliases
-const mergeDefs = (defs: TwoKDef[]): TwoKDef[] => {
+const mergeDefs = (
+	defs: TwoKDef[],
+	merged: Record<string, string>,
+	posNames: boolean,
+): TwoKDef[] => {
 	const byId = new Map(defs.map((d) => [d.id, { ...d }]));
-	for (const [from, to] of Object.entries(MERGED)) {
+	for (const [from, to] of Object.entries(merged)) {
 		const a = byId.get(from);
 		const b = byId.get(to);
 		if (!a || !b) {
@@ -78,17 +91,96 @@ const mergeDefs = (defs: TwoKDef[]): TwoKDef[] => {
 		}
 		b.aliases = [...b.aliases, a.name, ...a.aliases];
 		b.builds += a.builds;
+		// arch15: the union of positions and height gates (the removed build's profile is kept: classify.ts); where the kept
+		// name does not fit a position (a "Guard" at a wing), one of its other names that does is shown there (below)
+		if (MERGED_UNION.has(from)) {
+			b.positions = POSITION_ORDER.filter(
+				(p) => b.positions.includes(p) || a.positions.includes(p),
+			);
+			b.hgt = [Math.min(a.hgt[0], b.hgt[0]), Math.max(a.hgt[1], b.hgt[1])];
+			// (a group whose hard blocks the union crosses becomes a wing build: wings are allowed everywhere)
+			if (b.positions.some((p) => HARD_BLOCK[b.group].includes(p))) {
+				b.group = "wing";
+			}
+		}
 		byId.delete(from);
+	}
+	// arch15: hand-written names at position groups (posNames.data.ts)
+	for (const [id, names] of Object.entries(posNames ? POS_NAMES : {})) {
+		const d = byId.get(id);
+		if (!d) {
+			throw new Error(`Bad archetype position name ${id}`);
+		}
+		d.posNames = { ...d.posNames, ...names };
+	}
+	// arch15: a name must fit every position of its group the build is open at (position.ts nameContradictsPosition): else
+	// the build's own name there, or another of its names that does
+	if (posNames) {
+		for (const d of byId.values()) {
+			for (const g of new Set(d.positions.map((p) => POS_GROUP[p]))) {
+				const here = d.positions.filter((p) => POS_GROUP[p] === g);
+				const fits = (n: string) =>
+					here.every((p) => !nameContradictsPosition(n, p));
+				const name = [d.posNames?.[g], d.name, ...d.aliases].find(
+					(n) => n !== undefined && fits(n),
+				);
+				if (d.posNames?.[g] !== undefined || name !== d.name) {
+					const rest = { ...d.posNames };
+					delete rest[g];
+					d.posNames =
+						name !== undefined && name !== d.name
+							? { ...rest, [g]: name }
+							: rest;
+				}
+			}
+			if (d.posNames && Object.keys(d.posNames).length === 0) {
+				delete d.posNames;
+			}
+		}
 	}
 	return defs.filter((d) => byId.has(d.id)).map((d) => byId.get(d.id)!);
 };
-const ALL_DEFS = mergeDefs([...TWO_K_DEFS, ...CUSTOM_DEFS]);
+const POSITION_ORDER: Pos[] = [
+	"PG",
+	"G",
+	"SG",
+	"GF",
+	"SF",
+	"F",
+	"PF",
+	"FC",
+	"C",
+];
+// (arch14's merges, then arch15's on top)
+const ARCH14_DEFS = mergeDefs(
+	[...TWO_K_DEFS, ...CUSTOM_DEFS],
+	MERGED_ARCH14,
+	false,
+);
+const ALL_DEFS = mergeDefs(ARCH14_DEFS, MERGED_ARCH15, true);
 
 // The 2K builds, then the custom ones (customDefs.data.ts)
 export const ARCHETYPE_DEFS: Archetype[] = ALL_DEFS.map(toArchetype);
 
+// arch15: the profiles the reading scores: every build as it was before arch15's merges, each with the id of the build it
+// is now part of (`out`). A build merged in arch15 keeps its own profile, positions, height gate and name promises as one of
+// the kept build's profiles; the kept build is read as the best of its profiles (classify.ts)
+export const SCORING_DEFS: Archetype[] = ARCH14_DEFS.map((d) => ({
+	...toArchetype(d),
+	out: MERGED_ARCH15[d.id] ? mergedId(d.id) : d.id,
+}));
+
 // The other build names each archetype stands for (League > Archetypes' search finds them): the 2K names that say the same
 // thing, and the builds merged into it
+// (arch15: and its names at other position groups)
 export const TWO_K_NAMES: Record<string, string[]> = Object.fromEntries(
-	ALL_DEFS.filter((d) => d.aliases.length > 0).map((d) => [d.id, d.aliases]),
+	ALL_DEFS.filter((d) => d.aliases.length > 0 || d.posNames).map((d) => [
+		d.id,
+		[
+			...new Set([
+				...Object.values(d.posNames ?? {}).filter((n) => n !== d.name),
+				...d.aliases,
+			]),
+		],
+	]),
 );

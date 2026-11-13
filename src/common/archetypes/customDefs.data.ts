@@ -407,6 +407,81 @@ export const CUSTOM_DEFS: TwoKDef[] = [
 			"An elite shooter with unlimited range: the three is the weapon, whatever else he does.",
 		),
 	),
+	// arch15: the gap analysis with sub-ratings (gaps.script.test.ts, arch15 scratchpad new-archetypes.md): recurring roles
+	// that every existing build fit poorly, across a random league, veterans, prospects and real players
+	// (guards and wings who defend and space the floor with their catch-and-shoot three: real 3-and-D role players, KCP, Jae
+	// Crowder, Wesley Matthews; the 2K "3 & D Wing" is a folded alias of another build)
+	custom(
+		"3 & D Specialist",
+		["PG", "G", "SG", "GF", "SF", "F"],
+		[0, 58],
+		{
+			three: 2.5,
+			dper: 2,
+			diq: 1,
+			stl: 0.5,
+			drb: -1.5,
+			pss: -1,
+			post: -1,
+			fin: -0.5,
+			usg: -1,
+		},
+		"wing",
+		"shooter",
+		"A role player who guards the other team's scorer and spaces the floor with catch-and-shoot threes.",
+		{ drb: 0.6 },
+	),
+	// (guards and wings who defend the ball and protect the rim from the help side, without a jumper or a handle: mostly
+	// veterans whose athleticism is gone and long defensive wings)
+	custom(
+		"Shot-Erasing Guard Dog",
+		["PG", "G", "SG", "GF", "SF", "F"],
+		[0, 58],
+		{
+			dper: 2.5,
+			blk: 2,
+			dint: 1,
+			diq: 1.5,
+			mid: -2,
+			drb: -1.5,
+			pss: -0.5,
+			usg: -1.5,
+		},
+		"wing",
+		"defender",
+		"A perimeter stopper who also blocks shots from the help side.",
+	),
+	// (athletic bigs who space the floor: Mo Bamba, Dragan Bender)
+	custom(
+		"High-Flying Stretch Big",
+		["PF", "FC", "C"],
+		[55, 100],
+		{ three: 2.5, jmp: 2, ath: 1.5, post: -1.5, pss: -1, reb: -1 },
+		"big",
+		"shooter",
+		"An athletic big who runs, jumps and spaces the floor with his three.",
+	),
+	// (athletic guards who beat their man off the dribble and finish, with no jumper to speak of)
+	custom(
+		"Blow-By Rim Attacker",
+		["PG", "G", "SG", "GF"],
+		[0, 50],
+		{ fin: 2.5, drb: 2, ath: 1.5, spd: 1.5, three: -2, mid: -1 },
+		"guard",
+		"slasher",
+		"A quick, explosive guard who lives at the rim off the dribble, with little of a jumper.",
+		{ three: 0.6 },
+	),
+	// (athletic bigs who face up from mid-range)
+	custom(
+		"High-Flying Faceup Big",
+		["PF", "FC", "C"],
+		[55, 100],
+		{ mid: 2.5, jmp: 2, ath: 1.5, three: -1, pss: -1.5, post: -0.5 },
+		"big",
+		"scorer",
+		"An athletic big who faces up and knocks down the mid-range jumper.",
+	),
 	// arch13: the all-around star (no profile: read from his level, breadth and evenness, score.ts allAroundQuality)
 	{
 		...universal(

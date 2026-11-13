@@ -1,4 +1,4 @@
-import { ARCHETYPE_DEFS } from "./defs.data.ts";
+import { ARCHETYPE_DEFS, SCORING_DEFS } from "./defs.data.ts";
 import {
 	DIM_LABELS,
 	DIM_RATINGS,
@@ -53,6 +53,8 @@ import {
 	type Term,
 } from "./model.ts";
 import { FITTED } from "./fitted.data.ts";
+import { ptTerm, subTerm } from "./subStyle.ts";
+import { nameAt } from "./posNames.ts";
 import { FITTED_EXPANDED } from "./fittedExpanded.data.ts";
 import { ovrPercentile } from "./norms.ts";
 import { STAR_BIAS } from "./starBias.data.ts";
@@ -80,6 +82,14 @@ export const defaultNormsFor = (ratings: ArchetypeRatings): Norms =>
 
 export const ARCHETYPES: Archetype[] = ARCHETYPE_DEFS;
 const BY_ID = new Map(ARCHETYPES.map((a) => [a.id, a]));
+// arch15: the profiles the reading scores (defs.data.ts SCORING_DEFS): a build merged in arch15 is one of the kept build's
+// profiles, and the build is read as its best profile
+export const SCORING_ARCHETYPES: Archetype[] = SCORING_DEFS;
+// The profiles to score for a list of builds: the full builds' profiles for the build list itself
+const scoringFor = (archetypes: Archetype[]) =>
+	archetypes === ARCHETYPES ? SCORING_ARCHETYPES : archetypes;
+// The build a scored profile stands for
+const publicOf = (a: Archetype): Archetype => BY_ID.get(a.out ?? a.id) ?? a;
 export const archetypeById = (id: string) => BY_ID.get(id);
 export const archetypeByName = (name: string) =>
 	ARCHETYPES.find((a) => a.name === name);
@@ -197,6 +207,8 @@ export type Scored = { a: Archetype; raw: number; z: number; short: number };
 // `base` what is not fitted (the position prior and his traits)
 export type BuildTerms = {
 	a: Archetype;
+	// arch15: the build this profile is read as (a itself, or the build it was merged into)
+	pub: Archetype;
 	raw: number;
 	short: number;
 	blocked: boolean;
@@ -240,6 +252,31 @@ export const familyFeatures = (
 		z.blk ?? 0,
 		z.stl ?? 0,
 		z.drb ?? 0,
+		...styleFamilyFeatures(p),
+	];
+};
+const styleFamilyFeatures = (p: Prepared): number[] => {
+	const s = p.style.sub;
+	const pt = p.style.pt;
+	const f = (k: keyof NonNullable<typeof pt>["f"]) => (pt ? pt.w * pt.f[k] : 0);
+	return [
+		s?.blk ?? 0,
+		s?.stl ?? 0,
+		s?.pdf ?? 0,
+		s?.cs ?? 0,
+		s?.rng ?? 0,
+		s?.pst ?? 0,
+		s?.con ?? 0,
+		s?.crt ?? 0,
+		s?.vis ?? 0,
+		s?.sls ?? 0,
+		s?.mxv ?? 0,
+		f("iso"),
+		f("prb"),
+		f("spot"),
+		f("post"),
+		f("prr"),
+		f("cut"),
 	];
 };
 
@@ -263,7 +300,8 @@ export const scoreTerms = (
 	const starBias = norms.starBias ?? STAR_BIAS;
 	const calBias = norms.bias ?? defaultNorms(p.expanded).bias;
 	const rows: BuildTerms[] = [];
-	for (const a of archetypes) {
+	for (const a of scoringFor(archetypes)) {
+		const pub = publicOf(a);
 		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
 		const prior = archetypePrior(a, pos);
 		const trait = traitTerm(a, traits);
@@ -276,7 +314,17 @@ export const scoreTerms = (
 			// A label about his length needs a wingspan
 			(a.expanded && !p.expanded)
 		) {
-			rows.push({ a, raw, short: 0, blocked: true, base: 0, f, cls, fam });
+			rows.push({
+				a,
+				pub,
+				raw,
+				short: 0,
+				blocked: true,
+				base: 0,
+				f,
+				cls,
+				fam,
+			});
 			continue;
 		}
 		const base = prior + trait - CATCH_ALL_K * catchAllShortfall(a, p, cv);
@@ -286,7 +334,10 @@ export const scoreTerms = (
 			}
 		}
 		const bias = calBias?.[a.id] ?? 0;
-		const starB = star * (starBias[a.id] ?? 0);
+		// (arch15: the trim is per build; a merged profile reads its build's)
+		const starB =
+			star *
+			((starBias[pub.id] ?? 0) + (a.id !== pub.id ? (starBias[a.id] ?? 0) : 0));
 		// arch13: the all-around star build has no profile (score.ts, allAroundQuality)
 		if (a.tags.includes("allAround")) {
 			const q = allAroundQuality(p, cv, read.prospect);
@@ -299,6 +350,7 @@ export const scoreTerms = (
 			}
 			rows.push({
 				a,
+				pub,
 				raw,
 				short: q > 0 ? 0 : 1,
 				blocked: false,
@@ -343,13 +395,15 @@ export const scoreTerms = (
 		f[TERM_INDEX.promReb] = -REB_PERIM_K * (prom.reb ?? 0);
 		f[TERM_INDEX.promLead] = -LEAD_MIN_K * prom.lead;
 		f[TERM_INDEX.promRel] = -needPenaltyOf(prom.rel);
+		f[TERM_INDEX.sub] = subTerm(a, p.style);
+		f[TERM_INDEX.playType] = ptTerm(a, p.style);
 		const all = promisesOf(a).all;
 		for (const [i, k] of CLASS_FEATS.entries()) {
 			if (all.includes(k)) {
 				cls[i] = cv[k] ?? 0;
 			}
 		}
-		rows.push({ a, raw, short, blocked: false, base, f, cls, fam });
+		rows.push({ a, pub, raw, short, blocked: false, base, f, cls, fam });
 	}
 	return {
 		rows,
@@ -450,12 +504,19 @@ export const scoreAll = (
 	const t = scoreTerms(ratings, norms, archetypes, position, traitsIn, read);
 	const m = model ?? modelFor(t.p.expanded);
 	const fam = familyTerms(m, t.rows, t.famX);
-	const scored: Scored[] = t.rows.map((r) => ({
-		a: r.a,
-		raw: r.raw,
-		short: r.short,
-		z: r.blocked ? BLOCKED_Z : weighTerms(m, r) + (fam[r.fam] ?? 0),
-	}));
+	// (arch15: a build is read as the best of its profiles)
+	const best = new Map<string, Scored>();
+	for (const r of t.rows) {
+		// (the all-around star build is read apart: no family term, the classifier never learns that family)
+		const z = r.blocked
+			? BLOCKED_Z
+			: weighTerms(m, r) + (r.fam === "allAround" ? 0 : (fam[r.fam] ?? 0));
+		const prev = best.get(r.pub.id);
+		if (!prev || z > prev.z) {
+			best.set(r.pub.id, { a: r.pub, raw: r.raw, short: r.short, z });
+		}
+	}
+	const scored: Scored[] = [...best.values()];
 	scored.sort((x, y) => (y.z !== x.z ? y.z - x.z : x.a.id < y.a.id ? -1 : 1));
 	return {
 		scored,
@@ -608,6 +669,8 @@ export type ClassifyOptions = {
 	age?: number;
 	stats?: ReadOptions["stats"];
 	prospect?: boolean;
+	// arch15: his play types against his position's peers (with tracking stats)
+	pt?: ReadOptions["pt"];
 	// The fitted model to weigh the reading with (default: modelFor his ratings)
 	model?: FittedModel;
 };
@@ -618,13 +681,13 @@ export const classify = (
 	opts: ClassifyOptions = {},
 ): Classification => {
 	const norms = opts.norms ?? defaultNormsFor(ratings);
-	const { scored, z, expanded } = scoreAll(
+	const { scored, z, expanded, pos } = scoreAll(
 		ratings,
 		norms,
 		ARCHETYPES,
 		isPos(opts.pos) ? opts.pos : undefined,
 		opts.traits,
-		{ age: opts.age, stats: opts.stats, prospect: opts.prospect },
+		{ age: opts.age, stats: opts.stats, prospect: opts.prospect, pt: opts.pt },
 		opts.model,
 	);
 	const model = opts.model ?? modelFor(hasExpanded(ratings));
@@ -664,7 +727,7 @@ export const classify = (
 	const alternates = rest
 		.filter((s) => s.z > BLOCKED_Z && s.z >= first.z - ALTERNATE_Z)
 		.slice(0, ALTERNATES)
-		.map((s) => ({ id: s.a.id, name: s.a.name }));
+		.map((s) => ({ id: s.a.id, name: nameAt(s.a, pos) }));
 	const confidence = second
 		? Math.max(0, Math.min(1, (first.z - second.z) / 0.5))
 		: 1;
@@ -673,9 +736,11 @@ export const classify = (
 			? tierFromPercentile(ovrPercentile(norms, opts.ovr))
 			: null;
 	const a = first.a;
+	// arch15: the name at his position (posNames.ts)
+	const name = nameAt(a, pos);
 	return {
 		id: a.id,
-		name: a.name,
+		name,
 		group: a.group,
 		family: a.family,
 		desc: a.desc,
@@ -687,7 +752,7 @@ export const classify = (
 		confidence: Math.round(confidence * 100) / 100,
 		tier,
 		why: whyOf(a, z, expanded),
-		label: a.name,
+		label: name,
 		...(a.custom ? { custom: true } : {}),
 		...(opts.stats
 			? { statsWeight: Math.round(opts.stats.w * 100) / 100 }

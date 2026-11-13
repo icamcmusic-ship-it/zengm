@@ -2,6 +2,7 @@
 import { ARCHETYPES, archetypeById } from "./classify.ts";
 import { mergedId } from "./merges.data.ts";
 import { isPos } from "./position.ts";
+import { nameAt } from "./posNames.ts";
 import type {
 	ArchetypeFamily,
 	ArchetypeGroup,
@@ -32,11 +33,24 @@ export const GROUP_INFO: Record<
 
 export const GROUPS: ArchetypeGroup[] = ["guard", "wing", "forward", "big"];
 
+// A position's size group, for the roster warnings
+const POS_SIZE: Record<string, ArchetypeGroup> = {
+	PG: "guard",
+	G: "guard",
+	SG: "guard",
+	GF: "wing",
+	SF: "wing",
+	F: "forward",
+	PF: "forward",
+	FC: "big",
+	C: "big",
+};
+
 // Bumped whenever the reading changes enough that a stored label may no longer be what it would give: an entry stored by
 // an older reading (or before versions were stored) is not shown as the current label, the player is read again (and
 // stored anew), so a label from an older engine never lingers until the next preseason
-// arch14: 12 (the fitted reading, merged builds)
-export const ARCHETYPE_READING_VERSION = 12;
+// arch14: 12 (the fitted reading, merged builds); arch15: 13 (sub-ratings and play types, more merges, new builds)
+export const ARCHETYPE_READING_VERSION = 13;
 
 export const toStored = (
 	season: number,
@@ -104,10 +118,12 @@ export const viewOf = (
 	) {
 		return null;
 	}
+	// arch15: the name at his position (posNames.ts)
+	const name = nameAt(a, pos);
 	return {
 		id: a.id,
-		name: a.name,
-		label: a.name,
+		name,
+		label: name,
 		group: a.group,
 		family: a.family,
 		desc: a.desc,
@@ -315,8 +331,12 @@ export const compositionOf = (rows: Rated[], rotation = 9): Composition => {
 			ArchetypeGroup,
 			number
 		>;
+		// (arch15: by his position when it is known: a build open at several position groups names no size)
 		for (const r of top) {
-			topGroups[archetypeById(r.archetypeId!)!.group]++;
+			const g = isPos(r.pos)
+				? POS_SIZE[r.pos as string]!
+				: archetypeById(r.archetypeId!)!.group;
+			topGroups[g]++;
 		}
 		if (topGroups.big === 0) {
 			warnings.push({ kind: "size", text: "No big man in the rotation." });

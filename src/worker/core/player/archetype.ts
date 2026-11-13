@@ -1,7 +1,7 @@
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import {
-	ARCHETYPES,
+	SCORING_ARCHETYPES,
 	DEFAULT_NORMS,
 	DEFAULT_NORMS_EXPANDED,
 	buildNorms,
@@ -52,6 +52,18 @@ import type {
 } from "../../../common/archetypes/types.ts";
 import { isPos } from "../../../common/archetypes/position.ts";
 import { POS_BUCKET } from "../../../common/archetypes/norms.ts";
+import {
+	buildPtNorms,
+	buildSubNorms,
+	playTypesOf,
+	ptFeatures,
+	type PlayTypes,
+	type PtNorms,
+	combinePlayTypes,
+} from "../../../common/archetypes/subStyle.ts";
+import { isValidSubArray } from "../../../common/subRatings.ts";
+import { fuzzSubs, subRatingsOn } from "./subRatings.ts";
+import { playTypeProfile, sumAdv } from "../../../common/advStats.ts";
 
 // The archetype a player has is DERIVED from his ratings (src/common/archetypes), but it is STORED on him (p.archetypes) at
 // the start of every preseason, so what the UI shows stays fixed between preseasons. Prospects, and players who have no entry
@@ -92,7 +104,34 @@ export const ratingsForArchetype = (
 			out[key] = applyFuzz(row[key], fuzz);
 		}
 	}
+	// arch15: his sub-ratings, with the Sub-Ratings setting on (a prospect's as scouted)
+	if (subRatingsOn() && isValidSubArray(row.sub)) {
+		out.sub = fuzzed ? fuzzSubs(row.sub, row.fuzz, p) : row.sub;
+	}
 	return out;
+};
+
+// arch15: his play types (Advanced Tracking Stats) over the same seasons as his box score (subStyle.ts combinePlayTypes), or
+// undefined with the setting off or no tracked possessions
+export const archetypePlayTypes = (
+	p: Player,
+	season: number,
+): PlayTypes | undefined => {
+	if (
+		!featureOn("advStats") ||
+		p.tid === PLAYER.UNDRAFTED ||
+		!Array.isArray(p.stats)
+	) {
+		return undefined;
+	}
+	const rows = (p.stats as any[]).filter((r) => !r.playoffs);
+	return combinePlayTypes(
+		[1, 2, 3].map((k) =>
+			playTypesOf(
+				playTypeProfile(sumAdv(rows.filter((r) => r.season === season - k))),
+			),
+		),
+	);
 };
 
 // His box-score stats for the reading: the last three regular seasons before `season`, the older ones counting less
@@ -160,7 +199,14 @@ const viewContext = (current = true) => ({
 // His position as the game shows it now
 const posNow = (p: Player): unknown => (last(p.ratings) as any)?.pos;
 
-let normsCache: { key: string; norms: Norms; statNorms: StatNorms } | undefined;
+let normsCache:
+	| {
+			key: string;
+			norms: Norms;
+			statNorms: StatNorms;
+			ptNorms: Partial<PtNorms>;
+	  }
+	| undefined;
 
 export const resetArchetypeNorms = () => {
 	normsCache = undefined;
@@ -170,7 +216,7 @@ export const resetArchetypeNorms = () => {
 // asked. A tiny league falls back to the built-in reference league.
 export const getLeagueNorms = async (force = false): Promise<Norms> => {
 	const expanded = expandedRatingsOn();
-	const key = `${g.get("lid")}:${g.get("season")}:${g.get("phase")}:${expanded}`;
+	const key = `${g.get("lid")}:${g.get("season")}:${g.get("phase")}:${expanded}:${subRatingsOn()}:${featureOn("advStats")}`;
 	if (!force && normsCache?.key === key) {
 		return normsCache.norms;
 	}
@@ -185,7 +231,9 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 		age?: number;
 	}[] = [];
 	const statRows: { stats: ArchetypeStats; pos: Pos }[] = [];
+	const ptRows: { pt: PlayTypes; bucket: (typeof POS_BUCKET)[Pos] }[] = [];
 	const season = g.get("season");
+	const advOn = featureOn("advStats");
 	for (const p of players) {
 		const ratings = ratingsForArchetype(p);
 		if (ratings) {
@@ -200,20 +248,43 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 			if (st && isPos(pos)) {
 				statRows.push({ stats: st, pos });
 			}
+			if (advOn && isPos(pos) && Array.isArray(p.stats)) {
+				const pt = playTypesOf(
+					playTypeProfile(
+						sumAdv(
+							(p.stats as any[]).filter(
+								(r) => !r.playoffs && r.season === season - 1,
+							),
+						),
+					),
+				);
+				if (pt) {
+					ptRows.push({ pt, bucket: POS_BUCKET[pos] });
+				}
+			}
 		}
 	}
 	// The reference league (and its calibration) for the ratings the league has: with Expanded Ratings on, the one generated
 	// with the setting on
 	const reference = expanded ? DEFAULT_NORMS_EXPANDED : DEFAULT_NORMS;
-	const norms =
+	const norms: Norms =
 		rows.length >= MIN_LEAGUE_FOR_NORMS
 			? {
-					...buildNorms(rows, ARCHETYPES, reference),
+					// (arch15: a table per scoring profile, classify.ts SCORING_ARCHETYPES)
+					...buildNorms(rows, SCORING_ARCHETYPES, reference),
 					bias: reference.bias,
 					// (a league holds one draft class or two: prospects are read against the reference prospects)
 					prospect: reference.prospect,
 				}
-			: reference;
+			: { ...reference };
+	// arch15: how the league's sub-ratings sit around their bases (real players' shapes from their stats are smaller than
+	// generated ones: each is read against the league it is in)
+	const subNorms = subRatingsOn()
+		? buildSubNorms(rows.map((r) => r.ratings))
+		: undefined;
+	if (subNorms) {
+		norms.sub = subNorms;
+	}
 	// Stat references from the league's own last season (with the shot zones its games record), when enough players have
 	// real minutes in every position bucket; else the real NBA's
 	const own = buildStatNorms(statRows);
@@ -224,7 +295,7 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 		).length;
 		statNorms[b] = n >= 30 ? own[b]! : DEFAULT_STAT_NORMS[b];
 	}
-	normsCache = { key, norms, statNorms };
+	normsCache = { key, norms, statNorms, ptNorms: buildPtNorms(ptRows) };
 	return norms;
 };
 
@@ -235,15 +306,26 @@ export const readOptionsFor = (
 	p: Player,
 	pos: Pos,
 	season: number,
-): { age?: number; stats?: StatReading; prospect?: boolean } => {
+): {
+	age?: number;
+	stats?: StatReading;
+	prospect?: boolean;
+	pt?: ReturnType<typeof ptFeatures>;
+} => {
 	const prospect =
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
 	if (prospect) {
 		return { prospect: true };
 	}
+	// arch15: his play types against his position's peers in this league (none without tracking stats or a league table)
+	const pt = archetypePlayTypes(p, season);
+	const ptRead = pt
+		? ptFeatures(pt, normsCache?.ptNorms[POS_BUCKET[pos]])
+		: undefined;
 	return {
 		age: season - p.born.year,
 		stats: statReading(archetypeStats(p, season), pos, currentStatNorms()),
+		...(ptRead ? { pt: ptRead } : {}),
 	};
 };
 
@@ -265,6 +347,10 @@ export const fuzzedArchetypeLabel = (
 		for (const key of EXPANDED_RATINGS2) {
 			shown[key] = applyFuzz(ratings[key]!, f);
 		}
+	}
+	// (arch15: his sub-ratings as scouted)
+	if (subRatingsOn() && isValidSubArray(ratings.sub)) {
+		shown.sub = fuzzSubs(ratings.sub, fuzz);
 	}
 	// His position comes from the true ratings, as the game shows it; a prospect is read against the prospect tables
 	return classify(shown, {
@@ -379,7 +465,7 @@ export const archetypeFor = (
 		return undefined;
 	}
 	const season = (last(p.ratings) as any).season as number;
-	const live = viewOf(toStored(season, c));
+	const live = viewOf(toStored(season, c), posNow(p));
 	return live ? { view: live, stored: false, classification: c } : undefined;
 };
 

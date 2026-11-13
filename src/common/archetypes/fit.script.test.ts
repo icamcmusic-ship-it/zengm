@@ -14,7 +14,7 @@
 // 4. Five-fold cross-validation on the tuning split picks the regularisation, the family gate (tau, gate) and the close-call
 //    rule (tieMargin, tieStatsK) by top-1 agreement (then loss); the final fit uses the whole tuning split. The test split is
 //    only scored. ARCH_FIT_OUT=file: the report (before -> after per split, families, per-population).
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { test } from "vitest";
 import { RATING_KEYS } from "../ratingsBuilds/solver.ts";
 import { EXPANDED_RATINGS2, fillExpandedRatings } from "../expandedRatings.ts";
@@ -30,13 +30,22 @@ import {
 	CLASS_FEATS,
 	FAM_FEATS,
 	TERMS,
+	STYLE_PRIOR,
 	TRAIT_PRIOR,
 	familyProbs,
 } from "./model.ts";
 import { positionFor } from "./position.ts";
 import { generateTraitSeeds } from "../playerTraits/seeds.ts";
 import { traitScores } from "../playerTraits/scores.ts";
-import { realData, realPlayer } from "./real.testutil.ts";
+import {
+	generatedSubs,
+	realData,
+	realNorms,
+	realPlayer,
+} from "./real.testutil.ts";
+import { modelFor } from "./classify.ts";
+import { mergedId } from "./merges.data.ts";
+import { promiseChecks, promisesOf } from "./score.ts";
 
 const EXPANDED = Boolean(process.env.ARCH_EXPANDED);
 const NORMS = defaultNorms(EXPANDED);
@@ -92,7 +101,9 @@ export const judgedPlayers = (expanded = EXPANDED, norms = NORMS) => {
 		let read;
 		let ratings;
 		let pos = j.pos;
+		let nm = norms;
 		if (j.slug) {
+			nm = realNorms(norms, expanded);
 			const row = data.d.ratings.find(
 				(x) => x.slug === j.slug && x.season === j.season,
 			);
@@ -107,29 +118,47 @@ export const judgedPlayers = (expanded = EXPANDED, norms = NORMS) => {
 				fillExpandedRatings({ srID: `judged-${j.key}`, ratings: [row] });
 				ratings = rOf(row);
 			}
+			const sub = generatedSubs(ratings, j.key);
+			if (sub) ratings.sub = sub;
 			// (the position the game gives him now: the position model may have moved since he was judged)
 			pos = positionFor(ratings, true);
 			read = { age: j.age, prospect: j.prospect };
 		}
 		const t = scoreTerms(
 			ratings,
-			norms,
+			nm,
 			ARCHETYPES,
 			pos,
 			traitsOf(j, ratings, read.age, ji),
 			read,
 		);
-		const rows = t.rows.filter((r) => !r.blocked);
-		const pickIdx = j.ids
-			.map((id) => rows.findIndex((r) => r.a.id === id))
-			.filter((i) => i >= 0);
+		// (arch15: each profile is read as its build: a build merged in arch15 has more than one row)
+		const rows = t.rows
+			.filter((r) => !r.blocked)
+			.map((r) => ({ ...r, a: r.pub }));
+		const ids = [...new Set(j.ids.map(mergedId))];
+		const pickIdx = [];
+		const pickW = [];
+		ids.forEach((id, k) =>
+			rows.forEach((r, ri) => {
+				if (r.a.id === id) {
+					pickIdx.push(ri);
+					pickW.push(PICK_W[k] ?? 0.5);
+				}
+			}),
+		);
 		const famSet = new Set(
-			j.ids.map((id) => rows.find((r) => r.a.id === id)?.fam).filter(Boolean),
+			ids.map((id) => rows.find((r) => r.a.id === id)?.fam).filter(Boolean),
 		);
 		return {
 			j,
+			style: t.p.style,
+			cv: t.cv,
+			pos,
 			rows,
 			pickIdx,
+			pickW,
+			ids,
 			famSet,
 			famX: t.famX,
 			stats: read.stats,
@@ -216,7 +245,9 @@ const toModel = (w, famW, extra) => ({
 	...extra,
 });
 const prior0 = () => [
-	...TERMS.map((t) => (t.startsWith("tr") ? TRAIT_PRIOR : 1)),
+	...TERMS.map((t) =>
+		t.startsWith("tr") ? TRAIT_PRIOR : (STYLE_PRIOR[t] ?? 1),
+	),
 	...CLASS_FEATS.map(() => 0),
 	...FAMILIES.map(() => 0),
 	0,
@@ -246,7 +277,7 @@ const fitRanker = (players, lps, lambda, iters = 400) => {
 			const q = new Array(s.length).fill(0);
 			let qz = 0;
 			p.pickIdx.forEach((ri, k) => {
-				q[ri] = PICK_W[k] * e[ri];
+				q[ri] = p.pickW[k] * e[ri];
 				qz += q[ri];
 			});
 			p.rows.forEach((r, ri) => {
@@ -310,9 +341,15 @@ const evaluate = (players, lps, w, x) => {
 		const hit = p.pickIdx.includes(f);
 		n++;
 		if (hit) t1++;
-		if (order.slice(0, 3).some((i) => p.pickIdx.includes(i))) t3++;
+		const distinct = [];
+		for (const i of order) {
+			if (!distinct.some((d) => p.rows[d].a.id === p.rows[i].a.id))
+				distinct.push(i);
+			if (distinct.length === 3) break;
+		}
+		if (distinct.some((i) => p.pickIdx.includes(i))) t3++;
 		if (p.famSet.has(p.rows[f].fam)) fam++;
-		if (p.pickIdx[0] === f) first++;
+		if (p.rows[f].a.id === p.ids[0]) first++;
 		const b = (byPop[p.pop] ??= { n: 0, t1: 0, fam: 0 });
 		b.n++;
 		if (hit) b.t1++;
@@ -321,7 +358,7 @@ const evaluate = (players, lps, w, x) => {
 		const mx = Math.max(...s);
 		const Z = s.reduce((a, z) => a + Math.exp((z - mx) / T), 0);
 		const qz = p.pickIdx.reduce(
-			(a, ri, k) => a + PICK_W[k] * Math.exp((s[ri] - mx) / T),
+			(a, ri, k) => a + p.pickW[k] * Math.exp((s[ri] - mx) / T),
 			0,
 		);
 		loss += -Math.log(qz / Z);
@@ -340,7 +377,9 @@ const evaluate = (players, lps, w, x) => {
 const pct = (x) => `${(100 * x).toFixed(1)}%`;
 // (the hand settings had no trait terms)
 const handW = () =>
-	TERMS.map((t) => (t.startsWith("tr") ? 0 : 1)).concat(
+	TERMS.map((t) =>
+		t.startsWith("tr") ? 0 : t === "sub" || t === "playType" ? 0 : 1,
+	).concat(
 		CLASS_FEATS.map(() => 0),
 		FAMILIES.map(() => 0),
 		[0],
@@ -372,6 +411,119 @@ test.skipIf(!process.env.RUN_ARCHETYPE_FIT)(
 						`${k} ${pct(b.t1 / b.n)} / fam ${pct(b.fam / b.n)} (n=${b.n})`,
 				)
 				.join(", ")}`;
+		// arch15: the shipped model (fitted.data.ts / fittedExpanded.data.ts) as it reads now
+		{
+			const m = structuredClone(
+				process.env.ARCH_MODEL
+					? JSON.parse(readFileSync(process.env.ARCH_MODEL, "utf8"))
+					: modelFor(EXPANDED),
+			);
+			// (ARCH_THETA="sub=0.3,match=1.1": try other term weights)
+			for (const kv of (process.env.ARCH_THETA ?? "").split(",")) {
+				const [k, v] = kv.split("=");
+				if (k && v !== undefined) m.theta[k] = Number(v);
+			}
+			const wm = [
+				...TERMS.map((t) => m.theta[t] ?? 0),
+				...CLASS_FEATS.map((c) => m.cls[c] ?? 0),
+				...FAMILIES.map((f) => m.famBias[f] ?? 0),
+				m.gamma,
+			];
+			const xm = {
+				tau: m.tau,
+				gate: m.gate,
+				tieMargin: m.tieMargin,
+				tieStatsK: m.tieStatsK,
+			};
+			const lpOf = (ps) =>
+				m.gamma === 0 && m.gate === 0 ? handLp(ps) : famLogP(ps, m.famW);
+			out.push(show("shipped, tune", evaluate(tune, lpOf(tune), wm, xm)));
+			out.push(show("shipped, test", evaluate(testSet, lpOf(testSet), wm, xm)));
+			// arch15: the re-judging dossier: every judged player whose reading with sub-ratings disagrees with the judge,
+			// with the sub-rating evidence for each build (subStyle.ts subTerm, before weighting)
+			if (process.env.ARCH_FIT_DOSSIER) {
+				const SI = TERMS.indexOf("sub");
+				const lines = [];
+				all.forEach((p) => {
+					const lp = lpOf([p])[0];
+					const { first, order } = pickOf(p, lp, wm, xm);
+					const subs = p.style.sub
+						? Object.entries(p.style.sub)
+								.filter(([, v]) => Math.abs(v) >= 1)
+								.sort((x, y) => Math.abs(y[1]) - Math.abs(x[1]))
+								.map(([k, v]) => `${k} ${v.toFixed(1)}`)
+								.join(", ")
+						: "none";
+					const cls = Object.entries(p.cv)
+						.filter(([k]) => !["def", "score", "stre"].includes(k))
+						.sort((x, y) => y[1] - x[1])
+						.slice(0, 4)
+						.map(([k, v]) => `${k} ${v.toFixed(1)}`)
+						.join(", ");
+					const show = (i) =>
+						`${p.rows[i].a.name} [${p.rows[i].fam}] sub ${p.rows[i].f[SI].toFixed(2)}`;
+					const judged = p.pickIdx.map(show).join(" / ");
+					const hit = p.pickIdx.includes(first);
+					lines.push(
+						`${hit ? "ok  " : "MISS"} ${p.j.split} ${p.pop} | ${p.j.key} (${p.pos}) | classes ${cls} | subs ${subs}\n    judged: ${judged}\n    model:  ${order
+							.slice(0, 4)
+							.map(show)
+							.join(" / ")}`,
+					);
+				});
+				writeFileSync(process.env.ARCH_FIT_DOSSIER, lines.join("\n") + "\n");
+				const js = all.map((p) => {
+					const lp = lpOf([p])[0];
+					const { first, order } = pickOf(p, lp, wm, xm);
+					const top2 = Object.entries(p.cv)
+						.filter(([k]) => !["def", "score", "stre"].includes(k))
+						.sort((x, y) => y[1] - x[1])
+						.slice(0, 2)
+						.map(([k]) => k);
+					const info = (i) => ({
+						id: p.rows[i].a.id,
+						name: p.rows[i].a.name,
+						fam: p.rows[i].fam,
+						sub: p.rows[i].f[SI],
+						lead: promisesOf(p.rows[i].a).lead,
+						kept: Object.values(promiseChecks(p.rows[i].a, p.cv)).every(
+							Boolean,
+						),
+					});
+					return {
+						key: p.j.key,
+						split: p.j.split,
+						pop: p.pop,
+						ids: p.j.ids,
+						judged: p.pickIdx.map(info),
+						model: order.slice(0, 5).map(info),
+						first: p.rows[first].a.id,
+						top2,
+						hasSub: !!p.style.sub,
+					};
+				});
+				writeFileSync(
+					process.env.ARCH_FIT_DOSSIER + ".json",
+					JSON.stringify(js),
+				);
+			}
+			if (process.env.ARCH_FIT_EVAL) {
+				const lines = all.map((p, pi) => {
+					const lp = lpOf([p])[0];
+					const { first, order } = pickOf(p, lp, wm, xm);
+					const hit = p.pickIdx.includes(first);
+					return `${hit ? "ok  " : "MISS"}\t${p.j.split}\t${p.pop}\t${p.j.key}\t${p.j.pos}\tgot ${p.rows[first].a.name} [${p.rows[first].fam}]\tjudged ${p.j.ids.map((id) => ARCHETYPES.find((q) => q.id === id)?.name ?? id).join(" / ")}\trunners ${order
+						.slice(1, 4)
+						.map((i) => p.rows[i].a.name)
+						.join(", ")}`;
+				});
+				writeFileSync(
+					process.env.ARCH_FIT_OUT ?? "/tmp/arch-fit-eval.txt",
+					out.join("\n") + "\n" + lines.join("\n") + "\n",
+				);
+				return;
+			}
+		}
 		out.push(show("before, tune", evaluate(tune, handLp(tune), hw, HAND_X)));
 		out.push(
 			show("before, test", evaluate(testSet, handLp(testSet), hw, HAND_X)),
@@ -474,9 +626,13 @@ test.skipIf(!process.env.RUN_ARCHETYPE_FIT)(
 		const rowsOut = testSet.map((p, pi) => {
 			const b = p.rows[pickOf(p, hl[pi], hw, HAND_X).first].a.name;
 			const a = p.rows[pickOf(p, lpT[pi], w, x).first].a.name;
-			return `${p.j.key}\t${p.j.pos}\t${b}\t${p.j.ids.map((id) => ARCHETYPES.find((q) => q.id === id).name).join(" / ")}\t${a}`;
+			return `${p.j.key}\t${p.j.pos}\t${b}\t${p.j.ids.map((id) => ARCHETYPES.find((q) => q.id === mergedId(id))?.name ?? id).join(" / ")}\t${a}`;
 		});
 		if (process.env.ARCH_FIT_OUT) {
+			writeFileSync(
+				process.env.ARCH_FIT_OUT + ".model.json",
+				JSON.stringify(model),
+			);
 			writeFileSync(process.env.ARCH_FIT_OUT, out.join("\n") + "\n");
 			writeFileSync(
 				process.env.ARCH_FIT_OUT + ".test.tsv",

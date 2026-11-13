@@ -15,6 +15,9 @@ export type ArchetypeRatings = Record<RatingKey, number> & {
 	csh?: number;
 	dsh?: number;
 	bsc?: number;
+	// arch15: his sub-ratings (the subRatings setting, common/subRatings.ts SUB_DEFS order), when it's on: the reading reads
+	// their shape (subStyle.ts)
+	sub?: readonly number[];
 };
 
 // The dimensions an archetype profile is written over: BBGM's own composite ratings plus a few raw ratings
@@ -132,6 +135,12 @@ export type ArchetypeDef = {
 	trait?: { key: ArchetypeTraitKey; min: number };
 	// Visible traits that break ties toward this label (weight per trait, see TRAIT_TIE_K in classify.ts)
 	traitTie?: Partial<Record<ArchetypeTraitKey, number>>;
+	// arch15: extra sub-rating and play-type wants beyond what the name's concepts say (subStyle.ts buildWants)
+	sw?: Partial<Record<string, number>>;
+	pw?: Partial<Record<string, number>>;
+	// arch15: the name shown at a position group (guard PG/G/SG, wing GF/SF, big F/PF/FC/C), when it differs from `name`:
+	// one build, one id, a name that fits where he plays
+	posNames?: Partial<Record<"guard" | "wing" | "big", string>>;
 	// The positions he must play to get this label (a hard gate). All nine for the few universal (role) archetypes.
 	positions: Pos[];
 	// Position prior overrides on top of the group's (see position.ts): z nudge per position, null = never
@@ -159,6 +168,8 @@ export type TwoKDef = {
 	tags: string[];
 	// How many of the 2K builds it stands for
 	builds: number;
+	// arch15: names at position groups (Archetype's `posNames`)
+	posNames?: Partial<Record<"guard" | "wing" | "big", string>>;
 	// Not an NBA 2K build name (customDefs.data.ts): no "Same build in 2K" line
 	custom?: true;
 };
@@ -166,6 +177,8 @@ export type TwoKDef = {
 export type Archetype = ArchetypeDef & {
 	// Calibration prior (see calibration.data.ts), 1 = neutral
 	prior: number;
+	// arch15: a scoring profile's build (defs.data.ts SCORING_DEFS): the id it is read as
+	out?: string;
 };
 
 export type Norms = {
@@ -188,6 +201,9 @@ export type Norms = {
 	// Draft prospects are read against prospect tables (raw 19-year-olds: their ratings are compressed and their athleticism is
 	// ahead of their skills), so their builds spread out the way a league's do. Match tables stay the league's.
 	prospect?: Reading;
+	// arch15: how the league's sub-ratings sit around their bases (subStyle.ts SubNorms; the built-in generated table when
+	// absent)
+	sub?: { mean: number[]; sd: number[] };
 };
 
 // The tables a player's ratings are read against

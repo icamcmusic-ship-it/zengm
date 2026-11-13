@@ -20,6 +20,7 @@ import { EXPANDED_RATINGS2, fillExpandedRatings } from "../expandedRatings.ts";
 import { g } from "../../worker/util/index.ts";
 import {
 	ARCHETYPES,
+	SCORING_ARCHETYPES,
 	classify,
 	defaultNorms,
 	isPoorFit,
@@ -876,7 +877,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_DIAG)(
 							ovr: p.ovr,
 							pos: positionFor(p.ratings, true),
 						})),
-						ARCHETYPES,
+						SCORING_ARCHETYPES,
 						NORMS,
 					),
 					bias: NORMS.bias,
