@@ -310,6 +310,8 @@ const applyAction = (
 		si.o = true;
 	} else if (action === "officialVisit") {
 		si.v = true;
+	} else if (action === "retain") {
+		si.r = true;
 	}
 	return si;
 };
@@ -604,7 +606,9 @@ export const recruitingWeek = async (conditions?: Conditions) => {
 		}
 		if (box.commit === undefined) {
 			const tid = pickCommit(
-				box.schools ?? [],
+				kind === "portal"
+					? portalChoices(box.schools ?? [], p.portal!.from)
+					: (box.schools ?? []),
 				(tid) => {
 					const school = schools.get(tid);
 					return !!school && openSpots(school) > 0;
@@ -837,6 +841,12 @@ const addTransfers = async (moves: CollegeDeparture[]) => {
 	});
 };
 
+// The schools a portal player can pick. He entered the portal to leave, so his old school's standing offer doesn't count: it is
+// only in the running with a retention pitch (and then it has to win on interest like anyone else). Before, the standing offer
+// won most of the time at the close of the window and only about 7-30% of entrants moved
+const portalChoices = (schools: SchoolInterest[], from: number) =>
+	schools.filter((s) => s.tid !== from || s.r);
+
 // A portal player joins a school (his own again, or a new one)
 const portalMove = async (
 	p: CollegePlayer,
@@ -1024,7 +1034,7 @@ export const closePortal = async (conditions: Conditions) => {
 		const { p, box } = prospect;
 		const from = p.portal!.from;
 		const ovr = last(p.ratings).ovr;
-		const options = (box.schools ?? [])
+		const options = portalChoices(box.schools ?? [], from)
 			.filter((s) => {
 				const school = schools.get(s.tid);
 				return !!school && openSpots(school) > 0;
@@ -1042,7 +1052,8 @@ export const closePortal = async (conditions: Conditions) => {
 				if (ovr < (sorted[9] ?? 0)) {
 					continue;
 				}
-				const score = school.prestige + (school.tid === from ? 10 : 0);
+				// His old school only if nobody else has a place for him
+				const score = school.prestige - (school.tid === from ? 1000 : 0);
 				if (!best || score > best.score) {
 					best = { tid: school.tid, score };
 				}
