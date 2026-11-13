@@ -1180,6 +1180,52 @@ const finalizeContract = (p: PlayerWithoutKey, phase: Phase) => {
 	}
 };
 
+// Hard cap, new league with random players: lower the contract demands (which become their contracts) of teams above the cap
+// until they fit. Exported for headless test leagues that build their rosters like a new league (economy audit)
+export const fitHardCapContractDemands = async (players: Player[]) => {
+	if (g.get("salaryCapType") === "hard") {
+		const minContract = g.get("minContract");
+
+		const teams = await idb.cache.teams.getAll();
+		for (const t of teams) {
+			if (t.disabled) {
+				continue;
+			}
+			// Contract demands of random players, which become their contracts below
+			const roster = players
+				.filter((p) => p.tid === t.tid)
+				.map((p) => p.contractDemand)
+				.filter((contractDemand) => contractDemand !== undefined);
+			let payroll = await team.getPayroll(t.tid);
+			for (const contractDemand of roster) {
+				payroll += contractDemand.amount;
+			}
+
+			while (payroll > g.get("salaryCap")) {
+				let foundAny = false;
+
+				for (const contractDemand of roster) {
+					if (contractDemand.amount >= minContract + 10) {
+						payroll -= 10;
+						contractDemand.amount -= 10;
+						foundAny = true;
+					} else if (contractDemand.amount > minContract) {
+						payroll -= contractDemand.amount - minContract;
+						contractDemand.amount = minContract;
+						foundAny = true;
+					}
+				}
+
+				if (!foundAny) {
+					throw new Error(
+						"Invalid combination of salaryCapType, salaryCap, and minContract - a team full of min contract players is still over the hard cap",
+					);
+				}
+			}
+		}
+	}
+};
+
 const finalizeActivePlayers = async ({
 	fileHasPlayers,
 	legacyReleasedPlayers,
@@ -1248,46 +1294,8 @@ const finalizeActivePlayers = async ({
 	const players = await idb.cache.players.getAll();
 
 	// Adjustment for hard cap - lower contracts for teams above cap
-	if (!fileHasPlayers && g.get("salaryCapType") === "hard") {
-		const minContract = g.get("minContract");
-
-		const teams = await idb.cache.teams.getAll();
-		for (const t of teams) {
-			if (t.disabled) {
-				continue;
-			}
-			// Contract demands of random players, which become their contracts below
-			const roster = players
-				.filter((p) => p.tid === t.tid)
-				.map((p) => p.contractDemand)
-				.filter((contractDemand) => contractDemand !== undefined);
-			let payroll = await team.getPayroll(t.tid);
-			for (const contractDemand of roster) {
-				payroll += contractDemand.amount;
-			}
-
-			while (payroll > g.get("salaryCap")) {
-				let foundAny = false;
-
-				for (const contractDemand of roster) {
-					if (contractDemand.amount >= minContract + 10) {
-						payroll -= 10;
-						contractDemand.amount -= 10;
-						foundAny = true;
-					} else if (contractDemand.amount > minContract) {
-						payroll -= contractDemand.amount - minContract;
-						contractDemand.amount = minContract;
-						foundAny = true;
-					}
-				}
-
-				if (!foundAny) {
-					throw new Error(
-						"Invalid combination of salaryCapType, salaryCap, and minContract - a team full of min contract players is still over the hard cap",
-					);
-				}
-			}
-		}
+	if (!fileHasPlayers) {
+		await fitHardCapContractDemands(players);
 	}
 
 	for (const p of players) {

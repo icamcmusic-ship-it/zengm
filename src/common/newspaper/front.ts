@@ -981,16 +981,31 @@ export const leadPreseason = (c: Ctx): Article | undefined => {
 				"The defending champion ",
 				c.tl(champPrev.tid),
 				` ${champPrev.prev ? `went ${record(champPrev.prev)} last season` : "won it all last season"}` +
-					`${champPrev.tid === fav.t.tid ? " and start as favorites again." : `; on roster ratings they rank ${ordinal(power.findIndex((x) => x.t.tid === champPrev.tid) + 1)}.`}`,
+					`${
+						champPrev.tid === fav.t.tid
+							? " and start as favorites again."
+							: c.noRatings
+								? power.findIndex((x) => x.t.tid === champPrev.tid) < 4
+									? "; on paper they are among the favorites again."
+									: "; on paper they have work to do to repeat."
+								: `; on roster ratings they rank ${ordinal(power.findIndex((x) => x.t.tid === champPrev.tid) + 1)}.`
+					}`,
 			),
 		);
 	}
 	if (stars.length >= 2) {
 		body.push(
 			P(
-				"The highest-rated players entering the season: ",
+				c.noRatings
+					? "Among the league's best players entering the season: "
+					: "The highest-rated players entering the season: ",
 				...andList(
-					stars.map((p) => [c.pl(p.pid), ` (${p.ovr} ovr, `, c.tl(p.tid), ")"]),
+					stars.map((p) => [
+						c.pl(p.pid),
+						c.noRatings ? " (" : ` (${p.ovr} ovr, `,
+						c.tl(p.tid),
+						")",
+					]),
 				),
 				".",
 			),
@@ -1015,19 +1030,34 @@ export const leadPreseason = (c: Ctx): Article | undefined => {
 			),
 		);
 	}
-	body.push({
-		type: "table",
-		head: ["", "Team", "Roster rating", "Last season"],
-		numCols: [0, 2],
-		rows: power
-			.slice(0, 8)
-			.map((x, i) => [
-				[String(i + 1)],
-				[c.tl(x.t.tid, c.tfull(x.t.tid))],
-				[x.score.toFixed(1)],
-				[x.t.prev ? record(x.t.prev) : "–"],
-			]),
-	});
+	body.push(
+		c.noRatings
+			? {
+					type: "table",
+					head: ["", "Team", "Last season"],
+					numCols: [0],
+					rows: power
+						.slice(0, 8)
+						.map((x, i) => [
+							[String(i + 1)],
+							[c.tl(x.t.tid, c.tfull(x.t.tid))],
+							[x.t.prev ? record(x.t.prev) : "–"],
+						]),
+				}
+			: {
+					type: "table",
+					head: ["", "Team", "Roster rating", "Last season"],
+					numCols: [0, 2],
+					rows: power
+						.slice(0, 8)
+						.map((x, i) => [
+							[String(i + 1)],
+							[c.tl(x.t.tid, c.tfull(x.t.tid))],
+							[x.score.toFixed(1)],
+							[x.t.prev ? record(x.t.prev) : "–"],
+						]),
+				},
+	);
 	return {
 		id: "lead",
 		size: "lead",
@@ -1038,12 +1068,22 @@ export const leadPreseason = (c: Ctx): Article | undefined => {
 			`A new season begins, and the ${c.tn(fav.t.tid)} look strongest`,
 		])!,
 		deck: [
-			c.cycle("deck-pre", [
-				`Nothing has been played yet in ${c.season}; the outlook comes from roster ratings.`,
-				`${c.season} has not tipped off, so these are ratings, not results.`,
-				`Before a single game of ${c.season}, the rosters say this.`,
-				`The ${c.season} season preview: every team is 0-0 and the ratings have the floor.`,
-			]),
+			c.cycle(
+				"deck-pre",
+				c.noRatings
+					? [
+							`Nothing has been played yet in ${c.season}; the outlook comes from the rosters.`,
+							`${c.season} has not tipped off, so this is a forecast, not results.`,
+							`Before a single game of ${c.season}, the rosters say this.`,
+							`The ${c.season} season preview: every team is 0-0 and the rosters have the floor.`,
+						]
+					: [
+							`Nothing has been played yet in ${c.season}; the outlook comes from roster ratings.`,
+							`${c.season} has not tipped off, so these are ratings, not results.`,
+							`Before a single game of ${c.season}, the rosters say this.`,
+							`The ${c.season} season preview: every team is 0-0 and the ratings have the floor.`,
+						],
+			),
 		],
 		byline: c.byline("front"),
 		photoPid: stars[0]?.pid,

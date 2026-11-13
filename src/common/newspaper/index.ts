@@ -208,7 +208,10 @@ const leadFor = (c: Ctx) => {
 const pagesFor = (c: Ctx, section: SectionId, quota: number): Article[] => {
 	const eds = (p: PageDef) => p.eds ?? ["midseason", "playoffs", "final"];
 	const candidates = PAGES.filter(
-		(p) => p.section === section && eds(p).includes(c.f.edition),
+		(p) =>
+			p.section === section &&
+			eds(p).includes(c.f.edition) &&
+			!(p.ratings && c.noRatings),
 	).toSorted(
 		(a, b) =>
 			hashString(`${c.f.seedKey}|${section}|${c.tid ?? ""}|${a.id}`) -

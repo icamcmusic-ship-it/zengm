@@ -253,7 +253,9 @@ addPage(
 					{
 						type: "aside",
 						segs: [
-							"Ratings and playing time can still change; this is a snapshot, not a verdict.",
+							c.noRatings
+								? "Skills and playing time can still change; this is a snapshot, not a verdict."
+								: "Ratings and playing time can still change; this is a snapshot, not a verdict.",
 						],
 					},
 				],

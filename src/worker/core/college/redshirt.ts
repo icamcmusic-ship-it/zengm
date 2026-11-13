@@ -70,8 +70,18 @@ export const setRedshirt = async (p: Player, on: boolean) => {
 
 /**
  * AI schools redshirt their deep-bench freshmen (12th man and below by value, at most two) at the start of the regular season.
+ *
+ * Phased in over a new league's first REDSHIRT_PHASE_IN seasons: a league starts with four class years and no fifth-year seniors, so
+ * the first redshirted class leaves a year late all at once, and the year it should have left the seniors (and so the open spots,
+ * and the next recruiting class) dropped by a quarter in a full league, an echo that came back every four years. Phased in, the
+ * shift is spread over four classes.
  */
+export const REDSHIRT_PHASE_IN = 4;
+export const aiRedshirtChance = (season: number, startingSeason: number) =>
+	0.7 * Math.min(1, (season - startingSeason + 1) / REDSHIRT_PHASE_IN);
+
 export const aiRedshirts = async () => {
+	const chance = aiRedshirtChance(g.get("season"), g.get("startingSeason"));
 	const userTids = g.get("userTids");
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	for (const t of teams) {
@@ -86,7 +96,7 @@ export const aiRedshirts = async () => {
 		}
 		let n = 0;
 		for (const p of roster.slice(10)) {
-			if (n < 2 && canRedshirt(p) && Math.random() < 0.7) {
+			if (n < 2 && canRedshirt(p) && Math.random() < chance) {
 				await setRedshirt(p, true);
 				n += 1;
 			}

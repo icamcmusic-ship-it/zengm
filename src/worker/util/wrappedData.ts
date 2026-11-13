@@ -21,6 +21,7 @@ import {
 	LeagueIndex,
 	newLinesCache,
 	type LinesCache,
+	type RatingsView,
 } from "../../common/wrapped/league.ts";
 import type {
 	DraftLotteryResult,
@@ -208,6 +209,9 @@ const toWPlayer = (p: Player): WPlayer => ({
 	})),
 	relatives: p.relatives.map((r) => ({ type: r.type, pid: r.pid })),
 	pot: Object.fromEntries(p.ratings.map((r) => [r.season, r.pot])),
+	fuzz: Object.fromEntries(
+		p.ratings.map((r) => [r.season, Math.round((r.fuzz ?? 0) * 100) / 100]),
+	),
 	pos: Object.fromEntries(p.ratings.map((r) => [r.season, r.pos])),
 	hgt: p.ratings.at(-1)?.hgt,
 	paid: (p.contracts ?? []).flatMap((c) =>
@@ -1194,6 +1198,19 @@ export const isBulkSimming = () =>
 export const getWrappedIndex = async (
 	_updateEvents?: ReadonlySet<UpdateEvent>,
 ) => (await getWrapped()).X;
+
+// Which ratings the Wrapped slides may quote (see RatingsView): none under the No Visible Player Ratings challenge, the scouts'
+// fuzzed ones otherwise, except where the rest of the UI shows true ones too (God Mode, several user teams). Part of every
+// memoized slides key, so toggling the challenge never shows slides made for the other mode
+export const wrappedRatingsView = (): RatingsView => {
+	if (g.get("challengeNoRatings")) {
+		return "hidden";
+	}
+	if (g.get("godMode") || g.get("userTids").length > 1) {
+		return "true";
+	}
+	return "fuzz";
+};
 
 // Drop everything kept for the league, like when something that bypasses the cache wrote to the database
 export const resetWrappedCache = () => {

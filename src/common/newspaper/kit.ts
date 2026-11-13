@@ -24,6 +24,8 @@ export type PageDef = {
 	// Editions in which the page runs. Default: everything but the preview
 	eds?: readonly EditionId[];
 	build: (c: Ctx) => Article | undefined;
+	// The page is about player or roster ratings: it doesn't run under the No Visible Player Ratings challenge
+	ratings?: boolean;
 };
 
 export const PAGES: PageDef[] = [];
@@ -73,6 +75,8 @@ export type ArcPageSpec<X> = {
 	dateline?: (x: X, c: Ctx) => string | undefined;
 	colour?: boolean;
 	deck?: (x: X, c: Ctx) => Seg[] | undefined;
+	// See PageDef
+	ratings?: boolean;
 };
 
 // A head that has not run in this paper yet, stepping through the variants one place a season
@@ -106,6 +110,7 @@ export const arcPage = <X>(spec: ArcPageSpec<X>): PageDef => ({
 	section: spec.section,
 	kicker: spec.kicker,
 	eds: spec.eds,
+	ratings: spec.ratings,
 	build: (c) => {
 		const x = spec.prep(c);
 		if (x === undefined) {
@@ -181,6 +186,8 @@ export type RankSpec = {
 	minTop?: number;
 	size?: "feature" | "brief";
 	tableRows?: number;
+	// See PageDef
+	ratings?: boolean;
 	// A plain sentence that can open the table instead of the usual ones (the variation pass in vary.ts has rewrites for some of them)
 	lead?: (c: Ctx, items: Item[]) => string | undefined;
 };
@@ -223,6 +230,7 @@ export const rankPage = (spec: RankSpec): PageDef => {
 		eds: spec.eds,
 		beat: spec.beat,
 		size: spec.size,
+		ratings: spec.ratings,
 		prep: (c) => {
 			const items = spec.items(c);
 			if (!items || items.length < 6) {

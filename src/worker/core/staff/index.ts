@@ -340,6 +340,18 @@ export const hire = async (
 	clearCoachSystemsCache();
 };
 
+// Fired by this team this season or last: it can't hire him back yet (AI teams don't, and for the user it would be an exploit:
+// fire an overpaid coach for half the rest of his contract and rehire him at his lower asking price)
+export const firedRecentlyBy = (c: Coach, tid: number) => {
+	const lastTx = c.transactions.at(-1);
+	return (
+		lastTx !== undefined &&
+		lastTx.tid === tid &&
+		lastTx.type === "fired" &&
+		lastTx.season >= g.get("season") - 1
+	);
+};
+
 // Half of what's left on the contract, paid now as a coaching expense
 export const getBuyout = (c: Coach) => {
 	const season = g.get("season");
@@ -484,13 +496,7 @@ export const fillVacancies = async ({
 					continue;
 				}
 				// Former employees who were just fired by this team are not rehired
-				const lastTx = c.transactions.at(-1);
-				if (
-					lastTx &&
-					lastTx.tid === t.tid &&
-					lastTx.type === "fired" &&
-					lastTx.season >= g.get("season") - 1
-				) {
+				if (firedRecentlyBy(c, t.tid)) {
 					continue;
 				}
 				const gm = gms.get(t.tid);
@@ -947,6 +953,11 @@ export const userHire = async ({
 	const c = await getUserCoach(cid);
 	if (c.tid !== COACH_FREE_AGENT) {
 		throw new Error("That coach is not available");
+	}
+	if (firedRecentlyBy(c, tid)) {
+		throw new Error(
+			"You fired him this season or last, so he won't come back yet.",
+		);
 	}
 	const staff = await getTeamStaff(tid);
 	if (staff[role]) {

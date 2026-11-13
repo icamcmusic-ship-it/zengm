@@ -42,6 +42,7 @@ import {
 } from "../../worker/core/frontOffice/index.ts";
 import { nativeFeatureNewLeagueDefaults } from "../../common/nativeFeatures.ts";
 import { ALL_ON, OFF, mulberry32 } from "./harness.ts";
+import { fitHardCapContractDemands } from "../../worker/core/league/createStream.ts";
 
 const mean = (xs) =>
 	xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -168,6 +169,8 @@ const createLeague = async (settings, numTeams) => {
 		type: "newLeague",
 		pids: all.filter((p) => p.contractDemand?.temp).map((p) => p.pid),
 	});
+	// Hard cap: like a new league, contract demands are lowered until every team fits under the cap
+	await fitHardCapContractDemands(await idb.cache.players.getAll());
 	for (const p of await idb.cache.players.getAll()) {
 		if (!getCurrentContract(p) && p.tid >= 0) {
 			finalizeContract(p);

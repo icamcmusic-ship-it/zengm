@@ -23,6 +23,7 @@ import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, local, lock } from "../../util/index.ts";
 import { getCollegeArchive } from "./archive.ts";
 import { setRedshirt } from "./redshirt.ts";
+import { getClassYear } from "./offseason.ts";
 import { getCollegeTournamentSize } from "../../../common/college/teams.ts";
 import { getNitSize } from "./postseason.ts";
 import {
@@ -43,6 +44,13 @@ const SEASONS = Number(env.COLLEGE_SEASONS ?? 3);
 const BENCH: string | undefined = env.COLLEGE_BENCH;
 // COLLEGE_QUICK=1/0: the quick sim on or off all along. Default: the level's default, and on from the second season (so both paths run)
 const QUICK: string | undefined = env.COLLEGE_QUICK;
+// File to append one JSON line per season to: players by class year in the preseason, the portal's yield (share of entrants who moved)
+const LOG: string | undefined = env.COLLEGE_LOG;
+const logLine = (x: Record<string, unknown>) => {
+	if (LOG) {
+		appendFileSync(LOG, `${JSON.stringify(x)}\n`);
+	}
+};
 
 const where = () => `season ${g.get("season")} phase ${g.get("phase")}`;
 
@@ -187,6 +195,17 @@ const runLeague = async ({
 				await league.setGameAttributes({ collegeQuickSim: true });
 			}
 			await checkRosters(`preseason ${i}`);
+			if (LOG) {
+				const byYear: Record<string, number> = {};
+				for (const p of await idb.cache.players.indexGetAll("playersByTid", [
+					0,
+					Infinity,
+				])) {
+					const y = String(getClassYear(p as any));
+					byYear[y] = (byYear[y] ?? 0) + 1;
+				}
+				logLine({ level, season: g.get("season"), byYear });
+			}
 			const recruits = (
 				await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
 			).filter((p: any) => p.draft.year === g.get("season") && p.recruit);
@@ -478,6 +497,17 @@ const runLeague = async ({
 			}
 			await step("recruiting", () => phase.newPhase(PHASE.RESIGN_PLAYERS, {}));
 			assert.lengthOf(await getPortalPlayers(), 0, "portal closed");
+			{
+				const moved =
+					(await getCollegeArchive(g.get("season")))?.transfers?.length ?? 0;
+				logLine({
+					level,
+					season: g.get("season"),
+					portal: portal.length,
+					moved,
+					yield: Math.round((100 * moved) / portal.length) / 100,
+				});
+			}
 			assert.isAbove(
 				(await getCollegeArchive(g.get("season")))?.transfers?.length ?? 0,
 				0,

@@ -16,6 +16,7 @@ import handleUploadedDraftClass from "./handleUploadedDraftClass.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
 import { RATINGS } from "../../../common/constants.ts";
 import { syncExpandedToCompat } from "../player/expandedRatings.ts";
+import { potEstimatorBasketballWithoutNoise } from "../player/potEstimator.ts";
 import { EXPANDED_RATINGS } from "../../../common/expandedRatings.ts";
 import { last } from "../../../common/utils.ts";
 import { formatPlayerAwardName } from "../../../common/awards.ts";
@@ -310,8 +311,11 @@ const scaled = (ratings: any, k: number) => {
 /**
  * Put an imported class on this league's scale. A college league's ratings are ordinary ratings, but its talent is calibrated for college
  * games (its seniors are much better than the prospects of a pro draft class), so the class is mapped by rank onto a pro class generated
- * for the same draft (not saved): the k-th best imported prospect gets the ovr of the k-th best generated one, every rating but height
- * scaled by the same factor. Then ovr, pot and value are computed again.
+ * for the same draft (not saved): the k-th best imported prospect gets the draft value of the k-th best generated one (the age-adjusted
+ * mix of ovr and pot the draft AI uses, with the noiseless pot estimate for both), every rating but height scaled by the same factor.
+ * Then ovr, pot and value are computed again. Matching on value, not ovr: the class is about 1.5 years older than a generated one (the
+ * college off-screen draft takes mostly seniors), and at the same ovr an older prospect has less potential, so matching ovr left the class
+ * about 6 points of pot and 8 of value below a generated one, rank for rank. An older prospect now gets a little more ovr instead.
  */
 const toProScale = async (draftYear: number, lid: number, season: number) => {
 	const imported = (
@@ -330,36 +334,75 @@ const toProScale = async (draftYear: number, lid: number, season: number) => {
 	const scoutingLevel = await finances.getLevelLastThree("scouting", {
 		tid: g.get("userTid"),
 	});
-	const reference = (
-		await genPlayersWithoutSaving(draftYear, scoutingLevel, [])
-	)
-		.map((p) => last(p.ratings).ovr)
+	// Draft value from ovr and age, with the noiseless pot estimate (what monteCarloPot gives on average)
+	const draftValue = (ovr: number, age: number) =>
+		player.valueCombineOvrPot(
+			ovr,
+			Math.max(ovr, potEstimatorBasketballWithoutNoise(ovr, age)),
+			age,
+		);
+	const generated = await genPlayersWithoutSaving(draftYear, scoutingLevel, []);
+	const reference = generated
+		.map((p) => draftValue(last(p.ratings).ovr, draftYear - p.born.year))
 		.sort((a, b) => b - a);
 	if (reference.length === 0) {
 		return;
 	}
-	for (const [i, p] of imported.entries()) {
-		// Past the end of the reference class, keep the gap to its last prospect
-		const j = Math.min(i, reference.length - 1);
-		const target = reference[j]! - (i - j) * 0.2;
-		const ratings = last(p.ratings) as any;
-		// The factor that gives the target ovr (ovr rises with k)
-		let lo = 0.2;
-		let hi = 1.5;
-		for (let iter = 0; iter < 14; iter++) {
-			const mid = (lo + hi) / 2;
-			if (player.ovr(scaled(ratings, mid), ratings.pos) < target) {
-				lo = mid;
-			} else {
-				hi = mid;
+	// The values the draft AI will see (pot from monteCarloPot), for the calibration below
+	const actualValue = (p: {
+		born: { year: number };
+		ratings: { ovr: number; pot: number }[];
+	}) => {
+		const r = p.ratings.at(-1)!;
+		return player.valueCombineOvrPot(r.ovr, r.pot, draftYear - p.born.year);
+	};
+	const top = Math.min(60, imported.length, generated.length);
+	const meanTop = (values: number[]) =>
+		values
+			.sort((a, b) => b - a)
+			.slice(0, top)
+			.reduce((sum, x) => sum + x, 0) / top;
+	const referenceActual = meanTop(generated.map(actualValue));
+	const originals = imported.map((p) => ({ ...last(p.ratings) }));
+
+	const scaleAll = async (offset: number) => {
+		for (const [i, p] of imported.entries()) {
+			// Past the end of the reference class, keep the gap to its last prospect
+			const j = Math.min(i, reference.length - 1);
+			const target = reference[j]! - (i - j) * 0.2 + offset;
+			const ratings = last(p.ratings) as any;
+			Object.assign(ratings, originals[i]);
+			const age = draftYear - p.born.year;
+			// The factor that gives the target value (value rises with k)
+			let lo = 0.2;
+			let hi = 1.5;
+			for (let iter = 0; iter < 14; iter++) {
+				const mid = (lo + hi) / 2;
+				if (
+					draftValue(player.ovr(scaled(ratings, mid), ratings.pos), age) <
+					target
+				) {
+					lo = mid;
+				} else {
+					hi = mid;
+				}
 			}
+			const next = scaled(ratings, (lo + hi) / 2);
+			for (const key of SCALE_KEYS) {
+				ratings[key] = next[key];
+			}
+			syncExpandedToCompat(ratings);
+			await player.develop(p, 0);
 		}
-		const next = scaled(ratings, (lo + hi) / 2);
-		for (const key of SCALE_KEYS) {
-			ratings[key] = next[key];
-		}
-		syncExpandedToCompat(ratings);
-		await player.develop(p, 0);
+	};
+	await scaleAll(0);
+	// monteCarloPot doesn't give an older prospect quite the pot the estimate says: one more pass, with the gap between the top of
+	// the two classes (as the draft AI values them) added to the targets
+	const gap = referenceActual - meanTop(imported.map(actualValue));
+	if (Math.abs(gap) >= 0.5) {
+		await scaleAll(gap);
+	}
+	for (const p of imported) {
 		await player.updateValues(p);
 		await idb.cache.players.put(p);
 	}

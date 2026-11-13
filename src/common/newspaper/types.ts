@@ -343,6 +343,9 @@ export type NPCareerRow = {
 
 export type NewsFacts = {
 	leagueName: string;
+	// No Visible Player Ratings challenge: nothing in the paper quotes a rating (player or roster), it says it in words or leaves
+	// it out. The ratings in the facts are still there (fuzzed, as the user's scouts see them) for ordering
+	noRatings?: boolean;
 	// Stable per league, used to seed text choices
 	seedKey: string;
 	season: number;

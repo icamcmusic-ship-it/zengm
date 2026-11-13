@@ -15,6 +15,9 @@ import { getCollegeSettings } from "../../../common/college/settings.ts";
 import { last } from "../../../common/utils.ts";
 import { isPreDraftStatsRow } from "../../../common/preDraft.ts";
 import { draft, game, league, phase } from "../index.ts";
+import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
+import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
+import valueCombineOvrPot from "../player/valueCombineOvrPot.ts";
 import * as views from "../../views/index.ts";
 import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
@@ -205,9 +208,48 @@ describe("linked college league", () => {
 				),
 				JSON.stringify(honorTypes),
 			);
+			// Rank for rank, the class compares with a generated one on potential and on the age-adjusted value the draft AI uses
+			// (it averages about 1.5 years older: the off-screen college draft takes mostly seniors)
+			{
+				const ref = (await genPlayersWithoutSaving(
+					2025,
+					DEFAULT_LEVEL,
+					[],
+				)) as any[];
+				const stats = (ps: any[]) => {
+					const rows = ps
+						.map((p) => {
+							const r = last(p.ratings) as any;
+							const age = 2025 - p.born.year;
+							return {
+								age,
+								ovr: r.ovr,
+								pot: r.pot,
+								value: valueCombineOvrPot(r.ovr, r.pot, age),
+							};
+						})
+						.sort((a, b) => b.value - a.value)
+						.slice(0, 60);
+					const mean = (f: (x: (typeof rows)[number]) => number) =>
+						rows.reduce((sum, x) => sum + f(x), 0) / rows.length;
+					return {
+						age: mean((x) => x.age),
+						ovr: mean((x) => x.ovr),
+						pot: mean((x) => x.pot),
+						value: mean((x) => x.value),
+					};
+				};
+				const a = stats(linked);
+				const b = stats(ref);
+				// (Before value matching: pot 46 vs 56, value 41 vs 49 for the top 60)
+				assert.isAbove(a.age, b.age + 1, "an older class");
+				assert.closeTo(a.value, b.value, 3, JSON.stringify({ a, b }));
+				assert.closeTo(a.pot, b.pot, 4, JSON.stringify({ a, b }));
+			}
 			// On the pro scale: a top prospect is not already a star, as a generated class
 			const ovrs = linked.map((p) => last(p.ratings).ovr).sort((a, b) => b - a);
-			assert.isAtMost(ovrs[0]!, 62, "best prospect ovr");
+			// (matched on draft value, an older prospect gets a few more points of ovr than the generated one of his rank)
+			assert.isAtMost(ovrs[0]!, 65, "best prospect ovr");
 			assert.isAtLeast(ovrs[0]!, 40, "best prospect ovr");
 			assert.isBelow(ovrs.at(-1)!, ovrs[0]!);
 			assert.isAtLeast(

@@ -53,9 +53,14 @@ export const teamLead = (c: Ctx, tid: number): Article | undefined => {
 		if (roster.length >= 2) {
 			body.push(
 				P(
-					"The highest-rated players on the roster: ",
+					c.noRatings
+						? "The best players on the roster: "
+						: "The highest-rated players on the roster: ",
 					...andList(
-						roster.map((p) => [c.pl(p.pid), ` (${p.ovr}, age ${p.age})`]),
+						roster.map((p) => [
+							c.pl(p.pid),
+							c.noRatings ? ` (age ${p.age})` : ` (${p.ovr}, age ${p.age})`,
+						]),
 					),
 					".",
 				),
@@ -202,7 +207,7 @@ export const teamPlayerFeatures = (c: Ctx, tid: number): Article[] => {
 					),
 				);
 			}
-			if (p.prevOvr !== undefined && p.ovr !== p.prevOvr) {
+			if (p.prevOvr !== undefined && p.ovr !== p.prevOvr && !c.noRatings) {
 				body.push(
 					P(
 						`His rating ${p.ovr > p.prevOvr ? "rose" : "fell"} from ${p.prevOvr} to ${p.ovr} over the year.`,
@@ -367,7 +372,9 @@ export const teamRookies = (c: Ctx, tid: number): Article | undefined => {
 						.map((p) => [
 							c.pl(p.pid),
 							c.pre
-								? ` (${p.ovr} now, ${p.pot} potential)`
+								? c.noRatings
+									? ` (age ${p.age})`
+									: ` (${p.ovr} now, ${p.pot} potential)`
 								: ` (${fmt1(p.pts)} points in ${fmt1(p.min)} minutes, ${plural(p.gp, "game")})`,
 						]),
 				),
@@ -378,7 +385,7 @@ export const teamRookies = (c: Ctx, tid: number): Article | undefined => {
 	if (drafted.length > 0) {
 		body.push(
 			table(
-				["Pick", "Player", "Pos", "Age", "Ovr/Pot"],
+				["Pick", "Player", "Pos", "Age", ...(c.noRatings ? [] : ["Ovr/Pot"])],
 				drafted
 					.toSorted((a, b) => a.round - b.round || a.pick - b.pick)
 					.slice(0, 6)
@@ -387,7 +394,7 @@ export const teamRookies = (c: Ctx, tid: number): Article | undefined => {
 						[c.pl(d.pid, d.name)],
 						[d.pos],
 						[String(d.age)],
-						[`${d.ovr}/${d.pot}`],
+						...(c.noRatings ? [] : [[`${d.ovr}/${d.pot}`]]),
 					]),
 				[3],
 			),
@@ -580,7 +587,11 @@ export const teamRanks = (c: Ctx, tid: number): Article | undefined => {
 					},
 				];
 	const shown = rows.filter(
-		(x) => x.value !== "" && x.rank !== undefined && x.value !== "0.0",
+		(x) =>
+			x.value !== "" &&
+			x.rank !== undefined &&
+			x.value !== "0.0" &&
+			!(c.noRatings && x.label === "Roster rating"),
 	);
 	if (shown.length < 3) {
 		return undefined;
@@ -690,12 +701,16 @@ export const teamRoster = (c: Ctx, tid: number): Article | undefined => {
 		body: [
 			P(
 				c.pre
-					? `The ${t.name} roster, best rating first.`
+					? c.noRatings
+						? `The ${t.name} roster, best players first.`
+						: `The ${t.name} roster, best rating first.`
 					: `The ${t.name} rotation by win shares${c.done ? "" : " so far"}.`,
 			),
 			table(
 				c.pre
-					? ["Player", "Pos", "Age", "Ovr/Pot", "Salary"]
+					? c.noRatings
+						? ["Player", "Pos", "Age", "Salary"]
+						: ["Player", "Pos", "Age", "Ovr/Pot", "Salary"]
 					: ["Player", "Pos", "Age", "PTS/REB/AST", "WS", "Salary"],
 				ps.map((p) =>
 					c.pre
@@ -703,7 +718,7 @@ export const teamRoster = (c: Ctx, tid: number): Article | undefined => {
 								[c.pl(p.pid)],
 								[p.pos],
 								[String(p.age)],
-								[`${p.ovr}/${p.pot}`],
+								...(c.noRatings ? [] : [[`${p.ovr}/${p.pot}`]]),
 								[p.contractAmount ? money(p.contractAmount) : "–"],
 							]
 						: [
