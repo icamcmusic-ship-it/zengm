@@ -134,7 +134,10 @@ export const backProject = (
 			key === "spd" || key === "jmp" || key === "stre" || key === "endu"
 				? 0.55
 				: 1;
-		out[key] = Math.max(0, out[key]! - shift * factor);
+		(out as unknown as Record<string, number>)[key] = Math.max(
+			0,
+			(out[key] as number) - shift * factor,
+		);
 	}
 	return out;
 };
