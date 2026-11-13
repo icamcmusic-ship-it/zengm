@@ -330,17 +330,61 @@ export const PLAYER_STATS_TABLES = {
 		],
 		superCols: [
 			{ title: "", colspan: 7 },
-			{ title: "PnR BH", desc: "Pick-and-Roll Ball Handler (frequency, points per possession)", colspan: 2 },
-			{ title: "PnR Roll", desc: "Pick-and-Roll Roll Man (frequency, points per possession)", colspan: 2 },
-			{ title: "Iso", desc: "Isolation (frequency, points per possession)", colspan: 2 },
-			{ title: "Post", desc: "Post-Up (frequency, points per possession)", colspan: 2 },
-			{ title: "Spot", desc: "Spot-Up (frequency, points per possession)", colspan: 2 },
-			{ title: "Cut", desc: "Cut (frequency, points per possession)", colspan: 2 },
-			{ title: "Off Scr", desc: "Off Screen (frequency, points per possession)", colspan: 2 },
-			{ title: "Handoff", desc: "Handoff (frequency, points per possession)", colspan: 2 },
-			{ title: "Trans", desc: "Transition (frequency, points per possession)", colspan: 2 },
-			{ title: "Putback", desc: "Putback (frequency, points per possession)", colspan: 2 },
-			{ title: "Misc", desc: "Miscellaneous (frequency, points per possession)", colspan: 2 },
+			{
+				title: "PnR BH",
+				desc: "Pick-and-Roll Ball Handler (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "PnR Roll",
+				desc: "Pick-and-Roll Roll Man (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Iso",
+				desc: "Isolation (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Post",
+				desc: "Post-Up (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Spot",
+				desc: "Spot-Up (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Cut",
+				desc: "Cut (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Off Scr",
+				desc: "Off Screen (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Handoff",
+				desc: "Handoff (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Trans",
+				desc: "Transition (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Putback",
+				desc: "Putback (frequency, points per possession)",
+				colspan: 2,
+			},
+			{
+				title: "Misc",
+				desc: "Miscellaneous (frequency, points per possession)",
+				colspan: 2,
+			},
 		],
 	},
 	shootingSplits: {
@@ -367,10 +411,26 @@ export const PLAYER_STATS_TABLES = {
 		],
 		superCols: [
 			{ title: "", colspan: 6 },
-			{ title: "At Rim", desc: "Makes at the rim, assisted and unassisted", colspan: 3 },
-			{ title: "Short Mid", desc: "Post-ups and short shots, assisted and unassisted makes", colspan: 3 },
-			{ title: "Long Mid", desc: "Mid-range jumpers, assisted and unassisted makes", colspan: 3 },
-			{ title: "3PT", desc: "Threes, assisted and unassisted makes", colspan: 3 },
+			{
+				title: "At Rim",
+				desc: "Makes at the rim, assisted and unassisted",
+				colspan: 3,
+			},
+			{
+				title: "Short Mid",
+				desc: "Post-ups and short shots, assisted and unassisted makes",
+				colspan: 3,
+			},
+			{
+				title: "Long Mid",
+				desc: "Mid-range jumpers, assisted and unassisted makes",
+				colspan: 3,
+			},
+			{
+				title: "3PT",
+				desc: "Threes, assisted and unassisted makes",
+				colspan: 3,
+			},
 			{ title: "C&S 3", desc: "Catch-and-shoot threes", colspan: 2 },
 			{ title: "Pull-Up 3", desc: "Pull-up threes", colspan: 2 },
 		],
@@ -392,14 +452,35 @@ export const PLAYER_STATS_TABLES = {
 		],
 		superCols: [
 			{ title: "", colspan: 6 },
-			{ title: "Defended", desc: "Opponents' shots with him as the closest defender", colspan: 4 },
-			{ title: "Contests", desc: "Shots contested (closest defender, half court)", colspan: 2 },
-			{ title: "Rim Protection", desc: "Opponents' shots at the rim with him as the rim protector, and their rim attempts per 100 possessions with him on minus off", colspan: 3 },
+			{
+				title: "Defended",
+				desc: "Opponents' shots with him as the closest defender",
+				colspan: 4,
+			},
+			{
+				title: "Contests",
+				desc: "Shots contested (closest defender, half court)",
+				colspan: 2,
+			},
+			{
+				title: "Rim Protection",
+				desc: "Opponents' shots at the rim with him as the rim protector, and their rim attempts per 100 possessions with him on minus off",
+				colspan: 3,
+			},
 		],
 	},
 	onOff: {
 		name: "On/Off",
-		stats: ["gp", "min", "pm", "onOrtg", "onDrtg", "onNet", "offNet", "onOffNet"],
+		stats: [
+			"gp",
+			"min",
+			"pm",
+			"onOrtg",
+			"onDrtg",
+			"onNet",
+			"offNet",
+			"onOffNet",
+		],
 	},
 	clutch: {
 		name: "Clutch",

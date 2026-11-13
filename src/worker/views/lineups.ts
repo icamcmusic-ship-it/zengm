@@ -48,9 +48,7 @@ export default defineView({
 		const { tid, season } = inputs;
 		const playoffs = inputs.playoffs === "playoffs";
 		const teamStatsRows = await idb.merged.teamStats.getAll({ tid, season });
-		const teamStats = teamStatsRows.find(
-			(row) => !!row.playoffs === playoffs,
-		);
+		const teamStats = teamStatsRows.find((row) => !!row.playoffs === playoffs);
 		const teamAdv: TeamAdv | undefined = teamStats?.adv;
 		const numPlayers = g.get("numPlayersOnCourt");
 
@@ -72,7 +70,9 @@ export default defineView({
 		for (const p of players) {
 			const rows = p.stats.filter(
 				(row) =>
-					row.tid === tid && row.season === season && !!row.playoffs === playoffs,
+					row.tid === tid &&
+					row.season === season &&
+					!!row.playoffs === playoffs,
 			);
 			const ratings =
 				p.ratings.findLast((r) => r.season <= season) ?? p.ratings.at(-1)!;

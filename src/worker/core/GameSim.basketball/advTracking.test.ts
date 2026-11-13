@@ -118,12 +118,14 @@ const checkTotals = (results: any[]) => {
 			// Assisted makes are the assists, and every make is assisted or not
 			const astMakes = sum(
 				advs.map(
-					(a: number[]) => a[ADV.astRim]! + a[ADV.astShort]! + a[ADV.astLong]! + a[ADV.ast3]!,
+					(a: number[]) =>
+						a[ADV.astRim]! + a[ADV.astShort]! + a[ADV.astLong]! + a[ADV.ast3]!,
 				),
 			);
 			const unastMakes = sum(
 				advs.map(
-					(a: number[]) => a[ADV.unRim]! + a[ADV.unShort]! + a[ADV.unLong]! + a[ADV.un3]!,
+					(a: number[]) =>
+						a[ADV.unRim]! + a[ADV.unShort]! + a[ADV.unLong]! + a[ADV.un3]!,
 				),
 			);
 			assert.strictEqual(astMakes, t.stat.ast);
@@ -182,14 +184,20 @@ const checkTotals = (results: any[]) => {
 			const minutes = 48 + 5 * result.overtimes;
 			const luSec = sum(ta.lu.map((row) => row[n + LU.sec]!));
 			assert.closeTo(luSec, minutes * 60, 2 + ta.lu.length);
-			assert.strictEqual(sum(ta.lu.map((row) => row[n + LU.ptsFor]!)), t.stat.pts);
+			assert.strictEqual(
+				sum(ta.lu.map((row) => row[n + LU.ptsFor]!)),
+				t.stat.pts,
+			);
 			assert.strictEqual(
 				sum(ta.lu.map((row) => row[n + LU.possFor]!)),
 				ta.t[TEAM_ADV.possFor]!,
 			);
 			for (const row of ta.lu) {
 				const pids = row.slice(0, n);
-				assert.deepStrictEqual(pids, pids.toSorted((a, b) => a - b));
+				assert.deepStrictEqual(
+					pids,
+					pids.toSorted((a, b) => a - b),
+				);
 			}
 
 			// Clutch: a part of the game
@@ -197,7 +205,10 @@ const checkTotals = (results: any[]) => {
 				sum(advs.map((a: number[]) => a[ADV.clPts]!)),
 				t.stat.pts,
 			);
-			assert.isAtMost(ta.t[TEAM_ADV.clSec]!, 5 * 60 * (1 + result.overtimes) + 1);
+			assert.isAtMost(
+				ta.t[TEAM_ADV.clSec]!,
+				5 * 60 * (1 + result.overtimes) + 1,
+			);
 		}
 	}
 };
@@ -231,8 +242,10 @@ describe("advanced tracking stats", () => {
 		const adv = p.adv as number[];
 		const freqs = PLAY_TYPES.map(
 			(pt) =>
-				advStat(adv, `pt${pt.key.charAt(0).toUpperCase()}${pt.key.slice(1)}Freq`) ??
-				0,
+				advStat(
+					adv,
+					`pt${pt.key.charAt(0).toUpperCase()}${pt.key.slice(1)}Freq`,
+				) ?? 0,
 		);
 		assert.closeTo(sum(freqs), 100, 1e-6);
 		assert.isDefined(advStat(adv, "onNet"));
@@ -269,7 +282,10 @@ describe("play type classifier", () => {
 	test("a self-created guard is a pick-and-roll ball handler or isolation, a catch-and-shoot three mostly a spot-up", () => {
 		const w = shotWeights("threePointer", guard, undefined);
 		assert.isAbove(share(w, "prb") + share(w, "iso"), 0.7);
-		assert.isAbove(share(shotWeights("threePointer", guard, guard), "spot"), 0.6);
+		assert.isAbove(
+			share(shotWeights("threePointer", guard, guard), "spot"),
+			0.6,
+		);
 	});
 
 	test("the split is deterministic", () => {

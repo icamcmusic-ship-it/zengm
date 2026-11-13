@@ -635,7 +635,10 @@ export const getPlayers = async (
 			for (const p of players) {
 				const cs = p.currentStats[statRange];
 				if (cs) {
-					cs.advDef = advDefScore(cs as Record<string, number | undefined>, league);
+					cs.advDef = advDefScore(
+						cs as Record<string, number | undefined>,
+						league,
+					);
 				}
 			}
 		}

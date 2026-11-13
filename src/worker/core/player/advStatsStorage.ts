@@ -42,10 +42,7 @@ export const pruneSeasonLineups = async (season: number = g.get("season")) => {
 
 // A player's play-type profile (each play type's possessions, frequency, points per possession, FG%, TOV%) for one regular season (all
 // his teams), or over every regular season with tracking stats. Undefined without tracking stats. For archetypes (step 4) and others.
-export const getPlayTypeProfile = (
-	p: Pick<Player, "stats">,
-	season?: number,
-) =>
+export const getPlayTypeProfile = (p: Pick<Player, "stats">, season?: number) =>
 	playTypeProfile(
 		sumAdv(
 			p.stats.filter(

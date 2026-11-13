@@ -6,11 +6,7 @@ import g from "./g.ts";
 import helpers from "./helpers.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { getNumericStat } from "../../common/statValue.ts";
-import {
-	advStat,
-	sumAdv,
-	type AdvStatKey,
-} from "../../common/advStats.ts";
+import { advStat, sumAdv, type AdvStatKey } from "../../common/advStats.ts";
 
 const DEFAULT_FORMULA = bySport({
 	baseball: "20 * mvp + war",

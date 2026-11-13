@@ -135,7 +135,13 @@ export const TEAM_ADV = {
 };
 export const TEAM_ADV_LEN = 7;
 // Lineup fields after the pids
-export const LU = { sec: 0, ptsFor: 1, ptsAgainst: 2, possFor: 3, possAgainst: 4 };
+export const LU = {
+	sec: 0,
+	ptsFor: 1,
+	ptsAgainst: 2,
+	possFor: 3,
+	possAgainst: 4,
+};
 export const LU_FIELDS = 5;
 // Lineups kept per team-season: pruned to LINEUPS_KEEP by minutes whenever there are more than LINEUPS_MAX (during the season), and to
 // LINEUPS_FINAL after the playoffs
@@ -143,7 +149,11 @@ export const LINEUPS_KEEP = 60;
 export const LINEUPS_MAX = 150;
 export const LINEUPS_FINAL = 40;
 
-export const pruneLineups = (lu: number[][], numPlayers: number, keep: number) => {
+export const pruneLineups = (
+	lu: number[][],
+	numPlayers: number,
+	keep: number,
+) => {
 	if (lu.length <= keep) {
 		return lu;
 	}
@@ -243,7 +253,10 @@ const upper = (key: string) => key.charAt(0).toUpperCase() + key.slice(1);
 
 // Derived stats (the columns of the Player Stats tabs, the player page, awards and the GOAT lab). Each reads a player's summed adv array
 // (undefined when there is none)
-const ADV_STAT_FUNCTIONS: Record<string, (adv: readonly number[]) => number | undefined> = {
+const ADV_STAT_FUNCTIONS: Record<
+	string,
+	(adv: readonly number[]) => number | undefined
+> = {
 	ptPoss: (adv) => ptPoss(adv),
 };
 for (let i = 0; i < NUM_PT; i++) {
@@ -315,9 +328,7 @@ Object.assign(ADV_STAT_FUNCTIONS, {
 	clUsgp: (adv) =>
 		pct(
 			at(adv, ADV.clFga) + 0.44 * at(adv, ADV.clFta) + at(adv, ADV.clTov),
-			at(adv, ADV.clTmFga) +
-				0.44 * at(adv, ADV.clTmFta) +
-				at(adv, ADV.clTmTov),
+			at(adv, ADV.clTmFga) + 0.44 * at(adv, ADV.clTmFta) + at(adv, ADV.clTmTov),
 		),
 } satisfies Record<string, (adv: readonly number[]) => number | undefined>);
 
@@ -419,14 +430,16 @@ export const ADV_STAT_META: Record<
 	AdvStatKey,
 	{ title: string; desc: string; format: AdvFormat }
 > = (() => {
-	const meta: Record<string, { title: string; desc: string; format: AdvFormat }> =
-		{
-			ptPoss: {
-				title: "Poss",
-				desc: "Play-type possessions (shots, shooting fouls and turnovers)",
-				format: "count",
-			},
-		};
+	const meta: Record<
+		string,
+		{ title: string; desc: string; format: AdvFormat }
+	> = {
+		ptPoss: {
+			title: "Poss",
+			desc: "Play-type possessions (shots, shooting fouls and turnovers)",
+			format: "count",
+		},
+	};
 	for (const pt of PLAY_TYPES) {
 		const k = upper(pt.key);
 		meta[`pt${k}Poss`] = {
@@ -479,39 +492,146 @@ export const ADV_STAT_META: Record<
 		};
 	}
 	Object.assign(meta, {
-		cs3a: { title: "3PA", desc: "Catch-and-shoot three-point attempts", format: "count" },
-		cs3p: { title: "3P%", desc: "Catch-and-shoot three-point percentage", format: "pct" },
-		pu3a: { title: "3PA", desc: "Pull-up three-point attempts", format: "count" },
-		pu3p: { title: "3P%", desc: "Pull-up three-point percentage", format: "pct" },
-		cs3r: { title: "C&S%", desc: "Share of three-point attempts that were catch-and-shoot", format: "pct" },
-		dfga: { title: "DFGA", desc: "Opponents' field goal attempts with him as the closest defender", format: "count" },
-		dfgm: { title: "DFGM", desc: "Opponents' field goals made with him as the closest defender", format: "count" },
-		dfgp: { title: "DFG%", desc: "Defended field goal percentage (opponents' FG% with him as the closest defender)", format: "pct" },
-		dfgp2: { title: "D2P%", desc: "Defended two-point percentage", format: "pct" },
-		dfgp3: { title: "D3P%", desc: "Defended three-point percentage", format: "pct" },
-		rimDfga: { title: "RimDFGA", desc: "Opponents' shots at the rim with him as the rim protector (the best shot blocker on the floor)", format: "count" },
-		rimDfgp: { title: "RimDFG%", desc: "Opponents' FG% at the rim with him as the rim protector", format: "pct" },
-		con2: { title: "2PT", desc: "Two-point shots contested (closest defender, not in transition)", format: "count" },
-		con3: { title: "3PT", desc: "Three-point shots contested (closest defender, not in transition)", format: "count" },
-		rimDeter: { title: "Deter", desc: "Shots deterred: opponents' rim attempts per 100 possessions with him on the floor minus off (negative is better)", format: "pm" },
-		onOrtg: { title: "On ORtg", desc: "Team points per 100 possessions with him on the floor", format: "rating" },
-		onDrtg: { title: "On DRtg", desc: "Opponents' points per 100 possessions with him on the floor", format: "rating" },
-		onNet: { title: "On Net", desc: "Team net rating with him on the floor", format: "pm" },
-		offNet: { title: "Off Net", desc: "Team net rating with him off the floor (in the games he played)", format: "pm" },
-		onOffNet: { title: "On-Off", desc: "Net rating on minus off", format: "pm" },
-		clGp: { title: "G", desc: "Games with clutch minutes (last 5 minutes of the 4th quarter or overtime, margin within 5)", format: "count" },
+		cs3a: {
+			title: "3PA",
+			desc: "Catch-and-shoot three-point attempts",
+			format: "count",
+		},
+		cs3p: {
+			title: "3P%",
+			desc: "Catch-and-shoot three-point percentage",
+			format: "pct",
+		},
+		pu3a: {
+			title: "3PA",
+			desc: "Pull-up three-point attempts",
+			format: "count",
+		},
+		pu3p: {
+			title: "3P%",
+			desc: "Pull-up three-point percentage",
+			format: "pct",
+		},
+		cs3r: {
+			title: "C&S%",
+			desc: "Share of three-point attempts that were catch-and-shoot",
+			format: "pct",
+		},
+		dfga: {
+			title: "DFGA",
+			desc: "Opponents' field goal attempts with him as the closest defender",
+			format: "count",
+		},
+		dfgm: {
+			title: "DFGM",
+			desc: "Opponents' field goals made with him as the closest defender",
+			format: "count",
+		},
+		dfgp: {
+			title: "DFG%",
+			desc: "Defended field goal percentage (opponents' FG% with him as the closest defender)",
+			format: "pct",
+		},
+		dfgp2: {
+			title: "D2P%",
+			desc: "Defended two-point percentage",
+			format: "pct",
+		},
+		dfgp3: {
+			title: "D3P%",
+			desc: "Defended three-point percentage",
+			format: "pct",
+		},
+		rimDfga: {
+			title: "RimDFGA",
+			desc: "Opponents' shots at the rim with him as the rim protector (the best shot blocker on the floor)",
+			format: "count",
+		},
+		rimDfgp: {
+			title: "RimDFG%",
+			desc: "Opponents' FG% at the rim with him as the rim protector",
+			format: "pct",
+		},
+		con2: {
+			title: "2PT",
+			desc: "Two-point shots contested (closest defender, not in transition)",
+			format: "count",
+		},
+		con3: {
+			title: "3PT",
+			desc: "Three-point shots contested (closest defender, not in transition)",
+			format: "count",
+		},
+		rimDeter: {
+			title: "Deter",
+			desc: "Shots deterred: opponents' rim attempts per 100 possessions with him on the floor minus off (negative is better)",
+			format: "pm",
+		},
+		onOrtg: {
+			title: "On ORtg",
+			desc: "Team points per 100 possessions with him on the floor",
+			format: "rating",
+		},
+		onDrtg: {
+			title: "On DRtg",
+			desc: "Opponents' points per 100 possessions with him on the floor",
+			format: "rating",
+		},
+		onNet: {
+			title: "On Net",
+			desc: "Team net rating with him on the floor",
+			format: "pm",
+		},
+		offNet: {
+			title: "Off Net",
+			desc: "Team net rating with him off the floor (in the games he played)",
+			format: "pm",
+		},
+		onOffNet: {
+			title: "On-Off",
+			desc: "Net rating on minus off",
+			format: "pm",
+		},
+		clGp: {
+			title: "G",
+			desc: "Games with clutch minutes (last 5 minutes of the 4th quarter or overtime, margin within 5)",
+			format: "count",
+		},
 		clMin: { title: "MP", desc: "Clutch minutes", format: "rating" },
 		clPts: { title: "PTS", desc: "Clutch points", format: "count" },
 		clFg: { title: "FG", desc: "Clutch field goals made", format: "count" },
-		clFga: { title: "FGA", desc: "Clutch field goal attempts", format: "count" },
-		clFgp: { title: "FG%", desc: "Clutch field goal percentage", format: "pct" },
-		clTpp: { title: "3P%", desc: "Clutch three-point percentage", format: "pct" },
-		clFtp: { title: "FT%", desc: "Clutch free throw percentage", format: "pct" },
+		clFga: {
+			title: "FGA",
+			desc: "Clutch field goal attempts",
+			format: "count",
+		},
+		clFgp: {
+			title: "FG%",
+			desc: "Clutch field goal percentage",
+			format: "pct",
+		},
+		clTpp: {
+			title: "3P%",
+			desc: "Clutch three-point percentage",
+			format: "pct",
+		},
+		clFtp: {
+			title: "FT%",
+			desc: "Clutch free throw percentage",
+			format: "pct",
+		},
 		clTov: { title: "TOV", desc: "Clutch turnovers", format: "count" },
 		clPm: { title: "+/-", desc: "Clutch plus/minus", format: "pmInt" },
-		clUsgp: { title: "USG%", desc: "Clutch usage rate (his shots, free throws and turnovers, as a share of his team's while he was on the floor)", format: "pct" },
+		clUsgp: {
+			title: "USG%",
+			desc: "Clutch usage rate (his shots, free throws and turnovers, as a share of his team's while he was on the floor)",
+			format: "pct",
+		},
 	});
-	return meta as Record<AdvStatKey, { title: string; desc: string; format: AdvFormat }>;
+	return meta as Record<
+		AdvStatKey,
+		{ title: string; desc: string; format: AdvFormat }
+	>;
 })();
 
 // Player Stats tabs (and player page tables) of this feature

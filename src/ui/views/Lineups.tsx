@@ -20,7 +20,8 @@ const num = (x: number | undefined) => ({
 });
 
 const pm = (x: number | undefined, decimals = 1) => ({
-	value: x === undefined ? "" : <PlusMinus decimalPlaces={decimals}>{x}</PlusMinus>,
+	value:
+		x === undefined ? "" : <PlusMinus decimalPlaces={decimals}>{x}</PlusMinus>,
 	sortValue: x ?? -Infinity,
 });
 
@@ -53,7 +54,11 @@ const Lineups = ({
 
 	const lineupCols = [
 		{ title: "Lineup", sortType: "string" as const },
-		{ title: "MP", desc: "Minutes played together", sortType: "number" as const },
+		{
+			title: "MP",
+			desc: "Minutes played together",
+			sortType: "number" as const,
+		},
 		{
 			title: "Poss",
 			desc: "Offensive possessions",

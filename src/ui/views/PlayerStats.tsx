@@ -79,8 +79,9 @@ const PlayerStats = ({
 		? dropdownOptions.statTypesAdv
 		: dropdownOptions.statTypesAdv.filter(
 				(option) =>
-					!(ADV_STAT_TYPES as readonly (string | number)[]).includes(option.key) ||
-					option.key === statType,
+					!(ADV_STAT_TYPES as readonly (string | number)[]).includes(
+						option.key,
+					) || option.key === statType,
 			);
 	useTitleBar({
 		title: "Player Stats",
@@ -157,14 +158,15 @@ const PlayerStats = ({
 	// Advanced Tracking Stats tabs: sort by their main volume stat
 	const advSortStat = (
 		{
-		playTypes: "ptPoss",
-		shootingSplits: "cs3a",
-		trackingDefense: "dfga",
-		clutch: "clPts",
+			playTypes: "ptPoss",
+			shootingSplits: "cs3a",
+			trackingDefense: "dfga",
+			clutch: "clPts",
 		} as Record<string, string | undefined>
 	)[statType];
 	if (advSortStat !== undefined && stats.includes(advSortStat as any)) {
-		sortCol = 5 + (season === "all" ? 1 : 0) + stats.indexOf(advSortStat as any);
+		sortCol =
+			5 + (season === "all" ? 1 : 0) + stats.indexOf(advSortStat as any);
 	}
 
 	if (__SPORT === "baseball" && statType === "fielding") {

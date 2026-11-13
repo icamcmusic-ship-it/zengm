@@ -90,7 +90,10 @@ export const TrackingProfile = ({
 	const selected = seasons[index ?? defaultIndex] ?? seasons[0]!;
 	const adv = selected.adv;
 	const profile = playTypeProfile(adv);
-	const maxFreq = Math.max(1, ...(profile?.types.map((t) => t.freq ?? 0) ?? []));
+	const maxFreq = Math.max(
+		1,
+		...(profile?.types.map((t) => t.freq ?? 0) ?? []),
+	);
 
 	return (
 		<HideableSection
@@ -181,12 +184,28 @@ export const TrackingProfile = ({
 				<Group
 					adv={adv}
 					title="Shooting"
-					stats={["cs3a", "cs3p", "pu3a", "pu3p", "astpRim", "astpLong", "astp3"]}
+					stats={[
+						"cs3a",
+						"cs3p",
+						"pu3a",
+						"pu3p",
+						"astpRim",
+						"astpLong",
+						"astp3",
+					]}
 				/>
 				<Group
 					adv={adv}
 					title="Defense"
-					stats={["dfga", "dfgp", "dfgp3", "con2", "con3", "rimDfgp", "rimDeter"]}
+					stats={[
+						"dfga",
+						"dfgp",
+						"dfgp3",
+						"con2",
+						"con3",
+						"rimDfgp",
+						"rimDeter",
+					]}
 				/>
 				<Group
 					adv={adv}

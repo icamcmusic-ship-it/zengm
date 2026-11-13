@@ -3337,10 +3337,7 @@ class GameSim extends GameSimBase {
 			shotAt = quick
 				? drawOrbQuickShot()
 				: k *
-						Math.max(
-							1,
-							ORB_RESET_SEARCH_MEAN + ORB_RESET_SEARCH_SD * gaussian(),
-						);
+					Math.max(1, ORB_RESET_SEARCH_MEAN + ORB_RESET_SEARCH_SD * gaussian());
 		} else {
 			let probTransition = possessionStartsInFrontcourt
 				? 0
@@ -4418,18 +4415,14 @@ class GameSim extends GameSimBase {
 			: !possessionStartsInFrontcourt &&
 				(prev === "stl" || prev === "drb") &&
 				this.possessionLength <= 7;
-		const quick = this.realPoss
-			? this.advQuick
-			: this.possessionLength <= 3;
+		const quick = this.realPoss ? this.advQuick : this.possessionLength <= 3;
 		const putback =
 			prev === "orb" &&
 			(type === "putBack" ||
 				(quick && (p === this.lastOrbPlayer || type === "atRim")));
 		const j = this.playersOnCourt[this.o].indexOf(p);
 		const slot = this.playersOnCourt[this.d][j >= 0 ? j : 0];
-		const defender = this.matchupDefense
-			? (this.defenderOf(p) ?? slot)
-			: slot;
+		const defender = this.matchupDefense ? (this.defenderOf(p) ?? slot) : slot;
 		this.adv!.shot({
 			shooter: p,
 			passer,

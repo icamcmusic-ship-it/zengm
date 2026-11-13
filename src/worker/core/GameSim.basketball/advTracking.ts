@@ -431,11 +431,7 @@ export class AdvTracker {
 		}
 	}
 
-	turnover(
-		p: AdvPlayer,
-		transition: boolean,
-		putback: boolean,
-	) {
+	turnover(p: AdvPlayer, transition: boolean, putback: boolean) {
 		let key: PlayTypeKey;
 		if (transition) {
 			key = "tr";
@@ -563,7 +559,10 @@ export class AdvTracker {
 				row[this.numPlayers + LU.sec] = Math.round(
 					row[this.numPlayers + LU.sec]!,
 				);
-				if (row[this.numPlayers + LU.sec]! > 0 || row.some((x, i) => i >= this.numPlayers && x !== 0)) {
+				if (
+					row[this.numPlayers + LU.sec]! > 0 ||
+					row.some((x, i) => i >= this.numPlayers && x !== 0)
+				) {
 					lu.push(row);
 				}
 			}
