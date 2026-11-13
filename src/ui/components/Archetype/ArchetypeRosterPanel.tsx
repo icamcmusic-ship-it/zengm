@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { GROUPS, GROUP_INFO } from "../../../common/archetypes/index.ts";
 import type { ArchetypeRoster } from "../../../worker/api/archetypes.ts";
 import { helpers } from "../../util/helpers.ts";
+import { useLocal } from "../../util/local.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import { GroupDot } from "./ArchetypeLabel.tsx";
 
@@ -16,6 +17,7 @@ export const ArchetypeRosterPanel = ({
 }) => {
 	const [data, setData] = useState<ArchetypeRoster | undefined>();
 	const [open, setOpen] = useState(true);
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -79,7 +81,7 @@ export const ArchetypeRosterPanel = ({
 											</a>
 										</td>
 										<td>{p.pos}</td>
-										<td>{p.ovr}</td>
+										{challengeNoRatings ? null : <td>{p.ovr}</td>}
 										<td>
 											<GroupDot group={p.group} />
 											{p.label}

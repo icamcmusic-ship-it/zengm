@@ -1,6 +1,7 @@
 // College mode: the pro draft, transfers and signings of a season (docs/college-mode.md)
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
+import { useLocal } from "../util/local.ts";
 import type { View } from "../../common/types.ts";
 import {
 	CLASS_NAMES,
@@ -24,6 +25,7 @@ const CollegeDepartures = ({
 	userTid,
 }: View<"collegeDepartures">) => {
 	useTitleBar({ title: "Departures & Arrivals" });
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 
 	return (
 		<>
@@ -64,8 +66,12 @@ const CollegeDepartures = ({
 									<th>Class</th>
 									<th>Age</th>
 									<th>School</th>
-									<th className="text-end">Ovr</th>
-									<th className="text-end">Pot</th>
+									{challengeNoRatings ? null : (
+										<>
+											<th className="text-end">Ovr</th>
+											<th className="text-end">Pot</th>
+										</>
+									)}
 								</tr>
 							</thead>
 							<tbody>
@@ -89,8 +95,12 @@ const CollegeDepartures = ({
 												userTid={userTid}
 											/>
 										</td>
-										<td className="text-end">{p.ovr}</td>
-										<td className="text-end">{p.pot}</td>
+										{challengeNoRatings ? null : (
+											<>
+												<td className="text-end">{p.ovr}</td>
+												<td className="text-end">{p.pot}</td>
+											</>
+										)}
 									</tr>
 								))}
 							</tbody>
@@ -113,7 +123,9 @@ const CollegeDepartures = ({
 									<th>Class</th>
 									<th>From</th>
 									<th>To</th>
-									<th className="text-end">Ovr</th>
+									{challengeNoRatings ? null : (
+										<th className="text-end">Ovr</th>
+									)}
 								</tr>
 							</thead>
 							<tbody>
@@ -149,7 +161,9 @@ const CollegeDepartures = ({
 												/>
 											) : null}
 										</td>
-										<td className="text-end">{p.ovr}</td>
+										{challengeNoRatings ? null : (
+											<td className="text-end">{p.ovr}</td>
+										)}
 									</tr>
 								))}
 							</tbody>

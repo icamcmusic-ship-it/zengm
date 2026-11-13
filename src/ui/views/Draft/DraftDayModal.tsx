@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Modal } from "../../components/Modal.tsx";
 import { toWorker } from "../../util/toWorker.ts";
 import { helpers } from "../../util/helpers.ts";
+import { useLocal } from "../../util/local.ts";
 import type { TradeTeams } from "../../../common/types.ts";
 
 type Info = Awaited<ReturnType<typeof loadInfo>>;
@@ -23,6 +24,7 @@ export const DraftDayModal = ({
 	const [info, setInfo] = useState<Info | undefined>();
 	const [message, setMessage] = useState<string | undefined>();
 	const [busy, setBusy] = useState(false);
+	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 
 	const refresh = async (tid: number | undefined) => {
 		const output = await loadInfo(tid);
@@ -100,7 +102,8 @@ export const DraftDayModal = ({
 							onChange={() => toggle(side, "pids", p.pid)}
 						/>
 						<label className="form-check-label" htmlFor={`dd-p-${p.pid}`}>
-							{p.name}, {p.pos} {p.ovr}/{p.pot}
+							{p.name}, {p.pos}
+							{challengeNoRatings ? null : ` ${p.ovr}/${p.pot}`}
 						</label>
 					</div>
 				))}

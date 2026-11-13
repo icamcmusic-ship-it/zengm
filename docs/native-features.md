@@ -75,6 +75,8 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Season odds](#season-odds)                                         | Standings, Power Rankings, Award Races, Draft Lottery              | bball  | `featureSeasonOdds`                         | on / on                       |
 | [Realistic schedule length](#realistic-schedule-length)             | schedule, Schedule, Daily Schedule, play menu                      | bball  | `realisticSchedule`                         | on / off                      |
 | [Marquee games](#marquee-games)                                     | schedule, Schedule, Daily Schedule, box score, Games to Watch      | bball  | `marqueeGames`                              | on / off                      |
+| [Custom shot clock](#college-mode)                                  | game sim                                                           | bball  | `customShotClock`                           | off / off (college: on)       |
+| [One-and-one bonus](#college-mode)                                  | game sim                                                           | bball  | `oneAndOne`                                 | off / off (college: on)       |
 | [Archetypes](#archetypes)                                           | player page, Draft Scouting, search, Roster, League → Archetypes   | bball  | `featureArchetypes`                         | on / on                       |
 | [Improved positions](#improved-positions)                           | positions everywhere (rosters, player pages, AI, archetypes)       | bball  | `improvedPositions`                         | on / off                      |
 | Fork face parts                                                     | new male players' faces, Tools → Face Style Gallery                | bball  | `featureForkFaces`                          | off / off                     |
@@ -93,6 +95,9 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [AI GM personalities](#ai-gm-personalities)                         | League History → Front Offices tab, team pages, news, AI decisions | bball  | `featureGmPersonalities`                    | on / off                      |
 | [Front office budget](#front-office-budget)                         | Team → Finances, Trade, Free Agents, game sim, AI budgets          | bball  | `featureFrontOffice`                        | on / off                      |
 | [College mode](#college-mode)                                       | New League → College                                               | bball  | league type (`leagueType`), set at creation | pro / pro                     |
+| [College quick sim](#college-mode)                                  | college leagues: games without your team                           | bball  | `collegeQuickSim`                           | off / off (college: by size)  |
+| [College NIT](#college-mode)                                        | college leagues: College NIT page                                  | bball  | `collegeNit`                                | off / off (college: on)       |
+| [College realignment](#college-mode)                                | college leagues: conferences, Coaching Carousel                    | bball  | `collegeRealignment`                        | off / off (college: on)       |
 | [Coaching staff](#coaching-staff)                                   | Team → Coaching Staff, League → Coaches                            | bball  | `coachingStaff`                             | on / off (existing leagues)   |
 | [College & overseas stats](#draft-scouting)                         | Draft Scouting                                                     | bball  | `featureCollegeStats`                       | on / on (automatic: on / off) |
 | [College season & March Madness](#college-season-and-march-madness) | Draft Scouting → College/Overseas, player pages                    | bball  | `featureCollegeSeason`                      | on / off                      |
@@ -293,7 +298,7 @@ League menu → _Contract Value_: a value index, bargains and albatrosses, and t
 
 ### Unretirements
 
-- **What:** the old console script `tools/console-scripts/unretire.js`, built in (off by default). Once a season, when free agency starts, with the chosen chance (default 10%), one random retired player who retired at the minimum age or older (default 35) comes back as a free agent with a fresh ratings row for the season, boosted by a random 3-6 ovr (settings) by raising his non-height ratings one point at a time, favouring his strengths. Dead players, and anyone who already came back (including through the script), are skipped. A news event ("… has come out of retirement and is now a free agent") is logged and shown, and the comeback appears on the timeline.
+- **What:** the old console script `tools/console-scripts/unretire.js`, built in (off by default). Once a season, when free agency starts, with the chosen chance (default 10%), one random retired player who retired at the minimum age or older (default 35) comes back as a free agent with a fresh ratings row for the season (for someone who retired at the end of this same season, that season's row is the one boosted, since free agency is still part of it), boosted by a random 3-6 ovr (settings) by raising his non-height ratings one point at a time, favouring his strengths. Dead players, and anyone who already came back (including through the script), are skipped. A news event ("… has come out of retirement and is now a free agent") is logged and shown, and the comeback appears on the timeline.
 - **Code:** `src/worker/core/phase/unretire.ts`, called from `phase/finalize.ts`.
 
 ### Extra frivolities
@@ -1234,6 +1239,7 @@ Works in every sport.
 - The league-wide averages with player traits, the possession model or injury depth on stay about the same as with them off, but individual games and seasons are of course different; use the switches (off) to replay the old behaviour.
 - Existing leagues keep playing as before until the game-affecting switches (possession model, traits, injury depth, contracts, trades, drafting, coaching staff, GM personalities) are turned on in League Extras. Games already played replay unchanged.
 - Draft board and scouting need prospects: the Draft Board is empty in a league without upcoming classes.
+- The _No Visible Player Ratings_ challenge hides ovr, pot, projected peaks and badge scores on the fork's tables and player pages (Draft Scouting, Draft Board, Mock Draft, Archetypes, Skill Badges, Trade Market, Trade Offers, college pages, profile export, scouting reports), but the story features written from the league's records (Newspaper, Wrapped) still quote ratings in their text.
 
 ## Performance
 
