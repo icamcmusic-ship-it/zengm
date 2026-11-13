@@ -10,7 +10,7 @@ import {
 	GamesPlayedCache,
 	playerMeetsCategoryRequirements,
 } from "../../views/leaders.ts";
-import { getPlayerProfileStats } from "../../views/player.ts";
+import { getLeaderProfileStats } from "../../views/player.ts";
 import { player } from "../index.ts";
 import getLeaderRequirements, {
 	getLeaderRequirementsStats,
@@ -89,13 +89,13 @@ const calculateSeasonLeaders = async (
 
 	const requirements = getLeaderRequirements();
 
-	const playerProfileStats = getPlayerProfileStats();
+	const playerProfileStats = getLeaderProfileStats();
 	const requirementsStats = getLeaderRequirementsStats(
 		requirements,
 		playerProfileStats,
 	);
 	const stats = Array.from(
-		new Set([...getPlayerProfileStats(), ...requirementsStats]),
+		new Set([...playerProfileStats, ...requirementsStats]),
 	);
 	const ratings = ["ovr", "pot", ...RATINGS] as const;
 

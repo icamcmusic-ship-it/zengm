@@ -40,7 +40,7 @@ import { getHealthInfo } from "../core/player/getHealthInfo.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 import { playerFaceHistory } from "../util/faceAging.ts";
-import { ADV_STAT_TYPES, sumAdv } from "../../common/advStats.ts";
+import { ADV_STAT_TYPES, isAdvStat, sumAdv } from "../../common/advStats.ts";
 
 export const processInputs = (
 	params: RouteParams<"player"> | RouteParams<"relatives">,
@@ -60,6 +60,10 @@ export const getPlayerProfileStats = () => {
 
 	return Array.from(stats);
 };
+
+// League leaders are not computed for the Advanced Tracking Stats (rates of very different volumes, and many of them)
+export const getLeaderProfileStats = () =>
+	getPlayerProfileStats().filter((stat) => !isAdvStat(stat));
 
 export type PlayerAwardBuiltInWithPrefix = PlayerAwardBuiltIn & {
 	groupPrefix?: string;

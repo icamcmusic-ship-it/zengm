@@ -471,16 +471,7 @@ export const PLAYER_STATS_TABLES = {
 	},
 	onOff: {
 		name: "On/Off",
-		stats: [
-			"gp",
-			"min",
-			"pm",
-			"onOrtg",
-			"onDrtg",
-			"onNet",
-			"offNet",
-			"onOffNet",
-		],
+		stats: ["gp", "min", "onOrtg", "onDrtg", "onNet", "offNet", "onOffNet"],
 	},
 	clutch: {
 		name: "Clutch",

@@ -1,7 +1,7 @@
 import { PHASE, RATINGS } from "../../../common/constants.ts";
 import type { Player } from "../../../common/types.ts";
 import { g } from "../../util/index.ts";
-import { getPlayerProfileStats } from "../../views/player.ts";
+import { getLeaderProfileStats } from "../../views/player.ts";
 import player from "./index.ts";
 import getSeasonLeaders, {
 	splitRegularSeasonPlayoffsCombined,
@@ -18,7 +18,7 @@ const getLeaders = async (pRaw: Player) => {
 	const currentSeason = g.get("season");
 	const currentPhase = g.get("phase");
 
-	const stats = getPlayerProfileStats();
+	const stats = getLeaderProfileStats();
 	const ratings = ["ovr", "pot", ...RATINGS] as const;
 
 	const leaders: Record<
