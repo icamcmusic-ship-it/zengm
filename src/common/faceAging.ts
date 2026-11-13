@@ -16,6 +16,8 @@ export type FaceAgingFields = {
 	// hair id, hair colour
 	hi: string;
 	hc: string;
+	// hair behind the head (long hair, locs), cut once the hairline goes
+	hb?: string;
 	// facial hair id, facial hair colour (undefined: same as the hair)
 	fh: string;
 	bc?: string;
@@ -54,6 +56,8 @@ export const DEFAULT_FACE_AGING_OPTIONS: FaceAgingOptions = {
 // common/faceRender.ts; facesjs ignores the extra key.
 export type ForkFaceExtra = {
 	beard?: string;
+	// Dyed / bleached hair: the hair (and hair behind the head) only, not the brows or beard
+	hair?: string;
 };
 export type FaceWithExtra = FaceConfig & { fork?: ForkFaceExtra };
 
@@ -248,6 +252,7 @@ export const extractAgingFields = (face: FaceConfig): FaceAgingFields => {
 	const fields: FaceAgingFields = {
 		hi: face.hair.id,
 		hc: face.hair.color,
+		hb: face.hairBg?.id ?? "none",
 		fh: face.facialHair.id,
 		el: face.eyeLine.id,
 		sl: face.smileLine.id,
@@ -277,6 +282,9 @@ export const applyAgingFields = <T extends FaceConfig>(
 	} as T & { fork?: ForkFaceExtra };
 	if (fields.hi !== undefined) {
 		out.hair.id = fields.hi;
+	}
+	if (fields.hb !== undefined) {
+		out.hairBg = { ...face.hairBg, id: fields.hb };
 	}
 	if (fields.hc !== undefined) {
 		out.hair.color = fields.hc;
@@ -321,6 +329,7 @@ export const applyAgingFields = <T extends FaceConfig>(
 const FIELD_KEYS: (keyof FaceAgingFields)[] = [
 	"hi",
 	"hc",
+	"hb",
 	"fh",
 	"bc",
 	"el",
@@ -577,6 +586,9 @@ export const agedFields = (
 		const stage = Math.min(5, hairLossStageOf(base.hi) + Math.max(0, steps));
 		const { id, shaved } = hairLossId(base.hi, stage, genes);
 		out.hi = id;
+		if (id !== base.hi && base.hb !== undefined) {
+			out.hb = "none";
+		}
 		if (shaved && id !== base.hi) {
 			// A shaved head shows a little stubble shadow
 			out.sh = `rgba(0,0,0,${round2(0.08 + 0.1 * seededUniform("shave", ctx.seed))})`;

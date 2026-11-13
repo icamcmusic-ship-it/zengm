@@ -1,4 +1,4 @@
-import { generate, type FaceConfig } from "facesjs";
+import { generate, svgsIndex, type FaceConfig } from "facesjs";
 import { idb } from "../db/index.ts";
 import type { PlayerWithoutKey, Race } from "../../common/types.ts";
 import { DEFAULT_JERSEY } from "../../common/constants.ts";
@@ -6,14 +6,19 @@ import g from "./g.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { registerGlobal } from "../../common/registerGlobal.ts";
-import { addRandomForkParts } from "../../common/faceParts.ts";
+import { styleFace } from "../../common/faceStyles.ts";
 import { featureOn } from "./nativeFeatures.ts";
 
-export const generateFace = (
-	options:
-		| { race?: Race; relative?: undefined }
-		| { race?: undefined; relative?: FaceConfig } = {},
-) => {
+export const generateFace = ({
+	age,
+	...options
+}: (
+	| { race?: Race; relative?: undefined }
+	| { race?: undefined; relative?: FaceConfig }
+) & {
+	// Age of the person, for age-appropriate styles (League Extras "New Face Styles")
+	age?: number;
+} = {}) => {
 	let overrides: any;
 
 	if (__SPORT === "baseball") {
@@ -69,9 +74,17 @@ export const generateFace = (
 		});
 	}
 
-	// League Extras "Fork face parts": mix the fork's male parts in (off by default)
-	if (gender === "male" && featureOn("forkFaces")) {
-		addRandomForkParts(face);
+	// League Extras "New Face Styles": hair, beards and the fork's other parts picked to fit his hair texture, age and a rarity
+	// tier. Seeded from the face itself, so no random numbers are drawn (common/faceStyles.ts)
+	if (gender === "male" && featureOn("forkFaces") && !options.relative) {
+		styleFace(
+			face,
+			{ age, facialHairIds: svgsIndex.facialHair },
+			// No headbands with a suit later, no glasses outside basketball
+			(part) =>
+				__SPORT !== "basketball" &&
+				(part.feature === "glasses" || part.feature === "accessories"),
+		);
 	}
 
 	return face;

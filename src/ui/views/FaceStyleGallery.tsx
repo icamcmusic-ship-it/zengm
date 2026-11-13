@@ -105,9 +105,10 @@ const FaceStyleGallery = () => {
 				Every option of a face feature on {SAMPLES.length} sample faces, to
 				check how parts overlap. Parts marked <i>fork</i> are this fork's own
 				additions; they are only added after facesjs' own options and never
-				replace one. New male players get them mixed in at random when League
-				Extras → Fork Face Parts is on (off by default). In a player's face
-				editor (Customize Player), the Fork parts menu sets them by hand.
+				replace one. New male players get them, picked to fit their hair texture
+				and age, when League Extras → New Face Styles is on (on for new
+				leagues). In a player's face editor (Customize Player), the More styles
+				menu sets them by hand.
 			</p>
 			<div className="d-flex flex-wrap gap-2 mb-3">
 				<div className="btn-group flex-wrap">

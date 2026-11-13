@@ -588,10 +588,11 @@ export const NATIVE_FEATURES = [
 	{
 		id: "forkFaces",
 		key: "featureForkFaces",
-		name: "Fork Face Parts",
+		name: "New Face Styles",
 		description:
-			"New male players can get the fork's own face parts (heads, eyes, hair, beards, glasses, ...) mixed in with the usual ones. See Tools → Face Style Gallery.",
+			"New male players' (and staff's) faces use the fork's style catalogue: fades, waves, twists, locs, braids, beards and stubble, plus the fork's heads, eyes, brows, noses, ears, lines and accessories. Hair is picked to fit the hair texture and age, with common, uncommon and rare styles and a few dyed heads. Seeded from the face, so no game randomness. Existing faces and faces you edit are never changed. See Tools → Face Style Gallery; every style can be picked in Customize Player.",
 		default: false,
+		defaultNewLeague: true,
 		sports: BBGM,
 	},
 	{

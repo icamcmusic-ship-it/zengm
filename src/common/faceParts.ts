@@ -13,6 +13,7 @@ import { svgs, svgsIndex } from "facesjs";
 import { NATIVE_FACE_PARTS } from "./faceParts.native.ts";
 import { STAFF_SUIT_PARTS } from "./faceParts.suits.ts";
 import { STYLE_PARTS } from "./faceParts.styles.ts";
+import { HAIR_PARTS } from "./faceParts.hair.ts";
 
 export type FacePartFeature =
 	| "accessories"
@@ -104,6 +105,7 @@ export const FORK_FACE_PARTS: readonly FacePart[] = [
 	...NATIVE_FACE_PARTS,
 	// The style expansion (faceParts.styles.ts)
 	...STYLE_PARTS,
+	...HAIR_PARTS,
 ];
 
 export const registerForkFaceParts = () => {
@@ -120,7 +122,7 @@ export const registerForkFaceParts = () => {
 // that name them render them. The Face style gallery shows them either way.
 export const FORK_FACE_PARTS_SETTING = "forkFaceParts";
 
-// Random generation (League Extras "Fork face parts", worker side): after facesjs' generate() picks a male face, each
+// Random mixing of the fork's other parts (used by common/faceStyles.ts for League Extras "New Face Styles"): after facesjs' generate() picks a male face, each
 // feature is swapped for a fork part with a modest probability, so fork parts mix in with facesjs' own. Optional features
 // (facial hair, glasses, lines, ...) are only swapped when facesjs already gave the face one, so how often a face has
 // glasses or a beard is unchanged.
