@@ -386,6 +386,14 @@ at roster thumbnail size and in the dark theme.
   - _skin and glasses_: 12% of players 21 and under get a little acne; 30% of men 40 and over (coaches, GMs) get glasses.
   - the fork's other parts (heads, eyes, brows, noses, mouths, ears, lines, glasses, headbands) mixed in, each with its
     rarity (unibrow, cauliflower ear, gap teeth, face tattoo and bandana rare).
+- **Batch C** (`common/faceParts.batchc.ts`, all original designs: facesjs 5.0.4 is the latest release and its repository
+  has no parts beyond it): hair French crop (straight/curly, common), curtains (straight, young), Caesar (every texture,
+  mature), short coils (coily, young), curly mop with optional long curls behind (curly, young); facial hair goatee with
+  stubble (common) and fu manchu (rare); tapered brow; monolid and downturned eyes; pointed and bulb noses; pointed ear
+  (rare); mouthguard in team colour (rare) and pursed mouth; cheekbone and narrow-jaw heads; nose scar and teardrop tattoo
+  (rare); nasal strip (rare), striped headband, single earring; shoulder tattoo and arm script on the shoulders beside the
+  jersey. Not added: wristbands and chains (outside or under the jersey crop), hair ties (no visible spot), a raised brow
+  (looked off at thumbnail size).
 - No era curves: style frequency doesn't depend on the league's season. Seeded from the face facesjs made, so no random
   numbers are drawn and no league result changes.
 - **Face editor:** Customize Player → _More styles_ lists every fork part of every feature (hair, hair behind the head,

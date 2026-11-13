@@ -13,7 +13,7 @@ import type { FacePart } from "./faceParts.ts";
 const HEAD_TOP = "M200 100c100 0 150 60 150 200";
 const HEAD_SHAVE =
 	'<path fill="$[headShave]" d="M60 300H50c0-140 50-200 150-200s150 60 150 200h-10v-10c0-5-10-20-15-25s-5-55-15-65c-40-40-60 0-110 0s-70-40-110 0c-10 10-10 60-15 65s-15 20-15 25z"/>';
-const head = (id: string, lower: string, extra = ""): FacePart => ({
+export const head = (id: string, lower: string, extra = ""): FacePart => ({
 	feature: "head",
 	id,
 	svg: `<path fill="$[skinColor]" stroke="#000" stroke-width="6" d="${HEAD_TOP}${lower}c0-140 50-200 150-200Z"/><path fill="$[faceShave]" d="M200 410c30 0 50 10 50 10 30 0 90-15 90-120h10${lower}h10c0 105 60 120 90 120 0 0 20-10 50-10Z"/>${HEAD_SHAVE}${extra}`,
