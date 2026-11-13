@@ -7,6 +7,7 @@ import type {
 	ScoutRatings,
 	ScoutTraitReading,
 } from "./types.ts";
+import { SUB_INDEX } from "../subRatings.ts";
 
 export const GRADE_LABELS: Record<GradeKey, string> = {
 	shoot: "Shooting",
@@ -259,6 +260,39 @@ export const categoryScores = ({
 				iq: 50,
 				motor: 50,
 			};
+
+	// Sub-ratings (the subRatings setting): the grades read the parts of each base they're about, so a center whose Defense is all shot
+	// blocking grades as an interior defender, not a perimeter one, and a spot-up shooter's catch-and-shoot grade beats his off-the-dribble
+	if (r?.sub) {
+		const x = (k: string) => r.sub![SUB_INDEX[k]!]!;
+		base.cs = 0.5 * x("tcs") + 0.25 * x("rng") + 0.25 * x("spu");
+		base.od = 0.4 * x("tod") + 0.4 * x("pul") + 0.2 * x("crt");
+		base.fin =
+			0.14 * x("cls") +
+			0.12 * x("pst") +
+			0.12 * x("flt") +
+			0.16 * x("con") +
+			0.16 * x("fns") +
+			0.12 * r.hgt +
+			0.1 * x("mxv") +
+			0.08 * r.stre;
+		base.pm = 0.33 * x("vis") + 0.22 * x("acc") + 0.25 * x("hnd") + 0.2 * r.oiq;
+		base.bs = 0.6 * x("sec") + 0.25 * x("acc") + 0.15 * r.oiq;
+		base.reb = 0.4 * x("orb") + 0.6 * x("drd");
+		base.pd = 0.3 * x("pdf") + 0.2 * x("stl") + 0.35 * x("lat") + 0.15 * r.jmp;
+		base.id =
+			0.25 * x("idf") +
+			0.2 * x("blk") +
+			0.3 * r.hgt +
+			0.15 * x("stj") +
+			0.1 * r.stre;
+		base.ath =
+			0.21 * x("sls") +
+			0.21 * x("lat") +
+			0.21 * x("mxv") +
+			0.21 * x("stj") +
+			0.16 * r.endu;
+	}
 
 	// Motor: conditioning plus the visible effort traits (hustle, motor) when there is a reading
 	const hustle = traitScore(traits, "hustle");

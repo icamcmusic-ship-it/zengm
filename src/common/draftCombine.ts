@@ -19,6 +19,12 @@ export type DraftCombineRatings = {
 	wng?: number;
 	csh?: number;
 	dsh?: number;
+	// Sub-ratings, only when that setting is on: the verticals read standing reach and max vertical, the lane agility and shuttle
+	// lateral quickness, the sprint straight-line speed (each sub's average is its base, so the class's results keep their scale)
+	stj?: number;
+	mxv?: number;
+	lat?: number;
+	sls?: number;
 };
 
 export type DraftCombineInput = {
@@ -362,21 +368,25 @@ export const generateDraftCombine = (
 	const nBench = rng.normal(0, 1);
 	const nShoot = rng.normal(0, 1);
 
-	const maxVertExp = 35.2 + 3 * zJmp + 0.6 * zSpd - 0.025 * w;
+	const zMxv = r.mxv !== undefined ? z(r.mxv, REF.jmp) : zJmp;
+	const zStj = r.stj !== undefined ? z(r.stj, REF.jmp) : zJmp;
+	const zLat = r.lat !== undefined ? z(r.lat, REF.spd) : zSpd;
+	const zSls = r.sls !== undefined ? z(r.sls, REF.spd) : zSpd;
+	const maxVertExp = 35.2 + 3 * zMxv + 0.6 * zSls - 0.025 * w;
 	const maxVert = roundTo(clamp(maxVertExp + 2 * nVert, 24, 46), 0.5);
 	const standingVert = roundTo(
 		clamp(
-			maxVert - 5 + 0.3 * zStre + 1 * nStand,
+			maxVert - 5 + 0.3 * zStre + 1.5 * (zStj - zMxv) + 1 * nStand,
 			19,
 			Math.min(40, maxVert - 1),
 		),
 		0.5,
 	);
-	const laneExp = 11.28 - 0.3 * zSpd - 0.05 * zJmp + 0.004 * w;
+	const laneExp = 11.28 - 0.3 * zLat - 0.05 * zJmp + 0.004 * w;
 	const laneAgility = round2(clamp(laneExp + 0.25 * nLane, 10.05, 13));
-	const shuttleExp = 3.07 - 0.1 * zSpd + 0.0012 * w;
+	const shuttleExp = 3.07 - 0.1 * zLat + 0.0012 * w;
 	const shuttle = round2(clamp(shuttleExp + 0.09 * nShuttle, 2.6, 3.7));
-	const sprintExp = 3.28 - 0.085 * zSpd + 0.001 * w;
+	const sprintExp = 3.28 - 0.085 * zSls + 0.001 * w;
 	const sprint = round2(clamp(sprintExp + 0.06 * nSprint, 2.95, 3.8));
 	const bench = Math.max(
 		0,

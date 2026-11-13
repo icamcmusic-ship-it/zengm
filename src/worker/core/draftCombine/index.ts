@@ -27,6 +27,8 @@ import { g, helpers, logEvent } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import { earlyCombineRead } from "../frontOffice/index.ts";
+import { subRatingsOn } from "../player/subRatings.ts";
+import { isValidSubArray, SUB_INDEX } from "../../../common/subRatings.ts";
 
 type PlayerRatings = Player["ratings"][number] & Record<string, any>;
 
@@ -64,6 +66,15 @@ export const combineRatingsRow = (p: Player): PlayerRatings | undefined => {
 const stock = (p: Player, r: PlayerRatings) =>
 	r.pot + 0.5 * r.ovr - 1.5 * (p.draft.year - p.born.year - 19);
 
+// Sub-ratings (setting on): the subs the drills measure
+const combineSubs = (r: PlayerRatings) => {
+	if (!subRatingsOn() || !isValidSubArray(r.sub)) {
+		return {};
+	}
+	const x = (k: string) => r.sub[SUB_INDEX[k]!] as number;
+	return { stj: x("stj"), mxv: x("mxv"), lat: x("lat"), sls: x("sls") };
+};
+
 const toInput = (
 	p: Player,
 	r: PlayerRatings,
@@ -96,6 +107,7 @@ const toInput = (
 			wng: expanded ? x.wng : undefined,
 			csh: expanded ? x.csh : undefined,
 			dsh: expanded ? x.dsh : undefined,
+			...combineSubs(r),
 		},
 	};
 };

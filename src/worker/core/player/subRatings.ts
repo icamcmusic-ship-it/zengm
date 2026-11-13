@@ -22,12 +22,15 @@ import {
 	MAX_GENERATIONAL,
 	maxOffset,
 	neutralSubShape,
+	parseSubLean,
+	realSubShape,
 	seedForExisting,
 	seedForGenerated,
 	type StoredSubInfo,
 	syncRowSubs,
 } from "../../../common/subRatingsGen.ts";
 import { g } from "../../util/index.ts";
+import { applyFuzz, getFuzz } from "./fuzzRating.ts";
 
 export const subRatingsOn = (): boolean =>
 	__SPORT === "basketball" &&
@@ -46,6 +49,7 @@ type PlayerLike = {
 	tid: number;
 	ratings: any[];
 	subP?: StoredSubInfo;
+	subLean?: string;
 	preDraftCareer?: { story?: string; years?: { level: string }[] };
 };
 
@@ -108,7 +112,23 @@ export const ensureSubs = (p: PlayerLike): boolean => {
 	}
 	let changed = false;
 	const latest = p.ratings.at(-1);
-	if (!p.subP || p.subP.v !== SUB_RATINGS_VERSION) {
+	const lean = parseSubLean(p.subLean);
+	if (p.subLean !== undefined) {
+		delete p.subLean;
+		changed = true;
+	}
+	if (
+		lean &&
+		(!p.subP ||
+			p.subP.v !== SUB_RATINGS_VERSION ||
+			(p.subP.n === 1 && p.subP.rs === undefined))
+	) {
+		// A real player: his shape from his real stats (also replacing a neutral shape given before his stats were read)
+		const { sub, info } = realSubShape(latest, seedForExisting(p), lean);
+		latest.sub = sub;
+		p.subP = info;
+		changed = true;
+	} else if (!p.subP || p.subP.v !== SUB_RATINGS_VERSION) {
 		const { sub, info } = neutralSubShape(latest, seedForExisting(p));
 		p.subP = info;
 		if (!isValidSubArray(latest.sub)) {
@@ -230,4 +250,43 @@ export const subsAfterRewrite = (p: PlayerLike) => {
 	}
 	ensureSubs(p);
 	assignClassSubs([p]);
+};
+
+// Scouting fuzz on sub-ratings. Each sub gets the row's fuzz (like its base) plus its own deterministic part, up to 0.8x the row's fuzz
+// either way, so the shape of a player's game is uncertain too, not just its level; since it scales with the row's fuzz, a better
+// scouting level (front office scouting, scouting budget, a class aging) narrows it like the bases'. Subs the draft combine measures
+// (standing reach and max vertical from the verticals, lateral quickness from the lane agility drill, shot blocking from the wingspan)
+// keep a third of it once he was measured there. No fuzz in God Mode or multi team mode (getFuzz), like the bases.
+const COMBINE_SUBS = new Set(
+	["stj", "mxv", "lat", "blk"].map((k) =>
+		SUB_DEFS.findIndex((d) => d.key === k),
+	),
+);
+const COMBINE_FUZZ = 0.35;
+const SHAPE_FUZZ = 0.8;
+
+// Deterministic in [-1, 1] from the row's fuzz (a float unique to the player and season) and the sub
+const shapeNoise = (fuzz: number, i: number) => {
+	const x = Math.sin(fuzz * 12.9898 + (i + 1) * 78.233) * 43758.5453;
+	return 2 * (x - Math.floor(x)) - 1;
+};
+
+export const fuzzSubs = (
+	sub: readonly number[],
+	rowFuzz: number | undefined,
+	p?: { combine?: unknown },
+	forceFuzz?: boolean,
+): number[] => {
+	const fuzz = getFuzz(rowFuzz ?? 0, forceFuzz);
+	if (fuzz === 0) {
+		return [...sub];
+	}
+	const measured = p?.combine !== undefined;
+	return sub.map((x, i) => {
+		let f = fuzz + SHAPE_FUZZ * Math.abs(fuzz) * shapeNoise(fuzz, i);
+		if (measured && COMBINE_SUBS.has(i)) {
+			f *= COMBINE_FUZZ;
+		}
+		return applyFuzz(x, f);
+	});
 };

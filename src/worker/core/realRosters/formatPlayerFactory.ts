@@ -488,7 +488,13 @@ const formatPlayerFactory = async (
 			hof,
 			retiredYear,
 			srID: ratings.slug,
+			// Sub-ratings lean from his real stats, read once by ensureSubs (the subRatings setting) and then removed
+			subLean: ratings.subLean,
 		};
+
+		if (!p.subLean) {
+			delete p.subLean;
+		}
 
 		if (!p.hof) {
 			delete p.hof;

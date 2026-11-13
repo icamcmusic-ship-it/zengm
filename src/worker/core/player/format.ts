@@ -43,7 +43,7 @@ import {
 	isExpandedRatingKey,
 } from "../../../common/expandedRatings.ts";
 import { expandedRatingsApply } from "./expandedRatings.ts";
-import { subRatingsOn } from "./subRatings.ts";
+import { fuzzSubs, subRatingsOn } from "./subRatings.ts";
 import { isValidSubArray } from "../../../common/subRatings.ts";
 
 type PlayerFormatOptionsRequired = Required<
@@ -764,10 +764,13 @@ const processRatings = (
 			} else if (attr === "sub") {
 				// Sub-ratings (only with the setting on, and only on the rows that keep them), with scouting fuzz like the bases
 				const sub = (pr as any).sub;
-				if (subRatingsOn() && isValidSubArray(sub)) {
-					row.sub = fuzz
-						? sub.map((x: number) => player.fuzzRating(x, pr.fuzz))
-						: [...sub];
+				if (
+					subRatingsOn() &&
+					isValidSubArray(sub) &&
+					// No visible ratings challenge: hidden, like the bases (retired players excepted)
+					!(fuzz && g.get("challengeNoRatings") && p.tid !== PLAYER.RETIRED)
+				) {
+					row.sub = fuzz ? fuzzSubs(sub, pr.fuzz, p) : [...sub];
 				} else {
 					row.sub = undefined;
 				}

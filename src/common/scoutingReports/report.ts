@@ -35,6 +35,7 @@ import {
 	Voice,
 } from "./text.ts";
 import { Rng } from "../ratingsBuilds/rng.ts";
+import { SUB_INDEX } from "../subRatings.ts";
 import {
 	GRADE_KEYS,
 	type FullReport,
@@ -546,6 +547,26 @@ const selfCreatedOf = (input: ScoutInput, scores: CategoryScores) => {
 	return Math.round(100 * Math.max(0.08, Math.min(0.85, share)));
 };
 
+// A sub-rating (as scouted) in words
+const subWord = (value: number) =>
+	value >= 75
+		? "elite"
+		: value >= 63
+			? "strong"
+			: value >= 50
+				? "solid"
+				: value >= 38
+					? "below average"
+					: "a weakness";
+
+// "rim protection elite (78), steals solid (52), ...", best first
+const subBreakdown = (sub: readonly number[], parts: [string, string][]) =>
+	parts
+		.map(([key, label]) => ({ label, value: sub[SUB_INDEX[key]!]! }))
+		.sort((a, b) => b.value - a.value)
+		.map(({ label, value }) => `${label} ${subWord(value)} (${value})`)
+		.join(", ");
+
 export const buildReport = ({
 	input,
 	peers,
@@ -685,6 +706,19 @@ export const buildReport = ({
 		);
 	}
 
+	// Sub-ratings (the subRatings setting): the jumper broken into its parts
+	const subs = input.ratings?.sub;
+	if (subs) {
+		offense.push(
+			`Shooting by part: ${subBreakdown(subs, [
+				["rng", "range"],
+				["tcs", "catch-and-shoot"],
+				["tod", "off the dribble"],
+				["pul", "pull-up"],
+			])}.`,
+		);
+	}
+
 	// ---- defense ----
 	const defense: string[] = [];
 	const dv = v.child("defense");
@@ -741,6 +775,17 @@ export const buildReport = ({
 					])
 				: "Team defense is fine.",
 	);
+	if (subs) {
+		defense.push(
+			`Defense by part: ${subBreakdown(subs, [
+				["blk", "rim protection"],
+				["idf", "post defense"],
+				["pdf", "on the ball"],
+				["stl", "steals"],
+				["lat", "lateral quickness"],
+			])}.`,
+		);
+	}
 
 	// ---- physical ----
 	const physical: string[] = [];

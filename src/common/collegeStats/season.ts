@@ -4,13 +4,23 @@ import { COMPOSITE_WEIGHTS } from "../constants.basketball.ts";
 import { calculateAdvanced } from "./advanced.ts";
 import { clamp, type Rng } from "./rng.ts";
 import type { CollegeSeason, GameBox, Ratings } from "./types.ts";
+import { SUB_INDEX } from "../subRatings.ts";
+
+// Sub-ratings (the subRatings setting): how far a sub is from its base (0 without sub-ratings), so production follows the shape of his
+// game while his bases keep their effect. Deterministic: no extra random numbers
+const subDev = (ratings: Ratings, key: string) =>
+	ratings.subOff === undefined ? 0 : ratings.subOff[SUB_INDEX[key]!]!;
 
 /**
  * The college season model. This is a per-player rate model, in the spirit of (and with the anchors of) the BBGM Draft Class Workshop's stat model, but without simulating a whole league of college teams around the prospect: possessions used come from a usage rate, turnovers, free throw rate, shot mix and shooting percentages come from the Workshop's height-bucketed draft-year anchors adjusted by the prospect's ratings, and the season is built game by game so that totals, season highs and double-double counts are all consistent with each other.
  */
 
 // Bumped when generation changes enough that stored prospects' stats should be made again (see upgradeCollegeStats in worker/core/draft/generateCollegeStats.ts). 2: no forward projection of classes years away, rebounds/blocks lean more on the matching ratings
-export const COLLEGE_STATS_VERSION = 2;
+// 3: the sub-ratings (the subRatings setting) move blocks, steals, 3PA rate and 3P%, assists, turnovers and the ORB/DRB split. Only
+// prospects generated with sub-ratings are marked 3 (COLLEGE_STATS_VERSION); with the setting off generation is unchanged and stays 2
+// (COLLEGE_STATS_VERSION_BASE), and turning it on remakes undrafted prospects' stats once
+export const COLLEGE_STATS_VERSION = 3;
+export const COLLEGE_STATS_VERSION_BASE = 2;
 
 // Division I averages (modern era), per team game
 export const PACE = 68; // possessions
@@ -108,7 +118,8 @@ export const backProject = (
 	}
 	const out = { ...ratings };
 	for (const key of Object.keys(out) as (keyof Ratings)[]) {
-		if (key === "hgt" || key === "wng") {
+		// Sub-ratings are stored as offsets from their bases, so they go back with them
+		if (key === "hgt" || key === "wng" || typeof out[key] !== "number") {
 			continue;
 		}
 		let shift = 0;
@@ -383,7 +394,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			0.1 * (tovComp - 0.44) -
 			// Expanded ratings: ball security beyond what his handle and IQ say
 			(ratings.bsc === undefined
-				? 0
+				? // Sub-ratings: Ball Security (with expanded ratings it follows bsc, already counted)
+					0.003 * subDev(ratings, "sec")
 				: 0.0035 * (ratings.bsc - ballSecurityBase(ratings))) +
 			rng.normal(0, 0.014 * noise),
 		0.08,
@@ -411,7 +423,13 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			// Expanded ratings: spot-up shooters take more of their shots from three, shot creators more pull-up twos
 			(ratings.csh === undefined || ratings.dsh === undefined
 				? 1
-				: clamp(1 + 0.012 * (ratings.csh - ratings.dsh), 0.7, 1.3)) +
+				: clamp(1 + 0.012 * (ratings.csh - ratings.dsh), 0.7, 1.3)) *
+			// Sub-ratings: range takes more threes, catch-and-shoot a little more
+			clamp(
+				1 + 0.014 * subDev(ratings, "rng") + 0.006 * subDev(ratings, "tcs"),
+				0.7,
+				1.35,
+			) +
 			// The random part shrinks with his willingness too, so a non-shooter stays a non-shooter
 			rng.normal(0, 0.025 * noise) * Math.min(1, willing),
 		0,
@@ -451,6 +469,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			0.0005 * (ratings.oiq - 40) +
 			// Expanded ratings: most college threes are catch-and-shoot
 			(ratings.csh === undefined ? 0 : 0.0012 * (ratings.csh - ratings.tp)) +
+			// Sub-ratings: catch-and-shoot makes them, range a little
+			0.0014 * subDev(ratings, "tcs") +
+			0.0006 * subDev(ratings, "rng") +
 			0.35 * eff,
 		0.15,
 		0.47,
@@ -492,7 +513,14 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	);
 	const orbShare =
 		ratings.oreb === undefined || ratings.dreb === undefined
-			? 0.17 + 0.13 * b
+			? // Sub-ratings: offensive vs defensive rebounding (with expanded ratings they follow oreb/dreb, already counted)
+				clamp(
+					0.17 +
+						0.13 * b +
+						0.006 * (subDev(ratings, "orb") - subDev(ratings, "drd")),
+					0.05,
+					0.5,
+				)
 			: // Expanded ratings: offensive vs defensive rebounding moves the split
 				clamp(
 					0.17 + 0.13 * b + 0.006 * (ratings.oreb - ratings.dreb),
@@ -503,7 +531,12 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const drb40 = trb40 - orb40;
 	const ast40 = clamp(
 		// Bigs get fewer chances to make the assist (the ball is in a guard's hands), on top of what passing and handle say
-		(1.5 + 0.11 * (ratings.pss - 20) + 0.05 * (ratings.drb - 30) - 2.4 * b) *
+		(1.5 +
+			0.11 * (ratings.pss - 20) +
+			0.05 * (ratings.drb - 30) -
+			2.4 * b +
+			// Sub-ratings: vision makes the assists
+			0.08 * subDev(ratings, "vis")) *
 			(1 + 0.8 * (usg - 0.25)) +
 			rng.normal(0, 0.5 * noise),
 		0.4,
@@ -517,6 +550,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			0.03 * ((ratings.pdef ?? ratings.diq) - 40) +
 			(ratings.wng === undefined ? 0 : 0.006 * (ratings.wng - ratings.hgt)) -
 			0.35 * b +
+			// Sub-ratings: Steals
+			0.04 * subDev(ratings, "stl") +
 			rng.normal(0, 0.22 * noise),
 		0.4,
 		4,
@@ -528,6 +563,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			0.015 * (ratings.jmp - 40) +
 			0.045 * ((ratings.idef ?? ratings.diq) - 40) +
 			(ratings.wng === undefined ? 0 : 0.05 * (ratings.wng - ratings.hgt)) +
+			// Sub-ratings: Shot Blocking
+			0.06 * subDev(ratings, "blk") +
 			rng.normal(0, 0.25 * noise),
 		0.05,
 		6,

@@ -6,7 +6,10 @@ import { idb } from "../../db/index.ts";
 import { player } from "../index.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
-import { COLLEGE_STATS_VERSION } from "../../../common/collegeStats/index.ts";
+import {
+	COLLEGE_STATS_VERSION,
+	COLLEGE_STATS_VERSION_BASE,
+} from "../../../common/collegeStats/index.ts";
 import { isOverseasLeague } from "../../../common/collegeStats/overseas.ts";
 import {
 	generateCollegeStats,
@@ -284,7 +287,8 @@ describe("college stats on the path a new league uses", () => {
 
 	test("stats are stamped with the model version", () => {
 		for (const x of lines) {
-			assert.strictEqual(x.p.collegeStatsV, COLLEGE_STATS_VERSION);
+			// Sub-ratings off in this league: the version from before sub-ratings
+			assert.strictEqual(x.p.collegeStatsV, COLLEGE_STATS_VERSION_BASE);
 		}
 	});
 
@@ -321,7 +325,7 @@ describe("college stats on the path a new league uses", () => {
 		assert.deepStrictEqual(drafted.stats, draftedStats);
 		assert.strictEqual(drafted.collegeStatsV, undefined);
 		for (const [i, p] of before.entries()) {
-			assert.strictEqual(p.collegeStatsV, COLLEGE_STATS_VERSION);
+			assert.strictEqual(p.collegeStatsV, COLLEGE_STATS_VERSION_BASE);
 			assert.deepStrictEqual(p.stats, expected[i]!.stats);
 			assert.deepStrictEqual(p.collegeSeason, expected[i]!.collegeSeason);
 		}

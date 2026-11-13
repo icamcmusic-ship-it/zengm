@@ -8,6 +8,13 @@ import {
 	orderDisplayItems,
 } from "../../common/skillBadges/compute.ts";
 import { useFeatureOn } from "../util/nativeFeatures.ts";
+import { badgeDriverText } from "../../common/skillBadges/subDrivers.ts";
+
+// A skill or badge's tooltip, plus the sub-rating that drives it when the row has sub-ratings (the subRatings setting)
+const titleWithDriver = (base: string, token: string, sub?: number[]) => {
+	const driver = sub ? badgeDriverText(token, sub) : undefined;
+	return driver ? `${base} — ${driver}` : base;
+};
 
 const TruncatedSkills = ({
 	numSkillsBeforeTruncate,
@@ -39,12 +46,15 @@ export const SkillsBlock = ({
 	numSkillsBeforeTruncate,
 	skills,
 	badges,
+	sub,
 }: {
 	className?: string;
 	numSkillsBeforeTruncate?: number;
 	skills?: string[];
 	// Extended skill badges and combos (display only, from getDisplayBadges), all shown after the original skills in the same format
 	badges?: string[];
+	// Sub-ratings of the same row (as scouted), to name the sub that drives each skill in its tooltip
+	sub?: number[];
 }) => {
 	const { fullNames } = useLocal(["fullNames"]);
 	const badgesOn = useFeatureOn("skillBadges");
@@ -66,7 +76,11 @@ export const SkillsBlock = ({
 					<span
 						key={token}
 						className="skill"
-						title={original ? SKILLS[token] : badgeTitle(token)}
+						title={titleWithDriver(
+							original ? SKILLS[token]! : badgeTitle(token),
+							token,
+							sub,
+						)}
 					>
 						{token}
 					</span>
@@ -110,7 +124,11 @@ export const SkillsBlock = ({
 	return (
 		<span className={className}>
 			{truncatedSkills.map((skill) => (
-				<span key={skill} className="skill" title={SKILLS[skill]}>
+				<span
+					key={skill}
+					className="skill"
+					title={titleWithDriver(SKILLS[skill]!, skill, sub)}
+				>
 					{skill}
 				</span>
 			))}

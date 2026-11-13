@@ -250,6 +250,7 @@ const Player2 = ({
 									className="skills-alone"
 									skills={r.skills}
 									badges={r.badges}
+									sub={showRatings ? (r as any).sub : undefined}
 								/>,
 								wrappedSeasonAwards({
 									awards: awardsBySeason.get(r.season),

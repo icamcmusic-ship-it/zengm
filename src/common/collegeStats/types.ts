@@ -32,6 +32,9 @@ export type Ratings = Record<RatingKey, number> & {
 	csh?: number;
 	dsh?: number;
 	bsc?: number;
+	// Sub-ratings (the subRatings setting), only when it's on: each sub's offset from its base (SUB_DEFS order), so a rating projected
+	// back to an earlier college season keeps its shape
+	subOff?: number[];
 };
 
 // What the engine needs to know about a prospect. Nothing here is changed by generation.

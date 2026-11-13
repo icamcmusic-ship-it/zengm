@@ -588,7 +588,7 @@ export const lagRatings = <T extends Record<string, number | undefined>>(
 	}
 	const out: Record<string, number | undefined> = { ...ratings };
 	for (const key of Object.keys(out)) {
-		if (key === "hgt" || key === "wng" || out[key] === undefined) {
+		if (key === "hgt" || key === "wng" || typeof out[key] !== "number") {
 			continue;
 		}
 		const factor =

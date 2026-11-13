@@ -64,6 +64,8 @@ import { featureOn } from "../../util/nativeFeatures.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { getCoachProfile } from "../staff/systems.ts";
 import fuzzRating from "../player/fuzzRating.ts";
+import { fuzzSubs, subRatingsOn } from "../player/subRatings.ts";
+import { isValidSubArray } from "../../../common/subRatings.ts";
 import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import genContract from "../player/genContract.ts";
 import { getPlayerTraitsForUI } from "../player/traits.ts";
@@ -112,6 +114,7 @@ const EXPANDED_FUZZED = [
 // A ratings row as the user sees it: fuzz on everything but height and wingspan (measurements), like the player page
 export const scoutedRatingsOf = (
 	row: Record<string, any> | undefined,
+	p?: { combine?: unknown },
 ): ScoutRatings | undefined => {
 	if (!row || typeof row.hgt !== "number") {
 		return undefined;
@@ -134,6 +137,10 @@ export const scoutedRatingsOf = (
 				out[key] = fuzzRating(row[key], fuzz);
 			}
 		}
+	}
+	// Sub-ratings (setting on), with their scouting fuzz (fuzzSubs, as on the player page)
+	if (subRatingsOn() && isValidSubArray(row.sub)) {
+		out.sub = fuzzSubs(row.sub, fuzz, p);
 	}
 	return out;
 };
@@ -465,7 +472,7 @@ const getRoleScale = async (): Promise<RoleScale> => {
 
 export const getReportCtx = async (viewerTid?: number): Promise<ReportCtx> => {
 	const userTid = viewerTid ?? g.get("userTid");
-	const key = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}|${userTid}|${g.get("challengeNoRatings") ? 1 : 0}`;
+	const key = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}|${userTid}|${g.get("challengeNoRatings") ? 1 : 0}|${subRatingsOn() ? 1 : 0}`;
 	if (ctxCache && ctxCache.key === key && Date.now() - ctxCache.time < 15000) {
 		return ctxCache.ctx;
 	}
@@ -526,7 +533,7 @@ export type Light = {
 
 export const lightOf = (p: Player, ctx: ReportCtx): Light => {
 	const row = ratingsRowFor(p);
-	const ratings = ratingsHidden(p) ? undefined : scoutedRatingsOf(row);
+	const ratings = ratingsHidden(p) ? undefined : scoutedRatingsOf(row, p);
 	const prospect = isProspectPlayer(p);
 	const production = prospect
 		? preDraftProductionFor(p)
@@ -947,14 +954,14 @@ export const buildInput = async (
 			: "pro";
 	const row = ratingsRowFor(p);
 	const hidden = ratingsHidden(p);
-	const ratings = hidden ? undefined : scoutedRatingsOf(row);
+	const ratings = hidden ? undefined : scoutedRatingsOf(row, p);
 	const prevRow =
 		!prospect && !retired
 			? (p.ratings as any[]).findLast(
 					(r) => r.season < (row?.season ?? ctx.season),
 				)
 			: undefined;
-	const prevRatings = hidden ? undefined : scoutedRatingsOf(prevRow);
+	const prevRatings = hidden ? undefined : scoutedRatingsOf(prevRow, p);
 	const season = retired ? (row?.season ?? ctx.season) : ctx.season;
 	const age = (prospect ? p.draft.year : season) - p.born.year;
 	const pos = row?.pos ?? "F";

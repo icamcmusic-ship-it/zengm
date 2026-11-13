@@ -434,6 +434,7 @@ const TopStuff = ({
 					className={injured ? undefined : "skills-alone"}
 					skills={skills}
 					badges={badges}
+					sub={showRatings ? (ratingsRow as any).sub : undefined}
 				/>
 				<WatchBlock
 					className="ms-2"
