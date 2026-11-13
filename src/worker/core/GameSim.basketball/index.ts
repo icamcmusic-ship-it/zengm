@@ -69,6 +69,7 @@ import {
 	mismatchScale,
 	postMismatch,
 } from "./matchupDefense.ts";
+import { SUB_SIM_CAL } from "./subRatingsSim.ts";
 import {
 	ENDGAME,
 	endgameRole,
@@ -455,6 +456,9 @@ class GameSim extends GameSimBase {
 	positionalSharesLineup: [PlayerGameSim[], PlayerGameSim[]] = [[], []];
 	// Expanded ratings, second step (offRebounding/defRebounding/ballSecurity/catchShoot/offDribble composites from loadTeams)
 	expandedRatings2: boolean;
+	// Sub-Ratings in Sim (League extras, see subRatingsSim.ts): loadTeams folded the sub-ratings into the composites and added the jumper
+	// style gaps by shot type. Off: nothing here is used
+	subRatingsSim: boolean;
 	// Player traits: a playoff game, where the big-game trait applies (the whole game)
 	bigGame = false;
 	// Player traits: picking the player who gets a technical or flagrant foul (temper weighs in, see traitPickWeight)
@@ -593,6 +597,9 @@ class GameSim extends GameSimBase {
 		);
 		this.expandedRatings2 = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.offRebounding !== undefined),
+		);
+		this.subRatingsSim = teams.some((t) =>
+			t.player.some((p) => p.compositeRating.jumperGap3 !== undefined),
 		);
 		this.matchupDefense = nativeFeatureEnabled("matchupDefense", (key) =>
 			g.get(key as any),
@@ -3517,11 +3524,18 @@ class GameSim extends GameSimBase {
 	 */
 	// Expanded ratings: a jumper off a pass leans on catch-and-shoot, a self-created one on off-the-dribble shooting. csh and dsh average
 	// the player's fg/tp level, so this is plus or minus half their gap
-	jumpShotStyleDelta(p: PlayerGameSim, passer: PlayerGameSim | undefined) {
-		const gap = p.compositeRating.catchShoot - p.compositeRating.offDribble;
+	// Sub-Ratings in Sim: the gap by shot type (jumperGap3/jumperGapMid from loadTeams, see subRatingsSim.ts), also without Expanded
+	// Ratings (then with no offset)
+	jumpShotStyleDelta(
+		p: PlayerGameSim,
+		passer: PlayerGameSim | undefined,
+		subGap?: number,
+	) {
+		const gap =
+			subGap ?? p.compositeRating.catchShoot - p.compositeRating.offDribble;
 		return (
 			EXPANDED_JUMPER_STYLE * (passer !== undefined ? gap : -gap) * 0.5 +
-			EXPANDED_JUMPER_OFFSET
+			(this.expandedRatings2 ? EXPANDED_JUMPER_OFFSET : 0)
 		);
 	}
 
@@ -3606,6 +3620,9 @@ class GameSim extends GameSimBase {
 					(this.team[this.o].compositeRating.dribbling +
 						this.team[this.o].compositeRating.passing)));
 		let prob2 = this.expandedRatings ? prob * EXPANDED_STL_FACTOR : prob;
+		if (this.subRatingsSim) {
+			prob2 *= SUB_SIM_CAL.stl;
+		}
 		if (this.coachSys) {
 			prob2 *= this.cs[this.d].stl;
 		}
@@ -3764,13 +3781,19 @@ class GameSim extends GameSimBase {
 			fgaLogType = "fgaTipIn";
 			type = "tipIn";
 			probMissAndFoul = 0.02;
-			probMake = 0.1 + p.compositeRating.shootingAtRim * 0.1;
+			probMake =
+				0.1 +
+				(p.compositeRating.shootingPutBack ?? p.compositeRating.shootingAtRim) *
+					0.1;
 			probAndOne = 0.01;
 		} else if (putBack) {
 			type = "putBack";
 			fgaLogType = "fgaPutBack";
 			probMissAndFoul = 0.37;
-			probMake = p.compositeRating.shootingAtRim * 0.41 + 0.54;
+			probMake =
+				(p.compositeRating.shootingPutBack ?? p.compositeRating.shootingAtRim) *
+					0.41 +
+				0.54;
 			probAndOne = 0.25;
 
 			if (lateGamePutBack) {
@@ -3796,8 +3819,17 @@ class GameSim extends GameSimBase {
 			probMissAndFoul = 0.02;
 			probMake = shootingThreePointerScaled * 0.3 + 0.36;
 			probAndOne = 0.01;
-			if (this.expandedRatings2) {
-				probMake += this.jumpShotStyleDelta(p, passer);
+			if (this.expandedRatings2 || this.subRatingsSim) {
+				probMake += this.jumpShotStyleDelta(
+					p,
+					passer,
+					p.compositeRating.jumperGap3,
+				);
+				if (this.subRatingsSim) {
+					probMake += this.expandedRatings2
+						? SUB_SIM_CAL.three
+						: SUB_SIM_CAL.threeNoExpanded;
+				}
 			}
 
 			// Better shooting in the ASG, why not?
@@ -3861,15 +3893,30 @@ class GameSim extends GameSimBase {
 								p.compositeRating.shootingMidRange)
 					: p.compositeRating.shootingMidRange * 0.32 + 0.42;
 				probAndOne = 0.05;
-				if (this.expandedRatings2) {
-					probMake += this.jumpShotStyleDelta(p, passer);
+				if (this.expandedRatings2 || this.subRatingsSim) {
+					probMake += this.jumpShotStyleDelta(
+						p,
+						passer,
+						p.compositeRating.jumperGapMid,
+					);
+					if (this.subRatingsSim) {
+						probMake += SUB_SIM_CAL.mid;
+					}
 				}
 			} else if (r2 > r3) {
 				// Dunk, fast break or half court
 				type = "atRim";
 				fgaLogType = "fgaAtRim";
 				probMissAndFoul = 0.37;
-				probMake = p.compositeRating.shootingAtRim * 0.41 + 0.54;
+				// (Sub-Ratings in Sim: the make has its own composite, finesse and max vertical)
+				probMake =
+					(p.compositeRating.shootingAtRimMake ??
+						p.compositeRating.shootingAtRim) *
+						0.41 +
+					0.54;
+				if (this.subRatingsSim) {
+					probMake += SUB_SIM_CAL.rim;
+				}
 				probAndOne = 0.25;
 			} else {
 				// Post up
@@ -3884,6 +3931,9 @@ class GameSim extends GameSimBase {
 								p.compositeRating.shootingLowPost)
 					: p.compositeRating.shootingLowPost * 0.32 + 0.34;
 				probAndOne = 0.15;
+				if (this.subRatingsSim) {
+					probMake += SUB_SIM_CAL.post;
+				}
 			}
 			// Better shooting in the ASG, why not?
 			if (this.allStarGame) {
@@ -3895,7 +3945,8 @@ class GameSim extends GameSimBase {
 
 		let blocked;
 		if (
-			(this.expandedRatings ? this.probBlkExpanded(p, type) : this.probBlk()) >
+			(this.expandedRatings ? this.probBlkExpanded(p, type) : this.probBlk()) *
+				(this.subRatingsSim ? SUB_SIM_CAL.blk : 1) >
 			Math.random()
 		) {
 			blocked = true;
@@ -3909,6 +3960,11 @@ class GameSim extends GameSimBase {
 
 			if (this.allStarGame) {
 				foulFactor *= 0.4;
+			}
+
+			// Sub-Ratings in Sim: calibration (the league's contact finishing is below its dunks/layups rating)
+			if (this.subRatingsSim) {
+				foulFactor *= SUB_SIM_CAL.foul;
 			}
 
 			// Player traits: a defense of foul-prone players fouls more shooters

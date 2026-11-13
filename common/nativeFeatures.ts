@@ -422,6 +422,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "subRatingsSim",
+		key: "subRatingsSim",
+		name: "Sub-Ratings in Sim",
+		description:
+			"Requires Sub-Ratings. The game sim reads the sub-ratings where they are more specific than the rating: shot blocking and standing vertical for blocks, steals and lateral quickness for steals and on-ball defense, interior defense for the rim, catch-and-shoot vs off-the-dribble shooting by whether the shot was assisted (threes and mid-range jumpers), range for how often and how well he shoots threes, post moves for big men's post-ups and touch for small players' short shots, contact finishing for fouls drawn and and-ones, finesse and max vertical for finishing at the rim, handle and ball security for turnovers, vision for assists and pass accuracy for bad passes, straight-line speed for pace and fast breaks. League averages stay the same; only the shape of each player's game changes. With every sub-rating equal to its rating, games are exactly as before.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "ovrV2",
 		key: "ovrV2",
 		name: "Sim-Calibrated Ovr",

@@ -44,6 +44,15 @@ import {
 	simFixInjuryFactor,
 } from "../GameSim.basketball/simSettings.ts";
 import {
+	atRimWeights,
+	jumperGaps,
+	subSimComposite,
+	subSimLat,
+	subSimPlayer,
+	subSimTouches,
+} from "../GameSim.basketball/subRatingsSim.ts";
+import { subRatingsOn } from "../player/subRatings.ts";
+import {
 	PBP_EXPANDED_KEYS,
 	PBP_TRAIT_KEYS,
 } from "../../../common/pbpFlavor/story.ts";
@@ -302,7 +311,7 @@ export const processTeam = async (
 	const matchupDefense =
 		__SPORT === "basketball" &&
 		nativeFeatureEnabled("matchupDefense", (key) => g.get(key as any));
-	const compositeWeights = Object.entries(
+	const compositeWeightsObj =
 		__SPORT === "basketball"
 			? simFixes
 				? simFixCompositeWeights(
@@ -310,8 +319,13 @@ export const processTeam = async (
 						expandedRatings,
 					)
 				: compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings)
-			: COMPOSITE_WEIGHTS,
-	);
+			: COMPOSITE_WEIGHTS;
+	const compositeWeights = Object.entries(compositeWeightsObj);
+	// Sub-Ratings in Sim (basketball, needs Sub-Ratings): the subs folded into the composites, see GameSim.basketball/subRatingsSim.ts
+	const subSim =
+		__SPORT === "basketball" &&
+		subRatingsOn() &&
+		nativeFeatureEnabled("subRatingsSim", (key) => g.get(key as any));
 
 	let seasonStatsByPid;
 	if (SEASON_STATS_KEYS !== undefined) {
@@ -454,15 +468,20 @@ export const processTeam = async (
 		}
 		const seasonStats: Record<string, number> = {};
 
+		// Sub-Ratings in Sim: undefined with the setting off (or a row without subs), and then every composite is the stock one
+		const sp = subSim ? subSimPlayer(rating) : undefined;
+
 		// These use the same formulas as the skill definitions in player.skills!
 		for (const [k, weightInfo] of compositeWeights) {
 			p2.compositeRating[k] =
-				player.compositeRating(
-					rating,
-					weightInfo.ratings,
-					weightInfo.weights,
-					false,
-				) * injuryFactor;
+				(sp && subSimTouches(k)
+					? subSimComposite(sp, k, weightInfo.ratings, weightInfo.weights)
+					: player.compositeRating(
+							rating,
+							weightInfo.ratings,
+							weightInfo.weights,
+							false,
+						)) * injuryFactor;
 
 			if (__SPORT === "hockey" && k === "goalkeeping") {
 				const numConsecutiveGamesG = p.numConsecutiveGamesG ?? 0;
@@ -490,6 +509,27 @@ export const processTeam = async (
 
 		if (__SPORT === "basketball") {
 			p2.compositeRating.usage = p2.compositeRating.usage ** 1.9;
+			if (sp) {
+				// Sub-Ratings in Sim: the make of a drive, putbacks, and the jumper style gaps by shot type
+				const cr = p2.compositeRating;
+				const atRim = atRimWeights(compositeWeightsObj);
+				cr.shootingAtRimMake =
+					subSimComposite(
+						sp,
+						"shootingAtRimMake",
+						atRim.ratings,
+						atRim.weights,
+					) * injuryFactor;
+				cr.shootingPutBack =
+					subSimComposite(sp, "shootingPutBack", atRim.ratings, atRim.weights) *
+					injuryFactor;
+				const gaps = jumperGaps(
+					sp,
+					cr.catchShoot !== undefined ? cr.catchShoot - cr.offDribble : 0,
+				);
+				cr.jumperGap3 = gaps.three;
+				cr.jumperGapMid = gaps.mid;
+			}
 			if (positionalComposites) {
 				// Position-aware team composites: who plays big (GameSim.basketball/positionalComposites.ts)
 				(p2 as any).simHgt = (rating as any).hgt;
@@ -499,13 +539,19 @@ export const processTeam = async (
 					? CREATION_WEIGHTS_EXPANDED
 					: CREATION_WEIGHTS;
 				p2.compositeRating.creation =
-					player.compositeRating(rating, w.ratings, w.weights, false) *
+					(sp
+						? subSimComposite(sp, "creation", w.ratings, w.weights)
+						: player.compositeRating(rating, w.ratings, w.weights, false)) *
 					injuryFactor;
 				p2.compositeRating.spacingThreat = spacingThreat(p2.compositeRating);
 			}
 			if (matchupDefense) {
 				(p2 as any).simHgt = (rating as any).hgt;
 				(p2 as any).simSpd = (rating as any).spd;
+				if (sp) {
+					// Sub-Ratings in Sim: a defender's side of a drive mismatch is his lateral quickness
+					(p2 as any).simLat = subSimLat(sp);
+				}
 			}
 			if (simFixes) {
 				// Game Sim Fixes: strong, durable players get hurt a little less
