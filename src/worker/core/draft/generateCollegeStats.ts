@@ -1,7 +1,10 @@
+import { subRatingsOn } from "../player/subRatings.ts";
+import { isValidSubArray, subOffsets } from "../../../common/subRatings.ts";
 import { applyPendingShape } from "./classShape.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import {
 	COLLEGE_STATS_VERSION,
+	COLLEGE_STATS_VERSION_BASE,
 	RATING_KEYS,
 	generateCollegeClass,
 	type CollegeProspect,
@@ -57,6 +60,10 @@ export const toCollegeProspect = (
 		ratings.csh = r.csh;
 		ratings.dsh = r.dsh;
 		ratings.bsc = r.bsc;
+	}
+	// Sub-ratings (setting on): blocks, steals, threes, assists, turnovers and the rebounding split read them
+	if (subRatingsOn() && isValidSubArray((ratingsRow as any).sub)) {
+		ratings.subOff = subOffsets((ratingsRow as any).sub, ratingsRow as any);
 	}
 
 	// No projection for classes years away: prospects don't develop before they're drafted (only players on a team or in free agency
@@ -174,7 +181,12 @@ export const generateCollegeStats = async ({
 		});
 
 		p.stats = replacePreDraftStats(p.stats, rows, draftYear);
-		p.collegeStatsV = COLLEGE_STATS_VERSION;
+		// Sub-ratings read: the current version; otherwise generation is the same as the version before them
+		const prospect = prospects.find((x) => x.key === String(p.pid));
+		p.collegeStatsV =
+			prospect?.ratings.subOff !== undefined
+				? COLLEGE_STATS_VERSION
+				: COLLEGE_STATS_VERSION_BASE;
 		p.awards = replacePreDraftAwards(p.awards, result.honors, draftYear);
 		if (p.college === "" && result.school !== "") {
 			p.college = result.school;
@@ -304,7 +316,11 @@ export const upgradeCollegeStats = async () => {
 	const stale = prospects.filter(
 		(p) =>
 			p.preDraftCareer !== undefined &&
-			(p.collegeStatsV ?? 1) < COLLEGE_STATS_VERSION,
+			((p.collegeStatsV ?? 1) < COLLEGE_STATS_VERSION_BASE ||
+				// Sub-ratings turned on: stats made without them are remade once (with them, so they're marked the current version)
+				(subRatingsOn() &&
+					(p.collegeStatsV ?? 1) < COLLEGE_STATS_VERSION &&
+					isValidSubArray((p.ratings.at(-1) as any).sub))),
 	);
 	const years = [...new Set(stale.map((p) => p.draft.year))].sort(
 		(a, b) => a - b,

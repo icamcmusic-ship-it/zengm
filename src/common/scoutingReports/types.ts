@@ -51,6 +51,8 @@ export type ScoutRatings = {
 	csh?: number;
 	dsh?: number;
 	bsc?: number;
+	// Sub-ratings (the subRatings setting), SUB_DEFS order, with scouting fuzz
+	sub?: number[];
 };
 
 // One season of production, per game (percentages 0-100)

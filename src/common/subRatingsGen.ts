@@ -55,6 +55,8 @@ export type StoredSubInfo = {
 	c?: 1;
 	// Neutral derivation (existing league, real player, imported): no build
 	n?: 1;
+	// Real player: 1 if his shape came from his real stats (realSubShape), 0 if he has no stats to read (checked once)
+	rs?: 0 | 1;
 };
 
 const z = () => new Array<number>(NUM_SUBS).fill(0);
@@ -619,6 +621,35 @@ export const neutralSubShape = (
 		info.o = rng.int(0, NUM_SUBS - 1);
 	}
 	return { sub: finish(offsets, r), info };
+};
+
+// Parse a stored real-player lean (tools/realSubRatings.ts: 25 comma-separated ints)
+export const parseSubLean = (lean: unknown): number[] | undefined => {
+	if (typeof lean !== "string") {
+		return;
+	}
+	const out = lean.split(",").map(Number);
+	if (out.length !== NUM_SUBS || out.some((v) => !Number.isFinite(v))) {
+		return;
+	}
+	return out;
+};
+
+// A real player's shape from his real stats: the lean derived from his box scores (blocks from BLK%, range from 3PA rate, vision from
+// AST%, ...; already scaled by how sure the stats are), fitted to his bases so every base is exact. Deterministic, no noise (the stats
+// are the shape); the growth profile is seeded like a neutral shape's.
+export const realSubShape = (
+	r: RatingsLike,
+	seed: number,
+	lean: readonly number[],
+): { sub: number[]; info: StoredSubInfo } => {
+	const { info } = neutralSubShape(r, seed);
+	info.rs = 1;
+	const b = bases(r);
+	const x = b.map((v, i) => v + lean[i]!);
+	applySanityCaps(x, r);
+	const flex = new Array<number>(NUM_SUBS).fill(1);
+	return { sub: anchorAndFit(x, r, flex), info };
 };
 
 // A uint32 seed from a string

@@ -20,6 +20,8 @@ export type Ratings = {
 	pss: number;
 	reb: number;
 	abbrev_if_new_row?: string;
+	// Sub-ratings lean from his stats (tools/realSubRatings.ts): 25 comma-separated wanted offsets from the bases, SUB_DEFS order
+	subLean?: string;
 	retiredUntil?: number;
 };
 
