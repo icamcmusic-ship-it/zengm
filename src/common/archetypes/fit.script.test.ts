@@ -33,6 +33,7 @@ import {
 	TERMS,
 	familyProbs,
 } from "./model.ts";
+import { positionFor } from "./position.ts";
 import { realData, realPlayer } from "./real.testutil.ts";
 
 const EXPANDED = Boolean(process.env.ARCH_EXPANDED);
@@ -95,6 +96,8 @@ export const judgedPlayers = (expanded = EXPANDED, norms = NORMS) => {
 				fillExpandedRatings({ srID: `judged-${j.key}`, ratings: [row] });
 				ratings = rOf(row);
 			}
+			// (the position the game gives him now: the position model may have moved since he was judged)
+			pos = positionFor(ratings, true);
 			read = { age: j.age, prospect: j.prospect };
 		}
 		const t = scoreTerms(ratings, norms, ARCHETYPES, pos, undefined, read);

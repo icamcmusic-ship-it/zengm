@@ -49,7 +49,8 @@ import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
 import { CUSTOM_DEFS } from "./customDefs.data.ts";
 import { GOLD } from "./gold.data.ts";
 import { realData, realPlayer } from "./real.testutil.ts";
-import { promisesOf } from "./score.ts";
+import { promiseChecks, promisesOf } from "./score.ts";
+import { scoreAll } from "./classify.ts";
 import { statReading, STATS_W, STATS_W_MORE } from "./stats.ts";
 import { MERGED, mergedId } from "./merges.data.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
@@ -479,7 +480,7 @@ describe("classification", () => {
 			);
 			assert.ok(row, `${slug} ${season}`);
 			for (const id of ok) {
-				assert.ok(archetypeById(id), id);
+				assert.ok(archetypeById(mergedId(id)), id);
 			}
 			const p = realPlayer(data, row);
 			const c = classify(p.ratings, {
@@ -726,6 +727,34 @@ describe("position prior", () => {
 			assert.ok(a.positions.includes(positionOf(r)), c.id);
 		});
 	}
+});
+
+describe("name promises (arch14)", () => {
+	test("a build's holders keep what its name promises", async () => {
+		const by: Record<string, { n: number; worst: number[] }> = {};
+		for (const p of (await league()).slice(0, 2000)) {
+			const pos = positionFor(p.ratings, true);
+			const c = classify(p.ratings, { pos, age: p.age });
+			const { cv } = scoreAll(p.ratings, DEFAULT_NORMS, ARCHETYPES, pos, undefined, {
+				age: p.age,
+			});
+			const checks = Object.values(promiseChecks(archetypeById(c.id)!, cv));
+			const b = (by[c.id] ??= { n: 0, worst: [] });
+			b.n++;
+			b.worst.push(checks.every(Boolean) ? 1 : 0);
+		}
+		let kept = 0;
+		let n = 0;
+		for (const [id, b] of Object.entries(by)) {
+			const share = b.worst.reduce((a, x) => a + x, 0) / b.n;
+			kept += share * b.n;
+			n += b.n;
+			if (b.n >= 15) {
+				assert.ok(share >= 0.7, `${id} ${share} (${b.n})`);
+			}
+		}
+		assert.ok(kept / n >= 0.93, `${kept / n}`);
+	});
 });
 
 describe("distribution over a generated league", () => {
