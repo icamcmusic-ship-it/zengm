@@ -4,7 +4,8 @@
 // fork.beard the facial hair is drawn from a derived part ("<id>~fb", registered once per beard style, never listed in
 // svgsIndex so editors and generate() never see it) whose $[hairColor] placeholders are $[faceShave] instead. facesjs
 // replaces $[faceShave] with the feature's own "shave" value, so the render copy of the face sets facialHair.shave to the
-// beard colour. The stored face is never changed, and a face without fork.beard is passed through untouched.
+// beard colour. Dyed or bleached hair (fork.hair) works the same way for the hair and hair behind the head ("~fd"), so the
+// brows keep the natural colour. The stored face is never changed, and a face without fork extras is passed through untouched.
 import type { FaceConfig } from "facesjs";
 import { svgs } from "facesjs";
 import type { FaceWithExtra } from "./faceAging.ts";
@@ -16,38 +17,55 @@ const COLOR_REGEX = /^[\d #%()+,./A-Za-z-]+$/;
 const isValidColor = (color: unknown): color is string =>
 	typeof color === "string" && COLOR_REGEX.test(color);
 
-const BEARD_SUFFIX = "~fb";
-
-const derivedBeardId = (id: string) => {
-	const derived = `${id}${BEARD_SUFFIX}`;
-	const facialHair = table.facialHair!;
-	if (facialHair[derived] === undefined) {
-		const svg = facialHair[id];
+// Derived parts are made once per (feature, id): the same SVG with the hair colour placeholder read from the feature's own
+// "shave" value instead
+const derivedId = (feature: string, id: string, suffix: string) => {
+	const derived = `${id}${suffix}`;
+	const parts = table[feature];
+	if (!parts) {
+		return undefined;
+	}
+	if (parts[derived] === undefined) {
+		const svg = parts[id];
 		if (svg === undefined) {
 			return undefined;
 		}
-		facialHair[derived] = svg.replaceAll("$[hairColor]", "$[faceShave]");
+		parts[derived] = svg.replaceAll("$[hairColor]", "$[faceShave]");
 	}
 	return derived;
 };
 
-export const prepareFaceForDisplay = (face: FaceConfig): FaceConfig => {
-	const beard = (face as FaceWithExtra).fork?.beard;
+// Draws a feature in its own colour, when it has one that differs from the hair colour
+const recolor = (
+	face: FaceConfig,
+	feature: "facialHair" | "hair" | "hairBg",
+	color: string | undefined,
+	suffix: string,
+): FaceConfig => {
+	const part = face[feature] as { id: string } | undefined;
 	if (
-		beard === undefined ||
-		!isValidColor(beard) ||
-		!face.facialHair ||
-		face.facialHair.id === "none" ||
-		beard === face.hair?.color
+		color === undefined ||
+		!isValidColor(color) ||
+		!part ||
+		part.id === "none" ||
+		color === face.hair?.color
 	) {
 		return face;
 	}
-	const id = derivedBeardId(face.facialHair.id);
+	const id = derivedId(feature, part.id, suffix);
 	if (id === undefined) {
 		return face;
 	}
-	return {
-		...face,
-		facialHair: { ...face.facialHair, id, shave: beard } as any,
-	};
+	return { ...face, [feature]: { ...part, id, shave: color } };
+};
+
+export const prepareFaceForDisplay = (face: FaceConfig): FaceConfig => {
+	const extra = (face as FaceWithExtra).fork;
+	if (!extra) {
+		return face;
+	}
+	let out = recolor(face, "facialHair", extra.beard, "~fb");
+	out = recolor(out, "hair", extra.hair, "~fd");
+	out = recolor(out, "hairBg", extra.hair, "~fd");
+	return out;
 };

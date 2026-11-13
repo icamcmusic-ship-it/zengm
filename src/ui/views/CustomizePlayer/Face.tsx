@@ -6,6 +6,10 @@ import { FORK_FACE_PARTS } from "../../../common/faceParts.ts";
 // The fork's own parts (common/faceParts.ts) are not in the facesjs editor, so they are set here
 const FORK_FEATURES = [...new Set(FORK_FACE_PARTS.map((part) => part.feature))];
 
+// "fork-skin-fade-part" -> "skin fade part"
+const styleLabel = (id: string) =>
+	id.replace(/^fork-/, "").replaceAll("-", " ");
+
 export const Face = ({
 	face,
 	faceCount,
@@ -94,7 +98,7 @@ export const Face = ({
 				</div>
 				{parsedFace ? (
 					<details className="mt-2">
-						<summary>Fork parts</summary>
+						<summary>More styles (fades, locs, braids, beards, ...)</summary>
 						<div className="d-flex flex-wrap gap-2 mt-1">
 							{FORK_FEATURES.map((feature) => {
 								const current = parsedFace[feature]?.id;
@@ -125,7 +129,7 @@ export const Face = ({
 											<option value="">{current ?? "-"}</option>
 											{ids.map((id) => (
 												<option key={id} value={id}>
-													{id}
+													{styleLabel(id)}
 												</option>
 											))}
 										</select>
