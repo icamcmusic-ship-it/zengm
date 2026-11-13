@@ -138,6 +138,10 @@ export type FlavorResult = {
 	action?: ActionKind;
 	// The player a play belongs to when it isn't the event's own (the defender who took a charge)
 	pidHero?: number;
+	// The team of the line's subject: the first player or team its text names ("Smith is fouled by Jones" is Smith's line, "Jones
+	// draws the charge on Smith" is Jones's). The UI shows this team's logo next to the line, so the logo always matches the text,
+	// whichever side the wording starts from. Unset when the text names no one first (the event's own team is used then)
+	t?: 0 | 1;
 };
 
 export type FlavorInit = {
@@ -996,7 +1000,76 @@ export class FlavorSession {
 					res.text,
 				);
 		}
-		return typeof res === "object" ? this.cleanResult(res, undefined) : res;
+		if (typeof res !== "object") {
+			return res;
+		}
+		const out = this.cleanResult(res, undefined);
+		if ((ev.t === 0 || ev.t === 1) && !out.keepText) {
+			const t = this.subjectTeam(out.text);
+			if (t !== undefined) {
+				out.t = t;
+			}
+		}
+		return out;
+	}
+
+	// ---- whose line it is ----
+	// Every name a line can call a player or a team by, with its team (undefined when both teams have it). Built once the rosters are known
+	private subjectNames: { name: string; t: 0 | 1 | undefined }[] | undefined;
+	private subjectNamesSize = -1;
+
+	private namesForSubject() {
+		if (this.subjectNames && this.subjectNamesSize === this.players.size) {
+			return this.subjectNames;
+		}
+		const byName = new Map<string, 0 | 1 | undefined>();
+		const add = (name: string, t: 0 | 1) => {
+			if (name === "" || name === "???") {
+				return;
+			}
+			byName.set(
+				name,
+				byName.has(name) && byName.get(name) !== t ? undefined : t,
+			);
+		};
+		for (const p of this.players.values()) {
+			add(p.name, p.t);
+			add(this.shortName(p), p.t);
+		}
+		for (const t of [0, 1] as const) {
+			add(this.labels[t].name, t);
+			add(this.labels[t].abbrev, t);
+		}
+		this.subjectNames = [...byName].map(([name, t]) => ({ name, t }));
+		this.subjectNamesSize = this.players.size;
+		return this.subjectNames;
+	}
+
+	// The team of the first player or team a line names (FlavorResult.t). A line led by a pronoun is the event's own player's
+	private subjectTeam(text: string): 0 | 1 | undefined {
+		if (/^(He|She|His|Her|They|Their)\b/.test(text)) {
+			return undefined;
+		}
+		const wordChar = /[\p{L}\p{N}]/u;
+		let best: { at: number; len: number; t: 0 | 1 | undefined } | undefined;
+		for (const { name, t } of this.namesForSubject()) {
+			let at = text.indexOf(name);
+			while (at >= 0) {
+				const before = at > 0 ? text[at - 1]! : "";
+				const after = text[at + name.length] ?? "";
+				if (!wordChar.test(before) && !wordChar.test(after)) {
+					break;
+				}
+				at = text.indexOf(name, at + 1);
+			}
+			if (
+				at >= 0 &&
+				(!best || at < best.at || (at === best.at && name.length > best.len))
+			) {
+				best = { at, len: name.length, t };
+			}
+		}
+		return best?.t;
 	}
 
 	// Career highs and milestones for the players whose line this event changed (career.ts)

@@ -619,7 +619,6 @@ export const setPlay = (
 		}
 	};
 	const Off = cap(o.offense);
-	const Def = cap(o.defense);
 	const zone = o.scheme === "zone";
 	const switching = o.scheme === "switch";
 
@@ -670,7 +669,7 @@ export const setPlay = (
 			if (A.R.hgt >= 62) {
 				add(
 					0.5,
-					`${Def} send a double team at ${an} in the post.`,
+					`${an} draws a double team from ${o.defense} in the post.`,
 					"double-team",
 				);
 			}
@@ -710,7 +709,7 @@ export const setPlay = (
 			);
 			add(
 				switching ? 0.8 : 0.3,
-				`${Def} switch the screen, and the help is a step late.`,
+				`${Off} get ${o.defense} to switch the screen, and the help is a step late.`,
 				"switch",
 			);
 			add(0.6, `${an} and ${n} work a dribble hand-off up top.`, "handoff");
@@ -724,7 +723,7 @@ export const setPlay = (
 			if (A.R.hgt >= 62 || A.R.ins >= 60) {
 				add(
 					1,
-					`${Def} double ${an} in the post, and he passes out of it.`,
+					`${an} is doubled in the post and passes out of it.`,
 					"double-team",
 				);
 			}
@@ -804,7 +803,7 @@ export const setPlay = (
 			);
 			add(
 				r.ins >= 60 ? 0.7 : 0.3,
-				`${Def} send a double team at ${n}, and he goes up anyway.`,
+				`${n} draws a double team from ${o.defense} and goes up anyway.`,
 				"double-team",
 			);
 			if (switching && D && D.R.hgt < p.R.hgt - 5) {
@@ -930,14 +929,14 @@ export const setPlay = (
 					add(0.7, `${Off} can't find a seam in the zone.`, "zone");
 					add(
 						0.5,
-						`${Def} trap the ball handler, and it swings to ${n}.`,
+						`The ball handler is trapped, and it swings to ${n}.`,
 						"double-team",
 					);
 				}
 				add(0.7, `Against the zone, ${n} finds a gap.`, "zone");
 			}
 			if (D && o.zone === "rim" && switching) {
-				add(0.3, `${D.name} switches onto ${n} after the screen.`, "switch");
+				add(0.3, `${n} gets ${D.name} on a switch after the screen.`, "switch");
 			}
 			if (!o.made && o.zone === "rim" && r.spd >= 55) {
 				add(
