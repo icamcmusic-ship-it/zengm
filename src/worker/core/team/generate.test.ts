@@ -20,16 +20,21 @@ describe("team.generate", () => {
 			loadManagement: false,
 			collegePrestige: 71,
 			collegePrestigeBase: 68,
+			staffDevCarry: { season: 2025, score: 0.42 },
+			frontOffice: { analytics: 80, travel: 20 },
 		});
 		assert.deepStrictEqual(t.capExceptions, capExceptions);
 		assert.strictEqual(t.loadManagement, false);
 		assert.strictEqual((t as any).collegePrestige, 71);
 		assert.strictEqual((t as any).collegePrestigeBase, 68);
+		assert.deepStrictEqual(t.staffDevCarry, { season: 2025, score: 0.42 });
+		assert.deepStrictEqual(t.frontOffice, { analytics: 80, travel: 20 });
 
 		// A new team has none of them
 		const t2 = generate({ ...base, popRank: 1 });
 		assert.isUndefined(t2.capExceptions);
 		assert.isUndefined(t2.loadManagement);
 		assert.isUndefined((t2 as any).collegePrestige);
+		assert.isUndefined(t2.frontOffice);
 	});
 });

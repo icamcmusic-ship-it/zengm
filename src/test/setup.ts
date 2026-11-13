@@ -19,8 +19,16 @@ Math.random = (globalThis as any)[NATIVE_RANDOM];
 // since importing the worker's db before src/worker/index.ts breaks the import order)
 beforeAll(async () => {
 	const { idb } = await import("../worker/db/index.ts");
+	// (closed first, so the next league made with the same lid deletes and recreates its database instead of waiting on this
+	// connection, and stop the old cache's automatic flushes, which would write into whatever league is open next)
+	idb.cache.stopAutoFlush();
+	idb.league?.close();
 	// @ts-expect-error
 	idb.league = undefined;
+	// And the worker's locks: a file that stopped in the middle of a game sim (a failed assertion) leaves gameSim set, and then
+	// every later game.play in the same worker returns without playing, so a later file's "play until the phase changes" loop never ends
+	const { lock } = await import("../worker/util/index.ts");
+	lock.reset();
 });
 
 globalThis.fetch = async (url: Parameters<typeof fetch>[0]) => {

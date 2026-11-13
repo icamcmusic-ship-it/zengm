@@ -111,7 +111,7 @@ The -1.7 pts/g and -0.5 FG% are the realistic possession model and the traits in
 
 ## Regression tests
 
-- `src/test/ratingInflation/ratingInflation.test.ts` (runs with the normal suite, ~15 s): a league with every rating-related feature on, 4 seasons of the population model: mean ovr stays in 48-52.5, pot in 54.5-59.5, and the league mean `coachingEffect` stays within ±0.005 every season (it was -0.02 in a new league with the fixed reference).
+- `src/test/ratingInflation/ratingInflation.test.ts` (runs with the normal suite, ~20 s): two leagues (seeds 7 and 1) with every rating-related feature on, 4 seasons of the population model, averaged season by season (one league's mean moves by up to about ±0.8 with any change in how random numbers are drawn): mean ovr stays in 48-52.5, pot in 54.5-59.5, and the league mean `coachingEffect` stays within ±0.005 every season (it was -0.02 in a new league with the fixed reference).
 - `src/worker/core/staff/staff.test.ts`, "league-average development effect doesn't drift over decades": 30 offseasons of the real staff market, league mean `levelToEffect` within ±0.08 every season (it was -0.2 → +0.2 with the fixed reference).
 
 ## Re-running
