@@ -579,23 +579,24 @@ export const toCareer = (plan: CareerPlan): PreDraftCareer => ({
 });
 
 // Skill ratings a few points lower (physical ratings less), for a year he was further behind than his age says
-export const lagRatings = <T extends Record<string, number | undefined>>(
+export const lagRatings = <T extends Record<string, unknown>>(
 	ratings: T,
 	points: number,
 ): T => {
 	if (points <= 0) {
 		return ratings;
 	}
-	const out: Record<string, number | undefined> = { ...ratings };
+	const out: Record<string, unknown> = { ...ratings };
 	for (const key of Object.keys(out)) {
-		if (key === "hgt" || key === "wng" || typeof out[key] !== "number") {
+		const value = out[key];
+		if (key === "hgt" || key === "wng" || typeof value !== "number") {
 			continue;
 		}
 		const factor =
 			key === "spd" || key === "jmp" || key === "stre" || key === "endu"
 				? 0.4
 				: 1;
-		out[key] = Math.max(0, out[key] - points * factor);
+		out[key] = Math.max(0, value - points * factor);
 	}
 	return out as T;
 };

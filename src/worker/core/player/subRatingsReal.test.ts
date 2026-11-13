@@ -1,8 +1,8 @@
 // Sub-ratings step 2: real players' shapes from their stats (tools/realSubRatings.ts, stored as `subLean` in the real players data),
 // scouting fuzz on subs, scouting report grades, the combine, skill badge drivers and college stats reading the subs.
 import "fake-indexeddb/auto";
+// @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { readFileSync, writeFileSync } from "node:fs";
-import { env } from "node:process";
 import { assert, describe, test } from "vitest";
 import { LEAGUE_DATABASE_VERSION, PLAYER } from "../../../common/constants.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
@@ -32,6 +32,8 @@ import { getDefaultSettings } from "../../views/newLeague.ts";
 import { resetG } from "../../../test/helpers.ts";
 import { ensureSubs, fuzzSubs } from "./subRatings.ts";
 import updateSubRatingsForLeague from "./updateSubRatingsForLeague.ts";
+
+const env = (globalThis as any).process.env;
 
 const data = JSON.parse(
 	readFileSync("data/real-player-data.basketball.json", "utf8"),
@@ -217,8 +219,8 @@ describe("draft combine reads subs", () => {
 		const leaper = generateDraftCombine(
 			input({ stj: 45, mxv: 65, lat: 62, sls: 38 }) as any,
 		);
-		assert.isAbove(leaper.drills.maxVert!, plain.drills.maxVert!);
-		assert.isBelow(leaper.drills.laneAgility!, plain.drills.laneAgility!);
+		assert.isAbove(leaper.drills!.maxVert!, plain.drills!.maxVert!);
+		assert.isBelow(leaper.drills!.laneAgility!, plain.drills!.laneAgility!);
 	});
 });
 
@@ -315,7 +317,7 @@ describe("college stats read subs", () => {
 			["rng", "tp", "tpa"],
 			["orb", "reb", "orb"],
 		];
-		for (const [key, base, stat] of STATS) {
+		for (const [key, , stat] of STATS) {
 			const xs: number[] = [];
 			const yOn: number[] = [];
 			const yOff: number[] = [];

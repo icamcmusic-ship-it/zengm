@@ -10,6 +10,7 @@
 		"analysis/venv",
 		"build",
 		"src",
-		"tools/hypeCalibration/calibrate.ts"
+		"tools/hypeCalibration/calibrate.ts",
+		"tools/realSubRatings.ts"
 	]
 }
