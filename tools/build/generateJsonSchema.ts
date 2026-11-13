@@ -152,6 +152,18 @@ const genRatings = (sport: Sport) => {
 		};
 	}
 
+	// Sub-ratings (the subRatings setting): one number per sub-rating, in the order of SUB_DEFS (common/subRatings.ts)
+	if (sport === "basketball") {
+		properties.sub = {
+			type: "array",
+			items: {
+				type: "number",
+				minimum: 0,
+				maximum: 100,
+			},
+		};
+	}
+
 	return {
 		items: {
 			type: "object",

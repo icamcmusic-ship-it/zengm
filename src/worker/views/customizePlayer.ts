@@ -20,6 +20,7 @@ import { last, orderBy } from "../../common/utils.ts";
 import { upgradeFace } from "../util/face.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { ensureExpandedRatings } from "../core/player/expandedRatings.ts";
+import { ensureSubs } from "../core/player/subRatings.ts";
 
 const processInputs = (params: RouteParams<"customizePlayer">) => {
 	let pid: number | null = null;
@@ -136,6 +137,7 @@ export default defineView({
 				// can be edited
 				if (__SPORT === "basketball") {
 					ensureExpandedRatings(p);
+					ensureSubs(p as any);
 				}
 
 				contract = getContractSummary(p2);
@@ -226,6 +228,10 @@ export default defineView({
 			// Trait seeds give away the exact scores of hidden traits, so they stay in the worker unless God Mode is on. Saving restores them.
 			if (!g.get("godMode") && p) {
 				delete p.traits;
+			}
+			// Sub-ratings: his seed and hidden growth profile stay in the worker (saving restores them)
+			if (p) {
+				delete p.subP;
 			}
 
 			return {

@@ -1,3 +1,4 @@
+import { SUB_DEFS, SUB_TABLE_ORDER } from "../../common/subRatings.ts";
 import { getScoutingExport } from "../core/scoutingReports/index.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import {
@@ -265,6 +266,27 @@ export const getPlayersForExport = async ({
 					cell(r.pot),
 					...ratingKeys.map((key) => cell(r[key])),
 					(r.skills ?? []).join(" "),
+				]),
+			});
+		}
+		// Sub-ratings (the subRatings setting): the seasons that kept them
+		const subRows = showRatings
+			? p.ratings.filter((r: any) => Array.isArray(r.sub))
+			: [];
+		if (subRows.length > 0) {
+			tables.push({
+				section: "Ratings history",
+				title: "Sub-ratings by season (as scouted)",
+				cols: [
+					"Year",
+					...SUB_TABLE_ORDER.map((i) => {
+						const d = SUB_DEFS[i]!;
+						return `${d.label} (${d.name})`;
+					}),
+				],
+				rows: subRows.map((r: any) => [
+					r.season,
+					...SUB_TABLE_ORDER.map((i) => cell(r.sub[i])),
 				]),
 			});
 		}

@@ -1,3 +1,9 @@
+import {
+	SubRatingsToggle,
+	subRatingCells,
+	subRatingCols,
+	useSubRatingsView,
+} from "../../components/SubRatingsToggle.tsx";
 import { DataTable } from "../../components/DataTable/index.tsx";
 import { DownloadPlayerButton } from "../../components/DownloadPlayers.tsx";
 import Injuries from "./Injuries.tsx";
@@ -66,6 +72,8 @@ const Player2 = ({
 		"season",
 	]);
 	const showRatings = !challengeNoRatings || retired;
+	// Sub-ratings in the ratings history (an optional view; rows that kept them, the last few seasons)
+	const subView = useSubRatingsView("player");
 	const traitsOn = useLocal(["playerTraits"]).playerTraits;
 	const scoutingOn = useScoutingOn();
 	const profileOptions = getProfileDropdownOptions(
@@ -178,13 +186,14 @@ const Player2 = ({
 						"Ovr",
 						"Pot",
 						...ratings.map((rating) => `rating:${rating}`),
+						...(subView.show ? subRatingCols() : []),
 						"Skills",
 						"Awards",
 					])}
 					defaultSort={[0, "asc"]}
 					defaultStickyCols={2}
 					hideAllControls
-					name="Player:Ratings"
+					name={subView.show ? "Player:RatingsSub" : "Player:Ratings"}
 					rows={player.ratings.map((r, i) => {
 						return {
 							key: i,
@@ -234,6 +243,9 @@ const Player2 = ({
 										</MaybeBold>
 									) : null,
 								),
+								...(subView.show
+									? subRatingCells((r as any).sub, showRatings)
+									: []),
 								<SkillsBlock
 									className="skills-alone"
 									skills={r.skills}
@@ -247,6 +259,7 @@ const Player2 = ({
 						};
 					})}
 				/>
+				{showRatings ? <SubRatingsToggle view={subView} /> : null}
 			</HideableSection>
 
 			{playerTraits && showRatings ? (

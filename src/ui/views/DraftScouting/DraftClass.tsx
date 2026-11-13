@@ -147,6 +147,27 @@ const DraftClass = ({
 			sortType: "string",
 		});
 	}
+	// Sub-ratings (the subRatings setting): his standout and weakest sub-rating relative to its rating, as the scouts see them
+	const showSubs =
+		__SPORT === "basketball" &&
+		!challengeNoRatings &&
+		players.some((p) => p.subHighlights !== undefined);
+	if (showSubs) {
+		cols.push(
+			{
+				title: "Standout",
+				desc: "His best sub-rating relative to its rating (the gap in brackets), as your scouts see it",
+				sortType: "number",
+				sortSequence: ["desc", "asc"],
+			},
+			{
+				title: "Weakness",
+				desc: "His weakest sub-rating relative to its rating (the gap in brackets), as your scouts see it",
+				sortType: "number",
+				sortSequence: ["asc", "desc"],
+			},
+		);
+	}
 	const showScouting =
 		!challengeNoRatings &&
 		!fantasyDraft &&
@@ -202,6 +223,26 @@ const DraftClass = ({
 					: []),
 				...(showSchool ? [p.linkedSchool ?? ""] : []),
 				...(showArchetype ? [p.archetype ?? ""] : []),
+				...(showSubs
+					? ([p.subHighlights?.best, p.subHighlights?.worst] as const).map(
+							(h) =>
+								h
+									? {
+											sortValue: h.off,
+											searchValue: h.name,
+											value: (
+												<span className="text-nowrap">
+													{h.name} {h.value}{" "}
+													<span className="text-body-secondary">
+														({h.off > 0 ? "+" : ""}
+														{h.off})
+													</span>
+												</span>
+											),
+										}
+									: null,
+						)
+					: []),
 				...(showScouting && p.scoutReport
 					? [
 							{

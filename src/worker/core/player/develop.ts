@@ -32,6 +32,14 @@ import {
 	ensureExpandedRatings,
 	syncExpandedToCompat,
 } from "./expandedRatings.ts";
+import {
+	basesBefore,
+	developRowSubs,
+	ensureSubs,
+	pruneSubHistory,
+	subRatingsOn,
+	syncLatestSubs,
+} from "./subRatings.ts";
 
 // ovrs and pots only exist in sports with position-specific ratings, and there they have a value for every position
 const getRatingByPos = (
@@ -170,6 +178,12 @@ const develop = async (
 		ensureExpandedRatings(p);
 	}
 
+	// Sub-ratings: filled in if missing (generated players get their shape now), then developed with the bases. Off: nothing.
+	const subsOn = __SPORT === "basketball" && subRatingsOn();
+	if (subsOn) {
+		ensureSubs(p as any);
+	}
+
 	const ratings = last(p.ratings);
 	let age = ratings.season - p.born.year;
 
@@ -180,6 +194,7 @@ const develop = async (
 		}
 
 		if (!ratings.locked) {
+			const before = subsOn ? basesBefore(ratings) : undefined;
 			await developSeason(
 				ratings,
 				age,
@@ -188,6 +203,9 @@ const develop = async (
 				false,
 				__SPORT === "basketball" && years === 1 ? traitDev : undefined,
 			);
+			if (before) {
+				developRowSubs(p as any, ratings, before, age);
+			}
 		}
 	}
 
@@ -204,6 +222,14 @@ const develop = async (
 			MENTOR_RATING_KEYS,
 		);
 		syncExpandedToCompat(ratings as any);
+	}
+
+	if (subsOn) {
+		// Bases changed outside development (mentor bonus, an edit, a bonus, an injury): subs follow, keeping the shape
+		syncLatestSubs(p as any);
+		if (years > 0 && !newPlayer) {
+			pruneSubHistory(p as any);
+		}
 	}
 
 	// years===0 condition is so editing locked player in God Mode will update ovr and pot

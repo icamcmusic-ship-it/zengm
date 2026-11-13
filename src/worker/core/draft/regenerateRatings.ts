@@ -1,3 +1,4 @@
+import { subsAfterRewrite } from "../player/subRatings.ts";
 import { expandedRatingsOn } from "../player/expandedRatings.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { PLAYER } from "../../../common/constants.ts";
@@ -519,6 +520,7 @@ export const writeResult = async (
 		baseHgtInches: resolved.hgtInches,
 		applied: toBuildRatings(row),
 	};
+	subsAfterRewrite(p);
 	await updateValues(p);
 	await idb.cache.players.put(p);
 };
@@ -619,6 +621,7 @@ export const restoreOriginalRatings = async ({
 		p.draft.pot = row.pot;
 		p.draft.skills = row.skills;
 		delete p.ratingsBuild;
+		subsAfterRewrite(p);
 		await updateValues(p);
 		await idb.cache.players.put(p);
 		restored++;

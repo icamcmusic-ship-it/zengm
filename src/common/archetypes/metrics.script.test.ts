@@ -40,6 +40,8 @@ const newG = () => {
 	if (!process.env.ARCH_STOCK_GEN)
 		g.setWithoutSavingToDB("improvedPositions", true);
 	if (EXPANDED) g.setWithoutSavingToDB("expandedRatings", true);
+	// ARCH_SUBS=1: with Sub-ratings on (archetypes don't read the subs yet: the metrics should be identical)
+	if (process.env.ARCH_SUBS) g.setWithoutSavingToDB("subRatings", true);
 };
 const ratingsOfRow = (row) => {
 	const r = {};

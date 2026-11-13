@@ -1,6 +1,7 @@
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import addRatingsRow from "./addRatingsRow.ts";
 import develop, { monteCarloPot } from "./develop.ts";
+import { ensureSubs } from "./subRatings.ts";
 import generate from "./generate.ts";
 import heightToRating from "./heightToRating.ts";
 import name from "./name.ts";
@@ -505,6 +506,12 @@ const augmentPartialPlayer = async (
 		) {
 			p.jerseyNumber = row.jerseyNumber;
 		}
+	}
+
+	// Sub-ratings (setting on): an imported player or draft class without them gets them (neutral shape), with them they're kept in sync
+	// with the bases. Retired players are left alone.
+	if (__SPORT === "basketball" && p.tid !== PLAYER.RETIRED) {
+		ensureSubs(p as any);
 	}
 
 	return p;

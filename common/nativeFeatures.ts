@@ -412,6 +412,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "subRatings",
+		key: "subRatings",
+		name: "Sub-Ratings",
+		description:
+			"Ten ratings are split into 2-4 sub-ratings each (defense into shot blocking, steals, interior and perimeter defense; three-point shooting into range, catch-and-shoot and off-the-dribble; and so on), shown under each rating on the player page and optionally in the ratings tables. Each rating is the weighted average of its sub-ratings, so the game sim, ovr and everything else are unchanged. New players get a shape (a signature skill, a weakness, a build, a style from their background) and sub-ratings develop with age (shot blocking and leaping fade earlier, range and IQ skills hold longer). Turning it on in an existing league derives each player's sub-ratings from his ratings.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "ovrV2",
 		key: "ovrV2",
 		name: "Sim-Calibrated Ovr",
