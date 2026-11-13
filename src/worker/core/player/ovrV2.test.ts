@@ -166,6 +166,14 @@ describe("Realistic Aging", () => {
 		assert.deepStrictEqual(dev(true), dev(false));
 	});
 
+	test("the decline gets steeper past 40, not gentler", () => {
+		for (const key of ["ft", "oiq", "spd"]) {
+			const at40 = meanChange(key, 40, true);
+			assert.isBelow(meanChange(key, 42, true), at40 - 0.25, key);
+			assert.isBelow(meanChange(key, 45, true), meanChange(key, 42, true), key);
+		}
+	});
+
 	test("secret aging curve still shifts development on top", () => {
 		resetG();
 		g.setWithoutSavingToDB("realisticAging", true);
