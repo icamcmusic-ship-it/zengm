@@ -1,32 +1,46 @@
 // Worker side of League Extras "Face Aging" (common/faceAging.ts): when faces are aged, and which ones.
 // Faces are aged once a season at the preseason (and caught up when a league is created or a draft class is generated),
 // seeded from pid and season. Nothing here uses Math.random or the game's random stream.
-import { PLAYER } from "../../common/constants.ts";
+import { DEFAULT_JERSEY, PLAYER } from "../../common/constants.ts";
 import {
 	ageFaceForSeason,
 	agedFields,
 	applyAgingFields,
-	faceHistory,
 	faceAgingAfterEdit,
+	faceForSeason,
 	type FaceAging,
 	type FaceAgingOptions,
 } from "../../common/faceAging.ts";
+import { EYE_INJURIES, textureOf } from "../../common/faceEvents.ts";
+import {
+	firstProSeason,
+	firstSeasonLabel,
+	NEUTRAL_JERSEY_COLORS,
+	primeSeason,
+	seasonTeam,
+	type FaceHistoryEntry,
+	type FaceHistoryLabel,
+} from "../../common/faceHistory.ts";
 import type { Player } from "../../common/types.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 import { idb } from "../db/index.ts";
 import g from "./g.ts";
+import { getTeamInfoBySeason } from "./getTeamInfoBySeason.ts";
 import { featureOn, featureOption } from "./nativeFeatures.ts";
 
 type AgingPlayer = Pick<
 	Player,
 	"pid" | "born" | "face" | "imgURL" | "stats" | "weight"
-> & {
-	faceAging?: FaceAging;
-};
+> &
+	Partial<Pick<Player, "tid" | "retiredYear" | "injuries">> & {
+		faceAging?: FaceAging;
+	};
 
 export const faceAgingOptions = (): FaceAgingOptions => ({
 	speed: featureOption<FaceAgingOptions["speed"]>("faceAgingSpeed"),
 	hairLoss: featureOption<boolean>("faceAgingHairLoss"),
 	graying: featureOption<boolean>("faceAgingGraying"),
+	styleEvents: featureOption<boolean>("faceAgingStyleEvents"),
 });
 
 const careerMinutes = (p: AgingPlayer) => {
@@ -37,6 +51,26 @@ const careerMinutes = (p: AgingPlayer) => {
 		}
 	}
 	return min;
+};
+
+// What aging needs to know about him besides his age (seeded by pid)
+const agingContext = (p: AgingPlayer) => {
+	const base = p.faceAging?.b;
+	return {
+		seed: p.pid,
+		born: p.born.year,
+		minutes: careerMinutes(p),
+		weight: p.weight,
+		texture: textureOf(
+			p.face.body?.color,
+			base?.hi ?? p.face.hair.id,
+			base?.hb ?? p.face.hairBg?.id,
+		),
+		retiredYear: p.tid === PLAYER.RETIRED ? p.retiredYear : undefined,
+		eyeInjurySeasons: (p.injuries ?? [])
+			.filter((row) => EYE_INJURIES.has(row.type))
+			.map((row) => row.season),
+	};
 };
 
 // Ages one player's face to a season, in place. Returns true if anything changed (the caller saves the player).
@@ -53,11 +87,10 @@ export const agePlayerFace = (
 		p.face,
 		p.faceAging,
 		{
-			seed: p.pid,
-			born: p.born.year,
+			...agingContext(p),
 			season,
-			minutes: careerMinutes(p),
-			weight: p.weight,
+			// No snapshot of a draft prospect's face: face history starts at his first pro season
+			record: p.tid !== PLAYER.UNDRAFTED,
 		},
 		options,
 	);
@@ -172,46 +205,122 @@ const stripExtra = (face: AgingPlayer["face"] | undefined) => {
 	return rest;
 };
 
-// The player page's face history: the stored seasons, led by his rookie face when that was before the league's records of
-// him (a veteran in a new league), worked out from his generated face (no user edit since)
-export const withRookieFace = (
-	p: AgingPlayer & { draft: { year: number } },
-) => {
-	const history: {
-		season: number;
-		face: AgingPlayer["face"];
-		rookie?: true;
-	}[] = faceHistory(p.face, p.faceAging);
+// His face in any season: rebuilt from the snapshots, or worked out from his generated face for a season before them (a
+// veteran when the league or face aging began; not after a user edit, then the earliest snapshot stands in)
+export const faceAtSeason = (p: AgingPlayer, season: number) => {
 	const aging = p.faceAging;
-	if (
-		!aging ||
-		aging.ba !== undefined ||
-		history.length === 0 ||
-		p.pid === undefined
-	) {
-		return history;
+	if (!aging) {
+		return p.face;
 	}
-	const rookieSeason = Math.max(p.draft.year + 1, p.born.year + 19);
-	if (rookieSeason >= history[0]!.season) {
-		history[0]!.rookie = true;
-		return history;
+	const first = Math.min(...Object.keys(aging.h).map(Number));
+	if (season >= first || aging.ba !== undefined) {
+		return faceForSeason(p.face, aging, season);
 	}
 	const fields = agedFields(
 		aging.b,
-		{
-			seed: p.pid,
-			age: rookieSeason - p.born.year,
-			born: p.born.year,
-			weight: p.weight,
-		},
+		{ ...agingContext(p), age: season - p.born.year },
 		faceAgingOptions(),
 	);
-	return [
-		{
-			season: rookieSeason,
-			face: applyAgingFields(p.face, fields),
-			rookie: true as const,
-		},
-		...history,
-	];
+	return applyAgingFields(p.face, fields);
+};
+
+// The jersey of the team he played the most games for that season, in that season's colours; a plain one without a team
+const jerseyGetter = (p: HistoryAgingPlayer) => {
+	const cache = new Map<
+		string,
+		{ colors: [string, string, string]; jersey: string }
+	>();
+	const currentSeason = g.get("season");
+	return async (season: number) => {
+		const tid = seasonTeam(p, season, currentSeason);
+		const key = `${tid}|${season}`;
+		let out = cache.get(key);
+		if (!out) {
+			const info =
+				tid === undefined ? undefined : await getTeamInfoBySeason(tid, season);
+			out = info
+				? { colors: info.colors, jersey: info.jersey ?? DEFAULT_JERSEY }
+				: { colors: NEUTRAL_JERSEY_COLORS, jersey: DEFAULT_JERSEY };
+			cache.set(key, out);
+		}
+		return out;
+	};
+};
+
+type HistoryAgingPlayer = AgingPlayer &
+	Pick<Player, "draft" | "tid" | "ratings">;
+
+// The player page's "Then and Now": from his first pro season (never a draft prospect's face), every season his face changed
+// after it, and his prime for a retired player. Each face wears that season's jersey.
+export const playerFaceHistory = async (
+	p: HistoryAgingPlayer,
+): Promise<{ entries: FaceHistoryEntry[]; prime?: FaceHistoryEntry }> => {
+	const aging = p.faceAging;
+	const empty = { entries: [] };
+	if (!aging || p.pid === undefined) {
+		return empty;
+	}
+	const college = isCollege();
+	const currentSeason = g.get("season");
+	const proStart = firstProSeason(p, currentSeason, college);
+	const seasons = Object.keys(aging.h)
+		.map(Number)
+		.sort((a, b) => a - b);
+	if (proStart === undefined || seasons.length === 0) {
+		return empty;
+	}
+	const jersey = jerseyGetter(p);
+	const entry = async (
+		season: number,
+		face: Player["face"],
+		label?: FaceHistoryLabel,
+	): Promise<FaceHistoryEntry> => ({
+		season,
+		face,
+		...(await jersey(season)),
+		...(label ? { label } : {}),
+	});
+
+	const label = firstSeasonLabel(p, proStart, g.get("startingSeason"), college);
+	const entries: FaceHistoryEntry[] = [];
+	if (proStart >= seasons[0]! || aging.ba === undefined) {
+		entries.push(await entry(proStart, faceAtSeason(p, proStart), label));
+	} else {
+		// Edited before his records began: the earliest snapshot, unlabelled
+		entries.push(
+			await entry(seasons[0]!, faceForSeason(p.face, aging, seasons[0]!)),
+		);
+	}
+	for (const season of seasons) {
+		if (season > entries[0]!.season) {
+			entries.push(await entry(season, faceForSeason(p.face, aging, season)));
+		}
+	}
+
+	let prime: FaceHistoryEntry | undefined;
+	if (p.tid === PLAYER.RETIRED) {
+		const season = primeSeason(p, proStart);
+		if (
+			season !== undefined &&
+			season !== entries[0]!.season &&
+			season !== entries.at(-1)!.season
+		) {
+			prime = await entry(season, faceAtSeason(p, season));
+		}
+	}
+	return prime ? { entries, prime } : { entries };
+};
+
+// HoF plaques: his face in his prime (common/faceHistory.ts primeSeason), in that season's jersey
+export const primeFace = async (p: HistoryAgingPlayer) => {
+	const proStart = firstProSeason(p, g.get("season"), isCollege());
+	const season = proStart === undefined ? undefined : primeSeason(p, proStart);
+	if (season === undefined) {
+		return undefined;
+	}
+	return {
+		season,
+		face: p.faceAging && !p.imgURL ? faceAtSeason(p, season) : p.face,
+		...(await jerseyGetter(p)(season)),
+	};
 };

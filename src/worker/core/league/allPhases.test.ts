@@ -183,6 +183,42 @@ describe("all phases", () => {
 		const veteran = active.find((p) => p.draft.year < start);
 		assert.isDefined(veteran);
 		const view = await loadView("player", { pid: String(veteran!.pid) });
-		assert.isAbove(view.faceHistory.length, 0);
+		assert.isAbove(view.faceHistory.entries.length, 0);
+		const firstEntry = view.faceHistory.entries[0]!;
+		assert.notStrictEqual(firstEntry.label, "Rookie");
+		assert.strictEqual(firstEntry.colors.length, 3);
+
+		// No face from before a player was drafted is stored: prospects have no snapshots, and a player drafted in this
+		// run has none from before his first pro season
+		const prospects = await idb.cache.players.indexGetAll("playersByTid", [
+			PLAYER.UNDRAFTED,
+			PLAYER.UNDRAFTED,
+		]);
+		for (const p of prospects) {
+			assert.deepEqual(
+				Object.keys(p.faceAging?.h ?? {}),
+				[],
+				`prospect ${p.pid}`,
+			);
+		}
+		const rookie = active.find((p) => p.draft.year >= start && !p.imgURL);
+		assert.isDefined(rookie);
+		for (const season of Object.keys(rookie!.faceAging?.h ?? {})) {
+			assert.isAbove(
+				Number(season),
+				rookie!.draft.year,
+				`rookie ${rookie!.pid}`,
+			);
+		}
+		const rookieView = await loadView("player", { pid: String(rookie!.pid) });
+		for (const entry of rookieView.faceHistory.entries) {
+			assert.isAbove(entry.season, rookie!.draft.year);
+		}
+		if (rookieView.faceHistory.entries.length > 0) {
+			assert.strictEqual(rookieView.faceHistory.entries[0]!.label, "Rookie");
+		}
+
+		const hof = await loadView("hallOfFame", {});
+		assert.isArray(hof.plaques);
 	});
 });

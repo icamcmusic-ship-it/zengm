@@ -18,6 +18,9 @@ import { getPlayerProfileStats } from "./player.ts";
 import type { SeasonType } from "../util/processInputs.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { getTeamInfoBySeason } from "../util/getTeamInfoBySeason.ts";
+import { faceAtSeason } from "../util/faceAging.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
+import { wearsFaceMask, withFaceMask } from "../../common/faceRender.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { player } from "../core/index.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
@@ -346,6 +349,20 @@ const getStatsByPositions = (positions: string[]) => {
 	return Array.from(sportSpecific);
 };
 
+// League Extras "Face Aging": his face in that season (his peak season for career totals), with the clear mask while he's
+// out with a facial injury this season
+const faceForCompare = (pRaw: Player, season: number) => {
+	if (!featureOn("faceAging") || pRaw.imgURL || !pRaw.face) {
+		return pRaw.face;
+	}
+	const face = faceAtSeason(pRaw, season);
+	return season === g.get("season") &&
+		pRaw.tid !== PLAYER.RETIRED &&
+		wearsFaceMask(pRaw.injury, pRaw.injuries, season)
+		? withFaceMask(face)
+		: face;
+};
+
 // Returns a single ratings row and a single stats row, for either one season or career totals (with peak ratings)
 const getPlayer = async (
 	pRaw: Player,
@@ -417,6 +434,7 @@ const getPlayer = async (
 
 		return {
 			...rest,
+			face: faceForCompare(pRaw, ratings.season),
 			ratings,
 			stats,
 			colors: teamInfo?.colors,
@@ -436,6 +454,7 @@ const getPlayer = async (
 
 	return {
 		...p,
+		face: faceForCompare(pRaw, season),
 		awards: p.awards.filter((award) => award.season === season),
 		colors: teamInfo?.colors,
 		jersey: teamInfo?.jersey,
