@@ -10,7 +10,7 @@ export const PLAY_TYPES = {
 	// Multiplier on the mid-range draw of self-created shots (pull-ups)
 	selfMid: 1.15,
 	// Chance that a shooter who is not the creator creates for himself: slope * (his creation composite - min), capped at max
-	selfSlope: 2.2,
+	selfSlope: 1.7,
 	selfMin: 0.25,
 	selfMax: 0.8,
 	// Offensive rebounds: chance of a quick shot (stock 0.34), and the chance that the quick shot is the rebounder's putback
@@ -23,9 +23,12 @@ export const PLAY_TYPES = {
 	// Multiplier on the transition chances
 	transition: 1.2,
 	// Multipliers on the three-point draw and the two-point make probability, and on the assisted probability (keep league totals)
-	three: 1.14,
-	make2: -0.033,
+	three: 1.11,
+	make2: -0.042,
 	// Multiplier on the shooting-foul chance of two-point shots (fewer post-ups and more pull-ups would draw fewer free throws)
 	foul2: 1.18,
 	ast: 1.6,
+	// Extra multiplier on the assisted chance of self-created twos (a handoff or re-screen into the drive; the classifier keeps them the
+	// handler's play), so league assists stay where they were
+	astSelfTwo: 1.55,
 };

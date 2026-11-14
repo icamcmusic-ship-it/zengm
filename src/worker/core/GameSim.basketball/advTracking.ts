@@ -208,7 +208,7 @@ export const turnoverWeights = (p: Role): Weights => ({
 });
 
 // Realistic Play Types: more of the self-created shots are the sim's (many more) handlers' pick-and-rolls, so a smaller isolation share
-export const ISO_SCALE_REALISTIC = 0.6;
+export const ISO_SCALE_REALISTIC = 0.5;
 
 // Realistic Play Types: with fewer post-ups and more self-created shots, the turnovers follow the new mix (fewer post-ups, fewer on the
 // ball handler's pick-and-roll, more off the ball)
@@ -458,9 +458,16 @@ export class AdvTracker {
 			key = "post";
 		} else {
 			// With Spacing & Shot Creation the creator passed to the shooter even when no assist is credited
+			// (Realistic Play Types: a self-created two with an assist is still the handler's play, the pass a handoff or re-screen into it)
 			const from =
-				passer ??
-				(creator !== undefined && creator !== shooter ? creator : undefined);
+				this.realisticPlayTypes &&
+				creator === shooter &&
+				type !== "threePointer"
+					? undefined
+					: (passer ??
+						(creator !== undefined && creator !== shooter
+							? creator
+							: undefined));
 			const weights = shotWeights(
 				type,
 				this.role(shooter),

@@ -4826,7 +4826,10 @@ class GameSim extends GameSimBase {
 			this.probAst() *
 			typeFactor *
 			(selfCreated ? CREATION.astSelf : CREATION.astOther) *
-			(this.playTypes ? PLAY_TYPES.ast : 1);
+			(this.playTypes
+				? PLAY_TYPES.ast *
+					(selfCreated && type !== "threePointer" ? PLAY_TYPES.astSelfTwo : 1)
+				: 1);
 		if (prob > Math.random()) {
 			return this.creatorPasser(p);
 		}
