@@ -205,7 +205,7 @@ const realisticAgeModifier = (
 	return mod;
 };
 
-// Realistic Aging: a little less decline at 32-37 (added to every rating's target), so useful veterans stay at a role player's level a
+// Realistic Aging: a little less decline at 35-38 (added to every rating's target), so useful veterans stay at a role player's level a
 // few seasons longer, like the NBA's 36-39 year olds
 const VETERAN_EASE: Record<number, number> = {
 	35: 0.8,
