@@ -901,8 +901,9 @@ describe("targeting an archetype with the regenerator", () => {
 			.mockImplementation(() => ratingsRng.random());
 		const inputs: PlayerInput[] = [];
 		const wanted: string[] = [];
+		// (arch16: not a generic build: those are a last resort the reading turns down for a specific one when it can)
 		const pickable = ARCHETYPES.filter(
-			(a) => !a.rare && !a.trait && !a.expanded,
+			(a) => !a.rare && !a.trait && !a.expanded && !isGenericBuild(a),
 		);
 		let i = 0;
 		while (inputs.length < 160) {
