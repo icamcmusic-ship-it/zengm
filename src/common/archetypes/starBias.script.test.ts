@@ -6,6 +6,7 @@
 // a penalty-only bias (STAR_BIAS_MIN..0) on any build above STAR_TARGET of them or STAR_SEASON_MAX of one season's; it applies in full from a level well above
 // his position's average (score.ts starWeight). Run after the calibration (it reads the calibrated norms).
 import { writeFileSync } from "node:fs";
+import { isGenericBuild } from "./generic.ts";
 import { test } from "vitest";
 import { ARCHETYPES, defaultNorms, scoreAll } from "./classify.ts";
 import { realData, realNorms, realPlayer } from "./real.testutil.ts";
@@ -15,6 +16,14 @@ import { STAR_BIAS } from "./starBias.data.ts";
 const STAR_TARGET = 0.03;
 const STAR_SEASON_MAX = 0.035;
 const STAR_BIAS_MIN = -1.5;
+const GENERIC_STAR_TARGET = 0.01;
+const ARCH16_ONLY = true;
+const REPICKED = new Set([
+	"drive-and-rise",
+	"blow-by-dual-finisher",
+	"board-hunting-bucket-getter",
+	"backline-lob-threat",
+]);
 
 test.skipIf(!process.env.RUN_ARCHETYPE_STARBIAS)(
 	"write star bias",
@@ -57,12 +66,20 @@ test.skipIf(!process.env.RUN_ARCHETYPE_STARBIAS)(
 				seasonMax[id] = Math.max(seasonMax[id] ?? 0, n / 150);
 			}
 			for (const a of ARCHETYPES) {
+				// (arch16: only the generic builds and the builds whose kept name was re-picked are trimmed again; every other
+				// build keeps its arch15 trim, so the players moved off a generic build are not pushed on again)
+				if (ARCH16_ONLY && !isGenericBuild(a) && !REPICKED.has(a.id)) {
+					continue;
+				}
 				const share = (counts[a.id] ?? 0) / players.length;
 				const top = seasonMax[a.id] ?? 0;
+				// (arch16: a generic build at most GENERIC_STAR_TARGET, generic.ts)
+				const target = isGenericBuild(a) ? GENERIC_STAR_TARGET : STAR_TARGET;
+				const seasonMaxA = isGenericBuild(a) ? 0.015 : STAR_SEASON_MAX;
 				const b =
 					(bias[a.id] ?? 0) +
-					(share > STAR_TARGET ? 0.4 * Math.log(STAR_TARGET / share) : 0) +
-					(top > STAR_SEASON_MAX ? 0.3 * Math.log(STAR_SEASON_MAX / top) : 0);
+					(share > target ? 0.4 * Math.log(target / share) : 0) +
+					(top > seasonMaxA ? 0.3 * Math.log(seasonMaxA / top) : 0);
 				if (b < (bias[a.id] ?? 0)) {
 					bias[a.id] = Math.max(STAR_BIAS_MIN, b);
 				}

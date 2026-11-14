@@ -1,3 +1,4 @@
+import { isGenericBuild } from "./generic.ts";
 import { DIMS, skillsOf, STYLE_DIMS } from "./composites.ts";
 import { zVector } from "./norms.ts";
 import { STATS_W, type StatReading } from "./stats.ts";
@@ -489,7 +490,10 @@ export const passingBigBonus = (
 // A broad label pays for each standout skill of his it does not name
 export const GENERIC_K = 0.35;
 export const genericPenalty = (a: Archetype, st: Standout[]) => {
-	if (st.length === 0 || !a.tags.includes("generic")) {
+	if (
+		st.length === 0 ||
+		!(isGenericBuild(a) || isGenericBuild({ id: a.out ?? a.id }))
+	) {
 		return 0;
 	}
 	const c = coverOf(a);
@@ -1273,14 +1277,30 @@ export const traitGroupValue = (
 export const CATCH_ALL_K = 3;
 export const CATCH_ALL: Record<string, Partial<Record<string, number>>> = {
 	"versatile-scorer": { finish: 0.4, mid: 0.4, shoot: 0.4, create: 0.4 },
-	"three-level-scorer": { shoot: 0.3, mid: 0.3, create: 0 },
-	"crafty-3-level-scorer": { shoot: 0.3, mid: 0.3 },
-	"crafty-walking-bucket": { score: 0.5, create: 0.2 },
-	"walking-bucket": { score: 0.5, create: 0.2 },
+	"three-level-scorer": { shoot: 0.3, mid: 0.3, finish: 0.2, create: 0 },
+	"crafty-3-level-scorer": { shoot: 0.3, mid: 0.3, finish: 0.2 },
+	"crafty-walking-bucket": { score: 0.5, create: 0.2, shoot: 0.1, mid: 0.1 },
+	"walking-bucket": { score: 0.5, create: 0.2, shoot: 0.1, mid: 0.1 },
 	"mid-range-slasher": { mid: 0.3, finish: 0.3 },
-	"versatile-paint-finisher": { finish: 0.5 },
+	"versatile-paint-finisher": { finish: 0.5, ath: 0.2 },
 	"mid-range-high-flyer": { mid: 0.3, ath: 0.3 },
+	// arch16: every generic build (generic.ts)
+	"gritty-3-level-scorer": { shoot: 0.3, mid: 0.3, finish: 0.2 },
+	"physical-3-level-scorer": { shoot: 0.3, mid: 0.3, finish: 0.2 },
+	"versatile-paint-bully": { finish: 0.4, stre: 0.3 },
+	"versatile-scoring-cleaner": { reb: 0.3, score: 0.4, mid: 0.1, finish: 0.1 },
+	"inside-out-scorer": { shoot: 0.2, finish: 0.3, create: 0 },
+	"inside-out-slasher": { shoot: 0.2, finish: 0.4, ath: 0 },
+	"crafty-inside-out-scorer": { shoot: 0.2, finish: 0.3 },
+	"mid-paint-bully": { mid: 0.3, finish: 0.2, stre: 0.1 },
+	"crafty-mid-paint-scorer": { mid: 0.3, finish: 0.2 },
+	"mid-range-menace": { mid: 0.4 },
+	"slashing-dual-finisher": { finish: 0.4, ath: 0.2 },
+	// (arch16 spot fix: a "Shot-Erasing Mid-Paint Maestro" protects the rim and scores in the paint, not only from mid-range:
+	// Durant, Kawhi and Wembanyama had it with Mobley)
+	"shot-erasing-mid-paint-maestro": { rimD: 0.6, finish: 0.5, mid: 0.5 },
 };
+export const MID_SHOT_FLOOR = -1;
 export const creationOf = (p: Prepared, cv: Record<string, number>) =>
 	Math.max(cv.handle ?? 0, p.stats?.z.usg ?? -Infinity);
 export const catchAllShortfall = (
@@ -1288,11 +1308,16 @@ export const catchAllShortfall = (
 	p: Prepared,
 	cv: Record<string, number>,
 ): number => {
-	const req = CATCH_ALL[a.id];
+	// (arch16: a profile merged into a catch-all is held to the catch-all's floors: the name he is shown is the kept one's)
+	const req = CATCH_ALL[a.id] ?? (a.out ? CATCH_ALL[a.out] : undefined);
+	// arch16 (user report: Giannis read as mid-range): a mid-range name needs some jumper, not only a high fg rating
+	const mid = promisesOf(a).all.includes("mid")
+		? Math.max(0, MID_SHOT_FLOOR - (cv.shoot ?? 0))
+		: 0;
 	if (!req) {
-		return 0;
+		return mid;
 	}
-	let t = 0;
+	let t = mid;
 	for (const [k, floor] of Object.entries(req)) {
 		const v = k === "create" ? creationOf(p, cv) : (cv[k] ?? 0);
 		t += Math.max(0, floor! - v);
