@@ -68,6 +68,27 @@ import {
 import { isValidSubArray } from "../../../common/subRatings.ts";
 import { fuzzSubs, subRatingsOn } from "./subRatings.ts";
 import { playTypeProfile, sumAdv } from "../../../common/advStats.ts";
+import { modelFor } from "../../../common/archetypes/classify.ts";
+import {
+	applyTuning,
+	isEmptyTuning,
+} from "../../../common/archetypes/tuning.ts";
+import type { FittedModel } from "../../../common/archetypes/model.ts";
+import {
+	activeTuning,
+	overrideFor,
+	refitArchetypeTuning,
+} from "./archetypeFeedback.ts";
+
+// archfb: the shipped model with the user's tuning on top, or undefined (the shipped model) with no tuning
+export const tunedModelFor = (
+	ratings: ArchetypeRatings,
+): FittedModel | undefined => {
+	const t = activeTuning();
+	return isEmptyTuning(t)
+		? undefined
+		: applyTuning(modelFor(hasExpandedRatings(ratings)), t);
+};
 
 // The archetype a player has is DERIVED from his ratings (src/common/archetypes), but it is STORED on him (p.archetypes) at
 // the start of every preseason, so what the UI shows stays fixed between preseasons. Prospects, and players who have no entry
@@ -357,10 +378,12 @@ export const fuzzedArchetypeLabel = (
 		shown.sub = fuzzSubs(ratings.sub, fuzz);
 	}
 	// His position comes from the true ratings, as the game shows it; a prospect is read against the prospect tables
+	const model = tunedModelFor(shown);
 	return classify(shown, {
 		norms,
 		pos: posFn(ratings as any),
 		prospect: true,
+		...(model ? { model } : {}),
 	}).label;
 };
 
@@ -399,15 +422,17 @@ export const classifyPlayer = (
 		memo = new Map();
 		classifyMemo.set(norms, memo);
 	}
-	// (arch16: the reading version too, so a new reading never reuses an old result)
+	// (arch16: the reading version too, so a new reading never reuses an old result; archfb: and the user's tuning)
+	const tuning = activeTuning();
 	const key = JSON.stringify(
-		[ARCHETYPE_READING_VERSION, ratings, opts],
+		[ARCHETYPE_READING_VERSION, tuning.hash, ratings, opts],
 		memoReplacer,
 	);
 	if (memo.has(key)) {
 		return memo.get(key);
 	}
-	const c = classify(ratings, { norms, ...opts });
+	const model = tunedModelFor(ratings);
+	const c = classify(ratings, { norms, ...opts, ...(model ? { model } : {}) });
 	if (memo.size >= CLASSIFY_MEMO_MAX) {
 		memo.clear();
 	}
@@ -493,6 +518,8 @@ export const updateArchetypesForPreseason = async (players: Player[]) => {
 		return;
 	}
 	const norms = await getLeagueNorms(true);
+	// archfb: the user's tuning from all picks so far
+	await refitArchetypeTuning();
 	for (const p of players) {
 		if (p.tid === PLAYER.RETIRED || p.tid === PLAYER.UNDRAFTED) {
 			continue;
@@ -526,7 +553,13 @@ export const archetypeFor = (
 	p: Player,
 	norms: Norms,
 ):
-	| { view: ArchetypeView; stored: boolean; classification?: Classification }
+	| {
+			view: ArchetypeView;
+			stored: boolean;
+			classification?: Classification;
+			// archfb: the user's own pick for him
+			user?: boolean;
+	  }
 	| undefined => {
 	if (!featureOn("archetypes")) {
 		return undefined;
@@ -534,6 +567,11 @@ export const archetypeFor = (
 	const isProspect =
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
 	const entry = isProspect ? undefined : currentEntry(p.archetypes);
+	// archfb: the user's pick, while his position allows it (else the reading)
+	const ov = userView(p, entry);
+	if (ov) {
+		return { view: ov, stored: true, user: true };
+	}
 	// An entry his position no longer allows (stored by an older version) is read live until the next preseason
 	const v = viewOf(entry, posNow(p), viewContext());
 	if (v) {
@@ -548,6 +586,29 @@ export const archetypeFor = (
 	return live ? { view: live, stored: false, classification: c } : undefined;
 };
 
+// archfb: the user's pick for him as a view (the same display as any archetype)
+const userView = (
+	p: Player,
+	entry: StoredArchetype | undefined,
+): ArchetypeView | null => {
+	const id = overrideFor(p.pid);
+	if (!id) {
+		return null;
+	}
+	const row = last(p.ratings) as any;
+	return viewOf(
+		{
+			season: typeof row?.season === "number" ? row.season : g.get("season"),
+			id,
+			tier: entry?.tier,
+			conf: entry?.conf,
+			v: ARCHETYPE_READING_VERSION,
+		},
+		posNow(p),
+		viewContext(),
+	);
+};
+
 // The label to show for a player in a given season: the entry in force then, else (current season or prospect) a live reading
 export const archetypeLabelAt = (
 	p: Player,
@@ -559,6 +620,12 @@ export const archetypeLabelAt = (
 	}
 	const isProspect =
 		p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP;
+	if (isProspect || season >= g.get("season")) {
+		const ov = userView(p, currentEntry(p.archetypes));
+		if (ov) {
+			return ov.label;
+		}
+	}
 	if (!isProspect) {
 		const v = viewOf(
 			currentEntry(p.archetypes, season),
@@ -589,6 +656,9 @@ export type PlayerArchetypeInfo = {
 	why: { label: string; z: number; want: number }[];
 	// arch16: one short line citing what drove the pick (common/archetypes/whyText.ts)
 	whyText?: string;
+	// archfb: the user's own pick (internal: shown like any archetype; the popover offers to clear it)
+	user?: boolean;
+	pid?: number;
 };
 
 // Everything the player page shows. A non-prospect with no entry gets one stored here, once.
@@ -666,6 +736,8 @@ export const archetypeInfoForPlayer = async (
 		live: !found.stored,
 		why,
 		...(whyText ? { whyText } : {}),
+		pid: p.pid,
+		...(found.user ? { user: true } : {}),
 	};
 };
 

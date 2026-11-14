@@ -27,8 +27,16 @@ import {
 import { FAMILIES } from "./families.ts";
 import { JUDGED as JUDGED_BASE } from "./judged.data.ts";
 import { JUDGED_SIM, SIM_SUB_NORMS } from "./judgedSim.data.ts";
-// arch17: plus the simulated league's players, read with their play types
-const JUDGED = [...JUDGED_BASE, ...JUDGED_SIM];
+// arch17: plus the simulated league's players, read with their play types. archfb: ARCH_PICKS=file[,file...] (pick files
+// exported from League -> Archetypes, "Export my picks") replaces the judged set with the user's own picks as the answer
+// key (tune/test split by a hash of each pick, tuning.ts picksToJudged)
+const JUDGED = process.env.ARCH_PICKS
+	? picksToJudged(
+			process.env.ARCH_PICKS.split(",").flatMap((f) =>
+				fromPickFile(JSON.parse(readFileSync(f.trim(), "utf8"))),
+			),
+		)
+	: [...JUDGED_BASE, ...JUDGED_SIM];
 import {
 	CLASS_FEATS,
 	FAM_FEATS,
@@ -49,6 +57,7 @@ import {
 import { modelFor } from "./classify.ts";
 import { mergedId } from "./merges.data.ts";
 import { promiseChecks, promisesOf } from "./score.ts";
+import { fromPickFile, picksToJudged } from "./tuning.ts";
 
 const EXPANDED = Boolean(process.env.ARCH_EXPANDED);
 const NORMS = defaultNorms(EXPANDED);
@@ -94,18 +103,26 @@ export const judgedPlayers = (expanded = EXPANDED, norms = NORMS) => {
 	// arch14: player traits as a league with the Player Traits setting would give him (seeded by his key; every trait,
 	// hidden ones too), so the trait terms can be fitted. ARCH_FIT_NO_TRAITS=1: none (the setting off)
 	const traitsOf = (j, ratings, age, i) =>
-		process.env.ARCH_FIT_NO_TRAITS
-			? undefined
-			: traitScores(ratings, generateTraitSeeds(`judged-${j.key}`, i), {
-					age: age ?? 19,
-					experience: Math.max(0, (age ?? 19) - 20),
-				});
+		j.src === "picks"
+			? process.env.ARCH_FIT_NO_TRAITS
+				? undefined
+				: j.traits
+			: process.env.ARCH_FIT_NO_TRAITS
+				? undefined
+				: traitScores(ratings, generateTraitSeeds(`judged-${j.key}`, i), {
+						age: age ?? 19,
+						experience: Math.max(0, (age ?? 19) - 20),
+					});
 	return JUDGED.map((j, ji) => {
 		let read;
 		let ratings;
 		let pos = j.pos;
 		let nm = norms;
-		if (j.src === "sim") {
+		if (j.src === "picks") {
+			ratings = { ...j.ratings };
+			pos = j.pos;
+			read = { ...j.read };
+		} else if (j.src === "sim") {
 			ratings = { ...j.ratings };
 			nm = { ...norms, sub: SIM_SUB_NORMS };
 			pos = j.pos;
@@ -171,7 +188,10 @@ export const judgedPlayers = (expanded = EXPANDED, norms = NORMS) => {
 			famX: t.famX,
 			stats: read.stats,
 			pop:
-				j.src === "league" || j.src === "prospect" || j.src === "sim"
+				j.src === "league" ||
+				j.src === "prospect" ||
+				j.src === "sim" ||
+				j.src === "picks"
 					? j.src
 					: j.season >= 2016
 						? "real 2016+"

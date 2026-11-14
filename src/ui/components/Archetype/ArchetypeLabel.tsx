@@ -1,5 +1,6 @@
 import { OverlayTrigger, Popover } from "react-bootstrap";
-import { useId } from "react";
+import { useId, useState, type ReactNode } from "react";
+import { ArchetypeFeedbackModal } from "./ArchetypeFeedback.tsx";
 import { GROUP_INFO, TIER_NAMES } from "../../../common/archetypes/index.ts";
 import type { ArchetypeGroup, Tier } from "../../../common/archetypes/index.ts";
 
@@ -15,6 +16,9 @@ export type ArchetypeLabelInfo = {
 	why?: { label: string; z: number; want: number }[];
 	// arch16: one short line citing what drove the pick (sub-ratings, play types, traits or ratings)
 	whyText?: string;
+	// archfb: the player (for "Doesn't fit?") and whether the label is the user's own pick
+	pid?: number;
+	user?: boolean;
 };
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
@@ -73,30 +77,73 @@ export const ArchetypeWhy = ({
 	</div>
 );
 
-// The archetype's name with its group colour, and a click popover that says what it is and why he got it
-export const ArchetypeLabel = ({ info }: { info: ArchetypeLabelInfo }) => {
+// The archetype's name with its group colour, and a click popover that says what it is and why he got it. With
+// `feedback` (and his pid), a "Doesn't fit?" button beside it and in the popover (archfb)
+export const ArchetypeLabel = ({
+	info,
+	feedback,
+	suffix,
+}: {
+	info: ArchetypeLabelInfo;
+	feedback?: boolean;
+	// Shown right after the label (before the feedback button)
+	suffix?: ReactNode;
+}) => {
 	const id = useId();
+	const [show, setShow] = useState(false);
+	const canFeedback = feedback && info.pid !== undefined;
 	return (
-		<OverlayTrigger
-			trigger={["hover", "focus", "click"]}
-			placement="auto"
-			rootClose
-			overlay={
-				<Popover id={id}>
-					<Popover.Header as="h3">{info.label}</Popover.Header>
-					<Popover.Body>
-						<ArchetypeWhy info={info} />
-					</Popover.Body>
-				</Popover>
-			}
-		>
-			<button
-				type="button"
-				className="archetype-label btn btn-link p-0 align-baseline"
+		<>
+			<OverlayTrigger
+				trigger={["hover", "focus", "click"]}
+				placement="auto"
+				rootClose
+				overlay={
+					<Popover id={id}>
+						<Popover.Header as="h3">{info.label}</Popover.Header>
+						<Popover.Body>
+							<ArchetypeWhy info={info} />
+							{canFeedback ? (
+								<button
+									type="button"
+									className="btn btn-sm btn-outline-secondary mt-2"
+									onClick={() => setShow(true)}
+								>
+									{info.user ? "Change or clear my pick" : "Doesn't fit?"}
+								</button>
+							) : null}
+						</Popover.Body>
+					</Popover>
+				}
 			>
-				<GroupDot group={info.group} />
-				{info.label}
-			</button>
-		</OverlayTrigger>
+				<button
+					type="button"
+					className="archetype-label btn btn-link p-0 align-baseline"
+				>
+					<GroupDot group={info.group} />
+					{info.label}
+				</button>
+			</OverlayTrigger>
+			{suffix}
+			{canFeedback ? (
+				<>
+					{" "}
+					<button
+						type="button"
+						className="btn btn-link btn-sm p-0 align-baseline text-body-secondary archetype-fb-button"
+						onClick={() => setShow(true)}
+					>
+						Doesn't fit?
+					</button>
+					{show ? (
+						<ArchetypeFeedbackModal
+							pid={info.pid!}
+							show={show}
+							onHide={() => setShow(false)}
+						/>
+					) : null}
+				</>
+			) : null}
+		</>
 	);
 };

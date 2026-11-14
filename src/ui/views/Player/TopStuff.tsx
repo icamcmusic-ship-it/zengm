@@ -643,13 +643,19 @@ const TopStuff = ({
 							)}
 							{player.archetype ? (
 								<>
-									Archetype: <ArchetypeLabel info={player.archetype} />
-									{player.archetype.tier ? (
-										<span className="text-body-secondary">
-											{" "}
-											({TIER_NAMES[player.archetype.tier]})
-										</span>
-									) : null}
+									Archetype:{" "}
+									<ArchetypeLabel
+										info={player.archetype}
+										feedback
+										suffix={
+											player.archetype.tier ? (
+												<span className="text-body-secondary">
+													{" "}
+													({TIER_NAMES[player.archetype.tier]})
+												</span>
+											) : null
+										}
+									/>
 									<br />
 								</>
 							) : null}
