@@ -57,6 +57,12 @@ export type PositionalShares = {
 };
 
 // Each player's shares, in the order of players. Only for 5 players on the court; undefined otherwise (plain averages)
+const SCRATCH = INTERIOR_SHARES.map((_, i) => ({ i, v: 0 }));
+const byValueDesc = (
+	a: { i: number; v: number },
+	b: { i: number; v: number },
+) => b.v - a.v || a.i - b.i;
+
 export const positionalShares = (
 	players: Player[],
 	out?: PositionalShares,
@@ -71,19 +77,26 @@ export const positionalShares = (
 		perimeter: new Array(n).fill(1),
 		ball: new Array(n).fill(1),
 	};
-	const bySize = players
-		.map((p, i) => ({ i, v: interiorScore(p) }))
-		.sort((a, b) => b.v - a.v || a.i - b.i);
-	for (const [rank, { i }] of bySize.entries()) {
+	// (perf2: sorted in a reused scratch list, filled in the same order as a fresh one, so the sort gives the same order)
+	const order = SCRATCH;
+	for (let i = 0; i < n; i++) {
+		order[i]!.i = i;
+		order[i]!.v = interiorScore(players[i]!);
+	}
+	order.sort(byValueDesc);
+	for (let rank = 0; rank < n; rank++) {
+		const i = order[rank]!.i;
 		shares.interior[i] = INTERIOR_SHARES[rank]!;
 		shares.rebound[i] = REBOUND_SHARES[rank]!;
 		shares.perimeter[i] = PERIMETER_SHARES[rank]!;
 	}
-	const byBall = players
-		.map((p, i) => ({ i, v: p.compositeRating.dribbling ?? 0 }))
-		.sort((a, b) => b.v - a.v || a.i - b.i);
-	for (const [rank, { i }] of byBall.entries()) {
-		shares.ball[i] = BALL_SHARES[rank]!;
+	for (let i = 0; i < n; i++) {
+		order[i]!.i = i;
+		order[i]!.v = players[i]!.compositeRating.dribbling ?? 0;
+	}
+	order.sort(byValueDesc);
+	for (let rank = 0; rank < n; rank++) {
+		shares.ball[order[rank]!.i] = BALL_SHARES[rank]!;
 	}
 	return shares;
 };

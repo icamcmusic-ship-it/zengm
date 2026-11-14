@@ -744,10 +744,18 @@ const DEFENSE_NEEDS: Record<DefenseSystem, Partial<Attributes>> = {
 	press: { athletic: 0.5, endu: 0.2, perimD: 0.3 },
 };
 
+// (perf2: each needs table's entries listed once, in the same order, instead of Object.entries on every call)
+const needsEntries = new WeakMap<object, [string, number][]>();
 const weighted = (a: Attributes, needs: Partial<Attributes>) => {
+	let entries = needsEntries.get(needs);
+	if (!entries) {
+		entries = Object.entries(needs) as [string, number][];
+		needsEntries.set(needs, entries);
+	}
 	let x = 0;
-	for (const [key, w] of Object.entries(needs)) {
-		x += (a as any)[key] * (w as number);
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i]!;
+		x += (a as any)[entry[0]] * entry[1];
 	}
 	return x;
 };
