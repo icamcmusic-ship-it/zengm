@@ -8,6 +8,25 @@ import { idb } from "../../db/index.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { gauss } from "../../../common/random.ts";
 import { getProStats } from "../../../common/preDraft.ts";
+import { realisticAgingOn } from "./ratingsModelSwitch.ts";
+
+// Realistic Aging: the stock rule retires players at 34-39 much faster than the NBA (2000-2025: per season, about 8.5/6.2/4.0/2.7
+// players who played at 36/37/38/39, the stock rule leaves about 3/1.5/1/0.5). Both retirement chances below are multiplied by this
+// at these ages, more for useful veterans (see oldRetireScale). 40+ is unchanged.
+const OLD_RETIRE_SCALE: Record<number, number> = {
+	34: 0.4,
+	35: 0.35,
+	36: 0.35,
+	37: 0.4,
+	38: 0.45,
+	39: 0.6,
+};
+const oldRetireScale = (age: number) => {
+	if (!realisticAgingOn()) {
+		return 1;
+	}
+	return OLD_RETIRE_SCALE[age] ?? 1;
+};
 
 const checkForceRetireSeasons = (p: Player) => {
 	// No redshirt seasons before league was created, since we have no stats then
@@ -129,6 +148,7 @@ const shouldRetire = async (p: Player): Promise<boolean> => {
 
 	if (__SPORT === "basketball") {
 		const maxAge = 33;
+		const scale = oldRetireScale(age);
 		const minPot = 40;
 
 		// Only players older than maxAge or without a contract will retire
@@ -148,7 +168,7 @@ const shouldRetire = async (p: Player): Promise<boolean> => {
 				0.971 * Math.max(ws, estWS);
 
 			const odds = Math.exp(logit);
-			const prob = odds / (1 + odds);
+			const prob = (scale * odds) / (1 + odds);
 
 			if (prob > Math.random()) {
 				return true;
@@ -159,7 +179,7 @@ const shouldRetire = async (p: Player): Promise<boolean> => {
 				const maxOvr = Math.max(...p.ratings.map((row) => row.ovr));
 				const ovrFraction = ovr / maxOvr;
 				if (ovrFraction < 0.7) {
-					const prob2 = 0.2 + (0.7 - ovrFraction);
+					const prob2 = scale * (0.2 + (0.7 - ovrFraction));
 					if (prob2 > Math.random()) {
 						return true;
 					}

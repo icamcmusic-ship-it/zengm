@@ -13,6 +13,8 @@ export type ArchetypeLabelInfo = {
 	season?: number;
 	live?: boolean;
 	why?: { label: string; z: number; want: number }[];
+	// arch16: one short line citing what drove the pick (sub-ratings, play types, traits or ratings)
+	whyText?: string;
 };
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
@@ -40,12 +42,16 @@ export const ArchetypeWhy = ({
 }: {
 	info: Pick<
 		ArchetypeLabelInfo,
-		"desc" | "why" | "tier" | "conf" | "season" | "live"
+		"desc" | "why" | "whyText" | "tier" | "conf" | "season" | "live"
 	>;
 }) => (
 	<div className="archetype-popover">
 		<p className="mb-2">{info.desc}</p>
-		{info.why && info.why.length > 0 ? (
+		{info.whyText ? (
+			<p className="mb-2">
+				<span className="fw-bold">Why:</span> {info.whyText}
+			</p>
+		) : info.why && info.why.length > 0 ? (
 			<>
 				<div className="fw-bold">Why</div>
 				<ul className="mb-2 ps-3">

@@ -561,7 +561,7 @@ const ratingsInfo = async (s: number) => {
 	};
 };
 
-// Old players: by age (36, 37, 38, 39, 40+), how many played in the regular season and were on a roster at its end, their
+// Old players: by age (30-39, 40+), how many played in the regular season and were on a roster at its end, their
 // minutes and ovr, and retirements by age at the end of the season. Call after the draft phase (retirements are done).
 const oldPlayers = async (s: number) => {
 	const players = await idb.merged.players.getAll({ activeSeason: s });
@@ -569,16 +569,38 @@ const oldPlayers = async (s: number) => {
 	const played: Record<string, { n: number; min: number[]; ovr: number[] }> =
 		{};
 	const retired: Record<string, number> = {};
+	// Unsigned free agents by age (30+) after the draft
+	const fa: Record<string, number> = {};
 	// Every 38+ player who played: age, ovr, career best ovr, minutes and the secret aging curve
 	const list: string[] = [];
+	// Rookies' share of regular season minutes, and the mean age of the top 10 by ovr
+	let minTotal = 0;
+	let minRookies = 0;
+	const byOvr: [number, number][] = [];
 	for (const p of players) {
 		const age = s - p.born.year;
+		const ovrS = p.ratings.find((row) => row.season === s)?.ovr;
+		if (ovrS !== undefined && p.tid >= 0) {
+			byOvr.push([ovrS, age]);
+		}
+		for (const row of p.stats) {
+			if (row.season === s && !row.playoffs && row.tid >= 0) {
+				minTotal += row.min ?? 0;
+				if (p.draft.year === s - 1) {
+					minRookies += row.min ?? 0;
+				}
+			}
+		}
 		if (p.retiredYear === s) {
 			const k = age >= 40 ? "40+" : age >= 30 ? String(age) : "<30";
 			retired[k] = (retired[k] ?? 0) + 1;
 		}
-		if (age < 36) {
+		if (age < 30) {
 			continue;
+		}
+		if (p.tid === PLAYER.FREE_AGENT) {
+			const k = age >= 40 ? "40+" : String(age);
+			fa[k] = (fa[k] ?? 0) + 1;
 		}
 		const rows = p.stats.filter(
 			(row) => row.season === s && !row.playoffs && row.tid >= 0,
@@ -609,6 +631,16 @@ const oldPlayers = async (s: number) => {
 				]),
 		),
 		retired,
+		fa,
+		rookieMinShare: r(minTotal > 0 ? (100 * minRookies) / minTotal : 0),
+		top10Age: r(
+			mean(
+				byOvr
+					.sort((a, b) => b[0] - a[0])
+					.slice(0, 10)
+					.map((x) => x[1]),
+			),
+		),
 		list,
 	};
 };
@@ -1083,6 +1115,40 @@ const settingsFor = (config: string) => {
 };
 
 describe.skipIf(!ENABLED)("long run", () => {
+	// LONG_RUN_ARCH_DUMP=prefix (arch16): every player (rosters, free agents and draft prospects) at the preseason of the
+	// first season and after the last, with his stored archetype, ratings and stats, as `${prefix}-${season}.json`, for the
+	// archetype share checks (common/archetypes/userShares.script.test.ts)
+	const archDump = async () => {
+		if (!env.LONG_RUN_ARCH_DUMP) {
+			return;
+		}
+		const { writeFileSync } = await import(
+			/* @vite-ignore */ "node:fs" as string
+		);
+		const s = g.get("season");
+		const ps = await idb.cache.players.indexGetAll("playersByTid", [
+			PLAYER.UNDRAFTED,
+			Infinity,
+		]);
+		writeFileSync(
+			`${env.LONG_RUN_ARCH_DUMP}-${s}.json`,
+			JSON.stringify({
+				season: s,
+				players: ps.map((p) => ({
+					pid: p.pid,
+					tid: p.tid,
+					name: `${p.firstName} ${p.lastName}`,
+					born: p.born,
+					archetype: (p as any).archetypes?.at(-1),
+					ratings: p.ratings.slice(-1),
+					stats: p.stats.filter(
+						(row: any) => !row.playoffs && row.season >= s - 3,
+					),
+				})),
+			}),
+		);
+	};
+
 	test("seasons", { timeout: 24 * 60 * 60 * 1000 }, async () => {
 		Math.random = makeSeededRandom(SEED);
 		const { settings, enabledKeys } = settingsFor(CONFIG);
@@ -1114,6 +1180,7 @@ describe.skipIf(!ENABLED)("long run", () => {
 		);
 		await league.loadGameAttributes();
 
+		await archDump();
 		for (let i = 0; i < SEASONS; i++) {
 			const calib = calibrate().ms;
 			const ts = performance.now();
@@ -1300,6 +1367,7 @@ describe.skipIf(!ENABLED)("long run", () => {
 				}),
 			);
 		}
+		await archDump();
 		out(
 			`DONE problems ${problemCount}: ${JSON.stringify(Object.fromEntries(problemSeen))}`,
 		);

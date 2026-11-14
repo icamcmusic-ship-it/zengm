@@ -1,3 +1,4 @@
+import { isGenericBuild } from "./generic.ts";
 import { ARCHETYPE_DEFS, SCORING_DEFS } from "./defs.data.ts";
 import {
 	DIM_LABELS,
@@ -108,6 +109,16 @@ export const isPoorFit = (c: { score: number; shortfall: number }) =>
 	c.score < POOR_FIT_SCORE || c.shortfall > POOR_FIT_SHORT;
 // How many runners-up are listed as "also close to" (never part of the label)
 export const ALTERNATES = 2;
+// arch16 spot fix (user report: Wembanyama, Mobley and Kawhi all "Shot-Erasing Mid-Paint Maestro", the build over the
+// real top-150 cap): a hand bias on top of the calibrated one, for every profile of the build
+export const SPOT_BIAS: Record<string, number> = {
+	"shot-erasing-mid-paint-maestro": -0.4,
+};
+// arch16: every generic build (generic.ts) a little less likely, for its share in real players' leagues (the star trim
+// reaches only stars; the share trim only generated leagues)
+export const GENERIC_BIAS = 0.3;
+// arch16: how far below a generic best a specific build may be and still be shown instead (classify)
+export const GENERIC_FALLBACK_Z = 1.5;
 // A runner-up is only listed when its fit is within this much (in z) of the label's
 export const ALTERNATE_Z = 0.6;
 
@@ -201,7 +212,14 @@ export const traitTerm = (
 };
 
 // raw: similarity of shape, 0..1; z: how exceptional the fit is; short: how far he is from what the name promises (z)
-export type Scored = { a: Archetype; raw: number; z: number; short: number };
+export type Scored = {
+	a: Archetype;
+	raw: number;
+	z: number;
+	short: number;
+	// arch16: how far he is below the build's catch-all floors (score.ts CATCH_ALL), z
+	catchAll?: number;
+};
 
 // arch14: one build's terms for one player, before the fitted weights (model.ts): `f` per TERMS, `cls` per CLASS_FEATS,
 // `base` what is not fitted (the position prior and his traits)
@@ -213,6 +231,8 @@ export type BuildTerms = {
 	short: number;
 	blocked: boolean;
 	base: number;
+	// arch16: catch-all floors missed (score.ts catchAllShortfall)
+	catchAll?: number;
 	f: number[];
 	cls: number[];
 	fam: Family;
@@ -280,24 +300,21 @@ const styleFamilyFeatures = (p: Prepared): number[] => {
 	];
 };
 
-// perf2: what scoreTerms reads of a build that does not depend on the player (its public build, family, which trait
-// groups its name matches and which class features it promises), worked out once per build
-type BuildStatic = {
-	pub: Archetype;
-	fam: Family;
-	groupMatch: boolean[];
-	clsIdx: number[];
-};
-const staticCache = new WeakMap<Archetype, BuildStatic>();
-const staticOf = (a: Archetype): BuildStatic => {
+// arch16 (speed, same results): what a profile's terms need that never changes: the build it stands for, its family, the
+// trait groups its name matches and the skill classes it promises
+const staticCache = new WeakMap<
+	Archetype,
+	{ pub: Archetype; fam: Family; groups: number[]; cls: number[] }
+>();
+const staticOf = (a: Archetype) => {
 	let st = staticCache.get(a);
 	if (!st) {
 		const all = promisesOf(a).all;
 		st = {
 			pub: publicOf(a),
 			fam: familyOf(a),
-			groupMatch: TRAIT_GROUPS.map((g) => g.re.test(a.name)),
-			clsIdx: CLASS_FEATS.flatMap((k, i) => (all.includes(k) ? [i] : [])),
+			groups: TRAIT_GROUPS.flatMap((g, i) => (g.re.test(a.name) ? [i] : [])),
+			cls: CLASS_FEATS.flatMap((k, i) => (all.includes(k) ? [i] : [])),
 		};
 		staticCache.set(a, st);
 	}
@@ -327,7 +344,6 @@ export const scoreTerms = (
 	for (const a of scoringFor(archetypes)) {
 		const st = staticOf(a);
 		const pub = st.pub;
-		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
 		const prior = archetypePrior(a, pos);
 		const trait = traitTerm(a, traits);
 		const f: number[] = new Array(TERMS.length).fill(0);
@@ -342,7 +358,8 @@ export const scoreTerms = (
 			rows.push({
 				a,
 				pub,
-				raw,
+				// (arch16, speed: a build his position rules out is never matched)
+				raw: 0,
 				short: 0,
 				blocked: true,
 				base: 0,
@@ -352,13 +369,18 @@ export const scoreTerms = (
 			});
 			continue;
 		}
-		const base = prior + trait - CATCH_ALL_K * catchAllShortfall(a, p, cv);
-		for (let gi = 0; gi < TRAIT_GROUPS.length; gi++) {
-			if (groupVals[gi] !== 0 && st.groupMatch[gi]) {
+		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
+		const catchAll = catchAllShortfall(a, p, cv);
+		const base = prior + trait - CATCH_ALL_K * catchAll;
+		for (const gi of st.groups) {
+			if (groupVals[gi] !== 0) {
 				f[TERM_INDEX[TRAIT_GROUPS[gi]!.term as Term]] = groupVals[gi]!;
 			}
 		}
-		const bias = calBias?.[a.id] ?? 0;
+		const bias =
+			(calBias?.[a.id] ?? 0) +
+			(SPOT_BIAS[pub.id] ?? 0) -
+			(isGenericBuild(pub) || isGenericBuild(a) ? GENERIC_BIAS : 0);
 		// (arch15: the trim is per build; a merged profile reads its build's)
 		const starB =
 			star *
@@ -388,7 +410,18 @@ export const scoreTerms = (
 		}
 		const table = norms.match[a.id];
 		const need = needShortfall(a, p);
+		// (arch16: and the name he is shown: a merged profile's holders carry the kept build's name, which arch16 re-picked
+		// to a specific one for four merges)
 		const prom = promiseShortfall(a, cv, p);
+		if (pub !== a) {
+			const q = promiseShortfall(pub, cv, p);
+			prom.floor = Math.max(prom.floor, q.floor);
+			prom.rel = Math.max(prom.rel, q.rel);
+			prom.lead = Math.max(prom.lead, q.lead);
+			if (q.reb !== undefined) {
+				prom.reb = Math.max(prom.reb ?? 0, q.reb);
+			}
+		}
 		const short = need + prom.floor + prom.rel;
 		// (a role bonus only for a build he lives up to: it fades out as he misses its floors)
 		const role = roleParts(a, p, cv);
@@ -422,10 +455,21 @@ export const scoreTerms = (
 		f[TERM_INDEX.promRel] = -needPenaltyOf(prom.rel);
 		f[TERM_INDEX.sub] = subTerm(a, p.style);
 		f[TERM_INDEX.playType] = ptTerm(a, p.style);
-		for (const i of st.clsIdx) {
+		for (const i of st.cls) {
 			cls[i] = cv[CLASS_FEATS[i]!] ?? 0;
 		}
-		rows.push({ a, pub, raw, short, blocked: false, base, f, cls, fam });
+		rows.push({
+			a,
+			pub,
+			raw,
+			short,
+			blocked: false,
+			base,
+			catchAll,
+			f,
+			cls,
+			fam,
+		});
 	}
 	return {
 		rows,
@@ -443,20 +487,37 @@ export const modelFor = (expanded: boolean): FittedModel =>
 
 // One build's score under a model, before the family terms
 export const weighTerms = (m: FittedModel, r: BuildTerms): number => {
+	const w = weightsOfModel(m);
 	let z = r.base + m.famBias[r.fam];
-	for (let i = 0; i < TERMS.length; i++) {
+	for (let i = 0; i < w.theta.length; i++) {
 		const v = r.f[i]!;
 		if (v !== 0) {
-			z += m.theta[TERMS[i]!] * v;
+			z += w.theta[i]! * v;
 		}
 	}
-	for (let i = 0; i < CLASS_FEATS.length; i++) {
+	for (let i = 0; i < w.cls.length; i++) {
 		const v = r.cls[i]!;
 		if (v !== 0) {
-			z += m.cls[CLASS_FEATS[i]!] * v;
+			z += w.cls[i]! * v;
 		}
 	}
 	return z;
+};
+// arch16 (speed, same results): a model's weights as arrays in TERMS / CLASS_FEATS order
+const modelWeights = new WeakMap<
+	FittedModel,
+	{ theta: number[]; cls: number[] }
+>();
+const weightsOfModel = (m: FittedModel) => {
+	let w = modelWeights.get(m);
+	if (!w) {
+		w = {
+			theta: TERMS.map((t) => m.theta[t]),
+			cls: CLASS_FEATS.map((k) => m.cls[k]),
+		};
+		modelWeights.set(m, w);
+	}
+	return w;
 };
 
 // Family first: the classifier's probabilities over the families he has a build in, the log probability of a build's
@@ -535,7 +596,13 @@ export const scoreAll = (
 			: weighTerms(m, r) + (r.fam === "allAround" ? 0 : (fam[r.fam] ?? 0));
 		const prev = best.get(r.pub.id);
 		if (!prev || z > prev.z) {
-			best.set(r.pub.id, { a: r.pub, raw: r.raw, short: r.short, z });
+			best.set(r.pub.id, {
+				a: r.pub,
+				raw: r.raw,
+				short: r.short,
+				z,
+				catchAll: r.catchAll ?? 0,
+			});
 		}
 	}
 	const scored: Scored[] = [...best.values()];
@@ -730,8 +797,8 @@ export const classify = (
 	) {
 		first = runnerUp;
 	}
-	const sticky = opts.stickiness ?? STICKY_Z;
 	const previousId = opts.previousId && mergedId(opts.previousId);
+	const sticky = opts.stickiness ?? STICKY_Z;
 	if (previousId && previousId !== first.a.id) {
 		const prev = scored.find((s) => s.a.id === previousId);
 		// Never one his position now rules out, however sticky, nor one whose name he no longer lives up to
@@ -742,6 +809,29 @@ export const classify = (
 			prev.short <= POOR_FIT_SHORT
 		) {
 			first = prev;
+		}
+	}
+	// arch16: a generic build (generic.ts) is a last resort. When his best is one and a specific build is within
+	// GENERIC_FALLBACK_Z (and he lives up to its name), he gets the specific one, with a fit note
+	let fitNote: string | undefined;
+	if (isGenericBuild(first.a)) {
+		const g = first;
+		const ok = (s: Scored) =>
+			s.z > BLOCKED_Z &&
+			!isGenericBuild(s.a) &&
+			!s.a.tags.includes("allAround") &&
+			s.short <= POOR_FIT_SHORT &&
+			s.raw >= POOR_FIT_SCORE &&
+			(s.catchAll ?? 0) === 0 &&
+			// (the best of his generic build's family: a specific name from another family would say something he is not)
+			familyOf(s.a) === familyOf(g.a) &&
+			g.z - s.z < GENERIC_FALLBACK_Z;
+		// (his previous label when it is one of them, so the fallback does not flip between seasons)
+		const specific =
+			scored.find((s) => s.a.id === previousId && ok(s)) ?? scored.find(ok);
+		if (specific) {
+			first = specific;
+			fitNote = `Closest specific build; his game is broad (${nameAt(g.a, pos)})`;
 		}
 	}
 	const rest = scored.filter((s) => s.a.id !== first.a.id);
@@ -776,6 +866,7 @@ export const classify = (
 		why: whyOf(a, z, expanded),
 		label: name,
 		...(a.custom ? { custom: true } : {}),
+		...(fitNote ? { fitNote } : {}),
 		...(opts.stats
 			? { statsWeight: Math.round(opts.stats.w * 100) / 100 }
 			: {}),
