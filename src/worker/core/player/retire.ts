@@ -84,6 +84,10 @@ const retire = async (
 	p.retiredYear = g.get("season");
 	// Advanced Tracking Stats: only his last few seasons keep their records
 	trimAdvOnRetire(p);
+	// perf3: what his last archetype label was read from is only needed for the next preseason
+	if (p.archetypes?.some((e) => e.in)) {
+		p.archetypes = p.archetypes.map(({ in: _, ...e }) => e);
+	}
 	p.injury = {
 		type: "Healthy",
 		gamesRemaining: 0,

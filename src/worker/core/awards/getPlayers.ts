@@ -6,6 +6,7 @@ import type {
 	PlayerAward,
 	PlayerStatAttr,
 } from "../../../common/types.ts";
+import { flushAdvBatch } from "../game/advBatch.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { g, helpers } from "../../util/index.ts";
 import getLeaderRequirements, {
@@ -351,6 +352,8 @@ export const getPlayers = async (
 	statOverridesByMatchup: StatOverridesByMatchup | undefined,
 	variables: FormulaEvaluators["variables"] | undefined,
 ) => {
+	// perf3: tracking stats still waiting to be added (game/advBatch.ts)
+	await flushAdvBatch();
 	const playersAll = await idb.merged.players.getAll(
 		getActiveSeasonSelector(season),
 	);

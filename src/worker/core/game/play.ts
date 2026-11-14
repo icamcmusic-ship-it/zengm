@@ -58,6 +58,7 @@ import {
 import { last } from "../../../common/utils.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import { advStats } from "../../util/advStats.ts";
+import { advBatchDayDone, flushAdvBatch } from "./advBatch.ts";
 import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
 import { afterDay as staffDepthAfterDay } from "../staffDepth/index.ts";
 import { getDayTicks, scheduleDaysSpread } from "../season/scheduleDayScale.ts";
@@ -85,6 +86,8 @@ const play = async (
 	// This is called when there are no more games to play, either due to the user's request (e.g. 1 week) elapsing or at the end of the regular season
 	const cbNoGames = async (playoffsOver: boolean = false) => {
 		await lock.set("gameSim", false);
+		// perf3: the sim stopped, so add the tracking stats still waiting (game/advBatch.ts)
+		await flushAdvBatch();
 
 		// Check to see if the season is over
 		const schedule = await season.getSchedule();
@@ -178,6 +181,10 @@ const play = async (
 			if (maybeGameToUi) {
 				gameToUi = maybeGameToUi;
 			}
+		}
+		// perf3: tracking stats are added every few days of games (game/advBatch.ts)
+		if (dayOver) {
+			await advBatchDayDone();
 		}
 
 		// injuryDepth setting (and realistic schedule length, for the back-to-back markers): remember each team's last game

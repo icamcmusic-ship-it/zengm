@@ -19,6 +19,7 @@ import { levelToAmount } from "../../../common/budgetLevels.ts";
 import { getStaffPayroll, staffEnabled } from "../staff/index.ts";
 import getWinner from "../../../common/getWinner.ts";
 import { addTeamAdv, type TeamAdv } from "../../../common/advStats.ts";
+import { advBatchOn, queueTeamAdv } from "./advBatch.ts";
 import { getAdjustedTicketPrice } from "../../../common/getAdjustedTicketPrice.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 
@@ -395,9 +396,14 @@ const writeTeamStats = async (results: GameResults) => {
 		const teamAdv = (results.team[t1] as any).adv as TeamAdv | undefined;
 		if (teamAdv) {
 			const numPlayers = (results as any).numPlayersOnCourt ?? 5;
-			teamStats.adv = teamStats.adv
-				? addTeamAdv(teamStats.adv, teamAdv, numPlayers)
-				: addTeamAdv({ t: [], lu: [] }, teamAdv, numPlayers);
+			// (perf3: in pro leagues, added every few days in the order of the games, game/advBatch.ts)
+			if (advBatchOn()) {
+				queueTeamAdv(teamStats as any, teamAdv, numPlayers);
+			} else {
+				teamStats.adv = teamStats.adv
+					? addTeamAdv(teamStats.adv, teamAdv, numPlayers)
+					: addTeamAdv({ t: [], lu: [] }, teamAdv, numPlayers);
+			}
 		}
 
 		if (teamSeason.lastTen.length === 10 && g.get("phase") !== PHASE.PLAYOFFS) {
