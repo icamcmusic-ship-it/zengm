@@ -28,6 +28,7 @@ import {
 	seriesAdjustment,
 	hashString,
 	leagueRelativeFits,
+	ROTATION_WEIGHTS,
 	type CoachSim,
 	type FitRatings,
 	type SystemTrends,
@@ -183,6 +184,68 @@ const getLeagueFits = async (key?: string) => {
 	return fits;
 };
 
+// perf3: the fits the sim reads, worked out again for a team only when its rotation changes (its healthy top players by value, in
+// order, and their ratings rows: a trade, a signing, a release, an injury or a return, a new order, a God Mode edit), and for every
+// team once a week of games (days 0-6, 7-13, ... of the phase). A team's fit reads nothing else, so this gives the same fits as
+// working them out every day (the sim benchmark's hashes match with all extras on)
+let weeklyFits:
+	| {
+			week: string;
+			sigs: Map<number, unknown[]>;
+			raw: Map<number, ReturnType<typeof rosterSchemeFit>>;
+			tids: string;
+			rel: Map<number, ReturnType<typeof rosterSchemeFit>>;
+	  }
+	| undefined;
+// (off: every day, as before; for the sim benchmark's comparison)
+let weeklyFitsOn = true;
+export const setWeeklyFits = (on: boolean) => {
+	weeklyFitsOn = on;
+	weeklyFits = undefined;
+};
+const getWeeklyFits = async (day: number) => {
+	const week = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}|${weeklyFitsOn ? Math.floor(day / 7) : `d${day}`}`;
+	if (!weeklyFitsOn) {
+		// (every team's fit worked out afresh)
+		weeklyFits = undefined;
+	}
+	if (weeklyFits?.week !== week) {
+		weeklyFits = {
+			week,
+			sigs: new Map(),
+			raw: new Map(),
+			tids: "",
+			rel: new Map(),
+		};
+	}
+	const w = weeklyFits;
+	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	let changed = false;
+	for (const t of teams) {
+		const roster = await rosterOf(t.tid);
+		const sig = roster
+			.slice(0, ROTATION_WEIGHTS.length)
+			.map((p) => p.ratings.at(-1));
+		const prev = w.sigs.get(t.tid);
+		if (
+			!prev ||
+			prev.length !== sig.length ||
+			prev.some((row, i) => row !== sig[i])
+		) {
+			w.sigs.set(t.tid, sig);
+			w.raw.set(t.tid, rosterSchemeFit(roster.map(fitRatingsOf)));
+			changed = true;
+		}
+	}
+	const tids = teams.map((t) => t.tid).join(",");
+	if (changed || w.tids !== tids) {
+		w.tids = tids;
+		const rel = leagueRelativeFits(teams.map((t) => w.raw.get(t.tid)!));
+		w.rel = new Map(teams.map((t, i) => [t.tid, rel[i]!]));
+	}
+	return w.rel;
+};
+
 export const getRosterFit = async (tid: number, key?: string) => {
 	const fits = await getLeagueFits(key);
 	return (
@@ -272,6 +335,7 @@ let leagueCache:
 export const clearCoachSystemsCache = () => {
 	leagueCache = undefined;
 	fitsCache = undefined;
+	weeklyFits = undefined;
 };
 
 // Every team's sim multipliers, normalized over the league (common/coachSystems.ts normalizeCoachSims). Cached for a day of games
@@ -281,6 +345,7 @@ export const getLeagueCoachSystems = async (day?: number) => {
 		return leagueCache.teams;
 	}
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	const weekly = day !== undefined ? await getWeeklyFits(day) : undefined;
 	const rows: TeamCoachSystem[] = [];
 	for (const t of teams) {
 		const coaches = await idb.cache.coaches.indexGetAll("coachesByTid", t.tid);
@@ -289,7 +354,7 @@ export const getLeagueCoachSystems = async (day?: number) => {
 			continue;
 		}
 		const profile = getCoachProfile(head);
-		const fit = await getRosterFit(t.tid, `day${day}`);
+		const fit = weekly?.get(t.tid) ?? (await getRosterFit(t.tid, `day${day}`));
 		const install = await installProgress(head, profile);
 		const offFit = fit.off[profile.off];
 		const defFit = fit.def[profile.def];

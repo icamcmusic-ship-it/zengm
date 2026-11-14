@@ -879,7 +879,7 @@ export const playerSchemeFit = (r: FitRatings) => {
 };
 
 // Weights of a roster's players by rank in value (rotation players count most)
-const ROTATION_WEIGHTS = [1, 1, 1, 1, 1, 0.75, 0.6, 0.45, 0.3];
+export const ROTATION_WEIGHTS = [1, 1, 1, 1, 1, 0.75, 0.6, 0.45, 0.3];
 
 // A roster's fit to every system: rotation-weighted player fits, plus the team-level needs (heliocentric needs one star handler, post needs
 // a skilled big, switching needs no weak link, drop needs one rim protector). players sorted by value, best first

@@ -445,7 +445,13 @@ export const processTeam = async (
 		// Player traits (the playerTraits setting): his effects on the game, computed once per game. Undefined with the setting off, and then the
 		// sim uses its old formulas and draws no extra random numbers
 		if (__SPORT === "basketball") {
-			const traitEffects = player.getSimTraitEffects(p);
+			// (perf3: once a week of games, and when he changes teams)
+			const day = getSimDay();
+			const simWeek =
+				day === undefined
+					? undefined
+					: `${g.get("lid")}|${g.get("season")}|${g.get("phase")}|${Math.floor(day / 7)}`;
+			const traitEffects = player.getSimTraitEffectsWeekly(p, simWeek);
 			if (traitEffects) {
 				(p2 as any).traitEffects = traitEffects;
 				// Temper, for the trash talk in the play-by-play text only (pbpFlavor/trashTalk.ts)

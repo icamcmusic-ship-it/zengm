@@ -141,6 +141,45 @@ export const getSimTraitEffects = (
 	return traitEffects(getPlayerTraitScores(p, season));
 };
 
+// perf3: the game sim's effects, worked out once a week of games (`week`, from game/loadTeams) and again when he changes teams or
+// his ratings row or trait seeds are replaced (God Mode). Within a season his scores move only with those, so this mostly saves
+// the work; a change in something else (his pro seasons, when he plays his first game) waits for the next week
+let weeklyEffects: {
+	week: string;
+	byPid: Map<
+		number,
+		{ tid: number; row: unknown; seeds: unknown; e: TraitEffects | undefined }
+	>;
+} = { week: "", byPid: new Map() };
+// (off: every game, as before; for the sim benchmark's comparison)
+let weeklyEffectsOn = true;
+export const setWeeklyTraitEffects = (on: boolean) => {
+	weeklyEffectsOn = on;
+	weeklyEffects = { week: "", byPid: new Map() };
+};
+export const getSimTraitEffectsWeekly = (
+	p: TraitPlayer & { pid: number; tid: number },
+	week: string | undefined,
+): TraitEffects | undefined => {
+	if (!traitsEnabled()) {
+		return undefined;
+	}
+	if (week === undefined || !weeklyEffectsOn) {
+		return getSimTraitEffects(p);
+	}
+	if (weeklyEffects.week !== week) {
+		weeklyEffects = { week, byPid: new Map() };
+	}
+	const row = last(p.ratings);
+	const hit = weeklyEffects.byPid.get(p.pid);
+	if (hit && hit.tid === p.tid && hit.row === row && hit.seeds === p.traits) {
+		return hit.e;
+	}
+	const e = getSimTraitEffects(p);
+	weeklyEffects.byPid.set(p.pid, { tid: p.tid, row, seeds: p.traits, e });
+	return e;
+};
+
 // For the injury code: multiply a player's injury rate by this. 1 when the Player Traits setting is off, so injuries are exactly as before. Mean 1 across a league, 0.7-1.3 for one player.
 export const getTraitInjuryRateMultiplier = (
 	p: TraitPlayer,

@@ -21,6 +21,8 @@ import { draft, freeAgents, game, league, phase, season } from "../index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers, lock } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
+import { setWeeklyFits } from "../staff/systems.ts";
+import { setWeeklyTraitEffects } from "../player/traits.ts";
 
 const env = (globalThis as any).process.env;
 const MODE: string | undefined = env.SIM_BENCH;
@@ -95,6 +97,12 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 				}
 			}
 		};
+
+		// perf3: SIM_BENCH_PERF3_OFF=weekly works out coaching system fits every day and trait effects every game, as before
+		const perf3Off = new Set((env.SIM_BENCH_PERF3_OFF ?? "").split(","));
+		// (or only one of them: fits, traits)
+		setWeeklyFits(!perf3Off.has("weekly") && !perf3Off.has("fits"));
+		setWeeklyTraitEffects(!perf3Off.has("weekly") && !perf3Off.has("traits"));
 
 		const settings: any = getDefaultSettings();
 		if (MODE !== "stock") {
@@ -216,13 +224,60 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 				events.map((e) => [e.eid, e.type, e.text]),
 			]),
 		);
-		const line = `SIM_BENCH_RESULT ${JSON.stringify({ mode: MODE, feature: FEATURE, seed: SEED, phase: g.get("phase"), numGames, hash, hash2, times, cpu })}`;
+		// Advanced Tracking Stats: every stats row's
+		const teamStatsAll = await idb.league.getAll("teamStats");
+		const hash3 = hashOf(
+			JSON.stringify([
+				allPlayers
+					.map((p) => [
+						p.pid,
+						p.stats.map((r: any) => [r.season, r.tid, r.playoffs, r.adv]),
+					])
+					.sort((a, b) => (a[0] as number) - (b[0] as number)),
+				teamStatsAll
+					.map((ts: any) => [ts.tid, ts.season, ts.playoffs, ts.adv])
+					.sort((a, b) =>
+						a[0] !== b[0]
+							? a[0] - b[0]
+							: a[1] !== b[1]
+								? a[1] - b[1]
+								: Number(a[2]) - Number(b[2]),
+					),
+			]),
+		);
+		// League totals of the first regular season, per team game (perf3: to check that changed sim inputs stay within noise)
+		const totals: Record<string, number> = {};
+		const regular = teamStatsAll.filter(
+			(ts: any) => ts.season === g.get("season") - 1 && !ts.playoffs,
+		);
+		const gp = regular.reduce((a: number, ts: any) => a + ts.gp, 0);
+		for (const key of [
+			"pts",
+			"fga",
+			"fg",
+			"tpa",
+			"tp",
+			"fta",
+			"ast",
+			"tov",
+			"orb",
+			"drb",
+			"stl",
+			"blk",
+			"pf",
+		]) {
+			totals[key] =
+				Math.round(
+					(1000 *
+						regular.reduce((a: number, ts: any) => a + (ts[key] ?? 0), 0)) /
+						Math.max(1, gp),
+				) / 1000;
+		}
+		const line = `SIM_BENCH_RESULT ${JSON.stringify({ mode: MODE, feature: FEATURE, seed: SEED, phase: g.get("phase"), numGames, hash, hash2, perf3Off: env.SIM_BENCH_PERF3_OFF, hash3, totals, times, cpu })}`;
 		console.log(line);
 		await stopProf();
 		if (heapSession) {
-			const { profile } = await heapSession.post(
-				"HeapProfiler.stopSampling",
-			);
+			const { profile } = await heapSession.post("HeapProfiler.stopSampling");
 			writeFileSync(env.SIM_BENCH_HEAP, JSON.stringify(profile));
 		}
 		if (env.SIM_BENCH_OUT) {
