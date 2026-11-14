@@ -315,19 +315,18 @@ const scaled = (ratings: any, k: number) => {
  * mix of ovr and pot the draft AI uses, with the noiseless pot estimate for both), every rating but height scaled by the same factor.
  * Then ovr, pot and value are computed again. Matching on value, not ovr: the class is about 1.5 years older than a generated one (the
  * college off-screen draft takes mostly seniors), and at the same ovr an older prospect has less potential, so matching ovr left the class
- * about 6 points of pot and 8 of value below a generated one, rank for rank. An older prospect now gets a little more ovr instead.
+ * about 6 points of pot and 8 of value below a generated one, rank for rank. An older prospect now gets a little more ovr instead. The
+ * imported prospects are ranked by draft value too (on their college ratings), and every converted ovr stays within the generated class's.
  */
 const toProScale = async (draftYear: number, lid: number, season: number) => {
 	const imported = (
 		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
-	)
-		.filter(
-			(p) =>
-				p.draft.year === draftYear &&
-				p.linkedCollege?.lid === lid &&
-				p.linkedCollege.season === season,
-		)
-		.sort((a, b) => last(b.ratings).ovr - last(a.ratings).ovr);
+	).filter(
+		(p) =>
+			p.draft.year === draftYear &&
+			p.linkedCollege?.lid === lid &&
+			p.linkedCollege.season === season,
+	);
 	if (imported.length === 0) {
 		return;
 	}
@@ -341,6 +340,22 @@ const toProScale = async (draftYear: number, lid: number, season: number) => {
 			Math.max(ovr, potEstimatorBasketballWithoutNoise(ovr, age)),
 			age,
 		);
+	// Ranked the way the targets are: by draft value (on the college ratings), not ovr. Ranked by ovr, a young prospect (whose age is
+	// worth a lot of value) was ranked low and given a low target, so he was scaled far down to reach it: ovr 6-15 for a 19-year-old
+	// with a college ovr in the 50s, below anyone in a generated class; and an older one ranked high by ovr took a target that only a
+	// much higher ovr reaches for his age (70 for the best prospect)
+	const rankValue = new Map(
+		imported.map((p) => [
+			p,
+			draftValue(last(p.ratings).ovr, draftYear - p.born.year),
+		]),
+	);
+	imported.sort(
+		(a, b) =>
+			rankValue.get(b)! - rankValue.get(a)! ||
+			last(b.ratings).ovr - last(a.ratings).ovr ||
+			a.pid - b.pid,
+	);
 	const generated = await genPlayersWithoutSaving(draftYear, scoutingLevel, []);
 	const reference = generated
 		.map((p) => draftValue(last(p.ratings).ovr, draftYear - p.born.year))
@@ -364,6 +379,26 @@ const toProScale = async (draftYear: number, lid: number, season: number) => {
 			.reduce((sum, x) => sum + x, 0) / top;
 	const referenceActual = meanTop(generated.map(actualValue));
 	const originals = imported.map((p) => ({ ...last(p.ratings) }));
+	const generatedOvrs = generated.map((p) => last(p.ratings).ovr);
+	const ovrRange = {
+		min: Math.min(...generatedOvrs),
+		max: Math.max(...generatedOvrs),
+	};
+	// Bisection for the scale factor k in [0.2, 1.5], where below(k) holds for every k under the answer: the last k it holds for and
+	// the first it doesn't
+	const bisect = (below: (k: number) => boolean) => {
+		let lo = 0.2;
+		let hi = 1.5;
+		for (let iter = 0; iter < 14; iter++) {
+			const mid = (lo + hi) / 2;
+			if (below(mid)) {
+				lo = mid;
+			} else {
+				hi = mid;
+			}
+		}
+		return { lo, hi };
+	};
 
 	const scaleAll = async (offset: number) => {
 		for (const [i, p] of imported.entries()) {
@@ -373,21 +408,18 @@ const toProScale = async (draftYear: number, lid: number, season: number) => {
 			const ratings = last(p.ratings) as any;
 			Object.assign(ratings, originals[i]);
 			const age = draftYear - p.born.year;
+			const ovrAt = (k: number) => player.ovr(scaled(ratings, k), ratings.pos);
 			// The factor that gives the target value (value rises with k)
-			let lo = 0.2;
-			let hi = 1.5;
-			for (let iter = 0; iter < 14; iter++) {
-				const mid = (lo + hi) / 2;
-				if (
-					draftValue(player.ovr(scaled(ratings, mid), ratings.pos), age) <
-					target
-				) {
-					lo = mid;
-				} else {
-					hi = mid;
-				}
+			const { lo, hi } = bisect((mid) => draftValue(ovrAt(mid), age) < target);
+			let k = (lo + hi) / 2;
+			// Within the generated class's range of ovr: matched on value, an older prospect gets more ovr than the generated one of
+			// his rank, and that must not make him better (or, at the bottom, worse) than anyone in a generated class
+			if (ovrAt(k) > ovrRange.max) {
+				k = bisect((mid) => ovrAt(mid) <= ovrRange.max).lo;
+			} else if (ovrAt(k) < ovrRange.min) {
+				k = bisect((mid) => ovrAt(mid) < ovrRange.min).hi;
 			}
-			const next = scaled(ratings, (lo + hi) / 2);
+			const next = scaled(ratings, k);
 			for (const key of SCALE_KEYS) {
 				ratings[key] = next[key];
 			}
