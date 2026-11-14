@@ -38,6 +38,7 @@ import {
 import {
 	getBadgeScoutingLevel,
 	getBadgeTraits,
+	loadBadgeScoutingLevel,
 	traitsEnabled,
 } from "./traits.ts";
 import { TRAIT_DEFINITIONS } from "../../../common/playerTraits/definitions.ts";
@@ -240,6 +241,12 @@ export const resetArchetypeNorms = () => {
 // The league's own distribution (everyone on a roster or in free agency), rebuilt when the season or phase moves on, or when
 // asked. A tiny league falls back to the built-in reference league.
 export const getLeagueNorms = async (force = false): Promise<Norms> => {
+	// sweep20: a reading takes the traits as the user's scouts see them (archetypeTraits), which needs the user's scouting
+	// level. It was only loaded by player.formatAll (and only with Skill Badges on), so a reading before any page had
+	// formatted players (the warm-up after the league loads, the labels stored at a phase change) read the traits with no
+	// level, got different estimates and could give another label, and the warm-up's results were never reused. Every
+	// reading gets its norms here first, so load the level here
+	await loadBadgeScoutingLevel();
 	const expanded = expandedRatingsOn();
 	const key = `${g.get("lid")}:${g.get("season")}:${g.get("phase")}:${expanded}:${subRatingsOn()}:${featureOn("advStats")}`;
 	if (!force && normsCache?.key === key) {
