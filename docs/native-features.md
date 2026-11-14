@@ -1731,6 +1731,13 @@ all off, and the GameSim outcome-invariance fixture is unchanged.
 - Contract demands (stock): the auction's cumulative weights go into one reused buffer.
 - Killing off old retired players (start of the draft phase): one read of the retired players by the `tid` index,
   ordered like the old scan of every player drafted in the last 110 years, so the same players get the same draws.
+- GameSim: substitution values kept on the players instead of a new Map per call, lineup values, positional shares and
+  sort scratch in reused buffers, fatigue worked out once per player in `ratingArray`; coaching system fits list each
+  needs table once.
+- Measured (CPU, all extras on, 2-3 runs each on a shared machine): regular season + playoffs about -9% (archetypes
+  and scouting) and then another -4.5% (GameSim), offseason about -14%; with all extras off the season is unchanged and
+  the offseason about -13% (contract demands). Left: GameSim itself (about 40% of a season), garbage collection (about
+  15%), the preseason archetype update (about 1.7 s, every player is classified again after development).
 
 Wrapped and Storylines read the whole league into a snapshot. Converted pieces that can't change any more (retired players, finished seasons' box scores and team seasons) are cached in a separate IndexedDB database (`wrapped-cache`), versioned by the converter code and invalidated through the league's change log, so later sessions only read what changed. Idle snapshots are evicted from memory. `tools/perf/wrapped/` holds the Playwright benchmark scripts (see the header of `bench.cjs`).
 
