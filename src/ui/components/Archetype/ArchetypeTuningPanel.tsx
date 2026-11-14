@@ -6,6 +6,8 @@ import { downloadFile } from "../../util/downloadFile.ts";
 import { realtimeUpdate } from "../../util/realtimeUpdate.ts";
 import { toWorker } from "../../util/toWorker.ts";
 
+const plural = (n: number) => `${n} pick${n === 1 ? "" : "s"}`;
+
 export const ArchetypeTuningPanel = () => {
 	const [info, setInfo] = useState<TuningInfo | undefined>();
 	const [note, setNote] = useState<string | undefined>();
@@ -34,7 +36,7 @@ export const ArchetypeTuningPanel = () => {
 				<p className="mb-2">
 					{info.usedPicks === 0
 						? "No picks yet. When a label doesn't fit, use \"Doesn't fit?\" on the player's page: your pick becomes his label, and your picks tune how similar players are read."
-						: `${info.usedPicks} pick${info.usedPicks === 1 ? "" : "s"} tune the reading${info.globalWeights ? "" : ` (from ${info.minPicksGlobal} picks on, they can also reweigh sub-ratings, play types, traits and families)`}.`}
+						: `${info.usedPicks} pick${info.usedPicks === 1 ? " tunes" : "s tune"} the reading${info.globalWeights ? "" : ` (from ${info.minPicksGlobal} picks on, they can also reweigh sub-ratings, play types, traits and families)`}.`}
 				</p>
 				{info.changes.length > 0 ? (
 					<ul className="mb-2">
@@ -48,9 +50,9 @@ export const ArchetypeTuningPanel = () => {
 					</p>
 				) : null}
 				<p className="mb-2 text-body-secondary small">
-					This league: {info.leaguePicks} picks. All leagues: {info.globalPicks}{" "}
-					picks. New labels follow at the next preseason; players whose label
-					you picked keep it until you clear it.
+					This league: {plural(info.leaguePicks)}. All leagues:{" "}
+					{plural(info.globalPicks)}. New labels follow at the next preseason;
+					players whose label you picked keep it until you clear it.
 				</p>
 				<div className="form-check form-switch mb-2">
 					<input
