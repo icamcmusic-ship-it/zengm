@@ -783,7 +783,7 @@ season). Never for an edited face. Measured over 3,000 seeds:
 
   Spread across teams (SD of team season rates, new-league sim; off → on): 3PA rate .040 → .053 (range .157-.415), pace 1.4 → 3.0 possessions (96.5-112.0), ORB% .018 → .025, turnovers forced per 100 possessions 1.6 → 2.0, net rating 6.3 → 5.9 (systems change how teams score, not how much). By system (change vs the same rosters without coaching systems): Pace & Space +.048 3PA rate, Post −.050 3PA rate and +1.3% ORB, Seven Seconds +3.0 possessions, Isolation −1.4, Press +1.5 and Blitz +0.9 turnovers forced per 100, Drop −1.4; average net rating of every system within ±1.6 (sample noise ~±0.8). **Win impact of fit** (fits are relative to the league's rosters): 1 SD of scheme fit = +1.1 net rating per 100 possessions (+3.7% win%) with the new-league sim (6 leagues), +0.8 (+2.2%) stock.
 
-- **Speed:** (`simBenchmark.test.ts` with `SIM_BENCH=on`, with and without `SIM_BENCH_WITHOUT=coachSystems`, 2 seeds) the rest of the regular season +1.3% CPU (+4.8% wall time, a busy machine): the league's multipliers and roster fits are computed once per day of games.
+- **Speed:** (`simBenchmark.test.ts` with `SIM_BENCH=on`, with and without `SIM_BENCH_WITHOUT=coachSystems`, 2 seeds) the rest of the regular season +1.3% CPU (+4.8% wall time, a busy machine): the league's multipliers and roster fits are computed once per day of games. Since perf3, a team's roster fit is worked out again only when its rotation changes (its healthy top players by value, in order, and their ratings rows: trades, signings, releases, injuries and returns, a new order, God Mode edits) and for every team once a week of games; the fits are the same as working them out every day.
 - **Known limits:** systems are categorical (a coach runs one offense and one defense; adaptation switches them whole). Playoff adjustments look at the series score and the opponent's system, not at the box scores. The rotation hooks need Realistic Rotations. Assistants have no systems of their own beyond the coaching tree.
 
 ### Spacing & shot creation
@@ -1742,6 +1742,33 @@ all off, and the GameSim outcome-invariance fixture is unchanged.
   and scouting) and then another -4.5% (GameSim), offseason about -14%; with all extras off the season is unchanged and
   the offseason about -13% (contract demands). Left: GameSim itself (about 40% of a season), garbage collection (about
   15%), the preseason archetype update (about 1.7 s, every player is classified again after development).
+
+**Sim speed (perf3).** Same benchmark, all extras on; `SIM_BENCH_PERF3_OFF=weekly` turns the change off for a comparison, and the
+benchmark now also prints `hash3` (every player and team stats row's Advanced Tracking Stats) and the first regular season's league
+totals per team game.
+
+- Coaching system fits and player trait effects (shipped): the sim's trait effects for a player are kept for a week of games
+  (`player/traits.ts` `getSimTraitEffectsWeekly`, worked out again when he changes teams or his ratings row or trait seeds are
+  replaced), and a team's scheme fit is worked out again only when its rotation changes and once a week (`staff/systems.ts`
+  `getWeeklyFits`, see Coaching systems). Neither reads anything else that moves during a season, so the sim inputs are the same as
+  before: 8 leagues × 1 season with and without it give the same `hash`, `hash2` and `hash3` (so identical league totals). A trait
+  score that depends on something else that can move in a season (his pro seasons played, which counts once he plays his first game)
+  would wait for the next week; none of the 8 leagues had one. Measured: trait effects 0.45 → 0.16 s and fits 0.23 → 0.11 s of CPU over
+  a profiled regular season and playoffs (26-27 s), about 1.5%; the benchmark (8 seeds, one run each) −1.7% and −1.9% CPU in the
+  season phases (noise about ±3% per run).
+- Preseason archetype relabel only for players whose inputs moved (tried, not shipped): each stored label kept what it was read
+  from (ratings and sub-ratings after the age discount, ovr, position, traits, box-score and play-type readings, the tuning hash),
+  and a preseason kept the label when those moved less than a threshold. After a season's development almost nobody qualifies: over
+  3 seasons (570-617 players a preseason) a mean rating change of at most 1.5 and at most 6 on any one, with traits within 3, kept 0
+  players; much looser limits (mean 2.5, max 10, traits 10, stats z 0.5) kept 17-32 (3-6%), of which 6 of 69 got a different label than
+  a full relabel would have. The saving would have been at most 3-6% of the 1.6-2.4 s update, so it was left out
+  (`archetypeRelabel.script.test.ts` in the reverted commit measures it).
+- Advanced Tracking Stats added every 3 days (tried, not shipped): the games' tracking stats waited by stats row and were added every
+  third day of games in pro leagues (player rows summed, team rows replayed game by game in order, so the in-season lineup pruning kept
+  the same lineups), flushed at phase changes, when the sim stopped, on league close and before pages and awards that read them.
+  Season totals were identical (the same `hash3` as game by game), but the per-game merges it saves cost about 0.1 s of a 27 s season
+  (`addTeamAdv` 0.08-0.09 s, player rows a few ms), within noise, so the extra state (games not yet added, lost if the tab closes
+  mid-sim) was not worth it.
 
 Wrapped and Storylines read the whole league into a snapshot. Converted pieces that can't change any more (retired players, finished seasons' box scores and team seasons) are cached in a separate IndexedDB database (`wrapped-cache`), versioned by the converter code and invalidated through the league's change log, so later sessions only read what changed. Idle snapshots are evicted from memory. `tools/perf/wrapped/` holds the Playwright benchmark scripts (see the header of `bench.cjs`).
 
