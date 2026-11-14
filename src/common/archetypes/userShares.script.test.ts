@@ -1,5 +1,6 @@
 /* eslint-disable no-undef, curly */
 // @ts-nocheck
+/* eslint-disable unicorn/prefer-single-call */
 // arch16: build shares where the user sees them (RUN_ARCHETYPE_USERSHARES=1, ARCH_US_OUT=report, ARCH_US_DUMPS=comma list
 // of league dumps from longRun.script.test.ts with LONG_RUN_ARCH_DUMP: a new league with the new-league defaults at its first
 // preseason, and the same league after three seasons). Each dump is read as the game reads it at the preseason

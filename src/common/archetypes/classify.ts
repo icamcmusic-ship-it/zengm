@@ -300,6 +300,27 @@ const styleFamilyFeatures = (p: Prepared): number[] => {
 	];
 };
 
+// arch16 (speed, same results): what a profile's terms need that never changes: the build it stands for, its family, the
+// trait groups its name matches and the skill classes it promises
+const staticCache = new WeakMap<
+	Archetype,
+	{ pub: Archetype; fam: Family; groups: number[]; cls: number[] }
+>();
+const staticOf = (a: Archetype) => {
+	let st = staticCache.get(a);
+	if (!st) {
+		const all = promisesOf(a).all;
+		st = {
+			pub: publicOf(a),
+			fam: familyOf(a),
+			groups: TRAIT_GROUPS.flatMap((g, i) => (g.re.test(a.name) ? [i] : [])),
+			cls: CLASS_FEATS.flatMap((k, i) => (all.includes(k) ? [i] : [])),
+		};
+		staticCache.set(a, st);
+	}
+	return st;
+};
+
 // Every build's terms for one player (the fit reads these; scoreAll weighs them)
 export const scoreTerms = (
 	ratings: ArchetypeRatings,
@@ -321,13 +342,13 @@ export const scoreTerms = (
 	const calBias = norms.bias ?? defaultNorms(p.expanded).bias;
 	const rows: BuildTerms[] = [];
 	for (const a of scoringFor(archetypes)) {
-		const pub = publicOf(a);
-		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
+		const st = staticOf(a);
+		const pub = st.pub;
 		const prior = archetypePrior(a, pos);
 		const trait = traitTerm(a, traits);
-		const f = TERMS.map(() => 0);
-		const cls = CLASS_FEATS.map(() => 0);
-		const fam = familyOf(a);
+		const f: number[] = new Array(TERMS.length).fill(0);
+		const cls: number[] = new Array(CLASS_FEATS.length).fill(0);
+		const fam = st.fam;
 		if (
 			prior === null ||
 			trait === undefined ||
@@ -337,7 +358,8 @@ export const scoreTerms = (
 			rows.push({
 				a,
 				pub,
-				raw,
+				// (arch16, speed: a build his position rules out is never matched)
+				raw: 0,
 				short: 0,
 				blocked: true,
 				base: 0,
@@ -347,11 +369,12 @@ export const scoreTerms = (
 			});
 			continue;
 		}
+		const raw = rawMatch(a, p.z, p.hgt, p.skills, p.expanded);
 		const catchAll = catchAllShortfall(a, p, cv);
 		const base = prior + trait - CATCH_ALL_K * catchAll;
-		for (const [gi, g] of TRAIT_GROUPS.entries()) {
-			if (groupVals[gi] !== 0 && g.re.test(a.name)) {
-				f[TERM_INDEX[g.term as Term]] = groupVals[gi]!;
+		for (const gi of st.groups) {
+			if (groupVals[gi] !== 0) {
+				f[TERM_INDEX[TRAIT_GROUPS[gi]!.term as Term]] = groupVals[gi]!;
 			}
 		}
 		const bias =
@@ -432,11 +455,8 @@ export const scoreTerms = (
 		f[TERM_INDEX.promRel] = -needPenaltyOf(prom.rel);
 		f[TERM_INDEX.sub] = subTerm(a, p.style);
 		f[TERM_INDEX.playType] = ptTerm(a, p.style);
-		const all = promisesOf(a).all;
-		for (const [i, k] of CLASS_FEATS.entries()) {
-			if (all.includes(k)) {
-				cls[i] = cv[k] ?? 0;
-			}
+		for (const i of st.cls) {
+			cls[i] = cv[CLASS_FEATS[i]!] ?? 0;
 		}
 		rows.push({
 			a,
@@ -467,20 +487,37 @@ export const modelFor = (expanded: boolean): FittedModel =>
 
 // One build's score under a model, before the family terms
 export const weighTerms = (m: FittedModel, r: BuildTerms): number => {
+	const w = weightsOfModel(m);
 	let z = r.base + m.famBias[r.fam];
-	for (let i = 0; i < TERMS.length; i++) {
+	for (let i = 0; i < w.theta.length; i++) {
 		const v = r.f[i]!;
 		if (v !== 0) {
-			z += m.theta[TERMS[i]!] * v;
+			z += w.theta[i]! * v;
 		}
 	}
-	for (let i = 0; i < CLASS_FEATS.length; i++) {
+	for (let i = 0; i < w.cls.length; i++) {
 		const v = r.cls[i]!;
 		if (v !== 0) {
-			z += m.cls[CLASS_FEATS[i]!] * v;
+			z += w.cls[i]! * v;
 		}
 	}
 	return z;
+};
+// arch16 (speed, same results): a model's weights as arrays in TERMS / CLASS_FEATS order
+const modelWeights = new WeakMap<
+	FittedModel,
+	{ theta: number[]; cls: number[] }
+>();
+const weightsOfModel = (m: FittedModel) => {
+	let w = modelWeights.get(m);
+	if (!w) {
+		w = {
+			theta: TERMS.map((t) => m.theta[t]),
+			cls: CLASS_FEATS.map((k) => m.cls[k]),
+		};
+		modelWeights.set(m, w);
+	}
+	return w;
 };
 
 // Family first: the classifier's probabilities over the families he has a build in, the log probability of a build's

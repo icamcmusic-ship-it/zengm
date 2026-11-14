@@ -106,6 +106,10 @@ export const whyDrivers = ({
 				continue;
 			}
 			const [pos, neg] = SUB_SHOWN[k];
+			// (a build that wants less of a sub with no other side to show: "little shot creation" is no reason to cite)
+			if (w < 0 && !neg) {
+				continue;
+			}
 			const key = w < 0 && neg ? neg : pos;
 			out.push({
 				kind: "sub",

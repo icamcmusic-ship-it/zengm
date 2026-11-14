@@ -9,6 +9,7 @@ import {
 	currentEntry,
 	isStale,
 	explain,
+	ARCHETYPE_READING_VERSION,
 	archetypeById,
 	toStored,
 	viewOf,
@@ -394,7 +395,8 @@ export const classifyPlayer = (
 		memo = new Map();
 		classifyMemo.set(norms, memo);
 	}
-	const key = JSON.stringify([ratings, opts]);
+	// (arch16: the reading version too, so a new reading never reuses an old result)
+	const key = JSON.stringify([ARCHETYPE_READING_VERSION, ratings, opts]);
 	if (memo.has(key)) {
 		return memo.get(key);
 	}

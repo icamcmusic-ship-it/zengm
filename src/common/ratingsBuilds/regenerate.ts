@@ -304,7 +304,11 @@ export const regenerateClass = (
 					prospect: true,
 				}).scored;
 				const i = sc.findIndex((x) => x.a.id === targetId);
-				return { matched: i === 0, z: sc[i]!.z - sc[0]!.z };
+				// (matched: what the game will show, classify's pick: arch16's generic fallback can differ from the top score)
+				return {
+					matched: derivedOf(F, r, opts.norms).id === targetId,
+					z: sc[i]!.z - sc[0]!.z,
+				};
 			};
 			let best = fit(built.ratings);
 			matched = best.matched;

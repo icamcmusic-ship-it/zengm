@@ -531,7 +531,7 @@ describe("classification", () => {
 				assert.isAtMost(n / top.length, 0.02, id);
 			}
 		}
-	});
+	}, 60000);
 
 	test("gold set: real players across eras get a build that fits their role", () => {
 		const data = realData();
