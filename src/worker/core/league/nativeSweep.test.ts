@@ -31,6 +31,7 @@ import * as views from "../../views/index.ts";
 import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers, local, lock } from "../../util/index.ts";
+import api from "../../api/index.ts";
 
 const env = (globalThis as any).process.env;
 const ENABLED = !!env.NATIVE_SWEEP;
@@ -140,6 +141,7 @@ const loadPage = async (
 		if (inputs && inputs.redirectUrl) {
 			return;
 		}
+		const t0 = performance.now();
 		const out = await view.load({
 			inputs,
 			updateEvents: new Set(["firstRun"]),
@@ -147,6 +149,11 @@ const loadPage = async (
 			prevOutput: {},
 			conditions: {},
 		});
+		// NATIVE_SWEEP_SLOW_MS=500: log the worker's time for pages slower than that
+		const ms = performance.now() - t0;
+		if (env.NATIVE_SWEEP_SLOW_MS && ms > Number(env.NATIVE_SWEEP_SLOW_MS)) {
+			log(`SLOW ${Math.round(ms)} ms ${label}`);
+		}
 		scan(out, id, label, retiredPids, undefined);
 	} catch (error) {
 		problem(
@@ -634,6 +641,22 @@ describe.skipIf(!ENABLED)("native sweep", () => {
 				await step("day", () => game.play(1, {}));
 				await checkNewGames();
 				days += 1;
+				// NATIVE_SWEEP_FLIP=1: every League Extra off on day 5 of season 1 (through the League Extras tab's call), on
+				// again on day 8, loading every page each time
+				if (env.NATIVE_SWEEP_FLIP === "1" && i === 1 && (days === 5 || days === 8)) {
+					const on = days === 8;
+					const attrs: Record<string, boolean> = {};
+					for (const f of NATIVE_FEATURES) {
+						if (settings[f.key]) {
+							attrs[f.key] = on;
+						}
+					}
+					await step(`flip all ${on}`, () =>
+						api.main.updateGameAttributes(attrs as any),
+					);
+					await loadAllPages(`regular season ${i} all extras ${on ? "on" : "off"}`);
+					await checkArchetypes();
+				}
 				if (days === 4 && toggles) {
 					// Sim-Calibrated Ovr off in season 2, back on in season 4; coaching systems off in season 3, on in season 4
 					if (i === 1) {
