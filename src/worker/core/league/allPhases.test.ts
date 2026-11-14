@@ -180,7 +180,9 @@ describe("all phases", () => {
 				assert.strictEqual(p.faceAging?.s, g.get("season"), `face ${p.pid}`);
 			}
 		}
-		const veteran = active.find((p) => p.draft.year < start);
+		// A veteran: drafted before the league's last pre-league draft. Players drafted in start - 1 are rookies in the
+		// league's first season, so their first entry is labelled "Rookie" (common/faceHistory.ts firstSeasonLabel)
+		const veteran = active.find((p) => p.draft.year < start - 1 && !p.imgURL);
 		assert.isDefined(veteran);
 		const view = await loadView("player", { pid: String(veteran!.pid) });
 		assert.isAbove(view.faceHistory.entries.length, 0);
