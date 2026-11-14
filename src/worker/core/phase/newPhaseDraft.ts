@@ -6,6 +6,31 @@ import type { Conditions, PhaseReturn } from "../../../common/types.ts";
 import { NotEnoughTeamsError } from "../draft/genOrder.ts";
 import * as college from "../college/index.ts";
 
+// The retired players the old scan of the "draft.year, retiredYear" index (drafted in the last 110 years) would reach, in
+// that index's order (so the random draws for deaths are the same). perf2: one getAll of the retired players instead of a
+// cursor over every player ever drafted, active ones included, which got slow as the history grew.
+export const getKillCandidates = async (currentSeason: number) => {
+	const retired = await idb.league
+		.transaction("players")
+		.store.index("tid")
+		.getAll(PLAYER.RETIRED);
+	const lower = [currentSeason - 110];
+	const upper = [""];
+	const keyed: { p: (typeof retired)[number]; key: unknown[] }[] = [];
+	for (const p of retired) {
+		const key = [p.draft?.year, p.retiredYear];
+		try {
+			// (a record whose key isn't a valid key isn't in the index; cmp throws for those)
+			if (indexedDB.cmp(key, lower) >= 0 && indexedDB.cmp(key, upper) <= 0) {
+				keyed.push({ p, key });
+			}
+		} catch {}
+	}
+	// Index order: the key, then the primary key (getAll already returned them by pid, and the sort is stable)
+	keyed.sort((a, b) => indexedDB.cmp(a.key, b.key));
+	return keyed.map((row) => row.p);
+};
+
 const newPhaseDraft = async (conditions: Conditions): Promise<PhaseReturn> => {
 	// College mode: this phase is the departures (graduation and the off-screen pro draft)
 	if (college.isCollege()) {
@@ -22,12 +47,9 @@ const newPhaseDraft = async (conditions: Conditions): Promise<PhaseReturn> => {
 	const promises: Promise<unknown>[] = [];
 
 	const currentSeason = g.get("season");
-	for await (const { value: p } of idb.league
-		.transaction("players")
-		.store.index("draft.year, retiredYear")
-		.iterate(IDBKeyRange.bound([currentSeason - 110], [""]))) {
-		// Skip non-retired players and dead players
-		if (p.tid !== PLAYER.RETIRED || typeof p.diedYear === "number") {
+	for (const p of await getKillCandidates(currentSeason)) {
+		// Skip dead players
+		if (typeof p.diedYear === "number") {
 			continue;
 		}
 

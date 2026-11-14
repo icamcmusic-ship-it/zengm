@@ -8,7 +8,7 @@ import { TOO_MANY_TEAMS_TOO_SLOW } from "../season/getInitialNumGamesConfDivSett
 import { countBy, last, orderBy } from "../../../common/utils.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { randInt, shuffle, uniform } from "../../../common/random.ts";
-import { getCumulativeWeights } from "./getCumulativeWeights.ts";
+import { fillCumulativeWeights } from "./getCumulativeWeights.ts";
 import { getInSeasonContractExp } from "./decreaseDemands.ts";
 import { getContractSummaryOrThrow } from "../contract/index.ts";
 import { getAiTraitValueFactor, traitsEnabled } from "../player/traits.ts";
@@ -192,6 +192,7 @@ const normalizeContractDemands = async ({
 	//console.time("foo");
 	const updatedPIDs = new Set<number>();
 	const randTeams = [...teams];
+	const weightsBuffer = new Float64Array(playerInfosCurrent.length);
 	for (let i = 0; i < numRounds; i++) {
 		const OFFSET = LEARNING_RATE * (1 / (1 + i / numRounds) ** 4);
 		const SCALE_UP = 1.0 + OFFSET;
@@ -218,10 +219,18 @@ const normalizeContractDemands = async ({
 					p.contractAmount <= capSpace && p.numBids < NUM_BIDS_BEFORE_REMOVED,
 			);
 			while (capSpace > minContract && availablePlayers.length > 0) {
-				const weights = getCumulativeWeights(availablePlayers, PARAM);
-				const draw = Math.random() * weights.at(-1)!;
-				const p =
-					availablePlayers[weights.findIndex((weight) => weight >= draw)]!;
+				const total = fillCumulativeWeights(
+					availablePlayers,
+					PARAM,
+					weightsBuffer,
+				);
+				const draw = Math.random() * total;
+				let index = 0;
+				const lastIndex = availablePlayers.length - 1;
+				while (index < lastIndex && !(weightsBuffer[index]! >= draw)) {
+					index += 1;
+				}
+				const p = availablePlayers[index]!;
 
 				p.numBids += 1;
 				capSpace -= p.contractAmount;

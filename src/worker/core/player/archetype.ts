@@ -360,6 +360,10 @@ export const fuzzedArchetypeLabel = (
 	}).label;
 };
 
+// (JSON turns NaN and Infinity into null: keep them apart in the key)
+const memoReplacer = (_key: string, v: unknown) =>
+	typeof v === "number" && !Number.isFinite(v) ? `#${v}` : v;
+
 export const classifyPlayer = (
 	p: Player,
 	norms: Norms,
@@ -391,7 +395,7 @@ export const classifyPlayer = (
 		memo = new Map();
 		classifyMemo.set(norms, memo);
 	}
-	const key = JSON.stringify([ratings, opts]);
+	const key = JSON.stringify([ratings, opts], memoReplacer);
 	if (memo.has(key)) {
 		return memo.get(key);
 	}

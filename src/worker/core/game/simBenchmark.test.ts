@@ -39,14 +39,36 @@ const drain = async () => {
 describe.skipIf(!MODE)("sim benchmark", () => {
 	test("season", { timeout: 24 * 60 * 60 * 1000 }, async () => {
 		Math.random = makeSeededRandom(SEED);
-		// SIM_BENCH_PROF=file.cpuprofile: CPU profile of the whole run (open in Chrome DevTools or speedscope)
+		// SIM_BENCH_PROF=file.cpuprofile: CPU profile of the whole run (open in Chrome DevTools or speedscope). Only some phases:
+		// SIM_BENCH_PROF_FROM=<phase> starts after that phase, SIM_BENCH_PROF_TO=<phase> stops after that one (names as in times)
 		let session: any;
-		if (env.SIM_BENCH_PROF) {
+		const startProf = async () => {
 			session = new Session();
 			session.connect();
 			await session.post("Profiler.enable");
 			await session.post("Profiler.setSamplingInterval", { interval: 200 });
 			await session.post("Profiler.start");
+		};
+		const stopProf = async () => {
+			if (session) {
+				const { profile } = await session.post("Profiler.stop");
+				writeFileSync(env.SIM_BENCH_PROF, JSON.stringify(profile));
+				session = undefined;
+			}
+		};
+		if (env.SIM_BENCH_PROF && !env.SIM_BENCH_PROF_FROM) {
+			await startProf();
+		}
+		// SIM_BENCH_HEAP=file.heapprofile: sampled allocations of the whole run, garbage included (what drives GC time)
+		let heapSession: any;
+		if (env.SIM_BENCH_HEAP) {
+			heapSession = new Session();
+			heapSession.connect();
+			await heapSession.post("HeapProfiler.startSampling", {
+				samplingInterval: 256 * 1024,
+				includeObjectsCollectedByMajorGC: true,
+				includeObjectsCollectedByMinorGC: true,
+			});
 		}
 		// Wall time, and CPU time of this process (much less sensitive to other work on the machine)
 		const times: Record<string, number> = {};
@@ -65,6 +87,13 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 			const c = cpuNow();
 			cpu[name] = Math.round(c - c0);
 			c0 = c;
+			if (env.SIM_BENCH_PROF) {
+				if (name === env.SIM_BENCH_PROF_TO) {
+					await stopProf();
+				} else if (name === env.SIM_BENCH_PROF_FROM) {
+					await startProf();
+				}
+			}
 		};
 
 		const settings: any = getDefaultSettings();
@@ -155,15 +184,46 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 				.sort((a, b) => (a[0] as number) - (b[0] as number)),
 			teamSeasons.map((ts) => [ts.tid, ts.season, ts.won, ts.lost]),
 		]);
-		let hash = 0;
-		for (let i = 0; i < state.length; i++) {
-			hash = (Math.imul(hash, 31) + state.charCodeAt(i)) | 0;
-		}
-		const line = `SIM_BENCH_RESULT ${JSON.stringify({ mode: MODE, feature: FEATURE, seed: SEED, phase: g.get("phase"), numGames, hash, times, cpu })}`;
+		const hashOf = (str: string) => {
+			let h = 0;
+			for (let i = 0; i < str.length; i++) {
+				h = (Math.imul(h, 31) + str.charCodeAt(i)) | 0;
+			}
+			return h;
+		};
+		const hash = hashOf(state);
+		// A wider hash of the native features' stored state (archetypes, scouting snapshots, deaths, events, box scores),
+		// for optimizations that could change what is stored without moving the league itself
+		await idb.cache.flush();
+		const allPlayers = await idb.league.getAll("players");
+		const games = await idb.league.getAll("games");
+		const events = await idb.league.getAll("events");
+		const hash2 = hashOf(
+			JSON.stringify([
+				allPlayers
+					.map((p) => [
+						p.pid,
+						(p as any).archetypes,
+						(p as any).scoutSnaps,
+						(p as any).scoutDraft,
+						p.diedYear,
+						p.ratings,
+					])
+					.sort((a, b) => (a[0] as number) - (b[0] as number)),
+				games
+					.map((game) => [game.gid, game.teams, (game as any).pbp])
+					.sort((a, b) => (a[0] as number) - (b[0] as number)),
+				events.map((e) => [e.eid, e.type, e.text]),
+			]),
+		);
+		const line = `SIM_BENCH_RESULT ${JSON.stringify({ mode: MODE, feature: FEATURE, seed: SEED, phase: g.get("phase"), numGames, hash, hash2, times, cpu })}`;
 		console.log(line);
-		if (session) {
-			const { profile } = await session.post("Profiler.stop");
-			writeFileSync(env.SIM_BENCH_PROF, JSON.stringify(profile));
+		await stopProf();
+		if (heapSession) {
+			const { profile } = await heapSession.post(
+				"HeapProfiler.stopSampling",
+			);
+			writeFileSync(env.SIM_BENCH_HEAP, JSON.stringify(profile));
 		}
 		if (env.SIM_BENCH_OUT) {
 			appendFileSync(env.SIM_BENCH_OUT, `${line}\n`);

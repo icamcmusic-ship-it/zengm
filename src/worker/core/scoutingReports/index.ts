@@ -295,7 +295,7 @@ export const scoutCalls = async (ctx: ReportCtx) => {
 					.filter((r) => r.season > rec.s)
 					.map((r) => fuzzRating(r.ovr, r.fuzz ?? 0)),
 			);
-			const input = await buildInput(p, ctx, { light: true });
+			const input = await buildInput(p, ctx, { light: true, archetype: false });
 			became = outcomeTier({
 				peakOvr,
 				awards: input.awards,
@@ -455,7 +455,7 @@ export const recordSnapshots = async (phase: number) => {
 		if (prospect && p.draft.year > season + 1) {
 			continue;
 		}
-		const input = await buildInput(p, ctx, { light: true });
+		const input = await buildInput(p, ctx, { light: true, archetype: false });
 		const peers = await peersFor(input, ctx);
 		const base = categoryScores({
 			ratings: input.ratings,
@@ -633,7 +633,7 @@ export const getScoutingSplit = async (pid: number, salt = "") => {
 		return undefined;
 	}
 	const ctx = await getReportCtx();
-	const input = await buildInput(p, ctx, { light: true });
+	const input = await buildInput(p, ctx, { light: true, archetype: false });
 	const peers = await peersFor(input, ctx);
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const rng = new Rng(`rumorTeams|${ctx.seed}|${pid}|${ctx.season}${salt}`);

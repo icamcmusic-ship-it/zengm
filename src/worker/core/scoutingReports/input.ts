@@ -973,7 +973,15 @@ const projectedPickFor = async (p: Player) => {
 export const buildInput = async (
 	p: Player,
 	ctx: ReportCtx,
-	{ light = false }: { light?: boolean } = {},
+	{
+		light = false,
+		archetype: withArchetype = true,
+	}: {
+		light?: boolean;
+		// perf2: the archetype only shows in a full report's header (buildReport); snapshots, scout calls and the rumors'
+		// scouting split never read it, and a prospect's is a live classification each time
+		archetype?: boolean;
+	} = {},
 ): Promise<ScoutInput> => {
 	const prospect = isProspectPlayer(p);
 	const retired = p.tid === PLAYER.RETIRED;
@@ -1033,7 +1041,7 @@ export const buildInput = async (
 			? 0
 			: Math.max(0.4, 1.8 - 0.45 * proSeasons);
 	let archetype: string | undefined;
-	if (ratings && featureOn("archetypes")) {
+	if (withArchetype && ratings && featureOn("archetypes")) {
 		const found = archetypeFor(p, await getLeagueNorms());
 		if (found) {
 			// Only the archetype's name (no 2K build lists or "also close to")
