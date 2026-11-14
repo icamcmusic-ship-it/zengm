@@ -85,7 +85,7 @@ test("same candidates in the same order as the old index scan", async () => {
 	const tids = [PLAYER.RETIRED, PLAYER.RETIRED, PLAYER.RETIRED, 0, 5, -1, -2];
 	const tx = idb.league.transaction("players", "readwrite");
 	for (let pid = 0; pid < 600; pid++) {
-		const pick = <T,>(xs: T[]) => xs[Math.floor(random() * xs.length)]!;
+		const pick = <T>(xs: T[]) => xs[Math.floor(random() * xs.length)]!;
 		await tx.store.put({
 			pid,
 			tid: pick(tids),

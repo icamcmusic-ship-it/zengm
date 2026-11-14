@@ -233,6 +233,8 @@ const EXPANDED_JUMPER_OFFSET = 0.003;
 
 type PlayerGameSim = {
 	id: number;
+	// (perf2) his value for substitutions, set by updatePlayersOnCourt each time it runs
+	subOvr?: number;
 	name: string;
 	age: number;
 	pos: string;
@@ -286,25 +288,41 @@ type PossessionOutcome =
 type ClockFactor = ReturnType<GameSim["getClockFactor"]>;
 
 const teamNums: [TeamNum, TeamNum] = [0, 1];
+// (perf2: an empty list to loop over without allocating one)
+const NO_PLAYERS: readonly PlayerGameSim[] = [];
 
 // Return the indexes of the elements in ovrs, sorted from smallest to largest.
 // So [50, 70, 10, 20, 60] => [2, 3, 0, 4, 1]
 // The set is to handle ties.
 // The descending sort and reverse is so ties are handled with the later entry in ovrs getting the lower index, like:
 // [0, 0, 0, 0, 0] => [4, 3, 2, 1, 0]
+// perf2: the same steps in reused buffers (sort is the same algorithm toSorted uses, on the same values in the same order).
+// The returned list is only good until the next call
+const sortedDescBuffer: number[] = [];
+const sortedIndexesBuffer: number[] = [];
+const usedIndexesBuffer = new Set<number>();
+const byDesc = (a: number, b: number) => b - a;
 const getSortedIndexes = (ovrs: number[]) => {
-	const ovrsSortedDesc = ovrs.toSorted((a, b) => b - a);
-	const usedIndexes = new Set();
-	const sortedIndexes = ovrsSortedDesc
-		.map((ovr) => {
-			let index = ovrs.indexOf(ovr);
-			while (usedIndexes.has(index)) {
-				index += 1;
-			}
-			usedIndexes.add(index);
-			return index;
-		})
-		.reverse();
+	const ovrsSortedDesc = sortedDescBuffer;
+	ovrsSortedDesc.length = ovrs.length;
+	for (let i = 0; i < ovrs.length; i++) {
+		ovrsSortedDesc[i] = ovrs[i]!;
+	}
+	ovrsSortedDesc.sort(byDesc);
+	const usedIndexes = usedIndexesBuffer;
+	usedIndexes.clear();
+	const n = ovrsSortedDesc.length;
+	const sortedIndexes = sortedIndexesBuffer;
+	sortedIndexes.length = n;
+	for (let k = 0; k < n; k++) {
+		let index = ovrs.indexOf(ovrsSortedDesc[k]!);
+		while (usedIndexes.has(index)) {
+			index += 1;
+		}
+		usedIndexes.add(index);
+		// (reversed: the old .map(...).reverse())
+		sortedIndexes[n - 1 - k] = index;
+	}
 
 	return sortedIndexes;
 };
@@ -1945,8 +1963,7 @@ class GameSim extends GameSimBase {
 		for (const t of teamNums) {
 			const getOvrs = (includeFouledOut: boolean) => {
 				// Overall values scaled by fatigue, etc
-				// Player IDs can be large and sparse in long-running leagues.
-				const ovrs = new Map<number, number>();
+				// (perf2: each player's value goes on the player, subOvr, instead of a new Map each time)
 				let numEligiblePlayers = 0;
 
 				for (const [i, p] of this.team[t].player.entries()) {
@@ -1958,7 +1975,7 @@ class GameSim extends GameSimBase {
 							foulsNeededToFoulOut > 0 &&
 							p.stat.pf >= foulsNeededToFoulOut)
 					) {
-						ovrs.set(p.id, -Infinity);
+						p.subOvr = -Infinity;
 					} else {
 						let ovr =
 							p.valueNoPot *
@@ -1987,25 +2004,24 @@ class GameSim extends GameSimBase {
 							}
 						}
 
-						ovrs.set(p.id, ovr);
+						p.subOvr = ovr;
 						if (ovr > -Infinity) {
 							numEligiblePlayers += 1;
 						}
 					}
 				}
 
-				return { ovrs, numEligiblePlayers };
+				return numEligiblePlayers;
 			};
 
-			const result = getOvrs(false);
-			let ovrs = result.ovrs;
+			const numEligiblePlayers = getOvrs(false);
 
 			// What if too many players fouled out? Play them. Ideally would force non fouled out players to play first, but whatever. Without this, it would only play bottom of the roster guys (tied at -Infinity)
-			if (result.numEligiblePlayers < this.numPlayersOnCourt) {
-				ovrs = getOvrs(true).ovrs;
+			if (numEligiblePlayers < this.numPlayersOnCourt) {
+				getOvrs(true);
 			}
 
-			const ovrsOnCourt = this.playersOnCourt[t].map((p) => ovrs.get(p.id)!);
+			const ovrsOnCourt = this.playersOnCourt[t].map((p) => p.subOvr!);
 
 			const pids = [];
 			const pidsOff = [];
@@ -2013,7 +2029,7 @@ class GameSim extends GameSimBase {
 			// Sub off the lowest ovr guy first
 			for (const pp of getSortedIndexes(ovrsOnCourt)) {
 				const p = this.playersOnCourt[t][pp]!;
-				const onCourtOvr = ovrs.get(p.id)!;
+				const onCourtOvr = p.subOvr!;
 				const onCourtIsIneligible = onCourtOvr === -Infinity;
 				this.playersOnCourt[t][pp] = p; // Don't sub out guy shooting FTs!
 
@@ -2037,8 +2053,8 @@ class GameSim extends GameSimBase {
 
 					const benchIsValidAndBetter =
 						(odSubs || (p.stat.courtTime > 2 && b.stat.benchTime > 2)) &&
-						ovrs.get(b.id)! > onCourtOvr;
-					const benchIsEligible = ovrs.get(b.id) !== -Infinity;
+						b.subOvr! > onCourtOvr;
+					const benchIsEligible = b.subOvr! !== -Infinity;
 
 					if (
 						benchIsValidAndBetter ||
@@ -2494,8 +2510,16 @@ class GameSim extends GameSimBase {
 			same = last[i] === lineup[i];
 		}
 		if (!same) {
-			this.positionalSharesCache[t] = positionalShares(lineup);
-			this.positionalSharesLineup[t] = [...lineup];
+			// (perf2: refilled in place; the cache holds the only reference)
+			this.positionalSharesCache[t] = positionalShares(
+				lineup,
+				this.positionalSharesCache[t],
+			);
+			const copy = this.positionalSharesLineup[t];
+			copy.length = lineup.length;
+			for (let i = 0; i < lineup.length; i++) {
+				copy[i] = lineup[i]!;
+			}
 		}
 		return this.positionalSharesCache[t];
 	}
@@ -2505,6 +2529,23 @@ class GameSim extends GameSimBase {
 	 *
 	 * This should be called once every possession, after this.updatePlayersOnCourt and this.updateSynergy as they influence output, to update the team composite ratings based on the players currently on the court.
 	 */
+	// perf2: one value per player on team t's court, in court order, written into a reused buffer (slot 0 or 1) instead of a new
+	// array each possession. The buffer is only good until the next call with the same slot
+	lineupBuffers: [number[], number[]] = [[], []];
+	lineupValues(
+		t: TeamNum,
+		fn: (p: PlayerGameSim) => number,
+		slot: 0 | 1,
+	): number[] {
+		const lineup = this.playersOnCourt[t];
+		const out = this.lineupBuffers[slot];
+		out.length = lineup.length;
+		for (let i = 0; i < lineup.length; i++) {
+			out[i] = fn(lineup[i]!);
+		}
+		return out;
+	}
+
 	updateTeamCompositeRatings() {
 		const foulLimit = this.getFoulTroubleLimit();
 
@@ -2574,7 +2615,7 @@ class GameSim extends GameSimBase {
 				}
 			}
 			// Plain averages (the setting off): exactly the old arithmetic
-			for (const p of shares ? [] : this.playersOnCourt[t]) {
+			for (const p of shares ? NO_PLAYERS : this.playersOnCourt[t]) {
 				const ratings = p.compositeRating;
 				const fatigue = this.fatigue(p.stat.energy);
 				const pf = p.stat.pf;
@@ -2636,8 +2677,10 @@ class GameSim extends GameSimBase {
 			// Player traits: team chemistry (leadership) lifts or lowers every team composite rating a little
 			if (this.traitsOn) {
 				const bonus = teamChemistryBonus(
-					this.playersOnCourt[t].map(
+					this.lineupValues(
+						t,
 						(p) => p.traitEffects?.chemistryContribution ?? 0,
+						0,
 					),
 				);
 				if (bonus !== 0) {
@@ -2660,11 +2703,13 @@ class GameSim extends GameSimBase {
 
 				// Defensive versatility: switching against a lineup that mixes big and small players
 				const switchBonus = teamSwitchDefenseBonus(
-					this.playersOnCourt[t].map(
+					this.lineupValues(
+						t,
 						(p) => p.traitEffects?.switchDefenseContribution ?? 0,
+						0,
 					),
 					lineupSizeMismatch(
-						this.playersOnCourt[oppT].map((p) => p.traitHgt ?? 50),
+						this.lineupValues(oppT, (p) => p.traitHgt ?? 50, 1),
 					),
 				);
 				if (switchBonus !== 0) {
@@ -5623,16 +5668,17 @@ class GameSim extends GameSimBase {
 				}
 			}
 
-			let value = (compositeRating * this.fatigue(p.stat.energy)) ** power;
+			// (perf2: fatigue is a pure function of the game state, worked out once per player)
+			const fatigue = this.fatigue(p.stat.energy);
+			let value = (compositeRating * fatigue) ** power;
 
 			// Perimeter Defense: the steal goes more often to the on-ball, perimeter defender. Only who gets it changes, not how many
 			// steals there are, and no extra random numbers are drawn.
 			if (rating === "stealing" && this.perimeterDefense) {
 				value *=
-					(p.compositeRating.defensePerimeter * this.fatigue(p.stat.energy)) **
+					(p.compositeRating.defensePerimeter * fatigue) **
 						PERIMETER_STEAL_POWER /
-					(compositeRating * this.fatigue(p.stat.energy)) **
-						PERIMETER_STEAL_DAMPING;
+					(compositeRating * fatigue) ** PERIMETER_STEAL_DAMPING;
 			}
 
 			// Player traits: shot selection, foul proneness, steals and hustle
