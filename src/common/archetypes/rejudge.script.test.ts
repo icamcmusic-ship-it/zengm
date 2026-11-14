@@ -6,7 +6,7 @@
 // build list. No build is shown: the judges never see the reading's pick. ARCH_REJUDGE_SIM=a league dump from
 // longRun.script.test.ts LONG_RUN_ARCH_DUMP (3 seasons in, Advanced Tracking Stats on): also samples SIM_N of its players
 // with play types across positions and levels (sim.json: their ratings and reading, for judged.data.ts).
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { test } from "vitest";
 import { ARCHETYPES, defaultNorms, scoreAll } from "./classify.ts";
 import { JUDGED } from "./judged.data.ts";
