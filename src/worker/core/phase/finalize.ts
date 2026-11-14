@@ -21,6 +21,7 @@ import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.t
 import { unretireAtPhase } from "./unretire.ts";
 import { aiOffersAtPhase } from "../trade/aiOffers.ts";
 import { atPhase as rumorsAtPhase } from "../rumors/index.ts";
+import { warmProspectArchetypes } from "../player/archetype.ts";
 
 const save = async () => {
 	await updateStatus("Saving...");
@@ -100,6 +101,9 @@ const finalize = async (
 			redirectToNewURL = true;
 		}
 	}
+
+	// Draft Scouting reads every prospect's archetype live: fill the memo in the background (skipped while auto playing)
+	warmProspectArchetypes();
 
 	// await is needed on these toUI calls, otherwise when auto playing two quick phase updates could happen in a row, and then the worker view might not be called until the phase has advanced twice, and then some updateEvents checks for a specific newPhase phase might be missed
 	if (redirectToNewURL && redirect !== undefined) {
