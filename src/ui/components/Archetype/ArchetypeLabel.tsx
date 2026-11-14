@@ -1,5 +1,5 @@
 import { OverlayTrigger, Popover } from "react-bootstrap";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ArchetypeFeedbackModal } from "./ArchetypeFeedback.tsx";
 import { GROUP_INFO, TIER_NAMES } from "../../../common/archetypes/index.ts";
 import type { ArchetypeGroup, Tier } from "../../../common/archetypes/index.ts";
@@ -36,6 +36,11 @@ export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
 		aria-hidden
 	/>
 );
+
+const coarsePointer = () =>
+	typeof window !== "undefined" &&
+	typeof window.matchMedia === "function" &&
+	window.matchMedia("(pointer: coarse)").matches;
 
 // What the build wants that he has: more of it than his own average, or less where the build wants less
 const whyText = (w: { label: string; z: number; want: number }) =>
@@ -77,8 +82,9 @@ export const ArchetypeWhy = ({
 	</div>
 );
 
-// The archetype's name with its group colour, and a click popover that says what it is and why he got it. With
-// `feedback` (and his pid), a "Doesn't fit?" button beside it and in the popover (archfb)
+// The archetype's name with its group colour, and a popover that says what it is and why he got it (hover previews
+// it, click/tap/Enter pins it; fbfix). With `feedback` (and his pid), an always-visible "Doesn't fit?" button beside it
+// and one in the popover (archfb)
 export const ArchetypeLabel = ({
 	info,
 	feedback,
@@ -91,23 +97,73 @@ export const ArchetypeLabel = ({
 }) => {
 	const id = useId();
 	const [show, setShow] = useState(false);
+	// fbfix: hover previews the popover with a grace period so the pointer can move into it (the popover keeps itself open
+	// while hovered); click/tap/Enter pins it open until a click outside or Esc
+	const [open, setOpen] = useState(false);
+	const [pinned, setPinned] = useState(false);
+	const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
+	const cancelClose = () => {
+		if (closeTimer.current !== undefined) {
+			clearTimeout(closeTimer.current);
+			closeTimer.current = undefined;
+		}
+	};
+	const hoverOpen = () => {
+		cancelClose();
+		setOpen(true);
+	};
+	const hoverClose = () => {
+		cancelClose();
+		if (pinned) {
+			return;
+		}
+		closeTimer.current = setTimeout(() => setOpen(false), 400);
+	};
+	const closeAll = () => {
+		cancelClose();
+		setPinned(false);
+		setOpen(false);
+	};
+	useEffect(() => cancelClose, []);
+	const openPicker = () => {
+		closeAll();
+		setShow(true);
+	};
 	const canFeedback = feedback && info.pid !== undefined;
 	return (
 		<>
 			<OverlayTrigger
-				trigger={["hover", "focus", "click"]}
-				placement="auto"
+				trigger={[]}
+				show={open}
+				onToggle={(next) => {
+					if (!next) {
+						closeAll();
+					}
+				}}
+				// Below (or above, when there is no room), never beside: beside, it covered the "Doesn't fit?" button
+				placement="bottom"
 				rootClose
 				overlay={
-					<Popover id={id}>
+					<Popover
+						id={id}
+						onMouseEnter={hoverOpen}
+						onMouseLeave={hoverClose}
+						onKeyDown={(e) => {
+							if (e.key === "Escape") {
+								closeAll();
+							}
+						}}
+					>
 						<Popover.Header as="h3">{info.label}</Popover.Header>
 						<Popover.Body>
 							<ArchetypeWhy info={info} />
 							{canFeedback ? (
 								<button
 									type="button"
-									className="btn btn-sm btn-outline-secondary mt-2"
-									onClick={() => setShow(true)}
+									className="btn btn-sm btn-outline-secondary mt-2 archetype-fb-popover-button"
+									onClick={openPicker}
 								>
 									{info.user ? "Change or clear my pick" : "Doesn't fit?"}
 								</button>
@@ -119,6 +175,23 @@ export const ArchetypeLabel = ({
 				<button
 					type="button"
 					className="archetype-label btn btn-link p-0 align-baseline"
+					aria-expanded={open}
+					onMouseEnter={hoverOpen}
+					onMouseLeave={hoverClose}
+					onClick={() => {
+						cancelClose();
+						if (pinned) {
+							closeAll();
+						} else {
+							setPinned(true);
+							setOpen(true);
+						}
+					}}
+					onKeyDown={(e) => {
+						if (e.key === "Escape") {
+							closeAll();
+						}
+					}}
 				>
 					<GroupDot group={info.group} />
 					{info.label}
@@ -130,10 +203,16 @@ export const ArchetypeLabel = ({
 					{" "}
 					<button
 						type="button"
-						className="btn btn-link btn-sm p-0 align-baseline text-body-secondary archetype-fb-button"
-						onClick={() => setShow(true)}
+						className="btn btn-sm btn-outline-secondary py-0 px-2 align-baseline archetype-fb-button"
+						// fbfix: a 44 px touch target on touch screens
+						style={
+							coarsePointer()
+								? { minHeight: 44, minWidth: 44, verticalAlign: "middle" }
+								: undefined
+						}
+						onClick={openPicker}
 					>
-						Doesn't fit?
+						{info.user ? "Change my pick" : "Doesn't fit?"}
 					</button>
 					{show ? (
 						<ArchetypeFeedbackModal
