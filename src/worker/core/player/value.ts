@@ -28,7 +28,7 @@ import { ovrV2On, realisticAgingOn } from "./ratingsModelSwitch.ts";
  *     ratings.
  */
 // Realistic Aging: ages with no age discount in value (see below)
-const VETERAN_VALUE_AGES = [32, 39];
+const VETERAN_VALUE_AGES = [32, 39] as const;
 
 const value = (
 	p: PlayerWithoutKey,
