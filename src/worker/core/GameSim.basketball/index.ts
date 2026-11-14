@@ -125,6 +125,7 @@ import {
 	TOV_SCALE,
 } from "./possessionModel.ts";
 import { TURNOVERS } from "./realisticTurnovers.ts";
+import { PLAY_TYPES } from "./realisticPlayTypes.ts";
 import { AdvTracker } from "./advTracking.ts";
 
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
@@ -499,6 +500,11 @@ class GameSim extends GameSimBase {
 	smartEndgame: boolean;
 	// Realistic Turnovers (League extras, see realisticTurnovers.ts): fewer turnovers, the same steals
 	realisticTurnovers: boolean;
+	// Realistic Play Types (League extras, see realisticPlayTypes.ts): the play-type mix moves toward the NBA's. Only with the realistic
+	// possession model and Spacing & Shot Creation; off: nothing here is used and no extra random numbers are drawn. quickPutback: the
+	// shot of this possession segment is the offensive rebounder's putback
+	playTypes = false;
+	quickPutback = false;
 	earlyTimeouts: [number, number] = [0, 0];
 	// Unanswered points by each team
 	scoringRun: [number, number] = [0, 0];
@@ -682,6 +688,13 @@ class GameSim extends GameSimBase {
 		this.paceFactor = Math.max(this.paceFactor, 0.1);
 
 		this.realPoss = !!g.get("realisticPossessions");
+		this.playTypes =
+			this.realPoss &&
+			this.spacingCreation &&
+			nativeFeatureEnabled("realisticPlayTypes", (key) => g.get(key as any));
+		if (this.adv && this.playTypes) {
+			this.adv.realisticPlayTypes = true;
+		}
 		if (g.get("customShotClock")) {
 			this.shotClockFull = helpers.bound(
 				Math.round(g.get("shotClockLength")),
@@ -1384,6 +1397,7 @@ class GameSim extends GameSimBase {
 		this.isClockRunning = true; // Set after computing dtIinbound!
 		this.advTransition = false;
 		this.advQuick = false;
+		this.quickPutback = false;
 		if (this.adv) {
 			const period = this.team[0].stat.ptsQtrs.length;
 			this.adv.possessionStart(
@@ -2932,6 +2946,9 @@ class GameSim extends GameSimBase {
 			);
 		}
 		const shooter = this.pickShooter(clockFactor);
+		if (this.playTypes) {
+			this.maybeSelfCreate(shooter);
+		}
 
 		// Flagrant foul? (only with the technicalFouls setting, so otherwise no random number is drawn here)
 		if (
@@ -3314,6 +3331,7 @@ class GameSim extends GameSimBase {
 	) {
 		const sc = this.shotClock;
 		const tLeft = this.t;
+		this.quickPutback = false;
 		if (tipInFromOutOfBounds) {
 			return { shotAt: 0, violation: false };
 		}
@@ -3337,8 +3355,21 @@ class GameSim extends GameSimBase {
 			// Inbounding with part of the shot clock used: run a set play with what is left
 			shotAt = k * drawRestartSearch(sc, clockFactor === "maintainLead");
 		} else if (prev === "orb") {
-			const quick = Math.random() < PROB_ORB_QUICK_SHOT;
+			const quick =
+				Math.random() <
+				(this.playTypes ? PLAY_TYPES.orbQuick : PROB_ORB_QUICK_SHOT);
 			this.advQuick = quick;
+			if (
+				this.playTypes &&
+				quick &&
+				!tipInFromOutOfBounds &&
+				!lateGamePutBack &&
+				this.lastOrbPlayer !== undefined &&
+				this.playersOnCourt[this.o].includes(this.lastOrbPlayer) &&
+				Math.random() < PLAY_TYPES.orbRebounder
+			) {
+				this.quickPutback = true;
+			}
 			shotAt = quick
 				? drawOrbQuickShot()
 				: k *
@@ -3361,6 +3392,9 @@ class GameSim extends GameSimBase {
 				probTransition *=
 					this.cs[this.o].transition * this.cs[this.d].oppTransition;
 			}
+			if (this.playTypes) {
+				probTransition *= PLAY_TYPES.transition;
+			}
 			if (Math.random() < probTransition) {
 				shotAt = k * drawTransitionTime();
 				this.advTransition = true;
@@ -3368,7 +3402,9 @@ class GameSim extends GameSimBase {
 				let backcourt = possessionStartsInFrontcourt
 					? 0
 					: k * drawBackcourtTime();
-				let mean = HALF_COURT_SEARCH_MODE;
+				let mean = this.playTypes
+					? PLAY_TYPES.halfCourt * HALF_COURT_SEARCH_MODE
+					: HALF_COURT_SEARCH_MODE;
 				if (clockFactor === "catchUp") {
 					mean = 5;
 					backcourt *= 0.7;
@@ -3481,6 +3517,9 @@ class GameSim extends GameSimBase {
 			);
 		}
 		const shooter = this.pickShooter(clockFactor);
+		if (this.playTypes) {
+			this.maybeSelfCreate(shooter);
+		}
 
 		// Flagrant foul? (only with the technicalFouls setting)
 		if (
@@ -3850,7 +3889,8 @@ class GameSim extends GameSimBase {
 					shootingThreePointerScaled2 *
 					g.get("threePointTendencyFactor") *
 					(this.coachSys ? this.cs[this.o].three * this.cs[this.d].dThree : 1) *
-					(sc ? (selfCreated ? CREATION.selfThree : CREATION.otherThree) : 1)
+					(sc ? (selfCreated ? CREATION.selfThree : CREATION.otherThree) : 1) *
+					(this.playTypes ? PLAY_TYPES.three : 1)
 		) {
 			// Three pointer
 			type = "threePointer";
@@ -3886,6 +3926,7 @@ class GameSim extends GameSimBase {
 			const r1 =
 				(this.coachSys ? cso.mid * csd.dMid : 1) *
 				pullUpTilt *
+				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
 				0.8 *
 				Math.random() *
 				(this.simFixes
@@ -3895,8 +3936,11 @@ class GameSim extends GameSimBase {
 			const r2 =
 				(this.coachSys ? cso.rim * csd.dRim : 1) *
 				(sc
-					? (selfCreated ? CREATION.selfRim : 1) *
-						Math.max(0.2, 1 + SPACING.selectRim * spacing)
+					? (selfCreated
+							? CREATION.selfRim
+							: this.playTypes
+								? PLAY_TYPES.otherRim
+								: 1) * Math.max(0.2, 1 + SPACING.selectRim * spacing)
 					: 1) *
 				driveTilt *
 				Math.random() *
@@ -3906,6 +3950,7 @@ class GameSim extends GameSimBase {
 
 			const r3 =
 				(this.coachSys ? cso.post * csd.dPost : 1) *
+				(this.playTypes ? PLAY_TYPES.post : 1) *
 				postTilt *
 				Math.random() *
 				((this.simFixes
@@ -3982,6 +4027,9 @@ class GameSim extends GameSimBase {
 				probMake += 0.1;
 			}
 
+			if (this.playTypes) {
+				probMake += PLAY_TYPES.make2;
+			}
 			probMake *= g.get("twoPointAccuracyFactor");
 		}
 
@@ -4024,6 +4072,9 @@ class GameSim extends GameSimBase {
 			}
 
 			probMissAndFoul *= foulFactor;
+			if (this.playTypes && type !== "threePointer") {
+				probMissAndFoul *= PLAY_TYPES.foul2;
+			}
 			probAndOne *= foulFactor;
 			const teamDefense = this.expandedRatings
 				? this.shotDefenseExpanded(type)
@@ -4150,7 +4201,8 @@ class GameSim extends GameSimBase {
 		// The realistic possession model already ran the clock to the shot, and handled turnovers
 		preTimed: boolean = false,
 	) {
-		const putBack = lateGamePutBack; // Eventually use this in more situations
+		// (Realistic Play Types: also the offensive rebounder's quick putback)
+		const putBack = lateGamePutBack || this.quickPutback; // Eventually use this in more situations
 
 		// If it's a putback, override shooter selection with whoever got the last offensive rebound
 		if (putBack && this.lastOrbPlayer !== undefined) {
@@ -4732,6 +4784,21 @@ class GameSim extends GameSimBase {
 		);
 	}
 
+	// Realistic Play Types: a shooter who can create sometimes creates for himself (pick-and-roll or isolation), by his creation composite
+	maybeSelfCreate(shooter: PlayerGameSim) {
+		if (this.creator === undefined || this.creator === shooter) {
+			return;
+		}
+		const prob = Math.min(
+			PLAY_TYPES.selfMax,
+			PLAY_TYPES.selfSlope *
+				((shooter.compositeRating.creation ?? 0) - PLAY_TYPES.selfMin),
+		);
+		if (prob > 0 && Math.random() < prob) {
+			this.creator = shooter;
+		}
+	}
+
 	// Spacing & Shot Creation: who passes to shooter p, the creator unless he is the shooter himself
 	creatorPasser(p: PlayerGameSim) {
 		const creator = this.creator;
@@ -4758,7 +4825,8 @@ class GameSim extends GameSimBase {
 		const prob =
 			this.probAst() *
 			typeFactor *
-			(selfCreated ? CREATION.astSelf : CREATION.astOther);
+			(selfCreated ? CREATION.astSelf : CREATION.astOther) *
+			(this.playTypes ? PLAY_TYPES.ast : 1);
 		if (prob > Math.random()) {
 			return this.creatorPasser(p);
 		}

@@ -28,6 +28,7 @@ import { draft, freeAgents, game, league, phase, season } from "../index.ts";
 import archetypesApi from "../../api/archetypes.ts";
 import { getMilestones, getRecordsBook } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
+import { PLAY_TYPES } from "../GameSim.basketball/realisticPlayTypes.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers } from "../../util/index.ts";
 import { agingCurveForPlayer } from "../../../common/playerTraits/development.ts";
@@ -40,6 +41,10 @@ import {
 } from "../../../common/advStats.ts";
 
 const env = (globalThis as any).process.env;
+// LONG_RUN_PLAYTYPES='{"post":0.5}' changes the Realistic Play Types constants
+if (env.LONG_RUN_PLAYTYPES) {
+	Object.assign(PLAY_TYPES, JSON.parse(env.LONG_RUN_PLAYTYPES));
+}
 const ENABLED = !!env.LONG_RUN;
 const SEASONS = Number(env.LONG_RUN_SEASONS ?? 3);
 const SEED = Number(env.LONG_RUN_SEED ?? 1);

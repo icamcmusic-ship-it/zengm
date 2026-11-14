@@ -577,6 +577,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "realisticPlayTypes",
+		key: "realisticPlayTypes",
+		name: "Realistic Play Types",
+		description:
+			"Moves the sim's play-type mix toward the modern NBA: fewer post-ups (more drives and pull-ups instead), more pick-and-roll and isolation possessions created by ball handlers, more putbacks by the offensive rebounder and a little more transition. League totals (points, pace, shooting, turnovers, rebounds) stay about the same. Needs the Realistic Possession Model and Spacing & Shot Creation.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "advStats",
 		key: "advStats",
 		name: "Advanced Tracking Stats",
