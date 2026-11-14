@@ -923,37 +923,37 @@ season). Never for an edited face. Measured over 3,000 seeds:
 - **Why:** Advanced Tracking Stats showed a play mix far from the NBA's: three times the post-ups, half the pick-and-roll ball handler possessions (at 0.6 PPP with ~30% turnovers), few putbacks, too many cuts and 82% of threes catch-and-shoot.
 - **What** (with the setting on):
   - **Post-ups:** the post draw of the two-point shot selection × 0.4; the shots go to drives and (for self-created shots, mid-range draw × 1.15) pull-ups.
-  - **Self-creation:** after the creator and the shooter are picked, a shooter who is not the creator becomes his own creator with chance min(0.8, 2.2 × (his creation composite − 0.25)); one random number, only when he isn't already the creator. The shooter is the same, so usage doesn't move; his shot leans to drives and pull-ups and is mostly unassisted (Spacing & Shot Creation's self-created rules), which the classifier reads as pick-and-roll ball handler or isolation. Shots created by someone else have their at-rim draw × 0.6 (fewer cuts).
+  - **Self-creation:** after the creator and the shooter are picked, a shooter who is not the creator becomes his own creator with chance min(0.8, 1.7 × (his creation composite − 0.25)); one random number, only when he isn't already the creator. The shooter is the same, so usage doesn't move; his shot leans to drives and pull-ups and is mostly unassisted (Spacing & Shot Creation's self-created rules), which the classifier reads as pick-and-roll ball handler or isolation. Shots created by someone else have their at-rim draw × 0.6 (fewer cuts).
   - **Putbacks:** after an offensive rebound the quick-shot chance is 0.62 (stock 0.34), and 85% of the quick shots are the rebounder's own putback (the sim's `putBack` shot, never assisted).
   - **Transition:** the transition chances × 1.2; the half-court search time × 1.06 so the pace stays the same.
-  - **Re-centering:** three-point draw × 1.14, two-point make −0.033, two-point shooting-foul chance × 1.18, assisted chance × 1.6 (most threes are already at the cap).
-  - **Classifier** (only with this setting, since it describes the new mix): turnovers are split ball handler 0.05 + 0.2 × creator, isolation 0.12 × creator, post-up 0.12 × big, roll man 0.15 × big, cut 0.1, spot-up 0.06 + 0.2 × (1 − creator), handoff and off screen 0.04; the isolation weight of self-created shots × 0.6.
+  - **Re-centering:** three-point draw × 1.11, two-point make −0.042, two-point shooting-foul chance × 1.18, assisted chance × 1.6 (most threes and the shots created by someone else are already at the cap), and × 1.55 more on self-created twos (a handoff or re-screen into the handler's drive), which keeps league assists where they were.
+  - **Classifier** (only with this setting, since it describes the new mix): turnovers are split ball handler 0.05 + 0.2 × creator, isolation 0.12 × creator, post-up 0.12 × big, roll man 0.15 × big, cut 0.1, spot-up 0.06 + 0.2 × (1 − creator), handoff and off screen 0.04; the isolation weight of self-created shots × 0.5; a self-created two that is assisted is still classified as the shooter's own play (P&R ball handler, isolation), not by the passer.
 - **Calibration** (5-season long run, new-league defaults, seed 1, regular season; off = the setting off, which is the earlier sim exactly):
 
   | play type        | off freq | off PPP | on freq | on PPP | NBA freq |
   | ---------------- | -------- | ------- | ------- | ------ | -------- |
-  | P&R ball handler | 8.5%     | 0.61    | 16.2%   | 0.92   | 15–20%   |
-  | P&R roll man     | 9.5%     | 1.15    | 8.4%    | 1.06   | 6–8%     |
-  | isolation        | 4.6%     | 0.80    | 7.4%    | 0.94   | 5–8%     |
-  | post-up          | 16.9%    | 0.82    | 3.6%    | 0.72   | 4–6%     |
-  | spot-up          | 27.1%    | 1.02    | 27.8%   | 0.93   | 20–25%   |
-  | cut              | 12.3%    | 1.21    | 10.1%   | 1.12   | 6–9%     |
-  | off screen       | 3.6%     | 0.85    | 3.5%    | 0.78   | 4–6%     |
-  | handoff          | 4.5%     | 0.91    | 4.4%    | 0.84   | 3–5%     |
-  | transition       | 11.6%    | 1.02    | 13.8%   | 1.02   | 12–16%   |
-  | putback          | 1.3%     | 1.15    | 4.9%    | 1.30   | 5–6%     |
+  | P&R ball handler | 8.5%     | 0.61    | 19.6%   | 0.98   | 15–20%   |
+  | P&R roll man     | 9.5%     | 1.15    | 7.4%    | 1.03   | 6–8%     |
+  | isolation        | 4.6%     | 0.80    | 7.7%    | 0.97   | 5–8%     |
+  | post-up          | 16.9%    | 0.82    | 3.8%    | 0.72   | 4–6%     |
+  | spot-up          | 27.1%    | 1.02    | 27.5%   | 0.93   | 20–25%   |
+  | cut              | 12.3%    | 1.21    | 7.8%    | 1.04   | 6–9%     |
+  | off screen       | 3.6%     | 0.85    | 3.4%    | 0.78   | 4–6%     |
+  | handoff          | 4.5%     | 0.91    | 4.1%    | 0.83   | 3–5%     |
+  | transition       | 11.6%    | 1.02    | 14.0%   | 1.02   | 12–16%   |
+  | putback          | 1.3%     | 1.15    | 4.8%    | 1.31   | 5–6%     |
 
-  P&R ball handler TOV% 28.7 → 17.1 (last season). Catch-and-shoot share of threes 82.1% → 66.5% (NBA ~65–70%). Clutch minutes 2.3% → 2.5% of minutes (game closeness, not targeted). Per player: bigs (C/PF/FC/F) still post up most (4.8% of their possessions vs 3.2% wings, 2.4% guards) and run the most roll-man possessions (15.2%); guards run the most P&R (23.4% vs 14.4% wings, 9.9% bigs).
+  P&R ball handler TOV% 28.7 → 13.8 (last season). Catch-and-shoot share of threes 82.1% → 70.9% (NBA ~65–70%). Assisted share of made field goals by zone, off → on: rim 63.8 → 62.7%, short 47.1 → 68.0%, long 43.3 → 61.0%, three 83.8 → 72.2%. Clutch minutes 2.3% → 2.2% of minutes (game closeness, not targeted). Per player: bigs (C/PF/FC/F) still post up most (5.5% of their possessions vs 3.4% wings, 2.4% guards) and run the most roll-man possessions (14.3%); guards run the most P&R (28.9% vs 17.0% wings, 11.5% bigs).
 
   | per team game | pts   | pace  | FG%   | 3PA rate | 3P%   | FTA   | TOV   | STL  | BLK  | ORB   | TRB   | AST   | home win% |
   | ------------- | ----- | ----- | ----- | -------- | ----- | ----- | ----- | ---- | ---- | ----- | ----- | ----- | --------- |
   | off           | 110.2 | 101.5 | 46.14 | 34.82    | 35.56 | 22.76 | 14.28 | 7.34 | 4.94 | 11.22 | 45.02 | 25.94 | 57        |
-  | on            | 110.1 | 101.2 | 46.54 | 34.54    | 35.32 | 22.44 | 14.34 | 7.22 | 4.84 | 11.16 | 44.54 | 21.72 | 57        |
+  | on            | 110.6 | 101.6 | 46.42 | 34.74    | 36.00 | 22.32 | 14.42 | 7.26 | 4.98 | 11.08 | 44.64 | 26.82 | 57        |
 
-  4 new leagues × 1 regular season (`starCalibration.script.test.ts`, same rosters): team pts 110.8 off → 110.5 on, TOV 14.4 → 14.4, STL 7.4 → 7.4; scorers 3–10 24.3 → 24.1 ppg, PER 24.8 → 25.5; league bests 36.5 → 33.6 ppg, PER 35.0 → 37.9, WS 21.2 → 19.1. The superstar limits hold.
+  4 new leagues × 1 regular season (`starCalibration.script.test.ts`, same rosters): team pts 110.8 off → 109.4 on (the long run: 110.2 → 110.6), TOV 14.4 → 14.5, STL 7.4 → 7.4; scorers 3–10 24.3 → 23.6 ppg, PER 24.8 → 24.9; league bests 36.5 → 34.9 ppg, PER 35.0 → 37.2, WS 21.2 → 22.0. The superstar limits hold.
 
 - **Speed:** a few multiplications per shot and one random number on some possessions; `simBenchmark.test.ts` (`SIM_BENCH=on`, with and without `SIM_BENCH_WITHOUT=realisticPlayTypes`, seeds 1–3, 6 runs on a shared machine) 29.0 vs 27.8 ms per game, within the run-to-run noise (±15%).
-- **Known limits:** assists go down (~26 → ~22 per team game): far more shots are self-created, and the assisted chance of threes is already at its cap. Spot-up stays above the NBA range (the sim's assisted jumpers) and cuts a little above it. The sim still has no screens, so P&R vs isolation is the classifier's reading of the creator's role.
+- **Known limits:** spot-up stays a little above the NBA range (the sim's assisted jumpers) and P&R ball handler PPP a little above it (assisted self-created twos get the pass bonus). The sim still has no screens, so P&R vs isolation is the classifier's reading of the creator's role.
 
 ### Realistic turnovers
 
