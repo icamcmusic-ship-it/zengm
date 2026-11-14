@@ -22,7 +22,7 @@ import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
 import type { Player } from "../../../common/types.ts";
 import { last } from "../../../common/utils.ts";
 import { idb } from "../../db/index.ts";
-import { g } from "../../util/index.ts";
+import { g, local, lock } from "../../util/index.ts";
 import { applyFuzz, getFuzz } from "./fuzzRating.ts";
 import ovr from "./ovr.ts";
 import posFn from "./pos.ts";
@@ -374,8 +374,7 @@ export const classifyPlayer = (
 		typeof row.season === "number" ? (row.season as number) : g.get("season");
 	const pos: Pos = isPos(row.pos) ? row.pos : "F";
 	// His position as the game shows it decides which builds he may have
-	return classify(ratings, {
-		norms,
+	const opts = {
 		ovr: row.ovr,
 		previousId,
 		pos: isPos(row.pos) ? row.pos : undefined,
@@ -384,8 +383,76 @@ export const classifyPlayer = (
 				? archetypeTraits(p, row.season)
 				: undefined,
 		...readOptionsFor(p, pos, season),
-	});
+	};
+	// classify is a pure function of its inputs and costs several ms, and pages like Draft Scouting read every prospect
+	// live on each load, so remember results per norms object (rebuilt each phase) and inputs
+	let memo = classifyMemo.get(norms);
+	if (!memo) {
+		memo = new Map();
+		classifyMemo.set(norms, memo);
+	}
+	const key = JSON.stringify([ratings, opts]);
+	if (memo.has(key)) {
+		return memo.get(key);
+	}
+	const c = classify(ratings, { norms, ...opts });
+	if (memo.size >= CLASSIFY_MEMO_MAX) {
+		memo.clear();
+	}
+	memo.set(key, c);
+	return c;
 };
+const CLASSIFY_MEMO_MAX = 5000;
+
+// Read the draft prospects' live archetypes in the background, in small chunks, after the league loads or the phase changes, so the
+// first visit to Draft Scouting (every prospect is read live) finds them in the memo. Results are the same either way.
+let warmToken = 0;
+export const warmProspectArchetypes = () => {
+	// Not in tests: only there to save a visible wait in the UI
+	if (
+		__NODE_ENV === "test" ||
+		__SPORT !== "basketball" ||
+		!featureOn("archetypes")
+	) {
+		return;
+	}
+	const token = ++warmToken;
+	const lid = g.get("lid");
+	const busy = () =>
+		token !== warmToken ||
+		g.get("lid") !== lid ||
+		local.autoPlayUntil !== undefined ||
+		lock.get("newPhase") ||
+		lock.get("gameSim");
+	setTimeout(async () => {
+		try {
+			if (busy()) {
+				return;
+			}
+			const norms = await getLeagueNorms();
+			const prospects = await idb.cache.players.indexGetAll(
+				"playersByTid",
+				PLAYER.UNDRAFTED,
+			);
+			for (let i = 0; i < prospects.length; i += 8) {
+				if (busy()) {
+					return;
+				}
+				for (const p of prospects.slice(i, i + 8)) {
+					archetypeFor(p, norms);
+				}
+				await new Promise((resolve) => setTimeout(resolve, 0));
+			}
+		} catch (error) {
+			// Only a warm-up: the page reads them itself if this fails
+			console.error(error);
+		}
+	}, 300);
+};
+const classifyMemo = new WeakMap<
+	Norms,
+	Map<string, Classification | undefined>
+>();
 
 // Write this season's entry (replacing one for the same season). Returns true if the primary archetype changed.
 export const storeArchetype = (p: Player, norms: Norms): boolean => {
