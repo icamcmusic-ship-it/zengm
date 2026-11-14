@@ -138,6 +138,7 @@ export const shotWeights = (
 	type: ShotKind,
 	shooter: Role,
 	passer: Role | undefined,
+	isoScale = 1,
 ): Weights => {
 	const bp = shooter.big;
 	if (passer) {
@@ -168,7 +169,7 @@ export const shotWeights = (
 		};
 	}
 	const c = shooter.creator;
-	const iso = 0.15 + 0.3 * shooter.isoTilt;
+	const iso = isoScale * (0.15 + 0.3 * shooter.isoTilt);
 	if (type === "threePointer") {
 		return {
 			prb: 0.05 + 0.5 * c,
@@ -206,6 +207,22 @@ export const turnoverWeights = (p: Role): Weights => ({
 	offs: 0.04,
 });
 
+// Realistic Play Types: more of the self-created shots are the sim's (many more) handlers' pick-and-rolls, so a smaller isolation share
+export const ISO_SCALE_REALISTIC = 0.6;
+
+// Realistic Play Types: with fewer post-ups and more self-created shots, the turnovers follow the new mix (fewer post-ups, fewer on the
+// ball handler's pick-and-roll, more off the ball)
+export const turnoverWeightsRealistic = (p: Role): Weights => ({
+	prb: 0.05 + 0.2 * p.creator,
+	iso: 0.12 * p.creator,
+	post: 0.12 * p.big,
+	prr: 0.15 * p.big,
+	cut: 0.1,
+	spot: 0.06 + 0.2 * (1 - p.creator),
+	ho: 0.04,
+	offs: 0.04,
+});
+
 const isRim = (type: ShotKind) =>
 	type === "atRim" || type === "putBack" || type === "tipIn";
 
@@ -224,6 +241,8 @@ export class AdvTracker {
 	teams: [AdvTeam, AdvTeam];
 	numPlayers: number;
 	counter = 0;
+	// Realistic Play Types: the turnovers and the isolations follow the sim's new mix (turnoverWeightsRealistic, ISO_SCALE_REALISTIC)
+	realisticPlayTypes = false;
 	roles = new Map<AdvPlayer, Role>();
 	// Each player's record while the game is played
 	arr = new Map<AdvPlayer, number[]>();
@@ -446,6 +465,7 @@ export class AdvTracker {
 				type,
 				this.role(shooter),
 				from ? this.role(from) : undefined,
+				this.realisticPlayTypes ? ISO_SCALE_REALISTIC : 1,
 			);
 			key = pickPlayType(weights, this.unit());
 		}
@@ -542,7 +562,12 @@ export class AdvTracker {
 		} else if (putback) {
 			key = "pb";
 		} else {
-			key = pickPlayType(turnoverWeights(this.role(p)), this.unit());
+			key = pickPlayType(
+				this.realisticPlayTypes
+					? turnoverWeightsRealistic(this.role(p))
+					: turnoverWeights(this.role(p)),
+				this.unit(),
+			);
 		}
 		const pt = PT_INDEX[key];
 		const a = this.arr.get(p)!;
