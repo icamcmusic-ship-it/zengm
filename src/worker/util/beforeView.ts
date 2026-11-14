@@ -22,6 +22,7 @@ import updateSubRatingsForLeague, {
 } from "../core/player/updateSubRatingsForLeague.ts";
 import { env } from "./env.ts";
 import { initUILocalGames } from "./initUILocalGames.ts";
+import { warmProspectArchetypes } from "../core/player/archetype.ts";
 
 // ReturnType rather than number because bbgm-rosters type checks this with Node types
 let heartbeatIntervalID: ReturnType<typeof setInterval>;
@@ -175,6 +176,7 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 	}
 
 	local.leagueLoaded = true;
+	warmProspectArchetypes();
 
 	await updateStatus();
 	if (loadingNewLid !== newLid) {
