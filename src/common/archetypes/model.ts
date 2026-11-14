@@ -130,6 +130,8 @@ export type FittedModel = {
 	// Close calls: within this margin the previous label is kept, else his stats decide (classify.ts)
 	tieMargin: number;
 	tieStatsK: number;
+	// archfb: the user's per-build bias offsets (tuning.ts; absent in the shipped model)
+	buildBias?: Record<string, number>;
 };
 
 const ones = <K extends string>(keys: readonly K[], v: number) =>

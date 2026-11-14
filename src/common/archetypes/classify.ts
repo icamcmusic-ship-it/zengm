@@ -489,6 +489,9 @@ export const modelFor = (expanded: boolean): FittedModel =>
 export const weighTerms = (m: FittedModel, r: BuildTerms): number => {
 	const w = weightsOfModel(m);
 	let z = r.base + m.famBias[r.fam];
+	if (m.buildBias) {
+		z += m.buildBias[r.pub.id] ?? 0;
+	}
 	for (let i = 0; i < w.theta.length; i++) {
 		const v = r.f[i]!;
 		if (v !== 0) {

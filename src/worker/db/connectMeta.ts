@@ -17,6 +17,8 @@ import { env } from "../util/env.ts";
 
 // Value type for each key in the attributes store
 export type MetaAttributes = {
+	// archfb: the user's archetype picks, browser-wide (worker/core/player/archetypeFeedback.ts)
+	archetypeFeedbackGlobal: { enabled: boolean; picks: any[] };
 	defaultSettingsOverrides: Partial<Settings>;
 	keyboardShortcuts: KeyboardShortcutsLocal;
 	lastChangesVersion: string;

@@ -23,6 +23,7 @@ import updateSubRatingsForLeague, {
 import { env } from "./env.ts";
 import { initUILocalGames } from "./initUILocalGames.ts";
 import { warmProspectArchetypes } from "../core/player/archetype.ts";
+import { refitArchetypeTuning } from "../core/player/archetypeFeedback.ts";
 
 // ReturnType rather than number because bbgm-rosters type checks this with Node types
 let heartbeatIntervalID: ReturnType<typeof setInterval>;
@@ -177,6 +178,10 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 
 	local.leagueLoaded = true;
 	warmProspectArchetypes();
+	// archfb: the user's archetype tuning (their picks in this league and, when on, in all leagues)
+	if (__SPORT === "basketball") {
+		await refitArchetypeTuning().catch((error) => console.error(error));
+	}
 
 	await updateStatus();
 	if (loadingNewLid !== newLid) {
