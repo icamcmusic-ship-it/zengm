@@ -26,7 +26,11 @@ import hype from "./hype.ts";
 import recordsBook from "./recordsBook.ts";
 import archetypes from "./archetypes.ts";
 import scoutingReports from "./scouting.ts";
-import { getLeagueNorms, storeArchetype } from "../core/player/archetype.ts";
+import {
+	getLeagueNorms,
+	storeArchetype,
+	warmProspectArchetypes,
+} from "../core/player/archetype.ts";
 import * as awardSettings from "./awardSettings.ts";
 import leagueFileUpload, {
 	decompressStreamIfNecessary,
@@ -4654,6 +4658,9 @@ const updateGameAttributes = async (
 		await ensureGms();
 		await idb.cache.flush();
 	}
+	// The archetype norms are keyed on some of these settings (expanded ratings, sub-ratings, advanced stats): read the
+	// prospects again in the background, as after a phase change, so Draft Scouting doesn't make the user wait (sweep20)
+	warmProspectArchetypes();
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 const updateGameAttributesGodMode = async (
@@ -4752,6 +4759,7 @@ const updateGameAttributesGodMode = async (
 
 	await idb.cache.flush();
 
+	warmProspectArchetypes();
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 

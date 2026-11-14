@@ -347,7 +347,8 @@ const TradeThree = ({
 												destinationOf("pick", dp.dpid) !== undefined,
 										})}
 									>
-										<td>
+										{/* (tables don't wrap by default: a conditional pick's long description pushed the page wider than the screen) */}
+										<td style={{ whiteSpace: "normal" }}>
 											<SafeHtml dirty={dp.desc} />
 											{(() => {
 												const asset = validAssets.find(

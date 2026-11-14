@@ -26,6 +26,7 @@ import {
 } from "../../../common/contracts.ts";
 import { draft, freeAgents, game, league, phase, season } from "../index.ts";
 import archetypesApi from "../../api/archetypes.ts";
+import { isGenericBuild } from "../../../common/archetypes/generic.ts";
 import { getMilestones, getRecordsBook } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
 import { PLAY_TYPES } from "../GameSim.basketball/realisticPlayTypes.ts";
@@ -1256,6 +1257,38 @@ describe.skipIf(!ENABLED)("long run", () => {
 			} catch (error) {
 				problem("archetypes landscape", (error as Error).message);
 			}
+			// Rostered players' stored builds: the generic builds' share and the biggest build's share
+			let archShares: Record<string, unknown> | undefined;
+			{
+				const rostered = await idb.cache.players.indexGetAll("playersByTid", [
+					0,
+					Infinity,
+				]);
+				const counts = new Map<string, number>();
+				let n = 0;
+				let generic = 0;
+				for (const p of rostered) {
+					const id = (p as any).archetypes?.at(-1)?.id;
+					if (typeof id !== "string") {
+						continue;
+					}
+					n += 1;
+					counts.set(id, (counts.get(id) ?? 0) + 1);
+					if (isGenericBuild({ id })) {
+						generic += 1;
+					}
+				}
+				const top = [...counts].sort((a, b) => b[1] - a[1])[0];
+				if (n > 0 && top) {
+					archShares = {
+						n,
+						genericPct: Math.round((1000 * generic) / n) / 10,
+						max: top[0],
+						maxPct: Math.round((1000 * top[1]) / n) / 10,
+						builds: counts.size,
+					};
+				}
+			}
 			// LONG_RUN_DUMP=file (arch15): every player on a roster after the last season's playoffs, with his latest ratings row
 			// and his regular-season stats rows (tracking stats included), as JSON, for the archetype play-type check
 			// (common/archetypes/playTypes.script.test.ts)
@@ -1363,6 +1396,7 @@ describe.skipIf(!ENABLED)("long run", () => {
 						r1Pot: afterDraft.rookiesR1Pot,
 					},
 					archetypes,
+					archShares,
 					old,
 				}),
 			);

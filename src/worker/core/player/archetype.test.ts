@@ -20,8 +20,13 @@ import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { player } from "../index.ts";
 import {
+	getBadgeScoutingLevel,
+	loadBadgeScoutingLevel,
+} from "./traits.ts";
+import {
 	archetypeFor,
 	archetypeStats,
+	archetypeTraits,
 	ratingsForArchetype,
 	archetypeInfoForPlayer,
 	classifyPlayer,
@@ -172,6 +177,29 @@ describe("stored archetypes", () => {
 			ratingsForArchetype(prospect)!.spd,
 			Math.min(100, prow.spd + 5),
 		);
+	});
+
+	test("sweep20: the traits a reading uses don't depend on a page having formatted players first", async () => {
+		g.setWithoutSavingToDB("playerTraits", true);
+		g.setWithoutSavingToDB("budget", false);
+		// (no level loaded yet: a fresh worker, before any page)
+		g.setWithoutSavingToDB("playerTraits", false);
+		await loadBadgeScoutingLevel();
+		g.setWithoutSavingToDB("playerTraits", true);
+		assert.strictEqual(getBadgeScoutingLevel(), undefined);
+		const norms = await getLeagueNorms();
+		const level = getBadgeScoutingLevel();
+		assert.isNumber(level);
+		const prospect = (
+			await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+		)[0]!;
+		const first = JSON.stringify(archetypeTraits(prospect, season));
+		const label = archetypeFor(prospect, norms)?.view.id;
+		// what player.formatAll loads for the skill badges
+		await loadBadgeScoutingLevel();
+		assert.strictEqual(getBadgeScoutingLevel(), level);
+		assert.strictEqual(JSON.stringify(archetypeTraits(prospect, season)), first);
+		assert.strictEqual(archetypeFor(prospect, norms)?.view.id, label);
 	});
 
 	test("stats: last season's regular-season stats, none for a prospect", () => {
