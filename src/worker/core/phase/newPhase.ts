@@ -1,5 +1,4 @@
 import { PHASE, WEBSITE_ROOT } from "../../../common/constants.ts";
-import { flushAdvBatch } from "../game/advBatch.ts";
 import finalize from "./finalize.ts";
 import { afterNewPhase as scoutingAfterNewPhase } from "../scoutingReports/index.ts";
 import { afterNewPhase as draftCombineAfterNewPhase } from "../draftCombine/index.ts";
@@ -47,9 +46,6 @@ const newPhase = async (phase: Phase, conditions: Conditions, extra?: any) => {
 			"Can't call newPhase when expansion/fantasy draft is in progress",
 		);
 	}
-
-	// perf3: tracking stats still waiting to be added (game/advBatch.ts), before anything reads the season
-	await flushAdvBatch();
 
 	const doPhaseChange = {
 		[PHASE.PRESEASON]: newPhasePreseason,

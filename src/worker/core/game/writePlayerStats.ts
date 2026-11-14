@@ -12,7 +12,6 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { randInt } from "../../../common/random.ts";
 import { processPlayerStats } from "../../util/processPlayerStats.ts";
 import { addAdv } from "../../../common/advStats.ts";
-import { advBatchOn, queuePlayerAdv } from "./advBatch.ts";
 import {
 	frontOfficeEnabled,
 	getInjuryDurationFactor,
@@ -297,7 +296,6 @@ const writePlayerStats = async (
 
 	const playersByPid = await idb.cache.players.getAllByKey();
 	const playersToSave = new Set<Player>();
-	const batchAdv = advBatchOn();
 
 	for (const result of results) {
 		const allStarGame = result.team[0].id === -1 && result.team[1].id === -2;
@@ -536,13 +534,8 @@ const writePlayerStats = async (
 						}
 
 						// Advanced Tracking Stats: the game's tracking stats (only with the setting on)
-						// (perf3: in pro leagues, added every few days, game/advBatch.ts)
 						if (p.adv) {
-							if (batchAdv) {
-								queuePlayerAdv(p2.pid, ps as any, p.adv);
-							} else {
-								ps.adv = ps.adv ? addAdv(ps.adv, p.adv) : [...p.adv];
-							}
+							ps.adv = ps.adv ? addAdv(ps.adv, p.adv) : [...p.adv];
 						}
 
 						const derivedMaxValues: Record<string, number> | undefined =

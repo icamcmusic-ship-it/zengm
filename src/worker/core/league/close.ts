@@ -1,5 +1,4 @@
 import { idb } from "../../db/index.ts";
-import { flushAdvBatch } from "../game/advBatch.ts";
 import { g, local, lock, updateStatus } from "../../util/index.ts";
 import { cleanupAutoPlay } from "../league/autoPlay.ts";
 import { cancelLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
@@ -22,10 +21,6 @@ const close = async (disconnect?: boolean) => {
 	}
 
 	if (g.get("lid") !== undefined && idb.league !== undefined) {
-		// perf3: tracking stats still waiting to be added (game/advBatch.ts)
-		if (local.leagueLoaded) {
-			await flushAdvBatch();
-		}
 		// _dirty check is to prevent UI flicker if there is nothing to flush
 		if (local.leagueLoaded && idb.cache._dirty) {
 			await updateStatus("Saving...");

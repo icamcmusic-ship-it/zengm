@@ -64,7 +64,6 @@ import {
 	logEvent,
 } from "../util/index.ts";
 import * as views from "../views/index.ts";
-import { advBatchPending, flushAdvBatch } from "../core/game/advBatch.ts";
 import {
 	type Conditions,
 	type Env,
@@ -4155,29 +4154,6 @@ const retiredJerseyNumberUpsert = async ({
 	await toUI("realtimeUpdate", [["retiredJerseys", "playerMovement"]]);
 };
 
-// Pages that read Advanced Tracking Stats (perf3: game/advBatch.ts)
-const ADV_VIEWS = new Set([
-	"player",
-	"playerStats",
-	"lineups",
-	"teamStats",
-	"advancedPlayerSearch",
-	"playerGraphs",
-	"playerStatDists",
-	"teamStatDists",
-	"comparePlayers",
-	"leaders",
-	"leadersYears",
-	"leadersProgressive",
-	"awardRaces",
-	"most",
-	"archetypes",
-	"exportStats",
-	"exportLeague",
-	"exportPlayers",
-	"editAwardWinners",
-]);
-
 const runBefore = async (
 	{
 		viewId,
@@ -4232,10 +4208,6 @@ const runBefore = async (
 	}
 
 	if (view) {
-		// perf3: tracking stats still waiting to be added (game/advBatch.ts), for pages that show them
-		if (ADV_VIEWS.has(viewId) && advBatchPending()) {
-			await flushAdvBatch();
-		}
 		const data = await lock.runView(() =>
 			view.load({
 				inputs,

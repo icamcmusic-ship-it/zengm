@@ -23,8 +23,6 @@ import { g, helpers, lock } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
 import { setWeeklyFits } from "../staff/systems.ts";
 import { setWeeklyTraitEffects } from "../player/traits.ts";
-import { setPreseasonRelabelAll } from "../player/archetype.ts";
-import { setAdvBatchEnabled } from "./advBatch.ts";
 
 const env = (globalThis as any).process.env;
 const MODE: string | undefined = env.SIM_BENCH;
@@ -105,9 +103,6 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 		// (or only one of them: fits, traits)
 		setWeeklyFits(!perf3Off.has("weekly") && !perf3Off.has("fits"));
 		setWeeklyTraitEffects(!perf3Off.has("weekly") && !perf3Off.has("traits"));
-		// (perf3 experiments: relabel relabels everyone at the preseason, adv adds tracking stats game by game)
-		setPreseasonRelabelAll(perf3Off.has("relabel"));
-		setAdvBatchEnabled(!perf3Off.has("adv"));
 
 		const settings: any = getDefaultSettings();
 		if (MODE !== "stock") {

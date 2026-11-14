@@ -19,9 +19,7 @@ import {
 	type Classification,
 	type Norms,
 	type StoredArchetype,
-	type ArchetypeInputs,
 } from "../../../common/archetypes/index.ts";
-import { ageAdjusted } from "../../../common/archetypes/score.ts";
 import { whyDrivers, whyLine } from "../../../common/archetypes/whyText.ts";
 import { VISIBLE_TRAITS } from "../../../common/archetypes/classify.ts";
 import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
@@ -393,8 +391,11 @@ export const fuzzedArchetypeLabel = (
 const memoReplacer = (_key: string, v: unknown) =>
 	typeof v === "number" && !Number.isFinite(v) ? `#${v}` : v;
 
-// What classify reads for him: his ratings (true, or as scouted for a prospect) and the read options
-const classifyInputs = (p: Player, previousId?: string) => {
+export const classifyPlayer = (
+	p: Player,
+	norms: Norms,
+	previousId?: string,
+): Classification | undefined => {
 	const ratings = ratingsForArchetype(p);
 	if (!ratings) {
 		return undefined;
@@ -414,20 +415,6 @@ const classifyInputs = (p: Player, previousId?: string) => {
 				: undefined,
 		...readOptionsFor(p, pos, season),
 	};
-	return { ratings, opts };
-};
-
-export const classifyPlayer = (
-	p: Player,
-	norms: Norms,
-	previousId?: string,
-	// perf3: already worked out by the caller
-	inputs = classifyInputs(p, previousId),
-): Classification | undefined => {
-	if (!inputs) {
-		return undefined;
-	}
-	const { ratings, opts } = inputs;
 	// classify is a pure function of its inputs and costs several ms, and pages like Draft Scouting read every prospect
 	// live on each load, so remember results per norms object (rebuilt each phase) and inputs
 	let memo = classifyMemo.get(norms);
@@ -504,225 +491,32 @@ const classifyMemo = new WeakMap<
 	Map<string, Classification | undefined>
 >();
 
-// perf3: the inputs of a reading, rounded, to tell at the next preseason whether they moved (ArchetypeInputs)
-const R100 = (x: number | undefined) =>
-	typeof x === "number" && Number.isFinite(x) ? Math.round(100 * x) : -1e6;
-export const archetypeInputs = (
-	inputs: NonNullable<ReturnType<typeof classifyInputs>>,
-): ArchetypeInputs => {
-	const { ratings, opts } = inputs;
-	// (the ratings as the reading sees them: a veteran's age discount moves them each year from 31 on)
-	const adj = ageAdjusted(ratings, opts.age) as Record<string, unknown>;
-	const r: number[] = [];
-	const k: string[] = [];
-	for (const key of INPUT_RATING_KEYS) {
-		const v = adj[key];
-		if (typeof v === "number") {
-			r.push(Math.round(v));
-			k.push(key);
-		}
-	}
-	if (Array.isArray(ratings.sub)) {
-		k.push(`sub${ratings.sub.length}`);
-		for (const v of ratings.sub) {
-			r.push(typeof v === "number" ? Math.round(v) : -1);
-		}
-	}
-	const t: number[] = [];
-	if (opts.traits) {
-		const keys = Object.keys(opts.traits).sort();
-		k.push(`t:${keys.join(",")}`);
-		for (const key of keys) {
-			t.push(Math.round(opts.traits[key]!));
-		}
-	}
-	const z: number[] = [];
-	if (opts.stats) {
-		const keys = Object.keys(opts.stats.z).sort();
-		k.push(`z:${keys.join(",")}`);
-		z.push(R100(opts.stats.w));
-		for (const key of keys) {
-			z.push(R100((opts.stats.z as Record<string, number>)[key]));
-		}
-	}
-	const pt: number[] = [];
-	if (opts.pt) {
-		const keys = Object.keys(opts.pt.f).sort();
-		k.push(`pt:${keys.join(",")}`);
-		pt.push(R100(opts.pt.w));
-		for (const key of keys) {
-			pt.push(R100((opts.pt.f as Record<string, number>)[key]));
-		}
-	}
-	return {
-		h: activeTuning().hash,
-		k: k.join("|"),
-		pos: String(opts.pos),
-		ovr: Math.round(opts.ovr ?? 0),
-		r,
-		t,
-		z,
-		pt,
-	};
-};
-const INPUT_RATING_KEYS = [
-	...RATING_KEYS,
-	"wng",
-	"pdef",
-	"idef",
-	...EXPANDED_RATINGS2,
-];
-
-// perf3: how far a stored label's inputs may move before a preseason reads him again: his ratings and sub-ratings (after the age
-// discount) by more than 1.5 on average or 6 on any one, ovr by more than 2, a trait by more than 3, a box-score z or play-type
-// lean by more than 0.3 SD, or their weights by more than 0.05; any change of position, tuning, reading version or of the
-// settings and stats that add inputs (his first box-score or play-type reading)
-export const RELABEL_TOL = {
-	rMean: 1.5,
-	rMax: 6,
-	ovr: 2,
-	tMean: 3,
-	t: 3,
-	z: 30,
-	w: 5,
-};
-// (for the measurement in archetypeRelabel.script.test.ts)
-export const setRelabelTolerance = (tol: Partial<typeof RELABEL_TOL>) => {
-	Object.assign(RELABEL_TOL, tol);
-};
-const meanDiff = (a: number[], b: number[]) => {
-	let m = 0;
-	for (let i = 0; i < a.length; i++) {
-		m += Math.abs(a[i]! - b[i]!);
-	}
-	return a.length > 0 ? m / a.length : 0;
-};
-const maxDiff = (a: number[], b: number[], from = 0) => {
-	let m = 0;
-	for (let i = from; i < a.length; i++) {
-		m = Math.max(m, Math.abs(a[i]! - b[i]!));
-	}
-	return m;
-};
-// The first input that moved too far ("" if none)
-export const inputsMovedWhy = (
-	a: ArchetypeInputs,
-	b: ArchetypeInputs,
-): string =>
-	a.h !== b.h
-		? "tuning"
-		: a.k !== b.k ||
-			  a.r.length !== b.r.length ||
-			  a.t.length !== b.t.length ||
-			  a.z.length !== b.z.length ||
-			  a.pt.length !== b.pt.length
-			? "parts"
-			: a.pos !== b.pos
-				? "pos"
-				: maxDiff(a.r, b.r) > RELABEL_TOL.rMax ||
-					  meanDiff(a.r, b.r) > RELABEL_TOL.rMean
-					? "ratings"
-					: Math.abs(a.ovr - b.ovr) > RELABEL_TOL.ovr
-						? "ovr"
-						: maxDiff(a.t, b.t) > RELABEL_TOL.t ||
-							  meanDiff(a.t, b.t) > RELABEL_TOL.tMean
-							? "traits"
-							: a.z.length > 0 &&
-								  (Math.abs(a.z[0]! - b.z[0]!) > RELABEL_TOL.w ||
-										maxDiff(a.z, b.z, 1) > RELABEL_TOL.z)
-								? "stats"
-								: a.pt.length > 0 &&
-									  (Math.abs(a.pt[0]! - b.pt[0]!) > RELABEL_TOL.w ||
-											maxDiff(a.pt, b.pt, 1) > RELABEL_TOL.z)
-									? "playTypes"
-									: "";
-export const inputsMoved = (a: ArchetypeInputs, b: ArchetypeInputs) =>
-	inputsMovedWhy(a, b) !== "";
-
-// perf3: at a preseason, read only players whose inputs moved since their label (relabelAll: everyone, as before; for tests
-// and the measurement in archetypeRelabel.script.test.ts)
-let relabelAll = false;
-export const setPreseasonRelabelAll = (all: boolean) => {
-	relabelAll = all;
-};
-export const preseasonRelabelStats = {
-	players: 0,
-	read: 0,
-	ms: 0,
-	// the last preseason's players who kept their label
-	kept: new Set<number>(),
-	// why the others were read again
-	why: {} as Record<string, number>,
-};
-
 // Write this season's entry (replacing one for the same season). Returns true if the primary archetype changed.
-// keepIfSame (perf3, preseason): keep his label, carried to this season, when what it was read from hardly moved
-export const storeArchetype = (
-	p: Player,
-	norms: Norms,
-	keepIfSame = false,
-): boolean => {
+export const storeArchetype = (p: Player, norms: Norms): boolean => {
 	if (!featureOn("archetypes")) {
 		return false;
 	}
 	// (a label from an older reading is not kept by stickiness: he is read afresh)
 	const prev = currentEntry(p.archetypes);
-	const fresh = prev && !isStale(prev) ? prev : undefined;
-	const inputs = classifyInputs(p, fresh?.id);
-	if (!inputs) {
-		return false;
-	}
-	const season = (last(p.ratings) as any).season as number;
-	const now = archetypeInputs(inputs);
-	const why = !keepIfSame
-		? "all"
-		: !fresh?.in
-			? "new"
-			: inputsMovedWhy(fresh.in, now) ||
-				(viewOf(fresh, posNow(p), viewContext()) ? "" : "view");
-	if (why === "" && fresh) {
-		preseasonRelabelStats.kept.add(p.pid);
-		if (fresh.season !== season) {
-			p.archetypes = withEntry(dropInputs(p.archetypes), {
-				...fresh,
-				season,
-			});
-		}
-		return false;
-	}
-	preseasonRelabelStats.read += 1;
-	preseasonRelabelStats.why[why] = (preseasonRelabelStats.why[why] ?? 0) + 1;
-	const c = classifyPlayer(p, norms, fresh?.id, inputs);
+	const c = classifyPlayer(
+		p,
+		norms,
+		prev && !isStale(prev) ? prev.id : undefined,
+	);
 	if (!c) {
 		return false;
 	}
+	const season = (last(p.ratings) as any).season as number;
 	const before = currentEntry(p.archetypes)?.id;
-	p.archetypes = withEntry(dropInputs(p.archetypes), {
-		...toStored(season, c),
-		in: now,
-	});
+	p.archetypes = withEntry(p.archetypes, toStored(season, c));
 	return before !== c.id;
 };
-// (the inputs are kept on the latest entry only)
-const dropInputs = (list: StoredArchetype[] | undefined) =>
-	list?.map((e) => {
-		if (e.in) {
-			const { in: _, ...rest } = e;
-			return rest;
-		}
-		return e;
-	});
 
-// Everyone at the start of a preseason (after development): the label that holds until the next one. perf3: a player whose
-// ratings, sub-ratings, position, traits and stats reading moved less than RELABEL_TOL since his label keeps it (any change
-// of the reading version or the user's tuning reads everyone again)
+// Everyone at the start of a preseason (after development): the label that holds until the next one
 export const updateArchetypesForPreseason = async (players: Player[]) => {
 	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
 		return;
 	}
-	const start = performance.now();
-	preseasonRelabelStats.kept.clear();
-	preseasonRelabelStats.why = {};
 	const norms = await getLeagueNorms(true);
 	// archfb: the user's tuning from all picks so far
 	await refitArchetypeTuning();
@@ -730,11 +524,9 @@ export const updateArchetypesForPreseason = async (players: Player[]) => {
 		if (p.tid === PLAYER.RETIRED || p.tid === PLAYER.UNDRAFTED) {
 			continue;
 		}
-		preseasonRelabelStats.players += 1;
-		storeArchetype(p, norms, !relabelAll);
+		storeArchetype(p, norms);
 		await idb.cache.players.put(p);
 	}
-	preseasonRelabelStats.ms += performance.now() - start;
 };
 
 // New league: everyone gets a first entry

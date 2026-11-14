@@ -311,24 +311,4 @@ export type StoredArchetype = {
 	conf?: number;
 	// The reading's version (ARCHETYPE_READING_VERSION) when it was stored: an entry from an older reading is read again
 	v?: number;
-	// perf3: what the label was read from (worker/core/player/archetype.ts archetypeInputs), so a preseason only reads him again
-	// when it moved. Only on his latest entry
-	in?: ArchetypeInputs;
-};
-
-// perf3: a classification's inputs, rounded (ratings and sub-ratings as stored, z-scores and weights x100). `k` lists which
-// optional parts there are, so a setting turned on or off reads him again
-export type ArchetypeInputs = {
-	// the user's archetype tuning (archfb) the label was read with
-	h: string;
-	k: string;
-	pos: string;
-	ovr: number;
-	// ratings (after the reading's age adjustment) and sub-ratings
-	r: number[];
-	// player traits
-	t: number[];
-	// box-score reading (weight, then a z per dimension) and play types (weight, then a lean per play type), x100
-	z: number[];
-	pt: number[];
 };
