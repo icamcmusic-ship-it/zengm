@@ -25,7 +25,10 @@ import {
 	statAlignment,
 } from "./classify.ts";
 import { FAMILIES } from "./families.ts";
-import { JUDGED } from "./judged.data.ts";
+import { JUDGED as JUDGED_BASE } from "./judged.data.ts";
+import { JUDGED_SIM, SIM_SUB_NORMS } from "./judgedSim.data.ts";
+// arch17: plus the simulated league's players, read with their play types
+const JUDGED = [...JUDGED_BASE, ...JUDGED_SIM];
 import {
 	CLASS_FEATS,
 	FAM_FEATS,
@@ -102,7 +105,12 @@ export const judgedPlayers = (expanded = EXPANDED, norms = NORMS) => {
 		let ratings;
 		let pos = j.pos;
 		let nm = norms;
-		if (j.slug) {
+		if (j.src === "sim") {
+			ratings = { ...j.ratings };
+			nm = { ...norms, sub: SIM_SUB_NORMS };
+			pos = j.pos;
+			read = { ...j.read, age: j.age };
+		} else if (j.slug) {
 			nm = realNorms(norms, expanded);
 			const row = data.d.ratings.find(
 				(x) => x.slug === j.slug && x.season === j.season,
@@ -163,7 +171,7 @@ export const judgedPlayers = (expanded = EXPANDED, norms = NORMS) => {
 			famX: t.famX,
 			stats: read.stats,
 			pop:
-				j.src === "league" || j.src === "prospect"
+				j.src === "league" || j.src === "prospect" || j.src === "sim"
 					? j.src
 					: j.season >= 2016
 						? "real 2016+"

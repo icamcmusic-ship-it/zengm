@@ -1,0 +1,20 @@
+judged 549 (tune 384, test 165), expanded ratings off
+shipped, tune: top-1 19.0% (first pick 7.9%), top-3 41.2%, family 60.2%, loss 6.421 (n=379); real <2016 15.4% / fam 56.9% (n=65), real 2016+ 21.8% / fam 62.4% (n=101), league 19.1% / fam 63.2% (n=68), prospect 17.1% / fam 58.5% (n=41), sim 19.2% / fam 58.7% (n=104)
+shipped, test: top-1 23.8% (first pick 9.4%), top-3 40.6%, family 66.9%, loss 7.633 (n=160); real <2016 30.8% / fam 61.5% (n=26), real 2016+ 32.6% / fam 76.7% (n=43), league 6.7% / fam 56.7% (n=30), prospect 22.2% / fam 83.3% (n=18), sim 23.3% / fam 60.5% (n=43)
+before, tune: top-1 17.9% (first pick 7.9%), top-3 37.2%, family 54.6%, loss 6.317 (n=379); real <2016 18.5% / fam 50.8% (n=65), real 2016+ 15.8% / fam 54.5% (n=101), league 26.5% / fam 64.7% (n=68), prospect 19.5% / fam 56.1% (n=41), sim 13.5% / fam 50.0% (n=104)
+before, test: top-1 21.3% (first pick 8.8%), top-3 43.1%, family 59.4%, loss 7.473 (n=160); real <2016 23.1% / fam 61.5% (n=26), real 2016+ 27.9% / fam 65.1% (n=43), league 16.7% / fam 63.3% (n=30), prospect 16.7% / fam 77.8% (n=18), sim 18.6% / fam 41.9% (n=43)
+cv lamF 0.003 lam 0.3: best top-1 so far 21.1%
+cv lamF 0.003 lam 1: best top-1 so far 21.6%
+cv lamF 0.003 lam 3: best top-1 so far 22.2%
+cv lamF 0.01 lam 0.3: best top-1 so far 23.0%
+cv lamF 0.01 lam 1: best top-1 so far 23.0%
+cv lamF 0.01 lam 3: best top-1 so far 23.0%
+chosen: {"lamF":0.01,"lam":0.3,"tau":0.65,"gate":0.5,"tieMargin":0.3,"tieStatsK":1,"top1":0.22955145118733508,"loss":3.015856533875365,"fam":0.7071240105540897}
+after, tune: top-1 26.4% (first pick 11.1%), top-3 52.2%, family 84.7%, loss 2.662 (n=379); real <2016 16.9% / fam 76.9% (n=65), real 2016+ 26.7% / fam 80.2% (n=101), league 30.9% / fam 91.2% (n=68), prospect 22.0% / fam 82.9% (n=41), sim 30.8% / fam 90.4% (n=104)
+after, test: top-1 26.9% (first pick 10.6%), top-3 49.4%, family 75.6%, loss 2.828 (n=160); real <2016 34.6% / fam 84.6% (n=26), real 2016+ 34.9% / fam 74.4% (n=43), league 23.3% / fam 83.3% (n=30), prospect 11.1% / fam 66.7% (n=18), sim 23.3% / fam 69.8% (n=43)
+after, test, traits off: top-1 25.6% (first pick 8.8%), top-3 48.8%, family 75.0%, loss 2.815 (n=160); real <2016 30.8% / fam 84.6% (n=26), real 2016+ 32.6% / fam 74.4% (n=43), league 23.3% / fam 83.3% (n=30), prospect 5.6% / fam 66.7% (n=18), sim 25.6% / fam 67.4% (n=43)
+after, test, no family terms: top-1 30.0% (first pick 12.5%), top-3 46.9%, family 70.6%, loss 2.966 (n=160); real <2016 34.6% / fam 65.4% (n=26), real 2016+ 34.9% / fam 74.4% (n=43), league 20.0% / fam 70.0% (n=30), prospect 27.8% / fam 72.2% (n=18), sim 30.2% / fam 69.8% (n=43)
+after, test, no close-call rule: top-1 28.7% (first pick 13.1%), top-3 49.4%, family 77.5%, loss 2.828 (n=160); real <2016 38.5% / fam 88.5% (n=26), real 2016+ 37.2% / fam 76.7% (n=43), league 23.3% / fam 83.3% (n=30), prospect 11.1% / fam 66.7% (n=18), sim 25.6% / fam 72.1% (n=43)
+weights: match 0.346, rare 1, bias 0.453, star 0.823, standout 0.985, twoWay 0.97, passBig 0.992, sig 0.704, creator 1.014, rolePass 0.965, roleRim 0.848, roleSniper 1.001, roleShoot 1.002, roleMid 1.003, absFloor 0.971, noShot 1, air 1.002, eliteShot 0.401, touch 1, generic 1.004, need 0.021, promFloor 0.959, promReb 0.962, promLead 0.936, promRel 0.517, allAround 1.021, sub 0.125, playType 0.704, trOffBall 0.264, trScreen 0.272, trHandle 0.299, trDefVers 0.313, trHustle 0.214, trShotDisc 0.261, trClutch 0.284, trLeader 0.313, trIron 0.213
+skill classes: shoot 0.106, mid -0.061, finish -0.052, post 0.027, handle 0.067, pass 0.086, reb 0.016, rimD -0.127, perD 0.066, ath -0.075, stre -0.133, def -0.018, score -0.079
+family biases: playmaker -0.002, scorer -0.034, shooter 0.148, slasher -0.159, wingDefender 0.019, rimProtector 0.017, glass 0.041, stretchBig 0.01, postBig -0.057, allAround 0.019; gamma 0.653
