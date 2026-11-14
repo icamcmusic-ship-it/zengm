@@ -1,0 +1,200 @@
+0 crafty-mid-range-slasher 2-way-mid-range-menace mid-paint-point-forward
+1 point-four slashing-playmaker playmaking-shot-creator
+2 defensive-playmaker ball-hawking-playshot 2-way-3pt-playmaker
+3 catch-and-shoot-3pt-sniper 3pt-shot-hunter
+4 post-dimming-board-enforcer crafty-post-playmaker 2-way-post-bully
+5 athletic-hustler
+6 inside-out-high-flyer 3pt-shot-hunter drive-and-rise
+7 2-way-post-bully glass-cleaning-lockdown master-of-both-ends
+8 iso-savant crafty-3-level-scorer walking-bucket
+9 hustle-glass-cleaner physical-defensive-rebounder post-up-glass-cleaner
+10 post-combo-guard crafty-post-playmaker
+11 3-and-d-specialist catch-and-shoot-3pt-sniper
+12 stretch-board-enforcer skilled-stretch-four big-range
+13 athletic-hustler mid-range-high-flyer
+14 mid-range-slasher mid-range-high-flyer playmaking-shot-creator
+15 speedy-offensive-engine triple-double-threat do-it-all-superstar
+16 physical-mid-range-menace 2-way-mid-range-menace mid-post-bucket-getter
+17 pass-first-distributor slashing-playmaker speedy-offensive-engine
+18 athletic-hustler slashing-lockdown
+19 athletic-hustler
+20 switch-defending-cleaner stretch-board-enforcer 2-way-skilled-pick-and-popper
+21 diming-inside-out-scorer playmaking-3pt-creator crafty-inside-out-scorer
+22 slashing-lockdown athletic-hustler 2-way-rim-runner
+23 mid-paint-board-enforcer stretch-board-enforcer crafty-mid-paint-scorer
+24 catch-and-shoot-3pt-sniper mid-range-menace
+25 shot-erasing-board-enforcer glass-guardian rim-reaping-post-scorer
+26 offensive-engine playmaking-3pt-creator crafty-offensive-engine
+27 footer big-range
+28 pass-first-distributor diming-sharpshooter
+29 2-way-3pt-playmaker defensive-playmaker ball-hawking-playshot
+30 pass-first-distributor mid-range-menace
+31 2-way-point-forward-cleaner 2-way-inside-out-dime-dropper edge-enforcer
+32 3-and-d-specialist catch-and-shoot-3pt-sniper high-flying-3pt-sniper
+33 high-flying-stretch-big high-flying-shot-creator fluid-four
+34 footer board-hunting-paint-finisher
+35 defensive-playmaker the-guard-dog
+36 post-up-glass-cleaner 2-way-post-bully bulldozer
+37 footer table-setting-board-enforcer glass-guardian
+38 the-guard-dog blow-by-rim-attacker defensive-playmaker
+39 big-range backline-pick-and-popper stretch-board-enforcer
+40 3pt-shot-hunter crafty-sharpshooter catch-and-shoot-3pt-sniper
+41 the-anomaly shot-erasing-guard-dog rim-reaping-slasher
+42 post-dimming-board-enforcer footer rim-running-board-enforcer
+43 glass-guardian table-setting-board-enforcer shot-erasing-board-enforcer
+44 playmaking-3pt-creator offensive-engine aerial-playmaker
+45 table-setting-board-enforcer break-starting-stretch-five shot-erasing-table-setter
+46 mr-two-way 2-way-power-dunker 2-way-inside-out-creator
+47 ball-hawking-3pt-slasher 2-way-inside-out-creator drive-and-rise
+48 glass-cleaning-lockdown switch-defending-cleaner
+49 post-dimming-board-enforcer crafty-post-playmaker footwork-pharaoh
+50 gritty-mid-range-menace mid-paint-board-enforcer crafty-mid-range-menace
+51 ball-hawking-mid-range-menace 2-way-mid-range-menace 2-way-off-screen-shooter
+52 crafty-paint-finishing-cleaner rim-running-board-enforcer board-hunting-paint-finisher
+53 pass-first-distributor
+54 shot-blocking-anchor rim-reaping-rim-runner backline-lob-threat
+55 playmaking-shot-creator crafty-3-level-scorer diming-3-level-scorer
+56 3-and-d-specialist the-guard-dog
+57 3pt-shot-hunter crafty-3-level-scorer crafty-sharpshooter
+58 3pt-shot-hunter diming-3-level-scorer crafty-3-level-scorer
+59 playmaking-shot-creator offensive-engine speedy-offensive-engine
+60 mid-range-menace ankle-taker
+61 2-way-mid-post-scorer lockdown-defender master-of-both-ends
+62 catch-and-shoot-3pt-sniper 3-and-d-specialist
+63 2-way-small-ball-four shot-erasing-guard-dog backline-four
+64 catch-and-shoot-3pt-sniper mid-range-menace
+65 edge-enforcing-3pt-sniper 2-way-off-screen-shooter 3-and-d-specialist
+66 high-flying-3pt-sniper athletic-hustler
+67 athletic-hustler power-slasher
+68 2-way-3pt-playmaker mr-two-way ball-hawking-playshot
+69 playmaking-3pt-creator diming-sharpshooter 2-way-3pt-playmaker
+70 post-creator mid-post-bucket-getter power-slasher
+71 glass-cleaning-lockdown 3-and-d-specialist grinder
+72 inside-out-bully 2-way-bulldozer 2-way-power-finisher
+73 slashing-lockdown athletic-hustler
+74 athletic-hustler slashing-eraser rim-reaping-rim-runner
+75 stretch-board-enforcer inside-out-board-enforcer mid-paint-board-enforcer
+76 mid-range-slashing-cleaner mid-paint-point-forward playslash-board-enforcer
+77 catch-and-shoot-3pt-sniper crafty-sharpshooter
+78 post-combo-guard post-scoring-slasher
+79 lockdown-defender the-guard-dog
+80 pass-first-distributor playmaking-3pt-creator diming-sharpshooter
+81 the-guard-dog athletic-hustler blow-by-rim-attacker
+82 crafty-sharpshooter catch-and-shoot-3pt-sniper
+83 fluid-four slashing-playmaker big-glide
+84 mid-paint-point-four slashing-mid-range-maestro edge-enforcer
+85 catch-and-shoot-3pt-sniper 3-and-d-specialist
+86 shot-blocking-anchor pick-and-roll-finisher rim-reaping-rim-runner
+87 playmaking-3pt-creator offensive-engine shifty-king
+88 2-way-power-finisher 2-way-post-bully
+89 pass-first-distributor dot-dispenser
+90 3-and-d-specialist lockdown-defender gritty-3pt-slasher
+91 2-way-3pt-playmaker playmaking-3pt-creator aerial-playmaker
+92 catch-and-shoot-3pt-sniper 3pt-shot-hunter
+93 backline-post-rim-rocker rim-reaping-post-scorer glass-guardian-power-dunker
+94 defensive-playmaker triple-double-threat dot-dispenser
+95 the-guard-dog lockdown-defender 2-way-chaos-trigger
+96 footer glass-guardian shot-blocking-anchor
+97 big-range skilled-stretch-four stretch-board-enforcer
+98 post-combo-guard crafty-mid-range-menace
+99 post-creator board-hunting-bucket-getter rim-rocking-post-board-hunter
+100 2-way-post-bully rim-reaping-post-scorer backline-bulldimer
+101 2-way-3pt-sniping-high-flyer 3pt-high-flying-ball-hawk the-guard-dog
+102 2-way-small-ball-four athletic-hustler
+103 pass-first-distributor the-guard-dog
+104 physical-defensive-rebounder hustle-glass-cleaner post-up-glass-cleaner
+105 walking-bucket mr-two-way do-it-all-superstar
+106 rim-reaping-post-scorer backline-post-rim-rocker shot-blocking-anchor
+107 catch-and-shoot-3pt-sniper mid-range-menace
+108 diming-3-level-scorer 2-way-3-level-cleaner three-level-scorer
+109 3-and-d-specialist catch-and-shoot-3pt-sniper
+110 power-slasher drive-and-rise gritty-3pt-slasher
+111 defensive-playmaker 3-and-d-specialist the-guard-dog
+112 catch-and-shoot-3pt-sniper deep-range-sniper
+113 switch-defending-cleaner glass-guardian 2-way-point-forward-cleaner
+114 footer board-hunting-paint-finisher
+115 glass-cleaning-lockdown grinder
+116 mid-paint-point-four 2-way-point-forward-cleaner triple-double-threat
+117 the-guard-dog 3-and-d-specialist ball-hawking-sharpshooter
+118 board-hunting-high-flyer high-flying-board-enforcer rim-running-board-enforcer
+119 mid-paint-point-four slashing-mid-range-maestro physical-mid-paint-shot-eraser
+120 skilled-stretch-four 2-way-skilled-pick-and-popper stretch-board-enforcer
+121 athletic-hustler pick-and-roll-finisher
+122 post-combo-guard bulldozer post-scoring-slasher
+123 2-way-mid-range-menace ball-hawking-mid-range-menace
+124 grinder
+125 dime-dropping-3pt-gunner playmaking-3pt-creator
+126 crafty-mid-paint-scorer slashing-playmaker mid-range-slasher
+127 mid-range-menace catch-and-shoot-3pt-sniper
+128 catch-and-shoot-3pt-sniper mid-range-menace 3pt-shot-hunter
+129 big-range skilled-stretch-four
+130 do-it-all-superstar triple-double-threat 2-way-3pt-playmaker
+131 2-way-small-ball-four grinder switch-defending-cleaner
+132 mr-two-way 2-way-off-screen-shooter do-it-all-superstar
+133 aerial-playmaker slashing-playmaker
+134 3-and-d-specialist high-flying-3pt-sniper catch-and-shoot-3pt-sniper
+135 dot-dispenser diming-sharpshooter playmaking-3pt-creator
+136 playmaking-3pt-creator crafty-mid-paint-scorer shifty-king
+137 athletic-hustler blow-by-rim-attacker
+138 skilled-stretch-four big-range catch-and-shoot-3pt-sniper
+139 athletic-hustler drive-and-rise
+140 slashing-lockdown drive-and-rise
+141 catch-and-shoot-3pt-sniper mid-range-menace
+142 mid-post-bucket-getter post-dimming-board-enforcer board-hunting-bucket-getter
+143 glass-cleaning-lockdown grinder
+144 3-and-d-specialist ball-hawking-sharpshooter
+145 physical-defensive-rebounder hustle-glass-cleaner grinder
+146 slashing-playmaker blow-by-rim-attacker playmaking-shot-creator
+147 table-setting-board-enforcer post-dimming-board-enforcer physical-glass-visionary
+148 mid-range-menace
+149 catch-and-shoot-3pt-sniper high-flying-3pt-sniper deep-range-sniper
+150 shot-erasing-mid-paint-maestro backline-mid-range-scorer rim-reaping-3-level-scorer
+151 3pt-shot-hunter mid-range-menace
+152 physical-defensive-rebounder post-up-glass-cleaner hustle-glass-cleaner
+153 diming-sharpshooter crafty-sharpshooter
+154 from-the-logo playmaking-3pt-creator deep-range-sniper
+155 athletic-hustler slashing-lockdown
+156 2-way-small-ball-four 2-way-bulldozer athletic-hustler
+157 athletic-hustler high-flying-eraser
+158 catch-and-shoot-3pt-sniper athletic-hustler
+159 2-way-mid-range-menace mr-two-way ball-hawking-mid-range-menace
+160 pick-and-roll-finisher 2-way-rim-runner backline-four
+161 shot-blocking-anchor glass-guardian hustle-glass-cleaner
+162 crafty-mid-paint-scorer crafty-walking-bucket post-creator
+163 post-scoring-slasher dunk-tank bulldozer
+164 slashing-playmaker blow-by-dual-finisher
+165 post-scoring-slasher 2-way-post-bully rim-rocking-post-board-hunter
+166 dime-dropping-3pt-gunner playmaking-3pt-slasher diming-sharpshooter
+167 catch-and-shoot-3pt-sniper
+168 playmaking-3pt-creator shifty-king dime-dropping-3pt-gunner
+169 post-combo-guard crafty-post-playmaker
+170 post-up-glass-cleaner footwork-pharaoh
+171 catch-and-shoot-3pt-sniper grinder
+172 slashing-playmaker playmaking-3pt-slasher
+173 post-dimming-board-enforcer physical-glass-visionary footer
+174 post-combo-guard 2-way-post-bully inside-out-bully
+175 playmaking-3pt-creator offensive-engine 3pt-shot-hunter
+176 stretch-board-enforcer hustle-glass-cleaner pick-and-roll-finisher
+177 3-and-d-specialist shot-erasing-guard-dog diming-sharpshooter
+178 fluid-four slashing-playmaker big-glide
+179 diming-sharpshooter 3-and-d-specialist
+180 athletic-hustler drive-and-rise
+181 mid-range-slasher mid-range-menace ankle-taker
+182 ankle-taker mid-range-menace
+183 catch-and-shoot-3pt-sniper big-range 3-and-d-specialist
+184 defensive-playmaker dot-dispenser the-guard-dog
+185 slashing-playmaker triple-double-threat aerial-playmaker
+186 athletic-hustler 2-way-small-ball-four
+187 shot-erasing-guard-dog lockdown-defender 3-and-d-specialist
+188 athletic-hustler
+189 playmaking-shot-creator speedy-offensive-engine slashing-playmaker
+190 point-four diming-cleaner
+191 high-flying-3pt-sniper catch-and-shoot-3pt-sniper 2-way-3pt-sniping-high-flyer
+192 catch-and-shoot-3pt-sniper crafty-sharpshooter
+193 pass-first-distributor slashing-playmaker
+194 diming-3-level-scorer crafty-3-level-scorer offensive-engine
+195 high-flying-stretch-big fluid-four inside-out-high-flyer
+196 point-four diming-cleaner grinder
+197 diming-sharpshooter pass-first-distributor
+198 board-hunting-bucket-getter mid-range-slashing-cleaner mid-range-high-flyer
+199 catch-and-shoot-3pt-sniper deep-range-sniper crafty-sharpshooter
