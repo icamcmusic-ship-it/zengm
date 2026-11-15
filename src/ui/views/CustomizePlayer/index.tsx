@@ -140,6 +140,18 @@ const copyValidValues = (
 
 	target.college = source.college;
 
+	// Nickname: blank = generated from his career, "-" = none
+	{
+		const nick = (source.nickname ?? "").trim();
+		if (nick === "") {
+			delete target.nickname;
+		} else if (nick === "-") {
+			target.nickname = "";
+		} else {
+			target.nickname = nick;
+		}
+	}
+
 	const ovrByPos = bySport({
 		baseball: true,
 		basketball: false,
@@ -1101,6 +1113,27 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 									</button>
 								</div>
 							</div>
+							{__SPORT === "basketball" ? (
+								<div className="col-6 mb-3">
+									<label
+										className="form-label"
+										htmlFor="customize-player-nickname"
+									>
+										Nickname
+									</label>
+									<input
+										id="customize-player-nickname"
+										type="text"
+										className="form-control"
+										placeholder="Blank: generated from his career"
+										onChange={handleChange.bind(null, "root", "nickname")}
+										value={p.nickname ?? ""}
+									/>
+									<div className="form-text">
+										Leave blank for a generated nickname, or enter - for none.
+									</div>
+								</div>
+							) : null}
 							<div className="col-3 mb-3">
 								<label
 									className="form-label"

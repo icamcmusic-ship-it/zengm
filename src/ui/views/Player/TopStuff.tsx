@@ -641,6 +641,15 @@ const TopStuff = ({
 									<br />
 								</>
 							)}
+							{player.nickname ? (
+								<>
+									Nickname:{" "}
+									<span className="fst-italic" data-testid="player-nickname">
+										"{player.nickname}"
+									</span>
+									<br />
+								</>
+							) : null}
 							{player.archetype ? (
 								<>
 									Archetype:{" "}

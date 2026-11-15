@@ -1646,6 +1646,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 
 	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
 	archetypes?: StoredArchetype[];
+	// His nickname, set in God Mode ("" = none). Missing: generated from his career (common/hofStory.ts)
+	nickname?: string;
 	real?: boolean;
 	relatives: Relative[];
 	retiredYear: number;
