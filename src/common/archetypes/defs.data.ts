@@ -15,6 +15,8 @@ import { POS_NAMES } from "./posNames.data.ts";
 import { POS_GROUP } from "./posNames.ts";
 import { HARD_BLOCK, nameContradictsPosition } from "./position.ts";
 import { TWO_K_DEFS } from "./twoK/defs2k.data.ts";
+import { USER_2K_DEFS } from "./twoK/user2kDefs.data.ts";
+import { USER_2K_MAP } from "./twoK/user2kMap.data.ts";
 import type { Archetype, ArchetypeDef, Pos, TwoKDef } from "./types.ts";
 
 const ALL_POSITIONS = 9;
@@ -59,6 +61,7 @@ export const toArchetype = (d: TwoKDef): Archetype => {
 		need: Object.keys(d.need).length > 0 ? d.need : undefined,
 		needFor: Object.keys(d.needFor).length > 0 ? d.needFor : undefined,
 		cap: d.cap,
+		...(d.sw ? { sw: d.sw } : {}),
 		traitTie: Object.keys(traitTie).length > 0 ? traitTie : undefined,
 		...(d.posNames ? { posNames: d.posNames } : {}),
 		tags: [
@@ -151,13 +154,42 @@ const POSITION_ORDER: Pos[] = [
 	"FC",
 	"C",
 ];
-// (arch14's merges, then arch15's on top)
+// (arch14's merges, then arch15's on top; archuser2k: the builds made from the user's 2K archetypes after the rest)
 const ARCH14_DEFS = mergeDefs(
-	[...TWO_K_DEFS, ...CUSTOM_DEFS],
+	[...TWO_K_DEFS, ...CUSTOM_DEFS, ...USER_2K_DEFS],
 	MERGED_ARCH14,
 	false,
 );
 const ALL_DEFS = mergeDefs(ARCH14_DEFS, MERGED_ARCH15, true);
+// archuser2k: a 2K name that is now a build of its own is no longer another build's alias (the 2K matcher had folded some
+// into builds that do not promise what they do), and the user's other 2K names are aliases of their closest build
+{
+	const own = new Set(ALL_DEFS.map((d) => d.name));
+	const byId = new Map(ALL_DEFS.map((d) => [d.id, d]));
+	for (const d of ALL_DEFS) {
+		d.aliases = d.aliases.filter((n) => !own.has(n) || n === d.name);
+	}
+	// (a merged build's name stays with the build it was merged into)
+	const mergedNames = new Set(
+		[...TWO_K_DEFS, ...CUSTOM_DEFS]
+			.filter((d) => MERGED_ARCH14[d.id] ?? MERGED_ARCH15[d.id])
+			.map((d) => d.name),
+	);
+	for (const [name, m] of Object.entries(USER_2K_MAP)) {
+		const d = m.id ? byId.get(m.id) : undefined;
+		if (
+			d &&
+			!own.has(name) &&
+			!mergedNames.has(name) &&
+			!d.aliases.includes(name)
+		) {
+			for (const o of ALL_DEFS) {
+				o.aliases = o.aliases.filter((n) => n !== name);
+			}
+			d.aliases.push(name);
+		}
+	}
+}
 
 // The 2K builds, then the custom ones (customDefs.data.ts)
 export const ARCHETYPE_DEFS: Archetype[] = ALL_DEFS.map(toArchetype);

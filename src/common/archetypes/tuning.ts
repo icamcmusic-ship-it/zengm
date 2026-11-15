@@ -69,6 +69,10 @@ export type PickInput = {
 	stats?: ReadOptions["stats"];
 	pt?: ReadOptions["pt"];
 	traits?: Partial<Record<string, number>>;
+	// archuser2k: a real player's data key (the developer refit reads him from data/ as a real-players league does) and
+	// how much the pick counts (an all-time 2K rating of a player at his peak: half)
+	slug?: string;
+	weight?: number;
 };
 
 export type FeedbackPick = {
@@ -446,6 +450,11 @@ export const toPickFile = (picks: FeedbackPick[], now: number): PickFile => ({
 	picks,
 });
 export const fromPickFile = (x: unknown): FeedbackPick[] => {
+	// (archuser2k: a tuning-only export holds the same picks, league and browser-wide)
+	if ((x as Partial<TuningFile> | undefined)?.kind === TUNING_FILE_KIND) {
+		const t = fromTuningFile(x);
+		return mergePicks(t.globalPicks, t.leaguePicks);
+	}
 	const f = x as Partial<PickFile> | undefined;
 	if (!f || f.kind !== "bbgm-archetype-picks" || !Array.isArray(f.picks)) {
 		throw new Error("Not an archetype pick file");
@@ -473,9 +482,22 @@ export const mergePicks = (...lists: FeedbackPick[][]): FeedbackPick[] => {
 };
 
 // The developer's full offline refit (fit.script.test.ts ARCH_PICKS): the user's picks as a judged set, the picked build
-// as the answer; 30% of picks (by a hash of the pick) are the test split. "None of these" picks are left out.
+// as the answer; 30% of picks (by a hash of the pick) are the test split. "None of these" picks are left out; a pick of
+// the build he was shown counts too (archuser2k: an answer key agrees with the reading as often as not, and the refit
+// must learn to keep those), and so does a pick without snapshot rows (only the reading inputs are read)
+export const refitPicks = (picks: FeedbackPick[]): FeedbackPick[] => {
+	const byUid = new Map<string, FeedbackPick>();
+	for (const p of picks) {
+		if (p?.input?.ratings && p.picked) {
+			byUid.set(p.uid, p);
+		}
+	}
+	return [...byUid.values()].sort((a, b) =>
+		a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0,
+	);
+};
 export const picksToJudged = (picks: FeedbackPick[]) =>
-	usablePicks(picks).map((p) => {
+	refitPicks(picks).map((p) => {
 		let h = 2166136261;
 		for (let i = 0; i < p.uid.length; i++) {
 			h = Math.imul(h ^ p.uid.charCodeAt(i), 16777619);
@@ -483,6 +505,8 @@ export const picksToJudged = (picks: FeedbackPick[]) =>
 		return {
 			key: `pick-${p.uid}`,
 			src: "picks" as const,
+			slug: p.input.slug,
+			w: p.input.weight ?? (p.better ? BETTER_W : 1),
 			pos: p.pos,
 			ratings: p.input.ratings,
 			read: {
@@ -497,3 +521,118 @@ export const picksToJudged = (picks: FeedbackPick[]) =>
 			split: (h >>> 0) % 10 < 3 ? ("test" as const) : ("tune" as const),
 		};
 	});
+
+// archuser2k: "Archetype tuning only" (Export League, and the tuning panel's export): everything the user's tuning is made
+// of, without the league: his picks (this league's and the browser-wide ones), his per-player overrides, the tuning fitted
+// from them, the reading version and the tuning's hash, and optionally the reading inputs of every pick (`snapshots`, by
+// pick id: what an offline refit reads; without them each pick keeps only its snapshot rows, which is enough to refit the
+// tuning in the game). Importable from the tuning panel and by the developer refit (ARCH_PICKS: fromPickFile reads it).
+export const TUNING_FILE_KIND = "bbgm-archetype-tuning";
+export type TuningOverride = { id: string; at: number; uid: string };
+export type TuningFile = {
+	kind: typeof TUNING_FILE_KIND;
+	version: 1;
+	exported: number;
+	readingVersion: number;
+	tuningHash: string;
+	tuning: Tuning;
+	// The league it came from (overrides are per player of that league)
+	lid?: number;
+	leagueName?: string;
+	picks: { league: FeedbackPick[]; global: FeedbackPick[] };
+	overrides: Record<string, TuningOverride>;
+	snapshots?: Record<string, PickInput>;
+};
+
+export const toTuningFile = ({
+	leaguePicks,
+	globalPicks,
+	overrides,
+	tuning,
+	readingVersion,
+	now,
+	snapshots,
+	lid,
+	leagueName,
+}: {
+	leaguePicks: FeedbackPick[];
+	globalPicks: FeedbackPick[];
+	overrides: Record<string, TuningOverride>;
+	tuning: Tuning;
+	readingVersion: number;
+	now: number;
+	snapshots: boolean;
+	lid?: number;
+	leagueName?: string;
+}): TuningFile => {
+	const snaps: Record<string, PickInput> = {};
+	const strip = (ps: FeedbackPick[]) =>
+		ps.map((p) => {
+			const { input, ...rest } = p;
+			if (snapshots && input) {
+				snaps[p.uid] = input;
+			}
+			return rest as FeedbackPick;
+		});
+	return {
+		kind: TUNING_FILE_KIND,
+		version: 1,
+		exported: now,
+		readingVersion,
+		tuningHash: tuning.hash,
+		tuning,
+		...(lid !== undefined ? { lid } : {}),
+		...(leagueName !== undefined ? { leagueName } : {}),
+		picks: { league: strip(leaguePicks), global: strip(globalPicks) },
+		overrides,
+		...(snapshots ? { snapshots: snaps } : {}),
+	};
+};
+
+const validPick = (p: any): p is FeedbackPick =>
+	p &&
+	typeof p.uid === "string" &&
+	typeof p.shown === "string" &&
+	Array.isArray(p.rows);
+
+export const fromTuningFile = (
+	x: unknown,
+): {
+	leaguePicks: FeedbackPick[];
+	globalPicks: FeedbackPick[];
+	overrides: Record<string, TuningOverride>;
+	tuning?: Tuning;
+	readingVersion?: number;
+	lid?: number;
+} => {
+	const f = x as Partial<TuningFile> | undefined;
+	if (
+		!f ||
+		f.kind !== TUNING_FILE_KIND ||
+		!f.picks ||
+		!Array.isArray(f.picks.league) ||
+		!Array.isArray(f.picks.global)
+	) {
+		throw new Error("Not an archetype tuning file");
+	}
+	const snaps = f.snapshots ?? {};
+	const attach = (ps: unknown[]) =>
+		ps.filter(validPick).map((p) => {
+			const input = snaps[p.uid] ?? (p as Partial<FeedbackPick>).input;
+			return (input ? { ...p, input } : p) as FeedbackPick;
+		});
+	const overrides: Record<string, TuningOverride> = {};
+	for (const [pid, o] of Object.entries(f.overrides ?? {})) {
+		if (o && typeof o.id === "string" && typeof o.uid === "string") {
+			overrides[pid] = { id: o.id, at: Number(o.at) || 0, uid: o.uid };
+		}
+	}
+	return {
+		leaguePicks: attach(f.picks.league),
+		globalPicks: attach(f.picks.global),
+		overrides,
+		tuning: f.tuning,
+		readingVersion: f.readingVersion,
+		lid: f.lid,
+	};
+};

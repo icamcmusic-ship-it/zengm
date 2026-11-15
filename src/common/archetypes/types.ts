@@ -172,6 +172,8 @@ export type TwoKDef = {
 	posNames?: Partial<Record<"guard" | "wing" | "big", string>>;
 	// Not an NBA 2K build name (customDefs.data.ts): no "Same build in 2K" line
 	custom?: true;
+	// archuser2k: sub-rating wants beyond the name's (Archetype's `sw`: the leans the user's players with the name share)
+	sw?: Partial<Record<string, number>>;
 };
 
 export type Archetype = ArchetypeDef & {

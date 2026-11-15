@@ -17,6 +17,7 @@ import type makeExportStream from "../util/makeExportStream.ts";
 import { ProgressBarText } from "../components/ProgressBarText.tsx";
 import { ActionButton } from "../components/ActionButton.tsx";
 import { safeLocalStorage } from "../util/safeLocalStorage.ts";
+import { downloadFile } from "../util/downloadFile.ts";
 
 const HAS_FILE_SYSTEM_ACCESS_API = !!window.showSaveFilePicker;
 
@@ -46,7 +47,14 @@ type Category = {
 
 type Checked = Record<ExportLeagueKey, boolean>;
 
-type BulkType = "default" | "none" | "all" | "teamsOnly" | "leagueSettingsOnly";
+type BulkType =
+	| "default"
+	| "none"
+	| "all"
+	| "teamsOnly"
+	| "leagueSettingsOnly"
+	// archuser2k: not a league file at all: the archetype tuning file (common/archetypes/tuning.ts TuningFile)
+	| "archetypeTuningOnly";
 
 const categories: Category[] = [
 	{
@@ -502,6 +510,8 @@ const ExportLeague = ({ stats }: View<"exportLeague">) => {
 		HAS_FILE_SYSTEM_ACCESS_API,
 	);
 	const abortController = useRef<AbortController | undefined>(undefined);
+	const [archetypeTuningOnly, setArchetypeTuningOnly] = useState(false);
+	const [archetypeSnapshots, setArchetypeSnapshots] = useState(true);
 
 	const { lid } = useLocal(["lid"]);
 
@@ -518,7 +528,43 @@ const ExportLeague = ({ stats }: View<"exportLeague">) => {
 		safeLocalStorage.getItem("dropboxAccessToken"),
 	);
 
+	const handleArchetypeTuning = async () => {
+		setStatus(undefined);
+		try {
+			const file = await toWorker("archetypes", "tuningExportOnly", {
+				snapshots: archetypeSnapshots,
+			});
+			const base = await toWorker("main", "getExportFilename", "league");
+			downloadFile(
+				base.replace(/\.json$/, "") + "_archetype_tuning.json",
+				JSON.stringify(file, null, compressed ? undefined : 1),
+				"application/json",
+			);
+			setStatus(
+				<span className="text-success">
+					Exported {file.picks.league.length} league pick
+					{file.picks.league.length === 1 ? "" : "s"},{" "}
+					{file.picks.global.length} browser-wide pick
+					{file.picks.global.length === 1 ? "" : "s"} and{" "}
+					{Object.keys(file.overrides).length} player pick
+					{Object.keys(file.overrides).length === 1 ? "" : "s"}. Import it from
+					League &gt; Archetypes, Your archetype tuning.
+				</span>,
+			);
+		} catch (error) {
+			setStatus(
+				<span className="text-danger">
+					<b>Error:</b> {error.message}
+				</span>,
+			);
+		}
+	};
+
 	const handleSubmit = async (type: "download" | "dropbox") => {
+		if (archetypeTuningOnly) {
+			await handleArchetypeTuning();
+			return;
+		}
 		setStatus(undefined);
 		setState(type);
 		setAborting(false);
@@ -643,9 +689,15 @@ const ExportLeague = ({ stats }: View<"exportLeague">) => {
 
 	useTitleBar({ title: "Export League" });
 
-	const currentSelected = getCurrentSelected(checked);
+	const currentSelected = archetypeTuningOnly
+		? "archetypeTuningOnly"
+		: getCurrentSelected(checked);
 
 	const bulkSetChecked = (type: BulkType) => {
+		setArchetypeTuningOnly(type === "archetypeTuningOnly");
+		if (type === "archetypeTuningOnly") {
+			return;
+		}
 		if (type === "default") {
 			setChecked(getDefaultChecked());
 		} else {
@@ -692,6 +744,14 @@ const ExportLeague = ({ stats }: View<"exportLeague">) => {
 			key: "leagueSettingsOnly",
 			title: "Settings Only",
 		},
+		...(__SPORT === "basketball"
+			? [
+					{
+						key: "archetypeTuningOnly" as const,
+						title: "Archetype tuning only",
+					},
+				]
+			: []),
 	];
 
 	const bulkSelectButtons = bulkInfo.map((info) => (
@@ -729,9 +789,34 @@ const ExportLeague = ({ stats }: View<"exportLeague">) => {
 				</a>
 			</p>
 
-			<div className="btn-group mb-3">{bulkSelectButtons}</div>
+			<div className="btn-group mb-3 flex-wrap">{bulkSelectButtons}</div>
 
-			<div className="row">
+			{archetypeTuningOnly ? (
+				<div className="mb-3" style={{ maxWidth: 640 }}>
+					<p>
+						Exports only your archetype tuning, not the league: your "Doesn't
+						fit?" picks (this league's and the ones used in all leagues), the
+						players whose archetype you picked, the tuning fitted from your
+						picks, and the reading version. Import it from League &gt;
+						Archetypes, Your archetype tuning.
+					</p>
+					<div className="form-check">
+						<label className="form-check-label">
+							<input
+								className="form-check-input"
+								type="checkbox"
+								checked={archetypeSnapshots}
+								onChange={() => {
+									setArchetypeSnapshots((x) => !x);
+								}}
+							/>
+							Include player snapshots (what a full refit reads; larger file)
+						</label>
+					</div>
+				</div>
+			) : null}
+
+			<div className={clsx("row", archetypeTuningOnly && "d-none")}>
 				{categories.map((cat) => (
 					<div className="col-md-6 col-lg-5 col-xl-4" key={cat.name}>
 						<RenderOption

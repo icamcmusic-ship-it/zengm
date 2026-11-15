@@ -33,7 +33,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "lockdown",
-		re: /Lockdown|\bLock\b|Clamp|Guard Dog|Eliminator|Defender|Defensive(?! Rebound)|Edge[ -]Enforc|3 & D|Switch-Defending|Curtain/,
+		re: /Lockdown|\bLock\b|Clamp|Guard Dog|Eliminator|(?<!Paint )Defender|Defensive(?! Rebound)|Edge[ -]Enforc|3 & D|Switch-Defending|Curtain|Tenacious|Warden/,
 		w: { dper: 2.5 },
 		need: { pdef: 0.3, dper: 0.1 },
 		xw: { pdef: 2 },
@@ -43,7 +43,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "steal",
-		re: /Ball[ -]Hawk|Ball[ -]Snatch|Thie[fv]|Snatch & Slash|Disruptive|Chaos/,
+		re: /Ball[ -]Hawk|Ball[ -]Snatch|Thie[fv]|Snatch & Slash|Disruptive|Chaos|Pest|Bandit/,
 		w: { stl: 2.5 },
 		need: { stl: 0.3, pdef: 0.1 },
 		xw: { pdef: 1.5, len: 0.5 },
@@ -53,7 +53,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "rimD",
-		re: /Eras|Obliterat|Swats|Backline|Anchor|Guardian|Rim[ -]Reap|Paint[ -]Hawk|Curtain/,
+		re: /Eras|Obliterat|Swats|Backline|Anchor|Guardian|Rim[ -]Reap|Paint[ -]Hawk|Curtain|Paint Defender|Protect|Terror|Shot-Ax|Fortress|Pillar/,
 		w: { blk: 2.5, dint: 1.5 },
 		need: { blk: 0.3 },
 		needFor: { blk: 0 },
@@ -64,7 +64,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "oreb",
-		re: /Crash|Putback|Board[ -]Hunt/,
+		re: /Crash|Putback|Board[ -]Hunt|Tip-In|Possession Extend/,
 		w: { reb: 2.5 },
 		needFor: { reb: 0.3 },
 		xw: { orl: 1 },
@@ -74,7 +74,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "reb",
-		re: /Clean|Board(?![ -]Hunt)|Glass(?! Visionary)|Rebound|Floor-Sweeping/,
+		re: /Clean|Board(?![ -]Hunt)|Glass(?! Visionary)|Rebound|Floor[ -]Sweep/,
 		w: { reb: 2.5 },
 		needFor: { reb: 0.3 },
 		xw: { orl: -0.5 },
@@ -84,7 +84,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "outlet",
-		re: /Break[ -]Start/,
+		re: /Break[ -]Start|Break[ -]Lead/,
 		w: { pss: 2, reb: 1.5 },
 		need: { pss: 0.2 },
 		family: "playmaker",
@@ -111,7 +111,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "catchShoot",
-		re: /Sharp|Stretch|Strech|Pop|3 & D|Catch & Shoot|Off-Screen|Big Range|Automatic|Shots|Silk|PlayShot|Laser/,
+		re: /Sharp|Stretch|Strech|Pop|3 & D|Catch & Shoot|Off-Screen|Big Range|Automatic|Shots|Silk|PlayShot|Laser|Splash/,
 		w: { three: 2.5 },
 		need: { three: 0.3 },
 		xw: { cs: 1 },
@@ -121,7 +121,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "shotHunt",
-		re: /3PT|Snip|Shot Hunter|Gunner|Logo|Cash Out/,
+		re: /3PT|Snip|Shot Hunter|Gunner|Logo|Cash Out|Bomber/,
 		w: { three: 2.5 },
 		need: { three: 0.3 },
 		xw: { cs: -0.5 },
@@ -148,7 +148,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "mid",
-		re: /Mid-Range|Middy|Mid-Slash|Maestro|Menace|Smooth|Faceup/,
+		re: /Mid-Range|Middy|Mid-Slash|Maestro|Menace|Smooth|Faceup|Hash/,
 		w: { mid: 2.5 },
 		need: { mid: 0.3 },
 		family: "scorer",
@@ -156,7 +156,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "post",
-		re: /(?<!Mid-)Post(?!eriz|er\b)|Footwork/,
+		re: /(?<!Mid-|High-)Post(?!eriz|er\b)|Footwork/,
 		w: { post: 2.5 },
 		needFor: { post: 0.3 },
 		family: "scorer",
@@ -164,7 +164,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "paint",
-		re: /(?<!Mid-)Paint(?![ -]Hawk)/,
+		re: /(?<!Mid-)Paint(?![ -]Hawk| Defender|[ -]Protect)/,
 		w: { fin: 2, post: 1.5 },
 		need: { fin: 0.2 },
 		family: "scorer",
@@ -172,7 +172,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "slash",
-		re: /Sla[Ss]h|Blow-By|Drive & Rise/,
+		re: /Sla[Ss]h|Blow-By|Drive & Rise|Downhill/,
 		w: { fin: 2.5, draw: 1.5, drb: 1 },
 		need: { fin: 0.3, drb: -0.2 },
 		family: "slasher",
@@ -180,7 +180,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "finish",
-		re: /Finish|Laymak|Layup|Bullmaker/,
+		re: /Finish|Laymak|Layup|Bullmaker|Levitat/,
 		w: { fin: 2.5 },
 		need: { fin: 0.3 },
 		family: "slasher",
@@ -188,7 +188,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "dunk",
-		re: /Dunk|Rim[ -]Rock|Rim[ -]Wreck|Poster|[Mm]ash|Yamming/,
+		re: /Dunk|Rim[ -]Rock|Rim[ -]Wreck|Poster|[Mm]ash|Yamming|Slammer|Flush/,
 		w: { fin: 2.5, jmp: 1.5 },
 		need: { fin: 0.3 },
 		family: "athlete",
@@ -197,7 +197,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "air",
-		re: /High[ -]Fly|Aerial|Glide|Athletic|Explosive|Force of Nature/,
+		re: /High[ -]Fly|Aerial|Glide|Athletic|Athlete|Explosive|Force of Nature|Bouncy|Apex/,
 		w: { jmp: 2.5, ath: 2 },
 		need: { ath: 0.3 },
 		family: "athlete",
@@ -239,7 +239,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "creator",
-		re: /Creat|Iso|Ankle|Shifty|Shot Hunter/,
+		re: /Creat|Iso|Ankle|Shifty|Shot Hunter|Dribble|Off-the-Bounce/,
 		w: { drb: 2.5, usg: 1.5 },
 		need: { drb: 0.3 },
 		xw: { cs: -1 },
@@ -248,7 +248,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "pass",
-		re: /Playmak|Play(?:Shot|Sla[Ss]h)|Dim|Dot|Table[ -]Sett|Distributor|Point (?:Forward|Four|Center)|Point$|Visionary|Engine|Triple-Double/,
+		re: /Playmak|Play(?:Shot|Sla[Ss]h)|Dim|Dot|Table[ -]Sett|Distributor|Point (?:Forward|Four|Center)|Point$|Visionary|Engine|Triple-Double|Facilitat|General|Dish/,
 		w: { pss: 2.5 },
 		need: { pss: 0.3 },
 		xw: { sec: 0.5 },
@@ -273,7 +273,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "strength",
-		re: /Bull|Physical|Power|Bodyguard|Grinder|Tank|[Mm]asher|Pound/,
+		re: /Bull|Physical|Power|Bodyguard|Grinder|Tank|[Mm]asher|Pound|Bruis|Punish/,
 		w: { stre: 2 },
 		need: { stre: 0.2 },
 		family: "hustle",
@@ -281,10 +281,104 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "skill",
-		re: /Crafty|Skilled|Fluid|Phenom|Prodigy|Savant|Versatile|King/,
+		re: /Crafty|Skilled|Fluid|Phenom|Prodigy|Savant|Versatile|King|Finesse|Dynamic/,
 		w: { oiq: 1.5 },
 		family: "skilled",
 		phrase: "wins with skill and feel",
+	},
+	// archuser2k: the words of the user's NBA 2K archetypes (2K26-era names) the vocabulary did not have (user2k.data.ts);
+	// synonyms of an existing word joined its concept above (Pesky / Bandit: steals, Tip-In / Possession Extender: the
+	// offensive glass, Bouncy / Athlete / Apex: above the rim, Bruiser / Punishing: strength, Facilitating: passing, Hash:
+	// the mid-range, Bomber: threes, Tenacious / Warden: the perimeter, Paint Defender / Paint-Protecting / Terror / Shot-Axing:
+	// the rim (and Protector, Fortress, Pillar), Floor Sweeper: rebounds, Flush: dunks, Dish: passing, Pest: steals,
+	// Punisher / Bruising: strength, Break Leader: outlets, Splash: spacing, Downhill: slashing, Levitator: finishing, Slammer: dunks, Dribble /
+	// Off-the-Bounce: creating, General: passing, Finesse / Dynamic: skill)
+	{
+		key: "burner",
+		re: /Burner|Open-Lane/,
+		w: { spd: 2.5, ath: 1.5, fin: 1 },
+		need: { spd: 0.2 },
+		family: "athlete",
+		tag: "athletic",
+		phrase: "beats everyone down the floor",
+	},
+	{
+		key: "hammer",
+		re: /Hammer/,
+		w: { fin: 2.5, jmp: 2 },
+		need: { fin: 0.2 },
+		family: "athlete",
+		tag: "athletic",
+		phrase: "hammers it home at the rim",
+	},
+	{
+		key: "cutter",
+		re: /Cutter|Off-Ball/,
+		w: { ath: 2, fin: 1.5, oiq: 1 },
+		need: { ath: 0.2 },
+		family: "slasher",
+		phrase: "cuts to the basket without the ball",
+	},
+	{
+		key: "scoop",
+		re: /Scoop/,
+		w: { fin: 2.5, oiq: 1 },
+		need: { fin: 0.2 },
+		family: "slasher",
+		phrase: "scoops in crafty layups",
+	},
+	{
+		key: "pullUp",
+		re: /Pull-Up/,
+		w: { mid: 2.5, drb: 1 },
+		need: { mid: 0.3 },
+		xw: { cs: -1 },
+		family: "scorer",
+		phrase: "pulls up off the dribble",
+	},
+	{
+		key: "chaser",
+		re: /Chaser/,
+		w: { usg: 2, mid: 2, three: 1 },
+		need: { mid: 0.2 },
+		family: "scorer",
+		phrase: "chases his shots all over the floor",
+	},
+	{
+		key: "grabGo",
+		re: /Grab & Go/,
+		w: { reb: 2.5, spd: 1, drb: 1 },
+		needFor: { reb: 0.3 },
+		family: "rebounder",
+		tag: "rebounding",
+		phrase: "grabs the rebound and goes",
+	},
+	{
+		key: "pressure",
+		re: /Pressure|Cooker/,
+		w: { dper: 2.5, stl: 1.5 },
+		need: { dper: 0.2 },
+		xw: { pdef: 2 },
+		family: "defender",
+		tag: "defense",
+		phrase: "pressures the ball full court",
+	},
+	{
+		key: "highLow",
+		re: /High-Low/,
+		w: { post: 2, pss: 1.5, mid: 1 },
+		needFor: { post: 0.2 },
+		family: "scorer",
+		phrase: "works the high and low post",
+	},
+	{
+		key: "wizard",
+		re: /Wizard/,
+		w: { pss: 2, drb: 2 },
+		need: { pss: 0.1 },
+		family: "playmaker",
+		tag: "playmaking",
+		phrase: "works magic with the ball",
 	},
 ];
 

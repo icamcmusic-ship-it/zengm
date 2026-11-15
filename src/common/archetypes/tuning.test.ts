@@ -261,7 +261,7 @@ describe("archetype tuning", () => {
 			if (c.id !== base[i]!.id) {
 				assert.ok(
 					c.shortfall <= Math.max(0.25, base[i]!.shortfall + 0.25),
-					`${c.id} ${c.shortfall}`,
+					`${c.id} ${c.shortfall} (was ${base[i]!.id} ${base[i]!.shortfall}, target ${target})`,
 				);
 			}
 		}

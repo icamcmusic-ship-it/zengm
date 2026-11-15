@@ -400,6 +400,17 @@ const SUB_WANTS: Record<string, Wants<SubFeat>> = {
 	tripleDouble: { vis: 0.5 },
 	strength: { con: 1, pst: 0.3 },
 	skill: { con: -0.5, flt: 0.4 },
+	// archuser2k
+	burner: { sls: 1 },
+	hammer: { con: 0.5, mxv: 0.7 },
+	cutter: { cls: 0.5, mxv: 0.3 },
+	scoop: { cls: 0.6, flt: 0.4 },
+	pullUp: { crt: 0.7, cs: -0.5 },
+	chaser: { rng: 0.3, crt: 0.3 },
+	grabGo: { hnd: 0.5, vis: 0.3 },
+	pressure: { pdf: 1, stl: 0.4 },
+	wizard: { vis: 1, hnd: 0.6 },
+	highLow: { pst: 0.8, vis: 0.5 },
 };
 const PT_WANTS: Record<string, Wants<PtFeat>> = {
 	creator: { iso: 1, prb: 0.4, spot: -0.6 },
@@ -419,6 +430,16 @@ const PT_WANTS: Record<string, Wants<PtFeat>> = {
 	oreb: { pb: 1 },
 	reb: { pb: 0.3 },
 	steal: { tr: 0.4 },
+	// archuser2k
+	burner: { tr: 1 },
+	hammer: { prr: 0.5, cut: 0.5 },
+	cutter: { cut: 1 },
+	scoop: { cut: 0.4, iso: 0.3 },
+	pullUp: { iso: 0.5, prb: 0.5 },
+	chaser: { offs: 0.6, spot: 0.3 },
+	grabGo: { tr: 0.8 },
+	wizard: { prb: 1 },
+	highLow: { post: 1 },
 };
 // Names the concepts do not cover
 const NAME_SUB_WANTS: [RegExp, Wants<SubFeat>][] = [

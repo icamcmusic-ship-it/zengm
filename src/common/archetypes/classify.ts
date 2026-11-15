@@ -113,6 +113,11 @@ export const ALTERNATES = 2;
 // real top-150 cap): a hand bias on top of the calibrated one, for every profile of the build
 export const SPOT_BIAS: Record<string, number> = {
 	"shot-erasing-mid-paint-maestro": -0.4,
+	// archuser2k: two builds made from the user's 2K list that took players their names do not describe: Mid-Post Board
+	// Enforcer (2K's all-time bigs) took Giannis (arch16 user report: not a mid-range build), Post-Scoring Stretch (bigs,
+	// two forwards listed at SF) took Klay Thompson
+	"mid-post-board-enforcer": -0.3,
+	"post-scoring-stretch": -0.4,
 };
 // arch16: every generic build (generic.ts) a little less likely, for its share in real players' leagues (the star trim
 // reaches only stars; the share trim only generated leagues)
@@ -768,7 +773,25 @@ export type ClassifyOptions = {
 };
 
 // The ONE build he is most similar to. No hybrids: the runners-up are only listed as `alternates` ("also close to").
+// archuser2k: with the user's tuning on top (archfb, a model with `buildBias`), the archfb guardrail is enforced here: a
+// tuned label he falls short of by more than POOR_FIT_SHORT beyond the untuned label's shortfall is not given (the untuned
+// one is). Without a tuning nothing changes.
 export const classify = (
+	ratings: ArchetypeRatings,
+	opts: ClassifyOptions = {},
+): Classification => {
+	const c = classifyRead(ratings, opts);
+	if (opts.model?.buildBias === undefined) {
+		return c;
+	}
+	const { model: _tuned, ...rest } = opts;
+	const base = classifyRead(ratings, rest);
+	return c.id !== base.id &&
+		c.shortfall > Math.max(POOR_FIT_SHORT, base.shortfall + POOR_FIT_SHORT)
+		? base
+		: c;
+};
+const classifyRead = (
 	ratings: ArchetypeRatings,
 	opts: ClassifyOptions = {},
 ): Classification => {

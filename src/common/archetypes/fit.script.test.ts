@@ -31,19 +31,27 @@ import { RULE_KEY } from "./ruleKey.data.ts";
 // arch17: plus the simulated league's players, read with their play types. archfb: ARCH_PICKS=file[,file...] (pick files
 // exported from League -> Archetypes, "Export my picks") replaces the judged set with the user's own picks as the answer
 // key (tune/test split by a hash of each pick, tuning.ts picksToJudged)
-const JUDGED = process.env.ARCH_PICKS
+// archuser2k: ARCH_PICKS_ADD=1 keeps the judged set too (the picks on top); a pick file may also be a tuning-only export
+// (tuning.ts fromPickFile reads both)
+const PICKS = process.env.ARCH_PICKS
 	? picksToJudged(
 			process.env.ARCH_PICKS.split(",").flatMap((f) =>
 				fromPickFile(JSON.parse(readFileSync(f.trim(), "utf8"))),
 			),
 		)
-	: process.env.ARCH_KEY === "rule"
-		? // archrules: the rule answer key (ruleKey.data.ts) in place of the judged builds, same players and splits
-			[...JUDGED_BASE, ...JUDGED_SIM].map((j) => ({
-				...j,
-				ids: RULE_KEY[j.key] ?? j.ids,
-			}))
-		: [...JUDGED_BASE, ...JUDGED_SIM];
+	: undefined;
+const JUDGED =
+	PICKS && !process.env.ARCH_PICKS_ADD
+		? PICKS
+		: PICKS
+			? [...JUDGED_BASE, ...JUDGED_SIM, ...PICKS]
+			: process.env.ARCH_KEY === "rule"
+				? // archrules: the rule answer key (ruleKey.data.ts) in place of the judged builds, same players and splits
+					[...JUDGED_BASE, ...JUDGED_SIM].map((j) => ({
+						...j,
+						ids: RULE_KEY[j.key] ?? j.ids,
+					}))
+				: [...JUDGED_BASE, ...JUDGED_SIM];
 import {
 	CLASS_FEATS,
 	FAM_FEATS,
@@ -125,7 +133,7 @@ export const judgedPlayers = (expanded = EXPANDED, norms = NORMS) => {
 		let ratings;
 		let pos = j.pos;
 		let nm = norms;
-		if (j.src === "picks") {
+		if (j.src === "picks" && !j.slug) {
 			ratings = { ...j.ratings };
 			pos = j.pos;
 			read = { ...j.read };
@@ -279,7 +287,30 @@ const toModel = (w, famW, extra) => ({
 	gamma: w[NP - 1],
 	...extra,
 });
-const prior0 = () => [
+// archuser2k: ARCH_FIT_PRIOR=shipped regularises toward the shipped model (fitted.data.ts) instead of the hand settings,
+// and ARCH_FIT_KEEP_FAM=1 keeps its family classifier (a few hundred picks are too few to refit it)
+const SHIPPED = modelFor(EXPANDED);
+const prior0 = () =>
+	process.env.ARCH_FIT_PRIOR === "shipped"
+		? [
+				...TERMS.map((t) => SHIPPED.theta[t] ?? 0),
+				...CLASS_FEATS.map((c) => SHIPPED.cls[c] ?? 0),
+				...FAMILIES.map((f) => SHIPPED.famBias[f] ?? 0),
+				SHIPPED.gamma,
+			]
+		: priorHand();
+// archuser2k: ARCH_FIT_FREEZE=term,term,... keeps those weights at the prior (the name-promise terms, say: an answer key
+// that ignores what names promise would fit them away)
+const FROZEN = new Set(
+	(process.env.ARCH_FIT_FREEZE ?? "")
+		.split(",")
+		.filter(Boolean)
+		.map((t) => TERMS.indexOf(t))
+		.filter((i) => i >= 0),
+);
+const fitFamilyOr = (players, lambda) =>
+	process.env.ARCH_FIT_KEEP_FAM ? SHIPPED.famW : fitFamily(players, lambda);
+const priorHand = () => [
 	...TERMS.map((t) =>
 		t.startsWith("tr") ? TRAIT_PRIOR : (STYLE_PRIOR[t] ?? 1),
 	),
@@ -302,8 +333,11 @@ const fitRanker = (players, lps, lambda, iters = 400) => {
 	const lr = 0.02;
 	for (let it = 1; it <= iters; it++) {
 		const g = new Array(NP).fill(0);
+		let n = 0;
 		players.forEach((p, pi) => {
 			if (p.pickIdx.length === 0) return;
+			const pw = p.j.w ?? 1;
+			n += pw;
 			const lp = lps[pi];
 			const s = scoresOf(p, lp, w);
 			const mx = Math.max(...s);
@@ -316,7 +350,7 @@ const fitRanker = (players, lps, lambda, iters = 400) => {
 				qz += q[ri];
 			});
 			p.rows.forEach((r, ri) => {
-				const d = (e[ri] / Z - q[ri] / qz) / T;
+				const d = (pw * (e[ri] / Z - q[ri] / qz)) / T;
 				if (Math.abs(d) < 1e-9) return;
 				for (let i = 0; i < NT; i++) if (r.f[i] !== 0) g[i] += d * r.f[i];
 				for (let i = 0; i < NC; i++)
@@ -325,8 +359,8 @@ const fitRanker = (players, lps, lambda, iters = 400) => {
 				g[NP - 1] += d * lp.byFam[r.fam];
 			});
 		});
-		const n = players.length;
 		for (let i = 0; i < NP; i++) {
+			if (FROZEN.has(i)) continue;
 			const gr = g[i] / n + lambda * (w[i] - w0[i]);
 			m[i] = 0.9 * m[i] + 0.1 * gr;
 			v[i] = 0.999 * v[i] + 0.001 * gr * gr;
@@ -581,7 +615,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_FIT)(
 			for (let k = 0; k < FOLDS; k++) {
 				const tr = tune.filter((_, i) => folds[i] !== k);
 				const va = tune.filter((_, i) => folds[i] === k);
-				const famW = fitFamily(tr, g.lamF);
+				const famW = fitFamilyOr(tr, g.lamF);
 				const w = fitRanker(tr, famLogP(tr, famW), g.lam);
 				const lpVa = famLogP(va, famW);
 				foldRes.push(xs.map((x) => evaluate(va, lpVa, w, x)));
@@ -604,7 +638,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_FIT)(
 			);
 		}
 		out.push(`chosen: ${JSON.stringify(best)}`);
-		const famW = fitFamily(tune, best.lamF);
+		const famW = fitFamilyOr(tune, best.lamF);
 		const w = fitRanker(tune, famLogP(tune, famW), best.lam);
 		const x = {
 			tau: best.tau,

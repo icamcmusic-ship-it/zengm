@@ -1,5 +1,6 @@
 // archfb: "Your archetype tuning" (League -> Archetypes): how many picks the user made, what they changed (in words),
-// the cross-league switch, reset, and the picks as a JSON file for the developer's full offline refit
+// the cross-league switch, reset, and the picks as a JSON file for the developer's full offline refit (archuser2k: or the
+// whole tuning, "Export tuning only", importable here too)
 import { useEffect, useState } from "react";
 import type { TuningInfo } from "../../../worker/api/archetypes.ts";
 import { downloadFile } from "../../util/downloadFile.ts";
@@ -96,6 +97,23 @@ export const ArchetypeTuningPanel = () => {
 					>
 						Export my picks (JSON)
 					</button>
+					<button
+						type="button"
+						className="btn btn-sm btn-secondary"
+						title="Your picks, your per-player picks, the fitted tuning and the players' snapshots: everything your tuning is made of, without the league"
+						onClick={async () => {
+							const file = await toWorker("archetypes", "tuningExportOnly", {
+								snapshots: true,
+							});
+							downloadFile(
+								"archetype-tuning.json",
+								JSON.stringify(file, null, 1),
+								"application/json",
+							);
+						}}
+					>
+						Export tuning only (JSON)
+					</button>
 					<label className="btn btn-sm btn-secondary mb-0">
 						Import picks
 						<input
@@ -111,7 +129,9 @@ export const ArchetypeTuningPanel = () => {
 									const res = await toWorker("archetypes", "tuningImport", {
 										file: JSON.parse(await f.text()),
 									});
-									await after(`Imported ${res.n} picks.`);
+									await after(
+										`Imported ${res.n} picks${res.overrides > 0 ? ` and ${res.overrides} player picks` : ""}.`,
+									);
 								} catch (error) {
 									setNote(`Could not import: ${(error as Error).message}`);
 								}
