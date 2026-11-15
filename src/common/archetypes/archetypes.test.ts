@@ -1188,8 +1188,8 @@ const PINNED: [string, number, string][] = [
 	["embiijo01", 2025, "slashing-mid-range-maestro"], // Joel Embiid
 	["lopezbr01", 2025, "backline-pick-and-popper"], // Brook Lopez
 	["capelca01", 2025, "physical-defensive-rebounder"], // Clint Capela
-	["korveky01", 2021, "deep-range-sniper"], // Kyle Korver
-	["westbru01", 2025, "slashing-playmaker"], // Russell Westbrook (arch16: a mid-range name needs a jumper)
+	["korveky01", 2021, "crafty-sharpshooter"], // Kyle Korver (sgdrift: GF, was SF with deep-range-sniper)
+	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook (arch16: a mid-range name needs a jumper; sgdrift: PG, his listed position, was G with slashing-playmaker)
 	["wembavi01", 2025, "shot-erasing-mid-paint-maestro"], // Victor Wembanyama
 	["doncilu01", 2025, "diming-3-level-scorer"], // Luka Dončić (arch13: his three fixed, 53 -> 71)
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges

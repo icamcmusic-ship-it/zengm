@@ -29,6 +29,7 @@ import writePlayerStats, {
 } from "./writePlayerStats.ts";
 import writeTeamStats from "./writeTeamStats.ts";
 import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
+import { schedulePageWarm } from "../../util/pageWarm.ts";
 import { scheduleRecordsCheck } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
 import {
@@ -148,6 +149,8 @@ const play = async (
 
 		// League achievements unlocked by these games
 		scheduleLeagueAchievementsCheck();
+		// Best Games of the season so far and League Achievements, warmed once games stop (pageWarm.ts)
+		schedulePageWarm();
 		// Records Book and Milestones: records broken, milestones reached
 		scheduleRecordsCheck();
 	};

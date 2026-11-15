@@ -17,6 +17,7 @@ import type { Game } from "../../common/types.ts";
 import { idb } from "../db/index.ts";
 import { hypeForGids } from "./hypeData.ts";
 import { g } from "./index.ts";
+import { loadPage, savePage } from "./pagePersist.ts";
 
 export type BestGame = HypeLite & { rating: number };
 
@@ -101,15 +102,43 @@ const playsOfGameRaw = (gm: Game): TopPlay[] => {
 	return playsFromClutch(game);
 };
 
-export const seasonBest = async (season: number): Promise<SeasonBest> => {
-	const all = (await idb.merged.games.getAll({ season })).filter(isRegularGame);
-	const key = `${g.get("lid")}|${season}|${all.length}`;
-	const hit = cache.get(key);
-	if (hit) {
-		return hit;
-	}
+// Bump when what seasonBest returns for the same games changes (persisted results of past seasons, pagePersist.ts)
+const PERSIST_VERSION = 1;
 
-	const hype = await hypeForGids(all.map((gm) => gm.gid));
+// What a season's result depends on besides its box scores: team names (in the plays) and the league's gender
+const persistSig = () => {
+	const info = g.get("teamInfoCache");
+	return JSON.stringify([
+		female(),
+		info.map((t) => (t ? [t.abbrev, t.region, t.name] : null)),
+	]);
+};
+
+// A game's plays, kept for the session: wording a game's play-by-play is most of what a season costs, and a stored box
+// score doesn't change (the key has the team names, which the plays have in them)
+const playsMemo = new Map<string, TopPlay[]>();
+const playsOfGameMemo = (gm: Game, sig: string) => {
+	const key = `${g.get("lid")}|${gm.gid}|${sig}`;
+	let plays = playsMemo.get(key);
+	if (!plays) {
+		plays = playsOfGame(gm);
+		if (playsMemo.size >= 2000) {
+			playsMemo.clear();
+		}
+		playsMemo.set(key, plays);
+	}
+	return plays;
+};
+
+const computeSeasonBest = async (
+	season: number,
+	all: Game[],
+	yieldEvery?: number,
+): Promise<SeasonBest> => {
+	const hype = await hypeForGids(
+		all.map((gm) => gm.gid),
+		all,
+	);
 	const rated = Object.values(hype)
 		.filter((h) => h.post)
 		.map((h) => ({ ...h, rating: h.post!.score }))
@@ -124,22 +153,123 @@ export const seasonBest = async (season: number): Promise<SeasonBest> => {
 		)
 		.slice(0, MAX_PBP_GAMES);
 	const plays: TopPlay[] = [];
+	let last = performance.now();
+	const sig = persistSig();
 	for (const gm of pbpGames) {
-		plays.push(...playsOfGame(gm));
+		plays.push(...playsOfGameMemo(gm, sig));
+		// In the background, let the worker answer other messages now and then
+		if (yieldEvery !== undefined && performance.now() - last > yieldEvery) {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			last = performance.now();
+		}
 	}
 
-	const out: SeasonBest = {
+	return {
 		season,
 		games: rated.slice(0, GAMES_PER_SEASON),
 		plays: pickTopPlays(plays, { limit: PLAYS_PER_SEASON }),
 		numGames: all.length,
 		numWithPbp: all.filter((gm) => typeof (gm as any).pbp === "string").length,
 	};
+};
+
+const remember = (key: string, out: SeasonBest) => {
 	if (cache.size > 30) {
 		cache.delete(cache.keys().next().value!);
 	}
 	cache.set(key, out);
+};
+
+// A past season (all its box scores in the database): kept for the session, and across sessions (pagePersist.ts), keyed
+// by how many box scores it has. Its result only changes if they do (written to, which forgets the persisted copy, or
+// deleted, which changes the count) or a team is renamed.
+const pastSeasonBest = async (
+	season: number,
+	yieldEvery?: number,
+): Promise<SeasonBest> => {
+	const lid = g.get("lid");
+	const count = await idb.league
+		.transaction("games")
+		.store.index("season")
+		.count(season);
+	const sig = persistSig();
+	const key = `${lid}|${season}|past|${count}|${sig}`;
+	const hit = cache.get(key);
+	if (hit) {
+		return hit;
+	}
+	// The background warm-up and the page can ask at the same time
+	const pending = inflight.get(key);
+	if (pending) {
+		return pending;
+	}
+	const p = pastSeasonBestUncached(season, yieldEvery, lid, count, sig, key);
+	inflight.set(key, p);
+	try {
+		return await p;
+	} finally {
+		inflight.delete(key);
+	}
+};
+
+const inflight = new Map<string, Promise<SeasonBest>>();
+
+const pastSeasonBestUncached = async (
+	season: number,
+	yieldEvery: number | undefined,
+	lid: number,
+	count: number,
+	sig: string,
+	key: string,
+): Promise<SeasonBest> => {
+	const meta = { v: PERSIST_VERSION, count, sig };
+	const persisted = await loadPage<SeasonBest>(lid, "best", season, meta);
+	if (persisted) {
+		remember(key, persisted);
+		return persisted;
+	}
+	const stored = await idb.league
+		.transaction("games")
+		.store.index("season")
+		.getAll(season);
+	const out = await computeSeasonBest(
+		season,
+		stored.filter(isRegularGame),
+		yieldEvery,
+	);
+	if (stored.length === count && g.get("lid") === lid) {
+		// What the page gets is what a later session reads back (JSON, not a structured clone, which would keep what JSON drops)
+		// eslint-disable-next-line unicorn/prefer-structured-clone
+		const json = JSON.parse(JSON.stringify(out)) as SeasonBest;
+		void savePage(lid, "best", season, meta, json);
+		remember(key, json);
+		return json;
+	}
 	return out;
+};
+
+export const seasonBest = async (
+	season: number,
+	yieldEvery?: number,
+): Promise<SeasonBest> => {
+	if (season < g.get("season")) {
+		return pastSeasonBest(season, yieldEvery);
+	}
+	const all = (await idb.merged.games.getAll({ season })).filter(isRegularGame);
+	const key = `${g.get("lid")}|${season}|${all.length}`;
+	const hit = cache.get(key);
+	if (hit) {
+		return hit;
+	}
+	const out = await computeSeasonBest(season, all, yieldEvery);
+	remember(key, out);
+	return out;
+};
+
+// Background warm-up (pageWarm.ts): a season's result (a past season's is kept across sessions; the current season's for
+// the session, and its games' plays, so that after the next games only theirs are worded)
+export const warmSeasonBest = async (season: number) => {
+	await seasonBest(season, 30);
 };
 
 // All seasons with stored games, best of each merged
