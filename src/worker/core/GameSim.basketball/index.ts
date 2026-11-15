@@ -989,6 +989,9 @@ class GameSim extends GameSimBase {
 			numPlayersOnCourt: this.numPlayersOnCourt,
 			neutralSite: this.neutralSite,
 			// scoringSummary: this.playByPlay.scoringSummary,
+			...(this.shootoutShots.length > 0
+				? { shootoutShots: this.shootoutShots }
+				: {}),
 		};
 		return out;
 	}
@@ -1010,7 +1013,11 @@ class GameSim extends GameSimBase {
 			pid: p.id,
 			made,
 		});
+		// Presentation only (box score shootout section, news): who shot and whether it went in
+		this.shootoutShots.push([t, p.id, made ? 1 : 0]);
 	}
+
+	shootoutShots: [TeamNum, number, 0 | 1][] = [];
 
 	doShootout() {
 		if (
@@ -1099,6 +1106,8 @@ class GameSim extends GameSimBase {
 				kind: "shootout",
 				player: ref(shooters[winner]),
 				opp: ref(shooters[loser]),
+				made: [this.team[winner].stat.sPts, this.team[loser].stat.sPts],
+				att: [this.team[winner].stat.sAtt, this.team[loser].stat.sAtt],
 			},
 		});
 	}

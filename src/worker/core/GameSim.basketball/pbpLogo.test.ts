@@ -83,6 +83,29 @@ type Checked = {
 	fouledBy: number;
 };
 
+// content2: the newer flavor lines (play types, sub-rating shapes, help defense, the shootout sequence). Each must be seen, with the
+// logo checks above applying to it like any other line
+const NEW_LINES: [string, RegExp][] = [
+	["shootout tally", / is \d+ for \d+\./],
+	["shootout shooter", /steps up (to the line first|for the)/],
+	[
+		"touch floater",
+		/soft touch|feathery floater|teardrop over the outstretched/,
+	],
+	[
+		"finisher through help",
+		/help defenders and finishes|help-side bump|finishes through the help/,
+	],
+	[
+		"hand-off / screen",
+		/takes the hand-off, turns|rejects the screen and gets all the way|short-rolls/,
+	],
+	["post-up", /backs his man down from the block|seals deep in the post/],
+	["transition", /sprints the lane|runs the wing and lays/],
+	["help block", /rotates over in time|leaves his man to help/],
+];
+const seenNew = new Map<string, string>();
+
 const checkScenario = async (sc: Scenario, flavor: boolean) => {
 	local.setState({ featurePbpFlavor: flavor } as any);
 	const out: Checked = {
@@ -154,6 +177,13 @@ const checkScenario = async (sc: Scenario, flavor: boolean) => {
 			out.lines += 1;
 			// The main line (a second line is a quieter note under it)
 			const text = nodeToText(o.text).split("\n")[0]!;
+			if (flavor) {
+				for (const [label, re] of NEW_LINES) {
+					if (re.test(text) && !seenNew.has(label)) {
+						seenNew.set(label, text);
+					}
+				}
+			}
 
 			let first: { at: number; len: number; t: 0 | 1 } | undefined;
 			for (const [re, t, len] of patterns) {
@@ -253,6 +283,11 @@ for (const flavor of [true, false]) {
 		);
 		assert.isAbove(named, 5000);
 		if (flavor) {
+			assert.deepStrictEqual(
+				NEW_LINES.map(([label]) => label).filter((l) => !seenNew.has(l)),
+				[],
+				"new flavor lines never seen",
+			);
 			// The reported case: the fouled shooter leads the line, and it's his team's logo, not the fouler's
 			assert.isAbove(fouledBy, 50);
 		}

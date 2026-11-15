@@ -140,4 +140,17 @@ export type HofPlaque = {
 	face: FaceConfig;
 	colors: [string, string, string];
 	jersey: string;
+	// Hall of Fame words (common/hofStory.ts)
+	nickname?: string;
+	text?: string;
+};
+
+// Plaque text and induction speech of each Hall of Famer, for the Hall of Fame page (common/hofStory.ts)
+export type HofWords = {
+	pid: number;
+	name: string;
+	nickname?: string;
+	retiredYear: number;
+	plaque: string;
+	speech: string[];
 };

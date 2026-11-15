@@ -368,3 +368,24 @@ describe("newspaper text helpers", () => {
 		assert.notStrictEqual(new Rng("x").random(), new Rng("y").random());
 	});
 });
+
+test("franchise reboot feature", () => {
+	const facts = makeFacts("final");
+	facts.franchiseChanges = [
+		{
+			tid: 2,
+			season: facts.season,
+			kind: "relocation",
+			from: "City2 Team2",
+			to: "Newtown Team2",
+			fromRegion: "City2",
+			toRegion: "Newtown",
+			hype: 0.7,
+			record: { won: 400, lost: 380, titles: 1, seasons: 10 },
+		},
+	];
+	const text = paperText(buildPaper(facts));
+	assert.include(text, "Newtown Team2");
+	assert.include(text, "400-380");
+	assert.include(text, "1 championship");
+});

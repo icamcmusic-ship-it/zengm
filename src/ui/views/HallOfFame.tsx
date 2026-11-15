@@ -7,8 +7,9 @@ import { wrappedPlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import type { DataTableRow } from "../components/DataTable/index.tsx";
 import { useLocal } from "../util/local.ts";
 import { HallOfFamePlaques } from "./HallOfFamePlaques.tsx";
+import { HallOfFameSpeeches } from "./HallOfFameSpeeches.tsx";
 
-const HallOfFame = ({ players, plaques, stats }: View<"hallOfFame">) => {
+const HallOfFame = ({ players, plaques, stats, words }: View<"hallOfFame">) => {
 	useTitleBar({ title: "Hall of Fame" });
 	const { userTid } = useLocal(["userTid"]);
 
@@ -106,6 +107,8 @@ const HallOfFame = ({ players, plaques, stats }: View<"hallOfFame">) => {
 			</p>
 
 			<HallOfFamePlaques plaques={plaques} />
+
+			<HallOfFameSpeeches words={words} />
 
 			<DataTable
 				cols={cols}

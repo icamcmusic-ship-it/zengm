@@ -3,6 +3,7 @@
 // Articles and sidebars for the inside sections of the league paper.
 
 import { Ctx, P } from "./ctx.ts";
+import { featureParagraphs } from "../franchiseStory.ts";
 import { inGames, seriesVerb } from "./front.ts";
 import {
 	aOrAn,
@@ -977,6 +978,26 @@ export const retireStories = (c: Ctx): Article[] => {
 	}
 	return out;
 };
+
+// ---- Franchise reboots ----------------------------------------------------
+
+export const franchiseStories = (c: Ctx): Article[] =>
+	(c.f.franchiseChanges ?? []).slice(0, 2).map((ch, i) => {
+		const { head, body } = featureParagraphs(ch, ch.record);
+		return {
+			id: `franchise-${i}`,
+			size: "feature",
+			kicker:
+				ch.kind === "relocation"
+					? "On the move"
+					: ch.kind === "rename"
+						? "New name"
+						: "New look",
+			head,
+			byline: c.byline("league"),
+			body: body.map((text) => P(text)),
+		};
+	});
 
 // ---- Opinion --------------------------------------------------------------
 

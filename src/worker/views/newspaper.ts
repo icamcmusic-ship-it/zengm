@@ -45,6 +45,7 @@ import type {
 import { parseRumorText } from "../../common/rumors/text.ts";
 import { getRumorState } from "../core/rumors/index.ts";
 import type { Game, Player, TeamSeason } from "../../common/types.ts";
+import type { FranchiseChangeKind } from "../../common/franchiseStory.ts";
 import {
 	aggregateGames,
 	decideRebuild,
@@ -1039,7 +1040,66 @@ export const getNewsFacts = async (
 			facts.rumors = rumors;
 		}
 	}
+	// Franchise reboots: a team whose name, city or colors changed from last season
+	const changes = await getFranchiseChanges(season);
+	if (changes.length > 0) {
+		facts.franchiseChanges = changes;
+	}
 	return { facts, logos };
+};
+
+const getFranchiseChanges = async (season: number) => {
+	const out: NonNullable<NewsFacts["franchiseChanges"]> = [];
+	const now = await idb.merged.teamSeasons.getAll({ season });
+	for (const ts of now as TeamSeason[]) {
+		const prev = await idb.merged.teamSeasons.getByTidSeason(
+			ts.tid,
+			season - 1,
+		);
+		if (!prev) {
+			continue;
+		}
+		const kind: FranchiseChangeKind | undefined =
+			prev.region !== ts.region
+				? "relocation"
+				: prev.name !== ts.name
+					? "rename"
+					: prev.colors.join() !== ts.colors.join()
+						? "rebrand"
+						: undefined;
+		if (!kind) {
+			continue;
+		}
+		const record = { won: 0, lost: 0, titles: 0, seasons: 0 };
+		const all = await idb.merged.teamSeasons.getAll({ tid: ts.tid });
+		for (const row of all as TeamSeason[]) {
+			if (row.season >= season) {
+				continue;
+			}
+			record.seasons += 1;
+			record.won += row.won;
+			record.lost += row.lost;
+			if (
+				row.playoffRoundsWon >= 0 &&
+				row.playoffRoundsWon ===
+					g.get("numGamesPlayoffSeries", row.season).length
+			) {
+				record.titles += 1;
+			}
+		}
+		out.push({
+			tid: ts.tid,
+			season,
+			kind,
+			from: `${prev.region} ${prev.name}`,
+			to: `${ts.region} ${ts.name}`,
+			fromRegion: prev.region,
+			toRegion: ts.region,
+			hype: ts.hype,
+			record,
+		});
+	}
+	return out;
 };
 
 type PhotoInfo = {

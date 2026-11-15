@@ -100,7 +100,12 @@ import {
 	realPlayerPhotosSchema,
 	realTeamInfoSchema,
 	type Awards,
+	type Team,
 } from "../../common/types.ts";
+import {
+	fanReaction,
+	type FranchiseChangeKind,
+} from "../../common/franchiseStory.ts";
 import { getScore } from "../core/player/checkJerseyNumberRetirement.ts";
 import type { NewLeagueTeam } from "../../ui/views/NewLeague/types.ts";
 import { PointsFormulaEvaluator } from "../core/team/evaluatePointsFormula.ts";
@@ -5167,6 +5172,55 @@ const updatePlayoffTeams = async (
 	}
 };
 
+const logFranchiseChange = async (
+	t: Team,
+	old: { region: string; name: string; colors: string; imgURL?: string },
+) => {
+	const kind: FranchiseChangeKind | undefined =
+		old.region !== t.region
+			? "relocation"
+			: old.name !== t.name
+				? "rename"
+				: old.colors !== t.colors.join() || old.imgURL !== t.imgURL
+					? "rebrand"
+					: undefined;
+	if (!kind) {
+		return;
+	}
+	const season = g.get("season");
+	const ts = await idb.cache.teamSeasons.indexGet("teamSeasonsByTidSeason", [
+		t.tid,
+		season,
+	]);
+	const change = {
+		tid: t.tid,
+		season,
+		kind,
+		from: `${old.region} ${old.name}`,
+		to: `${t.region} ${t.name}`,
+		fromRegion: old.region,
+		toRegion: t.region,
+		hype: ts?.hype,
+	};
+	const link = `<a href="${helpers.leagueUrl(["roster", `${t.abbrev}_${t.tid}`, season])}">${t.region} ${t.name}</a>`;
+	const head =
+		kind === "rebrand"
+			? `The ${link} unveiled new colors and a new look.`
+			: `The ${old.region} ${old.name} are now the ${link}.`;
+	logEvent({
+		text: `${head} ${fanReaction(change)}`,
+		type:
+			kind === "relocation"
+				? "teamRelocation"
+				: kind === "rename"
+					? "teamRename"
+					: "teamLogo",
+		tids: [t.tid],
+		showNotification: false,
+		score: 20,
+	});
+};
+
 const updateTeamInfo = async ({
 	teams: newTeams,
 	from,
@@ -5202,6 +5256,14 @@ const updateTeamInfo = async ({
 				throw new Error(`New team not found for tid ${t.tid}`);
 			}
 		}
+
+		// For the franchise reboot story (news with the fan reaction), when God Mode renames, moves or recolors a team
+		const oldInfo = {
+			region: t.region,
+			name: t.name,
+			colors: t.colors.join(),
+			imgURL: t.imgURL,
+		};
 
 		if (newTeam.did !== undefined) {
 			const divs = g.get("divs");
@@ -5249,6 +5311,10 @@ const updateTeamInfo = async ({
 		}
 
 		await idb.cache.teams.put(t);
+
+		if (from === "manageTeams" && !t.disabled && !enableTeam) {
+			await logFranchiseChange(t, oldInfo);
+		}
 
 		if (enableTeam) {
 			await draft.genPicks();

@@ -308,7 +308,7 @@ League menu → _Contract Value_: a value index, bargains and albatrosses, and t
 - **Where:** _Rivalries_ tab of Head-to-Head, `/l/:lid/rivalries[/:tidA-:tidB]`; the _Rivals_ card on Team History; League Stats' More links.
 - **What:** one rivalry score per pair of teams (`src/common/rivalries`, gathered by `src/worker/util/rivalries.ts`): playoff meetings weighted by round (Finals most), series length and upsets; even regular season head-to-head; close games (3 points or fewer, or overtime) from stored box scores; same division (or conference); star duels (a 25+ point scorer on both sides in a playoff game); a bonus for a meeting last season and back-to-back meetings. Everything decays with a 6 season half-life. Tiers: Mild, Simmering (10+), Heated (22+), Bitter (40+). The page shows the top rivalries, Finals rivals, every Finals matchup and, for one pair, generated lines and a season-by-season timeline (record, running edge, playoff series, score).
 - **Shared score:** the hype "rivalry" reason (`hypeRivalryPoints`) and the "Playoff rivalry" storyline use the same score.
-- **Known limits:** close games and star duels only count seasons whose box scores are kept. Teams are by tid, so a relocated franchise stays one team.
+- **Known limits:** close games and star duels only count seasons whose box scores are kept. Teams are by tid, so a relocated franchise stays one team (see _Franchise reboots_).
 
 ### Series recaps
 
@@ -520,6 +520,20 @@ season). Never for an edited face. Measured over 3,000 seeds:
 - **Known limits:** the external facesjs editor (Customize Player → Face editor) drops `fork.beard`. Retired players are only
   aged with the option on. Changing the speed or style events changes how future seasons look, not the stored past.
 
+### Hall of Fame words
+
+- **Where:** Hall of Fame page (_Induction speeches_ section, a picker of every inductee, most recent first; plaque text under each plaque with Face Aging on), player page (_Nickname_ line), Customize Player (_Nickname_ field, basketball).
+- **Nicknames** (`generateNickname` in `src/common/hofStory.ts`): from career per-game stats (scorers "Buckets", shooters "Splash" / "Downtown Hale", shot blockers "The Eraser", rebounders, passers "The Professor", thieves), the style shape of his best season (dunker "Air Hale", touch "Soft Touch", handles, speed, strength, rim protection), hometown ("The Gary Kid"), height ("Big Marcus" / "Little Marcus"), MVPs and titles ("The King"), matching initials ("M-Squared"). Seeded by pid; a short, plain career gets none. God Mode: blank = generated, "-" = none, anything else is stored as `p.nickname`.
+- **Plaque text** (`plaqueText`): name with nickname, seasons and main teams (named as they were when he played there), honors, career totals, archetype, and "Pictured in 2006, with the Boston Celtics": the season and team of the prime-face jersey the plaque draws.
+- **Induction speech** (`inductionSpeech`): his hometown, the draft story (lottery pick with his college, first overall, second-rounder, undrafted), his first head coach (Coaching Staff setting), the fellow Hall of Famer he shared the most seasons with, his titles (or the ring he never got) and other teams, the playoff rival that eliminated him most (2+ times), his best stat game from the feats store, and his archetype. Facts are gathered in `src/worker/util/hofStory.ts`.
+- **No visible ratings:** no rating is ever written. The style shape is read from fuzzed ratings, and left out entirely under the no-visible-ratings challenge (nicknames then come from stats and bio only).
+- The Hall of Fame committee idea was dropped; induction is the stock formula.
+
+### Franchise reboots
+
+- **Stock:** God Mode Manage Teams edits region, name, abbrev, colors, jersey and logo; scheduled events (real-league history) and the relocation vote move or rename teams. A franchise is its tid, so records, banners, the records book, Team History and rivalries already carry over, and faces' jerseys per season already use that season's colors (Face history, HoF plaques).
+- **Added** (`src/common/franchiseStory.ts`): news for God Mode moves, renames and new colors/logo (`teamRelocation`, `teamRename`, `teamLogo` events) and a fan reaction appended to them and to scheduled relocations/renames (hype decides whether the new city sells out); a newspaper _History_ feature for each franchise whose city, name or colors changed from last season ("Goodbye, Seattle: the Oklahoma City Thunder begin a new era", with the franchise's record and titles so far, then the fan reaction); and a _Formerly:_ line at the top of Team History's seasons listing every earlier name with its seasons.
+
 ## Game simulation
 
 ### Play-by-play
@@ -537,6 +551,9 @@ season). Never for an edited face. Measured over 3,000 seeds:
 - **Save play-by-play** (`storePlayByPlay`, option `pbpStore`): which games keep their play-by-play with the box score: _All games_, _My team's games only_, _None_. About 7 KB per game, deleted with the box score. `storePlayByPlay` off (the old on/off setting) still means _None_ and is kept in step with the scope by `setGameAttributes`. Helpers and tests: `src/common/pbpSettings.ts`.
 - **The sim never depends on any of it:** the same seeded game gives the same box score with logging off, stored and live (tests in `outcomeInvariance.test.ts` and `playerTraitsSim.test.ts`).
 - **Known limits:** the wording assumes 12-minute quarters for some clock-based phrases.
+
+- **Content batch 2 lines** (`phrases.ts`, `session.ts`, `clutch.ts`): touch-specialist floaters (inside touch and a good stroke more than a leaper: "shows off the soft touch with a high-arcing floater"), elite finishers through the help ("draws two help defenders and finishes anyway"), hand-off, short-roll and post-up finishes ("backs his man down from the block and banks in a hook"), transition ("sprints the lane and finishes before the defense can set"), help-side blocks ("leaves his man to help and swats it off the glass"), more clutch wording ("for the game-winner"), and a note at the opening tip of a rivalry game ("A bitter rivalry renewed..."; its own seeded generator, so the rest of the game reads as before). The flavor layer infers play types from the events, so text only: `outcomeInvariance.test.ts` is unchanged. `pbpLogo.test.ts` requires every one of these lines to be seen in its runs, with the logo rule applying to them.
+- **Shootout sequence** (flavor on): the start ("Still level, so it goes to a three-point shootout: 3 shots for each team's best shooter."), each shooter ("Dorian Dunleavy steps up for the Celtics. The number to beat is 1." / "one make wins it"), every shot with his running tally ("It rims out! Quincy Quarles is 0 for 1."), the clinching or eliminating shot ("That wins it!"), and sudden death. Shooter selection is the sim's own (best three-point shooter, slightly toward usage), unchanged. The box score has a _Shootout_ section (each team's shooter, his shots in order as filled/empty dots and his makes; live and saved, from `game.shootoutShots`, which the sim records for presentation only), and the shootout news line gives both shooters' makes ("outduels X, 3 of 3 to 2 of 3, in a shootout").
 
 ### Game simulation options
 
