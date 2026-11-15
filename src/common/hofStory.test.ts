@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import {
+	factsForDisplay,
 	generateNickname,
+	nicknameForDisplay,
 	inductionSpeech,
 	plaqueText,
 	type CareerFacts,
@@ -77,5 +79,65 @@ describe("hofStory", () => {
 			}),
 		).toBeUndefined();
 	});
-});
 
+	describe("Show Player Nicknames off", () => {
+		// Broken punctuation a dropped nickname could leave behind
+		const broken = /""|“”|\s{2}|\s[!,.?]|a\.k\.a|\bnickname\b|\bundefined\b/i;
+
+		test("nicknameForDisplay", () => {
+			expect(nicknameForDisplay("Buckets", true)).toBe("Buckets");
+			expect(nicknameForDisplay("Buckets", false)).toBeUndefined();
+			expect(nicknameForDisplay("", true)).toBeUndefined();
+			expect(nicknameForDisplay("  ", true)).toBeUndefined();
+			expect(nicknameForDisplay(undefined, true)).toBeUndefined();
+		});
+
+		test("factsForDisplay keeps the stored nickname when on, drops it when off", () => {
+			const withNick = { ...facts, nickname: "Buckets" };
+			expect(factsForDisplay(withNick, true)).toBe(withNick);
+			const off = factsForDisplay(withNick, false);
+			expect(off.nickname).toBeUndefined();
+			expect("nickname" in off).toBe(false);
+			// The input is not changed
+			expect(withNick.nickname).toBe("Buckets");
+		});
+
+		// Many players, so every speech closing and plaque variant is covered
+		const variants = Array.from({ length: 60 }, (_, i) => ({
+			...facts,
+			pid: i,
+			nickname: generateNickname({ ...facts, pid: i }) ?? "The Machine",
+		}));
+
+		test("plaque reads naturally with the real name", () => {
+			for (const f of variants) {
+				const on = plaqueText(factsForDisplay(f, true));
+				expect(on).toContain(`"${f.nickname}"`);
+				const t = plaqueText(factsForDisplay(f, false));
+				expect(t).not.toContain(f.nickname);
+				expect(t).not.toContain('"');
+				expect(t).toMatch(/^Marcus Hale\. 14 seasons/);
+				expect(t).not.toMatch(broken);
+			}
+		});
+
+		test("speech has no nickname and no broken punctuation", () => {
+			let sawNickOn = false;
+			for (const f of variants) {
+				const on = inductionSpeech(factsForDisplay(f, true)).join(" ");
+				if (on.includes(`"${f.nickname}"`)) {
+					sawNickOn = true;
+				}
+				const speech = inductionSpeech(factsForDisplay(f, false));
+				for (const para of speech) {
+					expect(para).not.toContain(f.nickname);
+					expect(para).not.toMatch(broken);
+					expect(para).toBe(para.trim());
+					expect(para.length).toBeGreaterThan(0);
+				}
+				expect(speech.join(" ")).not.toMatch(/letting me be/);
+			}
+			expect(sawNickOn).toBe(true);
+		});
+	});
+});

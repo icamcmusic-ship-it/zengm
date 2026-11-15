@@ -1,6 +1,8 @@
 // Gathers a player's career facts for the Hall of Fame words in common/hofStory.ts (nickname, plaque, induction speech).
 import {
+	factsForDisplay,
 	generateNickname,
+	nicknameForDisplay,
 	inductionSpeech,
 	plaqueText,
 	type CareerFacts,
@@ -10,6 +12,7 @@ import {
 import { archetypeById } from "../../common/archetypes/index.ts";
 import { idb } from "../db/index.ts";
 import g from "./g.ts";
+import { featureOn } from "./nativeFeatures.ts";
 import { getTeamInfoBySeason } from "./getTeamInfoBySeason.ts";
 import { getHeadCoachForSeason } from "../core/staff/data.ts";
 import fuzzRating from "../core/player/fuzzRating.ts";
@@ -184,11 +187,12 @@ export const careerFacts = async (
 		facts.archetype = archetypeById(arch.id)?.name;
 	}
 
-	if (p.nickname !== undefined) {
-		facts.nickname = p.nickname || undefined;
-	} else {
-		facts.nickname = generateNickname(facts, styleShape(p));
-	}
+	// Generated (or stored) either way; the "Show Player Nicknames" setting only decides whether it is shown
+	const nickname =
+		p.nickname !== undefined
+			? p.nickname || undefined
+			: generateNickname(facts, styleShape(p));
+	facts.nickname = nicknameForDisplay(nickname, featureOn("playerNicknames"));
 
 	if (!ctx.full) {
 		return facts;
@@ -290,7 +294,10 @@ export const hofWords = (
 	facts: CareerFacts,
 	prime?: { season: number; tid?: number; team?: string },
 ) => {
-	const f = prime ? { ...facts, prime } : facts;
+	const f = factsForDisplay(
+		prime ? { ...facts, prime } : facts,
+		featureOn("playerNicknames"),
+	);
 	return {
 		plaque: plaqueText(f),
 		speech: inductionSpeech(f),

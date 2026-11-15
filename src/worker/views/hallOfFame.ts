@@ -30,6 +30,8 @@ export default defineView({
 	load: async ({ updateEvents }) => {
 		if (
 			updateEvents.has("firstRun") ||
+			// Show Player Nicknames setting (the speeches and plaques are written with or without them)
+			updateEvents.has("gameAttributes") ||
 			(updateEvents.has("newPhase") && g.get("phase") === PHASE.DRAFT_LOTTERY)
 		) {
 			const stats = bySport({

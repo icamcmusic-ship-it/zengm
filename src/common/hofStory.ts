@@ -98,6 +98,33 @@ const cityOf = (loc: string | undefined) => {
 
 // ---- Nicknames ------------------------------------------------------------
 
+// His facts as shown, under the "Show Player Nicknames" setting. Off: no nickname (stored or generated), so the plaque and
+// speech use his real name only. Only display is gated: the stored nickname is untouched.
+export const nicknameForDisplay = (
+	nickname: string | undefined,
+	showNicknames: boolean,
+) => {
+	const nick = nickname?.trim();
+	return showNicknames && nick ? nick : undefined;
+};
+
+export const factsForDisplay = <T extends { nickname?: string }>(
+	f: T,
+	showNicknames: boolean,
+): T => {
+	const nickname = nicknameForDisplay(f.nickname, showNicknames);
+	if (nickname === f.nickname) {
+		return f;
+	}
+	const out = { ...f };
+	if (nickname === undefined) {
+		delete out.nickname;
+	} else {
+		out.nickname = nickname;
+	}
+	return out;
+};
+
 // A nickname, or undefined when nothing about his game or story stands out. Candidates are weighted by how strongly they fit.
 export const generateNickname = (
 	f: Pick<
