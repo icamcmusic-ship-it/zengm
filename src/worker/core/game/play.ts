@@ -1,3 +1,4 @@
+import { applyOffEmphasis } from "../offEmphasis/index.ts";
 import { marqueeCrowdBoost } from "../../../common/marquee.ts";
 import { ALL_STAR_GAME_ONLY, PHASE } from "../../../common/constants.ts";
 import * as contractHooks from "../contract/hooks.ts";
@@ -30,6 +31,7 @@ import writePlayerStats, {
 } from "./writePlayerStats.ts";
 import writeTeamStats from "./writeTeamStats.ts";
 import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
+import { schedulePageWarm } from "../../util/pageWarm.ts";
 import { scheduleRecordsCheck } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
 import {
@@ -149,6 +151,8 @@ const play = async (
 
 		// League achievements unlocked by these games
 		scheduleLeagueAchievementsCheck();
+		// Best Games of the season so far and League Achievements, warmed once games stop (pageWarm.ts)
+		schedulePageWarm();
 		// Records Book and Milestones: records broken, milestones reached
 		scheduleRecordsCheck();
 	};
@@ -770,6 +774,8 @@ const play = async (
 				await setPbpGameContext(schedule, teams);
 				// Coaching systems (the coachSystems setting): each team's coach's tendencies for the sim
 				await staff.applyCoachSystems(schedule, teams);
+				// Offensive Emphasis: each team's play-type dials for the sim
+				await applyOffEmphasis(schedule, teams);
 			}
 
 			await cbSimGames(schedule, teams, dayOver, quickResults);

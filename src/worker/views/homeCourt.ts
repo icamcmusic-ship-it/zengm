@@ -4,6 +4,7 @@ import { changeLog } from "../db/changeLog.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { isBulkSimming } from "../util/wrappedData.ts";
+import { seasonGameSums } from "../util/gameSummaries.ts";
 import { getSeasonState } from "../util/processInputs.ts";
 import { isCurrentSeasonComplete } from "../../common/seasons.ts";
 import {
@@ -54,19 +55,31 @@ const loadGames = async () => {
 		if (hit && hit.count === count && hit.seq === seq) {
 			games = hit.games;
 		} else {
-			games = await idb.merged.games.getAll(
-				{ season },
-				{
-					filter: (gm) => gm.teams.length === 2,
-					map: (gm) => ({
-						season: gm.season,
-						playoffs: !!gm.playoffs,
-						neutralSite: !!gm.neutralSite,
-						home: { tid: gm.teams[0].tid, pts: gm.teams[0].pts },
-						away: { tid: gm.teams[1].tid, pts: gm.teams[1].pts },
-					}),
-				},
-			);
+			games =
+				season < g.get("season")
+					? // A past season: its box scores reduced once (and kept across sessions)
+						(await seasonGameSums(season))
+							.filter((gm) => gm.n === 2)
+							.map((gm) => ({
+								season: gm.season,
+								playoffs: gm.playoffs,
+								neutralSite: gm.neutralSite,
+								home: { tid: gm.teams[0]!.tid, pts: gm.teams[0]!.pts },
+								away: { tid: gm.teams[1]!.tid, pts: gm.teams[1]!.pts },
+							}))
+					: await idb.merged.games.getAll(
+							{ season },
+							{
+								filter: (gm) => gm.teams.length === 2,
+								map: (gm) => ({
+									season: gm.season,
+									playoffs: !!gm.playoffs,
+									neutralSite: !!gm.neutralSite,
+									home: { tid: gm.teams[0].tid, pts: gm.teams[0].pts },
+									away: { tid: gm.teams[1].tid, pts: gm.teams[1].pts },
+								}),
+							},
+						);
 			cache.set(season, { seq, count, games });
 		}
 		for (const gm of games) {

@@ -445,6 +445,8 @@ export const hypeForUpcoming = async (
 // Hype of games by gid, whether upcoming (in the schedule) or finished (stored)
 export const hypeForGids = async (
 	gids: number[],
+	// The finished games among gids when the caller has read them already (else they're read here)
+	storedGames?: Game[],
 ): Promise<Record<number, HypeLite>> => {
 	const out: Record<number, HypeLite> = {};
 	const { days } = await upcomingTargets(Number.MAX_SAFE_INTEGER);
@@ -457,7 +459,10 @@ export const hypeForGids = async (
 	}
 	// finished games, one snapshot per season
 	const rest = gids.filter((gid) => !upcoming.has(gid));
-	const stored = await idb.merged.games.getAll({ gids: rest });
+	const restSet = new Set(rest);
+	const stored = storedGames
+		? storedGames.filter((gm) => restSet.has(gm.gid))
+		: await idb.merged.games.getAll({ gids: rest });
 	const bySeason = Map.groupBy(stored, (gm) => gm.season);
 	for (const [season, list] of bySeason) {
 		const pids = list.flatMap((gm) =>

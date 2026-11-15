@@ -769,6 +769,114 @@ export class FlavorSession {
 		return p;
 	}
 
+	// ---- shootout: who is shooting, the running tally, and what each shot means ----
+	private so:
+		| {
+				rounds: number;
+				made: [number, number];
+				att: [number, number];
+				first?: 0 | 1;
+				sudden: boolean;
+		  }
+		| undefined;
+
+	private shootout() {
+		if (!this.so) {
+			this.so = { rounds: 5, made: [0, 0], att: [0, 0], sudden: false };
+		}
+		return this.so;
+	}
+
+	private onShootoutStart(rng: Rng, ev: any): FlavorResult {
+		this.so = {
+			rounds: ev.rounds ?? 5,
+			made: [0, 0],
+			att: [0, 0],
+			sudden: false,
+		};
+		const r = this.so.rounds;
+		return {
+			text: pickV(rng, [
+				`Still level, so it goes to a three-point shootout: ${r} shots for each team's best shooter.`,
+				`The game will now be decided by a three-point shootout with ${r} rounds!`,
+				`Nobody could separate them. A shootout settles it: ${r} threes each, from one shooter per side.`,
+			]),
+		};
+	}
+
+	private onShootoutTeam(rng: Rng, ev: any): FlavorResult {
+		const so = this.shootout();
+		const t: 0 | 1 = ev.t;
+		const n = this.pl(ev.pid).name;
+		if (so.first === undefined) {
+			so.first = t;
+			return {
+				text: pickV(rng, [
+					`${n} steps up to the line first for ${this.the(t)}.`,
+					`${n} will shoot for ${this.the(t)}; it's on him to set the target.`,
+					`${n} gets the ball for ${this.the(t)} and walks out to the arc.`,
+				]),
+			};
+		}
+		const other: 0 | 1 = t === 0 ? 1 : 0;
+		const target = so.made[other];
+		return {
+			text:
+				target > so.rounds - 1
+					? `${n} steps up for ${this.the(t)} needing a perfect ${so.rounds} for ${so.rounds} just to extend it.`
+					: target === 0
+						? `${n} steps up for ${this.the(t)}: one make wins it.`
+						: pickV(rng, [
+								`${n} steps up for ${this.the(t)}. The number to beat is ${target}.`,
+								`${n} answers for ${this.the(t)}, needing ${target + 1} to win and ${target} to keep it going.`,
+							]),
+		};
+	}
+
+	private onShootoutTie(rng: Rng): FlavorResult {
+		const so = this.shootout();
+		so.sudden = true;
+		return {
+			text: pickV(rng, [
+				`Tied at ${so.made[0]}! Sudden death: they alternate shots until one makes and the other misses.`,
+				"The shootout is tied! Players will alternate shots until there is a winner",
+			]),
+		};
+	}
+
+	private onShootoutShot(rng: Rng, ev: any): FlavorResult {
+		const so = this.shootout();
+		const t: 0 | 1 = ev.t;
+		const other: 0 | 1 = t === 0 ? 1 : 0;
+		const made = !!ev.made;
+		so.att[t] += 1;
+		if (made) {
+			so.made[t] += 1;
+		}
+		const n = this.pl(ev.pid).name;
+		const base = shootoutShotText(rng, made, this.female);
+		const tally = `${n} is ${so.made[t]} for ${so.att[t]}.`;
+		let end = "";
+		if (!so.sudden && so.first !== undefined && t !== so.first) {
+			const left = so.rounds - so.att[t];
+			if (so.made[t] > so.made[other]) {
+				end = pickV(rng, [
+					" That wins it!",
+					" Ballgame!",
+					" And that's the shootout!",
+				]);
+			} else if (so.made[t] + left < so.made[other]) {
+				end = pickV(rng, [" And that's the ballgame.", " That ends it."]);
+			}
+		} else if (so.sudden && t !== so.first && so.made[t] !== so.made[other]) {
+			end =
+				so.made[t] > so.made[other] ? " That wins it!" : " And that ends it.";
+		} else if (!so.sudden && t === so.first && so.att[t] === so.rounds) {
+			end = ` That's the mark to beat: ${so.made[t]}.`;
+		}
+		return { text: `${base} ${tally}${end}` };
+	}
+
 	private the(t: 0 | 1) {
 		const n = this.labels[t].name;
 		return this.noArticle ? n : `the ${n}`;
@@ -919,9 +1027,15 @@ export class FlavorSession {
 					e.type === "pfTP"
 				) {
 					res = this.onFoul(rng, ev, score);
+				} else if (e.type === "shootoutStart") {
+					res = this.onShootoutStart(rng, ev);
+				} else if (e.type === "shootoutTeam") {
+					res = this.onShootoutTeam(rng, ev);
+				} else if (e.type === "shootoutTie") {
+					res = this.onShootoutTie(rng);
 				} else if (e.type === "shootoutShot") {
 					// (worded from this session's seeded generator, so a replay reads the same as the live game)
-					res = { text: shootoutShotText(rng, !!ev.made, this.female) };
+					res = this.onShootoutShot(rng, ev);
 				} else if (e.type === "foulOut") {
 					this.fouledOut.add(ev.pid);
 					res = {
@@ -1254,8 +1368,27 @@ export class FlavorSession {
 				res.note = rec;
 			}
 		}
+		// content2: a rivalry game gets a line at the opening tip (its own generator, so the rest of the game reads the same)
+		const level = Number(this.context?.rivalry ?? 0);
+		if (this.period === 1 && level > 0 && !this.rivalryTipped) {
+			this.rivalryTipped = true;
+			const rr = new Rng(this.gid, 99001);
+			const line =
+				level >= 2
+					? rr.pick([
+							`There's no love lost between ${this.the(0)} and ${this.the(1)}, and the building knows it.`,
+							`A bitter rivalry renewed: ${this.the(0)} and ${this.the(1)} have been at each other for years.`,
+						])
+					: rr.pick([
+							`A rivalry game, and the crowd is loud from the opening tip.`,
+							`${cap(this.the(0))} and ${this.the(1)} always seem to bring out the best in each other.`,
+						]);
+			res.note = [res.note, line].filter(Boolean).join(" ");
+		}
 		return res;
 	}
+
+	private rivalryTipped = false;
 
 	// ---- shots ----
 	private defenderPicker(

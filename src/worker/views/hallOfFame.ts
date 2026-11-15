@@ -8,7 +8,13 @@ import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
 import { primeFace } from "../util/faceAging.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
-import type { HofPlaque } from "../../common/faceHistory.ts";
+import type { HofPlaque, HofWords } from "../../common/faceHistory.ts";
+import {
+	careerFacts,
+	featsByPid,
+	hofSeasonsOf,
+	hofWords,
+} from "../util/hofStory.ts";
 import type { Player } from "../../common/types.ts";
 
 // gpF is used on processPlayersHallOfFame for baseball
@@ -62,6 +68,7 @@ export default defineView({
 			// League Extras "Face Aging": plaques with each Hall of Famer's face in his prime
 			const plaquesOn = featureOn("faceAging");
 			const raws: Player[] = [];
+			const allRaws: Player[] = [];
 
 			const players = (
 				await idb.merged.players.getAll(
@@ -71,6 +78,7 @@ export default defineView({
 							if (plaquesOn) {
 								raws.push(pRaw);
 							}
+							allRaws.push(pRaw);
 							const pFormatted = formatPlayer(pRaw);
 							if (!pFormatted) {
 								return;
@@ -101,6 +109,40 @@ export default defineView({
 				)
 			).filter((p) => p !== undefined);
 
+			// Plaque text and induction speeches, from each Hall of Famer's career
+			const hofSeasons = hofSeasonsOf(allRaws);
+			const feats = await featsByPid(new Set(allRaws.map((p) => p.pid)));
+			const words: HofWords[] = [];
+			const wordsByPid = new Map<number, HofWords>();
+			for (const p of allRaws) {
+				const facts = await careerFacts(p, { full: true, hofSeasons, feats });
+				const prime = plaquesOn ? await primeFace(p) : undefined;
+				const primeTid = prime
+					? (p.stats as any[]).findLast(
+							(row) => row.season === prime.season && row.tid >= 0,
+						)?.tid
+					: undefined;
+				const w = hofWords(
+					facts,
+					prime
+						? {
+								season: prime.season,
+								team: facts.teams.find((t) => t.tid === primeTid)?.name,
+							}
+						: undefined,
+				);
+				const entry = {
+					pid: p.pid,
+					name: `${p.firstName} ${p.lastName}`,
+					nickname: facts.nickname,
+					retiredYear: p.retiredYear,
+					...w,
+				};
+				words.push(entry);
+				wordsByPid.set(p.pid, entry);
+			}
+			words.sort((a, b) => b.retiredYear - a.retiredYear);
+
 			const plaques: HofPlaque[] = [];
 			for (const p of raws) {
 				const prime = await primeFace(p);
@@ -113,6 +155,8 @@ export default defineView({
 						retiredYear: p.retiredYear,
 						peakOvr: Math.max(...p.ratings.map((row) => row.ovr)),
 						...prime,
+						nickname: wordsByPid.get(p.pid)?.nickname,
+						text: wordsByPid.get(p.pid)?.plaque,
 					});
 				}
 			}
@@ -125,6 +169,7 @@ export default defineView({
 				players: addFirstNameShort(processPlayersHallOfFame(players)),
 				plaques,
 				stats,
+				words,
 			};
 		}
 	},

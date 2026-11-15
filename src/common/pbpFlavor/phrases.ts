@@ -446,6 +446,13 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			add(1, "rim", 0, n + t);
 		}
 		add(0.5, "rim", 1, n + " goes coast to coast for the layup");
+		// content2: transition
+		for (const t of [
+			" sprints the lane and finishes before the defense can set",
+			" runs the wing and lays it in ahead of everyone",
+		]) {
+			add(0.6, "rim", 0, n + t);
+		}
 		add(
 			TIER.u * gate(Math.min(r.drb, r.spd), 60),
 			"rim",
@@ -742,6 +749,55 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 	if (r.drb >= 45 && r.drb < 55) {
 		for (const t of [" floats one in", " drops in a floater"]) {
 			add(0.07, "rim", 1, n + t);
+		}
+	}
+	// content2: sub-rating shapes and play types. A touch specialist's floater (soft hands inside, a good stroke, not a leaper)
+	if (r.ins >= 50 && r.fg >= 55 && r.dnk < r.fg) {
+		for (const t of [
+			" shows off the soft touch with a high-arcing floater",
+			" kisses a feathery floater high off the glass",
+			" flips a teardrop over the outstretched arms",
+		]) {
+			add(0.15, "rim", 0, n + t);
+		}
+		if (D) {
+			add(0.05, "rim", 1, n + " lofts a feathery floater just over " + dn, {
+				def: D,
+			});
+		}
+	}
+	// an elite finisher draws the help and finishes anyway
+	if (Math.max(r.ins, r.dnk) >= 72) {
+		for (const t of [
+			" draws two help defenders and finishes anyway",
+			" absorbs the help-side bump and still finishes",
+			" finishes through the help as the defense collapses on him",
+		]) {
+			add(0.06, "rim", 1, n + t);
+		}
+	}
+	// off a dribble hand-off or a pick-and-roll
+	for (const t of [
+		" takes the hand-off, turns the corner and lays it in",
+		" rejects the screen and gets all the way to the rim",
+	]) {
+		add(0.05, "rim", 1, n + t);
+	}
+	if (r.hgt >= 55) {
+		add(
+			0.05,
+			"rim",
+			2,
+			n + " short-rolls into the lane and finishes the pocket pass",
+		);
+	}
+	// a post-up
+	if (r.stre >= 55 && r.ins >= 55) {
+		for (const t of [
+			" backs his man down from the block and banks in a hook",
+			" seals deep in the post and scores over his shoulder",
+		]) {
+			add(0.06, "post", 0, n + t);
 		}
 	}
 	if (r.hgt >= 65 && !e.ast && !e.andOne) {
@@ -1623,6 +1679,8 @@ export function blockText(rng: any, b: any, three: any, trans: any, ctx: any) {
 			[0.8, bn + " slides over from the weak side and swats it"],
 			[0.7, bn + " rotates over for the help-side block"],
 			[0.6, bn + " comes across the lane and rejects it"],
+			[0.4, bn + " rotates over in time and meets the drive at the rim"],
+			[0.3, bn + " leaves his man to help and swats it off the glass"],
 		);
 	}
 	const x = pickW(rng, o)[1];

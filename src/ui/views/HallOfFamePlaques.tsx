@@ -44,12 +44,25 @@ export const HallOfFamePlaques = ({ plaques }: { plaques: HofPlaque[] }) => {
 								>
 									{p.name}
 								</a>
-								<br />
+								{p.nickname ? (
+									<div className="fst-italic">"{p.nickname}"</div>
+								) : (
+									<br />
+								)}
 								{p.firstSeason !== undefined
 									? `${p.firstSeason}-${p.retiredYear}`
 									: `Retired ${p.retiredYear}`}
 								<br />
 								<span className="text-body-secondary">Prime: {p.season}</span>
+								{p.text ? (
+									<p
+										className="text-start text-body-secondary mt-1 mb-0"
+										style={{ fontSize: "0.75rem" }}
+										data-testid="hof-plaque-text"
+									>
+										{p.text}
+									</p>
+								) : null}
 							</figcaption>
 						</figure>
 					))}

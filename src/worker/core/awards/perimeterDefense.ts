@@ -6,6 +6,7 @@ import {
 	nativeFeatureOption,
 } from "../../../common/nativeFeatures.ts";
 import g from "../../util/g.ts";
+import { TRACKING_FORMULA_TERMS } from "./trackingAwards.ts";
 
 // The default formula is dws/3.1 + seasonFraction*winp + gp/82*(blk/4.1 + stl/1.8). Defensive win shares come mostly from
 // defensive rebounds and blocks, so bigs dominate it: a starting C averages about 2.4x the DWS of a starting PG. With the setting
@@ -40,10 +41,10 @@ export const perimeterDefenseFormula = (award: AwardLike) =>
 		? PERIMETER_DEFENSE_FORMULA
 		: undefined;
 
-// Advanced Tracking Stats: with that setting on, the default defense formula (or the Perimeter Defense one) also counts, lightly, how
-// well the player defends shots (defended FG% and rim protection vs the league, the advDef variable from getPlayers, -1 to 1): at most
-// ±ADV_DEF_WEIGHT on a score of about 3-4 for a DPOY candidate
-export const ADV_DEF_WEIGHT = 0.15;
+// Advanced Tracking Stats: with that setting on, the default defense formula (or the Perimeter Defense one) also counts the tracking
+// defense score (trkDef in trackingAwards.ts, -1 to 1: defended FG% vs expected, rim protection, shots deterred, contests, defensive
+// on/off): at most ±TRACKING_WEIGHTS.def on a score of about 3-4 for a DPOY candidate. (It replaced a smaller advDef term; advDef stays
+// as a variable for custom formulas.)
 
 // The formula the default defense awards are scored with, if a League extra replaces it
 export const defenseAwardFormula = (award: AwardLike) => {
@@ -55,7 +56,7 @@ export const defenseAwardFormula = (award: AwardLike) => {
 		award.formulaByPos === undefined &&
 		nativeFeatureEnabled("advStats", (key) => g.get(key as any))
 	) {
-		return `${base ?? award.formula} + ${ADV_DEF_WEIGHT} * seasonFraction * advDef`;
+		return `${base ?? award.formula} + ${TRACKING_FORMULA_TERMS.def}`;
 	}
 	return base;
 };

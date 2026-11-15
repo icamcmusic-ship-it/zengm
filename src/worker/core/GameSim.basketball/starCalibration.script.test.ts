@@ -18,10 +18,15 @@ import { getDefaultSettings } from "../../views/newLeague.ts";
 import { helpers, lock } from "../../util/index.ts";
 import { TURNOVERS } from "./realisticTurnovers.ts";
 import { ATTENTION } from "./matchupDefense.ts";
+import { PLAY_TYPES } from "./realisticPlayTypes.ts";
 
 // SC_ATT='{"share":0.3}' changes the defensive attention constants
 if (process.env.SC_ATT) {
 	Object.assign(ATTENTION, JSON.parse(process.env.SC_ATT));
+}
+// SC_PT='{"astSelfPower":4}' changes the Realistic Play Types constants
+if (process.env.SC_PT) {
+	Object.assign(PLAY_TYPES, JSON.parse(process.env.SC_PT));
 }
 // SC_TOV='{"usagePower":2}' changes the Realistic Turnovers constants
 if (process.env.SC_TOV) {
@@ -81,7 +86,17 @@ test.skipIf(!process.env.SC_CAL)(
 		const configs = JSON.parse(process.env.SC_CONFIGS ?? "[{}]");
 		let lid = 0;
 		for (const config of configs) {
-			const tot = { games: 0, pts: 0, tov: 0, stl: 0 };
+			const tot = {
+				games: 0,
+				pts: 0,
+				tov: 0,
+				stl: 0,
+				blk: 0,
+				ast: 0,
+				fg: 0,
+				fga: 0,
+			};
+			const seedLeaders = [];
 			const leaders = [];
 			for (let seed = seed0; seed < seed0 + seeds; seed++) {
 				Math.random = makeSeededRandom(seed);
@@ -143,8 +158,13 @@ test.skipIf(!process.env.SC_CAL)(
 						tot.pts += t.pts;
 						tot.tov += t.tov;
 						tot.stl += t.stl;
+						tot.blk += t.blk;
+						tot.ast += t.ast;
+						tot.fg += t.fg;
+						tot.fga += t.fga;
 					}
 				}
+				const leaders0 = leaders.length;
 				for (const p of await idb.cache.players.getAll()) {
 					const ps = p.stats.filter(
 						(r) => !r.playoffs && r.tid >= 0 && r.gp >= 40,
@@ -158,6 +178,16 @@ test.skipIf(!process.env.SC_CAL)(
 							min: r.min / r.gp,
 							pts: r.pts / r.gp,
 							tov: r.tov / r.gp,
+							ast: r.ast / r.gp,
+							trb: (r.orb + r.drb) / r.gp,
+							stl: r.stl / r.gp,
+							blk: r.blk / r.gp,
+							pos: last(p.ratings).pos,
+							rim: `${r.fgAtRim}/${r.fgaAtRim}`,
+							mid: `${r.fgMidRange}/${r.fgaMidRange}`,
+							post: `${r.fgLowPost}/${r.fgaLowPost}`,
+							tp: `${r.tp}/${r.tpa}`,
+							bpm: r.obpm + r.dbpm,
 							usg: r.usgp,
 							per: r.per,
 							ws: r.ows + r.dws,
@@ -167,36 +197,59 @@ test.skipIf(!process.env.SC_CAL)(
 						});
 					}
 				}
+				const mine = leaders.slice(leaders0);
+				const best = (k) => Math.max(...mine.map((r) => r[k]));
+				seedLeaders.push({
+					seed,
+					pts: best("pts"),
+					ast: best("ast"),
+					ws: best("ws"),
+					bpm: best("bpm"),
+					per: best("per"),
+				});
 			}
-			const f = (x, d = 1) => x.toFixed(d);
-			const fmt = (r) =>
-				`s${r.seed}${r.god} ovr ${r.ovr} min ${f(r.min)} pts ${f(r.pts)} fga ${f(r.fga)} fta ${f(r.fta)} usg ${f(r.usg)} tov ${f(r.tov)} ts ${f(r.ts, 3)} per ${f(r.per)} ws ${f(r.ws)}`;
-			console.log(
-				`CONFIG ${JSON.stringify(config)} god ${god} games ${tot.games} team pts ${f(tot.pts / tot.games / 2, 2)} tov ${f(tot.tov / tot.games / 2, 2)} stl ${f(tot.stl / tot.games / 2, 2)}`,
-			);
-			console.log(
-				`GAMES max ${JSON.stringify(tot.maxGame)} ot/game ${f(tot.ot / tot.games, 3)} 300+ ${tot.over300} maxMin ${f(tot.maxMin)}`,
-			);
-			for (const key of ["pts", "per", "ws", "tov"]) {
-				const top = [...leaders]
-					.sort((a, b) => b[key] - a[key])
-					.slice(0, 5 * seeds);
-				console.log(`TOP ${key}:\n  ${top.map(fmt).join("\n  ")}`);
+			{
+				const f = (x, d = 1) => x.toFixed(d);
+				for (const r of seedLeaders) {
+					console.log(
+						`LEADERS s${r.seed} pts ${f(r.pts)} ast ${f(r.ast)} ws ${f(r.ws)} bpm ${f(r.bpm)} per ${f(r.per)}`,
+					);
+				}
+				console.log(
+					`TOTALS per team game fg% ${f((100 * tot.fg) / tot.fga)} ast ${f(tot.ast / tot.games / 2, 2)} blk ${f(tot.blk / tot.games / 2, 2)}`,
+				);
 			}
-			const scorers = [...leaders].sort((a, b) => b.pts - a.pts);
-			const typical = scorers.slice(2 * seeds, 10 * seeds);
-			const m = (k) => typical.reduce((a, r) => a + r[k], 0) / typical.length;
-			console.log(
-				`TYPICAL (scorers 3-10) pts ${f(m("pts"))} tov ${f(m("tov"), 2)} usg ${f(m("usg"))} per ${f(m("per"))} ws ${f(m("ws"))}`,
-			);
-			const hiUsg = [...leaders]
-				.filter((r) => r.min >= 30)
-				.sort((a, b) => b.usg - a.usg)
-				.slice(0, 10 * seeds);
-			const mu = (k) => hiUsg.reduce((a, r) => a + r[k], 0) / hiUsg.length;
-			console.log(
-				`TOP USG (10/league) usg ${f(mu("usg"))} pts ${f(mu("pts"))} tov ${f(mu("tov"), 2)}`,
-			);
+			{
+				const f = (x, d = 1) => x.toFixed(d);
+				const fmt = (r) =>
+					`s${r.seed}${r.god} ovr ${r.ovr} min ${f(r.min)} pts ${f(r.pts)} fga ${f(r.fga)} fta ${f(r.fta)} usg ${f(r.usg)} tov ${f(r.tov)} ts ${f(r.ts, 3)} ast ${f(r.ast)} trb ${f(r.trb)} stl ${f(r.stl)} blk ${f(r.blk)} ${r.pos} rim ${r.rim} mid ${r.mid} post ${r.post} tp ${r.tp} per ${f(r.per)} ws ${f(r.ws)} bpm ${f(r.bpm)}`;
+				console.log(
+					`CONFIG ${JSON.stringify(config)} god ${god} games ${tot.games} team pts ${f(tot.pts / tot.games / 2, 2)} tov ${f(tot.tov / tot.games / 2, 2)} stl ${f(tot.stl / tot.games / 2, 2)}`,
+				);
+				console.log(
+					`GAMES max ${JSON.stringify(tot.maxGame)} ot/game ${f(tot.ot / tot.games, 3)} 300+ ${tot.over300} maxMin ${f(tot.maxMin)}`,
+				);
+				for (const key of ["pts", "ast", "per", "ws", "bpm"]) {
+					const top = [...leaders]
+						.sort((a, b) => b[key] - a[key])
+						.slice(0, Number(process.env.SC_TOP ?? 3) * seeds);
+					console.log(`TOP ${key}:\n  ${top.map(fmt).join("\n  ")}`);
+				}
+				const scorers = [...leaders].sort((a, b) => b.pts - a.pts);
+				const typical = scorers.slice(2 * seeds, 10 * seeds);
+				const m = (k) => typical.reduce((a, r) => a + r[k], 0) / typical.length;
+				console.log(
+					`TYPICAL (scorers 3-10) pts ${f(m("pts"))} tov ${f(m("tov"), 2)} usg ${f(m("usg"))} per ${f(m("per"))} ws ${f(m("ws"))} ts ${f(m("ts"), 3)} ast ${f(m("ast"))}`,
+				);
+				const hiUsg = [...leaders]
+					.filter((r) => r.min >= 30)
+					.sort((a, b) => b.usg - a.usg)
+					.slice(0, 10 * seeds);
+				const mu = (k) => hiUsg.reduce((a, r) => a + r[k], 0) / hiUsg.length;
+				console.log(
+					`TOP USG (10/league) usg ${f(mu("usg"))} pts ${f(mu("pts"))} tov ${f(mu("tov"), 2)}`,
+				);
+			}
 		}
 	},
 );

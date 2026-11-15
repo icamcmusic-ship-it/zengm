@@ -138,6 +138,8 @@ export const boxScoreToLiveSim = async ({
 		// Special reset of shootout stats to undefined, since that is used in the UI to identify if we're in a shootout yet
 		delete t.sPts;
 		delete t.sAtt;
+		// (the shootout's shots are added back as they're played)
+		delete initialBoxScore.shootoutShots;
 
 		for (let j = 0; j < t.players.length; j++) {
 			const p = t.players[j];

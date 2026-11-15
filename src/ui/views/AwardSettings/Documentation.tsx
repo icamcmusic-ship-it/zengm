@@ -19,7 +19,7 @@ const myGetCol = (stat: string) => {
 		return "Team total WS";
 	}
 	if (stat === "advDef") {
-		return "Advanced Tracking Stats: defended FG% and rim protection vs the league, -1 to 1 (0 without tracking stats)";
+		return "Advanced Tracking Stats: defended FG% and rim protection vs the league, -1 to 1 (0 without tracking stats; the default defense formulas now use trkDef)";
 	}
 	if (stat === "won") {
 		return "1 for winning team, 0 for losing team";
@@ -77,6 +77,79 @@ export const FunctionDocs = () => {
 };
 
 export const TEXT_MAX_WIDTH = { maxWidth: 648 };
+
+type Variables = ReturnType<typeof getVariables>;
+
+const TRACKING_GROUPS = [
+	"Play types",
+	"Shooting splits",
+	"Defense",
+	"On/off",
+	"Clutch",
+	"Scores",
+];
+
+// Advanced Tracking Stats variables (worker/core/awards/trackingAwards.ts), grouped, each with its playoffs variant
+const TrackingVariables = ({
+	advStatsOn,
+	tracking,
+}: {
+	advStatsOn: boolean;
+	tracking: NonNullable<Variables["tracking"]>;
+}) => {
+	return (
+		<div data-testid="tracking-variables">
+			<h3>Advanced Tracking Stats</h3>
+			<div style={TEXT_MAX_WIDTH}>
+				{advStatsOn ? null : (
+					<div className="alert alert-warning">
+						Advanced Tracking Stats is off in this league (League Extras → Game
+						Simulation), so these variables have no data: a formula that uses
+						them leaves every player out (the scores starting with{" "}
+						<code>trk</code> are 0). Seasons played with the setting on still
+						have their data.
+					</div>
+				)}
+				<p>
+					Season totals and rates from the game sim's tracking, in every award
+					except playoff series awards. Each has a playoffs variant ending in{" "}
+					<code>Playoffs</code> (like <code>dfgpPlayoffs</code>), the season's
+					playoff totals, which playoff series awards like Finals MVP can use
+					too. Without tracking data a player's value is missing, so a formula
+					that uses it leaves him out, except the <code>trk</code> scores, which
+					are 0. With the setting on, the default MVP and All-League formulas
+					add <code>trkImpact</code> and <code>trkClutch</code>, DPOY and
+					All-Defensive add <code>trkDef</code>, Sixth Man adds{" "}
+					<code>trkImpact</code> and <code>trkPtEff</code>, and Finals MVP adds{" "}
+					<code>trkImpactPlayoffs</code>.
+				</p>
+			</div>
+			<div className={advStatsOn ? undefined : "opacity-75"}>
+				{TRACKING_GROUPS.map((group) => {
+					const rows = tracking.filter((row) => row.group === group);
+					if (rows.length === 0) {
+						return null;
+					}
+					return (
+						<details key={group} className="mb-2" open={group === "Scores"}>
+							<summary className="fw-bold">
+								{group} ({rows.length})
+							</summary>
+							<ul className="list-unstyled mt-1" style={{ columnWidth: 350 }}>
+								{rows.map((row) => (
+									<li key={row.key} className="mb-1">
+										<code>{row.key}</code> / <code>{row.playoffsKey}</code>:{" "}
+										{row.desc}
+									</li>
+								))}
+							</ul>
+						</details>
+					);
+				})}
+			</div>
+		</div>
+	);
+};
 
 export const Documentation = () => {
 	const [state, setState] = useState<
@@ -238,6 +311,12 @@ export const Documentation = () => {
 							like, if you want to try to find the best exponent.
 						</p>
 					</div>
+					{state.variables.tracking ? (
+						<TrackingVariables
+							advStatsOn={state.variables.advStatsOn}
+							tracking={state.variables.tracking}
+						/>
+					) : null}
 					<div style={TEXT_MAX_WIDTH}>
 						<h3>Only in playoff series awards</h3>
 						<ul className="list-unstyled" style={ulStyle}>

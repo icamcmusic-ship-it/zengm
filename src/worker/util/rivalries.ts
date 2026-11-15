@@ -6,8 +6,14 @@ import {
 	type RivalryScore,
 	type RivalSeries,
 } from "../../common/rivalries/index.ts";
-import type { Game, PlayoffSeries } from "../../common/types.ts";
+import type { PlayoffSeries } from "../../common/types.ts";
 import { idb } from "../db/index.ts";
+import {
+	gameSum,
+	seasonGameSums,
+	storedGameSeasons,
+	type GameSum,
+} from "./gameSummaries.ts";
 import g from "./g.ts";
 import helpers from "./helpers.ts";
 import { rivalrySeasonRows, rivalryStoriesOn } from "./rivalryStories.ts";
@@ -64,12 +70,8 @@ export const finishedSeries = (all: PlayoffSeries[]) => {
 	return out;
 };
 
-const isClose = (game: Game) =>
-	game.overtimes > 0 || Math.abs(game.teams[0].pts - game.teams[1].pts) <= 3;
-
-// Top scorer per game of a team in a game
-const topPts = (t: Game["teams"][number]) =>
-	Math.max(0, ...((t.players ?? []) as { pts: number }[]).map((p) => p.pts));
+const isClose = (game: GameSum) =>
+	game.overtimes > 0 || Math.abs(game.teams[0]!.pts - game.teams[1]!.pts) <= 3;
 
 export const loadRivalries = async (
 	season: number = g.get("season"),
@@ -167,13 +169,13 @@ export const loadRivalries = async (
 	// season games are in the cache and maybe not yet in the database, so each gid counts once.
 	const duelSeasons = new Map<string, Set<number>>();
 	const seen = new Set<number>();
-	const addGame = (game: Game) => {
+	const addGame = (game: GameSum) => {
 		if (seen.has(game.gid) || game.season > season) {
 			return;
 		}
 		seen.add(game.gid);
-		const t0 = game.teams[0].tid;
-		const t1 = game.teams[1].tid;
+		const t0 = game.teams[0]!.tid;
+		const t1 = game.teams[1]!.tid;
 		if (t0 < 0 || t1 < 0 || t0 === t1) {
 			return;
 		}
@@ -181,11 +183,7 @@ export const loadRivalries = async (
 		if (isClose(game)) {
 			get(t0, t1).input.closeGames!.push({ season: game.season });
 		}
-		if (
-			game.playoffs &&
-			topPts(game.teams[0]) >= 25 &&
-			topPts(game.teams[1]) >= 25
-		) {
+		if (game.playoffs && game.teams[0]!.top >= 25 && game.teams[1]!.top >= 25) {
 			let set = duelSeasons.get(key);
 			if (!set) {
 				set = new Set();
@@ -219,13 +217,21 @@ export const loadRivalries = async (
 		}
 	}
 	for (const game of fromLog ? [] : await idb.cache.games.getAll()) {
-		addGame(game);
+		addGame(gameSum(game));
 	}
 	if (opts.storedGames !== false && !fromLog) {
-		for await (const cursor of idb.league
-			.transaction("games")
-			.store.iterate()) {
-			addGame(cursor.value);
+		// The database's box scores (in gid order, as a pass over the store gives them): the current season's are all in the
+		// cache, so seen above, and past seasons' are read reduced (gameSummaries.ts)
+		const current = g.get("season");
+		const sums: GameSum[] = [];
+		for (const s of await storedGameSeasons()) {
+			if (s < current && s <= season) {
+				sums.push(...(await seasonGameSums(s)));
+			}
+		}
+		sums.sort((x, y) => x.gid - y.gid);
+		for (const sum of sums) {
+			addGame(sum);
 		}
 	}
 	for (const [key, set] of duelSeasons) {

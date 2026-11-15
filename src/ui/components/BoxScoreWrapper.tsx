@@ -1090,6 +1090,61 @@ const PlayoffRecord = ({
 
 // Games whose play-by-play was revealed with the button, remembered for this browser session
 // Coaching systems: each team's offense and defense system (stored with the game)
+// Basketball shootout: each team's shooter and his shots in order (made/missed), from the stored or live shot list
+const ShootoutSection = ({ boxScore }: { boxScore: any }) => {
+	const shots: [0 | 1, number, 0 | 1][] | undefined = boxScore.shootoutShots;
+	if (__SPORT !== "basketball" || !shots || shots.length === 0) {
+		return null;
+	}
+	const nameOf = (t: 0 | 1, pid: number) =>
+		boxScore.teams[t].players.find((p: any) => p.pid === pid)?.name ?? "";
+	const firstT = shots[0]![0];
+	const order: (0 | 1)[] = [firstT, firstT === 0 ? 1 : 0];
+	return (
+		<div className="mb-3" data-testid="box-score-shootout">
+			<h3 className="h5 mb-1">Shootout</h3>
+			<table className="table table-sm table-nonfluid mb-0">
+				<tbody>
+					{order.map((t) => {
+						const mine = shots.filter((s) => s[0] === t);
+						const pids = [...new Set(mine.map((s) => s[1]))];
+						const made = mine.filter((s) => s[2]).length;
+						return (
+							<tr key={t}>
+								<td className="text-nowrap">{boxScore.teams[t].abbrev}</td>
+								<td className="text-nowrap">
+									{pids.map((pid, i) => (
+										<span key={pid}>
+											{i > 0 ? ", " : ""}
+											<a href={helpers.leagueUrl(["player", pid])}>
+												{nameOf(t, pid)}
+											</a>
+										</span>
+									))}
+								</td>
+								<td className="text-nowrap" style={{ letterSpacing: 2 }}>
+									{mine.map((s, i) => (
+										<span
+											key={i}
+											className={s[2] ? "text-success" : "text-danger"}
+											title={s[2] ? "Made" : "Missed"}
+										>
+											{s[2] ? "●" : "○"}
+										</span>
+									))}
+								</td>
+								<td className="text-nowrap fw-bold">
+									{made}/{mine.length}
+								</td>
+							</tr>
+						);
+					})}
+				</tbody>
+			</table>
+		</div>
+	);
+};
+
 const CoachSystemsLine = ({ teams }: { teams: any[] }) => {
 	if (!teams?.[0]?.coachSys || !teams?.[1]?.coachSys) {
 		return null;
@@ -1358,6 +1413,7 @@ export const BoxScoreWrapper = ({
 				</div>
 				<TeamLogo season={boxScore.season} t={t1} />
 			</div>
+			<ShootoutSection boxScore={boxScore} />
 			{BoxScorePlayByPlayTabs && !live ? (
 				<BoxScorePlayByPlayTabs
 					boxScore={boxScore}

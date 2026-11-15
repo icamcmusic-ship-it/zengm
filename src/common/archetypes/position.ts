@@ -201,7 +201,8 @@ const percentile = (knots: number[], x: number) => {
 };
 
 // Share of playmaking read from stats at PLAY_STATS_FULL_MIN minutes or more (scaled down below, none without minutes)
-const PLAY_STATS_W = 0.817;
+// (an object so the offline fits can try other values)
+export const PLAY_STATS = { w: 0.817 };
 const PLAY_STATS_FULL_MIN = 1500;
 
 // inches: his height; length: inches of size (see above); skill, play: percentiles
@@ -214,11 +215,44 @@ export type PositionAxes = {
 	fromStats?: number;
 };
 
+// The quantiles (0%, 5%, ..., 100%) of assist% + usage%/10 among a league's players with PLAY_KNOTS_MIN_MINUTES or more
+// (their regular-season minutes of this and last season, as positionStats reads them), or undefined with too few of them.
+// Read against these instead of the real NBA's (sgdrift), a player's playmaking is his rank in his own league, so a
+// league whose game produces more assists or usage than the real one (realistic play types give guards more
+// pick-and-roll possessions) does not move everyone toward point guard over the seasons.
+export const PLAY_KNOTS_MIN_MINUTES = 500;
+const PLAY_KNOTS_MIN_PLAYERS = 100;
+export const playStatKnots = (values: number[]): number[] | undefined => {
+	const xs = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+	if (xs.length < PLAY_KNOTS_MIN_PLAYERS) {
+		return undefined;
+	}
+	const k = PLAY_STAT_KNOTS.length - 1;
+	const out: number[] = [];
+	for (let i = 0; i <= k; i++) {
+		const pos = (i / k) * (xs.length - 1);
+		const lo = Math.floor(pos);
+		const hi = Math.min(xs.length - 1, lo + 1);
+		out.push(xs[lo]! + (pos - lo) * (xs[hi]! - xs[lo]!));
+	}
+	return out;
+};
+
 export const positionAxes = (
 	r: PosRatings,
 	stats?: PositionStats,
+	// League quantiles of the playmaking stat (playStatKnots); the real NBA's without
+	statKnots?: number[],
 ): PositionAxes => {
-	const raw = positionRaw(r);
+	return axesFromRaw(positionRaw(r), stats, statKnots);
+};
+
+// positionAxes from his raw readings (positionRaw)
+export const axesFromRaw = (
+	raw: ReturnType<typeof positionRaw>,
+	stats?: PositionStats,
+	statKnots?: number[],
+): PositionAxes => {
 	let play = percentile(PLAY_KNOTS, raw.playmaking);
 	let fromStats = 0;
 	if (
@@ -227,11 +261,12 @@ export const positionAxes = (
 		Number.isFinite(stats.astp) &&
 		Number.isFinite(stats.usgp)
 	) {
-		const w = PLAY_STATS_W * Math.min(1, stats.min / PLAY_STATS_FULL_MIN);
+		const w = PLAY_STATS.w * Math.min(1, stats.min / PLAY_STATS_FULL_MIN);
 		play =
 			(1 - w) * play +
-			w * percentile(PLAY_STAT_KNOTS, stats.astp + 0.1 * stats.usgp);
-		fromStats = w / PLAY_STATS_W;
+			w *
+				percentile(statKnots ?? PLAY_STAT_KNOTS, stats.astp + 0.1 * stats.usgp);
+		fromStats = w / PLAY_STATS.w;
 	}
 	return {
 		inches: raw.inches,
@@ -300,10 +335,10 @@ export const sizeBand = (a: PositionAxes): SizeBand => {
 
 // [length in inches, playmaking, ball skills]
 export const POSITION_CENTROIDS: Record<Pos, [number, number, number]> = {
-	PG: [74.59, 0.89, 0.65],
-	G: [75.39, 0.64, 0.68],
-	SG: [76.28, 0.42, 0.61],
-	GF: [77.99, 0.55, 0.51],
+	PG: [75.19, 0.933, 0.65],
+	G: [75.39, 0.66, 0.68],
+	SG: [76.98, 0.327, 0.61],
+	GF: [78.19, 0.49, 0.51],
 	SF: [79.3, 0.43, 0.46],
 	F: [80.34, 0.37, 0.35],
 	PF: [82.51, 0.3, 0.27],
@@ -316,16 +351,23 @@ export const POSITION_CENTROIDS: Record<Pos, [number, number, number]> = {
 // PG 13.2 -> 12.2, G 9.1 -> 9.1, SG 12.9 -> 12.8, GF 7.0 -> 14.6, SF 12.6 -> 8.9, F 16.3 -> 11.3, PF 8.7 -> 10.0,
 // FC 10.5 -> 11.2, C 9.8 -> 9.9 (real NBA listings 2016-2025: 12.1, 11.7, 12.9, 14.0, 7.9, 9.2, 8.8, 12.3, 11.1); real
 // players 82.8% -> 83.0% exact or adjacent, the 2025 star targets kept.
+// sgdrift: re-fitted again, with the guard and wing centroids (PG, G, SG and GF: length and playmaking), on the axes of
+// full-engine random leagues (playmaking read from stats against the league's own quantiles, see playStatKnots) against the
+// real listed shares, mostly those of the players who came in through the draft (what a league turns into), with the
+// real-NBA accuracy, the 2025 star targets and the unit-test fixtures as constraints (sgdriftFit.script.test.ts). Before,
+// guards drifted to PG as their stats came in (with the ratings-only PG bias faded out) and wings to GF: rostered shares
+// over 10 seasons of 2 leagues, first -> last season, PG 12.3 -> 15.3, G 10.5 -> 7.2, SG 13.0 -> 10.0, GF 13.6 -> 17.2;
+// after, PG 11.5 -> 12.7, G 12.6 -> 11.0, SG 13.2 -> 12.6, GF 13.6 -> 15.7.
 export const POSITION_BIAS: Record<Pos, number> = {
-	PG: -0.27,
+	PG: -0.29,
 	G: -0.23,
-	SG: -0.2,
-	GF: 1.12,
+	SG: 0,
+	GF: 1.02,
 	SF: -0.1,
-	F: -0.66,
-	PF: 0.34,
-	FC: 0.52,
-	C: -0.61,
+	F: -0.81,
+	PF: 0.41,
+	FC: 0.97,
+	C: -0.38,
 };
 
 // arch13: playmaking read from ratings alone (a generated player before his first minutes, a draft prospect) puts more
@@ -333,7 +375,8 @@ export const POSITION_BIAS: Record<Pos, number> = {
 // BBGM's formula (real NBA 2016-2025 listings: 12.1%), the extra ones combo guards (old formula G). Without stats, PG's
 // bias is RATINGS_ONLY_PG lower, faded out as his stats take over (`fromStats`), so a player with a full season of minutes
 // reads exactly as before.
-export const RATINGS_ONLY_PG = 1.2;
+// (sgdrift: 1.2 -> 0.8 with the re-fitted centroids, so a new league is not short of point guards)
+export const RATINGS_ONLY_PG = 0.8;
 
 // Distance scales: inches of length, and percentile points (per 0.25) of playmaking and ball skills, weighted
 const LENGTH_SCALE = 1.472;
@@ -405,6 +448,8 @@ export type PositionContext = {
 	stats?: unknown;
 	// Last season's ratings, for the two-season comparison when re-assigning
 	previousRatings?: PosRatings & { season?: number };
+	// The league's quantiles of the playmaking stat (playStatKnots), when known
+	statKnots?: number[];
 };
 
 // Position for ratings: the improved model when on (sticky to `previous`), else BBGM's formula
@@ -423,6 +468,7 @@ export const positionFor = (
 	const axes = positionAxes(
 		ratings,
 		season === undefined ? undefined : positionStats(context?.stats, season),
+		context?.statKnots,
 	);
 	const prev = context?.previousRatings;
 	const prevAxes =
@@ -432,6 +478,7 @@ export const positionFor = (
 					prev.season === undefined
 						? undefined
 						: positionStats(context?.stats, prev.season),
+					context?.statKnots,
 				)
 			: undefined;
 	return improvedPosition(axes, previous, prevAxes);

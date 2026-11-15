@@ -70,6 +70,9 @@ const awardInfoCommonSchema = z.object({
 	bench: z.literal(true).optional(),
 	mip: z.literal(true).optional(),
 	rookie: z.literal(true).optional(),
+
+	// Only given with Advanced Tracking Stats on (basketball)
+	advStats: z.literal(true).optional(),
 });
 
 const awardInfoIndividualCommonSchema = z.object({

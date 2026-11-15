@@ -10,6 +10,7 @@ import type {
 import { PRIORITY_NAMES } from "../../common/staffDepth/regions.ts";
 import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
+import { fitLabel } from "../../common/offEmphasis.ts";
 
 const AREAS: { key: DelegationArea; name: string; what: string }[] = [
 	{
@@ -103,6 +104,7 @@ const StaffReport = ({
 	development,
 	fit,
 	conditioning,
+	offense,
 }: View<"staffReport">) => {
 	useTitleBar({ title: `${season} Staff Report` });
 	return (
@@ -432,6 +434,52 @@ const StaffReport = ({
 					</p>
 					<Recommendation rec={conditioning.rec} />
 				</Card>
+				{offense ? (
+					<Card title="Offense" testid="staff-offense">
+						<p className="small mb-1">
+							Offensive emphasis set by{" "}
+							<b>
+								{offense.mode === "auto"
+									? "the head coach (Auto)"
+									: offense.mode === "suggest"
+										? "you, with the coach's proposals (Suggest)"
+										: "you (Manual)"}
+							</b>
+							, {fitLabel(offense.fit).toLowerCase()} for the roster.{" "}
+							<a href={helpers.leagueUrl(["offense"])}>Offense</a>
+						</p>
+						<div className="btn-group btn-group-sm mb-1" role="group">
+							{LEVELS.map((level) => (
+								<button
+									key={level.key}
+									title={level.title}
+									className={`btn ${offense.mode === level.key ? "btn-primary" : "btn-light-bordered"}`}
+									onClick={() =>
+										toWorker("main", "offEmphasisAction", {
+											mode: level.key,
+										})
+									}
+								>
+									{level.name}
+								</button>
+							))}
+						</div>
+						{offense.text ? (
+							<div
+								className="border-start border-3 border-primary ps-2 mt-2"
+								data-testid="staff-offense-rec"
+							>
+								<div className="small text-body-secondary">Recommended</div>
+								<div className="small">{offense.text}</div>
+							</div>
+						) : (
+							<div className="small text-body-secondary mt-2">
+								No play type stands out yet: the mix fits what the roster does
+								well.
+							</div>
+						)}
+					</Card>
+				) : null}
 			</div>
 		</>
 	);

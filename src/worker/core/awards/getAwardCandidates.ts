@@ -1,3 +1,4 @@
+import { awardActive } from "./trackingAwards.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import type {
 	Award,
@@ -74,7 +75,8 @@ const getAwards = async (season: number) => {
 		statOverridesByMatchup = output.statOverridesByMatchup;
 	} else {
 		// Either the current season, or some past season where no awards are in database so might as well show current awards
-		awards = g.get("awards");
+		// (Advanced Tracking Stats only awards are left out with the setting off)
+		awards = g.get("awards").filter(awardActive);
 	}
 
 	return {

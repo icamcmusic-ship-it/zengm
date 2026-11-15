@@ -96,6 +96,8 @@ export const featureForUrl = (
 			return "gmPersonalities";
 		case "coach_notes":
 			return "coachSystems";
+		case "offense":
+			return "offEmphasis";
 		case "frivolities":
 			if (
 				second === "redraft" ||

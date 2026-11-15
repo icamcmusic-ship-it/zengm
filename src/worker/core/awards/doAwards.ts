@@ -1,3 +1,4 @@
+import { awardActive } from "./trackingAwards.ts";
 import type { Conditions, TeamFiltered } from "../../../common/types.ts";
 import { g } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
@@ -124,7 +125,8 @@ export const doAwards = async (conditions: Conditions) => {
 	const bestRecords = await teamAwards(teams);
 
 	const { players, realizedAwards } = await processAwards({
-		awards: g.get("awards"),
+		// Advanced Tracking Stats only awards (Clutch Player of the Year) are given with the setting on
+		awards: g.get("awards").filter(awardActive),
 		// League extras (Award Vote): more candidates for the simulated vote, cut back to the stored number below
 		numPlayersPerIndividualAward: awardVoteOn
 			? VOTE_CANDIDATES

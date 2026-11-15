@@ -1,0 +1,559 @@
+rule key: 549 players, 487 with a qualifying build (the rest: nearest specific build); builds accepted 1/2/3: 28/41/480
+first-pick families: slasher 138, scorer 130, glass 68, playmaker 59, wingDefender 45, shooter 39, postBig 30, stretchBig 15, rimProtector 13, allAround 12
+first-pick builds used: 117
+rule vs arch17 (all 549): n 549: share a build 36.4%, first pick among the other's 14.9%, same first pick 7.7%, same family of first pick 37.0%
+rule vs arch17 (test split): n 165: share a build 35.8%, first pick among the other's 19.4%, same first pick 7.9%, same family of first pick 37.6%
+rule vs arch14 (400 shared): n 400: share a build 45.3%, first pick among the other's 16.0%, same first pick 6.5%, same family of first pick 41.5%
+arch17 vs arch14 (400 shared, reference): n 400: share a build 60.5%, first pick among the other's 33.5%, same first pick 17.3%, same family of first pick 52.3%
+rule vs arch17 by population: real <2016: n 96: share a build 29.2%, first pick among the other's 12.5%, same first pick 6.3%, same family of first pick 33.3%; real 2016+: n 144: share a build 36.1%, first pick among the other's 15.3%, same first pick 6.9%, same family of first pick 31.3%; league: n 100: share a build 32.0%, first pick among the other's 13.0%, same first pick 8.0%, same family of first pick 41.0%; prospect: n 60: share a build 50.0%, first pick among the other's 15.0%, same first pick 8.3%, same family of first pick 38.3%; sim: n 149: share a build 38.9%, first pick among the other's 17.4%, same first pick 8.7%, same family of first pick 41.6%
+
+player | rule key | arch17 | arch14
+Brad Daugherty 1992 (FC, tune) | high-flying-shot-creator, yamming-force-of-nature, athletic-paint-prodigy | post-dimming-board-enforcer, footer, rim-running-board-enforcer | post-scoring-board-enforcer, post-bully-cleaner, paint-finishing-board-enforcer
+Michael Jordan 1992 (G, tune) | 2-way-chaos-trigger, edge-enforcer, lockdown-defender | 2-way-mid-range-menace, mr-two-way, ball-hawking-mid-paint-scorer | 2-way-mid-range-scorer, physical-mid-range-menace, gritty-mid-range-menace
+Terry Porter 1992 (PG, test) | 3-and-d-specialist, edge-enforcer, lockdown-defender | playmaking-3pt-creator, diming-sharpshooter, 2-way-3pt-playmaker | playmaking-3pt-creator, diming-sharpshooter, cash-out
+Nick Anderson 1992 (GF, tune) | bulldozer | drive-and-rise, power-slasher, 2-way-mid-range-slasher | gritty-slashing-dual-finisher, drive-and-rise, slashing-dual-finisher
+Kenny Smith 1992 (PG, test) | ankle-taker, iso-savant, shifty-king | pass-first-distributor, slashing-playmaker, dot-dispenser | playmaking-3pt-creator, speedy-offensive-engine, dot-dispenser
+Chuck Person 1992 (GF, test) | diming-3-level-scorer, crafty-mid-range-menace, gritty-mid-range-menace | deep-range-sniper, crafty-sharpshooter, 3pt-shot-hunter | deep-range-sniper, 3pt-shot-hunter, gritty-3-level-scorer
+Rumeal Robinson 1992 (PG, test) | playmaking-shot-creator, post-creator, 2-way-tempo-pusher | pass-first-distributor, defensive-playmaker, dot-dispenser | dot-dispenser, pass-first-distributor, aerial-playmaker
+Kevin Edwards 1992 (G, tune) | 2-way-chaos-trigger, edge-enforcer, lockdown-defender | ball-hawking-mid-range-menace, mr-two-way | 2-way-mid-paint-scorer, ball-hawking-mid-paint-scorer, ball-hawking-mid-range-menace
+Rex Chapman 1992 (G, tune) | playmaking-shot-creator, ankle-taker, iso-savant | mid-range-high-flyer, mid-range-slasher, playmaking-shot-creator | iso-savant, versatile-scorer, ankle-snatcher
+Stacey King 1992 (PF, test) | fluid-four | post-scoring-slasher, dunk-tank | rim-reaping-rim-runner, rim-reaping-poster-dunker, athletic-hustler
+Albert King 1992 (GF, tune, nearest) | board-hunting-bucket-getter, post-combo-guard, do-it-all-superstar | grinder | crafty-3-level-scorer, three-level-scorer, crafty-walking-bucket
+Terry Davis 1992 (PF, tune) | rim-rocking-post-board-hunter, crafty-paint-finishing-cleaner, post-up-glass-cleaner | hustle-glass-cleaner, physical-defensive-rebounder | hustle-glass-cleaner, board-hunting-power-dunker, physical-board-hunter
+Dan Majerle 1995 (SG, tune) | 3-and-d-specialist | 3-and-d-specialist, catch-and-shoot-3pt-sniper, high-flying-3pt-sniper | 2-way-sharpshooter, 2-way-off-screen-shooter, high-flying-3pt-sniper
+Hakeem Olajuwon 1995 (FC, tune) | backline-middy-creator, backline-tempo-pusher, rim-reaping-rim-runner | rim-reaping-post-scorer, master-of-both-ends, shot-erasing-mid-paint-maestro | rim-reaping-post-scorer, backline-mid-range-scorer, shot-erasing-mid-paint-maestro
+Toni Kukoč 1995 (F, test) | 2-way-table-setter, crafty-offensive-engine, offensive-engine | point-four, slashing-playmaker, crafty-offensive-engine | point-four, mid-paint-point-forward, offensive-engine
+Jason Kidd 1995 (G, test) | defensive-playmaker, playmaking-shot-creator, crafty-offensive-engine | defensive-playmaker, triple-double-threat, dot-dispenser | glass-cleaning-playmaker, defensive-playmaker, 2-way-high-flying-dime-dropper
+Hersey Hawkins 1995 (G, test) | 2-way-chaos-trigger, edge-enforcer, lockdown-defender | 3-and-d-specialist, ball-hawking-sharpshooter, 2-way-off-screen-shooter | 2-way-off-screen-shooter, 2-way-sharpshooter, catch-and-shoot-3pt-sniper
+Tim Hardaway 1995 (PG, tune) | crafty-post-playmaker, crafty-offensive-engine, dot-dispenser | playmaking-3pt-creator, shifty-king, dime-dropping-3pt-gunner | playmaking-3pt-creator, crafty-iso-sniper, cash-out
+Alonzo Mourning 1995 (C, tune) | rim-reaping-rim-runner, rim-reaping-post-scorer, power-slasher | rim-reaping-post-scorer, backline-post-rim-rocker, shot-blocking-anchor | backline-masher, backline-power-finisher, physical-rim-reaper
+Anthony Bowie 1995 (G, tune, nearest) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, crafty-mid-range-menace | 2-way-mid-range-menace, gritty-mid-range-menace, crafty-mid-range-menace
+Greg Anthony 1995 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | defensive-playmaker, ball-hawking-playshot, 2-way-3pt-playmaker | ball-hawking-3-and-d-point, ball-hawking-3pt-sniper, 2-way-3pt-playmaker
+Chuck Person 1995 (GF, tune) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, deep-range-sniper, crafty-sharpshooter | deep-range-sniper, 3pt-shot-hunter, gritty-3-level-scorer
+Adrian Caldwell 1995 (GF, tune, nearest) | bulldozer | grinder | mid-paint-bully, physical-mid-paint-cleaner, mid-paint-scoring-cleaner
+Gerald Glass 1995 (GF, test, nearest) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace | crafty-mid-range-menace, three-level-scorer, crafty-3-level-scorer
+Tim Duncan 1998 (C, tune) | post-creator, do-it-all-superstar, footer | rim-reaping-post-scorer, mid-post-bucket-getter, shot-erasing-mid-paint-maestro | post-scoring-board-enforcer, rim-reaping-post-scorer, post-bully-cleaner
+Michael Jordan 1998 (SG, tune) | post-scoring-slasher, post-combo-guard, 2-way-mid-range-slasher | physical-mid-range-menace, 2-way-mid-range-menace, gritty-mid-range-menace | crafty-mid-post-scorer, mid-post-bucket-getter, physical-mid-range-menace
+Grant Hill 1998 (GF, tune) | 2-way-table-setter, slashing-playmaker, speedy-offensive-engine | slashing-playmaker, triple-double-threat, aerial-playmaker | dime-dropping-dual-finisher, 2-way-slashing-point-forward, slashing-playmaker
+Matt Geiger 1998 (C, test) | footer, the-anomaly | footer, board-hunting-paint-finisher | physical-board-enforcer, physical-middy-board-enforcer, pick-and-roll-finisher
+Zydrunas Ilgauskas 1998 (C, tune) | shot-creating-mid-range-maestro, do-it-all-superstar, footer | footer, board-hunting-paint-finisher | physical-middy-board-enforcer, post-scoring-board-enforcer, shot-erasing-mid-paint-maestro
+Antoine Walker 1998 (SF, tune) | crafty-paint-finishing-cleaner, post-up-glass-cleaner, post-scoring-slasher | mid-post-bucket-getter, post-dimming-board-enforcer, board-hunting-bucket-getter | physical-mid-paint-cleaner, mid-paint-scoring-cleaner, post-scoring-cleaner
+Robert Horry 1998 (F, tune) | 2-way-small-ball-four, master-of-both-ends, do-it-all-superstar | 2-way-small-ball-four, shot-erasing-guard-dog, backline-four | backline-stretch-four, backline-four, rim-reaping-skilled-popper
+Anfernee Hardaway 1998 (G, tune) | defensive-playmaker, playmaking-shot-creator, slashing-playmaker | slashing-playmaker, playmaking-shot-creator, ball-hawking-playslash | aerial-playmaker, post-combo-guard, slashing-playmaker
+Chris Morris 1998 (PF, tune) | fluid-four | skilled-stretch-four, 2-way-small-ball-four | 2-way-pick-and-popper, rim-reaping-skilled-popper, 2-way-skilled-pick-and-popper
+Reggie Slater 1998 (F, test) | post-scoring-slasher, blow-by-dual-finisher, drive-and-rise | post-scoring-slasher, dunk-tank, bulldozer | dunk-tank, board-hunting-power-dunker, physical-board-hunter
+Chris Carr 1998 (SG, tune) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, catch-and-shoot-3pt-sniper | crafty-mid-range-menace, crafty-3-level-scorer, crafty-walking-bucket
+Brad Lohaus 1998 (SF, test, nearest) | 2-way-off-screen-shooter | catch-and-shoot-3pt-sniper, grinder | backline-pick-and-popper, 2-way-off-screen-shooter, shot-erasing-3pt-high-flyer
+Shareef Abdur-Rahim 2001 (F, test) | post-scoring-slasher, footwork-pharaoh, post-combo-guard | mid-post-bucket-getter, post-creator | versatile-post-scorer, mid-paint-bully, drive-and-rise-wing
+Derek Anderson 2001 (G, tune) | edge-enforcer, lockdown-defender, the-guard-dog | drive-and-rise, inside-out-slasher, gritty-3pt-slasher | iso-savant, versatile-scorer, shifty-king
+Kobe Bryant 2001 (G, tune) | post-scoring-slasher, 2-way-mid-post-scorer, post-combo-guard | 2-way-mid-range-menace, iso-savant, 2-way-iso-savant | physical-mid-range-menace, post-combo-guard, gritty-mid-range-menace
+Antonio McDyess 2001 (FC, tune) | post-creator, footwork-pharaoh, ankle-taker | mid-post-bucket-getter, rim-reaping-post-scorer, physical-mid-range-high-flyer | power-slasher, post-up-rim-rocking-crasher, physical-middy-board-enforcer
+Ben Wallace 2001 (PF, tune) | bulldozing-glass-guardian, shot-erasing-board-enforcer, shot-erasing-cleaner | glass-guardian, shot-blocking-anchor, rim-wrecking-glass-guardian | bulldozing-glass-guardian, physical-defensive-rebounder, switch-defending-cleaner
+Richard Hamilton 2001 (SG, tune) | post-combo-guard, crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, crafty-mid-range-menace, mid-post-bucket-getter | mid-range-menace, physical-mid-range-menace, crafty-mid-range-menace
+Marcus Camby 2001 (C, test) | rim-reaping-rim-runner, backline-four, shot-blocking-anchor | shot-blocking-anchor, rim-reaping-rim-runner, glass-guardian | shot-blocking-anchor, glass-guardian, physical-rim-reaper
+Matt Bullard 2001 (F, test) | skilled-stretch-four, fluid-four | deep-range-sniper, catch-and-shoot-3pt-sniper, big-range | big-range, skilled-stretch-four, deep-range-sniper
+Robert Horry 2001 (F, tune) | 2-way-small-ball-four, master-of-both-ends, do-it-all-superstar | backline-pick-and-popper, 2-way-skilled-pick-and-popper, shot-erasing-skilled-popper | backline-stretch-four, rim-reaping-skilled-popper, backline-four
+John Amaechi 2001 (PF, tune) | post-scoring-slasher, footwork-pharaoh, blow-by-dual-finisher | post-combo-guard, post-scoring-slasher | footwork-pharaoh, post-scoring-slasher, dunk-tank
+Lawrence Funderburke 2001 (PF, tune) | rim-rocking-post-board-hunter, board-hunting-paint-finisher, post-scoring-slasher | post-scoring-slasher, hustle-glass-cleaner | post-scoring-cleaner, rim-rocking-post-board-hunter, hustle-glass-cleaner
+Zendon Hamilton 2001 (GF, test, nearest) | bulldozer, post-combo-guard | grinder | mid-paint-bully, physical-mid-paint-cleaner, slashing-cleaner
+Paul Pierce 2004 (SG, test) | post-scoring-slasher, post-combo-guard, glass-cleaning-slasher | iso-savant, mid-post-bucket-getter, 2-way-mid-post-scorer | versatile-scorer, dime-dropping-dual-finisher, slashing-playmaker
+Andrei Kirilenko 2004 (FC, test) | rim-reaping-rim-runner, backline-tempo-pusher, backline-four | the-anomaly, shot-erasing-guard-dog, rim-reaping-slasher | lockdown-eraser, rim-reaping-rim-runner, backline-four
+Stephen Jackson 2004 (GF, tune) | 2-way-chaos-trigger, edge-enforcer, lockdown-defender | ball-hawking-mid-range-menace, 2-way-3-level-shot-creator, ball-hawking-3pt-slasher | 2-way-sharpshooter, edge-enforcing-3pt-sniper, gritty-3-level-scorer
+Walter McCarty 2004 (F, tune) | 2-way-off-screen-shooter, 2-way-skilled-pick-and-popper, big-range | catch-and-shoot-3pt-sniper, big-range, 3-and-d-specialist | skilled-stretch-four, big-range, deep-range-sniper
+Ronald Murray 2004 (G, tune) | post-creator, ankle-taker, iso-savant | ankle-taker, mid-range-menace | gritty-power-slasher, blow-by-high-flyer, iso-savant
+Jermaine O'Neal 2004 (FC, tune) | footwork-pharaoh, shot-creating-mid-range-maestro, bulldozer | rim-reaping-post-scorer, backline-mid-range-scorer, shot-erasing-mid-paint-maestro | physical-mid-paint-shot-eraser, rim-reaping-mid-paint-scorer, backline-mid-range-scorer
+Kenny Thomas 2004 (F, tune) | rim-rocking-post-board-hunter, crafty-paint-finishing-cleaner, post-up-glass-cleaner | physical-defensive-rebounder, post-up-glass-cleaner, hustle-glass-cleaner | hustle-glass-cleaner, physical-board-hunter, 2-way-bulldozing-putback-pro
+Chucky Atkins 2004 (PG, test, nearest) | do-it-all-superstar, 3-and-d-specialist, 2-way-off-screen-shooter | catch-and-shoot-3pt-sniper, dime-dropping-3pt-gunner | cash-out, crafty-sharpshooter, deep-range-sniper
+Robert Traylor 2004 (FC, tune) | rim-reaping-post-scorer, backline-post-bully-riser, footwork-pharaoh | physical-defensive-rebounder, hustle-glass-cleaner, grinder | ball-snatching-power-dunker, power-slasher, board-enforcing-bullmasher
+Wesley Person 2004 (GF, tune) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, crafty-sharpshooter | catch-and-shoot-3pt-sniper, crafty-sharpshooter, deep-range-sniper
+Mamadou N'Diaye 2004 (C, tune) | backline-four, shot-blocking-anchor, footer | shot-blocking-anchor, backline-lob-threat | shot-blocking-anchor, backline-lob-threat, rim-reaping-rim-runner
+George Lynch 2004 (SF, tune) | mid-paint-board-enforcer, do-it-all-superstar, crafty-walking-bucket | glass-cleaning-lockdown, 3-and-d-specialist, grinder | lockdown-stopper, glass-cleaning-lockdown, 2-way-mid-range-menace
+Caron Butler 2007 (GF, tune) | post-combo-guard, 2-way-post-bully, 2-way-bulldimer | 2-way-mid-range-slasher, 2-way-mid-range-menace, ball-hawking-mid-paint-scorer | ball-hawking-mid-paint-scorer, 2-way-mid-range-scorer, 2-way-mid-range-slasher
+Chauncey Billups 2007 (PG, tune) | blow-by-dual-finisher, post-scoring-slasher, blow-by-rim-attacker | playmaking-3pt-creator, dime-dropping-3pt-gunner, diming-sharpshooter | playmaking-3pt-creator, playmaking-shot-creator, dot-dispenser
+Steve Nash 2007 (PG, tune) | mid-paint-point-four, playmaking-shot-creator, crafty-offensive-engine | dot-dispenser, diming-sharpshooter, playmaking-3pt-creator | playmaking-shot-creator, playmaking-3pt-creator, offensive-engine
+Paul Pierce 2007 (SG, test) | post-scoring-slasher, glass-cleaning-slasher, post-combo-guard | post-creator, mid-post-bucket-getter, power-slasher | slashing-playmaker, dime-dropping-dual-finisher, versatile-scorer
+Andrei Kirilenko 2007 (F, test) | rim-reaping-rim-runner, backline-tempo-pusher, shot-erasing-shot-creator | the-anomaly, shot-erasing-guard-dog, high-flying-eraser | lockdown-eraser, rim-reaping-high-flyer, high-flying-eraser
+Jarrett Jack 2007 (PG, tune, nearest) | ankle-taker, iso-savant, shifty-king | pass-first-distributor, slashing-playmaker | dot-dispenser, pass-first-distributor, ankle-snatcher
+Shane Battier 2007 (GF, tune) | 2-way-high-flying-wing-runner, 2-way-mid-range-high-flyer, mid-range-high-flyer | 3-and-d-specialist, edge-enforcing-3pt-sniper | edge-enforcing-3pt-sniper, shot-erasing-3pt-high-flyer, wing-running-sharpshooter
+Jarvis Hayes 2007 (GF, tune) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, catch-and-shoot-3pt-sniper | three-level-scorer, crafty-3-level-scorer, 2-way-off-screen-shooter
+Eddie Jones 2007 (SG, tune) | 2-way-off-screen-shooter, 2-way-combo-guard, do-it-all-superstar | 3-and-d-specialist, ball-hawking-sharpshooter | 2-way-off-screen-shooter, ball-hawking-sharpshooter, ball-hawking-mid-range-menace
+Ronald Murray 2007 (G, tune) | ankle-taker, iso-savant, shifty-king | drive-and-rise, blow-by-rim-attacker | ankle-snatcher, shifty-king, iso-savant
+Keith Bogans 2007 (SG, tune, nearest) | 3-and-d-specialist, 2-way-off-screen-shooter, crafty-mid-range-menace | 3-and-d-specialist, catch-and-shoot-3pt-sniper | 2-way-off-screen-shooter, 3pt-shot-hunter, three-level-scorer
+Viktor Khryapa 2007 (F, tune) | post-up-glass-cleaner, board-hunting-bucket-getter, hustle-glass-cleaner | grinder, glass-cleaning-lockdown | 2-way-table-setter, glass-cleaning-lockdown, 2-way-point-forward-cleaner
+Nenê 2010 (PF, test) | rim-reaping-slasher, backline-lob-threat, backline-four | 2-way-power-finisher, rim-reaping-rim-runner | rim-reaping-rim-runner, physical-rim-reaper, 2-way-rim-runner
+Carmelo Anthony 2010 (GF, test) | post-scoring-slasher, glass-cleaning-slasher, post-combo-guard | mid-post-bucket-getter, iso-savant, post-creator | post-scoring-slasher, mid-post-bucket-getter, crafty-mid-post-scorer
+Danilo Gallinari 2010 (F, test) | high-flying-shot-creator, skilled-stretch-four, athletic-hustler | catch-and-shoot-3pt-sniper, skilled-stretch-four, big-range | high-flying-3pt-sniper, skilled-stretch-four, big-range
+Jason Richardson 2010 (GF, tune) | physical-mid-range-menace, crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, mid-range-menace | physical-3-level-scorer, gritty-3-level-scorer, 3pt-shot-hunter
+Luol Deng 2010 (F, tune) | athletic-hustler, big-glide, bulldozer | slashing-lockdown, drive-and-rise | drive-and-rise, 2-way-mid-range-slasher, drive-and-rise-wing
+Marc Gasol 2010 (FC, tune) | high-flying-shot-creator, yamming-force-of-nature, athletic-paint-prodigy | pick-and-roll-finisher, footer | pick-and-roll-finisher, physical-board-enforcer, footer
+Channing Frye 2010 (PF, tune) | skilled-stretch-four, fluid-four | big-range, skilled-stretch-four | shot-erasing-skilled-popper, skilled-stretch-four, backline-pick-and-popper
+Mike Miller 2010 (GF, tune, nearest) | mid-paint-board-enforcer, ankle-taker, iso-savant | diming-sharpshooter, crafty-sharpshooter | dime-dropping-3pt-gunner, offensive-engine, mid-paint-point-forward
+Marco Belinelli 2010 (G, tune, nearest) | edge-enforcer, lockdown-defender, the-guard-dog | catch-and-shoot-3pt-sniper, 3pt-shot-hunter | 3pt-shot-hunter, iso-sniper, shifty-king
+Jonas Jerebko 2010 (PF, test) | bulldozer, grinder, fluid-four | 2-way-small-ball-four, grinder, switch-defending-cleaner | switch-defending-cleaner, physical-disruptive-cleaner, hustle-glass-cleaner
+Luke Walton 2010 (GF, tune, nearest) | board-hunting-bucket-getter | point-four, diming-cleaner | 2-way-mid-paint-point-forward, 2-way-table-setter, mid-paint-point-forward
+James Posey 2010 (SF, test) | deep-range-sniper | catch-and-shoot-3pt-sniper, 3-and-d-specialist | 2-way-sharpshooter, edge-enforcing-3pt-sniper, 2-way-off-screen-shooter
+Kevin Durant 2013 (SF, tune) | ankle-taker, iso-savant, post-combo-guard | iso-savant, three-level-scorer, offensive-engine | walking-bucket, shot-erasing-shot-creator, high-flying-shot-creator
+James Harden 2013 (G, tune) | post-scoring-slasher, post-creator, post-combo-guard | playmaking-3pt-slasher, power-slasher, inside-out-bully | blow-by-dual-finisher, slashing-playmaker, gritty-power-slasher
+Stephen Curry 2013 (PG, tune) | post-creator, ankle-taker, iso-savant | playmaking-3pt-creator, deep-range-sniper, from-the-logo | playmaking-3pt-creator, 3pt-shot-hunter, crafty-iso-sniper
+Klay Thompson 2013 (SG, tune) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, mid-range-menace, 2-way-off-screen-shooter | catch-and-shoot-3pt-sniper, 3pt-shot-hunter, gritty-mid-range-menace
+Channing Frye 2013 (PF, test) | 2-way-mid-range-menace, 2-way-skilled-pick-and-popper, skilled-stretch-four | big-range, backline-pick-and-popper, stretch-board-enforcer | shot-erasing-skilled-popper, backline-pick-and-popper, skilled-stretch-four
+Ryan Anderson 2013 (PF, tune) | crashing-mid-paint-scorer, skilled-stretch-four, bulldozer | big-range, skilled-stretch-four, stretch-board-enforcer | skilled-stretch-board-enforcer, stretch-board-enforcer, skilled-stretch-four
+Danny Green 2013 (SG, test) | 2-way-high-flying-wing-runner, 2-way-mid-range-high-flyer, mid-range-high-flyer | 3-and-d-specialist, high-flying-3pt-sniper, catch-and-shoot-3pt-sniper | catch-and-shoot-3pt-sniper, shot-erasing-3pt-high-flyer, 2-way-off-screen-shooter
+Josh McRoberts 2013 (F, tune) | 2-way-small-ball-four, master-of-both-ends, fluid-four | point-four, diming-cleaner, grinder | point-four, versatile-scoring-crasher, hustle-glass-cleaner
+Patrick Beverley 2013 (G, tune) | crafty-offensive-engine, dot-dispenser, offensive-engine | 3-and-d-specialist, the-guard-dog, defensive-playmaker | 2-way-3pt-playmaker, mr-two-way, 3pt-high-flying-ball-hawk
+J.J. Hickson 2013 (FC, tune) | post-up-glass-cleaner, physical-defensive-rebounder, board-hunting-bucket-getter | hustle-glass-cleaner, physical-defensive-rebounder, post-up-glass-cleaner | board-hunting-power-dunker, physical-board-hunter, post-scoring-cleaner
+Donatas Motiejūnas 2013 (FC, tune) | high-flying-stretch-big, high-flying-faceup-big, skilled-stretch-four | skilled-stretch-four, big-range | mid-paint-scorer, walking-bucket, skilled-stretch-four
+Leandro Barbosa 2013 (G, test, nearest) | ankle-taker, iso-savant, shifty-king | 3pt-shot-hunter, mid-range-menace | versatile-scorer, shifty-king, iso-savant
+Kawhi Leonard 2016 (GF, tune) | disruptive-wing-runner, 2-way-chaos-trigger, 2-way-bulldimer | 2-way-mid-range-menace, ball-hawking-mid-paint-scorer, lockdown-defender | ball-hawking-mid-paint-scorer, 2-way-mid-range-scorer, ball-hawking-3-level-scorer
+Damian Lillard 2016 (PG, tune) | post-scoring-slasher, post-creator, blow-by-dual-finisher | playmaking-3pt-creator, offensive-engine, 3pt-shot-hunter | crafty-offensive-engine, playmaking-3pt-creator, 3pt-shot-hunter
+Giannis Antetokounmpo 2016 (FC, tune) | ankle-taker, iso-savant, do-it-all-superstar | aerial-playmaker, slashing-playmaker, yamming-force-of-nature | athletic-paint-prodigy, rim-reaping-rim-runner, point-four
+Kent Bazemore 2016 (GF, test, nearest) | do-it-all-superstar, crafty-mid-range-menace, gritty-mid-range-menace | 3-and-d-specialist, ball-hawking-sharpshooter | lockdown-stopper, 2-way-off-screen-shooter, ball-hawking-mid-paint-scorer
+Reggie Jackson 2016 (PG, tune) | crafty-post-playmaker, mid-paint-point-four, slashing-playmaker | playmaking-shot-creator, slashing-playmaker | crafty-offensive-engine, physical-offensive-engine, slashing-playmaker
+Andrew Wiggins 2016 (GF, tune) | post-scoring-slasher, yamming-force-of-nature, post-combo-guard | drive-and-rise, power-slasher, yamming-force-of-nature | drive-and-rise, blow-by-high-flyer, versatile-post-scorer
+Ryan Anderson 2016 (PF, test) | skilled-stretch-four, bulldozer, grinder | big-range, skilled-stretch-four, stretch-board-enforcer | skilled-stretch-four, physical-3-level-scorer, crafty-walking-bucket
+Markel Brown 2016 (SG, test, nearest) | 2-way-combo-guard, edge-enforcer, lockdown-defender | 3-and-d-specialist, athletic-hustler | athletic-hustler, 2-way-high-flying-wing-runner, edge-enforcer
+Joel Embiid 2016 (C, tune) | slashing-mid-range-maestro, power-slasher, pick-and-roll-finisher | footwork-pharaoh, rim-reaping-post-scorer, mid-post-bucket-getter | post-bully-cleaner, 2-way-mid-post-scorer, post-scoring-board-enforcer
+Dion Waiters 2016 (G, tune) | edge-enforcer, lockdown-defender, the-guard-dog | 3pt-shot-hunter, mid-range-menace, gritty-3pt-slasher | mid-range-high-flyer, physical-mid-range-high-flyer, versatile-scorer
+Nemanja Bjelica 2016 (F, tune) | break-starting-stretch-five, skilled-stretch-four, crafty-offensive-engine | skilled-stretch-four, big-range | skilled-stretch-four, dime-dropping-3pt-gunner, 2-way-skilled-stretch-riser
+Kyle Singler 2016 (SF, tune, nearest) | bulldozer | catch-and-shoot-3pt-sniper, 3-and-d-specialist | 2-way-off-screen-shooter, 2-way-pick-and-popper, skilled-stretch-four
+Giannis Antetokounmpo 2019 (FC, tune) | post-creator, ankle-taker, iso-savant | slashing-playmaker, crafty-paint-finishing-cleaner, yamming-force-of-nature | physical-offensive-engine, physical-glass-visionary, athletic-paint-prodigy
+Jrue Holiday 2019 (G, test) | 2-way-tempo-pusher, ankle-taker, iso-savant | defensive-playmaker, mr-two-way, 2-way-table-setter | defensive-playmaker, 2-way-playmaking-creator, aerial-playmaker
+D'Angelo Russell 2019 (PG, tune) | physical-mid-range-menace, do-it-all-superstar, crafty-mid-paint-scorer | playmaking-3pt-creator, crafty-offensive-engine, 3pt-shot-hunter | physical-offensive-engine, playmaking-3pt-creator, crafty-offensive-engine
+Marcus Smart 2019 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | defensive-playmaker, 3-and-d-specialist, the-guard-dog | the-guard-dog, defensive-playmaker, mr-two-way
+Nikola Mirotić 2019 (PF, tune) | big-range, skilled-stretch-four, fluid-four | big-range, skilled-stretch-four, stretch-board-enforcer | skilled-stretch-four, shot-erasing-skilled-popper, stretch-board-enforcer
+Julius Randle 2019 (F, tune) | rim-rocking-post-board-hunter, board-hunting-paint-finisher, post-scoring-slasher | post-creator, board-hunting-bucket-getter, rim-rocking-post-board-hunter | post-scoring-cleaner, post-scoring-slasher, rim-rocking-post-board-hunter
+Marc Gasol 2019 (FC, tune) | backline-tempo-pusher, 2-way-iso-savant, ankle-taker | table-setting-board-enforcer, shot-erasing-table-setter, break-starting-stretch-five | 2-way-post-break-starter, point-four, 2-way-break-starting-popper
+Trey Burke 2019 (PG, test, nearest) | blow-by-rim-attacker, drive-and-rise, blow-by-dual-finisher | playmaking-shot-creator, offensive-engine, speedy-offensive-engine | slashing-playmaker, crafty-offensive-engine, mid-range-slasher
+Caris LeVert 2019 (G, tune) | crafty-post-playmaker, playmaking-shot-creator, post-creator | playmaking-shot-creator, slashing-playmaker, drive-and-rise | slashing-playmaker, aerial-playmaker, post-creator
+Yogi Ferrell 2019 (PG, tune, nearest) | do-it-all-superstar, physical-mid-range-menace | catch-and-shoot-3pt-sniper, 3pt-shot-hunter | three-level-scorer, crafty-3-level-scorer, cash-out
+Wayne Selden 2019 (SG, tune, nearest) | post-combo-guard | gritty-3pt-slasher, drive-and-rise | crafty-mid-range-menace, post-combo-guard, gritty-slashing-dual-finisher
+Troy Daniels 2019 (SG, tune) | catch-and-shoot-3pt-sniper, crafty-sharpshooter, deep-range-sniper | catch-and-shoot-3pt-sniper, deep-range-sniper | deep-range-sniper, catch-and-shoot-3pt-sniper, from-the-logo
+Jaylen Brown 2022 (F, tune) | crafty-mid-post-scorer, mid-post-bucket-getter, diming-3-level-scorer | inside-out-slasher, mid-range-slasher, high-flying-mid-range-slasher | mid-range-slasher, crafty-mid-paint-scorer, high-flying-mid-range-slasher
+Kawhi Leonard 2022 (SF, test) | post-scoring-slasher, 2-way-tempo-pusher, ankle-taker | 2-way-iso-savant, 2-way-mid-range-menace, 2-way-3-level-shot-creator | crafty-mid-paint-scorer, mid-range-slasher, 2-way-mid-range-slasher
+Kevin Durant 2022 (F, tune) | slashing-playmaker, dime-dropping-dual-finisher, crafty-mid-post-scorer | iso-savant, crafty-3-level-scorer, three-level-scorer | walking-bucket, crafty-mid-paint-scorer, versatile-scorer
+John Collins 2022 (PF, test) | rim-running-board-enforcer, crafty-paint-finishing-cleaner, physical-defensive-rebounder | board-hunting-high-flyer, high-flying-board-enforcer, rim-running-board-enforcer | athletic-paint-prodigy, rim-wrecking-glass-guardian, glass-guardian-power-dunker
+John Wall 2022 (PG, tune) | blow-by-dual-finisher, dime-dropping-dual-finisher, blow-by-rim-attacker | slashing-playmaker, blow-by-rim-attacker, playmaking-shot-creator | slashing-playmaker, inside-out-crafty-slasher, ankle-snatcher
+Deandre Ayton 2022 (C, test) | rim-running-board-enforcer, crafty-paint-finishing-cleaner, physical-defensive-rebounder | crafty-paint-finishing-cleaner, rim-running-board-enforcer, board-hunting-paint-finisher | crafty-paint-finishing-cleaner, board-hunting-paint-finisher, post-up-rim-rocking-crasher
+De'Andre Hunter 2022 (SF, tune) | post-scoring-slasher, post-combo-guard, blow-by-dual-finisher | 3-and-d-specialist, power-slasher, 2-way-power-finisher | 2-way-dual-finisher, edge-enforcing-3pt-sniper, versatile-paint-finisher
+Collin Sexton 2022 (PG, tune) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | mid-range-slasher, crafty-mid-paint-scorer, blow-by-rim-attacker | mid-range-slasher, versatile-scorer, post-scoring-slasher
+Luguentz Dort 2022 (SG, test) | post-scoring-slasher, blow-by-rim-attacker, drive-and-rise | 3-and-d-specialist, the-guard-dog, gritty-3pt-slasher | 2-way-sharpshooter, 2-way-inside-out-combo-guard, physical-lockdown-defender
+Reggie Jackson 2022 (PG, tune) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | 3pt-shot-hunter, crafty-sharpshooter, mid-range-menace | inside-out-slasher, three-level-scorer, crafty-sharpshooter
+Chimezie Metu 2022 (FC, test) | crafty-paint-finishing-cleaner, physical-defensive-rebounder, hustle-glass-cleaner | physical-defensive-rebounder, hustle-glass-cleaner, post-up-glass-cleaner | post-scoring-cleaner, 2-way-paint-scoring-cleaner, hustle-glass-cleaner
+Mitchell Robinson 2022 (C, tune) | rim-reaping-rim-runner, 2-way-rim-runner, yamming-force-of-nature | backline-lob-threat, shot-blocking-anchor, shot-erasing-putback-pro | shot-blocking-anchor, rim-reaping-rim-runner, rim-wrecking-glass-guardian
+Devin Booker 2024 (G, tune) | crafty-mid-range-slasher, blow-by-dual-finisher, dime-dropping-dual-finisher | diming-3-level-scorer, crafty-3-level-scorer, offensive-engine | crafty-mid-range-menace, three-level-scorer, mid-range-slasher
+Tyrese Maxey 2024 (G, test) | crafty-mid-range-slasher, crafty-mid-range-menace, gritty-mid-range-menace | crafty-mid-paint-scorer, drive-and-rise, inside-out-slasher | mid-range-slasher, inside-out-slasher, high-flying-mid-range-slasher
+Alperen Şengün 2024 (F, test) | crafty-mid-post-scorer, mid-post-bucket-getter, mid-range-slashing-cleaner | post-dimming-board-enforcer, crafty-post-playmaker, footwork-pharaoh | physical-mid-paint-cleaner, post-dimming-board-enforcer, crashing-mid-paint-scorer
+Mikal Bridges 2024 (SF, tune) | crafty-mid-post-scorer, mid-post-bucket-getter, blow-by-dual-finisher | 2-way-mid-range-menace, mid-range-menace, 3-and-d-specialist | mid-range-menace, crafty-mid-paint-scorer, 2-way-mid-range-scorer
+Bam Adebayo 2024 (FC, tune) | slashing-mid-range-maestro, shot-creating-mid-range-maestro, power-slasher | mid-paint-point-four, slashing-mid-range-maestro, edge-enforcer | 2-way-mid-paint-cleaner, 2-way-mid-post-scorer, crashing-mid-paint-scorer
+LaMelo Ball 2024 (G, test) | triple-double-threat, stretch-board-enforcer, crafty-3-level-dime-dropper | playmaking-3pt-creator, triple-double-threat, from-the-logo | diming-inside-out-scorer, playmaking-3pt-creator, offensive-engine
+Miles Bridges 2024 (SF, test) | mid-paint-board-enforcer, crafty-mid-post-scorer, mid-post-bucket-getter | board-hunting-bucket-getter, mid-range-slashing-cleaner, mid-range-high-flyer | mid-paint-scoring-cleaner, slashing-cleaner, mid-post-bucket-getter
+Isaiah Hartenstein 2024 (C, tune) | shot-erasing-board-enforcer, rim-running-board-enforcer, glass-guardian | glass-guardian, shot-erasing-putback-pro, hustle-glass-cleaner | hustle-glass-cleaner, glass-guardian, table-setting-board-enforcer
+Davion Mitchell 2024 (G, tune) | physical-mid-range-high-flyer, mid-range-high-flyer, physical-mid-range-menace | the-guard-dog, 3-and-d-specialist, crafty-mid-range-menace | physical-lockdown-defender, physical-mid-range-menace, the-guard-dog
+Kyle Kuzma 2024 (F, tune) | diming-3-level-scorer, crafty-mid-post-scorer, mid-post-bucket-getter | crafty-3-level-scorer, 3pt-shot-hunter, skilled-stretch-four | gritty-3-level-scorer, crafty-mid-paint-scorer, diming-3-level-scorer
+Nassir Little 2024 (SF, tune) | stretch-board-enforcer, do-it-all-superstar, crafty-walking-bucket | catch-and-shoot-3pt-sniper, athletic-hustler | inside-out-scorer, shot-erasing-3pt-high-flyer, board-hunting-high-flyer
+Collin Sexton 2024 (G, test) | high-flying-mid-range-slasher, crafty-mid-range-slasher, yamming-force-of-nature | mid-range-slasher, blow-by-rim-attacker | crafty-mid-range-slasher, mid-range-slasher, versatile-scorer
+Scottie Barnes 2025 (F, tune) | backline-four, mid-paint-point-forward, mid-paint-point-four | mid-paint-point-four, 2-way-point-forward-cleaner, triple-double-threat | 2-way-mid-paint-point-forward, rim-reaping-mid-paint-scorer, mid-paint-point-forward
+Cade Cunningham 2025 (GF, tune) | crafty-mid-post-scorer, mid-post-bucket-getter, mid-paint-point-forward | offensive-engine, crafty-offensive-engine, mid-paint-point-forward | offensive-engine, mid-paint-point-forward, dime-dropping-dual-finisher
+Franz Wagner 2025 (F, tune) | crafty-mid-post-scorer, mid-post-bucket-getter, mid-paint-point-forward | crafty-mid-paint-scorer, slashing-playmaker, mid-range-slasher | crafty-mid-paint-scorer, mid-range-slasher, drive-and-rise-wing
+Jayson Tatum 2025 (SF, tune) | crafty-paint-finishing-cleaner, mid-paint-board-enforcer, post-up-glass-cleaner | diming-3-level-scorer, three-level-scorer, 2-way-3-level-cleaner | gritty-3-level-scorer, crafty-3-level-scorer, crafty-mid-paint-scorer
+Anthony Davis 2025 (FC, test) | mid-range-slashing-cleaner, mid-paint-board-enforcer, rim-running-board-enforcer | shot-erasing-mid-paint-maestro, backline-mid-range-scorer, rim-reaping-post-scorer | rim-wrecking-glass-guardian, rim-reaping-mid-paint-scorer, shot-erasing-mid-paint-maestro
+Jalen Johnson 2025 (SF, tune) | mid-paint-board-enforcer, 2-way-mid-range-menace, do-it-all-superstar | 2-way-point-forward-cleaner, mid-range-slashing-cleaner, high-flying-board-enforcer | mid-paint-scoring-cleaner, crashing-mid-paint-scorer, 2-way-point-forward-cleaner
+Donovan Mitchell 2025 (G, tune) | diming-inside-out-scorer, dime-dropping-dual-finisher, 2-way-inside-out-dime-dropper | crafty-inside-out-scorer, playmaking-3pt-creator, 2-way-inside-out-creator | inside-out-high-flying-slasher, inside-out-crafty-slasher, inside-out-slasher
+Trey Murphy III 2025 (GF, test) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, high-flying-3pt-sniper, deep-range-sniper | gritty-3-level-scorer, 3pt-sniping-rim-wrecker, deep-range-sniper
+Alperen Şengün 2025 (F, tune) | post-dimming-board-enforcer, rim-rocking-post-board-hunter, 2-way-point-forward-cleaner | post-dimming-board-enforcer, crafty-post-playmaker, footwork-pharaoh | post-dimming-board-enforcer, physical-mid-paint-cleaner, triple-double-threat
+Jalen Suggs 2025 (G, test) | high-flying-eraser, shot-erasing-guard-dog, edge-enforcing-rim-runner | 2-way-3pt-sniping-high-flyer, the-guard-dog, 3pt-high-flying-ball-hawk | 2-way-disruptive-high-flyer, 3pt-high-flying-ball-hawk, inside-out-high-flyer
+OG Anunoby 2025 (PF, tune) | rim-reaping-3-level-scorer, 2-way-skilled-pick-and-popper, backline-pick-and-popper | 3-and-d-specialist, edge-enforcing-3pt-sniper, 2-way-small-ball-four | 2-way-pick-and-popper, edge-enforcing-skilled-stretch
+Jaylen Brown 2025 (F, tune) | crafty-mid-post-scorer, mid-post-bucket-getter, mid-paint-point-forward | mid-range-slasher, 2-way-mid-range-menace, crafty-mid-paint-scorer | crafty-mid-paint-scorer, mid-range-slasher, crafty-mid-post-scorer
+Anthony Edwards 2025 (G, tune) | yamming-force-of-nature, high-flying-mid-range-slasher, glass-cleaning-slasher | inside-out-high-flyer, 3pt-shot-hunter, crafty-inside-out-scorer | inside-out-high-flying-slasher, blow-by-high-flyer, high-flying-slasher
+Tyrese Haliburton 2025 (PG, test) | diming-inside-out-scorer, 2-way-inside-out-dime-dropper, 2-way-off-screen-shooter | dime-dropping-3pt-gunner, dot-dispenser, diming-sharpshooter | offensive-engine, playmaking-3pt-creator, diming-sharpshooter
+Tyrese Maxey 2025 (PG, tune) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | crafty-mid-paint-scorer, speedy-offensive-engine, inside-out-slasher | inside-out-crafty-slasher, inside-out-slasher, three-level-scorer
+Jalen Williams 2025 (GF, tune) | mid-paint-point-forward, mid-paint-point-four, crafty-mid-range-menace | 2-way-mid-range-menace, crafty-mid-range-slasher, mid-range-slasher | mid-paint-scorer, 2-way-mid-paint-scorer, mid-range-slasher
+Jalen Green 2025 (G, test) | glass-cleaning-slasher, blow-by-dual-finisher, post-scoring-slasher | 3pt-shot-hunter, inside-out-high-flyer, inside-out-slasher | inside-out-high-flying-slasher, inside-out-slasher, high-flying-slasher
+Jaren Jackson Jr. 2025 (FC, test) | shot-erasing-mid-paint-maestro, rim-reaping-3-level-scorer, backline-mid-range-scorer | shot-erasing-mid-paint-maestro, shot-erasing-skilled-popper, backline-mid-range-scorer | rim-reaping-mid-paint-scorer, shot-erasing-skilled-popper, rim-reaping-3-level-scorer
+Kawhi Leonard 2025 (SF, tune) | 2-way-mid-range-menace, crafty-mid-post-scorer, mid-post-bucket-getter | 2-way-mid-range-menace, 2-way-iso-savant, ball-hawking-mid-range-menace | 2-way-mid-range-slasher, 2-way-mid-range-scorer, 2-way-mid-paint-scorer
+Domantas Sabonis 2025 (FC, tune) | triple-double-threat, table-setting-board-enforcer, mid-range-slashing-cleaner | table-setting-board-enforcer, physical-glass-visionary, post-dimming-board-enforcer | post-dimming-board-enforcer, post-bully-cleaner, table-setting-board-enforcer
+Pascal Siakam 2025 (F, test) | crafty-mid-post-scorer, mid-post-bucket-getter, mid-paint-point-forward | crafty-mid-paint-scorer, mid-paint-point-forward, mid-post-bucket-getter | crafty-mid-post-scorer, crafty-mid-paint-scorer, mid-range-slasher
+Karl-Anthony Towns 2025 (C, tune) | shot-creating-mid-range-maestro, slashing-mid-range-maestro, break-starting-stretch-five | stretch-board-enforcer, inside-out-board-enforcer, mid-paint-board-enforcer | slashing-mid-range-maestro, stretch-board-enforcer, walking-bucket
+Bam Adebayo 2025 (F, tune) | crafty-mid-post-scorer, mid-post-bucket-getter, mid-range-slashing-cleaner | mid-paint-point-four, slashing-mid-range-maestro, physical-mid-paint-shot-eraser | 2-way-mid-paint-cleaner, switch-defending-cleaner, physical-mid-paint-shot-eraser
+Paolo Banchero 2025 (F, tune) | post-scoring-slasher, blow-by-dual-finisher, dime-dropping-dual-finisher | mid-paint-point-forward, post-creator, physical-3-level-scorer | drive-and-rise-wing, versatile-scorer, mid-paint-bully
+Devin Booker 2025 (G, tune) | dime-dropping-dual-finisher, slashing-playmaker, blow-by-dual-finisher | diming-3-level-scorer, offensive-engine, crafty-offensive-engine | three-level-scorer, mid-range-slasher, versatile-scorer
+Jimmy Butler 2025 (G, tune) | glass-cleaning-slasher, playslash-board-enforcer, blow-by-dual-finisher | power-slasher, 2-way-power-finisher, slashing-playmaker | 2-way-blow-by-ace, 2-way-playmaking-slasher, 2-way-blow-by-dual-finisher
+De'Aaron Fox 2025 (PG, tune) | 2-way-mid-range-slasher, 2-way-mid-post-scorer, blow-by-dual-finisher | speedy-offensive-engine, drive-and-rise, ball-hawking-3pt-slasher | high-flying-mid-range-slasher, mid-range-slasher, high-flying-slasher
+Damian Lillard 2025 (PG, tune) | inside-out-high-flyer, yamming-force-of-nature, blow-by-dual-finisher | from-the-logo, playmaking-3pt-creator, 3pt-shot-hunter | 3pt-shot-hunter, inside-out-slasher, iso-sniper
+Ja Morant 2025 (G, tune) | post-scoring-slasher, yamming-force-of-nature, blow-by-dual-finisher | slashing-playmaker, aerial-playmaker, blow-by-rim-attacker | high-flying-slasher, blow-by-high-flyer, aerial-playmaker
+Jalen Brunson 2025 (PG, tune) | post-scoring-slasher, blow-by-dual-finisher, dime-dropping-dual-finisher | crafty-mid-paint-scorer, crafty-walking-bucket, post-creator | physical-mid-range-menace, mid-range-slasher, iso-savant
+Herbert Jones 2025 (SF, tune) | edge-enforcer, lockdown-defender, the-guard-dog | 3-and-d-specialist, lockdown-defender, shot-erasing-guard-dog | shot-erasing-guard-dog, lockdown-defender, lockdown-eraser
+Austin Reaves 2025 (G, tune) | crafty-mid-range-slasher, blow-by-dual-finisher, diming-inside-out-scorer | diming-inside-out-scorer, playmaking-3pt-creator, crafty-inside-out-scorer | playmaking-3pt-slasher, diming-inside-out-scorer, crafty-3-level-scorer
+Derrick White 2025 (G, tune) | 2-way-off-screen-shooter, catch-and-shoot-3pt-sniper, diming-sharpshooter | 3-and-d-specialist, shot-erasing-guard-dog, diming-sharpshooter | shot-erasing-3pt-high-flyer, catch-and-shoot-3pt-sniper, 2-way-off-screen-shooter
+Dyson Daniels 2025 (GF, tune) | ball-hawking-mid-paint-scorer, ball-hawking-mid-range-menace, 2-way-chaos-trigger | the-guard-dog, lockdown-defender, 2-way-chaos-trigger | ball-hawking-lockdown, versatile-defender, edge-enforcer
+Darius Garland 2025 (PG, tune) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | playmaking-3pt-creator, crafty-mid-paint-scorer, shifty-king | mid-range-slasher, three-level-scorer, playmaking-shot-creator
+Josh Giddey 2025 (GF, tune) | 2-way-point-forward-cleaner, diming-cleaner, mid-paint-board-enforcer | triple-double-threat, table-setting-board-enforcer, 2-way-point-forward-cleaner | diming-cleaner, dime-dropping-dual-finisher, versatile-scoring-cleaner
+Quentin Grimes 2025 (SG, test) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, 3-and-d-specialist, deep-range-sniper | 2-way-3-level-scorer, 2-way-sharpshooter, catch-and-shoot-3pt-sniper
+James Harden 2025 (PG, test) | glass-cleaning-slasher, 2-way-3pt-creating-cleaner, playslash-board-enforcer | playmaking-3pt-creator, offensive-engine, shifty-king | playmaking-3pt-slasher, playmaking-3pt-creator, diming-inside-out-scorer
+Josh Hart 2025 (SG, tune) | 2-way-combo-guard | switch-defending-cleaner, glass-cleaning-slasher, glass-cleaning-lockdown | slashing-cleaner, diming-cleaner, high-flying-board-enforcer
+Tyler Herro 2025 (G, tune) | mid-range-slashing-cleaner, mid-paint-board-enforcer, stretch-board-enforcer | 3pt-shot-hunter, crafty-3-level-scorer | crafty-3-level-scorer, crafty-3-level-dime-dropper, three-level-scorer
+Kyrie Irving 2025 (PG, tune) | blow-by-dual-finisher, glass-cleaning-slasher, blow-by-rim-attacker | shifty-king, iso-savant, crafty-3-level-scorer | three-level-scorer, iso-savant, crafty-3-level-scorer
+Lauri Markkanen 2025 (PF, test) | inside-out-board-enforcer, board-hunting-paint-finisher, gritty-3pt-slasher | big-range, skilled-stretch-four, inside-out-high-flyer | skilled-stretch-four, inside-out-slashing-dunker, big-range
+Jamal Murray 2025 (PG, tune) | mid-range-slashing-cleaner, playslash-board-enforcer, triple-double-threat | crafty-3-level-scorer, playmaking-shot-creator, diming-3-level-scorer | crafty-3-level-scorer, mid-range-slasher, versatile-scorer
+Kristaps Porziņģis 2025 (FC, test) | shot-erasing-3-level-creator, backline-middy-creator, shot-erasing-mid-paint-maestro | shot-erasing-skilled-popper, backline-pick-and-popper, shot-erasing-mid-paint-maestro | shot-erasing-skilled-popper, backline-stretch-four, shot-erasing-mid-paint-maestro
+Amen Thompson 2025 (GF, tune) | high-flying-board-enforcer, shot-erasing-board-enforcer, shot-erasing-cleaner | yamming-force-of-nature, high-flying-board-enforcer, slashing-lockdown | board-hunting-high-flyer, rim-reaping-high-flyer, yamming-force-of-nature
+Fred VanVleet 2025 (PG, test) | 2-way-3pt-sniping-high-flyer, athletic-hustler, big-glide | 2-way-3pt-playmaker, dime-dropping-3pt-gunner, 3-and-d-specialist | 2-way-3pt-playmaker, catch-and-shoot-3pt-sniper, ball-hawking-3-and-d-point
+Trae Young 2025 (PG, tune) | dime-dropping-dual-finisher, playmaking-shot-creator, slashing-playmaker | from-the-logo, playmaking-3pt-creator, dot-dispenser | slashing-playmaker, playmaking-3pt-creator, diming-inside-out-scorer
+Santi Aldama 2025 (FC, tune) | break-starting-stretch-five, big-range, skilled-stretch-four | skilled-stretch-four, big-range, stretch-board-enforcer | silk-stretch, skilled-stretch-four, stretch-board-enforcer
+LaMelo Ball 2025 (G, tune) | crafty-3-level-dime-dropper, diming-3-level-scorer, mid-paint-point-four | playmaking-3pt-creator, triple-double-threat, from-the-logo | diming-inside-out-scorer, playmaking-3pt-creator, crafty-3-level-dime-dropper
+Desmond Bane 2025 (G, test) | mid-range-slashing-cleaner, mid-paint-board-enforcer, stretch-board-enforcer | 3pt-shot-hunter, diming-3-level-scorer, crafty-sharpshooter | inside-out-scorer, three-level-scorer, crafty-3-level-scorer
+RJ Barrett 2025 (GF, tune) | crafty-mid-range-slasher, post-scoring-slasher, crafty-mid-post-scorer | mid-range-slasher, drive-and-rise, crafty-mid-paint-scorer | high-flying-mid-range-slasher, gritty-slashing-dual-finisher, mid-range-slasher
+Luguentz Dort 2025 (GF, test) | 2-way-off-screen-shooter, backline-four, 2-way-bulldimer | 3-and-d-specialist, the-guard-dog, edge-enforcing-3pt-sniper | 3-and-d-specialist, physical-lockdown-defender, 2-way-off-screen-shooter
+Ayo Dosunmu 2025 (SG, tune) | shot-erasing-mid-paint-maestro, 2-way-mid-range-menace, crafty-mid-range-menace | 3-and-d-specialist, catch-and-shoot-3pt-sniper, mid-range-menace | gritty-mid-range-menace, 2-way-mid-range-menace, crafty-mid-range-menace
+Tobias Harris 2025 (GF, test) | mid-paint-board-enforcer, physical-defensive-rebounder, physical-mid-range-menace | gritty-mid-range-menace, mid-paint-board-enforcer, physical-mid-range-menace | physical-mid-paint-cleaner, mid-paint-scoring-cleaner, mid-paint-scorer
+Isaiah Hartenstein 2025 (FC, tune) | bulldozing-glass-guardian, glass-guardian, shot-erasing-board-enforcer | glass-guardian, table-setting-board-enforcer, shot-erasing-board-enforcer | table-setting-board-enforcer, physical-board-enforcer, glass-guardian
+Michael Porter Jr. 2025 (PF, tune) | mid-paint-board-enforcer, stretch-board-enforcer, skilled-stretch-four | catch-and-shoot-3pt-sniper, big-range, skilled-stretch-four | stretch-board-enforcer, skilled-stretch-four, big-range
+Myles Turner 2025 (C, tune) | rim-reaping-rim-runner, rim-reaping-3-level-scorer, backline-pick-and-popper | shot-erasing-skilled-popper, backline-pick-and-popper, high-flying-stretch-big | backline-pick-and-popper, shot-blocking-anchor
+Nikola Vučević 2025 (C, test) | mid-paint-board-enforcer, physical-defensive-rebounder, hustle-glass-cleaner | mid-paint-board-enforcer, stretch-board-enforcer, crafty-mid-paint-scorer | physical-middy-board-enforcer, post-scoring-board-enforcer, silk-stretch
+P.J. Washington 2025 (PF, test) | rim-reaping-3-level-scorer, backline-pick-and-popper, shot-erasing-skilled-popper | 2-way-skilled-pick-and-popper, skilled-stretch-four, stretch-board-enforcer | backline-pick-and-popper, backline-stretch-four, stretch-board-enforcer
+Aaron Wiggins 2025 (GF, tune) | crashing-mid-paint-scorer, crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, mid-range-menace, 3-and-d-specialist | mid-range-menace, wing-running-sharpshooter, 2-way-mid-range-scorer
+Andrew Wiggins 2025 (SF, tune) | crafty-mid-post-scorer, mid-post-bucket-getter, do-it-all-superstar | mid-range-slasher, mid-range-high-flyer | mid-range-menace, crafty-mid-paint-scorer, drive-and-rise-wing
+Jaden Ivey 2025 (G, tune) | high-flying-mid-range-slasher, mid-range-high-flyer, yamming-force-of-nature | drive-and-rise, mid-range-slasher, high-flying-mid-range-slasher | high-flying-slasher, blow-by-high-flyer, high-flying-mid-range-slasher
+Davion Mitchell 2025 (G, tune, nearest) | athletic-hustler, big-glide, physical-mid-range-high-flyer | 3-and-d-specialist, the-guard-dog, catch-and-shoot-3pt-sniper | physical-lockdown-defender, physical-mid-range-menace, the-guard-dog
+Jerami Grant 2025 (SF, test) | post-scoring-slasher, blow-by-dual-finisher, drive-and-rise | inside-out-slasher, inside-out-scorer, drive-and-rise | inside-out-scorer, versatile-paint-finisher, crafty-inside-out-scorer
+Brandon Miller 2025 (SF, tune) | deep-range-sniper | 3pt-shot-hunter, mid-range-menace, catch-and-shoot-3pt-sniper | gritty-3-level-scorer, three-level-scorer, mid-range-menace
+Jose Alvarado 2025 (PG, tune) | mid-range-slashing-cleaner, edge-enforcer, lockdown-defender | the-guard-dog, 3-and-d-specialist, ball-hawking-sharpshooter | the-guard-dog, ball-hawking-3-level-scorer, clamp-thief
+Donte DiVincenzo 2025 (G, tune) | 3-and-d-specialist, edge-enforcing-3pt-sniper, stretch-board-enforcer | 3-and-d-specialist, deep-range-sniper, ball-hawking-sharpshooter | ball-hawking-3pt-sniper, catch-and-shoot-3pt-sniper, 2-way-off-screen-shooter
+Tre Mann 2025 (G, tune) | mid-paint-board-enforcer, crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, playmaking-shot-creator | diming-3-level-scorer, versatile-scorer, three-level-scorer
+Nic Claxton 2025 (FC, test) | rim-reaping-rim-runner, bulldozing-glass-guardian, glass-guardian | backline-lob-threat, shot-blocking-anchor, rim-reaping-rim-runner | rim-wrecking-glass-guardian, glass-guardian, shot-blocking-anchor
+Deni Avdija 2025 (F, tune) | mid-range-slashing-cleaner, crafty-paint-finishing-cleaner, mid-paint-board-enforcer | mid-range-slashing-cleaner, mid-paint-point-forward, playslash-board-enforcer | mid-paint-scoring-cleaner, crashing-mid-paint-scorer, mid-range-slasher
+Dillon Brooks 2025 (GF, tune) | physical-mid-range-menace, crafty-mid-range-menace, gritty-mid-range-menace | 3-and-d-specialist, gritty-mid-range-menace, catch-and-shoot-3pt-sniper | physical-2-way-sharpshooter, physical-mid-range-menace, physical-edge-enforcer
+CJ McCollum 2025 (G, tune) | 2-way-off-screen-shooter, 2-way-mid-post-scorer, do-it-all-superstar | 3pt-shot-hunter, crafty-sharpshooter, crafty-mid-range-menace | three-level-scorer, crafty-3-level-scorer, mid-paint-scorer
+Nickeil Alexander-Walker 2025 (SG, test) | 2-way-high-flying-wing-runner, athletic-hustler, 2-way-off-screen-shooter | 3-and-d-specialist, catch-and-shoot-3pt-sniper, shot-erasing-guard-dog | 2-way-off-screen-shooter, catch-and-shoot-3pt-sniper, 3pt-high-flying-ball-hawk
+Harrison Barnes 2025 (GF, test) | inside-out-bully, bulldozer | catch-and-shoot-3pt-sniper, gritty-3pt-slasher | inside-out-bully, gritty-3pt-slasher, 3pt-sniping-bulldozer
+Gary Trent Jr. 2025 (SG, test) | catch-and-shoot-3pt-sniper, crafty-sharpshooter, deep-range-sniper | catch-and-shoot-3pt-sniper, mid-range-menace, 3pt-shot-hunter | 2-way-off-screen-shooter, 3pt-shot-hunter, crafty-sharpshooter
+Collin Sexton 2025 (PG, tune) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | mid-range-slasher, crafty-mid-paint-scorer, blow-by-rim-attacker | mid-range-slasher, versatile-scorer, inside-out-crafty-slasher
+Julian Strawther 2025 (GF, tune) | crafty-mid-range-menace, gritty-mid-range-menace, catch-and-shoot-3pt-sniper | catch-and-shoot-3pt-sniper, mid-range-menace | three-level-scorer, gritty-3-level-scorer, deep-range-sniper
+Terance Mann 2025 (GF, tune, nearest) | board-hunting-bucket-getter | 3-and-d-specialist, grinder | athletic-hustler, 2-way-high-flying-wing-runner, crafty-walking-bucket
+Gradey Dick 2025 (SG, tune) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, mid-range-menace | crafty-sharpshooter, crafty-3-level-scorer, three-level-scorer
+Vince Williams Jr. 2025 (GF, tune) | high-flying-board-enforcer, 2-way-high-flying-wing-runner, inside-out-high-flyer | board-hunting-playshot, catch-and-shoot-3pt-sniper, 3-and-d-specialist | inside-out-scorer, inside-out-high-flyer, 2-way-inside-out-scorer
+Bogdan Bogdanović 2025 (SG, tune) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, crafty-sharpshooter, 3pt-shot-hunter | from-the-logo, crafty-sharpshooter, deep-range-sniper
+Matisse Thybulle 2025 (SF, tune) | ball-hawking-3-level-scorer, ball-hawking-mid-paint-scorer, edge-enforcer | shot-erasing-guard-dog, lockdown-defender, 3-and-d-specialist | ball-hawking-lockdown, lockdown-defender, 2-way-disruptive-high-flyer
+Micah Potter 2025 (PF, tune) | stretch-board-enforcer, mid-paint-board-enforcer, big-range | stretch-board-enforcer, big-range | skilled-stretch-four, stretch-board-enforcer, shot-erasing-skilled-popper
+Justin Champagnie 2025 (SF, test) | stretch-board-enforcer, 2-way-off-screen-shooter, do-it-all-superstar | 3-and-d-specialist, stretch-board-enforcer | board-hunting-high-flyer, 2-way-off-screen-shooter, wing-running-sharpshooter
+Payton Pritchard 2025 (G, tune) | stretch-board-enforcer, mid-paint-board-enforcer, catch-and-shoot-3pt-sniper | catch-and-shoot-3pt-sniper, deep-range-sniper, diming-sharpshooter | crafty-sharpshooter, deep-range-sniper, diming-sharpshooter
+Tristan Da Silva 2025 (PF, tune) | crashing-mid-paint-scorer, skilled-stretch-four, fluid-four | catch-and-shoot-3pt-sniper, skilled-stretch-four, big-range | skilled-stretch-four, skilled-stretch-board-enforcer, gritty-3-level-scorer
+Ron Holland 2025 (F, tune) | mid-range-high-flyer, mid-paint-board-enforcer, rim-running-board-enforcer | athletic-hustler, mid-range-slasher | mid-paint-scoring-cleaner, slashing-cleaner, athletic-hustler
+Justin Edwards 2025 (GF, tune) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, catch-and-shoot-3pt-sniper | three-level-scorer, mid-range-menace, crafty-3-level-scorer
+Bub Carrington 2025 (SG, tune) | mid-paint-board-enforcer, stretch-board-enforcer, catch-and-shoot-3pt-sniper | crafty-sharpshooter, catch-and-shoot-3pt-sniper | three-level-scorer, crafty-mid-range-menace, crafty-3-level-scorer
+Ousmane Dieng 2025 (F, test) | fluid-four | catch-and-shoot-3pt-sniper, mid-range-menace | mid-range-menace, crafty-mid-paint-scorer, mid-paint-scorer
+Jaden Hardy 2025 (G, tune) | mid-range-high-flyer, crafty-mid-range-menace, gritty-mid-range-menace | 3pt-shot-hunter, mid-range-menace, ankle-taker | mid-range-slasher, versatile-scorer, inside-out-slasher
+Ricky Council IV 2025 (SG, test) | crafty-mid-range-slasher, blow-by-rim-attacker, drive-and-rise | mid-range-slasher, drive-and-rise | board-hunting-middy-slasher, gritty-slashing-dual-finisher, crafty-mid-range-menace
+Mouhamed Gueye 2025 (PF, tune) | rim-reaping-rim-runner, rim-running-board-enforcer, shot-erasing-board-enforcer | athletic-hustler, hustle-glass-cleaner, backline-four | rim-reaping-rim-runner, high-flying-eraser, shot-erasing-putback-pro
+Markelle Fultz 2025 (SG, test) | mid-paint-board-enforcer, board-hunting-bucket-getter, do-it-all-superstar | 2-way-mid-range-menace, defensive-playmaker, crafty-mid-range-menace | 2-way-mid-paint-scorer, ball-hawking-mid-paint-scorer, 2-way-combo-guard
+Sidy Cissoko 2025 (GF, test, nearest) | blow-by-rim-attacker, drive-and-rise, blow-by-dual-finisher | athletic-hustler, slashing-lockdown | mid-range-slasher, gritty-slashing-dual-finisher, 2-way-mid-range-slasher
+Antonio Reeves 2025 (GF, test) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, crafty-sharpshooter | crafty-mid-range-menace, three-level-scorer, crafty-sharpshooter
+L1 (GF, test) | switch-defending-cleaner, 2-way-3-level-cleaner, 2-way-point-forward-cleaner | do-it-all-superstar, master-of-both-ends | do-it-all-superstar, 2-way-3-level-point-forward, 2-way-inside-out-bully-dimer
+L2 (G, tune) | 3-and-d-specialist, 2-way-chaos-trigger, edge-enforcer | do-it-all-superstar, master-of-both-ends | do-it-all-superstar, 2-way-inside-out-bully-slasher, 2-way-3-level-scorer
+L3 (PG, test) | thieving-inside-out-playmaker, ball-hawking-playshot, defensive-playmaker | do-it-all-superstar, triple-double-threat, 2-way-3pt-playmaker | 3-and-d-dime-dropper, ball-hawking-3-and-d-point, do-it-all-superstar
+L4 (PG, tune) | post-scoring-slasher, edge-enforcer, lockdown-defender | do-it-all-superstar, master-of-both-ends, 2-way-3pt-playmaker | do-it-all-superstar, 2-way-inside-out-bully-slasher, diming-inside-out-scorer
+L5 (G, tune) | ball-hawking-3-level-scorer, 2-way-chaos-trigger, edge-enforcer | mr-two-way, 2-way-off-screen-shooter, do-it-all-superstar | do-it-all-superstar, ball-hawking-3pt-slasher, 2-way-inside-out-creator
+L6 (G, test) | post-creator, 2-way-3-level-shot-creator, playmaking-shot-creator | do-it-all-superstar, walking-bucket, 2-way-3-level-shot-creator | do-it-all-superstar, 2-way-inside-out-creator, playmaking-3pt-slasher
+L7 (PG, test) | ball-hawking-playslash, edge-enforcer, lockdown-defender | speedy-offensive-engine, triple-double-threat, 2-way-tempo-pusher | speedy-offensive-engine, thieving-inside-out-playmaker, playmaking-shot-creator
+L8 (PG, tune) | 3-and-d-specialist, edge-enforcer, lockdown-defender | 2-way-3pt-playmaker, mr-two-way, ball-hawking-playshot | ball-hawking-3-and-d-point, 3-and-d-dime-dropper, 2-way-3pt-playmaker
+L9 (G, tune) | ball-hawking-3-level-scorer, 3-and-d-specialist, 2-way-chaos-trigger | walking-bucket, mr-two-way, do-it-all-superstar | 2-way-3pt-slasher, ball-hawking-sharpshooter, do-it-all-superstar
+L10 (G, test) | edge-enforcer, lockdown-defender, the-guard-dog | master-of-both-ends, defensive-playmaker, triple-double-threat | thieving-inside-out-playmaker, 3-and-d-dime-dropper, defensive-playmaker
+L11 (F, tune) | glass-cleaning-lockdown, switch-defending-cleaner, edge-enforcer | glass-cleaning-lockdown, 2-way-post-bully, 2-way-bulldozer | lockdown-eraser, shot-erasing-cleaner, post-scoring-eraser
+L12 (SG, test) | stretch-board-enforcer, ball-hawking-3-level-scorer, 3-and-d-specialist | mr-two-way, 2-way-3-level-cleaner, physical-3-level-scorer | 2-way-sharpshooting-riser, 2-way-3-level-scoring-bully, do-it-all-superstar
+L13 (F, test) | triple-double-threat, diming-cleaner, board-hunting-playshot | 2-way-3-level-cleaner, post-dimming-board-enforcer, master-of-both-ends | do-it-all-superstar, 2-way-rim-rocking-post-crasher, post-scoring-cleaner
+L14 (G, tune) | edge-enforcer, lockdown-defender, the-guard-dog | mr-two-way, 2-way-power-dunker, 2-way-inside-out-creator | physical-inside-out-slasher, 2-way-blow-by-bully, inside-out-slasher
+L15 (FC, tune) | footwork-pharaoh, 2-way-bulldozer, bulldozer | 2-way-post-bully, master-of-both-ends, backline-bulldimer | 2-way-post-bully-crasher, lockdown-eraser, backline-post-bully-riser
+L16 (F, test) | post-dimming-board-enforcer, 2-way-point-forward-cleaner, triple-double-threat | 2-way-point-forward-cleaner, post-dimming-board-enforcer, table-setting-board-enforcer | diming-cleaner, triple-double-threat, shot-erasing-cleaner
+L17 (SG, tune) | 3-and-d-specialist, stretch-board-enforcer, 2-way-off-screen-shooter | 2-way-off-screen-shooter, mr-two-way, edge-enforcing-3pt-sniper | 3-and-d-dime-dropper, 2-way-sharpshooter, ball-hawking-sharpshooter
+L18 (FC, test) | glass-cleaning-lockdown, edge-enforcing-skilled-stretch, edge-enforcer | edge-enforcer, 2-way-skilled-pick-and-popper, 2-way-post-bully | 2-way-power-finisher, master-of-both-ends, ball-snatching-power-dunker
+L19 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | defensive-playmaker, 2-way-3pt-playmaker, triple-double-threat | 2-way-playmaking-slasher, ball-hawking-playslash, defensive-playmaker
+L20 (F, tune) | backline-tempo-pusher, shot-erasing-shot-creator, slashing-eraser | edge-enforcer, slashing-lockdown, 2-way-small-ball-four | lockdown-eraser, backline-four, 2-way-small-ball-four
+L21 (PG, test) | triple-double-threat, edge-enforcer, lockdown-defender | defensive-playmaker, 2-way-3pt-playmaker, ball-hawking-playshot | 2-way-high-flying-dime-dropper, defensive-playmaker, ball-hawking-3-and-d-point
+L22 (SF, tune) | 2-way-point-forward-cleaner, crafty-paint-finishing-cleaner, diming-cleaner | slashing-lockdown, 2-way-high-flying-wing-runner, master-of-both-ends | rim-reaping-slasher, 2-way-blow-by-ace, lockdown-eraser
+L23 (F, tune) | switch-defending-cleaner, glass-cleaning-lockdown, 2-way-point-forward-cleaner | 2-way-point-forward-cleaner, 2-way-post-bully, 2-way-3-level-cleaner | 2-way-rim-rocking-post-crasher, 2-way-inside-out-bully-dimer, post-up-glass-cleaner
+L24 (PG, tune) | ball-hawking-playslash, dime-dropping-dual-finisher, slashing-playmaker | defensive-playmaker, dot-dispenser, the-guard-dog | defensive-playmaker, pass-first-distributor, dot-dispenser
+L25 (PG, test) | edge-enforcing-rim-runner, yamming-force-of-nature, athletic-hustler | speedy-offensive-engine, offensive-engine, triple-double-threat | aerial-playmaker, gritty-power-slasher, speedy-offensive-engine
+L38 (C, tune) | rim-reaping-rim-runner, 2-way-iso-savant, 2-way-rim-runner | rim-wrecking-glass-guardian, glass-guardian-power-dunker, yamming-force-of-nature | backline-masher, rim-reaping-rim-runner, board-enforcing-bullmasher
+L172 (FC, tune) | crafty-post-playmaker, crafty-offensive-engine, point-four | post-dimming-board-enforcer, 2-way-post-bully, crafty-post-playmaker | footer, 2-way-post-break-starter, footwork-pharaoh
+L151 (SF, test) | offensive-engine, ankle-taker, iso-savant | point-four, slashing-playmaker, dot-dispenser | speedy-offensive-engine, offensive-engine, mid-paint-point-forward
+L277 (G, test) | ankle-taker, iso-savant, shifty-king | ball-hawking-3pt-slasher, drive-and-rise | iso-savant, shifty-king, athletic-high-flyer
+L69 (SF, tune) | post-combo-guard, 2-way-off-screen-shooter, 2-way-post-bully | inside-out-bully, 2-way-bulldozer, 2-way-power-finisher | inside-out-bully, 2-way-inside-out-bully-slasher, rim-reaping-inside-out-scorer
+L89 (F, tune) | switch-defending-cleaner, glass-cleaning-lockdown, 2-way-point-forward-cleaner | glass-cleaning-lockdown, switch-defending-cleaner, rim-wrecking-glass-guardian | glass-cleaning-lockdown, lockdown-eraser, shot-erasing-cleaner
+L30 (GF, tune) | 2-way-chaos-trigger, slashing-lockdown, edge-enforcer | 2-way-mid-post-scorer, master-of-both-ends, lockdown-defender | slashing-lockdown, 2-way-dual-finisher, post-scoring-slasher
+L223 (SF, tune) | backline-four, 2-way-tempo-pusher, ankle-taker | 2-way-point-forward-cleaner, 2-way-inside-out-dime-dropper, lockdown-defender | backline-stretch-four, edge-enforcing-skilled-stretch, 2-way-iso-savant
+L77 (G, test) | edge-enforcing-rim-runner, 2-way-chaos-trigger, edge-enforcer | the-guard-dog, lockdown-defender, 2-way-power-dunker | 2-way-disruptive-high-flyer, physical-lockdown-defender, 2-way-high-flying-slasher
+L263 (GF, tune) | 3-and-d-specialist, bulldozer, do-it-all-superstar | inside-out-bully, high-flying-3pt-sniper, catch-and-shoot-3pt-sniper | inside-out-bully, 3pt-sniping-bulldozer, 3pt-sniping-rim-wrecker
+L221 (SG, tune) | edge-enforcer, lockdown-defender, blow-by-rim-attacker | 2-way-inside-out-creator, ball-hawking-3pt-slasher, gritty-3pt-slasher | gritty-3pt-slasher, inside-out-high-flying-slasher, physical-inside-out-slasher
+L159 (FC, test) | post-dimming-board-enforcer, post-up-glass-cleaner, footwork-pharaoh | post-dimming-board-enforcer, 2-way-post-bully, glass-guardian | post-bully-cleaner, physical-glass-visionary, 2-way-post-bully-crasher
+L204 (SF, tune) | blow-by-dual-finisher, drive-and-rise, inside-out-bully | inside-out-bully, catch-and-shoot-3pt-sniper, 2-way-off-screen-shooter | inside-out-bully, rim-reaping-inside-out-scorer, post-scoring-slasher
+L81 (F, tune) | post-dimming-board-enforcer, post-up-glass-cleaner, switch-defending-cleaner | switch-defending-cleaner, glass-cleaning-lockdown, 2-way-post-bully | glass-cleaning-lockdown, post-up-glass-cleaner, 2-way-rim-rocking-post-crasher
+L60 (F, tune) | post-dimming-board-enforcer, post-up-glass-cleaner, footwork-pharaoh | 2-way-power-finisher, 2-way-post-bully, 2-way-power-dunker | post-scoring-eraser, 2-way-power-finisher, shot-erasing-bulldozer
+L70 (C, tune) | post-creator, rim-reaping-rim-runner, rim-reaping-post-scorer | backline-post-rim-rocker, rim-reaping-post-scorer, glass-guardian-power-dunker | backline-poster-dunker, backline-power-dunker, rim-reaping-poster-dunker
+L74 (FC, tune) | 2-way-putback-pro, post-up-glass-cleaner, stretch-board-enforcer | switch-defending-cleaner, stretch-board-enforcer, 2-way-skilled-pick-and-popper | glass-guardian, 2-way-pick-and-pop-cleaner, lockdown-eraser
+L34 (PG, test) | ball-hawking-3-level-scorer, ball-hawking-mid-range-menace, 3-and-d-specialist | deep-range-sniper, mr-two-way, 2-way-3pt-playmaker | physical-mid-range-menace, three-level-scorer, cash-out
+L164 (GF, tune) | 2-way-bulldimer, 2-way-bulldozer, bulldozer | 2-way-bulldozer, lockdown-defender | 2-way-bulldozer, inside-out-bully, 2-way-3-level-scoring-bully
+L146 (SF, tune) | 2-way-off-screen-shooter, 2-way-bulldimer, 2-way-bulldozer | 2-way-off-screen-shooter, edge-enforcing-3pt-sniper, 3-and-d-specialist | physical-2-way-sharpshooter, 2-way-sharpshooting-riser, 2-way-crafty-inside-out-scorer
+L84 (FC, tune) | post-dimming-board-enforcer, triple-double-threat, post-up-glass-cleaner | switch-defending-cleaner, glass-guardian, 2-way-point-forward-cleaner | shot-erasing-board-enforcer, bulldozing-glass-guardian, glass-cleaning-lockdown
+L139 (FC, tune) | footwork-pharaoh, dunk-tank, bulldozer | 2-way-post-bully, post-scoring-slasher, rim-reaping-post-scorer | 2-way-power-finisher, pick-and-roll-finisher, master-of-both-ends
+L103 (SG, test) | shot-erasing-mid-paint-maestro, 2-way-off-screen-shooter, 2-way-mid-range-menace | 2-way-off-screen-shooter, 2-way-mid-range-menace, edge-enforcing-3pt-sniper | 2-way-mid-range-bully, 2-way-off-screen-shooter, 2-way-3-level-scoring-bully
+L40 (GF, tune) | edge-enforcing-rim-runner, slashing-lockdown, edge-enforcer | 2-way-3pt-sniping-high-flyer, 3-and-d-specialist, lockdown-defender | 3pt-high-flying-ball-hawk, 2-way-disruptive-high-flyer, 2-way-high-flying-wing-runner
+L275 (GF, tune) | diming-inside-out-scorer, inside-out-bully, post-combo-guard | post-combo-guard, 2-way-post-bully, inside-out-bully | post-scoring-slasher, inside-out-bully, crafty-inside-out-scorer
+L233 (FC, tune) | board-hunting-paint-finisher, crafty-paint-finishing-cleaner, post-up-glass-cleaner | 2-way-post-bully, rim-reaping-post-scorer, backline-bulldimer | 2-way-post-bully-crasher, 2-way-rim-rocking-post-crasher, footwork-pharaoh
+L102 (FC, tune) | footwork-pharaoh, 2-way-small-ball-four, master-of-both-ends | glass-cleaning-lockdown, switch-defending-cleaner, edge-enforcer | glass-cleaning-lockdown, 2-way-post-bully-crasher, master-of-both-ends
+L1192 (G, tune) | edge-enforcing-rim-runner, 2-way-chaos-trigger, edge-enforcer | the-guard-dog, 3-and-d-specialist | clamp-thief, edge-enforcer, 3pt-high-flying-ball-hawk
+L723 (F, tune) | fluid-four | 2-way-power-finisher, 2-way-power-dunker | drive-and-rise-wing, dunk-tank, board-hunting-power-dunker
+L802 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | the-guard-dog, defensive-playmaker | the-guard-dog, defensive-playmaker, mr-two-way
+L904 (GF, tune) | 2-way-3pt-playmaker, 2-way-table-setter, offensive-engine | diming-sharpshooter, 3-and-d-specialist | dime-dropping-3pt-gunner, offensive-engine, 3-and-d-dime-dropper
+L826 (G, test, nearest) | crafty-mid-range-menace, gritty-mid-range-menace, diming-3-level-scorer | catch-and-shoot-3pt-sniper, deep-range-sniper, 3-and-d-specialist | deep-range-sniper, crafty-sharpshooter, catch-and-shoot-3pt-sniper
+L339 (SG, test) | mid-range-high-flyer, athletic-hustler, crafty-mid-range-menace | mid-range-slasher, mid-range-menace, ankle-taker | mid-range-high-flyer, physical-3-level-scorer, post-combo-guard
+L515 (GF, tune) | 2-way-bulldimer, 2-way-bulldozer, bulldozer | 3-and-d-specialist, lockdown-defender, gritty-3pt-slasher | gritty-3pt-slasher, inside-out-bully, 3pt-shot-hunter
+L1438 (C, tune) | triple-double-threat, table-setting-board-enforcer, board-hunting-bucket-getter | footer, table-setting-board-enforcer, glass-guardian | footer, table-setting-board-enforcer, hustle-glass-cleaner
+L1022 (F, tune) | rim-reaping-slasher, backline-lob-threat, 2-way-power-dunker | 2-way-power-finisher, 2-way-post-bully | 2-way-post-bully, 2-way-mid-paint-bully, 2-way-power-dunker
+L1308 (G, tune) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | the-guard-dog, lockdown-defender | clamp-thief, edge-enforcer, mr-two-way
+L1239 (GF, test, nearest) | bulldozer, 2-way-bulldimer, 2-way-bulldozer | glass-cleaning-lockdown, grinder | 2-way-dual-finisher, lockdown-stopper, 2-way-power-dunker
+L1413 (F, test) | 2-way-point-forward-cleaner, triple-double-threat, diming-cleaner | post-up-glass-cleaner, post-dimming-board-enforcer, hustle-glass-cleaner | 2-way-crafty-putback-dimer, post-up-glass-cleaner, diming-cleaner
+L942 (PF, test) | backline-bulldimer, 2-way-bulldozer, bulldozer | glass-cleaning-lockdown, backline-four, grinder | backline-four, 2-way-small-ball-four, rim-reaping-rim-runner
+L495 (FC, tune) | post-up-glass-cleaner, rim-reaping-post-scorer, footwork-pharaoh | post-dimming-board-enforcer, physical-glass-visionary, footer | physical-board-enforcer, grinder, physical-glass-visionary
+L568 (SG, tune) | 2-way-mid-range-menace, crafty-mid-range-menace, gritty-mid-range-menace | 2-way-mid-range-menace, ball-hawking-mid-range-menace | 2-way-mid-range-menace, 2-way-mid-range-scorer, 2-way-mid-range-bully
+L414 (G, tune) | playslash-board-enforcer, triple-double-threat, slashing-playmaker | pass-first-distributor, defensive-playmaker, dot-dispenser | pass-first-distributor, dot-dispenser, 2-way-playmaking-creator
+L1417 (GF, tune, nearest) | crafty-sharpshooter, catch-and-shoot-3pt-sniper, deep-range-sniper | catch-and-shoot-3pt-sniper | crafty-inside-out-scorer, gritty-3pt-slasher, inside-out-slasher
+L368 (PG, tune) | triple-double-threat, edge-enforcer, lockdown-defender | defensive-playmaker, the-guard-dog, pass-first-distributor | defensive-playmaker, thieving-inside-out-playmaker, glass-cleaning-playmaker
+L370 (PG, test) | crafty-offensive-engine, dot-dispenser, offensive-engine | pass-first-distributor, defensive-playmaker | crafty-post-playmaker, pass-first-distributor, dot-dispenser
+L449 (F, test) | 2-way-point-forward-cleaner, crafty-paint-finishing-cleaner, triple-double-threat | glass-cleaning-lockdown, switch-defending-cleaner | 2-way-slashing-cleaner, glass-cleaning-lockdown, 2-way-slashing-point-forward
+L357 (F, tune) | rim-reaping-rim-runner, rim-reaping-high-flyer, 2-way-high-flying-wing-runner | 2-way-bulldozer, 2-way-small-ball-four, athletic-hustler | bulldozer, gritty-bulldozer, shot-erasing-bulldozer
+L660 (C, tune) | post-dimming-board-enforcer, inside-out-board-enforcer, stretch-board-enforcer | stretch-board-enforcer, mid-paint-board-enforcer, footer | 2-way-3-level-cleaner, stretch-board-enforcer, inside-out-board-enforcer
+L696 (G, tune) | triple-double-threat, crafty-offensive-engine, dot-dispenser | pass-first-distributor, defensive-playmaker, dot-dispenser | pass-first-distributor, crafty-post-playmaker, dot-dispenser
+L651 (F, tune) | switch-defending-cleaner, glass-cleaning-lockdown, 2-way-point-forward-cleaner | glass-cleaning-lockdown, grinder | hustle-glass-cleaner, 2-way-bulldozing-putback-pro, shot-erasing-cleaner
+L454 (PG, tune) | ball-hawking-playshot, 2-way-3pt-playmaker, triple-double-threat | diming-sharpshooter, pass-first-distributor | 2-way-3pt-playmaker, crafty-offensive-engine, pass-first-distributor
+L680 (SG, tune) | high-flying-3pt-sniper, mid-range-high-flyer, catch-and-shoot-3pt-sniper | high-flying-3pt-sniper, catch-and-shoot-3pt-sniper, 2-way-3pt-sniping-high-flyer | high-flying-3pt-sniper, catch-and-shoot-3pt-sniper, inside-out-high-flyer
+L359 (G, tune) | 2-way-tempo-pusher, do-it-all-superstar, crafty-mid-paint-scorer | 2-way-mid-range-menace, mr-two-way, lockdown-defender | 2-way-mid-range-high-flyer, 2-way-mid-range-scorer, 2-way-combo-guard
+L2425 (GF, tune, nearest) | ankle-taker, iso-savant, shifty-king | grinder | versatile-scorer, iso-savant, speedy-offensive-engine
+L1839 (GF, tune) | 2-way-bulldimer, 2-way-bulldozer, bulldozer | athletic-hustler, slashing-lockdown | athletic-hustler, high-flying-wing-runner, bulldozer
+L2150 (PF, tune) | rim-reaping-rim-runner, 2-way-rim-runner, fluid-four | backline-four, 2-way-small-ball-four | athletic-hustler, mid-range-high-flyer, backline-mid-range-scorer
+L2468 (PG, tune, nearest) | blow-by-rim-attacker, drive-and-rise, blow-by-dual-finisher | catch-and-shoot-3pt-sniper, pass-first-distributor | physical-iso-sniper, physical-inside-out-slasher, deep-range-sniper
+L2565 (FC, tune) | speedy-offensive-engine, ankle-taker, iso-savant | high-flying-shot-creator, big-glide, athletic-hustler | high-flying-shot-creator, shot-creating-mid-range-maestro, athletic-hustler
+L2057 (SF, tune) | bulldozer | athletic-hustler, drive-and-rise, power-slasher | inside-out-bully, versatile-paint-bully, inside-out-slashing-dunker
+L2049 (SG, tune, nearest) | edge-enforcer, lockdown-defender, 2-way-combo-guard | 3-and-d-specialist, the-guard-dog | athletic-hustler, mid-range-high-flyer, 2-way-mid-range-high-flyer
+L1863 (SG, tune) | 2-way-off-screen-shooter | 3-and-d-specialist, catch-and-shoot-3pt-sniper | 2-way-sharpshooter, ball-hawking-3-level-scorer, crafty-3-level-scorer
+L1650 (GF, tune) | physical-defensive-rebounder, bulldozer | glass-cleaning-lockdown, hustle-glass-cleaner, grinder | post-up-glass-cleaner, diming-cleaner, slashing-cleaner
+L2252 (PG, test, nearest) | athletic-hustler, big-glide | pass-first-distributor, athletic-hustler | big-glide, aerial-playmaker, athletic-high-flyer
+L2805 (SG, test) | edge-enforcer, lockdown-defender, 2-way-combo-guard | lockdown-defender, the-guard-dog | 2-way-mid-range-menace, 2-way-combo-guard, 2-way-mid-paint-scorer
+L2509 (SG, tune) | catch-and-shoot-3pt-sniper, crafty-sharpshooter, deep-range-sniper | catch-and-shoot-3pt-sniper, crafty-sharpshooter, deep-range-sniper | crafty-sharpshooter, deep-range-sniper, from-the-logo
+L2227 (C, test) | hustle-glass-cleaner, footer, the-anomaly | hustle-glass-cleaner, footer | hustle-glass-cleaner, footer, board-hunting-bucket-getter
+L2709 (C, tune) | power-slasher, pick-and-roll-finisher, do-it-all-superstar | footer | footer, rim-reaping-rim-runner, pick-and-roll-finisher
+L2891 (C, test) | footer, the-anomaly | footer, glass-guardian, shot-blocking-anchor | backline-post-bully-riser, footer, post-scoring-board-enforcer
+L1597 (SG, tune) | board-hunting-bucket-getter, do-it-all-superstar, crafty-walking-bucket | glass-cleaning-lockdown, grinder | lockdown-defender, rim-reaping-dime-dropper, lockdown-stopper
+L2316 (PF, tune) | 2-way-small-ball-four, master-of-both-ends, do-it-all-superstar | glass-cleaning-lockdown, grinder, backline-four | lockdown-eraser, backline-four, shot-erasing-board-enforcer
+L2375 (SF, tune, nearest) | rim-reaping-rim-runner, backline-four | athletic-hustler, drive-and-rise | blow-by-high-flyer, wing-running-finisher, slashing-dual-finisher
+L1834 (C, tune) | power-slasher, pick-and-roll-finisher, do-it-all-superstar | footer, shot-blocking-anchor | footer, power-slasher, hustle-glass-cleaner
+L2726 (FC, test) | glass-guardian, shot-erasing-board-enforcer, shot-erasing-putback-pro | shot-blocking-anchor, glass-guardian, hustle-glass-cleaner | shot-erasing-board-enforcer, hustle-glass-cleaner, glass-guardian
+L2340 (F, test) | rim-rocking-post-board-hunter, crafty-paint-finishing-cleaner, post-up-glass-cleaner | post-up-glass-cleaner, post-scoring-slasher | post-up-glass-cleaner, board-hunting-power-dunker, slashing-cleaner
+P321 (F, test) | 2-way-inside-out-creator, 3pt-shot-hunter, diming-inside-out-scorer | high-flying-stretch-big, high-flying-shot-creator, fluid-four | high-flying-shot-creator, shot-erasing-skilled-popper, iso-savant
+P504 (F, test) | speedy-offensive-engine, slashing-playmaker, crafty-offensive-engine | fluid-four, playmaking-3pt-slasher, slashing-playmaker | speedy-offensive-engine, shot-erasing-wing-runner, iso-savant
+P522 (C, tune) | break-starting-stretch-five, skilled-stretch-four, do-it-all-superstar | the-anomaly, high-flying-shot-creator, big-glide | high-flying-shot-creator, the-anomaly, versatile-scorer
+P615 (F, tune) | diming-inside-out-scorer, break-starting-stretch-five, ankle-taker | high-flying-shot-creator, fluid-four, big-glide | speedy-offensive-engine, iso-savant, high-flying-shot-creator
+P944 (GF, test) | diming-inside-out-scorer, diming-sharpshooter, dime-dropping-3pt-gunner | playmaking-3pt-slasher, aerial-playmaker | aerial-playmaker, rim-reaping-diming-high-flyer, dime-dropping-3pt-gunner
+P259 (FC, test) | high-flying-shot-creator, ankle-taker, iso-savant | the-anomaly, big-glide, high-flying-shot-creator | the-anomaly, high-flying-shot-creator, point-four
+P195 (F, test) | 3pt-shot-hunter, high-flying-shot-creator, inside-out-high-flyer | high-flying-stretch-big, fluid-four, inside-out-high-flyer | high-flying-3pt-sniper, iso-savant, versatile-scorer
+P347 (GF, test) | diming-inside-out-scorer, slashing-playmaker, speedy-offensive-engine | playmaking-3pt-slasher, slashing-playmaker | speedy-offensive-engine, aerial-playmaker, offensive-engine
+P12 (GF, tune) | slashing-playmaker, dime-dropping-dual-finisher, shot-erasing-table-setter | slashing-playmaker, aerial-playmaker | aerial-playmaker, rim-reaping-diming-high-flyer, speedy-offensive-engine
+P134 (GF, tune) | 2-way-tempo-pusher, ankle-taker, iso-savant | slashing-playmaker, aerial-playmaker | aerial-playmaker, rim-reaping-diming-high-flyer, speedy-offensive-engine
+P360 (F, tune) | speedy-offensive-engine, ankle-taker, iso-savant | fluid-four, slashing-playmaker, big-glide | speedy-offensive-engine, point-four, iso-savant
+P565 (F, tune) | ankle-taker, iso-savant, blow-by-dual-finisher | fluid-four, slashing-playmaker, big-glide | speedy-offensive-engine, point-four, high-flying-shot-creator
+P676 (GF, tune) | ankle-taker, iso-savant, shifty-king | slashing-playmaker, playmaking-3pt-slasher | iso-savant, versatile-scorer, high-flying-wing-runner
+P752 (GF, tune) | 2-way-tempo-pusher, ankle-taker, iso-savant | slashing-playmaker, 2-way-high-flying-dime-dropper, slashing-lockdown | aerial-playmaker, rim-reaping-diming-high-flyer, speedy-offensive-engine
+P780 (G, test) | yamming-force-of-nature, ankle-taker, iso-savant | blow-by-dual-finisher, drive-and-rise, slashing-playmaker | speedy-offensive-engine, iso-savant, aerial-playmaker
+P311 (C, tune) | rim-reaping-post-scorer, glass-guardian, backline-four | shot-blocking-anchor, glass-guardian | paint-finishing-board-enforcer, hustle-glass-cleaner, board-hunting-paint-finisher
+P497 (SF, tune) | slashing-eraser, backline-four, 2-way-tempo-pusher | athletic-hustler, high-flying-eraser, slashing-lockdown | high-flying-wing-runner, shot-erasing-wing-runner, athletic-hustler
+P581 (C, test) | backline-four, shot-blocking-anchor, do-it-all-superstar | shot-blocking-anchor, glass-guardian, footer | footer, hustle-glass-cleaner, rim-reaping-rim-runner
+P619 (SF, tune) | diming-inside-out-scorer, ankle-taker, iso-savant | diming-sharpshooter, playmaking-3pt-creator | iso-sniper, crafty-3pt-sniping-creator, dime-dropping-3pt-gunner
+P473 (GF, test) | speedy-offensive-engine, aerial-playmaker, slashing-playmaker | aerial-playmaker, slashing-playmaker | aerial-playmaker, rim-reaping-diming-high-flyer, speedy-offensive-engine
+P244 (GF, tune) | dime-dropping-dual-finisher, slashing-playmaker, ankle-taker | slashing-playmaker, blow-by-dual-finisher, aerial-playmaker | aerial-playmaker, iso-savant, speedy-offensive-engine
+P698 (PG, tune, nearest) | edge-enforcing-rim-runner, edge-enforcer, lockdown-defender | 3pt-high-flying-ball-hawk, high-flying-3pt-sniper | athletic-high-flyer, big-glide, athletic-hustler
+P765 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | defensive-playmaker, the-guard-dog | dot-dispenser, aerial-playmaker, pass-first-distributor
+P240 (G, tune) | ball-hawking-playslash, 2-way-tempo-pusher, playmaking-shot-creator | blow-by-rim-attacker, the-guard-dog, shifty-king | athletic-high-flyer, ankle-snatcher, aerial-playmaker
+P408 (PG, tune) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | the-guard-dog, blow-by-rim-attacker, ball-hawking-playslash | athletic-high-flyer, ankle-snatcher, aerial-playmaker
+P684 (PG, tune) | ball-hawking-playslash, 2-way-tempo-pusher, playmaking-shot-creator | defensive-playmaker, slashing-playmaker | ankle-snatcher, iso-savant, playmaking-shot-creator
+P637 (PG, test) | ball-hawking-playslash, edge-enforcer, lockdown-defender | the-guard-dog, blow-by-rim-attacker, defensive-playmaker | ankle-snatcher, aerial-playmaker, high-flying-slasher
+P304 (GF, tune) | mid-paint-point-forward, mid-paint-point-four, ankle-taker | playmaking-shot-creator, slashing-playmaker | mid-paint-point-forward, aerial-playmaker, iso-savant
+P319 (PG, tune, nearest) | edge-enforcing-rim-runner, athletic-hustler, big-glide | athletic-hustler, 3pt-shot-hunter | big-glide, athletic-high-flyer, aerial-playmaker
+P544 (SG, tune) | 3-and-d-specialist | catch-and-shoot-3pt-sniper, 3-and-d-specialist | deep-range-sniper, from-the-logo, catch-and-shoot-3pt-sniper
+P715 (PG, test) | athletic-hustler, big-glide | athletic-hustler, aerial-playmaker | big-glide, athletic-high-flyer, aerial-playmaker
+P902 (GF, test) | slashing-playmaker, dime-dropping-dual-finisher, speedy-offensive-engine | slashing-playmaker, dime-dropping-dual-finisher | aerial-playmaker, rim-reaping-diming-high-flyer, iso-savant
+P866 (F, tune) | slashing-playmaker, diming-inside-out-scorer, dime-dropping-dual-finisher | fluid-four, high-flying-shot-creator, big-glide | speedy-offensive-engine, iso-savant, point-four
+P146 (C, tune) | rim-reaping-post-scorer, backline-post-bully-riser, bulldozing-glass-guardian | shot-blocking-anchor, glass-guardian | hustle-glass-cleaner, shot-erasing-bulldozer, physical-board-enforcer
+P381 (PG, test) | yamming-force-of-nature, 2-way-tempo-pusher, playmaking-shot-creator | blow-by-rim-attacker, slashing-playmaker, shifty-king | aerial-playmaker, athletic-high-flyer, ankle-snatcher
+P854 (GF, test) | ankle-taker, iso-savant, shifty-king | slashing-playmaker, blow-by-dual-finisher | rim-reaping-diming-high-flyer, aerial-playmaker, iso-savant
+P666 (F, test) | break-starting-stretch-five, skilled-stretch-four, ankle-taker | skilled-stretch-four, big-range, catch-and-shoot-3pt-sniper | skilled-stretch-four, high-flying-3pt-sniper, iso-sniper
+P140 (C, test) | high-flying-shot-creator, yamming-force-of-nature, athletic-hustler | the-anomaly, high-flying-shot-creator, big-glide | the-anomaly, rim-reaping-rim-runner, high-flying-shot-creator
+P438 (GF, tune) | rim-reaping-inside-out-scorer, 3-and-d-specialist, edge-enforcing-3pt-sniper | high-flying-3pt-sniper, 3-and-d-specialist, catch-and-shoot-3pt-sniper | high-flying-3pt-sniper, wing-running-sharpshooter, deep-range-sniper
+P435 (F, tune) | slashing-playmaker, dime-dropping-dual-finisher, speedy-offensive-engine | fluid-four, slashing-playmaker, big-glide | point-four, speedy-offensive-engine, iso-savant
+P604 (PG, tune) | athletic-hustler, big-glide | 3pt-shot-hunter, playmaking-3pt-creator, from-the-logo | 3pt-sniping-creator, cash-out, 3pt-shot-hunter
+P168 (G, tune) | 2-way-inside-out-creator, 3-and-d-specialist, 2-way-chaos-trigger | 3-and-d-specialist, the-guard-dog | 3pt-shot-hunter, catch-and-shoot-3pt-sniper, athletic-high-flyer
+P829 (SF, tune) | ankle-taker, iso-savant, athletic-hustler | athletic-hustler, drive-and-rise | high-flying-wing-runner, athletic-hustler, rim-reaping-high-flyer
+P819 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | defensive-playmaker, the-guard-dog, slashing-playmaker | dot-dispenser, aerial-playmaker, pass-first-distributor
+P215 (PG, test) | slashing-playmaker, playmaking-shot-creator, diming-inside-out-scorer | pass-first-distributor, dot-dispenser | playmaking-shot-creator, crafty-offensive-engine, dot-dispenser
+P832 (SG, tune) | 2-way-chaos-trigger, edge-enforcer, lockdown-defender | the-guard-dog, lockdown-defender, 3-and-d-specialist | 3-and-d-specialist, athletic-hustler, clamp-thief
+P936 (GF, tune) | slashing-lockdown, 2-way-chaos-trigger, edge-enforcer | lockdown-defender, the-guard-dog | athletic-hustler, disruptive-wing-runner, high-flying-wing-runner
+P806 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | defensive-playmaker, the-guard-dog | dot-dispenser, pass-first-distributor, aerial-playmaker
+P611 (GF, tune) | 2-way-chaos-trigger, edge-enforcer, lockdown-defender | 3-and-d-specialist, ball-hawking-sharpshooter, lockdown-defender | athletic-hustler, high-flying-wing-runner, 2-way-high-flying-wing-runner
+P241 (GF, tune) | edge-enforcer, lockdown-defender, the-guard-dog | lockdown-defender, the-guard-dog, 3-and-d-specialist | athletic-hustler, clamp-thief, disruptive-wing-runner
+P961 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | defensive-playmaker, the-guard-dog, blow-by-rim-attacker | ankle-snatcher, playmaking-shot-creator, iso-savant
+P452 (F, tune) | 2-way-inside-out-creator, 2-way-iso-savant, 2-way-tempo-pusher | slashing-lockdown, athletic-hustler | athletic-hustler, backline-tempo-pusher, iso-savant
+P432 (SG, tune) | 2-way-chaos-trigger, edge-enforcer, lockdown-defender | the-guard-dog, blow-by-rim-attacker | athletic-hustler, clamp-thief, shifty-king
+P117 (PG, test) | edge-enforcing-rim-runner, edge-enforcer, lockdown-defender | the-guard-dog, athletic-hustler, blow-by-rim-attacker | athletic-high-flyer, big-glide, 2-way-disruptive-high-flyer
+P925 (PG, tune) | 3pt-shot-hunter, ankle-taker, iso-savant | 3pt-shot-hunter, playmaking-3pt-creator | athletic-high-flyer, 3pt-shot-hunter, big-glide
+P486 (PG, tune) | athletic-hustler, big-glide, ankle-taker | athletic-hustler, blow-by-rim-attacker | athletic-high-flyer, big-glide, aerial-playmaker
+P326 (GF, tune, nearest) | gritty-3pt-slasher, blow-by-dual-finisher, blow-by-rim-attacker | catch-and-shoot-3pt-sniper, high-flying-3pt-sniper | high-flying-3pt-sniper, deep-range-sniper, wing-running-sharpshooter
+P579 (F, tune) | break-starting-stretch-five, skilled-stretch-four, ankle-taker | fluid-four, skilled-stretch-four, big-glide | speedy-offensive-engine, point-four, skilled-stretch-four
+P957 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | 2-way-3pt-playmaker, defensive-playmaker, ball-hawking-playshot | dot-dispenser, ball-hawking-playshot, playmaking-3pt-creator
+P665 (SF, tune) | 2-way-tempo-pusher, ankle-taker, iso-savant | athletic-hustler, slashing-lockdown | ankle-breaking-bully, iso-savant, athletic-hustler
+Sim FirstName LastName 30 (C, test) | backline-pick-and-popper, rim-reaping-rim-runner, backline-four | shot-erasing-skilled-popper, backline-pick-and-popper, high-flying-stretch-big | 
+Sim FirstName LastName 26 (FC, test) | 2-way-small-ball-four, master-of-both-ends, do-it-all-superstar | pick-and-roll-finisher, 2-way-rim-runner, backline-four | 
+Sim FirstName LastName 208 (FC, tune) | physical-defensive-rebounder, stretch-board-enforcer, hustle-glass-cleaner | stretch-board-enforcer, table-setting-board-enforcer, break-starting-stretch-five | 
+Sim FirstName LastName 2 (FC, tune) | stretch-board-enforcer, physical-defensive-rebounder, hustle-glass-cleaner | stretch-board-enforcer, 2-way-small-ball-four, switch-defending-cleaner | 
+Sim FirstName LastName 187 (C, tune) | rim-running-board-enforcer, hustle-glass-cleaner, do-it-all-superstar | shot-erasing-board-enforcer, glass-guardian, backline-pick-and-popper | 
+Sim FirstName LastName 41 (C, tune) | post-dimming-board-enforcer, crafty-post-playmaker, triple-double-threat | post-dimming-board-enforcer, footer, crafty-post-playmaker | 
+Sim FirstName LastName 315 (FC, tune) | blow-by-dual-finisher, power-slasher, drive-and-rise | pick-and-roll-finisher, board-hunting-paint-finisher | 
+Sim FirstName LastName 182 (FC, test) | footwork-pharaoh, fluid-four, footer | post-up-glass-cleaner, footwork-pharaoh | 
+Sim FirstName LastName 96 (FC, tune) | bulldozer, grinder, fluid-four | switch-defending-cleaner, physical-defensive-rebounder, stretch-board-enforcer | 
+Sim FirstName LastName 546 (C, test) | rim-reaping-rim-runner, backline-four, shot-blocking-anchor | rim-reaping-post-scorer, shot-blocking-anchor, backline-post-rim-rocker | 
+Sim FirstName LastName 145 (PG, tune) | post-creator, 2-way-tempo-pusher, playmaking-shot-creator | playmaking-3pt-creator, aerial-playmaker, offensive-engine | 
+Sim FirstName LastName 228 (PG, tune, nearest) | ball-hawking-3-level-scorer, do-it-all-superstar, ball-hawking-mid-range-menace | diming-sharpshooter, playmaking-3pt-creator, crafty-sharpshooter | 
+Sim FirstName LastName 17 (PG, tune) | physical-mid-range-high-flyer, mid-range-high-flyer, athletic-hustler | playmaking-shot-creator, speedy-offensive-engine, slashing-playmaker | 
+Sim FirstName LastName 170 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | ball-hawking-mid-range-menace, 2-way-mid-range-menace, mr-two-way | 
+Sim FirstName LastName 251 (PG, test, nearest) | edge-enforcer, lockdown-defender, the-guard-dog | post-combo-guard, ball-hawking-mid-paint-scorer | 
+Sim FirstName LastName 139 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | offensive-engine, playmaking-3pt-creator, crafty-offensive-engine | 
+Sim FirstName LastName 164 (PG, tune, nearest) | do-it-all-superstar, 2-way-off-screen-shooter, 3-and-d-specialist | catch-and-shoot-3pt-sniper, 3-and-d-specialist, 2-way-off-screen-shooter | 
+Sim FirstName LastName 242 (PG, tune) | athletic-hustler, big-glide | ball-hawking-3pt-slasher, athletic-hustler, high-flying-3pt-sniper | 
+Sim FirstName LastName 0 (PG, tune) | edge-enforcer, lockdown-defender, the-guard-dog | 2-way-3pt-playmaker, mr-two-way, ball-hawking-playshot | 
+Sim FirstName LastName 155 (PG, tune) | ankle-taker, iso-savant, shifty-king | playmaking-3pt-creator, shifty-king, playmaking-shot-creator | 
+Sim FirstName LastName 47 (SG, test) | mid-range-high-flyer, athletic-hustler, do-it-all-superstar | high-flying-3pt-sniper, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 637 (SG, tune) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 63 (G, tune) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 51 (SG, test) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace | 
+Sim FirstName LastName 267 (G, tune) | stretch-board-enforcer, triple-double-threat | crafty-sharpshooter, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 380 (G, tune) | physical-mid-range-high-flyer, mid-range-high-flyer, athletic-hustler | pass-first-distributor, mid-range-menace | 
+Sim FirstName LastName Jr. 638 (SG, test) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 40 (G, tune) | physical-mid-range-menace, crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, 3pt-shot-hunter | 
+Sim FirstName LastName 248 (SG, test, nearest) | 2-way-combo-guard, board-hunting-bucket-getter | glass-cleaning-slasher, pass-first-distributor | 
+Sim FirstName LastName 115 (SG, tune, nearest) | do-it-all-superstar, 2-way-combo-guard, stretch-board-enforcer | diming-sharpshooter, crafty-sharpshooter | 
+Sim FirstName LastName 195 (F, tune) | edge-enforcing-rim-runner, edge-enforcer, lockdown-defender | slashing-lockdown, 2-way-rim-runner, athletic-hustler | 
+Sim FirstName LastName 634 (PF, test) | do-it-all-superstar, fluid-four, crafty-walking-bucket | athletic-hustler, 2-way-small-ball-four | 
+Sim FirstName LastName 71 (F, tune) | ball-hawking-3-level-scorer, 3-and-d-specialist, edge-enforcing-skilled-stretch | 3-and-d-specialist, ball-hawking-sharpshooter, 2-way-off-screen-shooter | 
+Sim FirstName LastName 82 (F, test) | rim-reaping-rim-runner, backline-four, 2-way-rim-runner | athletic-hustler, rim-reaping-rim-runner, slashing-eraser | 
+Sim FirstName LastName 58 (F, tune) | fluid-four | athletic-hustler, 2-way-small-ball-four | 
+Sim FirstName LastName 21 (PF, test) | 2-way-rim-runner, 2-way-small-ball-four, master-of-both-ends | backline-four, rim-reaping-rim-runner, athletic-hustler | 
+Sim FirstName LastName 602 (PF, tune) | bulldozer, grinder, fluid-four | skilled-stretch-four, big-range, stretch-board-enforcer | 
+Sim FirstName LastName 42 (F, tune) | fluid-four | grinder, 2-way-small-ball-four | 
+Sim FirstName LastName 64 (F, tune) | crafty-offensive-engine, offensive-engine, point-four | post-dimming-board-enforcer, crafty-post-playmaker, diming-cleaner | 
+Sim FirstName LastName 499 (PF, tune) | mid-paint-board-enforcer, stretch-board-enforcer, hustle-glass-cleaner | stretch-board-enforcer, mid-paint-board-enforcer, skilled-stretch-four | 
+Sim FirstName LastName 184 (GF, test) | 2-way-table-setter, slashing-playmaker, offensive-engine | 2-way-inside-out-dime-dropper, slashing-lockdown | 
+Sim FirstName LastName 169 (GF, test) | do-it-all-superstar, crafty-3-level-scorer, gritty-3-level-scorer | diming-sharpshooter, catch-and-shoot-3pt-sniper, 2-way-off-screen-shooter | 
+Sim FirstName LastName 576 (SF, tune, nearest) | crafty-mid-post-scorer, mid-post-bucket-getter | post-combo-guard, crafty-mid-post-scorer, crafty-sharpshooter | 
+Sim FirstName LastName 141 (SF, test) | slashing-lockdown, glass-cleaning-lockdown, edge-enforcer | master-of-both-ends, rim-reaping-diming-high-flyer, triple-double-threat | 
+Sim FirstName LastName 153 (GF, test) | 2-way-high-flying-wing-runner, athletic-hustler, big-glide | inside-out-high-flyer, high-flying-3pt-sniper, inside-out-slasher | 
+Sim FirstName LastName 148 (GF, tune) | 3pt-shot-hunter, ankle-taker, iso-savant | 3pt-shot-hunter, inside-out-high-flyer, 2-way-3pt-sniping-high-flyer | 
+Sim FirstName LastName 152 (SF, tune) | 2-way-off-screen-shooter, deep-range-sniper | inside-out-high-flyer, high-flying-3pt-sniper | 
+Sim FirstName LastName 99 (GF, test) | bulldozer | power-slasher, drive-and-rise, gritty-3pt-slasher | 
+Sim FirstName LastName 168 (GF, tune) | 3-and-d-specialist, ball-hawking-sharpshooter, edge-enforcing-3pt-sniper | 2-way-off-screen-shooter, edge-enforcing-3pt-sniper, 2-way-3-level-shot-creator | 
+Sim FirstName LastName 146 (GF, test) | disruptive-wing-runner, do-it-all-superstar, crafty-walking-bucket | rim-reaping-diming-high-flyer, 2-way-high-flying-dime-dropper, shot-erasing-table-setter | 
+Sim FirstName LastName 29 (C, tune) | rim-reaping-post-scorer, backline-post-bully-riser, bulldozing-glass-guardian | rim-reaping-post-scorer, backline-post-rim-rocker | 
+Sim FirstName LastName 229 (FC, tune) | triple-double-threat, table-setting-board-enforcer, physical-glass-visionary | table-setting-board-enforcer, glass-guardian | 
+Sim FirstName LastName 53 (C, tune) | rim-reaping-post-scorer, backline-post-bully-riser, physical-mid-paint-shot-eraser | rim-reaping-post-scorer, backline-post-rim-rocker, post-up-glass-cleaner | 
+Sim FirstName LastName 291 (C, tune) | skilled-stretch-four, footer, the-anomaly | big-range, stretch-board-enforcer | 
+Sim FirstName LastName 264 (FC, tune) | triple-double-threat, table-setting-board-enforcer, stretch-board-enforcer | table-setting-board-enforcer, stretch-board-enforcer, diming-cleaner | 
+Sim FirstName LastName 172 (C, tune) | skilled-stretch-four, footer, the-anomaly | footer, big-range | 
+Sim FirstName LastName 201 (C, tune) | stretch-board-enforcer, physical-defensive-rebounder, board-hunting-bucket-getter | stretch-board-enforcer, hustle-glass-cleaner, backline-pick-and-popper | 
+Sim FirstName LastName 10 (FC, tune) | shot-erasing-board-enforcer, hustle-glass-cleaner, do-it-all-superstar | table-setting-board-enforcer, diming-cleaner, glass-guardian | 
+Sim FirstName LastName 62 (FC, tune) | mid-paint-board-enforcer, physical-defensive-rebounder, hustle-glass-cleaner | physical-defensive-rebounder, post-up-glass-cleaner, hustle-glass-cleaner | 
+Sim FirstName LastName 278 (FC, tune) | bulldozer, grinder, fluid-four | skilled-stretch-four, stretch-board-enforcer, big-range | 
+Sim FirstName LastName 657 (GF, test) | crafty-mid-range-menace, gritty-mid-range-menace, ankle-taker | ankle-taker, mid-range-menace | 
+Sim FirstName LastName 552 (SF, tune, nearest) | physical-mid-range-menace, edge-enforcing-rim-runner, ball-hawking-mid-paint-scorer | athletic-hustler | 
+Sim FirstName LastName 595 (GF, test) | crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, mid-range-menace, 2-way-off-screen-shooter | 
+Sim FirstName LastName 14 (GF, tune) | ball-hawking-mid-paint-scorer | post-combo-guard, crafty-mid-range-menace | 
+Sim FirstName LastName 673 (GF, tune) | physical-mid-range-high-flyer, mid-range-high-flyer, athletic-hustler | athletic-hustler, mid-range-menace | 
+Sim FirstName LastName 119 (SF, tune) | 2-way-mid-range-high-flyer, rim-reaping-rim-runner, rim-reaping-high-flyer | athletic-hustler, pick-and-roll-finisher | 
+Sim FirstName LastName 305 (GF, test) | post-up-glass-cleaner, diming-cleaner, crafty-mid-post-scorer | crafty-mid-post-scorer, post-combo-guard, crafty-sharpshooter | 
+Sim FirstName LastName 326 (GF, test, nearest) | ankle-taker, iso-savant, shifty-king | post-combo-guard, crafty-post-playmaker | 
+Sim FirstName LastName 299 (GF, test) | post-scoring-slasher, glass-cleaning-slasher, crafty-paint-finishing-cleaner | bulldozer, post-scoring-slasher, post-combo-guard | 
+Sim FirstName LastName 233 (SF, tune) | backline-four, 2-way-bulldimer, 2-way-bulldozer | athletic-hustler | 
+Sim FirstName LastName 661 (FC, test) | shot-erasing-board-enforcer, glass-guardian, post-up-glass-cleaner | hustle-glass-cleaner, physical-defensive-rebounder, post-up-glass-cleaner | 
+Sim FirstName LastName 324 (FC, tune) | do-it-all-superstar, fluid-four, footer | hustle-glass-cleaner, rim-running-board-enforcer, athletic-hustler | 
+Sim FirstName LastName 80 (C, tune) | footer, the-anomaly | pick-and-roll-finisher, hustle-glass-cleaner | 
+Sim FirstName LastName 628 (FC, tune) | rim-running-board-enforcer, hustle-glass-cleaner, fluid-four | hustle-glass-cleaner, post-up-glass-cleaner | 
+Sim FirstName LastName 561 (C, tune) | backline-four, shot-blocking-anchor, footer | shot-blocking-anchor, pick-and-roll-finisher, rim-reaping-rim-runner | 
+Sim FirstName LastName 36 (FC, tune) | backline-tempo-pusher, 2-way-iso-savant, ankle-taker | rim-reaping-rim-runner, athletic-hustler, backline-lob-threat | 
+Sim FirstName LastName 252 (C, test) | power-slasher, pick-and-roll-finisher, do-it-all-superstar | footer, hustle-glass-cleaner, pick-and-roll-finisher | 
+Sim FirstName LastName 277 (FC, test) | skilled-stretch-four, do-it-all-superstar, fluid-four | stretch-board-enforcer, footer, skilled-stretch-four | 
+Sim FirstName LastName 217 (FC, test) | fluid-four, footer, the-anomaly | hustle-glass-cleaner, physical-defensive-rebounder | 
+Sim FirstName LastName 260 (FC, tune) | post-up-glass-cleaner, board-hunting-bucket-getter, hustle-glass-cleaner | hustle-glass-cleaner, physical-defensive-rebounder, table-setting-board-enforcer | 
+Sim FirstName LastName 475 (PG, tune, nearest) | ankle-taker, iso-savant, shifty-king | pass-first-distributor, dot-dispenser | 
+Sim FirstName LastName 553 (PG, tune) | mid-range-high-flyer, athletic-hustler, big-glide | athletic-hustler, mid-range-high-flyer | 
+Sim FirstName LastName 338 (PG, tune, nearest) | ankle-taker, iso-savant, shifty-king | pass-first-distributor, playmaking-3pt-creator, diming-sharpshooter | 
+Sim FirstName LastName 67 (PG, tune, nearest) | crafty-sharpshooter, catch-and-shoot-3pt-sniper, deep-range-sniper | catch-and-shoot-3pt-sniper, mid-range-menace | 
+Sim FirstName LastName 650 (PG, tune, nearest) | ball-hawking-3-level-scorer, ball-hawking-mid-range-menace, 3-and-d-specialist | 3-and-d-specialist, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 665 (PG, tune, nearest) | ball-hawking-3-level-scorer, do-it-all-superstar, ball-hawking-mid-range-menace | pass-first-distributor, diming-sharpshooter | 
+Sim FirstName LastName 630 (PG, tune) | mid-range-high-flyer, athletic-hustler, big-glide | pass-first-distributor | 
+Sim FirstName LastName 568 (PG, test, nearest) | ball-hawking-mid-range-menace, ankle-taker, iso-savant | pass-first-distributor, defensive-playmaker, the-guard-dog | 
+Sim FirstName LastName 425 (PG, test, nearest) | physical-mid-range-menace | mid-range-menace, pass-first-distributor, ankle-taker | 
+Sim FirstName LastName 616 (PF, tune) | crafty-paint-finishing-cleaner, post-up-glass-cleaner, footwork-pharaoh | athletic-hustler, pick-and-roll-finisher | 
+Sim FirstName LastName 619 (F, tune) | ankle-taker, iso-savant, fluid-four | athletic-hustler | 
+Sim FirstName LastName 447 (PF, tune) | blow-by-dual-finisher, drive-and-rise, do-it-all-superstar | pick-and-roll-finisher, athletic-hustler, rim-reaping-rim-runner | 
+Sim FirstName LastName 431 (PF, tune) | shot-erasing-mid-paint-maestro, backline-mid-range-scorer, 2-way-mid-range-menace | hustle-glass-cleaner | 
+Sim FirstName LastName 575 (F, tune) | triple-double-threat, diming-cleaner, physical-defensive-rebounder | diming-cleaner, table-setting-board-enforcer | 
+Sim FirstName LastName 310 (PF, tune) | post-up-glass-cleaner, mid-paint-board-enforcer, footwork-pharaoh | post-up-glass-cleaner, footwork-pharaoh | 
+Sim FirstName LastName 645 (F, test) | fluid-four | mid-range-menace, athletic-hustler | 
+Sim FirstName LastName 84 (PF, tune) | rim-reaping-rim-runner, blow-by-dual-finisher, rim-reaping-slasher | rim-reaping-rim-runner, pick-and-roll-finisher, backline-lob-threat | 
+Sim FirstName LastName 293 (F, test) | triple-double-threat, diming-cleaner, hustle-glass-cleaner | stretch-board-enforcer, hustle-glass-cleaner | 
+Sim FirstName LastName 649 (F, tune) | fluid-four | athletic-hustler | 
+Sim FirstName LastName 48 (F, test) | crafty-offensive-engine, offensive-engine, point-four | skilled-stretch-four, diming-sharpshooter | 
+Sim FirstName LastName 95 (F, test) | 3pt-shot-hunter, big-range, skilled-stretch-four | mid-range-menace, skilled-stretch-four, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 183 (F, tune) | post-up-glass-cleaner, shot-erasing-board-enforcer, shot-erasing-cleaner | table-setting-board-enforcer, post-dimming-board-enforcer, physical-defensive-rebounder | 
+Sim FirstName LastName 567 (F, tune) | 2-way-mid-range-high-flyer, physical-mid-range-high-flyer, mid-range-high-flyer | athletic-hustler, high-flying-3pt-sniper | 
+Sim FirstName LastName 28 (PF, test) | post-up-glass-cleaner, switch-defending-cleaner, glass-cleaning-lockdown | post-up-glass-cleaner, 2-way-post-bully, bulldozer | 
+Sim FirstName LastName 37 (PF, tune) | post-scoring-slasher, crafty-paint-finishing-cleaner, inside-out-board-enforcer | post-scoring-slasher, rim-rocking-post-board-hunter, 2-way-post-bully | 
+Sim FirstName LastName 635 (F, test) | skilled-stretch-four, fluid-four | catch-and-shoot-3pt-sniper, mid-range-menace | 
+Sim FirstName LastName 307 (PF, tune) | do-it-all-superstar, fluid-four, crafty-walking-bucket | 2-way-small-ball-four, athletic-hustler | 
+Sim FirstName LastName 6 (F, tune) | lockdown-eraser, backline-pick-and-popper, shot-erasing-skilled-popper | 2-way-3pt-sniping-high-flyer, edge-enforcing-3pt-sniper, 3-and-d-specialist | 
+Sim FirstName LastName 210 (F, tune) | athletic-hustler, big-glide, bulldozer | athletic-hustler, drive-and-rise | 
+Sim FirstName LastName 118 (SG, test) | catch-and-shoot-3pt-sniper, crafty-sharpshooter, deep-range-sniper | catch-and-shoot-3pt-sniper, mid-range-menace | 
+Sim FirstName LastName 38 (SG, test) | ball-hawking-3-level-scorer, 2-way-off-screen-shooter, 3-and-d-specialist | catch-and-shoot-3pt-sniper, 3-and-d-specialist, high-flying-3pt-sniper | 
+Sim FirstName LastName 81 (SG, tune, nearest) | mid-paint-board-enforcer, crafty-mid-range-menace, gritty-mid-range-menace | catch-and-shoot-3pt-sniper, mid-range-menace | 
+Sim FirstName LastName 211 (G, tune) | do-it-all-superstar, crafty-walking-bucket, versatile-scorer | diming-sharpshooter, 2-way-tempo-pusher, ball-hawking-playshot | 
+Sim FirstName LastName 273 (SG, tune) | crafty-mid-range-menace, gritty-mid-range-menace | mid-range-menace, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 236 (G, tune) | catch-and-shoot-3pt-sniper, crafty-sharpshooter, deep-range-sniper | crafty-sharpshooter, post-combo-guard, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 216 (G, tune) | athletic-hustler, big-glide, 2-way-combo-guard | athletic-hustler, 2-way-high-flying-dime-dropper | 
+Sim FirstName LastName 166 (G, test) | yamming-force-of-nature, athletic-hustler, big-glide | post-combo-guard, shot-erasing-post-scorer, the-guard-dog | 
+Sim FirstName LastName 398 (SG, tune) | mid-range-high-flyer, athletic-hustler | high-flying-3pt-sniper, catch-and-shoot-3pt-sniper, mid-range-high-flyer | 
+Sim FirstName LastName 127 (SG, test, nearest) | do-it-all-superstar, mid-paint-board-enforcer, 2-way-bulldozer | board-hunting-playshot, diming-sharpshooter | 
+Sim FirstName LastName 194 (G, tune) | triple-double-threat, do-it-all-superstar, crafty-walking-bucket | post-combo-guard, crafty-post-playmaker | 
+Sim FirstName LastName 544 (SG, tune) | yamming-force-of-nature, athletic-hustler, blow-by-rim-attacker | drive-and-rise, power-slasher, athletic-hustler | 
+Sim FirstName LastName 174 (G, tune, nearest) | 2-way-off-screen-shooter, do-it-all-superstar, stretch-board-enforcer | diming-sharpshooter, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 173 (G, tune) | ball-hawking-3-level-scorer, 3-and-d-specialist, ball-hawking-sharpshooter | 3pt-shot-hunter, catch-and-shoot-3pt-sniper, 2-way-off-screen-shooter | 
+Sim FirstName LastName 175 (G, tune) | playslash-board-enforcer, stretch-board-enforcer, diming-inside-out-scorer | diming-sharpshooter, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 142 (G, tune) | thieving-inside-out-playmaker, defensive-playmaker, 2-way-inside-out-dime-dropper | offensive-engine, crafty-post-playmaker, playmaking-3-level-ball-hawk | 
+Sim FirstName LastName 27 (G, tune) | 2-way-off-screen-shooter, 2-way-combo-guard, mr-two-way | catch-and-shoot-3pt-sniper, 3pt-shot-hunter | 
+Sim FirstName LastName 190 (G, tune) | post-creator, playmaking-shot-creator, crafty-post-playmaker | crafty-post-playmaker, post-combo-guard, crafty-mid-post-scorer | 
+Sim FirstName LastName 150 (G, tune) | playmaking-3pt-creator, playmaking-shot-creator, 2-way-high-flying-dime-dropper | 2-way-3pt-playmaker, playmaking-3pt-creator, aerial-playmaker | 
+Sim FirstName LastName 286 (G, tune) | crafty-mid-range-menace, gritty-mid-range-menace | diming-sharpshooter, crafty-sharpshooter | 
+Sim FirstName LastName 202 (GF, test, nearest) | crafty-sharpshooter, blow-by-rim-attacker, drive-and-rise | catch-and-shoot-3pt-sniper, crafty-sharpshooter | 
+Sim FirstName LastName 83 (GF, tune) | offensive-engine | dime-dropping-3pt-gunner, diming-sharpshooter, playmaking-3pt-slasher | 
+Sim FirstName LastName 241 (GF, tune, nearest) | 2-way-off-screen-shooter, do-it-all-superstar, crafty-sharpshooter | catch-and-shoot-3pt-sniper, 3-and-d-specialist, crafty-sharpshooter | 
+Sim FirstName LastName 668 (GF, tune, nearest) | 2-way-tempo-pusher, 2-way-bulldimer, 2-way-bulldozer | slashing-lockdown, athletic-hustler | 
+Sim FirstName LastName 672 (SF, test) | crafty-paint-finishing-cleaner, physical-defensive-rebounder, blow-by-dual-finisher | athletic-hustler, glass-cleaning-lockdown | 
+Sim FirstName LastName 49 (GF, tune) | yamming-force-of-nature, athletic-hustler, big-glide | athletic-hustler, drive-and-rise | 
+Sim FirstName LastName 624 (GF, tune) | mid-range-high-flyer, athletic-hustler, big-glide | high-flying-3pt-sniper, athletic-hustler | 
+Sim FirstName LastName 651 (GF, tune, nearest) | edge-enforcer, lockdown-defender, the-guard-dog | slashing-lockdown, lockdown-defender | 
+Sim FirstName LastName 370 (SF, tune, nearest) | gritty-3pt-slasher, drive-and-rise, blow-by-dual-finisher | crafty-sharpshooter, inside-out-slasher | 
+Sim FirstName LastName 644 (SF, tune) | physical-mid-range-menace | mid-range-menace, athletic-hustler | 
+Sim FirstName LastName 664 (PG, test, nearest) | do-it-all-superstar, 2-way-off-screen-shooter, mid-range-slashing-cleaner | diming-sharpshooter, catch-and-shoot-3pt-sniper | 
+Sim FirstName LastName 255 (PG, test) | 3pt-shot-hunter, ankle-taker, iso-savant | playmaking-3pt-creator, dime-dropping-3pt-gunner | 
+Sim FirstName LastName 596 (PG, test) | crafty-offensive-engine, dot-dispenser, offensive-engine | crafty-post-playmaker, post-combo-guard, pass-first-distributor | 
+Sim FirstName LastName 18 (PG, tune, nearest) | triple-double-threat | diming-sharpshooter, pass-first-distributor | 
+Sim FirstName LastName 577 (PG, tune) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | defensive-playmaker, 2-way-tempo-pusher, pass-first-distributor | 
+Sim FirstName LastName 585 (PG, test) | athletic-hustler, big-glide | dime-dropping-3pt-gunner, playmaking-3pt-creator | 
+Sim FirstName LastName 237 (PG, tune, nearest) | 3-and-d-specialist, 2-way-off-screen-shooter, crafty-sharpshooter | catch-and-shoot-3pt-sniper, crafty-sharpshooter, 2-way-off-screen-shooter | 
+Sim FirstName LastName 587 (PG, tune, nearest) | 2-way-mid-post-scorer, physical-mid-range-menace, ball-hawking-3-level-scorer | catch-and-shoot-3pt-sniper, ball-hawking-sharpshooter | 
+Sim FirstName LastName 336 (PG, tune, nearest) | edge-enforcer, lockdown-defender, the-guard-dog | crafty-post-playmaker, defensive-playmaker, post-combo-guard | 
+Sim FirstName LastName 220 (PG, tune, nearest) | blow-by-dual-finisher, blow-by-rim-attacker, drive-and-rise | pass-first-distributor, blow-by-rim-attacker | 

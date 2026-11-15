@@ -371,6 +371,10 @@ export type NewsFacts = {
 	trades: NPTrade[];
 	signings: NPSigning[];
 	retirees: NPRetiree[];
+	// Franchise reboots this season: relocations, renames and new colors (common/franchiseStory.ts), with the franchise's record so far
+	franchiseChanges?: (import("../franchiseStory.ts").FranchiseChange & {
+		record: { won: number; lost: number; titles: number; seasons: number };
+	})[];
 	draft: NPDraftee[];
 	injuries: NPInjury[];
 	// Most wins by any team in any earlier season, if known

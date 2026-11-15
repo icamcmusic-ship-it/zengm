@@ -64,6 +64,7 @@ import {
 import {
 	assignMatchups,
 	ATTENTION,
+	eliteFinisher,
 	driveMismatch,
 	MATCHUP,
 	mismatchScale,
@@ -126,6 +127,10 @@ import {
 } from "./possessionModel.ts";
 import { TURNOVERS } from "./realisticTurnovers.ts";
 import { PLAY_TYPES } from "./realisticPlayTypes.ts";
+import {
+	type EmphasisSim,
+	NEUTRAL_EMPHASIS_SIM,
+} from "../../../common/offEmphasis.ts";
 import { AdvTracker } from "./advTracking.ts";
 
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
@@ -262,6 +267,8 @@ type TeamGameSim = {
 	pace: number; // mean number of possessions the team likes to have in a game
 	// Coaching systems (the coachSystems setting, common/coachSystems.ts), set by staff/systems.ts applyCoachSystems. Undefined: no effect
 	coachSim?: CoachSim;
+	// Offensive Emphasis (featureOffEmphasis, common/offEmphasis.ts), set by worker/core/offEmphasis applyOffEmphasis. Undefined: no effect
+	offEmphasis?: EmphasisSim;
 	stat: any;
 	compositeRating: any;
 	player: PlayerGameSim[];
@@ -504,6 +511,8 @@ class GameSim extends GameSimBase {
 	attentionShares: number[] = [];
 	attentionShooter: PlayerGameSim | undefined;
 	attentionShooterShare = 0;
+	// Matchup Defense, help on elite finishers: what the help takes from a team's best finishers goes to all its two-point shots
+	helpGive: [number, number] = [0, 0];
 	// Matchup Defense (League extras, see matchupDefense.ts): for each team on defense, the index of the defender guarding each offensive
 	// player (by his index on the court), assigned at each substitution, and the team's average defensive versatility. Off: nothing here is
 	// used and no extra random numbers are drawn
@@ -522,6 +531,9 @@ class GameSim extends GameSimBase {
 	// possession model and Spacing & Shot Creation; off: nothing here is used and no extra random numbers are drawn. quickPutback: the
 	// shot of this possession segment is the offensive rebounder's putback
 	playTypes = false;
+	// Offensive Emphasis (only with Realistic Play Types): each team's play-type dials. Off: neutral, never read
+	offEmph = false;
+	oe: [EmphasisSim, EmphasisSim] = [NEUTRAL_EMPHASIS_SIM, NEUTRAL_EMPHASIS_SIM];
 	quickPutback = false;
 	earlyTimeouts: [number, number] = [0, 0];
 	// Unanswered points by each team
@@ -644,6 +656,42 @@ class GameSim extends GameSimBase {
 		this.matchupDefense = nativeFeatureEnabled("matchupDefense", (key) =>
 			g.get(key as any),
 		);
+		// Matchup Defense, defensive attention: help defense on elite finishers (diminishing returns on their two-point make composites)
+		if (this.matchupDefense) {
+			for (const [i, t] of this.team.entries()) {
+				let drop = 0;
+				for (const p of t.player) {
+					const cr = p.compositeRating;
+					const rim = cr.shootingAtRimMake ?? cr.shootingAtRim;
+					const mid = cr.shootingMidRangeMake ?? cr.shootingMidRange;
+					const post = cr.shootingLowPostMake ?? cr.shootingLowPost;
+					cr.shootingAtRimMake = eliteFinisher(rim, ATTENTION.makeKnee.atRim);
+					cr.shootingMidRangeMake = eliteFinisher(
+						mid,
+						ATTENTION.makeKnee.midRange,
+					);
+					cr.shootingLowPostMake = eliteFinisher(
+						post,
+						ATTENTION.makeKnee.lowPost,
+					);
+					cr.drawingFouls = eliteFinisher(
+						cr.drawingFouls,
+						ATTENTION.makeKnee.drawingFouls,
+					);
+					drop +=
+						rim -
+						cr.shootingAtRimMake +
+						mid -
+						cr.shootingMidRangeMake +
+						post -
+						cr.shootingLowPostMake;
+				}
+				if (t.player.length > 0) {
+					this.helpGive[i as TeamNum] =
+						(ATTENTION.helpGive * drop) / t.player.length;
+				}
+			}
+		}
 		// (loadTeams adds the creation composite only with the setting on)
 		this.spacingCreation = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.creation !== undefined),
@@ -712,6 +760,16 @@ class GameSim extends GameSimBase {
 			nativeFeatureEnabled("realisticPlayTypes", (key) => g.get(key as any));
 		if (this.adv && this.playTypes) {
 			this.adv.realisticPlayTypes = true;
+		}
+		if (this.playTypes && (teams[0].offEmphasis || teams[1].offEmphasis)) {
+			this.offEmph = true;
+			this.oe = [
+				teams[0].offEmphasis ?? NEUTRAL_EMPHASIS_SIM,
+				teams[1].offEmphasis ?? NEUTRAL_EMPHASIS_SIM,
+			];
+			if (this.adv) {
+				this.adv.emphasis = this.oe;
+			}
 		}
 		if (g.get("customShotClock")) {
 			this.shotClockFull = helpers.bound(
@@ -950,6 +1008,9 @@ class GameSim extends GameSimBase {
 			numPlayersOnCourt: this.numPlayersOnCourt,
 			neutralSite: this.neutralSite,
 			// scoringSummary: this.playByPlay.scoringSummary,
+			...(this.shootoutShots.length > 0
+				? { shootoutShots: this.shootoutShots }
+				: {}),
 		};
 		return out;
 	}
@@ -971,7 +1032,11 @@ class GameSim extends GameSimBase {
 			pid: p.id,
 			made,
 		});
+		// Presentation only (box score shootout section, news): who shot and whether it went in
+		this.shootoutShots.push([t, p.id, made ? 1 : 0]);
 	}
+
+	shootoutShots: [TeamNum, number, 0 | 1][] = [];
 
 	doShootout() {
 		if (
@@ -1060,6 +1125,8 @@ class GameSim extends GameSimBase {
 				kind: "shootout",
 				player: ref(shooters[winner]),
 				opp: ref(shooters[loser]),
+				made: [this.team[winner].stat.sPts, this.team[loser].stat.sPts],
+				att: [this.team[winner].stat.sAtt, this.team[loser].stat.sAtt],
 			},
 		});
 	}
@@ -3439,6 +3506,9 @@ class GameSim extends GameSimBase {
 			}
 			if (this.playTypes) {
 				probTransition *= PLAY_TYPES.transition;
+				if (this.offEmph) {
+					probTransition *= this.oe[this.o].transition;
+				}
 			}
 			if (Math.random() < probTransition) {
 				shotAt = k * drawTransitionTime();
@@ -3448,7 +3518,9 @@ class GameSim extends GameSimBase {
 					? 0
 					: k * drawBackcourtTime();
 				let mean = this.playTypes
-					? PLAY_TYPES.halfCourt * HALF_COURT_SEARCH_MODE
+					? PLAY_TYPES.halfCourt *
+						HALF_COURT_SEARCH_MODE *
+						(this.offEmph ? this.oe[this.o].halfCourt : 1)
 					: HALF_COURT_SEARCH_MODE;
 				if (clockFactor === "catchUp") {
 					mean = 5;
@@ -3935,7 +4007,15 @@ class GameSim extends GameSimBase {
 					g.get("threePointTendencyFactor") *
 					(this.coachSys ? this.cs[this.o].three * this.cs[this.d].dThree : 1) *
 					(sc ? (selfCreated ? CREATION.selfThree : CREATION.otherThree) : 1) *
-					(this.playTypes ? PLAY_TYPES.three : 1)
+					(this.playTypes
+						? PLAY_TYPES.three *
+							(selfCreated ? PLAY_TYPES.selfThree : PLAY_TYPES.otherThree) *
+							(this.offEmph
+								? selfCreated
+									? this.oe[this.o].selfThree
+									: this.oe[this.o].three
+								: 1)
+						: 1)
 		) {
 			// Three pointer
 			type = "threePointer";
@@ -3944,7 +4024,15 @@ class GameSim extends GameSimBase {
 			}
 			fgaLogType = g.get("threePointers") ? "fgaTp" : "fgaTpFake";
 			probMissAndFoul = 0.02;
-			probMake = shootingThreePointerScaled * 0.3 + 0.36;
+			probMake =
+				(this.matchupDefense
+					? eliteFinisher(
+							shootingThreePointerScaled,
+							ATTENTION.makeKnee.threePointer,
+						)
+					: shootingThreePointerScaled) *
+					0.3 +
+				0.36;
 			probAndOne = 0.01;
 			if (this.expandedRatings2 || this.subRatingsSim) {
 				probMake += this.jumpShotStyleDelta(
@@ -3972,6 +4060,7 @@ class GameSim extends GameSimBase {
 				(this.coachSys ? cso.mid * csd.dMid : 1) *
 				pullUpTilt *
 				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
+				(this.offEmph ? this.oe[this.o].mid : 1) *
 				0.8 *
 				Math.random() *
 				(this.simFixes
@@ -3988,6 +4077,7 @@ class GameSim extends GameSimBase {
 								: 1) * Math.max(0.2, 1 + SPACING.selectRim * spacing)
 					: 1) *
 				driveTilt *
+				(this.offEmph ? this.oe[this.o].rim : 1) *
 				Math.random() *
 				(p.compositeRating.shootingAtRim +
 					this.synergyFactor *
@@ -3996,6 +4086,7 @@ class GameSim extends GameSimBase {
 			const r3 =
 				(this.coachSys ? cso.post * csd.dPost : 1) *
 				(this.playTypes ? PLAY_TYPES.post : 1) *
+				(this.offEmph ? this.oe[this.o].post : 1) *
 				postTilt *
 				Math.random() *
 				((this.simFixes
@@ -4075,6 +4166,11 @@ class GameSim extends GameSimBase {
 			if (this.playTypes) {
 				probMake += PLAY_TYPES.make2;
 			}
+			// Matchup Defense with Realistic Play Types (the drive-and-kick model): the help on a team's elite finishers leaves its other
+			// shots a little more open (league totals stay the same)
+			if (this.playTypes) {
+				probMake += this.helpGive[this.o];
+			}
 			probMake *= g.get("twoPointAccuracyFactor");
 		}
 
@@ -4152,6 +4248,10 @@ class GameSim extends GameSimBase {
 
 			if (this.coachSys) {
 				probMake += this.coachMakeDelta();
+			}
+			// Offensive Emphasis: how well the team's play-type dials fit its roster
+			if (this.offEmph) {
+				probMake += this.oe[this.o].make;
 			}
 
 			// End-of-Game Intelligence: a play drawn up in a late timeout, better from a good game manager
@@ -4527,6 +4627,7 @@ class GameSim extends GameSimBase {
 			this.matchupDefense && j >= 0
 				? this.playersOnCourt[this.d][this.guards[this.d][j] ?? j]
 				: this.playersOnCourt[this.d][j >= 0 ? j : 0];
+		this.adv!.emphO = this.o;
 		this.adv!.shot(
 			p,
 			passer,
@@ -4834,11 +4935,12 @@ class GameSim extends GameSimBase {
 		if (this.creator === undefined || this.creator === shooter) {
 			return;
 		}
-		const prob = Math.min(
-			PLAY_TYPES.selfMax,
-			PLAY_TYPES.selfSlope *
-				((shooter.compositeRating.creation ?? 0) - PLAY_TYPES.selfMin),
-		);
+		const prob =
+			Math.min(
+				PLAY_TYPES.selfMax,
+				PLAY_TYPES.selfSlope *
+					((shooter.compositeRating.creation ?? 0) - PLAY_TYPES.selfMin),
+			) * (this.offEmph ? this.oe[this.o].selfCreate : 1);
 		if (prob > 0 && Math.random() < prob) {
 			this.creator = shooter;
 		}
@@ -4873,9 +4975,18 @@ class GameSim extends GameSimBase {
 			(selfCreated ? CREATION.astSelf : CREATION.astOther) *
 			(this.playTypes
 				? PLAY_TYPES.ast *
-					(selfCreated && type !== "threePointer" ? PLAY_TYPES.astSelfTwo : 1)
+					(selfCreated
+						? type !== "threePointer"
+							? PLAY_TYPES.astSelfTwo
+							: PLAY_TYPES.astSelfThree
+						: 1)
 				: 1);
 		if (prob > Math.random()) {
+			// Realistic Play Types: the handoff or re-screen into a self-created two can come from any teammate, so it is spread more
+			// evenly than a creator's pass (the steep creation power would credit nearly all of them to the team's lead creator)
+			if (this.playTypes && selfCreated && type !== "threePointer") {
+				return this.pickPlayer("creation", this.o, PLAY_TYPES.astSelfPower, p);
+			}
 			return this.creatorPasser(p);
 		}
 		return undefined;

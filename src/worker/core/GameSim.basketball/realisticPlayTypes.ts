@@ -24,6 +24,9 @@ export const PLAY_TYPES = {
 	transition: 1.2,
 	// Multipliers on the three-point draw and the two-point make probability, and on the assisted probability (keep league totals)
 	three: 1.11,
+	// pt2: the three-point draw of self-created shots (pull-ups) and of shots created by someone else (catch-and-shoot)
+	selfThree: 1,
+	otherThree: 1,
 	make2: -0.042,
 	// Multiplier on the shooting-foul chance of two-point shots (fewer post-ups and more pull-ups would draw fewer free throws)
 	foul2: 1.18,
@@ -31,4 +34,9 @@ export const PLAY_TYPES = {
 	// Extra multiplier on the assisted chance of self-created twos (a handoff or re-screen into the drive; the classifier keeps them the
 	// handler's play), so league assists stay where they were
 	astSelfTwo: 1.55,
+	// pt2: multiplier on the assisted chance of self-created threes (more of a creator's threes are his own pull-ups, so the
+	// catch-and-shoot share of threes is NBA-like)
+	astSelfThree: 0.92,
+	// Power on the creation composite when picking who set up a self-created two (the creator's pass uses CREATION_POWER)
+	astSelfPower: 2,
 };

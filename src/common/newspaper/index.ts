@@ -42,6 +42,7 @@ import {
 	numbersSidebar,
 	opinionColumn,
 	retireStories,
+	franchiseStories,
 	rookieStory,
 	rumorSidebar,
 	seriesRecaps,
@@ -333,7 +334,10 @@ const leaguePaper = (c: Ctx): Section[] => {
 		leaderTables(c),
 		...pagesFor(c, "numbers", 3),
 	]);
-	const history = section("history", "History", pagesFor(c, "history", 6));
+	const history = section("history", "History", [
+		...franchiseStories(c),
+		...pagesFor(c, "history", 6),
+	]);
 	const obits = section("obits", "Retirements", retireStories(c));
 	const opinion = section("opinion", "Opinion", [opinionColumn(c)]);
 	const colour = section(

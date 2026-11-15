@@ -587,6 +587,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "offEmphasis",
+		key: "featureOffEmphasis",
+		name: "Offensive Emphasis",
+		description:
+			"Each team leans its offense toward some play types (pick-and-roll, isolation, post-ups, spot-up shooting, transition, inside vs outside) with presets like Five-out, Pace and space, Post-centric, Heliocentric star and Motion. The head coach sets it from his system and the roster unless you take over (Offense tab of Coaching Staff). Fitting the roster helps a little, a mismatch hurts a little. Needs Realistic Play Types.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "advStats",
 		key: "advStats",
 		name: "Advanced Tracking Stats",

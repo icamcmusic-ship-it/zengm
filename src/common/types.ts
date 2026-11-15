@@ -479,6 +479,8 @@ export type Game = {
 	// Marquee Games: holiday slate or national TV, and rivalry games (from the schedule)
 	marquee?: MarqueeKind;
 	rivalry?: boolean;
+	// Basketball shootout: [team index, pid, made] for each shot, in order
+	shootoutShots?: [0 | 1, number, 0 | 1][];
 	note?: string;
 	noteBool?: 1; // Keep in sync with note - for indexing
 	numGamesToWinSeries?: number;
@@ -1646,6 +1648,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 
 	// Basketball: the archetype derived from his ratings at the start of each preseason (see src/common/archetypes), oldest first
 	archetypes?: StoredArchetype[];
+	// His nickname, set in God Mode ("" = none). Missing: generated from his career (common/hofStory.ts)
+	nickname?: string;
 	real?: boolean;
 	relatives: Relative[];
 	retiredYear: number;
@@ -2428,6 +2432,8 @@ export type Team = {
 	frontOffice?: Record<"analytics" | "travel", number>;
 	// Scouting Director & Regions / Coaching Staff Depth: the user's priorities, delegation, suggestions and reports (common/staffDepth)
 	staffDepth?: import("./staffDepth/types.ts").StaffDepthTeam;
+	// Offensive Emphasis (League Extra): the team's play-type dials and who sets them (common/offEmphasis.ts)
+	offEmphasis?: import("./offEmphasis.ts").OffEmphasisTeam;
 	// Scouting Director & Regions: the scouting department's careers (every team)
 	scoutCareer?: import("./staffDepth/types.ts").ScoutCareerTeam;
 	depth?:

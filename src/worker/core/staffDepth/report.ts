@@ -1,4 +1,5 @@
 // The Staff Report page and the Pro Scouting tab: what the staff sees and recommends, one action per area, accepted with one click.
+import { offEmphasisRecommendation } from "../offEmphasis/index.ts";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import {
 	DEFENSE_NAMES,
@@ -585,6 +586,7 @@ export const getStaffReport = async () => {
 		development: coachingOn ? await developmentSection(tid) : undefined,
 		fit: await fitSection(tid),
 		conditioning: await conditioningSection(tid),
+		offense: await offEmphasisRecommendation(tid),
 	};
 };
 
