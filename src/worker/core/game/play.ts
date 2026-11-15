@@ -1,3 +1,4 @@
+import { applyOffEmphasis } from "../offEmphasis/index.ts";
 import { marqueeCrowdBoost } from "../../../common/marquee.ts";
 import { ALL_STAR_GAME_ONLY, PHASE } from "../../../common/constants.ts";
 import * as contractHooks from "../contract/hooks.ts";
@@ -769,6 +770,8 @@ const play = async (
 				await setPbpGameContext(schedule, teams);
 				// Coaching systems (the coachSystems setting): each team's coach's tendencies for the sim
 				await staff.applyCoachSystems(schedule, teams);
+				// Offensive Emphasis: each team's play-type dials for the sim
+				await applyOffEmphasis(schedule, teams);
 			}
 
 			await cbSimGames(schedule, teams, dayOver, quickResults);

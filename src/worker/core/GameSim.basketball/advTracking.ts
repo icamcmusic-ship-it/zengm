@@ -3,6 +3,7 @@
 //
 // Recording never changes a game: nothing here draws a random number (the classifier splits ambiguous plays with a hash of the game id
 // and a counter, not Math.random) or touches anything the sim reads. With the setting off the GameSim has no tracker and none of this runs.
+import type { EmphasisSim } from "../../../common/offEmphasis.ts";
 import {
 	ADV as ADV_,
 	LU as LU_,
@@ -210,6 +211,11 @@ export const turnoverWeights = (p: Role): Weights => ({
 // Realistic Play Types: more of the self-created shots are the sim's (many more) handlers' pick-and-rolls, so a smaller isolation share
 export const ISO_SCALE_REALISTIC = 0.5;
 
+// Realistic Play Types (pt2): a movement shooter's catch-and-shoot jumper is more often read as coming off a screen or a handoff, so
+// spot-ups fall into the NBA's range. Multipliers on the off-screen and handoff weights of shots with a passer (the play type's
+// `offs`/`ho`) and on every spot-up weight, mutable for calibration
+export const MOVE_SCALE_REALISTIC = { offs: 1.9, ho: 1.2, spot: 0.93 };
+
 // Realistic Play Types: with fewer post-ups and more self-created shots, the turnovers follow the new mix (fewer post-ups, fewer on the
 // ball handler's pick-and-roll, more off the ball)
 export const turnoverWeightsRealistic = (p: Role): Weights => ({
@@ -260,6 +266,10 @@ export class AdvTracker {
 	counter = 0;
 	// Realistic Play Types: the turnovers and the isolations follow the sim's new mix (turnoverWeightsRealistic, ISO_SCALE_REALISTIC)
 	realisticPlayTypes = false;
+	// Offensive Emphasis: each team's dials (the classifier reads its isolation vs pick-and-roll and movement-shooter tilts), and the
+	// offense of the shot being classified. Undefined: no tilt
+	emphasis: [EmphasisSim, EmphasisSim] | undefined;
+	emphO: TeamNum = 0;
 	roles = new Map<AdvPlayer, Role>();
 	// Each player's record while the game is played
 	arr = new Map<AdvPlayer, number[]>();
@@ -502,6 +512,34 @@ export class AdvTracker {
 				from ? this.role(from) : undefined,
 				this.realisticPlayTypes ? ISO_SCALE_REALISTIC : 1,
 			);
+			if (this.realisticPlayTypes && from) {
+				if (weights.offs !== undefined) {
+					weights.offs *= MOVE_SCALE_REALISTIC.offs;
+				}
+				if (weights.ho !== undefined) {
+					weights.ho *= MOVE_SCALE_REALISTIC.ho;
+				}
+			}
+			if (this.realisticPlayTypes && weights.spot !== undefined) {
+				weights.spot *= MOVE_SCALE_REALISTIC.spot;
+			}
+			const em = this.emphasis?.[this.emphO];
+			if (em) {
+				if (weights.iso !== undefined) {
+					weights.iso *= em.iso;
+				}
+				if (weights.prb !== undefined) {
+					weights.prb *= em.prb;
+				}
+				if (from) {
+					if (weights.offs !== undefined) {
+						weights.offs *= em.move;
+					}
+					if (weights.ho !== undefined) {
+						weights.ho *= em.move;
+					}
+				}
+			}
 			key = pickPlayType(weights, this.unit());
 		}
 		const pt = PT_INDEX[key];

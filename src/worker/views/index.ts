@@ -91,6 +91,7 @@ export { default as playerTraits } from "./playerTraits.ts";
 export { default as playerScouting } from "./playerScouting.ts";
 export { default as scoutingDepartment } from "./scoutingDepartment.ts";
 export { default as staffReport } from "./staffReport.ts";
+export { default as offEmphasis } from "./offEmphasis.ts";
 export { default as proScouting } from "./proScouting.ts";
 export { default as playerRatingDists } from "./playerRatingDists.ts";
 export { default as playerRatings } from "./playerRatings.ts";
