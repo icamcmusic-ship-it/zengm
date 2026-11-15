@@ -31,4 +31,6 @@ export const PLAY_TYPES = {
 	// Extra multiplier on the assisted chance of self-created twos (a handoff or re-screen into the drive; the classifier keeps them the
 	// handler's play), so league assists stay where they were
 	astSelfTwo: 1.55,
+	// Power on the creation composite when picking who set up a self-created two (the creator's pass uses CREATION_POWER)
+	astSelfPower: 2,
 };
