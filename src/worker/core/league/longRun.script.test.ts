@@ -30,6 +30,7 @@ import { isGenericBuild } from "../../../common/archetypes/generic.ts";
 import { getMilestones, getRecordsBook } from "../../util/recordsBookData.ts";
 import { idb } from "../../db/index.ts";
 import { PLAY_TYPES } from "../GameSim.basketball/realisticPlayTypes.ts";
+import { MOVE_SCALE_REALISTIC } from "../GameSim.basketball/advTracking.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
 import { g, helpers } from "../../util/index.ts";
 import { agingCurveForPlayer } from "../../../common/playerTraits/development.ts";
@@ -45,6 +46,10 @@ const env = (globalThis as any).process.env;
 // LONG_RUN_PLAYTYPES='{"post":0.5}' changes the Realistic Play Types constants
 if (env.LONG_RUN_PLAYTYPES) {
 	Object.assign(PLAY_TYPES, JSON.parse(env.LONG_RUN_PLAYTYPES));
+}
+// LONG_RUN_MOVE='{"offs":1.7}' changes the classifier's movement-shooter weights (advTracking.ts MOVE_SCALE_REALISTIC)
+if (env.LONG_RUN_MOVE) {
+	Object.assign(MOVE_SCALE_REALISTIC, JSON.parse(env.LONG_RUN_MOVE));
 }
 const ENABLED = !!env.LONG_RUN;
 const SEASONS = Number(env.LONG_RUN_SEASONS ?? 3);

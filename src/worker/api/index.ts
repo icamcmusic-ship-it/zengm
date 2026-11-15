@@ -298,6 +298,7 @@ import {
 import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
 import { faceAgingOnCustomize } from "../util/faceAging.ts";
 import * as staffDepthActions from "../core/staffDepth/actions.ts";
+import * as offEmphasis from "../core/offEmphasis/index.ts";
 import type {
 	FocusKey,
 	ScoutRegion,
@@ -2904,6 +2905,16 @@ const staffDepthAction = async (
 	await toUI("realtimeUpdate", [
 		["staff", "teamFinances", "playerMovement", "gameAttributes", "watchList"],
 	]);
+};
+
+// Offensive Emphasis (Offense tab): the user's dials, mode, or accepting the coach's suggestion
+const offEmphasisAction = async (
+	action: Parameters<typeof offEmphasis.setOffEmphasis>[0],
+) => {
+	await offEmphasis.setOffEmphasis(action);
+	// (a setting the user just chose: kept even if the tab closes right away)
+	await idb.cache.flush();
+	await toUI("realtimeUpdate", [["staff", "team"]]);
 };
 
 const removeCollegeStats = async (draftYear: number) => {
@@ -6305,6 +6316,7 @@ const api = {
 		getDraftDayInfo,
 		staffAction,
 		staffDepthAction,
+		offEmphasisAction,
 		idbCacheFlush,
 		importPlayers,
 		importPlayersGetReal,

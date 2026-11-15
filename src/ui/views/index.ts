@@ -99,6 +99,7 @@ export { default as PlayerTraits } from "./PlayerTraits.tsx";
 export { default as PlayerScouting } from "./PlayerScouting.tsx";
 export { default as ScoutingDepartment } from "./ScoutingDepartment.tsx";
 export { default as StaffReport } from "./StaffReport.tsx";
+export { default as OffEmphasis } from "./OffEmphasis.tsx";
 export { default as ProScouting } from "./ProScouting.tsx";
 export { default as PlayerRatingDists } from "./PlayerRatingDists.tsx";
 export { default as PlayerRatings } from "./PlayerRatings.tsx";

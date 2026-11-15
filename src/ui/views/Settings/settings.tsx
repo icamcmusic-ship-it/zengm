@@ -117,6 +117,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	scheduleLoad: "League extras: Game Simulation",
 	realisticTurnovers: "League extras: Game Simulation",
 	realisticPlayTypes: "League extras: Game Simulation",
+	featureOffEmphasis: "League extras: Game Simulation",
 	advStats: "League extras: Game Simulation",
 	playerTraits: "League extras: Players",
 	injuryDepth: "League extras: Players",

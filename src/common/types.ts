@@ -2428,6 +2428,8 @@ export type Team = {
 	frontOffice?: Record<"analytics" | "travel", number>;
 	// Scouting Director & Regions / Coaching Staff Depth: the user's priorities, delegation, suggestions and reports (common/staffDepth)
 	staffDepth?: import("./staffDepth/types.ts").StaffDepthTeam;
+	// Offensive Emphasis (League Extra): the team's play-type dials and who sets them (common/offEmphasis.ts)
+	offEmphasis?: import("./offEmphasis.ts").OffEmphasisTeam;
 	// Scouting Director & Regions: the scouting department's careers (every team)
 	scoutCareer?: import("./staffDepth/types.ts").ScoutCareerTeam;
 	depth?:
