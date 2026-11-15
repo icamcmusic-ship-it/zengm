@@ -3,6 +3,7 @@ import { helpers } from "../util/helpers.ts";
 import { useLocal } from "../util/local.ts";
 import type { LocalStateUI, View } from "../../common/types.ts";
 import { isFinals } from "../../common/rivalries/index.ts";
+import { RivalryStory } from "./RivalryStory.tsx";
 
 type TeamInfoCache = LocalStateUI["teamInfoCache"];
 
@@ -194,6 +195,13 @@ const Rivalries = ({
 								</tbody>
 							</table>
 						</div>
+						{selected.story ? (
+							<RivalryStory
+								story={selected.story}
+								series={selected.series}
+								teamInfoCache={teamInfoCache}
+							/>
+						) : null}
 					</div>
 				</div>
 			) : (

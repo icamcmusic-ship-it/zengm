@@ -468,4 +468,6 @@ export type HypeLite = {
 	} | null;
 	verdict: Verdict | null;
 	watch: number;
+	// Rivalry Stories setting: "Third meeting this season; the last two were decided by 3 points"
+	rivalryNote?: string;
 };

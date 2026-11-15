@@ -1,4 +1,8 @@
 import {
+	getRivalryNewsFacts,
+	rivalryStoriesOn,
+} from "../util/rivalryStories.ts";
+import {
 	featureOffError,
 	featureOn,
 	featureOption,
@@ -1001,6 +1005,10 @@ export const getNewsFacts = async (
 		featureOption<boolean>("scoutingListSummaries")
 	) {
 		facts.draftPreview = await getDraftPreviewFacts();
+	}
+	// Rivalry Stories: previews of marquee rivalry games and recaps of the season's big ones
+	if (rivalryStoriesOn()) {
+		facts.rivalry = await getRivalryNewsFacts(season);
 	}
 	// Rumors: this season's rumors and how they turned out (only while they are in the league's rolling window)
 	if (featureOn("rumors")) {

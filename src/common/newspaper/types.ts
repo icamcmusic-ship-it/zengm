@@ -416,6 +416,17 @@ export type NewsFacts = {
 	rumors?: NPRumor[];
 	// Scouting Reports setting: the upcoming class as the user's scouts see it
 	draftPreview?: NPDraftPreview;
+	// Rivalry Stories setting: previews of upcoming marquee rivalry games and recaps of this season's big ones
+	rivalry?: { previews: NPRivalryStory[]; recaps: NPRivalryStory[] };
+};
+
+export type NPRivalryStory = {
+	kind: string;
+	gid?: number;
+	season: number;
+	tids: [number, number];
+	head: string;
+	body: string;
 };
 
 export type NPDraftPreview = {

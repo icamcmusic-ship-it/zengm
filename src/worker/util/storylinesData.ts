@@ -9,6 +9,7 @@ import {
 	type Built,
 } from "./wrappedData.ts";
 import { wperfTime } from "./wrappedPerf.ts";
+import { rivalryStoriesOn } from "./rivalryStories.ts";
 
 type State = {
 	X: LeagueIndex;
@@ -19,12 +20,16 @@ type State = {
 };
 
 // Stories and threads are found once per snapshot (the snapshot itself is rebuilt when the league changes), without holding up the worker
-export const getStoryState = (built: Built): Promise<State> =>
-	memoize(built, "storyState", async () => {
+export const getStoryState = (built: Built): Promise<State> => {
+	// Rivalry Stories setting: its "Rivalry renewed" kind only runs with the setting on
+	const renewed = rivalryStoriesOn();
+	return memoize(built, `storyState|${renewed ? 1 : 0}`, async () => {
 		const { X } = built;
-		const stories = await wperfTime("storylines.find", () =>
-			findStoriesAsync(X, yieldToWorker),
-		);
+		const stories = (
+			await wperfTime("storylines.find", () =>
+				findStoriesAsync(X, yieldToWorker),
+			)
+		).filter((s) => renewed || s.kind !== "Rivalry renewed");
 		const kindCounts = new Map<string, number>();
 		for (const s of stories) {
 			kindCounts.set(s.kind, (kindCounts.get(s.kind) ?? 0) + 1);
@@ -60,6 +65,7 @@ export const getStoryState = (built: Built): Promise<State> =>
 			threads: buildThreads(X, stories),
 		};
 	});
+};
 
 export const getStorylineWhy = async (
 	id: string,

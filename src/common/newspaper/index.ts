@@ -1,5 +1,6 @@
 // Newspaper engine: turns NewsFacts into a laid-out Paper. Pure and deterministic: the same facts always give the same paper.
 
+import { rivalryWatch } from "./rivalry.ts";
 import { leadChampion } from "./champ.ts";
 import { Ctx, finishArticle } from "./ctx.ts";
 import {
@@ -309,6 +310,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 		injuryStory(c),
 		c.done ? bestGamesStory(c) : undefined,
 		closeGamesStory(c),
+		rivalryWatch(c),
 		...pagesFor(c, "features", 3),
 	]);
 	const moves = section(
@@ -361,7 +363,13 @@ const teamPaper = (c: Ctx, tid: number): Section[] => {
 	const front = section(
 		"front",
 		"Front page",
-		[teamLead(c, tid), feats[0], teamPlayoffPath(c, tid), teamGames(c, tid)],
+		[
+			teamLead(c, tid),
+			feats[0],
+			teamPlayoffPath(c, tid),
+			teamGames(c, tid),
+			rivalryWatch(c, tid),
+		],
 		[standingsSidebar(c, tid), numbersSidebar(c)],
 	);
 	const players = section("players", "Players", [

@@ -19,6 +19,7 @@ import type {
 	IDBPTransaction,
 	StoreNames,
 } from "@dumbmatter/idb";
+import type { RivalryGame } from "../../common/rivalryStories/types.ts";
 import type {
 	DraftLotteryResult,
 	AllStars,
@@ -138,6 +139,14 @@ export interface LeagueDB extends DBSchema {
 	savedTrades: {
 		key: string;
 		value: SavedTrade;
+	};
+	rivalryGames: {
+		key: number;
+		value: RivalryGame;
+		indexes: {
+			pair: string;
+			season: number;
+		};
 	};
 	coaches: {
 		key: number;
@@ -664,6 +673,16 @@ const create = (db: IDBPDatabase<LeagueDB>) => {
 	});
 
 	createCoachesStore(db);
+	createRivalryGamesStore(db);
+};
+
+// Rivalry Stories (League extras): one compact summary per game, kept after the box score is deleted. Added in version 77
+const createRivalryGamesStore = (db: IDBPDatabase<LeagueDB>) => {
+	const store = db.createObjectStore("rivalryGames", {
+		keyPath: "gid",
+	});
+	store.createIndex("pair", "pair");
+	store.createIndex("season", "season");
 };
 
 // Coaching staff, added in version 76
@@ -1790,6 +1809,10 @@ const migrate = async ({
 			key: "coachingStaff",
 			value: false,
 		});
+	}
+
+	if (oldVersion < 77) {
+		createRivalryGamesStore(db);
 	}
 
 	// Next update - do similar to `oldVersion < 71` above for numPlayoffRounds and draftType, from loadGameAttributes

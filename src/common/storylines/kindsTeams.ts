@@ -1,6 +1,7 @@
 // More storyline kinds, about teams: seasons, runs, finals, rosters and rivalries. Playoff and title facts only for decided seasons.
 
 import { rivalryScore, type RivalSeries } from "../rivalries/index.ts";
+import { renewedText } from "../rivalryStories/text.ts";
 import type { SeasonLine } from "../wrapped/league.ts";
 import type { WPlayer, WTeamSeason } from "../wrapped/types.ts";
 import {
@@ -1305,6 +1306,95 @@ export const TEAM_KINDS: Kind[] = [
 						["Split", `${aWins}-${list.length - aWins}`],
 					],
 				});
+			}
+			return out;
+		},
+	},
+	// Rivalry Stories setting (filtered out with it off, see worker/util/storylinesData.ts): two teams meet in the playoffs
+	// again
+	{
+		kind: "Rivalry renewed",
+		find: (X) => {
+			const out: Draft[] = [];
+			const past = new Map<
+				string,
+				{ season: number; winner: number; wWon: number; wLost: number }[]
+			>();
+			for (const s of X.seasons) {
+				const rounds = X.series(s)?.rounds ?? [];
+				rounds.forEach((round, ri) => {
+					for (const m of round) {
+						if (!m.away) {
+							continue;
+						}
+						const a = Math.min(m.home.tid, m.away.tid);
+						const b = Math.max(m.home.tid, m.away.tid);
+						const k = `${a}|${b}`;
+						const before = past.get(k) ?? [];
+						if (before.length > 0) {
+							const last = before.at(-1)!;
+							out.push({
+								key: `${k}|${s}`,
+								kind: "Rivalry renewed",
+								// Known once the bracket is set, so it runs for a season still being played too (not as a playoff
+								// story, which would read as a result)
+								shape: X.decided(s) ? "playoffs" : "season",
+								season: s,
+								score:
+									14 +
+									4 * Math.min(before.length, 5) +
+									(s - last.season <= 2 ? 8 : 0) +
+									ri * 2,
+								pids: [],
+								tids: [a, b],
+								heads: [
+									renewedText({
+										a,
+										b,
+										season: s,
+										meetings: before,
+										name: (tid) => X.teamName(tid, s),
+									}).head,
+									`${X.teamAny(a, s)?.name} and ${X.teamAny(b, s)?.name}, together again in the playoffs`,
+								],
+								bodies: [
+									renewedText({
+										a,
+										b,
+										season: s,
+										meetings: before,
+										name: (tid) => tLink(X, tid, s),
+									}).body,
+								],
+								evidence: [
+									["Earlier series", `${before.length}`],
+									["Last met", `${last.season}`],
+								],
+							});
+						}
+					}
+				});
+				// Add this season's series after the whole bracket, so a season never renews itself
+				for (const round of rounds) {
+					for (const m of round) {
+						if (!m.away || m.home.won === m.away.won) {
+							continue;
+						}
+						const a = Math.min(m.home.tid, m.away.tid);
+						const b = Math.max(m.home.tid, m.away.tid);
+						const hw = m.home.won > m.away.won;
+						const k = `${a}|${b}`;
+						past.set(k, [
+							...(past.get(k) ?? []),
+							{
+								season: s,
+								winner: hw ? m.home.tid : m.away.tid,
+								wWon: Math.max(m.home.won, m.away.won),
+								wLost: Math.min(m.home.won, m.away.won),
+							},
+						]);
+					}
+				}
 			}
 			return out;
 		},

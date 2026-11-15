@@ -24,6 +24,7 @@ import {
 } from "../player/injuryDepth.ts";
 import updatePlayoffSeries from "./updatePlayoffSeries.ts";
 import writeGameStats from "./writeGameStats.ts";
+import { recordRivalryGames } from "../../util/rivalryStories.ts";
 import writePlayerStats, {
 	P_FATIGUE_DAILY_REDUCTION,
 } from "./writePlayerStats.ts";
@@ -179,6 +180,9 @@ const play = async (
 				gameToUi = maybeGameToUi;
 			}
 		}
+
+		// Rivalry Stories: log the day's games for the rivalry pages (one write for the day)
+		await recordRivalryGames(results);
 
 		// injuryDepth setting (and realistic schedule length, for the back-to-back markers): remember each team's last game
 		// day, for back-to-backs (scheduleLoad: and the one before, for 3 games in 4 nights)

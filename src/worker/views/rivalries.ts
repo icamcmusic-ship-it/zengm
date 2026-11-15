@@ -1,4 +1,5 @@
 import { featureOffError } from "../util/nativeFeatures.ts";
+import { loadRivalryStory, rivalryStoriesOn } from "../util/rivalryStories.ts";
 import { g } from "../util/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { isBulkSimming } from "../util/wrappedData.ts";
@@ -94,6 +95,10 @@ export default defineView({
 						closeGames: selected.input.closeGames?.length ?? 0,
 						starDuels: selected.input.starDuels ?? [],
 						sameDiv: !!selected.input.sameDiv,
+						// Rivalry Stories setting: the pair's full story (records, streaks, games, players, heat)
+						story: rivalryStoriesOn()
+							? await loadRivalryStory(selected.input, teamName)
+							: undefined,
 					}
 				: undefined,
 			season: g.get("season"),

@@ -1164,6 +1164,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "rivalryStories",
+		key: "featureRivalryStories",
+		name: "Rivalry Stories",
+		description:
+			'With Rivalries: a game log kept for every pair of teams after each game, so each rivalry page gets its all-time record, streaks, eras, playoff history, best and closest games, player duels, players who crossed the rivalry, coaching matchups and a heat timeline; plus rivalry previews and recaps in the Newspaper, a "Rivalry renewed" storyline and rivalry context lines in Games to Watch.',
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "seriesRecaps",
 		college: false,
 		key: "featureSeriesRecaps",

@@ -9,6 +9,9 @@ import {
 	hypeForUpcoming,
 	upcomingTargets,
 } from "../util/hypeData.ts";
+import { rivalryStoriesOn, seasonGames } from "../util/rivalryStories.ts";
+import { pairOf } from "../../common/rivalryStories/types.ts";
+import { rivalryContextLine } from "../../common/rivalryStories/text.ts";
 
 export type HypeBoard = {
 	enabled: boolean;
@@ -42,6 +45,34 @@ const recentGids = async () => {
 		.map((gm) => gm.gid);
 };
 
+// Rivalry Stories setting: a context line for upcoming games between teams that already met this season
+const addRivalryNotes = async (games: HypeLite[]) => {
+	if (!rivalryStoriesOn() || games.length === 0) {
+		return;
+	}
+	const logged = await seasonGames(g.get("season"));
+	const byPair = Map.groupBy(logged, (gm) => gm.pair);
+	const name = (tid: number) => g.get("teamInfoCache")[tid]?.name ?? "Team";
+	for (const h of games) {
+		const [home, away] = h.teams;
+		if (!home || !away || h.completed) {
+			continue;
+		}
+		const list = byPair.get(pairOf(home.tid, away.tid));
+		if (!list) {
+			continue;
+		}
+		const note = rivalryContextLine(
+			list,
+			{ home: home.tid, away: away.tid, playoffs: h.kind === "po" },
+			name,
+		);
+		if (note) {
+			h.rivalryNote = note;
+		}
+	}
+};
+
 const hype = {
 	// Upcoming days, the record chases and (optionally) last day's results
 	board: async ({
@@ -63,6 +94,7 @@ const hype = {
 			games.sort((a, b) => b.score - a.score || a.gid - b.gid);
 			outDays.push({ day: d.day, games });
 		}
+		await addRivalryNotes(outDays.flatMap((d) => d.games));
 		const recentGames: HypeLite[] = [];
 		if (recent) {
 			const gids = await recentGids();
