@@ -266,7 +266,7 @@ export const addDerived = (r: Row, L: LeagueContext) => {
 	}
 	const rimDeter = num(r.rimDeter);
 	if (rimDeter !== undefined) {
-		def += 0.15 * clamp(-rimDeter / 3) * shrink(onPoss, 2000);
+		def += 0.1 * clamp(-rimDeter / 3) * shrink(onPoss, 2000);
 	}
 	if (con36 !== undefined && L.con36 !== undefined && L.con36 > 0) {
 		def += 0.1 * clamp((con36 / L.con36 - 1) / 0.5) * shrink(totMin, 800);
