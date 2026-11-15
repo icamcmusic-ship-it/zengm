@@ -563,8 +563,9 @@ const tripleCrownAwardsToCheck = bySport({
 
 // All individual awards, except early round playoff ones because they're basically redundant with FMVP
 const hardwareStoreAwardsToCheck = defaultGameAttributes.awards
+	.filter((award) => award.numTeams === undefined)
 	// Advanced Tracking Stats only awards (Clutch Player of the Year) are optional, not part of the sweep
-	.filter((award) => award.numTeams === undefined && !award.advStats)
+	.filter((award) => !award.advStats)
 	.filter(
 		(award) => typeof award.statRange !== "number" || award.statRange === -1,
 	);
