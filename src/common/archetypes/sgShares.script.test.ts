@@ -4,7 +4,10 @@
 // run: RUN_SG_SHARES=1 (SG_OUT=file for the report, SG_SEEDS=n leagues, SG_SEASONS=n career seasons). Prints:
 // - real NBA listed shares (2016-2025 player-seasons) and the rating profile of each listed position (ratings-only axes),
 // - a new random league (new-league defaults) at creation: all players and rostered players, and the same profiles,
-// - careers: rostered player-seasons over SG_SEASONS seasons of the population model,
+// - careers: rostered player-seasons over SG_SEASONS seasons of the population model (SG_FULL=1: the full engine, games
+//   and stats, with each season's shares, the shares of players who came in through the draft and of rookies, playmaking
+//   read with vs without stats by position, position changes since last season and the league's assist% + usage%/10
+//   quantiles; SG_DUMP=file writes every rostered player-season's raw position readings for sgdriftFit.script.test.ts),
 // - draft classes: share of the top 60 by value at 6'3" or shorter.
 import { appendFileSync, writeFileSync } from "node:fs";
 import { afterAll, test } from "vitest";
@@ -19,7 +22,12 @@ import {
 } from "../../test/ratingInflation/harness.ts";
 import { runPopModel } from "../../test/ratingInflation/popModel.ts";
 import { TOGGLES } from "../../test/ratingInflation/toggles.ts";
-import { POSITIONS, positionAxes, positionRaw } from "./position.ts";
+import {
+	POSITIONS,
+	positionAxes,
+	positionRaw,
+	positionStats,
+} from "./position.ts";
 import { realData } from "./real.testutil.ts";
 import { SCORER_MIX } from "../../worker/core/player/genRatings.basketball.ts";
 
@@ -186,6 +194,9 @@ test.skipIf(!process.env.RUN_SG_SHARES)(
 			}
 		};
 		let g_season = () => 0;
+		const lastPos = new Map();
+		let startSeason;
+		const moves = new Map();
 		const pending = [];
 		for (let seed = 1; seed <= seeds; seed++) {
 			const origRandom = Math.random;
@@ -219,17 +230,100 @@ test.skipIf(!process.env.RUN_SG_SHARES)(
 					settings,
 					seed: 1000 + seed,
 					seasons,
-					onSeason: () => {
-						pending.push(
-							(async () => {
-								for (const p of (await idb.cache.players.indexGetAll(
-									"playersByTid",
-									[0, Infinity],
-								)) as any[]) {
-									careers.push(p.ratings.at(-1).pos);
-								}
-							})(),
+					onSeason: async () => {
+						// (lastPos, moves: position changes since last season, for players rostered both times)
+						// Rostered positions this season, and playmaking (percentile) read with vs without his stats
+						const season = g_season();
+						const list = [];
+						const drafted = [];
+						const rookies = [];
+						startSeason ??= season;
+						const play = {};
+						const statVals = [];
+						for (const p of (await idb.cache.players.indexGetAll(
+							"playersByTid",
+							[0, Infinity],
+						)) as any[]) {
+							const r = p.ratings.at(-1);
+							careers.push(r.pos);
+							list.push(r.pos);
+							if (p.draft.year >= startSeason) {
+								drafted.push(r.pos);
+							}
+							if (p.draft.year === season - 1) {
+								rookies.push(r.pos);
+							}
+							const before = lastPos.get(p.pid);
+							if (before !== undefined && before !== r.pos) {
+								const k = `${before}>${r.pos}`;
+								moves.set(k, (moves.get(k) ?? 0) + 1);
+							}
+							lastPos.set(p.pid, r.pos);
+							const st = positionStats(p.stats, season);
+							if (st && st.min >= 500) {
+								statVals.push(st.astp + 0.1 * st.usgp);
+							}
+							if (process.env.SG_DUMP) {
+								// The axes as next preseason reads them (this season's stats), for offline fits
+								const st1 = positionStats(p.stats, season + 1);
+								const raw = positionRaw(r);
+								appendFileSync(
+									process.env.SG_DUMP,
+									`${JSON.stringify({
+										seed,
+										season,
+										pid: p.pid,
+										pos: r.pos,
+										draftYear: p.draft.year,
+										r: Object.fromEntries(
+											[
+												...KEYS,
+												"hgt",
+												"ovr",
+												"bsc",
+												"pdef",
+												"idef",
+												"wsp",
+												"dreb",
+												"oreb",
+											]
+												.filter((k) => r[k] !== undefined)
+												.map((k) => [k, r[k]]),
+										),
+										raw,
+										st: st1 ?? null,
+									})}\n`,
+								);
+							}
+							const withStats = positionAxes(r, st).play;
+							const noStats = positionAxes(r).play;
+							(play[r.pos] ??= []).push([withStats, noStats]);
+						}
+						log(fmtShares(`seed ${seed} season ${season}, rostered`, list));
+						log(fmtShares(`  drafted in the league`, drafted));
+						log(fmtShares(`  rookies (first season)`, rookies));
+						const pl = POSITIONS.map((pos) => {
+							const xs = play[pos] ?? [];
+							const a =
+								xs.reduce((t, x) => t + x[0], 0) / Math.max(1, xs.length);
+							const b =
+								xs.reduce((t, x) => t + x[1], 0) / Math.max(1, xs.length);
+							return `${pos} ${a.toFixed(2)}/${b.toFixed(2)}`;
+						});
+						log(`  play with/without stats: ${pl.join("  ")}`);
+						log(
+							`  moves: ${[...moves]
+								.sort((a, b) => b[1] - a[1])
+								.slice(0, 12)
+								.map(([k, n]) => `${k} ${n}`)
+								.join("  ")}`,
 						);
+						moves.clear();
+						statVals.sort((x, y) => x - y);
+						const q = [0.1, 0.25, 0.5, 0.75, 0.9].map((f) =>
+							statVals[Math.floor(f * (statVals.length - 1))]?.toFixed(2),
+						);
+						log(`  ast%+usg%/10 (500+ min) q10/25/50/75/90: ${q.join(" ")}`);
 					},
 				});
 				await Promise.all(pending);

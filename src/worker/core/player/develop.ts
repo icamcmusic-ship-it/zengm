@@ -1,3 +1,4 @@
+import { leaguePlayStatKnots } from "./playStatKnots.ts";
 import {
 	NOT_REAL_POSITIONS,
 	PLAYER,
@@ -257,11 +258,17 @@ const develop = async (
 			} else {
 				// A developing player sticks to his current position (improved positions only); a new one gets a fresh one
 				// (his assist and usage rates and last season's ratings: the two-season comparison)
+				// (playmaking stats ranked within the league: leaguePlayStatKnots)
+				const statKnots =
+					p.stats && p.stats.length > 0
+						? await leaguePlayStatKnots(ratings.season)
+						: undefined;
 				ratings.pos = newPlayer
-					? pos(ratings, undefined, { stats: p.stats })
+					? pos(ratings, undefined, { stats: p.stats, statKnots })
 					: pos(ratings, ratings.pos, {
 							stats: p.stats,
 							previousRatings: p.ratings.at(-2) as any,
+							statKnots,
 						});
 			}
 		} else {
