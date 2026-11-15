@@ -311,7 +311,7 @@ export const NATIVE_FEATURES = [
 		key: "advStatsEvery3Days",
 		name: "Advanced Stats Every 3 Days",
 		description:
-			"Performance: in pro leagues, advanced stats (PER, WS, BPM, VORP, ...) are computed after every third game day of the regular season and playoffs instead of after every day. They are always brought up to date before anything reads them (awards and award races, the All-Star selection, trades, phase changes, the end of the regular season and of each playoff round, and pages you open), so the values are the same. Speeds up simming a season. On by default for new leagues.",
+			"Performance: in pro leagues, the full advanced stats (WS, BPM, VORP, ratings, percentages, ...) are computed after every third game day of the regular season and playoffs instead of after every day (PER and EWA still every regular season day, since player value reads PER). They are always brought up to date before anything reads them (awards and award races, the All-Star selection, phase changes, the end of the regular season and of a sim, and pages you open), so the values are the same and the league plays out the same. Speeds up simming a season. On by default for new leagues.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,

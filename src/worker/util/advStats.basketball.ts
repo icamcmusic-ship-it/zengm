@@ -750,7 +750,9 @@ const calculateRatings = (
  * @memberOf util.advStats
  * @return {Promise}
  */
-const advStats = async () => {
+// perOnly: only PER and EWA (Advanced stats every 3 days setting, on the days in between: player value reads PER after
+// every game, so it stays what the every-day computation gives)
+const advStats = async (perOnly?: boolean) => {
 	const playoffs = PHASE.PLAYOFFS === g.get("phase");
 
 	// Total player stats (not per game averages)
@@ -864,6 +866,15 @@ const advStats = async () => {
 	}
 
 	const teamsByTid = groupByUnique(teams, "tid");
+
+	if (perOnly) {
+		await advStatsSave(
+			players,
+			playersRaw,
+			calculatePER(players, teamsByTid, league),
+		);
+		return;
+	}
 
 	const updatedStats = {
 		...calculateOnOff(players, teamsByTid),

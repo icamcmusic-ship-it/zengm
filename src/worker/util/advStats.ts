@@ -8,12 +8,12 @@ import { setAdvStatsCompute, runAdvStats } from "./advStatsFlush.ts";
 
 export { advStatsAfterDay, advStatsRunCount } from "./advStatsFlush.ts";
 
-setAdvStatsCompute(() =>
+setAdvStatsCompute((perOnly) =>
 	bySport({
-		baseball: advStatsBaseball,
-		basketball: advStatsBasketball,
-		football: advStatsFootball,
-		hockey: advStatsHockey,
+		baseball: () => advStatsBaseball(),
+		basketball: () => advStatsBasketball(perOnly),
+		football: () => advStatsFootball(),
+		hockey: () => advStatsHockey(),
 	})(),
 );
 
