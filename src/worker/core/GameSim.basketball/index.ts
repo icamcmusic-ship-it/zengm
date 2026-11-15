@@ -64,6 +64,7 @@ import {
 import {
 	assignMatchups,
 	ATTENTION,
+	eliteFinisher,
 	driveMismatch,
 	MATCHUP,
 	mismatchScale,
@@ -504,6 +505,8 @@ class GameSim extends GameSimBase {
 	attentionShares: number[] = [];
 	attentionShooter: PlayerGameSim | undefined;
 	attentionShooterShare = 0;
+	// Matchup Defense, help on elite finishers: what the help takes from a team's best finishers goes to all its two-point shots
+	helpGive: [number, number] = [0, 0];
 	// Matchup Defense (League extras, see matchupDefense.ts): for each team on defense, the index of the defender guarding each offensive
 	// player (by his index on the court), assigned at each substitution, and the team's average defensive versatility. Off: nothing here is
 	// used and no extra random numbers are drawn
@@ -644,6 +647,42 @@ class GameSim extends GameSimBase {
 		this.matchupDefense = nativeFeatureEnabled("matchupDefense", (key) =>
 			g.get(key as any),
 		);
+		// Matchup Defense, defensive attention: help defense on elite finishers (diminishing returns on their two-point make composites)
+		if (this.matchupDefense) {
+			for (const [i, t] of this.team.entries()) {
+				let drop = 0;
+				for (const p of t.player) {
+					const cr = p.compositeRating;
+					const rim = cr.shootingAtRimMake ?? cr.shootingAtRim;
+					const mid = cr.shootingMidRangeMake ?? cr.shootingMidRange;
+					const post = cr.shootingLowPostMake ?? cr.shootingLowPost;
+					cr.shootingAtRimMake = eliteFinisher(rim, ATTENTION.makeKnee.atRim);
+					cr.shootingMidRangeMake = eliteFinisher(
+						mid,
+						ATTENTION.makeKnee.midRange,
+					);
+					cr.shootingLowPostMake = eliteFinisher(
+						post,
+						ATTENTION.makeKnee.lowPost,
+					);
+					cr.drawingFouls = eliteFinisher(
+						cr.drawingFouls,
+						ATTENTION.makeKnee.drawingFouls,
+					);
+					drop +=
+						rim -
+						cr.shootingAtRimMake +
+						mid -
+						cr.shootingMidRangeMake +
+						post -
+						cr.shootingLowPostMake;
+				}
+				if (t.player.length > 0) {
+					this.helpGive[i as TeamNum] =
+						(ATTENTION.helpGive * drop) / t.player.length;
+				}
+			}
+		}
 		// (loadTeams adds the creation composite only with the setting on)
 		this.spacingCreation = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.creation !== undefined),
@@ -3944,7 +3983,15 @@ class GameSim extends GameSimBase {
 			}
 			fgaLogType = g.get("threePointers") ? "fgaTp" : "fgaTpFake";
 			probMissAndFoul = 0.02;
-			probMake = shootingThreePointerScaled * 0.3 + 0.36;
+			probMake =
+				(this.matchupDefense
+					? eliteFinisher(
+							shootingThreePointerScaled,
+							ATTENTION.makeKnee.threePointer,
+						)
+					: shootingThreePointerScaled) *
+					0.3 +
+				0.36;
 			probAndOne = 0.01;
 			if (this.expandedRatings2 || this.subRatingsSim) {
 				probMake += this.jumpShotStyleDelta(
@@ -4074,6 +4121,11 @@ class GameSim extends GameSimBase {
 
 			if (this.playTypes) {
 				probMake += PLAY_TYPES.make2;
+			}
+			// Matchup Defense with Realistic Play Types (the drive-and-kick model): the help on a team's elite finishers leaves its other
+			// shots a little more open (league totals stay the same)
+			if (this.playTypes) {
+				probMake += this.helpGive[this.o];
 			}
 			probMake *= g.get("twoPointAccuracyFactor");
 		}
@@ -4876,6 +4928,11 @@ class GameSim extends GameSimBase {
 					(selfCreated && type !== "threePointer" ? PLAY_TYPES.astSelfTwo : 1)
 				: 1);
 		if (prob > Math.random()) {
+			// Realistic Play Types: the handoff or re-screen into a self-created two can come from any teammate, so it is spread more
+			// evenly than a creator's pass (the steep creation power would credit nearly all of them to the team's lead creator)
+			if (this.playTypes && selfCreated && type !== "threePointer") {
+				return this.pickPlayer("creation", this.o, PLAY_TYPES.astSelfPower, p);
+			}
 			return this.creatorPasser(p);
 		}
 		return undefined;

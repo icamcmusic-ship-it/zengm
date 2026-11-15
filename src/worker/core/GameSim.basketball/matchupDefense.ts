@@ -50,6 +50,22 @@ export const ATTENTION = {
 	// Help defense: his shots go in this much less often per unit of his share of the shooter draw (before the cap) above makeRef
 	make: 0.8,
 	makeRef: 0.32,
+	// Help defense on elite finishers (eliteFinisher, applied in the GameSim constructor and the three-point make): a make composite above
+	// its knee keeps only makeExcess of the part above it, as does the foul-drawing composite (whose square scales the shooting fouls, so a
+	// great foul drawer's misses mostly vanished from his FGA). The help rotates to the best finishers and shooters, so an elite edge has
+	// diminishing returns at the very top (like the stock scaling of three-point composites above 0.55). The knees are near the 90th
+	// percentile of rotation players; mid-range and post makes read these composites only with Game Sim Fixes on
+	makeKnee: {
+		atRim: 0.63,
+		midRange: 0.65,
+		lowPost: 0.62,
+		drawingFouls: 0.6,
+		threePointer: 0.68,
+	},
+	makeExcess: 0.25,
+	// The help leaves the others open (with Realistic Play Types on): a team's two-point makes get helpGive times the mean drop (over its players) of the sum of their
+	// three two-point make composites, so league scoring and FG% stay where they were and a team without elite finishers gets nothing
+	helpGive: 0.41,
 };
 
 export type MatchupPlayer = {
@@ -172,3 +188,7 @@ export const driveMismatch = (
 			MATCHUP.driveGap) /
 			MATCHUP.driveScale,
 	);
+
+// Defensive attention: diminishing returns on an elite two-point make composite (see ATTENTION.makeKnee)
+export const eliteFinisher = (c: number, knee: number) =>
+	c > knee ? knee + ATTENTION.makeExcess * (c - knee) : c;
