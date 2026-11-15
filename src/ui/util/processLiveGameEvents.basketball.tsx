@@ -605,6 +605,12 @@ const processLiveGameEvents = ({
 				)}${quarter}`;
 				quarters.push(boxScore.quarterShort);
 			}
+		} else if (e.type === "shootoutShot") {
+			// For the box score's shootout section
+			if (!boxScore.shootoutShots) {
+				boxScore.shootoutShots = [];
+			}
+			boxScore.shootoutShots.push([e.t, e.pid, e.made ? 1 : 0]);
 		} else if (e.type === "shootoutStart") {
 			boxScore.shootout = true;
 			boxScore.teams[0].sPts = 0;

@@ -25,6 +25,7 @@ import { applyRealTeamInfo } from "../../../common/applyRealTeamInfo.ts";
 import { formatList } from "../../../common/formatList.ts";
 import { getTeamInfoCache } from "../team/getTeamInfoCache.ts";
 import { getMetaAttribute } from "../../db/metaAttributes.ts";
+import { fanReaction } from "../../../common/franchiseStory.ts";
 
 // After the playoffs, the TeamSeason row of the current season is for a season that is already completed, so scheduled events should not change it. The TeamSeason row for the next season is created from the Team in the preseason, before scheduled events are processed.
 const isSeasonCompleted = (phase: number) => {
@@ -121,7 +122,16 @@ const processTeamInfo = async (
 		updatedRegionName = true;
 
 		logEvent({
-			text: helpers.upperCaseFirstLetter(text),
+			text: `${helpers.upperCaseFirstLetter(text)} ${fanReaction({
+				tid: t.tid,
+				season,
+				kind: "relocation",
+				from: `${old.region} ${old.name}`,
+				to: `${t.region} ${t.name}`,
+				fromRegion: old.region,
+				toRegion: t.region,
+				hype: teamSeason?.hype,
+			})}`,
 			type: "teamRelocation",
 			tids: [t.tid],
 			showNotification: false,
@@ -140,7 +150,14 @@ const processTeamInfo = async (
 		updatedRegionName = true;
 
 		logEvent({
-			text: helpers.upperCaseFirstLetter(text),
+			text: `${helpers.upperCaseFirstLetter(text)} ${fanReaction({
+				tid: t.tid,
+				season,
+				kind: "rename",
+				from: `${old.region} ${old.name}`,
+				to: `${t.region} ${t.name}`,
+				hype: teamSeason?.hype,
+			})}`,
 			type: "teamRename",
 			tids: [t.tid],
 			showNotification: false,

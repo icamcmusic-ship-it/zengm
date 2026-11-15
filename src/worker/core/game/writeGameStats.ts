@@ -266,6 +266,10 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	if (results.neutralSite) {
 		gameStats.neutralSite = true;
 	}
+	// Shootout: each shot, for the box score's shootout section
+	if (results.shootoutShots) {
+		gameStats.shootoutShots = results.shootoutShots;
+	}
 	if (results.marquee !== undefined) {
 		gameStats.marquee = results.marquee;
 	}

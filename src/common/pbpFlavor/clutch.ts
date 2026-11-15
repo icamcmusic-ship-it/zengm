@@ -46,6 +46,9 @@ export type ClutchMeta =
 			kind: "shootout";
 			player: ClutchPlayerRef;
 			opp: ClutchPlayerRef;
+			// [winner, loser] makes and attempts (missing in games played before they were recorded)
+			made?: [number, number];
+			att?: [number, number];
 	  };
 
 type Link = (p: ClutchPlayerRef) => string;
@@ -81,6 +84,7 @@ const shotPhrase = (
 				"splashes a corner three",
 				"knocks down a pull-up three",
 				"hits a deep three",
+				"rises over the contest and buries a three",
 			]);
 		case "midRange":
 			return rng.pick([
@@ -88,6 +92,7 @@ const shotPhrase = (
 				"drains a fadeaway jumper",
 				"knocks down a mid-range jumper",
 				"rises up for a jumper from the elbow",
+				"stops on a dime and drains the pull-up",
 			]);
 		case "lowPost":
 			return rng.pick([
@@ -124,7 +129,11 @@ export const clutchFlavorText = (
 	const who = link(meta.player);
 
 	if (meta.kind === "shootout") {
-		return `${who} ${rng.pick(["outduels", "beats", "outshoots"])} ${link(meta.opp)} in a shootout`;
+		const line =
+			meta.made && meta.att
+				? `, ${meta.made[0]} of ${meta.att[0]} to ${meta.made[1]} of ${meta.att[1]},`
+				: "";
+		return `${who} ${rng.pick(["outduels", "beats", "outshoots"])} ${link(meta.opp)}${line} in a shootout`;
 	}
 
 	if (meta.kind === "defense") {
@@ -198,7 +207,12 @@ export const clutchFlavorText = (
 
 	let end;
 	if (meta.kind === "winner") {
-		end = rng.pick(["to win it", "to win the game", "for the win"]);
+		end = rng.pick([
+			"to win it",
+			"to win the game",
+			"for the win",
+			"for the game-winner",
+		]);
 	} else if (meta.kind === "forceOT") {
 		const ot = meta.otLabel ? `${meta.otLabel} overtime` : "overtime";
 		end = rng.pick([`to force ${ot}`, `to send it to ${ot}`]);

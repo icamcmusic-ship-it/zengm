@@ -108,8 +108,36 @@ const Seasons = ({
 		);
 	});
 
+	// Franchise reboots: every name the franchise has played under, oldest first. Records, history and rivalries stay with it.
+	const eras: { name: string; first: number; last: number }[] = [];
+	for (const h of history.toReversed()) {
+		if (!h.name) {
+			continue;
+		}
+		const cur = eras.at(-1);
+		if (cur && cur.name === h.name) {
+			cur.last = h.season;
+		} else {
+			eras.push({ name: h.name, first: h.season, last: h.season });
+		}
+	}
+
 	return (
 		<>
+			{eras.length > 1 ? (
+				<p className="mb-2" data-testid="team-history-formerly">
+					<span className="fw-bold">Formerly: </span>
+					{eras
+						.slice(0, -1)
+						.toReversed()
+						.map(
+							(e) =>
+								`the ${e.name} (${e.first === e.last ? e.first : `${e.first}-${e.last}`})`,
+						)
+						.join(", ")}
+					. Records, banners and rivalries carry over.
+				</p>
+			) : null}
 			{historySeasons}
 			{userSeasons.length > 0 ? (
 				<p className="mt-2 text-body-secondary">

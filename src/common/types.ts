@@ -479,6 +479,8 @@ export type Game = {
 	// Marquee Games: holiday slate or national TV, and rivalry games (from the schedule)
 	marquee?: MarqueeKind;
 	rivalry?: boolean;
+	// Basketball shootout: [team index, pid, made] for each shot, in order
+	shootoutShots?: [0 | 1, number, 0 | 1][];
 	note?: string;
 	noteBool?: 1; // Keep in sync with note - for indexing
 	numGamesToWinSeries?: number;
