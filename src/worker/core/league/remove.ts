@@ -3,6 +3,7 @@ import close from "./close.ts";
 import { idb } from "../../db/index.ts";
 import { g, logEvent } from "../../util/index.ts";
 import { forgetLeague } from "../../util/wrappedPersist.ts";
+import { forgetLeague as forgetPagesLeague } from "../../util/pagePersist.ts";
 import { forgetLeagueAchievements } from "../../util/leagueAchievementsStore.ts";
 
 const remove = async (lid: number) => {
@@ -13,6 +14,7 @@ const remove = async (lid: number) => {
 	await idb.meta.delete("leagues", lid);
 	// What was kept of the league for Wrapped and Storylines
 	await forgetLeague(lid);
+	await forgetPagesLeague(lid);
 	await forgetLeagueAchievements(lid);
 	await deleteDB(`league${lid}`, {
 		blocked() {

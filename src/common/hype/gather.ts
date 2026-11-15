@@ -405,7 +405,9 @@ const listedFor = (
 	};
 };
 
-const envFor = (idx: Index, t: Target): HEnv => {
+// The league's scoring environment from the regular season games before a target, added one game at a time (in the
+// index's order, so that every prefix of the games gives exactly the numbers a full pass over it would)
+const envAcc = () => {
 	let n = 0;
 	let sum = 0;
 	let sq = 0;
@@ -420,13 +422,10 @@ const envFor = (idx: Index, t: Target): HEnv => {
 	let tvN = 0;
 	let tvS = 0;
 	let tvQ = 0;
-	for (const g of idx.sorted) {
-		if (g.playoffs || g.playIn || !isBefore(g, t)) {
-			continue;
-		}
+	const add = (g: HGame) => {
 		const all = g.teams[0].pts + g.teams[1].pts;
 		if (!all) {
-			continue;
+			return;
 		}
 		n++;
 		sum += all;
@@ -477,34 +476,93 @@ const envFor = (idx: Index, t: Target): HEnv => {
 				tvQ += tov * tov;
 			}
 		}
-	}
-	const ms = (N: number, S: number, Q: number) =>
-		N >= 20
-			? {
-					mean: S / N,
-					sd: Math.sqrt(Math.max(0, Q / N - (S / N) ** 2)),
-				}
-			: null;
-	const mean = n ? sum / n : 0;
-	const sd = n > 1 ? Math.sqrt(Math.max(0, sq / n - mean * mean)) : 0;
-	const per: Record<string, number> = {};
-	if (nLines) {
-		for (const k of LINE_STATS) {
-			per[k] = (tot[k] ?? 0) / nLines;
+	};
+	const result = (): HEnv => {
+		const ms = (N: number, S: number, Q: number) =>
+			N >= 20
+				? {
+						mean: S / N,
+						sd: Math.sqrt(Math.max(0, Q / N - (S / N) ** 2)),
+					}
+				: null;
+		const mean = n ? sum / n : 0;
+		const sd = n > 1 ? Math.sqrt(Math.max(0, sq / n - mean * mean)) : 0;
+		const per: Record<string, number> = {};
+		if (nLines) {
+			for (const k of LINE_STATS) {
+				per[k] = (tot[k] ?? 0) / nLines;
+			}
+		}
+		return {
+			n,
+			mean,
+			sd,
+			hiTeam,
+			hiTeamTp,
+			nLines,
+			per,
+			best: { ...best },
+			fgp: ms(fgN, fgS, fgQ),
+			tov: ms(tvN, tvS, tvQ),
+		};
+	};
+	return { add, result };
+};
+
+const isRegular = (g: { playoffs: boolean; playIn: boolean }) =>
+	!g.playoffs && !g.playIn;
+
+const envFor = (idx: Index, t: Target): HEnv => {
+	const acc = envAcc();
+	for (const g of idx.sorted) {
+		if (isRegular(g) && isBefore(g, t)) {
+			acc.add(g);
 		}
 	}
-	return {
-		n,
-		mean,
-		sd,
-		hiTeam,
-		hiTeamTp,
-		nLines,
-		per,
-		best,
-		fgp: ms(fgN, fgS, fgQ),
-		tov: ms(tvN, tvS, tvQ),
-	};
+	return acc.result();
+};
+
+// The environments of every finished game of an index at once. The regular season games before a finished game are a
+// prefix of the index's regular season games (they're ordered by day, and a regular season game counts the days before
+// its own, a playoff or play-in game all of them), so one pass gives the environment at the start of every day and at
+// the end. Only when every regular season game has a day; else (and for a day not in the index) null, and envFor is used.
+type EnvPrefix = { byDay: Map<number, HEnv>; all: HEnv } | null;
+const envPrefixCache = new WeakMap<Index, EnvPrefix>();
+const envPrefix = (idx: Index): EnvPrefix => {
+	if (envPrefixCache.has(idx)) {
+		return envPrefixCache.get(idx)!;
+	}
+	let out: EnvPrefix = null;
+	const regular = idx.sorted.filter(isRegular);
+	if (regular.every((g) => g.day > 0)) {
+		const acc = envAcc();
+		const byDay = new Map<number, HEnv>();
+		for (const g of regular) {
+			if (!byDay.has(g.day)) {
+				byDay.set(g.day, acc.result());
+			}
+			acc.add(g);
+		}
+		out = { byDay, all: acc.result() };
+	}
+	envPrefixCache.set(idx, out);
+	return out;
+};
+
+const envForCompleted = (idx: Index, t: Target): HEnv => {
+	const prefix = envPrefix(idx);
+	if (prefix) {
+		if (!isRegular(t)) {
+			return prefix.all;
+		}
+		if (t.day > 0) {
+			const env = prefix.byDay.get(t.day);
+			if (env) {
+				return env;
+			}
+		}
+	}
+	return envFor(idx, t);
 };
 
 // For an upcoming game every stored game counts, so the environment is the same for all of them: computed once per
@@ -512,7 +570,7 @@ const envFor = (idx: Index, t: Target): HEnv => {
 const upcomingEnvCache = new WeakMap<Index, HEnv>();
 const envForCached = (idx: Index, t: Target): HEnv => {
 	if (t.completed) {
-		return envFor(idx, t);
+		return envForCompleted(idx, t);
 	}
 	let env = upcomingEnvCache.get(idx);
 	if (!env) {
@@ -665,3 +723,9 @@ export const hasStored = (raw: HRaw, gid: number) =>
 export const storedGame = (raw: HRaw, gid: number) =>
 	indexOf(raw).byGid.get(gid);
 export const storedGames = (raw: HRaw) => indexOf(raw).sorted;
+
+// For tests: the environment of a finished game read from the per-day prefixes, and by a full pass
+export const envForTest = (raw: HRaw, t: Target) => {
+	const idx = indexOf(raw);
+	return { fast: envForCompleted(idx, t), full: envFor(idx, t) };
+};

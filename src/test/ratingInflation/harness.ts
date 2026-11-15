@@ -283,12 +283,14 @@ export const summarize = async (
 		age35p: byAge(35, 50),
 		meanAge: r2(mean(rows.map((r) => r.age))),
 		// Rostered players by age, 30 and up (40+ together)
-		ageCounts: JSON.stringify(Object.fromEntries(
-			[30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40].map((a) => [
-				a === 40 ? "40+" : String(a),
-				rows.filter((r) => (a === 40 ? r.age >= 40 : r.age === a)).length,
-			]),
-		)),
+		ageCounts: JSON.stringify(
+			Object.fromEntries(
+				[30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40].map((a) => [
+					a === 40 ? "40+" : String(a),
+					rows.filter((r) => (a === 40 ? r.age >= 40 : r.age === a)).length,
+				]),
+			),
+		),
 		// Aging (Realistic Aging): mean age of the best players, the age with the best mean ovr (ages with 10+ rostered players), and
 		// the mean age of last offseason's retirees
 		top10Age: r2(
@@ -454,7 +456,7 @@ export const runLeague = async ({
 	settings: Record<string, unknown>;
 	seed: number;
 	seasons: number;
-	onSeason?: (s: SeasonSummary) => void;
+	onSeason?: (s: SeasonSummary) => void | Promise<void>;
 }) => {
 	// The full engine reads the meta database (scheduled events), so it needs an IndexedDB. Only installed here, so that
 	// importing this file (from skipped script tests too) doesn't change the globals other tests see.
@@ -473,7 +475,7 @@ export const runLeague = async ({
 			await startAutoPlay(g.get("season"), PHASE.DRAFT_LOTTERY, {});
 			const s = await summarize(config, seed);
 			out.push(s);
-			onSeason?.(s);
+			await onSeason?.(s);
 			await startAutoPlay(target, PHASE.PRESEASON, {});
 		}
 		return out;
