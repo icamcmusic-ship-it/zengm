@@ -3,9 +3,12 @@ import { useState } from "react";
 import HideableSection from "../components/HideableSection.tsx";
 import type { HofWords } from "../../common/faceHistory.ts";
 import { helpers } from "../util/helpers.ts";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 
 export const HallOfFameSpeeches = ({ words }: { words: HofWords[] }) => {
 	const [pid, setPid] = useState<number | undefined>(undefined);
+	// League Extras "Show Player Nicknames" (the worker writes the plaque and speech without them while off)
+	const showNicknames = useFeatureOn("playerNicknames");
 	if (words.length === 0) {
 		return null;
 	}
@@ -27,7 +30,7 @@ export const HallOfFameSpeeches = ({ words }: { words: HofWords[] }) => {
 					{words.map((x) => (
 						<option key={x.pid} value={x.pid}>
 							{x.retiredYear}: {x.name}
-							{x.nickname ? ` "${x.nickname}"` : ""}
+							{x.nickname && showNicknames ? ` "${x.nickname}"` : ""}
 						</option>
 					))}
 				</select>
@@ -37,7 +40,7 @@ export const HallOfFameSpeeches = ({ words }: { words: HofWords[] }) => {
 				>
 					<h3 className="h5 mb-1">
 						<a href={helpers.leagueUrl(["player", w.pid])}>{w.name}</a>
-						{w.nickname ? (
+						{w.nickname && showNicknames ? (
 							<span className="fst-italic fw-normal"> "{w.nickname}"</span>
 						) : null}
 					</h3>

@@ -360,6 +360,7 @@ const useJerseyNumberConflictInfo = (
 const CustomizePlayer = (props: View<"customizePlayer">) => {
 	const regeneratorOn = useFeatureOn("ratingsRegenerator");
 	const faceAgingOn = useFeatureOn("faceAging");
+	const showNicknames = useFeatureOn("playerNicknames");
 	const { godMode, minContract, phase, season } = useLocal([
 		"godMode",
 		"minContract",
@@ -1131,6 +1132,9 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 									/>
 									<div className="form-text">
 										Leave blank for a generated nickname, or enter - for none.
+										{showNicknames
+											? null
+											: " Nicknames are hidden while Show Player Nicknames is off (League Settings → League Extras)."}
 									</div>
 								</div>
 							) : null}

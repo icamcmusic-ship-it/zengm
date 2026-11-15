@@ -121,6 +121,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Scouting reports](#scouting-reports)                               | player Scouting page, Scouting Department, PDF                                               | bball  | `featureScoutingReports`                                                                                                  | on / off                          |
 | [Coaching Staff Depth](#coaching-staff-depth)                       | Coaching Staff, coach pages, Staff Report, development                                       | bball  | `featureCoachingDepth`                                                                                                    | on / off                          |
 | [Extra frivolities](#extra-frivolities)                             | Frivolities                                                                                  | all    | `featureFrivolities`                                                                                                      | on / on                           |
+| [Show player nicknames](#show-player-nicknames)                     | Player page, Hall of Fame speeches and plaques (display only)                                | bball  | `showPlayerNicknames`                                                                                                     | on / on                           |
 | [Face style gallery](#face-style-gallery-and-extra-face-parts)      | Tools → Face Style Gallery                                                                   | all    | browser setting on the page (extra parts)                                                                                 | off (gallery always shown)        |
 | [Draft pick protections & swaps](#draft-pick-protections-and-swaps) | Trade, 3-team trade, Draft Picks, transactions                                               | all    | `featureDraftPickConditions`                                                                                              | on / off                          |
 
@@ -346,6 +347,13 @@ League menu → _Contract Value_: a value index, bargains and albatrosses, and t
 ### Extra frivolities
 
 Redraft, Draft Pick Value, Jersey Numbers by Team, Family Trees, League Economics and Home Court (the ones available in the sport). One switch hides the lot.
+
+### Show player nicknames
+
+- **Setting:** _Show Player Nicknames_ (`showPlayerNicknames`, League Settings → League Extras → History & Stories), on by default in new and existing leagues. Basketball only (nicknames are).
+- **Off:** no nickname is shown: not on the player page header (or the player profile export, which reads the same view), not in the Hall of Fame speech picker, speech titles, plaques, plaque text or induction speeches. The plaque names him "First Last" and the speech closes without the "Thank you for letting me be ..." line. The play-by-play, newspaper, storylines and recaps never use player nicknames (their "nickname" is the team's).
+- **Display only:** nicknames are still generated from the career (`generateNickname`) and nicknames set in Customize Player are kept, so they come back when the setting is turned on again. Customize Player keeps the nickname field, with a note while the setting is off.
+- **Code:** `careerFacts` / `hofWords` (`worker/util/hofStory.ts`) apply `nicknameForDisplay` / `factsForDisplay` (`common/hofStory.ts`); the UI also checks `useFeatureOn("playerNicknames")`. Tests: `common/hofStory.test.ts`.
 
 ### Face style gallery and extra face parts
 

@@ -1111,6 +1111,15 @@ export const NATIVE_FEATURES = [
 		default: true,
 	},
 	{
+		id: "playerNicknames",
+		key: "showPlayerNicknames",
+		name: "Show Player Nicknames",
+		description:
+			"Show players' nicknames (generated from their careers or set in Customize Player) on the player page and in Hall of Fame speeches and plaques. Off: no nickname is shown anywhere and those texts use his real name. Only hides them, so nicknames come back when you turn it on again.",
+		default: true,
+		sports: BBGM,
+	},
+	{
 		id: "timeline",
 		key: "featureTimeline",
 		name: "League Timeline",

@@ -99,6 +99,7 @@ const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	tradeGrader: "League extras: History & Stories",
 	contractValue: "League extras: History & Stories",
 	frivolities: "League extras: History & Stories",
+	playerNicknames: "League extras: History & Stories",
 	pbpFlavor: "League extras: Game Simulation",
 	pbpLiveGame: "League extras: Game Simulation",
 	pbpBoxScore: "League extras: Game Simulation",
