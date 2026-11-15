@@ -43,6 +43,8 @@ export const parseJSON = () => {
 		playerFeats: undefined,
 		players: undefined,
 		playoffSeries: undefined,
+		rivalryGames: undefined,
+		rivalrySeasons: undefined,
 		releasedPlayers: undefined,
 		savedTrades: undefined,
 		savedTradingBlock: undefined,

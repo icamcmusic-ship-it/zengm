@@ -184,6 +184,11 @@ export const HypeGameRow = ({
 					</a>
 				) : null}
 			</div>
+			{h.rivalryNote ? (
+				<div className="small fst-italic" data-testid="hype-rivalry-note">
+					{h.rivalryNote}
+				</div>
+			) : null}
 			{h.reasons.length > 0 ? (
 				<Reasons reasons={h.reasons} max={maxReasons} />
 			) : (

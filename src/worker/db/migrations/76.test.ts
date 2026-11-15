@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 test("version 76 migration adds coaches store and keeps the budget slider for existing leagues", async () => {
-	assert.strictEqual(LEAGUE_DATABASE_VERSION, 76);
+	assert.isAtLeast(LEAGUE_DATABASE_VERSION, 76);
 
 	// A version 75 league, only the stores this migration touches
 	const old = await openDB("league1", 75, {
@@ -47,7 +47,7 @@ test("version 76 migration adds coaches store and keeps the budget slider for ex
 	old.close();
 
 	const db = await connectLeague(1);
-	assert.strictEqual(db.version, 76);
+	assert.strictEqual(db.version, LEAGUE_DATABASE_VERSION);
 	assert.isTrue(db.objectStoreNames.contains("coaches"));
 
 	const tx = db.transaction(["coaches", "gameAttributes"], "readwrite");
