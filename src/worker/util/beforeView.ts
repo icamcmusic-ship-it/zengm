@@ -1,3 +1,4 @@
+import { schedulePageWarm } from "./pageWarm.ts";
 import { Cache, connectLeague, idb } from "../db/index.ts";
 import { draft, league } from "../core/index.ts";
 import {
@@ -178,6 +179,8 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 
 	local.leagueLoaded = true;
 	warmProspectArchetypes();
+	// Pages that read whole seasons of box scores, and League Achievements
+	schedulePageWarm();
 	// archfb: the user's archetype tuning (their picks in this league and, when on, in all leagues)
 	if (__SPORT === "basketball") {
 		await refitArchetypeTuning().catch((error) => console.error(error));

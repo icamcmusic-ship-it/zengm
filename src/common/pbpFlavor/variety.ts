@@ -30,7 +30,23 @@ export class VarietyMemory {
 		return this.nameRegex ? t.replace(this.nameRegex, "N") : t;
 	}
 
+	// key() of the texts seen so far: a game's lines ask for the same few hundred phrases' keys many times (each pick weighs
+	// every phrase of its list), and the name and number replacements are what wording a game costs most
+	private keys = new Map<string, string>();
+
 	key(t: string) {
+		let k = this.keys.get(t);
+		if (k === undefined) {
+			k = this.keyUncached(t);
+			if (this.keys.size >= 20000) {
+				this.keys.clear();
+			}
+			this.keys.set(t, k);
+		}
+		return k;
+	}
+
+	private keyUncached(t: string) {
 		let k = String(t);
 		if (this.nameRegex) {
 			// ("Harris' crossover" and "De La Cruz's crossover" are the same phrase)

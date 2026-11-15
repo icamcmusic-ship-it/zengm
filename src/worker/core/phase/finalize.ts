@@ -18,6 +18,7 @@ import { getGlobalSettings } from "../../util/getGlobalSettings.ts";
 import { processScheduledEvents } from "./processScheduledEvents.ts";
 import { autoPlayStopsAt, cleanupAutoPlay } from "../league/autoPlay.ts";
 import { scheduleLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
+import { schedulePageWarm } from "../../util/pageWarm.ts";
 import { unretireAtPhase } from "./unretire.ts";
 import { aiOffersAtPhase } from "../trade/aiOffers.ts";
 import { atPhase as rumorsAtPhase } from "../rumors/index.ts";
@@ -124,6 +125,8 @@ const finalize = async (
 
 	// League achievements unlocked by this phase change (waits while auto playing)
 	scheduleLeagueAchievementsCheck();
+	// Past seasons' Best Games and reduced box scores, League Achievements (waits while auto playing)
+	schedulePageWarm();
 
 	// Save a reference, since local.autoPlayUntil might be cleared during an await below, if the user stops auto play
 	const autoPlayUntil = local.autoPlayUntil;

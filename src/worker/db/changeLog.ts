@@ -7,6 +7,10 @@ import {
 	forgetPlayers,
 	forgetTeams,
 } from "../util/wrappedPersist.ts";
+import {
+	forgetLeague as forgetPagesLeague,
+	forgetSeason as forgetPagesSeason,
+} from "../util/pagePersist.ts";
 
 // A record of what has been written through the cache since a league was loaded, so that things derived from the database (like the Wrapped and Storylines snapshot) know what has to be recomputed. Every write to the cache (add, put, delete, clear) goes through note*, and loading a league (Cache.fill) resets the log. It only stores numbers: a sequence number per player, per (store, season) and per store.
 
@@ -46,6 +50,7 @@ const forgetLeagueSoon = () => {
 	const lid = gNumber("lid");
 	if (lid !== undefined) {
 		void forgetLeague(lid);
+		void forgetPagesLeague(lid);
 	}
 };
 const forgetTeamsSoon = () => {
@@ -54,6 +59,9 @@ const forgetTeamsSoon = () => {
 		void forgetTeams(lid);
 	}
 };
+
+// Game attributes no derived data reads (see noteWrite)
+const UNREAD_GAME_ATTRIBUTES = new Set(["leagueAchievements"]);
 
 const SEASON_STORES = new Set<Store>([
 	"games",
@@ -100,6 +108,11 @@ export const changeLog = {
 
 	noteWrite(store: Store, row: any) {
 		seq += 1;
+		// What League Achievements remembers (leagueAchievementsStore.ts) is kept in the game attributes but nothing derived
+		// reads it, and noting it would rebuild the snapshot that League Achievements itself reads after every check
+		if (store === "gameAttributes" && UNREAD_GAME_ATTRIBUTES.has(row?.key)) {
+			return;
+		}
 		storeSeq.set(store, seq);
 		if (store === "players") {
 			playerSeq.set(row.pid, seq);
@@ -118,6 +131,7 @@ export const changeLog = {
 				) {
 					if (store === "games") {
 						void forgetGames(lid, row.season);
+						void forgetPagesSeason(lid, row.season);
 					} else if (store === "teamSeasons" || store === "teamStats") {
 						void forgetTeams(lid, row.season);
 					}

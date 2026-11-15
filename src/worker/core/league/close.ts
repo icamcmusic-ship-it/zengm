@@ -1,3 +1,4 @@
+import { cancelPageWarm } from "../../util/pageWarm.ts";
 import { idb } from "../../db/index.ts";
 import { g, local, lock, updateStatus } from "../../util/index.ts";
 import { cleanupAutoPlay } from "../league/autoPlay.ts";
@@ -8,6 +9,7 @@ const close = async (disconnect?: boolean) => {
 	const gameSim = lock.get("gameSim");
 	cleanupAutoPlay();
 	cancelLeagueAchievementsCheck();
+	cancelPageWarm();
 	await lock.set("stopGameSim", true);
 	await lock.set("gameSim", false);
 
