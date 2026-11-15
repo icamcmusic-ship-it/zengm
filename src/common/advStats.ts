@@ -90,9 +90,12 @@ export const ADV = {
 	clTmFga: NUM_PT * PT_FIELDS + 41,
 	clTmFta: NUM_PT * PT_FIELDS + 42,
 	clTmTov: NUM_PT * PT_FIELDS + 43,
+	// Opponents' expected rim attempts while he was on the floor: each opposing player's rim attempts per possession against the
+	// rest of his team's lineups (in that game) times the possessions they shared with him, so rimDeter compares like with like
+	oppRimExp: NUM_PT * PT_FIELDS + 44,
 } as const;
 
-export const ADV_LEN = NUM_PT * PT_FIELDS + 44;
+export const ADV_LEN = NUM_PT * PT_FIELDS + 45;
 
 export const ptIndex = (pt: number, field: number) => pt * PT_FIELDS + field;
 
@@ -336,9 +339,16 @@ Object.assign(ADV_STAT_FUNCTIONS, {
 	rimDfgp: (adv) => pct(at(adv, ADV.rimDfgm), at(adv, ADV.rimDfga)),
 	con2: (adv) => at(adv, ADV.con2),
 	con3: (adv) => at(adv, ADV.con3),
-	// Opponents' rim attempts per 100 of their possessions, with him on the floor minus with him off (negative: he deters drives)
+	// Opponents' rim attempts per 100 of their possessions with him on the floor, minus what those same opponents attempted against the
+	// rest of his team (negative: he deters drives). Plain on minus off (older records) mostly measured who he played against: starters
+	// face starters, who attack the rim more
 	rimDeter: (adv) =>
-		sub(
+		adv.length > ADV.oppRimExp
+			? per100(
+					at(adv, ADV.oppRimOn) - at(adv, ADV.oppRimExp),
+					at(adv, ADV.possAgainst),
+				)
+			: sub(
 			per100(at(adv, ADV.oppRimOn), at(adv, ADV.possAgainst)),
 			per100(
 				at(adv, ADV.tmOppRim) - at(adv, ADV.oppRimOn),
@@ -633,7 +643,7 @@ export const ADV_STAT_META: Record<
 		},
 		rimDeter: {
 			title: "Deter",
-			desc: "Shots deterred: opponents' rim attempts per 100 possessions with him on the floor minus off (negative is better)",
+			desc: "Shots deterred: opponents' rim attempts per 100 possessions with him on the floor minus what the same opponents attempted against his teammates (negative is better)",
 			format: "pm",
 		},
 		onOrtg: {

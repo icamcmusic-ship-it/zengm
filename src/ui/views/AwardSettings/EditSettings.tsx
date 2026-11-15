@@ -593,7 +593,7 @@ export const EditSettings = ({
 					})}
 				</>
 			) : null}
-			<div className="mt-2 d-flex gap-3">
+			<div className="mt-2 d-flex flex-wrap gap-3">
 				<div>
 					<label className="mb-1" htmlFor={groupId}>
 						Grouping

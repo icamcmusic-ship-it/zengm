@@ -236,6 +236,23 @@ type Current = {
 	threePointer: boolean;
 };
 
+const RIM_EXP_SHRINK = 10;
+
+const addPair = (
+	pairs: Map<AdvPlayer, Map<AdvPlayer, number>>,
+	p: AdvPlayer,
+	qs: readonly AdvPlayer[],
+) => {
+	let m = pairs.get(p);
+	if (!m) {
+		m = new Map();
+		pairs.set(p, m);
+	}
+	for (const q of qs) {
+		m.set(q, (m.get(q) ?? 0) + 1);
+	}
+};
+
 export class AdvTracker {
 	gid: number;
 	teams: [AdvTeam, AdvTeam];
@@ -267,6 +284,11 @@ export class AdvTracker {
 		[0, 0, 0, 0, 0, 0, 0],
 	];
 	oppRim: [number, number] = [0, 0];
+	// For oppRimExp: each offensive player's possessions and rim attempts, in total and shared with each defender
+	offPoss = new Map<AdvPlayer, number>();
+	offRim = new Map<AdvPlayer, number>();
+	pairPoss = new Map<AdvPlayer, Map<AdvPlayer, number>>();
+	pairRim = new Map<AdvPlayer, Map<AdvPlayer, number>>();
 	ptsFor: [number, number] = [0, 0];
 	ptsAgainst: [number, number] = [0, 0];
 	lineups: [Map<number, number[]>, Map<number, number[]>] = [
@@ -413,6 +435,12 @@ export class AdvTracker {
 		}
 		rowO[this.numPlayers + LU.possFor]! += 1;
 		rowD[this.numPlayers + LU.possAgainst]! += 1;
+		for (const q of onCourt[o]) {
+			this.offPoss.set(q, (this.offPoss.get(q) ?? 0) + 1);
+		}
+		for (const p of onCourt[d]) {
+			addPair(this.pairPoss, p, onCourt[o]);
+		}
 	}
 
 	possessionEnd() {
@@ -543,6 +571,10 @@ export class AdvTracker {
 		}
 		if (isRim(cur.type)) {
 			this.oppRim[d] += 1;
+			this.offRim.set(cur.p, (this.offRim.get(cur.p) ?? 0) + 1);
+			for (const p of onCourtD) {
+				addPair(this.pairRim, p, [cur.p]);
+			}
 			let protector: AdvPlayer | undefined;
 			let best = -Infinity;
 			for (const p of onCourtD) {
@@ -663,6 +695,27 @@ export class AdvTracker {
 		}
 	}
 
+	// Rim attempts the opponents he shared the floor with would have taken in those possessions, at their rate against the rest of his
+	// team (shrunk toward their whole-game rate when they barely faced his teammates)
+	oppRimExp(p: AdvPlayer) {
+		const poss = this.pairPoss.get(p);
+		if (!poss) {
+			return 0;
+		}
+		const rim = this.pairRim.get(p);
+		let exp = 0;
+		for (const [q, shared] of poss) {
+			const qPoss = this.offPoss.get(q) ?? 0;
+			const qRim = this.offRim.get(q) ?? 0;
+			const sharedRim = rim?.get(q) ?? 0;
+			const rate =
+				(qRim - sharedRim + RIM_EXP_SHRINK * (qRim / qPoss)) /
+				(qPoss - shared + RIM_EXP_SHRINK);
+			exp += rate * shared;
+		}
+		return Math.round(exp * 100) / 100;
+	}
+
 	// End of the game: the players' and teams' records, on the objects the sim returns (players who didn't play get none)
 	finish() {
 		// Close the stints of the players on the court
@@ -694,6 +747,7 @@ export class AdvTracker {
 				a[ADV.tmPtsFor] = ptsFor;
 				a[ADV.tmPtsAgainst] = ptsAgainst;
 				a[ADV.tmOppRim] = this.oppRim[t];
+				a[ADV.oppRimExp] = this.oppRimExp(p);
 				a[ADV.clSec] = Math.round(a[ADV.clSec]!);
 				a[ADV.clGp] = a[ADV.clSec]! > 0 ? 1 : 0;
 			}

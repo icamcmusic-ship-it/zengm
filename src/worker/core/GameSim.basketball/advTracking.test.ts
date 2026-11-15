@@ -172,6 +172,15 @@ const checkTotals = (results: any[]) => {
 				sum(players.map((p: any) => p.stat.pm)),
 			);
 			assert.strictEqual(advs[0]![ADV.tmPtsFor], t.stat.pts);
+			// Clutch plus/minus: the five on the floor share the team's clutch margin (points only while the state is clutch)
+			assert.strictEqual(
+				sum(advs.map((a: number[]) => a[ADV.clPm]!)),
+				n * (ta.t[TEAM_ADV.clPtsFor]! - ta.t[TEAM_ADV.clPtsAgainst]!),
+			);
+			// Expected opponents' rim attempts: the five on the floor share the opponents' rim attempts, so the expectations add up
+			// to about five times the opponents' total
+			const rimExp = sum(advs.map((a: number[]) => a[ADV.oppRimExp]!));
+			assert.isAtMost(Math.abs(rimExp - n * opp.stat.fgaAtRim), 0.25 * n * opp.stat.fgaAtRim + 5);
 			// About 100 possessions each, the same number for both teams within a couple
 			assert.isAbove(ta.t[TEAM_ADV.possFor]!, 75);
 			assert.isBelow(ta.t[TEAM_ADV.possFor]!, 135);
