@@ -260,7 +260,7 @@ const develop = async (
 				// (his assist and usage rates and last season's ratings: the two-season comparison)
 				// (playmaking stats ranked within the league: leaguePlayStatKnots)
 				const statKnots =
-					p.stats && p.stats.length > 0
+					Array.isArray(p.stats) && p.stats.length > 0
 						? await leaguePlayStatKnots(ratings.season)
 						: undefined;
 				ratings.pos = newPlayer
