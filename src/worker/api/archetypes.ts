@@ -49,12 +49,16 @@ import { hasExpandedRatings } from "../../common/expandedRatings.ts";
 import {
 	MIN_PICKS_GLOBAL,
 	describeTuning,
+	TUNING_FILE_KIND,
 	fromPickFile,
+	fromTuningFile,
 	mergePicks,
 	snapshotRows,
 	toPickFile,
+	toTuningFile,
 	type FeedbackPick,
 	type PickFile,
+	type TuningFile,
 } from "../../common/archetypes/tuning.ts";
 import { traitsEnabled } from "../core/player/traits.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
@@ -496,19 +500,68 @@ export const setCrossLeague = async ({ enabled }: { enabled: boolean }) => {
 export const tuningExport = async (): Promise<PickFile> =>
 	toPickFile(await tuningPicks(), Date.now());
 
-export const tuningImport = async ({ file }: { file: unknown }) => {
-	const picks = fromPickFile(file);
+// archuser2k: "Archetype tuning only": the picks (this league's and the browser-wide ones), the per-player overrides,
+// the fitted tuning, the reading version and the tuning's hash, and with `snapshots` the reading inputs of every pick
+export const tuningExportOnly = async ({
+	snapshots = true,
+}: { snapshots?: boolean } = {}): Promise<TuningFile> => {
 	const lf = leagueFeedback();
-	await saveLeagueFeedback({
-		picks: mergePicks(lf.picks, picks),
+	const glob = await getGlobalFeedback();
+	const tuning = await refitArchetypeTuning();
+	const lid = g.get("lid");
+	let name: string | undefined;
+	try {
+		name = idb.meta ? (await idb.meta.get("leagues", lid))?.name : undefined;
+	} catch {}
+	return toTuningFile({
+		leaguePicks: lf.picks,
+		globalPicks: glob.picks,
 		overrides: lf.overrides,
+		tuning,
+		readingVersion: ARCHETYPE_READING_VERSION,
+		now: Date.now(),
+		snapshots,
+		lid,
+		leagueName: name,
+	});
+};
+
+// Import a pick file or a tuning file. A tuning file's league picks join this league's and its browser-wide picks the
+// browser-wide store (when that is on); its per-player overrides only apply to the league it was exported from (they are
+// per player id), unless `overrides` says otherwise
+export const tuningImport = async ({
+	file,
+	overrides: applyOverrides,
+}: {
+	file: unknown;
+	overrides?: boolean;
+}) => {
+	const isTuning = (file as any)?.kind === TUNING_FILE_KIND;
+	const t = isTuning ? fromTuningFile(file) : undefined;
+	const leaguePicks = t ? t.leaguePicks : fromPickFile(file);
+	const globalPicks = t ? t.globalPicks : leaguePicks;
+	const lf = leagueFeedback();
+	const useOverrides =
+		t !== undefined && (applyOverrides ?? t.lid === g.get("lid"));
+	await saveLeagueFeedback({
+		picks: mergePicks(lf.picks, leaguePicks),
+		overrides: useOverrides
+			? { ...lf.overrides, ...t.overrides }
+			: lf.overrides,
 	});
 	const glob = await getGlobalFeedback();
 	if (glob.enabled) {
-		await saveGlobalFeedback({ ...glob, picks: mergePicks(glob.picks, picks) });
+		await saveGlobalFeedback({
+			...glob,
+			picks: mergePicks(glob.picks, globalPicks),
+		});
 	}
 	await refitArchetypeTuning();
-	return { ok: true, n: picks.length };
+	return {
+		ok: true,
+		n: mergePicks(globalPicks, leaguePicks).length,
+		overrides: useOverrides ? Object.keys(t.overrides).length : 0,
+	};
 };
 
 export default {
@@ -521,5 +574,6 @@ export default {
 	tuningReset,
 	setCrossLeague,
 	tuningExport,
+	tuningExportOnly,
 	tuningImport,
 };

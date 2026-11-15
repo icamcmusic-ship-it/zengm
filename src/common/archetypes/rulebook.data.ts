@@ -43,14 +43,15 @@ export const RULES: Record<string, Bar> = {
 	},
 	lockdown: {
 		words:
-			"Lockdown, Lock, Clamp, Guard Dog, Defender, 3 & D, Switch-Defending",
+			"Lockdown, Lock, Clamp, Guard Dog, Defender, 3 & D, Switch-Defending, Tenacious, Warden",
 		classes: ["perD"],
 		lead: 0.2,
 		support: 0.3,
 		sub: { pdf: 0.25 },
 	},
 	steal: {
-		words: "Ball-Hawking, Ball Snatcher, Thief, Pickpocket, Disruptive, Chaos",
+		words:
+			"Ball-Hawking, Ball Snatcher, Thief, Pickpocket, Disruptive, Chaos, Pesky, Pest, Bandit",
 		classes: ["perD"],
 		lead: 0.2,
 		support: 0.3,
@@ -58,14 +59,14 @@ export const RULES: Record<string, Bar> = {
 	},
 	rimD: {
 		words:
-			"Rim Protector, Shot-Erasing, Eraser, Obliterator, Swats, Backline, Anchor, Guardian, Rim Reaper, Paint Hawk",
+			"Rim Protector, Shot-Erasing, Eraser, Apex-Erasing, Obliterator, Swats, Backline, Anchor, Guardian, Rim Reaper, Paint Hawk, Paint Defender, Paint Protector, Paint-Protecting, Terror, Shot-Axing, Fortress, Pillar",
 		classes: ["rimD"],
 		lead: 0.2,
 		support: 0.3,
 		sub: { blk: 0.52 },
 	},
 	oreb: {
-		words: "Crasher, Putback, Board-Hunting",
+		words: "Crasher, Putback, Board-Hunting, Tip-In, Possession Extender",
 		classes: ["reb"],
 		lead: 0.25,
 		support: 0.3,
@@ -73,13 +74,13 @@ export const RULES: Record<string, Bar> = {
 		pt: { pb: 0.25 },
 	},
 	reb: {
-		words: "Glass, Board, Cleaner, Rebounder, Floor-Sweeping",
+		words: "Glass, Board, Cleaner, Rebounder, Floor-Sweeping, Floor Sweeper",
 		classes: ["reb"],
 		lead: 0.25,
 		support: 0.3,
 	},
 	outlet: {
-		words: "Break Starter",
+		words: "Break Starter, Break Leader",
 		classes: ["pass"],
 		lead: 0.3,
 		support: 0.4,
@@ -98,14 +99,14 @@ export const RULES: Record<string, Bar> = {
 	},
 	catchShoot: {
 		words:
-			"Sharpshooter, Stretch, Pick & Pop, Popper, 3 & D, Catch & Shoot, Off-Screen, Big Range, Automatic, Laser, Silk",
+			"Sharpshooter, Stretch, Pick & Pop, Popper, 3 & D, Catch & Shoot, Off-Screen, Big Range, Automatic, Laser, Silk, Splash",
 		classes: ["shoot"],
 		lead: 0.25,
 		support: 0.3,
 		pt: { spot: 0, offs: 0 },
 	},
 	shotHunt: {
-		words: "3PT, Sniper, Shot Hunter, Gunner, Logo, Cash Out",
+		words: "3PT, Sniper, Shot Hunter, Gunner, Logo, Cash Out, Bomber",
 		classes: ["shoot"],
 		lead: 0.15,
 		support: 0.25,
@@ -124,13 +125,14 @@ export const RULES: Record<string, Bar> = {
 		support: 0.4,
 	},
 	mid: {
-		words: "Mid-Range, Middy, Mid-Slash, Maestro, Menace, Smooth, Faceup",
+		words:
+			"Mid-Range, Middy, Mid-Slash, Maestro, Menace, Smooth, Faceup, Hash-Sinking",
 		classes: ["mid"],
 		lead: 0.25,
 		support: 0.4,
 	},
 	post: {
-		words: "Post, Footwork (Bully: see strength)",
+		words: "Post, Footwork (Bully: see strength; not High-Post)",
 		classes: ["post"],
 		lead: 0.25,
 		support: 0.4,
@@ -138,32 +140,33 @@ export const RULES: Record<string, Bar> = {
 		pt: { post: 0 },
 	},
 	paint: {
-		words: "Paint (Paint Finisher, Paint Beast)",
+		words: "Paint (Paint Finisher, Paint Beast; not Paint Defender)",
 		classes: ["finish"],
 		lead: 0.3,
 		support: 0.4,
 	},
 	slash: {
-		words: "Slasher, Slashing, Blow-By, Drive & Rise",
+		words: "Slasher, Slashing, Blow-By, Drive & Rise, Downhill",
 		classes: ["finish"],
 		lead: 0.25,
 		support: 0.4,
 	},
 	finish: {
-		words: "Finisher, Layup, Laymaker",
+		words: "Finisher, Layup, Laymaker, Levitator",
 		classes: ["finish"],
 		lead: 0.25,
 		support: 0.4,
 	},
 	dunk: {
-		words: "Dunker, Rim Rocker, Rim Wrecker, Poster, Masher",
+		words: "Dunker, Rim Rocker, Rim Wrecker, Poster, Masher, Slammer, Flusher",
 		classes: ["finish"],
 		lead: 0.25,
 		support: 0.4,
 		sub: { mxv: 0 },
 	},
 	air: {
-		words: "High-Flying, Aerial, Glide, Athletic, Explosive, Force of Nature",
+		words:
+			"High-Flying, Aerial, Glide, Athletic, Athlete, Explosive, Force of Nature, Bouncy, Apex",
 		classes: ["ath"],
 		lead: 0.25,
 		support: 0.3,
@@ -197,14 +200,15 @@ export const RULES: Record<string, Bar> = {
 		support: 0.4,
 	},
 	creator: {
-		words: "Shot Creator, Iso, Ankle-Breaker, Shifty, Shot Hunter",
+		words:
+			"Shot Creator, Iso, Ankle-Breaker, Shifty, Shot Hunter, Dribble Tech, Off-the-Bounce",
 		classes: ["handle"],
 		lead: 0.25,
 		support: 0.4,
 	},
 	pass: {
 		words:
-			"Playmaker, Dimer, Diming, Dot, Table Setter, Distributor, Point Forward/Four/Center, Visionary, Engine",
+			"Playmaker, Dimer, Diming, Dot, Table Setter, Distributor, Point Forward/Four/Center, Visionary, Engine, Facilitating, General, Dish",
 		classes: ["pass"],
 		lead: 0.25,
 		support: 0.4,
@@ -224,17 +228,88 @@ export const RULES: Record<string, Bar> = {
 		support: 1,
 	},
 	strength: {
-		words: "Bully, Physical, Power, Bodyguard, Grinder, Tank, Masher, Pound",
+		words:
+			"Bully, Physical, Power, Bodyguard, Grinder, Tank, Masher, Pound, Bruiser, Bruising, Punishing, Punisher",
 		classes: ["stre"],
 		lead: 0.3,
 		support: 0.4,
 	},
 	skill: {
 		words:
-			"Crafty, Skilled, Fluid, Phenom, Prodigy, Savant, Versatile, King (style words: promise nothing measurable)",
+			"Crafty, Skilled, Fluid, Phenom, Prodigy, Savant, Versatile, King, Finesse, Dynamic (style words: promise nothing measurable)",
 		classes: [],
 		lead: 1,
 		support: 1,
+	},
+	// archuser2k: the new words of the user's 2K archetypes (user2k.data.ts). Bars as for the nearest existing word; the
+	// sub-rating and play-type leans are the ones the user's own players with the word show (twoK/user2k.script.test.ts lift)
+	burner: {
+		words: "Burner, Open-Lane (speed in the open floor)",
+		classes: ["ath"],
+		lead: 0.3,
+		support: 0.4,
+		pt: { tr: 0 },
+	},
+	hammer: {
+		words: "Hammer (finishes above the rim with force)",
+		classes: ["finish", "ath"],
+		lead: 0.25,
+		support: 0.4,
+		sub: { mxv: 0 },
+	},
+	cutter: {
+		words: "Cutter, Off-Ball (moves without the ball and finishes)",
+		classes: ["ath"],
+		lead: 0.3,
+		support: 0.4,
+		pt: { cut: 0 },
+	},
+	scoop: {
+		words: "Scooper, Scooping (crafty layups)",
+		classes: ["finish"],
+		lead: 0.25,
+		support: 0.4,
+		sub: { cls: 0 },
+	},
+	pullUp: {
+		words: "Pull-Up (the jumper off the dribble)",
+		classes: ["mid"],
+		lead: 0.25,
+		support: 0.4,
+		sub: { crt: 0 },
+	},
+	chaser: {
+		words: "Chaser, Bucket Chaser (hunts his shot at every level)",
+		classes: ["mid", "shoot"],
+		lead: 0.3,
+		support: 0.4,
+	},
+	grabGo: {
+		words: "Grab & Go (rebounds and pushes)",
+		classes: ["reb"],
+		lead: 0.25,
+		support: 0.3,
+	},
+	pressure: {
+		words: "Pressure Cooker (pressures the ball)",
+		classes: ["perD"],
+		lead: 0.2,
+		support: 0.3,
+		sub: { pdf: 0.25 },
+	},
+	highLow: {
+		words: "High-Low Threat (scores and passes from the high and low post)",
+		classes: ["post"],
+		lead: 0.3,
+		support: 0.4,
+		sub: { pst: 0 },
+	},
+	wizard: {
+		words: "Wizard (creates for others with the ball)",
+		classes: ["pass", "handle"],
+		lead: 0.3,
+		support: 0.4,
+		sub: { vis: 0 },
 	},
 };
 
@@ -252,7 +327,7 @@ export const WORD_RULES = {
 	// "High-Flying / Aerial / Force of Nature / Explosive / Athletic / Glide": athleticism top 25% and a max-vertical lean
 	// (score.ts absoluteParts air checks the leaping itself)
 	air: {
-		re: /High[ -]Fly|Aerial|Force of Nature|Explosive|Athletic|Glide/,
+		re: /High[ -]Fly|Aerial|Force of Nature|Explosive|Athletic|Athlete|Glide|Bouncy|Apex/,
 		cls: "ath",
 		bar: 0.25,
 		sub: { mxv: 0.25 } as Partial<Record<SubFeat, number>>,

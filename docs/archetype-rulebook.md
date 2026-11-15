@@ -38,41 +38,64 @@ word's bar is **support**. "none" means no bar beyond the promise floor.
 | Words | Concept | Promises (classes) | Lead bar | Support bar | Sub-ratings (z, all) | Play types (z, any) |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2-Way, Two Way, Both Ends | `twoWay` | [def] | top 30% | top 40% | - | - |
-| Lockdown, Lock, Clamp, Guard Dog, Defender, 3 & D, Switch-Defending | `lockdown` | [perD] | top 20% | top 30% | pdf: 0.25 | - |
-| Ball-Hawking, Ball Snatcher, Thief, Pickpocket, Disruptive, Chaos | `steal` | [perD] | top 20% | top 30% | stl: 0.52 | - |
-| Rim Protector, Shot-Erasing, Eraser, Obliterator, Swats, Backline, Anchor, Guardian, Rim Reaper, Paint Hawk | `rimD` | [rimD] | top 20% | top 30% | blk: 0.52 | - |
-| Crasher, Putback, Board-Hunting | `oreb` | [reb] | top 25% | top 30% | orb: 0.25 | any of pb: 0.25 |
-| Glass, Board, Cleaner, Rebounder, Floor-Sweeping | `reb` | [reb] | top 25% | top 30% | - | - |
-| Break Starter | `outlet` | [pass] | top 30% | top 40% | - | - |
+| Lockdown, Lock, Clamp, Guard Dog, Defender, 3 & D, Switch-Defending, Tenacious, Warden | `lockdown` | [perD] | top 20% | top 30% | pdf: 0.25 | - |
+| Ball-Hawking, Ball Snatcher, Thief, Pickpocket, Disruptive, Chaos, Pesky, Pest, Bandit | `steal` | [perD] | top 20% | top 30% | stl: 0.52 | - |
+| Rim Protector, Shot-Erasing, Eraser, Apex-Erasing, Obliterator, Swats, Backline, Anchor, Guardian, Rim Reaper, Paint Hawk, Paint Defender, Paint Protector, Paint-Protecting, Terror, Shot-Axing, Fortress, Pillar | `rimD` | [rimD] | top 20% | top 30% | blk: 0.52 | - |
+| Crasher, Putback, Board-Hunting, Tip-In, Possession Extender | `oreb` | [reb] | top 25% | top 30% | orb: 0.25 | any of pb: 0.25 |
+| Glass, Board, Cleaner, Rebounder, Floor-Sweeping, Floor Sweeper | `reb` | [reb] | top 25% | top 30% | - | - |
+| Break Starter, Break Leader | `outlet` | [pass] | top 30% | top 40% | - | - |
 | 3-Level, Versatile Scorer (with Scorer) | `threeLevel` | [shoot, mid] | top 30% | top 40% | - | - |
 | Inside-Out | `insideOut` | [shoot, finish] | top 30% | top 40% | - | - |
-| Sharpshooter, Stretch, Pick & Pop, Popper, 3 & D, Catch & Shoot, Off-Screen, Big Range, Automatic, Laser, Silk | `catchShoot` | [shoot] | top 25% | top 30% | - | any of spot: 0, offs: 0 |
-| 3PT, Sniper, Shot Hunter, Gunner, Logo, Cash Out | `shotHunt` | [shoot] | top 15% | top 25% | rng: 0.25 | - |
+| Sharpshooter, Stretch, Pick & Pop, Popper, 3 & D, Catch & Shoot, Off-Screen, Big Range, Automatic, Laser, Silk, Splash | `catchShoot` | [shoot] | top 25% | top 30% | - | any of spot: 0, offs: 0 |
+| 3PT, Sniper, Shot Hunter, Gunner, Logo, Cash Out, Bomber | `shotHunt` | [shoot] | top 15% | top 25% | rng: 0.25 | - |
 | Mid-Paint | `midPaint` | [mid] | top 30% | top 40% | - | - |
 | Mid-Post | `midPost` | [mid, post] | top 30% | top 40% | - | - |
-| Mid-Range, Middy, Mid-Slash, Maestro, Menace, Smooth, Faceup | `mid` | [mid] | top 25% | top 40% | - | - |
-| Post, Footwork (Bully: see strength) | `post` | [post] | top 25% | top 40% | pst: 0.25 | any of post: 0 |
-| Paint (Paint Finisher, Paint Beast) | `paint` | [finish] | top 30% | top 40% | - | - |
-| Slasher, Slashing, Blow-By, Drive & Rise | `slash` | [finish] | top 25% | top 40% | - | - |
-| Finisher, Layup, Laymaker | `finish` | [finish] | top 25% | top 40% | - | - |
-| Dunker, Rim Rocker, Rim Wrecker, Poster, Masher | `dunk` | [finish] | top 25% | top 40% | mxv: 0 | - |
-| High-Flying, Aerial, Glide, Athletic, Explosive, Force of Nature | `air` | [ath] | top 25% | top 30% | mxv: 0.25 | - |
+| Mid-Range, Middy, Mid-Slash, Maestro, Menace, Smooth, Faceup, Hash-Sinking | `mid` | [mid] | top 25% | top 40% | - | - |
+| Post, Footwork (Bully: see strength; not High-Post) | `post` | [post] | top 25% | top 40% | pst: 0.25 | any of post: 0 |
+| Paint (Paint Finisher, Paint Beast; not Paint Defender) | `paint` | [finish] | top 30% | top 40% | - | - |
+| Slasher, Slashing, Blow-By, Drive & Rise, Downhill | `slash` | [finish] | top 25% | top 40% | - | - |
+| Finisher, Layup, Laymaker, Levitator | `finish` | [finish] | top 25% | top 40% | - | - |
+| Dunker, Rim Rocker, Rim Wrecker, Poster, Masher, Slammer, Flusher | `dunk` | [finish] | top 25% | top 40% | mxv: 0 | - |
+| High-Flying, Aerial, Glide, Athletic, Athlete, Explosive, Force of Nature, Bouncy, Apex | `air` | [ath] | top 25% | top 30% | mxv: 0.25 | - |
 | Lob Threat, Lob City | `lob` | [finish] | top 25% | top 30% | mxv: 0.25 | any of prr: 0.25, cut: 0.25 |
 | Riser, Rising (a style word: promises nothing measurable) | `riser` | [] | none | none | - | - |
 | Rim Runner, Wing Runner, Pick-Diving, Speedy | `run` | [ath] | top 30% | top 40% | - | any of tr: 0, prr: 0 |
 | Tempo, Pilot | `tempo` | [handle] | top 30% | top 40% | - | - |
-| Shot Creator, Iso, Ankle-Breaker, Shifty, Shot Hunter | `creator` | [handle] | top 25% | top 40% | - | - |
-| Playmaker, Dimer, Diming, Dot, Table Setter, Distributor, Point Forward/Four/Center, Visionary, Engine | `pass` | [pass] | top 25% | top 40% | vis: 0 | any of prb: 0 |
+| Shot Creator, Iso, Ankle-Breaker, Shifty, Shot Hunter, Dribble Tech, Off-the-Bounce | `creator` | [handle] | top 25% | top 40% | - | - |
+| Playmaker, Dimer, Diming, Dot, Table Setter, Distributor, Point Forward/Four/Center, Visionary, Engine, Facilitating, General, Dish | `pass` | [pass] | top 25% | top 40% | vis: 0 | any of prb: 0 |
 | Triple-Double | `tripleDouble` | [reb] | top 30% | top 40% | - | - |
 | Scorer, Bucket, Engine (needs a way to score; never the head) | `scorer` | [score] | none | none | - | - |
-| Bully, Physical, Power, Bodyguard, Grinder, Tank, Masher, Pound | `strength` | [stre] | top 30% | top 40% | - | - |
-| Crafty, Skilled, Fluid, Phenom, Prodigy, Savant, Versatile, King (style words: promise nothing measurable) | `skill` | [] | none | none | - | - |
+| Bully, Physical, Power, Bodyguard, Grinder, Tank, Masher, Pound, Bruiser, Bruising, Punishing, Punisher | `strength` | [stre] | top 30% | top 40% | - | - |
+| Crafty, Skilled, Fluid, Phenom, Prodigy, Savant, Versatile, King, Finesse, Dynamic (style words: promise nothing measurable) | `skill` | [] | none | none | - | - |
+| Burner, Open-Lane (speed in the open floor) | `burner` | [ath] | top 30% | top 40% | - | any of tr: 0 |
+| Hammer (finishes above the rim with force) | `hammer` | [finish, ath] | top 25% | top 40% | mxv: 0 | - |
+| Cutter, Off-Ball (moves without the ball and finishes) | `cutter` | [ath] | top 30% | top 40% | - | any of cut: 0 |
+| Scooper, Scooping (crafty layups) | `scoop` | [finish] | top 25% | top 40% | cls: 0 | - |
+| Pull-Up (the jumper off the dribble) | `pullUp` | [mid] | top 25% | top 40% | crt: 0 | - |
+| Chaser, Bucket Chaser (hunts his shot at every level) | `chaser` | [mid, shoot] | top 30% | top 40% | - | - |
+| Grab & Go (rebounds and pushes) | `grabGo` | [reb] | top 25% | top 30% | - | - |
+| Pressure Cooker (pressures the ball) | `pressure` | [perD] | top 20% | top 30% | pdf: 0.25 | - |
+| High-Low Threat (scores and passes from the high and low post) | `highLow` | [post] | top 30% | top 40% | pst: 0 | - |
+| Wizard (creates for others with the ball) | `wizard` | [pass, handle] | top 30% | top 40% | vis: 0 | - |
+
+**archuser2k words** (the user's own NBA 2K archetypes, `user2k.data.ts`): synonyms of an existing word joined its concept
+(Pesky / Pest / Bandit: steals; Tip-In / Possession Extender: the offensive glass; Bouncy / Athlete / Apex: above the rim;
+Bruiser / Bruising / Punishing / Punisher: strength; Facilitating / General / Dish: passing; Hash-Sinking: the mid-range;
+Bomber: threes; Tenacious / Warden: the perimeter; Paint Defender / Paint Protector / Paint-Protecting / Terror / Shot-Axing /
+Fortress / Pillar: the rim (and no longer the Paint or Defender words); Break Leader: outlets; Splash: spacing; Downhill:
+slashing; Levitator: finishing; Slammer / Flusher: dunks; Dribble Tech / Off-the-Bounce: creating; Floor Sweeper:
+rebounding; Finesse / Dynamic: style; High-Post is not a Post word). The new words have their own rules: **Burner / Open-Lane**
+(athleticism, transition share), **Hammer** (finishing and athleticism, max-vertical lean), **Cutter / Off-Ball**
+(athleticism, cut share), **Scooper** (finishing, close-shot lean), **Pull-Up** (mid-range, shot-creation lean), **Chaser /
+Bucket Chaser** (mid-range and three), **Grab & Go** (rebounding), **Pressure Cooker** (perimeter D, perimeter D lean
++0.25 z), **Wizard** (passing and handling, vision lean) and **High-Low** (post, post-moves lean). Adding them changed no
+existing build's words, promises or wants (checked against a snapshot of every build and every 2K name).
 
 **Whole-name words** (`WORD_RULES`):
 
 - **Sniper** (Sniper, Sharpshooter, Laser, Automatic, Logo, Big Range, Silk): three-point skill **top 15%** AND range sub
   (rng) +0.84 z (about top 20%). Promise floor raised to 0.8 z on the three.
-- **High-Flying** (High-Flying, Aerial, Glide, Athletic, Explosive, Force of Nature): athleticism **top 25%** AND max vertical
+- **High-Flying** (High-Flying, Aerial, Glide, Athletic, Athlete, Explosive, Force of Nature, Bouncy, Apex): athleticism **top 25%** AND max vertical
   lean (mxv) +0.25 z. (The reading also checks the leaping itself: `score.ts absoluteParts` air.)
 
 Examples in words: **Rim Protector / Shot-Erasing / Eraser** as the head: rim protection top 20% and (Sub-Ratings) blocks lean

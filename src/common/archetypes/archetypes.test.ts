@@ -55,6 +55,8 @@ import { catchAllShortfall, promiseChecks, promisesOf } from "./score.ts";
 import { SCORING_ARCHETYPES, scoreAll, scoreTerms } from "./classify.ts";
 import { statReading, STATS_W, STATS_W_MORE } from "./stats.ts";
 import { MERGED, mergedId } from "./merges.data.ts";
+import { USER_2K_DEFS } from "./twoK/user2kDefs.data.ts";
+import { USER_2K_MAP } from "./twoK/user2kMap.data.ts";
 import { nameAt } from "./posNames.ts";
 import { DEFAULT_NORMS } from "./norms.data.ts";
 import pos from "../../worker/core/player/pos.ts";
@@ -134,18 +136,27 @@ describe("archetype table: every archetype is an NBA 2K build", () => {
 		const names = new Map(
 			[...TWO_K_DEFS, ...CUSTOM_DEFS].map((d) => [d.id, d.name]),
 		);
+		// (archuser2k: a merged build's name the user's 2K list made a build again is that build's own name)
+		const user = new Set(USER_2K_DEFS.map((d) => d.name));
 		for (const [from, to0] of Object.entries(MERGED)) {
 			// (arch15: a build may have been merged into one that was merged later)
 			const to = mergedId(to0);
 			assert.strictEqual(archetypeById(from), undefined, from);
 			assert.ok(archetypeById(to), to);
-			assert.ok(TWO_K_NAMES[to]!.includes(names.get(from)!), from);
+			assert.ok(
+				TWO_K_NAMES[to]!.includes(names.get(from)!) ||
+					user.has(names.get(from)!),
+				from,
+			);
 			const v = viewOf({ season: 2025, id: from, v: 12 });
 			assert.strictEqual(v?.id, to, from);
 		}
 		assert.strictEqual(
 			ARCHETYPES.length,
-			TWO_K_DEFS.length + CUSTOM_DEFS.length - Object.keys(MERGED).length,
+			TWO_K_DEFS.length +
+				CUSTOM_DEFS.length +
+				USER_2K_DEFS.length -
+				Object.keys(MERGED).length,
 		);
 	});
 });
@@ -235,6 +246,10 @@ describe("classification", () => {
 			for (const n of TWO_K_NAMES[a.id] ?? []) {
 				// (arch15: and its names at other position groups)
 				if (Object.values(a.posNames ?? {}).includes(n)) {
+					continue;
+				}
+				// (archuser2k: or a name of the user's 2K list whose closest build it is)
+				if (USER_2K_MAP[n]?.id === a.id) {
 					continue;
 				}
 				assert.ok(
@@ -1177,20 +1192,20 @@ const GOLD_LISTED_FLOOR = 0.4;
 // Korver, Westbrook and Luka changed)
 const PINNED: [string, number, string][] = [
 	["curryst01", 2025, "deep-range-sniper"], // Stephen Curry
-	["jamesle01", 2025, "mid-paint-point-four"], // LeBron James
+	["jamesle01", 2025, "mid-paint-playmaker"], // LeBron James (archuser2k: his 2K archetype exactly)
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
 	["goberru01", 2025, "backline-power-finisher"], // Rudy Gobert
 	["antetgi01", 2025, "crafty-paint-finishing-cleaner"], // Giannis Antetokounmpo (arch16: no jumper, not mid-range)
 	["duranke01", 2025, "crafty-mid-paint-scorer"], // Kevin Durant
 	["paulch01", 2025, "ball-hawking-3-and-d-point"], // Chris Paul
 	["greendr01", 2025, "shot-erasing-board-enforcer"], // Draymond Green
-	["thompkl01", 2025, "catch-and-shoot-3pt-sniper"], // Klay Thompson
+	["thompkl01", 2025, "skilled-stretch"], // Klay Thompson (archuser2k: one of the 2K shooting builds)
 	["embiijo01", 2025, "slashing-mid-range-maestro"], // Joel Embiid
-	["lopezbr01", 2025, "backline-pick-and-popper"], // Brook Lopez
+	["lopezbr01", 2025, "shot-erasing-stretch"], // Brook Lopez (archuser2k)
 	["capelca01", 2025, "physical-defensive-rebounder"], // Clint Capela
-	["korveky01", 2021, "crafty-sharpshooter"], // Kyle Korver (sgdrift: GF, was SF with deep-range-sniper)
+	["korveky01", 2021, "crafty-stretch"], // Kyle Korver (archuser2k; before: crafty-sharpshooter) (sgdrift: GF, was SF with deep-range-sniper)
 	["westbru01", 2025, "mid-range-slashing-cleaner"], // Russell Westbrook (arch16: a mid-range name needs a jumper; sgdrift: PG, his listed position, was G with slashing-playmaker)
-	["wembavi01", 2025, "shot-erasing-mid-paint-maestro"], // Victor Wembanyama
+	["wembavi01", 2025, "paint-protecting-riser"], // Victor Wembanyama (archuser2k)
 	["doncilu01", 2025, "diming-3-level-scorer"], // Luka Dončić (arch13: his three fixed, 53 -> 71)
 	["bridgmi01", 2025, "crafty-mid-post-scorer"], // Mikal Bridges
 	["adamsst01", 2025, "physical-board-enforcer"], // Steven Adams

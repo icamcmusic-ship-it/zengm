@@ -68,7 +68,13 @@ test.skipIf(!process.env.RUN_ARCHETYPE_STARBIAS)(
 			for (const a of ARCHETYPES) {
 				// (arch16: only the generic builds and the builds whose kept name was re-picked are trimmed again; every other
 				// build keeps its arch15 trim, so the players moved off a generic build are not pushed on again)
-				if (ARCH16_ONLY && !isGenericBuild(a) && !REPICKED.has(a.id)) {
+				// (archuser2k: and the builds made from the user's 2K archetypes, new this round)
+				if (
+					ARCH16_ONLY &&
+					!isGenericBuild(a) &&
+					!REPICKED.has(a.id) &&
+					!a.tags.includes("user2k")
+				) {
 					continue;
 				}
 				const share = (counts[a.id] ?? 0) / players.length;
