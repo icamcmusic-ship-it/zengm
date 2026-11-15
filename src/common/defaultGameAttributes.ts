@@ -414,6 +414,16 @@ export const defaultAwardsBasketball = {
 		bench: true,
 	} as AwardSettingIndividual,
 
+	// Advanced Tracking Stats: only given with that setting on. Clutch points, plus/minus, efficiency and usage, gated by clutch minutes
+	cpoy: {
+		shortName: "CPOY",
+		name: "Clutch Player of the Year",
+		formula:
+			"min(1, clMin / 40)^2 * (clPts / 15 + clPm / 25 + 6 * (clFg + 15) / (clFga + 30) + clUsgp / 8)",
+		showStats: "offense",
+		advStats: true,
+	} as AwardSettingIndividual,
+
 	sfmvp: {
 		shortName: "SFMVP",
 		name: "Semifinals MVP",
@@ -788,6 +798,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 		defaultAwardsBasketball.roy,
 		defaultAwardsBasketball.smoy,
 		defaultAwardsBasketball.mip,
+		defaultAwardsBasketball.cpoy,
 		defaultAwards.fmvp,
 		defaultAwardsBasketball.sfmvp,
 		defaultAwards.all,

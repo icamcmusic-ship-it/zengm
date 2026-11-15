@@ -328,6 +328,8 @@ Object.assign(ADV_STAT_FUNCTIONS, {
 			at(adv, ADV.dfgm2) + at(adv, ADV.dfgm3),
 			at(adv, ADV.dfga2) + at(adv, ADV.dfga3),
 		),
+	dfga2: (adv) => at(adv, ADV.dfga2),
+	dfga3: (adv) => at(adv, ADV.dfga3),
 	dfgp2: (adv) => pct(at(adv, ADV.dfgm2), at(adv, ADV.dfga2)),
 	dfgp3: (adv) => pct(at(adv, ADV.dfgm3), at(adv, ADV.dfga3)),
 	rimDfga: (adv) => at(adv, ADV.rimDfga),
@@ -347,6 +349,23 @@ Object.assign(ADV_STAT_FUNCTIONS, {
 	onOrtg: (adv) => per100(at(adv, ADV.ptsFor), at(adv, ADV.possFor)),
 	onDrtg: (adv) => per100(at(adv, ADV.ptsAgainst), at(adv, ADV.possAgainst)),
 	onNet: (adv) => onNet(adv),
+	onPoss: (adv) => (at(adv, ADV.possFor) + at(adv, ADV.possAgainst)) / 2,
+	onOffOrtg: (adv) =>
+		sub(
+			per100(at(adv, ADV.ptsFor), at(adv, ADV.possFor)),
+			per100(
+				at(adv, ADV.tmPtsFor) - at(adv, ADV.ptsFor),
+				at(adv, ADV.tmPossFor) - at(adv, ADV.possFor),
+			),
+		),
+	onOffDrtg: (adv) =>
+		sub(
+			per100(at(adv, ADV.ptsAgainst), at(adv, ADV.possAgainst)),
+			per100(
+				at(adv, ADV.tmPtsAgainst) - at(adv, ADV.ptsAgainst),
+				at(adv, ADV.tmPossAgainst) - at(adv, ADV.possAgainst),
+			),
+		),
 	offNet: (adv) => offNet(adv),
 	onOffNet: (adv) => sub(onNet(adv), offNet(adv)),
 
@@ -400,6 +419,8 @@ export type AdvStatKey =
 	| "dfga"
 	| "dfgm"
 	| "dfgp"
+	| "dfga2"
+	| "dfga3"
 	| "dfgp2"
 	| "dfgp3"
 	| "rimDfga"
@@ -410,6 +431,9 @@ export type AdvStatKey =
 	| "onOrtg"
 	| "onDrtg"
 	| "onNet"
+	| "onPoss"
+	| "onOffOrtg"
+	| "onOffDrtg"
 	| "offNet"
 	| "onOffNet"
 	| "clGp"
@@ -567,6 +591,16 @@ export const ADV_STAT_META: Record<
 			desc: "Defended field goal percentage (opponents' FG% with him as the closest defender)",
 			format: "pct",
 		},
+		dfga2: {
+			title: "D2PA",
+			desc: "Opponents' two-point attempts with him as the closest defender",
+			format: "count",
+		},
+		dfga3: {
+			title: "D3PA",
+			desc: "Opponents' three-point attempts with him as the closest defender",
+			format: "count",
+		},
 		dfgp2: {
 			title: "D2P%",
 			desc: "Defended two-point percentage",
@@ -615,6 +649,21 @@ export const ADV_STAT_META: Record<
 		onNet: {
 			title: "On Net",
 			desc: "Team net rating with him on the floor",
+			format: "pm",
+		},
+		onPoss: {
+			title: "On Poss",
+			desc: "Possessions he was on the floor for (average of offense and defense)",
+			format: "count",
+		},
+		onOffOrtg: {
+			title: "On-Off ORtg",
+			desc: "Team offensive rating with him on the floor minus off",
+			format: "pm",
+		},
+		onOffDrtg: {
+			title: "On-Off DRtg",
+			desc: "Opponents' offensive rating with him on the floor minus off (negative is better)",
 			format: "pm",
 		},
 		offNet: {

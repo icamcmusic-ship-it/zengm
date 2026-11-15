@@ -39,6 +39,7 @@ export const awardSettingToEditingState = (award: AwardSetting) => {
 		bench: !!award.bench,
 		mip: !!award.mip,
 		rookie: !!award.rookie,
+		advStats: !!award.advStats,
 	} as const;
 
 	type ActAs = "mvp" | "roy" | "opoy" | "none";
@@ -98,7 +99,7 @@ const editingStateToAward = (state: EditingState, index: number) => {
 		showStats: state.showStats,
 	};
 
-	const flags = ["bench", "mip", "rookie"] as const;
+	const flags = ["bench", "mip", "rookie", "advStats"] as const;
 	for (const flag of flags) {
 		if (state[flag]) {
 			common[flag] = true;
@@ -355,7 +356,7 @@ export const EditSettings = ({
 	];
 
 	const flags: {
-		key: "bench" | "mip" | "rookie";
+		key: "bench" | "mip" | "rookie" | "advStats";
 		text: string;
 		help: ReactNode;
 		id: string;
@@ -401,6 +402,15 @@ export const EditSettings = ({
 			id: useId(),
 		},
 	];
+	const advStatsFlagId = useId();
+	if (__SPORT === "basketball") {
+		flags.push({
+			key: "advStats",
+			text: "Advanced Tracking Stats only",
+			help: "Only given when Advanced Tracking Stats is on (League Extras), like the default Clutch Player of the Year. With the setting off the award is skipped.",
+			id: advStatsFlagId,
+		});
+	}
 
 	const actAsId = useId();
 	const groupId = useId();

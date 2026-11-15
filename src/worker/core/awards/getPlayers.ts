@@ -28,6 +28,15 @@ import {
 } from "../../util/processPlayerStats.ts";
 import type { FormulaEvaluators } from "./processAwards.ts";
 import { advDefScore } from "./perimeterDefense.ts";
+import { ADV_STAT_KEYS } from "../../../common/advStats.ts";
+import {
+	TRACKING_AWARD_VARS,
+	TRACKING_PLAYOFFS_VARS,
+	addDerived,
+	addPlayoffVariants,
+	leagueContext,
+	trackingNeeds,
+} from "./trackingAwards.ts";
 
 // tid gets added from root of AwardPlayer2 - that is the only tid we need to pass in to processPlayers, because otherwise we assume we have the actual stats available
 export type StatOverridesByMatchup = Record<
@@ -57,6 +66,11 @@ const AWARD_STATS: PlayerStatAttr[] = [
 		getPlayerStatsTableStats(x.stats),
 	),
 
+	// Advanced Tracking Stats: every tracking stat, not only the ones in the Player Stats tabs
+	...(__SPORT === "basketball"
+		? (ADV_STAT_KEYS as unknown as PlayerStatAttr[])
+		: []),
+
 	// A few extra that don't
 	...bySport({
 		baseball: ["outs"],
@@ -74,12 +88,18 @@ const AWARD_STATS_SPECIAL = [
 ];
 if (__SPORT === "basketball") {
 	AWARD_STATS_SPECIAL.push("teamWs", "advDef");
+	// Advanced Tracking Stats: derived scores and the playoff variants (trackingAwards.ts)
+	for (const key of TRACKING_AWARD_VARS) {
+		if (!ADV_STAT_KEYS.includes(key as any)) {
+			AWARD_STATS_SPECIAL.push(key);
+		}
+	}
 }
 // Advanced Tracking Stats: what advDef is computed from
 const ADV_DEF_STATS = ["dfga", "dfgp", "rimDfga", "rimDfgp"];
-export const AWARD_STATS_ALL = [...AWARD_STATS, ...AWARD_STATS_SPECIAL].filter(
-	(key) => !BOTH_AWARD_STATS_SKIP.has(key),
-);
+export const AWARD_STATS_ALL = Array.from(
+	new Set([...AWARD_STATS, ...AWARD_STATS_SPECIAL]),
+).filter((key) => !BOTH_AWARD_STATS_SKIP.has(key));
 
 const PLAYOFF_SERIES_AWARD_STATS_SKIP = new Set(
 	bySport({
@@ -106,7 +126,11 @@ const PLAYOFF_SERIES_AWARD_STATS = [
 	...PLAYOFF_SERIES_AWARD_STATS_RAW,
 	...PLAYOFF_SERIES_AWARD_STATS_DERIVED,
 ];
-const PLAYOFF_SERIES_AWARD_STATS_SPECIAL = ["won"];
+const PLAYOFF_SERIES_AWARD_STATS_SPECIAL = [
+	"won",
+	// Advanced Tracking Stats: box scores keep no tracking data, so a series award reads the season's playoff totals
+	...(__SPORT === "basketball" ? TRACKING_PLAYOFFS_VARS : []),
+];
 export const PLAYOFF_SERIES_AWARD_STATS_ALL = [
 	...PLAYOFF_SERIES_AWARD_STATS,
 	...PLAYOFF_SERIES_AWARD_STATS_SPECIAL,
@@ -357,11 +381,28 @@ export const getPlayers = async (
 
 	const advDef =
 		__SPORT === "basketball" && (!variables || variables.normal.has("advDef"));
+	// Advanced Tracking Stats: what the tracking variables need loaded (the playoff variants need the season's playoff rows)
+	const trk =
+		__SPORT === "basketball"
+			? trackingNeeds(
+					variables
+						? [...variables.normal, ...variables.playoffSeries]
+						: TRACKING_AWARD_VARS,
+				)
+			: undefined;
+	statRanges =
+		trk?.playoffs && !statRanges.has("playoffs")
+			? new Set([...statRanges, "playoffs"])
+			: statRanges;
 	const players = await getProcessedPlayers(
 		playersAll,
 		statRanges,
-		variables && advDef
-			? new Set([...variables.normal, ...ADV_DEF_STATS])
+		variables && (advDef || trk?.any)
+			? new Set([
+					...variables.normal,
+					...(advDef ? ADV_DEF_STATS : []),
+					...(trk?.stats ?? []),
+				])
 			: variables?.normal,
 	);
 
@@ -639,6 +680,31 @@ export const getPlayers = async (
 						cs as Record<string, number | undefined>,
 						league,
 					);
+				}
+			}
+		}
+	}
+
+	// Advanced Tracking Stats: derived scores against the league, then the playoff variants on every row
+	if (trk?.any) {
+		for (const statRange of statRanges) {
+			if (typeof statRange === "number") {
+				continue;
+			}
+			const rows = players
+				.map((p) => p.currentStats[statRange])
+				.filter((row) => row !== undefined);
+			const league = leagueContext(rows);
+			for (const row of rows) {
+				addDerived(row, league);
+			}
+		}
+		if (trk.playoffs) {
+			for (const p of players) {
+				for (const row of Object.values(p.currentStats)) {
+					if (row) {
+						addPlayoffVariants(row, p.currentStats.playoffs);
+					}
 				}
 			}
 		}
