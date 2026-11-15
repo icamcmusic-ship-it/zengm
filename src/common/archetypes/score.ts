@@ -1,3 +1,4 @@
+import { FLOOR, RULES, WORD_RULES } from "./rulebook.data.ts";
 import { isGenericBuild } from "./generic.ts";
 import { DIMS, skillsOf, STYLE_DIMS } from "./composites.ts";
 import { zVector } from "./norms.ts";
@@ -636,36 +637,13 @@ const styleOf = (
 // ---- What a build's name promises, and naming what stands out about him ----
 
 // The skill classes each concept of a 2K name (twoK/concepts.ts) promises ("def": either side of the floor, "stre": strength)
-const CONCEPT_CLASSES: Record<string, string[]> = {
-	twoWay: ["def"],
-	lockdown: ["perD"],
-	steal: ["perD"],
-	rimD: ["rimD"],
-	oreb: ["reb"],
-	reb: ["reb"],
-	outlet: ["pass"],
-	threeLevel: ["shoot", "mid"],
-	insideOut: ["shoot", "finish"],
-	catchShoot: ["shoot"],
-	shotHunt: ["shoot"],
-	midPaint: ["mid"],
-	midPost: ["mid", "post"],
-	mid: ["mid"],
-	post: ["post"],
-	paint: ["finish"],
-	slash: ["finish"],
-	finish: ["finish"],
-	dunk: ["finish"],
-	air: ["ath"],
-	lob: ["finish"],
-	run: ["ath"],
-	tempo: ["handle"],
-	creator: ["handle"],
-	pass: ["pass"],
-	tripleDouble: ["reb"],
-	strength: ["stre"],
-	scorer: ["score"],
-};
+// (archrules: read from the judging rulebook, rulebook.data.ts RULES, so a name promises exactly what the rulebook judges;
+// style words such as "Crafty" or "Riser" promise nothing)
+const CONCEPT_CLASSES: Record<string, string[]> = Object.fromEntries(
+	Object.entries(RULES)
+		.filter(([, r]) => r.classes.length > 0)
+		.map(([k, r]) => [k, r.classes]),
+);
 export type Promises = {
 	// Every class the name promises
 	all: string[];
@@ -953,8 +931,8 @@ const SHOT_KEYS = new Set([
 	"catchShoot",
 	"shotHunt",
 ]);
-const SNIPER_RE = /Snip|Sharp|Laser|Automatic|Logo|Big Range|Silk/;
-const AIR_RE = /High[ -]Fly|Aerial|Force of Nature|Explosive|Athletic|Glide/;
+const SNIPER_RE = WORD_RULES.sniper.re;
+const AIR_RE = WORD_RULES.air.re;
 // arch14: each part on its own, so the fitted model (model.ts) can weigh them
 export type AbsoluteParts = {
 	floor: number;
@@ -1173,8 +1151,8 @@ export const allAroundQuality = (
 // position and his stats): at least ordinary for him (PROMISE_MET), and an elite three for a sniper's name
 // ("Sniper", "Sharpshooter", "Laser", ...: PROMISE_ELITE). The name-promise check (namePromise.script.test.ts,
 // archetypes.test.ts) measures, per build, the share of its holders who meet each promise.
-export const PROMISE_MET = 0;
-export const PROMISE_ELITE = 0.8;
+export const PROMISE_MET = FLOOR;
+export const PROMISE_ELITE = WORD_RULES.sniper.floor;
 export const promiseChecks = (
 	a: Archetype,
 	cv: Record<string, number>,
