@@ -48,6 +48,7 @@ import {
 } from "../../../common/gmPersonality.ts";
 import { getProStats } from "../../../common/preDraft.ts";
 import { getGmWeights } from "../gm/index.ts";
+import { flushAdvStats } from "../../util/advStatsFlush.ts";
 
 type Asset =
 	| {
@@ -318,6 +319,11 @@ const getPlayers = async ({
 	getTraitFactor: ReturnType<typeof makeAiTraitValueFactorCache>;
 	gm?: GmWeights;
 }) => {
+	// Advanced stats every 3 days setting: AI GM personalities read PER
+	if (gm) {
+		await flushAdvStats();
+	}
+
 	const season = g.get("season");
 	const phase = g.get("phase");
 	const difficultyFudgeFactor = helpers.bound(

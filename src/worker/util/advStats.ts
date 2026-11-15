@@ -4,14 +4,19 @@ import advStatsBaseball from "./advStats.baseball.ts";
 import advStatsBasketball from "./advStats.basketball.ts";
 import advStatsFootball from "./advStats.football.ts";
 import advStatsHockey from "./advStats.hockey.ts";
+import { setAdvStatsCompute, runAdvStats } from "./advStatsFlush.ts";
 
-export const advStats = () => {
-	return bySport({
-		baseball: advStatsBaseball(),
-		basketball: advStatsBasketball(),
-		football: advStatsFootball(),
-		hockey: advStatsHockey(),
-	});
-};
+export { advStatsAfterDay, advStatsRunCount } from "./advStatsFlush.ts";
+
+setAdvStatsCompute(() =>
+	bySport({
+		baseball: advStatsBaseball,
+		basketball: advStatsBasketball,
+		football: advStatsFootball,
+		hockey: advStatsHockey,
+	})(),
+);
+
+export const advStats = () => runAdvStats();
 
 registerGlobal({ advStats });

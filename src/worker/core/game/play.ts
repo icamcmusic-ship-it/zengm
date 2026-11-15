@@ -57,7 +57,7 @@ import {
 } from "../../util/recomputeLocalUITeamOvrs.ts";
 import { last } from "../../../common/utils.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
-import { advStats } from "../../util/advStats.ts";
+import { advStatsAfterDay } from "../../util/advStats.ts";
 import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
 import { afterDay as staffDepthAfterDay } from "../staffDepth/index.ts";
 import { getDayTicks, scheduleDaysSpread } from "../season/scheduleDayScale.ts";
@@ -417,7 +417,13 @@ const play = async (
 			!college.isCollege() ||
 			!college.throttleAdvStats(results, await season.getSchedule())
 		) {
-			await advStats();
+			// Advanced stats every 3 days setting: pro leagues skip 2 of every 3 days, flushed before anything reads them
+			const day = results.find((r) => typeof r.day === "number")?.day;
+			const lastRegularSeasonDay =
+				g.get("phase") !== PHASE.PLAYOFFS &&
+				(await season.getSchedule()).length === 0;
+			// Also on the last day of this sim, so the pages refreshed when it stops are up to date
+			await advStatsAfterDay(day, lastRegularSeasonDay || numDays - 1 <= 0);
 		}
 
 		const playoffsOver =

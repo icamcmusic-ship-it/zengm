@@ -13,6 +13,7 @@ import { getPosByGpF } from "../player/getPosByGpF.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { shuffle } from "../../../common/random.ts";
 import { player } from "../index.ts";
+import { flushAdvStats } from "../../util/advStatsFlush.ts";
 
 // This is from the old football awards sytem. Eventually should make All-Star teams use the same formulas as the default All-League awards...
 // Football players from player.formatAll, with currentStats added in create
@@ -112,6 +113,9 @@ const mvpScore = (p: PlayerWithCurrentStats) => {
 const MIN_PLAYERS_CONTEST = 2;
 
 const create = async (conditions: Conditions) => {
+	// Advanced stats every 3 days setting: the selection reads EWA/WS
+	await flushAdvStats();
+
 	const allStars: AllStars = {
 		season: g.get("season"),
 		teamNames: ["", ""],

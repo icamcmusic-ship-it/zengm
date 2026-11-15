@@ -26,6 +26,7 @@ import type { Conditions, Phase } from "../../../common/types.ts";
 import { cleanupAutoPlay } from "../league/autoPlay.ts";
 import * as contractHooks from "../contract/hooks.ts";
 import { InvalidPlayoffSettingsError } from "../season/genPlayoffSeries.ts";
+import { flushAdvStats } from "../../util/advStatsFlush.ts";
 
 /**
  * Set a new phase of the game.
@@ -82,6 +83,9 @@ const newPhase = async (phase: Phase, conditions: Conditions, extra?: any) => {
 			await updatePlayMenu();
 
 			if (doPhaseChange[phase]) {
+				// Advanced stats every 3 days setting: bring them up to date for the phase that is ending
+				await flushAdvStats();
+
 				await contractHooks.beforeNewPhase(phase);
 
 				const result = await doPhaseChange[phase](conditions, extra);

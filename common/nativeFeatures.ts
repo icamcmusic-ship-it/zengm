@@ -307,6 +307,16 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "advStatsEvery3Days",
+		key: "advStatsEvery3Days",
+		name: "Advanced Stats Every 3 Days",
+		description:
+			"Performance: in pro leagues, advanced stats (PER, WS, BPM, VORP, ...) are computed after every third game day of the regular season and playoffs instead of after every day. They are always brought up to date before anything reads them (awards and award races, the All-Star selection, trades, phase changes, the end of the regular season and of each playoff round, and pages you open), so the values are the same. Speeds up simming a season. On by default for new leagues.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "collegeQuickSim",
 		key: "collegeQuickSim",
 		name: "College Quick Sim",

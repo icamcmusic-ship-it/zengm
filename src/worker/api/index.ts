@@ -303,6 +303,7 @@ import type {
 	ScoutRegion,
 	SuggestionAction,
 } from "../../common/staffDepth/types.ts";
+import { flushAdvStats } from "../util/advStatsFlush.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -3462,6 +3463,11 @@ const ratingsStatsPopoverInfo = async ({
 		return blankObj;
 	}
 
+	// Advanced stats every 3 days setting (not while simming)
+	if (!lock.get("gameSim")) {
+		await flushAdvStats();
+	}
+
 	let p;
 	let eightyTwoZeroDraftPlayer = false;
 	if (local.exhibitionGamePlayers) {
@@ -4212,6 +4218,11 @@ const runBefore = async (
 	}
 
 	if (view) {
+		// Advanced stats every 3 days setting: a page the user opens shows them up to date (not while simming)
+		if (updateEvents.has("firstRun") && !lock.get("gameSim")) {
+			await flushAdvStats();
+		}
+
 		const data = await lock.runView(() =>
 			view.load({
 				inputs,

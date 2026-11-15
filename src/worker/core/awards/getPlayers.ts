@@ -28,6 +28,7 @@ import {
 } from "../../util/processPlayerStats.ts";
 import type { FormulaEvaluators } from "./processAwards.ts";
 import { advDefScore } from "./perimeterDefense.ts";
+import { flushAdvStats } from "../../util/advStatsFlush.ts";
 
 // tid gets added from root of AwardPlayer2 - that is the only tid we need to pass in to processPlayers, because otherwise we assume we have the actual stats available
 export type StatOverridesByMatchup = Record<
@@ -351,6 +352,11 @@ export const getPlayers = async (
 	statOverridesByMatchup: StatOverridesByMatchup | undefined,
 	variables: FormulaEvaluators["variables"] | undefined,
 ) => {
+	// Advanced stats every 3 days setting: awards, award races and the award vote read them up to date
+	if (season === g.get("season")) {
+		await flushAdvStats();
+	}
+
 	const playersAll = await idb.merged.players.getAll(
 		getActiveSeasonSelector(season),
 	);
