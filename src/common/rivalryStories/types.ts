@@ -56,3 +56,48 @@ export type RivalryGame = {
 
 export const pairOf = (x: number, y: number) =>
 	x < y ? `${x}-${y}` : `${y}-${x}`;
+
+// The rivalry score's box score inputs of one season (rivalrySeasons store), by pair: [close games (3 points or fewer, or
+// overtime), 1 if a playoff game had a 25+ point scorer on both sides]
+export type RivalrySeason = {
+	season: number;
+	pairs: Record<string, [number, 0 | 1]>;
+};
+
+export const isCloseGame = (gm: Pick<RivalryGame, "hPts" | "aPts" | "ot">) =>
+	gm.ot > 0 || Math.abs(gm.hPts - gm.aPts) <= 3;
+
+export const isStarDuel = (
+	gm: Pick<RivalryGame, "playoffs" | "players" | "home" | "away">,
+) => {
+	if (!gm.playoffs) {
+		return false;
+	}
+	const top = (tid: number) =>
+		Math.max(0, ...gm.players.filter((p) => p.tid === tid).map((p) => p.pts));
+	return top(gm.home) >= 25 && top(gm.away) >= 25;
+};
+
+// Adds games to the season rows (mutates and returns the rows that changed)
+export const addToRivalrySeasons = (
+	rows: Map<number, RivalrySeason>,
+	games: RivalryGame[],
+) => {
+	const changed = new Set<number>();
+	for (const gm of games) {
+		let row = rows.get(gm.season);
+		if (!row) {
+			row = { season: gm.season, pairs: {} };
+			rows.set(gm.season, row);
+		}
+		const close = isCloseGame(gm);
+		const duel = isStarDuel(gm);
+		if (!close && !duel) {
+			continue;
+		}
+		const e = row.pairs[gm.pair] ?? [0, 0];
+		row.pairs[gm.pair] = [e[0] + (close ? 1 : 0), duel ? 1 : e[1]];
+		changed.add(gm.season);
+	}
+	return [...changed].map((season) => rows.get(season)!);
+};

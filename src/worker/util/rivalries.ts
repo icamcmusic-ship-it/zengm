@@ -10,6 +10,7 @@ import type { Game, PlayoffSeries } from "../../common/types.ts";
 import { idb } from "../db/index.ts";
 import g from "./g.ts";
 import helpers from "./helpers.ts";
+import { rivalrySeasonRows, rivalryStoriesOn } from "./rivalryStories.ts";
 
 export type RivalPair = {
 	key: string;
@@ -193,10 +194,34 @@ export const loadRivalries = async (
 			set.add(game.season);
 		}
 	};
-	for (const game of await idb.cache.games.getAll()) {
+	// Rivalry Stories setting: the same counts, kept up to date after every game (rivalrySeasons), so no box score is read
+	const fromLog = opts.storedGames !== false && rivalryStoriesOn();
+	if (fromLog) {
+		for (const row of await rivalrySeasonRows()) {
+			if (row.season > season) {
+				continue;
+			}
+			for (const [key, [close, duel]] of Object.entries(row.pairs)) {
+				const [x, y] = key.split("-").map(Number) as [number, number];
+				const e = get(x, y);
+				for (let i = 0; i < close; i++) {
+					e.input.closeGames!.push({ season: row.season });
+				}
+				if (duel) {
+					let set = duelSeasons.get(key);
+					if (!set) {
+						set = new Set();
+						duelSeasons.set(key, set);
+					}
+					set.add(row.season);
+				}
+			}
+		}
+	}
+	for (const game of fromLog ? [] : await idb.cache.games.getAll()) {
 		addGame(game);
 	}
-	if (opts.storedGames !== false) {
+	if (opts.storedGames !== false && !fromLog) {
 		for await (const cursor of idb.league
 			.transaction("games")
 			.store.iterate()) {

@@ -9,7 +9,12 @@ import {
 	type RivalryStory,
 	type TeamSeasonLite,
 } from "../../common/rivalryStories/aggregate.ts";
-import { pairOf, type RivalryGame } from "../../common/rivalryStories/types.ts";
+import {
+	addToRivalrySeasons,
+	pairOf,
+	type RivalryGame,
+	type RivalrySeason,
+} from "../../common/rivalryStories/types.ts";
 import type { RivalInput } from "../../common/rivalries/index.ts";
 import type { Game, GameResults } from "../../common/types.ts";
 import { idb } from "../db/index.ts";
@@ -75,6 +80,38 @@ const headCoaches = async (tids: number[]) => {
 	return out as [string | null, string | null];
 };
 
+// The records and the season rows they change, in one transaction
+const writeRecords = async (records: RivalryGame[]) => {
+	const tx = idb.league.transaction(
+		["rivalryGames", "rivalrySeasons"],
+		"readwrite",
+	);
+	const games = tx.objectStore("rivalryGames");
+	const seasonsStore = tx.objectStore("rivalrySeasons");
+	const rows = new Map<number, RivalrySeason>();
+	for (const season of new Set(records.map((x) => x.season))) {
+		const row = await seasonsStore.get(season);
+		if (row) {
+			rows.set(season, row);
+		}
+	}
+	for (const rec of records) {
+		void games.put(rec);
+	}
+	for (const row of addToRivalrySeasons(rows, records)) {
+		void seasonsStore.put(row);
+	}
+	await tx.done;
+	clearPairMemo();
+};
+
+// The rivalry score's close games and star duels by season and pair, from the season rows (the Rivalries page, with the
+// setting on, instead of reading every stored box score)
+export const rivalrySeasonRows = async () => {
+	await ensureBackfill();
+	return idb.league.transaction("rivalrySeasons").store.getAll();
+};
+
 // After a day of games (game/play.ts): one record per game, from its box score (already in the cache) and the sim
 // results (tracking stats, technicals)
 export const recordRivalryGames = async (resultsList: GameResults[]) => {
@@ -105,12 +142,7 @@ export const recordRivalryGames = async (resultsList: GameResults[]) => {
 	if (records.length === 0) {
 		return;
 	}
-	const tx = idb.league.transaction("rivalryGames", "readwrite");
-	for (const rec of records) {
-		void tx.store.put(rec);
-	}
-	await tx.done;
-	clearPairMemo();
+	await writeRecords(records);
 };
 
 // When the setting is turned on in a league that already has history (or after an import): log the stored box scores that
@@ -146,12 +178,7 @@ export const ensureBackfill = async () => {
 	if (records.size === 0) {
 		return;
 	}
-	const tx = idb.league.transaction("rivalryGames", "readwrite");
-	for (const rec of records.values()) {
-		void tx.store.put(rec);
-	}
-	await tx.done;
-	clearPairMemo();
+	await writeRecords([...records.values()]);
 };
 
 // Small memo of pair reads, cleared whenever games are logged

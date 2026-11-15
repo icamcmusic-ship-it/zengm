@@ -159,7 +159,7 @@ export const rivalryPreview = ({
 		.sort((x, y) => y.pts / y.gp - x.pts / x.gp)[0];
 	if (star && star.pts / star.gp >= 20) {
 		sentences.push(
-			`Watch ${star.name}: ${(star.pts / star.gp).toFixed(1)} points a game against the ${name(star.tid === game.home ? game.away : game.home)} over his last ${word(Math.min(star.gp, 7))} meetings.`,
+			`Watch ${star.name}: ${(star.pts / star.gp).toFixed(1)} points a game against the ${name(star.tid === game.home ? game.away : game.home)} in ${word(star.gp)} of their last ${word(Math.min(12, sorted.length))} meetings.`,
 		);
 	}
 	return {
@@ -172,7 +172,7 @@ export const rivalryPreview = ({
 			(tier === "Bitter" ? 20 : tier === "Heated" ? 10 : 0) +
 			(game.marquee ? 10 : 0),
 		head: game.marquee
-			? `${MARQUEE_LABELS[game.marquee]}: ${A} at ${H}, rivalry renewed`
+			? `${MARQUEE_LABELS[game.marquee]}: ${A} at ${H}`
 			: `Rivalry night: ${A} at ${H}`,
 		body: sentences.join(" "),
 	};
@@ -218,6 +218,10 @@ export const rivalryRecaps = ({
 		const L = name(l);
 		const score = scoreLine(gm, name);
 		const top = [...gm.players].sort((x, y) => y.pts - x.pts)[0];
+		// The winners' top scorer
+		const wTop = gm.players
+			.filter((p) => p.tid === w)
+			.sort((x, y) => y.pts - x.pts)[0];
 		const tids: [number, number] = [w, l];
 		const base = { gid: gm.gid, season: gm.season, tids };
 
@@ -239,7 +243,7 @@ export const rivalryRecaps = ({
 					lS === wS - 1
 						? `${W} outlast the ${L} in game ${wS + lS}`
 						: `${W} close out the ${L}, ${wS}-${lS}`,
-				body: `${score}. The ${W} won the series ${wS}-${lS}${lS === wS - 1 ? " in a deciding game" : ""}${top ? `, with ${top.name} scoring ${top.pts}` : ""}.`,
+				body: `${score}. The ${W} won the series ${wS}-${lS}${lS === wS - 1 ? " in a deciding game" : ""}${wTop ? `, with ${wTop.name} scoring ${wTop.pts}` : ""}${top && wTop && top.tid !== w && top.pts > wTop.pts ? `; ${top.name} had ${top.pts} for the ${L} in defeat` : ""}.`,
 			});
 			continue;
 		}

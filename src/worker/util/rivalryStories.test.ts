@@ -14,6 +14,7 @@ import { g, helpers } from "./index.ts";
 import { getDefaultSettings } from "../views/newLeague.ts";
 import * as views from "../views/index.ts";
 import { ensureBackfill, seasonGames } from "./rivalryStories.ts";
+import { loadRivalries } from "./rivalries.ts";
 
 const load = (id: string, params: Record<string, string>) => {
 	const view = (views as any)[id];
@@ -175,6 +176,33 @@ describe("rivalry stories in a league", () => {
 		}
 		assert.isBelow(ms, 2000, `rivalries view took ${ms} ms`);
 		console.log(`rivalries view (pair ${pair}): ${ms.toFixed(0)} ms`);
+	});
+
+	test("the rivalry score reads the same close games and star duels from the log as from the box scores", async () => {
+		await ensureBackfill();
+		const on = await loadRivalries();
+		await league.setGameAttributes({ featureRivalryStories: false });
+		const off = await loadRivalries();
+		await league.setGameAttributes({ featureRivalryStories: true });
+		const key = (list: typeof on) =>
+			list
+				.map((e) => [
+					e.key,
+					e.input.closeGames!.map((x) => x.season).sort(),
+					e.input.starDuels,
+					e.score.score,
+				])
+				.sort((x, y) => String(x[0]).localeCompare(String(y[0])));
+		assert.deepEqual(key(on), key(off));
+		assert.isAbove(
+			on.reduce((s, e) => s + e.input.closeGames!.length, 0),
+			10,
+		);
+		// and faster: the box scores are not read
+		const t0 = performance.now();
+		await loadRivalries();
+		const tOn = performance.now() - t0;
+		console.log(`loadRivalries from the log: ${tOn.toFixed(0)} ms`);
 	});
 
 	test("newspaper and storylines run with the setting", async () => {

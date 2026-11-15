@@ -34,7 +34,7 @@ afterEach(() => {
 	}
 });
 
-test("version 77 migration adds the rivalryGames store", async () => {
+test("version 77 migration adds the rivalryGames and rivalrySeasons stores", async () => {
 	assert.isAtLeast(LEAGUE_DATABASE_VERSION, 77);
 
 	const old = await openDB("league1", 76, {
@@ -46,6 +46,7 @@ test("version 77 migration adds the rivalryGames store", async () => {
 
 	const db = await connectLeague(1);
 	assert.isTrue(db.objectStoreNames.contains("rivalryGames"));
+	assert.isTrue(db.objectStoreNames.contains("rivalrySeasons"));
 	const tx = db.transaction("rivalryGames", "readwrite");
 	assert.deepEqual([...tx.store.indexNames].sort(), ["pair", "season"]);
 	await tx.store.put({ gid: 4, pair: "1-5", season: 2030 } as any);

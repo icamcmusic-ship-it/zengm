@@ -19,7 +19,10 @@ import type {
 	IDBPTransaction,
 	StoreNames,
 } from "@dumbmatter/idb";
-import type { RivalryGame } from "../../common/rivalryStories/types.ts";
+import type {
+	RivalryGame,
+	RivalrySeason,
+} from "../../common/rivalryStories/types.ts";
 import type {
 	DraftLotteryResult,
 	AllStars,
@@ -147,6 +150,10 @@ export interface LeagueDB extends DBSchema {
 			pair: string;
 			season: number;
 		};
+	};
+	rivalrySeasons: {
+		key: number;
+		value: RivalrySeason;
 	};
 	coaches: {
 		key: number;
@@ -683,6 +690,10 @@ const createRivalryGamesStore = (db: IDBPDatabase<LeagueDB>) => {
 	});
 	store.createIndex("pair", "pair");
 	store.createIndex("season", "season");
+	// Per season and pair, the close games and star duels the rivalry score reads, kept up to date with the log
+	db.createObjectStore("rivalrySeasons", {
+		keyPath: "season",
+	});
 };
 
 // Coaching staff, added in version 76
