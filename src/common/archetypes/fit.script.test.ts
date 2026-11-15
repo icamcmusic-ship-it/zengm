@@ -27,6 +27,7 @@ import {
 import { FAMILIES } from "./families.ts";
 import { JUDGED as JUDGED_BASE } from "./judged.data.ts";
 import { JUDGED_SIM, SIM_SUB_NORMS } from "./judgedSim.data.ts";
+import { RULE_KEY } from "./ruleKey.data.ts";
 // arch17: plus the simulated league's players, read with their play types. archfb: ARCH_PICKS=file[,file...] (pick files
 // exported from League -> Archetypes, "Export my picks") replaces the judged set with the user's own picks as the answer
 // key (tune/test split by a hash of each pick, tuning.ts picksToJudged)
@@ -36,7 +37,13 @@ const JUDGED = process.env.ARCH_PICKS
 				fromPickFile(JSON.parse(readFileSync(f.trim(), "utf8"))),
 			),
 		)
-	: [...JUDGED_BASE, ...JUDGED_SIM];
+	: process.env.ARCH_KEY === "rule"
+		? // archrules: the rule answer key (ruleKey.data.ts) in place of the judged builds, same players and splits
+			[...JUDGED_BASE, ...JUDGED_SIM].map((j) => ({
+				...j,
+				ids: RULE_KEY[j.key] ?? j.ids,
+			}))
+		: [...JUDGED_BASE, ...JUDGED_SIM];
 import {
 	CLASS_FEATS,
 	FAM_FEATS,
