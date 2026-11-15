@@ -6,6 +6,11 @@ import {
 	PLAYOFF_SERIES_AWARD_STATS_ALL,
 } from "../core/awards/getPlayers.ts";
 import g from "../util/g.ts";
+import {
+	advStatsOn,
+	isTrackingAwardVar,
+	trackingVariableDocs,
+} from "../core/awards/trackingAwards.ts";
 
 export const getAwardCandidates = async (
 	info:
@@ -34,12 +39,26 @@ export const getAwardCandidates = async (
 };
 
 export const getVariables = () => {
-	const normalSet = new Set(AWARD_STATS_ALL);
-	const playoffSeriesSet = new Set(PLAYOFF_SERIES_AWARD_STATS_ALL);
+	// Advanced Tracking Stats variables are listed on their own, grouped
+	const normalSet = new Set(
+		AWARD_STATS_ALL.filter((key) => !isTrackingAwardVar(key)),
+	);
+	const playoffSeriesSet = new Set(
+		PLAYOFF_SERIES_AWARD_STATS_ALL.filter((key) => !isTrackingAwardVar(key)),
+	);
 
 	const common = Array.from(normalSet.intersection(playoffSeriesSet));
 	const normalOnly = Array.from(normalSet.difference(playoffSeriesSet));
 	const playoffSeriesOnly = Array.from(playoffSeriesSet.difference(normalSet));
 
-	return { common, normalOnly, playoffSeriesOnly };
+	const tracking =
+		__SPORT === "basketball" ? trackingVariableDocs() : undefined;
+
+	return {
+		common,
+		normalOnly,
+		playoffSeriesOnly,
+		tracking,
+		advStatsOn: advStatsOn(),
+	};
 };

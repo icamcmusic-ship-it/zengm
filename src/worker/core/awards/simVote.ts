@@ -1,5 +1,6 @@
 // Simulated media vote for a season's awards (League extras: Award Vote, basketball). Built from processAwards' output so
 // the candidates and scores are exactly the ones BBGM decides awards with. See common/awardVote.
+import { awardActive } from "./trackingAwards.ts";
 import {
 	simulateVote,
 	type SimVote,
@@ -147,7 +148,10 @@ export const computeVoteInputs = async (
 ): Promise<VoteAwardInput[]> => {
 	const awards = g
 		.get("awards")
-		.filter((a) => a.group === undefined && a.statRange === undefined);
+		.filter(
+			(a) =>
+				a.group === undefined && a.statRange === undefined && awardActive(a),
+		);
 	const { players, realizedAwards } = await processAwards({
 		awards,
 		extraStatRanges: [],
