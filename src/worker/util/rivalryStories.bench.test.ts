@@ -299,7 +299,8 @@ describe.skipIf(!env.RIVALRY_BENCH)("rivalry stories bench", () => {
 				const keepBox =
 					BOX_ALL ||
 					season >=
-						current - defaultGameAttributes.saveOldBoxScores.pastSeasons;
+						current -
+							(defaultGameAttributes.saveOldBoxScores.pastSeasons as number);
 				const stores = [
 					"rivalryGames",
 					"rivalrySeasons",
