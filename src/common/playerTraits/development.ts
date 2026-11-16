@@ -163,6 +163,8 @@ export type TraitDevelopment = {
 		focus: import("../staffDepth/types.ts").FocusKey;
 		amount: number;
 	};
+	// Career Aging (worker/core/player/careerAging.ts): late-career reinvention, sub-rating points moved onto these subs inside their bases
+	careerTilt?: { keys: string[]; amount: number };
 };
 
 export const NEUTRAL_TRAIT_DEVELOPMENT: TraitDevelopment = Object.freeze({

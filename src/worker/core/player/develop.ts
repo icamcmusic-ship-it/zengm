@@ -40,6 +40,7 @@ import {
 	pruneSubHistory,
 	subRatingsOn,
 	syncLatestSubs,
+	tiltRowSubKeys,
 	tiltRowSubs,
 } from "./subRatings.ts";
 
@@ -214,6 +215,14 @@ const develop = async (
 						: undefined;
 				if (tilt) {
 					tiltRowSubs(p as any, ratings, tilt.focus, tilt.amount);
+				}
+				// Career Aging: late-career reinvention toward a specialist's subs
+				const careerTilt =
+					__SPORT === "basketball" && years === 1
+						? traitDev?.careerTilt
+						: undefined;
+				if (careerTilt) {
+					tiltRowSubKeys(p as any, ratings, careerTilt.keys, careerTilt.amount);
 				}
 			}
 		}

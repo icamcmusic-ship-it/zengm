@@ -1,3 +1,8 @@
+import {
+	type CareerAgingDev,
+	getCareerAgingDevelopment,
+	mergeCareerAging,
+} from "../player/careerAging.ts";
 import { allocateAi, frontOfficeEnabled } from "../frontOffice/index.ts";
 import { prepareDevelopment } from "../staffDepth/coaching.ts";
 import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
@@ -479,6 +484,12 @@ const newPhasePreseason = async (
 			? new Map<number, TraitDevelopment>()
 			: player.getTraitDevelopment(players as any, newSeason);
 
+	// Career Aging: wear and tear, style and reinvention (empty map when the setting is off)
+	const careerAging =
+		repeatSeason || __SPORT !== "basketball"
+			? new Map<number, CareerAgingDev>()
+			: getCareerAgingDevelopment(players as any, newSeason);
+
 	// Coaching Staff Depth: development plans, shooting coach and strength & conditioning (undefined when off)
 	const depthDev =
 		repeatSeason || __SPORT !== "basketball"
@@ -551,9 +562,12 @@ const newPhasePreseason = async (
 							bonus: mentorBonus,
 							seed: `mentor|${g.get("playerTraitsSeed") ?? 0}|${p.pid}|${newSeason}`,
 						},
-				depthDev
-					? depthDev.devFor(p as any, traitDevelopment.get(p.pid))
-					: traitDevelopment.get(p.pid),
+				mergeCareerAging(
+					depthDev
+						? depthDev.devFor(p as any, traitDevelopment.get(p.pid))
+						: traitDevelopment.get(p.pid),
+					careerAging.get(p.pid),
+				),
 			);
 			player.developTraits(p as any, newSeason);
 		}

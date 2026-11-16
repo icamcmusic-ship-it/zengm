@@ -472,6 +472,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "careerAging",
+		key: "careerAging",
+		name: "Career Aging",
+		description:
+			"How a player ages depends on his career: heavy career and playoff minutes bring the decline on sooner, major injuries (torn ACL, Achilles, knee, leg) take some speed, jumping and endurance for good (bounded, and now and then he's never the same), high flyers and slashers decline faster after 30 while shooters, passers and post players age gracefully, and fading veterans can keep improving a specialist skill (catch-and-shoot, passing, post moves) into their mid 30s. Retirement depends on his role, minutes, contract, a recent title, injuries and career milestones, and veterans take the minimum to chase a ring with a contender, so more players last into their late 30s like in the NBA. The league's average development is unchanged.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "perimeterDefense",
 		key: "perimeterDefense",
 		name: "Perimeter Defense",

@@ -1,6 +1,8 @@
 import { PLAYER } from "../../../common/constants.ts";
 import { player, team } from "../index.ts";
 import getBest from "./getBest.ts";
+import { careerAgingOn, RING_CHASE_AGE } from "../player/careerAging.ts";
+import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import {
 	makeAiTraitValueFactorCache,
 	traitsEnabled,
@@ -25,6 +27,34 @@ import {
  * @memberOf core.freeAgents
  * @return {Promise}
  */
+// Career Aging: for a contender, every free agent 33 or older asks for the minimum for one season (a copy of him, mapped back to him)
+const ringChaseOffers = <
+	T extends { born: { year: number }; contractDemand?: any },
+>(
+	players: T[],
+) => {
+	const season = g.get("season");
+	const minContract = g.get("minContract");
+	const exp = getContractStartSeason();
+	const original = new Map<T, T>();
+	const out = players.map((p) => {
+		if (
+			season - p.born.year >= RING_CHASE_AGE &&
+			p.contractDemand &&
+			p.contractDemand.amount > minContract
+		) {
+			const copy = {
+				...p,
+				contractDemand: { amount: minContract, exp },
+			};
+			original.set(copy, p);
+			return copy;
+		}
+		return p;
+	});
+	return original.size > 0 ? { players: out, original } : undefined;
+};
+
 const autoSign = async () => {
 	const players = await idb.cache.players.indexGetAll(
 		"playersByTid",
@@ -139,13 +169,25 @@ const autoSign = async () => {
 			payroll,
 			gm,
 		});
-		const p = getBest(
+		// Career Aging: veterans take the minimum (one season) to chase a ring with a contender
+		const ringChase =
+			careerAgingOn() && t.strategy === "contending"
+				? ringChaseOffers(playersForTeam)
+				: undefined;
+		const best = getBest(
 			playersOnRoster,
-			playersForTeam,
+			ringChase ? ringChase.players : playersForTeam,
 			payroll,
 			pickCapException,
 		);
-		if (p) {
+		const ringChaser = best ? ringChase?.original.get(best) : undefined;
+		const p = ringChaser ?? best;
+		if (p && ringChaser) {
+			playersSorted = playersSorted.filter((p2) => p2 !== p);
+			await player.sign(p, t.tid, best!.contractDemand!, g.get("phase"));
+			await idb.cache.players.put(p);
+			await team.rosterAutoSort(t.tid);
+		} else if (p) {
 			// Remove from list of free agents
 			playersSorted = playersSorted.filter((p2) => p2 !== p);
 

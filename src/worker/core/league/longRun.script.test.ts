@@ -575,6 +575,7 @@ const oldPlayers = async (s: number) => {
 	const played: Record<string, { n: number; min: number[]; ovr: number[] }> =
 		{};
 	const retired: Record<string, number> = {};
+	const retiredAges: number[] = [];
 	// Unsigned free agents by age (30+) after the draft
 	const fa: Record<string, number> = {};
 	// Every 38+ player who played: age, ovr, career best ovr, minutes and the secret aging curve
@@ -600,6 +601,44 @@ const oldPlayers = async (s: number) => {
 		if (p.retiredYear === s) {
 			const k = age >= 40 ? "40+" : age >= 30 ? String(age) : "<30";
 			retired[k] = (retired[k] ?? 0) + 1;
+			retiredAges.push(age);
+			// Career arc of a long career (31+, 8+ seasons with minutes): age, ovr, spd, jmp, dnk, tp, pss, ins, oiq, minutes
+			const minBy = new Map<number, number>();
+			for (const row of p.stats) {
+				if (!row.playoffs && row.tid >= 0) {
+					minBy.set(row.season, (minBy.get(row.season) ?? 0) + (row.min ?? 0));
+				}
+			}
+			if (age >= 31 && minBy.size >= 8) {
+				const rows = new Map<number, any>();
+				for (const row of p.ratings as any[]) {
+					rows.set(row.season, row);
+				}
+				out(
+					`ARC ${JSON.stringify({
+						pid: p.pid,
+						age,
+						born: p.born.year,
+						inj: p.injuries
+							.filter((x) => x.games > 25)
+							.map(
+								(x) => `${x.season - p.born.year}:${x.type}:${x.ovrDrop ?? 0}`,
+							),
+						rows: [...rows.values()].map((row) => [
+							row.season - p.born.year,
+							row.ovr,
+							row.spd,
+							row.jmp,
+							row.dnk,
+							row.tp,
+							row.pss,
+							row.ins,
+							row.oiq,
+							Math.round(minBy.get(row.season) ?? 0),
+						]),
+					})}`,
+				);
+			}
 		}
 		if (age < 30) {
 			continue;
@@ -637,6 +676,7 @@ const oldPlayers = async (s: number) => {
 				]),
 		),
 		retired,
+		retiredAge: r(mean(retiredAges)),
 		fa,
 		rookieMinShare: r(minTotal > 0 ? (100 * minRookies) / minTotal : 0),
 		top10Age: r(

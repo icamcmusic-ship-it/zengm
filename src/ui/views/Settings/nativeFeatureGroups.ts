@@ -53,6 +53,7 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	subRatingsWide: "League extras: Players",
 	ovrV2: "League extras: Players",
 	realisticAging: "League extras: Players",
+	careerAging: "League extras: Players",
 	archetypes: "League extras: Players",
 	skillBadges: "League extras: Players",
 	unretire: "League extras: Players",
