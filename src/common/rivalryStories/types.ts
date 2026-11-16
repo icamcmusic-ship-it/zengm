@@ -62,6 +62,10 @@ export const pairOf = (x: number, y: number) =>
 export type RivalrySeason = {
 	season: number;
 	pairs: Record<string, [number, 0 | 1]>;
+	// Every pair's highest single-game points by a player that season (the newspaper's "new high for the pair" bar, so it
+	// doesn't read every past game of every rival pair). Only on rows started after this was added: a row without it is
+	// read from the games instead.
+	highs?: Record<string, number>;
 };
 
 export const isCloseGame = (gm: Pick<RivalryGame, "hPts" | "aPts" | "ot">) =>
@@ -87,8 +91,15 @@ export const addToRivalrySeasons = (
 	for (const gm of games) {
 		let row = rows.get(gm.season);
 		if (!row) {
-			row = { season: gm.season, pairs: {} };
+			row = { season: gm.season, pairs: {}, highs: {} };
 			rows.set(gm.season, row);
+		}
+		if (row.highs) {
+			const high = Math.max(0, ...gm.players.map((p) => p.pts));
+			if (high > (row.highs[gm.pair] ?? -1)) {
+				row.highs[gm.pair] = high;
+				changed.add(gm.season);
+			}
 		}
 		const close = isCloseGame(gm);
 		const duel = isStarDuel(gm);

@@ -290,50 +290,60 @@ export const RivalryStory = ({
 			</div>
 
 			<h3 className="h5">Heat timeline</h3>
-			<div className="table-responsive" style={{ maxHeight: 420 }}>
-				<table className="table table-sm" data-testid="rivalry-heat">
-					<thead>
-						<tr>
-							<th>Season</th>
-							<th style={{ minWidth: 90 }}>Heat</th>
-							<th>Why</th>
-						</tr>
-					</thead>
-					<tbody>
-						{[...story.heat].reverse().map((h) => (
-							<tr key={h.season}>
-								<td>{h.season}</td>
-								<td>
-									<div className="d-flex align-items-center gap-1">
-										<div
-											className={h.delta >= 0 ? "bg-danger" : "bg-secondary"}
-											style={{
-												height: 8,
-												width: `${Math.max(2, (60 * h.heat) / maxHeat)}px`,
-												borderRadius: 2,
-											}}
-										/>
-										<span className="small">
-											{Math.round(h.heat)}
-											{h.delta !== 0 ? (
-												<span
-													className={
-														h.delta > 0 ? "text-danger" : "text-body-secondary"
-													}
-												>
-													{" "}
-													{h.delta > 0 ? "▲" : "▼"}
-												</span>
-											) : null}
-										</span>
-									</div>
-								</td>
-								<td className="small">{h.why.join("; ")}</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
+			{/* Rows, not a table: on a phone the reason wraps under the season and score instead of scrolling sideways */}
+			<ol
+				className="list-unstyled mb-0"
+				style={{ maxHeight: 420, overflowY: "auto", overflowX: "hidden" }}
+				data-testid="rivalry-heat"
+			>
+				{[...story.heat].reverse().map((h) => (
+					<li
+						key={h.season}
+						className="d-flex flex-wrap align-items-center column-gap-2 py-1 border-bottom"
+					>
+						<span className="fw-semibold" style={{ width: "3.5em" }}>
+							{h.season}
+						</span>
+						<span
+							className="d-flex align-items-center gap-1"
+							style={{ width: 100 }}
+						>
+							<span
+								className={h.delta >= 0 ? "bg-danger" : "bg-secondary"}
+								style={{
+									display: "inline-block",
+									height: 8,
+									width: `${Math.max(2, (60 * h.heat) / maxHeat)}px`,
+									borderRadius: 2,
+								}}
+							/>
+							<span className="small text-nowrap">
+								{Math.round(h.heat)}
+								{h.delta !== 0 ? (
+									<span
+										className={
+											h.delta > 0 ? "text-danger" : "text-body-secondary"
+										}
+									>
+										{" "}
+										{h.delta > 0 ? "▲" : "▼"}
+									</span>
+								) : null}
+							</span>
+						</span>
+						<span
+							className="small flex-grow-1"
+							style={{
+								flexBasis: "16rem",
+								minWidth: 0,
+								overflowWrap: "anywhere",
+							}}
+						>
+							{h.why.join("; ")}
+						</span>
+					</li>
+				))}
+			</ol>
 		</div>
 	);
 };

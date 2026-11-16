@@ -115,7 +115,15 @@ export const rivalrySeasonRows = async () => {
 // After a day of games (game/play.ts): one record per game, from its box score (already in the cache) and the sim
 // results (tracking stats, technicals)
 export const recordRivalryGames = async (resultsList: GameResults[]) => {
-	if (!rivalryStoriesOn() || resultsList.length === 0) {
+	if (!rivalryStoriesOn()) {
+		// Games played with the setting off are not logged: the next read with it on backfills them again, in this session
+		// too (ensureBackfill otherwise runs once a session)
+		if (resultsList.length > 0) {
+			backfilled.delete(`${g.get("lid")}`);
+		}
+		return;
+	}
+	if (resultsList.length === 0) {
 		return;
 	}
 	const playoffSeries = await idb.cache.playoffSeries.get(g.get("season"));
@@ -146,7 +154,9 @@ export const recordRivalryGames = async (resultsList: GameResults[]) => {
 };
 
 // When the setting is turned on in a league that already has history (or after an import): log the stored box scores that
-// are not in the log yet, once per league per session
+// are not in the log yet, once per league per session. Keys first (gids only, no box score is read), and only the log's
+// keys in the stored box scores' gid range, so a long league with years of log costs no more than its stored box scores;
+// then just the missing box scores are read.
 const backfilled = new Set<string>();
 export const ensureBackfill = async () => {
 	const key = `${g.get("lid")}`;
@@ -154,12 +164,26 @@ export const ensureBackfill = async () => {
 		return;
 	}
 	backfilled.add(key);
+	const cached = await idb.cache.games.getAll();
+	const stored = await idb.league.transaction("games").store.getAllKeys();
+	const gids = [...stored, ...cached.map((gm) => gm.gid)];
+	if (gids.length === 0) {
+		return;
+	}
+	let lo = Infinity;
+	let hi = -Infinity;
+	for (const gid of gids) {
+		lo = Math.min(lo, gid);
+		hi = Math.max(hi, gid);
+	}
 	const have = new Set(
-		await idb.league.transaction("rivalryGames").store.getAllKeys(),
+		await idb.league
+			.transaction("rivalryGames")
+			.store.getAllKeys(IDBKeyRange.bound(lo, hi)),
 	);
 	const records = new Map<number, RivalryGame>();
-	const add = (game: Game) => {
-		if (records.has(game.gid) || have.has(game.gid)) {
+	const add = (game: Game | undefined) => {
+		if (!game || records.has(game.gid) || have.has(game.gid)) {
 			return;
 		}
 		const rec = rivalryGameFromBox(game);
@@ -167,13 +191,17 @@ export const ensureBackfill = async () => {
 			records.set(game.gid, rec);
 		}
 	};
-	for await (const { value } of idb.league
-		.transaction("games")
-		.store.iterate()) {
-		add(value);
-	}
-	for (const game of await idb.cache.games.getAll()) {
+	for (const game of cached) {
 		add(game);
+	}
+	const missing = stored.filter((gid) => !have.has(gid) && !records.has(gid));
+	if (missing.length > 0) {
+		const store = idb.league.transaction("games").store;
+		for (const game of await Promise.all(
+			missing.map((gid) => store.get(gid)),
+		)) {
+			add(game);
+		}
 	}
 	if (records.size === 0) {
 		return;
@@ -185,6 +213,12 @@ export const ensureBackfill = async () => {
 const pairMemo = new Map<string, Promise<RivalryGame[]>>();
 const clearPairMemo = () => {
 	pairMemo.clear();
+};
+
+// Tests and benchmarks: forget the session's backfill and the pair memo, as a fresh session would
+export const resetRivalryStoriesSession = () => {
+	backfilled.clear();
+	clearPairMemo();
 };
 
 export const pairGames = async (a: number, b: number) => {
@@ -296,6 +330,31 @@ export const loadRivalryStory = async (
 	return buildRivalryStory({ input, games, teamSeasons, crossings, name });
 };
 
+// The bar for a "new high for the pair" in the recaps: each pair's highest points by a player before this season. From the
+// season rows (one small row per season, whatever the league's length), or, when an earlier row was written before they
+// kept highs, from the rival pairs' logged games.
+const pairHighs = async (
+	season: number,
+	rivalGames: RivalryGame[],
+): Promise<{ pairHigh: Map<string, number> } | { history: RivalryGame[] }> => {
+	const rows = (await rivalrySeasonRows()).filter((r) => r.season < season);
+	if (rows.every((r) => r.highs)) {
+		const pairHigh = new Map<string, number>();
+		for (const row of rows) {
+			for (const [pair, high] of Object.entries(row.highs!)) {
+				pairHigh.set(pair, Math.max(pairHigh.get(pair) ?? 0, high));
+			}
+		}
+		return { pairHigh };
+	}
+	const history: RivalryGame[] = [];
+	for (const pair of new Set(rivalGames.map((gm) => gm.pair))) {
+		const [a, b] = pair.split("-").map(Number) as [number, number];
+		history.push(...(await pairGames(a, b)));
+	}
+	return { history };
+};
+
 const fullName = (tid: number) => {
 	const t = g.get("teamInfoCache")[tid];
 	return t ? `${t.region} ${t.name}` : `Team ${tid}`;
@@ -318,14 +377,9 @@ export const getRivalryNewsFacts = async (
 
 	const games = await seasonGames(season);
 	const rivalGames = games.filter((gm) => isRival(gm.pair, gm.rivalry));
-	const history: RivalryGame[] = [];
-	for (const pair of new Set(rivalGames.map((gm) => gm.pair))) {
-		const [a, b] = pair.split("-").map(Number) as [number, number];
-		history.push(...(await pairGames(a, b)));
-	}
 	const recaps = rivalryRecaps({
 		games: rivalGames,
-		history,
+		...(await pairHighs(season, rivalGames)),
 		name: fullName,
 		isRival: () => true,
 	}).slice(0, 6);
