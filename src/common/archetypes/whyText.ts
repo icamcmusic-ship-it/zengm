@@ -10,7 +10,6 @@
 // The compact one-line form (whyLine) is the top two bullets joined with " · ".
 import { SUB_INDEX } from "../subRatings.ts";
 import { TRAIT_DEFINITIONS } from "../playerTraits/definitions.ts";
-import { DIM_LABELS } from "./composites.ts";
 import { zVector } from "./norms.ts";
 import { TRAIT_GROUPS, traitGroupValue, type ReadOptions } from "./score.ts";
 import {
