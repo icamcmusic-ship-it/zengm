@@ -5,6 +5,7 @@ import {
 	getRestrictionFactor,
 	isInjuryDepthEnabled,
 	isInjuryProne,
+	RETURN_GAMES,
 } from "./injuryDepth.ts";
 
 export type HealthInfo = {
@@ -22,6 +23,8 @@ export type HealthInfo = {
 	restrictGames: number;
 	returnGames: number;
 	recentBodyPart: string | undefined;
+	// Days since he came back from his last injury, while the return window lasts (for the nose bandage, common/faceRender.ts)
+	daysBack: number | undefined;
 	loadManagement: boolean;
 	canEditLoadManagement: boolean;
 };
@@ -54,6 +57,10 @@ export const getHealthInfo = (p: Player): HealthInfo => {
 		restrictGames: enabled ? (p.health?.restrict ?? 0) : 0,
 		returnGames: enabled ? (p.health?.returnGames ?? 0) : 0,
 		recentBodyPart: enabled ? p.health?.bodyPart : undefined,
+		daysBack:
+			enabled && p.health && p.health.returnGames > 0
+				? RETURN_GAMES - p.health.returnGames
+				: undefined,
 		loadManagement: !!p.loadManagement,
 		canEditLoadManagement: enabled && g.get("userTids").includes(p.tid),
 	};

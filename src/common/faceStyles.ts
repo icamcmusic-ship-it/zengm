@@ -8,6 +8,7 @@
 import type { FaceConfig } from "facesjs";
 import { seededRandom, type FaceWithExtra } from "./faceAging.ts";
 import { addRandomForkParts, type FacePart } from "./faceParts.ts";
+import { greyHair } from "./faceParts.suits.ts";
 
 export type Rarity = "common" | "uncommon" | "rare";
 export type Texture = "coily" | "curly" | "straight";
@@ -191,6 +192,29 @@ export const HAIR_STYLES: readonly HairStyle[] = [
 		rarity: "rare",
 		hairBg: "fork-shoulder-length",
 	},
+	// Batch D (common/faceParts.batchd.ts)
+	{ id: "fork-burst-fade", textures: ALL, rarity: "uncommon" },
+	{ id: "fork-buzz-leopard", textures: ALL, rarity: "rare", age: "young" },
+	{ id: "fork-frohawk", textures: C, rarity: "rare", age: "young" },
+	{ id: "fork-frohawk", textures: CU, rarity: "rare", age: "young" },
+	{ id: "fork-afro-puff", textures: C, rarity: "uncommon", age: "young" },
+	{ id: "fork-afro-puff", textures: CU, rarity: "rare", age: "young" },
+	{ id: "fork-high-top-slanted", textures: C, rarity: "rare", age: "young" },
+	{ id: "fork-jheri-curl", textures: C, rarity: "rare" },
+	{
+		id: "fork-jheri-curl",
+		textures: C,
+		rarity: "rare",
+		hairBg: "fork-curls-long",
+	},
+	{ id: "fork-bowl-cut", textures: S, rarity: "rare", age: "young" },
+	{
+		id: "fork-viking-braids",
+		textures: S,
+		rarity: "rare",
+		age: "young",
+		hairBg: "fork-viking-braids-long",
+	},
 ];
 
 // Facial hair rarity (ids not listed are uncommon; "none" is left to facesjs' own 50/50)
@@ -213,8 +237,10 @@ const FACIAL_COMMON = [
 	"fork-lineup-beard",
 	"fork-full-beard",
 	"fork-goatee-stubble",
+	"fork-goatee-extended",
 ];
 const FACIAL_RARE = [
+	"fork-braided-chin",
 	"fork-fu-manchu",
 	"fork-huge-beard",
 	"fork-handlebar",
@@ -257,6 +283,9 @@ const FORK_FACIAL = [
 	"fork-chin-patch",
 	"fork-goatee-stubble",
 	"fork-fu-manchu",
+	"fork-goatee-extended",
+	"fork-braided-chin",
+	"fork-pencil-beard",
 ];
 
 export const facialHairRarity = (id: string): Rarity =>
@@ -324,6 +353,52 @@ const GLASSES = [
 	"fork-glasses-rect",
 ];
 
+// Staff only (coaches and GMs 40 and over): looks of their own, made of existing parts, so players never get them as a set
+export const STAFF_LOOKS = [
+	"side-swept-grey",
+	"bald-beard-glasses",
+	"bald-heavy-brows",
+] as const;
+export type StaffLook = (typeof STAFF_LOOKS)[number];
+// Share of staff 40 and over with one of the looks (split evenly)
+export const STAFF_LOOK_CHANCE = 0.3;
+const STAFF_BEARDS = [
+	"beard1",
+	"beard2",
+	"fullgoatee",
+	"fork-full-beard",
+	"fork-boxed-beard",
+];
+const HEAVY_BROWS = ["fork-brow-bushy", "fork-brow-thick-straight"];
+const EVERYDAY_GLASSES = [
+	"glasses2-black",
+	"fork-glasses-round",
+	"fork-glasses-rect",
+];
+const pickOne = <T>(items: readonly T[], u: number) =>
+	items[Math.min(items.length - 1, Math.floor(u * items.length))]!;
+
+export const applyStaffLook = (
+	face: FaceConfig,
+	look: StaffLook,
+	random: () => number,
+) => {
+	face.hairBg.id = "none";
+	if (look === "side-swept-grey") {
+		face.hair.id = random() < 0.5 ? "fork-side-part" : "parted";
+		face.hair.color = greyHair(face.hair.color, 0.45 + 0.4 * random());
+		delete (face as FaceWithExtra).fork?.hair;
+	} else if (look === "bald-beard-glasses") {
+		face.hair.id = "bald";
+		face.facialHair.id = pickOne(STAFF_BEARDS, random());
+		face.glasses.id = pickOne(EVERYDAY_GLASSES, random());
+	} else {
+		face.hair.id = "bald";
+		face.facialHair.id = "none";
+		face.eyebrow.id = pickOne(HEAVY_BROWS, random());
+	}
+};
+
 // Natural hair colours stay facesjs'; a small share is bleached or dyed (younger players)
 const DYED = ["#e9d9a6", "#d8c38a", "#b5452f", "#f2efe6"];
 
@@ -332,10 +407,13 @@ export const styleFace = (
 	{
 		age,
 		facialHairIds,
+		staff,
 	}: {
 		age?: number;
 		// facesjs' facial hair ids (the index), to pick from with the fork's
 		facialHairIds: readonly string[];
+		// A coach or GM (staff-only looks from 40)
+		staff?: boolean;
 	},
 	exclude: (part: FacePart) => boolean = () => false,
 ) => {
@@ -393,6 +471,17 @@ export const styleFace = (
 		face.miscLine.id = "fork-acne";
 	}
 
+	// Staff only: a few coaches and GMs 40 and over get a look of their own (drawn only for staff, so players' faces are
+	// unchanged by it)
+	let look: StaffLook | undefined;
+	if (staff && age !== undefined && age >= 40) {
+		const u = random();
+		if (u < STAFF_LOOK_CHANCE) {
+			look = pickOne(STAFF_LOOKS, u / STAFF_LOOK_CHANCE);
+			applyStaffLook(face, look, random);
+		}
+	}
+
 	// Glasses: rare on players (goggles), common enough on older coaches and GMs
 	if (
 		age !== undefined &&
@@ -411,7 +500,10 @@ export const styleFace = (
 			exclude(part) ||
 			part.feature === "hair" ||
 			part.feature === "hairBg" ||
-			part.feature === "facialHair",
+			part.feature === "facialHair" ||
+			// A staff look keeps its brows and glasses
+			(look !== undefined &&
+				(part.feature === "eyebrow" || part.feature === "glasses")),
 	);
 	return face;
 };

@@ -447,10 +447,57 @@ at roster thumbnail size and in the dark theme.
   (rare); nasal strip (rare), striped headband, single earring; shoulder tattoo and arm script on the shoulders beside the
   jersey. Not added: wristbands and chains (outside or under the jersey crop), hair ties (no visible spot), a raised brow
   (looked off at thumbnail size).
+- **Batch D:** see below.
 - No era curves: style frequency doesn't depend on the league's season. Seeded from the face facesjs made, so no random
   numbers are drawn and no league result changes.
 - **Face editor:** Customize Player → _More styles_ lists every fork part of every feature (hair, hair behind the head,
   facial hair, ...). User choices are never overwritten: generation only runs for new faces, and aging skips edited faces.
+
+### Batch D
+
+Original SVG parts in `common/faceParts.batchd.ts` (append-only `fork-` ids after batch C; nothing copied from facesjs). Each
+candidate was first drawn on four sample faces next to the closest facesjs and fork styles; the ones that were already there
+were dropped. Every kept part was checked on light to dark skin, blond to black (and grey) hair, fatness 0 to 1, under the
+facesjs and fork headbands, at roster thumbnail size (40 px) and in the dark theme.
+
+- **Hair (generated):** `burst-fade` (fades out in rings round the ear; every texture, uncommon), `frohawk` (coily or curly,
+  rare, young), `afro-puff` (coily uncommon / curly rare, young), `high-top-slanted` (coily, rare, young), `jheri-curl`
+  (wet-look curls with shine, coily, rare, alone or with the fork's `curls-long` behind), `bowl-cut` (mushroom cut over
+  shaved sides, straight, rare, young), `viking-braids` (braided strip over shaved sides with two long braids behind,
+  `viking-braids-long`; straight, rare, young), `buzz-leopard` (bleached buzz with dark rosettes; every texture, rare,
+  young; counts as a buzz for hair loss). Young styles use the existing age fit (they fade after 27).
+- **Facial hair (generated):** `goatee-extended` (goatee and mustache spread along the jaw, uncommon), `braided-chin` (chin
+  beard with a braid and a tie, rare), `pencil-beard` (pencil-thin line along the jaw with a curl at each cheek and a pencil
+  mustache, uncommon). The two fuller ones count as short beards for beard events.
+- **Face and body (mixed in at random, rare):** `septum-ring` and `brow-piercing` (accessories), `ear-gauges`
+  (accessories), `mouth-grill` (a grin showing gold teeth, so the grill always shows), `body-neck-ink` (a small star on the
+  side of the neck between the jaw and the collar: the older `fork-body-neck-tattoo` sits under the jaw, where the head
+  covers it, and is left as it is so existing faces keep their look). Piercings, gauges and the neck ink are hard to see at
+  thumbnail size, like the earring studs.
+- **Nose bandage** (`nose-bandage`, gauze and tape over the bridge of the nose): never generated or stored. With _New Face
+  Styles_ on, the player page and Compare Players (current season) draw it while he's out with `Fractured Nose`, `Facial
+  Laceration` or `Skate to Face`, and for his first 10 days back when the return window is known (the Injury Depth setting's
+  `p.health.returnGames`, basketball); without it, only while he's out. It's drawn in the glasses slot (a derived
+  `<glasses>~nb` part, never listed), so a headband stays and the clear mask (Face Aging, below) goes over it. Concussions
+  and neck injuries get neither the bandage nor the mask: neither is worn for them. It can also be picked by hand.
+- **Staff only** (coaches and GMs 40 and over, `styleFace({ staff: true })` from `core/staff` and `core/gm`): 30% get one of
+  three looks made of existing parts, 10% each: _side-swept grey_ (`fork-side-part` or `parted`, hair 45-85% grey),
+  _bald with a beard and glasses_ (beard1/2, fullgoatee, fork full or boxed beard; everyday frames), _clean bald with heavy
+  brows_ (`fork-brow-bushy` / `fork-brow-thick-straight`, clean-shaven). Players never get these as a set (the draw only
+  happens for staff, so players' faces are the same with or without the flag).
+- **Dropped as duplicates:** temple taper / Brooklyn fade (= `fork-line-up`), undercut with a long top (= `fork-undercut`),
+  clear protective face mask (= facesjs `facemask`, already drawn after facial injuries), eye black (= facesjs `eye-black`),
+  low sweatband (= facesjs `headband`, which already sits low; `headband-high` is the high one), freckles (= facesjs
+  `freckles1`/`freckles2`), mole (= `fork-mole`), dimples (= `fork-dimple`), side-swept grey as a hair part (=
+  `fork-side-part` / `parted`; kept as a staff look with grey hair instead). Neck tattoo was not dropped (see above).
+- **Style events:** each new hair style has its own `HAIR_NEIGHBOURS` entry (burst fade ↔ low/high fade, frohawk ↔ high
+  fade / small afro, afro puff ↔ small afro / Bantu knots, slanted high-top ↔ high-top, Jheri curl short ↔ long, bowl cut ↔
+  Edgar / crop, Viking braids ↔ top knot / undercut, leopard buzz ↔ buzz); no existing style lists a new one, so existing
+  players' events are unchanged.
+- **Gate and editor:** generation is behind _New Face Styles_ (`featureForkFaces`); stored faces never change. Every part is
+  listed in Customize Player → _More styles_ and in the Face Style Gallery. No era curves.
+- **Tests:** `common/faceParts.batchd.test.ts` (append-only ids, rendering across skin, hair, fatness and headbands,
+  generation and age fit, neighbours, staff looks only for staff 40+, nose bandage rules and render-time drawing).
 
 ### Face aging
 

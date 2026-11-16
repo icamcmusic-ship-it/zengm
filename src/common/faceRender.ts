@@ -9,6 +9,7 @@
 import type { FaceConfig } from "facesjs";
 import { svgs } from "facesjs";
 import type { FaceWithExtra } from "./faceAging.ts";
+import { BATCH_D_PARTS } from "./faceParts.batchd.ts";
 
 const table = svgs as unknown as Record<string, Record<string, string>>;
 
@@ -97,3 +98,47 @@ export const withFaceMask = (face: FaceConfig): FaceConfig => ({
 	...face,
 	glasses: { id: "facemask" },
 });
+
+// Nose and facial injuries: a nose bandage while he's out and for his first days back (common/faceParts.batchd.ts,
+// League Extras "New Face Styles"). Drawn at render time, never stored, so it's gone once he's healed.
+export const NOSE_INJURIES = new Set([
+	"Facial Laceration",
+	"Fractured Nose",
+	"Skate to Face",
+]);
+// Days (the injury countdown is per day) after his return that he still wears it. Known only with the Injury Depth setting
+// (p.health.returnGames counts the days back down from injuryDepth's RETURN_GAMES); otherwise only while he's out.
+export const NOSE_BANDAGE_RETURN_DAYS = 10;
+
+export const wearsNoseBandage = (
+	injury: { type: string; gamesRemaining: number } | undefined,
+	// His last injury and the days since he came back from it, if known
+	recent?: { type: string | undefined; daysBack: number | undefined },
+) =>
+	(injury !== undefined &&
+		injury.gamesRemaining > 0 &&
+		NOSE_INJURIES.has(injury.type)) ||
+	(recent !== undefined &&
+		recent.type !== undefined &&
+		recent.daysBack !== undefined &&
+		recent.daysBack < NOSE_BANDAGE_RETURN_DAYS &&
+		NOSE_INJURIES.has(recent.type) &&
+		(injury === undefined || injury.gamesRemaining <= 0));
+
+const NOSE_BANDAGE_SVG =
+	BATCH_D_PARTS.find((part) => part.id === "fork-nose-bandage")?.svg ?? "";
+
+// Drawn in the glasses slot (under any glasses or the clear mask), so a headband or other accessory stays: a derived part
+// "<glasses id>~nb", registered once per glasses style and never listed in svgsIndex
+export const withNoseBandage = (face: FaceConfig): FaceConfig => {
+	const parts = table.glasses;
+	const glasses = face.glasses?.id ?? "none";
+	if (!parts) {
+		return face;
+	}
+	const id = `${glasses}~nb`;
+	if (parts[id] === undefined) {
+		parts[id] = NOSE_BANDAGE_SVG + (parts[glasses] ?? "");
+	}
+	return { ...face, glasses: { ...face.glasses, id } };
+};
