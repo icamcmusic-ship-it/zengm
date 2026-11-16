@@ -956,6 +956,22 @@ export const realSubShape = (
 	return { sub: anchorAndFit(x, r, flex), info };
 };
 
+// "Vary real players' sub-ratings": a real player's lean plus small bounded noise (sd 3, at most 6 points), seeded by his seed (and so by
+// the league salt), so famous shapes stay recognizable but two leagues differ a little
+export const VARY_REAL_SD = 3;
+export const VARY_REAL_MAX = 6;
+export const varyRealLean = (lean: readonly number[], seed: number) => {
+	const rng = new Rng(`subvary|${seed}`);
+	return lean.map(
+		(v) =>
+			v +
+			Math.max(
+				-VARY_REAL_MAX,
+				Math.min(VARY_REAL_MAX, rng.normal(0, VARY_REAL_SD)),
+			),
+	);
+};
+
 // A uint32 seed from a string
 export const seedFromString = (s: string) =>
 	Math.floor(new Rng(`subseed|${s}`).random() * 4294967296);

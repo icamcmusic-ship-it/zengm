@@ -25,6 +25,7 @@ import {
 	parseSubLean,
 	realSubShape,
 	seedForExisting,
+	varyRealLean,
 	seedForGenerated,
 	type StoredSubInfo,
 	syncRowSubs,
@@ -40,6 +41,10 @@ import { FOCUSES, tiltSubKeys } from "../../../common/staffDepth/devPlans.ts";
 import type { FocusKey } from "../../../common/staffDepth/types.ts";
 import { anchorAndFit } from "../../../common/subRatingsGen.ts";
 import { expandedFromSubs } from "../../../common/subRatings.ts";
+
+// League salt option: vary real players' shapes a little (off = exact real data)
+const varyRealOn = () =>
+	Object.hasOwn(g, "varyRealPlayers") && g.get("varyRealPlayers") === true;
 
 export const subRatingsOn = (): boolean =>
 	__SPORT === "basketball" &&
@@ -158,10 +163,11 @@ export const ensureSubs = (p: PlayerLike): boolean => {
 		if (subZ) {
 			realShootingSplit(latest, lean);
 		}
+		const seed = seedForExisting(p);
 		const { sub, info } = realSubShape(
 			latest,
-			seedForExisting(p),
-			lean,
+			seed,
+			varyRealOn() ? varyRealLean(lean, seed) : lean,
 			subZ !== undefined,
 		);
 		latest.sub = sub;

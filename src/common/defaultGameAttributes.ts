@@ -49,6 +49,8 @@ export const gameAttributesKeysGameState: GameAttributeKey[] = [
 	"aiTradeOffers",
 	"rumors",
 	"playerTraitsSeed",
+	"leagueSalt",
+	"leagueSaltHistory",
 ];
 export const gameAttributesKeysTeams: GameAttributeKey[] = ["confs", "divs"];
 export const gameAttributesCache: GameAttributeKey[] = [
@@ -90,6 +92,7 @@ const gameAttributesKeysSportSpecific = {
 		"assistFactor",
 		"realPlayerDeterminism",
 		"rpdPot",
+		"varyRealPlayers",
 		"foulRateFactor",
 		"foulsNeededToFoulOut",
 		"foulsUntilBonus",
@@ -659,6 +662,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	// Off for existing leagues, on for new ones (see views/newLeague.ts)
 	playerTraits: false,
 	playerTraitsSeed: 0,
+	leagueSalt: 0,
+	varyRealPlayers: false,
 	playerMoodTraits: true,
 	numPlayersOnCourt: 5,
 	aiJerseyRetirement: true,

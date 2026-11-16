@@ -2,6 +2,7 @@ import { createWithEqualityFn } from "zustand/traditional";
 import { shallow } from "zustand/shallow";
 import type { LocalStateUI, GameAttributesLeague } from "../../common/types.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
+import { setLeagueSaltGetter } from "../../common/leagueSalt.ts";
 import { safeLocalStorage } from "./safeLocalStorage.ts";
 import {
 	nativeFeatureLocalDefaults,
@@ -97,6 +98,7 @@ const useLocalRaw = createWithEqualityFn<LocalStateWithActions>(
 		phaseText: "",
 		playMenuOptions: [],
 		playerTraits: false,
+		leagueSalt: 0,
 		popup: window.location.search === "?w=popup",
 		quarterLength: defaultGameAttributes.quarterLength,
 		salaryCap: defaultGameAttributes.salaryCap,
@@ -180,6 +182,7 @@ const useLocalRaw = createWithEqualityFn<LocalStateWithActions>(
 					phase: 0,
 					playMenuOptions: [],
 					playerTraits: false,
+					leagueSalt: 0,
 					quarterLength: defaultGameAttributes.quarterLength,
 					season: 0,
 					startingSeason: 0,
@@ -329,5 +332,8 @@ const local = useLocalRaw;
 
 // This assumes the actions object never changes!
 const localActions = local.getState().actions;
+
+// League salt: the UI's seeded derivations (faces drawn here) read it from the synced state
+setLeagueSaltGetter(() => local.getState().leagueSalt ?? 0);
 
 export { local, localActions, useLocal };

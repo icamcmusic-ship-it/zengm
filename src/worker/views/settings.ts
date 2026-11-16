@@ -91,6 +91,7 @@ type Key =
 	| "challengeSisyphusMode"
 	| "challengeThanosMode"
 	| "realPlayerDeterminism"
+	| "varyRealPlayers"
 	| "repeatSeason"
 	| "maxOvertimes"
 	| "maxOvertimesPlayoffs"
@@ -322,6 +323,7 @@ export const getInitialSettings = (): Settings => {
 		challengeSisyphusMode: g.get("challengeSisyphusMode"),
 		challengeThanosMode: g.get("challengeThanosMode"),
 		realPlayerDeterminism: g.get("realPlayerDeterminism"),
+		varyRealPlayers: g.get("varyRealPlayers"),
 		repeatSeason: g.get("repeatSeason")?.type ?? "disabled",
 		maxOvertimes: g.get("maxOvertimes"),
 		maxOvertimesPlayoffs: g.get("maxOvertimesPlayoffs"),

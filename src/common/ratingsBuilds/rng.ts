@@ -2,6 +2,7 @@
 // itself, not from a draw off the parent, so creating one child never moves another.
 
 // xmur3 string hash -> 32 bit seed generator
+import { salted } from "../leagueSalt.ts";
 const hashSeed = (input: string) => {
 	const str = String(input);
 	let h = 1779033703 ^ str.length;
@@ -23,7 +24,7 @@ export class Rng {
 
 	constructor(seed: string | number) {
 		this.seedString = String(seed);
-		this.a = hashSeed(this.seedString)();
+		this.a = hashSeed(salted(this.seedString))();
 	}
 
 	// mulberry32, [0, 1)

@@ -5,6 +5,7 @@
 //
 // With the setting off nothing here runs (every entry point returns early), so the sim and the coaching market draw exactly the random numbers
 // they did before.
+import { salted } from "../../../common/leagueSalt.ts";
 import {
 	analyticsMgmtBoost,
 	analyticsRotationBias,
@@ -871,7 +872,7 @@ export const onHeadCoachHired = async (c: Coach) => {
 				name: `${mentor.firstName} ${mentor.lastName}`,
 			};
 			const random = makeSeededRandom(
-				hashString(`tree|${c.cid}|${mentor.cid}`),
+				hashString(salted(`tree|${c.cid}|${mentor.cid}`)),
 			);
 			if (asAssistant.role === "off" && random() < 0.65) {
 				profile.off = mp.off;

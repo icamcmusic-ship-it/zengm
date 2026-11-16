@@ -4,9 +4,10 @@ import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
 import { DAILY_SCHEDULE } from "../../common/constants.ts";
 import { useLocal } from "../util/local.ts";
+import { confirm } from "../util/confirm.tsx";
 
 const GodMode = () => {
-	const { godMode } = useLocal(["godMode"]);
+	const { godMode, leagueSalt } = useLocal(["godMode", "leagueSalt"]);
 
 	useTitleBar({ title: "God Mode" });
 
@@ -22,6 +23,16 @@ const GodMode = () => {
 
 		await toWorker("main", "updateGameAttributes", attrs);
 	};
+	const handleRerollSalt = async () => {
+		const proceed = await confirm(
+			"Re-roll the league salt? The salt is mixed into every seeded value of this league (sub-rating shapes, trait components, face styles and aging, award vote noise, newspaper, play-by-play and story wording, college stats, ratings builds, career aging, coach profiles). Values derived from now on change: new players' shapes, traits and faces, future award votes, future college seasons. Stored values are kept: existing players' sub-ratings, traits, faces and college stats don't change. Values recomputed when shown do change right away: face styles and face aging drawn on the page, newspaper and story wording. Recorded in the event log.",
+			{ okText: "Re-roll league salt" },
+		);
+		if (proceed) {
+			await toWorker("main", "rerollLeagueSalt", undefined);
+		}
+	};
+
 	return (
 		<div style={{ maxWidth: 1100 }}>
 			<p>
@@ -43,6 +54,18 @@ const GodMode = () => {
 			>
 				{godMode ? "Disable God Mode" : "Enable God Mode"}
 			</button>
+
+			{godMode ? (
+				<div className="mt-3">
+					<button className="btn btn-god-mode" onClick={handleRerollSalt}>
+						Re-roll league salt
+					</button>
+					<span className="ms-2 text-body-secondary">
+						Current salt: {leagueSalt ?? 0}
+						{leagueSalt ? "" : " (none: this league predates salts)"}
+					</span>
+				</div>
+			) : null}
 
 			<div className="card-group mt-3">
 				<div className="card border-radius-bottom-sm-0">

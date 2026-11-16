@@ -2403,6 +2403,29 @@ export const settings: Setting[] = (
 		},
 		{
 			category: "Real Players",
+			key: "varyRealPlayers",
+			name: "Vary Real Players' Sub-Ratings",
+			godModeRequired: "existingLeagueOnly",
+			type: "bool",
+			descriptionLong: (
+				<>
+					<p>
+						Off (default): real players' sub-rating shapes come exactly from
+						their real stats, the same in every league.
+					</p>
+					<p>
+						On: each real player's shape gets a small variation (about 3 points
+						per sub-rating, never more than 6), seeded by this league's salt, so
+						famous shapes stay recognizable but differ a little from league to
+						league. Applied when a real player's shape is first made (at league
+						creation), never to shapes already made. Trait components already
+						differ between leagues.
+					</p>
+				</>
+			),
+		},
+		{
+			category: "Real Players",
 			key: "rpdPot",
 			name: "RPD Affects Potential",
 			godModeRequired: "always",

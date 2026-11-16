@@ -1,3 +1,4 @@
+import { getLeagueSalt } from "../leagueSalt.ts";
 import { Rng } from "../ratingsBuilds/rng.ts";
 import { TRAIT_KEYS, type PlayerTraits, type TraitKey } from "./types.ts";
 
@@ -28,7 +29,7 @@ export const generateTraitSeeds = (
 	leagueSeed: number | string,
 	pid: number,
 ): Required<PlayerTraits> => {
-	const cacheKey = `${leagueSeed}|${pid}`;
+	const cacheKey = `${leagueSeed}|${pid}|${getLeagueSalt()}`;
 	const cached = generatedCache.get(cacheKey);
 	if (cached) {
 		return { ...cached };

@@ -1,5 +1,6 @@
 // Small pure helpers shared by Wrapped and Storylines: seeded randomness, number formatting, text polish, and rank-based scores.
 
+import { salted } from "../leagueSalt.ts";
 export const isNum = (x: unknown): x is number =>
 	typeof x === "number" && Number.isFinite(x);
 
@@ -17,7 +18,7 @@ export const hashString = (s: string) => {
 
 // mulberry32, seeded from text
 export const seededRng = (seed: string) => {
-	let a = hashString(seed) || 1;
+	let a = hashString(salted(seed)) || 1;
 	return () => {
 		a = (a + 0x6d2b79f5) | 0;
 		let t = Math.imul(a ^ (a >>> 15), 1 | a);
@@ -28,7 +29,7 @@ export const seededRng = (seed: string) => {
 
 // Deterministic choice of one item by a seed
 export const pickBy = <T>(seed: string, list: readonly T[]): T => {
-	return list[hashString(seed) % list.length]!;
+	return list[hashString(salted(seed)) % list.length]!;
 };
 
 // Building an Intl.NumberFormat is slow and every slide formats many numbers, so keep one per number of digits

@@ -1,3 +1,4 @@
+import { newLeagueSalt } from "../../common/leagueSalt.ts";
 import { csvFormat, csvFormatRows } from "d3-dsv";
 import type {
 	CoachRole,
@@ -4702,6 +4703,37 @@ const updateGameAttributes = async (
 	warmProspectArchetypes();
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
+// God Mode: a new league salt. Values derived from now on use it; stored values (sub-ratings, trait seeds, faces, college stats) are kept,
+// values recomputed when shown (face styles and aging, future award vote noise, newspaper and story wording) change. Recorded in the
+// event log and leagueSaltHistory.
+const rerollLeagueSalt = async () => {
+	if (!g.get("godMode")) {
+		throw new Error("God Mode required");
+	}
+	const from = g.get("leagueSalt") ?? 0;
+	let to = newLeagueSalt();
+	while (to === from) {
+		to = newLeagueSalt();
+	}
+	const history = [
+		...(g.get("leagueSaltHistory") ?? []),
+		{ season: g.get("season"), phase: g.get("phase"), from, to },
+	];
+	await league.setGameAttributes({
+		leagueSalt: to,
+		leagueSaltHistory: history,
+	});
+	logEvent({
+		type: "gameAttribute",
+		text: `League salt re-rolled (${from} to ${to}): values derived from now on are different.`,
+		showNotification: false,
+		score: 0,
+	});
+	await idb.cache.flush();
+	await toUI("realtimeUpdate", [["gameAttributes"]]);
+	return to;
+};
+
 const updateGameAttributesGodMode = async (
 	settings: Settings,
 	conditions: Conditions,
@@ -6470,6 +6502,7 @@ const api = {
 		updateDefaultSettingsOverrides,
 		updateGameAttributes,
 		updateGameAttributesGodMode,
+		rerollLeagueSalt,
 		updateKeepRosterSorted,
 		updateKeyboardShortcuts,
 		updateLeague,

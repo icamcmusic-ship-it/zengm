@@ -1,3 +1,4 @@
+import { saltedSeed } from "../leagueSalt.ts";
 import { makeSeededRandom } from "../random.ts";
 
 // A small seeded generator for the wording of the play-by-play. It is never connected to Math.random, so choosing words can neither change a
@@ -14,7 +15,9 @@ export class Rng {
 	random: () => number;
 
 	constructor(gid: number, index: number) {
-		this.random = makeSeededRandom(hash(Number.isFinite(gid) ? gid : 0, index));
+		this.random = makeSeededRandom(
+			saltedSeed(hash(Number.isFinite(gid) ? gid : 0, index)),
+		);
 		// Warm up: the first values of nearby seeds look alike
 		this.random();
 		this.random();

@@ -205,6 +205,10 @@ export const getDefaultSettings = () => {
 			defaultGameAttributes,
 			"challengeThanosMode",
 		),
+		varyRealPlayers: unwrapGameAttribute(
+			defaultGameAttributes,
+			"varyRealPlayers",
+		),
 		realPlayerDeterminism: unwrapGameAttribute(
 			defaultGameAttributes,
 			"realPlayerDeterminism",

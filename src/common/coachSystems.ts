@@ -2,6 +2,7 @@
 // and the UI. A head coach runs an offense system and a defense system, has dials (crash the glass, fouls, closing, timeouts, youth, rest),
 // a philosophy, a personality, a background, game management and adaptability. Rosters fit systems better or worse (scheme fit). The game
 // sim gets a small set of multipliers (CoachSim) that change how a team plays, normalized over the league so league averages stay put.
+import { salted } from "./leagueSalt.ts";
 import { makeSeededRandom } from "./random.ts";
 import type {
 	CoachBackground,
@@ -592,7 +593,9 @@ export const deriveCoachProfile = (
 ): CoachProfile => {
 	const random = makeSeededRandom(
 		hashString(
-			`coach|${c.firstName}|${c.lastName}|${c.born.year}|${c.born.loc}|${c.style.pace}|${c.style.threes}|${c.style.defense}|${c.style.rotation}`,
+			salted(
+				`coach|${c.firstName}|${c.lastName}|${c.born.year}|${c.born.loc}|${c.style.pace}|${c.style.threes}|${c.style.defense}|${c.style.rotation}`,
+			),
 		),
 	);
 	const noise = (sd: number) => sd * seededGauss(random);
