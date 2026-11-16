@@ -9,6 +9,12 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { gauss } from "../../../common/random.ts";
 import { getProStats } from "../../../common/preDraft.ts";
 import { realisticAgingOn } from "./ratingsModelSwitch.ts";
+import {
+	careerAgingOn,
+	careerRetireFactors,
+	freeAgentYearsBeforeRetiring,
+} from "./careerAging.ts";
+import { getPlayerTraitScores, traitsEnabled } from "./traits.ts";
 
 // Realistic Aging: the stock rule retires players at 34-39 much faster than the NBA (2000-2025: per season, about 8.5/6.2/4.0/2.7
 // players who played at 36/37/38/39, the stock rule leaves about 3/1.5/1/0.5). Both retirement chances below are multiplied by this
@@ -148,7 +154,22 @@ const shouldRetire = async (p: Player): Promise<boolean> => {
 
 	if (__SPORT === "basketball") {
 		const maxAge = 33;
-		const scale = oldRetireScale(age);
+		let scale = oldRetireScale(age);
+		// Career Aging: role, contract, title, injuries, milestones and mentor value
+		let add = 0;
+		if (careerAgingOn()) {
+			const factors = careerRetireFactors({
+				p,
+				age,
+				season,
+				ovr,
+				veteranSavvy: traitsEnabled()
+					? getPlayerTraitScores(p as any, season).veteranSavvy
+					: undefined,
+			});
+			scale *= factors.mult;
+			add = factors.add;
+		}
 		const minPot = 40;
 
 		// Only players older than maxAge or without a contract will retire
@@ -168,7 +189,7 @@ const shouldRetire = async (p: Player): Promise<boolean> => {
 				0.971 * Math.max(ws, estWS);
 
 			const odds = Math.exp(logit);
-			const prob = (scale * odds) / (1 + odds);
+			const prob = (scale * odds) / (1 + odds) + add;
 
 			if (prob > Math.random()) {
 				return true;
@@ -212,7 +233,13 @@ const shouldRetire = async (p: Player): Promise<boolean> => {
 	}
 
 	// Retire players who have been free agents for more than one years
-	if (p.tid === PLAYER.FREE_AGENT && p.yearsFreeAgent >= 1) {
+	if (
+		p.tid === PLAYER.FREE_AGENT &&
+		p.yearsFreeAgent >=
+			(careerAgingOn()
+				? freeAgentYearsBeforeRetiring(age, last(p.ratings).ovr)
+				: 1)
+	) {
 		return true;
 	}
 

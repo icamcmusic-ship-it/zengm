@@ -173,14 +173,21 @@ export const tiltSubs = (
 	focus: FocusKey,
 	amount: number,
 ) => {
+	return tiltSubKeys(sub, FOCUSES[focus].subs, amount);
+};
+
+// tiltSubs for any list of sub keys (Career Aging's reinvention too)
+export const tiltSubKeys = (
+	sub: readonly number[],
+	keys: readonly string[],
+	amount: number,
+) => {
 	const x = [...sub];
 	if (!isValidSubArray(sub) || amount === 0) {
 		return x;
 	}
 	const focusIdx = new Set(
-		FOCUSES[focus].subs
-			.map((key) => SUB_INDEX[key]!)
-			.filter((i) => i !== undefined),
+		keys.map((key) => SUB_INDEX[key]!).filter((i) => i !== undefined),
 	);
 	for (const group of SUB_GROUPS) {
 		const inFocus = group.idx.filter((i) => focusIdx.has(i));

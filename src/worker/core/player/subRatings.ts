@@ -36,7 +36,7 @@ import { parseSubZ, wideRealLean } from "../../../common/subRatingsReal.ts";
 import { shootingSplitBase } from "../../../common/expandedRatings.ts";
 import { g } from "../../util/index.ts";
 import { applyFuzz, getFuzz } from "./fuzzRating.ts";
-import { FOCUSES, tiltSubs } from "../../../common/staffDepth/devPlans.ts";
+import { FOCUSES, tiltSubKeys } from "../../../common/staffDepth/devPlans.ts";
 import type { FocusKey } from "../../../common/staffDepth/types.ts";
 import { anchorAndFit } from "../../../common/subRatingsGen.ts";
 import { expandedFromSubs } from "../../../common/subRatings.ts";
@@ -305,12 +305,22 @@ export const tiltRowSubs = (
 	focus: FocusKey,
 	amount: number,
 ) => {
+	tiltRowSubKeys(p, r, FOCUSES[focus].subs, amount);
+};
+
+// tiltRowSubs for any list of sub keys (Career Aging: reinvention, injuries)
+export const tiltRowSubKeys = (
+	p: PlayerLike,
+	r: any,
+	keys: readonly string[],
+	amount: number,
+) => {
 	if (!p.subP || isPending(p.subP) || !isValidSubArray(r.sub)) {
 		return;
 	}
-	const x = tiltSubs(r.sub, focus, amount);
+	const x = tiltSubKeys(r.sub, keys, amount);
 	const bases = new Set(
-		FOCUSES[focus].subs.map((key) => SUB_DEFS.find((d) => d.key === key)!.base),
+		keys.map((key) => SUB_DEFS.find((d) => d.key === key)!.base),
 	);
 	const ex = expandedFromSubs(x);
 	const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));

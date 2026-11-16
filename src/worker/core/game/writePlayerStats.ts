@@ -1,3 +1,5 @@
+import { careerAgingOn, injuryAthleticLoss } from "../player/careerAging.ts";
+import { syncLatestSubs, tiltRowSubKeys } from "../player/subRatings.ts";
 import { isNitGame } from "../college/postseason.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { finances, player } from "../index.ts";
@@ -234,26 +236,55 @@ const doInjury = async (
 		hockey: p2.injury.gamesRemaining,
 	});
 
+	// Career Aging: a bounded, seeded loss from major injuries (and a smaller one from other long ones) instead
+	const careerLoss = careerAgingOn()
+		? injuryAthleticLoss({
+				pid: p2.pid,
+				type: p2.injury.type,
+				games: p2.injury.gamesRemaining,
+				age: g.get("season") - p2.born.year,
+				season: g.get("season"),
+				n: p2.injuries.length,
+				seed: g.get("playerTraitsSeed") ?? 0,
+			})
+		: undefined;
+
 	if (
-		gamesRemainingNormalized > 25 &&
-		Math.random() < gamesRemainingNormalized / 82 &&
-		!last(p2.ratings).locked
+		careerLoss
+			? !last(p2.ratings).locked
+			: gamesRemainingNormalized > 25 &&
+				!careerAgingOn() &&
+				Math.random() < gamesRemainingNormalized / 82 &&
+				!last(p2.ratings).locked
 	) {
 		ratingsLoss = true;
 
 		player.addRatingsRow(p2, undefined, p2.injuries.length - 1);
 		const newRatings = last(p2.ratings);
 
-		const ratingsToNerf = bySport({
-			baseball: ["spd", "endu", "hpw", "thr", "ppw"],
-			basketball: ["spd", "endu", "jmp"],
-			football: ["spd", "endu", "thp"],
-			hockey: ["spd", "endu"],
-		});
-		for (const rating of ratingsToNerf) {
-			(newRatings as any)[rating] = player.limitRating(
-				(newRatings as any)[rating] - randInt(1, 20),
-			);
+		if (careerLoss) {
+			for (const [rating, loss] of Object.entries(careerLoss.loss)) {
+				(newRatings as any)[rating] = player.limitRating(
+					(newRatings as any)[rating] - loss,
+				);
+			}
+			// Matching subs: the bases' subs follow (in develop below), and max vertical goes more than standing reach
+			if (careerLoss.jmpTilt > 0) {
+				syncLatestSubs(p2 as any);
+				tiltRowSubKeys(p2 as any, newRatings, ["stj"], careerLoss.jmpTilt);
+			}
+		} else {
+			const ratingsToNerf = bySport({
+				baseball: ["spd", "endu", "hpw", "thr", "ppw"],
+				basketball: ["spd", "endu", "jmp"],
+				football: ["spd", "endu", "thp"],
+				hockey: ["spd", "endu"],
+			});
+			for (const rating of ratingsToNerf) {
+				(newRatings as any)[rating] = player.limitRating(
+					(newRatings as any)[rating] - randInt(1, 20),
+				);
+			}
 		}
 
 		// Update ovr and pot
