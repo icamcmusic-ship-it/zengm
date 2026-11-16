@@ -57,6 +57,19 @@ const REPAIR_MAX_EXTENSION = 2;
 // goes down by up to this much (the partner choice, where a home/away run is worth 0.15)
 const RIVAL_SPREAD = 0.5;
 const RIVAL_SPREAD_PENALTY = 1;
+// Every pair's meetings are spread the same way, a little less strongly than rivals'
+const PAIR_SPREAD_PENALTY = 0.6;
+// Same opponent in consecutive games: never 3 in a row, and 2 in a row only as a planned 2-game set (both teams' previous game was
+// that meeting, same home team, at most SET_MAX_GAP days later), at most one per team and about SETS_PER_TEAM per team in the league,
+// and with a small penalty so it happens when it suits both teams' rest anyway. The NBA has a few of these a season.
+const SET_MAX_GAP = 2;
+const SETS_PER_TEAM = 0.2;
+const SET_PENALTY = 0.3;
+// Days past the target length after which a second game in a row against the same team is allowed, so the season ends
+const OVERTIME_REPEAT = 4;
+// A pair with many of a team's remaining games goes earlier (by this times their share of each team's remaining games), so the last
+// weeks don't leave a team with mostly one opponent, which would mean meeting it in consecutive games
+const PAIR_SHARE_WEIGHT = 3;
 
 export type RealisticScheduleEvents = {
 	// Fraction of the season (as in the allStarGame setting), or null for no All-Star Game
@@ -111,7 +124,6 @@ const groupScheduleRealistic = (
 	const rivalKey = (a: number, b: number) =>
 		a < b ? `${a}-${b}` : `${b}-${a}`;
 	const rivalMeetings = new Map<string, number>();
-	const rivalLastMeeting = new Map<string, number>();
 	if (events.rivals) {
 		for (const [home, away] of tids) {
 			const key = rivalKey(home, away);
@@ -120,6 +132,28 @@ const groupScheduleRealistic = (
 			}
 		}
 	}
+	// Every pair (by id, for each matchup): number of meetings, remaining ones, whether rivals, the day and home team of the last one
+	const pairIds = new Map<string, number>();
+	const pairOf = new Int32Array(tids.length);
+	const pairMeetings: number[] = [];
+	for (const [m, [home, away]] of tids.entries()) {
+		const key = rivalKey(home, away);
+		let id = pairIds.get(key);
+		if (id === undefined) {
+			id = pairIds.size;
+			pairIds.set(key, id);
+			pairMeetings.push(0);
+		}
+		pairOf[m] = id;
+		pairMeetings[id]! += 1;
+	}
+	const pairRemaining = [...pairMeetings];
+	const pairRival = pairMeetings.map(() => false);
+	for (const [key, id] of pairIds) {
+		pairRival[id] = rivalMeetings.has(key);
+	}
+	const pairLastMeeting = new Array<number>(pairMeetings.length).fill(-1);
+	const pairLastHome = new Array<number>(pairMeetings.length).fill(-1);
 	const slateCap = new Map<number, number>();
 	const slatePriority = new Map<number, readonly number[]>();
 	const slatePairs = new Set<string>();
@@ -161,6 +195,12 @@ const groupScheduleRealistic = (
 	// Home/away runs: last venue (1 home, 0 away) and how many games in a row there
 	const lastHome = new Int8Array(numTeams).fill(-1);
 	const venueStreak = new Array<number>(numTeams).fill(0);
+	// Opponents (team index) of the last two games of each team, and the 2-game sets
+	const lastOpp = new Int32Array(numTeams).fill(-1);
+	const lastOpp2 = new Int32Array(numTeams).fill(-1);
+	const numSetsByTeam = new Uint8Array(numTeams);
+	let numSets = 0;
+	const maxSets = Math.floor(numTeams * SETS_PER_TEAM);
 
 	const outTids: [number, number][] = [];
 	const outDays: number[] = [];
@@ -252,9 +292,24 @@ const groupScheduleRealistic = (
 		numRemaining -= 1;
 		numToday += 1;
 		const [home, away] = tids[best]!;
-		if (rivalMeetings.size > 0) {
-			rivalLastMeeting.set(rivalKey(home, away), day);
+		const h = index.get(home)!;
+		const a = index.get(away)!;
+		if (lastOpp[h] === a || lastOpp[a] === h) {
+			numSets += 1;
+			numSetsByTeam[h]! += 1;
+			numSetsByTeam[a]! += 1;
 		}
+		for (const [team, opp] of [
+			[h, a],
+			[a, h],
+		] as const) {
+			lastOpp2[team] = lastOpp[team]!;
+			lastOpp[team] = opp;
+		}
+		const pair = pairOf[best]!;
+		pairLastMeeting[pair] = day;
+		pairRemaining[pair]! -= 1;
+		pairLastHome[pair] = home;
 		outTids.push([home, away]);
 		outDays.push(day);
 		for (const [tid, isHome] of [
@@ -278,6 +333,54 @@ const groupScheduleRealistic = (
 		}
 	};
 
+	// How much worse matchup m is today because the teams met recently: undefined if it can't be played today (a third game in a row
+	// against the same team, or a second one that isn't a planned 2-game set; only allowed late in an overtime season, so it always
+	// ends, and never 3 in a row if the teams have anyone else left), else a penalty for meeting again sooner than the pair's share
+	// of the season
+	const recentMeetingPenalty = (m: number, overtime: number) => {
+		const [home, away] = tids[m]!;
+		const h = index.get(home)!;
+		const a = index.get(away)!;
+		const pair = pairOf[m]!;
+		const last = pairLastMeeting[pair]!;
+		const pairRem = pairRemaining[pair]!;
+		const share = PAIR_SHARE_WEIGHT * (pairRem / rem[h]! + pairRem / rem[a]!);
+		if (last < 0) {
+			return -share;
+		}
+		if (lastOpp[h] === a || lastOpp[a] === h) {
+			const third =
+				(lastOpp[h] === a && lastOpp2[h] === a) ||
+				(lastOpp[a] === h && lastOpp2[a] === h);
+			const set =
+				!third &&
+				lastOpp[h] === a &&
+				lastOpp[a] === h &&
+				pairLastHome[pair] === home &&
+				day - last <= SET_MAX_GAP &&
+				numSetsByTeam[h] === 0 &&
+				numSetsByTeam[a] === 0 &&
+				numSets < maxSets;
+			if (set) {
+				return SET_PENALTY;
+			}
+			if (
+				third &&
+				(overtime < overtimeAnything || rem[h]! > pairRem || rem[a]! > pairRem)
+			) {
+				return undefined;
+			}
+			if (overtime < OVERTIME_REPEAT) {
+				return undefined;
+			}
+			return 10;
+		}
+		const meetings = pairMeetings[pair]!;
+		const minGap = (RIVAL_SPREAD * numPlayDaysTarget) / meetings;
+		const short = minGap - (day - last);
+		const weight = pairRival[pair] ? RIVAL_SPREAD_PENALTY : PAIR_SPREAD_PENALTY;
+		return (short > 0 ? (weight * short) / minGap : 0) - share;
+	};
 	while (numRemaining > 0 && day < maxDays) {
 		emitEvents(false);
 
@@ -386,6 +489,7 @@ const groupScheduleRealistic = (
 					const key = rivalKey(home, away);
 					if (
 						slatePairs.has(key) === repeat &&
+						recentMeetingPenalty(m, overtime) !== undefined &&
 						!usedToday[index.get(home)!] &&
 						!usedToday[index.get(away)!]
 					) {
@@ -430,19 +534,11 @@ const groupScheduleRealistic = (
 				if (!eligible[u] || usedToday[u]) {
 					continue;
 				}
-				let value = score[u]!;
-				if (rivalMeetings.size > 0) {
-					const key = rivalKey(home, away);
-					const meetings = rivalMeetings.get(key);
-					const last = rivalLastMeeting.get(key);
-					if (meetings !== undefined && last !== undefined) {
-						const minGap = (RIVAL_SPREAD * numPlayDaysTarget) / meetings;
-						const short = minGap - (day - last);
-						if (short > 0) {
-							value -= (RIVAL_SPREAD_PENALTY * short) / minGap;
-						}
-					}
+				const penalty = recentMeetingPenalty(m, overtime);
+				if (penalty === undefined) {
+					continue;
 				}
+				let value = score[u]! - penalty;
 				for (const [team, isHome] of [
 					[t, tIsHome],
 					[u, !tIsHome],
