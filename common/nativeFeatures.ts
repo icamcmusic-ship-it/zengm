@@ -678,6 +678,18 @@ export const NATIVE_FEATURES = [
 				],
 				default: "game",
 			},
+			{
+				key: "archetypeEngine",
+				name: "Archetype engine",
+				description:
+					"Classic: one of the game's builds. v2 (experimental): a 2K-style composed name, a core role (Playmaker, Slasher, Stretch, Board Enforcer, ...) with up to two descriptors (2-Way, Crafty, Mid-Paint, Glass-Cleaning, ...), each a yes/no test against players at his position, decided family first with a vote of similar players from your 2K list and your own picks; a name that is one of the game's builds shows as that build. Labels change at the next preseason.",
+				type: "string",
+				values: [
+					{ key: "classic", value: "Classic" },
+					{ key: "v2", value: "v2" },
+				],
+				default: "classic",
+			},
 		],
 	},
 	{

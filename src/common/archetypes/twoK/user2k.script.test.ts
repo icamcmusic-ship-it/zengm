@@ -207,7 +207,11 @@ export const userPlayers = () => {
 };
 
 // The builds without this round's (the base the names are mapped to)
-const USER_IDS = new Set(USER_2K_DEFS.map((d) => d.id));
+// (archgaps: ARCH_U2K_GAP=1 makes the tables and the trims act on the four gap builds instead)
+const GAP_IDS = ["glue-wing", "glue-guard", "steady-game-manager", "energy-big"];
+const USER_IDS = new Set(
+	process.env.ARCH_U2K_GAP ? GAP_IDS : USER_2K_DEFS.map((d) => d.id),
+);
 const baseBuilds = () => ARCHETYPES.filter((a) => !USER_IDS.has(a.id));
 
 // Kind of a 2K name against the base builds: existing / alias-2k / alias-merged / 2k-unadopted / new

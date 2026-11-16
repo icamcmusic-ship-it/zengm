@@ -60,21 +60,36 @@ export type DescDef = {
 };
 
 export const ROLES: RoleDef[] = [
-	{ key: "playmaker", names: ["Playmaker", "Dimer"], concepts: ["pass"], groups: ALL },
+	{
+		key: "playmaker",
+		names: ["Playmaker", "Dimer"],
+		concepts: ["pass"],
+		groups: ALL,
+	},
 	{
 		key: "engine",
 		names: ["Offensive Engine"],
 		concepts: ["pass", "creator", "scorer"],
 		groups: ["guard", "wing"],
 	},
-	{ key: "creator", names: ["Creator"], concepts: ["creator"], groups: ["guard", "wing"] },
+	{
+		key: "creator",
+		names: ["Creator"],
+		concepts: ["creator"],
+		groups: ["guard", "wing"],
+	},
 	{
 		key: "shotHunter",
 		names: ["Shot Hunter"],
 		concepts: ["shotHunt", "creator"],
 		groups: ["guard", "wing"],
 	},
-	{ key: "sniper", names: ["Sniper"], concepts: ["shotHunt"], groups: ["guard", "wing"] },
+	{
+		key: "sniper",
+		names: ["Sniper"],
+		concepts: ["shotHunt"],
+		groups: ["guard", "wing"],
+	},
 	{
 		key: "sharpshooter",
 		names: ["Sharpshooter"],
@@ -87,10 +102,31 @@ export const ROLES: RoleDef[] = [
 		concepts: ["catchShoot"],
 		groups: ["big"],
 	},
-	{ key: "bucketChaser", names: ["Bucket Chaser"], concepts: ["chaser", "scorer"], groups: ["guard", "wing"] },
-	{ key: "maestro", names: ["Mid-Range Maestro"], withDesc: "Maestro", concepts: ["mid"], groups: ALL },
-	{ key: "slasher", names: ["Slasher"], concepts: ["slash"], groups: ["guard", "wing"] },
-	{ key: "finisher", names: ["Finisher", "Laymaker"], concepts: ["finish"], groups: ALL },
+	{
+		key: "bucketChaser",
+		names: ["Bucket Chaser"],
+		concepts: ["chaser", "scorer"],
+		groups: ["guard", "wing"],
+	},
+	{
+		key: "maestro",
+		names: ["Mid-Range Maestro"],
+		withDesc: "Maestro",
+		concepts: ["mid"],
+		groups: ALL,
+	},
+	{
+		key: "slasher",
+		names: ["Slasher"],
+		concepts: ["slash"],
+		groups: ["guard", "wing"],
+	},
+	{
+		key: "finisher",
+		names: ["Finisher", "Laymaker"],
+		concepts: ["finish"],
+		groups: ALL,
+	},
 	{
 		key: "burner",
 		names: ["Open-Lane Burner"],
@@ -98,13 +134,51 @@ export const ROLES: RoleDef[] = [
 		concepts: ["burner"],
 		groups: ["guard", "wing"],
 	},
-	{ key: "highFlyer", names: ["High Flyer"], concepts: ["air"], groups: ["guard", "wing"] },
-	{ key: "cutter", names: ["Off-Ball Cutter"], withDesc: "Cutter", concepts: ["cutter"], groups: ["wing", "big"] },
-	{ key: "hammer", names: ["Rim Hammer"], withDesc: "Hammer", concepts: ["hammer"], groups: ["big"] },
-	{ key: "rimRunner", names: ["Rim Runner"], concepts: ["run"], groups: ["big"] },
-	{ key: "lobThreat", names: ["Lob Threat"], concepts: ["lob"], groups: ["big"] },
-	{ key: "lock", names: ["Perimeter Lock"], withDesc: "Lock", concepts: ["lockdown"], groups: ["guard", "wing"] },
-	{ key: "ballHawk", names: ["Ball Hawk"], concepts: ["steal"], groups: ["guard", "wing"] },
+	{
+		key: "highFlyer",
+		names: ["High Flyer"],
+		concepts: ["air"],
+		groups: ["guard", "wing"],
+	},
+	{
+		key: "cutter",
+		names: ["Off-Ball Cutter"],
+		withDesc: "Cutter",
+		concepts: ["cutter"],
+		groups: ["wing", "big"],
+	},
+	{
+		key: "hammer",
+		names: ["Rim Hammer"],
+		withDesc: "Hammer",
+		concepts: ["hammer"],
+		groups: ["big"],
+	},
+	{
+		key: "rimRunner",
+		names: ["Rim Runner"],
+		concepts: ["run"],
+		groups: ["big"],
+	},
+	{
+		key: "lobThreat",
+		names: ["Lob Threat"],
+		concepts: ["lob"],
+		groups: ["big"],
+	},
+	{
+		key: "lock",
+		names: ["Perimeter Lock"],
+		withDesc: "Lock",
+		concepts: ["lockdown"],
+		groups: ["guard", "wing"],
+	},
+	{
+		key: "ballHawk",
+		names: ["Ball Hawk"],
+		concepts: ["steal"],
+		groups: ["guard", "wing"],
+	},
 	{
 		key: "rimProtector",
 		names: ["Shot Eraser", "Paint Protector"],
@@ -117,35 +191,146 @@ export const ROLES: RoleDef[] = [
 		concepts: ["reb"],
 		groups: ["wing", "big"],
 	},
-	{ key: "boardHunter", names: ["Board Hunter"], concepts: ["oreb"], groups: ["wing", "big"] },
-	{ key: "postBully", names: ["Post Bully"], withDesc: "Bully", concepts: ["post", "strength"], groups: ["wing", "big"] },
-	{ key: "postPro", names: ["Post Pro"], concepts: ["post"], groups: ["wing", "big"] },
+	{
+		key: "boardHunter",
+		names: ["Board Hunter"],
+		concepts: ["oreb"],
+		groups: ["wing", "big"],
+	},
+	{
+		key: "postBully",
+		names: ["Post Bully"],
+		withDesc: "Bully",
+		concepts: ["post", "strength"],
+		groups: ["wing", "big"],
+	},
+	{
+		key: "postPro",
+		names: ["Post Pro"],
+		concepts: ["post"],
+		groups: ["wing", "big"],
+	},
+	// archgaps (user-approved): the role players' roles (custom tests in tests.ts: breadth, no standout)
+	{
+		key: "glueWing",
+		names: ["Glue Wing"],
+		concepts: ["glueWing"],
+		groups: ["wing"],
+	},
+	{
+		key: "glueGuard",
+		names: ["Glue Guard"],
+		concepts: ["glueGuard"],
+		groups: ["guard"],
+	},
+	{
+		key: "gameManager",
+		names: ["Steady Game Manager"],
+		concepts: ["gameManagerRole"],
+		groups: ["guard"],
+	},
+	{
+		key: "energyBig",
+		names: ["Energy Big"],
+		concepts: ["energyRole"],
+		groups: ["big"],
+	},
 ];
 
 export const DESCRIPTORS: DescDef[] = [
 	{ key: "twoWay", names: ["2-Way"], concept: "twoWay", slot: 0 },
 	{ key: "crafty", names: ["Crafty"], concept: "crafty", slot: 1 },
-	{ key: "physical", names: ["Physical", "Bruising"], concept: "strength", slot: 1 },
-	{ key: "highFlying", names: ["High-Flying", "Bouncy"], concept: "air", slot: 1 },
+	{
+		key: "physical",
+		names: ["Physical", "Bruising"],
+		concept: "strength",
+		slot: 1,
+	},
+	{
+		key: "highFlying",
+		names: ["High-Flying", "Bouncy"],
+		concept: "air",
+		slot: 1,
+	},
 	{ key: "ballHawking", names: ["Ball-Hawking"], concept: "steal", slot: 2 },
 	{ key: "defensive", names: ["Defensive"], concept: "lockdown", slot: 2 },
-	{ key: "shotErasing", names: ["Shot-Erasing", "Paint-Protecting", "Backline"], concept: "rimD", slot: 2 },
-	{ key: "glass", names: ["Glass-Cleaning", "Board-Enforcing"], concept: "reb", slot: 2 },
+	{
+		key: "shotErasing",
+		names: ["Shot-Erasing", "Paint-Protecting", "Backline"],
+		concept: "rimD",
+		slot: 2,
+	},
+	{
+		key: "glass",
+		names: ["Glass-Cleaning", "Board-Enforcing"],
+		concept: "reb",
+		slot: 2,
+	},
 	{ key: "boardHunting", names: ["Board-Hunting"], concept: "oreb", slot: 2 },
-	{ key: "playmaking", names: ["Playmaking", "Diming"], concept: "pass", slot: 2 },
-	{ key: "iso", names: ["Iso", "Shifty"], concept: "creator", slot: 2, groups: ["guard", "wing"] },
+	{
+		key: "playmaking",
+		names: ["Playmaking", "Diming"],
+		concept: "pass",
+		slot: 2,
+	},
+	{
+		key: "iso",
+		names: ["Iso", "Shifty"],
+		concept: "creator",
+		slot: 2,
+		groups: ["guard", "wing"],
+	},
 	{ key: "threeLevel", names: ["3-Level"], concept: "threeLevel", slot: 2 },
 	{ key: "insideOut", names: ["Inside-Out"], concept: "insideOut", slot: 2 },
 	{ key: "threePt", names: ["3PT"], concept: "shotHunt", slot: 2 },
-	{ key: "stretchy", names: ["Stretch"], concept: "catchShoot", slot: 2, groups: ["wing", "big"] },
+	{
+		key: "stretchy",
+		names: ["Stretch"],
+		concept: "catchShoot",
+		slot: 2,
+		groups: ["wing", "big"],
+	},
 	{ key: "midPaint", names: ["Mid-Paint"], concept: "midPaint", slot: 2 },
-	{ key: "midPost", names: ["Mid-Post"], concept: "midPost", slot: 2, groups: ["wing", "big"] },
+	{
+		key: "midPost",
+		names: ["Mid-Post"],
+		concept: "midPost",
+		slot: 2,
+		groups: ["wing", "big"],
+	},
 	{ key: "middy", names: ["Middy", "Hash-Sinking"], concept: "mid", slot: 2 },
-	{ key: "pullUp", names: ["Pull-Up"], concept: "pullUp", slot: 2, groups: ["guard", "wing"] },
-	{ key: "postScoring", names: ["Post-Scoring"], concept: "post", slot: 2, groups: ["wing", "big"] },
-	{ key: "slashing", names: ["Slashing", "Downhill"], concept: "slash", slot: 2 },
-	{ key: "rimRocking", names: ["Rim-Rocking", "Rim-Wrecking"], concept: "dunk", slot: 2 },
-	{ key: "rimRunning", names: ["Rim-Running", "Wing-Running"], concept: "run", slot: 2 },
+	{
+		key: "pullUp",
+		names: ["Pull-Up"],
+		concept: "pullUp",
+		slot: 2,
+		groups: ["guard", "wing"],
+	},
+	{
+		key: "postScoring",
+		names: ["Post-Scoring"],
+		concept: "post",
+		slot: 2,
+		groups: ["wing", "big"],
+	},
+	{
+		key: "slashing",
+		names: ["Slashing", "Downhill"],
+		concept: "slash",
+		slot: 2,
+	},
+	{
+		key: "rimRocking",
+		names: ["Rim-Rocking", "Rim-Wrecking"],
+		concept: "dunk",
+		slot: 2,
+	},
+	{
+		key: "rimRunning",
+		names: ["Rim-Running", "Wing-Running"],
+		concept: "run",
+		slot: 2,
+	},
 ];
 
 export const ROLE_BY_KEY = new Map(ROLES.map((r) => [r.key, r]));
@@ -190,6 +375,10 @@ const CONCEPT_GROUP: Record<string, string> = {
 	highLow: "post",
 	strength: "stre",
 	crafty: "style",
+	glueWing: "glue",
+	glueGuard: "glue",
+	gameManagerRole: "glue",
+	energyRole: "finish",
 	insideOut: "insideOut",
 };
 // Pairs that may share a group after all (2K says them): a mid-range word with the Maestro role
@@ -396,6 +585,12 @@ export const familyOfName = (name: string, pos: Pos | undefined): Family => {
 		case "burner":
 		case "cutter":
 			return "slasher";
+		case "glue":
+			return "wingDefender";
+		case "gameManager":
+			return "playmaker";
+		case "energy":
+			return "postBig";
 		case "creator":
 			return keys.includes("pass")
 				? "playmaker"
@@ -445,6 +640,9 @@ const CONCEPT_ROLE: Record<string, string> = {
 	post: "postPro",
 	highLow: "postPro",
 	strength: "postBully",
+	glue: "glueWing",
+	gameManager: "gameManager",
+	energy: "energyBig",
 };
 const CONCEPT_DESC: Record<string, string> = Object.fromEntries(
 	DESCRIPTORS.map((d) => [d.concept, d.key]),
@@ -476,8 +674,7 @@ export const parseName = (name: string, pos: Pos | undefined): ParsedName => {
 			headSeen = true;
 			continue;
 		}
-		const d =
-			k === "skill" && /Crafty/.test(name) ? "crafty" : CONCEPT_DESC[k];
+		const d = k === "skill" && /Crafty/.test(name) ? "crafty" : CONCEPT_DESC[k];
 		if (d && !descs.includes(d)) {
 			descs.push(d);
 		}
@@ -542,9 +739,17 @@ const ROLE_NOUN: Record<string, string> = {
 	boardHunter: "An offensive rebounder",
 	postBully: "A post bully",
 	postPro: "A post scorer",
+	glueWing: "A role-playing wing",
+	glueGuard: "A role-playing guard",
+	gameManager: "A steady point guard",
+	energyBig: "An energy big",
 };
 const CONCEPT_PHRASE = new Map(CONCEPTS.map((c) => [c.key, c.phrase]));
 const CUSTOM_PHRASE: Record<string, string> = {
+	glueWing: "defends, moves the ball and does a bit of everything",
+	glueGuard: "defends and keeps the offense moving",
+	gameManagerRole: "runs the offense without mistakes",
+	energyRole: "runs the floor, finishes at the rim and protects it",
 	crafty: "wins with craft and touch",
 	air: "plays above the rim",
 };

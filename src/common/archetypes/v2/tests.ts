@@ -63,6 +63,37 @@ export const CUSTOM_TESTS: Record<
 	string,
 	(ctx: WordContext, lead: boolean) => WordTest
 > = {
+	// archgaps (user-approved, scratchpad/archgaps/report.md): Glue Wing / Glue Guard: perimeter D top 50% and his head
+	// skill, two of three / passing / rebounding / rim D top 50% (guard: three or passing), 3+ of the 10 classes top 50%,
+	// no class top 20%
+	glueWing: (ctx) => glue(ctx, ["shoot", "pass", "reb", "rimD"], 2),
+	glueGuard: (ctx) => glue(ctx, ["shoot", "pass"], 1),
+	// Steady Game Manager: passing and handling top 50%, no class top 20%
+	gameManagerRole: (ctx) => {
+		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
+		const margin = Math.min(
+			p("pass") - 0.5,
+			p("handle") - 0.5,
+			noStandout(ctx),
+			(ctx.cv.pass ?? 0) / 4,
+			(ctx.cv.handle ?? 0) / 4,
+		);
+		return { pass: margin >= 0, margin };
+	},
+	// Energy Big: finishing and athleticism top 50% (one his head skill), rim D top 50%, three below top 50%
+	energyRole: (ctx) => {
+		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
+		const margin = Math.min(
+			p("finish") - 0.5,
+			p("ath") - 0.5,
+			p("rimD") - 0.5,
+			0.5 - p("shoot"),
+			ctx.top3.includes("finish") || ctx.top3.includes("ath") ? 1 : -0.01,
+			(ctx.cv.finish ?? 0) / 4,
+			(ctx.cv.ath ?? 0) / 4,
+		);
+		return { pass: margin >= 0, margin };
+	},
 	// Crafty: offensive feel well above his position's (and, with sub-ratings, finesse over contact)
 	crafty: (ctx) => {
 		const oiq = ctx.pz.oiq ?? 0;
@@ -70,6 +101,27 @@ export const CUSTOM_TESTS: Record<
 		const margin = Math.min((oiq - 0.5) / 2, (0.25 - con) / 2);
 		return { pass: margin >= 0, margin };
 	},
+};
+
+const noStandout = (ctx: WordContext) =>
+	Math.min(
+		...SKILL_CLASS_KEYS.map(
+			(k) => 0.8 - peerPct(ctx.bucket, k, ctx.cv[k] ?? 0),
+		),
+	);
+const glue = (ctx: WordContext, side: string[], nSide: number): WordTest => {
+	const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
+	const sides = side.map((k) => p(k) - 0.5).sort((a, b) => b - a);
+	const broad = SKILL_CLASS_KEYS.map((k) => p(k) - 0.5).sort((a, b) => b - a);
+	const margin = Math.min(
+		p("perD") - 0.5,
+		ctx.top3.includes("perD") ? 1 : -0.01,
+		sides[nSide - 1]!,
+		broad[2]!,
+		noStandout(ctx),
+		(ctx.cv.perD ?? 0) / 4,
+	);
+	return { pass: margin >= 0, margin };
 };
 
 const subOk = (

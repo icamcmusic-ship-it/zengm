@@ -26,15 +26,12 @@ import { hasExpandedRatings } from "../../expandedRatings.ts";
 import { mergedId } from "../merges.data.ts";
 import { familyProbs } from "../model.ts";
 import { isPos } from "../position.ts";
+import { nameAt } from "../posNames.ts";
 import { promiseMiss } from "../score.ts";
 import { RULES } from "../rulebook.data.ts";
 import { USER_2K_MAP } from "../twoK/user2kMap.data.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
-import type {
-	ArchetypeRatings,
-	Classification,
-	Pos,
-} from "../types.ts";
+import type { ArchetypeRatings, Classification, Pos } from "../types.ts";
 import {
 	compatible,
 	composedId,
@@ -97,14 +94,14 @@ export const V2_PARAMS: V2Params = {
 	dK: 1,
 	dCost: 0.3,
 	kCanon: 1,
-	classicBonus: 0.2,
+	classicBonus: 1,
 	buildBonus: 0.1,
 	hyst: 0.25,
 	words: true,
 	k: 15,
 };
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+const norm = (s: string) => s.toLowerCase().replace(/[^\da-z]/g, "");
 let nameIndex: Map<string, string> | undefined;
 // Every name a build goes by (its names at each position, its 2K aliases, the user's 2K names mapped to it)
 const buildOfName = (name: string): string | undefined => {
@@ -389,9 +386,36 @@ export const classifyV2 = (
 			add(classicCand);
 		}
 	}
-	cands.sort(
-		(x, y) => y.score - x.score || (x.canon < y.canon ? -1 : 1),
-	);
+	// The classic engine's runners-up: candidates too (its next builds are often the right one)
+	{
+		let added = 0;
+		for (const sc of s.scored) {
+			if (added >= 2) {
+				break;
+			}
+			if (sc.a.id === classic.id || !allowedBuild(sc.a.id, pos, cv)) {
+				continue;
+			}
+			added++;
+			const nm = nameAt(sc.a, pos);
+			const fam = familyOfName(nm, pos);
+			const parsed = parseName(nm, pos);
+			add({
+				id: sc.a.id,
+				name: nm,
+				canon: sc.a.id,
+				family: fam,
+				role: parsed.role,
+				descs: parsed.descs,
+				score:
+					famScore[fam] +
+					P.classicBonus * (0.5 - 0.25 * added) +
+					P.rK * (votes.role[parsed.role ?? ""] ?? 0) +
+					P.kCanon * (votes.canon[sc.a.id] ?? 0),
+			});
+		}
+	}
+	cands.sort((x, y) => y.score - x.score || (x.canon < y.canon ? -1 : 1));
 	// Family first: the candidates of his family (the classic label when none is)
 	let pool = cands.filter((c) => c.family === family);
 	if (pool.length === 0) {
@@ -449,9 +473,7 @@ export const classifyV2 = (
 		family: a.family,
 		desc: a.desc,
 		tags: a.tags,
-		alternates: rest
-			.slice(1, 3)
-			.map((c) => ({ id: c.id, name: c.name })),
+		alternates: rest.slice(1, 3).map((c) => ({ id: c.id, name: c.name })),
 		shortfall: isClassic ? classic.shortfall : 0,
 		confidence: Math.round(confidence * 100) / 100,
 		why: isClassic

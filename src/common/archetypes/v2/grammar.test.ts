@@ -24,13 +24,20 @@ describe("archv2 grammar", () => {
 			for (const w of d.names) {
 				const keys = conceptsOf(w).map((c) => c.key);
 				if (CUSTOM_TESTS[d.concept]) {
-					assert.ok(keys.every((k) => k === "skill"), `${w}: ${keys}`);
+					assert.ok(
+						keys.every((k) => k === "skill"),
+						`${w}: ${keys}`,
+					);
 				} else {
 					assert.ok(keys.includes(d.concept), `${w}: ${keys}`);
 				}
 			}
 		}
 		for (const r of ROLES) {
+			// (a role on a custom test: its test covers the name's promise, checked by the promise test below)
+			if (CUSTOM_TESTS[r.concepts[0]!]) {
+				continue;
+			}
 			for (const w of [...r.names, r.withDesc].filter(Boolean) as string[]) {
 				// (every promise of the name is tested; a role may test more than its name says)
 				const keys = conceptsOf(w)
@@ -40,7 +47,10 @@ describe("archv2 grammar", () => {
 					assert.ok(r.concepts.includes(k), `${w}: ${k} not tested`);
 				}
 				if (w === r.names[0]) {
-					assert.ok(keys.includes(r.concepts[0]!), `${w}: head ${r.concepts[0]}`);
+					assert.ok(
+						keys.includes(r.concepts[0]!),
+						`${w}: head ${r.concepts[0]}`,
+					);
 				}
 			}
 		}
@@ -74,10 +84,18 @@ describe("archv2 grammar", () => {
 			),
 		);
 		assert.isTrue(
-			compatible(ROLE_BY_KEY.get("maestro")!, [DESC_BY_KEY.get("midPaint")!], "wing"),
+			compatible(
+				ROLE_BY_KEY.get("maestro")!,
+				[DESC_BY_KEY.get("midPaint")!],
+				"wing",
+			),
 		);
 		assert.strictEqual(
-			composeName(ROLE_BY_KEY.get("maestro")!, [DESC_BY_KEY.get("midPaint")!], "wing"),
+			composeName(
+				ROLE_BY_KEY.get("maestro")!,
+				[DESC_BY_KEY.get("midPaint")!],
+				"wing",
+			),
 			"Mid-Paint Maestro",
 		);
 		assert.strictEqual(

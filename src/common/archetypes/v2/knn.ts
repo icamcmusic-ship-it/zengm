@@ -8,13 +8,7 @@
 import { POS_BUCKETS } from "../norms.ts";
 import type { Family } from "../families.ts";
 import type { Pos, PosBucket } from "../types.ts";
-import {
-	KNN_KEYS,
-	KNN_META,
-	KNN_NAMES,
-	KNN_SCALE,
-	KNN_X,
-} from "./knn.data.ts";
+import { KNN_KEYS, KNN_META, KNN_NAMES, KNN_SCALE, KNN_X } from "./knn.data.ts";
 import { familyOfName, parseName, type WordPick } from "./grammar.ts";
 
 // The features: FAM_FEATS without the constant and the prospect flag
@@ -27,7 +21,17 @@ export const FEAT_W: number[] = Array.from({ length: N_FEATS }, (_, i) =>
 	i < 11 ? 1 : 0.5,
 );
 
-export const POS_LIST: Pos[] = ["PG", "G", "SG", "GF", "SF", "F", "PF", "FC", "C"];
+export const POS_LIST: Pos[] = [
+	"PG",
+	"G",
+	"SG",
+	"GF",
+	"SF",
+	"F",
+	"PF",
+	"FC",
+	"C",
+];
 export const BUCKET_OF: Record<Pos, PosBucket> = {
 	PG: "PG",
 	G: "SG",
@@ -187,9 +191,7 @@ export const knnVotes = (
 	const k = opts.k ?? 15;
 	const gap = opts.bucketGap ?? 2;
 	const bi = bucketIndex(bucket);
-	const refs = opts.extra
-		? [...shippedRefs(), ...opts.extra]
-		: shippedRefs();
+	const refs = opts.extra ? [...shippedRefs(), ...opts.extra] : shippedRefs();
 	const best: { r: RefRow; d: number }[] = [];
 	for (const r of refs) {
 		if (r.key === opts.exclude || (opts.tuneOnly && r.split === "test")) {
@@ -221,8 +223,7 @@ export const knnVotes = (
 	const wordW: Record<string, Record<string, number>> = {};
 	let total = 0;
 	for (const { r, d } of best) {
-		const w =
-			(opts.srcW?.[r.src] ?? SOURCE_W[r.src]) / (0.5 + d);
+		const w = (opts.srcW?.[r.src] ?? SOURCE_W[r.src]) / (0.5 + d);
 		total += w;
 		v.dist += d;
 		v.family[r.family] = (v.family[r.family] ?? 0) + w;

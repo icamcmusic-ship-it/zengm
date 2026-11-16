@@ -53,12 +53,10 @@ import {
 	FEAT_FROM_FAMX,
 	metaOf,
 	N_FEATS,
-	POS_LIST,
 } from "./knn.ts";
 
 const MODE = process.env.ARCH_V2_MODE;
-const OUT =
-	process.env.ARCH_V2_OUT ?? "/tmp/claude-0/archv2-report.txt";
+const OUT = process.env.ARCH_V2_OUT ?? "/tmp/claude-0/archv2-report.txt";
 const NORMS = defaultNorms(false);
 const REAL_NORMS = realNorms(NORMS, false);
 const PARAMS = process.env.ARCH_V2_PARAMS
@@ -203,7 +201,8 @@ test.skipIf(!process.env.RUN_ARCHETYPE_V2)(
 			const peers = {};
 			for (const b of POS_BUCKETS) {
 				peers[b] = {};
-				for (const [k, xs] of Object.entries(by[b])) peers[b][k] = quantiles(xs);
+				for (const [k, xs] of Object.entries(by[b]))
+					peers[b][k] = quantiles(xs);
 			}
 			writeFileSync(
 				new URL("./peers.data.ts", import.meta.url),
@@ -219,7 +218,14 @@ export const PEER_QUANTILES: Partial<Record<PosBucket, Record<string, number[]>>
 			// The labeled players
 			const rows = [];
 			for (const x of userPlayers()) {
-				const s = scoreAll(x.p.ratings, x.norms, ARCHETYPES, x.p.pos, undefined, x.read);
+				const s = scoreAll(
+					x.p.ratings,
+					x.norms,
+					ARCHETYPES,
+					x.p.pos,
+					undefined,
+					x.read,
+				);
 				rows.push({
 					key: x.r.slug,
 					name: x.r.arch,
@@ -244,8 +250,9 @@ export const PEER_QUANTILES: Partial<Record<PosBucket, Record<string, number[]>>
 			const scale = {};
 			for (const b of POS_BUCKETS) {
 				const xs = rows.filter((r) => BUCKET_OF[r.pos] === b).map((r) => r.raw);
-				const mean = Array.from({ length: N_FEATS }, (_, i) =>
-					xs.reduce((s, x) => s + x[i], 0) / Math.max(1, xs.length),
+				const mean = Array.from(
+					{ length: N_FEATS },
+					(_, i) => xs.reduce((s, x) => s + x[i], 0) / Math.max(1, xs.length),
 				);
 				const sd = Array.from({ length: N_FEATS }, (_, i) =>
 					Math.max(
@@ -265,7 +272,8 @@ export const PEER_QUANTILES: Partial<Record<PosBucket, Record<string, number[]>>
 			const std = rows.map((r) =>
 				r.raw.map(
 					(v, i) =>
-						(v - scale[BUCKET_OF[r.pos]].mean[i]) / scale[BUCKET_OF[r.pos]].sd[i],
+						(v - scale[BUCKET_OF[r.pos]].mean[i]) /
+						scale[BUCKET_OF[r.pos]].sd[i],
 				),
 			);
 			writeFileSync(
@@ -376,7 +384,9 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			const ids = x.j.ids.map(mergedId);
 			return {
 				canon: ids,
-				fam: ids.map((id) => familyOfName(nameAt(archetypeById(id), x.pos), x.pos)),
+				fam: ids.map((id) =>
+					familyOfName(nameAt(archetypeById(id), x.pos), x.pos),
+				),
 				names: ids.map((id) => nameAt(archetypeById(id), x.pos)),
 			};
 		};
@@ -393,33 +403,47 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 				const ex = (x) => ({ ...loo(x), params: { ...PARAMS, ...pr } });
 				const a = accuracy("v2", tune2k, t2k, null, ex);
 				const b = accuracy("v2", tuneJ, tJ, null, ex);
-				out.push(`${JSON.stringify(pr)}\n  2K tune ${fmt(a)}\n  judged tune ${fmt(b)}\n  objective ${(a.fam + a.t3 + 0.5 * (b.fam + b.t3)).toFixed(4)}`);
+				out.push(
+					`${JSON.stringify(pr)}\n  2K tune ${fmt(a)}\n  judged tune ${fmt(b)}\n  objective ${(a.fam + a.t3 + 0.5 * (b.fam + b.t3)).toFixed(4)}`,
+				);
 				writeFileSync(OUT, out.join("\n") + "\n");
 			}
 			return;
 		}
 
-		const out = [`archv2 report (sub-ratings ${SUBS_ON ? "on" : "off"}), params ${JSON.stringify({ ...V2_PARAMS, ...PARAMS })}`];
+		const out = [
+			`archv2 report (sub-ratings ${SUBS_ON ? "on" : "off"}), params ${JSON.stringify({ ...V2_PARAMS, ...PARAMS })}`,
+		];
 		const groups2k = {
-			"user 2K held-out, current": u2k.filter((x) => x.split === "test" && !x.r.allTime),
-			"user 2K held-out, all-time (half weight)": u2k.filter((x) => x.split === "test" && x.r.allTime),
+			"user 2K held-out, current": u2k.filter(
+				(x) => x.split === "test" && !x.r.allTime,
+			),
+			"user 2K held-out, all-time (half weight)": u2k.filter(
+				(x) => x.split === "test" && x.r.allTime,
+			),
 			"user 2K held-out, all": u2k.filter((x) => x.split === "test"),
 		};
 		for (const [k, xs] of Object.entries(groups2k)) {
 			out.push(`${k}:`);
 			for (const e of ["classic", "v2"])
-				out.push(`  ${e.padEnd(7)} ${fmt(accuracy(e, xs, t2k, null, e === "v2" ? heldOut : () => ({})))}`);
+				out.push(
+					`  ${e.padEnd(7)} ${fmt(accuracy(e, xs, t2k, null, e === "v2" ? heldOut : () => ({})))}`,
+				);
 		}
 		{
 			const xs = judged.filter((x) => x.j.split === "test");
 			out.push("judged key held-out:");
 			for (const e of ["classic", "v2"])
-				out.push(`  ${e.padEnd(7)} ${fmt(accuracy(e, xs, tJ, null, e === "v2" ? heldOut : () => ({})))}`);
+				out.push(
+					`  ${e.padEnd(7)} ${fmt(accuracy(e, xs, tJ, null, e === "v2" ? heldOut : () => ({})))}`,
+				);
 		}
 		// v2 on the tune split, leave-one-out (for reference: not held out)
 		{
 			const xs = u2k.filter((x) => x.split === "tune");
-			out.push(`user 2K tune split (leave-one-out, reference): classic ${fmt(accuracy("classic", xs, t2k, null, () => ({})))}; v2 ${fmt(accuracy("v2", xs, t2k, null, loo))}`);
+			out.push(
+				`user 2K tune split (leave-one-out, reference): classic ${fmt(accuracy("classic", xs, t2k, null, () => ({})))}; v2 ${fmt(accuracy("v2", xs, t2k, null, loo))}`,
+			);
 		}
 		writeFileSync(OUT, out.join("\n") + "\n");
 		if (process.env.ARCH_V2_QUICK) return;
@@ -427,11 +451,13 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 		// ---- populations ----
 		const league = await genPlayers(3000, "metrics-league", 19, 32, 38);
 		const vets = await genPlayers(1000, "metrics-vets", 32, 37, 38);
-		const pros = (await genPlayers(1000, "metrics-pros", 19, 19, 40)).map((p) => ({
-			...p,
-			prospect: true,
-			age: undefined,
-		}));
+		const pros = (await genPlayers(1000, "metrics-pros", 19, 19, 40)).map(
+			(p) => ({
+				...p,
+				prospect: true,
+				age: undefined,
+			}),
+		);
 		const real = realPop(2016, 2025);
 		const real2025 = real.filter((p) => p.season === 2025);
 		const top150 = [...real2025].sort((a, b) => b.ovr - a.ovr).slice(0, 150);
@@ -460,7 +486,14 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 					if (isGenericBuild({ id: res.id })) generic++;
 					const a = archetypeById(res.id);
 					if (!a || !a.positions.includes(p.pos)) conflict++;
-					const s = scoreAll(p.ratings, p.norms, ARCHETYPES, p.pos, undefined, readOf(p));
+					const s = scoreAll(
+						p.ratings,
+						p.norms,
+						ARCHETYPES,
+						p.pos,
+						undefined,
+						readOf(p),
+					);
 					if (a && promiseMiss(a, s.cv) <= 1e-9) promise++;
 					if (res.id.startsWith("v2:")) composed++;
 					if (res.c.v2 && !res.c.v2.agreed) low++;
@@ -486,7 +519,8 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 						const r = { ...p.ratings };
 						for (const k of RATING_KEYS)
 							if (k !== "hgt") r[k] = Math.max(0, Math.min(100, r[k] + sgn));
-						if (r.sub) r.sub = r.sub.map((x) => Math.max(0, Math.min(100, x + sgn)));
+						if (r.sub)
+							r.sub = r.sub.map((x) => Math.max(0, Math.min(100, x + sgn)));
 						const res = ENGINES[e]({ ...p, ratings: r });
 						n++;
 						if (res.id === p[`res_${e}`].id) same++;
@@ -499,13 +533,18 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 		// Churn: the same players season after season, previous label and position carried, aging read
 		for (const e of ["classic", "v2"]) {
 			let changes = 0,
-				steps = 0,
-				close = 0;
+				steps = 0;
 			await seeded("metrics-flap", async () => {
 				newG();
 				const rng2 = new Rng("metrics-flap");
 				for (let i = 0; i < 2000; i++) {
-					const p = generate(-1, 19, 2025 - rng2.int(0, 6), false, DEFAULT_LEVEL);
+					const p = generate(
+						-1,
+						19,
+						2025 - rng2.int(0, 6),
+						false,
+						DEFAULT_LEVEL,
+					);
 					const dev = rng2.int(0, 10);
 					await develop(p, dev, true);
 					let prev, prevPos, prevR;
@@ -528,21 +567,29 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 					}
 				}
 			});
-			out.push(`churn ${e}: ${pct(changes, steps)} of seasons change label (${steps} player-seasons)`);
+			out.push(
+				`churn ${e}: ${pct(changes, steps)} of seasons change label (${steps} player-seasons)`,
+			);
 			writeFileSync(OUT, out.join("\n") + "\n");
 		}
 		// Notable players (current season of the user's list when there, else his latest season in the data)
-		const NOTABLE = (process.env.ARCH_V2_NOTABLE ??
-			"Jokic,Stephen Curry,Kevin Durant,LeBron James,Giannis,Gilgeous-Alexander,Luka,Embiid,Jayson Tatum,Jalen Brunson,Kyrie Irving,Donovan Mitchell,Rudy Gobert,Draymond Green,Evan Mobley,Alperen,Tyrese Haliburton,Cade Cunningham,Anthony Edwards,Wembanyama,Brook Lopez,Clint Capela,Alex Caruso,Tyler Herro,Tyrese Maxey,Karl-Anthony Towns,Zion Williamson,Ja Morant,Domantas Sabonis,Paolo Banchero").split(",");
+		const NOTABLE = (
+			process.env.ARCH_V2_NOTABLE ??
+			"Jokic,Stephen Curry,Kevin Durant,LeBron James,Giannis,Gilgeous-Alexander,Luka,Embiid,Jayson Tatum,Jalen Brunson,Kyrie Irving,Donovan Mitchell,Rudy Gobert,Draymond Green,Evan Mobley,Alperen,Tyrese Haliburton,Cade Cunningham,Anthony Edwards,Wembanyama,Brook Lopez,Clint Capela,Alex Caruso,Tyler Herro,Tyrese Maxey,Karl-Anthony Towns,Zion Williamson,Ja Morant,Domantas Sabonis,Paolo Banchero"
+		).split(",");
 		const data = realData();
 		const fold = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 		out.push("", "notable players | 2K | Classic | v2 (family; agreed?)");
 		for (const n of NOTABLE) {
 			let x = u2k.find((y) => !y.r.allTime && fold(y.r.name).includes(fold(n)));
 			if (!x) {
-				const slug = Object.entries(data.d.bios).find(([, b]) => b.name && fold(b.name).includes(fold(n)))?.[0];
+				const slug = Object.entries(data.d.bios).find(
+					([, b]) => b.name && fold(b.name).includes(fold(n)),
+				)?.[0];
 				const row = slug
-					? data.d.ratings.filter((r) => r.slug === slug).sort((a, b) => b.season - a.season)[0]
+					? data.d.ratings
+							.filter((r) => r.slug === slug)
+							.sort((a, b) => b.season - a.season)[0]
 					: undefined;
 				if (!row) {
 					out.push(`${n}: not found`);
