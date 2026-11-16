@@ -1145,6 +1145,15 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "profileExportFull",
+		key: "featureProfileExportFull",
+		name: "Complete Profile Export",
+		description:
+			"Export profile (player pages) includes everything his pages and the league pages show about him: recruiting, playoffs and tournaments (college and pro), coaches by season, award finishes and votes, the tracking profile, contract details and mood history, every news entry, and his legacy (Hall of Fame plaque and speech, GOAT Lab rank, rivalry lines, face history). Off: the shorter export.",
+		default: false,
+		defaultNewLeague: true,
+	},
+	{
 		id: "timeline",
 		key: "featureTimeline",
 		name: "League Timeline",
