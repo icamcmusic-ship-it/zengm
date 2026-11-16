@@ -9,6 +9,7 @@ import setRepeatSeason from "./setRepeatSeason.ts";
 import loadGameAttributes from "./loadGameAttributes.ts";
 import remove from "./remove.ts";
 import setGameAttributes from "./setGameAttributes.ts";
+import rerollSalt from "./rerollSalt.ts";
 import swapWorstRoster from "./swapWorstRoster.ts";
 import updateMeta from "./updateMeta.ts";
 
@@ -24,6 +25,7 @@ export default {
 	loadGameAttributes,
 	remove,
 	setGameAttributes,
+	rerollSalt,
 	swapWorstRoster,
 	updateMeta,
 };

@@ -4,6 +4,7 @@ import {
 	newLeagueSalt,
 	salted,
 	saltedSeed,
+	setLeagueSaltGetter,
 	setNewLeagueSaltOverride,
 } from "./leagueSalt.ts";
 import {
@@ -22,7 +23,11 @@ import { Rng as BuildsRng } from "./ratingsBuilds/rng.ts";
 import { seededRng } from "./wrapped/util.ts";
 import g from "../worker/util/g.ts";
 
-// The worker's g holds the salt (the getter registered by worker/util/g.ts)
+// The worker's g holds the salt. The test pool doesn't isolate files, so another file may have registered the UI's getter
+// (ui/util/local.ts) last: register the worker's here
+setLeagueSaltGetter(() =>
+	Object.hasOwn(g, "leagueSalt") ? (g.get("leagueSalt") ?? 0) : 0,
+);
 const state = {
 	set salt(v: number) {
 		g.setWithoutSavingToDB("leagueSalt", v);
