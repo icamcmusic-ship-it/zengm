@@ -13,7 +13,14 @@ import { idb } from "../db/index.ts";
 import { g, helpers } from "./index.ts";
 import { getDefaultSettings } from "../views/newLeague.ts";
 import * as views from "../views/index.ts";
-import { ensureBackfill, seasonGames } from "./rivalryStories.ts";
+import {
+	ensureBackfill,
+	recordRivalryGames,
+	rivalrySeasonRows,
+	seasonGames,
+} from "./rivalryStories.ts";
+import { pairHighBefore } from "../../common/rivalryStories/text.ts";
+import type { RivalryGame } from "../../common/rivalryStories/types.ts";
 import { loadRivalries } from "./rivalries.ts";
 
 const load = (id: string, params: Record<string, string>) => {
@@ -203,6 +210,35 @@ describe("rivalry stories in a league", () => {
 		await loadRivalries();
 		const tOn = performance.now() - t0;
 		console.log(`loadRivalries from the log: ${tOn.toFixed(0)} ms`);
+	});
+
+	test("the season rows keep each pair's high, the same as reading the games", async () => {
+		await ensureBackfill();
+		const season = g.get("season");
+		const logged = await idb.league.transaction("rivalryGames").store.getAll();
+		const fromGames = pairHighBefore(
+			[{ season: season + 1 }] as RivalryGame[],
+			logged,
+		);
+		const row = (await rivalrySeasonRows()).find((r) => r.season === season);
+		assert.isDefined(row?.highs);
+		assert.deepEqual(new Map(Object.entries(row!.highs!)), fromGames);
+		assert.isAbove(fromGames.size, 10);
+	});
+
+	test("games played while the setting was off are backfilled in the same session", async () => {
+		await ensureBackfill();
+		const total = await logCount();
+		// As if the last day had been played with the setting off: its games are not in the log
+		const last = (await allGames()).sort((x, y) => y.gid - x.gid)[0]!;
+		await idb.league
+			.transaction("rivalryGames", "readwrite")
+			.store.delete(last.gid);
+		await league.setGameAttributes({ featureRivalryStories: false });
+		await recordRivalryGames([{ gid: last.gid } as any]);
+		await league.setGameAttributes({ featureRivalryStories: true });
+		await ensureBackfill();
+		assert.strictEqual(await logCount(), total);
 	});
 
 	test("newspaper and storylines run with the setting", async () => {
