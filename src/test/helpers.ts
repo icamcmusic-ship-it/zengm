@@ -18,10 +18,21 @@ export const mockIDBLeague = (): any => {
 		},
 		async *iterate() {},
 		async *[Symbol.asyncIterator]() {},
+		count() {
+			return 0;
+		},
+		getAllKeys() {
+			return [];
+		},
 	};
 
+	// Writes are dropped (nothing is persisted outside the cache)
 	const store = {
 		...queries,
+		put() {},
+		add() {},
+		delete() {},
+		clear() {},
 		index() {
 			return queries;
 		},
@@ -35,6 +46,7 @@ export const mockIDBLeague = (): any => {
 		transaction() {
 			return {
 				store,
+				done: Promise.resolve(),
 				objectStore() {
 					return store;
 				},

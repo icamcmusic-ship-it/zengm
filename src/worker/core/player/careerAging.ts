@@ -390,7 +390,7 @@ export const careerRetireFactors = ({
 	p: CareerAgingPlayer & {
 		tid: number;
 		contracts: any[];
-		awards: { season: number; type: string }[];
+		awards: { season: number; type?: string }[];
 		injury: { type: string; gamesRemaining: number };
 	};
 	age: number;

@@ -160,9 +160,14 @@ describe("rivalry stories in a league", () => {
 				[gm.teams[0].tid, gm.teams[1].tid].includes(b),
 		);
 		assert.strictEqual(story.logged.games, mine.length);
+		// Playoff record is from the series, so play-in games (one game to win) are not in it
 		const won = (tid: number, playoffs: boolean) =>
-			mine.filter((gm) => !!gm.playoffs === playoffs && gm.won.tid === tid)
-				.length;
+			mine.filter(
+				(gm) =>
+					!!gm.playoffs === playoffs &&
+					!(playoffs && gm.numGamesToWinSeries === 1) &&
+					gm.won.tid === tid,
+			).length;
 		assert.strictEqual(story.record.rsA, won(a, false));
 		assert.strictEqual(story.record.rsB, won(b, false));
 		assert.strictEqual(story.record.poA, won(a, true));
