@@ -540,6 +540,9 @@ export const anchorToExpanded = (
 	x: number[],
 	r: RatingsLike,
 	flex: number[],
+	// Wider Sub-Rating Shapes: how much each sub takes of a correction (a standout or a hole takes less, common/subRatingsGen.ts
+	// protectFlex). Without it every sub of a side takes the same.
+	protect?: readonly number[],
 ) => {
 	if (typeof r.oreb === "number" && typeof r.dreb === "number") {
 		x[I.orb!] = r.oreb;
@@ -548,19 +551,32 @@ export const anchorToExpanded = (
 	if (typeof r.pdef === "number" && typeof r.idef === "number") {
 		const dp = r.pdef - sideLevel(x, PERIM_SIDE);
 		const di = r.idef - sideLevel(x, INTERIOR_SIDE);
-		for (const [i] of PERIM_SIDE) {
-			x[i] = x[i]! + dp;
-		}
-		for (const [i] of INTERIOR_SIDE) {
-			x[i] = x[i]! + di;
+		for (const [side, d] of [
+			[PERIM_SIDE, dp],
+			[INTERIOR_SIDE, di],
+		] as const) {
+			// The side's level moves by d (sum of w x its subs' moves)
+			const f = side.map(([i]) => protect?.[i] ?? 1);
+			const denom = side.reduce((a, [, w], j) => a + w * f[j]!, 0);
+			side.forEach(([i], j) => {
+				x[i] = x[i]! + (d * f[j]!) / denom;
+			});
 		}
 	}
 	if (typeof r.csh === "number" && typeof r.dsh === "number") {
-		const d = (r.csh - r.dsh - jumperLean(x)) / 2;
-		x[I.tcs!]! += d;
-		x[I.spu!]! += d;
-		x[I.tod!]! -= d;
-		x[I.pul!]! -= d;
+		const delta = r.csh - r.dsh - jumperLean(x);
+		const parts = [
+			[I.tcs!, 1],
+			[I.spu!, 1],
+			[I.tod!, -1],
+			[I.pul!, -1],
+		] as const;
+		// The lean moves by half the sum of its subs' signed moves
+		const f = parts.map(([i]) => protect?.[i] ?? 1);
+		const sum = f.reduce((a, b) => a + b, 0);
+		parts.forEach(([i, sign], j) => {
+			x[i]! += (sign * 2 * delta * f[j]!) / sum;
+		});
 	}
 	if (typeof r.bsc === "number") {
 		x[I.sec!] = r.bsc;
@@ -721,4 +737,57 @@ export const subHighlights = (sub: readonly number[], r: RatingsLike) => {
 		off: Math.round(off),
 	});
 	return { best: out(best, bestOff), worst: out(worst, worstOff) };
+};
+
+// Wider Sub-Rating Shapes (the subRatingsWide setting), player page: how far a sub is from its base, as a tone (strong/good above, poor/weak
+// below), and a base's notable strengths and weaknesses within it, for a short "Within Three-point: strong Range, weak Off-Dribble 3" line
+export const SUB_BASE_NAMES: Record<SubBase, string> = {
+	diq: "Defense",
+	tp: "Three-point",
+	ins: "Inside",
+	dnk: "Dunks/layups",
+	fg: "Mid-range",
+	reb: "Rebounding",
+	drb: "Dribbling",
+	pss: "Passing",
+	spd: "Speed",
+	jmp: "Jumping",
+};
+export const SUB_NOTABLE = 6;
+export const SUB_STRONG = 12;
+export type SubTone = "strong" | "good" | "even" | "poor" | "weak";
+export const subTone = (offset: number): SubTone =>
+	offset >= SUB_STRONG
+		? "strong"
+		: offset >= SUB_NOTABLE
+			? "good"
+			: offset <= -SUB_STRONG
+				? "weak"
+				: offset <= -SUB_NOTABLE
+					? "poor"
+					: "even";
+export const subNotes = (
+	sub: readonly number[],
+	r: RatingsLike,
+	base: SubBase,
+) => {
+	const b = r[base];
+	if (typeof b !== "number") {
+		return undefined;
+	}
+	const items = subGroupOf(base).idx.map((i) => ({
+		name: SUB_DEFS[i]!.name,
+		label: SUB_DEFS[i]!.label,
+		off: sub[i]! - b,
+	}));
+	const strengths = items
+		.filter((x) => x.off >= SUB_NOTABLE)
+		.sort((x, y) => y.off - x.off);
+	const weaknesses = items
+		.filter((x) => x.off <= -SUB_NOTABLE)
+		.sort((x, y) => x.off - y.off);
+	if (strengths.length === 0 && weaknesses.length === 0) {
+		return undefined;
+	}
+	return { baseName: SUB_BASE_NAMES[base], strengths, weaknesses };
 };

@@ -442,6 +442,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "subRatingsWide",
+		key: "subRatingsWide",
+		name: "Wider Sub-Rating Shapes",
+		description:
+			"Requires Sub-Ratings. Sub-ratings under one rating differ as much as real players' do: a catch-and-shoot specialist who can't shoot off the dribble, a passer who can't shoot from range, a shot blocker who never gets a steal. New players' shapes are wider (sized per rating from real players' stats, shooting and finishing widest), about one in eight is lopsided (one or two sub-ratings 15-25 away from their rating), and a standout no longer drags the rest of its group down as much. Real players' shapes follow their stats more strongly (shrunk only for a small sample), shapes spread less back toward the rating after 24, and a player's role grows its sub-ratings (a spot-up shooter's catch-and-shoot, a primary ball handler's pull-ups and handle). The ratings themselves, ovr and the game's random numbers are unchanged. Only new players get the wider shapes when it's turned on in an existing league.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "ovrV2",
 		key: "ovrV2",
 		name: "Sim-Calibrated Ovr",
