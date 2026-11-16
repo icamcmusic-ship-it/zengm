@@ -3,6 +3,7 @@ import finalize from "./finalize.ts";
 import { afterNewPhase as scoutingAfterNewPhase } from "../scoutingReports/index.ts";
 import { afterNewPhase as draftCombineAfterNewPhase } from "../draftCombine/index.ts";
 import { afterNewPhase as staffDepthAfterNewPhase } from "../staffDepth/index.ts";
+import { afterNewPhase as preDraftRanksAfterNewPhase } from "../draft/preDraftRanks.ts";
 import newPhasePreseason from "./newPhasePreseason.ts";
 import newPhaseRegularSeason from "./newPhaseRegularSeason.ts";
 import newPhaseAfterTradeDeadline from "./newPhaseAfterTradeDeadline.ts";
@@ -94,6 +95,9 @@ const newPhase = async (phase: Phase, conditions: Conditions, extra?: any) => {
 
 				// Scouting Director & Regions / Coaching Staff Depth: looks, the board, "our guy", scout careers, plan proposals (no-op when off)
 				await staffDepthAfterNewPhase(phase);
+
+				// Frozen Pre-draft Ranks setting: the class's ranks when the draft starts (no-op when off)
+				await preDraftRanksAfterNewPhase(phase);
 
 				await finalize(phase, conditions, result);
 			} else {

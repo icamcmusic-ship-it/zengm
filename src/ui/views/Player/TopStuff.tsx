@@ -1,4 +1,8 @@
 import { last } from "../../../common/utils.ts";
+import {
+	draftedVsPreDraftText,
+	preDraftRankText,
+} from "../../../common/preDraftRanks.ts";
 import { ExportProfileButton } from "../../components/ExportProfile.tsx";
 import { ArchetypeLabel } from "../../components/Archetype/ArchetypeLabel.tsx";
 import { TIER_NAMES } from "../../../common/archetypes/index.ts";
@@ -382,6 +386,22 @@ const TopStuff = ({
 		player.tid !== userTid && player.tid >= 0 && !collegeLeague;
 	const showTradingBlock = player.tid === userTid && !collegeLeague;
 
+	// Frozen Pre-draft Ranks setting: "Drafted #12 · Pre-draft #34", so steals and reaches show
+	const preDraft = player.preDraftRankInfo;
+	const preDraftRankNote = preDraft ? (
+		<span
+			className="text-body-secondary"
+			title={
+				preDraft.overall !== undefined
+					? draftedVsPreDraftText(preDraft.overall, preDraft.r)
+					: preDraftRankText(preDraft.r)
+			}
+		>
+			{" "}
+			· {preDraftRankText(preDraft.r)}
+		</span>
+	) : null;
+
 	let draftInfo: ReactNode = null;
 	if (player.draft.round > 0) {
 		draftInfo = (
@@ -399,6 +419,7 @@ const TopStuff = ({
 				>
 					{player.draft.abbrev}
 				</a>
+				{preDraftRankNote}
 				<br />
 			</>
 		);
@@ -409,6 +430,7 @@ const TopStuff = ({
 				<a href={helpers.leagueUrl(["draft_history", player.draft.year])}>
 					{player.draft.year}
 				</a>
+				{preDraftRankNote}
 				<br />
 			</>
 		);

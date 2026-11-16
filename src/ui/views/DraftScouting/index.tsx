@@ -149,6 +149,7 @@ const DraftScouting = ({
 							<DraftClass
 								challengeNoRatings={challengeNoRatings}
 								fantasyDraft={fantasyDraft}
+								frozenRanks={info.frozenRanks}
 								godMode={godMode}
 								numWithCollegeStats={info.numWithCollegeStats}
 								offset={offset}
