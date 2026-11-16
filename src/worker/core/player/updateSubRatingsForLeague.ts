@@ -3,12 +3,13 @@ import { isValidSubArray, subsMatchBases } from "../../../common/subRatings.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import loadDataBasketball from "../realRosters/loadData.basketball.ts";
-import { ensureSubs, subRatingsOn } from "./subRatings.ts";
+import { ensureSubs, subRatingsOn, subWideOn } from "./subRatings.ts";
 
 type MaybeReal = {
 	real?: boolean;
 	srID?: string;
 	subLean?: string;
+	subZ?: string;
 	subP?: { n?: 1; rs?: 0 | 1; v: number };
 	tid: number;
 };
@@ -38,20 +39,31 @@ const attachRealLeans = async (players: MaybeReal[]) => {
 	}
 	const season = g.get("season");
 	const slugs = new Set(want.map((p) => p.srID!));
-	const best = new Map<string, { season: number; lean?: string }>();
+	const best = new Map<
+		string,
+		{ season: number; lean?: string; subZ?: string }
+	>();
 	for (const r of data.ratings) {
 		if (!slugs.has(r.slug) || r.season > season) {
 			continue;
 		}
 		const prev = best.get(r.slug);
 		if (!prev || r.season > prev.season) {
-			best.set(r.slug, { season: r.season, lean: r.subLean });
+			best.set(r.slug, {
+				season: r.season,
+				lean: r.subLean,
+				subZ: r.subZ,
+			});
 		}
 	}
 	for (const p of want) {
-		const lean = best.get(p.srID!)?.lean;
-		if (lean !== undefined) {
-			p.subLean = lean;
+		const row = best.get(p.srID!);
+		if (row?.lean !== undefined) {
+			p.subLean = row.lean;
+		}
+		// Wider Sub-Rating Shapes: ensureSubs reads this instead when that setting is on
+		if (row?.subZ !== undefined && subWideOn()) {
+			p.subZ = row.subZ;
 		}
 	}
 	return true;
@@ -70,8 +82,10 @@ const updateSubRatingsForLeague = async () => {
 	const players = await idb.cache.players.getAll();
 	if (!subRatingsOn()) {
 		for (const p of players) {
-			if ((p as MaybeReal).subLean !== undefined) {
-				delete (p as MaybeReal).subLean;
+			const pr = p as MaybeReal;
+			if (pr.subLean !== undefined || pr.subZ !== undefined) {
+				delete pr.subLean;
+				delete pr.subZ;
 				await idb.cache.players.put(p);
 			}
 		}

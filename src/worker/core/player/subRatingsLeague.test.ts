@@ -17,6 +17,7 @@ import {
 	isValidSubArray,
 	SUB_HISTORY,
 	subsMatchBases,
+	SUB_DEFS,
 } from "../../../common/subRatings.ts";
 import { draft, game, league, phase } from "../index.ts";
 import { idb } from "../../db/index.ts";
@@ -74,9 +75,14 @@ const basesOf = (ps: any[]) =>
 
 // Generation (a draft class, as at league creation and each season) and several seasons of development with a fixed random seed:
 // identical bases with the setting on and off, so the game's random stream is untouched
-const genAndDevelop = async (subRatings: boolean, expanded: boolean) => {
+const genAndDevelop = async (
+	subRatings: boolean,
+	expanded: boolean,
+	wide = false,
+) => {
 	resetG();
 	g.setWithoutSavingToDB("subRatings", subRatings);
+	g.setWithoutSavingToDB("subRatingsWide" as any, wide as any);
 	g.setWithoutSavingToDB("expandedRatings", expanded);
 	g.setWithoutSavingToDB("ovrV2", true);
 	g.setWithoutSavingToDB("realisticAging", true);
@@ -147,6 +153,43 @@ describe("sub-ratings never change the bases", () => {
 					assert.isUndefined(p.subP);
 					assert.isTrue(p.ratings.every((r: any) => r.sub === undefined));
 				}
+			},
+		);
+	}
+});
+
+// Wider Sub-Rating Shapes: the bases are still exactly the stock ones, the subs still reproduce them, and the shapes are wider
+describe("wider sub-rating shapes never change the bases", () => {
+	for (const expanded of [false, true]) {
+		test(
+			`generation and 12 seasons of development${expanded ? ", expanded ratings" : ""}`,
+			{ timeout: 5 * 60 * 1000 },
+			async () => {
+				const off = await genAndDevelop(false, expanded);
+				const stock = await genAndDevelop(true, expanded);
+				const wide = await genAndDevelop(true, expanded, true);
+				assert.deepEqual(wide.atDraft, off.atDraft);
+				assert.deepEqual(wide.later, off.later);
+				const spread = (ps: any[]) => {
+					let sum = 0;
+					let n = 0;
+					for (const p of ps) {
+						const r = p.ratings.at(-1);
+						for (let i = 0; i < r.sub.length; i++) {
+							sum += Math.abs(r.sub[i] - r[SUB_DEFS[i]!.base]);
+							n += 1;
+						}
+					}
+					return sum / n;
+				};
+				for (const p of wide.players) {
+					assert.isTrue(subsMatchBases(p.ratings.at(-1) as any));
+				}
+				assert.isAbove(spread(wide.players), 1.1 * spread(stock.players));
+				assert.isAbove(
+					wide.players.filter((p: any) => p.subP?.lop === 1).length,
+					0,
+				);
 			},
 		);
 	}

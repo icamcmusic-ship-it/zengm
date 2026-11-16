@@ -16,6 +16,7 @@ import {
 	subsMatchBases,
 } from "../../../common/subRatings.ts";
 import { parseSubLean, realSubShape } from "../../../common/subRatingsGen.ts";
+import { parseSubZ, wideRealLean } from "../../../common/subRatingsReal.ts";
 import { categoryScores } from "../../../common/scoutingReports/categories.ts";
 import { generateDraftCombine } from "../../../common/draftCombine.ts";
 import { badgeDriver } from "../../../common/skillBadges/subDrivers.ts";
@@ -355,7 +356,7 @@ describe("real players in a league", () => {
 			timeout: 120_000,
 		},
 		async () => {
-			const create = async (subRatings: boolean) => {
+			const create = async (subRatings: boolean, subRatingsWide = false) => {
 				await league.createStream({} as any, {
 					confs: last(defaultGameAttributes.confs).value,
 					divs: last(defaultGameAttributes.divs).value,
@@ -372,7 +373,11 @@ describe("real players in a league", () => {
 					lid: 0,
 					name: "subs",
 					setLeagueCreationStatus: () => {},
-					settings: { ...getDefaultSettings(), subRatings } as any,
+					settings: {
+						...getDefaultSettings(),
+						subRatings,
+						subRatingsWide,
+					} as any,
 					shuffleRosters: false,
 					startingSeasonFromInput: "2026",
 					teamsFromInput: helpers.addPopRank(helpers.getTeamsDefault()),
@@ -409,6 +414,30 @@ describe("real players in a league", () => {
 			await updateSubRatingsForLeague();
 			assert.strictEqual(q.subP.rs, 0);
 			assert.strictEqual(q.subP.n, 1);
+
+			// Wider Sub-Rating Shapes: the wide lean from his stats' z-scores, fitted with the wide caps and protection
+			await create(true, true);
+			const pw: any = (
+				await idb.cache.players.indexGetAll("playersByTid", [0, Infinity])
+			)[0];
+			pw.real = true;
+			pw.srID = "goberru01";
+			delete pw.subP;
+			await updateSubRatingsForLeague();
+			assert.strictEqual(pw.subP.rs, 1);
+			assert.isUndefined(pw.subZ);
+			const rw = pw.ratings.at(-1);
+			assert.isTrue(subsMatchBases(rw));
+			const leanW = wideRealLean(
+				SUB_DEFS.map((d) => d.key),
+				parseSubZ(rowOf("goberru01", 2026).subZ)!,
+			);
+			assert.deepStrictEqual(
+				rw.sub,
+				realSubShape(rw, pw.subP.s, leanW, true).sub,
+			);
+			// Gobert: shot blocking far above steals
+			assert.isAbove(rw.sub[SUB_INDEX.blk!] - rw.sub[SUB_INDEX.stl!], 15);
 
 			// Off: an unread lean is dropped, nothing else
 			await create(false);
