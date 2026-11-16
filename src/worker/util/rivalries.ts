@@ -201,9 +201,9 @@ export const loadRivalries = async (
 			}
 			for (const [key, [close, duel]] of Object.entries(row.pairs)) {
 				const [x, y] = key.split("-").map(Number) as [number, number];
-				const e = get(x, y);
+				// Like the box score pass: a star duel alone (a play-in game) adds no pair, only a close game does
 				for (let i = 0; i < close; i++) {
-					e.input.closeGames!.push({ season: row.season });
+					get(x, y).input.closeGames!.push({ season: row.season });
 				}
 				if (duel) {
 					let set = duelSeasons.get(key);
