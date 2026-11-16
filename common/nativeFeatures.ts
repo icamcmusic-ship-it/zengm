@@ -1052,6 +1052,16 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "frozenDraftRanks",
+		college: false,
+		key: "featureFrozenDraftRanks",
+		name: "Frozen Pre-draft Ranks",
+		description:
+			"Each prospect's rank is frozen when the draft starts (your scouts' list and the consensus board), so it no longer moves as players are picked: the Draft page shows his pre-draft rank next to a separate Best available order, and drafted players show the pick they went at next to their pre-draft rank (steals and reaches). Off: ranks are counted among the players still on the board.",
+		default: false,
+		defaultNewLeague: true,
+	},
+	{
 		id: "aiDraftNeeds",
 		college: false,
 		key: "featureAiDraftNeeds",

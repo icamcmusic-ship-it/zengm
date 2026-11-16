@@ -136,7 +136,15 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 										<th>Pot</th>
 									</>
 								)}
-								<th title="Rank on your scouting list">Board</th>
+								<th
+									title={
+										result && "frozenRanks" in result && result.frozenRanks
+											? "Pre-draft rank on your scouting list: where he stood when the draft started (it doesn't change as players are picked)"
+											: "Rank on your scouting list"
+									}
+								>
+									Board
+								</th>
 								<th>Why</th>
 								{challengeNoRatings ? null : (
 									<th title="Projected peak ovr (10th-90th percentile)">

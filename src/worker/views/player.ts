@@ -1,4 +1,5 @@
 import { featureOn } from "../util/nativeFeatures.ts";
+import { getPreDraftRank } from "../core/draft/preDraftRanks.ts";
 import {
 	getTraitViewContext,
 	getTraitsForView,
@@ -238,6 +239,9 @@ export const getPlayer = async <
 		// Injury history by body part, and the injuryDepth setting's state (see core/player/injuryDepth.ts)
 		healthInfo: getHealthInfo(pRaw),
 
+		// Frozen Pre-draft Ranks setting: his rank on the scouts' list when his class's draft started, and the overall pick he went at
+		preDraftRankInfo: await preDraftRankInfo(pRaw),
+
 		// Handle prefixing awards
 		awards: p.awards.map(
 			(award): PlayerAwardSimple | PlayerAwardBuiltInWithPrefix => {
@@ -252,6 +256,25 @@ export const getPlayer = async <
 				return award;
 			},
 		),
+	};
+};
+
+const preDraftRankInfo = async (pRaw: Player) => {
+	if (isCollege()) {
+		return undefined;
+	}
+	const rank = await getPreDraftRank(pRaw);
+	if (!rank) {
+		return undefined;
+	}
+	return {
+		r: rank.r,
+		src: rank.src,
+		overall:
+			pRaw.draft.round > 0
+				? (pRaw.draft.round - 1) * Math.max(1, g.get("numActiveTeams")) +
+					pRaw.draft.pick
+				: undefined,
 	};
 };
 

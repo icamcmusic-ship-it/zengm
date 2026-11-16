@@ -82,6 +82,7 @@ import {
 const DraftClass = ({
 	challengeNoRatings,
 	fantasyDraft,
+	frozenRanks,
 	godMode,
 	numWithCollegeStats,
 	offset,
@@ -94,6 +95,7 @@ const DraftClass = ({
 	scoutingRemaining?: number;
 	challengeNoRatings: boolean;
 	fantasyDraft: boolean;
+	frozenRanks: boolean;
 	godMode: boolean;
 	numWithCollegeStats: number;
 	offset: number;
@@ -133,6 +135,14 @@ const DraftClass = ({
 		"Pot",
 		...(showExpanded ? EXPANDED_RATINGS.map((key) => `rating:${key}`) : []),
 	]);
+	// Frozen Pre-draft Ranks setting: once the class's draft has started, its ranks stay the ones it had then
+	if (frozenRanks) {
+		cols[0] = {
+			title: "Pre",
+			desc: "Pre-draft rank: his rank on your scouts' list when the draft started. It doesn't change as players are picked.",
+			sortType: "number",
+		};
+	}
 	if (showSchool) {
 		cols.push({
 			title: "School",

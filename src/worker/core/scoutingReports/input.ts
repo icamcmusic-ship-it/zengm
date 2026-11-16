@@ -3,6 +3,7 @@
 // visible ratings challenge), visible trait readings (hidden ones only once they are known), stats, measurements and public records.
 // Never true prospect ratings, never hidden trait scores, never the aging curve.
 import { PHASE, PLAYER } from "../../../common/constants.ts";
+import { getPreDraftRanks } from "../draft/preDraftRanks.ts";
 import { getPreDraftStats } from "../../../common/preDraft.ts";
 import { getPreDraftLabel } from "../../../common/collegeStats/overseas.ts";
 import {
@@ -961,6 +962,11 @@ const developmentFor = async (ctx: ReportCtx) => {
 
 // Where our board has a prospect: by what our scouts see (valueFuzz), not the true value
 const projectedPickFor = async (p: Player) => {
+	// Frozen Pre-draft Ranks setting: once his class's draft has started, his rank when it started (not among the players left)
+	const frozen = (await getPreDraftRanks(p.draft.year))?.get(p.pid);
+	if (frozen) {
+		return frozen.r;
+	}
 	const classPlayers = (
 		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
 	)
