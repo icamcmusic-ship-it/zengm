@@ -8,6 +8,8 @@ import {
 	injuryAthleticLoss,
 	mergeCareerAging,
 	mileageExcess,
+	oldAgeAthleticDelta,
+	oldAgeMinutesCap,
 	reinventionStrength,
 	specialtyOf,
 	usefulVeteran,
@@ -198,5 +200,21 @@ describe("careerAging", () => {
 		assert.isFalse(usefulVeteran(vet(38, 40), roster, "contending"));
 		assert.isFalse(usefulVeteran(vet(35, 40), roster, "rebuilding"));
 		assert.isTrue(usefulVeteran(vet(36, 50), roster.slice(0, 8), "contending"));
+	});
+
+	test("past 39: a seeded, bounded athletic decline and a minutes cap", () => {
+		assert.strictEqual(oldAgeAthleticDelta(5, 38), 0);
+		for (let pid = 0; pid < 50; pid++) {
+			const d39 = oldAgeAthleticDelta(pid, 39);
+			const d45 = oldAgeAthleticDelta(pid, 45);
+			assert.isBelow(d39, 0);
+			assert.isAtLeast(d39, -1.5 * 1.3);
+			assert.isBelow(d45, d39);
+			assert.isAtLeast(d45, -4 * 1.3);
+			assert.strictEqual(d39, oldAgeAthleticDelta(pid, 39));
+		}
+		assert.isUndefined(oldAgeMinutesCap(38, 0));
+		assert.isAbove(oldAgeMinutesCap(39, 7)!, oldAgeMinutesCap(40, 7)!);
+		assert.isAbove(oldAgeMinutesCap(40, 0)!, oldAgeMinutesCap(40, 7)!);
 	});
 });
