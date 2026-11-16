@@ -1,6 +1,7 @@
 import { PLAYER, PLAYER_STATS_TABLES } from "../../common/constants.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
+import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
 import { getCommon } from "./player.ts";
@@ -581,6 +582,10 @@ const getPreDraftInfo = async (pRaw: Player) => {
 
 	// Draft stock
 	const numPicks = getNumPicks();
+	// Frozen Pre-draft Ranks setting: once his class's draft has started, his ranks when it started
+	const preDraftRank = (await getPreDraftRanks(draftYear, classPlayers))?.get(
+		pRaw.pid,
+	);
 	let finalPick: number;
 	let drafted = false;
 	const pick = overallPick(pRaw);
@@ -591,6 +596,9 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		// Went undrafted
 		finalPick = numPicks + 10;
 		drafted = true;
+	} else if (preDraftRank) {
+		// Frozen Pre-draft Ranks setting, during the draft: where the board had him when the draft started, not among the players left
+		finalPick = preDraftRank.v;
 	} else {
 		// Where the board has him now: by value, the order the AI drafts in (and the Mock Draft shows), not the user's own fuzzed scouting list, which can put a second rounder in the lottery
 		const board = classPlayers
@@ -677,6 +685,9 @@ const getPreDraftInfo = async (pRaw: Player) => {
 					}
 				: undefined,
 		projectedPick: !drafted && finalPick <= numPicks ? finalPick : undefined,
+		preDraftRank: preDraftRank
+			? { r: preDraftRank.r, v: preDraftRank.v, src: preDraftRank.src }
+			: undefined,
 		numPicks,
 		perGame,
 		totals,

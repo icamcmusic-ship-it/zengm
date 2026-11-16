@@ -71,6 +71,7 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	ratingsRegenerator: "League extras: Draft",
 	scoutingSystem: "League extras: Draft",
 	draftBoard: "League extras: Draft",
+	frozenDraftRanks: "League extras: Draft",
 	aiDraftNeeds: "League extras: Draft",
 	mockDraft: "League extras: Draft",
 	coachingStaff: "League extras: Team",

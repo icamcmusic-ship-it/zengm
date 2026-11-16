@@ -25,6 +25,11 @@ import { confirm } from "../../util/confirm.tsx";
 import { getCol } from "../../../common/getCol.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { getNumericStat } from "../../../common/statValue.ts";
+import {
+	draftedVsPreDraftText,
+	preDraftRankText,
+	stealOrReach,
+} from "../../../common/preDraftRanks.ts";
 
 const DRAFT_BAR_HEIGHT = 82;
 
@@ -37,11 +42,37 @@ type DraftedPlayer = Exclude<DraftedRow, RemainingPick>;
 const isDraftedPlayer = (p: DraftedRow): p is DraftedPlayer => p.pid >= 0;
 const isRemainingPick = (p: DraftedRow): p is RemainingPick => p.pid < 0;
 
+// Drafted players: his pre-draft rank, and how far from it he went (steals and reaches)
+const wrappedPreDraftVsPick = (overallPick: number, preDraftRank: number) => {
+	const { diff, kind } = stealOrReach(overallPick, preDraftRank);
+	return {
+		value: (
+			<span className="text-nowrap">
+				#{preDraftRank}
+				{kind ? (
+					<span
+						className={clsx(
+							"ms-1 small",
+							kind === "steal" ? "text-success" : "text-danger",
+						)}
+					>
+						{diff > 0 ? `+${diff}` : diff}
+					</span>
+				) : null}
+			</span>
+		),
+		sortValue: preDraftRank,
+		searchValue: preDraftRank,
+		title: `${draftedVsPreDraftText(overallPick, preDraftRank)}${kind ? ` (${kind})` : ""}`,
+	};
+};
+
 const Draft = ({
 	challengeNoDraftPicks,
 	drafted,
 	expansionDraftFilteredTeamsMessage,
 	fantasyDraft,
+	frozenRanks,
 	stats,
 	teamsByTid,
 	undrafted,
@@ -158,6 +189,26 @@ const Draft = ({
 			},
 		},
 	);
+	// Frozen Pre-draft Ranks setting: the # column is his rank in the whole class when the draft started, and the live order of the
+	// players left is a separate Best available column
+	if (frozenRanks) {
+		colsUndrafted.splice(
+			0,
+			1,
+			{
+				title: "Pre",
+				desc: "Pre-draft rank: his rank on your scouts' list when the draft started. It doesn't change as players are picked.",
+				sortType: "number",
+			},
+			{
+				title: "BA",
+				desc: "Best available: his place among the players still on the board, on your scouts' list",
+				sortType: "number",
+			},
+		);
+	}
+	// Columns before Name
+	const numRankCols = frozenRanks ? 2 : 1;
 
 	if (fantasyDraft || expansionDraft) {
 		colsUndrafted.splice(
@@ -173,6 +224,18 @@ const Draft = ({
 
 	const rowsUndrafted: DataTableRow<"player">[] = undrafted.map((p) => {
 		const data: DataTableRow["data"] = [
+			...(frozenRanks
+				? [
+						{
+							value: p.preDraftRank ?? null,
+							sortValue: p.preDraftRank ?? null,
+							title:
+								p.preDraftRank !== undefined
+									? preDraftRankText(p.preDraftRank)
+									: undefined,
+						},
+					]
+				: []),
 			p.rank,
 			wrappedPlayerNameLabels({
 				pid: p.pid,
@@ -248,8 +311,15 @@ const Draft = ({
 	});
 
 	const colsDrafted = getCols(["Pick", "Team"]).concat(
-		colsUndrafted.slice(1, -1),
+		colsUndrafted.slice(numRankCols, -1),
 	);
+	if (frozenRanks) {
+		colsDrafted.push({
+			title: "Pre-draft",
+			desc: "His pre-draft rank on your scouts' list, and how many picks later (+, a steal) or earlier (-, a reach) he went",
+			sortType: "number",
+		});
+	}
 
 	if (expansionDraft) {
 		colsDrafted.splice(4, 1);
@@ -370,6 +440,14 @@ const Draft = ({
 			isDraftedPlayer(p) && !challengeNoRatings ? p.ratings.ovr : null,
 			isDraftedPlayer(p) && !challengeNoRatings ? p.ratings.pot : null,
 		];
+
+		if (frozenRanks) {
+			data.push(
+				isDraftedPlayer(p) && p.preDraftRank !== undefined
+					? wrappedPreDraftVsPick(p.overallPick, p.preDraftRank)
+					: null,
+			);
+		}
 
 		if (fantasyDraft || expansionDraft) {
 			data.splice(

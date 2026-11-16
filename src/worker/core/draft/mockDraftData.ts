@@ -31,6 +31,7 @@ import {
 } from "../player/traits.ts";
 import { getGmWeights } from "../gm/index.ts";
 import { getDraftCombineNudges } from "../draftCombine/index.ts";
+import { getPreDraftRanks } from "./preDraftRanks.ts";
 
 const MOCK_ROUNDS = 2;
 
@@ -195,6 +196,23 @@ export const getMockDraft = async () => {
 		formatted.map((p: any, i: number) => [p.pid, i + 1]),
 	);
 
+	// Frozen Pre-draft Ranks setting: during the draft, the board rank is the one each prospect had when the draft started (not among the
+	// players left), and the mock's picks are numbered from the next real pick
+	const preDraftRanks = await getPreDraftRanks(season);
+	let firstOverall = 1;
+	if (preDraftRanks) {
+		const maxRank = Math.max(0, ...[...preDraftRanks.values()].map((x) => x.r));
+		for (const [pid, rank] of scoutRank) {
+			scoutRank.set(pid, preDraftRanks.get(pid)?.r ?? maxRank + rank);
+		}
+		firstOverall += (
+			await idb.cache.players.indexGetAll("playersByDraftYearRetiredYear", [
+				[season],
+				[season, Infinity],
+			])
+		).filter((p) => p.draft.year === season && p.draft.round > 0).length;
+	}
+
 	// Draft Lottery Night & Combine setting: the AI's combine nudge, as in runPicks
 	const combineNudges = await getDraftCombineNudges(players, season);
 
@@ -214,7 +232,14 @@ export const getMockDraft = async () => {
 			: undefined,
 	}));
 
-	const picks = runMockDraft({ slots, prospects, teams, useNeeds, useTraits });
+	const picks = runMockDraft({
+		slots,
+		prospects,
+		teams,
+		useNeeds,
+		useTraits,
+		firstOverall,
+	});
 
 	const byPid = new Map(formatted.map((p: any) => [p.pid, p]));
 	const teamInfoCache = g.get("teamInfoCache");
@@ -240,6 +265,7 @@ export const getMockDraft = async () => {
 			};
 		}),
 		numProspects: players.length,
+		frozenRanks: preDraftRanks !== undefined,
 		userTids: g.get("userTids"),
 	};
 };

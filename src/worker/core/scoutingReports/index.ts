@@ -1,6 +1,7 @@
 // Scouting reports, worker side (League Extras: Scouting Reports). Reports are derived on view from what the user's scouts can see
 // (input.ts). Stored: compact grade snapshots at a few phases (stock up/down) and the department's take at the draft (track record).
 import { PHASE, PLAYER } from "../../../common/constants.ts";
+import { getPreDraftRanks } from "../draft/preDraftRanks.ts";
 import {
 	addSnap,
 	assignScouts,
@@ -690,10 +691,30 @@ export const getDraftPreviewFacts = async () => {
 		PLAYER.UNDRAFTED,
 	);
 	const draftYear = g.get("phase") > PHASE.DRAFT ? season + 1 : season;
-	const prospects = all
+	let prospects = all
 		.filter((p) => p.draft.year === draftYear)
 		.sort((a, b) => b.valueFuzz - a.valueFuzz)
 		.slice(0, 8);
+	// Frozen Pre-draft Ranks setting: during the draft, the preview is still the class's top 8 when the draft started (drafted ones
+	// included), not the best players left renumbered from 1
+	const preDraftRanks = await getPreDraftRanks(draftYear);
+	if (preDraftRanks) {
+		const ranked = [];
+		for (const [pid, rank] of preDraftRanks) {
+			if (rank.r <= 8) {
+				ranked.push({ pid, r: rank.r });
+			}
+		}
+		ranked.sort((a, b) => a.r - b.r);
+		const players = [];
+		for (const { pid } of ranked) {
+			const p = await idb.cache.players.get(pid);
+			if (p) {
+				players.push(p);
+			}
+		}
+		prospects = players;
+	}
 	if (prospects.length < 3) {
 		return undefined;
 	}
@@ -709,7 +730,7 @@ export const getDraftPreviewFacts = async () => {
 		const move = first ? report.overall.grade - first.o : 0;
 		rows.push({
 			pid: p.pid,
-			rank: i + 1,
+			rank: preDraftRanks?.get(p.pid)?.r ?? i + 1,
 			name: input.name,
 			pos: input.pos,
 			age: input.age,

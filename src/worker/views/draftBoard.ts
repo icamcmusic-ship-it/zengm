@@ -12,6 +12,7 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { confidenceFromFactor } from "../../common/staffDepth/regions.ts";
+import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
 
 /**
  * The user's draft board planner: one draft class, with the user's ranks, tiers and notes next to everything known about each prospect (fuzzed ratings, build, college/overseas stats and honors, scout report).
@@ -68,6 +69,15 @@ export default defineView({
 		const byPid = new Map(players.map((p) => [p.pid, p]));
 		const scoutingSystem = featureOn("scoutingSystem");
 
+		// Frozen Pre-draft Ranks setting: during and after this class's draft, the scouts' order is the one it had when the draft started
+		const preDraftRanks = fantasyDraft
+			? undefined
+			: await getPreDraftRanks(season);
+		const maxPreDraftRank = Math.max(
+			0,
+			...[...(preDraftRanks?.values() ?? [])].map((x) => x.r),
+		);
+
 		const prospects = addFirstNameShort(
 			formatted
 				.sort((a, b) => b.valueFuzz - a.valueFuzz)
@@ -94,7 +104,9 @@ export default defineView({
 						skills: ratings.skills as string[],
 						badges: (ratings as any).badges as string[] | undefined,
 						pos: ratings.pos as string,
-						valueRank: i + 1,
+						valueRank: preDraftRanks
+							? (preDraftRanks.get(pa.pid)?.r ?? maxPreDraftRank + i + 1)
+							: i + 1,
 						build: p.ratingsBuild?.name,
 						school: lastRow?.teamName ?? p.college ?? "",
 						preDraftLabel,
@@ -133,6 +145,7 @@ export default defineView({
 			seasons,
 			prospects,
 			draftBoardAutoDraft: g.get("draftBoardAutoDraft"),
+			frozenRanks: preDraftRanks !== undefined,
 			scoutingSystem,
 			depth,
 		};

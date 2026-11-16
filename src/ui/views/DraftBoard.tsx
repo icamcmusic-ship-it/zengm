@@ -70,6 +70,7 @@ const NoteInput = ({ p }: { p: Prospect }) => {
 
 const DraftBoard = ({
 	draftBoardAutoDraft,
+	frozenRanks,
 	prospects,
 	scoutingSystem,
 	season,
@@ -206,7 +207,15 @@ const DraftBoard = ({
 									<th>Pot</th>
 								</>
 							) : null}
-							<th title="Scouts' order">Scouts</th>
+							<th
+								title={
+									frozenRanks
+										? "Pre-draft rank: the scouts' order when the draft started (it doesn't change as players are picked)"
+										: "Scouts' order"
+								}
+							>
+								{frozenRanks ? "Pre-draft" : "Scouts"}
+							</th>
 							<th>Build</th>
 							<th>College / overseas</th>
 							{scoutingSystem && showRatings ? <th>Scout report</th> : null}

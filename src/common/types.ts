@@ -1625,6 +1625,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	combine?: Omit<DraftCombineResult, "pid">;
 	// The user's own draft board entry for this prospect (draft board planner)
 	draftBoard?: DraftBoardEntry;
+	// Frozen Pre-draft Ranks setting: his ranks in his class when the draft started (s: draft year, r: your scouts' list, v: the consensus
+	// board by value, n: class size), so they don't move as players are picked. See worker/core/draft/preDraftRanks.ts
+	preDraftRank?: PreDraftRank;
 	// Scouting Director & Regions: the user's looks at a prospect this season and the fuzz narrowing applied (common/staffDepth)
 	scoutLooks?: import("./staffDepth/types.ts").ProspectLooks;
 	// Coaching Staff Depth: this season's development plan
@@ -3082,6 +3085,13 @@ export type ScoutingEntry = {
 	points: number;
 	// |fuzz| before this action, so the report can say how much it narrowed
 	fuzzBefore: number;
+};
+
+export type PreDraftRank = {
+	s: number;
+	r: number;
+	v: number;
+	n: number;
 };
 
 export type DraftBoardEntry = {
