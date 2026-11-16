@@ -304,7 +304,7 @@ describe("facial hair fitted to the head", { timeout: 120_000 }, () => {
 		expect(out.facialHair.id).toBe(
 			"fork-boxed-beard~fb~fit-fork-head-narrow-jaw",
 		);
-		expect(out.facialHair.shave).toBe("#8a8a8a");
+		expect((out.facialHair as { shave?: string }).shave).toBe("#8a8a8a");
 		const grey = table.facialHair![out.facialHair.id]!;
 		const plain =
 			table.facialHair![

@@ -1,7 +1,7 @@
 // Lazy loaded by "Download players": each player's profile over as many pages as it needs. See common/playerExport.ts for the data.
 import type { FaceConfig } from "facesjs";
 import { parseTrueType } from "./ttf.ts";
-import { display } from "facesjs";
+import { faceToSvgMarkup } from "./faceSvg.ts";
 import { prepareFaceForDisplay } from "../../common/faceRender.ts";
 import { isFeatureOn } from "./nativeFeatures.ts";
 import { DEFAULT_JERSEY, DEFAULT_TEAM_COLORS } from "../../common/constants.ts";
@@ -24,10 +24,8 @@ export const faceToJpeg = async (p: PlayerExport) => {
 		return;
 	}
 	try {
-		// faceToSvgString is for Node (it fakes a document), so draw into a detached div like the page does
-		const div = document.createElement("div");
-		display(
-			div,
+		// Drawn into an attached, invisible container: facesjs measures with getBBox, which is zero in a detached div
+		const svg = faceToSvgMarkup(
 			prepareFaceForDisplay(p.face as FaceConfig, {
 				fitFacialHair: isFeatureOn("forkFaces") || isFeatureOn("faceAging"),
 			}),
@@ -36,14 +34,9 @@ export const faceToJpeg = async (p: PlayerExport) => {
 				jersey: { id: (p.jersey ?? DEFAULT_JERSEY).split(":")[0]! },
 			},
 		);
-		const svgEl = div.querySelector("svg");
-		if (!svgEl) {
+		if (!svg) {
 			return;
 		}
-		if (!svgEl.getAttribute("xmlns")) {
-			svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-		}
-		const svg = svgEl.outerHTML;
 		// Fixed size instead of 100%, so the image has an intrinsic size to draw
 		const sized = svg.replace(
 			/width="100%" height="100%"/,
