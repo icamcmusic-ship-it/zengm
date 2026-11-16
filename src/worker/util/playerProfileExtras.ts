@@ -220,11 +220,18 @@ const TRACKING_GROUPS: { title: string; stats: AdvStatKey[] }[] = [
 
 export const trackingSection = (
 	advSeasons: { season: number | "career"; adv: number[] }[],
+	// His season-by-season tracking was folded into the career total when he retired (Keep Career Tracking for Retired Players)
+	advCareerFolded?: boolean,
 ): Built | undefined => {
 	if (advSeasons.length === 0) {
 		return undefined;
 	}
 	const out = empty();
+	if (advCareerFolded) {
+		out.lines.push(
+			"Season-by-season tracking isn't kept after retirement: the career rows have all of his tracking.",
+		);
+	}
 	const seasons = advSeasons.map((row) => {
 		const profile = playTypeProfile(row.adv);
 		const groups = Object.fromEntries(
@@ -286,7 +293,9 @@ export const trackingSection = (
 			]),
 		});
 	}
-	out.data = { seasons };
+	out.data = advCareerFolded
+		? { seasons, foldedAtRetirement: true }
+		: { seasons };
 	return out;
 };
 

@@ -41,7 +41,12 @@ import { getHealthInfo } from "../core/player/getHealthInfo.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
 import { playerFaceHistory } from "../util/faceAging.ts";
-import { ADV_STAT_TYPES, isAdvStat, sumAdv } from "../../common/advStats.ts";
+import {
+	ADV_STAT_TYPES,
+	careerAdv,
+	isAdvStat,
+	sumAdv,
+} from "../../common/advStats.ts";
 
 export const processInputs = (
 	params: RouteParams<"player"> | RouteParams<"relatives">,
@@ -522,7 +527,11 @@ export const getCommon = async (
 	}
 
 	// Advanced Tracking Stats: their tables only for a player with tracking stats
-	if (__SPORT === "basketball" && !pRaw.stats.some((row) => row.adv)) {
+	if (
+		__SPORT === "basketball" &&
+		!pRaw.advCareer &&
+		!pRaw.stats.some((row) => row.adv)
+	) {
 		const advTables = new Set(
 			ADV_STAT_TYPES.map((key) => PLAYER_STATS_TABLES[key]),
 		);
@@ -616,8 +625,11 @@ const advSeasonsForPlayer = (pRaw: Player) => {
 	if (__SPORT !== "basketball") {
 		return [];
 	}
+	// Only the seasons that still have data: a retired player's are folded into his career total (Keep Career Tracking for Retired
+	// Players), which the career option includes
 	const rows = pRaw.stats.filter((row) => row.adv && !row.playoffs);
-	if (rows.length === 0) {
+	const career = careerAdv(pRaw.advCareer, rows, "regularSeason");
+	if (!career) {
 		return [];
 	}
 	const seasons = [...new Set(rows.map((row) => row.season))];
@@ -626,7 +638,7 @@ const advSeasonsForPlayer = (pRaw: Player) => {
 			season: season as number | "career",
 			adv: sumAdv(rows.filter((row) => row.season === season))!,
 		})),
-		{ season: "career" as const, adv: sumAdv(rows)! },
+		{ season: "career" as const, adv: career },
 	];
 };
 
@@ -727,6 +739,9 @@ export default defineView({
 			return {
 				...topStuffForUI,
 				advSeasons,
+				// His season-by-season tracking was folded into the career total when he retired
+				advCareerFolded:
+					__SPORT === "basketball" && topStuff.pRaw.advCareer !== undefined,
 				faceHistory,
 				playerTraits,
 				events,

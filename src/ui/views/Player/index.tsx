@@ -47,6 +47,7 @@ import {
 } from "../../components/ScoutingReport/index.tsx";
 
 const Player2 = ({
+	advCareerFolded,
 	advSeasons,
 	bestPos,
 	customMenu,
@@ -161,6 +162,7 @@ const Player2 = ({
 
 			{statTables.map(({ name, onlyShowIf, stats, superCols }) => (
 				<StatsTable
+					advCareerFolded={advCareerFolded}
 					awardsBySeason={awardsBySeason}
 					key={name}
 					name={name}
@@ -172,7 +174,10 @@ const Player2 = ({
 				/>
 			))}
 
-			<TrackingProfile advSeasons={advSeasons} />
+			<TrackingProfile
+				advSeasons={advSeasons}
+				advCareerFolded={advCareerFolded}
+			/>
 
 			<NitStats player={player} />
 
