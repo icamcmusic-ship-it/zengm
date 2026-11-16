@@ -131,7 +131,7 @@ export const generateCoach = async ({
 			year: g.get("season") - age,
 			loc: country,
 		},
-		face: generateFace({ race, age }),
+		face: generateFace({ race, age, staff: true }),
 		tid: COACH_FREE_AGENT,
 		role,
 		ratings,

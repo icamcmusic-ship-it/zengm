@@ -11,6 +11,7 @@ import { featureOn } from "./nativeFeatures.ts";
 
 export const generateFace = ({
 	age,
+	staff,
 	...options
 }: (
 	| { race?: Race; relative?: undefined }
@@ -18,6 +19,8 @@ export const generateFace = ({
 ) & {
 	// Age of the person, for age-appropriate styles (League Extras "New Face Styles")
 	age?: number;
+	// A coach or GM: staff-only looks from 40 (League Extras "New Face Styles")
+	staff?: boolean;
 } = {}) => {
 	let overrides: any;
 
@@ -79,7 +82,7 @@ export const generateFace = ({
 	if (gender === "male" && featureOn("forkFaces") && !options.relative) {
 		styleFace(
 			face,
-			{ age, facialHairIds: svgsIndex.facialHair },
+			{ age, facialHairIds: svgsIndex.facialHair, staff },
 			// No headbands with a suit later, no glasses outside basketball
 			(part) =>
 				__SPORT !== "basketball" &&

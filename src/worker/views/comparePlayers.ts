@@ -20,7 +20,13 @@ import { bySport } from "../../common/sportFunctions.ts";
 import { getTeamInfoBySeason } from "../util/getTeamInfoBySeason.ts";
 import { faceAtSeason } from "../util/faceAging.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
-import { wearsFaceMask, withFaceMask } from "../../common/faceRender.ts";
+import {
+	wearsFaceMask,
+	wearsNoseBandage,
+	withFaceMask,
+	withNoseBandage,
+} from "../../common/faceRender.ts";
+import { getHealthInfo } from "../core/player/getHealthInfo.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { player } from "../core/index.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
@@ -350,17 +356,30 @@ const getStatsByPositions = (positions: string[]) => {
 };
 
 // League Extras "Face Aging": his face in that season (his peak season for career totals), with the clear mask while he's
-// out with a facial injury this season
+// out with a facial injury this season. "New Face Styles": the nose bandage while he's out with a nose or facial injury and
+// for his first days back (current season only)
 const faceForCompare = (pRaw: Player, season: number) => {
-	if (!featureOn("faceAging") || pRaw.imgURL || !pRaw.face) {
+	if (pRaw.imgURL || !pRaw.face) {
 		return pRaw.face;
 	}
-	const face = faceAtSeason(pRaw, season);
-	return season === g.get("season") &&
-		pRaw.tid !== PLAYER.RETIRED &&
-		wearsFaceMask(pRaw.injury, pRaw.injuries, season)
-		? withFaceMask(face)
-		: face;
+	const faceAgingOn = featureOn("faceAging");
+	let face = faceAgingOn ? faceAtSeason(pRaw, season) : pRaw.face;
+	if (season !== g.get("season") || pRaw.tid === PLAYER.RETIRED) {
+		return face;
+	}
+	if (faceAgingOn && wearsFaceMask(pRaw.injury, pRaw.injuries, season)) {
+		face = withFaceMask(face);
+	}
+	if (
+		featureOn("forkFaces") &&
+		wearsNoseBandage(pRaw.injury, {
+			type: pRaw.injuries.at(-1)?.type,
+			daysBack: getHealthInfo(pRaw).daysBack,
+		})
+	) {
+		face = withNoseBandage(face);
+	}
+	return face;
 };
 
 // Returns a single ratings row and a single stats row, for either one season or career totals (with peak ratings)

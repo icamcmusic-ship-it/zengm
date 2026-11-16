@@ -37,7 +37,9 @@ export const facialHairTier = (id: string): number => {
 	if (
 		/^(beard1|beard4|fullgoatee|logan|mutton|harley|harly|wilt|neckbeard)/.test(
 			id,
-		)
+		) ||
+		id === "fork-goatee-extended" ||
+		id === "fork-braided-chin"
 	) {
 		return 3;
 	}
@@ -316,6 +318,31 @@ export const HAIR_NEIGHBOURS: Record<string, StyleNode> = {
 		near: ["fork-middle-part-long+fork-long-wavy", "shaggy1+shaggy"],
 	},
 	"shaggy1+shaggy": { t: "s", near: ["shaggy1", "longHair+longHair"] },
+	// Batch D: only new keys (no existing style lists them, so existing players' events are unchanged)
+	"fork-burst-fade": {
+		t: "cus",
+		near: ["fork-low-fade", "fork-high-fade", "short-fade"],
+	},
+	"fork-buzz-leopard": { t: "cus", near: ["fork-buzz", "short-fade"] },
+	"fork-frohawk": {
+		t: "cu",
+		near: ["fork-high-fade", "fork-afro-small", "blowoutFade"],
+	},
+	"fork-afro-puff": {
+		t: "cu",
+		near: ["fork-afro-small", "fork-bantu-knots", "curlyFade2"],
+	},
+	"fork-high-top-slanted": { t: "c", near: ["high", "tall-fade"] },
+	"fork-jheri-curl": {
+		t: "c",
+		near: ["fork-jheri-curl+fork-curls-long", "curlyFade1"],
+	},
+	"fork-jheri-curl+fork-curls-long": { t: "c", near: ["fork-jheri-curl"] },
+	"fork-bowl-cut": { t: "s", near: ["fork-edgar", "crop", "crop-fade"] },
+	"fork-viking-braids+fork-viking-braids-long": {
+		t: "s",
+		near: ["fork-top-knot", "fork-undercut"],
+	},
 };
 
 // What a thinning player may still switch to: cutting it short, never growing it back
