@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { assert, describe, expect, test } from "vitest";
 import {
 	factsForDisplay,
 	generateNickname,
@@ -140,4 +140,9 @@ describe("hofStory", () => {
 			expect(sawNickOn).toBe(true);
 		});
 	});
+});
+
+test("Hall of Fame words are on in basketball", async () => {
+	const { hofWordsOn } = await import("../worker/util/hofStory.ts");
+	assert.isTrue(hofWordsOn());
 });

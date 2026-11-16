@@ -24,6 +24,42 @@ const KIND_CODE: Record<FranchiseChangeKind, number> = {
 	rebrand: 3,
 };
 
+type TeamLook = {
+	region?: string;
+	name?: string;
+	colors?: readonly string[];
+};
+
+// What changed from last season's team row to this one's, if anything. Rows from very old leagues can lack the name, city or
+// colors: nothing is read into a missing field (no "undefined undefined are moving" story)
+export const franchiseChangeKind = (
+	prev: TeamLook,
+	now: TeamLook,
+): FranchiseChangeKind | undefined => {
+	if (
+		prev.region === undefined ||
+		prev.name === undefined ||
+		now.region === undefined ||
+		now.name === undefined
+	) {
+		return undefined;
+	}
+	if (prev.region !== now.region) {
+		return "relocation";
+	}
+	if (prev.name !== now.name) {
+		return "rename";
+	}
+	if (
+		Array.isArray(prev.colors) &&
+		Array.isArray(now.colors) &&
+		prev.colors.join() !== now.colors.join()
+	) {
+		return "rebrand";
+	}
+	return undefined;
+};
+
 // One or two sentences on how the fans took it
 export const fanReaction = (c: FranchiseChange): string => {
 	const rng = new Rng(c.tid * 1000 + c.season, 8800 + KIND_CODE[c.kind]);
