@@ -5,7 +5,7 @@ import type { Conditions, Player } from "../../../common/types.ts";
 import { player } from "../index.ts";
 import addAward from "./addAward.ts";
 import { endContractEarly } from "../contract/index.ts";
-import { trimAdvOnRetire } from "./advStatsStorage.ts";
+import { advOnRetire } from "./advStatsStorage.ts";
 
 /**
  * Have a player retire, including all event and HOF bookkeeping.
@@ -82,8 +82,9 @@ const retire = async (
 
 	p.tid = PLAYER.RETIRED;
 	p.retiredYear = g.get("season");
-	// Advanced Tracking Stats: only his last few seasons keep their records
-	trimAdvOnRetire(p);
+	// Advanced Tracking Stats: his tracking folded into a career total ("Keep Career Tracking for Retired Players"), or only his last
+	// few seasons keep their records (setting off)
+	await advOnRetire(p);
 	p.injury = {
 		type: "Healthy",
 		gamesRemaining: 0,

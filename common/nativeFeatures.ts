@@ -617,6 +617,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "advCareer",
+		key: "advCareerTracking",
+		name: "Keep Career Tracking for Retired Players",
+		description:
+			"Advanced Tracking Stats: when a player retires, all of his tracking stats are kept as one career total (regular season and playoffs), and his season-by-season tracking is removed. Off: a retired player keeps the tracking of his last 3 seasons only, and his career tracking covers just those. Turning it on also folds the seasons retired players still have into their career totals. Active players always keep every season.",
+		// On in existing leagues too: no game changes, and a retired player keeps more tracking in less space than with the trim
+		default: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		college: false,
 		key: "featureSeasonOdds",

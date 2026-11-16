@@ -8,6 +8,7 @@ import newPhasePreseason from "./newPhasePreseason.ts";
 import newPhaseRegularSeason from "./newPhaseRegularSeason.ts";
 import newPhaseAfterTradeDeadline from "./newPhaseAfterTradeDeadline.ts";
 import newPhasePlayoffs from "./newPhasePlayoffs.ts";
+import { foldRetiredAdvCareers } from "../player/advStatsStorage.ts";
 import newPhaseBeforeDraft from "./newPhaseBeforeDraft.ts";
 import newPhaseDraft from "./newPhaseDraft.ts";
 import newPhaseAfterDraft from "./newPhaseAfterDraft.ts";
@@ -95,6 +96,9 @@ const newPhase = async (phase: Phase, conditions: Conditions, extra?: any) => {
 
 				// Scouting Director & Regions / Coaching Staff Depth: looks, the board, "our guy", scout careers, plan proposals (no-op when off)
 				await staffDepthAfterNewPhase(phase);
+
+				// Keep Career Tracking for Retired Players: folds retired players' remaining tracking rows, once (no-op when off or done)
+				await foldRetiredAdvCareers();
 
 				// Frozen Pre-draft Ranks setting: the class's ranks when the draft starts (no-op when off)
 				await preDraftRanksAfterNewPhase(phase);

@@ -1,3 +1,4 @@
+import type { AdvCareer } from "./advStats.ts";
 import type { StoredSubInfo } from "./subRatingsGen.ts";
 import type { RumorState } from "./rumors/types.ts";
 import type { SystemTrends } from "./coachSystems.ts";
@@ -788,6 +789,9 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	// Realistic schedule length: the current season's schedule is spread over the calendar (games every other day or so). Usually
 	// the same as scheduleDayScale < 1, but in a 2-3 team league the old schedule already had one game a day, so the scale stays 1
 	scheduleSpread: boolean;
+	// League Extras "Keep Career Tracking for Retired Players": every retired player's tracking is folded into his career total (false
+	// after a league is loaded from before the setting, or after retirements with it off, until the next fold pass)
+	advCareerFolded: boolean;
 	heightFactor: number;
 	hideDisabledTeams: boolean;
 	hofFactor: number;
@@ -1659,6 +1663,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	rosterOrder: number;
 	srID?: string;
 	stats: PlayerStats[];
+	// Advanced Tracking Stats, League Extras "Keep Career Tracking for Retired Players": his tracking folded into a career total when
+	// he retired (the rows' adv is deleted then). See common/advStats.ts AdvCareer.
+	advCareer?: AdvCareer;
 	// College mode: his NIT games, apart from the national tournament's postseason stats (same rows, playoffs true). Not read by
 	// career totals, awards or records
 	nitStats?: PlayerStats[];
