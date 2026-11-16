@@ -51,8 +51,8 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // stored anew), so a label from an older engine never lingers until the next preseason
 // arch14: 12 (the fitted reading, merged builds); arch15: 13 (sub-ratings and play types, more merges, new builds); arch16:
 // 14 (generic builds held to all-around floors and capped, four merges' kept names re-picked); archuser2k: 15 (new builds
-// from the user's own 2K archetypes)
-export const ARCHETYPE_READING_VERSION = 15;
+// from the user's own 2K archetypes); arch2kfix: 16 (seven builds' biases: the season cap and the answer-key guard)
+export const ARCHETYPE_READING_VERSION = 16;
 
 export const toStored = (
 	season: number,
