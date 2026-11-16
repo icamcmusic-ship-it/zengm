@@ -17,6 +17,13 @@
 //   labels per split and kind of name, and the notable players' table
 // - picks (ARCH_U2K_OUT=file, ARCH_U2K_SPLIT=tune): the players as an archetype pick file (tuning.ts PickFile) for the
 //   developer refit (fit.script.test.ts ARCH_PICKS)
+// - fix (arch2kfix, after trim): (1) the season cap: no new build above SEASON_TOP_CAP of any one season's top 150 real
+//   players (2016-2027, read as the game reads them: classify, with stats), a step on its bias as the trim does (the trim's
+//   caps pool the seasons, which let one build hold 6% of the 2025 top 150), a step kept only if it adds no generic label
+//   and no poor fit (top 150s and all 2025 players); (2) the answer-key guard: a list player whose
+//   2K label is one of our existing builds, read as a new build that beats it by at most GUARD_RANGE, gets his own build
+//   back by a raise of that existing build's bias (to GUARD_MARGIN ahead), only while it stays under the season cap and
+//   REAL_CAP of all real players; else it is reported and left
 // ARCH_U2K_TRAIN_ONLY=1: builds and closest-build mapping from the tune split only (the held-out evaluation); the test
 // split is 30% of the players by a hash of the pick id (tuning.ts picksToJudged).
 import { readFileSync, writeFileSync } from "node:fs";
@@ -24,11 +31,14 @@ import { test } from "vitest";
 import {
 	ARCHETYPES,
 	SCORING_ARCHETYPES,
+	archetypeById,
 	classify,
 	defaultNorms,
+	isPoorFit,
 	modelFor,
 	scoreAll,
 } from "../classify.ts";
+import { isGenericBuild } from "../generic.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
 import { MERGED_ARCH14, MERGED_ARCH15, mergedId } from "../merges.data.ts";
 import { buildNorms } from "../match.ts";
@@ -71,6 +81,16 @@ const OUT = process.env.ARCH_U2K_OUT ?? "/tmp/arch-u2k.txt";
 export const REAL_CAP = 0.025;
 export const REAL_TOP_CAP = 0.035;
 const TRIM_MIN = -1.2;
+// arch2kfix (ARCH_U2K_MODE=fix): a new build at most this share of any one season's top 150 (6 of 150)
+export const SEASON_TOP_CAP = 0.045;
+const FIX_MIN = -1.6;
+// The answer-key guard: how far behind a new build his own existing build may be to be given back, and by how much it then leads
+export const GUARD_RANGE = 1;
+export const GUARD_MARGIN = 0.2;
+const GUARD_MAX = 0.6;
+// (a raised existing build stays at most this share of a generated league and of its draft prospects)
+export const GUARD_GEN_CAP = 0.025;
+export const GUARD_PROS_CAP = 0.04;
 
 const slug = (name) =>
 	name
@@ -461,7 +481,8 @@ import type { TwoKDef } from "../types.ts";
 
 // How each 2K name of the user's list maps to the builds before this round (existing / alias-2k / alias-merged /
 // 2k-unadopted / new)
-export const USER_2K_KINDS: Record<string, { kind: string; id?: string; folded?: string }> = ${JSON.stringify(kinds)};
+// (merged: the name is a build merged away in arch14/arch15 whose kept build does not keep its promises)
+export const USER_2K_KINDS: Record<string, { kind: string; id?: string; folded?: string; merged?: boolean }> = ${JSON.stringify(kinds)};
 
 export const USER_2K_DEFS: TwoKDef[] = ${JSON.stringify(defs)};
 `;
@@ -573,6 +594,231 @@ export const USER_2K_DEFS: TwoKDef[] = ${JSON.stringify(defs)};
 				);
 				if (moved === 0) break;
 			}
+			for (const f of files)
+				writeFileSync(
+					f.file,
+					`${f.header}export const ${f.name}: Norms = ${JSON.stringify(f.norms)};\n`,
+				);
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
+
+		if (MODE === "fix") {
+			const data = realData();
+			const norms = realNorms(defaultNorms(false), false);
+			const tops = [];
+			const allReal = [];
+			for (let season = 2016; season <= 2027; season++) {
+				const ps = data.d.ratings
+					.filter((r) => r.season === season)
+					.map((r) => realPlayer(data, r))
+					.sort((a, b) => b.ovr - a.ovr);
+				ps.slice(0, 150).forEach((p) => tops.push({ p, season }));
+				ps.forEach((p) => allReal.push(p));
+			}
+			const files = [false, true].map((expanded) => {
+				const file = new URL(
+					expanded ? "../normsExpanded.data.ts" : "../norms.data.ts",
+					import.meta.url,
+				);
+				const text = readFileSync(file, "utf8");
+				const name = expanded ? "DEFAULT_NORMS_EXPANDED" : "DEFAULT_NORMS";
+				return {
+					file,
+					name,
+					header: text.slice(0, text.indexOf(`export const ${name}`)),
+					norms: structuredClone(defaultNorms(expanded)),
+				};
+			});
+			const shift = (id, d, min, max) => {
+				for (const f of files)
+					for (const a of SCORING_ARCHETYPES)
+						if ((a.out ?? a.id) === id)
+							f.norms.bias[a.id] = Math.min(
+								max,
+								Math.max(
+									min,
+									Math.round(((f.norms.bias[a.id] ?? 0) + d) * 100) / 100,
+								),
+							);
+			};
+			const nb = () => ({ ...norms, bias: files[0].norms.bias });
+			const read = (p) =>
+				classify(p.ratings, {
+					norms: nb(),
+					pos: p.pos,
+					age: p.age,
+					stats: p.stats,
+				});
+			const seasonMax = () => {
+				const cnt = {};
+				for (const { p, season } of tops) {
+					const id = read(p).id;
+					const k = `${season}|${id}`;
+					cnt[k] = (cnt[k] ?? 0) + 1;
+				}
+				const max = {};
+				for (const [k, v] of Object.entries(cnt)) {
+					const id = k.split("|")[1];
+					max[id] = Math.max(max[id] ?? 0, v / 150);
+				}
+				return max;
+			};
+			const out = [];
+			// (1) the season cap, doing no harm: a build's step is kept only if it adds no generic label and no poor fit among
+			// the top 150s and all 2025 players; else the build is left where it was (and reported)
+			const r2025 = allReal.filter((p) => p.name.endsWith(" 2025"));
+			const harm = () => {
+				let gen = 0;
+				let poor = 0;
+				for (const p of [...tops.map((t) => t.p), ...r2025]) {
+					const c = read(p);
+					if (isGenericBuild(archetypeById(c.id))) gen++;
+					if (isPoorFit(c)) poor++;
+				}
+				return { gen, poor };
+			};
+			const h0 = harm();
+			const frozen = new Set();
+			for (let iter = 0; iter < 25; iter++) {
+				const max = seasonMax();
+				let moved = 0;
+				for (const id of USER_IDS) {
+					if (frozen.has(id)) continue;
+					const over = Math.log((max[id] ?? 0) / SEASON_TOP_CAP);
+					if (over > 0) {
+						const before = structuredClone(files.map((f) => f.norms.bias));
+						shift(id, -Math.max(0.05, 0.3 * over), FIX_MIN, 5);
+						const h = harm();
+						if (h.gen > h0.gen || h.poor > h0.poor) {
+							files.forEach((f, i) => (f.norms.bias = before[i]));
+							frozen.add(id);
+							out.push(
+								`season cap: ${id} left at ${files[0].norms.bias[id] ?? 0} (a step would add ${h.gen - h0.gen} generic, ${h.poor - h0.poor} poor fit)`,
+							);
+						} else {
+							moved++;
+						}
+					}
+				}
+				const worst = Object.entries(max)
+					.filter(([id]) => USER_IDS.has(id))
+					.sort((a, b) => b[1] - a[1])[0];
+				out.push(
+					`season cap round ${iter}: ${moved} builds lowered; largest new build ${worst[0]} ${(100 * worst[1]).toFixed(1)}%`,
+				);
+				if (moved === 0) break;
+			}
+			// (2) the answer-key guard: first a raise of his own (existing) build, held to the caps in every population (the real
+			// players, each season's top 150, a generated league and its draft prospects: no more than GUARD_GEN_CAP /
+			// GUARD_PROS_CAP there); else a cut of the new build that took him, kept only if none of the list players labelled
+			// with that new build lose it and it adds no generic label or poor fit
+			const gen = await sampleLeague(1500, "u2k-fix-league");
+			const pros = (await sampleLeague(800, "u2k-fix-pros", 0, 40)).map((p) => ({
+				...p,
+				prospect: true,
+			}));
+			const genNorms = () => ({ ...defaultNorms(false), bias: files[0].norms.bias });
+			const genShare = (xs, id) =>
+				xs.filter(
+					(p) =>
+						classify(p.ratings, {
+							norms: genNorms(),
+							age: p.prospect ? undefined : p.age,
+							prospect: p.prospect,
+						}).id === id,
+				).length / xs.length;
+			const zOf = (p, id) =>
+				scoreAll(
+					p.ratings,
+					nb(),
+					ARCHETYPES,
+					p.pos,
+					undefined,
+					{ age: p.age, stats: p.stats },
+				).scored.find((x) => (x.a.out ?? x.a.id) === id)?.z;
+			const own = (id) =>
+				userPlayers().filter((y) => USER_2K_MAP[y.r.arch]?.id === id);
+			for (const x of userPlayers()) {
+				const m = USER_2K_MAP[x.r.arch];
+				if (!m || m.id === null || USER_IDS.has(m.id)) continue;
+				if (m.kind !== "existing" && m.kind !== "alias-2k") continue;
+				const c = read(x.p);
+				if (!USER_IDS.has(c.id)) continue;
+				const gap = zOf(x.p, c.id) - (zOf(x.p, m.id) ?? -Infinity);
+				const tag = `guard: ${x.r.name} ${x.r.season} (${x.r.arch}) reads ${c.id}, ${m.id} ${Number.isFinite(gap) ? gap.toFixed(2) : "not allowed"} behind`;
+				if (!(gap <= GUARD_RANGE)) {
+					out.push(`${tag}: left`);
+					continue;
+				}
+				const won = () =>
+					read(x.p).id === m.id &&
+					zOf(x.p, m.id) - zOf(x.p, c.id) >= GUARD_MARGIN;
+				const before = structuredClone(files.map((f) => f.norms.bias));
+				const restore = () =>
+					files.forEach((f, i) => (f.norms.bias = structuredClone(before[i])));
+				const notes = [];
+				// (a) raise his own build
+				const startY = files[0].norms.bias[m.id] ?? 0;
+				for (let step = 0; step < 40 && !won(); step++) {
+					if ((files[0].norms.bias[m.id] ?? 0) >= GUARD_MAX) break;
+					shift(m.id, 0.05, FIX_MIN, GUARD_MAX);
+				}
+				let ok = won();
+				if (ok) {
+					const sm = seasonMax()[m.id] ?? 0;
+					const share =
+						allReal.filter((p) => read(p).id === m.id).length / allReal.length;
+					const gs = genShare(gen, m.id);
+					const ps = genShare(pros, m.id);
+					if (
+						sm > SEASON_TOP_CAP ||
+						share > REAL_CAP ||
+						gs > GUARD_GEN_CAP ||
+						ps > GUARD_PROS_CAP
+					) {
+						ok = false;
+						notes.push(
+							`raising ${m.id} ${startY} -> ${files[0].norms.bias[m.id]} breaks a cap (season top-150 ${(100 * sm).toFixed(1)}%, real ${(100 * share).toFixed(1)}%, league ${(100 * gs).toFixed(1)}%, prospects ${(100 * ps).toFixed(1)}%)`,
+						);
+					} else {
+						notes.push(`${m.id} bias ${startY} -> ${files[0].norms.bias[m.id]}`);
+					}
+				}
+				// (b) cut the new build that took him
+				if (!ok) {
+					restore();
+					const startX = files[0].norms.bias[c.id] ?? 0;
+					const holders = own(c.id).filter((y) => read(y.p).id === c.id);
+					const h0 = harm();
+					for (let step = 0; step < 40 && !won(); step++) {
+						if ((files[0].norms.bias[c.id] ?? 0) <= FIX_MIN) break;
+						shift(c.id, -0.05, FIX_MIN, 5);
+					}
+					ok = won();
+					if (ok) {
+						const lost = holders.filter((y) => read(y.p).id !== c.id);
+						const h = harm();
+						if (lost.length > 0 || h.gen > h0.gen || h.poor > h0.poor) {
+							ok = false;
+							notes.push(
+								`cutting ${c.id} ${startX} -> ${files[0].norms.bias[c.id]} costs ${lost.length} of its own list players, ${h.gen - h0.gen} generic, ${h.poor - h0.poor} poor fit`,
+							);
+						} else {
+							notes.push(`${c.id} bias ${startX} -> ${files[0].norms.bias[c.id]}`);
+						}
+					}
+				}
+				if (!ok) restore();
+				out.push(`${tag}: ${ok ? "given back" : "left"}; ${notes.join("; ")}`);
+			}
+			const max = seasonMax();
+			out.push(
+				"season top-150 max of each new build: " +
+					[...USER_IDS]
+						.map((id) => `${id} ${(100 * (max[id] ?? 0)).toFixed(1)}`)
+						.join(", "),
+			);
 			for (const f of files)
 				writeFileSync(
 					f.file,
@@ -703,7 +949,7 @@ export const USER_2K_MAP: Record<string, { kind: string; id: string | null }> = 
 						modelFor(false),
 						fitTuning(
 							fromPickFile(
-								JSON.parse(readFileSync(process.env.ARCH_U2K_TUNING, "utf8")),
+								JSON.parse(readFileSync(process.env.ARCH_U2K_TUNING, "utf8").replace(/^\uFEFF/, "")),
 							),
 							modelFor,
 						),
@@ -900,7 +1146,7 @@ export const USER_2K_MAP: Record<string, { kind: string; id: string | null }> = 
 			writeFileSync(OUT, JSON.stringify(toPickFile(picks, now)));
 			return;
 		}
-		throw new Error(`ARCH_U2K_MODE: defs, tables, map, read, score or picks`);
+		throw new Error(`ARCH_U2K_MODE: defs, tables, map, trim, fix, read, score or picks`);
 	},
 	3600000,
 );

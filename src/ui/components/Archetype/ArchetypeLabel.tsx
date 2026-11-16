@@ -14,11 +14,15 @@ export type ArchetypeLabelInfo = {
 	season?: number;
 	live?: boolean;
 	why?: { label: string; z: number; want: number }[];
-	// arch16: one short line citing what drove the pick (sub-ratings, play types, traits or ratings)
-	whyText?: string;
+	// arch16 / arch2kfix: 2-4 short bullets in words citing what drove the pick (sub-ratings, play types, traits or ratings)
+	whyBullets?: string[];
 	// archfb: the player (for "Doesn't fit?") and whether the label is the user's own pick
 	pid?: number;
 	user?: boolean;
+	// arch2kfix (Archetype Label Source): "Show both": NBA 2K's archetype for him (a second line where there is room);
+	// "2K labels when known": the game's label (the shown label is 2K's)
+	twoK?: string;
+	gameLabel?: string;
 };
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
@@ -51,15 +55,32 @@ export const ArchetypeWhy = ({
 }: {
 	info: Pick<
 		ArchetypeLabelInfo,
-		"desc" | "why" | "whyText" | "tier" | "conf" | "season" | "live"
+		| "desc"
+		| "why"
+		| "whyBullets"
+		| "tier"
+		| "conf"
+		| "season"
+		| "live"
+		| "gameLabel"
 	>;
 }) => (
 	<div className="archetype-popover">
-		<p className="mb-2">{info.desc}</p>
-		{info.whyText ? (
-			<p className="mb-2">
-				<span className="fw-bold">Why:</span> {info.whyText}
+		{info.gameLabel ? (
+			<p className="mb-2 text-body-secondary">
+				NBA 2K's archetype for him. In this game: {info.gameLabel}.
 			</p>
+		) : null}
+		<p className="mb-2">{info.desc}</p>
+		{info.whyBullets && info.whyBullets.length > 0 ? (
+			<>
+				<div className="fw-bold">Why</div>
+				<ul className="mb-2 ps-3">
+					{info.whyBullets.map((w) => (
+						<li key={w}>{w}</li>
+					))}
+				</ul>
+			</>
 		) : info.why && info.why.length > 0 ? (
 			<>
 				<div className="fw-bold">Why</div>

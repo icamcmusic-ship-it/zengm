@@ -8,6 +8,13 @@
 // Carter 2001, Ginobili 2008). arch12 (hand-judged): Draymond Green 2025 also as a defensive anchor (Lockdown Eraser), Embiid
 // 2025 as a face-up scorer (Slashing Mid-Range Maestro), Westbrook 2025 as a rebounding slasher (Mid-Range Slashing Cleaner)
 // and Gilgeous-Alexander 2025 as a paint finisher (Versatile Paint Finisher).
+// arch2kfix: sixteen lists gained the archuser2k build (twoK/user2kDefs.data.ts) the reading now picks, where the player's
+// own 2K label (user2k.data.ts) or his clear role supports it: LeBron 2025 Mid-Paint Playmaker (his 2K label), Klay 2025
+// Skilled Stretch, Brook Lopez 2025 and Ibaka 2017 Shot-Erasing Stretch, Korver 2021 Crafty Stretch, Wembanyama 2025, Duncan
+// 2003 and Ewing 1990 Paint-Protecting Riser, Booker 2022 Hash-Sinking Slasher, Davis 2020 (2K: Backline Paint Master) and
+// David Robinson 1995 Shot-Erasing Rim Wrecker, Duncan Robinson 2020 (2K: Sharpshooter) Stretch Riser, Jordan 1991 (2K:
+// 2-Way Mid-Post Maestro) 2-Way Mid-Paint Maestro, Pippen 1994 and Payton 1996 2-Way Mid-Paint Playmaker, Ginobili 2008 2-Way
+// Playmaking Creator (Bertans 2018 as a Shot-Erasing Stretch was not added: no rim protection in his role).
 // A tuning target (metrics.script.test.ts) and a test floor (archetypes.test.ts).
 export const GOLD: [
 	slug: string,
@@ -35,6 +42,7 @@ export const GOLD: [
 			"mid-paint-point-four",
 			"2-way-mid-paint-point-four",
 			"physical-offensive-engine",
+			"mid-paint-playmaker",
 		],
 		"pass|handle+finish|L:pass",
 	],
@@ -114,6 +122,7 @@ export const GOLD: [
 			"crafty-3-level-scorer",
 			"ball-hawking-sharpshooter",
 			"three-level-scorer",
+			"skilled-stretch",
 		],
 		"L:shoot",
 	],
@@ -137,6 +146,7 @@ export const GOLD: [
 			"shot-erasing-skilled-popper",
 			"silk-stretch",
 			"crafty-walking-bucket",
+			"shot-erasing-stretch",
 		],
 		"shoot+rimD|L:shoot|L:rimD",
 	],
@@ -160,6 +170,7 @@ export const GOLD: [
 			"crafty-walking-bucket",
 			"physical-3-level-scorer",
 			"crafty-inside-out-scorer",
+			"crafty-stretch",
 		],
 		"L:shoot",
 	],
@@ -183,6 +194,7 @@ export const GOLD: [
 			"rim-reaping-3-level-scorer",
 			"shot-erasing-mid-paint-maestro",
 			"rim-reaping-mid-paint-scorer",
+			"paint-protecting-riser",
 		],
 		"rimD+shoot|rimD|shoot+handle",
 	],
@@ -327,6 +339,7 @@ export const GOLD: [
 			"mid-paint-scorer",
 			"mid-range-slasher",
 			"slashing-playmaker",
+			"hash-sinking-slasher",
 		],
 		"mid|shoot+mid|handle|pass+finish",
 	],
@@ -375,6 +388,7 @@ export const GOLD: [
 			"rim-reaping-mid-paint-scorer",
 			"shot-erasing-mid-paint-maestro",
 			"backline-power-dunker",
+			"shot-erasing-rim-wrecker",
 		],
 		"rimD|def+finish|rimD+mid|reb+rimD",
 	],
@@ -553,6 +567,7 @@ export const GOLD: [
 			"crafty-3pt-sniper",
 			"walking-bucket",
 			"big-range",
+			"stretch-riser",
 		],
 		"L:shoot",
 	],
@@ -778,6 +793,7 @@ export const GOLD: [
 			"rim-reaping-3-level-scorer",
 			"rim-reaping-mid-paint-scorer",
 			"physical-mid-paint-shot-eraser",
+			"shot-erasing-stretch",
 		],
 		"rimD+shoot|shoot|rimD",
 	],
@@ -902,6 +918,7 @@ export const GOLD: [
 			"mid-paint-scorer",
 			"rim-reaping-mid-paint-scorer",
 			"2-way-mid-range-menace",
+			"2-way-mid-paint-maestro",
 		],
 		"mid|finish|def+mid|ath+finish",
 	],
@@ -957,6 +974,7 @@ export const GOLD: [
 			"rim-reaping-poster-dunker",
 			"board-hunting-lob-threat-bully",
 			"backline-power-finisher",
+			"paint-protecting-riser",
 		],
 		"post|rimD|reb",
 	],
@@ -1070,6 +1088,7 @@ export const GOLD: [
 			"ball-snatching-3-level-scorer",
 			"mid-paint-point-four",
 			"2-way-mid-paint-point-forward",
+			"2-way-mid-paint-playmaker-2k",
 		],
 		"def|perD|pass",
 	],
@@ -1081,6 +1100,7 @@ export const GOLD: [
 			"backline-mid-paint-bully",
 			"backline-bulldozer",
 			"yamming-force-of-nature",
+			"shot-erasing-rim-wrecker",
 		],
 		"rimD|post|ath",
 	],
@@ -1092,6 +1112,7 @@ export const GOLD: [
 			"physical-mid-paint-shot-eraser",
 			"backline-mid-paint-bully",
 			"bulldozing-glass-guardian",
+			"paint-protecting-riser",
 		],
 		"post|rimD|mid",
 	],
@@ -1181,7 +1202,13 @@ export const GOLD: [
 	[
 		"paytoga01",
 		1996,
-		["mr-two-way", "2-way-mid-range-menace", "the-guard-dog", "dot-dispenser"],
+		[
+			"mr-two-way",
+			"2-way-mid-range-menace",
+			"the-guard-dog",
+			"dot-dispenser",
+			"2-way-mid-paint-playmaker-2k",
+		],
 		"perD|def|pass",
 	],
 	[
@@ -1264,6 +1291,7 @@ export const GOLD: [
 			"post-scoring-slasher",
 			"dime-dropping-dual-finisher",
 			"slashing-playmaker",
+			"2-way-playmaking-creator-2k",
 		],
 		"handle|finish|pass",
 	],

@@ -624,6 +624,21 @@ export const NATIVE_FEATURES = [
 			"A 2K-style archetype for every player, derived from his ratings and saved each preseason: player page, Draft Scouting, Advanced Player Search, Roster composition, the Archetypes page and archetype targets in the ratings regenerator.",
 		default: true,
 		sports: BBGM,
+		options: [
+			{
+				key: "archetypeLabelSource",
+				name: "Archetype Label Source",
+				description:
+					"Which name a real player's archetype shows. NBA 2K's own archetype is known for the real players in your 2K list (current players in the 2026 and 2027 seasons, all-time players in the season they were matched to); everyone else, and every random or fictional player, always shows the game's archetype. 2K labels when known: those players show 2K's name as their label. Show both: the game's archetype with 2K's name as a small second line.",
+				type: "string",
+				values: [
+					{ key: "game", value: "Game archetypes" },
+					{ key: "twoK", value: "2K labels when known" },
+					{ key: "both", value: "Show both" },
+				],
+				default: "game",
+			},
+		],
 	},
 	{
 		id: "improvedPositions",

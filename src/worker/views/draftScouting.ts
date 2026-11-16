@@ -9,7 +9,12 @@ import { last } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
 import { getScoutReport, getScoutingStatus } from "../core/draft/scouting.ts";
-import { archetypeFor, getLeagueNorms } from "../core/player/archetype.ts";
+import {
+	archetypeFor,
+	displayArchetypeLabel,
+	getLeagueNorms,
+} from "../core/player/archetype.ts";
+import type { ArchetypeView } from "../../common/archetypes/index.ts";
 import { hasPreDraftStats } from "../../common/preDraft.ts";
 import {
 	getTraitViewContext,
@@ -52,10 +57,25 @@ const getSeason = async (
 	const scoutingSystem = featureOn("scoutingSystem");
 	// Derived from the prospects' ratings (live: their ratings can still be regenerated)
 	const norms = __SPORT === "basketball" ? await getLeagueNorms() : undefined;
+	// (arch2kfix: the label as the Archetype Label Source setting shows it)
+	const withTwoK = (
+		p: (typeof playersAllFiltered)[number],
+		v: ArchetypeView | undefined,
+	) =>
+		v
+			? {
+					...v,
+					label: displayArchetypeLabel(
+						p,
+						(last(p.ratings) as any).season,
+						v.label,
+					),
+				}
+			: undefined;
 	const archetypeByPid = new Map(
 		playersAllFiltered.map((p) => [
 			p.pid,
-			norms ? archetypeFor(p, norms)?.view : undefined,
+			norms ? withTwoK(p, archetypeFor(p, norms)?.view) : undefined,
 		]),
 	);
 

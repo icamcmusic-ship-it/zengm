@@ -1,4 +1,9 @@
-import { featureOn } from "../../util/nativeFeatures.ts";
+import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
+import {
+	labelSourceOf,
+	user2kLabel,
+	type ArchetypeLabelSource,
+} from "../../../common/archetypes/twoK/user2kLookup.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import {
 	SCORING_ARCHETYPES,
@@ -20,7 +25,7 @@ import {
 	type Norms,
 	type StoredArchetype,
 } from "../../../common/archetypes/index.ts";
-import { whyDrivers, whyLine } from "../../../common/archetypes/whyText.ts";
+import { whyBullets, whyDrivers } from "../../../common/archetypes/whyText.ts";
 import { VISIBLE_TRAITS } from "../../../common/archetypes/classify.ts";
 import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
 import type { Player } from "../../../common/types.ts";
@@ -616,8 +621,38 @@ const userView = (
 	);
 };
 
+// arch2kfix: the "Archetype Label Source" setting (League Extras -> Archetypes) and NBA 2K's own archetype for a real
+// player in the user's 2K list (twoK/user2kLookup.ts: by srID and name, in the matched season only). Random and fictional
+// players have none, so they always show the game's label.
+export const archetypeLabelSource = (): ArchetypeLabelSource =>
+	labelSourceOf(featureOption<string>("archetypeLabelSource"));
+
+export const twoKLabelFor = (
+	p: Pick<Player, "srID" | "lastName">,
+	season: number,
+): string | undefined =>
+	archetypeLabelSource() === "game" ? undefined : user2kLabel(p, season);
+
+// A label as the setting shows it where there is room for only one string (search columns, roster lists): the game's
+// (the default), 2K's when known, or the game's with 2K's after it
+export const displayArchetypeLabel = (
+	p: Pick<Player, "srID" | "lastName">,
+	season: number,
+	label: string,
+): string => {
+	const mode = archetypeLabelSource();
+	if (mode === "game") {
+		return label;
+	}
+	const tk = user2kLabel(p, season);
+	if (!tk) {
+		return label;
+	}
+	return mode === "twoK" ? tk : `${label} (2K: ${tk})`;
+};
+
 // The label to show for a player in a given season: the entry in force then, else (current season or prospect) a live reading
-export const archetypeLabelAt = (
+const gameLabelAt = (
 	p: Player,
 	season: number,
 	norms: Norms,
@@ -649,6 +684,18 @@ export const archetypeLabelAt = (
 	return undefined;
 };
 
+// The label to show for a player in a given season, as the Archetype Label Source setting shows it
+export const archetypeLabelAt = (
+	p: Player,
+	season: number,
+	norms: Norms,
+): string | undefined => {
+	const label = gameLabelAt(p, season, norms);
+	return label === undefined
+		? undefined
+		: displayArchetypeLabel(p, season, label);
+};
+
 export type PlayerArchetypeInfo = {
 	id: string;
 	name: string;
@@ -661,11 +708,15 @@ export type PlayerArchetypeInfo = {
 	season?: number;
 	live: boolean;
 	why: { label: string; z: number; want: number }[];
-	// arch16: one short line citing what drove the pick (common/archetypes/whyText.ts)
-	whyText?: string;
+	// arch16 / arch2kfix: 2-4 short bullets in words (no numbers) citing what drove the pick (common/archetypes/whyText.ts)
+	whyBullets?: string[];
 	// archfb: the user's own pick (internal: shown like any archetype; the popover offers to clear it)
 	user?: boolean;
 	pid?: number;
+	// arch2kfix (Archetype Label Source): "Show both": 2K's archetype for him, as a small second line; "2K labels when known":
+	// the game's label (the shown label is 2K's)
+	twoK?: string;
+	gameLabel?: string;
 };
 
 // Everything the player page shows. A non-prospect with no entry gets one stored here, once.
@@ -706,13 +757,14 @@ export const archetypeInfoForPlayer = async (
 		z: w.z,
 		want: w.want,
 	}));
-	// arch16: the short why line, from what drove the pick (sub-ratings, play types, traits, ratings), with the numbers the
-	// user sees (scouting fuzz as on the ratings pages; none under the no-visible-ratings challenge)
+	// arch16 / arch2kfix: the why bullets, from what drove the pick (sub-ratings, play types, traits, ratings), in words read
+	// from the ratings the user sees (scouting fuzz as on the ratings pages); no numbers, so nothing to hide under the
+	// no-visible-ratings challenge
 	const a = archetypeById(found.view.id);
-	let whyText: string | undefined;
+	let whyList: string[] | undefined;
 	if (ratings && a) {
 		const traits = archetypeTraits(p, season);
-		whyText = whyLine(
+		whyList = whyBullets(
 			whyDrivers({
 				a,
 				ratings,
@@ -726,15 +778,21 @@ export const archetypeInfoForPlayer = async (
 						)
 					: undefined,
 				shown: ratingsForArchetype(p, true),
-				hideNumbers: g.get("challengeNoRatings") && p.tid !== PLAYER.RETIRED,
 			}),
 		);
 	}
 	const v = found.view;
+	const mode = archetypeLabelSource();
+	const tk =
+		mode === "game"
+			? undefined
+			: user2kLabel(p, found.stored ? v.season : season);
 	return {
 		id: v.id,
 		name: v.name,
-		label: v.label,
+		label: tk && mode === "twoK" ? tk : v.label,
+		...(tk && mode === "twoK" ? { gameLabel: v.label } : {}),
+		...(tk && mode === "both" ? { twoK: tk } : {}),
 		desc: v.desc,
 		group: v.group,
 		tier: v.tier,
@@ -742,7 +800,7 @@ export const archetypeInfoForPlayer = async (
 		season: found.stored ? v.season : undefined,
 		live: !found.stored,
 		why,
-		...(whyText ? { whyText } : {}),
+		...(whyList && whyList.length > 0 ? { whyBullets: whyList } : {}),
 		pid: p.pid,
 		...(found.user ? { user: true } : {}),
 	};

@@ -3,7 +3,7 @@
 // whole tuning, "Export tuning only", importable here too)
 import { useEffect, useState } from "react";
 import type { TuningInfo } from "../../../worker/api/archetypes.ts";
-import { downloadFile } from "../../util/downloadFile.ts";
+import { downloadFile, jsonFileBytes } from "../../util/downloadFile.ts";
 import { realtimeUpdate } from "../../util/realtimeUpdate.ts";
 import { toWorker } from "../../util/toWorker.ts";
 
@@ -88,9 +88,10 @@ export const ArchetypeTuningPanel = () => {
 								"tuningExport",
 								undefined,
 							);
+							// (no byte order mark: the refit scripts JSON.parse the file as is)
 							downloadFile(
 								"archetype-picks.json",
-								JSON.stringify(file, null, 1),
+								jsonFileBytes(file, 1),
 								"application/json",
 							);
 						}}
@@ -105,9 +106,10 @@ export const ArchetypeTuningPanel = () => {
 							const file = await toWorker("archetypes", "tuningExportOnly", {
 								snapshots: true,
 							});
+							// (no byte order mark: the refit scripts JSON.parse the file as is)
 							downloadFile(
 								"archetype-tuning.json",
-								JSON.stringify(file, null, 1),
+								jsonFileBytes(file, 1),
 								"application/json",
 							);
 						}}

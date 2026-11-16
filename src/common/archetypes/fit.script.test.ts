@@ -36,7 +36,10 @@ import { RULE_KEY } from "./ruleKey.data.ts";
 const PICKS = process.env.ARCH_PICKS
 	? picksToJudged(
 			process.env.ARCH_PICKS.split(",").flatMap((f) =>
-				fromPickFile(JSON.parse(readFileSync(f.trim(), "utf8"))),
+				// (a leading byte order mark, as older "Export my picks" files carry, is not JSON)
+				fromPickFile(
+					JSON.parse(readFileSync(f.trim(), "utf8").replace(/^\uFEFF/, "")),
+				),
 			),
 		)
 	: undefined;

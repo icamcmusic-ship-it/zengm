@@ -7,7 +7,8 @@ import type { TwoKDef } from "../types.ts";
 // 2k-unadopted / new)
 export const USER_2K_KINDS: Record<
 	string,
-	{ kind: string; id?: string; folded?: string }
+	// (merged: the name is a build merged away in arch14/arch15 whose kept build does not keep its promises)
+	{ kind: string; id?: string; folded?: string; merged?: boolean }
 > = {
 	"2-Way 3-Level Dimer": { kind: "new" },
 	"2-Way 3-Level Playmaker": { kind: "new" },
