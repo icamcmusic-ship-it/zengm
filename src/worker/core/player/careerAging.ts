@@ -390,7 +390,7 @@ export const careerRetireFactors = ({
 	p: CareerAgingPlayer & {
 		tid: number;
 		contracts: any[];
-		awards: { season: number; type: string }[];
+		awards: { season: number; type?: string }[];
 		injury: { type: string; gamesRemaining: number };
 	};
 	age: number;
@@ -478,3 +478,34 @@ export const RING_CHASE_AGE = 33;
 // A useful veteran (33-38, ovr 45+) waits up to two seasons as a free agent for a contender's call before retiring (one for everyone else)
 export const freeAgentYearsBeforeRetiring = (age: number, ovr: number) =>
 	age >= 33 && age <= 38 && ovr >= 45 ? 2 : 1;
+
+// Veteran minimum (roster selection): a free agent or expiring player this old who would be in his team's top 13 by value (ahead of the
+// filler at the end of the bench) is kept or signed for the minimum for one season by a team that isn't rebuilding, like NBA teams keep
+// useful veterans on minimum deals instead of cutting them for younger players of the same level
+export const VET_MINIMUM_AGE = 33;
+// Not past this age (players 39+ are kept only by their own merit, otherwise too many play into their 40s)
+export const VET_MINIMUM_MAX_AGE = 37;
+const VET_MINIMUM_RANK = 13;
+
+export const usefulVeteran = (
+	p: {
+		born: { year: number };
+		value: number;
+		injury: { gamesRemaining: number };
+	},
+	rosterValues: number[],
+	strategy: string,
+) => {
+	if (strategy === "rebuilding" || p.injury.gamesRemaining > 20) {
+		return false;
+	}
+	const age = g.get("season") - p.born.year;
+	if (age < VET_MINIMUM_AGE || age > VET_MINIMUM_MAX_AGE) {
+		return false;
+	}
+	const sorted = rosterValues.toSorted((a, b) => b - a);
+	if (sorted.length < VET_MINIMUM_RANK) {
+		return sorted.length === 0 || p.value >= sorted.at(-1)!;
+	}
+	return p.value > sorted[VET_MINIMUM_RANK - 1]!;
+};

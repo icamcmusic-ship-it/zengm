@@ -1,7 +1,11 @@
 import { PLAYER } from "../../../common/constants.ts";
 import { player, team } from "../index.ts";
 import getBest from "./getBest.ts";
-import { careerAgingOn, RING_CHASE_AGE } from "../player/careerAging.ts";
+import {
+	careerAgingOn,
+	RING_CHASE_AGE,
+	usefulVeteran,
+} from "../player/careerAging.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
 import {
 	makeAiTraitValueFactorCache,
@@ -53,6 +57,33 @@ const ringChaseOffers = <
 		return p;
 	});
 	return original.size > 0 ? { players: out, original } : undefined;
+};
+
+// Career Aging: the best useful veteran (33-37, see usefulVeteran) a team with a free roster spot signs for the minimum
+const veteranMinimumSigning = <
+	T extends {
+		born: { year: number };
+		value: number;
+		injury: { gamesRemaining: number };
+	},
+>(
+	t: { strategy: string },
+	roster: { value: number }[],
+	freeAgents: T[],
+	payroll: number,
+) => {
+	if (roster.length >= g.get("maxRosterSize") - 1) {
+		return;
+	}
+	if (
+		g.get("salaryCapType") === "hard" &&
+		payroll + g.get("minContract") > g.get("salaryCap")
+	) {
+		return;
+	}
+	const values = roster.map((p) => p.value);
+	// freeAgents is sorted by value, best first
+	return freeAgents.find((p) => usefulVeteran(p, values, t.strategy));
 };
 
 const autoSign = async () => {
@@ -182,7 +213,22 @@ const autoSign = async () => {
 		);
 		const ringChaser = best ? ringChase?.original.get(best) : undefined;
 		const p = ringChaser ?? best;
-		if (p && ringChaser) {
+		// Career Aging: with nobody else to sign, a useful veteran on a one season minimum deal (a spot on the roster left)
+		const vet =
+			!p && careerAgingOn()
+				? veteranMinimumSigning(t, playersOnRoster, playersSorted, payroll)
+				: undefined;
+		if (vet) {
+			playersSorted = playersSorted.filter((p2) => p2 !== vet);
+			await player.sign(
+				vet,
+				t.tid,
+				{ amount: g.get("minContract"), exp: getContractStartSeason() },
+				g.get("phase"),
+			);
+			await idb.cache.players.put(vet);
+			await team.rosterAutoSort(t.tid);
+		} else if (p && ringChaser) {
 			playersSorted = playersSorted.filter((p2) => p2 !== p);
 			await player.sign(p, t.tid, best!.contractDemand!, g.get("phase"));
 			await idb.cache.players.put(p);

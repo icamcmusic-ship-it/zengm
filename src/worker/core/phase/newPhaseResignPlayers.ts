@@ -21,6 +21,43 @@ import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import { autoPlayStopsAt } from "../league/autoPlay.ts";
 import { getAllGmWeights } from "../gm/index.ts";
 import * as college from "../college/index.ts";
+import { careerAgingOn, usefulVeteran } from "../player/careerAging.ts";
+import type { Player } from "../../../common/types.ts";
+
+// Career Aging: would this expiring veteran be in his team's top 13 for next season, and does he take the minimum from it?
+const keepVeteranOnMinimum = async (p: Player, payroll: number | undefined) => {
+	const t = await idb.cache.teams.get(p.tid);
+	if (!t) {
+		return false;
+	}
+	const minContract = g.get("minContract");
+	if (
+		g.get("salaryCapType") === "hard" &&
+		(payroll === undefined || payroll + minContract > g.get("salaryCap"))
+	) {
+		return false;
+	}
+	const season = g.get("season");
+	const roster = (
+		await idb.cache.players.indexGetAll("playersByTid", p.tid)
+	).filter(
+		(p2) => p2.pid !== p.pid && getContractSummaryOrThrow(p2).exp > season,
+	);
+	if (roster.length >= g.get("maxRosterSize")) {
+		return false;
+	}
+	if (
+		!usefulVeteran(
+			p,
+			roster.map((p2) => p2.value),
+			t.strategy,
+		)
+	) {
+		return false;
+	}
+	const mood = await player.moodInfo(p, p.tid, { contractAmount: minContract });
+	return mood.willing;
+};
 
 export const FREE_AGENCY_DAYS = 30;
 
@@ -326,6 +363,28 @@ const newPhaseResignPlayers = async (
 						reSignPlayer = false;
 					}
 				}
+			}
+
+			// Career Aging: a useful veteran his team let go is kept on a one season minimum deal (if he is willing)
+			if (
+				!reSignPlayer &&
+				!draftPick &&
+				careerAgingOn() &&
+				(await keepVeteranOnMinimum(p, payrollsByTid.get(p.tid)))
+			) {
+				reSignPlayer = true;
+				const minContract = g.get("minContract");
+				await player.sign(
+					p,
+					p.tid,
+					{ amount: minContract, exp: g.get("season") + 1 },
+					PHASE.RESIGN_PLAYERS,
+				);
+				const payroll = payrollsByTid.get(p.tid);
+				if (payroll !== undefined) {
+					payrollsByTid.set(p.tid, payroll + minContract);
+				}
+				await valueChangeCalculator.invalidateCache({ teams: [p.tid] });
 			}
 
 			if (!reSignPlayer) {

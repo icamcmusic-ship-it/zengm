@@ -569,7 +569,52 @@ const ratingsInfo = async (s: number) => {
 
 // Old players: by age (30-39, 40+), how many played in the regular season and were on a roster at its end, their
 // minutes and ovr, and retirements by age at the end of the season. Call after the draft phase (retirements are done).
+// Where veterans go from one season to the next: status (team, free agent, retired) of every 31+ player after the draft, by age band
+let prevStatus = new Map<number, { band: string; st: string; ovr: number }>();
+const vetBand = (age: number) =>
+	age <= 32 ? "31-32" : age <= 35 ? "33-35" : age <= 38 ? "36-38" : "39+";
 const oldPlayers = async (s: number) => {
+	const players = await idb.merged.players.getAll({ activeSeason: s - 1 });
+	const flows: Record<string, Record<string, number>> = {};
+	const flowOvr: Record<string, number[]> = {};
+	const nextStatus = new Map<
+		number,
+		{ band: string; st: string; ovr: number }
+	>();
+	for (const p of players) {
+		const st =
+			p.tid >= 0
+				? "team"
+				: p.tid === PLAYER.FREE_AGENT
+					? "fa"
+					: p.tid === PLAYER.RETIRED
+						? "ret"
+						: "other";
+		const before = prevStatus.get(p.pid);
+		if (before) {
+			const k = `${before.band} ${before.st}`;
+			(flows[k] ??= {})[st] = (flows[k]![st] ?? 0) + 1;
+			(flowOvr[`${k}>${st}`] ??= []).push(before.ovr);
+		}
+		const age = s - p.born.year;
+		if (age >= 31 && st !== "ret" && st !== "other") {
+			nextStatus.set(p.pid, {
+				band: vetBand(age + 1),
+				st,
+				ovr: p.ratings.find((row) => row.season === s)?.ovr ?? 0,
+			});
+		}
+	}
+	prevStatus = nextStatus;
+	const flowsOut = {
+		flows,
+		flowOvr: Object.fromEntries(
+			Object.entries(flowOvr).map(([k, v]) => [k, r(mean(v))]),
+		),
+	};
+	return { ...(await oldPlayers2(s)), ...flowsOut };
+};
+const oldPlayers2 = async (s: number) => {
 	const players = await idb.merged.players.getAll({ activeSeason: s });
 	const bucket = (age: number) => (age >= 40 ? "40+" : String(age));
 	const played: Record<string, { n: number; min: number[]; ovr: number[] }> =
@@ -578,6 +623,10 @@ const oldPlayers = async (s: number) => {
 	const retiredAges: number[] = [];
 	// Unsigned free agents by age (30+) after the draft
 	const fa: Record<string, number> = {};
+	// Their ovr, and rostered players by age (end of season), and the ovr of rostered players by age group
+	const faOvr: Record<string, number[]> = {};
+	const rostered: Record<string, number> = {};
+	const rosterOvr: Record<string, number[]> = {};
 	// Every 38+ player who played: age, ovr, career best ovr, minutes and the secret aging curve
 	const list: string[] = [];
 	// Rookies' share of regular season minutes, and the mean age of the top 10 by ovr
@@ -589,6 +638,23 @@ const oldPlayers = async (s: number) => {
 		const ovrS = p.ratings.find((row) => row.season === s)?.ovr;
 		if (ovrS !== undefined && p.tid >= 0) {
 			byOvr.push([ovrS, age]);
+			const g5 =
+				age <= 22
+					? "<=22"
+					: age <= 25
+						? "23-25"
+						: age <= 29
+							? "26-29"
+							: age <= 32
+								? "30-32"
+								: age <= 35
+									? "33-35"
+									: "36+";
+			(rosterOvr[g5] ??= []).push(ovrS);
+			if (age >= 30) {
+				const k = age >= 40 ? "40+" : String(age);
+				rostered[k] = (rostered[k] ?? 0) + 1;
+			}
 		}
 		for (const row of p.stats) {
 			if (row.season === s && !row.playoffs && row.tid >= 0) {
@@ -646,6 +712,9 @@ const oldPlayers = async (s: number) => {
 		if (p.tid === PLAYER.FREE_AGENT) {
 			const k = age >= 40 ? "40+" : String(age);
 			fa[k] = (fa[k] ?? 0) + 1;
+			if (ovrS !== undefined) {
+				(faOvr[k] ??= []).push(ovrS);
+			}
 		}
 		const rows = p.stats.filter(
 			(row) => row.season === s && !row.playoffs && row.tid >= 0,
@@ -678,6 +747,18 @@ const oldPlayers = async (s: number) => {
 		retired,
 		retiredAge: r(mean(retiredAges)),
 		fa,
+		faOvr: Object.fromEntries(
+			Object.entries(faOvr)
+				.sort()
+				.map(([k, v]) => [k, r(mean(v))]),
+		),
+		rostered,
+		rosterOvr: Object.fromEntries(
+			Object.entries(rosterOvr).map(([k, v]) => [
+				k,
+				[v.length, r(mean(v)), Math.min(...v)],
+			]),
+		),
 		rookieMinShare: r(minTotal > 0 ? (100 * minRookies) / minTotal : 0),
 		top10Age: r(
 			mean(
@@ -1192,7 +1273,7 @@ const settingsFor = (config: string) => {
 		Object.assign(settings, extra);
 		out(`RANDOM GAME ${JSON.stringify(extra)}`);
 	}
-	if (env.LONG_RUN_SETTINGS) {
+	if (env.LONG_RUN_SETTINGS && env.LONG_RUN_SETTINGS !== "null") {
 		Object.assign(settings, JSON.parse(env.LONG_RUN_SETTINGS));
 	}
 	return { settings, enabledKeys };
