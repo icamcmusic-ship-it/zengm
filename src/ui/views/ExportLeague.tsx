@@ -17,7 +17,8 @@ import type makeExportStream from "../util/makeExportStream.ts";
 import { ProgressBarText } from "../components/ProgressBarText.tsx";
 import { ActionButton } from "../components/ActionButton.tsx";
 import { safeLocalStorage } from "../util/safeLocalStorage.ts";
-import { downloadFile } from "../util/downloadFile.ts";
+import { downloadFile, jsonFileBytes } from "../util/downloadFile.ts";
+import { EXPORT_STORES_BY_KEY } from "../util/exportStores.ts";
 
 const HAS_FILE_SYSTEM_ACCESS_API = !!window.showSaveFilePicker;
 
@@ -127,7 +128,7 @@ const categories: Category[] = [
 	{
 		name: "headToHead",
 		title: "Head-to-head data",
-		desc: "History of head-to-head results between teams.",
+		desc: "History of head-to-head results between teams (and the Rivalry Stories game log).",
 		default: true,
 	},
 	{
@@ -297,31 +298,7 @@ const getExportInfo = (
 ) => {
 	const storesSet = new Set<LeagueDBStoreNames>();
 
-	const storesByKey = {
-		players: ["players", "awards"],
-		teamsBasic: ["teams", "gameAttributes"],
-		teams: ["teamSeasons", "teamStats", "coaches"],
-		headToHead: ["headToHeads"],
-		schedule: ["schedule", "playoffSeries"],
-		draftPicks: ["draftPicks"],
-		leagueSettings: ["gameAttributes"],
-		gameState: [
-			"gameAttributes",
-			"trade",
-			"negotiations",
-			"draftLotteryResults",
-			"messages",
-			"playerFeats",
-			"allStars",
-			"scheduledEvents",
-			"seasonLeaders",
-			"savedTrades",
-			"savedTradingBlock",
-		],
-		newsFeedTransactions: ["events"],
-		newsFeedOther: ["events"],
-		games: ["games"],
-	} satisfies Record<string, LeagueDBStoreNames[]>;
+	const storesByKey = EXPORT_STORES_BY_KEY;
 
 	for (const key of helpers.keys(storesByKey)) {
 		if (checked[key]) {
@@ -537,7 +514,7 @@ const ExportLeague = ({ stats }: View<"exportLeague">) => {
 			const base = await toWorker("main", "getExportFilename", "league");
 			downloadFile(
 				base.replace(/\.json$/, "") + "_archetype_tuning.json",
-				JSON.stringify(file, null, compressed ? undefined : 1),
+				jsonFileBytes(file, compressed ? undefined : 1),
 				"application/json",
 			);
 			setStatus(

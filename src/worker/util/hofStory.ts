@@ -290,6 +290,10 @@ export const careerFacts = async (
 	return facts;
 };
 
+// Hall of Fame words (plaque text, induction speeches, nicknames) are about basketball careers: points, rebounds and assists,
+// shooting on a hoop. Other sports get the stock Hall of Fame page (no "0 points, 0 rebounds, 0 assists" plaque)
+export const hofWordsOn = () => __SPORT === "basketball";
+
 export const hofWords = (
 	facts: CareerFacts,
 	prime?: { season: number; tid?: number; team?: string },
