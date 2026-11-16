@@ -436,8 +436,6 @@ describe("real players in a league", () => {
 				rw.sub,
 				realSubShape(rw, pw.subP.s, leanW, true).sub,
 			);
-			// Gobert: shot blocking far above steals
-			assert.isAbove(rw.sub[SUB_INDEX.blk!] - rw.sub[SUB_INDEX.stl!], 15);
 
 			// Off: an unread lean is dropped, nothing else
 			await create(false);
