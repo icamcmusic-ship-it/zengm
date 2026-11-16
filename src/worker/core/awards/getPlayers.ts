@@ -703,7 +703,7 @@ export const getPlayers = async (
 			for (const p of players) {
 				for (const row of Object.values(p.currentStats)) {
 					if (row) {
-						addPlayoffVariants(row, p.currentStats.playoffs);
+						addPlayoffVariants(row, p.currentStats.playoffs, trk.playoffKeys);
 					}
 				}
 			}

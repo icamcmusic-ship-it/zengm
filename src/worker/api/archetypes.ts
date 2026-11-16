@@ -16,6 +16,8 @@ import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import {
 	archetypeFor,
+	archetypeLabelSource,
+	displayArchetypeLabel,
 	archetypeTraits,
 	classifyPlayer,
 	getLeagueNorms,
@@ -63,6 +65,7 @@ import {
 import { traitsEnabled } from "../core/player/traits.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 import { TWO_K_NAMES } from "../../common/archetypes/defs.data.ts";
+import { user2kLabel } from "../../common/archetypes/twoK/user2kLookup.ts";
 
 export type ArchetypeRosterPlayer = {
 	pid: number;
@@ -111,7 +114,11 @@ export const archetypeRoster = async ({
 			name: `${p.firstName} ${p.lastName}`,
 			pos: row.pos,
 			ovr: row.ovr,
-			label: found.view.label,
+			label: displayArchetypeLabel(
+				p,
+				found.stored ? found.view.season : row.season,
+				found.view.label,
+			),
 			group: found.view.group,
 			live: !found.stored,
 		});
@@ -130,6 +137,9 @@ export type ArchetypeTopPlayer = {
 	name: string;
 	ovr: number;
 	abbrev: string;
+	// arch2kfix: NBA 2K's archetype for him (a real player in the user's 2K list), with Archetype Label Source not "Game
+	// archetypes"
+	twoK?: string;
 };
 
 export type ArchetypeLandscape = {
@@ -147,6 +157,9 @@ export type ArchetypeLandscape = {
 		top: ArchetypeTopPlayer[];
 		// Other names for the same archetype (never shown: the table's search finds them)
 		aliases: string[];
+		// arch2kfix: NBA 2K's archetypes of the real players who hold it (in the user's 2K list, this season): never shown,
+		// the table's search finds them
+		twoK: string[];
 	}[];
 };
 
@@ -170,11 +183,20 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 	for (const t of await idb.cache.teams.getAll()) {
 		abbrevs.set(t.tid, t.abbrev);
 	}
-	const rated: (Rated & { name: string; tid: number })[] = [];
+	const rated: (Rated & { name: string; tid: number; twoK?: string })[] = [];
+	// (the search finds a build by its holders' 2K archetypes whatever the setting; they are shown only when it asks)
+	const showTwoK = archetypeLabelSource() !== "game";
+	const twoKById = new Map<string, Set<string>>();
 	for (const p of raw) {
 		const found = archetypeFor(p, norms);
 		if (!found) {
 			continue;
+		}
+		const tk = user2kLabel(p, season);
+		if (tk) {
+			const set = twoKById.get(found.view.id) ?? new Set<string>();
+			set.add(tk);
+			twoKById.set(found.view.id, set);
 		}
 		rated.push({
 			pid: p.pid,
@@ -182,6 +204,7 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 			archetypeId: found.view.id,
 			name: `${p.firstName} ${p.lastName}`,
 			tid: p.tid,
+			...(tk && showTwoK ? { twoK: tk } : {}),
 		});
 	}
 	const landscape = landscapeOf(rated, 3);
@@ -210,6 +233,7 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 				group: r.group,
 				desc: archetypeById(r.id)!.desc,
 				aliases: TWO_K_NAMES[r.id] ?? [],
+				twoK: [...(twoKById.get(r.id) ?? [])].sort(),
 				count: r.count,
 				share: r.share,
 				top: r.top.map((t) => {
@@ -219,6 +243,7 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 						name: x.name,
 						ovr: t.ovr,
 						abbrev: x.tid >= 0 ? (abbrevs.get(x.tid) ?? "") : "FA",
+						...(x.twoK ? { twoK: x.twoK } : {}),
 					};
 				}),
 			})),

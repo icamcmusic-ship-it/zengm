@@ -1211,4 +1211,5 @@ const PINNED: [string, number, string][] = [
 	["adamsst01", 2025, "physical-board-enforcer"], // Steven Adams
 	["allento01", 2018, "ball-hawking-mid-paint-scorer"], // Tony Allen
 	["drumman01", 2025, "paint-scoring-crasher"], // Andre Drummond
+	["irvinky01", 2027, "iso-savant"], // Kyrie Irving (arch2kfix: his 2K archetype exactly, given back by the answer-key guard)
 ];

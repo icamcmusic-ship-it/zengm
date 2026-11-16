@@ -10,8 +10,13 @@ import {
 } from "./faceParts.ts";
 
 describe("faceParts", () => {
-	const hairBefore = { ...(svgs as any).hair };
-	const indexBefore = [...(svgsIndex as any).hair];
+	// facesjs' own parts (other test files in the same worker may have registered the fork's already)
+	const indexBefore = ((svgsIndex as any).hair as string[]).filter(
+		(id) => !id.startsWith("fork-"),
+	);
+	const hairBefore = Object.fromEntries(
+		indexBefore.map((id) => [id, (svgs as any).hair[id]]),
+	);
 
 	test("registering appends without changing facesjs parts", () => {
 		registerForkFaceParts();

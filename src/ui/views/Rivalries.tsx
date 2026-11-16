@@ -152,7 +152,12 @@ const Rivalries = ({
 						<h3 className="h5">Rivalry timeline</h3>
 						<ScoreChart rows={selected.timeline} />
 						<div className="table-responsive" style={{ maxHeight: 400 }}>
-							<table className="table table-sm table-striped">
+							{/* Tables don't wrap by default (light.scss); this one does, so its six columns fit a phone */}
+							<table
+								className="table table-sm table-striped"
+								style={{ whiteSpace: "normal" }}
+								data-testid="rivalry-timeline"
+							>
 								<thead>
 									<tr>
 										<th>Season</th>

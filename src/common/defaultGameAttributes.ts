@@ -573,6 +573,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	groupScheduleSeries: false,
 	scheduleDayScale: 1,
 	scheduleSpread: false,
+	advCareerFolded: false,
 
 	salaryCapType: "soft",
 

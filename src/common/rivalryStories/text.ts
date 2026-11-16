@@ -178,33 +178,51 @@ export const rivalryPreview = ({
 	};
 };
 
+// Each pair's highest points by a player in the games before this season (not this season's, and not later ones when it
+// is a past season)
+export const pairHighBefore = (
+	games: RivalryGame[],
+	history: RivalryGame[],
+) => {
+	const pairHigh = new Map<string, number>();
+	let season = Infinity;
+	for (const gm of games) {
+		season = Math.min(season, gm.season);
+	}
+	for (const gm of history) {
+		if (gm.season >= season) {
+			continue;
+		}
+		let high = pairHigh.get(gm.pair) ?? 0;
+		for (const p of gm.players) {
+			high = Math.max(high, p.pts);
+		}
+		pairHigh.set(gm.pair, high);
+	}
+	return pairHigh;
+};
+
 // Recaps of a season's big rivalry games: upsets, series clinchers, heated games (technicals, ejections), record nights
 // and classics (overtime, a one-possession finish)
 export const rivalryRecaps = ({
 	games,
-	history,
+	history = [],
+	pairHigh: pairHighIn,
 	name,
 	isRival,
 }: {
 	// This season's logged games
 	games: RivalryGame[];
-	// Every logged game, for "record" performances in a pair
-	history: RivalryGame[];
+	// For "record" performances in a pair: each pair's highest points by a player before this season (pairHigh), or else
+	// every logged game of the pairs (history)
+	history?: RivalryGame[];
+	pairHigh?: Map<string, number>;
 	name: Name;
 	// Only pairs that count as rivals (score above the Mild tier, or tagged rivalry games)
 	isRival: (gm: RivalryGame) => boolean;
 }): RivalryArticleText[] => {
 	const out: RivalryArticleText[] = [];
-	const pairHigh = new Map<string, number>();
-	for (const gm of history) {
-		for (const p of gm.players) {
-			// Only the games before this season set the bar
-			if (games.some((x) => x.gid === gm.gid)) {
-				continue;
-			}
-			pairHigh.set(gm.pair, Math.max(pairHigh.get(gm.pair) ?? 0, p.pts));
-		}
-	}
+	const pairHigh = pairHighIn ?? pairHighBefore(games, history);
 	for (const gm of sortGames(games)) {
 		if (!isRival(gm)) {
 			continue;

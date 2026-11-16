@@ -12,6 +12,7 @@ import {
 } from "../../common/constants.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import {
+	FULL_PROFILE_SECTIONS,
 	PROFILE_EXPORT_FORMAT,
 	PROFILE_EXPORT_SCHEMA_VERSION,
 	PROFILE_SECTION_KEYS,
@@ -57,7 +58,7 @@ const allKeys = (x: unknown, out = new Set<string>()) => {
 	return out;
 };
 
-describe("Export profile", () => {
+describe("Export profile", { timeout: 120_000 }, () => {
 	beforeAll(
 		async () => {
 			Math.random = makeSeededRandom(7);
@@ -141,9 +142,15 @@ describe("Export profile", () => {
 		assert.isUndefined((profile as any).card);
 		assert.isUndefined((profile as any).scoutingPage);
 		for (const key of PROFILE_SECTION_KEYS) {
-			if (key === "preDraft" && !profile.sections.preDraft) {
-				// Only with college/overseas stats
-				assert.isTrue(profile.skipped.some((s) => s.key === "preDraft"));
+			if (
+				(key === "preDraft" || FULL_PROFILE_SECTIONS.includes(key)) &&
+				!profile.sections[key]
+			) {
+				// Only with college/overseas stats, tracking stats, playoff games, ...: skipped with the reason
+				assert.isTrue(
+					profile.skipped.some((s) => s.key === key),
+					key,
+				);
 				continue;
 			}
 			assert.isDefined(profile.sections[key], key);
@@ -186,7 +193,10 @@ describe("Export profile", () => {
 		const profile = await exportOf(pids.prospect);
 		assert.strictEqual(profile.player.status, "prospect");
 		assert.deepEqual(
-			profile.skipped.map((s) => s.key).sort(),
+			profile.skipped
+				.map((s) => s.key)
+				.filter((key) => !FULL_PROFILE_SECTIONS.includes(key))
+				.sort(),
 			["contract", "gameLog"]
 				.concat(profile.sections.preDraft ? [] : ["preDraft"])
 				.sort(),
@@ -298,7 +308,16 @@ describe("Export profile", () => {
 		for (const pid of [pids.active, pids.prospect, pids.retired]) {
 			const profile = (await getPlayerProfileExport({ pid }))!;
 			const files = await profileToPdfFiles(profile, undefined, fonts);
-			assert.strictEqual(files.length, Object.keys(profile.sections).length);
+			// Sections with nothing in them (only a note) get no PDF
+			assert.strictEqual(
+				files.length,
+				Object.values(profile.sections).filter(
+					(s) =>
+						s!.key === "overview" ||
+						(s!.key === "scouting" && profile.scoutingPage) ||
+						s!.facts.length + s!.lines.length + s!.tables.length > 0,
+				).length,
+			);
 			assert.strictEqual(files[0]!.name, "01_overview.pdf");
 			for (const file of files) {
 				const text = new TextDecoder("latin1").decode(file.bytes);

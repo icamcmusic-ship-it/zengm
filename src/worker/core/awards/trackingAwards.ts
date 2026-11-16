@@ -103,6 +103,8 @@ const stripPlayoffs = (key: string) =>
 // What getPlayers needs to load for these formula variables
 export const trackingNeeds = (variables: Iterable<string>) => {
 	const stats = new Set<string>();
+	// The bases of the playoff variants asked for (only those are added to the rows)
+	const playoffKeys = new Set<string>();
 	let playoffs = false;
 	let derived = false;
 	for (const v of variables) {
@@ -112,6 +114,7 @@ export const trackingNeeds = (variables: Iterable<string>) => {
 		const base = stripPlayoffs(v);
 		if (base !== v) {
 			playoffs = true;
+			playoffKeys.add(base);
 		}
 		if (TRACKING_BASE_SET.has(base) && !ADV_STAT_KEYS.includes(base as any)) {
 			derived = true;
@@ -124,7 +127,12 @@ export const trackingNeeds = (variables: Iterable<string>) => {
 			stats.add(s);
 		}
 	}
-	return { stats, playoffs, any: playoffs || derived || stats.size > 0 };
+	return {
+		stats,
+		playoffs,
+		playoffKeys,
+		any: playoffs || derived || stats.size > 0,
+	};
 };
 
 type Row = Record<string, any>;
@@ -293,9 +301,15 @@ export const addDerived = (r: Row, L: LeagueContext) => {
 		poss > 0 ? clamp((100 * added) / poss / 20) * shrink(poss, 400) : 0;
 };
 
-// Playoff variants: from the season's playoff row (NaN without one; composites 0)
-export const addPlayoffVariants = (r: Row, playoffsRow: Row | undefined) => {
-	for (const key of TRACKING_BASE) {
+// Playoff variants: from the season's playoff row (NaN without one; composites 0). Only the ones in `keys` (the formulas'
+// variables) when given: every row of every candidate goes to the award pages, and all of them is a few hundred values a row,
+// mostly NaN
+export const addPlayoffVariants = (
+	r: Row,
+	playoffsRow: Row | undefined,
+	keys: Iterable<string> = TRACKING_BASE,
+) => {
+	for (const key of keys) {
 		const value = playoffsRow?.[key];
 		r[`${key}Playoffs`] =
 			typeof value === "number" ? value : COMPOSITES.has(key) ? 0 : Number.NaN;

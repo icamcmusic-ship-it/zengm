@@ -128,6 +128,118 @@ export const sumAdv = (rows: readonly { adv?: number[] }[]) => {
 	return out;
 };
 
+// A retired player's tracking folded into one career total (League Extras "Keep Career Tracking for Retired Players", see
+// worker/core/player/advStatsStorage.ts): the sums of every stats row's adv, regular season (rs) and playoffs (po), and the first and
+// last season folded. The rows lose their adv when folded, so a career is always advCareer + the adv still on rows (a comeback's new
+// seasons), and folding again never counts a row twice. The arrays use the same append-only layout as a row's adv.
+export type AdvCareer = {
+	rs?: number[];
+	po?: number[];
+	from: number;
+	to: number;
+};
+
+// Folds the adv of the rows that pass `include` into career (in place, or a new one), and deletes it from those rows. Undefined if
+// there was nothing to fold and no career before.
+export const foldAdvRows = (
+	career: AdvCareer | undefined,
+	rows: { adv?: number[]; playoffs: boolean; season: number }[],
+	include: (row: { season: number; tid?: number }) => boolean = () => true,
+) => {
+	let out = career;
+	for (const row of rows) {
+		if (!row.adv || !include(row)) {
+			continue;
+		}
+		out ??= { from: row.season, to: row.season };
+		const key = row.playoffs ? "po" : "rs";
+		out[key] = addAdv(out[key] ?? newAdv(), row.adv);
+		out.from = Math.min(out.from, row.season);
+		out.to = Math.max(out.to, row.season);
+		delete row.adv;
+	}
+	return out;
+};
+
+// How a career total over some of a player's rows should use his folded career: "add" it (every folded season is in the rows asked
+// for), "hide" the tracking (some folded seasons are asked for but not all of them, or only one team's part, which the career total
+// can't split), or "none" (no folded season is asked for)
+export const advCareerUse = (
+	career: AdvCareer | undefined,
+	{
+		tid,
+		seasonRange,
+		rows,
+	}: {
+		tid?: number;
+		seasonRange?: [number, number];
+		rows: readonly { season?: number }[];
+	},
+): "add" | "hide" | "none" => {
+	if (!career) {
+		return "none";
+	}
+	const overlaps = seasonRange
+		? seasonRange[0] <= career.to && seasonRange[1] >= career.from
+		: true;
+	if (!overlaps) {
+		return "none";
+	}
+	const covers = seasonRange
+		? seasonRange[0] <= career.from && seasonRange[1] >= career.to
+		: true;
+	if (tid === undefined && covers) {
+		return "add";
+	}
+	// A team's rows (or a part of the folded seasons): hidden if any of the rows asked for is a folded season
+	return rows.some(
+		(row) =>
+			row.season !== undefined &&
+			row.season >= career.from &&
+			row.season <= career.to,
+	)
+		? "hide"
+		: "none";
+};
+
+// The folded career for a season type, combined = regular season + playoffs. Undefined if there is none.
+export const advCareerFor = (
+	career: AdvCareer | undefined,
+	seasonType: "regularSeason" | "playoffs" | "combined",
+) => {
+	if (!career) {
+		return undefined;
+	}
+	const parts =
+		seasonType === "regularSeason"
+			? [career.rs]
+			: seasonType === "playoffs"
+				? [career.po]
+				: [career.rs, career.po];
+	let out: number[] | undefined;
+	for (const part of parts) {
+		if (part) {
+			out ??= newAdv();
+			addAdv(out, part);
+		}
+	}
+	return out;
+};
+
+// A whole career: the folded total plus the rows' adv (undefined if neither)
+export const careerAdv = (
+	career: AdvCareer | undefined,
+	rows: readonly { adv?: number[] }[],
+	seasonType: "regularSeason" | "playoffs" | "combined",
+) => {
+	const folded = advCareerFor(career, seasonType);
+	const fromRows = sumAdv(rows);
+	if (folded && fromRows) {
+		return addAdv(folded, fromRows);
+	}
+	return folded ?? fromRows;
+};
+
 // Team: [possFor, possAgainst, clutch seconds, clutch points for, clutch points against, clutch possessions for, clutch possessions
 // against], and lineups: [...pids (sorted), seconds, points for, points against, possessions for, possessions against]
 export type TeamAdv = {
@@ -349,12 +461,12 @@ Object.assign(ADV_STAT_FUNCTIONS, {
 					at(adv, ADV.possAgainst),
 				)
 			: sub(
-			per100(at(adv, ADV.oppRimOn), at(adv, ADV.possAgainst)),
-			per100(
-				at(adv, ADV.tmOppRim) - at(adv, ADV.oppRimOn),
-				at(adv, ADV.tmPossAgainst) - at(adv, ADV.possAgainst),
-			),
-		),
+					per100(at(adv, ADV.oppRimOn), at(adv, ADV.possAgainst)),
+					per100(
+						at(adv, ADV.tmOppRim) - at(adv, ADV.oppRimOn),
+						at(adv, ADV.tmPossAgainst) - at(adv, ADV.possAgainst),
+					),
+				),
 
 	onOrtg: (adv) => per100(at(adv, ADV.ptsFor), at(adv, ADV.possFor)),
 	onDrtg: (adv) => per100(at(adv, ADV.ptsAgainst), at(adv, ADV.possAgainst)),

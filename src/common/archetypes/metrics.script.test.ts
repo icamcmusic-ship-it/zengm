@@ -32,11 +32,15 @@ import {
 	realNorms,
 	realPlayer as realPlayerOf,
 	SUBS_ON,
+	SUBS_WIDE,
 } from "./real.testutil.ts";
 import { ensureSubs } from "../../worker/core/player/subRatings.ts";
+import { defaultSubNorms } from "./subStyle.ts";
 
 const EXPANDED = Boolean(process.env.ARCH_EXPANDED);
-const NORMS = defaultNorms(EXPANDED);
+const NORMS = SUBS_WIDE
+	? { ...defaultNorms(EXPANDED), sub: defaultSubNorms(EXPANDED, true) }
+	: defaultNorms(EXPANDED);
 const OUT = process.env.ARCH_METRICS_OUT ?? "/tmp/claude-0/arch-metrics.txt";
 
 const newG = () => {
@@ -47,6 +51,8 @@ const newG = () => {
 	if (EXPANDED) g.setWithoutSavingToDB("expandedRatings", true);
 	// arch15: with Sub-Ratings on (the new-league default) unless ARCH_NO_SUBS=1
 	if (SUBS_ON) g.setWithoutSavingToDB("subRatings", true);
+	// subspread: ARCH_SUBS_WIDE=1, Wider Sub-Rating Shapes
+	if (SUBS_WIDE) g.setWithoutSavingToDB("subRatingsWide", true);
 };
 const ratingsOfRow = (row) => {
 	const r = {};

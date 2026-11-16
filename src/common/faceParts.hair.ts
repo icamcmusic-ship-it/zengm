@@ -7,10 +7,10 @@
 import type { StylePart } from "./faceParts.styles.ts";
 
 // Short hair's outline: the dome and the usual hairline (sideburns at (58, 306) / (342, 306), temples, forehead at y ~200)
-const SILHOUETTE =
+export const SILHOUETTE =
 	"M58 306H48c0-150 52-212 152-212s152 62 152 212h-10c-2-14-10-28-18-34-6-14-6-48-14-64-34-8-72-10-110-10s-76 2-110 10c-8 16-8 50-14 64-8 6-16 20-18 34Z";
 
-const BANDS = [0.6, 0.42, 0.27, 0.15, 0.07];
+export const BANDS = [0.6, 0.42, 0.27, 0.15, 0.07];
 
 // Faded sides from y = from down to the sideburns
 const fade = (id: string, from: number, strength = 1) => {
@@ -41,14 +41,14 @@ const TOP_EDGAR =
 	"M90 202c-2-70 42-110 110-110s112 40 110 110c-6-6-14-10-22-10H112c-8 0-16 4-22 10Z";
 
 // Bleached / dyed colour (frosted tips, dyed tips)
-const BLEACH = "#e9d9a6";
+export const BLEACH = "#e9d9a6";
 
 const r1 = (x: number) => Math.round(x * 10) / 10;
 
 // A cap of hair whose outline is made of small rounded lobes (twists, locs, coils): over the top from the left side to the right
 // side at height sideY, then back along the fringe (lowest at fringeY in the middle, rising to sideY at the sides). Strand lines
 // run from the fringe up toward the crown. lobes: number of lobes over the top / along the fringe.
-const lobedCap = ({
+export const lobedCap = ({
 	topY = 92,
 	sideY,
 	fringeY,
@@ -118,12 +118,12 @@ const lobedCap = ({
 };
 
 // A rounded strand as a path (facesjs' string renderer measures paths, not rects)
-const pill = (x: number, y: number, w: number, h: number) => {
+export const pill = (x: number, y: number, w: number, h: number) => {
 	const r = w / 2;
 	return `M${r1(x)} ${r1(y + r)}a${r} ${r} 0 0 1 ${w} 0V${r1(y + h - r)}a${r} ${r} 0 0 1 ${-w} 0Z`;
 };
 
-const range = (a: number, b: number, step: number) => {
+export const range = (a: number, b: number, step: number) => {
 	const out = [];
 	for (let x = a; x <= b; x += step) {
 		out.push(x);

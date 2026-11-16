@@ -22,6 +22,8 @@ export type Ratings = {
 	abbrev_if_new_row?: string;
 	// Sub-ratings lean from his stats (tools/realSubRatings.ts): 25 comma-separated wanted offsets from the bases, SUB_DEFS order
 	subLean?: string;
+	// Wider Sub-Rating Shapes: his minutes over the window and his 12 stat z-scores (common/subRatingsReal.ts)
+	subZ?: string;
 	retiredUntil?: number;
 };
 

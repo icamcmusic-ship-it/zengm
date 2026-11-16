@@ -18,7 +18,9 @@ import {
 	developSubs,
 	generateSubShape,
 	neutralSubShape,
+	roleLean,
 	syncRowSubs,
+	wideSanityCaps,
 } from "./subRatingsGen.ts";
 import { Rng } from "./ratingsBuilds/rng.ts";
 
@@ -199,5 +201,88 @@ describe("sub-ratings generation and development", () => {
 		}
 		// Relative to their base, blocks and max vertical end up lower than interior D and standing reach
 		assert.isAbove(fadeDrop / 600, holdDrop / 600 + 2);
+	});
+});
+
+// Wider Sub-Rating Shapes (subspread)
+describe("wider sub-rating shapes", () => {
+	test("wide shapes reproduce every base, deterministically, keep the build, are wider, and some are lopsided", () => {
+		const rng = new Rng("wide");
+		let lop = 0;
+		let spreadStock = 0;
+		let spreadWide = 0;
+		const n = 600;
+		for (let k = 0; k < n; k++) {
+			const r = randomRow(rng, k % 2 === 0);
+			const a = generateSubShape(r, k, { wide: true });
+			assert.deepEqual(a, generateSubShape(r, k, { wide: true }));
+			assert.isTrue(subsMatchBases({ ...r, sub: a.sub }));
+			// syncing a wide shape finds nothing to do
+			const synced = { ...r, sub: [...a.sub] };
+			syncRowSubs(synced);
+			assert.isFalse(syncRowSubs(synced));
+			const s = generateSubShape(r, k);
+			assert.strictEqual(a.info.b, s.info.b);
+			if (a.info.lop) {
+				lop += 1;
+			}
+			for (const o of subOffsets(a.sub, r)) {
+				spreadWide += Math.abs(o);
+			}
+			for (const o of subOffsets(s.sub, r)) {
+				spreadStock += Math.abs(o);
+			}
+		}
+		assert.isAbove(lop / n, 0.08);
+		assert.isBelow(lop / n, 0.2);
+		assert.isAbove(spreadWide, 1.15 * spreadStock);
+	});
+
+	test("wide sanity caps: a small guard is no elite shot blocker, a center no elite lateral defender", () => {
+		const x = SUB_DEFS.map(() => 99);
+		wideSanityCaps(x, { hgt: 30, jmp: 40, stre: 40, spd: 70 });
+		assert.isBelow(x[SUB_INDEX.blk!]!, 80);
+		const y = SUB_DEFS.map(() => 99);
+		wideSanityCaps(y, { hgt: 85, jmp: 40, stre: 70, spd: 30 });
+		assert.isBelow(y[SUB_INDEX.lat!]!, 65);
+	});
+
+	test("role growth: a spot-up shooter grows catch-and-shoot, a primary handler off the dribble", () => {
+		const base = {
+			min: 2500,
+			fga: 1000,
+			fta: 200,
+			fgaAtRim: 200,
+			fgaLowPost: 50,
+			fgaMidRange: 150,
+			blkp: 1,
+			stlp: 1.5,
+		};
+		const spot = roleLean({ ...base, tpa: 600, usgp: 15, astp: 8 }, 24)!;
+		assert.isAbove(spot[SUB_INDEX.tcs!]!, spot[SUB_INDEX.tod!]!);
+		const handler = roleLean({ ...base, tpa: 350, usgp: 30, astp: 32 }, 24)!;
+		assert.isAbove(handler[SUB_INDEX.tod!]!, handler[SUB_INDEX.tcs!]!);
+		assert.isAbove(handler[SUB_INDEX.hnd!]!, 0);
+		assert.isAbove(handler[SUB_INDEX.vis!]!, 0);
+		// Too few minutes: nothing
+		assert.isUndefined(
+			roleLean({ ...base, min: 100, tpa: 600, usgp: 15, astp: 8 }, 24),
+		);
+	});
+
+	test("wide development keeps every base", () => {
+		const rng = new Rng("wide-dev");
+		for (let k = 0; k < 200; k++) {
+			const r = randomRow(rng, k % 2 === 0);
+			const { sub, info } = generateSubShape(r, k, { wide: true });
+			const before = SUB_BASES.map((b) => r[b]);
+			for (const b of SUB_BASES) {
+				r[b] = Math.max(0, Math.min(100, r[b] + rng.int(-3, 3)));
+			}
+			r.season += 1;
+			const role = SUB_DEFS.map(() => rng.uniform(-1, 1));
+			const s = developSubs(sub, r, before, 27, info, { role });
+			assert.isTrue(subsMatchBases({ ...r, sub: s }));
+		}
 	});
 });

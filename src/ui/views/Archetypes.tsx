@@ -44,8 +44,9 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 					</span>
 				),
 				sortValue: r.name,
-				// (other names for the same archetype are not shown, but a search finds them)
-				searchValue: [r.name, ...r.aliases].join(" "),
+				// (other names for the same archetype, and the 2K archetypes of the real players who hold it, are not shown, but a
+				// search finds them)
+				searchValue: [r.name, ...r.aliases, ...r.twoK].join(" "),
 			},
 			GROUP_INFO[r.group].label,
 			r.count,
@@ -62,6 +63,7 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 									</a>{" "}
 									<span className="text-body-secondary">
 										{challengeNoRatings ? p.abbrev : `${p.ovr} ${p.abbrev}`}
+										{p.twoK ? ` (2K: ${p.twoK})` : ""}
 									</span>
 								</span>
 							))}
@@ -70,7 +72,9 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 						""
 					),
 				sortValue: r.top[0]?.name ?? "",
-				searchValue: r.top.map((p) => p.name).join(" "),
+				searchValue: r.top
+					.map((p) => (p.twoK ? `${p.name} ${p.twoK}` : p.name))
+					.join(" "),
 			},
 		],
 	}));

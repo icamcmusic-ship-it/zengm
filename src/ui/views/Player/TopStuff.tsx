@@ -1,4 +1,8 @@
 import { last } from "../../../common/utils.ts";
+import {
+	draftedVsPreDraftText,
+	preDraftRankText,
+} from "../../../common/preDraftRanks.ts";
 import { ExportProfileButton } from "../../components/ExportProfile.tsx";
 import { ArchetypeLabel } from "../../components/Archetype/ArchetypeLabel.tsx";
 import { TIER_NAMES } from "../../../common/archetypes/index.ts";
@@ -27,7 +31,12 @@ import { InjuryIcon } from "../../components/InjuryIcon.tsx";
 import { SkillsBlock } from "../../components/SkillsBlock.tsx";
 import { Mood } from "../../components/Mood.tsx";
 import { PlayerPicture } from "../../components/PlayerPicture.tsx";
-import { wearsFaceMask, withFaceMask } from "../../../common/faceRender.ts";
+import {
+	wearsFaceMask,
+	wearsNoseBandage,
+	withFaceMask,
+	withNoseBandage,
+} from "../../../common/faceRender.ts";
 import { JerseyNumber } from "../../components/JerseyNumber.tsx";
 import { Height } from "../../components/Height.tsx";
 import { Weight } from "../../components/Weight.tsx";
@@ -289,6 +298,36 @@ const ComparePlayerButton = ({
 	);
 };
 
+// Injury gear drawn at render time, never stored: the clear mask after a facial injury (Face Aging) and the nose bandage
+// while he's out with a nose or facial injury and for his first days back (New Face Styles)
+const injuryGearFace = (
+	player: View<"player">["player"],
+	currentSeason: number,
+	faceAgingOn: boolean,
+	forkFacesOn: boolean,
+) => {
+	let face = player.face;
+	if (!face || player.tid === PLAYER.RETIRED) {
+		return face;
+	}
+	if (
+		faceAgingOn &&
+		wearsFaceMask(player.injury, player.injuries, currentSeason)
+	) {
+		face = withFaceMask(face);
+	}
+	if (
+		forkFacesOn &&
+		wearsNoseBandage(player.injury, {
+			type: player.injuries.at(-1)?.type,
+			daysBack: player.healthInfo.daysBack,
+		})
+	) {
+		face = withNoseBandage(face);
+	}
+	return face;
+};
+
 const TopStuff = ({
 	bestPos,
 	currentSeason,
@@ -338,6 +377,7 @@ const TopStuff = ({
 	const injured = player.injury.gamesRemaining > 0;
 	// League Extras "Face Aging": a clear mask after a facial injury
 	const faceAgingOn = useFeatureOn("faceAging");
+	const forkFacesOn = useFeatureOn("forkFaces");
 	const showContract =
 		player.tid !== PLAYER.UNDRAFTED &&
 		player.tid !== PLAYER.UNDRAFTED_FANTASY_TEMP &&
@@ -345,6 +385,22 @@ const TopStuff = ({
 	const showTradeFor =
 		player.tid !== userTid && player.tid >= 0 && !collegeLeague;
 	const showTradingBlock = player.tid === userTid && !collegeLeague;
+
+	// Frozen Pre-draft Ranks setting: "Drafted #12 · Pre-draft #34", so steals and reaches show
+	const preDraft = player.preDraftRankInfo;
+	const preDraftRankNote = preDraft ? (
+		<span
+			className="text-body-secondary"
+			title={
+				preDraft.overall !== undefined
+					? draftedVsPreDraftText(preDraft.overall, preDraft.r)
+					: preDraftRankText(preDraft.r)
+			}
+		>
+			{" "}
+			· {preDraftRankText(preDraft.r)}
+		</span>
+	) : null;
 
 	let draftInfo: ReactNode = null;
 	if (player.draft.round > 0) {
@@ -363,6 +419,7 @@ const TopStuff = ({
 				>
 					{player.draft.abbrev}
 				</a>
+				{preDraftRankNote}
 				<br />
 			</>
 		);
@@ -373,6 +430,7 @@ const TopStuff = ({
 				<a href={helpers.leagueUrl(["draft_history", player.draft.year])}>
 					{player.draft.year}
 				</a>
+				{preDraftRankNote}
 				<br />
 			</>
 		);
@@ -541,14 +599,12 @@ const TopStuff = ({
 							}}
 						>
 							<PlayerPicture
-								face={
-									player.face &&
-									faceAgingOn &&
-									player.tid !== PLAYER.RETIRED &&
-									wearsFaceMask(player.injury, player.injuries, currentSeason)
-										? withFaceMask(player.face)
-										: player.face
-								}
+								face={injuryGearFace(
+									player,
+									currentSeason,
+									faceAgingOn,
+									forkFacesOn,
+								)}
 								imgURL={player.imgURL}
 								colors={teamColors}
 								jersey={teamJersey}
@@ -668,6 +724,17 @@ const TopStuff = ({
 										}
 									/>
 									<br />
+									{player.archetype.twoK ? (
+										<>
+											<span
+												className="small text-body-secondary"
+												data-testid="player-archetype-2k"
+											>
+												2K: {player.archetype.twoK}
+											</span>
+											<br />
+										</>
+									) : null}
 								</>
 							) : null}
 							Experience:{" "}

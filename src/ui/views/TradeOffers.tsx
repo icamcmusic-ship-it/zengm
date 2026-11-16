@@ -69,7 +69,8 @@ const RequestOffers = ({
 									setDpids(toggle(dpids, dp.dpid));
 								}}
 							>
-								{dp.desc}
+								{/* (a pick's desc links its original team: as plain text inside a button) */}
+								{dp.desc.replace(/<[^>]*>/g, "")}
 							</button>
 						))}
 					</div>

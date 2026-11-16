@@ -8,6 +8,7 @@ import { minBy } from "../../common/utils.ts";
 import { getDraftTeamsByTid } from "./draftHistory.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { defineView } from "../util/defineView.ts";
+import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
 
 const processInputs = () => {
 	if (
@@ -260,14 +261,28 @@ export default defineView({
 				}),
 			);
 			undraftedPlayers.sort((a, b) => b.valueFuzz - a.valueFuzz);
+
+			// Frozen Pre-draft Ranks setting: each player's rank in his whole class when the draft started, which doesn't move as players
+			// are picked. Without it (or in fantasy/expansion drafts), the # column counts among the players left.
+			const preDraftRanks = isFantasyOrExpansionDraft
+				? undefined
+				: await getPreDraftRanks(g.get("season"));
+
 			const undrafted = undraftedPlayers.map((p, i) => ({
 				...p,
+				// Best available: the live order of the players left, on your scouts' list
 				rank: i + 1,
+				preDraftRank: preDraftRanks?.get(p.pid)?.r,
 			}));
 
 			// Placeholders for remaining picks
 			const drafted = [
-				...draftedPlayers,
+				...draftedPlayers.map((p, i) => ({
+					...p,
+					preDraftRank: preDraftRanks?.get(p.pid)?.r,
+					// The pick he went at, counting every player taken (drafted players are sorted by round and pick)
+					overallPick: i + 1,
+				})),
 				...draftPicks.map((dp) => ({
 					draft: dp,
 					pid: -1 as const,
@@ -296,6 +311,8 @@ export default defineView({
 				drafted,
 				expansionDraftFilteredTeamsMessage,
 				fantasyDraft,
+				// Frozen Pre-draft Ranks setting: the ranks are the class's at the start of the draft
+				frozenRanks: preDraftRanks !== undefined,
 				stats,
 				teamsByTid,
 				undrafted,

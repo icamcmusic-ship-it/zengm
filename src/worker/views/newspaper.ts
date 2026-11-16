@@ -49,7 +49,7 @@ import type {
 import { parseRumorText } from "../../common/rumors/text.ts";
 import { getRumorState } from "../core/rumors/index.ts";
 import type { Game, Player, TeamSeason } from "../../common/types.ts";
-import type { FranchiseChangeKind } from "../../common/franchiseStory.ts";
+import { franchiseChangeKind } from "../../common/franchiseStory.ts";
 import {
 	aggregateGames,
 	decideRebuild,
@@ -1067,14 +1067,7 @@ const getFranchiseChanges = async (season: number) => {
 		if (!prev) {
 			continue;
 		}
-		const kind: FranchiseChangeKind | undefined =
-			prev.region !== ts.region
-				? "relocation"
-				: prev.name !== ts.name
-					? "rename"
-					: prev.colors.join() !== ts.colors.join()
-						? "rebrand"
-						: undefined;
+		const kind = franchiseChangeKind(prev, ts);
 		if (!kind) {
 			continue;
 		}

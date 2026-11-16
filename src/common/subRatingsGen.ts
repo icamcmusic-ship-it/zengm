@@ -51,6 +51,8 @@ export type StoredSubInfo = {
 	b?: string;
 	sp?: 1;
 	gen?: 1;
+	// Wider Sub-Rating Shapes: a lopsided shape (one or two subs 15-25 off their base)
+	lop?: 1;
 	// Prospect whose shape has been given with his class (background, class caps)
 	c?: 1;
 	// Neutral derivation (existing league, real player, imported): no build
@@ -448,8 +450,11 @@ export const anchorAndFit = (
 	x: number[],
 	r: RatingsLike,
 	flex: number[],
+	// Wider Sub-Rating Shapes: the anchoring corrections, like the fit, move a standout or a hole less (flex as protect weights)
+	wide?: boolean,
 ): number[] => {
-	anchorToExpanded(x, r, flex);
+	const protect = wide ? [...flex] : undefined;
+	anchorToExpanded(x, r, flex, protect);
 	let out = fitSubsToBases(x, r, flex);
 	const hasExpanded =
 		typeof r.oreb === "number" ||
@@ -464,7 +469,7 @@ export const anchorAndFit = (
 		}
 		const x2 = [...out];
 		const flex2 = new Array<number>(NUM_SUBS).fill(1);
-		anchorToExpanded(x2, r, flex2);
+		anchorToExpanded(x2, r, flex2, protect);
 		const next = fitSubsToBases(x2, r, flex2);
 		const same = next.every((v, i) => v === out[i]);
 		out = next;
@@ -484,6 +489,8 @@ export type GenContext = {
 	background?: Background;
 	// Prospect story (college careers): a project is raw, an older international a polished passer and shooter
 	story?: string;
+	// Wider Sub-Rating Shapes (the subRatingsWide setting): generateWideShape instead of the stock shape
+	wide?: boolean;
 };
 
 // The largest offset of a sub from its base, in a fitted row
@@ -521,6 +528,9 @@ export const generateSubShape = (
 	// Class caps: scale an extreme shape down
 	damp: number = 1,
 ): { sub: number[]; info: StoredSubInfo } => {
+	if (ctx.wide) {
+		return generateWideShape(r, seed, ctx, damp);
+	}
 	const rng = new Rng(`subr|${seed}`);
 	const build = pickBuild(r, rng);
 	const background = ctx.background ?? "college";
@@ -600,6 +610,295 @@ const profileIndex = (rng: Rng, background: Background, story?: string) => {
 	return rng.weighted(idx, (i) => shares[i]!);
 };
 
+// Wider Sub-Rating Shapes (the subRatingsWide setting) ------------------------------------------------------------------------------
+//
+// The stock shapes are narrow: small noise (sd 2.5) and factors (sd 3), and the fit to a base takes the group's weighted mean out of the
+// wanted offsets, so a lean of +10 on one of two subs ends up +5/-5. The wide shapes (measured against real players, see
+// docs/native-features.md, Sub-ratings, Wider shapes):
+// - noise sized per base (shooting and finishing wide, the athletic ones narrow: WIDE.noise);
+// - opposing factors (catch-and-shoot vs off the dribble, ball security vs shot creation, post vs touch, contact vs finesse, rim vs
+//   perimeter defense, vision vs accuracy, straight-line vs lateral, standing reach vs max vertical, offensive vs defensive boards);
+// - fat tails: about 13% are lopsided (one or two subs 15-25 off their base), specialists twice as common, larger signatures and
+//   weaknesses, a looser generational cap (an offset of 28+, three a class);
+// - standouts protected in the fit: a sub far from its base moves little and its siblings take up the rest, so a +20 stays about +18
+//   (the base never moves: base ratings, ovr and the game's random numbers stay exactly what they are without the setting);
+// - looser sanity caps where the body allows it (length and leaping for blocks, size and strength for the post), impossible combos
+//   still capped (wideSanityCaps).
+// Same seed string and the same build draw as the stock shape, so a player's build (and the archetype his shape points to) is the same.
+export const WIDE = {
+	specialist: 0.06,
+	specialistLean: 1.7,
+	signature: [6, 11] as const,
+	specialistSignature: [14, 20] as const,
+	weakness: [6, 11] as const,
+	lopsided: 0.13,
+	lopsidedTwo: 0.35,
+	lopsidedSize: [15, 25] as const,
+	// Share of lopsided subs that are a hole rather than a standout
+	lopsidedHole: 0.3,
+	generational: 28,
+	maxGenerational: 3,
+	// No sub further than this from its base (fitWide)
+	maxOffset: 32,
+	// Fit protection: a sub's flex in the fit is 1 / (1 + (|offset| / protect)^2)
+	protect: 8,
+	noise: {
+		diq: 3,
+		tp: 3.5,
+		ins: 2.5,
+		dnk: 2.5,
+		fg: 3,
+		reb: 1.5,
+		drb: 2.5,
+		pss: 1,
+		spd: 1,
+		jmp: 1.5,
+	} as Record<string, number>,
+	// Development: mean reversion a year (to 23, then from 24), and how hard a far-out sub is pulled back (beyond `far`)
+	revertYoung: 0.02,
+	revertOld: 0.005,
+	far: 28,
+	farRevert: 0.15,
+	// Role growth (a season's role, from his box score) per season at full minutes
+	role: 0.9,
+};
+
+// Keeps the league's mean offsets where the stock shapes have them (measured: subLeans.script.test.ts, Expanded Ratings on), so the
+// game sim's calibration (Sub-Ratings in Sim) holds: the protected fit and the tails leave range about a point lower and catch-and-shoot
+// a point higher than the stock shapes do, contact finishing half a point higher, ...
+const WIDE_CENTER = lean({
+	rng: 1,
+	tcs: -1,
+	con: -0.5,
+	fns: 0.5,
+	pul: -0.4,
+	spu: 0.4,
+	stj: 0.4,
+	mxv: -0.4,
+	sls: -0.3,
+	lat: 0.3,
+});
+
+const OPPOSING: { sd: number; v: number[] }[] = [
+	// Catch-and-shoot vs off the dribble
+	{ sd: 3.5, v: lean({ tcs: 1, spu: 0.8, tod: -1, pul: -0.8 }) },
+	// Ball security vs shot creation
+	{ sd: 3, v: lean({ sec: 1, acc: 0.4, crt: -1, hnd: -0.3 }) },
+	// Post vs face-up touch
+	{ sd: 2, v: lean({ pst: 1, cls: 0.3, flt: -1, fns: -0.3 }) },
+	// Contact vs finesse
+	{ sd: 2.5, v: lean({ con: 1, fns: -1 }) },
+	// Rim vs perimeter defense
+	{ sd: 2.5, v: lean({ blk: 1, idf: 0.6, stl: -0.8, pdf: -0.6 }) },
+	// Vision vs accuracy (the risky creative passer vs the safe one)
+	{ sd: 0.5, v: lean({ vis: 1, acc: -1 }) },
+	// Straight-line vs lateral
+	{ sd: 0.5, v: lean({ sls: 1, lat: -1 }) },
+	// Standing reach vs max vertical
+	{ sd: 1, v: lean({ stj: 1, mxv: -1 }) },
+	// Offensive vs defensive boards
+	{ sd: 1, v: lean({ orb: 1, drd: -1 }) },
+];
+
+// The fit takes the group's weighted mean out, which halves noise in a group of two: scale the diffuse part of a wide shape back up
+const WIDE_GROUP_SCALE = SUB_DEFS.map((d) => {
+	const n = SUB_DEFS.filter((d2) => d2.base === d.base).length;
+	return n <= 2 ? 1.4 : n === 3 ? 1.15 : 1.05;
+});
+
+// Sanity caps with the wide shapes: what the body allows. Elite shot blocking needs length and leaping (a little looser than the stock
+// cap, more for leapers), a post game size or strength, power finishing some strength, size or leaping; elite lateral quickness isn't
+// a 7'2" center, nor far above his speed; max vertical not far above his leaping. Holes are floored the same way (a 7-footer's
+// standing reach, a strong big's contact finishing).
+export const wideSanityCaps = (x: number[], r: RatingsLike) => {
+	const hgt = num(r, "hgt", 47);
+	const len = typeof r.wng === "number" ? (hgt + r.wng) / 2 : hgt;
+	const jmp = num(r, "jmp", 50);
+	const stre = num(r, "stre", 45);
+	const spd = num(r, "spd", 50);
+	const cap = (key: string, max: number) => {
+		const i = SUB_INDEX[key]!;
+		if (x[i]! > max) {
+			x[i] = max;
+		}
+	};
+	const floor = (key: string, min: number) => {
+		const i = SUB_INDEX[key]!;
+		if (x[i]! < min) {
+			x[i] = min;
+		}
+	};
+	cap("blk", 43 + 0.5 * len + 0.35 * jmp);
+	cap("lat", Math.min(100 - 1.2 * Math.max(0, hgt - 58), spd + 32));
+	cap("pst", 55 + 0.5 * hgt + 0.35 * stre);
+	cap("con", 52 + 0.35 * stre + 0.3 * jmp + 0.2 * hgt);
+	cap("mxv", jmp + 30);
+	floor("stj", 0.5 * hgt - 5);
+	floor("con", 0.3 * stre + 0.15 * hgt - 10);
+};
+
+// Flex in the fit: a sub far from its base (a standout or a hole) moves little, its siblings take up the rest
+const protectFlex = (x: readonly number[], r: RatingsLike) =>
+	SUB_DEFS.map((d, i) => {
+		const o = (x[i]! - num(r, d.base, 50)) / WIDE.protect;
+		return 1 / (1 + o * o);
+	});
+
+// The subs that follow an expanded rating outright (their place is the expanded rating's): never a lopsided pick
+const anchoredOutright = (r: RatingsLike) => {
+	const out = new Set<number>();
+	if (typeof r.oreb === "number") {
+		out.add(SUB_INDEX.orb!);
+		out.add(SUB_INDEX.drd!);
+	}
+	if (typeof r.bsc === "number") {
+		out.add(SUB_INDEX.sec!);
+	}
+	return out;
+};
+
+const finishWide = (
+	diffuse: readonly number[],
+	point: readonly number[],
+	r: RatingsLike,
+) => {
+	const b = bases(r);
+	const x = b.map((v, i) => v + WIDE_GROUP_SCALE[i]! * diffuse[i]! + point[i]!);
+	return fitWide(x, r);
+};
+
+// The protected fit, and no sub further than WIDE.maxOffset from its base: where every sub of a group leans far (a real shooter's range
+// and catch-and-shoot far up, his off-the-dribble far down), the protected fit can leave one 40+ away; that group's wanted offsets are
+// scaled down until none is
+const fitWide = (x: number[], r: RatingsLike) => {
+	wideSanityCaps(x, r);
+	let out = anchorAndFit([...x], r, protectFlex(x, r), true);
+	for (let iter = 0; iter < 8; iter++) {
+		let over = false;
+		for (const group of SUB_GROUPS) {
+			const b = num(r, group.base, 50);
+			if (group.idx.some((i) => Math.abs(out[i]! - b) > WIDE.maxOffset)) {
+				over = true;
+				for (const i of group.idx) {
+					x[i] = b + 0.85 * (x[i]! - b);
+				}
+			}
+		}
+		if (!over) {
+			break;
+		}
+		out = anchorAndFit([...x], r, protectFlex(x, r), true);
+	}
+	return out;
+};
+
+export const generateWideShape = (
+	r: RatingsLike,
+	seed: number,
+	ctx: GenContext = {},
+	damp: number = 1,
+): { sub: number[]; info: StoredSubInfo } => {
+	const rng = new Rng(`subr|${seed}`);
+	const build = pickBuild(r, rng);
+	const background = ctx.background ?? "college";
+	const specialist = rng.chance(WIDE.specialist);
+
+	const leans = z();
+	addTo(
+		leans,
+		build.lean,
+		rng.uniform(0.6, 1.2) * (specialist ? WIDE.specialistLean : 1),
+	);
+	if (ctx.story === "project") {
+		addTo(leans, TAG_LEANS.raw!);
+	}
+
+	const diffuse = physicalLean(r);
+	addTo(diffuse, leans);
+	addTo(diffuse, BACKGROUND_LEANS[background]);
+	if (ctx.story === "olderIntl" && background !== "intl") {
+		addTo(diffuse, BACKGROUND_LEANS.intl, 0.5);
+	}
+	for (const f of FACTORS) {
+		addTo(diffuse, f.v, rng.normal(0, f.sd));
+	}
+	for (const f of OPPOSING) {
+		addTo(diffuse, f.v, rng.normal(0, f.sd));
+	}
+	for (let i = 0; i < NUM_SUBS; i++) {
+		diffuse[i]! += rng.normal(0, WIDE.noise[SUB_DEFS[i]!.base]!);
+	}
+
+	// Signature, weakness and the fat tails: point offsets, not scaled for the group size (the fit protects them)
+	const point = z();
+	addTo(point, WIDE_CENTER);
+	const pos = SUB_DEFS.map((_, i) => i).filter((i) => leans[i]! > 0.5);
+	const neg = SUB_DEFS.map((_, i) => i).filter((i) => leans[i]! < -0.5);
+	let signature: number | undefined;
+	if ((specialist || rng.chance(SIGNATURE_CHANCE)) && pos.length > 0) {
+		signature = rng.weighted(pos, (i) => leans[i]! ** 1.5);
+		point[signature]! += specialist
+			? rng.uniform(...WIDE.specialistSignature)
+			: rng.uniform(...WIDE.signature);
+	}
+	if ((specialist || rng.chance(WEAKNESS_CHANCE)) && neg.length > 0) {
+		const weakness = rng.weighted(neg, (i) => (-leans[i]!) ** 1.5);
+		point[weakness]! -= rng.uniform(...WIDE.weakness);
+	}
+	const lopsided = rng.chance(WIDE.lopsided);
+	if (lopsided) {
+		const skip = anchoredOutright(r);
+		const n = rng.chance(WIDE.lopsidedTwo) ? 2 : 1;
+		const used = new Set<number>(skip);
+		for (let k = 0; k < n; k++) {
+			const hole = rng.chance(WIDE.lopsidedHole);
+			const cands = SUB_DEFS.map((_, i) => i).filter((i) => !used.has(i));
+			// A standout where his build leans (a hole where it leans away), any sub a little
+			const i = rng.weighted(cands, (j) =>
+				Math.max(0.15, hole ? -leans[j]! : leans[j]!),
+			);
+			used.add(i);
+			const size = rng.uniform(...WIDE.lopsidedSize);
+			// What the sub already has counts toward it
+			point[i] = (hole ? -size : size) - WIDE_GROUP_SCALE[i]! * diffuse[i]!;
+		}
+	}
+
+	if (damp !== 1) {
+		for (let i = 0; i < NUM_SUBS; i++) {
+			diffuse[i]! *= damp;
+			point[i]! *= damp;
+		}
+	}
+
+	const g = profileIndex(rng, background, ctx.story);
+	const info: StoredSubInfo = {
+		v: SUB_RATINGS_VERSION,
+		s: seed,
+		g,
+		b: build.a.name,
+	};
+	if (GROWTH_PROFILES[g] === "oneSkill") {
+		info.o =
+			signature ??
+			rng.weighted(
+				SUB_DEFS.map((_, i) => i),
+				(i) => Math.max(0.1, leans[i]!),
+			);
+	}
+	if (specialist) {
+		info.sp = 1;
+	}
+	if (lopsided) {
+		info.lop = 1;
+	}
+	const sub = finishWide(diffuse, point, r);
+	if (maxOffset(sub, r) >= WIDE.generational) {
+		info.gen = 1;
+	}
+	return { sub, info };
+};
+
 // Existing leagues, real players, imported players: a neutral shape (subs near their base) with a lean from size and physicals, a
 // seeded growth profile, no build, signature or weakness
 export const neutralSubShape = (
@@ -642,11 +941,16 @@ export const realSubShape = (
 	r: RatingsLike,
 	seed: number,
 	lean: readonly number[],
+	// Wider Sub-Rating Shapes: the wide lean (wideRealLean), its looser caps and the fit that protects standouts
+	wide?: boolean,
 ): { sub: number[]; info: StoredSubInfo } => {
 	const { info } = neutralSubShape(r, seed);
 	info.rs = 1;
 	const b = bases(r);
 	const x = b.map((v, i) => v + lean[i]!);
+	if (wide) {
+		return { sub: fitWide(x, r), info };
+	}
 	applySanityCaps(x, r);
 	const flex = new Array<number>(NUM_SUBS).fill(1);
 	return { sub: anchorAndFit(x, r, flex), info };
@@ -754,6 +1058,8 @@ export const developSubs = (
 	before: readonly number[],
 	age: number,
 	info: StoredSubInfo,
+	// Wider Sub-Rating Shapes: less mean reversion from 24, a pull back only for subs very far out, and growth from his role (roleLean)
+	wide?: { role?: readonly number[] },
 ): number[] => {
 	const profile = GROWTH_PROFILES[info.g] ?? "normal";
 	const rng = new Rng(`subd|${info.s}|${r.season}|${age}`);
@@ -778,13 +1084,81 @@ export const developSubs = (
 			let v = x[i]! + (delta * ms[j]!) / denom;
 			v += agingDrift(SUB_DEFS[i]!.aging, age, profile);
 			v += rng.normal(0, noiseSd);
-			// A little mean reversion, so the shape drifts without spreading out over a long career
-			v -= DEV_REVERT * (v - newBase);
+			if (wide) {
+				// Less reversion once he's grown into his game; a sub very far out is still pulled back a little
+				const off = v - newBase;
+				v -= (age < 24 ? WIDE.revertYoung : WIDE.revertOld) * off;
+				const excess = Math.abs(off) - WIDE.far;
+				if (excess > 0) {
+					v -= Math.sign(off) * WIDE.farRevert * excess;
+				}
+				v += wide.role?.[i] ?? 0;
+			} else {
+				// A little mean reversion, so the shape drifts without spreading out over a long career
+				v -= DEV_REVERT * (v - newBase);
+			}
 			x[i] = v;
 			flex[i] = ms[j]!;
 		});
 	});
 	return anchorAndFit(x, r, flex);
+};
+
+// Wider Sub-Rating Shapes: what his role last season grows (a season's nudge to each sub, before the fit to the bases). A spot-up shooter
+// (many threes, low usage) grows catch-and-shoot and spot-up, a primary handler (high usage and assists) off-the-dribble shooting, pull-ups,
+// handle and shot creation, a playmaker vision, a post scorer post moves, a rim finisher contact finishing and close shots, a mid-range
+// shooter his pull-up or spot-up, a rim protector blocks, a ball hawk steals. Scaled by his minutes (min / (min + 1000)) and his age
+// (full to 27, then 0.6). Box-score totals of his regular season(s).
+export type RoleStats = {
+	min: number;
+	fga: number;
+	tpa: number;
+	fta: number;
+	fgaAtRim: number;
+	fgaLowPost: number;
+	fgaMidRange: number;
+	// Rates, minutes-weighted
+	usgp: number;
+	astp: number;
+	blkp: number;
+	stlp: number;
+};
+export const roleLean = (st: RoleStats, age: number): number[] | undefined => {
+	if (st.min < 200 || st.fga <= 0) {
+		return;
+	}
+	const k = WIDE.role * (st.min / (st.min + 1000)) * (age <= 27 ? 1 : 0.6);
+	const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+	const out = z();
+	const add = (o: Record<string, number>, amount: number) => {
+		if (amount <= 0) {
+			return;
+		}
+		for (const [key, v] of Object.entries(o)) {
+			out[SUB_INDEX[key]!]! += k * amount * v;
+		}
+	};
+	const three = st.tpa / st.fga;
+	const rim = st.fgaAtRim / st.fga;
+	const post = st.fgaLowPost / st.fga;
+	const mid = st.fgaMidRange / st.fga;
+	const lowUsage = clamp01((22 - st.usgp) / 8);
+	const highUsage = clamp01((st.usgp - 22) / 8);
+	add(
+		{ tcs: 1, spu: 0.6, tod: -0.4 },
+		clamp01((three - 0.3) / 0.25) * lowUsage,
+	);
+	add(
+		{ tod: 1, pul: 1, hnd: 0.6, crt: 0.8, tcs: -0.3 },
+		highUsage * clamp01((st.astp - 12) / 15),
+	);
+	add({ vis: 1, acc: 0.3 }, clamp01((st.astp - 20) / 15));
+	add({ pst: 1, flt: -0.3 }, clamp01((post - 0.12) / 0.15));
+	add({ con: 0.8, cls: 0.6, fns: -0.2 }, clamp01((rim - 0.35) / 0.25));
+	add(st.usgp >= 22 ? { pul: 1 } : { spu: 1 }, clamp01((mid - 0.2) / 0.2));
+	add({ blk: 1, idf: 0.4, stl: -0.3 }, clamp01((st.blkp - 3) / 4));
+	add({ stl: 1, pdf: 0.3 }, clamp01((st.stlp - 1.8) / 1.5));
+	return out;
 };
 
 // Keep the subs of a row in sync with its bases (and its expanded ratings): a base that changed outside development moves its subs

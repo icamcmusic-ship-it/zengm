@@ -11,16 +11,23 @@
 //
 // Writes `subLean` (25 comma-separated ints in SUB_DEFS order, the wanted offsets from the base) on the ratings rows of
 // data/real-player-data.basketball.json that have stats; rows without stats (draft prospects, pre-1973 seasons without BLK%/STL%) get
-// none and keep the neutral shape.
+// none and keep the neutral shape. Also `subZ` (subspread, the Wider Sub-Rating Shapes setting): his minutes over the window and the 12
+// raw z-scores, against his era (common/subRatingsReal.ts reads them).
 //
-// node tools/realSubRatings.ts          print the fit and the famous players
-// node tools/realSubRatings.ts --write  also write the data file
+// node tools/realSubRatings.ts              print the fit and the famous players
+// node tools/realSubRatings.ts --write      also write the data file
+// node tools/realSubRatings.ts --reference  also the real NBA reference spread of sub offsets (docs/native-features.md, Wider shapes)
 import { readFileSync, writeFileSync } from "node:fs";
 import {
 	SUB_DEFS,
 	SUB_INDEX,
 	fitSubsToBases,
 } from "../src/common/subRatings.ts";
+import {
+	REAL_LEAN_MIX,
+	STAT_Z_KEYS,
+	type StatZKey,
+} from "../src/common/subRatingsReal.ts";
 
 const DATA = "data/real-player-data.basketball.json";
 const STATS = "data/real-player-stats.basketball.json";
@@ -46,50 +53,11 @@ const BASES = [
 	"reb",
 ] as const;
 
-const STATS_KEYS = [
-	"blk",
-	"stl",
-	"orb",
-	"drb",
-	"ast",
-	"tov",
-	"usg",
-	"tpar",
-	"tpp",
-	"ftr",
-	"twop",
-	"ftp",
-] as const;
-type StatKey = (typeof STATS_KEYS)[number];
+const STATS_KEYS = STAT_Z_KEYS;
+type StatKey = StatZKey;
 
-// Each sub's lean: weights on the stat z-scores
-const MIX: Record<string, Partial<Record<StatKey, number>>> = {
-	blk: { blk: 1 },
-	stl: { stl: 1 },
-	idf: { drb: 0.5, blk: 0.3, stl: -0.2 },
-	pdf: { stl: 0.5, blk: -0.3, drb: -0.2 },
-	rng: { tpar: 0.7, tpp: 0.3 },
-	tcs: { tpp: 0.6, usg: -0.5, ast: -0.2 },
-	tod: { usg: 0.6, tpar: 0.3, ast: 0.2 },
-	pst: { ftr: 0.4, tpar: -0.3, usg: 0.3 },
-	cls: { twop: 0.7, orb: 0.3 },
-	flt: { ftp: 0.5, twop: 0.3, ftr: -0.3 },
-	con: { ftr: 0.8, orb: 0.2 },
-	fns: { twop: 0.6, ftr: -0.4 },
-	pul: { usg: 0.7, ast: 0.2, tpp: -0.1 },
-	spu: { tpp: 0.5, usg: -0.5 },
-	orb: { orb: 1 },
-	drd: { drb: 1 },
-	hnd: { usg: 0.5, ast: 0.4, tov: -0.2 },
-	sec: { tov: -0.8, ast: 0.2 },
-	crt: { usg: 0.8, ftr: 0.2 },
-	vis: { ast: 0.8, usg: 0.2 },
-	acc: { tov: -0.7, ast: 0.3 },
-	sls: { ftr: 0.5, orb: 0.3, stl: 0.2 },
-	lat: { stl: 0.7, blk: -0.2 },
-	stj: { blk: 0.5, drb: 0.4 },
-	mxv: { orb: 0.5, ftr: 0.4, drb: -0.2 },
-};
+// Each sub's lean: weights on the stat z-scores (shared with the game: common/subRatingsReal.ts)
+const MIX = REAL_LEAN_MIX;
 
 // Points of sub offset per unit of z, the cap on a lean, the soft threshold and the shrinkage
 const K = 7;
@@ -211,7 +179,10 @@ const xOf = (r: any, key: StatKey) => [
 ];
 
 // One model per stat
-const models = {} as Record<StatKey, { w: number[]; se: number }>;
+const models = {} as Record<
+	StatKey,
+	{ w: number[]; se: number; r2: number; sdBase: number }
+>;
 const fitLines: string[] = [];
 for (const key of STATS_KEYS) {
 	const X: number[][] = [];
@@ -232,7 +203,11 @@ for (const key of STATS_KEYS) {
 	const ssr = y.reduce((a, v, i) => a + (v - pred[i]!) ** 2, 0);
 	const sst = y.reduce((a, v) => a + (v - mean) ** 2, 0);
 	const se = Math.sqrt(ssr / y.length);
-	models[key] = { w, se };
+	const mBase = X.reduce((a, row) => a + row[1]!, 0) / X.length;
+	const sdBase = Math.sqrt(
+		X.reduce((a, row) => a + (row[1]! - mBase) ** 2, 0) / X.length,
+	);
+	models[key] = { w, se, r2: 1 - ssr / sst, sdBase };
 	fitLines.push(
 		`${key.padEnd(5)} n ${y.length}, R2 ${(1 - ssr / sst).toFixed(2)}, residual sd ${se.toFixed(3)}`,
 	);
@@ -279,8 +254,33 @@ for (const key of STATS_KEYS) {
 	stability.push(`${key} ${(sab / Math.sqrt(saa * sbb)).toFixed(2)}`);
 }
 
+// Wider Sub-Rating Shapes: the z-scores in `subZ` are against his own era (the mean z of that season's 800+ minute players taken out), so
+// the three-point boom or the old FT rates aren't read as everyone's lean (the stock lean keeps its threshold instead)
+const eraMean = {} as Record<StatKey, Map<number, number>>;
+for (const key of STATS_KEYS) {
+	const sums = new Map<number, [number, number]>();
+	for (const [slug, seasons] of seasonStats) {
+		for (const season of seasons.keys()) {
+			const z = zOf(slug, season, key);
+			if (!z || z.min < 800) {
+				continue;
+			}
+			const s0 = sums.get(season) ?? [0, 0];
+			s0[0] += z.z;
+			s0[1] += 1;
+			sums.set(season, s0);
+		}
+	}
+	eraMean[key] = new Map(
+		[...sums].map(([season, [sum, n]]) => [season, n >= 30 ? sum / n : 0]),
+	);
+}
+
 // A row's lean: his last three seasons of stats up to the row's season
-const leanFor = (slug: string, season: number): number[] | undefined => {
+const leanFor = (
+	slug: string,
+	season: number,
+): { lean: number[]; subZ: string } | undefined => {
 	const seasons = seasonStats.get(slug);
 	if (!seasons) {
 		return;
@@ -290,47 +290,66 @@ const leanFor = (slug: string, season: number): number[] | undefined => {
 		return;
 	}
 	const zs = {} as Record<StatKey, number>;
+	// Wider Sub-Rating Shapes: the raw z-scores (no threshold, no shrinkage) and his minutes over the window
+	const raw = {} as Record<StatKey, number>;
+	let rawMin = 0;
 	let any = false;
 	for (const key of STATS_KEYS) {
 		let sw = 0;
 		let swz = 0;
+		let swzEra = 0;
 		WINDOW.forEach((wt, i) => {
 			const z = zOf(slug, last - i, key);
 			if (z) {
 				sw += wt * z.min;
 				swz += wt * z.min * z.z;
+				swzEra += wt * z.min * (z.z - (eraMean[key].get(last - i) ?? 0));
 			}
 		});
 		if (sw <= 0) {
 			zs[key] = 0;
+			raw[key] = 0;
 			continue;
 		}
 		any = true;
 		const z = swz / sw;
+		raw[key] = swzEra / sw;
+		rawMin = Math.max(rawMin, sw);
 		const soft = Math.sign(z) * Math.max(0, Math.abs(z) - THRESH);
 		zs[key] = soft * (sw / (sw + SHRINK_MIN));
 	}
 	if (!any) {
 		return;
 	}
-	return SUB_DEFS.map((def) => {
+	const lean = SUB_DEFS.map((def) => {
 		const mix = MIX[def.key]!;
 		let v = 0;
 		for (const [k, wt] of Object.entries(mix)) {
-			v += wt * zs[k as StatKey];
+			v += wt! * zs[k as StatKey];
 		}
 		return Math.max(-CAP, Math.min(CAP, Math.round(K * v)));
 	});
+	const subZ = [
+		Math.round(rawMin),
+		...STATS_KEYS.map((k) => Math.round(raw[k] * 100) / 100),
+	].join(",");
+	return { lean, subZ };
 };
 
 let written = 0;
 for (const r of d.ratings) {
-	const lean = leanFor(r.slug, r.season);
+	const out = leanFor(r.slug, r.season);
+	const lean = out?.lean;
 	if (lean && lean.some((v) => v !== 0)) {
 		r.subLean = lean.join(",");
 		written += 1;
 	} else {
 		delete r.subLean;
+	}
+	if (out) {
+		r.subZ = out.subZ;
+	} else {
+		delete r.subZ;
 	}
 }
 
@@ -412,6 +431,90 @@ for (const name of FAMOUS) {
 		return `${sub[i]} (${off >= 0 ? "+" : ""}${off})`;
 	};
 	console.log(`| ${name} (${r.season}) | ${SHOW.map(cell).join(" | ")} |`);
+}
+
+// --reference: how far real players' skills sit from what their base rating says, in rating points (subspread step 1). A stat that one
+// sub drives (BLK% for Shot Blocking, STL% for Steals, ...) is put on the base's scale (the base's spread over the same players), so
+// the part of it the base doesn't explain is the sub's implied offset: z x sqrt(1 - R2) x the base's sd. (The slope of the stat on the
+// base can't be used: real Defense barely tracks BLK%.) A contrast of two subs of one base (blocks vs steals) is the difference of
+// their implied offsets. Only the stable part counts (the covariance of a player's contrast in season t with t+1, both 800+ minutes):
+// one season's luck isn't a skill.
+if (process.argv.includes("--reference")) {
+	const scale = (key: StatKey) =>
+		Math.sqrt(Math.max(0, 1 - models[key].r2)) * models[key].sdBase;
+	const implied = (slug: string, season: number, key: StatKey, sign = 1) => {
+		const z = zOf(slug, season, key);
+		if (!z || z.min < 800) {
+			return;
+		}
+		return sign * z.z * scale(key);
+	};
+	type Part = [StatKey, number];
+	const CONTRASTS: { name: string; a: Part; b?: Part }[] = [
+		{ name: "Shot Blocking - Steals (diq)", a: ["blk", 1], b: ["stl", 1] },
+		{ name: "Offensive - Defensive Reb (reb)", a: ["orb", 1], b: ["drb", 1] },
+		{ name: "Vision - Pass Accuracy (pss)", a: ["ast", 1], b: ["tov", -1] },
+		{
+			name: "Shot Creation - Ball Security (drb)",
+			a: ["usg", 1],
+			b: ["tov", -1],
+		},
+		{ name: "Contact - Finesse (dnk)", a: ["ftr", 1], b: ["twop", 1] },
+		{ name: "Post Moves (ins, FT rate, alone)", a: ["ftr", 1] },
+		{ name: "Catch & Shoot 3 (tp, 3P%, alone)", a: ["tpp", 1] },
+		{ name: "Range (tp, alone)", a: ["tpar", 1] },
+		{ name: "Shot Blocking (diq, alone)", a: ["blk", 1] },
+		{ name: "Steals (diq, alone)", a: ["stl", 1] },
+		{ name: "Offensive Reb (reb, alone)", a: ["orb", 1] },
+		{ name: "Vision (pss, alone)", a: ["ast", 1] },
+	];
+	console.log(
+		"\nReference (real NBA, 1980-2026, 800+ min): implied sub offsets from the base, rating points",
+	);
+	console.log(
+		`Points per z by stat (common/subRatingsReal.ts REAL_WIDE.scale): ${STATS_KEYS.map((k) => `${k}: ${scale(k).toFixed(1)}`).join(", ")}`,
+	);
+	console.log(
+		"| Contrast | points per z (sqrt(1-R2) x base sd) | n pairs | sd one season | stable sd (t, t+1) |",
+	);
+	console.log("|---|---|---|---|---|");
+	for (const c of CONTRASTS) {
+		const xs: number[] = [];
+		const pairs: [number, number][] = [];
+		const at = (slug: string, season: number) => {
+			const a = implied(slug, season, c.a[0], c.a[1]);
+			const b = c.b ? implied(slug, season, c.b[0], c.b[1]) : 0;
+			return a === undefined || b === undefined ? undefined : a - b;
+		};
+		for (const [slug, seasons] of seasonStats) {
+			for (const season of seasons.keys()) {
+				if (season < 1980) {
+					continue;
+				}
+				const x = at(slug, season);
+				if (x === undefined) {
+					continue;
+				}
+				xs.push(x);
+				const y = at(slug, season + 1);
+				if (y !== undefined) {
+					pairs.push([x, y]);
+				}
+			}
+		}
+		const mean = (v: number[]) => v.reduce((s2, x) => s2 + x, 0) / v.length;
+		const m = mean(xs);
+		const sd = Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
+		const ma = mean(pairs.map((p) => p[0]));
+		const mb = mean(pairs.map((p) => p[1]));
+		const cov = mean(pairs.map((p) => (p[0] - ma) * (p[1] - mb)));
+		const slopes = [c.a[0], ...(c.b ? [c.b[0]] : [])]
+			.map((k) => scale(k).toFixed(1))
+			.join(" / ");
+		console.log(
+			`| ${c.name} | ${slopes} | ${pairs.length} | ${sd.toFixed(1)} | ${Math.sqrt(Math.max(0, cov)).toFixed(1)} |`,
+		);
+	}
 }
 
 if (process.argv.includes("--write")) {

@@ -380,6 +380,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "spreadMatchups",
+		key: "spreadMatchups",
+		name: "Spread Out Matchups",
+		description:
+			"With the old compact schedule (Realistic Schedule Length off, not grouped into series): no team plays the same opponent in consecutive games when the schedule can avoid it, and never 3 in a row. (Realistic Schedule Length always spreads out each pair's meetings, with at most an occasional 2-game set in the same arena.) Takes effect with the next schedule (the next regular season).",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "marqueeGames",
 		college: false,
 		key: "marqueeGames",
@@ -427,6 +437,16 @@ export const NATIVE_FEATURES = [
 		name: "Sub-Ratings in Sim",
 		description:
 			"Requires Sub-Ratings. The game sim reads the sub-ratings where they are more specific than the rating: shot blocking and standing vertical for blocks, steals and lateral quickness for steals and on-ball defense, interior defense for the rim, catch-and-shoot vs off-the-dribble shooting by whether the shot was assisted (threes and mid-range jumpers), range for how often and how well he shoots threes, post moves for big men's post-ups and touch for small players' short shots, contact finishing for fouls drawn and and-ones, finesse and max vertical for finishing at the rim, handle and ball security for turnovers, vision for assists and pass accuracy for bad passes, straight-line speed for pace and fast breaks. League averages stay the same; only the shape of each player's game changes. With every sub-rating equal to its rating, games are exactly as before.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "subRatingsWide",
+		key: "subRatingsWide",
+		name: "Wider Sub-Rating Shapes",
+		description:
+			"Requires Sub-Ratings. Sub-ratings under one rating differ as much as real players' do: a catch-and-shoot specialist who can't shoot off the dribble, a passer who can't shoot from range, a shot blocker who never gets a steal. New players' shapes are wider (sized per rating from real players' stats, shooting and finishing widest), about one in eight is lopsided (one or two sub-ratings 15-25 away from their rating), and a standout no longer drags the rest of its group down as much. Real players' shapes follow their stats more strongly (shrunk only for a small sample), shapes spread less back toward the rating after 24, and a player's role grows its sub-ratings (a spot-up shooter's catch-and-shoot, a primary ball handler's pull-ups and handle). The ratings themselves, ovr and the game's random numbers are unchanged. Only new players get the wider shapes when it's turned on in an existing league.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
@@ -617,6 +637,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "advCareer",
+		key: "advCareerTracking",
+		name: "Keep Career Tracking for Retired Players",
+		description:
+			"Advanced Tracking Stats: when a player retires, all of his tracking stats are kept as one career total (regular season and playoffs), and his season-by-season tracking is removed. Off: a retired player keeps the tracking of his last 3 seasons only, and his career tracking covers just those. Turning it on also folds the seasons retired players still have into their career totals. Active players always keep every season.",
+		// On in existing leagues too: no game changes, and a retired player keeps more tracking in less space than with the trim
+		default: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		college: false,
 		key: "featureSeasonOdds",
@@ -634,6 +664,21 @@ export const NATIVE_FEATURES = [
 			"A 2K-style archetype for every player, derived from his ratings and saved each preseason: player page, Draft Scouting, Advanced Player Search, Roster composition, the Archetypes page and archetype targets in the ratings regenerator.",
 		default: true,
 		sports: BBGM,
+		options: [
+			{
+				key: "archetypeLabelSource",
+				name: "Archetype Label Source",
+				description:
+					"Which name a real player's archetype shows. NBA 2K's own archetype is known for the real players in your 2K list (current players in the 2026 and 2027 seasons, all-time players in the season they were matched to); everyone else, and every random or fictional player, always shows the game's archetype. 2K labels when known: those players show 2K's name as their label. Show both: the game's archetype with 2K's name as a small second line.",
+				type: "string",
+				values: [
+					{ key: "game", value: "Game archetypes" },
+					{ key: "twoK", value: "2K labels when known" },
+					{ key: "both", value: "Show both" },
+				],
+				default: "game",
+			},
+		],
 	},
 	{
 		id: "improvedPositions",
@@ -650,7 +695,7 @@ export const NATIVE_FEATURES = [
 		key: "featureForkFaces",
 		name: "New Face Styles",
 		description:
-			"New male players' (and staff's) faces use the fork's style catalogue: fades, waves, twists, locs, braids, beards and stubble, plus the fork's heads, eyes, brows, noses, ears, lines and accessories. Hair is picked to fit the hair texture and age, with common, uncommon and rare styles and a few dyed heads. Seeded from the face, so no game randomness. Existing faces and faces you edit are never changed. See Tools → Face Style Gallery; every style can be picked in Customize Player.",
+			"New male players' (and staff's) faces use the fork's style catalogue: fades, waves, twists, locs, braids, beards and stubble, plus the fork's heads, eyes, brows, noses, ears, lines and accessories. Hair is picked to fit the hair texture and age, with common, uncommon and rare styles and a few dyed heads; older coaches and GMs have a few looks of their own. Players out with a nose or facial injury wear a nose bandage on the player page (not stored). Seeded from the face, so no game randomness. Existing faces and faces you edit are never changed. See Tools → Face Style Gallery; every style can be picked in Customize Player.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
@@ -1027,6 +1072,16 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "frozenDraftRanks",
+		college: false,
+		key: "featureFrozenDraftRanks",
+		name: "Frozen Pre-draft Ranks",
+		description:
+			"Each prospect's rank is frozen when the draft starts (your scouts' list and the consensus board), so it no longer moves as players are picked: the Draft page shows his pre-draft rank next to a separate Best available order, and drafted players show the pick they went at next to their pre-draft rank (steals and reaches). Off: ranks are counted among the players still on the board.",
+		default: false,
+		defaultNewLeague: true,
+	},
+	{
 		id: "aiDraftNeeds",
 		college: false,
 		key: "featureAiDraftNeeds",
@@ -1128,6 +1183,15 @@ export const NATIVE_FEATURES = [
 			"Show players' nicknames (generated from their careers or set in Customize Player) on the player page and in Hall of Fame speeches and plaques. Off: no nickname is shown anywhere and those texts use his real name. Only hides them, so nicknames come back when you turn it on again.",
 		default: true,
 		sports: BBGM,
+	},
+	{
+		id: "profileExportFull",
+		key: "featureProfileExportFull",
+		name: "Complete Profile Export",
+		description:
+			"Export profile (player pages) includes everything his pages and the league pages show about him: recruiting, playoffs and tournaments (college and pro), coaches by season, award finishes and votes, the tracking profile, contract details and mood history, every news entry, and his legacy (Hall of Fame plaque and speech, GOAT Lab rank, rivalry lines, face history). Off: the shorter export.",
+		default: false,
+		defaultNewLeague: true,
 	},
 	{
 		id: "timeline",

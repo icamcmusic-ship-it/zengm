@@ -14,6 +14,7 @@ import {
 	featsByPid,
 	hofSeasonsOf,
 	hofWords,
+	hofWordsOn,
 } from "../util/hofStory.ts";
 import type { Player } from "../../common/types.ts";
 
@@ -71,6 +72,8 @@ export default defineView({
 			const plaquesOn = featureOn("faceAging");
 			const raws: Player[] = [];
 			const allRaws: Player[] = [];
+			// Plaque text and speeches are written from basketball careers (points, rebounds, assists, hoops stories)
+			const wordsOn = hofWordsOn();
 
 			const players = (
 				await idb.merged.players.getAll(
@@ -80,7 +83,9 @@ export default defineView({
 							if (plaquesOn) {
 								raws.push(pRaw);
 							}
-							allRaws.push(pRaw);
+							if (wordsOn) {
+								allRaws.push(pRaw);
+							}
 							const pFormatted = formatPlayer(pRaw);
 							if (!pFormatted) {
 								return;
@@ -113,7 +118,9 @@ export default defineView({
 
 			// Plaque text and induction speeches, from each Hall of Famer's career
 			const hofSeasons = hofSeasonsOf(allRaws);
-			const feats = await featsByPid(new Set(allRaws.map((p) => p.pid)));
+			const feats = wordsOn
+				? await featsByPid(new Set(allRaws.map((p) => p.pid)))
+				: new Map<number, any[]>();
 			const words: HofWords[] = [];
 			const wordsByPid = new Map<number, HofWords>();
 			for (const p of allRaws) {

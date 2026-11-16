@@ -152,6 +152,7 @@ const BUZZED = new Set([
 	"short-fade-2",
 	"fork-buzz",
 	"fork-high-tight",
+	"fork-buzz-leopard",
 ]);
 
 export const hairLossStageOf = (id: string) => HAIR_LOSS_STAGE[id] ?? 0;

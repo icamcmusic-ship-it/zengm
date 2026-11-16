@@ -121,7 +121,7 @@ export const generateGm = async (gmid: number): Promise<Gm> => {
 			year: g.get("season") - age,
 			loc: country,
 		},
-		face: generateFace({ race, age }),
+		face: generateFace({ race, age, staff: true }),
 		traits: genGmTraits(() => gauss(0, 1)),
 		seasons: [],
 		tenures: [],

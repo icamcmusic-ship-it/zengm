@@ -4,10 +4,26 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { ratingsGradientStyle } from "../../components/RatingsStatsPopover/ratingsGradientStyle.ts";
 import { RatingWithChange } from "../../components/RatingWithChange.tsx";
 import { Fragment, type ReactNode, useState } from "react";
-import { subsOfBase } from "../../../common/subRatings.ts";
+import {
+	hasSubs,
+	subNotes,
+	subsOfBase,
+	subTone,
+	type SubTone,
+} from "../../../common/subRatings.ts";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 
 const SUBS_OPEN_KEY = "playerSubRatingsOpen";
+
+// Wider Sub-Rating Shapes: a sub's color by how far it is from its base (Bootstrap's emphasis colors, which follow the dark theme)
+const TONE_CLASS: Record<SubTone, string> = {
+	strong: "text-success-emphasis fw-bold",
+	good: "text-success-emphasis",
+	even: "",
+	poor: "text-danger-emphasis",
+	weak: "text-danger-emphasis fw-bold",
+};
 
 export const RatingsOverview = ({
 	ratings,
@@ -39,6 +55,10 @@ export const RatingsOverview = ({
 	// Sub-ratings (the subRatings setting): the base ratings, each expanding to show its sub-ratings. The expanded ratings that the subs
 	// cover (the defense, rebounding and shooting splits, ball security) are shown through the subs.
 	const hasSub = Array.isArray(currentSeason.sub);
+	// Wider Sub-Rating Shapes: subs colored by their offset from the base, and a strengths/weaknesses line per base. The subs shown are
+	// the scouted ones (fuzz included), and with the no visible ratings challenge there are none
+	const wideOn = useFeatureOn("subRatingsWide");
+	const showShape = hasSub && wideOn;
 	const expanded2 =
 		expanded && typeof currentSeason.oreb === "number" && !hasSub;
 	const lastSub: number[] | undefined = Array.isArray(lastSeason.sub)
@@ -729,12 +749,18 @@ export const RatingsOverview = ({
 													{opened
 														? subs.map(({ i, def }) => {
 																const v = currentSeason.sub[i];
+																const off = v - current;
+																const tone = showShape ? subTone(off) : "even";
 																return (
 																	<tr key={def.key} className="small">
 																		<td className="px-0 pb-0 ps-1 ps-md-2">
 																			<div
 																				className="d-flex text-body-secondary"
-																				title={def.description}
+																				title={
+																					showShape
+																						? `${def.description} (${off >= 0 ? "+" : ""}${off} vs ${typeof label === "string" ? label : "the rating"})`
+																						: def.description
+																				}
 																			>
 																				<span>
 																					<span className="d-md-none">
@@ -745,7 +771,14 @@ export const RatingsOverview = ({
 																					</span>
 																					:&nbsp;
 																				</span>
-																				<span className="ms-auto">{v}</span>
+																				<span
+																					className={`ms-auto ${TONE_CLASS[tone]}`}
+																					data-sub-tone={
+																						showShape ? tone : undefined
+																					}
+																				>
+																					{v}
+																				</span>
 																			</div>
 																		</td>
 																		<td className="px-0 pb-0 ps-1">
@@ -759,6 +792,13 @@ export const RatingsOverview = ({
 																);
 															})
 														: null}
+													{opened && showShape && hasSubs(rating) ? (
+														<ShapeNote
+															sub={currentSeason.sub}
+															row={currentSeason}
+															base={rating}
+														/>
+													) : null}
 												</Fragment>
 											);
 										})}
@@ -770,5 +810,57 @@ export const RatingsOverview = ({
 				))}
 			</div>
 		</div>
+	);
+};
+
+// Wider Sub-Rating Shapes: "Within Three-point: strong Range, weak Off-Dribble 3" under an opened base, when a sub is notably off it
+const ShapeNote = ({
+	sub,
+	row,
+	base,
+}: {
+	sub: number[];
+	row: Record<string, unknown>;
+	base: string;
+}) => {
+	if (!hasSubs(base)) {
+		return null;
+	}
+	const notes = subNotes(sub, row, base);
+	if (!notes) {
+		return null;
+	}
+	const part = (
+		word: string,
+		items: { name: string; label: string }[],
+		className: string,
+	) =>
+		items.length > 0 ? (
+			<span className={className}>
+				{word}{" "}
+				{items.map((x, j) => (
+					<Fragment key={x.name}>
+						{j > 0 ? ", " : null}
+						<span className="d-md-none">{x.label}</span>
+						<span className="d-none d-md-inline">{x.name}</span>
+					</Fragment>
+				))}
+			</span>
+		) : null;
+	return (
+		<tr className="small">
+			<td
+				colSpan={2}
+				className="px-0 pb-0 ps-1 ps-md-2 text-body-secondary sub-shape-note"
+				style={{ whiteSpace: "normal", maxWidth: "12rem", lineHeight: 1.2 }}
+			>
+				Within {notes.baseName}:{" "}
+				{part("strong", notes.strengths, "text-success-emphasis")}
+				{notes.strengths.length > 0 && notes.weaknesses.length > 0
+					? "; "
+					: null}
+				{part("weak", notes.weaknesses, "text-danger-emphasis")}
+			</td>
+		</tr>
 	);
 };

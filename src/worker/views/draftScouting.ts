@@ -9,7 +9,12 @@ import { last } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
 import { getScoutReport, getScoutingStatus } from "../core/draft/scouting.ts";
-import { archetypeFor, getLeagueNorms } from "../core/player/archetype.ts";
+import {
+	archetypeFor,
+	displayArchetypeLabel,
+	getLeagueNorms,
+} from "../core/player/archetype.ts";
+import type { ArchetypeView } from "../../common/archetypes/index.ts";
 import { hasPreDraftStats } from "../../common/preDraft.ts";
 import {
 	getTraitViewContext,
@@ -20,11 +25,13 @@ import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
 import { EXPANDED_RATINGS } from "../../common/expandedRatings.ts";
 import { getClassShapeInfo } from "../core/draft/classShape.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
+import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
 
 const getSeason = async (
 	playersAll: Player[],
 	season: number,
 	traitContext: TraitViewContext,
+	fantasy: boolean,
 ) => {
 	const playersAllFiltered = playersAll.filter((p) => p.draft.year === season);
 	const players = await player.formatAll(playersAllFiltered, {
@@ -48,14 +55,38 @@ const getSeason = async (
 	});
 	players.sort((a, b) => b.valueFuzz - a.valueFuzz);
 
+	// Frozen Pre-draft Ranks setting: once this class's draft has started, its ranks are the ones it had then, not counted among the
+	// players left (who would then start again at 1)
+	const preDraftRanks = fantasy ? undefined : await getPreDraftRanks(season);
+	// Anyone added to the class after the snapshot goes after it
+	const maxPreDraftRank = Math.max(
+		0,
+		...[...(preDraftRanks?.values() ?? [])].map((x) => x.r),
+	);
+
 	const playersByPid = new Map(playersAllFiltered.map((p) => [p.pid, p]));
 	const scoutingSystem = featureOn("scoutingSystem");
 	// Derived from the prospects' ratings (live: their ratings can still be regenerated)
 	const norms = __SPORT === "basketball" ? await getLeagueNorms() : undefined;
+	// (arch2kfix: the label as the Archetype Label Source setting shows it)
+	const withTwoK = (
+		p: (typeof playersAllFiltered)[number],
+		v: ArchetypeView | undefined,
+	) =>
+		v
+			? {
+					...v,
+					label: displayArchetypeLabel(
+						p,
+						(last(p.ratings) as any).season,
+						v.label,
+					),
+				}
+			: undefined;
 	const archetypeByPid = new Map(
 		playersAllFiltered.map((p) => [
 			p.pid,
-			norms ? archetypeFor(p, norms)?.view : undefined,
+			norms ? withTwoK(p, archetypeFor(p, norms)?.view) : undefined,
 		]),
 	);
 
@@ -107,14 +138,22 @@ const getSeason = async (
 				subHighlights: Array.isArray(ratings.sub)
 					? subHighlights(ratings.sub, ratings)
 					: undefined,
-				rank: i + 1,
+				rank: preDraftRanks
+					? (preDraftRanks.get(pa.pid)?.r ?? maxPreDraftRank + i + 1)
+					: i + 1,
 			};
 		}),
 	);
 
+	if (preDraftRanks) {
+		players2.sort((a, b) => a.rank - b.rank);
+	}
+
 	return {
 		players: players2,
 		season,
+		// The ranks are the class's when its draft started
+		frozenRanks: preDraftRanks !== undefined,
 		// Draft Class Shapes setting
 		shape:
 			__SPORT === "basketball"
@@ -165,7 +204,9 @@ export default defineView({
 			const traitContext = await getTraitViewContext();
 			const seasons: Awaited<ReturnType<typeof getSeason>>[] = [];
 			for (let season = firstSeason; season <= maxDraftYear; season++) {
-				seasons.push(await getSeason(players, season, traitContext));
+				seasons.push(
+					await getSeason(players, season, traitContext, fantasyDraft),
+				);
 			}
 
 			// Linked college league (pro leagues only): which one, and what was imported

@@ -136,6 +136,7 @@ export const runMockDraft = ({
 	useNeeds,
 	useTraits,
 	random = Math.random,
+	firstOverall = 1,
 }: {
 	slots: MockSlot[];
 	prospects: MockProspect[];
@@ -143,6 +144,9 @@ export const runMockDraft = ({
 	useNeeds: boolean;
 	useTraits: boolean;
 	random?: () => number;
+	// Overall number of the first slot. 1 = the whole draft; during the draft (Frozen Pre-draft Ranks setting), the next real pick, so a
+	// steal or reach compares the pick with the frozen pre-draft rank on the same scale
+	firstOverall?: number;
 }): MockPick[] => {
 	let pool = [...prospects].sort((a, b) => b.value - a.value);
 	const picks: MockPick[] = [];
@@ -207,7 +211,7 @@ export const runMockDraft = ({
 					: "Team preference",
 			);
 		}
-		const overall = picks.length + 1;
+		const overall = firstOverall + picks.length;
 		const diff = chosen.p.scoutRank - overall;
 		if (diff >= 8) {
 			reasons.push(`Steal: No. ${chosen.p.scoutRank} on your board`);

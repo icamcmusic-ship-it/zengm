@@ -20,6 +20,7 @@ import { wrappedTeamAbbrevLink } from "../../components/TeamAbbrevLink.tsx";
 import type { SuperCol } from "../../components/DataTable/index.tsx";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { hasNonZeroStat } from "../../../common/statValue.ts";
+import { isAdvStat } from "../../../common/advStats.ts";
 
 const hasStats = (
 	careerStats: View<"player">["player"][
@@ -47,6 +48,7 @@ const hasStats = (
 };
 
 export const StatsTable = ({
+	advCareerFolded,
 	awardsBySeason,
 	name,
 	onlyShowIf,
@@ -55,6 +57,8 @@ export const StatsTable = ({
 	superCols,
 	leaders,
 }: {
+	// Advanced Tracking Stats: his season-by-season tracking was folded into his career total when he retired
+	advCareerFolded?: boolean;
 	awardsBySeason: Map<number, PlayerAward[]>;
 	name: string;
 	onlyShowIf?: PlayerStatAttr[];
@@ -83,6 +87,16 @@ export const StatsTable = ({
 	let playerStats = p.stats.filter((ps) => ps.playoffs === playoffs);
 
 	const rangeFooter = useRangeFooter(p.pid, playerStats);
+
+	// Advanced Tracking Stats tables: only the seasons with tracking data (none before the setting, none after retirement with Keep
+	// Career Tracking for Retired Players, whose career row has them all), rather than empty rows
+	const isTracking =
+		__SPORT === "basketball" && stats.some((stat) => isAdvStat(stat));
+	if (isTracking) {
+		playerStats = playerStats.filter((ps) =>
+			stats.some((stat) => isAdvStat(stat) && (ps as any)[stat] !== undefined),
+		);
+	}
 
 	if (!hasRegularSeasonStats && !hasPlayoffStats) {
 		return null;
@@ -261,7 +275,7 @@ export const StatsTable = ({
 	let prevSeason;
 	for (const [i, ps] of playerStats.entries()) {
 		// Add blank rows for gap years if necessary
-		if (prevSeason !== undefined && prevSeason < ps.season - 1) {
+		if (!isTracking && prevSeason !== undefined && prevSeason < ps.season - 1) {
 			const gapSeason = prevSeason + 1;
 
 			rows.push({
@@ -403,6 +417,12 @@ export const StatsTable = ({
 					</ul>
 				}
 			/>
+			{isTracking && advCareerFolded ? (
+				<p className="text-body-secondary small mb-2">
+					Season-by-season tracking isn't kept after retirement: the career row
+					has all of his tracking.
+				</p>
+			) : null}
 			{showSelectSeasonRangeButton ? (
 				<button
 					className="btn btn-sm btn-secondary mb-3"
