@@ -19,7 +19,6 @@ import { g } from "../../worker/util/index.ts";
 import {
 	ARCHETYPES,
 	archetypeById,
-	classify,
 	defaultNorms,
 	isPoorFit,
 	scoreAll,

@@ -4,7 +4,8 @@
 import { assert, beforeEach, describe, test } from "vitest";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { PLAYER } from "../../../common/constants.ts";
-import { archetypeById, classify } from "../../../common/archetypes/index.ts";
+import { archetypeById } from "../../../common/archetypes/index.ts";
+import { classifyV2 } from "../../../common/archetypes/v2/engine.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
@@ -92,7 +93,8 @@ describe("archetype feedback", () => {
 				continue;
 			}
 			const row = last(p.ratings) as any;
-			const plain = classify(ratings, {
+			const plain = classifyV2(ratings, {
+				...(p.srID ? { srID: p.srID } : {}),
 				norms,
 				ovr: row.ovr,
 				pos: row.pos,
