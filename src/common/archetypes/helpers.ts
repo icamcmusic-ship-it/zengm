@@ -240,7 +240,11 @@ export const landscapeOf = (rows: Rated[], topN = 3): Landscape => {
 		ArchetypeGroup,
 		number
 	>;
-	const byArchetype = ARCHETYPES.map((a) => {
+	// (archv2: composed names held by someone are listed too)
+	const composed = [...by.keys()]
+		.filter((id) => id.startsWith("v2:"))
+		.map((id) => archetypeById(id)!);
+	const byArchetype = [...ARCHETYPES, ...composed].map((a) => {
 		const l = by.get(a.id) ?? [];
 		byGroup[a.group] += l.length;
 		return {

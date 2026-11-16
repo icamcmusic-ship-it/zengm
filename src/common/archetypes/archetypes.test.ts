@@ -229,11 +229,11 @@ describe("classification", () => {
 	});
 	test("custom builds: thirty-four (less the merged ones), not 2K names, never 2K aliases, positions their profile is played at", () => {
 		const custom = ARCHETYPES.filter((a) => a.custom);
-		// (arch15: five new builds from the gap analysis)
-		assert.strictEqual(CUSTOM_DEFS.length, 34);
+		// (arch15: five new builds from the gap analysis; archgaps: four more, user-approved)
+		assert.strictEqual(CUSTOM_DEFS.length, 38);
 		assert.strictEqual(
 			custom.length,
-			34 - CUSTOM_DEFS.filter((d) => MERGED[d.id]).length,
+			38 - CUSTOM_DEFS.filter((d) => MERGED[d.id]).length,
 		);
 		const twoK = new Set(
 			TWO_K_DEFS.flatMap((d) => [d.name, ...d.aliases]).map((n) =>

@@ -380,6 +380,35 @@ export const CONCEPTS: Concept[] = [
 		tag: "playmaking",
 		phrase: "works magic with the ball",
 	},
+	// archgaps (user-approved): honest names for role players with no standout skill
+	{
+		key: "glue",
+		re: /Glue/,
+		w: { dper: 2, diq: 1.5, three: 1, pss: 1 },
+		need: { dper: 0 },
+		xw: { pdef: 1 },
+		family: "defender",
+		tag: "defense",
+		phrase: "does a little of everything and defends",
+	},
+	{
+		key: "gameManager",
+		re: /Game Manager/,
+		w: { pss: 2, drb: 1.5, oiq: 1.5 },
+		need: { pss: 0, drb: 0 },
+		family: "playmaker",
+		tag: "playmaking",
+		phrase: "runs the offense without mistakes",
+	},
+	{
+		key: "energy",
+		re: /Energy/,
+		w: { fin: 2, ath: 2, blk: 1, reb: 1, three: -1 },
+		need: { fin: 0, ath: 0 },
+		family: "athlete",
+		tag: "athletic",
+		phrase: "brings energy at the rim on both ends",
+	},
 ];
 
 // What a name says, in the order the name says it

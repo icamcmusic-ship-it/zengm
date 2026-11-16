@@ -26,6 +26,7 @@ import {
 	type StoredArchetype,
 } from "../../../common/archetypes/index.ts";
 import { whyBullets, whyDrivers } from "../../../common/archetypes/whyText.ts";
+import { classifyV2 } from "../../../common/archetypes/v2/engine.ts";
 import { VISIBLE_TRAITS } from "../../../common/archetypes/classify.ts";
 import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
 import type { Player } from "../../../common/types.ts";
@@ -85,6 +86,10 @@ import {
 	overrideFor,
 	refitArchetypeTuning,
 } from "./archetypeFeedback.ts";
+
+// archv2: which engine reads labels ("classic" or "v2")
+export const archetypeEngine = (): string =>
+	featureOption<string>("archetypeEngine") === "v2" ? "v2" : "classic";
 
 // archfb: the shipped model with the user's tuning on top, or undefined (the shipped model) with no tuning
 export const tunedModelFor = (
@@ -436,15 +441,25 @@ export const classifyPlayer = (
 	}
 	// (arch16: the reading version too, so a new reading never reuses an old result; archfb: and the user's tuning)
 	const tuning = activeTuning();
+	const v2 = archetypeEngine();
 	const key = JSON.stringify(
-		[ARCHETYPE_READING_VERSION, tuning.hash, ratings, opts],
+		[ARCHETYPE_READING_VERSION, tuning.hash, v2, p.srID, ratings, opts],
 		memoReplacer,
 	);
 	if (memo.has(key)) {
 		return memo.get(key);
 	}
 	const model = tunedModelFor(ratings);
-	const c = classify(ratings, { norms, ...opts, ...(model ? { model } : {}) });
+	// archv2: the v2 engine (League Extras -> Archetypes -> Archetype engine), a labeled real player never voting for himself
+	const c =
+		v2 === "v2"
+			? classifyV2(ratings, {
+					norms,
+					...opts,
+					...(model ? { model } : {}),
+					...(p.srID ? { srID: p.srID } : {}),
+				})
+			: classify(ratings, { norms, ...opts, ...(model ? { model } : {}) });
 	if (memo.size >= CLASSIFY_MEMO_MAX) {
 		memo.clear();
 	}

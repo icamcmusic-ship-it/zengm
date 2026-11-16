@@ -97,6 +97,47 @@ const BIG_FORWARD: [number, number] = [48, 66];
 const BIG: [number, number] = [63, 100];
 
 export const CUSTOM_DEFS: TwoKDef[] = [
+	// archgaps (user-approved): role players with no top-20% skill had no honest name (athletic names on non-athletes)
+	custom(
+		"Glue Wing",
+		["GF", "SF", "F"],
+		WING,
+		{ dper: 2, diq: 1.5, three: 1, pss: 1, reb: 1, usg: -1.5 },
+		"wing",
+		"defender",
+		"A role-playing wing who defends, moves the ball and does a bit of everything.",
+		{ three: 1.2, pss: 1.2, reb: 1.2, fin: 1.2, mid: 1.2, ath: 1.2, drb: 1.2 },
+	),
+	custom(
+		"Glue Guard",
+		["PG", "G", "SG"],
+		SMALL_WING,
+		{ dper: 2, diq: 1.5, three: 1, pss: 1, usg: -1.5 },
+		"guard",
+		"defender",
+		"A role-playing guard who defends and keeps the offense moving.",
+		{ three: 1.2, pss: 1.2, fin: 1.2, mid: 1.2, ath: 1.2, drb: 1.2 },
+	),
+	custom(
+		"Steady Game Manager",
+		["PG", "G"],
+		SMALL,
+		{ pss: 2, drb: 1.5, oiq: 1.5, usg: -1.5 },
+		"guard",
+		"playmaker",
+		"A steady point guard who runs the offense and rarely makes a mistake.",
+		{ three: 1.2, pss: 1.2, fin: 1.2, mid: 1.2, ath: 1.2, drb: 1.2 },
+	),
+	custom(
+		"Energy Big",
+		["PF", "FC", "C"],
+		BIG_FORWARD,
+		{ fin: 2, ath: 2, blk: 1.5, reb: 1, three: -1.5, usg: -1 },
+		"big",
+		"athlete",
+		"A big who brings energy: runs the floor, finishes at the rim and protects it.",
+		{ three: 0 },
+	),
 	custom(
 		"Post-Scoring Slasher",
 		["PG", "G", "SG", "GF", "SF", "F", "PF"],

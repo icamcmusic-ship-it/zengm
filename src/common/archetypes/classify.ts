@@ -46,6 +46,7 @@ import {
 	type Standout,
 } from "./score.ts";
 import { familyOf, FAMILIES, type Family } from "./families.ts";
+import { composedArchetype, isComposedId } from "./v2/grammar.ts";
 import {
 	CLASS_FEATS,
 	TERMS,
@@ -91,7 +92,9 @@ const scoringFor = (archetypes: Archetype[]) =>
 	archetypes === ARCHETYPES ? SCORING_ARCHETYPES : archetypes;
 // The build a scored profile stands for
 const publicOf = (a: Archetype): Archetype => BY_ID.get(a.out ?? a.id) ?? a;
-export const archetypeById = (id: string) => BY_ID.get(id);
+// (archv2: a composed name's id, "v2:...", stands for the archetype its words make: v2/grammar.ts)
+export const archetypeById = (id: string) =>
+	BY_ID.get(id) ?? (isComposedId(id) ? composedArchetype(id) : undefined);
 export const archetypeByName = (name: string) =>
 	ARCHETYPES.find((a) => a.name === name);
 
@@ -591,6 +594,12 @@ export const scoreAll = (
 	hgt: number;
 	expanded: boolean;
 	stats?: ReadOptions["stats"];
+	// archv2: what the family classifier reads about him (model.ts FAM_FEATS) and his sub-rating / play-type reading
+	famX: number[];
+	style: Prepared["style"];
+	// archv2: his level at his position (score.ts pzLevel) and his position-relative standing per dimension
+	pzLevel: number;
+	pz: Prepared["pz"];
 } => {
 	const t = scoreTerms(ratings, norms, archetypes, position, traitsIn, read);
 	const m = model ?? modelFor(t.p.expanded);
@@ -625,6 +634,10 @@ export const scoreAll = (
 		hgt: t.p.hgt,
 		expanded: t.p.expanded,
 		stats: read.stats,
+		famX: t.famX,
+		style: t.p.style,
+		pzLevel: t.p.pzLevel,
+		pz: t.p.pz,
 	};
 };
 

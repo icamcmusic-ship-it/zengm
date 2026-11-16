@@ -311,6 +311,26 @@ export const RULES: Record<string, Bar> = {
 		support: 0.4,
 		sub: { vis: 0 },
 	},
+	// archgaps (user-approved): Glue (perimeter D head, breadth, no standout: v2/tests.ts and the builds' ceilings),
+	// Game Manager (passing and handling, no standout), Energy (finishing and athleticism, rim protection, no three)
+	glue: {
+		words: "Glue (a role player: defends and does a bit of everything)",
+		classes: ["perD"],
+		lead: 0.5,
+		support: 0.5,
+	},
+	gameManager: {
+		words: "Game Manager (runs the offense, no standout)",
+		classes: ["pass", "handle"],
+		lead: 0.5,
+		support: 0.5,
+	},
+	energy: {
+		words: "Energy (finishes and runs, protects the rim)",
+		classes: ["finish", "ath"],
+		lead: 0.5,
+		support: 0.5,
+	},
 };
 
 // Words matched on the whole name rather than a concept, with a raised bar (they also raise the promise: score.ts)
