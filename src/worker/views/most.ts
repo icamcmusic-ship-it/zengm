@@ -42,7 +42,7 @@ type PlayersAll = (Player & {
 	most: Most;
 })[];
 
-const withoutPreDraft = (p: Player): Player => {
+export const withoutPreDraft = (p: Player): Player => {
 	const stats = getProStats(p);
 	const awards = getProAwards(p);
 	if (stats === p.stats && awards === p.awards) {

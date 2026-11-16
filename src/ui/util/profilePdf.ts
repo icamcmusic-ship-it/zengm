@@ -7,9 +7,12 @@ import {
 	type ProfileSection,
 } from "../../common/playerProfileExport.ts";
 import type { PdfFonts } from "./miniPdf.ts";
+import type { PlayerExport } from "../../common/playerExport.ts";
 import {
 	BOTTOM,
 	Flow,
+	MARGIN,
+	RIGHT,
 	drawOverview,
 	drawPageHeaders,
 	drawScouting,
@@ -67,6 +70,46 @@ const drawSection = async (
 		flow.table(table);
 	}
 
+	// Legacy: his face in each season it changed (Face Aging), like the player page's "Then and Now"
+	const faces = (section.data as any)?.faceHistory as
+		| {
+				season: number;
+				label?: string;
+				face: unknown;
+				colors?: string[];
+				jersey?: string;
+		  }[]
+		| undefined;
+	if (section.key === "legacy" && faces && faces.length > 0) {
+		const width = 70;
+		const height = 105;
+		const perRow = Math.max(1, Math.floor((RIGHT - MARGIN) / (width + 12)));
+		flow.ensure(30 + height);
+		flow.sectionTitle("Then and now");
+		for (let i = 0; i < faces.length; i += perRow) {
+			flow.ensure(height + 20);
+			const top = flow.y;
+			for (const [j, entry] of faces.slice(i, i + perRow).entries()) {
+				const x = MARGIN + j * (width + 12);
+				const jpeg = await faceToJpeg({
+					face: entry.face,
+					colors: entry.colors,
+					jersey: entry.jersey,
+				} as PlayerExport);
+				if (jpeg) {
+					pdf.jpeg(jpeg, x, top, width, height);
+				}
+				pdf.text(
+					x,
+					top + height + 10,
+					`${entry.season}${entry.label === "prime" ? " (prime)" : ""}`,
+					{ size: 8 },
+				);
+			}
+			flow.y = top + height + 20;
+		}
+	}
+
 	const p = profile.player;
 	drawPageHeaders(
 		pdf,
@@ -87,9 +130,19 @@ export const profileToPdfFiles = async (
 	const usedFonts =
 		fonts === null ? undefined : (fonts ?? (await loadPdfFonts()));
 	const files: { name: string; bytes: Uint8Array }[] = [];
-	const keys = PROFILE_SECTIONS.map((s) => s.key).filter(
-		(key) => profile.sections[key],
-	);
+	// Sections with nothing to show (no facts, lines or tables, only a note like "No awards yet.") get no PDF; the Overview and
+	// Scouting cards always have something
+	const keys = PROFILE_SECTIONS.map((s) => s.key).filter((key) => {
+		const section = profile.sections[key];
+		return (
+			section !== undefined &&
+			(key === "overview" ||
+				(key === "scouting" && profile.scoutingPage !== undefined) ||
+				section.facts.length > 0 ||
+				section.lines.length > 0 ||
+				section.tables.length > 0)
+		);
+	});
 	for (const [i, key] of keys.entries()) {
 		files.push({
 			name: profileFileName(

@@ -24,7 +24,30 @@ export const PROFILE_SECTIONS = [
 	{ key: "contract", label: "Contract and mood", file: "contract_mood" },
 	{ key: "transactions", label: "Transactions", file: "transactions" },
 	{ key: "injuries", label: "Injuries", file: "injuries" },
+	// Complete Profile Export (League Extras, profileExportFull): the rest of what his pages and the league pages show about him
+	{ key: "tracking", label: "Tracking profile", file: "tracking" },
+	{ key: "recruiting", label: "Recruiting", file: "recruiting" },
+	{
+		key: "postseason",
+		label: "Playoffs and tournaments",
+		file: "playoffs_tournaments",
+	},
+	{ key: "coaches", label: "Coaches", file: "coaches" },
+	{ key: "legacy", label: "Legacy", file: "legacy" },
 ] as const;
+
+// Sections added by Complete Profile Export (skipped with a reason while it is off)
+export const FULL_PROFILE_SECTIONS: readonly ProfileSectionKey[] = [
+	"tracking",
+	"recruiting",
+	"postseason",
+	"coaches",
+	"legacy",
+];
+
+// Version of each section's content: bumped when a section gains or changes fields, so a reader can tell what to expect.
+// 1: the first export. 2: Complete Profile Export (more facts, tables and data in the section)
+export const PROFILE_SECTION_VERSION = 2;
 
 export type ProfileSectionKey = (typeof PROFILE_SECTIONS)[number]["key"];
 
@@ -39,6 +62,8 @@ export type ProfileFact = { label: string; value: string };
 export type ProfileSection = {
 	key: ProfileSectionKey;
 	title: string;
+	// PROFILE_SECTION_VERSION when it was written (1 without Complete Profile Export)
+	version: number;
 	// Why there is little or nothing here ("Hidden (no visible ratings challenge)", "No games this season")
 	note?: string;
 	facts: ProfileFact[];
@@ -100,6 +125,8 @@ export type PlayerProfileExport = {
 		jerseyNumber?: string;
 		experience?: number;
 	};
+	// Complete Profile Export (League Extras): on, every section has everything his pages show (version 2 sections)
+	complete: boolean;
 	// Requested sections that don't apply to him (no game log for a prospect, no contract when retired, setting off)
 	skipped: { key: ProfileSectionKey; reason: string }[];
 	sections: Partial<Record<ProfileSectionKey, ProfileSection>>;

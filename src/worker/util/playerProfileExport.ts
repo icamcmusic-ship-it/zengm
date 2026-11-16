@@ -15,14 +15,15 @@ import {
 	type ExportTable,
 } from "../../common/playerExport.ts";
 import {
+	FULL_PROFILE_SECTIONS,
 	PROFILE_EXPORT_FORMAT,
 	PROFILE_EXPORT_SCHEMA_VERSION,
+	PROFILE_SECTION_VERSION,
 	PROFILE_SECTIONS,
 	playerStatus,
 	scrubRatings,
 	stripHtml,
 	type PlayerProfileExport,
-	type ProfileFact,
 	type ProfileSection,
 	type ProfileSectionKey,
 } from "../../common/playerProfileExport.ts";
@@ -49,6 +50,23 @@ import playerTraitsView from "../views/playerTraits.ts";
 import { idb } from "../db/index.ts";
 import { g } from "./index.ts";
 import { getPlayersForExport } from "./playerExport.ts";
+import {
+	awardsExtras,
+	preDraftExtras,
+	cell,
+	coachesSection,
+	contractExtras,
+	fact,
+	fullProfileOn,
+	legacySection,
+	money,
+	newsTable,
+	overviewExtras,
+	postseasonSection,
+	recruitingSection,
+	trackingSection,
+	type Built,
+} from "./playerProfileExtras.ts";
 
 const runView = async (
 	view: { load: (args: any) => unknown },
@@ -76,35 +94,45 @@ const colTitle = (key: string) => {
 	}
 };
 
-const cell = (value: unknown): string | number => {
-	if (typeof value === "number") {
-		return Number.isFinite(value) ? Math.round(value * 10) / 10 : "";
-	}
-	if (value == null) {
-		return "";
-	}
-	return String(value);
-};
-
-const money = (thousands: number) =>
-	`$${(Math.round(thousands / 10) / 100).toFixed(2)}M`;
-
-const fact = (label: string, value: unknown): ProfileFact[] =>
-	value === undefined || value === null || value === ""
-		? []
-		: [{ label, value: String(value) }];
-
 const section = (
 	key: ProfileSectionKey,
-	rest: Partial<Omit<ProfileSection, "key" | "title">> = {},
+	rest: Partial<Omit<ProfileSection, "key" | "title" | "version">> = {},
 ): ProfileSection => ({
 	key,
 	title: PROFILE_SECTIONS.find((s) => s.key === key)!.label,
+	version: fullProfileOn() ? PROFILE_SECTION_VERSION : 1,
 	facts: [],
 	lines: [],
 	tables: [],
 	...rest,
 });
+
+// A Complete Profile Export section from its parts
+const builtSection = (key: ProfileSectionKey, built: Built) =>
+	section(key, {
+		facts: built.facts,
+		lines: built.lines,
+		tables: built.tables,
+		data: built.data,
+	});
+
+// Adds Complete Profile Export parts to a section (more facts, lines, tables and data)
+const extend = (s: ProfileSection, built: Built) => {
+	s.facts.push(...built.facts);
+	s.lines.push(...built.lines);
+	s.tables.push(...built.tables);
+	s.data = { ...(s.data as object | undefined), ...built.data };
+};
+
+const FULL_OFF_REASON =
+	"Complete Profile Export is turned off (League Settings, League Extras).";
+
+const trackingReason = () =>
+	__SPORT !== "basketball"
+		? "Tracking stats are only in Basketball GM."
+		: !featureOn("advStats")
+			? "Advanced Tracking Stats is turned off."
+			: undefined;
 
 // Which sections apply to him, for the Export profile dialog (the export itself skips the same ones, with the same reasons)
 export const getPlayerProfileExportSections = async (pid: number) => {
@@ -143,6 +171,18 @@ export const getPlayerProfileExportSections = async (pid: number) => {
 			: __SPORT === "basketball"
 				? "Scouting Reports is turned off."
 				: "Scouting reports are only in Basketball GM.";
+	}
+	if (!fullProfileOn()) {
+		for (const key of FULL_PROFILE_SECTIONS) {
+			reasons[key] = FULL_OFF_REASON;
+		}
+	} else {
+		const tracking = trackingReason();
+		if (tracking) {
+			reasons.tracking = tracking;
+		} else if (!p.stats.some((row) => row.adv && !row.playoffs)) {
+			reasons.tracking = "No tracking stats yet.";
+		}
 	}
 	return PROFILE_SECTIONS.map(({ key, label }) => ({
 		key,
@@ -190,6 +230,21 @@ export const getPlayerProfileExport = async (
 	const scoutingOn = scoutingReportsOn();
 	const teamInfo = g.get("teamInfoCache");
 	const userTid = g.get("userTid");
+	const full = fullProfileOn();
+
+	// The College/Overseas page, for that section and for recruiting, tournaments and coaches
+	let preDraftView: any;
+	let preDraftLoaded = false;
+	const getPreDraftView = async () => {
+		if (!preDraftLoaded) {
+			preDraftLoaded = true;
+			preDraftView =
+				__SPORT === "basketball"
+					? await runView(playerPreDraftView, { pid }, conditions)
+					: undefined;
+		}
+		return preDraftView;
+	};
 
 	const sections: PlayerProfileExport["sections"] = {};
 	const skipped: PlayerProfileExport["skipped"] = [];
@@ -295,6 +350,58 @@ export const getPlayerProfileExport = async (
 				imgURL: card.imgURL,
 			},
 		});
+		if (full) {
+			extend(
+				sections.overview,
+				await overviewExtras({ pRaw, p, showRatings, prospect }),
+			);
+			// League leader seasons and the contract value index, readable in the PDF too
+			const leaderRows = Object.entries(overview.leaders ?? {})
+				.map(([season, x]: [string, any]) => [
+					season,
+					[
+						...(x.stats ? [...x.stats] : []),
+						...(showRatings && x.ratings ? [...x.ratings] : []),
+						...(x.attrs ? [...x.attrs] : []),
+					]
+						.map((k: string) => colTitle(k))
+						.join(", "),
+				])
+				.filter((row) => row[1] !== "");
+			if (leaderRows.length > 0) {
+				sections.overview.tables.push({
+					section: "Overview",
+					title: "League leader",
+					cols: ["Year", "Led the league in"],
+					rows: leaderRows,
+				});
+			}
+			const feats: any[] = overview.feats ?? [];
+			if (feats.length > 0) {
+				sections.overview.tables.push({
+					section: "Overview",
+					title: "Statistical feats",
+					cols: ["Year", "Feat"],
+					rows: feats.map((f) => [f.season, stripHtml(f.text)]),
+				});
+				// The table replaces the feat lines
+				sections.overview.lines = sections.overview.lines.filter(
+					(line) => !line.startsWith("Feat ("),
+				);
+			}
+			const relatives: any[] = p.relatives ?? [];
+			if (relatives.length > 0) {
+				sections.overview.tables.push({
+					section: "Overview",
+					title: "Relatives",
+					cols: ["Relation", "Name"],
+					rows: relatives.map((r) => [
+						`${r.type[0].toUpperCase()}${r.type.slice(1)}`,
+						r.name,
+					]),
+				});
+			}
+		}
 	}
 
 	// Ratings history (scouted)
@@ -435,10 +542,7 @@ export const getPlayerProfileExport = async (
 	// College/Overseas page
 	if (want.has("preDraft")) {
 		const tables = tablesOf("College/Overseas");
-		const view =
-			__SPORT === "basketball"
-				? await runView(playerPreDraftView, { pid }, conditions)
-				: undefined;
+		const view = await getPreDraftView();
 		const info = view?.preDraft;
 		if (tables.length === 0 && !info) {
 			skip("preDraft", "No college or overseas stats or honors.");
@@ -484,6 +588,9 @@ export const getPlayerProfileExport = async (
 				],
 				data: info,
 			});
+			if (full && info) {
+				extend(sections.preDraft, preDraftExtras(info, view, showRatings));
+			}
 		}
 	}
 
@@ -656,6 +763,7 @@ export const getPlayerProfileExport = async (
 			// (awards from the awards settings have a name, no type: "All-League Team", "Rookie of the Year" in real players leagues)
 			type: formatPlayerAwardName(a, {
 				groupPrefix: a.type === undefined ? a.groupPrefix : undefined,
+				includeIndividualRank: true,
 			}),
 		}));
 		const honors = p.earlierHonors ?? [];
@@ -716,6 +824,9 @@ export const getPlayerProfileExport = async (
 			],
 			data: { awards, earlierHonors: honors, jerseyNumbers: jerseys },
 		});
+		if (full) {
+			extend(sections.awards, await awardsExtras(pRaw));
+		}
 	}
 
 	// Contract and mood (not for retired players, prospects or college leagues, like the Overview)
@@ -810,6 +921,9 @@ export const getPlayerProfileExport = async (
 					valueIndex: overview.valueIndex,
 				},
 			});
+			if (full) {
+				extend(sections.contract, await contractExtras(pid));
+			}
 		}
 	}
 
@@ -834,6 +948,14 @@ export const getPlayerProfileExport = async (
 					: [],
 			data: { events },
 		});
+		if (full) {
+			const news = await newsTable(pRaw);
+			if (news.table) {
+				sections.transactions.tables.push(news.table);
+				sections.transactions.note = undefined;
+			}
+			(sections.transactions.data as any).news = news.data;
+		}
 	}
 
 	// Injuries: current, history, the injury depth state
@@ -882,6 +1004,74 @@ export const getPlayerProfileExport = async (
 			data: { current: p.injury, history: injuries, health },
 		});
 	}
+
+	// Complete Profile Export sections
+	const fullSection = async (
+		key: ProfileSectionKey,
+		build: () => Promise<Built | undefined> | Built | undefined,
+		noneReason: string,
+	) => {
+		if (!want.has(key)) {
+			return;
+		}
+		if (!full) {
+			skip(key, FULL_OFF_REASON);
+			return;
+		}
+		const built = await build();
+		if (built) {
+			sections[key] = builtSection(key, built);
+		} else {
+			skip(key, noneReason);
+		}
+	};
+	const tracking = trackingReason();
+	await fullSection(
+		"tracking",
+		() => (tracking ? undefined : trackingSection(overview.advSeasons ?? [])),
+		tracking ?? "No tracking stats yet.",
+	);
+	await fullSection(
+		"recruiting",
+		async () =>
+			recruitingSection({
+				pRaw,
+				p,
+				info: (await getPreDraftView())?.preDraft,
+			}),
+		"No recruiting record (no college, junior college or overseas path on file).",
+	);
+	await fullSection(
+		"postseason",
+		async () =>
+			postseasonSection({
+				pRaw,
+				p,
+				info: (await getPreDraftView())?.preDraft,
+			}),
+		"No playoff or tournament games.",
+	);
+	await fullSection(
+		"coaches",
+		async () =>
+			coachesSection({
+				pRaw,
+				info: (await getPreDraftView())?.preDraft,
+				showRatings,
+			}),
+		__SPORT === "basketball"
+			? "No coaches on file (Coaching Staff is off and he has no college or overseas seasons)."
+			: "The coaching staff is only in Basketball GM.",
+	);
+	await fullSection(
+		"legacy",
+		() =>
+			legacySection({
+				pRaw,
+				faceHistory: overview.faceHistory,
+			}),
+		"Nothing yet (no Hall of Fame, GOAT Lab score, rivalry games or face history).",
+	);
 
 	// Under the no visible ratings challenge, nothing taken from the pages carries ratings (league leader in a rating, the
 	// College/Overseas comparisons), like the pages hide them
@@ -944,6 +1134,7 @@ export const getPlayerProfileExport = async (
 			jerseyNumber: p.jerseyNumber,
 			experience: p.experience,
 		},
+		complete: full,
 		skipped,
 		sections,
 		card: { ...card, tables: [], scouting: undefined },
