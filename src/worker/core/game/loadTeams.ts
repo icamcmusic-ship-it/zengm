@@ -52,6 +52,7 @@ import {
 	subSimTouches,
 } from "../GameSim.basketball/subRatingsSim.ts";
 import { subRatingsOn } from "../player/subRatings.ts";
+import { careerAgingOn, oldAgeMinutesCap } from "../player/careerAging.ts";
 import {
 	PBP_EXPANDED_KEYS,
 	PBP_TRAIT_KEYS,
@@ -679,6 +680,34 @@ export const processTeam = async (
 					if (restriction < 1) {
 						p2.minutesRestriction = restriction;
 					}
+				}
+			}
+		}
+
+		// Career Aging: AI coaches cap the minutes of their 39+ year olds (by his rank on the team), through the Realistic Rotations plan when
+		// it's on, otherwise by playing him a little less in the substitution order. Never on the user's own team
+		if (
+			!allStarGame &&
+			careerAgingOn() &&
+			(!g.get("userTids").includes(t.id) || g.get("spectator"))
+		) {
+			const ranked = t.player
+				.filter((p2: any) => !p2.injured)
+				.toSorted((a: any, b: any) => b.valueNoPot - a.valueNoPot);
+			for (const [rank, p2] of ranked.entries()) {
+				const cap = oldAgeMinutesCap(p2.age, rank);
+				if (cap === undefined) {
+					continue;
+				}
+				if (
+					nativeFeatureEnabled("realisticRotations", (key) => g.get(key as any))
+				) {
+					p2.minutesRestriction = Math.min(
+						p2.minutesRestriction ?? 1,
+						cap / 36,
+					);
+				} else {
+					p2.ptModifier = Math.min(p2.ptModifier, 0.75);
 				}
 			}
 		}

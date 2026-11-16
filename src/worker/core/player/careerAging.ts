@@ -7,7 +7,10 @@
 
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import { isValidSubArray, SUB_INDEX } from "../../../common/subRatings.ts";
-import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
+import {
+	agingCurveForPlayer,
+	type TraitDevelopment,
+} from "../../../common/playerTraits/development.ts";
 import { g } from "../../util/index.ts";
 import {
 	getContractExp,
@@ -163,6 +166,55 @@ export const reinventionStrength = (p: CareerAgingPlayer, age: number) => {
 	return faded * iq * ageFade;
 };
 
+// --- Past 39 ---
+
+export const OLD_AGE = {
+	// From this age, speed, jumping, endurance and dunking decline faster
+	from: 39,
+	// Extra yearly loss at 39, plus this much a year after, up to the max (rating points, before the per-player factor)
+	athletic: 1.5,
+	athleticPerYear: 1,
+	athleticMax: 4,
+	// Endurance loses this much more than the other athletic ratings
+	enduranceMult: 1.5,
+	// Per-player factor, seeded, uniform in this range
+	spread: [0.7, 1.3] as const,
+	// Graceful agers (Player Traits) lose this share of it
+	graceful: 0.6,
+} as const;
+
+/** The extra athletic decline (negative rating points) of a player this age this season, seeded per player and bounded. */
+export const oldAgeAthleticDelta = (pid: number, age: number) => {
+	if (age < OLD_AGE.from) {
+		return 0;
+	}
+	const base = Math.min(
+		OLD_AGE.athleticMax,
+		OLD_AGE.athletic + OLD_AGE.athleticPerYear * (age - OLD_AGE.from),
+	);
+	const u = new Rng(`careerOldAge|${pid}`).uniform(...OLD_AGE.spread);
+	let graceful = 1;
+	if (
+		Object.hasOwn(g, "playerTraits") &&
+		(g.get as any)("playerTraits") &&
+		agingCurveForPlayer((g.get as any)("playerTraitsSeed") ?? 0, pid) ===
+			"graceful"
+	) {
+		graceful = OLD_AGE.graceful;
+	}
+	return -base * u * graceful;
+};
+
+// AI coaches' minutes cap for a player this old (minutes per regulation game, before the Realistic Rotations planner's other limits): stars
+// keep more of a role. undefined = no cap
+export const oldAgeMinutesCap = (age: number, rank: number) => {
+	if (age < OLD_AGE.from) {
+		return undefined;
+	}
+	const base = age === 39 ? 24 : age === 40 ? 16 : 12;
+	return base + (rank < 3 ? 8 : rank < 5 ? 4 : 0);
+};
+
 export type CareerAgingDev = {
 	ratingDelta: Record<string, number>;
 	tilt?: { keys: string[]; amount: number };
@@ -247,6 +299,14 @@ export const getCareerAgingDevelopment = (
 			delta.oiq = (delta.oiq ?? 0) + C.reinventIq * s;
 			delta.diq = (delta.diq ?? 0) + 0.5 * C.reinventIq * s;
 			tilt = { keys: spec.subs, amount: C.reinventTilt * s };
+		}
+		// Past 39: faster athletic decline (not centered, it's meant to move the league's oldest down)
+		const old = oldAgeAthleticDelta(p.pid, age);
+		if (old < 0) {
+			for (const key of ["spd", "jmp", "dnk"]) {
+				delta[key] = (delta[key] ?? 0) + old;
+			}
+			delta.endu = (delta.endu ?? 0) + old * OLD_AGE.enduranceMult;
 		}
 		if (Object.keys(delta).length > 0 || tilt) {
 			output.set(p.pid, { ratingDelta: delta, tilt });
@@ -462,6 +522,11 @@ export const careerRetireFactors = ({
 		p.awards.some((a) => a.season === season && a.type === "Won Championship")
 	) {
 		add += 0.15;
+	}
+
+	// Past 40 with a shrinking role
+	if (age >= 40 && min < 800) {
+		mult *= 1.3;
 	}
 
 	// No more 41+ year olds piling up
