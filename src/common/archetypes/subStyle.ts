@@ -71,8 +71,57 @@ export const SUB_NORMS_REAL_EXPANDED: SubNorms = {
 		3.6, 2.1, 6.4, 2.8, 1.5, 1.5, 1.4, 1.4, 1.2, 1.2,
 	],
 };
-export const defaultSubNorms = (expanded: boolean) =>
-	expanded ? SUB_NORMS_GEN_EXPANDED : SUB_NORMS_GEN;
+// subspread: the same tables for Wider Sub-Rating Shapes (the subRatingsWide setting; subLeans.script.test.ts with ARCH_SUBS_WIDE=1).
+// A league reads its own table (buildSubNorms) once it has SUB_NORMS_MIN players with subs, so these are the fallback and the tuning
+// scripts' tables.
+export const SUB_NORMS_GEN_WIDE: SubNorms = {
+	mean: [
+		-1.6, -2.6, 4.8, -2, 0.4, 3, -4.8, 1.2, -1.8, 0.4, -2.8, 2.8, -3.4, 3.4,
+		-2.6, 2.6, -0.1, -0.4, 0.6, -0.6, 0.6, 1.1, -1.1, -0.3, 0.3,
+	],
+	sd: [
+		8.8, 7.9, 10.9, 7.9, 5.3, 6.9, 9, 6.2, 5.1, 8.5, 7.8, 7.8, 7.1, 7.1, 5.8,
+		5.8, 3.3, 7.9, 6.9, 4.7, 4.7, 5.5, 5.5, 6.6, 6.6,
+	],
+};
+export const SUB_NORMS_GEN_WIDE_EXPANDED: SubNorms = {
+	mean: [
+		-4.1, 0, 2.2, 0.6, 0.4, -0.6, 0.3, 1.2, -1.8, 0.5, -2.5, 2.5, 0.9, -0.9, 0,
+		0, -1.1, 2.3, -0.1, -0.5, 0.5, 0.9, -0.9, -0.5, 0.5,
+	],
+	sd: [
+		11.6, 8, 8.8, 7.4, 6.1, 8.1, 8.7, 6.1, 5.2, 8.4, 8, 8, 7.4, 7.4, 4.5, 4.5,
+		3.8, 6.9, 6.6, 4.7, 4.7, 5.6, 5.6, 6.6, 6.6,
+	],
+};
+export const SUB_NORMS_REAL_WIDE: SubNorms = {
+	mean: [
+		0, 0.2, 0, -0.1, 0.2, -0.6, 0.4, 0.2, 0.1, -0.5, 0.7, -0.7, 0.3, -0.3, 0.3,
+		-0.3, 0.1, -0.7, 0.4, 0.4, -0.4, 0.1, -0.1, 0, 0,
+	],
+	sd: [
+		5.2, 3.9, 3.4, 4.1, 2.2, 4.5, 6.5, 4.8, 5.9, 4.6, 5.2, 5.2, 4.9, 4.9, 3.7,
+		3.7, 1.5, 5.3, 3.5, 3.4, 3.4, 1.6, 1.6, 1.5, 1.5,
+	],
+};
+export const SUB_NORMS_REAL_WIDE_EXPANDED: SubNorms = {
+	mean: [
+		0.3, 0.1, 0.1, -0.4, 0.1, 0.9, -1.5, 0.2, 0.1, -0.5, 0.7, -0.7, -1.9, 1.9,
+		-0.4, 0.4, -1.2, 3.2, -0.8, 0.4, -0.4, 0.1, -0.1, 0, 0,
+	],
+	sd: [
+		5.6, 4.5, 4.6, 4.8, 2.2, 4.1, 5.3, 4.8, 5.9, 4.6, 5.2, 5.2, 5.1, 5.1, 3.6,
+		3.6, 2.5, 6.5, 3.2, 3.4, 3.4, 1.6, 1.6, 1.5, 1.5,
+	],
+};
+export const defaultSubNorms = (expanded: boolean, wide = false) =>
+	wide
+		? expanded
+			? SUB_NORMS_GEN_WIDE_EXPANDED
+			: SUB_NORMS_GEN_WIDE
+		: expanded
+			? SUB_NORMS_GEN_EXPANDED
+			: SUB_NORMS_GEN;
 
 // A sd below this is no spread to read (a league where nobody's shape is known)
 const SD_MIN = 0.6;

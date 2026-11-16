@@ -180,7 +180,10 @@ export const getPlayerProfileExportSections = async (pid: number) => {
 		const tracking = trackingReason();
 		if (tracking) {
 			reasons.tracking = tracking;
-		} else if (!p.stats.some((row) => row.adv && !row.playoffs)) {
+		} else if (
+			!p.advCareer?.rs &&
+			!p.stats.some((row) => row.adv && !row.playoffs)
+		) {
 			reasons.tracking = "No tracking stats yet.";
 		}
 	}
@@ -1028,7 +1031,10 @@ export const getPlayerProfileExport = async (
 	const tracking = trackingReason();
 	await fullSection(
 		"tracking",
-		() => (tracking ? undefined : trackingSection(overview.advSeasons ?? [])),
+		() =>
+			tracking
+				? undefined
+				: trackingSection(overview.advSeasons ?? [], overview.advCareerFolded),
 		tracking ?? "No tracking stats yet.",
 	);
 	await fullSection(

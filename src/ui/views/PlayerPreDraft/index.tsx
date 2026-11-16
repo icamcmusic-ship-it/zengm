@@ -1,4 +1,8 @@
 import { useState } from "react";
+import {
+	draftedVsPreDraftText,
+	stealOrReach,
+} from "../../../common/preDraftRanks.ts";
 import { COMBINE_ROWS } from "../../../common/combineRows.ts";
 import { COMBINE_COLUMNS } from "../../../common/draftCombine.ts";
 import clsx from "clsx";
@@ -629,6 +633,41 @@ const ScoutNotesSection = ({ preDraft }: { preDraft: PreDraft }) => {
 	);
 };
 
+// Frozen Pre-draft Ranks setting: the pick he went at next to his rank when the draft started (steals and reaches)
+const PreDraftRankLine = ({
+	overall,
+	rank,
+	src,
+}: {
+	overall: number;
+	rank: number;
+	src: "frozen" | "class" | "scout";
+}) => {
+	const { diff, kind } = stealOrReach(overall, rank);
+	return (
+		<div
+			className="small"
+			data-testid="pre-draft-rank"
+			title={
+				src === "scout"
+					? "From your scouts' last stored grades of his class before the draft"
+					: "His rank on your scouts' list when the draft started"
+			}
+		>
+			{draftedVsPreDraftText(overall, rank)}
+			{kind ? (
+				<span
+					className={
+						kind === "steal" ? "text-success ms-1" : "text-danger ms-1"
+					}
+				>
+					({kind === "steal" ? `steal, +${diff}` : `reach, ${diff}`})
+				</span>
+			) : null}
+		</div>
+	);
+};
+
 const OverviewCards = ({
 	preDraft,
 	pid,
@@ -655,15 +694,24 @@ const OverviewCards = ({
 						>
 							{preDraft.draft.abbrev}
 						</a>
+						{preDraft.preDraftRank ? (
+							<PreDraftRankLine
+								overall={preDraft.draft.overall}
+								rank={preDraft.preDraftRank.r}
+								src={preDraft.preDraftRank.src}
+							/>
+						) : null}
 					</div>
 				) : preDraft.drafted ? (
 					<div>Undrafted ({preDraft.draftYear})</div>
 				) : (
 					<div>
 						{preDraft.draftYear} prospect
-						{preDraft.projectedPick !== undefined
-							? `, projected #${preDraft.projectedPick}`
-							: ", projected undrafted"}{" "}
+						{preDraft.preDraftRank
+							? `, pre-draft rank #${preDraft.preDraftRank.r}${preDraft.projectedPick !== undefined ? `, projected #${preDraft.projectedPick} before the draft` : ""}`
+							: preDraft.projectedPick !== undefined
+								? `, projected #${preDraft.projectedPick}`
+								: ", projected undrafted"}{" "}
 						(<a href={helpers.leagueUrl(["draft_scouting"])}>Draft Scouting</a>)
 					</div>
 				)}

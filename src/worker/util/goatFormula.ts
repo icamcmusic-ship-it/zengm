@@ -6,7 +6,12 @@ import g from "./g.ts";
 import helpers from "./helpers.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { getNumericStat } from "../../common/statValue.ts";
-import { advStat, sumAdv, type AdvStatKey } from "../../common/advStats.ts";
+import {
+	advStat,
+	careerAdv,
+	sumAdv,
+	type AdvStatKey,
+} from "../../common/advStats.ts";
 
 const DEFAULT_FORMULA = bySport({
 	baseball: "20 * mvp + war",
@@ -286,8 +291,18 @@ const evaluate = (
 	}
 
 	if (ADV_VARIABLES.length > 0) {
-		const adv = sumAdv(statsRows.filter((row) => !row.playoffs));
-		const advPlayoffs = sumAdv(statsRows.filter((row) => row.playoffs));
+		// A career includes his folded career total (Keep Career Tracking for Retired Players); a season of a retired player has
+		// none, so NaN leaves him out of a season formula that uses tracking
+		const rsRows = statsRows.filter((row) => !row.playoffs);
+		const poRows = statsRows.filter((row) => row.playoffs);
+		const adv =
+			info.type === "career"
+				? careerAdv(p.advCareer, rsRows, "regularSeason")
+				: sumAdv(rsRows);
+		const advPlayoffs =
+			info.type === "career"
+				? careerAdv(p.advCareer, poRows, "playoffs")
+				: sumAdv(poRows);
 		for (const stat of ADV_VARIABLES) {
 			object[stat] = advStat(adv, stat) ?? Number.NaN;
 			object[`${stat}Playoffs`] = advStat(advPlayoffs, stat) ?? Number.NaN;

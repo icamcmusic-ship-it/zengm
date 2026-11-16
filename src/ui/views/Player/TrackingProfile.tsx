@@ -77,8 +77,11 @@ const Group = ({
 );
 
 export const TrackingProfile = ({
+	advCareerFolded,
 	advSeasons,
 }: {
+	// His season-by-season tracking was folded into the career total when he retired (Keep Career Tracking for Retired Players)
+	advCareerFolded?: boolean;
 	advSeasons: AdvSeason[] | undefined;
 }) => {
 	const seasons = advSeasons ?? [];
@@ -115,6 +118,11 @@ export const TrackingProfile = ({
 						</option>
 					))}
 				</select>
+				{advCareerFolded ? (
+					<span className="ms-2 small text-body-secondary">
+						Season-by-season tracking isn't kept after retirement.
+					</span>
+				) : null}
 			</div>
 			{profile ? (
 				<div className="table-responsive mb-3" style={{ maxWidth: 720 }}>

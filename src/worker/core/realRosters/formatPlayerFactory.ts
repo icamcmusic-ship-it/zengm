@@ -490,10 +490,15 @@ const formatPlayerFactory = async (
 			srID: ratings.slug,
 			// Sub-ratings lean from his real stats, read once by ensureSubs (the subRatings setting) and then removed
 			subLean: ratings.subLean,
+			// Wider Sub-Rating Shapes: his stats' z-scores, read once by ensureSubs instead of subLean when that setting is on
+			subZ: ratings.subZ,
 		};
 
 		if (!p.subLean) {
 			delete p.subLean;
+		}
+		if (!p.subZ) {
+			delete p.subZ;
 		}
 
 		if (!p.hof) {

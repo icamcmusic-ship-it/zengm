@@ -19,12 +19,37 @@ import {
 	realSubShape,
 	seedFromString,
 } from "../subRatingsGen.ts";
-import { SUB_NORMS_REAL, SUB_NORMS_REAL_EXPANDED } from "./subStyle.ts";
+import {
+	SUB_NORMS_REAL,
+	SUB_NORMS_REAL_EXPANDED,
+	SUB_NORMS_REAL_WIDE,
+	SUB_NORMS_REAL_WIDE_EXPANDED,
+} from "./subStyle.ts";
+import { SUB_DEFS } from "../subRatings.ts";
+import { parseSubZ, wideRealLean } from "../subRatingsReal.ts";
+import { realShootingSplit } from "../../worker/core/player/subRatings.ts";
 
 // arch15: sub-ratings as a league with the subRatings setting gives them: a real player's from his stats (the row's lean;
 // none without one), a generated player's from his generated shape (seeded by a key). ARCH_NO_SUBS=1: none (the setting off)
 export const SUBS_ON = !(globalThis as any).process?.env?.ARCH_NO_SUBS;
+// subspread: ARCH_SUBS_WIDE=1 reads the shapes the Wider Sub-Rating Shapes setting gives (real players' wide leans from their stats'
+// z-scores, generated players' wide shapes) and the wide norms
+export const SUBS_WIDE =
+	SUBS_ON && Boolean((globalThis as any).process?.env?.ARCH_SUBS_WIDE);
 export const realSubs = (row: any): number[] | undefined => {
+	if (SUBS_WIDE) {
+		const z = parseSubZ(row.subZ);
+		if (!z) {
+			return undefined;
+		}
+		const lean = wideRealLean(
+			SUB_DEFS.map((d) => d.key),
+			z,
+		);
+		// As the game does: with Expanded Ratings his jumper split follows his stats (it mutates the row, as the game's row)
+		realShootingSplit(row, lean);
+		return realSubShape(row, seedFromString(row.slug), lean, true).sub;
+	}
 	const lean = parseSubLean(row.subLean);
 	if (!SUBS_ON || !lean) {
 		return undefined;
@@ -35,14 +60,25 @@ export const realSubs = (row: any): number[] | undefined => {
 // each other
 export const realNorms = <N extends object>(norms: N, expanded: boolean): N =>
 	SUBS_ON
-		? { ...norms, sub: expanded ? SUB_NORMS_REAL_EXPANDED : SUB_NORMS_REAL }
+		? {
+				...norms,
+				sub: SUBS_WIDE
+					? expanded
+						? SUB_NORMS_REAL_WIDE_EXPANDED
+						: SUB_NORMS_REAL_WIDE
+					: expanded
+						? SUB_NORMS_REAL_EXPANDED
+						: SUB_NORMS_REAL,
+			}
 		: norms;
 export const generatedSubs = (
 	ratings: Record<string, any>,
 	key: string,
 ): number[] | undefined =>
 	SUBS_ON
-		? generateSubShape(ratings, seedFromString(`gen|${key}`)).sub
+		? generateSubShape(ratings, seedFromString(`gen|${key}`), {
+				wide: SUBS_WIDE,
+			}).sub
 		: undefined;
 
 export type RealData = {

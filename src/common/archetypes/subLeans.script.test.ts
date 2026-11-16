@@ -22,7 +22,7 @@ import {
 	realSubShape,
 	seedFromString,
 } from "../subRatingsGen.ts";
-import { realData } from "./real.testutil.ts";
+import { realData, realSubs, SUBS_WIDE } from "./real.testutil.ts";
 
 const EXPANDED = Boolean(process.env.ARCH_EXPANDED);
 
@@ -45,6 +45,8 @@ test.skipIf(!process.env.RUN_ARCHETYPE_SUBLEANS)(
 		g.setWithoutSavingToDB("improvedPositions", true);
 		g.setWithoutSavingToDB("subRatings", true);
 		if (EXPANDED) g.setWithoutSavingToDB("expandedRatings", true);
+		// subspread: ARCH_SUBS_WIDE=1, Wider Sub-Rating Shapes
+		if (SUBS_WIDE) g.setWithoutSavingToDB("subRatingsWide", true);
 		const rr = new Rng("subleans-random");
 		const orig = Math.random;
 		Math.random = () => rr.random();
@@ -75,6 +77,11 @@ test.skipIf(!process.env.RUN_ARCHETYPE_SUBLEANS)(
 		const real = [];
 		for (const row of d.ratings) {
 			if (row.season < 2016 || row.season > 2025) continue;
+			if (SUBS_WIDE) {
+				const sub = realSubs(row);
+				if (sub) real.push(offsetsOf({ ...row, sub }));
+				continue;
+			}
 			const lean = parseSubLean(row.subLean);
 			if (!lean) continue;
 			const { sub } = realSubShape(row, seedFromString(row.slug), lean);

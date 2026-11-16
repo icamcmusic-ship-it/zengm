@@ -183,6 +183,7 @@ import {
 } from "../core/trade/multiTeam.ts";
 import type { LookingForState } from "../../ui/views/TradingBlock/useLookingForState.ts";
 import { getPlayer } from "../views/player.ts";
+import { foldRetiredAdvCareers } from "../core/player/advStatsStorage.ts";
 import { getPlayersForExport } from "../util/playerExport.ts";
 import {
 	getPlayerProfileExport,
@@ -3182,6 +3183,24 @@ const importPlayers = async ({
 			adjustAndFilter("injuries", seasonOffset2, false);
 			adjustAndFilter("ratings", seasonOffset2, false);
 			adjustAndFilter("stats", seasonOffset2, false);
+			// His folded career tracking (Keep Career Tracking for Retired Players) goes with his stats, if all of its seasons are kept
+			if (
+				includeStats &&
+				p.advCareer &&
+				typeof p.advCareer.from === "number" &&
+				typeof p.advCareer.to === "number"
+			) {
+				const advCareer = {
+					...p.advCareer,
+					from: p.advCareer.from + seasonOffset2,
+					to: p.advCareer.to + seasonOffset2,
+				};
+				const lastStatsSeason =
+					currentSeason + (currentPhase <= PHASE.PLAYOFFS ? -1 : 0);
+				if (advCareer.to <= lastStatsSeason) {
+					(p2 as any).advCareer = advCareer;
+				}
+			}
 			const archetypes: { season: number }[] | undefined = (p2 as any)
 				.archetypes;
 			if (archetypes) {
@@ -4674,6 +4693,10 @@ const updateGameAttributes = async (
 		await ensureGms();
 		await idb.cache.flush();
 	}
+	// Keep Career Tracking for Retired Players turned on: retired players' remaining tracking rows folded now (no-op when done)
+	if (await foldRetiredAdvCareers()) {
+		await idb.cache.flush();
+	}
 	// The archetype norms are keyed on some of these settings (expanded ratings, sub-ratings, advanced stats): read the
 	// prospects again in the background, as after a phase change, so Draft Scouting doesn't make the user wait (sweep20)
 	warmProspectArchetypes();
@@ -4747,6 +4770,7 @@ const updateGameAttributesGodMode = async (
 	// Turning on the coaching staff in an existing league generates staffs
 	await staff.ensureStaff();
 	await ensureGms();
+	await foldRetiredAdvCareers();
 
 	// Raising the number of future draft classes generates the missing ones now
 	await draft.topUpDraftClasses();

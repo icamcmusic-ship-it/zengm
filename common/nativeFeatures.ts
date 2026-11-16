@@ -442,6 +442,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "subRatingsWide",
+		key: "subRatingsWide",
+		name: "Wider Sub-Rating Shapes",
+		description:
+			"Requires Sub-Ratings. Sub-ratings under one rating differ as much as real players' do: a catch-and-shoot specialist who can't shoot off the dribble, a passer who can't shoot from range, a shot blocker who never gets a steal. New players' shapes are wider (sized per rating from real players' stats, shooting and finishing widest), about one in eight is lopsided (one or two sub-ratings 15-25 away from their rating), and a standout no longer drags the rest of its group down as much. Real players' shapes follow their stats more strongly (shrunk only for a small sample), shapes spread less back toward the rating after 24, and a player's role grows its sub-ratings (a spot-up shooter's catch-and-shoot, a primary ball handler's pull-ups and handle). The ratings themselves, ovr and the game's random numbers are unchanged. Only new players get the wider shapes when it's turned on in an existing league.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "ovrV2",
 		key: "ovrV2",
 		name: "Sim-Calibrated Ovr",
@@ -607,6 +617,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "starClutchCal",
+		key: "starClutchCal",
+		name: "Star & Clutch Calibration",
+		description:
+			"Two sim calibrations from multi-season test leagues. Defensive attention scales with how much of his team's offense a player carries: the more of the shots he would take, the tougher they get, and the help leaves his teammates a little more open (team scoring stays the same), so superstar PER and BPM stay in the NBA's range. In clutch time (last 5 minutes, within 5) defenses tighten and stars take over, so close-game records and clutch plus/minus stay in the NBA's range. Needs Matchup Defense.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "advStats",
 		key: "advStats",
 		name: "Advanced Tracking Stats",
@@ -614,6 +634,16 @@ export const NATIVE_FEATURES = [
 			"The game sim records tracking-style stats as it plays (it never changes a result): play types (pick-and-roll ball handler and roll man, isolation, post-up, spot-up, cut, off screens, handoff, transition, putback) with possessions, points per possession and frequency, defended FG% and rim protection, 2PT and 3PT contests, on/off net rating, five-man lineups, assisted and unassisted makes by zone, catch-and-shoot vs pull-up threes and clutch stats. Shown on Player Stats (Play Types, Shooting Splits, Defense, On/Off, Clutch), the player page and the Lineups page. Off: nothing is recorded or stored.",
 		default: false,
 		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "advCareer",
+		key: "advCareerTracking",
+		name: "Keep Career Tracking for Retired Players",
+		description:
+			"Advanced Tracking Stats: when a player retires, all of his tracking stats are kept as one career total (regular season and playoffs), and his season-by-season tracking is removed. Off: a retired player keeps the tracking of his last 3 seasons only, and his career tracking covers just those. Turning it on also folds the seasons retired players still have into their career totals. Active players always keep every season.",
+		// On in existing leagues too: no game changes, and a retired player keeps more tracking in less space than with the trim
+		default: true,
 		sports: BBGM,
 	},
 	{
@@ -1040,6 +1070,16 @@ export const NATIVE_FEATURES = [
 				existing: true,
 			},
 		],
+	},
+	{
+		id: "frozenDraftRanks",
+		college: false,
+		key: "featureFrozenDraftRanks",
+		name: "Frozen Pre-draft Ranks",
+		description:
+			"Each prospect's rank is frozen when the draft starts (your scouts' list and the consensus board), so it no longer moves as players are picked: the Draft page shows his pre-draft rank next to a separate Best available order, and drafted players show the pick they went at next to their pre-draft rank (steals and reaches). Off: ranks are counted among the players still on the board.",
+		default: false,
+		defaultNewLeague: true,
 	},
 	{
 		id: "aiDraftNeeds",
