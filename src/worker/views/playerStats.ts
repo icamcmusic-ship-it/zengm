@@ -25,6 +25,8 @@ import {
 } from "../util/processInputs.ts";
 import { dropdownKeys } from "../../common/dropdownKeys.ts";
 import { player } from "../core/index.ts";
+import { ADV_STAT_TYPES, isAdvStat } from "../../common/advStats.ts";
+import { featureOn } from "../util/nativeFeatures.ts";
 
 export const validatePlayerStatType = (
 	statType: string | undefined,
@@ -289,6 +291,18 @@ export default defineView({
 			// Only keep players who actually played
 			if (inputs.team !== "watch" && __SPORT === "basketball") {
 				rows = rows.filter((p) => (p.stats.gp ?? 0) > 0);
+
+				// Advanced Tracking Stats tabs, with Keep Career Tracking for Retired Players: only rows with tracking data (a retired
+				// player's past seasons have none, it is in his career row), rather than empty ones
+				if (
+					featureOn("advCareer") &&
+					(ADV_STAT_TYPES as readonly string[]).includes(inputs.statType)
+				) {
+					const advStats = stats.filter((stat) => isAdvStat(stat));
+					rows = rows.filter((p) =>
+						advStats.some((stat) => (p.stats as any)[stat] !== undefined),
+					);
+				}
 			} else if (
 				inputs.team !== "watch" &&
 				statsTable.onlyShowIf &&

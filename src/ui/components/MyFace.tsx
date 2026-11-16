@@ -3,6 +3,7 @@ import { Face } from "facesjs/react";
 import { useMemo } from "react";
 import { prepareFaceForDisplay } from "../../common/faceRender.ts";
 import { DEFAULT_JERSEY, DEFAULT_TEAM_COLORS } from "../../common/constants.ts";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 
 const isChristmas = () => {
 	const now = new Date();
@@ -45,7 +46,14 @@ export const MyFace = ({
 		overrides.accessories = { id: "santa-hat" };
 	}
 
-	const displayFace = useMemo(() => prepareFaceForDisplay(face), [face]);
+	// Facial hair fitted to the head's jaw (common/faceFit.ts) with League Extras "New Face Styles" or "Face Aging" on
+	const forkFacesOn = useFeatureOn("forkFaces");
+	const faceAgingOn = useFeatureOn("faceAging");
+	const fitFacialHair = forkFacesOn || faceAgingOn;
+	const displayFace = useMemo(
+		() => prepareFaceForDisplay(face, { fitFacialHair }),
+		[face, fitFacialHair],
+	);
 
 	return (
 		<Face

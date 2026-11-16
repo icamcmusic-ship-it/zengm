@@ -1046,6 +1046,44 @@ const dbSize = async () => {
 	return { total: r(total, 1), stores: out };
 };
 
+// Retired players: how many, their size, and the size of their tracking (row adv and the folded advCareer, Keep Career Tracking
+// for Retired Players), in MB
+const retiredSize = async () => {
+	let count = 0;
+	let bytes = 0;
+	let advBytes = 0;
+	let withAdv = 0;
+	const db = idb.league as any;
+	for await (const cursor of db
+		.transaction("players")
+		.store.index("tid")
+		.iterate(PLAYER.RETIRED)) {
+		const p = cursor.value;
+		count += 1;
+		bytes += JSON.stringify(p).length;
+		let has = false;
+		for (const row of p.stats) {
+			if (row.adv) {
+				advBytes += JSON.stringify(row.adv).length + 6;
+				has = true;
+			}
+		}
+		if (p.advCareer) {
+			advBytes += JSON.stringify(p.advCareer).length + 12;
+			has = true;
+		}
+		if (has) {
+			withAdv += 1;
+		}
+	}
+	return {
+		count,
+		withAdv,
+		mb: r(bytes / 1e6, 2),
+		advMb: r(advBytes / 1e6, 2),
+	};
+};
+
 const settingsFor = (config: string) => {
 	const settings: any = getDefaultSettings();
 	settings.spectator = true;
@@ -1392,6 +1430,7 @@ describe.skipIf(!ENABLED)("long run", () => {
 							.filter(([, mb]) => (mb as number) >= 0.5),
 					),
 					stores: size.stores,
+					retired: await retiredSize(),
 					...box,
 					...avgs,
 					ratings: preseason,

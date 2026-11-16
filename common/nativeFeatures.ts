@@ -627,6 +627,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "advCareer",
+		key: "advCareerTracking",
+		name: "Keep Career Tracking for Retired Players",
+		description:
+			"Advanced Tracking Stats: when a player retires, all of his tracking stats are kept as one career total (regular season and playoffs), and his season-by-season tracking is removed. Off: a retired player keeps the tracking of his last 3 seasons only, and his career tracking covers just those. Turning it on also folds the seasons retired players still have into their career totals. Active players always keep every season.",
+		// On in existing leagues too: no game changes, and a retired player keeps more tracking in less space than with the trim
+		default: true,
+		sports: BBGM,
+	},
+	{
 		id: "seasonOdds",
 		college: false,
 		key: "featureSeasonOdds",
@@ -1052,6 +1062,16 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "frozenDraftRanks",
+		college: false,
+		key: "featureFrozenDraftRanks",
+		name: "Frozen Pre-draft Ranks",
+		description:
+			"Each prospect's rank is frozen when the draft starts (your scouts' list and the consensus board), so it no longer moves as players are picked: the Draft page shows his pre-draft rank next to a separate Best available order, and drafted players show the pick they went at next to their pre-draft rank (steals and reaches). Off: ranks are counted among the players still on the board.",
+		default: false,
+		defaultNewLeague: true,
+	},
+	{
 		id: "aiDraftNeeds",
 		college: false,
 		key: "featureAiDraftNeeds",
@@ -1153,6 +1173,15 @@ export const NATIVE_FEATURES = [
 			"Show players' nicknames (generated from their careers or set in Customize Player) on the player page and in Hall of Fame speeches and plaques. Off: no nickname is shown anywhere and those texts use his real name. Only hides them, so nicknames come back when you turn it on again.",
 		default: true,
 		sports: BBGM,
+	},
+	{
+		id: "profileExportFull",
+		key: "featureProfileExportFull",
+		name: "Complete Profile Export",
+		description:
+			"Export profile (player pages) includes everything his pages and the league pages show about him: recruiting, playoffs and tournaments (college and pro), coaches by season, award finishes and votes, the tracking profile, contract details and mood history, every news entry, and his legacy (Hall of Fame plaque and speech, GOAT Lab rank, rivalry lines, face history). Off: the shorter export.",
+		default: false,
+		defaultNewLeague: true,
 	},
 	{
 		id: "timeline",

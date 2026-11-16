@@ -1,4 +1,4 @@
-import { sumAdv } from "../../../common/advStats.ts";
+import { advCareerUse, careerAdv, sumAdv } from "../../../common/advStats.ts";
 import { getTermsFromContract } from "../../../common/contractTerms.ts";
 import { PLAYER, PHASE } from "../../../common/constants.ts";
 import { player, trade } from "../index.ts";
@@ -1321,6 +1321,8 @@ const processStats = (
 		oldStats,
 		statType,
 		stats,
+		seasonRange,
+		preDraftStats,
 	}: PlayerFormatOptionsRequired,
 	keepWithNoStats: boolean,
 	abbrevsCache: AbbrevsCache | undefined,
@@ -1461,6 +1463,31 @@ const processStats = (
 					if (sumInfo.extraForMissingValues) {
 						statSumsExtra[seasonType][attr] = sumInfo.extraForMissingValues;
 					}
+				}
+			}
+		}
+
+		// Advanced Tracking Stats: a retired player's tracking is folded into p.advCareer ("Keep Career Tracking for Retired Players"),
+		// added to the rows' remaining adv for a whole career. A team's career or a season range that only covers part of the folded
+		// seasons can't be split out of it, so it shows no tracking rather than a partial one.
+		if (__SPORT === "basketball" && p.advCareer) {
+			const use =
+				preDraftStats === "only"
+					? "none"
+					: advCareerUse(p.advCareer, {
+							tid,
+							seasonRange,
+							rows: careerStats,
+						});
+			for (const seasonType of seasonTypes) {
+				if (use === "add") {
+					statSums[seasonType].adv = careerAdv(
+						p.advCareer,
+						statSums[seasonType].adv ? [statSums[seasonType]] : [],
+						seasonType,
+					);
+				} else if (use === "hide") {
+					delete statSums[seasonType].adv;
 				}
 			}
 		}

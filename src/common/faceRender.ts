@@ -5,11 +5,17 @@
 // svgsIndex so editors and generate() never see it) whose $[hairColor] placeholders are $[faceShave] instead. facesjs
 // replaces $[faceShave] with the feature's own "shave" value, so the render copy of the face sets facialHair.shave to the
 // beard colour. Dyed or bleached hair (fork.hair) works the same way for the hair and hair behind the head ("~fd"), so the
-// brows keep the natural colour. The stored face is never changed, and a face without fork extras is passed through untouched.
+// brows keep the natural colour. The stored face is never changed, and a face without fork extras is passed through untouched
+// unless its facial hair is fitted to its head (fitFacialHair, below).
 import type { FaceConfig } from "facesjs";
 import { svgs } from "facesjs";
 import type { FaceWithExtra } from "./faceAging.ts";
 import { BATCH_D_PARTS } from "./faceParts.batchd.ts";
+import {
+	FIT_REFERENCE_HEAD,
+	fitFacialHairSvg,
+	headProfile,
+} from "./faceFit.ts";
 
 const table = svgs as unknown as Record<string, Record<string, string>>;
 
@@ -60,14 +66,62 @@ const recolor = (
 	return { ...face, [feature]: { ...part, id, shave: color } };
 };
 
-export const prepareFaceForDisplay = (face: FaceConfig): FaceConfig => {
-	const extra = (face as FaceWithExtra).fork;
-	if (!extra) {
+// Facial hair fitted to the head's jaw (common/faceFit.ts): a derived part "<id>~fit-<head id>", made once per (facial hair,
+// head) and never listed in svgsIndex. Head outlines are measured once per head.
+const profiles = new Map<string, ReturnType<typeof headProfile>>();
+const profileOf = (headId: string) => {
+	if (!profiles.has(headId)) {
+		const svg = table.head?.[headId];
+		profiles.set(headId, svg === undefined ? undefined : headProfile(svg));
+	}
+	return profiles.get(headId);
+};
+
+const fitFacialHair = (face: FaceConfig): FaceConfig => {
+	const part = face.facialHair as { id: string } | undefined;
+	const headId = face.head?.id;
+	const parts = table.facialHair;
+	if (
+		!part ||
+		part.id === "none" ||
+		!parts ||
+		parts[part.id] === undefined ||
+		headId === undefined
+	) {
 		return face;
 	}
-	let out = recolor(face, "facialHair", extra.beard, "~fb");
-	out = recolor(out, "hair", extra.hair, "~fd");
-	out = recolor(out, "hairBg", extra.hair, "~fd");
+	const id = `${part.id}~fit-${headId}`;
+	if (parts[id] === undefined) {
+		const ref = profileOf(FIT_REFERENCE_HEAD);
+		const to = profileOf(headId);
+		if (!ref || !to) {
+			return face;
+		}
+		parts[id] = fitFacialHairSvg(parts[part.id]!, ref, to);
+	}
+	return { ...face, facialHair: { ...part, id } };
+};
+
+export type DisplayOptions = {
+	// Fit the facial hair to the head's jaw (League Extras "New Face Styles" or "Face Aging" on). Off, a face that only uses
+	// facesjs parts and has no fork extras is drawn exactly as facesjs draws it.
+	fitFacialHair?: boolean;
+};
+
+export const prepareFaceForDisplay = (
+	face: FaceConfig,
+	options: DisplayOptions = {},
+): FaceConfig => {
+	const extra = (face as FaceWithExtra).fork;
+	let out = face;
+	if (extra) {
+		out = recolor(out, "facialHair", extra.beard, "~fb");
+		out = recolor(out, "hair", extra.hair, "~fd");
+		out = recolor(out, "hairBg", extra.hair, "~fd");
+	}
+	if (options.fitFacialHair) {
+		out = fitFacialHair(out);
+	}
 	return out;
 };
 

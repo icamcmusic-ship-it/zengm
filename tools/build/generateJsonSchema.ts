@@ -2217,6 +2217,17 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 						srID: {
 							type: "string",
 						},
+						// Advanced Tracking Stats folded into a career total at retirement (common/advStats.ts AdvCareer)
+						advCareer: {
+							type: "object",
+							properties: {
+								rs: { type: "array", items: { type: "number" } },
+								po: { type: "array", items: { type: "number" } },
+								from: { type: "integer" },
+								to: { type: "integer" },
+							},
+							required: ["from", "to"],
+						},
 						stats: {
 							type: "array",
 							items: {
