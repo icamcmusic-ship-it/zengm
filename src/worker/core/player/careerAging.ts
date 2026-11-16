@@ -211,8 +211,8 @@ export const oldAgeMinutesCap = (age: number, rank: number) => {
 	if (age < OLD_AGE.from) {
 		return undefined;
 	}
-	const base = age === 39 ? 24 : age === 40 ? 16 : 12;
-	return base + (rank < 3 ? 8 : rank < 5 ? 4 : 0);
+	const base = age === 39 ? 18 : age === 40 ? 12 : 9;
+	return base + (rank < 3 ? 6 : rank < 5 ? 3 : 0);
 };
 
 export type CareerAgingDev = {
