@@ -575,7 +575,7 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 		// Notable players (current season of the user's list when there, else his latest season in the data)
 		const NOTABLE = (
 			process.env.ARCH_V2_NOTABLE ??
-			"Jokic,Stephen Curry,Kevin Durant,LeBron James,Giannis,Gilgeous-Alexander,Luka,Embiid,Jayson Tatum,Jalen Brunson,Kyrie Irving,Donovan Mitchell,Rudy Gobert,Draymond Green,Evan Mobley,Alperen,Tyrese Haliburton,Cade Cunningham,Anthony Edwards,Wembanyama,Brook Lopez,Clint Capela,Alex Caruso,Tyler Herro,Tyrese Maxey,Karl-Anthony Towns,Zion Williamson,Ja Morant,Domantas Sabonis,Paolo Banchero"
+			"Jokic,Stephen Curry,Kevin Durant,LeBron James,Giannis,Gilgeous-Alexander,Luka,Embiid,Jayson Tatum,Jalen Brunson,Kyrie Irving,Donovan Mitchell,Rudy Gobert,Draymond Green,Evan Mobley,Alperen,Tyrese Haliburton,Cade Cunningham,Anthony Edwards,Victor Wembanyama,Brook Lopez,Clint Capela,Alex Caruso,Tyler Herro,Tyrese Maxey,Karl-Anthony Towns,Zion Williamson,Ja Morant,Domantas Sabonis,Paolo Banchero"
 		).split(",");
 		const data = realData();
 		const fold = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -583,9 +583,10 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 		for (const n of NOTABLE) {
 			let x = u2k.find((y) => !y.r.allTime && fold(y.r.name).includes(fold(n)));
 			if (!x) {
-				const slug = Object.entries(data.d.bios).find(
-					([, b]) => b.name && fold(b.name).includes(fold(n)),
-				)?.[0];
+				// (an exact full name first: "Victor Wembanyama", not a relative whose name contains it)
+				const bios = Object.entries(data.d.bios).filter(([, b]) => b.name);
+				const slug = (bios.find(([, b]) => fold(b.name) === fold(n)) ??
+					bios.find(([, b]) => fold(b.name).includes(fold(n))))?.[0];
 				const row = slug
 					? data.d.ratings
 							.filter((r) => r.slug === slug)
@@ -600,7 +601,7 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			const c = ENGINES.classic(x);
 			const v = ENGINES.v2(x, { srID: x.slug });
 			out.push(
-				`${x.r?.name ?? x.name} ${x.season ?? ""} (${x.pos}) | ${x.r?.arch ?? "-"} | ${c.name} | ${v.name} (${v.c.v2.family}${v.c.v2.agreed ? "" : "; safe"})`,
+				`${x.r ? `${x.r.name} ${x.season}` : x.name} (${x.pos}) | ${x.r?.arch ?? "-"} | ${c.name} | ${v.name} (${v.c.v2.family}${v.c.v2.agreed ? "" : "; safe"})`,
 			);
 		}
 		writeFileSync(OUT, out.join("\n") + "\n");

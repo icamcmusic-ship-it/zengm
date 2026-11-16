@@ -1,4 +1,4 @@
-// archv2: the v2 archetype engine (League Extras -> Archetypes -> Archetype engine: v2). Hierarchical and compositional:
+// archv2: the archetype engine (the only one). Hierarchical and compositional:
 // 1. Three voters decide his FAMILY first: the classic engine's label (classify.ts), the family classifier of the shipped
 //    model (model.ts familyProbs) with the rulebook's best-ranked role (the role whose head skill is his best), and the k
 //    nearest labeled players (knn.ts: the user's 2K list, the judged key, the user's own picks). When two of them agree
@@ -96,7 +96,7 @@ export const V2_PARAMS: V2Params = {
 	kCanon: 1,
 	classicBonus: 1,
 	buildBonus: 0.1,
-	hyst: 0.25,
+	hyst: 0.5,
 	words: true,
 	k: 15,
 };
@@ -409,7 +409,7 @@ export const classifyV2 = (
 				descs: parsed.descs,
 				score:
 					famScore[fam] +
-					P.classicBonus * (0.5 - 0.25 * added) +
+					P.classicBonus * (0.9 - 0.1 * added) +
 					P.rK * (votes.role[parsed.role ?? ""] ?? 0) +
 					P.kCanon * (votes.canon[sc.a.id] ?? 0),
 			});

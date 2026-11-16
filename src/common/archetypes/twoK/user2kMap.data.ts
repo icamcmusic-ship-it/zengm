@@ -441,7 +441,7 @@ export const USER_2K_MAP: Record<string, { kind: string; id: string | null }> =
 		"Paint-Protecting Riser": { kind: "build", id: "paint-protecting-riser" },
 		"Paint-Scoring Popper": { kind: "alias", id: "inside-out-slasher" },
 		"Paint-Scoring Stretch": { kind: "alias", id: "gritty-3pt-slasher" },
-		"Perimeter Lock": { kind: "alias", id: "edge-enforcer" },
+		"Perimeter Lock": { kind: "alias", id: "glue-wing" },
 		"Perimeter Shot Hunter": { kind: "build", id: "perimeter-shot-hunter" },
 		"Pesky Paint Slasher": { kind: "alias", id: "drive-and-rise" },
 		"Pesky Perimeter Lock": { kind: "alias", id: "pressure-cooker" },
@@ -568,7 +568,7 @@ export const USER_2K_MAP: Record<string, { kind: string; id: string | null }> =
 		"Versatile Finisher": { kind: "alias", id: "drive-and-rise" },
 		"Versatile Power Cutter": { kind: "alias", id: "open-lane-burner" },
 		"Versatile Slasher": { kind: "alias-2k", id: "drive-and-rise" },
-		"Wing Warden": { kind: "alias", id: "edge-enforcer" },
+		"Wing Warden": { kind: "alias", id: "glue-wing" },
 		"Wing-Running Bandit": { kind: "alias", id: "disruptive-wing-runner" },
 		"Wing-Running High Flyer": { kind: "build", id: "wing-running-high-flyer" },
 		"Wing-Running Sharpshooter": {

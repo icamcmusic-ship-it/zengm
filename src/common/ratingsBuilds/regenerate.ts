@@ -2,13 +2,11 @@
 // overall. Pure and deterministic: same seed + settings + inputs = same results.
 
 import { archetypeToBuild, personalizeSeed } from "../archetypes/target.ts";
-import {
-	ARCHETYPES as NEW_ARCHETYPES,
-	classify,
-} from "../archetypes/classify.ts";
+import { ARCHETYPES as NEW_ARCHETYPES } from "../archetypes/classify.ts";
 import { gateFactor } from "../archetypes/score.ts";
 import { archetypePrior, isPos, positionOf } from "../archetypes/position.ts";
 import { scoreAll } from "../archetypes/classify.ts";
+import { classifyV2 } from "../archetypes/v2/engine.ts";
 import type { Norms } from "../archetypes/types.ts";
 import { scoutingEffectCutoff, scoutingEffectStddev } from "../budgetLevels.ts";
 import { Rng, clamp } from "./rng.ts";
@@ -138,7 +136,7 @@ const state = (
 // Read with the game's position for these ratings (F.pos follows the league's position setting)
 const derivedOf = (F: Formulas, ratings: BuildRatings, norms?: Norms) => {
 	// (a draft prospect: read against the prospect tables, as the game shows him)
-	const c = classify(ratings, { norms, pos: F.pos(ratings), prospect: true });
+	const c = classifyV2(ratings, { norms, pos: F.pos(ratings), prospect: true });
 	return {
 		id: c.id,
 		name: c.name,

@@ -168,7 +168,7 @@ export const ROLES: RoleDef[] = [
 	},
 	{
 		key: "lock",
-		names: ["Perimeter Lock"],
+		names: ["Lockdown Defender"],
 		withDesc: "Lock",
 		concepts: ["lockdown"],
 		groups: ["guard", "wing"],

@@ -15,4 +15,6 @@ export const POS_NAMES: Record<string, Partial<Record<PosGroup, string>>> = {
 	// (arch15 new builds)
 	"3-and-d-specialist": { guard: "3 & D Guard" },
 	"shot-erasing-guard-dog": { wing: "Shot-Erasing Lockdown Wing" },
+	// (archgaps fix D, user-approved: the rulebook's cutter word as a name)
+	"athletic-hustler": { wing: "Off-Ball Cutter" },
 };

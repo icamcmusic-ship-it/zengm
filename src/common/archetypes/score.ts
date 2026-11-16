@@ -920,6 +920,10 @@ export const NO_SHOT_FROM = -1.1;
 export const NO_SHOT_K = 2;
 export const AIR_MIN = 0.3;
 export const AIR_K = 2;
+export const ATH_NAME_RE =
+	/High[ -]Fly|Aerial|Glide|Athletic|Athlete|Explosive|Force of Nature|Bouncy|Apex|Burner|Open-Lane|Wing[ -]Run|Rim[ -]Run|Speedy/;
+export const ATH_FLOOR = 0;
+export const ATH_FLOOR_K = 2;
 export const ELITE_SHOT_MIN = 1.9;
 export const ELITE_SHOT_K = 3;
 export const TOUCH_FROM = -1.1;
@@ -965,6 +969,11 @@ export const absoluteParts = (a: Archetype, p: Prepared): AbsoluteParts => {
 	if (AIR_RE.test(a.name)) {
 		const j = Math.min(0.5 * (p.pz.jmp + p.b.jmp), p.b.jmp + 0.3);
 		out.air = AIR_K * Math.max(0, AIR_MIN - j);
+	}
+	// archgaps fix A (user-approved): every athletic name (leaping and open-floor speed words alike) needs his
+	// athleticism at least ordinary for his position (ATH_FLOOR on his absolute / role reading), ATH_FLOOR_K per z below
+	if (ATH_NAME_RE.test(a.name)) {
+		out.air += ATH_FLOOR_K * Math.max(0, ATH_FLOOR - v("ath"));
 	}
 	if (SNIPER_RE.test(a.name)) {
 		out.eliteShot = ELITE_SHOT_K * Math.max(0, ELITE_SHOT_MIN - v("shoot"));

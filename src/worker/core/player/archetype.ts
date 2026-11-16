@@ -10,7 +10,6 @@ import {
 	DEFAULT_NORMS,
 	DEFAULT_NORMS_EXPANDED,
 	buildNorms,
-	classify,
 	currentEntry,
 	isStale,
 	explain,
@@ -86,10 +85,6 @@ import {
 	overrideFor,
 	refitArchetypeTuning,
 } from "./archetypeFeedback.ts";
-
-// archv2: which engine reads labels ("classic" or "v2")
-export const archetypeEngine = (): string =>
-	featureOption<string>("archetypeEngine") === "v2" ? "v2" : "classic";
 
 // archfb: the shipped model with the user's tuning on top, or undefined (the shipped model) with no tuning
 export const tunedModelFor = (
@@ -396,7 +391,7 @@ export const fuzzedArchetypeLabel = (
 	}
 	// His position comes from the true ratings, as the game shows it; a prospect is read against the prospect tables
 	const model = tunedModelFor(shown);
-	return classify(shown, {
+	return classifyV2(shown, {
 		norms,
 		pos: posFn(ratings as any),
 		prospect: true,
@@ -441,25 +436,21 @@ export const classifyPlayer = (
 	}
 	// (arch16: the reading version too, so a new reading never reuses an old result; archfb: and the user's tuning)
 	const tuning = activeTuning();
-	const v2 = archetypeEngine();
 	const key = JSON.stringify(
-		[ARCHETYPE_READING_VERSION, tuning.hash, v2, p.srID, ratings, opts],
+		[ARCHETYPE_READING_VERSION, tuning.hash, p.srID, ratings, opts],
 		memoReplacer,
 	);
 	if (memo.has(key)) {
 		return memo.get(key);
 	}
 	const model = tunedModelFor(ratings);
-	// archv2: the v2 engine (League Extras -> Archetypes -> Archetype engine), a labeled real player never voting for himself
-	const c =
-		v2 === "v2"
-			? classifyV2(ratings, {
-					norms,
-					...opts,
-					...(model ? { model } : {}),
-					...(p.srID ? { srID: p.srID } : {}),
-				})
-			: classify(ratings, { norms, ...opts, ...(model ? { model } : {}) });
+	// archv2: the one engine (common/archetypes/v2), a labeled real player never voting for himself
+	const { v2: _info, ...c } = classifyV2(ratings, {
+		norms,
+		...opts,
+		...(model ? { model } : {}),
+		...(p.srID ? { srID: p.srID } : {}),
+	});
 	if (memo.size >= CLASSIFY_MEMO_MAX) {
 		memo.clear();
 	}

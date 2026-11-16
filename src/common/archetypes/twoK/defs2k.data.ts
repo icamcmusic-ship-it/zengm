@@ -4133,8 +4133,9 @@ export const TWO_K_DEFS: TwoKDef[] = [
 		aliases: [],
 		group: "wing",
 		family: "scorer",
-		positions: ["GF", "SF", "F"],
-		hgt: [48, 58],
+		// (archgaps fix B, user-approved: open at PF/FC for faceup bigs like Elton Brand and Aldridge)
+		positions: ["GF", "SF", "F", "PF", "FC"],
+		hgt: [48, 66],
 		w: { ft: 1.5, jmp: -3, mid: 3, oiq: 1.5, post: 2, stl: -2.5, usg: 2 },
 		xw: {},
 		need: { mid: 0.3 },

@@ -96,17 +96,34 @@ const FORWARD: [number, number] = [33, 65];
 const BIG_FORWARD: [number, number] = [48, 66];
 const BIG: [number, number] = [63, 100];
 
+// (2K names that are another name of a custom build)
+const withAliases = (d: TwoKDef, aliases: string[]): TwoKDef => ({
+	...d,
+	aliases,
+});
+
 export const CUSTOM_DEFS: TwoKDef[] = [
 	// archgaps (user-approved): role players with no top-20% skill had no honest name (athletic names on non-athletes)
-	custom(
-		"Glue Wing",
-		["GF", "SF", "F"],
-		WING,
-		{ dper: 2, diq: 1.5, three: 1, pss: 1, reb: 1, usg: -1.5 },
-		"wing",
-		"defender",
-		"A role-playing wing who defends, moves the ball and does a bit of everything.",
-		{ three: 1.2, pss: 1.2, reb: 1.2, fin: 1.2, mid: 1.2, ath: 1.2, drb: 1.2 },
+	withAliases(
+		custom(
+			"Glue Wing",
+			["GF", "SF", "F"],
+			WING,
+			{ dper: 2, diq: 1.5, three: 1, pss: 1, reb: 1, usg: -1.5 },
+			"wing",
+			"defender",
+			"A role-playing wing who defends, moves the ball and does a bit of everything.",
+			{
+				three: 1.2,
+				pss: 1.2,
+				reb: 1.2,
+				fin: 1.2,
+				mid: 1.2,
+				ath: 1.2,
+				drb: 1.2,
+			},
+		),
+		["Wing Warden", "Perimeter Lock"],
 	),
 	custom(
 		"Glue Guard",
