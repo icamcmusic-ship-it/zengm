@@ -20,7 +20,7 @@ import {
 	type Norms,
 	type StoredArchetype,
 } from "../../../common/archetypes/index.ts";
-import { whyDrivers, whyLine } from "../../../common/archetypes/whyText.ts";
+import { whyBullets, whyDrivers } from "../../../common/archetypes/whyText.ts";
 import { VISIBLE_TRAITS } from "../../../common/archetypes/classify.ts";
 import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
 import type { Player } from "../../../common/types.ts";
@@ -661,8 +661,8 @@ export type PlayerArchetypeInfo = {
 	season?: number;
 	live: boolean;
 	why: { label: string; z: number; want: number }[];
-	// arch16: one short line citing what drove the pick (common/archetypes/whyText.ts)
-	whyText?: string;
+	// arch16 / arch2kfix: 2-4 short bullets in words (no numbers) citing what drove the pick (common/archetypes/whyText.ts)
+	whyBullets?: string[];
 	// archfb: the user's own pick (internal: shown like any archetype; the popover offers to clear it)
 	user?: boolean;
 	pid?: number;
@@ -706,13 +706,14 @@ export const archetypeInfoForPlayer = async (
 		z: w.z,
 		want: w.want,
 	}));
-	// arch16: the short why line, from what drove the pick (sub-ratings, play types, traits, ratings), with the numbers the
-	// user sees (scouting fuzz as on the ratings pages; none under the no-visible-ratings challenge)
+	// arch16 / arch2kfix: the why bullets, from what drove the pick (sub-ratings, play types, traits, ratings), in words read
+	// from the ratings the user sees (scouting fuzz as on the ratings pages); no numbers, so nothing to hide under the
+	// no-visible-ratings challenge
 	const a = archetypeById(found.view.id);
-	let whyText: string | undefined;
+	let whyList: string[] | undefined;
 	if (ratings && a) {
 		const traits = archetypeTraits(p, season);
-		whyText = whyLine(
+		whyList = whyBullets(
 			whyDrivers({
 				a,
 				ratings,
@@ -726,7 +727,6 @@ export const archetypeInfoForPlayer = async (
 						)
 					: undefined,
 				shown: ratingsForArchetype(p, true),
-				hideNumbers: g.get("challengeNoRatings") && p.tid !== PLAYER.RETIRED,
 			}),
 		);
 	}
@@ -742,7 +742,7 @@ export const archetypeInfoForPlayer = async (
 		season: found.stored ? v.season : undefined,
 		live: !found.stored,
 		why,
-		...(whyText ? { whyText } : {}),
+		...(whyList && whyList.length > 0 ? { whyBullets: whyList } : {}),
 		pid: p.pid,
 		...(found.user ? { user: true } : {}),
 	};

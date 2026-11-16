@@ -1,7 +1,14 @@
 import { assert, test } from "vitest";
 import { archetypeById, classify, defaultNorms, explain } from "./classify.ts";
 import { realData, realNorms, realPlayer } from "./real.testutil.ts";
-import { topDriver, whyDrivers, whyLine } from "./whyText.ts";
+import {
+	strengthWord,
+	topDriver,
+	whyBullets,
+	whyDrivers,
+	whyLine,
+} from "./whyText.ts";
+import { sampleLeague } from "./sample.testutil.ts";
 
 const SLUGS = ["wembavi01", "goberru01", "curryst01", "jokicni01", "carusal01"];
 
@@ -50,35 +57,101 @@ test("sub-ratings are cited by name when the build wants them", () => {
 	}
 });
 
-test("no numbers under the no-visible-ratings challenge, and the shown (fuzzed) values otherwise", () => {
-	const { p, a, norms, read, rows } = readFor("goberru01", true);
-	const hidden = whyLine(
-		whyDrivers({ a, ratings: p.ratings, norms, read, rows, hideNumbers: true }),
-	);
-	assert.ok(hidden.length > 0);
-	assert.notMatch(hidden, /\d/);
-	// Shown ratings 10 lower: every number cited is the shown one
-	const shown = { ...p.ratings };
-	for (const k of Object.keys(shown) as (keyof typeof shown)[]) {
-		if (typeof shown[k] === "number" && k !== "hgt") {
-			(shown as any)[k] = (shown[k] as number) - 10;
+test("no digits anywhere, 1-4 bullets, no repeats, and the words read from the shown ratings", async () => {
+	const d = realData();
+	const norms = realNorms(defaultNorms(false), false);
+	const rows2025 = d.d.ratings.filter((r) => r.season === 2025).slice(0, 120);
+	let n = 0;
+	for (const row of rows2025) {
+		const p = realPlayer(d, row);
+		const read = { pos: p.pos, age: p.age, stats: p.stats };
+		const c = classify(p.ratings, { norms, ...read });
+		const a = archetypeById(c.id)!;
+		const rows = explain(c.id, p.ratings, norms, read);
+		const drivers = whyDrivers({ a, ratings: p.ratings, norms, read, rows });
+		const bullets = whyBullets(drivers);
+		assert.ok(bullets.length >= 1 && bullets.length <= 4, row.slug);
+		assert.strictEqual(new Set(bullets).size, bullets.length, row.slug);
+		for (const b of bullets) {
+			assert.notMatch(b, /\d|%/, `${row.slug}: ${b}`);
 		}
+		assert.notMatch(whyLine(drivers), /\d/);
+		assert.strictEqual(
+			whyLine(drivers),
+			bullets.slice(0, 2).join(" · "),
+			row.slug,
+		);
+		// (a sub-rating and its base dimension never both: one bullet per skill)
+		const groups = bullets.map((b) => drivers.find((x) => x.text === b)!.group);
+		assert.strictEqual(new Set(groups).size, groups.length, row.slug);
+		// (never a strength below average: only the fallback, "Relies on" his best wanted dimension, can be)
+		for (const x of drivers) {
+			if (
+				(x.kind === "sub" || x.kind === "rating") &&
+				!x.text.startsWith("Relies on")
+			) {
+				assert.ok(x.s >= 0.4, `${row.slug} ${x.text}`);
+			}
+		}
+		// Stable: the same reading twice gives the same words
+		assert.deepEqual(
+			whyBullets(whyDrivers({ a, ratings: p.ratings, norms, read, rows })),
+			bullets,
+		);
+		n++;
 	}
-	if (shown.sub) {
-		shown.sub = shown.sub.map((x) => x - 10);
-	}
-	const a1 = whyDrivers({ a, ratings: p.ratings, norms, read, rows });
-	const a2 = whyDrivers({ a, ratings: p.ratings, norms, read, rows, shown });
-	for (const [i, d] of a1.entries()) {
-		const n1 = d.text.match(/\d+/);
-		const n2 = a2[i]!.text.match(/\d+/);
-		if (n1 && n2) {
-			assert.ok(Math.abs(Number(n1[0]) - 10 - Number(n2[0])) <= 1, d.text);
+	assert.ok(n >= 100);
+	// Random-league players too (no stats, no subs)
+	for (const p of await sampleLeague(150, "why")) {
+		const c = classify(p.ratings, { norms, age: p.age });
+		const a = archetypeById(c.id)!;
+		const rows = explain(c.id, p.ratings, norms, { age: p.age });
+		const bullets = whyBullets(
+			whyDrivers({
+				a,
+				ratings: p.ratings,
+				norms,
+				read: { age: p.age },
+				rows,
+			}),
+		);
+		assert.ok(bullets.length >= 1, a.name);
+		for (const b of bullets) {
+			assert.notMatch(b, /\d/, b);
 		}
 	}
 });
 
-test("a play type is cited with his share of possessions", () => {
+test("the words come from the shown (fuzzed) ratings", () => {
+	const { p, a, norms, read, rows } = readFor("goberru01", true);
+	// Shown ratings much lower: the words weaken, or the bullet goes
+	const shown = { ...p.ratings };
+	for (const k of Object.keys(shown) as (keyof typeof shown)[]) {
+		if (typeof shown[k] === "number" && k !== "hgt") {
+			(shown as any)[k] = (shown[k] as number) - 25;
+		}
+	}
+	if (shown.sub) {
+		shown.sub = shown.sub.map((x) => x - 25);
+	}
+	const rank = (t: string) =>
+		["Elite", "Strong", "Above-average", "Relies on"].findIndex((w) =>
+			t.startsWith(w),
+		);
+	const a1 = whyDrivers({ a, ratings: p.ratings, norms, read, rows });
+	const a2 = whyDrivers({ a, ratings: p.ratings, norms, read, rows, shown });
+	for (const d1 of a1) {
+		const d2 = a2.find((x) => x.kind === d1.kind && x.key === d1.key);
+		if (d2 && rank(d1.text) >= 0 && rank(d2.text) >= 0) {
+			assert.ok(rank(d2.text) >= rank(d1.text), `${d1.text} / ${d2.text}`);
+		}
+	}
+	assert.ok(a2.some((x) => x.kind !== "low"));
+	assert.strictEqual(strengthWord(2), "Elite");
+	assert.strictEqual(strengthWord(-0.1), undefined);
+});
+
+test("a play type is cited in words from how much he runs it", () => {
 	const { p, a, norms, read, rows } = readFor("goberru01", true);
 	const f = {
 		iso: 0,
@@ -126,7 +199,8 @@ test("a play type is cited with his share of possessions", () => {
 	});
 	const ptd = drivers.find((x) => x.kind === "playType");
 	if (ptd) {
-		assert.match(ptd.text, /^\d+% of his possessions/);
-		assert.include(whyLine(drivers), ptd.text);
+		assert.match(ptd.text, /^(Lives|Runs a lot|Plenty|Gets out)/);
+		assert.notMatch(ptd.text, /\d/);
+		assert.include(whyBullets(drivers), ptd.text);
 	}
 });
