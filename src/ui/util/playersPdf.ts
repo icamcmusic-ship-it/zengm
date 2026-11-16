@@ -3,6 +3,7 @@ import type { FaceConfig } from "facesjs";
 import { parseTrueType } from "./ttf.ts";
 import { display } from "facesjs";
 import { prepareFaceForDisplay } from "../../common/faceRender.ts";
+import { isFeatureOn } from "./nativeFeatures.ts";
 import { DEFAULT_JERSEY, DEFAULT_TEAM_COLORS } from "../../common/constants.ts";
 import {
 	fileSafeName,
@@ -25,10 +26,16 @@ export const faceToJpeg = async (p: PlayerExport) => {
 	try {
 		// faceToSvgString is for Node (it fakes a document), so draw into a detached div like the page does
 		const div = document.createElement("div");
-		display(div, prepareFaceForDisplay(p.face as FaceConfig), {
-			teamColors: p.colors ?? DEFAULT_TEAM_COLORS,
-			jersey: { id: (p.jersey ?? DEFAULT_JERSEY).split(":")[0]! },
-		});
+		display(
+			div,
+			prepareFaceForDisplay(p.face as FaceConfig, {
+				fitFacialHair: isFeatureOn("forkFaces") || isFeatureOn("faceAging"),
+			}),
+			{
+				teamColors: p.colors ?? DEFAULT_TEAM_COLORS,
+				jersey: { id: (p.jersey ?? DEFAULT_JERSEY).split(":")[0]! },
+			},
+		);
 		const svgEl = div.querySelector("svg");
 		if (!svgEl) {
 			return;

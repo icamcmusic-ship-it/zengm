@@ -11,6 +11,8 @@ import {
 	type FacePartFeature,
 } from "../../common/faceParts.ts";
 import { DEFAULT_JERSEY } from "../../common/constants.ts";
+import { prepareFaceForDisplay } from "../../common/faceRender.ts";
+import { useFeatureOn } from "../util/nativeFeatures.ts";
 
 const FEATURES: FacePartFeature[] = [
 	"hair",
@@ -70,6 +72,11 @@ const FaceStyleGallery = () => {
 		registerForkFaceParts();
 	});
 
+	// In a league with "New Face Styles" or "Face Aging", facial hair is drawn fitted to each head, as on the player pages
+	const forkFacesOn = useFeatureOn("forkFaces");
+	const faceAgingOn = useFeatureOn("faceAging");
+	const fitFacialHair = forkFacesOn || faceAgingOn;
+
 	const [feature, setFeature] = useState<FacePartFeature>("hair");
 	const [samples, setSamples] = useState(makeSamples);
 
@@ -88,7 +95,9 @@ const FaceStyleGallery = () => {
 				{samples.map((face, i) => (
 					<div key={i} style={{ width: 64 }}>
 						<Face
-							face={withPart(face, feature, id)}
+							face={prepareFaceForDisplay(withPart(face, feature, id), {
+								fitFacialHair,
+							})}
 							ignoreDisplayErrors
 							lazy
 							style={{ aspectRatio: "2/3" }}

@@ -486,6 +486,31 @@ facesjs and fork headbands, at roster thumbnail size (40 px) and in the dark the
 - **Tests:** `common/faceParts.batchd.test.ts` (append-only ids, rendering across skin, hair, fatness and headbands,
   generation and age fit, neighbours, staff looks only for staff 40+, nose bandage rules and render-time drawing).
 
+### Facial hair fit
+
+- **Setting:** on with League Extras _New Face Styles_ (`featureForkFaces`) or _Face Aging_ (`featureFaceAging`); both off,
+  a face is drawn exactly as facesjs draws it. Draw-time only (`common/faceFit.ts`, from `common/faceRender.ts`): stored
+  faces never change, and the player page, rosters, staff faces, the PDF export and the Face Style Gallery all draw it.
+- **Why:** facesjs draws every facial hair part in the same place on every head. Fatness was already fine (heads and facial
+  hair are both symmetric about the centre, so facesjs scales them alike), but the parts are drawn for one jaw (facesjs'
+  `head1`) while the jaws differ: 100 px (head2) to 135 px (head17) from the centre at the mouth, chins at y 500 to 510 (the
+  fork's long, v-chin and narrow-jaw heads). So stubble and beards stopped short of a wide jaw (bare skin between beard and
+  jaw line) or ran past a narrow one onto the background, a pencil beard line floated inside a square jaw, and chin pieces
+  sat too high on a long chin. Measured on every head, facial hair part and fatness 0 to 1 (pixels, in the browser): the
+  beard edge was a mean 8 px and up to 33 px off where it sits on head1; after the fit, a mean 0.9 px.
+- **How:** each point of the part moves from head1's jaw onto this head's, row by row and per side. Below the mouth the rows
+  stretch so head1's chin lands on this chin (goatees, chin pieces and hanging beards follow it). Pieces that follow the jaw
+  (stubble, beards, chin straps, sideburns, mutton chops, ...) are widened or narrowed so the jaw line lands on the jaw line;
+  a full beard's volume past it stays as thick (squeezed on a much wider jaw so it never reaches past the cheeks); the middle
+  of the face (mouth, mustache) doesn't move. Mustaches, goatees, a handlebar, a horseshoe stay where they are apart from the
+  chin. Nothing above the jaw moves, so sideburns still meet the hair. A greying beard (its own colour) gets the same shape.
+  The fitted part also carries an invisible full-width anchor so fatness scales it about exactly the head's centre: that
+  also fixes facesjs' own small misfit (mutton chops, the chin strap and some sideburns are up to a pixel off centre, so
+  facesjs scales them about a slightly different point). Face aging's fullness changes fatness, so it reaches the beard too.
+- **Tests:** `common/faceFit.test.ts` (off = facesjs untouched; same fatness transform as the head on every head and
+  fatness; stubble on the jaw line within 5 px on every head and fatness, against up to 33 px before; beards inside the
+  head's width and ending at its chin; mustaches and everything above the jaw unmoved; greying colour kept; aging).
+
 ### Face aging
 
 - **Setting:** League Extras _Face Aging_ (`featureFaceAging`, on for new leagues, off for existing ones), with _Face Aging Speed_

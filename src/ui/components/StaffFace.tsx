@@ -41,6 +41,7 @@ export const StaffFace = ({
 	const hairLoss = useFeatureOption<boolean>("faceAgingHairLoss");
 	const graying = useFeatureOption<boolean>("faceAgingGraying");
 	const styleEvents = useFeatureOption<boolean>("faceAgingStyleEvents");
+	const forkFacesOn = useFeatureOn("forkFaces");
 	const aged = agingOn && age !== undefined && seed !== undefined;
 	const drawnFace = useMemo(
 		() =>
@@ -65,8 +66,20 @@ export const StaffFace = ({
 							),
 						)
 					: face,
+				{ fitFacialHair: agingOn || forkFacesOn },
 			),
-		[aged, age, face, graying, hairLoss, seed, speed, styleEvents],
+		[
+			aged,
+			age,
+			agingOn,
+			face,
+			forkFacesOn,
+			graying,
+			hairLoss,
+			seed,
+			speed,
+			styleEvents,
+		],
 	);
 
 	const overrides = staffFaceOverrides(face, {
