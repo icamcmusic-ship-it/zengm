@@ -380,6 +380,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "spreadMatchups",
+		key: "spreadMatchups",
+		name: "Spread Out Matchups",
+		description:
+			"With the old compact schedule (Realistic Schedule Length off, not grouped into series): no team plays the same opponent in consecutive games when the schedule can avoid it, and never 3 in a row. (Realistic Schedule Length always spreads out each pair's meetings, with at most an occasional 2-game set in the same arena.) Takes effect with the next schedule (the next regular season).",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "marqueeGames",
 		college: false,
 		key: "marqueeGames",

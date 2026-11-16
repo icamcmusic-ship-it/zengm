@@ -15,6 +15,14 @@ const LONG_GAP = 6;
 const LONG_GAP_COST = 0.5;
 // Days with about the same number of games: per game moved from a day with fewer games to one with more
 const DAY_BALANCE_COST = 0.25;
+// Same opponent in consecutive games of a team: 3 in a row never, 2 in a row rarely (a 2-game set at the same venue within a
+// couple of days costs less), and meetings of a pair less than SHORT_MEETING_GAP days apart cost a little per day
+const REPEAT_3_COST = 1000;
+const REPEAT_COST = 12;
+const SET_COST = 3;
+const SET_MAX_GAP = 2;
+const SHORT_MEETING_GAP = 10;
+const SHORT_MEETING_COST = 0.3;
 
 export const teamRestCost = (list: readonly number[], b2bTarget: number) => {
 	let cost = 0;
@@ -36,6 +44,35 @@ export const teamRestCost = (list: readonly number[], b2bTarget: number) => {
 		}
 	}
 	return cost + B2B_COST * Math.abs(b2b - b2bTarget);
+};
+
+// Cost of a team's opponents: games in day order, as [day, opponent, home tid]
+export const teamRepeatCost = (
+	games: readonly (readonly [number, number, number])[],
+) => {
+	let cost = 0;
+	const lastMeeting = new Map<number, number>();
+	for (let i = 0; i < games.length; i++) {
+		const [day, opp, home] = games[i]!;
+		if (i >= 1 && games[i - 1]![1] === opp) {
+			if (i >= 2 && games[i - 2]![1] === opp) {
+				cost += REPEAT_3_COST;
+			} else if (
+				games[i - 1]![2] === home &&
+				day - games[i - 1]![0] <= SET_MAX_GAP
+			) {
+				cost += SET_COST;
+			} else {
+				cost += REPEAT_COST;
+			}
+		}
+		const last = lastMeeting.get(opp);
+		if (last !== undefined && day - last < SHORT_MEETING_GAP) {
+			cost += (SHORT_MEETING_GAP - (day - last)) * SHORT_MEETING_COST;
+		}
+		lastMeeting.set(opp, day);
+	}
+	return cost;
 };
 
 const countB2B = (list: readonly number[]) => {
@@ -126,6 +163,88 @@ export const createScheduleEditor = (
 		b2bTarget.set(tid, countB2B(list));
 	}
 
+	// Each team's game on each day (-1 for none), the same as teamGameOnDay, for repeatCost
+	const gameAt = new Map<number, Int32Array>();
+	for (const [tid, map] of teamGameOnDay) {
+		const arr = new Int32Array(lastDay + 2).fill(-1);
+		for (const [day, game] of map) {
+			arr[day] = game;
+		}
+		gameAt.set(tid, arr);
+	}
+	// Day of the last meeting with each opponent, valid where meetingStamp is the current stamp
+	let maxTid = 0;
+	for (const [home, away] of tids) {
+		maxTid = Math.max(maxTid, home, away);
+	}
+	const meetingDay = new Int32Array(maxTid + 1);
+	const meetingStamp = new Int32Array(maxTid + 1);
+	let stamp = 0;
+
+	// teamRepeatCost of a team on its game days "list", with the game on day "from" played on day "to" instead, and the games on days
+	// swapA and swapB trading places (-1: none). Same as building the games and calling teamRepeatCost, without the allocations.
+	const repeatCost = (
+		tid: number,
+		list: readonly number[],
+		from = -1,
+		to = -1,
+		swapA = -1,
+		swapB = -1,
+	) => {
+		const arr = gameAt.get(tid)!;
+		stamp += 1;
+		let cost = 0;
+		let opp1 = -1;
+		let opp2 = -1;
+		let home1 = -1;
+		let day1 = 0;
+		for (const day of list) {
+			const game =
+				day === to
+					? arr[from]!
+					: day === swapA
+						? arr[swapB]!
+						: day === swapB
+							? arr[swapA]!
+							: arr[day]!;
+			const [home, away] = tids[game]!;
+			const opp = home === tid ? away : home;
+			if (opp === opp1) {
+				if (opp === opp2) {
+					cost += REPEAT_3_COST;
+				} else if (home === home1 && day - day1 <= SET_MAX_GAP) {
+					cost += SET_COST;
+				} else {
+					cost += REPEAT_COST;
+				}
+			}
+			if (meetingStamp[opp] === stamp) {
+				const gap = day - meetingDay[opp]!;
+				if (gap < SHORT_MEETING_GAP) {
+					cost += (SHORT_MEETING_GAP - gap) * SHORT_MEETING_COST;
+				}
+			}
+			meetingStamp[opp] = stamp;
+			meetingDay[opp] = day;
+			opp2 = opp1;
+			opp1 = opp;
+			home1 = home;
+			day1 = day;
+		}
+		return cost;
+	};
+	const teamDelta = (tid: number, from: number, to: number) => {
+		const list = teamDays.get(tid)!;
+		const target = b2bTarget.get(tid)!;
+		const newList = replaceDay(list, from, to);
+		return (
+			teamRestCost(newList, target) -
+			teamRestCost(list, target) +
+			repeatCost(tid, newList, from, to) -
+			repeatCost(tid, list)
+		);
+	};
+
 	const pinned = new Set<number>();
 	// At most this many games on a day (the exclusive holiday slates of Marquee Games)
 	const dayCap = new Map<number, number>();
@@ -166,11 +285,7 @@ export const createScheduleEditor = (
 		const from = gameDays[i]!;
 		let delta = 0;
 		for (const tid of [home, away]) {
-			const list = teamDays.get(tid)!;
-			const target = b2bTarget.get(tid)!;
-			delta +=
-				teamRestCost(replaceDay(list, from, to), target) -
-				teamRestCost(list, target);
+			delta += teamDelta(tid, from, to);
 		}
 		delta +=
 			DAY_BALANCE_COST * (2 * (gamesPerDay[to]! - gamesPerDay[from]!) + 2);
@@ -185,6 +300,9 @@ export const createScheduleEditor = (
 			const map = teamGameOnDay.get(tid)!;
 			map.delete(from);
 			map.set(to, i);
+			const arr = gameAt.get(tid)!;
+			arr[from] = -1;
+			arr[to] = i;
 		}
 		gamesPerDay[from]! -= 1;
 		gamesPerDay[to]! += 1;
@@ -299,16 +417,18 @@ export const createScheduleEditor = (
 		] as const) {
 			for (const tid of teams) {
 				if (otherTeams.includes(tid)) {
+					// In both games: same days, the opponents trade places
+					if (teams === ti) {
+						const list = teamDays.get(tid)!;
+						delta +=
+							repeatCost(tid, list, -1, -1, di, dj) - repeatCost(tid, list);
+					}
 					continue;
 				}
 				if (teamGameOnDay.get(tid)!.has(to)) {
 					return undefined;
 				}
-				const list = teamDays.get(tid)!;
-				const target = b2bTarget.get(tid)!;
-				delta +=
-					teamRestCost(replaceDay(list, from, to), target) -
-					teamRestCost(list, target);
+				delta += teamDelta(tid, from, to);
 			}
 		}
 		return delta;
@@ -329,6 +449,7 @@ export const createScheduleEditor = (
 				}
 				teamDays.set(tid, replaceDay(teamDays.get(tid)!, from, to));
 				teamGameOnDay.get(tid)!.delete(from);
+				gameAt.get(tid)![from] = -1;
 			}
 		}
 		for (const [game, teams, day] of [
@@ -337,6 +458,7 @@ export const createScheduleEditor = (
 		] as const) {
 			for (const tid of teams) {
 				teamGameOnDay.get(tid)!.set(day, game);
+				gameAt.get(tid)![day] = game;
 			}
 			gameDays[game] = day;
 		}
@@ -346,7 +468,7 @@ export const createScheduleEditor = (
 	const totalCost = () => {
 		let cost = 0;
 		for (const [tid, list] of teamDays) {
-			cost += teamRestCost(list, b2bTarget.get(tid)!);
+			cost += teamRestCost(list, b2bTarget.get(tid)!) + repeatCost(tid, list);
 		}
 		return cost;
 	};

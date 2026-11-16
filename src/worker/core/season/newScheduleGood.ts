@@ -10,6 +10,8 @@ import { TOO_MANY_TEAMS_TOO_SLOW } from "./getInitialNumGamesConfDivSettings.ts"
 import groupScheduleSeries from "./groupScheduleSeries.ts";
 import groupScheduleCompact from "./groupScheduleCompact.ts";
 import { shuffle } from "../../../common/random.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+import orderDaysSpreadMatchups from "./orderDaysSpreadMatchups.ts";
 
 type MyTeam = {
 	seasonAttrs: {
@@ -930,7 +932,13 @@ const newSchedule = (
 		// Otherwise the most dense days will be at the beginning and the least dense days will be at the end
 		shuffle(days);
 
-		tids = days.flat();
+		// Spread Out Matchups: no team meets the same opponent in consecutive games (the realistic schedule length orders the games
+		// itself)
+		tids = (
+			featureOn("spreadMatchups") && !featureOn("realisticSchedule")
+				? orderDaysSpreadMatchups(days)
+				: days
+		).flat();
 	}
 
 	return {
