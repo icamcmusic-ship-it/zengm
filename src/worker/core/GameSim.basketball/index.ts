@@ -4037,7 +4037,6 @@ class GameSim extends GameSimBase {
 					g.get("threePointTendencyFactor") *
 					(this.coachSys ? this.cs[this.o].three * this.cs[this.d].dThree : 1) *
 					(sc ? (selfCreated ? CREATION.selfThree : CREATION.otherThree) : 1) *
-					(this.starClutchCal ? this.clutchThreeMult() : 1) *
 					(this.playTypes
 						? PLAY_TYPES.three *
 							(selfCreated ? PLAY_TYPES.selfThree : PLAY_TYPES.otherThree) *
@@ -4966,15 +4965,6 @@ class GameSim extends GameSimBase {
 			this.t <= 300 &&
 			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <= 5
 		);
-	}
-
-	// Star & Clutch Calibration: in clutch time a team down 3 to 5 hunts threes (more variance for the trailing team)
-	clutchThreeMult() {
-		if (!this.isClutchNba()) {
-			return 1;
-		}
-		const down = this.team[this.d].stat.pts - this.team[this.o].stat.pts;
-		return down >= 3 ? CLUTCH.trailThree : 1;
 	}
 
 	// Star & Clutch Calibration: in clutch time the stars take over (a multiplier on the shooter and creator draw powers)

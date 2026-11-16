@@ -10,21 +10,23 @@
 // five's expected make probability is about unchanged, so team scoring stays put, and the extra difficulty is on its main options.
 // No random numbers are added
 export const STAR = {
-	ref: 0.22,
-	make: 0.6,
+	ref: 0.21,
+	make: 0.7,
 	give: 1,
 };
 
-// Clutch time (the last 5 minutes of the final period or overtime, within 5)
+// Clutch time (the last 5 minutes of the final period or overtime, within 5). The test leagues had clutch FG% above the full game's
+// (.468 vs .459; NBA about 4 points below), stars' usage going down in clutch time (25.6 vs 26.5; NBA up) and clutch +/- totals of
+// +-110 to 130 (NBA leaders about +60 to +90): the winner of a close game outscored the loser by more in clutch time than in the NBA,
+// partly through trailing teams fouling down 4-6 with up to a minute left, so the leader's free throws counted while the trailer's
+// answers (starting 6+ down) did not
 export const CLUTCH = {
 	// Multiplier on the powers of the shooter and creator draws
-	usage: 1,
+	usage: 1.3,
 	// Change to the make probability of every shot
-	make: 0,
-	// Multiplier on the three-point share of a team down 3 to 5
-	trailThree: 1,
+	make: -0.035,
 	// A team down 4 to 6 fouls on purpose inside foulAlways seconds, and 30% of the time inside foulSometimes (stock 35 and 60; scaled by
 	// the coach's game management with Coaching Systems)
-	foulAlways: 35,
-	foulSometimes: 60,
+	foulAlways: 24,
+	foulSometimes: 40,
 };

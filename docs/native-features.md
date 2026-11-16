@@ -77,6 +77,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [End-of-game intelligence](#end-of-game-intelligence) | game sim (timeouts, late-game substitutions and fouls, clock) | bball | `smartEndgame` | on / off |
 | [Load, fatigue & venue](#load-fatigue--venue) | game sim (fatigue, injuries, home court, referees, travel) | bball | `scheduleLoad` | on / off |
 | [Realistic turnovers](#realistic-turnovers) | game sim (turnovers, steals) | bball | `realisticTurnovers` | on / off |
+| [Star & Clutch Calibration](#star--clutch-calibration) | game sim (star efficiency, clutch time) | bball | `starClutchCal` | on / off |
 | [Realistic play types](#realistic-play-types) | game sim (shot selection, putbacks) | bball | `realisticPlayTypes` | on / off |
 | [Offensive emphasis](#offensive-emphasis) | game sim (play-type decisions), Coaching Staff → Offense tab, Staff Report | bball | `featureOffEmphasis` | on / off |
 | [Advanced tracking stats](#advanced-tracking-stats) | Player Stats tabs, player page, Team Stats → Lineups tab, GOAT lab, DPOY | bball | `advStats` | on / off |
@@ -171,6 +172,7 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `smartEndgame`                                                                                            | on / off                                                        |                                                                                                                                        |
 | `scheduleLoad`                                                                                            | on / off                                                        | option `scheduleLoadRefVariance` on                                                                                                    |
 | `realisticTurnovers`                                                                                      | on / off                                                        |                                                                                                                                        |
+| `starClutchCal`                                                                                           | on / off                                                        | needs Matchup Defense                                                                                                                   |
 | `realisticPlayTypes`                                                                                      | on / off                                                        |                                                                                                                                        |
 | `featureOffEmphasis`                                                                                      | on / off                                                        | needs `realisticPlayTypes`                                                                                                             |
 | `advStats`                                                                                                | on / off                                                        | off: nothing is recorded or stored                                                                                                     |
@@ -1027,6 +1029,35 @@ season). Never for an edited face. Measured over 3,000 seeds:
   **Close games:** games within 3 points 12.5% → 12.6%, within 5 22.1% → 22.3%, overtime 3.5% → 3.7%, home win% .587 → .593 (noise), points per team in the last 2:00 and overtime 4.75 → 4.76. The leader with a minute left wins .957 → .954 of games; leading by 1–3 then, .760 → .727 (trailing teams foul the right player and advance the ball more often). **Game managers** (each pair of rosters with a +1 and a −1 game manager, everything else neutral, swapped halfway; 9,600 games): the good manager wins .500 of all games and .525 of close ones (within 5 or overtime), against .503 / .530 with the setting off, where game management already moved when teams start fouling and take timeouts.
 
 - **Known limits:** timeouts are only for runs and the end of games (no media timeouts, no timeouts to save a possession or to ice a shooter); the offense/defense substitution is decided at dead balls only, so it doesn't happen on a live-ball change of possession.
+
+### Star & Clutch Calibration
+
+- **Setting:** `starClutchCal` (League Extras → Game Simulation). On for new leagues, off for existing leagues (off: nothing runs, the same games as before: `outcomeInvariance.test.ts`). Needs Matchup Defense; not in All-Star games. Code: constants in `src/worker/core/GameSim.basketball/starClutch.ts`, hooks in `GameSim.pickShooter` (attention load), `doShot` (make probability), `usagePower` / `creationPower` (`clutchUsageMult`), `shouldIntentionalFoulRealistic`. No random numbers are added. Calibration: `SCAL=1 SCAL_SEEDS=1,2,3,4 SCAL_SEASONS=4 SCAL_OUT=/tmp/x.jsonl simCalibration.script.test.ts` (whole seasons with offseasons; one JSON line per season with players' PER/BPM/clutch stats, teams' clutch records and every clutch game's margins; `SCAL_SETTINGS`, `SCAL_CONST='{"star":{..},"clutch":{..}}'`).
+- **Diagnosis, superstars:** in 16 new leagues × 4 seasons the league-leading PER averaged 33.9 (above 32 in 45 of 64 seasons; NBA 2016–2025 leaders 30.9–32.8) and BPM 15.0 (NBA 10.9–13.6). Not usage (leaders 30% vs NBA 29–36%), minutes (32.6 vs 34–35), rebounding or assists (TRB% ~17, AST% ~26, NBA-like): efficiency. The leaders' true shooting was +.11 over the league (NBA leaders about +.06), two-pointers +.10 and threes +.04 over the league. Second cause, outside the sim: team strength is spread wider than the NBA's (win% SD .18 vs ~.15, net ratings −26 to +24), and BPM's team adjustment hands a 70-win team's star +2 to +4.
+- **Fix, attention by load:** each shot loses 0.7 × (shooter's share of his five's shot draw − 0.21) of make probability above 0.21, and every shot of that five gets back the five's expected loss (Σ share × loss), so a lineup's expected make probability, and team scoring, stay put; the difficulty moves onto its main options (a Matchup Defense attention penalty already existed above share 0.32, which almost nobody reached).
+- **Diagnosis, clutch:** turning off End-of-Game Intelligence, Coaching Systems, Player Traits or Realistic Rotations one at a time changed none of the clutch numbers beyond noise, so no feature is broken. Clutch shooting was better than the full game's (FG% .468 vs .459, TS .585 vs .555; NBA clutch FG% about 4 points below), the stars' usage went down in clutch time, and trailing teams fouled down 4–6 from a minute out, so leaders' free throws counted as clutch while the trailer's answers (starting 6+ down) did not.
+- **Fix, clutch:** in clutch time (last 5 minutes, within 5) every shot −0.035 make probability, shooter and creator draw powers × 1.3 (stars take over), and a team down 4–6 fouls on purpose only inside 24 s (30% inside 40 s) instead of 35 s (30% inside 60 s).
+- **Results** (16 new leagues, seeds 1–16, 4 seasons each with offseasons, 64 league-seasons per mode; `simCalibration.script.test.ts`), off → on:
+
+  | | off | on | NBA |
+  | --- | --- | --- | --- |
+  | PER top 5 (mean by rank, 1500+ min) | 33.9 / 30.6 / 29.2 / 28.1 / 27.1 | 31.3 / 28.8 / 27.5 / 26.4 / 25.7 | 31.6 / 30.3 / 29.8 / 26.9 / 25.6 |
+  | PER leader in 27–32 / above 32 | 19 / 45 | 43 / 20 | |
+  | BPM top 5 | 15.0 / 12.9 / 11.6 / 10.8 / 10.1 | 13.2 / 11.3 / 10.3 / 9.5 / 8.8 | 12.6 / 10.5 / 9.2 / 8.2 / 7.1 |
+  | BPM leader in 9–12 / above 12 | 9 / 55 | 22 / 42 | |
+  | top-5 PER players TS / usage | .647 / 28.1 | .628 / 27.1 | |
+  | team pts / pace / ORtg | 109.15 / 101.15 / 107.87 | 108.94 / 101.14 / 107.68 | |
+  | team 3PA rate / FTA per FGA / TOV | .343 / .255 / 14.40 | .343 / .254 / 14.43 | |
+  | clutch ORtg (full game 107.7) / clutch TS | 112.4 / .585 | 106.5 / .551 | below full game |
+  | team's top-usage star: usage, clutch usage | 26.5, 25.4 | 26.5, 27.0 | rises |
+  | clutch games per team / share of teams .400–.600 | 28.6 / .63 | 28.7 / .63 | ~35–45 / |
+  | clutch W% p05–p95, SD (binomial floor .095) | .303–.692, .120 | .304–.696, .119 | |
+  | player clutch +/- leader mean (range) | +82 (61 to 124) | +80 (55 to 118) | about +60 to +90 |
+  | player clutch +/- low mean (range) | −79 (−120 to −50) | −78 (−140 to −42) | |
+  | clutch-game winner's clutch +/-, share ≥ 10 | 4.60, .108 | 4.44, .096 | |
+
+  Reference NBA values: Basketball-Reference advanced tables 2016, 2019, 2022, 2024, 2025 (1500+ minutes); clutch records and games from NBA.com (2025-26: 24–39 clutch games per team by mid-March, best record .769).
+- **Known limits:** PER is now in the NBA range on average; BPM is still about 1 high at every rank, and leagues with a 65–75-win team (seeds 6, 7, 8, 12) still produce BPM 15–19 and PER 34–39: that is the team spread above, which is roster building, not the game sim. Close-game record spread is unchanged (not made more random), and the extreme clutch +/- seasons (±120–140) are players on those same extreme teams; per-game clutch margins shrank only a little.
 
 ### Load, fatigue & venue
 
