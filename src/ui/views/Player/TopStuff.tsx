@@ -668,6 +668,17 @@ const TopStuff = ({
 										}
 									/>
 									<br />
+									{player.archetype.twoK ? (
+										<>
+											<span
+												className="small text-body-secondary"
+												data-testid="player-archetype-2k"
+											>
+												2K: {player.archetype.twoK}
+											</span>
+											<br />
+										</>
+									) : null}
 								</>
 							) : null}
 							Experience:{" "}

@@ -283,6 +283,44 @@ describe("stored archetypes", () => {
 		assert.strictEqual(info!.why.length, 3);
 	});
 
+	test("Archetype Label Source: 2K's archetype for a real player in the list, nothing for anyone else", async () => {
+		const vet = (await idb.cache.players.indexGetAll("playersByTid", 4))[0]!;
+		const season = (vet.ratings.at(-1) as any).season as number;
+		const base = await archetypeInfoForPlayer(vet);
+		assert.ok(base);
+		// A random player (no srID): every mode shows the game's label and nothing else
+		for (const mode of ["game", "twoK", "both"]) {
+			g.setWithoutSavingToDB("archetypeLabelSource" as any, mode);
+			const info = await archetypeInfoForPlayer(vet);
+			assert.strictEqual(info!.label, base!.label, mode);
+			assert.strictEqual(info!.twoK, undefined);
+			assert.strictEqual(info!.gameLabel, undefined);
+		}
+		// The same player as a real one in the user's 2K list that season (an all-time entry: Kyrie Irving's Cavaliers season)
+		const real = {
+			...vet,
+			srID: "irvinky01",
+			lastName: "Irving",
+			ratings: vet.ratings.map((r) => ({ ...r, season: 2015 })),
+			archetypes: vet.archetypes?.map((a) => ({ ...a, season: 2015 })),
+		};
+		const at = (mode: string) => {
+			g.setWithoutSavingToDB("archetypeLabelSource" as any, mode);
+			return archetypeInfoForPlayer(real as any);
+		};
+		const game = await at("game");
+		assert.strictEqual(game!.twoK, undefined);
+		assert.notStrictEqual(game!.label, "Iso Savant");
+		const twoK = await at("twoK");
+		assert.strictEqual(twoK!.label, "Iso Savant");
+		assert.strictEqual(twoK!.gameLabel, game!.label);
+		const both = await at("both");
+		assert.strictEqual(both!.label, game!.label);
+		assert.strictEqual(both!.twoK, "Iso Savant");
+		g.setWithoutSavingToDB("archetypeLabelSource" as any, "game");
+		assert.ok(season > 0);
+	});
+
 	test("league norms: a big league uses its own distribution, a small one the built-in reference", async () => {
 		const norms = await getLeagueNorms();
 		assert.ok(norms === DEFAULT_NORMS || Object.keys(norms.match).length > 100);

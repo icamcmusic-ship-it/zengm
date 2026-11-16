@@ -19,6 +19,10 @@ export type ArchetypeLabelInfo = {
 	// archfb: the player (for "Doesn't fit?") and whether the label is the user's own pick
 	pid?: number;
 	user?: boolean;
+	// arch2kfix (Archetype Label Source): "Show both": NBA 2K's archetype for him (a second line where there is room);
+	// "2K labels when known": the game's label (the shown label is 2K's)
+	twoK?: string;
+	gameLabel?: string;
 };
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
@@ -51,10 +55,22 @@ export const ArchetypeWhy = ({
 }: {
 	info: Pick<
 		ArchetypeLabelInfo,
-		"desc" | "why" | "whyBullets" | "tier" | "conf" | "season" | "live"
+		| "desc"
+		| "why"
+		| "whyBullets"
+		| "tier"
+		| "conf"
+		| "season"
+		| "live"
+		| "gameLabel"
 	>;
 }) => (
 	<div className="archetype-popover">
+		{info.gameLabel ? (
+			<p className="mb-2 text-body-secondary">
+				NBA 2K's archetype for him. In this game: {info.gameLabel}.
+			</p>
+		) : null}
 		<p className="mb-2">{info.desc}</p>
 		{info.whyBullets && info.whyBullets.length > 0 ? (
 			<>
