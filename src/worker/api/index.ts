@@ -1,4 +1,3 @@
-import { newLeagueSalt } from "../../common/leagueSalt.ts";
 import { csvFormat, csvFormatRows } from "d3-dsv";
 import type {
 	CoachRole,
@@ -4710,25 +4709,7 @@ const rerollLeagueSalt = async () => {
 	if (!g.get("godMode")) {
 		throw new Error("God Mode required");
 	}
-	const from = g.get("leagueSalt") ?? 0;
-	let to = newLeagueSalt();
-	while (to === from) {
-		to = newLeagueSalt();
-	}
-	const history = [
-		...(g.get("leagueSaltHistory") ?? []),
-		{ season: g.get("season"), phase: g.get("phase"), from, to },
-	];
-	await league.setGameAttributes({
-		leagueSalt: to,
-		leagueSaltHistory: history,
-	});
-	logEvent({
-		type: "gameAttribute",
-		text: `League salt re-rolled (${from} to ${to}): values derived from now on are different.`,
-		showNotification: false,
-		score: 0,
-	});
+	const { to } = await league.rerollSalt();
 	await idb.cache.flush();
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 	return to;
