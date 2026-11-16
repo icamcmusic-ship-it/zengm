@@ -1,3 +1,4 @@
+import { salted } from "../../common/leagueSalt.ts";
 import {
 	getRivalryNewsFacts,
 	rivalryStoriesOn,
@@ -935,7 +936,7 @@ export const getNewsFacts = async (
 	const facts: NewsFacts = {
 		leagueName: await league.getName(),
 		noRatings: noRatings() || undefined,
-		seedKey: `${g.get("lid")}|${g.get("startingSeason")}`,
+		seedKey: salted(`${g.get("lid")}|${g.get("startingSeason")}`),
 		season,
 		edition,
 		numGames: g.get("numGames", season),

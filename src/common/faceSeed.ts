@@ -1,6 +1,7 @@
 // Seeded random numbers for faces (face aging, face styles, style events): a string hash, never Math.random or the
 // game's random stream, so faces never change a game or league result.
 
+import { salted } from "./leagueSalt.ts";
 export const hashFaceKey = (s: string) => {
 	let h1 = 0xdeadbeef;
 	let h2 = 0x41c6ce57;
@@ -20,11 +21,11 @@ export const hashFaceKey = (s: string) => {
 
 // One uniform number in [0, 1) for a key
 export const seededUniform = (...key: (string | number)[]) =>
-	hashFaceKey(key.join("|")) / 4294967296;
+	hashFaceKey(salted(key.join("|"))) / 4294967296;
 
 // A seeded generator for several numbers
 export const seededRandom = (...key: (string | number)[]) => {
-	let a = hashFaceKey(key.join("|"));
+	let a = hashFaceKey(salted(key.join("|")));
 	return () => {
 		a = (a + 0x6d2b79f5) | 0;
 		let t = Math.imul(a ^ (a >>> 15), 1 | a);

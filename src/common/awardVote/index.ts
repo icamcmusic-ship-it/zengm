@@ -7,6 +7,7 @@
 // Ported from League Explorer's awardvote.js (simplified: no per-term formula split). Pure, so the UI, the worker and
 // tests share it.
 
+import { salted } from "../leagueSalt.ts";
 export type VoteCandidate = {
 	pid: number;
 	tid: number;
@@ -315,7 +316,7 @@ export const simulateVote = (
 	if (cands.length === 0) {
 		return undefined;
 	}
-	const fullSeed = hashString(`${seed}|${input.shortName}`);
+	const fullSeed = hashString(salted(`${seed}|${input.shortName}`));
 	const spread = sd(cands.map((c) => c.score).slice(0, 10));
 	const shift = cands.map(() => 0);
 	const P = params ?? VOTE_PARAMS[input.kind];

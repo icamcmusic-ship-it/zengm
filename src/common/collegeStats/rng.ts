@@ -1,5 +1,6 @@
 // Small seeded random number generator, so the same seed always gives the same college seasons
 
+import { salted } from "../leagueSalt.ts";
 export const hashString = (str: string) => {
 	// cyrb128-ish, returns a 32 bit seed
 	let h1 = 1779033703 ^ str.length;
@@ -19,7 +20,7 @@ export class Rng {
 	private spare: number | undefined;
 
 	constructor(seed: string) {
-		this.state = hashString(seed) || 1;
+		this.state = hashString(salted(seed)) || 1;
 	}
 
 	// mulberry32

@@ -1,6 +1,7 @@
 // Draft lottery night (Draft Lottery Night & Combine setting): the presentation of a lottery that has already been run. The reveal
 // order, jumps and falls, the recap and the team reactions are all derived from the saved result, without random numbers (the
 // reactions pick their wording from a hash of the season and team).
+import { salted } from "./leagueSalt.ts";
 import { hashString } from "./collegeStats/rng.ts";
 import { helpers } from "./helpers.ts";
 
@@ -136,7 +137,7 @@ export type LotteryReactionTeam = {
 };
 
 const pickOne = (options: string[], seed: string) =>
-	options[hashString(seed) % options.length]!;
+	options[hashString(salted(seed)) % options.length]!;
 
 /**
  * One line of GM or fan reaction for a team's lottery result. Deterministic: same season, team and result, same line.

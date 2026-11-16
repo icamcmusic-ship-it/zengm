@@ -1,4 +1,5 @@
 // Small pure helpers of the hype engine
+import { salted } from "../leagueSalt.ts";
 import { hashString } from "../wrapped/util.ts";
 import type { HBoxLine, HListed, HRow, HTot, StatKey } from "./types.ts";
 
@@ -34,7 +35,7 @@ export const fmtN = (x: number) => Math.round(x).toLocaleString("en-US");
 
 // Pick one phrasing, the same one every time for the same game
 export const pick = <T>(gid: number, salt: number, arr: readonly T[]): T =>
-	arr[hashString(`${gid}:${salt}`) % arr.length]!;
+	arr[hashString(salted(`${gid}:${salt}`)) % arr.length]!;
 
 // "a 7-point" or "an 8-point"
 export const an = (n: number) =>

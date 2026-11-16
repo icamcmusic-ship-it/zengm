@@ -66,6 +66,7 @@ export type Key =
 	| "challengeSisyphusMode"
 	| "challengeThanosMode"
 	| "realPlayerDeterminism"
+	| "varyRealPlayers"
 	| "repeatSeason"
 	| "maxOvertimes"
 	| "maxOvertimesPlayoffs"

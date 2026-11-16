@@ -1,3 +1,4 @@
+import { newLeagueSalt } from "../../../common/leagueSalt.ts";
 import { season } from "../index.ts";
 import { DIFFICULTY, PHASE, WEBSITE_ROOT } from "../../../common/constants.ts";
 import type {
@@ -123,6 +124,16 @@ const createGameAttributes = async (
 		if (!gameAttributes.userTids.includes(userTid)) {
 			gameAttributes.userTids = [userTid];
 		}
+	}
+
+	// League salt: every new league (random players, real players, custom files) gets its own. A file's own salt is kept, and a league
+	// file exported by this fork before salts existed (it has playerTraitsSeed but no leagueSalt) keeps salt 0, so it plays as before.
+	// Checked before playerTraitsSeed is filled in below.
+	if (
+		gameAttributesInput?.leagueSalt === undefined &&
+		gameAttributesInput?.playerTraitsSeed === undefined
+	) {
+		gameAttributes.leagueSalt = newLeagueSalt();
 	}
 
 	// Basketball player traits: every new league gets its own seed for the stored trait components (leagues from before this existed keep 0)

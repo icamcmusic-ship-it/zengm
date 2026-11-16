@@ -1,5 +1,6 @@
 // Small text helpers and a seeded RNG for the newspaper engine. Pure functions only.
 
+import { salted } from "../leagueSalt.ts";
 import type { NPRecord, Seg } from "./types.ts";
 
 // FNV-1a string hash
@@ -16,7 +17,7 @@ export class Rng {
 	private state: number;
 
 	constructor(seed: string) {
-		this.state = hashString(seed) || 1;
+		this.state = hashString(salted(seed)) || 1;
 	}
 
 	// mulberry32

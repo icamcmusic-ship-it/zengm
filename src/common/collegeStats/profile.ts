@@ -1,3 +1,4 @@
+import { salted } from "../leagueSalt.ts";
 import { LEAGUE_ENV } from "./overseas.ts";
 import { Rng, clamp, hashString } from "./rng.ts";
 
@@ -616,7 +617,7 @@ export const getClub = (league: string, pid: number) => {
 	if (!clubs) {
 		return undefined;
 	}
-	return clubs[hashString(`club|${league}|${pid}`) % clubs.length]!;
+	return clubs[hashString(salted(`club|${league}|${pid}`)) % clubs.length]!;
 };
 
 export type TeamRecord = {

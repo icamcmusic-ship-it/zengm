@@ -3,11 +3,15 @@ import { IDBKeyRange } from "fake-indexeddb";
 import fs from "node:fs/promises";
 import { beforeAll } from "vitest";
 import { overridePostMessage } from "./overridePostMessage.ts";
+import { setNewLeagueSaltOverride } from "../common/leagueSalt.ts";
 
 // When mockIDBLeague is used, sometimes IDBKeyRange still gets called even though there is no actual database
 globalThis.IDBKeyRange = IDBKeyRange;
 
 overridePostMessage();
+
+// League salt: leagues made by tests get salt 0, so their values are the same as before salts existed (common/leagueSalt.ts)
+setNewLeagueSaltOverride(() => 0);
 
 // Test files share a worker (isolate: false), and many seed Math.random for a deterministic league without putting it back. Start every file with the real one, so a file's randomness never depends on which file happened to run before it in the same worker.
 const NATIVE_RANDOM = Symbol.for("zengm.nativeMathRandom");

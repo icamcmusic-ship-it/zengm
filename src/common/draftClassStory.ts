@@ -1,3 +1,4 @@
+import { salted } from "./leagueSalt.ts";
 import { COLLEGES, CONFERENCES } from "./collegeStats/colleges.ts";
 import { hashString } from "./collegeStats/rng.ts";
 import { DRAFT_CLASS_SHAPES, type DraftClassShape } from "./draftClassShape.ts";
@@ -142,7 +143,7 @@ export type ClassStoryInput = {
 
 // A choice of wording that is the same every time for the same class
 const pickWording = (seed: string, options: string[]) =>
-	options[hashString(seed) % options.length]!;
+	options[hashString(salted(seed)) % options.length]!;
 
 const describeNo1 = (draftYear: number, p: StoryProspect) => {
 	const who = `${p.age}-year-old ${positionName(p.pos)}`;

@@ -14,6 +14,7 @@ export const gameAttributesSyncedToUi = [
 	"godMode",
 	"hideDisabledTeams",
 	"homeCourtAdvantage",
+	"leagueSalt",
 	"leagueType",
 	"lid",
 	"luxuryPayroll",
