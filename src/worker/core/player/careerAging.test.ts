@@ -10,6 +10,7 @@ import {
 	mileageExcess,
 	reinventionStrength,
 	specialtyOf,
+	usefulVeteran,
 } from "./careerAging.ts";
 
 const row = (season: number, x: Record<string, number> = {}) => ({
@@ -181,5 +182,21 @@ describe("careerAging", () => {
 			ovr: 50,
 		});
 		assert.isAtLeast(old.add, 0.5);
+	});
+
+	test("a veteran is useful when he'd be in his team's top 13, not for a rebuilding team", () => {
+		const season = g.get("season");
+		const vet = (age: number, value: number) => ({
+			born: { year: season - age },
+			value,
+			injury: { gamesRemaining: 0 },
+		});
+		const roster = Array.from({ length: 14 }, (_, i) => 60 - i * 2); // 13th best is 36
+		assert.isTrue(usefulVeteran(vet(35, 40), roster, "contending"));
+		assert.isFalse(usefulVeteran(vet(35, 35), roster, "contending"));
+		assert.isFalse(usefulVeteran(vet(32, 40), roster, "contending"));
+		assert.isFalse(usefulVeteran(vet(38, 40), roster, "contending"));
+		assert.isFalse(usefulVeteran(vet(35, 40), roster, "rebuilding"));
+		assert.isTrue(usefulVeteran(vet(36, 50), roster.slice(0, 8), "contending"));
 	});
 });
