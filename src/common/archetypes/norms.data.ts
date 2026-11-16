@@ -5052,10 +5052,10 @@ export const DEFAULT_NORMS: Norms = {
 		"stretch-four": 0,
 		"stretch-riser": 0,
 		"wing-running-high-flyer": 0,
-		"glue-wing": 0,
-		"glue-guard": 0,
-		"steady-game-manager": 0,
-		"energy-big": 0,
+		"glue-wing": 1,
+		"glue-guard": 0.4,
+		"steady-game-manager": 1.1,
+		"energy-big": 0.8,
 	},
 	pq: {
 		PG: {

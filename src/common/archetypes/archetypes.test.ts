@@ -1196,7 +1196,7 @@ const PINNED: [string, number, string][] = [
 	["jokicni01", 2025, "post-dimming-board-enforcer"], // Nikola Jokić
 	["goberru01", 2025, "backline-power-finisher"], // Rudy Gobert
 	["antetgi01", 2025, "crafty-paint-finishing-cleaner"], // Giannis Antetokounmpo (arch16: no jumper, not mid-range)
-	["duranke01", 2025, "crafty-mid-paint-scorer"], // Kevin Durant
+	["duranke01", 2025, "crafty-mid-post-scorer"], // Kevin Durant (archgaps fix B: the mid-post build is open at FC)
 	["paulch01", 2025, "ball-hawking-3-and-d-point"], // Chris Paul
 	["greendr01", 2025, "shot-erasing-board-enforcer"], // Draymond Green
 	["thompkl01", 2025, "skilled-stretch"], // Klay Thompson (archuser2k: one of the 2K shooting builds)

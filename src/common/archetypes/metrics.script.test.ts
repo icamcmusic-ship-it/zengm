@@ -25,6 +25,7 @@ import {
 	scoreAll,
 } from "./classify.ts";
 import { GOLD } from "./gold.data.ts";
+import { classifyV2 } from "./v2/engine.ts";
 import { mergedId } from "./merges.data.ts";
 import { positionFor } from "./position.ts";
 import { promisesOf } from "./score.ts";
@@ -111,7 +112,7 @@ const population = (label, players, out) => {
 	const poorBy = {};
 	let poor = 0;
 	for (const p of players) {
-		const c = classify(p.ratings, read(p));
+		const c = classifyV2(p.ratings, read(p));
 		p.c = c;
 		counts[c.id] = (counts[c.id] ?? 0) + 1;
 		if (isPoorFit(c)) {
@@ -195,7 +196,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 		for (const [slug, season, ok, spec] of GOLD) {
 			const row = d.ratings.find((x) => x.slug === slug && x.season === season);
 			const p = realPlayer(d, st, row);
-			const c = classify(p.ratings, read(p));
+			const c = classifyV2(p.ratings, read(p));
 			if (ok.map(mergedId).includes(c.id)) hit++;
 			else if (specOk(archetypeById(c.id), spec))
 				unlisted.push(
@@ -239,7 +240,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 				.slice(0, 150);
 			const counts = {};
 			for (const p of top) {
-				const id = classify(p.ratings, read(p)).id;
+				const id = classifyV2(p.ratings, read(p)).id;
 				counts[id] = (counts[id] ?? 0) + 1;
 			}
 			const [id, n] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
@@ -257,7 +258,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 					// (the sub-ratings move with their bases)
 					if (r.sub)
 						r.sub = r.sub.map((x) => Math.max(0, Math.min(100, x + s)));
-					const c = classify(r, read(p));
+					const c = classifyV2(r, read(p));
 					n++;
 					if (c.id === p.c.id) same++;
 				}
@@ -287,7 +288,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 					const r = ratingsOfRow(row);
 					prevPos = positionFor(r, true, prevPos, { previousRatings: prevR });
 					prevR = r;
-					const c = classify(r, {
+					const c = classifyV2(r, {
 						norms: NORMS,
 						previousId: prev?.id,
 						pos: prevPos,
@@ -315,7 +316,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 				st,
 				d.ratings.find((x) => x.slug === slug && x.season === season),
 			);
-			const c = classify(p.ratings, read(p));
+			const c = classifyV2(p.ratings, read(p));
 			return `${p.name} ${p.pos}: ${c.name} [${c.alternates.map((a) => a.name).join(", ")}] fit ${c.fit} sim ${c.score}`;
 		});
 		out.push("pinned stars:\n  " + pins.join("\n  "));
@@ -328,7 +329,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_METRICS)(
 				);
 				for (const p of [...ps].sort((x, y) => y.ovr - x.ovr).slice(0, n)) {
 					const r = read(p);
-					const c = classify(p.ratings, r);
+					const c = classifyV2(p.ratings, r);
 					const sc = scoreAll(
 						p.ratings,
 						r.norms,

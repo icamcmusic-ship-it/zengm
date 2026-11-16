@@ -127,6 +127,9 @@ export const SPOT_BIAS: Record<string, number> = {
 export const GENERIC_BIAS = 0.3;
 // arch16: how far below a generic best a specific build may be and still be shown instead (classify)
 export const GENERIC_FALLBACK_Z = 1.5;
+// archgaps fix C (user-approved): for a shooter (three or mid-range at SHOOTER_CV or more on the blended reading)
+export const SHOOTER_CV = 0.8;
+export const SHOOTER_FALLBACK_Z = 2.5;
 // A runner-up is only listed when its fit is within this much (in z) of the label's
 export const ALTERNATE_Z = 0.6;
 
@@ -809,7 +812,7 @@ const classifyRead = (
 	opts: ClassifyOptions = {},
 ): Classification => {
 	const norms = opts.norms ?? defaultNormsFor(ratings);
-	const { scored, z, expanded, pos } = scoreAll(
+	const { scored, z, expanded, pos, cv } = scoreAll(
 		ratings,
 		norms,
 		ARCHETYPES,
@@ -855,6 +858,9 @@ const classifyRead = (
 	let fitNote: string | undefined;
 	if (isGenericBuild(first.a)) {
 		const g = first;
+		// (archgaps fix C: a pure or mid-range shooter falls back to a shooter's build too, from further away)
+		const shooter =
+			(cv.shoot ?? 0) >= SHOOTER_CV || (cv.mid ?? 0) >= SHOOTER_CV;
 		const ok = (s: Scored) =>
 			s.z > BLOCKED_Z &&
 			!isGenericBuild(s.a) &&
@@ -863,8 +869,9 @@ const classifyRead = (
 			s.raw >= POOR_FIT_SCORE &&
 			(s.catchAll ?? 0) === 0 &&
 			// (the best of his generic build's family: a specific name from another family would say something he is not)
-			familyOf(s.a) === familyOf(g.a) &&
-			g.z - s.z < GENERIC_FALLBACK_Z;
+			(familyOf(s.a) === familyOf(g.a) ||
+				(shooter && familyOf(s.a) === "shooter")) &&
+			g.z - s.z < (shooter ? SHOOTER_FALLBACK_Z : GENERIC_FALLBACK_Z);
 		// (his previous label when it is one of them, so the fallback does not flip between seasons)
 		const specific =
 			scored.find((s) => s.a.id === previousId && ok(s)) ?? scored.find(ok);
