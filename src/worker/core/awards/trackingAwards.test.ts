@@ -230,6 +230,15 @@ describe("variables", () => {
 		expect(some.playoffs).toBe(true);
 		expect(some.stats.has("dfgp")).toBe(true);
 		expect(some.stats.has("onOffNet")).toBe(true);
+		// Only the playoff variants the formulas use go on the rows (the award pages get every candidate's rows; all of them
+		// was a few hundred mostly-NaN values per row)
+		expect([...some.playoffKeys]).toEqual(["trkImpact"]);
+		const row: Record<string, any> = trackedRow({});
+		addPlayoffVariants(row, { trkImpact: 0.25 }, some.playoffKeys);
+		expect(row.trkImpactPlayoffs).toBe(0.25);
+		expect(Object.keys(row).filter((k) => k.endsWith("Playoffs"))).toEqual([
+			"trkImpactPlayoffs",
+		]);
 	});
 
 	test("editor documentation lists them with descriptions", () => {

@@ -655,7 +655,7 @@ export const NATIVE_FEATURES = [
 		key: "featureForkFaces",
 		name: "New Face Styles",
 		description:
-			"New male players' (and staff's) faces use the fork's style catalogue: fades, waves, twists, locs, braids, beards and stubble, plus the fork's heads, eyes, brows, noses, ears, lines and accessories. Hair is picked to fit the hair texture and age, with common, uncommon and rare styles and a few dyed heads. Seeded from the face, so no game randomness. Existing faces and faces you edit are never changed. See Tools → Face Style Gallery; every style can be picked in Customize Player.",
+			"New male players' (and staff's) faces use the fork's style catalogue: fades, waves, twists, locs, braids, beards and stubble, plus the fork's heads, eyes, brows, noses, ears, lines and accessories. Hair is picked to fit the hair texture and age, with common, uncommon and rare styles and a few dyed heads; older coaches and GMs have a few looks of their own. Players out with a nose or facial injury wear a nose bandage on the player page (not stored). Seeded from the face, so no game randomness. Existing faces and faces you edit are never changed. See Tools → Face Style Gallery; every style can be picked in Customize Player.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,

@@ -19,6 +19,8 @@ const leaguePartDescriptions: Record<string, string> = {
 	scheduledEvents:
 		"Scheduled events, like expansion and league rule changes. For more control, go to Tools > Scheduled Events after creating your league.",
 	headToHeads: "Team head-to-head results",
+	rivalryGames: "Rivalry Stories game log",
+	rivalrySeasons: "Rivalry Stories season summaries",
 	seasonLeaders: "Season leaders cache",
 	savedTrades: "Saved trades",
 	savedTradingBlock: "Current trading block",
