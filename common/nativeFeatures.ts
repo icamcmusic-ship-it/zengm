@@ -597,6 +597,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "starClutchCal",
+		key: "starClutchCal",
+		name: "Star & Clutch Calibration",
+		description:
+			"Two sim calibrations from multi-season test leagues. Defensive attention scales with how much of his team's offense a player carries: the more of the shots he would take, the tougher they get, and the help leaves his teammates a little more open (team scoring stays the same), so superstar PER and BPM stay in the NBA's range. In clutch time (last 5 minutes, within 5) defenses tighten and stars take over, so close-game records and clutch plus/minus stay in the NBA's range. Needs Matchup Defense.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "advStats",
 		key: "advStats",
 		name: "Advanced Tracking Stats",

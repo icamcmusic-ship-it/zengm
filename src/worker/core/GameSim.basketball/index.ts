@@ -126,6 +126,7 @@ import {
 	TOV_SCALE,
 } from "./possessionModel.ts";
 import { TURNOVERS } from "./realisticTurnovers.ts";
+import { CLUTCH, STAR } from "./starClutch.ts";
 import { PLAY_TYPES } from "./realisticPlayTypes.ts";
 import {
 	type EmphasisSim,
@@ -525,6 +526,14 @@ class GameSim extends GameSimBase {
 	// unanswered points), offense/defense substitutions in the last minute, who gets fouled on purpose, fouling when up 3, last shots and
 	// 2-for-1s in the stock possession model. Off: nothing here is used and no extra random numbers are drawn
 	smartEndgame: boolean;
+
+	// Star & Clutch Calibration (starClutchCal, with Matchup Defense on): see starClutch.ts
+	starClutchCal = false;
+
+	// (the attention load of the shooting five: what each of its shots gets back, and for which team)
+	starGive = 0;
+
+	starGiveTeam: TeamNum = 0;
 	// Realistic Turnovers (League extras, see realisticTurnovers.ts): fewer turnovers, the same steals
 	realisticTurnovers: boolean;
 	// Realistic Play Types (League extras, see realisticPlayTypes.ts): the play-type mix moves toward the NBA's. Only with the realistic
@@ -692,6 +701,10 @@ class GameSim extends GameSimBase {
 				}
 			}
 		}
+		this.starClutchCal =
+			this.matchupDefense &&
+			!allStarGame &&
+			nativeFeatureEnabled("starClutchCal", (key) => g.get(key as any));
 		// (loadTeams adds the creation composite only with the setting on)
 		this.spacingCreation = teams.some((t) =>
 			t.player.some((p) => p.compositeRating.creation !== undefined),
@@ -1862,6 +1875,18 @@ class GameSim extends GameSimBase {
 			this.attentionShooter = p;
 			this.attentionShooterShare =
 				this.attentionShares[this.playersOnCourt[this.o].indexOf(p)] ?? 0;
+			if (this.starClutchCal) {
+				// Star & Clutch Calibration: the five's expected attention loss per shot, given back to all of its shots
+				let load = 0;
+				for (let i = 0; i < this.numPlayersOnCourt; i++) {
+					const share = this.attentionShares[i] ?? 0;
+					if (share > STAR.ref) {
+						load += share * (share - STAR.ref);
+					}
+				}
+				this.starGive = STAR.give * STAR.make * load;
+				this.starGiveTeam = this.o;
+			}
 		}
 		return p;
 	}
@@ -3415,7 +3440,12 @@ class GameSim extends GameSimBase {
 		} else if (lead <= 6) {
 			// (coaching systems: better game managers start fouling at the right time, worse ones late)
 			const w = this.coachSys ? this.cs[this.d].foulWindow / 27 : 1;
-			prob = this.t <= 35 * w ? 1 : this.t <= 60 * w ? 0.3 : 0;
+			// (Star & Clutch Calibration: later, once the leader can nearly run the clock, so a two-possession game isn't turned into a free
+			// throw contest with a minute left)
+			const [always, sometimes] = this.starClutchCal
+				? [CLUTCH.foulAlways, CLUTCH.foulSometimes]
+				: [35, 60];
+			prob = this.t <= always * w ? 1 : this.t <= sometimes * w ? 0.3 : 0;
 		} else if (lead <= 9) {
 			prob = this.t <= 60 ? 0.5 : this.t <= 90 ? 0.15 : 0;
 		} else if (lead <= 12) {
@@ -4007,6 +4037,7 @@ class GameSim extends GameSimBase {
 					g.get("threePointTendencyFactor") *
 					(this.coachSys ? this.cs[this.o].three * this.cs[this.d].dThree : 1) *
 					(sc ? (selfCreated ? CREATION.selfThree : CREATION.otherThree) : 1) *
+					(this.starClutchCal ? this.clutchThreeMult() : 1) *
 					(this.playTypes
 						? PLAY_TYPES.three *
 							(selfCreated ? PLAY_TYPES.selfThree : PLAY_TYPES.otherThree) *
@@ -4273,6 +4304,23 @@ class GameSim extends GameSimBase {
 			) {
 				probMake -=
 					ATTENTION.make * (this.attentionShooterShare - ATTENTION.makeRef);
+			}
+
+			// Star & Clutch Calibration: defensive attention by load (see starClutch.ts)
+			if (this.starClutchCal) {
+				if (this.starGiveTeam === this.o) {
+					probMake += this.starGive;
+				}
+				if (
+					p === this.attentionShooter &&
+					this.attentionShooterShare > STAR.ref
+				) {
+					probMake -= STAR.make * (this.attentionShooterShare - STAR.ref);
+				}
+				// Clutch time: the defense tightens (late-game intensity, the scouting report, shots late in the shot clock)
+				if (this.isClutchNba()) {
+					probMake += CLUTCH.make;
+				}
 			}
 
 			// Matchup Defense: drop coverage gives up pull-up jumpers
@@ -4910,23 +4958,55 @@ class GameSim extends GameSimBase {
 		);
 	}
 
+	// Star & Clutch Calibration: clutch time as the NBA counts it (and as Advanced Tracking Stats record it), the last 5 minutes of the final
+	// period or overtime within 5
+	isClutchNba() {
+		return (
+			this.team[0].stat.ptsQtrs.length >= this.numPeriods &&
+			this.t <= 300 &&
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <= 5
+		);
+	}
+
+	// Star & Clutch Calibration: in clutch time a team down 3 to 5 hunts threes (more variance for the trailing team)
+	clutchThreeMult() {
+		if (!this.isClutchNba()) {
+			return 1;
+		}
+		const down = this.team[this.d].stat.pts - this.team[this.o].stat.pts;
+		return down >= 3 ? CLUTCH.trailThree : 1;
+	}
+
+	// Star & Clutch Calibration: in clutch time the stars take over (a multiplier on the shooter and creator draw powers)
+	clutchUsageMult() {
+		return this.starClutchCal && this.isClutchNba() ? CLUTCH.usage : 1;
+	}
+
 	// Power on the usage composite when picking the shooter: 1.25 stock, more for star-centric systems and, late, for closers
 	usagePower() {
 		if (!this.coachSys) {
-			return 1.25;
+			return 1.25 * this.clutchUsageMult();
 		}
 		const cs = this.cs[this.o];
-		return 1.25 * cs.usage * (this.isClutchTime() ? cs.clutchUsage : 1);
+		return (
+			1.25 *
+			cs.usage *
+			(this.isClutchTime() ? cs.clutchUsage : 1) *
+			this.clutchUsageMult()
+		);
 	}
 
 	// Spacing & Shot Creation: power on the creation composite when picking the creator (the coach's usage multipliers apply)
 	creationPower() {
 		if (!this.coachSys) {
-			return CREATION_POWER;
+			return CREATION_POWER * this.clutchUsageMult();
 		}
 		const cs = this.cs[this.o];
 		return (
-			CREATION_POWER * cs.usage * (this.isClutchTime() ? cs.clutchUsage : 1)
+			CREATION_POWER *
+			cs.usage *
+			(this.isClutchTime() ? cs.clutchUsage : 1) *
+			this.clutchUsageMult()
 		);
 	}
 
