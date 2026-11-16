@@ -87,7 +87,7 @@ export const DraftDayModal = ({
 							className={`form-check-label${dp.current ? " fw-bold" : ""}`}
 							htmlFor={`dd-dp-${dp.dpid}`}
 						>
-							{dp.desc}
+							{dp.desc.replace(/<[^>]*>/g, "")}
 						</label>
 					</div>
 				))}
