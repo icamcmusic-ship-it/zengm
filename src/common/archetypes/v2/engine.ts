@@ -200,6 +200,9 @@ export type V2Candidate = {
 	role?: string;
 	descs: string[];
 	classic?: boolean;
+	// What made him a candidate: a role and descriptors he passes, the earlier reading's label or its runners-up, a
+	// build the neighbours or the user's tuning favour
+	kind?: "comp" | "classic" | "classicAlt" | "build";
 };
 
 export type V2Info = {
@@ -210,6 +213,14 @@ export type V2Info = {
 	candidates: V2Candidate[];
 	composed: boolean;
 	votes: Votes;
+	// The roles whose tests he passes
+	roles?: string[];
+	// archcmp (what the offline comparison re-scores): the family classifier's probabilities, the earlier reading's
+	// confidence, its top builds and the score of its label as a candidate
+	probs?: number[];
+	classicConf?: number;
+	classicTop?: string[];
+	classicScore?: number;
 };
 
 export type V2Options = ClassifyOptions & {
@@ -454,6 +465,7 @@ export const classifyV2 = (
 				family: fam,
 				role: r.key,
 				descs: c.map((d) => d.key),
+				kind: "comp",
 				score:
 					famScore[fam] +
 					base +
@@ -473,6 +485,7 @@ export const classifyV2 = (
 		role: classicParsed.role,
 		descs: classicParsed.descs,
 		classic: true,
+		kind: "classic",
 		score:
 			famScore[classicFam] +
 			P.classicBonus +
@@ -515,6 +528,7 @@ export const classifyV2 = (
 				family: fam,
 				role: parsed.role,
 				descs: parsed.descs,
+				kind: "classicAlt",
 				score:
 					famScore[fam] +
 					P.classicBonus * (0.9 - 0.1 * added) +
@@ -538,6 +552,7 @@ export const classifyV2 = (
 			family: fam,
 			role: parsed.role,
 			descs: parsed.descs,
+			kind: "build",
 			score:
 				famScore[fam] +
 				P.rK * (votes.role[parsed.role ?? ""] ?? 0) +
@@ -700,6 +715,10 @@ export const classifyV2 = (
 			candidates: rest,
 			composed: isComposedId(a.id),
 			votes,
+			probs,
+			classicConf: classic.confidence,
+			classicTop,
+			classicScore: classicCand.score,
 		},
 	};
 };

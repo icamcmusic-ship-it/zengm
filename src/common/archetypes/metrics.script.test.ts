@@ -104,6 +104,10 @@ const read = (p) => ({
 	prospect: p.prospect,
 	// (real players' sub-ratings are read against each other, as a real-players league reads them)
 	norms: p.slug ? REAL_NORMS : NORMS,
+	// (archcmp: ARCH_V2_PARAMS overrides v2's parameters, e.g. its layers off)
+	...(process.env.ARCH_V2_PARAMS
+		? { params: JSON.parse(process.env.ARCH_V2_PARAMS) }
+		: {}),
 });
 
 const population = (label, players, out) => {

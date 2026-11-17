@@ -41,6 +41,10 @@ test.skipIf(!process.env.RUN_ARCHETYPE_SPEED)(
 			Math.random = orig;
 		}
 		const norms = defaultNorms(false);
+		// (archcmp: ARCH_V2_PARAMS overrides v2's parameters)
+		const params = process.env.ARCH_V2_PARAMS
+			? JSON.parse(process.env.ARCH_V2_PARAMS)
+			: undefined;
 		{
 			const { shippedRefs } = await import("./knn.ts");
 			const t0 = performance.now();
@@ -62,10 +66,10 @@ test.skipIf(!process.env.RUN_ARCHETYPE_SPEED)(
 			);
 		};
 		time("classifyV2 cold", (p) =>
-			classifyV2(p.ratings, { norms, pos: p.pos, prospect: true }),
+			classifyV2(p.ratings, { norms, pos: p.pos, prospect: true, params }),
 		);
 		time("classifyV2 warm", (p) =>
-			classifyV2(p.ratings, { norms, pos: p.pos, prospect: true }),
+			classifyV2(p.ratings, { norms, pos: p.pos, prospect: true, params }),
 		);
 		time("classify", (p) =>
 			classify(p.ratings, { norms, pos: p.pos, prospect: true }),
