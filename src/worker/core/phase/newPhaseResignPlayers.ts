@@ -1,3 +1,4 @@
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { PHASE, PLAYER, POSITION_COUNTS } from "../../../common/constants.ts";
 import {
 	contractNegotiation,
@@ -163,6 +164,10 @@ const newPhaseResignPlayers = async (
 	// Soft cap or no cap: AI teams don't re-sign role players into the luxury tax (cap health). Stars still get re-signed. With no cap the
 	// tax is the only brake, and without this payrolls ran away (half the league in the tax, a team 2x the cap and $400M in debt)
 	const avoidTax = g.get("salaryCapType") !== "hard" && g.get("luxuryTax") > 0;
+	// Competitive Balance (setting): only the two best go into the tax
+	const avoidTaxMinRank = featureOn("competitiveBalance")
+		? AVOID_TAX_MIN_RANK - 1
+		: AVOID_TAX_MIN_RANK;
 	const teamValueRank = new Map<number, number>();
 	if (avoidTax) {
 		const byTid = Map.groupBy(players, (p) => p.tid);
@@ -306,7 +311,7 @@ const newPhaseResignPlayers = async (
 				payroll !== undefined &&
 				contract.amount + payroll > g.get("luxuryPayroll") &&
 				(teamValueRank.get(p.pid) ?? 0) >=
-					AVOID_TAX_MIN_RANK + (gms.get(p.tid)?.avoidTaxRankShift ?? 0)
+					avoidTaxMinRank + (gms.get(p.tid)?.avoidTaxRankShift ?? 0)
 			) {
 				reSignPlayer = false;
 			}
