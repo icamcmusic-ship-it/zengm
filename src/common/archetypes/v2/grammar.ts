@@ -190,7 +190,7 @@ export const ROLES: RoleDef[] = [
 	},
 	{
 		key: "rimProtector",
-		names: ["Shot Eraser", "Paint Protector"],
+		names: ["Shot Eraser", "Paint Protector", "Rim Protector"],
 		concepts: ["rimD"],
 		groups: ["wing", "big"],
 	},
@@ -220,6 +220,14 @@ export const ROLES: RoleDef[] = [
 		groups: ["wing", "big"],
 	},
 	// archgaps (user-approved): the role players' roles (custom tests in tests.ts: breadth, no standout)
+	// archv3 (the user's 2K list, batch 4): a defender who guards inside and out (perimeter and rim D both his)
+	{
+		key: "switchDefender",
+		bare: true,
+		names: ["Switch Defender"],
+		concepts: ["switchD"],
+		groups: ["wing", "big"],
+	},
 	{
 		key: "glueWing",
 		bare: true,
@@ -255,7 +263,7 @@ export const DESCRIPTORS: DescDef[] = [
 	{ key: "crafty", names: ["Crafty"], concept: "crafty", slot: 1 },
 	{
 		key: "physical",
-		names: ["Physical", "Bruising"],
+		names: ["Physical", "Bruising", "Rugged"],
 		concept: "strength",
 		slot: 1,
 	},
@@ -265,7 +273,12 @@ export const DESCRIPTORS: DescDef[] = [
 		concept: "air",
 		slot: 1,
 	},
-	{ key: "ballHawking", names: ["Ball-Hawking"], concept: "steal", slot: 2 },
+	{
+		key: "ballHawking",
+		names: ["Ball-Hawking", "Pesky"],
+		concept: "steal",
+		slot: 2,
+	},
 	{ key: "defensive", names: ["Defensive"], concept: "lockdown", slot: 2 },
 	{
 		key: "shotErasing",
@@ -397,6 +410,7 @@ const CONCEPT_GROUP: Record<string, string> = {
 	crafty: "style",
 	glueWing: "glue",
 	glueGuard: "glue",
+	switchD: "perD",
 	gameManagerRole: "glue",
 	energyRole: "finish",
 	insideOut: "insideOut",
@@ -528,12 +542,22 @@ export const descWord = (
 ): string =>
 	(group ? d.byGroup?.[group] : undefined) ?? pick?.[d.key] ?? d.names[0]!;
 
+// archv3: 2K's own name for a role with these descriptors (whatever the display variants), from the user's list
+const COMBO_NAMES: Record<string, string> = {
+	"rimProtector|physical": "Rugged Rim Protector",
+	"creator|ballHawking+playmaking": "Pesky Playmaking Creator",
+};
+const comboKey = (role: RoleDef, descs: readonly DescDef[]) =>
+	`${role.key}|${orderDescs(descs)
+		.map((d) => d.key)
+		.join("+")}`;
 export const composeName = (
 	role: RoleDef,
 	descs: readonly DescDef[],
 	group: PosGroup,
 	pick?: WordPick,
 ): string =>
+	COMBO_NAMES[comboKey(role, descs)] ??
 	[
 		...orderDescs(descs).map((d) => descWord(d, pick, group)),
 		roleWord(role, group, shortForm(role, descs), pick),
@@ -564,6 +588,9 @@ export const composedId = (
 ): string => {
 	const ds = orderDescs(descs);
 	const variants: string[] = [];
+	if (COMBO_NAMES[comboKey(role, ds)]) {
+		pick = undefined;
+	}
 	const rw = roleWord(role, group, shortForm(role, ds), pick);
 	if (rw !== roleWord(role, group, shortForm(role, ds))) {
 		variants.push(`${role.key}=${role.names.indexOf(rw)}`);
@@ -823,6 +850,7 @@ const ROLE_NOUN: Record<string, string> = {
 	postBully: "A post bully",
 	postPro: "A post scorer",
 	glueWing: "A role-playing wing",
+	switchDefender: "A defender",
 	glueGuard: "A role-playing guard",
 	gameManager: "A steady point guard",
 	energyBig: "An energy big",
@@ -830,6 +858,7 @@ const ROLE_NOUN: Record<string, string> = {
 const CONCEPT_PHRASE = new Map(CONCEPTS.map((c) => [c.key, c.phrase]));
 const CUSTOM_PHRASE: Record<string, string> = {
 	glueWing: "defends, moves the ball and does a bit of everything",
+	switchD: "guards on the perimeter and at the rim, so he can switch",
 	glueGuard: "defends and keeps the offense moving",
 	gameManagerRole: "runs the offense without mistakes",
 	energyRole: "runs the floor, finishes at the rim and protects it",

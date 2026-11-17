@@ -332,7 +332,7 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 					if (cn !== res.id) counts[cn] = (counts[cn] ?? 0) + 1;
 					if (isGenericBuild({ id: res.id })) generic++;
 					if (res.id.startsWith("v2:")) composed++;
-					for (const r of ["glueWing", "glueGuard"])
+					for (const r of ["glueWing", "glueGuard", "switchDefender"])
 						if (res.c.v2.roles.includes(r))
 							dbg[`passes ${r}`] = (dbg[`passes ${r}`] ?? 0) + 1;
 					if (process.env.ARCH_V2_DEBUG) {

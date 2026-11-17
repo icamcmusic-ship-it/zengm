@@ -98,6 +98,7 @@ export type V2Params = {
 	// The Glue roles' head start (archv3: their tests' margins are small by construction, no standout)
 	glueWing: number;
 	glueGuard: number;
+	switchDefender: number;
 	// Last season's family's head start
 	famHyst: number;
 	// What a candidate outside the voted family pays (its family's vote is already in its score; Infinity: the voted
@@ -132,6 +133,7 @@ export const V2_PARAMS: V2Params = {
 	athPen: 1,
 	glueWing: 2,
 	glueGuard: 1.4,
+	switchDefender: 1.5,
 	famHyst: 1,
 	altClassic: 1,
 	words: true,
@@ -141,7 +143,22 @@ export const V2_PARAMS: V2Params = {
 const norm = (s: string) => s.toLowerCase().replace(/[^\da-z]/g, "");
 let nameIndex: Map<string, string> | undefined;
 // Every name a build goes by (its names at each position, its 2K aliases, the user's 2K names mapped to it)
+// archv3: 2K names of the user's list that the grammar composes as they are (its own words: Switch Defender, Rugged,
+// Pesky, Rim Protector), rather than read as the build they were an alias of
+export const OWN_COMPOSED_NAMES: ReadonlySet<string> = new Set(
+	[
+		"Switch Defender",
+		"Rugged Rim Protector",
+		"Pesky Playmaking Creator",
+		"2-Way Middy Playmaker",
+		"Wing-Running Sharpshooter",
+		"2-Way Bucket Chaser",
+	].map((n) => norm(n)),
+);
 const buildOfName = (name: string): string | undefined => {
+	if (OWN_COMPOSED_NAMES.has(norm(name))) {
+		return undefined;
+	}
 	if (!nameIndex) {
 		nameIndex = new Map();
 		for (const [n, v] of Object.entries(USER_2K_MAP)) {
@@ -418,7 +435,9 @@ export const classifyV2 = (
 				? P.glueWing
 				: r.key === "glueGuard"
 					? P.glueGuard
-					: 0);
+					: r.key === "switchDefender"
+						? P.switchDefender
+						: 0);
 		for (const c of combos) {
 			const pk = pickFor(r, pick, c);
 			const name = composeName(r, c, group, pk);
@@ -583,7 +602,7 @@ export const classifyV2 = (
 		c.family === family ? c.score : c.score - P.famOut;
 	// archv3: a composed name only where no preset says him: a build within presetMargin of it, or the earlier reading's
 	// label when that reading is sure of it (its confidence presetConf or more), is his label instead
-	if (isComposedId(first.id)) {
+	if (isComposedId(first.id) && !OWN_COMPOSED_NAMES.has(norm(first.name))) {
 		const fs = eff(first);
 		const preset = cands.find(
 			(c) =>
