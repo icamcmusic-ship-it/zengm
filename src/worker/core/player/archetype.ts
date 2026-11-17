@@ -25,7 +25,10 @@ import {
 	type StoredArchetype,
 } from "../../../common/archetypes/index.ts";
 import { whyBullets, whyDrivers } from "../../../common/archetypes/whyText.ts";
-import { classifyV2 } from "../../../common/archetypes/v2/engine.ts";
+import {
+	classifyV2,
+	warmArchetypeEngine,
+} from "../../../common/archetypes/v2/engine.ts";
 import { VISIBLE_TRAITS } from "../../../common/archetypes/classify.ts";
 import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
 import type { Player } from "../../../common/types.ts";
@@ -81,10 +84,12 @@ import {
 } from "../../../common/archetypes/tuning.ts";
 import type { FittedModel } from "../../../common/archetypes/model.ts";
 import {
+	activePickRefs,
 	activeTuning,
 	overrideFor,
 	refitArchetypeTuning,
 } from "./archetypeFeedback.ts";
+import { pickKey } from "../../../common/archetypes/v2/picks.ts";
 
 // archfb: the shipped model with the user's tuning on top, or undefined (the shipped model) with no tuning
 export const tunedModelFor = (
@@ -391,11 +396,13 @@ export const fuzzedArchetypeLabel = (
 	}
 	// His position comes from the true ratings, as the game shows it; a prospect is read against the prospect tables
 	const model = tunedModelFor(shown);
+	const { refs } = activePickRefs();
 	return classifyV2(shown, {
 		norms,
 		pos: posFn(ratings as any),
 		prospect: true,
 		...(model ? { model } : {}),
+		...(refs.length > 0 ? { extraRefs: refs } : {}),
 	}).label;
 };
 
@@ -436,8 +443,10 @@ export const classifyPlayer = (
 	}
 	// (arch16: the reading version too, so a new reading never reuses an old result; archfb: and the user's tuning)
 	const tuning = activeTuning();
+	// (archv3: and the user's picks, which vote as labeled players)
+	const { refs, refsKey } = activePickRefs();
 	const key = JSON.stringify(
-		[ARCHETYPE_READING_VERSION, tuning.hash, p.srID, ratings, opts],
+		[ARCHETYPE_READING_VERSION, tuning.hash, refsKey, p.srID, ratings, opts],
 		memoReplacer,
 	);
 	if (memo.has(key)) {
@@ -450,6 +459,8 @@ export const classifyPlayer = (
 		...opts,
 		...(model ? { model } : {}),
 		...(p.srID ? { srID: p.srID } : {}),
+		...(refs.length > 0 ? { extraRefs: refs } : {}),
+		pickKey: pickKey(g.get("lid"), p.pid),
 	});
 	if (memo.size >= CLASSIFY_MEMO_MAX) {
 		memo.clear();
@@ -473,6 +484,8 @@ export const warmProspectArchetypes = () => {
 	}
 	const token = ++warmToken;
 	const lid = g.get("lid");
+	// (archv3: the neighbours' index and the names table are built once, here rather than on the first reading)
+	warmArchetypeEngine();
 	const busy = () =>
 		token !== warmToken ||
 		g.get("lid") !== lid ||

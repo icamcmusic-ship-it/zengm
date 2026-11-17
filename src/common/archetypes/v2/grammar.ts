@@ -46,6 +46,8 @@ export type RoleDef = {
 	withDesc?: string;
 	// The display word for a size group, when it differs (Stretch Four / Stretch Five style)
 	byGroup?: Partial<Record<PosGroup, string>>;
+	// archv3: a role that takes no descriptor (the role players' names: "no standout" has nothing to add)
+	bare?: boolean;
 };
 
 // A descriptor: a word in front of the role
@@ -57,6 +59,8 @@ export type DescDef = {
 	// has at most one word per slot 0 and 1, and its descriptors are written in slot order (2K's order)
 	slot: 0 | 1 | 2;
 	groups?: PosGroup[];
+	// archv3: the word at a size group (the neighbours' variant is not taken over it)
+	byGroup?: Partial<Record<PosGroup, string>>;
 };
 
 export const ROLES: RoleDef[] = [
@@ -74,7 +78,9 @@ export const ROLES: RoleDef[] = [
 	},
 	{
 		key: "creator",
-		names: ["Creator"],
+		// (archv3: "Creator" alone is not a name; "Shot Creator" is 2K's)
+		names: ["Shot Creator"],
+		withDesc: "Creator",
 		concepts: ["creator"],
 		groups: ["guard", "wing"],
 	},
@@ -98,7 +104,10 @@ export const ROLES: RoleDef[] = [
 	},
 	{
 		key: "stretch",
-		names: ["Stretch"],
+		// (archv3: "Stretch" alone read as a half name, "v2:stretch::big" in the user's pick; with a word in front it is
+		// 2K's "Board-Crashing Stretch")
+		names: ["Stretch Big"],
+		withDesc: "Stretch",
 		concepts: ["catchShoot"],
 		groups: ["big"],
 	},
@@ -181,7 +190,7 @@ export const ROLES: RoleDef[] = [
 	},
 	{
 		key: "rimProtector",
-		names: ["Shot Eraser", "Paint Protector"],
+		names: ["Shot Eraser", "Paint Protector", "Rim Protector"],
 		concepts: ["rimD"],
 		groups: ["wing", "big"],
 	},
@@ -211,26 +220,38 @@ export const ROLES: RoleDef[] = [
 		groups: ["wing", "big"],
 	},
 	// archgaps (user-approved): the role players' roles (custom tests in tests.ts: breadth, no standout)
+	// archv3 (the user's 2K list, batch 4): a defender who guards inside and out (perimeter and rim D both his)
+	{
+		key: "switchDefender",
+		bare: true,
+		names: ["Switch Defender"],
+		concepts: ["switchD"],
+		groups: ["wing", "big"],
+	},
 	{
 		key: "glueWing",
+		bare: true,
 		names: ["Glue Wing"],
 		concepts: ["glueWing"],
 		groups: ["wing"],
 	},
 	{
 		key: "glueGuard",
+		bare: true,
 		names: ["Glue Guard"],
 		concepts: ["glueGuard"],
 		groups: ["guard"],
 	},
 	{
 		key: "gameManager",
+		bare: true,
 		names: ["Steady Game Manager"],
 		concepts: ["gameManagerRole"],
 		groups: ["guard"],
 	},
 	{
 		key: "energyBig",
+		bare: true,
 		names: ["Energy Big"],
 		concepts: ["energyRole"],
 		groups: ["big"],
@@ -242,7 +263,7 @@ export const DESCRIPTORS: DescDef[] = [
 	{ key: "crafty", names: ["Crafty"], concept: "crafty", slot: 1 },
 	{
 		key: "physical",
-		names: ["Physical", "Bruising"],
+		names: ["Physical", "Bruising", "Rugged"],
 		concept: "strength",
 		slot: 1,
 	},
@@ -252,7 +273,12 @@ export const DESCRIPTORS: DescDef[] = [
 		concept: "air",
 		slot: 1,
 	},
-	{ key: "ballHawking", names: ["Ball-Hawking"], concept: "steal", slot: 2 },
+	{
+		key: "ballHawking",
+		names: ["Ball-Hawking", "Pesky"],
+		concept: "steal",
+		slot: 2,
+	},
 	{ key: "defensive", names: ["Defensive"], concept: "lockdown", slot: 2 },
 	{
 		key: "shotErasing",
@@ -288,7 +314,8 @@ export const DESCRIPTORS: DescDef[] = [
 		names: ["Stretch"],
 		concept: "catchShoot",
 		slot: 2,
-		groups: ["wing", "big"],
+		// (archv3: a big's word; on a wing "Stretch Cutter" read wrong)
+		groups: ["big"],
 	},
 	{ key: "midPaint", names: ["Mid-Paint"], concept: "midPaint", slot: 2 },
 	{
@@ -328,6 +355,12 @@ export const DESCRIPTORS: DescDef[] = [
 	{
 		key: "rimRunning",
 		names: ["Rim-Running", "Wing-Running"],
+		// (archv3: a big runs to the rim, a guard or wing the wings: "2-Way Wing-Running Shot Eraser" read wrong)
+		byGroup: {
+			big: "Rim-Running",
+			guard: "Wing-Running",
+			wing: "Wing-Running",
+		},
 		concept: "run",
 		slot: 2,
 	},
@@ -377,6 +410,7 @@ const CONCEPT_GROUP: Record<string, string> = {
 	crafty: "style",
 	glueWing: "glue",
 	glueGuard: "glue",
+	switchD: "perD",
 	gameManagerRole: "glue",
 	energyRole: "finish",
 	insideOut: "insideOut",
@@ -385,6 +419,8 @@ const CONCEPT_GROUP: Record<string, string> = {
 const ALLOWED_SAME: ReadonlySet<string> = new Set(["mid|maestro"]);
 // Groups that overlap another (3-Level is a shot and a mid-range; Inside-Out a shot and a finish)
 const ALSO: Record<string, string[]> = {
+	// (archv3: "Defensive" after "2-Way" says defense twice)
+	lockdown: ["def"],
 	threeLevel: ["shoot"],
 	insideOut: ["shoot", "finish"],
 	chaser: ["shoot"],
@@ -401,6 +437,36 @@ const roleGroups = (r: RoleDef) => [
 	]),
 ];
 
+const DEFENSIVE_ROLES: ReadonlySet<string> = new Set([
+	"lock",
+	"ballHawk",
+	"rimProtector",
+]);
+// Words that read against a role (the mid-range maestro is no three-point or above-the-rim scorer)
+// (the lockdown defender and the ball hawk take defensive, physical and athletic words, not a scorer's; a bully is no
+// finesse player; an off-ball cutter does not isolate; a finisher with a three is Inside-Out)
+const SCORER_WORDS = [
+	"crafty",
+	"iso",
+	"threePt",
+	"stretchy",
+	"playmaking",
+	"middy",
+	"midPaint",
+	"midPost",
+	"pullUp",
+	"postScoring",
+	"insideOut",
+	"threeLevel",
+] as const;
+const CLASHES: Partial<Record<string, readonly string[]>> = {
+	maestro: ["threePt", "rimRocking", "rimRunning", "highFlying"],
+	ballHawk: SCORER_WORDS,
+	finisher: ["threePt"],
+	lock: SCORER_WORDS,
+	postBully: ["crafty"],
+	cutter: ["iso"],
+};
 // Whether a role and descriptors make a valid name: no word group twice (except the allowed pairs), one 2-Way, one style
 // word, at most two descriptors, each allowed at his size
 export const compatible = (
@@ -408,7 +474,15 @@ export const compatible = (
 	descs: readonly DescDef[],
 	group: PosGroup,
 ): boolean => {
-	if (descs.length > 2 || !role.groups.includes(group)) {
+	if (
+		descs.length > 2 ||
+		!role.groups.includes(group) ||
+		(role.bare && descs.length > 0) ||
+		// (archv3: "2-Way" on a defender's role says defense twice: "2-Way Lock", "2-Way Shot Eraser"; a word that reads
+		// against the role: "3PT Maestro", "Rim-Rocking Maestro")
+		(DEFENSIVE_ROLES.has(role.key) && descs.some((d) => d.key === "twoWay")) ||
+		descs.some((d) => CLASHES[role.key]?.includes(d.key))
+	) {
 		return false;
 	}
 	const used = new Map<string, string>();
@@ -461,22 +535,48 @@ export const roleWord = (
 	role.byGroup?.[group] ??
 	(hasDesc ? (role.withDesc ?? role.names[0]!) : role.names[0]!);
 
-export const descWord = (d: DescDef, pick?: WordPick): string =>
-	pick?.[d.key] ?? d.names[0]!;
+export const descWord = (
+	d: DescDef,
+	pick?: WordPick,
+	group?: PosGroup,
+): string =>
+	(group ? d.byGroup?.[group] : undefined) ?? pick?.[d.key] ?? d.names[0]!;
 
+// archv3: 2K's own name for a role with these descriptors (whatever the display variants), from the user's list
+const COMBO_NAMES: Record<string, string> = {
+	"rimProtector|physical": "Rugged Rim Protector",
+	"creator|ballHawking+playmaking": "Pesky Playmaking Creator",
+};
+const comboKey = (role: RoleDef, descs: readonly DescDef[]) =>
+	`${role.key}|${orderDescs(descs)
+		.map((d) => d.key)
+		.join("+")}`;
 export const composeName = (
 	role: RoleDef,
 	descs: readonly DescDef[],
 	group: PosGroup,
 	pick?: WordPick,
 ): string =>
+	COMBO_NAMES[comboKey(role, descs)] ??
 	[
-		...orderDescs(descs).map((d) => descWord(d, pick)),
-		roleWord(role, group, descs.length > 0, pick),
+		...orderDescs(descs).map((d) => descWord(d, pick, group)),
+		roleWord(role, group, shortForm(role, descs), pick),
 	].join(" ");
+// The role's short form ("Bully", "Creator") follows a style or skill word; after 2-Way alone the role keeps its whole
+// name where the short form is no name of its own ("2-Way Post Bully", not "2-Way Bully": archv3)
+const FULL_AFTER_2WAY: ReadonlySet<string> = new Set([
+	"postBully",
+	"creator",
+	"maestro",
+	"cutter",
+]);
+const shortForm = (role: RoleDef, descs: readonly DescDef[]) =>
+	descs.length > 0 &&
+	!(FULL_AFTER_2WAY.has(role.key) && descs.every((d) => d.slot === 0));
 
 // ---- composed ids ----
-// "v2:<role>:<desc>+<desc>[:<word>=<variant>,...]": the role, the descriptors, and any display variants picked
+// "v2:<role>+<desc>+<desc>:<group>[:<word>=<variant>,...]": the role, the descriptors, his size group, and any display
+// variants picked
 export const COMPOSED_PREFIX = "v2:";
 export const isComposedId = (id: string | undefined): id is string =>
 	typeof id === "string" && id.startsWith(COMPOSED_PREFIX);
@@ -488,17 +588,22 @@ export const composedId = (
 ): string => {
 	const ds = orderDescs(descs);
 	const variants: string[] = [];
-	const rw = roleWord(role, group, ds.length > 0, pick);
-	if (rw !== roleWord(role, group, ds.length > 0)) {
+	if (COMBO_NAMES[comboKey(role, ds)]) {
+		pick = undefined;
+	}
+	const rw = roleWord(role, group, shortForm(role, ds), pick);
+	if (rw !== roleWord(role, group, shortForm(role, ds))) {
 		variants.push(`${role.key}=${role.names.indexOf(rw)}`);
 	}
 	for (const d of ds) {
-		const w = descWord(d, pick);
+		const w = descWord(d, pick, group);
 		if (w !== d.names[0]) {
 			variants.push(`${d.key}=${d.names.indexOf(w)}`);
 		}
 	}
-	return `${COMPOSED_PREFIX}${role.key}:${ds.map((d) => d.key).join("+")}:${group}${variants.length > 0 ? `:${variants.join(",")}` : ""}`;
+	// (archv3: "v2:<role>[+<desc>...]:<group>[:<variants>]", with no empty part; the reading-17 form
+	// "v2:<role>:<desc>+<desc>:<group>[:...]" is still read)
+	return `${COMPOSED_PREFIX}${[role.key, ...ds.map((d) => d.key)].join("+")}:${group}${variants.length > 0 ? `:${variants.join(",")}` : ""}`;
 };
 export const parseComposedId = (
 	id: string,
@@ -508,9 +613,14 @@ export const parseComposedId = (
 	if (!isComposedId(id)) {
 		return undefined;
 	}
-	const [roleKey, descKeys, group, variants] = id
-		.slice(COMPOSED_PREFIX.length)
-		.split(":");
+	const parts = id.slice(COMPOSED_PREFIX.length).split(":");
+	// (the current form has the group second; the reading-17 form has the descriptors second, maybe empty)
+	const current = ALL.includes(parts[1] as PosGroup);
+	const [head, ...descHead] = (parts[0] ?? "").split("+");
+	const roleKey = head;
+	const descKeys = current ? descHead.join("+") : parts[1];
+	const group = current ? parts[1] : parts[2];
+	const variants = current ? parts[2] : parts[3];
 	const role = ROLE_BY_KEY.get(roleKey ?? "");
 	if (!role || !ALL.includes(group as PosGroup)) {
 		return undefined;
@@ -740,6 +850,7 @@ const ROLE_NOUN: Record<string, string> = {
 	postBully: "A post bully",
 	postPro: "A post scorer",
 	glueWing: "A role-playing wing",
+	switchDefender: "A defender",
 	glueGuard: "A role-playing guard",
 	gameManager: "A steady point guard",
 	energyBig: "An energy big",
@@ -747,6 +858,7 @@ const ROLE_NOUN: Record<string, string> = {
 const CONCEPT_PHRASE = new Map(CONCEPTS.map((c) => [c.key, c.phrase]));
 const CUSTOM_PHRASE: Record<string, string> = {
 	glueWing: "defends, moves the ball and does a bit of everything",
+	switchD: "guards on the perimeter and at the rim, so he can switch",
 	glueGuard: "defends and keeps the offense moving",
 	gameManagerRole: "runs the offense without mistakes",
 	energyRole: "runs the floor, finishes at the rim and protects it",

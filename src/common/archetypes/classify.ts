@@ -786,6 +786,8 @@ export type ClassifyOptions = {
 	pt?: ReadOptions["pt"];
 	// The fitted model to weigh the reading with (default: modelFor his ratings)
 	model?: FittedModel;
+	// archv3: scoreAll's result for these same inputs and model, when the caller has it (v2/engine.ts: read once)
+	scored?: ReturnType<typeof scoreAll>;
 };
 
 // The ONE build he is most similar to. No hybrids: the runners-up are only listed as `alternates` ("also close to").
@@ -800,7 +802,7 @@ export const classify = (
 	if (opts.model?.buildBias === undefined) {
 		return c;
 	}
-	const { model: _tuned, ...rest } = opts;
+	const { model: _tuned, scored: _scored, ...rest } = opts;
 	const base = classifyRead(ratings, rest);
 	return c.id !== base.id &&
 		c.shortfall > Math.max(POOR_FIT_SHORT, base.shortfall + POOR_FIT_SHORT)
@@ -812,15 +814,22 @@ const classifyRead = (
 	opts: ClassifyOptions = {},
 ): Classification => {
 	const norms = opts.norms ?? defaultNormsFor(ratings);
-	const { scored, z, expanded, pos, cv } = scoreAll(
-		ratings,
-		norms,
-		ARCHETYPES,
-		isPos(opts.pos) ? opts.pos : undefined,
-		opts.traits,
-		{ age: opts.age, stats: opts.stats, prospect: opts.prospect, pt: opts.pt },
-		opts.model,
-	);
+	const { scored, z, expanded, pos, cv } =
+		opts.scored ??
+		scoreAll(
+			ratings,
+			norms,
+			ARCHETYPES,
+			isPos(opts.pos) ? opts.pos : undefined,
+			opts.traits,
+			{
+				age: opts.age,
+				stats: opts.stats,
+				prospect: opts.prospect,
+				pt: opts.pt,
+			},
+			opts.model,
+		);
 	const model = opts.model ?? modelFor(hasExpanded(ratings));
 	let first = scored[0]!;
 	// arch14: a close call (the top two within the model's tie margin) without a previous label is settled by his stats:

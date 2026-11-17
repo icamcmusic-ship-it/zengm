@@ -1,4 +1,4 @@
-/* eslint-disable no-undef, curly */
+/* eslint-disable no-undef, curly, unicorn/prefer-single-call */
 // @ts-nocheck
 // archv2: the v2 engine's data and its before (Classic) / after (v2) report. Not part of the normal run:
 // RUN_ARCHETYPE_V2=1 with ARCH_V2_MODE=
@@ -47,13 +47,7 @@ import { judgedPlayers } from "../fit.script.test.ts";
 import { userPlayers } from "../twoK/user2k.script.test.ts";
 import { canonOf, classifyV2, V2_PARAMS } from "./engine.ts";
 import { familyOfName } from "./grammar.ts";
-import {
-	BUCKET_OF,
-	encodeX,
-	FEAT_FROM_FAMX,
-	metaOf,
-	N_FEATS,
-} from "./knn.ts";
+import { BUCKET_OF, encodeX, FEAT_FROM_FAMX, metaOf, N_FEATS } from "./knn.ts";
 
 const MODE = process.env.ARCH_V2_MODE;
 const OUT = process.env.ARCH_V2_OUT ?? "/tmp/claude-0/archv2-report.txt";
@@ -310,6 +304,271 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			return;
 		}
 
+		if (MODE === "shares") {
+			// archv3: v2's label shares in a random league and the real players 2016-2025 (ARCH_V2_IDS: the builds to list),
+			// the max share, generic share, and athletic names on players below their position's median athleticism
+			const { ATH_NAME_RE } = await import("../score.ts");
+			const { peerPct } = await import("./tests.ts");
+			const ids = (
+				process.env.ARCH_V2_IDS ??
+				"glue-wing,glue-guard,steady-game-manager,energy-big"
+			).split(",");
+			const out = [JSON.stringify(PARAMS ?? {})];
+			const pops = {
+				"random league": await genPlayers(3000, "metrics-league", 19, 32, 38),
+				"real 2016-2025": realPop(2016, 2025),
+			};
+			for (const [label, ps] of Object.entries(pops)) {
+				const counts = {};
+				const dbg = {};
+				const ex = {};
+				let ath = 0,
+					athLow = 0,
+					generic = 0,
+					composed = 0;
+				for (const p of ps) {
+					const res = ENGINES.v2(p, p.slug ? { srID: p.slug } : {});
+					counts[res.id] = (counts[res.id] ?? 0) + 1;
+					for (const id of ids) {
+						if ((id === res.id || id === canonOf(res.name)) && p.name) {
+							const k = `example ${id}`;
+							dbg[k] = dbg[k] ?? 0;
+							if ((ex[id] ??= []).length < 4) ex[id].push(`${p.name} ${p.pos}`);
+						}
+					}
+					const cn = canonOf(res.name);
+					if (cn !== res.id) counts[cn] = (counts[cn] ?? 0) + 1;
+					if (isGenericBuild({ id: res.id })) generic++;
+					if (res.id.startsWith("v2:")) composed++;
+					for (const r of ["glueWing", "glueGuard", "switchDefender"])
+						if (res.c.v2.roles.includes(r))
+							dbg[`passes ${r}`] = (dbg[`passes ${r}`] ?? 0) + 1;
+					if (process.env.ARCH_V2_DEBUG) {
+						for (const id of ids) {
+							const ci = res.c.v2.candidates.findIndex((c) => c.canon === id);
+							if (ci < 0) continue;
+							const key = `${id} cand (classic ${res.c.v2.candidates.find((c) => c.classic)?.canon === id ? "yes" : "no"}) rank ${ci === 0 ? "0" : ci < 3 ? "1-2" : "3+"} gap ${ci === 0 ? 0 : (res.c.v2.candidates[0].score - res.c.v2.candidates[ci].score).toFixed(1)}`;
+							dbg[key] = (dbg[key] ?? 0) + 1;
+							if (ci > 0)
+								dbg[`${id} lost to ${res.c.v2.candidates[0].name}`] =
+									(dbg[`${id} lost to ${res.c.v2.candidates[0].name}`] ?? 0) +
+									1;
+						}
+					}
+					if (ATH_NAME_RE.test(res.name)) {
+						ath++;
+						const s = scoreAll(
+							p.ratings,
+							p.norms,
+							ARCHETYPES,
+							p.pos,
+							undefined,
+							readOf(p),
+						);
+						if (peerPct(BUCKET_OF[s.pos], "ath", s.cv.ath ?? 0) < 0.5) {
+							athLow++;
+							const k = `athLow ${res.name}${res.id.startsWith("v2:") ? " (composed)" : res.c.v2.candidates.find((c) => c.classic)?.id === res.id ? " (classic)" : ""}`;
+							dbg[k] = (dbg[k] ?? 0) + 1;
+						}
+					}
+				}
+				const n = ps.length;
+				const sh = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+				const nm = (id) => archetypeById(id)?.name ?? id;
+				out.push(
+					`${label} (n=${n}): ${ids.map((id) => `${nm(id)} ${pct(counts[id] ?? 0, n)}`).join(", ")}; max share ${nm(sh[0][0])} ${pct(sh[0][1], n)}; generic ${pct(generic, n)}; composed ${pct(composed, n)}; athletic names ${pct(ath, n)}, on players below median athleticism ${pct(athLow, n)} (${pct(athLow, ath)} of them)`,
+				);
+				for (const [k, v] of Object.entries(dbg)
+					.filter(([k2]) => !k2.startsWith("example"))
+					.sort((a, b) => b[1] - a[1])
+					.slice(0, process.env.ARCH_V2_DEBUG ? 40 : 4))
+					out.push(`  ${v} ${k}`);
+				for (const [id, xs] of Object.entries(ex))
+					out.push(`  examples ${nm(id)}: ${xs.join(", ")}`);
+				writeFileSync(OUT, out.join("\n") + "\n");
+			}
+			return;
+		}
+		if (MODE === "who") {
+			// archv3: what decided some real players' labels (ARCH_V2_WHO="Name Season,...": voters, family scores, candidates)
+			const data = realData();
+			const fold = (x) =>
+				x
+					.normalize("NFD")
+					.replace(/[\u0300-\u036f]/g, "")
+					.toLowerCase();
+			const out = [];
+			for (const w of process.env.ARCH_V2_WHO.split(",")) {
+				const m = w.trim().match(/^(.*) (\d{4})$/);
+				const slug = Object.entries(data.d.bios).find(
+					([, b]) => b.name && fold(b.name) === fold(m[1]),
+				)?.[0];
+				const row = data.d.ratings.find(
+					(r) => r.slug === slug && r.season === Number(m[2]),
+				);
+				if (!row) {
+					out.push(`${w}: not found`);
+					continue;
+				}
+				const p = { ...realPlayer(data, row, ratingsOfRow), norms: REAL_NORMS };
+				const res = ENGINES.v2(
+					p,
+					process.env.ARCH_V2_WHO_SELF ? {} : { srID: p.slug },
+				);
+				const v = res.c.v2;
+				out.push(
+					`${w} (${p.pos}): ${res.name} [${res.id}] fam ${v.family} voters ${JSON.stringify(v.voters)} roles ${v.roles.join(",")}`,
+				);
+				out.push(
+					`  famScore ${Object.entries(v.famScore)
+						.sort((a, b) => b[1] - a[1])
+						.slice(0, 4)
+						.map(([k, x]) => `${k} ${x.toFixed(2)}`)
+						.join(", ")}; knn canon ${Object.entries(v.votes.canon)
+						.sort((a, b) => b[1] - a[1])
+						.slice(0, 4)
+						.map(([k, x]) => `${k} ${x.toFixed(2)}`)
+						.join(", ")}`,
+				);
+				for (const c of [...v.candidates]
+					.sort((a, b) => b.score - a.score)
+					.slice(0, 8))
+					out.push(
+						`  ${c.score.toFixed(2)} ${c.name} [${c.family}${c.classic ? ", classic" : ""}]`,
+					);
+			}
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
+		if (MODE === "composed") {
+			// archv3: the composed names v2 gives (random league and real 2016-2025): each with how often, example players,
+			// the earlier reading's label for them and how far the best preset was
+			const pops = {
+				league: await genPlayers(3000, "metrics-league", 19, 32, 38),
+				vets: await genPlayers(1000, "metrics-vets", 32, 37, 38),
+				pros: (await genPlayers(1000, "metrics-pros", 19, 19, 40)).map((p) => ({
+					...p,
+					prospect: true,
+					age: undefined,
+				})),
+				real: realPop(2016, 2025),
+			};
+			const by = {};
+			// (every composed name among the candidates, chosen or not: the grammar audit)
+			const pool = {};
+			let n = 0;
+			for (const [label, ps] of Object.entries(pops)) {
+				for (const p of ps) {
+					n++;
+					const res = ENGINES.v2(p, p.slug ? { srID: p.slug } : {});
+					const top = res.c.v2.candidates.find((c) => c.id.startsWith("v2:"));
+					if (top) pool[top.name] = (pool[top.name] ?? 0) + 1;
+					if (!res.id.startsWith("v2:")) continue;
+					const cl = res.c.v2.candidates.find((c) => c.classic);
+					const bestBuild = res.c.v2.candidates.find(
+						(c) => !c.id.startsWith("v2:"),
+					);
+					const e = (by[res.name] ??= { n: 0, ex: [], ids: new Set() });
+					e.n++;
+					e.ids.add(res.id);
+					if (e.ex.length < 3)
+						e.ex.push(
+							`${p.name ?? `gen#${n}`}${p.season ? ` ${p.season}` : ""} ${p.pos} (earlier: ${cl?.name}; best preset ${bestBuild?.name} ${(res.c.v2.candidates[0].score - (bestBuild?.score ?? 0)).toFixed(2)} behind)`,
+						);
+				}
+			}
+			const out = [
+				`composed: ${Object.values(by).reduce((s, e) => s + e.n, 0)} of ${n} players, ${Object.keys(by).length} names`,
+			];
+			for (const [nm, e] of Object.entries(by).sort((a, b) => b[1].n - a[1].n))
+				out.push(`${e.n}\t${nm}\t${[...e.ids].join(" ")}\t${e.ex.join(" | ")}`);
+			out.push(
+				"",
+				`audit pool: ${Object.keys(pool).length} composed candidate names`,
+			);
+			for (const [nm, k] of Object.entries(pool).sort((a, b) => b[1] - a[1]))
+				out.push(`${k}\t${nm}`);
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
+		if (MODE === "churn") {
+			const out = [JSON.stringify(PARAMS ?? {})];
+			await churnAll(out, ["v2"]);
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
+		if (MODE === "picks") {
+			// archv3: the user's picks (a tuning export, ARCH_V2_PICKS) read as the game reads them: his tuning fitted from all
+			// the picks on the model, the picks as labeled players, the player himself left out
+			const { readFileSync } = await import("node:fs");
+			const { applyTuning, fitTuning } = await import("../tuning.ts");
+			const { modelFor } = await import("../classify.ts");
+			const { pickKey, refsFromPicks } = await import("./picks.ts");
+			const f = JSON.parse(readFileSync(process.env.ARCH_V2_PICKS, "utf8"));
+			const byUid = new Map();
+			for (const p of [...f.picks.global, ...f.picks.league])
+				byUid.set(p.uid, { ...p, input: f.snapshots[p.uid] });
+			const picks = [...byUid.values()];
+			const tuning = fitTuning(picks, modelFor);
+			const refs = refsFromPicks(picks);
+			const lines = [`tuning n=${tuning.n} hash ${tuning.hash}`];
+			for (const p of picks) {
+				const inp = p.input;
+				const [lid, pid] = p.uid.split("-");
+				const expanded = typeof inp.ratings.wng === "number";
+				const base = {
+					pos: inp.pos,
+					age: inp.age,
+					prospect: inp.prospect,
+					stats: inp.stats,
+					pt: inp.pt,
+					traits: inp.traits,
+					norms: defaultNorms(expanded),
+				};
+				const plain = classifyV2(inp.ratings, base);
+				const tuned = classifyV2(inp.ratings, {
+					...base,
+					model: applyTuning(modelFor(expanded), tuning),
+					extraRefs: refs,
+					pickKey: pickKey(lid, pid),
+				});
+				const want = archetypeById(p.picked);
+				if (process.env.ARCH_V2_DEBUG) {
+					const fs2 = Object.entries(tuned.v2.famScore)
+						.sort((a, b) => b[1] - a[1])
+						.slice(0, 4)
+						.map(([k, v]) => `${k} ${v.toFixed(2)}`);
+					lines.push(
+						`  voters ${JSON.stringify(tuned.v2.voters)} fam ${fs2.join(", ")}`,
+					);
+					for (const c of tuned.v2.candidates.slice(0, 8))
+						lines.push(
+							`  ${c.score.toFixed(2)} ${c.name} [${c.family}${c.classic ? ", classic" : ""}]`,
+						);
+					const pc = tuned.v2.candidates.find((c) => c.canon === p.picked);
+					const { promiseMiss } = await import("../score.ts");
+					const sc0 = scoreAll(
+						inp.ratings,
+						base.norms,
+						ARCHETYPES,
+						inp.pos,
+						inp.traits,
+						base,
+					);
+					lines.push(
+						`  promiseMiss picked ${promiseMiss(archetypeById(p.picked), sc0.cv).toFixed(2)} positions ${archetypeById(p.picked).positions}`,
+					);
+					lines.push(
+						`  picked: ${pc ? `${pc.score.toFixed(2)} ${pc.family} rank ${tuned.v2.candidates.indexOf(pc)}` : "not a candidate"}`,
+					);
+				}
+				lines.push(
+					`${p.name} ${p.season} ${inp.pos}: picked ${want ? nameAt(want, inp.pos) : p.picked} | shown then ${p.shown} | now ${plain.name} [${plain.id}] | with his tuning and picks ${tuned.name} [${tuned.id}]${tuned.id === p.picked ? " OK" : ""}; alternates ${tuned.alternates.map((a) => a.name).join(", ")}`,
+				);
+			}
+			writeFileSync(OUT, lines.join("\n") + "\n");
+			return;
+		}
 		// ---- accuracy against the labeled players ----
 		const u2k = userPlayers().map((x) => ({
 			...x.p,
@@ -394,6 +653,139 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 		const heldOut = (x) => ({ srID: x.slug ?? x.key, knn: { tuneOnly: true } });
 		const loo = (x) => ({ srID: x.slug ?? x.key });
 
+		if (MODE === "voters") {
+			// Which family voter is right how often, per position bucket and per family it says (tune split, the neighbours
+			// leave-one-out from the tune split), and where the target build ranks among v2's and the classic reading's
+			// candidates
+			const xs = [
+				...u2k
+					.filter((x) => x.split === (process.env.ARCH_V2_SPLIT ?? "tune"))
+					.map((x) => ({ x, tg: t2k(x), src: "2k" })),
+				...judged
+					.filter((x) => x.j.split === (process.env.ARCH_V2_SPLIT ?? "tune"))
+					.map((x) => ({ x, tg: tJ(x), src: "judged" })),
+			];
+			{
+				const { shippedRefs, standardize: stdz } = await import("./knn.ts");
+				const refs = shippedRefs();
+				const ds = [];
+				for (const x of u2k.slice(0, 40)) {
+					const r = refs.find((y) => y.key === x.slug);
+					if (!r) continue;
+					const s0 = scoreAll(
+						x.ratings,
+						x.norms,
+						ARCHETYPES,
+						x.pos,
+						undefined,
+						readOf(x),
+					);
+					const z = stdz(FEAT_FROM_FAMX(s0.famX), BUCKET_OF[s0.pos]);
+					let d = 0;
+					const big = [];
+					for (let i = 0; i < z.length; i++) {
+						d += (z[i] - r.x[i]) ** 2;
+						if (Math.abs(z[i] - r.x[i]) > 0.3)
+							big.push(`${i}:${z[i].toFixed(2)}/${r.x[i]}`);
+					}
+					ds.push(
+						`${x.slug} ${s0.pos}/${r.pos} d=${Math.sqrt(d).toFixed(2)} ${big.join(" ")}`,
+					);
+				}
+				writeFileSync(OUT + ".self", ds.join("\n"));
+			}
+			const V = ["classic", "knn", "rule", "probs"];
+			const acc = {};
+			const rows = [];
+			for (const { x, tg, src } of xs) {
+				const res = ENGINES.v2(x, {
+					srID: x.slug ?? x.key,
+					knn: { tuneOnly: true },
+				});
+				const cl = ENGINES.classic(x);
+				const b = BUCKET_OF[res.c.v2 ? x.pos : x.pos] ?? "?";
+				const w = (x.w ?? 1) * (src === "judged" ? 0.5 : 1);
+				const vs = res.c.v2.voters;
+				const row = { b, src, w, tg: tg.fam, vs, fs: res.c.v2.famScore };
+				rows.push(row);
+				for (const v of V) {
+					const f = vs[v];
+					if (!f) continue;
+					const ok = tg.fam.includes(f) ? 1 : 0;
+					for (const key of [
+						`${v}|${b}|*`,
+						`${v}|${b}|${f}`,
+						`${v}|*|*`,
+						`${v}|*|${f}`,
+					]) {
+						acc[key] ??= { n: 0, ok: 0 };
+						acc[key].n += w;
+						acc[key].ok += ok * w;
+					}
+				}
+				// target's rank among candidates
+				const rk = res.c.v2.candidates.findIndex((c) =>
+					tg.canon.includes(c.canon),
+				);
+				const rc = cl.top.findIndex((c) => tg.canon.includes(c));
+				for (const [nm, r] of [
+					["v2rank", rk],
+					["clrank", rc],
+				]) {
+					const key = `${nm}|${r < 0 ? "none" : r < 3 ? r : r < 6 ? "3-5" : r < 10 ? "6-9" : "10+"}`;
+					acc[key] ??= { n: 0, ok: 0 };
+					acc[key].n += w;
+				}
+				// all disagree vs agree
+				const set = new Set([vs.classic, vs.knn, vs.rule].filter(Boolean));
+				const key = `agree|${set.size}`;
+				acc[key] ??= { n: 0, ok: 0 };
+				acc[key].n += w;
+				acc[key].ok += tg.fam.includes(res.c.v2.family) ? w : 0;
+			}
+			if (process.env.ARCH_V2_WRITE_REL) {
+				// Smoothed: a family the voter says rarely leans on the voter's accuracy at that position, which leans on its
+				// accuracy overall
+				const M = 4;
+				const rel = {};
+				for (const v of V) {
+					const all = acc[`${v}|*|*`];
+					const g0 = (all.ok + M * 0.4) / (all.n + M);
+					rel[v] = {};
+					for (const b of POS_BUCKETS) {
+						const ab = acc[`${v}|${b}|*`] ?? { n: 0, ok: 0 };
+						const rb = (ab.ok + M * g0) / (ab.n + M);
+						rel[v][b] = { "*": Math.round(rb * 1000) / 1000 };
+						for (const [k, a] of Object.entries(acc)) {
+							const [v2, b2, f] = k.split("|");
+							if (v2 !== v || b2 !== b || f === "*") continue;
+							rel[v][b][f] =
+								Math.round(((a.ok + M * rb) / (a.n + M)) * 1000) / 1000;
+						}
+					}
+				}
+				writeFileSync(
+					new URL("./voters.data.ts", import.meta.url),
+					`// GENERATED by v2/v2.script.test.ts (RUN_ARCHETYPE_V2=1 ARCH_V2_MODE=voters ARCH_V2_WRITE_REL=1). Do not edit by hand.
+// archv3: how often each family voter is right, per position bucket and per family it says ("*": any family it says),
+// measured on the tune split of the user's 2K list and the judged key (the neighbours leave-one-out from the tune split),
+// smoothed toward the voter's accuracy at that position and overall. The engine weighs each voter's family by this.
+import type { Family } from "../families.ts";
+import type { PosBucket } from "../types.ts";
+
+export type Voter = "classic" | "knn" | "rule" | "probs";
+// prettier-ignore
+export const VOTER_REL: Record<Voter, Record<PosBucket, Partial<Record<Family | "*", number>>>> = ${JSON.stringify(rel)};
+`,
+				);
+			}
+			const lines = Object.entries(acc)
+				.sort((a, b) => (a[0] < b[0] ? -1 : 1))
+				.map(([k, a]) => `${k}\t${a.n.toFixed(1)}\t${pct(a.ok, a.n)}`);
+			writeFileSync(OUT, lines.join("\n") + "\n");
+			writeFileSync(OUT + ".json", JSON.stringify(rows));
+			return;
+		}
 		if (MODE === "tune") {
 			const tune2k = u2k.filter((x) => x.split === "tune");
 			const tuneJ = judged.filter((x) => x.j.split === "tune");
@@ -406,6 +798,10 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 				out.push(
 					`${JSON.stringify(pr)}\n  2K tune ${fmt(a)}\n  judged tune ${fmt(b)}\n  objective ${(a.fam + a.t3 + 0.5 * (b.fam + b.t3)).toFixed(4)}`,
 				);
+				for (const [k, v] of Object.entries(dbg)
+					.sort((a, b) => b[1] - a[1])
+					.slice(0, process.env.ARCH_V2_DEBUG ? 40 : 4))
+					out.push(`  ${v} ${k}`);
 				writeFileSync(OUT, out.join("\n") + "\n");
 			}
 			return;
@@ -530,81 +926,100 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			}
 			writeFileSync(OUT, out.join("\n") + "\n");
 		}
-		// Churn: the same players season after season, previous label and position carried, aging read
-		for (const e of ["classic", "v2"]) {
-			let changes = 0,
-				steps = 0;
-			await seeded("metrics-flap", async () => {
-				newG();
-				const rng2 = new Rng("metrics-flap");
-				for (let i = 0; i < 2000; i++) {
-					const p = generate(
-						-1,
-						19,
-						2025 - rng2.int(0, 6),
-						false,
-						DEFAULT_LEVEL,
-					);
-					const dev = rng2.int(0, 10);
-					await develop(p, dev, true);
-					let prev, prevPos, prevR;
-					for (let y = 0; y < 5; y++) {
-						await develop(p, 1, false);
-						const row = p.ratings.at(-1);
-						if (ovrFn(row) < 38) continue;
-						const r = ratingsOfRow(row);
-						prevPos = positionFor(r, true, prevPos, { previousRatings: prevR });
-						prevR = r;
-						const res = ENGINES[e](
-							{ ratings: r, pos: prevPos, age: 20 + dev + y, norms: NORMS },
-							{ previousId: prev?.id },
-						);
-						if (prev) {
-							steps++;
-							if (prev.id !== res.id) changes++;
-						}
-						prev = res;
-					}
-				}
-			});
-			out.push(
-				`churn ${e}: ${pct(changes, steps)} of seasons change label (${steps} player-seasons)`,
-			);
-			writeFileSync(OUT, out.join("\n") + "\n");
-		}
-		// Notable players (current season of the user's list when there, else his latest season in the data)
-		const NOTABLE = (
-			process.env.ARCH_V2_NOTABLE ??
-			"Jokic,Stephen Curry,Kevin Durant,LeBron James,Giannis,Gilgeous-Alexander,Luka,Embiid,Jayson Tatum,Jalen Brunson,Kyrie Irving,Donovan Mitchell,Rudy Gobert,Draymond Green,Evan Mobley,Alperen,Tyrese Haliburton,Cade Cunningham,Anthony Edwards,Victor Wembanyama,Brook Lopez,Clint Capela,Alex Caruso,Tyler Herro,Tyrese Maxey,Karl-Anthony Towns,Zion Williamson,Ja Morant,Domantas Sabonis,Paolo Banchero"
-		).split(",");
-		const data = realData();
-		const fold = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-		out.push("", "notable players | 2K | Classic | v2 (family; agreed?)");
-		for (const n of NOTABLE) {
-			let x = u2k.find((y) => !y.r.allTime && fold(y.r.name).includes(fold(n)));
-			if (!x) {
-				// (an exact full name first: "Victor Wembanyama", not a relative whose name contains it)
-				const bios = Object.entries(data.d.bios).filter(([, b]) => b.name);
-				const slug = (bios.find(([, b]) => fold(b.name) === fold(n)) ??
-					bios.find(([, b]) => fold(b.name).includes(fold(n))))?.[0];
-				const row = slug
-					? data.d.ratings
-							.filter((r) => r.slug === slug)
-							.sort((a, b) => b.season - a.season)[0]
-					: undefined;
-				if (!row) {
-					out.push(`${n}: not found`);
-					continue;
-				}
-				x = { ...realPlayer(data, row, ratingsOfRow), norms: REAL_NORMS };
-			}
-			const c = ENGINES.classic(x);
-			const v = ENGINES.v2(x, { srID: x.slug });
-			out.push(
-				`${x.r ? `${x.r.name} ${x.season}` : x.name} (${x.pos}) | ${x.r?.arch ?? "-"} | ${c.name} | ${v.name} (${v.c.v2.family}${v.c.v2.agreed ? "" : "; safe"})`,
-			);
-		}
+		await churnAll(out);
+		writeFileSync(OUT, out.join("\n") + "\n");
+		notables(out);
 		writeFileSync(OUT, out.join("\n") + "\n");
 	},
 	3600000,
 );
+
+// Churn: the same players season after season, previous label and position carried, aging read
+const churnAll = async (out, engines = ["classic", "v2"]) => {
+	for (const e of engines) {
+		let changes = 0,
+			steps = 0;
+		await seeded("metrics-flap", async () => {
+			newG();
+			const rng2 = new Rng("metrics-flap");
+			for (let i = 0; i < 2000; i++) {
+				const p = generate(-1, 19, 2025 - rng2.int(0, 6), false, DEFAULT_LEVEL);
+				const dev = rng2.int(0, 10);
+				await develop(p, dev, true);
+				let prev, prevPos, prevR;
+				for (let y = 0; y < 5; y++) {
+					await develop(p, 1, false);
+					const row = p.ratings.at(-1);
+					if (ovrFn(row) < 38) continue;
+					const r = ratingsOfRow(row);
+					prevPos = positionFor(r, true, prevPos, { previousRatings: prevR });
+					prevR = r;
+					const res = ENGINES[e](
+						{ ratings: r, pos: prevPos, age: 20 + dev + y, norms: NORMS },
+						{ previousId: prev?.id },
+					);
+					if (prev) {
+						steps++;
+						if (prev.id !== res.id) {
+							changes++;
+							if (process.env.ARCH_V2_DEBUG && res.c.v2) {
+								const pc = res.c.v2.candidates.find((c) => c.id === prev.id);
+								const f = res.c.v2.candidates[0];
+								out.push(
+									`  ${prev.name} -> ${res.name} | prev ${pc ? `${pc.score.toFixed(2)} ${pc.family}` : "absent"} new ${f.score.toFixed(2)} ${f.family} fam ${res.c.v2.family} prevFam ${prev.c.v2?.family}`,
+								);
+							}
+						}
+					}
+					prev = res;
+				}
+			}
+		});
+		out.push(
+			`churn ${e}: ${pct(changes, steps)} of seasons change label (${steps} player-seasons)`,
+		);
+		writeFileSync(OUT, out.join("\n") + "\n");
+	}
+};
+
+// Notable players (current season of the user's list when there, else his latest season in the data)
+const notables = (out) => {
+	const u2k = userPlayers().map((x) => ({
+		...x.p,
+		norms: x.norms,
+		age: x.read.age,
+		stats: x.read.stats,
+		r: x.r,
+	}));
+	const NOTABLE = (
+		process.env.ARCH_V2_NOTABLE ??
+		"Jokic,Stephen Curry,Kevin Durant,LeBron James,Giannis,Gilgeous-Alexander,Luka,Embiid,Jayson Tatum,Jalen Brunson,Kyrie Irving,Donovan Mitchell,Rudy Gobert,Draymond Green,Evan Mobley,Alperen,Tyrese Haliburton,Cade Cunningham,Anthony Edwards,Victor Wembanyama,Brook Lopez,Clint Capela,Alex Caruso,Tyler Herro,Tyrese Maxey,Karl-Anthony Towns,Zion Williamson,Ja Morant,Domantas Sabonis,Paolo Banchero"
+	).split(",");
+	const data = realData();
+	const fold = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+	out.push("", "notable players | 2K | Classic | v2 (family; agreed?)");
+	for (const n of NOTABLE) {
+		let x = u2k.find((y) => !y.r.allTime && fold(y.r.name).includes(fold(n)));
+		if (!x) {
+			// (an exact full name first: "Victor Wembanyama", not a relative whose name contains it)
+			const bios = Object.entries(data.d.bios).filter(([, b]) => b.name);
+			const slug = (bios.find(([, b]) => fold(b.name) === fold(n)) ??
+				bios.find(([, b]) => fold(b.name).includes(fold(n))))?.[0];
+			const row = slug
+				? data.d.ratings
+						.filter((r) => r.slug === slug)
+						.sort((a, b) => b.season - a.season)[0]
+				: undefined;
+			if (!row) {
+				out.push(`${n}: not found`);
+				continue;
+			}
+			x = { ...realPlayer(data, row, ratingsOfRow), norms: REAL_NORMS };
+		}
+		const c = ENGINES.classic(x);
+		const v = ENGINES.v2(x, { srID: x.slug });
+		out.push(
+			`${x.r ? `${x.r.name} ${x.season}` : x.name} (${x.pos}) | ${x.r?.arch ?? "-"} | ${c.name} | ${v.name} (${v.c.v2.family}${v.c.v2.agreed ? "" : "; safe"})`,
+		);
+	}
+};

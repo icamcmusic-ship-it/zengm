@@ -1,11 +1,12 @@
-// archuser2k: the user's own NBA 2K archetypes, pasted in three batches (name | 2K positions | 2K archetype | 2K overall):
+// archuser2k: the user's own NBA 2K archetypes, pasted in four batches (name | 2K positions | 2K archetype | 2K overall):
 // about 700 entries, matched to the real-player data (data/real-player-*.basketball.json) by name (diacritics,
 // punctuation, Jr./II/III, a shortened first name and two nicknames ignored). Current players (batches 1 and 2) are read
 // at the latest season (2027: the 2026-27 preseason, with the 2025-26 stats); 2K's all-time teams (allTime: the Bulls and
 // Hawks of batch 2, twelve more franchises in batch 3) at the best season by overall of his stint with that franchise
 // (team; his best season overall where the stats do not show the stint), at half weight. Batch 2 replaces a batch-1 entry
 // of the same player; an all-time entry on the season of a current entry is dropped, and two all-time entries on one
-// season keep the higher 2K overall. No slug: not in the data (skipped).
+// season keep the higher 2K overall. No slug: not in the data (skipped). archv3: batch 4, the Celtics' current players
+// (Tatum among them), read at 2027 like batches 1 and 2.
 // The strongest answer key there is: the new builds of twoK/user2kDefs.data.ts are made from these players' ratings and
 // the developer refit reads them as picks (twoK/user2k.script.test.ts).
 export type User2KRow = {
@@ -13,7 +14,7 @@ export type User2KRow = {
 	pos: ("PG" | "SG" | "SF" | "PF" | "C")[];
 	arch: string;
 	ovr?: number;
-	batch: 1 | 2 | 3;
+	batch: 1 | 2 | 3 | 4;
 	allTime?: true;
 	team?: string;
 	slug?: string;
@@ -723,4 +724,21 @@ export const USER_2K: User2KRow[] = [
 	{name: "Dennis Scott",pos: ["SF","SG"],arch: "Sharpshooter",ovr: 84,batch: 3,allTime: true,team: "ORL",slug: "scottde01",season: 1996},
 	{name: "Jameer Nelson",pos: ["PG"],arch: "Playmaking Creator",ovr: 83,batch: 3,allTime: true,team: "ORL",slug: "nelsoja01",season: 2006},
 	{name: "Darrell Armstrong",pos: ["PG"],arch: "Middy Slasher",batch: 3,allTime: true,team: "ORL",slug: "armstda01",season: 1999},
+	{name: "Jayson Tatum",pos: ["PF","SF"],arch: "2-Way Bucket Chaser",ovr: 93,batch: 4,slug: "tatumja01",season: 2027},
+	{name: "Paul George",pos: ["SF","PF"],arch: "Pesky Playmaking Creator",ovr: 84,batch: 4,slug: "georgpa01",season: 2027},
+	{name: "Derrick White",pos: ["PG","SG"],arch: "2-Way Middy Playmaker",ovr: 83,batch: 4,slug: "whitede01",season: 2027},
+	{name: "Payton Pritchard",pos: ["PG"],arch: "Sharpshooter",ovr: 82,batch: 4,slug: "pritcpa01",season: 2027},
+	{name: "Mitchell Robinson",pos: ["C"],arch: "Paint-Protecting Riser",ovr: 80,batch: 4,slug: "robinmi01",season: 2027},
+	{name: "Neemias Queta",pos: ["C"],arch: "Rugged Rim Protector",ovr: 80,batch: 4,slug: "quetane01",season: 2027},
+	{name: "Sam Hauser",pos: ["SF","PF"],arch: "Sharpshooter",ovr: 77,batch: 4,slug: "hausesa01",season: 2027},
+	{name: "Luka Garza",pos: ["C","PF"],arch: "Board-Crashing Stretch",ovr: 75,batch: 4,slug: "garzalu01",season: 2027},
+	{name: "Mike Conley",pos: ["PG"],arch: "Defensive Playmaker",ovr: 75,batch: 4,slug: "conlemi01",season: 2027},
+	{name: "Jordan Walsh",pos: ["SG","SF"],arch: "Switch Defender",ovr: 75,batch: 4,slug: "walshjo01",season: 2027},
+	{name: "Devin Carter",pos: ["PG","SG"],arch: "High-Flying Slasher",ovr: 75,batch: 4,slug: "cartede02",season: 2027},
+	{name: "Baylor Scheierman",pos: ["SG","SF"],arch: "Wing-Running Sharpshooter",ovr: 75,batch: 4,slug: "scheiba01",season: 2027},
+	{name: "Hugo Gonzalez",pos: ["SG","SF"],arch: "2-Way Sniping Layup Bully",ovr: 75,batch: 4,slug: "gonzahu01",season: 2027},
+	{name: "Ron Harper Jr.",pos: ["SF","PF"],arch: "Perimeter Shot Hunter",ovr: 71,batch: 4,slug: "harpero02",season: 2027},
+	{name: "Chris Cenac Jr.",pos: ["PF","C"],arch: "Yamming Force of Nature",ovr: 71,batch: 4,slug: "cenacch01",season: 2027},
+	{name: "Amari Williams",pos: ["C"],arch: "Showmaker",ovr: 69,batch: 4,slug: "william01",season: 2027},
+	{name: "Dillon Mitchell",pos: ["PF","SF"],arch: "Rim-Running Hammer",batch: 4,slug: "mitchdi01",season: 2027},
 ];

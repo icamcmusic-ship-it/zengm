@@ -27,7 +27,7 @@ import { mergedId } from "../merges.data.ts";
 import { familyProbs } from "../model.ts";
 import { isPos } from "../position.ts";
 import { nameAt } from "../posNames.ts";
-import { promiseMiss } from "../score.ts";
+import { ATH_NAME_RE, promiseMiss } from "../score.ts";
 import { RULES } from "../rulebook.data.ts";
 import { USER_2K_MAP } from "../twoK/user2kMap.data.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
@@ -52,15 +52,21 @@ import {
 	BUCKET_OF,
 	FEAT_FROM_FAMX,
 	knnVotes,
+	shippedIndex,
 	standardize,
 	type KnnOptions,
 	type RefRow,
 	type Votes,
 } from "./knn.ts";
-import { testConcept, topSkills, type WordContext } from "./tests.ts";
+import { peerPct, testConcept, topSkills, type WordContext } from "./tests.ts";
+import { VOTER_REL, type Voter } from "./voters.data.ts";
+import { refsFromPicks } from "./picks.ts";
+import { USER_PICKS } from "./userPicks.data.ts";
 
 export type V2Params = {
-	// Family score: neighbours' share, the classic label's family, the family classifier, the rulebook's role
+	// Family score: the voters weighed by their reliability (archv3), neighbours' share, the classic label's family, the
+	// family classifier, the rulebook's role
+	fV: number;
 	fK: number;
 	fC: number;
 	fP: number;
@@ -79,15 +85,36 @@ export type V2Params = {
 	buildBonus: number;
 	// Hysteresis margin (keep last season's label unless beaten by this)
 	hyst: number;
+	// Runners-up order: a build over a composed name, the classic reading's top builds
+	altBuild: number;
+	// archv3: the user's tuning per build in the score, and the neighbours' share that makes a build a candidate
+	tuneW: number;
+	knnBuildMin: number;
+	// A composed name gives way to a build this close, or to the earlier reading's label at this confidence (archv3)
+	presetMargin: number;
+	presetConf: number;
+	// What an athletic name on a below-median athlete pays (archv3)
+	athPen: number;
+	// The Glue roles' head start (archv3: their tests' margins are small by construction, no standout)
+	glueWing: number;
+	glueGuard: number;
+	switchDefender: number;
+	// Last season's family's head start
+	famHyst: number;
+	// What a candidate outside the voted family pays (its family's vote is already in its score; Infinity: the voted
+	// family's candidates only, as before archv3)
+	famOut: number;
+	altClassic: number;
 	// Use the neighbours' display words
 	words: boolean;
 	k: number;
 };
 export const V2_PARAMS: V2Params = {
-	fK: 1,
-	fC: 0.6,
-	fP: 0.4,
-	fR: 0.4,
+	fV: 1,
+	fK: 0.5,
+	fC: 0,
+	fP: 0.2,
+	fR: 0,
 	rM: 1,
 	rK: 1,
 	dM: 1,
@@ -96,7 +123,19 @@ export const V2_PARAMS: V2Params = {
 	kCanon: 1,
 	classicBonus: 1,
 	buildBonus: 0.1,
-	hyst: 0.5,
+	hyst: 0.8,
+	altBuild: 0.5,
+	tuneW: 5,
+	knnBuildMin: 0.1,
+	famOut: 0.5,
+	presetMargin: 0.1,
+	presetConf: 0.8,
+	athPen: 1,
+	glueWing: 2,
+	glueGuard: 1.4,
+	switchDefender: 1.5,
+	famHyst: 1,
+	altClassic: 1,
 	words: true,
 	k: 15,
 };
@@ -104,7 +143,22 @@ export const V2_PARAMS: V2Params = {
 const norm = (s: string) => s.toLowerCase().replace(/[^\da-z]/g, "");
 let nameIndex: Map<string, string> | undefined;
 // Every name a build goes by (its names at each position, its 2K aliases, the user's 2K names mapped to it)
+// archv3: 2K names of the user's list that the grammar composes as they are (its own words: Switch Defender, Rugged,
+// Pesky, Rim Protector), rather than read as the build they were an alias of
+export const OWN_COMPOSED_NAMES: ReadonlySet<string> = new Set(
+	[
+		"Switch Defender",
+		"Rugged Rim Protector",
+		"Pesky Playmaking Creator",
+		"2-Way Middy Playmaker",
+		"Wing-Running Sharpshooter",
+		"2-Way Bucket Chaser",
+	].map((n) => norm(n)),
+);
 const buildOfName = (name: string): string | undefined => {
+	if (OWN_COMPOSED_NAMES.has(norm(name))) {
+		return undefined;
+	}
 	if (!nameIndex) {
 		nameIndex = new Map();
 		for (const [n, v] of Object.entries(USER_2K_MAP)) {
@@ -126,6 +180,13 @@ const buildOfName = (name: string): string | undefined => {
 	}
 	return nameIndex.get(norm(name));
 };
+// Build the tables a reading needs (the neighbours' index, the names, the shipped picks) ahead of the first one
+export const warmArchetypeEngine = () => {
+	shippedIndex();
+	buildOfName("");
+	withShippedPicks();
+};
+
 // What a name is, for votes and the evaluation: the build it names, else the name itself
 export const canonOf = (name: string): string =>
 	buildOfName(name) ?? `name:${norm(name)}`;
@@ -144,7 +205,8 @@ export type V2Candidate = {
 export type V2Info = {
 	family: Family;
 	agreed: boolean;
-	voters: { classic: Family; knn?: Family; rule?: Family };
+	voters: { classic: Family; knn?: Family; rule?: Family; probs?: Family };
+	famScore: Record<Family, number>;
 	candidates: V2Candidate[];
 	composed: boolean;
 	votes: Votes;
@@ -155,8 +217,10 @@ export type V2Options = ClassifyOptions & {
 	srID?: string;
 	knn?: KnnOptions;
 	params?: Partial<V2Params>;
-	// The user's own picks as labeled players (archfb)
+	// The user's own picks as labeled players (archfb; archv3: picks.ts refsFromPicks), and his own key among them (a
+	// league player's picks: picks.ts pickKey), so he never votes for himself
 	extraRefs?: readonly RefRow[];
+	pickKey?: string;
 };
 
 const allowedBuild = (
@@ -184,17 +248,13 @@ export const classifyV2 = (
 	const norms = opts.norms ?? defaultNormsFor(ratings);
 	const prevRaw = opts.previousId;
 	const prevComposed = isComposedId(prevRaw);
-	const classic = classify(ratings, {
-		...opts,
-		norms,
-		previousId: prevComposed ? undefined : prevRaw,
-	});
 	const read = {
 		age: opts.age,
 		stats: opts.stats,
 		prospect: opts.prospect,
 		pt: opts.pt,
 	};
+	// (read once: the classic reading takes the same scores; archv3)
 	const s = scoreAll(
 		ratings,
 		norms,
@@ -204,6 +264,12 @@ export const classifyV2 = (
 		read,
 		opts.model,
 	);
+	const classic = classify(ratings, {
+		...opts,
+		norms,
+		previousId: prevComposed ? undefined : prevRaw,
+		scored: s,
+	});
 	const pos = s.pos;
 	const group = GROUP_OF[pos];
 	const bucket = BUCKET_OF[pos];
@@ -214,6 +280,7 @@ export const classifyV2 = (
 		bucket,
 		pz: s.pz as unknown as Record<string, number>,
 		top3: topSkills(bucket, cv),
+		statZ: opts.stats?.z,
 	};
 	const order = topSkills(bucket, cv, 10);
 
@@ -221,8 +288,14 @@ export const classifyV2 = (
 	const votes = knnVotes(standardize(FEAT_FROM_FAMX(s.famX), bucket), bucket, {
 		k: P.k,
 		...opts.knn,
-		exclude: opts.srID ?? opts.knn?.exclude,
-		extra: opts.extraRefs,
+		exclude: [
+			...(opts.srID ? [opts.srID] : []),
+			...(opts.pickKey ? [opts.pickKey] : []),
+			...(typeof opts.knn?.exclude === "string"
+				? [opts.knn.exclude]
+				: (opts.knn?.exclude ?? [])),
+		],
+		extra: withShippedPicks(opts.extraRefs),
 		canonOf: (n) => canonOf(n),
 	});
 	const pick: WordPick | undefined = P.words ? votes.words : undefined;
@@ -268,26 +341,50 @@ export const classifyV2 = (
 		opts.model ?? modelFor(hasExpandedRatings(ratings)),
 		s.famX,
 	);
+	// archv3: each voter's family counts by how often that voter is right when it says that family at his position
+	// (voters.data.ts, measured on the tune split); the classifier's and the neighbours' shares add a little
+	const probsFam = FAMILIES[probs.indexOf(Math.max(...probs))]!;
+	const said: [Voter, Family | undefined][] = [
+		["classic", classicFam],
+		["knn", knnFam],
+		["rule", ruleFam],
+		["probs", probsFam],
+	];
+	const relOf = (v: Voter, f: Family) => {
+		const t = VOTER_REL[v][bucket];
+		return t?.[f] ?? t?.["*"] ?? 0.4;
+	};
+	const famVote = {} as Record<Family, number>;
 	const famScore = {} as Record<Family, number>;
 	for (const [i, f] of FAMILIES.entries()) {
+		famVote[f] = 0;
+		for (const [v, sf] of said) {
+			if (sf === f) {
+				famVote[f] += relOf(v, f);
+			}
+		}
 		famScore[f] =
+			P.fV * famVote[f] +
 			P.fK * (votes.family[f] ?? 0) +
-			P.fC * (classicFam === f ? 1 : 0) +
 			P.fP * probs[i]! +
+			P.fC * (classicFam === f ? 1 : 0) +
 			P.fR * (ruleFam === f ? 1 : 0);
 	}
-	const count = new Map<Family, number>();
-	for (const f of [classicFam, knnFam, ruleFam]) {
-		if (f) {
-			count.set(f, (count.get(f) ?? 0) + 1);
+	// (archv3: last season's family is kept a little: his family moves only when the vote moves clearly)
+	if (prevRaw && P.famHyst !== 0) {
+		const pa = archetypeById(prevComposed ? prevRaw : mergedId(prevRaw));
+		if (pa) {
+			famScore[familyOfName(nameAt(pa, pos), pos)] += P.famHyst;
 		}
 	}
-	const agreedFam = [...count.entries()].find(([, n]) => n >= 2)?.[0];
-	const family =
-		agreedFam ??
-		(FAMILIES.slice().sort(
-			(x, y) => famScore[y] - famScore[x] || (x < y ? -1 : 1),
-		)[0] as Family);
+	const famOrder = FAMILIES.slice().sort(
+		(x, y) => famScore[y] - famScore[x] || (x < y ? -1 : 1),
+	);
+	const family = famOrder[0] as Family;
+	// (the voters agree when two or more say his family; else the reading still takes the best label of the best-voted
+	// family, at a lower confidence)
+	const agreedFam =
+		said.filter(([, f]) => f === family).length >= 2 ? family : undefined;
 
 	// Descriptors he passes
 	const descTests = new Map<string, number>();
@@ -331,7 +428,16 @@ export const classifyV2 = (
 				}
 			}
 		}
-		const base = P.rM * t.margin + P.rK * (votes.role[r.key] ?? 0);
+		const base =
+			P.rM * t.margin +
+			P.rK * (votes.role[r.key] ?? 0) +
+			(r.key === "glueWing"
+				? P.glueWing
+				: r.key === "glueGuard"
+					? P.glueGuard
+					: r.key === "switchDefender"
+						? P.switchDefender
+						: 0);
 		for (const c of combos) {
 			const pk = pickFor(r, pick, c);
 			const name = composeName(r, c, group, pk);
@@ -387,6 +493,7 @@ export const classifyV2 = (
 		}
 	}
 	// The classic engine's runners-up: candidates too (its next builds are often the right one)
+	const classicTop: string[] = [classic.id];
 	{
 		let added = 0;
 		for (const sc of s.scored) {
@@ -397,6 +504,7 @@ export const classifyV2 = (
 				continue;
 			}
 			added++;
+			classicTop.push(sc.a.id);
 			const nm = nameAt(sc.a, pos);
 			const fam = familyOfName(nm, pos);
 			const parsed = parseName(nm, pos);
@@ -415,27 +523,112 @@ export const classifyV2 = (
 			});
 		}
 	}
-	cands.sort((x, y) => y.score - x.score || (x.canon < y.canon ? -1 : 1));
-	// Family first: the candidates of his family (the classic label when none is)
-	let pool = cands.filter((c) => c.family === family);
-	if (pool.length === 0) {
-		pool = [classicCand];
-	}
-	// Disagreement: the safest label of the family (no descriptors, or the classic label)
-	if (!agreedFam) {
-		const safe = pool.filter((c) => c.classic || c.descs.length === 0);
-		if (safe.length > 0) {
-			pool = safe;
+	const tuneBias = opts.model?.buildBias ?? {};
+	// (the candidates whose score already has the tuning)
+	const tuned = new Set<V2Candidate>();
+	// A build as a candidate on the neighbours' votes alone
+	const buildCand = (id: string): V2Candidate => {
+		const nm = nameAt(archetypeById(id)!, pos);
+		const fam = familyOfName(nm, pos);
+		const parsed = parseName(nm, pos);
+		return {
+			id,
+			name: nm,
+			canon: id,
+			family: fam,
+			role: parsed.role,
+			descs: parsed.descs,
+			score:
+				famScore[fam] +
+				P.rK * (votes.role[parsed.role ?? ""] ?? 0) +
+				P.kCanon * (votes.canon[id] ?? 0) +
+				P.tuneW * (tuneBias[id] ?? 0),
+		};
+	};
+	// archv3: builds the neighbours vote for, and builds the user's tuning favours (his picks), are candidates too (a
+	// pick of a build the reading never offered could not win otherwise)
+	{
+		const extraIds = new Set<string>();
+		for (const [c, share] of Object.entries(votes.canon)) {
+			if (!c.startsWith("name:") && (share ?? 0) >= P.knnBuildMin) {
+				extraIds.add(c);
+			}
+		}
+		for (const [id, b] of Object.entries(tuneBias)) {
+			if (b > 0) {
+				extraIds.add(id);
+			}
+		}
+		for (const id of [...extraIds].sort()) {
+			if (!seen.has(id) && allowedBuild(id, pos, cv)) {
+				const c = buildCand(id);
+				tuned.add(c);
+				add(c);
+			}
 		}
 	}
-	let first = pool[0]!;
+	// archv3: an athletic name (High-Flying, Burner, Rim Runner, ...) on a player below his position's median athleticism
+	// pays athPen (the earlier reading's floor lets some through)
+	if (P.athPen !== 0 && peerPct(bucket, "ath", cv.ath ?? 0) < 0.5) {
+		for (const c of cands) {
+			if (ATH_NAME_RE.test(c.name)) {
+				c.score -= P.athPen;
+			}
+		}
+	}
+	// The user's tuning (his picks) on every build: the reading follows his picks as the earlier reading's model did
+	if (P.tuneW !== 0) {
+		for (const c of cands) {
+			if (!tuned.has(c)) {
+				c.score += P.tuneW * (tuneBias[c.canon] ?? 0);
+			}
+		}
+	}
+	cands.sort((x, y) => y.score - x.score || (x.canon < y.canon ? -1 : 1));
+	// Family first: the candidates of his family (the classic label when none is)
+	// (a candidate outside the voted family pays famOut: archv3, was a hard filter; Infinity: the family only)
+	// (a build the user's picks favour pays no family toll: his picks say which family players like him are in)
+	const famToll = (c: V2Candidate) =>
+		c.family === family || (tuneBias[c.canon] ?? 0) > 0 ? 0 : P.famOut;
+	let first = classicCand;
+	{
+		let best = -Infinity;
+		for (const c of cands) {
+			const sc = c.score - famToll(c);
+			if (sc > best) {
+				best = sc;
+				first = c;
+			}
+		}
+	}
+	const eff = (c: V2Candidate) => c.score - famToll(c);
+	// archv3: a composed name only where no preset says him: a build within presetMargin of it, or the earlier reading's
+	// label when that reading is sure of it (its confidence presetConf or more), is his label instead
+	if (isComposedId(first.id) && !OWN_COMPOSED_NAMES.has(norm(first.name))) {
+		const fs = eff(first);
+		const preset = cands.find(
+			(c) =>
+				!isComposedId(c.id) &&
+				(eff(c) >= fs - P.presetMargin ||
+					(c.classic && classic.confidence >= P.presetConf)),
+		);
+		if (preset) {
+			first = preset;
+		}
+	}
 	// Hysteresis: last season's label stays unless beaten clearly (and while he still passes its tests)
+	// (archv3: on the same footing as the choice, outside his family included; a build he still passes that is no longer
+	// among the candidates is scored as one)
 	if (prevRaw && prevRaw !== first.id) {
 		const prevId = prevComposed ? prevRaw : mergedId(prevRaw);
-		const prev = cands.find((c) => c.id === prevId);
+		let prev = cands.find((c) => c.id === prevId);
+		if (!prev && !prevComposed && allowedBuild(prevId, pos, cv)) {
+			prev = buildCand(prevId);
+			cands.push(prev);
+		}
 		if (
 			prev &&
-			prev.score >= first.score - P.hyst &&
+			eff(prev) >= eff(first) - P.hyst &&
 			(prevComposed || prev.classic || allowedBuild(prevId, pos, cv))
 		) {
 			first = prev;
@@ -448,13 +641,26 @@ export const classifyV2 = (
 						c.role === parsed.role.key &&
 						c.descs.join("+") === parsed.descs.map((d) => d.key).join("+"),
 				);
-				if (own && own.score >= first.score - P.hyst) {
+				if (own && eff(own) >= eff(first) - P.hyst) {
 					first = own;
 				}
 			}
 		}
 	}
-	const rest = [first, ...cands.filter((c) => c !== first)];
+	// The runners-up: the next candidates, builds (presets) before composed names by altBuild, and the classic reading's
+	// own top builds by altClassic (archv3: what the user's 2K names most often are)
+	const altScore = (c: V2Candidate) =>
+		c.score +
+		(isComposedId(c.id) ? 0 : P.altBuild) +
+		(c.classic || classicTop.includes(c.id) ? P.altClassic : 0);
+	const rest = [
+		first,
+		...cands
+			.filter((c) => c !== first)
+			.sort(
+				(x, y) => altScore(y) - altScore(x) || (x.canon < y.canon ? -1 : 1),
+			),
+	];
 	const second = rest[1];
 	let confidence = second
 		? Math.max(0, Math.min(1, (first.score - second.score) / 0.5))
@@ -483,12 +689,30 @@ export const classifyV2 = (
 		v2: {
 			family,
 			agreed: !!agreedFam,
-			voters: { classic: classicFam, knn: knnFam, rule: ruleFam },
+			voters: {
+				classic: classicFam,
+				knn: knnFam,
+				rule: ruleFam,
+				probs: probsFam,
+			},
+			famScore,
+			roles: [...roleTests.keys()],
 			candidates: rest,
 			composed: isComposedId(a.id),
 			votes,
 		},
 	};
+};
+
+// The shipped picks (userPicks.data.ts) under the league's own (a league's copy of a shipped pick replaces it)
+let shippedPickRefs: RefRow[] | undefined;
+const withShippedPicks = (extra?: readonly RefRow[]): readonly RefRow[] => {
+	shippedPickRefs ??= refsFromPicks(USER_PICKS, true);
+	if (!extra || extra.length === 0) {
+		return shippedPickRefs;
+	}
+	const own = new Set(extra.map((r) => r.uid).filter(Boolean));
+	return [...shippedPickRefs.filter((r) => !own.has(r.uid)), ...extra];
 };
 
 const topOf = <K extends string>(m: Partial<Record<K, number>>) =>

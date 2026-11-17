@@ -5,6 +5,7 @@
 // players (distance-weighted) vote for a family, a role, descriptors, display words and a build. A labeled player never
 // votes for himself (leave-one-out by his real-player id), and the evaluation holds 30% of the labeled players out
 // (v2/v2.script.test.ts).
+import { FAM_FEATS } from "../model.ts";
 import { POS_BUCKETS } from "../norms.ts";
 import type { Family } from "../families.ts";
 import type { Pos, PosBucket } from "../types.ts";
@@ -14,7 +15,9 @@ import { familyOfName, parseName, type WordPick } from "./grammar.ts";
 // The features: FAM_FEATS without the constant and the prospect flag
 export const FEAT_FROM_FAMX = (famX: readonly number[]): number[] =>
 	famX.filter((_, i) => i !== 0 && i !== 14);
-export const N_FEATS = 35;
+// (archv3: derived from FAM_FEATS; it was a fixed 35 after arch15 added two play types, so the shipped rows of 37 were
+// read 35 at a time and every row after the first was shifted: the neighbours were close to random)
+export const N_FEATS = FAM_FEATS.length - 2;
 // Feature weights in the distance: the skill classes and strength count fully, the rest (size, level, stats, subs, play
 // types) half
 export const FEAT_W: number[] = Array.from({ length: N_FEATS }, (_, i) =>
@@ -63,6 +66,8 @@ export type RefRow = {
 	split: "tune" | "test";
 	// Standardized features
 	x: number[];
+	// A pick's uid (picks.ts): a league's copy of a shipped pick replaces it
+	uid?: string;
 	// What his name says (cached)
 	family: Family;
 	role?: string;
@@ -124,6 +129,26 @@ export const labelRow = (
 };
 
 let shipped: RefRow[] | undefined;
+const FEAT_W32 = Float32Array.from(FEAT_W);
+// The shipped rows as a flat feature array (rows x N_FEATS), their buckets and test-split flags
+let shippedIdx:
+	| { rows: RefRow[]; flat: Float32Array; bucket: Int8Array; test: Uint8Array }
+	| undefined;
+export const shippedIndex = () => {
+	if (!shippedIdx) {
+		const rows = shippedRefs();
+		const flat = new Float32Array(rows.length * N_FEATS);
+		const bucket = new Int8Array(rows.length);
+		const test = new Uint8Array(rows.length);
+		for (const [i, r] of rows.entries()) {
+			flat.set(r.x.slice(0, N_FEATS), i * N_FEATS);
+			bucket[i] = r.bucket;
+			test[i] = r.split === "test" ? 1 : 0;
+		}
+		shippedIdx = { rows, flat, bucket, test };
+	}
+	return shippedIdx;
+};
 export const shippedRefs = (): RefRow[] => {
 	if (!shipped) {
 		const metas = KNN_META ? KNN_META.split(";") : [];
@@ -173,7 +198,7 @@ export type KnnOptions = {
 	// Distance added per position bucket apart
 	bucketGap?: number;
 	// Leave out: his own key (leave-one-out) and, for the held-out evaluation, the test split
-	exclude?: string;
+	exclude?: string | readonly string[];
 	tuneOnly?: boolean;
 	// The user's own picks, on top of the shipped table
 	extra?: readonly RefRow[];
@@ -191,25 +216,65 @@ export const knnVotes = (
 	const k = opts.k ?? 15;
 	const gap = opts.bucketGap ?? 2;
 	const bi = bucketIndex(bucket);
-	const refs = opts.extra ? [...shippedRefs(), ...opts.extra] : shippedRefs();
+	const ex = opts.exclude;
+	const excluded = (key: string) =>
+		typeof ex === "string" ? key === ex : ex ? ex.includes(key) : false;
+	// (archv3: the shipped rows as one flat index, built once; the k best kept in place)
+	const idx = shippedIndex();
+	const xq = new Float32Array(N_FEATS);
+	for (let i = 0; i < N_FEATS; i++) {
+		xq[i] = x[i] ?? 0;
+	}
 	const best: { r: RefRow; d: number }[] = [];
-	for (const r of refs) {
-		if (r.key === opts.exclude || (opts.tuneOnly && r.split === "test")) {
+	const consider = (r: RefRow, d2: number) => {
+		if (best.length >= k && d2 >= best.at(-1)!.d) {
+			return;
+		}
+		let j = best.length;
+		if (j >= k) {
+			j--;
+			best.pop();
+		}
+		while (j > 0 && best[j - 1]!.d > d2) {
+			j--;
+		}
+		best.splice(j, 0, { r, d: d2 });
+	};
+	const n = idx.rows.length;
+	for (let ri = 0; ri < n; ri++) {
+		if (opts.tuneOnly && idx.test[ri]) {
+			continue;
+		}
+		let d = gap * Math.abs(idx.bucket[ri]! - bi);
+		const off = ri * N_FEATS;
+		const cut = best.length >= k ? best.at(-1)!.d : Infinity;
+		for (let i = 0; i < N_FEATS; i++) {
+			const t = xq[i]! - idx.flat[off + i]!;
+			d += FEAT_W32[i]! * t * t;
+			if (d >= cut) {
+				break;
+			}
+		}
+		if (d < cut) {
+			const r = idx.rows[ri]!;
+			if (!excluded(r.key)) {
+				consider(r, d);
+			}
+		}
+	}
+	for (const r of opts.extra ?? []) {
+		if (excluded(r.key) || (opts.tuneOnly && r.split === "test")) {
 			continue;
 		}
 		let d = gap * Math.abs(r.bucket - bi);
 		for (let i = 0; i < N_FEATS; i++) {
-			const t = (x[i] ?? 0) - (r.x[i] ?? 0);
-			d += FEAT_W[i]! * t * t;
+			const t = xq[i]! - (r.x[i] ?? 0);
+			d += FEAT_W32[i]! * t * t;
 		}
-		d = Math.sqrt(d);
-		if (best.length < k || d < best.at(-1)!.d) {
-			best.push({ r, d });
-			best.sort((a, b) => a.d - b.d);
-			if (best.length > k) {
-				best.pop();
-			}
-		}
+		consider(r, d);
+	}
+	for (const b of best) {
+		b.d = Math.sqrt(b.d);
 	}
 	const v: Votes = {
 		family: {},

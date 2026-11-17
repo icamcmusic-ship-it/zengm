@@ -43,7 +43,8 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "steal",
-		re: /Ball[ -]Hawk|Ball[ -]Snatch|Thie[fv]|Snatch & Slash|Disruptive|Chaos|Pest|Bandit/,
+		// (archv3: "Pesky" too: it is no "Pest", and the user's Pesky names read no steals)
+		re: /Ball[ -]Hawk|Ball[ -]Snatch|Thie[fv]|Snatch & Slash|Disruptive|Chaos|Pest|Pesky|Bandit/,
 		w: { stl: 2.5 },
 		need: { stl: 0.3, pdef: 0.1 },
 		xw: { pdef: 1.5, len: 0.5 },
@@ -273,7 +274,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "strength",
-		re: /Bull|Physical|Power|Bodyguard|Grinder|Tank|[Mm]asher|Pound|Bruis|Punish/,
+		re: /Bull|Physical|Power|Bodyguard|Grinder|Tank|[Mm]asher|Pound|Bruis|Punish|Rugged/,
 		w: { stre: 2 },
 		need: { stre: 0.2 },
 		family: "hustle",
