@@ -526,6 +526,7 @@ export const USER_2K_MAP: Record<string, { kind: string; id: string | null }> =
 		"Rim-Wrecking Stretch": { kind: "alias", id: "rim-rocking-stretch" },
 		"Rising Board Enforcer": { kind: "alias", id: "hustle-glass-cleaner" },
 		"Rising Iso Sniper": { kind: "alias", id: "perimeter-shot-hunter" },
+		"Rugged Rim Protector": { kind: "alias", id: "paint-protecting-riser" },
 		Sharpshooter: { kind: "build", id: "sharpshooter" },
 		"Sharpshooting Riser": { kind: "alias", id: "skilled-stretch" },
 		"Shifty Sniper": { kind: "build", id: "shifty-sniper" },
