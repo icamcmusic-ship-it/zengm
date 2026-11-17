@@ -587,19 +587,21 @@ export const classifyV2 = (
 	cands.sort((x, y) => y.score - x.score || (x.canon < y.canon ? -1 : 1));
 	// Family first: the candidates of his family (the classic label when none is)
 	// (a candidate outside the voted family pays famOut: archv3, was a hard filter; Infinity: the family only)
+	// (a build the user's picks favour pays no family toll: his picks say which family players like him are in)
+	const famToll = (c: V2Candidate) =>
+		c.family === family || (tuneBias[c.canon] ?? 0) > 0 ? 0 : P.famOut;
 	let first = classicCand;
 	{
 		let best = -Infinity;
 		for (const c of cands) {
-			const sc = c.family === family ? c.score : c.score - P.famOut;
+			const sc = c.score - famToll(c);
 			if (sc > best) {
 				best = sc;
 				first = c;
 			}
 		}
 	}
-	const eff = (c: V2Candidate) =>
-		c.family === family ? c.score : c.score - P.famOut;
+	const eff = (c: V2Candidate) => c.score - famToll(c);
 	// archv3: a composed name only where no preset says him: a build within presetMargin of it, or the earlier reading's
 	// label when that reading is sure of it (its confidence presetConf or more), is his label instead
 	if (isComposedId(first.id) && !OWN_COMPOSED_NAMES.has(norm(first.name))) {
