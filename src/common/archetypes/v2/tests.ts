@@ -16,6 +16,8 @@ export type WordContext = {
 	pz: Record<string, number>;
 	// His three best skill classes, by percentile among his position's players
 	top3: string[];
+	// archv3: his box score's standing at his position (stats.ts StatReading z), when he has minutes
+	statZ?: Partial<Record<string, number>>;
 };
 
 // His percentile (0-1) among players at his position in a class (the pooled rulebook table when the class has no
@@ -80,7 +82,8 @@ export const CUSTOM_TESTS: Record<
 		);
 		return { pass: margin >= 0, margin };
 	},
-	// Energy Big: finishing and athleticism top 50% (one his head skill), rim D top 50%, three below top 50%
+	// Energy Big: finishing and athleticism top 50% (one his head skill), rim D top 50%, three below top 50%, no standout
+	// but finishing and athleticism
 	energyRole: (ctx) => {
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
 		const margin = Math.min(
@@ -89,6 +92,8 @@ export const CUSTOM_TESTS: Record<
 			p("rimD") - 0.5,
 			0.5 - p("shoot"),
 			ctx.top3.includes("finish") || ctx.top3.includes("ath") ? 1 : -0.01,
+			// (archv3: a role player too: no standout but finishing and athleticism, an elite rim protector is not one)
+			noStandout(ctx, ["finish", "ath"]),
 			(ctx.cv.finish ?? 0) / 4,
 			(ctx.cv.ath ?? 0) / 4,
 		);
@@ -106,12 +111,21 @@ export const CUSTOM_TESTS: Record<
 // No standout: no class but his head skill(s) in his position's top (1 - GLUE_CAP) (archv3: was every class, the head
 // included, under the top 20%: a glue guy who defended well failed his own test)
 export const GLUE_CAP = 0.9;
+// (and he is not a leading scorer: scoring under his position's top 20%, archv3: a star scorer with no single standout
+// skill read as a Glue Guard)
+export const ROLE_SCORE_CAP = 0.8;
 const noStandout = (ctx: WordContext, head: readonly string[] = []) =>
 	Math.min(
+		ROLE_SCORE_CAP - peerPct(ctx.bucket, "score", ctx.cv.score ?? 0),
 		...SKILL_CLASS_KEYS.filter((k) => !head.includes(k)).map(
 			(k) => GLUE_CAP - peerPct(ctx.bucket, k, ctx.cv[k] ?? 0),
 		),
 	);
+// (a role player does not carry the offense: his usage, when his box score says, under +0.5 z at his position)
+const lowUsage = (ctx: WordContext) => {
+	const u = ctx.statZ?.usg;
+	return u === undefined ? Infinity : (0.5 - u) / 4;
+};
 const glue = (ctx: WordContext, side: string[], nSide: number): WordTest => {
 	const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
 	const sides = side.map((k) => p(k) - 0.5).sort((a, b) => b - a);
@@ -123,6 +137,7 @@ const glue = (ctx: WordContext, side: string[], nSide: number): WordTest => {
 		broad[2]!,
 		noStandout(ctx, ["perD"]),
 		(ctx.cv.perD ?? 0) / 4,
+		lowUsage(ctx),
 	);
 	return { pass: margin >= 0, margin };
 };

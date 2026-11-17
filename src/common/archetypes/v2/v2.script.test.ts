@@ -378,6 +378,57 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			}
 			return;
 		}
+		if (MODE === "who") {
+			// archv3: what decided some real players' labels (ARCH_V2_WHO="Name Season,...": voters, family scores, candidates)
+			const data = realData();
+			const fold = (x) =>
+				x
+					.normalize("NFD")
+					.replace(/[\u0300-\u036f]/g, "")
+					.toLowerCase();
+			const out = [];
+			for (const w of process.env.ARCH_V2_WHO.split(",")) {
+				const m = w.trim().match(/^(.*) (\d{4})$/);
+				const slug = Object.entries(data.d.bios).find(
+					([, b]) => b.name && fold(b.name) === fold(m[1]),
+				)?.[0];
+				const row = data.d.ratings.find(
+					(r) => r.slug === slug && r.season === Number(m[2]),
+				);
+				if (!row) {
+					out.push(`${w}: not found`);
+					continue;
+				}
+				const p = { ...realPlayer(data, row, ratingsOfRow), norms: REAL_NORMS };
+				const res = ENGINES.v2(
+					p,
+					process.env.ARCH_V2_WHO_SELF ? {} : { srID: p.slug },
+				);
+				const v = res.c.v2;
+				out.push(
+					`${w} (${p.pos}): ${res.name} [${res.id}] fam ${v.family} voters ${JSON.stringify(v.voters)} roles ${v.roles.join(",")}`,
+				);
+				out.push(
+					`  famScore ${Object.entries(v.famScore)
+						.sort((a, b) => b[1] - a[1])
+						.slice(0, 4)
+						.map(([k, x]) => `${k} ${x.toFixed(2)}`)
+						.join(", ")}; knn canon ${Object.entries(v.votes.canon)
+						.sort((a, b) => b[1] - a[1])
+						.slice(0, 4)
+						.map(([k, x]) => `${k} ${x.toFixed(2)}`)
+						.join(", ")}`,
+				);
+				for (const c of [...v.candidates]
+					.sort((a, b) => b.score - a.score)
+					.slice(0, 8))
+					out.push(
+						`  ${c.score.toFixed(2)} ${c.name} [${c.family}${c.classic ? ", classic" : ""}]`,
+					);
+			}
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
 		if (MODE === "churn") {
 			const out = [JSON.stringify(PARAMS ?? {})];
 			await churnAll(out, ["v2"]);

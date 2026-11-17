@@ -15,6 +15,15 @@
 // David Robinson 1995 Shot-Erasing Rim Wrecker, Duncan Robinson 2020 (2K: Sharpshooter) Stretch Riser, Jordan 1991 (2K:
 // 2-Way Mid-Post Maestro) 2-Way Mid-Paint Maestro, Pippen 1994 and Payton 1996 2-Way Mid-Paint Playmaker, Ginobili 2008 2-Way
 // Playmaking Creator (Bertans 2018 as a Shot-Erasing Stretch was not added: no rim protection in his role).
+// archv3 (v2's misses reviewed): twenty lists gained the label v2 now gives where it is clearly right (Luka 2025 the
+// composed Crafty Offensive Engine, his 2K name; Wembanyama 2025 2-Way Shot-Erasing Stretch; Chet Holmgren 2025 2-Way
+// Shot-Erasing Rim Runner; Giannis 2025 Playmaking Mid-Paint Finisher; Ben Wallace 2003 2-Way Board-Enforcing Shot Eraser;
+// Durant 2025 and Bam 2023 the mid-post scorers; Capela and Adams 2025 Physical Defensive Rebounder; Sabonis 2023
+// Post-Dimming Board Enforcer; Beverley 2017 and Tucker 2021 3 & D Specialist; Redick 2018 Perimeter Shot Hunter; Tony
+// Allen 2018 Glue Wing; Aaron Gordon 2023 High-Flying Mid-Range Slasher; Kobe 2006 2-Way Mid-Paint Maestro; Duncan 2003
+// Shot-Erasing Rim Wrecker; Garnett 2004 Backline Mid-Range Scorer; Nowitzki 2007 Shot-Creating Mid-Range Maestro; Ewing
+// 1990 Rim-Reaping Post Scorer). Not added: Bertans 2018 Shot-Erasing Stretch, Kareem 1972 Post-Up Glass Cleaner, Bill
+// Russell 1965 Rim-Reaping High Flyer, Payton 1996 2-Way Mid-Paint Maestro (the role fits, the name does not say him).
 // A tuning target (metrics.script.test.ts) and a test floor (archetypes.test.ts).
 export const GOLD: [
 	slug: string,
@@ -76,6 +85,7 @@ export const GOLD: [
 			"paint-scoring-crasher",
 			"mid-range-slashing-cleaner",
 			"board-hunting-paint-finisher",
+			"v2:finisher+playmaking+midPaint:big",
 		],
 		"finish+reb|finish+pass|L:finish+ath|post+finish",
 	],
@@ -87,6 +97,7 @@ export const GOLD: [
 			"mid-paint-scorer",
 			"rim-reaping-mid-paint-scorer",
 			"physical-mid-paint-shot-eraser",
+			"crafty-mid-post-scorer",
 		],
 		"shoot+mid|mid+handle|L:mid",
 	],
@@ -159,6 +170,7 @@ export const GOLD: [
 			"power-dunking-board-enforcer",
 			"bulldozing-glass-guardian",
 			"glass-guardian-lob-threat",
+			"physical-defensive-rebounder",
 		],
 		"reb|rimD|finish+reb",
 	],
@@ -195,6 +207,7 @@ export const GOLD: [
 			"shot-erasing-mid-paint-maestro",
 			"rim-reaping-mid-paint-scorer",
 			"paint-protecting-riser",
+			"v2:stretch+twoWay+shotErasing:big",
 		],
 		"rimD+shoot|rimD|shoot+handle",
 	],
@@ -206,6 +219,7 @@ export const GOLD: [
 			"iso-savant",
 			"gritty-iso-savant",
 			"dime-dropping-dual-finisher",
+			"v2:engine+crafty:wing",
 		],
 		"handle|pass|mid+handle",
 	],
@@ -228,6 +242,7 @@ export const GOLD: [
 			"post-bully-board-enforcer",
 			"bulldozing-glass-guardian",
 			"shot-erasing-putback-bully",
+			"physical-defensive-rebounder",
 		],
 		"reb",
 	],
@@ -239,6 +254,7 @@ export const GOLD: [
 			"eliminator",
 			"glass-cleaning-lockdown",
 			"ball-hawking-3-level-scorer",
+			"glue-wing",
 		],
 		"perD",
 	],
@@ -422,6 +438,7 @@ export const GOLD: [
 			"post-bully-cleaner",
 			"board-hunting-mid-paint-bully",
 			"board-hunting-lob-threat-bully",
+			"post-dimming-board-enforcer",
 		],
 		"pass+reb|reb|pass+post",
 	],
@@ -433,6 +450,7 @@ export const GOLD: [
 			"2-way-mid-paint-bully",
 			"2-way-mid-paint-crasher",
 			"2-way-mid-post-scorer",
+			"2-way-mid-post-maestro",
 		],
 		"def+pass|rimD+pass|def+mid|rimD",
 	],
@@ -499,6 +517,7 @@ export const GOLD: [
 			"3-and-d-dime-dropper",
 			"ball-hawking-3-and-d-point",
 			"playmaking-3-level-ball-hawk",
+			"3-and-d-specialist",
 		],
 		"perD",
 	],
@@ -590,6 +609,7 @@ export const GOLD: [
 			"cash-out",
 			"crafty-sharpshooter",
 			"crafty-3-level-scorer",
+			"perimeter-shot-hunter",
 		],
 		"L:shoot",
 	],
@@ -623,6 +643,7 @@ export const GOLD: [
 			"2-way-bulldozer",
 			"eliminator",
 			"physical-clamp-thief",
+			"3-and-d-specialist",
 		],
 		"def|perD|reb+shoot|def+shoot",
 	],
@@ -647,6 +668,7 @@ export const GOLD: [
 			"board-hunting-lob-threat-bully",
 			"yamming-force-of-nature",
 			"post-up-rim-rocking-crasher",
+			"high-flying-mid-range-slasher",
 		],
 		"ath|finish|post+finish",
 	],
@@ -682,6 +704,7 @@ export const GOLD: [
 			"rim-reaping-3-level-scorer",
 			"rim-reaping-rim-runner",
 			"shot-erasing-rim-runner",
+			"v2:rimRunner+twoWay+shotErasing:big",
 		],
 		"rimD|shoot+rimD",
 	],
@@ -930,6 +953,7 @@ export const GOLD: [
 			"mid-range-slasher",
 			"physical-mid-range-menace",
 			"2-way-mid-paint-bully",
+			"2-way-mid-paint-maestro",
 		],
 		"mid|handle|shoot+mid",
 	],
@@ -975,6 +999,7 @@ export const GOLD: [
 			"board-hunting-lob-threat-bully",
 			"backline-power-finisher",
 			"paint-protecting-riser",
+			"shot-erasing-rim-wrecker",
 		],
 		"post|rimD|reb",
 	],
@@ -986,6 +1011,7 @@ export const GOLD: [
 			"physical-middy-board-enforcer",
 			"rim-reaping-rim-runner",
 			"shot-erasing-mid-paint-maestro",
+			"backline-mid-range-scorer",
 		],
 		"def|mid|reb|rimD",
 	],
@@ -997,6 +1023,7 @@ export const GOLD: [
 			"physical-mid-paint-shot-eraser",
 			"slashing-mid-range-maestro",
 			"rim-reaping-mid-paint-scorer",
+			"shot-creating-mid-range-maestro",
 		],
 		"shoot|mid|L:mid",
 	],
@@ -1009,6 +1036,7 @@ export const GOLD: [
 			"shot-erasing-board-enforcer",
 			"2-way-bulldozing-cleaner",
 			"switch-defending-cleaner",
+			"v2:rimProtector+twoWay+glass:big:glass=1",
 		],
 		"rimD|reb|def",
 	],
@@ -1113,6 +1141,7 @@ export const GOLD: [
 			"backline-mid-paint-bully",
 			"bulldozing-glass-guardian",
 			"paint-protecting-riser",
+			"rim-reaping-post-scorer",
 		],
 		"post|rimD|mid",
 	],

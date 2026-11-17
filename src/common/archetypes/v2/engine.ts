@@ -258,6 +258,7 @@ export const classifyV2 = (
 		bucket,
 		pz: s.pz as unknown as Record<string, number>,
 		top3: topSkills(bucket, cv),
+		statZ: opts.stats?.z,
 	};
 	const order = topSkills(bucket, cv, 10);
 
