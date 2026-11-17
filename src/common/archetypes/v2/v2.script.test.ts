@@ -321,6 +321,7 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			for (const [label, ps] of Object.entries(pops)) {
 				const counts = {};
 				const dbg = {};
+				const ex = {};
 				let ath = 0,
 					athLow = 0,
 					generic = 0,
@@ -328,6 +329,13 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 				for (const p of ps) {
 					const res = ENGINES.v2(p, p.slug ? { srID: p.slug } : {});
 					counts[res.id] = (counts[res.id] ?? 0) + 1;
+					for (const id of ids) {
+						if ((id === res.id || id === canonOf(res.name)) && p.name) {
+							const k = `example ${id}`;
+							dbg[k] = dbg[k] ?? 0;
+							if ((ex[id] ??= []).length < 4) ex[id].push(`${p.name} ${p.pos}`);
+						}
+					}
 					const cn = canonOf(res.name);
 					if (cn !== res.id) counts[cn] = (counts[cn] ?? 0) + 1;
 					if (isGenericBuild({ id: res.id })) generic++;
@@ -371,9 +379,12 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 					`${label} (n=${n}): ${ids.map((id) => `${nm(id)} ${pct(counts[id] ?? 0, n)}`).join(", ")}; max share ${nm(sh[0][0])} ${pct(sh[0][1], n)}; generic ${pct(generic, n)}; composed ${pct(composed, n)}; athletic names ${pct(ath, n)}, on players below median athleticism ${pct(athLow, n)} (${pct(athLow, ath)} of them)`,
 				);
 				for (const [k, v] of Object.entries(dbg)
+					.filter(([k2]) => !k2.startsWith("example"))
 					.sort((a, b) => b[1] - a[1])
 					.slice(0, process.env.ARCH_V2_DEBUG ? 40 : 4))
 					out.push(`  ${v} ${k}`);
+				for (const [id, xs] of Object.entries(ex))
+					out.push(`  examples ${nm(id)}: ${xs.join(", ")}`);
 				writeFileSync(OUT, out.join("\n") + "\n");
 			}
 			return;

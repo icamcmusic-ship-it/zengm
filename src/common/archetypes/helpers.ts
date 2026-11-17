@@ -53,8 +53,10 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // 14 (generic builds held to all-around floors and capped, four merges' kept names re-picked); archuser2k: 15 (new builds
 // from the user's own 2K archetypes); arch2kfix: 16 (six builds' biases: the season cap and the answer-key guard)
 // archv2: 17 (the v2 engine is the only one: compositional names, family vote, gap builds; current labels are read
-// again at once, past seasons' stay)
-export const ARCHETYPE_READING_VERSION = 17;
+// again at once, past seasons' stay); archv3: 18 (the neighbours' table read right, the voters weighed by reliability,
+// the user's picks as labeled players, Glue roles, Switch Defender and the user's batch-4 names, composed ids without
+// empty parts)
+export const ARCHETYPE_READING_VERSION = 18;
 
 export const toStored = (
 	season: number,

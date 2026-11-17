@@ -987,8 +987,10 @@ describe("targeting an archetype with the regenerator", () => {
 		assert.ok(
 			// The defining-skill gates (score.ts) make a label harder to reach from an unrelated base than it was. Across
 			// ratings seeds this lands at 99-104 exact / 104-107 loose of 160 (103 / 107 for the fixed seed above), so the
-			// floors leave ~10 players of margin rather than sitting on the mean
-			derivedMatch / inputs.length > 0.58 && loose / inputs.length > 0.6,
+			// floors leave ~10 players of margin rather than sitting on the mean. archv3: v2 now gives some aimed players its
+			// own role names (Glue Wing / Guard, Switch Defender), an athletic name needs his athleticism, and the family
+			// vote is weighed by each voter's measured reliability: 92 exact / 92 loose of 160 for the fixed seed
+			derivedMatch / inputs.length > 0.53 && loose / inputs.length > 0.53,
 			`match ${derivedMatch}/${inputs.length} loose ${loose} ${misses.join(" ")}`,
 		);
 	}, 300000);
