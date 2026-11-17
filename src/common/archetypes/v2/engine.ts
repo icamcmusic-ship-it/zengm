@@ -52,6 +52,7 @@ import {
 	BUCKET_OF,
 	FEAT_FROM_FAMX,
 	knnVotes,
+	shippedIndex,
 	standardize,
 	type KnnOptions,
 	type RefRow,
@@ -149,6 +150,13 @@ const buildOfName = (name: string): string | undefined => {
 	}
 	return nameIndex.get(norm(name));
 };
+// Build the tables a reading needs (the neighbours' index, the names, the shipped picks) ahead of the first one
+export const warmArchetypeEngine = () => {
+	shippedIndex();
+	buildOfName("");
+	withShippedPicks();
+};
+
 // What a name is, for votes and the evaluation: the build it names, else the name itself
 export const canonOf = (name: string): string =>
 	buildOfName(name) ?? `name:${norm(name)}`;
@@ -210,17 +218,13 @@ export const classifyV2 = (
 	const norms = opts.norms ?? defaultNormsFor(ratings);
 	const prevRaw = opts.previousId;
 	const prevComposed = isComposedId(prevRaw);
-	const classic = classify(ratings, {
-		...opts,
-		norms,
-		previousId: prevComposed ? undefined : prevRaw,
-	});
 	const read = {
 		age: opts.age,
 		stats: opts.stats,
 		prospect: opts.prospect,
 		pt: opts.pt,
 	};
+	// (read once: the classic reading takes the same scores; archv3)
 	const s = scoreAll(
 		ratings,
 		norms,
@@ -230,6 +234,12 @@ export const classifyV2 = (
 		read,
 		opts.model,
 	);
+	const classic = classify(ratings, {
+		...opts,
+		norms,
+		previousId: prevComposed ? undefined : prevRaw,
+		scored: s,
+	});
 	const pos = s.pos;
 	const group = GROUP_OF[pos];
 	const bucket = BUCKET_OF[pos];

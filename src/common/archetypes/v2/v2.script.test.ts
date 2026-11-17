@@ -304,6 +304,54 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			return;
 		}
 
+		if (MODE === "shares") {
+			// archv3: v2's label shares in a random league and the real players 2016-2025 (ARCH_V2_IDS: the builds to list),
+			// the max share, generic share, and athletic names on players below their position's median athleticism
+			const { ATH_NAME_RE } = await import("../score.ts");
+			const { peerPct } = await import("./tests.ts");
+			const ids = (
+				process.env.ARCH_V2_IDS ??
+				"glue-wing,glue-guard,steady-game-manager,energy-big"
+			).split(",");
+			const out = [JSON.stringify(PARAMS ?? {})];
+			const pops = {
+				"random league": await genPlayers(3000, "metrics-league", 19, 32, 38),
+				"real 2016-2025": realPop(2016, 2025),
+			};
+			for (const [label, ps] of Object.entries(pops)) {
+				const counts = {};
+				let ath = 0,
+					athLow = 0,
+					generic = 0,
+					composed = 0;
+				for (const p of ps) {
+					const res = ENGINES.v2(p, p.slug ? { srID: p.slug } : {});
+					counts[res.id] = (counts[res.id] ?? 0) + 1;
+					if (isGenericBuild({ id: res.id })) generic++;
+					if (res.id.startsWith("v2:")) composed++;
+					if (ATH_NAME_RE.test(res.name)) {
+						ath++;
+						const s = scoreAll(
+							p.ratings,
+							p.norms,
+							ARCHETYPES,
+							p.pos,
+							undefined,
+							readOf(p),
+						);
+						if (peerPct(BUCKET_OF[s.pos], "ath", s.cv.ath ?? 0) < 0.5) athLow++;
+					}
+				}
+				const n = ps.length;
+				const sh = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+				const nm = (id) => archetypeById(id)?.name ?? id;
+				out.push(
+					`${label} (n=${n}): ${ids.map((id) => `${nm(id)} ${pct(counts[id] ?? 0, n)}`).join(", ")}; max share ${nm(sh[0][0])} ${pct(sh[0][1], n)}; generic ${pct(generic, n)}; composed ${pct(composed, n)}; athletic names ${pct(ath, n)}, on players below median athleticism ${pct(athLow, n)}`,
+				);
+				writeFileSync(OUT, out.join("\n") + "\n");
+			}
+			return;
+		}
 		if (MODE === "churn") {
 			const out = [JSON.stringify(PARAMS ?? {})];
 			await churnAll(out, ["v2"]);

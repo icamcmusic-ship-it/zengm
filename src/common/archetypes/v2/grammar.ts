@@ -74,7 +74,9 @@ export const ROLES: RoleDef[] = [
 	},
 	{
 		key: "creator",
-		names: ["Creator"],
+		// (archv3: "Creator" alone is not a name; "Shot Creator" is 2K's)
+		names: ["Shot Creator"],
+		withDesc: "Creator",
 		concepts: ["creator"],
 		groups: ["guard", "wing"],
 	},
@@ -98,7 +100,10 @@ export const ROLES: RoleDef[] = [
 	},
 	{
 		key: "stretch",
-		names: ["Stretch"],
+		// (archv3: "Stretch" alone read as a half name, "v2:stretch::big" in the user's pick; with a word in front it is
+		// 2K's "Board-Crashing Stretch")
+		names: ["Stretch Big"],
+		withDesc: "Stretch",
 		concepts: ["catchShoot"],
 		groups: ["big"],
 	},
@@ -476,7 +481,8 @@ export const composeName = (
 	].join(" ");
 
 // ---- composed ids ----
-// "v2:<role>:<desc>+<desc>[:<word>=<variant>,...]": the role, the descriptors, and any display variants picked
+// "v2:<role>+<desc>+<desc>:<group>[:<word>=<variant>,...]": the role, the descriptors, his size group, and any display
+// variants picked
 export const COMPOSED_PREFIX = "v2:";
 export const isComposedId = (id: string | undefined): id is string =>
 	typeof id === "string" && id.startsWith(COMPOSED_PREFIX);
@@ -498,7 +504,9 @@ export const composedId = (
 			variants.push(`${d.key}=${d.names.indexOf(w)}`);
 		}
 	}
-	return `${COMPOSED_PREFIX}${role.key}:${ds.map((d) => d.key).join("+")}:${group}${variants.length > 0 ? `:${variants.join(",")}` : ""}`;
+	// (archv3: "v2:<role>[+<desc>...]:<group>[:<variants>]", with no empty part; the reading-17 form
+	// "v2:<role>:<desc>+<desc>:<group>[:...]" is still read)
+	return `${COMPOSED_PREFIX}${[role.key, ...ds.map((d) => d.key)].join("+")}:${group}${variants.length > 0 ? `:${variants.join(",")}` : ""}`;
 };
 export const parseComposedId = (
 	id: string,
@@ -508,9 +516,14 @@ export const parseComposedId = (
 	if (!isComposedId(id)) {
 		return undefined;
 	}
-	const [roleKey, descKeys, group, variants] = id
-		.slice(COMPOSED_PREFIX.length)
-		.split(":");
+	const parts = id.slice(COMPOSED_PREFIX.length).split(":");
+	// (the current form has the group second; the reading-17 form has the descriptors second, maybe empty)
+	const current = ALL.includes(parts[1] as PosGroup);
+	const [head, ...descHead] = (parts[0] ?? "").split("+");
+	const roleKey = head;
+	const descKeys = current ? descHead.join("+") : parts[1];
+	const group = current ? parts[1] : parts[2];
+	const variants = current ? parts[2] : parts[3];
 	const role = ROLE_BY_KEY.get(roleKey ?? "");
 	if (!role || !ALL.includes(group as PosGroup)) {
 		return undefined;

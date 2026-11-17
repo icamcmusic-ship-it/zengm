@@ -25,7 +25,10 @@ import {
 	type StoredArchetype,
 } from "../../../common/archetypes/index.ts";
 import { whyBullets, whyDrivers } from "../../../common/archetypes/whyText.ts";
-import { classifyV2 } from "../../../common/archetypes/v2/engine.ts";
+import {
+	classifyV2,
+	warmArchetypeEngine,
+} from "../../../common/archetypes/v2/engine.ts";
 import { VISIBLE_TRAITS } from "../../../common/archetypes/classify.ts";
 import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
 import type { Player } from "../../../common/types.ts";
@@ -481,6 +484,8 @@ export const warmProspectArchetypes = () => {
 	}
 	const token = ++warmToken;
 	const lid = g.get("lid");
+	// (archv3: the neighbours' index and the names table are built once, here rather than on the first reading)
+	warmArchetypeEngine();
 	const busy = () =>
 		token !== warmToken ||
 		g.get("lid") !== lid ||

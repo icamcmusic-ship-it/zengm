@@ -178,13 +178,15 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 	}
 
 	local.leagueLoaded = true;
-	warmProspectArchetypes();
-	// Pages that read whole seasons of box scores, and League Achievements
-	schedulePageWarm();
-	// archfb: the user's archetype tuning (their picks in this league and, when on, in all leagues)
+	// archfb: the user's archetype tuning (their picks in this league and, when on, in all leagues). archv3: before the
+	// prospects are warmed, since the warm-up's results are kept under the tuning and picks in force (warmed first, they
+	// were read again on the first visit to Draft Scouting)
 	if (__SPORT === "basketball") {
 		await refitArchetypeTuning().catch((error) => console.error(error));
 	}
+	warmProspectArchetypes();
+	// Pages that read whole seasons of box scores, and League Achievements
+	schedulePageWarm();
 
 	await updateStatus();
 	if (loadingNewLid !== newLid) {

@@ -122,6 +122,41 @@ describe("archv2 grammar", () => {
 		assert.strictEqual(composedArchetype("v2:nope::big"), undefined);
 	});
 
+	test("archv3: a composed id has no empty part, a role alone is a whole name, and the reading-17 form still reads", () => {
+		const stretch = ROLE_BY_KEY.get("stretch")!;
+		const id = composedId(stretch, [], "big");
+		assert.strictEqual(id, "v2:stretch:big");
+		assert.notInclude(id, "::");
+		assert.strictEqual(archetypeById(id)!.name, "Stretch Big");
+		// (the user's pick showed "v2:stretch::big": it reads as the same label)
+		assert.strictEqual(archetypeById("v2:stretch::big")!.name, "Stretch Big");
+		assert.strictEqual(
+			archetypeById("v2:boardEnforcer:twoWay+playmaking:wing:playmaking=1")!
+				.name,
+			archetypeById(
+				composedId(
+					ROLE_BY_KEY.get("boardEnforcer")!,
+					[DESC_BY_KEY.get("twoWay")!, DESC_BY_KEY.get("playmaking")!],
+					"wing",
+					{ playmaking: DESC_BY_KEY.get("playmaking")!.names[1] },
+				),
+			)!.name,
+		);
+		assert.strictEqual(
+			composeName(ROLE_BY_KEY.get("creator")!, [], "guard"),
+			"Shot Creator",
+		);
+		// (a role's short form, said only after a descriptor, is never a name alone)
+		const short = new Set(
+			ROLES.map((r) => r.withDesc).filter((w): w is string => !!w),
+		);
+		for (const r of ROLES) {
+			for (const group of r.groups) {
+				assert.isFalse(short.has(composeName(r, [], group)), r.key);
+			}
+		}
+	});
+
 	test("2K names parse into a role and descriptors, with a family", () => {
 		const p = parseName("2-Way Mid-Paint Playmaker", "PG");
 		assert.strictEqual(p.role, "playmaker");
