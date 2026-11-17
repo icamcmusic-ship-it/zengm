@@ -19,10 +19,7 @@ import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { player } from "../index.ts";
-import {
-	getBadgeScoutingLevel,
-	loadBadgeScoutingLevel,
-} from "./traits.ts";
+import { getBadgeScoutingLevel, loadBadgeScoutingLevel } from "./traits.ts";
 import {
 	archetypeFor,
 	archetypeStats,
@@ -198,7 +195,10 @@ describe("stored archetypes", () => {
 		// what player.formatAll loads for the skill badges
 		await loadBadgeScoutingLevel();
 		assert.strictEqual(getBadgeScoutingLevel(), level);
-		assert.strictEqual(JSON.stringify(archetypeTraits(prospect, season)), first);
+		assert.strictEqual(
+			JSON.stringify(archetypeTraits(prospect, season)),
+			first,
+		);
 		assert.strictEqual(archetypeFor(prospect, norms)?.view.id, label);
 	});
 
