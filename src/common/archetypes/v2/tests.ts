@@ -71,7 +71,7 @@ export const CUSTOM_TESTS: Record<
 	glueWing: (ctx) => glue(ctx, ["shoot", "pass", "reb", "rimD"], 2),
 	glueGuard: (ctx) => glue(ctx, ["shoot", "pass"], 1),
 	// archv3 (the user's 2K list): Switch Defender: perimeter and rim D both top 40% at his position (one his head skill),
-	// athleticism top 60%
+	// athleticism top 60%, no offensive standout
 	switchD: (ctx) => {
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
 		const margin = Math.min(
@@ -81,6 +81,10 @@ export const CUSTOM_TESTS: Record<
 			ctx.top3.includes("perD") || ctx.top3.includes("rimD") ? 1 : -0.01,
 			(ctx.cv.perD ?? 0) / 4,
 			(ctx.cv.rimD ?? 0) / 4,
+			// (a role player's name: no standout on offense, not carrying it; a star who also defends everywhere is read by
+			// what he does with the ball)
+			noStandout(ctx, ["perD", "rimD", "ath", "reb", "stre"]),
+			lowUsage(ctx),
 		);
 		return { pass: margin >= 0, margin };
 	},
