@@ -525,9 +525,10 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 					traits: inp.traits,
 					norms: defaultNorms(expanded),
 				};
-				const plain = classifyV2(inp.ratings, base);
+				const plain = classifyV2(inp.ratings, { ...base, params: PARAMS });
 				const tuned = classifyV2(inp.ratings, {
 					...base,
+					params: PARAMS,
 					model: applyTuning(modelFor(expanded), tuning),
 					extraRefs: refs,
 					pickKey: pickKey(lid, pid),
