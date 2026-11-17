@@ -31,7 +31,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_SPEED)(
 				ensureSubs(p);
 				const row = p.ratings.at(-1);
 				const r = {};
-				for (const k of RATING_KEYS) r[k] = row[k];
+				for (const k of RATING_KEYS) {r[k] = row[k];}
 				r.sub = row.sub;
 				ps.push({ ratings: r, pos: positionFor(r, true) });
 			}
@@ -50,7 +50,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_SPEED)(
 		}
 		const time = (label, f) => {
 			const t0 = performance.now();
-			for (const p of ps) f(p);
+			for (const p of ps) {f(p);}
 			const ms = performance.now() - t0;
 			appendFileSync(
 				process.env.ARCH_SPEED_OUT ?? "/tmp/claude-0/arch-speed.txt",
