@@ -27,7 +27,7 @@ import { mergedId } from "../merges.data.ts";
 import { familyProbs } from "../model.ts";
 import { isPos } from "../position.ts";
 import { nameAt } from "../posNames.ts";
-import { promiseMiss } from "../score.ts";
+import { ATH_NAME_RE, promiseMiss } from "../score.ts";
 import { RULES } from "../rulebook.data.ts";
 import { USER_2K_MAP } from "../twoK/user2kMap.data.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
@@ -58,7 +58,7 @@ import {
 	type RefRow,
 	type Votes,
 } from "./knn.ts";
-import { testConcept, topSkills, type WordContext } from "./tests.ts";
+import { peerPct, testConcept, topSkills, type WordContext } from "./tests.ts";
 import { VOTER_REL, type Voter } from "./voters.data.ts";
 import { refsFromPicks } from "./picks.ts";
 import { USER_PICKS } from "./userPicks.data.ts";
@@ -90,6 +90,11 @@ export type V2Params = {
 	// archv3: the user's tuning per build in the score, and the neighbours' share that makes a build a candidate
 	tuneW: number;
 	knnBuildMin: number;
+	// What an athletic name on a below-median athlete pays (archv3)
+	athPen: number;
+	// The Glue roles' head start (archv3: their tests' margins are small by construction, no standout)
+	glueWing: number;
+	glueGuard: number;
 	// Last season's family's head start
 	famHyst: number;
 	// What a candidate outside the voted family pays (its family's vote is already in its score; Infinity: the voted
@@ -119,6 +124,9 @@ export const V2_PARAMS: V2Params = {
 	tuneW: 5,
 	knnBuildMin: 0.1,
 	famOut: 0.5,
+	athPen: 1,
+	glueWing: 2,
+	glueGuard: 1.4,
 	famHyst: 1,
 	altClassic: 1,
 	words: true,
@@ -397,7 +405,14 @@ export const classifyV2 = (
 				}
 			}
 		}
-		const base = P.rM * t.margin + P.rK * (votes.role[r.key] ?? 0);
+		const base =
+			P.rM * t.margin +
+			P.rK * (votes.role[r.key] ?? 0) +
+			(r.key === "glueWing"
+				? P.glueWing
+				: r.key === "glueGuard"
+					? P.glueGuard
+					: 0);
 		for (const c of combos) {
 			const pk = pickFor(r, pick, c);
 			const name = composeName(r, c, group, pk);
@@ -527,6 +542,15 @@ export const classifyV2 = (
 			}
 		}
 	}
+	// archv3: an athletic name (High-Flying, Burner, Rim Runner, ...) on a player below his position's median athleticism
+	// pays athPen (the earlier reading's floor lets some through)
+	if (P.athPen !== 0 && peerPct(bucket, "ath", cv.ath ?? 0) < 0.5) {
+		for (const c of cands) {
+			if (ATH_NAME_RE.test(c.name)) {
+				c.score -= P.athPen;
+			}
+		}
+	}
 	// The user's tuning (his picks) on every build: the reading follows his picks as the earlier reading's model did
 	if (P.tuneW !== 0) {
 		for (const c of cands) {
@@ -631,6 +655,7 @@ export const classifyV2 = (
 				probs: probsFam,
 			},
 			famScore,
+			roles: [...roleTests.keys()],
 			candidates: rest,
 			composed: isComposedId(a.id),
 			votes,

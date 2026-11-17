@@ -74,7 +74,7 @@ export const CUSTOM_TESTS: Record<
 		const margin = Math.min(
 			p("pass") - 0.5,
 			p("handle") - 0.5,
-			noStandout(ctx),
+			noStandout(ctx, ["pass", "handle"]),
 			(ctx.cv.pass ?? 0) / 4,
 			(ctx.cv.handle ?? 0) / 4,
 		);
@@ -103,10 +103,13 @@ export const CUSTOM_TESTS: Record<
 	},
 };
 
-const noStandout = (ctx: WordContext) =>
+// No standout: no class but his head skill(s) in his position's top (1 - GLUE_CAP) (archv3: was every class, the head
+// included, under the top 20%: a glue guy who defended well failed his own test)
+export const GLUE_CAP = 0.9;
+const noStandout = (ctx: WordContext, head: readonly string[] = []) =>
 	Math.min(
-		...SKILL_CLASS_KEYS.map(
-			(k) => 0.8 - peerPct(ctx.bucket, k, ctx.cv[k] ?? 0),
+		...SKILL_CLASS_KEYS.filter((k) => !head.includes(k)).map(
+			(k) => GLUE_CAP - peerPct(ctx.bucket, k, ctx.cv[k] ?? 0),
 		),
 	);
 const glue = (ctx: WordContext, side: string[], nSide: number): WordTest => {
@@ -118,7 +121,7 @@ const glue = (ctx: WordContext, side: string[], nSide: number): WordTest => {
 		ctx.top3.includes("perD") ? 1 : -0.01,
 		sides[nSide - 1]!,
 		broad[2]!,
-		noStandout(ctx),
+		noStandout(ctx, ["perD"]),
 		(ctx.cv.perD ?? 0) / 4,
 	);
 	return { pass: margin >= 0, margin };

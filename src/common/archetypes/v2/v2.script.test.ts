@@ -320,6 +320,7 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			};
 			for (const [label, ps] of Object.entries(pops)) {
 				const counts = {};
+				const dbg = {};
 				let ath = 0,
 					athLow = 0,
 					generic = 0,
@@ -327,8 +328,25 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 				for (const p of ps) {
 					const res = ENGINES.v2(p, p.slug ? { srID: p.slug } : {});
 					counts[res.id] = (counts[res.id] ?? 0) + 1;
+					const cn = canonOf(res.name);
+					if (cn !== res.id) counts[cn] = (counts[cn] ?? 0) + 1;
 					if (isGenericBuild({ id: res.id })) generic++;
 					if (res.id.startsWith("v2:")) composed++;
+					for (const r of ["glueWing", "glueGuard"])
+						if (res.c.v2.roles.includes(r))
+							dbg[`passes ${r}`] = (dbg[`passes ${r}`] ?? 0) + 1;
+					if (process.env.ARCH_V2_DEBUG) {
+						for (const id of ids) {
+							const ci = res.c.v2.candidates.findIndex((c) => c.canon === id);
+							if (ci < 0) continue;
+							const key = `${id} cand (classic ${res.c.v2.candidates.find((c) => c.classic)?.canon === id ? "yes" : "no"}) rank ${ci === 0 ? "0" : ci < 3 ? "1-2" : "3+"} gap ${ci === 0 ? 0 : (res.c.v2.candidates[0].score - res.c.v2.candidates[ci].score).toFixed(1)}`;
+							dbg[key] = (dbg[key] ?? 0) + 1;
+							if (ci > 0)
+								dbg[`${id} lost to ${res.c.v2.candidates[0].name}`] =
+									(dbg[`${id} lost to ${res.c.v2.candidates[0].name}`] ?? 0) +
+									1;
+						}
+					}
 					if (ATH_NAME_RE.test(res.name)) {
 						ath++;
 						const s = scoreAll(
@@ -339,15 +357,23 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 							undefined,
 							readOf(p),
 						);
-						if (peerPct(BUCKET_OF[s.pos], "ath", s.cv.ath ?? 0) < 0.5) athLow++;
+						if (peerPct(BUCKET_OF[s.pos], "ath", s.cv.ath ?? 0) < 0.5) {
+							athLow++;
+							const k = `athLow ${res.name}${res.id.startsWith("v2:") ? " (composed)" : res.c.v2.candidates.find((c) => c.classic)?.id === res.id ? " (classic)" : ""}`;
+							dbg[k] = (dbg[k] ?? 0) + 1;
+						}
 					}
 				}
 				const n = ps.length;
 				const sh = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 				const nm = (id) => archetypeById(id)?.name ?? id;
 				out.push(
-					`${label} (n=${n}): ${ids.map((id) => `${nm(id)} ${pct(counts[id] ?? 0, n)}`).join(", ")}; max share ${nm(sh[0][0])} ${pct(sh[0][1], n)}; generic ${pct(generic, n)}; composed ${pct(composed, n)}; athletic names ${pct(ath, n)}, on players below median athleticism ${pct(athLow, n)}`,
+					`${label} (n=${n}): ${ids.map((id) => `${nm(id)} ${pct(counts[id] ?? 0, n)}`).join(", ")}; max share ${nm(sh[0][0])} ${pct(sh[0][1], n)}; generic ${pct(generic, n)}; composed ${pct(composed, n)}; athletic names ${pct(ath, n)}, on players below median athleticism ${pct(athLow, n)} (${pct(athLow, ath)} of them)`,
 				);
+				for (const [k, v] of Object.entries(dbg)
+					.sort((a, b) => b[1] - a[1])
+					.slice(0, process.env.ARCH_V2_DEBUG ? 40 : 4))
+					out.push(`  ${v} ${k}`);
 				writeFileSync(OUT, out.join("\n") + "\n");
 			}
 			return;
@@ -659,6 +685,10 @@ export const VOTER_REL: Record<Voter, Record<PosBucket, Partial<Record<Family | 
 				out.push(
 					`${JSON.stringify(pr)}\n  2K tune ${fmt(a)}\n  judged tune ${fmt(b)}\n  objective ${(a.fam + a.t3 + 0.5 * (b.fam + b.t3)).toFixed(4)}`,
 				);
+				for (const [k, v] of Object.entries(dbg)
+					.sort((a, b) => b[1] - a[1])
+					.slice(0, process.env.ARCH_V2_DEBUG ? 40 : 4))
+					out.push(`  ${v} ${k}`);
 				writeFileSync(OUT, out.join("\n") + "\n");
 			}
 			return;

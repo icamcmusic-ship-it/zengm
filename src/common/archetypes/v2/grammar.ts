@@ -46,6 +46,8 @@ export type RoleDef = {
 	withDesc?: string;
 	// The display word for a size group, when it differs (Stretch Four / Stretch Five style)
 	byGroup?: Partial<Record<PosGroup, string>>;
+	// archv3: a role that takes no descriptor (the role players' names: "no standout" has nothing to add)
+	bare?: boolean;
 };
 
 // A descriptor: a word in front of the role
@@ -218,24 +220,28 @@ export const ROLES: RoleDef[] = [
 	// archgaps (user-approved): the role players' roles (custom tests in tests.ts: breadth, no standout)
 	{
 		key: "glueWing",
+		bare: true,
 		names: ["Glue Wing"],
 		concepts: ["glueWing"],
 		groups: ["wing"],
 	},
 	{
 		key: "glueGuard",
+		bare: true,
 		names: ["Glue Guard"],
 		concepts: ["glueGuard"],
 		groups: ["guard"],
 	},
 	{
 		key: "gameManager",
+		bare: true,
 		names: ["Steady Game Manager"],
 		concepts: ["gameManagerRole"],
 		groups: ["guard"],
 	},
 	{
 		key: "energyBig",
+		bare: true,
 		names: ["Energy Big"],
 		concepts: ["energyRole"],
 		groups: ["big"],
@@ -413,7 +419,11 @@ export const compatible = (
 	descs: readonly DescDef[],
 	group: PosGroup,
 ): boolean => {
-	if (descs.length > 2 || !role.groups.includes(group)) {
+	if (
+		descs.length > 2 ||
+		!role.groups.includes(group) ||
+		(role.bare && descs.length > 0)
+	) {
 		return false;
 	}
 	const used = new Map<string, string>();
