@@ -831,6 +831,15 @@ export const NATIVE_FEATURES = [
 		],
 	},
 	{
+		id: "competitiveBalance",
+		key: "competitiveBalance",
+		name: "Competitive Balance",
+		description:
+			"AI front offices respect the luxury tax like NBA teams do, so superteams don't keep piling up talent: an AI team doesn't use a salary cap exception to sign a free agent that would take it into the luxury tax, and an AI team already in the tax only re-signs its two best players into it (three without this). Your team's moves aren't affected, and nothing in the game sim changes.",
+		default: false,
+		defaultNewLeague: true,
+	},
+	{
 		id: "capExceptions",
 		key: "featureCapExceptions",
 		name: "Salary Cap Exceptions",

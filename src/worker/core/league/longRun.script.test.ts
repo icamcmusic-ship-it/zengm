@@ -1404,6 +1404,12 @@ describe.skipIf(!ENABLED)("long run", () => {
 			};
 			const box = await timed("checks", () => checkBoxScores(s));
 			const avgs = await timed("checks", () => leagueAverages(s));
+			const movs = new Map<number, number>();
+			for (const ts of await idb.cache.teamStats.getAll()) {
+				if (ts.season === s && !ts.playoffs && ts.gp > 0) {
+					movs.set(ts.tid, r((ts.pts - ts.oppPts) / ts.gp, 2));
+				}
+			}
 			await timed("checks", () => checkAwards(s));
 			await timed("checks", () => checkRecordsBook(s));
 			await timed("checks", () => checkPlayoffs(s));
@@ -1519,6 +1525,124 @@ describe.skipIf(!ENABLED)("long run", () => {
 			const adv = await timed("checks", () => advSummary(s));
 			if (adv) {
 				out(`ADV ${JSON.stringify({ season: s, ...adv })}`);
+			}
+			// Competitive balance: each team's record, ovr, payroll and playoff result, plus the top PER/BPM (1500+ minutes)
+			{
+				const tss = (await idb.cache.teamSeasons.getAll()).filter(
+					(ts) => ts.season === s,
+				);
+				const ps = await idb.merged.players.getAll({ activeSeason: s });
+				const rows = ps.flatMap((p) =>
+					p.stats.filter(
+						(row: any) => row.season === s && !row.playoffs && row.min >= 1500,
+					),
+				) as any[];
+				for (const row of rows) {
+					row.bpmTot = (row.obpm ?? 0) + (row.dbpm ?? 0);
+				}
+				const top = (k: string) =>
+					rows
+						.map((row) => row[k] as number)
+						.filter((x) => typeof x === "number")
+						.sort((a, b) => b - a)
+						.slice(0, 5)
+						.map((x) => r(x));
+				// Each team's top 8 players now (after the offseason): ovr, age, how he joined (draft pick number, fa, trade, import) and salary
+				const rostered = await idb.cache.players.indexGetAll("playersByTid", [
+					0,
+					Infinity,
+				]);
+				const rosters: Record<number, unknown[]> = {};
+				for (const [tid, tps] of Map.groupBy(rostered, (p) => p.tid)) {
+					rosters[tid] = tps
+						.map((p) => {
+							const tr = (p.transactions ?? []).findLast(
+								(x: any) => x.tid === tid,
+							) as any;
+							const how = !tr
+								? "?"
+								: tr.type === "draft"
+									? `d${tr.pickNum}`
+									: tr.type === "trade"
+										? `t${tr.season}`
+										: tr.type === "freeAgent"
+											? `f${tr.season}`
+											: tr.type;
+							return [
+								last(p.ratings).ovr,
+								g.get("season") - p.born.year,
+								how,
+								Math.round((getCurrentContract(p)?.amount ?? 0) / 1000),
+							];
+						})
+						.sort((a: any, b: any) => b[0] - a[0])
+						.slice(0, 8);
+				}
+				out(
+					`BALANCE ${JSON.stringify({
+						rosters,
+						season: s,
+						teams: tss.map((ts) => ({
+							tid: ts.tid,
+							w: ts.won,
+							l: ts.lost,
+							o0: ts.ovrStart,
+							o1: ts.ovrEnd,
+							pr: ts.playoffRoundsWon,
+							mov: movs.get(ts.tid),
+						})),
+						ev: Object.fromEntries(
+							[
+								...Map.groupBy(
+									[
+										...(await idb.league
+											.transaction("events")
+											.store.index("season")
+											.getAll(s)),
+										...(await idb.cache.events.getAll()).filter(
+											(e) => e.season === s,
+										),
+									].filter(
+										(e: any, idx, arr) =>
+											arr.findIndex((f: any) => f.eid === e.eid) === idx,
+									),
+									(e: any) => e.type as string,
+								).entries(),
+							]
+								.filter(([k]) =>
+									["trade", "freeAgent", "reSigned", "release"].includes(k),
+								)
+								.map(([k, v]) => [k, v.length]),
+						),
+						// Clutch: games per team (its most-used player's clutch games) and the player clutch +/- extremes
+						clutch: (() => {
+							const allRows = ps.flatMap((p) =>
+								p.stats.filter(
+									(row: any) => row.season === s && !row.playoffs && row.adv,
+								),
+							) as any[];
+							const gpByTid = new Map<number, number>();
+							const pms: number[] = [];
+							for (const row of allRows) {
+								const gp = advStat(row.adv, "clGp") ?? 0;
+								gpByTid.set(row.tid, Math.max(gpByTid.get(row.tid) ?? 0, gp));
+								const pm = advStat(row.adv, "clPm");
+								if (pm !== undefined) {
+									pms.push(pm);
+								}
+							}
+							return gpByTid.size === 0
+								? undefined
+								: {
+										gp: r(mean([...gpByTid.values()])),
+										pmMax: Math.max(...pms),
+										pmMin: Math.min(...pms),
+									};
+						})(),
+						per: top("per"),
+						bpm: top("bpmTot"),
+					})}`,
+				);
 			}
 			const offseasonCpu = cpuMs() - cs - simCpu;
 			const afterDraft = await ratingsInfo(s);

@@ -362,7 +362,11 @@ const AI_REBUILDING_MAX_AGE = 27;
 const aiGoesIntoTax = (
 	t: Pick<Team, "strategy">,
 	gm: Pick<GmWeights, "avoidTaxRankShift"> | undefined,
-) => t.strategy === "contending" && (gm?.avoidTaxRankShift ?? 0) >= 0;
+) =>
+	t.strategy === "contending" &&
+	(gm?.avoidTaxRankShift ?? 0) >= 0 &&
+	// Competitive Balance (setting): AI teams don't go into the luxury tax with an exception
+	!featureOn("competitiveBalance");
 
 // The most an AI team could pay a free agent with an exception right now, 0 if none. For the free agent demand market.
 export const getAiCapExceptionCapacity = (
