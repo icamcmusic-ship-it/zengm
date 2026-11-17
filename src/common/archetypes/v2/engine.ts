@@ -90,6 +90,9 @@ export type V2Params = {
 	// archv3: the user's tuning per build in the score, and the neighbours' share that makes a build a candidate
 	tuneW: number;
 	knnBuildMin: number;
+	// A composed name gives way to a build this close, or to the earlier reading's label at this confidence (archv3)
+	presetMargin: number;
+	presetConf: number;
 	// What an athletic name on a below-median athlete pays (archv3)
 	athPen: number;
 	// The Glue roles' head start (archv3: their tests' margins are small by construction, no standout)
@@ -124,6 +127,8 @@ export const V2_PARAMS: V2Params = {
 	tuneW: 5,
 	knnBuildMin: 0.1,
 	famOut: 0.5,
+	presetMargin: 0.1,
+	presetConf: 0.8,
 	athPen: 1,
 	glueWing: 2,
 	glueGuard: 1.4,
@@ -574,11 +579,25 @@ export const classifyV2 = (
 			}
 		}
 	}
+	const eff = (c: V2Candidate) =>
+		c.family === family ? c.score : c.score - P.famOut;
+	// archv3: a composed name only where no preset says him: a build within presetMargin of it, or the earlier reading's
+	// label when that reading is sure of it (its confidence presetConf or more), is his label instead
+	if (isComposedId(first.id)) {
+		const fs = eff(first);
+		const preset = cands.find(
+			(c) =>
+				!isComposedId(c.id) &&
+				(eff(c) >= fs - P.presetMargin ||
+					(c.classic && classic.confidence >= P.presetConf)),
+		);
+		if (preset) {
+			first = preset;
+		}
+	}
 	// Hysteresis: last season's label stays unless beaten clearly (and while he still passes its tests)
 	// (archv3: on the same footing as the choice, outside his family included; a build he still passes that is no longer
 	// among the candidates is scored as one)
-	const eff = (c: V2Candidate) =>
-		c.family === family ? c.score : c.score - P.famOut;
 	if (prevRaw && prevRaw !== first.id) {
 		const prevId = prevComposed ? prevRaw : mergedId(prevRaw);
 		let prev = cands.find((c) => c.id === prevId);

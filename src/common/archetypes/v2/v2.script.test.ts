@@ -429,6 +429,57 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			writeFileSync(OUT, out.join("\n") + "\n");
 			return;
 		}
+		if (MODE === "composed") {
+			// archv3: the composed names v2 gives (random league and real 2016-2025): each with how often, example players,
+			// the earlier reading's label for them and how far the best preset was
+			const pops = {
+				league: await genPlayers(3000, "metrics-league", 19, 32, 38),
+				vets: await genPlayers(1000, "metrics-vets", 32, 37, 38),
+				pros: (await genPlayers(1000, "metrics-pros", 19, 19, 40)).map((p) => ({
+					...p,
+					prospect: true,
+					age: undefined,
+				})),
+				real: realPop(2016, 2025),
+			};
+			const by = {};
+			// (every composed name among the candidates, chosen or not: the grammar audit)
+			const pool = {};
+			let n = 0;
+			for (const [label, ps] of Object.entries(pops)) {
+				for (const p of ps) {
+					n++;
+					const res = ENGINES.v2(p, p.slug ? { srID: p.slug } : {});
+					const top = res.c.v2.candidates.find((c) => c.id.startsWith("v2:"));
+					if (top) pool[top.name] = (pool[top.name] ?? 0) + 1;
+					if (!res.id.startsWith("v2:")) continue;
+					const cl = res.c.v2.candidates.find((c) => c.classic);
+					const bestBuild = res.c.v2.candidates.find(
+						(c) => !c.id.startsWith("v2:"),
+					);
+					const e = (by[res.name] ??= { n: 0, ex: [], ids: new Set() });
+					e.n++;
+					e.ids.add(res.id);
+					if (e.ex.length < 3)
+						e.ex.push(
+							`${p.name ?? `gen#${n}`}${p.season ? ` ${p.season}` : ""} ${p.pos} (earlier: ${cl?.name}; best preset ${bestBuild?.name} ${(res.c.v2.candidates[0].score - (bestBuild?.score ?? 0)).toFixed(2)} behind)`,
+						);
+				}
+			}
+			const out = [
+				`composed: ${Object.values(by).reduce((s, e) => s + e.n, 0)} of ${n} players, ${Object.keys(by).length} names`,
+			];
+			for (const [nm, e] of Object.entries(by).sort((a, b) => b[1].n - a[1].n))
+				out.push(`${e.n}\t${nm}\t${[...e.ids].join(" ")}\t${e.ex.join(" | ")}`);
+			out.push(
+				"",
+				`audit pool: ${Object.keys(pool).length} composed candidate names`,
+			);
+			for (const [nm, k] of Object.entries(pool).sort((a, b) => b[1] - a[1]))
+				out.push(`${k}\t${nm}`);
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
 		if (MODE === "churn") {
 			const out = [JSON.stringify(PARAMS ?? {})];
 			await churnAll(out, ["v2"]);

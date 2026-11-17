@@ -59,6 +59,8 @@ export type DescDef = {
 	// has at most one word per slot 0 and 1, and its descriptors are written in slot order (2K's order)
 	slot: 0 | 1 | 2;
 	groups?: PosGroup[];
+	// archv3: the word at a size group (the neighbours' variant is not taken over it)
+	byGroup?: Partial<Record<PosGroup, string>>;
 };
 
 export const ROLES: RoleDef[] = [
@@ -299,7 +301,8 @@ export const DESCRIPTORS: DescDef[] = [
 		names: ["Stretch"],
 		concept: "catchShoot",
 		slot: 2,
-		groups: ["wing", "big"],
+		// (archv3: a big's word; on a wing "Stretch Cutter" read wrong)
+		groups: ["big"],
 	},
 	{ key: "midPaint", names: ["Mid-Paint"], concept: "midPaint", slot: 2 },
 	{
@@ -339,6 +342,12 @@ export const DESCRIPTORS: DescDef[] = [
 	{
 		key: "rimRunning",
 		names: ["Rim-Running", "Wing-Running"],
+		// (archv3: a big runs to the rim, a guard or wing the wings: "2-Way Wing-Running Shot Eraser" read wrong)
+		byGroup: {
+			big: "Rim-Running",
+			guard: "Wing-Running",
+			wing: "Wing-Running",
+		},
 		concept: "run",
 		slot: 2,
 	},
@@ -396,6 +405,8 @@ const CONCEPT_GROUP: Record<string, string> = {
 const ALLOWED_SAME: ReadonlySet<string> = new Set(["mid|maestro"]);
 // Groups that overlap another (3-Level is a shot and a mid-range; Inside-Out a shot and a finish)
 const ALSO: Record<string, string[]> = {
+	// (archv3: "Defensive" after "2-Way" says defense twice)
+	lockdown: ["def"],
 	threeLevel: ["shoot"],
 	insideOut: ["shoot", "finish"],
 	chaser: ["shoot"],
@@ -412,6 +423,36 @@ const roleGroups = (r: RoleDef) => [
 	]),
 ];
 
+const DEFENSIVE_ROLES: ReadonlySet<string> = new Set([
+	"lock",
+	"ballHawk",
+	"rimProtector",
+]);
+// Words that read against a role (the mid-range maestro is no three-point or above-the-rim scorer)
+// (the lockdown defender and the ball hawk take defensive, physical and athletic words, not a scorer's; a bully is no
+// finesse player; an off-ball cutter does not isolate; a finisher with a three is Inside-Out)
+const SCORER_WORDS = [
+	"crafty",
+	"iso",
+	"threePt",
+	"stretchy",
+	"playmaking",
+	"middy",
+	"midPaint",
+	"midPost",
+	"pullUp",
+	"postScoring",
+	"insideOut",
+	"threeLevel",
+] as const;
+const CLASHES: Partial<Record<string, readonly string[]>> = {
+	maestro: ["threePt", "rimRocking", "rimRunning", "highFlying"],
+	ballHawk: SCORER_WORDS,
+	finisher: ["threePt"],
+	lock: SCORER_WORDS,
+	postBully: ["crafty"],
+	cutter: ["iso"],
+};
 // Whether a role and descriptors make a valid name: no word group twice (except the allowed pairs), one 2-Way, one style
 // word, at most two descriptors, each allowed at his size
 export const compatible = (
@@ -422,7 +463,11 @@ export const compatible = (
 	if (
 		descs.length > 2 ||
 		!role.groups.includes(group) ||
-		(role.bare && descs.length > 0)
+		(role.bare && descs.length > 0) ||
+		// (archv3: "2-Way" on a defender's role says defense twice: "2-Way Lock", "2-Way Shot Eraser"; a word that reads
+		// against the role: "3PT Maestro", "Rim-Rocking Maestro")
+		(DEFENSIVE_ROLES.has(role.key) && descs.some((d) => d.key === "twoWay")) ||
+		descs.some((d) => CLASHES[role.key]?.includes(d.key))
 	) {
 		return false;
 	}
@@ -476,8 +521,12 @@ export const roleWord = (
 	role.byGroup?.[group] ??
 	(hasDesc ? (role.withDesc ?? role.names[0]!) : role.names[0]!);
 
-export const descWord = (d: DescDef, pick?: WordPick): string =>
-	pick?.[d.key] ?? d.names[0]!;
+export const descWord = (
+	d: DescDef,
+	pick?: WordPick,
+	group?: PosGroup,
+): string =>
+	(group ? d.byGroup?.[group] : undefined) ?? pick?.[d.key] ?? d.names[0]!;
 
 export const composeName = (
 	role: RoleDef,
@@ -486,9 +535,20 @@ export const composeName = (
 	pick?: WordPick,
 ): string =>
 	[
-		...orderDescs(descs).map((d) => descWord(d, pick)),
-		roleWord(role, group, descs.length > 0, pick),
+		...orderDescs(descs).map((d) => descWord(d, pick, group)),
+		roleWord(role, group, shortForm(role, descs), pick),
 	].join(" ");
+// The role's short form ("Bully", "Creator") follows a style or skill word; after 2-Way alone the role keeps its whole
+// name where the short form is no name of its own ("2-Way Post Bully", not "2-Way Bully": archv3)
+const FULL_AFTER_2WAY: ReadonlySet<string> = new Set([
+	"postBully",
+	"creator",
+	"maestro",
+	"cutter",
+]);
+const shortForm = (role: RoleDef, descs: readonly DescDef[]) =>
+	descs.length > 0 &&
+	!(FULL_AFTER_2WAY.has(role.key) && descs.every((d) => d.slot === 0));
 
 // ---- composed ids ----
 // "v2:<role>+<desc>+<desc>:<group>[:<word>=<variant>,...]": the role, the descriptors, his size group, and any display
@@ -504,12 +564,12 @@ export const composedId = (
 ): string => {
 	const ds = orderDescs(descs);
 	const variants: string[] = [];
-	const rw = roleWord(role, group, ds.length > 0, pick);
-	if (rw !== roleWord(role, group, ds.length > 0)) {
+	const rw = roleWord(role, group, shortForm(role, ds), pick);
+	if (rw !== roleWord(role, group, shortForm(role, ds))) {
 		variants.push(`${role.key}=${role.names.indexOf(rw)}`);
 	}
 	for (const d of ds) {
-		const w = descWord(d, pick);
+		const w = descWord(d, pick, group);
 		if (w !== d.names[0]) {
 			variants.push(`${d.key}=${d.names.indexOf(w)}`);
 		}
