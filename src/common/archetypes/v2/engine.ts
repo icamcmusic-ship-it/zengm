@@ -28,7 +28,7 @@ import { familyProbs } from "../model.ts";
 import { isPos } from "../position.ts";
 import { nameAt } from "../posNames.ts";
 import { ATH_NAME_RE, promiseMiss } from "../score.ts";
-import { RULES } from "../rulebook.data.ts";
+import { FLOOR, RULES } from "../rulebook.data.ts";
 import { USER_2K_MAP } from "../twoK/user2kMap.data.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
 import type { ArchetypeRatings, Classification, Pos } from "../types.ts";
@@ -36,6 +36,7 @@ import {
 	compatible,
 	composedId,
 	composeName,
+	DESC_BY_KEY,
 	DESCRIPTORS,
 	familyOfName,
 	GROUP_OF,
@@ -45,6 +46,7 @@ import {
 	ROLES,
 	roleWord,
 	type DescDef,
+	type PosGroup,
 	type RoleDef,
 	type WordPick,
 } from "./grammar.ts";
@@ -58,7 +60,14 @@ import {
 	type RefRow,
 	type Votes,
 } from "./knn.ts";
-import { peerPct, testConcept, topSkills, type WordContext } from "./tests.ts";
+import {
+	floorMiss,
+	lowOvrTools,
+	peerPct,
+	testConcept,
+	topSkills,
+	type WordContext,
+} from "./tests.ts";
 import { VOTER_REL, type Voter } from "./voters.data.ts";
 import { refsFromPicks } from "./picks.ts";
 import { USER_PICKS } from "./userPicks.data.ts";
@@ -103,6 +112,20 @@ export type V2Params = {
 	// archv4 gap roles' head starts (their tests' margins are small by construction; nobody labeled votes for them yet)
 	floaterGuard: number;
 	rawHandler: number;
+	// archv5 roles' head starts (the user's labels: absolute tests), and what a name below the absolute floor of one of its
+	// words pays (tests.ts ABS_FLOORS; 0: no floors)
+	paintBeast: number;
+	interiorForce: number;
+	offGuard: number;
+	lowOvr: number;
+	floorPen: number;
+	// The low-ovr test: the cap on his skill ratings, and the age up to which one tool is allowed (tests.ts lowOvr)
+	lowCap: number;
+	lowYoung: number;
+	toolCap: number;
+	toolMin: number;
+	// Hysteresis on the absolute bars: last season's label keeps them this many rating points looser (tests.ts band)
+	absBand: number;
 	// Last season's family's head start
 	famHyst: number;
 	// What a candidate outside the voted family pays (its family's vote is already in its score; Infinity: the voted
@@ -145,6 +168,16 @@ export const V2_PARAMS: V2Params = {
 	switchDefender: 1.5,
 	floaterGuard: 2.5,
 	rawHandler: 2.5,
+	paintBeast: 0.75,
+	interiorForce: 1.5,
+	offGuard: 1,
+	lowOvr: 3,
+	floorPen: 3,
+	lowCap: 50,
+	lowYoung: 21,
+	toolCap: 52,
+	toolMin: 60,
+	absBand: 3,
 	famHyst: 1,
 	altClassic: 1,
 	alsoMargin: 0.15,
@@ -168,6 +201,18 @@ export const OWN_COMPOSED_NAMES: ReadonlySet<string> = new Set(
 		"2-Way Bucket Chaser",
 	].map((n) => norm(n)),
 );
+// archv5: the roles of the user's labels (the archcmp sample): their names are his, so no preset stands in for them
+const USER_ROLES: ReadonlySet<string> = new Set([
+	"paintBeast",
+	"interiorForce",
+	"offGuard",
+	"prospect",
+	"depthPiece",
+]);
+// archv5: the user's own names (his labels of the archcmp sample) for builds that say the same thing
+export const USER_LABEL_ALIASES: Record<string, string> = {
+	"Perimeter Lockdown": "lockdown-defender",
+};
 const buildOfName = (name: string): string | undefined => {
 	if (OWN_COMPOSED_NAMES.has(norm(name))) {
 		return undefined;
@@ -178,6 +223,9 @@ const buildOfName = (name: string): string | undefined => {
 			if (v.id) {
 				nameIndex.set(norm(n), mergedId(v.id));
 			}
+		}
+		for (const [n, id] of Object.entries(USER_LABEL_ALIASES)) {
+			nameIndex.set(norm(n), id);
 		}
 		for (const a of ARCHETYPES) {
 			for (const n of TWO_K_NAMES[a.id] ?? []) {
@@ -311,6 +359,12 @@ export const classifyV2 = (
 		top3: topSkills(bucket, cv),
 		statZ: opts.stats?.z,
 		prospect: opts.prospect,
+		r: ratings,
+		age: opts.age,
+		lowCap: P.lowCap,
+		lowYoung: P.lowYoung,
+		toolCap: P.toolCap,
+		toolMin: P.toolMin,
 	};
 	const order = topSkills(bucket, cv, 10);
 
@@ -332,15 +386,21 @@ export const classifyV2 = (
 	const pick: WordPick | undefined = P.words ? votes.words : undefined;
 
 	// Roles he passes
+	// (archv5: last season's role keeps its absolute bars a little looser, absBand)
+	const prevRole = prevComposed
+		? parseComposedId(prevRaw)?.role.key
+		: undefined;
+	const banded: WordContext = { ...ctx, band: P.absBand };
 	const roleTests = new Map<string, { margin: number; name: string }>();
 	for (const r of ROLES) {
 		if (!r.groups.includes(group)) {
 			continue;
 		}
 		const name = roleWord(r, group, false, pickFor(r, pick));
+		const rctx = r.key === prevRole ? banded : ctx;
 		let margin = Infinity;
 		for (const [i, c] of r.concepts.entries()) {
-			margin = Math.min(margin, testConcept(c, i === 0, ctx, name).margin);
+			margin = Math.min(margin, testConcept(c, i === 0, rctx, name).margin);
 		}
 		if (margin >= 0) {
 			roleTests.set(r.key, { margin, name });
@@ -453,28 +513,32 @@ export const classifyV2 = (
 			.sort((x, y) => dScore(y) - dScore(x))
 			.slice(0, 5);
 		const combos: DescDef[][] = [[]];
-		for (const [i, d] of ds.entries()) {
-			combos.push([d]);
-			for (const e of ds.slice(i + 1)) {
-				if (compatible(r, [d, e], group)) {
-					combos.push([d, e]);
+		// (archv5: a Prospect's one word is his one tool, from his ratings: tests.ts lowOvrTools)
+		const tool =
+			r.key === "prospect"
+				? toolDesc(
+						ratings,
+						group,
+						cv,
+						P.toolCap + (r.key === prevRole ? P.absBand : 0),
+					)
+				: undefined;
+		if (tool) {
+			combos.push([tool]);
+		} else if (r.key !== "prospect") {
+			for (const [i, d] of ds.entries()) {
+				combos.push([d]);
+				for (const e of ds.slice(i + 1)) {
+					if (compatible(r, [d, e], group)) {
+						combos.push([d, e]);
+					}
 				}
 			}
 		}
 		const base =
 			P.rM * t.margin +
 			P.rK * (votes.role[r.key] ?? 0) +
-			(r.key === "glueWing"
-				? P.glueWing
-				: r.key === "glueGuard"
-					? P.glueGuard
-					: r.key === "switchDefender"
-						? P.switchDefender
-						: r.key === "floaterGuard"
-							? P.floaterGuard
-							: r.key === "rawHandler"
-								? P.rawHandler
-								: 0);
+			roleHeadStart(r.key, P);
 		for (const c of combos) {
 			const pk = pickFor(r, pick, c);
 			const name = composeName(r, c, group, pk);
@@ -495,7 +559,10 @@ export const classifyV2 = (
 				score:
 					famScore[fam] +
 					base +
-					c.reduce((sum, d) => sum + dScore(d), 0) +
+					c.reduce(
+						(sum, d) => sum + (descTests.has(d.key) ? dScore(d) : TOOL_SCORE),
+						0,
+					) +
 					P.kCanon * (votes.canon[canon] ?? 0) +
 					(build ? P.buildBonus : 0),
 			});
@@ -617,6 +684,21 @@ export const classifyV2 = (
 			}
 		}
 	}
+	// archv5: a name below the absolute floor of one of its words (tests.ts ABS_FLOORS: "41 3PT is way too low for
+	// Stretch") pays floorPen, whichever way it came (a composed name, the earlier reading's label, a build)
+	// (last season's label keeps the floors absBand looser)
+	const prevKey = prevRaw && !prevComposed ? mergedId(prevRaw) : prevRaw;
+	const floorPay = (c: V2Candidate) => {
+		if (
+			P.floorPen !== 0 &&
+			floorMiss(c.name, ratings, c.id === prevKey ? P.absBand : 0) > 0
+		) {
+			c.score -= P.floorPen;
+		}
+	};
+	for (const c of cands) {
+		floorPay(c);
+	}
 	// The user's tuning (his picks) on every build: the reading follows his picks as the earlier reading's model did
 	if (P.tuneW !== 0) {
 		for (const c of cands) {
@@ -645,7 +727,11 @@ export const classifyV2 = (
 	const eff = (c: V2Candidate) => c.score - famToll(c);
 	// archv3: a composed name only where no preset says him: a build within presetMargin of it, or the earlier reading's
 	// label when that reading is sure of it (its confidence presetConf or more), is his label instead
-	if (isComposedId(first.id) && !OWN_COMPOSED_NAMES.has(norm(first.name))) {
+	if (
+		isComposedId(first.id) &&
+		!OWN_COMPOSED_NAMES.has(norm(first.name)) &&
+		!USER_ROLES.has(first.role ?? "")
+	) {
 		const fs = eff(first);
 		const preset = cands.find(
 			(c) =>
@@ -665,6 +751,7 @@ export const classifyV2 = (
 		let prev = cands.find((c) => c.id === prevId);
 		if (!prev && !prevComposed && allowedBuild(prevId, pos, cv)) {
 			prev = buildCand(prevId);
+			floorPay(prev);
 			cands.push(prev);
 		}
 		if (
@@ -780,6 +867,69 @@ const withShippedPicks = (extra?: readonly RefRow[]): readonly RefRow[] => {
 	}
 	const own = new Set(extra.map((r) => r.uid).filter(Boolean));
 	return [...shippedPickRefs.filter((r) => !own.has(r.uid)), ...extra];
+};
+
+// archv5: the roles' head starts (their tests' margins are small by construction; nobody labeled votes for them yet)
+const roleHeadStart = (key: string, P: V2Params): number => {
+	switch (key) {
+		case "glueWing":
+			return P.glueWing;
+		case "glueGuard":
+			return P.glueGuard;
+		case "switchDefender":
+			return P.switchDefender;
+		case "floaterGuard":
+			return P.floaterGuard;
+		case "rawHandler":
+			return P.rawHandler;
+		case "paintBeast":
+			return P.paintBeast;
+		case "interiorForce":
+			return P.interiorForce;
+		case "offGuard":
+			return P.offGuard;
+		case "prospect":
+		case "depthPiece":
+			return P.lowOvr;
+		default:
+			return 0;
+	}
+};
+
+// archv5: a Prospect's one tool as a word (the skill rating above the cap: tests.ts lowOvrTools), where the word is
+// allowed at his size and its class is at least ordinary for him (the name's promise)
+const TOOL_DESC: Record<string, Partial<Record<PosGroup, string>>> = {
+	reb: { guard: "glass", wing: "glass", big: "glass" },
+	dnk: { guard: "rimRocking", wing: "rimRocking", big: "rimRocking" },
+	ins: { guard: "slashing", wing: "postScoring", big: "postScoring" },
+	tp: { guard: "threePt", wing: "threePt", big: "stretchy" },
+	fg: { guard: "middy", wing: "middy", big: "middy" },
+	drb: { guard: "iso", wing: "iso" },
+	pss: { guard: "playmaking", wing: "playmaking", big: "playmaking" },
+	diq: { guard: "defensive", wing: "defensive", big: "defensive" },
+	oiq: { guard: "crafty", wing: "crafty", big: "crafty" },
+};
+const TOOL_SCORE = 0.3;
+const toolDesc = (
+	ratings: ArchetypeRatings,
+	group: PosGroup,
+	cv: Record<string, number>,
+	cap: number,
+): DescDef | undefined => {
+	const tools = lowOvrTools(ratings, cap);
+	if (tools.length !== 1) {
+		return undefined;
+	}
+	const d = DESC_BY_KEY.get(TOOL_DESC[tools[0]!]?.[group] ?? "");
+	if (!d || (d.groups && !d.groups.includes(group))) {
+		return undefined;
+	}
+	for (const k of RULES[d.concept]?.classes ?? []) {
+		if ((cv[k] ?? 0) < FLOOR) {
+			return undefined;
+		}
+	}
+	return d;
 };
 
 const topOf = <K extends string>(m: Partial<Record<K, number>>) =>

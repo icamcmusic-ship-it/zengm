@@ -56,8 +56,15 @@ const makePlayers = () => {
 	return players;
 };
 
-const someone = async () =>
-	(await idb.cache.players.indexGetAll("playersByTid", [0, Infinity]))[0]!;
+// (archv5: a player read as one of the builds, not a composed name such as a low-ovr "Prospect": a pick between builds
+// fits a tuning row for both)
+const someone = async () => {
+	const ps = await idb.cache.players.indexGetAll("playersByTid", [0, Infinity]);
+	const norms = await getLeagueNorms();
+	return (
+		ps.find((p) => !archetypeFor(p, norms)?.view.id.startsWith("v2:")) ?? ps[0]!
+	);
+};
 
 const pickOther = async (pid: number) => {
 	const o = await api.feedbackOptions({ pid });
@@ -67,7 +74,12 @@ const pickOther = async (pid: number) => {
 		`${o.suggestions.length}`,
 	);
 	assert.ok(o.all.length > o.suggestions.length);
-	return { o, id: o.suggestions[0]!.id };
+	return {
+		o,
+		id: (
+			o.suggestions.find((x) => !x.id.startsWith("v2:")) ?? o.suggestions[0]!
+		).id,
+	};
 };
 
 describe("archetype feedback", () => {

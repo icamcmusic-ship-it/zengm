@@ -16,7 +16,9 @@ import {
 	ROLE_BY_KEY,
 	ROLES,
 } from "./grammar.ts";
-import { CUSTOM_TESTS } from "./tests.ts";
+import { CUSTOM_TESTS, floorMiss, type WordContext } from "./tests.ts";
+import { USER_PICKS } from "./userPicks.data.ts";
+import { canonOf } from "./engine.ts";
 
 describe("archv2 grammar", () => {
 	test("every word reads as the concept its test is on (so a name's promises are exactly its words')", () => {
@@ -195,5 +197,87 @@ describe("archv2 grammar", () => {
 		assert.strictEqual(familyOfName("Rim-Rocking Stretch", "C"), "stretchBig");
 		assert.strictEqual(familyOfName("Perimeter Shot Hunter", "SG"), "shooter");
 		assert.strictEqual(familyOfName("Open-Lane Burner", "SF"), "slasher");
+	});
+
+	test("archv5: the user's labels of the archcmp sample are names the grammar says, each read back as its role", () => {
+		const picks = USER_PICKS.filter((p) => p.uid.startsWith("archcmp-"));
+		assert.strictEqual(picks.length, 20);
+		for (const p of picks) {
+			const a = archetypeById(p.picked!)!;
+			assert.ok(a, p.picked!);
+			// (an alias of a build reads as that build: "Perimeter Lockdown" is the Lockdown Defender)
+			if (p.picked!.startsWith("v2:")) {
+				assert.strictEqual(a.name, p.label, p.picked!);
+				const parsed = parseComposedId(p.picked!)!;
+				assert.strictEqual(
+					parseName(a.name, p.pos).role,
+					parsed.role.key,
+					a.name,
+				);
+			} else {
+				assert.strictEqual(canonOf(p.label!), p.picked, p.label);
+			}
+		}
+		assert.strictEqual(familyOfName("Glass-Cleaning Prospect", "FC"), "glass");
+		assert.strictEqual(familyOfName("Prospect", "GF"), "allAround");
+		assert.strictEqual(familyOfName("Paint Beast", "FC"), "postBig");
+		assert.strictEqual(familyOfName("Interior Force", "C"), "postBig");
+		assert.strictEqual(
+			parseName("Sharpshooting Slasher", "SG").descs[0],
+			"sharpshooting",
+		);
+		assert.strictEqual(
+			composeName(ROLE_BY_KEY.get("finisher")!, [], "big"),
+			"Interior Finisher",
+		);
+	});
+
+	test("archv5: absolute floors on shooting words, and the low-ovr label", () => {
+		const r = (x: Record<string, number>) => x as any;
+		assert.isAbove(floorMiss("Stretch Big", r({ tp: 41 })), 0);
+		assert.strictEqual(floorMiss("Stretch Big", r({ tp: 45 })), 0);
+		assert.isAbove(floorMiss("3 & D Specialist", r({ tp: 52 })), 0);
+		assert.strictEqual(floorMiss("3 & D Wing", r({ tp: 54 })), 0);
+		assert.isAbove(floorMiss("Catch & Shoot Sniper", r({ tp: 54 })), 0);
+		assert.strictEqual(floorMiss("Lockdown Defender", r({ tp: 20 })), 0);
+		const flat = {
+			hgt: 60,
+			stre: 60,
+			spd: 60,
+			jmp: 60,
+			endu: 60,
+			ins: 45,
+			dnk: 50,
+			ft: 40,
+			fg: 45,
+			tp: 40,
+			oiq: 45,
+			diq: 45,
+			drb: 45,
+			pss: 45,
+			reb: 50,
+		};
+		const ctx = (age: number | undefined, x = {}, prospect = false) =>
+			({
+				cv: {},
+				pz: {},
+				top3: [],
+				bucket: "C",
+				style: {},
+				r: { ...flat, ...x },
+				age,
+				prospect,
+			}) as unknown as WordContext;
+		const prospect = CUSTOM_TESTS.prospectRole!;
+		const depth = CUSTOM_TESTS.depthPieceRole!;
+		assert.isTrue(prospect(ctx(27), false).pass);
+		assert.isFalse(prospect(ctx(28), false).pass);
+		assert.isTrue(depth(ctx(28), false).pass);
+		assert.isFalse(depth(ctx(27), false).pass);
+		// (never a draft prospect; one tool only for a young player)
+		assert.isFalse(prospect(ctx(undefined, {}, true), false).pass);
+		assert.isTrue(prospect(ctx(21, { reb: 67 }), false).pass);
+		assert.isFalse(prospect(ctx(26, { reb: 67 }), false).pass);
+		assert.isFalse(prospect(ctx(21, { reb: 67, ins: 60 }), false).pass);
 	});
 });

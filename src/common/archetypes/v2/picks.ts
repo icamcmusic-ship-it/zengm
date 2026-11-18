@@ -26,6 +26,9 @@ export type ShippedPick = {
 	pos: Pos;
 	shown?: string;
 	picked: string | null;
+	// archv5: the user's own words for the label, and his reason (the archcmp sample's labels)
+	label?: string;
+	why?: string;
 	at?: number;
 	input?: PickInput;
 };

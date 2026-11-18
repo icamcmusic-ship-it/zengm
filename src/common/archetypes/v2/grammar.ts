@@ -135,6 +135,8 @@ export const ROLES: RoleDef[] = [
 		names: ["Finisher", "Laymaker"],
 		concepts: ["finish"],
 		groups: ALL,
+		// (archv5: the user's "2-Way Interior Finisher" for a big)
+		byGroup: { big: "Interior Finisher" },
 	},
 	{
 		key: "burner",
@@ -258,6 +260,42 @@ export const ROLES: RoleDef[] = [
 		concepts: ["rawHandlerRole"],
 		groups: ["guard", "wing"],
 	},
+	// archv5 (the user's labels of the archcmp sample): an interior scorer with no jumper, a physical rebounding big with
+	// no jumper, a scoring guard who does not defend, and the low-ovr labels (no skill good in absolute terms: young
+	// players "Prospect", with the one tool he has; older ones "Depth Piece"). Their tests read his ratings themselves.
+	{
+		key: "paintBeast",
+		names: ["Paint Beast"],
+		concepts: ["paintBeastRole"],
+		groups: ["wing", "big"],
+	},
+	{
+		key: "interiorForce",
+		bare: true,
+		names: ["Interior Force"],
+		concepts: ["interiorForceRole"],
+		groups: ["wing", "big"],
+	},
+	{
+		key: "offGuard",
+		bare: true,
+		names: ["Offensive-Minded Guard"],
+		concepts: ["offGuardRole"],
+		groups: ["guard"],
+	},
+	{
+		key: "prospect",
+		names: ["Prospect"],
+		concepts: ["prospectRole"],
+		groups: ALL,
+	},
+	{
+		key: "depthPiece",
+		bare: true,
+		names: ["Depth Piece"],
+		concepts: ["depthPieceRole"],
+		groups: ALL,
+	},
 	{
 		key: "gameManager",
 		bare: true,
@@ -325,6 +363,15 @@ export const DESCRIPTORS: DescDef[] = [
 	{ key: "threeLevel", names: ["3-Level"], concept: "threeLevel", slot: 2 },
 	{ key: "insideOut", names: ["Inside-Out"], concept: "insideOut", slot: 2 },
 	{ key: "threePt", names: ["3PT"], concept: "shotHunt", slot: 2 },
+	// archv5 (the user's "Sharpshooting Slasher"): a catch-and-shoot word for guards and wings (Stretch is the bigs'); it
+	// keeps the Sharpshooter's bar (rulebook.data.ts WORD_RULES.sniper) and floor (tests.ts ABS_FLOORS)
+	{
+		key: "sharpshooting",
+		names: ["Sharpshooting"],
+		concept: "catchShoot",
+		slot: 2,
+		groups: ["guard", "wing"],
+	},
 	{
 		key: "stretchy",
 		names: ["Stretch"],
@@ -432,6 +479,11 @@ const CONCEPT_GROUP: Record<string, string> = {
 	floaterRole: "finish",
 	rawHandlerRole: "handle",
 	insideOut: "insideOut",
+	paintBeastRole: "finish",
+	interiorForceRole: "reb",
+	offGuardRole: "offMind",
+	prospectRole: "lowOvr",
+	depthPieceRole: "lowOvr",
 };
 // Pairs that may share a group after all (2K says them): a mid-range word with the Maestro role
 const ALLOWED_SAME: ReadonlySet<string> = new Set(["mid|maestro"]);
@@ -496,6 +548,11 @@ export const compatible = (
 		descs.length > 2 ||
 		!role.groups.includes(group) ||
 		(role.bare && descs.length > 0) ||
+		// (archv5: a Prospect's one word is his one tool: tests.ts lowOvrTools, engine.ts TOOL_DESC)
+		// (a Paint Beast takes one word: "Diming Paint Beast")
+		(role.key === "paintBeast" && descs.length > 1) ||
+		(role.key === "prospect" &&
+			(descs.length > 1 || descs.some((d) => !TOOL_DESC_KEYS.has(d.key)))) ||
 		// (archv3: "2-Way" on a defender's role says defense twice: "2-Way Lock", "2-Way Shot Eraser"; a word that reads
 		// against the role: "3PT Maestro", "Rim-Rocking Maestro")
 		(DEFENSIVE_ROLES.has(role.key) && descs.some((d) => d.key === "twoWay")) ||
@@ -531,6 +588,21 @@ export const compatible = (
 	return true;
 };
 
+// archv5: the words a Prospect's tool may be (engine.ts TOOL_DESC)
+export const TOOL_DESC_KEYS: ReadonlySet<string> = new Set([
+	"glass",
+	"rimRocking",
+	"postScoring",
+	"slashing",
+	"threePt",
+	"stretchy",
+	"middy",
+	"iso",
+	"playmaking",
+	"defensive",
+	"crafty",
+]);
+
 // 2K's order: 2-Way, then the style word, then skill words (defensive and hustle words before scoring words)
 const SKILL_ORDER = DESCRIPTORS.map((d) => d.key);
 export const orderDescs = (descs: readonly DescDef[]): DescDef[] =>
@@ -561,21 +633,38 @@ export const descWord = (
 	(group ? d.byGroup?.[group] : undefined) ?? pick?.[d.key] ?? d.names[0]!;
 
 // archv3: 2K's own name for a role with these descriptors (whatever the display variants), from the user's list
+// (archv5: the user's own wording for some of the names he labeled; "@group": at that size only)
 const COMBO_NAMES: Record<string, string> = {
 	"rimProtector|physical": "Rugged Rim Protector",
 	"creator|ballHawking+playmaking": "Pesky Playmaking Creator",
+	"finisher|highFlying": "Athletic Finisher",
+	"finisher|twoWay+highFlying": "2-Way Athletic Finisher",
+	"slasher|iso": "Shot-Creating Slasher",
+	"slasher|twoWay+iso": "2-Way Shot-Creating Slasher",
+	"slasher|twoWay@wing": "2-Way Slashing Wing",
+	"playmaker|postScoring": "Post Playmaker",
+	"creator|highFlying": "High-Flying Shot Creator",
+	"paintBeast|playmaking": "Diming Paint Beast",
 };
 const comboKey = (role: RoleDef, descs: readonly DescDef[]) =>
 	`${role.key}|${orderDescs(descs)
 		.map((d) => d.key)
 		.join("+")}`;
+const comboName = (
+	role: RoleDef,
+	descs: readonly DescDef[],
+	group: PosGroup,
+): string | undefined => {
+	const k = comboKey(role, descs);
+	return COMBO_NAMES[`${k}@${group}`] ?? COMBO_NAMES[k];
+};
 export const composeName = (
 	role: RoleDef,
 	descs: readonly DescDef[],
 	group: PosGroup,
 	pick?: WordPick,
 ): string =>
-	COMBO_NAMES[comboKey(role, descs)] ??
+	comboName(role, descs, group) ??
 	[
 		...orderDescs(descs).map((d) => descWord(d, pick, group)),
 		roleWord(role, group, shortForm(role, descs), pick),
@@ -606,7 +695,7 @@ export const composedId = (
 ): string => {
 	const ds = orderDescs(descs);
 	const variants: string[] = [];
-	if (COMBO_NAMES[comboKey(role, ds)]) {
+	if (comboName(role, ds, group)) {
 		pick = undefined;
 	}
 	const rw = roleWord(role, group, shortForm(role, ds), pick);
@@ -666,7 +755,15 @@ export const parseComposedId = (
 // ---- families of names ----
 // The family of a name at a position: its head word (the last word that is not a modifier), with the size of the player,
 // as families.ts reads a build's (and the words the user's 2K list added: Hammer, Burner, Cutter, ...)
-const MODIFIERS = new Set(["strength", "skill", "twoWay", "scorer", "riser"]);
+// (archv5: "Prospect" too: "Glass-Cleaning Prospect" is a rebounder; a Prospect alone is no family's)
+const MODIFIERS = new Set([
+	"strength",
+	"skill",
+	"twoWay",
+	"scorer",
+	"riser",
+	"lowOvr",
+]);
 const BIG = new Set<Pos>(["F", "PF", "FC", "C"]);
 export const familyOfName = (name: string, pos: Pos | undefined): Family => {
 	const keys = conceptsOf(name).map((c) => c.key);
@@ -719,6 +816,11 @@ export const familyOfName = (name: string, pos: Pos | undefined): Family => {
 			return "playmaker";
 		case "energy":
 			return "postBig";
+		// archv5
+		case "interior":
+			return big ? "postBig" : "slasher";
+		case "lowOvr":
+			return "allAround";
 		case "creator":
 			return keys.includes("pass")
 				? "playmaker"
@@ -776,11 +878,22 @@ const CONCEPT_DESC: Record<string, string> = Object.fromEntries(
 	DESCRIPTORS.map((d) => [d.concept, d.key]),
 );
 export type ParsedName = { role?: string; descs: string[]; words: WordPick };
+// archv5: role names that are a whole phrase (the concept the role's own words read as, if any)
+const NAME_ROLES: { re: RegExp; role: string; concept?: string }[] = [
+	{ re: /Paint Beast/, role: "paintBeast", concept: "interior" },
+	{ re: /Interior Force/, role: "interiorForce", concept: "interior" },
+	{ re: /Offensive-Minded/, role: "offGuard", concept: "offMind" },
+	{ re: /Prospect/, role: "prospect", concept: "lowOvr" },
+	{ re: /Depth Piece/, role: "depthPiece", concept: "lowOvr" },
+];
 export const parseName = (name: string, pos: Pos | undefined): ParsedName => {
 	const cs = conceptsOf(name).map((c) => c.key);
 	const core = cs.filter((k) => !MODIFIERS.has(k));
-	const headKey = core.at(-1) ?? cs.at(-1);
-	let role = headKey ? CONCEPT_ROLE[headKey] : undefined;
+	// (archv5: the names whose role is a whole phrase: the role claims its own concept, if any, and every other word is a
+	// descriptor)
+	const own = NAME_ROLES.find((x) => x.re.test(name));
+	const headKey = own ? own.concept : (core.at(-1) ?? cs.at(-1));
+	let role = own ? own.role : headKey ? CONCEPT_ROLE[headKey] : undefined;
 	const big = pos !== undefined && GROUP_OF[pos] === "big";
 	if (role === "sharpshooter" && big) {
 		role = "stretch";
@@ -802,7 +915,11 @@ export const parseName = (name: string, pos: Pos | undefined): ParsedName => {
 			headSeen = true;
 			continue;
 		}
-		const d = k === "skill" && /Crafty/.test(name) ? "crafty" : CONCEPT_DESC[k];
+		let d = k === "skill" && /Crafty/.test(name) ? "crafty" : CONCEPT_DESC[k];
+		// (archv5: a catch-and-shoot word in front is "Stretch" on a big, "Sharpshooting" on a guard or wing)
+		if (d === "stretchy" && pos !== undefined && !big) {
+			d = "sharpshooting";
+		}
 		if (d && !descs.includes(d)) {
 			descs.push(d);
 		}
@@ -874,6 +991,11 @@ const ROLE_NOUN: Record<string, string> = {
 	energyBig: "An energy big",
 	floaterGuard: "A small guard",
 	rawHandler: "A young ball handler",
+	paintBeast: "An interior scorer",
+	interiorForce: "A physical big",
+	offGuard: "A scoring guard",
+	prospect: "A young player",
+	depthPiece: "A role player",
 };
 const CONCEPT_PHRASE = new Map(CONCEPTS.map((c) => [c.key, c.phrase]));
 const CUSTOM_PHRASE: Record<string, string> = {
@@ -886,6 +1008,12 @@ const CUSTOM_PHRASE: Record<string, string> = {
 	rawHandlerRole:
 		"has the burst and the handle but is still raw as a shooter and decision-maker",
 	crafty: "wins with craft and touch",
+	paintBeastRole:
+		"finishes inside with size or power and has no jumper to speak of",
+	interiorForceRole: "rebounds and plays physical inside, with no jumper",
+	offGuardRole: "looks for his shot and gives little on defense",
+	prospectRole: "has no skill that is good yet in absolute terms",
+	depthPieceRole: "has no skill that is good in absolute terms",
 	air: "plays above the rim",
 };
 const joinPhrases = (xs: string[]) =>
