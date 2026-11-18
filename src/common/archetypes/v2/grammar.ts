@@ -19,6 +19,7 @@ import type {
 	Pos,
 } from "../types.ts";
 
+import { HONEST_ROLES } from "./honest.ts";
 export type PosGroup = "guard" | "wing" | "big";
 export const GROUP_OF: Record<Pos, PosGroup> = {
 	PG: "guard",
@@ -48,6 +49,11 @@ export type RoleDef = {
 	byGroup?: Partial<Record<PosGroup, string>>;
 	// archv3: a role that takes no descriptor (the role players' names: "no standout" has nothing to add)
 	bare?: boolean;
+	// archreview2: an honest name (honest.ts): never a candidate of the reading, given by the honest rule, with its own
+	// description and family
+	honest?: true;
+	desc?: string;
+	family?: Family;
 };
 
 // A descriptor: a word in front of the role
@@ -429,6 +435,19 @@ export const DESCRIPTORS: DescDef[] = [
 	},
 ];
 
+// archreview2: the honest names (honest.ts), as roles a composed id can name
+for (const h of HONEST_ROLES) {
+	ROLES.push({
+		key: h.key,
+		names: h.names,
+		concepts: ["honest"],
+		groups: ALL,
+		bare: true,
+		honest: true,
+		desc: h.desc,
+		family: h.family,
+	});
+}
 export const ROLE_BY_KEY = new Map(ROLES.map((r) => [r.key, r]));
 export const DESC_BY_KEY = new Map(DESCRIPTORS.map((d) => [d.key, d]));
 
@@ -1023,6 +1042,9 @@ const joinPhrases = (xs: string[]) =>
 
 // A one-line description from the words: "A playmaker who defends his position and scores from mid-range and in the paint."
 export const describe = (role: RoleDef, descs: readonly DescDef[]): string => {
+	if (role.desc) {
+		return role.desc;
+	}
 	const own = role.concepts
 		.filter((c) => c !== "scorer")
 		.map((c) => CUSTOM_PHRASE[c] ?? CONCEPT_PHRASE.get(c))
@@ -1064,7 +1086,7 @@ export const composedArchetype = (
 			}
 		}
 		const positions = POSITIONS_OF[group];
-		const fam = familyOf(name, positions[1]);
+		const fam = role.family ?? familyOf(name, positions[1]);
 		out = {
 			id,
 			name,
@@ -1074,7 +1096,7 @@ export const composedArchetype = (
 			w,
 			hgt: [0, 100],
 			positions,
-			tags: [...tags, "composed"],
+			tags: [...tags, "composed", ...(role.honest ? ["honest"] : [])],
 			prior: 1,
 			custom: true,
 		};

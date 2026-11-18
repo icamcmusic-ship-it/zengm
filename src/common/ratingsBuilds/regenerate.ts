@@ -136,7 +136,13 @@ const state = (
 // Read with the game's position for these ratings (F.pos follows the league's position setting)
 const derivedOf = (F: Formulas, ratings: BuildRatings, norms?: Norms) => {
 	// (a draft prospect: read against the prospect tables, as the game shows him)
-	const c = classifyV2(ratings, { norms, pos: F.pos(ratings), prospect: true });
+	// (archreview2: with his ovr, so the honest names' tier is the one the game reads him at)
+	const c = classifyV2(ratings, {
+		norms,
+		pos: F.pos(ratings),
+		prospect: true,
+		ovr: F.ovr(ratings),
+	});
 	return {
 		id: c.id,
 		name: c.name,

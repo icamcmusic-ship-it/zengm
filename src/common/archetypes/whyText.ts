@@ -374,6 +374,26 @@ export const whyDrivers = ({
 			});
 		}
 	}
+	// archreview2: an honest name (v2/honest.ts) has no profile, so no drivers: his best skills so far, against players of
+	// his position
+	if (out.length === 0 && a.tags.includes("honest")) {
+		const best = (Object.keys(DIM_WORDS) as (keyof typeof DIM_WORDS)[])
+			.filter((d) => d !== "hgt" && typeof pz[d] === "number")
+			.sort((x, y) => (pz[y] ?? 0) - (pz[x] ?? 0) || (x < y ? -1 : 1))
+			.slice(0, 2);
+		for (const d of best) {
+			const [noun, group] = DIM_WORDS[d]!;
+			const s = pz[d] ?? 0;
+			out.push({
+				kind: "rating",
+				key: d,
+				group,
+				c: Math.max(s, 0.01),
+				s,
+				text: s >= 0 ? phrase(s, noun)! : `Best so far: ${noun}`,
+			});
+		}
+	}
 	return out;
 };
 

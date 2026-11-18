@@ -26,6 +26,7 @@ import {
 	SUB_NORMS_REAL_WIDE_EXPANDED,
 } from "./subStyle.ts";
 import { SUB_DEFS } from "../subRatings.ts";
+import { ratingQuantiles, type RatingQuantiles } from "./v2/gateScale.ts";
 import { parseSubZ, wideRealLean } from "../subRatingsReal.ts";
 import { realShootingSplit } from "../../worker/core/player/subRatings.ts";
 
@@ -58,7 +59,27 @@ export const realSubs = (row: any): number[] | undefined => {
 };
 // The league's own sub-ratings table for real players (subStyle.ts): a real-players league reads their shapes against
 // each other
+// archreview: the gates' scale among real players (v2/gateScale.ts): a real-players league builds it from its own players,
+// so these readings use the real players of 2016-2025 as theirs
+let realRq: RatingQuantiles | undefined;
+const realRatingQuantiles = (): RatingQuantiles => {
+	if (!realRq) {
+		const rows = realData()
+			.d.ratings.filter((row: any) => row.season >= 2016 && row.season <= 2025)
+			.map((row: any) => {
+				const r = {} as ArchetypeRatings;
+				for (const k of RATING_KEYS) {
+					r[k] = row[k];
+				}
+				return { ratings: r, ovr: ovrFn(r as any) };
+			});
+		realRq = ratingQuantiles(rows);
+	}
+	return realRq;
+};
 export const realNorms = <N extends object>(norms: N, expanded: boolean): N =>
+	realNormsSubs({ ...norms, rq: realRatingQuantiles() }, expanded);
+const realNormsSubs = <N extends object>(norms: N, expanded: boolean): N =>
 	SUBS_ON
 		? {
 				...norms,

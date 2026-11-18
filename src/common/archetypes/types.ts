@@ -206,6 +206,9 @@ export type Norms = {
 	// arch15: how the league's sub-ratings sit around their bases (subStyle.ts SubNorms; the built-in generated table when
 	// absent)
 	sub?: { mean: number[]; sd: number[] };
+	// archreview: quantiles of the raw ratings the absolute gates read, among the league's own players (v2/gateScale.ts):
+	// the gates' cutoffs are read as the same standing among them (absent: the cutoffs as they are)
+	rq?: Partial<Record<string, number[]>>;
 };
 
 // The tables a player's ratings are read against

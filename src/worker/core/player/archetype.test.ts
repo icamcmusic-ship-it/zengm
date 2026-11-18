@@ -280,7 +280,14 @@ describe("stored archetypes", () => {
 		assert.strictEqual(stored.archetypes?.length, 1);
 		const info2 = await archetypeInfoForPlayer(stored);
 		assert.strictEqual(info2!.id, info!.id);
-		assert.strictEqual(info!.why.length, 3);
+		// (the build's three strongest dimensions; archreview2: an honest name has no profile, and its why line names his
+		// best skills instead)
+		if (info!.id.startsWith("v2:h")) {
+			assert.strictEqual(info!.why.length, 0);
+		} else {
+			assert.strictEqual(info!.why.length, 3);
+		}
+		assert.isAtLeast(info!.whyBullets?.length ?? 0, 1);
 	});
 
 	test("Archetype Label Source: 2K's archetype for a real player in the list, nothing for anyone else", async () => {

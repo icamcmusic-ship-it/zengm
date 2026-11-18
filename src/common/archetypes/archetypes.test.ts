@@ -989,8 +989,11 @@ describe("targeting an archetype with the regenerator", () => {
 			// ratings seeds this lands at 99-104 exact / 104-107 loose of 160 (103 / 107 for the fixed seed above), so the
 			// floors leave ~10 players of margin rather than sitting on the mean. archv3: v2 now gives some aimed players its
 			// own role names (Glue Wing / Guard, Switch Defender), an athletic name needs his athleticism, and the family
-			// vote is weighed by each voter's measured reliability: 92 exact / 92 loose of 160 for the fixed seed
-			derivedMatch / inputs.length > 0.53 && loose / inputs.length > 0.53,
+			// vote is weighed by each voter's measured reliability: 92 exact / 92 loose of 160 for the fixed seed.
+			// archreview2: a label's words must be true in absolute terms and an elite word needs ovr 60 (v2/honest.ts): a
+			// 38-55 ovr player aimed at an elite or high-bar build is an honest name instead: 19 exact / 19 loose of 160 for the
+			// fixed seed (the regenerator aims at shapes; it does not yet aim at the absolute bars)
+			derivedMatch / inputs.length > 0.09 && loose / inputs.length > 0.09,
 			`match ${derivedMatch}/${inputs.length} loose ${loose} ${misses.join(" ")}`,
 		);
 	}, 300000);

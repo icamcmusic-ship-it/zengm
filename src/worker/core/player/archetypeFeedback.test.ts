@@ -34,6 +34,7 @@ import api from "../../api/archetypes.ts";
 import { last } from "../../../common/utils.ts";
 import { ARCHETYPE_READING_VERSION } from "../../../common/archetypes/helpers.ts";
 import { fromPickFile } from "../../../common/archetypes/tuning.ts";
+import { pickKey } from "../../../common/archetypes/v2/picks.ts";
 
 const season = 2025;
 
@@ -109,6 +110,9 @@ describe("archetype feedback", () => {
 				...(p.srID ? { srID: p.srID } : {}),
 				norms,
 				ovr: row.ovr,
+				// (archreview2: as classifyPlayer reads him: his potential and his key, the honest names' upside and seed)
+				pot: row.pot,
+				pickKey: pickKey(g.get("lid"), p.pid),
 				pos: row.pos,
 				...readOptionsFor(p, row.pos, row.season),
 			});

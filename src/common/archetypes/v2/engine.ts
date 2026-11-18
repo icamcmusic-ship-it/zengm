@@ -30,11 +30,19 @@ import { nameAt } from "../posNames.ts";
 import { ATH_NAME_RE, promiseMiss } from "../score.ts";
 import { FLOOR, RULES } from "../rulebook.data.ts";
 import { USER_2K_MAP } from "../twoK/user2kMap.data.ts";
+import {
+	ELITE_RE,
+	honestName,
+	isHonestKey,
+	skillsOf,
+	tierOf,
+} from "./honest.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
 import type { ArchetypeRatings, Classification, Pos } from "../types.ts";
 import {
 	compatible,
 	composedId,
+	ROLE_BY_KEY,
 	composeName,
 	DESC_BY_KEY,
 	DESCRIPTORS,
@@ -62,6 +70,7 @@ import {
 } from "./knn.ts";
 import {
 	floorGap,
+	gateGap,
 	RAMP_RAT,
 	lowOvrTools,
 	peerPct,
@@ -151,6 +160,14 @@ export type V2Params = {
 	prevClassic: boolean;
 	// archramp: a composed label he keeps is kept in last season's words
 	keepWords: boolean;
+	// archreview: absolute gates on every word of a name (tests.ts ABS_GATES): a name below one pays gatePen (0: no
+	// gates), and honest names (honest.ts) take over when no candidate is honest for him
+	gatePen: number;
+	// archreview2: honest names for limited players (honest.ts): the tier on ovr, the skills that clear a real bar
+	honest: boolean;
+	// archreview2 (the user: "take stat and shot tracking out of the archetype formula"): the reading uses ratings and
+	// traits only; with false, a player's box score and play types (and their shot zones) are not read at all
+	useStats: boolean;
 	// The low-ovr labels (archv5: Prospect, Depth Piece) are off (the user: "I don't want Prospect and Depth Piece
 	// anymore"): such a player is read like anyone else. true: as archv5.
 	lowOvrRoles: boolean;
@@ -217,6 +234,9 @@ export const V2_PARAMS: V2Params = {
 	prevClassic: true,
 	keepWords: true,
 	lowOvrRoles: false,
+	gatePen: 8,
+	honest: true,
+	useStats: false,
 	famSoft: 0,
 	famOutW: 0,
 	presetSoft: 0.1,
@@ -351,6 +371,8 @@ export type V2Options = ClassifyOptions & {
 	// league player's picks: picks.ts pickKey), so he never votes for himself
 	extraRefs?: readonly RefRow[];
 	pickKey?: string;
+	// archreview2: his potential (the honest names: upside is potential well above his ovr)
+	pot?: number;
 };
 
 const allowedBuild = (
@@ -375,6 +397,10 @@ export const classifyV2 = (
 	opts: V2Options = {},
 ): Classification & { v2: V2Info; also?: { id: string; name: string } } => {
 	const P = { ...V2_PARAMS, ...opts.params };
+	// (ratings and traits only: no box score, no play types)
+	if (!P.useStats && (opts.stats !== undefined || opts.pt !== undefined)) {
+		opts = { ...opts, stats: undefined, pt: undefined };
+	}
 	const norms = opts.norms ?? defaultNormsFor(ratings);
 	const prevRaw = opts.previousId;
 	const prevComposed = isComposedId(prevRaw);
@@ -829,8 +855,29 @@ export const classifyV2 = (
 	// Stretch") pays floorPen, whichever way it came (a composed name, the earlier reading's label, a build)
 	// (last season's label keeps the floors absBand looser)
 	const prevKey = prevRaw && !prevComposed ? mergedId(prevRaw) : prevRaw;
+	// (the name the label is shown as: a composed name that is a build's alias is shown as the build, "Glass-Cleaning
+	// Playmaker" as "Triple-Double Threat")
+	const shownName = (c: V2Candidate) => {
+		if (isComposedId(c.id)) {
+			return c.name;
+		}
+		const a = archetypeById(c.id);
+		return a ? nameAt(a, pos) : c.name;
+	};
+	const gatePasses = (c: V2Candidate) =>
+		gateGap(
+			shownName(c),
+			ratings,
+			opts.ovr,
+			c.id === prevKey ? P.absBand : 0,
+			norms.rq,
+		) <= 0;
 	// (archramp: the floor is a ramp: nothing `rampHi` widths above it, all of floorPen `rampLo` widths below)
 	const floorPay = (c: V2Candidate) => {
+		// (archreview: every word of the name true in absolute terms)
+		if (P.gatePen !== 0 && gatePasses(c) === false) {
+			c.score -= P.gatePen;
+		}
 		if (P.floorPen !== 0) {
 			const gap = floorGap(c.name, ratings, c.id === prevKey ? P.absBand : 0);
 			if (gap > -Infinity) {
@@ -900,6 +947,8 @@ export const classifyV2 = (
 		const preset = cands.find(
 			(c) =>
 				!isComposedId(c.id) &&
+				// (archreview: never a preset whose words he doesn't live up to)
+				(P.gatePen === 0 || gatePasses(c)) &&
 				eff(c) >= fs - P.presetMargin - (c.classic ? sure : 0),
 		);
 		if (preset) {
@@ -951,6 +1000,53 @@ export const classifyV2 = (
 			}
 		}
 	}
+	// archreview2: an honest name for a limited player (honest.ts). His tier (ovr) decides which words his name may have:
+	// elite words only from ELITE_OVR, and under MID_OVR only an honest name unless two skills clear a real bar; every word
+	// of the label must clear its gate. The reading's pick stays when it is honest for him; else the best candidate that is;
+	// else an honest name (a specialist, a developing or a depth name).
+	const tier = P.honest ? tierOf(opts.ovr) : "elite";
+	const honestFor = (c: V2Candidate) =>
+		(P.gatePen === 0 || gatePasses(c)) &&
+		(tier === "elite" || !ELITE_RE.test(shownName(c)));
+	if (P.honest) {
+		const cleared = skillsOf(ratings, norms.rq).filter(
+			(x) => x.margin >= 0,
+		).length;
+		const onlyHonest = tier === "low" && cleared <= 1;
+		if (onlyHonest || !honestFor(first)) {
+			const alt = onlyHonest
+				? undefined
+				: cands
+						.filter(honestFor)
+						.sort((x, y) => eff(y) - eff(x) || (x.canon < y.canon ? -1 : 1))[0];
+			if (alt) {
+				first = alt;
+			} else {
+				const h = honestName({
+					r: ratings,
+					group,
+					ovr: opts.ovr,
+					pot: opts.pot,
+					age: opts.age,
+					prospect: opts.prospect,
+					seed: opts.pickKey ?? opts.srID ?? `${ratings.hgt}|${ratings.stre}`,
+					rq: norms.rq,
+				});
+				const role = ROLE_BY_KEY.get(h.key)!;
+				const id = composedId(role, [], group, { [h.key]: h.name });
+				first = {
+					id,
+					name: h.name,
+					canon: id,
+					family: role.family ?? familyOfName(h.name, pos),
+					role: h.key,
+					descs: [],
+					kind: "comp",
+					score: eff(first),
+				};
+			}
+		}
+	}
 	// The runners-up: the next candidates, builds (presets) before composed names by altBuild, and the classic reading's
 	// own top builds by altClassic (archv3: what the user's 2K names most often are)
 	const altScore = (c: V2Candidate) =>
@@ -960,7 +1056,10 @@ export const classifyV2 = (
 	const rest = [
 		first,
 		...cands
-			.filter((c) => c !== first)
+			.filter(
+				(c) =>
+					c !== first && !isHonestKey(c.role) && (!P.honest || honestFor(c)),
+			)
 			.sort(
 				(x, y) => altScore(y) - altScore(x) || (x.canon < y.canon ? -1 : 1),
 			),
