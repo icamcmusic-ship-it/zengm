@@ -1572,7 +1572,11 @@ describe.skipIf(!ENABLED)("long run", () => {
 								last(p.ratings).ovr,
 								g.get("season") - p.born.year,
 								how,
-								Math.round((getCurrentContract(p)?.amount ?? 0) / 1000),
+								Math.round(
+									(getCurrentContract(p)
+										? getNearestContractAmount(getCurrentContract(p)!, s)
+										: 0) / 1000,
+								),
 							];
 						})
 						.sort((a: any, b: any) => b[0] - a[0])
