@@ -1,21 +1,15 @@
-// Gathers a player's career facts for the Hall of Fame words in common/hofStory.ts (nickname, plaque, induction speech).
+// Gathers a player's career facts for the Hall of Fame words in common/hofStory.ts (plaque, induction speech).
 import {
-	factsForDisplay,
-	generateNickname,
-	nicknameForDisplay,
 	inductionSpeech,
 	plaqueText,
 	type CareerFacts,
 	type HofTeam,
-	type StyleShape,
 } from "../../common/hofStory.ts";
 import { archetypeById } from "../../common/archetypes/index.ts";
 import { idb } from "../db/index.ts";
 import g from "./g.ts";
-import { featureOn } from "./nativeFeatures.ts";
 import { getTeamInfoBySeason } from "./getTeamInfoBySeason.ts";
 import { getHeadCoachForSeason } from "../core/staff/data.ts";
-import fuzzRating from "../core/player/fuzzRating.ts";
 import type { Player } from "../../common/types.ts";
 
 const teamNameCache = new Map<string, string>();
@@ -34,29 +28,6 @@ const proRows = (p: Player) =>
 	p.stats.filter(
 		(row: any) => row.tid >= 0 && !row.playoffs && !row.preDraft && row.gp > 0,
 	) as any[];
-
-// What he was best at, from his fuzzed ratings in his best season. Nothing under the no-visible-ratings challenge.
-export const styleShape = (p: Player): StyleShape | undefined => {
-	if (g.get("challengeNoRatings") || p.ratings.length === 0) {
-		return undefined;
-	}
-	const best = p.ratings.reduce((a, b) =>
-		(b as any).ovr > (a as any).ovr ? b : a,
-	);
-	const r = (key: string) => {
-		const v = (best as any)[key];
-		return typeof v === "number" ? fuzzRating(v, (best as any).fuzz ?? 0) : 0;
-	};
-	return {
-		dunker: r("dnk") >= 85 && r("jmp") >= 75,
-		shooter: r("tp") >= 85,
-		touch: r("ins") >= 75 && r("fg") >= 70 && r("dnk") < 75,
-		handles: r("drb") >= 85,
-		speed: r("spd") >= 88,
-		strength: r("stre") >= 85,
-		rimProtector: r("hgt") >= 70 && r("diq") >= 80,
-	};
-};
 
 export type HofContext = {
 	// Other Hall of Famers' team seasons, "tid:season" keys, for the teammate line
@@ -187,13 +158,6 @@ export const careerFacts = async (
 		facts.archetype = archetypeById(arch.id)?.name;
 	}
 
-	// Generated (or stored) either way; the "Show Player Nicknames" setting only decides whether it is shown
-	const nickname =
-		p.nickname !== undefined
-			? p.nickname || undefined
-			: generateNickname(facts, styleShape(p));
-	facts.nickname = nicknameForDisplay(nickname, featureOn("playerNicknames"));
-
 	if (!ctx.full) {
 		return facts;
 	}
@@ -290,7 +254,7 @@ export const careerFacts = async (
 	return facts;
 };
 
-// Hall of Fame words (plaque text, induction speeches, nicknames) are about basketball careers: points, rebounds and assists,
+// Hall of Fame words (plaque text, induction speeches) are about basketball careers: points, rebounds and assists,
 // shooting on a hoop. Other sports get the stock Hall of Fame page (no "0 points, 0 rebounds, 0 assists" plaque)
 export const hofWordsOn = () => __SPORT === "basketball";
 
@@ -298,10 +262,7 @@ export const hofWords = (
 	facts: CareerFacts,
 	prime?: { season: number; tid?: number; team?: string },
 ) => {
-	const f = factsForDisplay(
-		prime ? { ...facts, prime } : facts,
-		featureOn("playerNicknames"),
-	);
+	const f = prime ? { ...facts, prime } : facts;
 	return {
 		plaque: plaqueText(f),
 		speech: inductionSpeech(f),

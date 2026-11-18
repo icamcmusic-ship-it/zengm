@@ -141,7 +141,6 @@ export type HofPlaque = {
 	colors: [string, string, string];
 	jersey: string;
 	// Hall of Fame words (common/hofStory.ts)
-	nickname?: string;
 	text?: string;
 };
 
@@ -149,7 +148,6 @@ export type HofPlaque = {
 export type HofWords = {
 	pid: number;
 	name: string;
-	nickname?: string;
 	retiredYear: number;
 	plaque: string;
 	speech: string[];

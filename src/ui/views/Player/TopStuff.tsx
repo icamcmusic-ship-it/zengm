@@ -370,8 +370,6 @@ const TopStuff = ({
 	]);
 
 	const collegeLeague = useIsCollege();
-	// League Extras "Show Player Nicknames" (the worker also leaves it out while off)
-	const showNicknames = useFeatureOn("playerNicknames");
 	// College: tid FREE_AGENT means the transfer portal, no contract to negotiate
 	const freeAgent = player.tid === PLAYER.FREE_AGENT && !collegeLeague;
 	const injured = player.injury.gamesRemaining > 0;
@@ -699,15 +697,6 @@ const TopStuff = ({
 									<br />
 								</>
 							)}
-							{player.nickname && showNicknames ? (
-								<>
-									Nickname:{" "}
-									<span className="fst-italic" data-testid="player-nickname">
-										"{player.nickname}"
-									</span>
-									<br />
-								</>
-							) : null}
 							{player.archetype ? (
 								<>
 									Archetype:{" "}

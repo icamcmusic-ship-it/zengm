@@ -31,8 +31,6 @@ export default defineView({
 	load: async ({ updateEvents }) => {
 		if (
 			updateEvents.has("firstRun") ||
-			// Show Player Nicknames setting (the speeches and plaques are written with or without them)
-			updateEvents.has("gameAttributes") ||
 			(updateEvents.has("newPhase") && g.get("phase") === PHASE.DRAFT_LOTTERY)
 		) {
 			const stats = bySport({
@@ -143,7 +141,6 @@ export default defineView({
 				const entry = {
 					pid: p.pid,
 					name: `${p.firstName} ${p.lastName}`,
-					nickname: facts.nickname,
 					retiredYear: p.retiredYear,
 					...w,
 				};
@@ -164,7 +161,6 @@ export default defineView({
 						retiredYear: p.retiredYear,
 						peakOvr: Math.max(...p.ratings.map((row) => row.ovr)),
 						...prime,
-						nickname: wordsByPid.get(p.pid)?.nickname,
 						text: wordsByPid.get(p.pid)?.plaque,
 					});
 				}

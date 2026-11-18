@@ -86,14 +86,20 @@ const nativeFeatureSettings = (): Setting[] => {
 	const defs: readonly NativeFeatureDef[] = NATIVE_FEATURES;
 	for (const f of defs) {
 		const category = NATIVE_FEATURE_GROUPS[f.id] ?? "League extras";
-		out.push({
-			category,
-			key: f.key as Key,
-			name: f.name,
-			type: "bool",
-			description: f.description,
-		});
+		// (a core feature is part of the main model: every league has it, so it is no setting; its options still show)
+		if (!f.core) {
+			out.push({
+				category,
+				key: f.key as Key,
+				name: f.name,
+				type: "bool",
+				description: f.description,
+			});
+		}
 		for (const o of f.options ?? []) {
+			if (o.core) {
+				continue;
+			}
 			out.push({
 				category,
 				key: o.key as Key,

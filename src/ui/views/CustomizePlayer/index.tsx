@@ -140,18 +140,6 @@ const copyValidValues = (
 
 	target.college = source.college;
 
-	// Nickname: blank = generated from his career, "-" = none
-	{
-		const nick = (source.nickname ?? "").trim();
-		if (nick === "") {
-			delete target.nickname;
-		} else if (nick === "-") {
-			target.nickname = "";
-		} else {
-			target.nickname = nick;
-		}
-	}
-
 	const ovrByPos = bySport({
 		baseball: true,
 		basketball: false,
@@ -360,7 +348,6 @@ const useJerseyNumberConflictInfo = (
 const CustomizePlayer = (props: View<"customizePlayer">) => {
 	const regeneratorOn = useFeatureOn("ratingsRegenerator");
 	const faceAgingOn = useFeatureOn("faceAging");
-	const showNicknames = useFeatureOn("playerNicknames");
 	const { godMode, minContract, phase, season } = useLocal([
 		"godMode",
 		"minContract",
@@ -1114,30 +1101,6 @@ const CustomizePlayer = (props: View<"customizePlayer">) => {
 									</button>
 								</div>
 							</div>
-							{__SPORT === "basketball" ? (
-								<div className="col-6 mb-3">
-									<label
-										className="form-label"
-										htmlFor="customize-player-nickname"
-									>
-										Nickname
-									</label>
-									<input
-										id="customize-player-nickname"
-										type="text"
-										className="form-control"
-										placeholder="Blank: generated from his career"
-										onChange={handleChange.bind(null, "root", "nickname")}
-										value={p.nickname ?? ""}
-									/>
-									<div className="form-text">
-										Leave blank for a generated nickname, or enter - for none.
-										{showNicknames
-											? null
-											: " Nicknames are hidden while Show Player Nicknames is off (League Settings → League Extras)."}
-									</div>
-								</div>
-							) : null}
 							<div className="col-3 mb-3">
 								<label
 									className="form-label"

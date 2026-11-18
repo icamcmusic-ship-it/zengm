@@ -18,6 +18,7 @@ import {
 } from "../../common/constants.ts";
 import { hasExpandedRatings } from "../../common/expandedRatings.ts";
 import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
+import forceCoreFeatures from "../core/league/forceCoreFeatures.ts";
 import updateSubRatingsForLeague, {
 	subRatingsNeedUpdate,
 } from "../core/player/updateSubRatingsForLeague.ts";
@@ -171,6 +172,15 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 	}
 
 	await league.loadGameAttributes();
+	// The fork's main model: an older league or a league file with a core League Extra off gets it on now, once
+	// (core/league/forceCoreFeatures.ts)
+	try {
+		if ((await forceCoreFeatures()).length > 0) {
+			await idb.cache.flush();
+		}
+	} catch (error) {
+		console.error(error);
+	}
 	await initUILocalGames();
 
 	if (loadingNewLid !== newLid) {

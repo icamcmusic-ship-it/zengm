@@ -344,7 +344,6 @@ describe("Complete Profile Export", () => {
 				featureRivalryStories: g.get("featureRivalryStories" as any),
 				featureAwardVote: g.get("featureAwardVote" as any),
 				coachingStaff: g.get("coachingStaff" as any),
-				showPlayerNicknames: g.get("showPlayerNicknames" as any),
 			};
 			try {
 				await league.setGameAttributes({
@@ -353,7 +352,6 @@ describe("Complete Profile Export", () => {
 					featureRivalryStories: false,
 					featureAwardVote: false,
 					coachingStaff: false,
-					showPlayerNicknames: false,
 				} as any);
 				const some = await exportOf();
 				assert.isTrue(some.skipped.some((s) => s.key === "tracking"));
@@ -363,10 +361,6 @@ describe("Complete Profile Export", () => {
 				assert.isUndefined((some.sections.awards!.data as any).votes);
 				// Coaching Staff off: only his college coaches
 				assert.isUndefined((some.sections.coaches!.data as any).bySeason);
-				assert.isUndefined((some.sections.overview!.data as any).nickname);
-				assert.isFalse(
-					some.sections.overview!.facts.some((f) => f.label === "Nickname"),
-				);
 
 				await league.setGameAttributes({
 					featureProfileExportFull: false,

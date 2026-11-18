@@ -15,7 +15,6 @@ import {
 import { player } from "../core/index.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { archetypeInfoForPlayer } from "../core/player/archetype.ts";
-import { careerFacts } from "../util/hofStory.ts";
 import { idb } from "../db/index.ts";
 import { playerValueIndex } from "../util/valueData.ts";
 import { g, helpers } from "../util/index.ts";
@@ -219,10 +218,6 @@ export const getPlayer = async <
 
 		// Derived from his ratings, stored at each preseason (basketball)
 		archetype: await archetypeInfoForPlayer(pRaw),
-
-		// His nickname: set in God Mode, or generated from his career (common/hofStory.ts)
-		nickname:
-			__SPORT === "basketball" ? (await careerFacts(pRaw)).nickname : undefined,
 
 		// Filter out rows with no games played
 		stats: p.stats.filter((row) => (row.gp ?? 0) > 0),
