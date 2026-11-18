@@ -18,6 +18,8 @@ export type WordContext = {
 	top3: string[];
 	// archv3: his box score's standing at his position (stats.ts StatReading z), when he has minutes
 	statZ?: Partial<Record<string, number>>;
+	// archv4: whether he is a draft prospect (the Raw Athletic Handler is a prospect's name)
+	prospect?: boolean;
 };
 
 // His percentile (0-1) among players at his position in a class (the pooled rulebook table when the class has no
@@ -63,7 +65,7 @@ export type WordTest = {
 // Custom tests for words with no rulebook class (style words made measurable)
 export const CUSTOM_TESTS: Record<
 	string,
-	(ctx: WordContext, lead: boolean) => WordTest
+	(ctx: WordContext, lead: boolean, bar?: number) => WordTest
 > = {
 	// archgaps (user-approved, scratchpad/archgaps/report.md): Glue Wing / Glue Guard: perimeter D top 50% and his head
 	// skill, two of three / passing / rebounding / rim D top 50% (guard: three or passing), 3+ of the 10 classes top 50%,
@@ -117,14 +119,55 @@ export const CUSTOM_TESTS: Record<
 		);
 		return { pass: margin >= 0, margin };
 	},
+	// archv4 gap roles (the archv3 gap dump's weak clusters; their words promise what each test checks):
+	// Crafty Floater Guard: finishing top 50% at his position (and above the floor) and among his three best skills,
+	// floaters over burst (a floater lean +0.5 z with Sub-Ratings, else offensive feel +0.5 z), athleticism below the top
+	// 30%, no taller than his position's average, and no shooter's name to say first (a three below his position's top 20%)
+	floaterRole: (ctx) => {
+		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
+		const touch = ctx.style.sub
+			? ((ctx.style.sub.flt ?? 0) - 0.5) / 4
+			: ((ctx.pz.oiq ?? 0) - 0.5) / 2;
+		const margin = Math.min(
+			p("finish") - 0.5,
+			(ctx.cv.finish ?? 0) / 4,
+			touch,
+			0.7 - p("ath"),
+			-(ctx.pz.hgt ?? 0) / 2,
+			ctx.top3.includes("finish") ? 1 : -0.01,
+			0.8 - p("shoot"),
+		);
+		return { pass: margin >= 0, margin };
+	},
+	// Raw Athletic Handler: a draft prospect (a scouting word: a player in the league outgrows it, and a label he loses as
+	// he ages relabeled one in thirty players a season), athleticism top 30% and handling top 50% at his position,
+	// offensive feel below his position's average, a three below the top 50% and passing below the top 40%
+	rawHandlerRole: (ctx) => {
+		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
+		const margin = Math.min(
+			ctx.prospect ? 1 : -1,
+			p("ath") - 0.7,
+			p("handle") - 0.5,
+			(ctx.cv.ath ?? 0) / 4,
+			(ctx.cv.handle ?? 0) / 4,
+			-(ctx.pz.oiq ?? 0) / 2,
+			0.5 - p("shoot"),
+			0.6 - p("pass"),
+		);
+		return { pass: margin >= 0, margin };
+	},
 	// Crafty: offensive feel well above his position's (and, with sub-ratings, finesse over contact)
-	crafty: (ctx) => {
+	// (archv4: `bar` the learned offensive-feel bar, wordBars.data.ts)
+	crafty: (ctx, _lead, bar = CRAFTY_OIQ) => {
 		const oiq = ctx.pz.oiq ?? 0;
 		const con = ctx.style.sub?.con ?? 0;
-		const margin = Math.min((oiq - 0.5) / 2, (0.25 - con) / 2);
+		const margin = Math.min((oiq - bar) / 2, (0.25 - con) / 2);
 		return { pass: margin >= 0, margin };
 	},
 };
+
+// Crafty's offensive-feel bar (z at his position), before archv4's learned bars
+export const CRAFTY_OIQ = 0.5;
 
 // No standout: no class but his head skill(s) in his position's top (1 - GLUE_CAP) (archv3: was every class, the head
 // included, under the top 20%: a glue guy who defended well failed his own test)
@@ -188,37 +231,42 @@ const ptOk = (
 };
 
 // A concept's test, as the head of the name (lead) or a descriptor (support). `display`: the words shown, for the Sniper
-// and High-Flying whole-word bars
+// and High-Flying whole-word bars. `bar` (archv4, a descriptor only): the learned support bar (top fraction at his
+// position, wordBars.data.ts) in place of the rulebook's, and in place of the High-Flying whole-word bar for "air"; for
+// Crafty, its offensive-feel bar
 export const testConcept = (
 	concept: string,
 	lead: boolean,
 	ctx: WordContext,
 	display: string,
+	bar?: number,
 ): WordTest => {
 	const custom = CUSTOM_TESTS[concept];
 	if (custom) {
-		return custom(ctx, lead);
+		return custom(ctx, lead, lead ? undefined : bar);
 	}
-	const bar = RULES[concept];
-	if (!bar) {
+	const learned = lead ? undefined : bar;
+	const rule = RULES[concept];
+	if (!rule) {
 		return { pass: false, margin: -1 };
 	}
+	const support = learned ?? rule.support;
 	const v = (k: string) => ctx.cv[k] ?? 0;
 	const pct = (k: string) => peerPct(ctx.bucket, k, v(k));
 	let margin = Infinity;
-	const cls = bar.classes;
+	const cls = rule.classes;
 	if (cls.length > 0) {
 		// Every class at the support bar ...
-		if (bar.support < 1) {
+		if (support < 1) {
 			for (const k of cls) {
-				margin = Math.min(margin, pct(k) - (1 - bar.support));
+				margin = Math.min(margin, pct(k) - (1 - support));
 			}
 		}
 		// ... and for the head one of them at the lead bar, among his three best skills
-		if (lead && bar.lead < 1) {
+		if (lead && rule.lead < 1) {
 			margin = Math.min(
 				margin,
-				Math.max(...cls.map((k) => pct(k) - (1 - bar.lead))),
+				Math.max(...cls.map((k) => pct(k) - (1 - rule.lead))),
 			);
 			const head = cls.filter((k) => SKILL_CLASS_KEYS.includes(k));
 			if (head.length > 0 && !head.some((k) => ctx.top3.includes(k))) {
@@ -230,8 +278,8 @@ export const testConcept = (
 			margin = Math.min(margin, (v(k) - FLOOR) / 4);
 		}
 	}
-	margin = Math.min(margin, subOk(bar.sub, ctx.style) / 4);
-	margin = Math.min(margin, ptOk(bar.pt, ctx.style) / 4);
+	margin = Math.min(margin, subOk(rule.sub, ctx.style) / 4);
+	margin = Math.min(margin, ptOk(rule.pt, ctx.style) / 4);
 	if (WORD_RULES.sniper.re.test(display)) {
 		const s = WORD_RULES.sniper;
 		margin = Math.min(
@@ -245,7 +293,7 @@ export const testConcept = (
 		const s = WORD_RULES.air;
 		margin = Math.min(
 			margin,
-			pct(s.cls) - (1 - s.bar),
+			pct(s.cls) - (1 - (concept === "air" && learned ? learned : s.bar)),
 			subOk(s.sub, ctx.style) / 4,
 		);
 	}

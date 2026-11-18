@@ -62,6 +62,7 @@ import { peerPct, testConcept, topSkills, type WordContext } from "./tests.ts";
 import { VOTER_REL, type Voter } from "./voters.data.ts";
 import { refsFromPicks } from "./picks.ts";
 import { USER_PICKS } from "./userPicks.data.ts";
+import { CONF_CAL } from "./confCal.data.ts";
 
 export type V2Params = {
 	// Family score: the voters weighed by their reliability (archv3), neighbours' share, the classic label's family, the
@@ -99,12 +100,20 @@ export type V2Params = {
 	glueWing: number;
 	glueGuard: number;
 	switchDefender: number;
+	// archv4 gap roles' head starts (their tests' margins are small by construction; nobody labeled votes for them yet)
+	floaterGuard: number;
+	rawHandler: number;
 	// Last season's family's head start
 	famHyst: number;
 	// What a candidate outside the voted family pays (its family's vote is already in its score; Infinity: the voted
 	// family's candidates only, as before archv3)
 	famOut: number;
 	altClassic: number;
+	// archv4: the runner-up is shown ("also") when its score is within this of the label's (0: never)
+	alsoMargin: number;
+	// archv4: the shown confidence is calibrated (confCal.data.ts: the chance his label's family is right, from how far his
+	// family's vote leads) instead of the margin to the runner-up
+	confCal: boolean;
 	// Use the neighbours' display words
 	words: boolean;
 	k: number;
@@ -134,8 +143,12 @@ export const V2_PARAMS: V2Params = {
 	glueWing: 2,
 	glueGuard: 1.4,
 	switchDefender: 1.5,
+	floaterGuard: 2.5,
+	rawHandler: 2.5,
 	famHyst: 1,
 	altClassic: 1,
+	alsoMargin: 0.15,
+	confCal: true,
 	words: true,
 	k: 15,
 };
@@ -208,7 +221,12 @@ export type V2Candidate = {
 export type V2Info = {
 	family: Family;
 	agreed: boolean;
-	voters: { classic: Family; knn?: Family; rule?: Family; probs?: Family };
+	voters: {
+		classic: Family;
+		knn?: Family;
+		rule?: Family;
+		probs?: Family;
+	};
 	famScore: Record<Family, number>;
 	candidates: V2Candidate[];
 	composed: boolean;
@@ -254,7 +272,7 @@ const allowedBuild = (
 export const classifyV2 = (
 	ratings: ArchetypeRatings,
 	opts: V2Options = {},
-): Classification & { v2: V2Info } => {
+): Classification & { v2: V2Info; also?: { id: string; name: string } } => {
 	const P = { ...V2_PARAMS, ...opts.params };
 	const norms = opts.norms ?? defaultNormsFor(ratings);
 	const prevRaw = opts.previousId;
@@ -292,11 +310,13 @@ export const classifyV2 = (
 		pz: s.pz as unknown as Record<string, number>,
 		top3: topSkills(bucket, cv),
 		statZ: opts.stats?.z,
+		prospect: opts.prospect,
 	};
 	const order = topSkills(bucket, cv, 10);
 
 	// The neighbours
-	const votes = knnVotes(standardize(FEAT_FROM_FAMX(s.famX), bucket), bucket, {
+	const xStd = standardize(FEAT_FROM_FAMX(s.famX), bucket);
+	const votes = knnVotes(xStd, bucket, {
 		k: P.k,
 		...opts.knn,
 		exclude: [
@@ -381,6 +401,8 @@ export const classifyV2 = (
 			P.fC * (classicFam === f ? 1 : 0) +
 			P.fR * (ruleFam === f ? 1 : 0);
 	}
+	// (archv4: the calibrated confidence reads the vote before last season's head start)
+	const famLead = Object.values(famScore).sort((x, y) => y - x);
 	// (archv3: last season's family is kept a little: his family moves only when the vote moves clearly)
 	if (prevRaw && P.famHyst !== 0) {
 		const pa = archetypeById(prevComposed ? prevRaw : mergedId(prevRaw));
@@ -448,7 +470,11 @@ export const classifyV2 = (
 					? P.glueGuard
 					: r.key === "switchDefender"
 						? P.switchDefender
-						: 0);
+						: r.key === "floaterGuard"
+							? P.floaterGuard
+							: r.key === "rawHandler"
+								? P.rawHandler
+								: 0);
 		for (const c of combos) {
 			const pk = pickFor(r, pick, c);
 			const name = composeName(r, c, group, pk);
@@ -683,8 +709,29 @@ export const classifyV2 = (
 	if (!agreedFam) {
 		confidence *= 0.5;
 	}
+	if (P.confCal) {
+		const best = famLead[0] ?? 0;
+		confidence =
+			1 /
+			(1 +
+				Math.exp(
+					-(
+						CONF_CAL.a +
+						CONF_CAL.best * best +
+						CONF_CAL.lead * (best - (famLead[1] ?? 0))
+					),
+				));
+	}
 	const a = archetypeById(first.id)!;
 	const isClassic = first.id === classic.id;
+	// archv4: the runner-up, when it is close
+	const alsoC =
+		P.alsoMargin > 0 &&
+		second &&
+		second.canon !== first.canon &&
+		eff(first) - eff(second) < P.alsoMargin
+			? second
+			: undefined;
 	return {
 		...classic,
 		id: a.id,
@@ -701,6 +748,7 @@ export const classifyV2 = (
 			? classic.why
 			: explain(a.id, ratings, norms, { ...read, pos }),
 		...(isComposedId(a.id) ? { custom: true } : {}),
+		...(alsoC ? { also: { id: alsoC.id, name: alsoC.name } } : {}),
 		v2: {
 			family,
 			agreed: !!agreedFam,

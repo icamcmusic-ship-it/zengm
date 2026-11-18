@@ -23,6 +23,8 @@ export type ArchetypeLabelInfo = {
 	// "2K labels when known": the game's label (the shown label is 2K's)
 	twoK?: string;
 	gameLabel?: string;
+	// archv4: the runner-up, only when it is close (a small "Also:" line in the popover, nowhere else)
+	also?: string;
 };
 
 export const GroupDot = ({ group }: { group: ArchetypeGroup }) => (
@@ -63,6 +65,7 @@ export const ArchetypeWhy = ({
 		| "season"
 		| "live"
 		| "gameLabel"
+		| "also"
 	>;
 }) => (
 	<div className="archetype-popover">
@@ -72,6 +75,9 @@ export const ArchetypeWhy = ({
 			</p>
 		) : null}
 		<p className="mb-2">{info.desc}</p>
+		{info.also ? (
+			<p className="mb-2 small text-body-secondary">Also: {info.also}</p>
+		) : null}
 		{info.whyBullets && info.whyBullets.length > 0 ? (
 			<>
 				<div className="fw-bold">Why</div>

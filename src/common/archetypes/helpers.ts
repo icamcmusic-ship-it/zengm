@@ -55,8 +55,9 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // archv2: 17 (the v2 engine is the only one: compositional names, family vote, gap builds; current labels are read
 // again at once, past seasons' stay); archv3: 18 (the neighbours' table read right, the voters weighed by reliability,
 // the user's picks as labeled players, Glue roles, Switch Defender and the user's batch-4 names, composed ids without
-// empty parts)
-export const ARCHETYPE_READING_VERSION = 18;
+// empty parts); archv4: 19 (the Crafty Floater Guard and Raw Athletic Handler roles, the calibrated confidence and the
+// close runner-up stored for the popover)
+export const ARCHETYPE_READING_VERSION = 19;
 
 export const toStored = (
 	season: number,
@@ -71,6 +72,9 @@ export const toStored = (
 		out.tier = c.tier;
 	}
 	out.conf = Math.round(c.confidence * 100);
+	if (c.also) {
+		out.also = c.also.id;
+	}
 	return out;
 };
 
@@ -84,6 +88,8 @@ export type ArchetypeView = {
 	tier?: Tier;
 	conf?: number;
 	season: number;
+	// archv4: the close runner-up's name at his position
+	also?: string;
 };
 
 // A stored entry as the UI shows it; null if its archetype no longer exists (an id from an older version), or, given his
@@ -126,6 +132,7 @@ export const viewOf = (
 	}
 	// arch15: the name at his position (posNames.ts)
 	const name = nameAt(a, pos);
+	const alsoA = e.also ? archetypeById(mergedId(e.also)) : undefined;
 	return {
 		id: a.id,
 		name,
@@ -136,6 +143,7 @@ export const viewOf = (
 		tier: e.tier,
 		conf: e.conf,
 		season: e.season,
+		...(alsoA && alsoA.id !== a.id ? { also: nameAt(alsoA, pos) } : {}),
 	};
 };
 

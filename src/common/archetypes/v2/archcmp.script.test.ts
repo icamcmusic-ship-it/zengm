@@ -31,7 +31,8 @@ import {
 import { judgedPlayers } from "../fit.script.test.ts";
 import { userPlayers } from "../twoK/user2k.script.test.ts";
 import { canonOf, classifyV2, V2_PARAMS } from "./engine.ts";
-import { familyOfName, parseName } from "./grammar.ts";
+import { DESCRIPTORS, familyOfName, GROUP_OF, parseName } from "./grammar.ts";
+import { testConcept, topSkills } from "./tests.ts";
 import {
 	BUCKET_OF,
 	FEAT_FROM_FAMX,
@@ -53,6 +54,41 @@ const ratingsOfRow = (row) => {
 	return r;
 };
 
+// archv4 (ARCHCMP_WORDS=1): each descriptor's test at a grid of bars (words.py learns the bars from the user's 2K names):
+// a string per descriptor, "1" where he passes at that bar, "-" where the word is not for his position group
+export const WORD_GRID = [
+	0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7,
+];
+export const CRAFTY_GRID = [
+	-0.25, 0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3,
+];
+const wordTests = (s, stats) => {
+	const bucket = BUCKET_OF[s.pos];
+	const group = GROUP_OF[s.pos];
+	const ctx = {
+		cv: s.cv,
+		style: s.style,
+		bucket,
+		pz: s.pz,
+		top3: topSkills(bucket, s.cv),
+		statZ: stats?.z,
+	};
+	const out = {};
+	for (const d of DESCRIPTORS) {
+		if (d.groups && !d.groups.includes(group)) {
+			out[d.key] = "-";
+			continue;
+		}
+		const grid = d.concept === "crafty" ? CRAFTY_GRID : WORD_GRID;
+		out[d.key] = grid
+			.map((b) =>
+				testConcept(d.concept, false, ctx, d.names[0], b).pass ? "1" : "0",
+			)
+			.join("");
+	}
+	return out;
+};
+
 const reading = (p, extra) => {
 	const read = {
 		norms: p.norms,
@@ -71,7 +107,14 @@ const reading = (p, extra) => {
 		read.traits,
 		read,
 	);
-	const c = classifyV2(p.ratings, { ...read, ...extra });
+	const c = classifyV2(p.ratings, {
+		...read,
+		...extra,
+		// (archv4: ARCH_V2_PARAMS overrides v2's parameters)
+		...(process.env.ARCH_V2_PARAMS
+			? { params: JSON.parse(process.env.ARCH_V2_PARAMS) }
+			: {}),
+	});
 	const v = c.v2;
 	return {
 		pos: s.pos,
@@ -82,9 +125,14 @@ const reading = (p, extra) => {
 		ratings: Object.fromEntries(RATING_KEYS.map((k) => [k, p.ratings[k]])),
 		sub: p.ratings.sub ?? null,
 		statZ: p.stats?.z ?? null,
+		...(process.env.ARCHCMP_WORDS ? { wt: wordTests(s, p.stats) } : {}),
 		v2: {
 			id: c.id,
 			name: c.name,
+			conf: c.confidence,
+			also: c.also ?? null,
+			agreed: v.agreed,
+			alternates: c.alternates,
 			family: v.family,
 			famScore: v.famScore,
 			voters: v.voters,
@@ -231,6 +279,7 @@ test.skipIf(!process.env.RUN_ARCHCMP)(
 			return;
 		}
 		const rows = [];
+		const data = realData();
 		for (const x of userPlayers()) {
 			const p = {
 				...x.p,
@@ -238,10 +287,10 @@ test.skipIf(!process.env.RUN_ARCHCMP)(
 				age: x.read.age,
 				stats: x.read.stats,
 			};
-			const extra =
-				x.split === "test"
-					? { srID: p.slug, knn: { tuneOnly: true } }
-					: { srID: p.slug };
+			const extra = {
+				srID: p.slug,
+				...(x.split === "test" ? { knn: { tuneOnly: true } } : {}),
+			};
 			const rd = reading(p, extra);
 			rows.push({
 				key: p.slug,
@@ -255,7 +304,6 @@ test.skipIf(!process.env.RUN_ARCHCMP)(
 				...rd,
 			});
 		}
-		const data = realData();
 		for (const jp of judgedPlayers(false, NORMS)) {
 			let p;
 			if (jp.j.slug) {
@@ -285,10 +333,10 @@ test.skipIf(!process.env.RUN_ARCHCMP)(
 				};
 			}
 			const key = jp.j.slug ?? jp.j.key;
-			const extra =
-				jp.j.split === "test"
-					? { srID: key, knn: { tuneOnly: true } }
-					: { srID: key };
+			const extra = {
+				srID: key,
+				...(jp.j.split === "test" ? { knn: { tuneOnly: true } } : {}),
+			};
 			const rd = reading(p, extra);
 			const names = jp.j.ids
 				.map(mergedId)

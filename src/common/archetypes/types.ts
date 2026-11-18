@@ -278,6 +278,8 @@ export type Classification = {
 	tags: string[];
 	// The next closest builds ("also close to"), never part of the label
 	alternates: { id: string; name: string }[];
+	// archv4: the runner-up when it is close (v2 params.alsoMargin), shown as a small "Also:" line in the popover
+	also?: { id: string; name: string };
 	// 0..1: how similar the shape of his ratings is to the build's profile (absolute, see POOR_FIT in classify.ts)
 	score: number;
 	// How exceptional that fit is among the league's players the build allows, with the name's floors applied (z)
@@ -311,6 +313,8 @@ export type StoredArchetype = {
 	tier?: Tier;
 	// Confidence in percent
 	conf?: number;
+	// archv4: the runner-up's id when it was close (shown as "Also:" in the archetype popover only)
+	also?: string;
 	// The reading's version (ARCHETYPE_READING_VERSION) when it was stored: an entry from an older reading is read again
 	v?: number;
 };
