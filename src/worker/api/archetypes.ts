@@ -537,14 +537,22 @@ export const reviewQueue = async ({
 	);
 	const skipped = new Set(skip);
 	const norms = await getLeagueNorms();
+	// (of the draft prospects, the next class only: the later ones are years from the league)
+	const undrafted = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		PLAYER.UNDRAFTED,
+	);
+	const nextClass = Math.min(...undrafted.map((p) => p.draft.year));
 	const raw = [
 		...(await idb.cache.players.indexGetAll("playersByTid", [
 			PLAYER.FREE_AGENT,
 			Infinity,
 		])),
-		...(await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)),
+		...undrafted.filter((p) => p.draft.year === nextClass),
 	];
 	const open: {
+		// Players on a team first, then the draft class, then free agents: the ones the user knows best
+		tier: number;
 		pid: number;
 		conf: number;
 		ovr: number;
@@ -566,6 +574,7 @@ export const reviewQueue = async ({
 			continue;
 		}
 		open.push({
+			tier: p.tid >= 0 ? 0 : p.tid === PLAYER.UNDRAFTED ? 1 : 2,
 			pid: p.pid,
 			conf: found.view.conf ?? 50,
 			ovr: row.ovr ?? 0,
@@ -573,8 +582,11 @@ export const reviewQueue = async ({
 			family: familyNameOf(found.view.id),
 		});
 	}
-	// Least sure first (then the better player: the one the user is more likely to know)
-	open.sort((a, b) => a.conf - b.conf || b.ovr - a.ovr || a.pid - b.pid);
+	// Within each, least sure first (then the better player)
+	open.sort(
+		(a, b) =>
+			a.tier - b.tier || a.conf - b.conf || b.ovr - a.ovr || a.pid - b.pid,
+	);
 	const chosen: typeof open = [];
 	const labels = new Set<string>();
 	const perFamily = new Map<string, number>();

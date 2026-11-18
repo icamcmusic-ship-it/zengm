@@ -62,8 +62,9 @@ export const ArchetypeReviewQueue = () => {
 			<div className="card-body">
 				<h2 className="h5 card-title">Check labels</h2>
 				<p className="mb-2">
-					Does the label fit the player? The ones the reading is least sure of
-					come first. Your answers teach it how you see players like them.
+					Does the label fit the player? Players on teams come first, the ones
+					the reading is least sure of at the top. Your answers teach it how you
+					see players like them.
 				</p>
 				<p className="mb-3">
 					{stats.judged === 0 ? (
