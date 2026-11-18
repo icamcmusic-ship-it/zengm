@@ -331,6 +331,27 @@ export const RULES: Record<string, Bar> = {
 		lead: 0.5,
 		support: 0.5,
 	},
+	// archv5 (the user's labels): words whose tests read his ratings themselves (v2/tests.ts paintBeastRole,
+	// interiorForceRole, offGuardRole, prospectRole / depthPieceRole); they promise no class on the blended reading
+	interior: {
+		words:
+			"Interior Force, Paint Beast (inside, no jumper: absolute size, strength, rebounding or finishing)",
+		classes: [],
+		lead: 1,
+		support: 1,
+	},
+	offMind: {
+		words: "Offensive-Minded (a scoring tool, no defense)",
+		classes: [],
+		lead: 1,
+		support: 1,
+	},
+	lowOvr: {
+		words: "Prospect, Depth Piece (no skill good in absolute terms)",
+		classes: [],
+		lead: 1,
+		support: 1,
+	},
 };
 
 // Words matched on the whole name rather than a concept, with a raised bar (they also raise the promise: score.ts)

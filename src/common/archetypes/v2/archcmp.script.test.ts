@@ -199,6 +199,23 @@ const uncertain = async () => {
 	} finally {
 		Math.random = orig;
 	}
+	// archv5 (ARCHCMP_PLAYERS="118,20,..."): those players' snapshots (ratings with sub-ratings, position, age, ovr), the
+	// inputs of the user's labels of them (userPicks.data.ts)
+	if (process.env.ARCHCMP_PLAYERS) {
+		const want = process.env.ARCHCMP_PLAYERS.split(",").map(Number);
+		const snaps = want.map((n) => {
+			const p = ps[n - 1];
+			return {
+				n,
+				name: p.name,
+				pos: p.pos,
+				age: p.age,
+				ovr: p.ovr,
+				ratings: p.ratings,
+			};
+		});
+		writeFileSync(`${OUT}/players.json`, JSON.stringify(snaps));
+	}
 	const out = [];
 	for (const p of ps) {
 		const c = classifyV2(p.ratings, { norms: NORMS, pos: p.pos, age: p.age });

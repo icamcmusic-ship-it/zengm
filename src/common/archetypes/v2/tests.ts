@@ -5,7 +5,7 @@
 import { FLOOR, PT_MIN_W, RULES, WORD_RULES } from "../rulebook.data.ts";
 import { pctOf, SKILL_CLASS_KEYS } from "../rulebook.ts";
 import type { StyleReading } from "../subStyle.ts";
-import type { PosBucket } from "../types.ts";
+import type { ArchetypeRatings, PosBucket } from "../types.ts";
 import { PEER_QUANTILES } from "./peers.data.ts";
 
 export type WordContext = {
@@ -20,6 +20,133 @@ export type WordContext = {
 	statZ?: Partial<Record<string, number>>;
 	// archv4: whether he is a draft prospect (the Raw Athletic Handler is a prospect's name)
 	prospect?: boolean;
+	// archv5: his ratings themselves (the absolute tests: the user's labels read skills in absolute terms) and his age
+	r?: ArchetypeRatings;
+	age?: number;
+	// (the low-ovr test's cap and one-tool age, engine.ts V2Params lowCap / lowYoung)
+	lowCap?: number;
+	lowYoung?: number;
+	toolCap?: number;
+	toolMin?: number;
+	// (hysteresis on the absolute tests: for last season's label, every rating bar is relaxed by this many points and the
+	// age bars by two years; engine.ts V2Params absBand)
+	band?: number;
+};
+
+// ---- archv5: absolute tests (the user's labels of the archcmp sample: "41 3PT is way too low for Stretch", "52 3PT too
+// low for true 3&D", "no rating above 52 ... Prospect") ----
+
+// Absolute floors on the words of a name (a build's, a 2K alias's or a composed one): every holder of the word has at
+// least this rating, whatever his standing at his position. Calibrated on the user's labels and the user's 2K list
+// (scratchpad archv5/floors.txt).
+export const ABS_FLOORS: {
+	key: string;
+	re: RegExp;
+	rating: "tp";
+	min: number;
+}[] = [
+	// (a big who spaces the floor)
+	{ key: "stretch", re: /Stretch|Popper|Pick & Pop/, rating: "tp", min: 45 },
+	// (an elite shooter's words: rulebook.data.ts WORD_RULES.sniper)
+	{
+		key: "sniper",
+		re: /Snip|Sharp|Laser|Automatic|Logo|Big Range|Silk/,
+		rating: "tp",
+		min: 55,
+	},
+	// (a true 3-and-D player)
+	{ key: "threeD", re: /3 & D/, rating: "tp", min: 53 },
+	// (the other shooting words)
+	{
+		key: "threePt",
+		re: /3PT|Catch & Shoot|Off-Screen|Splash|Shooter\b|Gunner|Bomber/,
+		rating: "tp",
+		min: 50,
+	},
+];
+// (a Paint Beast or an Interior Force is not a rim protector or a rebounder first of all: his shot blocking and rebounding
+// stand below ANCHOR_PZ at his position (z: Gobert, Mutombo, Howard keep their anchor and glass names))
+export const ANCHOR_PZ = 1;
+const notAnchor = (ctx: WordContext) =>
+	Math.min(1, (ANCHOR_PZ - Math.max(ctx.pz.blk ?? 0, ctx.pz.reb ?? 0)) / 2);
+// (a Paint Beast's jumper: at most these)
+export const PAINT_BEAST_TP = 35;
+export const PAINT_BEAST_FG = 45;
+// How far below the absolute floors of its words a name is for him (0: every floor kept)
+export const floorMiss = (
+	name: string,
+	r: ArchetypeRatings | undefined,
+	band = 0,
+): number => {
+	if (!r) {
+		return 0;
+	}
+	let m = 0;
+	for (const f of ABS_FLOORS) {
+		if (f.re.test(name)) {
+			m = Math.max(m, f.min - band - (r[f.rating] ?? 0));
+		}
+	}
+	return m;
+};
+
+// The low-ovr label (the user: "no rating above 52 ... Prospect", "Glass-Cleaning Prospect"): no skill good in absolute
+// terms. His skill ratings (not size or the physical ones) are all at most LOW_OVR_CAP; a young player
+// (LOW_OVR_YOUNG or younger) may instead have one tool above LOW_OVR_TOOL with every other skill at most that, and his
+// name then says it ("Glass-Cleaning Prospect"). Never a draft prospect (all of them would be one: their label says what
+// kind of prospect).
+export const LOW_OVR_KEYS = [
+	"ins",
+	"dnk",
+	"ft",
+	"fg",
+	"tp",
+	"oiq",
+	"diq",
+	"drb",
+	"pss",
+	"reb",
+] as const;
+export const LOW_OVR_CAP = 50;
+export const LOW_OVR_YOUNG = 21;
+// (a young player's one tool is above this, and his other skills at most it; the tool itself at least LOW_OVR_TOOL_MIN:
+// a real standout, not a rating that grows past the cap next season)
+export const LOW_OVR_TOOL = 52;
+export const LOW_OVR_TOOL_MIN = 60;
+// "Prospect" up to this age, "Depth Piece" after (the user called a 27-year-old with no tool a Prospect)
+export const PROSPECT_MAX_AGE = 27;
+// His tools: the skill ratings above the cap, best first
+export const lowOvrTools = (r: ArchetypeRatings, cap = LOW_OVR_TOOL) =>
+	LOW_OVR_KEYS.filter((k) => (r[k] ?? 0) > cap).sort(
+		(x, y) => (r[y] ?? 0) - (r[x] ?? 0),
+	);
+const lowOvr = (ctx: WordContext, young: boolean): WordTest => {
+	const r = ctx.r;
+	if (!r || ctx.prospect) {
+		return { pass: false, margin: -1 };
+	}
+	const age = ctx.age;
+	const band = ctx.band ?? 0;
+	const ageBand = band > 0 ? 2 : 0;
+	const ageOk = young
+		? age !== undefined && age <= PROSPECT_MAX_AGE + ageBand
+		: age === undefined || age > PROSPECT_MAX_AGE - ageBand;
+	const vals = LOW_OVR_KEYS.map((k) => r[k] ?? 0).sort((x, y) => y - x);
+	// (no skill above the cap; or, for a young player, one tool above LOW_OVR_TOOL and every other skill at most that)
+	const toolCap = (ctx.toolCap ?? LOW_OVR_TOOL) + band;
+	const oneTool =
+		young &&
+		age !== undefined &&
+		age <= (ctx.lowYoung ?? LOW_OVR_YOUNG) + ageBand &&
+		vals[0]! > toolCap &&
+		vals[0]! >= (ctx.toolMin ?? LOW_OVR_TOOL_MIN) - band;
+	const margin = Math.min(
+		ageOk ? 1 : -1,
+		oneTool
+			? (toolCap + 0.5 - vals[1]!) / 10
+			: ((ctx.lowCap ?? LOW_OVR_CAP) + band + 0.5 - vals[0]!) / 10,
+	);
+	return { pass: margin >= 0, margin };
 };
 
 // His percentile (0-1) among players at his position in a class (the pooled rulebook table when the class has no
@@ -153,6 +280,72 @@ export const CUSTOM_TESTS: Record<
 			-(ctx.pz.oiq ?? 0) / 2,
 			0.5 - p("shoot"),
 			0.6 - p("pass"),
+		);
+		return { pass: margin >= 0, margin };
+	},
+	// archv5 (the user's labels): the low-ovr roles (lowOvr above)
+	prospectRole: (ctx) => lowOvr(ctx, true),
+	depthPieceRole: (ctx) => lowOvr(ctx, false),
+	// Paint Beast: an interior scorer with no jumper: finishing (dunk or inside) 55+ and among his two best skills, over any
+	// shot by 10, no jumper (a three at most PAINT_BEAST_TP, a mid-range at most PAINT_BEAST_FG), size (height 50+) or power (strength 60+), and finishing top 50% at his
+	// position (the user: "pure athletic rim-runner, zero shooting"; "Diming Paint Beast" with a playmaking word)
+	paintBeastRole: (ctx) => {
+		const r = ctx.r;
+		if (!r) {
+			return { pass: false, margin: -1 };
+		}
+		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
+		const b = ctx.band ?? 0;
+		const fin = Math.max(r.dnk ?? 0, r.ins ?? 0) + b;
+		// (finishing among his two best skills: LOW_OVR_KEYS, his size and athleticism aside)
+		const second = LOW_OVR_KEYS.filter((k) => k !== "dnk" && k !== "ins")
+			.map((k) => r[k] ?? 0)
+			.sort((x, y) => y - x)[1]!;
+		const margin = Math.min(
+			(fin - 55) / 10,
+			(fin - second) / 10,
+			(fin - Math.max(r.tp ?? 0, r.fg ?? 0) - 10) / 10,
+			(PAINT_BEAST_TP + b - (r.tp ?? 0)) / 10,
+			(PAINT_BEAST_FG + b - (r.fg ?? 0)) / 10,
+			Math.max((r.hgt ?? 0) - 50, (r.stre ?? 0) + b - 60) / 10,
+			p("finish") - 0.5,
+			(ctx.cv.finish ?? 0) / 4,
+			notAnchor(ctx),
+		);
+		return { pass: margin >= 0, margin };
+	},
+	// Interior Force: size and strength (both 55+) and rebounding 55+, no jumper (three and mid-range at most 45), and no
+	// finishing tool (then he is a Paint Beast) (the user: "reb 60, hgt 59, stre 58; 41 3PT rules out Stretch")
+	interiorForceRole: (ctx) => {
+		const r = ctx.r;
+		if (!r) {
+			return { pass: false, margin: -1 };
+		}
+		const b = ctx.band ?? 0;
+		const margin = Math.min(
+			((r.hgt ?? 0) + b - 55) / 10,
+			((r.stre ?? 0) + b - 55) / 10,
+			((r.reb ?? 0) + b - 55) / 10,
+			(45 + b - (r.tp ?? 0)) / 10,
+			(45 + b - (r.fg ?? 0)) / 10,
+			(54.5 + b - Math.max(r.dnk ?? 0, r.ins ?? 0)) / 10,
+			notAnchor(ctx),
+		);
+		return { pass: margin >= 0, margin };
+	},
+	// Offensive-Minded Guard: a scoring tool (mid-range, three or handle 60+) and no defense (defensive IQ at most 35,
+	// perimeter D below his position's top 70%) (the user: "79 FG, 61 TP, 66 DRB, no defense (25 DIQ)")
+	offGuardRole: (ctx) => {
+		const r = ctx.r;
+		if (!r) {
+			return { pass: false, margin: -1 };
+		}
+		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
+		const b = ctx.band ?? 0;
+		const margin = Math.min(
+			(Math.max(r.fg ?? 0, r.tp ?? 0, r.drb ?? 0) + b - 60) / 10,
+			(35 + b - (r.diq ?? 0)) / 10,
+			0.3 - p("perD"),
 		);
 		return { pass: margin >= 0, margin };
 	},

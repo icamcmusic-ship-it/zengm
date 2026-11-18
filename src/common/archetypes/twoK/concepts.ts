@@ -410,6 +410,30 @@ export const CONCEPTS: Concept[] = [
 		tag: "athletic",
 		phrase: "brings energy at the rim on both ends",
 	},
+	// archv5 (the user's labels of the archcmp sample; v2 roles with absolute tests, v2/tests.ts): an interior player with
+	// no jumper ("Paint Beast", "Interior Force"), a scoring guard who does not defend, a player with no skill good in
+	// absolute terms ("Prospect", "Depth Piece")
+	{
+		key: "interior",
+		re: /Interior Force|Beast/,
+		w: { fin: 1.5, reb: 1.5, three: -1 },
+		family: "skilled",
+		phrase: "plays inside with no jumper",
+	},
+	{
+		key: "offMind",
+		re: /Offensive-Minded/,
+		w: { usg: 1.5, diq: -1.5 },
+		family: "scorer",
+		phrase: "looks for his shot and gives little on defense",
+	},
+	{
+		key: "lowOvr",
+		re: /Prospect|Depth Piece/,
+		w: {},
+		family: "balanced",
+		phrase: "has no skill that is good yet",
+	},
 ];
 
 // What a name says, in the order the name says it

@@ -56,8 +56,9 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // again at once, past seasons' stay); archv3: 18 (the neighbours' table read right, the voters weighed by reliability,
 // the user's picks as labeled players, Glue roles, Switch Defender and the user's batch-4 names, composed ids without
 // empty parts); archv4: 19 (the Crafty Floater Guard and Raw Athletic Handler roles, the calibrated confidence and the
-// close runner-up stored for the popover)
-export const ARCHETYPE_READING_VERSION = 19;
+// close runner-up stored for the popover); archv5: 20 (the user's labels of the archcmp sample: absolute floors on shooting
+// words, the low-ovr Prospect / Depth Piece label, Paint Beast, Interior Force, Offensive-Minded Guard and his wording)
+export const ARCHETYPE_READING_VERSION = 20;
 
 export const toStored = (
 	season: number,

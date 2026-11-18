@@ -9,7 +9,7 @@
 //   uniform rating shift, share caps, generic share, poor fit, position conflicts, name promises and the notable players,
 //   for both engines. ARCH_V2_PARAMS='{"fK":1,...}' overrides the engine's parameters; ARCH_V2_QUICK=1 only the accuracy.
 // - tune: a small grid of the engine's parameters scored on the tune split (leave-one-out), to pick V2_PARAMS
-import { writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { test } from "vitest";
 import { DEFAULT_LEVEL } from "../../budgetLevels.ts";
 import { Rng } from "../../ratingsBuilds/rng.ts";
@@ -395,6 +395,180 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 			}
 			return;
 		}
+		if (MODE === "labels") {
+			// archv5: the user's labels of the archcmp sample (userPicks.data.ts "archcmp-" picks) read leave-one-out (his own
+			// pick never votes for him): the label against the user's
+			const { USER_PICKS } = await import("./userPicks.data.ts");
+			const out = [JSON.stringify(PARAMS ?? {})];
+			let ok = 0,
+				fam = 0,
+				n = 0;
+			for (const pk of USER_PICKS.filter((x) => x.uid.startsWith("archcmp-"))) {
+				const p = pk.input;
+				const want = nameAt(archetypeById(mergedId(pk.picked)), p.pos);
+				const c = classifyV2(p.ratings, {
+					norms: NORMS,
+					pos: p.pos,
+					age: p.age,
+					params: PARAMS,
+					srID: `upick:${pk.uid}`,
+				});
+				n++;
+				const hit = c.id === mergedId(pk.picked);
+				if (hit) ok++;
+				const fw = familyOfName(want, p.pos);
+				const fc = familyOfName(c.name, p.pos);
+				if (fw === fc) fam++;
+				out.push(
+					`${pk.name} ${p.pos} age ${p.age} ovr ${p.ovr}: user ${pk.label}${want !== pk.label ? ` (= ${want})` : ""} | now ${c.name}${hit ? " OK" : fw === fc ? " (same family)" : ""}; runners-up ${c.alternates.map((x) => x.name).join(", ")}`,
+				);
+			}
+			out.push(`as labeled ${ok}/${n}, same family ${fam}/${n}`);
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
+		if (MODE === "promise") {
+			// archv5: the draft prospects whose label breaks a promise
+			const pros = (await genPlayers(1000, "metrics-pros", 19, 19, 40)).map(
+				(p) => ({ ...p, prospect: true, age: undefined }),
+			);
+			const out = [];
+			for (const p of pros) {
+				const res = ENGINES.v2(p);
+				const s = scoreAll(
+					p.ratings,
+					p.norms,
+					ARCHETYPES,
+					p.pos,
+					undefined,
+					readOf(p),
+				);
+				const a = archetypeById(res.id);
+				if (!(a && promiseMiss(a, s.cv) <= 1e-9))
+					out.push(
+						`${p.pos} ${res.name} [${res.id}] miss ${a ? promiseMiss(a, s.cv).toFixed(2) : "?"}`,
+					);
+			}
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
+		if (MODE === "stab") {
+			// archv5: stability under a uniform shift of +-3 (as the eval) and churn, with what changes most
+			const league = (
+				await genPlayers(3000, "metrics-league", 19, 32, 38)
+			).slice(0, 1000);
+			const out = [JSON.stringify(PARAMS ?? {})];
+			let same = 0,
+				n = 0;
+			const flips = {};
+			for (const p of league) {
+				const base = ENGINES.v2(p);
+				for (const sgn of [-3, 3]) {
+					const r = { ...p.ratings };
+					for (const k of RATING_KEYS)
+						if (k !== "hgt") r[k] = Math.max(0, Math.min(100, r[k] + sgn));
+					if (r.sub)
+						r.sub = r.sub.map((x) => Math.max(0, Math.min(100, x + sgn)));
+					const res = ENGINES.v2({ ...p, ratings: r });
+					n++;
+					if (res.id === base.id) same++;
+					else {
+						const k = `${base.name} -> ${res.name}`;
+						flips[k] = (flips[k] ?? 0) + 1;
+					}
+				}
+			}
+			out.push(`stability +-3: same label ${pct(same, n)}`);
+			for (const [k, v] of Object.entries(flips)
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 15))
+				out.push(`  ${v} ${k}`);
+			await churnAll(out, ["v2"]);
+			writeFileSync(OUT, out.join("\n") + "\n");
+			return;
+		}
+		if (MODE === "archv5") {
+			// archv5: the new names' shares (the user's labels: Paint Beast, Prospect, ...), the low-ovr label's share, and the
+			// labels the absolute floors change (tests.ts ABS_FLOORS: the label with floors against floorPen 0), among all and
+			// among stars (real players ovr 60+, the 2025 top 150)
+			const { floorMiss } = await import("./tests.ts");
+			const { parseComposedId } = await import("./grammar.ts");
+			const NEW_NAMES = (
+				process.env.ARCH_V5_NAMES ??
+				"Paint Beast|Interior Force|Interior Finisher|Athletic Finisher|Slashing Playmaker|Shot-Creating Slasher|Slashing Wing|Playmaking Shot Creator|High-Flying Shot Creator|Offensive-Minded Guard|Lockdown Defender|3 & D Wing|Sharpshooting|3-Level Scorer|Post Playmaker|Prospect|Depth Piece"
+			).split("|");
+			const LOW = new Set(["prospect", "depthPiece"]);
+			const league = await genPlayers(3000, "metrics-league", 19, 32, 38);
+			const vets = await genPlayers(1000, "metrics-vets", 32, 37, 38);
+			const pros = (await genPlayers(1000, "metrics-pros", 19, 19, 40)).map(
+				(p) => ({ ...p, prospect: true, age: undefined }),
+			);
+			const real = realPop(2016, 2025);
+			const top150 = real
+				.filter((p) => p.season === 2025)
+				.sort((a, b) => b.ovr - a.ovr)
+				.slice(0, 150);
+			const pops = {
+				"random league": league,
+				veterans: vets,
+				"draft prospects": pros,
+				"real 2016-2025": real,
+				"real stars (ovr 60+)": real.filter((p) => p.ovr >= 60),
+				"real 2025 top 150": top150,
+			};
+			const out = [JSON.stringify(PARAMS ?? {})];
+			const off = { ...(PARAMS ?? {}), floorPen: 0 };
+			for (const [label, ps] of Object.entries(pops)) {
+				const n = ps.length;
+				const byName = {};
+				const ex = {};
+				let low = 0,
+					relabel = 0,
+					offFail = 0;
+				const relEx = [];
+				for (const p of ps) {
+					const extra = p.slug ? { srID: p.slug } : {};
+					const res = ENGINES.v2(p, extra);
+					const role = parseComposedId(res.id)?.role.key;
+					if (role && LOW.has(role)) low++;
+					for (const w of NEW_NAMES) {
+						if (res.name.includes(w)) {
+							byName[w] = (byName[w] ?? 0) + 1;
+							if ((ex[w] ??= []).length < 5)
+								ex[w].push(
+									`${p.name ?? "?"}${p.season ? ` ${p.season}` : ""} ${p.pos} ${p.age ?? ""} ovr ${p.ovr ?? "?"} (${res.name})`,
+								);
+						}
+					}
+					const r0 = classifyV2(p.ratings, {
+						...readOf(p),
+						params: off,
+						...extra,
+					});
+					if (floorMiss(r0.name, p.ratings) > 0) {
+						offFail++;
+						if (r0.id !== res.id) {
+							relabel++;
+							if (relEx.length < 8)
+								relEx.push(
+									`${p.name ?? "?"}${p.season ? ` ${p.season}` : ""} ${p.pos} ovr ${p.ovr ?? "?"} tp ${p.ratings.tp}: ${r0.name} -> ${res.name}`,
+								);
+						}
+					}
+				}
+				out.push(
+					`${label} (n=${n}): low-ovr label ${pct(low, n)}; floor-failing labels without floors ${pct(offFail, n)}, relabeled by the floors ${pct(relabel, n)}`,
+				);
+				out.push(
+					`  new names: ${NEW_NAMES.map((w) => `${w} ${pct(byName[w] ?? 0, n)}`).join(", ")}`,
+				);
+				for (const [w, xs] of Object.entries(ex))
+					out.push(`  examples ${w}: ${xs.join("; ")}`);
+				if (relEx.length) out.push(`  floor relabels: ${relEx.join("; ")}`);
+				writeFileSync(OUT, out.join("\n") + "\n");
+			}
+			return;
+		}
 		if (MODE === "who") {
 			// archv3: what decided some real players' labels (ARCH_V2_WHO="Name Season,...": voters, family scores, candidates)
 			const data = realData();
@@ -632,6 +806,12 @@ export const KNN_SCALE: Record<string, { mean: number[]; sd: number[] }> = ${JSO
 				n += w;
 				const top1 = canonOfLabel(res);
 				if (tg.canon.includes(top1)) t1 += w;
+				// (archv5: ARCH_V2_HITS=file, each held-out player's label and whether it is a hit)
+				if (process.env.ARCH_V2_HITS && engine === "v2")
+					appendFileSync(
+						process.env.ARCH_V2_HITS,
+						`${x.slug ?? x.key ?? x.name} | ${res.name} | t1 ${tg.canon.includes(top1) ? 1 : 0} t3 ${res.top.some((c) => tg.canon.includes(c)) ? 1 : 0} fam ${tg.fam.includes(familyOfName(res.name, x.pos)) ? 1 : 0} | want ${tg.names?.join(" / ")}\n`,
+					);
 				if (res.top.some((c) => tg.canon.includes(c))) t3 += w;
 				if (tg.fam.includes(familyOfName(res.name, x.pos))) fam += w;
 				if (tg.names?.some((nm) => nm.toLowerCase() === res.name.toLowerCase()))
