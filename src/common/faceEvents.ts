@@ -30,6 +30,9 @@ export const facialHairTier = (id: string): number => {
 			"fork-boxed-beard",
 			"fork-lineup-beard",
 			"fork-beard-line",
+			"fork-beard-coily",
+			"fork-beard-forked",
+			"fork-beard-spade",
 		].includes(id)
 	) {
 		return 4;
@@ -39,7 +42,8 @@ export const facialHairTier = (id: string): number => {
 			id,
 		) ||
 		id === "fork-goatee-extended" ||
-		id === "fork-braided-chin"
+		id === "fork-braided-chin" ||
+		id === "fork-beard-faded"
 	) {
 		return 3;
 	}
@@ -343,6 +347,51 @@ export const HAIR_NEIGHBOURS: Record<string, StyleNode> = {
 		t: "s",
 		near: ["fork-top-knot", "fork-undercut"],
 	},
+	// Batch E: only new keys, as batch D
+	"fork-cornrows-curved": {
+		t: "c",
+		near: ["cornrows", "fork-cornrows-zigzag", "fork-feed-in-braids"],
+	},
+	"fork-feed-in-braids": {
+		t: "c",
+		near: ["cornrows", "fork-box-braids", "fork-cornrows-curved"],
+	},
+	"fork-braided-mohawk": {
+		t: "c",
+		near: ["fork-feed-in-braids", "cornrows"],
+	},
+	"fork-locs-fringe": {
+		t: "c",
+		near: [
+			"fork-starter-locs",
+			"fork-twists-medium",
+			"fork-locs-high-ponytail",
+		],
+	},
+	"fork-locs-high-ponytail": {
+		t: "c",
+		near: ["fork-locs-back+fork-locs-long", "fork-locs-fringe"],
+	},
+	"fork-afro-taper": {
+		t: "cu",
+		near: ["fork-afro-small", "blowoutFade", "curlyFade2"],
+	},
+	"fork-curly-fringe": {
+		t: "cu",
+		near: ["curlyFade1", "curly", "fork-curly-top-knot"],
+	},
+	"fork-curly-top-knot": { t: "u", near: ["fork-curly-fringe", "curly2"] },
+	"fork-flow": {
+		t: "s",
+		near: [
+			"fork-slick-back",
+			"middle-part",
+			"fork-slick-back+fork-slick-back-long",
+		],
+	},
+	"fork-side-swoop": { t: "s", near: ["emo", "fork-undercut", "faux-hawk"] },
+	"fork-two-block": { t: "s", near: ["fork-edgar", "crop", "crop-fade"] },
+	"fork-split-dye": { t: "cus", near: ["fork-low-fade", "short-fade"] },
 };
 
 // What a thinning player may still switch to: cutting it short, never growing it back

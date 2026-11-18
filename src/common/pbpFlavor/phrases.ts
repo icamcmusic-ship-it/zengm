@@ -138,6 +138,9 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 				" trails the break and splashes a three",
 				" fills the corner on the break and buries a three",
 				" pulls up early in the shot clock and hits from deep",
+				" gets to his spot on the break and drains a three",
+				" sprints to the wing in transition and knocks down the three",
+				" stops at the three-point line on the run and buries it",
 			]) {
 				add(2, "three", 0, n + t);
 			}
@@ -163,8 +166,12 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 				" rises up off the dribble at the top of the key and hits",
 				" dances into a step-back three and drains it",
 				" stops on a dime behind the arc and splashes it",
+				" rocks his man back with a jab and buries the pull-up three",
+				" goes behind the back into a pull-up three and drains it",
+				" snatches the dribble back and hits the step-back three",
+				" strings together a couple of dribbles and steps back for three: good",
 			]) {
-				add(w, "three", 1, n + t);
+				add((w * 14) / 18, "three", 1, n + t);
 			}
 			if (D) {
 				add(
@@ -222,8 +229,11 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" splashes a three from the right corner",
 			" sinks the corner three as the closeout flies by",
 			" gets his feet set in the corner and buries it",
+			" drifts to the corner and splashes it",
+			" is left open in the corner and makes them pay",
+			" buries the three from deep in the corner",
 		]) {
-			add(0.9, "three", 2, n + t);
+			add(0.675, "three", 2, n + t);
 		}
 		for (const t of [
 			" hits a catch-and-shoot three",
@@ -238,8 +248,12 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" lets it go on the catch and splashes it",
 			" sets his feet on the catch and drills it",
 			" knocks down an open three from above the break",
+			" catches in the slot, squares up and drains it",
+			" takes it in the shooting pocket and lets it fly: good",
+			" spots up on the wing and knocks down the three",
+			" is ready on the catch and buries the three",
 		]) {
-			add(0.9, "three", 2, n + t);
+			add(0.675, "three", 2, n + t);
 		}
 		add(
 			TIER.u * gate(sh, 55),
@@ -282,8 +296,12 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" hits from long range",
 			" cashes in from beyond the arc",
 			" nails a three",
+			" rattles in a three",
+			" finds the bottom of the net from deep",
+			" knocks down the long ball",
+			" gets a three to fall",
 		]) {
-			add(0.55, "three", 0, n + t);
+			add(0.38, "three", 0, n + t);
 		}
 		// a shooter's or a playmaker's style (cosmetic, from his ratings): threes off the bounce, and from well out
 		const style = archetypeOf(e.p);
@@ -324,8 +342,11 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" puts it back up through traffic",
 			" lays the offensive rebound right back in",
 			" keeps it alive and finally gets it to go",
+			" muscles the offensive board back up and in",
+			" gathers the miss and powers it back in",
+			" is right there for the miss and lays it back in",
 		]) {
-			add(1, "rim", 1, n + t);
+			add(8 / 11, "rim", 1, n + t);
 		}
 		const tw = gate(Math.max(r.hgt, r.jmp), 55);
 		for (const t of [
@@ -335,8 +356,10 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" taps it in with one hand",
 			" tips in the miss at the rim",
 			" soft-taps it back through",
+			" tips it back in off the glass",
+			" gets a hand above the rim and taps it home",
 		]) {
-			add(0.9 * tw, "tip", 1, n + t);
+			add(0.675 * tw, "tip", 1, n + t);
 		}
 		const dw = 1.4 * gate(Math.min(r.dnk, r.jmp), 60);
 		for (const t of [
@@ -442,8 +465,11 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" lays it in ahead of the pack",
 			" beats everyone down the floor for an easy two",
 			" lays it in on the break",
+			" fills the lane and lays it in on the run",
+			" finishes on the run before the defense gets back",
+			" gets behind the defense for an easy layup",
 		]) {
-			add(1, "rim", 0, n + t);
+			add(0.7, "rim", 0, n + t);
 		}
 		add(0.5, "rim", 1, n + " goes coast to coast for the layup");
 		// content2: transition
@@ -551,8 +577,13 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 		" finishes a layup in traffic",
 		" glides in for a layup",
 		" gets the layup to roll in",
+		" lays it off the glass and in",
+		" gets a layup to fall",
+		" finishes at the cup",
+		" converts the layup",
+		" scores on a layup in the lane",
 	]) {
-		add(1 / 6, "rim", 0, n + t);
+		add(11 / 96, "rim", 0, n + t);
 	}
 	for (const t of [
 		" cuts backdoor for a layup",
@@ -562,8 +593,31 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 		" slips the screen and finishes at the rim",
 		" catches it under the basket and lays it in",
 		" flashes to the rim and scores on the catch",
+		" cuts down the lane and finishes the feed",
+		" catches it on the move and lays it in",
 	]) {
-		add(0.08, "rim", 2, n + t);
+		add(0.062, "rim", 2, n + t);
+	}
+	// (content3: the tables of this function that gained rows were scaled so that each table's total weight is what it was: the mix of
+	// shot kinds, and so the rates of dunks, posters and the rest, is unchanged)
+	// content3: the give-and-go. He gives the ball up, cuts and gets it back from the same teammate (an assisted basket at the rim: the
+	// pass that goes with it is the return pass, see passWord's "gng")
+	for (const t of [
+		" gives it up, cuts and gets it right back for the layup",
+		" passes, cuts hard to the rim and lays in the return feed",
+		" hands it off, cuts to the basket and takes it right back for the layup",
+		" gives it up on the wing, cuts down the lane and lays in the return pass",
+	]) {
+		add(0.035, "rim", 2, n + t, { pw: "gng" });
+	}
+	if (slam) {
+		add(
+			dw / 8,
+			"dunk",
+			2,
+			n + " gives it up, cuts to the rim and dunks the return pass",
+			{ pw: "gng" },
+		);
 	}
 	if (r.drb >= 60) {
 		add(0.12, "mid", 1, n + " isolates on the wing and hits a pull-up jumper");
@@ -614,8 +668,13 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" goes up-and-under in the post and scores",
 			" turns over his shoulder and banks in a hook",
 			" gets deep position and scores over the top",
+			" drop-steps to the rim and finishes",
+			" backs in, feels his man lean and spins the other way for the layup",
+			" catches on the block, turns and banks it in",
+			" posts up on the right block and scores with a jump hook",
+			" faces up from the mid-post and scores over his man",
 		]) {
-			add(pw / 6, "post", 0, n + t);
+			add((pw * 13) / 108, "post", 0, n + t);
 		}
 		if (D) {
 			for (const t of [
@@ -634,8 +693,12 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" scores on a little shoulder fake",
 			" spins off the block and lays it in",
 			" backs down and banks in a short turnaround",
+			" works his way to the block and scores",
+			" posts up, turns middle and flips in a hook",
+			" gets to his spot on the block and banks it in",
+			" uses a quick drop step and lays it in",
 		]) {
-			add(pw / 3, "post", 0, n + t);
+			add((pw * 7) / 33, "post", 0, n + t);
 		}
 	}
 	add(pw / 4, "post", 2, n + " seals his man and scores on the catch");
@@ -681,8 +744,10 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" pulls up from 15 feet and hits",
 			" pulls up off the bounce and hits",
 			" pulls up going left and knocks it down",
+			" pulls up at the nail and knocks it down",
+			" pulls up in the lane and hits the short jumper",
 		]) {
-			add((jw / 9) * pullW, "mid", 1, n + t);
+			add((jw / 15) * pullW, "mid", 1, n + t);
 		}
 	}
 	if (r.fg >= 65 && D) {
@@ -707,8 +772,13 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 		" hits a jumper from the free-throw line",
 		" knocks down the elbow jumper",
 		" drains a jumper from the short corner",
+		" knocks down a jumper from the wing",
+		" hits from 17 feet",
+		" buries a mid-range jumper",
+		" sticks the jumper from the foul line extended",
+		" gets a 14-footer to drop",
 	]) {
-		add(jw / 5, "mid", 0, n + t);
+		add((jw * 8) / 65, "mid", 0, n + t);
 	}
 	for (const t of [
 		" pops out of the screen and hits from the elbow",
@@ -716,8 +786,11 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 		" hits an open 17-footer off the catch",
 		" catches at the nail and knocks it down",
 		" hits a short-corner jumper off the catch",
+		" steps into a 15-footer off the catch and hits",
+		" catches on the baseline and knocks down the jumper",
+		" catches at the elbow, squares up and hits",
 	]) {
-		add(jw / 8, "mid", 2, n + t);
+		add((jw * 5) / 64, "mid", 2, n + t);
 	}
 	if (r.hgt >= 58) {
 		add(
@@ -738,8 +811,10 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 			" drops in a runner",
 			" hits a floater off the glass",
 			" tosses in a teardrop",
+			" gets into the lane and drops in a floater",
+			" lofts a runner over the shot-blocker",
 		]) {
-			add(0.13, "rim", 1, n + t);
+			add(0.104, "rim", 1, n + t);
 		}
 		if (D) {
 			add(0.06, "rim", 1, n + " drops a floater in over " + dn, { def: D });
@@ -849,6 +924,44 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 		0,
 		" drops in a sky hook",
 	);
+	// content3: post moves, each gated by what it takes (a drop step wants strength, a shake wants a handle, a face-up wants a jumper)
+	T2(
+		TIER.u * gate(Math.min(r.ins, r.stre), 55) * 0.3,
+		"post",
+		0,
+		" drop-steps past his man and finishes with two hands",
+	);
+	T2(
+		TIER.u * gate(Math.min(r.ins, r.stre), 58) * 0.3,
+		"post",
+		0,
+		" posts up, drop-steps baseline and banks it in",
+	);
+	T2(
+		TIER.r * gate(Math.min(r.ins, r.drb), 68) * 0.3,
+		"post",
+		0,
+		" shakes one way, then the other, and lays it in off the dream shake",
+		{ wow: 1 },
+	);
+	T2(
+		TIER.r * gate(Math.min(r.ins, r.drb), 66) * 0.3,
+		"post",
+		0,
+		" fakes the hook, pivots back and lays it in",
+	);
+	T2(
+		TIER.u * gate(Math.min(r.ins, r.fg), 58) * 0.3,
+		"post",
+		0,
+		" faces up on the block, jabs and hits a short turnaround",
+	);
+	T2(
+		TIER.u * gate(Math.min(r.hgt, r.ins), 62) * 0.3,
+		"post",
+		0,
+		" posts up, takes one hard dribble middle and drops in a hook",
+	);
 	T2(TIER.u * gate(r.fg, 60) * 0.3, "mid", 1, " nails a pull-up off the curl");
 	T2(
 		TIER.r * gate(r.fg, 72) * 0.3,
@@ -870,6 +983,45 @@ export function shotOptions(e: any, putback: any, trans: any, ctx: any) {
 export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 	const n = passer.name,
 		pss = passer.R.pss;
+	// content3: the return pass of a give-and-go (the shot's own words say he gave it up and cut)
+	if (how === "gng") {
+		return pickV(rng, [
+			"from " + n,
+			"from " + n + " on the give-and-go",
+			"from " + n + ", a textbook give-and-go",
+		]);
+	}
+	// content3: the stealer turns his steal into an assist on the break
+	if (ctx.trans && ctx.stealer === passer.pid && rng.random() < 0.75) {
+		return pickV(rng, [
+			"on the feed ahead after a steal by " + n,
+			"after the steal and the lead pass from " + n,
+			"with the steal and the assist both going to " + n,
+			"off a steal and a quick pitch ahead from " + n,
+			"as the takeaway becomes an easy assist for " + n,
+		]);
+	}
+	// content3: the offensive rebounder kicks it back out (or drops it off) for the second-chance basket
+	if (
+		!ctx.trans &&
+		how !== "pop" &&
+		ctx.lastReb &&
+		ctx.lastReb.pid === passer.pid &&
+		rng.random() < 0.6
+	) {
+		return cls === "three" || cls === "mid"
+			? pickV(rng, [
+					"on the kick-out from " + n + " after the offensive rebound",
+					"off the offensive board, kicked back out by " + n,
+					"with the offensive rebound and the kick-out coming from " + n,
+					"on a second-chance feed from " + n,
+				])
+			: pickV(rng, [
+					"off the offensive rebound and a quick drop-off from " + n,
+					"on a second-chance feed from " + n,
+					"with the offensive board and the dish coming from " + n,
+				]);
+	}
 	if (ctx.trans) {
 		if (ctx.defReb === passer.pid && pss >= 65 && rng.random() < 0.15) {
 			return pickV(rng, [
@@ -882,6 +1034,8 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 					"on the outlet from " + n,
 					"off a quick outlet from " + n,
 					"on a long outlet from " + n,
+					"off a two-handed outlet from " + n,
+					"with " + n + " firing the outlet up the floor",
 				])
 			: pickV(rng, [
 					"off a hit-ahead pass from " + n,
@@ -890,6 +1044,9 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 					"with " + n + " finding him in stride",
 					"on a two-man break with " + n,
 					"off a long bounce pass from " + n + " on the break",
+					"on a lead pass from " + n,
+					"off a pitch ahead from " + n,
+					"with " + n + " pushing the pace and finding him",
 				]);
 	}
 	if (how === "pop") {
@@ -897,6 +1054,7 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 			"on the pick-and-pop with " + n,
 			"with " + n + " finding him on the pop",
 			"off the pick-and-pop, " + n + " with the feed",
+			"after setting the screen for " + n + ", who finds him on the pop",
 		]);
 	}
 	const o = [];
@@ -914,6 +1072,10 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 			"off a hand-off from " + n,
 			"after " + n + " drives and kicks it out",
 			"on a kick-out after " + n + " collapses the defense",
+			"on a pitch-back from " + n,
+			"off a drift pass from " + n,
+			"on a hook pass out of the lane from " + n,
+			"with " + n + " swinging it to the open man",
 		);
 	}
 	if (cls === "mid") {
@@ -926,6 +1088,9 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 			"on a feed from " + n,
 			"off a pass from " + n + " at the top of the key",
 			"on a dump-down from " + n + " in the short corner",
+			"off a pocket pass from " + n,
+			"on a quick touch from " + n,
+			"off a pitch from " + n + " on the wing",
 		);
 	}
 	if (cls === "post") {
@@ -935,6 +1100,10 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 			"on a lob into the post from " + n,
 			"on a post entry from " + n + " on the wing",
 			"off a duck-in pass from " + n,
+			"on a bounce pass into the block from " + n,
+			"off a quick entry from " + n + " at the top",
+			"with " + n + " dropping it in over the fronting defender",
+			"on a wraparound entry from " + n,
 		);
 	}
 	if (cls === "post" && passer.R.hgt >= 65) {
@@ -952,6 +1121,10 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 			"on a wraparound dish from " + n + " in the lane",
 			"off a slick feed from " + n,
 			"with " + n + " threading the needle",
+			"on a shovel pass from " + n,
+			"on a drop-off from " + n + " at the rim",
+			"with " + n + " slipping it to him along the baseline",
+			"off a quick interior pass from " + n,
 		);
 		if (pss >= 60) {
 			o.push(
@@ -971,6 +1144,9 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 			"on a touch pass from " + n,
 			"on a no-look dime from " + n,
 			"on a pinpoint feed from " + n,
+			"off a behind-the-back dime from " + n,
+			"on a one-handed whip pass from " + n,
+			"off a touch pass from " + n + " that never hit the floor",
 		);
 	}
 	// rarer passes, by passing rating
@@ -986,6 +1162,13 @@ export function passWord(rng: any, passer: any, cls: any, ctx: any, how: any) {
 		[TIER.r * gate(pss, 74), "on a behind-the-back bounce pass from " + n],
 		[TIER.e * gate(pss, 85), "off a behind-the-head pass from " + n],
 		[TIER.e * gate(pss, 82), "on a no-look bounce pass from " + n],
+		[TIER.u * gate(pss, 62), "on a quick touch pass from " + n],
+		[
+			TIER.r * gate(pss, 72),
+			"off a behind-the-back pass from " + n + " in traffic",
+		],
+		[TIER.r * gate(pss, 70), "on a look-away feed from " + n],
+		[TIER.r * gate(pss, 68), "off a touch pass from " + n + " in the lane"],
 	].filter((x) => x[0] > 0);
 	if (rare.length && rng.random() < 0.18) {
 		return pickW(rng, rare)[1];
@@ -1059,6 +1242,8 @@ export function alleyOop(rng: any, e: any, ctx: any, trans: any) {
 			0.7,
 			n + " slips the screen and catches the lob from " + an + " for the jam",
 		);
+		add(0.8, an + " puts it up near the rim and " + n + " throws down the lob");
+		add(0.7, n + " gets behind the defense and dunks the lob from " + an);
 		add(
 			TIER.r * gate(Math.min(r.jmp, r.dnk), 76) * 3,
 			n + " catches " + an + "'s lob with one hand and flushes it",
@@ -1075,6 +1260,8 @@ export function alleyOop(rng: any, e: any, ctx: any, trans: any) {
 		add(1, an + " floats a lob to the rim and " + n + " lays it in");
 		add(1, n + " catches the lob from " + an + " and kisses it off the glass");
 		add(1, n + " finishes an alley-oop layup from " + an);
+		add(0.8, an + " lofts it over the top and " + n + " guides the lob in");
+		add(0.7, n + " cuts behind the defense and lays in the lob from " + an);
 		add(
 			0.7,
 			an + " throws it up and " + n + " lays in the alley-oop over the defense",
@@ -1128,6 +1315,13 @@ export function madeShot(rng: any, e: any, ctx: any) {
 					" hits him in stride for " +
 					(slam ? "a dunk" : "a layup"),
 				an +
+					" and " +
+					n +
+					" play catch on a 2-on-1, and " +
+					n +
+					" finishes with " +
+					(slam ? "a dunk" : "a layup"),
+				an +
 					" looks off the last defender on a 2-on-1 and lays it off to " +
 					n +
 					" for " +
@@ -1150,6 +1344,8 @@ export function madeShot(rng: any, e: any, ctx: any) {
 								(slam ? "slam" : "layup"),
 							n + " grabs it and goes the length of the floor for the layup",
 							n +
+								" rebounds, turns and beats everyone down the floor for the layup",
+							n +
 								" takes the rebound end to end and finishes" +
 								(r.drb >= 65 ? " with a Euro step" : " at the rim"),
 						]
@@ -1157,6 +1353,7 @@ export function madeShot(rng: any, e: any, ctx: any) {
 							n +
 								" goes coast to coast after the steal for the " +
 								(slam ? "dunk" : "layup"),
+							n + " turns his steal into two the other way, all by himself",
 							n +
 								" outruns everyone after his steal and " +
 								(slam ? "throws it down" : "lays it in"),
@@ -1221,6 +1418,10 @@ export function madeShot(rng: any, e: any, ctx: any) {
 	}
 	if (s.def && s.cls === "dunk" && !trans) {
 		ctx.ptype = "poster";
+	}
+	// content3: a give-and-go names its own action (no set play goes before it)
+	if (s.pw === "gng" && e.ast && !ctx.ptype) {
+		ctx.ptype = "give-and-go";
 	}
 	let t = s.t;
 	let flourished = false;
@@ -1347,6 +1548,9 @@ export function missText(rng: any, e: any, ctx: any) {
 				n + " fires from the top of the key",
 				n + " launches a three off the catch",
 				n + " steps into a pull-up three",
+				n + " squares up for a three",
+				n + " rises from the corner",
+				n + " shoots a three over the closeout",
 			]);
 		}
 		const rim = [
@@ -1357,6 +1561,9 @@ export function missText(rng: any, e: any, ctx: any) {
 			n + " goes up strong at the rim",
 			n + " tries to scoop it in",
 			n + " goes up for a layup in traffic",
+			n + " takes it right at the rim",
+			n + " gets into the lane and goes up",
+			n + " lays it up off the drive",
 			r.dnk >= 60 ? n + " elevates for a dunk" : n + " tries a floater",
 		];
 		if (trans) {
@@ -1364,6 +1571,8 @@ export function missText(rng: any, e: any, ctx: any) {
 				n + " races in for a layup on the break",
 				n + " has a step on everyone on the break and goes up",
 				n + " pushes it ahead and goes up for the layup",
+				n + " goes in alone on the break",
+				n + " gets out ahead of the pack and lays it up",
 			]);
 		}
 		const post = [
@@ -1372,6 +1581,9 @@ export function missText(rng: any, e: any, ctx: any) {
 			n + " goes up with a short jumper in the post",
 			n + " tries a baby hook",
 			n + " goes up-and-under",
+			n + " turns for a jump hook",
+			n + " spins baseline and goes up",
+			n + " drop-steps and goes up strong",
 		];
 		const mid = [
 			n + " pulls up from 12 feet",
@@ -1380,6 +1592,9 @@ export function missText(rng: any, e: any, ctx: any) {
 			n + " pulls up from the elbow",
 			n + " rises for a step-back jumper",
 			n + " tries a jumper from the baseline",
+			n + " pulls up in the lane",
+			n + " turns for a jumper at the elbow",
+			n + " rises from the foul line",
 		];
 		return pickV(
 			rng,
@@ -1404,6 +1619,9 @@ export function missText(rng: any, e: any, ctx: any) {
 			n + " can't finish the putback",
 			n + "'s tip-in try is off",
 			n + " goes back up with it and misses again",
+			n + " can't get the follow to drop",
+			n + "'s putback rolls off the front of the rim",
+			n + " tips it up, but it won't stay down",
 		]);
 	}
 	const w = (x, t) => [x, t];
@@ -1415,6 +1633,8 @@ export function missText(rng: any, e: any, ctx: any) {
 				n + "'s three in transition is off",
 				n + " trails the play and misses a three",
 				n + "'s early three on the break rims out",
+				n + "'s quick three in transition is short",
+				n + " pulls up at the arc on the break; no good",
 			]);
 		}
 		return pickW(rng, [
@@ -1462,6 +1682,16 @@ export function missText(rng: any, e: any, ctx: any) {
 			w(0.5, n + "'s three-point try glances off the rim"),
 			w(0.4, n + " can't get the three to fall"),
 			w(r.drb >= 60 ? 0.5 : 0, n + "'s step-back three is short"),
+			w(0.6, n + "'s three from the slot is off the back rim"),
+			w(0.6, n + "'s three is on line but short"),
+			w(0.6, n + " gets a clean look from the wing, but the three won't fall"),
+			w(0.5, n + "'s three from the left wing spins out"),
+			w(0.5, n + " pulls the trigger from deep and misses"),
+			w(0.5, n + "'s long-range try is off the side of the rim"),
+			w(0.5, n + "'s three is long off the back iron"),
+			w(0.4, n + " rushes a three and it's well short"),
+			w(0.4, n + "'s three from straightaway hits the heel of the rim"),
+			w(r.drb >= 58 ? 0.5 : 0, n + "'s side-step three is off the mark"),
 		])[1];
 	}
 	if (trans && (!z || z === "rim")) {
@@ -1472,6 +1702,8 @@ export function missText(rng: any, e: any, ctx: any) {
 			n + " can't finish on the break",
 			n + "'s layup on the break is too strong off the glass",
 			n + " gets to the rim on the break but can't convert",
+			n + "'s layup on the run is off the mark",
+			n + " goes in a little too fast on the break and misses the layup",
 		]);
 	}
 	const rim = [
@@ -1511,6 +1743,15 @@ export function missText(rng: any, e: any, ctx: any) {
 		w(0.4, n + " puts too much on the layup"),
 		w(0.4, n + "'s driving layup is off the mark"),
 		w(0.4, n + " misses a short one in the paint"),
+		w(0.6, n + "'s layup is just a little strong"),
+		w(0.6, n + " gets a step, but the layup rolls off the rim"),
+		w(0.5, n + "'s finish at the rim won't stay down"),
+		w(0.5, n + " can't get the shot to fall in a crowd"),
+		w(0.5, n + "'s layup kisses the glass and bounces away"),
+		w(0.4, n + " has it roll off his fingers at the rim"),
+		w(0.4, n + "'s driving shot is off the back of the rim"),
+		w(0.4, n + " gets all the way to the basket and can't finish"),
+		w(r.drb >= 55 ? 0.4 : 0.1, n + "'s scoop off the drive is short"),
 		w(
 			r.dnk >= 70 ? 0.4 : 0,
 			n + " tries to throw it down but it's off the back iron",
@@ -1538,6 +1779,21 @@ export function missText(rng: any, e: any, ctx: any) {
 		w(0.5, n + "'s shot from the block is off"),
 		w(0.4, n + " spins baseline and misses"),
 		w(0.4, n + "'s post move comes up empty"),
+		w(0.7, n + "'s hook from the right block is off"),
+		w(0.7, n + " backs his man down and misses the short turnaround"),
+		w(0.6, n + "'s half-hook rolls off the front of the rim"),
+		w(0.6, n + " turns baseline in the post and can't get it to drop"),
+		w(0.6, n + "'s shot over his man in the post is short"),
+		w(0.5, n + " works for position on the block, but the shot is off"),
+		w(0.5, n + "'s turnaround over his right shoulder is long"),
+		w(0.5, n + " gets deep in the post and misses a short one"),
+		w(0.5, n + "'s drop-step layup rolls off the rim"),
+		w(0.4, n + " leaves the jump hook short"),
+		w(0.4, n + "'s hook from the middle of the lane hits the back rim"),
+		w(
+			r.ins >= 60 ? 0.5 : 0.15,
+			n + " tries an up-and-under on the block and misses",
+		),
 	];
 	const mid = [
 		w(1, n + "'s jumper hits the front rim"),
@@ -1568,6 +1824,18 @@ export function missText(rng: any, e: any, ctx: any) {
 		w(0.5, n + "'s baseline jumper is off the side of the rim"),
 		w(0.4, n + "'s pull-up from the wing rattles out"),
 		w(0.4, n + " leaves the jumper short"),
+		w(0.7, n + "'s 15-footer is off the back rim"),
+		w(0.7, n + " misses a jumper from the wing"),
+		w(0.6, n + "'s jumper from the foul line is short"),
+		w(0.6, n + " rises for a mid-range jumper; no good"),
+		w(0.6, n + "'s shot from 17 feet is off"),
+		w(0.5, n + "'s pull-up in the lane is long"),
+		w(0.5, n + " has a good look from the elbow, but it rims out"),
+		w(0.5, n + "'s jumper from the short corner is off line"),
+		w(0.5, n + " can't knock down the jumper from the baseline"),
+		w(0.4, n + "'s turnaround from the wing is short"),
+		w(0.4, n + "'s mid-range try catches the front of the rim"),
+		w(r.drb >= 55 ? 0.5 : 0.15, n + "'s step-back from the elbow rattles out"),
 	];
 	if (z === "rim") {
 		return pickW(rng, rim)[1];
@@ -1632,6 +1900,8 @@ export function blockText(rng: any, b: any, three: any, trans: any, ctx: any) {
 			bn + " contests and blocks it",
 			bn + " gets a fingertip on the jumper",
 			bn + " closes out hard and swats the three",
+			bn + " gets out to the shooter and tips the three",
+			bn + " gets a hand on the ball at the top of the release",
 		]);
 	}
 	if (trans && r.spd >= 55) {
@@ -1644,6 +1914,8 @@ export function blockText(rng: any, b: any, three: any, trans: any, ctx: any) {
 			bn + " runs him down and swats it from behind",
 			bn + " tracks him down on the break and pins it",
 			bn + " sprints back and erases the layup from behind",
+			bn + " catches him from behind and knocks it off the glass",
+			bn + " never gives up on the play and blocks it from behind",
 		]);
 	}
 	const big = r.hgt >= 70 || r.jmp >= 75;
@@ -1657,6 +1929,13 @@ export function blockText(rng: any, b: any, three: any, trans: any, ctx: any) {
 		[0.8, bn + " rejects it"],
 		[0.7, bn + " blocks it cleanly"],
 		[0.6, bn + " walls up and blocks the shot"],
+		[0.7, bn + " goes straight up and blocks it"],
+		[0.7, bn + " times it and knocks the shot away"],
+		[0.6, bn + " gets a piece of the shot"],
+		[
+			0.5,
+			bn + " gets his hand on the ball before it leaves the shooter's hand",
+		],
 	];
 	if (r.hgt >= 75 && r.jmp >= 70) {
 		o.push(
@@ -1672,6 +1951,12 @@ export function blockText(rng: any, b: any, three: any, trans: any, ctx: any) {
 			[1, bn + " meets him at the rim"],
 			[0.8, bn + " sends it back with authority"],
 			[r.jmp >= 75 ? 0.8 : 0, bn + " meets him at the summit"],
+			[0.8, bn + " turns it away at the rim"],
+			[0.7, bn + " gets up and spikes it away"],
+			[
+				r.hgt >= 70 ? 0.7 : 0,
+				bn + " barely leaves the floor and blocks it anyway",
+			],
 		);
 	}
 	if (big || r.diq >= 60) {
@@ -1681,6 +1966,8 @@ export function blockText(rng: any, b: any, three: any, trans: any, ctx: any) {
 			[0.6, bn + " comes across the lane and rejects it"],
 			[0.4, bn + " rotates over in time and meets the drive at the rim"],
 			[0.3, bn + " leaves his man to help and swats it off the glass"],
+			[0.5, bn + " steps up from the back line and blocks it"],
+			[0.4, bn + " comes over to help and gets a hand on the shot"],
 		);
 	}
 	const x = pickW(rng, o)[1];
@@ -1716,6 +2003,12 @@ export function tovText(rng: any, e: any, ctx: any) {
 			s + " pokes it away from " + n + ", and it trickles out of bounds",
 			s + " gets a hand on " + n + "'s dribble and it goes out off " + n,
 			s + " deflects " + n + "'s pass out of bounds",
+			s + " slaps the ball off " + n + "'s leg and out of bounds",
+			s +
+				" gets a piece of " +
+				n +
+				"'s dribble, and it rolls out of bounds off " +
+				n,
 		]) {
 			add(1, t);
 		}
@@ -1769,6 +2062,14 @@ export function tovText(rng: any, e: any, ctx: any) {
 			s + " pickpockets " + n + " on the crossover",
 			s + " gets low and pokes it off " + n + "'s knee, then grabs it",
 			s + " swats the ball away from " + n + " on the gather",
+			s + " pokes the ball away from behind " + n + " and scoops it up",
+			s + " gets a hand in and takes it from " + n,
+			s + " strips " + n + " clean on the spin move",
+			s + " knocks the ball away from " + n + " and beats him to it",
+			s + " taps the ball loose from " + n + " and corrals it",
+			s + " takes it right out of " + n + "'s hands on the drive",
+			s + " crowds " + n + " at the arc and comes away with the ball",
+			s + " shows quick hands and lifts it from " + n,
 		]) {
 			add(1, t);
 		}
@@ -1807,6 +2108,30 @@ export function tovText(rng: any, e: any, ctx: any) {
 					", and the deflection goes his way",
 			]) {
 				add(1.2 * (0.6 + R100(sr.diq)), t, { mate: to });
+			}
+		}
+		// content3: taken from the rebounder. The defensive rebounder is stripped as he comes down with it, or his outlet is picked off
+		// (the steal comes within a few seconds of his rebound); the offensive rebounder is stripped going back up
+		if (ctx.defReb === e.p.pid && ctx.gap <= 4) {
+			for (const t of [
+				s + " strips " + n + " as he comes down with the rebound",
+				s + " sneaks up on " + n + " after the rebound and takes it from him",
+				s + " rips the rebound away from " + n,
+			]) {
+				add(4, t, { reb: 1 });
+			}
+			add(3, s + " picks off the outlet pass from " + n, { reb: 1 });
+			add(2, s + " reads the outlet from " + n + " and steps in front of it", {
+				reb: 1,
+			});
+		}
+		if (ctx.lastReb && ctx.lastReb.pid === e.p.pid && ctx.gap <= 4) {
+			for (const t of [
+				s + " strips " + n + " as he goes back up with the offensive rebound",
+				s + " slaps it away from " + n + " as he gathers the offensive board",
+				s + " takes the offensive rebound right back from " + n,
+			]) {
+				add(4, t, { reb: 1 });
 			}
 		}
 		// a teammate's deflection, a stolen inbound, a trap in the press
@@ -1882,6 +2207,16 @@ export function tovText(rng: any, e: any, ctx: any) {
 				" for " +
 				t2 +
 				" is off target and out",
+			n + " tries a touch pass to " + t2 + " and it sails out of bounds",
+			n + " leads " + t2 + " too far, and the pass goes out of bounds",
+			n +
+				" throws a behind-the-back pass that " +
+				t2 +
+				" never sees; out of bounds",
+			n +
+				" and " +
+				t2 +
+				" botch a give-and-go, and the return pass goes out of bounds",
 		]) {
 			add(0.6, t, { mate: to });
 		}
@@ -1917,6 +2252,9 @@ export function tovText(rng: any, e: any, ctx: any) {
 		n + " bobbles the entry pass and it rolls out of bounds",
 		n + " can't corral a high pass, and it skips out of bounds",
 		n + " is trapped on the sideline and steps out",
+		n + " has it knocked off his knee and out of bounds",
+		n + " catches it with a foot on the sideline: out of bounds",
+		n + " drives baseline and runs out of room: out of bounds",
 	]) {
 		add(0.5, t);
 	}
@@ -1940,6 +2278,9 @@ export function tovText(rng: any, e: any, ctx: any) {
 		n + " takes one step too many on the gather: traveling",
 		n + " travels trying to split the double team",
 		n + " shuffles his feet on the catch and is called for a travel",
+		n + " slides his pivot foot on the up-fake: traveling",
+		n + " falls to the floor with the ball and is called for a travel",
+		n + " takes off before he puts the ball down: traveling",
 	]) {
 		add(0.35, t);
 	}
@@ -1999,6 +2340,9 @@ export function tovText(rng: any, e: any, ctx: any) {
 			n + " hooks his defender on the drive: offensive foul",
 			n + " extends a hip on the screen: illegal screen",
 			n + " is called for an illegal screen setting the pick",
+			n + " clears out with his off arm: offensive foul",
+			n + " leans into his defender on the post-up: offensive foul",
+			n + " rolls into the defender on the screen: illegal screen",
 		]) {
 			add(0.3 * fw, t, tag);
 		}
@@ -2018,6 +2362,37 @@ export function tovText(rng: any, e: any, ctx: any) {
 				n + " is whistled for an over-the-back offensive foul",
 				tag,
 			);
+		}
+	}
+	// content3: a held ball he loses on the possession arrow (a dead-ball turnover that is not out of bounds), and the ball he just
+	// rebounded on the offensive glass
+	if (D) {
+		for (const t of [
+			D.name +
+				" ties up " +
+				n +
+				" for a held ball, and the possession arrow points the other way",
+			n +
+				" is tied up by " +
+				D.name +
+				": jump ball, and the arrow favors the defense",
+			"held ball between " +
+				n +
+				" and " +
+				D.name +
+				"; the possession arrow sends it the other way",
+		]) {
+			add(0.12, t, { drawer: D });
+		}
+	}
+	if (ctx.lastReb && ctx.lastReb.pid === e.p.pid && ctx.gap <= 4) {
+		for (const t of [
+			n +
+				" comes down with the offensive rebound and shuffles his feet: travel",
+			n +
+				" grabs the offensive board but is called for traveling going back up",
+		]) {
+			add(1.5, t);
 		}
 	}
 	// three seconds, mostly bigs
@@ -2133,7 +2508,38 @@ export function rebText(
 	three: any,
 	ownBlock: any,
 	blk: any,
+	// content3: what else is known about the miss: he took it himself (own), it was an airball (air)
+	x?: { own?: boolean; air?: boolean },
 ) {
+	if (!ownBlock && !blk && x?.air && rng.random() < 0.6) {
+		return pickV(
+			rng,
+			off
+				? [
+						p.name + " catches the airball and keeps the possession going",
+						p.name + " grabs the airball under the basket",
+						p.name +
+							" is in the right place when the shot comes up short of everything",
+					]
+				: [
+						p.name + " collects the airball",
+						p.name + " catches the airball on the baseline",
+						p.name + " gathers in a shot that never drew iron",
+						p.name +
+							" has the easiest rebound of the night: the shot hit nothing",
+					],
+		);
+	}
+	if (!ownBlock && !blk && off && x?.own && rng.random() < 0.5) {
+		return pickV(rng, [
+			p.name + " follows his own miss and gets it back",
+			p.name + " chases down his own miss",
+			p.name + " rebounds his own shot",
+			p.name + " stays with it and grabs his own miss",
+			p.name + " is first to his own miss",
+			p.name + " gets his own rebound for another try",
+		]);
+	}
 	if (ownBlock) {
 		return pickV(rng, [
 			p.name + " recovers his own blocked shot",
@@ -2155,12 +2561,16 @@ export function rebText(
 				p.name + " collects the blocked shot",
 				p.name + " corrals the block",
 				p.name + " picks up the pieces after the block",
+				p.name + " tracks down the deflected shot",
+				p.name + " comes up with the ball after the block",
 				p.name + " runs down the blocked shot",
 			]);
 		}
 		return pickV(rng, [
 			p.name + " scrambles after the block and gets it back",
 			p.name + " grabs the loose ball after the block",
+			p.name + " gets to the blocked shot first and keeps the possession alive",
+			p.name + " picks the blocked shot up off the floor",
 		]);
 	}
 	if (off) {
@@ -2199,6 +2609,18 @@ export function rebText(
 			p.name + " gets it back on the offensive glass",
 			"second chance: " + p.name + " has the rebound",
 			p.name + " beats his man to the miss",
+			p.name + " tips the miss out and runs it down",
+			p.name + " gets a second effort and comes up with the board",
+			p.name + " wedges inside for the offensive rebound",
+			p.name + " taps it away from the crowd and collects it",
+			p.name + " keeps the possession alive on the glass",
+			p.name + " pulls the miss away from two defenders",
+			p.name + " comes flying in for the offensive board",
+			p.name + " works the baseline and grabs the miss",
+			p.name + " extends the possession with an offensive rebound",
+			p.name + " gets a body on his man and takes the offensive board",
+			p.name + " reads the bounce and beats everyone to it",
+			p.name + " picks the miss off the rim for another chance",
 			three
 				? p.name + " runs down the long carom for another possession"
 				: p.name + " snares the miss right at the rim",
@@ -2250,6 +2672,28 @@ export function rebText(
 		"rebound, " + p.name,
 		"the miss goes to " + p.name,
 		p.name + " ends up with the ball",
+		p.name + " takes the rebound",
+		p.name + " pulls down the miss",
+		p.name + " grabs the board",
+		p.name + " rebounds",
+		p.name + " is there to clean the glass",
+		p.name + " comes away with the rebound",
+		p.name + " snags the rebound",
+		p.name + " takes the miss off the glass",
+		p.name + " secures the rebound and turns up the floor",
+		p.name + " grabs the rebound and looks for the outlet",
+		p.name + " boxes out his man and takes the board",
+		p.name + " gets position and hauls it in",
+		p.name + " collects the miss",
+		p.name + " corrals the rebound",
+		p.name + " goes up and gets it",
+		p.name + " grabs it off the back rim",
+		p.name + " takes it away from a crowd of hands",
+		p.name + " rebounds and walks it up",
+		p.name + " pulls the ball down with one hand",
+		p.name + " squeezes the rebound",
+		"board, " + p.name,
+		"the rebound comes down to " + p.name,
 		three
 			? p.name + " chases down the long carom"
 			: p.name + " grabs it in the lane",

@@ -4,6 +4,7 @@ import {
 	type DataTableRow,
 } from "../components/DataTable/index.tsx";
 import { GroupDot } from "../components/Archetype/ArchetypeLabel.tsx";
+import { ArchetypeReviewQueue } from "../components/Archetype/ArchetypeReviewQueue.tsx";
 import { ArchetypeTuningPanel } from "../components/Archetype/ArchetypeTuningPanel.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
@@ -109,6 +110,8 @@ const Archetypes = ({ byGroup, rows, season, total }: View<"archetypes">) => {
 					</div>
 				))}
 			</div>
+
+			<ArchetypeReviewQueue />
 
 			<ArchetypeTuningPanel />
 

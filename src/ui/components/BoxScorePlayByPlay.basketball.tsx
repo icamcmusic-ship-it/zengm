@@ -62,6 +62,9 @@ const makeStartingBoxScore = (boxScore: any) => ({
 	gid: boxScore.gid,
 	numPeriods: boxScore.numPeriods ?? 4,
 	quarterLength: boxScore.quarterLength,
+	shotClockLength: boxScore.shotClockLength,
+	// (the wording of a playoff game differs: it must read as it did live)
+	playoffs: boxScore.playoffs,
 	quarter: "",
 	time: "",
 	teams: boxScore.teams.map((t: any) => ({

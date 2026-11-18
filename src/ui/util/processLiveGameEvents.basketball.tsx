@@ -49,6 +49,8 @@ const makeFlavorSession = (initEvent: unknown, boxScore: any) => {
 		// The league's period length (stored with finished games; the session also reads each period's real length off its clock)
 		quarterLength:
 			boxScore.quarterLength ?? local.getState().quarterLength ?? 12,
+		// Seconds (a custom shot clock, stored with the game; 24 otherwise)
+		shotClock: boxScore.shotClockLength,
 		female: local.getState().gender === "female",
 		noArticle: allStar,
 		teams: boxScore.teams.map((t: any) => ({

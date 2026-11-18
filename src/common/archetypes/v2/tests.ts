@@ -33,6 +33,79 @@ export type WordContext = {
 	band?: number;
 };
 
+// ---- archramp: ramps. Every bar of a test used to be a cliff (one rating point, one percentile point either side of it
+// and the word was there or not), so a small change in his ratings could flip his label. Each test now also says how far
+// he is from its tightest bar in ramp widths (`soft`: 0 at the bar, -1 one ramp width below it), each bar in its own
+// unit, and the engine turns that into a membership between 0 and 1 (engine.ts rampMu, V2Params rampLo / rampHi) that
+// scales the word's head start and what a near miss pays. The promise floor (a name never says what he lacks), ages and
+// the prospect flag stay yes/no.
+// One ramp width: rating points, percentile points (0-1) at his position, z
+export const RAMP_RAT = 3;
+export const RAMP_PCT = 0.05;
+export const RAMP_Z = 0.25;
+// The bars of one test: `margin` as before the ramps (the tightest bar, in the units the score reads), `soft` the
+// tightest bar in ramp widths
+class Bars {
+	margin = Infinity;
+	soft = Infinity;
+	// A percentile bar (x: percentile points above it)
+	pct(x: number) {
+		this.margin = Math.min(this.margin, x);
+		this.soft = Math.min(this.soft, x / RAMP_PCT);
+		return this;
+	}
+	// A rating bar (x: rating points above it)
+	rat(x: number) {
+		this.margin = Math.min(this.margin, x / 10);
+		this.soft = Math.min(this.soft, x / RAMP_RAT);
+		return this;
+	}
+	// A z bar (x: z above it; `div` its scale in the margin; `cap` the most it adds to the margin)
+	z(x: number, div: number, cap = Infinity) {
+		this.margin = Math.min(this.margin, cap, x / div);
+		this.soft = Math.min(this.soft, x / RAMP_Z);
+		return this;
+	}
+	// A yes/no bar (x: its margin as before; below 0 no ramp reaches him)
+	hard(x: number) {
+		this.margin = Math.min(this.margin, x);
+		if (x < 0) {
+			this.soft = -Infinity;
+		}
+		return this;
+	}
+	// One of `keys` among his three best skills: a miss costs the margin 0.01 as before; the ramp reads how far the best
+	// of them is below his third-best skill, in percentile points at his position
+	top3(ctx: WordContext, keys: readonly string[]) {
+		if (keys.some((k) => ctx.top3.includes(k))) {
+			return this;
+		}
+		this.margin = Math.min(this.margin, -0.01);
+		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
+		const third = ctx.top3[2];
+		this.soft = Math.min(
+			this.soft,
+			third === undefined
+				? -Infinity
+				: Math.min(-1e-6, (Math.max(...keys.map(p)) - p(third)) / RAMP_PCT),
+		);
+		return this;
+	}
+	done(): WordTest {
+		if (this.margin === Infinity) {
+			return { pass: true, margin: 0, soft: Infinity };
+		}
+		return {
+			pass: this.margin >= 0,
+			margin: this.margin,
+			// (a bar met is never a miss on the ramp, and the other way round)
+			soft:
+				this.margin >= 0 ? Math.max(0, this.soft) : Math.min(-1e-6, this.soft),
+		};
+	}
+}
+const FAIL: WordTest = { pass: false, margin: -1, soft: -Infinity };
+
 // ---- archv5: absolute tests (the user's labels of the archcmp sample: "41 3PT is way too low for Stretch", "52 3PT too
 // low for true 3&D", "no rating above 52 ... Prospect") ----
 
@@ -67,11 +140,28 @@ export const ABS_FLOORS: {
 // (a Paint Beast or an Interior Force is not a rim protector or a rebounder first of all: his shot blocking and rebounding
 // stand below ANCHOR_PZ at his position (z: Gobert, Mutombo, Howard keep their anchor and glass names))
 export const ANCHOR_PZ = 1;
-const notAnchor = (ctx: WordContext) =>
-	Math.min(1, (ANCHOR_PZ - Math.max(ctx.pz.blk ?? 0, ctx.pz.reb ?? 0)) / 2);
+const notAnchor = (b: Bars, ctx: WordContext) =>
+	b.z(ANCHOR_PZ - Math.max(ctx.pz.blk ?? 0, ctx.pz.reb ?? 0), 2, 1);
 // (a Paint Beast's jumper: at most these)
 export const PAINT_BEAST_TP = 35;
 export const PAINT_BEAST_FG = 45;
+// How far he is from the tightest absolute floor of a name's words, in rating points (above 0: below the floor;
+// -Infinity: the name has no floor)
+export const floorGap = (
+	name: string,
+	r: ArchetypeRatings | undefined,
+	band = 0,
+): number => {
+	let m = -Infinity;
+	if (r) {
+		for (const f of ABS_FLOORS) {
+			if (f.re.test(name)) {
+				m = Math.max(m, f.min - band - (r[f.rating] ?? 0));
+			}
+		}
+	}
+	return m;
+};
 // How far below the absolute floors of its words a name is for him (0: every floor kept)
 export const floorMiss = (
 	name: string,
@@ -123,7 +213,7 @@ export const lowOvrTools = (r: ArchetypeRatings, cap = LOW_OVR_TOOL) =>
 const lowOvr = (ctx: WordContext, young: boolean): WordTest => {
 	const r = ctx.r;
 	if (!r || ctx.prospect) {
-		return { pass: false, margin: -1 };
+		return FAIL;
 	}
 	const age = ctx.age;
 	const band = ctx.band ?? 0;
@@ -134,19 +224,26 @@ const lowOvr = (ctx: WordContext, young: boolean): WordTest => {
 	const vals = LOW_OVR_KEYS.map((k) => r[k] ?? 0).sort((x, y) => y - x);
 	// (no skill above the cap; or, for a young player, one tool above LOW_OVR_TOOL and every other skill at most that)
 	const toolCap = (ctx.toolCap ?? LOW_OVR_TOOL) + band;
-	const oneTool =
+	const toolMin = (ctx.toolMin ?? LOW_OVR_TOOL_MIN) - band;
+	const mayTool =
 		young &&
 		age !== undefined &&
-		age <= (ctx.lowYoung ?? LOW_OVR_YOUNG) + ageBand &&
-		vals[0]! > toolCap &&
-		vals[0]! >= (ctx.toolMin ?? LOW_OVR_TOOL_MIN) - band;
-	const margin = Math.min(
-		ageOk ? 1 : -1,
-		oneTool
-			? (toolCap + 0.5 - vals[1]!) / 10
-			: ((ctx.lowCap ?? LOW_OVR_CAP) + band + 0.5 - vals[0]!) / 10,
-	);
-	return { pass: margin >= 0, margin };
+		age <= (ctx.lowYoung ?? LOW_OVR_YOUNG) + ageBand;
+	const oneTool = mayTool && vals[0]! > toolCap && vals[0]! >= toolMin;
+	// (rating points under each cap)
+	const noTool = (ctx.lowCap ?? LOW_OVR_CAP) + band + 0.5 - vals[0]!;
+	const others = toolCap + 0.5 - vals[1]!;
+	const margin = Math.min(ageOk ? 1 : -1, (oneTool ? others : noTool) / 10);
+	// (the ramp: the nearer of the two ways in)
+	const softTool = mayTool
+		? Math.min(others, vals[0]! - toolMin + 0.5) / RAMP_RAT
+		: -Infinity;
+	const soft = ageOk ? Math.max(noTool / RAMP_RAT, softTool) : -Infinity;
+	return {
+		pass: margin >= 0,
+		margin,
+		soft: margin >= 0 ? Math.max(0, soft) : Math.min(-1e-6, soft),
+	};
 };
 
 // His percentile (0-1) among players at his position in a class (the pooled rulebook table when the class has no
@@ -187,6 +284,9 @@ export type WordTest = {
 	pass: boolean;
 	// How far above (+) or below (-) the bars he is, in percentile points (the tightest bar)
 	margin: number;
+	// archramp: the same in ramp widths, each bar in its own unit (0 at the bar, -1 one ramp width below it; -Infinity:
+	// a yes/no bar missed)
+	soft: number;
 };
 
 // Custom tests for words with no rulebook class (style words made measurable)
@@ -203,48 +303,45 @@ export const CUSTOM_TESTS: Record<
 	// athleticism top 60%, no offensive standout
 	switchD: (ctx) => {
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
-		const margin = Math.min(
-			p("perD") - 0.6,
-			p("rimD") - 0.6,
-			p("ath") - 0.4,
-			ctx.top3.includes("perD") || ctx.top3.includes("rimD") ? 1 : -0.01,
-			(ctx.cv.perD ?? 0) / 4,
-			(ctx.cv.rimD ?? 0) / 4,
-			// (a role player's name: no standout on offense, not carrying it; a star who also defends everywhere is read by
-			// what he does with the ball)
-			noStandout(ctx, ["perD", "rimD", "ath", "reb", "stre"]),
-			lowUsage(ctx),
-		);
-		return { pass: margin >= 0, margin };
+		const b = new Bars()
+			.pct(p("perD") - 0.6)
+			.pct(p("rimD") - 0.6)
+			.pct(p("ath") - 0.4)
+			.top3(ctx, ["perD", "rimD"])
+			.hard((ctx.cv.perD ?? 0) / 4)
+			.hard((ctx.cv.rimD ?? 0) / 4);
+		// (a role player's name: no standout on offense, not carrying it; a star who also defends everywhere is read by
+		// what he does with the ball)
+		noStandout(b, ctx, ["perD", "rimD", "ath", "reb", "stre"]);
+		lowUsage(b, ctx);
+		return b.done();
 	},
 	// Steady Game Manager: passing and handling top 50%, no class top 20%
 	gameManagerRole: (ctx) => {
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
-		const margin = Math.min(
-			p("pass") - 0.5,
-			p("handle") - 0.5,
-			noStandout(ctx, ["pass", "handle"]),
-			(ctx.cv.pass ?? 0) / 4,
-			(ctx.cv.handle ?? 0) / 4,
-		);
-		return { pass: margin >= 0, margin };
+		const b = new Bars()
+			.pct(p("pass") - 0.5)
+			.pct(p("handle") - 0.5)
+			.hard((ctx.cv.pass ?? 0) / 4)
+			.hard((ctx.cv.handle ?? 0) / 4);
+		noStandout(b, ctx, ["pass", "handle"]);
+		return b.done();
 	},
 	// Energy Big: finishing and athleticism top 50% (one his head skill), rim D top 50%, three below top 50%, no standout
 	// but finishing and athleticism
 	energyRole: (ctx) => {
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
-		const margin = Math.min(
-			p("finish") - 0.5,
-			p("ath") - 0.5,
-			p("rimD") - 0.5,
-			0.5 - p("shoot"),
-			ctx.top3.includes("finish") || ctx.top3.includes("ath") ? 1 : -0.01,
-			// (archv3: a role player too: no standout but finishing and athleticism, an elite rim protector is not one)
-			noStandout(ctx, ["finish", "ath"]),
-			(ctx.cv.finish ?? 0) / 4,
-			(ctx.cv.ath ?? 0) / 4,
-		);
-		return { pass: margin >= 0, margin };
+		const b = new Bars()
+			.pct(p("finish") - 0.5)
+			.pct(p("ath") - 0.5)
+			.pct(p("rimD") - 0.5)
+			.pct(0.5 - p("shoot"))
+			.top3(ctx, ["finish", "ath"])
+			.hard((ctx.cv.finish ?? 0) / 4)
+			.hard((ctx.cv.ath ?? 0) / 4);
+		// (archv3: a role player too: no standout but finishing and athleticism, an elite rim protector is not one)
+		noStandout(b, ctx, ["finish", "ath"]);
+		return b.done();
 	},
 	// archv4 gap roles (the archv3 gap dump's weak clusters; their words promise what each test checks):
 	// Crafty Floater Guard: finishing top 50% at his position (and above the floor) and among his three best skills,
@@ -252,36 +349,35 @@ export const CUSTOM_TESTS: Record<
 	// 30%, no taller than his position's average, and no shooter's name to say first (a three below his position's top 20%)
 	floaterRole: (ctx) => {
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
-		const touch = ctx.style.sub
-			? ((ctx.style.sub.flt ?? 0) - 0.5) / 4
-			: ((ctx.pz.oiq ?? 0) - 0.5) / 2;
-		const margin = Math.min(
-			p("finish") - 0.5,
-			(ctx.cv.finish ?? 0) / 4,
-			touch,
-			0.7 - p("ath"),
-			-(ctx.pz.hgt ?? 0) / 2,
-			ctx.top3.includes("finish") ? 1 : -0.01,
-			0.8 - p("shoot"),
-		);
-		return { pass: margin >= 0, margin };
+		const b = new Bars()
+			.pct(p("finish") - 0.5)
+			.hard((ctx.cv.finish ?? 0) / 4)
+			.pct(0.7 - p("ath"))
+			.z(-(ctx.pz.hgt ?? 0), 2)
+			.top3(ctx, ["finish"])
+			.pct(0.8 - p("shoot"));
+		if (ctx.style.sub) {
+			b.z((ctx.style.sub.flt ?? 0) - 0.5, 4);
+		} else {
+			b.z((ctx.pz.oiq ?? 0) - 0.5, 2);
+		}
+		return b.done();
 	},
 	// Raw Athletic Handler: a draft prospect (a scouting word: a player in the league outgrows it, and a label he loses as
 	// he ages relabeled one in thirty players a season), athleticism top 30% and handling top 50% at his position,
 	// offensive feel below his position's average, a three below the top 50% and passing below the top 40%
 	rawHandlerRole: (ctx) => {
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
-		const margin = Math.min(
-			ctx.prospect ? 1 : -1,
-			p("ath") - 0.7,
-			p("handle") - 0.5,
-			(ctx.cv.ath ?? 0) / 4,
-			(ctx.cv.handle ?? 0) / 4,
-			-(ctx.pz.oiq ?? 0) / 2,
-			0.5 - p("shoot"),
-			0.6 - p("pass"),
-		);
-		return { pass: margin >= 0, margin };
+		return new Bars()
+			.hard(ctx.prospect ? 1 : -1)
+			.pct(p("ath") - 0.7)
+			.pct(p("handle") - 0.5)
+			.hard((ctx.cv.ath ?? 0) / 4)
+			.hard((ctx.cv.handle ?? 0) / 4)
+			.z(-(ctx.pz.oiq ?? 0), 2)
+			.pct(0.5 - p("shoot"))
+			.pct(0.6 - p("pass"))
+			.done();
 	},
 	// archv5 (the user's labels): the low-ovr roles (lowOvr above)
 	prospectRole: (ctx) => lowOvr(ctx, true),
@@ -292,7 +388,7 @@ export const CUSTOM_TESTS: Record<
 	paintBeastRole: (ctx) => {
 		const r = ctx.r;
 		if (!r) {
-			return { pass: false, margin: -1 };
+			return FAIL;
 		}
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
 		const b = ctx.band ?? 0;
@@ -301,61 +397,58 @@ export const CUSTOM_TESTS: Record<
 		const second = LOW_OVR_KEYS.filter((k) => k !== "dnk" && k !== "ins")
 			.map((k) => r[k] ?? 0)
 			.sort((x, y) => y - x)[1]!;
-		const margin = Math.min(
-			(fin - 55) / 10,
-			(fin - second) / 10,
-			(fin - Math.max(r.tp ?? 0, r.fg ?? 0) - 10) / 10,
-			(PAINT_BEAST_TP + b - (r.tp ?? 0)) / 10,
-			(PAINT_BEAST_FG + b - (r.fg ?? 0)) / 10,
-			Math.max((r.hgt ?? 0) - 50, (r.stre ?? 0) + b - 60) / 10,
-			p("finish") - 0.5,
-			(ctx.cv.finish ?? 0) / 4,
-			notAnchor(ctx),
-		);
-		return { pass: margin >= 0, margin };
+		const bars = new Bars()
+			.rat(fin - 55)
+			.rat(fin - second)
+			.rat(fin - Math.max(r.tp ?? 0, r.fg ?? 0) - 10)
+			.rat(PAINT_BEAST_TP + b - (r.tp ?? 0))
+			.rat(PAINT_BEAST_FG + b - (r.fg ?? 0))
+			.rat(Math.max((r.hgt ?? 0) - 50, (r.stre ?? 0) + b - 60))
+			.pct(p("finish") - 0.5)
+			.hard((ctx.cv.finish ?? 0) / 4);
+		return notAnchor(bars, ctx).done();
 	},
 	// Interior Force: size and strength (both 55+) and rebounding 55+, no jumper (three and mid-range at most 45), and no
 	// finishing tool (then he is a Paint Beast) (the user: "reb 60, hgt 59, stre 58; 41 3PT rules out Stretch")
 	interiorForceRole: (ctx) => {
 		const r = ctx.r;
 		if (!r) {
-			return { pass: false, margin: -1 };
+			return FAIL;
 		}
 		const b = ctx.band ?? 0;
-		const margin = Math.min(
-			((r.hgt ?? 0) + b - 55) / 10,
-			((r.stre ?? 0) + b - 55) / 10,
-			((r.reb ?? 0) + b - 55) / 10,
-			(45 + b - (r.tp ?? 0)) / 10,
-			(45 + b - (r.fg ?? 0)) / 10,
-			(54.5 + b - Math.max(r.dnk ?? 0, r.ins ?? 0)) / 10,
-			notAnchor(ctx),
-		);
-		return { pass: margin >= 0, margin };
+		const bars = new Bars()
+			.rat((r.hgt ?? 0) + b - 55)
+			.rat((r.stre ?? 0) + b - 55)
+			.rat((r.reb ?? 0) + b - 55)
+			.rat(45 + b - (r.tp ?? 0))
+			.rat(45 + b - (r.fg ?? 0))
+			.rat(54.5 + b - Math.max(r.dnk ?? 0, r.ins ?? 0));
+		return notAnchor(bars, ctx).done();
 	},
 	// Offensive-Minded Guard: a scoring tool (mid-range, three or handle 60+) and no defense (defensive IQ at most 35,
 	// perimeter D below his position's top 70%) (the user: "79 FG, 61 TP, 66 DRB, no defense (25 DIQ)")
 	offGuardRole: (ctx) => {
 		const r = ctx.r;
 		if (!r) {
-			return { pass: false, margin: -1 };
+			return FAIL;
 		}
 		const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
 		const b = ctx.band ?? 0;
-		const margin = Math.min(
-			(Math.max(r.fg ?? 0, r.tp ?? 0, r.drb ?? 0) + b - 60) / 10,
-			(35 + b - (r.diq ?? 0)) / 10,
-			0.3 - p("perD"),
-		);
-		return { pass: margin >= 0, margin };
+		return new Bars()
+			.rat(Math.max(r.fg ?? 0, r.tp ?? 0, r.drb ?? 0) + b - 60)
+			.rat(35 + b - (r.diq ?? 0))
+			.pct(0.3 - p("perD"))
+			.done();
 	},
 	// Crafty: offensive feel well above his position's (and, with sub-ratings, finesse over contact)
 	// (archv4: `bar` the learned offensive-feel bar, wordBars.data.ts)
 	crafty: (ctx, _lead, bar = CRAFTY_OIQ) => {
 		const oiq = ctx.pz.oiq ?? 0;
 		const con = ctx.style.sub?.con ?? 0;
-		const margin = Math.min((oiq - bar) / 2, (0.25 - con) / 2);
-		return { pass: margin >= 0, margin };
+		return new Bars()
+			.z(oiq - bar, 2)
+			.z(0.25 - con, 2)
+			.done();
 	},
 };
 
@@ -368,32 +461,37 @@ export const GLUE_CAP = 0.9;
 // (and he is not a leading scorer: scoring under his position's top 20%, archv3: a star scorer with no single standout
 // skill read as a Glue Guard)
 export const ROLE_SCORE_CAP = 0.8;
-const noStandout = (ctx: WordContext, head: readonly string[] = []) =>
-	Math.min(
-		ROLE_SCORE_CAP - peerPct(ctx.bucket, "score", ctx.cv.score ?? 0),
-		...SKILL_CLASS_KEYS.filter((k) => !head.includes(k)).map(
-			(k) => GLUE_CAP - peerPct(ctx.bucket, k, ctx.cv[k] ?? 0),
-		),
-	);
+const noStandout = (
+	b: Bars,
+	ctx: WordContext,
+	head: readonly string[] = [],
+) => {
+	b.pct(ROLE_SCORE_CAP - peerPct(ctx.bucket, "score", ctx.cv.score ?? 0));
+	for (const k of SKILL_CLASS_KEYS) {
+		if (!head.includes(k)) {
+			b.pct(GLUE_CAP - peerPct(ctx.bucket, k, ctx.cv[k] ?? 0));
+		}
+	}
+	return b;
+};
 // (a role player does not carry the offense: his usage, when his box score says, under +0.5 z at his position)
-const lowUsage = (ctx: WordContext) => {
+const lowUsage = (b: Bars, ctx: WordContext) => {
 	const u = ctx.statZ?.usg;
-	return u === undefined ? Infinity : (0.5 - u) / 4;
+	return u === undefined ? b : b.z(0.5 - u, 4);
 };
 const glue = (ctx: WordContext, side: string[], nSide: number): WordTest => {
 	const p = (k: string) => peerPct(ctx.bucket, k, ctx.cv[k] ?? 0);
 	const sides = side.map((k) => p(k) - 0.5).sort((a, b) => b - a);
 	const broad = SKILL_CLASS_KEYS.map((k) => p(k) - 0.5).sort((a, b) => b - a);
-	const margin = Math.min(
-		p("perD") - 0.5,
-		ctx.top3.includes("perD") ? 1 : -0.01,
-		sides[nSide - 1]!,
-		broad[2]!,
-		noStandout(ctx, ["perD"]),
-		(ctx.cv.perD ?? 0) / 4,
-		lowUsage(ctx),
-	);
-	return { pass: margin >= 0, margin };
+	const b = new Bars()
+		.pct(p("perD") - 0.5)
+		.top3(ctx, ["perD"])
+		.pct(sides[nSide - 1]!)
+		.pct(broad[2]!)
+		.hard((ctx.cv.perD ?? 0) / 4);
+	noStandout(b, ctx, ["perD"]);
+	lowUsage(b, ctx);
+	return b.done();
 };
 
 const subOk = (
@@ -441,57 +539,49 @@ export const testConcept = (
 	const learned = lead ? undefined : bar;
 	const rule = RULES[concept];
 	if (!rule) {
-		return { pass: false, margin: -1 };
+		return FAIL;
 	}
 	const support = learned ?? rule.support;
 	const v = (k: string) => ctx.cv[k] ?? 0;
 	const pct = (k: string) => peerPct(ctx.bucket, k, v(k));
-	let margin = Infinity;
+	const b = new Bars();
 	const cls = rule.classes;
 	if (cls.length > 0) {
 		// Every class at the support bar ...
 		if (support < 1) {
 			for (const k of cls) {
-				margin = Math.min(margin, pct(k) - (1 - support));
+				b.pct(pct(k) - (1 - support));
 			}
 		}
 		// ... and for the head one of them at the lead bar, among his three best skills
 		if (lead && rule.lead < 1) {
-			margin = Math.min(
-				margin,
-				Math.max(...cls.map((k) => pct(k) - (1 - rule.lead))),
-			);
+			b.pct(Math.max(...cls.map((k) => pct(k) - (1 - rule.lead))));
 			const head = cls.filter((k) => SKILL_CLASS_KEYS.includes(k));
-			if (head.length > 0 && !head.some((k) => ctx.top3.includes(k))) {
-				margin = Math.min(margin, -0.01);
+			if (head.length > 0) {
+				b.top3(ctx, head);
 			}
 		}
-		// The promise floor every holder of the name keeps
+		// The promise floor every holder of the name keeps (yes/no: a name never says what he lacks)
 		for (const k of cls) {
-			margin = Math.min(margin, (v(k) - FLOOR) / 4);
+			b.hard((v(k) - FLOOR) / 4);
 		}
 	}
-	margin = Math.min(margin, subOk(rule.sub, ctx.style) / 4);
-	margin = Math.min(margin, ptOk(rule.pt, ctx.style) / 4);
+	const zBar = (x: number) => {
+		if (x !== Infinity) {
+			b.z(x, 4);
+		}
+	};
+	zBar(subOk(rule.sub, ctx.style));
+	zBar(ptOk(rule.pt, ctx.style));
 	if (WORD_RULES.sniper.re.test(display)) {
 		const s = WORD_RULES.sniper;
-		margin = Math.min(
-			margin,
-			pct(s.cls) - (1 - s.bar),
-			(v(s.cls) - s.floor) / 4,
-			subOk(s.sub, ctx.style) / 4,
-		);
+		b.pct(pct(s.cls) - (1 - s.bar)).hard((v(s.cls) - s.floor) / 4);
+		zBar(subOk(s.sub, ctx.style));
 	}
 	if (WORD_RULES.air.re.test(display)) {
 		const s = WORD_RULES.air;
-		margin = Math.min(
-			margin,
-			pct(s.cls) - (1 - (concept === "air" && learned ? learned : s.bar)),
-			subOk(s.sub, ctx.style) / 4,
-		);
+		b.pct(pct(s.cls) - (1 - (concept === "air" && learned ? learned : s.bar)));
+		zBar(subOk(s.sub, ctx.style));
 	}
-	if (margin === Infinity) {
-		margin = 0;
-	}
-	return { pass: margin >= 0, margin };
+	return b.done();
 };

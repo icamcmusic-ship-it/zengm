@@ -145,7 +145,7 @@ export class GameFlow {
 		const big = this.largest[t];
 		if (this.leadChanges >= 5) {
 			return pickV(rng, [
-				`${this.leadChanges} lead changes and ${this.ties} ties so far.`,
+				`${this.leadChanges} lead changes and ${this.ties === 0 ? "no ties" : this.ties === 1 ? "1 tie" : `${this.ties} ties`} so far.`,
 				`The lead has changed hands ${this.leadChanges} times.`,
 			]);
 		}

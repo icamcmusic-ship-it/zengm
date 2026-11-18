@@ -488,6 +488,7 @@ export type Game = {
 	numPeriods?: number; // Optional only for legacy, otherwise it's the number of periods in the game, defined at the start
 	numPlayersOnCourt?: number;
 	quarterLength?: number; // Minutes per period when the game was played (missing for older games)
+	shotClockLength?: number; // Basketball: seconds on the shot clock when the game was played, only with a custom shot clock (24 otherwise)
 	playoffs?: boolean;
 	// College mode: an NIT game (also playoffs, played in the national tournament's days). Its stats are not postseason stats
 	nit?: boolean;

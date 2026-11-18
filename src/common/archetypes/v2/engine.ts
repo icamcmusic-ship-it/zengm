@@ -61,7 +61,8 @@ import {
 	type Votes,
 } from "./knn.ts";
 import {
-	floorMiss,
+	floorGap,
+	RAMP_RAT,
 	lowOvrTools,
 	peerPct,
 	testConcept,
@@ -126,6 +127,36 @@ export type V2Params = {
 	toolMin: number;
 	// Hysteresis on the absolute bars: last season's label keeps them this many rating points looser (tests.ts band)
 	absBand: number;
+	// archramp: the bars of a word as ramps, not cliffs (tests.ts WordTest soft). A word is fully his `rampHi` ramp
+	// widths above its tightest bar and not his at all `rampLo` widths below it (one width: 3 rating points, 5 percentile
+	// points at his position, 0.25 z); in between its membership rises from 0 to 1 and scales the role's head start, and
+	// a role or descriptor short of full membership pays up to `rampPen`, a name under an absolute floor up to floorPen.
+	// rampLo 0: the cliffs. Measured and NOT shipped (rampLo 1: no gain in stability on the user's league or generated
+	// players, and three gold players lost: the no-standout roles, with their head starts, take the near misses).
+	rampLo: number;
+	rampHi: number;
+	rampPen: number;
+	// archramp: ramps for the ranks the score read (0: as before).
+	// classicSoft (shipped): the earlier reading's builds are candidates by how close each is to its best (its bonus
+	// falls to nothing this many z behind, up to classicAlts of them), not the top three at 1 / 0.8 / 0.7 and the fourth
+	// at nothing: that reading's order moved with 60% of the labels that flipped under small rating noise.
+	// presetSoft (shipped): the earlier reading's label takes a composed name's place over this band of its confidence
+	// around presetConf, not at the one value.
+	// famSoft, famOutW (measured, NOT shipped: +0.9 stability, but held-out 2K family -0.9 and gold role fit -1.7): a
+	// voter torn between two families splits its vote (a softmax at this temperature: z of the earlier reading, a third
+	// of it in shares of the neighbours and the classifier); a candidate outside the voted family pays famOut in full
+	// only when its family trails by famOutW.
+	classicSoft: number;
+	classicAlts: number;
+	prevClassic: boolean;
+	// archramp: a composed label he keeps is kept in last season's words
+	keepWords: boolean;
+	// The low-ovr labels (archv5: Prospect, Depth Piece) are off (the user: "I don't want Prospect and Depth Piece
+	// anymore"): such a player is read like anyone else. true: as archv5.
+	lowOvrRoles: boolean;
+	famSoft: number;
+	famOutW: number;
+	presetSoft: number;
 	// Last season's family's head start
 	famHyst: number;
 	// What a candidate outside the voted family pays (its family's vote is already in its score; Infinity: the voted
@@ -155,7 +186,7 @@ export const V2_PARAMS: V2Params = {
 	kCanon: 1,
 	classicBonus: 1,
 	buildBonus: 0.1,
-	hyst: 0.8,
+	hyst: 1.2,
 	altBuild: 0.5,
 	tuneW: 5,
 	knnBuildMin: 0.1,
@@ -178,6 +209,17 @@ export const V2_PARAMS: V2Params = {
 	toolCap: 52,
 	toolMin: 60,
 	absBand: 3,
+	rampLo: 0,
+	rampHi: 0,
+	rampPen: 3,
+	classicSoft: 1.5,
+	classicAlts: 5,
+	prevClassic: true,
+	keepWords: true,
+	lowOvrRoles: false,
+	famSoft: 0,
+	famOutW: 0,
+	presetSoft: 0.1,
 	famHyst: 1,
 	altClassic: 1,
 	alsoMargin: 0.15,
@@ -185,6 +227,17 @@ export const V2_PARAMS: V2Params = {
 	words: true,
 	k: 15,
 };
+
+// (what the earlier reading's label may trail a composed name by when that reading is sure of it)
+const PRESET_SURE = 6;
+const LOW_OVR_ROLES: ReadonlySet<string> = new Set(["prospect", "depthPiece"]);
+// archramp: a word's membership (0-1) from how far he is from its tightest bar, in ramp widths
+export const rampMu = (soft: number, P: V2Params): number =>
+	P.rampLo <= 0
+		? soft >= 0
+			? 1
+			: 0
+		: Math.max(0, Math.min(1, (soft + P.rampLo) / (P.rampLo + P.rampHi)));
 
 const norm = (s: string) => s.toLowerCase().replace(/[^\da-z]/g, "");
 let nameIndex: Map<string, string> | undefined;
@@ -391,27 +444,39 @@ export const classifyV2 = (
 		? parseComposedId(prevRaw)?.role.key
 		: undefined;
 	const banded: WordContext = { ...ctx, band: P.absBand };
-	const roleTests = new Map<string, { margin: number; name: string }>();
+	// (archramp: `mu` his membership, 1 when he passes every bar clearly; a near miss is a candidate too, and pays)
+	const roleTests = new Map<
+		string,
+		{ margin: number; name: string; mu: number }
+	>();
 	for (const r of ROLES) {
 		if (!r.groups.includes(group)) {
+			continue;
+		}
+		if (!P.lowOvrRoles && LOW_OVR_ROLES.has(r.key)) {
 			continue;
 		}
 		const name = roleWord(r, group, false, pickFor(r, pick));
 		const rctx = r.key === prevRole ? banded : ctx;
 		let margin = Infinity;
+		let soft = Infinity;
 		for (const [i, c] of r.concepts.entries()) {
-			margin = Math.min(margin, testConcept(c, i === 0, rctx, name).margin);
+			const t = testConcept(c, i === 0, rctx, name);
+			margin = Math.min(margin, t.margin);
+			soft = Math.min(soft, t.soft);
 		}
-		if (margin >= 0) {
-			roleTests.set(r.key, { margin, name });
+		const mu = rampMu(soft, P);
+		if (mu > 0) {
+			roleTests.set(r.key, { margin, name, mu });
 		}
 	}
 	// The rulebook's role: the one whose head skill ranks best among his skills, then the margin
+	// (of the roles he passes outright: the voter is the rulebook's yes/no)
 	let ruleRole: RoleDef | undefined;
 	let ruleRank = Infinity;
 	for (const r of ROLES) {
 		const t = roleTests.get(r.key);
-		if (!t) {
+		if (!t || t.margin < 0) {
 			continue;
 		}
 		const head = testHeadRank(r, order);
@@ -447,22 +512,81 @@ export const classifyV2 = (
 	};
 	const famVote = {} as Record<Family, number>;
 	const famScore = {} as Record<Family, number>;
+	// (the vote with every voter all in on one family: what the calibrated confidence was fitted on)
+	const famHard = {} as Record<Family, number>;
+	// archramp: how each voter splits between the families (all on the one it says with famSoft 0)
+	const split: Partial<Record<Voter, Partial<Record<Family, number>>>> = {};
+	if (P.famSoft > 0) {
+		const soft = (
+			x: Partial<Record<Family, number>>,
+			t: number,
+		): Partial<Record<Family, number>> => {
+			const top = Math.max(...Object.values(x));
+			const out: Partial<Record<Family, number>> = {};
+			let sum = 0;
+			for (const [f, v] of Object.entries(x) as [Family, number][]) {
+				const e = Math.exp((v - top) / t);
+				if (e > 1e-4) {
+					out[f] = e;
+					sum += e;
+				}
+			}
+			for (const f of Object.keys(out) as Family[]) {
+				out[f]! /= sum;
+			}
+			return out;
+		};
+		// (the earlier reading: each family's best build, its own label counted as its best)
+		const zFam: Partial<Record<Family, number>> = {};
+		const zTop = s.scored[0]?.z ?? 0;
+		for (const sc of s.scored) {
+			if (zTop - sc.z > 6 * P.famSoft) {
+				break;
+			}
+			if (sc.a.id !== classic.id && !allowedBuild(sc.a.id, pos, cv)) {
+				continue;
+			}
+			const f = familyOfName(nameAt(sc.a, pos), pos);
+			zFam[f] = Math.max(zFam[f] ?? -Infinity, sc.z);
+		}
+		zFam[classicFam] = zTop;
+		split.classic = soft(zFam, P.famSoft);
+		const all = <T>(get: (f: Family, i: number) => T) =>
+			Object.fromEntries(FAMILIES.map((f, i) => [f, get(f, i)])) as Record<
+				Family,
+				T
+			>;
+		if (knnFam) {
+			split.knn = soft(
+				all((f) => votes.family[f] ?? 0),
+				P.famSoft / 3,
+			);
+		}
+		split.probs = soft(
+			all((_f, i) => probs[i]!),
+			P.famSoft / 3,
+		);
+	}
 	for (const [i, f] of FAMILIES.entries()) {
 		famVote[f] = 0;
+		let hard = 0;
 		for (const [v, sf] of said) {
 			if (sf === f) {
-				famVote[f] += relOf(v, f);
+				hard += relOf(v, f);
 			}
+			const q = split[v];
+			famVote[f] += q ? (q[f] ?? 0) * relOf(v, f) : sf === f ? relOf(v, f) : 0;
 		}
-		famScore[f] =
-			P.fV * famVote[f] +
+		const rest =
 			P.fK * (votes.family[f] ?? 0) +
 			P.fP * probs[i]! +
 			P.fC * (classicFam === f ? 1 : 0) +
 			P.fR * (ruleFam === f ? 1 : 0);
+		famScore[f] = P.fV * famVote[f] + rest;
+		famHard[f] = P.fV * hard + rest;
 	}
 	// (archv4: the calibrated confidence reads the vote before last season's head start)
-	const famLead = Object.values(famScore).sort((x, y) => y - x);
+	const famLead = Object.values(famHard).sort((x, y) => y - x);
 	// (archv3: last season's family is kept a little: his family moves only when the vote moves clearly)
 	if (prevRaw && P.famHyst !== 0) {
 		const pa = archetypeById(prevComposed ? prevRaw : mergedId(prevRaw));
@@ -480,18 +604,26 @@ export const classifyV2 = (
 		said.filter(([, f]) => f === family).length >= 2 ? family : undefined;
 
 	// Descriptors he passes
-	const descTests = new Map<string, number>();
+	const descTests = new Map<string, { margin: number; mu: number }>();
 	for (const d of DESCRIPTORS) {
 		if (d.groups && !d.groups.includes(group)) {
 			continue;
 		}
 		const t = testConcept(d.concept, false, ctx, pick?.[d.key] ?? d.names[0]!);
-		if (t.pass) {
-			descTests.set(d.key, t.margin);
+		const mu = rampMu(t.soft, P);
+		if (mu > 0) {
+			descTests.set(d.key, { margin: t.margin, mu });
 		}
 	}
-	const dScore = (d: DescDef) =>
-		P.dM * descTests.get(d.key)! + P.dK * (votes.desc[d.key] ?? 0) - P.dCost;
+	const dScore = (d: DescDef) => {
+		const t = descTests.get(d.key)!;
+		return (
+			P.dM * t.margin +
+			P.dK * (votes.desc[d.key] ?? 0) -
+			P.dCost -
+			P.rampPen * (1 - t.mu)
+		);
+	};
 
 	// Candidates
 	const cands: V2Candidate[] = [];
@@ -538,7 +670,8 @@ export const classifyV2 = (
 		const base =
 			P.rM * t.margin +
 			P.rK * (votes.role[r.key] ?? 0) +
-			roleHeadStart(r.key, P);
+			roleHeadStart(r.key, P) * t.mu -
+			P.rampPen * (1 - t.mu);
 		for (const c of combos) {
 			const pk = pickFor(r, pick, c);
 			const name = composeName(r, c, group, pk);
@@ -602,15 +735,23 @@ export const classifyV2 = (
 	const classicTop: string[] = [classic.id];
 	{
 		let added = 0;
+		const zTop = s.scored[0]?.z ?? 0;
 		for (const sc of s.scored) {
-			if (added >= 2) {
+			// (archramp: by how close it is to the earlier reading's best, not by its rank)
+			const near =
+				P.classicSoft > 0 ? 1 - (zTop - sc.z) / P.classicSoft : undefined;
+			if (
+				near === undefined ? added >= 2 : near <= 0 || added >= P.classicAlts
+			) {
 				break;
 			}
 			if (sc.a.id === classic.id || !allowedBuild(sc.a.id, pos, cv)) {
 				continue;
 			}
 			added++;
-			classicTop.push(sc.a.id);
+			if (added <= 2) {
+				classicTop.push(sc.a.id);
+			}
 			const nm = nameAt(sc.a, pos);
 			const fam = familyOfName(nm, pos);
 			const parsed = parseName(nm, pos);
@@ -624,7 +765,7 @@ export const classifyV2 = (
 				kind: "classicAlt",
 				score:
 					famScore[fam] +
-					P.classicBonus * (0.9 - 0.1 * added) +
+					P.classicBonus * (near ?? 0.9 - 0.1 * added) +
 					P.rK * (votes.role[parsed.role ?? ""] ?? 0) +
 					P.kCanon * (votes.canon[sc.a.id] ?? 0),
 			});
@@ -688,12 +829,13 @@ export const classifyV2 = (
 	// Stretch") pays floorPen, whichever way it came (a composed name, the earlier reading's label, a build)
 	// (last season's label keeps the floors absBand looser)
 	const prevKey = prevRaw && !prevComposed ? mergedId(prevRaw) : prevRaw;
+	// (archramp: the floor is a ramp: nothing `rampHi` widths above it, all of floorPen `rampLo` widths below)
 	const floorPay = (c: V2Candidate) => {
-		if (
-			P.floorPen !== 0 &&
-			floorMiss(c.name, ratings, c.id === prevKey ? P.absBand : 0) > 0
-		) {
-			c.score -= P.floorPen;
+		if (P.floorPen !== 0) {
+			const gap = floorGap(c.name, ratings, c.id === prevKey ? P.absBand : 0);
+			if (gap > -Infinity) {
+				c.score -= P.floorPen * (1 - rampMu(-gap / RAMP_RAT, P));
+			}
 		}
 	};
 	for (const c of cands) {
@@ -711,8 +853,14 @@ export const classifyV2 = (
 	// Family first: the candidates of his family (the classic label when none is)
 	// (a candidate outside the voted family pays famOut: archv3, was a hard filter; Infinity: the family only)
 	// (a build the user's picks favour pays no family toll: his picks say which family players like him are in)
+	// (archramp: in full only when its family trails the voted one by famOutW)
 	const famToll = (c: V2Candidate) =>
-		c.family === family || (tuneBias[c.canon] ?? 0) > 0 ? 0 : P.famOut;
+		c.family === family || (tuneBias[c.canon] ?? 0) > 0
+			? 0
+			: P.famOut *
+				(P.famOutW > 0
+					? Math.min(1, (famScore[family] - famScore[c.family]) / P.famOutW)
+					: 1);
 	let first = classicCand;
 	{
 		let best = -Infinity;
@@ -733,11 +881,26 @@ export const classifyV2 = (
 		!USER_ROLES.has(first.role ?? "")
 	) {
 		const fs = eff(first);
+		// (archramp: how far the earlier reading's label may trail and still take its place, rising over a band of that
+		// reading's confidence)
+		const sure =
+			P.presetSoft > 0
+				? PRESET_SURE *
+					Math.max(
+						0,
+						Math.min(
+							1,
+							(classic.confidence - P.presetConf + P.presetSoft) /
+								(2 * P.presetSoft),
+						),
+					)
+				: classic.confidence >= P.presetConf
+					? Infinity
+					: 0;
 		const preset = cands.find(
 			(c) =>
 				!isComposedId(c.id) &&
-				(eff(c) >= fs - P.presetMargin ||
-					(c.classic && classic.confidence >= P.presetConf)),
+				eff(c) >= fs - P.presetMargin - (c.classic ? sure : 0),
 		);
 		if (preset) {
 			first = preset;
@@ -751,6 +914,16 @@ export const classifyV2 = (
 		let prev = cands.find((c) => c.id === prevId);
 		if (!prev && !prevComposed && allowedBuild(prevId, pos, cv)) {
 			prev = buildCand(prevId);
+			// (archramp: with what the earlier reading still gives it, as its other builds get: a label that slipped out of
+			// that reading's top few used to come back with nothing and lose at once)
+			if (P.classicSoft > 0 && P.prevClassic) {
+				const sc = s.scored.find((x) => x.a.id === prevId);
+				if (sc) {
+					prev.score +=
+						P.classicBonus *
+						Math.max(0, 1 - ((s.scored[0]?.z ?? 0) - sc.z) / P.classicSoft);
+				}
+			}
 			floorPay(prev);
 			cands.push(prev);
 		}
@@ -770,7 +943,10 @@ export const classifyV2 = (
 						c.descs.join("+") === parsed.descs.map((d) => d.key).join("+"),
 				);
 				if (own && eff(own) >= eff(first) - P.hyst) {
-					first = own;
+					// (archramp: in last season's words: the neighbours' word for a role or a descriptor moves from season to
+					// season, and "Rim-Wrecking Prospect" one year and "Rim-Rocking Prospect" the next is the same label)
+					const kept = P.keepWords ? archetypeById(prevId) : undefined;
+					first = kept ? { ...own, id: prevId, name: kept.name } : own;
 				}
 			}
 		}
@@ -846,7 +1022,7 @@ export const classifyV2 = (
 				probs: probsFam,
 			},
 			famScore,
-			roles: [...roleTests.keys()],
+			roles: [...roleTests].filter(([, t]) => t.margin >= 0).map(([k]) => k),
 			candidates: rest,
 			composed: isComposedId(a.id),
 			votes,

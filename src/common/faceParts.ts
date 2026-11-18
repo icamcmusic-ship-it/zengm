@@ -17,6 +17,7 @@ import { HAIR_PARTS } from "./faceParts.hair.ts";
 import { MORE_PARTS } from "./faceParts.more.ts";
 import { BATCH_C_PARTS } from "./faceParts.batchc.ts";
 import { BATCH_D_PARTS } from "./faceParts.batchd.ts";
+import { BATCH_E_PARTS } from "./faceParts.batche.ts";
 
 export type FacePartFeature =
 	| "accessories"
@@ -112,6 +113,7 @@ export const FORK_FACE_PARTS: readonly FacePart[] = [
 	...MORE_PARTS,
 	...BATCH_C_PARTS,
 	...BATCH_D_PARTS,
+	...BATCH_E_PARTS,
 ];
 
 export const registerForkFaceParts = () => {

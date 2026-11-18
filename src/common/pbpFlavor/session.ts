@@ -149,6 +149,8 @@ export type FlavorInit = {
 	numPeriods: number;
 	// Minutes
 	quarterLength: number;
+	// Seconds on the shot clock (a custom shot clock); 24 if not given
+	shotClock?: number;
 	female: boolean;
 	teams: [TeamLabel, TeamLabel];
 	// "Lakers" or, for the All-Star Game, "Team LeBron" (no article)
@@ -457,6 +459,7 @@ export class FlavorSession {
 	private gid: number;
 	private numPeriods: number;
 	private quarterLength: number;
+	private shotClock: number;
 	private noArticle: boolean;
 	private female: boolean;
 	private labels: [TeamLabel, TeamLabel];
@@ -472,8 +475,23 @@ export class FlavorSession {
 	private prevScore: [number, number] = [0, 0];
 	private pending: Attempt | undefined;
 	private lastShot:
-		| { p?: FPlayer; three: boolean; blk?: FPlayer; ft?: boolean; t: 0 | 1 }
+		| {
+				p?: FPlayer;
+				three: boolean;
+				blk?: FPlayer;
+				ft?: boolean;
+				t: 0 | 1;
+				// content3: the miss was worded as an airball
+				air?: boolean;
+		  }
 		| undefined;
+	// content3: what started the possession, for a few play types of their own. The teammate whose block was rebounded (a break that
+	// started with a block), the clock when the ball was won (a foul within a few seconds of it stops a break), the last made three
+	// (threes traded on back-to-back possessions), and the delay-of-game warning each team gets at most once
+	private blockStart: number | undefined;
+	private startClock: number | undefined;
+	private lastMadeThree: { t: 0 | 1; idx: number } | undefined;
+	private delayWarned: [boolean, boolean] = [false, false];
 	private lastReb: { pid: number; own: boolean; t: 0 | 1 } | undefined;
 	private defReb: number | undefined;
 	private stealer: number | undefined;
@@ -581,6 +599,10 @@ export class FlavorSession {
 		this.gid = init.gid;
 		this.numPeriods = init.numPeriods;
 		this.quarterLength = init.quarterLength;
+		this.shotClock =
+			typeof init.shotClock === "number" && init.shotClock > 0
+				? init.shotClock
+				: 24;
 		this.noArticle = init.noArticle;
 		this.female = init.female;
 		this.labels = init.teams;
@@ -898,6 +920,15 @@ export class FlavorSession {
 		return this.period >= this.numPeriods;
 	}
 
+	// What a period of regulation is called in this league (as getPeriodName: halves, quarters, or periods for any other number)
+	private periodWord() {
+		return this.numPeriods === 2
+			? "half"
+			: this.numPeriods === 4
+				? "quarter"
+				: "period";
+	}
+
 	// Does the sim's next real event start a new period (or end the game)? Then what we are describing was the last thing to happen
 	private endsPeriodNext(future: readonly any[] | undefined) {
 		if (!future) {
@@ -1026,7 +1057,7 @@ export class FlavorSession {
 					e.type === "pfFG" ||
 					e.type === "pfTP"
 				) {
-					res = this.onFoul(rng, ev, score);
+					res = this.onFoul(rng, ev, score, future);
 				} else if (e.type === "shootoutStart") {
 					res = this.onShootoutStart(rng, ev);
 				} else if (e.type === "shootoutTeam") {
@@ -1232,7 +1263,7 @@ export class FlavorSession {
 		const prevLabel =
 			this.period > this.numPeriods
 				? "overtime"
-				: `${["first", "second", "third", "fourth", "fifth", "sixth"][this.period - 1] ?? "last"} ${this.numPeriods === 2 ? "half" : "quarter"}`;
+				: `${["first", "second", "third", "fourth", "fifth", "sixth"][this.period - 1] ?? "last"} ${this.periodWord()}`;
 		const prevLen = this.periodLens[this.period] ?? this.quarterLength * 60;
 		this.absBase += prevLen;
 		this.period = ev.period;
@@ -1303,11 +1334,17 @@ export class FlavorSession {
 		}
 		if (ev.type === "overtime") {
 			const n = this.period - this.numPeriods;
+			// the league's overtime length (the overtime's clock), in words: "five minutes"
+			const otMin = Math.round(this.periodLens[this.period]! / 6) / 10;
+			const otLen =
+				otMin === 5
+					? "five minutes"
+					: `${otMin} ${otMin === 1 ? "minute" : "minutes"}`;
 			if (n >= 2) {
 				notes.push(
 					pickV(rng, [
 						`Overtime number ${n}. Legs are heavy on both benches.`,
-						"Another five minutes. Hands on knees all around during the break.",
+						`Another ${otLen}. Hands on knees all around during the break.`,
 						"Into overtime again; the starters look gassed.",
 					]),
 				);
@@ -1316,7 +1353,7 @@ export class FlavorSession {
 					pickV(rng, [
 						"Nobody could separate them in regulation.",
 						"The building braces for extra basketball.",
-						"Five more minutes to settle it.",
+						`${cap(otLen.replace(/ (minutes?)$/, " more $1"))} to settle it.`,
 					]),
 				);
 			}
@@ -1499,6 +1536,18 @@ export class FlavorSession {
 		// (an offensive rebound started this possession; his streak of made field goals before this one)
 		const secondChance = this.startKind === "orb";
 		const hotBefore = this.hot.get(p.pid) ?? 0;
+		// content3: the teammate whose block started this possession; a three right after the other team's three
+		const blockStarter =
+			this.startKind === "drb" && this.blockStart !== undefined
+				? this.pl(this.blockStart)
+				: undefined;
+		const answersThree =
+			meta.three &&
+			!fake &&
+			this.lastMadeThree !== undefined &&
+			this.lastMadeThree.t === o &&
+			this.idx - this.lastMadeThree.idx <= 2;
+		this.lastMadeThree = meta.three && !fake ? { t, idx: this.idx } : undefined;
 		const play: any = {
 			k: "fg",
 			made: true,
@@ -1561,6 +1610,7 @@ export class FlavorSession {
 							`, and ${f.name} is called for the foul`,
 							`, and ${f.name} is whistled on the play`,
 							`, and the whistle is on ${f.name}`,
+							`, with ${f.name} called for the foul`,
 						]) + ` (${ctx.foulTag})`;
 				} else if (f) {
 					t0 +=
@@ -1577,6 +1627,8 @@ export class FlavorSession {
 										`, and ${f.name} is whistled for the foul`,
 										` while getting hit by ${f.name}: and-one`,
 										`, drawing the foul from ${f.name}`,
+										`, and he'll go to the line: the foul is on ${f.name}`,
+										`, plus the foul on ${f.name}`,
 									],
 						) + ` (${ctx.foulTag})`;
 				} else {
@@ -1608,6 +1660,8 @@ export class FlavorSession {
 					" just before the horn",
 					" with time expiring",
 					" as the clock hits zero",
+					" ahead of the horn",
+					" with the clock running out",
 				]);
 				ctx.wow = true;
 				buzzer = true;
@@ -1665,6 +1719,18 @@ export class FlavorSession {
 			fg: true,
 			flags,
 		});
+		// content3: threes on back-to-back possessions
+		if (answersThree && !heave && notes.length < 2 && rng.random() < 0.5) {
+			notes.push(
+				pickV(rng, [
+					`${p.name} answers right back with a three of his own.`,
+					"Threes on back-to-back possessions.",
+					`${cap(this.the(t))} answer from deep.`,
+					`Anything you can do: ${this.the(t)} match that three at the other end.`,
+					"They're trading threes now.",
+				]),
+			);
+		}
 		if (heatCheck && rng.random() < 0.55) {
 			// (the heat check says how many in a row: no second line about his streak)
 			for (let i = notes.length - 1; i >= 0; i--) {
@@ -1700,6 +1766,8 @@ export class FlavorSession {
 					`${p.name} leaks out before the rebound is secured.`,
 					`${p.name} takes off the moment the shot goes up.`,
 					`${p.name} cheats down the floor as the shot goes up.`,
+					`${p.name} releases early and gets behind the defense.`,
+					`${p.name} is off and running as ${rebounder.name} clears the rebound.`,
 				])} ${cap(res.text)}`;
 			}
 		} else if (
@@ -1725,6 +1793,33 @@ export class FlavorSession {
 				res.text = sp.text;
 				action = sp.action;
 			}
+		}
+		// content3: a break that started with a teammate's block (the blocked shot was rebounded by his team, and the basket came on the run)
+		if (
+			blockStarter &&
+			blockStarter.t === t &&
+			ctx.trans &&
+			ctx.defReb !== undefined &&
+			!heave &&
+			res.text === plain &&
+			rng.random() < 0.6
+		) {
+			const b = blockStarter;
+			res.text = `${
+				b.pid === p.pid
+					? pickV(rng, [
+							`${p.name} blocked it at one end; now he finishes at the other.`,
+							`${p.name} turns his own block into a basket.`,
+							`From his block to the other basket: ${p.name} does it all.`,
+						])
+					: pickV(rng, [
+							`${possessive(b.name)} block starts the break.`,
+							`It started with the block by ${b.name}.`,
+							`${possessive(b.name)} rejection turns into points the other way.`,
+							`Defense to offense: ${b.name} blocked it, and they run.`,
+							`${b.name} swatted it at one end, and it becomes a basket at the other.`,
+						])
+			} ${cap(res.text)}`;
 		}
 		if (action) {
 			res.action = action;
@@ -1765,6 +1860,32 @@ export class FlavorSession {
 		if (call) {
 			res.note = [call, res.note].filter(Boolean).join(" ");
 		}
+		// content3: a delay-of-game warning after a made basket (a warning has no stat and changes nothing; at most one a team, since a
+		// second one would be a technical foul, which only the sim can call). Not on an and-one, a buzzer shot or late in a close game
+		if (
+			!res.note &&
+			!this.delayWarned[o] &&
+			!meta.andOne &&
+			!buzzer &&
+			!heave &&
+			!flags.clutch &&
+			!flags.winner &&
+			rng.random() < 0.006
+		) {
+			this.delayWarned[o] = true;
+			const ds = this.floor(o);
+			const d = ds.length > 0 ? rng.pick(ds) : undefined;
+			res.note = pickV(rng, [
+				`${cap(this.the(o))} are warned for delay of game after the basket.`,
+				`Delay-of-game warning on ${this.the(o)}: the ball was knocked away after it went through the net.`,
+				...(d
+					? [
+							`${d.name} bats the ball away after the make, and ${this.the(o)} get a delay-of-game warning.`,
+							`${d.name} is slow to give the ball up after the basket: delay-of-game warning on ${this.the(o)}.`,
+						]
+					: []),
+			]);
+		}
 		res.tags = [
 			meta.andOne && "and-one",
 			ctx.trans && "transition",
@@ -1779,15 +1900,15 @@ export class FlavorSession {
 		return this.cleanResult(res, ctx);
 	}
 
-	// A shot late in the shot clock: the possession had lasted 21.5 seconds or more, and the shot clock was on (the game clock had at least 24
-	// seconds left when the possession started)
+	// A shot late in the shot clock: the possession had lasted 21.5 seconds or more (of a 24-second shot clock: the league's shot clock less
+	// 2.5), and the shot clock was on (the game clock had a full shot clock left when the possession started)
 	private lateInShotClock(att: Attempt | undefined) {
 		return (
 			!!att &&
 			att.poss !== undefined &&
-			att.poss >= 21.5 &&
+			att.poss >= this.shotClock - 2.5 &&
 			Number.isFinite(att.clock) &&
-			att.clock + att.poss >= 24
+			att.clock + att.poss >= this.shotClock
 		);
 	}
 
@@ -1844,6 +1965,8 @@ export class FlavorSession {
 					`${n} cuts to the rim and ${dunk ? "flushes" : "tips in"} the inbound lob from ${an}`,
 					`${an} lobs the inbound pass and ${n} ${dunk ? "slams it home" : "tips it in"}`,
 					`${n} catches the lob off the inbound from ${an} and ${dunk ? "throws it down" : "finishes at the rim"}`,
+					`${an} throws the inbound pass toward the rim, and ${n} ${dunk ? "dunks it" : "guides it in"}`,
+					`${n} gets free on the inbound play and ${dunk ? "slams home" : "lays in"} the lob from ${an}`,
 				]) + "."
 			);
 		}
@@ -1852,6 +1975,7 @@ export class FlavorSession {
 				`${n} cuts to the rim for the inbound lob from ${an} but can't get it to fall`,
 				`${an} lobs the inbound pass, and ${n}'s tip-in attempt rolls off`,
 				`${n} goes up for the inbound lob from ${an} and misses`,
+				`${an} throws the inbound lob to the rim, but ${n} can't finish it`,
 			]) + "."
 		);
 	}
@@ -1864,12 +1988,14 @@ export class FlavorSession {
 					`${n} hits a long jumper from beyond the old three-point line`,
 					`${n} drains a deep shot from downtown`,
 					`${n} pulls up from deep and hits`,
+					`${n} buries a long two from well out`,
 				]) + "."
 			: pickV(rng, [
 					`${n}'s deep shot is off the mark`,
 					`${n} misses a long jumper from deep`,
 					`${n}'s deep shot rims out`,
 					`${n} throws up a deep one that falls short`,
+					`${n} can't connect on a long two`,
 				]) + ".";
 	}
 
@@ -1973,7 +2099,12 @@ export class FlavorSession {
 		if (blocked && blocker) {
 			this.lastShot = { p: shooter, three, blk: blocker, t: shotT };
 		} else {
-			this.lastShot = { p: shooter, three, t: shotT };
+			this.lastShot = {
+				p: shooter,
+				three,
+				t: shotT,
+				air: /airball|misses everything/.test(text),
+			};
 		}
 		this.afterPlay("miss", shotT, ctx);
 		if (shooter) {
@@ -2105,8 +2236,8 @@ export class FlavorSession {
 		} else if (
 			!ev.outOfBounds &&
 			ev.poss !== undefined &&
-			ev.poss >= 17 &&
-			(typeof ev.clock !== "number" || ev.clock + ev.poss >= 24)
+			ev.poss >= this.shotClock - 7 &&
+			(typeof ev.clock !== "number" || ev.clock + ev.poss >= this.shotClock)
 		) {
 			play.shotClock = true;
 		}
@@ -2173,6 +2304,7 @@ export class FlavorSession {
 		if (!ev.outOfBounds) {
 			this.stealer = stealer.pid;
 		}
+		this.startClock = Number.isFinite(ev.clock) ? ev.clock : undefined;
 		this.lastShot = undefined;
 		void score;
 		const res: FlavorResult = {
@@ -2204,6 +2336,8 @@ export class FlavorSession {
 						`${p.name} fights for the rebound after the miss at the line and keeps it alive`,
 						`${p.name} slips in from the lane line and takes the missed free throw`,
 						`${p.name} beats the box-out on the free throw and gets it back`,
+						`${p.name} crashes in off the lane and rebounds the missed free throw`,
+						`${p.name} tips the missed free throw to himself`,
 					])
 				: pickV(rng, [
 						`${p.name} grabs the rebound off the missed free throw`,
@@ -2211,10 +2345,20 @@ export class FlavorSession {
 						`${p.name} takes the missed free throw off the rim`,
 						`${p.name} has the rebound after the miss at the line`,
 						`${p.name} clears the missed free throw`,
+						`${p.name} boxes out on the lane and takes the missed free throw`,
+						`${p.name} rebounds the miss at the line`,
+						`${p.name} pulls down the missed free throw`,
 					]);
 		} else {
-			text = rebText(rng, p, off, !!ls?.three, ownBlock, ls?.blk);
+			text = rebText(rng, p, off, !!ls?.three, ownBlock, ls?.blk, {
+				own: off && !ls?.blk && !ls?.ft && ls?.p?.pid === p.pid,
+				air: !!ls?.air,
+			});
 		}
+		// content3: a block his own team rebounds can start a break; the clock when the ball was won
+		this.blockStart =
+			!off && ls?.blk && ls.blk.t === ev.t ? ls.blk.pid : undefined;
+		this.startClock = Number.isFinite(ev.clock) ? ev.clock : undefined;
 		text = `${cap(text)}.`;
 		const t: 0 | 1 = ev.t;
 		if (off) {
@@ -2292,8 +2436,47 @@ export class FlavorSession {
 		);
 	}
 
-	private onFoul(rng: Rng, ev: any, score: [number, number]): FlavorResult {
+	// What follows a foul in the sim's events: whether the fouler fouls out on it, and whether a bonus trip is the front end of a one-and-one
+	// that is missed (one free throw, then the ball is live: college rules)
+	private afterFoul(ev: any, future: readonly any[] | undefined) {
+		let foulsOut = false;
+		let fts = 0;
+		let firstMissed = false;
+		for (const f of future ?? []) {
+			if (isStatEvent(f) || f.type === "sub" || f.type === "timeouts") {
+				continue;
+			}
+			if (f.type === "foulOut" && f.pid === ev.pid && fts === 0) {
+				foulsOut = true;
+				continue;
+			}
+			if (
+				(f.type === "ft" || f.type === "missFt") &&
+				!f.tech &&
+				f.pid === ev.pidShooting
+			) {
+				fts += 1;
+				if (fts === 1) {
+					firstMissed = f.type === "missFt";
+					continue;
+				}
+			}
+			break;
+		}
+		return {
+			foulsOut,
+			frontEndMissed: ev.type === "pfBonus" && fts === 1 && firstMissed,
+		};
+	}
+
+	private onFoul(
+		rng: Rng,
+		ev: any,
+		score: [number, number],
+		future: readonly any[] | undefined,
+	): FlavorResult {
 		const f = this.pl(ev.pid);
+		const next = this.afterFoul(ev, future);
 		const defT: 0 | 1 = ev.t;
 		const offT: 0 | 1 = defT === 0 ? 1 : 0;
 		this.teamFouls[defT] += 1;
@@ -2301,6 +2484,16 @@ export class FlavorSession {
 		this.checkFoulTrouble(f, pf);
 		const tag = `P${pf}, team foul ${this.teamFouls[defT]}`;
 		let text: string;
+		// content3: a foul within a few seconds of a steal or a defensive rebound is a foul on a break that has just started
+		const sinceStart =
+			this.startClock !== undefined && Number.isFinite(ev.clock)
+				? this.startClock - ev.clock
+				: undefined;
+		const onBreak =
+			(this.startKind === "steal" || this.startKind === "drb") &&
+			sinceStart !== undefined &&
+			sinceStart >= 0 &&
+			sinceStart <= 5;
 		this.startKind = "dead";
 		this.lastReb = undefined;
 		this.defReb = undefined;
@@ -2309,9 +2502,22 @@ export class FlavorSession {
 		this.pending = undefined;
 		if (ev.type === "pfNonShooting") {
 			const intentional = this.isIntentional(offT, score, ev.clock);
+			// content3: no free throws on this one, so the team had a foul to give: said as one late in a period
+			const stopsBreak = !intentional && onBreak && rng.random() < 0.6;
+			const toGive =
+				!intentional &&
+				!stopsBreak &&
+				Number.isFinite(ev.clock) &&
+				ev.clock >= 1 &&
+				ev.clock <= 24 &&
+				rng.random() < 0.6
+					? ev.clock
+					: undefined;
 			text = nonShootingFoul(rng, f, tag, this.the(offT), {
 				intentional,
 				bonus: false,
+				stopsBreak,
+				toGive,
 			});
 			this.trip = null;
 		} else if (ev.type === "pfBonus") {
@@ -2322,10 +2528,12 @@ export class FlavorSession {
 				shooter,
 				bonus: true,
 				teamPenalty: this.the(defT),
+				oneAndOne: next.frontEndMissed,
 			});
 			this.trip = {
 				shooter,
-				n: 2,
+				n: next.frontEndMissed ? 1 : 2,
+				oneAndOne: next.frontEndMissed,
 				i: 0,
 				m: 0,
 				three: false,
@@ -2337,7 +2545,9 @@ export class FlavorSession {
 		} else {
 			const shooter = this.pl(ev.pidShooting);
 			const three = ev.type === "pfTP";
-			text = shootingFoul(rng, shooter, f, tag, three, three ? 3 : 2);
+			text = shootingFoul(rng, shooter, f, tag, three, three ? 3 : 2, {
+				trans: !three && onBreak && rng.random() < 0.7,
+			});
 			this.trip = {
 				shooter,
 				n: three ? 3 : 2,
@@ -2353,17 +2563,21 @@ export class FlavorSession {
 		this.ato = [false, false];
 		const res: FlavorResult = { text };
 		const notes: string[] = [];
+		// (not on the foul he fouls out on: the next line says so)
 		if (
-			pf >= 5 ||
-			(pf >= 3 &&
-				this.period <= Math.floor(this.numPeriods / 2) &&
-				!this.fouledOut.has(f.pid))
+			!next.foulsOut &&
+			(pf >= 5 ||
+				(pf >= 3 &&
+					this.period <= Math.floor(this.numPeriods / 2) &&
+					!this.fouledOut.has(f.pid)))
 		) {
 			if (pf >= 3 && !this.fouledOut.has(f.pid) && rng.random() < 0.55) {
 				notes.push(
 					pickV(rng, [
 						`That's foul number ${pf} on ${f.name}.`,
 						`${f.name} is in foul trouble with ${pf}.`,
+						`${f.name} now has ${pf} fouls.`,
+						`Foul trouble for ${f.name}: that's ${pf}.`,
 					]),
 				);
 			}
@@ -2893,7 +3107,7 @@ export class FlavorSession {
 		const qp = (this.qPts.get(p.pid) ?? 0) + pts;
 		this.qPts.set(p.pid, qp);
 		if (qp >= 10 && qp - pts < 10 && rng.random() < 0.6) {
-			const per = this.numPeriods === 2 ? "half" : "quarter";
+			const per = this.periodWord();
 			const which = this.period > this.numPeriods ? "period" : per;
 			tenNote = pickV(rng, [
 				`That's 10 in the ${which} for ${p.name}.`,
@@ -2918,8 +3132,9 @@ export class FlavorSession {
 			const noMoreScoring = ahead.events.length === 0;
 			const marginBefore = marginAfter - pts;
 			const secs = Math.max(0, o.clock ?? 0);
+			// (at the buzzer only when nothing else happens before the period ends: not with a fraction of a second left and a timeout to come)
 			const when =
-				secs < 1
+				secs < 0.05 || (secs < 1 && this.endsPeriodNext(o.future))
 					? " at the buzzer"
 					: secs <= 10
 						? ` with ${Math.round(secs * 10) / 10} seconds left`
