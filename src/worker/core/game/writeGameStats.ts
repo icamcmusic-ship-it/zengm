@@ -242,6 +242,14 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	if (results.forceWin !== undefined) {
 		gameStats.forceWin = results.forceWin;
 	}
+	// A custom shot clock (as the sim reads it), so the play-by-play text knows when a shot or a turnover was late in the shot clock
+	if (__SPORT === "basketball" && g.get("customShotClock")) {
+		gameStats.shotClockLength = helpers.bound(
+			Math.round(g.get("shotClockLength")),
+			10,
+			60,
+		);
+	}
 	// Coaching systems: each team's offense and defense system, for the box score header
 	for (const i of [0, 1] as const) {
 		const cs = results.team[i].coachSim;
