@@ -816,6 +816,7 @@ export const archetypeInfoForPlayer = async (
 		group: v.group,
 		tier: v.tier,
 		conf: v.conf,
+		...(v.also ? { also: v.also } : {}),
 		season: found.stored ? v.season : undefined,
 		live: !found.stored,
 		why,

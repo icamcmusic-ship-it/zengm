@@ -242,6 +242,22 @@ export const ROLES: RoleDef[] = [
 		concepts: ["glueGuard"],
 		groups: ["guard"],
 	},
+	// archv4 gap roles (the archv3 gap dump's weak clusters): a small guard who scores on floaters and touch, and a
+	// prospect with the burst and the handle who is still raw on offense
+	{
+		key: "floaterGuard",
+		bare: true,
+		names: ["Crafty Floater Guard"],
+		concepts: ["floaterRole"],
+		groups: ["guard"],
+	},
+	{
+		key: "rawHandler",
+		bare: true,
+		names: ["Raw Athletic Handler"],
+		concepts: ["rawHandlerRole"],
+		groups: ["guard", "wing"],
+	},
 	{
 		key: "gameManager",
 		bare: true,
@@ -413,6 +429,8 @@ const CONCEPT_GROUP: Record<string, string> = {
 	switchD: "perD",
 	gameManagerRole: "glue",
 	energyRole: "finish",
+	floaterRole: "finish",
+	rawHandlerRole: "handle",
 	insideOut: "insideOut",
 };
 // Pairs that may share a group after all (2K says them): a mid-range word with the Maestro role
@@ -854,6 +872,8 @@ const ROLE_NOUN: Record<string, string> = {
 	glueGuard: "A role-playing guard",
 	gameManager: "A steady point guard",
 	energyBig: "An energy big",
+	floaterGuard: "A small guard",
+	rawHandler: "A young ball handler",
 };
 const CONCEPT_PHRASE = new Map(CONCEPTS.map((c) => [c.key, c.phrase]));
 const CUSTOM_PHRASE: Record<string, string> = {
@@ -862,6 +882,9 @@ const CUSTOM_PHRASE: Record<string, string> = {
 	glueGuard: "defends and keeps the offense moving",
 	gameManagerRole: "runs the offense without mistakes",
 	energyRole: "runs the floor, finishes at the rim and protects it",
+	floaterRole: "scores in the lane with floaters and touch rather than burst",
+	rawHandlerRole:
+		"has the burst and the handle but is still raw as a shooter and decision-maker",
 	crafty: "wins with craft and touch",
 	air: "plays above the rim",
 };

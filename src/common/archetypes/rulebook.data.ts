@@ -265,7 +265,7 @@ export const RULES: Record<string, Bar> = {
 		pt: { cut: 0 },
 	},
 	scoop: {
-		words: "Scooper, Scooping (crafty layups)",
+		words: "Scooper, Scooping, Floater (crafty layups)",
 		classes: ["finish"],
 		lead: 0.25,
 		support: 0.4,

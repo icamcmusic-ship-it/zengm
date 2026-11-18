@@ -322,7 +322,7 @@ export const CONCEPTS: Concept[] = [
 	},
 	{
 		key: "scoop",
-		re: /Scoop/,
+		re: /Scoop|Floater/,
 		w: { fin: 2.5, oiq: 1 },
 		need: { fin: 0.2 },
 		family: "slasher",
