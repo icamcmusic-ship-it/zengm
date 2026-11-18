@@ -149,6 +149,8 @@ export type FlavorInit = {
 	numPeriods: number;
 	// Minutes
 	quarterLength: number;
+	// Seconds on the shot clock (a custom shot clock); 24 if not given
+	shotClock?: number;
 	female: boolean;
 	teams: [TeamLabel, TeamLabel];
 	// "Lakers" or, for the All-Star Game, "Team LeBron" (no article)
@@ -457,6 +459,7 @@ export class FlavorSession {
 	private gid: number;
 	private numPeriods: number;
 	private quarterLength: number;
+	private shotClock: number;
 	private noArticle: boolean;
 	private female: boolean;
 	private labels: [TeamLabel, TeamLabel];
@@ -596,6 +599,10 @@ export class FlavorSession {
 		this.gid = init.gid;
 		this.numPeriods = init.numPeriods;
 		this.quarterLength = init.quarterLength;
+		this.shotClock =
+			typeof init.shotClock === "number" && init.shotClock > 0
+				? init.shotClock
+				: 24;
 		this.noArticle = init.noArticle;
 		this.female = init.female;
 		this.labels = init.teams;
@@ -913,6 +920,15 @@ export class FlavorSession {
 		return this.period >= this.numPeriods;
 	}
 
+	// What a period of regulation is called in this league (as getPeriodName: halves, quarters, or periods for any other number)
+	private periodWord() {
+		return this.numPeriods === 2
+			? "half"
+			: this.numPeriods === 4
+				? "quarter"
+				: "period";
+	}
+
 	// Does the sim's next real event start a new period (or end the game)? Then what we are describing was the last thing to happen
 	private endsPeriodNext(future: readonly any[] | undefined) {
 		if (!future) {
@@ -1041,7 +1057,7 @@ export class FlavorSession {
 					e.type === "pfFG" ||
 					e.type === "pfTP"
 				) {
-					res = this.onFoul(rng, ev, score);
+					res = this.onFoul(rng, ev, score, future);
 				} else if (e.type === "shootoutStart") {
 					res = this.onShootoutStart(rng, ev);
 				} else if (e.type === "shootoutTeam") {
@@ -1247,7 +1263,7 @@ export class FlavorSession {
 		const prevLabel =
 			this.period > this.numPeriods
 				? "overtime"
-				: `${["first", "second", "third", "fourth", "fifth", "sixth"][this.period - 1] ?? "last"} ${this.numPeriods === 2 ? "half" : "quarter"}`;
+				: `${["first", "second", "third", "fourth", "fifth", "sixth"][this.period - 1] ?? "last"} ${this.periodWord()}`;
 		const prevLen = this.periodLens[this.period] ?? this.quarterLength * 60;
 		this.absBase += prevLen;
 		this.period = ev.period;
@@ -1318,11 +1334,17 @@ export class FlavorSession {
 		}
 		if (ev.type === "overtime") {
 			const n = this.period - this.numPeriods;
+			// the league's overtime length (the overtime's clock), in words: "five minutes"
+			const otMin = Math.round(this.periodLens[this.period]! / 6) / 10;
+			const otLen =
+				otMin === 5
+					? "five minutes"
+					: `${otMin} ${otMin === 1 ? "minute" : "minutes"}`;
 			if (n >= 2) {
 				notes.push(
 					pickV(rng, [
 						`Overtime number ${n}. Legs are heavy on both benches.`,
-						"Another five minutes. Hands on knees all around during the break.",
+						`Another ${otLen}. Hands on knees all around during the break.`,
 						"Into overtime again; the starters look gassed.",
 					]),
 				);
@@ -1331,7 +1353,7 @@ export class FlavorSession {
 					pickV(rng, [
 						"Nobody could separate them in regulation.",
 						"The building braces for extra basketball.",
-						"Five more minutes to settle it.",
+						`${cap(otLen.replace(/ (minutes?)$/, " more $1"))} to settle it.`,
 					]),
 				);
 			}
@@ -1878,15 +1900,15 @@ export class FlavorSession {
 		return this.cleanResult(res, ctx);
 	}
 
-	// A shot late in the shot clock: the possession had lasted 21.5 seconds or more, and the shot clock was on (the game clock had at least 24
-	// seconds left when the possession started)
+	// A shot late in the shot clock: the possession had lasted 21.5 seconds or more (of a 24-second shot clock: the league's shot clock less
+	// 2.5), and the shot clock was on (the game clock had a full shot clock left when the possession started)
 	private lateInShotClock(att: Attempt | undefined) {
 		return (
 			!!att &&
 			att.poss !== undefined &&
-			att.poss >= 21.5 &&
+			att.poss >= this.shotClock - 2.5 &&
 			Number.isFinite(att.clock) &&
-			att.clock + att.poss >= 24
+			att.clock + att.poss >= this.shotClock
 		);
 	}
 
@@ -2214,8 +2236,8 @@ export class FlavorSession {
 		} else if (
 			!ev.outOfBounds &&
 			ev.poss !== undefined &&
-			ev.poss >= 17 &&
-			(typeof ev.clock !== "number" || ev.clock + ev.poss >= 24)
+			ev.poss >= this.shotClock - 7 &&
+			(typeof ev.clock !== "number" || ev.clock + ev.poss >= this.shotClock)
 		) {
 			play.shotClock = true;
 		}
@@ -2414,8 +2436,47 @@ export class FlavorSession {
 		);
 	}
 
-	private onFoul(rng: Rng, ev: any, score: [number, number]): FlavorResult {
+	// What follows a foul in the sim's events: whether the fouler fouls out on it, and whether a bonus trip is the front end of a one-and-one
+	// that is missed (one free throw, then the ball is live: college rules)
+	private afterFoul(ev: any, future: readonly any[] | undefined) {
+		let foulsOut = false;
+		let fts = 0;
+		let firstMissed = false;
+		for (const f of future ?? []) {
+			if (isStatEvent(f) || f.type === "sub" || f.type === "timeouts") {
+				continue;
+			}
+			if (f.type === "foulOut" && f.pid === ev.pid && fts === 0) {
+				foulsOut = true;
+				continue;
+			}
+			if (
+				(f.type === "ft" || f.type === "missFt") &&
+				!f.tech &&
+				f.pid === ev.pidShooting
+			) {
+				fts += 1;
+				if (fts === 1) {
+					firstMissed = f.type === "missFt";
+					continue;
+				}
+			}
+			break;
+		}
+		return {
+			foulsOut,
+			frontEndMissed: ev.type === "pfBonus" && fts === 1 && firstMissed,
+		};
+	}
+
+	private onFoul(
+		rng: Rng,
+		ev: any,
+		score: [number, number],
+		future: readonly any[] | undefined,
+	): FlavorResult {
 		const f = this.pl(ev.pid);
+		const next = this.afterFoul(ev, future);
 		const defT: 0 | 1 = ev.t;
 		const offT: 0 | 1 = defT === 0 ? 1 : 0;
 		this.teamFouls[defT] += 1;
@@ -2467,10 +2528,12 @@ export class FlavorSession {
 				shooter,
 				bonus: true,
 				teamPenalty: this.the(defT),
+				oneAndOne: next.frontEndMissed,
 			});
 			this.trip = {
 				shooter,
-				n: 2,
+				n: next.frontEndMissed ? 1 : 2,
+				oneAndOne: next.frontEndMissed,
 				i: 0,
 				m: 0,
 				three: false,
@@ -2500,11 +2563,13 @@ export class FlavorSession {
 		this.ato = [false, false];
 		const res: FlavorResult = { text };
 		const notes: string[] = [];
+		// (not on the foul he fouls out on: the next line says so)
 		if (
-			pf >= 5 ||
-			(pf >= 3 &&
-				this.period <= Math.floor(this.numPeriods / 2) &&
-				!this.fouledOut.has(f.pid))
+			!next.foulsOut &&
+			(pf >= 5 ||
+				(pf >= 3 &&
+					this.period <= Math.floor(this.numPeriods / 2) &&
+					!this.fouledOut.has(f.pid)))
 		) {
 			if (pf >= 3 && !this.fouledOut.has(f.pid) && rng.random() < 0.55) {
 				notes.push(
@@ -3042,7 +3107,7 @@ export class FlavorSession {
 		const qp = (this.qPts.get(p.pid) ?? 0) + pts;
 		this.qPts.set(p.pid, qp);
 		if (qp >= 10 && qp - pts < 10 && rng.random() < 0.6) {
-			const per = this.numPeriods === 2 ? "half" : "quarter";
+			const per = this.periodWord();
 			const which = this.period > this.numPeriods ? "period" : per;
 			tenNote = pickV(rng, [
 				`That's 10 in the ${which} for ${p.name}.`,
@@ -3067,8 +3132,9 @@ export class FlavorSession {
 			const noMoreScoring = ahead.events.length === 0;
 			const marginBefore = marginAfter - pts;
 			const secs = Math.max(0, o.clock ?? 0);
+			// (at the buzzer only when nothing else happens before the period ends: not with a fraction of a second left and a timeout to come)
 			const when =
-				secs < 1
+				secs < 0.05 || (secs < 1 && this.endsPeriodNext(o.future))
 					? " at the buzzer"
 					: secs <= 10
 						? ` with ${Math.round(secs * 10) / 10} seconds left`

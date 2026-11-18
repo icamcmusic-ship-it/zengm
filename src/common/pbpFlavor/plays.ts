@@ -28,6 +28,8 @@ export type Trip = {
 	fouler: FPlayer | undefined;
 	// a flagrant foul's free throws: the fouled team keeps the ball after them, there is no rebound
 	keepBall?: boolean;
+	// the front end of a one-and-one (college rules) that is missed: no second shot
+	oneAndOne?: boolean;
 };
 
 const ORD = ["first", "second", "third", "fourth"];
@@ -46,6 +48,8 @@ export const nonShootingFoul = (
 		// content3: a foul to give late in a period (seconds left; the team is not in the penalty), a foul to stop a break that has just started
 		toGive?: number;
 		stopsBreak?: boolean;
+		// a one-and-one whose front end is missed: one shot, not two
+		oneAndOne?: boolean;
 	},
 ) => {
 	const n = f.name;
@@ -136,7 +140,7 @@ export const nonShootingFoul = (
 			`${cap(ballTeam)} are in the bonus`,
 			`${team} are over the limit`,
 		]);
-		return `${x[1]} (${tag}). ${state}, so ${opts.shooter.name} ${pickV(rng, ["heads to the line", "goes to the line for two", "will shoot two"])}.`;
+		return `${x[1]} (${tag}). ${state}, so ${opts.shooter.name} ${pickV(rng, opts.oneAndOne ? ["heads to the line for a one-and-one", "will shoot the one-and-one", "goes to the line for a one-and-one"] : ["heads to the line", "goes to the line for two", "will shoot two"])}.`;
 	}
 	return `${x[1]} (${tag}). ${pickV(rng, [`Side out, ${ball} ball.`, `${cap(ballTeam)} inbound from the sideline.`, `Baseline inbound for ${ballTeam}.`, `${ball} ball.`, `${cap(ballTeam)} keep it.`, `${ball} will inbound.`, `${ball} ball out of bounds.`, `${cap(ballTeam)} take it out on the side.`, `No shots; ${ball} ball.`])}`;
 };
@@ -304,6 +308,18 @@ export const freeThrow = (
 	const last = i === total - 1;
 	const ord = ORD[i] ?? `#${i + 1}`;
 	const m = trip.m + (made ? 1 : 0); // makes including this one
+	if (trip.oneAndOne && !made) {
+		return (
+			pickV(rng, [
+				`${n} misses the front end of the one-and-one`,
+				`${n} can't convert the front end of the one-and-one`,
+				`${possessive(n)} one-and-one comes up empty: the front end rims out`,
+				`${n} leaves the front end of the one-and-one short`,
+			]) +
+			"." +
+			nerve
+		);
+	}
 	if (trip.andOne) {
 		const word = trip.three ? "four" : "three";
 		return (
