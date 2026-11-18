@@ -271,4 +271,90 @@ describe("archetype feedback", () => {
 		assert.ok((await getGlobalFeedback()).enabled);
 		void archetypeById;
 	});
+
+	test("review queue: verdicts are kept, counted and never change his label", async () => {
+		const q = await api.reviewQueue();
+		assert.ok(q.enabled);
+		assert.ok(q.items.length > 0 && q.items.length <= 10, `${q.items.length}`);
+		assert.strictEqual(q.stats.judged, 0);
+		// (spread out over labels; a small league fills the batch with whoever is left)
+		assert.isAtLeast(new Set(q.items.map((i) => i.label)).size, 5);
+		// (words only: nothing about a player in numbers but his age)
+		for (const it of q.items) {
+			assert.notMatch([it.label, it.desc, ...it.why].join(" "), /\d{2}/);
+		}
+		const norms = await getLeagueNorms();
+		const [a, b] = q.items;
+		const labelOf = async (pid: number) =>
+			archetypeFor((await idb.cache.players.get(pid))!, norms)!.view.id;
+		const before = [await labelOf(a!.pid), await labelOf(b!.pid)];
+
+		const yes = await api.reviewSubmit({ pid: a!.pid, fits: true });
+		assert.ok(yes.ok, yes.message);
+		const no = await api.reviewSubmit({ pid: b!.pid, fits: false });
+		assert.ok(no.ok, no.message);
+		assert.deepStrictEqual(
+			{ judged: no.stats!.judged, fits: no.stats!.fits },
+			{ judged: 2, fits: 1 },
+		);
+		// Kept in the league, as verdicts; no label pinned, no tuning fitted from them
+		const lf = leagueFeedback();
+		assert.deepStrictEqual(
+			lf.picks.map((x) => [x.pid, x.verdict, x.picked === x.shown]),
+			[
+				[a!.pid, "fits", true],
+				[b!.pid, "no", false],
+			],
+		);
+		assert.deepStrictEqual(lf.overrides, {});
+		assert.strictEqual(activeTuning().hash, "");
+		assert.deepStrictEqual(
+			[await labelOf(a!.pid), await labelOf(b!.pid)],
+			before,
+		);
+		// (they are not picks of another build)
+		assert.strictEqual((await api.tuningInfo()).leaguePicks, 0);
+
+		// The next queue leaves both out, and the user's own passes too
+		const c = q.items[2];
+		const q2 = await api.reviewQueue({ skip: c ? [c.pid] : [] });
+		const pids = q2.items.map((i) => i.pid);
+		assert.notInclude(pids, a!.pid);
+		assert.notInclude(pids, b!.pid);
+		if (c) {
+			assert.notInclude(pids, c.pid);
+		}
+		assert.strictEqual(q2.remaining, q.remaining - 2);
+
+		// Changing his mind replaces the verdict
+		const again = await api.reviewSubmit({ pid: b!.pid, fits: true });
+		assert.deepStrictEqual(
+			{ judged: again.stats!.judged, fits: again.stats!.fits },
+			{ judged: 2, fits: 2 },
+		);
+		assert.strictEqual(leagueFeedback().picks.length, 2);
+
+		// The picks file carries them, and a reset forgets them
+		const file = await api.tuningExport();
+		assert.strictEqual(
+			fromPickFile(JSON.parse(JSON.stringify(file))).filter((x) => x.verdict)
+				.length,
+			2,
+		);
+		await api.tuningReset();
+		assert.strictEqual((await api.reviewQueue()).stats.judged, 0);
+	});
+
+	test("review queue: a player whose label the user picked is not asked about", async () => {
+		const p = await someone();
+		const { id } = await pickOther(p.pid);
+		await api.feedbackSubmit({ pid: p.pid, id });
+		const q = await api.reviewQueue({ n: 100 });
+		assert.notInclude(
+			q.items.map((i) => i.pid),
+			p.pid,
+		);
+		const res = await api.reviewSubmit({ pid: p.pid, fits: true });
+		assert.isFalse(res.ok);
+	});
 });

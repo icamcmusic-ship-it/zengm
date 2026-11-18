@@ -16,6 +16,7 @@ import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
 import {
 	archetypeFor,
+	archetypeInfoForPlayer,
 	archetypeLabelSource,
 	displayArchetypeLabel,
 	archetypeTraits,
@@ -58,9 +59,12 @@ import {
 	snapshotRows,
 	toPickFile,
 	toTuningFile,
+	verdictKey,
+	verdictStats,
 	type FeedbackPick,
 	type PickFile,
 	type TuningFile,
+	type VerdictStats,
 } from "../../common/archetypes/tuning.ts";
 import { traitsEnabled } from "../core/player/traits.ts";
 import { expandedRatingsOn } from "../core/player/expandedRatings.ts";
@@ -471,6 +475,244 @@ export const feedbackClear = async ({ pid }: { pid: number }) => {
 	return { ok: true };
 };
 
+// ---- archramp: the review queue. "Does this label fit him?" for a handful of players at a time, the ones the reading is
+// least sure of first: a yes/no answer is quick and far more consistent than picking one build out of hundreds. A "Fits"
+// makes him a labeled player for the reading's neighbours (like a pick, v2/picks.ts) and pins nothing; a "Doesn't fit"
+// is kept as a miss (and the picker is one click away). Together they are the fit rate: the share of labels the user
+// accepts, the number to watch when the reading changes.
+
+export type ReviewItem = {
+	pid: number;
+	name: string;
+	pos: string;
+	age: number;
+	// Team abbreviation, "FA" or "Draft"
+	team: string;
+	label: string;
+	desc: string;
+	// The why bullets of his popover (words only: no numbers)
+	why: string[];
+};
+export type ReviewQueue = {
+	enabled: boolean;
+	items: ReviewItem[];
+	// Players still to judge this season (the queue's items included)
+	remaining: number;
+	stats: VerdictStats;
+};
+
+const REVIEW_BATCH = 10;
+// A batch is spread out: at most this many players of one family, and one of each label
+const REVIEW_PER_FAMILY = 3;
+
+// The family of a label, as the picker names it
+const familyNameOf = (id: string): string => {
+	const a = archetypeById(id);
+	return a ? FAMILY_NAMES[familyOf(a)] : "";
+};
+
+const reviewStats = async () => verdictStats(await tuningPicks());
+
+export const reviewQueue = async ({
+	n = REVIEW_BATCH,
+	skip = [],
+}: {
+	n?: number;
+	// Players the user passed over (this visit)
+	skip?: number[];
+} = {}): Promise<ReviewQueue> => {
+	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
+		return {
+			enabled: false,
+			items: [],
+			remaining: 0,
+			stats: { judged: 0, fits: 0, families: [] },
+		};
+	}
+	const lid = g.get("lid");
+	const lf = leagueFeedback();
+	// (judged already: this label of his, this season)
+	const judged = new Set(
+		lf.picks.filter((p) => p.verdict).map((p) => `${verdictKey(p)}:${p.shown}`),
+	);
+	const skipped = new Set(skip);
+	const norms = await getLeagueNorms();
+	const raw = [
+		...(await idb.cache.players.indexGetAll("playersByTid", [
+			PLAYER.FREE_AGENT,
+			Infinity,
+		])),
+		...(await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)),
+	];
+	const open: {
+		pid: number;
+		conf: number;
+		ovr: number;
+		id: string;
+		family: string;
+	}[] = [];
+	for (const p of raw) {
+		if (overrideFor(p.pid) !== undefined) {
+			continue;
+		}
+		const found = archetypeFor(p, norms);
+		if (!found || found.user) {
+			continue;
+		}
+		const row = last(p.ratings) as any;
+		const season =
+			typeof row.season === "number" ? (row.season as number) : g.get("season");
+		if (judged.has(`${lid}:${p.pid}:${season}:${found.view.id}`)) {
+			continue;
+		}
+		open.push({
+			pid: p.pid,
+			conf: found.view.conf ?? 50,
+			ovr: row.ovr ?? 0,
+			id: found.view.id,
+			family: familyNameOf(found.view.id),
+		});
+	}
+	// Least sure first (then the better player: the one the user is more likely to know)
+	open.sort((a, b) => a.conf - b.conf || b.ovr - a.ovr || a.pid - b.pid);
+	const chosen: typeof open = [];
+	const labels = new Set<string>();
+	const perFamily = new Map<string, number>();
+	for (const pass of [0, 1]) {
+		for (const o of open) {
+			if (chosen.length >= n) {
+				break;
+			}
+			if (skipped.has(o.pid) || chosen.includes(o)) {
+				continue;
+			}
+			// (the second pass fills a short batch with whoever is left)
+			if (pass === 0) {
+				if (
+					labels.has(o.id) ||
+					(perFamily.get(o.family) ?? 0) >= REVIEW_PER_FAMILY
+				) {
+					continue;
+				}
+			}
+			labels.add(o.id);
+			perFamily.set(o.family, (perFamily.get(o.family) ?? 0) + 1);
+			chosen.push(o);
+		}
+	}
+	const abbrevs = new Map<number, string>();
+	for (const t of await idb.cache.teams.getAll()) {
+		abbrevs.set(t.tid, t.abbrev);
+	}
+	const items: ReviewItem[] = [];
+	for (const o of chosen) {
+		const p = await idb.cache.players.get(o.pid);
+		const info = p ? await archetypeInfoForPlayer(p) : undefined;
+		if (!p || !info) {
+			continue;
+		}
+		const row = last(p.ratings) as any;
+		items.push({
+			pid: p.pid,
+			name: `${p.firstName} ${p.lastName}`,
+			pos: row.pos,
+			age: g.get("season") - p.born.year,
+			team:
+				p.tid >= 0
+					? (abbrevs.get(p.tid) ?? "")
+					: p.tid === PLAYER.FREE_AGENT
+						? "FA"
+						: "Draft",
+			label: info.label,
+			desc: info.desc,
+			why: info.whyBullets ?? [],
+		});
+	}
+	return {
+		enabled: true,
+		items,
+		remaining: open.length,
+		stats: await reviewStats(),
+	};
+};
+
+export const reviewSubmit = async ({
+	pid,
+	fits,
+}: {
+	pid: number;
+	fits: boolean;
+}): Promise<{ ok: boolean; message: string; stats?: VerdictStats }> => {
+	if (__SPORT !== "basketball" || !featureOn("archetypes")) {
+		return { ok: false, message: "Archetypes are off." };
+	}
+	const r = await readingOf(pid);
+	if (!r || !r.found) {
+		return { ok: false, message: "No archetype for this player." };
+	}
+	if (r.found.user) {
+		return { ok: false, message: "You already picked his label yourself." };
+	}
+	const shown = r.found.view.id;
+	const expanded = hasExpandedRatings(r.ratings);
+	const at = Date.now();
+	const pick: FeedbackPick = {
+		uid: `${g.get("lid")}-${pid}-${at.toString(36)}`,
+		at,
+		pid,
+		name: `${r.p.firstName} ${r.p.lastName}`,
+		season: r.season,
+		pos: r.pos,
+		shown,
+		picked: fits ? shown : null,
+		verdict: fits ? "fits" : "no",
+		family: familyNameOf(shown),
+		expanded,
+		v: ARCHETYPE_READING_VERSION,
+		rows: snapshotRows(
+			r.ratings,
+			r.norms,
+			modelFor(expanded),
+			[shown],
+			r.pos,
+			r.traits,
+			r.read,
+		),
+		input: {
+			ratings: r.ratings,
+			pos: r.pos,
+			ovr: r.row.ovr,
+			...r.read,
+			...(r.traits ? { traits: r.traits } : {}),
+		},
+	};
+	// (a new verdict on the same player and season replaces his earlier one)
+	const same = (x: FeedbackPick) =>
+		x.verdict !== undefined && verdictKey(x) === verdictKey(pick);
+	const lf = leagueFeedback();
+	const gone = new Set(lf.picks.filter(same).map((x) => x.uid));
+	await saveLeagueFeedback({
+		picks: [...lf.picks.filter((x) => !gone.has(x.uid)), pick],
+		overrides: lf.overrides,
+	});
+	const glob = await getGlobalFeedback();
+	if (glob.enabled) {
+		await saveGlobalFeedback({
+			...glob,
+			picks: mergePicks(
+				glob.picks.filter((x) => !gone.has(x.uid)),
+				[pick],
+			),
+		});
+	}
+	await scheduleRefit();
+	return {
+		ok: true,
+		message: fits ? "Fits." : "Doesn't fit.",
+		stats: await reviewStats(),
+	};
+};
+
 export type TuningInfo = {
 	enabled: boolean;
 	leaguePicks: number;
@@ -482,13 +724,16 @@ export type TuningInfo = {
 	changes: string[];
 };
 
+// (the review queue's verdicts are not picks of another build: counted apart)
+const isPick = (p: FeedbackPick) => !p.verdict;
+
 export const tuningInfo = async (): Promise<TuningInfo> => {
 	const glob = await getGlobalFeedback();
 	const t = await refitArchetypeTuning();
 	return {
 		enabled: __SPORT === "basketball" && featureOn("archetypes"),
-		leaguePicks: leagueFeedback().picks.length,
-		globalPicks: glob.picks.length,
+		leaguePicks: leagueFeedback().picks.filter(isPick).length,
+		globalPicks: glob.picks.filter(isPick).length,
 		usedPicks: t.n,
 		crossLeague: glob.enabled,
 		globalWeights: t.n >= MIN_PICKS_GLOBAL,
@@ -595,6 +840,8 @@ export default {
 	feedbackOptions,
 	feedbackSubmit,
 	feedbackClear,
+	reviewQueue,
+	reviewSubmit,
 	tuningInfo,
 	tuningReset,
 	setCrossLeague,

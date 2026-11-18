@@ -11,6 +11,11 @@ import { BoxScoreWrapper } from "../components/BoxScoreWrapper.tsx";
 import { GameHype } from "../components/GameHype.tsx";
 import { BoxScoreRow } from "../components/BoxScoreRow.tsx";
 import { useLocal } from "../util/local.ts";
+import { isValidElement, useState, type ReactNode } from "react";
+import { buildPlayByPlayEntries } from "../components/BoxScorePlayByPlay.basketball.tsx";
+import { downloadFile, jsonFileBytes } from "../util/downloadFile.ts";
+import { toWorker } from "../util/toWorker.ts";
+import { GAME_ACRONYM } from "../../common/constants.ts";
 
 const StatsRow = ({
 	p,
@@ -27,6 +32,133 @@ const StatsRow = ({
 	});
 	return (
 		<BoxScoreRow className={classes} onClick={toggleClicked} p={p} {...props} />
+	);
+};
+
+// A line of play-by-play as plain text (the page renders it with links and notes)
+const plainText = (node: ReactNode): string => {
+	if (node === null || node === undefined || typeof node === "boolean") {
+		return "";
+	}
+	if (typeof node === "string" || typeof node === "number") {
+		return String(node);
+	}
+	if (Array.isArray(node)) {
+		return node.map(plainText).join("");
+	}
+	if (isValidElement(node)) {
+		const inner = plainText((node.props as { children?: ReactNode }).children);
+		// (a note or a second sentence on its own line reads as a new sentence)
+		return typeof node.type === "string" && BLOCK_TAGS.has(node.type)
+			? ` ${inner} `
+			: inner;
+	}
+	return "";
+};
+const BLOCK_TAGS = new Set(["div", "p", "br", "li", "span"]);
+
+// "Download game data": one JSON file with everything stored for the game (worker api exportGame: the box score with
+// every player's line, the scoring summary...) and its play-by-play, as the events the sim logged and as the text the
+// Play-By-Play tab shows (period, clock, team, score after the play), when the game's play-by-play was stored
+const DownloadGame = ({ boxScore }: { boxScore: any }) => {
+	const [status, setStatus] = useState<
+		"idle" | "working" | "done" | "noPbp" | "error"
+	>("idle");
+	const download = async () => {
+		setStatus("working");
+		try {
+			const { leagueName, game, playByPlay } = await toWorker(
+				"main",
+				"exportGame",
+				{ gid: boxScore.gid },
+			);
+			const teams = boxScore.teams.map((t: any) => ({
+				tid: t.tid,
+				region: t.region,
+				name: t.name,
+				abbrev: t.abbrev,
+			}));
+			let lines:
+				| {
+						period: number;
+						clock: string | undefined;
+						team: string | undefined;
+						text: string;
+						score: Record<string, number>;
+						pids: number[];
+				  }[]
+				| undefined;
+			if (__SPORT === "basketball" && boxScore.pbp) {
+				try {
+					lines = buildPlayByPlayEntries(boxScore).map((e) => ({
+						period: e.period,
+						clock: e.time,
+						team: e.t === undefined ? undefined : teams[e.t]?.abbrev,
+						text: plainText(e.text).replace(/\s+/g, " ").trim(),
+						score: {
+							[teams[0].abbrev]: e.score[0],
+							[teams[1].abbrev]: e.score[1],
+						},
+						pids: e.pids,
+					}));
+				} catch (error) {
+					console.error(error);
+				}
+			}
+			const file = {
+				kind: "game",
+				version: 1,
+				sport: __SPORT,
+				exported: new Date().toISOString(),
+				// (teams[0] is the home team, as in the game)
+				teams,
+				game,
+				playByPlay: playByPlay
+					? {
+							lines,
+							players: playByPlay.players,
+							events: playByPlay.events,
+							rivalry: playByPlay.rivalry,
+							context: playByPlay.context,
+						}
+					: null,
+			};
+			downloadFile(
+				`${GAME_ACRONYM}_${leagueName}_game_${game.season}_${teams[1].abbrev}_at_${teams[0].abbrev}_${game.gid}.json`.replace(
+					/[^\w.-]/g,
+					"_",
+				),
+				jsonFileBytes(file, 1),
+				"application/json",
+			);
+			setStatus(playByPlay ? "done" : "noPbp");
+		} catch (error) {
+			console.error(error);
+			setStatus("error");
+		}
+	};
+	return (
+		<div className="d-flex flex-wrap align-items-center gap-2 mt-3">
+			<button
+				type="button"
+				className="btn btn-sm btn-secondary"
+				disabled={status === "working"}
+				onClick={download}
+			>
+				Download game data (JSON)
+			</button>
+			<span className="small text-body-secondary" role="status">
+				{status === "working"
+					? "Preparing..."
+					: status === "done"
+						? "Downloaded: box score and play-by-play."
+						: status === "noPbp"
+							? "Downloaded the box score. No play-by-play was stored for this game."
+							: status === "error"
+								? "Could not make the file."
+								: "Box score, every player's line and the play-by-play."}
+			</span>
+		</div>
 	);
 };
 
@@ -239,6 +371,9 @@ const GameLog = ({
 									tid={tid}
 									Row={StatsRow}
 								/>
+							) : null}
+							{boxScore.gid >= 0 ? (
+								<DownloadGame key={boxScore.gid} boxScore={boxScore} />
 							) : (
 								<p>Select a game from the menu to view a box score.</p>
 							)}

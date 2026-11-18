@@ -16,9 +16,15 @@ import {
 	ROLE_BY_KEY,
 	ROLES,
 } from "./grammar.ts";
-import { CUSTOM_TESTS, floorMiss, type WordContext } from "./tests.ts";
+import {
+	CUSTOM_TESTS,
+	floorGap,
+	floorMiss,
+	RAMP_RAT,
+	type WordContext,
+} from "./tests.ts";
 import { USER_PICKS } from "./userPicks.data.ts";
-import { canonOf } from "./engine.ts";
+import { canonOf, classifyV2, rampMu, V2_PARAMS } from "./engine.ts";
 
 describe("archv2 grammar", () => {
 	test("every word reads as the concept its test is on (so a name's promises are exactly its words')", () => {
@@ -279,5 +285,115 @@ describe("archv2 grammar", () => {
 		assert.isTrue(prospect(ctx(21, { reb: 67 }), false).pass);
 		assert.isFalse(prospect(ctx(26, { reb: 67 }), false).pass);
 		assert.isFalse(prospect(ctx(21, { reb: 67, ins: 60 }), false).pass);
+	});
+
+	test("archramp: a word's bars are ramps, in step with the yes/no they replace", () => {
+		// The membership: nothing a ramp width below the bar, all of it at the bar; rampLo 0 is the old cliff
+		const P = { ...V2_PARAMS, rampLo: 1, rampHi: 0 };
+		assert.strictEqual(rampMu(-1, P), 0);
+		assert.closeTo(rampMu(-0.5, P), 0.5, 1e-9);
+		assert.strictEqual(rampMu(0, P), 1);
+		assert.strictEqual(rampMu(3, P), 1);
+		assert.strictEqual(rampMu(-Infinity, P), 0);
+		const cliff = { ...V2_PARAMS, rampLo: 0 };
+		assert.strictEqual(rampMu(-1e-6, cliff), 0);
+		assert.strictEqual(rampMu(0, cliff), 1);
+		// (centred: half way at the bar)
+		assert.closeTo(
+			rampMu(0, { ...V2_PARAMS, rampLo: 1, rampHi: 1 }),
+			0.5,
+			1e-9,
+		);
+
+		// An absolute floor: how far below it, one ramp width = RAMP_RAT rating points
+		const r = (x: Record<string, number>) => x as any;
+		assert.strictEqual(floorGap("Stretch Big", r({ tp: 45 })), 0);
+		assert.strictEqual(floorGap("Stretch Big", r({ tp: 43 })), 2);
+		assert.strictEqual(floorGap("Lockdown Defender", r({ tp: 20 })), -Infinity);
+		const pen = (tp: number) =>
+			1 - rampMu(-floorGap("Stretch Big", r({ tp })) / RAMP_RAT, P);
+		assert.strictEqual(pen(45), 0);
+		assert.isAbove(pen(44), 0);
+		assert.isBelow(pen(44), pen(43));
+		assert.strictEqual(pen(42), 1);
+		assert.strictEqual(pen(30), 1);
+
+		// A test's distance in ramp widths has the sign of its yes/no, moves with the rating, and a yes/no bar (the
+		// prospect flag, an age) is never softened
+		const flat = {
+			hgt: 60,
+			stre: 60,
+			spd: 60,
+			jmp: 60,
+			endu: 60,
+			ins: 45,
+			dnk: 50,
+			ft: 40,
+			fg: 45,
+			tp: 40,
+			oiq: 45,
+			diq: 45,
+			drb: 45,
+			pss: 45,
+			reb: 50,
+		};
+		const ctx = (x = {}, age = 30, prospect = false) =>
+			({
+				cv: {},
+				pz: {},
+				top3: [],
+				bucket: "C",
+				style: {},
+				r: { ...flat, ...x },
+				age,
+				prospect,
+			}) as unknown as WordContext;
+		const depth = CUSTOM_TESTS.depthPieceRole!;
+		let last = Infinity;
+		for (const dnk of [48, 50, 51, 52, 53, 54, 60]) {
+			const t = depth(ctx({ dnk }), false);
+			assert.strictEqual(t.pass, t.soft >= 0, `dnk ${dnk}`);
+			assert.isAtMost(t.soft, last, `dnk ${dnk}`);
+			last = t.soft;
+		}
+		// (one point over the cap is a near miss, ten is not his word at all)
+		assert.isAbove(rampMu(depth(ctx({ dnk: 51 }), false).soft, P), 0);
+		assert.strictEqual(rampMu(depth(ctx({ dnk: 60 }), false).soft, P), 0);
+		assert.strictEqual(depth(ctx({}, 30, true), false).soft, -Infinity);
+		assert.strictEqual(depth(ctx({}, 22), false).soft, -Infinity);
+	});
+
+	test('no Prospect or Depth Piece label (the user: "I don\'t want Prospect and Depth Piece anymore")', () => {
+		// The user's own picks of the archcmp sample that he had called a Prospect: read like anyone else now, and with the
+		// labels back on (lowOvrRoles) they read as before
+		const low = USER_PICKS.filter(
+			(p) => /Prospect/.test(p.label ?? "") && p.input?.ratings,
+		);
+		assert.isAtLeast(low.length, 2);
+		let was = 0;
+		for (const pk of low) {
+			const opts = {
+				pos: pk.input!.pos,
+				age: pk.input!.age,
+				srID: `upick:${pk.uid}`,
+			};
+			const c = classifyV2(pk.input!.ratings, opts);
+			assert.notMatch(c.name, /Prospect|Depth Piece/, pk.name);
+			assert.notMatch(
+				c.alternates.map((a) => a.name).join(" "),
+				/Prospect|Depth Piece/,
+			);
+			if (
+				/Prospect|Depth Piece/.test(
+					classifyV2(pk.input!.ratings, {
+						...opts,
+						params: { lowOvrRoles: true },
+					}).name,
+				)
+			) {
+				was++;
+			}
+		}
+		assert.isAtLeast(was, 1);
 	});
 });

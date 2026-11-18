@@ -54,6 +54,7 @@ import {
 import * as staff from "../core/staff/index.ts";
 import { ensureGms } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
+import { decodePlayByPlay } from "../../common/pbpFlavor/store.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import {
 	achievement,
@@ -1853,6 +1854,44 @@ const getExportFilename = async (type: "league" | "players") => {
 	}
 
 	throw new Error("Not implemented");
+};
+
+// One game as a file (Game Log, "Download game data"): everything stored with the game (the box score: both teams, every
+// player's line, the scoring summary, the clutch plays...) and, where its play-by-play was stored (basketball, the Store
+// Play-By-Play setting), the events the sim logged, decoded (common/pbpFlavor/store.ts). The UI adds the team names and
+// the play-by-play as text, which it already has from the page.
+const exportGame = async ({ gid }: { gid: number }) => {
+	const raw = await idb.merged.games.get(gid);
+	if (!raw) {
+		throw new Error("Game not found");
+	}
+	const { pbp, ...game } = helpers.deepCopy(raw) as any;
+	let playByPlay:
+		| {
+				players: unknown[];
+				events: unknown[];
+				rivalry: number;
+				context?: number[];
+		  }
+		| undefined;
+	if (typeof pbp === "string") {
+		try {
+			const d = decodePlayByPlay(pbp);
+			playByPlay = {
+				players: d.players,
+				events: d.events,
+				rivalry: d.rivalry,
+				...(d.game ? { context: d.game } : {}),
+			};
+		} catch (error) {
+			console.error(error);
+		}
+	}
+	return {
+		leagueName: (await league.getName()).replace(/[^\da-z]/gi, "_"),
+		game,
+		playByPlay,
+	};
 };
 
 const exportDraftClass = async ({
@@ -6364,6 +6403,7 @@ const api = {
 		dunkUser,
 		evalOnWorker,
 		exportDraftClass,
+		exportGame,
 		getExportFilename,
 		exportPlayerAveragesCsv,
 		exportPlayerGamesCsv,

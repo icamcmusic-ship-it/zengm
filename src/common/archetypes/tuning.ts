@@ -86,6 +86,11 @@ export type FeedbackPick = {
 	shown: string;
 	picked: string | null;
 	better?: boolean;
+	// archramp: a verdict from the review queue ("Fits" / "Doesn't fit" on the label shown, League -> Archetypes). "fits":
+	// picked is the shown build (a labeled player for the reading's neighbours; it tunes nothing and pins nothing);
+	// "no": picked is null. `family`: the shown label's family, for the fit rate per family.
+	verdict?: "fits" | "no";
+	family?: string;
 	expanded: boolean;
 	// Reading version (helpers.ts ARCHETYPE_READING_VERSION)
 	v: number;
@@ -466,6 +471,54 @@ export const fromPickFile = (x: unknown): FeedbackPick[] => {
 			typeof p.shown === "string" &&
 			Array.isArray(p.rows),
 	);
+};
+
+// archramp: the review queue's verdicts as a fit rate: the latest verdict per player and season, overall and per family
+// of the label shown (worst first, families with `minPerFamily` verdicts or more)
+export type VerdictStats = {
+	judged: number;
+	fits: number;
+	families: { family: string; judged: number; fits: number }[];
+};
+export const verdictKey = (p: Pick<FeedbackPick, "uid" | "season">) => {
+	const [lid, pid] = p.uid.split("-");
+	return `${lid}:${pid}:${p.season}`;
+};
+export const verdictStats = (
+	picks: readonly FeedbackPick[],
+	minPerFamily = 3,
+): VerdictStats => {
+	const latest = new Map<string, FeedbackPick>();
+	for (const p of [...picks].sort((a, b) => a.at - b.at)) {
+		if (p.verdict) {
+			latest.set(verdictKey(p), p);
+		}
+	}
+	const fam = new Map<string, { judged: number; fits: number }>();
+	let fits = 0;
+	for (const p of latest.values()) {
+		const ok = p.verdict === "fits";
+		fits += ok ? 1 : 0;
+		if (p.family) {
+			const f = fam.get(p.family) ?? { judged: 0, fits: 0 };
+			f.judged++;
+			f.fits += ok ? 1 : 0;
+			fam.set(p.family, f);
+		}
+	}
+	return {
+		judged: latest.size,
+		fits,
+		families: [...fam]
+			.filter(([, f]) => f.judged >= minPerFamily)
+			.map(([family, f]) => ({ family, ...f }))
+			.sort(
+				(a, b) =>
+					a.fits / a.judged - b.fits / b.judged ||
+					b.judged - a.judged ||
+					(a.family < b.family ? -1 : 1),
+			),
+	};
 };
 
 // Merge pick lists (by uid; the later list wins)

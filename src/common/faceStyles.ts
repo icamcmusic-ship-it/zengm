@@ -215,6 +215,26 @@ export const HAIR_STYLES: readonly HairStyle[] = [
 		age: "young",
 		hairBg: "fork-viking-braids-long",
 	},
+	// Batch E (common/faceParts.batche.ts): no common tier, so the existing styles keep most of their share
+	{ id: "fork-cornrows-curved", textures: C, rarity: "rare", age: "young" },
+	{ id: "fork-feed-in-braids", textures: C, rarity: "uncommon", age: "young" },
+	{ id: "fork-braided-mohawk", textures: C, rarity: "rare", age: "young" },
+	{ id: "fork-locs-fringe", textures: C, rarity: "uncommon", age: "young" },
+	{
+		id: "fork-locs-high-ponytail",
+		textures: C,
+		rarity: "rare",
+		age: "young",
+	},
+	{ id: "fork-afro-taper", textures: C, rarity: "uncommon" },
+	{ id: "fork-afro-taper", textures: CU, rarity: "rare" },
+	{ id: "fork-curly-fringe", textures: CU, rarity: "uncommon", age: "young" },
+	{ id: "fork-curly-fringe", textures: C, rarity: "rare", age: "young" },
+	{ id: "fork-curly-top-knot", textures: CU, rarity: "rare", age: "young" },
+	{ id: "fork-flow", textures: S, rarity: "uncommon" },
+	{ id: "fork-side-swoop", textures: S, rarity: "uncommon", age: "young" },
+	{ id: "fork-two-block", textures: S, rarity: "uncommon", age: "young" },
+	{ id: "fork-split-dye", textures: ALL, rarity: "rare", age: "young" },
 ];
 
 // Facial hair rarity (ids not listed are uncommon; "none" is left to facesjs' own 50/50)
@@ -238,8 +258,12 @@ const FACIAL_COMMON = [
 	"fork-full-beard",
 	"fork-goatee-stubble",
 	"fork-goatee-extended",
+	"fork-beard-coily",
+	"fork-stache-scruff",
 ];
 const FACIAL_RARE = [
+	"fork-beard-forked",
+	"fork-imperial",
 	"fork-braided-chin",
 	"fork-fu-manchu",
 	"fork-huge-beard",
@@ -286,6 +310,13 @@ const FORK_FACIAL = [
 	"fork-goatee-extended",
 	"fork-braided-chin",
 	"fork-pencil-beard",
+	// Batch E
+	"fork-beard-faded",
+	"fork-beard-coily",
+	"fork-beard-forked",
+	"fork-beard-spade",
+	"fork-stache-scruff",
+	"fork-imperial",
 ];
 
 export const facialHairRarity = (id: string): Rarity =>

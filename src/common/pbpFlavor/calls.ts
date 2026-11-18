@@ -210,6 +210,8 @@ export const beatClockText = (rng: Rng) =>
 		" with the shot clock about to expire",
 		" as the shot clock hits one",
 		" a split second before the shot-clock horn",
+		" with one tick left on the shot clock",
+		" just ahead of the shot-clock buzzer",
 	]);
 
 export const lateClockMiss = (rng: Rng) =>
@@ -217,6 +219,8 @@ export const lateClockMiss = (rng: Rng) =>
 		" with the shot clock running out",
 		" as the shot clock expires",
 		", a forced look late in the clock",
+		" with the shot clock nearly gone",
+		", rushed to beat the shot clock",
 	]);
 
 // ---- second chances ----
@@ -227,12 +231,16 @@ export const secondChanceLead = (rng: Rng, made: boolean) =>
 			? [
 					"On the second chance, ",
 					"Second-chance points: ",
+					"Given a second look, ",
+					"After the offensive rebound, ",
 					"Off the offensive board, ",
 				]
 			: [
 					"On the second chance, ",
 					"Off the offensive board, ",
 					"With another chance, ",
+					"After the offensive rebound, ",
+					"Given a second look, ",
 				],
 	);
 
@@ -289,6 +297,8 @@ export const bigCall = (rng: Rng, kind: CallKind): string => {
 				"Oh, what a finish!",
 				"Thunder!",
 				"Look out below!",
+				"He threw that one down!",
+				"Powerful!",
 			]);
 		case "oop":
 			return pickV(rng, [
@@ -296,6 +306,7 @@ export const bigCall = (rng: Rng, kind: CallKind): string => {
 				"Up, and in!",
 				"Special delivery!",
 				"What a lob!",
+				"Right on the money!",
 			]);
 		case "block":
 			return pickV(rng, [
@@ -304,12 +315,16 @@ export const bigCall = (rng: Rng, kind: CallKind): string => {
 				"Not in his house!",
 				"Denied!",
 				"No, no, no!",
+				"Sent back!",
+				"Not today!",
 			]);
 		case "chasedown":
 			return pickV(rng, [
 				"Out of nowhere!",
 				"Where did he come from?!",
 				"What a hustle play!",
+				"He never gave up on it!",
+				"He ran that one down!",
 			]);
 		case "deep":
 			return pickV(rng, [
@@ -318,6 +333,8 @@ export const bigCall = (rng: Rng, kind: CallKind): string => {
 				"Splash!",
 				"Are you serious?!",
 				"From the parking lot!",
+				"From another zip code!",
+				"He pulled up from there?!",
 			]);
 		case "buzzer":
 			return pickV(rng, [
@@ -325,6 +342,8 @@ export const bigCall = (rng: Rng, kind: CallKind): string => {
 				"Got it off in time!",
 				"Beat the buzzer!",
 				"Just in time!",
+				"It counts!",
+				"Before the horn!",
 			]);
 		case "winner":
 			return pickV(rng, [
