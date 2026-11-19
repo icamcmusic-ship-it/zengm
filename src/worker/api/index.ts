@@ -198,6 +198,7 @@ import formatPlayerFactory from "../core/realRosters/formatPlayerFactory.ts";
 import { applyRealPlayerPhotos } from "../core/league/processPlayerNewLeague.ts";
 import * as scouting from "../core/draft/scouting.ts";
 import * as draftDay from "../core/draft/draftDay.ts";
+import * as draftNightTrades from "../core/draft/draftNightTrades.ts";
 import {
 	getMockDraft,
 	getProProjections as getProProjectionsCore,
@@ -2883,6 +2884,30 @@ const getDraftDayInfo = async (otherTid: number | undefined) => {
 		boards,
 		trade: tid !== undefined ? await draftDay.getDraftDayTrade(tid) : undefined,
 	};
+};
+
+const getDraftPickValueChart = async () =>
+	await draftNightTrades.getPickValueChart();
+
+const getDraftNightOffers = async (shopDpid: number | undefined) =>
+	await draftNightTrades.getDraftNightOffers(shopDpid);
+
+const declineDraftNightOffer = (key: string) => {
+	draftNightTrades.declineDraftNightOffer(key);
+};
+
+const acceptDraftNightOffer = async (teams: TradeTeams) => {
+	const result = await draftNightTrades.acceptDraftNightOffer(teams);
+	let undoKey;
+	if (result.accepted && result.undo) {
+		undoKey = local.undoLog.add(result.undo, [
+			"advanceDay",
+			"leagueChange",
+			"newPhase",
+		]);
+	}
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+	return { accepted: result.accepted, message: result.message, undoKey };
 };
 
 const setDraftBoardAutoDraft = async (draftBoardAutoDraft: boolean) => {
@@ -6457,6 +6482,10 @@ const api = {
 		runMockDraft,
 		getProProjections,
 		getDraftDayInfo,
+		getDraftPickValueChart,
+		getDraftNightOffers,
+		declineDraftNightOffer,
+		acceptDraftNightOffer,
 		staffAction,
 		staffDepthAction,
 		offEmphasisAction,

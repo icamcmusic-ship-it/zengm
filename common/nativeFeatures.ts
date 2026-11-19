@@ -1169,6 +1169,18 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "draftNightTrades",
+		college: false,
+		key: "featureDraftNightTrades",
+		core: true,
+		name: "Draft-Night Trades",
+		description:
+			"Picks move during the draft. A pick value chart for every pick of this draft (built from this class's prospects, so a deep or shallow class shifts it) on the Draft page. Now and then an AI team trades up for a prospect it wants with a team happy to move down, paying with later picks (news items). When you're on the clock or close to it, AI teams may offer to trade up into your pick or down out of theirs, and you can shop your pick for offers. Every deal is valued like any other trade.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "lotteryNight",
 		college: false,
 		key: "featureLotteryNight",

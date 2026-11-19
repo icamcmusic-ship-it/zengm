@@ -592,6 +592,14 @@ const getPickTradeValue = (
 	);
 };
 
+// Draft-night trades' pick value chart: the trade value of an overall pick number in a draft, the same number the trade
+// AI adds up for a pick whose place in the order is known (before strategy, GM and contract adjustments)
+export const getPickSlotTradeValue = (
+	estValues: TradePickValues,
+	season: number,
+	overallPick: number,
+) => getPickTradeValue({ estValues } as ValueChangeCache, season, overallPick);
+
 // Number of teams in the order going into the draft
 const getNumSlots = (cache: ValueChangeCache) => {
 	return cache.wps.filter((row) => !row.projectedTeam.noDraftPick).length;
