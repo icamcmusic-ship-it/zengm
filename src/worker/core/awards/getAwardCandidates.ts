@@ -6,6 +6,7 @@ import type {
 	AwardInfoTeam,
 	Awards,
 	GameAttributesLeague,
+	PlayerStatAttr,
 } from "../../../common/types.ts";
 import { groupByUnique } from "../../../common/utils.ts";
 import { idb } from "../../db/index.ts";
@@ -14,6 +15,15 @@ import g from "../../util/g.ts";
 import type { StatOverridesByMatchup } from "./getPlayers.ts";
 import { hashPlayoffSeries } from "./hashPlayoffSeries.ts";
 import { processAwards } from "./processAwards.ts";
+import {
+	effectiveAwardFormula,
+	getAwardKeyStats,
+	pickerStats,
+	type AwardKeyStats,
+	type KeyStatRow,
+} from "./keyStats.ts";
+import player from "../player/index.ts";
+import helpers from "../../util/helpers.ts";
 
 const persistedAwardsToAwardSetting = (persistedAwards: Awards) => {
 	let statOverridesByMatchup: StatOverridesByMatchup | undefined;
@@ -112,9 +122,101 @@ export const awardCandidateStats: Partial<
 	},
 });
 
+type StatRangeKey = "regularSeason" | "playoffs" | "combined";
+
+const sameStatRange = (
+	row: { playoffs: boolean | "combined" | "playoffSeries" },
+	statRange: StatRangeKey,
+) =>
+	statRange === "regularSeason"
+		? row.playoffs === false
+		: statRange === "playoffs"
+			? row.playoffs === true
+			: row.playoffs === "combined";
+
+// Arrays from stats by position or game highs, as single numbers (like getPlayers does)
+const BASEBALL_POS_AVERAGED = new Set(["ch", "fldp", "rf9", "rfg", "inn"]);
+const flattenStat = (key: string, value: unknown) => {
+	if (!Array.isArray(value)) {
+		return value;
+	}
+	if (key.endsWith("Max")) {
+		return value[0];
+	}
+	const numbers = value.filter((x): x is number => typeof x === "number");
+	const sum = helpers.sum(numbers);
+	if (__SPORT === "baseball" && BASEBALL_POS_AVERAGED.has(key)) {
+		return numbers.length > 0 ? sum / numbers.length : undefined;
+	}
+	return sum;
+};
+
+// Award Races stat picker: load every stat it offers for the candidates only (the award formulas only load what they read)
+const addPickerStats = async (
+	players: Awaited<ReturnType<typeof processAwards>>["players"],
+	pidsByStatRange: Map<StatRangeKey, Set<number>>,
+	season: number,
+) => {
+	const stats = pickerStats(false, []).filter(
+		(stat) => stat !== "keyStats",
+	) as PlayerStatAttr[];
+	const playersByPid = groupByUnique(players, "pid");
+
+	for (const [statRange, pids] of pidsByStatRange) {
+		if (pids.size === 0) {
+			continue;
+		}
+		const playersRaw = await idb.merged.players.getAll({
+			pids: Array.from(pids),
+		});
+		const formatted = (await player.formatAll(playersRaw, {
+			attrs: ["pid"],
+			stats: ["season", ...stats],
+			seasonRange: [season - 1, season],
+			seasonType: statRange,
+			mergeStats: "totOnly",
+			fuzz: true,
+		})) as unknown as {
+			pid: number;
+			stats: ({
+				season: number;
+				playoffs: boolean | "combined";
+			} & Record<string, unknown>)[];
+		}[];
+
+		for (const p2 of formatted) {
+			const p = playersByPid[p2.pid];
+			if (!p) {
+				continue;
+			}
+			for (const row2 of p2.stats) {
+				if (!sameStatRange(row2, statRange)) {
+					continue;
+				}
+
+				// currentStats is a reference to one of these rows
+				const targets = p.stats.filter(
+					(row) => row.season === row2.season && sameStatRange(row, statRange),
+				);
+				for (const target of targets as Record<string, unknown>[]) {
+					for (const stat of stats) {
+						if (target[stat] === undefined && row2[stat] !== undefined) {
+							target[stat] = flattenStat(stat, row2[stat]);
+						}
+					}
+				}
+			}
+		}
+	}
+};
+
 export const getAwardCandidates = async (
 	season: number,
 	awardsOverride?: GameAttributesLeague["awards"],
+	options?: {
+		// Load every stat the Award Races stat picker offers, for the candidates
+		pickerStats?: boolean;
+	},
 ) => {
 	let awards;
 	let statOverridesByMatchup;
@@ -136,6 +238,25 @@ export const getAwardCandidates = async (
 	});
 
 	const playersByPid = groupByUnique(players, "pid");
+
+	if (options?.pickerStats) {
+		const pidsByStatRange = new Map<StatRangeKey, Set<number>>();
+		for (const award of realizedAwards.flat()) {
+			const statRange = award.statRange ?? "regularSeason";
+			if (typeof statRange === "number") {
+				continue;
+			}
+			const pids = pidsByStatRange.getOrInsert(statRange, new Set());
+			const winners =
+				award.numTeams === undefined ? award.winner : award.winner.flat();
+			for (const p of winners) {
+				if (p.pid !== undefined) {
+					pids.add(p.pid);
+				}
+			}
+		}
+		await addPickerStats(players, pidsByStatRange, season);
+	}
 
 	const augmentPlayers = (
 		award: Award,
@@ -177,6 +298,46 @@ export const getAwardCandidates = async (
 	) & {
 		players: ReturnType<typeof augmentPlayers>;
 		stats: string[];
+		keyStats: AwardKeyStats;
+	};
+
+	const getKeyStats = (
+		award: Award,
+		augmented: ReturnType<typeof augmentPlayers>,
+		fallback: string[],
+	) => {
+		const rows: KeyStatRow[] = [];
+		for (const p of augmented) {
+			if (p.opoyOverride) {
+				// Scored with a different formula
+				continue;
+			}
+			const stats: Record<string, unknown> = {
+				...p.currentStats,
+				...p.statOverrides,
+			};
+			let baseline;
+			if (award.mip) {
+				const statRange = award.statRange ?? "regularSeason";
+				const prev =
+					typeof statRange === "number"
+						? undefined
+						: p.stats.findLast(
+								(row) =>
+									row.season === season - 1 && sameStatRange(row, statRange),
+							);
+				if (!prev) {
+					continue;
+				}
+				baseline = { ...stats, ...prev };
+			}
+			rows.push({
+				stats,
+				baseline,
+				formula: effectiveAwardFormula(award, p.pos),
+			});
+		}
+		return getAwardKeyStats({ award, fallback, rows });
 	};
 
 	const awardCandidates: Output[][] = realizedAwards.map((group) =>
@@ -190,23 +351,33 @@ export const getAwardCandidates = async (
 
 			const numTeams = award.numTeams;
 			if (numTeams !== undefined) {
-				return award.winner.map((winner, i): Output => {
+				const teams = award.winner.map((winner) =>
+					augmentPlayers(award, winner),
+				);
+
+				// Same key stats for every team of the award, from all of their players
+				const keyStats = getKeyStats(award, teams.flat(), showStats);
+
+				return teams.map((players, i): Output => {
 					return {
 						...award,
 						numTeams,
 						rank: i + 1,
-						players: augmentPlayers(award, winner),
+						players,
 						stats,
+						keyStats,
 					};
 				});
 			}
 
+			const players = augmentPlayers(award, award.winner);
 			return {
 				...award,
 				numTeams: undefined,
 				rank: undefined,
-				players: augmentPlayers(award, award.winner),
+				players,
 				stats,
+				keyStats: getKeyStats(award, players, showStats),
 			};
 		}),
 	);

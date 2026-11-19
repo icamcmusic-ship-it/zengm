@@ -147,6 +147,7 @@ export { default as Archetypes } from "./Archetypes.tsx";
 export { default as Hype } from "./Hype.tsx";
 export { default as BestGames } from "./BestGames.tsx";
 export { default as AwardVote } from "./AwardVote.tsx";
+export { default as AwardHistory } from "./AwardHistory.tsx";
 export { default as Timeline } from "./Timeline.tsx";
 export { default as LeagueExtras } from "./LeagueExtras.tsx";
 export { default as FaceStyleGallery } from "./FaceStyleGallery.tsx";

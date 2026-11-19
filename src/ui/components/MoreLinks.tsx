@@ -270,6 +270,10 @@ export const MoreLinks = (
 				name: "Award Races",
 			},
 			{
+				url: ["award_history"],
+				name: "Award History",
+			},
+			{
 				url: ["award_settings"],
 				name: "Award Settings",
 			},

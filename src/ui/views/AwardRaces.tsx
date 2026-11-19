@@ -8,7 +8,13 @@ import { PLAYER } from "../../common/constants.ts";
 import { wrappedPlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import type { DataTableRow } from "../components/DataTable/index.tsx";
 import { RatingWithChange } from "../components/RatingWithChange.tsx";
-import { StatWithChange } from "../components/StatWithChange.tsx";
+import {
+	AwardStatPicker,
+	KeyStatsNote,
+	keyStatCell,
+	keyStatCol,
+	useAwardStatCols,
+} from "../components/AwardKeyStats.tsx";
 import { useLocal } from "../util/local.ts";
 import { getCol } from "../../common/getCol.ts";
 import { Fragment, type ReactNode } from "react";
@@ -59,6 +65,7 @@ const getRows = ({
 	odds,
 	currentSeason,
 	season,
+	stats,
 	teams,
 	userTid,
 }: {
@@ -66,9 +73,10 @@ const getRows = ({
 	challengeNoRatings: boolean;
 	odds?: Record<number, number>;
 	currentSeason: number;
+	stats: string[];
 	userTid: number;
 } & Pick<View<"awardRaces">, "season" | "teams">) => {
-	const { mip, rookie, players, stats } = award;
+	const { mip, rookie, players } = award;
 
 	const rows: DataTableRow<"player">[] = players.map((p, j) => {
 		const ps = p.currentStats;
@@ -157,14 +165,10 @@ const getRows = ({
 					}
 
 					if (!ps2 || stat === "score" || stat === "keyStats") {
-						return helpers.roundStat(ps[stat], stat);
+						return keyStatCell(ps?.[stat], stat);
 					}
 
-					return (
-						<StatWithChange change={ps[stat] - ps2[stat]} stat={stat}>
-							{ps[stat]}
-						</StatWithChange>
-					);
+					return keyStatCell(ps?.[stat], stat, ps2[stat]);
 				}),
 				<a
 					href={helpers.leagueUrl([
@@ -186,11 +190,8 @@ const getRows = ({
 					};
 				}
 
-				return ps
-					? helpers.roundStat(
-							p.statOverrides ? p.statOverrides[stat] : ps[stat],
-							stat,
-						)
+				return ps || p.statOverrides
+					? keyStatCell(p.statOverrides?.[stat] ?? ps?.[stat], stat)
 					: null;
 			});
 			data.push(...statsRow);
@@ -259,14 +260,24 @@ export const AwardRaceTable = ({
 	confs,
 	divs,
 	odds,
+	picker = true,
 	rowsInfo: { award, season, teams },
 	titleOverride,
 }: {
 	odds?: Record<number, number>;
+
+	// false: always the suggested key stats, no picker (Award Settings preview, where the formula is being edited)
+	picker?: boolean;
+
 	rowsInfo: RowsInfo;
 	titleOverride?: ReactNode;
 } & Pick<View<"awardRaces">, "confs" | "divs">) => {
-	const { mip, rookie, stats } = award;
+	const { mip, rookie, keyStats } = award;
+
+	const statCols = useAwardStatCols(award.shortName, keyStats, picker);
+	const stats = keyStats
+		? [...statCols.stats.filter((stat) => stat !== "score"), "score"]
+		: award.stats;
 
 	const asterisk =
 		__SPORT === "football" &&
@@ -281,8 +292,8 @@ export const AwardRaceTable = ({
 		"Team",
 		rookie ? "Pick" : "Record",
 		"Ovr",
-		...stats.map((stat) => `stat:${stat}`),
 	]);
+	cols.push(...stats.map((stat) => keyStatCol(stat, keyStats)));
 	if (mip) {
 		cols.push(getCol("Compare"));
 	}
@@ -294,9 +305,22 @@ export const AwardRaceTable = ({
 		);
 	}
 
-	const title = titleOverride ?? (
+	const baseTitle = titleOverride ?? (
 		<Title asterisk={asterisk} award={award} confs={confs} divs={divs} />
 	);
+	const title =
+		picker && keyStats ? (
+			<div className="d-flex align-items-start gap-2">
+				{baseTitle}
+				<AwardStatPicker
+					awardName={award.name}
+					keyStats={keyStats}
+					statCols={statCols}
+				/>
+			</div>
+		) : (
+			baseTitle
+		);
 
 	const {
 		challengeNoRatings,
@@ -310,6 +334,7 @@ export const AwardRaceTable = ({
 		odds,
 		currentSeason,
 		season,
+		stats,
 		teams,
 		userTid,
 	});
@@ -338,6 +363,7 @@ export const AwardRaceTable = ({
 					* Exceptional QBs can win both MVP and {award.shortName}
 				</div>
 			) : null}
+			<KeyStatsNote keyStats={keyStats} who="these players" />
 		</>
 	);
 };

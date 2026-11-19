@@ -19,7 +19,9 @@ export default defineView({
 			inputs.season !== prevInputs?.season
 		) {
 			const awardCandidates = (
-				await getAwardCandidates(inputs.season)
+				await getAwardCandidates(inputs.season, undefined, {
+					pickerStats: true,
+				})
 			).awardCandidates.flat();
 
 			const teams = await team.getFormattedAll({
