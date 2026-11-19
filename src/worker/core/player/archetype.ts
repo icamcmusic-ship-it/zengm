@@ -279,6 +279,16 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 	const ptRows: { pt: PlayTypes; bucket: (typeof POS_BUCKET)[Pos] }[] = [];
 	const season = g.get("season");
 	const advOn = featureOn("advStats");
+	// (archnouns3: how common each current label is)
+	const labelCounts: Record<string, number> = {};
+	let labeled = 0;
+	for (const p of players) {
+		const id = currentEntry(p.archetypes)?.id;
+		if (id) {
+			labelCounts[id] = (labelCounts[id] ?? 0) + 1;
+			labeled++;
+		}
+	}
 	for (const p of players) {
 		const ratings = ratingsForArchetype(p);
 		if (ratings) {
@@ -343,6 +353,11 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 	// archreview: the league's scale for the absolute gates (common/archetypes/v2/gateScale.ts), for a real-players league
 	// only (real players' ratings sit on another scale: Chris Paul passes at 58). A random league, however weak, is read
 	// on the absolute bars (archreview2: the user's weak leagues should have no elite labels at all)
+	if (labeled >= MIN_LEAGUE_FOR_NORMS) {
+		norms.common = Object.fromEntries(
+			Object.entries(labelCounts).map(([id, n]) => [id, n / labeled]),
+		);
+	}
 	if (rows.length >= MIN_LEAGUE_FOR_NORMS) {
 		const q = ratingQuantiles(rows);
 		// (archnouns: the nouns' standings, in every league)

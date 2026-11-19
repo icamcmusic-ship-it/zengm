@@ -32,7 +32,7 @@ export const tierOf = (ovr: number | undefined): Tier =>
 // Words only a top player's name may have (the review: "Sniper", "Lockdown", "Engine", "Force of Nature", "Prodigy",
 // "Triple-Double Threat" and the like oversell anyone below the top tier)
 export const ELITE_RE =
-	/Sniper|Sharpshoot|Logo|Deep-Range|Splash|Laser|Automatic|Silk|Big Range|Lockdown|\bLock\b|Clamp|Eliminator|Engine|Force of Nature|Yamming|Prodigy|Phenom|Savant|Maestro|\bKing\b|Apex|Anomaly|Triple-Double|Superstar|Do-It-All|Wizard|Pharaoh|Master|Mr\.|Walking Bucket|Shot Creator|Shot-Creating|Ankle|Eras|Obliterat|Rim Reaper|Rim-Reaping|Terror|Fortress|\bGlide\b|Architect|\bGeneral\b|Titan|Juggernaut|Unicorn/;
+	/Sniper|Sharpshoot|Logo|Deep-Range|Splash|Laser|Automatic|Silk|Big Range|Lockdown|\bLock\b|Clamp|Eliminator|Engine|Force of Nature|Yamming|Prodigy|Phenom|Savant|Maestro|\bKing\b|Apex|Anomaly|Triple-Double|Superstar|Do-It-All|Wizard|Pharaoh|Master|Mr\.|Walking Bucket|Shot Creator|Shot-Creating|Ankle|Eras|Obliterat|Rim Reaper|Rim-Reaping|Terror|Fortress|\bGlide\b|Architect|\bGeneral\b|Titan|Juggernaut|Unicorn|Deadeye|\bAce\b|Walking-Bucket|Prototype|Clamp Lock/;
 
 // ---- skills that clear a real bar ----
 export type Skill =

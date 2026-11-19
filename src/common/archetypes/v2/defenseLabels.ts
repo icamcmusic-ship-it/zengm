@@ -1,6 +1,6 @@
 // archnouns: the defensive label's own description and "why" line (the user: a player with an offensive and a defensive
 // label has both in his description and his why). Keyed by the label without its Long / Switchable prefix.
-const DEFENSE_TEXT: Record<string, { desc: string; why: string }> = {
+export const DEFENSE_TEXT: Record<string, { desc: string; why: string }> = {
 	"Switch Defender": {
 		desc: "guards the perimeter and the rim, so he can switch",
 		why: "Defends both the perimeter and the rim well",

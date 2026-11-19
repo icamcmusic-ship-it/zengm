@@ -1048,6 +1048,7 @@ export const classifyV2 = (
 			prospect: opts.prospect,
 			traits: opts.traits as Record<string, number> | undefined,
 			rq: (norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+			...(norms.common ? { common: norms.common } : {}),
 			rejected: opts.rejects?.map((rj): Rejection => ({
 				name: rj.name,
 				own: rj.key !== undefined && rj.key === opts.pickKey,

@@ -155,7 +155,16 @@ test.skipIf(!DIR)(
 				if (ELITE_RE.test(name) && x.ovr < 58) {
 					why.push("elite word below 58");
 				}
-				if (nn && !HONESTISH.test(name.split(" · ")[0]!)) {
+				// (archnouns3, per slot: with a defensive label, the main name is judged on his skills that aren't defense; the user's
+				// best three may hold defensive skills the label covers, so a main noun outside them is fine then)
+				const twoSlots = name.includes(" · ");
+				const DEF = new Set(["perimD", "rimD", "steal"]);
+				const defInBest = x.best.filter((b) => DEF.has(b.noun)).length;
+				if (
+					nn &&
+					!HONESTISH.test(name.split(" · ")[0]!) &&
+					!(twoSlots && defInBest > 0)
+				) {
 					for (const k0 of nn.nouns) {
 						// (the user's skills have no shot creation: it is his ball handling)
 						const k = k0 === "creator" ? "handle" : k0;
@@ -251,7 +260,7 @@ test.skipIf(!DIR)(
 				);
 			}
 		}
-		writeFileSync(`${DIR}/nouns_audit_result.csv`, out.join("\n"));
+		writeFileSync(`${DIR}/nouns_audit_main.csv`, out.join("\n"));
 		console.log(
 			`players ${n}, pass the rules ${ok} (${Math.round((100 * ok) / n)}%), same nouns as the user's label ${sameNouns}`,
 		);

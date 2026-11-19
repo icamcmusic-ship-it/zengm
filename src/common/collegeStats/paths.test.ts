@@ -79,6 +79,8 @@ describe("more pre-draft paths", () => {
 				seed: `bseed${c}`,
 				draftYear: 2031,
 				paths: false,
+				// (the hashes predate pre-draft injuries, which have their own switch)
+				injuries: false,
 			});
 			assert.strictEqual(
 				String(hashString(JSON.stringify(results))),
