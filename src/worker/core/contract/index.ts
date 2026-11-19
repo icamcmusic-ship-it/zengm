@@ -1,3 +1,4 @@
+import { PLAYER } from "../../../common/constants.ts";
 import {
 	getContractAmount,
 	getContractExp,
@@ -182,6 +183,14 @@ export const getContractSummary = (
 	}
 };
 
+// Draft-and-stash: a stashed player has no contract while he plays abroad. Code that reads a contract for any player (mood,
+// for one) reads his as a minimum rookie deal, so it never throws for him.
+export const stashedContractSummary = (): FlatContractInfo => ({
+	amount: g.get("minContract"),
+	exp: g.get("season"),
+	rookie: true,
+});
+
 // Like getContractSummary, but throws if there is none. Use this for players who always have one, like players on a team or free agents.
 export const getContractSummaryOrThrow = (
 	p: Pick<
@@ -190,6 +199,9 @@ export const getContractSummaryOrThrow = (
 	>,
 ) => {
 	const summary = getContractSummary(p);
+	if (!summary && p.tid === PLAYER.STASHED) {
+		return stashedContractSummary();
+	}
 	if (!summary) {
 		throw new Error(
 			`No contract or contract demand for ${p.firstName} ${p.lastName} (pid ${p.pid})`,
