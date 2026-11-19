@@ -24,6 +24,7 @@ export const TRAIT_KEYS = [
 	"moneyVsWinning",
 	"motor",
 	"defensiveVersatility",
+	"competitiveness",
 ] as const;
 
 export type TraitKey = (typeof TRAIT_KEYS)[number];

@@ -93,6 +93,7 @@ import {
 	travelEndurance,
 } from "./scheduleLoad.ts";
 import {
+	COMPETE_MARGIN,
 	lateGameSituationWeight,
 	teamChemistryBonus,
 	teamSwitchDefenseBonus,
@@ -2423,12 +2424,14 @@ class GameSim extends GameSimBase {
 		const sit = this.traitSituation(offense);
 		const pressure = this.traitPressure(offense);
 		const bigGame = this.bigGame;
+		const close = this.closeGame();
 		return this.traitMean(
 			offense,
 			(e) =>
 				e.clutchTurnoverMult(sit) *
 				e.pressureTurnoverMult(pressure) *
-				(bigGame ? e.bigGameTurnoverMult : 1),
+				(bigGame ? e.bigGameTurnoverMult : 1) *
+				(close ? e.competeTurnoverMult : 1),
 			1,
 		);
 	}
@@ -2446,6 +2449,9 @@ class GameSim extends GameSimBase {
 		delta += e.clutchShotModifier(this.traitSituation(this.o));
 		if (this.bigGame) {
 			delta += e.bigGameShotDelta;
+		}
+		if (this.closeGame()) {
+			delta += e.competeShotDelta;
 		}
 		if (
 			passer !== undefined &&
@@ -2498,7 +2504,8 @@ class GameSim extends GameSimBase {
 				return (
 					e.clutchTurnoverMult(this.traitSituation(t)) *
 					e.pressureTurnoverMult(this.traitPressure(t)) *
-					(this.bigGame ? e.bigGameTurnoverMult : 1)
+					(this.bigGame ? e.bigGameTurnoverMult : 1) *
+					(this.closeGame() ? e.competeTurnoverMult : 1)
 				);
 			default:
 				return 1;
@@ -5196,6 +5203,13 @@ class GameSim extends GameSimBase {
 	}
 
 	// Coaching systems: late in a close game (final period or overtime, last 5 minutes, within 8)
+	// Player traits (competitiveness): the game is within COMPETE_MARGIN points
+	closeGame() {
+		return (
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) <= COMPETE_MARGIN
+		);
+	}
+
 	isClutchTime() {
 		return (
 			this.team[0].stat.ptsQtrs.length >= this.numPeriods &&

@@ -31,6 +31,7 @@ const NEW_TRAITS = [
 	"moneyVsWinning",
 	"motor",
 	"defensiveVersatility",
+	"competitiveness",
 ] as const;
 
 describe("trait categories", () => {
@@ -44,8 +45,8 @@ describe("trait categories", () => {
 		);
 	});
 
-	test("22 traits, new ones defined and weighted", () => {
-		assert.strictEqual(TRAIT_KEYS.length, 22);
+	test("23 traits, new ones defined and weighted", () => {
+		assert.strictEqual(TRAIT_KEYS.length, 23);
 		for (const key of NEW_TRAITS) {
 			assert.strictEqual(TRAIT_DEFINITIONS[key].key, key);
 			assert.isNumber(AI_TRAIT_WEIGHTS[key]);

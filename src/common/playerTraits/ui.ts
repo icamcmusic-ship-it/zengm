@@ -1,6 +1,6 @@
 import { TRAIT_DEFINITIONS } from "./definitions.ts";
 import { DEVELOPMENT_AMPLITUDES } from "./development.ts";
-import { EFFECT_AMPLITUDES, traitZ } from "./effects.ts";
+import { COMPETE_MARGIN, EFFECT_AMPLITUDES, traitZ } from "./effects.ts";
 import { EGO_AMPLITUDES } from "./ego.ts";
 import { PERSONALITY_AMPLITUDES } from "./personality.ts";
 import { TRAIT_KEYS, type TraitKey, type TraitScores } from "./types.ts";
@@ -126,6 +126,7 @@ export const TRAIT_SHORT: Record<TraitKey, string> = {
 	moneyVsWinning: "MvW",
 	motor: "Mot",
 	defensiveVersatility: "DVe",
+	competitiveness: "Cmp",
 };
 
 export const isTraitKey = (x: unknown): x is TraitKey =>
@@ -190,6 +191,8 @@ export const traitEffectSummary = (key: TraitKey, score: number): string => {
 				: `Pull of a winning team: ${rel(PERSONALITY_AMPLITUDES.winningTeamPerformance * z)}; no discount for contenders.`;
 		case "motor":
 			return `Energy lost per minute on the court: ${rel(-A.motorDrain * z)}; endurance on back-to-backs ${rel(A.motorBackToBack * z)}.`;
+		case "competitiveness":
+			return `In a close game (within ${COMPETE_MARGIN}): FG ${pts(A.competeShot * z)}, turnovers ${rel(-A.competeTurnover * z)}.`;
 		case "defensiveVersatility":
 			return `Team defense while he plays, against big/small lineups: ${signed((100 * A.switchDefense * z) / 5)}% (his share of the five).`;
 	}
