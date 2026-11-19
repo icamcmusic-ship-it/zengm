@@ -119,7 +119,7 @@ const inputOf = (row: Record<string, string>) => {
 };
 
 const HONESTISH =
-	/Specialist|Camp Body|Rotation Filler|Journeyman|Project|Raw|Developing|Lottery|Late Bloomer|Two-Way Contract|Ten-Day|Emergency|Practice Squad|Garbage|Hustle|Junkyard|Energy Big|Pogo|Track Star|Bruiser|Big Body|Wall|Space Eater|Human Screen|Pest|Gnat|Hound|Gunner|Bomber|Merchant|One-Trick|Shot-Only|Dime|Pass-First|Pass-Only|Caretaker|Board Specialist|Glass-Only|Earthbound|Slow-Motion|Empty-Calorie|Clay|Blueprint|Upside|Sleeper|Unfinished|Toolsy|All Tools|All Legs|No Game|Glove|Stopper|Bench|Deep Bench|Ball-Handling Specialist|Closer|Old Head|Connector|Off-Ball Mover|Screen-and-Roll|Jack-of-all-Trades/;
+	/Specialist|Camp Body|Rotation Filler|Journeyman|Project|Raw|Developing|Lottery|Late Bloomer|Two-Way Contract|Ten-Day|Emergency|Practice Squad|Garbage|Hustle|Junkyard|Energy Big|Pogo|Track Star|Bruiser|Big Body|Wall|Space Eater|Human Screen|Pest|Gnat|Hound|Gunner|Bomber|Merchant|One-Trick|Shot-Only|Dime|Pass-First|Pass-Only|Caretaker|Board Specialist|Glass-Only|Earthbound|Slow-Motion|Empty-Calorie|Clay|Blueprint|Upside|Sleeper|Unfinished|Toolsy|All Tools|All Legs|No Game|Glove|Stopper|Bench|Deep Bench|Ball-Handling Specialist|Closer|Old Head|Connector|Off-Ball Mover|Screen-and-Roll|Jack-Of-All-Trades/;
 
 test.skipIf(!DIR)(
 	"nouns audit",

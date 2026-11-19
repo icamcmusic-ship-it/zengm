@@ -747,7 +747,7 @@ ROLES.push(
 			],
 			[
 				"sJack",
-				"Jack-of-all-Trades",
+				"Jack-Of-All-Trades",
 				"Good at many things and great at none: he fills every gap.",
 				"allAround",
 			],

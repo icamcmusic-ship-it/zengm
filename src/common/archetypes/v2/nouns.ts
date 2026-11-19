@@ -1082,7 +1082,7 @@ function USER_SPECIALS_2(): {
 	];
 }
 
-// Jack-of-all-Trades: JACK_MIN or more nouns in the top 40%, none in the top 10%
+// Jack-Of-All-Trades: JACK_MIN or more nouns in the top 40%, none in the top 10%
 export const JACK_MIN = 5;
 
 // ---- height for his position (the user's "tall for his position", "small for a four") ----
@@ -1347,7 +1347,7 @@ export const pickNouns = (x: NounInput): NounPick => {
 				conf: confOf(cleared, pick.nouns),
 			};
 		}
-		// (Jack-of-all-Trades: many good skills, no great one)
+		// (Jack-Of-All-Trades: many good skills, no great one)
 		const good = scores.filter(
 			(s) => s.key !== "crafty" && s.pct >= GENERIC_PCT,
 		);
@@ -1356,12 +1356,12 @@ export const pickNouns = (x: NounInput): NounPick => {
 			good.length >= JACK_MIN &&
 			scores.every((s) => s.pct < 0.9) &&
 			(x.ovr ?? 0) >= 45 &&
-			!vetoed("Jack-of-all-Trades")
+			!vetoed("Jack-Of-All-Trades")
 		) {
 			return {
 				kind: "trait",
 				key: "sJack",
-				name: "Jack-of-all-Trades",
+				name: "Jack-Of-All-Trades",
 				conf: 0.6,
 			};
 		}
