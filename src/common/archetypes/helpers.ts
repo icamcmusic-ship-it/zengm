@@ -242,6 +242,12 @@ export type Landscape = {
 	byGroup: Record<ArchetypeGroup, number>;
 };
 
+// The size group a player counts in: his position's (archreview2: a composed or honest name has three groups, guard,
+// wing and big, so counting by the label's group left the forwards at a few percent and put them with the wings), else
+// his label's
+const groupOfRated = (r: Rated, a: { group: ArchetypeGroup }) =>
+	(r.pos ? POS_SIZE[r.pos] : undefined) ?? a.group;
+
 export const landscapeOf = (rows: Rated[], topN = 3): Landscape => {
 	const by = new Map<string, Rated[]>();
 	for (const r of rows) {
@@ -263,7 +269,9 @@ export const landscapeOf = (rows: Rated[], topN = 3): Landscape => {
 		.map((id) => archetypeById(id)!);
 	const byArchetype = [...ARCHETYPES, ...composed].map((a) => {
 		const l = by.get(a.id) ?? [];
-		byGroup[a.group] += l.length;
+		for (const r of l) {
+			byGroup[groupOfRated(r, a)]++;
+		}
 		return {
 			id: a.id,
 			name: a.name,
@@ -302,7 +310,7 @@ export const compositionOf = (rows: Rated[], rotation = 9): Composition => {
 	for (const r of known) {
 		const a = archetypeById(r.archetypeId!)!;
 		countMap.set(a.id, (countMap.get(a.id) ?? 0) + 1);
-		byGroup[a.group]++;
+		byGroup[groupOfRated(r, a)]++;
 		byFamily[a.family] = (byFamily[a.family] ?? 0) + 1;
 	}
 	const counts = [...countMap.entries()]

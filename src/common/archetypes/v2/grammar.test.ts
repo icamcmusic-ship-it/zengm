@@ -1,5 +1,6 @@
 import { assert, describe, test } from "vitest";
 import { archetypeById } from "../classify.ts";
+import { compositionOf, landscapeOf } from "../helpers.ts";
 import { RULES } from "../rulebook.data.ts";
 import { promisesOf } from "../score.ts";
 import { conceptsOf } from "../twoK/concepts.ts";
@@ -500,6 +501,23 @@ describe("archv2 grammar", () => {
 					);
 				}
 			}
+		});
+
+		test("the group cards count players by their position (a composed name's group has no forwards)", () => {
+			const role = ROLE_BY_KEY.get(HONEST_ROLES[0]!.key)!;
+			const id = composedId(role, [], "wing", {});
+			const rows = [
+				{ pid: 1, ovr: 50, archetypeId: id, pos: "F" },
+				{ pid: 2, ovr: 50, archetypeId: id, pos: "SF" },
+				{ pid: 3, ovr: 50, archetypeId: id, pos: "PF" },
+			];
+			assert.deepStrictEqual(landscapeOf(rows).byGroup, {
+				guard: 0,
+				wing: 1,
+				forward: 2,
+				big: 0,
+			});
+			assert.strictEqual(compositionOf(rows).byGroup.forward, 2);
 		});
 	});
 });
