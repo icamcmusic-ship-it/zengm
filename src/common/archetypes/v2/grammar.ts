@@ -54,6 +54,8 @@ export type RoleDef = {
 	honest?: true;
 	desc?: string;
 	family?: Family;
+	// archnouns: a word of the noun names only (nouns.ts): never a candidate of the reading, never tested
+	nounOnly?: true;
 };
 
 // A descriptor: a word in front of the role
@@ -67,6 +69,8 @@ export type DescDef = {
 	groups?: PosGroup[];
 	// archv3: the word at a size group (the neighbours' variant is not taken over it)
 	byGroup?: Partial<Record<PosGroup, string>>;
+	// archnouns: a word of the noun names only (nouns.ts): never a candidate of the reading, never tested
+	nounOnly?: true;
 };
 
 export const ROLES: RoleDef[] = [
@@ -434,6 +438,251 @@ export const DESCRIPTORS: DescDef[] = [
 		slot: 2,
 	},
 ];
+
+// archnouns: the noun names' own front words (nouns.ts NOUN_DESC) and end words (the position, or a trait name)
+DESCRIPTORS.push(
+	{
+		key: "speedy",
+		names: ["Speedy"],
+		concept: "speedNoun",
+		slot: 1,
+		nounOnly: true,
+	},
+	{
+		key: "lockdownD",
+		names: ["Lockdown"],
+		concept: "lockdown",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "rimProtecting",
+		names: ["Rim-Protecting"],
+		concept: "rimD",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "ballHandling",
+		names: ["Ball-Handling"],
+		concept: "handleNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "shotCreating",
+		names: ["Shot-Creating"],
+		concept: "creator",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "midRange",
+		names: ["Mid-Range"],
+		concept: "mid",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "postAny",
+		names: ["Post-Scoring"],
+		concept: "post",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "spotUp",
+		names: ["Spot-Up"],
+		concept: "catchShoot",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "powerFinishing",
+		names: ["Power-Finishing"],
+		concept: "finish",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "finesse",
+		names: ["Finesse"],
+		concept: "finish",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "closeRange",
+		names: ["Close-Range"],
+		concept: "post",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "floater",
+		names: ["Floater"],
+		concept: "post",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "shifty",
+		names: ["Shifty"],
+		concept: "handleNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "steady",
+		names: ["Steady"],
+		concept: "handleNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "shotBlocking",
+		names: ["Shot-Blocking"],
+		concept: "rimD",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "postDefending",
+		names: ["Post-Defending"],
+		concept: "rimD",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "quickFooted",
+		names: ["Quick-Footed"],
+		concept: "speedNoun",
+		slot: 1,
+		nounOnly: true,
+	},
+	{
+		key: "clutch",
+		names: ["Clutch"],
+		concept: "traitWord",
+		slot: 0,
+		nounOnly: true,
+	},
+	{
+		key: "veteran",
+		names: ["Veteran"],
+		concept: "traitWord",
+		slot: 0,
+		nounOnly: true,
+	},
+	{
+		key: "screenSetting",
+		names: ["Screen-Setting"],
+		concept: "traitWord",
+		slot: 0,
+		nounOnly: true,
+	},
+	{
+		key: "offBallMoving",
+		names: ["Off-Ball"],
+		concept: "traitWord",
+		slot: 0,
+		nounOnly: true,
+	},
+	{
+		key: "switchable",
+		names: ["Switchable"],
+		concept: "traitWord",
+		slot: 0,
+		nounOnly: true,
+	},
+	{
+		key: "rimFinishing",
+		names: ["Paint-Finishing"],
+		concept: "finish",
+		slot: 2,
+		nounOnly: true,
+	},
+);
+ROLES.push(
+	{
+		key: "posGuard",
+		names: ["Guard"],
+		concepts: [],
+		groups: ["guard"],
+		nounOnly: true,
+	},
+	{
+		key: "posWing",
+		names: ["Wing"],
+		concepts: [],
+		groups: ["wing"],
+		nounOnly: true,
+	},
+	{
+		key: "posForward",
+		names: ["Forward"],
+		concepts: [],
+		groups: ["wing", "big"],
+		nounOnly: true,
+	},
+	{
+		key: "posBig",
+		names: ["Big"],
+		concepts: [],
+		groups: ["big"],
+		nounOnly: true,
+	},
+	{
+		key: "tCloser",
+		names: ["Closer"],
+		concepts: [],
+		groups: ALL,
+		bare: true,
+		nounOnly: true,
+		desc: "Wants the ball with the game on the line, and delivers.",
+		family: "scorer",
+	},
+	{
+		key: "tOldHead",
+		names: ["Old Head"],
+		concepts: [],
+		groups: ALL,
+		bare: true,
+		nounOnly: true,
+		desc: "A savvy veteran: he knows every trick and where to be.",
+		family: "allAround",
+	},
+	{
+		key: "tScreenRoll",
+		names: ["Screen-and-Roll Big"],
+		concepts: [],
+		groups: ["big"],
+		bare: true,
+		nounOnly: true,
+		desc: "Sets hard screens and rolls to the rim.",
+		family: "postBig",
+	},
+	{
+		key: "tOffBall",
+		names: ["Off-Ball Mover"],
+		concepts: [],
+		groups: ALL,
+		bare: true,
+		nounOnly: true,
+		desc: "Always moving without the ball: cuts, relocates and finds the open spot.",
+		family: "slasher",
+	},
+	{
+		key: "tConnector",
+		names: ["Connector"],
+		concepts: [],
+		groups: ALL,
+		bare: true,
+		nounOnly: true,
+		desc: "Keeps the ball moving and makes the smart play, without a standout skill.",
+		family: "playmaker",
+	},
+);
 
 // archreview2: the honest names (honest.ts), as roles a composed id can name
 for (const h of HONEST_ROLES) {
@@ -894,7 +1143,7 @@ const CONCEPT_ROLE: Record<string, string> = {
 	energy: "energyBig",
 };
 const CONCEPT_DESC: Record<string, string> = Object.fromEntries(
-	DESCRIPTORS.map((d) => [d.concept, d.key]),
+	DESCRIPTORS.filter((d) => !d.nounOnly).map((d) => [d.concept, d.key]),
 );
 export type ParsedName = { role?: string; descs: string[]; words: WordPick };
 // archv5: role names that are a whole phrase (the concept the role's own words read as, if any)
@@ -1015,6 +1264,10 @@ const ROLE_NOUN: Record<string, string> = {
 	offGuard: "A scoring guard",
 	prospect: "A young player",
 	depthPiece: "A role player",
+	posGuard: "A guard",
+	posWing: "A wing",
+	posForward: "A forward",
+	posBig: "A big",
 };
 const CONCEPT_PHRASE = new Map(CONCEPTS.map((c) => [c.key, c.phrase]));
 const CUSTOM_PHRASE: Record<string, string> = {
@@ -1034,6 +1287,8 @@ const CUSTOM_PHRASE: Record<string, string> = {
 	prospectRole: "has no skill that is good yet in absolute terms",
 	depthPieceRole: "has no skill that is good in absolute terms",
 	air: "plays above the rim",
+	speedNoun: "plays fast",
+	handleNoun: "handles the ball",
 };
 const joinPhrases = (xs: string[]) =>
 	xs.length <= 1

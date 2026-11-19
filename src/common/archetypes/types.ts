@@ -209,6 +209,9 @@ export type Norms = {
 	// archreview: quantiles of the raw ratings the absolute gates read, among the league's own players (v2/gateScale.ts):
 	// the gates' cutoffs are read as the same standing among them (absent: the cutoffs as they are)
 	rq?: Partial<Record<string, number[]>>;
+	// archnouns: the same quantiles among the league's own players for every league, rebuilt each season: the nouns'
+	// standings (v2/nouns.ts) are always relative to the league as it is
+	nq?: Partial<Record<string, number[]>>;
 };
 
 // The tables a player's ratings are read against

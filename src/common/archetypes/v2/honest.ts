@@ -17,7 +17,7 @@ import { scaleCutoff, type RatingQuantiles } from "./gateScale.ts";
 export type PosGroup = "guard" | "wing" | "big";
 
 // ---- tiers ----
-export const ELITE_OVR = 60;
+export const ELITE_OVR = 58;
 export const MID_OVR = 50;
 export type Tier = "elite" | "mid" | "low";
 export const tierOf = (ovr: number | undefined): Tier =>
@@ -98,7 +98,7 @@ export const skillsOf = (
 		.sort((a, b) => b.margin - a.margin || (a.skill < b.skill ? -1 : 1));
 
 // ---- upside ----
-export const UPSIDE_POT = 15;
+export const UPSIDE_POT = 8;
 export const UPSIDE_AGE = 22;
 export const hasUpside = ({
 	age,
@@ -408,6 +408,9 @@ export type HonestInput = {
 	// a stable seed for the synonym (his league and player id when known)
 	seed: string;
 	rq?: RatingQuantiles;
+	// archnouns (nouns.ts): his one noun as the skill to name him for, or none at all (null)
+	skill?: Skill | null;
+	traits?: Record<string, number>;
 };
 
 const hash = (s: string) => {
@@ -422,8 +425,14 @@ const hash = (s: string) => {
 export const honestName = (x: HonestInput): { key: string; name: string } => {
 	const { r, group } = x;
 	const skills = skillsOf(r, x.rq);
-	const cleared = skills.filter((s) => s.margin >= 0);
-	const upside = hasUpside(x);
+	const cleared =
+		x.skill === undefined
+			? skills.filter((s) => s.margin >= 0)
+			: x.skill === null
+				? []
+				: [{ skill: x.skill, margin: 0 }];
+	// (the user: a Raw / Developing / Project name only at ovr 30 or below, or with no skill)
+	const upside = hasUpside(x) && (cleared.length === 0 || (x.ovr ?? 0) <= 30);
 	const best = cleared[0]?.skill;
 	const near = skills.find((s) => s.margin >= -10);
 	const ath = Math.max(r.spd ?? 0, r.jmp ?? 0);
@@ -467,7 +476,12 @@ export const honestName = (x: HonestInput): { key: string; name: string } => {
 			return near && near.margin > -6 ? nearKey(near.skill) : "hProject";
 		}
 		if (cleared.length === 0) {
-			if ((r.endu ?? 0) >= 75 && (x.ovr ?? 0) >= 35) {
+			// (a hustle name needs the hustle trait at 55+ when traits are on: the user's audit)
+			if (
+				(r.endu ?? 0) >= 75 &&
+				(x.ovr ?? 0) >= 35 &&
+				(x.traits === undefined || (x.traits.hustle ?? 0) >= 55)
+			) {
 				return "hHustle";
 			}
 			if ((x.ovr ?? 99) < 35) {

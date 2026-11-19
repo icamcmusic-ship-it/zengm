@@ -342,11 +342,16 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 	// archreview: the league's scale for the absolute gates (common/archetypes/v2/gateScale.ts), for a real-players league
 	// only (real players' ratings sit on another scale: Chris Paul passes at 58). A random league, however weak, is read
 	// on the absolute bars (archreview2: the user's weak leagues should have no elite labels at all)
-	if (
-		rows.length >= MIN_LEAGUE_FOR_NORMS &&
-		players.filter((p) => p.srID !== undefined).length >= players.length / 2
-	) {
-		norms.rq = ratingQuantiles(rows);
+	if (rows.length >= MIN_LEAGUE_FOR_NORMS) {
+		const q = ratingQuantiles(rows);
+		// (archnouns: the nouns' standings, in every league)
+		norms.nq = q;
+		if (
+			players.filter((p) => p.srID !== undefined).length >=
+			players.length / 2
+		) {
+			norms.rq = q;
+		}
 	}
 	normsCache = { key, norms, statNorms, ptNorms: buildPtNorms(ptRows) };
 	return norms;
