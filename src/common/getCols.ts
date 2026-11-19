@@ -3773,6 +3773,8 @@ const cols: {
 	...sportSpecificCols,
 };
 
+export const hasCol = (title: string) => Object.hasOwn(cols, title);
+
 export const getCols = (
 	titles: (string | Col)[],
 	overrides: Record<string, Partial<Col>> = {},

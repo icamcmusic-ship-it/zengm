@@ -266,6 +266,8 @@ export const routeInfos = {
 	"/l/:lid/all_star/history": "allStarHistory",
 	"/l/:lid/award_races": "awardRaces",
 	"/l/:lid/award_races/:season": "awardRaces",
+	"/l/:lid/award_history": "awardHistory",
+	"/l/:lid/award_history/:award": "awardHistory",
 	"/l/:lid/award_vote": "awardVote",
 	"/l/:lid/award_vote/:season": "awardVote",
 	"/l/:lid/expansion_draft": "expansionDraft",
