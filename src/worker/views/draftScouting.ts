@@ -26,6 +26,7 @@ import { EXPANDED_RATINGS } from "../../common/expandedRatings.ts";
 import { getClassShapeInfo } from "../core/draft/classShape.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
+import { getRealComps } from "../core/draft/realComps.ts";
 
 const getSeason = async (
 	playersAll: Player[],
@@ -103,6 +104,9 @@ const getSeason = async (
 		]),
 	);
 
+	// Real Player Comps: the closest real NBA players to his ratings as the scouts see them
+	const realComps = await getRealComps(playersAllFiltered);
+
 	const players2 = addFirstNameShort(
 		players.map((pa, i) => {
 			const ratings = last(pa.ratings);
@@ -120,6 +124,7 @@ const getSeason = async (
 				archetype: archetypeByPid.get(pa.pid)?.label,
 				archetypeGroup: archetypeByPid.get(pa.pid)?.group,
 				traits: traitsByPid.get(pa.pid),
+				comps: realComps.get(pa.pid),
 				// From a linked college league: his school there
 				linkedSchool: playersByPid.get(pa.pid)!.linkedCollege?.school,
 

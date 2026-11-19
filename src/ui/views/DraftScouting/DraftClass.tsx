@@ -6,6 +6,7 @@ import { DataTable } from "../../components/DataTable/index.tsx";
 import { helpers } from "../../util/helpers.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import { getCols } from "../../../common/getCols.ts";
+import { RealCompCell } from "../../components/RealComps.tsx";
 import type { View } from "../../../common/types.ts";
 import { WEBSITE_ROOT } from "../../../common/constants.ts";
 import { wrappedPlayerNameLabels } from "../../components/PlayerNameLabels.tsx";
@@ -178,6 +179,16 @@ const DraftClass = ({
 			},
 		);
 	}
+	// Real Player Comps: the top comp, all three in the tooltip
+	const showComps =
+		!challengeNoRatings && players.some((p) => p.comps !== undefined);
+	if (showComps) {
+		cols.push({
+			title: "Comp",
+			desc: "The real NBA player he plays like most, at about his age, from his ratings as your scouts see them. Hover for the top three and what they became.",
+			sortType: "string",
+		});
+	}
 	const showScouting =
 		!challengeNoRatings &&
 		!fantasyDraft &&
@@ -252,6 +263,17 @@ const DraftClass = ({
 										}
 									: null,
 						)
+					: []),
+				...(showComps
+					? [
+							p.comps && p.comps.length > 0
+								? {
+										value: <RealCompCell comps={p.comps} />,
+										searchValue: p.comps.map((c) => c.name).join(" "),
+										sortValue: p.comps[0]!.name,
+									}
+								: null,
+						]
 					: []),
 				...(showScouting && p.scoutReport
 					? [

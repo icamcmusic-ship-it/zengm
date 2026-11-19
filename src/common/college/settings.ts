@@ -43,6 +43,7 @@ const EXTRAS_FORCED_OFF = [
 	"featureCollegeSeason",
 	"featureDraftClassShapes",
 	"featureRatingsRegenerator",
+	"featureRealComps",
 	"scoutingSystem",
 	"featureDraftBoard",
 	"featureAiDraftNeeds",

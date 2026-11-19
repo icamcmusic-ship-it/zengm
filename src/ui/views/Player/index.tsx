@@ -39,6 +39,7 @@ import { useLocal } from "../../util/local.ts";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
 import { PreDraftSummary } from "./PreDraftSummary.tsx";
+import { RealCompsSummary } from "../../components/RealComps.tsx";
 import { NitStats } from "./NitStats.tsx";
 import { TrackingProfile } from "./TrackingProfile.tsx";
 import {
@@ -155,6 +156,8 @@ const Player2 = ({
 			{!retired ? <ContractMood pid={player.pid} refreshKey={player} /> : null}
 
 			<PreDraftSummary player={player} />
+
+			{player.realComps ? <RealCompsSummary comps={player.realComps} /> : null}
 
 			{player.tid === PLAYER.UNDRAFTED ? (
 				<ProProjectionSection pid={player.pid} />
