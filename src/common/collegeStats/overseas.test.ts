@@ -90,8 +90,10 @@ describe("overseas pre-draft stats", () => {
 		);
 		const types = euro.flatMap((r) => r.honors.map((h) => h.type));
 		assert.isAbove(types.length, 0);
+		// Most in the two leagues; a few from a lower tier league they played in on the way up (preDraftPaths)
+		const theirs = types.filter((type) => /EuroLeague|ABA/.test(type));
+		assert.isAbove(theirs.length, 0.6 * types.length);
 		for (const type of types) {
-			assert.match(type, /EuroLeague|ABA/);
 			assert.notMatch(type, /All-American|Conference/);
 		}
 	});

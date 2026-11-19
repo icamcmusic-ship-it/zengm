@@ -462,6 +462,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		0.0125 * z +
 		0.006 * (c - 1.5) +
 		compAdj +
+		// The pro pathway program's pro environment (undefined everywhere else, which changes nothing)
+		(proEnv?.effShift ?? 0) +
 		loadAdj +
 		0.03 +
 		rng.normal(0, 0.008 * noise);

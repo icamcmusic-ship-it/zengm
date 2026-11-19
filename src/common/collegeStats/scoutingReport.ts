@@ -62,6 +62,14 @@ export type ScoutingReportInput = {
 	// How many times the user's staff scouted him (scouting system), undefined when there is no scouting system
 	looks?: number;
 	story?: string;
+	// How he got to his last pre-draft season (preDraftPaths), all public: the pro pathway program, the school he transferred from, the tier of his league abroad
+	path?: ReportPath;
+};
+
+export type ReportPath = {
+	pathway?: boolean;
+	transferredFrom?: string;
+	tier?: "top" | "mid" | "dev";
 };
 
 export type ScoutingReport = {
@@ -532,6 +540,10 @@ export const getScoutingReport = (
 	if (storyNote) {
 		projection += ` ${storyNote}`;
 	}
+	const pathNote = getPathNote(input.path, s && s.gp > 0 ? s.team : undefined);
+	if (pathNote) {
+		projection += ` ${pathNote}`;
+	}
 
 	const basis = [
 		r ? "Our scouts' grades" : "Ratings hidden: production only",
@@ -559,6 +571,32 @@ const STORY_NOTES: Record<string, string> = {
 	olderIntl: "What you see is close to what you get.",
 	reclass: "A year younger than his class, which is a year of growth to come.",
 	injury: "The medical report will matter as much as the tape.",
+};
+
+// What how he got to his last season says about reading it (no draws: the rest of the report is the same with or without it)
+export const getPathNote = (
+	path: ReportPath | undefined,
+	team: string | undefined,
+): string | undefined => {
+	if (!path) {
+		return undefined;
+	}
+	if (path.pathway) {
+		return "Skipped college for a season with a pro development team: fewer minutes and a smaller role than he would have had in college, against grown men, so his numbers undersell him a little.";
+	}
+	if (path.transferredFrom) {
+		return `Transferred in from ${path.transferredFrom}${team ? `, so ${team} saw only one season of him` : ""}; teams will look at both stops.`;
+	}
+	if (path.tier === "top") {
+		return "Did it in a top tier league abroad, against grown men: his numbers are worth more than they look.";
+	}
+	if (path.tier === "mid") {
+		return "His numbers come from a mid tier league abroad, a step below the best competition overseas.";
+	}
+	if (path.tier === "dev") {
+		return "His numbers come from a development tier league abroad, well below the top: they flatter him.";
+	}
+	return undefined;
 };
 
 const capitalize = (text: string) => text.replace(/^./, (c) => c.toUpperCase());

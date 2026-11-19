@@ -1,5 +1,13 @@
 import { getLeagueEnv } from "./overseas.ts";
-import { COLLEGES, CONFERENCES, NON_NCAA, type Region } from "./colleges.ts";
+import {
+	COLLEGES,
+	CONFERENCES,
+	NON_NCAA,
+	OVERSEAS_EXTRA,
+	PATHWAY_STRENGTH,
+	PATHWAY_TEAM,
+	type Region,
+} from "./colleges.ts";
 import type { Rng } from "./rng.ts";
 
 const EUROPE = new Set([
@@ -178,7 +186,19 @@ export const getSchool = (name: string): School | undefined => {
 			gameMinutes: 40,
 		};
 	}
-	const other = NON_NCAA[name];
+	if (name === PATHWAY_TEAM) {
+		return {
+			name,
+			conference: undefined,
+			strength: PATHWAY_STRENGTH,
+			nonCollege: true,
+			idle: false,
+			gameMinutes: getLeagueEnv(name)!.gameMinutes,
+		};
+	}
+	const extra = OVERSEAS_EXTRA[name];
+	const other: (typeof NON_NCAA)[string] | undefined =
+		NON_NCAA[name] ?? (extra ? { ...extra, pro: true } : undefined);
 	if (other) {
 		return {
 			name,

@@ -1069,6 +1069,18 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "preDraftPaths",
+		college: false,
+		key: "featurePreDraftPaths",
+		core: true,
+		name: "More Pre-Draft Paths",
+		description:
+			"With college stats, more ways to the draft in generated pre-draft careers: transfers that follow coaching changes (each noted with when and why), a pro pathway program that a few elite high school prospects a year join instead of college, and overseas leagues in top, mid and development tiers that prospects climb as they improve. Only new pre-draft stats use it: stats already generated stay as they are.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "draftClassShapes",
 		college: false,
 		key: "featureDraftClassShapes",

@@ -1,6 +1,19 @@
-import { COLLEGES, CONFERENCES } from "./colleges.ts";
+import {
+	COLLEGES,
+	CONFERENCES,
+	NON_NCAA,
+	OVERSEAS_EXTRA,
+	PATHWAY_TEAM,
+	type Region,
+} from "./colleges.ts";
 import { getRegion, getSchool, type School } from "./colleges.helpers.ts";
-import { isOverseasLeague } from "./overseas.ts";
+import {
+	getLeagueTier,
+	isOverseasLeague,
+	TIER_NAMES,
+	type OverseasTier,
+} from "./overseas.ts";
+import { getHeadCoach } from "./profile.ts";
 import { Rng, clamp } from "./rng.ts";
 import type { CollegeProspect } from "./types.ts";
 
@@ -13,11 +26,18 @@ import type { CollegeProspect } from "./types.ts";
  * - Redshirt: a year at the school with no games. It takes the place of what would have been his first season (his age is fixed), so a redshirt junior is 22, as old as a senior.
  * - Medical redshirt: a season that ended after a few games and did not count against his eligibility.
  * - JUCO: one or two junior college seasons before Division I.
+ *
+ * More pre-draft paths (preDraftPaths, on unless `paths: false`), each from a stream of its own:
+ * - Transfer portal: a coaching change at his school makes a transfer more likely (and the season the new coach arrived the likely one he arrived in), and every transfer records why (`why`).
+ * - Pro pathway program: an elite high school prospect picked for it (generate.ts) plays his one season before the draft for a pro development team instead of college (level "pathway").
+ * - Overseas tiers: every season abroad has a tier (top, mid, development) from its league; a prospect works his way up, so his earlier, younger seasons are often in lower tier leagues of his region.
  */
 
 export type CareerStatus = "redshirt" | "medical" | "injury";
 export type CareerMove = "up" | "down" | "lateral" | "juco";
-export type CareerLevel = "ncaa" | "juco" | "other";
+export type CareerLevel = "ncaa" | "juco" | "pathway" | "other";
+// Why he transferred: a coaching change at either school, playing time (he was buried, or wanted a bigger role) or a breakout year at a smaller school
+export type TransferReason = "coach" | "minutes" | "breakout";
 
 export type CareerYear = {
 	season: number;
@@ -26,8 +46,12 @@ export type CareerYear = {
 	// Class year label of a college or JUCO year, like "Fr." or "RS So."
 	cls?: string;
 	status?: CareerStatus;
-	// He changed schools before this season, and how
+	// He changed schools (or, abroad, moved up a tier) before this season, and how
 	move?: CareerMove;
+	// With a transfer between Division I schools: why (preDraftPaths)
+	why?: TransferReason;
+	// A season abroad: the tier of the league (preDraftPaths). Careers stored before it have none; getLeagueTier gives it from the league
+	tier?: OverseasTier;
 };
 
 export const STORY_KINDS = [
@@ -194,6 +218,11 @@ const TRANSFER_FROM: Record<Tier, [Tier, CareerMove, number][]> = {
 
 // Chance a player transferred at least once, by how many years he has been in Division I
 const P_TRANSFER = [0, 0, 0.13, 0.25, 0.34, 0.38];
+// Transfer portal (preDraftPaths): P_TRANSFER is scaled by these, with and without a coaching change at his draft year school during his years there. About a quarter of multi-year careers have one, so the share who transferred stays about where it was (about a fifth of players with two or more Division I seasons)
+const COACH_CHANGE_TRANSFER = 1.8;
+const NO_COACH_CHANGE_TRANSFER = 0.62;
+// How much likelier the season a new coach arrived is as the one he transferred in
+const COACH_SEASON_WEIGHT = 3;
 
 // Height in inches for a hgt rating (genRatings), when his listed height is not known
 export const heightFromRating = (hgt: number) => Math.round(66 + 0.27 * hgt);
@@ -285,6 +314,95 @@ export const pickStory = (
 	return rng.weighted(kinds, weights);
 };
 
+const TIER_BELOW: Record<OverseasTier, OverseasTier | undefined> = {
+	top: "mid",
+	mid: "dev",
+	dev: undefined,
+};
+
+// Chance the season before was a tier lower, by his age that season: a teenager's first pro seasons are mostly in a lower tier, a 22-year-old has usually been where he is for a while
+export const tierDropChance = (age: number, z: number) => {
+	const base =
+		age <= 17
+			? 0.55
+			: age === 18
+				? 0.45
+				: age === 19
+					? 0.36
+					: age === 20
+						? 0.27
+						: age === 21
+							? 0.2
+							: 0.12;
+	// The best prospects of a class get to the top sooner, the rawest later
+	const talent = z >= 1.2 ? 0.5 : z >= 0.4 ? 0.75 : z < -0.5 ? 1.25 : 1;
+	return Math.min(0.8, base * talent);
+};
+
+let leaguesByTier: Record<OverseasTier, string[]> | undefined;
+const getLeaguesByTier = () => {
+	if (!leaguesByTier) {
+		leaguesByTier = { top: [], mid: [], dev: [] };
+		for (const name of [
+			...Object.keys(NON_NCAA),
+			...Object.keys(OVERSEAS_EXTRA),
+		]) {
+			const tier = getLeagueTier(name);
+			if (tier) {
+				leaguesByTier[tier].push(name);
+			}
+		}
+	}
+	return leaguesByTier;
+};
+
+// A league of this tier, likely one where players from his part of the world go
+export const pickLeagueOfTier = (
+	tier: OverseasTier,
+	region: Region,
+	rng: Rng,
+) => {
+	const names = getLeaguesByTier()[tier];
+	const weights = names.map((name) => {
+		const info = NON_NCAA[name] ?? OVERSEAS_EXTRA[name]!;
+		return info.w * (info.regions[region] ?? 1);
+	});
+	return rng.weighted(names, weights);
+};
+
+/**
+ * Overseas tiers for a prospect abroad (preDraftPaths). His draft year is in his own league, at its tier. Going back a season at a time, he may have been a tier lower (likelier the younger he was), in a league of that tier in his part of the world; once lower, never higher further back. A season in a lower tier league is a different league, with its own level of competition, minutes and pace. Drawn from a stream of its own, so nothing else about him changes.
+ */
+const planTiers = (
+	p: CollegeProspect,
+	years: PlannedYear[],
+	z: number,
+	seedBase: string,
+) => {
+	const last = years.at(-1)!;
+	let tier = getLeagueTier(last.school)!;
+	last.tier = tier;
+	const rng = new Rng(`${seedBase}|tiers`);
+	const region = getRegion(p.bornLoc);
+	let league = last.school;
+	for (let i = years.length - 2; i >= 0; i--) {
+		const year = years[i]!;
+		const lower = TIER_BELOW[tier];
+		if (lower && rng.random() < tierDropChance(p.age - year.yearsBack, z)) {
+			tier = lower;
+			league = pickLeagueOfTier(tier, region, rng);
+			years[i + 1]!.move = "up";
+		}
+		year.tier = tier;
+		if (league !== year.school) {
+			const info = getSchool(league)!;
+			year.school = league;
+			year.strength = info.strength;
+			year.gameMinutes = info.gameMinutes;
+		}
+	}
+};
+
 /**
  * Plan a prospect's years before the draft. `school` is where he plays in his draft year (undefined or idle: no years).
  */
@@ -297,6 +415,7 @@ export const planCareer = (
 		priorSeasons,
 		z,
 		classIndex,
+		paths = true,
 	}: {
 		seed: string;
 		draftYear: number;
@@ -304,6 +423,8 @@ export const planCareer = (
 		// Class-relative talent, clamped
 		z: number;
 		classIndex: number;
+		// More pre-draft paths (preDraftPaths): coaching changes in the transfer portal, the pro pathway program, overseas tiers. Default true
+		paths?: boolean;
 	},
 ): CareerPlan => {
 	if (!school || school.idle) {
@@ -312,10 +433,13 @@ export const planCareer = (
 	const seedBase = `${seed}|${draftYear}|${p.key}`;
 	const rng = new Rng(`${seedBase}|career`);
 	const isNcaa = !school.nonCollege && !!COLLEGES[school.name];
+	const pathway = school.name === PATHWAY_TEAM;
 	const c = classIndex;
-	const story = priorSeasons
-		? pickStory(p, { z, classIndex: c, isNcaa, school }, seedBase)
-		: undefined;
+	// The pro pathway program is his story
+	const story =
+		priorSeasons && !pathway
+			? pickStory(p, { z, classIndex: c, isNcaa, school }, seedBase)
+			: undefined;
 
 	let n = priorSeasons ? c + 1 : 1;
 	// An older international pro has been at it since he was 17 or 18 (the pre-draft window is six seasons)
@@ -326,7 +450,7 @@ export const planCareer = (
 	const base = (yearsBack: number): PlannedYear => ({
 		season: draftYear - yearsBack,
 		school: school.name,
-		level: isNcaa ? "ncaa" : "other",
+		level: isNcaa ? "ncaa" : pathway ? "pathway" : "other",
 		yearsBack,
 		played: true,
 		classIndex: c - yearsBack,
@@ -408,6 +532,21 @@ export const planCareer = (
 		// Transfers between Division I schools
 		const first = numJuco;
 		const d1 = n - first;
+		// Transfer portal (preDraftPaths): seasons his school started with a new head coach (the one the College/Overseas page shows), who brings in transfers of his own. With one in his window a transfer is more likely, without one less, so the overall share stays about the same
+		const coachSeasons = new Set<number>();
+		if (paths) {
+			for (let i = first + 1; i < n; i++) {
+				const season = years[i]!.season;
+				if (getHeadCoach(school.name, season).since === season) {
+					coachSeasons.add(season);
+				}
+			}
+		}
+		const coachFactor = paths
+			? coachSeasons.size > 0
+				? COACH_CHANGE_TRANSFER
+				: NO_COACH_CHANGE_TRANSFER
+			: 1;
 		const pTransfer =
 			story === "unranked"
 				? numJuco > 0
@@ -420,11 +559,13 @@ export const planCareer = (
 						: 0.85
 					: story === "smallSchoolScorer" || story === "reclass"
 						? 0
-						: (P_TRANSFER[clamp(d1, 0, 5)] ?? 0) * (numJuco > 0 ? 0.5 : 1);
+						: (P_TRANSFER[clamp(d1, 0, 5)] ?? 0) *
+							(numJuco > 0 ? 0.5 : 1) *
+							coachFactor;
 		if (d1 >= 2 && rng.random() < pTransfer) {
 			const used = new Set([school.name]);
 			// He changes schools before the year at index `boundary`. Later is more likely: most transfers are upperclassmen
-			const pickBoundary = (hi: number) => {
+			const pickBoundary = (hi: number, toDraftSchool = false) => {
 				const options = [];
 				const weights = [];
 				for (let i = first + 1; i <= hi; i++) {
@@ -433,7 +574,13 @@ export const planCareer = (
 						continue;
 					}
 					options.push(i);
-					weights.push(i - first);
+					// He most likely came in with the new coach
+					weights.push(
+						(i - first) *
+							(toDraftSchool && coachSeasons.has(years[i]!.season)
+								? COACH_SEASON_WEIGHT
+								: 1),
+					);
 				}
 				return options.length > 0 ? rng.weighted(options, weights) : undefined;
 			};
@@ -477,9 +624,21 @@ export const planCareer = (
 					years[boundary - 1]!.usageShift += 0.3;
 				}
 				years[boundary]!.move = kind;
+				if (paths) {
+					// No draws: whether either school changed coaches comes from the programs' own streams
+					const season = years[boundary]!.season;
+					const to = years[boundary]!.school;
+					years[boundary]!.why =
+						getHeadCoach(to, season).since === season ||
+						getHeadCoach(from.name, season).since === season
+							? "coach"
+							: kind === "up"
+								? "breakout"
+								: "minutes";
+				}
 				return fromTier;
 			};
-			const boundary = pickBoundary(n - 1);
+			const boundary = pickBoundary(n - 1, true);
 			if (boundary !== undefined) {
 				const fromTier = move(
 					boundary,
@@ -508,6 +667,11 @@ export const planCareer = (
 				elig += 1;
 			}
 		}
+	}
+
+	// Overseas tiers: where he was on his way up
+	if (paths && !isNcaa && isOverseasLeague(school.name)) {
+		planTiers(p, years, z, seedBase);
 	}
 
 	// Stories
@@ -573,10 +737,68 @@ export const toCareer = (plan: CareerPlan): PreDraftCareer => ({
 		...(year.cls !== undefined ? { cls: year.cls } : {}),
 		...(year.status ? { status: year.status } : {}),
 		...(year.move ? { move: year.move } : {}),
+		...(year.why ? { why: year.why } : {}),
+		...(year.tier ? { tier: year.tier } : {}),
 	})),
 	...(plan.story ? { story: plan.story } : {}),
 	...(plan.hsClass !== undefined ? { hsClass: plan.hsClass } : {}),
 });
+
+const CLASS_WORDS: Record<string, string> = {
+	"Fr.": "freshman",
+	"So.": "sophomore",
+	"Jr.": "junior",
+	"Sr.": "senior",
+	"Gr.": "graduate",
+};
+
+// "So." -> "sophomore", "RS Fr." -> "redshirt freshman"
+export const classWord = (cls: string | undefined) => {
+	if (!cls) {
+		return undefined;
+	}
+	const redshirt = cls.startsWith("RS ");
+	const word = CLASS_WORDS[redshirt ? cls.slice(3) : cls];
+	return word ? `${redshirt ? "redshirt " : ""}${word}` : undefined;
+};
+
+/**
+ * The note on a season he started somewhere new: a transfer ("Transferred from X to Y after his sophomore season, ..."), a junior college transfer, or a move up a tier abroad. undefined when he did not move. Works for careers stored before preDraftPaths too (no reason, no tier: the tier is read off the league).
+ */
+export const getMoveNote = (
+	prev: CareerYear | undefined,
+	year: CareerYear,
+): string | undefined => {
+	if (!year.move || !prev || prev.school === year.school) {
+		return undefined;
+	}
+	if (year.move === "juco") {
+		return `Junior college transfer from ${prev.school}`;
+	}
+	const prevTier = prev.tier ?? getLeagueTier(prev.school);
+	const tier = year.tier ?? getLeagueTier(year.school);
+	if (prevTier && tier) {
+		return prevTier === tier
+			? `Moved from ${prev.school}`
+			: `Moved up from ${prev.school} (${TIER_NAMES[prevTier].toLowerCase()})`;
+	}
+	const word = classWord(prev.cls);
+	let text = `Transferred from ${prev.school} to ${year.school} after ${word ? `his ${word} season` : `the ${prev.season} season`}`;
+	if (year.why === "coach") {
+		text +=
+			getHeadCoach(year.school, year.season).since === year.season
+				? `, to play for ${year.school}'s new coach`
+				: `, after a coaching change at ${prev.school}`;
+	} else if (year.why === "minutes") {
+		text +=
+			year.move === "down"
+				? ", looking for more playing time"
+				: ", looking for a bigger role";
+	} else if (year.why === "breakout") {
+		text += ", after a breakout season";
+	}
+	return text;
+};
 
 // Skill ratings a few points lower (physical ratings less), for a year he was further behind than his age says
 export const lagRatings = <T extends Record<string, unknown>>(

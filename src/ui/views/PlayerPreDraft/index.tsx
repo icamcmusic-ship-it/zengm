@@ -91,9 +91,16 @@ const StatsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 												{info.classYear}
 											</span>
 										) : (
-											<span className="badge text-bg-secondary fw-normal">
-												{info?.label}
-											</span>
+											<>
+												<span className="badge text-bg-secondary fw-normal">
+													{info?.label}
+												</span>
+												{info?.tierName ? (
+													<span className="text-body-secondary small ms-1">
+														{info.tierName}
+													</span>
+												) : null}
+											</>
 										)}
 									</>
 								),
@@ -188,6 +195,12 @@ const TeamsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 								</td>
 								<td className="text-nowrap">
 									{s.conference ?? s.league}
+									{s.tierName ? (
+										<span className="text-body-secondary">
+											{" "}
+											({s.tierName.toLowerCase()})
+										</span>
+									) : null}
 									{s.confRank ? (
 										<span className="text-body-secondary">
 											{" "}
