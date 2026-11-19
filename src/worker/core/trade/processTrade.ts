@@ -1,5 +1,9 @@
-import { getContractSummaryOrThrow } from "../contract/index.ts";
-import { PHASE } from "../../../common/constants.ts";
+import {
+	getContractSummary,
+	getContractSummaryOrThrow,
+} from "../contract/index.ts";
+import { PHASE, PLAYER } from "../../../common/constants.ts";
+import { getRightsTid } from "../draftStash/index.ts";
 import { player } from "../index.ts";
 import { idb } from "../../db/index.ts";
 import {
@@ -95,7 +99,13 @@ const processTrade = async (
 
 		const playersToSave = [];
 		for (const p of players) {
-			p.tid = tids[k];
+			// Draft-and-stash: his rights change hands, he stays abroad
+			const stashed = p.tid === PLAYER.STASHED && p.stash !== undefined;
+			if (stashed) {
+				p.stash!.tid = tids[k];
+			} else {
+				p.tid = tids[k];
+			}
 
 			// p.gamesUntilTradable = 14; // Don't make traded players untradable
 			p.ptModifier = 1; // Reset
@@ -106,7 +116,7 @@ const processTrade = async (
 				rosterOrder: p.rosterOrder,
 			});
 
-			if (duringSeason) {
+			if (duringSeason && !stashed) {
 				// If two players being traded for each other have the same jersey number, that shouldn't be treated as conflict and they should be able to keep their jersey numbers - that's what the pids[k] part does.
 				// Recompute this for every player, otherwise two incoming players could pick the same jersey number.
 				const teamJerseyNumbers = await getTeammateJerseyNumbers(p.tid, [
@@ -134,7 +144,9 @@ const processTrade = async (
 
 			playersToSave.push(p);
 
-			const contract = getContractSummaryOrThrow(p);
+			const contract = stashed
+				? (getContractSummary(p) ?? { amount: 0, exp: g.get("season") })
+				: getContractSummaryOrThrow(p);
 			teams[k].assets.push({
 				pid: p.pid,
 				name: `${p.firstName} ${p.lastName}`,
@@ -146,6 +158,7 @@ const processTrade = async (
 			// Players who were just drafted were never really part of the team, so they don't count either
 			if (
 				teamSeason &&
+				!stashed &&
 				!helpers.justDrafted(
 					{ draft: p.draft, contract },
 					g.get("phase"),
@@ -285,7 +298,7 @@ const processTrade = async (
 		p.transactions.push({
 			season: g.get("season"),
 			phase: g.get("phase"),
-			tid: p.tid,
+			tid: getRightsTid(p),
 			type: "trade",
 			fromTid: info.fromTid,
 			eid,
@@ -332,7 +345,7 @@ const processTrade = async (
 				return false;
 			}
 			for (const p of players[i]) {
-				if (p.tid !== tids[j]) {
+				if (getRightsTid(p) !== tids[j]) {
 					return false;
 				}
 			}
@@ -358,7 +371,11 @@ const processTrade = async (
 		// Revert trade
 		for (const i of [0, 1] as const) {
 			for (const p of players[i]) {
-				p.tid = tids[i];
+				if (p.tid === PLAYER.STASHED && p.stash) {
+					p.stash.tid = tids[i];
+				} else {
+					p.tid = tids[i];
+				}
 
 				p.transactions = p.transactions?.filter(
 					(row) => row.type !== "trade" || row.eid !== eid,

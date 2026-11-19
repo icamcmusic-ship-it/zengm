@@ -312,6 +312,7 @@ import type {
 	ScoutRegion,
 	SuggestionAction,
 } from "../../common/staffDepth/types.ts";
+import * as draftStash from "../core/draftStash/index.ts";
 
 const acceptContractNegotiation = async ({
 	pid,
@@ -3844,6 +3845,34 @@ const getStretchInfo = async (pid: number) => {
 	};
 };
 
+// Draft-and-stash: stash one of the user's draft picks overseas, or bring one of the user's stashed players over. Returns an
+// error message, or undefined
+const stashDraftPick = async (pid: number) => {
+	const p = await idb.cache.players.get(pid);
+	if (!p) {
+		return "Player not found";
+	}
+	if (!g.get("userTids").includes(p.tid) || g.get("spectator")) {
+		return `${p.firstName} ${p.lastName} is not on your team.`;
+	}
+	return draftStash.stashPlayer(p);
+};
+
+const bringOverStashed = async (pid: number) => {
+	const p = await idb.cache.players.get(pid);
+	if (!p) {
+		return "Player not found";
+	}
+	if (
+		!p.stash ||
+		!g.get("userTids").includes(p.stash.tid) ||
+		g.get("spectator")
+	) {
+		return `Your team does not hold the rights to ${p.firstName} ${p.lastName}.`;
+	}
+	return draftStash.bringOverPlayer(p);
+};
+
 const releasePlayer = async ({
 	pids,
 	stretch,
@@ -6512,6 +6541,8 @@ const api = {
 		regenerateDraftClass,
 		regenerateSchedule,
 		releasePlayer,
+		stashDraftPick,
+		bringOverStashed,
 		getStretchInfo,
 		expandVote,
 		relocateVote,

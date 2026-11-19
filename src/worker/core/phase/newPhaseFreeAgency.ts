@@ -5,6 +5,7 @@ import * as college from "../college/index.ts";
 import { idb } from "../../db/index.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import { getNumPlayersTradedAwayNormalizedAll } from "../player/getNumPlayersTradedAwayNormalized.ts";
+import { stashFreeAgencyStart } from "../draftStash/index.ts";
 
 const newPhaseFreeAgency = async (
 	conditions: Conditions,
@@ -19,6 +20,9 @@ const newPhaseFreeAgency = async (
 
 	// Delete all current negotiations to resign players
 	await contractNegotiation.cancelAll();
+
+	// Draft-and-stash: AI teams bring over who is ready, and rights at their limit lapse (before demands are normalized)
+	await stashFreeAgencyStart();
 
 	await freeAgents.ensureEnoughPlayers();
 

@@ -10,10 +10,17 @@ import { PLAYER } from "./constants.ts";
  *
  * These helpers are the single definition of that distinction. Pro experience, career totals, leaders, awards counts, valuations, retirement and Hall of Fame logic must not see these rows, so anything that reads `p.stats` or `p.awards` directly and cares about pro seasons should go through them.
  *
+ * Draft-and-stash (common/draftStash.ts): an overseas season a drafted player played while a team held his rights is a row like these after his draft year, marked `stash: true`. It counts as pre-draft (overseas) too, so it shows with them and never as a pro season.
+ *
  * Rows of players with an unknown draft year (0/undefined) are never pre-draft. A stats row with `tid === DOES_NOT_EXIST` and a season after the draft year is a real pro season (a team that no longer exists, or a season imported from another league), so it is kept.
  */
 
 type DraftYearSource = { draft?: { year?: number } };
+type StatsRowSource = {
+	tid?: number | undefined;
+	season: number;
+	stash?: true;
+};
 
 const isValidDraftYear = (
 	draftYear: number | undefined | null,
@@ -21,13 +28,13 @@ const isValidDraftYear = (
 	typeof draftYear === "number" && Number.isFinite(draftYear) && draftYear > 0;
 
 export const isPreDraftStatsRow = (
-	row: { tid?: number | undefined; season: number },
+	row: { tid?: number | undefined; season: number; stash?: true },
 	draftYear: number | undefined | null,
 ) => {
 	return (
 		row.tid === PLAYER.DOES_NOT_EXIST &&
 		isValidDraftYear(draftYear) &&
-		row.season <= draftYear
+		(row.season <= draftYear || row.stash === true)
 	);
 };
 
@@ -45,7 +52,7 @@ export const isPreDraftAward = (
 
 export const hasPreDraftStats = (
 	p: DraftYearSource & {
-		stats: { tid?: number | undefined; season: number }[];
+		stats: StatsRowSource[];
 	},
 ) => {
 	const draftYear = p.draft?.year;
@@ -58,9 +65,7 @@ export const hasPreDraftStats = (
 /**
  * Stats rows from the player's pro career only. Returns the original array (no copy) when there is nothing to remove, which is nearly always.
  */
-export const getProStats = <
-	Row extends { tid?: number | undefined; season: number },
->(
+export const getProStats = <Row extends StatsRowSource>(
 	p: DraftYearSource & { stats: Row[] },
 ): Row[] => {
 	const draftYear = p.draft?.year;
@@ -73,9 +78,7 @@ export const getProStats = <
 	return p.stats.filter((row) => !isPreDraftStatsRow(row, draftYear));
 };
 
-export const getPreDraftStats = <
-	Row extends { tid?: number | undefined; season: number },
->(
+export const getPreDraftStats = <Row extends StatsRowSource>(
 	p: DraftYearSource & { stats: Row[] },
 ): Row[] => {
 	const draftYear = p.draft?.year;

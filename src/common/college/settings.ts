@@ -46,6 +46,7 @@ const EXTRAS_FORCED_OFF = [
 	"featureRatingsRegenerator",
 	"scoutingSystem",
 	"featureDraftBoard",
+	"featureDraftStash",
 	"featureAiDraftNeeds",
 	"featureMockDraft",
 	"featureUnretire",

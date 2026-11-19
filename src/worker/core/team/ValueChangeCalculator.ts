@@ -5,7 +5,9 @@ import {
 } from "../contract/unrest.ts";
 import { contractToSummary } from "../contract/index.ts";
 import { getContractStartSeason } from "../../util/getContractStartSeason.ts";
-import { PHASE } from "../../../common/constants.ts";
+import { PHASE, PLAYER } from "../../../common/constants.ts";
+import { STASH_TRADE_VALUE_FACTOR } from "../../../common/draftStash.ts";
+import { getStashedPlayers } from "../draftStash/index.ts";
 import { draft, player, team, trade } from "../index.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local } from "../../util/index.ts";
@@ -334,6 +336,8 @@ const getPlayers = async ({
 
 	// Get players to remove
 	const players = await idb.cache.players.indexGetAll("playersByTid", tid);
+	// Draft-and-stash: rights to players abroad can be traded away too
+	const rights = pidsRemove.length > 0 ? await getStashedPlayers(tid) : [];
 
 	// Player traits (setting): a small, bounded adjustment, the same for players coming in and going out so there is nothing to arbitrage. 1 with the setting off
 	const traitsOn = traitsEnabled();
@@ -350,12 +354,14 @@ const getPlayers = async ({
 	const gmFactor = (p: Player, own: boolean) =>
 		gm ? getGmPlayerFactor(gm, p, own ? tid : undefined) : 1;
 
-	for (const p of players) {
+	for (const p of [...players, ...rights]) {
 		if (!pidsRemove.includes(p.pid)) {
 			continue;
 		}
 
-		const value = zscore(p.value);
+		const stashed = p.tid === PLAYER.STASHED;
+		// A stashed player is a discounted prospect: not here yet, and he might never come
+		const value = zscore(p.value) * (stashed ? STASH_TRADE_VALUE_FACTOR : 1);
 
 		// Only apply fudge factor to positive assets
 		let fudgedValue = value;
@@ -368,19 +374,17 @@ const getPlayers = async ({
 			}
 		}
 
-		const contract = getContractForValuation(p);
+		const contract = stashed ? undefined : getContractForValuation(p);
 		remove.push({
 			type: "player",
 			pid: p.pid,
 			value: fudgedValue,
-			contractValue: getContractValue(contract, value),
+			contractValue: contract ? getContractValue(contract, value) : 0,
 			injury: p.injury,
 			age: g.get("season") - p.born.year,
-			justDrafted: helpers.justDrafted(
-				{ draft: p.draft, contract },
-				phase,
-				season,
-			),
+			justDrafted: contract
+				? helpers.justDrafted({ draft: p.draft, contract }, phase, season)
+				: false,
 		});
 	}
 
@@ -388,21 +392,20 @@ const getPlayers = async ({
 	for (const pid of pidsAdd) {
 		const p = await idb.cache.players.get(pid);
 		if (p) {
-			const value = zscore(p.value);
+			const stashed = p.tid === PLAYER.STASHED;
+			const value = zscore(p.value) * (stashed ? STASH_TRADE_VALUE_FACTOR : 1);
 
-			const contract = getContractForValuation(p);
+			const contract = stashed ? undefined : getContractForValuation(p);
 			add.push({
 				type: "player",
 				pid: p.pid,
 				value: value > 0 ? value * traitFactor(p) * gmFactor(p, false) : value,
-				contractValue: getContractValue(contract, value),
+				contractValue: contract ? getContractValue(contract, value) : 0,
 				injury: p.injury,
 				age: g.get("season") - p.born.year,
-				justDrafted: helpers.justDrafted(
-					{ draft: p.draft, contract },
-					phase,
-					season,
-				),
+				justDrafted: contract
+					? helpers.justDrafted({ draft: p.draft, contract }, phase, season)
+					: false,
 			});
 		}
 	}
@@ -1825,7 +1828,8 @@ const getModifiedPickRank = async (
 	const playersAfterTrade = players.filter((p) => !pidsRemove.includes(p.pid));
 	for (const pid of pidsAdd) {
 		const p = await idb.cache.players.get(pid);
-		if (p) {
+		// Draft-and-stash: rights to a player abroad don't change this season's team
+		if (p && p.tid !== PLAYER.STASHED) {
 			playersAfterTrade.push(p);
 		}
 	}
