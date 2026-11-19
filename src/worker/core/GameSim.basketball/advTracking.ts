@@ -248,6 +248,7 @@ const addPair = (
 	pairs: Map<AdvPlayer, Map<AdvPlayer, number>>,
 	p: AdvPlayer,
 	qs: readonly AdvPlayer[],
+	n: number = 1,
 ) => {
 	let m = pairs.get(p);
 	if (!m) {
@@ -255,8 +256,21 @@ const addPair = (
 		pairs.set(p, m);
 	}
 	for (const q of qs) {
-		m.set(q, (m.get(q) ?? 0) + 1);
+		m.set(q, (m.get(q) ?? 0) + n);
 	}
+};
+
+// (perf4) the same players in the same order
+const sameLineup = (a: readonly AdvPlayer[], b: readonly AdvPlayer[]) => {
+	if (a.length !== b.length) {
+		return false;
+	}
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) {
+			return false;
+		}
+	}
+	return true;
 };
 
 export class AdvTracker {
@@ -445,12 +459,52 @@ export class AdvTracker {
 		}
 		rowO[this.numPlayers + LU.possFor]! += 1;
 		rowD[this.numPlayers + LU.possAgainst]! += 1;
-		for (const q of onCourt[o]) {
-			this.offPoss.set(q, (this.offPoss.get(q) ?? 0) + 1);
+		// perf4: the possessions each offensive player had and shared with each defender are counted per stretch of unchanged
+		// lineups and added to offPoss and pairPoss when the lineups change (and at the end), instead of 30 map updates per
+		// possession. Whole numbers, so the same totals, and the same insertion order (only oppRimExp iterates, a defender's
+		// map, whose keys come in the order the stretches were played)
+		const pend = this.pendingPoss;
+		if (
+			!sameLineup(pend.lineups[0], onCourt[0]) ||
+			!sameLineup(pend.lineups[1], onCourt[1])
+		) {
+			// (the counts so far go with the lineups they were played by, then the copies are replaced)
+			this.flushPendingPoss();
+			for (const t of [0, 1] as const) {
+				const copy = pend.lineups[t];
+				copy.length = onCourt[t].length;
+				for (let i = 0; i < copy.length; i++) {
+					copy[i] = onCourt[t][i]!;
+				}
+			}
 		}
-		for (const p of onCourt[d]) {
-			addPair(this.pairPoss, p, onCourt[o]);
+		if (pend.counts[o] === 0) {
+			pend.order.push(o);
 		}
+		pend.counts[o] += 1;
+	}
+
+	pendingPoss = {
+		lineups: [[], []] as [AdvPlayer[], AdvPlayer[]],
+		counts: [0, 0] as [number, number],
+		// (offenses in the order of their first possession of the stretch)
+		order: [] as TeamNum[],
+	};
+	flushPendingPoss() {
+		const pend = this.pendingPoss;
+		for (const o of pend.order) {
+			const n = pend.counts[o];
+			const offense = pend.lineups[o];
+			const defense = pend.lineups[o === 0 ? 1 : 0];
+			for (const q of offense) {
+				this.offPoss.set(q, (this.offPoss.get(q) ?? 0) + n);
+			}
+			for (const p of defense) {
+				addPair(this.pairPoss, p, offense, n);
+			}
+			pend.counts[o] = 0;
+		}
+		pend.order.length = 0;
 	}
 
 	possessionEnd() {
@@ -756,6 +810,7 @@ export class AdvTracker {
 
 	// End of the game: the players' and teams' records, on the objects the sim returns (players who didn't play get none)
 	finish() {
+		this.flushPendingPoss();
 		// Close the stints of the players on the court
 		for (const t of [0, 1] as const) {
 			for (const p of this.lineupCache[t]) {
