@@ -189,6 +189,35 @@ const NOUN_VALUE: Record<
 	crafty: { value: (r) => r.oiq, table: () => "oiq" },
 };
 export const NOUNS = Object.keys(NOUN_VALUE) as NounKey[];
+// The base rating the regenerator raises for a noun (it sets base ratings only)
+export const NOUN_RATING: Record<NounKey, keyof ArchetypeRatings> = {
+	three: "tp",
+	mid: "fg",
+	post: "ins",
+	finish: "dnk",
+	rimD: "diq",
+	perimD: "diq",
+	steal: "diq",
+	handle: "drb",
+	creator: "drb",
+	pass: "pss",
+	reb: "reb",
+	speed: "spd",
+	jump: "jmp",
+	strength: "stre",
+	crafty: "oiq",
+};
+// The rating at a standing among the league's players
+export const ratingAtPct = (k: string, p: number, rq?: RatingQuantiles) => {
+	const t = tableOf(k, rq);
+	if (!t) {
+		return 50;
+	}
+	const pos = p * (t.length - 1);
+	const lo = Math.floor(pos);
+	const hi = Math.min(t.length - 1, lo + 1);
+	return t[lo]! + (t[hi]! - t[lo]!) * (pos - lo);
+};
 
 export type NounScore = { key: NounKey; value: number; pct: number };
 
@@ -296,6 +325,34 @@ export type Special = {
 	twoWay: boolean;
 	elite: boolean;
 };
+// The nouns a build's name is made of, when it can be a special name at all (every word a noun, one to three nouns)
+export const specialNounsOf = (
+	name: string,
+): { nouns: NounKey[]; twoWay: boolean } | undefined => {
+	let nouns: NounKey[] | undefined = NICKNAMES[name];
+	let twoWay = false;
+	if (!nouns) {
+		const cs = conceptsOf(name);
+		if (cs.length === 0) {
+			return undefined;
+		}
+		const set = new Set<NounKey>();
+		for (const c of cs) {
+			const m = CONCEPT_NOUNS[c.key];
+			if (m === "twoWay") {
+				twoWay = true;
+			} else if (m) {
+				for (const n of m) {
+					set.add(n);
+				}
+			} else {
+				return undefined;
+			}
+		}
+		nouns = [...set];
+	}
+	return nouns.length === 0 || nouns.length > 3 ? undefined : { nouns, twoWay };
+};
 const specialCache = new Map<Pos, Special[]>();
 export const specialsAt = (pos: Pos): Special[] => {
 	const hit = specialCache.get(pos);
@@ -308,36 +365,17 @@ export const specialsAt = (pos: Pos): Special[] => {
 			continue;
 		}
 		const name = nameAt(a, pos);
-		let nouns: NounKey[] | undefined = NICKNAMES[name];
-		let twoWay = false;
-		if (!nouns) {
-			const cs = conceptsOf(name);
-			if (cs.length === 0) {
-				continue;
-			}
-			const set = new Set<NounKey>();
-			let ok = true;
-			for (const c of cs) {
-				const m = CONCEPT_NOUNS[c.key];
-				if (m === "twoWay") {
-					twoWay = true;
-				} else if (m) {
-					for (const n of m) {
-						set.add(n);
-					}
-				} else {
-					ok = false;
-				}
-			}
-			if (!ok) {
-				continue;
-			}
-			nouns = [...set];
-		}
-		if (nouns.length === 0 || nouns.length > 3) {
+		const sn = specialNounsOf(name);
+		if (!sn) {
 			continue;
 		}
-		out.push({ id: a.id, name, nouns, twoWay, elite: ELITE_RE.test(name) });
+		out.push({
+			id: a.id,
+			name,
+			nouns: sn.nouns,
+			twoWay: sn.twoWay,
+			elite: ELITE_RE.test(name),
+		});
 	}
 	specialCache.set(pos, out);
 	return out;

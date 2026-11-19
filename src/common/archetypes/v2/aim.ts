@@ -12,10 +12,24 @@ import {
 } from "./gateScale.ts";
 import { ELITE_OVR, ELITE_RE, MID_OVR, SKILL_BARS } from "./honest.ts";
 import { gatesOf } from "./tests.ts";
+import {
+	NOUN_CLEAR,
+	NOUN_RATING,
+	nounScores,
+	ratingAtPct,
+	specialNounsOf,
+} from "./nouns.ts";
 
-// The lowest ovr at which a name can be a player's label
+// The lowest ovr at which a name can be a player's label (archnouns: Infinity for a build that can never be one: a name
+// whose words are not all nouns, nouns.ts specialNounsOf)
 export const aimMinOvr = (name: string): number =>
-	ELITE_RE.test(name) ? ELITE_OVR : gatesOf(name).length < 2 ? MID_OVR : 0;
+	!specialNounsOf(name)
+		? Infinity
+		: ELITE_RE.test(name)
+			? ELITE_OVR
+			: gatesOf(name).length < 2
+				? MID_OVR
+				: 0;
 
 // The full skill bar of each rating (honest.ts SKILL_BARS, its deciding rating)
 const SKILL_BAR_OF: Partial<Record<string, number>> = {};
@@ -69,6 +83,29 @@ export const gatePush = (
 				}
 				default:
 					add(k as RatingKey, cut);
+			}
+		}
+	}
+	// archnouns: each of the name's nouns into his league's top 30% with room to spare (a special name needs its nouns
+	// among his three best)
+	const sn = specialNounsOf(name);
+	for (const n of sn?.nouns ?? []) {
+		const k = NOUN_RATING[n] as RatingKey;
+		add(k, ratingAtPct(k, Math.min(0.97, NOUN_CLEAR + 0.12), rq) + MARGIN);
+	}
+	// ... and the nouns he isn't to be named for pulled under the bar, so they neither outrank the target's nor take its
+	// place (a defensive one would make a defensive label of its own)
+	if (sn) {
+		const own = new Set(sn.nouns.map((n) => NOUN_RATING[n]));
+		for (const s of nounScores(r, rq)) {
+			const k = NOUN_RATING[s.key] as RatingKey;
+			if (sn.nouns.includes(s.key) || own.has(k) || s.key === "crafty") {
+				continue;
+			}
+			const cap = ratingAtPct(k, NOUN_CLEAR - 0.08, rq);
+			const v = r[k];
+			if (s.pct >= NOUN_CLEAR - 0.05 && typeof v === "number" && v > cap) {
+				push[k] = Math.min(push[k] ?? 0, cap - v);
 			}
 		}
 	}
