@@ -300,6 +300,20 @@ export const TRAIT_DEFINITIONS: Record<TraitKey, TraitDefinition> = {
 		badgeLow: "Low motor",
 		growth: "Declines slowly after 30.",
 	},
+	competitiveness: {
+		key: "competitiveness",
+		name: "Competitiveness",
+		description:
+			"Hates to lose: competes harder the closer the game is, from the opening tip.",
+		effect:
+			"In a close game (within 6 points), at any point of the game: better (or worse) shooting and fewer (or more) turnovers. Separate from Clutch (the last minutes) and Big-game (the playoffs).",
+		visibility: "hidden",
+		low: "Folds in close games",
+		high: "Fierce competitor",
+		badgeHigh: "Competitor",
+		badgeLow: "Soft",
+		growth: "Little change.",
+	},
 	defensiveVersatility: {
 		key: "defensiveVersatility",
 		name: "Defensive versatility",

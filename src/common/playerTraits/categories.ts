@@ -11,6 +11,7 @@ export const TRAIT_CATEGORIES = [
 			"clutch",
 			"lateGameIq",
 			"bigGame",
+			"competitiveness",
 			"consistency",
 			"shotDiscipline",
 			"foulDiscipline",
@@ -78,6 +79,11 @@ export const TRAIT_STATUS: Record<
 		high: "Raises his game in the playoffs",
 		average: "Plays the same in the playoffs as in the regular season",
 		low: "Shrinks when the playoffs come",
+	},
+	competitiveness: {
+		high: "Competes harder the closer the game gets",
+		average: "Competes like a typical player in close games",
+		low: "Lets close games slip away",
 	},
 	consistency: {
 		high: "Plays close to his level night after night",

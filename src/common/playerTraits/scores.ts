@@ -62,6 +62,8 @@ const RATING_WEIGHTS: Record<TraitKey, TraitRatings> = {
 	moneyVsWinning: {},
 	motor: { endu: 0.5, spd: 0.2, stre: 0.15, jmp: 0.15 },
 	defensiveVersatility: { spd: 0.3, diq: 0.35, stre: 0.2, jmp: 0.15 },
+	// Personality
+	competitiveness: {},
 };
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -148,6 +150,8 @@ export const CALIBRATION_OFFSETS: Record<TraitKey, number> = {
 	// Top 300 by ovr in generated leagues (12 leagues), like recovery
 	motor: 0.4,
 	defensiveVersatility: -0.2,
+	// Pure personality
+	competitiveness: 0,
 };
 
 // RATING_WEIGHTS as arrays, in the same order, so ratingPart (hot: every trait score) skips Object.entries. Same arithmetic, same results.

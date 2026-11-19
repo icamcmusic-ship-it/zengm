@@ -392,6 +392,7 @@ const TRAIT_WORDS: [RegExp, string, number][] = [
 	[/Off-Ball|Cutting/, "offBall", 55],
 	[/Motor|Demon|Relentless/, "motor", 55],
 	[/Clutch|Ice-Cold|Closer/, "clutch", 55],
+	[/Ruthless/, "competitiveness", 55],
 	[/Savvy|Veteran|Old Head/, "veteranSavvy", 55],
 	[/Iron|Durable/, "durability", 55],
 	[/Versatile|Switchable/, "defensiveVersatility", 55],
@@ -776,8 +777,9 @@ export const CUSTOM_SPECIALS: {
 			pct.post >= 0.8 &&
 			subGe(r, "pst", "cls", "flt") &&
 			subGe(r, "con", "fns") &&
+			// (Ruthless: the competitiveness trait, the user's choice)
 			traits !== undefined &&
-			(traits.motor ?? 0) >= TRAIT_WORD_MIN,
+			(traits.competitiveness ?? 0) >= TRAIT_WORD_MIN,
 	},
 	{
 		key: "sPickPocket",
@@ -1012,7 +1014,8 @@ export const pickNouns = (x: NounInput): NounPick => {
 			} else {
 				n =
 					stl!.pct >= 0.85 &&
-					((x.traits?.motor ?? 0) >= TRAIT_WORD_MIN ||
+					((x.traits?.competitiveness ?? 0) >= TRAIT_WORD_MIN ||
+						(x.traits?.motor ?? 0) >= TRAIT_WORD_MIN ||
 						(x.traits?.hustle ?? 0) >= TRAIT_WORD_MIN)
 						? "Ball-Hawking Menace"
 						: "Ball Hawk";

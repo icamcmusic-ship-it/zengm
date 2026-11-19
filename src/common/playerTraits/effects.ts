@@ -65,6 +65,10 @@ export const EFFECT_AMPLITUDES = {
 	// night of a back-to-back (only with the injury/rest setting that models back-to-backs)
 	motorDrain: 0.1,
 	motorBackToBack: 0.05,
+	// Competitiveness: in a close game (within competeMargin points), at any time, additive make probability on his shots and fractional
+	// change to his turnover probability
+	competeShot: 0.015,
+	competeTurnover: 0.06,
 	// Defensive versatility: fraction added to the team's defensive composite ratings, per unit of the on-court mean z, at a full size mismatch
 	switchDefense: 0.012,
 } as const;
@@ -161,7 +165,14 @@ export type TraitEffects = {
 	backToBackEnduranceMult: number;
 	/** Defensive versatility, -1 to 1, for teamSwitchDefenseBonus. Neutral 0. */
 	switchDefenseContribution: number;
+	/** Competitiveness: add to the make probability of his shots in a close game. +-0.015. Neutral 0. */
+	competeShotDelta: number;
+	/** Competitiveness: multiply his turnover probability in a close game. 0.94-1.06. Neutral 1. */
+	competeTurnoverMult: number;
 };
+
+// Competitiveness: a game within this many points is a close game
+export const COMPETE_MARGIN = 6;
 
 const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 	const A = EFFECT_AMPLITUDES;
@@ -184,6 +195,7 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		temper: traitZ(scores.temper),
 		motor: traitZ(scores.motor),
 		defensiveVersatility: traitZ(scores.defensiveVersatility),
+		competitiveness: traitZ(scores.competitiveness),
 	};
 	const vet = z.veteranSavvy;
 	const temper = z.temper;
@@ -246,6 +258,8 @@ const make = (scores: TraitScores, neutral: boolean): TraitEffects => {
 		energyDrainRate: 1 - A.motorDrain * z.motor,
 		backToBackEnduranceMult: 1 + A.motorBackToBack * z.motor,
 		switchDefenseContribution: z.defensiveVersatility,
+		competeShotDelta: A.competeShot * z.competitiveness,
+		competeTurnoverMult: 1 - A.competeTurnover * z.competitiveness,
 	};
 };
 
