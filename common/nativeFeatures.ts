@@ -1214,6 +1214,18 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "scoutRoom",
+		college: false,
+		key: "featureScoutRoom",
+		core: true,
+		name: "Scout Consensus & Flags",
+		description:
+			'Every one of your scouts who has seen a prospect gives his own grade (through his own error and lean: specialty, region, experience, bias, "our guy"), so you see the consensus, how much the room disagrees (Agree, Mixed, Split: a wide split means less is known) and the outliers, plus up to four short red and green flags from his character and effort traits, his pre-draft record and his ratings (hidden traits only as unconfirmed hints, as far as your scouts can read them). On Draft Scouting, the Draft Board and the prospect\'s Scouting page. Needs Scouting Reports.',
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "coachingDepth",
 		college: false,
 		key: "featureCoachingDepth",

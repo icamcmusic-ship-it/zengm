@@ -13,6 +13,10 @@ import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { confidenceFromFactor } from "../../common/staffDepth/regions.ts";
 import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
+import {
+	getProspectRooms,
+	summarizeRoom,
+} from "../core/scoutingReports/room.ts";
 
 /**
  * The user's draft board planner: one draft class, with the user's ranks, tiers and notes next to everything known about each prospect (fuzzed ratings, build, college/overseas stats and honors, scout report).
@@ -78,6 +82,9 @@ export default defineView({
 			...[...(preDraftRanks?.values() ?? [])].map((x) => x.r),
 		);
 
+		// Scout Consensus & Flags
+		const rooms = fantasyDraft ? undefined : await getProspectRooms(players);
+
 		const prospects = addFirstNameShort(
 			formatted
 				.sort((a, b) => b.valueFuzz - a.valueFuzz)
@@ -114,6 +121,9 @@ export default defineView({
 						numHonors: getPreDraftAwards(p).length,
 						scoutReport: scoutingSystem ? getScoutReport(p) : undefined,
 						board: p.draftBoard ?? {},
+						room: rooms?.has(pa.pid)
+							? summarizeRoom(rooms.get(pa.pid)!)
+							: undefined,
 					};
 				}),
 		);

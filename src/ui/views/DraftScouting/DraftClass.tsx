@@ -14,6 +14,12 @@ import { downloadFile } from "../../util/downloadFile.ts";
 import { LeagueFileUpload } from "../../components/LeagueFileUpload.tsx";
 import { CollegeStats } from "./CollegeStats.tsx";
 import { showNotification } from "../../util/showNotification.ts";
+import {
+	FlagsCell,
+	RoomCell,
+	flagsSortValue,
+	roomSortValue,
+} from "../../components/ScoutRoom.tsx";
 
 type ScoutReport = NonNullable<
 	View<"draftScouting">["seasons"][0]["players"][0]["scoutReport"]
@@ -189,6 +195,23 @@ const DraftClass = ({
 			sortType: "number",
 		});
 	}
+	// Scout Consensus & Flags
+	const showRoom = !fantasyDraft && players.some((p) => p.room !== undefined);
+	if (showRoom) {
+		cols.push(
+			{
+				title: "Scouts",
+				desc: "Your scouts' consensus (where the average of their grades slots him in this class) and how much they disagree: Agree, Mixed or Split (a wide split means less is known about him). * marks an outlier. Hover for details, each scout's grade is on his Scouting page.",
+				sortType: "number",
+			},
+			{
+				title: "Flags",
+				desc: "Red and green flags from his traits, pre-draft record and ratings. Hover to read them. Hidden traits only show up as unconfirmed hints.",
+				sortType: "number",
+				sortSequence: ["desc", "asc"],
+			},
+		);
+	}
 	if (showTraits) {
 		if (traitColumn) {
 			// One trait as a sortable number, instead of the badges
@@ -265,6 +288,20 @@ const DraftClass = ({
 										remaining={scoutingRemaining}
 									/>
 								),
+							},
+						]
+					: []),
+				...(showRoom
+					? [
+							{
+								sortValue: roomSortValue(p.room),
+								searchValue: p.room?.label ?? "",
+								value: <RoomCell room={p.room} />,
+							},
+							{
+								sortValue: flagsSortValue(p.room?.flags),
+								searchValue: (p.room?.flags ?? []).map((f) => f.text).join(" "),
+								value: <FlagsCell flags={p.room?.flags} />,
 							},
 						]
 					: []),
@@ -445,7 +482,7 @@ const DraftClass = ({
 			<DataTable
 				cols={cols}
 				defaultSort={[0, "asc"]}
-				name={`DraftScouting:${offset}${showTraits ? ":traits" : ""}${traitColumn ? ":col" : ""}`}
+				name={`DraftScouting:${offset}${showRoom ? ":room" : ""}${showTraits ? ":traits" : ""}${traitColumn ? ":col" : ""}`}
 				rows={rows}
 			/>
 		</>
