@@ -2,7 +2,7 @@
 
 ## Builds (246)
 
-Elite-word names (needs ovr 60+) are marked ★. Positions in brackets; a different name at a position is shown after it.
+Elite-word names (needs ovr 60+) are marked ★: below 60 a player gets a plainer name instead. Positions in brackets; a different name at a position is shown after it.
 
 ### All-around (3)
 
@@ -280,21 +280,21 @@ Elite-word names (needs ovr 60+) are marked ★. Positions in brackets; a differ
 - ★ Slashing Lockdown [GF/SF] — A defensive wing who scores by cutting and attacking the rim.
 - The Guard Dog [PG/G/GF/SF/F] (also shown as Eliminator) — Hounds ball handlers the length of the floor.
 
-## Composed names: 36 roles and 24 descriptors
+## Composed names: 34 roles and 24 descriptors
 
-A composed name is up to two descriptors in front of a role (2K's order), each word tested.
+A composed name is up to two descriptors in front of a role (2K's order), each word tested. ★ marks a role or descriptor (or one of its alternate words) only a player with ovr 60+ can get; below that a plainer word is used.
 
 Roles:
 
 - Playmaker / Dimer [guard, wing, big]
-- Offensive Engine [guard, wing]
-- Shot Creator (with a descriptor: Creator) [guard, wing]
+- ★ Offensive Engine [guard, wing]
+- ★ Shot Creator (with a descriptor: Creator) [guard, wing]
 - Shot Hunter [guard, wing]
-- Sniper [guard, wing]
-- Sharpshooter [guard, wing]
+- ★ Sniper [guard, wing]
+- ★ Sharpshooter [guard, wing]
 - Stretch Big (with a descriptor: Stretch) [big]
 - Bucket Chaser [guard, wing]
-- Mid-Range Maestro (with a descriptor: Maestro) [guard, wing, big]
+- ★ Mid-Range Maestro (with a descriptor: Maestro) [guard, wing, big]
 - Slasher [guard, wing]
 - Finisher / Laymaker [guard, wing, big]
 - Open-Lane Burner (with a descriptor: Burner) [guard, wing]
@@ -303,9 +303,9 @@ Roles:
 - Rim Hammer (with a descriptor: Hammer) [big]
 - Rim Runner [big]
 - Lob Threat [big]
-- Lockdown Defender (with a descriptor: Lock) [guard, wing]
+- ★ Lockdown Defender (with a descriptor: Lock) [guard, wing]
 - Ball Hawk [guard, wing]
-- Shot Eraser / Paint Protector / Rim Protector [wing, big]
+- ★ Shot Eraser / Paint Protector / Rim Protector [wing, big]
 - Board Enforcer / Glass Cleaner [wing, big]
 - Board Hunter [wing, big]
 - Post Bully (with a descriptor: Bully) [wing, big]
@@ -318,8 +318,6 @@ Roles:
 - Paint Beast [wing, big]
 - Interior Force [wing, big]
 - Offensive-Minded Guard [guard]
-- Prospect [guard, wing, big]
-- Depth Piece [guard, wing, big]
 - Steady Game Manager [guard]
 - Energy Big [big]
 
@@ -331,7 +329,7 @@ Descriptors:
 - High-Flying / Bouncy
 - Ball-Hawking / Pesky
 - Defensive
-- Shot-Erasing / Paint-Protecting / Backline
+- ★ Shot-Erasing / Paint-Protecting / Backline
 - Glass-Cleaning / Board-Enforcing
 - Board-Hunting
 - Playmaking / Diming
@@ -339,7 +337,7 @@ Descriptors:
 - 3-Level
 - Inside-Out
 - 3PT
-- Sharpshooting [guard, wing]
+- ★ Sharpshooting [guard, wing]
 - Stretch [big]
 - Mid-Paint
 - Mid-Post [wing, big]
