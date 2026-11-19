@@ -170,6 +170,10 @@ describe("archv2 grammar", () => {
 			ROLES.map((r) => r.withDesc).filter((w): w is string => !!w),
 		);
 		for (const r of ROLES) {
+			// (archnouns: the noun names' end words always follow a front word; their whole names are their own)
+			if (r.nounOnly) {
+				continue;
+			}
 			for (const group of r.groups) {
 				assert.isFalse(short.has(composeName(r, [], group)), r.key);
 			}

@@ -123,6 +123,7 @@ export const nounOfDesc = (d: string): NounKey | undefined => DESC_NOUN[d];
 
 // The position word that ends the name
 export type PosWord =
+	| `e${string}`
 	| "posGuard"
 	| "posWing"
 	| "posForward"
@@ -727,6 +728,7 @@ const isLong = (r: ArchetypeRatings) =>
 
 // ---- the user's own special names (tested on his nouns, sub-ratings and traits; checked before anything else) ----
 type SpecialCtx = {
+	pos: Pos;
 	pct: Record<NounKey, number>;
 	r: ArchetypeRatings;
 	traits?: Record<string, number>;
@@ -745,6 +747,8 @@ export const CUSTOM_SPECIALS: {
 	key: string;
 	positions: readonly Pos[];
 	nouns: NounKey[];
+	// a name about many skills: it need not have his best one
+	anyBest?: true;
 	test: (c: SpecialCtx) => boolean;
 }[] = [
 	{
@@ -819,6 +823,7 @@ export const CUSTOM_SPECIALS: {
 		test: ({ pct, eliteOvr }) =>
 			eliteOvr && pct.rimD >= ELITE_PCT && pct.post >= 0.85 && pct.pass >= 0.7,
 	},
+	...USER_SPECIALS_2(),
 	{
 		key: "sSlashMiddyF",
 		positions: ["SF", "F", "PF"],
@@ -826,8 +831,402 @@ export const CUSTOM_SPECIALS: {
 		test: ({ pct }) => pct.finish >= 0.7 && pct.handle >= 0.6 && pct.mid >= 0.7,
 	},
 ];
+// The user's second list (archnouns2)
+function USER_SPECIALS_2(): {
+	key: string;
+	positions: readonly Pos[];
+	nouns: NounKey[];
+	anyBest?: true;
+	test: (c: SpecialCtx) => boolean;
+}[] {
+	const G_F: Pos[] = ["PG", "G", "SG", "GF", "SF", "F"];
+	const G_SF: Pos[] = ["PG", "G", "SG", "GF", "SF"];
+	const SF_PF: Pos[] = ["SF", "F", "PF"];
+	const BIGS: Pos[] = ["PF", "FC", "C"];
+	const lead = (r: ArchetypeRatings, a: string, b: string) =>
+		(sub(r, a) ?? 0) > (sub(r, b) ?? 0);
+	const tr = (c: SpecialCtx, k: string) => c.traits?.[k] ?? 0;
+	const count = (c: SpecialCtx, min: number) =>
+		NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= min).length;
+	return [
+		{
+			key: "sMidnightHash",
+			positions: G_F,
+			nouns: ["mid", "three"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.mid >= ELITE_PCT &&
+				c.pct.three >= ELITE_PCT &&
+				tr(c, "clutch") >= 75,
+		},
+		{
+			key: "sSwissArmy",
+			positions: ["PG", "G", "SG", "GF", "SF", "F", "PF", "FC", "C"],
+			nouns: [],
+			anyBest: true,
+			test: (c) =>
+				count(c, GENERIC_PCT) >= 6 &&
+				NOUNS.some((n) => n !== "crafty" && c.pct[n] >= 0.85),
+		},
+		{
+			key: "sSwitchblade",
+			positions: G_SF,
+			nouns: ["creator", "handle", "perimD"],
+			test: (c) =>
+				c.pct.creator >= 0.85 &&
+				c.pct.handle >= 0.8 &&
+				c.pct.perimD >= 0.7 &&
+				pctOf("spd", sub(c.r, "lat") ?? c.r.spd) >= 0.7,
+		},
+		{
+			key: "sFadeawayTech",
+			positions: ["SF", "F", "PF"],
+			nouns: ["mid", "post"],
+			test: (c) =>
+				c.pct.mid >= 0.85 &&
+				lead(c.r, "pul", "spu") &&
+				c.pct.post >= 0.7 &&
+				Math.max(c.pct.perimD, c.pct.rimD) >= 0.7 &&
+				c.pct.crafty >= 0.7,
+		},
+		{
+			key: "sVelvetStepBack",
+			positions: ["GF", "SF"],
+			nouns: ["three", "handle"],
+			test: (c) =>
+				c.pct.three >= 0.85 &&
+				lead(c.r, "tod", "tcs") &&
+				c.pct.handle >= 0.7 &&
+				!lead(c.r, "con", "fns"),
+		},
+		{
+			key: "sClampCreate",
+			positions: ["SG", "GF", "SF"],
+			nouns: ["perimD", "creator"],
+			test: (c) => c.eliteOvr && c.pct.perimD >= 0.85 && c.pct.creator >= 0.8,
+		},
+		{
+			key: "sArcCatalyst",
+			positions: G_SF,
+			nouns: ["three", "pass", "perimD"],
+			test: (c) =>
+				c.pct.three >= 0.8 && c.pct.pass >= 0.7 && c.pct.perimD >= 0.7,
+		},
+		{
+			key: "sWingMarksman",
+			positions: ["GF", "SF"],
+			nouns: ["three", "mid"],
+			test: (c) =>
+				c.pct.three >= 0.85 && c.pct.mid >= 0.8 && c.pct.speed >= 0.6,
+		},
+		{
+			key: "sSwitchProof",
+			positions: G_F,
+			nouns: ["creator"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.creator >= 0.85 &&
+				c.pct.strength >= 0.6 &&
+				tallForPos(c.r, c.pos),
+		},
+		{
+			key: "sBackcourtWing",
+			positions: ["SG", "GF"],
+			nouns: ["three", "mid"],
+			test: (c) => c.pct.three >= 0.8 && c.pct.mid >= 0.8,
+		},
+		{
+			key: "sTrailThree",
+			positions: BIGS,
+			nouns: ["rimD", "three"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.rimD >= ELITE_PCT &&
+				c.pct.three >= 0.7 &&
+				c.pct.speed >= 0.6,
+		},
+		{
+			key: "sHighPostStretch",
+			positions: BIGS,
+			nouns: ["three", "mid"],
+			test: (c) => c.pct.three >= 0.8 && c.pct.mid >= 0.8 && c.pct.pass >= 0.6,
+		},
+		{
+			key: "sTripleStretch",
+			positions: BIGS,
+			nouns: ["reb", "pass", "three"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.reb >= 0.85 &&
+				c.pct.pass >= 0.8 &&
+				c.pct.three >= 0.7 &&
+				c.pct.rimD >= 0.7,
+		},
+		{
+			key: "sUnicornBig",
+			positions: ["FC", "C"],
+			nouns: [],
+			anyBest: true,
+			test: (c) =>
+				c.eliteOvr &&
+				count(c, NOUN_CLEAR) >= 5 &&
+				c.pct.three >= NOUN_CLEAR &&
+				Math.max(c.pct.handle, c.pct.pass) >= NOUN_CLEAR,
+		},
+		{
+			key: "sPaintWarden",
+			positions: BIGS,
+			nouns: ["rimD", "perimD"],
+			test: (c) =>
+				c.pct.rimD >= 0.85 &&
+				c.pct.perimD >= 0.7 &&
+				pctOf("spd", sub(c.r, "lat") ?? c.r.spd) >= 0.6 &&
+				tr(c, "defensiveVersatility") >= 70,
+		},
+		{
+			key: "sHybridFive",
+			positions: ["C"],
+			nouns: ["three"],
+			test: (c) =>
+				c.pct.three >= 0.7 &&
+				Math.max(c.pct.handle, c.pct.pass) >= 0.7 &&
+				c.pct.speed >= 0.6,
+		},
+		{
+			key: "sPutbackJuggernaut",
+			positions: BIGS,
+			nouns: ["reb", "strength"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.reb >= 0.9 &&
+				lead(c.r, "orb", "drd") &&
+				c.pct.strength >= 0.8 &&
+				tr(c, "motor") >= 70,
+		},
+		{
+			key: "sGlassTitan",
+			positions: BIGS,
+			nouns: ["post", "reb", "strength"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.post >= 0.85 &&
+				subGe(c.r, "pst", "cls", "flt") &&
+				c.pct.reb >= 0.85 &&
+				c.pct.strength >= 0.8,
+		},
+		{
+			key: "sMismatchIso",
+			positions: SF_PF,
+			nouns: ["creator", "pass"],
+			test: (c) =>
+				c.pct.creator >= 0.8 && c.pct.pass >= 0.8 && tallForPos(c.r, c.pos),
+		},
+		{
+			key: "sForwardHub",
+			positions: ["F", "PF"],
+			nouns: ["pass", "mid"],
+			test: (c) => c.pct.pass >= 0.8 && c.pct.mid >= 0.7 && c.pct.crafty >= 0.7,
+		},
+		{
+			key: "sHelpDisruptor",
+			positions: ["GF", "SF", "F", "PF"],
+			nouns: ["steal", "rimD"],
+			test: (c) => c.pct.steal >= 0.85 && c.pct.rimD >= 0.7,
+		},
+		{
+			key: "sBaselineCutter",
+			positions: ["GF", "SF", "F"],
+			nouns: ["finish"],
+			test: (c) =>
+				c.pct.finish >= 0.8 && tr(c, "offBall") >= 65 && c.pct.speed >= 0.6,
+		},
+		{
+			key: "sOpenCourtSlasher",
+			positions: G_SF,
+			nouns: ["speed", "finish"],
+			test: (c) =>
+				c.pct.speed >= 0.85 &&
+				lead(c.r, "sls", "lat") &&
+				c.pct.finish >= 0.8 &&
+				c.pct.handle >= 0.6 &&
+				tr(c, "motor") >= 70,
+		},
+		{
+			key: "sCornerCombo",
+			positions: SF_PF,
+			nouns: ["three"],
+			test: (c) =>
+				c.pct.three >= 0.8 &&
+				lead(c.r, "tcs", "tod") &&
+				Math.max(c.pct.perimD, c.pct.reb) >= 0.7,
+		},
+		{
+			key: "sPositionless",
+			positions: SF_PF,
+			nouns: [],
+			anyBest: true,
+			test: (c) =>
+				count(c, GENERIC_PCT) >= 4 &&
+				Math.max(c.pct.three, c.pct.mid, c.pct.finish, c.pct.post) >=
+					GENERIC_PCT &&
+				Math.max(c.pct.pass, c.pct.handle) >= GENERIC_PCT &&
+				Math.max(c.pct.perimD, c.pct.rimD, c.pct.steal) >= GENERIC_PCT,
+		},
+		{
+			key: "sFourOut",
+			positions: ["F", "PF"],
+			nouns: ["three", "pass"],
+			test: (c) =>
+				c.pct.three >= 0.7 && c.pct.pass >= 0.6 && shortForPos(c.r, c.pos),
+		},
+	];
+}
+
 // Jack-of-all-Trades: JACK_MIN or more nouns in the top 40%, none in the top 10%
 export const JACK_MIN = 5;
+
+// ---- height for his position (the user's "tall for his position", "small for a four") ----
+// The usual height rating at each position (generated leagues), and how far from it counts as tall or short
+const HGT_AT_POS: Record<Pos, number> = {
+	PG: 30,
+	G: 34,
+	SG: 38,
+	GF: 44,
+	SF: 48,
+	F: 52,
+	PF: 56,
+	FC: 61,
+	C: 65,
+};
+const HGT_SPREAD = 5;
+export const tallForPos = (r: ArchetypeRatings, pos: Pos) =>
+	r.hgt >= HGT_AT_POS[pos] + HGT_SPREAD;
+export const shortForPos = (r: ArchetypeRatings, pos: Pos) =>
+	r.hgt <= HGT_AT_POS[pos] - HGT_SPREAD;
+
+// ---- end words (the user's nouns): in place of his position at the end of the name. One that says a noun (Maestro: his
+// mid-range) needs that noun among his two shown, and the noun is then said by the end word alone ----
+type EndCtx = {
+	pct: Record<NounKey, number>;
+	r: ArchetypeRatings;
+	traits?: Record<string, number>;
+	pos: Pos;
+	group: PosGroup;
+	elite: (k: NounKey) => boolean;
+	shown: readonly NounKey[];
+	ovr: number;
+};
+const athletic = (pct: Record<NounKey, number>) =>
+	Math.max(pct.speed, pct.jump);
+export const END_WORDS: {
+	key: string;
+	covers?: NounKey;
+	ok: (c: EndCtx) => boolean;
+}[] = [
+	{
+		key: "eGeneral",
+		covers: "pass",
+		ok: (c) =>
+			c.pos === "PG" &&
+			c.pct.pass >= 0.85 &&
+			c.pct.crafty >= 0.8 &&
+			c.elite("pass") &&
+			(c.traits?.leadership ?? 0) >= 70,
+	},
+	{
+		key: "eArchitect",
+		covers: "pass",
+		ok: (c) => c.elite("pass") && c.pct.crafty >= 0.85,
+	},
+	{
+		key: "eWizard",
+		covers: "pass",
+		ok: (c) => c.elite("pass") && c.pct.handle >= 0.85,
+	},
+	{ key: "eMaestro", covers: "mid", ok: (c) => c.elite("mid") },
+	{
+		key: "eTechnician",
+		covers: "crafty",
+		ok: (c) =>
+			c.pct.crafty >= 0.85 &&
+			athletic(c.pct) < 0.5 &&
+			(leadSub(c.r, ["pst", "cls", "flt"]) === "pst" ||
+				leadSub(c.r, ["pul", "spu"]) === "pul"),
+	},
+	{
+		key: "eArtist",
+		covers: "finish",
+		ok: (c) =>
+			Math.max(c.pct.finish, c.pct.post) >= 0.8 &&
+			(sub(c.r, "fns") ?? 0) > (sub(c.r, "con") ?? 0) &&
+			(sub(c.r, "flt") ?? 0) >= (sub(c.r, "pst") ?? 0),
+	},
+	{
+		key: "eGlider",
+		covers: "speed",
+		ok: (c) =>
+			c.pct.speed >= 0.8 &&
+			leadSub(c.r, ["sls", "lat"]) !== "lat" &&
+			Math.max(c.pct.finish, c.pct.handle) >= 0.7,
+	},
+	{
+		key: "eAttacker",
+		covers: "finish",
+		ok: (c) => c.pct.handle >= 0.7 && c.pct.finish >= 0.7 && c.pct.speed >= 0.6,
+	},
+	{
+		key: "eInterceptor",
+		covers: "steal",
+		ok: (c) =>
+			c.pct.steal >= 0.85 && (sub(c.r, "stl") ?? 0) > (sub(c.r, "pdf") ?? 0),
+	},
+	{
+		key: "eProtector",
+		covers: "rimD",
+		ok: (c) => c.shown[0] === "rimD" && c.pct.rimD >= 0.8,
+	},
+	{
+		key: "eFacilitator",
+		covers: "pass",
+		ok: (c) => c.shown[0] === "pass" && c.pct.pass >= 0.8 && c.pos !== "PG",
+	},
+	{
+		key: "eCutter",
+		covers: "finish",
+		ok: (c) =>
+			(c.traits?.offBall ?? 0) >= 60 &&
+			c.pct.finish >= 0.7 &&
+			c.pct.handle < 0.5,
+	},
+	{
+		key: "eGunner",
+		ok: (c) =>
+			Math.max(c.pct.three, c.pct.mid) >= 0.7 &&
+			c.traits !== undefined &&
+			(c.traits.shotDiscipline ?? 100) <= 40,
+	},
+	{
+		key: "eMover",
+		ok: (c) => !BIG_POS.has(c.pos) && (c.traits?.offBall ?? 0) >= 70,
+	},
+	{
+		key: "eConnector",
+		ok: (c) =>
+			c.pct.pass >= 0.55 &&
+			c.pct.crafty >= 0.55 &&
+			c.shown.every((n) => c.pct[n] < 0.85),
+	},
+	{
+		key: "eSwingman",
+		ok: (c) =>
+			(c.pos === "SG" || c.pos === "GF" || c.pos === "SF") &&
+			(["three", "finish", "handle", "perimD"] as const).filter(
+				(n) => c.pct[n] >= 0.7,
+			).length >= 2,
+	},
+	{ key: "eFour", ok: (c) => c.pos === "PF" },
+	{ key: "eFive", ok: (c) => c.pos === "C" },
+];
 
 // ---- the defensive label ----
 const DEF_NOUNS: ReadonlySet<NounKey> = new Set(["rimD", "perimD", "steal"]);
@@ -898,6 +1297,7 @@ export const pickNouns = (x: NounInput): NounPick => {
 	// whole: no defensive label)
 	{
 		const ctx: SpecialCtx = {
+			pos,
 			pct: pctOfKey,
 			r,
 			traits: x.traits,
@@ -918,6 +1318,7 @@ export const pickNouns = (x: NounInput): NounPick => {
 					n === "creator" ? "handle" : n,
 				);
 				if (
+					!c.anyBest &&
 					best &&
 					!nouns.includes(best) &&
 					!(best === "creator" && nouns.includes("handle"))
@@ -927,7 +1328,8 @@ export const pickNouns = (x: NounInput): NounPick => {
 				const sc =
 					c.nouns.reduce((sum, n) => sum + pctOfKey[n], 0) + c.nouns.length;
 				const role = ROLE_BY_KEY.get(c.key)!;
-				if (!okName(composeName(role, [], GROUP_OF[pos]))) {
+				// (the user's own names: only his verdicts can rule one out)
+				if (vetoed(composeName(role, [], GROUP_OF[pos]))) {
 					continue;
 				}
 				if (sc > pickScore) {
@@ -984,7 +1386,15 @@ export const pickNouns = (x: NounInput): NounPick => {
 			const per = has("perimD");
 			const stl = has("steal");
 			let n: string;
-			if (rim && per && rim.pct >= 0.8 && per.pct >= 0.8) {
+			if (
+				rim &&
+				stl &&
+				group !== "big" &&
+				rim.pct >= NOUN_CLEAR &&
+				stl.pct >= NOUN_CLEAR
+			) {
+				n = "Help-Side Roamer";
+			} else if (rim && per && rim.pct >= 0.8 && per.pct >= 0.8) {
 				n = "Switch Defender";
 			} else if (rim && group === "guard" && rim.pct >= 0.85) {
 				n = "Swatting Guard";
@@ -1001,6 +1411,12 @@ export const pickNouns = (x: NounInput): NounPick => {
 						: lead === "idf"
 							? "Post Defender"
 							: "Rim Protector";
+			} else if (
+				per &&
+				per.pct >= 0.8 &&
+				Math.max(x.traits?.motor ?? 0, x.traits?.hustle ?? 0) >= 65
+			) {
+				n = "Perimeter Stalker";
 			} else if (per && stl) {
 				n = "Point-of-Attack Pest";
 			} else if (per) {
@@ -1018,7 +1434,9 @@ export const pickNouns = (x: NounInput): NounPick => {
 						(x.traits?.motor ?? 0) >= TRAIT_WORD_MIN ||
 						(x.traits?.hustle ?? 0) >= TRAIT_WORD_MIN)
 						? "Ball-Hawking Menace"
-						: "Ball Hawk";
+						: stl!.pct >= 0.85 && (sub(r, "stl") ?? 0) > (sub(r, "pdf") ?? 0)
+							? "Passing-Lane Interceptor"
+							: "Ball Hawk";
 			}
 			if (long && !/Lockdown|Eraser/.test(n)) {
 				n = `Long ${n}`;
@@ -1158,16 +1576,47 @@ export const pickNouns = (x: NounInput): NounPick => {
 	};
 	// (the end word: his position; Bruiser for a guard or wing whose best is strength; Enigma for a talented player with
 	// no consistency)
-	const endKey =
+	const baseEnd =
 		(x.traits?.consistency ?? 100) <= 30 && (x.ovr ?? 0) >= 45
 			? "enigma"
 			: group !== "big" && skills[0]?.key === "strength"
 				? "bruiser"
 				: POS_WORD[pos];
-	const roleDef = ROLE_BY_KEY.get(endKey)!;
-	const nameOf = (descs: string[], pick?: Record<string, string>) =>
+	// (the user's end words: the first that fits the nouns his name shows)
+	const endFor = (shown: readonly NounKey[]) => {
+		if (baseEnd === "enigma" || baseEnd === "bruiser") {
+			return { key: baseEnd as string, covers: undefined };
+		}
+		const ctx: EndCtx = {
+			pct: pctOfKey,
+			r,
+			traits: x.traits,
+			pos,
+			group,
+			elite: (k) => {
+				const sc = scores.find((s) => s.key === k);
+				return sc !== undefined && isElite(sc);
+			},
+			shown,
+			ovr: x.ovr ?? 0,
+		};
+		for (const e of END_WORDS) {
+			if (e.covers !== undefined && !shown.includes(e.covers)) {
+				continue;
+			}
+			if (e.ok(ctx) && !vetoed(ROLE_BY_KEY.get(e.key)?.names[0] ?? "")) {
+				return { key: e.key, covers: e.covers };
+			}
+		}
+		return { key: baseEnd as string, covers: undefined };
+	};
+	const nameOf = (
+		end: string,
+		descs: string[],
+		pick?: Record<string, string>,
+	) =>
 		composeName(
-			roleDef,
+			ROLE_BY_KEY.get(end)!,
 			descs.map((k) => DESC_BY_KEY.get(k)!),
 			GROUP_OF[pos],
 			pick,
@@ -1239,15 +1688,23 @@ export const pickNouns = (x: NounInput): NounPick => {
 	}
 	tries.push([skills[0]!]);
 	for (const two of tries) {
-		const b = build(two);
-		if (okName(nameOf(b.descs, b.pick))) {
+		const end = endFor(two.map((t) => t.key));
+		// (an end word that says one of his nouns says it alone: that noun leaves the front words)
+		const front = end.covers ? two.filter((t) => t.key !== end.covers) : two;
+		const b = build(front.length > 0 ? front : two);
+		const descs = front.length > 0 || !end.covers ? b.descs : ([] as string[]);
+		const nouns = end.covers ? [...new Set([...b.nouns, end.covers])] : b.nouns;
+		if (descs.length === 0) {
+			continue;
+		}
+		if (okName(nameOf(end.key, descs, b.pick))) {
 			return withDef({
 				kind: "composed",
-				descs: b.descs,
-				role: endKey as PosWord,
-				nouns: b.nouns,
+				descs,
+				role: end.key as PosWord,
+				nouns,
 				pick: b.pick,
-				conf: confOf(cleared, b.nouns),
+				conf: confOf(cleared, nouns),
 			});
 		}
 	}

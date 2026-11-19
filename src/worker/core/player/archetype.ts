@@ -1,4 +1,5 @@
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
+import { defenseWhy } from "../../../common/archetypes/v2/defenseLabels.ts";
 import {
 	labelSourceOf,
 	user2kLabel,
@@ -830,6 +831,10 @@ export const archetypeInfoForPlayer = async (
 		);
 	}
 	const v = found.view;
+	// archnouns: the defensive label's own why line, after the main label's
+	if (v.defense) {
+		whyList = [...(whyList ?? []), defenseWhy(v.defense)];
+	}
 	const mode = archetypeLabelSource();
 	const tk =
 		mode === "game"

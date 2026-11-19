@@ -365,8 +365,9 @@ export const POSITION_BIAS: Record<Pos, number> = {
 	GF: 1.02,
 	SF: -0.1,
 	F: -0.81,
-	PF: 0.41,
-	FC: 0.97,
+	// (the user: "forwards still run a bit low in leagues": PF +0.2 and FC -0.2, which moves the PF / FC line only; wings unchanged)
+	PF: 0.61,
+	FC: 0.77,
 	C: -0.38,
 };
 
