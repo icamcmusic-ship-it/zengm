@@ -1,4 +1,5 @@
 import { subsAfterRewrite } from "../player/subRatings.ts";
+import { aimMinOvr } from "../../../common/archetypes/v2/aim.ts";
 import { expandedRatingsOn } from "../player/expandedRatings.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { PLAYER } from "../../../common/constants.ts";
@@ -364,10 +365,19 @@ const makeRow = (
 		build: r.build,
 		prevBuild: p.ratingsBuild?.name,
 		archetype: {
-			before: fuzzedArchetypeLabel(current, row.fuzz, norms),
+			before: fuzzedArchetypeLabel(current, row.fuzz, norms, {
+				ovr: currentOvr,
+				pot: row.pot,
+			}),
 			after: r.skipped
-				? fuzzedArchetypeLabel(current, row.fuzz, norms)
-				: fuzzedArchetypeLabel(after.ratings, after.fuzz, norms),
+				? fuzzedArchetypeLabel(current, row.fuzz, norms, {
+						ovr: currentOvr,
+						pot: row.pot,
+					})
+				: fuzzedArchetypeLabel(after.ratings, after.fuzz, norms, {
+						ovr: after.ovr,
+						pot: after.pot,
+					}),
 			prevStored: viewOf(currentEntry(p.archetypes))?.label,
 			target: r.target
 				? {
@@ -643,6 +653,8 @@ export const getArchetypeTargets = () =>
 			min: a.hgt[0],
 			max: a.hgt[1],
 			rare: !!a.rare,
+			// (archreview2: the lowest ovr at which the name can be his label, common/archetypes/v2/aim.ts)
+			minOvr: aimMinOvr(a.name),
 		}));
 
 export const getBuildList = () =>
@@ -743,8 +755,14 @@ export const previewRegenerateSingle = async (
 		shortfall: r.ovrShortfall,
 		prevBuild: p?.ratingsBuild?.name,
 		archetype: {
-			before: fuzzedArchetypeLabel(current, params.fuzz, norms),
-			after: fuzzedArchetypeLabel(r.after.ratings, r.after.fuzz, norms),
+			before: fuzzedArchetypeLabel(current, params.fuzz, norms, {
+				ovr: F.ovr(current),
+				pot: params.pot,
+			}),
+			after: fuzzedArchetypeLabel(r.after.ratings, r.after.fuzz, norms, {
+				ovr: r.after.ovr,
+				pot: r.after.pot,
+			}),
 			target: r.target
 				? {
 						name: r.target.name,

@@ -7,6 +7,8 @@ import { gateFactor } from "../archetypes/score.ts";
 import { archetypePrior, isPos, positionOf } from "../archetypes/position.ts";
 import { scoreAll } from "../archetypes/classify.ts";
 import { classifyV2 } from "../archetypes/v2/engine.ts";
+import { aimMinOvr, gatePush } from "../archetypes/v2/aim.ts";
+import { nameAt } from "../archetypes/posNames.ts";
 import type { Norms } from "../archetypes/types.ts";
 import { scoutingEffectCutoff, scoutingEffectStddev } from "../budgetLevels.ts";
 import { Rng, clamp } from "./rng.ts";
@@ -134,7 +136,12 @@ const state = (
 });
 
 // Read with the game's position for these ratings (F.pos follows the league's position setting)
-const derivedOf = (F: Formulas, ratings: BuildRatings, norms?: Norms) => {
+const derivedOf = (
+	F: Formulas,
+	ratings: BuildRatings,
+	norms?: Norms,
+	pot?: number,
+) => {
 	// (a draft prospect: read against the prospect tables, as the game shows him)
 	// (archreview2: with his ovr, so the honest names' tier is the one the game reads him at)
 	const c = classifyV2(ratings, {
@@ -142,6 +149,7 @@ const derivedOf = (F: Formulas, ratings: BuildRatings, norms?: Norms) => {
 		pos: F.pos(ratings),
 		prospect: true,
 		ovr: F.ovr(ratings),
+		pot,
 	});
 	return {
 		id: c.id,
@@ -149,6 +157,9 @@ const derivedOf = (F: Formulas, ratings: BuildRatings, norms?: Norms) => {
 		label: c.label,
 	};
 };
+
+// Attempts at an aimed archetype that missed (archreview2: 4 -> 10, the gates take a few steps more; only a miss pays)
+const AIM_TRIES = 10;
 
 const clampPot = (pot: number, ovr: number) => clamp(Math.round(pot), ovr, 100);
 
@@ -243,11 +254,13 @@ export const regenerateClass = (
 			const basePos = isPos(fPos) ? fPos : positionOf(base);
 			const fits = s.archetypePool.filter((id) => {
 				const a = NEW_ARCHETYPES.find((x) => x.id === id);
-				// Inside its height gate and not ruled out by his position (a guard is never aimed at a big archetype)
+				// Inside its height gate and not ruled out by his position (a guard is never aimed at a big archetype), and a
+				// name he can have at his ovr (archreview2: aim.ts aimMinOvr)
 				return (
 					a &&
 					gateFactor(base.hgt, a.hgt) >= 0.6 &&
-					archetypePrior(a, basePos) !== null
+					archetypePrior(a, basePos) !== null &&
+					targetOvr >= aimMinOvr(nameAt(a, basePos))
 				);
 			});
 			if (fits.length > 0) {
@@ -310,7 +323,7 @@ export const regenerateClass = (
 				const i = sc.findIndex((x) => x.a.id === targetId);
 				// (matched: what the game will show, classify's pick: arch16's generic fallback can differ from the top score)
 				return {
-					matched: derivedOf(F, r, opts.norms).id === targetId,
+					matched: derivedOf(F, r, opts.norms, p.pot).id === targetId,
 					z: sc[i]!.z - sc[0]!.z,
 				};
 			};
@@ -318,7 +331,12 @@ export const regenerateClass = (
 			matched = best.matched;
 			// What the solver did to his ratings (caps, the overall) is then corrected for: the missing push is added to the offsets
 			const acc: Partial<Record<RatingKey, number>> = { ...aimed!.o };
-			for (let n = 0; n < 4; n++) {
+			// (archreview2: the name his target is shown as at his position, whose words' absolute gates he must clear)
+			const targetA = NEW_ARCHETYPES.find((x) => x.id === targetId);
+			const targetName = targetA
+				? nameAt(targetA, isPos(F.pos(base)) ? F.pos(base) : positionOf(base))
+				: aimed!.name;
+			for (let n = 0; n < AIM_TRIES; n++) {
 				if (matched) {
 					break;
 				}
@@ -332,6 +350,16 @@ export const regenerateClass = (
 				);
 				for (const k of Object.keys(corr) as RatingKey[]) {
 					acc[k] = (acc[k] ?? 0) + corr[k]! * (1 + 0.35 * n);
+				}
+				// archreview2: and the ratings his target's words fall short of, raised to their gates
+				const push = gatePush(
+					targetName,
+					built.ratings,
+					opts.norms?.rq,
+					F.ovr(built.ratings),
+				);
+				for (const k of Object.keys(push) as RatingKey[]) {
+					acc[k] = (acc[k] ?? 0) + push[k]!;
 				}
 				const attempt = run(
 					Math.max(s.specialization, 1),
@@ -398,7 +426,7 @@ export const regenerateClass = (
 			before,
 			after,
 			build: { name: arch.name, tags: arch.tags },
-			derived: derivedOf(F, after.ratings, opts.norms),
+			derived: derivedOf(F, after.ratings, opts.norms, pot),
 			target:
 				aimed && targetId
 					? {

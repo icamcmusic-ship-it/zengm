@@ -10,11 +10,22 @@ export type ArchetypeTargetInfo = {
 	min: number;
 	max: number;
 	rare: boolean;
+	// archreview2: the lowest ovr at which the name can be his label (an elite name needs 60)
+	minOvr: number;
 };
 
-// Archetypes a prospect with this hgt rating can be aimed at (the gate with a little room)
-export const eligibleArchetypes = (list: ArchetypeTargetInfo[], hgt: number) =>
-	list.filter((a) => hgt >= a.min - 3 && hgt <= a.max + 3);
+// Archetypes a prospect with this hgt rating (and, when given, this ovr) can be aimed at (the gate with a little room)
+export const eligibleArchetypes = (
+	list: ArchetypeTargetInfo[],
+	hgt: number,
+	ovr?: number,
+) =>
+	list.filter(
+		(a) =>
+			hgt >= a.min - 3 &&
+			hgt <= a.max + 3 &&
+			(ovr === undefined || ovr >= a.minOvr),
+	);
 
 // <optgroup>s of archetypes, for a select
 export const ArchetypeOptions = ({ list }: { list: ArchetypeTargetInfo[] }) => (

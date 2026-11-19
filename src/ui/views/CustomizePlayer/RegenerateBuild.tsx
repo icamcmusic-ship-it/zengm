@@ -142,7 +142,8 @@ export const RegenerateBuild = ({
 	}, [show, ratingsKey, JSON.stringify(settings), JSON.stringify(lock), pid]);
 
 	const eligibleArch = ratings
-		? eligibleArchetypes(archetypes, ratings.hgt)
+		? // (archreview2: only names he can have at his ovr, once the preview has it)
+			eligibleArchetypes(archetypes, ratings.hgt, result?.ovr[0])
 		: [];
 	const eligible = ratings
 		? builds.filter((b) => ratings.hgt >= b.min && ratings.hgt <= b.max)

@@ -392,6 +392,8 @@ export const fuzzedArchetypeLabel = (
 	ratings: ArchetypeRatings,
 	fuzz: number,
 	norms: Norms,
+	// (archreview2: his ovr and potential, for the honest names' tier and upside, as the game reads him)
+	level: { ovr?: number; pot?: number } = {},
 ): string => {
 	const f = getFuzz(fuzz);
 	const shown = {} as ArchetypeRatings;
@@ -417,6 +419,8 @@ export const fuzzedArchetypeLabel = (
 		norms,
 		pos: posFn(ratings as any),
 		prospect: true,
+		ovr: level.ovr,
+		pot: level.pot,
 		...(model ? { model } : {}),
 		...(refs.length > 0 ? { extraRefs: refs } : {}),
 	}).label;
