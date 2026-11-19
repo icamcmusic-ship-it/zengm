@@ -7,12 +7,23 @@ import {
 	combineNudges,
 	combineRanks,
 	generateDraftCombine,
+	generateMedical,
+	medicalGradeOf,
+	medicalNoiseSd,
+	medicalReason,
+	medicalRisk,
 	numCombineInvites,
 	COMBINE_COLUMN_BY_KEY,
+	MEDICAL_DRAFT_PENALTY,
 	type CombineKey,
+	type CombineMedical,
 	type DraftCombineInput,
 	type DraftCombineResult,
 } from "../../../common/draftCombine.ts";
+import { careerInjuries } from "../../../common/collegeStats/injuries.ts";
+import { levelToEffect } from "../../../common/budgetLevels.ts";
+import getLevelLastThree from "../finances/getLevelLastThree.ts";
+import { getPlayerTraitScores, traitsEnabled } from "../player/traits.ts";
 import {
 	getLotteryNightRows,
 	lotteryRecap,
@@ -75,6 +86,58 @@ const combineSubs = (r: PlayerRatings) => {
 	return { stj: x("stj"), mxv: x("mxv"), lat: x("lat"), sls: x("sls") };
 };
 
+// Hurt at the time of the combine
+const injuredAtCombine = (p: Player) =>
+	p.tid === PLAYER.UNDRAFTED
+		? p.injury.gamesRemaining > 0
+		: (p.injuries ?? []).some(
+				(inj) => inj.season === p.draft.year && inj.games > 0,
+			);
+
+export const medicalsOn = () =>
+	__SPORT === "basketball" && featureOn("preDraftMedicals");
+
+// The noise on the user's medical read, from his team's scouting and medical (health) budget (3-season levels). League average
+// without the budget setting
+export const getMedicalNoiseSd = async () => {
+	const tid = g.get("userTid");
+	if (!g.get("budget") || !(await idb.cache.teams.get(tid))) {
+		return medicalNoiseSd(0, 0);
+	}
+	const scouting = await getLevelLastThree("scouting", { tid });
+	const health = await getLevelLastThree("health", { tid });
+	return medicalNoiseSd(levelToEffect(scouting), levelToEffect(health));
+};
+
+// His medical at the combine (Pre-Draft Injuries & Combine Medicals): from his pre-draft injuries, an injury now and his durability
+export const getMedical = (p: Player, noiseSd: number): CombineMedical => {
+	const season = p.draft.year;
+	const risk = medicalRisk({
+		season,
+		injuries: careerInjuries(p.preDraftCareer),
+		durability: traitsEnabled()
+			? getPlayerTraitScores(p, season).durability
+			: undefined,
+		injuredNow: injuredAtCombine(p),
+	});
+	return generateMedical({ pid: p.pid, season, risk, noiseSd });
+};
+
+// A plain line on his medical grade, for the views
+export const getMedicalReason = (p: Player) =>
+	medicalReason(careerInjuries(p.preDraftCareer), injuredAtCombine(p));
+
+// His stored medical grade (as the user's staff read it) with a line on why, for lists (Draft Scouting, Draft Board). undefined
+// before his combine, when he wasn't invited, for a combine held before medicals existed, or when off
+export const storedMedicalView = (p: Player) => {
+	const medical =
+		p.combine?.season === p.draft.year ? p.combine.medical : undefined;
+	if (!medical || !medicalsOn()) {
+		return undefined;
+	}
+	return { grade: medical.grade, reason: getMedicalReason(p) };
+};
+
 const toInput = (
 	p: Player,
 	r: PlayerRatings,
@@ -82,12 +145,7 @@ const toInput = (
 ): DraftCombineInput => {
 	const x = r;
 	const expanded = expandedRatingsApply(r);
-	const injured =
-		p.tid === PLAYER.UNDRAFTED
-			? p.injury.gamesRemaining > 0
-			: (p.injuries ?? []).some(
-					(inj) => inj.season === p.draft.year && inj.games > 0,
-				);
+	const injured = injuredAtCombine(p);
 	return {
 		pid: p.pid,
 		season: p.draft.year,
@@ -165,12 +223,17 @@ export const getClassCombine = async (
 		}
 	} else if (held && !noDraft()) {
 		// (in a league without a draft, only a combine stored before the setting changed is shown)
+		const noiseSd = medicalsOn() ? await getMedicalNoiseSd() : undefined;
 		for (const [i, { p, r }] of players.entries()) {
 			if (i >= numInvites) {
 				break;
 			}
 			invited.add(p.pid);
-			results.set(p.pid, generateDraftCombine(toInput(p, r, i + 1)));
+			const res = generateDraftCombine(toInput(p, r, i + 1));
+			if (noiseSd !== undefined) {
+				res.medical = getMedical(p, noiseSd);
+			}
+			results.set(p.pid, res);
 		}
 	}
 	return {
@@ -213,8 +276,9 @@ export const getPlayerCombine = async (p: Player) => {
 };
 
 /**
- * AI draft nudge (value points) for each prospect of this season's draft, averaging zero over the class. Empty when off or when
- * the combine was not held (fantasy and expansion drafts).
+ * AI draft nudge (value points) for each prospect of this season's draft: the combine performance part averages zero over the class,
+ * then medical concerns take a little off (Pre-Draft Injuries & Combine Medicals). Empty when off or when the combine was not held
+ * (fantasy and expansion drafts).
  */
 export const getDraftCombineNudges = async (
 	players: Player[],
@@ -231,14 +295,30 @@ export const getDraftCombineNudges = async (
 	}
 	const classPlayers = players.filter((p) => p.draft.year === season);
 	const c = await getClassCombine(season, classPlayers);
-	return combineNudges(
+	const nudges = combineNudges(
 		classPlayers.map((p) => p.pid),
 		c.results,
 	);
+	// Pre-Draft Injuries & Combine Medicals: a little off for medical concerns (the actual risk, not the user's read)
+	if (medicalsOn()) {
+		for (const [pid, res] of c.results) {
+			if (res.medical && nudges.has(pid)) {
+				nudges.set(
+					pid,
+					nudges.get(pid)! -
+						MEDICAL_DRAFT_PENALTY[medicalGradeOf(res.medical.risk)],
+				);
+			}
+		}
+	}
+	return nudges;
 };
 
 const playerLink = (p: Player) =>
 	`<a href="${helpers.leagueUrl(["player", p.pid])}">${p.firstName} ${p.lastName}</a>`;
+
+// Red flags in the combine news: the top of the class by projected stock
+const TOP_PROSPECTS_FOR_NEWS = 20;
 
 // News when the combine is held (start of the draft lottery phase)
 export const afterNewPhase = async (phase: number, conditions?: Conditions) => {
@@ -308,6 +388,28 @@ export const afterNewPhase = async (phase: number, conditions?: Conditions) => {
 		},
 		conditions,
 	);
+
+	// Pre-Draft Injuries & Combine Medicals: red flags among the top prospects (as your medical staff reads them)
+	if (medicalsOn()) {
+		const flagged = c.players
+			.slice(0, TOP_PROSPECTS_FOR_NEWS)
+			.filter((p) => c.results.get(p.pid)?.medical?.grade === "redFlag");
+		if (flagged.length > 0) {
+			logEvent(
+				{
+					type: "draft",
+					text: `Medical red ${flagged.length === 1 ? "flag" : "flags"} at the <a href="${helpers.leagueUrl(["draft_combine", season])}">${season} draft combine</a>: ${flagged
+						.map((p) => `${playerLink(p)} (${getMedicalReason(p)})`)
+						.join(", ")}.`,
+					showNotification: false,
+					pids: flagged.map((p) => p.pid),
+					tids: [],
+					score: 10,
+				},
+				conditions,
+			);
+		}
+	}
 };
 
 // News after the lottery: winners and losers

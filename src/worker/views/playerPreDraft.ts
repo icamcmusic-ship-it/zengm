@@ -10,7 +10,9 @@ import { getCollegeSeason } from "../core/draft/collegeSeason.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { getScoutReport } from "../core/draft/scouting.ts";
 import {
+	getMedicalReason,
 	getPlayerCombine,
+	medicalsOn,
 	lotteryNightOn,
 } from "../core/draftCombine/index.ts";
 import {
@@ -190,12 +192,10 @@ const formatTable = async (
 	}
 	return {
 		rows: (formatted.stats as Record<string, any>[])
-			.map(
-				(row, i): Record<string, any> => ({
-					...row,
-					teamName: rawRows[i]!.teamName ?? pRaw.college ?? "",
-				}),
-			)
+			.map((row, i): Record<string, any> => ({
+				...row,
+				teamName: rawRows[i]!.teamName ?? pRaw.college ?? "",
+			}))
 			.filter((row) => (row.gp ?? 0) > 0),
 		career: formatted.careerStats as Record<string, any> | undefined,
 	};
@@ -440,7 +440,17 @@ const getPreDraftInfo = async (pRaw: Player) => {
 			);
 		}
 		if (year?.status) {
-			notes.push(CAREER_NOTES[year.status]!);
+			// Pre-Draft Injuries & Combine Medicals: the injury that ended it
+			notes.push(
+				year.injury?.ended
+					? `${CAREER_NOTES[year.status]!}: ${year.injury.type}`
+					: CAREER_NOTES[year.status]!,
+			);
+		}
+		if (year?.injury && !year.injury.ended) {
+			notes.push(
+				`Missed ${year.injury.games} ${year.injury.games === 1 ? "game" : "games"}: ${year.injury.type}`,
+			);
 		}
 		prevTeam = teamName;
 
@@ -942,6 +952,27 @@ const getComps = async (pRaw: Player, rDraft: PlayerRatings, fuzz: number) => {
 	return output;
 };
 
+// Pre-Draft Injuries & Combine Medicals: his medical grade as your staff reads it, with a line on why (his actual risk stays in the worker)
+const withMedical = (
+	draftCombine: NonNullable<Awaited<ReturnType<typeof getPlayerCombine>>>,
+	p: Player,
+) => {
+	const season = p.draft.year;
+	if (!draftCombine.invited) {
+		return { ...draftCombine, season };
+	}
+	const { medical, ...result } = draftCombine.result;
+	return {
+		...draftCombine,
+		result,
+		season,
+		medical:
+			medical && medicalsOn()
+				? { grade: medical.grade, reason: getMedicalReason(p) }
+				: undefined,
+	};
+};
+
 const processInputs = (params: RouteParams<"playerPreDraft">) => {
 	return {
 		pid: params.pid !== undefined ? Number.parseInt(params.pid) : undefined,
@@ -988,7 +1019,7 @@ export default defineView({
 				...topStuffForUI,
 				preDraft,
 				draftCombine: draftCombine
-					? { ...draftCombine, season: topStuff.pRaw.draft.year }
+					? withMedical(draftCombine, topStuff.pRaw)
 					: undefined,
 			};
 		}

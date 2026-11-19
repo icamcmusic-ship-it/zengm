@@ -4,7 +4,11 @@ import {
 	stealOrReach,
 } from "../../../common/preDraftRanks.ts";
 import { COMBINE_ROWS } from "../../../common/combineRows.ts";
-import { COMBINE_COLUMNS } from "../../../common/draftCombine.ts";
+import {
+	COMBINE_COLUMNS,
+	MEDICAL_EXPLANATION,
+} from "../../../common/draftCombine.ts";
+import { MedicalGrade } from "../../components/MedicalGrade.tsx";
 import clsx from "clsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import type { View } from "../../../common/types.ts";
@@ -778,6 +782,17 @@ const DraftCombineSection = ({
 			title={`${draftCombine.season} Draft Combine${"early" in draftCombine && draftCombine.early ? " (early read)" : ""}`}
 			description={`${"early" in draftCombine && draftCombine.early ? "Your scouting department's early read (Front Office Budget), before the combine is held at the draft lottery. " : ""}Rank and percentile among the ${n} prospects measured at the combine.${result.skipped ? ` ${result.skipped === "injured" ? "He skipped the drills while injured." : "He skipped the athletic testing and shooting drills."}` : ""}`}
 		>
+			{"medical" in draftCombine && draftCombine.medical ? (
+				<p data-testid="pre-draft-medical">
+					<b>Medical:</b>{" "}
+					<MedicalGrade
+						grade={draftCombine.medical.grade}
+						reason={draftCombine.medical.reason}
+					/>{" "}
+					{draftCombine.medical.reason}.{" "}
+					<span className="text-body-secondary">{MEDICAL_EXPLANATION}</span>
+				</p>
+			) : null}
 			<div className="table-responsive">
 				<table
 					className="table table-striped table-borderless table-sm table-nonfluid"

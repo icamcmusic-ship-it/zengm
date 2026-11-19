@@ -179,6 +179,8 @@ export type SeasonContext = {
 	usageShift?: number;
 	// A season cut short (injury, medical redshirt): he plays only this many games, the first ones of the season, and none of the postseason
 	gamesCap?: number;
+	// Games he missed with an injury in the middle of the season (pre-draft injuries, injuries.ts). Taken out of his games played
+	injuryGames?: number;
 };
 
 // A stretch of games (non-conference, conference) summed up
@@ -333,6 +335,16 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	let missed =
 		rng.random() < 0.34 ? Math.round(Math.abs(rng.normal(0, 3.5)) + 1) : 0;
 	missed = Math.min(missed, 18);
+	// An injury in the middle of the season: at least that many games missed (the draws above are made either way)
+	if (ctx.injuryGames !== undefined && !capped) {
+		missed = Math.max(
+			missed,
+			Math.min(
+				Math.round(ctx.injuryGames),
+				Math.max(0, teamGames - teamPostseason - 4),
+			),
+		);
+	}
 	// Role on his college team: a class-average prospect is a rotation player around 25 minutes, the best of the class are 30-34 minute stars, the bottom of the class (and young players) come off the bench. Real Division I starters rarely average more than 35
 	const mpgBase =
 		25.5 * (gameMinutes / 40) +

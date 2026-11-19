@@ -6,8 +6,10 @@ import { helpers } from "../util/helpers.ts";
 import {
 	COMBINE_COLUMNS,
 	COMBINE_COLUMN_BY_KEY,
+	MEDICAL_EXPLANATION,
 	type CombineKey,
 } from "../../common/draftCombine.ts";
+import { MEDICAL_SORT, MedicalGrade } from "../components/MedicalGrade.tsx";
 
 type Prospect = View<"draftCombine">["players"][number];
 
@@ -186,6 +188,11 @@ const DraftCombine = ({
 
 	const numSkipped = players.filter((p) => !p.drills).length;
 	const showDraft = players.some((p) => p.draft);
+	// Pre-Draft Injuries & Combine Medicals
+	const showMedical = players.some((p) => p.medical);
+	const numRedFlags = players.filter(
+		(p) => p.medical?.grade === "redFlag",
+	).length;
 
 	const cols: Col[] = [
 		{ title: "Name", sortType: "name" },
@@ -200,20 +207,28 @@ const DraftCombine = ({
 					} as Col,
 				]
 			: []),
-		...COMBINE_COLUMNS.map(
-			(c): Col => ({
-				title: c.short,
-				desc: c.lowerBetter ? `${c.name} (lower is better)` : c.name,
-				sortType: "number",
-				sortSequence: c.lowerBetter ? ["asc", "desc"] : ["desc", "asc"],
-			}),
-		),
+		...COMBINE_COLUMNS.map((c): Col => ({
+			title: c.short,
+			desc: c.lowerBetter ? `${c.name} (lower is better)` : c.name,
+			sortType: "number",
+			sortSequence: c.lowerBetter ? ["asc", "desc"] : ["desc", "asc"],
+		})),
 		{
 			title: "Ath",
 			desc: "Athletic score: average percentile in the lane agility, shuttle, sprint and vertical jumps",
 			sortType: "number",
 			sortSequence: ["desc", "asc"],
 		},
+		...(showMedical
+			? [
+					{
+						title: "Med",
+						desc: MEDICAL_EXPLANATION,
+						sortType: "number",
+						sortSequence: ["desc", "asc"],
+					} as Col,
+				]
+			: []),
 	];
 
 	const rows = players.map((p) => ({
@@ -261,6 +276,22 @@ const DraftCombine = ({
 				};
 			}),
 			p.athletic ?? null,
+			...(showMedical
+				? [
+						p.medical
+							? {
+									value: (
+										<MedicalGrade
+											grade={p.medical.grade}
+											reason={p.medical.reason}
+										/>
+									),
+									sortValue: MEDICAL_SORT[p.medical.grade],
+									searchValue: p.medical.reason,
+								}
+							: null,
+					]
+				: []),
 		],
 	}));
 
@@ -273,6 +304,9 @@ const DraftCombine = ({
 					: ""}
 				. Green and red cells are the top and bottom 5 of each test. Shooting
 				drills are makes out of the attempts.
+				{showMedical
+					? ` Med is each prospect's medical grade from the physicals, as your medical staff reads his injury history and durability (hover for why${numRedFlags > 0 ? `; ${numRedFlags} red ${numRedFlags === 1 ? "flag" : "flags"}` : ""}).`
+					: null}
 			</p>
 			<Standouts players={players} />
 			<h3>Top performers</h3>

@@ -13,6 +13,8 @@ import type { DataTableRow } from "../../components/DataTable/index.tsx";
 import { downloadFile } from "../../util/downloadFile.ts";
 import { LeagueFileUpload } from "../../components/LeagueFileUpload.tsx";
 import { CollegeStats } from "./CollegeStats.tsx";
+import { MEDICAL_SORT, MedicalGrade } from "../../components/MedicalGrade.tsx";
+import { MEDICAL_EXPLANATION } from "../../../common/draftCombine.ts";
 import { showNotification } from "../../util/showNotification.ts";
 
 type ScoutReport = NonNullable<
@@ -189,6 +191,16 @@ const DraftClass = ({
 			sortType: "number",
 		});
 	}
+	// Pre-Draft Injuries & Combine Medicals: once the class's combine was held
+	const showMedical = players.some((p) => p.medical !== undefined);
+	if (showMedical) {
+		cols.push({
+			title: "Med",
+			desc: `${MEDICAL_EXPLANATION} Only prospects invited to the combine have one.`,
+			sortType: "number",
+			sortSequence: ["desc", "asc"],
+		});
+	}
 	if (showTraits) {
 		if (traitColumn) {
 			// One trait as a sortable number, instead of the badges
@@ -266,6 +278,22 @@ const DraftClass = ({
 									/>
 								),
 							},
+						]
+					: []),
+				...(showMedical
+					? [
+							p.medical
+								? {
+										value: (
+											<MedicalGrade
+												grade={p.medical.grade}
+												reason={p.medical.reason}
+											/>
+										),
+										sortValue: MEDICAL_SORT[p.medical.grade],
+										searchValue: p.medical.reason,
+									}
+								: null,
 						]
 					: []),
 				...(showTraits

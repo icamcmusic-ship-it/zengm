@@ -1193,6 +1193,18 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "preDraftMedicals",
+		college: false,
+		key: "featurePreDraftMedicals",
+		core: true,
+		name: "Pre-Draft Injuries & Combine Medicals",
+		description:
+			"Generated pre-draft careers include injuries (most prospects are clean, some miss a few games, a few have a major injury like a knee reconstruction or a medical redshirt), more often for players with low durability, with games played to match. At the combine every invited prospect gets a medical grade (Clean, Minor concerns or Red flag) from his injury history and durability, read by your medical staff (a better scouting and medical budget means a more accurate read) and stored with his combine results. AI teams mark red flags down a little on draft night, and a player who had a major injury before the draft is a little more likely to get hurt in his first two pro seasons.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "scoutingReports",
 		key: "featureScoutingReports",
 		core: true,

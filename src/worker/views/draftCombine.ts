@@ -7,6 +7,8 @@ import {
 	combineHeld,
 	combineRatingsRow,
 	getClassCombine,
+	getMedicalReason,
+	medicalsOn,
 } from "../core/draftCombine/index.ts";
 import {
 	athleticScore,
@@ -15,6 +17,7 @@ import {
 	type CombineMeasurements,
 	type CombineRank,
 	type DraftCombineResult,
+	type MedicalGrade,
 } from "../../common/draftCombine.ts";
 import { PHASE } from "../../common/constants.ts";
 
@@ -58,7 +61,10 @@ export default defineView({
 			skipped?: DraftCombineResult["skipped"];
 			ranks: Partial<Record<CombineKey, CombineRank>>;
 			athletic?: number;
+			// Pre-Draft Injuries & Combine Medicals: as your medical staff reads it
+			medical?: { grade: MedicalGrade; reason: string };
 		}[] = [];
+		const showMedical = medicalsOn();
 		for (const p of c.players) {
 			const res = c.results.get(p.pid);
 			if (!res) {
@@ -87,6 +93,10 @@ export default defineView({
 				skipped: res.skipped,
 				ranks,
 				athletic: athleticScore(ranks),
+				medical:
+					showMedical && res.medical
+						? { grade: res.medical.grade, reason: getMedicalReason(p) }
+						: undefined,
 			});
 		}
 

@@ -6,3 +6,4 @@ export { getPreDraftLabel, isOverseasLeague } from "./overseas.ts";
 export { getClassStats, getNcaaSchools } from "./generate.ts";
 export * from "./ncaa.ts";
 export * from "./career.ts";
+export * from "./injuries.ts";
