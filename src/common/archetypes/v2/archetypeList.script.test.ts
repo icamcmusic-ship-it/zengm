@@ -123,7 +123,7 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 			`## Special names: builds whose words are all nouns (${builds.length})`,
 		);
 		out.push("");
-		out.push(...[...new Set(builds)]);
+		out.push(...new Set(builds));
 		out.push("");
 		out.push(`## Trait keywords (${TRAIT_KEYWORDS.length})`);
 		out.push("");

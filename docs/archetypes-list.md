@@ -1,4 +1,4 @@
-# Archetypes (reading 24)
+# Archetypes (reading 25)
 
 Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 15% (never below 55). A label is a main name, plus a defensive label after a · when a defensive skill is among his best.
 

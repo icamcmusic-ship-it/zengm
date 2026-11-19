@@ -66,7 +66,8 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // archnouns: 23 (names from nouns: a special name, two nouns and his position, or an honest name; a defensive label; the
 // user's verdicts as vetoes)
 // archnouns2: 24 (end words, the user's second list of special names, Stalker / Roamer / Interceptor)
-export const ARCHETYPE_READING_VERSION = 24;
+// archnouns3: 25 (the third list, and the picker improvements)
+export const ARCHETYPE_READING_VERSION = 25;
 
 export const toStored = (
 	season: number,
