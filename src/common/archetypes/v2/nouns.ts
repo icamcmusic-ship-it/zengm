@@ -418,6 +418,29 @@ export const wordsFit = (
 	return true;
 };
 
+// archnouns: whether a build can be the label the Ratings Regenerator aims at: a special name whose words are all
+// nouns, with no 2-Way and no defensive noun next to an offensive one (a two-way player has a main name and a
+// defensive label), no trait word (the regenerator sets no traits) and, at a position, no big's word on a non-big
+export const aimReachable = (name: string, pos?: Pos): boolean => {
+	const sn = specialNounsOf(name);
+	if (!sn || sn.twoWay) {
+		return false;
+	}
+	const def = sn.nouns.filter((n) => DEF_NOUN_KEYS.has(n));
+	if (def.length > 0 && def.length < sn.nouns.length) {
+		return false;
+	}
+	if (TRAIT_WORDS.some(([re]) => re.test(name))) {
+		return false;
+	}
+	return pos === undefined || wordsFit(name, pos, {});
+};
+const DEF_NOUN_KEYS: ReadonlySet<NounKey> = new Set([
+	"rimD",
+	"perimD",
+	"steal",
+]);
+
 // (for tests)
 export const allConceptKeys = () => CONCEPTS.map((c) => c.key);
 
