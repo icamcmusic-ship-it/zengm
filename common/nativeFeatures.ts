@@ -1069,6 +1069,18 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "preDraftPaths",
+		college: false,
+		key: "featurePreDraftPaths",
+		core: true,
+		name: "More Pre-Draft Paths",
+		description:
+			"With college stats, more ways to the draft in generated pre-draft careers: transfers that follow coaching changes (each noted with when and why), a pro pathway program that a few elite high school prospects a year join instead of college, and overseas leagues in top, mid and development tiers that prospects climb as they improve. Only new pre-draft stats use it: stats already generated stay as they are.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "draftClassShapes",
 		college: false,
 		key: "featureDraftClassShapes",
@@ -1078,6 +1090,17 @@ export const NATIVE_FEATURES = [
 			"Every draft class the game generates gets a shape (a deep class, a top-heavy one, a weak one, a generational talent, a guard-heavy or big man class, an international class, a high-upside class...) that reshapes its talent, positions, ages and origins within realistic bounds, shown on Draft Scouting. Balanced so the average class is as good as before. Imported and uploaded classes are never reshaped.",
 		default: false,
 		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "realComps",
+		college: false,
+		key: "featureRealComps",
+		core: true,
+		name: "Real Player Comps",
+		description:
+			"Each draft prospect gets the 3 real NBA players whose real young seasons look most like his ratings as your scouts see them (\"Plays like: Name (2003-04, age 20), close\"), with what each became. Shown on the prospect's player page, Draft Scouting and the Draft Board. Only real players and their real seasons are used; nothing shows if the real player data can't be loaded.",
+		default: true,
 		sports: BBGM,
 	},
 	{
@@ -1169,6 +1192,18 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "draftNightTrades",
+		college: false,
+		key: "featureDraftNightTrades",
+		core: true,
+		name: "Draft-Night Trades",
+		description:
+			"Picks move during the draft. A pick value chart for every pick of this draft (built from this class's prospects, so a deep or shallow class shifts it) on the Draft page. Now and then an AI team trades up for a prospect it wants with a team happy to move down, paying with later picks (news items). When you're on the clock or close to it, AI teams may offer to trade up into your pick or down out of theirs, and you can shop your pick for offers. Every deal is valued like any other trade.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "lotteryNight",
 		college: false,
 		key: "featureLotteryNight",
@@ -1176,6 +1211,30 @@ export const NATIVE_FEATURES = [
 		name: "Draft Lottery Night & Combine",
 		description:
 			"The draft lottery as a lottery night: picks revealed from the last lottery pick up to No. 1 with the odds going in, jumps and falls, team reactions and a winners and losers recap (and news). A draft combine after the playoffs: measurements, athletic testing and shooting drills for every prospect (a Combine tab on Draft Scouting and on the prospect's College/Overseas page). Combine results narrow the scouting report's athleticism and size grades and give AI teams a small, class-neutral nudge for big over/under-performers.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "preDraftMedicals",
+		college: false,
+		key: "featurePreDraftMedicals",
+		core: true,
+		name: "Pre-Draft Injuries & Combine Medicals",
+		description:
+			"Generated pre-draft careers include injuries (most prospects are clean, some miss a few games, a few have a major injury like a knee reconstruction or a medical redshirt), more often for players with low durability, with games played to match. At the combine every invited prospect gets a medical grade (Clean, Minor concerns or Red flag) from his injury history and durability, read by your medical staff (a better scouting and medical budget means a more accurate read) and stored with his combine results. AI teams mark red flags down a little on draft night, and a player who had a major injury before the draft is a little more likely to get hurt in his first two pro seasons.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "draftStash",
+		college: false,
+		key: "featureDraftStash",
+		core: true,
+		name: "Draft-and-Stash",
+		description:
+			"Draft a prospect whose last season before the draft was with a club overseas and keep his rights while he keeps playing there: no roster spot and no salary, an overseas season added to his record each year, development like any player. Bring him over in a later offseason (rookie scale inside a year of the draft, otherwise a market contract, plus a buyout of his club contract as a team expense) before his rights lapse 4 seasons after the draft or at age 27. Rights can be traded; AI teams stash late picks who aren't ready and bring them over once they are.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
@@ -1209,6 +1268,18 @@ export const NATIVE_FEATURES = [
 		name: "Scouting Director & Regions",
 		description:
 			'A Director of Scouting runs your scouting department: he assigns your scouts to five regions (East, West, Midwest/South, International, G League/Prep) by specialty, and prospects in covered regions are seen more often, so the fuzz on their ratings and sub-ratings narrows over the season (tournaments, a late-season showcase and the combine give big bumps; blind spots and late risers stay uncertain). Set one priority (or Auto). He keeps your Draft Board up to date every week (lock or drag players to keep them), files pro scouting reports on other teams\' players and free agents (a Pro Scouting tab), and scouts have careers: experience, specialties, reputation from their hit rates, favourite prospects ("our guy"), poaching, promotion and retirement. Needs Scouting Reports.',
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "scoutRoom",
+		college: false,
+		key: "featureScoutRoom",
+		core: true,
+		name: "Scout Consensus & Flags",
+		description:
+			'Every one of your scouts who has seen a prospect gives his own grade (through his own error and lean: specialty, region, experience, bias, "our guy"), so you see the consensus, how much the room disagrees (Agree, Mixed, Split: a wide split means less is known) and the outliers, plus up to four short red and green flags from his character and effort traits, his pre-draft record and his ratings (hidden traits only as unconfirmed hints, as far as your scouts can read them). On Draft Scouting, the Draft Board and the prospect\'s Scouting page. Needs Scouting Reports.',
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,

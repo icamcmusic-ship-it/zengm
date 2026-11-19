@@ -978,3 +978,33 @@ export const NON_NCAA: Record<
 		},
 	},
 };
+
+// Overseas leagues a prospect can play in on his way up (preDraftPaths: the development tier) but that no prospect is sent to as his draft year destination. They are not in NON_NCAA, so the destinations of blank colleges are drawn exactly as before
+export const OVERSEAS_EXTRA: Record<
+	string,
+	{
+		strength: number;
+		w: number;
+		regions: Record<Region, number>;
+	}
+> = {
+	"European Second Division": {
+		strength: 54,
+		w: 8,
+		regions: {
+			usa: 0.3,
+			canada: 0.3,
+			europe: 2.4,
+			oceania: 0.2,
+			asia: 0.3,
+			latam: 0.4,
+			africa: 1.2,
+			other: 0.8,
+		},
+	},
+};
+
+// The pro pathway program (preDraftPaths): a professional development team that a few elite high school prospects a year join instead of going to college. A made-up name
+export const PATHWAY_TEAM = "Ascent Pro Pathway";
+// Its level of competition: pro development teams, on the conference scale
+export const PATHWAY_STRENGTH = 84;

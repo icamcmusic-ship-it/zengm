@@ -16,6 +16,7 @@ import {
 	frontOfficeEnabled,
 	getNewDeptLevelLastThree,
 } from "../frontOffice/index.ts";
+import { getStashedPlayers } from "../draftStash/index.ts";
 
 const getTeamOvr = async (playersRaw: Player[]) => {
 	const players = await player.formatAll(playersRaw, {
@@ -72,8 +73,10 @@ const summary = async (teams: TradeTeams): Promise<TradeSummary> => {
 			"playersByTid",
 			tids[i],
 		);
+		// Draft-and-stash: rights to players abroad can be in the trade, but they are not on the roster (no ovr, no salary)
+		const rights = await getStashedPlayers(tids[i]);
 		const playersOrdered = orderBy(
-			playersBefore.filter(
+			[...playersBefore, ...rights].filter(
 				(p) => pids[i].includes(p.pid) && !isUntradable(p).untradable,
 			),
 			"valueFuzz",

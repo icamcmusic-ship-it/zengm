@@ -3,6 +3,7 @@ import { getCommon } from "./player.ts";
 import { featureOffError } from "../util/nativeFeatures.ts";
 import { getPlayerScoutingPage } from "../core/scoutingReports/index.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { getProspectRooms } from "../core/scoutingReports/room.ts";
 
 const processInputs = (params: RouteParams<"playerScouting">) => {
 	return {
@@ -33,11 +34,16 @@ export default defineView({
 		if (!scouting) {
 			return { errorMessage: "Player not found." };
 		}
+		// Scout Consensus & Flags (prospects): each scout's grade, the consensus and spread, and the flags
+		const room = (await getProspectRooms([topStuff.pRaw])).get(
+			topStuff.pRaw.pid,
+		);
 		// The raw player stays in the worker
 		const { pRaw: _pRaw, ...topStuffForUI } = topStuff;
 		return {
 			...topStuffForUI,
 			scouting,
+			room,
 			scout,
 		};
 	},

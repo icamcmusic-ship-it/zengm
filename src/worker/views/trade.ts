@@ -1,3 +1,4 @@
+import { PLAYER } from "../../common/constants.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { getTradePickConditions } from "../../common/draftPickConditions.ts";
 import { player, team, trade } from "../core/index.ts";
@@ -8,6 +9,7 @@ import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { orderBy } from "../../common/utils.ts";
 import { ValueChangeCalculator } from "../core/team/ValueChangeCalculator.ts";
 import { defineView } from "../util/defineView.ts";
+import { getStashedPlayers } from "../core/draftStash/index.ts";
 
 const getSummaryTeam = (summary: TradeSummary, i: 0 | 1) => {
 	return {
@@ -93,10 +95,14 @@ export default defineView({
 	id: "trade",
 	load: async ({ updateEvents }) => {
 		const teams = await validateTeams();
-		const userRosterAll = await idb.cache.players.indexGetAll(
-			"playersByTid",
-			g.get("userTid"),
-		);
+		// Draft-and-stash: rights to players abroad are listed with the roster
+		const userRosterAll = [
+			...(await idb.cache.players.indexGetAll(
+				"playersByTid",
+				g.get("userTid"),
+			)),
+			...(await getStashedPlayers(g.get("userTid"))),
+		];
 		const userPicks = await idb.merged.draftPicks.getAll({
 			tid: g.get("userTid"),
 		});
@@ -132,8 +138,12 @@ export default defineView({
 			}),
 		);
 
+		const isStashed = (rosterAll: typeof userRosterAll, pid: number) =>
+			rosterAll.some((p) => p.pid === pid && p.tid === PLAYER.STASHED);
+
 		const userRosterWithIncluded = userRoster.map((p) => ({
 			...p,
+			stashed: isStashed(userRosterAll, p.pid),
 			included: teams[0].pids.includes(p.pid),
 			excluded: teams[0].pidsExcluded.includes(p.pid),
 		}));
@@ -150,10 +160,10 @@ export default defineView({
 		);
 
 		const otherTid = teams[1].tid;
-		const otherRosterAll = await idb.cache.players.indexGetAll(
-			"playersByTid",
-			otherTid,
-		);
+		const otherRosterAll = [
+			...(await idb.cache.players.indexGetAll("playersByTid", otherTid)),
+			...(await getStashedPlayers(otherTid)),
+		];
 		const otherPicks = await idb.merged.draftPicks.getAll({ tid: otherTid });
 		const t = await team.getFormatted({
 			tid: otherTid,
@@ -186,6 +196,7 @@ export default defineView({
 
 		const otherRosterWithIncluded = otherRoster.map((p) => ({
 			...p,
+			stashed: isStashed(otherRosterAll, p.pid),
 			included: teams[1].pids.includes(p.pid),
 			excluded: teams[1].pidsExcluded.includes(p.pid),
 		}));

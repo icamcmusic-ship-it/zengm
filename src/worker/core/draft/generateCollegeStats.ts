@@ -30,6 +30,7 @@ import {
 import { last } from "../../../common/utils.ts";
 import type { Player } from "../../../common/types.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
+import { getPlayerTraitScores, traitsEnabled } from "../player/traits.ts";
 
 const getProspects = async (draftYear: number) => {
 	// In a fantasy draft the prospects are temporary and there's no point
@@ -83,6 +84,10 @@ export const toCollegeProspect = (
 		bornLoc: p.born.loc,
 		heightInches: p.hgt,
 		...(p.draftClassShapeInjury ? { injuryHistory: true } : {}),
+		// Pre-Draft Injuries & Combine Medicals: low durability means more injuries before the draft (his score in his draft year)
+		...(featureOn("preDraftMedicals") && traitsEnabled()
+			? { durability: getPlayerTraitScores(p, draftYear).durability }
+			: {}),
 	};
 };
 
@@ -129,6 +134,8 @@ export const generateCollegeStats = async ({
 		seed,
 		draftYear,
 		fillBlankColleges: fillBlankColleges ?? true,
+		// More pre-draft paths: the transfer portal's coaching changes, the pro pathway program, overseas tiers
+		paths: featureOn("preDraftPaths"),
 		// Measured against the whole class, also when only some of it gets stats
 		...(players.length < classPlayers.length
 			? {
@@ -157,6 +164,7 @@ export const generateCollegeStats = async ({
 	const results = generateCollegeClass(prospects, {
 		...options,
 		ncaaSeason,
+		injuries: featureOn("preDraftMedicals"),
 	});
 	const resultsByKey = new Map(results.map((result) => [result.key, result]));
 

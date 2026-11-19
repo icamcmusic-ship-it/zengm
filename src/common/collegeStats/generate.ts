@@ -1,6 +1,8 @@
 import { backProject, simulateSeason } from "./season.ts";
 import { getHonors } from "./honors.ts";
+import { COLLEGES, PATHWAY_TEAM } from "./colleges.ts";
 import {
+	getRegion,
 	getSchool,
 	pickBlankDestination,
 	unknownSchool,
@@ -40,7 +42,18 @@ export type GenerateOptions = {
 	ncaaSeason?: NcaaSeason;
 	// The whole draft class, when only some of it is being generated (prospects missing stats, or a remake of some): where a prospect stands in his class is measured against all of it. Default: the prospects being generated
 	classProspects?: CollegeProspect[];
+	// Pre-draft injuries (injuries.ts). Default true
+	injuries?: boolean;
+	// More pre-draft paths (the preDraftPaths League Extra): coaching changes in the transfer portal, the pro pathway program and overseas tiers. Default true; false generates exactly what the model did before them
+	paths?: boolean;
 };
+
+// How many elite high school prospects of a class join the pro pathway program instead of going to college: at most this many, from at most PATHWAY_POOL of the best
+const PATHWAY_COUNTS = [2, 3, 4, 5];
+const PATHWAY_COUNT_WEIGHTS = [0.3, 0.35, 0.23, 0.12];
+const PATHWAY_POOL = 10;
+// Class-relative draft stock (zStock) a prospect needs to be offered a spot: about the top fifth of a class
+const PATHWAY_MIN_STOCK = 0.85;
 
 // Game score per 40 minutes a junior college season needs for honors
 const JUCO_BARS = { allAmerican: 17.5, allRegion: 14 };
@@ -119,11 +132,13 @@ export const generateCollegeClass = (
 	const { seed, draftYear } = options;
 	const priorSeasons = options.priorSeasons ?? true;
 	const noise = clamp(options.noise ?? 1, 0, 3);
+	const paths = options.paths ?? true;
 	const classProspects = options.classProspects ?? prospects;
 	const classStats = getClassStats(classProspects);
 	const potStats = getClassStats(
 		classProspects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
 	);
+	const pathwayKeys = getPathwayKeys(classProspects, options);
 
 	const results: (CollegeResult & { pos: string })[] = [];
 
@@ -139,7 +154,7 @@ export const generateCollegeClass = (
 	for (const p of prospects) {
 		// Each player has his own stream, so what he gets doesn't depend on who else is in the class
 		const rng = new Rng(`${seed}|${draftYear}|${p.key}`);
-		const school = pickSchool(p, options, classStats);
+		const school = pickSchool(p, options, classStats, pathwayKeys);
 
 		// His team in the college season, if it has one
 		let team = -1;
@@ -162,9 +177,11 @@ export const generateCollegeClass = (
 			draftYear,
 			priorSeasons,
 			z: zClass,
+			injuries: options.injuries ?? true,
 			classIndex: isCollegeSchool(school)
 				? getClassIndexForStock(p.age, zStock, classRng.random())
 				: getClassIndex(p.age),
+			paths,
 		});
 		// His draft year season ended early: he missed the postseason
 		let missedPostseason = false;
@@ -208,6 +225,9 @@ export const generateCollegeClass = (
 					...(year.mpgShift !== 0 ? { mpgShift: year.mpgShift } : {}),
 					...(year.usageShift !== 0 ? { usageShift: year.usageShift } : {}),
 					...(year.gamesCap !== undefined ? { gamesCap: year.gamesCap } : {}),
+					...(year.injuryGames !== undefined
+						? { injuryGames: year.injuryGames }
+						: {}),
 					...(year.teamGames !== undefined
 						? { teamGames: year.teamGames }
 						: {}),
@@ -222,6 +242,18 @@ export const generateCollegeClass = (
 						: {}),
 				}),
 			);
+			// The games a mid-season injury actually cost him (a season-ending one keeps 0: the rest of the season, which depends on how
+			// many games his team played)
+			if (year.injury && !year.injury.ended) {
+				const sim = seasons.at(-1)!;
+				year.injury.games = Math.min(
+					year.injury.games,
+					Math.max(0, sim.teamGames - (sim.stats.gp ?? 0)),
+				);
+				if (year.injury.games === 0) {
+					delete year.injury;
+				}
+			}
 		}
 
 		if (ncaaSeason && team >= 0 && school) {
@@ -311,8 +343,14 @@ const pickSchool = (
 	p: CollegeProspect,
 	options: GenerateOptions,
 	classStats: { mean: number; sd: number },
+	// Prospects of the class in the pro pathway program (getPathwayKeys)
+	pathwayKeys?: Set<string>,
 ): School | undefined => {
-	if (p.college !== "") {
+	if (pathwayKeys?.has(p.key)) {
+		return getSchool(PATHWAY_TEAM);
+	}
+	// A blank college filled in with the pro pathway program when his stats were made last time is blank again: whether he is in it depends on the seed
+	if (p.college !== "" && p.college !== PATHWAY_TEAM) {
 		return getSchool(p.college) ?? unknownSchool(p.college);
 	}
 	if (options.fillBlankColleges ?? true) {
@@ -330,6 +368,66 @@ const pickSchool = (
 };
 
 /**
+ * The class's prospects in the pro pathway program (preDraftPaths), by key: a few elite high school prospects (North Americans young enough to be college freshmen, headed to a Division I school, among the best fifth of the class by draft stock) skip college for one season with a pro development team. 2-5 a class (fewer when the class has fewer such prospects), the best likeliest. Drawn from a stream of the class's own and read off the whole class, so the same class and seed always give the same players, whichever of them are being generated.
+ */
+export const getPathwayKeys = (
+	classProspects: CollegeProspect[],
+	options: GenerateOptions,
+): Set<string> => {
+	const keys = new Set<string>();
+	if (!(options.paths ?? true) || classProspects.length === 0) {
+		return keys;
+	}
+	const classStats = getClassStats(classProspects);
+	const potStats = getClassStats(
+		classProspects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
+	);
+	const candidates: { key: string; zStock: number }[] = [];
+	for (const p of classProspects) {
+		const region = getRegion(p.bornLoc);
+		if (
+			getClassIndex(p.age) !== 0 ||
+			(region !== "usa" && region !== "canada") ||
+			p.injuryHistory
+		) {
+			continue;
+		}
+		const school = pickSchool(p, options, classStats);
+		if (!school || school.nonCollege || !COLLEGES[school.name]) {
+			continue;
+		}
+		const zClass = clamp((p.ovr - classStats.mean) / classStats.sd, -2.5, 2.5);
+		const zPot = clamp(
+			(p.pot + POT_PRIOR_SHIFT - potStats.mean) / potStats.sd,
+			-2.5,
+			2.5,
+		);
+		const zStock = 0.4 * zClass + 0.6 * zPot;
+		if (zStock >= PATHWAY_MIN_STOCK) {
+			candidates.push({ key: p.key, zStock });
+		}
+	}
+	candidates.sort((a, b) =>
+		b.zStock !== a.zStock ? b.zStock - a.zStock : a.key < b.key ? -1 : 1,
+	);
+	const pool = candidates.slice(0, PATHWAY_POOL);
+	const rng = new Rng(`${options.seed}|${options.draftYear}|pathway`);
+	const count = Math.min(
+		pool.length,
+		rng.weighted(PATHWAY_COUNTS, PATHWAY_COUNT_WEIGHTS),
+	);
+	for (let i = 0; i < count; i++) {
+		const left = pool.filter((x) => !keys.has(x.key));
+		const pick = rng.weighted(
+			left,
+			left.map((x) => Math.exp(1.5 * x.zStock)),
+		);
+		keys.add(pick.key);
+	}
+	return keys;
+};
+
+/**
  * The schools generateCollegeClass will give these prospects (with the same options), by key, for building the college season before the stats. Only NCAA schools are included.
  */
 export const getNcaaSchools = (
@@ -337,9 +435,13 @@ export const getNcaaSchools = (
 	options: GenerateOptions,
 ) => {
 	const classStats = getClassStats(options.classProspects ?? prospects);
+	const pathwayKeys = getPathwayKeys(
+		options.classProspects ?? prospects,
+		options,
+	);
 	const output = new Map<string, string>();
 	for (const p of prospects) {
-		const school = pickSchool(p, options, classStats);
+		const school = pickSchool(p, options, classStats, pathwayKeys);
 		if (school && !school.nonCollege && !school.idle) {
 			output.set(p.key, school.name);
 		}

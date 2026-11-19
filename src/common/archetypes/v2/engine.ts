@@ -46,6 +46,7 @@ import {
 	type Rejection,
 } from "./nouns.ts";
 import type { RatingQuantiles } from "./gateScale.ts";
+import { defenseSentence } from "./defenseLabels.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
 import type { ArchetypeRatings, Classification, Pos } from "../types.ts";
 import {
@@ -1047,6 +1048,7 @@ export const classifyV2 = (
 			prospect: opts.prospect,
 			traits: opts.traits as Record<string, number> | undefined,
 			rq: (norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+			...(norms.common ? { common: norms.common } : {}),
 			rejected: opts.rejects?.map((rj): Rejection => ({
 				name: rj.name,
 				own: rj.key !== undefined && rj.key === opts.pickKey,
@@ -1215,7 +1217,8 @@ export const classifyV2 = (
 		...(nounDefense ? { defense: nounDefense } : {}),
 		group: a.group,
 		family: a.family,
-		desc: a.desc,
+		// (archnouns: both labels in the description)
+		desc: nounDefense ? `${a.desc} ${defenseSentence(nounDefense)}` : a.desc,
 		tags: a.tags,
 		alternates: rest.slice(1, 3).map((c) => ({ id: c.id, name: c.name })),
 		shortfall: isClassic ? classic.shortfall : 0,

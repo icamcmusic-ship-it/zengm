@@ -55,6 +55,8 @@ export type CollegeProspect = {
 	heightInches?: number;
 	// The injury-riddled draft class (Draft Class Shapes): he comes into the draft off an injury, which is likely his story
 	injuryHistory?: boolean;
+	// His durability trait score (Player Traits, 0-100, 50 average), when known: low durability means more pre-draft injuries
+	durability?: number;
 };
 
 export type GameBox = {

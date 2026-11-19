@@ -1,4 +1,4 @@
-import { NON_NCAA } from "./colleges.ts";
+import { NON_NCAA, OVERSEAS_EXTRA, PATHWAY_TEAM } from "./colleges.ts";
 
 /**
  * The overseas (pro club abroad) stat environment and honors, ported from the BBGM Draft Class Workshop (bbgmdraft js/stats.js LEAGUE_ENV and js/awards.js PRO_AWARDS / PRO_SHORT).
@@ -15,6 +15,8 @@ export type LeagueEnv = {
 	usageShift: number;
 	// Minutes lost relative to a college role: the stronger the league, the less a prospect plays (a teenager in the EuroLeague averages about 15 minutes)
 	minShift: number;
+	// Shooting efficiency above or below what his ratings and the level of competition give (a share: 0.01 is about a point of FG%). Only the pro pathway program has one
+	effShift?: number;
 };
 
 const env = (
@@ -64,6 +66,14 @@ export const LEAGUE_ENV: Record<string, LeagueEnv> = {
 	"Philippine PBA": env(84, 48, 26, 36, 36),
 	"Argentine Liga Nacional": env(76, 40, 26, 34, 38),
 	"Mexican LNBP": env(80, 40, 28, 34, 40),
+	// Development tier (preDraftPaths): a second division, where a teenager gets real minutes and a big role against weaker teams
+	"European Second Division": env(76, 40, 30, 35, 34, -0.012, -1.5),
+};
+
+// The pro pathway program (preDraftPaths): one season of 48-minute games against pro development teams for an elite high school prospect who skips college. He comes off a pro bench more than he would start in college (a few minutes fewer than the same player in college), takes fewer shots, and finishes worse against grown men (a few points of FG% below the same player in college)
+export const PATHWAY_ENV: LeagueEnv = {
+	...env(100, 48, 27, 32, 30, -0.04, -10),
+	effShift: -0.05,
 };
 
 const DEFAULT_ENV = env(75, 40, 24, 33, 32);
@@ -99,25 +109,56 @@ export const PRO_SHORT: Record<string, string> = {
 	"Mexican LNBP": "LNBP",
 };
 
-// A pro league (not the NCAA, not a youth/prep program)
+// A pro league (not the NCAA, not a youth/prep program, not the pro pathway program)
 export const isProLeague = (name: string) =>
-	!!NON_NCAA[name]?.pro && !NON_NCAA[name]?.youth;
+	(!!NON_NCAA[name]?.pro && !NON_NCAA[name]?.youth) || !!OVERSEAS_EXTRA[name];
 
 // A pro club abroad, as opposed to the (domestic) G League
 export const isOverseasLeague = (name: string) =>
 	isProLeague(name) && name !== "NBA G League";
 
 export const getLeagueEnv = (name: string): LeagueEnv | undefined =>
-	isProLeague(name) ? (LEAGUE_ENV[name] ?? DEFAULT_ENV) : undefined;
+	name === PATHWAY_TEAM
+		? PATHWAY_ENV
+		: isProLeague(name)
+			? (LEAGUE_ENV[name] ?? DEFAULT_ENV)
+			: undefined;
+
+export const isPathway = (name: string | undefined) => name === PATHWAY_TEAM;
 
 /**
- * What a pre-draft stats row is, from where it was played: "Overseas" for a pro club abroad, "G League" for the G League, "College" for everything else (NCAA, prep, youth programs).
+ * Overseas league tiers (preDraftPaths), by the level of competition: top (the strongest leagues, 76+ on the conference scale), mid (most first divisions, 60-75) and development (second divisions and the weakest pro leagues, under 60). A prospect abroad usually works his way up: the season before a top tier one is often in a mid tier league, and a teenager's first pro seasons are often in the development tier.
+ */
+export const OVERSEAS_TIERS = ["dev", "mid", "top"] as const;
+export type OverseasTier = (typeof OVERSEAS_TIERS)[number];
+
+export const TIER_NAMES: Record<OverseasTier, string> = {
+	top: "Top tier",
+	mid: "Mid tier",
+	dev: "Development tier",
+};
+
+export const getLeagueTier = (
+	name: string | undefined,
+): OverseasTier | undefined => {
+	if (name === undefined || !isOverseasLeague(name)) {
+		return undefined;
+	}
+	const strength = (NON_NCAA[name] ?? OVERSEAS_EXTRA[name])!.strength;
+	return strength >= 76 ? "top" : strength >= 60 ? "mid" : "dev";
+};
+
+/**
+ * What a pre-draft stats row is, from where it was played: "Overseas" for a pro club abroad, "G League" for the G League, "Pro pathway" for the pro pathway program, "College" for everything else (NCAA, prep, youth programs).
  */
 export const getPreDraftLabel = (
 	teamName: string | undefined,
-): "Overseas" | "G League" | "College" => {
+): "Overseas" | "G League" | "Pro pathway" | "College" => {
 	if (teamName === "NBA G League") {
 		return "G League";
+	}
+	if (teamName === PATHWAY_TEAM) {
+		return "Pro pathway";
 	}
 	if (teamName !== undefined && isOverseasLeague(teamName)) {
 		return "Overseas";

@@ -8,6 +8,10 @@ import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
 import { PlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import { ScoutCell } from "./DraftScouting/DraftClass.tsx";
+import { MedicalGrade } from "../components/MedicalGrade.tsx";
+import { MEDICAL_EXPLANATION } from "../../common/draftCombine.ts";
+import { FlagsCell, RoomCell } from "../components/ScoutRoom.tsx";
+import { RealCompCell } from "../components/RealComps.tsx";
 
 type Prospect = View<"draftBoard">["prospects"][number];
 
@@ -99,6 +103,12 @@ const DraftBoard = ({
 	};
 
 	const showRatings = !challengeNoRatings;
+	// Pre-Draft Injuries & Combine Medicals: once the class's combine was held
+	const showMedical = prospects.some((p) => p.medical !== undefined);
+	// Scout Consensus & Flags
+	const showRoom = prospects.some((p) => p.room !== undefined);
+	// Real Player Comps
+	const showComps = showRatings && prospects.some((p) => p.comps !== undefined);
 
 	return (
 		<>
@@ -217,8 +227,24 @@ const DraftBoard = ({
 								{frozenRanks ? "Pre-draft" : "Scouts"}
 							</th>
 							<th>Build</th>
+							{showComps ? (
+								<th title="The real NBA player he plays like most, at about his age, from his ratings as your scouts see them. Hover for the top three.">
+									Comp
+								</th>
+							) : null}
 							<th>College / overseas</th>
 							{scoutingSystem && showRatings ? <th>Scout report</th> : null}
+							{showMedical ? <th title={MEDICAL_EXPLANATION}>Med</th> : null}
+							{showRoom ? (
+								<>
+									<th title="Your scouts' consensus slot in this class and how much they disagree (Agree, Mixed, Split). Hover for details">
+										Room
+									</th>
+									<th title="Red and green flags (hover to read them)">
+										Flags
+									</th>
+								</>
+							) : null}
 							<th>Notes</th>
 						</tr>
 					</thead>
@@ -355,6 +381,9 @@ const DraftBoard = ({
 										) : null}
 									</td>
 									<td>{p.build ?? ""}</td>
+									{showComps ? (
+										<td>{p.comps ? <RealCompCell comps={p.comps} /> : null}</td>
+									) : null}
 									<td>
 										{p.preDraftLabel ? (
 											<span className="badge text-bg-secondary fw-normal me-1">
@@ -379,6 +408,26 @@ const DraftBoard = ({
 												remaining={undefined}
 											/>
 										</td>
+									) : null}
+									{showMedical ? (
+										<td>
+											{p.medical ? (
+												<MedicalGrade
+													grade={p.medical.grade}
+													reason={p.medical.reason}
+												/>
+											) : null}
+										</td>
+									) : null}
+									{showRoom ? (
+										<>
+											<td>
+												<RoomCell room={p.room} />
+											</td>
+											<td>
+												<FlagsCell flags={p.room?.flags} />
+											</td>
+										</>
 									) : null}
 									<td>
 										<NoteInput p={p} />

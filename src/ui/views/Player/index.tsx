@@ -39,6 +39,8 @@ import { useLocal } from "../../util/local.ts";
 import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
 import { PreDraftSummary } from "./PreDraftSummary.tsx";
+import { StashPlayerPanel } from "../../components/DraftStash.tsx";
+import { RealCompsSummary } from "../../components/RealComps.tsx";
 import { NitStats } from "./NitStats.tsx";
 import { TrackingProfile } from "./TrackingProfile.tsx";
 import {
@@ -61,6 +63,7 @@ const Player2 = ({
 	randomDebutsForeverPids,
 	ratings,
 	retired,
+	stashInfo,
 	statTables,
 	statSummary,
 	teamColors,
@@ -152,9 +155,15 @@ const Player2 = ({
 
 			<DownloadPlayerButton name={player.name} pid={player.pid} />
 
-			{!retired ? <ContractMood pid={player.pid} refreshKey={player} /> : null}
+			<StashPlayerPanel info={stashInfo} pid={player.pid} />
+
+			{!retired && player.tid !== PLAYER.STASHED ? (
+				<ContractMood pid={player.pid} refreshKey={player} />
+			) : null}
 
 			<PreDraftSummary player={player} />
+
+			{player.realComps ? <RealCompsSummary comps={player.realComps} /> : null}
 
 			{player.tid === PLAYER.UNDRAFTED ? (
 				<ProProjectionSection pid={player.pid} />

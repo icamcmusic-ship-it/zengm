@@ -4,7 +4,10 @@
 // Never true prospect ratings, never hidden trait scores, never the aging curve.
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { getPreDraftRanks } from "../draft/preDraftRanks.ts";
-import { getPreDraftStats } from "../../../common/preDraft.ts";
+import {
+	getPreDraftStats,
+	isPreDraftStatsRow,
+} from "../../../common/preDraft.ts";
 import { getPreDraftLabel } from "../../../common/collegeStats/overseas.ts";
 import {
 	COMBINE_COLUMN_BY_KEY,
@@ -270,7 +273,7 @@ const proRows = (p: Player, season: number) =>
 		(r) =>
 			r.season === season &&
 			!r.playoffs &&
-			!(r.tid === PLAYER.DOES_NOT_EXIST && r.season <= (p.draft.year ?? 0)),
+			!isPreDraftStatsRow(r, p.draft.year),
 	);
 
 export const proProductionFor = (p: Player, season: number) =>
@@ -304,7 +307,7 @@ export const preDraftProductionFor = (p: Player) => {
 			? "juco"
 			: label === "Overseas"
 				? "overseas"
-				: label === "G League"
+				: label === "G League" || label === "Pro pathway"
 					? "pro"
 					: "college";
 	const prod = productionFromRows(seasonRows, season, teamName ?? "", level);
@@ -398,7 +401,7 @@ const proSeasonsOf = (p: Player) =>
 				(r) =>
 					!r.playoffs &&
 					(r.gp ?? 0) >= 10 &&
-					!(r.tid === PLAYER.DOES_NOT_EXIST && r.season <= (p.draft.year ?? 0)),
+					!isPreDraftStatsRow(r, p.draft.year),
 			)
 			.map((r) => r.season),
 	).size;
@@ -976,6 +979,29 @@ const projectedPickFor = async (p: Player) => {
 	return i >= 0 ? i + 1 : undefined;
 };
 
+// A prospect's remaining scouting uncertainty, rating points: scouting points spent, the looks this season (Scouting Director & Regions:
+// the share of his fuzz they left, 1 without the setting), the budget and how far off his draft is. Never from his true fuzz
+export const prospectUncertainty = (
+	p: Pick<Player, "scouting" | "scoutLooks" | "draft">,
+	scoutingLevel: number,
+	season: number,
+) => {
+	const looksFactor =
+		featureOn("scoutingDepth") && p.scoutLooks ? p.scoutLooks.a : 1;
+	const yearsOut = Math.max(0, p.draft.year - season);
+	return (
+		getUncertainty(p.scouting ?? []) *
+			looksFactor *
+			// (no budget data: an average department, as getDepartment)
+			(1.3 -
+				0.6 *
+					departmentQualityForLevel(
+						Number.isFinite(scoutingLevel) ? scoutingLevel : 34,
+					)) +
+		0.7 * yearsOut
+	);
+};
+
 export const buildInput = async (
 	p: Player,
 	ctx: ReportCtx,
@@ -1028,21 +1054,13 @@ export const buildInput = async (
 			part: injuryBodyPart(i.type),
 			games: i.games,
 		}));
-	const scouting = p.scouting ?? [];
-	const yearsOut = prospect ? Math.max(0, p.draft.year - ctx.season) : 0;
 	const proSeasons = proSeasonsOf(p);
 	const nightCombine =
 		prospect && !light && lotteryNightOn()
 			? await nightCombineFor(p)
 			: undefined;
-	// Scouting Director & Regions: the share of his fuzz his looks this season left (1 without the setting)
-	const looksFactor =
-		prospect && featureOn("scoutingDepth") && p.scoutLooks ? p.scoutLooks.a : 1;
 	const uncertainty = prospect
-		? getUncertainty(scouting) *
-				looksFactor *
-				(1.3 - 0.6 * departmentQualityForLevel(ctx.scoutingLevel)) +
-			0.7 * yearsOut
+		? prospectUncertainty(p, ctx.scoutingLevel, ctx.season)
 		: retired
 			? 0
 			: Math.max(0.4, 1.8 - 0.45 * proSeasons);

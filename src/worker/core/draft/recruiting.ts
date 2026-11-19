@@ -74,6 +74,7 @@ export const getRecruitBasis = (
 			nationalRank: plain.nationalRank,
 			story: career.story,
 			jucoStart: common.jucoStart,
+			pathway: first.level === "pathway",
 		});
 		return {
 			...common,

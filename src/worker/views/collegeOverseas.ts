@@ -11,8 +11,11 @@ import {
 	getPreDraftStats,
 } from "../../common/preDraft.ts";
 import {
+	TIER_NAMES,
+	getLeagueTier,
 	getPreDraftLabel,
 	isOverseasLeague,
+	isPathway,
 } from "../../common/collegeStats/overseas.ts";
 import { NCAA_REGIONS } from "../../common/collegeStats/ncaa.ts";
 import {
@@ -134,11 +137,17 @@ export default defineView({
 				const per = (key: string) => (gp > 0 ? row[key] / gp : 0);
 				const pct = (made: string, att: string) =>
 					row[att] > 0 ? row[made] / row[att] : undefined;
+				// Overseas league tier (preDraftPaths): stored with his career, or read off the league
+				const tier =
+					p.preDraftCareer?.years.find((year) => year.season === season)
+						?.tier ?? getLeagueTier(row.teamName);
 				return [
 					{
 						...prospectInfo(p, season),
 						league: row.teamName as string,
 						overseas: isOverseasLeague(row.teamName),
+						pathway: isPathway(row.teamName),
+						tier: tier ? TIER_NAMES[tier] : undefined,
 						gp,
 						min: per("min"),
 						pts: per("pts"),

@@ -15,6 +15,8 @@ import type {
 	PlayerInjury,
 } from "../../../common/types.ts";
 import { PHASE } from "../../../common/constants.ts";
+import { hasMajorPreDraftInjury } from "../../../common/collegeStats/injuries.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 
 export const isInjuryDepthEnabled = () =>
 	__SPORT === "basketball" && !!g.get("injuryDepth");
@@ -74,11 +76,32 @@ export const isInjuryProne = (
 export const isRecentlyReturned = (health: PlayerHealth | undefined) =>
 	health !== undefined && health.returnGames > 0;
 
+// Pre-Draft Injuries & Combine Medicals: a player who had a major injury before the draft (a long absence, a season-ending injury, a
+// medical redshirt) is this much more likely to get hurt in his first two pro seasons
+export const PRE_DRAFT_INJURY_RISK = 1.15;
+export const PRE_DRAFT_INJURY_SEASONS = 2;
+
+export const preDraftInjuryRisk = (
+	p: Partial<Pick<Player, "preDraftCareer" | "draft">>,
+	season: number = g.get("season"),
+) => {
+	if (!p.preDraftCareer || !p.draft || !featureOn("preDraftMedicals")) {
+		return 1;
+	}
+	const proSeason = season - p.draft.year;
+	return proSeason >= 1 &&
+		proSeason <= PRE_DRAFT_INJURY_SEASONS &&
+		hasMajorPreDraftInjury(p.preDraftCareer)
+		? PRE_DRAFT_INJURY_RISK
+		: 1;
+};
+
 export const getInjuryRiskFactor = (
-	p: Pick<Player, "pid" | "injuries" | "health">,
+	p: Pick<Player, "pid" | "injuries" | "health"> &
+		Partial<Pick<Player, "preDraftCareer" | "draft">>,
 	backToBack: boolean,
 ) => {
-	let factor = NORMALIZATION;
+	let factor = NORMALIZATION * preDraftInjuryRisk(p);
 	if (isInjuryProne(p)) {
 		factor *= PRONE_RISK;
 	}

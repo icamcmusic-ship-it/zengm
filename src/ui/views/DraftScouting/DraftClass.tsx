@@ -6,6 +6,7 @@ import { DataTable } from "../../components/DataTable/index.tsx";
 import { helpers } from "../../util/helpers.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import { getCols } from "../../../common/getCols.ts";
+import { RealCompCell } from "../../components/RealComps.tsx";
 import type { View } from "../../../common/types.ts";
 import { WEBSITE_ROOT } from "../../../common/constants.ts";
 import { wrappedPlayerNameLabels } from "../../components/PlayerNameLabels.tsx";
@@ -13,7 +14,15 @@ import type { DataTableRow } from "../../components/DataTable/index.tsx";
 import { downloadFile } from "../../util/downloadFile.ts";
 import { LeagueFileUpload } from "../../components/LeagueFileUpload.tsx";
 import { CollegeStats } from "./CollegeStats.tsx";
+import { MEDICAL_SORT, MedicalGrade } from "../../components/MedicalGrade.tsx";
+import { MEDICAL_EXPLANATION } from "../../../common/draftCombine.ts";
 import { showNotification } from "../../util/showNotification.ts";
+import {
+	FlagsCell,
+	RoomCell,
+	flagsSortValue,
+	roomSortValue,
+} from "../../components/ScoutRoom.tsx";
 
 type ScoutReport = NonNullable<
 	View<"draftScouting">["seasons"][0]["players"][0]["scoutReport"]
@@ -178,6 +187,16 @@ const DraftClass = ({
 			},
 		);
 	}
+	// Real Player Comps: the top comp, all three in the tooltip
+	const showComps =
+		!challengeNoRatings && players.some((p) => p.comps !== undefined);
+	if (showComps) {
+		cols.push({
+			title: "Comp",
+			desc: "The real NBA player he plays like most, at about his age, from his ratings as your scouts see them. Hover for the top three and what they became.",
+			sortType: "string",
+		});
+	}
 	const showScouting =
 		!challengeNoRatings &&
 		!fantasyDraft &&
@@ -188,6 +207,33 @@ const DraftClass = ({
 			desc: "Ovr and pot ranges from your scouts, with their confidence. Assign a scout (1 point) or attend a workout (3 points) to narrow them. Scouting notes are on each player's page.",
 			sortType: "number",
 		});
+	}
+	// Pre-Draft Injuries & Combine Medicals: once the class's combine was held
+	const showMedical = players.some((p) => p.medical !== undefined);
+	if (showMedical) {
+		cols.push({
+			title: "Med",
+			desc: `${MEDICAL_EXPLANATION} Only prospects invited to the combine have one.`,
+			sortType: "number",
+			sortSequence: ["desc", "asc"],
+		});
+	}
+	// Scout Consensus & Flags
+	const showRoom = !fantasyDraft && players.some((p) => p.room !== undefined);
+	if (showRoom) {
+		cols.push(
+			{
+				title: "Scouts",
+				desc: "Your scouts' consensus (where the average of their grades slots him in this class) and how much they disagree: Agree, Mixed or Split (a wide split means less is known about him). * marks an outlier. Hover for details, each scout's grade is on his Scouting page.",
+				sortType: "number",
+			},
+			{
+				title: "Flags",
+				desc: "Red and green flags from his traits, pre-draft record and ratings. Hover to read them. Hidden traits only show up as unconfirmed hints.",
+				sortType: "number",
+				sortSequence: ["desc", "asc"],
+			},
+		);
 	}
 	if (showTraits) {
 		if (traitColumn) {
@@ -253,6 +299,17 @@ const DraftClass = ({
 									: null,
 						)
 					: []),
+				...(showComps
+					? [
+							p.comps && p.comps.length > 0
+								? {
+										value: <RealCompCell comps={p.comps} />,
+										searchValue: p.comps.map((c) => c.name).join(" "),
+										sortValue: p.comps[0]!.name,
+									}
+								: null,
+						]
+					: []),
 				...(showScouting && p.scoutReport
 					? [
 							{
@@ -265,6 +322,36 @@ const DraftClass = ({
 										remaining={scoutingRemaining}
 									/>
 								),
+							},
+						]
+					: []),
+				...(showMedical
+					? [
+							p.medical
+								? {
+										value: (
+											<MedicalGrade
+												grade={p.medical.grade}
+												reason={p.medical.reason}
+											/>
+										),
+										sortValue: MEDICAL_SORT[p.medical.grade],
+										searchValue: p.medical.reason,
+									}
+								: null,
+						]
+					: []),
+				...(showRoom
+					? [
+							{
+								sortValue: roomSortValue(p.room),
+								searchValue: p.room?.label ?? "",
+								value: <RoomCell room={p.room} />,
+							},
+							{
+								sortValue: flagsSortValue(p.room?.flags),
+								searchValue: (p.room?.flags ?? []).map((f) => f.text).join(" "),
+								value: <FlagsCell flags={p.room?.flags} />,
 							},
 						]
 					: []),
@@ -445,7 +532,7 @@ const DraftClass = ({
 			<DataTable
 				cols={cols}
 				defaultSort={[0, "asc"]}
-				name={`DraftScouting:${offset}${showTraits ? ":traits" : ""}${traitColumn ? ":col" : ""}`}
+				name={`DraftScouting:${offset}${showRoom ? ":room" : ""}${showTraits ? ":traits" : ""}${traitColumn ? ":col" : ""}`}
 				rows={rows}
 			/>
 		</>

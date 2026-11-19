@@ -3,6 +3,7 @@ import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import type { Conditions, PhaseReturn } from "../../../common/types.ts";
 import * as college from "../college/index.ts";
+import { aiStashAfterDraft } from "../draftStash/index.ts";
 
 const newPhaseAfterDraft = async (
 	conditions: Conditions,
@@ -26,6 +27,9 @@ const newPhaseAfterDraft = async (
 			await idb.cache.draftPicks.delete(dp.dpid);
 		}
 	}
+
+	// Draft-and-stash: AI teams stash the picks who aren't ready yet
+	await aiStashAfterDraft();
 
 	// Already set in afterPicks, but do again just to be sure
 	await league.setGameAttributes({

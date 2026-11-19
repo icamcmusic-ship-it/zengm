@@ -1,10 +1,12 @@
 // Draft combine (Draft Lottery Night & Combine setting, basketball): measurements, athletic testing and shooting drills for the
 // invited prospects of a draft class, held at the start of the draft lottery phase. Everything here is a pure function of the
 // prospect (pid, draft year, his ratings in his draft year, listed height and weight), seeded with its own small RNG, so the
-// results are the same every time they are computed and the game's random numbers are never touched. Nothing is stored.
+// results are the same every time they are computed and the game's random numbers are never touched. Nothing is stored here (the
+// worker stores each prospect's results when the combine is held). The medicals (below) have an RNG of their own.
 //
 // Scales follow real NBA combine results (2000s-2020s): see COMBINE_REAL_RANGES, checked by draftCombine.test.ts.
 import { Rng } from "./collegeStats/rng.ts";
+import { RECONSTRUCTIONS, type CareerInjury } from "./collegeStats/injuries.ts";
 
 export type DraftCombineRatings = {
 	hgt: number;
@@ -73,6 +75,139 @@ export type DraftCombineResult = {
 	skipped?: "injured" | "topProspect" | "personal";
 	// Over/under-performance in the drills against what his ratings predict, about N(0, 1). 0 when he skipped
 	performance: number;
+	// Pre-Draft Injuries & Combine Medicals: his medical grade. Missing for a combine held before it existed
+	medical?: CombineMedical;
+};
+
+// ---- Medicals (Pre-Draft Injuries & Combine Medicals) ----
+// Every invited prospect has a physical at the combine. His medical risk comes from his pre-draft injury history (recent and major
+// injuries weigh most, a knee or Achilles reconstruction most of all), an injury he has now and, with Player Traits, his durability. The
+// grade the user sees is his medical staff's read of that risk, with noise from a seeded RNG of its own (pid and draft year), narrowed
+// by a better scouting and medical budget. AI teams draft on the risk itself.
+
+export type MedicalGrade = "clean" | "minor" | "redFlag";
+
+export type CombineMedical = {
+	// As the user's medical staff reads it
+	grade: MedicalGrade;
+	// His actual risk (MEDICAL_THRESHOLDS), what AI teams draft on
+	risk: number;
+};
+
+export const MEDICAL_GRADE_NAMES: Record<MedicalGrade, string> = {
+	clean: "Clean",
+	minor: "Minor concerns",
+	redFlag: "Red flag",
+};
+
+export const MEDICAL_EXPLANATION =
+	"Medical grade from the combine physicals: your medical staff's read of his injury history and how well his body holds up. A better scouting and medical budget makes the read more accurate.";
+
+// Risk below minor: clean; below redFlag: minor concerns; above: red flag
+export const MEDICAL_THRESHOLDS = { minor: 1, redFlag: 2.4 };
+
+export const medicalGradeOf = (risk: number): MedicalGrade =>
+	risk >= MEDICAL_THRESHOLDS.redFlag
+		? "redFlag"
+		: risk >= MEDICAL_THRESHOLDS.minor
+			? "minor"
+			: "clean";
+
+export const medicalRisk = ({
+	season,
+	injuries,
+	durability,
+	injuredNow,
+}: {
+	// Draft year
+	season: number;
+	injuries: CareerInjury[];
+	// Durability trait score (0-100), when Player Traits is on
+	durability?: number;
+	injuredNow?: boolean;
+}) => {
+	let risk = 0;
+	for (const inj of injuries) {
+		const yearsAgo = season - inj.season;
+		const recency = yearsAgo <= 0 ? 1 : yearsAgo === 1 ? 0.8 : 0.6;
+		const base = inj.ended
+			? RECONSTRUCTIONS.has(inj.type)
+				? 3
+				: 2.4
+			: inj.major
+				? 1.4
+				: 0.45;
+		risk += recency * base;
+	}
+	if (injuredNow) {
+		risk += 0.8;
+	}
+	if (durability !== undefined) {
+		risk += Math.max(-0.7, Math.min(1.8, (50 - durability) / 15));
+	}
+	return Math.round(Math.max(0, risk) * 100) / 100;
+};
+
+// The noise on the user's read: budget effects (levelToEffect, about -1 to 1, 0 at the league average) of scouting and medical (health)
+export const medicalNoiseSd = (scoutingEffect: number, healthEffect: number) =>
+	0.6 *
+	Math.max(
+		0.35,
+		Math.min(1.7, 1 - 0.25 * scoutingEffect - 0.35 * healthEffect),
+	);
+
+export const generateMedical = ({
+	pid,
+	season,
+	risk,
+	noiseSd,
+}: {
+	pid: number;
+	season: number;
+	risk: number;
+	noiseSd: number;
+}): CombineMedical => {
+	const rng = new Rng(`draftCombineMedical|${pid}|${season}`);
+	const read = risk + noiseSd * rng.normal(0, 1);
+	return { grade: medicalGradeOf(read), risk };
+};
+
+// What AI teams take off a prospect's draft value (value points) for his medical risk: a little for a red flag
+export const MEDICAL_DRAFT_PENALTY: Record<MedicalGrade, number> = {
+	clean: 0,
+	minor: 0.3,
+	redFlag: 1.2,
+};
+
+const gamesText = (n: number) => `${n} ${n === 1 ? "game" : "games"}`;
+
+// One plain line on why: his most serious injuries before the draft
+export const medicalReason = (
+	injuries: CareerInjury[],
+	injuredNow?: boolean,
+) => {
+	const parts = [...injuries]
+		.sort(
+			(a, b) =>
+				Number(!!b.ended) - Number(!!a.ended) ||
+				Number(!!b.major) - Number(!!a.major) ||
+				b.season - a.season,
+		)
+		.slice(0, 2)
+		.map((inj) =>
+			inj.ended
+				? `${inj.type} (${inj.season}, season-ending)`
+				: `${inj.type} (${inj.season}, missed ${gamesText(inj.games)})`,
+		);
+	if (injuredNow) {
+		parts.unshift("injured now");
+	}
+	if (parts.length === 0) {
+		return "No injuries before the draft";
+	}
+	const more = injuries.length - Math.min(2, injuries.length);
+	const s = `${parts.join(", ")}${more > 0 ? ` and ${more} more` : ""}`;
+	return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
 export type CombineKey = keyof CombineMeasurements | keyof CombineDrills;

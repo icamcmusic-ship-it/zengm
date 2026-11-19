@@ -1,4 +1,5 @@
 // Pure helpers the UI and the worker views share: how an archetype is stored on a player, shown, aggregated and warned about.
+import { defenseSentence } from "./v2/defenseLabels.ts";
 import { ARCHETYPES, archetypeById } from "./classify.ts";
 import { mergedId } from "./merges.data.ts";
 import { isPos } from "./position.ts";
@@ -64,7 +65,9 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // players by ovr tier and skills, ratings and traits only: no box score or play types)
 // archnouns: 23 (names from nouns: a special name, two nouns and his position, or an honest name; a defensive label; the
 // user's verdicts as vetoes)
-export const ARCHETYPE_READING_VERSION = 23;
+// archnouns2: 24 (end words, the user's second list of special names, Stalker / Roamer / Interceptor)
+// archnouns3: 25 (the third list, and the picker improvements)
+export const ARCHETYPE_READING_VERSION = 25;
 
 export const toStored = (
 	season: number,
@@ -152,7 +155,8 @@ export const viewOf = (
 		...(e.def ? { defense: e.def } : {}),
 		group: a.group,
 		family: a.family,
-		desc: a.desc,
+		// (archnouns: both labels in the description)
+		desc: e.def ? `${a.desc} ${defenseSentence(e.def)}` : a.desc,
 		tier: e.tier,
 		conf: e.conf,
 		season: e.season,

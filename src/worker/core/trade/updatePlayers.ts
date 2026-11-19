@@ -4,6 +4,7 @@ import isUntradable from "./isUntradable.ts";
 import { validatePickConditionSpec } from "../../../common/draftPickConditions.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { getNumPicksPerRound } from "./getPickValues.ts";
+import { getStashedPlayers } from "../draftStash/index.ts";
 
 /**
  * Validates that players are allowed to be traded and updates the database.
@@ -29,7 +30,11 @@ const updatePlayers = async (teams: TradeTeams): Promise<TradeTeams> => {
 		}
 
 		// Check players
-		const players = await idb.cache.players.indexGetAll("playersByTid", t.tid);
+		// Draft-and-stash: rights to players abroad are traded like players
+		const players = [
+			...(await idb.cache.players.indexGetAll("playersByTid", t.tid)),
+			...(await getStashedPlayers(t.tid)),
+		];
 		const pidsGood: number[] = [];
 		const pidsExcludedGood: number[] = [];
 

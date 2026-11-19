@@ -83,6 +83,9 @@ export const PLAYER = {
 	// Used for summed up season stats for multiple teams
 	TOT: -8,
 
+	// Draft-and-stash: a drafted player playing overseas while a team holds his rights (p.stash, docs/native-features.md)
+	STASHED: -9,
+
 	// THESE ARE OBSOLETE!
 	UNDRAFTED_2: -4, // Next year's draft class
 	UNDRAFTED_3: -5, // Next next year's draft class

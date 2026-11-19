@@ -14,6 +14,7 @@ import {
 	ReportSection,
 	ShotMixChart,
 } from "../components/ScoutingReport/index.tsx";
+import { FlagChips, ScoutRoomTable } from "../components/ScoutRoom.tsx";
 
 // Print / Save as PDF: only the one-page card, on a light page in either theme. Everything else is display: none (not just
 // invisible, which kept its space and printed blank pages after the card), the card keeps its two columns at print width (below
@@ -62,6 +63,7 @@ const PlayerScouting = ({
 	player,
 	randomDebutsForeverPids,
 	retired,
+	room,
 	scouting,
 	scout,
 	statSummary,
@@ -232,6 +234,14 @@ const PlayerScouting = ({
 				</ReportSection>
 			</div>
 
+			{room?.room ? (
+				<div style={{ maxWidth: 1000 }}>
+					<ReportSection title="The scouts' room" testid="scouting-room">
+						<ScoutRoomTable room={room.room} />
+					</ReportSection>
+				</div>
+			) : null}
+
 			<div className="row" style={{ maxWidth: 1000 }}>
 				<div className="col-12 col-md-6">
 					{report.pro ? (
@@ -283,7 +293,9 @@ const PlayerScouting = ({
 				</div>
 				<div className="col-12 col-md-6">
 					<ReportSection title="Flags" testid="scouting-flags">
-						{red.length + green.length === 0 ? (
+						{room ? <FlagChips flags={room.flags} /> : null}
+						{red.length + green.length === 0 &&
+						(room?.flags.length ?? 0) === 0 ? (
 							<div className="text-body-secondary">No flags.</div>
 						) : null}
 						{red.map((f) => (

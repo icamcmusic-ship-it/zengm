@@ -1,388 +1,435 @@
-# Archetypes (reading 22)
+# Archetypes (reading 25)
 
-## Builds (246)
+Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 15% (never below 55). A label is a main name, plus a defensive label after a · when a defensive skill is among his best.
 
-Elite-word names (needs ovr 60+) are marked ★: below 60 a player gets a plainer name instead. Positions in brackets; a different name at a position is shown after it.
+## How a main name is built
 
-### All-around (3)
+Each skill is a noun scored by his standing in the league that season. His name is, in order: one of the special names below whose skills are all among his three best (and include his best); else his two best nouns' front words and an end word (his position, or one of the end words below); else, with one skill at low OVR or none, an honest name.
 
-- ★ Do-It-All Superstar [PG/G/SG/GF/SF/F/PF/FC/C] — An elite all-around player: scores at every level, makes plays and defends, with no single skill that defines him.
-- ★ Master Of Both Ends [F/PF/FC] — Dominates the game on offense and on defense.
-- ★ The Anomaly [FC/C] — A one-of-a-kind big: skills no player his size should have.
+## Front words of the nouns
 
-### Rebounder (23)
+- **3PT**: 3PT · bigs: Stretch · elite: ★ Sharpshooting
+- **mid-range**: Mid-Range
+- **inside**: Post-Scoring
+- **finishing**: Paint-Finishing
+- **rim protection**: Rim-Protecting · elite: ★ Shot-Erasing
+- **perimeter D**: Defensive · elite: ★ Lockdown
+- **steals**: Ball-Hawking
+- **handle**: Ball-Handling
+- **shot creation**: Iso · elite: ★ Shot-Creating
+- **passing**: Playmaking
+- **rebounding**: Glass-Cleaning
+- **speed**: Speedy
+- **leaping**: High-Flying
+- **strength**: Physical
+- **offensive IQ**: Crafty
 
-- 2-Way 3-Level Cleaner [GF/SF/F/PF/FC/C] — Defends his position, scores at all three levels and cleans the glass.
-- 2-Way 3PT-Creating Cleaner [PG/G/SG/GF/SF/F] — Defends his position, hunts threes, creates his own shot off the dribble and cleans the glass.
-- 2-Way Point Forward Cleaner [GF/SF/F] — Defends his position, sets up teammates and cleans the glass.
-- 2-Way Putback Pro [FC/C] — Defends his position and crashes the offensive glass.
-- Board-Hunting Bucket Getter [G/SG/GF/F/PF/FC/C] — Crashes the offensive glass and carries a scoring load.
-- Crafty Paint-Finishing Cleaner [GF/SF/F/PF/FC/C] — Wins with skill and feel, scores in the paint, finishes around the rim and cleans the glass.
-- Diming Cleaner [GF/SF/F/PF] — A smart forward who rebounds and makes the extra pass.
-- High-Flying Board Enforcer [G/SG/GF] — Plays above the rim and cleans the glass.
-- Hustle Glass Cleaner [F/PF/FC/C] — A pure rebounder: crashes the glass and does the dirty work, with no scoring game.
-- Inside-Out Board Enforcer [F/PF/FC/C] — Scores at the rim and from three and cleans the glass.
-- Mid-Paint Board Enforcer [G/SG/GF/SF/F/PF/FC/C] — Scores from mid-range and in the paint and cleans the glass.
-- Mid-Post Board Enforcer [F/PF/FC/C] — Scores from mid-range and the post and cleans the glass.
-- Mid-Range Slashing Cleaner [PG/G/SG/GF/F/PF/FC/C] — Lives in the mid-range, attacks the basket off the dribble and cleans the glass.
-- Physical Defensive Rebounder [GF/SF/F/PF/FC/C] — Plays through contact and cleans the glass.
-- PlaySlash Board Enforcer [PG/G] — Sets up teammates, attacks the basket off the dribble and cleans the glass.
-- Post-Dimming Board Enforcer [F/PF/FC/C] — Scores in the post, sets up teammates and cleans the glass.
-- Rim-Running Board Enforcer [F/PF/FC/C] — Runs the floor and cleans the glass.
-- ★ Shot-Erasing Board Enforcer [GF/SF/F/PF/FC/C] — Protects the rim and cleans the glass.
-- ★ Shot-Erasing Cleaner [PG/G/GF/SF/F/PF] (also shown as Shot-Erasing Glass Guard) — Rebounds and protects the paint above his size, without a perimeter game.
-- ★ Shot-Erasing Putback Pro [F/PF/FC] — Protects the rim and crashes the offensive glass.
-- Stretch Board Enforcer [G/SG/GF/SF/F/PF/FC/C] — Spaces the floor with his jumper and cleans the glass.
-- Switch-Defending Cleaner [GF/SF/F/PF/FC] — Locks down the perimeter and cleans the glass.
-- Table-Setting Board Enforcer [FC/C] — Sets up teammates and cleans the glass.
+## End words (31)
 
-### Playmaker (33)
+- ★ **Walking-Bucket** (says his 3PT): Scores from everywhere on the floor.
+- ★ **Engine** (says his passing): The offense runs through him: passing, creating and scoring.
+- ★ **Deadeye** (says his 3PT): One of the purest shooters in the league.
+- ★ **Floor General** (says his passing): Runs the team: elite passer, high IQ and a leader.
+- ★ **Architect** (says his passing): Designs the offense: an elite passer with a high basketball IQ.
+- ★ **Wizard** (says his passing): Works magic with the ball: passing and handling.
+- ★ **Maestro** (says his mid-range): A master of the mid-range.
+- **Technician** (says his offensive IQ): Wins with skill and footwork, not athleticism.
+- **Artist** (says his finishing): Scores with touch: floaters, finesse finishes and soft hands.
+- **Glider** (says his speed): Smooth and fast in the open floor.
+- **Attacker** (says his finishing): Attacks the rim off the dribble.
+- **Interceptor** (says his steals): Jumps passing lanes for steals.
+- **Protector** (says his rim protection): Protects the rim.
+- **Facilitator** (says his passing): A pass-first player outside the point guard spot.
+- **Cutter** (says his finishing): Scores by cutting to the rim without the ball.
+- **Gunner**: Shoots often, and not always wisely.
+- **Mover**: Always moving without the ball.
+- **Connector**: Keeps the ball moving and makes the smart play.
+- **Swingman**: Plays guard or forward: scores, handles and defends on the wing.
+- **Acrobat** (says his finishing): Contorts around defenders to finish at the rim.
+- **Driver** (says his handle): Gets into the paint off the dribble.
+- **Point** (says his passing): A true point guard: handles and runs the offense.
+- **Dimer** (says his passing): A pass-first guard.
+- **Spacer** (says his 3PT): Spaces the floor with his jumper.
+- **Closer**: Wants the ball with the game on the line.
+- **Workhorse**: Logs heavy minutes without wearing down.
+- **Spark**: Brings energy off the bench.
+- ★ **Ace**: The star of his team, great at more than one thing.
+- **Scorer**: Gets buckets.
+- **Four**: A power forward.
+- **Five**: A center.
 
-- 2-Way 3-Level Dimer [PG/G/SG/GF/SF/F/PF/FC] — Defends his position, scores at all three levels and sets up teammates.
-- 2-Way 3PT Playmaker [PG/G/SG/GF] — Defends his position, hunts threes and sets up teammates.
-- 2-Way Crafty Putback Dimer [GF/SF/F] — Defends his position, wins with skill and feel, crashes the offensive glass and sets up teammates.
-- 2-Way High-Flying Dime Dropper [PG/G] — Defends his position, plays above the rim and sets up teammates.
-- 2-Way Inside-Out Dime-Dropper [PG/G/SG/GF/SF/F/PF/FC/C] (also shown as 2-Way Inside-Out Point Forward) — Defends his position, scores at the rim and from three and sets up teammates.
-- 2-Way Mid-Paint Playmaker [PG/G/SG/GF/SF/F] — Defends his position, scores from mid-range and in the paint and sets up teammates.
-- 2-Way Playmaking Creator [PG/G/SG/GF/SF/F] — Defends his position, sets up teammates and creates his own shot off the dribble.
-- 2-Way Table Setter [GF/SF/F] — Defends his position and sets up teammates.
-- 2-Way Tempo Pusher [PG/G/SG/GF/SF/F] — Defends his position and pushes the pace.
-- Aerial Playmaker [PG/G/GF/SF/F] (also shown as Aerial Point Forward) — Plays above the rim and sets up teammates.
-- Backline Tempo Pusher [F/PF/FC] — Protects the rim and pushes the pace.
-- Ball-Hawking PlayShot [PG/G/GF/SF/F/FC/C] — Hunts steals and deflections, spaces the floor with his jumper and sets up teammates.
-- Board-Hunting PlayShot [F/PF/FC] — Crashes the offensive glass, spaces the floor with his jumper and sets up teammates.
-- Crafty 3-Level Dime-Dropper [PG/G/SG/GF/SF/F/PF/FC] — Wins with skill and feel, scores at all three levels and sets up teammates.
-- ★ Crafty Offensive Engine [PG/G/F/PF/FC] — Wins with skill and feel, sets up teammates and carries a scoring load.
-- Crafty Post Playmaker [PG/G/FC/C] — Wins with skill and feel, scores in the post and sets up teammates.
-- Defensive Playmaker [PG/G] — Locks down the perimeter and sets up teammates.
-- Dot Dispenser [PG/G] — A pass-first table setter who racks up assists.
-- Mid-Paint Playmaker [PG/G/SG/GF/SF/F/PF/FC] — Scores from mid-range and in the paint and sets up teammates.
-- Mid-Paint Point Forward [GF/SF/F] — Scores from mid-range and in the paint and sets up teammates.
-- Mid-Paint Point Four [PG/G/GF/SF/F/PF/FC] (also shown as 2-Way Middy Playmaker, 2-Way Mid-Paint Point Forward) — Scores from mid-range and in the paint and sets up teammates.
-- ★ Offensive Engine [PG/G/GF/SF/F] — The offense runs through him: scoring, handling and passing.
-- Pass-First Distributor [PG/G] — A backup point guard who runs the offense and moves the ball, with little scoring of his own.
-- Physical Glass Visionary [FC/C] — Plays through contact and sets up teammates.
-- PlayShot Point [PG/G] — Spaces the floor with his jumper and sets up teammates.
-- Playmaking 3PT Creator [PG/G] — Sets up teammates, hunts threes and creates his own shot off the dribble.
-- ★ Playmaking Shot Creator [PG/G] — Sets up teammates and creates his own shot off the dribble.
-- Point Four [F/PF/FC] — Sets up teammates.
-- ★ Shot-Erasing Table Setter [G/SG/GF] — Protects the rim and sets up teammates.
-- Slashing Playmaker [PG/G/SG/GF/SF/F] (also shown as Downhill Point Forward) — Runs the offense off the dribble: gets into the paint to score or find a teammate.
-- ★ Speedy Offensive Engine [PG/G/SG/GF/SF/F/PF/FC] — Runs the floor, sets up teammates and carries a scoring load.
-- Thieving Inside-Out Playmaker [PG/G/SG/GF] — Hunts steals and deflections, scores at the rim and from three and sets up teammates.
-- ★ Triple-Double Threat [PG/G/F/PF/FC/C] — Scores, rebounds and passes every night.
+## Defensive labels (16)
 
-### Post / interior big (19)
+- **Switch Defender**: guards the perimeter and the rim, so he can switch
+- **Help-Side Roamer**: roams off his man for steals and blocks
+- **Swatting Guard**: a guard who blocks shots
+- ★ **Shot Eraser**: an elite rim protector
+- **Shot Blocker**: a shot blocker
+- **Post Defender**: a sturdy post defender
+- **Rim Protector**: protects the rim
+- **Perimeter Stalker**: hounds his man all over the floor
+- **Point-of-Attack Pest**: pressures the ball and jumps passing lanes
+- ★ **Lockdown Defender**: locks down the other team's best perimeter player
+- **Cerebral Defender**: defends with positioning and smarts more than feet
+- **On-Ball Stopper**: stays in front of ball handlers
+- **Perimeter Defender**: a solid perimeter defender
+- **Ball-Hawking Menace**: a relentless ball hawk
+- **Passing-Lane Interceptor**: jumps passing lanes for steals
+- **Ball Hawk**: a ball hawk
 
-- 2-Way Power Finisher [F/PF/FC] — Defends his position, plays through contact and finishes around the rim.
-- ★ Athletic Paint Prodigy [F/PF/FC] — Plays above the rim, scores in the paint and wins with skill and feel.
-- Backline Lob Threat [F/PF/FC/C] — Protects the rim and catches lobs.
-- Backline Post Bully Riser [F/PF/FC/C] — Protects the rim, scores in the post, plays through contact and rises up for his shot.
-- Backline Post Rim Rocker [FC/C] — Protects the rim, scores in the post and dunks on people.
-- Ball-Snatching Power Dunker [FC/C] — Hunts steals and deflections, plays through contact and dunks on people.
-- Board-Hunting Paint Finisher [F/PF/FC/C] — Crashes the offensive glass, scores in the paint and finishes around the rim.
-- Dunk Tank [F/PF/FC] — Powers through contact for dunks.
-- Footer [FC/C] — Seven feet of size around the basket.
-- ★ Footwork Pharaoh [F/PF/FC] — Wins in the post with footwork and touch.
-- Glass Guardian Power Dunker [F/PF/FC] — Cleans the glass, protects the rim, plays through contact and dunks on people.
-- Grinder [F/PF/FC] — Does the dirty work: strength, effort and no glamour.
-- Pick & Roll Finisher [FC/C] — A screen-and-roll big: sets picks, dives and finishes at the rim, with no jumper.
-- Post-Up Glass Cleaner [PG/G/GF/SF/F/PF/FC/C] — An undersized, earthbound post scorer who cleans the glass.
-- Post-Up Rim-Rocking Crasher [FC/C] — Scores in the post, dunks on people and crashes the offensive glass.
-- Power Slasher [FC/C] — Plays through contact and attacks the basket off the dribble.
-- ★ Rim-Reaping Post Scorer [FC/C] — Protects the rim, scores in the post and carries a scoring load.
-- Rim-Rocking Post Board Hunter [F/PF/FC] — Dunks on people, scores in the post and crashes the offensive glass.
-- ★ Shot-Erasing Rim Wrecker [F/PF/FC/C] — Protects the rim and dunks on people.
+Any of them may take Long (long arms) or Switchable (defensive versatility 70+) in front.
 
-### Rim protector (12)
+## Special names: the user's own (93)
 
-- Backline Bulldimer [F/PF/FC] — Protects the rim and plays through contact.
-- Backline Four [GF/SF/F/PF/FC/C] (also shown as Shot-Erasing Lockdown) — Protects the rim.
-- Bulldozing Glass Guardian [F/PF/FC/C] — Plays through contact, cleans the glass and protects the rim.
-- Glass Guardian [FC/C] — Cleans the glass and protects the rim.
-- ★ High-Flying Eraser [PG/G/SG/F/PF] — A bouncy forward who blocks shots on athleticism alone.
-- ★ Lockdown Eraser [F/PF/FC/C] (also shown as Help-Side Eraser) — Protects the paint first and can still guard on the perimeter; no jumper to speak of.
-- Paint-Protecting Riser [F/PF/FC/C] — Protects the rim and rises up for his shot.
-- ★ Physical Mid-Paint Shot Eraser [GF/SF/F/FC/C] — Plays through contact, scores from mid-range and in the paint and protects the rim.
-- ★ Post-Scoring Eraser [GF/SF/F/PF] — An undersized interior defender who scores on the block.
-- Rim-Wrecking Glass Guardian [F/PF/FC] — Dunks on people, cleans the glass and protects the rim.
-- Shot-Blocking Anchor [FC/C] — A rim protector first and last: blocks shots and anchors the paint.
-- ★ Slashing Eraser [PG/G/GF/SF/F] — Gets to the rim on offense and defends the paint above his size.
+- **Swimming Mid-Range Stopper** [PG/G/SG/GF/SF/F] (perimeter D, mid-range): A slippery, mobile perimeter stopper who also hits from mid-range.
+- ★ **Paint Scoring Sniper** [PG/G/SG/GF/SF/F] (3PT, inside): An elite shooter who also scores in the paint with touch.
+- **Ruthless Bully Big** [PF/FC/C] (strength, inside): A relentless, powerful big who punishes defenders in the post.
+- **Slashing Pick-Pocket Guard / Slashing Pick-Pocket Wing** [PG/G/SG/GF/SF] (steals, finishing): Takes the ball away and turns it into points at the rim.
+- **Rim-Rocking Showtimer** [PG/G/SG/GF/SF/F] (finishing, leaping, speed): Runs the break and finishes above the rim.
+- **By-The-Book Guard** [PG/G] (passing, offensive IQ): A steady, smart guard who takes care of the ball and makes the right play.
+- ★ **Rim-Reaping Post Pilot** [FC/C] (rim protection, inside, passing): An elite rim protector the offense runs through in the post.
+- ★ **Midnight Hash Sniper** [PG/G/SG/GF/SF/F] (mid-range, 3PT): An elite late-game shooter from mid-range and three.
+- **Swiss-Army-Knife** [PG/G/SG/GF/SF/F/PF/FC/C]: Does a bit of everything, and one thing very well.
+- **Switchblade Perimeter Creator** [PG/G/SG/GF/SF] (shot creation, handle, perimeter D): A quick, slippery creator who also defends the perimeter.
+- **Two-Way Fadeaway Technician** [SF/F/PF] (mid-range, inside): A skilled forward who scores on fadeaways and defends.
+- **Velvet Step-Back Wing** [GF/SF] (3PT, handle): A smooth wing who creates his three off the dribble.
+- ★ **Clamp-and-Create Swingman** [SG/GF/SF] (perimeter D, shot creation): Locks down his man and creates his own shot.
+- **Two-Way Arc Catalyst** [PG/G/SG/GF/SF] (3PT, passing, perimeter D): Spaces the floor, moves the ball and defends.
+- **All-Court Wing Marksman** [GF/SF] (3PT, mid-range): A wing who scores from three and mid-range, in the half court and on the run.
+- ★ **Switch-Proof Shot Creator** [PG/G/SG/GF/SF/F] (shot creation): A big, strong creator no switch can stop.
+- **Backcourt-to-Wing Shotmaker** [SG/GF] (3PT, mid-range): A shooter who plays either guard or wing.
+- ★ **Trail-Three Rim Eraser** [PF/FC/C] (rim protection, 3PT): An elite rim protector who trails the break for threes.
+- **High-Post Stretch Threat** [PF/FC/C] (3PT, mid-range): A big who scores from the high post and from three, and finds cutters.
+- ★ **Triple-Double Stretch Anchor** [PF/FC/C] (rebounding, passing, 3PT): A big who rebounds, passes, shoots and protects the rim.
+- ★ **All-Around Unicorn Big** [FC/C]: A center with a guard's skills: shooting, handling, passing.
+- **Switch-Everything Paint Warden** [PF/FC/C] (rim protection, perimeter D): Protects the paint and switches onto anyone.
+- **Modern Hybrid Five** [C] (3PT): A center who shoots, handles and runs.
+- ★ **Relentless Putback Juggernaut** [PF/FC/C] (rebounding, strength): A powerful big who never stops crashing the offensive glass.
+- ★ **Drop-Step Glass Titan** [PF/FC/C] (inside, rebounding, strength): A dominant post scorer and rebounder with power.
+- **Mismatch Iso Point-Forward** [SF/F/PF] (shot creation, passing): A big forward who creates his own shot and runs the offense.
+- **High-Post Forward Hub** [F/PF] (passing, mid-range): A forward the offense runs through from the high post.
+- **Roaming Help-Side Disruptor** [GF/SF/F/PF] (steals, rim protection): Roams off his man for steals and blocks.
+- **Baseline-Cutting Rim Attacker** [GF/SF/F] (finishing): Lives on baseline cuts and finishes at the rim.
+- **Relentless Open-Court Slasher** [PG/G/SG/GF/SF] (speed, finishing): Runs the floor nonstop and finishes on the break.
+- **Corner-Spacing Combo Forward** [SF/F/PF] (3PT): A forward who spaces the corner and defends or rebounds.
+- **Modern Positionless Forward** [SF/F/PF]: Scores, makes plays and defends: plays any spot.
+- **Small-Ball Four-Out Connector** [F/PF] (3PT, passing): An undersized four who shoots and moves the ball.
+- ★ **High-IQ Offensive Engine** [PG/G/SG/GF/SF/F] (passing, shot creation, offensive IQ): An elite, high-IQ passer and creator the offense runs through.
+- **High-IQ Offense Catalyst** [PG/G/SG/GF/SF/F] (passing, offensive IQ): A smart passer who makes the offense run.
+- ★ **Pick-and-Roll Dime Wizard** [PG/G] (passing, handle): An elite pick-and-roll passer with a great handle.
+- ★ **Pick-and-Roll Dime Maestro** [PG/G] (passing, mid-range): An elite pick-and-roll passer who also pulls up from mid-range.
+- **Paint-Touching Playmaker** [PG/G/SG] (passing, handle): A guard who gets into the paint and makes plays.
+- **Two-Way Tempo Conductor** [PG/G] (passing, speed): A fast point guard who pushes the pace and defends.
+- **Half-Court Pace Setter** [PG] (passing): A careful point guard who runs the half-court offense.
+- **Live-Dribble Passing Connector** [PG/G/SG/GF/SF/F] (passing, handle): Passes on the move and keeps the ball moving.
+- **Secondary-Action Facilitator** [SG/GF/SF/F/PF/FC/C] (passing): Makes the extra pass when the play breaks down.
+- **Short-Roll Playmaking Hub** [PF/FC/C] (passing): A big who makes plays out of the short roll.
+- **Two-Way Point-Wing Creator** [GF/SF] (passing, shot creation, perimeter D): A wing who runs the offense and defends.
+- **Secondary-Creating Swingman** [SG/GF/SF] (shot creation, passing): A wing who can create when the play breaks down.
+- **Three-Level Iso Shotmaker** [PG/G/SG/GF/SF/F] (3PT, mid-range, finishing, shot creation): An elite creator who scores at all three levels.
+- **Three-Level Iso Threat** [PG/G/SG/GF/SF/F] (3PT, mid-range, finishing, shot creation): Creates his own shot and scores at all three levels.
+- **Triple-Threat Wing Scorer** [GF/SF] (3PT, mid-range, finishing): A wing who scores from three, mid-range and at the rim.
+- **Off-Bounce Shotmaker** [PG/G/SG/GF/SF/F] (shot creation, 3PT): Makes shots off the dribble.
+- **Two-Way Pull-Up Creator** [PG/G/SG/GF/SF/F] (mid-range, shot creation, perimeter D): Creates pull-ups and defends.
+- **Deep-Bag Shot Technician** [PG/G/SG/GF/SF/F] (shot creation, mid-range, offensive IQ): A skilled shotmaker with a deep bag of moves, not athleticism.
+- **Mid-Range Fadeaway Artist** [PG/G/SG/GF/SF/F/PF/FC/C] (mid-range): A soft-touch fadeaway shooter.
+- **Post-Fading Perimeter Wing** [GF/SF] (mid-range, inside): A wing who posts up and fades away.
+- **Rhythm Step-Through Scorer** [SF/F/PF/FC/C] (inside, mid-range): A footwork scorer inside and from mid-range.
+- **Clutch-Time Closer** [PG/G/SG/GF/SF/F/PF/FC/C] (3PT): An elite scorer who wants the last shot.
+- ★ **Step-Back Deep Sniper** [PG/G/SG/GF/SF/F] (3PT): An elite deep shooter off the step-back.
+- ★ **Step-Back Deep-Range Gunner** [PG/G/SG/GF/SF/F] (3PT): Fires step-back threes, and plenty of them.
+- **High-Arc Perimeter Gunner** [PG/G/SG/GF/SF/F] (3PT): A deep-range shooter who never hesitates.
+- **High-Volume Perimeter Spacer** [PG/G/SG/GF/SF/F] (3PT): A shooter first and foremost.
+- ★ **Off-Ball Movement Sniper** [PG/G/SG/GF/SF/F] (3PT): An elite shooter who never stops moving.
+- ★ **Off-Screen Movement Sniper** [PG/G/SG/GF/SF/F] (3PT, speed): An elite catch-and-shoot shooter coming off screens.
+- **Catch-and-Shoot Floor Spacer** [PG/G/SG/GF/SF/F/PF/FC/C] (3PT): Spaces the floor and knocks down open threes.
+- **Corner-Pocket Three-Point Threat** [GF/SF/F/PF] (3PT): Waits in the corner for open threes.
+- **Complete Two-Way Wing** [GF/SF] (perimeter D): A wing who scores and defends.
+- **Playmaking Two-Way Wing** [GF/SF] (passing, perimeter D): A wing who passes and defends.
+- **Two-Way Glue-Guy Wing** [GF/SF] (perimeter D): A team-first wing who does a bit of everything.
+- ★ **Corner-Camping Lockdown Wing** [GF/SF] (perimeter D, 3PT): An elite defender who spaces the corner.
+- ★ **Three-Level Lockdown Ace** [PG/G/SG/GF/SF/F] (3PT, mid-range, finishing, perimeter D): A star who scores at all three levels and locks down.
+- ★ **Unicorn Two-Way Swingman** [SG/GF/SF] (perimeter D, rim protection): A wing who does everything, including protecting the rim.
+- **Small-Ball Rim-Protecting Wing** [GF/SF/F] (rim protection): A wing who protects the rim.
+- **Glass-Crashing Perimeter Wing** [GF/SF] (rebounding): A wing who crashes the offensive glass.
+- **High-Motor Hustle Wing** [GF/SF] (rebounding, perimeter D): A wing who never stops working.
+- **High-Motor Hustle Spark** [PG/G/SG/GF/SF/F] (speed): Energy off the bench.
+- **Switch-Proof Two-Way Hybrid** [SF/F/PF] (perimeter D, rim protection): Defends the perimeter and the rim and can score.
+- **Two-Way Swiss-Army Threat** [PG/G/SG/GF/SF/F/PF/FC/C] (perimeter D): Good at everything, including defense.
+- ★ **Complete All-Court Prototype** [PG/G/SG/GF/SF/F/PF/FC/C]: A complete star: elite at nearly everything.
+- ★ **Unicorn Two-Way Anomaly** [FC/C] (3PT, rim protection): A center who shoots, protects the rim and handles.
+- **Rim-Pressuring Turbo Guard** [PG/G/SG] (speed, finishing): A blur of a guard who attacks the rim.
+- **Acrobatic Layup Artist** [PG/G/SG/GF/SF/F] (finishing, leaping): Finishes at the rim with acrobatic touch.
+- **Downhill Transition Slasher** [PG/G/SG/GF/SF] (speed, finishing): Runs downhill on the break and finishes through contact.
+- **Baseline-Cutting Rim Finisher** [SF/F/PF/FC] (finishing): A forward who cuts baseline and finishes.
+- **Lob-Threat Rim Runner** [PF/FC/C] (leaping, speed, finishing): A big who runs the floor and catches lobs.
+- **Pick-and-Pop Stretch Finisher** [PF/FC/C] (3PT, finishing): A big who pops for threes or rolls to finish.
+- **Full-Court Press Pest** [PG/G/SG] (steals, speed): A guard who hounds the ball all over the floor.
+- ★ **Point-of-Attack Clamp Lock** [PG/G/SG/GF/SF] (perimeter D): An elite on-ball defender.
+- **Switch-All Perimeter Stopper** [PG/G/SG/GF/SF/F] (perimeter D): A perimeter stopper who switches onto anyone.
+- ★ **Passing-Lane Interceptor Lock** [PG/G/SG/GF/SF/F] (steals, perimeter D): An elite defender who jumps passing lanes.
+- **Two-Way Ball-Hawking Menace** [PG/G/SG/GF/SF/F] (steals): A ball hawk who also scores.
+- ★ **Weak-Side Shot Eraser** [GF/SF/F/PF] (rim protection): A wing or forward who erases shots from the weak side.
+- **Ironclad Defensive Anchor** [PF/FC/C] (rim protection, strength): An elite, durable interior defender.
+- **Relentless Glass Cleaner** [F/PF/FC/C] (rebounding): A rebounder with a nonstop motor.
+- **Slashing Middy Forward** [SF/F/PF] (finishing, handle, mid-range): A forward who attacks the basket and pulls up from mid-range.
+- **Jack-Of-All-Trades** [any]: 5+ skills in the top 40%, none in the top 10%.
 
-### Scorer / creator (62)
+## Special names: builds whose words are all nouns (205)
 
-- ★ 2-Way 3-Level Shot Creator [PG/G/SG/GF/SF/F/PF/FC/C] — Defends his position, scores at all three levels and creates his own shot off the dribble.
-- 2-Way Inside-Out Creator [PG/G/SG/GF/F/PF/FC/C] — Defends his position, scores at the rim and from three and creates his own shot off the dribble.
-- ★ 2-Way Iso Savant [F/PF/FC/C] — Defends his position, creates his own shot off the dribble and wins with skill and feel.
-- ★ 2-Way Mid-Paint Maestro [PG/G/SG/GF/SF/F] — Defends his position, scores from mid-range and in the paint and lives in the mid-range.
-- ★ 2-Way Mid-Post Maestro [PG/G/SG/GF/SF/F/PF/FC/C] — Defends his position, scores from mid-range and the post and lives in the mid-range.
-- 2-Way Mid-Post Scorer [PG/G/FC/C] — Defends his position, scores from mid-range and the post and carries a scoring load.
-- 2-Way Mid-Range Menace [PG/G/SG/GF/SF/F/PF/FC] — Defends his position and lives in the mid-range.
-- 2-Way Post Bully [GF/SF/F] — Defends his position, scores in the post and plays through contact.
-- 3-Level Scorer [PG/G/SG/GF/SF/F/PF/FC] — Scores at all three levels and carries a scoring load.
-- ★ Ankle Taker [PG/G/SG/GF/SF/F/PF/FC] — Creates his own shot off the dribble.
-- Backline Mid-Range Scorer [GF/SF/F/PF/FC/C] — Protects the rim, lives in the mid-range and carries a scoring load.
-- Backline Middy Creator [F/PF/FC] — Protects the rim, lives in the mid-range and creates his own shot off the dribble.
-- Ball-Hawking 3-Level Scorer [PG/G/SG/GF/SF/F/PF/FC] — Hunts steals and deflections, scores at all three levels and carries a scoring load.
-- Ball-Hawking Mid-Paint Scorer [G/SG/GF/SF/F] — Hunts steals and deflections, scores from mid-range and in the paint and carries a scoring load.
-- Ball-Hawking Mid-Range Menace [PG/G/SG/GF] — Hunts steals and deflections and lives in the mid-range.
-- Board-Hunting Mid-Paint Bully [FC/C] — Crashes the offensive glass, scores from mid-range and in the paint and plays through contact.
-- Bucket Chaser [G/SG/GF/SF/F/PF/FC] — Carries a scoring load and chases his shots all over the floor.
-- Crafty 3-Level Scorer [PG/G/SG/GF/SF/F/PF/FC/C] — Wins with skill and feel, scores at all three levels and carries a scoring load.
-- Crafty Inside-Out Scorer [PG/G/SG/GF/SF/F/PF/FC] — Wins with skill and feel, scores at the rim and from three and carries a scoring load.
-- Crafty Mid-Paint Scorer [PG/G/SG/GF/SF/F/PF/FC/C] — Wins with skill and feel, scores from mid-range and in the paint and carries a scoring load.
-- Crafty Mid-Post Scorer [GF/SF/F/PF/FC] — Wins with skill and feel, scores from mid-range and the post and carries a scoring load.
-- Crafty Mid-Range Menace [G/SG/GF] — Wins with skill and feel and lives in the mid-range.
-- ★ Crafty Walking Bucket [G/SG/GF/SF/F/PF/FC/C] — Wins with skill and feel and carries a scoring load.
-- Crashing Mid-Paint Scorer [GF/SF/F/PF/FC/C] — Crashes the offensive glass, scores from mid-range and in the paint and carries a scoring load.
-- Diming 3-Level Scorer [G/SG/GF/SF/F/PF/FC] — Sets up teammates, scores at all three levels and carries a scoring load.
-- Diming Inside-Out Scorer [PG/G/GF/SF/F] — Sets up teammates, scores at the rim and from three and carries a scoring load.
-- Energy Big [PF/FC/C] — A big who brings energy: runs the floor, finishes at the rim and protects it.
-- Fluid Four [F/PF/FC] — A power forward who moves and handles like a wing.
-- Glue Guard [PG/G/SG] — A role-playing guard who defends and keeps the offense moving.
-- Glue Wing [GF/SF/F] — A role-playing wing who defends, moves the ball and does a bit of everything.
-- Gritty 3-Level Scorer [PG/G/SG/GF/SF/F/PF/FC/C] — Scores at all three levels and carries a scoring load.
-- Gritty Mid-Range Menace [G/SG/GF] — Lives in the mid-range.
-- High-Flying Faceup Big [PF/FC/C] — An athletic big who faces up and knocks down the mid-range jumper.
-- ★ High-Flying Shot Creator [F/PF/FC/C] — A big who runs, jumps and handles like a wing: raw, but a rare athlete.
-- Inside-Out Bully [GF/SF/F] — Scores at the rim and from three and plays through contact.
-- Inside-Out Scorer [G/SG/GF/SF/F] — Scores at the rim and from three and carries a scoring load.
-- ★ Iso Savant [PG/G/SG/GF/SF/F/PF/FC] — Creates his own shot off the dribble and wins with skill and feel.
-- Mid-Paint Bully [GF/SF/F] — Scores from mid-range and in the paint and plays through contact.
-- Mid-Paint Creator [PG/G/SG/GF/SF/F] — Scores from mid-range and in the paint and creates his own shot off the dribble.
-- Mid-Paint Pro [PG/G/SG/GF/SF/F] — Scores from mid-range and in the paint.
-- Mid-Post Bucket Getter [GF/SF/F] — Scores from mid-range and the post and carries a scoring load.
-- Mid-Range Menace [PG/G/GF/SF/F/PF/FC] — Lives in the mid-range.
-- Open-Lane Burner [PG/G/SG/GF/SF/F] — Beats everyone down the floor.
-- Physical 3-Level Scorer [G/SG/GF/SF/F/PF/FC] — Plays through contact, scores at all three levels and carries a scoring load.
-- Physical Mid-Range Menace [PG/G/GF/SF/F] — Plays through contact and lives in the mid-range.
-- ★ Point-Fading Wizard [PG/G] — Works magic with the ball.
-- Post Combo Guard [G/SG/GF/SF/F] (also shown as Versatile Post Scorer) — Scores in the post.
-- Post Creator [PG/G/FC/C] — Scores in the post and creates his own shot off the dribble.
-- Pressure Cooker [PG/G/SG/GF/SF/F] — Pressures the ball full court.
-- ★ Rim-Reaping 3-Level Scorer [GF/SF/F/PF/FC/C] — Protects the rim, scores at all three levels and carries a scoring load.
-- ★ Rim-Reaping Inside-Out Scorer [GF/SF/F/PF/FC/C] — Protects the rim, scores at the rim and from three and carries a scoring load.
-- Rim-Running Hammer [F/PF/FC/C] — Runs the floor and hammers it home at the rim.
-- ★ Shifty King [PG/G/SG/GF] — Breaks defenders down with the best handle on the floor.
-- ★ Shot-Creating Mid-Range Maestro [FC/C] — A center who faces up, handles and pulls up from mid-range like a wing.
-- ★ Shot-Erasing 3-Level Creator [G/SG/GF/SF/F/PF/FC/C] — Protects the rim, scores at all three levels and creates his own shot off the dribble.
-- ★ Shot-Erasing Mid-Paint Maestro [G/SG/GF/SF/F/PF/FC/C] — Protects the rim, scores from mid-range and in the paint and lives in the mid-range.
-- ★ Shot-Erasing Post Scorer [PG/G/SG] — A strong little guard who posts up and holds his own inside on defense.
-- ★ Shot-Erasing Shot Creator [F/PF] — An athletic forward who handles like a guard and blocks shots: raw, but rare tools.
-- ★ Slashing Mid-Range Maestro [FC/C] — A scoring center: a soft mid-range touch and strong finishes, not a shot blocker.
-- Steady Game Manager [PG/G] — A steady point guard who runs the offense and rarely makes a mistake.
-- Versatile Scorer [PG/G/GF/SF/F/PF/FC/C] — Wins with skill and feel and carries a scoring load.
-- ★ Walking Bucket [F/PF/FC/C] — Scores from everywhere on the floor.
+- **2-Way 3-Level Cleaner** [GF/SF/F/PF/FC/C] (2-Way, 3PT, mid-range, rebounding)
+- **2-Way 3-Level Dimer** [PG/G/SG/GF/SF/F/PF/FC] (2-Way, 3PT, mid-range, passing)
+- ★ **2-Way 3-Level Shot Creator** [PG/G/SG/GF/SF/F/PF/FC/C] (2-Way, 3PT, mid-range, shot creation)
+- **2-Way 3PT-Creating Cleaner** [PG/G/SG/GF/SF/F] (2-Way, 3PT, shot creation, rebounding)
+- **2-Way 3PT Playmaker** [PG/G/SG/GF] (2-Way, 3PT, passing)
+- **2-Way 3PT-Sniping High Flyer** [PG/G/SG/GF/SF/F] (2-Way, 3PT, leaping)
+- **2-Way Bulldozer** [G/SG/GF/SF/F/PF/FC/C] (2-Way, strength)
+- **2-Way Bully Playmaker** [GF/SF/F] (2-Way, strength, passing)
+- **2-Way Chaos Trigger** [G/SG/GF] (2-Way, steals)
+- **2-Way Crafty Putback Dimer** [GF/SF/F] (2-Way, offensive IQ, rebounding, passing)
+- ★ **2-Way Crafty Sniper** [G/SG/GF/SF/F/PF/FC] (2-Way, offensive IQ, 3PT)
+- **2-Way High-Flying Dime Dropper** [PG/G] (2-Way, leaping, passing)
+- **2-Way High-Flying Slasher** [PG/G/SG/GF/SF/F/PF/FC] (2-Way, leaping, finishing, handle)
+- **2-Way High-Flying Wing Runner** [SG/GF/SF/F] (2-Way, leaping, speed)
+- **2-Way Inside-Out Creator** [PG/G/SG/GF/F/PF/FC/C] (2-Way, 3PT, finishing, shot creation)
+- **2-Way Inside-Out Dime-Dropper** [PG/G/SG/GF/SF/F/PF/FC/C] (2-Way, 3PT, finishing, passing)
+- **2-Way Inside-Out Point Forward** [PG/G/SG/GF/SF/F/PF/FC/C] (2-Way, 3PT, finishing, passing)
+- ★ **2-Way Iso Savant** [F/PF/FC/C] (2-Way, shot creation, offensive IQ)
+- ★ **2-Way Iso Sniper** [PG/G/SG/GF/SF/F] (2-Way, shot creation, 3PT)
+- **2-Way Middy Playmaker** [PG/G/GF/SF/F/PF/FC] (2-Way, mid-range, passing)
+- ★ **2-Way Mid-Paint Maestro** [PG/G/SG/GF/SF/F] (2-Way, mid-range, inside)
+- **2-Way Mid-Paint Playmaker** [PG/G/SG/GF/SF/F] (2-Way, mid-range, inside, passing)
+- **2-Way Mid-Paint Point Forward** [PG/G/GF/SF/F/PF/FC] (2-Way, mid-range, inside, passing)
+- ★ **2-Way Mid-Post Maestro** [PG/G/SG/GF/SF/F/PF/FC/C] (2-Way, mid-range, inside)
+- **2-Way Mid-Range Assassin** [PG/G/SG/GF/SF/F/PF/FC] (2-Way, mid-range)
+- **2-Way Mid-Range High Flyer** [PG/G/SG/GF/SF/F] (2-Way, mid-range, leaping)
+- **2-Way Mid-Range Slasher** [PG/G/SG/GF/SF/F/PF/FC] (2-Way, mid-range, finishing, handle)
+- **2-Way Off-Screen Shooter** [PG/G/SG/GF/SF/F] (2-Way, 3PT)
+- **2-Way Playmaking Creator** [PG/G/SG/GF/SF/F] (2-Way, passing, shot creation)
+- **2-Way Point Forward Cleaner** [GF/SF/F] (2-Way, passing, rebounding)
+- **2-Way Post Bully** [GF/SF/F] (2-Way, inside, strength)
+- **2-Way Power Dunker** [GF/SF/F] (2-Way, strength, finishing)
+- **2-Way Power Finisher** [F/PF/FC] (2-Way, strength, finishing)
+- **2-Way Putback Pro** [FC/C] (2-Way, rebounding)
+- **2-Way Rim Runner** [F/PF/FC/C] (2-Way, speed)
+- **2-Way Skilled Pick & Popper** [F/PF/FC/C] (2-Way, offensive IQ, 3PT)
+- **2-Way Skilled Stretch Riser** [F/PF/FC/C] (2-Way, offensive IQ, 3PT, leaping)
+- **2-Way Stretch** [GF/SF/F/PF/FC/C] (2-Way, 3PT)
+- **2-Way Table Setter** [GF/SF/F] (2-Way, passing)
+- **2-Way Tempo Pusher** [PG/G/SG/GF/SF/F] (2-Way, speed, passing)
+- **3 & D Guard** [PG/G/SG/GF/SF/F] (perimeter D, 3PT)
+- **3 & D Specialist** [PG/G/SG/GF/SF/F] (perimeter D, 3PT)
+- **3 & D Two Guard** [PG/G/SG] (perimeter D, 3PT)
+- **3 & D Wing** [PG/G/SG/GF/SF/F] (perimeter D, 3PT)
+- **3PT High-Flying Ball Hawk** [PG/G/SG/GF] (3PT, leaping, steals)
+- **3PT Shot Hunter** [PG/G/SG/GF/SF/F] (3PT, shot creation)
+- **Aerial Playmaker** [PG/G/GF/SF/F] (leaping, passing)
+- **Aerial Point Forward** [PG/G/GF/SF/F] (leaping, passing)
+- ★ **Ankle Taker** [PG/G/SG/GF/SF/F/PF/FC] (shot creation, handle)
+- **Athletic Hustler** [PG/G/SG/GF/SF/F/PF/FC/C] (leaping)
+- ★ **Athletic Paint Prodigy** [F/PF/FC] (leaping, inside, offensive IQ)
+- **Backline Bully Playmaker** [F/PF/FC] (rim protection, strength, passing)
+- **Backline Four** [GF/SF/F/PF/FC/C] (rim protection)
+- **Backline Lob Threat** [F/PF/FC/C] (rim protection, leaping)
+- **Backline Middy Creator** [F/PF/FC] (rim protection, mid-range, shot creation)
+- **Backline Pick & Popper** [SF/F/PF/FC/C] (rim protection, 3PT)
+- **Backline Post Rim Rocker** [FC/C] (rim protection, inside, finishing)
+- **Backline Tempo Pusher** [F/PF/FC] (rim protection, speed, passing)
+- **Ball-Hawking Mid-Range Assassin** [PG/G/SG/GF] (steals, mid-range)
+- **Ball-Hawking PlayShot** [PG/G/GF/SF/F/FC/C] (steals, 3PT, passing)
+- ★ **Ball-Hawking Sharpshooter** [PG/G/GF/SF/F] (steals, 3PT)
+- **Ball-Snatching Power Dunker** [FC/C] (steals, strength, finishing)
+- ★ **Big Glide** [PG/G/GF/SF/F] (handle, speed)
+- ★ **Big Range** [F/PF/FC] (3PT)
+- **Blow-By Dual Finisher** [PG/G/GF/SF/F/PF/FC] (finishing, handle)
+- **Blow-By Rim Attacker** [PG/G/SG/GF] (finishing, handle)
+- **Board-Hunting High Flyer** [G/SG/GF/SF/F] (rebounding, leaping)
+- **Board-Hunting Paint Finisher** [F/PF/FC/C] (rebounding, inside, finishing)
+- **Board-Hunting PlayShot** [F/PF/FC] (rebounding, 3PT, passing)
+- ★ **Bouncy Sharpshooter** [G/SG/GF/SF/F/PF/FC] (leaping, 3PT)
+- **Break-Starting Stretch Five** [F/PF/FC/C] (rebounding, passing, 3PT)
+- **Bulldozer** [GF/SF/F/PF/FC] (strength)
+- **Bulldozing Glass Guardian** [F/PF/FC/C] (strength, rebounding, rim protection)
+- ★ **Catch & Shoot 3PT Sniper** [PG/G/SG/GF] (3PT)
+- ★ **Catch & Shoot Sniper** [PG/G/SG/GF/SF/F/PF/FC] (3PT)
+- **Crafty Mid-Range Assassin** [G/SG/GF] (offensive IQ, mid-range)
+- **Crafty Post Playmaker** [PG/G/FC/C] (offensive IQ, inside, passing)
+- ★ **Crafty Sharpshooter** [PG/G/SG/GF] (offensive IQ, 3PT)
+- **Crafty Stretch** [GF/SF/F/PF/FC/C] (offensive IQ, 3PT)
+- ★ **Deep-Range Sniper** [PG/G/SG/GF/SF/F] (3PT)
+- **Defensive Playmaker** [PG/G] (perimeter D, passing)
+- **Dime-Dropping 3PT Gunner** [GF/SF/F] (passing, 3PT)
+- **Dime-Dropping Dual Finisher** [PG/G/GF/SF/F] (passing, finishing)
+- **Diming Cleaner** [GF/SF/F/PF] (passing, rebounding)
+- ★ **Diming Sharpshooter** [PG/G/SG/GF] (passing, 3PT)
+- **Disruptive Wing Runner** [SG/GF] (steals, speed)
+- **Dot Dispenser** [PG/G] (passing)
+- **Downhill Point Forward** [PG/G/SG/GF/SF/F] (finishing, handle, passing)
+- **Drive & Rise** [PG/G/SG/GF/SF/F/PF/FC] (finishing, handle)
+- **Dunk Tank** [F/PF/FC] (finishing, strength)
+- **Edge Enforcer** [PG/G/SG/GF/SF/F/PF/FC/C] (perimeter D)
+- ★ **Edge-Enforcing 3PT Sniper** [PG/G/GF/SF/F] (perimeter D, 3PT)
+- **Edge-Enforcing Rim Runner** [PG/G/GF/SF/F/PF/FC/C] (perimeter D, speed)
+- **Edge-Enforcing Skilled Stretch** [F/PF/FC] (perimeter D, offensive IQ, 3PT)
+- **Edge-Enforcing Switch Big** [PG/G/SG/GF/SF/F/PF/FC/C] (perimeter D)
+- ★ **Eliminator** [PG/G/GF/SF/F] (perimeter D)
+- **Fluid Four** [F/PF/FC] (offensive IQ)
+- ★ **Footwork Pharaoh** [F/PF/FC] (inside, offensive IQ)
+- ★ **From The Logo** [G/SG/GF] (3PT)
+- ★ **Glass-Cleaning Lockdown** [GF/SF/F/PF/FC/C] (rebounding, perimeter D)
+- **Glass-Cleaning Slasher** [PG/G/SG/GF] (rebounding, finishing, handle)
+- **Glass-Cleaning Stretch** [F/PF/FC/C] (rebounding, 3PT)
+- **Glass Guardian** [FC/C] (rebounding, rim protection)
+- **Grinder** [F/PF/FC] (strength)
+- **Gritty 3PT Slasher** [PG/G/SG/GF/SF/F/PF/FC] (3PT, finishing, handle)
+- **Gritty Mid-Range Assassin** [G/SG/GF] (mid-range)
+- **Hash-Sinking Slasher** [PG/G/SG/GF/SF/F] (mid-range, finishing, handle)
+- ★ **Help-Side Eraser** [F/PF/FC/C] (rim protection)
+- ★ **High-Flying 3PT Sniper** [G/SG/GF/SF/F] (leaping, 3PT)
+- **High-Flying Board Enforcer** [G/SG/GF] (leaping, rebounding)
+- ★ **High-Flying Eraser** [PG/G/SG/F/PF] (leaping, rim protection)
+- **High-Flying Faceup Big** [PF/FC/C] (leaping, mid-range)
+- ★ **High-Flying Shot Creator** [F/PF/FC/C] (leaping, shot creation)
+- ★ **High-Flying Sniper** [PG/G/SG/GF/SF/F/PF/FC] (leaping, 3PT)
+- **High-Flying Stretch Big** [PF/FC/C] (leaping, 3PT)
+- **Hustle Glass Cleaner** [F/PF/FC/C] (rebounding)
+- **Inside-Out Board Enforcer** [F/PF/FC/C] (3PT, finishing, rebounding)
+- **Inside-Out Bully** [GF/SF/F] (3PT, finishing, strength)
+- **Inside-Out High Flyer** [PG/G/SG/GF/SF/F] (3PT, finishing, leaping)
+- **Inside-Out Slasher** [PG/G/SG/GF/SF/F] (3PT, finishing, handle)
+- **Inside-Out Slashing Wing** [PG/G/SG/GF/SF/F] (3PT, finishing, handle)
+- ★ **Iso Savant** [PG/G/SG/GF/SF/F/PF/FC] (shot creation, offensive IQ)
+- ★ **Lockdown Defender** [PG/G/SG/GF/SF/F] (perimeter D)
+- ★ **Lockdown Eraser** [F/PF/FC/C] (perimeter D, rim protection)
+- **Middy Slasher** [PG/G/SG/GF] (mid-range, finishing, handle)
+- **Mid-Paint Board Enforcer** [G/SG/GF/SF/F/PF/FC/C] (mid-range, inside, rebounding)
+- **Mid-Paint Bully** [GF/SF/F] (mid-range, inside, strength)
+- **Mid-Paint Creator** [PG/G/SG/GF/SF/F] (mid-range, inside, shot creation)
+- **Mid-Paint Playmaker** [PG/G/SG/GF/SF/F/PF/FC] (mid-range, inside, passing)
+- **Mid-Paint Point Forward** [GF/SF/F] (mid-range, inside, passing)
+- **Mid-Paint Point Four** [PG/G/GF/SF/F/PF/FC] (mid-range, inside, passing)
+- **Mid-Paint Pro** [PG/G/SG/GF/SF/F] (mid-range, inside)
+- **Mid-Post Board Enforcer** [F/PF/FC/C] (mid-range, inside, rebounding)
+- **Mid-Range Assassin** [PG/G/GF/SF/F/PF/FC] (mid-range)
+- **Mid-Range High Flyer** [PG/G/SG/GF/SF/F] (mid-range, leaping)
+- **Mid-Range Slasher** [PG/G/GF/SF/F/PF/FC] (mid-range, finishing, handle)
+- **Open-Lane Burner** [PG/G/SG/GF/SF/F] (speed)
+- **Paint-Protecting Riser** [F/PF/FC/C] (rim protection, leaping)
+- **Pass-First Distributor** [PG/G] (passing)
+- **Physical Defensive Rebounder** [GF/SF/F/PF/FC/C] (strength, rebounding)
+- **Physical Glass Visionary** [FC/C] (strength, passing)
+- **Physical Mid-Range Assassin** [PG/G/GF/SF/F] (strength, mid-range)
+- **Physical Mid-Range High Flyer** [PG/G/GF/SF/F] (strength, mid-range, leaping)
+- **Pick & Pop Glass Visionary** [F/PF/FC/C] (3PT, passing)
+- **Pick & Roll Finisher** [FC/C] (finishing)
+- **Playmaking 3PT Creator** [PG/G] (passing, 3PT, shot creation)
+- ★ **Playmaking Shot Creator** [PG/G] (passing, shot creation)
+- **PlayShot Point** [PG/G] (3PT, passing)
+- ★ **Point-Fading Wizard** [PG/G] (mid-range, passing)
+- **Point Four** [F/PF/FC] (passing)
+- **Point-of-Attack Pest** [PG/G/SG/GF/SF/F] (steals)
+- **Post Combo Guard** [G/SG/GF/SF/F] (inside)
+- **Post Creator** [PG/G/FC/C] (inside, shot creation)
+- **Post-Diming Board Enforcer** [F/PF/FC/C] (inside, passing, rebounding)
+- **Post-Up Glass Cleaner** [PG/G/GF/SF/F/PF/FC/C] (inside, rebounding)
+- **Post-Up Rim-Rocking Crasher** [FC/C] (inside, finishing, rebounding)
+- **Power Slasher** [FC/C] (strength, finishing, handle)
+- **Pressure Cooker** [PG/G/SG/GF/SF/F] (steals)
+- **Pull-Up Shot Hunter** [PG/G/SG/GF/SF/F] (mid-range, shot creation, 3PT)
+- ★ **Rim-Reaping Diming High Flyer** [GF/SF/F] (rim protection, passing, leaping)
+- ★ **Rim-Reaping High Flyer** [GF/SF/F] (rim protection, leaping)
+- ★ **Rim-Reaping Rim Runner** [GF/SF/F/PF/FC/C] (rim protection, speed)
+- ★ **Rim-Reaping Slasher** [G/SG/GF/SF/F/PF/FC] (rim protection, finishing, handle)
+- **Rim-Rocking Post Board Hunter** [F/PF/FC] (finishing, inside, rebounding)
+- **Rim-Rocking Stretch** [GF/SF/F/PF/FC/C] (finishing, 3PT)
+- **Rim-Running Board Enforcer** [F/PF/FC/C] (speed, rebounding)
+- **Rim-Running Hammer** [F/PF/FC/C] (speed, finishing)
+- **Rim-Wrecking Glass Guardian** [F/PF/FC] (finishing, rebounding, rim protection)
+- ★ **Sharpshooter** [G/SG/GF/SF/F] (3PT)
+- ★ **Shifty King** [PG/G/SG/GF] (handle, shot creation)
+- ★ **Shifty Sniper** [PG/G/SG/GF/SF/F] (shot creation, 3PT)
+- **Shot-Blocking Anchor** [FC/C] (rim protection)
+- ★ **Shot-Creating Mid-Range Maestro** [FC/C] (shot creation, mid-range)
+- ★ **Shot-Erasing 3PT High Flyer** [G/SG/GF/SF/F] (rim protection, 3PT, leaping)
+- ★ **Shot-Erasing Board Enforcer** [GF/SF/F/PF/FC/C] (rim protection, rebounding)
+- ★ **Shot-Erasing Cleaner** [PG/G/GF/SF/F/PF] (rim protection, rebounding)
+- ★ **Shot-Erasing Glass Guard** [PG/G/GF/SF/F/PF] (rim protection, rebounding)
+- ★ **Shot-Erasing Guard Dog** [PG/G/SG/GF/SF/F] (rim protection, perimeter D)
+- ★ **Shot-Erasing Lockdown** [GF/SF/F/PF/FC/C] (rim protection, perimeter D)
+- ★ **Shot-Erasing Lockdown Wing** [PG/G/SG/GF/SF/F] (rim protection, perimeter D)
+- ★ **Shot-Erasing Mid-Paint Maestro** [G/SG/GF/SF/F/PF/FC/C] (rim protection, mid-range, inside)
+- ★ **Shot-Erasing Putback Pro** [F/PF/FC] (rim protection, rebounding)
+- ★ **Shot-Erasing Rim Wrecker** [F/PF/FC/C] (rim protection, finishing)
+- ★ **Shot-Erasing Shot Creator** [F/PF] (rim protection, shot creation)
+- ★ **Shot-Erasing Skilled Popper** [F/PF/FC] (rim protection, offensive IQ, 3PT)
+- ★ **Shot-Erasing Stretch** [F/PF/FC/C] (rim protection, 3PT)
+- ★ **Shot-Erasing Table Setter** [G/SG/GF] (rim protection, passing)
+- ★ **Shot-Erasing Wing Runner** [GF/SF/F/PF/FC/C] (rim protection, speed)
+- **Skilled Stretch** [GF/SF/F/PF/FC/C] (offensive IQ, 3PT)
+- **Skilled Stretch Four** [F/PF/FC/C] (offensive IQ, 3PT)
+- ★ **Slashing Eraser** [PG/G/GF/SF/F] (finishing, handle, rim protection)
+- ★ **Slashing Lockdown** [GF/SF] (finishing, handle, perimeter D)
+- ★ **Slashing Mid-Range Maestro** [FC/C] (finishing, handle, mid-range)
+- **Slashing Playmaker** [PG/G/SG/GF/SF/F] (finishing, handle, passing)
+- **Stretch Board Enforcer** [G/SG/GF/SF/F/PF/FC/C] (3PT, rebounding)
+- **Stretch Five** [FC/C] (3PT)
+- **Stretch Four** [F/PF/FC] (3PT)
+- **Stretch Riser** [GF/SF/F/PF/FC/C] (3PT, leaping)
+- **Switch-Defending Cleaner** [GF/SF/F/PF/FC] (perimeter D, rebounding)
+- **Table-Setting Board Enforcer** [FC/C] (passing, rebounding)
+- **The Guard Dog** [PG/G/GF/SF/F] (perimeter D)
+- ★ **Triple-Double Threat** [PG/G/F/PF/FC/C] (passing, rebounding)
+- **Versatile Paint Bully** [PG/G/GF/SF/F/PF/FC] (offensive IQ, inside, strength)
+- **Wing-Running High Flyer** [SG/GF/SF/F] (speed, leaping)
+- ★ **Yamming Force of Nature** [PG/G/SG/GF/SF/F/PF/FC/C] (leaping, finishing)
 
-### Shooter (27)
+## Trait keywords (9)
 
-- ★ 2-Way Crafty Sniper [G/SG/GF/SF/F/PF/FC] — Defends his position, wins with skill and feel and hunts threes.
-- ★ 2-Way Iso Sniper [PG/G/SG/GF/SF/F] — Defends his position, creates his own shot off the dribble and hunts threes.
-- 2-Way Off-Screen Shooter [PG/G/SG/GF/SF/F] — Defends his position and spaces the floor with his jumper.
-- 2-Way Stretch [GF/SF/F/PF/FC/C] — Defends his position and spaces the floor with his jumper.
-- 3 & D Specialist [PG/G/SG/GF/SF/F] (also shown as 3 & D Guard, 3 & D Wing) — A role player who guards the other team's scorer and spaces the floor with catch-and-shoot threes.
-- 3 & D Two Guard [PG/G/SG] — Locks down the perimeter and spaces the floor with his jumper.
-- 3PT Shot Hunter [PG/G/SG/GF/SF/F] — Hunts threes and creates his own shot off the dribble.
-- ★ Ball-Hawking Sharpshooter [PG/G/GF/SF/F] — Hunts steals and deflections and spaces the floor with his jumper.
-- ★ Bouncy Sharpshooter [G/SG/GF/SF/F/PF/FC] — Plays above the rim and spaces the floor with his jumper.
-- ★ Catch & Shoot 3PT Sniper [PG/G/SG/GF] — Spaces the floor with his jumper and hunts threes.
-- ★ Catch & Shoot Sniper [PG/G/SG/GF/SF/F/PF/FC] — Spaces the floor with his jumper and hunts threes.
-- ★ Crafty Sharpshooter [PG/G/SG/GF] — Wins with skill and feel and spaces the floor with his jumper.
-- Crafty Stretch [GF/SF/F/PF/FC/C] — Wins with skill and feel and spaces the floor with his jumper.
-- ★ Deep-Range Sniper [PG/G/SG/GF/SF/F] — An elite shooter with unlimited range: the three is the weapon, whatever else he does.
-- Dime-Dropping 3PT Gunner [GF/SF/F] — Sets up teammates and hunts threes.
-- ★ Diming Sharpshooter [PG/G/SG/GF] — Sets up teammates and spaces the floor with his jumper.
-- ★ Edge-Enforcing 3PT Sniper [PG/G/GF/SF/F] — Locks down the perimeter and hunts threes.
-- ★ From The Logo [G/SG/GF] — Pulls up from anywhere past half court.
-- ★ High-Flying 3PT Sniper [G/SG/GF/SF/F] — Plays above the rim and hunts threes.
-- ★ High-Flying Sniper [PG/G/SG/GF/SF/F/PF/FC] — Plays above the rim and hunts threes.
-- Perimeter Shot Hunter [PG/G/SG/GF/SF/F] — Hunts threes and creates his own shot off the dribble.
-- Post-Scoring Stretch [GF/SF/F/PF/FC/C] — Scores in the post, carries a scoring load and spaces the floor with his jumper.
-- Rim-Rocking Stretch [GF/SF/F/PF/FC/C] — Dunks on people and spaces the floor with his jumper.
-- ★ Sharpshooter [G/SG/GF/SF/F] — Spaces the floor with his jumper.
-- ★ Shifty Sniper [PG/G/SG/GF/SF/F] — Creates his own shot off the dribble and hunts threes.
-- Skilled Stretch [GF/SF/F/PF/FC/C] — Wins with skill and feel and spaces the floor with his jumper.
-- Stretch Riser [GF/SF/F/PF/FC/C] — Spaces the floor with his jumper and rises up for his shot.
+- **clutch**: in front: Clutch / Ice-Cold; as a name: Closer
+- **savvy**: in front: Savvy / Veteran; as a name: Old Head / Savvy Vet
+- **ironMan**: in front: Iron-Man / Durable; as a name: Iron Man
+- **versatile**: in front: Versatile / Switchable; as a name: Versatile Defender
+- **rolling**: in front: Rolling / Roll-Man; as a name: Roll Man / Screen-and-Roll Big
+- **pop**: in front: Pick-and-Pop / Popping; as a name: Popper / Pick-and-Pop Big
+- **demon**: in front: Relentless; as a name: Demon / Motor Demon
+- **offBall**: in front: Off-Ball / Cutting; as a name: Off-Ball Mover / Cutter
+- **hustle**: in front: Hustle / Gritty; as a name: Hustler / Grinder
 
-### Slasher / athlete (43)
+## Honest names (36 kinds)
 
-- 2-Way 3PT-Sniping High Flyer [PG/G/SG/GF/SF/F] — Defends his position, hunts threes and plays above the rim.
-- 2-Way Bulldimer [GF/SF/F] — Defends his position and plays through contact.
-- 2-Way Bulldozer [G/SG/GF/SF/F/PF/FC/C] — Defends his position and plays through contact.
-- 2-Way High-Flying Slasher [PG/G/SG/GF/SF/F/PF/FC] — Defends his position, plays above the rim and attacks the basket off the dribble.
-- 2-Way High-Flying Wing Runner [SG/GF/SF/F] — Defends his position, plays above the rim and runs the floor.
-- 2-Way Mid-Range High Flyer [PG/G/SG/GF/SF/F] — Defends his position, lives in the mid-range and plays above the rim.
-- 2-Way Mid-Range Slasher [PG/G/SG/GF/SF/F/PF/FC] — Defends his position, lives in the mid-range and attacks the basket off the dribble.
-- 2-Way Power Dunker [GF/SF/F] — Defends his position, plays through contact and dunks on people.
-- 2-Way Rim Runner [F/PF/FC/C] — Defends his position and runs the floor.
-- Athletic Hustler [PG/G/SG/GF/SF/F/PF/FC/C] (also shown as Off-Ball Cutter) — A raw athlete: runs, jumps and plays hard, with the skills still to come.
-- Ball-Hawking 3PT Slasher [PG/G/SG/GF/SF/F] — Hunts steals and deflections, hunts threes and attacks the basket off the dribble.
-- Ball-Hawking PlaySlash [PG/G/SG/GF] — Hunts steals and deflections, sets up teammates and attacks the basket off the dribble.
-- ★ Big Glide [PG/G/GF/SF/F] — A big, gliding point guard who gets where he wants.
-- Blow-By Dual Finisher [PG/G/GF/SF/F/PF/FC] — Attacks the basket off the dribble and finishes around the rim.
-- Blow-By Rim Attacker [PG/G/SG/GF] — A quick, explosive guard who lives at the rim off the dribble, with little of a jumper.
-- Board-Hunting High Flyer [G/SG/GF/SF/F] — Crashes the offensive glass and plays above the rim.
-- Board-Hunting Middy Slasher [G/SG/GF] — Crashes the offensive glass, lives in the mid-range and attacks the basket off the dribble.
-- Bulldozer [GF/SF/F/PF/FC] — Plays through contact.
-- Crafty Mid-Range Slasher [G/SG/GF] — Wins with skill and feel, lives in the mid-range and attacks the basket off the dribble.
-- Dime-Dropping Dual Finisher [PG/G/GF/SF/F] — Sets up teammates and finishes around the rim.
-- Disruptive Wing Runner [SG/GF] — Hunts steals and deflections and runs the floor.
-- Drive & Rise [PG/G/SG/GF/SF/F/PF/FC] — Attacks the basket off the dribble.
-- Edge-Enforcing Rim Runner [PG/G/GF/SF/F/PF/FC/C] — Locks down the perimeter and runs the floor.
-- Glass-Cleaning Slasher [PG/G/SG/GF] — A small guard who attacks the rim and rebounds like a forward.
-- Gritty 3PT Slasher [PG/G/SG/GF/SF/F/PF/FC] — Hunts threes and attacks the basket off the dribble.
-- Hash-Sinking Slasher [PG/G/SG/GF/SF/F] — Lives in the mid-range and attacks the basket off the dribble.
-- High-Flying Mid-Range Slasher [PG/G/SG/GF/SF/F] — Plays above the rim, lives in the mid-range and attacks the basket off the dribble.
-- Inside-Out High Flyer [PG/G/SG/GF/SF/F] — Scores at the rim and from three and plays above the rim.
-- Inside-Out Slasher [PG/G/SG/GF/SF/F] (also shown as Inside-Out Slashing Wing) — Scores at the rim and from three and attacks the basket off the dribble.
-- Mid-Range High Flyer [PG/G/SG/GF/SF/F] — Lives in the mid-range and plays above the rim.
-- Mid-Range Slasher [PG/G/GF/SF/F/PF/FC] — Lives in the mid-range and attacks the basket off the dribble.
-- Middy Slasher [PG/G/SG/GF] — Lives in the mid-range and attacks the basket off the dribble.
-- Physical Mid-Range High Flyer [PG/G/GF/SF/F] — Plays through contact, lives in the mid-range and plays above the rim.
-- Playmaking 3PT Slasher [PG/G/SG/GF/SF/F] — Sets up teammates, hunts threes and attacks the basket off the dribble.
-- Post-Scoring Slasher [PG/G/SG/GF/SF/F/PF] — Scores in the post and finishes at the rim, without much of a handle or a jumper.
-- ★ Rim-Reaping Diming High Flyer [GF/SF/F] — Protects the rim, sets up teammates and plays above the rim.
-- ★ Rim-Reaping High Flyer [GF/SF/F] — Protects the rim and plays above the rim.
-- ★ Rim-Reaping Rim Runner [GF/SF/F/PF/FC/C] (also shown as Shot-Erasing Wing Runner) — Protects the rim and runs the floor.
-- ★ Rim-Reaping Slasher [G/SG/GF/SF/F/PF/FC] — Protects the rim and attacks the basket off the dribble.
-- ★ Shot-Erasing 3PT High Flyer [G/SG/GF/SF/F] — Protects the rim, hunts threes and plays above the rim.
-- Versatile Paint Bully [PG/G/GF/SF/F/PF/FC] — Wins with skill and feel, scores in the paint and plays through contact.
-- Wing-Running High Flyer [SG/GF/SF/F] — Runs the floor and plays above the rim.
-- ★ Yamming Force of Nature [PG/G/SG/GF/SF/F/PF/FC/C] — An overwhelming athlete who gets to the rim and finishes above it.
-
-### Stretch big (12)
-
-- 2-Way Skilled Pick & Popper [F/PF/FC/C] — Defends his position, wins with skill and feel and spaces the floor with his jumper.
-- Backline Pick & Popper [SF/F/PF/FC/C] — Protects the rim and spaces the floor with his jumper.
-- ★ Big Range [F/PF/FC] — A big forward with deep shooting range.
-- Break-Starting Stretch Five [F/PF/FC/C] (also shown as Pick & Pop Glass Visionary) — Starts the break with his outlet passes and spaces the floor with his jumper.
-- Edge-Enforcing Skilled Stretch [F/PF/FC] — Locks down the perimeter, wins with skill and feel and spaces the floor with his jumper.
-- Glass-Cleaning Stretch [F/PF/FC/C] — Cleans the glass and spaces the floor with his jumper.
-- High-Flying Stretch Big [PF/FC/C] — An athletic big who runs, jumps and spaces the floor with his three.
-- ★ Shot-Erasing Skilled Popper [F/PF/FC] — Protects the rim, wins with skill and feel and spaces the floor with his jumper.
-- ★ Shot-Erasing Stretch [F/PF/FC/C] — Protects the rim and spaces the floor with his jumper.
-- Skilled Stretch Four [F/PF/FC/C] (also shown as 2-Way Skilled Stretch Riser) — Wins with skill and feel and spaces the floor with his jumper.
-- Stretch Five [FC/C] — Spaces the floor with his jumper.
-- Stretch Four [F/PF/FC] — Spaces the floor with his jumper.
-
-### Perimeter defender (12)
-
-- 2-Way Chaos Trigger [G/SG/GF] — Defends his position and hunts steals and deflections.
-- 2-Way Combo Guard [G/SG] — Defends his position.
-- 2-Way Small Ball Four [F/PF/FC] — Defends his position.
-- 3PT High-Flying Ball Hawk [PG/G/SG/GF] — Hunts threes, plays above the rim and hunts steals and deflections.
-- Edge Enforcer [PG/G/SG/GF/SF/F/PF/FC/C] (also shown as Edge-Enforcing Switch Big) — Locks down the perimeter.
-- ★ Glass-Cleaning Lockdown [GF/SF/F/PF/FC/C] — A smart, physical defender who rebounds: all effort, little shooting.
-- ★ Lockdown Defender [PG/G/SG/GF/SF/F] — Locks down the perimeter.
-- ★ Mr. Two Way [PG/G] — A guard who scores and guards the other team's best.
-- Playmaking 3-Level Ball Hawk [PG/G] — Sets up teammates, scores at all three levels and hunts steals and deflections.
-- ★ Shot-Erasing Guard Dog [PG/G/SG/GF/SF/F] (also shown as Shot-Erasing Lockdown Wing) — A perimeter stopper who also blocks shots from the help side.
-- ★ Slashing Lockdown [GF/SF] — A defensive wing who scores by cutting and attacking the rim.
-- The Guard Dog [PG/G/GF/SF/F] (also shown as Eliminator) — Hounds ball handlers the length of the floor.
-
-## Composed names: 34 roles and 24 descriptors
-
-A composed name is up to two descriptors in front of a role (2K's order), each word tested. ★ marks a role or descriptor (or one of its alternate words) only a player with ovr 60+ can get; below that a plainer word is used.
-
-Roles:
-
-- Playmaker / Dimer [guard, wing, big]
-- ★ Offensive Engine [guard, wing]
-- ★ Shot Creator (with a descriptor: Creator) [guard, wing]
-- Shot Hunter [guard, wing]
-- ★ Sniper [guard, wing]
-- ★ Sharpshooter [guard, wing]
-- Stretch Big (with a descriptor: Stretch) [big]
-- Bucket Chaser [guard, wing]
-- ★ Mid-Range Maestro (with a descriptor: Maestro) [guard, wing, big]
-- Slasher [guard, wing]
-- Finisher / Laymaker [guard, wing, big]
-- Open-Lane Burner (with a descriptor: Burner) [guard, wing]
-- High Flyer [guard, wing]
-- Off-Ball Cutter (with a descriptor: Cutter) [wing, big]
-- Rim Hammer (with a descriptor: Hammer) [big]
-- Rim Runner [big]
-- Lob Threat [big]
-- ★ Lockdown Defender (with a descriptor: Lock) [guard, wing]
-- Ball Hawk [guard, wing]
-- ★ Shot Eraser / Paint Protector / Rim Protector [wing, big]
-- Board Enforcer / Glass Cleaner [wing, big]
-- Board Hunter [wing, big]
-- Post Bully (with a descriptor: Bully) [wing, big]
-- Post Pro [wing, big]
-- Switch Defender [wing, big]
-- Glue Wing [wing]
-- Glue Guard [guard]
-- Crafty Floater Guard [guard]
-- Raw Athletic Handler [guard, wing]
-- Paint Beast [wing, big]
-- Interior Force [wing, big]
-- Offensive-Minded Guard [guard]
-- Steady Game Manager [guard]
-- Energy Big [big]
-
-Descriptors:
-
-- 2-Way
-- Crafty
-- Physical / Bruising / Rugged
-- High-Flying / Bouncy
-- Ball-Hawking / Pesky
-- Defensive
-- ★ Shot-Erasing / Paint-Protecting / Backline
-- Glass-Cleaning / Board-Enforcing
-- Board-Hunting
-- Playmaking / Diming
-- Iso / Shifty [guard, wing]
-- 3-Level
-- Inside-Out
-- 3PT
-- ★ Sharpshooting [guard, wing]
-- Stretch [big]
-- Mid-Paint
-- Mid-Post [wing, big]
-- Middy / Hash-Sinking
-- Pull-Up [guard, wing]
-- Post-Scoring [wing, big]
-- Slashing / Downhill
-- Rim-Rocking / Rim-Wrecking
-- Rim-Running / Wing-Running
-
-## Honest names (88 names in 36 kinds)
-
-- **Shoot** (Shooter): guard: Spot-Up Specialist, Corner Merchant, One-Trick Shooter, Bench Bomber; wing: Spot-Up Specialist, Corner Merchant, One-Trick Shooter, Bench Bomber, Shot-Only Wing; big: Spot-Up Specialist, Corner Merchant, One-Trick Shooter, Bench Bomber — A shooter, and only a shooter: he spaces the floor and waits for the kick-out.
-- **Gunner** (Shooter): Garbage-Time Gunner, Streaky Gunner, Deep Bench Shooter — A low-end shooter who lets it fly when the game is out of reach, makes or misses.
-- **PerD** (Perimeter defender): guard: Pest, Gnat, Hound, Defensive Specialist; wing: Defensive Specialist, Hound; big: Defensive Specialist, Hound — A defender, and only a defender: he hounds his man and gives little back on offense.
-- **Glove** (Perimeter defender): Glove-Only Guard — A guard who can defend and do nothing else.
-- **RimD** (Rim protector): Shot-Blocking Specialist — A shot blocker, and only that: he protects the rim and gives little else.
-- **Reb** (Rebounder): guard: Board Specialist, Garbage Man; wing: Board Specialist, Garbage Man; big: Glass-Only Big, Board Specialist, Garbage Man — A rebounder, and only a rebounder: he cleans up the glass.
-- **Strength** (Post / interior big): guard: Bruiser; wing: Bruiser; big: Big Body, Wall, Space Eater, Human Screen — Size and strength, not skill: he takes up space and sets screens.
-- **Jump** (Slasher / athlete): guard: Pogo Stick; wing: Pogo Stick, Bounce-Only Wing; big: Pogo Stick — A leaper with little game beyond his bounce.
-- **Speed** (Slasher / athlete): Track Star, All Legs, No Game — A runner with little game beyond his speed.
-- **AthNoShot** (Slasher / athlete): Shooter Without a Jumper — An athlete who can't shoot.
-- **Pass** (Playmaker): guard: Dime Specialist, Pass-First, Pass-Only, Caretaker Guard; wing: Dime Specialist, Pass-First, Pass-Only; big: Dime Specialist, Pass-First, Pass-Only — A passer, and only a passer: he moves the ball and rarely looks for his own shot.
-- **Handle** (Playmaker): guard: Ball-Handling Specialist, Caretaker Guard; wing: Ball-Handling Specialist; big: Ball-Handling Specialist — A ball handler with little else: he brings it up and gets it to the scorers.
-- **Mid** (Scorer / creator): Mid-Range Specialist — A mid-range shooter and not much else.
-- **Post** (Post / interior big): Post-Up Specialist — A post scorer and not much else.
-- **Dunk** (Slasher / athlete): Dunk Specialist — A finisher above the rim and not much else.
-- **SlowScorer** (Scorer / creator): Slow-Motion Scorer — He can score from his spots, but slowly: no burst to get anywhere else.
-- **EmptyScorer** (Scorer / creator): Empty-Calorie Scorer — He gets his points, and gives them back on defense.
-- **Earthbound** (Post / interior big): Earthbound Big — A big who plays below the rim: size and one skill, no athleticism.
-- **Hustle** (All-around): guard: Hustle Guy, Junkyard Dog, Hustle Over Talent; wing: Hustle Guy, Junkyard Dog, Hustle Over Talent; big: Energy Big, Junkyard Dog, Hustle Over Talent — Effort over talent: he plays hard every minute he gets.
-- **DevShoot** (Shooter): guard: Developing Shooter, Raw Shooter; wing: Developing Shooter, Raw Shooter; big: Project Stretch Big, Developing Shooter — A young shooter still growing into the role.
-- **DevPerD** (Perimeter defender): guard: Developing Defender, Stopper-in-Training; wing: Developing Lockdown Wing, Stopper-in-Training; big: Developing Defender, Stopper-in-Training — A young defender still learning the job.
-- **DevRimD** (Rim protector): Rim Protector in Training — A young shot blocker still growing into the job.
-- **DevPass** (Playmaker): Developing Playmaker — A young passer still learning to run an offense.
-- **DevHandle** (Playmaker): Developing Ball Handler — A young ball handler still learning to run an offense.
-- **DevReb** (Rebounder): guard: Developing Rebounder; wing: Developing Rebounder; big: Developing Glass Cleaner, Raw Big — A young rebounder still growing into the role.
-- **DevScore** (Scorer / creator): Developing Scorer, Raw Scorer — A young scorer still finding his game.
-- **DevPost** (Post / interior big): Developing Post Scorer — A young post scorer still learning his moves.
-- **DevAth** (Slasher / athlete): guard: Raw Bouncy Guard, Raw Athlete; wing: Raw Bouncy Wing, Raw Athlete; big: Raw Bouncy Big, Raw Athlete — A young athlete whose skills haven't caught up with his body.
-- **DevStrength** (Post / interior big): guard: Raw Bruiser; wing: Raw Bruiser; big: Raw Big — A young big with size and strength and little skill yet.
-- **Tools** (Slasher / athlete): guard: Toolsy Guard, All Tools, No Toolbox; wing: Toolsy Wing, All Tools, No Toolbox; big: Toolsy Big, All Tools, No Toolbox — The tools are there; the skills aren't yet.
-- **Project** (All-around): guard: Project Guard, Unfinished Product, Upside Play, Sleeper; wing: Project Wing, Unfinished Product, Clay, Blueprint; big: Project Center, Unfinished Product, Clay, Blueprint — A project: nothing in his game is ready yet, but there is room to grow.
-- **Lottery** (All-around): Lottery Ticket — A long shot with a high ceiling.
-- **LateBloomer** (All-around): Late Bloomer — Older than most prospects and still improving.
-- **Filler** (All-around): guard: Rotation Filler, Ten-Day Guard, Two-Way Contract; wing: Rotation Filler, Two-Way Contract; big: Rotation Filler, Emergency Big, Practice Squad Big — A depth player: he fills minutes without standing out at anything.
-- **Journeyman** (All-around): Journeyman — A veteran who has been around: he fills a roster spot wherever he's needed.
-- **CampBody** (All-around): guard: Camp Body, Ten-Day Guard; wing: Camp Body, Ten-Day Wing; big: Camp Body, Practice Squad Big, Emergency Big — Training camp depth: he's here to fill out the roster.
+- Spot-Up Specialist, Corner Merchant, One-Trick Shooter, Bench Bomber, Shot-Only Wing: A shooter, and only a shooter: he spaces the floor and waits for the kick-out.
+- Garbage-Time Gunner, Streaky Gunner, Deep Bench Shooter: A low-end shooter who lets it fly when the game is out of reach, makes or misses.
+- Defensive Specialist, Hound, Pest, Gnat: A defender, and only a defender: he hounds his man and gives little back on offense.
+- Glove-Only Guard: A guard who can defend and do nothing else.
+- Shot-Blocking Specialist: A shot blocker, and only that: he protects the rim and gives little else.
+- Board Specialist, Garbage Man, Glass-Only Big: A rebounder, and only a rebounder: he cleans up the glass.
+- Bruiser, Big Body, Wall, Space Eater, Human Screen: Size and strength, not skill: he takes up space and sets screens.
+- Pogo Stick, Bounce-Only Wing: A leaper with little game beyond his bounce.
+- Track Star, All Legs, No Game: A runner with little game beyond his speed.
+- Shooter Without a Jumper: An athlete who can't shoot.
+- Dime Specialist, Pass-First, Pass-Only, Caretaker Guard: A passer, and only a passer: he moves the ball and rarely looks for his own shot.
+- Ball-Handling Specialist, Caretaker Guard: A ball handler with little else: he brings it up and gets it to the scorers.
+- Mid-Range Specialist: A mid-range shooter and not much else.
+- Post-Up Specialist: A post scorer and not much else.
+- Dunk Specialist: A finisher above the rim and not much else.
+- Slow-Motion Scorer: He can score from his spots, but slowly: no burst to get anywhere else.
+- Empty-Calorie Scorer: He gets his points, and gives them back on defense.
+- Earthbound Big: A big who plays below the rim: size and one skill, no athleticism.
+- Hustle Guy, Junkyard Dog, Hustle Over Talent, Energy Big: Effort over talent: he plays hard every minute he gets.
+- Developing Shooter, Raw Shooter, Project Stretch Big: A young shooter still growing into the role.
+- Developing Defender, Stopper-in-Training, Developing Lockdown Wing: A young defender still learning the job.
+- Rim Protector in Training: A young shot blocker still growing into the job.
+- Developing Playmaker: A young passer still learning to run an offense.
+- Developing Ball Handler: A young ball handler still learning to run an offense.
+- Developing Rebounder, Developing Glass Cleaner, Raw Big: A young rebounder still growing into the role.
+- Developing Scorer, Raw Scorer: A young scorer still finding his game.
+- Developing Post Scorer: A young post scorer still learning his moves.
+- Raw Athlete, Raw Bouncy Guard, Raw Bouncy Wing, Raw Bouncy Big: A young athlete whose skills haven't caught up with his body.
+- Raw Big, Raw Bruiser: A young big with size and strength and little skill yet.
+- All Tools, No Toolbox, Toolsy Guard, Toolsy Wing, Toolsy Big: The tools are there; the skills aren't yet.
+- Unfinished Product, Clay, Blueprint, Upside Play, Project Guard, Sleeper, Project Wing, Project Center: A project: nothing in his game is ready yet, but there is room to grow.
+- Lottery Ticket: A long shot with a high ceiling.
+- Late Bloomer: Older than most prospects and still improving.
+- Rotation Filler, Two-Way Contract, Ten-Day Guard, Emergency Big, Practice Squad Big: A depth player: he fills minutes without standing out at anything.
+- Journeyman: A veteran who has been around: he fills a roster spot wherever he's needed.
+- Camp Body, Ten-Day Guard, Ten-Day Wing, Practice Squad Big, Emergency Big: Training camp depth: he's here to fill out the roster.

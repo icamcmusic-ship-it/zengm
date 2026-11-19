@@ -34,6 +34,17 @@ const genPlayerRows = (
 	challengeNoRatings: boolean,
 ) => {
 	return players.map((p) => {
+		const nameLabels = wrappedPlayerNameLabels({
+			pid: p.pid,
+			injury: p.injury,
+			jerseyNumber: p.jerseyNumber,
+			skills: p.ratings.skills,
+			badges: p.ratings.badges,
+			defaultWatch: p.watch,
+			firstName: p.firstName,
+			firstNameShort: p.firstNameShort,
+			lastName: p.lastName,
+		});
 		return {
 			key: p.pid,
 			data: [
@@ -61,17 +72,22 @@ const genPlayerRows = (
 						/>
 					),
 				},
-				wrappedPlayerNameLabels({
-					pid: p.pid,
-					injury: p.injury,
-					jerseyNumber: p.jerseyNumber,
-					skills: p.ratings.skills,
-					badges: p.ratings.badges,
-					defaultWatch: p.watch,
-					firstName: p.firstName,
-					firstNameShort: p.firstNameShort,
-					lastName: p.lastName,
-				}),
+				p.stashed
+					? {
+							...nameLabels,
+							value: (
+								<>
+									{nameLabels.value}{" "}
+									<span
+										className="badge bg-secondary"
+										title="Draft rights to a player playing overseas. He takes no roster spot and no salary until he is brought over."
+									>
+										Stashed
+									</span>
+								</>
+							),
+						}
+					: nameLabels,
 				p.ratings.pos,
 				p.age,
 				!challengeNoRatings ? p.ratings.ovr : null,

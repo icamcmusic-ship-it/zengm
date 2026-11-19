@@ -284,7 +284,10 @@ const MarchMadness = (props: WithSeason) => {
 const Overseas = ({ overseas }: { overseas: Props["overseas"] }) => {
 	if (overseas.length === 0) {
 		return (
-			<p>No prospects in this class played overseas or in the G League.</p>
+			<p>
+				No prospects in this class played overseas, in the G League or in the
+				pro pathway program.
+			</p>
 		);
 	}
 	return (
@@ -296,6 +299,7 @@ const Overseas = ({ overseas }: { overseas: Props["overseas"] }) => {
 						<th>Pos</th>
 						<th>Age</th>
 						<th>League</th>
+						<th>Tier</th>
 						<th>GP</th>
 						<th>MIN</th>
 						<th>PTS</th>
@@ -321,10 +325,13 @@ const Overseas = ({ overseas }: { overseas: Props["overseas"] }) => {
 							<td>{p.age}</td>
 							<td className="text-nowrap">
 								{p.league}
-								{!p.overseas ? (
+								{p.pathway ? (
+									<span className="badge bg-secondary ms-1">Pathway</span>
+								) : !p.overseas ? (
 									<span className="badge bg-secondary ms-1">US</span>
 								) : null}
 							</td>
+							<td className="text-nowrap">{p.tier ?? null}</td>
 							<td>{p.gp}</td>
 							<td>{p.min.toFixed(1)}</td>
 							<td>{p.pts.toFixed(1)}</td>

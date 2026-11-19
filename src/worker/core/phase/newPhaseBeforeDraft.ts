@@ -35,6 +35,7 @@ import * as staff from "../staff/index.ts";
 import * as gm from "../gm/index.ts";
 import * as college from "../college/index.ts";
 import { pruneSeasonLineups } from "../player/advStatsStorage.ts";
+import { addStashSeasons } from "../draftStash/index.ts";
 
 const INFLATION_GAME_ATTRIBUTES = [
 	"salaryCap",
@@ -542,6 +543,11 @@ const newPhaseBeforeDraft = async (
 
 	// Draft Class Shapes: this year's class in the news
 	await logClassHeadline(g.get("season"), conditions);
+
+	// Draft-and-stash: the season that just ended, abroad, for every stashed player
+	if (!college.isCollege()) {
+		await addStashSeasons();
+	}
 
 	// Randomize order of doRelocate and doExpand, because we want one to block the other but not always the same one
 	if (Math.random() > 0.5) {

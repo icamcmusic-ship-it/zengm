@@ -284,6 +284,9 @@ describe("stored archetypes", () => {
 		// best skills instead)
 		if (info!.id.startsWith("v2:h")) {
 			assert.strictEqual(info!.why.length, 0);
+		} else if (info!.id.startsWith("v2:")) {
+			// (archnouns: a noun name's profile is the dimensions its words say: up to three)
+			assert.isAtMost(info!.why.length, 3);
 		} else {
 			assert.strictEqual(info!.why.length, 3);
 		}

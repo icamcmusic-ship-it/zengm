@@ -53,6 +53,7 @@ import {
 	getNearestContractAmount,
 } from "../../../common/contracts.ts";
 import { ageFacesForPreseason } from "../../util/faceAging.ts";
+import { developStashed } from "../draftStash/index.ts";
 
 // When a player changes teams or leaves his team at the start of a new season without a normal signing or release (repeat season, forced historical rosters), his contract just ends before this season
 const endContractBeforeNewSeason = (
@@ -609,6 +610,12 @@ const newPhasePreseason = async (
 	}
 
 	await depthDev?.finish(players as any);
+
+	// Draft-and-stash: players abroad develop too, after everyone else so a league without any develops exactly as before.
+	// From here on they go along with the others (archetypes, faces, saved below; the jersey numbers only look at rosters)
+	if (!repeatSeason && __SPORT === "basketball") {
+		players.push(...(await developStashed(scoutingLevel)));
+	}
 
 	// The archetype label for the new season, now that development has happened
 	await updateArchetypesForPreseason(players);

@@ -617,7 +617,8 @@ const checkClass = (
 	honors: Set<string>,
 ) => {
 	{
-		const options = { seed, draftYear: 2027 };
+		// Every prospect in college: none of these freshmen goes to the pro pathway program (preDraftPaths)
+		const options = { seed, draftYear: 2027, paths: false };
 		const schools = getNcaaSchools(prospects, options);
 		const ncaaSeason = simulateNcaaSeason({
 			seed,

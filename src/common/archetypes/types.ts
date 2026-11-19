@@ -212,6 +212,9 @@ export type Norms = {
 	// archnouns: the same quantiles among the league's own players for every league, rebuilt each season: the nouns'
 	// standings (v2/nouns.ts) are always relative to the league as it is
 	nq?: Partial<Record<string, number[]>>;
+	// archnouns3: how common each label is in the league right now (share of players, by id), so near-ties go to the rarer
+	// name (the user's "spread out near-ties")
+	common?: Record<string, number>;
 };
 
 // The tables a player's ratings are read against

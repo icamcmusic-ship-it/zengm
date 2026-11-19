@@ -21,6 +21,7 @@ import { GATE_REF } from "./gateScale.data.ts";
 import { percentileIn, type RatingQuantiles } from "./gateScale.ts";
 import { ELITE_RE, hasUpside } from "./honest.ts";
 import {
+	composedId,
 	composeName,
 	DESC_BY_KEY,
 	GROUP_OF,
@@ -123,6 +124,7 @@ export const nounOfDesc = (d: string): NounKey | undefined => DESC_NOUN[d];
 
 // The position word that ends the name
 export type PosWord =
+	| `e${string}`
 	| "posGuard"
 	| "posWing"
 	| "posForward"
@@ -165,7 +167,12 @@ const NOUN_VALUE: Record<
 	post: { value: (r) => r.ins, table: () => "ins" },
 	finish: { value: (r) => r.dnk, table: () => "dnk" },
 	rimD: {
-		value: (r) => mean([sub(r, "blk"), r.idef ?? r.diq]),
+		// (without interior defense or the block sub-rating, defensive IQ alone would make every smart defender a rim
+		// protector: his size and leaping then count too)
+		value: (r) =>
+			r.idef === undefined && sub(r, "blk") === undefined
+				? mean([r.diq, r.hgt, r.jmp])
+				: mean([sub(r, "blk"), r.idef ?? r.diq]),
 		table: (r) => (r.idef !== undefined ? "idef" : "diq"),
 	},
 	perimD: {
@@ -173,7 +180,8 @@ const NOUN_VALUE: Record<
 		table: (r) => (r.pdef !== undefined ? "pdef" : "diq"),
 	},
 	steal: {
-		value: (r) => sub(r, "stl") ?? r.diq,
+		// (without the steals sub-rating: his IQ and quickness)
+		value: (r) => sub(r, "stl") ?? mean([r.diq, r.spd]),
 		table: () => "diq",
 	},
 	handle: { value: (r) => r.drb, table: () => "drb" },
@@ -219,7 +227,13 @@ export const ratingAtPct = (k: string, p: number, rq?: RatingQuantiles) => {
 	return t[lo]! + (t[hi]! - t[lo]!) * (pos - lo);
 };
 
-export type NounScore = { key: NounKey; value: number; pct: number };
+export type NounScore = {
+	key: NounKey;
+	value: number;
+	pct: number;
+	// how far above the league's 90th percentile, in units of its top spread (breaks ties at the very top)
+	above: number;
+};
 
 const tableOf = (k: string, rq?: RatingQuantiles) =>
 	(rq as Record<string, number[] | undefined> | undefined)?.[k] ??
@@ -237,8 +251,17 @@ export const nounScores = (
 ): NounScore[] =>
 	NOUNS.map((key) => {
 		const value = NOUN_VALUE[key].value(r);
-		return { key, value, pct: pctOf(NOUN_VALUE[key].table(r), value, rq) };
-	}).sort((a, b) => b.pct - a.pct || b.value - a.value);
+		const tk = NOUN_VALUE[key].table(r);
+		const t = tableOf(tk, rq);
+		const q90 = t ? t[Math.round(0.9 * (t.length - 1))]! : 70;
+		const top = t ? t.at(-1)! : 100;
+		return {
+			key,
+			value,
+			pct: pctOf(tk, value, rq),
+			above: (value - q90) / Math.max(1, top - q90),
+		};
+	}).sort((a, b) => b.pct - a.pct || b.above - a.above);
 
 // The nouns he qualifies for (Crafty only from the top 15%), best first
 export const clearedNouns = (scores: readonly NounScore[]): NounScore[] =>
@@ -555,7 +578,11 @@ export type NounInput = {
 	prev?: { special?: string; nouns?: NounKey[]; trait?: string };
 	// the user's "Doesn't fit" verdicts with no pick
 	rejected?: readonly Rejection[];
+	// how common each label is in the league (share, by id): a near-tie goes to the rarer name
+	common?: Record<string, number>;
 };
+// (a name held by 10% of the league pays SPREAD_PEN * 0.1 in a tie: enough to settle a near-tie, never to beat a better fit)
+export const SPREAD_PEN = 3;
 export type NounPick = (
 	| {
 			kind: "special";
@@ -727,6 +754,9 @@ const isLong = (r: ArchetypeRatings) =>
 
 // ---- the user's own special names (tested on his nouns, sub-ratings and traits; checked before anything else) ----
 type SpecialCtx = {
+	pos: Pos;
+	// his ovr's standing in the league (0..1)
+	ovrPct?: number;
 	pct: Record<NounKey, number>;
 	r: ArchetypeRatings;
 	traits?: Record<string, number>;
@@ -745,6 +775,8 @@ export const CUSTOM_SPECIALS: {
 	key: string;
 	positions: readonly Pos[];
 	nouns: NounKey[];
+	// a name about many skills: it need not have his best one
+	anyBest?: true;
 	test: (c: SpecialCtx) => boolean;
 }[] = [
 	{
@@ -819,6 +851,8 @@ export const CUSTOM_SPECIALS: {
 		test: ({ pct, eliteOvr }) =>
 			eliteOvr && pct.rimD >= ELITE_PCT && pct.post >= 0.85 && pct.pass >= 0.7,
 	},
+	...USER_SPECIALS_2(),
+	...USER_SPECIALS_3(),
 	{
 		key: "sSlashMiddyF",
 		positions: ["SF", "F", "PF"],
@@ -826,8 +860,1050 @@ export const CUSTOM_SPECIALS: {
 		test: ({ pct }) => pct.finish >= 0.7 && pct.handle >= 0.6 && pct.mid >= 0.7,
 	},
 ];
-// Jack-of-all-Trades: JACK_MIN or more nouns in the top 40%, none in the top 10%
+// The user's second list (archnouns2)
+function USER_SPECIALS_2(): {
+	key: string;
+	positions: readonly Pos[];
+	nouns: NounKey[];
+	anyBest?: true;
+	test: (c: SpecialCtx) => boolean;
+}[] {
+	const G_F: Pos[] = ["PG", "G", "SG", "GF", "SF", "F"];
+	const G_SF: Pos[] = ["PG", "G", "SG", "GF", "SF"];
+	const SF_PF: Pos[] = ["SF", "F", "PF"];
+	const BIGS: Pos[] = ["PF", "FC", "C"];
+	const lead = (r: ArchetypeRatings, a: string, b: string) =>
+		(sub(r, a) ?? 0) > (sub(r, b) ?? 0);
+	const tr = (c: SpecialCtx, k: string) => c.traits?.[k] ?? 0;
+	const count = (c: SpecialCtx, min: number) =>
+		NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= min).length;
+	return [
+		{
+			key: "sMidnightHash",
+			positions: G_F,
+			nouns: ["mid", "three"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.mid >= ELITE_PCT &&
+				c.pct.three >= ELITE_PCT &&
+				tr(c, "clutch") >= 75,
+		},
+		{
+			key: "sSwissArmy",
+			positions: ["PG", "G", "SG", "GF", "SF", "F", "PF", "FC", "C"],
+			nouns: [],
+			anyBest: true,
+			test: (c) =>
+				count(c, NOUN_CLEAR) >= 8 &&
+				NOUNS.some((n) => n !== "crafty" && c.pct[n] >= 0.85),
+		},
+		{
+			key: "sSwitchblade",
+			positions: G_SF,
+			nouns: ["creator", "handle", "perimD"],
+			test: (c) =>
+				c.pct.creator >= 0.85 &&
+				c.pct.handle >= 0.8 &&
+				c.pct.perimD >= 0.7 &&
+				pctOf("spd", sub(c.r, "lat") ?? c.r.spd) >= 0.7,
+		},
+		{
+			key: "sFadeawayTech",
+			positions: ["SF", "F", "PF"],
+			nouns: ["mid", "post"],
+			test: (c) =>
+				c.pct.mid >= 0.85 &&
+				lead(c.r, "pul", "spu") &&
+				c.pct.post >= 0.7 &&
+				Math.max(c.pct.perimD, c.pct.rimD) >= 0.7 &&
+				c.pct.crafty >= 0.7,
+		},
+		{
+			key: "sVelvetStepBack",
+			positions: ["GF", "SF"],
+			nouns: ["three", "handle"],
+			test: (c) =>
+				c.pct.three >= 0.85 &&
+				lead(c.r, "tod", "tcs") &&
+				c.pct.handle >= 0.7 &&
+				!lead(c.r, "con", "fns"),
+		},
+		{
+			key: "sClampCreate",
+			positions: ["SG", "GF", "SF"],
+			nouns: ["perimD", "creator"],
+			test: (c) => c.eliteOvr && c.pct.perimD >= 0.85 && c.pct.creator >= 0.8,
+		},
+		{
+			key: "sArcCatalyst",
+			positions: G_SF,
+			nouns: ["three", "pass", "perimD"],
+			test: (c) =>
+				c.pct.three >= 0.8 && c.pct.pass >= 0.7 && c.pct.perimD >= 0.7,
+		},
+		{
+			key: "sWingMarksman",
+			positions: ["GF", "SF"],
+			nouns: ["three", "mid"],
+			test: (c) =>
+				c.pct.three >= 0.85 && c.pct.mid >= 0.8 && c.pct.speed >= 0.6,
+		},
+		{
+			key: "sSwitchProof",
+			positions: G_F,
+			nouns: ["creator"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.creator >= 0.85 &&
+				c.pct.strength >= 0.6 &&
+				tallForPos(c.r, c.pos),
+		},
+		{
+			key: "sBackcourtWing",
+			positions: ["SG", "GF"],
+			nouns: ["three", "mid"],
+			test: (c) => c.pct.three >= 0.8 && c.pct.mid >= 0.8,
+		},
+		{
+			key: "sTrailThree",
+			positions: BIGS,
+			nouns: ["rimD", "three"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.rimD >= ELITE_PCT &&
+				c.pct.three >= 0.7 &&
+				c.pct.speed >= 0.6,
+		},
+		{
+			key: "sHighPostStretch",
+			positions: BIGS,
+			nouns: ["three", "mid"],
+			test: (c) => c.pct.three >= 0.8 && c.pct.mid >= 0.8 && c.pct.pass >= 0.6,
+		},
+		{
+			key: "sTripleStretch",
+			positions: BIGS,
+			nouns: ["reb", "pass", "three"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.reb >= 0.85 &&
+				c.pct.pass >= 0.8 &&
+				c.pct.three >= 0.7 &&
+				c.pct.rimD >= 0.7,
+		},
+		{
+			key: "sUnicornBig",
+			positions: ["FC", "C"],
+			nouns: [],
+			anyBest: true,
+			test: (c) =>
+				c.eliteOvr &&
+				count(c, NOUN_CLEAR) >= 5 &&
+				c.pct.three >= NOUN_CLEAR &&
+				Math.max(c.pct.handle, c.pct.pass) >= NOUN_CLEAR,
+		},
+		{
+			key: "sPaintWarden",
+			positions: BIGS,
+			nouns: ["rimD", "perimD"],
+			test: (c) =>
+				c.pct.rimD >= 0.85 &&
+				c.pct.perimD >= 0.7 &&
+				pctOf("spd", sub(c.r, "lat") ?? c.r.spd) >= 0.6 &&
+				tr(c, "defensiveVersatility") >= 70,
+		},
+		{
+			key: "sHybridFive",
+			positions: ["C"],
+			nouns: ["three"],
+			test: (c) =>
+				c.pct.three >= 0.7 &&
+				Math.max(c.pct.handle, c.pct.pass) >= 0.7 &&
+				c.pct.speed >= 0.6,
+		},
+		{
+			key: "sPutbackJuggernaut",
+			positions: BIGS,
+			nouns: ["reb", "strength"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.reb >= 0.9 &&
+				lead(c.r, "orb", "drd") &&
+				c.pct.strength >= 0.8 &&
+				tr(c, "motor") >= 70,
+		},
+		{
+			key: "sGlassTitan",
+			positions: BIGS,
+			nouns: ["post", "reb", "strength"],
+			test: (c) =>
+				c.eliteOvr &&
+				c.pct.post >= 0.85 &&
+				subGe(c.r, "pst", "cls", "flt") &&
+				c.pct.reb >= 0.85 &&
+				c.pct.strength >= 0.8,
+		},
+		{
+			key: "sMismatchIso",
+			positions: SF_PF,
+			nouns: ["creator", "pass"],
+			test: (c) =>
+				c.pct.creator >= 0.8 && c.pct.pass >= 0.8 && tallForPos(c.r, c.pos),
+		},
+		{
+			key: "sForwardHub",
+			positions: ["F", "PF"],
+			nouns: ["pass", "mid"],
+			test: (c) => c.pct.pass >= 0.8 && c.pct.mid >= 0.7 && c.pct.crafty >= 0.7,
+		},
+		{
+			key: "sHelpDisruptor",
+			positions: ["GF", "SF", "F", "PF"],
+			nouns: ["steal", "rimD"],
+			test: (c) => c.pct.steal >= 0.85 && c.pct.rimD >= 0.7,
+		},
+		{
+			key: "sBaselineCutter",
+			positions: ["GF", "SF", "F"],
+			nouns: ["finish"],
+			test: (c) =>
+				c.pct.finish >= 0.8 && tr(c, "offBall") >= 65 && c.pct.speed >= 0.6,
+		},
+		{
+			key: "sOpenCourtSlasher",
+			positions: G_SF,
+			nouns: ["speed", "finish"],
+			test: (c) =>
+				c.pct.speed >= 0.85 &&
+				lead(c.r, "sls", "lat") &&
+				c.pct.finish >= 0.8 &&
+				c.pct.handle >= 0.6 &&
+				tr(c, "motor") >= 70,
+		},
+		{
+			key: "sCornerCombo",
+			positions: SF_PF,
+			nouns: ["three"],
+			test: (c) =>
+				c.pct.three >= 0.8 &&
+				lead(c.r, "tcs", "tod") &&
+				Math.max(c.pct.perimD, c.pct.reb) >= 0.7,
+		},
+		{
+			key: "sPositionless",
+			positions: SF_PF,
+			nouns: [],
+			anyBest: true,
+			test: (c) =>
+				count(c, NOUN_CLEAR) >= 5 &&
+				Math.max(c.pct.three, c.pct.mid, c.pct.finish, c.pct.post) >=
+					GENERIC_PCT &&
+				Math.max(c.pct.pass, c.pct.handle) >= GENERIC_PCT &&
+				Math.max(c.pct.perimD, c.pct.rimD, c.pct.steal) >= GENERIC_PCT,
+		},
+		{
+			key: "sFourOut",
+			positions: ["F", "PF"],
+			nouns: ["three", "pass"],
+			test: (c) =>
+				c.pct.three >= 0.7 && c.pct.pass >= 0.6 && shortForPos(c.r, c.pos),
+		},
+	];
+}
+
+// The user's third list (archnouns3)
+function USER_SPECIALS_3(): {
+	key: string;
+	positions: readonly Pos[];
+	nouns: NounKey[];
+	anyBest?: true;
+	test: (c: SpecialCtx) => boolean;
+}[] {
+	const ALL_POS: Pos[] = ["PG", "G", "SG", "GF", "SF", "F", "PF", "FC", "C"];
+	const GUARDS: Pos[] = ["PG", "G", "SG"];
+	const PGG: Pos[] = ["PG", "G"];
+	const G_F: Pos[] = ["PG", "G", "SG", "GF", "SF", "F"];
+	const G_SF: Pos[] = ["PG", "G", "SG", "GF", "SF"];
+	const WINGS: Pos[] = ["GF", "SF"];
+	const SG_SF: Pos[] = ["SG", "GF", "SF"];
+	const GF_F: Pos[] = ["GF", "SF", "F"];
+	const GF_PF: Pos[] = ["GF", "SF", "F", "PF"];
+	const SF_PF: Pos[] = ["SF", "F", "PF"];
+	const SF_C: Pos[] = ["SF", "F", "PF", "FC", "C"];
+	const SF_FC: Pos[] = ["SF", "F", "PF", "FC"];
+	const F_C: Pos[] = ["F", "PF", "FC", "C"];
+	const BIGS: Pos[] = ["PF", "FC", "C"];
+	const lead = (r: ArchetypeRatings, a: string, b: string, by = 0) =>
+		(sub(r, a) ?? 0) - (sub(r, b) ?? 0) > by;
+	const tr = (c: SpecialCtx, k: string) => c.traits?.[k] ?? 0;
+	const count = (c: SpecialCtx, min: number) =>
+		NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= min).length;
+	const lat = (c: SpecialCtx) => pctOf("spd", sub(c.r, "lat") ?? c.r.spd);
+	const elite = (c: SpecialCtx) => c.eliteOvr;
+	const scoring = (c: SpecialCtx) =>
+		Math.max(c.pct.three, c.pct.mid, c.pct.finish, c.pct.post);
+	const S = (
+		key: string,
+		positions: Pos[],
+		nouns: NounKey[],
+		test: (c: SpecialCtx) => boolean,
+		anyBest?: true,
+	) => ({ key, positions, nouns, test, ...(anyBest ? { anyBest } : {}) });
+	return [
+		// Creators and playmakers
+		S(
+			"s3OffEngine",
+			G_F,
+			["pass", "creator", "crafty"],
+			(c) =>
+				elite(c) &&
+				c.pct.pass >= 0.9 &&
+				c.pct.creator >= 0.85 &&
+				c.pct.crafty >= 0.9,
+		),
+		S(
+			"s3OffCatalyst",
+			G_F,
+			["pass", "crafty"],
+			(c) => c.pct.pass >= 0.75 && c.pct.crafty >= 0.9,
+		),
+		S(
+			"s3DimeWizard",
+			PGG,
+			["pass", "handle"],
+			(c) => elite(c) && c.pct.pass >= ELITE_PCT && c.pct.handle >= 0.85,
+		),
+		S(
+			"s3DimeMaestro",
+			PGG,
+			["pass", "mid"],
+			(c) =>
+				elite(c) &&
+				c.pct.pass >= ELITE_PCT &&
+				c.pct.mid >= 0.8 &&
+				lead(c.r, "pul", "spu"),
+		),
+		S(
+			"s3PaintPlaymaker",
+			GUARDS,
+			["pass", "handle"],
+			(c) =>
+				c.pct.pass >= 0.8 &&
+				c.pct.handle >= 0.75 &&
+				Math.max(c.pct.finish, c.pct.post) >= 0.7,
+		),
+		S(
+			"s3TempoConductor",
+			PGG,
+			["pass", "speed"],
+			(c) => c.pct.pass >= 0.8 && c.pct.speed >= 0.75 && c.pct.perimD >= 0.7,
+		),
+		S(
+			"s3PaceSetter",
+			["PG"],
+			["pass"],
+			(c) =>
+				c.pct.pass >= 0.7 &&
+				subGe(c.r, "sec", "hnd", "crt") &&
+				c.pct.speed < 0.5,
+		),
+		S(
+			"s3LiveDribble",
+			G_F,
+			["pass", "handle"],
+			(c) =>
+				c.pct.pass >= 0.7 &&
+				c.pct.handle >= 0.7 &&
+				lead(c.r, "vis", "acc") &&
+				NOUNS.every((n) => n === "crafty" || c.pct[n] < 0.9),
+		),
+		S(
+			"s3SecondaryFacilitator",
+			["SG", "GF", "SF", "F", "PF", "FC", "C"],
+			["pass"],
+			(c) => c.pct.pass >= 0.75 && c.pct.creator < 0.5,
+		),
+		S(
+			"s3ShortRollHub",
+			BIGS,
+			["pass"],
+			(c) =>
+				c.pct.pass >= 0.8 &&
+				Math.max(c.pct.mid, c.pct.finish) >= 0.7 &&
+				tr(c, "screen") >= 60,
+		),
+		S(
+			"s3PointWing",
+			WINGS,
+			["pass", "creator", "perimD"],
+			(c) => c.pct.pass >= 0.8 && c.pct.creator >= 0.75 && c.pct.perimD >= 0.75,
+		),
+		S(
+			"s3SecondarySwing",
+			SG_SF,
+			["creator", "pass"],
+			(c) =>
+				c.pct.creator >= 0.7 &&
+				c.pct.pass >= 0.6 &&
+				c.best !== "creator" &&
+				c.best !== "handle",
+		),
+		// Scorers
+		S(
+			"s3IsoShotmaker",
+			G_F,
+			["three", "mid", "finish", "creator"],
+			(c) =>
+				elite(c) &&
+				c.pct.three >= 0.75 &&
+				c.pct.mid >= 0.75 &&
+				c.pct.finish >= 0.75 &&
+				c.pct.creator >= 0.85,
+			true,
+		),
+		S(
+			"s3IsoThreat",
+			G_F,
+			["three", "mid", "finish", "creator"],
+			(c) =>
+				c.pct.three >= 0.65 &&
+				c.pct.mid >= 0.65 &&
+				c.pct.finish >= 0.65 &&
+				c.pct.creator >= 0.75,
+			true,
+		),
+		S(
+			"s3TripleThreatWing",
+			WINGS,
+			["three", "mid", "finish"],
+			(c) => c.pct.three >= 0.7 && c.pct.mid >= 0.7 && c.pct.finish >= 0.7,
+		),
+		S(
+			"s3OffBounce",
+			G_F,
+			["creator", "three"],
+			(c) =>
+				c.pct.creator >= 0.8 &&
+				((c.pct.three >= 0.8 && lead(c.r, "tod", "tcs")) ||
+					(c.pct.mid >= 0.8 && lead(c.r, "pul", "spu"))),
+		),
+		S(
+			"s3PullUpCreator",
+			G_F,
+			["mid", "creator", "perimD"],
+			(c) =>
+				c.pct.mid >= 0.8 &&
+				lead(c.r, "pul", "spu") &&
+				c.pct.creator >= 0.75 &&
+				c.pct.perimD >= 0.75,
+		),
+		S(
+			"s3DeepBag",
+			G_F,
+			["creator", "mid", "crafty"],
+			(c) =>
+				c.pct.creator >= 0.8 &&
+				c.pct.mid >= 0.8 &&
+				c.pct.crafty >= 0.8 &&
+				athletic(c.pct) < 0.5,
+		),
+		S(
+			"s3FadeawayArtist",
+			ALL_POS,
+			["mid"],
+			(c) =>
+				c.pct.mid >= 0.85 && lead(c.r, "pul", "spu") && lead(c.r, "fns", "con"),
+		),
+		S(
+			"s3PostFadeWing",
+			WINGS,
+			["mid", "post"],
+			(c) => c.pct.mid >= 0.85 && lead(c.r, "pul", "spu") && c.pct.post >= 0.7,
+		),
+		S(
+			"s3StepThrough",
+			SF_C,
+			["post", "mid"],
+			(c) =>
+				c.pct.post >= 0.75 &&
+				(lead(c.r, "cls", "pst") || lead(c.r, "flt", "pst")) &&
+				c.pct.mid >= 0.75 &&
+				c.pct.crafty >= 0.7,
+		),
+		S(
+			"s3ClutchCloser",
+			ALL_POS,
+			["three"],
+			(c) => elite(c) && tr(c, "clutch") >= 80 && scoring(c) >= 0.85,
+			true,
+		),
+		// Shooters
+		S(
+			"s3StepBackSniper",
+			G_F,
+			["three"],
+			(c) =>
+				elite(c) &&
+				c.pct.three >= 0.95 &&
+				lead(c.r, "tod", "tcs") &&
+				subGe(c.r, "rng", "tcs"),
+		),
+		S(
+			"s3StepBackGunner",
+			G_F,
+			["three"],
+			(c) =>
+				c.pct.three >= 0.85 &&
+				lead(c.r, "tod", "tcs") &&
+				c.traits !== undefined &&
+				(c.traits.shotDiscipline ?? 100) <= 50,
+		),
+		S(
+			"s3HighArcGunner",
+			G_F,
+			["three"],
+			(c) =>
+				c.pct.three >= 0.75 &&
+				subGe(c.r, "rng", "tcs", "tod") &&
+				c.traits !== undefined &&
+				(c.traits.shotDiscipline ?? 100) <= 50,
+		),
+		S(
+			"s3VolumeSpacer",
+			G_F,
+			["three"],
+			(c) =>
+				c.pct.three >= 0.8 &&
+				NOUNS.every(
+					(n) =>
+						n === "three" || n === "crafty" || c.pct[n] <= c.pct.three - 0.12,
+				),
+		),
+		S(
+			"s3OffBallSniper",
+			G_F,
+			["three"],
+			(c) => elite(c) && c.pct.three >= 0.9 && tr(c, "offBall") >= 70,
+		),
+		S(
+			"s3OffScreenSniper",
+			G_F,
+			["three", "speed"],
+			(c) =>
+				elite(c) &&
+				c.pct.three >= 0.9 &&
+				lead(c.r, "tcs", "tod") &&
+				c.pct.speed >= 0.6,
+		),
+		S(
+			"s3FloorSpacer",
+			ALL_POS,
+			["three"],
+			(c) =>
+				c.pct.three >= 0.75 &&
+				lead(c.r, "tcs", "tod", 5) &&
+				NOUNS.filter((n) => n !== "three" && n !== "crafty" && c.pct[n] >= 0.7)
+					.length <= 1,
+		),
+		S(
+			"s3CornerPocket",
+			["GF", "SF", "F", "PF"],
+			["three"],
+			(c) =>
+				c.pct.three >= 0.75 && lead(c.r, "tcs", "tod") && c.pct.handle < 0.5,
+		),
+		// Wings, two-way and all-around
+		S(
+			"s3CompleteTwoWayWing",
+			WINGS,
+			["perimD"],
+			(c) =>
+				(
+					["three", "mid", "finish", "pass", "handle", "creator"] as const
+				).filter((n) => c.pct[n] >= 0.7).length >= 3 && c.pct.perimD >= 0.8,
+			true,
+		),
+		S(
+			"s3PlaymakingTwoWayWing",
+			WINGS,
+			["pass", "perimD"],
+			(c) => c.pct.pass >= 0.75 && c.pct.perimD >= 0.75,
+		),
+		S(
+			"s3GlueGuyWing",
+			WINGS,
+			["perimD"],
+			(c) =>
+				count(c, GENERIC_PCT) >= 3 &&
+				NOUNS.every((n) => n === "crafty" || c.pct[n] < 0.85) &&
+				c.pct.perimD >= 0.7 &&
+				(c.traits === undefined || (c.traits.ego ?? 0) >= 60),
+			true,
+		),
+		S(
+			"s3CornerLockdown",
+			WINGS,
+			["perimD", "three"],
+			(c) =>
+				elite(c) &&
+				c.pct.perimD >= ELITE_PCT &&
+				c.pct.three >= 0.7 &&
+				lead(c.r, "tcs", "tod"),
+		),
+		S(
+			"s3LockdownAce",
+			G_F,
+			["three", "mid", "finish", "perimD"],
+			(c) =>
+				elite(c) &&
+				(c.ovrPct ?? 0) >= 0.95 &&
+				c.pct.three >= 0.75 &&
+				c.pct.mid >= 0.75 &&
+				c.pct.finish >= 0.75 &&
+				c.pct.perimD >= 0.9,
+			true,
+		),
+		S(
+			"s3UnicornSwingman",
+			SG_SF,
+			["perimD", "rimD"],
+			(c) =>
+				elite(c) &&
+				count(c, NOUN_CLEAR) >= 5 &&
+				c.pct.perimD >= NOUN_CLEAR &&
+				c.pct.rimD >= NOUN_CLEAR,
+			true,
+		),
+		S("s3SmallBallRimWing", GF_F, ["rimD"], (c) => c.pct.rimD >= 0.8),
+		S(
+			"s3GlassCrashingWing",
+			WINGS,
+			["reb"],
+			(c) =>
+				c.pct.reb >= 0.8 &&
+				lead(c.r, "orb", "drd") &&
+				Math.max(c.pct.three, c.pct.perimD) >= 0.6,
+		),
+		S(
+			"s3HustleWing",
+			WINGS,
+			["reb", "perimD"],
+			(c) =>
+				tr(c, "motor") >= 70 &&
+				tr(c, "hustle") >= 70 &&
+				Math.max(c.pct.reb, c.pct.perimD) >= 0.6,
+		),
+		S(
+			"s3HustleSpark",
+			G_F,
+			["speed"],
+			(c) =>
+				tr(c, "motor") >= 70 &&
+				tr(c, "hustle") >= 70 &&
+				c.pct.speed >= 0.7 &&
+				(c.ovrPct ?? 1) < 0.6,
+		),
+		S(
+			"s3SwitchProofHybrid",
+			SF_PF,
+			["perimD", "rimD"],
+			(c) => c.pct.perimD >= 0.75 && c.pct.rimD >= 0.75 && scoring(c) >= 0.7,
+		),
+		S(
+			"s3SwissArmyThreat",
+			ALL_POS,
+			["perimD"],
+			(c) =>
+				count(c, NOUN_CLEAR) >= 8 &&
+				Math.max(c.pct.perimD, c.pct.rimD, c.pct.steal) >= 0.85,
+			true,
+		),
+		S(
+			"s3AllCourtPrototype",
+			ALL_POS,
+			[],
+			(c) => elite(c) && (c.ovrPct ?? 0) >= 0.95 && count(c, NOUN_CLEAR) >= 7,
+			true,
+		),
+		S(
+			"s3TwoWayAnomaly",
+			["FC", "C"],
+			["three", "rimD"],
+			(c) =>
+				elite(c) &&
+				c.pct.three >= 0.8 &&
+				c.pct.rimD >= 0.9 &&
+				Math.max(c.pct.handle, c.pct.pass) >= 0.7,
+		),
+		// Athletes and finishers
+		S(
+			"s3TurboGuard",
+			GUARDS,
+			["speed", "finish"],
+			(c) =>
+				c.pct.speed >= 0.9 &&
+				lead(c.r, "sls", "lat") &&
+				c.pct.finish >= 0.75 &&
+				c.pct.handle >= 0.7,
+		),
+		S(
+			"s3LayupArtist",
+			G_F,
+			["finish", "jump"],
+			(c) =>
+				c.pct.finish >= 0.85 &&
+				lead(c.r, "fns", "con") &&
+				c.pct.jump >= 0.75 &&
+				subGe(c.r, "flt", "pst"),
+		),
+		S(
+			"s3TransitionSlasher",
+			G_SF,
+			["speed", "finish"],
+			(c) =>
+				c.pct.speed >= 0.85 && c.pct.finish >= 0.8 && lead(c.r, "con", "fns"),
+		),
+		S(
+			"s3BaselineFinisher",
+			SF_FC,
+			["finish"],
+			(c) => c.pct.finish >= 0.8 && tr(c, "offBall") >= 65,
+		),
+		S(
+			"s3LobRunner",
+			BIGS,
+			["jump", "speed", "finish"],
+			(c) =>
+				c.pct.jump >= 0.85 &&
+				lead(c.r, "mxv", "stj") &&
+				c.pct.speed >= 0.7 &&
+				c.pct.finish >= 0.75,
+		),
+		S(
+			"s3PopFinisher",
+			BIGS,
+			["three", "finish"],
+			(c) => c.pct.three >= 0.7 && c.pct.finish >= 0.7 && tr(c, "screen") >= 60,
+		),
+		// Defenders and rebounders
+		S(
+			"s3PressPest",
+			GUARDS,
+			["steal", "speed"],
+			(c) =>
+				c.pct.steal >= 0.85 &&
+				c.pct.speed >= 0.75 &&
+				Math.max(tr(c, "motor"), tr(c, "hustle")) >= 65,
+		),
+		S(
+			"s3ClampLock",
+			G_SF,
+			["perimD"],
+			(c) => elite(c) && c.pct.perimD >= 0.95 && lat(c) >= 0.8,
+		),
+		S(
+			"s3SwitchAllStopper",
+			G_F,
+			["perimD"],
+			(c) => c.pct.perimD >= 0.85 && tr(c, "defensiveVersatility") >= 70,
+		),
+		S(
+			"s3InterceptorLock",
+			G_F,
+			["steal", "perimD"],
+			(c) => elite(c) && c.pct.steal >= ELITE_PCT && c.pct.perimD >= 0.85,
+		),
+		S(
+			"s3BallHawkMenace",
+			G_F,
+			["steal"],
+			(c) =>
+				c.pct.steal >= 0.85 &&
+				scoring(c) >= 0.7 &&
+				Math.max(tr(c, "motor"), tr(c, "competitiveness")) >= 70,
+		),
+		S(
+			"s3WeakSideEraser",
+			GF_PF,
+			["rimD"],
+			(c) => elite(c) && c.pct.rimD >= ELITE_PCT && lead(c.r, "blk", "idf"),
+		),
+		S(
+			"s3IroncladAnchor",
+			BIGS,
+			["rimD", "strength"],
+			(c) =>
+				elite(c) &&
+				c.pct.rimD >= ELITE_PCT &&
+				lead(c.r, "idf", "blk") &&
+				c.pct.strength >= 0.75 &&
+				tr(c, "durability") >= 70,
+		),
+		S(
+			"s3RelentlessCleaner",
+			F_C,
+			["reb"],
+			(c) => c.pct.reb >= 0.9 && tr(c, "motor") >= 70,
+		),
+	];
+}
+
+// Jack-Of-All-Trades: JACK_MIN or more nouns in the top 40%, none in the top 10%
 export const JACK_MIN = 5;
+// A name about many skills gives way to a standout skill: one in the league's top 7%
+export const STANDOUT_PCT = 0.93;
+
+// ---- height for his position (the user's "tall for his position", "small for a four") ----
+// The usual height rating at each position (generated leagues), and how far from it counts as tall or short
+const HGT_AT_POS: Record<Pos, number> = {
+	PG: 30,
+	G: 34,
+	SG: 38,
+	GF: 44,
+	SF: 48,
+	F: 52,
+	PF: 56,
+	FC: 61,
+	C: 65,
+};
+const HGT_SPREAD = 5;
+export const tallForPos = (r: ArchetypeRatings, pos: Pos) =>
+	r.hgt >= HGT_AT_POS[pos] + HGT_SPREAD;
+export const shortForPos = (r: ArchetypeRatings, pos: Pos) =>
+	r.hgt <= HGT_AT_POS[pos] - HGT_SPREAD;
+
+// ---- end words (the user's nouns): in place of his position at the end of the name. One that says a noun (Maestro: his
+// mid-range) needs that noun among his two shown, and the noun is then said by the end word alone ----
+type EndCtx = {
+	pct: Record<NounKey, number>;
+	r: ArchetypeRatings;
+	traits?: Record<string, number>;
+	pos: Pos;
+	group: PosGroup;
+	elite: (k: NounKey) => boolean;
+	shown: readonly NounKey[];
+	ovr: number;
+	// his ovr's standing in the league (0..1)
+	ovrPct: number;
+};
+const GUARD_POS: ReadonlySet<Pos> = new Set(["PG", "G", "SG"]);
+const lead2 = (r: ArchetypeRatings, a: string, b: string) =>
+	(sub(r, a) ?? 0) > (sub(r, b) ?? 0);
+const athletic = (pct: Record<NounKey, number>) =>
+	Math.max(pct.speed, pct.jump);
+export const END_WORDS: {
+	key: string;
+	covers?: NounKey;
+	ok: (c: EndCtx) => boolean;
+}[] = [
+	// (archnouns3: the user's third list)
+	{
+		key: "eWalkingBucket",
+		covers: "three",
+		ok: (c) =>
+			c.elite("three") ||
+			(c.ovr >= ELITE_OVR_FLOOR &&
+				c.pct.three >= 0.85 &&
+				c.pct.mid >= 0.85 &&
+				c.pct.finish >= 0.85 &&
+				c.ovrPct >= 0.85),
+	},
+	{
+		key: "eEngine",
+		covers: "pass",
+		ok: (c) =>
+			c.ovr >= ELITE_OVR_FLOOR &&
+			c.ovrPct >= 0.85 &&
+			c.pct.pass >= 0.85 &&
+			c.pct.creator >= 0.85 &&
+			Math.max(c.pct.three, c.pct.mid, c.pct.finish) >= 0.85,
+	},
+	{
+		key: "eDeadeye",
+		covers: "three",
+		ok: (c) =>
+			c.ovr >= ELITE_OVR_FLOOR && c.ovrPct >= 0.85 && c.pct.three >= 0.95,
+	},
+	{
+		key: "eGeneral",
+		covers: "pass",
+		ok: (c) =>
+			c.pos === "PG" &&
+			c.pct.pass >= 0.85 &&
+			c.pct.crafty >= 0.8 &&
+			c.elite("pass") &&
+			(c.traits?.leadership ?? 0) >= 70,
+	},
+	{
+		key: "eArchitect",
+		covers: "pass",
+		ok: (c) => c.elite("pass") && c.pct.crafty >= 0.85,
+	},
+	{
+		key: "eWizard",
+		covers: "pass",
+		ok: (c) => c.elite("pass") && c.pct.handle >= 0.85,
+	},
+	{ key: "eMaestro", covers: "mid", ok: (c) => c.elite("mid") },
+	{
+		key: "eTechnician",
+		covers: "crafty",
+		ok: (c) =>
+			c.pct.crafty >= 0.85 &&
+			athletic(c.pct) < 0.5 &&
+			(leadSub(c.r, ["pst", "cls", "flt"]) === "pst" ||
+				leadSub(c.r, ["pul", "spu"]) === "pul"),
+	},
+	{
+		key: "eArtist",
+		covers: "finish",
+		ok: (c) =>
+			Math.max(c.pct.finish, c.pct.post) >= 0.8 &&
+			(sub(c.r, "fns") ?? 0) > (sub(c.r, "con") ?? 0) &&
+			(sub(c.r, "flt") ?? 0) >= (sub(c.r, "pst") ?? 0),
+	},
+	{
+		key: "eGlider",
+		covers: "speed",
+		ok: (c) =>
+			c.pct.speed >= 0.8 &&
+			leadSub(c.r, ["sls", "lat"]) !== "lat" &&
+			Math.max(c.pct.finish, c.pct.handle) >= 0.7,
+	},
+	{
+		key: "eAttacker",
+		covers: "finish",
+		ok: (c) => c.pct.handle >= 0.7 && c.pct.finish >= 0.7 && c.pct.speed >= 0.6,
+	},
+	{
+		key: "eInterceptor",
+		covers: "steal",
+		ok: (c) =>
+			c.pct.steal >= 0.85 && (sub(c.r, "stl") ?? 0) > (sub(c.r, "pdf") ?? 0),
+	},
+	{
+		key: "eProtector",
+		covers: "rimD",
+		ok: (c) => c.shown[0] === "rimD" && c.pct.rimD >= 0.8,
+	},
+	{
+		key: "eFacilitator",
+		covers: "pass",
+		ok: (c) => c.shown[0] === "pass" && c.pct.pass >= 0.8 && c.pos !== "PG",
+	},
+	{
+		key: "eCutter",
+		covers: "finish",
+		ok: (c) =>
+			(c.traits?.offBall ?? 0) >= 60 &&
+			c.pct.finish >= 0.7 &&
+			c.pct.handle < 0.5,
+	},
+	{
+		key: "eGunner",
+		ok: (c) =>
+			Math.max(c.pct.three, c.pct.mid) >= 0.7 &&
+			c.traits !== undefined &&
+			(c.traits.shotDiscipline ?? 100) <= 40,
+	},
+	{
+		key: "eMover",
+		ok: (c) => !BIG_POS.has(c.pos) && (c.traits?.offBall ?? 0) >= 70,
+	},
+	{
+		key: "eConnector",
+		ok: (c) =>
+			c.pct.pass >= 0.55 &&
+			c.pct.crafty >= 0.55 &&
+			c.shown.every((n) => c.pct[n] < 0.85),
+	},
+	{
+		key: "eSwingman",
+		ok: (c) =>
+			(c.pos === "SG" || c.pos === "GF" || c.pos === "SF") &&
+			(["three", "finish", "handle", "perimD"] as const).filter(
+				(n) => c.pct[n] >= 0.7,
+			).length >= 2,
+	},
+	{
+		key: "eAcrobat",
+		covers: "finish",
+		ok: (c) =>
+			c.pct.finish >= 0.8 &&
+			(sub(c.r, "fns") ?? 0) > (sub(c.r, "con") ?? 0) &&
+			c.pct.jump >= 0.7,
+	},
+	{
+		key: "eDriver",
+		covers: "handle",
+		ok: (c) =>
+			c.pct.speed >= 0.7 &&
+			c.pct.handle >= 0.7 &&
+			leadSub(c.r, ["sls", "lat"]) !== "lat",
+	},
+	{
+		key: "ePoint",
+		covers: "pass",
+		ok: (c) =>
+			(c.pos === "PG" || c.pos === "G") &&
+			c.pct.pass >= 0.7 &&
+			c.pct.handle >= 0.7,
+	},
+	{
+		key: "eDimer",
+		covers: "pass",
+		ok: (c) =>
+			GUARD_POS.has(c.pos) && c.shown[0] === "pass" && c.pct.pass >= 0.8,
+	},
+	{
+		key: "eSpacer",
+		covers: "three",
+		ok: (c) =>
+			c.pct.three >= 0.8 &&
+			!lead2(c.r, "tod", "tcs") &&
+			NOUNS.every((n) => n === "three" || n === "crafty" || c.pct[n] < 0.85),
+	},
+	{
+		key: "eCloser",
+		ok: (c) =>
+			(c.traits?.clutch ?? 0) >= 75 &&
+			c.ovr >= 50 &&
+			c.shown.some(
+				(n) => n === "three" || n === "mid" || n === "finish" || n === "post",
+			),
+	},
+	{
+		key: "eWorkhorse",
+		ok: (c) =>
+			(c.r.endu ?? 0) >= 75 &&
+			Math.max(c.traits?.durability ?? 0, c.traits?.motor ?? 0) >= 70,
+	},
+	{
+		key: "eSpark",
+		ok: (c) =>
+			Math.max(c.traits?.motor ?? 0, c.traits?.hustle ?? 0) >= 70 &&
+			c.pct.speed >= 0.7 &&
+			c.ovrPct < 0.6,
+	},
+	{
+		key: "eAce",
+		ok: (c) =>
+			c.ovr >= ELITE_OVR_FLOOR &&
+			c.ovrPct >= 0.98 &&
+			NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= 0.9).length >= 2,
+	},
+	{
+		key: "eScorer",
+		ok: (c) =>
+			(["three", "mid", "finish", "post"] as const).filter(
+				(n) => c.pct[n] >= 0.7,
+			).length >= 2 &&
+			c.pct.pass < 0.7 &&
+			Math.max(c.pct.perimD, c.pct.rimD) < 0.7,
+	},
+	{ key: "eFour", ok: (c) => c.pos === "PF" },
+	{ key: "eFive", ok: (c) => c.pos === "C" },
+];
 
 // ---- the defensive label ----
 const DEF_NOUNS: ReadonlySet<NounKey> = new Set(["rimD", "perimD", "steal"]);
@@ -898,6 +1974,8 @@ export const pickNouns = (x: NounInput): NounPick => {
 	// whole: no defensive label)
 	{
 		const ctx: SpecialCtx = {
+			pos,
+			ovrPct: x.ovr === undefined ? 0 : pctOf("ovr", x.ovr, rq),
 			pct: pctOfKey,
 			r,
 			traits: x.traits,
@@ -906,6 +1984,13 @@ export const pickNouns = (x: NounInput): NounPick => {
 			best: cleared.find((c) => c.key !== "crafty")?.key,
 		};
 		const young = hasUpside(x) && (x.ovr ?? 99) <= DEV_MAX_OVR;
+		const top3Custom = new Set<NounKey>(
+			cleared
+				.filter((c) => c.key !== "crafty")
+				.slice(0, 3)
+				.map((c) => (c.key === "creator" ? "handle" : c.key)),
+		);
+		top3Custom.add("crafty");
 		let pick: (typeof CUSTOM_SPECIALS)[number] | undefined;
 		let pickScore = -Infinity;
 		if (!young) {
@@ -913,21 +1998,46 @@ export const pickNouns = (x: NounInput): NounPick => {
 				if (!c.positions.includes(pos) || !c.test(ctx)) {
 					continue;
 				}
+				// (the user's rule: one skill under ONE_NOUN_OVR is a specialist's honest name, not a one-skill special)
+				if (
+					c.nouns.length <= 1 &&
+					!c.anyBest &&
+					(x.ovr ?? 99) < ONE_NOUN_OVR &&
+					cleared.filter((s2) => s2.key !== "crafty").length < 2
+				) {
+					continue;
+				}
+				// (archnouns3, the user's rule for every special name: all its skills among his three best)
+				if (
+					!c.anyBest &&
+					!c.nouns.every((n) => top3Custom.has(n === "creator" ? "handle" : n))
+				) {
+					continue;
+				}
 				const best = ctx.best;
 				const nouns: NounKey[] = c.nouns.map((n) =>
 					n === "creator" ? "handle" : n,
 				);
 				if (
+					!c.anyBest &&
 					best &&
 					!nouns.includes(best) &&
 					!(best === "creator" && nouns.includes("handle"))
 				) {
 					continue;
 				}
-				const sc =
-					c.nouns.reduce((sum, n) => sum + pctOfKey[n], 0) + c.nouns.length;
+				// (archnouns3, the real-player check: a many-skills name never hides a true standout: with his best noun in the
+				// league's top STANDOUT_PCT, the name must be about it)
+				if (c.anyBest && best && pctOfKey[best] >= STANDOUT_PCT) {
+					continue;
+				}
 				const role = ROLE_BY_KEY.get(c.key)!;
-				if (!okName(composeName(role, [], GROUP_OF[pos]))) {
+				const sc =
+					c.nouns.reduce((sum, n) => sum + pctOfKey[n], 0) +
+					c.nouns.length -
+					SPREAD_PEN * (x.common?.[composedId(role, [], GROUP_OF[pos])] ?? 0);
+				// (the user's own names: only his verdicts can rule one out)
+				if (vetoed(composeName(role, [], GROUP_OF[pos]))) {
 					continue;
 				}
 				if (sc > pickScore) {
@@ -945,7 +2055,7 @@ export const pickNouns = (x: NounInput): NounPick => {
 				conf: confOf(cleared, pick.nouns),
 			};
 		}
-		// (Jack-of-all-Trades: many good skills, no great one)
+		// (Jack-Of-All-Trades: many good skills, no great one)
 		const good = scores.filter(
 			(s) => s.key !== "crafty" && s.pct >= GENERIC_PCT,
 		);
@@ -954,12 +2064,12 @@ export const pickNouns = (x: NounInput): NounPick => {
 			good.length >= JACK_MIN &&
 			scores.every((s) => s.pct < 0.9) &&
 			(x.ovr ?? 0) >= 45 &&
-			!vetoed("Jack-of-all-Trades")
+			!vetoed("Jack-Of-All-Trades")
 		) {
 			return {
 				kind: "trait",
 				key: "sJack",
-				name: "Jack-of-all-Trades",
+				name: "Jack-Of-All-Trades",
 				conf: 0.6,
 			};
 		}
@@ -972,8 +2082,13 @@ export const pickNouns = (x: NounInput): NounPick => {
 	{
 		// (a defensive noun names him when it is among his three best, or in the league's top 15%)
 		const top3All = new Set(cleared.slice(0, 3).map((c) => c.key));
+		// (archnouns3: for a star, near the top of the league at everything, "top 15%" says little: outside his three best
+		// it must also be within 0.05 of his very best)
+		const bestPct = cleared[0]?.pct ?? 0;
 		const d = cleared.filter(
-			(c) => DEF_NOUNS.has(c.key) && (top3All.has(c.key) || c.pct >= 0.85),
+			(c) =>
+				DEF_NOUNS.has(c.key) &&
+				(top3All.has(c.key) || c.pct >= Math.max(0.85, bestPct - 0.05)),
 		);
 		const rest = cleared.filter(
 			(c) => !DEF_NOUNS.has(c.key) && c.key !== "crafty",
@@ -984,7 +2099,9 @@ export const pickNouns = (x: NounInput): NounPick => {
 			const per = has("perimD");
 			const stl = has("steal");
 			let n: string;
-			if (rim && per && rim.pct >= 0.8 && per.pct >= 0.8) {
+			if (rim && stl && group !== "big" && rim.pct >= 0.8 && stl.pct >= 0.8) {
+				n = "Help-Side Roamer";
+			} else if (rim && per && rim.pct >= 0.8 && per.pct >= 0.8) {
 				n = "Switch Defender";
 			} else if (rim && group === "guard" && rim.pct >= 0.85) {
 				n = "Swatting Guard";
@@ -1001,8 +2118,15 @@ export const pickNouns = (x: NounInput): NounPick => {
 						: lead === "idf"
 							? "Post Defender"
 							: "Rim Protector";
+			} else if (
+				per &&
+				per.pct >= 0.8 &&
+				Math.max(x.traits?.motor ?? 0, x.traits?.hustle ?? 0) >= 65
+			) {
+				n = "Perimeter Stalker";
 			} else if (per && stl) {
-				n = "Point-of-Attack Pest";
+				// (archnouns3: Pest, the lighter one)
+				n = per.pct < 0.85 && stl.pct < 0.85 ? "Pest" : "Point-of-Attack Pest";
 			} else if (per) {
 				n = isElite(per)
 					? "Lockdown Defender"
@@ -1018,7 +2142,9 @@ export const pickNouns = (x: NounInput): NounPick => {
 						(x.traits?.motor ?? 0) >= TRAIT_WORD_MIN ||
 						(x.traits?.hustle ?? 0) >= TRAIT_WORD_MIN)
 						? "Ball-Hawking Menace"
-						: "Ball Hawk";
+						: stl!.pct >= 0.85 && (sub(r, "stl") ?? 0) > (sub(r, "pdf") ?? 0)
+							? "Passing-Lane Interceptor"
+							: "Ball Hawk";
 			}
 			if (long && !/Lockdown|Eraser/.test(n)) {
 				n = `Long ${n}`;
@@ -1096,7 +2222,8 @@ export const pickNouns = (x: NounInput): NounPick => {
 					(sum, n) => sum + top3.find((s) => s.key === n)!.pct,
 					0,
 				) +
-				(x.prev?.special === sp.id ? 1 : 0);
+				(x.prev?.special === sp.id ? 1 : 0) -
+				SPREAD_PEN * (x.common?.[sp.id] ?? 0);
 			if (score > pickScore) {
 				pick = sp;
 				pickScore = score;
@@ -1158,16 +2285,48 @@ export const pickNouns = (x: NounInput): NounPick => {
 	};
 	// (the end word: his position; Bruiser for a guard or wing whose best is strength; Enigma for a talented player with
 	// no consistency)
-	const endKey =
+	const baseEnd =
 		(x.traits?.consistency ?? 100) <= 30 && (x.ovr ?? 0) >= 45
 			? "enigma"
 			: group !== "big" && skills[0]?.key === "strength"
 				? "bruiser"
 				: POS_WORD[pos];
-	const roleDef = ROLE_BY_KEY.get(endKey)!;
-	const nameOf = (descs: string[], pick?: Record<string, string>) =>
+	// (the user's end words: the first that fits the nouns his name shows)
+	const endFor = (shown: readonly NounKey[]) => {
+		if (baseEnd === "enigma" || baseEnd === "bruiser") {
+			return { key: baseEnd as string, covers: undefined };
+		}
+		const ctx: EndCtx = {
+			pct: pctOfKey,
+			r,
+			traits: x.traits,
+			pos,
+			group,
+			elite: (k) => {
+				const sc = scores.find((s) => s.key === k);
+				return sc !== undefined && isElite(sc);
+			},
+			shown,
+			ovr: x.ovr ?? 0,
+			ovrPct: x.ovr === undefined ? 0 : pctOf("ovr", x.ovr, rq),
+		};
+		for (const e of END_WORDS) {
+			if (e.covers !== undefined && !shown.includes(e.covers)) {
+				continue;
+			}
+			if (e.ok(ctx) && !vetoed(ROLE_BY_KEY.get(e.key)?.names[0] ?? "")) {
+				return { key: e.key, covers: e.covers };
+			}
+		}
+		return { key: baseEnd as string, covers: undefined };
+	};
+	const nameOf = (
+		end: string,
+		descs: string[],
+		pick?: Record<string, string>,
+	) =>
 		composeName(
-			roleDef,
+			ROLE_BY_KEY.get(end)!,
 			descs.map((k) => DESC_BY_KEY.get(k)!),
 			GROUP_OF[pos],
 			pick,
@@ -1239,15 +2398,23 @@ export const pickNouns = (x: NounInput): NounPick => {
 	}
 	tries.push([skills[0]!]);
 	for (const two of tries) {
-		const b = build(two);
-		if (okName(nameOf(b.descs, b.pick))) {
+		const end = endFor(two.map((t) => t.key));
+		// (an end word that says one of his nouns says it alone: that noun leaves the front words)
+		const front = end.covers ? two.filter((t) => t.key !== end.covers) : two;
+		const b = build(front.length > 0 ? front : two);
+		const descs = front.length > 0 || !end.covers ? b.descs : ([] as string[]);
+		const nouns = end.covers ? [...new Set([...b.nouns, end.covers])] : b.nouns;
+		if (descs.length === 0) {
+			continue;
+		}
+		if (okName(nameOf(end.key, descs, b.pick))) {
 			return withDef({
 				kind: "composed",
-				descs: b.descs,
-				role: endKey as PosWord,
-				nouns: b.nouns,
+				descs,
+				role: end.key as PosWord,
+				nouns,
 				pick: b.pick,
-				conf: confOf(cleared, b.nouns),
+				conf: confOf(cleared, nouns),
 			});
 		}
 	}
@@ -1270,6 +2437,14 @@ const WORD_NOUNS: [RegExp, NounKey][] = [
 	[/Shifty|Steady/, "handle"],
 	[/Shot-Blocking|Post-Defending/, "rimD"],
 	[/Quick-Footed|Twitchy/, "speed"],
+	[/\b(Driver|Glider)$/, "speed"],
+	[/\bDriver$/, "handle"],
+	[/\b(Point|Dimer|Facilitator|Wizard|Architect|Engine|General)$/, "pass"],
+	[/\b(Spacer|Deadeye)$/, "three"],
+	[/\b(Acrobat|Artist|Attacker|Cutter)$/, "finish"],
+	[/\bMaestro$/, "mid"],
+	[/\bInterceptor$/, "steal"],
+	[/\bProtector$/, "rimD"],
 	[/Highlight-Reel/, "jump"],
 ];
 // (trait words name no noun)
