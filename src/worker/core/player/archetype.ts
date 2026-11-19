@@ -342,11 +342,16 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 	// archreview: the league's scale for the absolute gates (common/archetypes/v2/gateScale.ts), for a real-players league
 	// only (real players' ratings sit on another scale: Chris Paul passes at 58). A random league, however weak, is read
 	// on the absolute bars (archreview2: the user's weak leagues should have no elite labels at all)
-	if (
-		rows.length >= MIN_LEAGUE_FOR_NORMS &&
-		players.filter((p) => p.srID !== undefined).length >= players.length / 2
-	) {
-		norms.rq = ratingQuantiles(rows);
+	if (rows.length >= MIN_LEAGUE_FOR_NORMS) {
+		const q = ratingQuantiles(rows);
+		// (archnouns: the nouns' standings, in every league)
+		norms.nq = q;
+		if (
+			players.filter((p) => p.srID !== undefined).length >=
+			players.length / 2
+		) {
+			norms.rq = q;
+		}
 	}
 	normsCache = { key, norms, statNorms, ptNorms: buildPtNorms(ptRows) };
 	return norms;
@@ -414,7 +419,7 @@ export const fuzzedArchetypeLabel = (
 	}
 	// His position comes from the true ratings, as the game shows it; a prospect is read against the prospect tables
 	const model = tunedModelFor(shown);
-	const { refs } = activePickRefs();
+	const { refs, rejects } = activePickRefs();
 	return classifyV2(shown, {
 		norms,
 		pos: posFn(ratings as any),
@@ -423,6 +428,7 @@ export const fuzzedArchetypeLabel = (
 		pot: level.pot,
 		...(model ? { model } : {}),
 		...(refs.length > 0 ? { extraRefs: refs } : {}),
+		...(rejects.length > 0 ? { rejects } : {}),
 	}).label;
 };
 
@@ -466,7 +472,7 @@ export const classifyPlayer = (
 	// (arch16: the reading version too, so a new reading never reuses an old result; archfb: and the user's tuning)
 	const tuning = activeTuning();
 	// (archv3: and the user's picks, which vote as labeled players)
-	const { refs, refsKey } = activePickRefs();
+	const { refs, refsKey, rejects } = activePickRefs();
 	const key = JSON.stringify(
 		[ARCHETYPE_READING_VERSION, tuning.hash, refsKey, p.srID, ratings, opts],
 		memoReplacer,
@@ -482,6 +488,7 @@ export const classifyPlayer = (
 		...(model ? { model } : {}),
 		...(p.srID ? { srID: p.srID } : {}),
 		...(refs.length > 0 ? { extraRefs: refs } : {}),
+		...(rejects.length > 0 ? { rejects } : {}),
 		pickKey: pickKey(g.get("lid"), p.pid),
 	});
 	if (memo.size >= CLASSIFY_MEMO_MAX) {

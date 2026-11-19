@@ -129,6 +129,20 @@ const parseInfinity = (string: string) => {
 		val === null ? Infinity : val,
 	);
 };
+// perf4: a range query over an index with array keys parsed every key of the index each time (teamSeasonsBySeasonTid, ...,
+// several times a day of games). The parsed keys are only compared, never changed, so each key string is parsed once
+const parsedKeys = new Map<string, unknown[]>();
+const parseInfinityMemo = (string: string) => {
+	let parsed = parsedKeys.get(string);
+	if (parsed === undefined) {
+		if (parsedKeys.size >= 50_000) {
+			parsedKeys.clear();
+		}
+		parsed = parseInfinity(string) as unknown[];
+		parsedKeys.set(string, parsed);
+	}
+	return parsed;
+};
 type IndexInfo = {
 	name: Index;
 	filter?: (a: any) => boolean;
@@ -1130,14 +1144,14 @@ class Cache {
 		}
 
 		const [min, max] = key;
-		let output: unknown[] = [];
+		const output: unknown[] = [];
 
 		for (const keyString of Object.keys(this._indexes[index])) {
 			let keyParsed;
 
 			// Array keys are special, because they need to be stored in a JS object and then recovered
 			if (Array.isArray(min)) {
-				keyParsed = parseInfinity(keyString);
+				keyParsed = parseInfinityMemo(keyString);
 			} else if (typeof min === "number") {
 				keyParsed = Number(keyString);
 
@@ -1151,7 +1165,15 @@ class Cache {
 			}
 
 			if (cmp(keyParsed, min) >= 0 && cmp(keyParsed, max) <= 0) {
-				output = output.concat(this._indexes[index][keyString]);
+				// (perf4: appended in place, as concat did: an array's rows, or a unique index's row)
+				const val = this._indexes[index][keyString];
+				if (Array.isArray(val)) {
+					for (const row of val) {
+						output.push(row);
+					}
+				} else {
+					output.push(val);
+				}
 			}
 		}
 

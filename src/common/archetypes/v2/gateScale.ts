@@ -79,7 +79,7 @@ export const ratingQuantiles = (
 };
 
 // Where x sits in q (0..1), linear between the points
-const percentileIn = (q: readonly number[], x: number) => {
+export const percentileIn = (q: readonly number[], x: number) => {
 	if (x <= q[0]!) {
 		return 0;
 	}

@@ -36,7 +36,16 @@ import {
 	isHonestKey,
 	skillsOf,
 	tierOf,
+	type Skill,
 } from "./honest.ts";
+import {
+	nounOfDesc,
+	nounScores,
+	pickNouns,
+	type NounKey,
+	type Rejection,
+} from "./nouns.ts";
+import type { RatingQuantiles } from "./gateScale.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
 import type { ArchetypeRatings, Classification, Pos } from "../types.ts";
 import {
@@ -165,6 +174,8 @@ export type V2Params = {
 	gatePen: number;
 	// archreview2: honest names for limited players (honest.ts): the tier on ovr, the skills that clear a real bar
 	honest: boolean;
+	// archnouns: the name from his nouns (nouns.ts), the user's design: the final say over the reading's pick
+	nouns: boolean;
 	// archreview2 (the user: "take stat and shot tracking out of the archetype formula"): the reading uses ratings and
 	// traits only; with false, a player's box score and play types (and their shot zones) are not read at all
 	useStats: boolean;
@@ -236,6 +247,7 @@ export const V2_PARAMS: V2Params = {
 	lowOvrRoles: false,
 	gatePen: 8,
 	honest: true,
+	nouns: true,
 	useStats: false,
 	famSoft: 0,
 	famOutW: 0,
@@ -373,6 +385,12 @@ export type V2Options = ClassifyOptions & {
 	pickKey?: string;
 	// archreview2: his potential (the honest names: upside is potential well above his ovr)
 	pot?: number;
+	// archnouns: the user's "Doesn't fit" verdicts with no pick: the name shown, the player's key and his ratings then
+	rejects?: readonly {
+		key?: string;
+		name: string;
+		ratings?: ArchetypeRatings;
+	}[];
 };
 
 const allowedBuild = (
@@ -476,7 +494,7 @@ export const classifyV2 = (
 		{ margin: number; name: string; mu: number }
 	>();
 	for (const r of ROLES) {
-		if (!r.groups.includes(group)) {
+		if (!r.groups.includes(group) || r.nounOnly) {
 			continue;
 		}
 		if (!P.lowOvrRoles && LOW_OVR_ROLES.has(r.key)) {
@@ -632,7 +650,7 @@ export const classifyV2 = (
 	// Descriptors he passes
 	const descTests = new Map<string, { margin: number; mu: number }>();
 	for (const d of DESCRIPTORS) {
-		if (d.groups && !d.groups.includes(group)) {
+		if ((d.groups && !d.groups.includes(group)) || d.nounOnly) {
 			continue;
 		}
 		const t = testConcept(d.concept, false, ctx, pick?.[d.key] ?? d.names[0]!);
@@ -1004,6 +1022,89 @@ export const classifyV2 = (
 	// elite words only from ELITE_OVR, and under MID_OVR only an honest name unless two skills clear a real bar; every word
 	// of the label must clear its gate. The reading's pick stays when it is honest for him; else the best candidate that is;
 	// else an honest name (a specialist, a developing or a depth name).
+	// archnouns: the name from his nouns (nouns.ts): a special name (a build), his two best nouns and his position, a
+	// trait name, or (one noun at low ovr, or none) an honest name about that noun
+	let nounHonest: NounKey | null | undefined;
+	let nounConf: number | undefined;
+	let nounDefense: string | undefined;
+	if (P.nouns && isPos(pos)) {
+		const prevParsed = prevComposed ? parseComposedId(prevRaw) : undefined;
+		const prevNouns =
+			prevParsed &&
+			(prevParsed.role.key.startsWith("pos") ||
+				prevParsed.role.key === "bruiser" ||
+				prevParsed.role.key === "enigma")
+				? prevParsed.descs
+						.map((d) => nounOfDesc(d.key))
+						.filter((n): n is NounKey => n !== undefined)
+				: undefined;
+		const np = pickNouns({
+			r: ratings,
+			pos,
+			ovr: opts.ovr,
+			pot: opts.pot,
+			age: opts.age,
+			prospect: opts.prospect,
+			traits: opts.traits as Record<string, number> | undefined,
+			rq: (norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+			rejected: opts.rejects?.map((rj): Rejection => ({
+				name: rj.name,
+				own: rj.key !== undefined && rj.key === opts.pickKey,
+				...(rj.ratings
+					? {
+							pct: Object.fromEntries(
+								nounScores(
+									rj.ratings,
+									(norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+								).map((x) => [x.key, x.pct]),
+							),
+						}
+					: {}),
+			})),
+			prev: {
+				nouns: prevNouns,
+				special: prevRaw && !prevComposed ? mergedId(prevRaw) : undefined,
+			},
+		});
+		const score = eff(first);
+		nounConf = np.conf;
+		nounDefense = np.defense;
+		if (np.kind === "special") {
+			const a = archetypeById(np.id)!;
+			const nm = nameAt(a, pos);
+			const parsed = parseName(nm, pos);
+			first = {
+				id: np.id,
+				name: nm,
+				canon: np.id,
+				family: familyOfName(nm, pos),
+				role: parsed.role,
+				descs: parsed.descs,
+				kind: "build",
+				score,
+			};
+		} else if (np.kind === "composed" || np.kind === "trait") {
+			const role = ROLE_BY_KEY.get(np.kind === "trait" ? np.key : np.role)!;
+			const descs =
+				np.kind === "trait" ? [] : np.descs.map((k) => DESC_BY_KEY.get(k)!);
+			const wp: WordPick =
+				np.kind === "trait" ? { [np.key]: np.name } : (np.pick ?? {});
+			const id = composedId(role, descs, group, wp);
+			const nm = composeName(role, descs, group, wp);
+			first = {
+				id,
+				name: nm,
+				canon: id,
+				family: role.family ?? familyOfName(nm, pos),
+				role: role.key,
+				descs: descs.map((d) => d.key),
+				kind: "comp",
+				score,
+			};
+		} else {
+			nounHonest = np.noun ?? null;
+		}
+	}
 	const tier = P.honest ? tierOf(opts.ovr) : "elite";
 	const honestFor = (c: V2Candidate) =>
 		(P.gatePen === 0 || gatePasses(c)) &&
@@ -1012,8 +1113,10 @@ export const classifyV2 = (
 		const cleared = skillsOf(ratings, norms.rq).filter(
 			(x) => x.margin >= 0,
 		).length;
-		const onlyHonest = tier === "low" && cleared <= 1;
-		if (onlyHonest || !honestFor(first)) {
+		const onlyHonest = P.nouns
+			? nounHonest !== undefined
+			: tier === "low" && cleared <= 1;
+		if (onlyHonest || (!P.nouns && !honestFor(first))) {
 			const alt = onlyHonest
 				? undefined
 				: cands
@@ -1031,6 +1134,10 @@ export const classifyV2 = (
 					prospect: opts.prospect,
 					seed: opts.pickKey ?? opts.srID ?? `${ratings.hgt}|${ratings.stre}`,
 					rq: norms.rq,
+					...(nounHonest !== undefined
+						? { skill: nounHonest === null ? null : NOUN_SKILL[nounHonest] }
+						: {}),
+					traits: opts.traits as Record<string, number> | undefined,
 				});
 				const role = ROLE_BY_KEY.get(h.key)!;
 				const id = composedId(role, [], group, { [h.key]: h.name });
@@ -1084,6 +1191,10 @@ export const classifyV2 = (
 					),
 				));
 	}
+	// (archnouns: how clearly his nouns name him)
+	if (nounConf !== undefined) {
+		confidence = nounConf;
+	}
 	const a = archetypeById(first.id)!;
 	const isClassic = first.id === classic.id;
 	// archv4: the runner-up, when it is close
@@ -1098,7 +1209,10 @@ export const classifyV2 = (
 		...classic,
 		id: a.id,
 		name: isComposedId(a.id) ? a.name : first.classic ? classic.name : a.name,
-		label: isComposedId(a.id) ? a.name : first.classic ? classic.label : a.name,
+		label:
+			(isComposedId(a.id) ? a.name : first.classic ? classic.label : a.name) +
+			(nounDefense ? ` · ${nounDefense}` : ""),
+		...(nounDefense ? { defense: nounDefense } : {}),
 		group: a.group,
 		family: a.family,
 		desc: a.desc,
@@ -1131,6 +1245,25 @@ export const classifyV2 = (
 			classicScore: classicCand.score,
 		},
 	};
+};
+
+// archnouns: the honest skill a noun is
+const NOUN_SKILL: Record<NounKey, Skill> = {
+	three: "shoot",
+	mid: "mid",
+	post: "post",
+	finish: "dunk",
+	rimD: "rimD",
+	perimD: "perD",
+	steal: "perD",
+	handle: "handle",
+	creator: "handle",
+	pass: "pass",
+	reb: "reb",
+	speed: "speed",
+	jump: "jump",
+	strength: "strength",
+	crafty: "pass",
 };
 
 // The shipped picks (userPicks.data.ts) under the league's own (a league's copy of a shipped pick replaces it)

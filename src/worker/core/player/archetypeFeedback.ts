@@ -13,8 +13,14 @@ import {
 	type FeedbackPick,
 	type Tuning,
 } from "../../../common/archetypes/tuning.ts";
-import { modelFor } from "../../../common/archetypes/classify.ts";
-import { refsFromPicks } from "../../../common/archetypes/v2/picks.ts";
+import { pickKey, refsFromPicks } from "../../../common/archetypes/v2/picks.ts";
+import {
+	archetypeById,
+	modelFor,
+} from "../../../common/archetypes/classify.ts";
+import { mergedId } from "../../../common/archetypes/merges.data.ts";
+import { nameAt } from "../../../common/archetypes/posNames.ts";
+import type { ArchetypeRatings } from "../../../common/archetypes/types.ts";
 import type { RefRow } from "../../../common/archetypes/v2/knn.ts";
 
 export const FEEDBACK_KEY = "archetypeFeedback";
@@ -76,8 +82,20 @@ export const tuningPicks = async (): Promise<FeedbackPick[]> => {
 	return glob.enabled ? mergePicks(glob.picks, league) : league;
 };
 
+// archnouns: a "Doesn't fit" verdict with no pick: the name he was shown is never his again (nor a near player's)
+export type PickRejection = {
+	key: string;
+	name: string;
+	ratings?: ArchetypeRatings;
+};
 let active:
-	| { lid: unknown; tuning: Tuning; refs: RefRow[]; refsKey: string }
+	| {
+			lid: unknown;
+			tuning: Tuning;
+			refs: RefRow[];
+			refsKey: string;
+			rejects: PickRejection[];
+	  }
 	| undefined;
 
 // The tuning in force (none until the first refit for this league)
@@ -86,9 +104,16 @@ export const activeTuning = (): Tuning =>
 
 // archv3: the picks as labeled players for the reading's neighbours (common/archetypes/v2/picks.ts), with a key that
 // changes when they do
-const NO_REFS = { refs: [] as RefRow[], refsKey: "" };
-export const activePickRefs = (): { refs: RefRow[]; refsKey: string } =>
-	active && active.lid === g.get("lid") ? active : NO_REFS;
+const NO_REFS = {
+	refs: [] as RefRow[],
+	refsKey: "",
+	rejects: [] as PickRejection[],
+};
+export const activePickRefs = (): {
+	refs: RefRow[];
+	refsKey: string;
+	rejects: PickRejection[];
+} => (active && active.lid === g.get("lid") ? active : NO_REFS);
 
 const hashString = (str: string) => {
 	let h = 5381;
@@ -102,16 +127,35 @@ export const refitArchetypeTuning = async (): Promise<Tuning> => {
 	const picks = await tuningPicks();
 	const tuning = fitTuning(picks, modelFor);
 	const labeled = picks.filter((p) => p.picked && p.input?.ratings);
+	const rejects: PickRejection[] = [];
+	for (const p of picks) {
+		if (p.picked || !p.shown) {
+			continue;
+		}
+		const a = archetypeById(mergedId(p.shown));
+		if (!a) {
+			continue;
+		}
+		const [lid, pid] = p.uid.split("-");
+		rejects.push({
+			key: pickKey(lid, pid),
+			name: nameAt(a, p.pos),
+			...(p.input?.ratings ? { ratings: p.input.ratings } : {}),
+		});
+	}
 	active = {
 		lid: g.get("lid"),
 		tuning,
 		refs: refsFromPicks(labeled),
 		refsKey: hashString(
-			labeled
-				.map((p) => `${p.uid}=${p.picked}`)
+			[
+				...labeled.map((p) => `${p.uid}=${p.picked}`),
+				...rejects.map((r) => `${r.key}!${r.name}`),
+			]
 				.sort()
 				.join(","),
 		),
+		rejects,
 	};
 	return tuning;
 };

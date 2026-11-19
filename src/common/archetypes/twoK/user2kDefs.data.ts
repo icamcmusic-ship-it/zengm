@@ -1075,8 +1075,8 @@ export const USER_2K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "perimeter-shot-hunter",
-		name: "Perimeter Shot Hunter",
-		aliases: [],
+		name: "Pull-Up Shot Hunter",
+		aliases: ["Perimeter Shot Hunter"],
 		group: "wing",
 		family: "scorer",
 		positions: ["PG", "G", "SG", "GF", "SF", "F"],
@@ -1177,8 +1177,8 @@ export const USER_2K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "pressure-cooker",
-		name: "Pressure Cooker",
-		aliases: [],
+		name: "Point-of-Attack Pest",
+		aliases: ["Pressure Cooker"],
 		group: "wing",
 		family: "defender",
 		positions: ["PG", "G", "SG", "GF", "SF", "F"],

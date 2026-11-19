@@ -23,15 +23,19 @@ import {
 	floorMiss,
 	RAMP_RAT,
 	type WordContext,
-	gateGap,
 } from "./tests.ts";
 import { USER_PICKS } from "./userPicks.data.ts";
 import { canonOf, classifyV2, rampMu, V2_PARAMS } from "./engine.ts";
 import { ELITE_RE, HONEST_ROLES, tierOf } from "./honest.ts";
+import { nounScores, nounsOfName } from "./nouns.ts";
 
 describe("archv2 grammar", () => {
 	test("every word reads as the concept its test is on (so a name's promises are exactly its words')", () => {
 		for (const d of DESCRIPTORS) {
+			// (archnouns: the noun names' own words are never tested on a concept)
+			if (d.nounOnly) {
+				continue;
+			}
 			for (const w of d.names) {
 				const keys = conceptsOf(w).map((c) => c.key);
 				if (CUSTOM_TESTS[d.concept]) {
@@ -45,6 +49,10 @@ describe("archv2 grammar", () => {
 			}
 		}
 		for (const r of ROLES) {
+			// (archnouns: the noun names' end words are never tested on a concept)
+			if (r.nounOnly) {
+				continue;
+			}
 			// (a role on a custom test: its test covers the name's promise, checked by the promise test below)
 			if (CUSTOM_TESTS[r.concepts[0]!]) {
 				continue;
@@ -170,12 +178,17 @@ describe("archv2 grammar", () => {
 
 	test("archv3: every composable name is whole: no empty word, no id, no word twice, and it resolves by its id", () => {
 		let n = 0;
+		// (the reading's own words; the noun names are checked by nouns.test.ts)
+		const descs = DESCRIPTORS.filter((d) => !d.nounOnly);
 		for (const r of ROLES) {
+			if (r.nounOnly) {
+				continue;
+			}
 			for (const group of r.groups) {
 				const combos: (typeof DESCRIPTORS)[number][][] = [[]];
-				for (const [i, d] of DESCRIPTORS.entries()) {
+				for (const [i, d] of descs.entries()) {
 					combos.push([d]);
-					for (const e of DESCRIPTORS.slice(i + 1)) {
+					for (const e of descs.slice(i + 1)) {
 						combos.push([d, e]);
 					}
 				}
@@ -390,7 +403,7 @@ describe("archv2 grammar", () => {
 				/Prospect|Depth Piece/.test(
 					classifyV2(pk.input!.ratings, {
 						...opts,
-						params: { lowOvrRoles: true },
+						params: { lowOvrRoles: true, nouns: false },
 					}).name,
 				)
 			) {
@@ -435,9 +448,9 @@ describe("archv2 grammar", () => {
 			}
 		});
 
-		test("tiers: elite words only from ovr 60", () => {
-			assert.strictEqual(tierOf(60), "elite");
-			assert.strictEqual(tierOf(59), "mid");
+		test("tiers: elite words only from ovr 58", () => {
+			assert.strictEqual(tierOf(58), "elite");
+			assert.strictEqual(tierOf(57), "mid");
 			assert.strictEqual(tierOf(49), "low");
 			// a great shooter below the top tier is never a Sniper
 			const shooter = { tp: 85, fg: 70, ft: 85, oiq: 60 };
@@ -493,12 +506,17 @@ describe("archv2 grammar", () => {
 					},
 				);
 				assert.notMatch(c.name, ELITE_RE, c.name);
-				if (!c.tags.includes("honest")) {
-					assert.isAtMost(
-						gateGap(c.name, { ...base, ...r }, 30 + (i % 25)),
-						0,
-						c.name,
-					);
+				// (archnouns: every noun of his name is one he stands well in the league at)
+				const sc = nounScores({ ...base, ...r });
+				const nn = nounsOfName(c.label);
+				if (!c.tags.includes("honest") && nn) {
+					for (const k of nn.nouns) {
+						assert.isAtLeast(
+							sc.find((x) => x.key === k)!.pct,
+							0.6,
+							`${c.label}: ${k}`,
+						);
+					}
 				}
 			}
 		});

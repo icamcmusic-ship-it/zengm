@@ -127,7 +127,12 @@ describe("archetype table: every archetype is an NBA 2K build", () => {
 			seen.push(d.name, ...d.aliases);
 		}
 		assert.strictEqual(seen.length, new Set(seen).size);
-		assert.deepStrictEqual([...new Set(seen)].sort(), [...all].sort());
+		// (archnouns: every 2K name is covered; a build renamed for the user (Bully Playmaker, Mid-Range Assassin, ...)
+		// keeps its 2K name as an alias)
+		const seenSet = new Set(seen);
+		for (const n of all) {
+			assert.ok(seenSet.has(n), n);
+		}
 		for (const id of Object.keys(TWO_K_NAMES)) {
 			assert.ok(archetypeById(id), id);
 		}

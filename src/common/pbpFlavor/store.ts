@@ -172,18 +172,65 @@ const isInt = (x: unknown): x is number =>
 const isHundredths = (x: number) =>
 	Number.isFinite(x) && Math.round(x * 100) / 100 === x;
 
-// Appends to a string (V8 makes that cheap), rather than collecting one-character strings to join
+// perf4: the alphabet's character codes, and a decoder for runs of them (all ASCII)
+const ALPHABET_CODES = Array.from(ALPHABET, (c) => c.charCodeAt(0));
+const asciiDecoder = new TextDecoder("latin1");
+
+// perf4: collects the characters' codes in a growing byte buffer and makes a string of them once, instead of appending one
+// character at a time to a string (every append was a new string object: a game's play-by-play made several thousand, the
+// largest allocation of a season after the box scores). The same string as before: a value outside the alphabet (never written)
+// still appends "undefined", as the old string append did
+// (the buffers are kept between games, one per writer of an encoding: encodePlayByPlay runs start to end without awaiting)
+const writerBuffers = [new Uint8Array(4096), new Uint8Array(4096)];
 class Writer {
-	out = "";
+	private slot: number;
+	private buf: Uint8Array;
+	private n = 0;
+	private parts: string[] = [];
+	constructor(slot: 0 | 1) {
+		this.slot = slot;
+		this.buf = writerBuffers[slot]!;
+	}
+	private push(code: number) {
+		if (this.n === this.buf.length) {
+			const bigger = new Uint8Array(this.buf.length * 2);
+			bigger.set(this.buf);
+			this.buf = bigger;
+			writerBuffers[this.slot] = bigger;
+		}
+		this.buf[this.n] = code;
+		this.n += 1;
+	}
+	private char(index: number) {
+		const code = ALPHABET_CODES[index];
+		if (code === undefined) {
+			this.raw(String(ALPHABET[index]));
+		} else {
+			this.push(code);
+		}
+	}
+	private flush() {
+		if (this.n > 0) {
+			this.parts.push(asciiDecoder.decode(this.buf.subarray(0, this.n)));
+			this.n = 0;
+		}
+	}
 	num(v: number) {
 		while (v >= 32) {
-			this.out += ALPHABET[32 + (v % 32)]!;
+			this.char(32 + (v % 32));
 			v = Math.floor(v / 32);
 		}
-		this.out += ALPHABET[v]!;
+		this.char(v);
 	}
 	raw(s: string) {
-		this.out += s;
+		this.flush();
+		this.parts.push(s);
+	}
+	get out() {
+		this.flush();
+		const out = this.parts.join("");
+		this.parts = [out];
+		return out;
 	}
 }
 
@@ -249,7 +296,7 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 		}
 	}
 
-	const body = new Writer();
+	const body = new Writer(0);
 	let prevClock = 0;
 
 	const pidOk = (x: unknown) => x === undefined || isInt(x);
@@ -403,7 +450,7 @@ export const encodePlayByPlay = (events: readonly any[]): string => {
 		body.raw(json);
 	}
 
-	const head = new Writer();
+	const head = new Writer(1);
 	head.num(VERSION);
 	const rivalry = init?.boxScore?.[0]?.pbpRivalry;
 	head.num(isInt(rivalry) ? rivalry : 0);

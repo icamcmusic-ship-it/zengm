@@ -62,7 +62,9 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // vote; last season's label kept by 1.2 and in its own words; no Prospect / Depth Piece label)
 // archreview: 22 (the user's reviews of 995 labels: absolute gates on every word of a name, honest names for limited
 // players by ovr tier and skills, ratings and traits only: no box score or play types)
-export const ARCHETYPE_READING_VERSION = 22;
+// archnouns: 23 (names from nouns: a special name, two nouns and his position, or an honest name; a defensive label; the
+// user's verdicts as vetoes)
+export const ARCHETYPE_READING_VERSION = 23;
 
 export const toStored = (
 	season: number,
@@ -80,6 +82,9 @@ export const toStored = (
 	if (c.also) {
 		out.also = c.also.id;
 	}
+	if (c.defense) {
+		out.def = c.defense;
+	}
 	return out;
 };
 
@@ -95,6 +100,8 @@ export type ArchetypeView = {
 	season: number;
 	// archv4: the close runner-up's name at his position
 	also?: string;
+	// archnouns: his defensive label (also in `label`, after the name)
+	defense?: string;
 };
 
 // A stored entry as the UI shows it; null if its archetype no longer exists (an id from an older version), or, given his
@@ -141,7 +148,8 @@ export const viewOf = (
 	return {
 		id: a.id,
 		name,
-		label: name,
+		label: e.def ? `${name} · ${e.def}` : name,
+		...(e.def ? { defense: e.def } : {}),
 		group: a.group,
 		family: a.family,
 		desc: a.desc,

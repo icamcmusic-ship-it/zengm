@@ -18,7 +18,6 @@ export const TWO_K_DEFS: TwoKDef[] = [
 			"Board-Enforcing 3-Level Dimer",
 			"Board-Hunting Stretch Riser",
 			"Crafty 3-Level Scoring Cleaner",
-			"Crafty 3-Level-Scoring Cleaner",
 			"Physical 2-Way 3-Level Crasher",
 		],
 		group: "forward",
@@ -167,7 +166,7 @@ export const TWO_K_DEFS: TwoKDef[] = [
 			"Edge-Enforcing Stretch Slasher",
 			"Gritty Inside-Out Slasher",
 			"Rim-Rocking Stretch Slasher",
-			"Rim-Wrecking Strech",
+			"Rim-Wrecking Stretch",
 		],
 		group: "wing",
 		family: "slasher",
@@ -428,8 +427,8 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "2-way-bulldimer",
-		name: "2-Way Bulldimer",
-		aliases: [],
+		name: "2-Way Bully Playmaker",
+		aliases: ["2-Way Bulldimer"],
 		group: "wing",
 		family: "hustle",
 		positions: ["GF", "SF", "F"],
@@ -882,7 +881,7 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	{
 		id: "2-way-high-flying-slasher",
 		name: "2-Way High-Flying Slasher",
-		aliases: ["2-Way PlaySlaSh Bully", "2-Way PlaySlash Bully"],
+		aliases: ["2-Way PlaySlash Bully"],
 		group: "wing",
 		family: "slasher",
 		positions: ["PG", "G", "SG", "GF", "SF", "F"],
@@ -1418,8 +1417,9 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "2-way-mid-range-menace",
-		name: "2-Way Mid-Range Menace",
+		name: "2-Way Mid-Range Assassin",
 		aliases: [
+			"2-Way Mid-Range Menace",
 			"2-Way Mid-Post Playmaker",
 			"2-Way Middy-Creating Cleaner",
 			"Lock & Board Middy Maestro",
@@ -1573,7 +1573,7 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	{
 		id: "2-way-paint-scoring-cleaner",
 		name: "2-Way Paint-Scoring Cleaner",
-		aliases: ["Post-Scoreing Board Enforcer"],
+		aliases: [],
 		group: "forward",
 		family: "rebounder",
 		positions: ["F", "PF", "FC"],
@@ -2431,7 +2431,6 @@ export const TWO_K_DEFS: TwoKDef[] = [
 		id: "3pt-sniping-rim-wrecker",
 		name: "3PT-Sniping Rim Wrecker",
 		aliases: [
-			"3PT-Snipping Rim Wrecker",
 			"Backline Pick & Pop Dimer",
 			"Backline Stretch Lob Threat",
 			"Board-Hunting 3PT Lob Threat",
@@ -2610,8 +2609,8 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "backline-bulldimer",
-		name: "Backline Bulldimer",
-		aliases: ["Power-Dimming Glass Guardian"],
+		name: "Backline Bully Playmaker",
+		aliases: ["Backline Bulldimer", "Power-Diming Glass Guardian"],
 		group: "forward",
 		family: "hustle",
 		positions: ["F", "PF", "FC"],
@@ -3201,8 +3200,8 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "ball-hawking-mid-range-menace",
-		name: "Ball-Hawking Mid-Range Menace",
-		aliases: [],
+		name: "Ball-Hawking Mid-Range Assassin",
+		aliases: ["Ball-Hawking Mid-Range Menace"],
 		group: "guard",
 		family: "scorer",
 		positions: ["PG", "G", "SG", "GF"],
@@ -3476,8 +3475,9 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "board-enforcing-bullmasher",
-		name: "Board-Enforcing Bullmasher",
+		name: "Board-Enforcing Bully Finisher",
 		aliases: [
+			"Board-Enforcing Bullmasher",
 			"2-Way Diming Power Finisher",
 			"2-Way Paint-Pounding Cleaner",
 			"2-Way Paint-Pounding Crasher",
@@ -3509,7 +3509,7 @@ export const TWO_K_DEFS: TwoKDef[] = [
 		id: "board-enforcing-diming-riser",
 		name: "Board-Enforcing Diming Riser",
 		aliases: [
-			"2-Way Mid-Post-Dimming Crasher",
+			"2-Way Mid-Post-Diming Crasher",
 			"Board-Enforcing Middy Maestro",
 			"Diming Lob Threat Crasher",
 			"Glass Guardian Middy Maestro",
@@ -4146,8 +4146,8 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "crafty-mid-range-menace",
-		name: "Crafty Mid-Range Menace",
-		aliases: [],
+		name: "Crafty Mid-Range Assassin",
+		aliases: ["Crafty Mid-Range Menace"],
 		group: "guard",
 		family: "scorer",
 		positions: ["G", "SG", "GF"],
@@ -5183,8 +5183,8 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "gritty-mid-range-menace",
-		name: "Gritty Mid-Range Menace",
-		aliases: [],
+		name: "Gritty Mid-Range Assassin",
+		aliases: ["Gritty Mid-Range Menace"],
 		group: "guard",
 		family: "scorer",
 		positions: ["G", "SG", "GF"],
@@ -5581,7 +5581,6 @@ export const TWO_K_DEFS: TwoKDef[] = [
 			"Board-Enforcing Stretch Dunker",
 			"Board-Hunting Stretch Slasher",
 			"Diming Inside-Out Crasher",
-			"Inside-Out-Slashing-Cleaner",
 			"Stretch Lob Threat Crasher",
 		],
 		group: "wing",
@@ -5861,7 +5860,6 @@ export const TWO_K_DEFS: TwoKDef[] = [
 		name: "Mid-Paint-Scoring Cleaner",
 		aliases: [
 			"3-Level Scoring Cleaner",
-			"3-Level-Scoring Cleaner",
 			"3-Level-Scoring Crasher",
 			"Board-Enforcing 3-Level Scorer",
 		],
@@ -5920,8 +5918,8 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "mid-range-menace",
-		name: "Mid-Range Menace",
-		aliases: [],
+		name: "Mid-Range Assassin",
+		aliases: ["Mid-Range Menace"],
 		group: "wing",
 		family: "scorer",
 		positions: ["GF", "SF", "F"],
@@ -6603,8 +6601,12 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "physical-mid-range-menace",
-		name: "Physical Mid-Range Menace",
-		aliases: ["2-Way Crafty Mid-Post Creator", "Physical Mid-Post Creator"],
+		name: "Physical Mid-Range Assassin",
+		aliases: [
+			"Physical Mid-Range Menace",
+			"2-Way Crafty Mid-Post Creator",
+			"Physical Mid-Post Creator",
+		],
 		group: "wing",
 		family: "scorer",
 		positions: ["PG", "G", "GF", "SF", "F"],
@@ -6963,8 +6965,8 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	},
 	{
 		id: "post-dimming-board-enforcer",
-		name: "Post-Dimming Board Enforcer",
-		aliases: ["2-Way Post-Up Stretch Cleaner"],
+		name: "Post-Diming Board Enforcer",
+		aliases: ["Post-Dimming Board Enforcer", "2-Way Post-Up Stretch Cleaner"],
 		group: "big",
 		family: "rebounder",
 		positions: ["F", "PF", "FC", "C"],
@@ -7257,7 +7259,6 @@ export const TWO_K_DEFS: TwoKDef[] = [
 			"Edge-Enforcing 3PT Slasher",
 			"Inside-Out Playmaking Eraser",
 			"Inside-Out-Creating Eraser",
-			"Inside-Out-Dimming Eraser",
 			"Rim-Reaping Inside-Out Pilot",
 			"Rim-Reaping Stretch Dunker",
 			"Rim-Reaping Stretch Rim Rocker",
@@ -8459,7 +8460,7 @@ export const TWO_K_DEFS: TwoKDef[] = [
 	{
 		id: "versatile-scoring-cleaner",
 		name: "Versatile-Scoring Cleaner",
-		aliases: ["Versatile-Scoring-Cleaner"],
+		aliases: [],
 		group: "wing",
 		family: "rebounder",
 		positions: ["G", "SG", "GF", "F", "PF", "FC"],

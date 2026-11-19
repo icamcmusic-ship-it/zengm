@@ -14,6 +14,8 @@ import type { FPlayer } from "./types.ts";
 export const CAREER_STATS = ["pts", "trb", "ast", "tp", "blk", "stl"] as const;
 export type CareerStat = (typeof CAREER_STATS)[number];
 const TOTAL_STATS = ["pts", "trb", "ast", "tp"] as const;
+// (perf4: the stats rows' keys of the single-game highs, made once rather than for every row of every player before each game)
+const MAX_KEYS = CAREER_STATS.map((stat) => `${stat}Max`);
 
 // The layout of pbpCareer. -1 = not known. Never reorder: stored games use it
 const FLAGS = 0;
@@ -87,11 +89,12 @@ export const careerFromStats = (
 	out[GP_SEASON] = gpSeason;
 	out[TD] = td ?? -1;
 	out[AGE] = num(info.age) && info.age >= 0 ? Math.round(info.age) : -1;
-	for (const [i, stat] of CAREER_STATS.entries()) {
+	for (let i = 0; i < CAREER_STATS.length; i++) {
+		const maxKey = MAX_KEYS[i]!;
 		let high: number | undefined = 0;
 		let seasonHigh: number | undefined = 0;
 		for (const r of played) {
-			const m = r[`${stat}Max`];
+			const m = r[maxKey];
 			const v = Array.isArray(m) && num(m[0]) ? m[0] : undefined;
 			if (v === undefined) {
 				high = undefined;
