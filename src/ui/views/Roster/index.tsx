@@ -33,6 +33,7 @@ import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { confirm } from "../../util/confirm.tsx";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { ArchetypeRosterPanel } from "../../components/Archetype/ArchetypeRosterPanel.tsx";
+import { RosterStashSection } from "../../components/DraftStash.tsx";
 import { useIsCollege } from "../../util/collegeMode.ts";
 import { classYearAbbrev } from "../../../common/college/constants.ts";
 
@@ -129,6 +130,7 @@ const Roster = ({
 	showRelease,
 	showTradeFor,
 	showTradingBlock,
+	stash,
 	stats,
 	t,
 	tid,
@@ -615,6 +617,8 @@ const Roster = ({
 						: undefined
 				}
 			/>
+
+			<RosterStashSection stash={stash} />
 
 			{__SPORT === "basketball" && season === currentSeason ? (
 				<ArchetypeRosterPanel

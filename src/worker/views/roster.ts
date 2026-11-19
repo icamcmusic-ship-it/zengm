@@ -23,6 +23,7 @@ import {
 } from "../../common/coachSystems.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { canRedshirt, isRedshirting } from "../core/college/redshirt.ts";
+import { getTeamStashView } from "../core/draftStash/index.ts";
 
 const getRosterCoachSystem = async (tid: number) => {
 	const s = await getTeamCoachSystem(tid);
@@ -442,9 +443,18 @@ export default defineView({
 					? await getTeamGmInfo(await idb.cache.teams.get(inputs.tid))
 					: ({ type: "off" } as const);
 
+			// Draft-and-stash: the team's players abroad, and the user's picks that can be stashed
+			const stash =
+				__SPORT === "basketball" &&
+				!collegeLeague &&
+				inputs.season === g.get("season")
+					? await getTeamStashView(inputs.tid)
+					: undefined;
+
 			return {
 				editable,
 				gmInfo,
+				stash,
 				maxRosterSize: g.get("maxRosterSize"),
 				numPlayersOnCourt: g.get("numPlayersOnCourt"),
 				luxuryTaxAmount,

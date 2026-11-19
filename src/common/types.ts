@@ -1131,7 +1131,8 @@ export type LogEventType =
 	| "extension"
 	| "tradeRequest"
 	| "holdout"
-	| "draftPickCondition";
+	| "draftPickCondition"
+	| "draftStash";
 
 // https://stackoverflow.com/a/57103940/786644
 export type DistributiveOmit<T, K extends keyof T> = T extends any
@@ -1484,6 +1485,9 @@ type PlayerStatsCommon = {
 
 	// Only for pre-draft (college) rows, which have tid PLAYER.DOES_NOT_EXIST. The school or program name to show in the team column
 	teamName?: string;
+	// Draft-and-stash: an overseas season played while a team held his rights (after his draft year, tid PLAYER.DOES_NOT_EXIST).
+	// Shown with his pre-draft/overseas rows, never as a pro season (common/preDraft.ts)
+	stash?: true;
 	playoffs: boolean;
 	season: number;
 	tid: number;
@@ -1531,6 +1535,16 @@ export type MinimalPlayerRatings = {
 	spd: number;
 	endu: number;
 	locked?: boolean;
+};
+
+// Draft-and-stash rights (p.stash), see common/draftStash.ts
+export type PlayerStash = {
+	// Team holding his rights
+	tid: number;
+	// Season (offseason) he was stashed
+	season: number;
+	// Overseas league he plays in
+	league: string;
 };
 
 export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
@@ -1654,6 +1668,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	preDraftCareer?: StoredPreDraftCareer;
 	// Basketball: version of the college stats model his pre-draft stats were generated with (COLLEGE_STATS_VERSION in common/collegeStats/season.ts). Missing: 1, or not generated
 	collegeStatsV?: number;
+	// Draft-and-stash: while tid is PLAYER.STASHED, the team holding his rights and where he plays (common/draftStash.ts)
+	stash?: PlayerStash;
 
 	// Basketball, the Draft Class Shapes setting: the shape his class was given (a key of DRAFT_CLASS_SHAPES), or "pending" between being generated and being shaped
 	draftClassShape?: string;

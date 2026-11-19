@@ -379,7 +379,8 @@ const TopStuff = ({
 	const showContract =
 		player.tid !== PLAYER.UNDRAFTED &&
 		player.tid !== PLAYER.UNDRAFTED_FANTASY_TEMP &&
-		player.tid !== PLAYER.RETIRED;
+		player.tid !== PLAYER.RETIRED &&
+		player.tid !== PLAYER.STASHED;
 	const showTradeFor =
 		player.tid !== userTid && player.tid >= 0 && !collegeLeague;
 	const showTradingBlock = player.tid === userTid && !collegeLeague;

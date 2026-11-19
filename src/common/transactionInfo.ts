@@ -76,6 +76,10 @@ export const types: Partial<
 		text: "Re-signing",
 		category: "transaction",
 	},
+	draftStash: {
+		text: "Stashed Overseas",
+		category: "transaction",
+	},
 	release: {
 		text: "Released",
 		category: "transaction",

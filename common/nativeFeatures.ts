@@ -1181,6 +1181,18 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "draftStash",
+		college: false,
+		key: "featureDraftStash",
+		core: true,
+		name: "Draft-and-Stash",
+		description:
+			"Draft a prospect whose last season before the draft was with a club overseas and keep his rights while he keeps playing there: no roster spot and no salary, an overseas season added to his record each year, development like any player. Bring him over in a later offseason (rookie scale inside a year of the draft, otherwise a market contract, plus a buyout of his club contract as a team expense) before his rights lapse 4 seasons after the draft or at age 27. Rights can be traded; AI teams stash late picks who aren't ready and bring them over once they are.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "scoutingReports",
 		key: "featureScoutingReports",
 		core: true,

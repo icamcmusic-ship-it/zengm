@@ -2249,6 +2249,10 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 									tid: {
 										type: "integer",
 									},
+									// Draft-and-stash: an overseas season after his draft year (counts as pre-draft/overseas, not pro)
+									stash: {
+										type: "boolean",
+									},
 								},
 								required: ["playoffs", "season", "tid"],
 							},
@@ -2258,6 +2262,22 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 							items: {
 								type: "number",
 							},
+						},
+						// Draft-and-stash (basketball): while tid is -9 (stashed overseas), the team holding his rights
+						stash: {
+							type: "object",
+							properties: {
+								tid: {
+									type: "integer",
+								},
+								season: {
+									type: "integer",
+								},
+								league: {
+									type: "string",
+								},
+							},
+							required: ["tid", "season", "league"],
 						},
 						tid: {
 							type: "integer",

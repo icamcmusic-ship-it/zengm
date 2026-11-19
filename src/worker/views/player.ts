@@ -47,6 +47,7 @@ import {
 	isAdvStat,
 	sumAdv,
 } from "../../common/advStats.ts";
+import { getStashInfo } from "../core/draftStash/index.ts";
 
 export const processInputs = (
 	params: RouteParams<"player"> | RouteParams<"relatives">,
@@ -318,8 +319,9 @@ export const getCommon = async (
 
 	const p = {
 		...pWithoutMood,
+		// (no mood for a stashed player: he has no contract to be happy with until he is brought over)
 		mood:
-			pWithoutMood.tid !== PLAYER.RETIRED
+			pWithoutMood.tid !== PLAYER.RETIRED && pWithoutMood.tid !== PLAYER.STASHED
 				? await player.moodInfos(pRaw)
 				: undefined,
 	};
@@ -348,6 +350,9 @@ export const getCommon = async (
 		teamName = "Draft Prospect";
 	} else if (p.tid === PLAYER.RETIRED) {
 		teamName = "Retired";
+	} else if (p.tid === PLAYER.STASHED && pRaw.stash) {
+		const info = g.get("teamInfoCache")[pRaw.stash.tid];
+		teamName = `Stashed overseas (${info?.region} ${info?.name} rights)`;
 	}
 
 	const teams = await idb.cache.teams.getAll();
@@ -568,6 +573,9 @@ export const getCommon = async (
 		p.tid === PLAYER.UNDRAFTED_FANTASY_TEMP
 	) {
 		teamURL = helpers.leagueUrl(["draft_scouting"]);
+	} else if (p.tid === PLAYER.STASHED && pRaw.stash) {
+		const abbrev = g.get("teamInfoCache")[pRaw.stash.tid]?.abbrev;
+		teamURL = helpers.leagueUrl(["roster", `${abbrev}_${pRaw.stash.tid}`]);
 	}
 
 	if (season !== undefined) {
@@ -629,6 +637,8 @@ export const getCommon = async (
 		player: p,
 		randomDebutsForeverPids,
 		retired,
+		// Draft-and-stash: his rights while he plays abroad, or the Stash option for a user's draft pick
+		stashInfo: await getStashInfo(pRaw),
 		statSummary,
 		statTables,
 		teamColors,

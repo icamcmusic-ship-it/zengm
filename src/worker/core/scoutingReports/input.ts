@@ -4,7 +4,10 @@
 // Never true prospect ratings, never hidden trait scores, never the aging curve.
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { getPreDraftRanks } from "../draft/preDraftRanks.ts";
-import { getPreDraftStats } from "../../../common/preDraft.ts";
+import {
+	getPreDraftStats,
+	isPreDraftStatsRow,
+} from "../../../common/preDraft.ts";
 import { getPreDraftLabel } from "../../../common/collegeStats/overseas.ts";
 import {
 	COMBINE_COLUMN_BY_KEY,
@@ -270,7 +273,7 @@ const proRows = (p: Player, season: number) =>
 		(r) =>
 			r.season === season &&
 			!r.playoffs &&
-			!(r.tid === PLAYER.DOES_NOT_EXIST && r.season <= (p.draft.year ?? 0)),
+			!isPreDraftStatsRow(r, p.draft.year),
 	);
 
 export const proProductionFor = (p: Player, season: number) =>
@@ -398,7 +401,7 @@ const proSeasonsOf = (p: Player) =>
 				(r) =>
 					!r.playoffs &&
 					(r.gp ?? 0) >= 10 &&
-					!(r.tid === PLAYER.DOES_NOT_EXIST && r.season <= (p.draft.year ?? 0)),
+					!isPreDraftStatsRow(r, p.draft.year),
 			)
 			.map((r) => r.season),
 	).size;
