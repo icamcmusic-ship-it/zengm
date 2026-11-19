@@ -13,6 +13,7 @@ import type {
 } from "../../worker/db/connectLeague.ts";
 import { gameAttributesArrayToObject } from "../../common/gameAttributesArrayToObject.ts";
 import getAll from "../../common/getAll.ts";
+import { isValidSubArray, labeledSubs } from "../../common/subRatings.ts";
 
 // Otherwise it often pulls just one record per transaction, as it's hitting up against the high water mark
 const TWENTY_MEGABYTES_IN_BYTES = 20 * 1024 * 1024;
@@ -268,6 +269,15 @@ const makeExportStream = async (
 							if (store === "players") {
 								if (value.imgURL) {
 									delete value.face;
+								}
+
+								// Sub-ratings by name next to the compact array, so the file is readable (import reads either)
+								if (Array.isArray(value.ratings)) {
+									for (const r of value.ratings) {
+										if (isValidSubArray(r.sub)) {
+											r.subRatings = labeledSubs(r.sub);
+										}
+									}
 								}
 							}
 

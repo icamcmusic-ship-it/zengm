@@ -353,6 +353,28 @@ export const baseFromGroup = (
 export const baseFromSubs = (sub: readonly number[], base: SubBase) =>
 	baseFromGroup(sub, subGroupOf(base));
 
+// Exports: a ratings row's sub-ratings by name ({"Shot Blocking": 61, ...}), written next to the compact `sub` array so a league file
+// is readable. Import reads it back (subFromLabeled), so editing the named values in a file changes the player.
+export const labeledSubs = (sub: readonly number[]): Record<string, number> =>
+	Object.fromEntries(SUB_DEFS.map((d, i) => [d.name, sub[i]!]));
+
+// The `sub` array from a labeled object; each sub-rating may be named by its name, key or short label. Undefined unless all are there.
+export const subFromLabeled = (labeled: unknown): number[] | undefined => {
+	if (!labeled || typeof labeled !== "object" || Array.isArray(labeled)) {
+		return undefined;
+	}
+	const obj = labeled as Record<string, unknown>;
+	const sub: number[] = [];
+	for (const d of SUB_DEFS) {
+		const x = obj[d.name] ?? obj[d.key] ?? obj[d.label];
+		if (typeof x !== "number" || !Number.isFinite(x)) {
+			return undefined;
+		}
+		sub.push(Math.max(0, Math.min(100, Math.round(x))));
+	}
+	return sub;
+};
+
 export const isValidSubArray = (sub: unknown): sub is number[] =>
 	Array.isArray(sub) &&
 	sub.length === NUM_SUBS &&

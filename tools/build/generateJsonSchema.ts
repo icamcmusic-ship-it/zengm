@@ -162,6 +162,13 @@ const genRatings = (sport: Sport) => {
 				maximum: 100,
 			},
 		};
+		// The same sub-ratings by name ({"Shot Blocking": 61, ...}), written by exports; on import the named values win
+		properties.subRatings = {
+			type: "object",
+			additionalProperties: {
+				type: "number",
+			},
+		};
 	}
 
 	return {

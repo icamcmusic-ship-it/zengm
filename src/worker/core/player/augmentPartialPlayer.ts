@@ -2,6 +2,10 @@ import { PHASE, PLAYER } from "../../../common/constants.ts";
 import addRatingsRow from "./addRatingsRow.ts";
 import develop, { monteCarloPot } from "./develop.ts";
 import { ensureSubs } from "./subRatings.ts";
+import {
+	setBasesFromSubs,
+	subFromLabeled,
+} from "../../../common/subRatings.ts";
 import generate from "./generate.ts";
 import heightToRating from "./heightToRating.ts";
 import name from "./name.ts";
@@ -34,6 +38,31 @@ const augmentPartialPlayer = async (
 	scoutingLevel: number,
 	version: number | undefined,
 ): Promise<Player> => {
+	// Exported files carry each season's sub-ratings by name too (subRatings, see common/subRatings.ts labeledSubs); the named values win
+	if (Array.isArray(p.ratings)) {
+		for (const r of p.ratings) {
+			if (r && r.subRatings !== undefined) {
+				const sub = subFromLabeled(r.subRatings);
+				if (
+					sub &&
+					!(
+						Array.isArray(r.sub) &&
+						r.sub.length === sub.length &&
+						r.sub.every((x: unknown, i: number) => x === sub[i])
+					)
+				) {
+					// Edited in the file: the bases follow the named sub-ratings (ovr and the rest are recomputed on import)
+					r.sub = sub;
+					if (setBasesFromSubs(r).length > 0) {
+						delete r.ovr;
+						delete r.skills;
+					}
+				}
+				delete r.subRatings;
+			}
+		}
+	}
+
 	let age;
 
 	if (p.born === undefined) {
