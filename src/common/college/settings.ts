@@ -41,6 +41,7 @@ const EXTRAS_FORCED_OFF = [
 	"featureGmPersonalities",
 	"featureCollegeStats",
 	"featureCollegeSeason",
+	"featurePreDraftPaths",
 	"featureDraftClassShapes",
 	"featureRatingsRegenerator",
 	"scoutingSystem",

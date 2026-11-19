@@ -98,7 +98,7 @@ describe("career model", () => {
 			// The draft year school is his own school, never a redshirt year
 			assert.strictEqual(years.at(-1)!.school, result.school);
 			assert.notStrictEqual(years.at(-1)!.status, "redshirt");
-			if (p.college !== "") {
+			if (p.college !== "" && years.at(-1)!.level !== "pathway") {
 				assert.strictEqual(result.school, p.college);
 			}
 
@@ -139,7 +139,10 @@ describe("career model", () => {
 		let numJuco = 0;
 		for (const { p, result } of all()) {
 			const years = result.career?.years ?? [];
-			if (!years.some((year) => year.level !== "other")) {
+			// No class years outside college (pro clubs, the pro pathway program)
+			if (
+				!years.some((year) => year.level === "ncaa" || year.level === "juco")
+			) {
 				for (const year of years) {
 					assert.isUndefined(year.cls);
 					assert(year.status === undefined || year.status === "injury");

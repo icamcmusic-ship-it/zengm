@@ -3,7 +3,7 @@ import stats from "../../worker/core/player/stats.basketball.ts";
 import { COLLEGE_AWARD_PREFIX } from "../preDraft.ts";
 import { generateCollegeClass, getClassIndex } from "./index.ts";
 import { getClassIndexForStock } from "./generate.ts";
-import { COLLEGES } from "./colleges.ts";
+import { COLLEGES, PATHWAY_TEAM } from "./colleges.ts";
 import { Rng } from "./rng.ts";
 import { RATING_KEYS, type CollegeProspect } from "./types.ts";
 
@@ -207,6 +207,9 @@ describe("generateCollegeClass", () => {
 		for (const [i, result] of results.entries()) {
 			if (prospects[i]!.college === "") {
 				assert(result.school !== "");
+			} else if (result.career?.years.at(-1)?.level === "pathway") {
+				// An elite freshman picked for the pro pathway program (preDraftPaths)
+				assert.strictEqual(result.school, PATHWAY_TEAM);
 			} else {
 				assert.strictEqual(result.school, prospects[i]!.college);
 			}

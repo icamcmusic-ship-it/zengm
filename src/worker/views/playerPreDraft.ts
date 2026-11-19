@@ -23,8 +23,11 @@ import {
 } from "../../common/preDraft.ts";
 import {
 	PRO_SHORT,
+	TIER_NAMES,
 	getLeagueEnv,
+	getLeagueTier,
 	getPreDraftLabel,
+	isPathway,
 } from "../../common/collegeStats/overseas.ts";
 import { getSchool } from "../../common/collegeStats/colleges.helpers.ts";
 import {
@@ -53,6 +56,7 @@ import {
 import type { MinimalPlayerRatings, Player } from "../../common/types.ts";
 import {
 	JUCO_LEAGUE,
+	getMoveNote,
 	getStoryText,
 	isJuco,
 	type CareerYear,
@@ -61,6 +65,7 @@ import {
 import { COLLEGES } from "../../common/collegeStats/colleges.ts";
 import {
 	getScoutingReport,
+	type ReportPath,
 	type ReportRatings,
 } from "../../common/collegeStats/scoutingReport.ts";
 import {
@@ -420,6 +425,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 	let collegeIndex = 0;
 	const seasons = [];
 	let prevTeam: string | undefined;
+	let prevYear: CareerYear | undefined;
 	for (const entry of entries) {
 		const { teamName, year } = entry;
 		const row = entry.row ?? { season: entry.season, gp: 0, gs: 0 };
@@ -431,13 +437,15 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		const club = isNcaa || juco ? undefined : getClub(teamName, pRaw.pid);
 		const coachKey = club ? `${teamName}|${club}` : teamName;
 		const coach = getHeadCoach(coachKey, row.season, label === "Overseas");
+		const pathway = isPathway(teamName);
+		// Overseas league tier (preDraftPaths): stored with the season, or read off the league for a career stored before tiers
+		const tier = year?.tier ?? getLeagueTier(teamName);
 		const notes: string[] = [];
 		if (year?.move && prevTeam !== undefined && prevTeam !== teamName) {
-			notes.push(
-				year.move === "juco"
-					? `Junior college transfer from ${prevTeam}`
-					: `Transferred from ${prevTeam}`,
-			);
+			notes.push(getMoveNote(prevYear, year) ?? `Transferred from ${prevTeam}`);
+		}
+		if (pathway) {
+			notes.push("Skipped college for the pro pathway program");
 		}
 		if (year?.status) {
 			// Pre-Draft Injuries & Combine Medicals: the injury that ended it
@@ -453,6 +461,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 			);
 		}
 		prevTeam = teamName;
+		prevYear = year;
 
 		let record: TeamRecord | undefined;
 		let apRank: number | undefined;
@@ -511,12 +520,20 @@ const getPreDraftInfo = async (pRaw: Player) => {
 					? CLASS_NAMES[Math.min(collegeIndex++, 4)]
 					: undefined,
 			conference: isNcaa ? school.conference : undefined,
-			league: isNcaa ? undefined : juco ? JUCO_LEAGUE : teamName,
+			league: isNcaa
+				? undefined
+				: juco
+					? JUCO_LEAGUE
+					: pathway
+						? "Pro development games"
+						: teamName,
 			leagueShort: isNcaa
 				? undefined
 				: juco
 					? "JUCO"
 					: (PRO_SHORT[teamName] ?? teamName),
+			tier,
+			tierName: tier ? TIER_NAMES[tier] : undefined,
 			status: year?.status,
 			notes,
 			club,
@@ -663,6 +680,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		drafted,
 		prospect,
 		story: career?.story,
+		path: getReportPath(career, entries.at(-1)?.teamName),
 	});
 
 	// Similar prospects from past classes in this league
@@ -727,6 +745,37 @@ const getPreDraftInfo = async (pRaw: Player) => {
 	};
 };
 
+/**
+ * How he got to his last pre-draft season, for the scouting report (preDraftPaths): the pro pathway program, a transfer right before it, or the tier of his league abroad.
+ */
+const getReportPath = (
+	career: StoredPreDraftCareer | undefined,
+	lastTeam: string | undefined,
+): ReportPath | undefined => {
+	if (lastTeam === undefined) {
+		return undefined;
+	}
+	if (isPathway(lastTeam)) {
+		return { pathway: true };
+	}
+	const years = career?.years ?? [];
+	const last = years.at(-1);
+	const prev = years.at(-2);
+	if (
+		last &&
+		prev &&
+		last.level === "ncaa" &&
+		prev.level === "ncaa" &&
+		last.move &&
+		last.move !== "juco" &&
+		prev.school !== last.school
+	) {
+		return { transferredFrom: prev.school };
+	}
+	const tier = last?.tier ?? getLeagueTier(lastTeam);
+	return tier ? { tier } : undefined;
+};
+
 const REPORT_RATINGS = [
 	"hgt",
 	"stre",
@@ -779,6 +828,7 @@ const getReport = async (
 		drafted,
 		prospect,
 		story,
+		path,
 	}: {
 		rDraft: PlayerRatings | undefined;
 		lastSeason:
@@ -790,6 +840,7 @@ const getReport = async (
 		drafted: boolean;
 		prospect: boolean;
 		story: string | undefined;
+		path: ReportPath | undefined;
 	},
 ) => {
 	if (!rDraft) {
@@ -840,6 +891,7 @@ const getReport = async (
 				? (p.scouting ?? []).length
 				: undefined,
 		story,
+		path,
 	});
 };
 

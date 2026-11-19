@@ -304,7 +304,7 @@ export const preDraftProductionFor = (p: Player) => {
 			? "juco"
 			: label === "Overseas"
 				? "overseas"
-				: label === "G League"
+				: label === "G League" || label === "Pro pathway"
 					? "pro"
 					: "college";
 	const prod = productionFromRows(seasonRows, season, teamName ?? "", level);

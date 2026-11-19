@@ -466,7 +466,7 @@ export const recruitingSection = ({
 				s.season,
 				s.club ? `${s.club} (${s.teamName})` : s.teamName,
 				s.label === "Overseas"
-					? (s.league ?? "Overseas")
+					? `${s.league ?? "Overseas"}${s.tierName ? ` (${s.tierName.toLowerCase()})` : ""}`
 					: s.label === "JUCO"
 						? "Junior college"
 						: (s.conference ?? s.label ?? ""),
@@ -482,6 +482,7 @@ export const recruitingSection = ({
 				club: s.club,
 				league: s.league ?? s.teamName,
 				leagueShort: s.leagueShort,
+				tier: s.tier,
 				gp: s.gp,
 				leagueGames: s.leagueGames,
 			}));

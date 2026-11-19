@@ -105,13 +105,19 @@ export const adjustRecruitRank = ({
 	nationalRank,
 	story,
 	jucoStart,
+	pathway,
 }: {
 	pid: number;
 	nationalRank: number;
 	story: string | undefined;
 	jucoStart: boolean;
+	// He went to the pro pathway program (preDraftPaths), which only takes the very best of a high school class
+	pathway?: boolean;
 }): number | undefined => {
 	const rng = new Rng(`recruit-story|${pid}`);
+	if (pathway) {
+		return Math.min(nationalRank, 1 + Math.floor(rng.random() * 25));
+	}
 	if (story === "bust") {
 		return 2 + Math.floor(rng.random() * 21);
 	}
