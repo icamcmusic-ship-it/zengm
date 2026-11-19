@@ -10,6 +10,7 @@ import { PlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import { ScoutCell } from "./DraftScouting/DraftClass.tsx";
 import { MedicalGrade } from "../components/MedicalGrade.tsx";
 import { MEDICAL_EXPLANATION } from "../../common/draftCombine.ts";
+import { FlagsCell, RoomCell } from "../components/ScoutRoom.tsx";
 
 type Prospect = View<"draftBoard">["prospects"][number];
 
@@ -103,6 +104,8 @@ const DraftBoard = ({
 	const showRatings = !challengeNoRatings;
 	// Pre-Draft Injuries & Combine Medicals: once the class's combine was held
 	const showMedical = prospects.some((p) => p.medical !== undefined);
+	// Scout Consensus & Flags
+	const showRoom = prospects.some((p) => p.room !== undefined);
 
 	return (
 		<>
@@ -224,6 +227,16 @@ const DraftBoard = ({
 							<th>College / overseas</th>
 							{scoutingSystem && showRatings ? <th>Scout report</th> : null}
 							{showMedical ? <th title={MEDICAL_EXPLANATION}>Med</th> : null}
+							{showRoom ? (
+								<>
+									<th title="Your scouts' consensus slot in this class and how much they disagree (Agree, Mixed, Split). Hover for details">
+										Room
+									</th>
+									<th title="Red and green flags (hover to read them)">
+										Flags
+									</th>
+								</>
+							) : null}
 							<th>Notes</th>
 						</tr>
 					</thead>
@@ -394,6 +407,16 @@ const DraftBoard = ({
 												/>
 											) : null}
 										</td>
+									) : null}
+									{showRoom ? (
+										<>
+											<td>
+												<RoomCell room={p.room} />
+											</td>
+											<td>
+												<FlagsCell flags={p.room?.flags} />
+											</td>
+										</>
 									) : null}
 									<td>
 										<NoteInput p={p} />

@@ -27,12 +27,18 @@ import { getClassShapeInfo } from "../core/draft/classShape.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
 import { storedMedicalView } from "../core/draftCombine/index.ts";
+import {
+	getProspectRooms,
+	summarizeRoom,
+	type ProspectRoom,
+} from "../core/scoutingReports/room.ts";
 
 const getSeason = async (
 	playersAll: Player[],
 	season: number,
 	traitContext: TraitViewContext,
 	fantasy: boolean,
+	rooms: Map<number, ProspectRoom>,
 ) => {
 	const playersAllFiltered = playersAll.filter((p) => p.draft.year === season);
 	const players = await player.formatAll(playersAllFiltered, {
@@ -121,6 +127,8 @@ const getSeason = async (
 				archetype: archetypeByPid.get(pa.pid)?.label,
 				archetypeGroup: archetypeByPid.get(pa.pid)?.group,
 				traits: traitsByPid.get(pa.pid),
+				// Scout Consensus & Flags: the room's consensus, spread and the flags
+				room: rooms.has(pa.pid) ? summarizeRoom(rooms.get(pa.pid)!) : undefined,
 				// From a linked college league: his school there
 				linkedSchool: playersByPid.get(pa.pid)!.linkedCollege?.school,
 				// Pre-Draft Injuries & Combine Medicals: his medical grade, once his combine was held
@@ -205,10 +213,13 @@ export default defineView({
 			}
 
 			const traitContext = await getTraitViewContext();
+			const rooms = fantasyDraft
+				? new Map<number, ProspectRoom>()
+				: await getProspectRooms(players);
 			const seasons: Awaited<ReturnType<typeof getSeason>>[] = [];
 			for (let season = firstSeason; season <= maxDraftYear; season++) {
 				seasons.push(
-					await getSeason(players, season, traitContext, fantasyDraft),
+					await getSeason(players, season, traitContext, fantasyDraft, rooms),
 				);
 			}
 
