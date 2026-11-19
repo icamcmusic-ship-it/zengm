@@ -1,5 +1,9 @@
 import { g } from "../util/index.ts";
-import { getAwardCandidates } from "../core/awards/getAwardCandidates.ts";
+import {
+	awardCandidateStats,
+	getAwardCandidates,
+} from "../core/awards/getAwardCandidates.ts";
+import { getAwardKeyStats } from "../core/awards/keyStats.ts";
 import { groupByUnique } from "../../common/utils.ts";
 import { actualPhase } from "../util/actualPhase.ts";
 import { PHASE } from "../../common/constants.ts";
@@ -67,6 +71,11 @@ export default defineView({
 				players: [],
 				stats: [],
 				winner: [],
+				keyStats: getAwardKeyStats({
+					award: mvp,
+					fallback: awardCandidateStats[mvp.showStats] ?? [],
+					rows: [],
+				}),
 			};
 
 			return {

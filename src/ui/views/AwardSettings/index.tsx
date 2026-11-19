@@ -245,6 +245,7 @@ const AwardSettings = ({
 									<AwardRaceTable
 										confs={confs}
 										divs={divs}
+										picker={false}
 										rowsInfo={{ award, season, teams }}
 										titleOverride={title}
 									/>

@@ -139,6 +139,7 @@ export { default as archetypes } from "./archetypes.ts";
 export { default as hype } from "./hype.ts";
 export { default as bestGames } from "./bestGames.ts";
 export { default as awardVote } from "./awardVote.ts";
+export { default as awardHistory } from "./awardHistory.ts";
 export { default as timeline } from "./timeline.ts";
 export { default as leagueExtras } from "./leagueExtras.ts";
 export { default as tradeGrader } from "./tradeGrader.ts";

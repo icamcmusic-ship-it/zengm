@@ -40,6 +40,7 @@ import {
 	defenseAwardFormula,
 } from "./perimeterDefense.ts";
 import { trackingAwardFormula } from "./trackingAwards.ts";
+import { effectiveAwardFormula, formulaVariables } from "./keyStats.ts";
 
 const ROUGH_MPG_NEEDED_FOR_MIP = bySport({
 	baseball: undefined,
@@ -416,11 +417,7 @@ export const processAwards = async ({
 
 	for (const p of players) {
 		for (const award of awards) {
-			const formula =
-				award.formulaByPos?.[p.pos] ??
-				defenseAwardFormula(award) ??
-				trackingAwardFormula(award) ??
-				award.formula;
+			const formula = effectiveAwardFormula(award, p.pos);
 
 			// Used to skip based on award.formula or some hash of stuff that affects score (formula+statRange+mip) but I think it's not worth the complexity and as more features are added it'll just be a source of bugs. So now just assume shortName can be used to uniquely identify a score.
 
@@ -673,6 +670,21 @@ export const processAwards = async ({
 											for (const stat of stats) {
 												if (currentStats[stat] !== undefined) {
 													statOverrides[stat] = currentStats[stat];
+												}
+											}
+
+											// Also the stats the formula reads, so Award History can show this series' key stats later
+											for (const stat of formulaVariables(
+												effectiveAwardFormula(award, p.pos),
+												true,
+											)) {
+												const value = currentStats[stat];
+												if (
+													statOverrides[stat] === undefined &&
+													typeof value === "number" &&
+													Number.isFinite(value)
+												) {
+													statOverrides[stat] = value;
 												}
 											}
 										} else if (statOverridesByMatchup) {

@@ -97,6 +97,10 @@ if (__SPORT === "basketball") {
 }
 // Advanced Tracking Stats: what advDef is computed from
 const ADV_DEF_STATS = ["dfga", "dfgp", "rimDfga", "rimDfgp"];
+// Stats loaded straight from player stats rows (not computed for awards), for the Award Races/History stat picker
+export const AWARD_STATS_PLAIN: string[] = Array.from(
+	new Set(AWARD_STATS),
+).filter((key) => !BOTH_AWARD_STATS_SKIP.has(key));
 export const AWARD_STATS_ALL = Array.from(
 	new Set([...AWARD_STATS, ...AWARD_STATS_SPECIAL]),
 ).filter((key) => !BOTH_AWARD_STATS_SKIP.has(key));
