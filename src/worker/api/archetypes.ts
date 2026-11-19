@@ -130,6 +130,7 @@ export const archetypeRoster = async ({
 			pid: p.pid,
 			ovr: row.ovr,
 			archetypeId: found.view.id,
+			pos: row.pos,
 		});
 	}
 	players.sort((a, b) => b.ovr - a.ovr || a.pid - b.pid);
@@ -206,6 +207,7 @@ export const archetypeLandscape = async (): Promise<ArchetypeLandscape> => {
 			pid: p.pid,
 			ovr: (last(p.ratings) as any).ovr,
 			archetypeId: found.view.id,
+			pos: (last(p.ratings) as any).pos,
 			name: `${p.firstName} ${p.lastName}`,
 			tid: p.tid,
 			...(tk && showTwoK ? { twoK: tk } : {}),
