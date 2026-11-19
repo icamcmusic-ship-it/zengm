@@ -286,6 +286,8 @@ export type Classification = {
 	alternates: { id: string; name: string }[];
 	// archv4: the runner-up when it is close (v2 params.alsoMargin), shown as a small "Also:" line in the popover
 	also?: { id: string; name: string };
+	// archnouns: his defensive label, shown after the name ("Pull-Up Shot Hunter · Point-of-Attack Pest")
+	defense?: string;
 	// 0..1: how similar the shape of his ratings is to the build's profile (absolute, see POOR_FIT in classify.ts)
 	score: number;
 	// How exceptional that fit is among the league's players the build allows, with the name's floors applied (z)
@@ -321,6 +323,8 @@ export type StoredArchetype = {
 	conf?: number;
 	// archv4: the runner-up's id when it was close (shown as "Also:" in the archetype popover only)
 	also?: string;
+	// archnouns: his defensive label
+	def?: string;
 	// The reading's version (ARCHETYPE_READING_VERSION) when it was stored: an entry from an older reading is read again
 	v?: number;
 };

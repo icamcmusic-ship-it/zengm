@@ -1,4 +1,5 @@
 // @ts-nocheck
+/* eslint-disable no-undef */
 // archnouns: the user's 2048 audit (archetype_audit_2048.csv, unlabeled_prospect_suggestions_2048.csv) as a scorecard.
 // RUN_NOUNS_AUDIT=<dir with the two csv files> to run. Reports how many labels pass the user's rules, read with the
 // user's own percentiles (the "Best: ... (top N%)" of each row).
@@ -109,7 +110,7 @@ const inputOf = (row: Record<string, string>) => {
 	const bm =
 		/Best: (.*?)\. (?:Traits|Skills)/.exec(row.Reasoning ?? "")?.[1] ?? "";
 	for (const part of bm.split(/\); /)) {
-		const m = /^([A-Za-z0-9 -]+?) \d+ \(top (\d+)%/.exec(part.trim());
+		const m = /^([\d A-Za-z-]+?) \d+ \(top (\d+)%/.exec(part.trim());
 		if (m && SKILL_NOUN[m[1]!]) {
 			best.push({ noun: SKILL_NOUN[m[1]!]!, top: Number(m[2]) });
 		}
@@ -118,7 +119,7 @@ const inputOf = (row: Record<string, string>) => {
 };
 
 const HONESTISH =
-	/Specialist|Camp Body|Rotation Filler|Journeyman|Project|Raw|Developing|Lottery|Late Bloomer|Two-Way Contract|Ten-Day|Emergency|Practice Squad|Garbage|Hustle|Junkyard|Energy Big|Pogo|Track Star|Bruiser|Big Body|Wall|Space Eater|Human Screen|Pest|Gnat|Hound|Gunner|Bomber|Merchant|One-Trick|Shot-Only|Dime|Pass-First|Pass-Only|Caretaker|Board Specialist|Glass-Only|Earthbound|Slow-Motion|Empty-Calorie|Clay|Blueprint|Upside|Sleeper|Unfinished|Toolsy|All Tools|All Legs|No Game|Glove|Stopper|Bench|Deep Bench|Ball-Handling Specialist|Closer|Old Head|Connector|Off-Ball Mover|Screen-and-Roll/;
+	/Specialist|Camp Body|Rotation Filler|Journeyman|Project|Raw|Developing|Lottery|Late Bloomer|Two-Way Contract|Ten-Day|Emergency|Practice Squad|Garbage|Hustle|Junkyard|Energy Big|Pogo|Track Star|Bruiser|Big Body|Wall|Space Eater|Human Screen|Pest|Gnat|Hound|Gunner|Bomber|Merchant|One-Trick|Shot-Only|Dime|Pass-First|Pass-Only|Caretaker|Board Specialist|Glass-Only|Earthbound|Slow-Motion|Empty-Calorie|Clay|Blueprint|Upside|Sleeper|Unfinished|Toolsy|All Tools|All Legs|No Game|Glove|Stopper|Bench|Deep Bench|Ball-Handling Specialist|Closer|Old Head|Connector|Off-Ball Mover|Screen-and-Roll|Jack-of-all-Trades/;
 
 test.skipIf(!DIR)(
 	"nouns audit",
@@ -146,7 +147,7 @@ test.skipIf(!DIR)(
 					traits: x.tr as any,
 					prospect: f.startsWith("unlabeled"),
 				});
-				const name = c.name;
+				const name = c.label;
 				const why: string[] = [];
 				const bestNoun = x.best[0];
 				const top3 = new Set(x.best.map((b) => b.noun));
@@ -154,7 +155,7 @@ test.skipIf(!DIR)(
 				if (ELITE_RE.test(name) && x.ovr < 58) {
 					why.push("elite word below 58");
 				}
-				if (nn && !HONESTISH.test(name)) {
+				if (nn && !HONESTISH.test(name.split(" · ")[0]!)) {
 					for (const k0 of nn.nouns) {
 						// (the user's skills have no shot creation: it is his ball handling)
 						const k = k0 === "creator" ? "handle" : k0;

@@ -419,7 +419,7 @@ export const fuzzedArchetypeLabel = (
 	}
 	// His position comes from the true ratings, as the game shows it; a prospect is read against the prospect tables
 	const model = tunedModelFor(shown);
-	const { refs } = activePickRefs();
+	const { refs, rejects } = activePickRefs();
 	return classifyV2(shown, {
 		norms,
 		pos: posFn(ratings as any),
@@ -428,6 +428,7 @@ export const fuzzedArchetypeLabel = (
 		pot: level.pot,
 		...(model ? { model } : {}),
 		...(refs.length > 0 ? { extraRefs: refs } : {}),
+		...(rejects.length > 0 ? { rejects } : {}),
 	}).label;
 };
 
@@ -471,7 +472,7 @@ export const classifyPlayer = (
 	// (arch16: the reading version too, so a new reading never reuses an old result; archfb: and the user's tuning)
 	const tuning = activeTuning();
 	// (archv3: and the user's picks, which vote as labeled players)
-	const { refs, refsKey } = activePickRefs();
+	const { refs, refsKey, rejects } = activePickRefs();
 	const key = JSON.stringify(
 		[ARCHETYPE_READING_VERSION, tuning.hash, refsKey, p.srID, ratings, opts],
 		memoReplacer,
@@ -487,6 +488,7 @@ export const classifyPlayer = (
 		...(model ? { model } : {}),
 		...(p.srID ? { srID: p.srID } : {}),
 		...(refs.length > 0 ? { extraRefs: refs } : {}),
+		...(rejects.length > 0 ? { rejects } : {}),
 		pickKey: pickKey(g.get("lid"), p.pid),
 	});
 	if (memo.size >= CLASSIFY_MEMO_MAX) {

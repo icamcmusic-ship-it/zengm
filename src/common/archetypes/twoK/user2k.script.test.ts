@@ -208,7 +208,12 @@ export const userPlayers = () => {
 
 // The builds without this round's (the base the names are mapped to)
 // (archgaps: ARCH_U2K_GAP=1 makes the tables and the trims act on the four gap builds instead)
-const GAP_IDS = ["glue-wing", "glue-guard", "steady-game-manager", "energy-big"];
+const GAP_IDS = [
+	"glue-wing",
+	"glue-guard",
+	"steady-game-manager",
+	"energy-big",
+];
 const USER_IDS = new Set(
 	process.env.ARCH_U2K_GAP ? GAP_IDS : USER_2K_DEFS.map((d) => d.id),
 );
@@ -718,11 +723,16 @@ export const USER_2K_DEFS: TwoKDef[] = ${JSON.stringify(defs)};
 			// GUARD_PROS_CAP there); else a cut of the new build that took him, kept only if none of the list players labelled
 			// with that new build lose it and it adds no generic label or poor fit
 			const gen = await sampleLeague(1500, "u2k-fix-league");
-			const pros = (await sampleLeague(800, "u2k-fix-pros", 0, 40)).map((p) => ({
-				...p,
-				prospect: true,
-			}));
-			const genNorms = () => ({ ...defaultNorms(false), bias: files[0].norms.bias });
+			const pros = (await sampleLeague(800, "u2k-fix-pros", 0, 40)).map(
+				(p) => ({
+					...p,
+					prospect: true,
+				}),
+			);
+			const genNorms = () => ({
+				...defaultNorms(false),
+				bias: files[0].norms.bias,
+			});
 			const genShare = (xs, id) =>
 				xs.filter(
 					(p) =>
@@ -733,14 +743,10 @@ export const USER_2K_DEFS: TwoKDef[] = ${JSON.stringify(defs)};
 						}).id === id,
 				).length / xs.length;
 			const zOf = (p, id) =>
-				scoreAll(
-					p.ratings,
-					nb(),
-					ARCHETYPES,
-					p.pos,
-					undefined,
-					{ age: p.age, stats: p.stats },
-				).scored.find((x) => (x.a.out ?? x.a.id) === id)?.z;
+				scoreAll(p.ratings, nb(), ARCHETYPES, p.pos, undefined, {
+					age: p.age,
+					stats: p.stats,
+				}).scored.find((x) => (x.a.out ?? x.a.id) === id)?.z;
 			const own = (id) =>
 				userPlayers().filter((y) => USER_2K_MAP[y.r.arch]?.id === id);
 			for (const x of userPlayers()) {
@@ -786,7 +792,9 @@ export const USER_2K_DEFS: TwoKDef[] = ${JSON.stringify(defs)};
 							`raising ${m.id} ${startY} -> ${files[0].norms.bias[m.id]} breaks a cap (season top-150 ${(100 * sm).toFixed(1)}%, real ${(100 * share).toFixed(1)}%, league ${(100 * gs).toFixed(1)}%, prospects ${(100 * ps).toFixed(1)}%)`,
 						);
 					} else {
-						notes.push(`${m.id} bias ${startY} -> ${files[0].norms.bias[m.id]}`);
+						notes.push(
+							`${m.id} bias ${startY} -> ${files[0].norms.bias[m.id]}`,
+						);
 					}
 				}
 				// (b) cut the new build that took him
@@ -809,7 +817,9 @@ export const USER_2K_DEFS: TwoKDef[] = ${JSON.stringify(defs)};
 								`cutting ${c.id} ${startX} -> ${files[0].norms.bias[c.id]} costs ${lost.length} of its own list players, ${h.gen - h0.gen} generic, ${h.poor - h0.poor} poor fit`,
 							);
 						} else {
-							notes.push(`${c.id} bias ${startX} -> ${files[0].norms.bias[c.id]}`);
+							notes.push(
+								`${c.id} bias ${startX} -> ${files[0].norms.bias[c.id]}`,
+							);
 						}
 					}
 				}
@@ -953,7 +963,12 @@ export const USER_2K_MAP: Record<string, { kind: string; id: string | null }> = 
 						modelFor(false),
 						fitTuning(
 							fromPickFile(
-								JSON.parse(readFileSync(process.env.ARCH_U2K_TUNING, "utf8").replace(/^\uFEFF/, "")),
+								JSON.parse(
+									readFileSync(process.env.ARCH_U2K_TUNING, "utf8").replace(
+										/^\uFEFF/,
+										"",
+									),
+								),
 							),
 							modelFor,
 						),
@@ -1150,7 +1165,9 @@ export const USER_2K_MAP: Record<string, { kind: string; id: string | null }> = 
 			writeFileSync(OUT, JSON.stringify(toPickFile(picks, now)));
 			return;
 		}
-		throw new Error(`ARCH_U2K_MODE: defs, tables, map, trim, fix, read, score or picks`);
+		throw new Error(
+			`ARCH_U2K_MODE: defs, tables, map, trim, fix, read, score or picks`,
+		);
 	},
 	3600000,
 );

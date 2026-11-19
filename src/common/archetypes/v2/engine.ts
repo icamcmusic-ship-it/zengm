@@ -38,7 +38,13 @@ import {
 	tierOf,
 	type Skill,
 } from "./honest.ts";
-import { nounOfDesc, pickNouns, type NounKey } from "./nouns.ts";
+import {
+	nounOfDesc,
+	nounScores,
+	pickNouns,
+	type NounKey,
+	type Rejection,
+} from "./nouns.ts";
 import type { RatingQuantiles } from "./gateScale.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
 import type { ArchetypeRatings, Classification, Pos } from "../types.ts";
@@ -379,6 +385,12 @@ export type V2Options = ClassifyOptions & {
 	pickKey?: string;
 	// archreview2: his potential (the honest names: upside is potential well above his ovr)
 	pot?: number;
+	// archnouns: the user's "Doesn't fit" verdicts with no pick: the name shown, the player's key and his ratings then
+	rejects?: readonly {
+		key?: string;
+		name: string;
+		ratings?: ArchetypeRatings;
+	}[];
 };
 
 const allowedBuild = (
@@ -1014,10 +1026,14 @@ export const classifyV2 = (
 	// trait name, or (one noun at low ovr, or none) an honest name about that noun
 	let nounHonest: NounKey | null | undefined;
 	let nounConf: number | undefined;
+	let nounDefense: string | undefined;
 	if (P.nouns && isPos(pos)) {
 		const prevParsed = prevComposed ? parseComposedId(prevRaw) : undefined;
 		const prevNouns =
-			prevParsed && prevParsed.role.key.startsWith("pos")
+			prevParsed &&
+			(prevParsed.role.key.startsWith("pos") ||
+				prevParsed.role.key === "bruiser" ||
+				prevParsed.role.key === "enigma")
 				? prevParsed.descs
 						.map((d) => nounOfDesc(d.key))
 						.filter((n): n is NounKey => n !== undefined)
@@ -1031,6 +1047,20 @@ export const classifyV2 = (
 			prospect: opts.prospect,
 			traits: opts.traits as Record<string, number> | undefined,
 			rq: (norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+			rejected: opts.rejects?.map((rj): Rejection => ({
+				name: rj.name,
+				own: rj.key !== undefined && rj.key === opts.pickKey,
+				...(rj.ratings
+					? {
+							pct: Object.fromEntries(
+								nounScores(
+									rj.ratings,
+									(norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+								).map((x) => [x.key, x.pct]),
+							),
+						}
+					: {}),
+			})),
 			prev: {
 				nouns: prevNouns,
 				special: prevRaw && !prevComposed ? mergedId(prevRaw) : undefined,
@@ -1038,6 +1068,7 @@ export const classifyV2 = (
 		});
 		const score = eff(first);
 		nounConf = np.conf;
+		nounDefense = np.defense;
 		if (np.kind === "special") {
 			const a = archetypeById(np.id)!;
 			const nm = nameAt(a, pos);
@@ -1056,8 +1087,10 @@ export const classifyV2 = (
 			const role = ROLE_BY_KEY.get(np.kind === "trait" ? np.key : np.role)!;
 			const descs =
 				np.kind === "trait" ? [] : np.descs.map((k) => DESC_BY_KEY.get(k)!);
-			const id = composedId(role, descs, group);
-			const nm = composeName(role, descs, group);
+			const wp: WordPick =
+				np.kind === "trait" ? { [np.key]: np.name } : (np.pick ?? {});
+			const id = composedId(role, descs, group, wp);
+			const nm = composeName(role, descs, group, wp);
 			first = {
 				id,
 				name: nm,
@@ -1176,7 +1209,10 @@ export const classifyV2 = (
 		...classic,
 		id: a.id,
 		name: isComposedId(a.id) ? a.name : first.classic ? classic.name : a.name,
-		label: isComposedId(a.id) ? a.name : first.classic ? classic.label : a.name,
+		label:
+			(isComposedId(a.id) ? a.name : first.classic ? classic.label : a.name) +
+			(nounDefense ? ` · ${nounDefense}` : ""),
+		...(nounDefense ? { defense: nounDefense } : {}),
 		group: a.group,
 		family: a.family,
 		desc: a.desc,
