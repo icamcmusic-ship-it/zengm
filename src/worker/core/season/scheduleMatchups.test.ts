@@ -3,8 +3,6 @@ import { g, helpers } from "../../util/index.ts";
 import { resetG } from "../../../test/helpers.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import { newScheduleWithDays } from "./newSchedule.ts";
-import newScheduleGood from "./newScheduleGood.ts";
-import addDaysToSchedule from "./addDaysToSchedule.ts";
 import { getScheduleRestStats } from "./groupScheduleRealistic.ts";
 import type { MarqueeInput } from "./marqueeSchedule.ts";
 import { createScheduleEditor, teamRepeatCost } from "./scheduleEditor.ts";
@@ -14,7 +12,6 @@ import { createScheduleEditor, teamRepeatCost } from "./scheduleEditor.ts";
 //   realistic schedule: 2-game runs 52.4 -> 2.2 (all same-venue sets, at most 1 per team), 3-game runs 3.0 -> 0 (47 of 50 seeds
 //   had one before), median shortest gap between a pair's meetings 8 -> 28 days
 //   with Marquee Games: 2-game runs 51.2 -> 2.1, 3-game runs 3.0 -> 0
-//   old compact schedule with Spread Out Matchups: 2-game runs 27 -> 0.5, 3-game runs 0.33 -> 0 (16 of 50 seeds had one)
 
 const options = { timeout: 300_000 } as const;
 
@@ -171,45 +168,6 @@ describe("same opponent in consecutive games", options, () => {
 			assert.approximately(avg(b2b), 14, 1);
 		});
 	}
-
-	test("old compact schedule with Spread Out Matchups: no repeats", () => {
-		g.setWithoutSavingToDB("realisticSchedule", false);
-		g.setWithoutSavingToDB("spreadMatchups", true);
-		const repeats = [];
-		for (let seed = 1; seed <= NUM_SEEDS; seed++) {
-			Math.random = makeSeededRandom(seed);
-			const output = newScheduleWithDays(getTeams());
-			const days = addDaysToSchedule(
-				output.tids.map(([homeTid, awayTid]) => ({ homeTid, awayTid })),
-			).map((game) => game.day);
-			const runs = getRuns(output.tids, days);
-			assert.isAtMost(runs.maxRun, 2, `seed ${seed}`);
-			// (a few at the end of the season, where the last days can't avoid them)
-			assert.isAtMost(runs.numRepeats, 3, `seed ${seed}`);
-			repeats.push(runs.numRepeats);
-		}
-		assert.isAtMost(avg(repeats), 1);
-	});
-
-	test("Spread Out Matchups off: exactly the old schedule, same random numbers", () => {
-		g.setWithoutSavingToDB("realisticSchedule", false);
-		g.setWithoutSavingToDB("spreadMatchups", false);
-		Math.random = makeSeededRandom(3);
-		const off = newScheduleGood(getTeams()).tids;
-		const afterOff = Math.random();
-
-		g.setWithoutSavingToDB("spreadMatchups", true);
-		Math.random = makeSeededRandom(3);
-		const on = newScheduleGood(getTeams()).tids;
-		const afterOn = Math.random();
-
-		// Same games, only their order changes, and no extra random numbers
-		assert.strictEqual(afterOn, afterOff);
-		assert.deepStrictEqual(
-			on.map((m) => m.join("-")).sort(),
-			off.map((m) => m.join("-")).sort(),
-		);
-	});
 
 	test("schedule editor: a move or swap that would make 3 in a row costs a lot", () => {
 		// Team 0 plays 1, 2, 1, 1 on days 1, 3, 5, 7; moving the day 3 game away from between would make 3 in a row

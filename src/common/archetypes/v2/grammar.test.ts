@@ -22,9 +22,11 @@ import {
 	floorMiss,
 	RAMP_RAT,
 	type WordContext,
+	gateGap,
 } from "./tests.ts";
 import { USER_PICKS } from "./userPicks.data.ts";
 import { canonOf, classifyV2, rampMu, V2_PARAMS } from "./engine.ts";
+import { ELITE_RE, HONEST_ROLES, tierOf } from "./honest.ts";
 
 describe("archv2 grammar", () => {
 	test("every word reads as the concept its test is on (so a name's promises are exactly its words')", () => {
@@ -395,5 +397,109 @@ describe("archv2 grammar", () => {
 			}
 		}
 		assert.isAtLeast(was, 1);
+	});
+
+	describe("archreview: absolute gates and honest names", () => {
+		const base = {
+			hgt: 45,
+			stre: 40,
+			spd: 45,
+			jmp: 45,
+			endu: 50,
+			ins: 40,
+			dnk: 40,
+			ft: 50,
+			fg: 45,
+			tp: 45,
+			oiq: 45,
+			diq: 45,
+			drb: 45,
+			pss: 45,
+			reb: 40,
+		} as any;
+		const read = (r: any, o: any = {}) =>
+			classifyV2({ ...base, ...r }, { pos: "SG", age: 27, ...o });
+
+		test("every honest name composes, reads back, and has its own description and family", () => {
+			for (const h of HONEST_ROLES) {
+				const role = ROLE_BY_KEY.get(h.key)!;
+				assert.ok(role.honest, h.key);
+				for (const n of h.names) {
+					const id = composedId(role, [], "wing", { [h.key]: n });
+					const a = composedArchetype(id)!;
+					assert.strictEqual(a.name, n, id);
+					assert.strictEqual(a.desc, h.desc);
+					assert.include(a.tags, "honest");
+				}
+			}
+		});
+
+		test("tiers: elite words only from ovr 60", () => {
+			assert.strictEqual(tierOf(60), "elite");
+			assert.strictEqual(tierOf(59), "mid");
+			assert.strictEqual(tierOf(49), "low");
+			// a great shooter below the top tier is never a Sniper
+			const shooter = { tp: 85, fg: 70, ft: 85, oiq: 60 };
+			for (const ovr of [40, 48, 52, 58]) {
+				assert.notMatch(read(shooter, { ovr }).name, ELITE_RE, `ovr ${ovr}`);
+			}
+		});
+
+		test("no skill over the bar: a depth name, or a developing one with upside", () => {
+			const weak = { tp: 35, fg: 35, pss: 35, drb: 35, reb: 35 };
+			const vet = read(weak, { ovr: 38, age: 31, pot: 38 });
+			assert.include(vet.tags, "honest");
+			assert.match(
+				vet.name,
+				/Journeyman|Filler|Camp Body|Ten-Day|Two-Way Contract|Hustle/,
+			);
+			const kid = read(weak, { ovr: 30, age: 19, pot: 55 });
+			assert.include(kid.tags, "honest");
+			assert.notMatch(kid.name, /Journeyman|Camp Body|Filler/);
+			// (the same player, the same name: the synonym is seeded, not random)
+			assert.strictEqual(
+				read(weak, { ovr: 38, age: 31, pot: 38 }).name,
+				vet.name,
+			);
+		});
+
+		test("one skill under the top tier: a specialist", () => {
+			const c = read({ tp: 72 }, { ovr: 44, age: 27, pot: 44 });
+			assert.include(c.tags, "honest");
+			assert.match(
+				c.name,
+				/Spot-Up|Corner|One-Trick|Bench Bomber|Shot-Only|Gunner|Deep Bench/,
+			);
+		});
+
+		test("a whole weak league has no elite words and every word of a label is true", () => {
+			const rng = (i: number) =>
+				(((Math.sin(i * 12.9898) * 43758.5453) % 1) + 1) % 1;
+			for (let i = 0; i < 120; i++) {
+				const r: any = {};
+				for (const k of Object.keys(base)) {
+					r[k] = Math.round(
+						15 + 40 * rng(i * 31 + k.length * 7 + k.charCodeAt(0)),
+					);
+				}
+				const c = classifyV2(
+					{ ...base, ...r },
+					{
+						pos: (["PG", "SG", "SF", "PF", "C"] as const)[i % 5],
+						age: 20 + (i % 15),
+						ovr: 30 + (i % 25),
+						pot: 30 + (i % 25),
+					},
+				);
+				assert.notMatch(c.name, ELITE_RE, c.name);
+				if (!c.tags.includes("honest")) {
+					assert.isAtMost(
+						gateGap(c.name, { ...base, ...r }, 30 + (i % 25)),
+						0,
+						c.name,
+					);
+				}
+			}
+		});
 	});
 });

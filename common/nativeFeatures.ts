@@ -28,7 +28,8 @@ type NativeOptionDef = {
 	max?: number;
 	// The key is already a game attribute declared elsewhere (types, defaults, schema), so only its settings form entry
 	// comes from here
-	existing?: true;
+	existing?: true; // Part of the fork's main model (see NativeFeatureDef core): forced to its default, not shown in the settings forms
+	core?: true;
 };
 
 export type NativeFeatureDef = {
@@ -45,6 +46,12 @@ export type NativeFeatureDef = {
 	existing?: true;
 	// false: the feature needs contracts, trades or a draft, so it is always off in a college league (leagueType "college")
 	college?: false;
+	// Part of the fork's main model: no longer a setting. It is left out of the settings forms (its options still show,
+	// unless they are core too) and every league has it on: new leagues by their defaults, existing leagues and league
+	// files when they are loaded (worker core/league/forceCoreFeatures.ts, which also runs the conversions that turning
+	// it on used to run). A college league still has it off where `college` is false. The game attribute itself is kept
+	// (with its old default for a missing value), so code and tests that read it are unchanged.
+	core?: true;
 	options?: readonly NativeOptionDef[];
 };
 
@@ -232,6 +239,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "storePlayByPlay",
 		key: "storePlayByPlay",
+		core: true,
 		name: "Save Play-by-Play",
 		description:
 			"Keep each game's play-by-play with its box score, to read or replay later. Uses about 7 KB of storage per game, and it is deleted along with the box score. Live games always show their play-by-play while you watch. When off, no game keeps its play-by-play.",
@@ -257,6 +265,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "technicalFouls",
 		key: "technicalFouls",
+		core: true,
 		name: "Technical & Flagrant Fouls",
 		description:
 			"Rare technical fouls (1 FT, possession unchanged), flagrant fouls (2 FTs and the ball) and ejections in the game simulation.",
@@ -348,6 +357,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "realisticPossessions",
 		key: "realisticPossessions",
+		core: true,
 		name: "Realistic Possession Model",
 		description:
 			"Possessions play out like in the NBA: a 24-second shot clock (14 after an offensive rebound), fast breaks and half-court possessions, late-clock shots and shot-clock violations, holding for the last shot, 2-for-1s, and intentional fouling late in games. Box score averages stay about the same.",
@@ -359,6 +369,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "playerTraits",
 		key: "playerTraits",
+		core: true,
 		name: "Player Traits",
 		description:
 			"Twelve traits (clutch, consistency, durability, shot discipline, off-ball movement, screening, hustle, foul discipline, recovery, handling under pressure, late-game IQ, leadership) that nudge how players perform in games. Derived from ratings plus a stored random component, they average out league-wide. Shown on player pages, Draft Scouting and Advanced Player Search.",
@@ -372,6 +383,7 @@ export const NATIVE_FEATURES = [
 		// College mode builds its own schedule (non-conference, then conference play)
 		college: false,
 		key: "realisticSchedule",
+		core: true,
 		name: "Realistic Schedule Length",
 		description:
 			"The regular season is spread over about 2 days per game (82 games in about 172 days) instead of most teams playing almost every day: each team plays about every other day, with about 14 back-to-backs and at most about one 3-in-4 per 82 games, never 3 days in a row, and an All-Star break. Scales with the number of games. Daily things (injuries healing, free agents' asking prices, AI signings and trades, rumors, ...) keep their pace per season. Takes effect with the next schedule (the next regular season).",
@@ -380,19 +392,10 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
-		id: "spreadMatchups",
-		key: "spreadMatchups",
-		name: "Spread Out Matchups",
-		description:
-			"With the old compact schedule (Realistic Schedule Length off, not grouped into series): no team plays the same opponent in consecutive games when the schedule can avoid it, and never 3 in a row. (Realistic Schedule Length always spreads out each pair's meetings, with at most an occasional 2-game set in the same arena.) Takes effect with the next schedule (the next regular season).",
-		default: false,
-		defaultNewLeague: true,
-		sports: BBGM,
-	},
-	{
 		id: "marqueeGames",
 		college: false,
 		key: "marqueeGames",
+		core: true,
 		name: "Marquee Games",
 		description:
 			"With Realistic Schedule Length: holiday games on fixed days of the season (an opening night doubleheader with the defending champion, a Christmas slate of 5 games with the best and most hyped teams and rivals, an MLK Day slate), 2-4 national TV games a week picked from the best matchups, and rivalry games spread over the season instead of bunched. The schedule pages, game previews and box scores show them, and marquee and rivalry games get a slightly louder home crowd (with Load, Fatigue & Venue). Takes effect with the next schedule (the next regular season).",
@@ -403,6 +406,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "injuryDepth",
 		key: "injuryDepth",
+		core: true,
 		name: "Injury Depth",
 		description:
 			"Players returning from injury play under a minutes restriction and have a higher re-injury risk (often the same body part) for a while, some players are injury prone, the second night of a back-to-back is a little riskier and tiring, and teams can rest players on back-to-backs (load management). League-wide injury totals stay about the same.",
@@ -414,6 +418,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "expandedRatings",
 		key: "expandedRatings",
+		core: true,
 		name: "Expanded Ratings",
 		description:
 			"Three more player ratings: wingspan (length) and perimeter and interior defense, which replace the single defensive IQ in the game sim (defensive IQ stays as their average). Length helps blocks, steals, rebounds, contesting shots and finishing over defenders; perimeter defense guards ball handlers and shooters, interior defense protects the rim. League averages stay the same. Turning it on in an existing league derives the new ratings from each player's current ratings.",
@@ -424,6 +429,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "subRatings",
 		key: "subRatings",
+		core: true,
 		name: "Sub-Ratings",
 		description:
 			"Ten ratings are split into 2-4 sub-ratings each (defense into shot blocking, steals, interior and perimeter defense; three-point shooting into range, catch-and-shoot and off-the-dribble; and so on), shown under each rating on the player page and optionally in the ratings tables. Each rating is the weighted average of its sub-ratings, so the game sim, ovr and everything else are unchanged. New players get a shape (a signature skill, a weakness, a build, a style from their background) and sub-ratings develop with age (shot blocking and leaping fade earlier, range and IQ skills hold longer). Turning it on in an existing league derives each player's sub-ratings from his ratings.",
@@ -434,6 +440,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "subRatingsSim",
 		key: "subRatingsSim",
+		core: true,
 		name: "Sub-Ratings in Sim",
 		description:
 			"Requires Sub-Ratings. The game sim reads the sub-ratings where they are more specific than the rating: shot blocking and standing vertical for blocks, steals and lateral quickness for steals and on-ball defense, interior defense for the rim, catch-and-shoot vs off-the-dribble shooting by whether the shot was assisted (threes and mid-range jumpers), range for how often and how well he shoots threes, post moves for big men's post-ups and touch for small players' short shots, contact finishing for fouls drawn and and-ones, finesse and max vertical for finishing at the rim, handle and ball security for turnovers, vision for assists and pass accuracy for bad passes, straight-line speed for pace and fast breaks. League averages stay the same; only the shape of each player's game changes. With every sub-rating equal to its rating, games are exactly as before.",
@@ -444,6 +451,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "subRatingsWide",
 		key: "subRatingsWide",
+		core: true,
 		name: "Wider Sub-Rating Shapes",
 		description:
 			"Requires Sub-Ratings. Sub-ratings under one rating differ as much as real players' do: a catch-and-shoot specialist who can't shoot off the dribble, a passer who can't shoot from range, a shot blocker who never gets a steal. New players' shapes are wider (sized per rating from real players' stats, shooting and finishing widest), about one in eight is lopsided (one or two sub-ratings 15-25 away from their rating), and a standout no longer drags the rest of its group down as much. Real players' shapes follow their stats more strongly (shrunk only for a small sample), shapes spread less back toward the rating after 24, and a player's role grows its sub-ratings (a spot-up shooter's catch-and-shoot, a primary ball handler's pull-ups and handle). The ratings themselves, ovr and the game's random numbers are unchanged. Only new players get the wider shapes when it's turned on in an existing league.",
@@ -454,6 +462,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "ovrV2",
 		key: "ovrV2",
+		core: true,
 		name: "Sim-Calibrated Ovr",
 		description:
 			"Player ovr weighs each rating by how much it actually helps a team win in the game sim (measured, with separate weights when Expanded Ratings is on), instead of the old formula that overrated basketball IQ, strength and endurance and underrated height, speed, ball handling and three-point shooting. The league's ovr scale stays the same; bigs gain a little and small guards lose a little. Player value leans a little less on PER. Turning it on or off recomputes every player's ovr.",
@@ -464,6 +473,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "realisticAging",
 		key: "realisticAging",
+		core: true,
 		name: "Realistic Aging",
 		description:
 			"Players age more like in the NBA: basketball IQ and free throw shooting keep improving into the late 20s, shooting holds into the early 30s, speed and jumping decline gently from about 28 and faster after 32 (a little faster for big men), and strength holds until about 30. With Expanded Ratings, old guards no longer turn into interior defenders. Secret aging curves (Player Traits) still apply on top.",
@@ -474,6 +484,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "careerAging",
 		key: "careerAging",
+		core: true,
 		name: "Career Aging",
 		description:
 			"How a player ages depends on his career: heavy career and playoff minutes bring the decline on sooner, major injuries (torn ACL, Achilles, knee, leg) take some speed, jumping and endurance for good (bounded, and now and then he's never the same), high flyers and slashers decline faster after 30 while shooters, passers and post players age gracefully, and fading veterans can keep improving a specialist skill (catch-and-shoot, passing, post moves) into their mid 30s. Retirement depends on his role, minutes, contract, a recent title, injuries and career milestones, and veterans take the minimum to chase a ring with a contender, and AI teams that aren't rebuilding keep or sign useful veterans (33-37, good enough for their top 13) on one season minimum deals instead of cutting them for younger filler, so more players last into their late 30s like in the NBA. The league's average development is unchanged.",
@@ -484,6 +495,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "perimeterDefense",
 		key: "perimeterDefense",
+		core: true,
 		name: "Perimeter Defense",
 		description:
 			"Credit for perimeter defenders: steals go more to quick on-ball defenders (league steal totals unchanged), and the default DPOY and All-Defensive formulas weigh steals more and defensive win shares (inflated by defensive rebounding) less. Awards with an edited formula are not changed.",
@@ -509,6 +521,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "simFixes",
 		key: "simFixes",
+		core: true,
 		name: "Game Sim Fixes",
 		description:
 			"Small fixes to how ratings work in the game simulation: offensive IQ steers players away from mid-range jumpers instead of making them miss more, better post scorers and mid-range shooters are more efficient instead of just shooting more, strong and durable players get hurt a little less, the trailing team's comeback boost is smaller, and with Expanded Ratings perimeter and interior defense (not defensive IQ) decide who fouls and the synergy skill cutoffs match the expanded ratings. League averages stay about the same.",
@@ -519,6 +532,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "positionalComposites",
 		key: "positionalComposites",
+		core: true,
 		name: "Position-Aware Team Ratings",
 		description:
 			"In the game simulation, each player on the court counts by his role for the team's ratings: the biggest players for rim protection, blocks and rebounding, the ball handlers for ball handling, the smaller players for perimeter defense (instead of a plain 5-man average, where a guard's height protected the rim as much as a center's). League averages stay about the same.",
@@ -529,6 +543,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "realisticRotations",
 		key: "realisticRotations",
+		core: true,
 		name: "Realistic Rotations",
 		description:
 			"Coaches plan each player's minutes at tip-off (by his value, minutes restrictions, back-to-backs; a tighter 8-man rotation with stars playing 38-42 minutes in the playoffs) and sub to stay on plan, sit players in foul trouble by NBA rules of thumb (2 fouls in the 1st quarter, 3 in the first half, 4 in the 3rd quarter, 5 until the closing minutes), close tight games with their best five, and empty the bench by value in blowouts. League minutes stay the same.",
@@ -539,6 +554,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "coachSystems",
 		key: "coachSystems",
+		core: true,
 		name: "Coaching Systems",
 		description:
 			"Head coaches run an offense system (Motion, Pace & Space, Heliocentric PnR, Post, Isolation, Princeton, Seven Seconds or Less) and a defense system (Switch Everything, Drop Coverage, Blitz, Pack the Paint, Zone, Full-Court Press) that change how their team plays: shot mix, pace, transition, usage, turnovers forced, fouls, the offensive glass, rotations and late-game management. Rosters fit systems better or worse, new systems take part of a season to install, coaches adapt, and reputation, hot seats and coaching trees drive the coaching market. League averages stay the same. Needs Coaching Staff.",
@@ -549,6 +565,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "spacingCreation",
 		key: "spacingCreation",
+		core: true,
 		name: "Spacing & Shot Creation",
 		description:
 			"Floor spacing and who creates the shot. The three-point threat of the four teammates around a driver makes drives more likely and easier to finish, and two or more non-shooters on the floor cramp the paint. Each shot has a creator (a ball handler, by dribbling, passing and offensive IQ) picked before the shooter: three-pointers are mostly assisted, shots at the rim about 60% and post-ups and mid-range jumpers about 40%, and better passers set up easier shots. League averages stay about the same.",
@@ -559,6 +576,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "matchupDefense",
 		key: "matchupDefense",
+		core: true,
 		name: "Matchup Defense",
 		description:
 			"At each substitution, defenders are matched to the opponents by threat and fit (perimeter defenders on guards and wings, interior defenders on bigs). A shot is defended partly by the player guarding the shooter and partly by the team (help defense), so weak defenders get attacked, and size and speed mismatches lead to more post-ups and drives. Switching coaches and versatile defenders limit mismatches, drop coverage gives up pull-up jumpers. League averages stay about the same.",
@@ -569,6 +587,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "smartEndgame",
 		key: "smartEndgame",
+		core: true,
 		name: "End-of-Game Intelligence",
 		description:
 			"Coaches manage the end of games: a timeout to stop an opponent's 10-0 run (each team has five extra timeouts for that, quick-trigger coaches use them sooner), offense and defense substitutions in the last minute of a close game, intentional fouls on the worst free throw shooter on the floor, a foul when up 3 with a few seconds left, holding for the last shot and 2-for-1s in every possession model, and the last timeout saved for when it matters. With Coaching Systems, better game managers do these more reliably.",
@@ -579,6 +598,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "scheduleLoad",
 		key: "scheduleLoad",
+		core: true,
 		name: "Load, Fatigue & Venue",
 		description:
 			"Tired players fade faster (the fatigue penalty steepens as energy runs low) and get hurt more often (the league injury rate stays the same), the third game in four nights wears teams down like a back-to-back, and home court is split into a base part, the crowd (bigger with a hyped team and in the playoffs) and a small referee lean (the home team gets about 3% more free throws), plus travel for the visitors. The league home win percentage stays the same on average.",
@@ -588,6 +608,7 @@ export const NATIVE_FEATURES = [
 		options: [
 			{
 				key: "scheduleLoadRefVariance",
+				core: true,
 				name: "Referee Crews",
 				description:
 					"Each game's referees call it a little tighter or looser than average (about ±7% fouls).",
@@ -599,6 +620,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "realisticTurnovers",
 		key: "realisticTurnovers",
+		core: true,
 		name: "Realistic Turnovers",
 		description:
 			"Fewer turnovers, closer to the modern NBA (about 14.5 per team game instead of about 16.5 with the other new-league settings): live-ball and dead-ball turnovers both go down, the share of them that are steals goes up so steals stay the same, and the extra possessions end in shots. Points go up by about 2 per team game, pace and the other averages stay about the same.",
@@ -609,6 +631,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "realisticPlayTypes",
 		key: "realisticPlayTypes",
+		core: true,
 		name: "Realistic Play Types",
 		description:
 			"Moves the sim's play-type mix toward the modern NBA: fewer post-ups (more drives and pull-ups instead), more pick-and-roll and isolation possessions created by ball handlers, more putbacks by the offensive rebounder and a little more transition. League totals (points, pace, shooting, turnovers, rebounds) stay about the same. Needs the Realistic Possession Model and Spacing & Shot Creation.",
@@ -619,6 +642,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "offEmphasis",
 		key: "featureOffEmphasis",
+		core: true,
 		name: "Offensive Emphasis",
 		description:
 			"Each team leans its offense toward some play types (pick-and-roll, isolation, post-ups, spot-up shooting, transition, inside vs outside) with presets like Five-out, Pace and space, Post-centric, Heliocentric star and Motion. The head coach sets it from his system and the roster unless you take over (Offense tab of Coaching Staff). Fitting the roster helps a little, a mismatch hurts a little. Needs Realistic Play Types.",
@@ -629,6 +653,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "starClutchCal",
 		key: "starClutchCal",
+		core: true,
 		name: "Star & Clutch Calibration",
 		description:
 			"Two sim calibrations from multi-season test leagues. Defensive attention scales with how much of his team's offense a player carries: the more of the shots he would take, the tougher they get, and the help leaves his teammates a little more open (team scoring stays the same), so superstar PER and BPM stay in the NBA's range. In clutch time (last 5 minutes, within 5) defenses tighten and stars take over, so close-game records and clutch plus/minus stay in the NBA's range. Needs Matchup Defense.",
@@ -639,6 +664,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "advStats",
 		key: "advStats",
+		core: true,
 		name: "Advanced Tracking Stats",
 		description:
 			"The game sim records tracking-style stats as it plays (it never changes a result): play types (pick-and-roll ball handler and roll man, isolation, post-up, spot-up, cut, off screens, handoff, transition, putback) with possessions, points per possession and frequency, defended FG% and rim protection, 2PT and 3PT contests, on/off net rating, five-man lineups, assisted and unassisted makes by zone, catch-and-shoot vs pull-up threes and clutch stats. Shown on Player Stats (Play Types, Shooting Splits, Defense, On/Off, Clutch), the player page and the Lineups page. Off: nothing is recorded or stored.",
@@ -649,6 +675,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "advCareer",
 		key: "advCareerTracking",
+		core: true,
 		name: "Keep Career Tracking for Retired Players",
 		description:
 			"Advanced Tracking Stats: when a player retires, all of his tracking stats are kept as one career total (regular season and playoffs), and his season-by-season tracking is removed. Off: a retired player keeps the tracking of his last 3 seasons only, and his career tracking covers just those. Turning it on also folds the seasons retired players still have into their career totals. Active players always keep every season.",
@@ -693,6 +720,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "improvedPositions",
 		key: "improvedPositions",
+		core: true,
 		name: "Improved positions",
 		description:
 			"Positions (PG, G, SG, GF, SF, F, PF, FC, C) from two axes, size and ball skills, instead of one line: tall playmakers become F, GF or FC rather than C, small bigs PF or F. A player keeps his position unless his ratings clearly move him to another one, and positions change only when players develop (preseason) or are created. Overall shares stay about the same. Off: the original formula.",
@@ -703,6 +731,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "forkFaces",
 		key: "featureForkFaces",
+		core: true,
 		name: "New Face Styles",
 		description:
 			"New male players' (and staff's) faces use the fork's style catalogue: fades, waves, twists, locs, braids, beards and stubble, plus the fork's heads, eyes, brows, noses, ears, lines and accessories. Hair is picked to fit the hair texture and age, with common, uncommon and rare styles and a few dyed heads; older coaches and GMs have a few looks of their own. Players out with a nose or facial injury wear a nose bandage on the player page (not stored). Seeded from the face, so no game randomness. Existing faces and faces you edit are never changed. See Tools → Face Style Gallery; every style can be picked in Customize Player.",
@@ -713,6 +742,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "faceAging",
 		key: "featureFaceAging",
+		core: true,
 		name: "Face Aging",
 		description:
 			"Generated faces age with the players, once a season at the preseason: rookies look young (no lines, little facial hair), beards grow in over the early 20s, hair greys and may thin or recede from the late 20s, lines appear after about 30 (sooner with heavy minutes) and faces fill out a little. Seeded from the player, so it's the same every time and never changes a game or league result. Faces edited in Customize Player stay as they are unless that player's \"Allow aging\" box is ticked. Players with an image URL are untouched. The player page shows a then-and-now and his face in past seasons.",
@@ -779,6 +809,7 @@ export const NATIVE_FEATURES = [
 		id: "contractOptions",
 		college: false,
 		key: "contractOptions",
+		core: true,
 		name: "Contract Options & Guarantees",
 		description:
 			"Contracts can have a player or team option on their final season, and later seasons can be partially guaranteed, which lowers what a team owes if it releases the player. Players decide on their options based on mood and market value, and teams decide on team options, at the start of the re-signing phase.",
@@ -790,6 +821,7 @@ export const NATIVE_FEATURES = [
 		id: "contractExtensions",
 		college: false,
 		key: "contractExtensions",
+		core: true,
 		name: "In-Season Contract Extensions",
 		description:
 			"Players in the last two seasons of their contracts can be extended during the preseason and regular season. AI teams extend some of their own players too.",
@@ -833,6 +865,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "competitiveBalance",
 		key: "competitiveBalance",
+		core: true,
 		name: "Competitive Balance",
 		description:
 			"AI front offices respect the luxury tax like NBA teams do, so superteams don't keep piling up talent: an AI team doesn't use a salary cap exception to sign a free agent that would take it into the luxury tax, and an AI team already in the tax only re-signs its two best players into it (three without this). Your team's moves aren't affected, and nothing in the game sim changes.",
@@ -842,6 +875,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "capExceptions",
 		key: "featureCapExceptions",
+		core: true,
 		name: "Salary Cap Exceptions",
 		description:
 			"With a soft cap, a team over the cap can sign one free agent a season with each salary cap exception it has: the mid-level exception (9.1% of the cap, up to 4 years; a smaller taxpayer one, 3.7% and 2 years, near the luxury tax), the bi-annual exception (3.3%, 2 years, every other season) and, for teams that used cap space, the room exception (5.7%, 3 years). They are used automatically when a signing only fits that way, by AI teams too. Off: over the cap, only minimum contracts. No effect with a hard cap or no cap.",
@@ -879,6 +913,7 @@ export const NATIVE_FEATURES = [
 		id: "aiNeedTrades",
 		college: false,
 		key: "aiTradesNeedBased",
+		core: true,
 		name: "Need-Based AI-to-AI Trades",
 		description:
 			"Many AI-to-AI trades are driven by team needs: contenders buy veterans before the trade deadline, rebuilding teams sell veterans for picks and young players, and teams over the tax dump salary into cap space. The reason is written into the trade's transaction text. When off, AI teams only make the classic random value-for-value trades.",
@@ -890,6 +925,7 @@ export const NATIVE_FEATURES = [
 		id: "realisticEconomy",
 		college: false,
 		key: "featureRealisticEconomy",
+		core: true,
 		name: "Realistic AI Economy",
 		description:
 			"AI teams keep their money and trades closer to real life: random AI-to-AI trades must be roughly fair for both teams (not just the one being asked), in leagues without a salary cap a team over the luxury tax can't take back much more salary than it sends out (125% + $100k), and teams sitting on large cash reserves spend more on their budget items (within the front office envelope when Front Office Budget is on) and pay out owner distributions, so cash stays in a realistic band. When off, the stock BBGM behaviour.",
@@ -940,6 +976,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "rumors",
 		key: "featureRumors",
+		core: true,
 		name: "Rumors",
 		description:
 			"A rumor mill built from what AI teams are actually planning: who is on the block, which teams are calling about whom, unhappy players, extension talks, where free agents are leaning, coaches and GMs on the hot seat, draft targets. Each rumor has a confidence and is later marked confirmed or didn't happen (Rumors tab of Transactions, dashboard card, newspaper). It never changes what AI teams do.",
@@ -968,6 +1005,7 @@ export const NATIVE_FEATURES = [
 		id: "draftPickConditions",
 		college: false,
 		key: "featureDraftPickConditions",
+		core: true,
 		name: "Draft Pick Protections & Swaps",
 		description:
 			"NBA-style conditions on traded draft picks: top-N protections that roll over to the next year (or convert to a 2nd round pick, or vanish), and pick swap rights. Resolved when the draft order is set. The AI values them and may offer protections in counter offers.",
@@ -977,6 +1015,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "coachingStaff",
 		key: "coachingStaff",
+		core: true,
 		name: "Coaching Staff",
 		description:
 			"Every team has a real coaching staff (head coach plus player development, offense and defense assistants) with ratings, styles and contracts, instead of the coaching budget slider. Their salaries are paid as coaching expenses, and the staff's development ability replaces the coaching budget's effect on player progression. Turning it on in an existing league generates staffs for every team.",
@@ -988,6 +1027,7 @@ export const NATIVE_FEATURES = [
 		id: "gmPersonalities",
 		college: false,
 		key: "featureGmPersonalities",
+		core: true,
 		name: "AI GM Personalities",
 		description:
 			"Every AI team has a general manager with a name, a face and fixed leanings (win-now or patient, analytics or old-school, risk, luxury tax, draft picks, how often he trades, loyalty, free agency and draft approach) that shift its trades, signings, re-signings, draft picks, team strategy and coach hires a little. GMs are fired after sustained failure against expectations and replaced through a GM carousel (Front Offices tab of League History, team pages, news). Your team has no GM unless you're in spectator mode or auto play.",
@@ -1020,6 +1060,7 @@ export const NATIVE_FEATURES = [
 		id: "collegeSeason",
 		college: false,
 		key: "featureCollegeSeason",
+		core: true,
 		name: "College Season & March Madness",
 		description:
 			"With college stats, a light college season for each draft class's draft year: conference standings, AP Top 25, conference tournaments and the 68-team NCAA tournament, with prospects' teams, tournament games and honors on their pre-draft record (Draft Scouting → College/Overseas tab).",
@@ -1031,6 +1072,7 @@ export const NATIVE_FEATURES = [
 		id: "draftClassShapes",
 		college: false,
 		key: "featureDraftClassShapes",
+		core: true,
 		name: "Draft Class Shapes",
 		description:
 			"Every draft class the game generates gets a shape (a deep class, a top-heavy one, a weak one, a generational talent, a guard-heavy or big man class, an international class, a high-upside class...) that reshapes its talent, positions, ages and origins within realistic bounds, shown on Draft Scouting. Balanced so the average class is as good as before. Imported and uploaded classes are never reshaped.",
@@ -1063,6 +1105,7 @@ export const NATIVE_FEATURES = [
 		id: "scoutingSystem",
 		college: false,
 		key: "scoutingSystem",
+		core: true,
 		name: "Scouting System",
 		description:
 			"Your scouting budget gives you scouting points every season to spend on individual draft prospects (assign a scout or attend a workout) on the Draft Scouting page. Each one narrows how far off your view of that prospect's ratings can be and gives a scout report with confidence ranges.",
@@ -1094,6 +1137,7 @@ export const NATIVE_FEATURES = [
 		id: "frozenDraftRanks",
 		college: false,
 		key: "featureFrozenDraftRanks",
+		core: true,
 		name: "Frozen Pre-draft Ranks",
 		description:
 			"Each prospect's rank is frozen when the draft starts (your scouts' list and the consensus board), so it no longer moves as players are picked: the Draft page shows his pre-draft rank next to a separate Best available order, and drafted players show the pick they went at next to their pre-draft rank (steals and reaches). Off: ranks are counted among the players still on the board.",
@@ -1104,6 +1148,7 @@ export const NATIVE_FEATURES = [
 		id: "aiDraftNeeds",
 		college: false,
 		key: "featureAiDraftNeeds",
+		core: true,
 		name: "AI Drafts by Need",
 		description:
 			"AI teams add a small need (guard, wing, big) and strategy (contenders want players who are ready, rebuilding teams want ceiling) adjustment to their draft picks.",
@@ -1115,6 +1160,7 @@ export const NATIVE_FEATURES = [
 		id: "mockDraft",
 		college: false,
 		key: "featureMockDraft",
+		core: true,
 		name: "Mock Draft",
 		description:
 			"A two-round mock draft of the current class on Draft Scouting (each team picks by its own needs and strategy, in its real pick order), and simulated pro careers for prospects (peak ovr, star/starter/bust odds), also on the prospect's player page.",
@@ -1126,6 +1172,7 @@ export const NATIVE_FEATURES = [
 		id: "lotteryNight",
 		college: false,
 		key: "featureLotteryNight",
+		core: true,
 		name: "Draft Lottery Night & Combine",
 		description:
 			"The draft lottery as a lottery night: picks revealed from the last lottery pick up to No. 1 with the odds going in, jumps and falls, team reactions and a winners and losers recap (and news). A draft combine after the playoffs: measurements, athletic testing and shooting drills for every prospect (a Combine tab on Draft Scouting and on the prospect's College/Overseas page). Combine results narrow the scouting report's athleticism and size grades and give AI teams a small, class-neutral nudge for big over/under-performers.",
@@ -1136,6 +1183,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "scoutingReports",
 		key: "featureScoutingReports",
+		core: true,
 		name: "Scouting Reports",
 		description:
 			"Full scouting reports for every player, written by your scouting department (2-5 scouts made from your scouting budget, with specialties and biases): letter grades with ranges, comparisons, floor and ceiling, offense/defense breakdowns, flags, development plan, team fit and a bottom line, only from what your scouts can see. A Scouting page on every player, a printable scouting card, stock up/down history and a track record per scout. Off: the short report on the College/Overseas page stays as it was.",
@@ -1157,6 +1205,7 @@ export const NATIVE_FEATURES = [
 		id: "scoutingDepth",
 		college: false,
 		key: "featureScoutingDepth",
+		core: true,
 		name: "Scouting Director & Regions",
 		description:
 			'A Director of Scouting runs your scouting department: he assigns your scouts to five regions (East, West, Midwest/South, International, G League/Prep) by specialty, and prospects in covered regions are seen more often, so the fuzz on their ratings and sub-ratings narrows over the season (tournaments, a late-season showcase and the combine give big bumps; blind spots and late risers stay uncertain). Set one priority (or Auto). He keeps your Draft Board up to date every week (lock or drag players to keep them), files pro scouting reports on other teams\' players and free agents (a Pro Scouting tab), and scouts have careers: experience, specialties, reputation from their hit rates, favourite prospects ("our guy"), poaching, promotion and retirement. Needs Scouting Reports.',
@@ -1168,6 +1217,7 @@ export const NATIVE_FEATURES = [
 		id: "coachingDepth",
 		college: false,
 		key: "featureCoachingDepth",
+		core: true,
 		name: "Coaching Staff Depth",
 		description:
 			"Three more staff jobs (shooting coach, strength & conditioning, video/analytics coordinator) with ratings, contracts and bounded effects that are neutral at average staff; development plans that the staff sets each offseason for every player from his weaknesses, archetype and role (a small shift within his yearly development toward the sub-ratings he works on, with a Development Report); and coaching careers: new coaches start as assistants and are promoted, good assistants are hired away as head coaches and carry their systems, with coaching trees. A Staff Report page each season, with delegation per area (Auto, Suggest, Manual). Needs Coaching Staff.",
@@ -1179,6 +1229,7 @@ export const NATIVE_FEATURES = [
 		id: "frontOffice",
 		college: false,
 		key: "featureFrontOffice",
+		core: true,
 		name: "Front Office Budget",
 		description:
 			"Six front office departments on Team Finances (Scouting, Analytics, Medical, Travel & Sports Science, Coaching, Facilities) funded from an owner-set envelope that grows with market size: more in one means less elsewhere, and spending over the envelope costs owner mood. Analytics narrows your projection ranges in trades and free agency, sharpens the head coach's game management (with Coaching Systems) and makes AI GMs who spend on it lean analytics; Medical lowers injury rates and speeds older players' recovery on top of the health budget's shorter injuries; Travel & Sports Science softens travel, back-to-back and 3-in-4 fatigue (with Load, Fatigue & Venue or Injury Depth). Bounded, with diminishing returns, neutral at average spending. AI teams allocate by GM leanings and market size. A season review shows what your spending bought.",
@@ -1195,17 +1246,9 @@ export const NATIVE_FEATURES = [
 		default: true,
 	},
 	{
-		id: "playerNicknames",
-		key: "showPlayerNicknames",
-		name: "Show Player Nicknames",
-		description:
-			"Show players' nicknames (generated from their careers or set in Customize Player) on the player page and in Hall of Fame speeches and plaques. Off: no nickname is shown anywhere and those texts use his real name. Only hides them, so nicknames come back when you turn it on again.",
-		default: true,
-		sports: BBGM,
-	},
-	{
 		id: "profileExportFull",
 		key: "featureProfileExportFull",
+		core: true,
 		name: "Complete Profile Export",
 		description:
 			"Export profile (player pages) includes everything his pages and the league pages show about him: recruiting, playoffs and tournaments (college and pro), coaches by season, award finishes and votes, the tracking profile, contract details and mood history, every news entry, and his legacy (Hall of Fame plaque and speech, GOAT Lab rank, rivalry lines, face history). Off: the shorter export.",
@@ -1278,6 +1321,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "rivalryStories",
 		key: "featureRivalryStories",
+		core: true,
 		name: "Rivalry Stories",
 		description:
 			'With Rivalries: a game log kept for every pair of teams after each game, so each rivalry page gets its all-time record, streaks, eras, playoff history, best and closest games, player duels, players who crossed the rivalry, coaching matchups and a heat timeline; plus rivalry previews and recaps in the Newspaper, a "Rivalry renewed" storyline and rivalry context lines in Games to Watch.',
@@ -1298,6 +1342,7 @@ export const NATIVE_FEATURES = [
 	{
 		id: "hyphenatedNames",
 		key: "featureHyphenatedNames",
+		core: true,
 		name: "Hyphenated Last Names",
 		description:
 			"Some new American players get a hyphenated last name made of two common surnames, like Smith-Jones. Only affects players generated while it is on.",
@@ -1402,6 +1447,28 @@ export const nativeFeatureAvailableInSport = (
 	feature: NativeFeatureDef,
 	sport: string,
 ) => !feature.sports || (feature.sports as readonly string[]).includes(sport);
+
+// The settings every league is forced to (core features and core options): key -> value, for a sport and a league type
+export const nativeCoreSettingsFor = (
+	sport: string,
+	college: boolean,
+): Record<string, boolean | number | string> => {
+	const out: Record<string, boolean | number | string> = {};
+	for (const f of allDefs) {
+		if (!nativeFeatureAvailableInSport(f, sport)) {
+			continue;
+		}
+		if (f.core) {
+			out[f.key] = !(college && f.college === false);
+		}
+		for (const o of f.options ?? []) {
+			if (o.core) {
+				out[o.key] = o.default;
+			}
+		}
+	}
+	return out;
+};
 
 // Every setting key of the registry (switches then options), including existing ones
 export const NATIVE_FEATURE_SETTING_KEYS = allDefs.flatMap((f) => [

@@ -111,7 +111,7 @@ const careerStints = (pRaw: Player) => {
 	return out;
 };
 
-// ---- Overview: nickname, archetype details, the user's archetype pick, pro projection ----
+// ---- Overview: archetype details, the user's archetype pick, pro projection ----
 
 export const overviewExtras = async ({
 	pRaw,
@@ -125,11 +125,6 @@ export const overviewExtras = async ({
 	prospect: boolean;
 }): Promise<Built> => {
 	const out = empty();
-	const nickname: string | undefined =
-		featureOn("playerNicknames") && p.nickname ? p.nickname : undefined;
-	out.facts.push(...fact("Nickname", nickname));
-	out.data.nickname = nickname;
-
 	const a = p.archetype;
 	if (showRatings && a) {
 		const override = overrideFor(pRaw.pid);
@@ -1323,7 +1318,7 @@ export const legacySection = async ({
 	const out = empty();
 	const pid = pRaw.pid;
 
-	// Hall of Fame plaque and speech (the Hall of Fame pages), nickname by the Show Player Nicknames setting
+	// Hall of Fame plaque and speech (the Hall of Fame pages)
 	if (pRaw.hof && hofWordsOn()) {
 		const hofPlayers = await idb.merged.players.getAll({ hof: true });
 		const facts = await careerFacts(pRaw, {
@@ -1359,7 +1354,6 @@ export const legacySection = async ({
 		);
 		out.data.hallOfFame = {
 			inducted,
-			nickname: featureOn("playerNicknames") ? facts.nickname : undefined,
 			plaque: words.plaque,
 			speech: words.speech,
 		};

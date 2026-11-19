@@ -7,6 +7,12 @@ import { pctOf, SKILL_CLASS_KEYS } from "../rulebook.ts";
 import type { StyleReading } from "../subStyle.ts";
 import type { ArchetypeRatings, PosBucket } from "../types.ts";
 import { PEER_QUANTILES } from "./peers.data.ts";
+import { conceptsOf } from "../twoK/concepts.ts";
+import {
+	scaleCutoff,
+	type GateScaleKey,
+	type RatingQuantiles,
+} from "./gateScale.ts";
 
 export type WordContext = {
 	cv: Record<string, number>;
@@ -379,6 +385,8 @@ export const CUSTOM_TESTS: Record<
 			.pct(0.6 - p("pass"))
 			.done();
 	},
+	// archreview2: the honest names (honest.ts) are given by the honest rule, never tested as candidates
+	honest: () => ({ pass: false, margin: -1, soft: -Infinity }),
 	// archv5 (the user's labels): the low-ovr roles (lowOvr above)
 	prospectRole: (ctx) => lowOvr(ctx, true),
 	depthPieceRole: (ctx) => lowOvr(ctx, false),
@@ -584,4 +592,165 @@ export const testConcept = (
 		zBar(subOk(s.sub, ctx.style));
 	}
 	return b.done();
+};
+
+// ---- archreview: absolute gates on every word of a name (the user's review of 410 labels, 249 disagreements: "labels are
+// picked from a player's best ratings, not from whether those ratings are good"). A name's words must be true in absolute
+// terms, whatever his standing at his position or against his own level: each word concept (twoK/concepts.ts) has the
+// ratings it needs, on the 0-100 scale the user sees. Fitted to the reviews (scratchpad archreview/fit.py; archreview2: refit on all three, 995 labels): every cutoff
+// below reproduces the user's verdicts for that word on 85-100% of the labels that carry it. A name below a gate pays
+// gatePen (engine.ts), so a modest word, or an honest name (honest.ts), says him
+// instead.
+// "fin" is his best finishing tool (inside or dunk), "best" his best shot (three, mid-range, inside, dunk), "ath" his
+// best of speed and jumping, "ovr" his overall (when the reading has it)
+export type GateKey = keyof ArchetypeRatings | "fin" | "best" | "ath" | "ovr";
+export const ABS_GATES: Record<string, Partial<Record<GateKey, number>>> = {
+	// shooting (the review: a sniper needs a three of 60; every three-point word was judged on the same bar)
+	catchShoot: { tp: 60 },
+	shotHunt: { tp: 60 },
+	threeLevel: { tp: 55, fg: 55 },
+	insideOut: { tp: 55, fin: 55 },
+	mid: { fg: 60 },
+	midPaint: { fg: 60 },
+	pullUp: { fg: 60 },
+	chaser: { fg: 55, tp: 55 },
+	midPost: { fg: 50, ins: 55 },
+	// inside
+	post: { ins: 55 },
+	highLow: { ins: 55 },
+	paint: { fin: 55 },
+	finish: { fin: 55 },
+	scorer: { best: 60 },
+	// athletic (the review: Aerial, Drive & Rise and Riser with jumping in the 50s; Slashers with speed in the 40s-50s)
+	air: { jmp: 65 },
+	riser: { jmp: 60 },
+	dunk: { dnk: 60, jmp: 55 },
+	hammer: { dnk: 60, stre: 55 },
+	lob: { jmp: 60 },
+	slash: { spd: 60, drb: 50 },
+	run: { spd: 55 },
+	burner: { spd: 60 },
+	cutter: { spd: 55 },
+	tempo: { spd: 55, drb: 55 },
+	creator: { drb: 55 },
+	strength: { stre: 60 },
+	// playmaking (the review: passing in the 40s-50s on Table Setters, Visionaries and Triple-Double Threats)
+	pass: { pss: 60 },
+	wizard: { pss: 60, drb: 55 },
+	outlet: { pss: 55 },
+	tripleDouble: { pss: 60, reb: 60, drb: 55, ovr: 55 },
+	// rebounding
+	reb: { reb: 60 },
+	oreb: { reb: 60 },
+	grabGo: { reb: 60 },
+	// defense (the review: Lockdown needs perimeter D 55 and defensive IQ 50, Shot-Erasing interior D 55 and the size; 2-Way
+	// players good on one end only)
+	lockdown: { pdef: 55, diq: 40 },
+	steal: { pdef: 55, diq: 50 },
+	pressure: { pdef: 50, diq: 45 },
+	rimD: { idef: 55, hgt: 45 },
+	twoWay: { oiq: 50, diq: 45, ovr: 50 },
+};
+// Words the concepts above read loosely, with a gate of their own
+export const WORD_GATES: {
+	re: RegExp;
+	need: Partial<Record<GateKey, number>>;
+}[] = [
+	// (a lockdown defender in so many words: the user's 55 / 50)
+	{ re: /Lockdown|\bLock\b|Clamp/, need: { pdef: 55, diq: 50 } },
+	// (the review read these as strength: "Enforcer", "Hammer", a force of nature, a beast)
+	{
+		re: /Enforcer|Hammer|Force of Nature|Beast|Bulldoz|Bruis|Tank\b/,
+		need: { stre: 60 },
+	},
+	// (a switch defender guards on the perimeter and inside: the review's perimeter D)
+	{ re: /Switch/, need: { pdef: 50, idef: 50 } },
+	// (glass in any form is rebounding: "Glass Visionary")
+	{ re: /Glass/, need: { reb: 60 } },
+	// (athletic words without a leap of their own: "Athletic Hustler")
+	{ re: /Athletic|Athlete|Bouncy|Explosive/, need: { ath: 65 } },
+];
+
+const gateValue = (
+	r: ArchetypeRatings,
+	k: GateKey,
+	ovr: number | undefined,
+): number | undefined => {
+	switch (k) {
+		case "fin":
+			return Math.max(r.ins ?? 0, r.dnk ?? 0);
+		case "best":
+			return Math.max(r.tp ?? 0, r.fg ?? 0, r.ins ?? 0, r.dnk ?? 0);
+		case "ath":
+			return Math.max(r.spd ?? 0, r.jmp ?? 0);
+		case "ovr":
+			return ovr;
+		default: {
+			const v = r[k];
+			return typeof v === "number" ? v : undefined;
+		}
+	}
+};
+
+const gateCache = new Map<string, Partial<Record<GateKey, number>>[]>();
+// Concepts a word reads as without making the promise the review judges it on: an "Offensive Engine" carries the
+// offense (judged on scoring), it is not a passer's name
+const GATE_EXEMPT: { re: RegExp; concepts: string[] }[] = [
+	{ re: /Offensive Engine/, concepts: ["pass"] },
+];
+
+// The gates a name's words need
+export const gatesOf = (name: string): Partial<Record<GateKey, number>>[] => {
+	let g = gateCache.get(name);
+	if (!g) {
+		g = [];
+		const exempt = new Set(
+			GATE_EXEMPT.filter((e) => e.re.test(name)).flatMap((e) => e.concepts),
+		);
+		for (const c of conceptsOf(name)) {
+			if (exempt.has(c.key)) {
+				continue;
+			}
+			const need = ABS_GATES[c.key];
+			if (need) {
+				g.push(need);
+			}
+		}
+		for (const w of WORD_GATES) {
+			if (w.re.test(name)) {
+				g.push(w.need);
+			}
+		}
+		if (gateCache.size > 5000) {
+			gateCache.clear();
+		}
+		gateCache.set(name, g);
+	}
+	return g;
+};
+
+// How far below the absolute gates of its words a name is for him, in rating points (0: every gate met; -Infinity: no
+// gate). `band`: last season's label keeps them this much looser
+export const gateGap = (
+	name: string,
+	r: ArchetypeRatings | undefined,
+	ovr?: number,
+	band = 0,
+	// (the league's rating quantiles: the cutoffs read on its scale, gateScale.ts)
+	rq?: RatingQuantiles,
+): number => {
+	if (!r) {
+		return -Infinity;
+	}
+	let m = -Infinity;
+	for (const need of gatesOf(name)) {
+		for (const [k, min] of Object.entries(need) as [GateKey, number][]) {
+			const v = gateValue(r, k, ovr);
+			if (v !== undefined) {
+				const cut = scaleCutoff(min, k as GateScaleKey, rq);
+				m = Math.max(m, cut - band - v);
+			}
+		}
+	}
+	return m;
 };

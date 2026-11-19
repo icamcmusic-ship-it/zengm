@@ -60,7 +60,9 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // words, the low-ovr Prospect / Depth Piece label, Paint Beast, Interior Force, Offensive-Minded Guard and his wording);
 // archramp: 21 (ramps in place of the cliffs: word bars, absolute floors, the earlier reading's candidates, the family
 // vote; last season's label kept by 1.2 and in its own words; no Prospect / Depth Piece label)
-export const ARCHETYPE_READING_VERSION = 21;
+// archreview: 22 (the user's reviews of 995 labels: absolute gates on every word of a name, honest names for limited
+// players by ovr tier and skills, ratings and traits only: no box score or play types)
+export const ARCHETYPE_READING_VERSION = 22;
 
 export const toStored = (
 	season: number,

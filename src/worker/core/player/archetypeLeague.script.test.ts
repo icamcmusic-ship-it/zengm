@@ -284,9 +284,9 @@ test.skipIf(!process.env.RUN_ARCHETYPE_LEAGUE)(
 									bump("old label still a candidate");
 									cgaps.push(c.v2.candidates[0].score - old.score);
 								}
-								if (/Prospect|Depth Piece/.test(prev.name))
+								if (/^(Raw|Reserve) |Prospect|Depth Piece/.test(prev.name))
 									bump("was Prospect / Depth Piece");
-								if (/Prospect|Depth Piece/.test(c.name))
+								if (/^(Raw|Reserve) |Prospect|Depth Piece/.test(c.name))
 									bump("became Prospect / Depth Piece");
 							}
 						}

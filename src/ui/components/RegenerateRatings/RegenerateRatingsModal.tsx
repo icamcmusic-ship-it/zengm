@@ -90,7 +90,12 @@ const RowDetail = ({
 	setLock: (lock: UiLock) => void;
 }) => {
 	const eligible = builds.filter((b) => row.hgt >= b.min && row.hgt <= b.max);
-	const eligibleArch = eligibleArchetypes(archetypes, row.hgt);
+	// (archreview2: only names he can have at the ovr he will be built to)
+	const eligibleArch = eligibleArchetypes(
+		archetypes,
+		row.hgt,
+		row.ovr[0] + (Number(lock.ovrDelta) || 0),
+	);
 	return (
 		<div
 			className="p-2"

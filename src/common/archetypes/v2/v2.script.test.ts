@@ -1190,8 +1190,10 @@ const notables = (out) => {
 		if (!x) {
 			// (an exact full name first: "Victor Wembanyama", not a relative whose name contains it)
 			const bios = Object.entries(data.d.bios).filter(([, b]) => b.name);
-			const slug = (bios.find(([, b]) => fold(b.name) === fold(n)) ??
-				bios.find(([, b]) => fold(b.name).includes(fold(n))))?.[0];
+			const slug = (
+				bios.find(([, b]) => fold(b.name) === fold(n)) ??
+				bios.find(([, b]) => fold(b.name).includes(fold(n)))
+			)?.[0];
 			const row = slug
 				? data.d.ratings
 						.filter((r) => r.slug === slug)

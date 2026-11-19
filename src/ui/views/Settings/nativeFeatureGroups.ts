@@ -21,7 +21,6 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	tradeGrader: "League extras: History & Stories",
 	contractValue: "League extras: History & Stories",
 	frivolities: "League extras: History & Stories",
-	playerNicknames: "League extras: History & Stories",
 	profileExportFull: "League extras: History & Stories",
 	pbpFlavor: "League extras: Game Simulation",
 	pbpLiveGame: "League extras: Game Simulation",
@@ -80,4 +79,8 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	aiDraftNeeds: "League extras: Draft",
 	mockDraft: "League extras: Draft",
 	coachingStaff: "League extras: Team",
+	customShotClock: "League extras: Game Simulation",
+	oneAndOne: "League extras: Game Simulation",
+	faceAging: "League extras: Players",
+	scoutingReports: "League extras: Draft",
 };

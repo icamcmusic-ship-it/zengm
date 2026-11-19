@@ -5,14 +5,11 @@ import HideableSection from "../components/HideableSection.tsx";
 import { PlayerPicture } from "../components/PlayerPicture.tsx";
 import type { HofPlaque } from "../../common/faceHistory.ts";
 import { helpers } from "../util/helpers.ts";
-import { useFeatureOn } from "../util/nativeFeatures.ts";
 
 const FIRST = 12;
 
 export const HallOfFamePlaques = ({ plaques }: { plaques: HofPlaque[] }) => {
 	const [all, setAll] = useState(false);
-	// League Extras "Show Player Nicknames" (the worker leaves them out of the plaque text while off)
-	const showNicknames = useFeatureOn("playerNicknames");
 	if (plaques.length === 0) {
 		return null;
 	}
@@ -47,11 +44,7 @@ export const HallOfFamePlaques = ({ plaques }: { plaques: HofPlaque[] }) => {
 								>
 									{p.name}
 								</a>
-								{p.nickname && showNicknames ? (
-									<div className="fst-italic">"{p.nickname}"</div>
-								) : (
-									<br />
-								)}
+								<br />
 								{p.firstSeason !== undefined
 									? `${p.firstSeason}-${p.retiredYear}`
 									: `Retired ${p.retiredYear}`}

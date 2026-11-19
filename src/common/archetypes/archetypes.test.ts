@@ -1,4 +1,5 @@
 import { isGenericBuild } from "./generic.ts";
+import { aimMinOvr } from "./v2/aim.ts";
 import { assert, describe, test, vi } from "vitest";
 import { resetG } from "../../test/helpers.ts";
 import genRatings from "../../worker/core/player/genRatings.basketball.ts";
@@ -934,7 +935,9 @@ describe("targeting an archetype with the regenerator", () => {
 				(a) =>
 					r.hgt >= a.hgt[0] + 2 &&
 					r.hgt <= a.hgt[1] - 2 &&
-					(archetypePrior(a, ps) ?? -9) > -1,
+					(archetypePrior(a, ps) ?? -9) > -1 &&
+					// (archreview2: a name he can have at his ovr, as the regenerator's pool and pickers offer)
+					ovr >= aimMinOvr(nameAt(a, ps)),
 			);
 			if (fits.length === 0 || ovr < 38) {
 				continue;
@@ -989,11 +992,14 @@ describe("targeting an archetype with the regenerator", () => {
 			// ratings seeds this lands at 99-104 exact / 104-107 loose of 160 (103 / 107 for the fixed seed above), so the
 			// floors leave ~10 players of margin rather than sitting on the mean. archv3: v2 now gives some aimed players its
 			// own role names (Glue Wing / Guard, Switch Defender), an athletic name needs his athleticism, and the family
-			// vote is weighed by each voter's measured reliability: 92 exact / 92 loose of 160 for the fixed seed
-			derivedMatch / inputs.length > 0.53 && loose / inputs.length > 0.53,
+			// vote is weighed by each voter's measured reliability: 92 exact / 92 loose of 160 for the fixed seed.
+			// archreview2: a label's words must be true in absolute terms and an elite word needs ovr 60 (v2/honest.ts). Aimed
+			// at names he can have at his ovr (v2/aim.ts aimMinOvr), with his ratings pushed to the target's gates (gatePush):
+			// 80 exact / 80 loose of 160 for the fixed seed (without the push, 19 of 160 of all targets)
+			derivedMatch / inputs.length > 0.44 && loose / inputs.length > 0.44,
 			`match ${derivedMatch}/${inputs.length} loose ${loose} ${misses.join(" ")}`,
 		);
-	}, 300000);
+	}, 900000);
 });
 
 describe("positions are a hard gate", () => {

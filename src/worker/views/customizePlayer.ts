@@ -232,10 +232,6 @@ export default defineView({
 			// Sub-ratings: his seed and hidden growth profile stay in the worker (saving restores them)
 			if (p) {
 				delete p.subP;
-				// Nickname: "" (none) is edited as "-", missing (generated) as blank
-				if (p.nickname === "") {
-					p.nickname = "-";
-				}
 			}
 
 			return {

@@ -1,4 +1,4 @@
-// Hall of Fame words: player nicknames, plaque text and induction speeches, built from career facts the worker gathers
+// Hall of Fame words: plaque text and induction speeches, built from career facts the worker gathers
 // (worker/util/hofStory.ts). Pure and seeded by pid, so the same player always reads the same. Never shows a rating: the
 // only rating input is an optional "shape" (what he was best at), which the worker leaves out under the no-visible-ratings
 // challenge and reads from fuzzed ratings otherwise.
@@ -62,19 +62,7 @@ export type CareerFacts = {
 		tpm: number;
 	};
 	prime?: { season: number; team?: string };
-	nickname?: string;
 	retiredYear?: number;
-};
-
-// What he was best at, from fuzzed ratings (undefined under the no-visible-ratings challenge)
-export type StyleShape = {
-	dunker?: boolean;
-	shooter?: boolean;
-	touch?: boolean;
-	handles?: boolean;
-	speed?: boolean;
-	strength?: boolean;
-	rimProtector?: boolean;
 };
 
 const ord = (n: number) => {
@@ -86,8 +74,6 @@ const ord = (n: number) => {
 const times = (n: number, what: string) =>
 	n === 1 ? what : `${n}-time ${what}`;
 
-const fmt1 = (x: number) => (Math.round(x * 10) / 10).toFixed(1);
-
 const cityOf = (loc: string | undefined) => {
 	if (!loc) {
 		return undefined;
@@ -96,162 +82,7 @@ const cityOf = (loc: string | undefined) => {
 	return city.length > 0 && city.length <= 16 ? city : undefined;
 };
 
-// ---- Nicknames ------------------------------------------------------------
-
-// His facts as shown, under the "Show Player Nicknames" setting. Off: no nickname (stored or generated), so the plaque and
-// speech use his real name only. Only display is gated: the stored nickname is untouched.
-export const nicknameForDisplay = (
-	nickname: string | undefined,
-	showNicknames: boolean,
-) => {
-	const nick = nickname?.trim();
-	return showNicknames && nick ? nick : undefined;
-};
-
-export const factsForDisplay = <T extends { nickname?: string }>(
-	f: T,
-	showNicknames: boolean,
-): T => {
-	const nickname = nicknameForDisplay(f.nickname, showNicknames);
-	if (nickname === f.nickname) {
-		return f;
-	}
-	const out = { ...f };
-	if (nickname === undefined) {
-		delete out.nickname;
-	} else {
-		out.nickname = nickname;
-	}
-	return out;
-};
-
-// A nickname, or undefined when nothing about his game or story stands out. Candidates are weighted by how strongly they fit.
-export const generateNickname = (
-	f: Pick<
-		CareerFacts,
-		| "pid"
-		| "firstName"
-		| "lastName"
-		| "perGame"
-		| "career"
-		| "hometown"
-		| "college"
-		| "hgt"
-		| "archetype"
-		| "titles"
-		| "mvps"
-	>,
-	shape?: StyleShape,
-): string | undefined => {
-	const rng = new Rng(f.pid, 7301);
-	const c: [number, string][] = [];
-	const add = (w: number, t: string) => {
-		if (w > 0) {
-			c.push([w, t]);
-		}
-	};
-	const L = f.lastName;
-	const F = f.firstName;
-	const pg = f.perGame;
-	const gp = f.career.gp;
-	if (pg && gp >= 60) {
-		if (pg.pts >= 24) {
-			add(pg.pts - 20, "Buckets");
-			add(pg.pts - 21, "The Closer");
-			add(pg.pts - 22, `${F} Buckets`);
-		}
-		if (pg.tpm >= 2.2) {
-			add((pg.tpm - 1.8) * 4, "Splash");
-			add((pg.tpm - 1.8) * 3, `Downtown ${L}`);
-			add((pg.tpm - 2) * 3, "The Sniper");
-		}
-		if (pg.blk >= 1.8) {
-			add((pg.blk - 1.4) * 5, "The Eraser");
-			add((pg.blk - 1.5) * 4, "No Fly Zone");
-		}
-		if (pg.trb >= 10) {
-			add(pg.trb - 8, "The Glass Cleaner");
-			add(pg.trb - 9, "Board Man");
-		}
-		if (pg.ast >= 7) {
-			add(pg.ast - 5, "The Professor");
-			add(pg.ast - 5.5, "The Maestro");
-			add(pg.ast - 6, "Dimes");
-		}
-		if (pg.stl >= 1.7) {
-			add((pg.stl - 1.3) * 6, "The Pickpocket");
-			add((pg.stl - 1.4) * 5, "Sticky Fingers");
-		}
-		if (pg.pts >= 10 && pg.trb >= 6 && pg.ast >= 5) {
-			add(3, "Do-It-All");
-		}
-	}
-	if (shape) {
-		if (shape.dunker) {
-			add(3, `Air ${L}`);
-			add(2, "Hang Time");
-		}
-		if (shape.shooter) {
-			add(2, "The Rainmaker");
-		}
-		if (shape.touch) {
-			add(2.5, "Soft Touch");
-			add(1.5, "The Surgeon");
-		}
-		if (shape.handles) {
-			add(2.5, "The Magician");
-			add(1.5, "Yo-Yo");
-		}
-		if (shape.speed) {
-			add(2, "The Blur");
-			add(1.5, "Jet");
-		}
-		if (shape.strength) {
-			add(2, "The Bulldozer");
-			add(1.5, "Tank");
-		}
-		if (shape.rimProtector) {
-			add(2, "The Wall");
-		}
-	}
-	const city = cityOf(f.hometown);
-	if (city && gp >= 150) {
-		add(1.2, `The ${city} Kid`);
-		add(1, `The Pride of ${city}`);
-	}
-	if (f.hgt !== undefined) {
-		if (f.hgt >= 85) {
-			add(2, `Big ${F}`);
-			add(1.5, "The Tower");
-		} else if (f.hgt <= 72) {
-			add(2, `Little ${F}`);
-			add(1, "Pocket Rocket");
-		}
-	}
-	if (f.mvps >= 2 || f.titles.length >= 3) {
-		add(2.5, "The King");
-		add(2, "The Franchise");
-	}
-	if (F[0] && L[0] && F[0].toUpperCase() === L[0].toUpperCase()) {
-		add(1.5, `${F[0].toUpperCase()}-Squared`);
-	}
-	if (c.length === 0) {
-		return undefined;
-	}
-	// Short careers with only a weak fit go without
-	const total = c.reduce((a, x) => a + x[0], 0);
-	if (total < 1.5 && gp < 300) {
-		return undefined;
-	}
-	let r = rng.random() * total;
-	for (const [w, t] of c) {
-		r -= w;
-		if (r <= 0) {
-			return t;
-		}
-	}
-	return c.at(-1)![1];
-};
+const fmt1 = (x: number) => (Math.round(x * 10) / 10).toFixed(1);
 
 // ---- Plaque ---------------------------------------------------------------
 
@@ -260,14 +91,13 @@ export const generateNickname = (
 export const plaqueText = (f: CareerFacts): string => {
 	const rng = new Rng(f.pid, 7302);
 	const parts: string[] = [];
-	const nick = f.nickname ? ` "${f.nickname}"` : "";
 	const teams = f.teams.slice(0, 3).map((t) => t.name);
 	const teamList =
 		teams.length <= 1
 			? (teams[0] ?? "")
 			: `${teams.slice(0, -1).join(", ")} and ${teams.at(-1)}`;
 	parts.push(
-		`${f.firstName}${nick} ${f.lastName}. ${f.career.seasons} seasons${teamList ? `, ${teamList}` : ""}.`,
+		`${f.firstName} ${f.lastName}. ${f.career.seasons} seasons${teamList ? `, ${teamList}` : ""}.`,
 	);
 	const honors: string[] = [];
 	if (f.titles.length > 0) {
@@ -436,13 +266,10 @@ export const inductionSpeech = (f: CareerFacts): string[] => {
 	}
 
 	// Close
-	const nick = f.nickname
-		? ` Thank you for letting me be "${f.nickname}".`
-		: "";
 	out.push(
 		rng.pick([
-			`${f.career.seasons} seasons, ${f.career.pts.toLocaleString("en-US")} points, and I'd do every one of them again. Thank you.${nick}`,
-			`To my family, who sat through every game: this is your plaque too.${nick} Thank you.`,
+			`${f.career.seasons} seasons, ${f.career.pts.toLocaleString("en-US")} points, and I'd do every one of them again. Thank you.`,
+			`To my family, who sat through every game: this is your plaque too. Thank you.`,
 		]),
 	);
 	return out;

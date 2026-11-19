@@ -28,6 +28,7 @@ import { whyBullets, whyDrivers } from "../../../common/archetypes/whyText.ts";
 import {
 	classifyV2,
 	warmArchetypeEngine,
+	V2_PARAMS,
 } from "../../../common/archetypes/v2/engine.ts";
 import { VISIBLE_TRAITS } from "../../../common/archetypes/classify.ts";
 import { RATING_KEYS } from "../../../common/ratingsBuilds/solver.ts";
@@ -90,6 +91,7 @@ import {
 	refitArchetypeTuning,
 } from "./archetypeFeedback.ts";
 import { pickKey } from "../../../common/archetypes/v2/picks.ts";
+import { ratingQuantiles } from "../../../common/archetypes/v2/gateScale.ts";
 
 // archfb: the shipped model with the user's tuning on top, or undefined (the shipped model) with no tuning
 export const tunedModelFor = (
@@ -337,6 +339,15 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 		).length;
 		statNorms[b] = n >= 30 ? own[b]! : DEFAULT_STAT_NORMS[b];
 	}
+	// archreview: the league's scale for the absolute gates (common/archetypes/v2/gateScale.ts), for a real-players league
+	// only (real players' ratings sit on another scale: Chris Paul passes at 58). A random league, however weak, is read
+	// on the absolute bars (archreview2: the user's weak leagues should have no elite labels at all)
+	if (
+		rows.length >= MIN_LEAGUE_FOR_NORMS &&
+		players.filter((p) => p.srID !== undefined).length >= players.length / 2
+	) {
+		norms.rq = ratingQuantiles(rows);
+	}
 	normsCache = { key, norms, statNorms, ptNorms: buildPtNorms(ptRows) };
 	return norms;
 };
@@ -359,6 +370,11 @@ export const readOptionsFor = (
 	if (prospect) {
 		return { prospect: true };
 	}
+	// archreview2 (the user: "take stat and shot tracking out of the archetype formula"): ratings and traits only, so
+	// neither his box score nor his play types are read (the reading's useStats; the why line cites neither)
+	if (!V2_PARAMS.useStats) {
+		return { age: season - p.born.year };
+	}
 	// arch15: his play types against his position's peers in this league (none without tracking stats or a league table)
 	const pt = archetypePlayTypes(p, season);
 	const ptRead = pt
@@ -376,6 +392,8 @@ export const fuzzedArchetypeLabel = (
 	ratings: ArchetypeRatings,
 	fuzz: number,
 	norms: Norms,
+	// (archreview2: his ovr and potential, for the honest names' tier and upside, as the game reads him)
+	level: { ovr?: number; pot?: number } = {},
 ): string => {
 	const f = getFuzz(fuzz);
 	const shown = {} as ArchetypeRatings;
@@ -401,6 +419,8 @@ export const fuzzedArchetypeLabel = (
 		norms,
 		pos: posFn(ratings as any),
 		prospect: true,
+		ovr: level.ovr,
+		pot: level.pot,
 		...(model ? { model } : {}),
 		...(refs.length > 0 ? { extraRefs: refs } : {}),
 	}).label;
@@ -426,6 +446,8 @@ export const classifyPlayer = (
 	// His position as the game shows it decides which builds he may have
 	const opts = {
 		ovr: row.ovr,
+		// (archreview2: upside for the honest names)
+		pot: row.pot,
 		previousId,
 		pos: isPos(row.pos) ? row.pos : undefined,
 		traits:
