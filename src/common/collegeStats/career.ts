@@ -1,6 +1,7 @@
 import { COLLEGES, CONFERENCES } from "./colleges.ts";
 import { getRegion, getSchool, type School } from "./colleges.helpers.ts";
-import { isOverseasLeague } from "./overseas.ts";
+import { getLeagueEnv, isOverseasLeague } from "./overseas.ts";
+import { planInjuries, type PreDraftInjury } from "./injuries.ts";
 import { Rng, clamp } from "./rng.ts";
 import type { CollegeProspect } from "./types.ts";
 
@@ -28,6 +29,8 @@ export type CareerYear = {
 	status?: CareerStatus;
 	// He changed schools before this season, and how
 	move?: CareerMove;
+	// An injury that season (injuries.ts)
+	injury?: PreDraftInjury;
 };
 
 export const STORY_KINDS = [
@@ -66,6 +69,8 @@ export type PlannedYear = CareerYear & {
 	lag: number;
 	gamesCap?: number;
 	teamGames?: number;
+	// Games missed with an injury in the middle of the season (injuries.ts)
+	injuryGames?: number;
 };
 
 // What is kept on the player (p.preDraftCareer): his years, his story and, once it has been set against the rest of his high school class, his recruiting ranking (null: unranked)
@@ -297,6 +302,7 @@ export const planCareer = (
 		priorSeasons,
 		z,
 		classIndex,
+		injuries = true,
 	}: {
 		seed: string;
 		draftYear: number;
@@ -304,6 +310,8 @@ export const planCareer = (
 		// Class-relative talent, clamped
 		z: number;
 		classIndex: number;
+		// Pre-draft injuries (injuries.ts), from a stream of their own. Default true
+		injuries?: boolean;
 	},
 ): CareerPlan => {
 	if (!school || school.idle) {
@@ -557,6 +565,14 @@ export const planCareer = (
 		last.gamesCap = 5 + Math.floor(rng.random() * 11);
 	}
 
+	if (injuries) {
+		planInjuries(years, {
+			seedBase,
+			durability: p.durability,
+			seasonGames: getLeagueEnv(school.name)?.games ?? 32,
+		});
+	}
+
 	const firstYear = years[0]!;
 	return {
 		years,
@@ -573,6 +589,7 @@ export const toCareer = (plan: CareerPlan): PreDraftCareer => ({
 		...(year.cls !== undefined ? { cls: year.cls } : {}),
 		...(year.status ? { status: year.status } : {}),
 		...(year.move ? { move: year.move } : {}),
+		...(year.injury ? { injury: { ...year.injury } } : {}),
 	})),
 	...(plan.story ? { story: plan.story } : {}),
 	...(plan.hsClass !== undefined ? { hsClass: plan.hsClass } : {}),

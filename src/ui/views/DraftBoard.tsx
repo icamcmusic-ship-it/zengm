@@ -8,6 +8,8 @@ import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
 import { PlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import { ScoutCell } from "./DraftScouting/DraftClass.tsx";
+import { MedicalGrade } from "../components/MedicalGrade.tsx";
+import { MEDICAL_EXPLANATION } from "../../common/draftCombine.ts";
 
 type Prospect = View<"draftBoard">["prospects"][number];
 
@@ -99,6 +101,8 @@ const DraftBoard = ({
 	};
 
 	const showRatings = !challengeNoRatings;
+	// Pre-Draft Injuries & Combine Medicals: once the class's combine was held
+	const showMedical = prospects.some((p) => p.medical !== undefined);
 
 	return (
 		<>
@@ -219,6 +223,7 @@ const DraftBoard = ({
 							<th>Build</th>
 							<th>College / overseas</th>
 							{scoutingSystem && showRatings ? <th>Scout report</th> : null}
+							{showMedical ? <th title={MEDICAL_EXPLANATION}>Med</th> : null}
 							<th>Notes</th>
 						</tr>
 					</thead>
@@ -378,6 +383,16 @@ const DraftBoard = ({
 												report={p.scoutReport}
 												remaining={undefined}
 											/>
+										</td>
+									) : null}
+									{showMedical ? (
+										<td>
+											{p.medical ? (
+												<MedicalGrade
+													grade={p.medical.grade}
+													reason={p.medical.reason}
+												/>
+											) : null}
 										</td>
 									) : null}
 									<td>

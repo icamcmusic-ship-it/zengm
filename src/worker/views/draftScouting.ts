@@ -26,6 +26,7 @@ import { EXPANDED_RATINGS } from "../../common/expandedRatings.ts";
 import { getClassShapeInfo } from "../core/draft/classShape.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
+import { storedMedicalView } from "../core/draftCombine/index.ts";
 
 const getSeason = async (
 	playersAll: Player[],
@@ -122,6 +123,8 @@ const getSeason = async (
 				traits: traitsByPid.get(pa.pid),
 				// From a linked college league: his school there
 				linkedSchool: playersByPid.get(pa.pid)!.linkedCollege?.school,
+				// Pre-Draft Injuries & Combine Medicals: his medical grade, once his combine was held
+				medical: storedMedicalView(playersByPid.get(pa.pid)!),
 
 				// Ratings - just take the only entry
 				ovr: ratings.ovr,

@@ -40,6 +40,8 @@ export type GenerateOptions = {
 	ncaaSeason?: NcaaSeason;
 	// The whole draft class, when only some of it is being generated (prospects missing stats, or a remake of some): where a prospect stands in his class is measured against all of it. Default: the prospects being generated
 	classProspects?: CollegeProspect[];
+	// Pre-draft injuries (injuries.ts). Default true
+	injuries?: boolean;
 };
 
 // Game score per 40 minutes a junior college season needs for honors
@@ -162,6 +164,7 @@ export const generateCollegeClass = (
 			draftYear,
 			priorSeasons,
 			z: zClass,
+			injuries: options.injuries ?? true,
 			classIndex: isCollegeSchool(school)
 				? getClassIndexForStock(p.age, zStock, classRng.random())
 				: getClassIndex(p.age),
@@ -208,6 +211,9 @@ export const generateCollegeClass = (
 					...(year.mpgShift !== 0 ? { mpgShift: year.mpgShift } : {}),
 					...(year.usageShift !== 0 ? { usageShift: year.usageShift } : {}),
 					...(year.gamesCap !== undefined ? { gamesCap: year.gamesCap } : {}),
+					...(year.injuryGames !== undefined
+						? { injuryGames: year.injuryGames }
+						: {}),
 					...(year.teamGames !== undefined
 						? { teamGames: year.teamGames }
 						: {}),
@@ -222,6 +228,18 @@ export const generateCollegeClass = (
 						: {}),
 				}),
 			);
+			// The games a mid-season injury actually cost him (a season-ending one keeps 0: the rest of the season, which depends on how
+			// many games his team played)
+			if (year.injury && !year.injury.ended) {
+				const sim = seasons.at(-1)!;
+				year.injury.games = Math.min(
+					year.injury.games,
+					Math.max(0, sim.teamGames - (sim.stats.gp ?? 0)),
+				);
+				if (year.injury.games === 0) {
+					delete year.injury;
+				}
+			}
 		}
 
 		if (ncaaSeason && team >= 0 && school) {

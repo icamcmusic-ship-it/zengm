@@ -13,6 +13,7 @@ import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { confidenceFromFactor } from "../../common/staffDepth/regions.ts";
 import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
+import { storedMedicalView } from "../core/draftCombine/index.ts";
 
 /**
  * The user's draft board planner: one draft class, with the user's ranks, tiers and notes next to everything known about each prospect (fuzzed ratings, build, college/overseas stats and honors, scout report).
@@ -113,6 +114,8 @@ export default defineView({
 						preDraftLine,
 						numHonors: getPreDraftAwards(p).length,
 						scoutReport: scoutingSystem ? getScoutReport(p) : undefined,
+						// Pre-Draft Injuries & Combine Medicals: his medical grade, once his combine was held
+						medical: storedMedicalView(p),
 						board: p.draftBoard ?? {},
 					};
 				}),
