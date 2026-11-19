@@ -44,6 +44,7 @@ const EXTRAS_FORCED_OFF = [
 	"featurePreDraftPaths",
 	"featureDraftClassShapes",
 	"featureRatingsRegenerator",
+	"featureRealComps",
 	"scoutingSystem",
 	"featureDraftBoard",
 	"featureDraftStash",

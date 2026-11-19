@@ -32,6 +32,7 @@ import {
 	summarizeRoom,
 	type ProspectRoom,
 } from "../core/scoutingReports/room.ts";
+import { getRealComps } from "../core/draft/realComps.ts";
 
 const getSeason = async (
 	playersAll: Player[],
@@ -110,6 +111,9 @@ const getSeason = async (
 		]),
 	);
 
+	// Real Player Comps: the closest real NBA players to his ratings as the scouts see them
+	const realComps = await getRealComps(playersAllFiltered);
+
 	const players2 = addFirstNameShort(
 		players.map((pa, i) => {
 			const ratings = last(pa.ratings);
@@ -129,6 +133,7 @@ const getSeason = async (
 				traits: traitsByPid.get(pa.pid),
 				// Scout Consensus & Flags: the room's consensus, spread and the flags
 				room: rooms.has(pa.pid) ? summarizeRoom(rooms.get(pa.pid)!) : undefined,
+				comps: realComps.get(pa.pid),
 				// From a linked college league: his school there
 				linkedSchool: playersByPid.get(pa.pid)!.linkedCollege?.school,
 				// Pre-Draft Injuries & Combine Medicals: his medical grade, once his combine was held

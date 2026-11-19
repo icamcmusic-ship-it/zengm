@@ -1093,6 +1093,17 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "realComps",
+		college: false,
+		key: "featureRealComps",
+		core: true,
+		name: "Real Player Comps",
+		description:
+			"Each draft prospect gets the 3 real NBA players whose real young seasons look most like his ratings as your scouts see them (\"Plays like: Name (2003-04, age 20), close\"), with what each became. Shown on the prospect's player page, Draft Scouting and the Draft Board. Only real players and their real seasons are used; nothing shows if the real player data can't be loaded.",
+		default: true,
+		sports: BBGM,
+	},
+	{
 		id: "ratingsRegenerator",
 		college: false,
 		key: "featureRatingsRegenerator",

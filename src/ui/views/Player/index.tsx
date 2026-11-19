@@ -40,6 +40,7 @@ import { wrappedSeasonAwards } from "./SeasonAwards.tsx";
 import { last, orderBy } from "../../../common/utils.ts";
 import { PreDraftSummary } from "./PreDraftSummary.tsx";
 import { StashPlayerPanel } from "../../components/DraftStash.tsx";
+import { RealCompsSummary } from "../../components/RealComps.tsx";
 import { NitStats } from "./NitStats.tsx";
 import { TrackingProfile } from "./TrackingProfile.tsx";
 import {
@@ -161,6 +162,8 @@ const Player2 = ({
 			) : null}
 
 			<PreDraftSummary player={player} />
+
+			{player.realComps ? <RealCompsSummary comps={player.realComps} /> : null}
 
 			{player.tid === PLAYER.UNDRAFTED ? (
 				<ProProjectionSection pid={player.pid} />

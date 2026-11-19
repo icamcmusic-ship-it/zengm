@@ -40,6 +40,7 @@ import type { LeagueUrlParts } from "../../ui/router/types.ts";
 import { getHealthInfo } from "../core/player/getHealthInfo.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { ratingsKeysForView } from "../core/player/expandedRatings.ts";
+import { getRealComps } from "../core/draft/realComps.ts";
 import { playerFaceHistory } from "../util/faceAging.ts";
 import {
 	ADV_STAT_TYPES,
@@ -237,6 +238,9 @@ export const getPlayer = async <
 
 		// Frozen Pre-draft Ranks setting: his rank on the scouts' list when his class's draft started, and the overall pick he went at
 		preDraftRankInfo: await preDraftRankInfo(pRaw),
+
+		// Real Player Comps (draft prospects only): the closest real NBA players to his ratings as the scouts see them
+		realComps: (await getRealComps([pRaw])).get(pRaw.pid),
 
 		// Handle prefixing awards
 		awards: p.awards.map(

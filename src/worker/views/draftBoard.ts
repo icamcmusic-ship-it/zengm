@@ -18,6 +18,7 @@ import {
 	getProspectRooms,
 	summarizeRoom,
 } from "../core/scoutingReports/room.ts";
+import { getRealComps } from "../core/draft/realComps.ts";
 
 /**
  * The user's draft board planner: one draft class, with the user's ranks, tiers and notes next to everything known about each prospect (fuzzed ratings, build, college/overseas stats and honors, scout report).
@@ -85,6 +86,8 @@ export default defineView({
 
 		// Scout Consensus & Flags
 		const rooms = fantasyDraft ? undefined : await getProspectRooms(players);
+		// Real Player Comps
+		const realComps = await getRealComps(players);
 
 		const prospects = addFirstNameShort(
 			formatted
@@ -116,6 +119,7 @@ export default defineView({
 							? (preDraftRanks.get(pa.pid)?.r ?? maxPreDraftRank + i + 1)
 							: i + 1,
 						build: p.ratingsBuild?.name,
+						comps: realComps.get(pa.pid),
 						school: lastRow?.teamName ?? p.college ?? "",
 						preDraftLabel,
 						preDraftLine,
