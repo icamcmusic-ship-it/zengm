@@ -942,7 +942,7 @@ describe("targeting an archetype with the regenerator", () => {
 					r.hgt <= a.hgt[1] - 2 &&
 					(archetypePrior(a, ps) ?? -9) > -1 &&
 					// (archreview2: a name he can have at his ovr, as the regenerator's pool and pickers offer)
-					ovr >= aimMinOvr(nameAt(a, ps)),
+					ovr >= aimMinOvr(nameAt(a, ps), ps),
 			);
 			if (fits.length === 0 || ovr < 38) {
 				continue;

@@ -5,9 +5,8 @@ import { archetypeToBuild, personalizeSeed } from "../archetypes/target.ts";
 import { ARCHETYPES as NEW_ARCHETYPES } from "../archetypes/classify.ts";
 import { gateFactor } from "../archetypes/score.ts";
 import { archetypePrior, isPos, positionOf } from "../archetypes/position.ts";
-import { scoreAll } from "../archetypes/classify.ts";
 import { classifyV2 } from "../archetypes/v2/engine.ts";
-import { aimMinOvr, gatePush } from "../archetypes/v2/aim.ts";
+import { aimMinOvr, gatePush, nounAimMargin } from "../archetypes/v2/aim.ts";
 import { nameAt } from "../archetypes/posNames.ts";
 import type { Norms } from "../archetypes/types.ts";
 import { scoutingEffectCutoff, scoutingEffectStddev } from "../budgetLevels.ts";
@@ -260,7 +259,7 @@ export const regenerateClass = (
 					a &&
 					gateFactor(base.hgt, a.hgt) >= 0.6 &&
 					archetypePrior(a, basePos) !== null &&
-					targetOvr >= aimMinOvr(nameAt(a, basePos))
+					targetOvr >= aimMinOvr(nameAt(a, basePos), basePos)
 				);
 			});
 			if (fits.length > 0) {
@@ -316,26 +315,21 @@ export const regenerateClass = (
 		// a few times and keep the attempt that fits the target best.
 		let matched = false;
 		if (aimed && targetId && !lock?.skip) {
-			const fit = (r: BuildRatings) => {
-				const sc = scoreAll(r, opts.norms, undefined, undefined, undefined, {
-					prospect: true,
-				}).scored;
-				const i = sc.findIndex((x) => x.a.id === targetId);
-				// (matched: what the game will show, classify's pick: arch16's generic fallback can differ from the top score)
-				return {
-					matched: derivedOf(F, r, opts.norms, p.pot).id === targetId,
-					z: sc[i]!.z - sc[0]!.z,
-				};
-			};
-			let best = fit(built.ratings);
-			matched = best.matched;
-			// What the solver did to his ratings (caps, the overall) is then corrected for: the missing push is added to the offsets
-			const acc: Partial<Record<RatingKey, number>> = { ...aimed!.o };
 			// (archreview2: the name his target is shown as at his position, whose words' absolute gates he must clear)
 			const targetA = NEW_ARCHETYPES.find((x) => x.id === targetId);
 			const targetName = targetA
 				? nameAt(targetA, isPos(F.pos(base)) ? F.pos(base) : positionOf(base))
 				: aimed!.name;
+			const fit = (r: BuildRatings) => ({
+				// (matched: what the game will show)
+				matched: derivedOf(F, r, opts.norms, p.pot).id === targetId,
+				// archnouns: how near the target's nouns are to naming him (nouns.ts)
+				z: nounAimMargin(targetName, r, opts.norms?.nq ?? opts.norms?.rq),
+			});
+			let best = fit(built.ratings);
+			matched = best.matched;
+			// What the solver did to his ratings (caps, the overall) is then corrected for: the missing push is added to the offsets
+			const acc: Partial<Record<RatingKey, number>> = { ...aimed!.o };
 			for (let n = 0; n < AIM_TRIES; n++) {
 				if (matched) {
 					break;
@@ -355,7 +349,7 @@ export const regenerateClass = (
 				const push = gatePush(
 					targetName,
 					built.ratings,
-					opts.norms?.rq,
+					opts.norms?.nq ?? opts.norms?.rq,
 					F.ovr(built.ratings),
 				);
 				for (const k of Object.keys(push) as RatingKey[]) {

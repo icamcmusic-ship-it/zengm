@@ -4,7 +4,7 @@
 // ovr where it can be had (aimMinOvr), and an aimed player's ratings are pushed up to the gates his target's words need
 // (gatePush), not only toward the target's shape.
 import type { RatingKey } from "../../ratingsBuilds/types.ts";
-import type { ArchetypeRatings } from "../types.ts";
+import type { ArchetypeRatings, Pos } from "../types.ts";
 import {
 	scaleCutoff,
 	type GateScaleKey,
@@ -17,13 +17,14 @@ import {
 	NOUN_RATING,
 	nounScores,
 	ratingAtPct,
+	aimReachable,
 	specialNounsOf,
 } from "./nouns.ts";
 
 // The lowest ovr at which a name can be a player's label (archnouns: Infinity for a build that can never be one: a name
 // whose words are not all nouns, nouns.ts specialNounsOf)
-export const aimMinOvr = (name: string): number =>
-	!specialNounsOf(name)
+export const aimMinOvr = (name: string, pos?: Pos): number =>
+	!aimReachable(name, pos)
 		? Infinity
 		: ELITE_RE.test(name)
 			? ELITE_OVR
@@ -110,4 +111,25 @@ export const gatePush = (
 		}
 	}
 	return push;
+};
+
+// archnouns: how close his ratings are to being named for a target (> 0: its nouns all clear the bar and lead his other
+// nouns; the smaller of the two margins, in league standing)
+export const nounAimMargin = (
+	name: string,
+	r: ArchetypeRatings,
+	rq?: RatingQuantiles,
+): number => {
+	const sn = specialNounsOf(name);
+	if (!sn) {
+		return -Infinity;
+	}
+	const sc = nounScores(r, rq);
+	const own = sc.filter((x) => sn.nouns.includes(x.key));
+	const rest = sc.filter(
+		(x) => !sn.nouns.includes(x.key) && x.key !== "crafty",
+	);
+	const low = Math.min(...own.map((x) => x.pct));
+	const high = Math.max(NOUN_CLEAR - 0.05, ...rest.map((x) => x.pct));
+	return Math.min(low - NOUN_CLEAR, low - high);
 };
