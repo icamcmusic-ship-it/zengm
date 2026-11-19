@@ -15,6 +15,7 @@ import { last } from "../../../common/utils.ts";
 import { choice } from "../../../common/random.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { getDraftCombineNudges } from "../draftCombine/index.ts";
+import { maybeAiDraftNightTrade } from "./draftNightTrades.ts";
 import { prepareWholeRoster } from "../team/ovr.ts";
 import {
 	getDraftAdjustment,
@@ -128,6 +129,9 @@ const runPicks = async (
 
 	const expansionDraft = g.get("expansionDraft");
 
+	// Draft-night trades: picks already considered for an AI trade-up in this run
+	const triedDraftNightTrade = new Set<number>();
+
 	let playersAll: Player[];
 	if (g.get("phase") === PHASE.FANTASY_DRAFT) {
 		playersAll = await idb.cache.players.indexGetAll(
@@ -209,6 +213,16 @@ const runPicks = async (
 
 			if (pauseForUserPick || pauseForDpid) {
 				return afterDoneAuto();
+			}
+
+			// Draft-night trades: maybe an AI team trades up into this pick (seeded, at most one try per pick). Then the
+			// order is read again, since the pick and maybe others changed hands
+			if (!triedDraftNightTrade.has(dp.dpid)) {
+				triedDraftNightTrade.add(dp.dpid);
+				if (await maybeAiDraftNightTrade(draftPicks, playersAll)) {
+					draftPicks = await getOrder();
+					return autoSelectPlayer();
+				}
 			}
 
 			draftPicks.shift();

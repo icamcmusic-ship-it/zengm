@@ -19,6 +19,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { groupByUnique } from "../../../common/utils.ts";
 import { StickyDraftInfo } from "./StickyDraftInfo.tsx";
 import { DraftDayModal } from "./DraftDayModal.tsx";
+import { DraftNightOffers, PickValueChartModal } from "./DraftNightTrades.tsx";
 import { wrappedDraftAbbrev } from "../../components/DraftAbbrev.tsx";
 import { RosterComposition } from "../../components/RosterComposition.tsx";
 import { confirm } from "../../util/confirm.tsx";
@@ -102,6 +103,9 @@ const Draft = ({
 	]);
 	const expansionDraft = phase === PHASE.EXPANSION_DRAFT;
 	const draftBoardOn = useFeatureOn("draftBoard");
+	const draftNightTradesOn =
+		useFeatureOn("draftNightTrades") && phase === PHASE.DRAFT;
+	const [showPickChart, setShowPickChart] = useState(false);
 
 	const [drafting, setDrafting] = useState(false);
 
@@ -178,6 +182,11 @@ const Draft = ({
 	const usersTurn = !!(nextPick && userTids.includes(nextPick.draft.tid));
 
 	const canEditDraftOrder = godMode && remainingPicks.length > 0;
+
+	// Draft-night offers are reloaded whenever a pick is made or changes hands
+	const draftNightKey = remainingPicks
+		.map((p) => `${p.draft.dpid}:${p.draft.tid}`)
+		.join(",");
 
 	const sortableRows = editDraftOrder && canEditDraftOrder;
 
@@ -599,6 +608,23 @@ const Draft = ({
 							/>
 						</>
 					) : null}
+				</>
+			) : null}
+			{draftNightTradesOn && remainingPicks.length > 0 ? (
+				<>
+					<div className="mb-2">
+						<button
+							className="btn btn-light-bordered btn-sm"
+							onClick={() => setShowPickChart(true)}
+						>
+							Pick value chart
+						</button>
+					</div>
+					<PickValueChartModal
+						show={showPickChart}
+						onHide={() => setShowPickChart(false)}
+					/>
+					{!spectator ? <DraftNightOffers refreshKey={draftNightKey} /> : null}
 				</>
 			) : null}
 			<StickyDraftInfo
