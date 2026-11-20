@@ -26,7 +26,7 @@ export const SHOT_SHARE = {
 	abilityHi: 0.45,
 	// Role in the five: weight multiplier for the 1st, 2nd, 3rd option and the two role players. The 1st option's is more for a better
 	// scorer: tier[0] + firstAbility × (ability - 0.5)
-	tier: [1.55, 1.1, 1, 0.92, 0.88],
+	tier: [1.72, 1.1, 1, 0.92, 0.88],
 	firstAbility: 0.2,
 	// Lineup-relative knee: a weight above knee × the five's mean keeps only `excess` of the part above it. knee = kneeLo + kneeSpan × ability
 	kneeLo: 1.3,
@@ -101,6 +101,17 @@ export const SHOT_SHARE = {
 	// take over part of its job
 	attnShare: 0.36,
 	attnExcess: 0.6,
+	// Star foul drawing: the defense fouls the first options more (they attack the rim and get the whistle), so each player's
+	// foul-drawing composite × 1 + foulStar × (ability - the mean ability of his team's top 8 by value - foulOff) (the shooting fouls go
+	// with its square). Relative to his team, so league free throws stay about the same whatever the league's talent; foulOff because
+	// the better scorers take more of the shots
+	foulStar: 0.55,
+	foulOff: 0.06,
+	// Star shot making: a first option's shots are the ones the offense is built to get him (his spots, screens, matchups), which the
+	// defensive attention penalties (Matchup Defense, Star & Clutch Calibration) took back too much of (the top scorers' true shooting was
+	// barely above the league's, NBA about +.04-.05): his make probability + starMake × (ability - the mean ability of the five on the
+	// court), so league FG% stays about the same
+	starMake: 0.14,
 	// Calibration, so league shooting stays the same: added to the make probability of every shot from the shooter draw (the stars take
 	// more of the shots, and more of them against the help defense), and a multiplier on the three-point draw
 	makeCal: 0.009,
@@ -249,6 +260,35 @@ export const kneeAndFloor = (
 			weights[i] = floor;
 		}
 	}
+};
+
+// Star foul drawing: the multiplier on his foul-drawing composite
+export const starFoulMult = (ability: number, teamMean: number) =>
+	Math.max(
+		0,
+		1 + SHOT_SHARE.foulStar * (ability - teamMean - SHOT_SHARE.foulOff),
+	);
+
+// Star shot making: added to the make probability of his shots from the shooter draw
+export const starMakeDelta = (ability: number, fiveMean: number) =>
+	SHOT_SHARE.starMake * (ability - fiveMean);
+
+// Mean scoring ability of a team's top 8 by value (healthy), for starFoulMult
+export const rotationMeanAbility = (
+	players: { valueNoPot: number; injured: boolean; usage: number }[],
+) => {
+	const top = players
+		.filter((p) => !p.injured)
+		.toSorted((a, b) => b.valueNoPot - a.valueNoPot)
+		.slice(0, 8);
+	if (top.length === 0) {
+		return 0;
+	}
+	let sum = 0;
+	for (const p of top) {
+		sum += scoringAbility(p.usage);
+	}
+	return sum / top.length;
 };
 
 // Double teams: the probability that the defense doubles a player with this share of his five's weight

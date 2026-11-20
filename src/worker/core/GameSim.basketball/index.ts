@@ -162,6 +162,9 @@ import {
 	kneeAndFloor,
 	sagOf,
 	scoringAbility,
+	starFoulMult,
+	starMakeDelta,
+	rotationMeanAbility,
 	shareEffect,
 	SHOT_SHARE,
 	shotPlanMult,
@@ -943,8 +946,20 @@ class GameSim extends GameSimBase {
 		);
 		if (this.shotShare) {
 			for (const t of teams) {
+				// Star foul drawing, relative to his team's rotation
+				const teamMean = rotationMeanAbility(
+					t.player.map((p) => ({
+						valueNoPot: p.valueNoPot,
+						injured: p.injured,
+						usage: p.compositeRating.usage,
+					})),
+				);
 				for (const p of t.player) {
 					p.ss = this.shotShareState(p);
+					p.compositeRating.drawingFouls *= starFoulMult(
+						p.ss.ability,
+						teamMean,
+					);
 				}
 			}
 		}
@@ -2520,7 +2535,13 @@ class GameSim extends GameSimBase {
 		if (i < 0) {
 			return -SHOT_SHARE.makeCal;
 		}
-		let delta = -SHOT_SHARE.makeCal;
+		const five = this.playersOnCourt[t];
+		let fiveMean = 0;
+		for (const q of five) {
+			fiveMean += q.ss?.ability ?? 0;
+		}
+		fiveMean /= five.length;
+		let delta = -SHOT_SHARE.makeCal - starMakeDelta(s.ability, fiveMean);
 		if (this.ssLate && i !== this.ssCreator[t] && this.ssTier[t][i] !== 0) {
 			delta += SHOT_SHARE.lateForced;
 		}

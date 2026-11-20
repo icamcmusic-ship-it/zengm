@@ -4,9 +4,10 @@
 
 // Minutes per regulation game (48) planned by rank in value among the healthy players, regular season. Sums to 240. Planned a little
 // above what the top of the rotation ends up playing, since blowouts and foul trouble take minutes from them (calibrated so the
-// league minutes by rank stay about the same as with the setting off, see docs/native-features.md)
+// league minutes by rank stay about the same as with the setting off, see docs/native-features.md). The top three were raised (and the
+// bench trimmed) so the league's top scorers play ~34-35 minutes per game (they played ~33, NBA ~35)
 const REGULAR_SEASON_TARGETS = [
-	37.5, 35.5, 33.5, 31, 29, 22.5, 20, 16, 11.5, 3.5,
+	40, 38, 35, 31.5, 28.5, 21.5, 18.5, 14.5, 10, 2.5,
 ];
 // Playoffs: an 8-man rotation, stars play 38-42 (about 40 in close games, less in blowouts)
 const PLAYOFF_TARGETS = [43, 41, 38, 36, 34, 24, 15, 9];
@@ -15,11 +16,11 @@ const PLAYOFF_TARGETS = [43, 41, 38, 36, 34, 24, 15, 9];
 const BACK_TO_BACK_STARTER_CUT = 2;
 
 // The most a player is planned for (before ptModifier above 1)
-const MAX_TARGET_REGULAR_SEASON = 39;
+const MAX_TARGET_REGULAR_SEASON = 42;
 const MAX_TARGET_PLAYOFFS = 44;
 // A star (this much better than the team's 5th best player) gets a little more, up to the max
 const STAR_VALUE_GAP = 10;
-const STAR_BONUS = 2;
+const STAR_BONUS = 3;
 
 export type RotationPlayer = {
 	valueNoPot: number;
