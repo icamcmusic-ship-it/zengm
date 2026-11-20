@@ -210,9 +210,20 @@ const genPlayersWithoutSaving = async (
 	if (existingPlayers.length === 0) {
 		const numSpecialPlayerChances = Math.round((4 / 70) * numPlayers);
 
+		// The top of the class by potential (with the same fudge factor as declaring, already drawn, so no new random numbers), not the
+		// first declarers: enteringDraft is in declaration order, so its first players are always the youngest
+		const byPot = enteringDraft
+			.map((p, i) => ({
+				p,
+				i,
+				v: p.ratings[0].pot + (fudgeFactors.get(p) ?? 0),
+			}))
+			.sort((a, b) => b.v - a.v || a.i - b.i)
+			.map((x) => x.p);
+
 		for (let i = 0; i < numSpecialPlayerChances; i++) {
 			if (Math.random() < 1 / numSpecialPlayerChances) {
-				const p = enteringDraft[i];
+				const p = byPot[i];
 				assertDefined(p);
 				player.bonus(p);
 				await player.develop(p, 0); // Recalculate ovr/pot

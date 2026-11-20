@@ -212,6 +212,8 @@ export type AExtras = {
 	numGames: number;
 	// Wins needed to take a series in each round of the current season, so a series still being played isn't read as decided (a 3-0 lead is not a sweep)
 	seriesWinsNeeded?: number[];
+	// League salary cap / the default salary cap. Money is read in default-cap dollars, so the fixed dollar thresholds ($60M of tax...) keep their meaning after inflation or in leagues with a different cap
+	capScale?: number;
 	// Only trades and free agent signings are read
 	events: any[];
 	awards: any[];
@@ -424,7 +426,7 @@ const toAPlayer = (p: WPlayer): APlayer => {
 	};
 };
 
-const toATeamSeason = (s: WTeamSeason): ATeamSeason => {
+const toATeamSeason = (s: WTeamSeason, capScale = 1): ATeamSeason => {
 	const won = num(s.won);
 	const lost = num(s.lost);
 	const tied = num(s.tied);
@@ -461,7 +463,7 @@ const toATeamSeason = (s: WTeamSeason): ATeamSeason => {
 		hype: num(s.hype),
 		streak: num(s.streak),
 		payroll: Math.round(num(s.payroll)),
-		luxuryTax: Math.round(num(s.luxuryTax)),
+		luxuryTax: Math.round(num(s.luxuryTax) / capScale),
 	};
 };
 
@@ -645,6 +647,10 @@ const slimAwards = (a: any) => {
 };
 
 export const toAData = (L: WLeague, x: AExtras): AData => {
+	const capScale =
+		x.capScale !== undefined && Number.isFinite(x.capScale) && x.capScale > 0
+			? x.capScale
+			: 1;
 	const bySeason = new Map<number, WTeamSeason[]>();
 	const byTid = new Map<number, WTeamSeason[]>();
 	for (const ts of L.teamSeasons) {
@@ -680,7 +686,7 @@ export const toAData = (L: WLeague, x: AExtras): AData => {
 					seasonRetired: j.seasonRetired,
 					pid: typeof j.pid === "number" ? j.pid : null,
 				})),
-				seasons: rows.map(toATeamSeason),
+				seasons: rows.map((s) => toATeamSeason(s, capScale)),
 			};
 		});
 

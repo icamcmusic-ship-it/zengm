@@ -1,3 +1,4 @@
+import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import { idb } from "../db/index.ts";
 import { changeLog } from "../db/changeLog.ts";
 import { g, helpers, lock, local, logEvent, toUI } from "./index.ts";
@@ -51,6 +52,7 @@ const readExtras = async (): Promise<AExtras> => {
 	return {
 		phase: g.get("phase"),
 		numGames: g.get("numGames"),
+		capScale: g.get("salaryCap") / defaultGameAttributes.salaryCap,
 		seriesWinsNeeded: g
 			.get("numGamesPlayoffSeries", "current")
 			.map((n) => Math.ceil(n / 2)),

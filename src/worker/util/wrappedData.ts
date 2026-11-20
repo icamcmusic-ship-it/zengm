@@ -1,3 +1,4 @@
+import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import { idb } from "../db/index.ts";
 import { changeLog } from "../db/changeLog.ts";
 import { g, local, lock, toUI } from "./index.ts";
@@ -1065,6 +1066,7 @@ const build = async (c: LeagueCache): Promise<Built> => {
 		trades,
 		lottery,
 		picks,
+		capScale: g.get("salaryCap") / defaultGameAttributes.salaryCap,
 	};
 
 	const X = await wperfTime("index", () => {

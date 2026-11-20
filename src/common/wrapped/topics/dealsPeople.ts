@@ -1,6 +1,13 @@
 // Player and all-time topics about the front office: a player's trades, contracts, release and draft night; the league's most lopsided trades, best and worst contracts, lottery luck, draft slots and longest-running teammates.
 import { mk, type Topic } from "./helpers.ts";
-import { fmtNum, ordinal, plural, rankOf, rankScore } from "../util.ts";
+import {
+	capDollars,
+	fmtNum,
+	ordinal,
+	plural,
+	rankOf,
+	rankScore,
+} from "../util.ts";
 import {
 	assetText,
 	careerWs,
@@ -263,7 +270,7 @@ const released: Topic = ({ X, season, pid }) => {
 		id: "p-released",
 		group: "p-contract2",
 		theme: "moves",
-		score: clamp01(0.3 + Math.min(0.2, r.owed / 50000)),
+		score: clamp01(0.3 + Math.min(0.2, capDollars(X.L, r.owed) / 50000)),
 		kicker: "Released",
 		pid,
 		season,
@@ -919,14 +926,14 @@ const deadMoneyAll: Topic = ({ X, season }) => {
 	const r = releases(X, season).toSorted(
 		(a, b) => b.owed - a.owed || a.p.pid - b.p.pid,
 	)[0];
-	if (!r || r.owed < 5000) {
+	if (!r || capDollars(X.L, r.owed) < 5000) {
 		return null;
 	}
 	return mk({
 		id: "a-rel-dead",
 		group: "a-money-y",
 		theme: "money",
-		score: clamp01(0.3 + Math.min(0.3, r.owed / 150000)),
+		score: clamp01(0.3 + Math.min(0.3, capDollars(X.L, r.owed) / 150000)),
 		kicker: "Dead money",
 		season: r.season,
 		pid: r.p.pid,

@@ -24,14 +24,24 @@ export const CREATION_WEIGHTS_EXPANDED = {
 export const CREATION_POWER = 4;
 
 // Three-point threat of a player: the three-point composite, half catch-and-shoot with expanded ratings (spot-up shooting is what spaces
-// the floor)
-export const spacingThreat = (r: {
-	shootingThreePointer: number;
-	catchShoot?: number;
-}) =>
-	r.catchShoot === undefined
-		? r.shootingThreePointer
-		: 0.5 * r.shootingThreePointer + 0.5 * r.catchShoot;
+// the floor). With no three-point line (threePointers off) nobody spaces the floor from deep: every player is a league-average threat, so
+// the spacing effects are neutral rather than driven by a shot that doesn't exist
+export const spacingThreat = (
+	r: {
+		shootingThreePointer: number;
+		catchShoot?: number;
+	},
+	threePointers: boolean = true,
+) => {
+	if (!threePointers) {
+		return SPACING.ref;
+	}
+	const threat =
+		r.catchShoot === undefined
+			? r.shootingThreePointer
+			: 0.5 * r.shootingThreePointer + 0.5 * r.catchShoot;
+	return Number.isFinite(threat) ? threat : SPACING.ref;
+};
 
 // Below this threat a player is a non-shooter: defenders sag off him
 export const NON_SHOOTER_THREAT = 0.4;
@@ -90,7 +100,8 @@ export const lineupSpacing = (
 	let sum = 0;
 	let nonShooters = 0;
 	for (const p of lineup) {
-		const threat = p.compositeRating.spacingThreat ?? 0;
+		const raw = p.compositeRating.spacingThreat ?? 0;
+		const threat = Number.isFinite(raw) ? raw : SPACING.ref;
 		sum += threat;
 		if (threat < NON_SHOOTER_THREAT) {
 			nonShooters += 1;

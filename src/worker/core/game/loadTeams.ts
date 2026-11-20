@@ -550,7 +550,10 @@ export const processTeam = async (
 						? subSimComposite(sp, "creation", w.ratings, w.weights)
 						: player.compositeRating(rating, w.ratings, w.weights, false)) *
 					injuryFactor;
-				p2.compositeRating.spacingThreat = spacingThreat(p2.compositeRating);
+				p2.compositeRating.spacingThreat = spacingThreat(
+					p2.compositeRating,
+					g.get("threePointers"),
+				);
 			}
 			if (matchupDefense) {
 				(p2 as any).simHgt = (rating as any).hgt;

@@ -153,3 +153,11 @@ export const listText = (items: string[]) => {
 	}
 	return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
 };
+
+// Dollars (thousands) in default-salary-cap terms, for fixed score scales
+export const capDollars = (L: { capScale?: number }, n: number) => {
+	const scale = L.capScale;
+	return scale !== undefined && Number.isFinite(scale) && scale > 0
+		? n / scale
+		: n;
+};

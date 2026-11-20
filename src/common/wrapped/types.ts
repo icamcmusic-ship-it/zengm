@@ -266,6 +266,8 @@ export type WLeague = {
 	lottery?: WLottery[];
 	// Draft picks not used yet, with who owns them now
 	picks?: WPick[];
+	// League salary cap / the default salary cap, so fixed dollar amounts (score scales) keep their meaning after inflation
+	capScale?: number;
 };
 
 export type WrappedMode = "season" | "team" | "player" | "all";
