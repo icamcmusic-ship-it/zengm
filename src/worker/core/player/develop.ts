@@ -214,7 +214,7 @@ const develop = async (
 						? traitDev?.subTilt
 						: undefined;
 				if (tilt) {
-					tiltRowSubs(p as any, ratings, tilt.focus, tilt.amount);
+					tiltRowSubs(p as any, ratings, tilt.focus, tilt.amount, tilt.center);
 				}
 				// Career Aging: late-career reinvention toward a specialist's subs
 				const careerTilt =

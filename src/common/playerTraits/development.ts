@@ -199,6 +199,8 @@ export type TraitDevelopment = {
 	subTilt?: {
 		focus: import("../staffDepth/types.ts").FocusKey;
 		amount: number;
+		// Added to every sub after the tilt: minus the league's average plan tilt, so the plans move who has which subs, not the league's
+		center?: number[];
 	};
 	// Career Aging (worker/core/player/careerAging.ts): late-career reinvention, sub-rating points moved onto these subs inside their bases
 	careerTilt?: { keys: string[]; amount: number };
