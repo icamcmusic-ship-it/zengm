@@ -2783,6 +2783,9 @@ export type TeamSeasonWithoutKey = {
 	// Coach & Executive of the Year (League Extra): Executive of the Year won by a front office with no AI GM (the user's team, which
 	// has no GM object). An AI GM's award is stored on the GM instead (Gm.awards)
 	execOfTheYear?: { name: string; user: boolean };
+	// Who ran a team the user had that season, recorded when the regular season and the playoffs start: "user" (the user himself at
+	// least once) or "auto" (spectator mode or auto play both times). Missing on other teams and in older leagues
+	userControl?: "user" | "auto";
 	ownerMood?: OwnerMood;
 	// Power rankings snapshots taken about once a week during the regular season, used for movement arrows and the rank-over-time chart
 	powerRankHistory?: {

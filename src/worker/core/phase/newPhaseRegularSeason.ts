@@ -13,6 +13,7 @@ import {
 } from "../../../common/constants.ts";
 import { getMetaAttribute, putMetaAttribute } from "../../db/metaAttributes.ts";
 import { onRegularSeason as gmOnRegularSeason } from "../gm/index.ts";
+import markUserControl from "../team/markUserControl.ts";
 
 class GameHasYourTeamCache {
 	cache: Record<number, boolean> = {};
@@ -184,6 +185,9 @@ const newPhaseRegularSeason = async (
 		regularSeason: {},
 		playoffs: {},
 	});
+
+	// Who runs the user's teams this season (GM History, Executive of the Year)
+	await markUserControl();
 
 	// AI GMs: what's expected of each team this season
 	await gmOnRegularSeason();

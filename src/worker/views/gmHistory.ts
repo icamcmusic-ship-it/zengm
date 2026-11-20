@@ -1,5 +1,5 @@
 import { idb } from "../db/index.ts";
-import { g } from "../util/index.ts";
+import { g, local } from "../util/index.ts";
 import type { TeamSeason, Player } from "../../common/types.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
 import {
@@ -20,21 +20,38 @@ export default defineView({
 		) {
 			const seasonsByTid: Record<number, Set<number>> = {};
 			const teamSeasonsByTeam: TeamSeason[][] = [];
-			let prevTid: number | undefined;
+			// Each team's current run of consecutive seasons
+			const runs = new Map<number, TeamSeason[]>();
 			for (
 				let season = g.get("startingSeason");
 				season <= g.get("season");
 				season++
 			) {
-				const tid = g.get("userTid", season);
-				if (tid !== prevTid) {
-					prevTid = tid;
-					teamSeasonsByTeam.push([]);
+				// The teams the user ran this season, every one in multi team mode. Recorded on the team seasons (TeamSeason.userControl),
+				// where a season spent in spectator mode or auto play is "auto" and doesn't count. Seasons before that was recorded: the
+				// season's user team; this season before its regular season: the user's teams now, unless the AI runs them
+				const all = await idb.merged.teamSeasons.getAll({ season });
+				let teamSeasons: TeamSeason[];
+				if (all.some((ts) => ts.userControl !== undefined)) {
+					teamSeasons = all.filter((ts) => ts.userControl === "user");
+				} else if (season === g.get("season")) {
+					const userTids = new Set(
+						g.get("spectator") || local.autoPlayUntil ? [] : g.get("userTids"),
+					);
+					teamSeasons = all.filter((ts) => userTids.has(ts.tid));
+				} else {
+					const tid = g.get("userTid", season);
+					teamSeasons = all.filter((ts) => ts.tid === tid);
 				}
 
-				const ts = await idb.merged.teamSeasons.getByTidSeason(tid, season);
-				if (ts) {
-					teamSeasonsByTeam.at(-1)!.push(ts);
+				for (const ts of teamSeasons.sort((a, b) => a.tid - b.tid)) {
+					let run = runs.get(ts.tid);
+					if (!run || run.at(-1)!.season !== season - 1) {
+						run = [];
+						runs.set(ts.tid, run);
+						teamSeasonsByTeam.push(run);
+					}
+					run.push(ts);
 
 					if (!seasonsByTid[ts.tid]) {
 						seasonsByTid[ts.tid] = new Set();

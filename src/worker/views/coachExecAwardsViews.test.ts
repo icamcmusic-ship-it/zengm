@@ -343,6 +343,52 @@ describe("Coach & Executive of the Year", { timeout: 5 * 60 * 1000 }, () => {
 		await saveCoachExecAwardFormulas({});
 	});
 
+	test("who ran each season: multi team mode counts, spectator and auto play seasons don't", async () => {
+		const userTid = g.get("userTid");
+		const otherTid = userTid === 1 ? 2 : 1;
+		const getTs = async (tid: number) =>
+			(await idb.cache.teamSeasons.indexGet("teamSeasonsBySeasonTid", [
+				season,
+				tid,
+			]))!;
+		const userTs = await getTs(userTid);
+		const otherTs = await getTs(otherTid);
+		// Recorded when the regular season started
+		assert.strictEqual(userTs.userControl, "user");
+		assert.isUndefined(otherTs.userControl);
+
+		const userFlags = async () =>
+			new Map(
+				(await getEoyCandidates(season)).candidates.map((c) => [c.tid, c.user]),
+			);
+
+		// Multi team mode: both teams this season
+		otherTs.userControl = "user";
+		await idb.cache.teamSeasons.put(otherTs);
+		let gmHistory = await load("gmHistory", {});
+		assert.deepStrictEqual(
+			gmHistory.teamHistories.map((h: any) => h.history[0].tid).sort(),
+			[userTid, otherTid].sort(),
+		);
+		let flags = await userFlags();
+		assert.isTrue(flags.get(userTid));
+		assert.isTrue(flags.get(otherTid));
+
+		// Auto play all season: not the user's season
+		userTs.userControl = "auto";
+		delete otherTs.userControl;
+		await idb.cache.teamSeasons.put(userTs);
+		await idb.cache.teamSeasons.put(otherTs);
+		gmHistory = await load("gmHistory", {});
+		assert.strictEqual(gmHistory.teamHistories.length, 0);
+		flags = await userFlags();
+		assert.isFalse(flags.get(userTid));
+		assert.isFalse(flags.get(otherTid));
+
+		userTs.userControl = "user";
+		await idb.cache.teamSeasons.put(userTs);
+	});
+
 	test("Award Settings: formulas are editable, validated and previewed", async () => {
 		const info = await getCoachExecAwardSettings({ season });
 		assert.isTrue(info.available.coy);

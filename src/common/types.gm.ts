@@ -72,6 +72,16 @@ export type Gm = {
 	// AI GM finance styles (core gmFinance): how he runs the team's money. Missing in older leagues: derived from his gmid (gmFinance.ts)
 	financeStyle?: GmFinanceStyle;
 	seasons: GmSeason[];
+	// A retired GM's career totals: his season rows are dropped when he retires (long leagues), this keeps his record
+	career?: {
+		seasons: number;
+		won: number;
+		lost: number;
+		tied: number;
+		otl: number;
+		playoffs: number;
+		titles: number;
+	};
 	tenures: GmTenure[];
 	// Expected wins for the current season, set when the regular season starts
 	expWon?: number;

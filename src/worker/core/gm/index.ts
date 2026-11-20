@@ -1,7 +1,10 @@
 // AI general managers (featureGmPersonalities, basketball only): generation, the weights AI decisions read, season expectations, firing
 // after sustained failure and the GM carousel. GMs live on the team objects (t.gm, and t.formerGms for those who left the team), so
-// they're exported/imported with the teams and need no database store. The user's team has no GM unless the AI runs it (spectator mode
-// or auto play). With the setting off, getGmWeights returns undefined and every caller keeps its old behavior exactly.
+// they're exported/imported with the teams and need no database store. The user's teams have no GM unless the AI runs them in
+// spectator mode: when the user takes a team over its GM leaves ("left"), and when he gives one up (or turns spectator mode on) it gets
+// a new GM at once. Auto play changes nothing (the user's teams keep no GM and the AI runs them neutrally), so a GM is never hired or
+// fired on a team the user is about to take back. With the setting off, getGmWeights returns undefined and every caller keeps its old
+// behavior exactly.
 
 import { PHASE } from "../../../common/constants.ts";
 import {
@@ -15,10 +18,19 @@ import {
 	gmWeightsFromTraits,
 	type GmWeights,
 } from "../../../common/gmPersonality.ts";
-import { gauss, randInt } from "../../../common/random.ts";
+import {
+	gauss,
+	makeSeededRandom,
+	randInt,
+	withRandom,
+} from "../../../common/random.ts";
+import { saltedSeed } from "../../../common/leagueSalt.ts";
 import type { Gm, GmSeason, Team } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import { g, local, logEvent } from "../../util/index.ts";
+import { g, helpers, local, logEvent } from "../../util/index.ts";
+import { actualPhase } from "../../util/actualPhase.ts";
+import { loadNames } from "../../util/loadNames.ts";
+import { isCollege } from "../college/isCollege.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
@@ -40,10 +52,15 @@ import { winProb } from "../seasonOdds/simSeason.ts";
 export const gmEnabled = () =>
 	__SPORT === "basketball" && featureOn("gmPersonalities");
 
+// The user makes this team's decisions right now
 export const userControlsTeam = (tid: number) =>
 	g.get("userTids").includes(tid) &&
 	!local.autoPlayUntil &&
 	!g.get("spectator");
+
+// The team is the user's, even while auto play runs it for him: it has no AI GM, and none is hired or fired there
+export const userOwnsTeam = (tid: number) =>
+	g.get("userTids").includes(tid) && !g.get("spectator");
 
 // Keyed by the traits object, which is never edited in place
 const weightsCache = new WeakMap<Gm["traits"], GmWeights>();
@@ -115,6 +132,7 @@ const allGms = (teams: Team[]) => {
 	return gms;
 };
 
+// Over every team, contracted ones included (their former GMs keep their ids)
 const nextGmid = (teams: Team[]) => {
 	let max = -1;
 	for (const gm of allGms(teams)) {
@@ -123,11 +141,13 @@ const nextGmid = (teams: Team[]) => {
 	return max + 1;
 };
 
-export const generateGm = async (gmid: number): Promise<Gm> => {
-	const { country, firstName, lastName, race } = await name();
+const genGmBase = (
+	gmid: number,
+	{ country, firstName, lastName, race }: Awaited<ReturnType<typeof name>>,
+): Gm => {
 	const age = randInt(36, 60);
 	const traits = genGmTraits(() => gauss(0, 1));
-	const gm: Gm = {
+	return {
 		gmid,
 		firstName,
 		lastName,
@@ -140,6 +160,40 @@ export const generateGm = async (gmid: number): Promise<Gm> => {
 		seasons: [],
 		tenures: [],
 	};
+};
+
+/**
+ * A new GM. seeded: drawn from a stream keyed on his id instead of the main one, for hires outside the offseason carousel (a team the
+ * user gave up, an expansion team), so they don't move the league's random numbers
+ */
+export const generateGm = async (
+	gmid: number,
+	{ seeded }: { seeded?: boolean } = {},
+): Promise<Gm> => {
+	let gm: Gm;
+	if (seeded) {
+		// With the names loaded, name() runs without awaiting anything, so Math.random can be swapped around the call
+		if (local.playerBioInfo === undefined) {
+			local.playerBioInfo = await loadNames();
+		}
+		const rng = makeSeededRandom(
+			saltedSeed((Math.imul(gmid + 1, 0x5bd1e995) ^ 0x1b873593) >>> 0),
+		);
+		// Warm up the stream (mulberry32's first value from nearby seeds is correlated)
+		rng();
+		const orig = Math.random;
+		let namePromise;
+		Math.random = rng;
+		try {
+			namePromise = name();
+		} finally {
+			Math.random = orig;
+		}
+		const info = await namePromise;
+		gm = withRandom(rng, () => genGmBase(gmid, info));
+	} else {
+		gm = genGmBase(gmid, await name());
+	}
 	// AI GM finance styles: seeded by his id, no main stream draws
 	if (gmFinanceEnabled()) {
 		gm.financeStyle = genGmFinanceStyle(gm);
@@ -196,7 +250,11 @@ const teamLink = (tid: number) => {
 const gmLink = (gm: Gm) =>
 	`<a href="/l/${g.get("lid")}/front_offices">${gm.firstName} ${gm.lastName}</a>`;
 
+// College mode has no Executive of the Year and no "general managers" (athletic directors don't get fired in the news), so no news there
 const logGmEvent = async (text: string, tids: number[], score = 0) => {
+	if (isCollege()) {
+		return;
+	}
 	await logEvent({
 		type: "info",
 		text,
@@ -206,9 +264,9 @@ const logGmEvent = async (text: string, tids: number[], score = 0) => {
 	});
 };
 
-// Season a GM hired now starts counting in
+// Season a GM hired now starts counting in: once the playoffs have started (or in an expansion/fantasy draft after them), next season
 const startSeason = () =>
-	g.get("phase") > PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
+	actualPhase() >= PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
 
 const hireGm = (
 	t: Team,
@@ -225,7 +283,82 @@ const hireGm = (
 	t.gm = gm;
 };
 
-// Give every AI team without a GM one (new leagues, turning the setting on, expansion teams, a team the user stopped running)
+const currentTenure = (gm: Gm) => gm.tenures.at(-1);
+
+const isTitle = (row: GmSeason) =>
+	row.playoffRoundsWon >= 0 &&
+	row.playoffRoundsWon >= g.get("numGamesPlayoffSeries", row.season).length;
+
+// A retired GM's season rows become his career totals (tenures and awards are kept, for the history pages and Executive of the Year)
+const pruneRetired = (gm: Gm) => {
+	if (gm.retiredYear === undefined || gm.seasons.length === 0) {
+		return false;
+	}
+	const career = gm.career ?? {
+		seasons: 0,
+		won: 0,
+		lost: 0,
+		tied: 0,
+		otl: 0,
+		playoffs: 0,
+		titles: 0,
+	};
+	for (const row of gm.seasons) {
+		career.seasons += 1;
+		career.won += row.won;
+		career.lost += row.lost;
+		career.tied += row.tied;
+		career.otl += row.otl;
+		if (row.playoffRoundsWon >= 0) {
+			career.playoffs += 1;
+		}
+		if (isTitle(row)) {
+			career.titles += 1;
+		}
+	}
+	gm.career = career;
+	gm.seasons = [];
+	return true;
+};
+
+const retire = (gm: Gm, season: number) => {
+	gm.retiredYear = season;
+	gm.face = undefined;
+	pruneRetired(gm);
+};
+
+/**
+ * Leaves his team: fired or retired after the playoffs, or "left" (the user took the team over, or it was contracted). He goes on the
+ * team's list of former GMs, where the carousel finds him. season is his last season, by default (for "left") the last one he ran: this
+ * one once the playoffs have started, else the one before (never before his first)
+ */
+export const leaveTeam = (
+	t: Team,
+	reason: "fired" | "retired" | "left",
+	season: number = startSeason() - 1,
+) => {
+	const gm = t.gm;
+	if (!gm) {
+		return;
+	}
+	const tenure = currentTenure(gm);
+	if (tenure && tenure.end === undefined) {
+		tenure.end = Math.max(season, tenure.start - 1);
+		tenure.reason = reason;
+	}
+	gm.expWon = undefined;
+	if (reason === "retired") {
+		retire(gm, season);
+	}
+	t.formerGms = [...(t.formerGms ?? []), gm];
+	t.gm = undefined;
+};
+
+/**
+ * Give every AI team without a GM one (new leagues, turning the setting on, expansion teams, a team the user gave up), and take the GM
+ * away from a team the user took over or one that was contracted ("left"). Called at the moment the user's teams change (league
+ * setGameAttributes), when a team is added or contracted, and at the phases the GMs matter
+ */
 export const ensureGms = async () => {
 	if (!gmEnabled()) {
 		return false;
@@ -233,12 +366,32 @@ export const ensureGms = async () => {
 	const teams = await idb.cache.teams.getAll();
 	const firstTime = allGms(teams).length === 0;
 	let changed = await ensureFinanceStyles(teams);
+
+	for (const t of teams) {
+		const gm = t.gm;
+		if (gm && (t.disabled || userOwnsTeam(t.tid))) {
+			// A contracted team's GM left after its last season (older leagues kept him on the team, maybe for years)
+			const lastRow = t.disabled
+				? gm.seasons.findLast((row) => row.tid === t.tid)?.season
+				: undefined;
+			leaveTeam(t, "left", Math.min(startSeason() - 1, lastRow ?? Infinity));
+			await idb.cache.teams.put(t);
+			changed = true;
+			if (!t.disabled) {
+				await logGmEvent(
+					`General manager ${gmLink(gm)} left ${teamLink(t.tid)}.`,
+					[t.tid],
+				);
+			}
+		}
+	}
+
 	let gmid = nextGmid(teams);
 	for (const t of teams) {
-		if (t.disabled || t.gm || userControlsTeam(t.tid)) {
+		if (t.disabled || t.gm || userOwnsTeam(t.tid)) {
 			continue;
 		}
-		const gm = await generateGm(gmid);
+		const gm = await generateGm(gmid, { seeded: !firstTime });
 		gmid += 1;
 		hireGm(t, gm, firstTime);
 		await idb.cache.teams.put(t);
@@ -251,6 +404,18 @@ export const ensureGms = async () => {
 		}
 	}
 	return changed;
+};
+
+// The user's teams changed (taking a team over, giving one up, multi team mode, spectator mode), or a team was added or contracted:
+// GMs leave or are hired at once. Only once the league has GMs (not while a league is being created)
+export const syncGms = async () => {
+	if (!gmEnabled()) {
+		return;
+	}
+	if (allGms(await idb.cache.teams.getAll()).length === 0) {
+		return;
+	}
+	await ensureGms();
 };
 
 // Expected wins for each team this season: the Season Odds projection when that's on, else the roster rating against the league average
@@ -303,7 +468,8 @@ export const onRegularSeason = async () => {
 	await ensureGms();
 	const exp = await getExpectedWins();
 	for (const t of await idb.cache.teams.getAll()) {
-		if (!t.gm || t.disabled) {
+		// ensureGms took the GM away from the user's teams, this is in case
+		if (!t.gm || t.disabled || userOwnsTeam(t.tid)) {
 			continue;
 		}
 		const expWon = exp.get(t.tid);
@@ -312,8 +478,6 @@ export const onRegularSeason = async () => {
 		await idb.cache.teams.put(t);
 	}
 };
-
-const currentTenure = (gm: Gm) => gm.tenures.at(-1);
 
 // His seasons with his current team
 export const seasonsWithTeam = (gm: Gm, tid: number) => {
@@ -514,45 +678,32 @@ export const projectedFireProb = async (
 
 const age = (gm: Gm) => g.get("season") - gm.born.year;
 
-// Leaves his team: fired, retired, or the user took over. He goes on the team's list of former GMs, where the carousel finds him
-const leaveTeam = (
-	t: Team,
-	reason: "fired" | "retired" | "left",
-	season: number,
-) => {
-	const gm = t.gm;
-	if (!gm) {
-		return;
-	}
-	const tenure = currentTenure(gm);
-	if (tenure && tenure.end === undefined) {
-		tenure.end = season;
-		tenure.reason = reason;
-	}
-	gm.expWon = undefined;
-	if (reason === "retired") {
-		gm.retiredYear = season;
-		gm.face = undefined;
-	}
-	t.formerGms = [...(t.formerGms ?? []), gm];
-	t.gm = undefined;
-};
-
-// Former GMs still on the market
+// Former GMs still on the market: out of a job for at most MARKET_SEASONS seasons and at most MAX_HIRE_AGE at the carousel. Anyone else
+// on a team's list of former GMs retires at the next carousel
 const MARKET_SEASONS = 4;
 const MAX_HIRE_AGE = 66;
 
+// Season of the next GM carousel (runOffseason runs while the phase is still the playoffs)
+export const nextCarouselSeason = () =>
+	g.get("phase") > PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
+
+// A former GM who can be hired at the carousel of this season
+export const onGmMarket = (gm: Gm, season: number = nextCarouselSeason()) => {
+	const last = gm.tenures.at(-1);
+	return (
+		gm.retiredYear === undefined &&
+		last?.end !== undefined &&
+		last.end >= season - MARKET_SEASONS &&
+		season - gm.born.year <= MAX_HIRE_AGE
+	);
+};
+
+// Every team, contracted ones included (a contracted team's GM is on the market)
 const getMarket = (teams: Team[], season: number) => {
 	const market: { gm: Gm; from: Team }[] = [];
 	for (const t of teams) {
 		for (const gm of t.formerGms ?? []) {
-			const last = gm.tenures.at(-1);
-			if (
-				gm.retiredYear === undefined &&
-				last?.end !== undefined &&
-				last.end >= season - MARKET_SEASONS &&
-				age(gm) <= MAX_HIRE_AGE
-			) {
+			if (onGmMarket(gm, season)) {
 				market.push({ gm, from: t });
 			}
 		}
@@ -570,13 +721,8 @@ const careerScore = (gm: Gm) => {
 	return Math.max(-10, Math.min(10, mean));
 };
 
-const titles = (gm: Gm, tid?: number) =>
-	gm.seasons.filter(
-		(row) =>
-			(tid === undefined || row.tid === tid) &&
-			row.playoffRoundsWon >= 0 &&
-			row.playoffRoundsWon >= g.get("numGamesPlayoffSeries", row.season).length,
-	).length;
+const titles = (gm: Gm) =>
+	gm.seasons.filter(isTitle).length + (gm.career?.titles ?? 0);
 
 // After the playoffs: record the season, then GMs retire or get fired, and the carousel fills the jobs
 export const runOffseason = async () => {
@@ -586,13 +732,15 @@ export const runOffseason = async () => {
 	await ensureGms();
 
 	const season = g.get("season");
-	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	const allTeams = await idb.cache.teams.getAll();
+	const teams = allTeams.filter((t) => !t.disabled);
 	const vacancies: Team[] = [];
 	const markets = marketFactors(teams);
 
 	for (const t of teams) {
 		const gm = t.gm;
-		if (!gm || userControlsTeam(t.tid)) {
+		// The user's teams have no GM (ensureGms), even while auto play runs them
+		if (!gm || userOwnsTeam(t.tid)) {
 			continue;
 		}
 
@@ -600,9 +748,11 @@ export const runOffseason = async () => {
 			season,
 			t.tid,
 		]);
+		// Not for a season before his first (hired once the playoffs had started)
 		if (
 			ts &&
 			ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0) > 0 &&
+			(currentTenure(gm)?.start ?? season) <= season &&
 			!gm.seasons.some((row) => row.season === season && row.tid === t.tid)
 		) {
 			const row = await makeSeasonRow(t, gm, {
@@ -636,12 +786,16 @@ export const runOffseason = async () => {
 
 		const fireProb = fireProbOf(t, gm, rows, markets.get(t.tid) ?? 0);
 		if (fireProb > 0 && Math.random() < fireProb) {
-			const won = rows.reduce((sum, row) => sum + row.won, 0);
-			const lost = rows.reduce((sum, row) => sum + row.lost, 0);
+			const record = helpers.formatRecord({
+				won: rows.reduce((sum, row) => sum + row.won, 0),
+				lost: rows.reduce((sum, row) => sum + row.lost, 0),
+				tied: rows.reduce((sum, row) => sum + row.tied, 0),
+				otl: rows.reduce((sum, row) => sum + row.otl, 0),
+			});
 			leaveTeam(t, "fired", season);
 			vacancies.push(t);
 			await logGmEvent(
-				`${teamLink(t.tid)} fired general manager ${gmLink(gm)} after ${rows.length} season${rows.length === 1 ? "" : "s"} (${won}-${lost}).`,
+				`${teamLink(t.tid)} fired general manager ${gmLink(gm)} after ${rows.length} season${rows.length === 1 ? "" : "s"} (${record}).`,
 				[t.tid],
 				10,
 			);
@@ -649,24 +803,21 @@ export const runOffseason = async () => {
 		await idb.cache.teams.put(t);
 	}
 
-	// Long unemployed GMs retire
-	for (const t of teams) {
+	// Former GMs who can't be hired any more (out of a job too long, or too old) retire, on every team's list (contracted teams too).
+	// Retired GMs' season rows become career totals
+	for (const t of allTeams) {
 		for (const gm of t.formerGms ?? []) {
-			const last = gm.tenures.at(-1);
-			if (
-				gm.retiredYear === undefined &&
-				last?.end !== undefined &&
-				(last.end < season - MARKET_SEASONS || age(gm) > MAX_HIRE_AGE + 4)
-			) {
-				gm.retiredYear = season;
-				gm.face = undefined;
+			if (gm.retiredYear === undefined && !onGmMarket(gm, season)) {
+				retire(gm, season);
+			} else {
+				pruneRetired(gm);
 			}
 		}
 	}
 
 	await fillVacancies(vacancies);
 
-	for (const t of teams) {
+	for (const t of allTeams) {
 		await idb.cache.teams.put(t);
 	}
 };
@@ -678,7 +829,8 @@ const fillVacancies = async (vacancies: Team[]) => {
 		return;
 	}
 	const season = g.get("season");
-	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	// Every team, contracted ones included: their former GMs keep their ids and are on the market
+	const teams = await idb.cache.teams.getAll();
 	let gmid = nextGmid(teams);
 	const market = getMarket(teams, season);
 
@@ -687,7 +839,7 @@ const fillVacancies = async (vacancies: Team[]) => {
 			score: -Infinity,
 		};
 		for (const row of market) {
-			// Not the team that just let him go
+			// Never back to a team he ran
 			if (row.gm.tenures.some((tenure) => tenure.tid === t.tid)) {
 				continue;
 			}
@@ -720,7 +872,7 @@ const fillVacancies = async (vacancies: Team[]) => {
 			gmid += 1;
 			text = `${teamLink(t.tid)} hired ${gmLink(gm)}${financeText(gm)} as general manager, his first job running a team.`;
 		}
-		// Hired after the playoffs, so his first season is next season (the phase may not have moved past the playoffs yet)
+		// Hired after the playoffs, so his first season is next season
 		hireGm(t, gm, false, season + 1);
 		await idb.cache.teams.put(t);
 		await logGmEvent(text, [t.tid], 5);

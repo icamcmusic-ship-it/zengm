@@ -8,12 +8,16 @@ import type {
 } from "../../../common/types.ts";
 import { PHASE } from "../../../common/constants.ts";
 import * as college from "../college/index.ts";
+import markUserControl from "../team/markUserControl.ts";
 
 const newPhasePlayoffs = async (
 	conditions: Conditions,
 	liveGameSim: boolean = false,
 ): Promise<PhaseReturn> => {
 	await achievement.check("afterRegularSeason", conditions);
+
+	// Who ran the user's teams this season (GM History, Executive of the Year)
+	await markUserControl();
 
 	// In case this was somehow set already
 	local.playingUntilEndOfRound = false;
