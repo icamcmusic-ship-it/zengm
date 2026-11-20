@@ -467,23 +467,19 @@ addPage(
 						c.T("play", "played"),
 						" a short tournament for the last two playoff spots: 7 against 8 and 9 against 10, with the loser of the first game getting a second chance against the winner of the second.",
 					),
-					...x.zones.map(
-						(z): Block =>
-							P(
-								x.zones.length > 1 ? `${z.name}: ` : "",
-								c.T(
-									"Right now the play-in field is ",
-									"The play-in field was ",
-								),
-								...andList(
-									z.rows.map((t, i) => [
-										`${ordinal(7 + i)} `,
-										c.tl(t.tid),
-										` (${record(t)})`,
-									]),
-								),
-								".",
+					...x.zones.map((z): Block =>
+						P(
+							x.zones.length > 1 ? `${z.name}: ` : "",
+							c.T("Right now the play-in field is ", "The play-in field was "),
+							...andList(
+								z.rows.map((t, i) => [
+									`${ordinal(7 + i)} `,
+									c.tl(t.tid),
+									` (${record(t)})`,
+								]),
 							),
+							".",
+						),
 					),
 				],
 			},

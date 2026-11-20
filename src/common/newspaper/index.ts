@@ -24,6 +24,7 @@ import "./pages-deals.ts";
 import "./pages-coaching.ts";
 import { playInSidebar } from "./pages-league.ts";
 import { draftPreviewPage } from "./pages-scouting.ts";
+import { draftNightStory, powerRankColumn } from "./pages-weekly.ts";
 import { varyPaper } from "./vary.ts";
 import {
 	allLeagueBlock,
@@ -296,7 +297,10 @@ const leaguePaper = (c: Ctx): Section[] => {
 			])
 		: section("awards", "Awards", awardPages);
 	// The preview has no games to report, so it has room for more of these
-	const teams = section("teams", "Teams", pagesFor(c, "teams", c.pre ? 8 : 6));
+	const teams = section("teams", "Teams", [
+		powerRankColumn(c),
+		...pagesFor(c, "teams", c.pre ? 8 : 6),
+	]);
 	const players = section(
 		"players",
 		"Players",
@@ -335,6 +339,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 		draftPreviewPage.build(c),
 		...pagesFor(c, "draft", 2),
 	]);
+	const draftNight = section("draftnight", "Draft night", [draftNightStory(c)]);
 	const numbers = section("numbers", "By the numbers", [
 		teamStatsTable(c),
 		leaderTables(c),
@@ -360,6 +365,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 		features,
 		moves,
 		draft,
+		draftNight,
 		numbers,
 		history,
 		obits,
