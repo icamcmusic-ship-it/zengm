@@ -4,6 +4,7 @@ import { finances, player, team } from "../index.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
+import { ownerDistribution } from "./ownerDistribution.ts";
 
 test("store payroll and appropriately assess luxury and minimum payroll taxes for each team", async () => {
 	resetG();
@@ -61,4 +62,50 @@ test("store payroll and appropriately assess luxury and minimum payroll taxes fo
 			assert.strictEqual(teamSeason.expenses.minTax, 0);
 		}
 	}
+});
+
+test("Realistic AI Economy: owner distributions are recorded so the books reconcile", async () => {
+	resetG();
+	g.setWithoutSavingToDB("featureRealisticEconomy", true);
+	g.setWithoutSavingToDB("numTeams", 2);
+	g.setWithoutSavingToDB("numActiveTeams", 2);
+	g.setWithoutSavingToDB("userTid", 0);
+	g.setWithoutSavingToDB("userTids", [0]);
+	const players = [
+		player.generate(0, 30, 2017, true, DEFAULT_LEVEL),
+		player.generate(1, 30, 2017, true, DEFAULT_LEVEL),
+	] as const;
+	const teamsDefault = helpers.getTeamsDefault().slice(0, 2);
+	const teamSeasonsStart = teamsDefault.map((t) => team.genSeasonRow(t));
+	const cap = g.get("salaryCap");
+	for (const ts of teamSeasonsStart) {
+		ts.cash = 3 * cap;
+	}
+	await resetCache({
+		players,
+		teamSeasons: teamSeasonsStart,
+		teams: teamsDefault.map(team.generate),
+	});
+
+	await finances.assessPayrollMinLuxury();
+	const teamSeasons = await idb.cache.teamSeasons.getAll();
+	const user = teamSeasons.find((ts) => ts.tid === 0)!;
+	const ai = teamSeasons.find((ts) => ts.tid === 1)!;
+	// The user's owner takes nothing
+	assert.isUndefined(user.ownerDistributions);
+	// The AI owner's draw is recorded: cash change = revenue - expenses - distributions
+	const distributed = ai.ownerDistributions ?? 0;
+	assert.isAbove(distributed, 0);
+	assert.strictEqual(
+		distributed,
+		ownerDistribution(ai.cash + distributed, cap),
+	);
+	assert.strictEqual(
+		ai.cash,
+		3 * cap +
+			(ai.revenues.luxuryTaxShare ?? 0) -
+			ai.expenses.luxuryTax -
+			ai.expenses.minTax -
+			distributed,
+	);
 });

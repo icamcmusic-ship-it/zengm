@@ -34,6 +34,7 @@ import {
 	isRepeaterTaxTeam,
 	makeAiCapExceptionPicker,
 	recordCapExceptionSigning,
+	stretchHardCapSeason,
 } from "./capExceptions.ts";
 
 const NUM_TEAMS = 3;
@@ -429,14 +430,8 @@ describe("salary cap exceptions", () => {
 			);
 		});
 
-		test("filling a little cap space or signing a minimum contract doesn't cost the other exceptions", async () => {
+		test("a minimum contract doesn't cost any exception", async () => {
 			const cap = g.get("salaryCap");
-			await recordCapExceptionSigning(1, {
-				pid: 100,
-				amount: 3000,
-				exception: undefined,
-				payroll: cap - 4000,
-			});
 			await recordCapExceptionSigning(1, {
 				pid: 101,
 				amount: g.get("minContract"),
@@ -444,6 +439,35 @@ describe("salary cap exceptions", () => {
 				payroll: cap - 50000,
 			});
 			assert.isUndefined((await getTeam(1)).capExceptions);
+		});
+
+		test("filling a little cap space (no more than the mid-level) uses the mid-level exception, so it can't be stacked on top", async () => {
+			const cap = g.get("salaryCap");
+			await recordCapExceptionSigning(1, {
+				pid: 100,
+				amount: 3000,
+				exception: undefined,
+				payroll: cap - 4000,
+			});
+			const t = await getTeam(1);
+			assert.isUndefined(t.capExceptions?.capSpaceSeason);
+			assert.deepEqual(
+				t.capExceptions?.uses.map((use) => use.type),
+				["nonTaxpayerMle"],
+			);
+			// Now at the cap: the bi-annual exception is left, no mid-level
+			assert.sameMembers(
+				getAvailableCapExceptions(t, cap - 1000).map((e) => e.type),
+				["biAnnual"],
+			);
+			// A second small fill has nothing more to give up
+			await recordCapExceptionSigning(1, {
+				pid: 102,
+				amount: 900,
+				exception: undefined,
+				payroll: cap - 1000,
+			});
+			assert.strictEqual((await getTeam(1)).capExceptions?.uses.length, 1);
 		});
 	});
 
@@ -989,6 +1013,34 @@ describe("salary cap exceptions", () => {
 			start,
 			amounts,
 			payments: [],
+		});
+
+		test("with a hard cap, a stretch that would put payroll over it is blocked", async () => {
+			await setup({ phase: PHASE.FREE_AGENCY });
+			const start = getLeagueYear();
+			const cap = g.get("salaryCap");
+			const before = makeContract(start, [10000, 10000]);
+			// Stretched: 20000 over 5 seasons, 4000 each. Seasons 3-5 had nothing owed before
+			const tight = (season: number) => (season < start + 2 ? cap : cap - 2000);
+			assert.strictEqual(
+				stretchHardCapSeason({
+					before,
+					after: before,
+					payrollBySeason: tight,
+					salaryCap: cap,
+				}),
+				start + 2,
+			);
+			const roomy = (season: number) =>
+				season < start + 2 ? cap - 10000 : cap - 5000;
+			assert.isUndefined(
+				stretchHardCapSeason({
+					before,
+					after: before,
+					payrollBySeason: roomy,
+					salaryCap: cap,
+				}),
+			);
 		});
 
 		test("in the offseason, everything left is spread over 2n+1 seasons", async () => {

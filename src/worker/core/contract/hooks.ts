@@ -72,8 +72,17 @@ export const aiExtensions = async (probPerTeam = 0.05) => {
 	const salaryCapType = g.get("salaryCapType");
 	// AI GM personalities (setting): loyal GMs extend more often, big spenders extend into the tax. Empty when off
 	const gms = await getAllGmWeights();
+	// Disabled (contracted) teams have no roster to extend
+	const disabledTids = new Set(
+		(await idb.cache.teams.getAll())
+			.filter((t) => t.disabled)
+			.map((t) => t.tid),
+	);
 	for (let tid = 0; tid < g.get("numTeams"); tid++) {
 		if (userTids.includes(tid) && !local.autoPlayUntil && !g.get("spectator")) {
+			continue;
+		}
+		if (disabledTids.has(tid)) {
 			continue;
 		}
 

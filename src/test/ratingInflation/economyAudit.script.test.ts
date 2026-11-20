@@ -18,10 +18,7 @@ import { getContractExp, getCurrentContract } from "../../common/contracts.ts";
 import getTeamInfos from "../../common/getTeamInfos.ts";
 import teamInfos from "../../common/teamInfos.ts";
 import { DEFAULT_LEVEL } from "../../common/budgetLevels.ts";
-import {
-	newDeptsAverageAmount,
-	overspendMoodPenalty,
-} from "../../common/frontOffice.ts";
+import { overspendMoodPenalty } from "../../common/frontOffice.ts";
 import { mockIDBLeague, resetCache, resetG } from "../helpers.ts";
 import { idb } from "../../worker/db/index.ts";
 import { g, helpers, local } from "../../worker/util/index.ts";
@@ -489,10 +486,7 @@ test.skipIf(!process.env.RUN_ECO_AUDIT)(
 					[[season], [season, "Z"]],
 				);
 				const scf = cap / 90000;
-				let expectedProfit = 15 * scf;
-				if (frontOfficeEnabled()) {
-					expectedProfit -= newDeptsAverageAmount(cap) / 1000;
-				}
+				const expectedProfit = 15 * scf;
 				const profits = [];
 				const moneyDeltas = [];
 				const spendRatios = [];

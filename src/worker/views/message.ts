@@ -3,6 +3,7 @@ import { g, helpers, updatePlayMenu, updateStatus } from "../util/index.ts";
 import { defineView, keepType } from "../util/defineView.ts";
 import getPlayoffsByConf from "../core/season/getPlayoffsByConf.ts";
 import { getRoundsWonText } from "./frivolitiesTeamSeasons.ts";
+import { seasonProfit } from "../../common/teamSeasonFinances.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 
 const processInputs = (params: RouteParams<"message">) => {
@@ -88,13 +89,7 @@ export default defineView({
 
 						let seasonInfo;
 						if (teamSeason) {
-							const revenue = helpers
-								.keys(teamSeason.revenues)
-								.reduce((memo, rev) => memo + teamSeason.revenues[rev], 0);
-							const expense = helpers
-								.keys(teamSeason.expenses)
-								.reduce((memo, rev) => memo + teamSeason.expenses[rev], 0);
-							const profit = (revenue - expense) / 1000; // [millions of dollars]
+							const profit = seasonProfit(teamSeason) / 1000; // [millions of dollars]
 
 							const roundsWonText = getRoundsWonText(
 								teamSeason,

@@ -6,6 +6,12 @@ import { resetCache, resetG } from "../../../test/helpers.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers } from "../../util/index.ts";
 import { team } from "../index.ts";
+import updateOwnerMood from "../season/updateOwnerMood.ts";
+import { overspendMoodPenalty } from "../../../common/frontOffice.ts";
+import {
+	seasonExpenses,
+	seasonRevenue,
+} from "../../../common/teamSeasonFinances.ts";
 import {
 	allocateAi,
 	defaultNewDeptLevel,
@@ -14,6 +20,8 @@ import {
 	getFinancesInfo,
 	getInjuryDurationFactor,
 	getNewDeptLevelLastThree,
+	getSeasonEnvelope,
+	getSeasonSpend,
 	getSimFrontOffice,
 	payGame,
 	recordFatigue,
@@ -195,5 +203,48 @@ describe("Front Office Budget (worker)", () => {
 		assert.isDefined(info.review);
 		// The biggest market's owner funds more than the average
 		assert.isAbove(info.targetLevel, DEFAULT_LEVEL);
+	});
+
+	test("Analytics and Travel spending counts in profit and owner mood, with no expected-profit discount", async () => {
+		g.setWithoutSavingToDB("userTid", 0);
+		g.setWithoutSavingToDB("userTids", [0]);
+		g.setWithoutSavingToDB("gracePeriodEnd", g.get("season"));
+		const t = (await idb.cache.teams.get(0))!;
+		t.frontOffice = { analytics: 100, travel: 100 };
+		const ts = (await idb.cache.teamSeasons.indexGet("teamSeasonsByTidSeason", [
+			0,
+			g.get("season"),
+		]))!;
+		ts.revenues.ticket = 200000;
+		ts.expenses.salary = 100000;
+		let paid = 0;
+		for (let i = 0; i < 82; i++) {
+			paid += payGame(t, ts);
+		}
+		ts.won = 41;
+		ts.lost = 41;
+		assert.isAbove(paid, 0);
+
+		const expectedProfit = (seasonRevenue(ts) - seasonExpenses(ts)) / 1000;
+		assert.closeTo(expectedProfit, (200000 - 100000 - paid) / 1000, 1e-6);
+		const formatted = await team.getFormatted({
+			seasonAttrs: ["profit"],
+			season: g.get("season"),
+			tid: 0,
+		});
+		assert.closeTo(formatted!.seasonAttrs.profit, expectedProfit, 1e-6);
+
+		const result = await updateOwnerMood();
+		const scf = g.get("salaryCap") / 90000;
+		const penalty = overspendMoodPenalty(
+			getSeasonSpend(ts),
+			await getSeasonEnvelope(ts),
+		);
+		// The owner expects the plain 15 (scaled), not 15 minus the new departments' average cost
+		assert.closeTo(
+			result!.deltas.money,
+			(expectedProfit - 15 * scf) / (100 * scf) - penalty,
+			1e-9,
+		);
 	});
 });

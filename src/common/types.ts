@@ -2733,6 +2733,9 @@ export type TeamSeasonWithoutKey = {
 	// Front Office Budget (League Extra): spending and levels of the two new departments (like expenses and expenseLevels), and what the
 	// spending measurably bought this season (worker/core/frontOffice)
 	frontOffice?: TeamSeasonFrontOffice;
+	// Realistic AI Economy: cash the owner took out this season (thousands of dollars). Not an expense, so it doesn't lower profit, but
+	// cash change = revenue - expenses - ownerDistributions
+	ownerDistributions?: number;
 	payrollEndOfSeason: number;
 	ownerMood?: OwnerMood;
 	numPlayersTradedAway: number;

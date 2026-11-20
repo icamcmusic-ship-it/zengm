@@ -146,6 +146,8 @@ const assessPayrollMinLuxury = async () => {
 			const amount = ownerDistribution(teamSeason.cash, g.get("salaryCap"));
 			if (amount > 0) {
 				teamSeason.cash -= amount;
+				teamSeason.ownerDistributions =
+					(teamSeason.ownerDistributions ?? 0) + amount;
 				logEvent({
 					type: "ownerDistribution",
 					text: `The owner of the ${rosterLink(

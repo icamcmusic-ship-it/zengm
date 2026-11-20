@@ -199,21 +199,34 @@ export const recordCapExceptionSigning = async (
 	if (!t) {
 		return;
 	}
+	const leagueYear = getLeagueYear();
+	// A team with less cap space than the mid-level exception is treated like a team over the cap: filling that bit of space counts as
+	// its (non-taxpayer) mid-level exception, so it can't fill its space and then also sign a mid-level player on top. It keeps its
+	// bi-annual exception, as with the mid-level. If it has no mid-level exception left (or already used cap space or the room exception),
+	// there is nothing more to give up.
+	let fillAsMle = false;
 	if (
 		!exception &&
 		g.get("salaryCap") - payroll <= getCapExceptionAmount("nonTaxpayerMle")
 	) {
-		// A team with less cap space than the mid-level exception is treated like a team over the cap: filling that bit of space doesn't cost it its exceptions
-		return;
+		const used = new Set(usesThisYear(t, leagueYear).map((use) => use.type));
+		if (
+			t.capExceptions?.capSpaceSeason === leagueYear ||
+			used.has("room") ||
+			used.has("nonTaxpayerMle") ||
+			used.has("taxpayerMle")
+		) {
+			return;
+		}
+		fillAsMle = true;
 	}
-	const leagueYear = getLeagueYear();
 	const previous = helpers.deepCopy(t.capExceptions);
 	t.capExceptions ??= { uses: [] };
 	prune(t, leagueYear);
-	if (exception) {
+	if (exception || fillAsMle) {
 		t.capExceptions.uses.push({
 			season: leagueYear,
-			type: exception,
+			type: exception ?? "nonTaxpayerMle",
 			pid,
 			amount,
 		});
@@ -569,4 +582,37 @@ export const applyStretchProvision = (contract: Contract) => {
 	}
 	contract.stretched = true;
 	return true;
+};
+
+// Stretch provision with a hard cap: stretching moves money into later seasons, so it's blocked when, in some season, it would put the
+// team's payroll over the hard cap (and higher than without stretching). payrollBySeason is the team's payroll before the release, which
+// includes the contract as it was (before). after is the contract as owed after the release (guarantees applied), before stretching.
+export const stretchHardCapSeason = ({
+	before,
+	after,
+	payrollBySeason,
+	salaryCap,
+}: {
+	before: Pick<Contract, "amounts" | "start">;
+	after: Pick<Contract, "amounts" | "start">;
+	payrollBySeason: (season: number) => number;
+	salaryCap: number;
+}) => {
+	const stretched = getStretchedAmounts(after);
+	if (!stretched) {
+		return;
+	}
+	const amountIn = (
+		contract: Pick<Contract, "amounts" | "start">,
+		season: number,
+	) => contract.amounts[season - contract.start] ?? 0;
+	const stretchedContract = { amounts: stretched.amounts, start: after.start };
+	for (let season = stretched.firstSeason; season <= stretched.exp; season++) {
+		const others = payrollBySeason(season) - amountIn(before, season);
+		const withStretch = others + amountIn(stretchedContract, season);
+		const withoutStretch = others + amountIn(after, season);
+		if (withStretch > salaryCap && withStretch > withoutStretch) {
+			return season;
+		}
+	}
 };

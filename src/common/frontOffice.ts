@@ -66,14 +66,6 @@ export const deptAmount = (
 	salaryCap: number,
 ) => DEPT_COST_SCALE[dept] * levelToAmount(level, salaryCap);
 
-// What the two new departments cost a team at the league-average level, per season (thousands of dollars). The owner's profit
-// expectation is lowered by this much, so owner mood is neutral at average spending
-export const newDeptsAverageAmount = (salaryCap: number) =>
-	FRONT_OFFICE_NEW_KEYS.reduce(
-		(sum, key) => sum + deptAmount(key, DEFAULT_LEVEL, salaryCap),
-		0,
-	);
-
 // ---------------------------------------------------------------------------------------------------------------------------------
 // Owner's envelope
 

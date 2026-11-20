@@ -8,8 +8,11 @@ import {
 } from "../../../common/contracts.ts";
 import {
 	applyStretchProvision,
+	getStretchedAmounts,
+	stretchHardCapSeason,
 	stretchProvisionEnabled,
 } from "../contract/capExceptions.ts";
+import getPayroll from "../team/getPayroll.ts";
 import {
 	endContractEarly,
 	setContractDemandFromCurrentContract,
@@ -27,6 +30,34 @@ import { getNumPlayersTradedAwayNormalizedAll } from "./getNumPlayersTradedAwayN
  * @param {boolean} justDrafted True if the player was just drafted by his current team and the regular season hasn't started yet. False otherwise. If True, then the player can be released without paying his salary.
  * @return {Promise}
  */
+// Stretch provision with a hard cap: the first season stretching this player's contract would put his team over the hard cap, or
+// undefined if it wouldn't (or there's no hard cap)
+export const getStretchHardCapSeason = async (p: Player) => {
+	if (g.get("salaryCapType") !== "hard" || p.tid < 0) {
+		return;
+	}
+	const contract = getCurrentContract(p);
+	if (!contract) {
+		return;
+	}
+	const after = helpers.deepCopy(contract);
+	applyReleaseGuarantees(after);
+	const stretched = getStretchedAmounts(after);
+	if (!stretched) {
+		return;
+	}
+	const payrolls = new Map<number, number>();
+	for (let season = stretched.firstSeason; season <= stretched.exp; season++) {
+		payrolls.set(season, await getPayroll(p.tid, season));
+	}
+	return stretchHardCapSeason({
+		before: contract,
+		after,
+		payrollBySeason: (season) => payrolls.get(season) ?? 0,
+		salaryCap: g.get("salaryCap"),
+	});
+};
+
 const release = async (
 	p: Player,
 	justDrafted: boolean,
@@ -34,6 +65,15 @@ const release = async (
 	stretch: boolean = false,
 ) => {
 	let stretched = false;
+	// Hard cap: no stretching that would put the team over it
+	if (
+		stretch &&
+		stretchProvisionEnabled() &&
+		!justDrafted &&
+		(await getStretchHardCapSeason(p)) !== undefined
+	) {
+		stretch = false;
+	}
 	// Before his contract ends, since that's what his contract demand is based on
 	setContractDemandFromCurrentContract(p);
 
