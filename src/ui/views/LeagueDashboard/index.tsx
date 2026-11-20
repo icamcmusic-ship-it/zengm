@@ -70,7 +70,9 @@ const LeagueDashboard = ({
 	const timelineOn = useFeatureOn("timeline");
 	const scoutingDepthOn = useFeatureOn("scoutingDepth");
 	const coachingDepthOn = useFeatureOn("coachingDepth");
-	const staffReportOn = scoutingDepthOn || coachingDepthOn;
+	const coachingStaffOn = useFeatureOn("coachingStaff");
+	// Same rule as the Staff Report page (worker/views/staffReport.ts)
+	const staffReportOn = scoutingDepthOn || (coachingDepthOn && coachingStaffOn);
 	const recordsLinks = [
 		...(newspaperOn
 			? [
