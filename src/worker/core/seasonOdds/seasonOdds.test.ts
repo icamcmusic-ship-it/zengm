@@ -1,7 +1,7 @@
 import { assert, beforeEach, describe, test } from "vitest";
 import { g } from "../../util/index.ts";
 import { resetG } from "../../../test/helpers.ts";
-import { simSeasonOdds, winProb } from "./simSeason.ts";
+import { simBracket, simSeasonOdds, winProb } from "./simSeason.ts";
 import { awardWinProbs } from "./awardOdds.ts";
 import {
 	getWhatIfChances,
@@ -127,6 +127,118 @@ describe("season odds", () => {
 		// The best team in each conference is the #1 seed every time
 		const best = odds.teams.find((t) => t.tid === 0)!;
 		assert.strictEqual(best.seeds[0], 1);
+	});
+});
+
+describe("season odds bracket format", () => {
+	// Seed n is tid n - 1
+	const st = (seed: number, won = 0, cid = 0) => ({
+		tid: seed - 1,
+		cid,
+		seed,
+		won,
+	});
+	const play = (
+		series: { home: ReturnType<typeof st>; away?: ReturnType<typeof st> }[],
+		numGamesPlayoffSeries: number[],
+		ratingBySeed: Record<number, number>,
+		{
+			hca = 0,
+			reseed = false,
+			byConf = false as number | false,
+			winp = (tid: number) => -tid,
+		} = {},
+	) => {
+		const ratings = new Map<number, number>();
+		for (let seed = 1; seed <= 16; seed++) {
+			ratings.set(seed - 1, ratingBySeed[seed] ?? 0);
+		}
+		const roundsWon: number[][] = numGamesPlayoffSeries.map(() => []);
+		simBracket({
+			series: [series],
+			startRound: 0,
+			numGamesPlayoffSeries,
+			ratings,
+			hca,
+			// Deterministic: the favorite always wins
+			random: () => 0.5,
+			onRoundWon: (tid, rnd) => roundsWon[rnd]!.push(tid + 1),
+			byConf,
+			reseed,
+			winp,
+		});
+		return roundsWon;
+	};
+
+	test("home court follows the real schedule (best of 3: game 3 at the better seed)", () => {
+		// 1-1 going into game 3 of a best of 3, even teams, home court decides it
+		const won = play(
+			[{ home: st(1, 1), away: st(2, 1) }],
+			[3],
+			{},
+			{ hca: 50 },
+		);
+		assert.deepEqual(won, [[1]]);
+	});
+
+	// 8 teams: 8 and 6 pull upsets, 4 is the best team, 2 the worst left
+	const ratings = { 8: 100, 6: 100, 4: 200, 7: -100 };
+	const bracket = () => [
+		{ home: st(1), away: st(8) },
+		{ home: st(4), away: st(5) },
+		{ home: st(3), away: st(6) },
+		{ home: st(2), away: st(7) },
+	];
+
+	test("no reseeding: bracket positions", () => {
+		// 4 v 8 and 2 v 6
+		const won = play(bracket(), [1, 1, 1], ratings);
+		assert.deepEqual(won[1], [4, 6]);
+	});
+
+	test("reseeding: best remaining seed plays the worst", () => {
+		// 2 v 8 and 4 v 6
+		const won = play(bracket(), [1, 1, 1], ratings, { reseed: true });
+		assert.deepEqual(won[1], [8, 4]);
+	});
+
+	test("reseeding by conference uses the stored cid, then records across conferences", () => {
+		// Conference 0 has seeds 1-4 of its own, conference 1 too, but the bracket lists them interleaved
+		const c = (seed: number, cid: number) => st(seed, 0, cid);
+		const series = [
+			{ home: c(1, 0), away: c(4, 0) },
+			{ home: { ...c(1, 1), tid: 10 }, away: { ...c(4, 1), tid: 13 } },
+			{ home: c(2, 0), away: c(3, 0) },
+			{ home: { ...c(2, 1), tid: 11 }, away: { ...c(3, 1), tid: 12 } },
+		];
+		const rating = new Map<number, number>([
+			[0, 0],
+			[3, 100],
+			[10, 100],
+			[13, 0],
+			[1, 0],
+			[2, 100],
+			[11, 100],
+			[12, 0],
+		]);
+		const roundsWon: number[][] = [[], [], []];
+		simBracket({
+			series: [series],
+			startRound: 0,
+			numGamesPlayoffSeries: [1, 1, 1],
+			ratings: rating,
+			hca: 0,
+			random: () => 0.5,
+			onRoundWon: (tid, rnd) => roundsWon[rnd]!.push(tid),
+			byConf: 2,
+			reseed: true,
+			winp: () => 0.5,
+		});
+		// Conference 0: 4 (tid 3) and 3 (tid 2) won, conference 1: 1 (tid 10) and 2 (tid 11). Each conference final is within the
+		// conference (by position, 3 would have met 1 of the other conference)
+		assert.deepEqual(roundsWon[0], [3, 10, 2, 11]);
+		// (even teams, so the road team wins: 3 at 2 and 11 at 10; grouped by position it would be 3 at 10 and 2 at 11)
+		assert.deepEqual(roundsWon[1], [3, 11]);
 	});
 });
 

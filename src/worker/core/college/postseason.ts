@@ -530,6 +530,85 @@ const logFirstFour = async (games: CollegeFirstFourGame[]) => {
 	}
 };
 
+export class InvalidCollegeBracketError extends Error {
+	constructor(message: string) {
+		super(`College national tournament: ${message}`);
+		this.name = "InvalidCollegeBracketError";
+	}
+}
+
+/**
+ * The first round of the national tournament from the selected field. Guarded against fields that don't fit the bracket (settings
+ * changed in God Mode, a contracted team): within each region the teams fill the seed slots in seed order (so a missing seed moves
+ * the worse seeds up a line and leaves the top seed with a bye, and a duplicate seed doesn't drop a team), the worst teams are left
+ * out of a region that is too big, and a region count that can't split the bracket evenly is played as one region in seed line order (the S-curve).
+ * 0 rounds means no tournament. Throws a clear error only when the field can't fill half of the first round of some region.
+ */
+export const buildNationalBracket = (
+	field: CollegeFieldTeam[],
+	numRounds: number,
+	cidByTid: Map<number, number>,
+): {
+	series: PlayoffSeries["series"];
+	placed: CollegeFieldTeam[];
+} => {
+	if (numRounds <= 0) {
+		// No playoff rounds in the settings: no tournament, like a league with no playoff series
+		return { series: [], placed: [] };
+	}
+	if (field.length === 0) {
+		throw new InvalidCollegeBracketError(
+			"no teams were selected for the field.",
+		);
+	}
+	const series: PlayoffSeries["series"] = Array.from(
+		{ length: numRounds },
+		() => [],
+	);
+	const numSlots = 2 ** numRounds;
+	let numRegions = Math.max(...field.map((t) => t.region)) + 1;
+	const evenSplit =
+		Number.isInteger(numRegions) &&
+		numRegions >= 1 &&
+		(numRegions & (numRegions - 1)) === 0 &&
+		numSlots / numRegions >= 2;
+	if (!evenSplit) {
+		numRegions = 1;
+	}
+	const perRegion = numSlots / numRegions;
+	const order = seedOrder(perRegion);
+	const placed: CollegeFieldTeam[] = [];
+	const toTeam = (t: CollegeFieldTeam) => ({
+		tid: t.tid,
+		cid: cidByTid.get(t.tid) ?? -1,
+		seed: t.seed,
+		won: 0,
+	});
+	for (let region = 0; region < numRegions; region++) {
+		const ranked = field
+			.filter((t) => !evenSplit || t.region === region)
+			.sort((a, b) => a.seed - b.seed || a.overall - b.overall)
+			.slice(0, perRegion);
+		if (ranked.length < perRegion / 2) {
+			throw new InvalidCollegeBracketError(
+				`region ${region + 1} has ${ranked.length} ${ranked.length === 1 ? "team" : "teams"}, but needs at least ${perRegion / 2} for a ${numRounds} round bracket. Check the number of playoff rounds in the league settings.`,
+			);
+		}
+		placed.push(...ranked);
+		for (let i = 0; i < perRegion; i += 2) {
+			const a = ranked[Math.min(order[i]!, order[i + 1]!) - 1];
+			const b = ranked[Math.max(order[i]!, order[i + 1]!) - 1];
+			// Each pair has one slot in the top half, which ranked always fills (checked above), so a is defined
+			series[0]!.push({
+				home: toTeam(a!),
+				// A missing team is a bye for the better seed
+				away: b ? toTeam(b) : undefined,
+			});
+		}
+	}
+	return { series, placed };
+};
+
 /**
  * The national tournament as the engine's playoff series (first round only, the engine pairs the winners). Called when the playoffs phase
  * starts.
@@ -568,31 +647,16 @@ export const genNationalTournament = async (conditions: Conditions) => {
 	state = await saveCollegeState(state);
 
 	const numRounds = g.get("numGamesPlayoffSeries", "current").length;
-	const series: PlayoffSeries["series"] = Array.from(
-		{ length: numRounds },
-		() => [],
+	const { series, placed } = buildNationalBracket(
+		bracketField,
+		numRounds,
+		cidByTid,
 	);
-	const numRegions = Math.max(...bracketField.map((t) => t.region)) + 1;
-	const perRegion = bracketField.length / numRegions;
-	const order = seedOrder(perRegion);
-	for (let region = 0; region < numRegions; region++) {
-		const bySeed = new Map(
-			bracketField.filter((t) => t.region === region).map((t) => [t.seed, t]),
-		);
-		for (let i = 0; i < perRegion; i += 2) {
-			const a = bySeed.get(Math.min(order[i]!, order[i + 1]!))!;
-			const b = bySeed.get(Math.max(order[i]!, order[i + 1]!))!;
-			series[0]!.push({
-				home: { tid: a.tid, cid: cidByTid.get(a.tid)!, seed: a.seed, won: 0 },
-				away: { tid: b.tid, cid: cidByTid.get(b.tid)!, seed: b.seed, won: 0 },
-			});
-		}
-	}
 
 	const teamInfoCache = g.get("teamInfoCache");
 	const userTid = g.get("userTid");
 	const bracketUrl = helpers.leagueUrl(["playoffs", g.get("season")]);
-	for (const t of bracketField) {
+	for (const t of placed) {
 		const info = teamInfoCache[t.tid];
 		logEvent(
 			{
@@ -662,7 +726,7 @@ export const genNationalTournament = async (conditions: Conditions) => {
 		playIns: undefined,
 		series,
 		tidPlayIn: [] as number[],
-		tidPlayoffs: bracketField.map((t) => t.tid),
+		tidPlayoffs: placed.map((t) => t.tid),
 	};
 };
 

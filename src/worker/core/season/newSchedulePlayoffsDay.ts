@@ -3,29 +3,15 @@ import { idb } from "../../db/index.ts";
 import { g, helpers, local, lock } from "../../util/index.ts";
 import type { PlayoffSeriesTeam } from "../../../common/types.ts";
 import { season, team } from "../index.ts";
-import { chunk, groupByUnique } from "../../../common/utils.ts";
+import { groupByUnique } from "../../../common/utils.ts";
+import {
+	betterSeedHome,
+	groupByConf,
+	interleaveForReseed,
+} from "./playoffBracketUtils.ts";
 import { orderTeams } from "../../util/orderTeams.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { getNitGames } from "../college/postseason.ts";
-
-// Play 2 home (true) then 2 away (false) and repeat, but ensure that the better team always gets the last game.
-const betterSeedHome = (numGamesPlayoffSeries: number, gameNum: number) => {
-	// For series lengths like 3, 7, 11, 15, etc., special case last 3 games to ensure the home team always gets the last game
-	const needsSpecialEnding = (numGamesPlayoffSeries + 1) % 4 === 0;
-
-	if (needsSpecialEnding) {
-		// Special case for last 3 games
-		if (gameNum >= numGamesPlayoffSeries - 3) {
-			return (
-				gameNum === numGamesPlayoffSeries - 3 ||
-				gameNum === numGamesPlayoffSeries - 1
-			);
-		}
-	}
-
-	const num = Math.floor(gameNum / 2);
-	return num % 2 === 0;
-};
 
 const seriesIsNotOver = (
 	home: PlayoffSeriesTeam,
@@ -95,6 +81,7 @@ const newSchedulePlayoffsDay = async (): Promise<boolean> => {
 					return {
 						...helpers.deepCopy(oldTeam),
 						pts: undefined,
+						sPts: undefined,
 						won: 0,
 					};
 				};
@@ -278,8 +265,7 @@ const newSchedulePlayoffsDay = async (): Promise<boolean> => {
 
 		// teamsWon.length > playoffsByConf check is so it stops grouping by conference when all the intraconference matchups are complete
 		if (playoffsByConf !== false && teamsWon.length > playoffsByConf) {
-			const groupSize = Math.ceil(teamsWon.length / playoffsByConf);
-			groups = chunk(teamsWon, groupSize);
+			groups = groupByConf(teamsWon, playoffsByConf);
 		} else {
 			groups = [[...teamsWon]];
 		}
@@ -307,15 +293,7 @@ const newSchedulePlayoffsDay = async (): Promise<boolean> => {
 				orderedGroup = group.sort((a, b) => a.seed - b.seed);
 			}
 
-			const interleaved: PlayoffSeriesTeam[] = [];
-			while (orderedGroup.length > 0) {
-				const t =
-					interleaved.length % 2 === 0
-						? orderedGroup.shift()!
-						: orderedGroup.pop()!;
-				interleaved.push(t);
-			}
-			groups[i] = interleaved;
+			groups[i] = interleaveForReseed(orderedGroup);
 		}
 
 		teamsWon = groups.flat();

@@ -5,7 +5,10 @@ import season from "../season/index.ts";
 import { findSeries } from "./writeGameStats.ts";
 import getWinner from "../../../common/getWinner.ts";
 import formatScoreWithShootout from "../../../common/formatScoreWithShootout.ts";
-import { seriesEndNote } from "../../../common/seriesRecap/index.ts";
+import {
+	seedsComparable,
+	seriesEndNote,
+} from "../../../common/seriesRecap/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 
 const updatePlayoffSeries = async (
@@ -108,10 +111,10 @@ const updatePlayoffSeries = async (
 				loserWon = series.home.won;
 			} else {
 				winnerPts = series.home.pts;
-				winnerSPts = series.away.sPts;
+				winnerSPts = series.home.sPts;
 				winnerTid = series.home.tid;
 				loserPts = series.away.pts;
-				loserSPts = series.home.sPts;
+				loserSPts = series.away.sPts;
 				loserTid = series.away.tid;
 				loserWon = series.away.won;
 			}
@@ -154,16 +157,31 @@ const updatePlayoffSeries = async (
 				playoffSeries.currentRound >= 0 &&
 				numGamesToWinSeries > 1;
 			if (recapsOn) {
-				const gameWinners: boolean[] = [];
+				// Game by game, to find a comeback. A missing box score makes the order unknown (null), so the note can't silently drop
+				// a comeback by skipping the games it happened in
+				let gameWinners: boolean[] | null = [];
 				for (const gid of series.gids ?? []) {
-					const game = await idb.cache.games.get(gid);
-					if (game) {
-						gameWinners.push(game.won.tid === winnerTid);
+					const game = await idb.merged.games.get(gid);
+					if (!game) {
+						gameWinners = null;
+						break;
 					}
+					gameWinners.push(game.won.tid === winnerTid);
+				}
+				if (
+					gameWinners &&
+					gameWinners.length !== series.home.won + series.away.won
+				) {
+					gameWinners = null;
 				}
 				const w = winnerTid === series.home.tid ? series.home : series.away;
 				const l = winnerTid === series.home.tid ? series.away : series.home;
-				recapNote = seriesEndNote(w, l, gameWinners, w.cid === l.cid);
+				recapNote = seriesEndNote(
+					w,
+					l,
+					gameWinners,
+					seedsComparable(w, l, playoffsByConf),
+				);
 				const note = recapNote;
 				recapText = `${note ? ` ${note}` : ""} <a href="${helpers.leagueUrl([
 					"series_recaps",
