@@ -117,4 +117,32 @@ describe("award key stats views", () => {
 		const unknown = await load("awardHistory", { award: "NOPE" });
 		assert.strictEqual(unknown.award, output.awardOptions[0].key);
 	});
+
+	test("Season History: each award carries its key stats, and its winner has them", async () => {
+		const season = (await load("awardHistory", { award: "MVP" })).rows[0]
+			.season;
+		const output = await load("history", { season: String(season) });
+		const mvp = output.awards.individualAwards.find(
+			(award: any) => award.shortName === "MVP",
+		);
+		assert.isDefined(mvp);
+		assert.isAbove(mvp.keyStats.suggested.length, 0);
+		for (const stat of mvp.keyStats.suggested) {
+			assert.isDefined(
+				mvp.winner.stats[stat] ?? mvp.winner.statOverrides?.[stat],
+				stat,
+			);
+		}
+		const dpoy = output.awards.individualAwards.find(
+			(award: any) => award.shortName === "DPOY",
+		);
+		assert.isDefined(dpoy?.keyStats);
+		// (the defensive award's suggestion is about defense)
+		assert.isTrue(
+			dpoy.keyStats.suggested.some((stat: string) =>
+				["blk", "stl", "drb", "dws", "dpm", "trkDef"].includes(stat),
+			),
+			dpoy.keyStats.suggested.join(","),
+		);
+	});
 });
