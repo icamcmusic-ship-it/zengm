@@ -11,6 +11,7 @@ import getPlayoffsByConf from "../core/season/getPlayoffsByConf.ts";
 import { defaultAwards } from "../../common/defaultGameAttributes.ts";
 import { defineView } from "../util/defineView.ts";
 import { team } from "../core/index.ts";
+import { legacyAllDefensiveSelection } from "../core/awards/perimeterDefense.ts";
 
 const getTeams = async (season: number) => {
 	const teams = await team.getFormattedAll({
@@ -84,6 +85,8 @@ export default defineView({
 				confs: g.get("confs", season),
 				divs: g.get("divs", season),
 				errorMessages,
+				// The league-wide All-Defensive rule, written into exported All-Defensive awards without their own team selection
+				legacyAllDefensive: legacyAllDefensiveSelection(),
 				numGamesPlayoffSeries: g.get("numGamesPlayoffSeries", season),
 				playoffsByConf: await getPlayoffsByConf(season),
 				season,

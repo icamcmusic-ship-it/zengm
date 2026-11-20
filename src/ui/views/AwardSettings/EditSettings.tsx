@@ -13,6 +13,7 @@ import {
 	type AwardInfoCommon,
 	type AwardSettingIndividual,
 	type AwardSettingTeam,
+	type TeamSelection,
 } from "../../../common/types.ts";
 import { orderBy } from "../../../common/utils.ts";
 import type { ZodError } from "zod";
@@ -21,6 +22,15 @@ import { POS_NUMBERS } from "../../../common/constants.baseball.ts";
 
 const SUPPORT_OPOY_STUFF = __SPORT === "football";
 const OPOY_FORMULA_NAME = "OPOY (including QB)";
+
+// Team awards in BBGM can be filled by position (football, hockey and baseball team awards are always by position)
+const SUPPORT_TEAM_SELECTION = __SPORT === "basketball";
+const teamSelections: { key: TeamSelection | "default"; text: string }[] = [
+	{ key: "default", text: "Default" },
+	{ key: "none", text: "Positionless" },
+	{ key: "oneGuard", text: "One guard" },
+	{ key: "gfc", text: "Guards, forwards, center" },
+];
 
 type AwardSetting = AwardSettingIndividual | AwardSettingTeam;
 
@@ -53,6 +63,7 @@ export const awardSettingToEditingState = (award: AwardSetting) => {
 				((award.opoyFormula !== undefined ? "opoy" : "none") as ActAs),
 			opoyFormula: award.opoyFormula ?? "",
 			numTeams: "1",
+			teamSelection: "default" as TeamSelection | "default",
 		};
 	}
 
@@ -62,6 +73,9 @@ export const awardSettingToEditingState = (award: AwardSetting) => {
 		actAs: "none" as ActAs,
 		opoyFormula: "",
 		numTeams: String(award.numTeams),
+		teamSelection: (award.teamSelection ?? "default") as
+			| TeamSelection
+			| "default",
 	};
 };
 
@@ -140,6 +154,9 @@ const editingStateToAward = (state: EditingState, index: number) => {
 			...common,
 			numTeams,
 		};
+		if (SUPPORT_TEAM_SELECTION && state.teamSelection !== "default") {
+			award.teamSelection = state.teamSelection;
+		}
 	}
 
 	if (state.group === "conf" || state.group === "div") {
@@ -413,6 +430,7 @@ export const EditSettings = ({
 	}
 
 	const actAsId = useId();
+	const teamSelectionId = useId();
 	const groupId = useId();
 	const opoyId = useId();
 
@@ -752,6 +770,46 @@ export const EditSettings = ({
 						</label>
 					</div>
 				)}
+				{state.type === "team" && SUPPORT_TEAM_SELECTION ? (
+					<div>
+						<label className="mb-1" htmlFor={teamSelectionId}>
+							Team selection
+						</label>
+						<HelpPopover title="Team selection" className="ms-1">
+							<p>How the players on each team are picked.</p>
+							<p>
+								<b>Positionless:</b> the best scores, like the NBA since 2024.
+							</p>
+							<p>
+								<b>One guard:</b> at least one guard (PG, SG or G) on every
+								team.
+							</p>
+							<p>
+								<b>Guards, forwards, center:</b> 2 guards, 2 forwards and a
+								center on every team, like the NBA before 2024 (a GF can be a
+								guard or a forward, an FC a forward or a center).
+							</p>
+							<p>
+								<b>Default:</b> an All-Defensive award follows the league's
+								Perimeter Defense setting "All-Defensive Teams by Position", any
+								other team award is positionless.
+							</p>
+						</HelpPopover>
+						<select
+							id={teamSelectionId}
+							className="form-select"
+							disabled={disabled}
+							onChange={changeHandler("teamSelection")}
+							value={state.teamSelection}
+						>
+							{teamSelections.map(({ key, text }) => (
+								<option key={key} value={key}>
+									{text}
+								</option>
+							))}
+						</select>
+					</div>
+				) : null}
 				<button
 					type="button"
 					className="ms-auto btn btn-secondary"

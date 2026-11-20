@@ -27,6 +27,11 @@ import {
 	type PlayerAward,
 	type Award,
 	type Awards,
+	TEAM_SELECTIONS,
+	isAllDefensiveAward,
+	isTeamSelection,
+	withAllDefensiveTeamSelection,
+	type TeamSelection,
 } from "../../common/types.ts";
 
 export {
@@ -43,6 +48,11 @@ export {
 	type PlayerAward,
 	type Award,
 	type Awards,
+	TEAM_SELECTIONS,
+	isAllDefensiveAward,
+	isTeamSelection,
+	withAllDefensiveTeamSelection,
+	type TeamSelection,
 };
 
 // Would be nice to make .at(-1) return T but idk how, so use the `last` function instead!

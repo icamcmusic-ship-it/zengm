@@ -82,8 +82,50 @@ const awardInfoIndividualCommonSchema = z.object({
 	actAs: z.enum(["mvp", "roy"]).optional(),
 });
 
+// How a team award's teams are filled by position (basketball): "none" positionless (best scores), "oneGuard" at least one true
+// guard (PG, SG, G) per team, "gfc" 2 guards, 2 forwards and a center per team. Not set: an All-Defensive award follows the league's
+// old Perimeter Defense option (perimeterDefenseAllDefensive), any other team award is positionless.
+export const TEAM_SELECTIONS = ["none", "oneGuard", "gfc"] as const;
+export type TeamSelection = (typeof TEAM_SELECTIONS)[number];
+
+export const isTeamSelection = (value: unknown): value is TeamSelection =>
+	(TEAM_SELECTIONS as readonly unknown[]).includes(value);
+
+// An All-Defensive style team award (the default abbrev, or a team award showing defense stats)
+export const isAllDefensiveAward = (award: {
+	numTeams?: number;
+	shortName: string;
+	showStats: string;
+}) =>
+	award.numTeams !== undefined &&
+	(award.shortName === "DEF" || award.showStats === "defense");
+
+// Write the league-wide All-Defensive rule (the old perimeterDefenseAllDefensive option) into the All-Defensive awards that don't
+// have their own teamSelection, so the rule travels with the awards when they are exported or imported
+export const withAllDefensiveTeamSelection = <
+	T extends {
+		numTeams?: number;
+		shortName: string;
+		showStats: string;
+		teamSelection?: TeamSelection;
+	},
+>(
+	awards: T[],
+	legacy: unknown,
+): T[] => {
+	if (!isTeamSelection(legacy)) {
+		return awards;
+	}
+	return awards.map((award) =>
+		award.teamSelection === undefined && isAllDefensiveAward(award)
+			? { ...award, teamSelection: legacy }
+			: award,
+	);
+};
+
 const awardInfoTeamCommonSchema = z.object({
 	numTeams: z.number().gte(1),
+	teamSelection: z.enum(TEAM_SELECTIONS).optional(),
 });
 
 const awardInfoIndividualSchema = awardInfoCommonSchema

@@ -2,6 +2,7 @@ import useTitleBar from "../../hooks/useTitleBar.tsx";
 import { MoreLinks } from "../../components/MoreLinks.tsx";
 import {
 	awardSettingsSchema,
+	withAllDefensiveTeamSelection,
 	type GameAttributesLeague,
 	type View,
 } from "../../../common/types.ts";
@@ -70,6 +71,7 @@ const AwardSettings = ({
 	confs,
 	divs,
 	errorMessages,
+	legacyAllDefensive,
 	numGamesPlayoffSeries,
 	playoffsByConf,
 	season,
@@ -345,7 +347,12 @@ const AwardSettings = ({
 										JSON.stringify(
 											{
 												version: LEAGUE_DATABASE_VERSION,
-												gameAttributes: { awards },
+												gameAttributes: {
+													awards: withAllDefensiveTeamSelection(
+														awards,
+														legacyAllDefensive,
+													),
+												},
 											},
 											undefined,
 											2,
@@ -400,7 +407,22 @@ const AwardSettings = ({
 											basicInfo.gameAttributes.awards,
 										);
 										if (result.success) {
-											setImporting({ awards: result.data, show: true });
+											// A league file from before per-award team selection: its All-Defensive rule was the
+											// league-wide perimeterDefenseAllDefensive option, so keep it with the awards
+											const gameAttributes = basicInfo.gameAttributes as Record<
+												string,
+												unknown
+											>;
+											setImporting({
+												awards:
+													gameAttributes.perimeterDefense === false
+														? result.data
+														: withAllDefensiveTeamSelection(
+																result.data,
+																gameAttributes.perimeterDefenseAllDefensive,
+															),
+												show: true,
+											});
 										} else {
 											const uniqueErrorMessages = getUniqueErrorMessages(
 												zodErrorsToErrorMessages(result.error),

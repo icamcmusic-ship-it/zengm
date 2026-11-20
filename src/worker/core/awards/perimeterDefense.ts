@@ -7,6 +7,10 @@ import {
 } from "../../../common/nativeFeatures.ts";
 import g from "../../util/g.ts";
 import { TRACKING_FORMULA_TERMS } from "./trackingAwards.ts";
+import {
+	isAllDefensiveAward,
+	type TeamSelection,
+} from "../../../common/types.ts";
 
 // The default formula is dws/3.1 + seasonFraction*winp + gp/82*(blk/4.1 + stl/1.8). Defensive win shares come mostly from
 // defensive rebounds and blocks, so bigs dominate it: a starting C averages about 2.4x the DWS of a starting PG. With the setting
@@ -21,6 +25,9 @@ type AwardLike = {
 	formulaByPos?: unknown;
 	numTeams?: number;
 	statRange?: unknown;
+	shortName?: string;
+	showStats?: string;
+	teamSelection?: TeamSelection;
 };
 
 const STOCK_FORMULAS = new Set([
@@ -79,7 +86,7 @@ export const advDefScore = (
 	return Math.max(-1, Math.min(1, score));
 };
 
-export type AllDefensiveFormat = "none" | "oneGuard" | "gfc";
+export type AllDefensiveFormat = TeamSelection;
 
 // "oneGuard" wants a true guard, a GF (a wing) doesn't count
 const TRUE_GUARDS = new Set(["PG", "SG", "G"]);
@@ -87,16 +94,38 @@ const GUARDS = new Set(["PG", "SG", "G", "GF"]);
 const FORWARDS = new Set(["GF", "SF", "F", "PF", "FC"]);
 const CENTERS = new Set(["FC", "C"]);
 
-// The All-Defensive team format, for a team award built on the default defense formula
+// An All-Defensive award: the default defense formula (as before) or, since an imported or edited All-Defensive award usually has
+// its own formula, the default abbrev or a defense team award
+const isAllDefensive = (award: AwardLike) =>
+	STOCK_FORMULAS.has(award.formula) ||
+	isAllDefensiveAward({
+		numTeams: award.numTeams,
+		shortName: award.shortName ?? "",
+		showStats: award.showStats ?? "",
+	});
+
+// How a team award's teams are filled by position (basketball only). The award's own teamSelection (Award Settings, kept in award
+// settings exports and league files) wins. Without one (leagues and files from before it existed), an All-Defensive award follows
+// the league's Perimeter Defense option perimeterDefenseAllDefensive (which used to apply only while the award kept the default
+// formula, so an imported custom All-Defensive formula silently lost the rule), and every other team award is positionless.
 export const allDefensiveFormat = (award: AwardLike): AllDefensiveFormat => {
-	if (
-		award.numTeams === undefined ||
-		award.statRange !== undefined ||
-		!STOCK_FORMULAS.has(award.formula) ||
-		!enabled()
-	) {
+	if (__SPORT !== "basketball" || award.numTeams === undefined) {
 		return "none";
 	}
+	if (award.teamSelection !== undefined) {
+		return award.teamSelection;
+	}
+	if (award.statRange !== undefined || !isAllDefensive(award) || !enabled()) {
+		return "none";
+	}
+	return legacyAllDefensiveFormat();
+};
+
+// The old league-wide option, for All-Defensive awards without their own teamSelection (undefined if it doesn't apply)
+export const legacyAllDefensiveSelection = () =>
+	enabled() ? legacyAllDefensiveFormat() : undefined;
+
+export const legacyAllDefensiveFormat = (): AllDefensiveFormat => {
 	const format = nativeFeatureOption<string>(
 		"perimeterDefenseAllDefensive",
 		(key) => g.get(key as any),

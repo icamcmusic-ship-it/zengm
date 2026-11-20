@@ -1,10 +1,20 @@
 import { describe, expect, test } from "vitest";
-import { defaultAwardsBasketball } from "../../../common/defaultGameAttributes.ts";
 import {
+	defaultAwards,
+	defaultAwardsBasketball,
+} from "../../../common/defaultGameAttributes.ts";
+import {
+	allDefensiveFormat,
 	fillAllDefensive,
 	PERIMETER_DEFENSE_FORMULA,
 } from "./perimeterDefense.ts";
 import { FormulaEvaluators } from "./processAwards.ts";
+import { resetG } from "../../../test/helpers.ts";
+import g from "../../util/g.ts";
+import {
+	awardSettingsSchema,
+	withAllDefensiveTeamSelection,
+} from "../../../common/types.ts";
 
 const players = (positions: string[]) =>
 	positions.map((pos, i) => ({ pos, id: i }));
@@ -80,4 +90,63 @@ test("the perimeter defense formula is valid", () => {
 	);
 	expect(evaluators.errorMessages).toBeUndefined();
 	expect(evaluators.variables.normal.has("drb")).toBe(true);
+});
+
+describe("allDefensiveFormat", () => {
+	const def = defaultAwardsBasketball.def;
+	const custom = { ...def, formula: "blk + stl" };
+	const setOption = (perimeterDefense: boolean, option: string) => {
+		resetG();
+		g.setWithoutSavingToDB("perimeterDefense" as any, perimeterDefense);
+		g.setWithoutSavingToDB("perimeterDefenseAllDefensive" as any, option);
+	};
+
+	test("an All-Defensive award with an imported formula follows the league option", () => {
+		setOption(true, "gfc");
+		expect(allDefensiveFormat(def)).toBe("gfc");
+		expect(allDefensiveFormat(custom)).toBe("gfc");
+		expect(
+			allDefensiveFormat({ ...custom, shortName: "XYZ", showStats: "offense" }),
+		).toBe("none");
+	});
+
+	test("the award's own teamSelection wins, for any team award", () => {
+		setOption(true, "gfc");
+		expect(allDefensiveFormat({ ...custom, teamSelection: "none" })).toBe(
+			"none",
+		);
+		expect(
+			allDefensiveFormat({
+				...defaultAwards.alr,
+				teamSelection: "oneGuard",
+			}),
+		).toBe("oneGuard");
+		setOption(false, "gfc");
+		expect(allDefensiveFormat(custom)).toBe("none");
+		expect(allDefensiveFormat({ ...custom, teamSelection: "gfc" })).toBe("gfc");
+		expect(
+			allDefensiveFormat({
+				...defaultAwardsBasketball.dpoy,
+				teamSelection: "gfc",
+			} as any),
+		).toBe("none");
+	});
+
+	test("withAllDefensiveTeamSelection carries the old option into the awards", () => {
+		const awards = withAllDefensiveTeamSelection(
+			[
+				custom,
+				defaultAwards.alr,
+				{ ...def, shortName: "DEF2", teamSelection: "none" },
+			],
+			"oneGuard",
+		);
+		expect(awards.map((award) => award.teamSelection)).toEqual([
+			"oneGuard",
+			undefined,
+			"none",
+		]);
+		expect(awardSettingsSchema.parse(awards)).toEqual(awards);
+		expect(withAllDefensiveTeamSelection([custom], "bogus")).toEqual([custom]);
+	});
 });
