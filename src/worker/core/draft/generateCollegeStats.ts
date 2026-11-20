@@ -31,6 +31,7 @@ import { last } from "../../../common/utils.ts";
 import type { Player } from "../../../common/types.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import { getPlayerTraitScores, traitsEnabled } from "../player/traits.ts";
+import { trajectoryLatenessOf } from "../player/trajectory.ts";
 
 const getProspects = async (draftYear: number) => {
 	// In a fantasy draft the prospects are temporary and there's no point
@@ -88,6 +89,7 @@ export const toCollegeProspect = (
 		...(featureOn("preDraftMedicals") && traitsEnabled()
 			? { durability: getPlayerTraitScores(p, draftYear).durability }
 			: {}),
+		lateness: trajectoryLatenessOf(p),
 	};
 };
 

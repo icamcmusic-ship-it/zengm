@@ -601,6 +601,36 @@ export const generateSubShape = (
 	return { sub, info };
 };
 
+/**
+ * The growth profile a player develops with, made to agree with his hidden trajectory (the same number that sets his aging curve and
+ * whether he can be a college late bloomer): an early bloomer is never a late-blooming grower and a late bloomer never an early peaker
+ * (both become normal), and the deepest quarter of each curve's share turns a normal profile into its own. Stored profiles are untouched.
+ */
+export const reconcileGrowthProfile = (
+	profile: GrowthProfile,
+	lateness: number | undefined,
+): GrowthProfile => {
+	if (lateness === undefined || lateness === 0) {
+		return profile;
+	}
+	if (lateness < 0) {
+		if (profile === "lateBloomer") {
+			return "normal";
+		}
+		if (profile === "normal" && lateness <= -0.875) {
+			return "earlyPeaker";
+		}
+	} else {
+		if (profile === "earlyPeaker") {
+			return "normal";
+		}
+		if (profile === "normal" && lateness >= 0.875) {
+			return "lateBloomer";
+		}
+	}
+	return profile;
+};
+
 const profileIndex = (rng: Rng, background: Background, story?: string) => {
 	const shares = [...PROFILE_SHARES[background]];
 	if (story === "lateBloomer") {
@@ -1076,8 +1106,13 @@ export const developSubs = (
 	info: StoredSubInfo,
 	// Wider Sub-Rating Shapes: less mean reversion from 24, a pull back only for subs very far out, and growth from his role (roleLean)
 	wide?: { role?: readonly number[] },
+	// His trajectory's lateness (playerTraits/development.ts, trajectoryLateness), when known
+	lateness?: number,
 ): number[] => {
-	const profile = GROWTH_PROFILES[info.g] ?? "normal";
+	const profile = reconcileGrowthProfile(
+		GROWTH_PROFILES[info.g] ?? "normal",
+		lateness,
+	);
 	const rng = new Rng(`subd|${info.s}|${r.season}|${age}`);
 	const x = [...sub];
 	const flex = new Array<number>(NUM_SUBS).fill(1);

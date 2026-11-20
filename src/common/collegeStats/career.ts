@@ -310,7 +310,12 @@ export const pickStory = (
 		add("unranked", 3);
 	}
 	if (isNcaa && c === 3 && z >= -0.3) {
-		add("lateBloomer", 2.4);
+		// His hidden trajectory (playerTraits/development.ts): only a late bloomer by it is likely to tell this story, an early one never.
+		// Averages out to the old weight over a class
+		const w = 2.4 * Math.max(0, 1 + 1.5 * (p.lateness ?? 0));
+		if (w > 0) {
+			add("lateBloomer", w);
+		}
 	}
 	// Reclassified up a year: a young freshman, not an older one
 	if (isNcaa && c === 0 && p.age <= 19) {

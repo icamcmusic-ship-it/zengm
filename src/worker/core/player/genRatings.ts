@@ -10,9 +10,12 @@ import { bySport } from "../../../common/sportFunctions.ts";
 import { syncExpandedToCompat } from "./expandedRatings.ts";
 
 const genRatings = (season: number, scoutingLevel: number) => {
-	const { heightInInches, ratings } = bySport<{
+	const { heightInInches, ratings, apeIndex, build } = bySport<{
 		heightInInches: number;
 		ratings: MinimalPlayerRatings;
+		// Basketball: his ape index (inches) and the player type his ratings were drawn for
+		apeIndex?: number;
+		build?: string;
 	}>({
 		baseball: genRatingsBaseball(season, scoutingLevel),
 		basketball: genRatingsBasketball(season, scoutingLevel),
@@ -164,6 +167,8 @@ const genRatings = (season: number, scoutingLevel: number) => {
 	return {
 		heightInInches,
 		ratings,
+		apeIndex,
+		build,
 		// genPos,
 	};
 };

@@ -57,6 +57,9 @@ export type CollegeProspect = {
 	injuryHistory?: boolean;
 	// His durability trait score (Player Traits, 0-100, 50 average), when known: low durability means more pre-draft injuries
 	durability?: number;
+	// His hidden trajectory's lateness (playerTraits/development.ts, -1 early bloomer to 1 late bloomer), when known: it decides who can
+	// have the late bloomer story, so the story agrees with how he develops and ages
+	lateness?: number;
 };
 
 export type GameBox = {

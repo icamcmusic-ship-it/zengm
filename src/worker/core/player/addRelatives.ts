@@ -15,6 +15,20 @@ import {
 } from "../../util/romanNumerals.ts";
 import { generateFace } from "../../util/face.ts";
 import { randInt, choice } from "../../../common/random.ts";
+import { inheritFromRelative } from "./heredity.ts";
+
+// Family heredity: he takes after his father or brother in size, athleticism and a few trait seeds (heredity.ts), then his ovr, pot,
+// position and value are recomputed
+const inherit = async (
+	p: Player,
+	relative: Player,
+	kind: "father" | "brother",
+) => {
+	if (inheritFromRelative(p, relative, kind)) {
+		await player.develop(p, 0, true);
+		await player.updateValues(p);
+	}
+};
 
 const parseLastName = (lastName: string): [string, number | undefined] => {
 	const parts = lastName.split(" ");
@@ -275,6 +289,7 @@ export const makeSon = async (p: Player) => {
 		name: `${p.firstName} ${p.lastName}`,
 	});
 	await makeSimilar(father, p);
+	await inherit(p, father, "father");
 	await idb.cache.players.put(p);
 	await idb.cache.players.put(father);
 };
@@ -381,6 +396,7 @@ export const makeBrother = async (p: Player) => {
 		name: `${p.firstName} ${p.lastName}`,
 	});
 	await makeSimilar(brother, p);
+	await inherit(p, brother, "brother");
 	await idb.cache.players.put(p);
 	await idb.cache.players.put(brother);
 };
