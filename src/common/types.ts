@@ -1165,6 +1165,18 @@ export type OwnerMood = {
 	wins: number;
 };
 
+// The end-of-season owner evaluation as it was applied (worker/core/season/updateOwnerMood), stored on that season's teamSeason so the
+// evaluation breakdown shows what really happened and running the evaluation again doesn't apply it twice
+export type OwnerEvaluation = {
+	// Millions of dollars: the profit the owner judged (project payments left out) and the baseline he expected that season
+	profit: number;
+	expectedProfit: number;
+	deltas: OwnerMood;
+	cappedDeltas: OwnerMood;
+	// False in the grace period or God Mode, when the mood isn't changed
+	applied: boolean;
+};
+
 export type MessageWithoutKey = {
 	mid?: number;
 	from: string;
@@ -1174,6 +1186,8 @@ export type MessageWithoutKey = {
 	tid?: number;
 	subject?: string;
 	ownerMoods?: OwnerMood[];
+	// Season of each entry of ownerMoods (missing in old messages, which assume consecutive seasons ending at year)
+	ownerMoodSeasons?: number[];
 };
 
 export type Message = {
@@ -2775,8 +2789,9 @@ export type TeamSeasonWithoutKey = {
 	// Realistic AI Economy: cash the owner took out this season (thousands of dollars). Not an expense, so it doesn't lower profit, but
 	// cash change = revenue - expenses - ownerDistributions
 	ownerDistributions?: number;
-	// Owner's Office (League Extra): arena/facilities project payments this season (an expense, in profit), and the owner's goals
-	// from the preseason budget meeting (common/ownerOffice.ts)
+	// Owner's Office (League Extra): arena/facilities project payments this season (an expense, in profit, but not in the profit the
+	// owner judges: common/teamSeasonFinances.ts seasonOwnerJudgedProfit), and the owner's goals from the preseason budget meeting
+	// (common/ownerOffice.ts)
 	projectExpenses?: number;
 	ownerGoals?: import("./ownerOffice.ts").OwnerGoals;
 	payrollEndOfSeason: number;
@@ -2784,6 +2799,7 @@ export type TeamSeasonWithoutKey = {
 	// has no GM object). An AI GM's award is stored on the GM instead (Gm.awards)
 	execOfTheYear?: { name: string; user: boolean };
 	ownerMood?: OwnerMood;
+	ownerEvaluation?: OwnerEvaluation;
 	// Power rankings snapshots taken about once a week during the regular season, used for movement arrows and the rank-over-time chart
 	powerRankHistory?: {
 		day: number;

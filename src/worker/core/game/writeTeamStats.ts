@@ -7,6 +7,7 @@ import {
 import {
 	ownerOfficeEnabled,
 	payGame as payOwnerProjectGame,
+	trackPayrollGame,
 } from "../ownerOffice/index.ts";
 import {
 	commercialEnabled,
@@ -314,6 +315,10 @@ const writeTeamStats = async (results: GameResults) => {
 		const projectPaid = ownerOfficeEnabled()
 			? payOwnerProjectGame(t, teamSeason)
 			: 0;
+		// Owner's Office: the payroll ceiling is judged on the whole season's payroll, not just the end of it
+		if (ownerOfficeEnabled()) {
+			await trackPayrollGame(t.tid, teamSeason);
+		}
 		const expenses =
 			salaryPaid +
 			scoutingPaid +

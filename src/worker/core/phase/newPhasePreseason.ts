@@ -332,6 +332,10 @@ const newPhasePreseason = async (
 		}
 	}
 
+	// Commercial Deals & Ownership: ownership sales (seeded streams) before the AI budgets below, so a sold team's budget follows the
+	// new owner's type this season, not the old one's
+	await commercial.onPreseasonSales();
+
 	const activeTeams = teams.filter((t) => !t.disabled);
 	const popRanks = helpers.getPopRanks(activeTeams);
 	for (const [t, popRank] of Iterator.zip([activeTeams, popRanks], {
@@ -411,8 +415,8 @@ const newPhasePreseason = async (
 	}
 
 	// Owner's Office: finished projects, the owner's budget meeting, AI projects (seeded, not the main random stream)
-	// Commercial Deals & Ownership: ownership sales and deal renewals (seeded streams). Before the Owner's Office, whose goals follow
-	// the owner's type
+	// Commercial Deals & Ownership: deal renewals (seeded streams; sales ran above, so the Owner's Office goals follow the new owner's
+	// type)
 	await commercial.onPreseason();
 	await ownerOffice.onPreseason();
 
