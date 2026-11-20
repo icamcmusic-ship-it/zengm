@@ -10,7 +10,7 @@ import type {
 } from "../../../common/staffDepth/types.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
-import { getTeamStaff, userFire, userHire } from "../staff/index.ts";
+import { userHire } from "../staff/index.ts";
 import { clearDepthCache, stateOf } from "./coaching.ts";
 import {
 	applyBoardRanks,
@@ -124,12 +124,16 @@ export const applyStaffAction = async (
 			break;
 		case "devPlans": {
 			const season =
-				g.get("phase") >= PHASE.PLAYOFFS
+				action.season ??
+				(g.get("phase") >= PHASE.PLAYOFFS
 					? g.get("season") + 1
-					: g.get("season");
+					: g.get("season"));
+			// Merged with plans already approved for the same season (a later proposal only covers players who were missing)
+			const prev =
+				state.devAccepted?.season === season ? state.devAccepted.plans : {};
 			t.staffDepth = {
 				...state,
-				devAccepted: { season, plans: action.plans },
+				devAccepted: { season, plans: { ...prev, ...action.plans } },
 			};
 			await idb.cache.teams.put(t);
 			break;
@@ -140,16 +144,14 @@ export const applyStaffAction = async (
 			});
 			break;
 		case "hire": {
-			const staff = await getTeamStaff(t.tid);
-			const current = staff[action.role];
-			if (current) {
-				await userFire({ cid: current.cid, tid: t.tid });
-			}
+			// Hire first, then let the current coach go: if the hire fails (he signed elsewhere, was fired by you recently), the job
+			// stays filled and no buyout is paid
 			await userHire({
 				cid: action.cid,
 				role: action.role,
 				years: 3,
 				tid: t.tid,
+				replace: true,
 			});
 			clearDepthCache();
 			break;

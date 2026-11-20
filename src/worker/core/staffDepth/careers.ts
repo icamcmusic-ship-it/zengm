@@ -3,6 +3,7 @@
 // seasons); the head coach he worked under is his mentor, which makes coaching trees. Head coaches are only made as head coaches at league
 // creation. Seeded streams only for the new parts.
 import {
+	AI_SPEND_REFERENCE_RATINGS,
 	COACH_FREE_AGENT,
 	COACH_ROLE_NAMES,
 	coachOvr,
@@ -185,15 +186,31 @@ export const onCoachHired = async (c: Coach, tid: number, role: CoachRole) => {
 	return { text };
 };
 
-export const userHiringDelegation = async () => {
-	const tid = g.get("userTid");
+export const userHiringDelegation = async (tid = g.get("userTid")) => {
 	const t = await idb.cache.teams.get(tid);
 	return t && userControls(tid) ? stateOf(t).delegation.hiring : "auto";
 };
 
-// After the offseason market: with hiring on Suggest, the staff proposes a candidate for each of the user's vacancies
+// The user's teams (all of them in multi team mode) whose hiring is delegated (Auto)
+export const userAutoHiringTids = async () => {
+	const tids = new Set<number>();
+	for (const tid of g.get("userTids")) {
+		if ((await userHiringDelegation(tid)) === "auto") {
+			tids.add(tid);
+		}
+	}
+	return tids;
+};
+
+// After the offseason market: with hiring on Suggest, the staff proposes a candidate for each of the user's vacancies (every user
+// team in multi team mode)
 export const afterCoachingMarket = async () => {
-	const tid = g.get("userTid");
+	for (const tid of g.get("userTids")) {
+		await suggestHiresFor(tid);
+	}
+};
+
+const suggestHiresFor = async (tid: number) => {
 	const t = await idb.cache.teams.get(tid);
 	if (!t || !userControls(tid)) {
 		return;
@@ -215,19 +232,7 @@ export const afterCoachingMarket = async () => {
 					(role !== "head" || isHeadEligible(c)) &&
 					coachSalaryDemand(c.ratings, role, salaryCap) <=
 						1.3 *
-							coachSalaryDemand(
-								{
-									dev: 60,
-									off: 60,
-									def: 60,
-									mot: 60,
-									sht: 60,
-									cnd: 60,
-									vid: 60,
-								},
-								role,
-								salaryCap,
-							),
+							coachSalaryDemand(AI_SPEND_REFERENCE_RATINGS, role, salaryCap),
 			)
 			.sort((a, b) => coachOvr(b.ratings, role) - coachOvr(a.ratings, role))[0];
 		if (best) {

@@ -405,12 +405,25 @@ const developmentSection = async (tid: number) => {
 	const nextSeason =
 		g.get("phase") > PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
 	const report = state.devReport;
-	const rows = report?.rows ?? [];
+	// No Visible Ratings challenge: the report says who worked on what, but not the rating numbers (like every other page)
+	const hideRatings = !!g.get("challengeNoRatings");
+	const rawRows = report?.rows ?? [];
+	const rows = rawRows.map((r) =>
+		hideRatings
+			? {
+					...r,
+					focusBefore: null,
+					focusAfter: null,
+					ovrBefore: null,
+					ovrAfter: null,
+				}
+			: r,
+	);
 	const avgFocus =
-		rows.length > 0
+		!hideRatings && rawRows.length > 0
 			? Math.round(
-					(10 * rows.reduce((a, r) => a + r.focusAfter - r.focusBefore, 0)) /
-						rows.length,
+					(10 * rawRows.reduce((a, r) => a + r.focusAfter - r.focusBefore, 0)) /
+						rawRows.length,
 				) / 10
 			: undefined;
 	// The plans that will run at the next development (preseason)
@@ -419,7 +432,8 @@ const developmentSection = async (tid: number) => {
 			? g.get("season") + 1
 			: g.get("season") + 1;
 	const plans = players
-		.sort((a, b) => b.value - a.value)
+		// Scouted value, so the order doesn't leak hidden ratings
+		.sort((a, b) => b.valueFuzz - a.valueFuzz || a.pid - b.pid)
 		.map((p) => {
 			const plan = planFor(p, planSeason, state);
 			const staff = staffFocusFor(p, planSeason, state.devPriority);
@@ -457,6 +471,7 @@ const developmentSection = async (tid: number) => {
 		season: report?.season,
 		rows,
 		avgFocus,
+		hideRatings,
 		plans,
 		planSeason,
 		devPriority: state.devPriority,

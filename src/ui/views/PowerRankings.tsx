@@ -74,7 +74,7 @@ const PowerRankings = ({
 	const [showHealthy, setShowHealthy] = useState(true);
 	const actualShowHealthy = showHealthy || currentSeason !== season;
 
-	const [otherKeys, otherKeysTitle, otherKeysPrefix] = bySport({
+	const [allOtherKeys, otherKeysTitle, otherKeysPrefix] = bySport({
 		baseball: [
 			POSITIONS.filter((pos) => pos !== "DH"),
 			"Position Ranks",
@@ -88,6 +88,9 @@ const PowerRankings = ({
 		],
 		hockey: [POSITIONS, "Position Ranks", "pos"],
 	});
+
+	// No Visible Ratings challenge: no rating/position rank columns, they'd leak the hidden ratings
+	const otherKeys: string[] = challengeNoRatings ? [] : allOtherKeys;
 
 	const superCols = [
 		{
@@ -121,7 +124,7 @@ const PowerRankings = ({
 			),
 			colspan: otherKeys.length,
 		},
-	];
+	].filter((superCol) => superCol.colspan > 0);
 
 	const colNames = [
 		"#",

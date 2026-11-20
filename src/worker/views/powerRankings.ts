@@ -1,5 +1,6 @@
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
+import { bySport } from "../../common/sportFunctions.ts";
 import type { TeamFiltered } from "../../common/types.ts";
 import { defineView } from "../util/defineView.ts";
 import { player, team } from "../core/index.ts";
@@ -49,6 +50,56 @@ const otherToRanks = (
 			}
 		}
 	}
+};
+
+// How much a point (goal, run) of margin of victory is worth next to the rating term. Basketball is the reference (1, so its
+// rankings are unchanged); in low scoring sports a goal or run is worth much more, otherwise MOV barely counts there
+export const MOV_SCALE = bySport({
+	baseball: 7,
+	basketball: 1,
+	football: 1,
+	hockey: 10,
+});
+
+// Wins and games played in a "last ten" string (W-L, W-L-OTL, W-L-T or W-L-OTL-T)
+export const parseLastTen = (lastTen: string) => {
+	const parts = lastTen.split("-").map((x) => Number.parseInt(x));
+	if (parts.length === 0 || parts.some((x) => Number.isNaN(x))) {
+		return { won: 0, played: 0 };
+	}
+	return {
+		won: parts[0]!,
+		played: parts.reduce((a, b) => a + b, 0),
+	};
+};
+
+export const getPowerRankingsScore = ({
+	mov,
+	gp,
+	numGames,
+	ovr,
+	lastTen,
+}: {
+	mov: number;
+	gp: number;
+	numGames: number;
+	ovr: number;
+	lastTen: string;
+}) => {
+	// Start with MOV, scaled for games played (and per sport)
+	let score = numGames > 0 ? (MOV_SCALE * mov * gp) / numGames : 0;
+
+	// Add estimated MOV from ovr (0/100 to -30/30)
+	score += ovr * 0.6 - 30;
+
+	// Modulate by recent record: +10 for winning all of the last 10 and -10 for losing all of them, by the games actually played (a
+	// team 3-0 in its first 3 games gets +10, not -4)
+	const { won, played } = parseLastTen(lastTen);
+	if (played > 0) {
+		score += 10 * ((2 * won) / played - 1);
+	}
+
+	return score;
 };
 
 export const addPowerRankingsStuffToTeams = async <
@@ -135,22 +186,14 @@ export const addPowerRankingsStuffToTeams = async <
 			playoffs: playoffs === "playoffs",
 		});
 
-		// Calculate score
-
-		// Start with MOV, scaled for games played
-		let score = (t.stats.mov * t.stats.gp) / g.get("numGames", season);
-
-		// Add estimated MOV from ovr (0/100 to -30/30)
-		const estimatedMOV = ovr * 0.6 - 30;
-		score += estimatedMOV;
-		let winsLastTen = Number.parseInt(t.seasonAttrs.lastTen.split("-")[0]!);
-
-		if (Number.isNaN(winsLastTen)) {
-			winsLastTen = 0;
-		}
-
-		// Modulate point differential by recent record: +10 for 10-0 in last 10 and -10 for 0-10
-		score += -10 + 2 * winsLastTen;
+		// Injury-aware rating in the current season (who can actually play now), healthy rating for past seasons
+		const score = getPowerRankingsScore({
+			mov: t.stats.mov,
+			gp: t.stats.gp,
+			numGames: g.get("numGames", season),
+			ovr: currentSeason ? ovrCurrent : ovr,
+			lastTen: t.seasonAttrs.lastTen,
+		});
 
 		const other: Record<string, number> = {};
 		const otherCurrent: Record<string, number> = {};
@@ -316,6 +359,14 @@ export default defineView({
 							: undefined,
 				};
 			});
+
+			// No Visible Ratings challenge: the rating/position ranks are hidden, so don't send them either
+			if (g.get("challengeNoRatings")) {
+				for (const t of teamsWithRankings) {
+					t.powerRankings.other = {};
+					t.powerRankings.otherCurrent = {};
+				}
+			}
 
 			let ties = false;
 			let otl = false;

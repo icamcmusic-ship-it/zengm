@@ -305,7 +305,7 @@ export const staffFocusFor = (
 /**
  * The plan of one player for a season's development, or undefined (Manual delegation and no override, or a free agent/prospect).
  * User's team: his override, else by delegation (Auto: the staff with the team priority; Suggest: the approved plans, else last season's
- * focus; Manual: none). AI teams: the staff's.
+ * focus, else the staff's; Manual: none). AI teams: the staff's.
  */
 export const planFor = (
 	p: Pick<Player, "pid" | "ratings" | "born" | "tid" | "devPlan">,
@@ -334,9 +334,15 @@ export const planFor = (
 		if (accepted) {
 			return { f: accepted, src: "staff" };
 		}
-		return p.devPlan && p.devPlan.s === season - 1
-			? { f: p.devPlan.f, src: p.devPlan.src }
-			: undefined;
+		if (p.devPlan && p.devPlan.s === season - 1) {
+			return { f: p.devPlan.f, src: p.devPlan.src };
+		}
+		// Nothing approved and no plan last season (a draftee, a signing or a trade arrival after the proposal): the staff's plan, so
+		// nobody goes without one
+		return {
+			f: staffFocusFor(p, season, state.devPriority),
+			src: state.devPriority ? "team" : "staff",
+		};
 	}
 	return {
 		f: staffFocusFor(p, season, state.devPriority),
