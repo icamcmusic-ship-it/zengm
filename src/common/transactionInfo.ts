@@ -164,6 +164,18 @@ export const types: Partial<
 		text: "Luxury Tax Dist",
 		category: "team",
 	},
+	ownerSale: {
+		text: "Ownership",
+		category: "team",
+	},
+	commercialDeal: {
+		text: "Commercial Deal",
+		category: "team",
+	},
+	revenueSharing: {
+		text: "Revenue Sharing",
+		category: "team",
+	},
 	minPayroll: {
 		text: "Minimum Payroll",
 		category: "team",

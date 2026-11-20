@@ -1140,6 +1140,9 @@ export type LogEventType =
 	| "luxuryTax"
 	| "luxuryTaxDist"
 	| "ownerDistribution"
+	| "ownerSale"
+	| "commercialDeal"
+	| "revenueSharing"
 	| "minPayroll"
 	| "undo"
 	| "contractOption"
@@ -2486,6 +2489,8 @@ export type Team = {
 	frontOffice?: Record<"analytics" | "travel", number>;
 	// Owner's Office (League Extra): arena/facilities projects (common/ownerOffice.ts)
 	ownerOffice?: import("./ownerOffice.ts").OwnerOfficeTeam;
+	// Commercial Deals & Ownership (League Extra): sponsorship/local TV deals and the owner's type (common/commercial.ts)
+	commercial?: import("./commercial.ts").CommercialTeam;
 	// Scouting Director & Regions / Coaching Staff Depth: the user's priorities, delegation, suggestions and reports (common/staffDepth)
 	staffDepth?: import("./staffDepth/types.ts").StaffDepthTeam;
 	// Offensive Emphasis (League Extra): the team's play-type dials and who sets them (common/offEmphasis.ts)
@@ -2733,6 +2738,10 @@ export type TeamSeasonWithoutKey = {
 		ticket: number;
 		nationalTv: number;
 		localTv: number;
+		// Commercial Deals & Ownership (League Extra): multi-year deal payments and the revenue sharing payout
+		sponsorDeal?: number;
+		localTvDeal?: number;
+		revenueSharing?: number;
 	};
 	expenses: {
 		luxuryTax: number;
@@ -2742,6 +2751,8 @@ export type TeamSeasonWithoutKey = {
 		health: number;
 		facilities: number;
 		scouting: number;
+		// Commercial Deals & Ownership: the contribution to the revenue sharing pool
+		revenueSharing?: number;
 	};
 	// These are cumsums per game, divide by gp for the average
 	expenseLevels: {

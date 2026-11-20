@@ -46,6 +46,7 @@ import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { getAdjustedTicketPrice } from "../../../common/getAdjustedTicketPrice.ts";
 import { FrontOfficeDepartments, FrontOfficeReview } from "./FrontOffice.tsx";
 import { OwnerOffice } from "./OwnerOffice.tsx";
+import { Commercial, SeasonPnl } from "./Commercial.tsx";
 
 const paddingLeft85 = { paddingLeft: 85 };
 
@@ -823,6 +824,8 @@ const TeamFinances = ({
 	capExceptions,
 	repeaterTax,
 	coachingStaff,
+	commercial,
+	pnl,
 	frontOffice,
 	ownerOffice,
 	barData,
@@ -1051,14 +1054,28 @@ const TeamFinances = ({
 						<div id="bar-graph-revenue" className="bar-graph-large">
 							<BarGraph
 								data={barData}
-								y={[
-									"revenuesNationalTv",
-									"revenuesLocalTv",
-									"revenuesTicket",
-									"revenuesSponsor",
-									"revenuesMerch",
-									"revenuesLuxuryTaxShare",
-								]}
+								y={
+									commercial
+										? [
+												"revenuesNationalTv",
+												"revenuesLocalTv",
+												"revenuesLocalTvDeal",
+												"revenuesTicket",
+												"revenuesSponsor",
+												"revenuesSponsorDeal",
+												"revenuesMerch",
+												"revenuesLuxuryTaxShare",
+												"revenuesRevenueSharing",
+											]
+										: [
+												"revenuesNationalTv",
+												"revenuesLocalTv",
+												"revenuesTicket",
+												"revenuesSponsor",
+												"revenuesMerch",
+												"revenuesLuxuryTaxShare",
+											]
+								}
 								tooltip={(row, y) => {
 									const text = {
 										revenuesNationalTv: "national TV revenue",
@@ -1067,6 +1084,9 @@ const TeamFinances = ({
 										revenuesSponsor: "corporate sponsorship revenue",
 										revenuesMerch: "merchandising revenue",
 										revenuesLuxuryTaxShare: "luxury tax share revenue",
+										revenuesLocalTvDeal: "local TV deal revenue",
+										revenuesSponsorDeal: "sponsorship deal revenue",
+										revenuesRevenueSharing: "revenue sharing payout",
 									};
 
 									return `${row.season} ${text[y]}: ${helpers.formatCurrency(
@@ -1094,6 +1114,7 @@ const TeamFinances = ({
 									"expensesProjects",
 									"expensesMinTax",
 									"expensesLuxuryTax",
+									...(commercial ? (["expensesRevenueSharing"] as const) : []),
 								]}
 								tooltip={(row, y) => {
 									const text = {
@@ -1107,6 +1128,7 @@ const TeamFinances = ({
 										expensesProjects: "arena & facilities projects",
 										expensesMinTax: "minimum payroll tax",
 										expensesLuxuryTax: "luxury tax",
+										expensesRevenueSharing: "revenue sharing contribution",
 									};
 
 									return `${row.season} ${text[y]}: ${helpers.formatCurrency(
@@ -1169,6 +1191,16 @@ const TeamFinances = ({
 					disabled={gameSimInProgress}
 				/>
 			) : null}
+
+			{budget && commercial ? (
+				<Commercial
+					info={commercial}
+					own={tid === userTid}
+					disabled={gameSimInProgress}
+				/>
+			) : null}
+
+			{budget && pnl && pnl.length > 0 ? <SeasonPnl pnl={pnl} /> : null}
 
 			<h2>Player Salaries</h2>
 

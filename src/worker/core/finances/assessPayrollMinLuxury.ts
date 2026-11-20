@@ -6,6 +6,7 @@ import { ownerDistribution } from "./ownerDistribution.ts";
 import getLuxuryTaxAmount from "./getLuxuryTaxAmount.ts";
 import getMinPayrollAmount from "./getMinPayrollAmount.ts";
 import { isRepeaterTaxTeam } from "../contract/capExceptions.ts";
+import { shareRevenue } from "../commercial/index.ts";
 
 const rosterLink = (tid: number) =>
 	`<a href="${helpers.leagueUrl([
@@ -132,6 +133,9 @@ const assessPayrollMinLuxury = async () => {
 			}
 		}
 	}
+
+	// Commercial Deals & Ownership: the revenue sharing pool (before owner distributions, which depend on cash)
+	shareRevenue(teamSeasons);
 
 	// Realistic AI Economy: AI owners take out most of the cash above a reserve, so it doesn't grow without bound
 	if (featureOn("realisticEconomy")) {

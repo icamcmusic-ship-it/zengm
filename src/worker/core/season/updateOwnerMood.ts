@@ -13,6 +13,8 @@ import {
 import * as college from "../college/index.ts";
 import { ownerOfficeEnabled } from "../ownerOffice/index.ts";
 import { evaluateOwnerGoals } from "../../../common/ownerOffice.ts";
+import { commercialEnabled, getOwnerType } from "../commercial/index.ts";
+import { OWNER_TYPES } from "../../../common/commercial.ts";
 
 /**
  * Update teamSeason.ownerMood based on performance this season, only for user's team.
@@ -124,6 +126,17 @@ const updateOwnerMood = async (): Promise<
 		deltas.wins += result.moodDeltas.wins;
 		deltas.money += result.moodDeltas.money;
 		await idb.cache.teamSeasons.put(teamSeason);
+	}
+
+	// Commercial Deals & Ownership: the owner's type weighs the three parts of his mood differently
+	if (commercialEnabled()) {
+		const tRaw = await idb.cache.teams.get(g.get("userTid"));
+		if (tRaw) {
+			const weights = OWNER_TYPES[getOwnerType(tRaw)].moodWeights;
+			deltas.wins *= weights.wins;
+			deltas.playoffs *= weights.playoffs;
+			deltas.money *= weights.money;
+		}
 	}
 
 	// College mode: the season is judged against what the program's prestige predicts

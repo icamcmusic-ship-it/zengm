@@ -18,7 +18,16 @@ import {
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateOption, validateTeam } from "../util/processInputs.ts";
 import { dropdownKeys } from "../../common/dropdownKeys.ts";
-import { seasonProfit } from "../../common/teamSeasonFinances.ts";
+import {
+	seasonExpenses,
+	seasonFrontOfficeExpenses,
+	seasonProfit,
+	seasonRevenue,
+} from "../../common/teamSeasonFinances.ts";
+import {
+	commercialEnabled,
+	getFinancesInfo as getCommercialInfo,
+} from "../core/commercial/index.ts";
 import {
 	frontOfficeEnabled,
 	getFinancesInfo,
@@ -149,13 +158,13 @@ export default defineView({
 					const outputKey = `revenues${helpers.upperCaseFirstLetter(
 						key,
 					)}` as const;
-					output[outputKey] = value;
+					output[outputKey] = value ?? 0;
 				}
 				for (const [key, value] of helpers.entries(teamSeason.expenses)) {
 					const outputKey = `expenses${helpers.upperCaseFirstLetter(
 						key,
 					)}` as const;
-					output[outputKey] = value;
+					output[outputKey] = value ?? 0;
 				}
 				return output;
 			};
@@ -188,6 +197,11 @@ export default defineView({
 					ownerDistributions: teamSeason.ownerDistributions ?? 0,
 					// Owner's Office arena/facilities project payments (an expense, in profit)
 					expensesProjects: teamSeason.projectExpenses ?? 0,
+					// Commercial Deals & Ownership lines (0 when off or before the feature existed)
+					revenuesSponsorDeal: teamSeason.revenues.sponsorDeal ?? 0,
+					revenuesLocalTvDeal: teamSeason.revenues.localTvDeal ?? 0,
+					revenuesRevenueSharing: teamSeason.revenues.revenueSharing ?? 0,
+					expensesRevenueSharing: teamSeason.expenses.revenueSharing ?? 0,
 					profit: seasonProfit(teamSeason) / 1000, // convert to millions
 				};
 
@@ -287,7 +301,64 @@ export default defineView({
 					}
 				: undefined;
 
+			// Commercial Deals & Ownership: deals, owner and the season P&L / cash reconciliation of the shown seasons
+			const commercialInfo = await getCommercialInfo(inputs.tid);
+			const pnl = commercialEnabled()
+				? teamSeasons.slice(0, showInt).map((ts, i) => {
+						const revenue = seasonRevenue(ts);
+						const expense = seasonExpenses(ts);
+						const distributions = ts.ownerDistributions ?? 0;
+						const prev = teamSeasons[i + 1];
+						return {
+							season: ts.season,
+							revenues: [
+								["Tickets", ts.revenues.ticket],
+								["Merchandise", ts.revenues.merch],
+								["Sponsorship (per game)", ts.revenues.sponsor],
+								["Sponsorship deal", ts.revenues.sponsorDeal ?? 0],
+								["Local TV (per game)", ts.revenues.localTv],
+								["Local TV deal", ts.revenues.localTvDeal ?? 0],
+								["National TV", ts.revenues.nationalTv],
+								["Luxury tax share", ts.revenues.luxuryTaxShare ?? 0],
+								["Revenue sharing payout", ts.revenues.revenueSharing ?? 0],
+							] as [string, number][],
+							expenses: [
+								["Player salaries", ts.expenses.salary],
+								["Scouting", ts.expenses.scouting],
+								["Coaching", ts.expenses.coaching],
+								["Health", ts.expenses.health],
+								["Facilities", ts.expenses.facilities],
+								["Analytics", ts.frontOffice?.expenses.analytics ?? 0],
+								[
+									"Travel & sports science",
+									ts.frontOffice?.expenses.travel ?? 0,
+								],
+								["Arena & facilities projects", ts.projectExpenses ?? 0],
+								["Minimum payroll tax", ts.expenses.minTax],
+								["Luxury tax", ts.expenses.luxuryTax],
+								[
+									"Revenue sharing contribution",
+									ts.expenses.revenueSharing ?? 0,
+								],
+							] as [string, number][],
+							revenue,
+							expense,
+							frontOffice: seasonFrontOfficeExpenses(ts),
+							profit: revenue - expense,
+							distributions,
+							cashEnd: ts.cash,
+							// Cash at the start implied by this season's books, and the previous season's ending cash (any difference is
+							// a change made outside the books, like God Mode or a league file edit)
+							cashStart: ts.cash - (revenue - expense - distributions),
+							prevCashEnd:
+								prev && prev.season === ts.season - 1 ? prev.cash : undefined,
+						};
+					})
+				: undefined;
+
 			return {
+				commercial: commercialInfo,
+				pnl,
 				frontOffice,
 				ownerOffice: await getOwnerOfficeInfo(inputs.tid),
 				autoTicketPrice,

@@ -8,6 +8,10 @@ import {
 	ownerOfficeEnabled,
 	payGame as payOwnerProjectGame,
 } from "../ownerOffice/index.ts";
+import {
+	commercialEnabled,
+	payGame as payCommercialGame,
+} from "../commercial/index.ts";
 import { payContracts } from "../contract/index.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { player, season, team } from "../index.ts";
@@ -276,12 +280,21 @@ const writeTeamStats = async (results: GameResults) => {
 		nationalTvRevenue *= fudgeFactor * seasonLengthFactor;
 		localTvRevenue *= fudgeFactor * seasonLengthFactor;
 		ticketRevenue *= fudgeFactor * seasonLengthFactor;
+		// Commercial Deals & Ownership: in the regular season, sponsorship and local TV come from the team's multi-year deals (recorded in
+		// their own revenue lines) instead of the per-game formula. Playoff games still earn the usual amounts
+		let dealRevenue = 0;
+		if (commercialEnabled() && g.get("phase") !== PHASE.PLAYOFFS) {
+			sponsorRevenue = 0;
+			localTvRevenue = 0;
+			dealRevenue = await payCommercialGame(t, teamSeason, fudgeFactor);
+		}
 		const revenue =
 			merchRevenue +
 			sponsorRevenue +
 			nationalTvRevenue +
 			localTvRevenue +
-			ticketRevenue;
+			ticketRevenue +
+			dealRevenue;
 		// Front Office Budget: the Analytics and Travel & Sports Science departments (regular season games, like the others), and what the
 		// fatigue measurement of this game says Travel & Sports Science saved
 		let frontOfficePaid = 0;
