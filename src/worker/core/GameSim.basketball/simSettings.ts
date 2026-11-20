@@ -23,6 +23,13 @@ export const SIM_FIX_COMPOSITE_WEIGHTS: CompositeWeights<string> = {
 		ratings: [30, "hgt", "stre", "spd", "ins", "oiq"],
 		weights: [0.2, 1, 0.6, 0.2, 0.5, 0.4],
 	},
+	// How often he drives to the rim (stock: shootingAtRim, hgt 2, stre 0.3, dnk 0.3, oiq 0.2): height counts much less, quickness
+	// and ball handling count, so quick guards with a handle get to the rim more. The constant keeps the league's at-rim share
+	// about the same. The make still uses shootingAtRim
+	shootingAtRimSelect: {
+		ratings: [35, "hgt", "spd", "drb", "dnk", "oiq"],
+		weights: [0.5, 0.8, 0.4, 0.4, 0.3, 0.2],
+	},
 	// Make probability of a mid-range jumper. Offensive IQ only decides how often (above), not whether it goes in
 	shootingMidRangeMake: {
 		ratings: ["fg", "stre"],
@@ -47,6 +54,13 @@ export const SIM_FIX_EXPANDED_COMPOSITE_WEIGHTS: CompositeWeights<string> = {
 // matters more, intercepts so the league percentages stay the same
 export const SIM_FIX_MID_RANGE = { intercept: 0.343, slope: 0.5 };
 export const SIM_FIX_LOW_POST = { intercept: 0.253, slope: 0.5 };
+
+// Transition possessions (realistic possession model) lean toward the rim and away from post-ups
+export const SIM_FIX_TRANSITION = { rim: 1.6, post: 0.3 };
+
+// Rest at the breaks between periods (energy, 0-1, recovered by every player on the roster): quarter breaks and halftime. A bench
+// minute recovers 0.094, so these are like about half a minute and a minute and a half on the bench
+export const SIM_FIX_BREAK_REST = { quarter: 0.04, halftime: 0.12 };
 
 // The trailing team's boost (perfFactor = 1 - X tanh(diff / 60)), stock 0.2
 export const SIM_FIX_PERF_FACTOR = 0.1;

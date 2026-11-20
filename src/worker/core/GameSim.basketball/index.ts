@@ -5,7 +5,9 @@ import {
 	SIM_FIX_EXPANDED_SYNERGY_CUTOFFS,
 	SIM_FIX_LOW_POST,
 	SIM_FIX_MID_RANGE,
+	SIM_FIX_BREAK_REST,
 	SIM_FIX_PERF_FACTOR,
+	SIM_FIX_TRANSITION,
 } from "./simSettings.ts";
 import {
 	CLOSER_FACTOR,
@@ -1356,6 +1358,22 @@ class GameSim extends GameSimBase {
 			}
 
 			period += 1;
+
+			// Game Sim Fixes: everyone gets some rest at the break, more at halftime
+			if (this.simFixes) {
+				const rest =
+					period - 1 === Math.ceil(this.numPeriods / 2)
+						? SIM_FIX_BREAK_REST.halftime
+						: SIM_FIX_BREAK_REST.quarter;
+				for (const t of this.team) {
+					for (const p of t.player) {
+						p.stat.energy = Math.min(
+							1,
+							p.stat.energy + rest * (p.traitEffects?.energyRecoveryRate ?? 1),
+						);
+					}
+				}
+			}
 
 			this.team[0].stat.ptsQtrs.push(0);
 			this.team[1].stat.ptsQtrs.push(0);
@@ -4362,8 +4380,12 @@ class GameSim extends GameSimBase {
 					: 1) *
 				driveTilt *
 				(this.offEmph ? this.oe[this.o].rim : 1) *
+				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1) *
 				Math.random() *
-				(p.compositeRating.shootingAtRim +
+				((this.simFixes
+					? (p.compositeRating.shootingAtRimSelect ??
+						p.compositeRating.shootingAtRim)
+					: p.compositeRating.shootingAtRim) +
 					this.synergyFactor *
 						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)); // Synergy makes easy shots either more likely or less likely
 
@@ -4372,6 +4394,7 @@ class GameSim extends GameSimBase {
 				(this.playTypes ? PLAY_TYPES.post : 1) *
 				(this.offEmph ? this.oe[this.o].post : 1) *
 				postTilt *
+				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.post : 1) *
 				Math.random() *
 				((this.simFixes
 					? (p.compositeRating.shootingLowPostSelect ??
