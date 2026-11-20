@@ -6,6 +6,7 @@
 import { PHASE } from "../../../common/constants.ts";
 import { gauss, randInt, truncGauss } from "../../../common/random.ts";
 import {
+	AI_SPEND_REFERENCE_RATINGS,
 	COACH_FREE_AGENT,
 	COACH_RETIRED,
 	COACH_ROLE_NAMES,
@@ -46,7 +47,7 @@ import {
 	headCandidateBonus,
 	isHeadEligible,
 	onCoachHired,
-	userHiringDelegation,
+	userAutoHiringTids,
 } from "../staffDepth/careers.ts";
 import {
 	adaptSystems,
@@ -309,6 +310,26 @@ const logHeadCoachEvent = async (text: string, tid: number) => {
 	});
 };
 
+// News when an assistant leaves a staff (head coaches have their own items). Shown as a notification to the user when it's his staff
+const logAssistantDeparture = async (
+	c: Coach,
+	tid: number,
+	role: CoachRole,
+	how: string,
+) => {
+	if (role === "head") {
+		return;
+	}
+	const user = g.get("userTids").includes(tid);
+	await logEvent({
+		type: "info",
+		text: `${COACH_ROLE_NAMES[role]} ${coachLink(c)} ${how} ${teamLink(tid)}.`,
+		showNotification: user && !g.get("spectator"),
+		tids: [tid],
+		score: 0,
+	});
+};
+
 export const teamLink = (tid: number) => {
 	const info = g.get("teamInfoCache")[tid];
 	if (!info) {
@@ -434,6 +455,8 @@ export const fire = async (c: Coach) => {
 			`${teamLink(tid)} fired head coach ${coachLink(c)}.`,
 			tid,
 		);
+	} else {
+		await logAssistantDeparture(c, tid, c.role, "was fired by");
 	}
 	clearDepthCache();
 	return buyout;
@@ -457,8 +480,8 @@ export const fillVacancies = async ({
 	skipTids?: Set<number>;
 	// Only these jobs (default: every job of the league)
 	roles?: CoachRole[];
-	// Coaching Staff Depth: the user's hiring is delegated (Auto), so his vacancies are filled too
-	userAuto?: boolean;
+	// Coaching Staff Depth: the user's teams whose hiring is delegated (Auto), so their vacancies are filled too
+	userAuto?: Set<number>;
 }) => {
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const salaryCap = g.get("salaryCap");
@@ -498,7 +521,7 @@ export const fillVacancies = async ({
 			if (filled.has(`${t.tid}-${role}`)) {
 				continue;
 			}
-			if (!includeUser && userControlsTeam(t.tid) && !userAuto) {
+			if (!includeUser && userControlsTeam(t.tid) && !userAuto?.has(t.tid)) {
 				continue;
 			}
 			if (role === "head" && skipTids?.has(t.tid)) {
@@ -531,7 +554,9 @@ export const fillVacancies = async ({
 
 			const maxSpend =
 				coachSalaryDemand(
-					{ dev: 60, off: 60, def: 60, mot: 60 },
+					// Every rating at 60, including the Staff Depth jobs' own ratings (otherwise those
+					// jobs read the 40 default and AI teams can't afford good shooting/S&C/video coaches)
+					AI_SPEND_REFERENCE_RATINGS,
 					role,
 					salaryCap,
 				) *
@@ -582,6 +607,14 @@ export const fillVacancies = async ({
 			if (prevTid >= 0) {
 				// Promoted or hired away: his old job is open now
 				filled.delete(`${prevTid}-${prevRole}`);
+				if (prevTid !== t.tid) {
+					await logAssistantDeparture(
+						choice,
+						prevTid,
+						prevRole,
+						`was hired away as ${COACH_ROLE_NAMES[role]} of ${teamLink(t.tid)}, leaving`,
+					);
+				}
 			}
 			const idx = freeAgents.indexOf(choice);
 			if (idx >= 0) {
@@ -881,6 +914,8 @@ const retire = async (c: Coach) => {
 				`Head coach ${coachLink(c)} of ${teamLink(tid)} retired.`,
 				tid,
 			);
+		} else {
+			await logAssistantDeparture(c, tid, c.role, "retired from");
 		}
 	}
 	c.tid = COACH_RETIRED;
@@ -972,6 +1007,13 @@ export const runOffseason = async () => {
 						`Head coach ${coachLink(c)} left ${teamLink(tid)} when his contract expired.`,
 						tid,
 					);
+				} else {
+					await logAssistantDeparture(
+						c,
+						tid,
+						c.role,
+						"left at the end of his contract with",
+					);
 				}
 			}
 			continue;
@@ -1025,7 +1067,7 @@ export const runOffseason = async () => {
 	await fillVacancies({
 		includeUser: false,
 		skipTids: held,
-		userAuto: coachingDepthOn() && (await userHiringDelegation()) === "auto",
+		userAuto: coachingDepthOn() ? await userAutoHiringTids() : undefined,
 	});
 	if (coachingDepthOn()) {
 		await afterCoachingMarket();
@@ -1056,6 +1098,25 @@ export const onPreseason = async () => {
 	await syncAllBudgets();
 };
 
+// A team folds (contraction): its coaches go back on the market, their contracts end with the team
+export const releaseTeamCoaches = async (tid: number) => {
+	const coaches = await idb.cache.coaches.indexGetAll("coachesByTid", tid);
+	if (coaches.length === 0) {
+		return;
+	}
+	for (const c of coaches) {
+		addTransaction(c, tid, c.role, "left");
+		c.tid = COACH_FREE_AGENT;
+		c.hiredRecord = undefined;
+		await idb.cache.coaches.put(c);
+	}
+	clearCoachSystemsCache();
+	clearDepthCache();
+	if (staffEnabled()) {
+		await syncAllBudgets();
+	}
+};
+
 // User actions
 
 const getUserCoach = async (cid: number) => {
@@ -1071,11 +1132,15 @@ export const userHire = async ({
 	role,
 	years,
 	tid,
+	replace,
 }: {
 	cid: number;
 	role: CoachRole;
 	years: number;
 	tid: number;
+	// Replace the current holder of the job: the new coach is hired first, and the old one is only fired (buyout paid) once the
+	// hire went through, so a failed hire never leaves the job empty
+	replace?: boolean;
 }) => {
 	if (!staffEnabled()) {
 		throw new Error("Coaching staff is disabled");
@@ -1090,12 +1155,20 @@ export const userHire = async ({
 		);
 	}
 	const staff = await getTeamStaff(tid);
-	if (staff[role]) {
+	const previous = staff[role];
+	if (previous && !replace) {
 		throw new Error(
 			`You already have a ${COACH_ROLE_NAMES[role]}. Fire him first.`,
 		);
 	}
 	await hire(c, tid, role, helpers.bound(Math.round(years), 1, 5));
+	if (previous && previous.cid !== c.cid) {
+		const old = await idb.cache.coaches.get(previous.cid);
+		if (old && old.tid === tid && old.role === role) {
+			await fire(old);
+			clearCoachSystemsCache();
+		}
+	}
 	// The league's average staff changed too, so every team's level is relative to the new average
 	await syncAllBudgets();
 };

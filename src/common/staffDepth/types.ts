@@ -33,7 +33,12 @@ export type FocusKey =
 export type SuggestionAction =
 	| { type: "assignRegions"; assignments: Record<number, ScoutRegion> }
 	| { type: "setPriority"; priority: ScoutPriority }
-	| { type: "devPlans"; plans: Record<number, FocusKey> }
+	| {
+			type: "devPlans";
+			plans: Record<number, FocusKey>;
+			// The development season these plans are for (default: the next one from the current phase)
+			season?: number;
+	  }
 	| { type: "teamDevPriority"; focus: FocusKey | "none" }
 	| { type: "hire"; cid: number; role: CoachRole }
 	| { type: "board"; ranks: Record<number, number> }
@@ -93,7 +98,15 @@ export type ScoutCareerTeam = {
 	cuts: Record<number, number>;
 	cutWhy?: Record<number, "poached" | "promoted" | "retired">;
 	// Directors of Scouting, oldest first (a scout id: his own chain, promoted from a slot, or hired away from another team)
-	dirs: { id: number; since: number; how: "hired" | "promoted" | "poached" }[];
+	dirs: {
+		id: number;
+		since: number;
+		how: "hired" | "promoted" | "poached";
+		// A scout who moved up (promoted or poached): his quality and age when he started the job, so he keeps both (missing in old
+		// leagues and for outside hires, which come from the seeded chain)
+		q?: number;
+		age?: number;
+	}[];
 	// Reputation swings from "our guy" calls, by scout id
 	rep: Record<number, number>;
 	// Favourite prospects of each scout ("our guy"), by class

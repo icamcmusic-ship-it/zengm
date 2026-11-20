@@ -8,7 +8,7 @@ import {
 	stateOf,
 	userControls,
 } from "./coaching.ts";
-import { addSuggestion } from "./suggestions.ts";
+import { addSuggestion, removeSuggestion } from "./suggestions.ts";
 import {
 	afterDay as scoutingAfterDay,
 	afterNewPhase as scoutingAfterNewPhase,
@@ -28,9 +28,16 @@ const safely = async (what: string, fn: () => Promise<void>) => {
 	}
 };
 
-// Development delegation Suggest: after the playoffs the staff proposes next season's plans
-const proposeDevPlans = async () => {
-	const tid = g.get("userTid");
+// Development delegation Suggest: after the playoffs the staff proposes next season's plans. In the preseason it proposes again for
+// anyone still without an approved plan for next season (draftees, signings and trade arrivals since the last proposal)
+export const proposeDevPlans = async (missingOnly?: boolean) => {
+	// Every user team in multi team mode
+	for (const tid of g.get("userTids")) {
+		await proposeDevPlansFor(tid, missingOnly);
+	}
+};
+
+const proposeDevPlansFor = async (tid: number, missingOnly?: boolean) => {
 	const t = await idb.cache.teams.get(tid);
 	if (!t || !userControls(tid)) {
 		return;
@@ -41,26 +48,44 @@ const proposeDevPlans = async () => {
 	}
 	const season = g.get("season") + 1;
 	const players = await idb.cache.players.indexGetAll("playersByTid", tid);
+	const accepted =
+		state.devAccepted?.season === season ? state.devAccepted.plans : {};
+	const pending = state.suggestions?.find(
+		(x) => x.id === `dev-${season}` && x.action.type === "devPlans",
+	);
+	if (missingOnly && pending) {
+		// The full proposal is still waiting for an answer
+		return;
+	}
 	const plans: Record<number, FocusKey> = {};
 	const lines: string[] = [];
 	for (const p of players) {
 		if (state.devOverrides?.[p.pid]) {
 			continue;
 		}
+		if (missingOnly && accepted[p.pid]) {
+			continue;
+		}
 		const f = staffFocusFor(p, season, state.devPriority);
 		plans[p.pid] = f;
 		lines.push(`${p.firstName} ${p.lastName}: ${FOCUSES[f].name}`);
+	}
+	if (!missingOnly) {
+		// Replaced by the full proposal
+		await removeSuggestion(tid, `dev-${season}-missing`);
 	}
 	if (lines.length === 0) {
 		return;
 	}
 	await addSuggestion(tid, {
-		id: `dev-${season}`,
+		id: missingOnly ? `dev-${season}-missing` : `dev-${season}`,
 		area: "development",
 		season: g.get("season"),
-		title: `Development plans for ${season}`,
+		title: missingOnly
+			? `Development plans for ${season}: players without one`
+			: `Development plans for ${season}`,
 		text: lines.join("; "),
-		action: { type: "devPlans", plans },
+		action: { type: "devPlans", plans, season },
 		pending: true,
 	});
 };
@@ -70,7 +95,10 @@ export const afterNewPhase = async (phase: number) => {
 		await safely("scouting", () => scoutingAfterNewPhase(phase));
 	}
 	if (coachingDepthOn() && phase === PHASE.DRAFT_LOTTERY) {
-		await safely("development plans", proposeDevPlans);
+		await safely("development plans", () => proposeDevPlans());
+	}
+	if (coachingDepthOn() && phase === PHASE.PRESEASON) {
+		await safely("development plans", () => proposeDevPlans(true));
 	}
 };
 

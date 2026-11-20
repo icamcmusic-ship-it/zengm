@@ -272,8 +272,15 @@ const StaffReport = ({
 						{development.rows.length > 0 ? (
 							<>
 								<p className="small mb-1">
-									{development.season} offseason: average change in the
-									worked-on skills <b>{signed(development.avgFocus ?? 0)}</b>.
+									{development.season} offseason
+									{development.hideRatings ? (
+										"."
+									) : (
+										<>
+											: average change in the worked-on skills{" "}
+											<b>{signed(development.avgFocus ?? 0)}</b>.
+										</>
+									)}
 								</p>
 								<div className="table-responsive">
 									<table className="table table-sm small mb-2">
@@ -281,8 +288,12 @@ const StaffReport = ({
 											<tr>
 												<th>Player</th>
 												<th>Worked on</th>
-												<th>Skills</th>
-												<th>Ovr</th>
+												{development.hideRatings ? null : (
+													<>
+														<th>Skills</th>
+														<th>Ovr</th>
+													</>
+												)}
 											</tr>
 										</thead>
 										<tbody>
@@ -299,12 +310,16 @@ const StaffReport = ({
 																?.name
 														}
 													</td>
-													<td className="text-nowrap">
-														{r.focusBefore} → {r.focusAfter}
-													</td>
-													<td className="text-nowrap">
-														{r.ovrBefore} → {r.ovrAfter}
-													</td>
+													{development.hideRatings ? null : (
+														<>
+															<td className="text-nowrap">
+																{r.focusBefore} → {r.focusAfter}
+															</td>
+															<td className="text-nowrap">
+																{r.ovrBefore} → {r.ovrAfter}
+															</td>
+														</>
+													)}
 												</tr>
 											))}
 										</tbody>

@@ -117,6 +117,18 @@ export const bestRole = (
 	return best;
 };
 
+// Reference coach an AI team budgets for (scaled by its market): every rating at 60, including the Staff Depth jobs' own ratings
+// (otherwise those jobs read the 40 default and AI teams can't afford good shooting, S&C or video coaches)
+export const AI_SPEND_REFERENCE_RATINGS: CoachRatings = {
+	dev: 60,
+	off: 60,
+	def: 60,
+	mot: 60,
+	sht: 60,
+	cnd: 60,
+	vid: 60,
+};
+
 // Salary in thousands per season at the default $90M salary cap
 const BASE_SALARY: Record<CoachRole, number> = {
 	head: 5500,

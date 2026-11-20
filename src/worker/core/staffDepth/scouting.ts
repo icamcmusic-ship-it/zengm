@@ -23,6 +23,7 @@ import {
 import {
 	confidenceFromFactor,
 	effectiveQuality,
+	experienceBonus,
 	eventLooks,
 	fuzzFactorForLooks,
 	LOOKS_CARRY,
@@ -101,6 +102,15 @@ export const directorFor = (t: Team, season: number, level: number): Scout => {
 		9999,
 	);
 	s.tid = t.tid;
+	if (dir?.q !== undefined && dir.age !== undefined) {
+		// Promoted or hired away: the same scout as before the move, a little sharper for each year in the job
+		s.age = dir.age + Math.max(0, season - since);
+		s.quality = Math.min(
+			0.97,
+			dir.q + experienceBonus(Math.max(0, season - since)),
+		);
+		return s;
+	}
 	s.age += Math.max(0, season - since);
 	s.quality = effectiveQuality(s, season);
 	return s;
@@ -631,6 +641,18 @@ const BIAS_SCORE: Record<string, (r: any, p: Player) => number> = {
 	youth: (_r, p) => (p.draft.year - p.born.year <= 19 ? 2 : 0),
 };
 
+// A prospect's latest ratings as the user's scouts see them (fuzzed), so biases don't read hidden true ratings
+const scoutedRatings = (p: Player) => {
+	const r = p.ratings.at(-1) as any;
+	const out: Record<string, unknown> = { ...r };
+	for (const [key, value] of Object.entries(r)) {
+		if (typeof value === "number" && key !== "fuzz" && key !== "season") {
+			out[key] = fuzzRating(value, r.fuzz);
+		}
+	}
+	return out as any;
+};
+
 // Preseason: each scout picks 1-3 favourite prospects of the coming class, through his specialty and bias (never the consensus top 3)
 export const pickOurGuys = async () => {
 	const season = g.get("season");
@@ -638,7 +660,8 @@ export const pickOurGuys = async () => {
 		await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
 	)
 		.filter((p) => p.draft.year === season)
-		.sort((a, b) => b.value - a.value);
+		// Scouted value, not true value: "our guy" calls must not leak hidden ratings (No Visible Ratings, or just fuzz)
+		.sort((a, b) => b.valueFuzz - a.valueFuzz || a.pid - b.pid);
 	if (prospects.length < 10) {
 		return;
 	}
@@ -653,9 +676,9 @@ export const pickOurGuys = async () => {
 		for (const s of dept.scouts) {
 			const rng = new Rng(`ourGuy|${seed}|${s.id}|${season}`);
 			const scored = pool.map((p) => {
-				const r = p.ratings.at(-1) as any;
+				const r = scoutedRatings(p);
 				const region = regionOf(p);
-				let score = p.value + (BIAS_SCORE[s.bias]?.(r, p) ?? 0);
+				let score = p.valueFuzz + (BIAS_SCORE[s.bias]?.(r, p) ?? 0);
 				if (s.specialty === "international" && region === "intl") {
 					score += 4;
 				} else if (
@@ -695,7 +718,8 @@ export const runScoutCareers = async () => {
 	const season = g.get("season");
 	const seed = leagueSeed();
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
-	const userTid = g.get("userTid");
+	// Multi team mode: news for every user team
+	const userTids = g.get("userTids");
 	const acc = await scoutAccuracyById();
 	const news: { tids: number[]; text: string; user: boolean }[] = [];
 
@@ -737,7 +761,7 @@ export const runScoutCareers = async () => {
 					Math.round(100 * ((career.rep[call.sid] ?? 0) + 0.3)) / 100;
 				news.push({
 					tids: [t.tid],
-					user: t.tid === userTid,
+					user: userTids.includes(t.tid),
 					text: `Scout ${name} called it: ${link} was "his guy" in the ${call.s} class and became a star. His reputation soars.`,
 				});
 			} else if (verdict === "bust") {
@@ -745,7 +769,7 @@ export const runScoutCareers = async () => {
 					Math.round(100 * ((career.rep[call.sid] ?? 0) - 0.2)) / 100;
 				news.push({
 					tids: [t.tid],
-					user: t.tid === userTid,
+					user: userTids.includes(t.tid),
 					text: `Scout ${name} pounded the table for ${link} in the ${call.s} class. He busted, and it shows on ${name}'s reputation.`,
 				});
 			}
@@ -764,7 +788,7 @@ export const runScoutCareers = async () => {
 		const career = careerOf(t);
 		const rng = new Rng(`scoutCareer|${seed}|${t.tid}|${season}`);
 		const { dept } = await departmentOf(t, season);
-		const user = t.tid === userTid;
+		const user = userTids.includes(t.tid);
 		for (const s of dept.scouts) {
 			if (career.cuts[s.id] !== undefined) {
 				continue;
@@ -778,6 +802,13 @@ export const runScoutCareers = async () => {
 					season,
 					text: `${s.name} retired after ${season - s.since} seasons`,
 				});
+				if (userTids.includes(t.tid)) {
+					news.push({
+						tids: [t.tid],
+						user: true,
+						text: `Scout ${s.name} retired after ${season - s.since} seasons with the ${t.region} ${t.name}.`,
+					});
+				}
 				continue;
 			}
 			const rep = reputationOf(s, career, acc, season);
@@ -792,7 +823,13 @@ export const runScoutCareers = async () => {
 				if (options.length > 0) {
 					const o = options[rng.int(0, options.length - 1)]!;
 					const oc = careerOf(o);
-					oc.dirs.push({ id: s.id, since: next, how: "poached" });
+					oc.dirs.push({
+						id: s.id,
+						since: next,
+						how: "poached",
+						q: s.quality,
+						age: s.age + 1,
+					});
 					oc.log.push({
 						season,
 						text: `Hired ${s.name} away from the ${t.region} ${t.name} as Director of Scouting`,
@@ -807,7 +844,7 @@ export const runScoutCareers = async () => {
 					});
 					news.push({
 						tids: [t.tid, o.tid],
-						user: user || o.tid === userTid,
+						user: user || userTids.includes(o.tid),
 						text: `The ${o.region} ${o.name} hired scout ${s.name} away from the ${t.region} ${t.name} to be their Director of Scouting.`,
 					});
 				}
@@ -830,7 +867,13 @@ export const runScoutCareers = async () => {
 			if (promoted) {
 				career.cuts[promoted.id] = next;
 				career.cutWhy = { ...career.cutWhy, [promoted.id]: "promoted" };
-				career.dirs.push({ id: promoted.id, since: next, how: "promoted" });
+				career.dirs.push({
+					id: promoted.id,
+					since: next,
+					how: "promoted",
+					q: promoted.quality,
+					age: promoted.age + 1,
+				});
 				career.log.push({
 					season,
 					text: `${promoted.name} was promoted to Director of Scouting (${dir.name} ${dir.age >= 68 ? "retired" : "left"})`,

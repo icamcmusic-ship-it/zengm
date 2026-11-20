@@ -13,6 +13,7 @@ import { actualPhase } from "../../util/actualPhase.ts";
 import { getNumPlayersTradedAwayNormalizedAll } from "../player/getNumPlayersTradedAwayNormalized.ts";
 import { choice } from "../../../common/random.ts";
 import { getTeamInfoCache } from "./getTeamInfoCache.ts";
+import { releaseTeamCoaches } from "../staff/index.ts";
 
 const disable = async (tid: number) => {
 	const t = await idb.cache.teams.get(tid);
@@ -104,6 +105,9 @@ const disable = async (tid: number) => {
 		});
 	}
 	await idb.cache.players.putAll(players);
+
+	// Coaching staff: the coaches become free agents too (otherwise they'd stay on a team that no longer exists)
+	await releaseTeamCoaches(t.tid);
 
 	// In preseason, need to delete teamSeason and teamStats
 	if (actualPhase() < PHASE.PLAYOFFS) {
