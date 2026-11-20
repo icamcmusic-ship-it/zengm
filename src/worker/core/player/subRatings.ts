@@ -315,9 +315,15 @@ export const tiltRowSubs = (
 	r: any,
 	focus: FocusKey,
 	amount: number,
+	// Added to the tilted subs: the league's centering of the plans' tilts (staffDepth/coaching.ts prepareDevelopment)
+	center?: readonly number[],
 ) => {
-	tiltRowSubKeys(p, r, FOCUSES[focus].subs, amount);
+	tiltRowSubKeys(p, r, FOCUSES[focus].subs, amount, center);
 };
+
+// Whether a row's subs can be tilted (tiltRowSubKeys does something)
+export const subsTiltable = (p: PlayerLike, r: any) =>
+	!!p.subP && !isPending(p.subP) && isValidSubArray(r.sub);
 
 // tiltRowSubs for any list of sub keys (Career Aging: reinvention, injuries)
 export const tiltRowSubKeys = (
@@ -325,6 +331,7 @@ export const tiltRowSubKeys = (
 	r: any,
 	keys: readonly string[],
 	amount: number,
+	center?: readonly number[],
 ) => {
 	if (!p.subP || isPending(p.subP) || !isValidSubArray(r.sub)) {
 		return;
@@ -333,6 +340,14 @@ export const tiltRowSubKeys = (
 	const bases = new Set(
 		keys.map((key) => SUB_DEFS.find((d) => d.key === key)!.base),
 	);
+	if (center) {
+		for (const [i, d] of center.entries()) {
+			if (d !== 0) {
+				x[i] = x[i]! + d;
+				bases.add(SUB_DEFS[i]!.base);
+			}
+		}
+	}
 	const ex = expandedFromSubs(x);
 	const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
 	if (bases.has("diq") && typeof r.pdef === "number") {

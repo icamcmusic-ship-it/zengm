@@ -556,7 +556,7 @@ const newPhasePreseason = async (
 	const depthDev =
 		repeatSeason || __SPORT !== "basketball"
 			? undefined
-			: await prepareDevelopment(newSeason);
+			: await prepareDevelopment(newSeason, players as any);
 
 	// Loop through all non-retired players
 	for (const p of players) {
