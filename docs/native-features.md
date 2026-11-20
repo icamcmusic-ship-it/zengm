@@ -924,6 +924,19 @@ season). Never for an edited face. Measured over 3,000 seeds:
   - **Expanded Ratings clean-up:** who commits the fouls reads `pdef`/`idef` (−0.5 each) instead of `diq`; the synergy skill counts use the expanded skill cutoffs (Di 0.595, Dp 0.607, R 0.62) instead of the stock ones.
   - **Injuries:** the per-possession injury rate is multiplied by `exp(-0.08 × (avg(stre, endu) − 51.4) / 10)` (±10 points ≈ ∓8%), centered on the minutes-weighted league average (mean multiplier 1.000-1.001).
   - **Comeback boost:** the trailing team's composite boost `1 − X tanh(diff / 60)` uses X = 0.1 instead of 0.2.
+  - **Team strength gap** (`SIM_FIX_STRENGTH_GAP`): every shot's make probability − 0.0023 × (the shooting team's predicted margin − its opponent's), each predicted from team ovr's formula (before its 0-100 scale) over the team's healthy players at tip-off, with their true (unfuzzed) ovrs. Why: the fork's sim features each added a little to how much a better roster wins by (single games between new-league teams, margin regressed on the team ovr difference, 2,400 games each: 0.54 points per team ovr point with everything on; turning one feature off: player traits 0.46, spacing & creation 0.47, realistic rotations 0.49, the other Game Sim Fixes 0.49, realistic play types 0.50, star & clutch 0.51, coaching systems 0.52; matchup defense compresses, 0.58 without it), while team ovr's formula assumes 0.3, so the league's win% SD was ~.17 even with the League Parity roster changes (NBA ~.15) and a new league already had ~.16. No single feature is to blame and each is calibrated on its own, so the gap is taken back in one place. Within a team nothing changes (a star's shot share, his edge over his teammates), and the two teams' deltas cancel, so league averages stay put. No random numbers are added. `src/test/parity/marginSlope.script.test.ts` (single games) and `parity.script.test.ts` (seasons) measure it.
+
+    | 6 seeds × 5 seasons, new-league defaults            | before                               | after                                |
+    | --------------------------------------------------- | ------------------------------------ | ------------------------------------ |
+    | margin per team ovr point, single games             | 0.54                                 | 0.32                                 |
+    | margin per team ovr point, season MOV on ovr        | 0.55                                 | 0.36                                 |
+    | win% SD, season 1 / seasons 2-5                     | .158 .172                            | .135 .151                            |
+    | win% SD at a team ovr SD of 11.5 (fit over seasons) | .171                                 | .147                                 |
+    | win% per point of MOV                               | .021                                 | .023                                 |
+    | 60-win / 20-or-fewer-win teams per season           | 2.8 2.4                              | 2.3 1.4                              |
+    | most wins (mean)                                    | 67.9                                 | 66.6                                 |
+    | PPG leader, players 25+ / 20+ PPG                   | 29.7 10.3 42.3                       | 30.4 10.6 43.4                       |
+    | pts, FG%, 3P%, pace, TOV, FTA, ORB                  | 109.6 45.4 35.3 100.8 15.2 21.8 11.6 | 109.8 45.4 35.4 100.7 15.2 21.8 11.6 |
 - **Calibration** (scratch scripts, 30-team random leagues, 6 rosters × 250 games, stock sim otherwise; per team game):
 
   | expanded ratings off / on  | before                          | after                           |
