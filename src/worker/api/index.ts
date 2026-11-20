@@ -2935,21 +2935,52 @@ const generateCollegeStatsAllClasses = async (options: {
 
 const staffAction = async (
 	action:
-		| { type: "hire"; cid: number; role: CoachRole; years: number }
+		| {
+				type: "hire";
+				cid: number;
+				role: CoachRole;
+				years: number;
+				// Coach Market & Succession
+				premium?: number;
+				match?: boolean;
+		  }
 		| { type: "fire"; cid: number }
-		| { type: "extend"; cid: number; years: number },
+		| { type: "extend"; cid: number; years: number }
+		// Coach Market & Succession
+		| { type: "interview"; cid: number; role: CoachRole }
+		| { type: "walkAway"; cid: number }
+		| { type: "setHeir"; cid: number | null }
+		| { type: "promoteHeir" }
+		| { type: "interim"; cid: number; keep: boolean; years: number },
 ) => {
 	const tid = g.get("userTid");
 	let buyout;
+	let offer;
 	if (action.type === "hire") {
-		await staff.userHire({ ...action, tid });
+		offer = (await staff.userHire({ ...action, tid }))?.offer;
 	} else if (action.type === "fire") {
 		buyout = await staff.userFire({ cid: action.cid, tid });
-	} else {
+	} else if (action.type === "extend") {
 		await staff.userExtend({ ...action, tid });
+	} else if (action.type === "interview") {
+		await staff.interviewCoach({ tid, cid: action.cid, role: action.role });
+	} else if (action.type === "walkAway") {
+		await staff.walkAway(tid, action.cid);
+	} else if (action.type === "setHeir") {
+		await staff.setHeir(tid, action.cid);
+	} else if (action.type === "promoteHeir") {
+		if (!(await staff.promoteHeir(tid))) {
+			throw new Error(
+				"No associate head coach to promote, or the job is not open.",
+			);
+		}
+		await staff.syncAllBudgets();
+	} else {
+		await staff.userInterimDecision({ ...action, tid });
+		await staff.syncAllBudgets();
 	}
 	await toUI("realtimeUpdate", [["staff", "teamFinances"]]);
-	return { buyout };
+	return { buyout, offer };
 };
 
 // Scouting Director & Regions / Coaching Staff Depth (Staff Report, Scouting Department, Draft Board)

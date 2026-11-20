@@ -36,6 +36,16 @@ import { awardCoachOfTheYear } from "../awards/coachExecAwards.ts";
 import { COACH_OF_THE_YEAR } from "../../../common/coachExecAwards.ts";
 import { collegeFireProb, runCollegeCarousel } from "./collegeCarousel.ts";
 import {
+	afterHeadFired,
+	beforeUserHire,
+	coachMarketOn,
+	heirOffseason,
+	interimOffseason,
+	promoteHeirs,
+	resolvePendingOffers,
+	settleInterims,
+} from "./market.ts";
+import {
 	activeCoachRoles,
 	clearDepthCache,
 	coachingCareersOn,
@@ -421,7 +431,11 @@ export const getBuyout = (c: Coach) => {
 	return Math.round(Math.max(0, remaining) * c.contract.amount * 0.5);
 };
 
-export const fire = async (c: Coach) => {
+export const fire = async (
+	c: Coach,
+	// Coach Market & Succession: the job is filled right away by the caller, so no interim
+	opts?: { noInterim?: boolean },
+) => {
 	const tid = c.tid;
 	const buyout = getBuyout(c);
 	if (buyout > 0) {
@@ -457,6 +471,10 @@ export const fire = async (c: Coach) => {
 			`${teamLink(tid)} fired head coach ${coachLink(c)}.`,
 			tid,
 		);
+		// Coach Market & Succession: fired during the season, the heir or an interim takes over
+		if (!opts?.noInterim) {
+			await afterHeadFired(tid);
+		}
 	} else {
 		await logAssistantDeparture(c, tid, c.role, "was fired by");
 	}
@@ -485,6 +503,8 @@ export const fillVacancies = async ({
 	// Coaching Staff Depth: the user's teams whose hiring is delegated (Auto), so their vacancies are filled too
 	userAuto?: Set<number>;
 }) => {
+	// Coach Market & Succession: associate head coaches step into vacant head coaching jobs first
+	await promoteHeirs({ includeUser, userAuto });
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	const salaryCap = g.get("salaryCap");
 	const numTeams = teams.length;
@@ -893,6 +913,8 @@ export const runOffseason = async () => {
 	// AI GM personalities (setting): patient GMs give coaches more time, win-now ones less. Empty when off
 	const gms = await getAllGmWeights();
 	const collegeExpected = isCollege() ? await getExpectedWinps() : undefined;
+	// Coach Market & Succession: interim head coaches are kept or replaced before contracts run out
+	await interimOffseason();
 	for (const c of coaches) {
 		progress(c);
 
@@ -1007,6 +1029,8 @@ export const runOffseason = async () => {
 
 	// Coaching systems: adaptable coaches move toward what their roster fits
 	await adaptSystems();
+	// Coach Market & Succession: heirs grow, AI teams name theirs
+	await heirOffseason();
 
 	await replenishPool();
 	// College mode: schools hire head coaches away from smaller programs, and make offers to the user
@@ -1032,6 +1056,9 @@ export const onPreseason = async () => {
 	}
 	await ensureStaff();
 	await ensureProfiles();
+	// Coach Market & Succession: undecided interims stay, unanswered competing offers go to the rival teams
+	await settleInterims();
+	await resolvePendingOffers();
 	const hired = await fillVacancies({ includeUser: true });
 	for (const { c, tid } of hired) {
 		if (g.get("userTids").includes(tid)) {
@@ -1081,11 +1108,16 @@ export const userHire = async ({
 	years,
 	tid,
 	replace,
+	premium,
+	match,
 }: {
 	cid: number;
 	role: CoachRole;
 	years: number;
 	tid: number;
+	// Coach Market & Succession: salary premium over his asking price (0-0.2), and matching a competing offer
+	premium?: number;
+	match?: boolean;
 	// Replace the current holder of the job: the new coach is hired first, and the old one is only fired (buyout paid) once the
 	// hire went through, so a failed hire never leaves the job empty
 	replace?: boolean;
@@ -1109,16 +1141,37 @@ export const userHire = async ({
 			`You already have a ${COACH_ROLE_NAMES[role]}. Fire him first.`,
 		);
 	}
-	await hire(c, tid, role, helpers.bound(Math.round(years), 1, 5));
+	const contractYears = helpers.bound(Math.round(years), 1, 5);
+	let amount: number | undefined;
+	if (coachMarketOn() && g.get("userTids").includes(tid)) {
+		const res = await beforeUserHire({
+			c,
+			tid,
+			role,
+			years: contractYears,
+			premium: helpers.bound(premium ?? 0, 0, 0.2),
+			match,
+		});
+		if ("offer" in res) {
+			return { offer: res.offer };
+		}
+		amount = res.amount;
+	}
+	await hire(c, tid, role, contractYears);
+	if (amount !== undefined) {
+		c.contract.amount = amount;
+		await idb.cache.coaches.put(c);
+	}
 	if (previous && previous.cid !== c.cid) {
 		const old = await idb.cache.coaches.get(previous.cid);
 		if (old && old.tid === tid && old.role === role) {
-			await fire(old);
+			await fire(old, { noInterim: true });
 			clearCoachSystemsCache();
 		}
 	}
 	// The league's average staff changed too, so every team's level is relative to the new average
 	await syncAllBudgets();
+	return {};
 };
 
 export const userFire = async ({ cid, tid }: { cid: number; tid: number }) => {
@@ -1160,6 +1213,17 @@ export const userExtend = async ({
 	addTransaction(c, tid, c.role, "reSigned");
 	await idb.cache.coaches.put(c);
 };
+
+export {
+	coachMarketOn,
+	heirOf,
+	interviewCoach,
+	marketStateOf,
+	promoteHeir,
+	setHeir,
+	userInterimDecision,
+	walkAway,
+} from "./market.ts";
 
 export {
 	getCoachAwards,

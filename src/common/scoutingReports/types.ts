@@ -162,6 +162,8 @@ export type ScoutInput = {
 	builds2k?: string[];
 	// Scouting looks this season (scouting system), undefined without it
 	looks?: number;
+	// Scout Specialties & Assignments: scouts' focus areas sharpen reports on prospects in them
+	scoutFocus?: boolean;
 	// Remaining uncertainty about his ratings, in rating points (never from the true fuzz: from scouting actions and the budget)
 	uncertainty: number;
 	draft: { year: number; round: number; pick: number; abbrev?: string };
@@ -330,4 +332,7 @@ export type ScoutBrief = {
 	quality: number;
 	bias: ScoutBias;
 	title: string;
+	// Scout Specialties: his focus, and whether this player is in it
+	focus?: string;
+	inFocus?: boolean;
 };

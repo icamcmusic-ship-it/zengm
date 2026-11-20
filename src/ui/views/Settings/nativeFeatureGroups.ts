@@ -84,6 +84,8 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	mockDraft: "League extras: Draft",
 	coachingStaff: "League extras: Team",
 	ownerOffice: "League extras: Team",
+	coachMarket: "League extras: Team",
+	scoutSpecialties: "League extras: Draft",
 	customShotClock: "League extras: Game Simulation",
 	oneAndOne: "League extras: Game Simulation",
 	faceAging: "League extras: Players",

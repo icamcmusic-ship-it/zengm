@@ -175,6 +175,9 @@ const PlayerScouting = ({
 						<div>{h.rangeLine}</div>
 						<div className="small text-body-secondary">
 							By {report.byline.lead.name}, {report.byline.lead.title}
+							{report.byline.lead.focus
+								? ` (specialty: ${report.byline.lead.focus.toLowerCase()}${report.byline.lead.inFocus ? ", in his wheelhouse" : ""})`
+								: ""}
 							{report.byline.second
 								? ` · second opinion: ${report.byline.second.name}`
 								: ""}

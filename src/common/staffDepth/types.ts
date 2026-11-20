@@ -145,3 +145,38 @@ export type PlayerDevPlan = {
 	f: FocusKey;
 	src: PlanSource;
 };
+
+// Coach Market & Succession (featureCoachMarket), on the user's team (t.coachMarket): this hiring season's interviews and offers
+export type CoachInterview = {
+	cid: number;
+	role: CoachRole;
+	// Hiring season (the season his contract would start)
+	season: number;
+	// What the interview revealed, with some noise
+	lines: string[];
+	// Estimated scheme fit with the roster (head coaches with Coaching Systems), 0-100
+	fit?: number;
+	// How much he wants this job, 0-100 (noisy)
+	interest: number;
+};
+
+export type CompetingOffer = {
+	cid: number;
+	role: CoachRole;
+	season: number;
+	// The AI team that made it
+	tid: number;
+	// Thousands of dollars per season
+	amount: number;
+	years: number;
+	// Contract length the user offered, to complete the hire on a match
+	userYears: number;
+};
+
+export type CoachMarketTeam = {
+	season: number;
+	interviews: CoachInterview[];
+	offers: CompetingOffer[];
+	// Candidates who already had their chance at a competing offer this hiring season (cid)
+	checked: number[];
+};

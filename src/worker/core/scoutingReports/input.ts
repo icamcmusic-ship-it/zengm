@@ -79,6 +79,13 @@ import { getUncertainty } from "../draft/scouting.ts";
 import { effectiveQuality } from "../../../common/staffDepth/regions.ts";
 
 // Off in college leagues (no draft, contracts or trades to scout for): the pages are hidden there
+// Scout Specialties & Assignments (needs Scouting Director & Regions)
+export const scoutFocusOn = () =>
+	__SPORT === "basketball" &&
+	featureOn("scoutSpecialties") &&
+	featureOn("scoutingDepth") &&
+	scoutingReportsOn();
+
 export const scoutingReportsOn = () =>
 	__SPORT === "basketball" && featureOn("scoutingReports") && !isCollege();
 
@@ -1088,6 +1095,7 @@ export const buildInput = async (
 			? (p.draft.round - 1) * ctx.numTeams + p.draft.pick
 			: undefined;
 	const input: ScoutInput = {
+		scoutFocus: scoutFocusOn() || undefined,
 		pid: p.pid,
 		name: `${p.firstName} ${p.lastName}`,
 		kind,

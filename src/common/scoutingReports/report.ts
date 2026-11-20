@@ -1,6 +1,13 @@
 // The full scouting report: a scout's grades (with ranges when unsure), projection, breakdowns, flags, development plan, team fit and
 // bottom line, all from a ScoutInput (what the user's scouts can see). Pure and deterministic.
 import {
+	FOCUS_SIGMA_MULT,
+	SCOUT_FOCUS_NAMES,
+	inScoutFocus,
+	scoutFocusOf,
+	type ScoutFocus,
+} from "../staffDepth/scoutFocus.ts";
+import {
 	categoryScores,
 	GRADE_LABELS,
 	lowerLabel,
@@ -118,6 +125,26 @@ const matchInfo = (input: ScoutInput, base: CategoryScores) => ({
 	shooter: isShooter(base),
 });
 
+// Scout Specialties (input.scoutFocus): the scout's focus when the prospect falls in it
+const focusOfScout = (
+	input: ScoutInput,
+	scout: Pick<Scout, "seed" | "specialty">,
+	info: ReturnType<typeof matchInfo>,
+): ScoutFocus | undefined => {
+	if (!input.scoutFocus || input.kind !== "prospect") {
+		return undefined;
+	}
+	const focus = scoutFocusOf(scout);
+	return inScoutFocus(focus, {
+		overseas: info.level === undefined ? undefined : info.level === "overseas",
+		pos: input.pos,
+		athletic: info.athletic,
+		shooter: info.shooter,
+	})
+		? focus
+		: undefined;
+};
+
 // Generic league aging (public knowledge): what a typical player gains or loses in a year at this age. Never a player's own curve
 export const typicalAgingDelta = (age: number) =>
 	age <= 20
@@ -173,8 +200,12 @@ export const scoutTake = ({
 		traits: input.traits,
 		productionMult,
 	});
-	const match = specialtyMatch(scout, matchInfo(input, base));
-	const sigma = scoutSigma(scout, input.kind, match);
+	const info = matchInfo(input, base);
+	const match = specialtyMatch(scout, info);
+	// Scout Specialties: a prospect in the scout's focus is read more sharply
+	const sigma =
+		scoutSigma(scout, input.kind, match) *
+		(focusOfScout(input, scout, info) ? FOCUS_SIGMA_MULT : 1);
 	const shifts = BIAS_SHIFT[scout.bias];
 	const all =
 		scout.bias === "harsh"
@@ -589,7 +620,26 @@ export const buildReport = ({
 		group,
 		traits: input.traits,
 	});
-	const assigned = assignScouts(dept, matchInfo(input, base), input.pid);
+	const info = matchInfo(input, base);
+	const assigned = assignScouts(dept, info, input.pid);
+	// Scout Specialties: a scout whose focus covers the prospect writes the report, unless he is clearly worse
+	if (
+		input.scoutFocus &&
+		assigned.lead &&
+		!focusOfScout(input, assigned.lead, info)
+	) {
+		const inFocus = dept.scouts
+			.filter(
+				(x) =>
+					focusOfScout(input, x, info) &&
+					x.quality >= assigned.lead!.quality - 0.15,
+			)
+			.sort((a, b) => b.quality - a.quality || a.id - b.id)[0];
+		if (inFocus) {
+			assigned.second = assigned.lead;
+			assigned.lead = inFocus;
+		}
+	}
 	const forced = dept.scouts.find((x) => x.id === leadId);
 	const lead = forced ?? assigned.lead;
 	const second =
@@ -598,6 +648,7 @@ export const buildReport = ({
 		throw new Error("Empty scouting department");
 	}
 	const take = scoutTake({ input, peers, scout: lead });
+	const leadFocus = focusOfScout(input, lead, info);
 	const take2 = second ? scoutTake({ input, peers, scout: second }) : undefined;
 	const v = new Voice(`report|${input.pid}|${lead.id}|${input.season}`);
 	const grades: GradeRow[] = take.grades.map((g) => ({
@@ -625,6 +676,9 @@ export const buildReport = ({
 		looksText,
 		`${qualityLabel(dept.quality).toLowerCase()} department (${dept.scouts.length} scouts)`,
 		`${lead.name}, ${qualityLabel(lead.quality).toLowerCase()} ${briefOf(lead).title}`,
+		leadFocus
+			? `in his specialty (${SCOUT_FOCUS_NAMES[leadFocus].toLowerCase()}): a sharper read`
+			: undefined,
 		input.ratings ? undefined : "ratings hidden: production only",
 	]
 		.filter(Boolean)
@@ -1224,7 +1278,13 @@ export const buildReport = ({
 		name: input.name,
 		kind: input.kind,
 		byline: {
-			lead: briefOf(lead),
+			lead: input.scoutFocus
+				? {
+						...briefOf(lead),
+						focus: SCOUT_FOCUS_NAMES[scoutFocusOf(lead)],
+						inFocus: leadFocus !== undefined,
+					}
+				: briefOf(lead),
 			second: second ? briefOf(second) : undefined,
 		},
 		header: {

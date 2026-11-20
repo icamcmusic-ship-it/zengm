@@ -127,6 +127,11 @@ const ScoutCareer = ({
 			{s.second ? `, also ${s.second.toLowerCase()}` : ""} · reputation:{" "}
 			{s.reputationLabel}
 		</div>
+		{s.focus ? (
+			<div data-testid="scout-focus">
+				Specialty: <b>{s.focus}</b> ({s.focusKind})
+			</div>
+		) : null}
 		<div className="d-flex align-items-center gap-1">
 			Region:{" "}
 			{isUser ? (
@@ -165,6 +170,66 @@ const ScoutCareer = ({
 			</div>
 		) : null}
 	</div>
+);
+
+// Scout Specialties & Assignments: which scout covers which region, and the current class's prospects there (in his specialty first)
+const AssignmentMap = ({
+	assignments,
+}: {
+	assignments: NonNullable<Depth["assignments"]>;
+}) => (
+	<>
+		<h2>Assignments</h2>
+		<p className="text-body-secondary small">
+			Looks by a scout at a prospect in his specialty narrow the fuzz more, and
+			his reports on them are sharper.
+		</p>
+		<div className="table-responsive mb-3">
+			<table
+				className="table table-sm small"
+				data-testid="scouting-assignments"
+			>
+				<thead>
+					<tr>
+						<th>Scout</th>
+						<th>Specialty</th>
+						<th>Region</th>
+						<th>In specialty</th>
+						<th>Prospects</th>
+					</tr>
+				</thead>
+				<tbody>
+					{assignments.map((a) => (
+						<tr key={a.id}>
+							<td className="text-nowrap">{a.name}</td>
+							<td className="text-nowrap">
+								{a.focus}{" "}
+								<span className="text-body-secondary">({a.focusKind})</span>
+							</td>
+							<td className="text-nowrap">{a.regionName}</td>
+							<td>
+								{a.numInFocus} of {a.numInRegion}
+							</td>
+							<td>
+								{a.prospects.length === 0
+									? "None"
+									: a.prospects.map((p, i) => (
+											<span key={p.pid}>
+												{i > 0 ? ", " : ""}
+												<a href={helpers.leagueUrl(["player_scouting", p.pid])}>
+													{p.name}
+												</a>{" "}
+												({p.pos}, #{p.rank}
+												{p.inFocus ? ", specialty" : ""})
+											</span>
+										))}
+							</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
+	</>
 );
 
 // A team's scouting department (Scouting Reports setting)
@@ -254,6 +319,10 @@ const ScoutingDepartment = ({
 					</div>
 				))}
 			</div>
+
+			{depth?.assignments ? (
+				<AssignmentMap assignments={depth.assignments} />
+			) : null}
 
 			<h2>Track record</h2>
 			{track.length === 0 ? (

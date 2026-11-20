@@ -157,6 +157,8 @@ export type CoachWithoutKey = {
 	retiredYear?: number;
 	// Coaching Staff Depth: how his career started and his coaching tree (works without Coaching Systems too)
 	tree?: CoachTree;
+	// Coach Market & Succession (featureCoachMarket): associate head coach (heir apparent) and interim head coach
+	succession?: CoachSuccession;
 	// The team's record when he was hired during a season, so his season row only counts the games he coached
 	hiredRecord?: {
 		season: number;
@@ -188,4 +190,11 @@ export type CoachTree = {
 
 export type Coach = CoachWithoutKey & {
 	cid: number;
+};
+
+export type CoachSuccession = {
+	// Associate head coach: the team's heir apparent (an assistant), since this season
+	heir?: number;
+	// Interim head coach since this season, promoted from this job
+	interim?: { season: number; from: CoachRole };
 };

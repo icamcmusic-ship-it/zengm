@@ -55,6 +55,8 @@ export const Market = ({
 	level,
 	onCompare,
 	onHire,
+	onInterview,
+	interviewed,
 	role,
 	setRole,
 	slots,
@@ -66,6 +68,9 @@ export const Market = ({
 	level: number;
 	onCompare: (candidate: Candidate) => void;
 	onHire: (candidate: Candidate) => void;
+	// Coach Market & Succession (undefined when off)
+	onInterview?: (candidate: Candidate) => void;
+	interviewed?: Set<number>;
 	role: CoachRole;
 	setRole: (role: CoachRole) => void;
 	slots: View<"staff">["slots"];
@@ -115,6 +120,14 @@ export const Market = ({
 			`Your development level with him in this job (now ${level}). ${COACH_TERMS.devLevel.text}`,
 		),
 		numberCol("Asking", "Salary per season he asks for"),
+		...(interviewed
+			? [
+					numberCol(
+						"Interest",
+						"How much he wants your job, from your team's success, market size and the salary (each coach weighs them differently). Interview him to learn more.",
+					),
+				]
+			: []),
 		...(role === "head"
 			? [
 					{
@@ -208,12 +221,35 @@ export const Market = ({
 				sortValue: c.demand,
 				searchValue: formatSalary(c.demand),
 			},
+			...(interviewed
+				? [
+						{
+							value: c.interest ? (
+								<span title={`${c.interest.value}/100`}>
+									{c.interest.label}
+								</span>
+							) : null,
+							sortValue: c.interest?.value ?? null,
+							searchValue: c.interest?.label ?? "",
+						},
+					]
+				: []),
 			...(role === "head"
 				? [c.headSeasons > 0 ? `${c.headWon}-${c.headLost}` : ""]
 				: []),
 			{
 				value: (
 					<div className="btn-group text-nowrap">
+						{interviewed ? (
+							<button
+								className="btn btn-sm btn-light-bordered"
+								onClick={() => onInterview?.(c)}
+								disabled={!onInterview || interviewed.has(c.cid)}
+								data-testid="candidate-interview"
+							>
+								{interviewed.has(c.cid) ? "Interviewed" : "Interview"}
+							</button>
+						) : null}
 						<button
 							className="btn btn-sm btn-light-bordered"
 							onClick={() => onCompare(c)}
