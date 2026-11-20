@@ -3513,6 +3513,11 @@ const cols: {
 		noSearch: true,
 		sortSequence: [],
 	},
+	Shots: {
+		desc: "Game Plan: More Shots, Normal or Fewer Shots",
+		noSearch: true,
+		sortSequence: [],
+	},
 	PTS: {
 		desc: "Points",
 		sortSequence: ["desc", "asc"],

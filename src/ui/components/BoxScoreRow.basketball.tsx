@@ -2,6 +2,7 @@ import clsx from "clsx";
 import type { MouseEvent } from "react";
 import { PlayerNameLabels } from "./PlayerNameLabels.tsx";
 import { helpers } from "../util/helpers.ts";
+import { shotDietText } from "../../common/advStats.ts";
 
 const BoxScoreRow = ({
 	className,
@@ -35,7 +36,7 @@ const BoxScoreRow = ({
 	) : (
 		<>
 			<td>{helpers.formatNumber(p.min, "minutes")}</td>
-			<td>
+			<td title={shotDietText(p.sd)}>
 				{p.fg}-{p.fga}
 			</td>
 			<td>

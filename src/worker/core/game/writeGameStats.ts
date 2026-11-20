@@ -4,6 +4,7 @@ import {
 	shouldStorePbp,
 } from "../../../common/pbpSettings.ts";
 import { PHASE } from "../../../common/constants.ts";
+import { shotDietOfGame } from "../../../common/advStats.ts";
 import { updatePlayerAwards } from "../awards/awardsByPlayer.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
@@ -340,6 +341,13 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 				p.injuryAtStart = p0.injuryAtStart;
 			}
 			p.jerseyNumber = p0.jerseyNumber;
+			// Shot Share Model: where his shots came from (Advanced Tracking Stats records it)
+			if (__SPORT === "basketball" && p0.adv) {
+				const sd = shotDietOfGame(p0.adv);
+				if (sd.some((x) => x > 0)) {
+					p.sd = sd;
+				}
+			}
 
 			if (__SPORT === "baseball") {
 				p.seasonStats = p0.seasonStats;

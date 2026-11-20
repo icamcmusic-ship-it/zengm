@@ -66,6 +66,7 @@ import {
 import {
 	assignMatchups,
 	ATTENTION,
+	defenderFit,
 	eliteFinisher,
 	driveMismatch,
 	MATCHUP,
@@ -97,6 +98,7 @@ import {
 import {
 	COMPETE_MARGIN,
 	lateGameSituationWeight,
+	traitZ,
 	teamChemistryBonus,
 	teamSwitchDefenseBonus,
 	lineupSizeMismatch,
@@ -136,6 +138,51 @@ import {
 	NEUTRAL_EMPHASIS_SIM,
 } from "../../../common/offEmphasis.ts";
 import { AdvTracker } from "./advTracking.ts";
+import {
+	doubleTeamProb,
+	kneeAndFloor,
+	sagOf,
+	scoringAbility,
+	shareEffect,
+	SHOT_SHARE,
+	shotPlanMult,
+} from "./shotShare.ts";
+import { ADV as ADV_LAYOUT } from "../../../common/advStats.ts";
+
+// Shot Share Model: the shot diet fields (read once: used in the sim's hot path)
+const SD = {
+	normal: ADV_LAYOUT.sdNormal,
+	created: ADV_LAYOUT.sdCreated,
+	putback: ADV_LAYOUT.sdPutback,
+	late: ADV_LAYOUT.sdLate,
+	hot: ADV_LAYOUT.sdHot,
+	kick: ADV_LAYOUT.sdKick,
+	hunt: ADV_LAYOUT.sdHunt,
+	draws: ADV_LAYOUT.sdDraws,
+	coach: ADV_LAYOUT.smCoach,
+	fatigue: ADV_LAYOUT.smFatigue,
+	discipline: ADV_LAYOUT.smDiscipline,
+	attention: ADV_LAYOUT.smAttention,
+	plan: ADV_LAYOUT.smPlan,
+	role: ADV_LAYOUT.smRole,
+};
+
+// Shot Share Model: a player's constants for the game (worked out in the constructor) and his hot hand
+type ShotShareState = {
+	ability: number;
+	// game plan, season drift, ego (all three multiply his weight)
+	fixed: number;
+	plan: number;
+	compete: number;
+	roleForce: number;
+	roleForceMake: number;
+	sag: number;
+	hotBoost: number;
+	hotAfter: number;
+	threat: number;
+	streak: number;
+	hot: number;
+};
 
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
 // weight, before late-game IQ moves it (see applyLateGameDecision)
@@ -271,6 +318,11 @@ type PlayerGameSim = {
 	gameZ?: number;
 	// His height rating, for defensive versatility (size mismatches). Only set with traitEffects
 	traitHgt?: number;
+	// Shot Share Model (loadTeams): his game plan (-1 Fewer shots, 1 More shots) and season drift correction, and (the constructor) his
+	// constants for the game and hot hand
+	shotPlan?: number;
+	shotDrift?: number;
+	ss?: ShotShareState;
 };
 type TeamGameSim = {
 	id: number;
@@ -655,6 +707,34 @@ class GameSim extends GameSimBase {
 	// changes a game (no random numbers, nothing the sim reads). Off: undefined, and nothing is recorded. advTransition/advQuick: the
 	// realistic possession model's transition and quick putback chances for this possession segment, noted for the classifier only
 	adv: AdvTracker | undefined;
+	// Shot Share Model (League extras, see shotShare.ts). Off: nothing here is used and no extra random numbers are drawn. The weights of the
+	// shooter draw and what each modifier contributed (by court index), each team's roles in its five, best creator and matchup
+	// multipliers (refreshed when the lineups change, ssVersion), the late shot clock flag of this possession, and the last draw (for the
+	// shot diet)
+	shotShare = false;
+	ssW: number[] = [];
+	ssPre: number[] = [];
+	ssAbility: number[] = [];
+	ssCoach: number[] = [];
+	ssFatigue: number[] = [];
+	ssDiscipline: number[] = [];
+	ssPlan: number[] = [];
+	ssRole: number[] = [];
+	ssKickW: number[] = [];
+	// (the boosts from the late shot clock, the hot hand and mismatch hunting, for the shot diet)
+	ssBoostLate: number[] = [];
+	ssBoostHot: number[] = [];
+	ssBoostHunt: number[] = [];
+	ssVersion = 0;
+	ssLineupVersion: [number, number] = [-1, -1];
+	ssTier: [number[], number[]] = [[], []];
+	ssCreator: [number, number] = [0, 0];
+	ssHunt: [number[], number[]] = [[], []];
+	ssLate = false;
+	ssPick: PlayerGameSim | undefined;
+	ssPickKick: PlayerGameSim | undefined;
+	ssPickSource = 0;
+	ssPickMods: number[] = [1, 1, 1, 1, 1, 1];
 	advTransition = false;
 	advQuick = false;
 	advThreePointers = true;
@@ -820,6 +900,18 @@ class GameSim extends GameSimBase {
 			// One draw per game: how tightly this crew calls it
 			const crew = Math.exp(LOAD.refSd * gaussian());
 			this.foulMult = [crew, crew];
+		}
+
+		// Shot Share Model: each player's constants for the game
+		this.shotShare = nativeFeatureEnabled("shotShareModel", (key) =>
+			g.get(key as any),
+		);
+		if (this.shotShare) {
+			for (const t of teams) {
+				for (const p of t.player) {
+					p.ss = this.shotShareState(p);
+				}
+			}
 		}
 
 		// Starting lineups, which will be reset by updatePlayersOnCourt. This must be done because of injured players in the top 5.
@@ -2014,19 +2106,420 @@ class GameSim extends GameSimBase {
 		return players[0]!;
 	}
 
+	// Shot Share Model: a player's constants for the game
+	shotShareState(p: PlayerGameSim): ShotShareState {
+		const S = SHOT_SHARE;
+		const cr = p.compositeRating;
+		const ability = scoringAbility(cr.usage);
+		const e = p.traitEffects;
+		const z = (
+			key: "ego" | "competitiveness" | "roleAcceptance" | "consistency",
+		) => (e && !e.neutral ? traitZ(e.scores[key]) : 0);
+		const zEgo = z("ego");
+		const zRole = z("roleAcceptance");
+		const zCons = z("consistency");
+		const threat = cr.spacingThreat ?? cr.shootingThreePointer ?? 0.5;
+		const sag = sagOf(threat);
+		const plan = shotPlanMult(p.shotPlan);
+		return {
+			ability,
+			fixed:
+				plan *
+				(p.shotDrift ?? 1) *
+				(1 + S.ego * Math.max(0, -zEgo) * ability) *
+				(1 - S.sagPass * sag),
+			plan,
+			compete: 1 + S.compete * z("competitiveness"),
+			roleForce: 1 + S.roleForce * Math.max(0, -zRole),
+			roleForceMake: S.roleForceMake * Math.max(0, -zRole),
+			sag,
+			hotBoost: 1 + S.hot * (1 - S.hotCons * zCons),
+			hotAfter: zCons < -S.streakyZ ? S.hotAfterStreaky : S.hotAfter,
+			threat,
+			streak: 0,
+			hot: 0,
+		};
+	}
+
+	// Shot Share Model: team t's roles in its five (by usage composite times game plan), its best creator and, with Matchup Defense, the
+	// mismatch hunting and lockdown multipliers, worked out again when the lineups change
+	ssRefreshLineup(t: TeamNum) {
+		if (this.ssLineupVersion[t] === this.ssVersion) {
+			return;
+		}
+		this.ssLineupVersion[t] = this.ssVersion;
+		const S = SHOT_SHARE;
+		const n = this.numPlayersOnCourt;
+		const players = this.playersOnCourt[t];
+		const tier = this.ssTier[t];
+		tier.length = n;
+		let creator = 0;
+		for (let i = 0; i < n; i++) {
+			const p = players[i]!;
+			const key = p.compositeRating.usage * (p.ss?.plan ?? 1);
+			let rank = 0;
+			for (let j = 0; j < n; j++) {
+				if (j === i) {
+					continue;
+				}
+				const q = players[j]!;
+				const keyQ = q.compositeRating.usage * (q.ss?.plan ?? 1);
+				if (keyQ > key || (keyQ === key && j < i)) {
+					rank += 1;
+				}
+			}
+			tier[i] = Math.min(rank, S.tier.length - 1);
+			const c = this.spacingCreation
+				? (p.compositeRating.creation ?? 0)
+				: p.compositeRating.usage;
+			const best = this.spacingCreation
+				? (players[creator]!.compositeRating.creation ?? 0)
+				: players[creator]!.compositeRating.usage;
+			if (c > best) {
+				creator = i;
+			}
+		}
+		this.ssCreator[t] = creator;
+
+		const hunt = this.ssHunt[t];
+		hunt.length = n;
+		for (let i = 0; i < n; i++) {
+			hunt[i] = 1;
+		}
+		if (this.matchupDefense) {
+			const d: TeamNum = t === 0 ? 1 : 0;
+			const defense = this.playersOnCourt[d];
+			const switching = this.isSwitching(d);
+			const sizeWeight = switching ? MATCHUP.switchSizeWeight : 1;
+			let bestGap = S.huntMin;
+			let bestIdx = -1;
+			for (let j = 0; j < n; j++) {
+				const a = players[j]!;
+				const defender = defense[this.guards[d][j] ?? j];
+				if (!defender) {
+					continue;
+				}
+				let mean = 0;
+				for (const q of defense) {
+					mean += defenderFit(q, a, sizeWeight);
+				}
+				mean /= defense.length;
+				const fit = defenderFit(defender, a, sizeWeight);
+				const relief = mismatchScale(
+					defender,
+					switching,
+					this.teamVersatility[d],
+				);
+				const gap =
+					mean -
+					fit +
+					0.25 *
+						relief *
+						(postMismatch(a, defender) + driveMismatch(a, defender));
+				if (gap > bestGap) {
+					bestGap = gap;
+					bestIdx = j;
+				}
+				// An elite defender takes some of his man's shots away
+				if (fit > S.lockRef) {
+					hunt[j] =
+						1 - Math.min(S.lock, (S.lock * (fit - S.lockRef)) / S.lockScale);
+				}
+			}
+			if (bestIdx >= 0) {
+				hunt[bestIdx] =
+					hunt[bestIdx]! *
+					(1 + S.hunt * Math.min(1, (bestGap - S.huntMin) / S.huntScale));
+			}
+		}
+	}
+
+	// Shot Share Model: the weights of team t's shooter draw (in this.ssW, by court index), with what the coach, fatigue, shot discipline, the
+	// game plan and the role contributed (ssCoach ... ssRole) and each one's scoring ability (ssAbility)
+	shotShareWeights(t: TeamNum) {
+		this.ssRefreshLineup(t);
+		const S = SHOT_SHARE;
+		const n = this.numPlayersOnCourt;
+		const players = this.playersOnCourt[t];
+		const lateGame = this.isLateGame();
+		const cs = this.cs[t];
+		const coachMult = this.coachSys
+			? cs.usage * (this.isClutchTime() ? cs.clutchUsage : 1)
+			: 1;
+		const power = S.power * coachMult * this.clutchUsageMult();
+		const close = this.traitsOn && this.closeGame();
+		const late = this.ssLate;
+		const tier = this.ssTier[t];
+		const hunt = this.ssHunt[t];
+		const creator = this.ssCreator[t];
+		const w = this.ssW;
+		for (let i = 0; i < n; i++) {
+			const p = players[i]!;
+			const s = p.ss!;
+			const fatigue = this.fatigueLate(p.stat.energy, lateGame);
+			const x = p.compositeRating.usage * fatigue;
+			let v = x ** power;
+			this.ssFatigue[i] = fatigue ** power;
+			this.ssCoach[i] = coachMult === 1 ? 1 : x ** (power - power / coachMult);
+			const discipline =
+				this.traitsOn && p.traitEffects
+					? this.traitPickWeight("usage", p, t)
+					: 1;
+			this.ssDiscipline[i] = discipline;
+			const rank = tier[i]!;
+			const role =
+				(rank === 0
+					? S.tier[0]! + S.firstAbility * (s.ability - 0.5)
+					: S.tier[rank]!) * (rank >= 3 ? s.roleForce : 1);
+			this.ssRole[i] = role;
+			this.ssPlan[i] = s.plan;
+			const huntMult = hunt[i]!;
+			v *= discipline * role * s.fixed * huntMult;
+			if (close) {
+				v *= s.compete;
+			}
+			const hotMult = s.hot > 0 ? s.hotBoost : 1;
+			let lateMult = 1;
+			if (late) {
+				if (i === creator) {
+					lateMult *= 1 + S.lateCreator;
+				}
+				if (rank === 0) {
+					lateMult *= 1 + S.lateFirst;
+				}
+			}
+			v *= hotMult * lateMult;
+			this.ssBoostLate[i] = lateMult;
+			this.ssBoostHot[i] = hotMult;
+			this.ssBoostHunt[i] = huntMult > 1 ? huntMult : 1;
+			w[i] = v;
+			this.ssAbility[i] = s.ability;
+		}
+		kneeAndFloor(w, this.ssAbility, n);
+		return w;
+	}
+
+	// Shot Share Model: the shooter draw. One random number, as in the stock draw: the double team takes the end of the star's part of it
+	// and gives it to a teammate
+	pickShooterShotShare() {
+		const t = this.o;
+		const n = this.numPlayersOnCourt;
+		const players = this.playersOnCourt[t];
+		const w = this.shotShareWeights(t);
+		let total = 0;
+		let star = 0;
+		for (let i = 0; i < n; i++) {
+			total += w[i]!;
+			this.ssPre[i] = w[i]!;
+			if (w[i]! > w[star]!) {
+				star = i;
+			}
+		}
+		const dbl =
+			this.matchupDefense && total > 0 ? doubleTeamProb(w[star]! / total) : 0;
+		if (this.matchupDefense) {
+			this.attentionCap(w, SHOT_SHARE.attnShare, SHOT_SHARE.attnExcess);
+		}
+		let sum = 0;
+		for (let i = 0; i < n; i++) {
+			sum += w[i]!;
+		}
+
+		let picked = 0;
+		let kick: PlayerGameSim | undefined;
+		// Where in his part of the draw the random number fell, 0 to 1 (for the shot diet)
+		let u = 0;
+		if (sum > 0) {
+			const rand = Math.random() * sum;
+			let runningSum = 0;
+			picked = n - 1;
+			for (let i = 0; i < n; i++) {
+				runningSum += w[i]!;
+				if (rand < runningSum) {
+					picked = i;
+					break;
+				}
+			}
+			const start = runningSum - w[picked]!;
+			u = w[picked]! > 0 ? (rand - start) / w[picked]! : 0;
+			if (picked === star && dbl > 0 && n > 1) {
+				const cut = start + (1 - dbl) * w[star]!;
+				u = (rand - start) / ((1 - dbl) * w[star]!);
+				if (rand >= cut) {
+					// The open man: by his weight, leaning to shooters
+					const u = (rand - cut) / (dbl * w[star]!);
+					let kickTotal = 0;
+					for (let i = 0; i < n; i++) {
+						const k =
+							i === star
+								? 0
+								: w[i]! * (1 + SHOT_SHARE.kickThreat * players[i]!.ss!.threat);
+						this.ssKickW[i] = k;
+						kickTotal += k;
+					}
+					if (kickTotal > 0) {
+						const target = u * kickTotal;
+						let running = 0;
+						let j = star === 0 ? 1 : 0;
+						for (let i = 0; i < n; i++) {
+							running += this.ssKickW[i]!;
+							if (target < running) {
+								j = i;
+								break;
+							}
+						}
+						if (j !== star) {
+							kick = players[star];
+							picked = j;
+						}
+					}
+				}
+			}
+		} else {
+			picked = Math.floor(Math.random() * n);
+		}
+
+		const p = players[picked]!;
+		this.ssPick = p;
+		this.ssPickKick = kick;
+		// The shot came from a boost when the random number fell in the part of his weight the boost added: the last (1 - 1 / boost) of it,
+		// split as late clock, hot hand, mismatch hunting
+		let source = SD.normal;
+		if (kick !== undefined) {
+			source = SD.kick;
+		} else {
+			const hunt = this.ssBoostHunt[picked]!;
+			const hot = this.ssBoostHot[picked]! * hunt;
+			const late = this.ssBoostLate[picked]! * hot;
+			if (u >= 1 / hunt) {
+				source = SD.hunt;
+			} else if (u >= 1 / hot) {
+				source = SD.hot;
+			} else if (u >= 1 / late) {
+				source = SD.late;
+			}
+		}
+		this.ssPickSource = source;
+		// What each modifier did to his share of the draw (attention: the cap and the double team)
+		if (this.adv) {
+			const mods = this.ssPickMods;
+			mods[0] = shareEffect(this.ssPre, this.ssCoach, picked, n);
+			mods[1] = shareEffect(this.ssPre, this.ssFatigue, picked, n);
+			mods[2] = shareEffect(this.ssPre, this.ssDiscipline, picked, n);
+			mods[3] =
+				(this.ssPre[picked]! > 0 ? w[picked]! / this.ssPre[picked]! : 1) *
+				(total > 0 ? total / sum : 1) *
+				(picked === star ? 1 - dbl : 1);
+			mods[4] = shareEffect(this.ssPre, this.ssPlan, picked, n);
+			mods[5] = shareEffect(this.ssPre, this.ssRole, picked, n);
+		}
+
+		// The hot hand cools down with each of his team's shooter draws
+		for (let i = 0; i < n; i++) {
+			const q = players[i]!.ss!;
+			if (q.hot > 0) {
+				q.hot -= 1;
+				if (q.hot === 0) {
+					q.streak = 0;
+				}
+			}
+		}
+		return p;
+	}
+
+	// Shot Share Model: the doubled star, if p's shot is his kick-out
+	ssKickFor(p: PlayerGameSim) {
+		return this.ssPickKick !== undefined && p === this.ssPick
+			? this.ssPickKick
+			: undefined;
+	}
+
+	// Shot Share Model: the multiplier on the three-point draw (spacing sag, kick-outs and catch-and-shoot role players)
+	ssThreeTilt(p: PlayerGameSim, selfCreated: boolean) {
+		const s = p.ss;
+		if (!s) {
+			return 1;
+		}
+		let tilt = SHOT_SHARE.threeCal * (1 - SHOT_SHARE.sagThree * s.sag);
+		if (this.ssKickFor(p) !== undefined) {
+			tilt *= SHOT_SHARE.kickThree;
+		} else {
+			const i = this.playersOnCourt[this.o].indexOf(p);
+			const rank = i >= 0 ? (this.ssTier[this.o][i] ?? 2) : 2;
+			if (rank >= 3) {
+				if (!selfCreated) {
+					tilt *= SHOT_SHARE.roleThree;
+				}
+			} else if (rank === 0) {
+				tilt *= SHOT_SHARE.optionThree;
+			}
+		}
+		return tilt;
+	}
+
+	// Shot Share Model: make probability taken off a forced late-clock shot (not the creator's or the 1st option's) and a role player's
+	// forced shot (low role acceptance)
+	ssMakeDelta(p: PlayerGameSim) {
+		const s = p.ss;
+		if (!s) {
+			return 0;
+		}
+		const t = this.o;
+		const i = this.playersOnCourt[t].indexOf(p);
+		if (i < 0) {
+			return -SHOT_SHARE.makeCal;
+		}
+		let delta = -SHOT_SHARE.makeCal;
+		if (this.ssLate && i !== this.ssCreator[t] && this.ssTier[t][i] !== 0) {
+			delta += SHOT_SHARE.lateForced;
+		}
+		if ((this.ssTier[t][i] ?? 0) >= 3) {
+			delta += s.roleForceMake;
+		}
+		return delta;
+	}
+
+	// Shot Share Model: the shot diet (Advanced Tracking Stats): where this shot came from and, for the shooter draw, what moved his share
+	ssRecordShot(p: PlayerGameSim, putBack: boolean, tipIn: boolean) {
+		const a = this.adv!.arr.get(p);
+		if (!a) {
+			return;
+		}
+		if (putBack) {
+			a[SD.putback]! += 1;
+			return;
+		}
+		if (tipIn || p !== this.ssPick) {
+			a[SD.normal]! += 1;
+			return;
+		}
+		let source = this.ssPickSource;
+		if (source === SD.normal && this.spacingCreation && this.creator === p) {
+			source = SD.created;
+		}
+		a[source]! += 1;
+		a[SD.draws]! += 1;
+		const mods = this.ssPickMods;
+		a[SD.coach]! += Math.round(1000 * mods[0]!);
+		a[SD.fatigue]! += Math.round(1000 * mods[1]!);
+		a[SD.discipline]! += Math.round(1000 * mods[2]!);
+		a[SD.attention]! += Math.round(1000 * mods[3]!);
+		a[SD.plan]! += Math.round(1000 * mods[4]!);
+		a[SD.role]! += Math.round(1000 * mods[5]!);
+		this.ssPick = undefined;
+	}
+
 	// The shooter of the possession: by usage, or when the defense fouls on purpose, its target
 	pickShooter(clockFactor: ClockFactor) {
 		if (this.smartEndgame && clockFactor === "intentionalFoul") {
 			this.attentionShooter = undefined;
+			this.ssPick = undefined;
+			this.ssPickKick = undefined;
 			return this.pickFoulTarget();
 		}
-		const p = this.pickPlayer(
-			"usage",
-			this.o,
-			this.usagePower(),
-			undefined,
-			true,
-		);
+		const p = this.shotShare
+			? this.pickShooterShotShare()
+			: this.pickPlayer("usage", this.o, this.usagePower(), undefined, true);
 		if (this.matchupDefense) {
 			this.attentionShooter = p;
 			this.attentionShooterShare =
@@ -2764,6 +3257,8 @@ class GameSim extends GameSimBase {
 		if (this.matchupDefense) {
 			this.assignMatchups();
 		}
+		// Shot Share Model: the roles and matchups are worked out again for the new lineups
+		this.ssVersion += 1;
 	}
 
 	// Matchup Defense: each defense's assignments for the current lineups, and its average defensive versatility
@@ -3406,9 +3901,19 @@ class GameSim extends GameSimBase {
 				true,
 			);
 		}
+		if (this.shotShare) {
+			this.ssLate = false;
+		}
 		const shooter = this.pickShooter(clockFactor);
 		if (this.playTypes) {
 			this.maybeSelfCreate(shooter);
+		}
+		if (
+			this.shotShare &&
+			this.ssPickKick !== undefined &&
+			shooter === this.ssPick
+		) {
+			this.creator = this.ssPickKick;
 		}
 
 		// Flagrant foul? (only with the technicalFouls setting, so otherwise no random number is drawn here)
@@ -3977,6 +4482,12 @@ class GameSim extends GameSimBase {
 			return this.doOutOfBounds(1);
 		}
 
+		// Shot Share Model: a shot late in the shot clock (while the shot clock is on)
+		if (this.shotShare) {
+			this.ssLate =
+				this.t > this.shotClock && this.shotClock - shotAt < SHOT_SHARE.lateSec;
+		}
+
 		// Spacing & Shot Creation: the creator first, then the shooter
 		if (this.spacingCreation) {
 			this.creator = this.pickPlayer(
@@ -3990,6 +4501,14 @@ class GameSim extends GameSimBase {
 		const shooter = this.pickShooter(clockFactor);
 		if (this.playTypes) {
 			this.maybeSelfCreate(shooter);
+		}
+		// Shot Share Model: a kick-out from a double team was set up by the doubled star
+		if (
+			this.shotShare &&
+			this.ssPickKick !== undefined &&
+			shooter === this.ssPick
+		) {
+			this.creator = this.ssPickKick;
 		}
 
 		// Flagrant foul? (only with the technicalFouls setting)
@@ -4359,7 +4878,8 @@ class GameSim extends GameSimBase {
 				// (capped: up to 7 factors multiply here, and past a three-point tendency of about 1.5 nearly every shot was a three)
 				Math.min(
 					MAX_THREE_PROB,
-					0.67 *
+					(this.shotShare ? this.ssThreeTilt(p, selfCreated) : 1) *
+						0.67 *
 						shootingThreePointerScaled2 *
 						this.ga.threePointTendencyFactor *
 						(this.coachSys
@@ -4441,6 +4961,7 @@ class GameSim extends GameSimBase {
 								: 1) * Math.max(0.2, 1 + SPACING.selectRim * spacing)
 					: 1) *
 				driveTilt *
+				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				(this.offEmph ? this.oe[this.o].rim : 1) *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1) *
 				Math.random() *
@@ -4457,6 +4978,7 @@ class GameSim extends GameSimBase {
 				(this.offEmph ? this.oe[this.o].post : 1) *
 				postTilt *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.post : 1) *
+				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				Math.random() *
 				((this.simFixes
 					? (p.compositeRating.shootingLowPostSelect ??
@@ -4642,6 +5164,11 @@ class GameSim extends GameSimBase {
 			) {
 				probMake -=
 					ATTENTION.make * (this.attentionShooterShare - ATTENTION.makeRef);
+			}
+
+			// Shot Share Model: a forced shot late in the shot clock, a role player forcing his shots
+			if (this.shotShare && !putBack && !tipInFromOutOfBounds) {
+				probMake -= this.ssMakeDelta(p);
 			}
 
 			// Star & Clutch Calibration: defensive attention by load (see starClutch.ts)
@@ -4865,6 +5392,9 @@ class GameSim extends GameSimBase {
 				possessionStartsInFrontcourt,
 				tipInFromOutOfBounds,
 			);
+			if (this.shotShare) {
+				this.ssRecordShot(p, putBack, tipInFromOutOfBounds);
+			}
 		}
 
 		const baseLogInformation = {
@@ -4984,6 +5514,10 @@ class GameSim extends GameSimBase {
 			clock: this.t,
 		});
 		this.adv?.shotDone(false, undefined, this.d, this.playersOnCourt[this.d]);
+		if (p.ss) {
+			p.ss.streak = 0;
+			p.ss.hot = 0;
+		}
 
 		return this.doReb();
 	}
@@ -5120,6 +5654,10 @@ class GameSim extends GameSimBase {
 	 * @return {string} Output of this.doReb.
 	 */
 	doBlk(p: PlayerGameSim, type: ShotType) {
+		if (p.ss) {
+			p.ss.streak = 0;
+			p.ss.hot = 0;
+		}
 		this.recordStat(this.o, p, "ba");
 		this.recordStat(this.o, p, "fga");
 
@@ -5179,6 +5717,13 @@ class GameSim extends GameSimBase {
 		andOne: boolean = false,
 	) {
 		const pid = p.id;
+		// Shot Share Model: the hot hand (the team feeds him for its next few shooter draws)
+		if (p.ss) {
+			p.ss.streak += 1;
+			if (p.ss.streak >= p.ss.hotAfter) {
+				p.ss.hot = SHOT_SHARE.hotPoss;
+			}
+		}
 		this.recordStat(this.o, p, "fga");
 		this.recordStat(this.o, p, "fg");
 		this.recordStat(this.o, p, "pts", 2); // 2 points for 2's
@@ -5379,6 +5924,10 @@ class GameSim extends GameSimBase {
 
 	// Spacing & Shot Creation: is a shot of this type assisted, and by whom
 	drawAssist(p: PlayerGameSim, type: ShotType, selfCreated: boolean) {
+		// Shot Share Model: the doubled star's kick-out is an assisted catch-and-shoot attempt (no random number drawn)
+		if (this.ssKickFor(p) !== undefined) {
+			return this.ssPickKick;
+		}
 		const typeFactor =
 			type === "threePointer"
 				? CREATION.astThree
@@ -6297,7 +6846,11 @@ class GameSim extends GameSimBase {
 	// and doubles, so above a share of ATTENTION.share of the five's weight (shot or creation) only ATTENTION.excess of the rest gets
 	// through and the ball goes to his teammates. Records the shooter's share (before the cap) for the make penalty in doShot. No random
 	// numbers
-	attentionCap(weights: number[]) {
+	attentionCap(
+		weights: number[],
+		share: number = ATTENTION.share,
+		excess: number = ATTENTION.excess,
+	) {
 		let total = 0;
 		for (let i = 0; i < this.numPlayersOnCourt; i++) {
 			total += weights[i]!;
@@ -6305,12 +6858,12 @@ class GameSim extends GameSimBase {
 		if (total <= 0) {
 			return;
 		}
-		const cap = ATTENTION.share * total;
+		const cap = share * total;
 		for (let i = 0; i < this.numPlayersOnCourt; i++) {
 			const w = weights[i]!;
 			this.attentionShares[i] = w / total;
 			if (w > cap) {
-				weights[i] = cap + ATTENTION.excess * (w - cap);
+				weights[i] = cap + excess * (w - cap);
 			}
 		}
 	}

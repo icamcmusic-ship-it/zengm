@@ -662,6 +662,17 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "shotShareModel",
+		key: "shotShareModel",
+		core: true,
+		name: "Shot Share Model",
+		description:
+			"Who takes the shots, closer to the NBA: each five has a 1st, 2nd and 3rd option (late-clock bailouts for the 1st, more catch-and-shoot for role players), a scorer's share is set against his five (a middling scorer among role players doesn't dominate, five scorers spread it) with a softer floor for non-scorers, the offense feeds a hot hand and hunts the weakest matchup, elite defenders take shots away from their man, non-shooters get sagged off and pass up open threes, late in the shot clock the ball goes to the best creator, stars get doubled above a share threshold and kick it to the open man, diva stars and competitors in close games take a little more, and a gentle season correction pulls back a player whose share runs far above his role. Each player on your team has a game plan (More shots, Normal, Fewer shots) next to his playing time; AI coaches set their own. The player page shows each player's shot diet (where his shots came from). League totals stay about the same. Needs Matchup Defense.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "advStats",
 		key: "advStats",
 		core: true,

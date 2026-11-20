@@ -11,6 +11,8 @@ import { toWorker } from "../../util/toWorker.ts";
 import { getCols } from "../../../common/getCols.ts";
 import { useLocal } from "../../util/local.ts";
 import PlayingTime, { ptModifiers } from "./PlayingTime.tsx";
+import ShotPlan, { shotPlans } from "./ShotPlan.tsx";
+import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import TopStuff from "./TopStuff.tsx";
 import type {
 	GameAttributesLeague,
@@ -192,6 +194,8 @@ const Roster = ({
 
 	const college = useIsCollege();
 	const showMood = season === currentSeason && !college;
+	// Shot Share Model: each player's game plan, next to his playing time
+	const showShotPlan = useFeatureOn("shotShareModel") && editable;
 
 	const cols = getCols(
 		[
@@ -205,6 +209,7 @@ const Roster = ({
 			"Country",
 			...stats.map((stat) => `stat:${stat}`),
 			...(editable ? ["PT"] : []),
+			...(showShotPlan ? ["Shots"] : []),
 			...(showMood ? ["Mood"] : []),
 			...(showRelease ? ["Release"] : []),
 			...(showTradeFor || showTradingBlock ? ["Trade"] : []),
@@ -248,6 +253,34 @@ const Roster = ({
 							<p className="text-danger">
 								<b>Warning:</b> be careful increasing playing time! Players play
 								worse when they are tired.
+							</p>
+						</HelpPopover>
+					</>
+				),
+			},
+			Shots: {
+				titleReact: (
+					<>
+						Shots{" "}
+						<HelpPopover title="Game plan">
+							<p>
+								How many of the team's shots your coach draws up for{" "}
+								{helpers.pronoun(gender, "him")} while{" "}
+								{helpers.pronoun(gender, "he")} is on the court, on top of{" "}
+								{helpers.pronoun(gender, "his")} ability and role:
+							</p>
+							<table className="mb-3">
+								{shotPlans.map((info) => {
+									return (
+										<tr key={info.shotPlan} style={info.style}>
+											<td className="px-1">{info.text}</td>
+											<td className="px-1">{info.title}</td>
+										</tr>
+									);
+								})}
+							</table>
+							<p>
+								More shots for a weak scorer means worse shots for the team.
 							</p>
 						</HelpPopover>
 					</>
@@ -417,6 +450,7 @@ const Roster = ({
 				},
 				...stats.map((stat) => helpers.roundStat(p.stats[stat], stat)),
 				...(editable ? [<PlayingTime p={p} userTid={userTid} />] : []),
+				...(showShotPlan ? [<ShotPlan p={p} userTid={userTid} />] : []),
 				...(showMood
 					? [
 							wrappedMood({

@@ -43,6 +43,7 @@ import { StashPlayerPanel } from "../../components/DraftStash.tsx";
 import { RealCompsSummary } from "../../components/RealComps.tsx";
 import { NitStats } from "./NitStats.tsx";
 import { TrackingProfile } from "./TrackingProfile.tsx";
+import { ShotDiet } from "./ShotDiet.tsx";
 import {
 	ScoutingSummaryLine,
 	useScoutingOn,
@@ -187,6 +188,8 @@ const Player2 = ({
 				advSeasons={advSeasons}
 				advCareerFolded={advCareerFolded}
 			/>
+
+			<ShotDiet advSeasons={advSeasons} />
 
 			<NitStats player={player} />
 

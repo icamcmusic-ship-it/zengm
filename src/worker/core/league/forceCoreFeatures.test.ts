@@ -39,6 +39,7 @@ describe("core League Extras", () => {
 			"simFixes",
 			"matchupDefense",
 			"starClutchCal",
+			"shotShareModel",
 			"expandedRatings",
 			"subRatings",
 			"ovrV2",

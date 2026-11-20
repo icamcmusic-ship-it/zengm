@@ -5279,6 +5279,31 @@ const updatePlayingTime = async ({
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 };
 
+// Shot Share Model: the game plan for a player on the user's team (-1 Fewer shots, 0 Normal, 1 More shots)
+const updateShotPlan = async ({
+	pid,
+	shotPlan,
+}: {
+	pid: number;
+	shotPlan: number;
+}) => {
+	const p = await idb.cache.players.get(pid);
+	if (!p) {
+		throw new Error("Invalid pid");
+	}
+	if (!g.get("userTids").includes(p.tid)) {
+		throw new Error("Not on your team");
+	}
+	if (shotPlan === 1 || shotPlan === -1) {
+		p.shotPlan = shotPlan;
+	} else {
+		delete p.shotPlan;
+	}
+	await idb.cache.players.put(p);
+
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+};
+
 const updatePlayoffTeams = async (
 	teams: {
 		tid: number;
@@ -5848,6 +5873,7 @@ const upsertCustomizedPlayer = async (
 			p.numDaysFreeAgent = 0;
 			p.gamesUntilTradable = 0;
 			p.ptModifier = 1;
+			delete p.shotPlan;
 		}
 	}
 
@@ -6631,6 +6657,7 @@ const api = {
 		updatePlayerWatch,
 		updatePlayersWatch,
 		updatePlayingTime,
+		updateShotPlan,
 		updatePlayoffTeams,
 		updateTeamInfo,
 		updateTrade,
