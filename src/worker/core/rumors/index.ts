@@ -4,8 +4,8 @@
  * and GM hot seats and draft needs. Each rumor has a confidence and is later marked confirmed or didn't happen.
  *
  * It only reads the league. It never changes a team or a player and never draws from Math.random: its own seeded stream (league rumor
- * seed + day counter) decides how many rumors, which ones and how they are worded, and while it runs Math.random is swapped for that
- * stream, so even a helper that draws a random number can't move the sim's sequence. AI decisions are the same with it on or off
+ * seed + day counter) decides how many rumors, which ones and how they are worded, and a helper that would draw a random number gets
+ * that stream passed in (swapped in only around synchronous code), so it can't move the sim's sequence. AI decisions are the same with it on or off
  * (rumors.test.ts).
  */
 import { PHASE, PLAYER } from "../../../common/constants.ts";
@@ -162,7 +162,7 @@ const toCandidates = (players: Player[], season: number): CandidatePlayer[] =>
 	});
 
 // Everything the gatherers share, read once per rumor day
-const makeCtx = async () => {
+const makeCtx = async (random: () => number) => {
 	const season = g.get("season");
 	const phase = g.get("phase");
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
@@ -225,6 +225,8 @@ const makeCtx = async () => {
 		clock,
 		aiTrades,
 		moodSum,
+		// The mill's stream, for helpers that would otherwise draw from Math.random
+		random,
 		tradeUntil: tradeRumorUntil(season, phase, hasDeadline),
 		// Days of games left before the deadline (or the end of the season), about two days per game
 		daysToDeadline: Math.max(
@@ -620,7 +622,7 @@ const gatherFreeAgent = async (ctx: Ctx): Promise<Draft[]> => {
 	if (freeAgents.length === 0) {
 		return out;
 	}
-	const market = await getFreeAgentMarket(freeAgents);
+	const market = await getFreeAgentMarket(freeAgents, ctx.random);
 	const sorted = freeAgents.toSorted((a, b) => b.value - a.value).slice(0, 25);
 	// A free agent rumor made in free agency can come true until the next regular season starts
 	const until: RumorMoment =
@@ -1074,7 +1076,7 @@ const makeRumors = async (
 	if (count <= 0) {
 		return created;
 	}
-	const ctx = await makeCtx();
+	const ctx = await makeCtx(random);
 	const weights = typeWeights(ctx.clock);
 	const cache = new Map<RumorType, Draft[]>();
 	const taken = takenKeys(state, ctx.season);
@@ -1250,11 +1252,12 @@ const run = async (event: "day" | "phase") => {
 		mixSeed(state.seed, state.tick, event === "day" ? 1 : 2),
 	);
 
-	// Nothing in here may move the sim's random sequence
-	const realRandom = Math.random;
-	Math.random = random;
+	// Nothing in here may move the sim's random sequence: every draw takes random (or buzzRandom) explicitly. Math.random is never
+	// swapped here, since a swap held across these awaits would also hand the mill's stream to anything else that runs meanwhile (a
+	// game sim, a UI request). A helper that draws on its own gets the stream passed in and swaps it only around synchronous code
+	// (common/random.ts withRandom)
 	let created: Rumor[] = [];
-	try {
+	{
 		await resolveRumors(state);
 		const count =
 			event === "day"
@@ -1266,7 +1269,6 @@ const run = async (event: "day" | "phase") => {
 			const buzzRandom = makeSeededRandom(
 				mixSeed(state.seed, state.tick, event === "day" ? 3 : 4),
 			);
-			Math.random = buzzRandom;
 			const buzzCount =
 				event === "day"
 					? poisson(buzzDailyRate(g.get("phase")), buzzRandom)
@@ -1274,8 +1276,6 @@ const run = async (event: "day" | "phase") => {
 			await makeBuzz(state, buzzCount, buzzRandom);
 		}
 		pruneRumors(state, g.get("season"));
-	} finally {
-		Math.random = realRandom;
 	}
 
 	await league.setGameAttributes({ rumors: state });

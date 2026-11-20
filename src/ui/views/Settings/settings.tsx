@@ -26,6 +26,7 @@ import type {
 	RealDraftRatings,
 } from "../../../common/types.ts";
 import { parseCurrencyFormat } from "../../util/parseCurrencyFormat.ts";
+import { validateGameSimSetting } from "../../../common/gameSimSettingsValidation.ts";
 import { getDraftTypeDescription } from "../DraftLottery.tsx";
 import { bySport } from "../../../common/sportFunctions.ts";
 import {
@@ -172,6 +173,20 @@ type Setting = {
 
 	// Longer than one line, hidden by default
 	descriptionLong?: ReactNode;
+};
+
+// The game sim range checks (factors >= 0 and finite, quarter length > 0, pace and home court ranges), before a setting's own validator
+const withGameSimValidator = (setting: Setting): Setting => {
+	const own = setting.validator;
+	return {
+		...setting,
+		validator: async (value, output, props) => {
+			validateGameSimSetting(setting.key, value);
+			if (own) {
+				await own(value, output, props);
+			}
+		},
+	};
 };
 
 export const settings: Setting[] = (
@@ -1974,7 +1989,8 @@ export const settings: Setting[] = (
 			type: "float",
 			description: bySport({
 				baseball: "",
-				basketball: "Average number of possessions per 48 minutes.",
+				basketball:
+					"Average number of possessions per 48 minutes. With Realistic Possessions on, a very low pace (below about 87) mostly adds dead clock between possessions rather than slower possessions.",
 				football:
 					"The time between plays is divided by this number. So higher value -> shorter time between plays. And lower value -> longer time between plays.",
 				hockey:
@@ -2583,11 +2599,7 @@ export const settings: Setting[] = (
 			name: "Period Length (minutes)",
 			godModeRequired: "always",
 			type: "float",
-			validator: (value) => {
-				if (value < 0) {
-					throw new Error("Value must be greater than or equal to 0");
-				}
-			},
+			// (> 0 and finite: see the game sim range checks in withGameSimValidator)
 		},
 		{
 			category: "Game Simulation",
@@ -3156,7 +3168,9 @@ export const settings: Setting[] = (
 			type: "float",
 			decoration: "percent",
 			description:
-				"This is the percentage boost/penalty given to home/away player ratings. Default is 1%.",
+				__SPORT === "basketball"
+					? "This is the percentage boost/penalty given to home/away player ratings. Default is 1%. With Load, Fatigue & Venue on, part of it instead becomes a referee lean (the home team draws more fouls, the visitors fewer)."
+					: "This is the percentage boost/penalty given to home/away player ratings. Default is 1%.",
 		},
 		{
 			category: "Game Simulation",
@@ -3271,4 +3285,6 @@ export const settings: Setting[] = (
 		// League extras: one switch per native feature plus its options, all from the registry
 		...nativeFeatureSettings(),
 	] as Setting[]
-).filter((setting) => !gameAttributesKeysOtherSports.has(setting.key as any));
+)
+	.filter((setting) => !gameAttributesKeysOtherSports.has(setting.key as any))
+	.map(withGameSimValidator);

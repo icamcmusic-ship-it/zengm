@@ -46,9 +46,11 @@ export const LOAD = {
 
 // The fatigue multiplier (1 = fresh) from the stock one
 export const loadFatigue = (energy: number) => {
-	const x = 1 - energy;
+	const x = Math.max(0, Math.min(1, 1 - energy));
 	const w = LOAD.fatigueCurve;
-	return 1 - ((1 - w) * x + (w * x * x) / LOAD.fatigueX0);
+	// Clamped at 0: below about 48% energy the curve went negative, which turned the fatigue penalty into a bonus (with the late-game
+	// blend in GameSim.fatigue, and multiplied into ratings that are subtracted)
+	return Math.max(0, 1 - ((1 - w) * x + (w * x * x) / LOAD.fatigueX0));
 };
 
 // Injury risk weight for a player with this (stock) energy on the court, before dividing by the average over the court
@@ -65,8 +67,15 @@ export const homeCourtModifier = (homeCourtAdvantage: number, crowd: number) =>
 	1 + (homeCourtAdvantage / 100) * (LOAD.baseShare + LOAD.crowdShare * crowd);
 
 // The referees' lean, also proportional to the home court setting (1% stock)
-export const refLean = (homeCourtAdvantage: number) =>
-	LOAD.refFoulLean * homeCourtAdvantage;
+// Clamped so the foul multipliers 1 -/+ lean stay in [0.5, 1.5] (unclamped, a home court above about 34% made the home team's foul
+// multiplier negative)
+export const REF_LEAN_MAX = 0.5;
+export const refLean = (homeCourtAdvantage: number) => {
+	const lean = LOAD.refFoulLean * homeCourtAdvantage;
+	return Number.isFinite(lean)
+		? Math.max(-REF_LEAN_MAX, Math.min(REF_LEAN_MAX, lean))
+		: 0;
+};
 
 // Great-circle distance in km between two team regions, undefined if either has no coordinates
 export const travelDistance = (

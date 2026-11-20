@@ -37,6 +37,24 @@ export const makeSeededRandom = (seed: number) => {
 };
 
 /**
+ * Runs a synchronous function with Math.random replaced by random, and puts Math.random back before returning. Synchronous only: a
+ * swap held across an await would hand the replacement to whatever else runs in the meantime (a game sim, another request).
+ */
+export const withRandom = <T>(random: () => number, fn: () => T): T => {
+	const orig = Math.random;
+	Math.random = random;
+	try {
+		const result = fn();
+		if (result instanceof Promise) {
+			throw new Error("withRandom needs a synchronous function");
+		}
+		return result;
+	} finally {
+		Math.random = orig;
+	}
+};
+
+/**
  * Choose a random integer from [a, b]
  *
  * @memberOf util.random

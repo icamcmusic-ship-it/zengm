@@ -140,6 +140,12 @@ import { AdvTracker } from "./advTracking.ts";
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
 // weight, before late-game IQ moves it (see applyLateGameDecision)
 const LATE_GAME_BASE_ERROR = 0.06;
+
+// The most likely a shot attempt is a three (shot-type roll), whatever the settings
+export const MAX_THREE_PROB = 0.85;
+
+// A probability in [0, 1] (NaN -> 0, which is what comparing NaN with Math.random() did)
+const clampProb = (x: number) => (x > 0 ? (x < 1 ? x : 1) : 0);
 // const NUM_TIMEOUTS_MAX_FINAL_PERIOD = 4;
 // const NUM_TIMEOUTS_MAX_FINAL_PERIOD_LAST_3_MIN = 2;
 const NUM_TIMEOUTS_OVERTIME = 2;
@@ -514,6 +520,8 @@ class GameSim extends GameSimBase {
 	// numbers are exactly what they were before this existed
 	techFouls: boolean;
 	ejected = new Set<PlayerGameSim>();
+	// Injured or ejected players who had to stay on the court because no substitute was eligible (updatePlayersOnCourt)
+	stuckOnCourt = new Set<PlayerGameSim>();
 	techs = new Map<PlayerGameSim | number, number>();
 	flagrants = new Map<PlayerGameSim, number>();
 	// The realistic possession model (the realisticPossessions setting, see possessionModel.ts): a real shot clock, transition and
@@ -1156,14 +1164,20 @@ class GameSim extends GameSimBase {
 			clock: this.t,
 		});
 
+		const foulsNeededToFoulOut = this.ga.foulsNeededToFoulOut;
 		const shooters = teamNums.map((t) => {
-			// Find best shooter - slight bias towards high usage players
+			// Find best shooter - slight bias towards high usage players. Injured, ejected and fouled out players only if nobody else can
+			// shoot
 			return maxBy(
 				this.team[t].player,
 				(p) =>
 					p.compositeRating.shootingThreePointer +
 					0.2 * p.compositeRating.usage -
-					(p.injured ? 1000 : 0),
+					(p.injured ? 1000 : 0) -
+					(this.ejected.has(p) ? 1000 : 0) -
+					(foulsNeededToFoulOut > 0 && p.stat.pf >= foulsNeededToFoulOut
+						? 1000
+						: 0),
 			)!;
 		}) as [PlayerGameSim, PlayerGameSim];
 
@@ -1236,11 +1250,20 @@ class GameSim extends GameSimBase {
 			}
 			return this.playersOnCourt[t][ind];
 		}) as [PlayerGameSim, PlayerGameSim];
-		const prob =
-			0.5 *
-			(jumpers[0].compositeRating.jumpBall /
-				jumpers[1].compositeRating.jumpBall) **
-				3;
+		let prob: number;
+		if (this.simFixes) {
+			// Game Sim Fixes: a fair contest, r0^3 / (r0^3 + r1^3). The stock formula, 0.5 (r0 / r1)^3, favors team 0 (a 10% better
+			// jumper wins 67% for team 0 but 62% for team 1). Same single draw, so the random stream is unchanged
+			const a = Math.max(0, jumpers[0].compositeRating.jumpBall) ** 3;
+			const b = Math.max(0, jumpers[1].compositeRating.jumpBall) ** 3;
+			prob = a + b > 0 ? a / (a + b) : 0.5;
+		} else {
+			prob =
+				0.5 *
+				(jumpers[0].compositeRating.jumpBall /
+					jumpers[1].compositeRating.jumpBall) **
+					3;
+		}
 
 		// Team assignments are the opposite of what you'd expect, cause in simPossession it swaps possession at top
 		this.o = Math.random() < prob ? 1 : 0;
@@ -1443,7 +1466,11 @@ class GameSim extends GameSimBase {
 			this.team[this.o].stat.pts - this.team[this.d].stat.pts;
 
 		// Run out the clock if winning
-		if (period >= this.numPeriods && this.t <= 24 && pointDifferential > 0) {
+		if (
+			period >= this.numPeriods &&
+			this.t <= this.shotClockFull &&
+			pointDifferential > 0
+		) {
 			return "runOutClock" as const;
 		}
 
@@ -1750,6 +1777,7 @@ class GameSim extends GameSimBase {
 					// The coach's rotation style and rest philosophy (coaching systems, staff/systems.ts applyCoachSystems)
 					rotationStyle: (t as any).rotationStyle,
 					backToBackCut: (t as any).backToBackCut,
+					regulationMinutes: this.numPeriods * this.ga.quarterLength,
 				},
 			);
 			for (const [i, p] of t.player.entries()) {
@@ -1783,6 +1811,7 @@ class GameSim extends GameSimBase {
 			numPeriods: this.numPeriods,
 			foulsNeededToFoulOut: this.rotationFoulsToFoulOut,
 			quarterSeconds: this.rotationQuarterSeconds,
+			elapsed: this.elapsedRegulationSeconds(),
 		});
 		if (
 			sitUntil !== undefined &&
@@ -2042,8 +2071,7 @@ class GameSim extends GameSimBase {
 	) {
 		let factor = 1;
 		const sitUntil = this.foulTroubleSitUntil.get(p);
-		const rulesApply =
-			this.numPeriods === 4 && this.rotationFoulsToFoulOut >= 5;
+		const rulesApply = this.numPeriods >= 1 && this.rotationFoulsToFoulOut >= 5;
 		if (rulesApply) {
 			if (
 				sitUntil !== undefined &&
@@ -2067,13 +2095,20 @@ class GameSim extends GameSimBase {
 				factor *= minutesDebtFactor(
 					target,
 					p.stat.min,
-					elapsed / regulationSeconds,
+					// (no regulation at all, quarter length 0: all of it has been played, rather than 0 / 0)
+					regulationSeconds > 0 ? elapsed / regulationSeconds : 1,
 				);
 			} else {
 				factor *= UNPLANNED_FACTOR;
 			}
 		}
 		return factor;
+	}
+
+	// Regulation length / 48 minutes, for clock thresholds written for a 48-minute game (1 with default settings)
+	gameLengthScale() {
+		const minutes = this.numPeriods * this.ga.quarterLength;
+		return Number.isFinite(minutes) && minutes > 0 ? minutes / 48 : 1;
 	}
 
 	getFoulTroubleLimit() {
@@ -2084,7 +2119,7 @@ class GameSim extends GameSimBase {
 		if (
 			this.overtimes > 0 ||
 			this.elamActive ||
-			(quarter === this.numPeriods && this.t < 8 * 60)
+			(quarter === this.numPeriods && this.t < 8 * 60 * this.gameLengthScale())
 		) {
 			return foulsNeededToFoulOut;
 		}
@@ -2092,7 +2127,9 @@ class GameSim extends GameSimBase {
 		const quarterLength = this.ga.quarterLength;
 
 		const gameCompletionFraction =
-			(quarter - this.t / (quarterLength * 60)) / this.numPeriods;
+			quarterLength > 0
+				? (quarter - this.t / (quarterLength * 60)) / this.numPeriods
+				: 1;
 
 		// For default settings, the limit by quarter is 2/3/5/5. (Last quarter is 5 because of that Math.min)
 		let foulLimit = Math.ceil(gameCompletionFraction * foulsNeededToFoulOut);
@@ -2156,13 +2193,15 @@ class GameSim extends GameSimBase {
 					Math.max(this.team[this.d].stat.pts, this.team[this.o].stat.pts);
 				blowout = diff >= 20 && ptsToTarget < diff;
 			} else {
+				// (cutoffs for a 48-minute game, scaled to the game's length)
+				const s = this.gameLengthScale();
 				blowout =
 					quarter === this.numPeriods &&
-					((diff >= 30 && this.t < 12 * 60) ||
-						(diff >= 25 && this.t < 9 * 60) ||
-						(diff >= 20 && this.t < 7 * 60) ||
-						(diff >= 15 && this.t < 3 * 60) ||
-						(diff >= 10 && this.t < 1 * 60));
+					((diff >= 30 && this.t < 12 * 60 * s) ||
+						(diff >= 25 && this.t < 9 * 60 * s) ||
+						(diff >= 20 && this.t < 7 * 60 * s) ||
+						(diff >= 15 && this.t < 3 * 60 * s) ||
+						(diff >= 10 && this.t < 1 * 60 * s));
 			}
 		}
 
@@ -2362,6 +2401,15 @@ class GameSim extends GameSimBase {
 					pidsOff,
 					clock: this.t,
 				});
+			}
+
+			// An injured (or ejected) player only stays on the court when nobody on the bench can play at all (fouled out players are
+			// already allowed in that case, see getOvrs(true)): the team still has to field a lineup. Marked, so it's visible rather than
+			// silent
+			for (const p of this.playersOnCourt[t]) {
+				if (p.injured || this.ejected.has(p)) {
+					this.stuckOnCourt.add(p);
+				}
 			}
 		}
 
@@ -2929,22 +2977,24 @@ class GameSim extends GameSimBase {
 			const ratings = this.team[t].compositeRating;
 			const synergy = this.team[t].synergy;
 
-			ratings.dribbling = dribbling / 5 + this.synergyFactor * synergy.off;
-			ratings.passing = passing / 5 + this.synergyFactor * synergy.off;
-			ratings.rebounding = rebounding / 5 + this.synergyFactor * synergy.reb;
-			ratings.defense = defense / 5 + this.synergyFactor * synergy.def;
+			// (the number of players on the court, 5 unless the league changed it; this was a literal 5, which weakened 3-on-3 teams)
+			const nOn = this.numPlayersOnCourt;
+			ratings.dribbling = dribbling / nOn + this.synergyFactor * synergy.off;
+			ratings.passing = passing / nOn + this.synergyFactor * synergy.off;
+			ratings.rebounding = rebounding / nOn + this.synergyFactor * synergy.reb;
+			ratings.defense = defense / nOn + this.synergyFactor * synergy.def;
 			ratings.defensePerimeter =
-				defensePerimeter / 5 + this.synergyFactor * synergy.def;
-			ratings.blocking = blocking / 5 + this.synergyFactor * synergy.def;
+				defensePerimeter / nOn + this.synergyFactor * synergy.def;
+			ratings.blocking = blocking / nOn + this.synergyFactor * synergy.def;
 			if (this.expandedRatings) {
 				ratings.defenseInterior =
-					defenseInterior / 5 + this.synergyFactor * synergy.def;
+					defenseInterior / nOn + this.synergyFactor * synergy.def;
 			} else if (shares) {
 				// Position-aware team composites without expanded ratings: shot defense inside and outside (see shotDefense)
 				ratings.defenseInside =
-					defenseInside / 5 + this.synergyFactor * synergy.def;
+					defenseInside / nOn + this.synergyFactor * synergy.def;
 				ratings.defenseOutside =
-					defenseOutside / 5 + this.synergyFactor * synergy.def;
+					defenseOutside / nOn + this.synergyFactor * synergy.def;
 			} else if (this.positionalComposites) {
 				// Not 5 players on the court, so no shares: shots inside and outside face the plain team defense (these were left undefined,
 				// which made every shot's make probability NaN, so no shot ever went in)
@@ -2953,11 +3003,11 @@ class GameSim extends GameSimBase {
 			}
 			if (this.expandedRatings2) {
 				ratings.offRebounding =
-					offRebounding / 5 + this.synergyFactor * synergy.reb;
+					offRebounding / nOn + this.synergyFactor * synergy.reb;
 				ratings.defRebounding =
-					defRebounding / 5 + this.synergyFactor * synergy.reb;
+					defRebounding / nOn + this.synergyFactor * synergy.reb;
 				ratings.ballSecurity =
-					ballSecurity / 5 + this.synergyFactor * synergy.off;
+					ballSecurity / nOn + this.synergyFactor * synergy.off;
 			}
 
 			// Player traits: team chemistry (leadership) lifts or lowers every team composite rating a little
@@ -3108,7 +3158,9 @@ class GameSim extends GameSimBase {
 			this.injuryPaceRate === undefined ||
 			this.injuryPaceRateFrom !== this.baseInjuryRate
 		) {
-			this.injuryPaceRate = this.baseInjuryRate * (100 / this.ga.pace);
+			// (pace floored at 10, like the sim's pace factor: a tiny pace used to multiply the injury rate by up to 10,000)
+			this.injuryPaceRate =
+				this.baseInjuryRate * (100 / Math.max(10, this.ga.pace));
 			this.injuryPaceRateFrom = this.baseInjuryRate;
 		}
 		const baseRate = this.injuryPaceRate;
@@ -3458,7 +3510,7 @@ class GameSim extends GameSimBase {
 				// ball and put the free throw shooters in (better game managers more often)
 				if (
 					pointDifferential <= 3 &&
-					this.t <= 24 &&
+					this.t <= this.shotClockFull &&
 					this.t > 2 &&
 					(this.prevPossessionOutcome === "fg" ||
 						this.prevPossessionOutcome === "ft") &&
@@ -4304,20 +4356,30 @@ class GameSim extends GameSimBase {
 		} else if (
 			forceThreePointer ||
 			Math.random() <
-				0.67 *
-					shootingThreePointerScaled2 *
-					this.ga.threePointTendencyFactor *
-					(this.coachSys ? this.cs[this.o].three * this.cs[this.d].dThree : 1) *
-					(sc ? (selfCreated ? CREATION.selfThree : CREATION.otherThree) : 1) *
-					(this.playTypes
-						? PLAY_TYPES.three *
-							(selfCreated ? PLAY_TYPES.selfThree : PLAY_TYPES.otherThree) *
-							(this.offEmph
-								? selfCreated
-									? this.oe[this.o].selfThree
-									: this.oe[this.o].three
-								: 1)
-						: 1)
+				// (capped: up to 7 factors multiply here, and past a three-point tendency of about 1.5 nearly every shot was a three)
+				Math.min(
+					MAX_THREE_PROB,
+					0.67 *
+						shootingThreePointerScaled2 *
+						this.ga.threePointTendencyFactor *
+						(this.coachSys
+							? this.cs[this.o].three * this.cs[this.d].dThree
+							: 1) *
+						(sc
+							? selfCreated
+								? CREATION.selfThree
+								: CREATION.otherThree
+							: 1) *
+						(this.playTypes
+							? PLAY_TYPES.three *
+								(selfCreated ? PLAY_TYPES.selfThree : PLAY_TYPES.otherThree) *
+								(this.offEmph
+									? selfCreated
+										? this.oe[this.o].selfThree
+										: this.oe[this.o].three
+									: 1)
+							: 1),
+				)
 		) {
 			// Three pointer
 			type = "threePointer";
@@ -4649,14 +4711,16 @@ class GameSim extends GameSimBase {
 			}
 		}
 
+		// Always valid probabilities (only clamped before when player traits applied). Compared with Math.random() in [0, 1), so this
+		// changes no outcome, it just keeps NaN-free, sane values for anything that reads them
 		return {
 			blocked,
 			passer,
 			desperation: forceThreePointer || rushed,
 			fgaLogType,
-			probAndOne,
-			probMake,
-			probMissAndFoul,
+			probAndOne: clampProb(probAndOne),
+			probMake: clampProb(probMake),
+			probMissAndFoul: clampProb(probMissAndFoul),
 			type,
 		};
 	}
@@ -5718,8 +5782,9 @@ class GameSim extends GameSimBase {
 
 	// 95% max, a 75 FT rating gets you 90%, and a 25 FT rating gets you 60%. Player traits: clutch free throw shooting
 	freeThrowProb(t: TeamNum, p: PlayerGameSim) {
+		// The FT accuracy factor scales the whole probability (it used to scale only the ratings part, so a factor of 0 still made 45%)
 		const base =
-			this.ga.ftAccuracyFactor * p.compositeRating.shootingFT * 0.6 + 0.45;
+			this.ga.ftAccuracyFactor * (p.compositeRating.shootingFT * 0.6 + 0.45);
 		if (this.traitsOn && p.traitEffects) {
 			return helpers.bound(
 				base +
