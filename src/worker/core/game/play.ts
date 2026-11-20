@@ -389,6 +389,11 @@ const play = async (
 				await freeAgents.decreaseDemands();
 				await freeAgents.autoSign();
 				await contractHooks.afterDay();
+
+				// Weekly power rankings snapshot, for movement arrows on the Power Rankings page
+				const { snapshotPowerRankings } =
+					await import("../../views/powerRankings.ts");
+				await snapshotPowerRankings();
 			}
 			if (dayTick && phase === PHASE.REGULAR_SEASON) {
 				// AI-to-AI trades and AI offers are background activity: a bug in them must not stop the season

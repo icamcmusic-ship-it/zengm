@@ -12,6 +12,7 @@ import { bySport } from "../../common/sportFunctions.ts";
 import { useLocal } from "../util/local.ts";
 import { getCol } from "../../common/getCol.ts";
 import { formatOdds } from "../components/SeasonOdds.tsx";
+import PowerRankingsChart, { RankChange } from "./PowerRankingsChart.tsx";
 
 const Other = ({
 	actualShowHealthy,
@@ -175,7 +176,16 @@ const PowerRankings = ({
 		return {
 			key: t.tid,
 			data: [
-				t.powerRankings.rank,
+				{
+					value: (
+						<>
+							{t.powerRankings.rank}
+							<RankChange change={t.rankChange} />
+						</>
+					),
+					sortValue: t.powerRankings.rank,
+					searchValue: t.powerRankings.rank,
+				},
 				wrappedTeamLogoAndName(
 					t,
 					helpers.leagueUrl([
@@ -257,6 +267,8 @@ const PowerRankings = ({
 					some teams get higher or lower ratings.
 				</p>
 			) : null}
+
+			<PowerRankingsChart teams={teams} userTid={userTid} />
 
 			<DataTable
 				cols={cols}

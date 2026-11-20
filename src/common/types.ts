@@ -2735,6 +2735,11 @@ export type TeamSeasonWithoutKey = {
 	frontOffice?: TeamSeasonFrontOffice;
 	payrollEndOfSeason: number;
 	ownerMood?: OwnerMood;
+	// Power rankings snapshots taken about once a week during the regular season, used for movement arrows and the rank-over-time chart
+	powerRankHistory?: {
+		day: number;
+		rank: number;
+	}[];
 	numPlayersTradedAway: number;
 	note?: string;
 	noteBool?: 1; // Keep in sync with note - for indexing

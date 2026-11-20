@@ -4,6 +4,17 @@ import { defineView, keepType } from "../util/defineView.ts";
 import getPlayoffsByConf from "../core/season/getPlayoffsByConf.ts";
 import { getRoundsWonText } from "./frivolitiesTeamSeasons.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { bySport } from "../../common/sportFunctions.ts";
+
+// Same as the baseline in core/season/updateOwnerMood, for showing the owner's expectations next to the results
+const getExpectedProfit = () =>
+	(15 * g.get("salaryCap")) /
+	bySport({
+		baseball: 175000,
+		basketball: 90000,
+		football: 200000,
+		hockey: 80000,
+	});
 
 const processInputs = (params: RouteParams<"message">) => {
 	return {
@@ -110,12 +121,30 @@ export default defineView({
 									teamSeason.playoffRoundsWon ===
 									g.get("numGamesPlayoffSeries", teamSeason.season).length,
 								profit,
+								expectedProfit: getExpectedProfit(),
+								playoffRoundsWon: teamSeason.playoffRoundsWon,
+								numPlayoffRounds: g.get(
+									"numGamesPlayoffSeries",
+									teamSeason.season,
+								).length,
+								numGames: g.get("numGames", teamSeason.season),
 								roundsWonText,
 							};
 						}
 
+						// ownerMood is cumulative, so this season's contribution is the change from last season
+						const prevMood = i > 0 ? message.ownerMoods[i - 1] : undefined;
+						const deltas = prevMood
+							? {
+									wins: mood.wins - prevMood.wins,
+									playoffs: mood.playoffs - prevMood.playoffs,
+									money: mood.money - prevMood.money,
+								}
+							: undefined;
+
 						augmentedOwnerMoods.push({
 							...mood,
+							deltas,
 							total: mood.money + mood.playoffs + mood.wins,
 							season,
 							seasonInfo,

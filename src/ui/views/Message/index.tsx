@@ -1,4 +1,5 @@
 import OwnerMoodsChart from "./OwnerMoodsChart.tsx";
+import OwnerMoodBreakdown from "./OwnerMoodBreakdown.tsx";
 import { SafeHtml } from "../../components/SafeHtml.tsx";
 import useTitleBar from "../../hooks/useTitleBar.tsx";
 import { helpers } from "../../util/helpers.ts";
@@ -29,6 +30,10 @@ const Message = ({ message }: View<"message">) => {
 
 			{message.ownerMoods && message.ownerMoods.length > 2 ? (
 				<OwnerMoodsChart ownerMoods={message.ownerMoods} />
+			) : null}
+
+			{message.ownerMoods && message.ownerMoods.length > 0 ? (
+				<OwnerMoodBreakdown ownerMoods={message.ownerMoods} />
 			) : null}
 
 			<div className="mt-3">

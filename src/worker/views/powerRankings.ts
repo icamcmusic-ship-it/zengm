@@ -218,6 +218,54 @@ export const addPowerRankingsStuffToTeams = async <
 	return teamsWithRankings;
 };
 
+const SNAPSHOT_INTERVAL_DAYS = __SPORT === "football" ? 1 : 7;
+
+// Store each team's power rank in its teamSeason about once every SNAPSHOT_INTERVAL_DAYS days of games
+export const snapshotPowerRankings = async () => {
+	const season = g.get("season");
+	const teamSeasons = (
+		await idb.cache.teamSeasons.indexGetAll("teamSeasonsBySeasonTid", [
+			[season],
+			[season, "Z"],
+		])
+	).filter((ts) => !g.get("teamInfoCache")[ts.tid]?.disabled);
+	if (teamSeasons.length === 0) {
+		return;
+	}
+
+	const day = Math.max(...teamSeasons.map((ts) => ts.lastGameDay ?? 0));
+	const lastDay = Math.max(
+		-Infinity,
+		...teamSeasons.map((ts) => ts.powerRankHistory?.at(-1)?.day ?? -Infinity),
+	);
+	if (day <= 0 || day - lastDay < SNAPSHOT_INTERVAL_DAYS) {
+		return;
+	}
+
+	const teams = await team.getFormattedAll({
+		attrs: ["tid", "playThroughInjuries"],
+		seasonAttrs: ["lastTen"],
+		stats: ["gp", "mov"],
+		season,
+		showNoStats: true,
+	});
+	const ranked = await addPowerRankingsStuffToTeams(
+		teams,
+		season,
+		"regularSeason",
+	);
+	const rankByTid = new Map(ranked.map((t) => [t.tid, t.powerRankings.rank]));
+
+	for (const ts of teamSeasons) {
+		const rank = rankByTid.get(ts.tid);
+		if (rank === undefined) {
+			continue;
+		}
+		ts.powerRankHistory = [...(ts.powerRankHistory ?? []), { day, rank }];
+		await idb.cache.teamSeasons.put(ts);
+	}
+};
+
 export default defineView({
 	id: "powerRankings",
 	processInputs,
@@ -242,17 +290,32 @@ export default defineView({
 					"did",
 					"imgURL",
 					"imgURLSmall",
+					"powerRankHistory",
+					"lastGameDay",
 				],
 				stats: ["gp", "mov", "pts", "oppPts"],
 				season,
 				showNoStats: true,
 			});
 
-			const teamsWithRankings = await addPowerRankingsStuffToTeams(
-				teams,
-				season,
-				playoffs,
-			);
+			const teamsWithRankings = (
+				await addPowerRankingsStuffToTeams(teams, season, playoffs)
+			).map((t) => {
+				// Movement since the previous weekly snapshot. If a snapshot was taken on the latest game day, compare to the one before it
+				const history = t.seasonAttrs.powerRankHistory ?? [];
+				const latestDay = t.seasonAttrs.lastGameDay;
+				const prev = history.findLast(
+					(row) => row.day < (latestDay ?? Infinity),
+				);
+				return {
+					...t,
+					powerRankHistory: history,
+					rankChange:
+						playoffs === "regularSeason" && prev
+							? prev.rank - t.powerRankings.rank
+							: undefined,
+				};
+			});
 
 			let ties = false;
 			let otl = false;

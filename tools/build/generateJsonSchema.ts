@@ -3001,6 +3001,21 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 										},
 										required: ["wins", "playoffs", "money"],
 									},
+									powerRankHistory: {
+										type: "array",
+										items: {
+											type: "object",
+											properties: {
+												day: {
+													type: "number",
+												},
+												rank: {
+													type: "number",
+												},
+											},
+											required: ["day", "rank"],
+										},
+									},
 									numPlayersTradedAway: {
 										type: "number",
 										minimum: 0,
