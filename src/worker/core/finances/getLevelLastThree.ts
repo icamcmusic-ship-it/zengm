@@ -4,6 +4,14 @@ import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { idb } from "../../db/index.ts";
 import { assertDefined } from "../../../common/utils.ts";
+import { MAX_LEVEL } from "../../../common/budgetLevels.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+
+// Owner's Office: facilities levels from completed arena/facilities projects (worker/core/ownerOffice)
+const facilitiesBonus = (t: Team) =>
+	__SPORT === "basketball" && featureOn("ownerOffice")
+		? (t.ownerOffice?.facilitiesBonus ?? 0)
+		: 0;
 
 const getLevelLastThree = async (
 	key: keyof TeamSeasonWithoutKey["expenseLevels"],
@@ -74,7 +82,14 @@ const getLevelLastThree = async (
 		}
 
 		if (gpSum > 0) {
-			return Math.round(levelSum / gpSum);
+			const level = Math.round(levelSum / gpSum);
+			if (key === "facilities") {
+				const bonus = facilitiesBonus(t);
+				if (bonus > 0) {
+					return Math.min(MAX_LEVEL, level + bonus);
+				}
+			}
+			return level;
 		}
 	}
 

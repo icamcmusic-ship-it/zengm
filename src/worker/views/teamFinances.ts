@@ -23,6 +23,7 @@ import {
 	frontOfficeEnabled,
 	getFinancesInfo,
 } from "../core/frontOffice/index.ts";
+import { getFinancesInfo as getOwnerOfficeInfo } from "../core/ownerOffice/index.ts";
 import { departmentSize } from "../../common/scoutingReports/scouts.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 
@@ -185,6 +186,8 @@ export default defineView({
 					expensesTravel: teamSeason.frontOffice?.expenses.travel ?? 0,
 					// Realistic AI Economy: cash the owner took out (not an expense), so cash change = revenue - expenses - this
 					ownerDistributions: teamSeason.ownerDistributions ?? 0,
+					// Owner's Office arena/facilities project payments (an expense, in profit)
+					expensesProjects: teamSeason.projectExpenses ?? 0,
 					profit: seasonProfit(teamSeason) / 1000, // convert to millions
 				};
 
@@ -286,6 +289,7 @@ export default defineView({
 
 			return {
 				frontOffice,
+				ownerOffice: await getOwnerOfficeInfo(inputs.tid),
 				autoTicketPrice,
 				tid: inputs.tid,
 				show: inputs.show,

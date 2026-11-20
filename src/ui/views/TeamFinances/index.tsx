@@ -45,6 +45,7 @@ import { BarGraph } from "./BarGraph.tsx";
 import { HelpPopover } from "../../components/HelpPopover.tsx";
 import { getAdjustedTicketPrice } from "../../../common/getAdjustedTicketPrice.ts";
 import { FrontOfficeDepartments, FrontOfficeReview } from "./FrontOffice.tsx";
+import { OwnerOffice } from "./OwnerOffice.tsx";
 
 const paddingLeft85 = { paddingLeft: 85 };
 
@@ -823,6 +824,7 @@ const TeamFinances = ({
 	repeaterTax,
 	coachingStaff,
 	frontOffice,
+	ownerOffice,
 	barData,
 	contractTotals,
 	contracts,
@@ -1089,6 +1091,7 @@ const TeamFinances = ({
 									"expensesFacilities",
 									"expensesAnalytics",
 									"expensesTravel",
+									"expensesProjects",
 									"expensesMinTax",
 									"expensesLuxuryTax",
 								]}
@@ -1101,6 +1104,7 @@ const TeamFinances = ({
 										expensesFacilities: "facilities",
 										expensesAnalytics: "analytics",
 										expensesTravel: "travel & sports science",
+										expensesProjects: "arena & facilities projects",
 										expensesMinTax: "minimum payroll tax",
 										expensesLuxuryTax: "luxury tax",
 									};
@@ -1157,6 +1161,14 @@ const TeamFinances = ({
 			</div>
 
 			{budget && frontOffice ? <FrontOfficeReview info={frontOffice} /> : null}
+
+			{ownerOffice ? (
+				<OwnerOffice
+					info={ownerOffice}
+					own={tid === userTid}
+					disabled={gameSimInProgress}
+				/>
+			) : null}
 
 			<h2>Player Salaries</h2>
 

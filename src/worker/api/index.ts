@@ -54,6 +54,7 @@ import {
 	season,
 } from "../core/index.ts";
 import * as staff from "../core/staff/index.ts";
+import * as ownerOffice from "../core/ownerOffice/index.ts";
 import { ensureGms } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
 import { decodePlayByPlay } from "../../common/pbpFlavor/store.ts";
@@ -4766,6 +4767,15 @@ const updateBudget = async ({
 	await toUI("realtimeUpdate", [["teamFinances"]]);
 };
 
+// Owner's Office: the user starts an arena/facilities project. Returns an error message, or undefined
+const startOwnerProject = async ({
+	type,
+}: {
+	type: import("../../common/ownerOffice.ts").OwnerProjectType;
+}) => {
+	return await ownerOffice.startProject(type);
+};
+
 const updateDefaultSettingsOverrides = async (
 	defaultSettingsOverrides: Partial<Settings>,
 ) => {
@@ -6641,6 +6651,7 @@ const api = {
 		onLiveSimOver,
 		updateAwards,
 		updateBudget,
+		startOwnerProject,
 		updateConfsDivs,
 		updateDefaultSettingsOverrides,
 		updateGameAttributes,

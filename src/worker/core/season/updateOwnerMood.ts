@@ -11,6 +11,8 @@ import {
 	getSeasonSpend,
 } from "../frontOffice/index.ts";
 import * as college from "../college/index.ts";
+import { ownerOfficeEnabled } from "../ownerOffice/index.ts";
+import { evaluateOwnerGoals } from "../../../common/ownerOffice.ts";
 
 /**
  * Update teamSeason.ownerMood based on performance this season, only for user's team.
@@ -105,6 +107,23 @@ const updateOwnerMood = async (): Promise<
 			(0.16 / numPlayoffRounds) * t.seasonAttrs.playoffRoundsWon;
 	} else {
 		deltas.playoffs = 0.2;
+	}
+
+	// Owner's Office: results against the preseason budget meeting's goals, a small bounded nudge (common/ownerOffice.ts)
+	if (ownerOfficeEnabled() && teamSeason.ownerGoals) {
+		const result = evaluateOwnerGoals(teamSeason.ownerGoals, {
+			won: teamSeason.won,
+			profit: t.seasonAttrs.profit,
+			payroll: await team.getPayroll(g.get("userTid")),
+			numGames: g.get("numGames"),
+			salaryCapScale: salaryCapFactor,
+			luxuryPayroll: g.get("luxuryPayroll"),
+			budget: !!g.get("budget"),
+		});
+		teamSeason.ownerGoals.result = result;
+		deltas.wins += result.moodDeltas.wins;
+		deltas.money += result.moodDeltas.money;
+		await idb.cache.teamSeasons.put(teamSeason);
 	}
 
 	// College mode: the season is judged against what the program's prestige predicts

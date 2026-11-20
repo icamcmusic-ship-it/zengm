@@ -26,6 +26,7 @@ import { cashSpendingNudge } from "../finances/ownerDistribution.ts";
 import { MAX_LEVEL } from "../../../common/budgetLevels.ts";
 import * as staff from "../staff/index.ts";
 import { ensureGms } from "../gm/index.ts";
+import * as ownerOffice from "../ownerOffice/index.ts";
 import * as college from "../college/index.ts";
 import { updateArchetypesForPreseason } from "../player/archetype.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
@@ -379,6 +380,9 @@ const newPhasePreseason = async (
 			await idb.cache.teams.put(t);
 		}
 	}
+
+	// Owner's Office: finished projects, the owner's budget meeting, AI projects (seeded, not the main random stream)
+	await ownerOffice.onPreseason();
 
 	if (updatedTeams) {
 		await league.setGameAttributes({

@@ -2474,6 +2474,8 @@ export type Team = {
 	// Front Office Budget (League Extra): levels (1-100) of the two departments that are not budget items. Missing: the team's average
 	// level of its other departments (common/frontOffice.ts, worker/core/frontOffice)
 	frontOffice?: Record<"analytics" | "travel", number>;
+	// Owner's Office (League Extra): arena/facilities projects (common/ownerOffice.ts)
+	ownerOffice?: import("./ownerOffice.ts").OwnerOfficeTeam;
 	// Scouting Director & Regions / Coaching Staff Depth: the user's priorities, delegation, suggestions and reports (common/staffDepth)
 	staffDepth?: import("./staffDepth/types.ts").StaffDepthTeam;
 	// Offensive Emphasis (League Extra): the team's play-type dials and who sets them (common/offEmphasis.ts)
@@ -2744,6 +2746,10 @@ export type TeamSeasonWithoutKey = {
 	// Realistic AI Economy: cash the owner took out this season (thousands of dollars). Not an expense, so it doesn't lower profit, but
 	// cash change = revenue - expenses - ownerDistributions
 	ownerDistributions?: number;
+	// Owner's Office (League Extra): arena/facilities project payments this season (an expense, in profit), and the owner's goals
+	// from the preseason budget meeting (common/ownerOffice.ts)
+	projectExpenses?: number;
+	ownerGoals?: import("./ownerOffice.ts").OwnerGoals;
 	payrollEndOfSeason: number;
 	// Coach & Executive of the Year (League Extra): Executive of the Year won by a front office with no AI GM (the user's team, which
 	// has no GM object). An AI GM's award is stored on the GM instead (Gm.awards)
