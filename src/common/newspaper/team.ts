@@ -210,7 +210,7 @@ export const teamPlayerFeatures = (c: Ctx, tid: number): Article[] => {
 			if (p.prevOvr !== undefined && p.ovr !== p.prevOvr && !c.noRatings) {
 				body.push(
 					P(
-						`His rating ${p.ovr > p.prevOvr ? "rose" : "fell"} from ${p.prevOvr} to ${p.ovr} over the year.`,
+						`${c.pr("His")} rating ${p.ovr > p.prevOvr ? "rose" : "fell"} from ${p.prevOvr} to ${p.ovr} over the year.`,
 					),
 				);
 			}
@@ -222,7 +222,7 @@ export const teamPlayerFeatures = (c: Ctx, tid: number): Article[] => {
 				p.contractAmount !== undefined &&
 				p.contractExp <= c.season + 1
 			) {
-				body.push(P(`His contract runs through ${p.contractExp}.`));
+				body.push(P(`${c.pr("His")} contract runs through ${p.contractExp}.`));
 			}
 			return {
 				id: `team-player-${p.pid}`,

@@ -213,7 +213,7 @@ addPage(
 				id: "recent",
 				heads: (x, c) => [
 					`The last ${Math.min(8, x.list.length)} MVPs`,
-					`MVP history: ${x.list[0]!.name} and the winners before him`,
+					`MVP history: ${x.list[0]!.name} and the winners before ${c.pr("him")}`,
 					`Who has won the MVP, ${x.list.at(-1)!.season} to ${x.list[0]!.season}`,
 					`The league's MVP ledger`,
 				],

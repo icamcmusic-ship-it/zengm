@@ -277,8 +277,8 @@ addPage(
 				build: (x, r, c) => [
 					c.quote(
 						c.cycle("oh-1", [
-							`He ${c.T("is", "was")} at ${fmt1(x.scorer.pts)} a game, and at some point you stop calling it a hot streak.`,
-							`${fmt1(x.scorer.pts)} points a night and he still ${c.T("looks", "looked")} bored.`,
+							`${c.pr("He")} ${c.T("is", "was")} at ${fmt1(x.scorer.pts)} a game, and at some point you stop calling it a hot streak.`,
+							`${fmt1(x.scorer.pts)} points a night and ${c.pr("he")} still ${c.T("looks", "looked")} bored.`,
 							`Ask me who scores the most and I will say ${x.scorer.name} before you finish the question, ${fmt1(x.scorer.pts)} a game or not.`,
 							`${x.scorer.name} at ${fmt1(x.scorer.pts)} a night ${c.T("makes", "made")} the other ${x.scorer.pos}s look like they ${c.T("are", "were")} jogging.`,
 							`I ${c.T("have", "had")} stopped checking the box score on ${x.scorer.name}; ${fmt1(x.scorer.pts)} is just the number now.`,

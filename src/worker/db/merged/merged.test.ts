@@ -15,6 +15,7 @@ import type {
 	EventBBGM,
 	Game,
 	Message,
+	PlayerFeat,
 	Player,
 	TeamSeason,
 	TeamStats,
@@ -24,6 +25,7 @@ import { player, team } from "../../core/index.ts";
 import { g } from "../../util/index.ts";
 import Cache, { STORES } from "../Cache.ts";
 import { connectLeague, idb } from "../index.ts";
+import { resetPlayerFeatsRanges } from "./playerFeats.ts";
 
 const SEASON = 2016;
 
@@ -767,5 +769,58 @@ describe("teamStats", () => {
 			rids(await idb.merged.teamStats.getAll({ tid: 0 })),
 			[0, 1, 100, 4, 5, 8],
 		);
+	});
+});
+
+describe("playerFeats", () => {
+	const makeFeat = (fid: number, season: number): PlayerFeat => ({
+		fid,
+		pid: fid,
+		name: `Player ${fid}`,
+		pos: "G",
+		season,
+		tid: 0,
+		oppTid: 1,
+		playoffs: false,
+		gid: fid,
+		stats: { pts: 50 },
+		result: "W",
+		score: "100-90",
+		overtimes: 0,
+		numPeriods: 4,
+	});
+
+	test("season reads that season's feats, including ones added after the ranges were found", async () => {
+		resetPlayerFeatsRanges();
+		// Out of order on purpose, like an imported league
+		const seasons = [2010, 2010, 2011, 2010, 2012, 2011, 2012];
+		for (const [fid, season] of seasons.entries()) {
+			await idb.league.put("playerFeats", makeFeat(fid, season));
+		}
+		const fids = async (season: number) =>
+			(
+				await idb.merged.playerFeats.getAll({ season }, { map: (f) => f.fid })
+			).toSorted((a, b) => a - b);
+		assert.deepStrictEqual(await fids(2010), [0, 1, 3]);
+		assert.deepStrictEqual(await fids(2011), [2, 5]);
+
+		// After the pass: a new feat in IndexedDB (flushed from the cache) and one only in the cache
+		await idb.league.put("playerFeats", makeFeat(7, 2010));
+		await idb.cache.playerFeats.put(makeFeat(8, 2012));
+		assert.deepStrictEqual(await fids(2010), [0, 1, 3, 7]);
+		assert.deepStrictEqual(await fids(2012), [4, 6, 8]);
+		assert.deepStrictEqual(await fids(2013), []);
+
+		// The same as filtering the whole store
+		const all = await idb.merged.playerFeats.getAll();
+		for (const season of [2010, 2011, 2012]) {
+			assert.deepStrictEqual(
+				await fids(season),
+				all
+					.filter((f) => f.season === season)
+					.map((f) => f.fid)
+					.toSorted((a, b) => a - b),
+			);
+		}
 	});
 });

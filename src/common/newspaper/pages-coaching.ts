@@ -56,7 +56,7 @@ addPage(
 						r.pick([
 							"Owners have fired coaches for less.",
 							"Results against expectations are what get coaches fired.",
-							"A coach's reputation buys him some time, but not forever.",
+							`A coach's reputation buys ${c.pr("him")} some time, but not forever.`,
 						]),
 					),
 				],
@@ -113,7 +113,7 @@ addPage(
 						`Around the league, ${x.common[1]} head coaches ${c.T("run", "ran")} ${x.common[0]}, the most popular offense. `,
 						r.pick([
 							"Systems that win get copied.",
-							"Every coach has his system; the good ones fit it to their players.",
+							`Every coach has ${c.pr("his")} system; the good ones fit it to their players.`,
 						]),
 					),
 				],

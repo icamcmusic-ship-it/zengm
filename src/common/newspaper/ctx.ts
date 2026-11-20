@@ -9,6 +9,7 @@ import {
 	tidySegs,
 	winp,
 } from "./text.ts";
+import { helpers } from "../helpers.ts";
 import type {
 	Article,
 	Block,
@@ -117,6 +118,8 @@ export class Ctx {
 	readonly tid: number | undefined;
 	// No Visible Player Ratings challenge (NewsFacts.noRatings)
 	readonly noRatings: boolean;
+	// The league's gender setting
+	readonly gender: "male" | "female";
 	private readonly teamMap = new Map<number, NPTeam>();
 	private readonly playerMap = new Map<number, NPPlayer>();
 	readonly rows: NPTeam[];
@@ -128,11 +131,17 @@ export class Ctx {
 	// Names of people who are not in the season's player list (retired stars, old draftees)
 	private readonly names = new Map<number, string>();
 
+	// A pronoun in the league's gender: "he" gives "she" in a women's league
+	pr(word: Parameters<typeof helpers.pronoun>[1]) {
+		return helpers.pronoun(this.gender, word);
+	}
+
 	constructor(facts: NewsFacts, tid?: number) {
 		this.f = facts;
 		this.season = facts.season;
 		this.tid = tid;
 		this.noRatings = facts.noRatings === true;
+		this.gender = facts.gender ?? "male";
 		for (const t of facts.teams) {
 			this.teamMap.set(t.tid, t);
 		}
@@ -205,12 +214,16 @@ export class Ctx {
 		return this.playerMap.get(pid);
 	}
 
+	// Teams no longer in the league that the facts still name (contracted champions)
+	private gone(tid: number) {
+		return this.f.champions?.find((x) => x.tid === tid && x.name !== undefined);
+	}
 	tn(tid: number) {
-		return this.team(tid)?.name ?? "team";
+		return this.team(tid)?.name ?? this.gone(tid)?.name ?? "team";
 	}
 	tfull(tid: number) {
-		const t = this.team(tid);
-		return t ? `${t.region} ${t.name}` : "team";
+		const t = this.team(tid) ?? this.gone(tid);
+		return t ? `${t.region ?? ""} ${t.name}`.trim() : "team";
 	}
 	city(tid: number) {
 		return this.team(tid)?.region ?? this.f.leagueName;

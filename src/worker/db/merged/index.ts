@@ -16,7 +16,7 @@ export const headToHeads = new MergedStore("headToHeads", {
 	currentSeasonInCache: true,
 });
 export { default as messages } from "./messages.ts";
-export const playerFeats = new MergedStore("playerFeats");
+export { default as playerFeats } from "./playerFeats.ts";
 export { default as players } from "./players.ts";
 export const playoffSeries = new MergedStore("playoffSeries", {
 	currentSeasonInCache: true,

@@ -1,4 +1,5 @@
 import { salted } from "../../common/leagueSalt.ts";
+import { NATIVE_FEATURE_SETTING_KEYS } from "../../common/nativeFeatures.ts";
 import {
 	getRivalryNewsFacts,
 	rivalryStoriesOn,
@@ -102,7 +103,35 @@ const countryOf = (loc: string | undefined) => {
 const ratingsFor = (p: Player, season: number) =>
 	p.ratings.findLast((r) => r.season === season);
 
-const getTeams = async (season: number, numRounds: number) => {
+// Each franchise's team seasons, read once per build (getTeams and getFranchiseChanges both need them) and shared by the
+// builds of one Timeline load
+export type TeamHistCache = Map<number, Promise<TeamSeason[]>>;
+
+const teamHistory = (cache: TeamHistCache, tid: number) => {
+	let hit = cache.get(tid);
+	if (!hit) {
+		hit = idb.merged.teamSeasons.getAll({ tid });
+		cache.set(tid, hit);
+	}
+	return hit;
+};
+
+// Share of games won, for comparing seasons of different lengths
+const winFrac = (r: {
+	won: number;
+	lost?: number;
+	tied?: number;
+	otl?: number;
+}) => {
+	const gp = r.won + (r.lost ?? 0) + (r.tied ?? 0) + (r.otl ?? 0);
+	return gp > 0 ? (r.won + 0.5 * (r.tied ?? 0)) / gp : 0;
+};
+
+const getTeams = async (
+	season: number,
+	numRounds: number,
+	histCache: TeamHistCache,
+) => {
 	const teams = await team.getFormattedAll({
 		attrs: ["tid"],
 		seasonAttrs: [
@@ -136,9 +165,7 @@ const getTeams = async (season: number, numRounds: number) => {
 		if (!s) {
 			continue;
 		}
-		const history: TeamSeason[] = await idb.merged.teamSeasons.getAll({
-			tid: t.tid,
-		});
+		const history: TeamSeason[] = await teamHistory(histCache, t.tid);
 		const titles: number[] = [];
 		const hist: NonNullable<NPTeam["hist"]> = [];
 		let firstSeason = season;
@@ -173,9 +200,20 @@ const getTeams = async (season: number, numRounds: number) => {
 					playoffRoundsWon: ts.playoffRoundsWon,
 				};
 			}
-			if (ts.season < season && (!recordWins || ts.won > recordWins.won)) {
+			// The best record by share of games won, so a 60-22 season beats a 62-38 one in a longer schedule
+			const tsGp = ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0);
+			if (
+				ts.season < season &&
+				tsGp > 0 &&
+				(!recordWins ||
+					winFrac(ts) > winFrac(recordWins) ||
+					(winFrac(ts) === winFrac(recordWins) && ts.won > recordWins.won))
+			) {
 				recordWins = {
 					won: ts.won,
+					lost: ts.lost,
+					tied: ts.tied || undefined,
+					otl: ts.otl || undefined,
 					tid: ts.tid,
 					season: ts.season,
 					region: ts.region ?? "",
@@ -274,26 +312,55 @@ const getHistory = async (
 	teams: NPTeam[],
 	numRounds: number,
 	edition: EditionId,
+	headlineOnly: boolean,
 ): Promise<History> => {
-	const key = `${g.get("lid")}|${season}|${g.get("season")}|${edition === "final" ? 1 : 0}`;
+	const key = `${g.get("lid")}|${season}|${g.get("season")}|${edition === "final" ? 1 : 0}|${headlineOnly ? "h" : ""}`;
 	const hit = historyCache.get(key);
 	if (hit) {
 		return hit;
 	}
 	const first = g.get("startingSeason");
 
-	// Champions and runners-up from the team seasons
+	// Champions and runners-up from the team seasons. With no playoffs there is no runner-up (every team that missed them
+	// has playoffRoundsWon -1, which is rounds - 1). A champion that has since been contracted is not among the current
+	// teams, so then the season's own team seasons are read
 	const champions: NPChampion[] = [];
 	for (let y = Math.max(first, season - 40); y < season; y++) {
 		const rounds = g.get("numGamesPlayoffSeries", y).length;
 		const won = teams.find((t) =>
 			t.hist?.some((h) => h.season === y && h.playoffRoundsWon >= rounds),
 		);
-		const lost = teams.find((t) =>
-			t.hist?.some((h) => h.season === y && h.playoffRoundsWon === rounds - 1),
-		);
+		const lost =
+			rounds > 0
+				? teams.find((t) =>
+						t.hist?.some(
+							(h) => h.season === y && h.playoffRoundsWon === rounds - 1,
+						),
+					)
+				: undefined;
 		if (won) {
 			champions.push({ season: y, tid: won.tid, runnerUp: lost?.tid });
+			continue;
+		}
+		const rows = await idb.merged.teamSeasons.getAll({ season: y });
+		const gone = rows.find(
+			(ts) =>
+				ts.playoffRoundsWon >= rounds &&
+				ts.playoffRoundsWon >= 0 &&
+				!teams.some((t) => t.tid === ts.tid),
+		);
+		if (gone) {
+			const ru =
+				rounds > 0
+					? rows.find((ts) => ts.playoffRoundsWon === rounds - 1)
+					: undefined;
+			champions.push({
+				season: y,
+				tid: gone.tid,
+				runnerUp: ru?.tid,
+				region: gone.region,
+				name: gone.name,
+			});
 		}
 	}
 
@@ -342,69 +409,72 @@ const getHistory = async (
 	const board: NPCareerRow[] = [];
 	const retroPicks: NPRetroPick[] = [];
 	const thenRows: (NPThen & { _p: Player })[] = [];
-	await idb.merged.players.forEach({ activeAndRetired: true }, (p) => {
-		const career = careerBefore(p, season);
-		const active = p.tid >= 0 || p.tid === PLAYER.FREE_AGENT;
-		if (career && career.pts >= 3000) {
-			board.push({
-				pid: p.pid,
-				name: `${p.firstName} ${p.lastName}`,
-				tid: p.tid >= 0 ? p.tid : -1,
-				active,
-				pts: career.pts,
-				trb: career.trb,
-				ast: career.ast,
-				ws: career.ws,
-				seasons: career.seasons,
+	const everyone = headlineOnly
+		? Promise.resolve()
+		: idb.merged.players.forEach({ activeAndRetired: true }, (p) => {
+				const career = careerBefore(p, season);
+				const active = p.tid >= 0 || p.tid === PLAYER.FREE_AGENT;
+				if (career && career.pts >= 3000) {
+					board.push({
+						pid: p.pid,
+						name: `${p.firstName} ${p.lastName}`,
+						tid: p.tid >= 0 ? p.tid : -1,
+						active,
+						pts: career.pts,
+						trb: career.trb,
+						ast: career.ast,
+						ws: career.ws,
+						seasons: career.seasons,
+					});
+				}
+				if (
+					retroYear !== undefined &&
+					p.draft.year === retroYear &&
+					p.draft.round > 0
+				) {
+					const c = careerBefore(p, season);
+					retroPicks.push({
+						pid: p.pid,
+						name: `${p.firstName} ${p.lastName}`,
+						pick: p.draft.pick,
+						round: p.draft.round,
+						draftTid: p.draft.tid,
+						tid: p.tid >= 0 ? p.tid : -1,
+						retired: p.retiredYear !== Infinity && p.tid === PLAYER.RETIRED,
+						ovr: ratingsFor(p, season - 1)
+							? seen(
+									ratingsFor(p, season - 1)!.ovr,
+									ratingsFor(p, season - 1)!.fuzz,
+								)
+							: undefined,
+						pts: c?.pts ?? 0,
+						ws: c?.ws ?? 0,
+						seasons: c?.seasons ?? 0,
+						allStar: honorsBefore(p, season).allStar,
+					});
+				}
+				if (thenYear !== undefined) {
+					const line = lineFor(p, thenYear, false);
+					if (line && line.gp >= 40) {
+						const now = lineFor(p, season - 1, false);
+						const r = ratingsFor(p, season - 1);
+						thenRows.push({
+							pid: p.pid,
+							name: `${p.firstName} ${p.lastName}`,
+							ws: line.ws,
+							pts: line.pts,
+							tid: seasonTid(p, thenYear),
+							nowTid: p.tid,
+							retired: p.tid === PLAYER.RETIRED,
+							age: p.born.year ? season - 1 - p.born.year : undefined,
+							ovr: r ? seen(r.ovr, r.fuzz) : undefined,
+							nowPpg: now && now.gp >= 10 ? now.pts : undefined,
+							_p: p,
+						});
+					}
+				}
 			});
-		}
-		if (
-			retroYear !== undefined &&
-			p.draft.year === retroYear &&
-			p.draft.round > 0
-		) {
-			const c = careerBefore(p, season);
-			retroPicks.push({
-				pid: p.pid,
-				name: `${p.firstName} ${p.lastName}`,
-				pick: p.draft.pick,
-				round: p.draft.round,
-				draftTid: p.draft.tid,
-				tid: p.tid >= 0 ? p.tid : -1,
-				retired: p.retiredYear !== Infinity && p.tid === PLAYER.RETIRED,
-				ovr: ratingsFor(p, season - 1)
-					? seen(
-							ratingsFor(p, season - 1)!.ovr,
-							ratingsFor(p, season - 1)!.fuzz,
-						)
-					: undefined,
-				pts: c?.pts ?? 0,
-				ws: c?.ws ?? 0,
-				seasons: c?.seasons ?? 0,
-				allStar: honorsBefore(p, season).allStar,
-			});
-		}
-		if (thenYear !== undefined) {
-			const line = lineFor(p, thenYear, false);
-			if (line && line.gp >= 40) {
-				const now = lineFor(p, season - 1, false);
-				const r = ratingsFor(p, season - 1);
-				thenRows.push({
-					pid: p.pid,
-					name: `${p.firstName} ${p.lastName}`,
-					ws: line.ws,
-					pts: line.pts,
-					tid: seasonTid(p, thenYear),
-					nowTid: p.tid,
-					retired: p.tid === PLAYER.RETIRED,
-					age: p.born.year ? season - 1 - p.born.year : undefined,
-					ovr: r ? seen(r.ovr, r.fuzz) : undefined,
-					nowPpg: now && now.gp >= 10 ? now.pts : undefined,
-					_p: p,
-				});
-			}
-		}
-	});
+	await everyone;
 	const careerBoard = board.toSorted((a, b) => b.pts - a.pts).slice(0, 30);
 	const draftRetro =
 		retroYear !== undefined && retroPicks.length >= 10
@@ -442,14 +512,23 @@ const getHistory = async (
 	return out;
 };
 
+// headlineOnly: just enough for the front page lead (the Timeline's headlines), skipping the pass over every player who
+// ever played and the League extras sections. histCache lets several builds share the team histories
 export const getNewsFacts = async (
 	season: number,
+	opts: { headlineOnly?: boolean; histCache?: TeamHistCache } = {},
 ): Promise<{
 	facts: NewsFacts;
 	logos: Record<number, { imgURL?: string; imgURLSmall?: string }>;
 }> => {
 	const numRounds = g.get("numGamesPlayoffSeries", season).length;
-	const { teams, recordWins, logos } = await getTeams(season, numRounds);
+	const histCache: TeamHistCache = opts.histCache ?? new Map();
+	const headlineOnly = opts.headlineOnly === true;
+	const { teams, recordWins, logos } = await getTeams(
+		season,
+		numRounds,
+		histCache,
+	);
 	const maxGp = Math.max(
 		0,
 		...teams.map((t) => t.won + t.lost + (t.tied ?? 0) + (t.otl ?? 0)),
@@ -691,10 +770,7 @@ export const getNewsFacts = async (
 
 	// Feats
 	const feats: NPFeat[] = [];
-	await idb.merged.playerFeats.forEach(undefined, (f) => {
-		if (f.season !== season) {
-			return;
-		}
+	await idb.merged.playerFeats.forEach({ season }, (f) => {
 		feats.push({
 			pid: f.pid,
 			name: f.name,
@@ -734,6 +810,7 @@ export const getNewsFacts = async (
 				((e as { phase?: number }).phase ?? 0) <= PHASE.PLAYOFFS,
 		),
 	];
+	let lastWasTrade = false;
 	for (const e of events) {
 		if (e.type === "trade" && e.teams) {
 			const got = [1, 0].map((from) =>
@@ -754,12 +831,32 @@ export const getNewsFacts = async (
 							},
 				),
 			) as NPTrade["got"];
-			trades.push({
-				phase: e.phase ?? 0,
-				tids: e.tids,
-				got,
-				score: num(e.score),
-			});
+			const note = e.note?.trim() || undefined;
+			// A multi-team trade is logged as one event per leg, one after another, each with the deal's note: one story
+			const last = trades.at(-1);
+			if (
+				note &&
+				lastWasTrade &&
+				last?.note === note &&
+				last.phase === (e.phase ?? 0) &&
+				/-team (deal|trade)/i.test(note) &&
+				[last.tids, ...(last.legs ?? []).map((x) => x.tids)]
+					.flat()
+					.some((tid) => e.tids.includes(tid))
+			) {
+				(last.legs ??= []).push({ tids: e.tids, got });
+				last.score = Math.max(last.score, num(e.score));
+			} else {
+				trades.push({
+					phase: e.phase ?? 0,
+					tids: e.tids,
+					got,
+					score: num(e.score),
+					note,
+				});
+			}
+			lastWasTrade = true;
+			continue;
 		} else if (
 			(e.type === "freeAgent" || e.type === "reSigned") &&
 			e.contract
@@ -776,23 +873,27 @@ export const getNewsFacts = async (
 				score: num(e.score),
 			});
 		}
+		lastWasTrade = false;
 	}
 	// What each traded player gave the team that got him this season, from his own stats rows
 	const tradedPids = trades.flatMap((tr) =>
-		tr.got.flat().flatMap((a) => (a.kind === "player" ? [a.pid] : [])),
+		[tr, ...(tr.legs ?? [])]
+			.flatMap((leg) => leg.got.flat())
+			.flatMap((a) => (a.kind === "player" ? [a.pid] : [])),
 	);
 	if (tradedPids.length > 0) {
 		const tps = await idb.merged.players.getAll({
 			pids: [...new Set(tradedPids)],
 		});
-		for (const tr of trades) {
-			tr.got.forEach((side, i) => {
+		for (const leg of trades.flatMap((tr) => [tr, ...(tr.legs ?? [])])) {
+			leg.got.forEach((side, i) => {
 				for (const a of side) {
 					const p =
 						a.kind === "player" ? tps.find((x) => x.pid === a.pid) : undefined;
 					if (a.kind === "player" && p) {
 						const rows = getProStats(p).filter(
-							(r) => r.season === season && !r.playoffs && r.tid === tr.tids[i],
+							(r) =>
+								r.season === season && !r.playoffs && r.tid === leg.tids[i],
 						);
 						if (rows.length > 0) {
 							a.ws = rows.reduce(
@@ -909,7 +1010,13 @@ export const getNewsFacts = async (
 				.filter((x) => x.pick > 0)
 		: undefined;
 
-	const history = await getHistory(season, teams, numRounds, edition);
+	const history = await getHistory(
+		season,
+		teams,
+		numRounds,
+		edition,
+		headlineOnly,
+	);
 
 	// Draft
 	const draft: NPDraftee[] = [];
@@ -936,6 +1043,7 @@ export const getNewsFacts = async (
 	const facts: NewsFacts = {
 		leagueName: await league.getName(),
 		noRatings: noRatings() || undefined,
+		gender: g.get("gender") === "female" ? "female" : undefined,
 		seedKey: salted(`${g.get("lid")}|${g.get("startingSeason")}`),
 		season,
 		edition,
@@ -977,6 +1085,9 @@ export const getNewsFacts = async (
 		releases,
 		...history,
 	};
+	if (headlineOnly) {
+		return { facts, logos };
+	}
 	// Coaching systems: head coaches' systems and hot seats (current season only)
 	if (season === g.get("season") && coachSystemsEnabled()) {
 		const heads: NonNullable<NewsFacts["coaching"]>["heads"] = [];
@@ -1050,14 +1161,17 @@ export const getNewsFacts = async (
 		}
 	}
 	// Franchise reboots: a team whose name, city or colors changed from last season
-	const changes = await getFranchiseChanges(season);
+	const changes = await getFranchiseChanges(season, histCache);
 	if (changes.length > 0) {
 		facts.franchiseChanges = changes;
 	}
 	return { facts, logos };
 };
 
-const getFranchiseChanges = async (season: number) => {
+const getFranchiseChanges = async (
+	season: number,
+	histCache: TeamHistCache,
+) => {
 	const out: NonNullable<NewsFacts["franchiseChanges"]> = [];
 	const now = await idb.merged.teamSeasons.getAll({ season });
 	for (const ts of now as TeamSeason[]) {
@@ -1073,7 +1187,7 @@ const getFranchiseChanges = async (season: number) => {
 			continue;
 		}
 		const record = { won: 0, lost: 0, titles: 0, seasons: 0 };
-		const all = await idb.merged.teamSeasons.getAll({ tid: ts.tid });
+		const all = await teamHistory(histCache, ts.tid);
 		for (const row of all as TeamSeason[]) {
 			if (row.season >= season) {
 				continue;
@@ -1142,6 +1256,29 @@ const getPhotos = async (paper: Paper, facts: NewsFacts) => {
 	return photos;
 };
 
+// Everything a built paper depends on besides the season's data: the league, season and team, the No Visible Ratings
+// challenge, the gender setting, the user's team (the paper marks it) and every League extras switch and option (rumors,
+// rivalries, coaching systems, scouting summaries...). Turning one on or off, or switching teams, builds a new paper
+const paperKey = (season: number, team: unknown) => {
+	const settings: Record<string, unknown> = {};
+	for (const key of NATIVE_FEATURE_SETTING_KEYS) {
+		try {
+			settings[key] = g.get(key as any);
+		} catch {
+			settings[key] = undefined;
+		}
+	}
+	return [
+		g.get("lid"),
+		season,
+		String(team),
+		noRatings() ? "noRatings" : "ratings",
+		g.get("gender"),
+		g.get("userTid"),
+		JSON.stringify(settings),
+	].join("|");
+};
+
 // Past seasons never change, so their papers are kept. The season in progress is rebuilt when a phase changes or several days have been played, not on every simmed day
 type Built = {
 	stamp: string;
@@ -1204,7 +1341,7 @@ export default defineView({
 			};
 		}
 
-		const key = `${g.get("lid")}|${inputs.season}|${inputs.team}|${noRatings() ? "noRatings" : "ratings"}`;
+		const key = paperKey(inputs.season, inputs.team);
 		const gp = isCurrent ? await currentGp(inputs.season) : 0;
 		const stamp = isCurrent
 			? `${g.get("phase")}|${g.get("gameOver") ? 1 : 0}`

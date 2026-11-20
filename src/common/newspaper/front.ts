@@ -670,7 +670,7 @@ export const leadMidseason = (c: Ctx): Article | undefined => {
 				c.pl(l0.pid),
 				` has ${fmt1(l0.ws)} win shares through ${c.f.gp} games, ${fmt1(l0.ws - l1.ws)} more than `,
 				c.pl(l1.pid),
-				`. He is averaging ${c.lineWords(l0)} for ${aOrAn(c.rec(l0.tid))} `,
+				`. ${c.pr("He")} is averaging ${c.lineWords(l0)} for ${aOrAn(c.rec(l0.tid))} `,
 				c.tl(l0.tid),
 				" team.",
 			),
@@ -699,13 +699,25 @@ export const leadMidseason = (c: Ctx): Article | undefined => {
 		);
 	} else if (arc === "pace") {
 		const best = c.f.recordWins;
+		// The record season may have had a different schedule length: compare by share of games won, scaled to this one
+		const bestGp = best
+			? best.won + (best.lost ?? 0) + (best.tied ?? 0) + (best.otl ?? 0)
+			: 0;
+		const sameLen = !best || best.lost === undefined || bestGp === N;
+		const bestAtN = best
+			? sameLen
+				? best.won
+				: Math.round(winp({ ...best, lost: best.lost ?? 0 }) * N)
+			: 0;
 		heads = [
 			`${na} on pace for ${pace(a)} wins`,
 			worst
 				? `At this rate: ${na} ${pace(a)}-${N - pace(a)}, ${c.tn(worst.tid)} ${pace(worst)}-${N - pace(worst)}`
 				: null,
-			best && pace(a) > best.won
-				? `${na} on pace to break the league record of ${best.won} wins`
+			best && pace(a) > bestAtN
+				? sameLen
+					? `${na} on pace to break the league record of ${best.won} wins`
+					: `${na} on pace for the best record in league history`
 				: null,
 		];
 		body.push(
@@ -714,7 +726,9 @@ export const leadMidseason = (c: Ctx): Article | undefined => {
 				c.tl(a.tid, c.tfull(a.tid)),
 				` are ${record(a)} after ${a.gp} games, a pace of ${pace(a)} wins over ${N}.`,
 				best
-					? ` The most wins in a season in this league is ${best.won}, by the ${best.season} ${best.region} ${best.name}; ${pace(a)} would ${pace(a) > best.won ? "pass" : "fall short of"} it.`
+					? sameLen
+						? ` The most wins in a season in this league is ${best.won}, by the ${best.season} ${best.region} ${best.name}; ${pace(a)} would ${pace(a) > best.won ? "pass" : "fall short of"} it.`
+						: ` The best record in a season in this league is ${record({ ...best, lost: best.lost ?? 0 })}, by the ${best.season} ${best.region} ${best.name}, the same as ${bestAtN} wins over ${N}; ${pace(a)} would ${pace(a) > bestAtN ? "pass" : "fall short of"} it.`
 					: "",
 			),
 		);

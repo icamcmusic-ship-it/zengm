@@ -1,10 +1,13 @@
 // The variation pass. Many pages open with the same plain sentence every season ("Seasons since each team last made the playoffs:"). This file lists those sentences with hand-written alternatives that say the same thing with the same facts; the pass swaps the first paragraph of an article for one of them (or leaves the original), chosen by the seeded RNG from the league, season and headline, so a given edition always reads the same. Only paragraphs that are plain text and match a rule exactly are touched: a lead that carries links or any other facts is never rewritten. Ported from the Explorer's season-vary.js.
 
+import { helpers } from "../helpers.ts";
 import { Rng, segsText } from "./text.ts";
 import type { Article, NewsFacts, Paper } from "./types.ts";
 
 type M = any;
-type Rule = { id: string; re: RegExp; alts: ((m: M) => string)[] };
+// A pronoun in the league's gender
+type Pr = (word: "he" | "He" | "his" | "him") => string;
+type Rule = { id: string; re: RegExp; alts: ((m: M, pr: Pr) => string)[] };
 
 const plural = (n: unknown, a: string, b?: string) =>
 	Number(n) === 1 ? a : (b ?? `${a}s`);
@@ -316,7 +319,10 @@ const RULES: Rule[] = [
 		re: /^Ratings can still change; production so far favors the later pick\.$/,
 		alts: [
 			() => "Ratings can still move; so far the later pick has produced more.",
-			() => "It is early, but the later pick has done more with his chances.",
+			(_m: M, pr: Pr) =>
+				"It is early, but the later pick has done more with " +
+				pr("his") +
+				" chances.",
 			() =>
 				"Production so far leans toward the player taken later, though ratings can still change.",
 		],
@@ -387,46 +393,66 @@ const RULES: Rule[] = [
 	},
 	{
 		id: "contracts-lead",
-		re: /^The winner, of the (.+), predates this league's player records, so neither his name nor his line is in this file\.$/,
+		re: /^The winner, of the (.+), predates this league's player records, so neither (?:his|her) name nor (?:his|her) line is in this file\.$/,
 		alts: [
-			(m: M) =>
+			(m: M, pr: Pr) =>
 				"The award went to a player of the " +
 				m[1] +
-				" who predates this league's records, so neither his name nor his line is in this file.",
-			(m: M) =>
+				" who predates this league's records, so neither " +
+				pr("his") +
+				" name nor " +
+				pr("his") +
+				" line is in this file.",
+			(m: M, pr: Pr) =>
 				"This league's player records begin after the winner's time with the " +
 				m[1] +
-				", so he is not in this file.",
-			(m: M) =>
+				", so " +
+				pr("he") +
+				" is not in this file.",
+			(m: M, pr: Pr) =>
 				"The winner played for the " +
 				m[1] +
-				" before this league's player records begin; neither his name nor his statistics are on file.",
-			(m: M) =>
+				" before this league's player records begin; neither " +
+				pr("his") +
+				" name nor " +
+				pr("his") +
+				" statistics are on file.",
+			(m: M, pr: Pr) =>
 				"The " +
 				m[1] +
-				" player who won it is from before this league's records, so the file has neither his name nor his stats.",
-			(m: M) =>
+				" player who won it is from before this league's records, so the file has neither " +
+				pr("his") +
+				" name nor " +
+				pr("his") +
+				" stats.",
+			(m: M, pr: Pr) =>
 				"A " +
 				m[1] +
 				" player took the award, but this league's player records start later; no name or line to show.",
-			(m: M) =>
-				"He played for the " +
+			(m: M, pr: Pr) =>
+				pr("He") +
+				" played for the " +
 				m[1] +
-				" in a season this file's player records do not reach, so nothing about him is on file.",
+				" in a season this file's player records do not reach, so nothing about " +
+				pr("him") +
+				" is on file.",
 		],
 	},
 	{
 		id: "mvp-missing",
-		re: /^The (\d+) (.+?) is not in this league file \(pre-league history\), so his season line is unavailable\.$/,
+		re: /^The (\d+) (.+?) is not in this league file \(pre-league history\), so (?:his|her) season line is unavailable\.$/,
 		alts: [
-			(m: M) =>
+			(m: M, pr: Pr) =>
 				"The " +
 				m[1] +
 				" " +
 				m[2] +
-				" is from before this league's records, so his season line is not on file.",
-			(m: M) =>
-				"He is not in this league file, which starts after " +
+				" is from before this league's records, so " +
+				pr("his") +
+				" season line is not on file.",
+			(m: M, pr: Pr) =>
+				pr("He") +
+				" is not in this league file, which starts after " +
 				m[1] +
 				": the " +
 				m[2] +
@@ -443,12 +469,14 @@ const RULES: Rule[] = [
 				", so the " +
 				m[2] +
 				" winner has no season line here.",
-			(m: M) =>
+			(m: M, pr: Pr) =>
 				"The " +
 				m[1] +
 				" " +
 				m[2] +
-				" is from the years before the file's player records; his season line is not available.",
+				" is from the years before the file's player records; " +
+				pr("his") +
+				" season line is not available.",
 		],
 	},
 	{
@@ -676,7 +704,7 @@ export const varyStats = () => ({
 
 const varyArticle = (
 	a: Article,
-	facts: Pick<NewsFacts, "seedKey" | "season">,
+	facts: Pick<NewsFacts, "seedKey" | "season" | "gender">,
 ) => {
 	const first = a.body[0];
 	if (
@@ -702,7 +730,14 @@ const varyArticle = (
 		return {
 			...a,
 			body: [
-				{ type: "p" as const, segs: [rule.alts[k]!(m)] },
+				{
+					type: "p" as const,
+					segs: [
+						rule.alts[k]!(m, (word) =>
+							helpers.pronoun(facts.gender ?? "male", word),
+						),
+					],
+				},
 				...a.body.slice(1),
 			],
 		};
@@ -713,7 +748,7 @@ const varyArticle = (
 // Swap the lead paragraph of every article for an alternative where a rule matches
 export const varyPaper = (
 	paper: Paper,
-	facts: Pick<NewsFacts, "seedKey" | "season">,
+	facts: Pick<NewsFacts, "seedKey" | "season" | "gender">,
 ): Paper => ({
 	...paper,
 	sections: paper.sections.map((s) => ({
