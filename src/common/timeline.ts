@@ -97,6 +97,8 @@ export type FeatRecordInput = {
 	pts: number;
 	gid: number;
 	playoffs: boolean;
+	// Scale factor of the feat cutoffs for that game, when the input is statistical feats
+	factor?: number;
 };
 
 const winp = (t: TeamSeasonRecordInput) => {
@@ -169,13 +171,20 @@ export const findTeamRecords = (
 	return out;
 };
 
-// Single-game scoring records: each feat that beats every earlier one. The first season's best only sets the bar.
+// Single-game scoring records: each game that beats every earlier one. The first season's best only sets the bar.
+//
+// The input must be scoring games, not just any feat: a 12-point triple-double would otherwise set a bar that a
+// 35-point game "breaks". Games below minPts (the feats' own scoring cutoff, when the input is statistical feats) and
+// All-Star games (tid < 0, not league games and with no team page) are left out.
 export const findScoringRecords = (
 	feats: FeatRecordInput[],
 	teamAbbrev: (tid: number, season: number) => string,
+	minPts: (f: FeatRecordInput) => number = () => 0,
 ): TimelineItem[] => {
 	const out: TimelineItem[] = [];
-	const sorted = feats.slice().sort((a, b) => a.gid - b.gid);
+	const sorted = feats
+		.filter((f) => f.tid >= 0 && f.pts > 0 && f.pts >= minPts(f))
+		.sort((a, b) => a.gid - b.gid);
 	const firstSeason = sorted[0]?.season;
 	let best: number | undefined;
 	for (const f of sorted) {

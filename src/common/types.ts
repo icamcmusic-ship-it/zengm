@@ -1482,6 +1482,11 @@ export type PlayerFeatWithoutKey = {
 	score: string;
 	overtimes: number;
 	numPeriods: number;
+	// College mode: an NIT game (playoffs is false for these)
+	nit?: boolean;
+	// Scale factor of the cutoffs for this game (game length with overtime, players on the court). Missing in feats
+	// from before it was stored
+	factor?: number;
 };
 
 export type PlayerFeat = PlayerFeatWithoutKey & {

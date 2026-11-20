@@ -27,6 +27,9 @@ const checkStatisticalFeat = (
 	p: GamePlayer,
 	results: GameResults,
 	conditions: Conditions,
+	// Playoff games, not counting college mode's NIT (a postseason tournament, but not the playoffs)
+	playoffs: boolean = g.get("phase") === PHASE.PLAYOFFS,
+	nit: boolean = false,
 ) => {
 	const minFactor = helpers.quarterLengthFactor();
 	if (minFactor <= 0.01) {
@@ -69,7 +72,12 @@ const checkStatisticalFeat = (
 	const [i, j] =
 		results.team[0].id === tid ? ([0, 1] as const) : ([1, 0] as const);
 
-	const { score, feats } = checkPlayer(p, results.team[i].stat);
+	// Cutoffs for this game: its length including overtime, and players on the court
+	const factor = helpers.featScaleFactor(results.overtimes, playoffs || nit);
+	const { score, feats } = checkPlayer(p, results.team[i].stat, {
+		factor,
+		playoffs,
+	});
 	const allStarGame = results.team[0].id === -1 && results.team[1].id === -2;
 
 	const winner = getWinner([results.team[0].stat, results.team[1].stat]);
@@ -132,12 +140,14 @@ const checkStatisticalFeat = (
 			season: g.get("season"),
 			tid,
 			oppTid: results.team[j].id,
-			playoffs: g.get("phase") === PHASE.PLAYOFFS,
+			playoffs,
+			...(nit ? { nit: true } : {}),
 			gid: results.gid,
 			stats: p.stat,
 			score: scoreText,
 			overtimes: results.overtimes,
 			numPeriods: g.get("numPeriods"),
+			factor,
 			result,
 		});
 	}

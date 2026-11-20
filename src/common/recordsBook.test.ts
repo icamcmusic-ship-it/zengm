@@ -6,6 +6,9 @@ import {
 	crossed,
 	emptyState,
 	findChases,
+	milestoneBig,
+	milestoneLadder,
+	nextMark,
 	reachedThisSeason,
 	teamGamesToReach,
 	type RBGameIn,
@@ -249,6 +252,25 @@ describe("milestones", () => {
 		assert.strictEqual(
 			teamGamesToReach(50, { rate: 0, share: 1 }),
 			Number.POSITIVE_INFINITY,
+		);
+	});
+
+	test("ladders scale with game and season length, staying round", () => {
+		const half = { stats: 0.5, gp: 0.5 };
+		assert.deepEqual(
+			crossed("pts", 0, 5000, half),
+			[500, 1300, 2500, 3800, 5000],
+		);
+		assert.strictEqual(milestoneBig("pts", half), 10000);
+		assert.strictEqual(milestoneBig("pts"), 20000);
+		assert.strictEqual(nextMark("gp", 130, half), 250);
+		// No duplicates when marks round to the same value
+		const tiny = milestoneLadder("stl", { stats: 0.001, gp: 1 });
+		assert.deepEqual(tiny, [...new Set(tiny)]);
+		// Default leagues keep the ladders as they are
+		assert.deepEqual(
+			milestoneLadder("trb", { stats: 1, gp: 1 }),
+			[1000, 2500, 5000, 7500, 10000, 12500, 15000, 17500, 20000, 25000],
 		);
 	});
 

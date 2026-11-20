@@ -1,8 +1,10 @@
-import { helpers } from "../../../worker/util/index.ts";
 import type { GamePlayer } from "../../../common/types.ts";
 
-const checkStatisticalFeat = (p: GamePlayer) => {
-	const minFactor = helpers.quarterLengthFactor();
+const checkStatisticalFeat = (
+	p: GamePlayer,
+	_teamStat: unknown,
+	{ factor: minFactor }: { factor: number; playoffs: boolean },
+) => {
 	const FIVE_HUNDRED = minFactor * 500;
 	const FOUR_HUNDRED = minFactor * 400;
 	const THREE_HUNDRED = minFactor * 300;
