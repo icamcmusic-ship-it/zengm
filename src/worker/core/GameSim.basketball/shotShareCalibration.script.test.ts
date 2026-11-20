@@ -158,6 +158,56 @@ export const seasonShotShares = (
 	};
 };
 
+// Star scoring: the PPG leader, players at 30/25/20+ PPG (58+ games... 40+ here), the top-10 scorers' MPG and FTA per game, and the mean
+// over teams of the top scorer's share of his team's points
+export const seasonStars = (
+	rows: {
+		tid: number;
+		gp: number;
+		min: number;
+		pts: number;
+		fta: number;
+		fga: number;
+	}[],
+) => {
+	const qual = rows.filter((r) => r.gp >= 40);
+	const ppg = (r: (typeof rows)[number]) => r.pts / r.gp;
+	const sorted = qual.toSorted((a, b) => ppg(b) - ppg(a));
+	const top10 = sorted.slice(0, 10);
+	const teamPts = new Map<number, number>();
+	const teamTop = new Map<number, number>();
+	for (const r of rows) {
+		teamPts.set(r.tid, (teamPts.get(r.tid) ?? 0) + r.pts);
+		teamTop.set(r.tid, Math.max(teamTop.get(r.tid) ?? 0, r.pts));
+	}
+	const topShares = [...teamPts.keys()].map(
+		(tid) => teamTop.get(tid)! / teamPts.get(tid)!,
+	);
+	const r1 = (x: number) => Number(x.toFixed(1));
+	const ts = (rs: typeof rows) => {
+		let pts = 0;
+		let tsa = 0;
+		for (const r of rs) {
+			pts += r.pts;
+			tsa += 2 * (r.fga + 0.44 * r.fta);
+		}
+		return tsa > 0 ? pts / tsa : 0;
+	};
+	return {
+		ppgLeader: r1(ppg(sorted[0])),
+		ppg30: qual.filter((r) => ppg(r) >= 30).length,
+		ppg25: qual.filter((r) => ppg(r) >= 25).length,
+		ppg20: qual.filter((r) => ppg(r) >= 20).length,
+		top10Ppg: r1(mean(top10.map(ppg))),
+		top10Mpg: r1(mean(top10.map((r) => r.min / r.gp))),
+		top10Fta: r1(mean(top10.map((r) => r.fta / r.gp))),
+		top10Fga: r1(mean(top10.map((r) => r.fga / r.gp))),
+		teamTopPtsShare: Number(mean(topShares).toFixed(3)),
+		// True shooting of the top 10 scorers minus the league's
+		top10TsGap: Number((ts(top10) - ts(rows)).toFixed(3)),
+	};
+};
+
 test.skipIf(!env.SHOT_SHARE_CAL)(
 	"shot share calibration",
 	{ timeout: 24 * 60 * 60 * 1000 },
@@ -270,6 +320,7 @@ test.skipIf(!env.SHOT_SHARE_CAL)(
 				}
 			}
 			const shares = seasonShotShares(rows);
+			const stars = seasonStars(rows);
 			// The league's shot diet: each source's share of the shots, and the modifiers' average effects
 			const diet = shotDiet(sumAdv(rows));
 			const dietOut = diet
@@ -296,7 +347,14 @@ test.skipIf(!env.SHOT_SHARE_CAL)(
 				tov: sum.tov / gp,
 				fta: sum.fta / gp,
 			};
-			const result = { seed, season: s, ...shares, ...totals, diet: dietOut };
+			const result = {
+				seed,
+				season: s,
+				...shares,
+				...stars,
+				...totals,
+				diet: dietOut,
+			};
 			results.push(result);
 			console.log(`SHOT_SHARE ${JSON.stringify(result)}`);
 			if (env.SHOT_SHARE_OUT) {
