@@ -121,6 +121,7 @@ import {
 } from "../core/game/attendance.ts";
 import goatFormula from "../util/goatFormula.ts";
 import getRandomTeams from "./getRandomTeams.ts";
+import previewGameSim from "../core/game/previewGameSim.ts";
 import { withState } from "../core/player/name.ts";
 import { initDefaults, loadNames } from "../util/loadNames.ts";
 import type { PlayerRatings } from "../../common/types.basketball.ts";
@@ -6565,6 +6566,7 @@ const api = {
 		getRandomName,
 		getRandomRatings,
 		getRandomTeams,
+		previewGameSim,
 		getStorylineWhy,
 		getRecentLeagueAchievements,
 		getPlayersForScheduledEvents,

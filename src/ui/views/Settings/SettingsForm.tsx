@@ -621,6 +621,7 @@ const SettingsForm = ({
 					numPlayoffTeamsInfo={numPlayoffTeamsInfo}
 					onCancelDefaultSetting={onCancelDefaultSetting}
 					setGameSimPreset={setGameSimPreset}
+					setState={setState}
 					showGodModeSettings={showGodModeSettings}
 					state={state}
 					visibleCategories={visibleCategories}
