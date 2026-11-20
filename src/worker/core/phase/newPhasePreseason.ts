@@ -27,6 +27,8 @@ import { MAX_LEVEL } from "../../../common/budgetLevels.ts";
 import * as staff from "../staff/index.ts";
 import { ensureGms } from "../gm/index.ts";
 import * as ownerOffice from "../ownerOffice/index.ts";
+import * as commercial from "../commercial/index.ts";
+import { OWNER_TYPES } from "../../../common/commercial.ts";
 import * as college from "../college/index.ts";
 import { updateArchetypesForPreseason } from "../player/archetype.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
@@ -349,7 +351,9 @@ const newPhasePreseason = async (
 			}
 			const budgetLevel = () =>
 				helpers.bound(
-					finances.defaultBudgetLevel(popRank) + cashNudge,
+					finances.defaultBudgetLevel(popRank) +
+						cashNudge +
+						OWNER_TYPES[commercial.getOwnerType(t)].budgetNudge,
 					1,
 					MAX_LEVEL,
 				);
@@ -382,6 +386,9 @@ const newPhasePreseason = async (
 	}
 
 	// Owner's Office: finished projects, the owner's budget meeting, AI projects (seeded, not the main random stream)
+	// Commercial Deals & Ownership: ownership sales and deal renewals (seeded streams). Before the Owner's Office, whose goals follow
+	// the owner's type
+	await commercial.onPreseason();
 	await ownerOffice.onPreseason();
 
 	if (updatedTeams) {

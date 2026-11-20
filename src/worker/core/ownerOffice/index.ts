@@ -24,6 +24,7 @@ import { idb } from "../../db/index.ts";
 import { g, helpers, local, toUI } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import getPayroll from "../team/getPayroll.ts";
+import { adjustOwnerGoals, commercialEnabled } from "../commercial/index.ts";
 
 export const ownerOfficeEnabled = () =>
 	__SPORT === "basketball" && featureOn("ownerOffice") && !!g.get("budget");
@@ -206,7 +207,10 @@ export const onPreseason = async () => {
 			prevWinPct:
 				prev && prevGp > 0 ? (prev.won + 0.5 * prev.tied) / prevGp : undefined,
 		});
-		teamSeason.ownerGoals = goals;
+		// Commercial Deals & Ownership: the owner's type shifts the payroll ceiling and profit target
+		teamSeason.ownerGoals = commercialEnabled()
+			? adjustOwnerGoals(goals, t, salaryCapScale())
+			: goals;
 
 		if (userTeam(t.tid)) {
 			if (g.get("userTids").length === 1) {

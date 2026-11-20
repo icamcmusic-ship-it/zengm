@@ -1341,6 +1341,42 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "commercial",
+		college: false,
+		key: "featureCommercial",
+		name: "Commercial Deals & Ownership",
+		description:
+			"Sponsorship and local TV become multi-year deals whose value depends on market size, recent success, star power (hype and population) and your arena/facilities; at expiry you pick one of three offers (long and safe, standard, or a one-season deal with a winning bonus) on Team Finances. A league-wide revenue sharing pool takes a share of each team's local revenue and pays it back out. Rarely a team is sold to a new owner (big spender, bottom line or win now) who weighs owner mood and spending differently; you get a season's notice if it's yours. Team Finances also gets a season P&L with cash reconciliation. Needs budget.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "featureRevenueSharePct",
+				name: "Revenue Sharing",
+				description:
+					"Share of each team's local revenue (tickets, merchandise, sponsorship, local TV) paid into the pool at the end of the regular season. 0 turns it off.",
+				type: "float",
+				decoration: "percent",
+				default: 10,
+				min: 0,
+				max: 50,
+			},
+			{
+				key: "featureRevenueShareMode",
+				name: "Revenue Sharing Payout",
+				description:
+					"Pay the pool out equally, or weighted toward small markets.",
+				type: "string",
+				default: "equal",
+				values: [
+					{ key: "equal", value: "Equally" },
+					{ key: "smallMarkets", value: "To small markets" },
+				],
+			},
+		],
+	},
+	{
 		id: "frivolities",
 		key: "featureFrivolities",
 		name: "Extra Frivolities",
