@@ -7,6 +7,7 @@ import {
 	SIM_FIX_MID_RANGE,
 	SIM_FIX_BREAK_REST,
 	SIM_FIX_PERF_FACTOR,
+	SIM_FIX_SHOT_CHOICE,
 	SIM_FIX_TRANSITION,
 } from "./simSettings.ts";
 import {
@@ -4825,16 +4826,38 @@ class GameSim extends GameSimBase {
 		// In some situations (4th quarter late game situations depending on score, and last second heaves in other quarters) players shoot more 3s
 		const diff = this.team[this.d].stat.pts - this.team[this.o].stat.pts;
 		const quarter = this.team[this.o].stat.ptsQtrs.length;
+		// Game Sim Fixes: no forced threes without a three-point line, and late in the game they depend on the shooter (a poor three-point
+		// shooter isn't forced to take one unless it's a heave). The same random number as before is drawn, in the same situations.
+		const fix = SIM_FIX_SHOT_CHOICE;
+		const forceThreeShooter =
+			!this.simFixes || this.t < 2
+				? 1
+				: helpers.bound(
+						(p.compositeRating.shootingThreePointer - fix.forceThreeNone) /
+							(fix.forceThreeFull - fix.forceThreeNone),
+						0,
+						1,
+					);
 		const forceThreePointer =
-			(diff >= 3 &&
+			(!this.simFixes || this.ga.threePointers) &&
+			((diff >= 3 &&
 				diff <= 10 &&
 				this.t <= 10 &&
 				quarter >= this.numPeriods &&
-				Math.random() > this.t / 60) ||
-			(quarter < this.numPeriods &&
-				this.t < 2 &&
-				this.possessionLength <= 3 &&
-				!this.sideOutOfBounds());
+				(this.simFixes
+					? Math.random() < (1 - this.t / 60) * forceThreeShooter
+					: Math.random() > this.t / 60)) ||
+				(quarter < this.numPeriods &&
+					this.t < 2 &&
+					this.possessionLength <= 3 &&
+					!this.sideOutOfBounds()));
+		// Game Sim Fixes: trailing by 1-2 late, look for a two at the rim rather than a three
+		const trailBy2 =
+			this.simFixes &&
+			diff >= 1 &&
+			diff <= 2 &&
+			this.t <= fix.trailBy2Seconds &&
+			quarter >= this.numPeriods;
 
 		const rushed = this.t < 2 && this.possessionLength < 6;
 
@@ -4879,6 +4902,7 @@ class GameSim extends GameSimBase {
 				Math.min(
 					MAX_THREE_PROB,
 					(this.shotShare ? this.ssThreeTilt(p, selfCreated) : 1) *
+						(trailBy2 ? fix.trailBy2Three : 1) *
 						0.67 *
 						shootingThreePointerScaled2 *
 						this.ga.threePointTendencyFactor *
@@ -4940,18 +4964,13 @@ class GameSim extends GameSimBase {
 			// Game Sim Fixes: the shot selection has its own composites (see simSettings.ts)
 			const cso = this.cs[this.o];
 			const csd = this.cs[this.d];
-			const r1 =
+			// (multiplier products in the same order as before, so the old sim's floating point is unchanged)
+			const m1 =
 				(this.coachSys ? cso.mid * csd.dMid : 1) *
 				pullUpTilt *
 				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
-				(this.offEmph ? this.oe[this.o].mid : 1) *
-				0.8 *
-				Math.random() *
-				(this.simFixes
-					? (p.compositeRating.shootingMidRangeSelect ??
-						p.compositeRating.shootingMidRange)
-					: p.compositeRating.shootingMidRange);
-			const r2 =
+				(this.offEmph ? this.oe[this.o].mid : 1);
+			const m2 =
 				(this.coachSys ? cso.rim * csd.dRim : 1) *
 				(sc
 					? (selfCreated
@@ -4963,29 +4982,57 @@ class GameSim extends GameSimBase {
 				driveTilt *
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				(this.offEmph ? this.oe[this.o].rim : 1) *
-				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1) *
-				Math.random() *
-				((this.simFixes
-					? (p.compositeRating.shootingAtRimSelect ??
-						p.compositeRating.shootingAtRim)
-					: p.compositeRating.shootingAtRim) +
-					this.synergyFactor *
-						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)); // Synergy makes easy shots either more likely or less likely
-
-			const r3 =
+				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1);
+			const m3 =
 				(this.coachSys ? cso.post * csd.dPost : 1) *
 				(this.playTypes ? PLAY_TYPES.post : 1) *
 				(this.offEmph ? this.oe[this.o].post : 1) *
 				postTilt *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.post : 1) *
-				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
-				Math.random() *
-				((this.simFixes
+				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1);
+			// Synergy makes easy shots either more likely or less likely
+			const synergy =
+				this.synergyFactor *
+				(this.team[this.o].synergy.off - this.team[this.d].synergy.def);
+			const base1 = this.simFixes
+				? (p.compositeRating.shootingMidRangeSelect ??
+					p.compositeRating.shootingMidRange)
+				: p.compositeRating.shootingMidRange;
+			const base2 =
+				(this.simFixes
+					? (p.compositeRating.shootingAtRimSelect ??
+						p.compositeRating.shootingAtRim)
+					: p.compositeRating.shootingAtRim) + synergy;
+			const base3 =
+				(this.simFixes
 					? (p.compositeRating.shootingLowPostSelect ??
 						p.compositeRating.shootingLowPost)
-					: p.compositeRating.shootingLowPost) +
-					this.synergyFactor *
-						(this.team[this.o].synergy.off - this.team[this.d].synergy.def)); // Synergy makes easy shots either more likely or less likely
+					: p.compositeRating.shootingLowPost) + synergy;
+
+			let r1;
+			let r2;
+			let r3;
+			if (this.simFixes) {
+				// Game Sim Fixes: proportional selection from deterministic weights (the clamped product of the multipliers times the
+				// floored rating + synergy), with one random number instead of the old race of three (weight x random, biggest wins)
+				const clampMult = (m: number) =>
+					helpers.bound(m, fix.multMin, fix.multMax);
+				const w1 = fix.mid * clampMult(m1) * Math.max(fix.baseFloor, base1);
+				const w2 =
+					fix.rim *
+					clampMult(m2 * (trailBy2 ? fix.trailBy2Rim : 1)) *
+					Math.max(fix.baseFloor, base2);
+				const w3 = fix.post * clampMult(m3) * Math.max(fix.baseFloor, base3);
+				const rand = Math.random() * (w1 + w2 + w3);
+				// (encoded as r1/r2/r3 so the comparisons below pick the drawn type)
+				r1 = rand < w1 ? 1 : 0;
+				r2 = rand >= w1 && rand < w1 + w2 ? 1 : 0;
+				r3 = r1 === 0 && r2 === 0 ? 0.5 : 0;
+			} else {
+				r1 = m1 * 0.8 * Math.random() * base1;
+				r2 = m2 * Math.random() * base2;
+				r3 = m3 * Math.random() * base3;
+			}
 
 			if (deferAssist) {
 				passer = this.drawAssist(

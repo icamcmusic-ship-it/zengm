@@ -58,6 +58,30 @@ export const SIM_FIX_LOW_POST = { intercept: 0.253, slope: 0.5 };
 // Transition possessions (realistic possession model) lean toward the rim and away from post-ups
 export const SIM_FIX_TRANSITION = { rim: 1.6, post: 0.3 };
 
+// Shot type choice among twos (getShotInfo): proportional selection, p_i = w_i / sum(w), from deterministic weights (one random draw).
+// - mid/rim/post: the constant on each weight, calibrated so the league's mid-range / rim / post shares are about those of the old
+//   winner-take-max race (with its three random numbers)
+// - multMin/multMax: the product of a shot's situational multipliers (coach, play types, emphasis, spacing, matchups, transition, sag...)
+//   is clamped to this range, so stacked multipliers can't push a shot type to (almost) never or always
+// - baseFloor: the rating + synergy term of a weight can't go below this (a bad synergy made rim and post weights negative, and then
+//   mid-range always won)
+// - forceThree*: end-of-game forced threes (when trailing by 3-10 late) fade out for a shooter whose three-point composite is below
+//   forceThreeFull, and are never forced below forceThreeNone, unless it's a heave (under 2 seconds)
+// - trailBy2*: trailing by 1-2 late, the shot leans away from threes and toward the rim
+export const SIM_FIX_SHOT_CHOICE = {
+	mid: 0.93,
+	rim: 1.06,
+	post: 0.34,
+	multMin: 0.4,
+	multMax: 2.5,
+	baseFloor: 0.02,
+	forceThreeNone: 0.25,
+	forceThreeFull: 0.35,
+	trailBy2Seconds: 10,
+	trailBy2Three: 0.6,
+	trailBy2Rim: 1.5,
+};
+
 // Rest at the breaks between periods (energy, 0-1, recovered by every player on the roster): quarter breaks and halftime. A bench
 // minute recovers 0.094, so these are like about half a minute and a minute and a half on the bench
 export const SIM_FIX_BREAK_REST = { quarter: 0.04, halftime: 0.12 };
