@@ -11,7 +11,7 @@ import { toWorker } from "../../util/toWorker.ts";
 import { getCols } from "../../../common/getCols.ts";
 import { useLocal } from "../../util/local.ts";
 import PlayingTime, { ptModifiers } from "./PlayingTime.tsx";
-import ShotPlan, { shotPlans } from "./ShotPlan.tsx";
+import ShotPlan, { ShotProfileSelect, shotPlans } from "./ShotPlan.tsx";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import TopStuff from "./TopStuff.tsx";
 import type {
@@ -196,6 +196,8 @@ const Roster = ({
 	const showMood = season === currentSeason && !college;
 	// Shot Share Model: each player's game plan, next to his playing time
 	const showShotPlan = useFeatureOn("shotShareModel") && editable;
+	// Shot Profiles & Defensive Schemes: each player's shot profile, in the same column
+	const showShotProfile = useFeatureOn("shotProfiles") && editable;
 
 	const cols = getCols(
 		[
@@ -209,7 +211,7 @@ const Roster = ({
 			"Country",
 			...stats.map((stat) => `stat:${stat}`),
 			...(editable ? ["PT"] : []),
-			...(showShotPlan ? ["Shots"] : []),
+			...(showShotPlan || showShotProfile ? ["Shots"] : []),
 			...(showMood ? ["Mood"] : []),
 			...(showRelease ? ["Release"] : []),
 			...(showTradeFor || showTradingBlock ? ["Trade"] : []),
@@ -282,6 +284,17 @@ const Roster = ({
 							<p>
 								More shots for a weak scorer means worse shots for the team.
 							</p>
+							{showShotProfile ? (
+								<p>
+									Shot profile (Auto: the coach picks from{" "}
+									{helpers.pronoun(gender, "his")} ratings): Hunt threes, Attack
+									the rim, Stay out of the post or Mid-range green light tilt
+									the kinds of shots {helpers.pronoun(gender, "he")} takes by up
+									to 30%. Forcing a profile against{" "}
+									{helpers.pronoun(gender, "his")} ratings costs a little
+									accuracy on those shots.
+								</p>
+							) : null}
 						</HelpPopover>
 					</>
 				),
@@ -450,7 +463,16 @@ const Roster = ({
 				},
 				...stats.map((stat) => helpers.roundStat(p.stats[stat], stat)),
 				...(editable ? [<PlayingTime p={p} userTid={userTid} />] : []),
-				...(showShotPlan ? [<ShotPlan p={p} userTid={userTid} />] : []),
+				...(showShotPlan || showShotProfile
+					? [
+							<div className="d-flex gap-1">
+								{showShotPlan ? <ShotPlan p={p} userTid={userTid} /> : null}
+								{showShotProfile ? (
+									<ShotProfileSelect p={p} userTid={userTid} />
+								) : null}
+							</div>,
+						]
+					: []),
 				...(showMood
 					? [
 							wrappedMood({

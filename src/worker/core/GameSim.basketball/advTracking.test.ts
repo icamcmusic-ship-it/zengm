@@ -180,13 +180,17 @@ const checkTotals = (results: any[]) => {
 			// Expected opponents' rim attempts: the five on the floor share the opponents' rim attempts, so the expectations add up
 			// to about five times the opponents' total
 			const rimExp = sum(advs.map((a: number[]) => a[ADV.oppRimExp]!));
-			assert.isAtMost(Math.abs(rimExp - n * opp.stat.fgaAtRim), 0.25 * n * opp.stat.fgaAtRim + 5);
+			assert.isAtMost(
+				Math.abs(rimExp - n * opp.stat.fgaAtRim),
+				0.25 * n * opp.stat.fgaAtRim + 5,
+			);
 			// About 100 possessions each, the same number for both teams within a couple
 			assert.isAbove(ta.t[TEAM_ADV.possFor]!, 75);
 			assert.isBelow(ta.t[TEAM_ADV.possFor]!, 135);
 			assert.isAtMost(
 				Math.abs(ta.t[TEAM_ADV.possFor]! - ta.t[TEAM_ADV.possAgainst]!),
-				2,
+				// (each overtime period can end on an extra possession too)
+				2 + result.overtimes,
 			);
 
 			// Lineups: the whole game, every point

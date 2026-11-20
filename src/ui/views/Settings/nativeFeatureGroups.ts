@@ -43,6 +43,7 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	realisticTurnovers: "League extras: Game Simulation",
 	starClutchCal: "League extras: Game Simulation",
 	shotShareModel: "League extras: Game Simulation",
+	shotProfiles: "League extras: Game Simulation",
 	realisticPlayTypes: "League extras: Game Simulation",
 	offEmphasis: "League extras: Game Simulation",
 	advStats: "League extras: Game Simulation",

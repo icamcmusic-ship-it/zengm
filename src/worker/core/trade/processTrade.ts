@@ -110,6 +110,7 @@ const processTrade = async (
 			// p.gamesUntilTradable = 14; // Don't make traded players untradable
 			p.ptModifier = 1; // Reset
 			delete p.shotPlan;
+			delete p.shotProfile;
 
 			undoInfoPlayers.set(p.pid, {
 				jerseyNumber: p.jerseyNumber,

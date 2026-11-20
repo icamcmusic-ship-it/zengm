@@ -21,6 +21,7 @@ const addToFreeAgents = (
 	p.numDaysFreeAgent = 0;
 	p.ptModifier = 1;
 	delete p.shotPlan;
+	delete p.shotProfile;
 
 	// Extra check is for console scripts from before numPlayersTradedAwayNormalized was a required parameter
 	// Spread is because addToFreeAgents is often called in a loop, with numPlayersTradedAwayNormalized calculated once up front

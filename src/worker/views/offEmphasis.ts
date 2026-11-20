@@ -1,6 +1,25 @@
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
-import { featureOffError } from "../util/nativeFeatures.ts";
+import { featureOffError, featureOn } from "../util/nativeFeatures.ts";
+import { idb } from "../db/index.ts";
+import { aiDefScheme, type DefScheme } from "../../common/shotProfiles.ts";
+
+// Shot Profiles & Defensive Schemes: the user's scheme (undefined: the coach picks) and the coach's pick for the healthy roster
+const defSchemeInfo = async (
+	tid: number,
+): Promise<{ value: DefScheme | undefined; auto: DefScheme } | undefined> => {
+	if (!featureOn("shotProfiles")) {
+		return undefined;
+	}
+	const t = await idb.cache.teams.get(tid);
+	const players = (await idb.cache.players.indexGetAll("playersByTid", tid))
+		.filter((p) => p.injury.gamesRemaining === 0)
+		.toSorted((a, b) => b.valueNoPot - a.valueNoPot);
+	return {
+		value: t?.defScheme,
+		auto: aiDefScheme(players.map((p) => p.ratings.at(-1) as any)),
+	};
+};
 import {
 	getOffEmphasisPage,
 	offEmphasisOn,
@@ -26,6 +45,10 @@ export default defineView({
 		if (!page) {
 			return { errorMessage: "No team." };
 		}
-		return { ...page, season: g.get("season") };
+		return {
+			...page,
+			season: g.get("season"),
+			defScheme: await defSchemeInfo(g.get("userTid")),
+		};
 	},
 });

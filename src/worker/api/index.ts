@@ -316,6 +316,12 @@ import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
 import { faceAgingOnCustomize } from "../util/faceAging.ts";
 import * as staffDepthActions from "../core/staffDepth/actions.ts";
 import * as offEmphasis from "../core/offEmphasis/index.ts";
+import {
+	DEF_SCHEMES,
+	SHOT_PROFILES,
+	type DefScheme,
+	type ShotProfile,
+} from "../../common/shotProfiles.ts";
 import type {
 	FocusKey,
 	ScoutRegion,
@@ -5357,6 +5363,47 @@ const updateShotPlan = async ({
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 };
 
+// Shot Profiles & Defensive Schemes: the shot profile for a player on the user's team (undefined: the coach picks)
+const updateShotProfile = async ({
+	pid,
+	shotProfile,
+}: {
+	pid: number;
+	shotProfile: string | undefined;
+}) => {
+	const p = await idb.cache.players.get(pid);
+	if (!p) {
+		throw new Error("Invalid pid");
+	}
+	if (!g.get("userTids").includes(p.tid)) {
+		throw new Error("Not on your team");
+	}
+	if (SHOT_PROFILES.includes(shotProfile as any)) {
+		p.shotProfile = shotProfile as ShotProfile;
+	} else {
+		delete p.shotProfile;
+	}
+	await idb.cache.players.put(p);
+
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+};
+
+// Shot Profiles & Defensive Schemes: the user's team's defensive scheme (undefined: the coach picks)
+const updateDefScheme = async ({ defScheme }: { defScheme?: string }) => {
+	const t = await idb.cache.teams.get(g.get("userTid"));
+	if (!t) {
+		return;
+	}
+	if (DEF_SCHEMES.includes(defScheme as any)) {
+		t.defScheme = defScheme as DefScheme;
+	} else {
+		delete t.defScheme;
+	}
+	await idb.cache.teams.put(t);
+	await idb.cache.flush();
+	await toUI("realtimeUpdate", [["staff", "team"]]);
+};
+
 const updatePlayoffTeams = async (
 	teams: {
 		tid: number;
@@ -5927,6 +5974,7 @@ const upsertCustomizedPlayer = async (
 			p.gamesUntilTradable = 0;
 			p.ptModifier = 1;
 			delete p.shotPlan;
+			delete p.shotProfile;
 		}
 	}
 
@@ -6714,6 +6762,8 @@ const api = {
 		updatePlayersWatch,
 		updatePlayingTime,
 		updateShotPlan,
+		updateShotProfile,
+		updateDefScheme,
 		updatePlayoffTeams,
 		updateTeamInfo,
 		updateTrade,
