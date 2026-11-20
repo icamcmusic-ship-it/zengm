@@ -124,7 +124,7 @@ describe("coaching staff depth", () => {
 
 	test("Suggest mode gives a plan to players with none approved (draftees, signings, trades)", async () => {
 		const tid = g.get("userTid");
-		const p = player.generate(tid, 20, g.get("season"), true, 50);
+		const p = { ...player.generate(tid, 20, g.get("season"), true, 50), pid: 999999 };
 		const t = (await idb.cache.teams.get(tid))!;
 		const state = stateOf(t);
 		state.delegation.development = "suggest";
