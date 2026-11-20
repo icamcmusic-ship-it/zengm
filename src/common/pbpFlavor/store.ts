@@ -131,6 +131,7 @@ const SCHEMAS: [string, Field[]][] = [
 	["techFoul", [T, P, ["num", "n"], C]],
 	["flagrantFoul", [T, P, ["pidShooting", "p"], ["level", "n"], C]],
 	["ejection", [T, P, ["reason", "e:flagrant2,flagrants,techs"], C]],
+	["offFoul", [T, P, ["pidDefense", "p"], C, POSS]],
 ];
 const SCHEMA_BY_TYPE = new Map(
 	SCHEMAS.map(([type, fields], i) => [

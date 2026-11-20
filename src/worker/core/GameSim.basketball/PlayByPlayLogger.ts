@@ -190,6 +190,15 @@ type PlayByPlayEventInputNoScore =
 			shotClock?: boolean;
 	  }
 	| {
+			// Game Sim Fixes: an offensive foul (charge) by pid, drawn by pidDefense
+			type: "offFoul";
+			t: TeamNum;
+			pid: number;
+			pidDefense: number;
+			clock: number;
+			poss?: number;
+	  }
+	| {
 			type: "elamActive";
 			target: number;
 	  }

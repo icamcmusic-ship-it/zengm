@@ -4,6 +4,8 @@ import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import {
 	SIM_FIX_EXPANDED_SYNERGY_CUTOFFS,
 	SIM_FIX_LOW_POST,
+	SIM_FIX_OFF_FOUL,
+	SIM_FIX_FT_ORB,
 	SIM_FIX_MID_RANGE,
 	SIM_FIX_BREAK_REST,
 	SIM_FIX_PERF_FACTOR,
@@ -5431,6 +5433,20 @@ class GameSim extends GameSimBase {
 			type,
 		} = shotInfo;
 		passer = shotInfo.passer;
+
+		// Game Sim Fixes: some drives and post-ups end in an offensive foul (a charge) instead of a shot
+		if (
+			this.simFixes &&
+			!putBack &&
+			!tipInFromOutOfBounds &&
+			(type === "atRim" || type === "lowPost")
+		) {
+			const outcome = this.maybeOffensiveFoul(p);
+			if (outcome) {
+				return outcome;
+			}
+		}
+
 		if (this.adv) {
 			this.advShot(
 				p,
@@ -6436,10 +6452,49 @@ class GameSim extends GameSimBase {
 			this.isClockRunning = false;
 		} else {
 			this.isClockRunning = true;
-			outcome = this.doReb();
+			outcome = this.doReb(true);
 		}
 
 		return outcome;
+	}
+
+	// Game Sim Fixes: an offensive foul on a drive or post-up (a turnover and a personal foul on the ball handler, not a team foul).
+	// Returns undefined if there is no foul (one random draw)
+	maybeOffensiveFoul(p: PlayerGameSim) {
+		const ind = this.playersOnCourt[this.o].indexOf(p);
+		const defender = this.matchupDefense
+			? (this.defenderOf(p) ?? this.playersOnCourt[this.d][0])
+			: this.playersOnCourt[this.d][ind >= 0 ? ind : 0];
+		if (!defender) {
+			return;
+		}
+		const { base, k } = SIM_FIX_OFF_FOUL;
+		const risk = p.compositeRating.offFoulRisk ?? 0.5;
+		const draw = defender.compositeRating.drawingCharges ?? 0.5;
+		const prob =
+			base *
+			Math.max(0, 1 + k * (risk - 0.5)) *
+			Math.max(0, 1 + k * (draw - 0.5));
+		if (Math.random() >= prob) {
+			return;
+		}
+
+		this.isClockRunning = false;
+		this.recordStat(this.o, p, "tov");
+		if (this.adv) {
+			this.adv.turnover(p, this.advTransition, this.advPutbackTurnover(p));
+		}
+		this.noteDefensiveStop("tov", defender, p);
+		this.playByPlay.logEvent({
+			type: "offFoul",
+			t: this.o,
+			pid: p.id,
+			pidDefense: defender.id,
+			clock: this.t,
+			poss: this.eventPoss(),
+		});
+		this.doPf({ t: this.o, type: "offFoul", fouler: p });
+		return "outOfBoundsOffense" as const;
 	}
 
 	/**
@@ -6451,7 +6506,7 @@ class GameSim extends GameSimBase {
 		info:
 			| {
 					t: TeamNum;
-					type: "pfNonShooting";
+					type: "pfNonShooting" | "offFoul";
 					shooter?: undefined;
 					fouler?: PlayerGameSim;
 			  }
@@ -6466,8 +6521,8 @@ class GameSim extends GameSimBase {
 		const p = info.fouler ?? this.pickPlayer("fouling", t, 1);
 		this.recordStat(t, p, "pf");
 
-		// pfAndOne is handled in the shot event
-		if (info.type !== "pfAndOne") {
+		// pfAndOne is handled in the shot event, offFoul by its own event
+		if (info.type !== "pfAndOne" && info.type !== "offFoul") {
 			const baseLogInformation = {
 				t,
 				pid: p.id,
@@ -6478,7 +6533,7 @@ class GameSim extends GameSimBase {
 					...baseLogInformation,
 					type: info.type,
 				});
-			} else {
+			} else if (info.shooter) {
 				this.playByPlay.logEvent({
 					...baseLogInformation,
 					type: info.type,
@@ -6502,6 +6557,11 @@ class GameSim extends GameSimBase {
 				shooter: info.shooter,
 			});
 			this.updateSynergy();
+		}
+
+		// An offensive foul is not a team foul (bonus)
+		if (info.type === "offFoul") {
+			return;
 		}
 
 		this.foulsThisQuarter[t] += 1;
@@ -6698,7 +6758,7 @@ class GameSim extends GameSimBase {
 		return "nonShootingFoul";
 	}
 
-	doReb() {
+	doReb(afterFt: boolean = false) {
 		let p;
 		this.afterShotAttempt = true;
 
@@ -6724,15 +6784,16 @@ class GameSim extends GameSimBase {
 		const oReb = exp2
 			? EXPANDED_ORB_FACTOR * this.team[this.o].compositeRating.offRebounding
 			: this.team[this.o].compositeRating.rebounding;
-		if (
+		let probDrb =
 			(0.75 * (2 + dReb)) /
-				(this.ga.orbFactor *
-					(2 + oReb) *
-					(this.coachSys
-						? this.cs[this.o].orb * this.cs[this.d].orbAllowed
-						: 1)) >
-			Math.random()
-		) {
+			(this.ga.orbFactor *
+				(2 + oReb) *
+				(this.coachSys ? this.cs[this.o].orb * this.cs[this.d].orbAllowed : 1));
+		// Game Sim Fixes: fewer offensive rebounds off a missed free throw (the defense has inside position)
+		if (afterFt && this.simFixes) {
+			probDrb = 1 - SIM_FIX_FT_ORB * (1 - probDrb);
+		}
+		if (probDrb > Math.random()) {
 			p = this.pickPlayer(exp2 ? "defRebounding" : "rebounding", this.d, 3);
 			this.recordStat(this.d, p, "drb");
 			this.playByPlay.logEvent({

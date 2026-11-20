@@ -351,6 +351,11 @@ const getText = (
 		];
 	} else if (event.type === "missFt") {
 		texts = [`${getName(event.pid)} missed a free throw`];
+	} else if (event.type === "offFoul") {
+		texts = [
+			`Offensive foul on ${getName(event.pid)}${formatLiveGameStat(playersByPid[event.pid], "pf")}, charge drawn by ${getName(event.pidDefense)}`,
+			`${getName(event.pid)} is called for the charge${formatLiveGameStat(playersByPid[event.pid], "pf")}, ${getName(event.pidDefense)} took it`,
+		];
 	} else if (event.type === "pfNonShooting") {
 		texts = [
 			`Non-shooting foul on ${getName(event.pid)}${formatLiveGameStat(playersByPid[event.pid], "pf")}`,

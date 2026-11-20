@@ -40,6 +40,16 @@ export const SIM_FIX_COMPOSITE_WEIGHTS: CompositeWeights<string> = {
 		ratings: ["hgt", "stre", "spd", "ins", "oiq"],
 		weights: [0.8, 0.5, 0.2, 2, 0.4],
 	},
+	// Offensive fouls (SIM_FIX_OFF_FOUL): a strong, aggressive driver runs into more charges, a smart one fewer
+	offFoulRisk: {
+		ratings: [50, "stre", "dnk", "spd", "oiq"],
+		weights: [1, 1, 0.5, 0.5, -1],
+	},
+	// ...and a smart, quick defender draws more of them
+	drawingCharges: {
+		ratings: ["diq", "spd", "stre"],
+		weights: [2, 0.5, 0.5],
+	},
 };
 
 // With Expanded Ratings, who commits the fouls reads perimeter and interior defense instead of defensive IQ (their average)
@@ -125,3 +135,10 @@ export const simFixCompositeWeights = (
 	}
 	return out;
 };
+
+// Offensive fouls (charges): on a drive or post-up, chance = base * (1 + k (offFoulRisk - 0.5)) * (1 + k (drawingCharges - 0.5)),
+// for the shooter's offFoulRisk and his defender's drawingCharges composites (SIM_FIX_COMPOSITE_WEIGHTS). About 1 per team game
+export const SIM_FIX_OFF_FOUL = { base: 0.025, k: 1.5 };
+
+// Offensive rebound chance after a missed last free throw, relative to after a missed shot (NBA: ~13% vs ~25%)
+export const SIM_FIX_FT_ORB = 0.5;
