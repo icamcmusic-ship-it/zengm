@@ -34,6 +34,7 @@ import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import fuzzRating from "../player/fuzzRating.ts";
 import { ratingsBuildFormulas as F } from "../player/ratingsBuildFormulas.ts";
 import updateValues from "../player/updateValues.ts";
+import { refreshSkills } from "../player/skills.ts";
 import {
 	ensureExpandedRatings,
 	setDefenseSplit,
@@ -506,8 +507,9 @@ export const writeResult = async (
 		);
 		row.ovr = F.ovr(row as any);
 		row.pot = Math.max(row.pot, row.ovr);
-		row.skills = F.skills(row as any);
 	}
+	// Stored skills (and the prospect's draft copy) from the rewritten row
+	refreshSkills(p, row as any, isProspect(p));
 	if (r.after.hgtInches !== undefined) {
 		p.hgt = r.after.hgtInches;
 	}
@@ -518,7 +520,6 @@ export const writeResult = async (
 	if (isProspect(p)) {
 		p.draft.ovr = row.ovr;
 		p.draft.pot = row.pot;
-		p.draft.skills = row.skills;
 	}
 	p.ratingsBuild = {
 		name: r.build.name,
@@ -622,14 +623,14 @@ export const restoreOriginalRatings = async ({
 		row.ovr = F.ovr(b.base);
 		row.pot = Math.max(row.ovr, b.basePot);
 		row.pos = F.pos(b.base);
-		row.skills = F.skills({ ...b.base, fuzz: b.baseFuzz });
+		// The skills of the base ratings (the build's own rows may hold stale expanded ratings)
+		refreshSkills(p, row as any, true, { ...b.base, fuzz: b.baseFuzz } as any);
 		p.hgt = b.baseHgtInches;
 		if (typeof p.pos === "string") {
 			p.pos = row.pos;
 		}
 		p.draft.ovr = row.ovr;
 		p.draft.pot = row.pot;
-		p.draft.skills = row.skills;
 		delete p.ratingsBuild;
 		subsAfterRewrite(p);
 		await updateValues(p);

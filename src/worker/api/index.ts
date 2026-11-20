@@ -4764,6 +4764,9 @@ const updateBudget = async ({
 		throw new Error("Invalid tid");
 	}
 
+	// Trait badges read the user's scouting level: read it again next time
+	player.resetBadgeScoutingLevel();
+
 	for (const key of helpers.keys(budgetLevels)) {
 		// With a coaching staff, the coaching level is set by the staff
 		if (key === "coaching" && staff.staffEnabled()) {

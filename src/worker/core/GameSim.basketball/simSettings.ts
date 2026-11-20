@@ -108,13 +108,6 @@ export const simFixInjuryFactor = (stre: number, endu: number) =>
 		(-SIM_FIX_INJURY_K * ((stre + endu) / 2 - SIM_FIX_INJURY_CENTER)) / 10,
 	);
 
-// Synergy skill cutoffs with Expanded Ratings on (the expanded Di, Dp and R composites have their own skill cutoffs)
-export const SIM_FIX_EXPANDED_SYNERGY_CUTOFFS = {
-	Di: 0.595,
-	Dp: 0.607,
-	R: 0.62,
-};
-
 const merged = new WeakMap<object, CompositeWeights<string>>();
 const mergedExpanded = new WeakMap<object, CompositeWeights<string>>();
 

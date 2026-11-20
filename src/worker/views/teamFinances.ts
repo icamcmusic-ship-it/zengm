@@ -13,6 +13,7 @@ import { getAutoTicketPriceByTid } from "../core/game/attendance.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
 import {
 	getSkillBadgesForRow,
+	getSkillsForRow,
 	prepareSkillBadges,
 } from "../core/player/format.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
@@ -90,10 +91,13 @@ export default defineView({
 			// Extended skill badges, shown with the skills (League Extras switch)
 			await prepareSkillBadges();
 			const badgesByPid = new Map<number, string[] | undefined>();
+			// The skills too, live from the ratings the user sees (as player.format shows them)
+			const skillsByPid = new Map<number, string[]>();
 			for (const contract of contractsRaw) {
 				const p = await idb.cache.players.get(contract.pid);
 				if (p) {
 					badgesByPid.set(p.pid, getSkillBadgesForRow(p, p.ratings.at(-1)!));
+					skillsByPid.set(p.pid, getSkillsForRow(p, p.ratings.at(-1)!));
 				}
 			}
 
@@ -115,7 +119,7 @@ export default defineView({
 						pid: contract.pid,
 						firstName: contract.firstName,
 						lastName: contract.lastName,
-						skills: contract.skills,
+						skills: skillsByPid.get(contract.pid) ?? contract.skills,
 						badges: badgesByPid.get(contract.pid),
 						pos: contract.pos,
 						injury: contract.injury,

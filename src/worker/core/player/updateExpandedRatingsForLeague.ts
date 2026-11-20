@@ -3,7 +3,7 @@ import { PLAYER } from "../../../common/constants.ts";
 import { idb } from "../../db/index.ts";
 import { helpers } from "../../util/index.ts";
 import ovr from "./ovr.ts";
-import skills from "./skills.ts";
+import { refreshSkills } from "./skills.ts";
 import updateValues from "./updateValues.ts";
 import { expandedRatingsOn, syncExpandedToCompat } from "./expandedRatings.ts";
 
@@ -32,11 +32,10 @@ const updateExpandedRatingsForLeague = async () => {
 			r.ovr = ovr(r);
 			r.pot = helpers.bound(r.pot + (r.ovr - oldOvr), r.ovr, 100);
 		}
-		r.skills = skills(r);
+		refreshSkills(p, r, p.tid === PLAYER.UNDRAFTED);
 		if (p.tid === PLAYER.UNDRAFTED) {
 			p.draft.ovr = r.ovr;
 			p.draft.pot = r.pot;
-			p.draft.skills = r.skills;
 		}
 		await updateValues(p);
 		await idb.cache.players.put(p);

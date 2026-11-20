@@ -1,6 +1,7 @@
 import { schoolDistanceKm } from "../../../common/college/geography.ts";
 import { g, helpers } from "../../util/index.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
+import { skillCutoffs } from "../../../common/skillCutoffs.ts";
 import {
 	type DefScheme,
 	PROFILE_LEAGUE_MAKE,
@@ -12,7 +13,6 @@ import {
 	type ShotProfile,
 } from "../../../common/shotProfiles.ts";
 import {
-	SIM_FIX_EXPANDED_SYNERGY_CUTOFFS,
 	SIM_FIX_LOW_POST,
 	SIM_FIX_OFF_FOUL,
 	SIM_FIX_FT_ORB,
@@ -482,8 +482,6 @@ const getSortedIndexes = (ovrs: number[]) => {
 
 	return sortedIndexes;
 };
-
-const STOCK_SYNERGY_CUTOFFS = { Di: 0.57, Dp: 0.61, R: 0.61 };
 
 const NEUTRAL_CS: CoachSim = {
 	...NEUTRAL_COACH_SIM,
@@ -3221,23 +3219,20 @@ class GameSim extends GameSimBase {
 				let skills = this.skillsCountCache.get(p);
 
 				if (!skills) {
-					// 1 / (1 + e^-(15 * (x - 0.61))) from 0 to 1
-					// 0.61 is not always used - keep in sync with skills.js!
-
+					// 1 / (1 + e^-(15 * (x - cutoff))) from 0 to 1, with the same cutoffs as the skill labels (common/skillCutoffs.ts)
 					const r = p.compositeRating;
-					// Game Sim Fixes: the expanded Di, Dp and R composites have their own skill cutoffs
-					const cutoffs =
-						this.simFixes && this.expandedRatings
-							? SIM_FIX_EXPANDED_SYNERGY_CUTOFFS
-							: STOCK_SYNERGY_CUTOFFS;
+					const cutoffs = skillCutoffs({
+						expanded: this.expandedRatings,
+						simFixes: this.simFixes,
+					});
 					skills = {
-						"3": helpers.sigmoid(r.shootingThreePointer, 15, 0.59),
-						A: helpers.sigmoid(r.athleticism, 15, 0.63),
-						B: helpers.sigmoid(r.dribbling, 15, 0.68),
+						"3": helpers.sigmoid(r.shootingThreePointer, 15, cutoffs["3"]),
+						A: helpers.sigmoid(r.athleticism, 15, cutoffs.A),
+						B: helpers.sigmoid(r.dribbling, 15, cutoffs.B),
 						Di: helpers.sigmoid(r.defenseInterior, 15, cutoffs.Di),
 						Dp: helpers.sigmoid(r.defensePerimeter, 15, cutoffs.Dp),
-						Po: helpers.sigmoid(r.shootingLowPost, 15, 0.61),
-						Ps: helpers.sigmoid(r.passing, 15, 0.63),
+						Po: helpers.sigmoid(r.shootingLowPost, 15, cutoffs.Po),
+						Ps: helpers.sigmoid(r.passing, 15, cutoffs.Ps),
 						R: helpers.sigmoid(r.rebounding, 15, cutoffs.R),
 					};
 

@@ -393,7 +393,7 @@ const normalizePick = async (
 	p.ratings = [ratings];
 	p.draft.ovr = ratings.ovr;
 	p.draft.pot = ratings.pot;
-	p.draft.skills = ratings.skills;
+	player.refreshSkills(p, ratings, true);
 
 	addContract(
 		p,

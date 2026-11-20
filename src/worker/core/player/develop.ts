@@ -11,7 +11,7 @@ import {
 } from "./developSeason.ts";
 import ovr from "./ovr.ts";
 import pos from "./pos.ts";
-import skills from "./skills.ts";
+import { refreshSkills } from "./skills.ts";
 import { g, helpers } from "../../util/index.ts";
 import type {
 	MinimalPlayerRatings,
@@ -343,7 +343,7 @@ const develop = async (
 		}
 	}
 
-	ratings.skills = skills(ratings);
+	refreshSkills(p, ratings, p.tid === PLAYER.UNDRAFTED);
 
 	if (p.tid === PLAYER.UNDRAFTED) {
 		p.draft.ovr = ratings.ovr;
@@ -351,8 +351,6 @@ const develop = async (
 		if (!skipPot) {
 			p.draft.pot = ratings.pot;
 		}
-
-		p.draft.skills = ratings.skills;
 	}
 
 	if (newPlayer) {
