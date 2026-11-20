@@ -1,4 +1,5 @@
 import { applyOffEmphasis } from "../offEmphasis/index.ts";
+import { snapshotPowerRankings } from "../../views/powerRankings.ts";
 import { marqueeCrowdBoost } from "../../../common/marquee.ts";
 import { ALL_STAR_GAME_ONLY, PHASE } from "../../../common/constants.ts";
 import * as contractHooks from "../contract/hooks.ts";
@@ -391,8 +392,6 @@ const play = async (
 				await contractHooks.afterDay();
 
 				// Weekly power rankings snapshot, for movement arrows on the Power Rankings page
-				const { snapshotPowerRankings } =
-					await import("../../views/powerRankings.ts");
 				await snapshotPowerRankings();
 			}
 			if (dayTick && phase === PHASE.REGULAR_SEASON) {
