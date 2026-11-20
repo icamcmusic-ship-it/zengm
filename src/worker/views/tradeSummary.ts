@@ -26,6 +26,7 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { gradeOneTrade } from "../util/valueData.ts";
 import {
 	getSkillBadgesForRow,
+	getSkillsForRow,
 	prepareSkillBadges,
 } from "../core/player/format.ts";
 
@@ -309,7 +310,7 @@ const getActualPlayerInfo = async (
 		ovr: player.fuzzRating(ratings.ovr, ratings.fuzz),
 		pot: player.fuzzRating(ratings.pot, ratings.fuzz),
 		retiredYear: p.retiredYear,
-		skills: ratings.skills,
+		skills: getSkillsForRow(p, ratings),
 		badges: getSkillBadgesForRow(p, ratings),
 		stat,
 		statTeam,

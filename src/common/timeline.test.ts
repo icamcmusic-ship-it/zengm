@@ -77,6 +77,36 @@ describe("League timeline", () => {
 		assert.deepStrictEqual(items[0]!.url, ["game_log", "ATL_0", 2021, 4]);
 	});
 
+	test("scoring records: non-scoring feats and All-Star games don't count", () => {
+		const feat = (gid: number, season: number, pts: number, tid = 0) => ({
+			gid,
+			season,
+			pts,
+			pid: gid,
+			tid,
+			name: `P${gid}`,
+			playoffs: false,
+		});
+		const items = findScoringRecords(
+			[
+				// A triple-double in the first season would set a 12-point bar
+				feat(1, 2020, 12),
+				feat(2, 2021, 35),
+				// All-Star game
+				feat(3, 2021, 70, -1),
+				feat(4, 2021, 52),
+				feat(5, 2022, 51),
+				feat(6, 2022, 56),
+			],
+			() => "ATL",
+			() => 50,
+		);
+		assert.deepStrictEqual(
+			items.map((x) => x.pids[0]),
+			[6],
+		);
+	});
+
 	test("major trades: top N per season above the minimum score", () => {
 		const trades = [
 			{ eid: 1, season: 2020, score: 5 },

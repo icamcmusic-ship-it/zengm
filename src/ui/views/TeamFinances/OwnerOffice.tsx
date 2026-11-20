@@ -32,6 +32,11 @@ export const OwnerOffice = ({
 	const { numGames, season } = useLocal(["numGames", "season"]);
 	const [starting, setStarting] = useState(false);
 	const goals = info.goals;
+	// The owner judges the season average payroll (or the payroll now, if higher)
+	const seasonAvgPayroll =
+		goals?.payrollTrack && goals.payrollTrack.n > 0
+			? goals.payrollTrack.sum / goals.payrollTrack.n
+			: undefined;
 
 	const start = async (type: OwnerProjectType) => {
 		setStarting(true);
@@ -56,8 +61,10 @@ export const OwnerOffice = ({
 					</p>
 					<p>
 						Projects are paid from cash every regular season game (an expense in
-						profit). When finished they raise your facilities level (which wears
-						off by 1 level a season), and a new arena adds seats.
+						profit, but the owner approved them, so they don't count against you
+						in his review or his profit target). When finished they raise your
+						facilities level (which wears off by 1 level a season), and a new
+						arena adds seats.
 					</p>
 				</HelpPopover>
 			</h2>
@@ -74,13 +81,24 @@ export const OwnerOffice = ({
 										{goals.taxWilling ? "(will pay some tax)" : "(no tax)"}
 									</td>
 									<td>
-										Now {money(info.payroll)}{" "}
-										<Status ok={info.payroll <= goals.maxPayroll} />
+										Now {money(info.payroll)}
+										{seasonAvgPayroll !== undefined
+											? `, season average ${money(seasonAvgPayroll)}`
+											: null}{" "}
+										<Status
+											ok={
+												Math.max(info.payroll, seasonAvgPayroll ?? 0) <=
+												goals.maxPayroll
+											}
+										/>
 									</td>
 								</tr>
 								<tr>
 									<th>Profit target</th>
-									<td>{helpers.formatCurrency(goals.profitTarget, "M", 1)}</td>
+									<td>
+										{helpers.formatCurrency(goals.profitTarget, "M", 1)} (not
+										counting project payments)
+									</td>
 									<td />
 								</tr>
 								<tr>
@@ -92,6 +110,16 @@ export const OwnerOffice = ({
 								</tr>
 							</tbody>
 						</table>
+					) : info.noGoalsReason === "multiTeam" ? (
+						<p>
+							No budget meeting goals in multi-team mode, where the owner
+							doesn't review you.
+						</p>
+					) : info.noGoalsReason === "college" ? (
+						<p>
+							No budget meeting goals in college, where you're judged against
+							your program's expectations.
+						</p>
 					) : (
 						<p>The owner sets this season's goals at the next preseason.</p>
 					)}

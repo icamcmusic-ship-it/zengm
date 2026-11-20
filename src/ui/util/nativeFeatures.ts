@@ -131,9 +131,13 @@ export const featureOffForUrl = (
 };
 
 export const isUrlFeatureOn = (url: readonly unknown[] | string) => {
-	// The Staff Report belongs to two features
+	// The Staff Report belongs to two features. Same rule as the page itself (worker/views/staffReport.ts): Coaching
+	// Staff Depth only counts with Coaching Staff on
 	if (typeof url !== "string" && url[0] === "staff_report") {
-		return isFeatureOn("scoutingDepth") || isFeatureOn("coachingDepth");
+		return (
+			isFeatureOn("scoutingDepth") ||
+			(isFeatureOn("coachingDepth") && isFeatureOn("coachingStaff"))
+		);
 	}
 	const feature = featureForUrl(url);
 	const replacedBy = featureOffForUrl(url);
@@ -150,3 +154,16 @@ export const useFeatureSwitches = () =>
 			nativeFeatureEnabled(f.id, getter(state)) ? "1" : "0",
 		).join(""),
 	);
+
+// Whether a menu or command palette link's League extras are on: its own feature/featureOff, and the same rule as the
+// page it links to (isUrlFeatureOn), so a link is never shown for a page that would say it is turned off, or hidden
+// for a page that is on (like the Staff Report, which belongs to two features). Non-reactive: components call
+// useFeatureSwitches to re-render when a switch changes.
+export const isMenuLinkFeatureOn = (menuItem: {
+	feature?: NativeFeatureId;
+	featureOff?: NativeFeatureId;
+	path?: readonly unknown[] | string;
+}) =>
+	(menuItem.feature === undefined || isFeatureOn(menuItem.feature)) &&
+	(menuItem.featureOff === undefined || !isFeatureOn(menuItem.featureOff)) &&
+	(!Array.isArray(menuItem.path) || isUrlFeatureOn(menuItem.path));

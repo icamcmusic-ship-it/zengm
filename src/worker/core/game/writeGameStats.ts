@@ -32,17 +32,35 @@ const allStarMVP = async (
 
 	// Why special case for basketball? No real reason, but it was there before the other sports and seems to work better than getBestPlayer because efficiency gets factored into gmSc.
 	if (__SPORT === "basketball") {
-		let maxScore = -Infinity;
+		let best: [number, number, number, number] | undefined;
 
 		for (const t of game.teams) {
-			const wonBonus = game.won.tid === t.tid ? 8 : 0;
+			const won = game.won.tid === t.tid ? 1 : 0;
+			const wonBonus = won ? 8 : 0;
 
 			for (const p of t.players) {
 				const score = helpers.gameScore(p) + p.pts / 2 + wonBonus;
 
-				if (score > maxScore) {
+				// Ties: the winning team's player, then more points, then the lower pid (deterministic, not box score order)
+				const key: [number, number, number, number] = [
+					score,
+					won,
+					p.pts,
+					-p.pid,
+				];
+				let better = best === undefined;
+				if (best) {
+					for (let i = 0; i < key.length; i++) {
+						if (key[i] !== best[i]) {
+							better = key[i]! > best[i]!;
+							break;
+						}
+					}
+				}
+
+				if (better) {
 					mvp = p;
-					maxScore = score;
+					best = key;
 				}
 			}
 		}
@@ -80,16 +98,19 @@ const allStarMVP = async (
 		return;
 	}
 
+	// No team link for a player without a team (released or retired since the game was set up)
+	const teamInfo = p.tid >= 0 ? g.get("teamInfoCache")[p.tid] : undefined;
+	const teamText = teamInfo
+		? ` (<a href="${helpers.leagueUrl([
+				"roster",
+				`${teamInfo.abbrev}_${p.tid}`,
+				g.get("season"),
+			])}">${teamInfo.abbrev}</a>)`
+		: "";
 	game.clutchPlays.push(
 		`<a href="${helpers.leagueUrl(["player", mvp.pid])}">${
 			mvp.name
-		}</a> (<a href="${helpers.leagueUrl([
-			"roster",
-			`${g.get("teamInfoCache")[p.tid]?.abbrev}_${p.tid}`,
-			g.get("season"),
-		])}">${
-			g.get("teamInfoCache")[p.tid]?.abbrev
-		}</a>) won the All-Star MVP award.`,
+		}</a>${teamText} won the All-Star MVP award.`,
 	);
 
 	const awardsByPlayer = [

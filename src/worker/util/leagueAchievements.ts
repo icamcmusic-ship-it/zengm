@@ -29,12 +29,47 @@ import {
 	type UnlockLogEntry,
 } from "./leagueAchievementsStore.ts";
 import { PHASE } from "../../common/constants.ts";
+import type { PlayerFeat } from "../../common/types.ts";
 
 // League achievements (basketball only): the League Explorer's catalogue and engine (src/common/leagueAchievements) run on the league's own data. The data is the Wrapped/Storylines snapshot (incremental and cached, see wrappedData.ts) plus a few small stores, and the result is kept with the snapshot, so it is only recomputed when the league changed.
 //
 // Unlocks are noticed after games and phase changes: scheduleLeagueAchievementsCheck is called there, waits until things are quiet (no games being simmed, no auto play), runs the engine once and announces tiers that weren't unlocked before (see leagueAchievementsStore.ts for what is remembered).
 
 export type Computed = { data: AData; run: EngineRun };
+
+// Feats only ever get added (fids are auto-increment), so like the Records Book's lastGid, the ones read before are kept
+// with a watermark and each check only reads the new ones. Kept per database connection, so importing a league over
+// this lid (a new connection) starts over.
+let featsKept:
+	| { db: typeof idb.league; maxFid: number; feats: PlayerFeat[] }
+	| undefined;
+const readFeats = async (): Promise<PlayerFeat[]> => {
+	const db = idb.league;
+	if (featsKept?.db !== db) {
+		featsKept = { db, maxFid: -1, feats: [] };
+	}
+	const kept = featsKept;
+	const added = await idb.merged.playerFeats.getAll({
+		fidAbove: kept.maxFid,
+	});
+	if (featsKept !== kept || idb.league !== db) {
+		// Another league meanwhile: read it all again
+		return idb.merged.playerFeats.getAll();
+	}
+	added.sort((a, b) => a.fid - b.fid);
+	for (const f of added) {
+		if (f.fid > kept.maxFid) {
+			kept.feats.push(f);
+			kept.maxFid = f.fid;
+		}
+	}
+	return kept.feats.slice();
+};
+
+// For tests
+export const resetLeagueAchievementsFeats = () => {
+	featsKept = undefined;
+};
 
 const readExtras = async (): Promise<AExtras> => {
 	const [events, awards, allStars, lottery, h2h, feats, teams] =
@@ -46,7 +81,7 @@ const readExtras = async (): Promise<AExtras> => {
 			idb.merged.allStars.getAll(),
 			idb.merged.draftLotteryResults.getAll(),
 			idb.merged.headToHeads.getAll(),
-			idb.merged.playerFeats.getAll(),
+			readFeats(),
 			idb.cache.teams.getAll(),
 		]);
 	return {

@@ -1,4 +1,5 @@
 import { COMPOSITE_WEIGHTS, SKILLS } from "../constants.ts";
+import { weightedComposite } from "../compositeMath.ts";
 import { TRAIT_DEFINITIONS } from "../playerTraits/definitions.ts";
 import { TRAIT_KEYS, type TraitKey } from "../playerTraits/types.ts";
 import {
@@ -40,7 +41,6 @@ export const BADGE_RATING_KEYS: BadgeRatingKey[] = [
 	"reb",
 ];
 
-const bound = (x: number) => Math.min(1, Math.max(0, x));
 const bound100 = (x: number) => Math.min(100, Math.max(0, x));
 
 // Part of the memo keys: the expanded ratings, if any
@@ -49,7 +49,8 @@ const expandedKey = (ratings: BadgeRatings) =>
 		? `${Math.round(ratings.wng)},${Math.round(ratings.pdef ?? 0)},${Math.round(ratings.idef ?? 0)},${ratings.oreb ?? ""},${ratings.dreb ?? ""},${ratings.csh ?? ""},${ratings.dsh ?? ""},${ratings.bsc ?? ""}|`
 		: "";
 
-// Same maths as worker compositeRating (without fuzz), but free of worker imports so the sim, worker and UI can all use it.
+// The same formula as worker compositeRating (common/compositeMath.ts, without fuzz), but free of worker imports so the sim, worker
+// and UI can all use it. The expanded-rating substitutions (xr) are the only difference.
 export const badgeComposite = (
 	ratings: BadgeRatings,
 	{
@@ -65,10 +66,8 @@ export const badgeComposite = (
 			: undefined;
 	// Second step ratings, when the ratings have them
 	const sub2 = sub && typeof ratings.oreb === "number" ? sub : undefined;
-	let numerator = 0;
-	let denominator = 0;
-	for (const [i, component] of components.entries()) {
-		let factor = component === 50 ? 50 : ratings[component];
+	return weightedComposite(components, weights, (component) => {
+		let factor = ratings[component as BadgeRatingKey];
 		if (sub) {
 			if (component === "diq" && sub.diq) {
 				factor = ratings[sub.diq]!;
@@ -86,11 +85,8 @@ export const badgeComposite = (
 				factor = (1 - sub2.bsc) * ratings.drb + sub2.bsc * ratings.bsc!;
 			}
 		}
-		const weight = weights[i] ?? 1;
-		numerator += factor * weight;
-		denominator += 100 * weight;
-	}
-	return bound(numerator / denominator);
+		return factor;
+	});
 };
 
 export const conditionMet = (

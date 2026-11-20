@@ -14,6 +14,7 @@ import {
 import { getMetaAttribute, putMetaAttribute } from "../../db/metaAttributes.ts";
 import { onRegularSeason as gmOnRegularSeason } from "../gm/index.ts";
 import markUserControl from "../team/markUserControl.ts";
+import { recordsCheckBeforeBoxScoresDeleted } from "../../util/recordsBookData.ts";
 
 class GameHasYourTeamCache {
 	cache: Record<number, boolean> = {};
@@ -53,6 +54,9 @@ const deleteOldBoxScores = async () => {
 	) {
 		// Not deleting anything
 	} else {
+		// Records Book: games it hasn't read yet are read now, before their box scores are gone
+		await recordsCheckBeforeBoxScoresDeleted();
+
 		// Extra flush before reading games from IndexedDB, in case there is a game in memory with an added/deleted note
 		await idb.cache.flush(["games"]);
 

@@ -965,14 +965,13 @@ const migrate = async ({
 					}
 
 					r.ovr = player.ovr(r);
-					r.skills = player.skills(r);
+					player.refreshSkills(p, r, p.draft.year === r.season);
 
 					// Don't want to deal with monteCarloPot now being async
 					r.pot = r.ovr;
 
 					if (p.draft.year === r.season) {
 						p.draft.ovr = r.ovr;
-						p.draft.skills = r.skills;
 						p.draft.pot = r.pot;
 					}
 				}

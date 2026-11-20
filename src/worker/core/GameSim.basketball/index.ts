@@ -1,6 +1,7 @@
 import { schoolDistanceKm } from "../../../common/college/geography.ts";
 import { g, helpers } from "../../util/index.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
+import { skillCutoffs } from "../../../common/skillCutoffs.ts";
 import {
 	type DefScheme,
 	PROFILE_LEAGUE_MAKE,
@@ -12,13 +13,13 @@ import {
 	type ShotProfile,
 } from "../../../common/shotProfiles.ts";
 import {
-	SIM_FIX_EXPANDED_SYNERGY_CUTOFFS,
 	SIM_FIX_LOW_POST,
 	SIM_FIX_OFF_FOUL,
 	SIM_FIX_FT_ORB,
 	SIM_FIX_MID_RANGE,
 	SIM_FIX_BREAK_REST,
 	SIM_FIX_PERF_FACTOR,
+	SIM_FIX_STRENGTH_GAP,
 	SIM_FIX_SHOT_CHOICE,
 	SIM_FIX_TRANSITION,
 } from "./simSettings.ts";
@@ -48,6 +49,7 @@ import type {
 	TeamNum,
 } from "../../../common/types.ts";
 import GameSimBase from "../GameSim/GameSimBase.ts";
+import { ovr as teamOvrBasketball } from "../team/ovr.basketball.ts";
 import { maxBy } from "../../../common/utils.ts";
 import {
 	type BlockType,
@@ -322,6 +324,7 @@ type PlayerGameSim = {
 	id: number;
 	// (perf2) his value for substitutions, set by updatePlayersOnCourt each time it runs
 	subOvr?: number;
+	ovr?: number;
 	name: string;
 	age: number;
 	pos: string;
@@ -482,8 +485,6 @@ const getSortedIndexes = (ovrs: number[]) => {
 
 	return sortedIndexes;
 };
-
-const STOCK_SYNERGY_CUTOFFS = { Di: 0.57, Dp: 0.61, R: 0.61 };
 
 const NEUTRAL_CS: CoachSim = {
 	...NEUTRAL_COACH_SIM,
@@ -687,6 +688,8 @@ class GameSim extends GameSimBase {
 	attentionShooterShare = 0;
 	// Matchup Defense, help on elite finishers: what the help takes from a team's best finishers goes to all its two-point shots
 	helpGive: [number, number] = [0, 0];
+	// Game Sim Fixes: each team's predicted margin minus its opponent's (SIM_FIX_STRENGTH_GAP)
+	strengthGap: [number, number] = [0, 0];
 	// Matchup Defense (League extras, see matchupDefense.ts): for each team on defense, the index of the defender guarding each offensive
 	// player (by his index on the court), assigned at each substitution, and the team's average defensive versatility. Off: nothing here is
 	// used and no extra random numbers are drawn
@@ -908,6 +911,18 @@ class GameSim extends GameSimBase {
 						(ATTENTION.helpGive * drop) / t.player.length;
 				}
 			}
+		}
+		// Game Sim Fixes: the team strength gap (see SIM_FIX_STRENGTH_GAP)
+		if (this.simFixes && !allStarGame) {
+			const pred = this.team.map((t) =>
+				teamOvrBasketball(
+					t.player
+						.filter((p) => !p.injured)
+						.map((p) => ({ ratings: { ovr: p.ovr ?? 0, pos: p.pos } })),
+					{ rating: "ovr" },
+				),
+			);
+			this.strengthGap = [pred[0]! - pred[1]!, pred[1]! - pred[0]!];
 		}
 		this.starClutchCal =
 			this.matchupDefense &&
@@ -1247,6 +1262,7 @@ class GameSim extends GameSimBase {
 
 				// @ts-expect-error
 				delete p.valueNoPot;
+				delete p.ovr;
 				delete p.compositeRating;
 				delete p.traitEffects;
 				delete p.gameZ;
@@ -3221,23 +3237,20 @@ class GameSim extends GameSimBase {
 				let skills = this.skillsCountCache.get(p);
 
 				if (!skills) {
-					// 1 / (1 + e^-(15 * (x - 0.61))) from 0 to 1
-					// 0.61 is not always used - keep in sync with skills.js!
-
+					// 1 / (1 + e^-(15 * (x - cutoff))) from 0 to 1, with the same cutoffs as the skill labels (common/skillCutoffs.ts)
 					const r = p.compositeRating;
-					// Game Sim Fixes: the expanded Di, Dp and R composites have their own skill cutoffs
-					const cutoffs =
-						this.simFixes && this.expandedRatings
-							? SIM_FIX_EXPANDED_SYNERGY_CUTOFFS
-							: STOCK_SYNERGY_CUTOFFS;
+					const cutoffs = skillCutoffs({
+						expanded: this.expandedRatings,
+						simFixes: this.simFixes,
+					});
 					skills = {
-						"3": helpers.sigmoid(r.shootingThreePointer, 15, 0.59),
-						A: helpers.sigmoid(r.athleticism, 15, 0.63),
-						B: helpers.sigmoid(r.dribbling, 15, 0.68),
+						"3": helpers.sigmoid(r.shootingThreePointer, 15, cutoffs["3"]),
+						A: helpers.sigmoid(r.athleticism, 15, cutoffs.A),
+						B: helpers.sigmoid(r.dribbling, 15, cutoffs.B),
 						Di: helpers.sigmoid(r.defenseInterior, 15, cutoffs.Di),
 						Dp: helpers.sigmoid(r.defensePerimeter, 15, cutoffs.Dp),
-						Po: helpers.sigmoid(r.shootingLowPost, 15, 0.61),
-						Ps: helpers.sigmoid(r.passing, 15, 0.63),
+						Po: helpers.sigmoid(r.shootingLowPost, 15, cutoffs.Po),
+						Ps: helpers.sigmoid(r.passing, 15, cutoffs.Ps),
 						R: helpers.sigmoid(r.rebounding, 15, cutoffs.R),
 					};
 
@@ -5356,6 +5369,10 @@ class GameSim extends GameSimBase {
 
 			if (this.coachSys) {
 				probMake += this.coachMakeDelta();
+			}
+			// Game Sim Fixes: the team strength gap
+			if (this.simFixes) {
+				probMake -= SIM_FIX_STRENGTH_GAP.k * this.strengthGap[this.o];
 			}
 			// Offensive Emphasis: how well the team's play-type dials fit its roster
 			if (this.offEmph) {

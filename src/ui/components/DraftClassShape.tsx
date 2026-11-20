@@ -7,6 +7,8 @@ export const DraftClassShape = ({
 		name: string;
 		description: string;
 		storylines?: string[];
+		// A second, compatible shape (one about strength, one about composition)
+		second?: { key: string; name: string; description: string };
 	};
 }) => {
 	return (
@@ -17,6 +19,16 @@ export const DraftClassShape = ({
 				</span>
 				<span className="text-body-secondary">{shape.description}</span>
 			</p>
+			{shape.second ? (
+				<p className="mb-1" data-shape2={shape.second.key}>
+					<span className="badge text-bg-secondary fw-normal me-1">
+						{shape.second.name}
+					</span>
+					<span className="text-body-secondary">
+						{shape.second.description}
+					</span>
+				</p>
+			) : null}
 			{shape.storylines && shape.storylines.length > 0 ? (
 				<ul className="draft-class-storylines small mb-0 ps-4">
 					{shape.storylines.map((line, i) => (

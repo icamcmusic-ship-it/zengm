@@ -5,6 +5,7 @@ import { StaffFace } from "../components/StaffFace.tsx";
 import { toWorker } from "../util/toWorker.ts";
 import {
 	PRIORITY_NAMES,
+	coverageColor,
 	REGION_NAMES,
 	SCOUT_REGIONS,
 } from "../../common/staffDepth/regions.ts";
@@ -99,7 +100,7 @@ const DirectorPanel = ({ depth }: { depth: Depth }) => (
 								<td>{r.importance}%</td>
 								<td>
 									<span
-										className={`badge ${r.coverage < 0.18 ? "text-bg-danger" : r.coverage < 0.3 ? "text-bg-warning" : "text-bg-success"}`}
+										className={`badge text-bg-${coverageColor(r.coverage)}`}
 									>
 										{r.label}
 									</span>{" "}

@@ -191,7 +191,12 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 							{ title: "Replaces" },
 							{ title: "Meaning", sortType: "string" },
 							{ title: "Players", sortType: "number" },
-							{ title: "Top 5 (margin)", noSearch: true },
+							{
+								title: challengeNoRatings
+									? "Players (by team)"
+									: "Top 5 (margin)",
+								noSearch: true,
+							},
 						]}
 						defaultSort={[4, "desc"]}
 						name="SkillBadges:combos"
@@ -242,7 +247,12 @@ const SkillBadges = ({ badges, combos, label, numPlayers, userTid }: Props) => {
 								desc: "Score needed on the 0-100 badge composite",
 							},
 							{ title: "Players", sortType: "number" },
-							{ title: "Top 5 (score)", noSearch: true },
+							{
+								title: challengeNoRatings
+									? "Players (by team)"
+									: "Top 5 (score)",
+								noSearch: true,
+							},
 						]}
 						defaultSort={[4, "desc"]}
 						name={`SkillBadges:${groupName}`}

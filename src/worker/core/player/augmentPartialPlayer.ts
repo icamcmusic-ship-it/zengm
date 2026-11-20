@@ -11,7 +11,7 @@ import heightToRating from "./heightToRating.ts";
 import name from "./name.ts";
 import ovr from "./ovr.ts";
 import pos from "./pos.ts";
-import skills from "./skills.ts";
+import { refreshSkills } from "./skills.ts";
 import stats from "./stats.ts";
 import { g, helpers } from "../../util/index.ts";
 import type { Player } from "../../../common/types.ts";
@@ -315,7 +315,7 @@ const augmentPartialPlayer = async (
 				}
 
 				r.ovr = ovr(r);
-				r.skills = skills(r);
+				refreshSkills(p, r, p.draft.year === r.season);
 				r.pot = await monteCarloPot({
 					ratings: r,
 					age: r.season - p.born.year,
@@ -324,7 +324,6 @@ const augmentPartialPlayer = async (
 
 				if (p.draft.year === r.season) {
 					p.draft.ovr = r.ovr;
-					p.draft.skills = r.skills;
 					p.draft.pot = r.pot;
 				}
 			}
@@ -346,7 +345,7 @@ const augmentPartialPlayer = async (
 		}
 
 		if (r.skills === undefined || appliedFuzz) {
-			r.skills = skills(r);
+			refreshSkills(p, r, false);
 		}
 
 		if (r.ovr === undefined || appliedFuzz) {

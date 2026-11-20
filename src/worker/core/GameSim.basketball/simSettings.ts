@@ -99,6 +99,16 @@ export const SIM_FIX_BREAK_REST = { quarter: 0.04, halftime: 0.12 };
 // The trailing team's boost (perfFactor = 1 - X tanh(diff / 60)), stock 0.2
 export const SIM_FIX_PERF_FACTOR = 0.1;
 
+// Team strength gap: every shot's make probability - k × (the shooting team's predicted margin - its opponent's), the predicted
+// margins from team ovr's formula (team/ovr.basketball.ts, before its 0-100 scale) over each team's healthy players at tip-off, from
+// their true ovrs. The fork's sim features (traits, spacing, rotations, coaching systems, star calibration, these fixes ...) each
+// added a little to how much a better roster wins by, together ~0.54 points of margin per team ovr point in single games (the
+// formula assumes 0.3), so the league's win% SD was ~.17 (NBA ~.15). With k = 0.0023 it is ~0.32 per point in single games and
+// win% SD ~.15 over a league's first five seasons (src/test/parity). Who scores within a team is unchanged (a star's shot share and
+// his edge over his teammates), and the league averages too (the two teams' deltas cancel). Mutable only so the parity scripts can
+// sweep it
+export const SIM_FIX_STRENGTH_GAP = { k: 0.0023 };
+
 // Injury rate multiplier from strength and endurance: exp(-K (avg(stre, endu) - center) / 10), centered on the minutes-weighted
 // league average so the league injury rate stays the same
 export const SIM_FIX_INJURY_K = 0.08;
@@ -107,13 +117,6 @@ export const simFixInjuryFactor = (stre: number, endu: number) =>
 	Math.exp(
 		(-SIM_FIX_INJURY_K * ((stre + endu) / 2 - SIM_FIX_INJURY_CENTER)) / 10,
 	);
-
-// Synergy skill cutoffs with Expanded Ratings on (the expanded Di, Dp and R composites have their own skill cutoffs)
-export const SIM_FIX_EXPANDED_SYNERGY_CUTOFFS = {
-	Di: 0.595,
-	Dp: 0.607,
-	R: 0.62,
-};
 
 const merged = new WeakMap<object, CompositeWeights<string>>();
 const mergedExpanded = new WeakMap<object, CompositeWeights<string>>();

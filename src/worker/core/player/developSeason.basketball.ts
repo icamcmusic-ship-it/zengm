@@ -12,6 +12,12 @@ import {
 	REALISTIC_AGING_TARGETS,
 	STOCK_UNTIL,
 } from "./realisticAging.basketball.ts";
+import {
+	DEV_RATES,
+	DEV_RATES_MAX_AGE,
+	rateFor,
+	type DevRates,
+} from "../../../common/prospectVariety.ts";
 
 type RatingFormula = {
 	ageModifier: (age: number) => number;
@@ -236,17 +242,30 @@ const baseChangeByAge = (age: number) => {
 	return -6;
 };
 
+// Prospect variety (players generated since it exists): a real bust tail. Young players' yearly noise is bounded at -4; the part of the same
+// draw between -4 and -7 is added back to every rating after its limits (so it can't be clipped away), minus its mean (0.418), so the
+// league's development is unchanged on average for every rating
+let bustTail = 0;
+
 const calcBaseChange = (
 	age: number,
 	coachingLevel: number,
 	traitDev?: TraitDevelopment,
+	wideYoung?: boolean,
 ): number => {
 	let val = baseChangeByAge(age);
 
 	// Noise
 	let noise;
+	bustTail = 0;
 	if (age <= 23) {
-		noise = helpers.bound(realGauss(0, 5), -4, 20);
+		const draw = realGauss(0, 5);
+		noise = helpers.bound(draw, -4, 20);
+		if (wideYoung) {
+			bustTail =
+				Math.min(0, Math.max(draw, DEV_RATES.youngNoiseMin) + 4) +
+				DEV_RATES.youngNoiseRecenter;
+		}
 	} else if (age <= 25) {
 		noise = helpers.bound(realGauss(0, 5), -4, 10);
 	} else {
@@ -273,6 +292,9 @@ const developSeason = (
 	coachingLevel: number,
 	// Player traits development (work ethic, aging curve), see common/playerTraits/development.ts. Never passed for pot estimates
 	traitDev?: TraitDevelopment,
+	// Prospect variety: his development rate per rating group (common/prospectVariety.ts, devRatesOf). Never passed for pot estimates, so
+	// how fast each part of his game grows stays hidden
+	rates?: DevRates,
 ) => {
 	// In young players, height can sometimes increase
 	if (age <= 21) {
@@ -287,7 +309,14 @@ const developSeason = (
 		}
 	}
 
-	const baseChange = calcBaseChange(age, coachingLevel, traitDev);
+	const baseChange = calcBaseChange(
+		age,
+		coachingLevel,
+		traitDev,
+		rates !== undefined,
+	);
+	const useRates = rates !== undefined && age <= DEV_RATES_MAX_AGE;
+	const bust = rates !== undefined ? bustTail : 0;
 	const realistic = realisticAgingOn();
 	const hgt = ratings.hgt;
 
@@ -297,11 +326,17 @@ const developSeason = (
 			: formula.ageModifier(age);
 		const changeLimits = formula.changeLimits(age);
 
-		const change = helpers.bound(
-			(baseChange + ageModifier) * uniform(0.4, 1.4),
+		const u = uniform(0.4, 1.4);
+		let change = helpers.bound(
+			(baseChange + ageModifier) * u,
 			changeLimits[0],
 			changeLimits[1],
 		);
+		// Prospect variety: his group's rate scales a gain (after the limits, so a fast developer isn't clipped back), and the bust tail
+		if (useRates && change > 0) {
+			change *= rateFor(rates, key);
+		}
+		change += bust * u;
 		// Coaching Staff Depth: a fixed shift of this rating's change (development plan, shooting coach, strength & conditioning)
 		const delta = traitDev?.ratingDelta?.[key];
 		ratings[key] = limitRating(
