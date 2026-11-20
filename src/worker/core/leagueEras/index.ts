@@ -34,6 +34,11 @@ const WALK: Record<EraKey, { revert: number; step: number; bound: number }> = {
 // What won: how much the best teams' style pulls the league (log step per unit of relative difference, and its cap)
 const WINNERS_PULL = 0.5;
 const WINNERS_PULL_MAX = 0.03;
+// The winners' usual edge is a running average of their edges (this weight on the newest season). The good teams always take more
+// threes than the league (their good shooters are why they're good: +7% to +20% of the league's three-point share every season), so the
+// raw edge pulled the three-point tendency up by the full cap every season, a one-way drift to its bound (+49%) that lowered FG% and
+// scoring. Only a season whose winners leaned on threes (or pace) more than winners usually do moves the league now.
+const EDGE_NORM_WEIGHT = 0.3;
 
 // A rule-change vote: chance when a trigger fires, and never within this many seasons of the last one
 const VOTE_PROB = 0.35;
@@ -331,14 +336,31 @@ export const advanceEra = async (conditions: Conditions) => {
 	};
 
 	const rng = new Rng(`leagueEras-${season}`);
+	// What won, beyond the winners' usual edge (the first season, with no history, has none)
+	const edges = {
+		tpShare: winnersEdge(rows, (row) => row.tpShare),
+		poss: winnersEdge(rows, (row) => row.poss),
+	};
+	const norm = prev?.edgeNorm ?? edges;
+	record.edgeNorm = {
+		tpShare:
+			Math.round(
+				10000 *
+					(norm.tpShare + EDGE_NORM_WEIGHT * (edges.tpShare - norm.tpShare)),
+			) / 10000,
+		poss:
+			Math.round(
+				10000 * (norm.poss + EDGE_NORM_WEIGHT * (edges.poss - norm.poss)),
+			) / 10000,
+	};
 	const pulls: Partial<Record<EraKey, number>> = {
 		threePointTendencyFactor: helpers.bound(
-			WINNERS_PULL * winnersEdge(rows, (row) => row.tpShare),
+			WINNERS_PULL * (edges.tpShare - norm.tpShare),
 			-WINNERS_PULL_MAX,
 			WINNERS_PULL_MAX,
 		),
 		pace: helpers.bound(
-			WINNERS_PULL * winnersEdge(rows, (row) => row.poss),
+			WINNERS_PULL * (edges.poss - norm.poss),
 			-WINNERS_PULL_MAX / 3,
 			WINNERS_PULL_MAX / 3,
 		),

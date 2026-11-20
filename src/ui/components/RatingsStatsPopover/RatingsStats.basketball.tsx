@@ -17,6 +17,8 @@ type Props = {
 			csh?: number;
 			dsh?: number;
 			bsc?: number;
+			// Sub-ratings exist: label defensive IQ "Def", as the player page does
+			hasSub?: boolean;
 		};
 	stats: any;
 	type?: "career" | "current" | "draft" | number;
@@ -83,7 +85,7 @@ const RatingsStats = ({ challengeNoRatings, ratings, stats, type }: Props) => {
 					<span style={ratingsGradientStyle(ratings.ft)}>Ft: {ratings.ft}</span>
 					<br />
 					<span style={ratingsGradientStyle(ratings.fg)}>
-						2Pt: {ratings.fg}
+						Mid: {ratings.fg}
 					</span>
 					<br />
 					<span style={ratingsGradientStyle(ratings.tp)}>
@@ -123,7 +125,7 @@ const RatingsStats = ({ challengeNoRatings, ratings, stats, type }: Props) => {
 						</>
 					) : (
 						<span style={ratingsGradientStyle(ratings.diq)}>
-							dIQ: {ratings.diq}
+							{ratings.hasSub ? "Def" : "dIQ"}: {ratings.diq}
 						</span>
 					)}
 					<br />

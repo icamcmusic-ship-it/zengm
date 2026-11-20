@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { seriesEndNote, seriesRecap, type RecapGame } from "./index.ts";
+import {
+	seedsComparable,
+	seriesEndNote,
+	seriesRecap,
+	type RecapGame,
+} from "./index.ts";
 
 const line = (pid: number, pts: number) => ({
 	pid,
@@ -147,5 +152,61 @@ describe("series recap", () => {
 		expect(seriesEndNote({ seed: 1, won: 4 }, { seed: 8, won: 0 }, [])).toBe(
 			"A sweep.",
 		);
+	});
+
+	test("news note: unknown game order leaves the comeback out, keeps what the bracket proves", () => {
+		// Down 3-1 and came back, but a box score is missing: no comeback claimed, no false sweep or upset either
+		expect(seriesEndNote({ seed: 2, won: 4 }, { seed: 3, won: 3 }, null)).toBe(
+			"",
+		);
+		expect(seriesEndNote({ seed: 7, won: 4 }, { seed: 2, won: 3 }, null)).toBe(
+			"An upset: the No. 7 seed knocked out No. 2.",
+		);
+		expect(seriesEndNote({ seed: 1, won: 4 }, { seed: 8, won: 0 }, null)).toBe(
+			"A sweep.",
+		);
+	});
+});
+
+describe("seedsComparable", () => {
+	test("by conference: only within a conference", () => {
+		expect(seedsComparable({ cid: 0 }, { cid: 0 }, 2)).toBe(true);
+		// Finals between conference champions
+		expect(seedsComparable({ cid: 0 }, { cid: 1 }, 2)).toBe(false);
+	});
+
+	test("not by conference: one seeding, whatever the conferences", () => {
+		expect(seedsComparable({ cid: 0 }, { cid: 1 }, false)).toBe(true);
+		expect(seedsComparable({ cid: 3 }, { cid: 3 }, false)).toBe(true);
+	});
+
+	test("college national tournament: national seed lines, athletic conference cids", () => {
+		// The bracket is stored with byConf false, and the teams' cids are their (different) athletic conferences
+		expect(seedsComparable({ cid: 4 }, { cid: 17 }, false)).toBe(true);
+	});
+
+	test("news note and recap page agree", () => {
+		const home = { tid: 0, cid: 0, seed: 1, won: 1 };
+		const away = { tid: 1, cid: 1, seed: 5, won: 4 };
+		for (const byConf of [false, 2] as const) {
+			const comparable = seedsComparable(home, away, byConf);
+			const recap = seriesRecap(
+				{
+					season: 2025,
+					round: 1,
+					numRounds: 4,
+					roundName: "Second Round",
+					home,
+					away,
+					numToWin: 4,
+					seedsComparable: comparable,
+					games: [],
+				},
+				(tid) => `T${tid}`,
+			);
+			const note = seriesEndNote(away, home, [], comparable);
+			expect(recap.upset).toBe(byConf === false);
+			expect(note.startsWith("An upset")).toBe(byConf === false);
+		}
 	});
 });

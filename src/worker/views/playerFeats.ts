@@ -24,6 +24,32 @@ const processInputs = (params: RouteParams<"playerFeats">) => {
 	};
 };
 
+// Which of these players still exist. Only keys are read from IndexedDB, plus the cache (new players not saved yet,
+// and players deleted but not saved yet)
+const existingPids = async (pids: Set<number>) => {
+	const out = new Set<number>();
+	if (pids.size === 0) {
+		return out;
+	}
+	const cacheByKey = await idb.cache.players.getAllByKey();
+	const sorted = [...pids].sort((a, b) => a - b);
+	const dbKeys = new Set(
+		await idb.league.getAllKeys(
+			"players",
+			IDBKeyRange.bound(sorted[0]!, sorted.at(-1)!),
+		),
+	);
+	for (const pid of pids) {
+		if (
+			cacheByKey[pid] !== undefined ||
+			(dbKeys.has(pid) && !idb.cache.players.hasPendingDelete(pid))
+		) {
+			out.add(pid);
+		}
+	}
+	return out;
+};
+
 export default defineView({
 	id: "playerFeats",
 	processInputs,
@@ -43,7 +69,14 @@ export default defineView({
 				(watchPids === undefined || watchPids.has(feat.pid)) &&
 				(inputs.season === "all" || feat.season === inputs.season);
 
-			const feats = await idb.merged.playerFeats.getAll(undefined, { filter });
+			// One season only reads that season's feats (see merged/playerFeats.ts)
+			const feats = await idb.merged.playerFeats.getAll(
+				inputs.season === "all" ? undefined : { season: inputs.season },
+				{ filter },
+			);
+
+			// Deleted players have no player page, so their names are shown without a link
+			const pidExists = await existingPids(new Set(feats.map((f) => f.pid)));
 
 			const featsProcessed = feats.map((feat) => {
 				const featStats = { ...feat.stats };
@@ -81,9 +114,11 @@ export default defineView({
 					score += ` (${overtimeText})`;
 				}
 
-				let type: "regularSeason" | "playoffs" | "allStar";
+				let type: "regularSeason" | "playoffs" | "allStar" | "nit";
 				if (feat.playoffs) {
 					type = "playoffs";
+				} else if (feat.nit) {
+					type = "nit";
 				} else if (feat.tid === -1 || feat.tid === -2) {
 					type = "allStar";
 				} else {
@@ -97,8 +132,21 @@ export default defineView({
 					abbrev: g.get("teamInfoCache")[feat.tid]?.abbrev,
 					oppAbbrev: g.get("teamInfoCache")[feat.oppTid]?.abbrev,
 					type,
+					deleted: !pidExists.has(feat.pid),
 				};
 			});
+
+			// The cutoffs in the text: for one season, the ones its regulation games used (feats store their factor), so
+			// changed settings don't rewrite old seasons' cutoffs. Otherwise the current settings.
+			let quarterLengthFactor = helpers.featScaleFactor(0);
+			if (inputs.season !== "all") {
+				const stored = feats.find(
+					(f) => f.factor !== undefined && f.overtimes === 0,
+				)?.factor;
+				if (stored !== undefined) {
+					quarterLengthFactor = stored;
+				}
+			}
 
 			const stats = bySport({
 				baseball: [
@@ -196,7 +244,7 @@ export default defineView({
 			return {
 				team: inputs.team,
 				feats: featsProcessed,
-				quarterLengthFactor: helpers.quarterLengthFactor(),
+				quarterLengthFactor,
 				season: inputs.season,
 				stats,
 			};

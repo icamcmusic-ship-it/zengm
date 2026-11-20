@@ -21,6 +21,7 @@ import {
 	focusSubNames,
 	planRatingDeltas,
 	planTiltAmount,
+	tiltSubs,
 } from "../../../common/staffDepth/devPlans.ts";
 import type {
 	DevReportRow,
@@ -40,7 +41,11 @@ import { SUB_INDEX } from "../../../common/subRatings.ts";
 import { idb } from "../../db/index.ts";
 import { g, local } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
-import { subRatingsOn, tiltRowSubs } from "../player/subRatings.ts";
+import {
+	subRatingsOn,
+	subsTiltable,
+	tiltRowSubs,
+} from "../player/subRatings.ts";
 import { ovrRaw } from "../player/ovr.basketball.ts";
 import { ballSecurityBase } from "../../../common/expandedRatings.ts";
 import { OVR_COEFS } from "../../../common/staffDepth/devPlans.ts";
@@ -386,7 +391,11 @@ const reportRowBefore = (p: Player, focus: FocusKey) => {
  * The preseason's development (phase/newPhasePreseason): every rostered player's plan and the shooting coach and strength & conditioning
  * shifts, as extra fields of his trait development (same random numbers as without them). undefined when the setting is off.
  */
-export const prepareDevelopment = async (newSeason: number) => {
+export const prepareDevelopment = async (
+	newSeason: number,
+	// Everyone developing this preseason (before their new ratings rows), for the league centering of the plans
+	players: Player[] = [],
+) => {
 	if (!coachingDepthOn()) {
 		return undefined;
 	}
@@ -400,6 +409,58 @@ export const prepareDevelopment = async (newSeason: number) => {
 		}
 	}
 	const subsOn = subRatingsOn();
+
+	// Every rostered player's plan, planned now from his latest ratings (the new row devFor sees is a copy of them), and the league's
+	// average plan: its rating deltas and its sub-rating tilt. The staff picks some plans far more often than others (finishing and threes
+	// for most players, pull-up shooting and perimeter defense for few), so the plans used to move the whole league: each season catch-and-
+	// shoot gained ~0.33 on off-the-dribble shooting and interior defense ~0.2 on perimeter defense (through the tilts the expanded ratings
+	// follow), and the jumpers, ball skills and IQ gave up rating points to finishing, rim protection and rebounding, at the same ovr, a
+	// slow shift of the league from offense to defense. Centered, a plan still builds his focus relative to the league, but the league as a
+	// whole develops like without plans.
+	type Planned = ReturnType<typeof planDevelopment> & {
+		plan: { f: FocusKey; src: PlanSource };
+	};
+	const plannedByPid = new Map<number, Planned>();
+	const deltaSum: Record<string, number> = {};
+	let tiltSum: number[] | undefined;
+	let numTilted = 0;
+	for (const p of players) {
+		if (p.tid < 0) {
+			continue;
+		}
+		const plan = planFor(p, newSeason, states.get(p.tid));
+		if (!plan) {
+			continue;
+		}
+		const devRating = teams.get(p.tid)?.devRating ?? VACANT_RATING;
+		const planned = planDevelopment(
+			p,
+			plan.f,
+			newSeason - p.born.year,
+			devRating,
+			subsOn,
+		);
+		plannedByPid.set(p.pid, { ...planned, plan });
+		for (const [key, d] of Object.entries(planned.ratingDelta)) {
+			deltaSum[key] = (deltaSum[key] ?? 0) + d;
+		}
+		const r = planRatings(p);
+		if (planned.subTilt && subsTiltable(p as any, r)) {
+			const x = tiltSubs(r.sub, planned.subTilt.focus, planned.subTilt.amount);
+			tiltSum ??= new Array<number>(x.length).fill(0);
+			for (const [i, v] of x.entries()) {
+				tiltSum[i]! += v - r.sub[i];
+			}
+			numTilted += 1;
+		}
+	}
+	const deltaMean: Record<string, number> = {};
+	for (const [key, sum] of Object.entries(deltaSum)) {
+		deltaMean[key] = sum / plannedByPid.size;
+	}
+	const tiltCenter =
+		tiltSum && numTilted > 0 ? tiltSum.map((v) => -v / numTilted) : undefined;
+
 	const report = new Map<
 		number,
 		{
@@ -424,11 +485,23 @@ export const prepareDevelopment = async (newSeason: number) => {
 				delete p.devPlan;
 			}
 			const devRating = dt?.devRating ?? VACANT_RATING;
-			const planned = plan
-				? planDevelopment(p, plan.f, age, devRating, subsOn)
-				: undefined;
+			const cached = plannedByPid.get(p.pid);
+			const centered = cached !== undefined && cached.plan.f === plan?.f;
+			const planned = centered
+				? cached
+				: plan
+					? planDevelopment(p, plan.f, age, devRating, subsOn)
+					: undefined;
 			const ratingDelta: Record<string, number> = { ...planned?.ratingDelta };
-			const tilt = planned?.subTilt;
+			if (centered) {
+				for (const [key, m] of Object.entries(deltaMean)) {
+					ratingDelta[key] = (ratingDelta[key] ?? 0) - m;
+				}
+			}
+			const tilt =
+				planned?.subTilt && centered && tiltCenter
+					? { ...planned.subTilt, center: tiltCenter }
+					: planned?.subTilt;
 			const add = (deltas: Record<string, number | undefined>) => {
 				for (const [key, d] of Object.entries(deltas)) {
 					if (d !== undefined && d !== 0) {

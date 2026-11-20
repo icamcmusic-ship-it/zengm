@@ -393,18 +393,35 @@ export const seriesRecap = (
 	};
 };
 
-// One line for the news feed when a series ends, from just the bracket entry and the series' game winners
+/**
+ * Can a lower seed beating a higher seed in this series be called an upset? Seeds only rank teams against each other when they come
+ * from the same seeding: with playoffs by conference (byConf a number) that is the same conference, so a Finals between two
+ * conference champions is no upset. Without conferences (byConf false) all seeds come from one ranking, whatever cid the teams have.
+ * That includes college national tournaments, whose seed lines are national (an S-curve over the whole field) and whose cids are
+ * athletic conferences, unrelated to the bracket. Shared by the news note and the Series Recaps page so they always agree.
+ */
+export const seedsComparable = (
+	a: { cid: number },
+	b: { cid: number },
+	byConf: number | false,
+) => byConf === false || a.cid === b.cid;
+
+/**
+ * One line for the news feed when a series ends, from just the bracket entry and the series' game winners (in order, true when the
+ * series winner won that game). Pass null when some game is unknown (a missing box score): the comeback can't be told then, so it is
+ * left out rather than claimed or denied, and only what the bracket entry proves (upset, sweep) is reported.
+ */
 export const seriesEndNote = (
 	winner: { seed: number; won: number },
 	loser: { seed: number; won: number },
-	gameWinnersAreSeriesWinner: boolean[],
+	gameWinnersAreSeriesWinner: boolean[] | null,
 	seedsComparable = true,
 ) => {
 	let w = 0;
 	let l = 0;
 	let worst = 0;
 	let at: [number, number] | null = null;
-	for (const x of gameWinnersAreSeriesWinner) {
+	for (const x of gameWinnersAreSeriesWinner ?? []) {
 		if (x) {
 			w += 1;
 		} else {

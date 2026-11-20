@@ -1,4 +1,4 @@
-import { DEFAULT_TEAM_COLORS, PLAYER } from "../../common/constants.ts";
+import { DEFAULT_TEAM_COLORS, PHASE, PLAYER } from "../../common/constants.ts";
 import { draftPickConditionText } from "../../common/draftPickConditions.ts";
 import { helpers as commonHelpers } from "../../common/helpers.ts";
 import { idb } from "../db/index.ts";
@@ -398,6 +398,32 @@ const quarterLengthFactor = () => {
 	);
 };
 
+// Statistical feat cutoffs for one game: like quarterLengthFactor, but counting the overtime minutes actually played,
+// and in basketball each player's share of the box score (3-on-3 leagues give each player 5/3 as much, which would
+// otherwise flood the feats list). Stored on each feat, so the Statistical Feats page can show the cutoffs used then.
+const featScaleFactor = (overtimes: number = 0, playoffs?: boolean) => {
+	let gameLength = effectiveGameLength();
+	if (__SPORT !== "baseball" && overtimes > 0) {
+		const po = playoffs ?? g.get("phase") === PHASE.PLAYOFFS;
+		const otLength =
+			(po ? g.get("overtimeLengthPlayoffs") : undefined) ??
+			g.get("overtimeLength") ??
+			0;
+		gameLength += overtimes * otLength;
+	}
+	let factor = Math.sqrt(
+		gameLength /
+			(defaultGameAttributes.numPeriods * defaultGameAttributes.quarterLength),
+	);
+	if (__SPORT === "basketball") {
+		const onCourt = g.get("numPlayersOnCourt");
+		if (onCourt > 0) {
+			factor *= defaultGameAttributes.numPlayersOnCourt / onCourt;
+		}
+	}
+	return factor;
+};
+
 const gameAndSeasonLengthScaleFactor = () => {
 	return (
 		(quarterLengthFactor() * g.get("numGames")) /
@@ -525,6 +551,7 @@ const helpers = {
 	overtimeCounter,
 	pickDesc,
 	quarterLengthFactor,
+	featScaleFactor,
 	resetG,
 	roundContract,
 	sigmoid,

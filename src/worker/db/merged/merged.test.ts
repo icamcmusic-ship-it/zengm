@@ -823,4 +823,48 @@ describe("playerFeats", () => {
 			);
 		}
 	});
+
+	test("a new connection to the same lid (league imported over it) finds the ranges again", async () => {
+		resetPlayerFeatsRanges();
+		for (const [fid, season] of [2010, 2011].entries()) {
+			await idb.league.put("playerFeats", makeFeat(fid, season));
+		}
+		const fids = async (season: number) =>
+			(
+				await idb.merged.playerFeats.getAll({ season }, { map: (f) => f.fid })
+			).toSorted((a, b) => a - b);
+		assert.deepStrictEqual(await fids(2010), [0]);
+
+		// The import replaces the store: same lid, different feats, new connection
+		await idb.league.clear("playerFeats");
+		for (const [fid, season] of [2011, 2010].entries()) {
+			await idb.league.put("playerFeats", makeFeat(fid, season));
+		}
+		const old = idb.league;
+		idb.league = await connectLeague(1);
+		try {
+			// The old ranges would have read only fid 0 for 2010
+			assert.deepStrictEqual(await fids(2010), [1]);
+			assert.deepStrictEqual(await fids(2011), [0]);
+		} finally {
+			idb.league.close();
+			idb.league = old;
+			resetPlayerFeatsRanges();
+		}
+	});
+
+	test("fidAbove reads only newer feats, from IndexedDB and the cache", async () => {
+		for (let fid = 0; fid < 5; fid++) {
+			await idb.league.put("playerFeats", makeFeat(fid, 2010));
+		}
+		await idb.cache.playerFeats.put(makeFeat(5, 2010));
+		const got = await idb.merged.playerFeats.getAll(
+			{ fidAbove: 2 },
+			{ map: (f) => f.fid },
+		);
+		assert.deepStrictEqual(
+			got.toSorted((a, b) => a - b),
+			[3, 4, 5],
+		);
+	});
 });

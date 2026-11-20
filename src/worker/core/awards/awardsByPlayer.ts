@@ -42,13 +42,17 @@ const logEventAwardsByPlayer = ({
 	allStarGID?: number;
 }) => {
 	// None of this stuff needs to block, it's just notifications
-	let text = `<a href="${helpers.leagueUrl(["player", p.pid])}">${
-		p.name
-	}</a> (<a href="${helpers.leagueUrl([
-		"roster",
-		`${g.get("teamInfoCache")[p.tid]?.abbrev}_${p.tid}`,
-		g.get("season"),
-	])}">${g.get("teamInfoCache")[p.tid]?.abbrev}</a>) `;
+	// No team link for a player without a team (a free agent or retired player), rather than "undefined"
+	const teamInfo = p.tid >= 0 ? g.get("teamInfoCache")[p.tid] : undefined;
+	let text = `<a href="${helpers.leagueUrl(["player", p.pid])}">${p.name}</a> ${
+		teamInfo
+			? `(<a href="${helpers.leagueUrl([
+					"roster",
+					`${teamInfo.abbrev}_${p.tid}`,
+					g.get("season"),
+				])}">${teamInfo.abbrev}</a>) `
+			: ""
+	}`;
 
 	let score;
 	if (p.award.type?.includes("Leader")) {

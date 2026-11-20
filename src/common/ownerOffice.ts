@@ -72,14 +72,20 @@ export type OwnerGoals = {
 	// Payroll the owner is willing to carry (thousands)
 	maxPayroll: number;
 	taxWilling: boolean;
-	// Millions of dollars, like the profit in team.getFormatted
+	// Millions of dollars, like the profit in team.getFormatted. Judged against the profit without project payments
+	// (seasonOwnerJudgedProfit), which this target doesn't include either
 	profitTarget: number;
 	winTarget: number;
+	// Payroll over the regular season (user's team, one sample per game), so running over the ceiling all season and trading salary
+	// away by the deadline still counts
+	payrollTrack?: { sum: number; n: number; max: number };
 	// Set at season end (user's team)
 	result?: {
 		won: number;
 		profit: number;
+		// The payroll judged: the larger of the season average and the end of season payroll
 		payroll: number;
+		payrollMax?: number;
 		scores: { wins: number; profit: number; payroll: number };
 		moodDeltas: { wins: number; money: number };
 	};
@@ -106,6 +112,24 @@ export const projectDone = (project: OwnerProject, season: number) =>
 // Market factor: 1 for the biggest market, 0 for the smallest (0.5 in a one-team league)
 export const marketFactor = (popRank: number, numTeams: number) =>
 	numTeams > 1 ? clamp(1 - (popRank - 1) / (numTeams - 1), 0, 1) : 0.5;
+
+// Record one regular season game's payroll
+export const trackGoalsPayroll = (goals: OwnerGoals, payroll: number) => {
+	const track = (goals.payrollTrack ??= { sum: 0, n: 0, max: 0 });
+	track.sum += payroll;
+	track.n += 1;
+	track.max = Math.max(track.max, payroll);
+};
+
+// The payroll the owner judges at season end: the season average if it was tracked, but never less than the payroll now
+export const judgedGoalsPayroll = (goals: OwnerGoals, payrollNow: number) => {
+	const track = goals.payrollTrack;
+	const avg = track && track.n > 0 ? track.sum / track.n : payrollNow;
+	return {
+		payroll: Math.max(avg, payrollNow),
+		payrollMax: Math.max(track?.max ?? 0, payrollNow),
+	};
+};
 
 // The preseason budget meeting. No random draws: market size, cash and last season's record
 export const computeOwnerGoals = ({
@@ -156,7 +180,8 @@ export const computeOwnerGoals = ({
 	};
 };
 
-// Weight of each goal score (-1 to 1) in owner mood: a small, bounded effect next to the main formula
+// Weight of each goal score (-1 to 1) in owner mood: a small, bounded effect next to the main formula. It is added after the owner
+// type's weights (not multiplied by them), because the main formula already counts the same wins and profit
 export const OWNER_GOAL_WEIGHT = 0.05;
 
 export const evaluateOwnerGoals = (
@@ -169,10 +194,12 @@ export const evaluateOwnerGoals = (
 		salaryCapScale,
 		luxuryPayroll,
 		budget,
+		payrollMax,
 	}: {
 		won: number;
 		profit: number;
 		payroll: number;
+		payrollMax?: number;
 		numGames: number;
 		salaryCapScale: number;
 		luxuryPayroll: number;
@@ -201,6 +228,7 @@ export const evaluateOwnerGoals = (
 		won,
 		profit,
 		payroll,
+		...(payrollMax !== undefined ? { payrollMax } : {}),
 		scores,
 		moodDeltas: {
 			wins: OWNER_GOAL_WEIGHT * scores.wins,

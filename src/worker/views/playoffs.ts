@@ -72,6 +72,12 @@ export default defineView({
 				series = playoffSeries.series;
 				playIns = playoffSeries.playIns;
 				finalMatchups = true;
+			} else if (inputs.season !== g.get("season")) {
+				// genPlayoffSeries only projects the current season, so a past (or future) season without a saved bracket (imported
+				// history, playoffs turned off) has no playoffs to show, rather than this season's projection under the wrong year
+				series = [];
+				playIns = undefined;
+				finalMatchups = true;
 			} else {
 				let result;
 				try {
@@ -208,7 +214,10 @@ export default defineView({
 
 				const seedsByTid = new Map();
 				for (const matchup of matchupsToCheck) {
-					seedsByTid.set(matchup.home.tid, matchup.home.seed);
+					// A team waiting on a play-in game does not hold the seed yet
+					if (!matchup.home.pendingPlayIn) {
+						seedsByTid.set(matchup.home.tid, matchup.home.seed);
+					}
 					if (matchup.away && !matchup.away.pendingPlayIn) {
 						seedsByTid.set(matchup.away.tid, matchup.away.seed);
 					}
