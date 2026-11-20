@@ -25,6 +25,7 @@ import {
 } from "./attendance.ts";
 import { levelToAmount } from "../../../common/budgetLevels.ts";
 import { getStaffPayroll, staffEnabled } from "../staff/index.ts";
+import { gmTicketFactor } from "../gm/finance.ts";
 import getWinner from "../../../common/getWinner.ts";
 import { addTeamAdv, type TeamAdv } from "../../../common/advStats.ts";
 import { getAdjustedTicketPrice } from "../../../common/getAdjustedTicketPrice.ts";
@@ -93,7 +94,12 @@ const writeTeamStats = async (results: GameResults) => {
 					teamSeasons,
 					tid: teamSeason.tid,
 				});
-				t.budget.ticketPrice = ticketPrice;
+				// AI GM finance styles: frugal GMs charge more, spendthrifts less (1 when off or for the user's team)
+				const ticketFactor = gmTicketFactor(t);
+				t.budget.ticketPrice =
+					ticketFactor === 1
+						? ticketPrice
+						: Math.round(ticketPrice * ticketFactor * 100) / 100;
 			}
 
 			adjustedTicketPrice = getAdjustedTicketPrice(

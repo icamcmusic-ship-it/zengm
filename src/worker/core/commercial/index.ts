@@ -31,6 +31,7 @@ import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import { getFacilitiesBonus } from "../ownerOffice/index.ts";
+import { gmDealStyle } from "../gm/finance.ts";
 
 export const commercialEnabled = () =>
 	__SPORT === "basketball" && featureOn("commercial") && !!g.get("budget");
@@ -119,9 +120,17 @@ const fairValues = async (tid: number) => {
 };
 
 const aiStyle = (t: Team, rng: () => number): DealStyle => {
-	const preferred = OWNER_TYPES[getOwnerType(t)].dealStyle;
+	const ownerType = getOwnerType(t);
+	const preferred = OWNER_TYPES[ownerType].dealStyle;
+	// AI GM finance styles: the GM's preferred style (undefined when off or he has none). A traditional owner leaves the choice to him;
+	// another owner type's preference comes first and the GM picks within the rest
+	const gmStyle = gmDealStyle(t);
+	const first = gmStyle && ownerType === "traditional" ? gmStyle : preferred;
 	if (rng() < 0.6) {
-		return preferred;
+		return first;
+	}
+	if (gmStyle && first !== gmStyle && rng() < 0.6) {
+		return gmStyle;
 	}
 	const styles: DealStyle[] = ["long", "standard", "short"];
 	return styles[Math.floor(rng() * styles.length)]!;

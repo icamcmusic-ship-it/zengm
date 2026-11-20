@@ -1086,6 +1086,18 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "gmFinance",
+		college: false,
+		key: "featureGmFinance",
+		core: true,
+		name: "AI GM Finance Styles",
+		description:
+			"Each AI general manager has a finance style (spendthrift, frugal, analytics-first, player development, facilities builder or balanced) that decides how he runs the team's money within the owner's budget: department budget levels, ticket prices, luxury tax willingness in re-signing and free agency, arena and facilities projects and commercial deal style. The owner's type wins where they disagree. Shown on Front Offices and in GM hiring news. Needs budget.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "collegeStats",
 		college: false,
 		key: "featureCollegeStats",

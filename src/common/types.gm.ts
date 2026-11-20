@@ -1,4 +1,5 @@
 import type { FaceConfig } from "facesjs";
+import type { GmFinanceStyle } from "./gmFinance.ts";
 
 // AI general managers (basketball only, gated by the featureGmPersonalities setting). See src/common/gmPersonality.ts
 
@@ -68,6 +69,8 @@ export type Gm = {
 	};
 	face?: FaceConfig;
 	traits: GmTraits;
+	// AI GM finance styles (core gmFinance): how he runs the team's money. Missing in older leagues: derived from his gmid (gmFinance.ts)
+	financeStyle?: GmFinanceStyle;
 	seasons: GmSeason[];
 	tenures: GmTenure[];
 	// Expected wins for the current season, set when the regular season starts

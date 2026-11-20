@@ -705,3 +705,83 @@ describe("trade value", () => {
 		assert.isUndefined(t.gm);
 	});
 });
+
+describe("AI GM finance styles", () => {
+	const setupFinance = async (on: boolean) => {
+		await setup();
+		g.setWithoutSavingToDB("featureGmFinance", on);
+	};
+
+	test("every GM gets a stable style from his id, without main stream draws", async () => {
+		const run = async (on: boolean) => {
+			await setupFinance(on);
+			const next = await withRandom(7, async () => {
+				await ensureGms();
+				return Math.random();
+			});
+			const teams = await idb.cache.teams.getAll();
+			return {
+				next,
+				gms: teams.map((t) =>
+					t.gm ? JSON.stringify([t.gm.firstName, t.gm.traits]) : "",
+				),
+				styles: teams.map((t) => t.gm?.financeStyle),
+			};
+		};
+		const off = await run(false);
+		const on = await run(true);
+		// Same GMs and the same next random number either way
+		assert.strictEqual(on.next, off.next);
+		assert.deepStrictEqual(on.gms, off.gms);
+		assert.isTrue(off.styles.every((style) => style === undefined));
+		const styles = on.styles.filter((style) => style !== undefined);
+		assert.strictEqual(styles.length, on.gms.length - 1);
+		assert.isAbove(new Set(styles).size, 2);
+
+		// An existing GM without a style gets the same one back
+		for (const t of await idb.cache.teams.getAll()) {
+			if (t.gm) {
+				delete t.gm.financeStyle;
+				await idb.cache.teams.put(t);
+			}
+		}
+		await ensureGms();
+		assert.deepStrictEqual(
+			(await idb.cache.teams.getAll()).map((t) => t.gm?.financeStyle),
+			on.styles,
+		);
+	});
+
+	test("style moves tax willingness, the owner's type wins", async () => {
+		await setupFinance(true);
+		g.setWithoutSavingToDB("featureCommercial", true);
+		await ensureGms();
+		const tid = 1;
+		const set = async (
+			financeStyle: "frugal" | "spendthrift" | "balanced",
+			ownerType?: "profit",
+		) => {
+			const t = (await idb.cache.teams.get(tid))!;
+			t.gm!.traits = { ...NEUTRAL_GM_TRAITS };
+			t.gm!.financeStyle = financeStyle;
+			t.commercial = ownerType ? { deals: {}, ownerType } : undefined;
+			await idb.cache.teams.put(t);
+			return (await getGmWeights(tid))!;
+		};
+		const balanced = await set("balanced");
+		const frugal = await set("frugal");
+		const spendthrift = await set("spendthrift");
+		assert.strictEqual(balanced.avoidTaxRankShift, 0);
+		assert.isBelow(frugal.avoidTaxRankShift, 0);
+		assert.isAbove(spendthrift.avoidTaxRankShift, 0);
+		assert.isAbove(spendthrift.faStarShift, frugal.faStarShift);
+		// A bottom line owner won't let a spendthrift pay tax
+		const blocked = await set("spendthrift", "profit");
+		assert.strictEqual(blocked.avoidTaxRankShift, 0);
+
+		// Off: no change
+		g.setWithoutSavingToDB("featureGmFinance", false);
+		const off = await set("frugal");
+		assert.strictEqual(off.avoidTaxRankShift, 0);
+	});
+});

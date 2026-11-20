@@ -25,6 +25,7 @@ import { g, helpers, local, toUI } from "../../util/index.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import getPayroll from "../team/getPayroll.ts";
 import { adjustOwnerGoals, commercialEnabled } from "../commercial/index.ts";
+import { gmProjectParams } from "../gm/finance.ts";
 
 export const ownerOfficeEnabled = () =>
 	__SPORT === "basketball" && featureOn("ownerOffice") && !!g.get("budget");
@@ -119,13 +120,15 @@ const maybeStartAi = (t: Team, teamSeason: TeamSeasonWithoutKey) => {
 	}
 	const salaryCap = g.get("salaryCap");
 	const rng = makeSeededRandom(g.get("season") * 7919 + t.tid * 104729 + 31);
-	if (rng() >= AI_START_PROB) {
+	// AI GM finance styles: facilities builders start projects more often with less in reserve, frugal GMs less often (unchanged when off)
+	const { prob, reserve } = gmProjectParams(t, AI_START_PROB);
+	if (rng() >= prob) {
 		return;
 	}
 	const bonus = t.ownerOffice?.facilitiesBonus ?? 0;
 	const affordable = OWNER_PROJECT_TYPES.filter(
 		(type) =>
-			teamSeason.cash > projectCost(type, salaryCap) + salaryCap &&
+			teamSeason.cash > projectCost(type, salaryCap) + reserve * salaryCap &&
 			bonus + OWNER_PROJECTS[type].facilities <= FACILITIES_BONUS_MAX + 4,
 	);
 	if (affordable.length === 0) {

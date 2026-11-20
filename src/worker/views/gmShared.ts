@@ -8,7 +8,18 @@ import {
 } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
+import { GM_FINANCE_STYLES } from "../../common/gmFinance.ts";
+import { gmFinanceStyleOf } from "../core/gm/finance.ts";
 import { EXEC_OF_THE_YEAR } from "../../common/coachExecAwards.ts";
+
+const financeInfo = (gm: Gm) => {
+	const style = gmFinanceStyleOf(gm);
+	if (!style) {
+		return;
+	}
+	const info = GM_FINANCE_STYLES[style];
+	return { style, name: info.name, description: info.description };
+};
 
 const abbrev = (tid: number) => g.get("teamInfoCache")[tid]?.abbrev ?? "";
 
@@ -52,6 +63,8 @@ export const formatGm = async (gm: Gm, tid?: number) => {
 		face: gm.face,
 		traits: gm.traits,
 		styleLabels: gmStyleLabels(gm.traits),
+		// AI GM finance styles, undefined when off
+		finance: financeInfo(gm),
 		since: tenure?.start,
 		tenureSeasons: current.length,
 		won: sum(current, "won"),

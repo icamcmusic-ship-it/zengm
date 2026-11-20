@@ -24,6 +24,16 @@ import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
 import { team } from "../index.ts";
 import { gmAnalyticsShift } from "../frontOffice/index.ts";
+import {
+	GM_FINANCE_STYLES,
+	genGmFinanceStyle,
+	isGmFinanceStyle,
+} from "../../../common/gmFinance.ts";
+import {
+	gmFinanceEnabled,
+	gmFinanceStyleOf,
+	gmTraitShifts,
+} from "./finance.ts";
 import { getSeasonOdds } from "../seasonOdds/index.ts";
 import { winProb } from "../seasonOdds/simSeason.ts";
 
@@ -37,23 +47,26 @@ export const userControlsTeam = (tid: number) =>
 
 // Keyed by the traits object, which is never edited in place
 const weightsCache = new WeakMap<Gm["traits"], GmWeights>();
-// Front Office Budget: a GM whose team spends on analytics leans analytics (shift 0 when off), keyed by traits and shift
-const shiftedCache = new WeakMap<
-	Gm["traits"],
-	{ shift: number; w: GmWeights }
->();
+// Front Office Budget: a GM whose team spends on analytics leans analytics (shift 0 when off); AI GM finance styles: his finance style
+// shifts his tax tolerance and free agency traits (0 when off). Keyed by traits and shifts
+const shiftedCache = new WeakMap<Gm["traits"], { key: string; w: GmWeights }>();
+const clampTrait = (x: number) => Math.max(-1, Math.min(1, x));
 const weightsOf = (gm: Gm, t?: Team) => {
 	const shift = t ? gmAnalyticsShift(t) : 0;
-	if (shift !== 0) {
+	const finance = t ? gmTraitShifts(t) : { taxTolerance: 0, faStars: 0 };
+	if (shift !== 0 || finance.taxTolerance !== 0 || finance.faStars !== 0) {
+		const key = `${shift}|${finance.taxTolerance}|${finance.faStars}`;
 		const cached = shiftedCache.get(gm.traits);
-		if (cached && cached.shift === shift) {
+		if (cached && cached.key === key) {
 			return cached.w;
 		}
 		const w = gmWeightsFromTraits({
 			...gm.traits,
-			analytics: Math.max(-1, Math.min(1, gm.traits.analytics + shift)),
+			analytics: clampTrait(gm.traits.analytics + shift),
+			taxTolerance: clampTrait(gm.traits.taxTolerance + finance.taxTolerance),
+			faStars: clampTrait(gm.traits.faStars + finance.faStars),
 		});
-		shiftedCache.set(gm.traits, { shift, w });
+		shiftedCache.set(gm.traits, { key, w });
 		return w;
 	}
 	let w = weightsCache.get(gm.traits);
@@ -113,7 +126,8 @@ const nextGmid = (teams: Team[]) => {
 export const generateGm = async (gmid: number): Promise<Gm> => {
 	const { country, firstName, lastName, race } = await name();
 	const age = randInt(36, 60);
-	return {
+	const traits = genGmTraits(() => gauss(0, 1));
+	const gm: Gm = {
 		gmid,
 		firstName,
 		lastName,
@@ -122,10 +136,48 @@ export const generateGm = async (gmid: number): Promise<Gm> => {
 			loc: country,
 		},
 		face: generateFace({ race, age, staff: true }),
-		traits: genGmTraits(() => gauss(0, 1)),
+		traits,
 		seasons: [],
 		tenures: [],
 	};
+	// AI GM finance styles: seeded by his id, no main stream draws
+	if (gmFinanceEnabled()) {
+		gm.financeStyle = genGmFinanceStyle(gm);
+	}
+	return gm;
+};
+
+// AI GM finance styles: give every GM without a style one (existing leagues, the feature just turned on), derived from his id. Returns
+// whether anything changed
+const ensureFinanceStyles = async (teams: Team[]) => {
+	if (!gmFinanceEnabled()) {
+		return false;
+	}
+	let changed = false;
+	for (const t of teams) {
+		let teamChanged = false;
+		for (const gm of [...(t.gm ? [t.gm] : []), ...(t.formerGms ?? [])]) {
+			if (!isGmFinanceStyle(gm.financeStyle)) {
+				gm.financeStyle = genGmFinanceStyle(gm);
+				teamChanged = true;
+			}
+		}
+		if (teamChanged) {
+			changed = true;
+			await idb.cache.teams.put(t);
+		}
+	}
+	return changed;
+};
+
+// " a frugal GM" style text for news, "" when off
+const financeText = (gm: Gm) => {
+	const style = gmFinanceStyleOf(gm);
+	if (!style) {
+		return "";
+	}
+	const adjective = GM_FINANCE_STYLES[style].adjective;
+	return `, ${/^[aeiou]/i.test(adjective) ? "an" : "a"} ${adjective} GM,`;
 };
 
 const teamName = (tid: number) => {
@@ -180,8 +232,8 @@ export const ensureGms = async () => {
 	}
 	const teams = await idb.cache.teams.getAll();
 	const firstTime = allGms(teams).length === 0;
+	let changed = await ensureFinanceStyles(teams);
 	let gmid = nextGmid(teams);
-	let changed = false;
 	for (const t of teams) {
 		if (t.disabled || t.gm || userControlsTeam(t.tid)) {
 			continue;
@@ -193,7 +245,7 @@ export const ensureGms = async () => {
 		changed = true;
 		if (!firstTime) {
 			await logGmEvent(
-				`${teamLink(t.tid)} named ${gmLink(gm)} general manager.`,
+				`${teamLink(t.tid)} named ${gmLink(gm)}${financeText(gm)} general manager.`,
 				[t.tid],
 			);
 		}
@@ -661,12 +713,12 @@ const fillVacancies = async (vacancies: Team[]) => {
 			market.splice(index, 1);
 			const numTitles = titles(gm);
 			const prev = gm.tenures.at(-1)!;
-			text = `${teamLink(t.tid)} hired ${gmLink(gm)} as general manager. He ran the ${teamName(prev.tid)} until ${prev.end}${numTitles > 0 ? ` and has won ${numTitles} title${numTitles > 1 ? "s" : ""}` : ""}.`;
+			text = `${teamLink(t.tid)} hired ${gmLink(gm)}${financeText(gm)} as general manager. He ran the ${teamName(prev.tid)} until ${prev.end}${numTitles > 0 ? ` and has won ${numTitles} title${numTitles > 1 ? "s" : ""}` : ""}.`;
 			await idb.cache.teams.put(from);
 		} else {
 			gm = await generateGm(gmid);
 			gmid += 1;
-			text = `${teamLink(t.tid)} hired ${gmLink(gm)} as general manager, his first job running a team.`;
+			text = `${teamLink(t.tid)} hired ${gmLink(gm)}${financeText(gm)} as general manager, his first job running a team.`;
 		}
 		// Hired after the playoffs, so his first season is next season (the phase may not have moved past the playoffs yet)
 		hireGm(t, gm, false, season + 1);

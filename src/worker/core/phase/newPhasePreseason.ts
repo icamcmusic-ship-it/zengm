@@ -4,6 +4,12 @@ import {
 	mergeCareerAging,
 } from "../player/careerAging.ts";
 import { allocateAi, frontOfficeEnabled } from "../frontOffice/index.ts";
+import {
+	gmDeptMultipliers,
+	gmSpendNudge,
+	gmTicketFactor,
+} from "../gm/finance.ts";
+import { applyDeptMultipliers } from "../../../common/gmFinance.ts";
 import { prepareDevelopment } from "../staffDepth/coaching.ts";
 import type { TraitDevelopment } from "../../../common/playerTraits/development.ts";
 import {
@@ -337,6 +343,12 @@ const newPhasePreseason = async (
 			g.get("spectator")
 		) {
 			await team.resetTicketPrice(t, popRank);
+			// AI GM finance styles: frugal GMs charge more, spendthrifts less (1 when off)
+			const ticketFactor = gmTicketFactor(t);
+			if (ticketFactor !== 1) {
+				t.budget.ticketPrice =
+					Math.round(t.budget.ticketPrice * ticketFactor * 100) / 100;
+			}
 
 			// Realistic AI Economy: cash reserves nudge the owner's spending (a few levels, bounded; no random draws)
 			let cashNudge = 0;
@@ -353,25 +365,38 @@ const newPhasePreseason = async (
 				helpers.bound(
 					finances.defaultBudgetLevel(popRank) +
 						cashNudge +
-						OWNER_TYPES[commercial.getOwnerType(t)].budgetNudge,
+						OWNER_TYPES[commercial.getOwnerType(t)].budgetNudge +
+						// AI GM finance styles: the GM spends more or less within the owner's envelope (0 when off)
+						gmSpendNudge(t),
 					1,
 					MAX_LEVEL,
 				);
+			// AI GM finance styles: department priorities (undefined when off)
+			const deptMultipliers = gmDeptMultipliers(t);
 
 			if (frontOfficeEnabled()) {
 				// Front Office Budget: split the owner's spending (market size, with the usual randomness) over the departments by the
 				// GM's leanings
-				allocateAi(t, budgetLevel());
+				allocateAi(t, budgetLevel(), deptMultipliers);
 			} else {
 				// Sometimes update budget items for AI teams
-				for (const key of [
-					"scouting",
-					"coaching",
-					"health",
-					"facilities",
-				] as const) {
+				const keys = ["scouting", "coaching", "health", "facilities"] as const;
+				const mults = deptMultipliers
+					? applyDeptMultipliers(
+							{ scouting: 1, coaching: 1, health: 1, facilities: 1 },
+							deptMultipliers,
+							keys,
+						)
+					: undefined;
+				for (const key of keys) {
 					if (Math.random() < 0.5) {
-						t.budget[key] = budgetLevel();
+						t.budget[key] = mults
+							? helpers.bound(
+									Math.round(budgetLevel() * mults[key]),
+									1,
+									MAX_LEVEL,
+								)
+							: budgetLevel();
 					}
 				}
 			}
