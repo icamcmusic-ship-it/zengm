@@ -5973,6 +5973,9 @@ const upsertCustomizedPlayer = async (
 ): Promise<number> => {
 	const { contract: contractInput, ...p } = pInput;
 
+	// Hall of Fame words (worker/util/hofStory.ts) are written again from the edited player the next time they are shown
+	delete p.hofStory;
+
 	if (p.tid >= 0) {
 		const t = await idb.cache.teams.get(p.tid);
 		if (!t) {

@@ -45,7 +45,7 @@ export const processPlayersHallOfFame = <
 		if (__SPORT === "baseball") {
 			// In baseball, go based on games played on defense by position - this is not ideal for traded players, will just use last entry
 			for (const row of filteredStats) {
-				if (!row.playoffs && row.gpF && row.tid > 0) {
+				if (!row.playoffs && row.gpF && row.tid >= 0) {
 					const pos = getPosByGpF(row.gpF);
 					if (pos !== undefined) {
 						posBySeason[row.season] = pos;

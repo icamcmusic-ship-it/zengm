@@ -1651,6 +1651,13 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	gamesUntilTradable: number;
 	hgt: number;
 	hof?: 1; // Would rather be boolean, but can't index boolean
+	// Hall of Fame plaque text (without the prime face line) and induction speech, written once at induction or on the first view
+	// after it (worker/util/hofStory.ts). v is HOF_STORY_VERSION there: an older one is written again
+	hofStory?: {
+		v: number;
+		plaque: string;
+		speech: string[];
+	};
 	imgURL: string;
 	injury: PlayerInjury;
 	injuries: {

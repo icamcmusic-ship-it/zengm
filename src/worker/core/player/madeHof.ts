@@ -6,12 +6,13 @@ import type { PlayerWithoutKey } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 
 const madeHof = (p: PlayerWithoutKey): boolean => {
+	// Thunks, so only the current sport's formula runs
 	return bySport({
-		baseball: madeHofBaseball(p),
-		basketball: madeHofBasketball(p),
-		football: madeHofFootball(p as any),
-		hockey: madeHofHockey(p),
-	});
+		baseball: () => madeHofBaseball(p),
+		basketball: () => madeHofBasketball(p),
+		football: () => madeHofFootball(p as any),
+		hockey: () => madeHofHockey(p),
+	})();
 };
 
 export default madeHof;

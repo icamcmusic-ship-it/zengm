@@ -1,6 +1,11 @@
-import { g, helpers } from "../../util/index.ts";
+import { g } from "../../util/index.ts";
 import type { PlayerWithoutKey } from "../../../common/types.ts";
 import { getProStats } from "../../../common/preDraft.ts";
+import {
+	bestRegularSeason,
+	hofSeasonValues,
+	hofThresholdScale,
+} from "./hofSeasons.ts";
 
 /**
  * Is a player worthy of the Hall of Fame?
@@ -12,10 +17,18 @@ import { getProStats } from "../../../common/preDraft.ts";
  * @return {boolean} Hall of Fame worthy?
  */
 const madeHof = (p: PlayerWithoutKey): boolean => {
-	let earliestSeason = Infinity;
+	const stats = getProStats(p);
 
-	// Average together WS and EWA
-	const winShares = getProStats(p).map((ps) => {
+	let earliestSeason = Infinity;
+	for (const ps of stats) {
+		if (ps.season < earliestSeason) {
+			earliestSeason = ps.season;
+		}
+	}
+
+	// Average together WS and EWA, per season (all of a season's teams together, playoffs separately), scaled to that season's
+	// schedule
+	const seasons = hofSeasonValues(stats, (ps) => {
 		let sum = 0;
 
 		if (typeof ps.dws === "number") {
@@ -30,12 +43,9 @@ const madeHof = (p: PlayerWithoutKey): boolean => {
 			sum += ps.ewa;
 		}
 
-		if (ps.season < earliestSeason) {
-			earliestSeason = ps.season;
-		}
-
 		return sum / 2;
 	});
+	const winShares = seasons.map((season) => season.value);
 
 	// Calculate career WS and "dominance factor" DF (top 5 years WS - 50)
 	winShares.sort((a, b) => b - a); // Descending order
@@ -51,19 +61,18 @@ const madeHof = (p: PlayerWithoutKey): boolean => {
 		}
 	}
 
-	// Fudge factor for players generated when the league started
+	// Fudge factor for players generated when the league started: the seasons before the league's records are credited with his
+	// best full regular season
 	const fudgeSeasons =
 		Math.min(earliestSeason, g.get("startingSeason")) - p.draft.year - 5;
+	const bestSeason = bestRegularSeason(seasons);
 
-	if (fudgeSeasons > 0 && winShares[0] !== undefined) {
-		total += winShares[0] * fudgeSeasons;
+	if (fudgeSeasons > 0 && bestSeason !== undefined) {
+		total += bestSeason * fudgeSeasons;
 	}
 
 	// Final formula
-	return (
-		total + df >
-		120 * helpers.gameAndSeasonLengthScaleFactor() * g.get("hofFactor")
-	);
+	return total + df > 120 * hofThresholdScale();
 };
 
 export default madeHof;

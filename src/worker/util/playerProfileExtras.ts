@@ -36,13 +36,7 @@ import { staffViewEnabled } from "../views/staffShared.ts";
 import { primeFace } from "./faceAging.ts";
 import { formatEventText } from "./formatEventText.ts";
 import goatFormula from "./goatFormula.ts";
-import {
-	careerFacts,
-	featsByPid,
-	hofSeasonsOf,
-	hofWords,
-	hofWordsOn,
-} from "./hofStory.ts";
+import { getHofStories, hofWordsOn, plaqueWithPrime } from "./hofStory.ts";
 import { g, helpers } from "./index.ts";
 import { featureOn } from "./nativeFeatures.ts";
 import { loadRivalries } from "./rivalries.ts";
@@ -1321,27 +1315,27 @@ export const legacySection = async ({
 
 	// Hall of Fame plaque and speech (the Hall of Fame pages)
 	if (pRaw.hof && hofWordsOn()) {
-		const hofPlayers = await idb.merged.players.getAll({ hof: true });
-		const facts = await careerFacts(pRaw, {
-			full: true,
-			hofSeasons: hofSeasonsOf(hofPlayers),
-			feats: await featsByPid(new Set([pid])),
-		} as any);
+		// Stored on him at induction (written once here for older inductees)
+		const story = (
+			await getHofStories([pRaw], () =>
+				idb.merged.players.getAll({ hof: true }),
+			)
+		).get(pid)!;
 		const prime = featureOn("faceAging") ? await primeFace(pRaw) : undefined;
-		const primeTid = prime
-			? (pRaw.stats as any[]).findLast(
-					(row) => row.season === prime.season && row.tid >= 0,
-				)?.tid
-			: undefined;
-		const words = hofWords(
-			facts,
-			prime
-				? {
-						season: prime.season,
-						team: facts.teams.find((t) => t.tid === primeTid)?.name,
-					}
-				: undefined,
-		);
+		const words = {
+			plaque: await plaqueWithPrime(
+				story,
+				prime
+					? {
+							season: prime.season,
+							tid: (pRaw.stats as any[]).findLast(
+								(row) => row.season === prime.season && row.tid >= 0,
+							)?.tid,
+						}
+					: undefined,
+			),
+			speech: story.speech,
+		};
 		const inducted = pRaw.awards.find(
 			(a) => a.type === "Inducted into the Hall of Fame",
 		)?.season;

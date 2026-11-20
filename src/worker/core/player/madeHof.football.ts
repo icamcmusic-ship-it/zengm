@@ -1,7 +1,8 @@
-import { g, helpers } from "../../util/index.ts";
+import { g } from "../../util/index.ts";
 import type { Player, PlayerWithoutKey } from "../../../common/types.ts";
 import type { PlayerRatings } from "../../../common/types.football.ts";
 import { getProStats } from "../../../common/preDraft.ts";
+import { hofSeasonValues, hofThresholdScale } from "./hofSeasons.ts";
 
 const getMostCommonPos = (ratings: PlayerRatings[]) => {
 	const counts = new Map<string, number>();
@@ -66,13 +67,14 @@ export const getThreshold = (pos?: string) => {
 const madeHof = (
 	p: Player<PlayerRatings> | PlayerWithoutKey<PlayerRatings>,
 ): boolean => {
-	const avs: number[] = getProStats(p)
-		.filter((ps) => {
-			// No playoff stats, because AV is scaled strangely there
-			return !ps.playoffs;
-		})
-		.map((ps) => ps.av ?? 0); // Calculate career WS and "dominance factor" DF (top 5 years WS - 35)
+	// AV per season (all of a season's teams together), scaled to that season's schedule. No playoff stats, because AV is scaled
+	// strangely there
+	const avs = hofSeasonValues(
+		getProStats(p).filter((ps) => !ps.playoffs),
+		(ps) => ps.av ?? 0,
+	).map((season) => season.value);
 
+	// Calculate career AV and "dominance factor" DF (top 5 years AV - 35)
 	avs.sort((a, b) => b - a); // Descending order
 
 	let total = 0;
@@ -97,10 +99,7 @@ const madeHof = (
 	const threshold = getThreshold(pos);
 
 	// Final formula
-	return (
-		total + df >
-		threshold * helpers.gameAndSeasonLengthScaleFactor() * g.get("hofFactor")
-	);
+	return total + df > threshold * hofThresholdScale();
 };
 
 export default madeHof;
