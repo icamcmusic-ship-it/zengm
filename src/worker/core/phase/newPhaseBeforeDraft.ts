@@ -1,3 +1,4 @@
+import { advanceEra } from "../leagueEras/index.ts";
 import { autoImportLinkedCollegeClass } from "../draft/linkedCollege.ts";
 import { clearPaidReleasedContracts } from "../contract/index.ts";
 import { PLAYER } from "../../../common/constants.ts";
@@ -555,6 +556,9 @@ const newPhaseBeforeDraft = async (
 	}
 
 	await doInflation(conditions);
+
+	// League Eras: record this season's style, drift next season's, maybe a rule-change vote
+	await advanceEra(conditions);
 
 	await updateColaAfterPlayoffs();
 

@@ -320,6 +320,7 @@ export const routeInfos = {
 	"/l/:lid/upgrade65": "upgrade65",
 	"/l/:lid/schedule_editor": "scheduleEditor",
 	"/l/:lid/award_settings": "awardSettings",
+	"/l/:lid/league_eras": "leagueEras",
 	"/l/:lid/records_book": "recordsBook",
 	"/l/:lid/records_book/:team": "recordsBook",
 	"/l/:lid/milestones": "milestones",

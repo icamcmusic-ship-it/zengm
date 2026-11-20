@@ -167,6 +167,7 @@ export { default as FrontOffices } from "./FrontOffices.tsx";
 export { default as CoachNotes } from "./CoachNotes.tsx";
 export { default as SkillBadges } from "./SkillBadges.tsx";
 export { default as RecordsBook } from "./RecordsBook.tsx";
+export { default as LeagueEras } from "./LeagueEras.tsx";
 export { default as Milestones } from "./Milestones.tsx";
 export { default as Rivalries } from "./Rivalries.tsx";
 export { default as SeriesRecaps } from "./SeriesRecaps.tsx";

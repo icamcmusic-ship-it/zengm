@@ -1503,6 +1503,39 @@ export const NATIVE_FEATURES = [
 			},
 		],
 	},
+	{
+		id: "leagueEras",
+		key: "featureLeagueEras",
+		name: "League Eras",
+		description:
+			"The league's style of play drifts slowly from season to season: three-point tendency, pace, foul rate and offensive rebounding take a small random step each offseason, pulled back toward normal and nudged toward what the best teams did (if contenders shot more threes, threes trend up). Also continues a real-player league after its real seasons run out. Notable shifts are in the news, and League History → Eras lists each season's style.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "featureLeagueErasVotes",
+				name: "Rule-Change Votes",
+				description:
+					"Now and then (at most once a season) the league office proposes a rule change when something has gotten out of hand: heavy tanking (flatter lottery odds), a superteam paying the tax (a higher luxury tax rate) or a three-point share far from normal (moving the line). The teams vote, two thirds are needed, and the proposal and the result are in the news. Not in college leagues.",
+				type: "bool",
+				default: true,
+			},
+			{
+				key: "featureLeagueErasUserVote",
+				name: "Your Rule-Change Vote",
+				description:
+					"How your team votes on rule-change proposals: decided for you by what is good for your team, always yes or always no.",
+				type: "string",
+				values: [
+					{ key: "auto", value: "Auto (your team's interest)" },
+					{ key: "yes", value: "Always yes" },
+					{ key: "no", value: "Always no" },
+				],
+				default: "auto",
+			},
+		],
+	},
 ] as const satisfies readonly NativeFeatureDef[];
 
 type Defs = (typeof NATIVE_FEATURES)[number];

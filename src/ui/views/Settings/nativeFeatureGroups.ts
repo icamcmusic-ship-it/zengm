@@ -16,6 +16,7 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	milestones: "League extras: History & Stories",
 	rivalries: "League extras: History & Stories",
 	seriesRecaps: "League extras: History & Stories",
+	leagueEras: "League extras: History & Stories",
 	bestGames: "League extras: History & Stories",
 	awardVote: "League extras: History & Stories",
 	coachExecAwards: "League extras: History & Stories",
