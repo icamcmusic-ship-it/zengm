@@ -1344,7 +1344,8 @@ const dunkGetProjected = async ({
 	index: number;
 }) => {
 	let score = 0;
-	let prob = 0;
+	// Undefined under the No Visible Ratings challenge: the success rate comes from his true ratings
+	let prob: number | undefined = 0;
 
 	const allStars = await idb.cache.allStars.get(g.get("season"));
 	const dunk = allStars?.dunk;
@@ -1358,11 +1359,17 @@ const dunkGetProjected = async ({
 				allStar.dunkContest.HIGHEST_POSSIBLE_SCORE,
 			);
 
-			const difficulty = allStar.dunkContest.getDifficulty(dunkAttempt);
-			prob = allStar.dunkContest.difficultyToProbability(
-				difficulty,
-				allStar.dunkContest.getDunkerRating(p.ratings.at(-1) as PlayerRatings),
-			);
+			if (g.get("challengeNoRatings")) {
+				prob = undefined;
+			} else {
+				const difficulty = allStar.dunkContest.getDifficulty(dunkAttempt);
+				prob = allStar.dunkContest.difficultyToProbability(
+					difficulty,
+					allStar.dunkContest.getDunkerRating(
+						p.ratings.at(-1) as PlayerRatings,
+					),
+				);
+			}
 		}
 	}
 

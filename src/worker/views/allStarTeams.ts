@@ -18,11 +18,13 @@ import { validateSeasonOnly } from "../util/processInputs.ts";
 const sortByPos = (p: {
 	bestPos: string;
 	ratings: {
-		ovr: number;
+		ovr?: number;
 	};
 }) => {
 	const ind = POSITIONS.indexOf(p.bestPos);
-	return (POSITIONS.length - ind) * 1000 + p.ratings.ovr;
+	// No Visible Ratings challenge: no ovr, so within a position they stay in selection order (the sort is stable)
+	const ovr = g.get("challengeNoRatings") ? 0 : (p.ratings.ovr ?? 0);
+	return (POSITIONS.length - ind) * 1000 + ovr;
 };
 
 const stats = bySport({
@@ -44,7 +46,10 @@ const getPlayerInfo = async (
 
 	const p2 = await player.format(p, {
 		attrs: ["pid", "injury", "watch", "age", "numAllStar"],
-		ratings: ["ovr", "skills", "pos"],
+		// No Visible Ratings challenge: no ovr sent (the page hides it anyway)
+		ratings: g.get("challengeNoRatings")
+			? ["skills", "pos"]
+			: ["ovr", "skills", "pos"],
 		season,
 		stats: [...stats, "jerseyNumber", "tid", "abbrev", ...extraStats],
 		fuzz: true,

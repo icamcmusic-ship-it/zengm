@@ -848,27 +848,12 @@ const loadTeams = async (tids: number[], conditions: Conditions) => {
 	> = {};
 	if (tids.length === 2 && tids.includes(-1) && tids.includes(-2)) {
 		// All-Star Game
-		const allStars = await allStar.getOrCreate(g.get("season"));
+		assertDefined(await allStar.getOrCreate(g.get("season")));
+		// Finish the draft and name injury replacements (play.ts already did this, and skips the game if it can't be played)
+		await allStar.prepareGame(conditions);
+		await allStar.simContests(conditions);
+		const allStars = await idb.cache.allStars.get(g.get("season"));
 		assertDefined(allStars);
-		if (!allStars.finalized) {
-			await allStar.draftAll();
-		}
-		if (allStars.dunk && allStars.dunk.winner === undefined) {
-			while (true) {
-				const type = await allStar.dunkContest.simNextDunkEvent(conditions);
-				if (type === "all") {
-					break;
-				}
-			}
-		}
-		if (allStars.three && allStars.three.winner === undefined) {
-			while (true) {
-				const type = await allStar.threeContest.simNextThreeEvent(conditions);
-				if (type === "all") {
-					break;
-				}
-			}
-		}
 
 		for (const tid of tids) {
 			const allStarsTeamInd = tid === -1 ? 0 : 1;
