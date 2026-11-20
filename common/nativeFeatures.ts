@@ -684,6 +684,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "shotZones",
+		key: "shotZones",
+		name: "Shot Zones",
+		description:
+			"Every shot gets a sub-zone: at the rim a dunk, layup or cut, mid-range a short shot or floater (4-14 ft, more for small, quick players with a good floater) or a long two, threes from the corner (more for catch-and-shoot role players who don't handle the ball much) or above the break. Corner threes, dunks and cuts go in a little more often, calibrated so league totals stay the same. Each shot also gets an expected FG% (xFG) from its zone, the defense, an assist and spacing. The player page shows a shot chart by zone vs the league and his position, and his shot quality (xFG% vs actual FG%). Needs Advanced Tracking Stats for the chart. Off: no change to the game.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "advCareer",
 		key: "advCareerTracking",
 		core: true,

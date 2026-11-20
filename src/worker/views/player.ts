@@ -46,8 +46,10 @@ import {
 	ADV_STAT_TYPES,
 	careerAdv,
 	isAdvStat,
+	shotZones,
 	sumAdv,
 } from "../../common/advStats.ts";
+import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import { getStashInfo } from "../core/draftStash/index.ts";
 
 export const processInputs = (
@@ -674,6 +676,78 @@ const advSeasonsForPlayer = (pRaw: Player) => {
 	];
 };
 
+// Shot Zones: the league's and each position's zone totals (adv arrays, regular season) for a season. Past seasons don't change, so they
+// are cached
+const shotZoneRefCache = new Map<
+	string,
+	{ league: number[]; byPos: Record<string, number[]> }
+>();
+const shotZoneRefsForSeason = async (season: number) => {
+	const key = `${g.get("lid")}|${season}`;
+	const cached = shotZoneRefCache.get(key);
+	if (cached) {
+		return cached;
+	}
+	const players = await idb.merged.players.getAll(
+		getActiveSeasonSelector(season),
+	);
+	const leagueRows = [];
+	const posRows: Record<string, { adv?: number[] }[]> = {};
+	for (const p of players) {
+		const rows = p.stats.filter(
+			(row) => row.season === season && !row.playoffs && row.adv,
+		);
+		if (rows.length === 0) {
+			continue;
+		}
+		const pos = (
+			p.ratings.findLast((r) => r.season <= season) ?? p.ratings.at(-1)
+		)?.pos;
+		leagueRows.push(...rows);
+		if (pos) {
+			(posRows[pos] ??= []).push(...rows);
+		}
+	}
+	const out = {
+		league: sumAdv(leagueRows) ?? [],
+		byPos: Object.fromEntries(
+			Object.entries(posRows).map(([pos, rows]) => [pos, sumAdv(rows) ?? []]),
+		),
+	};
+	if (season < g.get("season")) {
+		shotZoneRefCache.set(key, out);
+	}
+	return out;
+};
+
+// Shot Zones: references for the player's most recent seasons with zone data (his position that season too)
+const shotZoneRefsForPlayer = async (
+	pRaw: Player,
+	advSeasons: { season: number | "career"; adv: number[] }[],
+) => {
+	if (__SPORT !== "basketball") {
+		return [];
+	}
+	const seasons = advSeasons
+		.filter((row) => row.season !== "career" && shotZones(row.adv))
+		.map((row) => row.season as number)
+		.slice(-3);
+	const out = [];
+	for (const season of seasons) {
+		const refs = await shotZoneRefsForSeason(season);
+		const pos = (
+			pRaw.ratings.findLast((r) => r.season <= season) ?? pRaw.ratings.at(-1)
+		)?.pos;
+		out.push({
+			season,
+			pos,
+			league: refs.league,
+			posAdv: pos !== undefined ? refs.byPos[pos] : undefined,
+		});
+	}
+	return out;
+};
+
 // Retired players don't change, so no need to update them except on playerMovement
 const keepPrevOutput = {
 	retired: keepType<boolean>(),
@@ -767,10 +841,15 @@ export default defineView({
 
 			// Advanced Tracking Stats: his summed records by regular season (all teams) and for his career, for the profile section
 			const advSeasons = advSeasonsForPlayer(topStuff.pRaw);
+			const shotZoneRefs = await shotZoneRefsForPlayer(
+				topStuff.pRaw,
+				advSeasons,
+			);
 
 			return {
 				...topStuffForUI,
 				advSeasons,
+				shotZoneRefs,
 				// His season-by-season tracking was folded into the career total when he retired
 				advCareerFolded:
 					__SPORT === "basketball" && topStuff.pRaw.advCareer !== undefined,

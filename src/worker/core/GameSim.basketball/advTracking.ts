@@ -240,6 +240,9 @@ type Current = {
 	transition: boolean;
 	defender: AdvPlayer | undefined;
 	threePointer: boolean;
+	// Shot Zones: the sub-zone (-1: none) and 1000 × expected FG%
+	zone: number;
+	xfg: number;
 };
 
 const RIM_EXP_SHRINK = 10;
@@ -297,7 +300,12 @@ export class AdvTracker {
 		transition: false,
 		defender: undefined,
 		threePointer: false,
+		zone: -1,
+		xfg: 0,
 	};
+	// Shot Zones: set by the sim before shot() (-1: the setting is off)
+	szZone = -1;
+	szXfg = 0;
 	clutch = false;
 	// The lineups may have changed (GameSim.updatePlayersOnCourt ran)
 	dirty = true;
@@ -607,6 +615,8 @@ export class AdvTracker {
 		cur.transition = transition;
 		cur.defender = defender;
 		cur.threePointer = type === "threePointer" && threePointers;
+		cur.zone = this.szZone;
+		cur.xfg = Math.round(1000 * this.szXfg);
 		this.cur = cur;
 	}
 
@@ -623,6 +633,14 @@ export class AdvTracker {
 		}
 		const a = this.arr.get(cur.p)!;
 		a[ptIndex(cur.pt, PT_FGA)]! += 1;
+		if (cur.zone >= 0) {
+			a[ADV.szFga + cur.zone]! += 1;
+			if (made) {
+				a[ADV.szFgm + cur.zone]! += 1;
+			}
+			a[ADV.szXfg]! += cur.xfg;
+			a[ADV.szN]! += 1;
+		}
 		const three = cur.type === "threePointer";
 		if (made) {
 			a[ptIndex(cur.pt, PT_FGM)]! += 1;

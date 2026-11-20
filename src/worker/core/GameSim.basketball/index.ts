@@ -142,6 +142,12 @@ import {
 } from "../../../common/offEmphasis.ts";
 import { AdvTracker } from "./advTracking.ts";
 import {
+	expectedFg,
+	pickShotZone,
+	shotZoneProfile,
+	type ShotZoneProfile,
+} from "./shotZones.ts";
+import {
 	doubleTeamProb,
 	kneeAndFloor,
 	sagOf,
@@ -150,7 +156,10 @@ import {
 	SHOT_SHARE,
 	shotPlanMult,
 } from "./shotShare.ts";
-import { ADV as ADV_LAYOUT } from "../../../common/advStats.ts";
+import {
+	ADV as ADV_LAYOUT,
+	SHOT_ZONE_INDEX,
+} from "../../../common/advStats.ts";
 
 // Shot Share Model: the shot diet fields (read once: used in the sim's hot path)
 const SD = {
@@ -326,6 +335,8 @@ type PlayerGameSim = {
 	shotPlan?: number;
 	shotDrift?: number;
 	ss?: ShotShareState;
+	// Shot Zones (the constructor): his sub-zone tendencies for the game
+	sz?: ShotZoneProfile;
 };
 type TeamGameSim = {
 	id: number;
@@ -715,6 +726,11 @@ class GameSim extends GameSimBase {
 	// multipliers (refreshed when the lineups change, ssVersion), the late shot clock flag of this possession, and the last draw (for the
 	// shot diet)
 	shotShare = false;
+	// Shot Zones (League extras, see shotZones.ts): sub-zones, their make shifts and xFG. Off: nothing here runs and no extra random
+	// number is drawn. szZone/szXfg: the last shot's sub-zone and expected FG% (-1: none), for Advanced Tracking Stats
+	shotZones = false;
+	szZone = -1;
+	szXfg = 0;
 	ssW: number[] = [];
 	ssPre: number[] = [];
 	ssAbility: number[] = [];
@@ -913,6 +929,18 @@ class GameSim extends GameSimBase {
 			for (const t of teams) {
 				for (const p of t.player) {
 					p.ss = this.shotShareState(p);
+				}
+			}
+		}
+
+		// Shot Zones: each player's sub-zone tendencies
+		this.shotZones =
+			!allStarGame &&
+			nativeFeatureEnabled("shotZones", (key) => g.get(key as any));
+		if (this.shotZones) {
+			for (const t of teams) {
+				for (const p of t.player) {
+					p.sz = shotZoneProfile(p.pbpRatings);
 				}
 			}
 		}
@@ -5114,6 +5142,14 @@ class GameSim extends GameSimBase {
 			probMake *= this.ga.twoPointAccuracyFactor;
 		}
 
+		// Shot Zones: the sub-zone (one more random number, only with the setting on) with its small make shift, and the expected FG%
+		if (this.shotZones) {
+			this.szShot(p, type, passer, defender, spacing, rushed);
+			if (type === "threePointer" || type === "midRange" || type === "atRim") {
+				probMake += this.szMake;
+			}
+		}
+
 		let blocked;
 		if (
 			(this.expandedRatings ? this.probBlkExpanded(p, type) : this.probBlk()) *
@@ -5613,6 +5649,8 @@ class GameSim extends GameSimBase {
 				? this.playersOnCourt[this.d][this.guards[this.d][j] ?? j]
 				: this.playersOnCourt[this.d][j >= 0 ? j : 0];
 		this.adv!.emphO = this.o;
+		this.adv!.szZone = this.shotZones ? this.szZone : -1;
+		this.adv!.szXfg = this.szXfg;
 		this.adv!.shot(
 			p,
 			passer,
@@ -5623,6 +5661,51 @@ class GameSim extends GameSimBase {
 			putback,
 			defender,
 			this.advThreePointers,
+		);
+	}
+
+	// Shot Zones: the sub-zone of the shot that is up (szZone, with its make shift szMake) and its expected FG% (szXfg). The xFG reads where
+	// the shot is, the team defense and his man (Matchup Defense), an assist and spacing, not the shooter's skill
+	szMake = 0;
+	szShot(
+		p: PlayerGameSim,
+		type: ShotType,
+		passer: PlayerGameSim | undefined,
+		defender: PlayerGameSim | undefined,
+		spacing: number,
+		rushed: boolean,
+	) {
+		this.szMake = 0;
+		let zone;
+		if (type === "putBack" || type === "tipIn") {
+			zone = SHOT_ZONE_INDEX.putback;
+		} else if (type === "lowPost") {
+			zone = SHOT_ZONE_INDEX.post;
+		} else if (
+			type === "threePointer" ||
+			type === "midRange" ||
+			type === "atRim"
+		) {
+			const picked = pickShotZone(
+				type,
+				p.sz ?? shotZoneProfile(p.pbpRatings),
+				passer !== undefined,
+				Math.random(),
+			);
+			zone = picked.zone;
+			this.szMake = picked.make;
+		} else {
+			this.szZone = -1;
+			return;
+		}
+		this.szZone = zone;
+		this.szXfg = expectedFg(
+			zone,
+			this.team[this.d].compositeRating.defense,
+			defender?.compositeRating.defense,
+			passer !== undefined,
+			spacing,
+			rushed ? Math.sqrt(this.possessionLength / 8) : 1,
 		);
 	}
 

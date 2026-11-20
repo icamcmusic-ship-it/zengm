@@ -112,9 +112,64 @@ export const ADV = {
 	smAttention: NUM_PT * PT_FIELDS + 56,
 	smPlan: NUM_PT * PT_FIELDS + 57,
 	smRole: NUM_PT * PT_FIELDS + 58,
+	// Shot Zones (League extras): attempts and makes by sub-zone (SHOT_ZONES order, szFga + i and szFgm + i), the sum of 1000 × each
+	// attempt's expected FG% (xFG) and the attempts that have one
+	szFga: NUM_PT * PT_FIELDS + 59,
+	szFgm: NUM_PT * PT_FIELDS + 59 + 9,
+	szXfg: NUM_PT * PT_FIELDS + 59 + 18,
+	szN: NUM_PT * PT_FIELDS + 59 + 19,
 } as const;
 
-export const ADV_LEN = NUM_PT * PT_FIELDS + 59;
+export const ADV_LEN = NUM_PT * PT_FIELDS + 59 + 20;
+
+// Shot Zones: the sub-zones (index order is the storage order, append-only), their coarse group and points
+export const SHOT_ZONES = [
+	{ key: "dunk", name: "Dunk", group: "rim", pts: 2 },
+	{ key: "layup", name: "Layup", group: "rim", pts: 2 },
+	{ key: "cut", name: "Cut / lob", group: "rim", pts: 2 },
+	{ key: "putback", name: "Putback / tip", group: "rim", pts: 2 },
+	{ key: "post", name: "Post-up", group: "paint", pts: 2 },
+	{ key: "short", name: "Short mid / floater", group: "paint", pts: 2 },
+	{ key: "long", name: "Long two", group: "long", pts: 2 },
+	{ key: "corner3", name: "Corner three", group: "corner3", pts: 3 },
+	{ key: "ab3", name: "Above-the-break three", group: "ab3", pts: 3 },
+] as const;
+export type ShotZoneKey = (typeof SHOT_ZONES)[number]["key"];
+export const SHOT_ZONE_INDEX = Object.fromEntries(
+	SHOT_ZONES.map((z, i) => [z.key, i]),
+) as Record<ShotZoneKey, number>;
+
+// Shot Zones: a player's (or a group's) zone table from an adv array, undefined without any zone recorded
+export const shotZones = (adv: readonly number[] | undefined) => {
+	if (!adv) {
+		return undefined;
+	}
+	let fga = 0;
+	let fgm = 0;
+	const zones = SHOT_ZONES.map((z, i) => {
+		const a = adv[ADV.szFga + i] ?? 0;
+		const m = adv[ADV.szFgm + i] ?? 0;
+		fga += a;
+		fgm += m;
+		return { ...z, fga: a, fgm: m };
+	});
+	if (fga <= 0) {
+		return undefined;
+	}
+	const n = adv[ADV.szN] ?? 0;
+	return {
+		fga,
+		fgm,
+		fgp: fgm / fga,
+		// Expected FG% of his shots (shot quality) vs his actual FG% on them
+		xfgp: n > 0 ? (adv[ADV.szXfg] ?? 0) / (1000 * n) : undefined,
+		zones: zones.map((z) => ({
+			...z,
+			freq: z.fga / fga,
+			fgp: z.fga > 0 ? z.fgm / z.fga : undefined,
+		})),
+	};
+};
 
 // Shot Share Model: the shot diet's sources and modifiers (keys of ADV), with their labels
 export const SHOT_DIET_SOURCES = [

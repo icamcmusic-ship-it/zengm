@@ -44,6 +44,7 @@ import { RealCompsSummary } from "../../components/RealComps.tsx";
 import { NitStats } from "./NitStats.tsx";
 import { TrackingProfile } from "./TrackingProfile.tsx";
 import { ShotDiet } from "./ShotDiet.tsx";
+import { ShotZones } from "./ShotZones.tsx";
 import {
 	ScoutingSummaryLine,
 	useScoutingOn,
@@ -52,6 +53,7 @@ import {
 const Player2 = ({
 	advCareerFolded,
 	advSeasons,
+	shotZoneRefs,
 	bestPos,
 	customMenu,
 	events,
@@ -190,6 +192,8 @@ const Player2 = ({
 			/>
 
 			<ShotDiet advSeasons={advSeasons} />
+
+			<ShotZones advSeasons={advSeasons} refs={shotZoneRefs} />
 
 			<NitStats player={player} />
 
