@@ -12,6 +12,7 @@ import {
 	poss,
 	record,
 	signed,
+	tradeSides,
 	winp,
 } from "./text.ts";
 import type { NPFeat, NPPlayer, NPTeam, NPTrade, Seg } from "./types.ts";
@@ -55,7 +56,7 @@ export const playerSeason = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 		yrs !== undefined
 			? [
 					c.pl(pid),
-					`, ${p.age}, ${c.R("is", "was")} in his ${ordinal(yrs)} season, ${c.R("playing", "playing")} for the ${tn}. `,
+					`, ${p.age}, ${c.R("is", "was")} in ${c.pr("his")} ${ordinal(yrs)} season, ${c.R("playing", "playing")} for the ${tn}. `,
 				]
 			: undefined,
 		[
@@ -70,7 +71,7 @@ export const playerSeason = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 	])!;
 	const s2 = pick<Seg[]>(r, [
 		[
-			`${capFirst(c.R("he is averaging ", "he averaged "))}${lw}${kp && kp <= 20 ? `, ${kp === 1 ? "the league's best scoring average" : `${ordinal(kp)} in the league in scoring`}` : ""}. `,
+			`${capFirst(c.R(`${c.pr("he")} is averaging `, `${c.pr("he")} averaged `))}${lw}${kp && kp <= 20 ? `, ${kp === 1 ? "the league's best scoring average" : `${ordinal(kp)} in the league in scoring`}` : ""}. `,
 		],
 		[
 			`The line: ${lw}${kp && kp <= 20 ? ` (${ordinal(kp)} in scoring)` : ""}. `,
@@ -86,7 +87,7 @@ export const playerSeason = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 						`${poss(ln)} ${fmt1(p.ws)} win shares ${c.R("rank", "ranked")} ${ordinal(kw)} in the league. `,
 					],
 					[
-						`By win shares (${fmt1(p.ws)}) he ${c.R("is", "was")} the league's ${kw === 1 ? "most productive player" : `${ordinal(kw)}-most productive player`}. `,
+						`By win shares (${fmt1(p.ws)}) ${c.pr("he")} ${c.R("is", "was")} the league's ${kw === 1 ? "most productive player" : `${ordinal(kw)}-most productive player`}. `,
 					],
 				]) ?? undefined)
 			: undefined;
@@ -97,12 +98,12 @@ export const playerSeason = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 		s4 =
 			Math.abs(d) < 0.5
 				? [
-						`His scoring held steady from ${c.season - 1} (${fmt1(pl.pts)} a game). `,
+						`${c.pr("His")} scoring held steady from ${c.season - 1} (${fmt1(pl.pts)} a game). `,
 					]
 				: [
 						pick<string>(r, [
 							`That is ${d > 0 ? "up" : "down"} from ${fmt1(pl.pts)} points a game in ${c.season - 1}. `,
-							`In ${c.season - 1} he averaged ${fmt1(pl.pts)} points, ${fmt1(Math.abs(d))} ${d > 0 ? "fewer" : "more"} than now. `,
+							`In ${c.season - 1} ${c.pr("he")} averaged ${fmt1(pl.pts)} points, ${fmt1(Math.abs(d))} ${d > 0 ? "fewer" : "more"} than now. `,
 						])!,
 					];
 	}
@@ -283,7 +284,7 @@ export const playerRank = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 			: `${list[0]}, ${list[1]} and ${list[2]}`;
 	const kids = pick<string>(r, [
 		`Among qualified players ${lastName(p.name)} ${c.R("ranks", "ranked")} ${joined}. `,
-		`Across the league he ${c.R("is", "was")} ${joined}. `,
+		`Across the league ${c.pr("he")} ${c.R("is", "was")} ${joined}. `,
 	])!;
 	return { kids: [kids], keys: [] };
 };
@@ -307,18 +308,18 @@ export const playerShare = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 	const kids = top
 		? pick<Seg[]>(r, [
 				[
-					`He ${c.R("accounts", "accounted")} for ${pc}% of the ${poss(tn)} win shares (${fmt1(p.ws)} of ${fmt1(tot)})${next ? "; the next-best teammate, " : ". "}`,
+					`${c.pr("He")} ${c.R("accounts", "accounted")} for ${pc}% of the ${poss(tn)} win shares (${fmt1(p.ws)} of ${fmt1(tot)})${next ? "; the next-best teammate, " : ". "}`,
 					...(next
 						? [c.pl(next.pid), `, ${c.R("has", "had")} ${fmt1(next.ws)}. `]
 						: []),
 				],
 				[
-					`${fmt1(p.ws)} of the ${poss(tn)} ${fmt1(tot)} win shares ${c.R("are", "were")} his, ${pc}% of the total${next ? ". Next on the roster: " : ". "}`,
+					`${fmt1(p.ws)} of the ${poss(tn)} ${fmt1(tot)} win shares ${c.R("are", "were")} ${c.pr("his")}, ${pc}% of the total${next ? ". Next on the roster: " : ". "}`,
 					...(next ? [c.pl(next.pid), ` (${fmt1(next.ws)}). `] : []),
 				],
 			])!
 		: [
-				`His ${fmt1(p.ws)} win shares ${c.R("are", "were")} ${pc}% of the ${poss(tn)} total; `,
+				`${c.pr("His")} ${fmt1(p.ws)} win shares ${c.R("are", "were")} ${pc}% of the ${poss(tn)} total; `,
 				c.pl(next!.pid),
 				` ${c.R("leads", "led")} the roster with ${fmt1(next!.ws)}. `,
 			];
@@ -338,7 +339,7 @@ export const playerRace = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 		k === 0
 			? pick<Seg[]>(r, [
 					[
-						`He ${c.R("leads", "led")} the league in scoring, ahead of `,
+						`${c.pr("He")} ${c.R("leads", "led")} the league in scoring, ahead of `,
 						c.pl(q[1]!.pid),
 						` (${v(q[1]!)}) and `,
 						c.pl(q[2]!.pid),
@@ -354,7 +355,7 @@ export const playerRace = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 				])!
 			: pick<Seg[]>(r, [
 					[
-						`In the scoring race he ${c.R("sits", "ranked")} ${ordinal(k + 1)}, behind `,
+						`In the scoring race ${c.pr("he")} ${c.R("sits", "ranked")} ${ordinal(k + 1)}, behind `,
 						c.pl(up!.pid),
 						` (${v(up!)})${dn ? " and ahead of " : ". "}`,
 						...(dn ? [c.pl(dn.pid), ` (${v(dn)}). `] : []),
@@ -362,7 +363,7 @@ export const playerRace = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 					[
 						`${capFirst(ordinal(k + 1))} in scoring: `,
 						c.pl(up!.pid),
-						` ${c.R("is", "was")} one place above him at ${v(up!)}. `,
+						` ${c.R("is", "was")} one place above ${c.pr("him")} at ${v(up!)}. `,
 					],
 				])!;
 	return { kids, keys: [] };
@@ -791,8 +792,7 @@ export const tradeSince = (c: Ctx, tr: NPTrade, r: Rng): Para | undefined => {
 		return undefined;
 	}
 	const out: { p: NPPlayer; to: number }[] = [];
-	for (const [i, got] of tr.got.entries()) {
-		const to = tr.tids[i as 0 | 1];
+	for (const { tid: to, got } of tradeSides(tr)) {
 		for (const a of got) {
 			if (a.kind !== "player") {
 				continue;
@@ -850,19 +850,19 @@ export const breakNext = (c: Ctx, pid: number, r: Rng): Para | undefined => {
 						`${nm} is ${p.age}, and by every account the climb is not finished. `,
 					])!
 				: pick<string>(r, [
-						`The scouts think ${nm} is near his ceiling at ${p.age}. `,
-						`At ${p.age}, ${nm} may already be close to as good as he gets. `,
+						`The scouts think ${nm} is near ${c.pr("his")} ceiling at ${p.age}. `,
+						`At ${p.age}, ${nm} may already be close to as good as ${c.pr("he")} gets. `,
 					])!;
 		return { kids: [kids], keys: [] };
 	}
 	const kids =
 		room >= 3
 			? pick<string>(r, [
-					`The ratings say there is more to come: at ${p.age}, ${nm} carries a potential of ${p.pot}, ${plural(room, "point")} above his ${p.ovr}. `,
-					`${nm} is ${p.age} and his potential rating is ${p.pot}, so by the numbers the climb from ${p.ovr} is not finished. `,
+					`The ratings say there is more to come: at ${p.age}, ${nm} carries a potential of ${p.pot}, ${plural(room, "point")} above ${c.pr("his")} ${p.ovr}. `,
+					`${nm} is ${p.age} and ${c.pr("his")} potential rating is ${p.pot}, so by the numbers the climb from ${p.ovr} is not finished. `,
 				])!
 			: pick<string>(r, [
-					`By the ratings ${nm} is near his ceiling: at ${p.age} his potential is ${p.pot}, against an overall of ${p.ovr}. `,
+					`By the ratings ${nm} is near ${c.pr("his")} ceiling: at ${p.age} ${c.pr("his")} potential is ${p.pot}, against an overall of ${p.ovr}. `,
 					`At ${p.age}, ${nm} has a potential rating of ${p.pot}; the jump to ${p.ovr} already reaches most of it. `,
 				])!;
 	return { kids: [kids], keys: [] };

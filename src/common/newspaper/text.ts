@@ -1,7 +1,7 @@
 // Small text helpers and a seeded RNG for the newspaper engine. Pure functions only.
 
 import { salted } from "../leagueSalt.ts";
-import type { NPRecord, Seg } from "./types.ts";
+import type { NPRecord, NPTrade, NPTradeAsset, Seg } from "./types.ts";
 
 // FNV-1a string hash
 export const hashString = (s: string) => {
@@ -150,8 +150,7 @@ export const polish = (s: string) =>
 		.replace(/ {2,}/g, " ")
 		.replace(/ ([,:;])/g, "$1")
 		.replace(/ \.(?!\d)/g, ".")
-		.replace(/\.\./g, ".")
-		.replace(/\bundefined\b|\bNaN\b/g, "");
+		.replace(/\.\./g, ".");
 
 // Merge adjacent strings and polish them
 export const tidySegs = (segs: Seg[]): Seg[] => {
@@ -166,3 +165,27 @@ export const tidySegs = (segs: Seg[]): Seg[] => {
 	}
 	return out.map((seg) => (typeof seg === "string" ? polish(seg) : seg));
 };
+
+// Every team in a trade with everything it received, over all the legs of a multi-team trade, in the order the teams first appear
+export const tradeSides = (
+	tr: NPTrade,
+): { tid: number; got: NPTradeAsset[] }[] => {
+	const out: { tid: number; got: NPTradeAsset[] }[] = [];
+	for (const leg of [{ tids: tr.tids, got: tr.got }, ...(tr.legs ?? [])]) {
+		for (const [i, tid] of leg.tids.entries()) {
+			let side = out.find((x) => x.tid === tid);
+			if (!side) {
+				side = { tid, got: [] };
+				out.push(side);
+			}
+			side.got.push(...leg.got[i]!);
+		}
+	}
+	return out;
+};
+
+// The trade the trade feature covers: the biggest one made during the season (preseason to playoffs). The Transactions page leaves out exactly this one
+export const featuredTrade = (trades: NPTrade[]): NPTrade | undefined =>
+	trades
+		.filter((x) => x.phase >= 0 && x.phase <= 3)
+		.toSorted((a, b) => b.score - a.score)[0];

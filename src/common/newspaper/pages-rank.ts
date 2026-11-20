@@ -838,11 +838,14 @@ const specs: RankSpec[] = [
 			desc(
 				teams(
 					c,
+					// With no playoffs there are no finals (and rounds - 1 is -1, missing the playoffs)
 					(t) =>
-						(t.hist ?? []).filter(
-							(h) => h.playoffRoundsWon === c.f.numRounds - 1,
-						).length +
-						(c.done && t.playoffRoundsWon === c.f.numRounds - 1 ? 1 : 0),
+						c.f.numRounds === 0
+							? 0
+							: (t.hist ?? []).filter(
+									(h) => h.playoffRoundsWon === c.f.numRounds - 1,
+								).length +
+								(c.done && t.playoffRoundsWon === c.f.numRounds - 1 ? 1 : 0),
 					0,
 				),
 			),

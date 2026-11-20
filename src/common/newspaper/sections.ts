@@ -16,6 +16,7 @@ import {
 	poss,
 	record,
 	winp,
+	tradeSides,
 	word,
 } from "./text.ts";
 import type {
@@ -23,6 +24,7 @@ import type {
 	Block,
 	NPPlayer,
 	NPTeam,
+	NPTrade,
 	NPTradeAsset,
 	Seg,
 	Sidebar,
@@ -71,27 +73,29 @@ export const awardStory = (c: Ctx, key: string): Article | undefined => {
 	);
 	if (key === "DPOY") {
 		body.push(
-			P(`He added ${fmt1(p.stl)} steals and ${fmt1(p.blk)} blocks a night.`),
+			P(
+				`${c.pr("He")} added ${fmt1(p.stl)} steals and ${fmt1(p.blk)} blocks a night.`,
+			),
 		);
 	} else if (key === "MIP" && p.prevLine) {
 		body.push(
 			P(
-				`A year ago he averaged ${fmt1(p.prevLine.pts)} points in ${plural(p.prevLine.gp, "game")}; this season it was ${fmt1(p.pts)}${p.prevOvr !== undefined && !c.noRatings ? `, and his rating climbed from ${p.prevOvr} to ${p.ovr}` : ""}.`,
+				`A year ago ${c.pr("he")} averaged ${fmt1(p.prevLine.pts)} points in ${plural(p.prevLine.gp, "game")}; this season it was ${fmt1(p.pts)}${p.prevOvr !== undefined && !c.noRatings ? `, and ${c.pr("his")} rating climbed from ${p.prevOvr} to ${p.ovr}` : ""}.`,
 			),
 		);
 	} else if (key === "ROY") {
 		body.push(
 			P(
 				p.draftRound > 0
-					? `He was the No. ${p.draftPick + (p.draftRound - 1) * 30} pick in the ${p.draftYear} draft${p.draftTid !== p.tid ? ", taken by another team before landing here" : ""}.`
-					: `He went undrafted in ${p.draftYear}.`,
+					? `${c.pr("He")} was the No. ${p.draftPick + (p.draftRound - 1) * 30} pick in the ${p.draftYear} draft${p.draftTid !== p.tid ? ", taken by another team before landing here" : ""}.`
+					: `${c.pr("He")} went undrafted in ${p.draftYear}.`,
 			),
 		);
 	} else {
 		const k = c.statRank(p.pid, "ws");
 		body.push(
 			P(
-				`His ${fmt1(p.ws)} win shares ${k === 1 ? "led the league" : k ? `ranked ${ordinal(k)} in the league` : "were a team high"}${p.per ? `, with a PER of ${fmt1(p.per)}` : ""}.`,
+				`${c.pr("His")} ${fmt1(p.ws)} win shares ${k === 1 ? "led the league" : k ? `ranked ${ordinal(k)} in the league` : "were a team high"}${p.per ? `, with a PER of ${fmt1(p.per)}` : ""}.`,
 			),
 		);
 	}
@@ -324,7 +328,7 @@ export const finalsMvpStory = (c: Ctx): Article | undefined => {
 		kicker: "Finals MVP",
 		head: c.freshHead(r, [
 			`${p.name} is Finals MVP`,
-			`Finals MVP ${p.name} saved his best for last`,
+			`Finals MVP ${p.name} saved ${c.pr("his")} best for last`,
 			`${poss(p.name)} playoff run ends with Finals MVP`,
 		])!,
 		byline: c.byline("playoffs"),
@@ -336,7 +340,7 @@ export const finalsMvpStory = (c: Ctx): Article | undefined => {
 				c.tl(a.tid),
 				` was named Finals MVP after averaging ${c.lineWords(p.po)} in ${plural(p.po.gp, "playoff game")}${p.po.fgp ? ` on ${fmt1(p.po.fgp)}% shooting` : ""}.`,
 			),
-			P(`In the regular season he had averaged ${c.lineWords(p)}.`),
+			P(`In the regular season ${c.pr("he")} had averaged ${c.lineWords(p)}.`),
 		],
 	};
 };
@@ -447,7 +451,7 @@ export const declineStory = (c: Ctx): Article | undefined => {
 		size: "brief",
 		kicker: "Father Time",
 		head: c.freshHead(r, [
-			`${top.name} shows his age`,
+			`${top.name} shows ${c.pr("his")} age`,
 			c.noRatings
 				? `The slide: ${top.name} loses a step`
 				: `The slide: ${top.name} drops from ${top.prevOvr} to ${top.ovr}`,
@@ -461,7 +465,7 @@ export const declineStory = (c: Ctx): Article | undefined => {
 					? `, ${top.age}, ${c.T("has lost", "lost")} a step this season`
 					: `, ${top.age}, ${c.T("has dropped", "dropped")} from a ${top.prevOvr} rating to ${top.ovr}`,
 				top.prevLine && top.prevLine.pts > top.pts
-					? `, and his scoring from ${fmt1(top.prevLine.pts)} to ${fmt1(top.pts)} points a game.`
+					? `, and ${c.pr("his")} scoring from ${fmt1(top.prevLine.pts)} to ${fmt1(top.pts)} points a game.`
 					: ".",
 			),
 			downs.length > 1
@@ -733,20 +737,31 @@ const assetText = (c: Ctx, a: NPTradeAsset): Seg[] =>
 				`${typeof a.season === "number" ? a.season : "a"} ${ordinal(a.round)}-round pick${a.originalTid >= 0 && c.team(a.originalTid) ? ` (${c.team(a.originalTid)!.abbrev})` : ""}`,
 			];
 
-export const tradeStories = (c: Ctx, tid?: number): Article[] => {
-	const trades = c.f.trades
-		.filter((t) => tid === undefined || t.tids.includes(tid))
-		.toSorted((a, b) => b.score - a.score)
-		.slice(0, tid === undefined ? 3 : 4);
+// The league paper passes the trade its trade feature already covers (if any), so that one trade neither runs twice nor drops out
+export const tradeStories = (
+	c: Ctx,
+	tid?: number,
+	opts?: { league: true; featured: NPTrade | undefined },
+): Article[] => {
+	const sorted = c.f.trades
+		.filter(
+			(t) => tid === undefined || tradeSides(t).some((x) => x.tid === tid),
+		)
+		.toSorted((a, b) => b.score - a.score);
+	const trades = opts
+		? sorted.filter((t) => t !== opts.featured).slice(0, 2)
+		: sorted.slice(0, tid === undefined ? 3 : 4);
 	const r = c.rng("trades", tid ?? "");
-	return trades.map((tr, i) => {
+	return trades.map((tr, j) => {
+		const i = opts ? j + 1 : j;
 		const [a, b] = tr.tids;
-		const aGot = tr.got[0];
-		const bGot = tr.got[1];
-		const star = [...aGot, ...bGot].find(
-			(x): x is Extract<NPTradeAsset, { kind: "player" }> =>
-				x.kind === "player",
-		);
+		const sides = tradeSides(tr);
+		const star = sides
+			.flatMap((x) => x.got)
+			.find(
+				(x): x is Extract<NPTradeAsset, { kind: "player" }> =>
+					x.kind === "player",
+			);
 		const when =
 			tr.phase >= 4 || tr.phase < 0
 				? "in the offseason"
@@ -766,30 +781,24 @@ export const tradeStories = (c: Ctx, tid?: number): Article[] => {
 			photoPid: star?.pid,
 			body: [
 				P(
-					`The `,
-					c.tl(a, c.tfull(a)),
-					` and the `,
-					c.tl(b, c.tfull(b)),
-					` completed a trade ${when}.`,
+					...andList(
+						sides.map((x, k) => [
+							k === 0 ? `The ` : `the `,
+							c.tl(x.tid, c.tfull(x.tid)),
+						]),
+					),
+					` completed a ${sides.length > 2 ? `${word(sides.length)}-team ` : ""}trade ${when}.`,
 				),
+				...(tr.note ? [P(tr.note)] : []),
 				{
 					type: "list",
-					items: [
-						[
-							c.tl(a),
-							" get ",
-							...(aGot.length
-								? andList(aGot.map((x) => assetText(c, x)))
-								: ["nothing"]),
-						],
-						[
-							c.tl(b),
-							" get ",
-							...(bGot.length
-								? andList(bGot.map((x) => assetText(c, x)))
-								: ["nothing"]),
-						],
-					],
+					items: sides.map((x) => [
+						c.tl(x.tid),
+						" get ",
+						...(x.got.length
+							? andList(x.got.map((y) => assetText(c, y)))
+							: ["nothing"]),
+					]),
 				},
 			],
 		};
@@ -864,7 +873,7 @@ export const draftStory = (c: Ctx, tid?: number): Article | undefined => {
 					: `The scouts' favorite by potential, though, was `,
 				c.pl(highPot.pid, highPot.name),
 				c.noRatings
-					? `, who went`
+					? `, who went No. ${highPot.pick} in round ${highPot.round} to the `
 					: ` (${highPot.pot}), who went No. ${highPot.pick} in round ${highPot.round} to the `,
 				c.tl(highPot.tid),
 				".",
@@ -942,11 +951,11 @@ export const retireStories = (c: Ctx): Article[] => {
 					c.pl(top.pid, top.name),
 					` has retired at ${top.age} after ${plural(top.seasons, "season")}, the last of them with the `,
 					top.tid >= 0 && c.team(top.tid) ? c.tl(top.tid) : "league",
-					`. He finishes with ${top.pts.toLocaleString("en-US")} points, ${top.trb.toLocaleString("en-US")} rebounds and ${top.ast.toLocaleString("en-US")} assists in ${plural(top.gp, "game")}${top.gp > 0 ? ` (${fmt1(top.pts / top.gp)} a game)` : ""}.`,
+					`. ${c.pr("He")} finishes with ${top.pts.toLocaleString("en-US")} points, ${top.trb.toLocaleString("en-US")} rebounds and ${top.ast.toLocaleString("en-US")} assists in ${plural(top.gp, "game")}${top.gp > 0 ? ` (${fmt1(top.pts / top.gp)} a game)` : ""}.`,
 				),
 				honors.length
 					? P(`${poss(top.name)} résumé: ${honors.join(", ")}.`)
-					: P(`He piled up ${fmt1(top.ws)} career win shares.`),
+					: P(`${c.pr("He")} piled up ${fmt1(top.ws)} career win shares.`),
 				top.hof
 					? P(
 							c.cycle("hof-line", [
@@ -1042,14 +1051,14 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 							: "Everybody wants an MVP pick at this point in the season, so here is mine: ",
 						c.pl(a.pid),
 						mvp ? " won it. " : ". ",
-						`He ${c.T("is averaging", "averaged")} ${c.lineWords(a)} with ${fmt1(a.ws)} win shares.`,
+						`${c.pr("He")} ${c.T("is averaging", "averaged")} ${c.lineWords(a)} with ${fmt1(a.ws)} win shares.`,
 					),
 					P(
 						"The case for ",
 						c.pl(b.pid),
 						` is ${b.ws > a.ws ? "better than people think" : "real but thinner"}: ${fmt1(b.ws)} win shares and ${fmt1(b.pts)} points a game for a ${c.rec(b.tid)} team.`,
 						b.ws > a.ws
-							? ` By the most complete single number we have, he ${c.T("is", "was")} the more valuable player, ${fmt1(b.ws)} win shares to ${fmt1(a.ws)}.`
+							? ` By the most complete single number we have, ${c.pr("he")} ${c.T("is", "was")} the more valuable player, ${fmt1(b.ws)} win shares to ${fmt1(a.ws)}.`
 							: ` The numbers back ${a.name}: ${fmt1(a.ws)} win shares to ${fmt1(b.ws)}.`,
 					),
 					P(

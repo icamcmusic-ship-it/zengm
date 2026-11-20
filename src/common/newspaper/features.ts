@@ -20,7 +20,18 @@ import {
 	tradeSince,
 } from "./longform.ts";
 import type { Rng } from "./text.ts";
-import { fmt1, ordinal, plural, poss, record, winp } from "./text.ts";
+import {
+	andList,
+	featuredTrade,
+	fmt1,
+	ordinal,
+	plural,
+	poss,
+	record,
+	tradeSides,
+	winp,
+	word,
+} from "./text.ts";
 import type {
 	Article,
 	Block,
@@ -50,7 +61,7 @@ const merge = (
 
 const QUOTES: Record<
 	string,
-	((n: string, x: string, past: boolean) => string)[]
+	((n: string, x: string, past: boolean, he: string) => string)[]
 > = {
 	star: [
 		(n, x, p) =>
@@ -65,8 +76,8 @@ const QUOTES: Record<
 	riser: [
 		(n, x, p) =>
 			`${n} ${p ? "came" : "came"} back a different player, and the jump to ${x} ${p ? "was" : "is"} real.`,
-		(n, x, p) =>
-			`A year ago ${n} was a name on the roster; at ${x} he ${p ? "was" : "is"} a problem for everybody.`,
+		(n, x, p, he) =>
+			`A year ago ${n} was a name on the roster; at ${x} ${he} ${p ? "was" : "is"} a problem for everybody.`,
 		(n, x) =>
 			`Whatever ${n} did over the summer worked, because ${x} does not lie.`,
 	],
@@ -108,7 +119,7 @@ const quoteFor = (
 		return undefined;
 	}
 	const fn = c.cycle(`quote|${mood}|${n}`, list);
-	return c.quote(fn(n, x, c.regDone), "newsroom colour");
+	return c.quote(fn(n, x, c.regDone, c.pr("he")), "newsroom colour");
 };
 
 const playerBox = (
@@ -512,7 +523,7 @@ export const topPickFeature = (c: Ctx): Article | undefined => {
 				c,
 				"pick",
 				d.name,
-				`his first season with the ${c.tn(d.tid)}`,
+				`${c.pr("his")} first season with the ${c.tn(d.tid)}`,
 			),
 			next: teamDraft(c, d.tid, r),
 			box: {
@@ -637,19 +648,16 @@ export const tradeFeature = (c: Ctx, tr?: NPTrade): Article | undefined => {
 	if (c.pre) {
 		return undefined;
 	}
-	const t =
-		tr ??
-		c.f.trades
-			.filter((x) => x.phase >= 0 && x.phase <= 3)
-			.toSorted((a, b) => b.score - a.score)[0];
+	const t = tr ?? featuredTrade(c.f.trades);
 	if (!t) {
 		return undefined;
 	}
+	const sides = tradeSides(t);
 	const [a, b] = t.tids;
 	const r = c.rng("feature-trade");
-	const stars = t.got
-		.flatMap((g) =>
-			g.filter(
+	const stars = sides
+		.flatMap((side) =>
+			side.got.filter(
 				(x): x is Extract<NPTradeAsset, { kind: "player" }> =>
 					x.kind === "player",
 			),
@@ -665,18 +673,18 @@ export const tradeFeature = (c: Ctx, tr?: NPTrade): Article | undefined => {
 	])!;
 	const intro: Block[] = [
 		P(
-			`The `,
-			c.tl(a, c.tfull(a)),
-			` and the `,
-			c.tl(b, c.tfull(b)),
-			` completed a trade ${t.phase === 0 ? "before the season" : "during the season"}.`,
+			...andList(
+				sides.map((x, i) => [
+					i === 0 ? `The ` : `the `,
+					c.tl(x.tid, c.tfull(x.tid)),
+				]),
+			),
+			` completed a ${sides.length > 2 ? `${word(sides.length)}-team ` : ""}trade ${t.phase === 0 ? "before the season" : "during the season"}.`,
 		),
+		...(t.note ? [P(t.note)] : []),
 		{
 			type: "list",
-			items: [
-				[c.tl(a), " get ", ...assetLine(c, t.got[0])],
-				[c.tl(b), " get ", ...assetLine(c, t.got[1])],
-			],
+			items: sides.map((x) => [c.tl(x.tid), " get ", ...assetLine(c, x.got)]),
 		},
 	];
 	const aTeam = c.team(a);
@@ -729,7 +737,9 @@ export const tradeFeature = (c: Ctx, tr?: NPTrade): Article | undefined => {
 								},
 								{
 									value: String(
-										t.got.flat().filter((x) => x.kind === "player").length,
+										sides
+											.flatMap((x) => x.got)
+											.filter((x) => x.kind === "player").length,
 									),
 									label: "players moved",
 								},

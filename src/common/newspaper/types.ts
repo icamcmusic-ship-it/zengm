@@ -207,6 +207,10 @@ export type NPTrade = {
 	// What each side received
 	got: [NPTradeAsset[], NPTradeAsset[]];
 	score: number;
+	// Why the AI made the trade, or that it was part of a multi-team deal (the event's note)
+	note?: string;
+	// The other legs of a multi-team trade (one event per leg), grouped into this one story
+	legs?: { tids: [number, number]; got: [NPTradeAsset[], NPTradeAsset[]] }[];
 };
 
 export type NPTradeAsset =
@@ -280,6 +284,9 @@ export type NPChampion = {
 	tid: number;
 	runnerUp?: number;
 	fmvp?: string;
+	// For a champion that is no longer in the league (contracted): its name then
+	region?: string;
+	name?: string;
 };
 
 export type NPMvp = {
@@ -346,6 +353,8 @@ export type NewsFacts = {
 	// No Visible Player Ratings challenge: nothing in the paper quotes a rating (player or roster), it says it in words or leaves
 	// it out. The ratings in the facts are still there (fuzzed, as the user's scouts see them) for ordering
 	noRatings?: boolean;
+	// The league's gender setting, for pronouns (male when left out)
+	gender?: "male" | "female";
 	// Stable per league, used to seed text choices
 	seedKey: string;
 	season: number;
@@ -377,9 +386,13 @@ export type NewsFacts = {
 	})[];
 	draft: NPDraftee[];
 	injuries: NPInjury[];
-	// Most wins by any team in any earlier season, if known
+	// The best record (by share of games won, so schedules of different lengths compare) of any team in any earlier
+	// season, if known
 	recordWins?: {
 		won: number;
+		lost?: number;
+		tied?: number;
+		otl?: number;
 		tid: number;
 		season: number;
 		region: string;

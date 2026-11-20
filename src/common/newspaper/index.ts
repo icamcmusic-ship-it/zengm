@@ -66,7 +66,7 @@ import {
 	teamRookies,
 	teamRoster,
 } from "./team.ts";
-import { Rng, hashString, segsText } from "./text.ts";
+import { Rng, featuredTrade, hashString, segsText } from "./text.ts";
 import type {
 	Article,
 	EditionId,
@@ -318,7 +318,13 @@ const leaguePaper = (c: Ctx): Section[] => {
 		"moves",
 		"Transactions",
 		[
-			...tradeStories(c).slice(1),
+			...tradeStories(c, undefined, {
+				league: true,
+				// The trade feature, when it runs, covers this one
+				featured: feats.some((a) => a.id === "feature-trade")
+					? featuredTrade(c.f.trades)
+					: undefined,
+			}),
 			signingsStory(c),
 			...pagesFor(c, "money", c.pre ? 5 : 4),
 		],
@@ -458,6 +464,13 @@ export const buildPaper = (
 		sections,
 	};
 	return opts?.vary === false ? paper : varyPaper(paper, facts);
+};
+
+// Just the league paper's front page lead headline, without building the rest of the paper (the Timeline). The lead is
+// the first article the league paper builds, so this is the same headline buildPaper gives
+export const buildHeadline = (facts: NewsFacts): string | undefined => {
+	const lead = leadFor(new Ctx(facts));
+	return lead ? finishArticle(lead).head : undefined;
 };
 
 // All the text of a paper, for tests

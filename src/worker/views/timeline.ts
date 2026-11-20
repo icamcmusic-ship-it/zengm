@@ -2,7 +2,7 @@
 // trades and comebacks, season by season. Reads the other features' outputs through their worker functions and leaves
 // out the ones that are turned off.
 import { PHASE } from "../../common/constants.ts";
-import { buildPaper } from "../../common/newspaper/index.ts";
+import { buildHeadline } from "../../common/newspaper/index.ts";
 import { plainText } from "../../common/storylines/kit.ts";
 import {
 	findScoringRecords,
@@ -20,7 +20,7 @@ import { getLeagueAchievementsLog } from "../util/leagueAchievements.ts";
 import { featureOffError, featureOn } from "../util/nativeFeatures.ts";
 import { getStoryState } from "../util/storylinesData.ts";
 import { getWrappedStatus } from "../util/wrappedData.ts";
-import { getNewsFacts } from "./newspaper.ts";
+import { getNewsFacts, type TeamHistCache } from "./newspaper.ts";
 
 // Seasons shown by default, and the most that get newspaper headlines (each one reads a season's results)
 const DEFAULT_SEASONS = 10;
@@ -39,18 +39,25 @@ const processInputs = (params: RouteParams<"timeline">) => {
 // Front page leads of finished seasons don't change, so they are kept per league
 const headlineCache = new Map<string, { head: string } | null>();
 
-const getHeadline = async (season: number, finished: boolean) => {
+const getHeadline = async (
+	season: number,
+	finished: boolean,
+	histCache: TeamHistCache,
+) => {
 	const key = `${g.get("lid")}|${season}`;
 	if (finished && headlineCache.has(key)) {
 		return headlineCache.get(key) ?? undefined;
 	}
 	let out: { head: string } | undefined;
 	try {
-		const { facts } = await getNewsFacts(season);
-		const paper = buildPaper(facts);
-		const lead = paper.sections[0]?.articles[0];
-		if (lead) {
-			out = { head: lead.head };
+		// Only the facts and the article the headline needs, not a whole paper
+		const { facts } = await getNewsFacts(season, {
+			headlineOnly: true,
+			histCache,
+		});
+		const head = buildHeadline(facts);
+		if (head !== undefined) {
+			out = { head };
 		}
 	} catch (error) {
 		console.error(`Timeline: no newspaper for ${season}`, error);
@@ -291,8 +298,14 @@ export default defineView({
 		// Newspaper front page leads
 		if (featureOn("newspaper")) {
 			const minHeadlineSeason = Math.max(from, to - MAX_HEADLINE_SEASONS + 1);
+			// Team histories are read once for all the seasons
+			const histCache: TeamHistCache = new Map();
 			for (let season = to; season >= minHeadlineSeason; season--) {
-				const h = await getHeadline(season, season <= lastFinishedSeason);
+				const h = await getHeadline(
+					season,
+					season <= lastFinishedSeason,
+					histCache,
+				);
 				if (h) {
 					items.push({
 						kind: "headline",
