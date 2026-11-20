@@ -15,6 +15,11 @@ import {
 	PRESETS,
 } from "../../common/offEmphasis.ts";
 import { OFFENSE_NAMES } from "../../common/coachSystems.ts";
+import {
+	DEF_SCHEME_DESCRIPTIONS,
+	DEF_SCHEME_NAMES,
+	DEF_SCHEMES,
+} from "../../common/shotProfiles.ts";
 import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
 
@@ -77,6 +82,7 @@ const OffEmphasis = ({
 	coachSystem,
 	mix,
 	recommendation,
+	defScheme,
 }: View<"offEmphasis">) => {
 	useTitleBar({ title: `${season} Offensive Emphasis` });
 	const [draft, setDraft] = useState<Emphasis>(e);
@@ -95,6 +101,44 @@ const OffEmphasis = ({
 				little, while leaning into its weaknesses hurts a little.{" "}
 				<a href={helpers.leagueUrl(["staff_report"])}>Staff Report</a>
 			</p>
+
+			{defScheme ? (
+				<div className="card mb-3" data-testid="def-scheme">
+					<div className="card-body">
+						<div className="d-flex flex-wrap align-items-center gap-2">
+							<label className="fw-bold" htmlFor="def-scheme-select">
+								Defensive scheme
+							</label>
+							<select
+								id="def-scheme-select"
+								className="form-select form-select-sm"
+								style={{ width: "auto" }}
+								value={defScheme.value ?? ""}
+								onChange={(event) => {
+									const v = event.currentTarget.value;
+									toWorker("main", "updateDefScheme", {
+										defScheme: v === "" ? undefined : v,
+									});
+								}}
+							>
+								<option value="">
+									Auto (coach: {DEF_SCHEME_NAMES[defScheme.auto]})
+								</option>
+								{DEF_SCHEMES.map((s) => (
+									<option key={s} value={s}>
+										{DEF_SCHEME_NAMES[s]}
+									</option>
+								))}
+							</select>
+						</div>
+						<div className="small text-body-secondary mt-2">
+							{DEF_SCHEME_DESCRIPTIONS[defScheme.value ?? defScheme.auto]}{" "}
+							Shapes the shots your opponents take (each kind of shot up to
+							about 30%), on top of the head coach's defense system.
+						</div>
+					</div>
+				</div>
+			) : null}
 
 			<div className="card mb-3" data-testid="offense-mode">
 				<div className="card-body">

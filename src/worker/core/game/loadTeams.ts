@@ -39,6 +39,7 @@ import {
 	spacingThreat,
 } from "../GameSim.basketball/spacingCreation.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
+import { aiDefScheme, aiShotProfile } from "../../../common/shotProfiles.ts";
 import {
 	aiShotPlans,
 	seasonDriftMults,
@@ -663,6 +664,39 @@ export const processTeam = async (
 				p2.shotPlan = plan;
 				p2.shotDrift = drift.get(p2.id) ?? 1;
 			}
+		}
+
+		// Shot Profiles & Defensive Schemes (common/shotProfiles.ts): each player's shot profile (the user's own, else the coach's from his
+		// ratings) and the team's defensive scheme (the user's own, else the coach's from the roster)
+		if (
+			!allStarGame &&
+			nativeFeatureEnabled("shotProfiles", (key) => g.get(key as any))
+		) {
+			const userTeam = g.get("userTids").includes(t.id) && !g.get("spectator");
+			const playersByPid = new Map(players.map((p) => [p.pid, p]));
+			for (const p2 of t.player) {
+				const c = p2.compositeRating;
+				p2.shotProfile =
+					(userTeam ? playersByPid.get(p2.id)?.shotProfile : undefined) ??
+					aiShotProfile({
+						three: c.shootingThreePointer,
+						mid: c.shootingMidRange,
+						rim: c.shootingAtRim,
+						post: c.shootingLowPost,
+					});
+			}
+			const userScheme = userTeam
+				? (await idb.cache.teams.get(t.id))?.defScheme
+				: undefined;
+			t.defScheme =
+				userScheme ??
+				aiDefScheme(
+					t.player
+						.filter((p2: any) => !p2.injured)
+						.toSorted((a: any, b: any) => b.valueNoPot - a.valueNoPot)
+						.map((p2: any) => playersByPid.get(p2.id)?.ratings.at(-1))
+						.filter((r: any) => r !== undefined),
+				);
 		}
 
 		// Load, Fatigue & Venue (basketball): the crowd (hype), where the team is from (travel) and 3 games in 4 nights, see

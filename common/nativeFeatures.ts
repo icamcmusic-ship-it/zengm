@@ -673,6 +673,16 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "shotProfiles",
+		key: "featureShotProfiles",
+		name: "Shot Profiles & Defensive Schemes",
+		description:
+			"Each player gets a shot profile on top of his More/Fewer shots plan (Normal, Hunt threes, Attack the rim, Stay out of the post, Mid-range green light): bounded tilts (at most ±30%) on the kinds of shots he takes, with a small make penalty when it goes against his ratings. Set it next to the shots plan on the Roster page; AI coaches pick from ratings. Each team also plays a defensive scheme (Standard, Drop, ICE, Blitz / hedge, Zone, Run them off the line) that shapes the opponent's shot mix, a few makes, turnovers and rebounding; set it on the Offense tab of Coaching Staff or leave it to the coach, who picks from the roster.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "advStats",
 		key: "advStats",
 		core: true,

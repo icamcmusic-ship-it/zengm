@@ -2,6 +2,16 @@ import { schoolDistanceKm } from "../../../common/college/geography.ts";
 import { g, helpers } from "../../util/index.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import {
+	type DefScheme,
+	PROFILE_LEAGUE_MAKE,
+	PROFILE_MIX,
+	profileMakePenalty,
+	SCHEME_EFFECTS,
+	scaleTilt,
+	schemeMatchupScale,
+	type ShotProfile,
+} from "../../../common/shotProfiles.ts";
+import {
 	SIM_FIX_EXPANDED_SYNERGY_CUTOFFS,
 	SIM_FIX_LOW_POST,
 	SIM_FIX_OFF_FOUL,
@@ -326,6 +336,8 @@ type PlayerGameSim = {
 	shotPlan?: number;
 	shotDrift?: number;
 	ss?: ShotShareState;
+	// Shot Profiles & Defensive Schemes (loadTeams): his shot profile. Undefined when off
+	shotProfile?: ShotProfile;
 };
 type TeamGameSim = {
 	id: number;
@@ -334,6 +346,8 @@ type TeamGameSim = {
 	coachSim?: CoachSim;
 	// Offensive Emphasis (featureOffEmphasis, common/offEmphasis.ts), set by worker/core/offEmphasis applyOffEmphasis. Undefined: no effect
 	offEmphasis?: EmphasisSim;
+	// Shot Profiles & Defensive Schemes (loadTeams): the team's defensive scheme. Undefined when off
+	defScheme?: DefScheme;
 	stat: any;
 	compositeRating: any;
 	player: PlayerGameSim[];
@@ -687,6 +701,8 @@ class GameSim extends GameSimBase {
 	playTypes = false;
 	// Offensive Emphasis (only with Realistic Play Types): each team's play-type dials. Off: neutral, never read
 	offEmph = false;
+	// Shot Profiles & Defensive Schemes (featureShotProfiles, common/shotProfiles.ts)
+	shotProfiles = false;
 	oe: [EmphasisSim, EmphasisSim] = [NEUTRAL_EMPHASIS_SIM, NEUTRAL_EMPHASIS_SIM];
 	quickPutback = false;
 	earlyTimeouts: [number, number] = [0, 0];
@@ -969,6 +985,10 @@ class GameSim extends GameSimBase {
 				this.adv.emphasis = this.oe;
 			}
 		}
+		this.shotProfiles =
+			!allStarGame &&
+			nativeFeatureEnabled("shotProfiles", (key) => g.get(key as any)) &&
+			(teams[0].defScheme !== undefined || teams[1].defScheme !== undefined);
 		if (g.get("customShotClock")) {
 			this.shotClockFull = helpers.bound(
 				Math.round(g.get("shotClockLength")),
@@ -4628,6 +4648,10 @@ class GameSim extends GameSimBase {
 		if (this.realisticTurnovers) {
 			prob2 *= TURNOVERS.tovMult;
 		}
+		// Shot Profiles & Defensive Schemes: the blitz forces turnovers
+		if (this.shotProfiles) {
+			prob2 *= SCHEME_EFFECTS[this.team[this.d].defScheme ?? "standard"].tov;
+		}
 		return boundProb(
 			this.traitsOn ? prob2 * this.traitTurnoverMult(this.o) : prob2,
 		);
@@ -4747,6 +4771,85 @@ class GameSim extends GameSimBase {
 		);
 	}
 
+	// Shot Profiles & Defensive Schemes: the multipliers on a shooter's shot-type weights from his profile and the defense's scheme (the
+	// tilt away from threes or the rim scaled by how quick his defender is). Bounded: each factor is within ±30%
+	shotProfileMix(
+		p: PlayerGameSim,
+		selfCreated: boolean | undefined,
+		passer: PlayerGameSim | undefined,
+		defender: PlayerGameSim | undefined,
+	) {
+		const prof = PROFILE_MIX[p.shotProfile ?? "normal"];
+		const scheme = this.team[this.d].defScheme ?? "standard";
+		const eff = SCHEME_EFFECTS[scheme];
+		const self = selfCreated ?? passer === undefined;
+		const mix = self ? eff.self : eff.other;
+		const scale = schemeMatchupScale(
+			defender?.compositeRating.defensePerimeter,
+		);
+		let three = scaleTilt(mix.three, scale);
+		let mid = mix.mid;
+		if (scheme === "blitz" && self && this.isOnCourtStar(p)) {
+			three *= eff.starThree;
+			mid *= eff.starMid;
+		}
+		return {
+			three: prof.three * three,
+			mid: prof.mid * mid,
+			rim: prof.rim * scaleTilt(mix.rim, scale),
+			post: prof.post * mix.post,
+		};
+	}
+
+	// The offense's best scorer on the court (highest usage)
+	isOnCourtStar(p: PlayerGameSim) {
+		let best: PlayerGameSim | undefined;
+		for (const q of this.playersOnCourt[this.o]) {
+			if (!best || q.compositeRating.usage > best.compositeRating.usage) {
+				best = q;
+			}
+		}
+		return best === p;
+	}
+
+	shotProfileMake(
+		p: PlayerGameSim,
+		type: ShotType,
+		selfCreated: boolean | undefined,
+	) {
+		const key =
+			type === "threePointer"
+				? "three"
+				: type === "midRange"
+					? "mid"
+					: type === "atRim"
+						? "rim"
+						: type === "lowPost"
+							? "post"
+							: undefined;
+		if (!key) {
+			return 0;
+		}
+		const c = p.compositeRating;
+		let delta =
+			PROFILE_LEAGUE_MAKE -
+			profileMakePenalty(p.shotProfile, key, {
+				three: c.shootingThreePointer,
+				mid: c.shootingMidRange,
+				rim: c.shootingAtRim,
+				post: c.shootingLowPost,
+			});
+		const eff = SCHEME_EFFECTS[this.team[this.d].defScheme ?? "standard"];
+		if (key === "three") {
+			delta += selfCreated ? eff.makeThreeSelf : eff.makeThreeOther;
+		} else if (key === "mid") {
+			delta += eff.makeMid;
+		} else if (key === "rim") {
+			delta += eff.makeRim;
+		}
+		return delta;
+	}
+
 	getShotInfo({
 		currentFatigue,
 		lateGamePutBack,
@@ -4806,6 +4909,10 @@ class GameSim extends GameSimBase {
 				pullUpTilt = MATCHUP.dropPullUpSelect;
 			}
 		}
+		// Shot Profiles & Defensive Schemes: his profile and the defense's scheme, as multipliers on the shot-type weights (all 1 when off)
+		const sp = this.shotProfiles
+			? this.shotProfileMix(p, selfCreated, passer, defender)
+			: undefined;
 
 		let shootingThreePointerScaled = p.compositeRating.shootingThreePointer;
 
@@ -4924,7 +5031,8 @@ class GameSim extends GameSimBase {
 										? this.oe[this.o].selfThree
 										: this.oe[this.o].three
 									: 1)
-							: 1),
+							: 1) *
+						(sp ? sp.three : 1),
 				)
 		) {
 			// Three pointer
@@ -4971,7 +5079,8 @@ class GameSim extends GameSimBase {
 				(this.coachSys ? cso.mid * csd.dMid : 1) *
 				pullUpTilt *
 				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
-				(this.offEmph ? this.oe[this.o].mid : 1);
+				(this.offEmph ? this.oe[this.o].mid : 1) *
+				(sp ? sp.mid : 1);
 			const m2 =
 				(this.coachSys ? cso.rim * csd.dRim : 1) *
 				(sc
@@ -4984,14 +5093,16 @@ class GameSim extends GameSimBase {
 				driveTilt *
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				(this.offEmph ? this.oe[this.o].rim : 1) *
-				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1);
+				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1) *
+				(sp ? sp.rim : 1);
 			const m3 =
 				(this.coachSys ? cso.post * csd.dPost : 1) *
 				(this.playTypes ? PLAY_TYPES.post : 1) *
 				(this.offEmph ? this.oe[this.o].post : 1) *
 				postTilt *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.post : 1) *
-				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1);
+				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
+				(sp ? sp.post : 1);
 			// Synergy makes easy shots either more likely or less likely
 			const synergy =
 				this.synergyFactor *
@@ -5245,6 +5356,11 @@ class GameSim extends GameSimBase {
 				this.team[this.d].coachSim?.def === "drop"
 			) {
 				probMake += MATCHUP.dropPullUpMake;
+			}
+
+			// Shot Profiles & Defensive Schemes: forcing a profile against his ratings, and what the scheme gives up or takes away
+			if (sp && !putBack && !tipInFromOutOfBounds) {
+				probMake += this.shotProfileMake(p, type, selfCreated);
 			}
 
 			// Spacing & Shot Creation: room to drive and post up
@@ -6788,7 +6904,10 @@ class GameSim extends GameSimBase {
 			(0.75 * (2 + dReb)) /
 			(this.ga.orbFactor *
 				(2 + oReb) *
-				(this.coachSys ? this.cs[this.o].orb * this.cs[this.d].orbAllowed : 1));
+				(this.coachSys ? this.cs[this.o].orb * this.cs[this.d].orbAllowed : 1) *
+				(this.shotProfiles
+					? SCHEME_EFFECTS[this.team[this.d].defScheme ?? "standard"].orb
+					: 1));
 		// Game Sim Fixes: fewer offensive rebounds off a missed free throw (the defense has inside position)
 		if (afterFt && this.simFixes) {
 			probDrb = 1 - SIM_FIX_FT_ORB * (1 - probDrb);

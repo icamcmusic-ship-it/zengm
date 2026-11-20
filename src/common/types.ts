@@ -1646,6 +1646,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	// Shot Share Model (basketball): the user's game plan for him, -1 Fewer shots, 1 More shots (missing: Normal). Reset when he changes
 	// teams, like ptModifier
 	shotPlan?: -1 | 1;
+	// Shot Profiles & Defensive Schemes (basketball): the user's shot profile for him (missing: the coach picks). Reset when he changes teams
+	shotProfile?: import("./shotProfiles.ts").ShotProfile;
 	ratings: NonEmptyArray<PlayerRatings>;
 
 	// Basketball only: the stored random components of the player traits (see common/playerTraits). Created at player generation and lazily; scores are derived from these plus ratings.
@@ -2480,6 +2482,8 @@ export type Team = {
 	staffDepth?: import("./staffDepth/types.ts").StaffDepthTeam;
 	// Offensive Emphasis (League Extra): the team's play-type dials and who sets them (common/offEmphasis.ts)
 	offEmphasis?: import("./offEmphasis.ts").OffEmphasisTeam;
+	// Shot Profiles & Defensive Schemes (League Extra): the user's defensive scheme (missing: the coach picks from the roster)
+	defScheme?: import("./shotProfiles.ts").DefScheme;
 	// Scouting Director & Regions: the scouting department's careers (every team)
 	scoutCareer?: import("./staffDepth/types.ts").ScoutCareerTeam;
 	depth?:

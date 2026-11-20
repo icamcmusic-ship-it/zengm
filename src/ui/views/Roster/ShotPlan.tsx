@@ -2,6 +2,12 @@ import { toWorker } from "../../util/toWorker.ts";
 import type { View } from "../../../common/types.ts";
 import { showNotification } from "../../util/showNotification.ts";
 import type { CSSProperties } from "react";
+import {
+	SHOT_PROFILE_ABBREVS,
+	SHOT_PROFILE_NAMES,
+	SHOT_PROFILES,
+	type ShotProfile,
+} from "../../../common/shotProfiles.ts";
 
 type Player = View<"roster">["players"][number];
 
@@ -85,3 +91,48 @@ const ShotPlan = ({ p, userTid }: { p: Player; userTid: number }) => {
 };
 
 export default ShotPlan;
+
+// Shot Profiles & Defensive Schemes: the kinds of shots he looks for (missing: the coach picks from his ratings)
+export const ShotProfileSelect = ({
+	p,
+	userTid,
+}: {
+	p: Player;
+	userTid: number;
+}) => {
+	const value = (p as { shotProfile?: ShotProfile }).shotProfile ?? "";
+	return (
+		<select
+			className="form-select pt-modifier-select"
+			value={value}
+			onChange={async (event) => {
+				if (p.tid !== userTid) {
+					return;
+				}
+				const v = event.currentTarget.value;
+				try {
+					await toWorker("main", "updateShotProfile", {
+						pid: p.pid,
+						shotProfile: v === "" ? undefined : v,
+					});
+				} catch (error) {
+					showNotification({
+						type: "error",
+						text: `Error updating the shot profile: ${error.message}`,
+					});
+					throw error;
+				}
+			}}
+			style={{ width: "auto" }}
+			aria-label="Shot profile"
+			title={value === "" ? "Coach's pick" : SHOT_PROFILE_NAMES[value]}
+		>
+			<option value="">Auto</option>
+			{SHOT_PROFILES.map((sp) => (
+				<option key={sp} value={sp} title={SHOT_PROFILE_NAMES[sp]}>
+					{SHOT_PROFILE_ABBREVS[sp]}
+				</option>
+			))}
+		</select>
+	);
+};

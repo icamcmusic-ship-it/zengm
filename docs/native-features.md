@@ -1270,6 +1270,25 @@ season). Never for an edited face. Measured over 3,000 seeds:
 
 - **Known limits:** P&R ball handler PPP a little above the NBA range (assisted self-created twos get the pass bonus), and its frequency at the top of it. The sim still has no screens, so P&R vs isolation, and spot-up vs off screen vs handoff, are the classifier's reading of who passed to whom and the players' roles.
 
+### Shot profiles & defensive schemes
+
+- **Setting:** `featureShotProfiles` (League Extras → Game Simulation, "Shot Profiles & Defensive Schemes"). On for new leagues, off for existing leagues. Off: loadTeams sets nothing, the sim's `shotProfiles` flag is false and every hook is a `? : 1` / `? : 0` ternary, so games are exactly as before (`outcomeInvariance.test.ts` unchanged). No random draws are added when on either. Code: `src/common/shotProfiles.ts` (tables, AI choices, norms), `game/loadTeams.ts` (each player's `shotProfile`, the team's `defScheme`), GameSim (`shotProfileMix`, `shotProfileMake`, `probTov`, the rebound chance), the Roster page's _Shots_ column (`ShotProfileSelect` next to the More/Fewer plan) and a _Defensive scheme_ card on Coaching Staff → Offense. Player field `shotProfile` (reset on trade / release like `shotPlan`), team field `defScheme`; missing means the coach picks.
+- **Shot profile (per player):** Normal, Hunt threes, Attack the rim, Stay out of the post, Mid-range green light. Multipliers on his three-point chance and two-point mid / rim / post weights, each within ±30% (`PROFILE_MIX`). Fit cost: on the shot type a profile pushes, a make penalty of 0.06 × (0.5 − his composite) when below 0.5, capped at 2.5 points. A league calibration of −0.7 points on every shot (`PROFILE_LEAGUE_MAKE`) keeps scoring about where it was (players taking more of their best shots is otherwise worth ~1.5 ORtg). AI coaches (and the user's players on Auto) pick from z-scores of the shooting composites (`aiShotProfile`): in generated leagues ~43% Normal, 21% Attack the rim, 16% Stay out of the post, 13% Hunt threes, 7% Mid-range.
+- **Defensive scheme (per team):** Standard, Drop, ICE, Blitz / hedge, Zone, Run them off the line (`SCHEME_EFFECTS`), on top of the coach's defense system. Multipliers on the offense's shot mix, separately for self-created shots and shots off a pass, small make deltas, and a turnover (blitz ×1.06) and offensive-rebound (zone ×1.04 on the offense's odds) factor. Matchup-aware: the tilt on threes and rim attempts is scaled by the shooter's defender's perimeter defense (0.75–1.25×), and the blitz's cut on pull-ups (threes ×0.75, mid ×0.8) only hits the offense's highest-usage player on the floor. The AI picks from its top 8 healthy players (`aiDefScheme`: rim protector, big mobility, guard quickness, athleticism, defensive IQ against league norms); in generated leagues roughly drop 32%, run-off 20%, zone 17%, standard 13%, blitz 12%, ICE 7%.
+- **Measured (30 seeds × 3 games, new-league defaults, both teams forced into each scheme; share of FGA, putbacks excluded; ORtg per 100):**
+
+  | scheme   | 3PA  | mid  | rim  | post | ORtg  | TOV% | ORB% |
+  | -------- | ---- | ---- | ---- | ---- | ----- | ---- | ---- |
+  | off      | 28.7 | 37.4 | 29.7 | 4.2  | 102.1 | 13.9 | 23.3 |
+  | standard | 30.4 | 34.4 | 31.3 | 3.9  | 102.6 | 14.2 | 24.7 |
+  | drop     | 31.4 | 36.5 | 28.2 | 3.9  | 102.1 | 13.3 | 24.2 |
+  | ICE      | 27.6 | 38.9 | 29.6 | 3.9  | 101.1 | 13.7 | 24.2 |
+  | blitz    | 29.7 | 32.7 | 33.6 | 3.9  | 102.8 | 14.6 | 24.2 |
+  | zone     | 35.5 | 35.4 | 25.3 | 3.8  | 103.9 | 13.7 | 27.5 |
+  | run-off  | 26.1 | 35.7 | 34.3 | 4.0  | 103.3 | 14.2 | 24.5 |
+
+  ("standard" vs "off" is the profiles' effect.) Blitz: 3P% on threes off a pass 34.5 vs 33.4 standard. ORtg noise is about ±0.8.
+
 ### Offensive emphasis
 
 - **Setting:** _Always on in every league (core; see Core features). Before:_ `featureOffEmphasis` (League Extras → Game Simulation, "Offensive Emphasis"). On for new leagues, off for existing leagues. Needs Realistic Play Types (and what that needs: the realistic possession model and Spacing & Shot Creation); without them nothing runs. Off: no team gets dials, the sim reads none and draws no extra random numbers, so games are exactly as before (`outcomeInvariance.test.ts` unchanged; `offEmphasis.test.ts`: a neutral emphasis plays the same box scores as none, so the hooks draw nothing). Code: `src/common/offEmphasis.ts` (dials, presets, strengths, fit, sim multipliers, auto choice, report line), `src/worker/core/offEmphasis/index.ts` (league side: weekly refresh, `applyOffEmphasis` before each day's games in `game/play.ts`, the user's actions, the page), GameSim hooks (`this.oe`: `maybeSelfCreate`, the three-point and two-point shot selection, transition chance and half-court time, the make probability) and the classifier's tilts (`AdvTracker.emphasis`), `ui/views/OffEmphasis.tsx`, the Staff Report's _Offense_ card. Calibration: `OE_CAL=1 offEmphasis.script.test.ts` (and `OE_NORMS=1` for the built-in strength norms).

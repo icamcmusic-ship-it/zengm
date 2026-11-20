@@ -257,6 +257,7 @@ export default defineView({
 				"injury",
 				"ptModifier",
 				"shotPlan",
+				"shotProfile",
 				"watch",
 				"untradable",
 				"hof",
