@@ -18,6 +18,81 @@ import {
 } from "../core/awards/keyStats.ts";
 import { awardActive } from "../core/awards/trackingAwards.ts";
 import { getPosByGpF } from "../core/player/getPosByGpF.ts";
+import {
+	COACH_EXEC_AWARD_KEYS,
+	COACH_EXEC_AWARD_NAMES,
+	COACH_OF_THE_YEAR,
+	type CoachExecAwardKind,
+} from "../../common/coachExecAwards.ts";
+import {
+	coachExecAwardAvailable,
+	getExecAwards,
+} from "../core/awards/coachExecAwards.ts";
+import { getCoachAwards } from "../core/staff/data.ts";
+import getPlayoffsByConf from "../core/season/getPlayoffsByConf.ts";
+
+export type CoachExecHistoryRow = {
+	key: string;
+	season: number;
+	name: string;
+	// Coach of the Year: the coach. Executive of the Year: the AI GM, if any
+	cid?: number;
+	gmid?: number;
+	user: boolean;
+	tid: number;
+	abbrev: string;
+	region: string;
+	record: string | undefined;
+	// Playoff result, like "league champs", empty if it missed them
+	playoffs: string;
+};
+
+// Coach of the Year or Executive of the Year winners, newest first
+const getCoachExecHistory = async (
+	kind: CoachExecAwardKind,
+): Promise<CoachExecHistoryRow[]> => {
+	const winners =
+		kind === "coy"
+			? (await getCoachAwards(COACH_OF_THE_YEAR)).map((a) => ({
+					...a,
+					gmid: undefined,
+					user: false,
+				}))
+			: (await getExecAwards()).map((a) => ({ ...a, cid: undefined }));
+	const rows: CoachExecHistoryRow[] = [];
+	for (const a of winners) {
+		const ts = await idb.merged.teamSeasons.getByTidSeason(a.tid, a.season);
+		rows.push({
+			key: `${a.season}-${a.tid}-${a.cid ?? a.gmid ?? "user"}`,
+			season: a.season,
+			name: a.name,
+			cid: a.cid,
+			gmid: a.gmid,
+			user: a.user,
+			tid: a.tid,
+			abbrev: ts?.abbrev ?? g.get("teamInfoCache")[a.tid]?.abbrev ?? "???",
+			region: ts?.region ?? g.get("teamInfoCache")[a.tid]?.region ?? "",
+			record: ts
+				? helpers.formatRecord({
+						won: ts.won,
+						lost: ts.lost,
+						tied: ts.tied,
+						otl: ts.otl,
+					})
+				: undefined,
+			playoffs: ts
+				? helpers.upperCaseFirstLetter(
+						helpers.roundsWonText({
+							playoffRoundsWon: ts.playoffRoundsWon,
+							numPlayoffRounds: g.get("numGamesPlayoffSeries", a.season).length,
+							playoffsByConf: await getPlayoffsByConf(a.season),
+						}),
+					)
+				: "",
+		});
+	}
+	return rows.sort((a, b) => b.season - a.season);
+};
 
 type StoredAward = Awards["awards"][number];
 
@@ -74,6 +149,17 @@ export default defineView({
 				}
 			}
 		}
+		// Coach of the Year and Executive of the Year (built in), if given in this league
+		const coachExecHistories = new Map<string, CoachExecHistoryRow[]>();
+		for (const kind of ["coy", "eoy"] as const) {
+			const history = await getCoachExecHistory(kind);
+			if (history.length > 0 || coachExecAwardAvailable(kind)) {
+				const key = COACH_EXEC_AWARD_KEYS[kind];
+				coachExecHistories.set(key, history);
+				names.set(key, COACH_EXEC_AWARD_NAMES[kind]);
+			}
+		}
+
 		const awardOptions: DropdownOption[] = Array.from(
 			names,
 			([key, label]) => ({ key, label }),
@@ -308,7 +394,12 @@ export default defineView({
 			awardName: shortName !== undefined ? names.get(shortName) : undefined,
 			awardOptions,
 			formulaChanged: formulas.size > 1,
-			hasHistory: storedShortNames.size > 0,
+			// Coach of the Year or Executive of the Year: its own table
+			coachExecRows:
+				shortName !== undefined ? coachExecHistories.get(shortName) : undefined,
+			hasHistory:
+				storedShortNames.size > 0 ||
+				[...coachExecHistories.values()].some((rows) => rows.length > 0),
 			keyStats,
 			mip: !!latestAward.mip,
 			numTeams: latestAward.numTeams,

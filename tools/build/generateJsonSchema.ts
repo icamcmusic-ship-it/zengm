@@ -1803,6 +1803,18 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 						maximum: 1,
 					},
 					awards: zodJsonSchema(awardSettingsSchema),
+					// Coach & Executive of the Year formulas (src/common/coachExecAwards.ts)
+					coachExecAwardFormulas: {
+						type: "object",
+						properties: {
+							coy: {
+								type: "string",
+							},
+							eoy: {
+								type: "string",
+							},
+						},
+					},
 				},
 			},
 			games: {

@@ -32,6 +32,8 @@ import name from "../player/name.ts";
 import { getAllGmWeights } from "../gm/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { getExpectedWinps } from "../college/expectations.ts";
+import { awardCoachOfTheYear } from "../awards/coachExecAwards.ts";
+import { COACH_OF_THE_YEAR } from "../../../common/coachExecAwards.ts";
 import { collegeFireProb, runCollegeCarousel } from "./collegeCarousel.ts";
 import {
 	activeCoachRoles,
@@ -814,64 +816,10 @@ const recordSeason = async () => {
 	}
 };
 
-export const COACH_OF_THE_YEAR = "Coach of the Year";
+export { COACH_OF_THE_YEAR };
 
-// Best record, with a bonus for improvement over last season and for playoff success
-export const coachOfTheYear = async () => {
-	const season = g.get("season");
-	const heads = (await idb.cache.coaches.getAll()).filter(
-		(c) => c.tid >= 0 && c.role === "head",
-	);
-	const collegeExpected = isCollege() ? await getExpectedWinps() : undefined;
-	let best: Coach | undefined;
-	let bestScore = -Infinity;
-	for (const c of heads) {
-		const row = c.stats.find((r) => r.season === season && r.tid === c.tid);
-		if (!row || row.won + row.lost === 0) {
-			continue;
-		}
-		const prev = (
-			await idb.merged.teamSeasons.getAll({
-				tid: c.tid,
-				seasons: [season - 1, season - 1],
-			})
-		)[0];
-		const prevPct = prev && prev.won + prev.lost > 0 ? winPct(prev) : 0.5;
-		const pct = winPct(row);
-		// College mode: against what the program's prestige expects, and the national tournament counts more
-		const score = collegeExpected
-			? pct -
-				(collegeExpected.get(c.tid) ?? 0.5) +
-				0.3 * (pct - prevPct) +
-				0.05 * Math.max(0, row.playoffRoundsWon + 1) +
-				gauss(0, 0.01)
-			: pct +
-				0.6 * (pct - prevPct) +
-				0.02 * row.playoffRoundsWon +
-				gauss(0, 0.01);
-		if (score > bestScore) {
-			bestScore = score;
-			best = c;
-		}
-	}
-	if (
-		best &&
-		!best.awards.some(
-			(a) => a.season === season && a.type === COACH_OF_THE_YEAR,
-		)
-	) {
-		best.awards.push({ season, type: COACH_OF_THE_YEAR });
-		await idb.cache.coaches.put(best);
-		await logEvent({
-			type: "award",
-			text: `${coachLink(best)} of ${teamLink(best.tid)} won the ${COACH_OF_THE_YEAR} award.`,
-			showNotification: false,
-			tids: [best.tid],
-			score: 10,
-		});
-	}
-	return best;
-};
+// Coach of the Year: scored by its Award Settings formula (core/awards/coachExecAwards.ts), deterministic
+export const coachOfTheYear = awardCoachOfTheYear;
 
 const age = (c: CoachWithoutKey) => g.get("season") - c.born.year;
 

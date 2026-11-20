@@ -31,6 +31,7 @@ import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts"
 import { env } from "../../util/env.ts";
 import { orderTeams } from "../../util/orderTeams.ts";
 import { doAwards } from "../awards/doAwards.ts";
+import { awardExecOfTheYear } from "../awards/coachExecAwards.ts";
 import * as staff from "../staff/index.ts";
 import * as gm from "../gm/index.ts";
 import * as college from "../college/index.ts";
@@ -349,6 +350,10 @@ const newPhaseBeforeDraft = async (
 	if (college.isCollege()) {
 		await college.archiveSeason();
 	}
+
+	// Executive of the Year, before the GM carousel so the GM who ran the season still runs the team (Coach of the Year is given in
+	// staff.runOffseason, once the coaches' season records are written)
+	await awardExecOfTheYear();
 
 	// AI GM records, firings and the GM carousel (before the coaching market, so new GMs run it)
 	await gm.runOffseason();

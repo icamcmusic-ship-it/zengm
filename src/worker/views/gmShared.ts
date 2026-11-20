@@ -8,6 +8,7 @@ import {
 } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
+import { EXEC_OF_THE_YEAR } from "../../common/coachExecAwards.ts";
 
 const abbrev = (tid: number) => g.get("teamInfoCache")[tid]?.abbrev ?? "";
 
@@ -64,6 +65,11 @@ export const formatGm = async (gm: Gm, tid?: number) => {
 		careerTitles: gm.seasons.filter((row) =>
 			isTitle(row.season, row.playoffRoundsWon),
 		).length,
+		// Coach & Executive of the Year: seasons he won Executive of the Year
+		execAwards: (gm.awards ?? [])
+			.filter((a) => a.type === EXEC_OF_THE_YEAR)
+			.map((a) => a.season)
+			.sort((a, b) => a - b),
 		expWon: gm.expWon,
 		seasonWon,
 		seasonLost,

@@ -75,4 +75,6 @@ export type Gm = {
 	// Last computed job security score (negative is bad), after the playoffs
 	hotSeat?: number;
 	retiredYear?: number;
+	// Coach & Executive of the Year (League Extra): Executive of the Year awards he won (missing in older leagues)
+	awards?: { season: number; type: string; tid: number }[];
 };

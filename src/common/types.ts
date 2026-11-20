@@ -1031,6 +1031,11 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	// Basketball only. Real coaching staff (coaches with ratings and contracts) instead of the coaching budget slider
 	coachingStaff: boolean;
 	fakeAgeProb: number;
+
+	// Coach & Executive of the Year (League Extra): custom formulas from Award Settings, undefined for the defaults
+	coachExecAwardFormulas:
+		| import("./coachExecAwards.ts").CoachExecAwardFormulas
+		| undefined;
 };
 
 type AlwaysWrap = (typeof ALWAYS_WRAP)[number];
@@ -2737,6 +2742,9 @@ export type TeamSeasonWithoutKey = {
 	// cash change = revenue - expenses - ownerDistributions
 	ownerDistributions?: number;
 	payrollEndOfSeason: number;
+	// Coach & Executive of the Year (League Extra): Executive of the Year won by a front office with no AI GM (the user's team, which
+	// has no GM object). An AI GM's award is stored on the GM instead (Gm.awards)
+	execOfTheYear?: { name: string; user: boolean };
 	ownerMood?: OwnerMood;
 	// Power rankings snapshots taken about once a week during the regular season, used for movement arrows and the rank-over-time chart
 	powerRankHistory?: {

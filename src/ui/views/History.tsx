@@ -214,7 +214,15 @@ const History = (props: View<"history">) => {
 		);
 	}
 
-	const { awards, champ, college, confs, retiredPlayers, retiredStat } = props;
+	const {
+		awards,
+		champ,
+		coachExecAwards,
+		college,
+		confs,
+		retiredPlayers,
+		retiredStat,
+	} = props;
 
 	const { teamAwards1, teamAwards2 } = splitTeamAwards(awards.teamAwards);
 
@@ -344,40 +352,6 @@ const History = (props: View<"history">) => {
 											</div>
 										</>
 									) : null}
-									<h2>Coach of the Year</h2>
-									<div className="mb-3">
-										{college.coachOfYear ? (
-											<span
-												className={
-													college.coachOfYear.tid === userTid
-														? "table-info"
-														: undefined
-												}
-											>
-												<a
-													href={helpers.leagueUrl([
-														"coach",
-														college.coachOfYear.cid,
-													])}
-												>
-													{college.coachOfYear.name}
-												</a>{" "}
-												(
-												<a
-													href={helpers.leagueUrl([
-														"roster",
-														`${college.coachOfYear.abbrev}_${college.coachOfYear.tid}`,
-														season,
-													])}
-												>
-													{college.coachOfYear.region}
-												</a>
-												)
-											</span>
-										) : (
-											NO_WINNER
-										)}
-									</div>
 								</>
 							) : null}
 							{awards.individualAwards.map((award, i) => {
@@ -399,6 +373,82 @@ const History = (props: View<"history">) => {
 									</React.Fragment>
 								);
 							})}
+							{coachExecAwards.showCoy ? (
+								<>
+									<h2>Coach of the Year</h2>
+									<div className="mb-3">
+										{coachExecAwards.coy ? (
+											<span
+												className={
+													coachExecAwards.coy.tid === userTid
+														? "table-info"
+														: undefined
+												}
+											>
+												<a
+													href={helpers.leagueUrl([
+														"coach",
+														coachExecAwards.coy.cid,
+													])}
+												>
+													{coachExecAwards.coy.name}
+												</a>{" "}
+												(
+												<a
+													href={helpers.leagueUrl([
+														"roster",
+														`${coachExecAwards.coy.abbrev}_${coachExecAwards.coy.tid}`,
+														season,
+													])}
+												>
+													{coachExecAwards.coy.region}
+												</a>
+												)
+											</span>
+										) : (
+											NO_WINNER
+										)}
+									</div>
+								</>
+							) : null}
+							{coachExecAwards.showEoy ? (
+								<>
+									<h2>Executive of the Year</h2>
+									<div className="mb-3">
+										{coachExecAwards.eoy ? (
+											<span
+												className={
+													coachExecAwards.eoy.user ||
+													coachExecAwards.eoy.tid === userTid
+														? "table-info"
+														: undefined
+												}
+											>
+												{coachExecAwards.eoy.gmid !== undefined ? (
+													<a href={helpers.leagueUrl(["front_offices"])}>
+														{coachExecAwards.eoy.name}
+													</a>
+												) : (
+													coachExecAwards.eoy.name
+												)}{" "}
+												(
+												<a
+													href={helpers.leagueUrl([
+														"roster",
+														`${coachExecAwards.eoy.abbrev}_${coachExecAwards.eoy.tid}`,
+														season,
+													])}
+												>
+													{coachExecAwards.eoy.region}
+												</a>
+												)
+											</span>
+										) : (
+											NO_WINNER
+										)}
+									</div>
+								</>
+							) : null}
 						</div>
 					</div>
 				</div>

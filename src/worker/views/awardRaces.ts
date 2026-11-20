@@ -7,6 +7,7 @@ import { team } from "../core/index.ts";
 import { PHASE } from "../../common/constants.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { awardWinProbs } from "../core/seasonOdds/awardOdds.ts";
+import { getCoachExecRaces } from "../core/awards/coachExecAwards.ts";
 
 export default defineView({
 	id: "awardRaces",
@@ -33,6 +34,7 @@ export default defineView({
 			// Award race probabilities (basketball, current regular season), keyed like getAwardKey in the UI
 			let awardOdds: Record<string, Record<number, number>> | undefined;
 			const phase = g.get("phase");
+			let fracPlayed: number | undefined;
 			if (
 				__SPORT === "basketball" &&
 				featureOn("seasonOdds") &&
@@ -48,7 +50,7 @@ export default defineView({
 				);
 				const avgGp =
 					gp.length > 0 ? gp.reduce((a, b) => a + b, 0) / gp.length : 0;
-				const fracPlayed = Math.min(1, avgGp / g.get("numGames"));
+				fracPlayed = Math.min(1, avgGp / g.get("numGames"));
 				awardOdds = {};
 				for (const award of awardCandidates) {
 					if (award.numTeams !== undefined || award.statRange !== undefined) {
@@ -65,9 +67,18 @@ export default defineView({
 				}
 			}
 
+			// Coach of the Year and Executive of the Year (built in, not part of the award settings list)
+			const coachExecRaces = await getCoachExecRaces(inputs.season, {
+				oddsFor:
+					fracPlayed !== undefined
+						? (scores) => awardWinProbs({ scores, fracPlayed: fracPlayed! })
+						: undefined,
+			});
+
 			return {
 				awardOdds,
 				awardCandidates,
+				coachExecRaces,
 				confs: g.get("confs", inputs.season),
 				divs: g.get("divs", inputs.season),
 				season: inputs.season,
