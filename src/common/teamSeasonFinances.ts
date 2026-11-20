@@ -1,6 +1,7 @@
 // Season totals of a team's books (thousands of dollars). Expenses include the Front Office Budget's Analytics and Travel & Sports
 // Science departments, which are recorded in teamSeason.frontOffice rather than teamSeason.expenses but are paid from cash like the
-// other budget items, and Owner's Office project payments (teamSeason.projectExpenses). Owner distributions (Realistic AI Economy) are not an expense: they are a draw on cash after profit, recorded in
+// other budget items, and Owner's Office project payments (teamSeason.projectExpenses, which the owner doesn't hold against the GM:
+// seasonOwnerJudgedProfit). Owner distributions (Realistic AI Economy) are not an expense: they are a draw on cash after profit, recorded in
 // teamSeason.ownerDistributions, so cash change = revenue - expenses - ownerDistributions.
 
 type SeasonBooks = {
@@ -37,3 +38,8 @@ export const seasonExpenses = (
 
 export const seasonProfit = (ts: SeasonBooks) =>
 	seasonRevenue(ts) - seasonExpenses(ts);
+
+// The profit the owner judges the GM on (owner mood, the budget meeting's profit target): Owner's Office project payments are left
+// out, because the owner approved the project and is paying for it himself. They are still an expense in seasonProfit and the books
+export const seasonOwnerJudgedProfit = (ts: SeasonBooks) =>
+	seasonProfit(ts) + (ts.projectExpenses ?? 0);

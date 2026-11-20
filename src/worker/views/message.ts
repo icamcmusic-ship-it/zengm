@@ -1,21 +1,12 @@
 import { idb } from "../db/index.ts";
 import { g, helpers, updatePlayMenu, updateStatus } from "../util/index.ts";
 import { defineView, keepType } from "../util/defineView.ts";
+import type { OwnerMood } from "../../common/types.ts";
 import getPlayoffsByConf from "../core/season/getPlayoffsByConf.ts";
 import { getRoundsWonText } from "./frivolitiesTeamSeasons.ts";
-import { seasonProfit } from "../../common/teamSeasonFinances.ts";
+import { seasonOwnerJudgedProfit } from "../../common/teamSeasonFinances.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
-import { bySport } from "../../common/sportFunctions.ts";
-
-// Same as the baseline in core/season/updateOwnerMood, for showing the owner's expectations next to the results
-const getExpectedProfit = () =>
-	(15 * g.get("salaryCap")) /
-	bySport({
-		baseball: 175000,
-		basketball: 90000,
-		football: 200000,
-		hockey: 80000,
-	});
+import { getExpectedProfit } from "../../common/ownerMood.ts";
 
 const processInputs = (params: RouteParams<"message">) => {
 	return {
@@ -90,7 +81,10 @@ export default defineView({
 					augmentedOwnerMoods = [];
 
 					for (const [i, mood] of message.ownerMoods.entries()) {
-						const season = message.year - message.ownerMoods.length + 1 + i;
+						// Old messages don't store the seasons, and assume they are consecutive
+						const season =
+							message.ownerMoodSeasons?.[i] ??
+							message.year - message.ownerMoods.length + 1 + i;
 
 						const teamSeason = await idb.merged.teamSeasons.getByTidSeason(
 							// Old messages don't include tid
@@ -100,7 +94,13 @@ export default defineView({
 
 						let seasonInfo;
 						if (teamSeason) {
-							const profit = seasonProfit(teamSeason) / 1000; // [millions of dollars]
+							// What the evaluation applied that season, stored on the team season. Older seasons fall back to recomputing it
+							// (with today's salary cap for the baseline)
+							const evaluation = teamSeason.ownerEvaluation;
+							// [millions of dollars], without Owner's Office project payments, like the owner judges it
+							const profit =
+								evaluation?.profit ??
+								seasonOwnerJudgedProfit(teamSeason) / 1000;
 
 							const roundsWonText = getRoundsWonText(
 								teamSeason,
@@ -116,7 +116,13 @@ export default defineView({
 									teamSeason.playoffRoundsWon ===
 									g.get("numGamesPlayoffSeries", teamSeason.season).length,
 								profit,
-								expectedProfit: getExpectedProfit(),
+								expectedProfit:
+									evaluation?.expectedProfit ??
+									getExpectedProfit(g.get("salaryCap")),
+								projectExpenses: (teamSeason.projectExpenses ?? 0) / 1000,
+								profitTarget: teamSeason.ownerGoals?.result
+									? teamSeason.ownerGoals.profitTarget
+									: undefined,
 								playoffRoundsWon: teamSeason.playoffRoundsWon,
 								numPlayoffRounds: g.get(
 									"numGamesPlayoffSeries",
@@ -127,15 +133,28 @@ export default defineView({
 							};
 						}
 
-						// ownerMood is cumulative, so this season's contribution is the change from last season
-						const prevMood = i > 0 ? message.ownerMoods[i - 1] : undefined;
-						const deltas = prevMood
-							? {
+						// This season's contribution: what the evaluation applied, if it was stored. Otherwise the change from last season
+						// (ownerMood is cumulative), only if that entry really is last season
+						let deltas: OwnerMood | undefined;
+						const evaluation = teamSeason?.ownerEvaluation;
+						if (evaluation) {
+							deltas = evaluation.applied
+								? { ...evaluation.cappedDeltas }
+								: { wins: 0, playoffs: 0, money: 0 };
+						} else {
+							const prevMood = i > 0 ? message.ownerMoods[i - 1] : undefined;
+							const prevSeason =
+								i > 0
+									? (message.ownerMoodSeasons?.[i - 1] ?? season - 1)
+									: undefined;
+							if (prevMood && prevSeason === season - 1) {
+								deltas = {
 									wins: mood.wins - prevMood.wins,
 									playoffs: mood.playoffs - prevMood.playoffs,
 									money: mood.money - prevMood.money,
-								}
-							: undefined;
+								};
+							}
+						}
 
 						augmentedOwnerMoods.push({
 							...mood,
