@@ -1,6 +1,8 @@
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local } from "../../util/index.ts";
+import { PLAYER } from "../../../common/constants.ts";
+import { team } from "../index.ts";
 import isUntradable from "./isUntradable.ts";
 import makeItWork, { withStartingProtections } from "./makeItWork.ts";
 import processTrade from "./processTrade.ts";
@@ -99,6 +101,53 @@ export const realisticSalaryMatchOk = async (teams: TradeTeams) => {
 		g.get("luxuryPayroll"),
 		g.get("salaryCap") / defaultGameAttributes.salaryCap,
 	);
+};
+
+// League Parity (setting): an AI-to-AI trade can't add this much team ovr to the team that was already better
+export const PARITY_MAX_OVR_GAIN = 2;
+
+const teamOvrAfter = async (
+	tid: number,
+	pidsAdd: number[],
+	pidsRemove: number[],
+) => {
+	const players = (
+		await idb.cache.players.indexGetAll("playersByTid", tid)
+	).filter((p) => !pidsRemove.includes(p.pid));
+	for (const pid of pidsAdd) {
+		const p = await idb.cache.players.get(pid);
+		if (p && p.tid !== PLAYER.STASHED) {
+			players.push(p);
+		}
+	}
+	return team.ovr(
+		players.map((p) => {
+			const r = p.ratings.at(-1)!;
+			return {
+				pid: p.pid,
+				value: p.value,
+				injury: p.injury,
+				ratings: { ovr: r.ovr, ovrs: r.ovrs, pos: r.pos },
+			};
+		}),
+	);
+};
+
+// True when the trade is fine for parity (or the setting is off)
+export const parityTradeOk = async (teams: TradeTeams) => {
+	if (!featureOn("parityBalance")) {
+		return true;
+	}
+	const [a, b] = teams;
+	const before = [
+		await teamOvrAfter(a.tid, [], []),
+		await teamOvrAfter(b.tid, [], []),
+	];
+	const better = before[0]! >= before[1]! ? 0 : 1;
+	const t = teams[better];
+	const other = teams[1 - better]!;
+	const after = await teamOvrAfter(t.tid, other.pids, t.pids);
+	return after - before[better]! < PARITY_MAX_OVR_GAIN;
 };
 
 const attempt = async (
@@ -227,6 +276,10 @@ const attempt = async (
 		if (!(await realisticSalaryMatchOk(teams))) {
 			return "unfair";
 		}
+	}
+
+	if (!(await parityTradeOk(teams))) {
+		return "unfair";
 	}
 
 	const finalTids: [number, number] = [teams[0].tid, teams[1].tid];
@@ -827,7 +880,11 @@ const betweenAiTeams = async () => {
 				if (result && "multi" in result) {
 					tradeTids = result.multi.tids;
 					await processMultiAi(result.multi, result.note);
-				} else if (result && (await realisticSalaryMatchOk(result.teams))) {
+				} else if (
+					result &&
+					(await realisticSalaryMatchOk(result.teams)) &&
+					(await parityTradeOk(result.teams))
+				) {
 					tradeTids = [result.teams[0].tid, result.teams[1].tid];
 					await processTrade(result.teams, undefined, { note: result.note });
 				}

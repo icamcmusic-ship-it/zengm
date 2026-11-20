@@ -82,6 +82,38 @@ test.skipIf(!process.env.RUN_PARITY)(
 							.sort((a, b) => b.ratings.ovr - a.ratings.ovr);
 						ovrs.push(team.ovr(players));
 					}
+					if (process.env.PARITY_DIAG) {
+						const order = ovrs
+							.map((o, i) => [o, teams[i].tid])
+							.sort((a, b) => b[0] - a[0]);
+						const groups = { top: order.slice(0, 8), bot: order.slice(-8) };
+						const out = {};
+						for (const [name, grp] of Object.entries(groups)) {
+							const agg = {};
+							for (const [, tid] of grp) {
+								const ps = (
+									await idb.cache.players.indexGetAll("playersByTid", tid)
+								)
+									.sort((a, b) => b.ratings.at(-1).ovr - a.ratings.at(-1).ovr)
+									.slice(0, 8);
+								for (const p of ps) {
+									const tr = (p.transactions ?? [])
+										.filter((t) => t.tid === tid)
+										.at(-1);
+									let src = tr ? tr.type : "initial";
+									if (src === "draft" && tr.pickNum <= 5) src = "draftTop5";
+									agg[src] ??= { n: 0, ovr: 0 };
+									agg[src].n += 1;
+									agg[src].ovr += p.ratings.at(-1).ovr;
+								}
+							}
+							for (const k of Object.keys(agg)) {
+								agg[k] = `${agg[k].n}@${(agg[k].ovr / agg[k].n).toFixed(1)}`;
+							}
+							out[name] = agg;
+						}
+						log("DIAG", season, JSON.stringify(out));
+					}
 					const row = {
 						seed,
 						season,

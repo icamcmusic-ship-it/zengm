@@ -1,3 +1,4 @@
+import { featureOn } from "../../util/nativeFeatures.ts";
 import { finances } from "../index.ts";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { facilitiesEffectMood } from "../../../common/budgetLevels.ts";
@@ -270,8 +271,9 @@ const moodComponents = async (
 				}
 
 				// Negative matters more
+				// League Parity (setting): only 1.25x, so a losing team's players don't all leave for winners
 				if (__SPORT === "basketball" && components.teamPerformance < 0) {
-					components.teamPerformance *= 2;
+					components.teamPerformance *= featureOn("parityBalance") ? 1.25 : 2;
 				}
 
 				// Set upper bound, in case went over due to playoff bonus
