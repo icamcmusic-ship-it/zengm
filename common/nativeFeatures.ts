@@ -1328,6 +1328,28 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "coachMarket",
+		college: false,
+		key: "featureCoachMarket",
+		name: "Coach Market & Succession",
+		description:
+			"Hiring a head coach or assistant becomes a market: interview up to 3 candidates per offseason (reveals his systems, personality, development leaning and fit with your roster, with some noise), candidates weigh team success, market size and salary, and AI teams make competing offers for the best ones (match the offer or lose him). Name one assistant your associate head coach (heir apparent): he grows toward head coach ratings and, when the head coach leaves, is promoted at once and keeps the players' system familiarity. When a head coach is fired during the season an assistant takes over as interim, and at season end you keep or replace him. AI teams name heirs and interims too. Needs Coaching Staff and Coaching Staff Depth.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "scoutSpecialties",
+		college: false,
+		key: "featureScoutSpecialties",
+		name: "Scout Specialties & Assignments",
+		description:
+			"Each scout has a specialty: a region (US college or international), a position group (guards or bigs) or a skill (shooting or athleticism). Looks at a prospect in his specialty narrow the fuzz more and give sharper scouting report notes. Specialties show on the Scouting Department and in scout reports, and an Assignments tab lists which scouts cover which regions and prospects. Needs Scouting Director & Regions.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "frontOffice",
 		college: false,
 		key: "featureFrontOffice",

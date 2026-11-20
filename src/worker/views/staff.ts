@@ -27,6 +27,17 @@ import {
 } from "../core/staff/systems.ts";
 import { idb } from "../db/index.ts";
 import {
+	coachMarketOn,
+	marketStateOf,
+	teamAppeal,
+} from "../core/staff/market.ts";
+import {
+	MAX_INTERVIEWS,
+	candidateInterest,
+	coachPrefs,
+	interestLabel,
+} from "../../common/staffDepth/coachMarket.ts";
+import {
 	activeCoachRoles,
 	coachingDepthOn,
 } from "../core/staffDepth/coaching.ts";
@@ -199,10 +210,29 @@ export default defineView({
 
 			const isUser = g.get("userTids").includes(tid) && !g.get("spectator");
 
+			// Coach Market & Succession
+			const marketOn = coachMarketOn();
+			const appeal = marketOn && isUser ? await teamAppeal(tid) : undefined;
+			const marketState =
+				marketOn && isUser && staffTeam ? marketStateOf(staffTeam) : undefined;
+			const interestOf = (c: Coach) => {
+				if (!appeal) {
+					return undefined;
+				}
+				const x = candidateInterest({
+					prefs: coachPrefs(c),
+					...appeal,
+					salaryRatio: 1,
+					courted: marketState?.interviews.some((i) => i.cid === c.cid),
+				});
+				return { value: x, label: interestLabel(x) };
+			};
+
 			// The hiring market, for your own team: the best free agents at each job, how each would change the staff, and recommendations
 			const formatCandidate = (c: Coach, role: CoachRole) => ({
 				...formatCoach(c, role),
 				levelIfHired: levelIfHired(role, c.ratings),
+				interest: interestOf(c),
 				outlook:
 					role === "head" && rosterFit
 						? headCoachOutlook(c, rosterFit, coordinators)
@@ -258,6 +288,43 @@ export default defineView({
 				}
 			}
 
+			const nameOf = (cid: number) => {
+				const c = coaches.find((x) => x.cid === cid);
+				return c ? `${c.firstName} ${c.lastName}` : "?";
+			};
+			const market = marketOn
+				? {
+						interviews: (marketState?.interviews ?? []).map((i) => ({
+							...i,
+							name: nameOf(i.cid),
+							roleName: COACH_ROLE_NAMES[i.role],
+						})),
+						interviewsLeft:
+							MAX_INTERVIEWS - (marketState?.interviews.length ?? 0),
+						offers: (marketState?.offers ?? []).map((o) => ({
+							...o,
+							name: nameOf(o.cid),
+							roleName: COACH_ROLE_NAMES[o.role],
+							team: `${g.get("teamInfoCache")[o.tid]?.region ?? ""} ${g.get("teamInfoCache")[o.tid]?.name ?? ""}`.trim(),
+						})),
+						heir: teamCoaches.find(
+							(c) => c.role !== "head" && c.succession?.heir !== undefined,
+						)?.cid,
+						interim: byRole.head?.succession?.interim
+							? {
+									cid: byRole.head.cid,
+									name: nameOf(byRole.head.cid),
+									since: byRole.head.succession.interim.season,
+									fromName:
+										COACH_ROLE_NAMES[byRole.head.succession.interim.from],
+								}
+							: undefined,
+						inSeason:
+							g.get("phase") >= PHASE.REGULAR_SEASON &&
+							g.get("phase") <= PHASE.PLAYOFFS,
+					}
+				: undefined;
+
 			const levelLastThree = await finances.getLevelLastThree("coaching", {
 				tid,
 			});
@@ -292,6 +359,7 @@ export default defineView({
 				slots,
 				roles,
 				depth: coachingDepthOn(),
+				market,
 				tid,
 			};
 		}

@@ -135,6 +135,8 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Draft-and-stash](#draft-and-stash) | Player page, Roster (Stashed overseas), Trade, College/Overseas stats | bball | `featureDraftStash` | always on (core) |
 | [Scouting reports](#scouting-reports) | player Scouting page, Scouting Department, PDF | bball | `featureScoutingReports` | always on (core) |
 | [Coaching Staff Depth](#coaching-staff-depth) | Coaching Staff, coach pages, Staff Report, development | bball | `featureCoachingDepth` | always on (core) |
+| [Coach market & succession](#coach-market-and-succession) | Coaching Staff (hiring, coach market panel) | bball | `featureCoachMarket` | off / on |
+| [Scout specialties & assignments](#scout-specialties-and-assignments) | Scouting Department, prospect Scouting page | bball | `featureScoutSpecialties` | off / on |
 | [Extra frivolities](#extra-frivolities) | Frivolities | all | `featureFrivolities` | on / on |
 | [Face style gallery](#face-style-gallery-and-extra-face-parts) | Tools → Face Style Gallery | all | browser setting on the page (extra parts) | off (gallery always shown) |
 | [Draft pick protections & swaps](#draft-pick-protections-and-swaps) | Trade, 3-team trade, Draft Picks, transactions | all | `featureDraftPickConditions` | always on (core) |
@@ -2135,6 +2137,23 @@ Part of _College & Overseas Stats_ (no toggle of its own): everything here is ma
   - _Coaching careers_: about 5.1 promotions to head coach a season (17% of head jobs; 1-8), nearly all hired away from (or promoted within) an NBA staff; no head coach was generated as one after league creation. Head coaches by career start after 1 / 5 / 10 seasons (two leagues): made as head coaches at creation 27 / 11 / 5, initial assistants promoted 3 / 18.5 / 23, new assistants promoted 0 / 0.5 / 2. Employed coaches who started as assistants: 75% at creation (the assistants of the first staffs), 81% after 5 seasons, 86% after 10.
 
 - **Code:** `common/staffDepth/` (`coaching.ts`, `devPlans.ts`), `common/staff.ts` (roles, ratings), `worker/core/staffDepth/coaching.ts` (z, plans, report), `careers.ts`, hooks in `staff/index.ts`, `staff/systems.ts` (video), `game/loadTeams.ts` (S&C), `phase/newPhasePreseason.ts`, `player/develop.ts`, `player/developSeason.basketball.ts`, `player/subRatings.ts` (`tiltRowSubs`), `player/ovr.basketball.ts` (`ovrRaw`).
+
+### Coach market and succession
+
+- **Where:** League Extras → _Coach Market & Succession_ (`featureCoachMarket`, basketball, on for new leagues, off for existing ones; needs Coaching Staff Depth; off in college leagues). Coaching Staff page: an Interest column and Interview button in the hiring table, a salary offer in the hire dialog, a _Coach market_ panel (offers, interviews, interim, heir), "Name associate head coach" on assistant cards. Code: `worker/core/staff/market.ts`, `common/staffDepth/coachMarket.ts`. Off: nothing below runs.
+- **Interviews:** up to 3 per hiring season (the season a contract signed now starts). An interview reveals, with seeded noise, what the coach cares about, his game management, adaptability, youth/personality leanings (with Coaching Systems), teaching, his roster fit for head coaches and his interest in the job. An interviewed candidate is a little more interested.
+- **Preferences:** each coach weighs team success, market size and salary (stable weights from his identity). Interest 0-100; under 30 he turns the job down. The user can offer 10% or 20% over the asking price.
+- **Competing offers:** once per candidate and hiring season, a top candidate (top 3 at the job, or a high overall) may draw an offer from an AI team that has the job open or a clearly worse coach in it (45% for head coaches, 30% for assistants; none for eager candidates or a 20% premium). The user matches it (pays the rival's salary) or walks away (the rival hires him, firing its incumbent). Offers still open in the preseason go to the rival. A replacement hire now fires the old coach only once the hire went through.
+- **Associate head coach (heir apparent):** one assistant per team. Each offseason he gains 0-2 in offense, defense and motivation (below 78). When the head job is open he is promoted at once (AI teams automatically, before the market; the user with "Promote him", or automatically if the job is still open in the preseason) and keeps the predecessor's systems and their installation (no new installation period). AI teams name the assistant with the best head coach overall (45+, 60 or younger).
+- **Interim coaches:** a head coach fired during the season is replaced at once by the heir, else by the assistant with the best head coach overall as interim (a 1-season deal). After the season the user keeps him (contract length of choice) or replaces him (he goes back to his old job if it is open, else leaves); undecided by the preseason he stays. AI interims are kept at .500 or better (or 25% of the time), else replaced.
+- **Determinism:** seeded streams only (`interview|`, `rivalOffer|`, `heirGrowth|`, `interim|` with the league seed, team, coach and season); no draws from the main random stream.
+
+### Scout specialties and assignments
+
+- **Where:** League Extras → _Scout Specialties & Assignments_ (`featureScoutSpecialties`, basketball, on for new leagues, off for existing ones; needs Scouting Director & Regions). Scouting Department (specialty on each scout, an _Assignments_ table), the prospect Scouting page byline. Code: `common/staffDepth/scoutFocus.ts`. Off: nothing below runs.
+- **Specialties:** every scout has one: a region (US college, international), a position group (guards, bigs) or a skill (shooting, athleticism). From his existing seeded specialty (college, international, athletes, shooters); pro personnel scouts get guards, bigs or shooting from a seeded pick. Nothing stored.
+- **Effect:** weekly and event looks at a prospect get ×1.35 when a scout assigned to his region has him in his specialty (the fuzz narrows faster). In scouting reports a scout whose specialty covers the prospect writes the report (unless clearly worse), his own error is ×0.75 (tighter grades), and the byline says so.
+- **Assignments:** for each scout his region, specialty, how many of the region's current class are in his specialty, and up to six prospects there (in his specialty first).
 
 ### Staff Report and delegation
 

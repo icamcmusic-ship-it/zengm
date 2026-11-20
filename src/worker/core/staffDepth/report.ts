@@ -68,12 +68,20 @@ import {
 import {
 	careerOf,
 	currentDraftYear,
+	focusScoutsFor,
 	getScoutingContext,
+	type ScoutingContext,
 	reputationLabel,
 	scoutAccuracyById,
 	scoutingDepthOn,
 } from "./scouting.ts";
 import { getScoutingBlurbs } from "../scoutingReports/index.ts";
+import { scoutFocusOn } from "../scoutingReports/input.ts";
+import {
+	SCOUT_FOCUS_KIND,
+	SCOUT_FOCUS_NAMES,
+	scoutFocusOf,
+} from "../../../common/staffDepth/scoutFocus.ts";
 
 type Recommendation = {
 	id: string;
@@ -607,6 +615,45 @@ export const getStaffReport = async () => {
 
 // ---- Scouting department extras (Scouting Department page) ----
 
+const ASSIGNMENT_PROSPECTS = 6;
+
+const assignmentMap = (ctx: ScoutingContext) => {
+	const draftYear = currentDraftYear();
+	const current = ctx.rows
+		.filter((r) => r.p.draft.year === draftYear)
+		.sort((a, b) => a.rank - b.rank);
+	return ctx.scouts.map((s) => {
+		const region = ctx.plan.assignments[s.id] as ScoutRegion;
+		const focus = scoutFocusOf(s);
+		const prospects = current
+			.filter((r) => r.region === region)
+			.map((r) => ({
+				pid: r.p.pid,
+				name: `${r.p.firstName} ${r.p.lastName}`,
+				pos: r.p.ratings.at(-1)!.pos,
+				rank: r.rank,
+				inFocus: focusScoutsFor(ctx, r.p, region).some((x) => x.id === s.id),
+			}))
+			.sort((a, b) => Number(b.inFocus) - Number(a.inFocus) || a.rank - b.rank)
+			.slice(0, ASSIGNMENT_PROSPECTS);
+		return {
+			id: s.id,
+			name: s.name,
+			region,
+			regionName: REGION_NAMES[region],
+			focus: SCOUT_FOCUS_NAMES[focus],
+			focusKind: SCOUT_FOCUS_KIND[focus],
+			prospects,
+			numInFocus: current.filter(
+				(r) =>
+					r.region === region &&
+					focusScoutsFor(ctx, r.p, region).some((x) => x.id === s.id),
+			).length,
+			numInRegion: current.filter((r) => r.region === region).length,
+		};
+	});
+};
+
 export const getScoutingDepth = async (tid: number) => {
 	if (!scoutingDepthOn()) {
 		return undefined;
@@ -619,6 +666,7 @@ export const getScoutingDepth = async (tid: number) => {
 	const acc = await scoutAccuracyById();
 	const season = ctx.season;
 	const ourGuys = career.ourGuys.filter((x) => x.s >= season - 6);
+	const focusOn = scoutFocusOn();
 	return {
 		isUser: tid === g.get("userTid"),
 		director: {
@@ -654,9 +702,12 @@ export const getScoutingDepth = async (tid: number) => {
 							0.015 * scoutExperience(s, season)),
 				) / 100;
 			const second = secondSpecialty(s, season);
+			const focus = focusOn ? scoutFocusOf(s) : undefined;
 			return {
 				id: s.id,
 				name: s.name,
+				focus: focus ? SCOUT_FOCUS_NAMES[focus] : undefined,
+				focusKind: focus ? SCOUT_FOCUS_KIND[focus] : undefined,
 				region: ctx.plan.assignments[s.id] as ScoutRegion,
 				autoRegion: ctx.auto.assignments[s.id] as ScoutRegion,
 				experience: scoutExperience(s, season),
@@ -674,6 +725,8 @@ export const getScoutingDepth = async (tid: number) => {
 			};
 		}),
 		log: [...career.log].reverse().slice(0, 12),
+		// Scout Specialties & Assignments: who covers which region, and the prospects there (in his focus first)
+		assignments: focusOn ? assignmentMap(ctx) : undefined,
 		formerOurGuys: ourGuys
 			.filter((x) => x.judged && x.judged !== "solid")
 			.slice(-8),

@@ -2499,6 +2499,8 @@ export type Team = {
 	offEmphasis?: import("./offEmphasis.ts").OffEmphasisTeam;
 	// Scouting Director & Regions: the scouting department's careers (every team)
 	scoutCareer?: import("./staffDepth/types.ts").ScoutCareerTeam;
+	// Coach Market & Succession: interviews and competing offers of the current hiring season
+	coachMarket?: import("./staffDepth/types.ts").CoachMarketTeam;
 	depth?:
 		| {
 				QB: number[];

@@ -55,10 +55,18 @@ import {
 	careerCutsFor,
 	getReportCtx,
 	leagueSeed,
+	scoutFocusOn,
 	scoutingReportsOn,
 	withExperience,
 } from "../scoutingReports/input.ts";
 import { stateOf } from "./coaching.ts";
+import {
+	FOCUS_LOOKS_MULT,
+	inScoutFocus,
+	ratingsAthletic,
+	ratingsShooter,
+	scoutFocusOf,
+} from "../../../common/staffDepth/scoutFocus.ts";
 import { scoutCalls } from "../scoutingReports/index.ts";
 import { addSuggestion } from "./suggestions.ts";
 
@@ -380,10 +388,46 @@ const addLooks = async (
 			added = eventLooks(what.event, coverage);
 			event = what.event;
 		}
+		// Scout Specialties: a scout working this region whose focus covers him gets more out of each look
+		if (added > 0 && focusScoutsFor(ctx, p, row.region).length > 0) {
+			added *= FOCUS_LOOKS_MULT;
+		}
 		applyLooks(p, added, ctx.season, row.region, coverage, event);
 		await updateValues(p);
 		await idb.cache.players.put(p);
 	}
+};
+
+// Scout Specialties & Assignments: the scouts assigned to a prospect's region whose focus covers him (empty when the setting is off)
+export const focusScoutsFor = (
+	ctx: Pick<ScoutingContext, "scouts" | "plan">,
+	p: Player,
+	region: ScoutRegion,
+) => {
+	if (!scoutFocusOn()) {
+		return [];
+	}
+	// basketball ratings
+	const r = p.ratings.at(-1)! as any;
+	const fr = {
+		spd: fuzzRating(r.spd, r.fuzz),
+		jmp: fuzzRating(r.jmp, r.fuzz),
+		endu: fuzzRating(r.endu, r.fuzz),
+		tp: fuzzRating(r.tp, r.fuzz),
+		fg: fuzzRating(r.fg, r.fuzz),
+		ft: fuzzRating(r.ft, r.fuzz),
+	};
+	const info = {
+		region,
+		pos: r.pos,
+		athletic: ratingsAthletic(fr),
+		shooter: ratingsShooter(fr),
+	};
+	return ctx.scouts.filter(
+		(s) =>
+			ctx.plan.assignments[s.id] === region &&
+			inScoutFocus(scoutFocusOf(s), info),
+	);
 };
 
 // The user's view (fuzz is always the user team's): also while auto playing, so the board is ready when the user takes over

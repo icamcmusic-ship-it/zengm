@@ -34,9 +34,26 @@ import {
 	type StaffCoach,
 } from "./CompareModal.tsx";
 import { Market } from "./Market.tsx";
+import {
+	MAX_INTERVIEWS,
+	PREMIUMS,
+} from "../../../common/staffDepth/coachMarket.ts";
 
 type StaffActionArgs =
-	| { type: "hire"; cid: number; role: CoachRole; years: number }
+	| {
+			type: "hire";
+			cid: number;
+			role: CoachRole;
+			years: number;
+			replace?: boolean;
+			premium?: number;
+			match?: boolean;
+	  }
+	| { type: "interview"; cid: number; role: CoachRole }
+	| { type: "walkAway"; cid: number }
+	| { type: "setHeir"; cid: number | null }
+	| { type: "promoteHeir" }
+	| { type: "interim"; cid: number; keep: boolean; years: number }
 	| { type: "fire"; cid: number }
 	| { type: "extend"; cid: number; years: number };
 
@@ -51,6 +68,13 @@ const action = async (args: StaffActionArgs) => {
 				type: "info",
 				text: `Paid a buyout of ${formatSalary(result.buyout)}.`,
 			});
+		}
+		if (result.offer) {
+			showNotification({
+				type: "info",
+				text: `Another team made him a competing offer of ${formatSalary(result.offer.amount)} per season. Match it or walk away (Coach market, above).`,
+			});
+			return false;
 		}
 		return true;
 	} catch (error) {
@@ -96,6 +120,143 @@ const YearsSelect = ({
 	</label>
 );
 
+// Coach Market & Succession: offers to match, interviews, the interim coach and the heir
+const CoachMarketPanel = ({
+	market,
+	hasHead,
+	candidates,
+}: {
+	market: NonNullable<View<"staff">["market"]>;
+	hasHead: boolean;
+	candidates: View<"staff">["candidates"];
+}) => {
+	const [interimYears, setInterimYears] = useState(3);
+	const demandOf = (cid: number) =>
+		Object.values(candidates)
+			.flat()
+			.find((c) => c.cid === cid)?.demand;
+	return (
+		<div className="card mb-3" data-testid="coach-market-panel">
+			<div className="card-body">
+				<h2 className="card-title h5">Coach market</h2>
+				{market.offers.map((o) => (
+					<div key={o.cid} className="alert alert-warning py-2">
+						<b>{o.name}</b> ({o.roleName}) has an offer from {o.team}:{" "}
+						{formatSalary(o.amount)} per season for {o.years} seasons
+						{demandOf(o.cid) !== undefined
+							? ` (he asked you for ${formatSalary(demandOf(o.cid)!)})`
+							: ""}
+						.{" "}
+						<button
+							className="btn btn-sm btn-success ms-1"
+							onClick={() =>
+								action({
+									type: "hire",
+									cid: o.cid,
+									role: o.role,
+									years: o.userYears,
+									replace: true,
+									match: true,
+								})
+							}
+						>
+							Match ({formatSalary(o.amount)})
+						</button>
+						<button
+							className="btn btn-sm btn-light-bordered ms-1"
+							onClick={() => action({ type: "walkAway", cid: o.cid })}
+						>
+							Walk away
+						</button>
+					</div>
+				))}
+				{market.interim ? (
+					<div className="mb-2" data-testid="coach-market-interim">
+						<b>{market.interim.name}</b> is your interim head coach (since{" "}
+						{market.interim.since}, from {market.interim.fromName}).{" "}
+						{market.inSeason ? (
+							"After the season you can keep him or replace him."
+						) : (
+							<span className="d-inline-flex flex-wrap align-items-center gap-1">
+								<select
+									className="form-select form-select-sm w-auto"
+									value={interimYears}
+									onChange={(event) =>
+										setInterimYears(Number(event.target.value))
+									}
+								>
+									{[1, 2, 3, 4, 5].map((y) => (
+										<option key={y} value={y}>
+											{y} season{y > 1 ? "s" : ""}
+										</option>
+									))}
+								</select>
+								<button
+									className="btn btn-sm btn-success"
+									onClick={() =>
+										action({
+											type: "interim",
+											cid: market.interim!.cid,
+											keep: true,
+											years: interimYears,
+										})
+									}
+								>
+									Keep him
+								</button>
+								<button
+									className="btn btn-sm btn-light-bordered"
+									onClick={() =>
+										action({
+											type: "interim",
+											cid: market.interim!.cid,
+											keep: false,
+											years: 1,
+										})
+									}
+								>
+									Replace him
+								</button>
+								<span className="text-body-secondary small">
+									(undecided by the preseason: he stays)
+								</span>
+							</span>
+						)}
+					</div>
+				) : null}
+				{!hasHead && market.heir !== undefined ? (
+					<div className="mb-2">
+						Your associate head coach is ready to take over.{" "}
+						<button
+							className="btn btn-sm btn-success"
+							onClick={() => action({ type: "promoteHeir" })}
+							data-testid="staff-promote-heir"
+						>
+							Promote him (keeps your systems)
+						</button>
+					</div>
+				) : null}
+				<p className="mb-2 small text-body-secondary">
+					Interviews left this hiring season: {market.interviewsLeft} of{" "}
+					{MAX_INTERVIEWS}. Name one assistant your associate head coach: he
+					grows toward head coach ratings and takes over at once, with the same
+					systems, when the head coach leaves.
+				</p>
+				{market.interviews.length > 0 ? (
+					<ul className="mb-0" data-testid="coach-market-interviews">
+						{market.interviews.map((i) => (
+							<li key={i.cid}>
+								<CoachLink cid={i.cid} name={i.name} /> ({i.roleName}):{" "}
+								{i.lines.join(" ")}
+							</li>
+						))}
+					</ul>
+				) : null}
+			</div>
+		</div>
+	);
+};
+
 const Staff = ({
 	abbrev,
 	budget,
@@ -120,6 +281,7 @@ const Staff = ({
 	slots,
 	tid,
 	depth,
+	market,
 }: View<"staff">) => {
 	useTitleBar({
 		title: "Coaching Staff",
@@ -133,6 +295,7 @@ const Staff = ({
 		slots.find((s) => !s.coach)?.role ?? "head",
 	);
 	const [years, setYears] = useState(3);
+	const [premium, setPremium] = useState(0);
 	const [pending, setPending] = useState<Pending | undefined>();
 	const [busy, setBusy] = useState(false);
 	const [compare, setCompare] = useState<
@@ -170,17 +333,15 @@ const Staff = ({
 			} else if (pending.type === "extend") {
 				await action({ type: "extend", cid: pending.coach.cid, years });
 			} else {
-				const fired =
-					!pending.replace ||
-					(await action({ type: "fire", cid: pending.replace.cid }));
-				if (fired) {
-					await action({
-						type: "hire",
-						cid: pending.candidate.cid,
-						role: pending.role,
-						years,
-					});
-				}
+				// The old coach is only fired once the hire went through
+				await action({
+					type: "hire",
+					cid: pending.candidate.cid,
+					role: pending.role,
+					years,
+					replace: pending.replace ? true : undefined,
+					premium: market ? premium : undefined,
+				});
 			}
 		} finally {
 			setBusy(false);
@@ -293,6 +454,33 @@ const Staff = ({
 			body: (
 				<>
 					<YearsSelect years={years} setYears={setYears} />
+					{market ? (
+						<label className="d-flex align-items-center gap-2 mb-3">
+							Salary offer
+							<select
+								className="form-select form-select-sm w-auto"
+								value={premium}
+								onChange={(event) => setPremium(Number(event.target.value))}
+								data-testid="staff-premium"
+							>
+								{PREMIUMS.map((x) => (
+									<option key={x} value={x}>
+										{x === 0
+											? "His asking price"
+											: `${Math.round(100 * x)}% more (${formatSalary(Math.round((c.demand * (1 + x)) / 10) * 10)})`}
+									</option>
+								))}
+							</select>
+						</label>
+					) : null}
+					{market && c.interest ? (
+						<p>
+							His interest in the job: <b>{c.interest.label}</b>. A coach who is
+							not interested turns you down; a top candidate may draw a
+							competing offer from another team, which you then match or lose
+							him. Paying more helps with both.
+						</p>
+					) : null}
 					<ul className="mb-0 ps-3">
 						<li>
 							{c.name} becomes your {roleNoun(pending.role)} on a{" "}
@@ -419,9 +607,43 @@ const Staff = ({
 
 	const hc = headSlot.coach;
 	const h: Head | undefined = head;
+	const interviewed = new Set(market?.interviews.map((i) => i.cid));
+
+	// Coach Market & Succession: name an assistant the associate head coach (heir apparent)
+	const heirButton = (c: StaffCoach, role: CoachRole) =>
+		isUser && market && role !== "head" ? (
+			<div className="mt-1">
+				{market.heir === c.cid ? (
+					<>
+						<span className="badge text-bg-info me-1">Associate HC</span>
+						<button
+							className="btn btn-sm btn-link p-0"
+							onClick={() => action({ type: "setHeir", cid: null })}
+						>
+							Remove
+						</button>
+					</>
+				) : (
+					<button
+						className="btn btn-sm btn-link p-0"
+						onClick={() => action({ type: "setHeir", cid: c.cid })}
+						data-testid={`staff-heir-${role}`}
+					>
+						Name associate head coach
+					</button>
+				)}
+			</div>
+		) : null;
 
 	return (
 		<>
+			{market && isUser ? (
+				<CoachMarketPanel
+					market={market}
+					hasHead={!!hc}
+					candidates={candidates}
+				/>
+			) : null}
 			{!coachSystems ? <SystemsOffNote /> : null}
 			{depth && isUser ? (
 				<p data-testid="staff-depth-note">
@@ -834,6 +1056,7 @@ const Staff = ({
 												highlight={info.keyRating}
 											/>
 											<div className="mt-2 small">{contractLine(c)}</div>
+											{heirButton(c, role)}
 											{actionButtons(c, role)}
 										</>
 									)}
@@ -856,6 +1079,18 @@ const Staff = ({
 						offseason, teams fire and hire coaches and expiring contracts end.
 					</p>
 					<Market
+						onInterview={
+							market && market.interviewsLeft > 0
+								? (c) => {
+										void action({
+											type: "interview",
+											cid: c.cid,
+											role: marketRole,
+										});
+									}
+								: undefined
+						}
+						interviewed={market ? interviewed : undefined}
 						key={marketRole}
 						candidates={candidates}
 						coachSystems={coachSystems}
