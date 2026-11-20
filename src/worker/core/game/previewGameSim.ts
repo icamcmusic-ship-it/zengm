@@ -1,5 +1,5 @@
 // Settings > Tendencies > Preview: simulates a handful of games between the league's teams with some game sim settings swapped in,
-// and returns league averages (pace, 3PA rate, eFG%, TOV%, ORB%, FT rate, points). Nothing is saved: the teams are loaded from the
+// and returns league averages (pace, 3PA rate, eFG%, TOV%, ORB%, FT rate, points, ORtg, FG%, 3P%, FT%). Nothing is saved: the teams are loaded from the
 // cache, the games are played with GameSim.run directly (no box scores, player stats, injuries or schedule changes are written), and
 // the settings are only swapped in g while the games run (one synchronous block, so nothing else in the worker can see them).
 // Deterministic: the matchups and every random draw come from a fixed seed, and the same games are played for each settings set, so
@@ -53,13 +53,29 @@ export type GameSimPreviewStats = {
 	ftRate: number;
 	// per team per game
 	pts: number;
+	// points per 100 possessions
+	ortg: number;
+	// FG / FGA, 3P / 3PA, FT / FTA
+	fgPct: number;
+	tpPct: number;
+	ftPct: number;
 };
 
 export const PREVIEW_SEED = 20_260_101;
 const MAX_GAMES = 200;
 
 type Totals = Record<
-	"pts" | "fg" | "fga" | "tp" | "tpa" | "fta" | "orb" | "drb" | "tov" | "poss",
+	| "pts"
+	| "fg"
+	| "fga"
+	| "tp"
+	| "tpa"
+	| "ft"
+	| "fta"
+	| "orb"
+	| "drb"
+	| "tov"
+	| "poss",
 	number
 > & { games: number; minutes: number };
 
@@ -71,6 +87,7 @@ const emptyTotals = (): Totals => ({
 	fga: 0,
 	tp: 0,
 	tpa: 0,
+	ft: 0,
 	fta: 0,
 	orb: 0,
 	drb: 0,
@@ -102,6 +119,7 @@ export const addGameToTotals = (
 		tot.fga += s.fga ?? 0;
 		tot.tp += s.tp ?? 0;
 		tot.tpa += s.tpa ?? 0;
+		tot.ft += s.ft ?? 0;
 		tot.fta += s.fta ?? 0;
 		tot.orb += s.orb ?? 0;
 		tot.drb += s.drb ?? 0;
@@ -123,6 +141,10 @@ export const totalsToStats = (tot: Totals): GameSimPreviewStats => {
 		orbPct: div(tot.orb, tot.orb + tot.drb),
 		ftRate: div(tot.fta, tot.fga),
 		pts: div(tot.pts, 2 * tot.games),
+		ortg: div(tot.pts, tot.poss) * 100,
+		fgPct: div(tot.fg, tot.fga),
+		tpPct: div(tot.tp, tot.tpa),
+		ftPct: div(tot.ft, tot.fta),
 	};
 };
 

@@ -3,19 +3,28 @@
 // Creates one new league with the new-league defaults (the fork's default League Extras on), then for each season fits the game sim
 // tendency settings so that a sample of games between the league's teams (played like the Settings preview: no DB writes, fixed seeds)
 // matches that NBA season's league averages:
-//   pace            -> sim possessions per 48 minutes
+//   pace                     -> possessions per 48 minutes (from 1974; before that Basketball-Reference has no pace, so it is fit to
+//                               points per team game instead, which pins the possessions given the shooting below)
 //   threePointTendencyFactor -> 3PA / FGA        (from 1980, the first season with the line; before that the old value is kept)
-//   foulRateFactor  -> FTA / FGA
-//   orbFactor       -> ORB%                      (from 1974, when offensive rebounds were first counted)
-//   turnoverFactor  -> TOV%                      (from 1978, when turnovers were first counted)
-// The accuracy, block and steal factors are kept from the old presets (2021-2026 start from 2020's). Where a stat was not counted,
-// its knob keeps the nearest later season's fit. Each knob gets a damped
-// multiplicative update per iteration; every iteration plays the same games with the same seed (common random numbers), so it is
-// deterministic and converges smoothly. Run with
+//   foulRateFactor           -> FTA / FGA
+//   orbFactor                -> ORB%             (from 1974, when offensive rebounds were first counted)
+//   turnoverFactor           -> TOV%             (from 1974, the first season with team turnovers and pace on Basketball-Reference)
+//   threePointAccuracyFactor -> 3P%              (from 1980; before that the old value is kept)
+//   twoPointAccuracyFactor   -> 2P% (= (FG% - 3PA rate * 3P%) / (1 - 3PA rate)), so with 3PA rate and 3P% it gives eFG% and FG%
+//                               (before 1980, the sim FG% to FG%)
+//   ftAccuracyFactor         -> FT%
+// With pace, the shooting, FT rate, ORB% and TOV% matched, points per game (and ORtg) follow; they are reported, not fit (except
+// before 1974, see pace). The block and steal factors are kept from the old presets. Where a stat was not counted, its knob keeps the
+// nearest later season's fit. Every iteration plays the same balanced set of games (with the next seed) and gives each knob an
+// estimate (a damped multiplicative step toward its target); the fit is the average of the last iterations' estimates. Run with
 //   ERA_CAL=1 ERA_CAL_OUT=/tmp/era.jsonl npx vitest run --maxWorkers=1 --project basketball <this file>
-// Options: ERA_CAL_SEASONS=2026,2025 (default all), ERA_CAL_GAMES=100 (games per iteration), ERA_CAL_ITERS=10, ERA_CAL_CHECK_GAMES=300
-// (fresh games, different seed, to report the fit), ERA_CAL_SEED=1 (league seed). Writes one JSON line per season (fitted values, the
-// targets, the check sample's stats and errors), and prints the presets as TypeScript to paste into gameSimPresets.ts.
+// Options: ERA_CAL_SEASONS=2026,2025 (default all, newest first; a later season's fit is the next one's starting point, so split a
+// parallel run into contiguous ranges), ERA_CAL_GAMES=100 (games per iteration, rounded up to whole round robin rounds),
+// ERA_CAL_ITERS=10, ERA_CAL_AVG_ITERS=ITERS/2 (iterations averaged), ERA_CAL_CHECK_GAMES=300 (fresh games, different seed, to report
+// the fit), ERA_CAL_SEED=1 (league seed), ERA_CAL_START='{"orbFactor":1.1,...}' (starting knobs for the first season, e.g. the fit of
+// the season after it from another run), ERA_CAL_TRACE=1 (also write every iteration). Writes one JSON line per season (fitted values,
+// the targets, the check sample's stats and errors), and the presets as TypeScript (ERA_CAL_OUT.ts) to paste into gameSimPresets.ts.
+// The presets in gameSimPresets.ts were fit with ERA_CAL_GAMES=210 ERA_CAL_ITERS=16 ERA_CAL_AVG_ITERS=10 ERA_CAL_CHECK_GAMES=510.
 import "fake-indexeddb/auto";
 import { appendFileSync } from "node:fs";
 import { test } from "vitest";
@@ -32,102 +41,166 @@ import { loadMatchups, runPreviewGames } from "../game/previewGameSim.ts";
 
 const env = (globalThis as any).process.env;
 
-// NBA league averages by season (season = the year it ends), from Basketball-Reference's league averages table, rounded.
-// [pace, 3PA/FGA, FTA/FGA, ORB%, TOV%]; null where the stat was not counted that season. Pace before 1974 is Basketball-Reference's
-// estimate (the same values the old presets used). 2026 is the 2025-26 season to date.
+// NBA (1947-1949 BAA) league averages by season (season = the year it ends), from Basketball-Reference's league averages table
+// (https://www.basketball-reference.com/leagues/NBA_stats_per_game.html, fetched 2026-11-20; 2026 is the complete 2025-26 regular
+// season). 3PA rate and FT rate are computed from the per game FGA, 3PA and FTA (Basketball-Reference's "FT/FGA" column is FT, not FTA).
+// null where the stat was not counted (pace, ORtg, ORB%, TOV% before 1974; 3P% before 1980), 0 for the 3PA rate before 1980.
+// [pace, pts per team game, ORtg, eFG%, FG%, 3P%, FT%, 3PA/FGA, FTA/FGA, ORB%, TOV%]
 // prettier-ignore
-const TARGETS: Record<number, [number, number, number, number | null, number | null]> = {
-	2026: [99.6, 0.425, 0.243, 0.25, 0.124],
-	2025: [99.0, 0.421, 0.240, 0.247, 0.125],
-	2024: [98.5, 0.391, 0.248, 0.244, 0.122],
-	2023: [99.1, 0.387, 0.259, 0.243, 0.125],
-	2022: [98.2, 0.395, 0.246, 0.239, 0.124],
-	2021: [99.2, 0.392, 0.251, 0.224, 0.124],
-	2020: [100.3, 0.384, 0.259, 0.229, 0.128],
-	2019: [100.0, 0.359, 0.259, 0.229, 0.126],
-	2018: [97.3, 0.337, 0.254, 0.226, 0.131],
-	2017: [96.4, 0.316, 0.267, 0.232, 0.127],
-	2016: [95.8, 0.285, 0.275, 0.238, 0.132],
-	2015: [93.9, 0.268, 0.268, 0.251, 0.136],
-	2014: [93.9, 0.259, 0.278, 0.253, 0.136],
-	2013: [92.0, 0.243, 0.266, 0.266, 0.136],
-	2012: [91.3, 0.226, 0.281, 0.270, 0.137],
-	2011: [92.1, 0.222, 0.292, 0.262, 0.132],
-	2010: [92.7, 0.222, 0.300, 0.265, 0.133],
-	2009: [91.7, 0.224, 0.302, 0.266, 0.133],
-	2008: [92.4, 0.222, 0.304, 0.267, 0.132],
-	2007: [91.9, 0.211, 0.320, 0.277, 0.139],
-	2006: [90.5, 0.200, 0.325, 0.283, 0.133],
-	2005: [90.9, 0.195, 0.324, 0.292, 0.135],
-	2004: [90.1, 0.186, 0.304, 0.287, 0.138],
-	2003: [91.0, 0.186, 0.307, 0.287, 0.138],
-	2002: [90.7, 0.181, 0.300, 0.292, 0.133],
-	2001: [91.3, 0.172, 0.310, 0.292, 0.137],
-	2000: [93.1, 0.168, 0.322, 0.300, 0.138],
-	1999: [88.9, 0.169, 0.335, 0.309, 0.144],
-	1998: [90.3, 0.155, 0.325, 0.308, 0.143],
-	1997: [90.1, 0.201, 0.312, 0.310, 0.144],
-	1996: [91.8, 0.200, 0.325, 0.308, 0.144],
-	1995: [92.9, 0.182, 0.335, 0.310, 0.144],
-	1994: [95.1, 0.122, 0.322, 0.319, 0.143],
-	1993: [96.8, 0.104, 0.329, 0.320, 0.137],
-	1992: [96.6, 0.086, 0.324, 0.321, 0.136],
-	1991: [97.8, 0.077, 0.326, 0.322, 0.138],
-	1990: [98.3, 0.071, 0.336, 0.325, 0.140],
-	1989: [100.6, 0.064, 0.327, 0.329, 0.141],
-	1988: [99.6, 0.050, 0.322, 0.321, 0.140],
-	1987: [100.8, 0.044, 0.334, 0.324, 0.141],
-	1986: [102.1, 0.030, 0.325, 0.317, 0.147],
-	1985: [102.1, 0.030, 0.322, 0.318, 0.146],
-	1984: [101.4, 0.020, 0.330, 0.316, 0.146],
-	1983: [103.1, 0.019, 0.313, 0.322, 0.153],
-	1982: [100.9, 0.023, 0.312, 0.318, 0.149],
-	1981: [101.8, 0.019, 0.316, 0.325, 0.152],
-	1980: [103.1, 0.028, 0.307, 0.327, 0.152],
-	1979: [105.8, 0, 0.313, 0.335, 0.157],
-	1978: [106.7, 0, 0.322, 0.334, 0.156],
-	1977: [106.5, 0, 0.319, 0.330, null],
-	1976: [105.5, 0, 0.318, 0.318, null],
-	1975: [104.5, 0, 0.302, 0.318, null],
-	1974: [107.8, 0, 0.286, 0.313, null],
-	1973: [110.385, 0, 0.287, null, null],
-	1972: [109.785, 0, 0.310, null, null],
-	1971: [112.988, 0, 0.309, null, null],
-	1970: [114.811, 0, 0.313, null, null],
-	1969: [114.571, 0, 0.317, null, null],
-	1968: [117.058, 0, 0.356, null, null],
-	1967: [119.602, 0, 0.366, null, null],
-	1966: [118.921, 0, 0.362, null, null],
-	1965: [115.617, 0, 0.370, null, null],
-	1964: [114.689, 0, 0.365, null, null],
-	1963: [117.316, 0, 0.369, null, null],
-	1962: [125.168, 0, 0.365, null, null],
-	1961: [127.219, 0, 0.361, null, null],
-	1960: [126.113, 0, 0.352, null, null],
-	1959: [118.68, 0, 0.379, null, null],
-	1958: [118.564, 0, 0.392, null, null],
-	1957: [109.736, 0, 0.424, null, null],
-	1956: [106.17, 0, 0.445, null, null],
-	1955: [101, 0, 0.434, null, null],
-	1954: [93, 0, 0.464, null, null],
-	1953: [95, 0, 0.489, null, null],
-	1952: [97, 0, 0.442, null, null],
-	1951: [99, 0, 0.424, null, null],
-	1950: [99, 0, 0.432, null, null],
-	1949: [104, 0, 0.375, null, null],
-	1948: [108, 0, 0.351, null, null],
-	1947: [104, 0, 0.326, null, null],
+const TARGETS: Record<number, [number | null, number, number | null, number, number, number | null, number, number, number, number | null, number | null]> = {
+	2026: [99.4, 115.6, 115.7, 0.546, 0.471, 0.360, 0.783, 0.415, 0.264, 0.260, 0.127],
+	2025: [98.8, 113.8, 114.5, 0.543, 0.467, 0.360, 0.780, 0.422, 0.243, 0.252, 0.126],
+	2024: [98.5, 114.2, 115.3, 0.547, 0.474, 0.366, 0.784, 0.395, 0.244, 0.242, 0.121],
+	2023: [99.2, 114.7, 114.8, 0.545, 0.475, 0.361, 0.782, 0.387, 0.266, 0.240, 0.125],
+	2022: [98.2, 110.6, 112.0, 0.532, 0.461, 0.354, 0.775, 0.400, 0.249, 0.232, 0.123],
+	2021: [99.2, 112.1, 112.3, 0.538, 0.466, 0.367, 0.778, 0.391, 0.247, 0.222, 0.124],
+	2020: [100.3, 111.8, 110.6, 0.529, 0.460, 0.358, 0.773, 0.384, 0.260, 0.225, 0.128],
+	2019: [100.0, 111.2, 110.4, 0.524, 0.461, 0.355, 0.766, 0.359, 0.259, 0.229, 0.124],
+	2018: [97.3, 106.3, 108.6, 0.521, 0.460, 0.362, 0.767, 0.337, 0.252, 0.223, 0.130],
+	2017: [96.4, 105.6, 108.8, 0.514, 0.457, 0.358, 0.772, 0.316, 0.270, 0.233, 0.127],
+	2016: [95.8, 102.7, 106.4, 0.502, 0.452, 0.354, 0.757, 0.285, 0.277, 0.238, 0.132],
+	2015: [93.9, 100.0, 105.6, 0.496, 0.449, 0.350, 0.750, 0.268, 0.273, 0.251, 0.133],
+	2014: [93.9, 101.0, 106.6, 0.501, 0.454, 0.360, 0.756, 0.259, 0.284, 0.255, 0.136],
+	2013: [92.0, 98.1, 105.8, 0.496, 0.453, 0.359, 0.753, 0.244, 0.271, 0.265, 0.137],
+	2012: [91.3, 96.3, 104.6, 0.487, 0.448, 0.349, 0.752, 0.226, 0.276, 0.270, 0.138],
+	2011: [92.1, 99.6, 107.3, 0.498, 0.459, 0.358, 0.763, 0.222, 0.300, 0.264, 0.134],
+	2010: [92.7, 100.4, 107.6, 0.501, 0.461, 0.355, 0.759, 0.222, 0.300, 0.263, 0.133],
+	2009: [91.7, 100.0, 108.3, 0.500, 0.459, 0.367, 0.771, 0.224, 0.305, 0.267, 0.133],
+	2008: [92.4, 99.9, 107.5, 0.497, 0.457, 0.362, 0.755, 0.222, 0.306, 0.267, 0.132],
+	2007: [91.9, 98.7, 106.5, 0.496, 0.458, 0.358, 0.752, 0.212, 0.327, 0.271, 0.142],
+	2006: [90.5, 97.0, 106.2, 0.490, 0.454, 0.358, 0.745, 0.203, 0.333, 0.273, 0.137],
+	2005: [90.9, 97.2, 106.1, 0.482, 0.447, 0.356, 0.756, 0.197, 0.325, 0.287, 0.136],
+	2004: [90.1, 93.4, 102.9, 0.471, 0.439, 0.347, 0.752, 0.187, 0.303, 0.286, 0.142],
+	2003: [91.0, 95.1, 103.6, 0.474, 0.442, 0.349, 0.758, 0.182, 0.302, 0.285, 0.140],
+	2002: [90.7, 95.5, 104.5, 0.477, 0.445, 0.354, 0.752, 0.181, 0.293, 0.289, 0.136],
+	2001: [91.3, 94.8, 103.0, 0.473, 0.443, 0.354, 0.748, 0.170, 0.309, 0.282, 0.141],
+	2000: [93.1, 97.5, 104.1, 0.478, 0.449, 0.353, 0.750, 0.167, 0.308, 0.289, 0.142],
+	1999: [88.9, 91.6, 102.2, 0.466, 0.437, 0.339, 0.728, 0.169, 0.330, 0.302, 0.146],
+	1998: [90.3, 95.6, 105.0, 0.478, 0.450, 0.346, 0.737, 0.159, 0.330, 0.314, 0.145],
+	1997: [90.1, 96.9, 106.7, 0.493, 0.455, 0.360, 0.738, 0.212, 0.319, 0.308, 0.148],
+	1996: [91.8, 99.5, 107.6, 0.499, 0.462, 0.367, 0.740, 0.200, 0.329, 0.306, 0.147],
+	1995: [92.9, 101.4, 108.3, 0.500, 0.466, 0.359, 0.737, 0.188, 0.333, 0.314, 0.146],
+	1994: [95.1, 101.5, 106.3, 0.485, 0.466, 0.333, 0.734, 0.117, 0.315, 0.322, 0.143],
+	1993: [96.8, 105.3, 108.0, 0.491, 0.473, 0.336, 0.754, 0.105, 0.322, 0.320, 0.140],
+	1992: [96.6, 105.3, 108.2, 0.487, 0.472, 0.331, 0.759, 0.087, 0.306, 0.329, 0.136],
+	1991: [97.8, 106.3, 107.9, 0.487, 0.474, 0.320, 0.765, 0.081, 0.320, 0.323, 0.139],
+	1990: [98.3, 107.0, 108.1, 0.489, 0.476, 0.331, 0.764, 0.076, 0.327, 0.321, 0.139],
+	1989: [100.6, 109.2, 107.8, 0.489, 0.477, 0.323, 0.768, 0.074, 0.324, 0.330, 0.145],
+	1988: [99.6, 108.2, 108.0, 0.489, 0.480, 0.316, 0.766, 0.057, 0.332, 0.328, 0.143],
+	1987: [100.8, 109.9, 108.3, 0.488, 0.480, 0.301, 0.763, 0.053, 0.343, 0.334, 0.143],
+	1986: [102.1, 110.2, 107.2, 0.493, 0.487, 0.282, 0.756, 0.037, 0.342, 0.324, 0.149],
+	1985: [102.1, 110.8, 107.9, 0.496, 0.491, 0.282, 0.764, 0.035, 0.330, 0.329, 0.149],
+	1984: [101.4, 110.1, 107.6, 0.495, 0.492, 0.250, 0.760, 0.027, 0.336, 0.330, 0.150],
+	1983: [103.1, 108.5, 104.7, 0.488, 0.485, 0.238, 0.740, 0.026, 0.315, 0.334, 0.158],
+	1982: [100.9, 108.6, 106.9, 0.495, 0.491, 0.262, 0.746, 0.026, 0.324, 0.330, 0.150],
+	1981: [101.8, 108.1, 105.5, 0.489, 0.486, 0.245, 0.751, 0.023, 0.327, 0.335, 0.156],
+	1980: [103.1, 109.3, 105.3, 0.486, 0.481, 0.280, 0.764, 0.031, 0.307, 0.335, 0.155],
+	1979: [105.8, 110.3, 103.8, 0.485, 0.485, null, 0.752, 0, 0.309, 0.328, 0.160],
+	1978: [106.7, 108.5, 100.9, 0.469, 0.469, null, 0.752, 0, 0.306, 0.318, 0.160],
+	1977: [106.5, 106.5, 99.5, 0.465, 0.465, null, 0.751, 0, 0.301, 0.318, 0.165],
+	1976: [105.5, 104.3, 98.3, 0.458, 0.458, null, 0.751, 0, 0.293, 0.303, 0.160],
+	1975: [104.5, 102.6, 97.7, 0.457, 0.457, null, 0.765, 0, 0.277, 0.302, 0.163],
+	1974: [107.8, 105.7, 97.7, 0.459, 0.459, null, 0.771, 0, 0.271, 0.305, 0.165],
+	1973: [null, 107.6, null, 0.456, 0.456, null, 0.758, 0, 0.261, null, null],
+	1972: [null, 110.2, null, 0.455, 0.455, null, 0.748, 0, 0.327, null, null],
+	1971: [null, 112.4, null, 0.449, 0.449, null, 0.745, 0, 0.334, null, null],
+	1970: [null, 116.7, null, 0.460, 0.460, null, 0.751, 0, 0.339, null, null],
+	1969: [null, 112.3, null, 0.441, 0.441, null, 0.714, 0, 0.354, null, null],
+	1968: [null, 116.6, null, 0.446, 0.446, null, 0.720, 0, 0.368, null, null],
+	1967: [null, 117.4, null, 0.441, 0.441, null, 0.732, 0, 0.351, null, null],
+	1966: [null, 115.5, null, 0.433, 0.433, null, 0.727, 0, 0.361, null, null],
+	1965: [null, 110.6, null, 0.426, 0.426, null, 0.721, 0, 0.357, null, null],
+	1964: [null, 111.0, null, 0.433, 0.433, null, 0.722, 0, 0.353, null, null],
+	1963: [null, 115.3, null, 0.441, 0.441, null, 0.727, 0, 0.355, null, null],
+	1962: [null, 118.8, null, 0.426, 0.426, null, 0.727, 0, 0.344, null, null],
+	1961: [null, 118.1, null, 0.415, 0.415, null, 0.731, 0, 0.343, null, null],
+	1960: [null, 115.3, null, 0.410, 0.410, null, 0.735, 0, 0.329, null, null],
+	1959: [null, 108.4, null, 0.395, 0.395, null, 0.756, 0, 0.355, null, null],
+	1958: [null, 106.6, null, 0.383, 0.383, null, 0.746, 0, 0.376, null, null],
+	1957: [null, 99.6, null, 0.380, 0.380, null, 0.751, 0, 0.390, null, null],
+	1956: [null, 99.0, null, 0.387, 0.387, null, 0.745, 0, 0.416, null, null],
+	1955: [null, 93.1, null, 0.385, 0.385, null, 0.738, 0, 0.415, null, null],
+	1954: [null, 79.5, null, 0.372, 0.372, null, 0.709, 0, 0.438, null, null],
+	1953: [null, 82.5, null, 0.370, 0.370, null, 0.716, 0, 0.466, null, null],
+	1952: [null, 83.7, null, 0.367, 0.367, null, 0.735, 0, 0.411, null, null],
+	1951: [null, 84.1, null, 0.357, 0.357, null, 0.733, 0, 0.400, null, null],
+	1950: [null, 80.0, null, 0.340, 0.340, null, 0.712, 0, 0.398, null, null],
+	1949: [null, 80.0, null, 0.327, 0.327, null, 0.703, 0, 0.353, null, null],
+	1948: [null, 72.7, null, 0.284, 0.284, null, 0.675, 0, 0.281, null, null],
+	1947: [null, 67.8, null, 0.279, 0.279, null, 0.641, 0, 0.267, null, null],
 };
 
-// knob, the stat it is fit to (index in a TARGETS row), the stat's key in the preview stats, and the damping exponent (about 1 / the
-// stat's elasticity to the knob, measured: ORB% moves ~4x as much as orbFactor in relative terms, FT rate ~2x foulRateFactor)
-const KNOBS = [
-	["pace", 0, "pace", 0.8],
-	["threePointTendencyFactor", 1, "tpaRate", 1],
-	["foulRateFactor", 2, "ftRate", 0.45],
-	["orbFactor", 3, "orbPct", 0.25],
-	["turnoverFactor", 4, "tovPct", 0.7],
-] as const;
+const T = {
+	pace: 0,
+	pts: 1,
+	ortg: 2,
+	efg: 3,
+	fg: 4,
+	tp: 5,
+	ft: 6,
+	tpaRate: 7,
+	ftRate: 8,
+	orb: 9,
+	tov: 10,
+} as const;
+
+type Row = (typeof TARGETS)[number];
+type Stats = Record<string, number>;
+
+// 2P% from FG%, 3P% and the 3PA rate (FG% = (1 - r) * 2P% + r * 3P%)
+const twoPct = (fg: number, tp: number | null, r: number) =>
+	tp === null || r === 0 ? fg : (fg - r * tp) / (1 - r);
+
+// knob, its target (null: not fit this season, the knob keeps its starting value), the sim stat, and the damping exponent (about 1 /
+// the stat's elasticity to the knob, measured: ORB% moves ~4x as much as orbFactor in relative terms, FT rate ~2x foulRateFactor)
+const KNOBS: [
+	string,
+	(row: Row) => number | null,
+	(stats: Stats, row: Row) => number,
+	(row: Row) => number,
+][] = [
+	[
+		"pace",
+		(row) => row[T.pace] ?? row[T.pts],
+		// before 1974 (no pace) the possessions are fit to points per game
+		(s, row) => (row[T.pace] === null ? s.pts : s.pace),
+		(row) => (row[T.pace] === null ? 1 : 0.8),
+	],
+	[
+		"threePointTendencyFactor",
+		(row) => row[T.tpaRate] || null,
+		(s) => s.tpaRate,
+		() => 1,
+	],
+	["foulRateFactor", (row) => row[T.ftRate], (s) => s.ftRate, () => 0.45],
+	["orbFactor", (row) => row[T.orb], (s) => s.orbPct, () => 0.25],
+	["turnoverFactor", (row) => row[T.tov], (s) => s.tovPct, () => 0.7],
+	["threePointAccuracyFactor", (row) => row[T.tp], (s) => s.tpPct, () => 1],
+	[
+		"twoPointAccuracyFactor",
+		(row) => twoPct(row[T.fg], row[T.tp], row[T.tpaRate]),
+		// before 1980 (no line) the sim's few threes count with the twos, so its FG% matches
+		(s, row) =>
+			row[T.tp] === null ? s.fgPct : twoPct(s.fgPct, s.tpPct, s.tpaRate),
+		() => 0.9,
+	],
+	["ftAccuracyFactor", (row) => row[T.ft], (s) => s.ftPct, () => 1],
+];
+
+// sim stat key -> target index, for the reported errors
+const REPORT = {
+	pace: T.pace,
+	pts: T.pts,
+	ortg: T.ortg,
+	efg: T.efg,
+	fgPct: T.fg,
+	tpPct: T.tp,
+	ftPct: T.ft,
+	tpaRate: T.tpaRate,
+	ftRate: T.ftRate,
+	orbPct: T.orb,
+	tovPct: T.tov,
+};
 
 const round = (x: number, d: number) => Math.round(x * 10 ** d) / 10 ** d;
 
@@ -139,6 +212,7 @@ test.skipIf(!env.ERA_CAL)(
 		const games = Number(env.ERA_CAL_GAMES ?? 100);
 		const iters = Number(env.ERA_CAL_ITERS ?? 10);
 		const checkGames = Number(env.ERA_CAL_CHECK_GAMES ?? 300);
+		const avgIters = Number(env.ERA_CAL_AVG_ITERS ?? Math.ceil(iters / 2));
 		const seasons = env.ERA_CAL_SEASONS
 			? env.ERA_CAL_SEASONS.split(",").map(Number)
 			: Object.keys(TARGETS)
@@ -181,16 +255,38 @@ test.skipIf(!env.ERA_CAL)(
 		await lock.set("gameSim", false);
 
 		const tids = (await idb.cache.teams.getAll()).map((t) => t.tid);
+		// Balanced matchups: whole round robin rounds (circle method, on a seeded shuffle of the teams, home and away alternating), so
+		// every team plays about as many games as every other (a random team mix moves the league averages, e.g. FT rate by ~0.005)
 		const makePairs = (n: number, s: number) => {
 			const r = makeSeededRandom(s);
-			const pairs = [];
-			for (let i = 0; i < n; i++) {
-				const a = Math.floor(r() * tids.length);
-				let b = Math.floor(r() * (tids.length - 1));
-				if (b >= a) {
-					b += 1;
+			const shuffle = () => {
+				const out = [...tids];
+				for (let i = out.length - 1; i > 0; i--) {
+					const j = Math.floor(r() * (i + 1));
+					[out[i], out[j]] = [out[j], out[i]];
 				}
-				pairs.push([tids[a], tids[b]]);
+				if (out.length % 2 === 1) {
+					out.push(undefined);
+				}
+				return out;
+			};
+			let order = shuffle();
+			const k = order.length;
+			const pairs = [];
+			for (let round = 0; pairs.length < n; round++) {
+				if (round > 0 && round % (k - 1) === 0) {
+					order = shuffle();
+				}
+				const rest = order.slice(1);
+				const shift = round % (k - 1);
+				const arr = [order[0], ...rest.slice(shift), ...rest.slice(0, shift)];
+				for (let i = 0; i < k / 2; i++) {
+					const a = arr[i];
+					const b = arr[k - 1 - i];
+					if (a !== undefined && b !== undefined) {
+						pairs.push(round % 2 === 0 ? [a, b] : [b, a]);
+					}
+				}
 			}
 			return pairs;
 		};
@@ -200,7 +296,7 @@ test.skipIf(!env.ERA_CAL)(
 			runPreviewGames(await loadMatchups(pairs, {}), settings, s);
 
 		const fitted = {};
-		let prev;
+		let prev = env.ERA_CAL_START ? JSON.parse(env.ERA_CAL_START) : undefined;
 		for (const season of seasons) {
 			const target = TARGETS[season];
 			const old = gameSimPresets[season] ?? gameSimPresets[2020];
@@ -208,57 +304,74 @@ test.skipIf(!env.ERA_CAL)(
 				...old,
 				foulRateFactor: old.foulRateFactor ?? 1,
 			};
-			// Start the tendency knobs from the neighboring (later) season's fit: a starting point when there is a target, and the value
-			// to keep when the stat was not counted (ORB before 1974, TOV before 1978). Before 1980 (no line) the old near-zero 3PA value stays.
+			// Start the knobs from the neighboring (later) season's fit: a starting point when there is a target, and the value to keep
+			// when the stat was not counted (ORB% and TOV% before 1974). Before 1980 (no line) the old 3PA and 3P% values stay.
 			if (prev) {
-				for (const [knob, i] of KNOBS) {
-					if (knob !== "pace" && target[i] !== 0) {
+				for (const [knob] of KNOBS) {
+					if (
+						knob !== "pace" &&
+						!(
+							(knob === "threePointTendencyFactor" ||
+								knob === "threePointAccuracyFactor") &&
+							target[T.tp] === null
+						) &&
+						prev[knob] !== undefined
+					) {
 						settings[knob] = prev[knob];
 					}
 				}
 			}
-			const avg = [];
+			// Each iteration's games are effectively a fresh sample (a knob change shifts the random draws), and a 200 game sample's
+			// league averages move by ~0.005 in FG% or FT rate from one to the next, so the fit averages over many iterations: each one
+			// gives an estimate of the knob that would hit the target (knob * (target / stat) ^ exp), and the last avgIters estimates
+			// are averaged. The settings themselves follow the estimates, so the later iterations are played near the answer.
+			const implied = [];
 			for (let it = 0; it < iters; it++) {
-				const stats = await play(fitPairs, settings, 3000 + seed);
+				const stats = await play(fitPairs, settings, 3000 + seed + it);
 				if (env.ERA_CAL_TRACE) {
-					console.log(JSON.stringify({ season, it, settings, stats }));
+					out({ trace: true, season, it, settings, stats });
 				}
-				for (const [knob, i, stat, exp] of KNOBS) {
-					const t = target[i];
-					if (t === null || t === 0 || stats[stat] <= 0) {
+				const estimate = { ...settings };
+				for (const [knob, getTarget, get, exp] of KNOBS) {
+					const t = getTarget(target);
+					const s = get(stats, target);
+					if (t === null || t === 0 || !(s > 0)) {
 						continue;
 					}
-					const ratio = helpers.bound((t / stats[stat]) ** exp, 0.75, 1.33);
-					settings[knob] *= ratio;
+					const ratio = helpers.bound((t / s) ** exp(target), 0.75, 1.33);
+					estimate[knob] = settings[knob] * ratio;
 				}
-				settings.threePointTendencyFactor = helpers.bound(
-					settings.threePointTendencyFactor,
+				estimate.threePointTendencyFactor = helpers.bound(
+					estimate.threePointTendencyFactor,
 					0,
 					3,
 				);
-				// Average the knobs over the last 3 iterations (smooths out the sampling noise of a 100 game fit)
-				if (it >= iters - 3) {
-					avg.push({ ...settings });
+				if (it >= iters - avgIters) {
+					implied.push(estimate);
 				}
-			}
-			for (const [knob] of KNOBS) {
-				settings[knob] =
-					avg.reduce((sum, row) => sum + row[knob], 0) / avg.length;
+				// Play the next iteration at the running average of the estimates (once averaging has started), else at this estimate
+				for (const [knob] of KNOBS) {
+					settings[knob] =
+						implied.length > 0
+							? implied.reduce((sum, row) => sum + row[knob], 0) /
+								implied.length
+							: estimate[knob];
+				}
 			}
 			const check = await play(checkPairs, settings, 4000 + seed);
 			const errors = {};
-			for (const [, i, stat] of KNOBS) {
+			for (const [stat, i] of Object.entries(REPORT)) {
 				const t = target[i];
-				if (t !== null && !(i === 1 && t === 0)) {
+				if (t !== null && !(i === T.tpaRate && t === 0)) {
 					errors[stat] = round(check[stat] - t, 4);
 				}
 			}
 			const preset = {
 				pace: round(settings.pace, 1),
 				threePointTendencyFactor: round(settings.threePointTendencyFactor, 3),
-				threePointAccuracyFactor: settings.threePointAccuracyFactor,
-				twoPointAccuracyFactor: settings.twoPointAccuracyFactor,
-				ftAccuracyFactor: settings.ftAccuracyFactor,
+				threePointAccuracyFactor: round(settings.threePointAccuracyFactor, 3),
+				twoPointAccuracyFactor: round(settings.twoPointAccuracyFactor, 3),
+				ftAccuracyFactor: round(settings.ftAccuracyFactor, 3),
 				blockFactor: settings.blockFactor,
 				stealFactor: settings.stealFactor,
 				turnoverFactor: round(settings.turnoverFactor, 3),
