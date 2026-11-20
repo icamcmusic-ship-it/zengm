@@ -11,6 +11,13 @@ import { bySport } from "../../common/sportFunctions.ts";
 import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
 import { groupByUnique, last } from "../../common/utils.ts";
 import { showStatsByType } from "../../common/awards.ts";
+import { awardCandidateStats } from "../core/awards/getAwardCandidates.ts";
+import {
+	effectiveAwardFormula,
+	getAwardKeyStats,
+	pickerStats,
+	type KeyStatRow,
+} from "../core/awards/keyStats.ts";
 import { getPosByGpF } from "../core/player/getPosByGpF.ts";
 import { formatAwardNamePrefix } from "../core/awards/prefixes.ts";
 import { PlayersCache } from "../db/PlayersCache.ts";
@@ -120,7 +127,11 @@ export default defineView({
 					throw new Error("Invalid showStats");
 				}
 
-				const allStats = [...stats];
+				// (award key stats: every stat the award's picker offers, so the page shows the user's chosen columns or the
+				// ones its formula suggests)
+				const allStats = [
+					...new Set([...stats, ...(pickerStats(false, []) as typeof stats)]),
+				];
 				if (__SPORT === "baseball") {
 					allStats.push("gpF");
 				}
@@ -237,12 +248,100 @@ export default defineView({
 				}
 			}
 
+			// Award key stats: each award's formula's stats, ranked across the players this page shows for it (the winner and
+			// the stored finishers, or the whole team), as on Award Races and Award History
+			const keyStatsFor = async (
+				award: (typeof awards.awards)[number],
+				shown: { pid?: number; tid?: number; pos?: string }[],
+			) => {
+				const rows: KeyStatRow[] = [];
+				for (const w of shown) {
+					if (w.pid === undefined || w.tid === undefined) {
+						continue;
+					}
+					const ap = await augmentPlayer({
+						pid: w.pid,
+						pos: w.pos,
+						season: awards.season,
+						showStats: award.showStats,
+						statRange: award.statRange,
+						tid: w.tid,
+					});
+					if (!ap) {
+						continue;
+					}
+					const t = teamsByTid[w.tid]?.seasonAttrs;
+					const gp = t ? t.won + t.lost + (t.tied ?? 0) + (t.otl ?? 0) : 0;
+					const stats: Record<string, unknown> = {
+						seasonFraction: 1,
+						teamGp: gp,
+						winp: t && gp > 0 ? (t.won + 0.5 * (t.tied ?? 0)) / gp : 0,
+					};
+					for (const [k, v] of Object.entries(ap.stats)) {
+						stats[k] = Array.isArray(v)
+							? v
+									.filter((x): x is number => typeof x === "number")
+									.reduce((a, b) => a + b, 0)
+							: v;
+					}
+					for (const [k, v] of Object.entries(ap.statOverrides ?? {})) {
+						stats[k] = v;
+					}
+					rows.push({ stats, formula: effectiveAwardFormula(award, ap.pos) });
+				}
+				return getAwardKeyStats({
+					award,
+					fallback: awardCandidateStats[award.showStats] ?? [],
+					rows,
+				});
+			};
+			const storedByShortName = new Map(
+				awards.awards.map((award) => [
+					award.shortName + JSON.stringify(award.group ?? null),
+					award,
+				]),
+			);
+			const withKeyStats = async <
+				T extends { shortName: string; group?: unknown },
+			>(
+				list: T[],
+			) => {
+				const out = [];
+				for (const a of list) {
+					const stored = storedByShortName.get(
+						a.shortName + JSON.stringify(a.group ?? null),
+					);
+					if (!stored) {
+						out.push(a);
+						continue;
+					}
+					const shown =
+						stored.numTeams === undefined
+							? (
+									stored.winner as {
+										pid?: number;
+										tid?: number;
+										pos?: string;
+									}[]
+								).slice(0, 5)
+							: (
+									stored.winner as {
+										pid?: number;
+										tid?: number;
+										pos?: string;
+									}[][]
+								).flat();
+					out.push({ ...a, keyStats: await keyStatsFor(stored, shown) });
+				}
+				return out;
+			};
+
 			const awardsAugmented = {
 				season: awards.season,
 				bestRecordConfs: augmentTeams(awards.bestRecordConfs),
-				individualAwards,
-				individualAwardsPlayoffs,
-				teamAwards,
+				individualAwards: await withKeyStats(individualAwards),
+				individualAwardsPlayoffs: await withKeyStats(individualAwardsPlayoffs),
+				teamAwards: await withKeyStats(teamAwards),
 			};
 
 			const retiredPlayersAll = await idb.merged.players.getAll({

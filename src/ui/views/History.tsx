@@ -7,6 +7,11 @@ import { helpers } from "../util/helpers.ts";
 import React from "react";
 import { showStatsByType } from "../../common/awards.ts";
 import { getCol } from "../../common/getCol.ts";
+import {
+	keyStatTitle,
+	useAwardStatCols,
+	type AwardKeyStats,
+} from "../components/AwardKeyStats.tsx";
 
 type ActualProps = Exclude<
 	View<"history">,
@@ -32,10 +37,19 @@ const Winner = ({
 	season: number;
 	userTid: number;
 }) => {
-	const stats = showStatsByType[award.showStats];
-	if (!stats) {
+	const fixedStats = showStatsByType[award.showStats];
+	if (!fixedStats) {
 		throw new Error("Invalid showStats");
 	}
+	// Award key stats: the user's chosen columns for this award, or the ones its formula suggests (Award Races, Award History)
+	const keyStats = (award as { keyStats?: AwardKeyStats }).keyStats;
+	const chosen = useAwardStatCols(
+		award.shortName,
+		keyStats,
+		keyStats !== undefined,
+	);
+	const stats: string[] =
+		keyStats && chosen.stats.length > 0 ? chosen.stats : fixedStats;
 
 	if (!p) {
 		return null;
@@ -74,10 +88,27 @@ const Winner = ({
 			</div>
 			<div className={indentStats ? "ms-3" : undefined}>
 				{stats
-					.map(
+					.filter(
 						(stat) =>
-							`${helpers.roundStat(p.statOverrides?.[stat] ?? p.stats[stat], stat)}${stat === "keyStats" ? "" : ` ${getCol(`stat:${stat}`).title}`}`,
+							(p.statOverrides as Record<string, unknown> | undefined)?.[
+								stat
+							] !== undefined ||
+							(p.stats as Record<string, unknown>)[stat] !== undefined,
 					)
+					.map((stat) => {
+						const value =
+							(p.statOverrides as Record<string, unknown> | undefined)?.[
+								stat
+							] ?? (p.stats as Record<string, unknown>)[stat];
+						const shown =
+							typeof value === "number"
+								? helpers.roundStat(value, stat)
+								: String(value);
+						if (stat === "keyStats") {
+							return shown;
+						}
+						return `${shown} ${keyStats ? keyStatTitle(stat, keyStats) : getCol(`stat:${stat}`).title}`;
+					})
 					.join(", ")}
 			</div>
 		</>
