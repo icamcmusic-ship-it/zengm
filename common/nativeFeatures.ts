@@ -884,6 +884,15 @@ export const NATIVE_FEATURES = [
 		defaultNewLeague: true,
 	},
 	{
+		id: "parityBalance",
+		key: "featureParityBalance",
+		name: "League Parity",
+		description:
+			"AI front offices stop concentrating talent on a few teams: stars on losing teams aren't twice as quick to refuse to re-sign as stars on winning teams are to stay, an AI team already in the luxury tax only re-signs its best player into it, and AI-to-AI trades can't make the better team much better (2+ team ovr points). Your team's moves aren't affected, and nothing in the game sim changes.",
+		default: false,
+		defaultNewLeague: true,
+	},
+	{
 		id: "capExceptions",
 		key: "featureCapExceptions",
 		core: true,

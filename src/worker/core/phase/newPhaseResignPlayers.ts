@@ -165,9 +165,12 @@ const newPhaseResignPlayers = async (
 	// tax is the only brake, and without this payrolls ran away (half the league in the tax, a team 2x the cap and $400M in debt)
 	const avoidTax = g.get("salaryCapType") !== "hard" && g.get("luxuryTax") > 0;
 	// Competitive Balance (setting): only the two best go into the tax
-	const avoidTaxMinRank = featureOn("competitiveBalance")
-		? AVOID_TAX_MIN_RANK - 1
-		: AVOID_TAX_MIN_RANK;
+	// League Parity (setting): only the best one
+	const avoidTaxMinRank = featureOn("parityBalance")
+		? 1
+		: featureOn("competitiveBalance")
+			? AVOID_TAX_MIN_RANK - 1
+			: AVOID_TAX_MIN_RANK;
 	const teamValueRank = new Map<number, number>();
 	if (avoidTax) {
 		const byTid = Map.groupBy(players, (p) => p.tid);

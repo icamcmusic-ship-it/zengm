@@ -17,6 +17,7 @@ import { g, local } from "../../util/index.ts";
 import { orderBy } from "../../../common/utils.ts";
 import { shuffle } from "../../../common/random.ts";
 import { getAllGmWeights } from "../gm/index.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
 import {
 	capExceptionsEnabled,
 	makeAiCapExceptionPicker,
@@ -125,7 +126,9 @@ const autoSign = async () => {
 
 		let probSkip;
 		if (__SPORT === "basketball") {
-			probSkip = t.strategy === "rebuilding" ? 0.9 : 0.75;
+			// League Parity (setting): rebuilding teams, the ones with cap space, are as active as contenders
+			probSkip =
+				t.strategy === "rebuilding" && !featureOn("parityBalance") ? 0.9 : 0.75;
 		} else {
 			probSkip = 0.5;
 		}
