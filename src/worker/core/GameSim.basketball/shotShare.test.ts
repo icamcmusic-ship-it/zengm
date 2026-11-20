@@ -301,12 +301,14 @@ describe("in the game sim", () => {
 		"weights: game plan, hot hand, late clock, roles",
 		{ timeout: 300_000 },
 		async () => {
-			const [{ sim }] = await simGames(
-				{ ...NEW_LEAGUE, shotShareModel: true },
-				[11],
-				undefined,
-				false,
-			);
+			const { sim } = (
+				await simGames(
+					{ ...NEW_LEAGUE, shotShareModel: true },
+					[11],
+					undefined,
+					false,
+				)
+			)[0]!;
 			sim.ssLate = false;
 			const base = shares([...sim.shotShareWeights(0)]);
 
