@@ -1,5 +1,6 @@
 import type { AdvCareer } from "./advStats.ts";
 import type { StoredSubInfo } from "./subRatingsGen.ts";
+import type { GenVariety } from "./prospectVariety.ts";
 import type { RumorState } from "./rumors/types.ts";
 import type { SystemTrends } from "./coachSystems.ts";
 import * as z from "zod";
@@ -1716,6 +1717,12 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	draftClassShapeV?: number;
 	// The injury-riddled class: he comes into the draft off an injury (his college story)
 	draftClassShapeInjury?: boolean;
+	// A second, compatible shape his class was given on top of the first (one about strength, one about composition)
+	draftClassShape2?: string;
+
+	// Basketball: prospect variety (common/prospectVariety.ts), for players generated since it exists: his variety seed (development group
+	// rates), a ceiling multiplier and, until his class is saved, the ages he developed at before the draft. Hidden from the UI.
+	genVar?: GenVariety;
 
 	// Basketball, the subRatings setting: his sub-ratings seed, hidden growth profile and generation info (see common/subRatingsGen.ts)
 	subP?: StoredSubInfo;

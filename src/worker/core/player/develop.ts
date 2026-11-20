@@ -34,6 +34,10 @@ import {
 	syncExpandedToCompat,
 } from "./expandedRatings.ts";
 import {
+	devRatesOf,
+	type GenVariety,
+} from "../../../common/prospectVariety.ts";
+import {
 	basesBefore,
 	developRowSubs,
 	ensureSubs,
@@ -190,6 +194,13 @@ const develop = async (
 	const ratings = last(p.ratings);
 	let age = ratings.season - p.born.year;
 
+	// Prospect variety: players generated since it exists develop each rating group at their own rate
+	const genVar = (p as { genVar?: GenVariety }).genVar;
+	const rates =
+		__SPORT === "basketball" && genVar && !p.srID
+			? devRatesOf(genVar)
+			: undefined;
+
 	for (let i = 0; i < years; i++) {
 		// (CONFUSING!) Don't increment age for existing players developing one season (i.e. newPhasePreseason) because the season is already incremented before this function is called. But in other scenarios (new league and draft picks), the season is not changing, so age should be incremented every iteration of this loop.
 		if (newPlayer || years > 1) {
@@ -205,6 +216,7 @@ const develop = async (
 				coachingLevel,
 				false,
 				__SPORT === "basketball" && years === 1 ? traitDev : undefined,
+				rates,
 			);
 			if (before) {
 				developRowSubs(p as any, ratings, before, age);

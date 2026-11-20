@@ -1,5 +1,6 @@
 // Family heredity (basketball): a player generated as the son or brother of an existing player takes after him in size (height, length,
-// weight for his height), athleticism (speed, jumping, endurance) and a few trait seeds. Each one is a correlated blend around the
+// weight for his height), athleticism (speed, jumping, endurance), a few trait seeds and, for players generated with prospect variety, his shooting and skill
+// tendencies (how much they stand out from the rest of his game; his ovr kept). Each one is a correlated blend around the
 // league mean: new = mean + h * (relative - mean) + sqrt(1 - h^2) * (own - mean), so a son of a 7-footer is tall but regresses toward
 // the mean, the spread of the league's players stays what it was, and every shift is bounded. No random numbers are drawn.
 
@@ -10,6 +11,8 @@ import { g, helpers } from "../../util/index.ts";
 import { BASKETBALL_WEIGHT } from "./genWeight.ts";
 import limitRating from "./limitRating.ts";
 import { getTraitSeeds, traitsEnabled } from "./traits.ts";
+import { HEREDITY_SKILL } from "../../../common/prospectVariety.ts";
+import { reshapeKeepingOvr, SKILL_KEYS } from "./prospectVariety.ts";
 
 export const HEREDITY = {
 	// Correlation with the relative (father-son and brother-brother height correlation is about 0.5 in people; athleticism and temperament
@@ -52,6 +55,30 @@ export const HEREDITY = {
 };
 
 type Kind = keyof typeof HEREDITY.h;
+
+// Tendencies: a group's mean rating minus the mean of all 14 skill ratings, and its average among prospects (what the blend regresses to)
+const HEREDITY_TENDENCY_KEYS: Record<string, string[]> = {
+	shooting: ["ft", "fg", "tp"],
+	skill: ["drb", "pss", "oiq"],
+};
+const HEREDITY_TENDENCY_MEAN: Record<string, number> = {
+	shooting: 1,
+	skill: -1.5,
+};
+const tendency = (r: any, keys: string[]) => {
+	if (!r) {
+		return Number.NaN;
+	}
+	let all = 0;
+	for (const key of SKILL_KEYS) {
+		all += r[key];
+	}
+	let group = 0;
+	for (const key of keys) {
+		group += r[key];
+	}
+	return group / keys.length - all / SKILL_KEYS.length;
+};
 
 const blend = (
 	own: number,
@@ -168,6 +195,31 @@ export const inheritFromRelative = (
 				),
 			),
 		);
+	}
+
+	// Shooting and skill tendencies (prospect variety, only for players generated with it): how much his shooting and his skill (handle,
+	// passing, IQ) stand out from the rest of his game, blended with the relative's at about the same age, his ovr kept
+	if (p.genVar) {
+		const deltas: Record<string, number> = {};
+		for (const [group, keys] of Object.entries(HEREDITY_TENDENCY_KEYS)) {
+			const own = tendency(r, keys);
+			const relT = tendency(relRow, keys);
+			if (!Number.isFinite(own) || !Number.isFinite(relT)) {
+				continue;
+			}
+			const mean = HEREDITY_TENDENCY_MEAN[group]!;
+			const shift = Math.round(
+				blend(own, relT, mean, HEREDITY_SKILL.h, HEREDITY_SKILL.maxShift) - own,
+			);
+			if (shift !== 0) {
+				for (const key of keys) {
+					deltas[key] = (deltas[key] ?? 0) + shift;
+				}
+			}
+		}
+		if (Object.keys(deltas).length > 0) {
+			reshapeKeepingOvr(r, deltas);
+		}
 	}
 
 	// Trait seeds (only stored with the Player Traits setting on; with it off they are derived later from the pid, as for anyone)
