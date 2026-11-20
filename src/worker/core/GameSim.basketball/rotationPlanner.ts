@@ -41,6 +41,8 @@ export type RotationPlanOptions = {
 	rotationStyle?: number;
 	// Coaching systems: minutes the starters give up on the second night of a back-to-back (rest philosophy). Undefined = 2
 	backToBackCut?: number;
+	// Minutes in regulation (numPeriods * quarterLength). The tables are for 48; everything is scaled to this. Undefined = 48
+	regulationMinutes?: number;
 };
 
 // Minutes targets per regulation game, in the order of players (0 for injured players and the end of the bench). They sum to
@@ -121,6 +123,20 @@ export const planMinutes = (
 		}
 	}
 
+	// Shorter (college 2x20) or longer games: the same shares of the game. Before, the 48-minute plan was compared with the minutes of a
+	// 40-minute game, so every planned player looked behind his plan
+	const gameScale =
+		options.regulationMinutes !== undefined &&
+		Number.isFinite(options.regulationMinutes) &&
+		options.regulationMinutes > 0
+			? options.regulationMinutes / 48
+			: 1;
+	if (gameScale !== 1) {
+		for (let i = 0; i < targets.length; i++) {
+			targets[i] = targets[i]! * gameScale;
+		}
+	}
+
 	return targets;
 };
 
@@ -140,28 +156,49 @@ export const UNPLANNED_FACTOR = 0.2;
 // A player sitting because of foul trouble
 export const FOUL_TROUBLE_SIT_FACTOR = 0.05;
 
-// Foul trouble rules (NBA-like, with 6 fouls to foul out and 4 periods): when he commits his nth foul, until when (in elapsed
-// regulation seconds) he sits. undefined = he doesn't have to sit
+// Foul trouble rules (NBA-like, with 6 fouls to foul out): when he commits his nth foul, until when (in elapsed regulation seconds) he
+// sits. undefined = he doesn't have to sit. Written for 4 quarters; with another number of periods (college halves) the game is
+// treated as 4 equal "quarters" by elapsed time (elapsed is then needed), so the same rules apply at the same points of the game
+// (before, they never applied unless there were exactly 4 periods)
 export const foulTroubleSitUntil = ({
 	pf,
 	period,
 	numPeriods,
 	foulsNeededToFoulOut,
 	quarterSeconds,
+	elapsed,
 }: {
 	pf: number;
 	period: number;
 	numPeriods: number;
 	foulsNeededToFoulOut: number;
 	quarterSeconds: number;
+	// Elapsed regulation seconds at the foul (only used when numPeriods !== 4)
+	elapsed?: number;
 }) => {
-	if (numPeriods !== 4 || foulsNeededToFoulOut < 5 || period > numPeriods) {
+	if (
+		numPeriods < 1 ||
+		foulsNeededToFoulOut < 5 ||
+		period > numPeriods ||
+		!(quarterSeconds > 0)
+	) {
 		return undefined;
 	}
 	const f = foulsNeededToFoulOut;
-	// Elapsed seconds when the clock in period q shows m minutes (minutes scaled to the quarter length)
+	// "Quarters" of the game, each a quarter of regulation
+	const virtualQuarterSeconds = (numPeriods * quarterSeconds) / 4;
+	if (numPeriods !== 4) {
+		if (elapsed === undefined || !Number.isFinite(elapsed)) {
+			return undefined;
+		}
+		period = Math.max(
+			1,
+			Math.min(4, Math.floor(elapsed / virtualQuarterSeconds) + 1),
+		);
+	}
+	// Elapsed seconds when the clock in "quarter" q shows m minutes (minutes scaled to the quarter length)
 	const at = (q: number, m: number) =>
-		(q - 1) * quarterSeconds + quarterSeconds * (1 - m / 12);
+		(q - 1) * virtualQuarterSeconds + virtualQuarterSeconds * (1 - m / 12);
 	if (pf >= f - 1) {
 		// 5 fouls: closing minutes only
 		return at(4, 5);

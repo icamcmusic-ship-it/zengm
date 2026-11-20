@@ -1,5 +1,6 @@
 import { PHASE } from "../../../common/constants.ts";
 import { orderBy } from "../../../common/utils.ts";
+import { withRandom } from "../../../common/random.ts";
 import type { Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g, local } from "../../util/index.ts";
@@ -67,7 +68,12 @@ export const combineMarket = (
 };
 
 // For each free agent, which AI teams want him and how likely each is to sign him soon. This runs getBest a few times per team, like autoSign would over the next few days, without signing anyone.
-export const getFreeAgentMarket = async (freeAgents: Player[]) => {
+// random: where getBest draws a random number (no salary cap), it draws from this instead of Math.random (rumors, which must not move
+// the sim's sequence). Only swapped around the synchronous call, never across an await
+export const getFreeAgentMarket = async (
+	freeAgents: Player[],
+	random?: () => number,
+) => {
 	const output: Record<number, FreeAgentMarket> = {};
 	const phase = g.get("phase");
 	const signingAllowed =
@@ -119,7 +125,11 @@ export const getFreeAgentMarket = async (freeAgents: Player[]) => {
 			});
 
 			for (const tier of TIERS) {
-				const p = getBest(roster, available, payroll, pickCapException);
+				const p = random
+					? withRandom(random, () =>
+							getBest(roster, available, payroll, pickCapException),
+						)
+					: getBest(roster, available, payroll, pickCapException);
 				if (!p) {
 					break;
 				}

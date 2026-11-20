@@ -1,3 +1,4 @@
+import { validateGameSimSettings } from "../../common/gameSimSettingsValidation.ts";
 import { csvFormat, csvFormatRows } from "d3-dsv";
 import type {
 	CoachRole,
@@ -4815,6 +4816,16 @@ const updateGameAttributesGodMode = async (
 	const gameAttributes: Partial<GameAttributesLeague> = omit(settings, [
 		"repeatSeason",
 	]);
+
+	// Game sim range checks, for the values being changed (a league that already has an out of range value can still save other settings)
+	validateGameSimSettings(
+		Object.fromEntries(
+			Object.entries(gameAttributes).filter(
+				([key, value]) =>
+					!(Object.hasOwn(g, key) && value === g.get(key as any)),
+			),
+		),
+	);
 
 	const currentRepeatSeasonType = g.get("repeatSeason")?.type ?? "disabled";
 	const repeatSeason = settings.repeatSeason;
