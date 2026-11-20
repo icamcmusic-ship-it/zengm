@@ -255,6 +255,12 @@ const SCENARIOS: Scenario[] = [
 	},
 	{ name: "Elam ending", seeds: 10, settings: { ...ALL_ON, elam: true } },
 	{
+		name: "overtime",
+		// (short quarters, so ties after regulation are common: the overtime line doesn't depend on a lucky seed above)
+		seeds: 10,
+		settings: { quarterLength: 0.5 },
+	},
+	{
 		name: "shootouts",
 		// (a tie after regulation is a few percent of games, so enough of them for a handful of shootouts)
 		seeds: 150,

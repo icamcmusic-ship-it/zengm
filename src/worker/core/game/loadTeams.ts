@@ -40,6 +40,7 @@ import {
 } from "../GameSim.basketball/spacingCreation.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import { aiDefScheme, aiShotProfile } from "../../../common/shotProfiles.ts";
+import { getShootingHand } from "../../../common/shootingHand.ts";
 import {
 	aiShotPlans,
 	seasonDriftMults,
@@ -579,6 +580,8 @@ export const processTeam = async (
 					(rating as any).stre,
 					(rating as any).endu,
 				);
+				// ...and lefties get a small edge at the rim (computed once per player here, not per shot)
+				(p2 as any).lefty = getShootingHand(p) === "left";
 			}
 		}
 		if (SEASON_STATS_KEYS !== undefined) {
