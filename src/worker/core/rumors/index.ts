@@ -1060,6 +1060,7 @@ const notify = async (rumors: Rumor[]) => {
 	for (const r of rumors) {
 		await logEvent({
 			type: "info",
+			category: "trades",
 			text: `Rumor: ${renderRumorText(r.text, teamName)} <a href="${url}">Rumors</a>`,
 			saveToDb: false,
 			tids: [g.get("userTid")],

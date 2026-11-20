@@ -474,6 +474,7 @@ export const addAiOffer = async (
 		const url = helpers.leagueUrl(["trade_offers"]);
 		await logEvent({
 			type: "info",
+			category: "trades",
 			text: `Trade offer: ${built.reason} <a href="${url}">View offer</a>`,
 			saveToDb: false,
 			tids: [g.get("userTid")],
@@ -529,6 +530,7 @@ const deadlineNotice = async () => {
 	deadlineNoticeSeasons.add(noticeKey);
 	await logEvent({
 		type: "info",
+		category: "trades",
 		text: `The trade deadline is ${daysLeft <= 1 ? "tomorrow" : `in ${daysLeft} days`}. ${featureOn("tradeMarket") ? `See who AI teams are shopping on the <a href="${helpers.leagueUrl(["trade_market"])}">Trade Market</a>.` : ""}`.trim(),
 		saveToDb: false,
 		tids: [g.get("userTid")],

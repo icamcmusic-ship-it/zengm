@@ -8,6 +8,7 @@ import type { FaceConfig } from "facesjs";
 import type { FaceAging } from "./faceAging.ts";
 import type { ReactNode } from "react";
 import type { RBState } from "./recordsBook.ts";
+import type { NotificationFilter } from "./notificationCategories.ts";
 import type { MarqueeKind } from "./marquee.ts";
 import type { DraftCombineResult } from "./draftCombine.ts";
 import type { CapExceptionType, TeamCapExceptions } from "./capExceptions.ts";
@@ -905,6 +906,7 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	rookiesCanRefuse: boolean;
 	salaryCap: number;
 	salaryCapType: "hard" | "none" | "soft";
+	notificationFilter?: NotificationFilter;
 	saveOldBoxScores: {
 		pastSeasons: number | "all";
 		pastSeasonsType?: "your" | "all";

@@ -1,3 +1,4 @@
+import type { NotificationFilter } from "../../../common/notificationCategories.ts";
 import clsx from "clsx";
 import { useState, type ReactNode, type SubmitEvent, useEffect } from "react";
 import { ActionButton } from "../../components/ActionButton.tsx";
@@ -212,6 +213,7 @@ export const SPECIAL_STATE_OTHERS = [
 	"injuries",
 	"tragicDeaths",
 	"playerBioInfo",
+	"notificationFilter",
 ] as const;
 export const SPECIAL_STATE_BOOLEANS = ["godMode", "godModeInPast"] as const;
 export const SPECIAL_STATE_ALL = [
@@ -229,6 +231,7 @@ export type State = Record<
 		injuries: InjuriesSetting;
 		tragicDeaths: TragicDeaths;
 		playerBioInfo: PlayerBioInfo | undefined;
+		notificationFilter: NotificationFilter;
 		saveOldBoxScores: Omit<
 			GameAttributesLeague["saveOldBoxScores"],
 			"pastSeasons"

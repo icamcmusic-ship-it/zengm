@@ -1446,6 +1446,20 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					salaryCapType: {
 						enum: ["hard", "none", "soft"],
 					},
+					notificationFilter: {
+						type: "object",
+						properties: {
+							hidden: {
+								type: "array",
+								items: {
+									type: "string",
+								},
+							},
+							onlyMyTeam: {
+								type: "boolean",
+							},
+						},
+					},
 					saveOldBoxScores: {
 						type: "object",
 						properties: {

@@ -19,6 +19,11 @@ import {
 } from "../../../common/defaultGameAttributes.ts";
 import type { HandleChange, HandleChangeRaw } from "./SettingsFormOptions.tsx";
 import type { State } from "./SettingsForm.tsx";
+import {
+	NOTIFICATION_CATEGORIES,
+	NOTIFICATION_CATEGORY_NAMES,
+	NOTIFICATION_PRESETS,
+} from "../../../common/notificationCategories.ts";
 import RowsEditor from "./RowsEditor.tsx";
 import PlayerBioInfo2 from "./PlayerBioInfo.tsx";
 import type {
@@ -3077,6 +3082,100 @@ export const settings: Setting[] = (
 					pastSeasons,
 				};
 			},
+		},
+		{
+			category: "UI",
+			key: "notificationFilter",
+			name: "Pop-up Notifications",
+			type: "custom",
+			maxWidth: true,
+			customForm: ({ disabled, handleChangeRaw, id, state }) => {
+				const filter = state.notificationFilter ?? {};
+				const hidden = filter.hidden ?? [];
+				const onChange = handleChangeRaw("notificationFilter");
+				const presetKey = Object.entries(NOTIFICATION_PRESETS).find(
+					([, preset]) =>
+						preset.filter.hidden.length === hidden.length &&
+						preset.filter.hidden.every((c) => hidden.includes(c)) &&
+						preset.filter.onlyMyTeam === !!filter.onlyMyTeam,
+				)?.[0];
+
+				return (
+					<div className="d-flex flex-column gap-1">
+						<div className="btn-group btn-group-sm">
+							{Object.entries(NOTIFICATION_PRESETS).map(([key, preset]) => (
+								<button
+									key={key}
+									type="button"
+									className={`btn btn-${presetKey === key ? "primary" : "secondary"}`}
+									disabled={disabled}
+									onClick={() => {
+										onChange({
+											hidden: [...preset.filter.hidden],
+											onlyMyTeam: preset.filter.onlyMyTeam,
+										});
+									}}
+								>
+									{preset.name}
+								</button>
+							))}
+						</div>
+						{NOTIFICATION_CATEGORIES.map((category) => (
+							<div className="form-check form-switch" key={category}>
+								<input
+									className="form-check-input"
+									type="checkbox"
+									id={`${id}-${category}`}
+									disabled={disabled}
+									checked={!hidden.includes(category)}
+									onChange={(event) => {
+										onChange({
+											...filter,
+											hidden: event.target.checked
+												? hidden.filter((c) => c !== category)
+												: [...hidden, category],
+										});
+									}}
+								/>
+								<label
+									className="form-check-label"
+									htmlFor={`${id}-${category}`}
+								>
+									{NOTIFICATION_CATEGORY_NAMES[category]}
+								</label>
+							</div>
+						))}
+						<div className="form-check form-switch">
+							<input
+								className="form-check-input"
+								type="checkbox"
+								id={`${id}-onlyMyTeam`}
+								disabled={disabled}
+								checked={!!filter.onlyMyTeam}
+								onChange={(event) => {
+									onChange({
+										...filter,
+										onlyMyTeam: event.target.checked,
+									});
+								}}
+							/>
+							<label className="form-check-label" htmlFor={`${id}-onlyMyTeam`}>
+								Only about my team
+							</label>
+						</div>
+					</div>
+				);
+			},
+			description:
+				"Choose which events pop up a notification. Hidden ones still go to the event log and news feed. Critical messages (like being fired, errors, or anything you must act on) always pop up.",
+			descriptionLong: (
+				<p>
+					"Important only" shows injuries, trades, owner and finance messages,
+					and awards, only when they involve your team. "Only about my team"
+					hides pop-ups for events that involve only other teams; league-wide
+					events with no team still show.
+				</p>
+			),
 		},
 		{
 			category: "UI",

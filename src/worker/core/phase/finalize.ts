@@ -117,6 +117,7 @@ const finalize = async (
 		if (redirect !== undefined && !local.autoPlayUntil) {
 			await logEvent({
 				type: "info",
+				category: "system",
 				text: `<a href="${redirect.url}">${redirect.text}</a>`,
 				saveToDb: false,
 			});
