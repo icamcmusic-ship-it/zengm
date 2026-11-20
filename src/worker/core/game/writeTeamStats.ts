@@ -4,6 +4,10 @@ import {
 	payGame,
 	recordFatigue,
 } from "../frontOffice/index.ts";
+import {
+	ownerOfficeEnabled,
+	payGame as payOwnerProjectGame,
+} from "../ownerOffice/index.ts";
 import { payContracts } from "../contract/index.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { player, season, team } from "../index.ts";
@@ -287,13 +291,18 @@ const writeTeamStats = async (results: GameResults) => {
 			}
 			recordFatigue(teamSeason, (results.team[t1] as any).foFatigue);
 		}
+		// Owner's Office: arena/facilities project payments (regular season games)
+		const projectPaid = ownerOfficeEnabled()
+			? payOwnerProjectGame(t, teamSeason)
+			: 0;
 		const expenses =
 			salaryPaid +
 			scoutingPaid +
 			coachingPaid +
 			healthPaid +
 			facilitiesPaid +
-			frontOfficePaid;
+			frontOfficePaid +
+			projectPaid;
 		teamSeason.cash += revenue - expenses;
 
 		if (t1 === 0) {

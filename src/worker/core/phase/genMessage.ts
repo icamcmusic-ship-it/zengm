@@ -164,6 +164,23 @@ export const genMessage = async (
 				m += `<p>${text}</p>`;
 			}
 
+			// Owner's Office: the budget meeting's goals (set in updateOwnerMood)
+			const goalsResult = teamSeasons.at(-1)?.ownerGoals;
+			if (goalsResult?.result) {
+				const r = goalsResult.result;
+				const hit = (ok: boolean) => (ok ? "met" : "missed");
+				const parts = [
+					`wins ${hit(r.won >= goalsResult.winTarget)} (${r.won} of ${goalsResult.winTarget})`,
+					`payroll ceiling ${hit(r.payroll <= goalsResult.maxPayroll)}`,
+				];
+				if (g.get("budget")) {
+					parts.push(
+						`profit target ${hit(r.profit >= goalsResult.profitTarget)}`,
+					);
+				}
+				m += `<p>Budget meeting goals: ${parts.join(", ")}.</p>`;
+			}
+
 			const prob = helpers.bound(currentTotal, 0, 3) / 3;
 			const otherTeamsWantToHire = Math.random() < prob;
 

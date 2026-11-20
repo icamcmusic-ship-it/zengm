@@ -109,6 +109,8 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Three-team trades](#trades) | Trade → 3-team trade | all | `featureThreeTeamTrades` | on / on |
 | [AI GM personalities](#ai-gm-personalities) | League History → Front Offices tab, team pages, news, AI decisions | bball | `featureGmPersonalities` | always on (core) |
 | [Front office budget](#front-office-budget) | Team → Finances, Trade, Free Agents, game sim, AI budgets | bball | `featureFrontOffice` | always on (core) |
+| `featureOwnerOffice` | on / off | needs the budget setting; off in college leagues; goals start at the next preseason |
+| [Owner's Office](#owners-office) | Team → Finances, owner messages, owner mood | bball | `featureOwnerOffice` | on / off |
 | [College mode](#college-mode) | New League → College | bball | league type (`leagueType`), set at creation | pro / pro |
 | [College quick sim](#college-mode) | college leagues: games without your team | bball | `collegeQuickSim` | off / off (college: by size) |
 | [College NIT](#college-mode) | college leagues: College NIT page | bball | `collegeNit` | off / off (college: on) |
@@ -201,8 +203,8 @@ Every setting the features add. "New / existing" is the value for a new league a
 | `featureAiTradeOffers` + `aiTradeOffersFrequency` + `aiTradeOffersExpiration`                             | on / off; 1 / 1; 15          | offers per 10 games/days, 0 means none; days an offer lasts                                                                            |
 | `featureRumors` + `rumorsNotify`                                                                          | always on (core)             | notification for new rumors about your team                                                                                            |
 | `coachingStaff`                                                                                           | always on (core)             | turning it on in an existing league generates staffs                                                                                   |
-| `shotShareModel` | always on (core) | needs Matchup Defense; per-player game plan set on the Roster page |
-| `featureCoachExecAwards` + `coachExecAwardFormulas` | always on (core) | formulas edited in Award Settings (not League Extras); missing = the default formulas |
+| `shotShareModel`                                                                                          | always on (core)             | needs Matchup Defense; per-player game plan set on the Roster page                                                                     |
+| `featureCoachExecAwards` + `coachExecAwardFormulas`                                                       | always on (core)             | formulas edited in Award Settings (not League Extras); missing = the default formulas                                                  |
 | `generateCollegeStats`                                                                                    | on / off                     | option of College & Overseas Stats                                                                                                     |
 | `featureCollegeSeason`                                                                                    | always on (core)             | needs college stats; made with them                                                                                                    |
 | `rerandomizeDraftClassRatings`                                                                            | off / off                    | option of the Ratings Regenerator                                                                                                      |
@@ -1157,15 +1159,15 @@ season). Never for an edited face. Measured over 3,000 seeds:
 - **Shot diet:** appended to the Advanced Tracking Stats array (`ADV.sdNormal` … `ADV.smRole`, `common/advStats.ts`, `shotDiet()`): each shot counted once as normal draw, self-created, putback, late clock, hot hand, double-team kick-out or mismatch hunting (a boosted source when the draw's number fell in the part of his weight the boost added), and for shooter-draw shots the average effect on his share of coach system, fatigue, shot discipline, attention (cap and doubles), game plan and role. Player page → _Shot diet_ (season or career); box score → hover the FG cell (`sd`, the game's source counts).
 - **Results:** new leagues (seeds 1, 2, 3 seasons each with offseasons, `shotShareCalibration.script.test.ts`), before → after:
 
-  |                                                         | before | after | target       |
-  | ------------------------------------------------------- | ------ | ----- | ------------ |
-  | team's top player, on-court share of team FGA (mean)    | .263   | .313  | .28–.33      |
-  | same, range over teams                                  | .226–.326 | .277–.344 |       |
-  | team's top usage rate                                    | 26.6   | 31.3  | 28–33        |
-  | 5th starter's on-court FGA share                        | .171   | .146  | .14–.17      |
-  | players averaging 20+ FGA (40+ games), per season       | 0.8    | 5.8   | 8–15         |
-  | highest usage rate (1000+ min)                           | 33.2   | 35.2  | below ~37    |
-  | team pts / FG% / 3PA rate / TOV / FTA                   | 109.3 / .459 / .346 / 14.34 / 22.4 | 108.8 / .457 / .347 / 14.26 / 22.5 | unchanged |
+  |                                                      | before                             | after                              | target    |
+  | ---------------------------------------------------- | ---------------------------------- | ---------------------------------- | --------- |
+  | team's top player, on-court share of team FGA (mean) | .263                               | .313                               | .28–.33   |
+  | same, range over teams                               | .226–.326                          | .277–.344                          |           |
+  | team's top usage rate                                | 26.6                               | 31.3                               | 28–33     |
+  | 5th starter's on-court FGA share                     | .171                               | .146                               | .14–.17   |
+  | players averaging 20+ FGA (40+ games), per season    | 0.8                                | 5.8                                | 8–15      |
+  | highest usage rate (1000+ min)                       | 33.2                               | 35.2                               | below ~37 |
+  | team pts / FG% / 3PA rate / TOV / FTA                | 109.3 / .459 / .346 / 14.34 / 22.4 | 108.8 / .457 / .347 / 14.26 / 22.5 | unchanged |
 
   Shot diet of the league: 27% normal draw, 43% self-created, 5% putbacks, 7% late clock, 3.5% hot hand, 4% kick-outs, 10% mismatch hunting.
 
@@ -2168,6 +2170,15 @@ Part of _College & Overseas Stats_ (no toggle of its own): everything here is ma
 - **Off is unchanged:** `src/test/frontOffice/offIdentity.script.test.ts` (two seeded headless leagues, a season and the next preseason with the setting off, every other new-league default on): the `simFingerprint` hash and the next random number match master exactly (ea8ef5d5… and f662b216… for seeds 11 and 12 on both).
 - **Code:** `src/common/frontOffice.ts` (formulas), `src/worker/core/frontOffice/index.ts` (levels, payments, review, AI allocation), hooks in `game/writeTeamStats.ts`, `game/writePlayerStats.ts`, `player/injury.ts`, `game/loadTeams.ts`, `game/injuryDepthTeam.ts`, `GameSim.basketball/index.ts`, `staff/systems.ts`, `gm/index.ts`, `phase/newPhasePreseason.ts`, `season/updateOwnerMood.ts`, views `teamFinances.ts`, `freeAgents.ts`, `trade/summary.ts`, UI `src/ui/views/TeamFinances/FrontOffice.tsx`. Tests: `src/common/frontOffice.test.ts`, `src/worker/core/frontOffice/frontOffice.test.ts`; calibration `src/test/frontOffice/calibration.script.test.ts`.
 - **Known limits:** the scouting review approximates the level the fuzz was drawn at by the current 3-season level. The Expenses bar graph doesn't show the two new departments separately (they're in the cash and profit). The rotation effect needs Coaching Systems and Realistic Rotations.
+
+## Owner's Office
+
+Setting `featureOwnerOffice` (_Owner's Office_, basketball, on for new leagues, off for existing ones, off in college leagues). It needs the `budget` setting. Off: none of the code below runs and no random numbers are drawn. Formulas in `src/common/ownerOffice.ts`, worker code in `src/worker/core/ownerOffice`.
+
+- **Budget meeting:** every preseason the owner sets each team's goals (`teamSeason.ownerGoals`), with no random draws, from market size (pop rank), cash and last season's record: a payroll ceiling (93-105% of the luxury tax line, higher in big markets and with cash; above the line = willing to pay some tax), a profit target (higher in big markets and when cash is short, lower when he'll pay tax) and a win target (last season's win% + 3%, bounded 30-70%). The user gets a _Budget meeting_ message from The Owner; Team Finances shows the goals with how you are tracking. AI teams get the same goals (used only internally).
+- **Owner mood:** at season end (`updateOwnerMood`) each goal scores -1 to 1 (wins vs target per 10% of the season, profit vs target per $15M scaled to the cap, payroll over the ceiling per 10% of the tax line). Wins add `0.05 × score` to the wins delta, profit + payroll add at most ±0.05 to the money delta. The annual evaluation says which goals were met.
+- **Arena & facilities projects:** on Team Finances the user can start one project at a time (needs 25% of the cost in cash): Arena renovation (0.2 caps over 2 seasons, +6 facilities), Practice facility (0.3 caps over 2 seasons, +9), New arena (1 cap over 4 seasons, +12 and +10% stadium capacity). The cost is paid every regular season game from cash and recorded in `teamSeason.projectExpenses`, which `teamSeasonFinances.ts` counts as an expense (profit, owner mood, Team Finances expenses chart). It completes at the preseason after its last payment season (any unpaid remainder is paid then). Completed projects add to `t.ownerOffice.facilitiesBonus` (max 20, wears off 1 level a season), added to the facilities level of the last three seasons (`getLevelLastThree`), so attendance and everything else that reads facilities. Started after the regular season, payments begin next season.
+- **AI teams:** in the preseason an AI team with no project and cash above a project's cost plus one salary cap starts one with 25% probability, from a seeded stream (season, tid), not `Math.random`.
 
 ## Realistic AI economy
 
