@@ -36,6 +36,8 @@ const PRO_ONLY_PAGES = new Set([
 	"player_scouting",
 	"scouting_department",
 	"pro_scouting",
+	// Scouting, the draft board and coaching staff depth, all pro-only League extras
+	"staff_report",
 ]);
 
 // A league URL (parts after /l/:lid/) of a page that does not exist in the current league, if it is a college league

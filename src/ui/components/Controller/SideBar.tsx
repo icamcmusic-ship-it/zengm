@@ -1,9 +1,19 @@
 import { tabHostPageID } from "../../util/pageTabs.ts";
 import clsx from "clsx";
-import { memo, type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+	memo,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useId,
+	useState,
+} from "react";
 import { helpers } from "../../util/helpers.ts";
 import { localActions, useLocal } from "../../util/local.ts";
-import { useFeatureOn } from "../../util/nativeFeatures.ts";
+import {
+	isMenuLinkFeatureOn,
+	useFeatureSwitches,
+} from "../../util/nativeFeatures.ts";
 import type {
 	MenuItemLink,
 	MenuItemHeader,
@@ -26,6 +36,30 @@ export const getText = (
 	return text;
 };
 
+// Titles of the side menu groups the user collapsed, remembered in this browser like sidebarOpen
+const COLLAPSED_KEY = "sidebarCollapsedGroups";
+
+const readCollapsed = (): string[] => {
+	try {
+		const parsed = JSON.parse(safeLocalStorage.getItem(COLLAPSED_KEY) ?? "[]");
+		return Array.isArray(parsed)
+			? parsed.filter((title) => typeof title === "string")
+			: [];
+	} catch {
+		return [];
+	}
+};
+
+const writeCollapsed = (title: string, collapsed: boolean) => {
+	try {
+		const titles = readCollapsed().filter((other) => other !== title);
+		if (collapsed) {
+			titles.push(title);
+		}
+		safeLocalStorage.setItem(COLLAPSED_KEY, JSON.stringify(titles));
+	} catch {}
+};
+
 const MenuGroup = ({
 	children,
 	title,
@@ -33,16 +67,23 @@ const MenuGroup = ({
 	children: ReactNode;
 	title?: string;
 }) => {
-	const [open, setOpen] = useState(true);
+	const [open, setOpen] = useState(
+		() => title === undefined || !readCollapsed().includes(title),
+	);
+	const id = useId();
 
 	return (
 		<>
 			{title ? (
 				<button
 					className="btn sidebar-heading"
+					aria-expanded={open}
+					aria-controls={id}
 					onClick={(event) => {
 						event.preventDefault();
-						setOpen((prev) => !prev);
+						const newOpen = !open;
+						writeCollapsed(title, !newOpen);
+						setOpen(newOpen);
 					}}
 				>
 					<CollapseArrow open={open} /> {title}
@@ -52,6 +93,7 @@ const MenuGroup = ({
 				{open ? (
 					<m.ul
 						className="nav flex-column flex-nowrap overflow-hidden"
+						id={id}
 						initial="collapsed"
 						animate="open"
 						exit="collapsed"
@@ -118,33 +160,74 @@ export const makeAnchorProps = (
 	};
 };
 
+type VisibilityContext = {
+	godMode: boolean;
+	lid?: number;
+	leagueType: string | undefined;
+};
+
+// Whether a link is shown in the side menu. Non-reactive (League extras switches are read from the local state), so
+// SideBar re-renders on a switch change with useFeatureSwitches
+export const sideMenuLinkVisible = (
+	menuItem: MenuItemLink,
+	{ godMode, lid, leagueType }: VisibilityContext,
+) =>
+	!menuItem.commandPaletteOnly &&
+	(lid === undefined ? !!menuItem.nonLeague : !!menuItem.league) &&
+	(!menuItem.godMode || godMode) &&
+	isMenuLinkFeatureOn(menuItem) &&
+	!menuItemHiddenForLeagueType(menuItem, leagueType);
+
+const visibleSideMenuLinks = (context: VisibilityContext) => {
+	const links: MenuItemLink[] = [];
+	for (const item of menuItems) {
+		if (item.type === "link") {
+			if (sideMenuLinkVisible(item, context)) {
+				links.push(item);
+			}
+		} else if (
+			!item.commandPaletteOnly &&
+			(context.lid === undefined ? item.nonLeague : item.league)
+		) {
+			for (const child of item.children) {
+				if (child.type === "link" && sideMenuLinkVisible(child, context)) {
+					links.push(child);
+				}
+			}
+		}
+	}
+	return links;
+};
+
+// Page the side menu highlights: the page itself when it has a visible item of its own (like Rumors or the Staff
+// Report), otherwise the host page it is a tab of (util/pageTabs.ts), so exactly one place lights up
+export const sideMenuHighlightPageID = (
+	pageID: string | undefined,
+	pathname: string | undefined,
+	context: VisibilityContext,
+) => {
+	const own = visibleSideMenuLinks(context).some((link) =>
+		link.active?.(pageID, pathname),
+	);
+	return own ? pageID : (tabHostPageID(pageID) ?? pageID);
+};
+
 const MenuItem = ({
-	godMode,
-	lid,
+	context,
+	highlightPageID,
 	menuItem,
 	onMenuItemClick,
-	pageID,
 	pathname,
 	root,
 }: {
-	godMode: boolean;
-	lid?: number;
+	context: VisibilityContext;
+	highlightPageID?: string;
 	menuItem: MenuItemHeader | MenuItemLink | MenuItemText;
 	onMenuItemClick: () => void;
-	pageID?: string;
 	pathname?: string;
 	root: boolean;
 }) => {
-	const featureOn = useFeatureOn(
-		menuItem.type === "link" ? menuItem.feature : undefined,
-	);
-	const replacingFeatureOn = useFeatureOn(
-		menuItem.type === "link" ? menuItem.featureOff : undefined,
-	);
-	const { leagueType } = useLocal(["leagueType"]);
-
-	// On a tab of a page (util/pageTabs.ts), highlight that page
-	const hostPageID = tabHostPageID(pageID);
+	const { lid } = context;
 
 	if (menuItem.type === "text") {
 		return null;
@@ -159,45 +242,40 @@ const MenuItem = ({
 	}
 
 	if (menuItem.type === "link") {
-		if (menuItem.commandPaletteOnly) {
-			return null;
-		}
-
-		if (menuItem.godMode && !godMode) {
-			return null;
-		}
-
-		if (
-			!featureOn ||
-			(menuItem.type === "link" &&
-				menuItem.featureOff !== undefined &&
-				replacingFeatureOn)
-		) {
-			return null;
-		}
-
-		if (menuItemHiddenForLeagueType(menuItem, leagueType)) {
+		if (!sideMenuLinkVisible(menuItem, context)) {
 			return null;
 		}
 
 		const anchorProps = makeAnchorProps(menuItem, onMenuItemClick);
+		const active = menuItem.active
+			? menuItem.active(highlightPageID, pathname)
+			: false;
+		const className = clsx("nav-link", {
+			active,
+			"god-mode": menuItem.godMode,
+		});
 
 		const item = (
 			<li className="nav-item">
-				<a
-					className={clsx("nav-link", {
-						active: menuItem.active
-							? menuItem.active(pageID, pathname) ||
-								(hostPageID !== undefined &&
-									hostPageID !== pageID &&
-									menuItem.active(hostPageID, pathname))
-							: false,
-						"god-mode": menuItem.godMode,
-					})}
-					{...anchorProps}
-				>
-					{getText(menuItem.text)}
-				</a>
+				{anchorProps.href === undefined ? (
+					// An action (Auto Play, Screenshot, ...) rather than a page: a real button, so it can be reached
+					// with Tab and activated with Enter or Space
+					<button
+						type="button"
+						className={clsx(className, "w-100 text-start")}
+						onClick={anchorProps.onClick}
+					>
+						{getText(menuItem.text)}
+					</button>
+				) : (
+					<a
+						className={className}
+						aria-current={active ? "page" : undefined}
+						{...anchorProps}
+					>
+						{getText(menuItem.text)}
+					</a>
+				)}
 			</li>
 		);
 		return root ? <MenuGroup>{item}</MenuGroup> : item;
@@ -211,12 +289,11 @@ const MenuItem = ({
 		const children = menuItem.children
 			.map((child, i) => (
 				<MenuItem
-					godMode={godMode}
+					context={context}
+					highlightPageID={highlightPageID}
 					key={i}
-					lid={lid}
 					menuItem={child}
 					onMenuItemClick={onMenuItemClick}
-					pageID={pageID}
 					pathname={pathname}
 					root={false}
 				/>
@@ -243,11 +320,17 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 	const [node, setNode] = useState<null | HTMLDivElement>(null);
 	const [nodeFade, setNodeFade] = useState<null | HTMLDivElement>(null);
 
-	const { godMode, lid, sidebarOpen } = useLocal([
+	const { godMode, leagueType, lid, sidebarOpen } = useLocal([
 		"godMode",
+		"leagueType",
 		"lid",
 		"sidebarOpen",
 	]);
+
+	// Re-render when a League extras switch changes
+	useFeatureSwitches();
+	const context = { godMode, leagueType, lid };
+	const highlightPageID = sideMenuHighlightPageID(pageID, pathname, context);
 
 	const getNode = useCallback((node2: HTMLDivElement) => {
 		if (node2 !== null) {
@@ -378,9 +461,9 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 				>
 					{menuItems.map((menuItem, i) => (
 						<MenuItem
-							godMode={godMode}
+							context={context}
+							highlightPageID={highlightPageID}
 							key={i}
-							lid={lid}
 							menuItem={menuItem}
 							onMenuItemClick={() => {
 								// Only on mobile, close menu on click
@@ -388,7 +471,6 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 									localActions.setSidebarOpen(false);
 								}
 							}}
-							pageID={pageID}
 							pathname={pathname}
 							root
 						/>

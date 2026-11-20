@@ -8,6 +8,7 @@ import { resetCache, resetG } from "../../../test/helpers.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { range } from "../../../common/utils.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
+import { withStockGeneration } from "../player/prospectVariety.ts";
 import processLiveGameEvents from "../../../ui/util/processLiveGameEvents.basketball.tsx";
 import {
 	FlavorSession,
@@ -121,8 +122,11 @@ export const genTeams = async (playersPerTeam = 15) => {
 	g.setWithoutSavingToDB("season", 2013);
 	const teamsDefault = helpers.getTeamsDefault().slice(0, 2);
 	// Draw a bigger pool and keep the best of it, so the rosters look like those of a real league
-	const pool = range(playersPerTeam * 6).map(() =>
-		player.generate(0, 19, 2010, true, DEFAULT_LEVEL),
+	// The stock rating draw (prospect variety off): these tests check the sim's own mechanics, calibrated on this population
+	const pool = await withStockGeneration(() =>
+		range(playersPerTeam * 6).map(() =>
+			player.generate(0, 19, 2010, true, DEFAULT_LEVEL),
+		),
 	);
 	for (const [i, p] of pool.entries()) {
 		await player.develop(p, 2 + (i % 6), true);

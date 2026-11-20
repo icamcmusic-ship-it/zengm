@@ -12,6 +12,7 @@ import type {
 } from "../../../../common/types.ts";
 import { g } from "../../../util/index.ts";
 import { shuffle } from "../../../../common/random.ts";
+import { pastInjuryLoss } from "../../player/pastInjuries.ts";
 
 export const getNumPlayersPerTeam = () => {
 	// 13 for basketball
@@ -101,6 +102,23 @@ const createRandomPlayers = async ({
 			const pot = p.ratings[0].pot;
 			const ovr = p.ratings[0].ovr;
 			const skills = p.ratings[0].skills;
+
+			// Basketball: the athleticism he lost to injuries in the seasons he has played (a league's players lose it every season, so
+			// without this a new league's players were more athletic than its players a few seasons later). Taken off his draft ratings,
+			// which comes to the same as during his career since development adds the same changes whatever the rating.
+			const seasonsPlayed = numYearsAgo - 1 - seasonOffset;
+			if (__SPORT === "basketball" && seasonsPlayed > 0) {
+				const r = p.ratings[0] as any;
+				const draftAge = g.get("season") - p.born.year;
+				const loss = pastInjuryLoss(
+					`${g.get("season") - numYearsAgo}|${i}`,
+					Array.from({ length: seasonsPlayed }, (_, k) => draftAge + 1 + k),
+					g.get("season") - 1,
+				);
+				for (const [key, x] of Object.entries(loss)) {
+					r[key] = player.limitRating(r[key] - x);
+				}
+			}
 
 			// Develop player and see if he is still non-retired
 

@@ -6,7 +6,9 @@ import {
 	SHAPE_COUNTRIES,
 	describeDraftClassShape,
 	drawDraftClassShape,
+	drawSecondShape,
 	isDraftClassShape,
+	mergeShapePlans,
 	planDraftClassShape,
 	type DraftClassShape,
 	type ExpandedTilt,
@@ -185,22 +187,27 @@ export const applyPendingShape = async (
 		(a, b) => b.value - a.value || a.pid - b.pid,
 	);
 	const draftAges = g.get("draftAges");
-	const changes = planDraftClassShape(
-		shape,
-		seed,
-		ordered.map((p) => {
-			const ratings = p.ratings.at(-1)!;
-			return {
-				key: String(p.pid),
-				ovr: ratings.ovr,
-				age: draftYear - p.born.year,
-				pos: ratings.pos,
-				international:
-					!helpers.isAmerican(p.born.loc) && !p.born.loc.endsWith("Canada"),
-			};
-		}),
-		[draftAges[0], draftAges[1]],
-	);
+	const shapeProspects = ordered.map((p) => {
+		const ratings = p.ratings.at(-1)!;
+		return {
+			key: String(p.pid),
+			ovr: ratings.ovr,
+			age: draftYear - p.born.year,
+			pos: ratings.pos,
+			international:
+				!helpers.isAmerican(p.born.loc) && !p.born.loc.endsWith("Canada"),
+		};
+	});
+	const ages: [number, number] = [draftAges[0], draftAges[1]];
+	let changes = planDraftClassShape(shape, seed, shapeProspects, ages);
+	// Prospect variety: a second, compatible shape (one about strength, one about composition), never with a forced shape (tests)
+	const second = force ? undefined : drawSecondShape(seed, shape);
+	if (second) {
+		changes = mergeShapePlans(
+			changes,
+			planDraftClassShape(second, seed, shapeProspects, ages),
+		);
+	}
 	const byPid = new Map(ordered.map((p) => [String(p.pid), p]));
 	const countryRng = new Rng(`${seed}|countries`);
 	const schoolRng = new Rng(`${seed}|schools`);
@@ -296,6 +303,9 @@ export const applyPendingShape = async (
 	for (const p of pending) {
 		p.draftClassShape = shape;
 		p.draftClassShapeV = DRAFT_CLASS_SHAPE_VERSION;
+		if (second) {
+			p.draftClassShape2 = second;
+		}
 		await idb.cache.players.put(p);
 	}
 	return shape;
@@ -402,6 +412,8 @@ export type ClassShapeInfo = {
 	name: string;
 	description: string;
 	storylines: string[];
+	// Its second, compatible shape, if it got one (prospect variety)
+	second?: { key: DraftClassShape; name: string; description: string };
 };
 
 /**
@@ -439,11 +451,27 @@ export const getClassShapeInfo = async (
 	}
 	const input = { draftYear, shape: key, prospects, history, ncaaTie };
 	const storylines = writeClassStorylines(input);
+	const secondKey = players.find(
+		(p) => p.draftClassShape === key && isDraftClassShape(p.draftClassShape2),
+	)?.draftClassShape2 as DraftClassShape | undefined;
 	return {
 		key,
 		name: DRAFT_CLASS_SHAPES[key].name,
 		description: describeDraftClassShape(key, version, getClassSeed(draftYear)),
 		storylines,
+		...(secondKey
+			? {
+					second: {
+						key: secondKey,
+						name: DRAFT_CLASS_SHAPES[secondKey].name,
+						description: describeDraftClassShape(
+							secondKey,
+							version,
+							`${getClassSeed(draftYear)}|second`,
+						),
+					},
+				}
+			: {}),
 		...(headline ? { headline: writeClassHeadline(input, storylines) } : {}),
 	};
 };

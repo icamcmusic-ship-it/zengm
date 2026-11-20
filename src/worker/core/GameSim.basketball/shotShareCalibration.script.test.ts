@@ -12,6 +12,12 @@
 //     node_modules/.bin/vitest run --project basketball --dir src src/worker/core/GameSim.basketball/shotShareCalibration.script.test.ts
 //
 // SHOT_SHARE_CAL=measure only prints the numbers (no assertions).
+// SHOT_SHARE_DIAG=1 [SHOT_SHARE_DIAG_OUT=/tmp/d.jsonl] also writes the league's drift diagnostics every season: rating means of the
+// rostered players (all and minutes weighted) and by age, the sim's composites of each team's top 8, age, rookies and retirees, injuries,
+// the league's preseason development vs a new league's generator's, box totals (with the Settings preview's definitions), the style
+// settings in effect and the winners' edges League Eras reads. SHOT_SHARE_PREVIEW=150 also plays that many preview games (the era
+// calibration's games: full rosters, no injuries) at the start of each season. Leagues made by tests have league salt 0, so League Eras
+// draws the same walk for every seed: pass {"featureLeagueEras":false} in SHOT_SHARE_SETTINGS to measure anything else.
 import "fake-indexeddb/auto";
 // @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { appendFileSync } from "node:fs";
@@ -300,6 +306,73 @@ test.skipIf(!env.SHOT_SHARE_CAL)(
 			const s = g.get("season");
 			await phase.newPhase(PHASE.REGULAR_SEASON, {});
 			await lock.set("gameSim", false);
+			// The sim's composite ratings (mean over each team's top 8 by value) at the start of the season, for SHOT_SHARE_DIAG
+			let compositeSnapshot;
+			// Ratings at the start of the regular season, for the in-season changes (injuries)
+			const startRows = new Map();
+			for (const p of await idb.cache.players.getAll()) {
+				if (p.tid >= 0) {
+					startRows.set(p.pid, { ...p.ratings.at(-1) });
+				}
+			}
+			// Rostered players already injured when the regular season starts, and their games remaining
+			const injuredAtStart = { players: 0, games: 0, ovr: 0 };
+			for (const p of await idb.cache.players.getAll()) {
+				if (p.tid >= 0 && p.injury.gamesRemaining > 0) {
+					injuredAtStart.players += 1;
+					injuredAtStart.games += p.injury.gamesRemaining;
+					injuredAtStart.ovr += p.ratings.at(-1).ovr;
+				}
+			}
+			if (injuredAtStart.players > 0) {
+				injuredAtStart.ovr = Number(
+					(injuredAtStart.ovr / injuredAtStart.players).toFixed(1),
+				);
+			}
+			if (env.SHOT_SHARE_DIAG) {
+				const { default: loadTeams } = await import("../game/loadTeams.ts");
+				const teams = await loadTeams(range(g.get("numActiveTeams")), {});
+				const acc = {};
+				let n = 0;
+				for (const t of Object.values(teams)) {
+					for (const p of t.player
+						.toSorted((a, b) => b.valueNoPot - a.valueNoPot)
+						.slice(0, 8)) {
+						n += 1;
+						for (const [k, v] of Object.entries(p.compositeRating)) {
+							if (typeof v === "number") {
+								acc[k] = (acc[k] ?? 0) + v;
+							}
+						}
+					}
+				}
+				compositeSnapshot = Object.fromEntries(
+					Object.entries(acc).map(([k, v]) => [k, Number((v / n).toFixed(4))]),
+				);
+			}
+			// SHOT_SHARE_PREVIEW=n: also play n preview games (Settings preview / era calibration: full rosters, no injuries, no schedule)
+			// at the start of the season, to compare with the season's own totals
+			let previewStats;
+			if (env.SHOT_SHARE_PREVIEW) {
+				const { loadMatchups, runPreviewGames } =
+					await import("../game/previewGameSim.ts");
+				const tids = range(g.get("numActiveTeams"));
+				const pairs = [];
+				for (let k = 0; pairs.length < Number(env.SHOT_SHARE_PREVIEW); k++) {
+					const a = tids[k % tids.length];
+					const b =
+						tids[(k * 7 + 1 + Math.floor(k / tids.length)) % tids.length];
+					if (a !== b) {
+						pairs.push(k % 2 === 0 ? [a, b] : [b, a]);
+					}
+				}
+				previewStats = runPreviewGames(
+					await loadMatchups(pairs, {}),
+					{},
+					5000 + seed,
+				);
+				console.log(`PREVIEW ${s} ${JSON.stringify(previewStats)}`);
+			}
 			let guard = 0;
 			while (
 				g.get("phase") === PHASE.REGULAR_SEASON ||
@@ -361,6 +434,329 @@ test.skipIf(!env.SHOT_SHARE_CAL)(
 				appendFileSync(env.SHOT_SHARE_OUT, `${JSON.stringify(result)}\n`);
 			}
 
+			if (env.SHOT_SHARE_DIAG) {
+				// League drift diagnostics: rating means of rostered players (all, and minutes weighted), age, this season's rookies and
+				// the players who retired after the previous season, the sim's composite ratings of each team's top 8 at the start of the
+				// season, box totals, and the style settings in effect
+				const players = await idb.cache.players.getAll();
+				const minBy = new Map<number, number>();
+				for (const p of players) {
+					for (const row of p.stats) {
+						if (row.season === s && !row.playoffs && row.tid >= 0) {
+							minBy.set(p.pid, (minBy.get(p.pid) ?? 0) + row.min);
+						}
+					}
+				}
+				const r2 = (x: number) => Number(x.toFixed(2));
+				const ratingRows = [];
+				for (const p of players) {
+					const r = p.ratings.findLast((row) => row.season === s);
+					if (r && p.tid >= 0) {
+						ratingRows.push({ p, r, min: minBy.get(p.pid) ?? 0 });
+					}
+				}
+				const skip = new Set([
+					"season",
+					"fuzz",
+					"dovr",
+					"dpot",
+					"injuryIndex",
+					"tid",
+				]);
+				const keys = Object.keys(ratingRows[0].r).filter(
+					(k) => typeof ratingRows[0].r[k] === "number" && !skip.has(k),
+				);
+				const wmean = (f) => {
+					let num = 0;
+					let den = 0;
+					for (const x of ratingRows) {
+						num += x.min * f(x);
+						den += x.min;
+					}
+					return r2(num / den);
+				};
+				const ratingsAll = Object.fromEntries(
+					keys.map((k) => [k, r2(mean(ratingRows.map((x) => x.r[k])))]),
+				);
+				const ratingsMin = Object.fromEntries(
+					keys.map((k) => [k, wmean((x) => x.r[k])]),
+				);
+				const ovrs = ratingRows.map((x) => x.r.ovr).toSorted((a, b) => b - a);
+				const rookies = players.filter(
+					(p) => p.draft.year === s - 1 && p.tid >= 0,
+				);
+				const retirees = await idb.merged.players.getAll({
+					retiredYear: s - 1,
+				});
+				const teamStats2 = (await idb.cache.teamStats.getAll()).filter(
+					(ts) => ts.season === s && !ts.playoffs,
+				);
+				const tot = {};
+				let gp2 = 0;
+				for (const ts of teamStats2) {
+					gp2 += ts.gp;
+					for (const k of [
+						"pts",
+						"fg",
+						"fga",
+						"tp",
+						"tpa",
+						"ft",
+						"fta",
+						"orb",
+						"drb",
+						"tov",
+						"ast",
+						"stl",
+						"blk",
+						"pf",
+						"min",
+					]) {
+						tot[k] = (tot[k] ?? 0) + ts[k];
+					}
+				}
+				const poss = tot.fga - tot.orb + tot.tov + 0.44 * tot.fta;
+				// League Eras' "what won" pull: the top quarter's (by win%) relative edge over the league in its own possession estimate
+				// (what the era engine reads), in game tempo (own and opponent possessions averaged), in 3PA share and in FT rate
+				const tss = (await idb.cache.teamSeasons.getAll()).filter(
+					(t) => t.season === s,
+				);
+				const eraRows = teamStats2.map((ts) => {
+					const t = tss.find((x) => x.tid === ts.tid);
+					const own = (ts.fga - ts.orb + ts.tov + 0.44 * ts.fta) / ts.gp;
+					const opp =
+						(ts.oppFga - ts.oppOrb + ts.oppTov + 0.44 * ts.oppFta) / ts.gp;
+					return {
+						winp: t.won / Math.max(1, t.won + t.lost),
+						own,
+						tempo: (own + opp) / 2,
+						tpShare: ts.tpa / ts.fga,
+						ftRate: ts.fta / ts.fga,
+					};
+				});
+				const edge = (key) => {
+					const lg = mean(eraRows.map((x) => x[key]));
+					const top = eraRows
+						.toSorted((a, b) => b.winp - a.winp)
+						.slice(0, Math.round(eraRows.length / 4));
+					return Number((mean(top.map((x) => x[key])) / lg - 1).toFixed(4));
+				};
+				const winnersEdge = {
+					own: edge("own"),
+					tempo: edge("tempo"),
+					tpShare: edge("tpShare"),
+					ftRate: edge("ftRate"),
+				};
+				const r4 = (x: number) => Number(x.toFixed(4));
+				const box = {
+					pts: r2(tot.pts / gp2),
+					poss: r2(poss / gp2),
+					ortg: r2((100 * tot.pts) / poss),
+					efg: r4((tot.fg + 0.5 * tot.tp) / tot.fga),
+					fgp: r4(tot.fg / tot.fga),
+					twop: r4((tot.fg - tot.tp) / (tot.fga - tot.tpa)),
+					tpp: r4(tot.tp / tot.tpa),
+					ftp: r4(tot.ft / tot.fta),
+					fta: r2(tot.fta / gp2),
+					tpaRate: r4(tot.tpa / tot.fga),
+					tovPct: r4(tot.tov / poss),
+					orbPct: r4(tot.orb / (tot.orb + tot.drb)),
+					ast: r2(tot.ast / gp2),
+					blk: r2(tot.blk / gp2),
+					stl: r2(tot.stl / gp2),
+					pf: r2(tot.pf / gp2),
+					// The Settings preview's / era calibration's definitions (previewGameSim.ts), from league totals
+					brPace: r2(
+						((tot.fga +
+							0.4 * tot.fta -
+							1.07 * (tot.orb / (tot.orb + tot.drb)) * (tot.fga - tot.fg) +
+							tot.tov) /
+							tot.min) *
+							5 *
+							48,
+					),
+					brTovPct: r4(tot.tov / (tot.fga + 0.44 * tot.fta + tot.tov)),
+					ftRate: r4(tot.fta / tot.fga),
+				};
+				const style = Object.fromEntries(
+					[
+						"pace",
+						"threePointTendencyFactor",
+						"foulRateFactor",
+						"orbFactor",
+						"twoPointAccuracyFactor",
+						"threePointAccuracyFactor",
+						"ftAccuracyFactor",
+						"turnoverFactor",
+					].map((k) => [k, g.get(k)]),
+				);
+				const diag = {
+					seed,
+					season: s,
+					n: ratingRows.length,
+					age: r2(mean(ratingRows.map((x) => s - x.p.born.year))),
+					ageMin: wmean((x) => s - x.p.born.year),
+					ovrMean: r2(mean(ovrs)),
+					ovrRank: [10, 30, 60, 150, 300].map((k) => ovrs[k - 1]),
+					rookies: rookies.length,
+					rookieOvr: r2(
+						mean(
+							rookies.map(
+								(p) => p.ratings.findLast((row) => row.season === s).ovr,
+							),
+						),
+					),
+					retirees: retirees.length,
+					retireeOvr: r2(mean(retirees.map((p) => p.ratings.at(-1).ovr))),
+					ratingsAll,
+					ratingsMin,
+					composites: compositeSnapshot,
+					box,
+					style,
+					winnersEdge,
+					preview: previewStats,
+					injuredAtStart,
+					// Development by age group, the league's vs a new league's generator's: "dev" is this season's ratings minus last
+					// season's final ones (the preseason development, everything included), "gen" the expected change of the same rows
+					// from the stock development a new league's players get (developSeason with the default coaching, no traits, career
+					// aging, coaching staff, mentors), "inj" the change during this regular season (injuries) of rostered players
+					devCompare: await (async () => {
+						const { default: developSeasonBasketball } =
+							await import("../player/developSeason.basketball.ts");
+						const { default: ovrFn } = await import("../player/ovr.ts");
+						const { DEFAULT_LEVEL } =
+							await import("../../../common/budgetLevels.ts");
+						const { withRandom } = await import("../../../common/random.ts");
+						const KEYS = [
+							"ovr",
+							"spd",
+							"jmp",
+							"endu",
+							"dnk",
+							"ins",
+							"fg",
+							"tp",
+							"ft",
+							"oiq",
+							"diq",
+							"drb",
+							"pss",
+							"reb",
+							"stre",
+						];
+						const groups = [
+							[19, 22],
+							[23, 25],
+							[26, 28],
+							[29, 31],
+							[32, 34],
+							[35, 45],
+						];
+						const acc = {};
+						const rnd = makeSeededRandom(777 + s);
+						for (const { p, r } of ratingRows) {
+							const age = s - p.born.year;
+							const gi = groups.findIndex(([lo, hi]) => age >= lo && age <= hi);
+							if (gi < 0) {
+								continue;
+							}
+							const key = `${groups[gi][0]}-${groups[gi][1]}`;
+							acc[key] ??= { n: 0, nInj: 0, dev: {}, gen: {}, inj: {} };
+							const a = acc[key];
+							const start = startRows.get(p.pid);
+							if (start && start.season === s) {
+								a.nInj += 1;
+								for (const k of KEYS) {
+									a.inj[k] = (a.inj[k] ?? 0) + (r[k] - start[k]);
+								}
+							}
+							const prevRow = p.ratings.findLast((row) => row.season === s - 1);
+							if (!prevRow || !start || start.season !== s) {
+								continue;
+							}
+							a.n += 1;
+							for (const k of KEYS) {
+								a.dev[k] = (a.dev[k] ?? 0) + (start[k] - prevRow[k]);
+							}
+							const K = 4;
+							for (let i = 0; i < K; i++) {
+								const copy = { ...prevRow };
+								withRandom(rnd, () =>
+									developSeasonBasketball(copy, age, DEFAULT_LEVEL),
+								);
+								copy.ovr = ovrFn(copy);
+								for (const k of KEYS) {
+									a.gen[k] = (a.gen[k] ?? 0) + (copy[k] - prevRow[k]) / K;
+								}
+							}
+						}
+						for (const a of Object.values(acc)) {
+							for (const part of ["dev", "gen"]) {
+								for (const k of KEYS) {
+									a[part][k] = r2((a[part][k] ?? 0) / Math.max(1, a.n));
+								}
+							}
+							for (const k of KEYS) {
+								a.inj[k] = r2((a.inj[k] ?? 0) / Math.max(1, a.nInj));
+							}
+						}
+						return acc;
+					})(),
+					// Mean ratings of rostered players by age group (the steady state vs the generated league)
+					byAge: Object.fromEntries(
+						[
+							[19, 22],
+							[23, 25],
+							[26, 28],
+							[29, 31],
+							[32, 45],
+						].map(([lo, hi]) => {
+							const xs = ratingRows.filter((x) => {
+								const age = s - x.p.born.year;
+								return age >= lo && age <= hi;
+							});
+							return [
+								`${lo}-${hi}`,
+								{
+									n: xs.length,
+									...Object.fromEntries(
+										[
+											"ovr",
+											"spd",
+											"jmp",
+											"endu",
+											"dnk",
+											"fg",
+											"tp",
+											"ins",
+											"oiq",
+											"diq",
+										].map((k) => [k, r2(mean(xs.map((x) => x.r[k])))]),
+									),
+								},
+							];
+						}),
+					),
+					// Injuries suffered this season (by players in the cache) and the games they cost
+					injuries: (() => {
+						let n = 0;
+						let games = 0;
+						for (const p of players) {
+							for (const inj of p.injuries ?? []) {
+								if (inj.season === s) {
+									n += 1;
+									games += inj.games;
+								}
+							}
+						}
+						return { n, games };
+					})(),
+				};
+				console.log(`DIAG ${JSON.stringify(diag)}`);
+				if (env.SHOT_SHARE_DIAG_OUT) {
+					appendFileSync(env.SHOT_SHARE_DIAG_OUT, `${JSON.stringify(diag)}\n`);
+				}
+			}
 			if (i === numSeasons - 1) {
 				break;
 			}

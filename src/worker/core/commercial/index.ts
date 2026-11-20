@@ -25,6 +25,7 @@ import {
 } from "../../../common/commercial.ts";
 import { marketFactor, type OwnerGoals } from "../../../common/ownerOffice.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
+import { honeymoonOwnerMood } from "../../../common/ownerMood.ts";
 import type { Team, TeamSeasonWithoutKey } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
@@ -278,12 +279,38 @@ export const shareRevenue = (teamSeasons: TeamSeasonWithoutKey[]) => {
 	}
 };
 
-const applySale = (t: Team, ownerType: OwnerType) => {
+// Messages from the owner go to every user team (multi-team mode included), so a user team never gets a sale or deal renewals silently
+const userMessage = async (tid: number, subject: string, text: string) => {
+	const multiTeam = g.get("userTids").length > 1;
+	await idb.cache.messages.add({
+		read: false,
+		from: "The Owner",
+		year: g.get("season"),
+		text,
+		subject: multiTeam
+			? `${subject} (${g.get("teamInfoCache")[tid]?.region ?? ""} ${g.get("teamInfoCache")[tid]?.name ?? ""})`.trim()
+			: subject,
+		tid,
+	});
+};
+
+const applySale = async (t: Team, ownerType: OwnerType) => {
 	const office = ensure(t);
 	office.ownerType = ownerType;
 	office.ownerSince = g.get("season");
 	office.pendingSale = undefined;
 	const def = OWNER_TYPES[ownerType];
+
+	// Honeymoon: the new owner doesn't inherit his predecessor's grudges (common/ownerMood.ts)
+	const teamSeason = await idb.cache.teamSeasons.indexGet(
+		"teamSeasonsByTidSeason",
+		[t.tid, g.get("season")],
+	);
+	if (teamSeason?.ownerMood) {
+		teamSeason.ownerMood = honeymoonOwnerMood(teamSeason.ownerMood);
+		await idb.cache.teamSeasons.put(teamSeason);
+	}
+
 	logEvent({
 		type: "ownerSale",
 		text: `The ${rosterLink(t.tid)} have been sold. The new owner is a ${def.name.toLowerCase()} type: ${def.description.toLowerCase()}`,
@@ -293,8 +320,9 @@ const applySale = (t: Team, ownerType: OwnerType) => {
 	});
 };
 
-// Preseason (after the new team season rows exist): ownership sales (the user's team gets a season's notice) and deal renewals
-export const onPreseason = async () => {
+// Preseason, before AI teams set their budgets (after the new team season rows exist): ownership sales, so a sold AI team's budget
+// already follows its new owner. The user's team gets a season's notice
+export const onPreseasonSales = async () => {
 	if (!commercialEnabled()) {
 		return;
 	}
@@ -302,42 +330,43 @@ export const onPreseason = async () => {
 	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
 	for (const t of teams) {
 		const office = ensure(t);
-		const user = isUserTeam(t.tid);
 
 		if (office.pendingSale && office.pendingSale.season <= season) {
-			applySale(t, office.pendingSale.ownerType);
+			await applySale(t, office.pendingSale.ownerType);
 		} else if (!office.pendingSale) {
 			const rng = seeded(season, t.tid, SALT_SALE);
 			if (rng() < OWNER_SALE_PROB) {
 				const ownerType = pickNewOwnerType(getOwnerType(t), rng);
-				if (user) {
+				if (isUserTeam(t.tid)) {
 					office.pendingSale = { season: season + 1, ownerType };
-					if (g.get("userTids").length === 1) {
-						await idb.cache.messages.add({
-							read: false,
-							from: "The Owner",
-							year: season,
-							text: `<p>I wanted you to hear it from me first: I have agreed to sell the team. The new ownership group takes over before next season.</p><p>From what I hear they are the <b>${OWNER_TYPES[ownerType].name.toLowerCase()}</b> type. ${OWNER_TYPES[ownerType].description} Plan accordingly.</p>`,
-							subject: "The team is being sold",
-							tid: t.tid,
-						});
-					}
+					await userMessage(
+						t.tid,
+						"The team is being sold",
+						`<p>I wanted you to hear it from me first: I have agreed to sell the team. The new ownership group takes over before next season.</p><p>From what I hear they are the <b>${OWNER_TYPES[ownerType].name.toLowerCase()}</b> type. ${OWNER_TYPES[ownerType].description} Plan accordingly.</p>`,
+					);
 				} else {
-					applySale(t, ownerType);
+					await applySale(t, ownerType);
 				}
 			}
 		}
+		await idb.cache.teams.put(t);
+	}
+};
 
+// Preseason (after the AI budgets are set): deal renewals
+export const onPreseason = async () => {
+	if (!commercialEnabled()) {
+		return;
+	}
+	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	for (const t of teams) {
 		const userKinds = await renewDeals(t);
-		if (user && userKinds.length > 0 && g.get("userTids").length === 1) {
-			await idb.cache.messages.add({
-				read: false,
-				from: "The Owner",
-				year: season,
-				text: `<p>Our ${userKinds.map((kind) => DEAL_KIND_NAMES[kind].toLowerCase()).join(" and ")} deal${userKinds.length > 1 ? "s are" : " is"} up. Pick one of the offers on <a href="${helpers.leagueUrl(["team_finances"])}">Team Finances</a> before the regular season starts, or I'll sign the standard one.</p>`,
-				subject: "Commercial deals up for renewal",
-				tid: t.tid,
-			});
+		if (isUserTeam(t.tid) && userKinds.length > 0) {
+			await userMessage(
+				t.tid,
+				"Commercial deals up for renewal",
+				`<p>Our ${userKinds.map((kind) => DEAL_KIND_NAMES[kind].toLowerCase()).join(" and ")} deal${userKinds.length > 1 ? "s are" : " is"} up. Pick one of the offers on <a href="${helpers.leagueUrl(["team_finances"])}">Team Finances</a> before the regular season starts, or I'll sign the standard one.</p>`,
+			);
 		}
 		await idb.cache.teams.put(t);
 	}

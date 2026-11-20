@@ -5,6 +5,7 @@ import type {
 	TeamSeasonWithoutKey,
 } from "../../../common/types.ts";
 import { DEFAULT_JERSEY } from "../../../common/constants.ts";
+import { getLegacyOwnerMood } from "../../../common/ownerMood.ts";
 
 const genSeasonRow = (
 	t: Team | TeamBasic,
@@ -108,10 +109,12 @@ const genSeasonRow = (
 		}
 
 		if (g.get("userTid") === t.tid) {
-			if (prevSeason.ownerMood) {
-				newSeason.ownerMood = prevSeason.ownerMood;
-			} else if ((g as any).ownerMood) {
-				newSeason.ownerMood = (g as any).ownerMood;
+			// A copy: sharing the object would let this season's evaluation (or a sale's honeymoon) also change last season's mood
+			const prevMood = prevSeason.ownerMood
+				? { ...prevSeason.ownerMood }
+				: getLegacyOwnerMood(g);
+			if (prevMood) {
+				newSeason.ownerMood = prevMood;
 			}
 		}
 	}
