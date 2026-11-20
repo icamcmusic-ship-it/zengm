@@ -5,6 +5,7 @@ import { AnimatePresence, m } from "framer-motion";
 import { type ChangeEvent, Fragment, type ReactNode, useState } from "react";
 import { HelpPopover } from "../../components/HelpPopover.tsx";
 import gameSimPresets from "./gameSimPresets.ts";
+import { GameSimPreview, StyleSliders } from "./GameSimTools.tsx";
 import {
 	getVisibleCategories,
 	settingIsEnabled,
@@ -346,6 +347,7 @@ const SettingsFormOptions = ({
 	numPlayoffTeamsInfo,
 	onCancelDefaultSetting,
 	setGameSimPreset,
+	setState,
 	showGodModeSettings,
 	state,
 	visibleCategories,
@@ -361,6 +363,7 @@ const SettingsFormOptions = ({
 	numPlayoffTeamsInfo: NumPlayoffTeamsInfo;
 	onCancelDefaultSetting?: (key: Key) => void;
 	setGameSimPreset: (gameSimPreset: string) => void;
+	setState?: (arg: (prevState: State) => State) => void;
 	showGodModeSettings: boolean;
 	state: State;
 	visibleCategories: ReturnType<typeof getVisibleCategories>;
@@ -452,6 +455,21 @@ const SettingsFormOptions = ({
 										</option>
 									))}
 							</select>
+						) : null}
+						{category.name === "Tendencies" &&
+						__SPORT === "basketball" &&
+						setState &&
+						(godMode || showGodModeSettings) ? (
+							<StyleSliders
+								disabled={!godMode || disabled}
+								setState={setState}
+								state={state}
+							/>
+						) : null}
+						{category.name === "Tendencies" &&
+						__SPORT === "basketball" &&
+						!newLeague ? (
+							<GameSimPreview disabled={disabled} state={state} />
 						) : null}
 						<div className={clsx("row mb-5 mb-md-3", collapsed && "d-none")}>
 							{category.settings.map(
