@@ -301,6 +301,95 @@ export const drawDraftClassShape = (seed: string): DraftClassShape => {
 	return "typical";
 };
 
+// Prospect variety: a class can have two compatible shapes, one about its strength (how talent is spread) and one about its composition
+// (positions, skills, origins), which never touch the same thing (strength shapes only move ovr; composition ones nudge builds and origins
+// and keep ovr). The other shapes (ages, schools, injuries, typical) stay alone.
+export const STRENGTH_SHAPES: readonly DraftClassShape[] = [
+	"deep",
+	"topHeavy",
+	"weak",
+	"generational",
+	"noClearTop",
+	"coHeadliners",
+	"boomOrBust",
+];
+export const COMPOSITION_SHAPES: readonly DraftClassShape[] = [
+	"guards",
+	"bigs",
+	"wings",
+	"international",
+	"shooters",
+	"defenders",
+	"pointGuards",
+	"stretchBigs",
+	"twoWayWings",
+	"intlBigs",
+	"countrySpike",
+];
+// Chance that a strength or composition class gets a second shape of the other kind
+export const SECOND_SHAPE_CHANCE = 0.35;
+
+export const drawSecondShape = (
+	seed: string,
+	first: DraftClassShape,
+): DraftClassShape | undefined => {
+	const pool = STRENGTH_SHAPES.includes(first)
+		? COMPOSITION_SHAPES
+		: COMPOSITION_SHAPES.includes(first)
+			? STRENGTH_SHAPES
+			: undefined;
+	if (!pool) {
+		return undefined;
+	}
+	const rng = new Rng(`${seed}|second`);
+	if (rng.random() >= SECOND_SHAPE_CHANCE) {
+		return undefined;
+	}
+	const total = pool.reduce((sum, k) => sum + DRAFT_CLASS_SHAPES[k].weight, 0);
+	let x = rng.random() * total;
+	for (const k of pool) {
+		x -= DRAFT_CLASS_SHAPES[k].weight;
+		if (x < 0) {
+			return k;
+		}
+	}
+	return pool.at(-1);
+};
+
+// Both shapes' plans together: ovr changes add up, nudges follow each other, the composition shape's origin changes are kept
+export const mergeShapePlans = (
+	a: ShapeChange[],
+	b: ShapeChange[],
+): ShapeChange[] => {
+	const byKey = new Map<string, ShapeChange>();
+	for (const c of [...a, ...b]) {
+		const prev = byKey.get(c.key);
+		if (!prev) {
+			byKey.set(c.key, {
+				...c,
+				...(c.nudges ? { nudges: [...c.nudges] } : {}),
+			});
+			continue;
+		}
+		prev.ovr += c.ovr;
+		prev.age += c.age;
+		if (c.nudges) {
+			prev.nudges = [...(prev.nudges ?? []), ...c.nudges];
+		}
+		for (const key of [
+			"international",
+			"country",
+			"midMajor",
+			"injury",
+		] as const) {
+			if (c[key] !== undefined) {
+				(prev as any)[key] = c[key];
+			}
+		}
+	}
+	return [...byKey.values()];
+};
+
 export type ShapeProspect = {
 	key: string;
 	// Ovr now

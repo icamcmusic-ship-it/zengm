@@ -11,6 +11,7 @@ import { helpers } from "../util/index.ts";
 import { getSeasonState, validateSeason } from "../util/processInputs.ts";
 import { hasCurrentSeasonDraftHappened } from "../../common/seasons.ts";
 import { player, team } from "../core/index.ts";
+import { getPreDraftRanks } from "../core/draft/preDraftRanks.ts";
 
 const processInputs = (params: RouteParams<"draftHistory">) => {
 	let season: number;
@@ -102,6 +103,9 @@ export default defineView({
 				: { draftYear: inputs.season },
 			{ filter: (p) => p.draft.year === inputs.season },
 		);
+		// Frozen pre-draft ranks of the class (undefined when the setting is off, or for classes with no snapshot or scout grades)
+		const preDraftRanks = await getPreDraftRanks(inputs.season, playersRaw);
+
 		const playersAll = await player.formatAll(playersRaw, {
 			attrs: [
 				"tid",
@@ -136,6 +140,7 @@ export default defineView({
 					firstName: p.firstName,
 					lastName: p.lastName,
 					draft: p.draft,
+					preDraftRank: preDraftRanks?.get(p.pid)?.r,
 					currentAge: p.age,
 					ageAtDeath: p.ageAtDeath,
 					currentAbbrev: p.abbrev,
@@ -191,10 +196,25 @@ export default defineView({
 				};
 			});
 
+		// Overall pick number, for comparing with the pre-draft rank
+		const overallByPid = new Map<number, number>();
+		if (preDraftRanks) {
+			const drafted = players
+				.filter((p) => p.draft.round >= 1 && p.draft.pick >= 1)
+				.sort(
+					(a, b) =>
+						a.draft.round - b.draft.round || a.draft.pick - b.draft.pick,
+				);
+			drafted.forEach((p, i) => overallByPid.set(p.pid, i + 1));
+		}
+
 		const teamsByTid = await getDraftTeamsByTid(inputs.season);
 
 		return {
-			players: addFirstNameShort(players),
+			players: addFirstNameShort(
+				players.map((p) => ({ ...p, overallPick: overallByPid.get(p.pid) })),
+			),
+			showPreDraftRanks: preDraftRanks !== undefined,
 			season: inputs.season,
 			stats,
 			summaryStat,

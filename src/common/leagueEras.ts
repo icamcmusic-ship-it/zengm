@@ -44,6 +44,9 @@ export type EraRecord = {
 	// League three-point share of shots and possessions per team game in the season
 	tpShare?: number;
 	poss?: number;
+	// The winners' usual edge (the top quarter by win% over the league, relative) in three-point share and possessions, a running
+	// average through this season. The "what won" pull only follows the part of a season's edge beyond it (see core/leagueEras)
+	edgeNorm?: { tpShare: number; poss: number };
 	// True when the season's style came from the league's real history (scheduled events), not the drift
 	scheduled?: boolean;
 	vote?: RuleVote;

@@ -5,6 +5,7 @@ import helpers from "../../util/helpers.ts";
 import local from "../../util/local.ts";
 import type { OwnerMood } from "../../../common/types.ts";
 import { COURT } from "../../../common/constants.ts";
+import { isCollege } from "../college/isCollege.ts";
 
 const moodTexts = ["Horrible!", "Bad.", "Pretty good.", "Good.", "Excellent!"];
 
@@ -164,18 +165,19 @@ export const genMessage = async (
 				m += `<p>${text}</p>`;
 			}
 
-			// Owner's Office: the budget meeting's goals (set in updateOwnerMood)
+			// Owner's Office: the budget meeting's goals (set in updateOwnerMood, never in college, which judges against the program's
+			// expectations instead)
 			const goalsResult = teamSeasons.at(-1)?.ownerGoals;
-			if (goalsResult?.result) {
+			if (goalsResult?.result && !isCollege()) {
 				const r = goalsResult.result;
 				const hit = (ok: boolean) => (ok ? "met" : "missed");
 				const parts = [
 					`wins ${hit(r.won >= goalsResult.winTarget)} (${r.won} of ${goalsResult.winTarget})`,
-					`payroll ceiling ${hit(r.payroll <= goalsResult.maxPayroll)}`,
+					`payroll ceiling ${hit(r.payroll <= goalsResult.maxPayroll)} (season payroll ${helpers.formatCurrency(r.payroll / 1000, "M")} vs ${helpers.formatCurrency(goalsResult.maxPayroll / 1000, "M")})`,
 				];
 				if (g.get("budget")) {
 					parts.push(
-						`profit target ${hit(r.profit >= goalsResult.profitTarget)}`,
+						`profit target ${hit(r.profit >= goalsResult.profitTarget)} (${helpers.formatCurrency(r.profit, "M")} not counting project payments, vs ${helpers.formatCurrency(goalsResult.profitTarget, "M")})`,
 					);
 				}
 				m += `<p>Budget meeting goals: ${parts.join(", ")}.</p>`;
@@ -231,5 +233,6 @@ export const genMessage = async (
 		subject: "Annual performance evaluation",
 		tid: g.get("userTid"),
 		ownerMoods: moods,
+		ownerMoodSeasons: teamSeasons.map((ts) => ts.season),
 	});
 };

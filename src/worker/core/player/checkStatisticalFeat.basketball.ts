@@ -1,10 +1,11 @@
-import { g, helpers } from "../../../worker/util/index.ts";
+import { helpers } from "../../../worker/util/index.ts";
 import type { GamePlayer } from "../../../common/types.ts";
-import { PHASE } from "../../../common/constants.ts";
 
-const checkStatisticalFeat = (p: GamePlayer) => {
-	const minFactor = helpers.quarterLengthFactor();
-
+const checkStatisticalFeat = (
+	p: GamePlayer,
+	_teamStat: unknown,
+	{ factor: minFactor, playoffs }: { factor: number; playoffs: boolean },
+) => {
 	const TEN = minFactor * 10;
 	const FIVE = minFactor * 5;
 	const TWENTY = minFactor * 20;
@@ -86,9 +87,7 @@ const checkStatisticalFeat = (p: GamePlayer) => {
 
 	if (Object.keys(statArr).length > 0) {
 		const gmsc = helpers.gameScore(p.stat);
-		const score = Math.round(
-			gmsc / 2 + (g.get("phase") === PHASE.PLAYOFFS ? 10 : 0),
-		);
+		const score = Math.round(gmsc / 2 + (playoffs ? 10 : 0));
 		return {
 			feats: statArr,
 			score,

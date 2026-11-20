@@ -3,7 +3,10 @@ import { memo, useCallback, useId, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { Dropdown, Nav } from "react-bootstrap";
 import { helpers } from "../util/helpers.ts";
-import { useFeatureOn } from "../util/nativeFeatures.ts";
+import {
+	isMenuLinkFeatureOn,
+	useFeatureSwitches,
+} from "../util/nativeFeatures.ts";
 import type {
 	MenuItemLink,
 	MenuItemHeader,
@@ -138,12 +141,8 @@ const MenuItem = ({
 	openID?: string;
 	root: boolean;
 }) => {
-	const featureOn = useFeatureOn(
-		menuItem.type === "link" ? menuItem.feature : undefined,
-	);
-	const replacingFeatureOn = useFeatureOn(
-		menuItem.type === "link" ? menuItem.featureOff : undefined,
-	);
+	// Re-render when a League extras switch changes
+	useFeatureSwitches();
 	const { leagueType } = useLocal(["leagueType"]);
 
 	if (menuItem.type === "text") {
@@ -167,12 +166,7 @@ const MenuItem = ({
 			return null;
 		}
 
-		if (
-			!featureOn ||
-			(menuItem.type === "link" &&
-				menuItem.featureOff !== undefined &&
-				replacingFeatureOn)
-		) {
+		if (!isMenuLinkFeatureOn(menuItem)) {
 			return null;
 		}
 

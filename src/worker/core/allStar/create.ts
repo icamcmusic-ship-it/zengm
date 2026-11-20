@@ -5,7 +5,6 @@ import type {
 	Conditions,
 	AllStarPlayer,
 } from "../../../common/types.ts";
-import { PLAYER } from "../../../common/constants.ts";
 import { idb } from "../../db/index.ts";
 import type { PlayerRatings } from "../../../common/types.basketball.ts";
 import { last, orderBy, range, assertDefined } from "../../../common/utils.ts";
@@ -13,6 +12,8 @@ import { getPosByGpF } from "../player/getPosByGpF.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { shuffle } from "../../../common/random.ts";
 import { player } from "../index.ts";
+import { isCollege } from "../college/isCollege.ts";
+import { isRedshirting } from "../college/redshirt.ts";
 
 // This is from the old football awards sytem. Eventually should make All-Star teams use the same formulas as the default All-League awards...
 // Football players from player.formatAll, with currentStats added in create
@@ -111,19 +112,21 @@ const mvpScore = (p: PlayerWithCurrentStats) => {
 
 const MIN_PLAYERS_CONTEST = 2;
 
-const create = async (conditions: Conditions) => {
-	const allStars: AllStars = {
-		season: g.get("season"),
-		teamNames: ["", ""],
-		teams: [[], []],
-		remaining: [],
-		finalized: false,
-		type: "top",
-	};
-	const playersAll = await idb.cache.players.indexGetAll("playersByTid", [
-		PLAYER.FREE_AGENT,
-		Infinity,
-	]);
+// Players who can be All-Stars or enter a contest: on a team (not free agents), and in college mode not redshirting (they don't play)
+export const isEligible = <
+	T extends {
+		tid: number;
+		redshirt?: number;
+	},
+>(
+	p: T,
+) => p.tid >= 0 && !(isCollege() && isRedshirting(p));
+
+// All the players who could be All-Stars, best first
+export const getAllStarCandidates = async () => {
+	const playersAll = (
+		await idb.cache.players.indexGetAll("playersByTid", [0, Infinity])
+	).filter((p) => isEligible(p));
 	const players = await player.formatAll(playersAll, {
 		attrs: ["pid", "firstName", "name", "tid", "injury"],
 		ratings: ["pos", "ovr"],
@@ -186,8 +189,6 @@ const create = async (conditions: Conditions) => {
 		showNoStats: true,
 	});
 
-	const allStarNum = g.get("allStarNum");
-
 	const score = (p: (typeof players)[number]) =>
 		bySport({
 			baseball: p.stats.war ?? 0,
@@ -196,11 +197,59 @@ const create = async (conditions: Conditions) => {
 			hockey: p.stats.ps ?? 0,
 		});
 
-	const sortedPlayers = orderBy(
+	// pid last, so equal players always come out in the same order
+	return orderBy(
 		players,
-		[score, (p) => p.ratings.ovr],
-		["desc", "desc"],
+		[score, (p) => p.ratings.ovr, (p) => p.pid],
+		["desc", "desc", "asc"],
 	);
+};
+
+// Three-point contest, by stats: this regular season's threes, summed over all his teams this season (not just his last
+// stat row, which is only his current team after a trade, or last season, or a playoff row)
+export const getSeasonThrees = (
+	stats: {
+		season: number;
+		playoffs: boolean;
+		gp?: number;
+		tp?: number;
+		tpa?: number;
+	}[],
+	season: number,
+) => {
+	let gp = 0;
+	let tp = 0;
+	let tpa = 0;
+	for (const row of stats) {
+		if (row.season === season && !row.playoffs) {
+			gp += row.gp ?? 0;
+			tp += row.tp ?? 0;
+			tpa += row.tpa ?? 0;
+		}
+	}
+	return {
+		gp,
+		tp,
+		tpa,
+		tpp: tpa > 0 ? tp / tpa : 0,
+	};
+};
+
+const create = async (conditions: Conditions) => {
+	const allStars: AllStars = {
+		season: g.get("season"),
+		teamNames: ["", ""],
+		teams: [[], []],
+		remaining: [],
+		finalized: false,
+		type: "top",
+	};
+
+	// Not free agents (they'd have no team for the game or the news), and no redshirts
+	const sortedPlayers = await getAllStarCandidates();
+	const players = sortedPlayers;
+
+	const allStarNum = g.get("allStarNum");
 
 	let allStarType = g.get("allStarType");
 	const confs = g.get("confs");
@@ -449,11 +498,21 @@ const create = async (conditions: Conditions) => {
 		season: g.get("season"),
 	});
 
+	// Returns false if there is no healthy player left to assign
 	const assignTopPlayerToTeam = (team: (typeof allStars)["teams"][number]) => {
 		const ind = allStars.remaining.findIndex(({ pid }) => healthyPids.has(pid));
+		if (ind < 0) {
+			return false;
+		}
 		team.push(allStars.remaining[ind]!);
 		allStars.remaining.splice(ind, 1);
+		return true;
 	};
+
+	if (allStarType === "draft" && healthyPids.size < 2) {
+		// Not enough healthy players for two captains (a tiny league), so no draft
+		allStarType = "top";
+	}
 
 	if (allStarType === "draft") {
 		// Pick two captains
@@ -490,7 +549,9 @@ const create = async (conditions: Conditions) => {
 		allStars.teamNames[1] = `${confNames[1]}`;
 		allStars.teamNames[0] = `${confNames[0]}`;
 	} else {
-		// Alternate team assignment when going through list of players, in snake fashion
+		// Alternate team assignment when going through list of players, in snake fashion. With too few players for a full
+		// game this still keeps the two sides within one player of each other (fewer per team); if that's still not enough
+		// for a game, the game is called off when it comes up (prepareGame.ts)
 		const snakeOrder = Math.random() < 0.5 ? [0, 1, 1, 0] : [1, 0, 0, 1];
 		let i = 0;
 		while (
@@ -498,7 +559,9 @@ const create = async (conditions: Conditions) => {
 			healthyPids.size
 		) {
 			const teamIndex = snakeOrder[i % snakeOrder.length]!;
-			assignTopPlayerToTeam(allStars.teams[teamIndex]!);
+			if (!assignTopPlayerToTeam(allStars.teams[teamIndex]!)) {
+				break;
+			}
 			i += 1;
 		}
 
@@ -519,10 +582,10 @@ const create = async (conditions: Conditions) => {
 			prevWinnerThree = lastYear.three.players[lastYear.three.winner]!.pid;
 		}
 
-		const activePlayers = await idb.cache.players.indexGetAll("playersByTid", [
-			0,
-			Infinity,
-		]);
+		// No redshirts: they don't play this season
+		const activePlayers = (
+			await idb.cache.players.indexGetAll("playersByTid", [0, Infinity])
+		).filter((p) => isEligible(p));
 
 		if (g.get("allStarDunk")) {
 			const dunkers = orderBy(
@@ -593,23 +656,36 @@ const create = async (conditions: Conditions) => {
 		}
 
 		if (g.get("allStarThree")) {
-			// Half qualify by taking a lot of threes. Half qualify by ratings.
+			// Half qualify by taking a lot of threes. Half qualify by ratings (plus any stats spots nobody qualifies for yet, early in the season).
 			const numStats = Math.floor(g.get("numPlayersThree") / 2);
-			const numRatings = g.get("numPlayersThree") - numStats;
 
+			// This regular season's threes. To qualify on stats he needs at least one attempt per team game so far (about the
+			// most games anyone has played), then it's makes, with 3P% as the tiebreaker
+			const season = g.get("season");
+			const threesByPid = new Map(
+				activePlayers.map((p) => [p.pid, getSeasonThrees(p.stats, season)]),
+			);
+			let teamGames = 0;
+			for (const threes of threesByPid.values()) {
+				teamGames = Math.max(teamGames, threes.gp);
+			}
+			const minAttempts = Math.max(1, teamGames);
 			const shootersStats = orderBy(
-				activePlayers.filter((p) => p.injury.gamesRemaining === 0),
+				activePlayers.filter(
+					(p) =>
+						p.injury.gamesRemaining === 0 &&
+						threesByPid.get(p.pid)!.tpa >= minAttempts,
+				),
 				[
-					(p) => {
-						const stats = p.stats.at(-1);
-						return stats?.tp ?? 0;
-					},
+					(p) => threesByPid.get(p.pid)!.tp,
+					(p) => threesByPid.get(p.pid)!.tpp,
 					(p) => {
 						const ratings = p.ratings.at(-1) as PlayerRatings;
 						return ratings.tp;
 					},
+					(p) => p.pid,
 				],
-				["desc", "desc"],
+				["desc", "desc", "desc", "asc"],
 			).slice(0, numStats);
 
 			const shootersRatings = orderBy(
@@ -625,7 +701,7 @@ const create = async (conditions: Conditions) => {
 					},
 				],
 				["desc", "desc"],
-			).slice(0, numRatings);
+			).slice(0, g.get("numPlayersThree") - shootersStats.length);
 
 			const shooters = [...shootersStats, ...shootersRatings].map((p) => ({
 				pid: p.pid,

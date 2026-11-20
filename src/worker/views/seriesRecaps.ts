@@ -5,6 +5,7 @@ import { defineView } from "../util/defineView.ts";
 import { season as seasonCore } from "../core/index.ts";
 import {
 	seriesRecap,
+	seedsComparable,
 	type RecapGame,
 	type RecapPlayerLine,
 	type SeriesRecap,
@@ -26,23 +27,21 @@ export const toRecapGame = (game: Game): RecapGame => ({
 		tid: t.tid,
 		pts: t.pts,
 		ptsQtrs: Array.isArray(t.ptsQtrs) ? t.ptsQtrs : [],
-		players: ((t.players ?? []) as any[]).map(
-			(p): RecapPlayerLine => ({
-				pid: p.pid,
-				name: p.name ?? "",
-				min: num(p.min),
-				pts: num(p.pts),
-				trb: num(p.drb) + num(p.orb),
-				ast: num(p.ast),
-				stl: num(p.stl),
-				blk: num(p.blk),
-				tov: num(p.tov),
-				fg: num(p.fg),
-				fga: num(p.fga),
-				ft: num(p.ft),
-				fta: num(p.fta),
-			}),
-		),
+		players: ((t.players ?? []) as any[]).map((p): RecapPlayerLine => ({
+			pid: p.pid,
+			name: p.name ?? "",
+			min: num(p.min),
+			pts: num(p.pts),
+			trb: num(p.drb) + num(p.orb),
+			ast: num(p.ast),
+			stl: num(p.stl),
+			blk: num(p.blk),
+			tov: num(p.tov),
+			fg: num(p.fg),
+			fga: num(p.fga),
+			ft: num(p.ft),
+			fta: num(p.fta),
+		})),
 	})) as RecapGame["teams"],
 });
 
@@ -82,7 +81,7 @@ export const loadSeriesRecaps = async (season: number) => {
 					home: m.home,
 					away: m.away,
 					numToWin,
-					seedsComparable: m.home.cid === m.away.cid || byConf === false,
+					seedsComparable: seedsComparable(m.home, m.away, byConf),
 					games: recapGames,
 				},
 				teamName,
@@ -117,9 +116,10 @@ export default defineView({
 		if (featureOff) {
 			return featureOff;
 		}
+		// A game day only changes the current season's recaps
 		if (
 			!updateEvents.has("firstRun") &&
-			!updateEvents.has("gameSim") &&
+			!(updateEvents.has("gameSim") && inputs.season === g.get("season")) &&
 			!updateEvents.has("newPhase") &&
 			inputs.season === prevInputs?.season &&
 			inputs.pair === prevInputs?.pair

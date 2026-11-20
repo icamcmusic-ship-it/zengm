@@ -9,16 +9,24 @@ import pos from "./pos.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { syncExpandedToCompat } from "./expandedRatings.ts";
 
-const genRatings = (season: number, scoutingLevel: number) => {
-	const { heightInInches, ratings, apeIndex, build } = bySport<{
+const genRatings = (
+	season: number,
+	scoutingLevel: number,
+	_hgtOverride?: undefined,
+	// Basketball: where he is from (prospect variety's regional tilts)
+	origin?: { country?: string },
+) => {
+	const { heightInInches, ratings, apeIndex, build, genVar } = bySport<{
 		heightInInches: number;
 		ratings: MinimalPlayerRatings;
 		// Basketball: his ape index (inches) and the player type his ratings were drawn for
 		apeIndex?: number;
 		build?: string;
+		// Basketball: prospect variety seed (common/prospectVariety.ts)
+		genVar?: unknown;
 	}>({
 		baseball: genRatingsBaseball(season, scoutingLevel),
-		basketball: genRatingsBasketball(season, scoutingLevel),
+		basketball: genRatingsBasketball(season, scoutingLevel, undefined, origin),
 		football: genRatingsFootball(season, scoutingLevel),
 		hockey: genRatingsHockey(season, scoutingLevel),
 	});
@@ -169,6 +177,7 @@ const genRatings = (season: number, scoutingLevel: number) => {
 		ratings,
 		apeIndex,
 		build,
+		genVar,
 		// genPos,
 	};
 };

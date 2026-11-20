@@ -19,6 +19,7 @@ import {
 	SIM_FIX_MID_RANGE,
 	SIM_FIX_BREAK_REST,
 	SIM_FIX_PERF_FACTOR,
+	SIM_FIX_STRENGTH_GAP,
 	SIM_FIX_SHOT_CHOICE,
 	SIM_FIX_TRANSITION,
 } from "./simSettings.ts";
@@ -48,6 +49,7 @@ import type {
 	TeamNum,
 } from "../../../common/types.ts";
 import GameSimBase from "../GameSim/GameSimBase.ts";
+import { ovr as teamOvrBasketball } from "../team/ovr.basketball.ts";
 import { maxBy } from "../../../common/utils.ts";
 import {
 	type BlockType,
@@ -322,6 +324,7 @@ type PlayerGameSim = {
 	id: number;
 	// (perf2) his value for substitutions, set by updatePlayersOnCourt each time it runs
 	subOvr?: number;
+	ovr?: number;
 	name: string;
 	age: number;
 	pos: string;
@@ -685,6 +688,8 @@ class GameSim extends GameSimBase {
 	attentionShooterShare = 0;
 	// Matchup Defense, help on elite finishers: what the help takes from a team's best finishers goes to all its two-point shots
 	helpGive: [number, number] = [0, 0];
+	// Game Sim Fixes: each team's predicted margin minus its opponent's (SIM_FIX_STRENGTH_GAP)
+	strengthGap: [number, number] = [0, 0];
 	// Matchup Defense (League extras, see matchupDefense.ts): for each team on defense, the index of the defender guarding each offensive
 	// player (by his index on the court), assigned at each substitution, and the team's average defensive versatility. Off: nothing here is
 	// used and no extra random numbers are drawn
@@ -906,6 +911,18 @@ class GameSim extends GameSimBase {
 						(ATTENTION.helpGive * drop) / t.player.length;
 				}
 			}
+		}
+		// Game Sim Fixes: the team strength gap (see SIM_FIX_STRENGTH_GAP)
+		if (this.simFixes && !allStarGame) {
+			const pred = this.team.map((t) =>
+				teamOvrBasketball(
+					t.player
+						.filter((p) => !p.injured)
+						.map((p) => ({ ratings: { ovr: p.ovr ?? 0, pos: p.pos } })),
+					{ rating: "ovr" },
+				),
+			);
+			this.strengthGap = [pred[0]! - pred[1]!, pred[1]! - pred[0]!];
 		}
 		this.starClutchCal =
 			this.matchupDefense &&
@@ -1245,6 +1262,7 @@ class GameSim extends GameSimBase {
 
 				// @ts-expect-error
 				delete p.valueNoPot;
+				delete p.ovr;
 				delete p.compositeRating;
 				delete p.traitEffects;
 				delete p.gameZ;
@@ -5351,6 +5369,10 @@ class GameSim extends GameSimBase {
 
 			if (this.coachSys) {
 				probMake += this.coachMakeDelta();
+			}
+			// Game Sim Fixes: the team strength gap
+			if (this.simFixes) {
+				probMake -= SIM_FIX_STRENGTH_GAP.k * this.strengthGap[this.o];
 			}
 			// Offensive Emphasis: how well the team's play-type dials fit its roster
 			if (this.offEmph) {
