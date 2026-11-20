@@ -178,6 +178,12 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 			url: ["records_book"],
 			basketballOnly: true,
 		},
+		{
+			id: "leagueEras",
+			name: "Eras",
+			url: ["league_eras"],
+			basketballOnly: true,
+		},
 	],
 	[
 		{ id: "teamStats", name: "Team Stats", url: ["team_stats"] },

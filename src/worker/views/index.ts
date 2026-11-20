@@ -157,6 +157,7 @@ export { default as frontOffices } from "./frontOffices.ts";
 export { default as coachNotes } from "./coachNotes.ts";
 export { default as skillBadges } from "./skillBadges.ts";
 export { default as recordsBook } from "./recordsBook.ts";
+export { default as leagueEras } from "./leagueEras.ts";
 export { default as milestones } from "./milestones.ts";
 export { default as rivalries } from "./rivalries.ts";
 export { default as seriesRecaps } from "./seriesRecaps.ts";
