@@ -256,7 +256,8 @@ const SCENARIOS: Scenario[] = [
 	{ name: "Elam ending", seeds: 10, settings: { ...ALL_ON, elam: true } },
 	{
 		name: "shootouts",
-		seeds: 40,
+		// (a tie after regulation is a few percent of games, so enough of them for a handful of shootouts)
+		seeds: 150,
 		settings: { maxOvertimes: 0, shootoutRounds: 3 },
 	},
 ];

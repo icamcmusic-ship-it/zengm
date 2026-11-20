@@ -1,62 +1,98 @@
 [
 	{
 		"seed": 1000,
-		"pts": [48, 69],
-		"hash": "c8c9eca1cf28e9cf4c9f08b4149aa1a0175fa25d7ee2926294a1e25101f1136c"
+		"pts": [
+			56,
+			78
+		],
+		"hash": "3bce6cc3f3318b6008a63cdd3155ccfda314c07832c48c717eb1d286e7484df7"
 	},
 	{
 		"seed": 1037,
-		"pts": [62, 42],
-		"hash": "2739abae5b1bdd36fafa64430298b9cf765acdb991a50f22a3309cfa3c58aea0"
+		"pts": [
+			66,
+			39
+		],
+		"hash": "3885b38decb17a2cf82a25133ea1704f80a539f50ff3fc6733e6e401365e1529"
 	},
 	{
 		"seed": 1074,
-		"pts": [61, 106],
-		"hash": "42ddf8532313cfc5612bc7a2a9e65996a71f27c01b6bda7f121c071b85557e9c"
+		"pts": [
+			97,
+			55
+		],
+		"hash": "9a748ed81ec259ed8fc6298ddcb934984de24ef51e82bc5c06249171848399c1"
 	},
 	{
 		"seed": 1111,
-		"pts": [70, 49],
-		"hash": "b72eb6f913b5893a536d0beb9a1c9ba1d143bb00baa159b67e123dfc4fd8a55d"
+		"pts": [
+			68,
+			60
+		],
+		"hash": "0184b0f3a74d3791c5976958ea8a4de1cb73b2ff7dea909a284854209f050d29"
 	},
 	{
 		"seed": 1148,
-		"pts": [51, 60],
-		"hash": "2cb21e384f7de1fc34a7ba410914a320ebf5c24187479f738a3316ec31175034"
+		"pts": [
+			54,
+			69
+		],
+		"hash": "4c676f81cb22ddcc6b1b10e8bef58ac290a14ecc8b345a81c86f176e86b4f380"
 	},
 	{
 		"seed": 1185,
-		"pts": [61, 62],
-		"hash": "12769b7113073c88b2e738ef41be2265faf1d115d5ab266d46ff14867a5a360e"
+		"pts": [
+			63,
+			85
+		],
+		"hash": "974326a8201dd354700f3e402e6ffc2952b992ca030217bd4ef6a004a5a8bc07"
 	},
 	{
 		"seed": 1222,
-		"pts": [57, 67],
-		"hash": "186c174b07488a9c950cb9b44e9de93f6749924d12a3f0dfff9416f851dd372b"
+		"pts": [
+			56,
+			74
+		],
+		"hash": "493d981948f6b9682d5cc865491d944156ae447ca755a67c46ae55722d065af1"
 	},
 	{
 		"seed": 1259,
-		"pts": [63, 84],
-		"hash": "f1560b05f03e0d4edcedf5cc7f6fc277c5a2c054b7193c588b1ea6301fad604c"
+		"pts": [
+			65,
+			57
+		],
+		"hash": "4296cf9f0e043e6d861d930eb6d92556dab05814d69f2980b7b60bf1d2097f8e"
 	},
 	{
 		"seed": 1296,
-		"pts": [75, 63],
-		"hash": "ffe365e8d3d8277d98901e06d672042055b221e93cd85fd789fe780ae0c25066"
+		"pts": [
+			75,
+			63
+		],
+		"hash": "916647ae9a3f1f1d485c15127f06763e7f902d3c4d62bbbdbef9258fcc8dbd92"
 	},
 	{
 		"seed": 1333,
-		"pts": [65, 50],
-		"hash": "90ed169144063d62a9c2b74291da71a62a15150025c8725d7900b6eb2f9bc576"
+		"pts": [
+			41,
+			68
+		],
+		"hash": "5dfbd0c9fb4ac57724db947ffb9f256eb0528d9e2543587865b5fe3d0194d522"
 	},
 	{
 		"seed": 1370,
-		"pts": [60, 58],
-		"hash": "604b0998e4704112b247b1e45ab96281e068a73c767fb1201fa3dfe7c3daff60"
+		"pts": [
+			68,
+			55
+		],
+		"hash": "662c90d6b4170b6e324f72ba5b43594ba89d967deaae1239f3b5f44079c459a4"
 	},
 	{
 		"seed": 1407,
-		"pts": [86, 71],
-		"hash": "0cdfc46a6158fb21a124869a4fe6b40c47589043eb4adf4218f28498f60310be"
+		"pts": [
+			89,
+			74
+		],
+		"hash": "eb6def9b7804c504b376f73ceb65c0ebe2150cbf04297c04bc0af380b6bec6a8"
 	}
 ]

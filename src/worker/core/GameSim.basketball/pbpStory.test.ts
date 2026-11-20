@@ -100,7 +100,13 @@ test("storyline calls are true, and the rest of the text is unchanged", () => {
 				again.out.map((x) => x.r),
 				a.out.map((x) => x.r),
 			);
-			assert.strictEqual(b.session.storyCalls().length, 0);
+			// (garbage time and the bench mob read only the score, the clock and the subs, so they're called without the extra data too)
+			assert.deepStrictEqual(
+				b.session
+					.storyCalls()
+					.filter((c) => c.kind !== "garbage" && c.kind !== "benchMob"),
+				[],
+			);
 			assert.strictEqual(a.out.length, b.out.length);
 			for (const [i, x] of a.out.entries()) {
 				const y = b.out[i]!;

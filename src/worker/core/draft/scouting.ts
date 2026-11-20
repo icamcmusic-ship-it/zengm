@@ -1,4 +1,4 @@
-import { PLAYER } from "../../../common/constants.ts";
+import { PLAYER, RATINGS } from "../../../common/constants.ts";
 import { MAX_LEVEL } from "../../../common/budgetLevels.ts";
 import { getPreDraftStats } from "../../../common/preDraft.ts";
 import { last } from "../../../common/utils.ts";
@@ -96,9 +96,12 @@ export const applyScouting = (
 	const fuzzBefore = Math.abs(ratings.fuzz);
 	ratings.fuzz *= action.factor;
 	// Skills are read through fuzz: keep them in step with the new fuzz
-	ratings.skills = player.skills(ratings as any);
-	if ((p as any).draft && (p as any).tid === PLAYER.UNDRAFTED) {
-		(p as any).draft.skills = ratings.skills;
+	// (only when the row carries every rating; partial rows can't be scored)
+	if (RATINGS.every((key) => typeof (ratings as any)[key] === "number")) {
+		ratings.skills = player.skills(ratings as any);
+		if ((p as any).draft && (p as any).tid === PLAYER.UNDRAFTED) {
+			(p as any).draft.skills = ratings.skills;
+		}
 	}
 	if (!p.scouting) {
 		p.scouting = [];

@@ -209,7 +209,9 @@ const starDriver = async (threat: number, seeds = SEEDS, games = 2) => {
 };
 
 test("spacingCreation: shooters around a star driver open up the paint", async () => {
-	const games = Number((globalThis as any).process.env.SM_GAMES ?? 6);
+	// (with non-shooters around him the star rarely gets to the rim, so his rim FG% needs enough games to be more than noise: at 6 games
+	// it's ~70 attempts, a standard error of about 0.055 against the 0.03 margin)
+	const games = Number((globalThis as any).process.env.SM_GAMES ?? 30);
 	const shooters = await starDriver(0.6, SEEDS, games);
 	const nonShooters = await starDriver(0.3, SEEDS, games);
 	if ((globalThis as any).process.env.SM_PRINT) {
