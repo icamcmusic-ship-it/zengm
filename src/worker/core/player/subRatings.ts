@@ -126,6 +126,9 @@ const generateFor = (p: PlayerLike, damp = 1) => {
 		damp,
 	);
 	r.sub = sub;
+	// The generated shape can leave an anchored sub just outside ANCHOR_TOLERANCE of its expanded rating (a side whose other sub is
+	// clamped at 0 or 100); syncing now makes it what ensureSubs keeps on load, so the prospect round-trips through a league file
+	syncRowSubs(r);
 	p.subP = info;
 };
 
