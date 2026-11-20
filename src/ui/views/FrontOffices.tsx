@@ -19,6 +19,7 @@ const FrontOffices = ({
 	moves,
 	rows,
 	traitInfo,
+	financeInfo,
 }: View<"frontOffices">) => {
 	useTitleBar({ title: "Front Offices" });
 	const [open, setOpen] = useState<number | undefined>();
@@ -43,6 +44,7 @@ const FrontOffices = ({
 							<th>GM</th>
 							<th>Age</th>
 							<th>Style</th>
+							{financeInfo ? <th>Finances</th> : null}
 							<th>Since</th>
 							<th title="Record with this team">Record</th>
 							<th title="Wins above the preseason expectations, per 82 games, with this team">
@@ -93,6 +95,14 @@ const FrontOffices = ({
 														? gm.styleLabels.join(" · ")
 														: "Balanced"}
 												</td>
+												{financeInfo ? (
+													<td
+														className="text-nowrap"
+														title={gm.finance?.description}
+													>
+														{gm.finance?.name}
+													</td>
+												) : null}
 												<td>{gm.since}</td>
 												<td className="text-nowrap">
 													{gm.tenureSeasons > 0 ? `${gm.won}-${gm.lost}` : "—"}
@@ -111,14 +121,17 @@ const FrontOffices = ({
 												</td>
 											</>
 										) : (
-											<td colSpan={9} className="text-body-secondary">
+											<td
+												colSpan={financeInfo ? 10 : 9}
+												className="text-body-secondary"
+											>
 												{row.user ? "You" : "Vacant"}
 											</td>
 										)}
 									</tr>
 									{gm && open === row.tid ? (
 										<tr>
-											<td colSpan={10}>
+											<td colSpan={financeInfo ? 11 : 10}>
 												<div className="d-flex flex-wrap gap-3">
 													{gm.face ? (
 														<div style={{ width: 80, height: 120 }}>
@@ -141,6 +154,12 @@ const FrontOffices = ({
 																? `. Executive of the Year: ${gm.execAwards.join(", ")}`
 																: ""}
 														</div>
+														{gm.finance ? (
+															<div>
+																Finances: <b>{gm.finance.name}</b>.{" "}
+																{gm.finance.description}
+															</div>
+														) : null}
 														<GmTraitBars traits={gm.traits} />
 													</div>
 												</div>
@@ -181,6 +200,9 @@ const FrontOffices = ({
 										) : (
 											<>
 												{MOVE_TEXT[m.type]} {m.name}
+												{m.type === "hired" && m.finance
+													? `, ${/^[aeiou]/i.test(m.finance) ? "an" : "a"} ${m.finance} GM`
+													: ""}
 												{m.type === "hired" &&
 												m.previousTeams &&
 												m.previousTeams.length > 0
@@ -208,6 +230,7 @@ const FrontOffices = ({
 								<th>Name</th>
 								<th>Age</th>
 								<th>Style</th>
+								{financeInfo ? <th>Finances</th> : null}
 								<th>Last job</th>
 								<th>Career</th>
 								<th>Titles</th>
@@ -223,6 +246,9 @@ const FrontOffices = ({
 											? gm.styleLabels.join(" · ")
 											: "Balanced"}
 									</td>
+									{financeInfo ? (
+										<td title={gm.finance?.description}>{gm.finance?.name}</td>
+									) : null}
 									<td>
 										{gm.lastTeam
 											? `${gm.lastTeam.abbrev}, until ${gm.lastTeam.end}`
@@ -247,6 +273,23 @@ const FrontOffices = ({
 					</li>
 				))}
 			</ul>
+			{financeInfo ? (
+				<>
+					<h2>Finance styles</h2>
+					<p>
+						How a GM runs his team's money within the owner's budget. The
+						owner's type wins where they disagree (a bottom line owner won't let
+						a spendthrift pay luxury tax).
+					</p>
+					<ul>
+						{financeInfo.map((info) => (
+							<li key={info.key}>
+								<b>{info.name}</b>: {info.description}
+							</li>
+						))}
+					</ul>
+				</>
+			) : null}
 		</>
 	);
 };

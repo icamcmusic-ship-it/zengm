@@ -14,6 +14,7 @@ import { getNumPlayersTradedAwayNormalizedAll } from "../player/getNumPlayersTra
 import { choice } from "../../../common/random.ts";
 import { getTeamInfoCache } from "./getTeamInfoCache.ts";
 import { releaseTeamCoaches } from "../staff/index.ts";
+import { syncGms } from "../gm/index.ts";
 
 const disable = async (tid: number) => {
 	const t = await idb.cache.teams.get(tid);
@@ -108,6 +109,9 @@ const disable = async (tid: number) => {
 
 	// Coaching staff: the coaches become free agents too (otherwise they'd stay on a team that no longer exists)
 	await releaseTeamCoaches(t.tid);
+
+	// AI GMs: the GM leaves ("left") for the market, on the team's list of former GMs so its history stays
+	await syncGms();
 
 	// In preseason, need to delete teamSeason and teamStats
 	if (actualPhase() < PHASE.PLAYOFFS) {

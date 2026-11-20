@@ -74,7 +74,10 @@ export default defineView({
 					"weight",
 					"awards",
 				],
-				ratings: ["ovr", "pot", "dnk", "jmp", "pos"],
+				// No Visible Ratings challenge: only the position, not his true ratings
+				ratings: g.get("challengeNoRatings")
+					? ["pos"]
+					: ["ovr", "pot", "dnk", "jmp", "pos"],
 				stats: ["gp", "pts", "trb", "ast", "jerseyNumber"],
 				season,
 				fuzz: true,

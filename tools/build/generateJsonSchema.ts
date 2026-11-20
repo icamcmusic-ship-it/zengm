@@ -1998,6 +1998,12 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 							type: "integer",
 							minimum: 0,
 						},
+						nit: {
+							type: "boolean",
+						},
+						factor: {
+							type: "number",
+						},
 					},
 					required: [
 						"pid",

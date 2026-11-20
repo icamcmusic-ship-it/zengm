@@ -1,6 +1,12 @@
 // AI GM personalities: every team's general manager, the GM carousel and the former GMs still on the market
 import { GM_TRAIT_INFO, GM_TRAIT_KEYS } from "../../common/gmPersonality.ts";
-import { userControlsTeam } from "../core/gm/index.ts";
+import { onGmMarket, userOwnsTeam } from "../core/gm/index.ts";
+import {
+	GM_FINANCE_STYLES,
+	GM_FINANCE_STYLE_KEYS,
+} from "../../common/gmFinance.ts";
+import type { Gm } from "../../common/types.ts";
+import { gmFinanceEnabled, gmFinanceStyleOf } from "../core/gm/finance.ts";
 import { idb } from "../db/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
@@ -16,6 +22,13 @@ type Move = {
 	name: string;
 	// For hires: record and teams before
 	previousTeams?: string[];
+	// For hires: AI GM finance style name, when that's on
+	finance?: string;
+};
+
+const financeName = (gm: Gm) => {
+	const style = gmFinanceStyleOf(gm);
+	return style ? GM_FINANCE_STYLES[style].adjective : undefined;
 };
 
 export default defineView({
@@ -36,7 +49,8 @@ export default defineView({
 
 		const teamInfoCache = g.get("teamInfoCache");
 		const abbrev = (tid: number) => teamInfoCache[tid]?.abbrev ?? "";
-		const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+		// Contracted teams too: their GMs' history and the ones on the market (no row on the table)
+		const teams = await idb.cache.teams.getAll();
 
 		const rows: {
 			tid: number;
@@ -52,16 +66,19 @@ export default defineView({
 		const season = g.get("season");
 
 		for (const t of teams) {
-			const user = userControlsTeam(t.tid);
-			rows.push({
-				tid: t.tid,
-				abbrev: t.abbrev,
-				region: t.region,
-				name: t.name,
-				colors: t.colors,
-				user,
-				gm: t.gm && !user ? await formatGm(t.gm, t.tid) : undefined,
-			});
+			if (!t.disabled) {
+				// The user's teams, even while auto play runs them (they have no GM)
+				const user = userOwnsTeam(t.tid);
+				rows.push({
+					tid: t.tid,
+					abbrev: t.abbrev,
+					region: t.region,
+					name: t.name,
+					colors: t.colors,
+					user,
+					gm: t.gm && !user ? await formatGm(t.gm, t.tid) : undefined,
+				});
+			}
 
 			for (const gm of [...(t.gm ? [t.gm] : []), ...(t.formerGms ?? [])]) {
 				const name = `${gm.firstName} ${gm.lastName}`;
@@ -78,6 +95,7 @@ export default defineView({
 							gmid: gm.gmid,
 							name,
 							previousTeams: before,
+							finance: financeName(gm),
 						});
 					}
 					if (tenure.end !== undefined && tenure.reason) {
@@ -93,8 +111,9 @@ export default defineView({
 				}
 			}
 
+			// The ones the next carousel can hire (the others retire then)
 			for (const gm of t.formerGms ?? []) {
-				if (gm.retiredYear === undefined) {
+				if (onGmMarket(gm)) {
 					market.push(await formatGm(gm));
 				}
 			}
@@ -118,6 +137,13 @@ export default defineView({
 			season,
 			traitKeys: [...GM_TRAIT_KEYS],
 			traitInfo: GM_TRAIT_INFO,
+			financeInfo: gmFinanceEnabled()
+				? GM_FINANCE_STYLE_KEYS.map((key) => ({
+						key,
+						name: GM_FINANCE_STYLES[key].name,
+						description: GM_FINANCE_STYLES[key].description,
+					}))
+				: undefined,
 			userTid: g.get("userTid"),
 		};
 	},

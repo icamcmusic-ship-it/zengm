@@ -1,6 +1,7 @@
 // Gathers a player's career facts for the Hall of Fame words in common/hofStory.ts (plaque, induction speech).
 import {
 	inductionSpeech,
+	plaquePrimeLine,
 	plaqueText,
 	type CareerFacts,
 	type HofTeam,
@@ -12,16 +13,50 @@ import { getTeamInfoBySeason } from "./getTeamInfoBySeason.ts";
 import { getHeadCoachForSeason } from "../core/staff/data.ts";
 import type { Player } from "../../common/types.ts";
 
-const teamNameCache = new Map<string, string>();
-const teamName = async (tid: number, season: number) => {
-	const key = `${g.get("lid")}:${tid}:${season}`;
-	let name = teamNameCache.get(key);
-	if (name === undefined) {
-		const info = await getTeamInfoBySeason(tid, season);
-		name = info ? `${info.region} ${info.name}` : "";
-		teamNameCache.set(key, name);
+// Module caches of past seasons' team names and playoff eliminations, which never change. They belong to one league (cleared
+// when another league is loaded) and are bounded. The current season is never cached: its team names can still change and its
+// playoffs may not be played yet.
+const MAX_CACHE_SIZE = 5000;
+let cacheLid: number | undefined;
+const teamInfoCache = new Map<
+	string,
+	{ region: string; name: string } | undefined
+>();
+const eliminators = new Map<number, Map<number, number>>();
+const cacheable = (season: number) => {
+	const lid = g.get("lid");
+	if (cacheLid !== lid) {
+		cacheLid = lid;
+		teamInfoCache.clear();
+		eliminators.clear();
 	}
-	return name || undefined;
+	return season < g.get("season");
+};
+const setBounded = <K, V>(map: Map<K, V>, key: K, value: V) => {
+	if (map.size >= MAX_CACHE_SIZE) {
+		map.clear();
+	}
+	map.set(key, value);
+};
+
+// The team's region and name in that season (after a relocation or rename, the old one)
+const teamInfo = async (tid: number, season: number) => {
+	const cache = cacheable(season);
+	const key = `${tid}:${season}`;
+	if (cache && teamInfoCache.has(key)) {
+		return teamInfoCache.get(key);
+	}
+	const info = await getTeamInfoBySeason(tid, season);
+	const out = info ? { region: info.region, name: info.name } : undefined;
+	if (cache) {
+		setBounded(teamInfoCache, key, out);
+	}
+	return out;
+};
+
+const teamName = async (tid: number, season: number) => {
+	const info = await teamInfo(tid, season);
+	return info ? `${info.region} ${info.name}` : undefined;
 };
 
 const proRows = (p: Player) =>
@@ -29,17 +64,22 @@ const proRows = (p: Player) =>
 		(row: any) => row.tid >= 0 && !row.playoffs && !row.preDraft && row.gp > 0,
 	) as any[];
 
+// Hall of Famers' team seasons, for the teammate line: who played for each "tid:season", in the order of the players given
+export type HofIndex = {
+	names: Map<number, string>;
+	order: Map<number, number>;
+	byTeamSeason: Map<string, number[]>;
+};
+
 export type HofContext = {
-	// Other Hall of Famers' team seasons, "tid:season" keys, for the teammate line
-	hofSeasons?: Map<number, { name: string; seasons: Set<string> }>;
+	hofIndex?: HofIndex;
 	feats?: Map<number, any[]>;
 	full?: boolean;
 };
 
-const eliminators = new Map<string, Map<number, number>>();
 const eliminatorOf = async (tid: number, season: number) => {
-	const key = `${g.get("lid")}:${season}`;
-	let m = eliminators.get(key);
+	const cache = cacheable(season);
+	let m = cache ? eliminators.get(season) : undefined;
 	if (!m) {
 		m = new Map();
 		const ps: any = await idb.merged.playoffSeries.get(season);
@@ -55,7 +95,9 @@ const eliminatorOf = async (tid: number, season: number) => {
 				}
 			}
 		}
-		eliminators.set(key, m);
+		if (cache) {
+			setBounded(eliminators, season, m);
+		}
 	}
 	return m.get(tid);
 };
@@ -163,7 +205,8 @@ export const careerFacts = async (
 	}
 
 	// Playoff rival: the team that ended his season most often
-	const elim = new Map<number, number>();
+	// Rival tid -> [times, last season]
+	const elim = new Map<number, [number, number]>();
 	const playoffSeasons = new Set(
 		(p.stats as any[])
 			.filter((r) => r.playoffs && r.tid >= 0)
@@ -176,19 +219,24 @@ export const careerFacts = async (
 		}
 		const by = await eliminatorOf(tid, season);
 		if (by !== undefined && by !== tid) {
-			elim.set(by, (elim.get(by) ?? 0) + 1);
+			const prev = elim.get(by);
+			elim.set(by, [
+				(prev?.[0] ?? 0) + 1,
+				Math.max(prev?.[1] ?? season, season),
+			]);
 		}
 	}
-	let rival: [number, number] | undefined;
+	let rival: [number, [number, number]] | undefined;
 	for (const e of elim) {
-		if (!rival || e[1] > rival[1]) {
+		if (!rival || e[1][0] > rival[1][0]) {
 			rival = e;
 		}
 	}
 	if (rival) {
-		const info = g.get("teamInfoCache")[rival[0]];
-		if (info) {
-			facts.rival = { name: `${info.region} ${info.name}`, times: rival[1] };
+		// Named as it was the last time they knocked him out
+		const name = await teamName(rival[0], rival[1][1]);
+		if (name) {
+			facts.rival = { name, times: rival[1][0] };
 		}
 	}
 
@@ -204,25 +252,31 @@ export const careerFacts = async (
 		}
 	}
 
-	// Fellow Hall of Famer with the most shared seasons
-	if (ctx.hofSeasons) {
-		const mine = new Set(rows.map((r) => `${r.tid}:${r.season}`));
-		let best: { name: string; seasons: number } | undefined;
-		for (const [pid, other] of ctx.hofSeasons) {
-			if (pid === p.pid) {
-				continue;
-			}
-			let n = 0;
-			for (const k of other.seasons) {
-				if (mine.has(k)) {
-					n += 1;
+	// Fellow Hall of Famer with the most shared seasons. Looked up by his own team seasons, not by scanning every Hall of Famer
+	if (ctx.hofIndex) {
+		const { byTeamSeason, names, order } = ctx.hofIndex;
+		const shared = new Map<number, number>();
+		for (const key of new Set(rows.map((r) => `${r.tid}:${r.season}`))) {
+			for (const pid of byTeamSeason.get(key) ?? []) {
+				if (pid !== p.pid) {
+					shared.set(pid, (shared.get(pid) ?? 0) + 1);
 				}
 			}
-			if (n >= 2 && (!best || n > best.seasons)) {
-				best = { name: other.name, seasons: n };
+		}
+		let best: { pid: number; seasons: number } | undefined;
+		for (const [pid, n] of shared) {
+			if (
+				n >= 2 &&
+				(!best ||
+					n > best.seasons ||
+					(n === best.seasons && order.get(pid)! < order.get(best.pid)!))
+			) {
+				best = { pid, seasons: n };
 			}
 		}
-		facts.teammate = best;
+		facts.teammate = best
+			? { name: names.get(best.pid)!, seasons: best.seasons }
+			: undefined;
 	}
 
 	// Signature game, from his stat feats
@@ -240,7 +294,11 @@ export const careerFacts = async (
 	}
 	if (bestFeat) {
 		const s = bestFeat.stats ?? {};
-		const info = g.get("teamInfoCache")[bestFeat.oppTid];
+		// The opponent as it was named that season
+		const info =
+			typeof bestFeat.oppTid === "number"
+				? await teamInfo(bestFeat.oppTid, bestFeat.season)
+				: undefined;
 		facts.bestGame = {
 			season: bestFeat.season,
 			pts: s.pts ?? 0,
@@ -284,13 +342,117 @@ export const featsByPid = async (pids: Set<number>) => {
 	return out;
 };
 
-export const hofSeasonsOf = (players: Player[]) => {
-	const m = new Map<number, { name: string; seasons: Set<string> }>();
+export const hofIndexOf = (players: Player[]): HofIndex => {
+	const index: HofIndex = {
+		names: new Map(),
+		order: new Map(),
+		byTeamSeason: new Map(),
+	};
 	for (const p of players) {
-		m.set(p.pid, {
-			name: `${p.firstName} ${p.lastName}`,
-			seasons: new Set(proRows(p).map((r) => `${r.tid}:${r.season}`)),
-		});
+		if (index.order.has(p.pid)) {
+			continue;
+		}
+		index.order.set(p.pid, index.order.size);
+		index.names.set(p.pid, `${p.firstName} ${p.lastName}`);
+		for (const key of new Set(proRows(p).map((r) => `${r.tid}:${r.season}`))) {
+			let pids = index.byTeamSeason.get(key);
+			if (!pids) {
+				pids = [];
+				index.byTeamSeason.set(key, pids);
+			}
+			pids.push(p.pid);
+		}
 	}
-	return m;
+	return index;
+};
+
+// Version of the stored Hall of Fame words (p.hofStory). Bump it when the words or the facts behind them change, and every
+// stored story is written again the next time it is shown
+export const HOF_STORY_VERSION = 1;
+
+type HofStory = NonNullable<Player["hofStory"]>;
+
+const hasCurrentStory = (p: Player) => p.hofStory?.v === HOF_STORY_VERSION;
+
+const writeHofStory = async (
+	p: Player,
+	ctx: { hofIndex: HofIndex; feats: Map<number, any[]> },
+): Promise<HofStory> => {
+	const facts = await careerFacts(p, { full: true, ...ctx });
+	const words = hofWords(facts);
+	return { v: HOF_STORY_VERSION, plaque: words.plaque, speech: words.speech };
+};
+
+// Saves his story on the stored player (the object passed in may be a copy)
+const saveHofStory = async (pid: number, story: HofStory) => {
+	const p =
+		(await idb.cache.players.get(pid)) ??
+		(await idb.league.get("players", pid));
+	if (p && p.hof) {
+		p.hofStory = story;
+		await idb.cache.players.put(p);
+	}
+};
+
+/**
+ * Hall of Fame words at his induction, stored on the player so pages never rebuild them. Called by player.retire with the
+ * player object it is about to save. Never throws: a failure only means the words are written on the first view instead.
+ */
+export const storeHofStoryAtInduction = async (p: Player) => {
+	if (!hofWordsOn()) {
+		return;
+	}
+	try {
+		const others = (await idb.merged.players.getAll({ hof: true })).filter(
+			(p2) => p2.pid !== p.pid,
+		);
+		p.hofStory = await writeHofStory(p, {
+			hofIndex: hofIndexOf([...others, p]),
+			feats: await featsByPid(new Set([p.pid])),
+		});
+	} catch (error) {
+		console.error(error);
+	}
+};
+
+/**
+ * Plaque text and speech of these Hall of Famers, from what is stored on them. Inductees from before stored words (or with an
+ * older HOF_STORY_VERSION) get them written now, once, and saved. allHof is every Hall of Famer (for the teammate line), only
+ * read when something is missing.
+ */
+export const getHofStories = async (
+	players: Player[],
+	allHof: Player[] | (() => Promise<Player[]>),
+) => {
+	const out = new Map<number, HofStory>();
+	const missing = players.filter((p) => !hasCurrentStory(p));
+	if (missing.length > 0) {
+		const all = typeof allHof === "function" ? await allHof() : allHof;
+		const hofIndex = hofIndexOf(all);
+		const feats = await featsByPid(new Set(missing.map((p) => p.pid)));
+		for (const p of missing) {
+			const story = await writeHofStory(p, { hofIndex, feats });
+			p.hofStory = story;
+			await saveHofStory(p.pid, story);
+		}
+	}
+	for (const p of players) {
+		out.set(p.pid, p.hofStory!);
+	}
+	return out;
+};
+
+// The plaque as shown: the stored text, plus the season and team of his prime face when the plaque shows one
+export const plaqueWithPrime = async (
+	story: HofStory,
+	prime: { season: number; tid?: number } | undefined,
+) => {
+	if (!prime) {
+		return story.plaque;
+	}
+	const team =
+		prime.tid !== undefined
+			? await teamName(prime.tid, prime.season)
+			: undefined;
+	return `${story.plaque} ${plaquePrimeLine({ season: prime.season, team })}`;
 };

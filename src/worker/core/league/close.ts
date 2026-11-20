@@ -3,6 +3,7 @@ import { idb } from "../../db/index.ts";
 import { g, local, lock, updateStatus } from "../../util/index.ts";
 import { cleanupAutoPlay } from "../league/autoPlay.ts";
 import { cancelLeagueAchievementsCheck } from "../../util/leagueAchievements.ts";
+import { resetBadgeScoutingLevel } from "../player/traits.ts";
 
 // Flush cache, disconnect from league database, and unset g.get("lid")
 const close = async (disconnect?: boolean) => {
@@ -10,6 +11,8 @@ const close = async (disconnect?: boolean) => {
 	cleanupAutoPlay();
 	cancelLeagueAchievementsCheck();
 	cancelPageWarm();
+	// The user's scouting level for trait badges belongs to this league
+	resetBadgeScoutingLevel();
 	await lock.set("stopGameSim", true);
 	await lock.set("gameSim", false);
 

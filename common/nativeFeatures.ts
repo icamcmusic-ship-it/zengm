@@ -524,7 +524,7 @@ export const NATIVE_FEATURES = [
 		core: true,
 		name: "Game Sim Fixes",
 		description:
-			"Small fixes to how ratings work in the game simulation: offensive IQ steers players away from mid-range jumpers instead of making them miss more, better post scorers and mid-range shooters are more efficient instead of just shooting more, strong and durable players get hurt a little less, the trailing team's comeback boost is smaller, and with Expanded Ratings perimeter and interior defense (not defensive IQ) decide who fouls and the synergy skill cutoffs match the expanded ratings. League averages stay about the same.",
+			"Small fixes to how ratings work in the game simulation: offensive IQ steers players away from mid-range jumpers instead of making them miss more, better post scorers and mid-range shooters are more efficient instead of just shooting more, strong and durable players get hurt a little less, the trailing team's comeback boost is smaller, the stronger team's edge in a game is trimmed a little (so the spread of team records is NBA-like), and with Expanded Ratings perimeter and interior defense (not defensive IQ) decide who fouls and the synergy skill cutoffs match the expanded ratings. League averages stay about the same.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,
@@ -1081,6 +1081,18 @@ export const NATIVE_FEATURES = [
 		name: "AI GM Personalities",
 		description:
 			"Every AI team has a general manager with a name, a face and fixed leanings (win-now or patient, analytics or old-school, risk, luxury tax, draft picks, how often he trades, loyalty, free agency and draft approach) that shift its trades, signings, re-signings, draft picks, team strategy and coach hires a little. GMs are fired after sustained failure against expectations and replaced through a GM carousel (Front Offices tab of League History, team pages, news). Your team has no GM unless you're in spectator mode or auto play.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
+		id: "gmFinance",
+		college: false,
+		key: "featureGmFinance",
+		core: true,
+		name: "AI GM Finance Styles",
+		description:
+			"Each AI general manager has a finance style (spendthrift, frugal, analytics-first, player development, facilities builder or balanced) that decides how he runs the team's money within the owner's budget: department budget levels, ticket prices, luxury tax willingness in re-signing and free agency, arena and facilities projects and commercial deal style. The owner's type wins where they disagree. Shown on Front Offices and in GM hiring news. Needs budget.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,

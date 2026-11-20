@@ -58,6 +58,7 @@ export type GmCardInfo = {
 	face?: FaceConfig;
 	traits: GmTraits;
 	styleLabels: string[];
+	finance?: { name: string; description: string };
 	since?: number;
 	tenureSeasons: number;
 	won: number;
@@ -113,6 +114,11 @@ export const GmCard = ({
 							? gm.styleLabels.join(" · ")
 							: "Balanced"}
 					</div>
+					{gm.finance ? (
+						<div title={gm.finance.description}>
+							Finances: {gm.finance.name}
+						</div>
+					) : null}
 					<div>
 						{gm.since !== undefined ? `Since ${gm.since}` : null}
 						{gm.tenureSeasons > 0 ? (

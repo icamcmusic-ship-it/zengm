@@ -725,6 +725,18 @@ const play = async (
 			await phase.newPhase(PHASE.AFTER_TRADE_DEADLINE, conditions);
 			await toUI("deleteGames", [[schedule[0].gid]]);
 			await play(numDays - 1, conditions, false);
+		} else if (
+			schedule[0]?.homeTid === -1 &&
+			schedule[0].awayTid === -2 &&
+			(await allStar.getOrCreate(g.get("season"))) !== undefined &&
+			!(await allStar.prepareGame(conditions))
+		) {
+			// All-Star Game, but not enough healthy All-Stars for two full lineups even after replacements (a tiny league): the
+			// contests still happen, the game comes off the schedule, with a news note
+			await allStar.skipGame(conditions);
+			await idb.cache.schedule.delete(schedule[0].gid);
+			await toUI("deleteGames", [[schedule[0].gid]]);
+			await play(numDays - 1, conditions, false);
 		} else {
 			// This should also call cbNoGames after the playoffs end, because g.get("phase") will have been incremented by season.newSchedulePlayoffsDay after the previous day's games
 			if (schedule.length === 0 && g.get("phase") !== PHASE.PLAYOFFS) {

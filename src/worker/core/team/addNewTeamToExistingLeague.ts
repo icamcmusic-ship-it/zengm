@@ -8,6 +8,7 @@ import { idb } from "../../db/index.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { last } from "../../../common/utils.ts";
 import { getTeamInfoCache } from "./getTeamInfoCache.ts";
+import { syncGms } from "../gm/index.ts";
 
 const addNewTeamToExistingLeague = async (
 	teamInfo: {
@@ -85,6 +86,9 @@ const addNewTeamToExistingLeague = async (
 		numTeams: allTeams.length,
 		teamInfoCache: getTeamInfoCache(allTeams),
 	});
+
+	// AI GMs: the new team names its GM now (a revived team's old GM stays gone, he left when it was contracted)
+	await syncGms();
 
 	await draft.genPicks();
 

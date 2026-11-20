@@ -38,6 +38,8 @@ import {
 	getSeasonSpend,
 } from "../../worker/core/frontOffice/index.ts";
 import { nativeFeatureNewLeagueDefaults } from "../../common/nativeFeatures.ts";
+import { getGmFinanceStyle } from "../../common/gmFinance.ts";
+import { getDeptLevels } from "../../worker/core/frontOffice/index.ts";
 import { ALL_ON, OFF, mulberry32 } from "./harness.ts";
 import { fitHardCapContractDemands } from "../../worker/core/league/createStream.ts";
 
@@ -573,6 +575,48 @@ test.skipIf(!process.env.RUN_ECO_AUDIT)(
 						mean(rumorItems.map((r) => (r.status === "confirmed" ? 1 : 0))),
 					),
 				};
+
+				// ECO_GMF_OUT: one row per team for the AI GM finance styles measurement (style, owner type, spending, tickets, payroll)
+				if (process.env.ECO_GMF_OUT) {
+					for (const t of teams) {
+						const row = ts.find((x) => x.tid === t.tid);
+						if (!row) {
+							continue;
+						}
+						const gp = Math.max(1, helpers.getTeamSeasonGp(row));
+						const rev = Object.values(row.revenues).reduce((a, b) => a + b, 0);
+						const exp = Object.values(row.expenses).reduce((a, b) => a + b, 0);
+						const fo = Object.values(row.frontOffice?.expenses ?? {}).reduce(
+							(a, b) => a + b,
+							0,
+						);
+						appendFileSync(
+							process.env.ECO_GMF_OUT,
+							JSON.stringify({
+								seed,
+								i,
+								tid: t.tid,
+								style: t.gm ? getGmFinanceStyle(t.gm) : null,
+								owner: t.commercial?.ownerType ?? "traditional",
+								levels: getDeptLevels(t),
+								ticket: t.budget.ticketPrice / (cap / 90000),
+								att: row.att / gp,
+								ticketRev: row.revenues.ticket / 1000,
+								payroll: row.payrollEndOfSeason / cap,
+								overTax: row.payrollEndOfSeason > tax ? 1 : 0,
+								taxPaid: row.expenses.luxuryTax / 1000,
+								profit: (rev - exp - fo) / 1000,
+								cash: row.cash / 1000,
+								projects:
+									(t.ownerOffice?.completed.length ?? 0) +
+									(t.ownerOffice?.active ? 1 : 0),
+								deals: Object.values(t.commercial?.deals ?? {}).map(
+									(d) => d.style,
+								),
+							}) + "\n",
+						);
+					}
+				}
 
 				await startAutoPlay(season + 1, PHASE.PRESEASON, {});
 				const events = (await idb.cache.events.getAll()).filter(

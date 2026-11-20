@@ -9,9 +9,14 @@ import type {
 	SuggestionAction,
 } from "../../../common/staffDepth/types.ts";
 import { idb } from "../../db/index.ts";
-import { g } from "../../util/index.ts";
+import { g, local } from "../../util/index.ts";
 import { userHire } from "../staff/index.ts";
-import { clearDepthCache, stateOf } from "./coaching.ts";
+import {
+	clearDepthCache,
+	nextDevSeason,
+	stateOf,
+	userControls,
+} from "./coaching.ts";
 import {
 	applyBoardRanks,
 	getScoutingContext,
@@ -19,8 +24,22 @@ import {
 } from "./scouting.ts";
 import { removeSuggestion } from "./suggestions.ts";
 
+// Refuses in spectator mode and while auto play runs: the staff decides then, like for every AI team
+const assertControls = (tid: number) => {
+	if (!userControls(tid)) {
+		throw new Error(
+			g.get("spectator")
+				? "You're in spectator mode: the staff makes these decisions."
+				: local.autoPlayUntil
+					? "Auto play is running: the staff makes these decisions."
+					: "You don't control this team.",
+		);
+	}
+};
+
 const userTeam = async () => {
 	const tid = g.get("userTid");
+	assertControls(tid);
 	const t = await idb.cache.teams.get(tid);
 	if (!t) {
 		throw new Error("No team");
@@ -98,36 +117,66 @@ export const setScoutRegion = async (scoutId: number, region: ScoutRegion) => {
 	await idb.cache.teams.put(t);
 };
 
+/**
+ * Accept a recommendation or approve a proposal. With a suggestionId, the stored proposal's action is applied (the page may not have all of
+ * it, e.g. the plans under the No Visible Ratings challenge). Returns a sentence for the confirmation toast.
+ */
 export const applyStaffAction = async (
-	action: SuggestionAction,
+	actionFromPage: SuggestionAction,
 	suggestionId?: string,
-) => {
+): Promise<string> => {
 	const t = await userTeam();
 	const state = stateOf(t);
+	const stored = suggestionId
+		? state.suggestions?.find((s) => s.id === suggestionId && s.pending)
+		: undefined;
+	const action = stored?.action ?? actionFromPage;
+	let message = "Done.";
 	switch (action.type) {
-		case "assignRegions":
+		case "assignRegions": {
+			// Applied over the assignments as they are now (not a copy from when the page loaded), and only for scouts still on staff
+			const ctx = await getScoutingContext(t.tid);
+			if (!ctx) {
+				throw new Error("Scouting Director & Regions is off.");
+			}
+			const ids = new Set(ctx.scouts.map((s) => s.id));
+			const moves = Object.entries(action.assignments)
+				.map(([id, region]) => [Number(id), region] as const)
+				.filter(([id]) => ids.has(id));
+			if (moves.length === 0) {
+				throw new Error(
+					"Those scouts are no longer on your staff. Reload the page for a new recommendation.",
+				);
+			}
+			const regions: Record<number, ScoutRegion> = {};
+			for (const s of ctx.scouts) {
+				regions[s.id] = ctx.plan.assignments[s.id] as ScoutRegion;
+			}
+			for (const [id, region] of moves) {
+				regions[id] = region;
+			}
+			const wasAuto = state.delegation.scouting === "auto";
 			t.staffDepth = {
 				...state,
-				manualRegions: action.assignments,
+				manualRegions: regions,
 				delegation: {
 					...state.delegation,
-					scouting:
-						state.delegation.scouting === "auto"
-							? "suggest"
-							: state.delegation.scouting,
+					// Auto would ignore the kept assignments
+					scouting: wasAuto ? "suggest" : state.delegation.scouting,
 				},
 			};
 			await idb.cache.teams.put(t);
+			message = wasAuto
+				? "Scouts reassigned. Scouting delegation is now Suggest, so the Director keeps these assignments and proposes changes for you to approve."
+				: "Scouts reassigned.";
 			break;
+		}
 		case "setPriority":
 			await setStaffDepthSettings({ priority: action.priority });
+			message = "Scouting priority set.";
 			break;
 		case "devPlans": {
-			const season =
-				action.season ??
-				(g.get("phase") >= PHASE.PLAYOFFS
-					? g.get("season") + 1
-					: g.get("season"));
+			const season = action.season ?? nextDevSeason();
 			// Merged with plans already approved for the same season (a later proposal only covers players who were missing)
 			const prev =
 				state.devAccepted?.season === season ? state.devAccepted.plans : {};
@@ -136,12 +185,14 @@ export const applyStaffAction = async (
 				devAccepted: { season, plans: { ...prev, ...action.plans } },
 			};
 			await idb.cache.teams.put(t);
+			message = `Development plans for ${season} approved.`;
 			break;
 		}
 		case "teamDevPriority":
 			await setStaffDepthSettings({
 				devPriority: action.focus === "none" ? null : action.focus,
 			});
+			message = "Team development priority set.";
 			break;
 		case "hire": {
 			// Hire first, then let the current coach go: if the hire fails (he signed elsewhere, was fired by you recently), the job
@@ -154,10 +205,12 @@ export const applyStaffAction = async (
 				replace: true,
 			});
 			clearDepthCache();
+			message = "Coach hired.";
 			break;
 		}
 		case "board":
 			await applyBoardRanks(action.ranks);
+			message = "Draft board updated.";
 			break;
 		case "watch": {
 			const p = await idb.cache.players.get(action.pid);
@@ -165,19 +218,23 @@ export const applyStaffAction = async (
 				p.watch = p.watch ?? 1;
 				await idb.cache.players.put(p);
 			}
+			message = "Added to your watch list.";
 			break;
 		}
 	}
 	if (suggestionId) {
 		await removeSuggestion(t.tid, suggestionId);
 	}
+	return message;
 };
 
 export const dismissStaffSuggestion = async (id: string) => {
-	await removeSuggestion(g.get("userTid"), id);
+	const t = await userTeam();
+	await removeSuggestion(t.tid, id);
 };
 
 export const setDraftBoardLock = async (pid: number, locked: boolean) => {
+	assertControls(g.get("userTid"));
 	const p = await idb.cache.players.get(pid);
 	if (!p || !p.draftBoard) {
 		return;

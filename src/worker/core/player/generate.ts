@@ -10,6 +10,7 @@ import genWeight from "./genWeight.ts";
 import genMoodTraits from "./genMoodTraits.ts";
 import { generateFace } from "../../util/face.ts";
 import { markGenerated } from "./subRatings.ts";
+import type { GenVariety } from "../../../common/prospectVariety.ts";
 
 const generate = (
 	tid: number,
@@ -37,10 +38,15 @@ const generate = (
 		race: "asian",
 	},
 ): PlayerWithoutKey => {
-	const { heightInInches, ratings, build } = genRatings(
+	const generated = genRatings(
 		newLeague ? g.get("startingSeason") : draftYear,
 		scoutingLevel,
+		undefined,
+		{ country },
 	);
+	const { heightInInches, ratings, build } = generated;
+	// Basketball prospect variety (common/prospectVariety.ts): his seed, for his development rates
+	const genVar = (generated as { genVar?: GenVariety }).genVar;
 	// lastName += `-${genPos}`;
 
 	const weight = genWeight(
@@ -111,6 +117,7 @@ const generate = (
 		valueNoPot: 0,
 		valueFuzz: 0,
 		valueNoPotFuzz: 0,
+		...(genVar ? { genVar } : {}),
 	};
 
 	// Sub-ratings: his seed (from what was drawn above, so no random number is drawn); his shape is made at his first development

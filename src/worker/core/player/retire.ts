@@ -6,6 +6,7 @@ import { player } from "../index.ts";
 import addAward from "./addAward.ts";
 import { endContractEarly } from "../contract/index.ts";
 import { advOnRetire } from "./advStatsStorage.ts";
+import { storeHofStoryAtInduction } from "../../util/hofStory.ts";
 
 /**
  * Have a player retire, including all event and HOF bookkeeping.
@@ -47,8 +48,10 @@ const retire = async (
 	}
 
 	// Add to Hall of Fame?
+	let inducted = false;
 	if (conditions && !p.hof && madeHof(p)) {
 		p.hof = 1;
+		inducted = true;
 		addAward(p, {
 			season: g.get("season"),
 			type: "Inducted into the Hall of Fame",
@@ -94,6 +97,11 @@ const retire = async (
 	delete p.numPlayersTradedAwayNormalized;
 
 	await player.checkJerseyNumberRetirement(p);
+
+	// His plaque text and induction speech, written once now (with his career complete) and stored on him
+	if (inducted) {
+		await storeHofStoryAtInduction(p);
+	}
 };
 
 export default retire;

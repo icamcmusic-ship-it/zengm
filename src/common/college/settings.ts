@@ -39,6 +39,7 @@ const EXTRAS_FORCED_OFF = [
 	"featureThreeTeamTrades",
 	"featureDraftPickConditions",
 	"featureGmPersonalities",
+	"featureGmFinance",
 	"featureCollegeStats",
 	"featureCollegeSeason",
 	"featurePreDraftPaths",

@@ -265,6 +265,8 @@ const TARGETS: Record<Group, Partial<Record<FocusKey, number>>> = {
 	},
 	wing: {
 		three: 55,
+		// Wings create shots off the dribble too (before, the pull-up plan was for guards only: 1 player in a new league had it)
+		pullup: 50,
 		perimD: 52,
 		finish: 55,
 		handle: 48,

@@ -27,6 +27,24 @@ import {
 	setShootingSplit,
 } from "./expandedRatings.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
+import { Rng } from "../../../common/ratingsBuilds/rng.ts";
+import {
+	GROUP_FACTOR,
+	PROSPECT_VARIETY_VERSION,
+	REGION_TILTS,
+	RATING_TO_GROUP,
+	drawOutlier,
+	drawSpikes,
+	drawSubBuild,
+	ratingZs,
+	regionOf,
+	ratingFactor,
+	OUTLIER,
+	type GenVariety,
+	type RatingGroup,
+} from "../../../common/prospectVariety.ts";
+import { ovrRaw } from "./ovr.basketball.ts";
+import { shiftToRawOvr, stockGenerationForTests } from "./prospectVariety.ts";
 
 type PlayerType = "point" | "scorer" | "wing" | "big";
 
@@ -135,8 +153,6 @@ export const SCORER_MIX: {
 ];
 const scorerMix = (hgt: number) => SCORER_MIX.find((m) => hgt <= m.maxHgt);
 
-const athleticismRatings = new Set(["stre", "spd", "jmp", "endu", "dnk"]);
-const shootingRatings = new Set(["ft", "fg", "tp"]);
 // Ape index of a generated player (inches): normal, bounded. inHgt: the share of it in the hgt rating (the old -1/0/+1 inch of length
 // had sd 0.82 inch; 0.37 x 2.2 = 0.81)
 export const APE_INDEX = {
@@ -147,13 +163,13 @@ export const APE_INDEX = {
 	inHgt: 0.37,
 };
 
-const skillRatings = new Set(["oiq", "diq", "drb", "pss", "reb"]); // ins purposely left out
-
 const genRatings = (
 	season: number,
 	scoutingLevel: number,
 	// For real players, who already have a height
 	hgtOverride?: number,
+	// Where he is from (born.loc or a country), for the regional tilts of prospect variety
+	origin?: { country?: string },
 ): {
 	heightInInches: number;
 	ratings: PlayerRatings;
@@ -161,26 +177,52 @@ const genRatings = (
 	apeIndex: number;
 	// The player type his ratings were drawn for (genWeight: bigs are heavier for their height, point guards lighter)
 	build: PlayerType;
+	// Prospect variety (common/prospectVariety.ts): his seed, stored on the player. Undefined for real players (hgtOverride)
+	genVar?: GenVariety;
 } => {
 	// realHeight is drawn from a custom probability distribution and then offset by a fraction of an inch either way
 	let heightInInches = heightDist() + Math.random() - 0.5; // Fraction of an inch
 
+	// Prospect variety: every new random number below comes from this prospect's own stream, seeded by numbers already drawn (his exact
+	// height and wingspan draws), so the game's random stream draws as many numbers as before. Not for real players (hgtOverride).
+	const apeU = Math.random();
+	const rng =
+		hgtOverride === undefined && !stockGenerationForTests()
+			? new Rng(`prospect|${heightInInches}|${apeU}`)
+			: undefined;
+	const genVar: GenVariety | undefined = rng
+		? {
+				v: PROSPECT_VARIETY_VERSION,
+				s: Math.floor(rng.random() * 4294967296),
+			}
+		: undefined;
+	// Regional tilt (a style, not talent: his ovr is put back below), drawn first so his wingspan can take it
+	const region =
+		rng && origin?.country !== undefined
+			? regionOf(helpers.getCountry(origin.country))
+			: undefined;
+	const tiltScale = rng ? rng.uniform(0.5, 1.5) : 0;
+	const tilt = region ? REGION_TILTS[region] : undefined;
+
 	// Ape index (wingspan minus height, inches): its own draw, normal around +4 (NBA prospects: mean about +4, sd a little over 2). It
 	// takes the one random number the old -1/0/+1 inch of "length" took, and the hgt rating keeps about the same share of it (sd 0.8
 	// inch), so the hgt rating and everything built on it are distributed as before.
-	const apeIndex = helpers.bound(
-		APE_INDEX.mean + APE_INDEX.sd * probit(Math.random()),
-		APE_INDEX.min,
-		APE_INDEX.max,
-	);
-	const length = helpers.bound(
-		APE_INDEX.inHgt * (apeIndex - APE_INDEX.mean),
-		-1.5,
-		1.5,
-	);
+	const apeOf = (extra: number) =>
+		helpers.bound(
+			APE_INDEX.mean + APE_INDEX.sd * probit(apeU) + extra,
+			APE_INDEX.min,
+			APE_INDEX.max,
+		);
+	const lengthOf = (ape: number) =>
+		helpers.bound(APE_INDEX.inHgt * (ape - APE_INDEX.mean), -1.5, 1.5);
+	const apeIndex = apeOf(tilt ? tilt.ape * tiltScale : 0);
+	const length = lengthOf(apeIndex);
 	const wingspanAdjust = heightInInches + length; // hgt 0-100 corresponds to height 5'6" to 7'9" (Anything taller or shorter than the extremes will just get 100/0)
 
 	const hgt = hgtOverride ?? heightToRating(wingspanAdjust);
+	// His hgt rating without the regional wingspan tilt (the ovr he is put back to)
+	const hgtBeforeTilt =
+		hgtOverride ?? heightToRating(heightInInches + lengthOf(apeOf(0)));
 	heightInInches = Math.round(heightInInches); // Pick type of player (point, wing, or big) based on height
 
 	const randType = Math.random();
@@ -245,10 +287,33 @@ const genRatings = (
 
 	// For correlation across ratings, to ensure some awesome players, but athleticism and skill are independent to
 	// ensure there are some who are elite in one but not the other
-	const factorAthleticism = helpers.bound(realGauss(1, 0.2), 0.2, 1.2);
-	const factorShooting = helpers.bound(realGauss(1, 0.2), 0.2, 1.2);
-	const factorSkill = helpers.bound(realGauss(1, 0.2), 0.2, 1.2);
-	const factorIns = helpers.bound(realGauss(1, 0.2), 0.2, 1.2);
+	const groupX: Record<RatingGroup, number> = {
+		ath: realGauss(1, GROUP_FACTOR.sd),
+		shoot: realGauss(1, GROUP_FACTOR.sd),
+		skill: realGauss(1, GROUP_FACTOR.sd),
+		ins: realGauss(1, GROUP_FACTOR.sd),
+	};
+
+	// Prospect variety: each rating's factor mixes the group's draw with a subgroup's and its own (so ratings inside a group are related, not
+	// in lockstep), with a soft cap at 1.45 instead of the hard one at 1.2 (scaled so the mean factor is unchanged); a sub-build within his
+	// type, rarely an outlier (one group far up, another down), regional tilts and specialist spikes, all with his ovr put back
+	const zs = rng
+		? ratingZs(
+				{
+					ath: (groupX.ath - 1) / GROUP_FACTOR.sd,
+					shoot: (groupX.shoot - 1) / GROUP_FACTOR.sd,
+					skill: (groupX.skill - 1) / GROUP_FACTOR.sd,
+					ins: (groupX.ins - 1) / GROUP_FACTOR.sd,
+				},
+				rng,
+			)
+		: undefined;
+	const subBuild = rng ? drawSubBuild(type, rng) : undefined;
+	const outlier = rng ? drawOutlier(type, rng) : undefined;
+	const spikes = rng ? drawSpikes(rng) : undefined;
+
+	// Without the shape changes (sub-build, outlier), for the ovr he is put back to
+	const refRatings = { ...rawRatings };
 
 	for (const key of helpers.keys(rawRatings)) {
 		let typeFactor = typeFactors[type][key] ?? 1;
@@ -256,23 +321,54 @@ const genRatings = (
 		if (typeScale !== undefined) {
 			typeFactor = 1 + typeScale * (typeFactor - 1);
 		}
-		let factor = factorIns;
-
-		if (athleticismRatings.has(key)) {
-			factor = factorAthleticism;
-		} else if (shootingRatings.has(key)) {
-			factor = factorShooting;
-		} else if (skillRatings.has(key)) {
-			factor = factorSkill;
-		}
+		const group = RATING_TO_GROUP[key]!;
 
 		// For TypeScript
 		// https://github.com/microsoft/TypeScript/issues/21732
 		assertDefined(typeFactor);
 
-		rawRatings[key] = limitRating(
-			factor * typeFactor * realGauss(rawRatings[key], 3),
-		);
+		const noise = realGauss(rawRatings[key], 3);
+		if (zs) {
+			const factor = ratingFactor(key, zs[key]!);
+			let shape = subBuild?.mult[key] ?? 1;
+			if (outlier?.up === group) {
+				shape *= OUTLIER.up;
+			} else if (outlier?.down === group) {
+				shape *= OUTLIER.down;
+			}
+			refRatings[key] = limitRating(factor * typeFactor * noise);
+			rawRatings[key] = limitRating(shape * factor * typeFactor * noise);
+		} else {
+			// Stock (real players' random ratings)
+			const factor = helpers.bound(groupX[group], 0.2, 1.2);
+			rawRatings[key] = limitRating(factor * typeFactor * noise);
+		}
+	}
+
+	if (rng) {
+		const changed = subBuild || outlier || tilt || spikes;
+		if (changed) {
+			if (tilt) {
+				for (const [key, d] of Object.entries(tilt.ratings)) {
+					const k = key as keyof typeof rawRatings;
+					rawRatings[k] = limitRating(
+						rawRatings[k] + Math.round(d * tiltScale),
+					);
+				}
+			}
+			if (spikes) {
+				for (const [key, d] of Object.entries(spikes)) {
+					const k = key as keyof typeof rawRatings;
+					rawRatings[k] = limitRating(rawRatings[k] + d);
+				}
+			}
+			const target = ovrRaw({ ...refRatings, hgt: hgtBeforeTilt } as any);
+			const shaped = { ...rawRatings, hgt } as any;
+			shiftToRawOvr(shaped, target, new Set(Object.keys(spikes ?? {})));
+			for (const key of helpers.keys(rawRatings)) {
+				rawRatings[key] = shaped[key];
+			}
+		}
 	}
 
 	const ratings: PlayerRatings = {
@@ -345,6 +441,7 @@ const genRatings = (
 		ratings,
 		apeIndex,
 		build: type,
+		genVar,
 	};
 };
 

@@ -16,6 +16,7 @@ import { defaultInjuries } from "../../util/defaultInjuries.ts";
 import { initUILocalGames } from "../../util/initUILocalGames.ts";
 import { disableNba2027, initializeNba2027 } from "../draft/nba2027.ts";
 import { groupByUnique } from "../../../common/utils.ts";
+import { syncGms } from "../gm/index.ts";
 
 const updateMetaDifficulty = async (difficulty: number) => {
 	await updateMeta({
@@ -200,6 +201,11 @@ const setGameAttributes = async (
 
 	if (toUpdate.has("userTid")) {
 		await initUILocalGames();
+	}
+
+	// AI GMs: a team the user took over loses its GM, one he gave up gets one, right away
+	if (toUpdate.has("userTids") || toUpdate.has("spectator")) {
+		await syncGms();
 	}
 
 	if (

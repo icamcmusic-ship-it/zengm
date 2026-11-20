@@ -390,8 +390,10 @@ export const processTeam = async (
 			ovrs: rating.ovrs,
 		};
 
-		// Raw ratings, only used to word the basketball play-by-play (which kind of finish or pass is plausible for him). The sim itself never reads them.
 		if (__SPORT === "basketball") {
+			// His true ovr, not the fuzzed one (Game Sim Fixes: the team strength gap, SIM_FIX_STRENGTH_GAP). Removed from the sim's result
+			(p2 as any).ovr = rating.ovr;
+			// Raw ratings, only used to word the basketball play-by-play (which kind of finish or pass is plausible for him). The sim itself never reads them.
 			const r = rating as Record<string, any>;
 			(p2 as any).pbpRatings = {
 				hgt: r["hgt"],
@@ -851,27 +853,12 @@ const loadTeams = async (tids: number[], conditions: Conditions) => {
 	> = {};
 	if (tids.length === 2 && tids.includes(-1) && tids.includes(-2)) {
 		// All-Star Game
-		const allStars = await allStar.getOrCreate(g.get("season"));
+		assertDefined(await allStar.getOrCreate(g.get("season")));
+		// Finish the draft and name injury replacements (play.ts already did this, and skips the game if it can't be played)
+		await allStar.prepareGame(conditions);
+		await allStar.simContests(conditions);
+		const allStars = await idb.cache.allStars.get(g.get("season"));
 		assertDefined(allStars);
-		if (!allStars.finalized) {
-			await allStar.draftAll();
-		}
-		if (allStars.dunk && allStars.dunk.winner === undefined) {
-			while (true) {
-				const type = await allStar.dunkContest.simNextDunkEvent(conditions);
-				if (type === "all") {
-					break;
-				}
-			}
-		}
-		if (allStars.three && allStars.three.winner === undefined) {
-			while (true) {
-				const type = await allStar.threeContest.simNextThreeEvent(conditions);
-				if (type === "all") {
-					break;
-				}
-			}
-		}
 
 		for (const tid of tids) {
 			const allStarsTeamInd = tid === -1 ? 0 : 1;

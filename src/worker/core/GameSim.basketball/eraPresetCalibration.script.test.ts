@@ -1,8 +1,9 @@
 // @ts-nocheck (diagnostic script)
 // Era preset calibration (Settings > Tendencies > "Select preset based on historical NBA stats", src/ui/views/Settings/gameSimPresets.ts).
-// Creates one new league with the new-league defaults (the fork's default League Extras on), then for each season fits the game sim
-// tendency settings so that a sample of games between the league's teams (played like the Settings preview: no DB writes, fixed seeds)
-// matches that NBA season's league averages:
+// Creates one new league with the new-league defaults (the fork's default League Extras on, League Eras off), plays it into its steady
+// state (ERA_CAL_ADVANCE=3 whole seasons, then ERA_CAL_INTO=0.5 of the next regular season, so the rosters have a season's usual
+// injuries), then for each season fits the game sim tendency settings so that a sample of games between the league's teams (played like
+// the Settings preview: no DB writes, fixed seeds) matches that NBA season's league averages:
 //   pace                     -> possessions per 48 minutes (from 1974; before that Basketball-Reference has no pace, so it is fit to
 //                               points per team game instead, which pins the possessions given the shooting below)
 //   threePointTendencyFactor -> 3PA / FGA        (from 1980, the first season with the line; before that the old value is kept)
@@ -32,10 +33,10 @@ import { LEAGUE_DATABASE_VERSION, PHASE } from "../../../common/constants.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import { last } from "../../../common/utils.ts";
-import { league, phase } from "../index.ts";
+import { draft, freeAgents, game, league, phase, season } from "../index.ts";
 import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
-import { helpers, lock } from "../../util/index.ts";
+import { g, helpers, lock } from "../../util/index.ts";
 import gameSimPresets from "../../../ui/views/Settings/gameSimPresets.ts";
 import { loadMatchups, runPreviewGames } from "../game/previewGameSim.ts";
 
@@ -213,6 +214,8 @@ test.skipIf(!env.ERA_CAL)(
 		const iters = Number(env.ERA_CAL_ITERS ?? 10);
 		const checkGames = Number(env.ERA_CAL_CHECK_GAMES ?? 300);
 		const avgIters = Number(env.ERA_CAL_AVG_ITERS ?? Math.ceil(iters / 2));
+		const advance = Number(env.ERA_CAL_ADVANCE ?? 3);
+		const into = Number(env.ERA_CAL_INTO ?? 0.5);
 		const seasons = env.ERA_CAL_SEASONS
 			? env.ERA_CAL_SEASONS.split(",").map(Number)
 			: Object.keys(TARGETS)
@@ -243,7 +246,13 @@ test.skipIf(!env.ERA_CAL)(
 				lid: seed,
 				name: `era${seed}`,
 				setLeagueCreationStatus: () => {},
-				settings: { ...getDefaultSettings() },
+				// Spectator, so every team is run by the AI through the offseasons
+				// (League Eras off, so the style doesn't drift while the seasons are played)
+				settings: {
+					...getDefaultSettings(),
+					spectator: true,
+					featureLeagueEras: false,
+				},
 				shuffleRosters: false,
 				startingSeasonFromInput: "2025",
 				teamsFromInput: helpers.addPopRank(helpers.getTeamsDefault()),
@@ -251,8 +260,58 @@ test.skipIf(!env.ERA_CAL)(
 			},
 		);
 		await league.loadGameAttributes();
+
+		// Fit on a league in its steady state, not a brand new one: play ERA_CAL_ADVANCE whole seasons (with the offseasons), then
+		// ERA_CAL_INTO of the next regular season, so the rosters have a season's usual injured and banged-up players (a new league
+		// starts with none, and the games are played from the rosters as they are). The seasons are played with the 2026 preset.
+		// Preview games of a brand new league's healthy rosters scored ~3 points per team game more than the same league's real
+		// season (injuries ~2.7 of it) and new leagues settle ~1 point lower after their first season, so presets fit that way came
+		// out ~4 points short in a league's real seasons.
+		await league.setGameAttributes({ ...gameSimPresets[2026] });
+		for (let i = 0; i < advance; i++) {
+			await phase.newPhase(PHASE.REGULAR_SEASON, {});
+			await lock.set("gameSim", false);
+			let guard = 0;
+			while (
+				g.get("phase") === PHASE.REGULAR_SEASON ||
+				g.get("phase") === PHASE.AFTER_TRADE_DEADLINE ||
+				g.get("phase") === PHASE.PLAYOFFS
+			) {
+				await game.play(
+					g.get("phase") === PHASE.PLAYOFFS
+						? 100
+						: await season.getDaysLeftSchedule(),
+					{},
+				);
+				if (++guard > 100) {
+					throw new Error("stuck in season");
+				}
+			}
+			await phase.newPhase(PHASE.DRAFT, {});
+			await draft.runPicks({ type: "untilEnd" }, {});
+			await phase.newPhase(PHASE.RESIGN_PLAYERS, {});
+			await phase.newPhase(PHASE.FREE_AGENCY, {});
+			guard = 0;
+			while (g.get("phase") === PHASE.FREE_AGENCY) {
+				await freeAgents.play(30, {});
+				if (++guard > 10) {
+					throw new Error("stuck in free agency");
+				}
+			}
+		}
 		await phase.newPhase(PHASE.REGULAR_SEASON, {});
 		await lock.set("gameSim", false);
+		const intoDays = Math.round(into * (await season.getDaysLeftSchedule()));
+		if (intoDays > 0) {
+			await game.play(intoDays, {});
+		}
+		await lock.set("gameSim", false);
+		const injured = (await idb.cache.players.getAll()).filter(
+			(p) => p.tid >= 0 && p.injury.gamesRemaining > 0,
+		).length;
+		console.log(
+			JSON.stringify({ season: g.get("season"), advance, into, injured }),
+		);
 
 		const tids = (await idb.cache.teams.getAll()).map((t) => t.tid);
 		// Balanced matchups: whole round robin rounds (circle method, on a seeded shuffle of the teams, home and away alternating), so

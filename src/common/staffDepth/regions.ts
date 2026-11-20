@@ -257,19 +257,25 @@ export const planRegions = ({
 	return { assignments, coverage, importance };
 };
 
+// Below this coverage a region is a blind spot; below COVERED it's thin
+export const BLIND_SPOT = 0.18;
+export const COVERED = 0.3;
+
 // Coverage words for the UI
 export const coverageLabel = (c: number) =>
 	c >= 0.9
 		? "Saturated"
 		: c >= 0.55
 			? "Strong"
-			: c >= 0.3
+			: c >= COVERED
 				? "Covered"
-				: c >= 0.18
+				: c >= BLIND_SPOT
 					? "Thin"
 					: "Blind spot";
 
-export const BLIND_SPOT = 0.18;
+// Bootstrap color of a coverage badge
+export const coverageColor = (c: number) =>
+	c < BLIND_SPOT ? "danger" : c < COVERED ? "warning" : "success";
 
 // How visible a prospect is (top of the class gets seen more), from his projected rank in his class by the scouts' value
 export const visibilityForRank = (rank: number) =>

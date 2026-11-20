@@ -51,18 +51,23 @@ const PlayerFeats = ({
 
 		return {
 			key: p.fid,
-			metadata: {
-				type: "player",
-				pid: p.pid,
-				season: p.season,
-				playoffs: p.type !== "allStar" ? p.type : "regularSeason",
-			},
+			// A deleted player has no player page or stats to show
+			metadata: p.deleted
+				? undefined
+				: {
+						type: "player",
+						pid: p.pid,
+						season: p.season,
+						playoffs: p.type === "playoffs" ? "playoffs" : "regularSeason",
+					},
 			data: [
-				wrappedPlayerNameLabels({
-					pid: p.pid,
-					season: typeof season === "number" ? season : undefined,
-					legacyName: p.name,
-				}),
+				p.deleted
+					? { value: p.name, sortValue: p.name, searchValue: p.name }
+					: wrappedPlayerNameLabels({
+							pid: p.pid,
+							season: typeof season === "number" ? season : undefined,
+							legacyName: p.name,
+						}),
 				p.pos,
 				<a
 					href={helpers.leagueUrl(["roster", `${p.abbrev}_${p.tid}`, p.season])}
@@ -100,7 +105,9 @@ const PlayerFeats = ({
 					? "All-Star"
 					: p.type === "playoffs"
 						? "Playoffs"
-						: "Regular season",
+						: p.type === "nit"
+							? "NIT"
+							: "Regular season",
 			],
 			classNames: {
 				"table-info": p.tid === userTid,
@@ -180,10 +187,10 @@ const PlayerFeats = ({
 						{scaleMinimum(10)} steals, {scaleMinimum(10)} blocks, or{" "}
 						{scaleMinimum(10)} threes
 						{quarterLengthFactor !== 1
-							? " (cutoffs are scaled due to a non-default period length)"
+							? " (cutoffs are scaled for the game length and players on the court)"
 							: null}
-						. Statistical feats from your players are{" "}
-						<span className="text-info">highlighted in blue</span>.
+						. Cutoffs are higher in overtime games. Statistical feats from your
+						players are <span className="text-info">highlighted in blue</span>.
 					</p>
 				),
 				football: (

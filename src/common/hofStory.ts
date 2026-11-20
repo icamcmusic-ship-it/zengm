@@ -136,12 +136,15 @@ export const plaqueText = (f: CareerFacts): string => {
 		);
 	}
 	if (f.prime) {
-		parts.push(
-			`Pictured in ${f.prime.season}${f.prime.team ? `, with the ${f.prime.team}` : ""}.`,
-		);
+		parts.push(plaquePrimeLine(f.prime));
 	}
 	return parts.join(" ");
 };
+
+// Last sentence of a plaque with his prime face (League Extras "Face Aging"): the season and team of the jersey he is drawn in.
+// Separate so the rest of the plaque can be stored once at induction (worker/util/hofStory.ts) and this added when it is shown.
+export const plaquePrimeLine = (prime: { season: number; team?: string }) =>
+	`Pictured in ${prime.season}${prime.team ? `, with the ${prime.team}` : ""}.`;
 
 // ---- Induction speech -----------------------------------------------------
 

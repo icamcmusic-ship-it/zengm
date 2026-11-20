@@ -1,14 +1,21 @@
 // AI GM personalities: shared formatting for the Front Offices page and the team page
 import { gmHotSeatLabel, gmStyleLabels } from "../../common/gmPersonality.ts";
 import type { Gm, Team } from "../../common/types.ts";
-import {
-	gmEnabled,
-	seasonsWithTeam,
-	userControlsTeam,
-} from "../core/gm/index.ts";
+import { gmEnabled, seasonsWithTeam, userOwnsTeam } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
+import { GM_FINANCE_STYLES } from "../../common/gmFinance.ts";
+import { gmFinanceStyleOf } from "../core/gm/finance.ts";
 import { EXEC_OF_THE_YEAR } from "../../common/coachExecAwards.ts";
+
+const financeInfo = (gm: Gm) => {
+	const style = gmFinanceStyleOf(gm);
+	if (!style) {
+		return;
+	}
+	const info = GM_FINANCE_STYLES[style];
+	return { style, name: info.name, description: info.description };
+};
 
 const abbrev = (tid: number) => g.get("teamInfoCache")[tid]?.abbrev ?? "";
 
@@ -52,6 +59,8 @@ export const formatGm = async (gm: Gm, tid?: number) => {
 		face: gm.face,
 		traits: gm.traits,
 		styleLabels: gmStyleLabels(gm.traits),
+		// AI GM finance styles, undefined when off
+		finance: financeInfo(gm),
 		since: tenure?.start,
 		tenureSeasons: current.length,
 		won: sum(current, "won"),
@@ -60,11 +69,12 @@ export const formatGm = async (gm: Gm, tid?: number) => {
 		playoffs: current.filter((row) => row.playoffRoundsWon >= 0).length,
 		titles: current.filter((row) => isTitle(row.season, row.playoffRoundsWon))
 			.length,
-		careerWon: sum(gm.seasons, "won"),
-		careerLost: sum(gm.seasons, "lost"),
-		careerTitles: gm.seasons.filter((row) =>
-			isTitle(row.season, row.playoffRoundsWon),
-		).length,
+		// A retired GM's season rows are folded into gm.career
+		careerWon: sum(gm.seasons, "won") + (gm.career?.won ?? 0),
+		careerLost: sum(gm.seasons, "lost") + (gm.career?.lost ?? 0),
+		careerTitles:
+			gm.seasons.filter((row) => isTitle(row.season, row.playoffRoundsWon))
+				.length + (gm.career?.titles ?? 0),
 		// Coach & Executive of the Year: seasons he won Executive of the Year
 		execAwards: (gm.awards ?? [])
 			.filter((a) => a.type === EXEC_OF_THE_YEAR)
@@ -104,7 +114,7 @@ export const getTeamGmInfo = async (
 	if (!gmEnabled() || !t) {
 		return { type: "off" };
 	}
-	if (userControlsTeam(t.tid)) {
+	if (userOwnsTeam(t.tid)) {
 		return { type: "user" };
 	}
 	if (!t.gm) {

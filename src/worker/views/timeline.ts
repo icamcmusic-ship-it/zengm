@@ -15,8 +15,9 @@ import { DEF_BY_ID } from "../../common/leagueAchievements/index.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { idb } from "../db/index.ts";
 import { defineView, keepType } from "../util/defineView.ts";
-import { g } from "../util/index.ts";
+import { g, helpers } from "../util/index.ts";
 import { getLeagueAchievementsLog } from "../util/leagueAchievements.ts";
+import { getRecordsBookState } from "../util/recordsBookData.ts";
 import { featureOffError, featureOn } from "../util/nativeFeatures.ts";
 import { getStoryState } from "../util/storylinesData.ts";
 import { getWrappedStatus } from "../util/wrappedData.ts";
@@ -34,6 +35,66 @@ const processInputs = (params: RouteParams<"timeline">) => {
 		from: parseSeason(params.from),
 		to: parseSeason(params.to),
 	};
+};
+
+// Single-game scoring records. With the Records Book on, from its single-game highs (kept as games are played, no
+// scan; league games only, All-Star and NIT games are not in it). Its lists hold the top 10, so a record that has since
+// fallen out of the top 10 isn't shown. Otherwise from statistical feats: only scoring feats (50+ points, scaled like
+// the feat cutoffs) and no All-Star games.
+const scoringRecordItems = async (
+	teamAbbrev: (tid: number, season: number) => string,
+) => {
+	const state = featureOn("recordsBook") ? getRecordsBookState() : undefined;
+	if (state) {
+		const highs = [
+			...(state.game["pts|0"] ?? []).map((h) => ({ h, playoffs: false })),
+			...(state.game["pts|1"] ?? []).map((h) => ({ h, playoffs: true })),
+		];
+		const pids = [...new Set(highs.map((x) => x.h.p))];
+		const names = new Map<number, string>();
+		await idb.merged.players.getAll(
+			{ pids },
+			{
+				map: (p) => {
+					names.set(p.pid, `${p.firstName} ${p.lastName}`.trim());
+					return undefined;
+				},
+			},
+		);
+		return findScoringRecords(
+			highs.map(({ h, playoffs }) => ({
+				season: h.s,
+				pid: h.p,
+				tid: h.t,
+				name: names.get(h.p) ?? "A player",
+				pts: h.v,
+				gid: h.g,
+				playoffs,
+			})),
+			teamAbbrev,
+		);
+	}
+
+	const feats: Parameters<typeof findScoringRecords>[0] = [];
+	await idb.merged.playerFeats.forEach(undefined, (f) => {
+		const pts = (f.stats as { pts?: number }).pts;
+		if (typeof pts === "number" && f.tid >= 0) {
+			feats.push({
+				season: f.season,
+				pid: f.pid,
+				tid: f.tid,
+				name: f.name,
+				pts,
+				gid: f.gid,
+				playoffs: f.playoffs,
+				factor: f.factor,
+			});
+		}
+	});
+	const factorNow = helpers.featScaleFactor(0);
+	return findScoringRecords(feats, teamAbbrev, (f) =>
+		Math.ceil(50 * (f.factor ?? factorNow)),
+	);
 };
 
 // Front page leads of finished seasons don't change, so they are kept per league
@@ -201,23 +262,8 @@ export default defineView({
 			).filter((x) => inRange(x.season)),
 		);
 		if (__SPORT === "basketball") {
-			const feats: Parameters<typeof findScoringRecords>[0] = [];
-			await idb.merged.playerFeats.forEach(undefined, (f) => {
-				const pts = (f.stats as { pts?: number }).pts;
-				if (typeof pts === "number") {
-					feats.push({
-						season: f.season,
-						pid: f.pid,
-						tid: f.tid,
-						name: f.name,
-						pts,
-						gid: f.gid,
-						playoffs: f.playoffs,
-					});
-				}
-			});
 			items.push(
-				...findScoringRecords(feats, teamAbbrev).filter((x) =>
+				...(await scoringRecordItems(teamAbbrev)).filter((x) =>
 					inRange(x.season),
 				),
 			);

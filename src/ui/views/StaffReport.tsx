@@ -7,8 +7,12 @@ import type {
 	FocusKey,
 	SuggestionAction,
 } from "../../common/staffDepth/types.ts";
-import { PRIORITY_NAMES } from "../../common/staffDepth/regions.ts";
+import {
+	PRIORITY_NAMES,
+	coverageColor,
+} from "../../common/staffDepth/regions.ts";
 import { helpers } from "../util/helpers.ts";
+import { showNotification } from "../util/showNotification.ts";
 import { toWorker } from "../util/toWorker.ts";
 import { fitLabel } from "../../common/offEmphasis.ts";
 
@@ -37,20 +41,32 @@ const LEVELS: { key: DelegationLevel; name: string; title: string }[] = [
 	{ key: "manual", name: "Manual", title: "You decide" },
 ];
 
+// Accept or approve, with a toast either way (a coach may have signed elsewhere since the page loaded). Returns whether it worked.
 const act = async (action: SuggestionAction, suggestionId?: string) => {
-	await toWorker("main", "staffDepthAction", {
-		type: "apply",
-		action,
-		suggestionId,
-	});
+	try {
+		const message = await toWorker("main", "staffDepthAction", {
+			type: "apply",
+			action,
+			suggestionId,
+		});
+		showNotification({ type: "success", text: message ?? "Done." });
+		return true;
+	} catch (error) {
+		showNotification({ type: "error", text: error.message });
+		return false;
+	}
 };
 
+// Rendered with key={rec.id}, so a new recommendation in the same card starts with its own Accept button
 const Recommendation = ({
 	rec,
+	controls,
 }: {
 	rec: { id: string; title: string; text: string; action?: SuggestionAction };
+	controls: boolean;
 }) => {
-	const [done, setDone] = useState(false);
+	const [status, setStatus] = useState<"idle" | "working" | "done">("idle");
+	const done = status === "done";
 	return (
 		<div
 			className="border-start border-3 border-primary ps-2 mt-2"
@@ -62,10 +78,16 @@ const Recommendation = ({
 			{rec.action ? (
 				<button
 					className="btn btn-sm btn-primary mt-1"
-					disabled={done}
+					disabled={!controls || status !== "idle"}
+					title={
+						controls
+							? undefined
+							: "The staff decides in spectator mode and auto play"
+					}
 					onClick={async () => {
-						await act(rec.action!);
-						setDone(true);
+						setStatus("working");
+						const ok = await act(rec.action!);
+						setStatus(ok ? "done" : "idle");
 					}}
 				>
 					{done ? "Done" : "Accept"}
@@ -98,6 +120,7 @@ const StaffReport = ({
 	season,
 	scoutingOn,
 	coachingOn,
+	controls,
 	delegation,
 	suggestions,
 	scouting,
@@ -128,6 +151,7 @@ const StaffReport = ({
 					<div className="row g-2">
 						{AREAS.map((area) => {
 							const disabled =
+								!controls ||
 								(!scoutingOn &&
 									(area.key === "scouting" || area.key === "board")) ||
 								(!coachingOn && area.key === "development");
@@ -177,12 +201,14 @@ const StaffReport = ({
 								<div className="mt-1 d-flex gap-2">
 									<button
 										className="btn btn-sm btn-primary"
+										disabled={!controls}
 										onClick={() => act(s.action, s.id)}
 									>
 										Approve
 									</button>
 									<button
 										className="btn btn-sm btn-light-bordered"
+										disabled={!controls}
 										onClick={() =>
 											toWorker("main", "staffDepthAction", {
 												type: "dismiss",
@@ -208,6 +234,7 @@ const StaffReport = ({
 							{scouting.director.age}). Priority:{" "}
 							<select
 								className="form-select form-select-sm d-inline-block w-auto"
+								disabled={!controls}
 								value={scouting.priority}
 								onChange={(event) =>
 									toWorker("main", "staffDepthAction", {
@@ -242,7 +269,7 @@ const StaffReport = ({
 							{scouting.regions.map((r) => (
 								<span
 									key={r.region}
-									className={`badge ${r.coverage < 0.18 ? "text-bg-danger" : r.coverage < 0.3 ? "text-bg-warning" : "text-bg-success"}`}
+									className={`badge text-bg-${coverageColor(r.coverage)}`}
 									title={`${r.prospects} prospects, ${r.importance}% of the class's top talent; ${r.scouts.join(", ") || "no scout"}`}
 								>
 									{r.name}: {r.label}
@@ -258,12 +285,16 @@ const StaffReport = ({
 						{scouting.boardLog.length > 0 ? (
 							<div className="small mt-2">
 								<div className="fw-bold">Latest board changes</div>
-								{scouting.boardLog.slice(0, 1).map((entry, i) => (
+								{scouting.boardLog.map((entry, i) => (
 									<div key={i}>{entry.lines.join(" · ")}</div>
 								))}
 							</div>
 						) : null}
-						<Recommendation rec={scouting.rec} />
+						<Recommendation
+							key={scouting.rec.id}
+							rec={scouting.rec}
+							controls={controls}
+						/>
 					</Card>
 				) : null}
 
@@ -305,10 +336,11 @@ const StaffReport = ({
 														</a>
 													</td>
 													<td>
-														{
-															development.focuses.find((f) => f.key === r.focus)
-																?.name
-														}
+														{r.focus
+															? development.focuses.find(
+																	(f) => f.key === r.focus,
+																)?.name
+															: "Staff plan"}
 													</td>
 													{development.hideRatings ? null : (
 														<>
@@ -338,6 +370,7 @@ const StaffReport = ({
 							<span>Team priority:</span>
 							<select
 								className="form-select form-select-sm w-auto"
+								disabled={!controls}
 								value={development.devPriority ?? ""}
 								onChange={(event) =>
 									toWorker("main", "staffDepthAction", {
@@ -371,6 +404,7 @@ const StaffReport = ({
 												<select
 													className="form-select form-select-sm"
 													style={{ minWidth: 150 }}
+													disabled={!controls}
 													value={p.override ?? ""}
 													onChange={(event) =>
 														toWorker("main", "staffDepthAction", {
@@ -384,7 +418,9 @@ const StaffReport = ({
 													<option value="">
 														{p.focus
 															? `Staff: ${development.focuses.find((f) => f.key === p.focus)?.name}`
-															: "No plan"}
+															: p.src
+																? "Staff plan"
+																: "No plan"}
 													</option>
 													{development.focuses.map((f) => (
 														<option key={f.key} value={f.key}>
@@ -398,11 +434,18 @@ const StaffReport = ({
 								</tbody>
 							</table>
 						</div>
-						<Recommendation rec={development.rec} />
+						<Recommendation
+							key={development.rec.id}
+							rec={development.rec}
+							controls={controls}
+						/>
 					</Card>
 				) : null}
 
-				<Card title="System fit" testid="staff-fit">
+				<Card
+					title={fit.systems ? "System fit" : "Roster needs"}
+					testid="staff-fit"
+				>
 					{fit.systems ? (
 						<p className="small mb-1">
 							{fit.systems.off}: <b>{fit.systems.offFit.toLowerCase()}</b>.{" "}
@@ -413,12 +456,15 @@ const StaffReport = ({
 					) : null}
 					<p className="small mb-1">
 						Weakest area against the league: <b>{fit.weakest.name}</b> (
-						{signed(fit.weakest.gap)}).{" "}
+						{fit.weakest.gap !== undefined
+							? signed(fit.weakest.gap)
+							: fit.weakest.band}
+						).{" "}
 						{fit.needs.length > 0
 							? `Positional needs: ${fit.needs.join(", ")}.`
 							: "No positional need."}
 					</p>
-					<Recommendation rec={fit.rec} />
+					<Recommendation key={fit.rec.id} rec={fit.rec} controls={controls} />
 				</Card>
 
 				<Card title="Injuries and conditioning" testid="staff-conditioning">
@@ -447,7 +493,11 @@ const StaffReport = ({
 									.map((p) => `${p.name} (${p.type}, ${p.games} games)`)
 									.join(", ")}.`}
 					</p>
-					<Recommendation rec={conditioning.rec} />
+					<Recommendation
+						key={conditioning.rec.id}
+						rec={conditioning.rec}
+						controls={controls}
+					/>
 				</Card>
 				{offense ? (
 					<Card title="Offense" testid="staff-offense">
@@ -468,6 +518,7 @@ const StaffReport = ({
 								<button
 									key={level.key}
 									title={level.title}
+									disabled={!controls}
 									className={`btn ${offense.mode === level.key ? "btn-primary" : "btn-light-bordered"}`}
 									onClick={() =>
 										toWorker("main", "offEmphasisAction", {

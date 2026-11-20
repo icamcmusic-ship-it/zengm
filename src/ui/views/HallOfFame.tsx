@@ -8,10 +8,21 @@ import type { DataTableRow } from "../components/DataTable/index.tsx";
 import { useLocal } from "../util/local.ts";
 import { HallOfFamePlaques } from "./HallOfFamePlaques.tsx";
 import { HallOfFameSpeeches } from "./HallOfFameSpeeches.tsx";
+import { useIsCollege } from "../util/collegeMode.ts";
 
 const HallOfFame = ({ players, plaques, stats, words }: View<"hallOfFame">) => {
 	useTitleBar({ title: "Hall of Fame" });
 	const { userTid } = useLocal(["userTid"]);
+	const college = useIsCollege();
+
+	if (college) {
+		return (
+			<p>
+				College leagues have no Hall of Fame. Players leave for the pros or
+				graduate rather than retire, so nobody is ever inducted.
+			</p>
+		);
+	}
 
 	const superCols = [
 		{
@@ -44,6 +55,13 @@ const HallOfFame = ({ players, plaques, stats, words }: View<"hallOfFame">) => {
 	]);
 
 	const rows: DataTableRow<"player">[] = players.map((p) => {
+		// No pro stats (bestStats falls back to his career stats, which have no season or team): no best season to show
+		const bestSeason: number | undefined = p.bestStats?.season;
+		const hasBestTeam =
+			bestSeason !== undefined &&
+			typeof p.bestStats.tid === "number" &&
+			p.bestStats.tid >= 0 &&
+			p.bestStats.abbrev !== undefined;
 		return {
 			key: p.pid,
 			metadata: {
@@ -66,18 +84,28 @@ const HallOfFame = ({ players, plaques, stats, words }: View<"hallOfFame">) => {
 				p.peakOvr,
 				p.countMvp,
 				p.countTitles,
-				p.bestStats.season,
-				<a
-					href={helpers.leagueUrl([
-						"roster",
-						`${p.bestStats.abbrev}_${p.bestStats.tid}`,
-						p.bestStats.season,
-					])}
-				>
-					{p.bestStats.abbrev}
-				</a>,
-				...stats.map((stat) => helpers.roundStat(p.bestStats[stat], stat)),
-				...stats.map((stat) => helpers.roundStat(p.careerStats[stat], stat)),
+				bestSeason ?? null,
+				hasBestTeam ? (
+					<a
+						href={helpers.leagueUrl([
+							"roster",
+							`${p.bestStats.abbrev}_${p.bestStats.tid}`,
+							bestSeason,
+						])}
+					>
+						{p.bestStats.abbrev}
+					</a>
+				) : null,
+				...stats.map((stat) =>
+					bestSeason !== undefined
+						? helpers.roundStat(p.bestStats[stat], stat)
+						: null,
+				),
+				...stats.map((stat) =>
+					p.careerStats?.[stat] !== undefined
+						? helpers.roundStat(p.careerStats[stat], stat)
+						: null,
+				),
 			],
 			classNames: {
 				"table-danger": p.legacyTid === userTid,

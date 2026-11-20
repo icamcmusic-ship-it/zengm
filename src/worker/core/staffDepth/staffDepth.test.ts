@@ -19,6 +19,7 @@ import {
 	releaseTeamCoaches,
 } from "../staff/index.ts";
 import { applyStaffAction } from "./actions.ts";
+import { getStaffReport } from "./report.ts";
 import { planFor, stateOf } from "./coaching.ts";
 import { directorFor } from "./scouting.ts";
 
@@ -124,7 +125,10 @@ describe("coaching staff depth", () => {
 
 	test("Suggest mode gives a plan to players with none approved (draftees, signings, trades)", async () => {
 		const tid = g.get("userTid");
-		const p = { ...player.generate(tid, 20, g.get("season"), true, 50), pid: 999999 };
+		const p = {
+			...player.generate(tid, 20, g.get("season"), true, 50),
+			pid: 999999,
+		};
 		const t = (await idb.cache.teams.get(tid))!;
 		const state = stateOf(t);
 		state.delegation.development = "suggest";
@@ -138,6 +142,85 @@ describe("coaching staff depth", () => {
 		p.tid = PLAYER.FREE_AGENT;
 		state.delegation.development = "suggest";
 		assert.isUndefined(planFor(p, g.get("season") + 1, state));
+	});
+
+	test("accepted development plans default to the next development, in the regular season too", async () => {
+		const tid = g.get("userTid");
+		await applyStaffAction({ type: "devPlans", plans: { 1: "three" } });
+		const t = (await idb.cache.teams.get(tid))!;
+		assert.strictEqual(stateOf(t).devAccepted!.season, g.get("season") + 1);
+	});
+
+	test("Staff Report actions are refused in spectator mode", async () => {
+		g.setWithoutSavingToDB("spectator", true);
+		try {
+			let threw = false;
+			try {
+				await applyStaffAction({ type: "devPlans", plans: {} });
+			} catch {
+				threw = true;
+			}
+			assert.isTrue(threw);
+			const report = await getStaffReport();
+			assert.isFalse(report!.controls);
+		} finally {
+			g.setWithoutSavingToDB("spectator", false);
+		}
+	});
+
+	test("No Visible Ratings: the Staff Report has no rating numbers or staff focuses", async () => {
+		const tid = g.get("userTid");
+		for (let i = 0; i < 10; i++) {
+			const p = player.generate(tid, 22 + i, g.get("season"), true, 50);
+			await player.develop(p, 0);
+			await player.updateValues(p);
+			await idb.cache.players.add(p);
+		}
+		const t = (await idb.cache.teams.get(tid))!;
+		t.staffDepth = {
+			...stateOf(t),
+			devReport: {
+				season: g.get("season"),
+				rows: [
+					{
+						pid: 1,
+						name: "A B",
+						pos: "G",
+						age: 25,
+						focus: "three",
+						src: "staff",
+						subs: [
+							{ key: "tcs", name: "Catch & shoot", before: 50, after: 53 },
+						],
+						focusBefore: 50,
+						focusAfter: 53,
+						ovrBefore: 50,
+						ovrAfter: 51,
+					},
+				],
+			},
+		};
+		await idb.cache.teams.put(t);
+		g.setWithoutSavingToDB("challengeNoRatings", true);
+		try {
+			const report = (await getStaffReport())!;
+			assert.isUndefined(report.fit.weakest.gap);
+			assert.isString(report.fit.weakest.band);
+			assert.isUndefined(report.fit.systems);
+			const dev = report.development!;
+			assert.isUndefined(dev.rows[0]!.subs);
+			assert.isUndefined(dev.rows[0]!.focus);
+			assert.isNull(dev.rows[0]!.focusAfter);
+			assert.strictEqual(dev.planSeason, g.get("season") + 1);
+			assert.isAbove(dev.plans.length, 0);
+			for (const p of dev.plans) {
+				assert.isUndefined(p.focus);
+				assert.notProperty(p, "staffFocus");
+			}
+			assert.strictEqual(dev.rec.id, "none");
+		} finally {
+			g.setWithoutSavingToDB("challengeNoRatings", false);
+		}
 	});
 
 	test("a contracted team's coaches go back on the market", async () => {

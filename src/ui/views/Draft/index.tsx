@@ -26,11 +26,8 @@ import { confirm } from "../../util/confirm.tsx";
 import { getCol } from "../../../common/getCol.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { getNumericStat } from "../../../common/statValue.ts";
-import {
-	draftedVsPreDraftText,
-	preDraftRankText,
-	stealOrReach,
-} from "../../../common/preDraftRanks.ts";
+import { preDraftRankText } from "../../../common/preDraftRanks.ts";
+import { wrappedPreDraftVsPick } from "../../util/preDraftCell.tsx";
 
 const DRAFT_BAR_HEIGHT = 82;
 
@@ -42,31 +39,6 @@ type DraftedPlayer = Exclude<DraftedRow, RemainingPick>;
 
 const isDraftedPlayer = (p: DraftedRow): p is DraftedPlayer => p.pid >= 0;
 const isRemainingPick = (p: DraftedRow): p is RemainingPick => p.pid < 0;
-
-// Drafted players: his pre-draft rank, and how far from it he went (steals and reaches)
-const wrappedPreDraftVsPick = (overallPick: number, preDraftRank: number) => {
-	const { diff, kind } = stealOrReach(overallPick, preDraftRank);
-	return {
-		value: (
-			<span className="text-nowrap">
-				#{preDraftRank}
-				{kind ? (
-					<span
-						className={clsx(
-							"ms-1 small",
-							kind === "steal" ? "text-success" : "text-danger",
-						)}
-					>
-						{diff > 0 ? `+${diff}` : diff}
-					</span>
-				) : null}
-			</span>
-		),
-		sortValue: preDraftRank,
-		searchValue: preDraftRank,
-		title: `${draftedVsPreDraftText(overallPick, preDraftRank)}${kind ? ` (${kind})` : ""}`,
-	};
-};
 
 const Draft = ({
 	challengeNoDraftPicks,

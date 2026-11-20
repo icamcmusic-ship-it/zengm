@@ -1,6 +1,4 @@
-import { PHASE } from "../../common/constants.ts";
 import { idb } from "../db/index.ts";
-import { g } from "../util/index.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
@@ -10,11 +8,9 @@ import { primeFace } from "../util/faceAging.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import type { HofPlaque, HofWords } from "../../common/faceHistory.ts";
 import {
-	careerFacts,
-	featsByPid,
-	hofSeasonsOf,
-	hofWords,
+	getHofStories,
 	hofWordsOn,
+	plaqueWithPrime,
 } from "../util/hofStory.ts";
 import type { Player } from "../../common/types.ts";
 
@@ -29,9 +25,12 @@ export const extraStats = bySport({
 export default defineView({
 	id: "hallOfFame",
 	load: async ({ updateEvents }) => {
+		// Inductions happen whenever a player retires: in the offseason (newPhase), from tragic deaths during games and God Mode
+		// retirements (playerMovement), and from scheduled events (newPhase)
 		if (
 			updateEvents.has("firstRun") ||
-			(updateEvents.has("newPhase") && g.get("phase") === PHASE.DRAFT_LOTTERY)
+			updateEvents.has("newPhase") ||
+			updateEvents.has("playerMovement")
 		) {
 			const stats = bySport({
 				baseball: ["keyStats", "war"],
@@ -68,25 +67,22 @@ export default defineView({
 
 			// League Extras "Face Aging": plaques with each Hall of Famer's face in his prime
 			const plaquesOn = featureOn("faceAging");
-			const raws: Player[] = [];
-			const allRaws: Player[] = [];
 			// Plaque text and speeches are written from basketball careers (points, rebounds, assists, hoops stories)
 			const wordsOn = hofWordsOn();
+			// Raw players, only kept when plaques or words need them, and only for players on the page
+			const raws: Player[] = [];
 
 			const players = (
 				await idb.merged.players.getAll(
 					{ hof: true },
 					{
 						map: (pRaw) => {
-							if (plaquesOn) {
-								raws.push(pRaw);
-							}
-							if (wordsOn) {
-								allRaws.push(pRaw);
-							}
 							const pFormatted = formatPlayer(pRaw);
 							if (!pFormatted) {
 								return;
+							}
+							if (plaquesOn || wordsOn) {
+								raws.push(pRaw);
 							}
 
 							const { awards, ...p } = pFormatted;
@@ -114,57 +110,63 @@ export default defineView({
 				)
 			).filter((p) => p !== undefined);
 
-			// Plaque text and induction speeches, from each Hall of Famer's career
-			const hofSeasons = hofSeasonsOf(allRaws);
-			const feats = wordsOn
-				? await featsByPid(new Set(allRaws.map((p) => p.pid)))
-				: new Map<number, any[]>();
-			const words: HofWords[] = [];
-			const wordsByPid = new Map<number, HofWords>();
-			for (const p of allRaws) {
-				const facts = await careerFacts(p, { full: true, hofSeasons, feats });
-				const prime = plaquesOn ? await primeFace(p) : undefined;
-				const primeTid = prime
-					? (p.stats as any[]).findLast(
-							(row) => row.season === prime.season && row.tid >= 0,
-						)?.tid
-					: undefined;
-				const w = hofWords(
-					facts,
-					prime
-						? {
-								season: prime.season,
-								team: facts.teams.find((t) => t.tid === primeTid)?.name,
-							}
-						: undefined,
-				);
-				const entry = {
-					pid: p.pid,
-					name: `${p.firstName} ${p.lastName}`,
-					retiredYear: p.retiredYear,
-					...w,
-				};
-				words.push(entry);
-				wordsByPid.set(p.pid, entry);
+			// Plaque text and induction speeches: stored on each Hall of Famer at induction (written once here for older ones)
+			const stories = wordsOn
+				? await getHofStories(raws, () =>
+						idb.merged.players.getAll({ hof: true }),
+					)
+				: new Map<number, NonNullable<Player["hofStory"]>>();
+			const primes = new Map<
+				number,
+				Awaited<ReturnType<typeof primeFace>> & { tid?: number }
+			>();
+			if (plaquesOn) {
+				for (const p of raws) {
+					const prime = await primeFace(p);
+					if (prime) {
+						primes.set(p.pid, {
+							...prime,
+							tid: (p.stats as any[]).findLast(
+								(row) => row.season === prime.season && row.tid >= 0,
+							)?.tid,
+						});
+					}
+				}
 			}
-			words.sort((a, b) => b.retiredYear - a.retiredYear);
 
+			const words: HofWords[] = [];
 			const plaques: HofPlaque[] = [];
 			for (const p of raws) {
-				const prime = await primeFace(p);
+				const story = stories.get(p.pid);
+				const prime = primes.get(p.pid);
+				const plaqueText = story
+					? await plaqueWithPrime(story, prime)
+					: undefined;
+				const name = `${p.firstName} ${p.lastName}`;
+				if (story) {
+					words.push({
+						pid: p.pid,
+						name,
+						retiredYear: p.retiredYear,
+						plaque: plaqueText!,
+						speech: story.speech,
+					});
+				}
 				if (prime) {
+					const { tid, ...primeInfo } = prime;
 					plaques.push({
 						pid: p.pid,
-						name: `${p.firstName} ${p.lastName}`,
+						name,
 						imgURL: p.imgURL,
 						firstSeason: p.stats.find((row) => row.tid >= 0)?.season,
 						retiredYear: p.retiredYear,
 						peakOvr: Math.max(...p.ratings.map((row) => row.ovr)),
-						...prime,
-						text: wordsByPid.get(p.pid)?.plaque,
+						...primeInfo,
+						text: plaqueText,
 					});
 				}
 			}
+			words.sort((a, b) => b.retiredYear - a.retiredYear);
 			// Most recent inductees first
 			plaques.sort(
 				(a, b) => b.retiredYear - a.retiredYear || b.peakOvr - a.peakOvr,

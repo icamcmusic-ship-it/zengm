@@ -1,5 +1,6 @@
 import type { AdvCareer } from "./advStats.ts";
 import type { StoredSubInfo } from "./subRatingsGen.ts";
+import type { GenVariety } from "./prospectVariety.ts";
 import type { RumorState } from "./rumors/types.ts";
 import type { SystemTrends } from "./coachSystems.ts";
 import * as z from "zod";
@@ -1165,6 +1166,18 @@ export type OwnerMood = {
 	wins: number;
 };
 
+// The end-of-season owner evaluation as it was applied (worker/core/season/updateOwnerMood), stored on that season's teamSeason so the
+// evaluation breakdown shows what really happened and running the evaluation again doesn't apply it twice
+export type OwnerEvaluation = {
+	// Millions of dollars: the profit the owner judged (project payments left out) and the baseline he expected that season
+	profit: number;
+	expectedProfit: number;
+	deltas: OwnerMood;
+	cappedDeltas: OwnerMood;
+	// False in the grace period or God Mode, when the mood isn't changed
+	applied: boolean;
+};
+
 export type MessageWithoutKey = {
 	mid?: number;
 	from: string;
@@ -1174,6 +1187,8 @@ export type MessageWithoutKey = {
 	tid?: number;
 	subject?: string;
 	ownerMoods?: OwnerMood[];
+	// Season of each entry of ownerMoods (missing in old messages, which assume consecutive seasons ending at year)
+	ownerMoodSeasons?: number[];
 };
 
 export type Message = {
@@ -1482,6 +1497,11 @@ export type PlayerFeatWithoutKey = {
 	score: string;
 	overtimes: number;
 	numPeriods: number;
+	// College mode: an NIT game (playoffs is false for these)
+	nit?: boolean;
+	// Scale factor of the cutoffs for this game (game length with overtime, players on the court). Missing in feats
+	// from before it was stored
+	factor?: number;
 };
 
 export type PlayerFeat = PlayerFeatWithoutKey & {
@@ -1631,6 +1651,13 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	gamesUntilTradable: number;
 	hgt: number;
 	hof?: 1; // Would rather be boolean, but can't index boolean
+	// Hall of Fame plaque text (without the prime face line) and induction speech, written once at induction or on the first view
+	// after it (worker/util/hofStory.ts). v is HOF_STORY_VERSION there: an older one is written again
+	hofStory?: {
+		v: number;
+		plaque: string;
+		speech: string[];
+	};
 	imgURL: string;
 	injury: PlayerInjury;
 	injuries: {
@@ -1702,6 +1729,12 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	draftClassShapeV?: number;
 	// The injury-riddled class: he comes into the draft off an injury (his college story)
 	draftClassShapeInjury?: boolean;
+	// A second, compatible shape his class was given on top of the first (one about strength, one about composition)
+	draftClassShape2?: string;
+
+	// Basketball: prospect variety (common/prospectVariety.ts), for players generated since it exists: his variety seed (development group
+	// rates), a ceiling multiplier and, until his class is saved, the ages he developed at before the draft. Hidden from the UI.
+	genVar?: GenVariety;
 
 	// Basketball, the subRatings setting: his sub-ratings seed, hidden growth profile and generation info (see common/subRatingsGen.ts)
 	subP?: StoredSubInfo;
@@ -2775,15 +2808,20 @@ export type TeamSeasonWithoutKey = {
 	// Realistic AI Economy: cash the owner took out this season (thousands of dollars). Not an expense, so it doesn't lower profit, but
 	// cash change = revenue - expenses - ownerDistributions
 	ownerDistributions?: number;
-	// Owner's Office (League Extra): arena/facilities project payments this season (an expense, in profit), and the owner's goals
-	// from the preseason budget meeting (common/ownerOffice.ts)
+	// Owner's Office (League Extra): arena/facilities project payments this season (an expense, in profit, but not in the profit the
+	// owner judges: common/teamSeasonFinances.ts seasonOwnerJudgedProfit), and the owner's goals from the preseason budget meeting
+	// (common/ownerOffice.ts)
 	projectExpenses?: number;
 	ownerGoals?: import("./ownerOffice.ts").OwnerGoals;
 	payrollEndOfSeason: number;
 	// Coach & Executive of the Year (League Extra): Executive of the Year won by a front office with no AI GM (the user's team, which
 	// has no GM object). An AI GM's award is stored on the GM instead (Gm.awards)
 	execOfTheYear?: { name: string; user: boolean };
+	// Who ran a team the user had that season, recorded when the regular season and the playoffs start: "user" (the user himself at
+	// least once) or "auto" (spectator mode or auto play both times). Missing on other teams and in older leagues
+	userControl?: "user" | "auto";
 	ownerMood?: OwnerMood;
+	ownerEvaluation?: OwnerEvaluation;
 	// Power rankings snapshots taken about once a week during the regular season, used for movement arrows and the rank-over-time chart
 	powerRankHistory?: {
 		day: number;

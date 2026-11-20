@@ -14,6 +14,7 @@ import {
 	levelToAmount,
 	levelToEffect,
 } from "./budgetLevels.ts";
+import { applyDeptMultipliers } from "./gmFinance.ts";
 
 // The two new departments (stored in t.frontOffice and teamSeason.frontOffice). Medical is the existing health budget item, Scouting,
 // Coaching and Facilities are the existing ones
@@ -264,8 +265,15 @@ export const aiAllocate = (
 	targetLevel: number,
 	leanings: { analytics: number; patience: number },
 	depts: readonly FrontOfficeDept[],
+	deptMultipliers?: Partial<Record<FrontOfficeDept, number>>,
 ) => {
-	const weights = aiDeptWeights(leanings, depts);
+	const weights = deptMultipliers
+		? applyDeptMultipliers(
+				aiDeptWeights(leanings, depts),
+				deptMultipliers,
+				depts,
+			)
+		: aiDeptWeights(leanings, depts);
 	const out = {} as Record<FrontOfficeDept, number>;
 	for (const dept of depts) {
 		out[dept] = clamp(Math.round(targetLevel * weights[dept]), 1, MAX_LEVEL);

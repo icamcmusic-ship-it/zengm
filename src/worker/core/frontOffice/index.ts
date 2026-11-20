@@ -324,10 +324,20 @@ export const getLeanings = (t: Team) => {
 	};
 };
 
-export const allocateAi = (t: Team, targetLevel: number) => {
+// deptMultipliers: AI GM finance styles' department priorities (renormalized, so they only move money between departments)
+export const allocateAi = (
+	t: Team,
+	targetLevel: number,
+	deptMultipliers?: Partial<Record<FrontOfficeDept, number>>,
+) => {
 	const staff = __SPORT === "basketball" && !!g.get("coachingStaff");
 	const depts = FRONT_OFFICE_DEPTS.filter((d) => !staff || d !== "coaching");
-	const levels = aiAllocate(targetLevel, getLeanings(t), depts);
+	const levels = aiAllocate(
+		targetLevel,
+		getLeanings(t),
+		depts,
+		deptMultipliers,
+	);
 	t.budget.scouting = levels.scouting;
 	t.budget.health = levels.health;
 	t.budget.facilities = levels.facilities;
