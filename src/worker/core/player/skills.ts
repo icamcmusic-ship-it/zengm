@@ -123,10 +123,15 @@ export const fuzzedSkillRow = (
 /**
  * The skills stored in a ratings row (ratings.skills, and p.draft.skills for a draft prospect): from the scouts' view of the ratings,
  * always with the row's fuzz. player.format computes the displayed skills live instead (God Mode, scouting and settings as they are
- * now), so the stored ones are only a snapshot for raw views and exports.
+ * now), so the stored ones are only a snapshot for raw views and exports. The snapshot reads the base ratings only (not Sub-Ratings
+ * in Sim): the subs change after the row's skills are written (development, league file import), and a stored value that moved on
+ * every reload would not be a snapshot.
  */
 const skills = (playerRatings: MinimalPlayerRatings) =>
-	skillsFromRow(fuzzedSkillRow(playerRatings, true));
+	skillsFromRow(fuzzedSkillRow(playerRatings, true), {
+		...skillFlags(),
+		subRatingsSim: false,
+	});
 
 /**
  * The one place a ratings row's stored skills are refreshed. mirrorDraft: also copy them to p.draft.skills (the row is his draft
