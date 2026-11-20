@@ -31,3 +31,9 @@ test("salary matching only binds teams over the tax taking back more", () => {
 		),
 	);
 });
+
+test("salary match buffer scales with the salary cap", () => {
+	const side = [{ payrollBefore: 240000, salaryOut: 20000, salaryIn: 25150 }];
+	assert.isFalse(salaryMatchOk(side, 200000));
+	assert.isTrue(salaryMatchOk(side, 200000, 2));
+});

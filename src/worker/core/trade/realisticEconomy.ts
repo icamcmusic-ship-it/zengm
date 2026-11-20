@@ -10,7 +10,7 @@ export const FAIR_TRADE_RETRIES = 2;
 
 // No salary cap: a team over the luxury tax after the trade can't take back more than 125% + $100k of what it sends out
 export const SALARY_MATCH_RATIO = 1.25;
-export const SALARY_MATCH_BUFFER = 100; // thousands
+export const SALARY_MATCH_BUFFER = 100; // thousands, at the default salary cap (scaled by salaryCapScale)
 
 export type SalaryMatchSide = {
 	payrollBefore: number;
@@ -21,6 +21,8 @@ export type SalaryMatchSide = {
 export const salaryMatchOk = (
 	sides: SalaryMatchSide[],
 	luxuryPayroll: number,
+	// League salary cap / default salary cap, so the fixed buffer keeps its size after inflation
+	salaryCapScale = 1,
 ) =>
 	sides.every(({ payrollBefore, salaryOut, salaryIn }) => {
 		if (salaryIn <= salaryOut) {
@@ -30,5 +32,8 @@ export const salaryMatchOk = (
 		if (payrollAfter <= luxuryPayroll) {
 			return true;
 		}
-		return salaryIn <= SALARY_MATCH_RATIO * salaryOut + SALARY_MATCH_BUFFER;
+		return (
+			salaryIn <=
+			SALARY_MATCH_RATIO * salaryOut + SALARY_MATCH_BUFFER * salaryCapScale
+		);
 	});

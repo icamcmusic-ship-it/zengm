@@ -1,6 +1,13 @@
 // Team topics about the front office: the team's trades, signings, releases and contracts, its lottery and draft night, its pick stash, and how the roster was put together.
 import { mk, type Topic } from "./helpers.ts";
-import { fmtNum, ordinal, plural, rankOf, rankScore } from "../util.ts";
+import {
+	capDollars,
+	fmtNum,
+	ordinal,
+	plural,
+	rankOf,
+	rankScore,
+} from "../util.ts";
 import {
 	careerWs,
 	contractIn,
@@ -359,7 +366,7 @@ const teamReleases: Topic = ({ X, season, tid }) => {
 		id: "t-releases",
 		group: "t-books",
 		theme: "money",
-		score: clamp01(0.2 + Math.min(0.3, owed / 60000)),
+		score: clamp01(0.2 + Math.min(0.3, capDollars(X.L, owed) / 60000)),
 		kicker: "Waived",
 		tid,
 		season,

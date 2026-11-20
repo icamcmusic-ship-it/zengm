@@ -53,6 +53,13 @@ export const paceScales = (
 	paceFactor: number,
 	shotClockFull: number = SHOT_CLOCK_FULL,
 ) => {
+	// Guards for odd settings: a non-positive or non-finite pace or shot clock would give NaN/Infinity clocks
+	if (!Number.isFinite(paceFactor) || paceFactor <= 0) {
+		paceFactor = 1;
+	}
+	if (!Number.isFinite(shotClockFull) || shotClockFull <= 0) {
+		shotClockFull = SHOT_CLOCK_FULL;
+	}
 	const scale = 1 / paceFactor;
 	const possTimeScale = Math.min(
 		scale,
@@ -128,7 +135,12 @@ export const shotClockMakeFactor = (
 	shotClockFull: number = SHOT_CLOCK_FULL,
 ) => {
 	let factor;
-	if (shotClockLeft >= shotClockFull - 6) {
+	// The early (transition) window is the first 6 s of a 24 s clock; on a short custom clock (customShotClock, down to 10 s) keep it from
+	// swallowing the late-clock windows below
+	const earlyFrom = Math.max(shotClockFull - 6, 0.75 * shotClockFull, 7);
+	if (!Number.isFinite(shotClockLeft)) {
+		factor = 1;
+	} else if (shotClockLeft >= earlyFrom) {
 		factor = 1.07;
 	} else if (shotClockLeft >= 7) {
 		factor = 1;

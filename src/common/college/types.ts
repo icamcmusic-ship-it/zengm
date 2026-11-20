@@ -121,8 +121,8 @@ export type CollegeRealignmentMove = {
 	// Conference ids (g.confs) before and after
 	from: number;
 	to: number;
-	// Joined a stronger conference, or filled a spot left by one
-	reason: "upgrade" | "backfill";
+	// Joined a stronger conference, filled a spot left by one, or dropped to a weaker one (sent down by a conference that took in a school)
+	reason: "upgrade" | "backfill" | "relegation";
 };
 
 export type CollegeNit = CollegeConfTournament & {

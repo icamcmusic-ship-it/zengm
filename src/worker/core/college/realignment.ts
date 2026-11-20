@@ -1,6 +1,9 @@
 // College mode: conference realignment (setting collegeRealignment, docs/college-mode.md). Every few years, when a season is over, programs
 // that have outgrown their conference move to a stronger one nearby, and the conference they left backfills from a weaker conference. A
-// move changes the team's conference (t.cid / t.did) for the next season on; the season just played keeps its conferences (teamSeasons).
+// Realignment is two-way: a conference taking in a school sends its weakest member (one well below its average) down to the conference
+// left a school short, so conference sizes stay stable and strong conferences don't snowball into permanent super-conferences. A
+// conference only grows past the league's median size when it has no such member to send down.
+// A move changes the team's conference (t.cid / t.did) for the next season on; the season just played keeps its conferences (teamSeasons).
 import { gauss } from "../../../common/random.ts";
 import { CONFERENCES } from "../../../common/collegeStats/colleges.ts";
 import {
@@ -136,8 +139,8 @@ export const realignConferences = async (
 	};
 
 	// Backfill a conference that lost a school: the best school of a weaker conference, nearby ones first. One more level of backfill at
-	// most, after that a conference just has one school fewer
-	const backfill = (conf: Conf, depth: number) => {
+	// most, after that a conference just has one school fewer. Returns the conference left one school short
+	const backfill = (conf: Conf, depth: number): Conf => {
 		const options = teams
 			.filter((t) => {
 				const from = confs.get(t.cid);
@@ -158,13 +161,40 @@ export const realignConferences = async (
 			.sort((a, b) => b.score - a.score);
 		const pick = options[0];
 		if (!pick) {
-			return;
+			return conf;
 		}
 		const from = confs.get(pick.t.cid)!;
 		move(pick.t.tid, from, conf, "backfill");
 		if (depth < 1) {
-			backfill(from, depth + 1);
+			return backfill(from, depth + 1);
 		}
+		return from;
+	};
+
+	// Sizes are kept around the league's median conference size
+	const sizes = [...confs.values()]
+		.map((c) => c.tids.length)
+		.filter((n) => n > 0)
+		.sort((a, b) => a - b);
+	const medianSize =
+		sizes.length > 0 ? sizes[Math.floor(sizes.length / 2)]! : 0;
+
+	// The member of a conference that has fallen well below its average (deterministic: no random draws), to be sent down
+	const relegationCandidate = (conf: Conf) => {
+		let best: { tid: number; gap: number } | undefined;
+		for (const tid of conf.tids) {
+			if (moved.has(tid)) {
+				continue;
+			}
+			const gap = prestige.get(tid)! - avgBefore.get(conf.cid)!;
+			if (
+				gap <= -OUTGROWN &&
+				(!best || gap < best.gap || (gap === best.gap && tid < best.tid))
+			) {
+				best = { tid, gap };
+			}
+		}
+		return best?.tid;
 	};
 
 	const movers = teams
@@ -194,6 +224,8 @@ export const realignConferences = async (
 					conf.cid !== own.cid &&
 					conf.tids.length > 0 &&
 					conf.tids.length < MAX_SIZE &&
+					(conf.tids.length < medianSize ||
+						relegationCandidate(conf) !== undefined) &&
 					avgBefore.get(conf.cid)! >= avgBefore.get(own.cid)! + STEP_UP &&
 					p >= conf.avg - FIT,
 			)
@@ -207,7 +239,18 @@ export const realignConferences = async (
 		}
 		move(t.tid, own, target, "upgrade");
 		numMoves -= 1;
-		backfill(own, 0);
+		const short = backfill(own, 0);
+		// Relegation: the stronger conference sends its weakest member down to the conference left short
+		const down = relegationCandidate(target);
+		if (
+			down !== undefined &&
+			short.cid !== target.cid &&
+			avgBefore.get(short.cid)! < avgBefore.get(target.cid)! &&
+			short.tids.length < MAX_SIZE &&
+			target.tids.length > MIN_SIZE
+		) {
+			move(down, target, short, "relegation");
+		}
 	}
 
 	if (moves.length === 0) {
@@ -246,10 +289,12 @@ export const realignConferences = async (
 			text:
 				m.reason === "upgrade"
 					? `Conference realignment: ${teamLink(t)} leaves ${confLink(from.name)} for ${confLink(to.name)}.`
-					: `Conference realignment: ${teamLink(t)} moves from ${confLink(from.name)} to ${confLink(to.name)} to fill its opening.`,
+					: m.reason === "relegation"
+						? `Conference realignment: ${teamLink(t)} drops from ${confLink(from.name)} to ${confLink(to.name)}.`
+						: `Conference realignment: ${teamLink(t)} moves from ${confLink(from.name)} to ${confLink(to.name)} to fill its opening.`,
 			showNotification: user,
 			tids: [m.tid],
-			score: m.reason === "upgrade" ? 20 : 10,
+			score: m.reason === "backfill" ? 10 : 20,
 		});
 	}
 	return moves;

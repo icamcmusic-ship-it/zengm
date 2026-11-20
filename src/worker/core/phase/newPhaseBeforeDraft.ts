@@ -45,21 +45,25 @@ const INFLATION_GAME_ATTRIBUTES = [
 	"luxuryPayroll",
 ] as const;
 
-const upcomingScheduledEventBlocksInflation = async () => {
+// Keys an upcoming scheduled event sets itself (absolute values, e.g. real salary caps). Inflation still applies to the other keys, so a season with a scheduled event doesn't freeze minContract/luxuryPayroll etc.
+const keysSetByUpcomingScheduledEvents = async () => {
 	const scheduledEvents = await idb.merged.scheduledEvents.getAll();
-	return scheduledEvents.some((event) => {
+	const keys = new Set<(typeof INFLATION_GAME_ATTRIBUTES)[number]>();
+	for (const event of scheduledEvents) {
 		if (event.type === "gameAttributes") {
 			for (const key of INFLATION_GAME_ATTRIBUTES) {
 				if (Object.hasOwn(event.info, key)) {
-					return true;
+					keys.add(key);
 				}
 			}
 		}
-	});
+	}
+	return keys;
 };
 
 const doInflation = async (conditions: Conditions) => {
-	if (await upcomingScheduledEventBlocksInflation()) {
+	const scheduledKeys = await keysSetByUpcomingScheduledEvents();
+	if (scheduledKeys.size === INFLATION_GAME_ATTRIBUTES.length) {
 		return;
 	}
 
@@ -72,7 +76,8 @@ const doInflation = async (conditions: Conditions) => {
 
 	if (inflationMin === inflationMax) {
 		inflation = inflationMin;
-	} else if (inflationStd === 0) {
+	} else if (inflationStd === 0 || scheduledKeys.size > 0) {
+		// With a scheduled event, use the average instead of a random draw: these seasons used to skip inflation, so a draw here would shift the random stream
 		inflation = helpers.bound(inflationAvg, inflationMin, inflationMax);
 	} else {
 		try {
@@ -97,6 +102,9 @@ const doInflation = async (conditions: Conditions) => {
 	const updatedGameAttributes: Partial<GameAttributesLeague> = {};
 
 	for (const key of INFLATION_GAME_ATTRIBUTES) {
+		if (scheduledKeys.has(key)) {
+			continue;
+		}
 		const oldValue = g.get(key);
 		const newValue = helpers.roundContract(oldValue * (1 + inflation / 100));
 		if (oldValue !== newValue) {
@@ -112,12 +120,16 @@ const doInflation = async (conditions: Conditions) => {
 		logEvent(
 			{
 				type: "gameAttribute",
-				text: `An inflation rate of ${inflation}% ${
-					inflation > 0 ? "increased" : "decreased"
-				} the salary cap to ${helpers.formatCurrency(
-					g.get("salaryCap") / 1000,
-					"M",
-				)}.`,
+				text: scheduledKeys.has("salaryCap")
+					? `An inflation rate of ${inflation}% ${
+							inflation > 0 ? "increased" : "decreased"
+						} contract and payroll limits.`
+					: `An inflation rate of ${inflation}% ${
+							inflation > 0 ? "increased" : "decreased"
+						} the salary cap to ${helpers.formatCurrency(
+							g.get("salaryCap") / 1000,
+							"M",
+						)}.`,
 				tids: [],
 				persistent: true,
 				hideInLiveGame: true,
@@ -549,8 +561,11 @@ const newPhaseBeforeDraft = async (
 		await addStashSeasons();
 	}
 
-	// Randomize order of doRelocate and doExpand, because we want one to block the other but not always the same one
-	if (Math.random() > 0.5) {
+	// Randomize order of doRelocate and doExpand, because we want one to block the other but not always the same one. Never in a college
+	// league: schools don't relocate, and the field is the real college list (conferences change by realignment instead)
+	if (college.isCollege()) {
+		// Nothing
+	} else if (Math.random() > 0.5) {
 		const relocated = await doRelocate();
 		if (!relocated) {
 			await doExpand();

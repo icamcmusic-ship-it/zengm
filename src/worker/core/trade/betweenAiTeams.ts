@@ -1,3 +1,4 @@
+import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, local } from "../../util/index.ts";
 import isUntradable from "./isUntradable.ts";
@@ -96,6 +97,7 @@ export const realisticSalaryMatchOk = async (teams: TradeTeams) => {
 			},
 		],
 		g.get("luxuryPayroll"),
+		g.get("salaryCap") / defaultGameAttributes.salaryCap,
 	);
 };
 

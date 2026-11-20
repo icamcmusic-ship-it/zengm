@@ -256,7 +256,9 @@ const CollegeCarousel = ({
 									<td>
 										{m.reason === "upgrade"
 											? "Moved up to a stronger conference"
-											: "Filled an opening"}
+											: m.reason === "relegation"
+												? "Dropped to a weaker conference"
+												: "Filled an opening"}
 									</td>
 								</tr>
 							))}

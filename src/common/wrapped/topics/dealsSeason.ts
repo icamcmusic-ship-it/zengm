@@ -1,6 +1,13 @@
 // Season topics about the front office: the trade market, free agency, contracts, releases, the draft lottery and the draft. Value-based ones (win shares a deal bought) wait for the season to be over; nothing uses what happened after the season.
 import { mk, type Topic } from "./helpers.ts";
-import { fmtNum, ordinal, plural, rankOf, rankScore } from "../util.ts";
+import {
+	capDollars,
+	fmtNum,
+	ordinal,
+	plural,
+	rankOf,
+	rankScore,
+} from "../util.ts";
 import {
 	careerWs,
 	contractRows,
@@ -476,7 +483,7 @@ const releasesTopic: Topic = ({ X, season }) => {
 		id: "s-releases",
 		group: "s-wire",
 		theme: "money",
-		score: clamp01(0.2 + Math.min(0.25, top.owed / 80000)),
+		score: clamp01(0.2 + Math.min(0.25, capDollars(X.L, top.owed) / 80000)),
 		kicker: "Cut loose",
 		season,
 		pid: top.p.pid,
