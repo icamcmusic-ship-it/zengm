@@ -57,6 +57,18 @@ export default defineView({
 
 			const allTeamSeasons = teamSeasonsByTeam.flat();
 
+			// Executive of the Year awards you won (Coach & Executive of the Year), stored on your team seasons
+			const execAwards = allTeamSeasons
+				.filter((ts) => ts.execOfTheYear?.user)
+				.map((ts) => ({
+					season: ts.season,
+					tid: ts.tid,
+					abbrev: ts.abbrev,
+					region: ts.region,
+					name: ts.name,
+				}))
+				.sort((a, b) => b.season - a.season);
+
 			const tids = new Set(allTeamSeasons.map((ts) => ts.tid));
 
 			const teamHistory = getHistoryTeam(
@@ -111,6 +123,7 @@ export default defineView({
 
 			return {
 				...teamHistory,
+				execAwards,
 				players: addFirstNameShort(players),
 				stats: historyStats,
 				teamHistories,

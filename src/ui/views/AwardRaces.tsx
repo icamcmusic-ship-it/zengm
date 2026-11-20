@@ -21,6 +21,10 @@ import { Fragment, type ReactNode } from "react";
 import { formatPlayerAwardName } from "../../common/awards.ts";
 import clsx from "clsx";
 import type { getAwardCandidates } from "../../worker/core/awards/getAwardCandidates.ts";
+import {
+	CoachExecRaceTable,
+	formatProb,
+} from "../components/CoachExecAwards.tsx";
 
 const MARGIN = 14;
 
@@ -239,23 +243,6 @@ export const getAwardKey = (
 	]);
 };
 
-// Win probability, as shown in the award race tables (see worker/core/seasonOdds/awardOdds.ts)
-const formatProb = (prob: number) => {
-	if (prob <= 0) {
-		return "0%";
-	}
-	if (prob >= 1) {
-		return "100%";
-	}
-	if (prob < 0.01) {
-		return "<1%";
-	}
-	if (prob > 0.99) {
-		return ">99%";
-	}
-	return `${Math.round(100 * prob)}%`;
-};
-
 export const AwardRaceTable = ({
 	confs,
 	divs,
@@ -371,6 +358,7 @@ export const AwardRaceTable = ({
 const AwardRaces = ({
 	awardOdds,
 	awardCandidates,
+	coachExecRaces,
 	confs,
 	divs,
 	season,
@@ -412,6 +400,15 @@ const AwardRaces = ({
 						</Fragment>
 					);
 				})}
+				{coachExecRaces.map((race) => (
+					<div
+						key={race.key}
+						className="col-12 col-lg-9"
+						style={{ marginTop: MARGIN }}
+					>
+						<CoachExecRaceTable race={race} season={season} />
+					</div>
+				))}
 			</div>
 		</>
 	);

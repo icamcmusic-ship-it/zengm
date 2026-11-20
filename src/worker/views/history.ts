@@ -28,7 +28,12 @@ import { player, team } from "../core/index.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { getCollegeState } from "../core/college/state.ts";
 import { getCollegeArchive } from "../core/college/archive.ts";
-import { COACH_OF_THE_YEAR } from "../core/staff/index.ts";
+import { COACH_OF_THE_YEAR } from "../../common/coachExecAwards.ts";
+import {
+	coyAvailable,
+	eoyAvailable,
+	getExecAwardsForSeason,
+} from "../core/awards/coachExecAwards.ts";
 import { getCoachAwards } from "../core/staff/data.ts";
 
 const processInputs = (params: RouteParams<"history">) => {
@@ -388,24 +393,50 @@ export default defineView({
 					g.get("numGamesPlayoffSeries", season).length,
 			);
 
-			// College mode: the Coach of the Year (staff), shown with the awards
+			// Coach of the Year and Executive of the Year (built in), shown with the awards
+			const coyRow = (await getCoachAwards(COACH_OF_THE_YEAR)).find(
+				(a) => a.season === season,
+			);
+			const eoyRow = (await getExecAwardsForSeason(season))[0];
+			const teamLabel = (tid: number) => {
+				const t = teams.find((t2) => t2.tid === tid);
+				const info = g.get("teamInfoCache")[tid];
+				return {
+					abbrev: t?.seasonAttrs.abbrev ?? info?.abbrev ?? "",
+					region: t?.seasonAttrs.region ?? info?.region ?? "",
+				};
+			};
+			const coachExecAwards = {
+				coy: coyRow
+					? {
+							cid: coyRow.cid,
+							name: coyRow.name,
+							tid: coyRow.tid,
+							...teamLabel(coyRow.tid),
+						}
+					: undefined,
+				eoy: eoyRow
+					? {
+							name: eoyRow.name,
+							gmid: eoyRow.gmid,
+							user: eoyRow.user,
+							tid: eoyRow.tid,
+							...teamLabel(eoyRow.tid),
+						}
+					: undefined,
+				// Show the heading (with "No winner" until it's given) for the current season when the award exists in this league,
+				// and for past seasons only when it was given
+				showCoy: !!coyRow || (coyAvailable() && season === g.get("season")),
+				showEoy: !!eoyRow || (eoyAvailable() && season === g.get("season")),
+			};
+
+			// College mode: the NIT champion, shown with the awards
 			let college:
 				| {
-						coachOfYear?: {
-							cid: number;
-							name: string;
-							tid: number;
-							abbrev: string;
-							region: string;
-						};
 						nitChampion?: { tid: number; abbrev: string; region: string };
 				  }
 				| undefined;
 			if (isCollege()) {
-				const coy = (await getCoachAwards(COACH_OF_THE_YEAR)).find(
-					(a) => a.season === season,
-				);
-				const info = coy ? g.get("teamInfoCache")[coy.tid] : undefined;
 				const state = getCollegeState();
 				const nit =
 					state && state.season === season
@@ -424,21 +455,13 @@ export default defineView({
 									region: nitInfo?.region ?? "",
 								}
 							: undefined,
-					coachOfYear: coy
-						? {
-								cid: coy.cid,
-								name: coy.name,
-								tid: coy.tid,
-								abbrev: info?.abbrev ?? "",
-								region: info?.region ?? "",
-							}
-						: undefined,
 				};
 			}
 
 			return {
 				awards: awardsAugmented,
 				champ,
+				coachExecAwards,
 				college,
 				confs: g.get("confs", season),
 				invalidSeason: false as const,

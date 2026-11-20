@@ -798,6 +798,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	// New leagues get a coaching staff. Existing leagues are set to false in the version 76 DB migration
 	coachingStaff: true,
 	fakeAgeProb: 0.01,
+	coachExecAwardFormulas: undefined,
 	awards: [
 		defaultAwards.mvp,
 		defaultAwardsBasketball.dpoy,

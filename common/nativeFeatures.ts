@@ -1024,6 +1024,16 @@ export const NATIVE_FEATURES = [
 		existing: true,
 	},
 	{
+		id: "coachExecAwards",
+		key: "featureCoachExecAwards",
+		core: true,
+		name: "Coach & Executive of the Year",
+		description:
+			"Coach of the Year and Executive of the Year are built-in awards, given with the other awards after the playoffs and scored by formulas you can edit in Award Settings. They show in Award Races (with odds), Award History and the season's History page. Coach of the Year needs the coaching staff; Executive of the Year goes to an AI team's general manager or to you, and isn't given in college leagues.",
+		default: true,
+		sports: BBGM,
+	},
+	{
 		id: "gmPersonalities",
 		college: false,
 		key: "featureGmPersonalities",

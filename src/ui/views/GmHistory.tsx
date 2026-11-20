@@ -11,6 +11,7 @@ import { Championships } from "./TeamHistory/Championships.tsx";
 const GmHistory = ({
 	bestRecord,
 	championships,
+	execAwards,
 	finalsAppearances,
 	players,
 	playoffAppearances,
@@ -114,6 +115,29 @@ const GmHistory = ({
 					<Championships
 						history={teamHistories.flatMap((row) => row.history)}
 					/>
+					{execAwards.length > 0 ? (
+						<HideableSection pageName="GmHistory" title="Executive of the Year">
+							<ul className="list-unstyled">
+								{execAwards.map((award) => (
+									<li key={award.season}>
+										<a href={helpers.leagueUrl(["history", award.season])}>
+											{award.season}
+										</a>{" "}
+										-{" "}
+										<a
+											href={helpers.leagueUrl([
+												"roster",
+												`${award.abbrev}_${award.tid}`,
+												award.season,
+											])}
+										>
+											{award.region} {award.name}
+										</a>
+									</li>
+								))}
+							</ul>
+						</HideableSection>
+					) : null}
 					<HideableSection title="Players">
 						<Players gmHistory players={players} stats={stats} tid={userTid} />
 					</HideableSection>

@@ -33,6 +33,7 @@ import { Dropdown } from "react-bootstrap";
 import { resetFileInput } from "../../util/resetFileInput.ts";
 import { Documentation } from "./Documentation.tsx";
 import { ImportModal } from "./ImportModal.tsx";
+import { CoachExecAwardSettings } from "./CoachExecAwardSettings.tsx";
 
 const MARGIN = 14;
 
@@ -287,6 +288,8 @@ const AwardSettings = ({
 					</button>
 				</div>
 			</form>
+
+			<CoachExecAwardSettings season={season} />
 
 			<StickyBottomButtons>
 				<Dropdown>

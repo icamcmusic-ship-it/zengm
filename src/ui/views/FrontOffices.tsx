@@ -137,6 +137,9 @@ const FrontOffices = ({
 															{gm.careerTitles > 0
 																? `, ${gm.careerTitles} title${gm.careerTitles > 1 ? "s" : ""}`
 																: ""}
+															{gm.execAwards.length > 0
+																? `. Executive of the Year: ${gm.execAwards.join(", ")}`
+																: ""}
 														</div>
 														<GmTraitBars traits={gm.traits} />
 													</div>
