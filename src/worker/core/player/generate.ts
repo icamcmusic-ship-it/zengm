@@ -37,13 +37,18 @@ const generate = (
 		race: "asian",
 	},
 ): PlayerWithoutKey => {
-	const { heightInInches, ratings } = genRatings(
+	const { heightInInches, ratings, build } = genRatings(
 		newLeague ? g.get("startingSeason") : draftYear,
 		scoutingLevel,
 	);
 	// lastName += `-${genPos}`;
 
-	const weight = genWeight(ratings.hgt, (ratings as any).stre);
+	const weight = genWeight(
+		ratings.hgt,
+		(ratings as any).stre,
+		undefined,
+		__SPORT === "basketball" ? { heightInInches, build } : undefined,
+	);
 
 	let actualHeightInInches = g.get("heightFactor") * heightInInches;
 	if (g.get("gender") === "female") {

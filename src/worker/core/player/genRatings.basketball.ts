@@ -6,7 +6,8 @@ import type {
 	PlayerRatings,
 	RatingKey,
 } from "../../../common/types.basketball.ts";
-import { heightDist, randInt, realGauss } from "../../../common/random.ts";
+import { heightDist, realGauss } from "../../../common/random.ts";
+import { probit } from "../../../common/archetypes/norms.ts";
 import { assertDefined } from "../../../common/utils.ts";
 import {
 	BALL_SECURITY_NOISE,
@@ -18,7 +19,6 @@ import {
 	reboundSplitBase,
 	SHOOTING_SPLIT_NOISE,
 	shootingSplitBase,
-	WINGSPAN_NOISE,
 } from "../../../common/expandedRatings.ts";
 import {
 	expandedRatingsOn,
@@ -137,6 +137,16 @@ const scorerMix = (hgt: number) => SCORER_MIX.find((m) => hgt <= m.maxHgt);
 
 const athleticismRatings = new Set(["stre", "spd", "jmp", "endu", "dnk"]);
 const shootingRatings = new Set(["ft", "fg", "tp"]);
+// Ape index of a generated player (inches): normal, bounded. inHgt: the share of it in the hgt rating (the old -1/0/+1 inch of length
+// had sd 0.82 inch; 0.37 x 2.2 = 0.81)
+export const APE_INDEX = {
+	mean: 4,
+	sd: 2.2,
+	min: -4,
+	max: 11,
+	inHgt: 0.37,
+};
+
 const skillRatings = new Set(["oiq", "diq", "drb", "pss", "reb"]); // ins purposely left out
 
 const genRatings = (
@@ -147,11 +157,28 @@ const genRatings = (
 ): {
 	heightInInches: number;
 	ratings: PlayerRatings;
+	// Wingspan minus height (inches), drawn here
+	apeIndex: number;
+	// The player type his ratings were drawn for (genWeight: bigs are heavier for their height, point guards lighter)
+	build: PlayerType;
 } => {
 	// realHeight is drawn from a custom probability distribution and then offset by a fraction of an inch either way
 	let heightInInches = heightDist() + Math.random() - 0.5; // Fraction of an inch
 
-	const wingspanAdjust = heightInInches + randInt(-1, 1); // hgt 0-100 corresponds to height 5'6" to 7'9" (Anything taller or shorter than the extremes will just get 100/0)
+	// Ape index (wingspan minus height, inches): its own draw, normal around +4 (NBA prospects: mean about +4, sd a little over 2). It
+	// takes the one random number the old -1/0/+1 inch of "length" took, and the hgt rating keeps about the same share of it (sd 0.8
+	// inch), so the hgt rating and everything built on it are distributed as before.
+	const apeIndex = helpers.bound(
+		APE_INDEX.mean + APE_INDEX.sd * probit(Math.random()),
+		APE_INDEX.min,
+		APE_INDEX.max,
+	);
+	const length = helpers.bound(
+		APE_INDEX.inHgt * (apeIndex - APE_INDEX.mean),
+		-1.5,
+		1.5,
+	);
+	const wingspanAdjust = heightInInches + length; // hgt 0-100 corresponds to height 5'6" to 7'9" (Anything taller or shorter than the extremes will just get 100/0)
 
 	const hgt = hgtOverride ?? heightToRating(wingspanAdjust);
 	heightInInches = Math.round(heightInInches); // Pick type of player (point, wing, or big) based on height
@@ -275,7 +302,10 @@ const genRatings = (
 	// Expanded ratings: wingspan around height, and diq split into perimeter and interior defense. Only with the setting on, so with it
 	// off no extra random numbers are drawn.
 	if (expandedRatingsOn()) {
-		ratings.wng = limitRating(Math.round(realGauss(hgt, WINGSPAN_NOISE)));
+		// His drawn ape index, on the hgt scale (wingspanInches reads it back: height + ape index)
+		ratings.wng = limitRating(
+			Math.round(hgt + ((apeIndex - APE_INDEX.mean) * 100) / 27),
+		);
 		const split =
 			2 *
 			(defenseSplitBase(ratings) +
@@ -313,6 +343,8 @@ const genRatings = (
 	return {
 		heightInInches,
 		ratings,
+		apeIndex,
+		build: type,
 	};
 };
 

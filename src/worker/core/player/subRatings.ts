@@ -36,6 +36,7 @@ import {
 import { parseSubZ, wideRealLean } from "../../../common/subRatingsReal.ts";
 import { shootingSplitBase } from "../../../common/expandedRatings.ts";
 import { g } from "../../util/index.ts";
+import { trajectoryLatenessOf } from "./trajectory.ts";
 import { applyFuzz, getFuzz } from "./fuzzRating.ts";
 import { FOCUSES, tiltSubKeys } from "../../../common/staffDepth/devPlans.ts";
 import type { FocusKey } from "../../../common/staffDepth/types.ts";
@@ -252,6 +253,7 @@ export const developRowSubs = (
 		age,
 		p.subP,
 		subWideOn() ? { role: roleOf(p, r.season - 1, age) } : undefined,
+		trajectoryLatenessOf(p),
 	);
 };
 

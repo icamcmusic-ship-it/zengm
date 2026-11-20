@@ -61,8 +61,11 @@ const genPlayers = async (
 		await player.updateValues(p);
 
 		// Seeds for the player traits, from the league seed and pid
+		// (A son or brother already has his, partly inherited: addRelatives)
 		if (__SPORT === "basketball") {
-			player.initTraits(p as any);
+			if (!(p as any).traits) {
+				player.initTraits(p as any);
+			}
 			await idb.cache.players.put(p as any);
 		}
 	}

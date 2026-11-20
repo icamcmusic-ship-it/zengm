@@ -68,8 +68,19 @@ export const AGING_CURVE_INFO: Record<
 export const agingCurveForPlayer = (
 	leagueSeed: number | string,
 	pid: number,
-): AgingCurve => {
-	const u = new Rng(`agingCurve|${leagueSeed}|${pid}`).random();
+): AgingCurve => agingCurveFromTrajectory(trajectoryU(leagueSeed, pid));
+
+// --- Trajectory (secret) ---
+//
+// One hidden number per player, uniform in [0, 1), that drives every "late bloomer / early peaker" signal so they agree: the aging curve
+// (above), the growth profile of his sub-ratings (subRatingsGen.ts, reconcileGrowthProfile) and whether his college career can tell the
+// late bloomer story (collegeStats/career.ts). It is the aging curve's own draw (same stream as before it existed), so no player's aging
+// curve changed. Derived from the league's trait seed and the pid, never stored, so it never reaches the UI except through the signals
+// that already existed (a college story, how he develops, the aging curve revealed at retirement).
+export const trajectoryU = (leagueSeed: number | string, pid: number) =>
+	new Rng(`agingCurve|${leagueSeed}|${pid}`).random();
+
+export const agingCurveFromTrajectory = (u: number): AgingCurve => {
 	let cumulative = 0;
 	for (const curve of AGING_CURVE_ORDER) {
 		cumulative += AGING_CURVE_SHARES[curve];
@@ -78,6 +89,32 @@ export const agingCurveForPlayer = (
 		}
 	}
 	return "normal";
+};
+
+/**
+ * Lateness of a trajectory, in [-1, 1]: -1 to -0.5 for an early bloomer, 0.5 to 1 for a late bloomer (stronger deeper into his curve's
+ * share), 0 for graceful and normal agers. Averages 0 over the league, so the signals it tilts keep their league-wide shares.
+ */
+export const trajectoryLateness = (u: number) => {
+	const curve = agingCurveFromTrajectory(u);
+	let start = 0;
+	for (const c of AGING_CURVE_ORDER) {
+		if (c === curve) {
+			break;
+		}
+		start += AGING_CURVE_SHARES[c];
+	}
+	const within = Math.min(
+		1,
+		Math.max(0, (u - start) / AGING_CURVE_SHARES[curve]),
+	);
+	if (curve === "early") {
+		return -1 + 0.5 * within;
+	}
+	if (curve === "late") {
+		return 0.5 + 0.5 * within;
+	}
+	return 0;
 };
 
 // Raw change to the yearly base change (rating points) by age, before centering

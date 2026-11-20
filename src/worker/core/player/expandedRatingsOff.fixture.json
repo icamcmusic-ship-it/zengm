@@ -1,44 +1,44 @@
 [
 	{
 		"seed": 4000,
-		"ratings": "b822325c1289b488b3f4b79fe56e29b3caa88bef1cd13a3f83d19458b107f203",
-		"composites": "69902c01cbca323d50a6f903481f023504eeaa7bac5a732170f00b905de89b56",
-		"box": "281041a20c9c3d5fff8a600789f2f0f082d04460ce37b795feb45e94c327a710",
-		"pts": [92, 116]
+		"ratings": "ad2ef1bb205c9ac7fe8a29b22e0a391c33cbd463fa8eb69bdd16d0e4316ee7da",
+		"composites": "9cd828643f9a750eb1bc4f935aaa64003888f6cc7bd509048159fefca8dcf1cc",
+		"box": "2782b286b1527d2fd7ee596234e81f7362b720ccfeb15bf1bf666a9f556bb29d",
+		"pts": [81, 111]
 	},
 	{
 		"seed": 4053,
-		"ratings": "264337563e06f8a11442c834ae2ed8276c1bd074f4c08fb751c4f001b56c6c9f",
-		"composites": "de67c4c0484703c4791cc5a1ec766579e1318367393dc2acc8d2fa8ad6023281",
-		"box": "7e41f0504e51be7b293525b94e04c50a590f9e0446a328f3e012954b89d5f69a",
-		"pts": [62, 114]
+		"ratings": "ba00ce4c3298048ccbe9678e79e14cb9fe9ac10a3bb36c43a8bcf9ed9566c678",
+		"composites": "95f3b9664c7b14e20d3ddebf5ba8a436d320eddd9431e3675f28ceaf3dd1baca",
+		"box": "3a27d5d48fd45ba8a3abab92e4ee9a75f912a43ebf1aa5cb46ddd8f25efd15ae",
+		"pts": [91, 105]
 	},
 	{
 		"seed": 4106,
-		"ratings": "d676acfafa1c25a7635b835f9623ed5a84758bf11ec31c68ae04fff35fdd0a03",
-		"composites": "be33cafb6f5564e55a13d597d8dba2f185e3f9ed9046224d56eda75ce9376e2f",
-		"box": "1d5aaa1c964286690f2d72352eb44e57fb63a1e775e3a821a27faef95a0a0421",
-		"pts": [96, 116]
+		"ratings": "d708dc0dac70fdff519b74499e5ac6f49526fb6521e52fdc7055fee0f1b080af",
+		"composites": "bcbe5abd5e79490403784dd5afd0dcd2a572feca6cda61bfdb9ffabc9d3d69b4",
+		"box": "9cc963c2a558910604ffb74d246ae0fb433bd2228fe3cf9904bd9d78e5edb338",
+		"pts": [96, 114]
 	},
 	{
 		"seed": 4159,
-		"ratings": "58e4e9f27e14ed8a91cee34671c81554f0433a720eee0caaee56b64caf6da671",
-		"composites": "cf83ee66bb3059d2e8c8f9a7dc1a8eb90285834eeb747611547d5453db06bc21",
-		"box": "64ec6e474116a84229414a1b4f6edbfc9db882a00387bc29068946ec36e87060",
-		"pts": [90, 115]
+		"ratings": "8a221dbd16cb43bc423b14f3f25861d4041a22b4007152b2e35b4d50875466db",
+		"composites": "27d95a2f5b3353fa06f5fdc30df2b136699cd7cd18904f386b0d3fc7186eb44b",
+		"box": "acad8ff8afbd3fdfa9fed57fbf384c2daf2eac5ffe91020a07a1d699379265cc",
+		"pts": [93, 136]
 	},
 	{
 		"seed": 4212,
-		"ratings": "266d152fe6e42be058f5c488b89b5d81430d76f4c5d0870045ea4e9d132871cd",
-		"composites": "7f7e89395962a57663aee62ac4587135ec0db85bf23ce800e7608b2234e75f17",
-		"box": "1782a6326e86b20c4b6050ef8dd9b28ccc7d6ebed033f91986fe640557a11b6d",
-		"pts": [104, 96]
+		"ratings": "2508d5e8af605ac8d8edeaf03e828411c841c48c577e0e4dff5bebce2d654c23",
+		"composites": "be1d9812767df21cffa8e070d5b98092031a29c6716d2b83b8770cb11f3150bb",
+		"box": "866d44f5b98f5d1926d10ad41a6ae84f7ca0fa6623b88f40e16c9a3f0eb04325",
+		"pts": [83, 100]
 	},
 	{
 		"seed": 4265,
-		"ratings": "7b4cdbb9585365335f602fa773cd9accadf2479dc14ea2137aa5583aac6b9b33",
-		"composites": "536cc35197b764100bededc1aad3ca1237a93f6a28fcb6cc4f75ca2517240a95",
-		"box": "d04073f9599cf0522d1187204743b8395675ddc8b67f5d62e9b20e33122c0580",
-		"pts": [99, 98]
+		"ratings": "1db8b96675d80481c72ebc99a5aca3e12778970e8025f3caffe4434250b47726",
+		"composites": "e8d676c09fdca1a996b2f780c769822dce33ed6dae1aaedd2bc850b58608074f",
+		"box": "4e76765d208d56bd8804484717c6d085ab6fd701b703d8a2b23fc7533c09d92b",
+		"pts": [79, 118]
 	}
 ]
