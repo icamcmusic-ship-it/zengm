@@ -10,6 +10,12 @@ import {
 	featureOption,
 } from "../util/nativeFeatures.ts";
 import {
+	compsForInput,
+	getRealCompIndex,
+	realCompsOn,
+	shownCompInput,
+} from "../core/draft/realComps.ts";
+import {
 	getDraftPreviewFacts,
 	scoutingReportsOn,
 } from "../core/scoutingReports/index.ts";
@@ -223,6 +229,12 @@ const getTeams = async (
 		}
 		const stats = t.stats as any;
 		const gp = num(stats?.gp);
+		const snaps =
+			history.find((ts) => ts.season === season)?.powerRankHistory ?? [];
+		const power =
+			snaps.length > 0
+				? { rank: snaps.at(-1)!.rank, prev: snaps.at(-2)?.rank }
+				: undefined;
 		out.push({
 			tid: t.tid,
 			abbrev: s.abbrev,
@@ -249,6 +261,7 @@ const getTeams = async (
 			titles,
 			firstSeason,
 			hist,
+			power,
 		});
 		const info = g.get("teamInfoCache")[t.tid];
 		logos[t.tid] = {
@@ -1036,7 +1049,29 @@ export const getNewsFacts = async (
 				ovr: r ? seen(r.ovr, r.fuzz) : 0,
 				pot: r ? seen(r.pot, r.fuzz) : 0,
 				college: p.college || undefined,
+				cons: p.preDraftRank?.s === season ? p.preDraftRank.v : undefined,
+				consN: p.preDraftRank?.s === season ? p.preDraftRank.n : undefined,
+				stash:
+					p.stash && p.stash.season === season ? p.stash.league : undefined,
 			});
+		}
+	}
+	// Real Player Comps for the top picks of this season's draft (current season only, never under No Visible Ratings)
+	if (!headlineOnly && season === g.get("season") && realCompsOn()) {
+		const index = await getRealCompIndex();
+		if (index) {
+			const top = draft
+				.toSorted((a, b) => a.round - b.round || a.pick - b.pick)
+				.slice(0, 5);
+			for (const d of top) {
+				const p = drafted.find((x) => x.pid === d.pid);
+				if (p && p.ratings.length > 0) {
+					const comps = compsForInput(index, shownCompInput(p));
+					if (comps.length > 0) {
+						d.comps = comps.map((x) => `${x.name} (${x.became})`);
+					}
+				}
+			}
 		}
 	}
 

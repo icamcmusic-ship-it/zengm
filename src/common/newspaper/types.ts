@@ -48,6 +48,8 @@ export type NPTeam = NPRecord & {
 	worstStreak?: number;
 	// Total of the contracts on the roster, in thousands (current season only)
 	payroll?: number;
+	// Power rankings (weekly snapshots, TeamSeason.powerRankHistory): the latest rank and the one before it
+	power?: { rank: number; prev?: number };
 };
 
 export type NPLine = {
@@ -269,6 +271,13 @@ export type NPDraftee = {
 	ovr: number;
 	pot: number;
 	college?: string;
+	// Frozen Pre-draft Ranks: his place on the consensus board when the draft started, and the class size
+	cons?: number;
+	consN?: number;
+	// Draft-and-stash: the overseas league he was stashed in on draft night
+	stash?: string;
+	// Real Player Comps: "Name (what he became)", closest first
+	comps?: string[];
 };
 
 export type NPInjury = {
