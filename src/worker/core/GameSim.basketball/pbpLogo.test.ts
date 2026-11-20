@@ -255,6 +255,12 @@ const SCENARIOS: Scenario[] = [
 	},
 	{ name: "Elam ending", seeds: 10, settings: { ...ALL_ON, elam: true } },
 	{
+		// (very short quarters, so ties after regulation are common and the overtime lines show up whatever the sim's tuning)
+		name: "overtimes",
+		seeds: 30,
+		settings: { ...ALL_ON, quarterLength: 0.5 },
+	},
+	{
 		name: "shootouts",
 		// (a tie after regulation is a few percent of games, so enough of them for a handful of shootouts)
 		seeds: 150,
