@@ -1638,6 +1638,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	pid?: number;
 	pos?: string; // Only in players from custom league files
 	ptModifier: number;
+	// Shot Share Model (basketball): the user's game plan for him, -1 Fewer shots, 1 More shots (missing: Normal). Reset when he changes
+	// teams, like ptModifier
+	shotPlan?: -1 | 1;
 	ratings: NonEmptyArray<PlayerRatings>;
 
 	// Basketball only: the stored random components of the player traits (see common/playerTraits). Created at player generation and lazily; scores are derived from these plus ratings.

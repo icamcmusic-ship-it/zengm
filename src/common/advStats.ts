@@ -93,9 +93,92 @@ export const ADV = {
 	// Opponents' expected rim attempts while he was on the floor: each opposing player's rim attempts per possession against the
 	// rest of his team's lineups (in that game) times the possessions they shared with him, so rimDeter compares like with like
 	oppRimExp: NUM_PT * PT_FIELDS + 44,
+	// Shot Share Model, his shot diet: where his shots came from (each shot counted once, in this order of priority: a putback, a kick-out
+	// from a double team, a late shot clock bailout, the hot hand, a mismatch he was hunted for, a shot he created himself, the normal
+	// draw), how many of them came from the shooter draw (sdDraws), and for those, the sum of 1000 × how much each modifier moved his share
+	// of the draw (1000 = no change): the coach's system, fatigue, shot discipline, defensive attention and double teams, his game plan, and
+	// his role in the five
+	sdNormal: NUM_PT * PT_FIELDS + 45,
+	sdCreated: NUM_PT * PT_FIELDS + 46,
+	sdPutback: NUM_PT * PT_FIELDS + 47,
+	sdLate: NUM_PT * PT_FIELDS + 48,
+	sdHot: NUM_PT * PT_FIELDS + 49,
+	sdKick: NUM_PT * PT_FIELDS + 50,
+	sdHunt: NUM_PT * PT_FIELDS + 51,
+	sdDraws: NUM_PT * PT_FIELDS + 52,
+	smCoach: NUM_PT * PT_FIELDS + 53,
+	smFatigue: NUM_PT * PT_FIELDS + 54,
+	smDiscipline: NUM_PT * PT_FIELDS + 55,
+	smAttention: NUM_PT * PT_FIELDS + 56,
+	smPlan: NUM_PT * PT_FIELDS + 57,
+	smRole: NUM_PT * PT_FIELDS + 58,
 } as const;
 
-export const ADV_LEN = NUM_PT * PT_FIELDS + 45;
+export const ADV_LEN = NUM_PT * PT_FIELDS + 59;
+
+// Shot Share Model: the shot diet's sources and modifiers (keys of ADV), with their labels
+export const SHOT_DIET_SOURCES = [
+	{ key: "sdNormal", name: "Normal draw" },
+	{ key: "sdCreated", name: "Self-created" },
+	{ key: "sdPutback", name: "Putbacks" },
+	{ key: "sdLate", name: "Late clock" },
+	{ key: "sdHot", name: "Hot hand" },
+	{ key: "sdKick", name: "Double-team kick-outs" },
+	{ key: "sdHunt", name: "Mismatch hunting" },
+] as const;
+export const SHOT_DIET_MODIFIERS = [
+	{ key: "smCoach", name: "Coach system" },
+	{ key: "smFatigue", name: "Fatigue" },
+	{ key: "smDiscipline", name: "Shot discipline" },
+	{ key: "smAttention", name: "Defensive attention" },
+	{ key: "smPlan", name: "Game plan" },
+	{ key: "smRole", name: "Role" },
+] as const;
+
+// Shot Share Model: a game's shot diet as stored in the box score (sd: the source counts, in SHOT_DIET_SOURCES order), and its text
+export const shotDietOfGame = (adv: readonly number[]) =>
+	SHOT_DIET_SOURCES.map((s) => adv[ADV[s.key]] ?? 0);
+export const shotDietText = (sd: readonly number[] | undefined) => {
+	if (!sd) {
+		return undefined;
+	}
+	const parts = [];
+	for (const [i, s] of SHOT_DIET_SOURCES.entries()) {
+		const count = sd[i] ?? 0;
+		if (count > 0) {
+			parts.push(`${count} ${s.name.toLowerCase()}`);
+		}
+	}
+	return parts.length > 0 ? `Shot diet: ${parts.join(", ")}` : undefined;
+};
+
+// Shot Share Model: a shot diet from an adv array (undefined without any shot recorded): each source's count and share of his shots, and
+// each modifier's average effect on his share of the draw (1 = none)
+export const shotDiet = (adv: readonly number[] | undefined) => {
+	if (!adv) {
+		return undefined;
+	}
+	let total = 0;
+	for (const s of SHOT_DIET_SOURCES) {
+		total += adv[ADV[s.key]] ?? 0;
+	}
+	if (total <= 0) {
+		return undefined;
+	}
+	const draws = adv[ADV.sdDraws] ?? 0;
+	return {
+		total,
+		draws,
+		sources: SHOT_DIET_SOURCES.map((s) => {
+			const count = adv[ADV[s.key]] ?? 0;
+			return { ...s, count, pct: count / total };
+		}),
+		modifiers: SHOT_DIET_MODIFIERS.map((m) => ({
+			...m,
+			mult: draws > 0 ? (adv[ADV[m.key]] ?? 0) / (1000 * draws) : 1,
+		})),
+	};
+};
 
 export const ptIndex = (pt: number, field: number) => pt * PT_FIELDS + field;
 

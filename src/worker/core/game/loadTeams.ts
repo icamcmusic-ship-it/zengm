@@ -40,6 +40,10 @@ import {
 } from "../GameSim.basketball/spacingCreation.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import {
+	aiShotPlans,
+	seasonDriftMults,
+} from "../GameSim.basketball/shotShare.ts";
+import {
 	simFixCompositeWeights,
 	simFixInjuryFactor,
 } from "../GameSim.basketball/simSettings.ts";
@@ -621,6 +625,42 @@ export const processTeam = async (
 		}
 
 		applyInjuryDepth(t, teamInput, teamSeason, players);
+
+		// Shot Share Model (GameSim.basketball/shotShare.ts): each player's game plan (the user's own, or the AI coach's by role) and the
+		// season drift correction from his stats with this team this season
+		if (
+			!allStarGame &&
+			nativeFeatureEnabled("shotShareModel", (key) => g.get(key as any))
+		) {
+			const userTeam = g.get("userTids").includes(t.id) && !g.get("spectator");
+			const playersByPid = new Map(players.map((p) => [p.pid, p]));
+			const season = g.get("season");
+			const rows = t.player.map((p2: any) => {
+				const row = playersByPid
+					.get(p2.id)
+					?.stats?.findLast(
+						(r: any) => r.season === season && !r.playoffs && r.tid === t.id,
+					);
+				return {
+					id: p2.id,
+					valueNoPot: p2.valueNoPot,
+					usage: p2.compositeRating.usage,
+					injured: p2.injured,
+					fga: row?.fga ?? 0,
+					min: row?.min ?? 0,
+				};
+			});
+			const aiPlans = userTeam ? undefined : aiShotPlans(rows);
+			const drift = seasonDriftMults(rows);
+			for (const p2 of t.player) {
+				const plan = userTeam
+					? (playersByPid.get(p2.id)?.shotPlan ?? 0)
+					: (aiPlans!.get(p2.id) ?? 0);
+				// (set on every player, so the sim's player objects keep one shape)
+				p2.shotPlan = plan;
+				p2.shotDrift = drift.get(p2.id) ?? 1;
+			}
+		}
 
 		// Load, Fatigue & Venue (basketball): the crowd (hype), where the team is from (travel) and 3 games in 4 nights, see
 		// GameSim.basketball/scheduleLoad.ts
