@@ -97,6 +97,9 @@ const TYPE_TO_CATEGORY: Record<LogEventType, NotificationCategoryOrSystem> = {
 	holdout: "contracts",
 	draftPickCondition: "trades",
 	draftStash: "draft",
+	commercialDeal: "owner",
+	ownerSale: "owner",
+	revenueSharing: "owner",
 };
 
 export const isMappedLogEventType = (type: string) =>
