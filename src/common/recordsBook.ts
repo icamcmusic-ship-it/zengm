@@ -936,12 +936,69 @@ export const MILESTONE_BIG: Record<RBCareerStat, number> = {
 
 export const MILESTONE_STATS: RBCareerStat[] = [...RB_STATS, "gp"];
 
-// Ladder marks crossed going from before to now
-export const crossed = (k: RBCareerStat, before: number, now: number) =>
-	MILESTONE_LADDERS[k].filter((t) => before < t && now >= t);
+// The ladders are for default leagues (82 games of 48 minutes). Other schedules scale them, so short seasons can still
+// reach the big marks and long ones don't hit one every few games: stats by gameAndSeasonLengthScaleFactor (game and
+// season length), games played by season length alone.
+export type MilestoneScale = { stats: number; gp: number };
+export const NO_SCALE: MilestoneScale = { stats: 1, gp: 1 };
 
-export const nextMark = (k: RBCareerStat, v: number) =>
-	MILESTONE_LADDERS[k].find((t) => t > v);
+// Two significant figures, so scaled marks stay round (5000 * 0.6 = 3000, 2500 * 0.73 = 1800)
+const niceMark = (x: number) => {
+	if (!(x > 0)) {
+		return 1;
+	}
+	const step = 10 ** Math.max(0, Math.floor(Math.log10(x) + 1e-9) - 1);
+	return Math.max(step, Math.round(x / step) * step);
+};
+
+const scaleFor = (k: RBCareerStat, scale: MilestoneScale) =>
+	k === "gp" ? scale.gp : scale.stats;
+
+const ladderCache = new Map<string, number[]>();
+export const milestoneLadder = (
+	k: RBCareerStat,
+	scale: MilestoneScale = NO_SCALE,
+): number[] => {
+	const f = scaleFor(k, scale);
+	if (f === 1 || !(f > 0)) {
+		return MILESTONE_LADDERS[k];
+	}
+	const key = `${k}|${f}`;
+	let out = ladderCache.get(key);
+	if (!out) {
+		out = [...new Set(MILESTONE_LADDERS[k].map((t) => niceMark(t * f)))];
+		if (ladderCache.size > 100) {
+			ladderCache.clear();
+		}
+		ladderCache.set(key, out);
+	}
+	return out;
+};
+
+// Smallest mark that is league news for anyone
+export const milestoneBig = (
+	k: RBCareerStat,
+	scale: MilestoneScale = NO_SCALE,
+) => {
+	const f = scaleFor(k, scale);
+	return f === 1 || !(f > 0)
+		? MILESTONE_BIG[k]
+		: niceMark(MILESTONE_BIG[k] * f);
+};
+
+// Ladder marks crossed going from before to now
+export const crossed = (
+	k: RBCareerStat,
+	before: number,
+	now: number,
+	scale: MilestoneScale = NO_SCALE,
+) => milestoneLadder(k, scale).filter((t) => before < t && now >= t);
+
+export const nextMark = (
+	k: RBCareerStat,
+	v: number,
+	scale: MilestoneScale = NO_SCALE,
+) => milestoneLadder(k, scale).find((t) => t > v);
 
 export type RBPace = {
 	// Stat per game played
@@ -1024,6 +1081,7 @@ export const findChases = ({
 	teamGamesNow,
 	horizon,
 	rankCut = 100,
+	scale = NO_SCALE,
 }: {
 	players: RBPlayer[];
 	season: number;
@@ -1031,6 +1089,7 @@ export const findChases = ({
 	// Most team games ahead to look
 	horizon: number;
 	rankCut?: number;
+	scale?: MilestoneScale;
 }): RBChase[] => {
 	const out: RBChase[] = [];
 	for (const k of MILESTONE_STATS) {
@@ -1071,7 +1130,7 @@ export const findChases = ({
 					});
 				}
 			};
-			const mark = nextMark(k, v);
+			const mark = nextMark(k, v, scale);
 			if (mark !== undefined) {
 				add({ kind: "milestone", mark }, mark - v);
 			}
@@ -1104,7 +1163,11 @@ export const findChases = ({
 };
 
 // Milestones reached this season by active players, from their totals (the check's log adds the day when it has it)
-export const reachedThisSeason = (players: RBPlayer[], season: number) => {
+export const reachedThisSeason = (
+	players: RBPlayer[],
+	season: number,
+	scale: MilestoneScale = NO_SCALE,
+) => {
 	const out: {
 		pid: number;
 		name: string;
@@ -1135,7 +1198,7 @@ export const reachedThisSeason = (players: RBPlayer[], season: number) => {
 					before += v;
 				}
 			}
-			for (const t of crossed(k, before, now)) {
+			for (const t of crossed(k, before, now, scale)) {
 				out.push(
 					retired
 						? { pid: p.pid, name: p.name, tid: lastRow!.tid, k, t, retired }

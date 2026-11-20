@@ -17,6 +17,7 @@ import { downloadFile } from "../util/downloadFile.ts";
 import { wrappedSkillsBlock } from "../components/SkillsBlock.tsx";
 import { getCol } from "../../common/getCol.ts";
 import { bySport } from "../../common/sportFunctions.ts";
+import { wrappedPreDraftVsPick } from "../util/preDraftCell.tsx";
 
 const Summary = ({
 	players,
@@ -221,6 +222,7 @@ const ExportButton = ({ season }: { season: number }) => {
 const DraftHistory = ({
 	players,
 	season,
+	showPreDraftRanks,
 	stats,
 	summaryStat,
 	teamsByTid,
@@ -253,7 +255,7 @@ const DraftHistory = ({
 	const superCols = [
 		{
 			title: "",
-			colspan: 3,
+			colspan: showPreDraftRanks ? 4 : 3,
 		},
 		{
 			title: noDraft ? "As Prospect" : "At Draft",
@@ -293,6 +295,13 @@ const DraftHistory = ({
 		"Skills",
 		...stats.map((stat) => `stat:${stat}`),
 	]);
+	if (showPreDraftRanks) {
+		cols.splice(1, 0, {
+			title: "Pre-draft",
+			desc: "His pre-draft rank, and how many picks later (+, a steal) or earlier (-, a reach) he went",
+			sortType: "number",
+		});
+	}
 
 	const rows: DataTableRow<"player">[] = players.map((p) => {
 		const showRatings = !challengeNoRatings || p.currentTid === PLAYER.RETIRED;
@@ -310,6 +319,18 @@ const DraftHistory = ({
 			},
 			data: [
 				p.draft.round >= 1 ? `${p.draft.round}-${p.draft.pick}` : null,
+				...(showPreDraftRanks
+					? [
+							p.preDraftRank === undefined
+								? null
+								: p.overallPick !== undefined
+									? wrappedPreDraftVsPick(p.overallPick, p.preDraftRank)
+									: {
+											value: `#${p.preDraftRank}`,
+											sortValue: p.preDraftRank,
+										},
+						]
+					: []),
 				wrappedPlayerNameLabels({
 					awards: p.awards,
 					pid: p.pid,

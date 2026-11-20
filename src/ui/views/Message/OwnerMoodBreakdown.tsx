@@ -94,6 +94,12 @@ const OwnerMoodBreakdown = ({ ownerMoods }: { ownerMoods: OwnerMoods }) => {
 												{helpers.formatCurrency(info.profit, "M")} profit vs{" "}
 												{helpers.formatCurrency(info.expectedProfit, "M")}{" "}
 												expected
+												{info.projectExpenses > 0
+													? ` (not counting ${helpers.formatCurrency(info.projectExpenses, "M")} of owner-approved project payments)`
+													: null}
+												{info.profitTarget !== undefined
+													? `, ${helpers.formatCurrency(info.profitTarget, "M")} budget meeting target`
+													: null}
 											</div>
 										) : null}
 									</td>

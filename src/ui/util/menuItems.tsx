@@ -12,7 +12,11 @@ import type {
 	MenuItemText,
 } from "../../common/types.ts";
 import { frivolities } from "../views/Frivolities.tsx";
-import { isFrivolitiesTabPage } from "./pageTabs.ts";
+import {
+	isFrivolitiesTabPage,
+	PAGE_TAB_GROUPS,
+	tabsForSport,
+} from "./pageTabs.ts";
 import { takeScreenshot } from "./takeScreenshot.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 
@@ -114,7 +118,9 @@ const leagueAchievementsLinks: MenuItemLink[] =
 			]
 		: [];
 
-// Coaching staff (basketball only, page explains how to enable it if the setting is off)
+// Coaching staff (basketball only). Hidden while its League extras are off (the pages themselves say how to turn them
+// on, for old links and bookmarks). The Staff Report has no `feature`: it belongs to two features, so it uses the same
+// rule as the page (isUrlFeatureOn, via isMenuLinkFeatureOn)
 const staffLinks: MenuItemLink[] =
 	__SPORT === "basketball"
 		? [
@@ -132,7 +138,6 @@ const staffLinks: MenuItemLink[] =
 					active: (pageID) => pageID === "staffReport",
 					league: true,
 					commandPalette: true,
-					feature: "coachingDepth",
 					path: ["staff_report"],
 					text: "Staff Report",
 				},
@@ -149,6 +154,16 @@ const coachesLinks: MenuItemLink[] =
 					feature: "coachingStaff",
 					path: ["coaches"],
 					text: "Coaches",
+				},
+				{
+					type: "link",
+					active: (pageID) => pageID === "coachNotes",
+					league: true,
+					commandPalette: true,
+					commandPaletteOnly: true,
+					feature: "coachSystems",
+					path: ["coach_notes"],
+					text: "Coach's Notes",
 				},
 				{
 					type: "link",
@@ -1349,5 +1364,56 @@ const consolidate = <T extends MenuItemLink | MenuItemHeader | MenuItemText>(
 	return item;
 };
 
-export const menuItems: (MenuItemLink | MenuItemHeader)[] =
-	menuItemsRaw.map(consolidate);
+const startsWithUrl = (path: readonly unknown[], url: readonly unknown[]) =>
+	url.every((part, i) => path[i] === part);
+
+// Tabs of a page (util/pageTabs.ts) with no command palette item of their own get one, in the group of the page they
+// are a tab of, so every tab-only page can be found by name ("Transactions > Trade Grader")
+const addTabPages = (items: (MenuItemLink | MenuItemHeader)[]) => {
+	const headers = items.filter(
+		(item): item is MenuItemHeader => item.type === "header",
+	);
+	const findLink = (url: readonly unknown[]) => {
+		for (const header of headers) {
+			for (const link of header.children) {
+				if (
+					link.type === "link" &&
+					link.commandPalette &&
+					Array.isArray(link.path) &&
+					startsWithUrl(link.path, url)
+				) {
+					return { header, link };
+				}
+			}
+		}
+	};
+	const fallback = headers.find((header) => header.long === "Tools")!;
+
+	for (const group of PAGE_TAB_GROUPS) {
+		const host = findLink(group[0]!.url);
+		const hostText =
+			host && typeof host.link.text === "string"
+				? host.link.text
+				: group[0]!.name;
+		for (const tab of tabsForSport(group)) {
+			if (findLink(tab.url)) {
+				continue;
+			}
+			(host?.header ?? fallback).children.push({
+				type: "link",
+				active: (pageID) => pageID === tab.id,
+				league: true,
+				commandPalette: true,
+				commandPaletteOnly: true,
+				path: [...tab.url] as MenuItemLink["path"],
+				text: `${hostText} > ${tab.name}`,
+			});
+		}
+	}
+
+	return items;
+};
+
+export const menuItems: (MenuItemLink | MenuItemHeader)[] = addTabPages(
+	menuItemsRaw.map(consolidate),
+);

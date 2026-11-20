@@ -123,6 +123,7 @@ const compute = async (numSims: number) => {
 		playoffSeries,
 		numGamesPlayoffSeries: g.get("numGamesPlayoffSeries", "current"),
 		hca: 2.5 * g.get("homeCourtAdvantage"),
+		reseed: !!g.get("playoffsReseed"),
 		numSims,
 	});
 };
@@ -154,7 +155,10 @@ const getKey = async () => {
 			1000000007;
 	}
 
-	return `${season}|${g.get("phase")}|${schedule.length}|${playoffKey}|${rosterHash}`;
+	// The playoff format (series lengths, reseeding) changes the odds too
+	const formatKey = `${g.get("numGamesPlayoffSeries", "current").join(",")}|${!!g.get("playoffsReseed")}`;
+
+	return `${season}|${g.get("phase")}|${schedule.length}|${playoffKey}|${rosterHash}|${formatKey}`;
 };
 
 // Cached until a game day, a roster move or an injury changes things

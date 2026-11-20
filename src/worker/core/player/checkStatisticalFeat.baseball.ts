@@ -1,11 +1,12 @@
 import { g, helpers } from "../../../worker/util/index.ts";
 import type { GamePlayer } from "../../../common/types.ts";
-import { PHASE } from "../../../common/constants.ts";
 import { NUM_OUTS_PER_INNING } from "../../../common/constants.baseball.ts";
 
-const checkStatisticalFeat = (p: GamePlayer, teamStat: { e: number[] }) => {
-	const minFactor = helpers.quarterLengthFactor();
-
+const checkStatisticalFeat = (
+	p: GamePlayer,
+	teamStat: { e: number[] },
+	{ factor: minFactor, playoffs }: { factor: number; playoffs: boolean },
+) => {
 	const TWENTY = minFactor * 20;
 	const FIFTEEN = minFactor * 15;
 	const EIGHT = minFactor * 8;
@@ -78,7 +79,7 @@ const checkStatisticalFeat = (p: GamePlayer, teamStat: { e: number[] }) => {
 	}
 
 	if (Object.keys(statArr).length > 0) {
-		if (g.get("phase") === PHASE.PLAYOFFS) {
+		if (playoffs) {
 			score += 10;
 		}
 

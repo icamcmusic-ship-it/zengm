@@ -2,12 +2,16 @@ import clsx from "clsx";
 import { helpers } from "../util/helpers.ts";
 import { isUrlFeatureOn, useFeatureSwitches } from "../util/nativeFeatures.ts";
 import { getTabGroup, tabsForSport } from "../util/pageTabs.ts";
+import { urlHiddenInCollege, useIsCollege } from "../util/collegeMode.ts";
 
 // Tabs across the top of a page that has pages of this fork folded into it (see util/pageTabs.ts). Tabs of disabled
-// League extras features are hidden, and with only one tab left there is no tab bar at all.
+// League extras features and, in a college league, tabs of pro-only pages are hidden, and with only one tab left there
+// is no tab bar at all.
 export const PageTabs = ({ pageID }: { pageID: string | undefined }) => {
 	// Re-render when a League extras switch changes
 	useFeatureSwitches();
+	// Re-render when the league type is known
+	useIsCollege();
 
 	const group = getTabGroup(pageID);
 	if (!group) {
@@ -15,7 +19,9 @@ export const PageTabs = ({ pageID }: { pageID: string | undefined }) => {
 	}
 
 	const tabs = tabsForSport(group).filter(
-		(tab) => tab.id === pageID || isUrlFeatureOn(tab.url),
+		(tab) =>
+			tab.id === pageID ||
+			(isUrlFeatureOn(tab.url) && !urlHiddenInCollege(tab.url)),
 	);
 	if (tabs.length < 2) {
 		return null;

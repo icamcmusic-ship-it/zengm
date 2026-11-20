@@ -3,6 +3,7 @@ import { PLAYER } from "../../common/constants.ts";
 import g from "./g.ts";
 import helpers from "./helpers.ts";
 import type { ByConf } from "../../common/types.ts";
+import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 
 beforeAll(() => {
 	g.setWithoutSavingToDB("userTid", 4);
@@ -118,5 +119,27 @@ describe("roundsWonText", () => {
 		assert.strictEqual(roundsWonText(2, 4, 16), "made semifinals");
 		assert.strictEqual(roundsWonText(3, 4, 16), "made finals");
 		assert.strictEqual(roundsWonText(4, 4, 16), "league champs");
+	});
+});
+
+describe("featScaleFactor", () => {
+	test("counts overtime minutes and players on the court", () => {
+		for (const key of [
+			"numPeriods",
+			"quarterLength",
+			"elam",
+			"overtimeLength",
+			"overtimeLengthPlayoffs",
+			"numPlayersOnCourt",
+		] as const) {
+			g.setWithoutSavingToDB(key, defaultGameAttributes[key] as any);
+		}
+		g.setWithoutSavingToDB("phase", 1);
+		assert.strictEqual(helpers.featScaleFactor(0), 1);
+		// One 5 minute overtime: 53 of 48 minutes
+		assert.closeTo(helpers.featScaleFactor(1), Math.sqrt(53 / 48), 1e-9);
+		g.setWithoutSavingToDB("numPlayersOnCourt", 3);
+		assert.closeTo(helpers.featScaleFactor(0), 5 / 3, 1e-9);
+		g.setWithoutSavingToDB("numPlayersOnCourt", 5);
 	});
 });

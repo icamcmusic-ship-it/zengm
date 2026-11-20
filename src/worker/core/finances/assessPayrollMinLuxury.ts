@@ -7,6 +7,7 @@ import getLuxuryTaxAmount from "./getLuxuryTaxAmount.ts";
 import getMinPayrollAmount from "./getMinPayrollAmount.ts";
 import { isRepeaterTaxTeam } from "../contract/capExceptions.ts";
 import { shareRevenue } from "../commercial/index.ts";
+import { ownerOfficeEnabled } from "../ownerOffice/index.ts";
 
 const rosterLink = (tid: number) =>
 	`<a href="${helpers.leagueUrl([
@@ -147,7 +148,15 @@ const assessPayrollMinLuxury = async () => {
 			if (userTids.has(teamSeason.tid)) {
 				continue;
 			}
-			const amount = ownerDistribution(teamSeason.cash, g.get("salaryCap"));
+			// Owner's Office: the owner leaves what an active project still costs, so AI teams can afford projects at all
+			const project = ownerOfficeEnabled()
+				? (await idb.cache.teams.get(teamSeason.tid))?.ownerOffice?.active
+				: undefined;
+			const amount = ownerDistribution(
+				teamSeason.cash,
+				g.get("salaryCap"),
+				project ? project.cost - project.paid : 0,
+			);
 			if (amount > 0) {
 				teamSeason.cash -= amount;
 				teamSeason.ownerDistributions =
