@@ -12,6 +12,10 @@ import type {
 } from "../../../common/types.ts";
 import { DEFAULT_POINTS_FORMULA } from "../../../common/constants.ts";
 import { orderBy } from "../../../common/utils.ts";
+import {
+	seasonExpenses,
+	seasonRevenue,
+} from "../../../common/teamSeasonFinances.ts";
 
 const processAttrs = <
 	Attrs extends Readonly<TeamAttr[]>,
@@ -83,12 +87,9 @@ const processSeasonAttrs = async <
 	for (const ts of seasons) {
 		const row: any = {};
 
-		const revenue = helpers
-			.keys(ts.revenues)
-			.reduce((memo, rev) => memo + ts.revenues[rev], 0);
-		const expense = helpers
-			.keys(ts.expenses)
-			.reduce((memo, rev) => memo + ts.expenses[rev], 0);
+		const revenue = seasonRevenue(ts);
+		// Includes the Front Office Budget's Analytics and Travel departments
+		const expense = seasonExpenses(ts);
 
 		for (const temp of seasonAttrs) {
 			const attr: string = temp;

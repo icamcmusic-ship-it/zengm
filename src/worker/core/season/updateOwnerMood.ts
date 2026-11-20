@@ -4,10 +4,7 @@ import type { OwnerMood } from "../../../common/types.ts";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { assertDefined } from "../../../common/utils.ts";
 import { team } from "../index.ts";
-import {
-	newDeptsAverageAmount,
-	overspendMoodPenalty,
-} from "../../../common/frontOffice.ts";
+import { overspendMoodPenalty } from "../../../common/frontOffice.ts";
 import {
 	frontOfficeEnabled,
 	getSeasonEnvelope,
@@ -68,12 +65,12 @@ const updateOwnerMood = async (): Promise<
 			hockey: 80000,
 		});
 
-	let expectedProfit = 15 * salaryCapFactor;
+	const expectedProfit = 15 * salaryCapFactor;
 
-	// Front Office Budget: the owner expects the two new departments' average cost, and docks money mood for spending over his envelope
+	// Front Office Budget: the owner docks money mood for spending over his envelope. The two new departments' spending counts in profit
+	// like the other budget items, with no discount on the expected profit
 	let overspendPenalty = 0;
 	if (frontOfficeEnabled()) {
-		expectedProfit -= newDeptsAverageAmount(g.get("salaryCap")) / 1000;
 		overspendPenalty = overspendMoodPenalty(
 			getSeasonSpend(teamSeason),
 			await getSeasonEnvelope(teamSeason),

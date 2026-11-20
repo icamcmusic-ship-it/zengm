@@ -30,6 +30,7 @@ import {
 	MAX_LEVEL,
 	coachingEffect,
 	facilitiesEffectAttendance,
+	boundTicketPrice,
 	facilitiesEffectMood,
 	healthEffect,
 	levelToAmount,
@@ -261,12 +262,9 @@ const FinancesForm = ({
 			),
 
 			// Already in [dollars]
-			ticketPrice: helpers.bound(
-				helpers.localeParseFloat(
-					helpers.localeParseFloat(state.ticketPrice).toFixed(2),
-				),
-				0,
-				Infinity,
+			ticketPrice: boundTicketPrice(
+				helpers.localeParseFloat(state.ticketPrice),
+				salaryCap,
 			),
 		};
 
@@ -1089,6 +1087,8 @@ const TeamFinances = ({
 									"expensesCoaching",
 									"expensesHealth",
 									"expensesFacilities",
+									"expensesAnalytics",
+									"expensesTravel",
 									"expensesMinTax",
 									"expensesLuxuryTax",
 								]}
@@ -1099,6 +1099,8 @@ const TeamFinances = ({
 										expensesCoaching: "coaching",
 										expensesHealth: "health",
 										expensesFacilities: "facilities",
+										expensesAnalytics: "analytics",
+										expensesTravel: "travel & sports science",
 										expensesMinTax: "minimum payroll tax",
 										expensesLuxuryTax: "luxury tax",
 									};
@@ -1123,7 +1125,15 @@ const TeamFinances = ({
 										row.cash,
 										"M",
 										1,
-									)}${champSuffix(row)}`
+									)} (profit ${helpers.formatCurrency(row.profit, "M", 1)}${
+										row.ownerDistributions > 0
+											? `, owner distribution ${helpers.formatCurrency(
+													row.ownerDistributions / 1000,
+													"M",
+													1,
+												)}`
+											: ""
+									})${champSuffix(row)}`
 								}
 								classNameOverride={classNameOverride}
 							/>

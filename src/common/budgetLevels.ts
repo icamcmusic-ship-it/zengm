@@ -8,6 +8,21 @@ export const DEFAULT_LEVEL = 34;
 // Overshoot to handle the sigmoid positive part never quite reaching 1, and probably no team drops all the way down to level 1
 export const BUDGET_LEVEL_SCALE = 1.1;
 
+// Valid range of a user-set budget level
+export const boundBudgetLevel = (level: number) =>
+	Math.max(1, Math.min(MAX_LEVEL, Math.round(level)));
+
+// Valid range of a user-set ticket price (dollars). A price of 0 (or less) would fill the arena for free, since attendance falls with
+// the square of the price. The top is far above any sensible price (about 20x the default), just to keep it finite
+export const MIN_TICKET_PRICE = 1;
+export const maxTicketPrice = (salaryCap: number) =>
+	Math.max(MIN_TICKET_PRICE, Math.round((1000 * salaryCap) / 90000));
+export const boundTicketPrice = (price: number, salaryCap: number) =>
+	Math.max(
+		MIN_TICKET_PRICE,
+		Math.min(maxTicketPrice(salaryCap), Math.round(price * 100) / 100),
+	);
+
 // https://www.wolframalpha.com/input?i2d=true&i=1.1*Piecewise%5B%7B%7Btanh%5C%2840%29%5C%2840%293Divide%5Bx%2C100%5D-1%5C%2841%29%5C%2841%29%2Cx%3EDivide%5B100%2C3%5D%7D%2C%7B%5C%2840%293Divide%5Bx%2C100%5D-1%5C%2841%29%2Cx%3C%3DDivide%5B100%2C3%5D%7D%7D%5Dfrom+1+to+100
 // Level should be the 3 year average, from getLevelLastThree
 export const levelToEffect = (level: number) => {

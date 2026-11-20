@@ -22,6 +22,7 @@ import {
 } from "../../common/constants.ts";
 import { isGoldActive } from "../../common/isGoldActive.ts";
 import actions from "./actions.ts";
+import { getStretchHardCapSeason } from "../core/player/release.ts";
 import hype from "./hype.ts";
 import recordsBook from "./recordsBook.ts";
 import archetypes from "./archetypes.ts";
@@ -161,7 +162,11 @@ import {
 	getStats as teamGetStats,
 	statTypes as teamStatTypes,
 } from "../views/teamGraphs.ts";
-import { DEFAULT_LEVEL, MAX_LEVEL } from "../../common/budgetLevels.ts";
+import {
+	DEFAULT_LEVEL,
+	boundBudgetLevel,
+	boundTicketPrice,
+} from "../../common/budgetLevels.ts";
 import {
 	frontOfficeEnabled,
 	getNewDeptLevel,
@@ -3898,6 +3903,21 @@ const releasePlayer = async ({
 		return `${notOnTeam.length} players are no longer on your team.`;
 	}
 
+	// Stretch provision with a hard cap: refuse a stretch that would put the team over it
+	if (stretch && stretchProvisionEnabled()) {
+		for (const p of players) {
+			const justDrafted = helpers.justDrafted(
+				{ draft: p.draft, contract: getContractSummaryOrThrow(p) },
+				g.get("phase"),
+				g.get("season"),
+			);
+			const season = justDrafted ? undefined : await getStretchHardCapSeason(p);
+			if (season !== undefined) {
+				return `Stretching ${p.firstName} ${p.lastName}'s contract would put your payroll over the hard cap in ${season}.`;
+			}
+		}
+	}
+
 	for (const p of players) {
 		const justDrafted = helpers.justDrafted(
 			{ draft: p.draft, contract: getContractSummaryOrThrow(p) },
@@ -4709,10 +4729,15 @@ const updateBudget = async ({
 			continue;
 		}
 
-		// Check for NaN before updating
-		if (!Number.isNaN(budgetLevels[key])) {
-			t.budget[key] = budgetLevels[key];
+		// Check for NaN (and other non-numbers) before updating, and keep the value in its valid range
+		const value = budgetLevels[key];
+		if (typeof value !== "number" || !Number.isFinite(value)) {
+			continue;
 		}
+		t.budget[key] =
+			key === "ticketPrice"
+				? boundTicketPrice(value, g.get("salaryCap"))
+				: boundBudgetLevel(value);
 	}
 
 	if (frontOffice && frontOfficeEnabled()) {
@@ -4722,8 +4747,8 @@ const updateBudget = async ({
 		};
 		for (const key of helpers.keys(current)) {
 			const level = frontOffice[key];
-			if (!Number.isNaN(level)) {
-				current[key] = helpers.bound(Math.round(level), 1, MAX_LEVEL);
+			if (typeof level === "number" && Number.isFinite(level)) {
+				current[key] = boundBudgetLevel(level);
 			}
 		}
 		t.frontOffice = current;

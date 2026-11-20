@@ -18,6 +18,7 @@ import {
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateOption, validateTeam } from "../util/processInputs.ts";
 import { dropdownKeys } from "../../common/dropdownKeys.ts";
+import { seasonProfit } from "../../common/teamSeasonFinances.ts";
 import {
 	frontOfficeEnabled,
 	getFinancesInfo,
@@ -179,6 +180,12 @@ export default defineView({
 					hype: teamSeason.hype,
 					pop: teamSeason.pop,
 					...formatRevenueExpenses(teamSeason),
+					// Front Office Budget departments, paid from cash like the other budget items
+					expensesAnalytics: teamSeason.frontOffice?.expenses.analytics ?? 0,
+					expensesTravel: teamSeason.frontOffice?.expenses.travel ?? 0,
+					// Realistic AI Economy: cash the owner took out (not an expense), so cash change = revenue - expenses - this
+					ownerDistributions: teamSeason.ownerDistributions ?? 0,
+					profit: seasonProfit(teamSeason) / 1000, // convert to millions
 				};
 
 				return row;

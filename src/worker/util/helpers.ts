@@ -164,8 +164,11 @@ const defaultTicketPrice = (
 		(
 			1 +
 			(salaryCap / 90000) * 36 +
-			(25 * (salaryCap / 90000) * (g.get("numActiveTeams") - popRank)) /
-				(g.get("numActiveTeams") - 1)
+			// (A one-team league is the middle market, not 0 / 0)
+			(g.get("numActiveTeams") > 1
+				? (25 * (salaryCap / 90000) * (g.get("numActiveTeams") - popRank)) /
+					(g.get("numActiveTeams") - 1)
+				: 12.5 * (salaryCap / 90000))
 		).toFixed(2),
 	);
 };

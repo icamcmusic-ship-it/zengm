@@ -21,6 +21,9 @@ import {
 	team,
 } from "../index.ts";
 import { idb } from "../../db/index.ts";
+import { featureOn } from "../../util/nativeFeatures.ts";
+import { cashSpendingNudge } from "../finances/ownerDistribution.ts";
+import { MAX_LEVEL } from "../../../common/budgetLevels.ts";
 import * as staff from "../staff/index.ts";
 import { ensureGms } from "../gm/index.ts";
 import * as college from "../college/index.ts";
@@ -332,10 +335,28 @@ const newPhasePreseason = async (
 		) {
 			await team.resetTicketPrice(t, popRank);
 
+			// Realistic AI Economy: cash reserves nudge the owner's spending (a few levels, bounded; no random draws)
+			let cashNudge = 0;
+			if (featureOn("realisticEconomy")) {
+				const teamSeason = await idb.cache.teamSeasons.indexGet(
+					"teamSeasonsByTidSeason",
+					[t.tid, g.get("season")],
+				);
+				if (teamSeason) {
+					cashNudge = cashSpendingNudge(teamSeason.cash, g.get("salaryCap"));
+				}
+			}
+			const budgetLevel = () =>
+				helpers.bound(
+					finances.defaultBudgetLevel(popRank) + cashNudge,
+					1,
+					MAX_LEVEL,
+				);
+
 			if (frontOfficeEnabled()) {
 				// Front Office Budget: split the owner's spending (market size, with the usual randomness) over the departments by the
 				// GM's leanings
-				allocateAi(t, finances.defaultBudgetLevel(popRank));
+				allocateAi(t, budgetLevel());
 			} else {
 				// Sometimes update budget items for AI teams
 				for (const key of [
@@ -345,7 +366,7 @@ const newPhasePreseason = async (
 					"facilities",
 				] as const) {
 					if (Math.random() < 0.5) {
-						t.budget[key] = finances.defaultBudgetLevel(popRank);
+						t.budget[key] = budgetLevel();
 					}
 				}
 			}

@@ -17,10 +17,13 @@ const effectToLevel = (effect: number) => {
 
 const defaultBudgetLevel = (popRank: number) => {
 	// Scale popRank to between 1.1 and -1.1
+	// (A one-team league has no spread of market sizes: its team is the middle, not 0 / 0)
+	const numActiveTeams = g.get("numActiveTeams");
 	const scaledRank =
-		BUDGET_LEVEL_SCALE *
-		((2 * (g.get("numActiveTeams") - popRank)) / (g.get("numActiveTeams") - 1) -
-			1);
+		numActiveTeams > 1
+			? BUDGET_LEVEL_SCALE *
+				((2 * (numActiveTeams - popRank)) / (numActiveTeams - 1) - 1)
+			: 0;
 
 	// Add some randomness, 0.95 mean is so it doesn't overshoot the limits and get bounded too much
 	const scaledRank2 = scaledRank * gauss(0.95, 0.2);
