@@ -95,6 +95,11 @@ export const applyScouting = (
 	const ratings = last(p.ratings);
 	const fuzzBefore = Math.abs(ratings.fuzz);
 	ratings.fuzz *= action.factor;
+	// Skills are read through fuzz: keep them in step with the new fuzz
+	ratings.skills = player.skills(ratings as any);
+	if ((p as any).draft && (p as any).tid === PLAYER.UNDRAFTED) {
+		(p as any).draft.skills = ratings.skills;
+	}
 	if (!p.scouting) {
 		p.scouting = [];
 	}
