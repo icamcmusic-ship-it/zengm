@@ -389,8 +389,10 @@ export const processTeam = async (
 			ovrs: rating.ovrs,
 		};
 
-		// Raw ratings, only used to word the basketball play-by-play (which kind of finish or pass is plausible for him). The sim itself never reads them.
 		if (__SPORT === "basketball") {
+			// His true ovr, not the fuzzed one (Game Sim Fixes: the team strength gap, SIM_FIX_STRENGTH_GAP). Removed from the sim's result
+			(p2 as any).ovr = rating.ovr;
+			// Raw ratings, only used to word the basketball play-by-play (which kind of finish or pass is plausible for him). The sim itself never reads them.
 			const r = rating as Record<string, any>;
 			(p2 as any).pbpRatings = {
 				hgt: r["hgt"],

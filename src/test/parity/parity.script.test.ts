@@ -3,13 +3,14 @@
 // Parity measurement: seeded multi-season headless sim with new-league defaults, recording the spread of win% and how fast
 // a team's average margin rises per team ovr point. Run with
 // RUN_PARITY=1 npx vitest run --project basketball src/test/parity/parity.script.test.ts
-// Env: PARITY_SEEDS (comma list, default 1,2), PARITY_SEASONS (default 3), PARITY_OUT (file to append the rows to)
+// Env: PARITY_SEEDS (comma list, default 1,2), PARITY_SEASONS (default 3), PARITY_OUT (file to append the rows to), PARITY_K
 import { appendFileSync } from "node:fs";
 import { test } from "vitest";
 import { idb } from "../../worker/db/index.ts";
 import { g } from "../../worker/util/index.ts";
 import { team } from "../../worker/core/index.ts";
 import { ALL_ON, runLeague } from "../ratingInflation/harness.ts";
+import { SIM_FIX_STRENGTH_GAP } from "../../worker/core/GameSim.basketball/simSettings.ts";
 
 const log = (...args: string[]) => {
 	const line = args.join(" ");
@@ -41,6 +42,10 @@ test.skipIf(!process.env.RUN_PARITY)(
 	async () => {
 		const seeds = (process.env.PARITY_SEEDS ?? "1,2").split(",").map(Number);
 		const seasons = Number(process.env.PARITY_SEASONS ?? 3);
+		// PARITY_K: the Game Sim Fixes team strength gap constant, to sweep it
+		if (process.env.PARITY_K !== undefined) {
+			SIM_FIX_STRENGTH_GAP.k = Number(process.env.PARITY_K);
+		}
 		const rows = [];
 		for (const seed of seeds) {
 			await runLeague({
@@ -48,7 +53,7 @@ test.skipIf(!process.env.RUN_PARITY)(
 				settings: ALL_ON,
 				seed,
 				seasons,
-				onSeason: async () => {
+				onSeason: async (summary) => {
 					const season = g.get("season");
 					const teams = (await idb.cache.teams.getAll()).filter(
 						(t) => !t.disabled,
@@ -101,7 +106,9 @@ test.skipIf(!process.env.RUN_PARITY)(
 										.filter((t) => t.tid === tid)
 										.at(-1);
 									let src = tr ? tr.type : "initial";
-									if (src === "draft" && tr.pickNum <= 5) src = "draftTop5";
+									if (src === "draft" && tr.pickNum <= 5) {
+										src = "draftTop5";
+									}
 									agg[src] ??= { n: 0, ovr: 0 };
 									agg[src].n += 1;
 									agg[src].ovr += p.ratings.at(-1).ovr;
@@ -114,6 +121,22 @@ test.skipIf(!process.env.RUN_PARITY)(
 						}
 						log("DIAG", season, JSON.stringify(out));
 					}
+					// Star scoring: per-player regular season PPG (min 40 games)
+					const ppgs = [];
+					for (const p of await idb.cache.players.getAll()) {
+						let pts = 0;
+						let gp = 0;
+						for (const ps of p.stats ?? []) {
+							if (ps.season === season && !ps.playoffs) {
+								pts += ps.pts;
+								gp += ps.gp;
+							}
+						}
+						if (gp >= 40) {
+							ppgs.push(pts / gp);
+						}
+					}
+					ppgs.sort((a, b) => b - a);
 					const row = {
 						seed,
 						season,
@@ -124,6 +147,17 @@ test.skipIf(!process.env.RUN_PARITY)(
 						winpPerMov: Math.round(slope(mov, winp) * 10000) / 10000,
 						maxWins: Math.max(...wins),
 						wins60: wins.filter((w) => w >= 60).length,
+						wins20: wins.filter((w) => w <= 20).length,
+						ppgMax: Math.round(ppgs[0] * 10) / 10,
+						n25: ppgs.filter((x) => x >= 25).length,
+						n20: ppgs.filter((x) => x >= 20).length,
+						pts: summary.ptsPerGame,
+						fgPct: summary.fgPct,
+						tpPct: summary.tpPct,
+						poss: summary.possPerGame,
+						tov: summary.tovPerGame,
+						fta: summary.ftaPerGame,
+						orb: summary.orbPerGame,
 					};
 					rows.push(row);
 					log("PARITY", JSON.stringify(row));
@@ -140,6 +174,17 @@ test.skipIf(!process.env.RUN_PARITY)(
 				winpPerMov: mean(rows.map((r) => r.winpPerMov)).toFixed(4),
 				maxWins: mean(rows.map((r) => r.maxWins)).toFixed(1),
 				wins60: mean(rows.map((r) => r.wins60)).toFixed(2),
+				wins20: mean(rows.map((r) => r.wins20)).toFixed(2),
+				ppgMax: mean(rows.map((r) => r.ppgMax)).toFixed(1),
+				n25: mean(rows.map((r) => r.n25)).toFixed(2),
+				n20: mean(rows.map((r) => r.n20)).toFixed(2),
+				pts: mean(rows.map((r) => r.pts)).toFixed(2),
+				fgPct: mean(rows.map((r) => r.fgPct)).toFixed(2),
+				tpPct: mean(rows.map((r) => r.tpPct)).toFixed(2),
+				poss: mean(rows.map((r) => r.poss)).toFixed(2),
+				tov: mean(rows.map((r) => r.tov)).toFixed(2),
+				fta: mean(rows.map((r) => r.fta)).toFixed(2),
+				orb: mean(rows.map((r) => r.orb)).toFixed(2),
 			}),
 		);
 	},

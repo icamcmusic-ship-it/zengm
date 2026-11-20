@@ -32,7 +32,7 @@ import { menuItems } from "../../util/menuItems.tsx";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
 import { local, useLocal } from "../../util/local.ts";
 import { menuItemHiddenForLeagueType } from "../../util/collegeMode.ts";
-import { isFeatureOn } from "../../util/nativeFeatures.ts";
+import { isMenuLinkFeatureOn } from "../../util/nativeFeatures.ts";
 import { relativeTime } from "../../util/relativeTime.ts";
 import { router } from "../../router/index.ts";
 
@@ -127,11 +127,8 @@ const getResultsGroupedDefault = ({
 			return false;
 		}
 
-		if (menuItem.feature && !isFeatureOn(menuItem.feature)) {
-			return false;
-		}
-
-		if (menuItem.featureOff && isFeatureOn(menuItem.featureOff)) {
+		// Same rule as the page it links to (like the Staff Report, which belongs to two features)
+		if (!isMenuLinkFeatureOn(menuItem)) {
 			return false;
 		}
 
