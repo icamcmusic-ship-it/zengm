@@ -245,6 +245,7 @@ export const runCollegeCarousel = async () => {
 	if (offers.length > 0) {
 		await logEvent({
 			type: "info",
+			category: "staff",
 			text: `You have ${offers.length === 1 ? "a job offer" : `${offers.length} job offers`} from ${offers.map((o) => teamLink(o.tid).replace(/^the /, "")).join(", ")}. <a href="${helpers.leagueUrl(["college_carousel"])}">Accept or decline</a> before the Departures phase.`,
 			showNotification: true,
 			tids: offers.map((o) => o.tid),

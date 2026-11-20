@@ -572,6 +572,7 @@ export const importLinkedCollegeClass = async ({
 	});
 	await logEvent({
 		type: "info",
+		category: "draft",
 		text: `The ${draftYear} draft class is the class of ${collegeSeason} from your linked college league: ${file.players.length} prospects. <a href="${helpers.leagueUrl(["draft_scouting"])}">Draft Scouting</a>`,
 		showNotification: !local.autoPlayUntil,
 		saveToDb: false,

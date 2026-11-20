@@ -325,6 +325,7 @@ const logAssistantDeparture = async (
 	const user = g.get("userTids").includes(tid);
 	await logEvent({
 		type: "info",
+		category: "staff",
 		text: `${COACH_ROLE_NAMES[role]} ${coachLink(c)} ${how} ${teamLink(tid)}.`,
 		showNotification: user && !g.get("spectator"),
 		tids: [tid],
@@ -1037,6 +1038,7 @@ export const onPreseason = async () => {
 		if (g.get("userTids").includes(tid)) {
 			await logEvent({
 				type: "info",
+				category: "staff",
 				text: `Your vacant ${COACH_ROLE_NAMES[c.role]} job was filled by ${coachLink(c)}.`,
 				saveToDb: false,
 				showNotification: true,

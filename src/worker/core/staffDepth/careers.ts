@@ -173,6 +173,7 @@ export const onCoachHired = async (c: Coach, tid: number, role: CoachRole) => {
 		if (userControls(prevTid)) {
 			await logEvent({
 				type: "info",
+				category: "staff",
 				text: `Your ${job} ${coachLink(c)} was hired away by ${teamLink(tid)} as their head coach.`,
 				showNotification: true,
 				tids: [prevTid],

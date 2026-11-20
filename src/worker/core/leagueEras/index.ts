@@ -279,6 +279,7 @@ const runVote = async (
 	await logEvent(
 		{
 			type: "info",
+			category: "leagueNews",
 			text: `<b>Rule-change vote:</b> after ${proposal.reason}, the league office proposed: ${proposal.title}. ${passed ? "Passed" : "Failed"}, ${yes}-${vote.no} (${needed} needed)${userVote === undefined ? "" : `; your team voted ${userVote ? "yes" : "no"}`}.${passed && proposal.type === "lottery" ? " The new odds apply from next season." : ""} <a href="${helpers.leagueUrl(["league_eras"])}">League Eras</a>`,
 			showNotification: true,
 			tids: rows.map((row) => row.tid),
@@ -415,6 +416,7 @@ export const advanceEra = async (conditions: Conditions) => {
 	if (text) {
 		await logEvent({
 			type: "info",
+			category: "leagueNews",
 			text: `${text} <a href="${helpers.leagueUrl(["league_eras"])}">League Eras</a>`,
 			showNotification: false,
 			tids: [],

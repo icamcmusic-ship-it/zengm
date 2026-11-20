@@ -774,6 +774,8 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	neutralSite: "never",
 	tradeProposalsSeed: 0,
 	rpdPot: true,
+	// Pop-up notification filter (common/notificationCategories.ts). Empty = all pop-ups show
+	notificationFilter: {},
 	saveOldBoxScores: {
 		pastSeasons: 2,
 		pastSeasonsType: "all",

@@ -203,6 +203,7 @@ type Key =
 	| "neutralSite"
 	| "rpdPot"
 	| "saveOldBoxScores"
+	| "notificationFilter"
 	| "currencyFormat"
 	| "overtimeLength"
 	| "overtimeLengthPlayoffs"
@@ -430,6 +431,7 @@ export const getInitialSettings = (): Settings => {
 		neutralSite: g.get("neutralSite"),
 		rpdPot: g.get("rpdPot"),
 		saveOldBoxScores: g.get("saveOldBoxScores"),
+		notificationFilter: g.get("notificationFilter") ?? {},
 		currencyFormat: g.get("currencyFormat"),
 		overtimeLength: g.get("overtimeLength"),
 		overtimeLengthPlayoffs: g.get("overtimeLengthPlayoffs"),

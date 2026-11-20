@@ -1,6 +1,12 @@
 import { idb } from "../db/index.ts";
 import g from "./g.ts";
 import toUI from "./toUI.ts";
+import {
+	getNotificationCategory,
+	isMappedLogEventType,
+	shouldShowNotification,
+	type NotificationCategoryOrSystem,
+} from "../../common/notificationCategories.ts";
 import type {
 	Conditions,
 	DistributiveOmit,
@@ -9,6 +15,8 @@ import type {
 
 // Really, pids, tids, and type should not be optional if saveToDb is true
 type LogEventOptions<SaveToDb> = {
+	// Pop-up filter category, for events whose type ("info") is too generic. Defaults to the type's category
+	category?: NotificationCategoryOrSystem;
 	extraClass?: string;
 	hideInLiveGame?: boolean;
 	onClose?: () => void;
@@ -20,6 +28,7 @@ type LogEventOptions<SaveToDb> = {
 // conditions only needed when showNotification is true, otherwise this is never called
 const logEvent = async <SaveToDb extends boolean = true>(
 	{
+		category,
 		extraClass,
 		hideInLiveGame,
 		onClose,
@@ -39,7 +48,28 @@ const logEvent = async <SaveToDb extends boolean = true>(
 		result = await idb.cache.events.add({ ...event, season: g.get("season") });
 	}
 
-	if (showNotification && event.text) {
+	if (
+		__NODE_ENV !== "production" &&
+		event.type &&
+		!isMappedLogEventType(event.type)
+	) {
+		console.warn(
+			`logEvent type "${event.type}" has no notification category (add it to common/notificationCategories.ts); using "Other"`,
+		);
+	}
+
+	// Notification filter (Settings > UI): suppresses only the pop-up, the event is still saved above
+	if (
+		showNotification &&
+		event.text &&
+		shouldShowNotification({
+			category: category ?? getNotificationCategory(event.type),
+			filter: g.get("notificationFilter"),
+			persistent,
+			tids: event.tids,
+			userTids: g.get("userTids"),
+		})
+	) {
 		void toUI(
 			"showNotification",
 			[

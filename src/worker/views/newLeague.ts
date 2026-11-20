@@ -470,6 +470,7 @@ export const getDefaultSettings = () => {
 		),
 		neutralSite: unwrapGameAttribute(defaultGameAttributes, "neutralSite"),
 		rpdPot: unwrapGameAttribute(defaultGameAttributes, "rpdPot"),
+		notificationFilter: {},
 		saveOldBoxScores: unwrapGameAttribute(
 			defaultGameAttributes,
 			"saveOldBoxScores",

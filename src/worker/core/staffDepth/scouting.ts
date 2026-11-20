@@ -910,6 +910,7 @@ export const runScoutCareers = async () => {
 	for (const n of news) {
 		await logEvent({
 			type: "info",
+			category: "draft",
 			text: n.text,
 			showNotification: n.user,
 			tids: n.tids,
