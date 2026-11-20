@@ -256,6 +256,7 @@ export default defineView({
 				"rosterOrder",
 				"injury",
 				"ptModifier",
+				"shotPlan",
 				"watch",
 				"untradable",
 				"hof",
