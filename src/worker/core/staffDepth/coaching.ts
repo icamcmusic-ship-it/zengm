@@ -133,10 +133,16 @@ export const stateOf = (t: { staffDepth?: StaffDepthTeam }): StaffDepthTeam => {
 	};
 };
 
+// The user runs this team's staff decisions (not in spectator mode or while auto play runs). The Staff Report and its actions check
+// it too, so nothing the user can't control is changed from the page.
 export const userControls = (tid: number) =>
 	g.get("userTids").includes(tid) &&
 	!local.autoPlayUntil &&
 	!g.get("spectator");
+
+// The season of the next development plans: development runs when a preseason starts, so this season's already ran (the expansion
+// and fantasy drafts go back to the phase they started from, still before next season's preseason)
+export const nextDevSeason = () => g.get("season") + 1;
 
 export type DepthTeam = {
 	tid: number;
@@ -284,7 +290,8 @@ export const ditherDeltas = (deltas: Record<string, number>, seed: string) => {
 const hashOf = (pid: number, season: number) =>
 	new Rng(`devPlan|${pid}|${season}`).random();
 
-// The latest ratings row the staff plans from (his true ratings: they work with him every day)
+// The latest ratings row the staff plans from (his true ratings: they work with him every day). Because of that, a staff focus is never
+// shown under the No Visible Ratings challenge (Staff Report, development proposals): it points at his weakest skill.
 const planRatings = (p: Pick<Player, "ratings">) => p.ratings.at(-1) as any;
 
 export const staffFocusFor = (

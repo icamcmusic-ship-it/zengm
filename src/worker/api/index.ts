@@ -3002,7 +3002,9 @@ const staffDepthAction = async (
 		| { type: "apply"; action: SuggestionAction; suggestionId?: string }
 		| { type: "dismiss"; id: string }
 		| { type: "boardLock"; pid: number; locked: boolean },
-) => {
+): Promise<string | undefined> => {
+	// A sentence for the confirmation toast (accepting a recommendation or approving a proposal)
+	let message: string | undefined;
 	if (action.type === "settings") {
 		await staffDepthActions.setStaffDepthSettings(action.settings);
 	} else if (action.type === "devOverride") {
@@ -3010,7 +3012,7 @@ const staffDepthAction = async (
 	} else if (action.type === "scoutRegion") {
 		await staffDepthActions.setScoutRegion(action.scoutId, action.region);
 	} else if (action.type === "apply") {
-		await staffDepthActions.applyStaffAction(
+		message = await staffDepthActions.applyStaffAction(
 			action.action,
 			action.suggestionId,
 		);
@@ -3022,6 +3024,7 @@ const staffDepthAction = async (
 	await toUI("realtimeUpdate", [
 		["staff", "teamFinances", "playerMovement", "gameAttributes", "watchList"],
 	]);
+	return message;
 };
 
 // Offensive Emphasis (Offense tab): the user's dials, mode, or accepting the coach's suggestion

@@ -84,7 +84,10 @@ const proposeDevPlansFor = async (tid: number, missingOnly?: boolean) => {
 		title: missingOnly
 			? `Development plans for ${season}: players without one`
 			: `Development plans for ${season}`,
-		text: lines.join("; "),
+		// No Visible Ratings challenge: the staff's focus points at each player's weakest skill, so it isn't listed
+		text: g.get("challengeNoRatings")
+			? `The staff has a plan for ${lines.length} ${lines.length === 1 ? "player" : "players"} (not shown under the No Visible Ratings challenge).`
+			: lines.join("; "),
 		action: { type: "devPlans", plans, season },
 		pending: true,
 	});

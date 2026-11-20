@@ -1,6 +1,6 @@
 // The Staff Report page and the Pro Scouting tab: what the staff sees and recommends, one action per area, accepted with one click.
 import { offEmphasisRecommendation } from "../offEmphasis/index.ts";
-import { PHASE, PLAYER } from "../../../common/constants.ts";
+import { PLAYER } from "../../../common/constants.ts";
 import {
 	DEFENSE_NAMES,
 	OFFENSE_NAMES,
@@ -35,6 +35,7 @@ import {
 } from "../../../common/scoutingReports/scouts.ts";
 import type {
 	DelegationArea,
+	DevReportRow,
 	FocusKey,
 	ScoutRegion,
 	StaffSuggestion,
@@ -55,15 +56,18 @@ import {
 import { getTeamNeeds } from "../draft/draftNeeds.ts";
 import {
 	coachSystemsEnabled,
+	getCoachProfile,
 	getRosterFit,
-	playerSystemFitForTeam,
+	playerSystemFit,
 } from "../staff/systems.ts";
 import {
 	coachingDepthOn,
 	getDepthTeams,
+	nextDevSeason,
 	planFor,
 	staffFocusFor,
 	stateOf,
+	userControls,
 } from "./coaching.ts";
 import {
 	careerOf,
@@ -130,33 +134,59 @@ const AREAS: { key: string; name: string; bases: string[]; subs: string[] }[] =
 const areaValue = (r: any, area: (typeof AREAS)[number]) =>
 	area.bases.reduce((a, k) => a + (r[k] ?? 0), 0) / area.bases.length;
 
+// An area as the scouts see it (fuzzed ratings, like every other page; height isn't fuzzed)
+const fuzzedAreaValue = (r: any, area: (typeof AREAS)[number]) =>
+	area.bases.reduce(
+		(a, k) => a + (k === "hgt" ? (r.hgt ?? 0) : fuzzRating(r[k] ?? 0, r.fuzz)),
+		0,
+	) / area.bases.length;
+
+// The gap as words, for the No Visible Ratings challenge (no number)
+export const gapBand = (gap: number) =>
+	gap <= -5
+		? "well below the league"
+		: gap <= -1.5
+			? "below the league"
+			: "about even with the league";
+
+// The user's weakest area against the league: the average of each team's top 8 players (by scouted value), in scouted ratings
 const weakestArea = async (tid: number) => {
 	const all = await idb.cache.players.indexGetAll("playersByTid", [
 		0,
 		Infinity,
 	]);
-	const top8 = (players: Player[]) =>
-		[...players].sort((a, b) => b.value - a.value).slice(0, 8);
 	const byTid = new Map<number, Player[]>();
 	for (const p of all) {
-		byTid.set(p.tid, [...(byTid.get(p.tid) ?? []), p]);
+		let list = byTid.get(p.tid);
+		if (!list) {
+			list = [];
+			byTid.set(p.tid, list);
+		}
+		list.push(p);
 	}
-	const avg = (players: Player[], area: (typeof AREAS)[number]) => {
-		const list = top8(players);
-		return list.length > 0
-			? list.reduce((a, p) => a + areaValue(p.ratings.at(-1), area), 0) /
-					list.length
+	const tops = new Map<number, any[]>();
+	for (const [t, players] of byTid) {
+		tops.set(
+			t,
+			[...players]
+				.sort((a, b) => b.valueFuzz - a.valueFuzz || a.pid - b.pid)
+				.slice(0, 8)
+				.map((p) => p.ratings.at(-1)),
+		);
+	}
+	const avg = (list: any[], area: (typeof AREAS)[number]) =>
+		list.length > 0
+			? list.reduce((a, r) => a + fuzzedAreaValue(r, area), 0) / list.length
 			: 0;
-	};
 	let worst = AREAS[0]!;
 	let worstGap = Infinity;
 	for (const area of AREAS) {
 		let league = 0;
-		for (const players of byTid.values()) {
-			league += avg(players, area);
+		for (const list of tops.values()) {
+			league += avg(list, area);
 		}
-		league /= Math.max(1, byTid.size);
-		const gap = avg(byTid.get(tid) ?? [], area) - league;
+		league /= Math.max(1, tops.size);
+		const gap = avg(tops.get(tid) ?? [], area) - league;
 		if (gap < worstGap) {
 			worstGap = gap;
 			worst = area;
@@ -167,7 +197,8 @@ const weakestArea = async (tid: number) => {
 
 // ---- Pro Scouting ----
 
-export const getProScouting = async () => {
+// light: only what the Staff Report's best-target recommendation needs (no scouting blurbs, no formatted list of 30 targets)
+export const getProScouting = async ({ light }: { light?: boolean } = {}) => {
 	const tid = g.get("userTid");
 	const noRatings = !!g.get("challengeNoRatings");
 	const season = g.get("season");
@@ -176,6 +207,13 @@ export const getProScouting = async () => {
 	const needs = getTeamNeeds(roster as any);
 	const { area, gap } = await weakestArea(tid);
 	const systems = coachSystemsEnabled() && !noRatings;
+	// The head coach's systems, read once (not once per candidate)
+	const head = systems
+		? (await idb.cache.coaches.indexGetAll("coachesByTid", tid)).find(
+				(c) => c.role === "head",
+			)
+		: undefined;
+	const profile = head ? getCoachProfile(head) : undefined;
 	const subsArea = AREAS.find((a) => a.key === area.key)!;
 	const candidates = (
 		await idb.cache.players.indexGetAll("playersByTid", [
@@ -247,7 +285,7 @@ export const getProScouting = async () => {
 				}
 			}
 		}
-		const fit = systems ? (await playerSystemFitForTeam(p, tid)).fit : 0;
+		const fit = profile ? playerSystemFit(p, profile).fit : 0;
 		const score =
 			value +
 			6 * need +
@@ -273,9 +311,10 @@ export const getProScouting = async () => {
 	const top = rows.slice(0, 30);
 	const listsOn =
 		featureOn("scoutingReports") && !!g.get("scoutingListSummaries" as any);
-	const blurbs = listsOn
-		? await getScoutingBlurbs(top.slice(0, 20).map((x) => x.p.pid))
-		: {};
+	const blurbs =
+		listsOn && !light
+			? await getScoutingBlurbs(top.slice(0, 20).map((x) => x.p.pid))
+			: {};
 	const teams = g.get("teamInfoCache");
 	const fmt = (x: (typeof rows)[number]) => ({
 		pid: x.p.pid,
@@ -308,14 +347,19 @@ export const getProScouting = async () => {
 	return {
 		noRatings,
 		listsOn,
-		weakest: { name: area.name, gap },
+		// No Visible Ratings challenge: a band, not the number
+		weakest: {
+			name: area.name,
+			gap: noRatings ? undefined : gap,
+			band: gapBand(gap),
+		},
 		needs: (["G", "F", "C"] as const)
 			.filter((k) => needs[k] > 0.05)
 			.map((k) => ({ G: "Guard", F: "Wing/forward", C: "Big" })[k]),
 		filedBy: proScout
 			? `${proScout.name} (${SPECIALTY_NAMES[proScout.specialty].toLowerCase()})`
 			: undefined,
-		targets: top.map(fmt),
+		targets: light ? [] : top.map(fmt),
 		trade,
 		fa,
 		systems,
@@ -360,21 +404,45 @@ const scoutingSection = async (tid: number) => {
 	);
 	let rec: Recommendation;
 	if (blind.length > 0) {
-		// Move the scout who adds least where he is to the biggest blind spot
-		const target = blind.sort((a, b) => b.importance - a.importance)[0]!;
-		const s = [...ctx.scouts].sort((a, b) => a.quality - b.quality)[0];
+		// Move the scout who adds least where he is to the biggest blind spot: never one already there (Accept would do nothing), and
+		// never the last scout of another region that matters (that would open a new blind spot, and the next report would move him back)
+		const target = [...blind].sort(
+			(a, b) => b.importance - a.importance || a.region.localeCompare(b.region),
+		)[0]!;
+		const scoutsIn = (reg: ScoutRegion) =>
+			ctx.scouts.filter((x) => ctx.plan.assignments[x.id] === reg).length;
+		const importanceOf = (reg: ScoutRegion) =>
+			Math.round(100 * (ctx.plan.importance[reg] ?? 0));
+		const s = ctx.scouts
+			.filter((x) => {
+				const reg = ctx.plan.assignments[x.id] as ScoutRegion | undefined;
+				if (reg === target.region) {
+					return false;
+				}
+				return !reg || scoutsIn(reg) > 1 || importanceOf(reg) < 8;
+			})
+			.sort((a, b) => a.quality - b.quality || a.id - b.id)[0];
+		const auto = ctx.state.delegation.scouting === "auto";
 		if (s) {
 			rec = {
-				id: `rec-scout-${ctx.season}`,
+				id: `rec-scout-${ctx.season}-${s.id}-${target.region}`,
 				title: `Send ${s.name} to the ${target.name}`,
-				text: `${target.name} is a blind spot (${target.prospects} prospects of the class, ${target.importance}% of its top talent): prospects there stay uncertain.`,
+				text: `${target.name} is a blind spot (${target.prospects} prospects of the class, ${target.importance}% of its top talent): prospects there stay uncertain.${auto ? " Scouting delegation goes from Auto to Suggest, so the Director keeps him there and proposes changes for you to approve." : ""}`,
 				action: {
 					type: "assignRegions",
-					assignments: { ...ctx.plan.assignments, [s.id]: target.region },
+					// Only this move: the other assignments are read again when you accept
+					assignments: { [s.id]: target.region },
 				},
 			};
 		} else {
-			rec = { id: "none", title: "No scouts to move", text: "" };
+			rec = {
+				id: `rec-scout-hire-${ctx.season}`,
+				title: "Add a scout",
+				text:
+					ctx.scouts.length === 0
+						? `You have no scouts, so ${target.name} and every other region go unseen. Raise the scouting budget (Finances) to add scouts.`
+						: `${target.name} is a blind spot (${target.importance}% of the class's top talent) and moving a scout there would open another one. Raise the scouting budget (Finances) to add a scout.`,
+			};
 		}
 	} else if (ctx.state.priority === "auto") {
 		rec = {
@@ -410,16 +478,32 @@ const developmentSection = async (tid: number) => {
 	const t = (await idb.cache.teams.get(tid))!;
 	const state = stateOf(t);
 	const players = await idb.cache.players.indexGetAll("playersByTid", tid);
-	const nextSeason =
-		g.get("phase") > PHASE.PLAYOFFS ? g.get("season") + 1 : g.get("season");
 	const report = state.devReport;
-	// No Visible Ratings challenge: the report says who worked on what, but not the rating numbers (like every other page)
+	// No Visible Ratings challenge: no rating numbers (sub-ratings included), and no staff focus either (the staff picks it from his
+	// weakest skill, so the label would give the hidden ratings away). A focus you or your team priority chose is shown.
 	const hideRatings = !!g.get("challengeNoRatings");
 	const rawRows = report?.rows ?? [];
-	const rows = rawRows.map((r) =>
+	const rows: {
+		pid: number;
+		name: string;
+		pos: string;
+		age: number;
+		focus: FocusKey | undefined;
+		src: DevReportRow["src"];
+		subs?: DevReportRow["subs"];
+		focusBefore: number | null;
+		focusAfter: number | null;
+		ovrBefore: number | null;
+		ovrAfter: number | null;
+	}[] = rawRows.map((r) =>
 		hideRatings
 			? {
-					...r,
+					pid: r.pid,
+					name: r.name,
+					pos: r.pos,
+					age: r.age,
+					focus: r.src === "staff" ? undefined : r.focus,
+					src: r.src,
 					focusBefore: null,
 					focusAfter: null,
 					ovrBefore: null,
@@ -434,36 +518,36 @@ const developmentSection = async (tid: number) => {
 						rawRows.length,
 				) / 10
 			: undefined;
-	// The plans that will run at the next development (preseason)
-	const planSeason =
-		g.get("phase") >= PHASE.PLAYOFFS
-			? g.get("season") + 1
-			: g.get("season") + 1;
+	// The plans that will run at the next development, at the start of next season's preseason (this season's already ran when its
+	// preseason started). Ages are at that development too, like the staff's choice of focus.
+	const planSeason = nextDevSeason();
+	const staffFocuses = new Map<number, FocusKey>();
 	const plans = players
 		// Scouted value, so the order doesn't leak hidden ratings
 		.sort((a, b) => b.valueFuzz - a.valueFuzz || a.pid - b.pid)
 		.map((p) => {
 			const plan = planFor(p, planSeason, state);
-			const staff = staffFocusFor(p, planSeason, state.devPriority);
+			staffFocuses.set(p.pid, staffFocusFor(p, planSeason, state.devPriority));
 			return {
 				pid: p.pid,
 				name: `${p.firstName} ${p.lastName}`,
 				pos: p.ratings.at(-1)!.pos,
-				age: nextSeason - p.born.year,
-				focus: plan?.f,
+				age: planSeason - p.born.year,
+				focus: hideRatings && plan?.src === "staff" ? undefined : plan?.f,
 				src: plan?.src,
-				staffFocus: staff,
 				override: state.devOverrides?.[p.pid],
 			};
 		});
-	// Recommendation: the most common staff focus among the top 8, as a team priority
+	// Recommendation: the most common staff focus among the top 8, as a team priority (not under No Visible Ratings: it comes from
+	// the hidden ratings)
 	const counts = new Map<FocusKey, number>();
 	for (const p of plans.slice(0, 8)) {
-		counts.set(p.staffFocus, (counts.get(p.staffFocus) ?? 0) + 1);
+		const f = staffFocuses.get(p.pid)!;
+		counts.set(f, (counts.get(f) ?? 0) + 1);
 	}
 	const common = [...counts].sort((a, b) => b[1] - a[1])[0];
 	const rec: Recommendation =
-		common && common[1] >= 3 && state.devPriority !== common[0]
+		!hideRatings && common && common[1] >= 3 && state.devPriority !== common[0]
 			? {
 					id: `rec-dev-${g.get("season")}`,
 					title: `Team priority: ${FOCUSES[common[0]].name}`,
@@ -494,9 +578,11 @@ const developmentSection = async (tid: number) => {
 };
 
 const fitSection = async (tid: number) => {
-	const pro = await getProScouting();
+	const pro = await getProScouting({ light: true });
+	const noRatings = !!g.get("challengeNoRatings");
 	let systems;
-	if (coachSystemsEnabled()) {
+	// No Visible Ratings challenge: no system fit (it comes from the ratings), like Pro Scouting
+	if (coachSystemsEnabled() && !noRatings) {
 		const fit = await getRosterFit(tid);
 		const coaches = await idb.cache.coaches.indexGetAll("coachesByTid", tid);
 		const head = coaches.find((c) => c.role === "head");
@@ -537,9 +623,17 @@ const conditioningSection = async (tid: number) => {
 	let rec: Recommendation = {
 		id: "none",
 		title: "No change needed",
-		text: "Your conditioning staff is at or above the league average.",
+		text: depth
+			? "Your conditioning staff is about league average or better."
+			: "",
 	};
 	if (depth && depth.scZ < -0.2) {
+		// Below average: a hire if someone better is affordable, else say so (not "no change needed")
+		rec = {
+			id: `rec-sc-none-${season}`,
+			title: "No affordable upgrade",
+			text: `Your conditioning staff is below the league average, but no available ${COACH_ROLE_NAMES.sc.toLowerCase()} is clearly better at a reasonable salary. Check the coaching market again later.`,
+		};
 		const salaryCap = g.get("salaryCap");
 		const fa = coaches
 			.filter((c) => c.tid === -1 && (c.ratings.cnd ?? 0) > depth.sc + 6)
@@ -598,13 +692,23 @@ export const getStaffReport = async () => {
 	const state = stateOf(t);
 	const scoutingOn = scoutingDepthOn();
 	const coachingOn = coachingDepthOn();
+	const noRatings = !!g.get("challengeNoRatings");
 	return {
 		season: g.get("season"),
 		phase: g.get("phase"),
 		scoutingOn,
 		coachingOn,
+		// Spectator mode and auto play: the page is read only (the actions refuse too)
+		controls: userControls(tid),
 		delegation: state.delegation,
-		suggestions: (state.suggestions ?? []).filter((s) => s.pending),
+		suggestions: (state.suggestions ?? [])
+			.filter((s) => s.pending)
+			// No Visible Ratings challenge: the proposed plans (staff focuses) stay in the worker; approving uses the stored proposal
+			.map((s) =>
+				noRatings && s.action.type === "devPlans"
+					? { ...s, action: { ...s.action, plans: {} } }
+					: s,
+			),
 		scouting: scoutingOn ? await scoutingSection(tid) : undefined,
 		development: coachingOn ? await developmentSection(tid) : undefined,
 		fit: await fitSection(tid),
