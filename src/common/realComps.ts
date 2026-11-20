@@ -44,7 +44,13 @@ export const COMP_WEIGHTS: Record<(typeof COMP_RATINGS)[number], number> = {
 // Height counts as much as this many other ratings
 export const HEIGHT_WEIGHT = 4;
 // Added to the distance per year between his age and the real player's age in that season
-export const AGE_PENALTY = 1.5;
+// (comp fix: was 1.5 per year, uncapped: very few real players had a season at 18-19, so every young prospect was pulled to them)
+export const AGE_PENALTY = 0.75;
+export const AGE_PENALTY_MAX_YEARS = 4;
+// How much a gap in standing costs, in rating points per whole range (a 10-point gap in standing costs LEVEL_PCT_SCALE / 10)
+export const LEVEL_PCT_SCALE = 30;
+// In one class, a real player is the comp of at most this many prospects
+export const MAX_USES_PER_CLASS = 2;
 // Real seasons at this age or younger are candidates; a player who first played later counts with his first season only
 export const MAX_YOUNG_AGE = 23;
 
@@ -105,6 +111,9 @@ export type RealCompIndex = {
 	rowSeason: Int16Array;
 	rowAge: Int8Array;
 	rowRatings: Uint8Array;
+	// Each candidate season's level (weighted mean of the ratings other than height) as a standing among all candidate seasons
+	// (0..1): a prospect is matched on his standing in his own class against it, not on raw rating points
+	rowLevelPct: Float32Array;
 	lastSeason: number;
 };
 
@@ -144,7 +153,7 @@ export const buildRealCompIndex = (data: RealCompSource): RealCompIndex => {
 
 	const index: Omit<
 		RealCompIndex,
-		"rowPlayer" | "rowSeason" | "rowAge" | "rowRatings"
+		"rowPlayer" | "rowSeason" | "rowAge" | "rowRatings" | "rowLevelPct"
 	> = {
 		slugs: [],
 		names: [],
@@ -219,6 +228,7 @@ export const buildRealCompIndex = (data: RealCompSource): RealCompIndex => {
 		rowSeason: Int16Array.from(rowSeason),
 		rowAge: Int8Array.from(rowAge),
 		rowRatings: Uint8Array.from(rowRatings),
+		rowLevelPct: levelPercentiles(rowRatings),
 	};
 };
 
@@ -229,6 +239,8 @@ export type CompProspect = {
 	pos: string;
 	// A real player in a real players league is never his own comp
 	srID?: string;
+	// His level's standing in his own draft class (0..1). With it, level is matched on standing; without, on rating points.
+	levelPct?: number;
 };
 
 export type RealCompMatch = {
@@ -242,6 +254,48 @@ export type RealCompMatch = {
 
 const WEIGHTS = COMP_RATINGS.map((key) => COMP_WEIGHTS[key]);
 const WEIGHT_SUM = WEIGHTS.reduce((a, b) => a + b, 0);
+
+// The level of a ratings row: the weighted mean of the ratings other than height
+export const ratingsLevel = (a: ArrayLike<number>, offset = 0) => {
+	let level = 0;
+	for (let k = 1; k < NUM; k++) {
+		level += WEIGHTS[k]! * a[offset + k]!;
+	}
+	return level / WEIGHT_SUM;
+};
+// Each row's level as a standing among all rows (0..1)
+function levelPercentiles(flat: readonly number[]): Float32Array {
+	const n = flat.length / NUM;
+	const levels = Array.from({ length: n }, (_, i) =>
+		ratingsLevel(flat, i * NUM),
+	);
+	const order = levels.map((_, i) => i).sort((a, b) => levels[a]! - levels[b]!);
+	const out = new Float32Array(n);
+	order.forEach((row, rank) => {
+		out[row] = n > 1 ? rank / (n - 1) : 0.5;
+	});
+	return out;
+}
+
+// The shape distance alone (the level difference taken out), with height counting HEIGHT_WEIGHT times a single rating
+export const shapeDistance = (
+	a: ArrayLike<number>,
+	b: ArrayLike<number>,
+	bOffset = 0,
+) => {
+	let level = 0;
+	for (let k = 1; k < NUM; k++) {
+		level += WEIGHTS[k]! * (a[k]! - b[bOffset + k]!);
+	}
+	level /= WEIGHT_SUM;
+	let shape = 0;
+	for (let k = 1; k < NUM; k++) {
+		const d = a[k]! - b[bOffset + k]! - level;
+		shape += WEIGHTS[k]! * d * d;
+	}
+	const dh = a[0]! - b[bOffset]!;
+	return (shape + HEIGHT_WEIGHT * dh * dh) / (WEIGHT_SUM + HEIGHT_WEIGHT);
+};
 
 // Distance between two rating rows, in rating points: the shape (how far apart the ratings are after the level difference is taken out)
 // and the level (the weighted mean difference), with height counting HEIGHT_WEIGHT times a single rating
@@ -283,9 +337,21 @@ export const findRealComps = (
 		if (!posOk[i]) {
 			continue;
 		}
+		const age =
+			AGE_PENALTY *
+			Math.min(
+				AGE_PENALTY_MAX_YEARS,
+				Math.abs(index.rowAge[row]! - prospect.age),
+			);
 		const d =
-			ratingsDistance(a, index.rowRatings, row * NUM) +
-			AGE_PENALTY * Math.abs(index.rowAge[row]! - prospect.age);
+			(prospect.levelPct === undefined
+				? ratingsDistance(a, index.rowRatings, row * NUM)
+				: Math.sqrt(
+						shapeDistance(a, index.rowRatings, row * NUM) +
+							(LEVEL_PCT_SCALE *
+								(prospect.levelPct - index.rowLevelPct[row]!)) **
+								2,
+					)) + age;
 		if (d < bestD[i]!) {
 			bestD[i] = d;
 			bestRow[i] = row;

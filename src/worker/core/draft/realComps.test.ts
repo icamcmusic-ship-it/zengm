@@ -41,6 +41,15 @@ test("every prospect of a generated class gets 3 real players' real young season
 	const ms = performance.now() - start;
 	assert.isBelow(ms, 1500, `${ms} ms for ${players.length} prospects`);
 	assert.strictEqual(comps.size, players.length);
+	// (comp fix: the user saw the same few names for late picks) A real player is the comp of at most 2 prospects of a class
+	const uses = new Map<string, number>();
+	for (const list of comps.values()) {
+		for (const c of list) {
+			uses.set(c.name, (uses.get(c.name) ?? 0) + 1);
+		}
+	}
+	assert.isAtMost(Math.max(...uses.values()), 2);
+	assert.isAbove(uses.size, players.length);
 
 	const data = await loadDataBasketball();
 	const realNames = new Set(Object.values(data.bios).map((b) => b.name));
