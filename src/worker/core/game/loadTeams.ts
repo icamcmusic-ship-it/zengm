@@ -56,6 +56,7 @@ import {
 	subSimTouches,
 } from "../GameSim.basketball/subRatingsSim.ts";
 import { subRatingsOn } from "../player/subRatings.ts";
+import { isValidSubArray, SUB_INDEX } from "../../../common/subRatings.ts";
 import { careerAgingOn, oldAgeMinutesCap } from "../player/careerAging.ts";
 import {
 	PBP_EXPANDED_KEYS,
@@ -406,6 +407,10 @@ export const processTeam = async (
 				pss: r["pss"],
 				reb: r["reb"],
 			};
+			// Shot Zones: the floater/touch sub-rating, when he has sub-ratings (the sub-zone of his short shots)
+			if (isValidSubArray(r["sub"])) {
+				(p2 as any).pbpRatings.flt = r["sub"][SUB_INDEX["flt"]!];
+			}
 			// Expanded ratings, when the setting is on (catch-and-shoot or pull-up jumpers, ball security, the offensive glass, length,
 			// perimeter and interior defense), for the same wording only (pbpFlavor/story.ts)
 			if (expandedRatings) {

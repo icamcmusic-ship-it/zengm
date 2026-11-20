@@ -46,6 +46,7 @@ export const NATIVE_FEATURE_GROUPS: Record<string, Category> = {
 	realisticPlayTypes: "League extras: Game Simulation",
 	offEmphasis: "League extras: Game Simulation",
 	advStats: "League extras: Game Simulation",
+	shotZones: "League extras: Game Simulation",
 	advCareer: "League extras: Game Simulation",
 	playerTraits: "League extras: Players",
 	injuryDepth: "League extras: Players",
