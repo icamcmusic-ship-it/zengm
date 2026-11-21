@@ -39,6 +39,7 @@ import {
 	type Skill,
 } from "./honest.ts";
 import {
+	END_WORDS,
 	nameCtxOf,
 	namePromises,
 	nounOfDesc,
@@ -389,6 +390,8 @@ export type V2Options = ClassifyOptions & {
 	pickKey?: string;
 	// archreview2: his potential (the honest names: upside is potential well above his ovr)
 	pot?: number;
+	// archstick: last season's defensive label (with previousId, his whole label last season)
+	previousDefense?: string;
 	// archnouns: the user's "Doesn't fit" verdicts with no pick: the name shown, the player's key and his ratings then
 	rejects?: readonly {
 		key?: string;
@@ -1038,7 +1041,8 @@ export const classifyV2 = (
 			prevParsed &&
 			(prevParsed.role.key.startsWith("pos") ||
 				prevParsed.role.key === "bruiser" ||
-				prevParsed.role.key === "enigma")
+				prevParsed.role.key === "enigma" ||
+				END_WORDS.some((e) => e.key === prevParsed.role.key))
 				? prevParsed.descs
 						.map((d) => nounOfDesc(d.key))
 						.filter((n): n is NounKey => n !== undefined)
@@ -1070,9 +1074,18 @@ export const classifyV2 = (
 			prev: {
 				nouns: prevNouns,
 				special: prevRaw && !prevComposed ? mergedId(prevRaw) : undefined,
+				// archstick: his whole label last season
+				...(prevRaw ? { id: prevComposed ? prevRaw : mergedId(prevRaw) } : {}),
+				...(prevRaw && opts.previousDefense
+					? { defense: opts.previousDefense }
+					: {}),
 			},
 		};
 		const np = pickNouns(nounIn);
+		// (archstick: his name's words are then read in the order his nouns were picked in)
+		if (np.tie === false) {
+			nounIn = { ...nounIn, tie: false };
+		}
 		const score = eff(first);
 		nounConf = np.conf;
 		nounDefense = np.defense;
@@ -1096,8 +1109,13 @@ export const classifyV2 = (
 				np.kind === "trait" ? [] : np.descs.map((k) => DESC_BY_KEY.get(k)!);
 			const wp: WordPick =
 				np.kind === "trait" ? { [np.key]: np.name } : (np.pick ?? {});
-			const id = composedId(role, descs, group, wp);
-			const nm = composeName(role, descs, group, wp);
+			// (archstick: last season's noun name, kept, is kept in its own words)
+			const keep =
+				np.kind === "composed" && np.keepId
+					? archetypeById(np.keepId)
+					: undefined;
+			const id = keep ? keep.id : composedId(role, descs, group, wp);
+			const nm = keep ? keep.name : composeName(role, descs, group, wp);
 			first = {
 				id,
 				name: nm,
@@ -1182,6 +1200,24 @@ export const classifyV2 = (
 									? "hJourneyman"
 									: "hFiller";
 						h = { key, name: ROLE_BY_KEY.get(key)!.names[0]! };
+					}
+				}
+				// archstick: last season's honest name, in its own words, while he is still the same kind of honest name (a
+				// player who outgrows it, a development name above ovr 30 or a specialist with a second skill, gets this
+				// season's name: that is a new kind, never kept)
+				const prevH = prevComposed ? parseComposedId(prevRaw) : undefined;
+				if (
+					prevH &&
+					prevH.role.key === h.key &&
+					prevH.group === group &&
+					prevH.descs.length === 0
+				) {
+					const pn = composeName(prevH.role, [], group, prevH.pick);
+					if (
+						pn !== h.name &&
+						(!nounIn || namePromises(pn, nameCtxOf(nounIn)).length === 0)
+					) {
+						h = { key: h.key, name: pn };
 					}
 				}
 				const role = ROLE_BY_KEY.get(h.key)!;

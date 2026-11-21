@@ -456,6 +456,8 @@ export const classifyPlayer = (
 	p: Player,
 	norms: Norms,
 	previousId?: string,
+	// archstick: last season's defensive label (with previousId, his whole label then)
+	previousDefense?: string,
 ): Classification | undefined => {
 	const ratings = ratingsForArchetype(p);
 	if (!ratings) {
@@ -471,6 +473,7 @@ export const classifyPlayer = (
 		// (archreview2: upside for the honest names)
 		pot: row.pot,
 		previousId,
+		...(previousId && previousDefense ? { previousDefense } : {}),
 		pos: isPos(row.pos) ? row.pos : undefined,
 		traits:
 			typeof row.season === "number"
@@ -573,11 +576,14 @@ export const storeArchetype = (p: Player, norms: Norms): boolean => {
 		return false;
 	}
 	// (a label from an older reading is not kept by stickiness: he is read afresh)
+	// (archstick: with its defensive label: his whole label is kept while it still fits)
 	const prev = currentEntry(p.archetypes);
+	const fresh = prev && !isStale(prev);
 	const c = classifyPlayer(
 		p,
 		norms,
-		prev && !isStale(prev) ? prev.id : undefined,
+		fresh ? prev.id : undefined,
+		fresh ? prev.def : undefined,
 	);
 	if (!c) {
 		return false;
