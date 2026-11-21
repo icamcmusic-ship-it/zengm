@@ -14,11 +14,10 @@
 // with that season's real stats: real_labels.csv.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { test } from "vitest";
-import { PLAYER } from "../../../common/constants.ts";
 import { isPos } from "../../../common/archetypes/position.ts";
 import { POS_BUCKET } from "../../../common/archetypes/norms.ts";
 import { seasonStats } from "../../../common/archetypes/stats.ts";
-import { currentEntry, viewOf } from "../../../common/archetypes/helpers.ts";
+import { viewOf } from "../../../common/archetypes/helpers.ts";
 import { defaultNormsFor } from "../../../common/archetypes/classify.ts";
 import { classifyV2 } from "../../../common/archetypes/v2/engine.ts";
 import { ratingQuantiles } from "../../../common/archetypes/v2/gateScale.ts";
@@ -97,16 +96,23 @@ const SKILLS = {
 	strength: (r) => r.stre,
 };
 const pctIn = (sorted, v) => {
-	if (v === undefined || sorted.length === 0) return 0;
+	if (v === undefined || sorted.length === 0) {
+		return 0;
+	}
 	let lo = 0;
 	let hi = sorted.length;
 	while (lo < hi) {
 		const m = (lo + hi) >> 1;
-		if (sorted[m] < v) lo = m + 1;
-		else hi = m;
+		if (sorted[m] < v) {
+			lo = m + 1;
+		} else {
+			hi = m;
+		}
 	}
 	let hi2 = lo;
-	while (hi2 < sorted.length && sorted[hi2] === v) hi2++;
+	while (hi2 < sorted.length && sorted[hi2] === v) {
+		hi2++;
+	}
 	return (lo + hi2) / 2 / sorted.length;
 };
 
@@ -123,7 +129,9 @@ const GUARDPOS = new Set(["PG", "G", "SG"]);
 // One player's stats for a season (regular season rows summed)
 const statsOf = (rows) => {
 	rows = rows.filter((r) => !r.playoffs && (r.min ?? 0) > 0);
-	if (rows.length === 0) return undefined;
+	if (rows.length === 0) {
+		return undefined;
+	}
 	const sum = (k) => rows.reduce((a, r) => a + (r[k] ?? 0), 0);
 	const gp = sum("gp");
 	const min = sum("min");
@@ -175,15 +183,27 @@ const QUAL_MIN = 800;
 
 // The nouns of a defensive label
 const defNouns = (def) => {
-	if (!def) return [];
-	if (/Switch Defender/.test(def)) return ["perimD", "rimD"];
-	if (/Help-Side Roamer/.test(def)) return ["rimD", "steal"];
-	if (/Pest/.test(def)) return ["perimD", "steal"];
-	if (/Shot Blocker|Post Defender|Rim Protector|Swatting|Eraser/.test(def))
+	if (!def) {
+		return [];
+	}
+	if (/Switch Defender/.test(def)) {
+		return ["perimD", "rimD"];
+	}
+	if (/Help-Side Roamer/.test(def)) {
+		return ["rimD", "steal"];
+	}
+	if (/Pest/.test(def)) {
+		return ["perimD", "steal"];
+	}
+	if (/Shot Blocker|Post Defender|Rim Protector|Swatting|Eraser/.test(def)) {
 		return ["rimD"];
-	if (/Perimeter|Stopper|Cerebral|Lockdown|Stalker/.test(def))
+	}
+	if (/Perimeter|Stopper|Cerebral|Lockdown|Stalker/.test(def)) {
 		return ["perimD"];
-	if (/Hawk|Menace|Interceptor/.test(def)) return ["steal"];
+	}
+	if (/Hawk|Menace|Interceptor/.test(def)) {
+		return ["steal"];
+	}
 	return [];
 };
 
@@ -192,7 +212,9 @@ const flagsOf = (x, L) => {
 	const f = [];
 	const [main, def] = x.label.split(" · ");
 	const mainNouns = new Set(
-		(nounsOfName(main)?.nouns ?? []).map((n) => (n === "creator" ? "handle" : n)),
+		(nounsOfName(main)?.nouns ?? []).map((n) =>
+			n === "creator" ? "handle" : n,
+		),
 	);
 	const allNouns = new Set([...mainNouns, ...defNouns(def)]);
 	const best = x.best; // [{noun, top}] top = 100 * (1 - pct), best first
@@ -204,40 +226,52 @@ const flagsOf = (x, L) => {
 		.filter((b) => ["perimD", "rimD", "steal"].includes(b.noun)).length;
 
 	// --- the user's rules (nounsAudit.script.test.ts), with skills read against the league's own distribution
-	if (ELITE_RE.test(x.label) && ovrPct < 0.85) f.push("R:elite-word-not-elite");
+	if (ELITE_RE.test(x.label) && ovrPct < 0.85) {
+		f.push("R:elite-word-not-elite");
+	}
 	if (!HONESTISH.test(main) && !(twoSlots && defInBest > 0)) {
 		for (const k of mainNouns) {
-			if (!top3.has(k) && k !== "crafty") f.push(`R:noun-not-top3(${k})`);
+			if (!top3.has(k) && k !== "crafty") {
+				f.push(`R:noun-not-top3(${k})`);
+			}
 		}
 		if (
 			best[0] &&
 			best[0].top <= 15 &&
 			!allNouns.has(best[0].noun) &&
-			!(
-				nounsOfName(main)?.twoWay &&
-				["perimD", "steal"].includes(best[0].noun)
-			)
-		)
+			!(nounsOfName(main)?.twoWay && ["perimD", "steal"].includes(best[0].noun))
+		) {
 			f.push(`R:misses-best(${best[0].noun})`);
+		}
 	}
 	if (NO_SKILL.test(main)) {
 		const strong = best.filter((b) => b.top <= 15).length;
 		const good = best.filter((b) => b.top <= 26).length;
-		if (strong >= 1 || good >= 2) f.push("R:no-skill-name-with-skills");
+		if (strong >= 1 || good >= 2) {
+			f.push("R:no-skill-name-with-skills");
+		}
 	}
-	if (DEV.test(main) && x.ovr > 30 && best.some((b) => b.top <= 30))
+	if (DEV.test(main) && x.ovr > 30 && best.some((b) => b.top <= 30)) {
 		f.push("R:dev-name-with-skill");
-	if (DEV.test(main) && x.age >= 25) f.push("R:dev-name-age25+");
-	if (/Stretch|\bFour\b|\bFive\b/.test(main) && !BIGPOS.has(x.pos))
+	}
+	if (DEV.test(main) && x.age >= 25) {
+		f.push("R:dev-name-age25+");
+	}
+	if (/Stretch|\bFour\b|\bFive\b/.test(main) && !BIGPOS.has(x.pos)) {
 		f.push("R:big-word-non-big");
-	if (/\bGuard\b|Point\b|Dimer|Floor General/.test(main) && BIGPOS.has(x.pos))
+	}
+	if (/\bGuard\b|Point\b|Dimer|Floor General/.test(main) && BIGPOS.has(x.pos)) {
 		f.push("R:guard-word-on-big");
-	if (/\bBig\b|Five|Center|Rim Protector/.test(main) && GUARDPOS.has(x.pos))
+	}
+	if (/\bBig\b|Five|Center|Rim Protector/.test(main) && GUARDPOS.has(x.pos)) {
 		f.push("R:big-word-on-guard");
-	if (/Hustle|Junkyard|Energy Big/.test(main) && (x.traits?.hustle ?? 0) < 55)
+	}
+	if (/Hustle|Junkyard|Energy Big/.test(main) && (x.traits?.hustle ?? 0) < 55) {
 		f.push("R:hustle-trait<55");
-	if (ovrPct >= 0.9 && (STAR_BAD.test(main) || mainNouns.size === 0))
+	}
+	if (ovrPct >= 0.9 && (STAR_BAD.test(main) || mainNouns.size === 0)) {
 		f.push("R:star-generic-name");
+	}
 	// (athletic nouns crowding out a skill: his name says speed / leaping / strength while a skill he is in the league's
 	// top 5% at goes unnamed)
 	const ATH = ["speed", "jump", "strength"];
@@ -245,10 +279,13 @@ const flagsOf = (x, L) => {
 		const skill = best.find(
 			(b) => !ATH.includes(b.noun) && b.top <= 5 && !allNouns.has(b.noun),
 		);
-		if (skill) f.push(`A:athletic-over-skill(${skill.noun})`);
+		if (skill) {
+			f.push(`A:athletic-over-skill(${skill.noun})`);
+		}
 	}
-	if (ovrPct >= 0.9 && mainNouns.size === 0 && !def)
+	if (ovrPct >= 0.9 && mainNouns.size === 0 && !def) {
 		f.push("R:star-no-skill-in-name");
+	}
 
 	// --- label vs what he did (that season, qualified minutes; standings within his position bucket)
 	const st = x.st;
@@ -263,10 +300,12 @@ const flagsOf = (x, L) => {
 				main,
 			);
 		if (shooterWord) {
-			if ((st.tpa36 ?? 0) < 3 || (P("tpa36") ?? 1) < 0.3)
+			if ((st.tpa36 ?? 0) < 3 || (P("tpa36") ?? 1) < 0.3) {
 				f.push("S:shooter-label-low-3PA");
-			if ((st.tpag ?? 0) * st.gp >= 100 && (st.tppct ?? 1) < 0.32)
+			}
+			if ((st.tpag ?? 0) * st.gp >= 100 && (st.tppct ?? 1) < 0.32) {
 				f.push("S:shooter-label-poor-3P%");
+			}
 		} else if (
 			(P("tpa36") ?? 0) >= 0.9 &&
 			(st.tppct ?? 0) >= 0.37 &&
@@ -275,36 +314,52 @@ const flagsOf = (x, L) => {
 			f.push("S:volume-shooter-unnamed");
 		}
 		if (allNouns.has("rimD")) {
-			if ((P("blkp") ?? 1) < 0.3) f.push("S:rimD-label-low-blk%");
-		} else if ((P("blkp") ?? 0) >= 0.9 && st.bpg >= 1)
+			if ((P("blkp") ?? 1) < 0.3) {
+				f.push("S:rimD-label-low-blk%");
+			}
+		} else if ((P("blkp") ?? 0) >= 0.9 && st.bpg >= 1) {
 			f.push("S:shotblocker-unnamed");
+		}
 		if (allNouns.has("perimD") || allNouns.has("steal")) {
-			if ((P("stlp") ?? 1) < 0.3 && (P("dbpm") ?? 1) < 0.4)
+			if ((P("stlp") ?? 1) < 0.3 && (P("dbpm") ?? 1) < 0.4) {
 				f.push("S:perimD-label-poor-defense-stats");
+			}
 		}
 		if (allNouns.has("pass")) {
-			if ((P("astp") ?? 1) < 0.3) f.push("S:pass-label-low-ast%");
-		} else if ((P("astp") ?? 0) >= 0.9 && (st.astp ?? 0) >= 25)
+			if ((P("astp") ?? 1) < 0.3) {
+				f.push("S:pass-label-low-ast%");
+			}
+		} else if ((P("astp") ?? 0) >= 0.9 && (st.astp ?? 0) >= 25) {
 			f.push("S:playmaker-unnamed");
+		}
 		if (allNouns.has("reb")) {
-			if ((P("trbp") ?? 1) < 0.3) f.push("S:reb-label-low-reb%");
-		} else if ((P("trbp") ?? 0) >= 0.93 && st.rpg >= 8)
+			if ((P("trbp") ?? 1) < 0.3) {
+				f.push("S:reb-label-low-reb%");
+			}
+		} else if ((P("trbp") ?? 0) >= 0.93 && st.rpg >= 8) {
 			f.push("S:rebounder-unnamed");
+		}
 		if (allNouns.has("finish") && st.rimr !== undefined) {
-			if ((P("rimr") ?? 1) < 0.3 && (P("ftr") ?? 1) < 0.4)
+			if ((P("rimr") ?? 1) < 0.3 && (P("ftr") ?? 1) < 0.4) {
 				f.push("S:finisher-label-few-rim-shots");
+			}
 		}
 		if (allNouns.has("post") && st.postr !== undefined) {
-			if ((P("postr") ?? 1) < 0.3) f.push("S:post-label-few-post-shots");
+			if ((P("postr") ?? 1) < 0.3) {
+				f.push("S:post-label-few-post-shots");
+			}
 		}
 		if (allNouns.has("mid") && st.midr !== undefined) {
-			if ((P("midr") ?? 1) < 0.3) f.push("S:mid-label-few-midrange");
+			if ((P("midr") ?? 1) < 0.3) {
+				f.push("S:mid-label-few-midrange");
+			}
 		}
 		if (
 			(allNouns.has("handle") || /Creat|Iso|Shot Hunter/.test(main)) &&
 			(P("usgp") ?? 1) < 0.25
-		)
+		) {
 			f.push("S:creator-label-low-usage");
+		}
 		if (
 			ovrPct >= 0.9 &&
 			(st.ppg ?? 0) >= 20 &&
@@ -312,14 +367,17 @@ const flagsOf = (x, L) => {
 				mainNouns.has(k),
 			) &&
 			!/Bucket|Scorer|Ace|Engine|Maestro/.test(main)
-		)
+		) {
 			f.push("S:top-scorer-no-scoring-word");
+		}
 	}
 	// --- prospect-variety builds
-	if (BIGPOS.has(x.pos) && x.r.tp >= L.tp80 && !mainNouns.has("three"))
+	if (BIGPOS.has(x.pos) && x.r.tp >= L.tp80 && !mainNouns.has("three")) {
 		f.push("B:stretch-big-not-shooter");
-	if (!BIGPOS.has(x.pos) && best[0]?.noun === "rimD" && !allNouns.has("rimD"))
+	}
+	if (!BIGPOS.has(x.pos) && best[0]?.noun === "rimD" && !allNouns.has("rimD")) {
 		f.push("B:small-rim-protector-unnamed");
+	}
 	return f;
 };
 
@@ -449,15 +507,22 @@ const contextOf = (xs) => {
 	}
 	const stat = {};
 	for (const x of xs) {
-		if (!x.st || x.st.min < QUAL_MIN) continue;
+		if (!x.st || x.st.min < QUAL_MIN) {
+			continue;
+		}
 		const b = (stat[POS_BUCKET[x.pos]] ??= {});
 		for (const k of STAT_KEYS) {
 			const v = x.st[k];
-			if (typeof v === "number" && Number.isFinite(v)) (b[k] ??= []).push(v);
+			if (typeof v === "number" && Number.isFinite(v)) {
+				(b[k] ??= []).push(v);
+			}
 		}
 	}
-	for (const b of Object.values(stat))
-		for (const k of Object.keys(b)) b[k].sort((p, q) => p - q);
+	for (const b of Object.values(stat)) {
+		for (const k of Object.keys(b)) {
+			b[k].sort((p, q) => p - q);
+		}
+	}
 	const tps = xs.map((x) => x.r.tp).sort((a, b) => a - b);
 	return {
 		skill,
@@ -484,11 +549,11 @@ const finish = (xs) => {
 const summary = (title, xs) => {
 	const out = [`== ${title}: ${xs.length} players`];
 	const tally = {};
-	for (const x of xs)
-		for (const f of new Set(
-			x.flags.map((f) => f.replace(/\(.*\)/, "")),
-		))
+	for (const x of xs) {
+		for (const f of new Set(x.flags.map((f) => f.replace(/\(.*\)/, "")))) {
 			tally[f] = (tally[f] ?? 0) + 1;
+		}
+	}
 	const pass = xs.filter(
 		(x) => !x.flags.some((f) => f.startsWith("R:")),
 	).length;
@@ -496,8 +561,9 @@ const summary = (title, xs) => {
 	out.push(
 		`user-rules pass: ${pass} (${((100 * pass) / xs.length).toFixed(1)}%), no flag at all: ${passAll} (${((100 * passAll) / xs.length).toFixed(1)}%)`,
 	);
-	for (const [k, v] of Object.entries(tally).sort((a, b) => b[1] - a[1]))
+	for (const [k, v] of Object.entries(tally).sort((a, b) => b[1] - a[1])) {
 		out.push(`  ${k}: ${v} (${((100 * v) / xs.length).toFixed(1)}%)`);
+	}
 	for (const part of ["main", "defense", "label"]) {
 		const c = {};
 		for (const x of xs) {
@@ -514,7 +580,9 @@ const summary = (title, xs) => {
 		);
 	}
 	const kinds = {};
-	for (const x of xs) kinds[x.kind] = (kinds[x.kind] ?? 0) + 1;
+	for (const x of xs) {
+		kinds[x.kind] = (kinds[x.kind] ?? 0) + 1;
+	}
 	out.push(`noun pick kinds: ${JSON.stringify(kinds)}`);
 	return out;
 };
@@ -536,7 +604,31 @@ test.skipIf(!OUT)(
 				const season = g.get("season");
 				if (lines.length === 0) {
 					lines.push(
-						`config ${CONFIG} seed ${SEED}: ${["archetypes", "subRatings", "expandedRatings", "playerTraits", "advStats", "ovrV2", "improvedPositions"].map((k) => { let v; try { v = featureOn(k); } catch { v = "?"; } let gv; try { gv = g.get(k); } catch { gv = "unset"; } return `${k} ${v}/${gv}`; }).join(", ")}`,
+						`config ${CONFIG} seed ${SEED}: ${[
+							"archetypes",
+							"subRatings",
+							"expandedRatings",
+							"playerTraits",
+							"advStats",
+							"ovrV2",
+							"improvedPositions",
+						]
+							.map((k) => {
+								let v;
+								try {
+									v = featureOn(k);
+								} catch {
+									v = "?";
+								}
+								let gv;
+								try {
+									gv = g.get(k);
+								} catch {
+									gv = "unset";
+								}
+								return `${k} ${v}/${gv}`;
+							})
+							.join(", ")}`,
 					);
 				}
 				const norms = await getLeagueNorms(true);
@@ -548,10 +640,14 @@ test.skipIf(!OUT)(
 				const xs = [];
 				for (const p of players) {
 					const r = ratingsForArchetype(p);
-					if (!r) continue;
+					if (!r) {
+						continue;
+					}
 					const row = p.ratings.at(-1);
 					const info = await archetypeInfoForPlayer(p);
-					if (!info) continue;
+					if (!info) {
+						continue;
+					}
 					const pos = isPos(row.pos) ? row.pos : "F";
 					const traits = archetypeTraits(p, season);
 					const np = pickNouns({
@@ -568,7 +664,10 @@ test.skipIf(!OUT)(
 						.map((e) => `${e.season}:${viewOf(e, row.pos)?.label ?? e.id}`)
 						.join(" > ");
 					hist.set(p.pid, {
-						name: p.firstName === "FirstName" ? `p${p.pid}` : `${p.firstName} ${p.lastName}`,
+						name:
+							p.firstName === "FirstName"
+								? `p${p.pid}`
+								: `${p.firstName} ${p.lastName}`,
 						entries: (p.archetypes ?? []).map((e) => ({
 							season: e.season,
 							label: viewOf(e, row.pos)?.label ?? e.id,
@@ -577,7 +676,10 @@ test.skipIf(!OUT)(
 					xs.push({
 						season,
 						pid: p.pid,
-						name: p.firstName === "FirstName" ? `p${p.pid}` : `${p.firstName} ${p.lastName}`,
+						name:
+							p.firstName === "FirstName"
+								? `p${p.pid}`
+								: `${p.firstName} ${p.lastName}`,
 						tid: p.tid,
 						pos,
 						age: season - p.born.year,
@@ -622,13 +724,22 @@ test.skipIf(!OUT)(
 			const es = h.entries;
 			for (let i = 1; i < es.length; i++) {
 				steps++;
-				if (es[i].label !== es[i - 1].label) changes++;
-				if (es[i].label.split(" · ")[0] !== es[i - 1].label.split(" · ")[0])
+				if (es[i].label !== es[i - 1].label) {
+					changes++;
+				}
+				if (es[i].label.split(" · ")[0] !== es[i - 1].label.split(" · ")[0]) {
 					mainChanges++;
-				if (es[i].label.split(" · ")[1] !== es[i - 1].label.split(" · ")[1])
+				}
+				if (es[i].label.split(" · ")[1] !== es[i - 1].label.split(" · ")[1]) {
 					defChanges++;
+				}
 			}
-			hrows.push([pid, h.name, es.length, es.map((e) => `${e.season}:${e.label}`).join(" > ")]);
+			hrows.push([
+				pid,
+				h.name,
+				es.length,
+				es.map((e) => `${e.season}:${e.label}`).join(" > "),
+			]);
 		}
 		lines.push(
 			`== stability (stored labels, season to season): ${steps} steps, label changed ${changes} (${((100 * changes) / Math.max(1, steps)).toFixed(1)}%), main name changed ${mainChanges} (${((100 * mainChanges) / Math.max(1, steps)).toFixed(1)}%), defensive label changed ${defChanges} (${((100 * defChanges) / Math.max(1, steps)).toFixed(1)}%)`,
@@ -640,9 +751,8 @@ test.skipIf(!OUT)(
 
 		// Real players
 		if (REAL) {
-			const { realData, realPlayer, realNorms } = await import(
-				"../../../common/archetypes/real.testutil.ts"
-			);
+			const { realData, realPlayer, realNorms } =
+				await import("../../../common/archetypes/real.testutil.ts");
 			const season = Number(REAL);
 			const data = realData();
 			const rows = data.d.ratings.filter((r) => r.season === season);
@@ -652,9 +762,7 @@ test.skipIf(!OUT)(
 					row,
 					rp,
 					st: statsOf(
-						(data.st.stats[row.slug] ?? []).filter(
-							(s) => s.season === season,
-						),
+						(data.st.stats[row.slug] ?? []).filter((s) => s.season === season),
 					),
 				}))
 				.filter((x) => x.st && x.st.min > 0);
@@ -697,9 +805,7 @@ test.skipIf(!OUT)(
 					conf: Math.round(100 * c.confidence),
 					kind: np.kind,
 					scores: nounScores(rp.ratings, q),
-					why: (c.why ?? []).map(
-						(w) => `${w.label} ${r1(w.z, 2)}`,
-					),
+					why: (c.why ?? []).map((w) => `${w.label} ${r1(w.z, 2)}`),
 				});
 			}
 			finish(xs);

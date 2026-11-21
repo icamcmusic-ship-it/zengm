@@ -39,9 +39,12 @@ import {
 	type Skill,
 } from "./honest.ts";
 import {
+	nameCtxOf,
+	namePromises,
 	nounOfDesc,
 	nounScores,
 	pickNouns,
+	type NounInput,
 	type NounKey,
 	type Rejection,
 } from "./nouns.ts";
@@ -1028,6 +1031,7 @@ export const classifyV2 = (
 	let nounHonest: NounKey | null | undefined;
 	let nounConf: number | undefined;
 	let nounDefense: string | undefined;
+	let nounIn: NounInput | undefined;
 	if (P.nouns && isPos(pos)) {
 		const prevParsed = prevComposed ? parseComposedId(prevRaw) : undefined;
 		const prevNouns =
@@ -1039,7 +1043,7 @@ export const classifyV2 = (
 						.map((d) => nounOfDesc(d.key))
 						.filter((n): n is NounKey => n !== undefined)
 				: undefined;
-		const np = pickNouns({
+		nounIn = {
 			r: ratings,
 			pos,
 			ovr: opts.ovr,
@@ -1067,7 +1071,8 @@ export const classifyV2 = (
 				nouns: prevNouns,
 				special: prevRaw && !prevComposed ? mergedId(prevRaw) : undefined,
 			},
-		});
+		};
+		const np = pickNouns(nounIn);
 		const score = eff(first);
 		nounConf = np.conf;
 		nounDefense = np.defense;
@@ -1127,7 +1132,7 @@ export const classifyV2 = (
 			if (alt) {
 				first = alt;
 			} else {
-				const h = honestName({
+				const hIn = {
 					r: ratings,
 					group,
 					ovr: opts.ovr,
@@ -1136,11 +1141,49 @@ export const classifyV2 = (
 					prospect: opts.prospect,
 					seed: opts.pickKey ?? opts.srID ?? `${ratings.hgt}|${ratings.stre}`,
 					rq: norms.rq,
+					traits: opts.traits as Record<string, number> | undefined,
+				};
+				let h = honestName({
+					...hIn,
 					...(nounHonest !== undefined
 						? { skill: nounHonest === null ? null : NOUN_SKILL[nounHonest] }
 						: {}),
-					traits: opts.traits as Record<string, number> | undefined,
 				});
+				// archnouns4: an honest name's words keep their promises too (a specialist's skill in the top 30%, a trait
+				// word's trait at its bar); else the name about no skill, else a plain depth name
+				if (nounIn) {
+					const nctx = nameCtxOf(nounIn);
+					// (another word for the same name, then another of his skills in the top 30%, best first, then none)
+					const ok = (name: string) => namePromises(name, nctx).length === 0;
+					const synonym = (key: string) =>
+						ROLE_BY_KEY.get(key)?.names.find(ok) ??
+						Object.values(ROLE_BY_KEY.get(key)?.byGroup ?? {}).find((nm) =>
+							ok(nm!),
+						);
+					for (const n of [...nctx.cleared, null]) {
+						if (ok(h.name)) {
+							break;
+						}
+						const alt = synonym(h.key);
+						if (alt) {
+							h = { key: h.key, name: alt };
+							break;
+						}
+						h = honestName({
+							...hIn,
+							skill: n === null ? null : NOUN_SKILL[n],
+						});
+					}
+					if (namePromises(h.name, nctx).length > 0) {
+						const key =
+							(opts.ovr ?? 99) < 35
+								? "hCampBody"
+								: (opts.age ?? 0) >= 30
+									? "hJourneyman"
+									: "hFiller";
+						h = { key, name: ROLE_BY_KEY.get(key)!.names[0]! };
+					}
+				}
 				const role = ROLE_BY_KEY.get(h.key)!;
 				const id = composedId(role, [], group, { [h.key]: h.name });
 				first = {

@@ -15,6 +15,7 @@ import {
 	END_WORDS,
 	NOUN_DESC,
 	TRAIT_KEYWORDS,
+	WORD_REQ,
 	specialNounsOf,
 } from "./nouns.ts";
 import { DESC_BY_KEY } from "./grammar.ts";
@@ -46,7 +47,7 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 		out.push(`# Archetypes (reading ${ARCHETYPE_READING_VERSION})`);
 		out.push("");
 		out.push(
-			"Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 15% (never below 55). A label is a main name, plus a defensive label after a · when a defensive skill is among his best.",
+			"Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is a main name, plus a defensive label after a · when a defensive skill is among his best.",
 		);
 		out.push("");
 		out.push("## How a main name is built");
@@ -54,6 +55,24 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 		out.push(
 			"Each skill is a noun scored by his standing in the league that season. His name is, in order: one of the special names below whose skills are all among his three best (and include his best); else his two best nouns' front words and an end word (his position, or one of the end words below); else, with one skill at low OVR or none, an honest name.",
 		);
+		out.push("");
+		out.push("## Every word keeps its promise");
+		out.push("");
+		out.push(
+			"Every kind of name (special names, the user's own names, noun names, end words, honest names, defensive labels) is checked word by word: a skill word needs that skill in the league's top 30% and among his three best, a trait word its trait at the bar, an elite word an elite OVR. A name that breaks a promise gives way to the next one.",
+		);
+		out.push("");
+		for (const w of WORD_REQ) {
+			const what =
+				"nouns" in w
+					? `${w.why} in the top 30% and among his three best`
+					: "any" in w
+						? `${w.why}: one in the top 30%`
+						: "trait" in w
+							? `trait ${w.trait} ${w.min}+`
+							: w.why;
+			out.push(`- \`${String(w.re).slice(1, 70)}\`: ${what}`);
+		}
 		out.push("");
 		out.push("## Front words of the nouns");
 		out.push("");
@@ -101,7 +120,7 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 			);
 		}
 		out.push(
-			"- **Jack-Of-All-Trades** [any]: 5+ skills in the top 40%, none in the top 10%.",
+			"- **Jack-Of-All-Trades** [any]: 4+ skills in the top 30%, none in the top 10%.",
 		);
 		out.push("");
 		const builds: string[] = [];

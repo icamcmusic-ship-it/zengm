@@ -1,10 +1,51 @@
-# Archetypes (reading 25)
+# Archetypes (reading 26)
 
-Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 15% (never below 55). A label is a main name, plus a defensive label after a · when a defensive skill is among his best.
+Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is a main name, plus a defensive label after a · when a defensive skill is among his best.
 
 ## How a main name is built
 
 Each skill is a noun scored by his standing in the league that season. His name is, in order: one of the special names below whose skills are all among his three best (and include his best); else his two best nouns' front words and an end word (his position, or one of the end words below); else, with one skill at low OVR or none, an honest name.
+
+## Every word keeps its promise
+
+Every kind of name (special names, the user's own names, noun names, end words, honest names, defensive labels) is checked word by word: a skill word needs that skill in the league's top 30% and among his three best, a trait word its trait at the bar, an elite word an elite OVR. A name that breaks a promise gives way to the next one.
+
+- `\b3PT\b|\bThree\b(?!-Level)|Sniper|Sharpshoot|Shooter|Shooting|Spacer`: 3PT in the top 30% and among his three best
+- `Gunner|Shot Hunter|Shotmaker|Shot-Maker|Jumper\b/`: a jumper (3PT or mid-range): one in the top 30%
+- `Three-Level|3-Level/`: three levels in the top 30% and among his three best
+- `Scorer|Bucket|\bScoring\b/`: a scoring skill: one in the top 30%
+- `Mid-Range|Middy|Mid-Post|Pull-Up|Fadeaway|Fading|\bFade\b|Maestro|Elb`: mid-range in the top 30% and among his three best
+- `\bPost(?![ -]Defend)|Footwork|Pharaoh|Step-Through|Back-to-Basket|Bul`: post scoring in the top 30% and among his three best
+- `Finish|Dunk|Rim Wrecker|Rim-Wreck|Hammer|Slam|Layup|Acrobat|Attacker|`: finishing in the top 30% and among his three best
+- `\bArtist\b/`: finishing or mid-range touch
+- `Ball-Handling|Handle|Shifty|\bIso\b|Step Back|Step-Back|Shot-Creat|Sh`: ball handling in the top 30% and among his three best
+- `Step Back|Step-Back|Live-Dribble|Shot-Creat|Shot Creator|Ankle/`: the shot-creation sub-rating
+- `Slash|Open-Lane/`: a slasher's handle (top 50%) and speed
+- `Playmak|\bDime|Diming|Dimming|Engine|Facilitat|\bPoint\b(?!-of)|Wizar`: passing in the top 30% and among his three best
+- `Glass|Rebound|Board|Cleaner|Putback|Crash/`: rebounding in the top 30% and among his three best
+- `Speedy|Glider|\bGlide\b|Burner|Track Star|\bJet\b|Blur|Open-Lane|Tran`: speed in the top 30% and among his three best
+- `High-Flying|Flyer|Flier|Pogo|Bouncy|Aerial|Highlight|Hops|Leap|Spring`: leaping in the top 30% and among his three best
+- `High-Flying|Flyer|Flier|Highlight|Above-the-Rim|Aerial/`: finishing in the top 40%, or leaping in the top 5% (a high flyer uses his leaping at the rim)
+- `Physical|Bulldozer|Bruiser|Hammer|Strong|Bully|Space Eater|\bWall\b|B`: strength in the top 30% and among his three best
+- `Defensive|Lockdown|Stopper|Glove|3 & D|3-and-D|Perimeter Defender|Cla`: perimeter D in the top 30% and among his three best
+- `Two-Way|2-Way/`: two ways (a defensive and an offensive skill in the top 30%)
+- `Rim-Protect|Rim Protector|Shot-Block|Shot Blocker|Eras|Anchor|Swat|Po`: rim protection in the top 30% and among his three best
+- `Ball-Hawk|Ball Hawk|Interceptor|Pickpocket|Pick-Pocket|Pick Pocket|Th`: steals in the top 30% and among his three best
+- `Lockdown|\bLock\b|Clamp/`: mobility
+- `Jack|Swiss|Do-It-All|All-Around/`: 4 skills in the top 30%
+- `Wing-Running|Rim-Running|Demon|Motor|Workhorse|Relentless/`: trait motor 50+
+- `Hustl|\bPest\b|Chaos|Junkyard|Energy|Pressure|Gritty|Grinder/`: trait hustle 55+
+- `Switch/`: trait defensiveVersatility 55+
+- `By-the-Book|By-The-Book|Caretaker|Steady/`: trait consistency 55+
+- `Caretaker/`: trait shotDiscipline 50+
+- `Clutch|Closer|Ice-Cold/`: trait clutch 55+
+- `Off-Ball|Cutter|Mover/`: trait offBall 55+
+- `Roll Man|Roll-Man|Rolling|Screen/`: trait screen 50+
+- `Savvy|Veteran|Old Head/`: trait veteranSavvy 55+
+- `Ruthless/`: trait competitiveness 55+
+- `Iron\b|Durable/`: trait durability 55+
+- `Sniper|Sharpshoot|Logo|Deep-Range|Splash|Laser|Automatic|Silk|Big Ran`: an elite ovr
+- `\bRaw\b|Developing|Project|Late Bloomer|Lottery/`: ovr 30 or below, or no skill
 
 ## Front words of the nouns
 
@@ -173,7 +214,7 @@ Any of them may take Long (long arms) or Switchable (defensive versatility 70+) 
 - **Ironclad Defensive Anchor** [PF/FC/C] (rim protection, strength): An elite, durable interior defender.
 - **Relentless Glass Cleaner** [F/PF/FC/C] (rebounding): A rebounder with a nonstop motor.
 - **Slashing Middy Forward** [SF/F/PF] (finishing, handle, mid-range): A forward who attacks the basket and pulls up from mid-range.
-- **Jack-Of-All-Trades** [any]: 5+ skills in the top 40%, none in the top 10%.
+- **Jack-Of-All-Trades** [any]: 4+ skills in the top 30%, none in the top 10%.
 
 ## Special names: builds whose words are all nouns (205)
 

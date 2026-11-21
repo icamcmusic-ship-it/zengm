@@ -52,7 +52,7 @@ export const NOUN_CLEAR = 0.7;
 // Elite words: ovr 58+ (the user's audit: the top 15% of a league) and a top 8% standing at the noun
 export const NOUN_ELITE_OVR = 58;
 // (with a league table of ovr: his league's top ELITE_OVR_PCT, never below ELITE_OVR_FLOOR; the user)
-export const ELITE_OVR_PCT = 0.85;
+export const ELITE_OVR_PCT = 0.9;
 export const ELITE_OVR_FLOOR = 55;
 // A generic no-skill name only with no noun in the league's top 40% (else his best one's specialist name; the user)
 export const GENERIC_PCT = 0.6;
@@ -263,9 +263,23 @@ export const nounScores = (
 		};
 	}).sort((a, b) => b.pct - a.pct || b.above - a.above);
 
-// The nouns he qualifies for (Crafty only from the top 15%), best first
+// archnouns4 (the user: "a lot of high flyer builds, maybe too many"): leaping names him only from the league's top
+// 10%, and ranks ATH_DISCOUNT below a skill at the same standing, so a skill that is close wins (speed and strength
+// stay as they were: the user's audit names his top strength and speed, "Interior Force", "Track Star")
+export const ATH_NOUNS: ReadonlySet<NounKey> = new Set(["jump"]);
+export const ATH_CLEAR: Partial<Record<NounKey, number>> = { jump: 0.9 };
+export const ATH_DISCOUNT = 0.04;
+// A defensive skill in his defensive label from this standing (or among his three best)
+export const DEF_LABEL_PCT = 0.85;
+const clearAt = (k: NounKey) =>
+	k === "crafty" ? CRAFTY_PCT : (ATH_CLEAR[k] ?? NOUN_CLEAR);
+const rankPct = (s: NounScore) =>
+	s.pct - (ATH_NOUNS.has(s.key) ? ATH_DISCOUNT : 0);
+// The nouns he qualifies for (Crafty only from the top 15%), best first (athletic nouns discounted)
 export const clearedNouns = (scores: readonly NounScore[]): NounScore[] =>
-	scores.filter((s) => s.pct >= (s.key === "crafty" ? CRAFTY_PCT : NOUN_CLEAR));
+	scores
+		.filter((s) => s.pct >= clearAt(s.key))
+		.sort((a, b) => rankPct(b) - rankPct(a) || b.above - a.above);
 
 export const twoWayOk = (r: ArchetypeRatings, rq?: RatingQuantiles) => {
 	const perim = NOUN_VALUE.perimD.value(r);
@@ -456,6 +470,24 @@ export const aimReachable = (name: string, pos?: Pos): boolean => {
 	}
 	if (TRAIT_WORDS.some(([re]) => re.test(name))) {
 		return false;
+	}
+	// (archnouns4: and every promise its words make is one of its nouns: a word that needs another skill, a trait or a
+	// sub-rating the regenerator doesn't set makes the name unreachable)
+	const has = (n: NounKey) =>
+		sn.nouns.includes(n) || (n === "handle" && sn.nouns.includes("creator"));
+	for (const w of WORD_REQ) {
+		if (!w.re.test(name)) {
+			continue;
+		}
+		if ("nouns" in w ? !w.nouns.every(has) : "trait" in w) {
+			return false;
+		}
+		if (
+			"check" in w &&
+			/slasher|shot-creation|mobility|high flyer/.test(w.why)
+		) {
+			return false;
+		}
 	}
 	return pos === undefined || wordsFit(name, pos, {});
 };
@@ -730,6 +762,261 @@ export const nameProblem = (name: string): string | undefined => {
 		}
 	}
 	return undefined;
+};
+
+// ---- the words' promises (archnouns4, the user's 2053 audit): every word of a name is checked against what it
+// promises, the same way for every kind of name (special names, the user's own names, noun names, end words, honest
+// names, defensive labels). A skill word needs its noun in the league's top 30% AND among his three best; a trait word
+// needs the trait at its bar; an elite word an elite ovr. (The user's audit reads each word on its own: "Wing-Running"
+// is his motor, "Hammer" his strength, "Defensive" his perimeter D, "Step Back" his handle and shot creation.)
+export type NameCtx = {
+	// his nouns in the league's top 30% (crafty apart), and his three best of them
+	cleared: ReadonlySet<NounKey>;
+	top3: ReadonlySet<NounKey>;
+	// his standing at a noun (0..1)
+	pct: (k: NounKey) => number;
+	// his shot-creation sub-rating's standing (undefined without sub-ratings)
+	crtPct?: number;
+	traits?: Record<string, number>;
+	eliteOvr: boolean;
+	mobile: boolean;
+	ovr: number;
+	// a young player with upside (honest.ts hasUpside)
+	upside: boolean;
+};
+type WordReq =
+	// each of these nouns: top 30% and among his three best
+	| { re: RegExp; nouns: NounKey[]; why: string }
+	// one of these nouns in the top 30%
+	| { re: RegExp; any: NounKey[]; why: string }
+	// a trait at its bar (no traits: never)
+	| { re: RegExp; trait: string; min: number; why: string }
+	| { re: RegExp; check: (c: NameCtx) => boolean; why: string };
+const OFF_NOUNS: NounKey[] = [
+	"three",
+	"mid",
+	"post",
+	"finish",
+	"handle",
+	"pass",
+];
+export const WORD_REQ: WordReq[] = [
+	// shooting
+	{
+		re: /\b3PT\b|\bThree\b(?!-Level)|Sniper|Sharpshoot|Shooter|Shooting|Spacer|Spacing|Marksman|Deadeye|Splash|Logo|\bArc\b|Deep\b|Bomber|Stretch|Pick & Pop|Pick-and-Pop|Popp|Catch & Shoot|Catch-and-Shoot|Corner|Trey/,
+		nouns: ["three"],
+		why: "3PT",
+	},
+	{
+		re: /Gunner|Shot Hunter|Shotmaker|Shot-Maker|Jumper\b/,
+		any: ["three", "mid"],
+		why: "a jumper (3PT or mid-range)",
+	},
+	{
+		re: /Three-Level|3-Level/,
+		nouns: ["three", "mid"],
+		why: "three levels",
+	},
+	{
+		re: /Scorer|Bucket|\bScoring\b/,
+		any: ["three", "mid", "post", "finish"],
+		why: "a scoring skill",
+	},
+	{
+		re: /Mid-Range|Middy|Mid-Post|Pull-Up|Fadeaway|Fading|\bFade\b|Maestro|Elbow/,
+		nouns: ["mid"],
+		why: "mid-range",
+	},
+	{
+		re: /\bPost(?![ -]Defend)|Footwork|Pharaoh|Step-Through|Back-to-Basket|Bully|\bPaint\b(?![ -]Finish)/,
+		nouns: ["post"],
+		why: "post scoring",
+	},
+	{
+		re: /Finish|Dunk|Rim Wrecker|Rim-Wreck|Hammer|Slam|Layup|Acrobat|Attacker|Rim-Rocking|Rim-Running|Rim Runner|Cutter|Lob\b/,
+		nouns: ["finish"],
+		why: "finishing",
+	},
+	{
+		re: /\bArtist\b/,
+		check: (c) =>
+			(c.cleared.has("finish") && c.top3.has("finish")) ||
+			(c.cleared.has("mid") && c.top3.has("mid")),
+		why: "finishing or mid-range touch",
+	},
+	// handle and creation
+	{
+		re: /Ball-Handling|Handle|Shifty|\bIso\b|Step Back|Step-Back|Shot-Creat|Shot Creator|Creator|Ankle|Live-Dribble|Dribbl|Driver/,
+		nouns: ["handle"],
+		why: "ball handling",
+	},
+	{
+		re: /Step Back|Step-Back|Live-Dribble|Shot-Creat|Shot Creator|Ankle/,
+		check: (c) => c.crtPct === undefined || c.crtPct >= NOUN_CLEAR,
+		why: "the shot-creation sub-rating",
+	},
+	{
+		re: /Slash|Open-Lane/,
+		check: (c) => c.pct("handle") >= 0.5 && c.cleared.has("speed"),
+		why: "a slasher's handle (top 50%) and speed",
+	},
+	// passing, rebounding
+	{
+		re: /Playmak|\bDime|Diming|Dimming|Engine|Facilitat|\bPoint\b(?!-of)|Wizard|Table-Setting|Connector|\bHub\b|Catalyst|Passing(?!-Lane)|Architect|General|Triple-Double|Distribut|Outlet/,
+		nouns: ["pass"],
+		why: "passing",
+	},
+	{
+		re: /Glass|Rebound|Board|Cleaner|Putback|Crash/,
+		nouns: ["reb"],
+		why: "rebounding",
+	},
+	// athleticism
+	{
+		re: /Speedy|Glider|\bGlide\b|Burner|Track Star|\bJet\b|Blur|Open-Lane|Transition|Twitchy|Quick|\bFast\b|Speed/,
+		nouns: ["speed"],
+		why: "speed",
+	},
+	{
+		re: /High-Flying|Flyer|Flier|Pogo|Bouncy|Aerial|Highlight|Hops|Leap|Springy|Yamming|Riser|Above-the-Rim|\bAir\b/,
+		nouns: ["jump"],
+		why: "leaping",
+	},
+	// (archnouns4, the user: "a lot of high flyer builds": a high flyer also uses it, at the rim)
+	{
+		re: /High-Flying|Flyer|Flier|Highlight|Above-the-Rim|Aerial/,
+		check: (c) =>
+			c.pct("finish") >= HIGH_FLYER_FINISH || c.pct("jump") >= HIGH_FLYER_ALONE,
+		why: "finishing in the top 40%, or leaping in the top 5% (a high flyer uses his leaping at the rim)",
+	},
+	{
+		re: /Physical|Bulldozer|Bruiser|Hammer|Strong|Bully|Space Eater|\bWall\b|Brute|Muscle/,
+		nouns: ["strength"],
+		why: "strength",
+	},
+	// defense
+	{
+		re: /Defensive|Lockdown|Stopper|Glove|3 & D|3-and-D|Perimeter Defender|Clamp|\bLock\b|Stalker/,
+		nouns: ["perimD"],
+		why: "perimeter D",
+	},
+	{
+		re: /Two-Way|2-Way/,
+		check: (c) =>
+			(c.cleared.has("perimD") || c.cleared.has("rimD")) &&
+			OFF_NOUNS.some((n) => c.cleared.has(n)),
+		why: "two ways (a defensive and an offensive skill in the top 30%)",
+	},
+	{
+		re: /Rim-Protect|Rim Protector|Shot-Block|Shot Blocker|Eras|Anchor|Swat|Post-Defend|Post Defender|Protector/,
+		nouns: ["rimD"],
+		why: "rim protection",
+	},
+	{
+		re: /Ball-Hawk|Ball Hawk|Interceptor|Pickpocket|Pick-Pocket|Pick Pocket|Thief|Passing-Lane|Menace/,
+		nouns: ["steal"],
+		why: "steals",
+	},
+	{
+		re: /Lockdown|\bLock\b|Clamp/,
+		check: (c) => c.mobile,
+		why: "mobility",
+	},
+	// versatility: four skills in the top 30%
+	{
+		re: /Jack|Swiss|Do-It-All|All-Around/,
+		check: (c) => c.cleared.size >= JACK_CLEARED,
+		why: `${4} skills in the top 30%`,
+	},
+	// traits
+	{
+		re: /Wing-Running|Rim-Running|Demon|Motor|Workhorse|Relentless/,
+		trait: "motor",
+		min: 50,
+		why: "motor",
+	},
+	{
+		re: /Hustl|\bPest\b|Chaos|Junkyard|Energy|Pressure|Gritty|Grinder/,
+		trait: "hustle",
+		min: 55,
+		why: "hustle",
+	},
+	{
+		re: /Switch/,
+		trait: "defensiveVersatility",
+		min: 55,
+		why: "defensive versatility",
+	},
+	{
+		re: /By-the-Book|By-The-Book|Caretaker|Steady/,
+		trait: "consistency",
+		min: 55,
+		why: "consistency",
+	},
+	{
+		re: /Caretaker/,
+		trait: "shotDiscipline",
+		min: 50,
+		why: "shot discipline",
+	},
+	{ re: /Clutch|Closer|Ice-Cold/, trait: "clutch", min: 55, why: "clutch" },
+	{ re: /Off-Ball|Cutter|Mover/, trait: "offBall", min: 55, why: "off-ball" },
+	{
+		re: /Roll Man|Roll-Man|Rolling|Screen/,
+		trait: "screen",
+		min: 50,
+		why: "screen setting",
+	},
+	{
+		re: /Savvy|Veteran|Old Head/,
+		trait: "veteranSavvy",
+		min: 55,
+		why: "veteran savvy",
+	},
+	{ re: /Ruthless/, trait: "competitiveness", min: 55, why: "competitiveness" },
+	{ re: /Iron\b|Durable/, trait: "durability", min: 55, why: "durability" },
+	// elite words, development words
+	{ re: ELITE_RE, check: (c) => c.eliteOvr, why: "an elite ovr" },
+	{
+		re: /\bRaw\b|Developing|Project|Late Bloomer|Lottery/,
+		check: (c) => c.ovr <= DEV_MAX_OVR || c.cleared.size === 0,
+		why: "ovr 30 or below, or no skill",
+	},
+];
+// Four skills in the top 30% for a versatility name (the user's audit says three; the coordinator's ask: more breadth)
+export const JACK_CLEARED = 4;
+// A High-Flying name also needs his finishing at this standing
+export const HIGH_FLYER_FINISH = 0.6;
+// (or his leaping alone at this standing)
+export const HIGH_FLYER_ALONE = 0.95;
+// What a name promises that he doesn't have (empty: every word fits)
+export const namePromises = (name: string, c: NameCtx): string[] => {
+	const out: string[] = [];
+	for (const w of WORD_REQ) {
+		if (!w.re.test(name)) {
+			continue;
+		}
+		if ("nouns" in w) {
+			for (const n of w.nouns) {
+				if (!c.cleared.has(n)) {
+					out.push(`${w.why}: not in the top 30%`);
+				} else if (!c.top3.has(n)) {
+					out.push(`${w.why}: not one of his three best`);
+				}
+			}
+		} else if ("any" in w) {
+			if (!w.any.some((n) => c.cleared.has(n))) {
+				out.push(`${w.why}: none in the top 30%`);
+			}
+		} else if ("trait" in w) {
+			if ((c.traits?.[w.trait] ?? -Infinity) < w.min) {
+				out.push(`${w.why}: trait below ${w.min}`);
+			}
+		} else if (!w.check(c)) {
+			out.push(`needs ${w.why}`);
+		}
+	}
+	return out;
 };
 
 // ---- the user's "Doesn't fit" verdicts ----
@@ -1908,18 +2195,47 @@ export const END_WORDS: {
 // ---- the defensive label ----
 const DEF_NOUNS: ReadonlySet<NounKey> = new Set(["rimD", "perimD", "steal"]);
 
+// Whether his ovr is elite: the league's top ELITE_OVR_PCT, never below ELITE_OVR_FLOOR (no league table: NOUN_ELITE_OVR)
+const eliteOvrOf = (ovr: number | undefined, rq?: RatingQuantiles) => {
+	const ovrTable = tableOf("ovr", rq);
+	return (
+		ovr !== undefined &&
+		(ovrTable
+			? ovr >= ELITE_OVR_FLOOR && percentileIn(ovrTable, ovr) >= ELITE_OVR_PCT
+			: ovr >= NOUN_ELITE_OVR)
+	);
+};
+// archnouns4: what his name's words are checked against (namePromises)
+export const nameCtxOf = (x: NounInput): NameCtx => {
+	const scores = nounScores(x.r, x.rq);
+	const cleared = clearedNouns(scores).filter((c) => c.key !== "crafty");
+	const pct = Object.fromEntries(scores.map((s) => [s.key, s.pct])) as Record<
+		NounKey,
+		number
+	>;
+	const crt = sub(x.r, "crt");
+	return {
+		cleared: new Set(cleared.map((c) => c.key)),
+		top3: new Set(cleared.slice(0, 3).map((c) => c.key)),
+		pct: (k) => pct[k],
+		...(crt === undefined ? {} : { crtPct: pctOf("drb", crt, x.rq) }),
+		...(x.traits ? { traits: x.traits } : {}),
+		eliteOvr: eliteOvrOf(x.ovr, x.rq),
+		mobile: mobile(x.r, x.rq),
+		ovr: x.ovr ?? 99,
+		upside: hasUpside(x),
+	};
+};
+
 export const pickNouns = (x: NounInput): NounPick => {
 	const { r, pos, rq } = x;
 	const group = groupOfPos(pos);
 	const scores = nounScores(r, rq);
 	let cleared = clearedNouns(scores);
-	const ovrTable = tableOf("ovr", rq);
-	const eliteOvr =
-		x.ovr !== undefined &&
-		(ovrTable
-			? x.ovr >= ELITE_OVR_FLOOR &&
-				percentileIn(ovrTable, x.ovr) >= ELITE_OVR_PCT
-			: x.ovr >= NOUN_ELITE_OVR);
+	const eliteOvr = eliteOvrOf(x.ovr, rq);
+	// archnouns4: every name's words are checked against what they promise
+	const nctx = nameCtxOf(x);
+	const fits = (name: string) => namePromises(name, nctx).length === 0;
 	const isElite = (s: NounScore) =>
 		eliteOvr &&
 		s.pct >= ELITE_PCT &&
@@ -1951,7 +2267,8 @@ export const pickNouns = (x: NounInput): NounPick => {
 			}
 			return n > 0 && sum / n <= REJECT_NEAR;
 		});
-	const okName = (name: string) => !vetoed(name) && !nameProblem(name);
+	const okName = (name: string) =>
+		!vetoed(name) && !nameProblem(name) && fits(name);
 
 	// Last season's order, while each of its nouns is within HYST of where it would be now
 	const prevNouns = x.prev?.nouns;
@@ -1971,7 +2288,9 @@ export const pickNouns = (x: NounInput): NounPick => {
 	}
 
 	// The user's own special names first: the most specific that fits and has his best noun (a two-sided one names him
-	// whole: no defensive label)
+	// whole: no defensive label; archnouns4: an offensive one keeps his defensive label)
+	let customPick: NounPick | undefined;
+	let customDef = false;
 	{
 		const ctx: SpecialCtx = {
 			pos,
@@ -2036,8 +2355,9 @@ export const pickNouns = (x: NounInput): NounPick => {
 					c.nouns.reduce((sum, n) => sum + pctOfKey[n], 0) +
 					c.nouns.length -
 					SPREAD_PEN * (x.common?.[composedId(role, [], GROUP_OF[pos])] ?? 0);
-				// (the user's own names: only his verdicts can rule one out)
-				if (vetoed(composeName(role, [], GROUP_OF[pos]))) {
+				// (the user's own names: only his verdicts can rule one out; archnouns4: and every word must keep its promise)
+				const cname = composeName(role, [], GROUP_OF[pos]);
+				if (vetoed(cname) || !fits(cname)) {
 					continue;
 				}
 				if (sc > pickScore) {
@@ -2048,22 +2368,22 @@ export const pickNouns = (x: NounInput): NounPick => {
 		}
 		if (pick) {
 			const role = ROLE_BY_KEY.get(pick.key)!;
-			return {
+			customPick = {
 				kind: "trait",
 				key: pick.key,
 				name: composeName(role, [], GROUP_OF[pos]),
 				conf: confOf(cleared, pick.nouns),
 			};
+			customDef = pick.nouns.some((n) => DEF_NOUNS.has(n));
 		}
-		// (Jack-Of-All-Trades: many good skills, no great one)
-		const good = scores.filter(
-			(s) => s.key !== "crafty" && s.pct >= GENERIC_PCT,
-		);
+		// (Jack-Of-All-Trades: many good skills, no great one; archnouns4: JACK_CLEARED skills in the top 30%)
 		if (
+			!pick &&
 			!young &&
-			good.length >= JACK_MIN &&
+			nctx.cleared.size >= JACK_CLEARED &&
 			scores.every((s) => s.pct < 0.9) &&
 			(x.ovr ?? 0) >= 45 &&
+			fits("Jack-Of-All-Trades") &&
 			!vetoed("Jack-Of-All-Trades")
 		) {
 			return {
@@ -2085,10 +2405,13 @@ export const pickNouns = (x: NounInput): NounPick => {
 		// (archnouns3: for a star, near the top of the league at everything, "top 15%" says little: outside his three best
 		// it must also be within 0.05 of his very best)
 		const bestPct = cleared[0]?.pct ?? 0;
+		// (a defensive skill among his three best names him, or one in the league's top 15% within 0.05 of his best: the
+		// user's 2048 audit rules out a defensive label about a skill outside his three best)
 		const d = cleared.filter(
 			(c) =>
 				DEF_NOUNS.has(c.key) &&
-				(top3All.has(c.key) || c.pct >= Math.max(0.85, bestPct - 0.05)),
+				(top3All.has(c.key) ||
+					c.pct >= Math.max(DEF_LABEL_PCT, bestPct - 0.05)),
 		);
 		const rest = cleared.filter(
 			(c) => !DEF_NOUNS.has(c.key) && c.key !== "crafty",
@@ -2098,10 +2421,42 @@ export const pickNouns = (x: NounInput): NounPick => {
 			const rim = has("rimD");
 			const per = has("perimD");
 			const stl = has("steal");
+			// (archnouns4: the trait words of a defensive label need their traits: Pest hustle 55+, Switch defensive
+			// versatility 55+)
+			const trv = (k: string) => x.traits?.[k] ?? -Infinity;
+			const switchOk = trv("defensiveVersatility") >= 55;
+			const pestOk = trv("hustle") >= 55;
+			const rimName = (rr: NounScore) => {
+				const lead = leadSub(r, ["blk", "idf"]);
+				return isElite(rr)
+					? "Shot Eraser"
+					: lead === "blk"
+						? "Shot Blocker"
+						: lead === "idf"
+							? "Post Defender"
+							: "Rim Protector";
+			};
+			const perName = (pp: NounScore) =>
+				isElite(pp)
+					? "Lockdown Defender"
+					: eliteOvr && pp.pct >= ELITE_PCT
+						? "Cerebral Defender"
+						: pctOf("spd", sub(r, "lat") ?? r.spd, rq) >= 0.7
+							? "On-Ball Stopper"
+							: "Perimeter Defender";
+			const stlName = (ss: NounScore) =>
+				ss.pct >= 0.85 &&
+				(trv("competitiveness") >= TRAIT_WORD_MIN ||
+					trv("motor") >= TRAIT_WORD_MIN ||
+					trv("hustle") >= TRAIT_WORD_MIN)
+					? "Ball-Hawking Menace"
+					: ss.pct >= 0.85 && (sub(r, "stl") ?? 0) > (sub(r, "pdf") ?? 0)
+						? "Passing-Lane Interceptor"
+						: "Ball Hawk";
 			let n: string;
 			if (rim && stl && group !== "big" && rim.pct >= 0.8 && stl.pct >= 0.8) {
 				n = "Help-Side Roamer";
-			} else if (rim && per && rim.pct >= 0.8 && per.pct >= 0.8) {
+			} else if (rim && per && rim.pct >= 0.8 && per.pct >= 0.8 && switchOk) {
 				n = "Switch Defender";
 			} else if (rim && group === "guard" && rim.pct >= 0.85) {
 				n = "Swatting Guard";
@@ -2110,41 +2465,20 @@ export const pickNouns = (x: NounInput): NounPick => {
 				(!per || rim.pct >= per.pct) &&
 				(!stl || rim.pct >= stl.pct)
 			) {
-				const lead = leadSub(r, ["blk", "idf"]);
-				n = isElite(rim)
-					? "Shot Eraser"
-					: lead === "blk"
-						? "Shot Blocker"
-						: lead === "idf"
-							? "Post Defender"
-							: "Rim Protector";
+				n = rimName(rim);
 			} else if (
 				per &&
 				per.pct >= 0.8 &&
 				Math.max(x.traits?.motor ?? 0, x.traits?.hustle ?? 0) >= 65
 			) {
 				n = "Perimeter Stalker";
-			} else if (per && stl) {
+			} else if (per && stl && pestOk) {
 				// (archnouns3: Pest, the lighter one)
 				n = per.pct < 0.85 && stl.pct < 0.85 ? "Pest" : "Point-of-Attack Pest";
-			} else if (per) {
-				n = isElite(per)
-					? "Lockdown Defender"
-					: eliteOvr && per.pct >= ELITE_PCT
-						? "Cerebral Defender"
-						: pctOf("spd", sub(r, "lat") ?? r.spd, rq) >= 0.7
-							? "On-Ball Stopper"
-							: "Perimeter Defender";
+			} else if (per && (!stl || per.pct >= stl.pct)) {
+				n = perName(per);
 			} else {
-				n =
-					stl!.pct >= 0.85 &&
-					((x.traits?.competitiveness ?? 0) >= TRAIT_WORD_MIN ||
-						(x.traits?.motor ?? 0) >= TRAIT_WORD_MIN ||
-						(x.traits?.hustle ?? 0) >= TRAIT_WORD_MIN)
-						? "Ball-Hawking Menace"
-						: stl!.pct >= 0.85 && (sub(r, "stl") ?? 0) > (sub(r, "pdf") ?? 0)
-							? "Passing-Lane Interceptor"
-							: "Ball Hawk";
+				n = stlName(stl!);
 			}
 			if (long && !/Lockdown|Eraser/.test(n)) {
 				n = `Long ${n}`;
@@ -2161,6 +2495,9 @@ export const pickNouns = (x: NounInput): NounPick => {
 	}
 	const withDef = <T extends NounPick>(p: T): T =>
 		defense ? { ...p, defense } : p;
+	if (customPick) {
+		return customDef ? customPick : withDef(customPick);
+	}
 
 	const top3 = cleared.slice(0, 3);
 	const top3Keys = new Set(top3.map((s) => s.key));
@@ -2254,7 +2591,7 @@ export const pickNouns = (x: NounInput): NounPick => {
 			if (role && (t || connector(pctOfKey))) {
 				const i = Math.min(t?.variant?.(x) ?? 0, role.names.length - 1);
 				const name = role.names[i]!;
-				if (!vetoed(name)) {
+				if (!vetoed(name) && fits(name)) {
 					return withDef({ kind: "trait", key: role.key, name, conf: 0.6 });
 				}
 			}
