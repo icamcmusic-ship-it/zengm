@@ -62,11 +62,42 @@ const Recommendation = ({
 	rec,
 	controls,
 }: {
-	rec: { id: string; title: string; text: string; action?: SuggestionAction };
+	rec: {
+		id: string;
+		title: string;
+		text: string;
+		action?: SuggestionAction;
+		dismissed?: boolean;
+	};
 	controls: boolean;
 }) => {
 	const [status, setStatus] = useState<"idle" | "working" | "done">("idle");
 	const done = status === "done";
+	const dismiss = (undo: boolean) =>
+		toWorker("main", "staffDepthAction", {
+			type: "dismissRec",
+			id: rec.id,
+			undo,
+		});
+
+	if (rec.dismissed) {
+		return (
+			<div
+				className="small text-body-secondary mt-2"
+				data-testid="staff-rec-dismissed"
+			>
+				Recommendation dismissed for this season ({rec.title}).{" "}
+				<button
+					className="btn btn-link btn-sm p-0 align-baseline"
+					disabled={!controls}
+					onClick={() => dismiss(true)}
+				>
+					Show it again
+				</button>
+			</div>
+		);
+	}
+
 	return (
 		<div
 			className="border-start border-3 border-primary ps-2 mt-2"
@@ -75,25 +106,150 @@ const Recommendation = ({
 			<div className="small text-body-secondary">Recommended</div>
 			<div className="fw-bold">{rec.title}</div>
 			{rec.text ? <div className="small">{rec.text}</div> : null}
-			{rec.action ? (
-				<button
-					className="btn btn-sm btn-primary mt-1"
-					disabled={!controls || status !== "idle"}
-					title={
-						controls
-							? undefined
-							: "The staff decides in spectator mode and auto play"
-					}
-					onClick={async () => {
-						setStatus("working");
-						const ok = await act(rec.action!);
-						setStatus(ok ? "done" : "idle");
-					}}
-				>
-					{done ? "Done" : "Accept"}
-				</button>
+			{rec.action || rec.id !== "none" ? (
+				<div className="d-flex gap-2 mt-1">
+					{rec.action ? (
+						<button
+							className="btn btn-sm btn-primary"
+							disabled={!controls || status !== "idle"}
+							title={
+								controls
+									? undefined
+									: "The staff decides in spectator mode and auto play"
+							}
+							onClick={async () => {
+								setStatus("working");
+								const ok = await act(rec.action!);
+								setStatus(ok ? "done" : "idle");
+							}}
+						>
+							{done ? "Done" : "Accept"}
+						</button>
+					) : null}
+					{rec.id !== "none" && !done ? (
+						<button
+							className="btn btn-sm btn-light-bordered"
+							disabled={!controls || status !== "idle"}
+							title="Hide this recommendation for the rest of the season"
+							onClick={() => dismiss(false)}
+						>
+							Dismiss
+						</button>
+					) : null}
+				</div>
 			) : null}
 		</div>
+	);
+};
+
+type DevSortKey = "skills" | "ovr";
+
+const DEV_ROWS_SHOWN = 10;
+
+// The development table: sorted by the change in the worked-on skills or ovr (biggest first, click again for smallest), the first 10
+// unless "show all"
+const DevelopmentTable = ({
+	development,
+}: {
+	development: NonNullable<View<"staffReport">["development"]>;
+}) => {
+	const [sort, setSort] = useState<
+		{ key: DevSortKey; dir: "desc" | "asc" } | undefined
+	>();
+	const [showAll, setShowAll] = useState(false);
+
+	const change = (r: (typeof development.rows)[number], key: DevSortKey) => {
+		const before = key === "skills" ? r.focusBefore : r.ovrBefore;
+		const after = key === "skills" ? r.focusAfter : r.ovrAfter;
+		return before === null || after === null ? -Infinity : after - before;
+	};
+
+	let rows = development.rows;
+	if (sort && !development.hideRatings) {
+		rows = rows.toSorted((a, b) => {
+			const diff = change(b, sort.key) - change(a, sort.key);
+			return (sort.dir === "desc" ? diff : -diff) || a.pid - b.pid;
+		});
+	}
+	const shown = showAll ? rows : rows.slice(0, DEV_ROWS_SHOWN);
+
+	const header = (key: DevSortKey, label: string) => {
+		const active = sort?.key === key;
+		return (
+			<th
+				className="text-nowrap"
+				role="button"
+				data-testid={`staff-dev-sort-${key}`}
+				title="Sort by the change"
+				onClick={() =>
+					setSort(
+						active
+							? { key, dir: sort.dir === "desc" ? "asc" : "desc" }
+							: { key, dir: "desc" },
+					)
+				}
+			>
+				{label}
+				{active ? (sort.dir === "desc" ? " ▼" : " ▲") : null}
+			</th>
+		);
+	};
+
+	return (
+		<>
+			<div className="table-responsive">
+				<table
+					className="table table-sm small mb-2"
+					data-testid="staff-dev-table"
+				>
+					<thead>
+						<tr>
+							<th>Player</th>
+							<th>Worked on</th>
+							{development.hideRatings ? null : (
+								<>
+									{header("skills", "Skills")}
+									{header("ovr", "Ovr")}
+								</>
+							)}
+						</tr>
+					</thead>
+					<tbody>
+						{shown.map((r) => (
+							<tr key={r.pid}>
+								<td>
+									<a href={helpers.leagueUrl(["player", r.pid])}>{r.name}</a>
+								</td>
+								<td>
+									{r.focus
+										? development.focuses.find((f) => f.key === r.focus)?.name
+										: "Staff plan"}
+								</td>
+								{development.hideRatings ? null : (
+									<>
+										<td className="text-nowrap">
+											{r.focusBefore} → {r.focusAfter}
+										</td>
+										<td className="text-nowrap">
+											{r.ovrBefore} → {r.ovrAfter}
+										</td>
+									</>
+								)}
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			{rows.length > DEV_ROWS_SHOWN ? (
+				<button
+					className="btn btn-link btn-sm p-0 mb-2"
+					data-testid="staff-dev-show-all"
+					onClick={() => setShowAll(!showAll)}
+				>
+					{showAll ? `Show top ${DEV_ROWS_SHOWN}` : `Show all ${rows.length}`}
+				</button>
+			) : null}
+		</>
 	);
 };
 
@@ -313,50 +469,7 @@ const StaffReport = ({
 										</>
 									)}
 								</p>
-								<div className="table-responsive">
-									<table className="table table-sm small mb-2">
-										<thead>
-											<tr>
-												<th>Player</th>
-												<th>Worked on</th>
-												{development.hideRatings ? null : (
-													<>
-														<th>Skills</th>
-														<th>Ovr</th>
-													</>
-												)}
-											</tr>
-										</thead>
-										<tbody>
-											{development.rows.slice(0, 10).map((r) => (
-												<tr key={r.pid}>
-													<td>
-														<a href={helpers.leagueUrl(["player", r.pid])}>
-															{r.name}
-														</a>
-													</td>
-													<td>
-														{r.focus
-															? development.focuses.find(
-																	(f) => f.key === r.focus,
-																)?.name
-															: "Staff plan"}
-													</td>
-													{development.hideRatings ? null : (
-														<>
-															<td className="text-nowrap">
-																{r.focusBefore} → {r.focusAfter}
-															</td>
-															<td className="text-nowrap">
-																{r.ovrBefore} → {r.ovrAfter}
-															</td>
-														</>
-													)}
-												</tr>
-											))}
-										</tbody>
-									</table>
-								</div>
+								<DevelopmentTable development={development} />
 							</>
 						) : (
 							<p className="small">

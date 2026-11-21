@@ -233,6 +233,26 @@ export const dismissStaffSuggestion = async (id: string) => {
 	await removeSuggestion(t.tid, id);
 };
 
+// Staff Report: dismiss a recommendation for the rest of the season, or bring it back
+const MAX_DISMISSED_RECS = 50;
+export const dismissStaffRecommendation = async (id: string, undo = false) => {
+	const t = await userTeam();
+	const state = stateOf(t);
+	const season = g.get("season");
+	let ids =
+		state.dismissedRecs?.season === season ? [...state.dismissedRecs.ids] : [];
+	ids = ids.filter((x) => x !== id);
+	if (!undo && id !== "none") {
+		ids.push(id);
+	}
+	state.dismissedRecs = { season, ids: ids.slice(-MAX_DISMISSED_RECS) };
+	if (ids.length === 0) {
+		delete state.dismissedRecs;
+	}
+	t.staffDepth = state;
+	await idb.cache.teams.put(t);
+};
+
 export const setDraftBoardLock = async (pid: number, locked: boolean) => {
 	assertControls(g.get("userTid"));
 	const p = await idb.cache.players.get(pid);

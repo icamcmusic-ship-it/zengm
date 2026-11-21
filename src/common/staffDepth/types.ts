@@ -90,6 +90,8 @@ export type StaffDepthTeam = {
 	devReport?: { season: number; rows: DevReportRow[] };
 	// Last week of the regular season processed (weekly looks and board)
 	week?: { season: number; n: number };
+	// Staff Report recommendations the user dismissed, for that season only (ids as the report builds them)
+	dismissedRecs?: { season: number; ids: string[] };
 };
 
 // On every team (t.scoutCareer): the scouting department's careers, layered on the seeded chains of common/scoutingReports/scouts.ts

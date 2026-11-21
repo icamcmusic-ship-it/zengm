@@ -18,7 +18,7 @@ import {
 	getTeamStaff,
 	releaseTeamCoaches,
 } from "../staff/index.ts";
-import { applyStaffAction } from "./actions.ts";
+import { applyStaffAction, dismissStaffRecommendation } from "./actions.ts";
 import { getStaffReport } from "./report.ts";
 import { planFor, stateOf } from "./coaching.ts";
 import { directorFor } from "./scouting.ts";
@@ -220,6 +220,69 @@ describe("coaching staff depth", () => {
 			assert.strictEqual(dev.rec.id, "none");
 		} finally {
 			g.setWithoutSavingToDB("challengeNoRatings", false);
+		}
+	});
+
+	test("a dismissed recommendation stays dismissed for the season only, and can be brought back", async () => {
+		for (const tid of [g.get("userTid"), 1, 2]) {
+			for (let i = 0; i < 10; i++) {
+				const p = player.generate(tid, 22 + i, g.get("season"), true, 50);
+				await player.develop(p, 0);
+				await player.updateValues(p);
+				await idb.cache.players.add(p);
+			}
+		}
+		const recs = async () => {
+			const report = (await getStaffReport())!;
+			return [report.fit.rec, report.conditioning.rec, report.development?.rec];
+		};
+		const target = (await recs()).find((rec) => rec && rec.id !== "none");
+		assert.isDefined(target, "a recommendation to dismiss");
+		const id = target!.id;
+		assert.isUndefined(target!.dismissed);
+
+		await dismissStaffRecommendation(id);
+		const dismissed = (await recs()).find((rec) => rec?.id === id)!;
+		assert.isTrue(dismissed.dismissed);
+		// The others are untouched
+		for (const rec of await recs()) {
+			if (rec && rec.id !== id) {
+				assert.isUndefined(rec.dismissed);
+			}
+		}
+
+		// Back
+		await dismissStaffRecommendation(id, true);
+		assert.isUndefined((await recs()).find((rec) => rec?.id === id)!.dismissed);
+
+		// Next season it's back on its own
+		await dismissStaffRecommendation(id);
+		const t = (await idb.cache.teams.get(g.get("userTid")))!;
+		assert.deepStrictEqual(t.staffDepth!.dismissedRecs, {
+			season: g.get("season"),
+			ids: [id],
+		});
+		g.setWithoutSavingToDB("season", g.get("season") + 1);
+		try {
+			for (const rec of await recs()) {
+				assert.isUndefined(rec?.dismissed);
+			}
+		} finally {
+			g.setWithoutSavingToDB("season", g.get("season") - 1);
+		}
+
+		// Not in spectator mode
+		g.setWithoutSavingToDB("spectator", true);
+		try {
+			let threw = false;
+			try {
+				await dismissStaffRecommendation(id, true);
+			} catch {
+				threw = true;
+			}
+			assert.isTrue(threw);
+		} finally {
+			g.setWithoutSavingToDB("spectator", false);
 		}
 	});
 

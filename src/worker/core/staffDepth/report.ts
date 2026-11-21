@@ -92,6 +92,19 @@ type Recommendation = {
 	title: string;
 	text: string;
 	action?: SuggestionAction;
+	// Dismissed for this season (the page shows it collapsed, with a way to bring it back)
+	dismissed?: boolean;
+};
+
+// Marks the recommendations the user dismissed this season
+const markDismissed = <T extends { rec: Recommendation } | undefined>(
+	section: T,
+	dismissed: Set<string>,
+): T => {
+	if (section && section.rec.id !== "none" && dismissed.has(section.rec.id)) {
+		return { ...section, rec: { ...section.rec, dismissed: true } };
+	}
+	return section;
 };
 
 const POS_NEED: Record<string, "G" | "F" | "C"> = {
@@ -693,6 +706,11 @@ export const getStaffReport = async () => {
 	const scoutingOn = scoutingDepthOn();
 	const coachingOn = coachingDepthOn();
 	const noRatings = !!g.get("challengeNoRatings");
+	const dismissed = new Set(
+		state.dismissedRecs?.season === g.get("season")
+			? state.dismissedRecs.ids
+			: [],
+	);
 	return {
 		season: g.get("season"),
 		phase: g.get("phase"),
@@ -709,10 +727,16 @@ export const getStaffReport = async () => {
 					? { ...s, action: { ...s.action, plans: {} } }
 					: s,
 			),
-		scouting: scoutingOn ? await scoutingSection(tid) : undefined,
-		development: coachingOn ? await developmentSection(tid) : undefined,
-		fit: await fitSection(tid),
-		conditioning: await conditioningSection(tid),
+		scouting: markDismissed(
+			scoutingOn ? await scoutingSection(tid) : undefined,
+			dismissed,
+		),
+		development: markDismissed(
+			coachingOn ? await developmentSection(tid) : undefined,
+			dismissed,
+		),
+		fit: markDismissed(await fitSection(tid), dismissed),
+		conditioning: markDismissed(await conditioningSection(tid), dismissed),
 		offense: await offEmphasisRecommendation(tid),
 	};
 };

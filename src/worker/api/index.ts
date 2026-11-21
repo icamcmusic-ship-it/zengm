@@ -3009,6 +3009,7 @@ const staffDepthAction = async (
 		| { type: "scoutRegion"; scoutId: number; region: ScoutRegion }
 		| { type: "apply"; action: SuggestionAction; suggestionId?: string }
 		| { type: "dismiss"; id: string }
+		| { type: "dismissRec"; id: string; undo?: boolean }
 		| { type: "boardLock"; pid: number; locked: boolean },
 ): Promise<string | undefined> => {
 	// A sentence for the confirmation toast (accepting a recommendation or approving a proposal)
@@ -3026,6 +3027,8 @@ const staffDepthAction = async (
 		);
 	} else if (action.type === "dismiss") {
 		await staffDepthActions.dismissStaffSuggestion(action.id);
+	} else if (action.type === "dismissRec") {
+		await staffDepthActions.dismissStaffRecommendation(action.id, action.undo);
 	} else {
 		await staffDepthActions.setDraftBoardLock(action.pid, action.locked);
 	}
