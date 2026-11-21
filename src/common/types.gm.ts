@@ -87,6 +87,8 @@ export type Gm = {
 	expWon?: number;
 	// Last computed job security score (negative is bad), after the playoffs
 	hotSeat?: number;
+	// Season of the last "job reportedly in danger" news item about him (hotSeatNews), so he gets at most one a season
+	hotSeatNews?: number;
 	retiredYear?: number;
 	// Coach & Executive of the Year (League Extra): Executive of the Year awards he won (missing in older leagues)
 	awards?: { season: number; type: string; tid: number }[];

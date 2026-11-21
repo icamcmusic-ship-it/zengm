@@ -676,6 +676,103 @@ export const projectedFireProb = async (
 	return fireProbOf(t, gm, rows, marketFactors(teams).get(t.tid) ?? 0);
 };
 
+// Hot seat news: at the trade deadline (mid-season in a league without one), the AI GMs most likely to be fired if the season ended
+// now are reported to be in danger. At least HOT_SEAT_NEWS_MIN_PROB, each reported with that probability from a stream seeded by the
+// season and his id (never the main stream), at most HOT_SEAT_NEWS_MAX a season, worst first
+export const HOT_SEAT_NEWS_MIN_PROB = 0.3;
+export const HOT_SEAT_NEWS_MAX = 3;
+const HOT_SEAT_NEWS_MIN_GP = 10;
+
+export const hotSeatNews = async () => {
+	if (!gmEnabled() || isCollege()) {
+		return;
+	}
+	const phase = g.get("phase");
+	if (phase !== PHASE.REGULAR_SEASON && phase !== PHASE.AFTER_TRADE_DEADLINE) {
+		return;
+	}
+	const season = g.get("season");
+	const teams = (await idb.cache.teams.getAll()).filter((t) => !t.disabled);
+	const numGames = g.get("numGames");
+
+	const candidates: { t: Team; gm: Gm; prob: number; record: string }[] = [];
+	for (const t of teams) {
+		const gm = t.gm;
+		if (!gm || userOwnsTeam(t.tid) || gm.hotSeatNews === season) {
+			continue;
+		}
+		const ts = await idb.cache.teamSeasons.indexGet("teamSeasonsBySeasonTid", [
+			season,
+			t.tid,
+		]);
+		const gp = ts ? helpers.getTeamSeasonGp(ts) : 0;
+		if (!ts || gp < HOT_SEAT_NEWS_MIN_GP) {
+			continue;
+		}
+		// The season so far projected to a full one, judged the way the owner will judge it (as the rumor mill does)
+		const scale = numGames / gp;
+		const prob = await projectedFireProb(t, teams, {
+			season,
+			won: ts.won * scale,
+			lost: ts.lost * scale,
+			tied: (ts.tied ?? 0) * scale,
+			otl: (ts.otl ?? 0) * scale,
+			playoffRoundsWon: -1,
+		});
+		if (prob < HOT_SEAT_NEWS_MIN_PROB) {
+			continue;
+		}
+		const random = makeSeededRandom(
+			saltedSeed((season * 100003 + gm.gmid * 7919 + 17) >>> 0),
+		);
+		if (random() >= prob) {
+			continue;
+		}
+		candidates.push({ t, gm, prob, record: helpers.formatRecord(ts) });
+	}
+
+	candidates.sort((a, b) => b.prob - a.prob || a.t.tid - b.t.tid);
+	for (const { t, gm, prob, record } of candidates.slice(
+		0,
+		HOT_SEAT_NEWS_MAX,
+	)) {
+		gm.hotSeatNews = season;
+		await idb.cache.teams.put(t);
+		const strength = prob >= 0.6 ? "seriously " : "";
+		await logEvent({
+			type: "info",
+			category: "staff",
+			text: `Sources say general manager ${gmLink(gm)}'s job with ${teamLink(t.tid)} (${record}) is reportedly ${strength}in danger.`,
+			showNotification: true,
+			tids: [t.tid],
+			score: prob >= 0.6 ? 10 : 0,
+		});
+	}
+};
+
+// Mid-season, for a league without a trade deadline: once every team has played half its games, until they've all played 2 more
+// (the per-GM marker keeps it to one item each)
+export const hotSeatNewsMidSeason = async () => {
+	if (!gmEnabled() || g.get("tradeDeadline") < 1) {
+		return;
+	}
+	const teamSeasons = await idb.cache.teamSeasons.indexGetAll(
+		"teamSeasonsBySeasonTid",
+		[[g.get("season")], [g.get("season"), "Z"]],
+	);
+	const active = teamSeasons.filter(
+		(ts) => !g.get("teamInfoCache")[ts.tid]?.disabled,
+	);
+	if (active.length === 0) {
+		return;
+	}
+	const minGp = Math.min(...active.map((ts) => helpers.getTeamSeasonGp(ts)));
+	const half = Math.ceil(g.get("numGames") / 2);
+	if (minGp >= half && minGp < half + 2) {
+		await hotSeatNews();
+	}
+};
+
 const age = (gm: Gm) => g.get("season") - gm.born.year;
 
 // Former GMs still on the market: out of a job for at most MARKET_SEASONS seasons and at most MAX_HIRE_AGE at the carousel. Anyone else

@@ -26,6 +26,8 @@ import {
 	ensureGms,
 	getAllGmWeights,
 	getGmWeights,
+	HOT_SEAT_NEWS_MAX,
+	hotSeatNews,
 	judgedSeasons,
 	onGmMarket,
 	onRegularSeason,
@@ -608,6 +610,112 @@ describe("AI GMs", () => {
 		assert.isDefined(other2.gm);
 		const t2 = (await idb.cache.teams.get(tid))!;
 		assert.notStrictEqual(t2.gm!.gmid, firedGmid);
+	});
+});
+
+describe("GM hot seat news", () => {
+	beforeEach(async () => {
+		await setup();
+		await ensureGms();
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		await onRegularSeason();
+	});
+
+	// Teams far below expectations for two seasons (past the honeymoon), then a bad start to the third
+	const badTids = [3, 5, 7, 9, 11];
+	const setupBadSeasons = async () => {
+		for (let i = 0; i < 2; i++) {
+			await finishSeason((tid) => (badTids.includes(tid) ? 20 : 41));
+			await withRandom(i + 1, async () => {
+				// Only the bad seasons get recorded here: no firing yet in the honeymoon
+				await runOffseason();
+			});
+			await nextSeason();
+			await onRegularSeason();
+		}
+		const season = g.get("season");
+		for (const t of await idb.cache.teams.getAll()) {
+			if (
+				!(await idb.cache.teamSeasons.indexGet("teamSeasonsBySeasonTid", [
+					season,
+					t.tid,
+				]))
+			) {
+				await idb.cache.teamSeasons.add(
+					team.genSeasonRow(t, undefined, season),
+				);
+			}
+			const ts = (await idb.cache.teamSeasons.indexGet(
+				"teamSeasonsBySeasonTid",
+				[season, t.tid],
+			))!;
+			ts.won = badTids.includes(t.tid) ? 6 : 20;
+			ts.lost = badTids.includes(t.tid) ? 34 : 20;
+			await idb.cache.teamSeasons.put(ts);
+		}
+	};
+
+	const newsTexts = async () =>
+		(await idb.cache.events.getAll())
+			.map((e) => e.text ?? "")
+			.filter((x) => x.includes("reportedly"));
+
+	test("GMs about to be fired are reported, at most a few a season, once each, without main stream draws", async () => {
+		await setupBadSeasons();
+		const orig = Math.random;
+		Math.random = () => {
+			throw new Error("Math.random called");
+		};
+		try {
+			await hotSeatNews();
+			const texts = await newsTexts();
+			assert.isAbove(texts.length, 0);
+			assert.isAtMost(texts.length, HOT_SEAT_NEWS_MAX);
+			for (const tid of badTids) {
+				const t = (await idb.cache.teams.get(tid))!;
+				if (t.gm!.hotSeatNews === g.get("season")) {
+					assert.isTrue(
+						texts.some((x) => x.includes(t.gm!.lastName)),
+						"news for a marked GM",
+					);
+				}
+			}
+			const event = (await idb.cache.events.getAll()).find((e) =>
+				e.text?.includes("reportedly"),
+			)!;
+			assert.isTrue(badTids.includes(event.tids![0]!));
+
+			// Again (another day in the mid-season window): nobody twice
+			await hotSeatNews();
+			const again = await newsTexts();
+			assert.isAtMost(again.length, HOT_SEAT_NEWS_MAX + badTids.length);
+			assert.strictEqual(
+				new Set(again).size,
+				again.length,
+				"no GM reported twice",
+			);
+		} finally {
+			Math.random = orig;
+		}
+	});
+
+	test("nothing for teams doing fine, in college or with the setting off", async () => {
+		await hotSeatNews();
+		assert.strictEqual(
+			(await newsTexts()).length,
+			0,
+			"first season: honeymoon",
+		);
+
+		await setupBadSeasons();
+		g.setWithoutSavingToDB("leagueType", "college" as any);
+		await hotSeatNews();
+		assert.strictEqual((await newsTexts()).length, 0, "college");
+		g.setWithoutSavingToDB("leagueType", undefined as any);
+
+		g.setWithoutSavingToDB("featureGmPersonalities", false);
+		await hotSeatNews();
+		assert.strictEqual((await newsTexts()).length, 0, "setting off");
 	});
 });
 

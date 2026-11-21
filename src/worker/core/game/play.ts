@@ -63,6 +63,7 @@ import { last } from "../../../common/utils.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
 import { advStats } from "../../util/advStats.ts";
 import { afterDay as rumorsAfterDay } from "../rumors/index.ts";
+import { hotSeatNewsMidSeason } from "../gm/index.ts";
 import { afterDay as staffDepthAfterDay } from "../staffDepth/index.ts";
 import { getDayTicks, scheduleDaysSpread } from "../season/scheduleDayScale.ts";
 
@@ -401,6 +402,13 @@ const play = async (
 			if (dayTick && phase === PHASE.REGULAR_SEASON) {
 				// AI-to-AI trades and AI offers are background activity: a bug in them must not stop the season
 				await trade.runAiTradesSafely();
+
+				// GM hot seat news (at the trade deadline, or here mid-season in a league without one)
+				try {
+					await hotSeatNewsMidSeason();
+				} catch (error) {
+					console.error(error);
+				}
 			}
 
 			// Rumors (League extras): read-only, on its own random stream. After the day's trades and signings
