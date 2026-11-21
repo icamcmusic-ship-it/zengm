@@ -406,7 +406,16 @@ test.skipIf(!env.SHOT_SHARE_CAL)(
 				(ts) => ts.season === s && !ts.playoffs,
 			);
 			let gp = 0;
-			const sum = { pts: 0, fga: 0, fg: 0, tpa: 0, tov: 0, fta: 0 };
+			const sum = {
+				pts: 0,
+				fga: 0,
+				fg: 0,
+				tpa: 0,
+				tp: 0,
+				tov: 0,
+				fta: 0,
+				ft: 0,
+			};
 			for (const ts of teamStats) {
 				gp += ts.gp;
 				for (const key of Object.keys(sum)) {
@@ -419,6 +428,10 @@ test.skipIf(!env.SHOT_SHARE_CAL)(
 				tpaRate: sum.tpa / sum.fga,
 				tov: sum.tov / gp,
 				fta: sum.fta / gp,
+				// (the era calibration's targets: 3P%, FT%, eFG%)
+				tpp: sum.tp / sum.tpa,
+				ftp: sum.ft / sum.fta,
+				efg: (sum.fg + 0.5 * sum.tp) / sum.fga,
 			};
 			const result = {
 				seed,
