@@ -3318,7 +3318,7 @@ export const settings: Setting[] = (
 			type: "int",
 			validator: (value) => {
 				if (value <= 1) {
-					throw new Error("Value must be greater than 2");
+					throw new Error("Value must be at least 2");
 				}
 			},
 		},
@@ -3335,7 +3335,7 @@ export const settings: Setting[] = (
 			type: "int",
 			validator: (value) => {
 				if (value <= 1) {
-					throw new Error("Value must be greater than 2");
+					throw new Error("Value must be at least 2");
 				}
 			},
 		},

@@ -38,6 +38,7 @@ import {
 	getBadgeTraits,
 	getBadgeScoutingLevel,
 	loadBadgeScoutingLevel,
+	resetBadgeScoutingLevel,
 	getSimTraitEffects,
 	getSimTraitEffectsWeekly,
 	getMentorBonuses,
@@ -72,7 +73,11 @@ import setContractDemand from "./setContractDemand.ts";
 import setJerseyNumber from "./setJerseyNumber.ts";
 import sign from "./sign.ts";
 import shouldRetire from "./shouldRetire.ts";
-import skills from "./skills.ts";
+import skills, {
+	fuzzedSkillRow,
+	refreshSkills,
+	skillsFromRow,
+} from "./skills.ts";
 import stats from "./stats.ts";
 import updateOvrMeanStd from "./updateOvrMeanStd.ts";
 import updateValues from "./updateValues.ts";
@@ -114,6 +119,7 @@ export default {
 	getBadgeTraits,
 	getBadgeScoutingLevel,
 	loadBadgeScoutingLevel,
+	resetBadgeScoutingLevel,
 	getSimTraitEffects,
 	getSimTraitEffectsWeekly,
 	getMentorBonuses,
@@ -149,6 +155,9 @@ export default {
 	setJerseyNumber,
 	shouldRetire,
 	skills,
+	skillsFromRow,
+	fuzzedSkillRow,
+	refreshSkills,
 	stats,
 	updateOvrMeanStd,
 	updateValues,

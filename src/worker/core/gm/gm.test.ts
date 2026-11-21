@@ -27,9 +27,12 @@ import {
 	getAllGmWeights,
 	getGmWeights,
 	judgedSeasons,
+	onGmMarket,
 	onRegularSeason,
 	runOffseason,
+	syncGms,
 } from "./index.ts";
+import frontOfficesView from "../../views/frontOffices.ts";
 
 const withRandom = async <T>(seed: number, f: () => Promise<T>) => {
 	const orig = Math.random;
@@ -605,6 +608,222 @@ describe("AI GMs", () => {
 		assert.isDefined(other2.gm);
 		const t2 = (await idb.cache.teams.get(tid))!;
 		assert.notStrictEqual(t2.gm!.gmid, firedGmid);
+	});
+});
+
+describe("AI GMs and the user's teams", () => {
+	beforeEach(async () => {
+		await setup();
+		await ensureGms();
+	});
+
+	// Fails the test if anything draws from the main random stream
+	const noRandom = async <T>(f: () => Promise<T>) => {
+		const orig = Math.random;
+		Math.random = () => {
+			throw new Error("Math.random called");
+		};
+		try {
+			return await f();
+		} finally {
+			Math.random = orig;
+		}
+	};
+
+	const allGmids = async () => {
+		const gmids: number[] = [];
+		for (const t of await idb.cache.teams.getAll()) {
+			for (const gm of [...(t.gm ? [t.gm] : []), ...(t.formerGms ?? [])]) {
+				gmids.push(gm.gmid);
+			}
+		}
+		return gmids;
+	};
+
+	test("taking a team over ends its GM's tenure, giving it up names a new GM at once, without main stream draws", async () => {
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		const tid = 5;
+		const before = (await idb.cache.teams.get(tid))!.gm!;
+		const season = g.get("season");
+
+		// Multi team mode: the user adds team 5
+		g.setWithoutSavingToDB("userTids", [g.get("userTid"), tid]);
+		await noRandom(syncGms);
+		const t1 = (await idb.cache.teams.get(tid))!;
+		assert.isUndefined(t1.gm);
+		const left = t1.formerGms!.at(-1)!;
+		assert.strictEqual(left.gmid, before.gmid);
+		assert.strictEqual(left.tenures.at(-1)!.reason, "left");
+		// Taken over during the regular season: his last season was the one before (never before his first)
+		assert.strictEqual(
+			left.tenures.at(-1)!.end,
+			Math.max(season - 1, left.tenures.at(-1)!.start - 1),
+		);
+		assert.isTrue(onGmMarket(left));
+
+		// The AI doesn't record a season for him on the user's team, nor set expectations
+		await onRegularSeason();
+		assert.isUndefined((await idb.cache.teams.get(tid))!.gm);
+
+		// Given up: a new GM at once, a new id
+		g.setWithoutSavingToDB("userTids", [g.get("userTid")]);
+		await noRandom(syncGms);
+		const t2 = (await idb.cache.teams.get(tid))!;
+		assert.isDefined(t2.gm);
+		assert.notStrictEqual(t2.gm!.gmid, before.gmid);
+		assert.strictEqual(t2.gm!.tenures.at(-1)!.start, season);
+		const gmids = await allGmids();
+		assert.strictEqual(new Set(gmids).size, gmids.length);
+		const texts = (await idb.cache.events.getAll()).map((e) => e.text ?? "");
+		assert.isTrue(texts.some((x) => x.includes(" left ")));
+		assert.isTrue(texts.some((x) => x.includes(" named ")));
+
+		// Spectator mode on and off: the user's team gets a GM, and loses him again
+		g.setWithoutSavingToDB("spectator", true);
+		await syncGms();
+		const spectatorGm = (await idb.cache.teams.get(g.get("userTid")))!.gm!;
+		assert.isDefined(spectatorGm);
+		g.setWithoutSavingToDB("spectator", false);
+		await syncGms();
+		const userTeam = (await idb.cache.teams.get(g.get("userTid")))!;
+		assert.isUndefined(userTeam.gm);
+		assert.strictEqual(
+			userTeam.formerGms!.at(-1)!.tenures.at(-1)!.reason,
+			"left",
+		);
+	});
+
+	test("auto play: no GM is hired or fired on the user's team", async () => {
+		local.autoPlayUntil = {
+			season: g.get("season") + 5,
+			phase: PHASE.PRESEASON,
+			start: Date.now(),
+			resolve: () => {},
+			reject: () => {},
+		};
+		try {
+			await ensureGms();
+			g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+			await onRegularSeason();
+			await finishSeason(() => 10);
+			await withRandom(1, runOffseason);
+			const t = (await idb.cache.teams.get(g.get("userTid")))!;
+			assert.isUndefined(t.gm);
+			assert.isUndefined(t.formerGms);
+			assert.isUndefined(await getGmWeights(t.tid));
+		} finally {
+			local.autoPlayUntil = undefined;
+		}
+	});
+
+	test("contraction: the GM leaves for the market, ids stay unique, the history stays", async () => {
+		const tid = 7;
+		const t = (await idb.cache.teams.get(tid))!;
+		const gm = t.gm!;
+		const maxGmid = Math.max(...(await allGmids()));
+		gm.gmid = maxGmid + 10;
+		t.disabled = true;
+		await idb.cache.teams.put(t);
+		await noRandom(syncGms);
+		const t1 = (await idb.cache.teams.get(tid))!;
+		assert.isUndefined(t1.gm);
+		assert.strictEqual(t1.formerGms!.at(-1)!.tenures.at(-1)!.reason, "left");
+
+		// The carousel's new GMs get ids above every GM's, the contracted team's included
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		await onRegularSeason();
+		for (const tid2 of [3, 4]) {
+			const t2 = (await idb.cache.teams.get(tid2))!;
+			t2.gm!.born.year = g.get("season") - 80;
+			await idb.cache.teams.put(t2);
+		}
+		await finishSeason(() => 41);
+		await withRandom(5, runOffseason);
+		const gmids = await allGmids();
+		assert.strictEqual(new Set(gmids).size, gmids.length);
+
+		// Front Offices: the contracted team's GM moves are listed
+		const fo = await frontOfficesView.load({
+			inputs: {},
+			updateEvents: new Set(["firstRun"]),
+			prevInputs: {},
+			prevOutput: {},
+			conditions: {},
+		} as any);
+		assert.isTrue(
+			(fo as any).moves.some(
+				(m: any) => m.tid === tid && m.type === "left" && m.gmid === gm.gmid,
+			),
+		);
+		assert.isFalse((fo as any).rows.some((r: any) => r.tid === tid));
+		for (const row of (fo as any).market) {
+			assert.isAtMost(row.age, 66);
+		}
+
+		// A revived team names a new GM
+		t1.disabled = false;
+		await idb.cache.teams.put(t1);
+		await noRandom(syncGms);
+		const t3 = (await idb.cache.teams.get(tid))!;
+		assert.isDefined(t3.gm);
+		assert.notStrictEqual(t3.gm!.gmid, gm.gmid);
+	});
+
+	test("retired GMs keep career totals instead of season rows, the market matches who can be hired", async () => {
+		const tid = 9;
+		const t = (await idb.cache.teams.get(tid))!;
+		const gm = t.gm!;
+		gm.born.year = g.get("season") - 80;
+		gm.seasons.push({
+			season: g.get("season") - 1,
+			tid,
+			won: 60,
+			lost: 21,
+			tied: 1,
+			otl: 0,
+			numGames: 82,
+			playoffRoundsWon: 4,
+		});
+		await idb.cache.teams.put(t);
+		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
+		await onRegularSeason();
+		await finishSeason(() => 41);
+		await withRandom(3, runOffseason);
+		const retired = (await idb.cache.teams.get(tid))!.formerGms!.find(
+			(x) => x.gmid === gm.gmid,
+		)!;
+		assert.isDefined(retired.retiredYear);
+		assert.strictEqual(retired.seasons.length, 0);
+		assert.strictEqual(retired.career!.seasons, 2);
+		assert.strictEqual(retired.career!.won, 101);
+		assert.strictEqual(retired.career!.tied, 1);
+		assert.strictEqual(retired.career!.titles, 1);
+		assert.isFalse(onGmMarket(retired));
+
+		// A 67 year old former GM can't be hired, so he's not on the market
+		const t2 = (await idb.cache.teams.get(11))!;
+		const old = t2.gm!;
+		old.born.year = g.get("season") - 67;
+		old.tenures.at(-1)!.end = g.get("season") - 1;
+		old.tenures.at(-1)!.reason = "fired";
+		t2.formerGms = [...(t2.formerGms ?? []), old];
+		t2.gm = undefined;
+		await idb.cache.teams.put(t2);
+		assert.isFalse(onGmMarket(old));
+	});
+
+	test("turned on during the playoffs, the first tenures start next season", async () => {
+		await setup();
+		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		await ensureGms();
+		const season = g.get("season");
+		const t = (await idb.cache.teams.get(5))!;
+		assert.strictEqual(t.gm!.tenures[0]!.start, season + 1);
+		await finishSeason(() => 41);
+		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		await withRandom(1, runOffseason);
+		const t1 = (await idb.cache.teams.get(5))!;
+		assert.strictEqual(t1.gm!.seasons.length, 0);
 	});
 });
 

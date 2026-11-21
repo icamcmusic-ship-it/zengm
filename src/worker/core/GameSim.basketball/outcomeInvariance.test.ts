@@ -11,6 +11,7 @@ import { resetCache, resetG } from "../../../test/helpers.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import { range } from "../../../common/utils.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
+import { withStockGeneration } from "../player/prospectVariety.ts";
 
 /*
  * The play-by-play text ("flavor") layer must never change a game's result. These tests simulate fixed-seed games (Math.random replaced by a
@@ -38,11 +39,13 @@ const genTwoTeams = async () => {
 	resetG();
 	g.setWithoutSavingToDB("season", 2013);
 	const teamsDefault = helpers.getTeamsDefault().slice(0, 2);
+	// The stock rating draw (prospect variety off): this checks the sim, so its players are the ones the fixture was recorded with
+	const players = await withStockGeneration(() => [
+		...range(50).map(() => player.generate(0, 25, 2010, true, DEFAULT_LEVEL)),
+		...range(50).map(() => player.generate(1, 25, 2010, true, DEFAULT_LEVEL)),
+	]);
 	await resetCache({
-		players: [
-			...range(50).map(() => player.generate(0, 25, 2010, true, DEFAULT_LEVEL)),
-			...range(50).map(() => player.generate(1, 25, 2010, true, DEFAULT_LEVEL)),
-		],
+		players,
 		teams: teamsDefault.map(team.generate),
 		teamSeasons: teamsDefault.map((t) => team.genSeasonRow(t)),
 		teamStats: teamsDefault.map((t) => team.genStatsRow(t.tid)),

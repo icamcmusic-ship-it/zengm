@@ -98,10 +98,11 @@ export const applyScouting = (
 	// Skills are read through fuzz: keep them in step with the new fuzz
 	// (only when the row carries every rating; partial rows can't be scored)
 	if (RATINGS.every((key) => typeof (ratings as any)[key] === "number")) {
-		ratings.skills = player.skills(ratings as any);
-		if ((p as any).draft && (p as any).tid === PLAYER.UNDRAFTED) {
-			(p as any).draft.skills = ratings.skills;
-		}
+		player.refreshSkills(
+			p as any,
+			ratings as any,
+			(p as any).tid === PLAYER.UNDRAFTED,
+		);
 	}
 	if (!p.scouting) {
 		p.scouting = [];

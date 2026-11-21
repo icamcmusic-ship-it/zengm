@@ -5,6 +5,12 @@
 import type { ByConf, PlayoffSeries } from "../../../common/types.ts";
 import { genPlayoffSeriesFromTeams } from "../season/genPlayoffSeries.ts";
 import {
+	betterSeedHome,
+	groupByConf,
+	interleaveForReseed,
+} from "../season/playoffBracketUtils.ts";
+import { helpers } from "../../util/index.ts";
+import {
 	getHypotheticalTeam,
 	type TeamSeasonRecord,
 } from "../team/getHypotheticalTeam.ts";
@@ -39,7 +45,7 @@ export type SeasonOddsResult = {
 export const winProb = (ratingDiff: number) =>
 	1 / (1 + Math.exp(-ratingDiff / 6.5));
 
-type SeriesTeam = { tid: number; seed: number; won?: number };
+type SeriesTeam = { tid: number; cid: number; seed: number; won?: number };
 
 const simSeries = (
 	home: SeriesTeam,
@@ -53,11 +59,10 @@ const simSeries = (
 	let homeWon = home.won ?? 0;
 	let awayWon = away.won ?? 0;
 	const diff = ratings.get(home.tid)! - ratings.get(away.tid)!;
-	// 2-2-1-1-1
-	const homeCourtPattern = [1, 1, -1, -1, 1, -1, 1];
 	let game = homeWon + awayWon;
 	while (homeWon < numGamesToWin && awayWon < numGamesToWin) {
-		const sign = homeCourtPattern[game % 7]!;
+		// The same home court pattern as the real schedule, for any series length
+		const sign = betterSeedHome(numGames, game) ? 1 : -1;
 		if (random() < winProb(diff + sign * hca)) {
 			homeWon += 1;
 		} else {
@@ -116,8 +121,10 @@ const simPlayIn = (
 	return replacements;
 };
 
-// Plays out the bracket from a given round. Returns the tids eliminated in each round and the champion, in callback form.
-const simBracket = ({
+// Plays out the bracket from a given round. Returns the tids eliminated in each round and the champion, in callback form. Pairs the
+// next round like newSchedulePlayoffsDay: reseeding (playoffsReseed) within each conference while the conference brackets last, and
+// once they are over, the better record (winp, standing in for orderTeams) rather than the seed decides home court and reseeding.
+export const simBracket = ({
 	series,
 	startRound,
 	numGamesPlayoffSeries,
@@ -125,21 +132,27 @@ const simBracket = ({
 	hca,
 	random,
 	onRoundWon,
+	byConf,
+	reseed,
+	winp,
 }: {
-	series: PlayoffSeries["series"];
+	series: { home: SeriesTeam; away?: SeriesTeam }[][];
 	startRound: number;
 	numGamesPlayoffSeries: number[];
 	ratings: Map<number, number>;
 	hca: number;
 	random: () => number;
 	onRoundWon: (tid: number, round: number) => void;
+	byConf: ByConf;
+	reseed: boolean;
+	winp: (tid: number) => number;
 }) => {
 	let matchups: { home: SeriesTeam; away?: SeriesTeam }[] = series[
 		startRound
 	]!.map(({ home, away }) => ({ home, away }));
 
 	for (let rnd = startRound; rnd < numGamesPlayoffSeries.length; rnd++) {
-		const winners: SeriesTeam[] = [];
+		let winners: SeriesTeam[] = [];
 		for (const { home, away } of matchups) {
 			let winner;
 			if (!away) {
@@ -155,7 +168,22 @@ const simBracket = ({
 				);
 			}
 			onRoundWon(winner.tid, rnd);
-			winners.push({ tid: winner.tid, seed: winner.seed });
+			winners.push({ tid: winner.tid, cid: winner.cid, seed: winner.seed });
+		}
+
+		// Seeds from different conferences aren't comparable, so then the regular season record decides
+		const confRoundsOver = byConf !== false && winners.length <= byConf;
+		const compare = (a: SeriesTeam, b: SeriesTeam) =>
+			confRoundsOver ? winp(b.tid) - winp(a.tid) : a.seed - b.seed;
+
+		if (reseed && winners.length > 2) {
+			const groups =
+				byConf !== false && winners.length > byConf
+					? groupByConf(winners, byConf)
+					: [winners];
+			winners = groups.flatMap((group) =>
+				interleaveForReseed([...group].sort(compare)),
+			);
 		}
 
 		matchups = [];
@@ -164,7 +192,7 @@ const simBracket = ({
 			const b = winners[i + 1];
 			if (!b) {
 				matchups.push({ home: a });
-			} else if (a.seed <= b.seed) {
+			} else if (compare(a, b) < 0) {
 				matchups.push({ home: a, away: b });
 			} else {
 				matchups.push({ home: b, away: a });
@@ -181,10 +209,13 @@ export const simSeasonOdds = async ({
 	hca,
 	numSims,
 	byConf,
+	reseed = false,
 	random = Math.random,
 }: {
 	// From getPlayoffsByConf, looked up once rather than in every simulation
 	byConf: ByConf;
+	// g.get("playoffsReseed")
+	reseed?: boolean;
 	teams: OddsTeam[];
 	// Remaining regular season games
 	schedule: { homeTid: number; awayTid: number }[];
@@ -239,6 +270,13 @@ export const simSeasonOdds = async ({
 	const won = new Array<number>(teams.length);
 	const lost = new Array<number>(teams.length);
 
+	// Regular season records, for home court and reseeding once the conference brackets are over (simWinp: this simulation's
+	// projected record, recordWinp: the record so far, which is final during the playoffs)
+	const recordWinp = new Map(
+		teams.map((t) => [t.tid, helpers.calcWinp(t.record)]),
+	);
+	const simWinp = new Map<number, number>();
+
 	for (let sim = 0; sim < numSims; sim++) {
 		if (playoffSeries && playoffSeries.currentRound >= 0) {
 			// Playoffs already seeded and past the play-in
@@ -265,11 +303,15 @@ export const simSeasonOdds = async ({
 				hca,
 				random,
 				onRoundWon,
+				byConf: playoffSeries.byConf ?? byConf,
+				reseed,
+				winp: (tid) => recordWinp.get(tid) ?? 0,
 			});
 			continue;
 		}
 
 		let result: {
+			byConf?: ByConf;
 			series: PlayoffSeries["series"];
 			playIns?: PlayoffSeries["playIns"];
 		};
@@ -303,6 +345,10 @@ export const simSeasonOdds = async ({
 				});
 			});
 
+			for (const t of hypothetical) {
+				simWinp.set(t.tid, t.seasonAttrs.winp);
+			}
+
 			if (numRounds === 0) {
 				continue;
 			}
@@ -331,6 +377,7 @@ export const simSeasonOdds = async ({
 		const series0 = result.series[0]!.map(({ home, away }) => {
 			const fix = (t: SeriesTeam) => ({
 				tid: replacements.get(t.tid) ?? t.tid,
+				cid: t.cid,
 				seed: t.seed,
 			});
 			return { home: fix(home), away: away ? fix(away) : undefined };
@@ -343,13 +390,16 @@ export const simSeasonOdds = async ({
 		}
 
 		simBracket({
-			series: [series0 as any],
+			series: [series0],
 			startRound: 0,
 			numGamesPlayoffSeries,
 			ratings,
 			hca,
 			random,
 			onRoundWon,
+			byConf: result.byConf ?? byConf,
+			reseed,
+			winp: (tid) => simWinp.get(tid) ?? recordWinp.get(tid) ?? 0,
 		});
 	}
 

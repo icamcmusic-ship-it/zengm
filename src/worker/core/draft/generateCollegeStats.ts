@@ -1,6 +1,8 @@
 import { subRatingsOn } from "../player/subRatings.ts";
 import { isValidSubArray, subOffsets } from "../../../common/subRatings.ts";
 import { applyPendingShape } from "./classShape.ts";
+import { applyPreDraftTrajectory } from "../player/prospectVariety.ts";
+import { player } from "../index.ts";
 import { PLAYER } from "../../../common/constants.ts";
 import {
 	COLLEGE_STATS_VERSION,
@@ -411,6 +413,20 @@ export const processNewDraftClasses = async (
 		years = [...new Set(prospects.map((p) => p.draft.year))];
 	}
 	years = [...years].sort((a, b) => a - b);
+	// Prospect variety: the hidden trajectory of the seasons new prospects developed before they had a pid, before anything reads the class
+	const prospects = await idb.cache.players.indexGetAll(
+		"playersByTid",
+		PLAYER.UNDRAFTED,
+	);
+	for (const p of prospects) {
+		if (p.genVar?.pre && years.includes(p.draft.year)) {
+			if (applyPreDraftTrajectory(p)) {
+				await player.develop(p, 0);
+				await player.updateValues(p);
+			}
+			await idb.cache.players.put(p);
+		}
+	}
 	for (const draftYear of years) {
 		await applyPendingShape(draftYear);
 	}

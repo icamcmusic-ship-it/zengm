@@ -4,8 +4,14 @@
 export const OWNER_RESERVE_CAPS = 1;
 export const OWNER_DISTRIBUTION_SHARE = 0.75;
 
-export const ownerDistribution = (cash: number, salaryCap: number) => {
-	const excess = cash - OWNER_RESERVE_CAPS * salaryCap;
+// extraReserve: cash the owner also leaves in the team, like what an Owner's Office project still has to be paid (thousands)
+export const ownerDistribution = (
+	cash: number,
+	salaryCap: number,
+	extraReserve: number = 0,
+) => {
+	const excess =
+		cash - OWNER_RESERVE_CAPS * salaryCap - Math.max(0, extraReserve);
 	return excess > 0 ? Math.round(OWNER_DISTRIBUTION_SHARE * excess) : 0;
 };
 

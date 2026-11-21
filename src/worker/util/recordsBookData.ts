@@ -9,6 +9,7 @@
 // played, in the "recordsBook" game attribute (like leagueAchievements: the league's own key-value store, carried by
 // export/import). A league that never had it starts from the box scores it still has.
 import { PHASE, PLAYER } from "../../common/constants.ts";
+import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
 import {
 	addGame,
 	buildBook,
@@ -16,12 +17,13 @@ import {
 	emptyState,
 	findChases,
 	lineOf,
-	MILESTONE_BIG,
+	milestoneBig,
 	MILESTONE_STATS,
 	MS_LOG_MAX,
 	RB_STATS,
 	RB_WORDS,
 	reachedThisSeason,
+	type MilestoneScale,
 	type RBCareerStat,
 	type RBChase,
 	type RBGameIn,
@@ -138,6 +140,9 @@ const getState = (): RBState | undefined => {
 	return s && s.v === 1 ? s : undefined;
 };
 
+// For other features that need single-game highs (the timeline's scoring records), without reading box scores or feats
+export const getRecordsBookState = getState;
+
 const saveState = async (state: RBState) => {
 	if (state.ms.length > MS_LOG_MAX) {
 		state.ms = state.ms.slice(-MS_LOG_MAX);
@@ -237,6 +242,12 @@ const bootstrap = async (): Promise<RBState> => {
 	state.lastSeason = g.get("season");
 	return state;
 };
+
+// Career milestones (and the career record news minimum) scale with the league's game and season length
+const milestoneScale = (): MilestoneScale => ({
+	stats: helpers.gameAndSeasonLengthScaleFactor(),
+	gp: (g.get("numGames") as number) / defaultGameAttributes.numGames[0]!.value,
+});
 
 // Minimum career total for a broken career record to be news (a new league's leaders change all the time)
 const CAREER_NEWS_MIN: Record<RBStat, number> = {
@@ -397,8 +408,11 @@ const runCheck = async () => {
 	}
 
 	const msNotify = featureOption<boolean>("featureMilestoneNotifications");
+	const msScale = milestoneScale();
 	for (const [pid, d] of deltas) {
-		const p = await idb.cache.players.get(pid);
+		// Players who retired since the game (a check delayed past the end of the season) are only in the database
+		const p =
+			(await idb.cache.players.get(pid)) ?? (await idb.merged.players.get(pid));
 		if (!p) {
 			continue;
 		}
@@ -430,7 +444,7 @@ const runCheck = async () => {
 			const before = now[k] - delta;
 
 			// Career milestones, at the game they came in
-			for (const t of crossed(k, before, now[k])) {
+			for (const t of crossed(k, before, now[k], msScale)) {
 				let run = before;
 				let at = d.lines.at(-1)!;
 				for (const x of d.lines) {
@@ -450,12 +464,12 @@ const runCheck = async () => {
 					g: at.gid,
 				});
 				const mine = userTids.has(d.tid);
-				if (mine || t >= MILESTONE_BIG[k]) {
+				if (mine || t >= milestoneBig(k, msScale)) {
 					newsList.push({
 						text: `${await pLink(pid)} reached ${fmt(t)} career ${RB_WORDS[k].unit}${k === "gp" ? " played" : ""} (<a href="${helpers.leagueUrl(["milestones"])}">milestones</a>).`,
 						pids: [pid],
 						tids: [d.tid],
-						score: t >= MILESTONE_BIG[k] ? 20 : 10,
+						score: t >= milestoneBig(k, msScale) ? 20 : 10,
 						notify: mine && msNotify,
 					});
 				}
@@ -467,7 +481,12 @@ const runCheck = async () => {
 			// League career record
 			const c = state.rec.career[k];
 			if (!c || now[k] > c.v) {
-				if (c && c.p !== pid && before <= c.v && c.v >= CAREER_NEWS_MIN[k]) {
+				if (
+					c &&
+					c.p !== pid &&
+					before <= c.v &&
+					c.v >= CAREER_NEWS_MIN[k] * msScale.stats
+				) {
 					newsList.push({
 						text: `${await pLink(pid)} passed ${await pLink(c.p)} (${fmt(c.v)}) for the most career ${RB_WORDS[k].unit} in league history (<a href="${helpers.leagueUrl(["records_book"])}">records book</a>).`,
 						pids: [pid, c.p],
@@ -589,6 +608,29 @@ export const scheduleRecordsCheck = (delay = 1200) => {
 // For tests and the views: run the check now
 export const recordsCheckNow = runCheck;
 
+// Single-game highs, streaks and milestones are read from box scores, and lastGid moves past every game it reads. So a
+// game whose box score is deleted before the check saw it would be skipped for good (with box scores not kept, the
+// check is often still waiting at the season rollover after auto play or a multi-season sim, because it never runs
+// while games are being simmed). This is called right before old box scores are deleted, to process them first. Games
+// played while the Records Book was turned off and deleted before it was turned back on are still never seen.
+export const recordsCheckBeforeBoxScoresDeleted = async () => {
+	if (__SPORT !== "basketball" || !featureOn("recordsBook")) {
+		return;
+	}
+	// A check already running finishes first, so the two don't both add the same games
+	while (running) {
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	running = true;
+	try {
+		await runCheck();
+	} catch (error) {
+		console.error("Records check failed", error);
+	} finally {
+		running = false;
+	}
+};
+
 // ---- views ----
 
 const ctxNow = async () => {
@@ -682,6 +724,7 @@ export const getMilestones = async ({
 		season,
 		teamGamesNow: (t) => gamesByTid.get(t) ?? 0,
 		horizon: h,
+		scale: milestoneScale(),
 	}).filter((c) => tid === undefined || c.tid === tid);
 
 	const rows: MilestoneRow[] = chases.slice(0, 400).map((c) => {
@@ -711,7 +754,11 @@ export const getMilestones = async ({
 
 	// Reached this season, with the game from the check's log when it has it
 	const log = getState()?.ms ?? [];
-	const reached: ReachedRow[] = reachedThisSeason(players, season)
+	const reached: ReachedRow[] = reachedThisSeason(
+		players,
+		season,
+		milestoneScale(),
+	)
 		.filter((x) => tid === undefined || x.tid === tid)
 		.map((x) => {
 			const hit = log.findLast(

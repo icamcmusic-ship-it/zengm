@@ -2,7 +2,7 @@
 // season and the fuzz narrowing they buy (the user's view only: AI teams always see true ratings), the weekly big board, "our guy" and scout
 // careers. Seeded streams only; nothing runs while the setting is off.
 import { PHASE, PLAYER } from "../../../common/constants.ts";
-import skills from "../player/skills.ts";
+import { refreshSkills } from "../player/skills.ts";
 import {
 	getPreDraftSchool,
 	getPreDraftStats,
@@ -329,10 +329,7 @@ export const applyLooks = (
 	L.a = Math.round(f * 10000) / 10000;
 	r.fuzz = L.b * L.a;
 	// Skills are read through the fuzz: keep them in step with it (as a league file load recomputes them)
-	r.skills = skills(r);
-	if (p.tid === PLAYER.UNDRAFTED) {
-		p.draft.skills = r.skills;
-	}
+	refreshSkills(p, r, p.tid === PLAYER.UNDRAFTED);
 	L.reg = region;
 	L.cov = Math.round(coverage * 100) / 100;
 	p.scoutLooks = L;

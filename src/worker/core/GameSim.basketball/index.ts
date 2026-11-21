@@ -1,6 +1,7 @@
 import { schoolDistanceKm } from "../../../common/college/geography.ts";
 import { g, helpers } from "../../util/index.ts";
 import { nativeFeatureEnabled } from "../../../common/nativeFeatures.ts";
+import { skillCutoffs } from "../../../common/skillCutoffs.ts";
 import {
 	type DefScheme,
 	PROFILE_LEAGUE_MAKE,
@@ -12,10 +13,10 @@ import {
 	type ShotProfile,
 } from "../../../common/shotProfiles.ts";
 import {
-	SIM_FIX_EXPANDED_SYNERGY_CUTOFFS,
 	SIM_FIX_LOW_POST,
 	SIM_FIX_OFF_FOUL,
 	SIM_FIX_FT_ORB,
+	SIM_FIX_LEFTY,
 	SIM_FIX_MID_RANGE,
 	SIM_FIX_BREAK_REST,
 	SIM_FIX_PERF_FACTOR,
@@ -355,6 +356,8 @@ type PlayerGameSim = {
 	sz?: ShotZoneProfile;
 	// Shot Profiles & Defensive Schemes (loadTeams): his shot profile. Undefined when off
 	shotProfile?: ShotProfile;
+	// Game Sim Fixes (loadTeams): whether he shoots left-handed (common/shootingHand.ts). Undefined when off
+	lefty?: boolean;
 };
 type TeamGameSim = {
 	id: number;
@@ -485,8 +488,6 @@ const getSortedIndexes = (ovrs: number[]) => {
 
 	return sortedIndexes;
 };
-
-const STOCK_SYNERGY_CUTOFFS = { Di: 0.57, Dp: 0.61, R: 0.61 };
 
 const NEUTRAL_CS: CoachSim = {
 	...NEUTRAL_COACH_SIM,
@@ -638,6 +639,14 @@ class GameSim extends GameSimBase {
 	// Game Sim Fixes (League extras, see simSettings.ts): make probabilities of mid-range and post shots, the trailing team's boost,
 	// synergy skill cutoffs with expanded ratings. Off: nothing below is used
 	simFixes: boolean;
+	// Game Sim Fixes: the lefties' at-rim/post edge (SIM_FIX_LEFTY), set in the constructor. makeOffset and the drive multipliers take
+	// the average edge over everyone in the game back out, so the league totals stay the same. Undefined when off
+	lefty?: {
+		makeOffset: number;
+		sameHandExpected: number;
+		driveLefty: number;
+		driveRighty: number;
+	};
 	// Position-aware team composites (League extras, see positionalComposites.ts): each player counts by his role for the team
 	// composites. Off: plain 5-man averages, as before
 	positionalComposites: boolean;
@@ -861,6 +870,9 @@ class GameSim extends GameSimBase {
 		this.simFixes = nativeFeatureEnabled("simFixes", (key) =>
 			g.get(key as any),
 		);
+		if (this.simFixes) {
+			this.initLefty();
+		}
 		this.positionalComposites = nativeFeatureEnabled(
 			"positionalComposites",
 			(key) => g.get(key as any),
@@ -3239,23 +3251,20 @@ class GameSim extends GameSimBase {
 				let skills = this.skillsCountCache.get(p);
 
 				if (!skills) {
-					// 1 / (1 + e^-(15 * (x - 0.61))) from 0 to 1
-					// 0.61 is not always used - keep in sync with skills.js!
-
+					// 1 / (1 + e^-(15 * (x - cutoff))) from 0 to 1, with the same cutoffs as the skill labels (common/skillCutoffs.ts)
 					const r = p.compositeRating;
-					// Game Sim Fixes: the expanded Di, Dp and R composites have their own skill cutoffs
-					const cutoffs =
-						this.simFixes && this.expandedRatings
-							? SIM_FIX_EXPANDED_SYNERGY_CUTOFFS
-							: STOCK_SYNERGY_CUTOFFS;
+					const cutoffs = skillCutoffs({
+						expanded: this.expandedRatings,
+						simFixes: this.simFixes,
+					});
 					skills = {
-						"3": helpers.sigmoid(r.shootingThreePointer, 15, 0.59),
-						A: helpers.sigmoid(r.athleticism, 15, 0.63),
-						B: helpers.sigmoid(r.dribbling, 15, 0.68),
+						"3": helpers.sigmoid(r.shootingThreePointer, 15, cutoffs["3"]),
+						A: helpers.sigmoid(r.athleticism, 15, cutoffs.A),
+						B: helpers.sigmoid(r.dribbling, 15, cutoffs.B),
 						Di: helpers.sigmoid(r.defenseInterior, 15, cutoffs.Di),
 						Dp: helpers.sigmoid(r.defensePerimeter, 15, cutoffs.Dp),
-						Po: helpers.sigmoid(r.shootingLowPost, 15, 0.61),
-						Ps: helpers.sigmoid(r.passing, 15, 0.63),
+						Po: helpers.sigmoid(r.shootingLowPost, 15, cutoffs.Po),
+						Ps: helpers.sigmoid(r.passing, 15, cutoffs.Ps),
 						R: helpers.sigmoid(r.rebounding, 15, cutoffs.R),
 					};
 
@@ -3372,6 +3381,47 @@ class GameSim extends GameSimBase {
 
 	isSwitching(d: TeamNum) {
 		return this.team[d].coachSim?.def === "switch";
+	}
+
+	// Game Sim Fixes: the lefties' edge (SIM_FIX_LEFTY), from the share of lefties among the players in this game (no random numbers)
+	initLefty() {
+		let n = 0;
+		let lefties = 0;
+		for (const t of this.team) {
+			for (const p of t.player) {
+				n += 1;
+				if (p.lefty) {
+					lefties += 1;
+				}
+			}
+		}
+		const share = n > 0 ? lefties / n : 0;
+		const { make, sameHand, drive } = SIM_FIX_LEFTY;
+		// expected bonus factor when the defender is unknown: a lefty defender with probability share
+		const sameHandExpected = 1 - share * (1 - sameHand);
+		const driveNorm = 1 + (drive - 1) * share;
+		this.lefty = {
+			makeOffset: make * share * sameHandExpected,
+			sameHandExpected,
+			driveLefty: drive / driveNorm,
+			driveRighty: 1 / driveNorm,
+		};
+	}
+
+	// Game Sim Fixes: the make-probability edge of an at-rim or post shot by p (his bonus if a lefty, minus the game's average bonus)
+	leftyMakeEdge(p: PlayerGameSim, defender: PlayerGameSim | undefined) {
+		const lefty = this.lefty!;
+		let bonus = 0;
+		if (p.lefty) {
+			const sameHand =
+				defender === undefined
+					? lefty.sameHandExpected
+					: defender.lefty
+						? SIM_FIX_LEFTY.sameHand
+						: 1;
+			bonus = SIM_FIX_LEFTY.make * sameHand;
+		}
+		return bonus - lefty.makeOffset;
 	}
 
 	// Matchup Defense: the player guarding offensive player p (undefined if he is not on the court)
@@ -5161,7 +5211,12 @@ class GameSim extends GameSimBase {
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				(this.offEmph ? this.oe[this.o].rim : 1) *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1) *
-				(sp ? sp.rim : 1);
+				(sp ? sp.rim : 1) *
+				(this.lefty
+					? p.lefty
+						? this.lefty.driveLefty
+						: this.lefty.driveRighty
+					: 1);
 			const m3 =
 				(this.coachSys ? cso.post * csd.dPost : 1) *
 				(this.playTypes ? PLAY_TYPES.post : 1) *
@@ -5275,6 +5330,10 @@ class GameSim extends GameSimBase {
 				if (this.subRatingsSim) {
 					probMake += SUB_SIM_CAL.post;
 				}
+			}
+			// Game Sim Fixes: a lefty's unfamiliarity edge at the rim and in the post
+			if (this.lefty && type !== "midRange") {
+				probMake += this.leftyMakeEdge(p, defender);
 			}
 			// Better shooting in the ASG, why not?
 			if (this.allStarGame) {

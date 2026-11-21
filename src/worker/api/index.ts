@@ -1345,7 +1345,8 @@ const dunkGetProjected = async ({
 	index: number;
 }) => {
 	let score = 0;
-	let prob = 0;
+	// Undefined under the No Visible Ratings challenge: the success rate comes from his true ratings
+	let prob: number | undefined = 0;
 
 	const allStars = await idb.cache.allStars.get(g.get("season"));
 	const dunk = allStars?.dunk;
@@ -1359,11 +1360,17 @@ const dunkGetProjected = async ({
 				allStar.dunkContest.HIGHEST_POSSIBLE_SCORE,
 			);
 
-			const difficulty = allStar.dunkContest.getDifficulty(dunkAttempt);
-			prob = allStar.dunkContest.difficultyToProbability(
-				difficulty,
-				allStar.dunkContest.getDunkerRating(p.ratings.at(-1) as PlayerRatings),
-			);
+			if (g.get("challengeNoRatings")) {
+				prob = undefined;
+			} else {
+				const difficulty = allStar.dunkContest.getDifficulty(dunkAttempt);
+				prob = allStar.dunkContest.difficultyToProbability(
+					difficulty,
+					allStar.dunkContest.getDunkerRating(
+						p.ratings.at(-1) as PlayerRatings,
+					),
+				);
+			}
 		}
 	}
 
@@ -3003,7 +3010,9 @@ const staffDepthAction = async (
 		| { type: "apply"; action: SuggestionAction; suggestionId?: string }
 		| { type: "dismiss"; id: string }
 		| { type: "boardLock"; pid: number; locked: boolean },
-) => {
+): Promise<string | undefined> => {
+	// A sentence for the confirmation toast (accepting a recommendation or approving a proposal)
+	let message: string | undefined;
 	if (action.type === "settings") {
 		await staffDepthActions.setStaffDepthSettings(action.settings);
 	} else if (action.type === "devOverride") {
@@ -3011,7 +3020,7 @@ const staffDepthAction = async (
 	} else if (action.type === "scoutRegion") {
 		await staffDepthActions.setScoutRegion(action.scoutId, action.region);
 	} else if (action.type === "apply") {
-		await staffDepthActions.applyStaffAction(
+		message = await staffDepthActions.applyStaffAction(
 			action.action,
 			action.suggestionId,
 		);
@@ -3023,6 +3032,7 @@ const staffDepthAction = async (
 	await toUI("realtimeUpdate", [
 		["staff", "teamFinances", "playerMovement", "gameAttributes", "watchList"],
 	]);
+	return message;
 };
 
 // Offensive Emphasis (Offense tab): the user's dials, mode, or accepting the coach's suggestion
@@ -3700,6 +3710,7 @@ const ratingsStatsPopoverInfo = async ({
 		"season",
 		"tid",
 		...ratingsKeysForView(RATINGS),
+		...(__SPORT === "basketball" ? (["sub"] as const) : []),
 		...(includeAbbrev ? (["abbrev"] as const) : []),
 	] as const;
 
@@ -3791,11 +3802,22 @@ const ratingsStatsPopoverInfo = async ({
 	} else {
 		type = actualSeason;
 	}
+	// Same ratings as the player page: with sub-ratings, the expanded splits they cover (shooting, defense, rebounding, ball security) are
+	// shown through the subs there, so the popover shows the base ratings (defensive IQ as "Def", rebounding) instead of the old splits
+	const { sub, ...ratingsBase } = ratingsOutput as typeof ratingsOutput & {
+		sub?: unknown;
+	};
+	const hasSub = Array.isArray(sub);
+	if (hasSub) {
+		for (const key of ["csh", "dsh", "bsc", "oreb", "dreb", "pdef", "idef"]) {
+			delete (ratingsBase as Record<string, unknown>)[key];
+		}
+	}
 	return {
 		...rest,
 		abbrev,
 		tid,
-		ratings: ratingsOutput,
+		ratings: { ...ratingsBase, hasSub },
 		stats: statsOutput,
 		type,
 	};
@@ -4764,6 +4786,9 @@ const updateBudget = async ({
 	if (!t) {
 		throw new Error("Invalid tid");
 	}
+
+	// Trait badges read the user's scouting level: read it again next time
+	player.resetBadgeScoutingLevel();
 
 	for (const key of helpers.keys(budgetLevels)) {
 		// With a coaching staff, the coaching level is set by the staff
@@ -5948,6 +5973,9 @@ const upsertCustomizedPlayer = async (
 	conditions: Conditions,
 ): Promise<number> => {
 	const { contract: contractInput, ...p } = pInput;
+
+	// Hall of Fame words (worker/util/hofStory.ts) are written again from the edited player the next time they are shown
+	delete p.hofStory;
 
 	if (p.tid >= 0) {
 		const t = await idb.cache.teams.get(p.tid);

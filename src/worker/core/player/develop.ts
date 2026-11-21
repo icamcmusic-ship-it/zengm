@@ -11,7 +11,7 @@ import {
 } from "./developSeason.ts";
 import ovr from "./ovr.ts";
 import pos from "./pos.ts";
-import skills from "./skills.ts";
+import { refreshSkills } from "./skills.ts";
 import { g, helpers } from "../../util/index.ts";
 import type {
 	MinimalPlayerRatings,
@@ -33,6 +33,10 @@ import {
 	ensureExpandedRatings,
 	syncExpandedToCompat,
 } from "./expandedRatings.ts";
+import {
+	devRatesOf,
+	type GenVariety,
+} from "../../../common/prospectVariety.ts";
 import {
 	basesBefore,
 	developRowSubs,
@@ -190,6 +194,13 @@ const develop = async (
 	const ratings = last(p.ratings);
 	let age = ratings.season - p.born.year;
 
+	// Prospect variety: players generated since it exists develop each rating group at their own rate
+	const genVar = (p as { genVar?: GenVariety }).genVar;
+	const rates =
+		__SPORT === "basketball" && genVar && !p.srID
+			? devRatesOf(genVar)
+			: undefined;
+
 	for (let i = 0; i < years; i++) {
 		// (CONFUSING!) Don't increment age for existing players developing one season (i.e. newPhasePreseason) because the season is already incremented before this function is called. But in other scenarios (new league and draft picks), the season is not changing, so age should be incremented every iteration of this loop.
 		if (newPlayer || years > 1) {
@@ -205,6 +216,7 @@ const develop = async (
 				coachingLevel,
 				false,
 				__SPORT === "basketball" && years === 1 ? traitDev : undefined,
+				rates,
 			);
 			if (before) {
 				developRowSubs(p as any, ratings, before, age);
@@ -214,7 +226,7 @@ const develop = async (
 						? traitDev?.subTilt
 						: undefined;
 				if (tilt) {
-					tiltRowSubs(p as any, ratings, tilt.focus, tilt.amount);
+					tiltRowSubs(p as any, ratings, tilt.focus, tilt.amount, tilt.center);
 				}
 				// Career Aging: late-career reinvention toward a specialist's subs
 				const careerTilt =
@@ -343,7 +355,7 @@ const develop = async (
 		}
 	}
 
-	ratings.skills = skills(ratings);
+	refreshSkills(p, ratings, p.tid === PLAYER.UNDRAFTED);
 
 	if (p.tid === PLAYER.UNDRAFTED) {
 		p.draft.ovr = ratings.ovr;
@@ -351,8 +363,6 @@ const develop = async (
 		if (!skipPot) {
 			p.draft.pot = ratings.pot;
 		}
-
-		p.draft.skills = ratings.skills;
 	}
 
 	if (newPlayer) {

@@ -53,6 +53,7 @@ export default defineView({
 			!updateEvents.has("firstRun") &&
 			!updateEvents.has("playerMovement") &&
 			!updateEvents.has("newPhase") &&
+			!updateEvents.has("gameAttributes") &&
 			prevInputs?.label === inputs.label
 		) {
 			return;
@@ -93,6 +94,13 @@ export default defineView({
 			skills: string[];
 		};
 		const rows: Row[] = [];
+		// No visible ratings challenge: holders in a neutral order (team, then name), and no ovr or scores sent at all, or the order
+		// and the numbers would be a leaderboard of the hidden ratings
+		const hideRatings = !!g.get("challengeNoRatings");
+		const neutralOrder = (a: { row: Row }, b: { row: Row }) =>
+			a.row.abbrev.localeCompare(b.row.abbrev) ||
+			a.row.name.localeCompare(b.row.name) ||
+			a.row.pid - b.row.pid;
 		const traitContext = await getTraitViewContext();
 		const playersByPid = new Map(playersAll.map((p) => [p.pid, p]));
 		for (const p of formatted) {
@@ -129,16 +137,20 @@ export default defineView({
 			const holders = rows
 				.filter((r) => hasBadge(r.ratings, def, r.traits))
 				.map((r) => ({ row: r, score: badgeScore(r.ratings, def, r.traits) }))
-				.sort((a, b) => b.score - a.score || b.row.ovr - a.row.ovr);
+				.sort(
+					hideRatings
+						? neutralOrder
+						: (a, b) => b.score - a.score || b.row.ovr - a.row.ovr,
+				);
 			const toLeader = ({ row, score }: (typeof holders)[number]) => ({
 				pid: row.pid,
 				name: row.name,
 				pos: row.pos,
-				ovr: row.ovr,
+				ovr: hideRatings ? undefined : row.ovr,
 				age: row.age,
 				abbrev: row.abbrev,
 				tid: row.tid,
-				score: Math.round(score * 100),
+				score: hideRatings ? undefined : Math.round(score * 100),
 			});
 			return {
 				label: def.label,
@@ -189,16 +201,20 @@ export default defineView({
 						},
 					];
 				})
-				.sort((a, b) => b.score - a.score || b.row.ovr - a.row.ovr);
+				.sort(
+					hideRatings
+						? neutralOrder
+						: (a, b) => b.score - a.score || b.row.ovr - a.row.ovr,
+				);
 			const toLeader = ({ row, score, parts }: (typeof holders)[number]) => ({
 				pid: row.pid,
 				name: row.name,
 				pos: row.pos,
-				ovr: row.ovr,
+				ovr: hideRatings ? undefined : row.ovr,
 				age: row.age,
 				abbrev: row.abbrev,
 				tid: row.tid,
-				score: Math.round(score * 100),
+				score: hideRatings ? undefined : Math.round(score * 100),
 				parts: parts.join(" + "),
 			});
 			return {

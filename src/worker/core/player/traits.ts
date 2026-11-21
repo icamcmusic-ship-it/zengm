@@ -393,13 +393,31 @@ export const setTraitScores = (
 
 // The user team's scouting level, for trait-based skill badges in player.format (which is synchronous per player). Loaded
 // by loadBadgeScoutingLevel before formatting, so badges use the same trait estimates as the trait ranges the user sees.
-let badgeScoutingLevel: number | undefined;
+// Tagged with the league and user team it was read for, so a level from another league (or before switching teams) is never used;
+// reset when the league closes and when the budget changes (resetBadgeScoutingLevel).
+let badgeScoutingLevel: { key: string; level: number | undefined } | undefined;
+const badgeScoutingKey = () => {
+	try {
+		return `${g.get("lid")}:${g.get("userTid")}`;
+	} catch {
+		return undefined;
+	}
+};
 export const loadBadgeScoutingLevel = async () => {
-	badgeScoutingLevel = traitsEnabled()
+	const key = badgeScoutingKey();
+	const level = traitsEnabled()
 		? await finances.getLevelLastThree("scouting", { tid: g.get("userTid") })
 		: undefined;
+	badgeScoutingLevel = key === undefined ? undefined : { key, level };
 };
-export const getBadgeScoutingLevel = () => badgeScoutingLevel;
+export const getBadgeScoutingLevel = () =>
+	badgeScoutingLevel !== undefined &&
+	badgeScoutingLevel.key === badgeScoutingKey()
+		? badgeScoutingLevel.level
+		: undefined;
+export const resetBadgeScoutingLevel = () => {
+	badgeScoutingLevel = undefined;
+};
 
 // For skill badges: the trait scores the user can see. Visible traits use the shown estimate; hidden traits only once they are known exactly (otherwise left out, so no badge can leak them). Undefined when traits are off.
 export const getBadgeTraits = (

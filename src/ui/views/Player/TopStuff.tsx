@@ -646,7 +646,7 @@ const TopStuff = ({
 								<>
 									<br />
 									Shoots:{" "}
-									{getShootingHand(player.pid) === "left" ? "Left" : "Right"}
+									{getShootingHand(player) === "left" ? "Left" : "Right"}
 								</>
 							) : null}
 							<br />

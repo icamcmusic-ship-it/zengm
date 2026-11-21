@@ -544,34 +544,50 @@ const allGms = (teams: Team[]) => {
 	return gms;
 };
 
-// Who ran a team's front office in a season: its AI GM, or the user
+// Who ran a team's front office in a season: its AI GM, or the user. Attributed per season: the team season's record of who ran the
+// user's teams (TeamSeason.userControl), else (seasons before that was recorded) the season's user team, never today's user teams
 const frontOfficeFor = (
 	t: Team,
 	season: number,
 	gms: Gm[],
+	ts: TeamSeason | undefined,
 ): { gm?: Gm; user: boolean } => {
+	if (ts?.userControl === "user") {
+		return { user: true };
+	}
 	if (season === g.get("season")) {
+		// Spectator mode or auto play all season: its GM if it has one (spectator mode), else nobody
+		if (ts?.userControl === "auto") {
+			return { gm: t.gm, user: false };
+		}
 		const user = userControlsTeamNow(t.tid);
 		return { gm: !user ? t.gm : undefined, user };
 	}
-	const gm = gms.find(
-		(x) =>
-			x.seasons.some((row) => row.season === season && row.tid === t.tid) ||
-			x.tenures.some(
-				(tenure) =>
-					tenure.tid === t.tid &&
-					tenure.start <= season &&
-					(tenure.end === undefined || tenure.end >= season),
-			),
+	// His season row is the best evidence (written only for seasons an AI GM ran), then the season's user team, then a tenure
+	const byRow = gms.find((x) =>
+		x.seasons.some((row) => row.season === season && row.tid === t.tid),
 	);
-	if (gm) {
-		return { gm, user: false };
+	if (byRow) {
+		return { gm: byRow, user: false };
 	}
-	let userTid: number | undefined;
-	try {
-		userTid = g.get("userTid", season);
-	} catch {}
-	return { user: userTid === t.tid || g.get("userTids").includes(t.tid) };
+	if (ts?.userControl === undefined) {
+		let userTid: number | undefined;
+		try {
+			userTid = g.get("userTid", season);
+		} catch {}
+		if (userTid === t.tid) {
+			return { user: true };
+		}
+	}
+	const byTenure = gms.find((x) =>
+		x.tenures.some(
+			(tenure) =>
+				tenure.tid === t.tid &&
+				tenure.start <= season &&
+				(tenure.end === undefined || tenure.end >= season),
+		),
+	);
+	return { gm: byTenure, user: false };
 };
 
 const userName = () => "You";
@@ -593,6 +609,9 @@ export const getEoyCandidates = async (
 	const contexts = options.contexts ?? (await getTeamAwardContexts(season));
 	const teams = await idb.cache.teams.getAll();
 	const gms = allGms(teams);
+	const teamSeasons = new Map(
+		(await idb.merged.teamSeasons.getAll({ season })).map((ts) => [ts.tid, ts]),
+	);
 
 	const candidates: EoyCandidate[] = [];
 	for (const t of teams) {
@@ -600,7 +619,7 @@ export const getEoyCandidates = async (
 		if (!ctx) {
 			continue;
 		}
-		const { gm, user } = frontOfficeFor(t, season, gms);
+		const { gm, user } = frontOfficeFor(t, season, gms, teamSeasons.get(t.tid));
 		candidates.push({
 			tid: t.tid,
 			abbrev: ctx.abbrev,

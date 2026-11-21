@@ -572,27 +572,40 @@ const processAttrs = (
 const badgesWithSkills = () =>
 	__SPORT === "basketball" && featureOn("skillBadges");
 
-// Extended skill badges and combos (display only, see common/skillBadges). Uses the same fuzzed ratings the user sees.
-const getBadgesForRatingsRow = (
+// The ratings row as the user sees it (fuzzed unless fuzz is false, with God Mode and multi team mode turning fuzz off as everywhere
+// else): the one row both the displayed skills and the extended badges are computed from
+const shownRow = (pr: any, fuzz: boolean | undefined, p: Player) =>
+	fuzz ? player.fuzzedSkillRow(pr, false, p) : pr;
+
+// The skills to show for a row, computed live from the shown ratings and the current settings (the same composites and cutoffs as
+// the game sim's synergy, common/skillCutoffs.ts). Falls back to the stored ones for a row missing ratings.
+const skillsForShownRow = (row: any, pr: any): string[] => {
+	try {
+		return player.skillsFromRow(row);
+	} catch {
+		return helpers.deepCopy(pr.skills ?? []);
+	}
+};
+
+// Extended skill badges and combos (display only, see common/skillBadges), from the shown row and its live skills
+const getBadgesForShownRow = (
+	row: any,
 	pr: any,
-	fuzz: boolean | undefined,
+	skills: string[],
 	p: Player,
 ) => {
 	const r: any = {};
 	for (const key of BADGE_RATING_KEYS) {
-		const v = pr[key];
+		const v = row[key];
 		if (typeof v !== "number") {
 			return [];
 		}
-		r[key] = fuzz && key !== "hgt" ? player.fuzzRating(v, pr.fuzz) : v;
+		r[key] = v;
 	}
 	// Expanded ratings, when the setting is on (wingspan is a measurement, never fuzzed)
 	if (expandedRatingsApply(pr)) {
-		r.wng = pr.wng;
-		r.pdef = fuzz ? player.fuzzRating(pr.pdef, pr.fuzz) : pr.pdef;
-		r.idef = fuzz ? player.fuzzRating(pr.idef, pr.fuzz) : pr.idef;
-		for (const key of EXPANDED_RATINGS2) {
-			r[key] = fuzz ? player.fuzzRating(pr[key], pr.fuzz) : pr[key];
+		for (const key of ["wng", "pdef", "idef", ...EXPANDED_RATINGS2]) {
+			r[key] = row[key];
 		}
 	}
 	// Only the latest ratings row: trait scores are for the player now
@@ -604,8 +617,15 @@ const getBadgesForRatingsRow = (
 					player.getBadgeScoutingLevel(),
 				)
 			: undefined;
-	return getDisplayBadges(r, pr.skills ?? [], traits);
+	return getDisplayBadges(r, skills, traits);
 };
+
+// For views that show skills from raw ratings rows (not through format): the skills to show (live, as format does)
+export const getSkillsForRow = (
+	p: Player,
+	pr: Player["ratings"][number],
+	fuzz = true,
+): string[] => skillsForShownRow(shownRow(pr, fuzz, p), pr);
 
 // For views that show skills from raw ratings rows (not through format): the extended badges to show with them, or
 // undefined when that League Extra is off. Call prepareSkillBadges once before, for the user's scouting level.
@@ -613,8 +633,13 @@ export const getSkillBadgesForRow = (
 	p: Player,
 	pr: Player["ratings"][number],
 	fuzz = true,
-): string[] | undefined =>
-	badgesWithSkills() ? getBadgesForRatingsRow(pr, fuzz, p) : undefined;
+): string[] | undefined => {
+	if (!badgesWithSkills()) {
+		return undefined;
+	}
+	const row = shownRow(pr, fuzz, p);
+	return getBadgesForShownRow(row, pr, skillsForShownRow(row, pr), p);
+};
 
 export const prepareSkillBadges = () =>
 	loadBadgeScoutingLevelIfNeeded({ ratings: ["badges"] });
@@ -699,15 +724,25 @@ const processRatings = (
 
 		for (const attr of ratings) {
 			if (attr === "skills") {
-				row.skills = helpers.deepCopy(pr.skills);
+				// Live, from the ratings the user sees now (not the stored snapshot, which may be from a God Mode spell)
+				const shown = shownRow(pr, fuzz, p);
+				row.skills = skillsForShownRow(shown, pr);
 				// Wherever skills are shown, the extended badges are shown with them (League Extras switch)
 				if (badgesWithSkills()) {
-					row.badges = getBadgesForRatingsRow(pr, fuzz, p);
+					row.badges = getBadgesForShownRow(shown, pr, row.skills, p);
 				}
 			} else if (attr === "badges") {
-				row.badges = badgesWithSkills()
-					? getBadgesForRatingsRow(pr, fuzz, p)
-					: [];
+				if (badgesWithSkills()) {
+					const shown = shownRow(pr, fuzz, p);
+					row.badges = getBadgesForShownRow(
+						shown,
+						pr,
+						row.skills ?? skillsForShownRow(shown, pr),
+						p,
+					);
+				} else {
+					row.badges = [];
+				}
 			} else if (attr === "dovr" || attr === "dpot") {
 				// Handle dovr and dpot - if there are previous ratings, calculate the fuzzed difference
 				const cat = attr === "dovr" ? "ovr" : "pot";

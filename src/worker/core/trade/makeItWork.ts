@@ -17,6 +17,8 @@ import { featureOn } from "../../util/nativeFeatures.ts";
 import { getNumPicksPerRound } from "./getPickValues.ts";
 import { helpers } from "../../util/index.ts";
 import { COMPOSITE_WEIGHTS, POSITIONS } from "../../../common/constants.ts";
+import { compositeWeightsFor } from "../../../common/expandedRatings.ts";
+import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import { last } from "../../../common/utils.ts";
 import type { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 
@@ -476,11 +478,16 @@ const tryAddAsset = async (
 			for (const asset of assets) {
 				if (asset.type === "player") {
 					const ratings = last(asset.p.ratings);
+					// Expanded ratings: the same composites as the sim and the skills (wingspan, perimeter/interior defense)
+					const weights = compositeWeightsFor(
+						COMPOSITE_WEIGHTS,
+						__SPORT === "basketball" && expandedRatingsApply(ratings),
+					);
 					for (const skill of lookingFor.skills) {
 						asset.score += player.compositeRating(
 							ratings,
-							COMPOSITE_WEIGHTS[skill]!.ratings,
-							COMPOSITE_WEIGHTS[skill]!.weights,
+							weights[skill]!.ratings,
+							weights[skill]!.weights,
 							false,
 						);
 					}

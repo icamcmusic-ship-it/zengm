@@ -105,8 +105,11 @@ type DunkContestPlayer = View<"allStarDunk">["players"][number];
 type ThreeContestPlayer = View<"allStarThree">["players"][number];
 type ContestPlayer = DunkContestPlayer | ThreeContestPlayer;
 
-const isThreeContestPlayer = (p: ContestPlayer): p is ThreeContestPlayer =>
-	"tp" in p.ratings;
+// By the contest, not by his ratings: under the No Visible Ratings challenge no ratings are sent
+const isThreeContestPlayer = (
+	p: ContestPlayer,
+	contestIsDunk: boolean,
+): p is ThreeContestPlayer => !contestIsDunk;
 
 const alertStyle = {
 	maxWidth: 600,
@@ -345,7 +348,10 @@ const UserDunkForm = ({
 		move1: "none",
 		move2: "none",
 	});
-	const [projected, setProjected] = useState({
+	const [projected, setProjected] = useState<{
+		score: number;
+		prob: number | undefined;
+	}>({
 		score: 0,
 		prob: 0,
 	});
@@ -477,12 +483,14 @@ const UserDunkForm = ({
 						Projected score:{" "}
 						<span className="text-info">{projected.score}</span>
 					</h3>
-					<h3 className="mb-0">
-						Success rate:{" "}
-						<span className="text-info">
-							{Math.round(projected.prob * 100)}%
-						</span>
-					</h3>
+					{projected.prob !== undefined ? (
+						<h3 className="mb-0">
+							Success rate:{" "}
+							<span className="text-info">
+								{Math.round(projected.prob * 100)}%
+							</span>
+						</h3>
+					) : null}
 				</div>
 			</div>
 		</div>
@@ -590,7 +598,7 @@ export const ContestantProfiles = ({
 							{!challengeNoRatings ? (
 								<>
 									{p.ratings.ovr} ovr, {p.ratings.pot} pot,{" "}
-									{isThreeContestPlayer(p) ? (
+									{isThreeContestPlayer(p, contestIsDunk) ? (
 										<>{p.ratings.tp} tp</>
 									) : (
 										<>
@@ -600,7 +608,7 @@ export const ContestantProfiles = ({
 									<br />
 								</>
 							) : null}
-							{isThreeContestPlayer(p) ? (
+							{isThreeContestPlayer(p, contestIsDunk) ? (
 								<>
 									{helpers.roundStat(p.stats.pts, "pts")} pts,{" "}
 									{helpers.roundStat(p.stats.tpa, "tpa")} 3pa,{" "}

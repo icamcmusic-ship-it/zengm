@@ -12,6 +12,22 @@ import { ballSecurityBase } from "../../../common/expandedRatings.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import limitRating from "../player/limitRating.ts";
 import { assignClassSubs } from "../player/subRatings.ts";
+import { Rng } from "../../../common/ratingsBuilds/rng.ts";
+import {
+	CLASS_TALENT,
+	DECLARE_FUDGE,
+	FIFTH_YEAR_SHARE,
+	classTalentShift,
+	type GenVariety,
+} from "../../../common/prospectVariety.ts";
+import { ovrRaw } from "../player/ovr.basketball.ts";
+import {
+	polishSenior,
+	separateNearDuplicates,
+	shiftToRawOvr,
+	steerArchetypeMix,
+} from "../player/prospectVariety.ts";
+import { helpers } from "../../../common/helpers.ts";
 
 // arch13: small guards in the draft. BBGM's prospect generator was tuned to the stock ovr, which flatters small guards;
 // the sim-calibrated ovr (ovrV2, on for new leagues) takes about 2-3 points from them, so far fewer 6'3" and shorter
@@ -80,8 +96,27 @@ const getFractionPerYear = (ageGap: number) => {
 	return 1 / ageGap;
 };
 
+const genVarOf = (p: PlayerWithoutKey) => (p as { genVar?: GenVariety }).genVar;
+
 const developOneSeason = async (p: PlayerWithoutKey) => {
+	// Prospect variety: the ages he develops at before the draft, for his hidden trajectory once he has a pid (draft/genPlayers.ts)
+	const gv = genVarOf(p);
+	if (gv) {
+		const age = p.ratings.at(-1)!.season - p.born.year + 1;
+		gv.pre = [...(gv.pre ?? []), age];
+	}
 	await player.develop(p, 1, true);
+};
+
+// The class's seed for its talent draw (a league id may be missing in tests)
+const classSeed = (draftYear: number) => {
+	let lid: unknown;
+	try {
+		lid = g.get("lid");
+	} catch {
+		lid = undefined;
+	}
+	return `${String(lid)}|${draftYear}`;
 };
 
 const genPlayersWithoutSaving = async (
@@ -180,9 +215,15 @@ const genPlayersWithoutSaving = async (
 
 	const fudgeFactors = new WeakMap<PlayerWithoutKey, number>();
 	const getFudgeFactor = (p: PlayerWithoutKey) => {
-		// Add a fudge factor, used when sorting below to add a little randomness to players entering draft. This may
-		// seem quite large, but empirically it seems to work well.
-		return fudgeFactors.getOrInsertComputed(p, () => randInt(-50, 50));
+		// Add a fudge factor, used when sorting below to add a little randomness to players entering draft. Stock: +/-50, which swamps the
+		// spread in pot, so who declared early was close to random. Basketball prospect variety: +/-DECLARE_FUDGE, so the best prospects tend
+		// to come out young (the same random number, scaled).
+		return fudgeFactors.getOrInsertComputed(p, () => {
+			const fudge = randInt(-50, 50);
+			return __SPORT === "basketball" && genVarOf(p)
+				? Math.round((fudge * DECLARE_FUDGE) / 50)
+				: fudge;
+		});
 	};
 
 	for (let i = 0; i < minMaxAgeDiff + 1; i++) {
@@ -200,6 +241,20 @@ const genPlayersWithoutSaving = async (
 		);
 		enteringDraft = enteringDraft.concat(remaining.slice(0, cutoff));
 		remaining = remaining.slice(cutoff); // Each player staying in college, develop 1 year more
+
+		// Prospect variety: in the last year a few stay one more (fifth-year seniors, medical redshirts), so a class has a few 23-year-olds
+		if (__SPORT === "basketball" && i === minMaxAgeDiff && minMaxAgeDiff >= 2) {
+			for (const p of enteringDraft) {
+				const gv = genVarOf(p);
+				if (
+					gv &&
+					p.draft.year - p.born.year === draftAges[1] &&
+					new Rng(`fifthYear|${gv.s}`).chance(FIFTH_YEAR_SHARE)
+				) {
+					await developOneSeason(p);
+				}
+			}
+		}
 
 		for (const p of remaining) {
 			await developOneSeason(p);
@@ -228,6 +283,52 @@ const genPlayersWithoutSaving = async (
 				player.bonus(p);
 				await player.develop(p, 0); // Recalculate ovr/pot
 			}
+		}
+	}
+
+	// Basketball prospect variety, for a class made from scratch: seniors' polish, the class's talent draw (the top of the board up or down
+	// together), near-identical prospects pulled apart and a light steer of the archetype mix. Seeded, no Math.random.
+	if (
+		__SPORT === "basketball" &&
+		existingPlayers.length === 0 &&
+		!forceScrubs
+	) {
+		const changed = new Set<PlayerWithoutKey>();
+		for (const p of enteringDraft) {
+			const age = p.draft.year - p.born.year;
+			if (
+				genVarOf(p) &&
+				minMaxAgeDiff >= 2 &&
+				age >= draftAges[1] &&
+				p.college !== "" &&
+				helpers.isAmerican(p.born.loc)
+			) {
+				polishSenior(p);
+				changed.add(p);
+			}
+		}
+		const shift = classTalentShift(classSeed(draftYear));
+		const top = enteringDraft
+			.filter((p) => genVarOf(p))
+			.toSorted((a, b) => b.ratings[0].pot - a.ratings[0].pot)
+			.slice(0, CLASS_TALENT.top);
+		for (const p of top) {
+			const r = p.ratings[0];
+			shiftToRawOvr(r, ovrRaw(r as any) + shift);
+			changed.add(p);
+		}
+		for (const p of changed) {
+			await player.develop(p, 0);
+		}
+		changed.clear();
+		for (const p of separateNearDuplicates(enteringDraft)) {
+			changed.add(p);
+		}
+		for (const p of steerArchetypeMix(enteringDraft)) {
+			changed.add(p);
+		}
+		for (const p of changed) {
+			await player.develop(p, 0);
 		}
 	}
 

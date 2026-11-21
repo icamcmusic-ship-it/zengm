@@ -118,13 +118,6 @@ export const simFixInjuryFactor = (stre: number, endu: number) =>
 		(-SIM_FIX_INJURY_K * ((stre + endu) / 2 - SIM_FIX_INJURY_CENTER)) / 10,
 	);
 
-// Synergy skill cutoffs with Expanded Ratings on (the expanded Di, Dp and R composites have their own skill cutoffs)
-export const SIM_FIX_EXPANDED_SYNERGY_CUTOFFS = {
-	Di: 0.595,
-	Dp: 0.607,
-	R: 0.62,
-};
-
 const merged = new WeakMap<object, CompositeWeights<string>>();
 const mergedExpanded = new WeakMap<object, CompositeWeights<string>>();
 
@@ -152,3 +145,9 @@ export const SIM_FIX_OFF_FOUL = { base: 0.025, k: 1.5 };
 
 // Offensive rebound chance after a missed last free throw, relative to after a missed shot (NBA: ~13% vs ~25%)
 export const SIM_FIX_FT_ORB = 0.5;
+
+// Left-handed shooters (common/shootingHand.ts, cached as p.lefty in loadTeams): defenders see fewer of them, so a lefty's at-rim and
+// post makes get a small unfamiliarity bonus (make, added to the make probability), mostly gone against a left-handed defender (sameHand
+// keeps that fraction), and he drives a little more (drive, on the at-rim weight). Both are offset over everyone in the game by the
+// share of lefties in it, so the league's at-rim/post rates and percentages stay the same
+export const SIM_FIX_LEFTY = { make: 0.012, sameHand: 0.3, drive: 1.04 };

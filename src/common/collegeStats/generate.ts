@@ -52,6 +52,8 @@ export type GenerateOptions = {
 const PATHWAY_COUNTS = [2, 3, 4, 5];
 const PATHWAY_COUNT_WEIGHTS = [0.3, 0.35, 0.23, 0.12];
 const PATHWAY_POOL = 10;
+// How much a candidate's draft stock raises his chance of being one who joins (was 1.5, which made the class's best a near-lock)
+const PATHWAY_STOCK_LEAN = 0.25;
 // Class-relative draft stock (zStock) a prospect needs to be offered a spot: about the top fifth of a class
 const PATHWAY_MIN_STOCK = 0.85;
 
@@ -368,7 +370,7 @@ const pickSchool = (
 };
 
 /**
- * The class's prospects in the pro pathway program (preDraftPaths), by key: a few elite high school prospects (North Americans young enough to be college freshmen, headed to a Division I school, among the best fifth of the class by draft stock) skip college for one season with a pro development team. 2-5 a class (fewer when the class has fewer such prospects), the best likeliest. Drawn from a stream of the class's own and read off the whole class, so the same class and seed always give the same players, whichever of them are being generated.
+ * The class's prospects in the pro pathway program (preDraftPaths), by key: a few elite high school prospects (North Americans young enough to be college freshmen, headed to a Division I school, among the best fifth of the class by draft stock) skip college for one season with a pro development team. 2-5 a class, picked nearly evenly from the elite pool, so most top prospects still go to college. Drawn from a stream of the class's own and read off the whole class, so the same class and seed always give the same players, whichever of them are being generated.
  */
 export const getPathwayKeys = (
 	classProspects: CollegeProspect[],
@@ -417,11 +419,14 @@ export const getPathwayKeys = (
 		pool.length,
 		rng.weighted(PATHWAY_COUNTS, PATHWAY_COUNT_WEIGHTS),
 	);
+	// Joining is a choice, not a reward for being the top prospect: the pick is close to even across the elite pool, with only a mild lean
+	// toward the best. (Weighted heavily by stock, the class's best freshman joined almost every year, so the top pick nearly always came
+	// from the program.) With 2-5 of up to 10 candidates, the class's best joins about a third of the time when he is eligible.
 	for (let i = 0; i < count; i++) {
 		const left = pool.filter((x) => !keys.has(x.key));
 		const pick = rng.weighted(
 			left,
-			left.map((x) => Math.exp(1.5 * x.zStock)),
+			left.map((x) => Math.exp(PATHWAY_STOCK_LEAN * x.zStock)),
 		);
 		keys.add(pick.key);
 	}

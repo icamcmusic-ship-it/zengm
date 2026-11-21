@@ -81,6 +81,8 @@ const load = async (
 					p.born.loc = "Chicago, IL";
 					p.college = "Duke";
 				}
+				// As if already saved: the pre-draft trajectory (prospect variety) is applied when a class is saved, not by its shape
+				delete p.genVar?.pre;
 				return { ...p, pid } as Player;
 			}),
 		);
