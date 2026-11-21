@@ -1,0 +1,137 @@
+import { safeLocalStorage } from "./safeLocalStorage.ts";
+import type {
+	SidebarCounts,
+	SidebarSeen,
+} from "../../worker/util/sidebarCounts.ts";
+
+// Side menu extras, remembered in this browser per league (safeLocalStorage; storage that is missing or throws just starts
+// empty): new-item badges on News Feed, Trade Offers and Newspaper (unread since the last visit, hooks/useSidebarBadges.ts), and the
+// recently visited pages.
+
+const SEEN_KEY = "sidebarSeen";
+const RECENT_KEY = "sidebarRecent";
+// Leagues remembered, newest first, so the stored maps don't grow forever
+const MAX_LEAGUES = 30;
+export const MAX_RECENT = 5;
+
+const readMap = <T>(key: string): Record<string, T> => {
+	try {
+		const parsed = JSON.parse(safeLocalStorage.getItem(key) ?? "{}");
+		return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+			? parsed
+			: {};
+	} catch {
+		return {};
+	}
+};
+
+const writeMap = <T>(key: string, lid: number, value: T) => {
+	try {
+		const map = readMap<T>(key);
+		delete map[lid];
+		const entries = [[String(lid), value], ...Object.entries(map)].slice(
+			0,
+			MAX_LEAGUES,
+		);
+		safeLocalStorage.setItem(key, JSON.stringify(Object.fromEntries(entries)));
+	} catch {}
+};
+
+export const readSeen = (lid: number): SidebarSeen =>
+	readMap<SidebarSeen>(SEEN_KEY)[lid] ?? {};
+
+export const writeSeen = (lid: number, seen: SidebarSeen) => {
+	writeMap(SEEN_KEY, lid, seen);
+};
+
+export type SidebarBadgeKey = "news" | "tradeOffers" | "newspaper";
+
+// Page of each badge (pageID of the view)
+export const BADGE_PAGE_IDS: Record<SidebarBadgeKey, string> = {
+	news: "news",
+	tradeOffers: "tradeOffers",
+	newspaper: "newspaper",
+};
+
+// Side menu link path (its first part) of each badge
+export const BADGE_PATHS: Record<string, SidebarBadgeKey> = {
+	news: "news",
+	trade_offers: "tradeOffers",
+	newspaper: "newspaper",
+};
+
+// What has been seen after this count: everything on the page being viewed, and the first time a league is opened (nothing is
+// new before there is a baseline)
+export const nextSeen = (
+	seen: SidebarSeen,
+	counts: SidebarCounts,
+	pageID: string | undefined,
+): SidebarSeen => {
+	const out = { ...seen };
+	if (seen.news === undefined || pageID === BADGE_PAGE_IDS.news) {
+		out.news = counts.news.latest;
+	}
+	if (
+		counts.tradeOffers &&
+		(seen.tradeOffers === undefined || pageID === BADGE_PAGE_IDS.tradeOffers)
+	) {
+		out.tradeOffers = counts.tradeOffers.keys;
+	}
+	if (
+		counts.newspaper &&
+		(seen.newspaper === undefined || pageID === BADGE_PAGE_IDS.newspaper)
+	) {
+		out.newspaper = counts.newspaper.latest;
+	}
+	return out;
+};
+
+// Badge numbers to show (0 on the page itself, which is being read)
+export const badgeCounts = (
+	counts: SidebarCounts,
+	pageID: string | undefined,
+): Partial<Record<SidebarBadgeKey, number>> => {
+	const out: Partial<Record<SidebarBadgeKey, number>> = {};
+	const add = (key: SidebarBadgeKey, count: number | undefined) => {
+		if (count !== undefined && count > 0 && pageID !== BADGE_PAGE_IDS[key]) {
+			out[key] = count;
+		}
+	};
+	add("news", counts.news.count);
+	add("tradeOffers", counts.tradeOffers?.count);
+	add("newspaper", counts.newspaper?.count);
+	return out;
+};
+
+export const formatBadgeCount = (count: number) =>
+	count > 99 ? "99+" : String(count);
+
+// ---- Recently visited ----
+
+export type RecentPage = {
+	path: string;
+	label: string;
+};
+
+export const readRecent = (lid: number): RecentPage[] => {
+	const list = readMap<unknown>(RECENT_KEY)[lid];
+	return Array.isArray(list)
+		? list.filter(
+				(x): x is RecentPage =>
+					!!x &&
+					typeof x === "object" &&
+					typeof x.path === "string" &&
+					typeof x.label === "string",
+			)
+		: [];
+};
+
+// Newest first, one entry per path, at most MAX_RECENT + 1 (the page being viewed is one of them and isn't listed)
+export const addRecent = (lid: number, page: RecentPage) => {
+	const list = [
+		page,
+		...readRecent(lid).filter((other) => other.path !== page.path),
+	].slice(0, MAX_RECENT + 1);
+	writeMap(RECENT_KEY, lid, list);
+	return list;
+};

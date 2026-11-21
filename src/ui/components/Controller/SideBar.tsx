@@ -1,6 +1,7 @@
 import { tabHostPageID } from "../../util/pageTabs.ts";
 import clsx from "clsx";
 import {
+	Fragment,
 	memo,
 	type ReactNode,
 	useCallback,
@@ -25,6 +26,16 @@ import { VIDEO_ADS, VIDEO_AD_PADDING } from "../../../common/constants.ts";
 import { menuItems } from "../../util/menuItems.tsx";
 import { safeLocalStorage } from "../../util/safeLocalStorage.ts";
 import { menuItemHiddenForLeagueType } from "../../util/collegeMode.ts";
+import {
+	addRecent,
+	BADGE_PATHS,
+	formatBadgeCount,
+	MAX_RECENT,
+	readRecent,
+	type RecentPage,
+	type SidebarBadgeKey,
+} from "../../util/sidebarExtras.ts";
+import useSidebarBadges from "../../hooks/useSidebarBadges.ts";
 
 export const getText = (
 	text: MenuItemLink["text"],
@@ -212,7 +223,61 @@ export const sideMenuHighlightPageID = (
 	return own ? pageID : (tabHostPageID(pageID) ?? pageID);
 };
 
+// Badge of a side menu link (News Feed, Trade Offers, Newspaper), if it has new items
+const badgeKeyOf = (menuItem: MenuItemLink): SidebarBadgeKey | undefined =>
+	Array.isArray(menuItem.path) && typeof menuItem.path[0] === "string"
+		? BADGE_PATHS[menuItem.path[0]]
+		: undefined;
+
+// The page a visit is recorded as in "Recently visited": a side menu page of its own (not the dashboard), with its label
+export const recentPageFor = (
+	pageID: string | undefined,
+	pathname: string | undefined,
+	context: VisibilityContext,
+): RecentPage | undefined => {
+	if (!pathname || !pageID || pageID === "leagueDashboard") {
+		return;
+	}
+	const link = visibleSideMenuLinks(context).find((link2) =>
+		link2.active?.(pageID, pathname),
+	);
+	const label = link ? getText(link.text) : undefined;
+	if (typeof label !== "string") {
+		return;
+	}
+	return { path: pathname, label };
+};
+
+const RecentlyVisited = ({
+	onMenuItemClick,
+	pages,
+}: {
+	onMenuItemClick: () => void;
+	pages: RecentPage[];
+}) => {
+	if (pages.length === 0) {
+		return null;
+	}
+	return (
+		<MenuGroup title="Recently visited">
+			{pages.map((page) => (
+				<li className="nav-item" key={page.path}>
+					<a
+						className="nav-link"
+						data-testid="sidebar-recent"
+						href={page.path}
+						onClick={onMenuItemClick}
+					>
+						{page.label}
+					</a>
+				</li>
+			))}
+		</MenuGroup>
+	);
+};
+
 const MenuItem = ({
+	badges,
 	context,
 	highlightPageID,
 	menuItem,
@@ -220,6 +285,7 @@ const MenuItem = ({
 	pathname,
 	root,
 }: {
+	badges: Partial<Record<SidebarBadgeKey, number>>;
 	context: VisibilityContext;
 	highlightPageID?: string;
 	menuItem: MenuItemHeader | MenuItemLink | MenuItemText;
@@ -254,6 +320,8 @@ const MenuItem = ({
 			active,
 			"god-mode": menuItem.godMode,
 		});
+		const badgeKey = badgeKeyOf(menuItem);
+		const badge = badgeKey ? badges[badgeKey] : undefined;
 
 		const item = (
 			<li className="nav-item">
@@ -274,6 +342,16 @@ const MenuItem = ({
 						{...anchorProps}
 					>
 						{getText(menuItem.text)}
+						{badge !== undefined ? (
+							<span
+								className="badge rounded-pill text-bg-danger ms-1"
+								data-testid="sidebar-badge"
+								title={`${badge} new since your last visit`}
+							>
+								{formatBadgeCount(badge)}
+								<span className="visually-hidden"> new</span>
+							</span>
+						) : null}
 					</a>
 				)}
 			</li>
@@ -289,6 +367,7 @@ const MenuItem = ({
 		const children = menuItem.children
 			.map((child, i) => (
 				<MenuItem
+					badges={badges}
 					context={context}
 					highlightPageID={highlightPageID}
 					key={i}
@@ -331,6 +410,31 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 	useFeatureSwitches();
 	const context = { godMode, leagueType, lid };
 	const highlightPageID = sideMenuHighlightPageID(pageID, pathname, context);
+
+	const badges = useSidebarBadges(pageID);
+
+	// Recently visited pages of this league, newest first, the current one left out
+	const [recent, setRecent] = useState<RecentPage[]>([]);
+	useEffect(() => {
+		if (lid === undefined) {
+			setRecent([]);
+			return;
+		}
+		// The pathname prop is only passed in baseball (for its depth chart links), so read the address here
+		const locationPath = pathname ?? document.location.pathname;
+		const page = recentPageFor(pageID, locationPath, {
+			godMode,
+			leagueType,
+			lid,
+		});
+		const list = page ? addRecent(lid, page) : readRecent(lid);
+		setRecent(
+			list.filter((other) => other.path !== locationPath).slice(0, MAX_RECENT),
+		);
+	}, [godMode, leagueType, lid, pageID, pathname]);
+	const firstHeaderIndex = menuItems.findIndex(
+		(item) => item.type === "header",
+	);
 
 	const getNode = useCallback((node2: HTMLDivElement) => {
 		if (node2 !== null) {
@@ -424,6 +528,13 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 		};
 	}, [close, open]);
 
+	const onMenuItemClick = useCallback(() => {
+		// Only on mobile, close menu on click
+		if (window.innerWidth < 1200) {
+			localActions.setSidebarOpen(false);
+		}
+	}, []);
+
 	useEffect(() => {
 		const closeHandler = () => {
 			localActions.setSidebarOpen(false);
@@ -460,20 +571,23 @@ export const SideBar = memo(({ pageID, pathname }: Props) => {
 					}
 				>
 					{menuItems.map((menuItem, i) => (
-						<MenuItem
-							context={context}
-							highlightPageID={highlightPageID}
-							key={i}
-							menuItem={menuItem}
-							onMenuItemClick={() => {
-								// Only on mobile, close menu on click
-								if (window.innerWidth < 1200) {
-									localActions.setSidebarOpen(false);
-								}
-							}}
-							pathname={pathname}
-							root
-						/>
+						<Fragment key={i}>
+							{i === firstHeaderIndex && lid !== undefined ? (
+								<RecentlyVisited
+									onMenuItemClick={onMenuItemClick}
+									pages={recent}
+								/>
+							) : null}
+							<MenuItem
+								badges={badges}
+								context={context}
+								highlightPageID={highlightPageID}
+								menuItem={menuItem}
+								onMenuItemClick={onMenuItemClick}
+								pathname={pathname}
+								root
+							/>
+						</Fragment>
 					))}
 				</div>
 			</nav>

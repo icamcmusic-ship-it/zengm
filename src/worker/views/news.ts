@@ -31,7 +31,20 @@ const processInputs = (params: RouteParams<"news">) => {
 	};
 };
 
-const IGNORE_EVENT_TYPES = ["retiredList", "newTeam"];
+export const IGNORE_EVENT_TYPES = ["retiredList", "newTeam"];
+
+// An event's importance in the feed: its score, plus a bonus when it involves the user's team
+export const adjustedNewsScore = (
+	event: { score?: number; tids?: number[]; type: LogEventType },
+	userTid: number,
+) => {
+	if (event.score !== undefined && event.tids && event.tids.includes(userTid)) {
+		const bonus =
+			event.type === "madePlayoffs" || event.type === "draft" ? 20 : 10;
+		return event.score + bonus;
+	}
+	return event.score;
+};
 
 const getTid = (event: { tids?: number[]; type: LogEventType }) => {
 	if (!event.tids || event.tids.length === 0 || event.tids[0]! < 0) {
@@ -93,11 +106,9 @@ export const processEvents = async (
 				event.tids &&
 				event.tids.includes(g.get("userTid"))
 			) {
-				const bonus =
-					event.type === "madePlayoffs" || event.type === "draft" ? 20 : 10;
 				return {
 					...event,
-					score: event.score + bonus,
+					score: adjustedNewsScore(event, g.get("userTid"))!,
 				};
 			}
 

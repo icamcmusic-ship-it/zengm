@@ -31,6 +31,8 @@ Pages that belong with an original BBGM page are tabs of that page: a tab bar at
 
 Other pages are still reached from _More_ links: League Achievements (League Stats / History group) and Coaching Staff (team pages and the Team menu).
 
+**Side menu extras** (all sports, remembered in this browser per league with `safeLocalStorage`, `ui/util/sidebarExtras.ts`): _News Feed_, _Trade Offers_ and _Newspaper_ show a small count badge of what's new since you last opened them (News Feed: items at its default "big" level; Trade Offers: offers to you not seen yet; Newspaper: new issues, one per rebuild of the regular season paper and one per new edition). The counts come from the worker (`getSidebarCounts`, `worker/util/sidebarCounts.ts`) when the page, the phase or a sim changes; the first time a league is opened only sets the baseline. A _Recently visited_ group above _League_ lists the last 5 side menu pages you opened in this league (the exact address, so a season or team you picked is kept), newest first, without the page you're on, collapsible like the other groups.
+
 ## Feature index
 
 | Feature | Where | Sports | Switch (League Extras) | Default new / existing league |

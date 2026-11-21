@@ -316,6 +316,7 @@ import {
 import { getScheduleDayScale } from "../core/season/scheduleDayScale.ts";
 import { faceAgingOnCustomize } from "../util/faceAging.ts";
 import * as staffDepthActions from "../core/staffDepth/actions.ts";
+import { getSidebarCounts } from "../util/sidebarCounts.ts";
 import * as offEmphasis from "../core/offEmphasis/index.ts";
 import {
 	DEF_SCHEMES,
@@ -6717,6 +6718,7 @@ const api = {
 		acceptDraftNightOffer,
 		staffAction,
 		staffDepthAction,
+		getSidebarCounts,
 		offEmphasisAction,
 		idbCacheFlush,
 		importPlayers,
