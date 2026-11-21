@@ -85,7 +85,7 @@ Other pages are still reached from _More_ links: League Achievements (League Sta
 | [Offensive emphasis](#offensive-emphasis) | game sim (play-type decisions), Coaching Staff → Offense tab, Staff Report | bball | `featureOffEmphasis` | always on (core) |
 | [Advanced tracking stats](#advanced-tracking-stats) | Player Stats tabs, player page, Team Stats → Lineups tab, GOAT lab, DPOY | bball | `advStats` | always on (core) |
 | [Keep career tracking for retired players](#keep-career-tracking-for-retired-players) | retirements, career tracking everywhere | bball | `advCareerTracking` | always on (core) |
-| [Season odds](#season-odds) | Standings, Power Rankings, Award Races, Draft Lottery | bball | `featureSeasonOdds` | on / on |
+| [Season odds](#season-odds) | Standings, Power Rankings, Playoffs, Award Races, Draft Lottery | bball | `featureSeasonOdds` | on / on |
 | [Realistic schedule length](#realistic-schedule-length) | schedule, Schedule, Daily Schedule, play menu | bball | `realisticSchedule` | always on (core) |
 | [Marquee games](#marquee-games) | schedule, Schedule, Daily Schedule, box score, Games to Watch | bball | `marqueeGames` | always on (core) |
 | [Custom shot clock](#college-mode) | game sim | bball | `customShotClock` | off / off (college: on) |
@@ -420,6 +420,7 @@ League menu → _Contract Value_: a value index, bargains and albatrosses, and t
 
 - **Where:** _Series Recaps_ tab of Playoffs, `/l/:lid/series_recaps[/:season[/:tidA-:tidB]]`; a _Recap_ link on every started series of the bracket; Rivalries timeline and Finals matchups link to them.
 - **What:** per series (`src/common/seriesRecap`): headline and generated text, result with seeds, game by game (score, margin, overtime, running series score, box score links), series leaders and series MVP (best game score per game on the winning side), turning points (biggest win, biggest fourth-quarter comeback, overtime games, the swing game, the closeout, stored clutch plays), upsets by seed and comebacks in the series (down 3-1, ...). When a series ends the news item ("X defeated Y in the 1st round, 4-3") gets a line about a comeback, upset or sweep and a recap link, and is kept in the news for every round.
+- **Conference Finals MVP:** a playoff series award before the finals (the default _Semifinals MVP_, `sfmvp`, given for each series of the second-to-last round, which is the conference finals in a league split by conference) is named in that series' end-of-series news ("X was named Semifinals MVP.", tagged with the player) and shown at the top of its recap, computed with the award code itself from the series' stats (`core/awards/seriesAwards.ts`) until the season's awards are given, then read from them, so all three agree. Season History already lists it with the playoff awards. Basketball, not in college leagues.
 - **Known limits:** needs the series' box scores; older seasons whose box scores were deleted show only the result.
 
 ### League eras & rule-change votes
@@ -1432,11 +1433,12 @@ season). Never for an edited face. Measured over 3,000 seeds:
 
 ### Season odds
 
-- **Where:** _Standings_ (a _Season odds_ section below the tables), _Power Rankings_ (Playoffs and Title columns), _Award Races_ (a Win% column), _Draft Lottery_ (a _What-if simulator_ below the lottery table).
+- **Where:** _Standings_ (a _Season odds_ section below the tables), _Power Rankings_ (Playoffs and Title columns), _Playoffs_ (series odds on the bracket), _Award Races_ (a Win% column), _Draft Lottery_ (a _What-if simulator_ below the lottery table).
 - **What:** 1,000 Monte Carlo simulations of the rest of the season in the worker: each remaining game is decided from team strength (team rating from the current roster, ignoring injuries of 10 days or less, blended with point margin as games are played) plus home court, playoffs are seeded with the game's own playoff code, then the play-in and the bracket are played out. Gives projected record, playoff and play-in odds, seed distribution, reaching the semifinals/finals and title odds. During the playoffs it plays out the remaining series from the current state. Results are cached and refreshed after each day of games, trades, signings or injuries (about 0.2 s per refresh), and only when a page that shows them asks.
+- **Series odds:** during the playoffs, each unfinished series of the round in progress (the first round during the play-in) shows each team's chance to win it next to its wins, from the same simulations (the share of simulations in which the team wins that round, so a team waiting on a play-in opponent gets its odds against either one). Current season only, not in college leagues.
 - **Award races:** each candidate's award score (BBGM's award scoring) is projected to the end of the regular season with noise that shrinks as the season goes on, and the winner drawn 5,000 times.
 - **Lottery what-if:** move teams up or down the lottery order (chances stay with the slot) or pick another lottery format, then _Run lottery_ for exact odds (where fast enough), a 20,000-lottery simulation (hover a cell) and one sample draw.
-- **Known limits:** current season only. Tiebreakers are approximated (random among tied teams) and playoff reseeding is ignored. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats; in the other sports (no Season Odds there) it goes with the _Extra frivolities_ switch.
+- **Known limits:** current season only. Tiebreakers are approximated (random among tied teams). Series follow the real home court pattern for any length, and reseeding is applied. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats; in the other sports (no Season Odds there) it goes with the _Extra frivolities_ switch.
 
 ### Realistic schedule length
 

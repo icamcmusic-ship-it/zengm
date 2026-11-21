@@ -1,5 +1,6 @@
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
+import { getSeriesAwardWinners } from "../awards/seriesAwards.ts";
 import type { Conditions, GameResults } from "../../../common/types.ts";
 import season from "../season/index.ts";
 import { findSeries } from "./writeGameStats.ts";
@@ -190,6 +191,21 @@ const updatePlayoffSeries = async (
 				])}">Series recap</a>`;
 			}
 
+			// Series MVP awards before the finals (Semifinals MVP: the conference finals MVP), named when the series ends
+			let seriesAwardText = "";
+			const seriesAwardPids: number[] = [];
+			if (__SPORT === "basketball" && playoffSeries.currentRound >= 0) {
+				const winners = await getSeriesAwardWinners({
+					season: g.get("season"),
+					round: playoffSeries.currentRound,
+					tids: [series.home.tid, series.away.tid],
+				});
+				for (const w of winners) {
+					seriesAwardPids.push(w.pid);
+					seriesAwardText += ` <a href="${helpers.leagueUrl(["player", w.pid])}">${w.playerName}</a> was named ${w.name}.`;
+				}
+			}
+
 			const showNotification =
 				series.away.tid === g.get("userTid") ||
 				series.home.tid === g.get("userTid") ||
@@ -210,12 +226,13 @@ const updatePlayoffSeries = async (
 						g.get("season"),
 					])}">${
 						g.get("teamInfoCache")[loserTid]?.name
-					}</a> in the ${currentRoundText}, ${score}.${recapText}`,
+					}</a> in the ${currentRoundText}, ${score}.${seriesAwardText}${recapText}`,
 					showNotification,
 					tids: [winnerTid, loserTid],
+					pids: seriesAwardPids.length > 0 ? seriesAwardPids : undefined,
 					// A comeback, upset or sweep is big news
 					score: recapNote ? 20 : 10,
-					saveToDb: saveToDb || recapsOn,
+					saveToDb: saveToDb || recapsOn || seriesAwardText !== "",
 				},
 				conditions,
 			);

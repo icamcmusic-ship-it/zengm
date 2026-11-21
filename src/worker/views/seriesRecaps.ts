@@ -11,6 +11,7 @@ import {
 	type SeriesRecap,
 } from "../../common/seriesRecap/index.ts";
 import type { Game } from "../../common/types.ts";
+import { getSeriesAwardWinners } from "../core/awards/seriesAwards.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 
 const teamName = (tid: number) =>
@@ -131,9 +132,19 @@ export default defineView({
 			(inputs.pair ? recaps.find((r) => r.key === inputs.pair) : undefined) ??
 			recaps.findLast((r) => r.complete) ??
 			recaps.at(-1);
+		// The series' MVP award (Semifinals MVP: the conference finals MVP) once the series is over
+		const seriesAwards =
+			selected?.complete && __SPORT === "basketball"
+				? await getSeriesAwardWinners({
+						season: inputs.season,
+						round: selected.round,
+						tids: [selected.winner.tid, selected.loser.tid],
+					})
+				: [];
 		return {
 			season: inputs.season,
 			pair: inputs.pair,
+			seriesAwards,
 			recaps: recaps.map((r) => ({
 				key: r.key,
 				round: r.round,

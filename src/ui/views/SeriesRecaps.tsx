@@ -3,7 +3,12 @@ import { helpers } from "../util/helpers.ts";
 import { useLocal } from "../util/local.ts";
 import type { View } from "../../common/types.ts";
 
-const SeriesRecaps = ({ recaps, season, selected }: View<"seriesRecaps">) => {
+const SeriesRecaps = ({
+	recaps,
+	season,
+	selected,
+	seriesAwards,
+}: View<"seriesRecaps">) => {
 	useTitleBar({
 		title: "Series Recaps",
 		dropdown: {
@@ -67,6 +72,19 @@ const SeriesRecaps = ({ recaps, season, selected }: View<"seriesRecaps">) => {
 					<div className="text-body-secondary mb-2">
 						{season} {selected.roundName}
 					</div>
+					{seriesAwards.map((award) => (
+						<p
+							key={award.shortName}
+							className="mb-2"
+							data-testid="series-award"
+						>
+							<span className="badge text-bg-warning me-2">{award.name}</span>
+							<a href={helpers.leagueUrl(["player", award.pid])}>
+								{award.playerName}
+							</a>{" "}
+							({abbrev(award.tid)})
+						</p>
+					))}
 					{selected.text.map((line, i) => (
 						<p key={i} className="mb-1">
 							{line}
