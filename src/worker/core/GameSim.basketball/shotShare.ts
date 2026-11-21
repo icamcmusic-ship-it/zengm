@@ -29,9 +29,11 @@ export const SHOT_SHARE = {
 	tier: [1.72, 1.1, 1, 0.92, 0.88],
 	firstAbility: 0.2,
 	// Lineup-relative knee: a weight above knee × the five's mean keeps only `excess` of the part above it. knee = kneeLo + kneeSpan × ability
+	// (0.35 before the three-point make followed the rating: the elite shooters, whose usage composites are the highest, took 25+ shots a
+	// game)
 	kneeLo: 1.3,
 	kneeSpan: 0.45,
-	kneeExcess: 0.35,
+	kneeExcess: 0.1,
 	// Floor: floorShare of the five's total, times floorMin + (1 - floorMin) × ability
 	floorShare: 0.05,
 	floorMin: 0.4,
@@ -104,17 +106,20 @@ export const SHOT_SHARE = {
 	// Star foul drawing: the defense fouls the first options more (they attack the rim and get the whistle), so each player's
 	// foul-drawing composite × 1 + foulStar × (ability - the mean ability of his team's top 8 by value - foulOff) (the shooting fouls go
 	// with its square). Relative to his team, so league free throws stay about the same whatever the league's talent; foulOff because
-	// the better scorers take more of the shots
-	foulStar: 0.55,
-	foulOff: 0.06,
+	// the better scorers take more of the shots. (0.55 and 0.06 before the three-point make followed the rating, when the top scorers'
+	// threes went in less than the league's and their free throws made up for it: now their FTA per FGA is about the NBA's top scorers')
+	foulStar: 0.35,
+	foulOff: 0.01,
 	// Star shot making: a first option's shots are the ones the offense is built to get him (his spots, screens, matchups), which the
 	// defensive attention penalties (Matchup Defense, Star & Clutch Calibration) took back too much of (the top scorers' true shooting was
 	// barely above the league's, NBA about +.04-.05): his make probability + starMake × (ability - the mean ability of the five on the
-	// court), so league FG% stays about the same
-	starMake: 0.14,
+	// court), so league FG% stays about the same. 0 now (was 0.14): that was measured while the attention penalties took as much off his
+	// threes as off his drives, so a high-volume shooter's threes went in at .20-.30. With the penalties mostly on his drives and post-ups
+	// (ATTENTION.makeJumper, STAR.makeJumper) the top scorers' eFG% is about .01-.02 above the league's without it
+	starMake: 0,
 	// Calibration, so league shooting stays the same: added to the make probability of every shot from the shooter draw (the stars take
 	// more of the shots, and more of them against the help defense), and a multiplier on the three-point draw
-	makeCal: 0.009,
+	makeCal: 0.02,
 	threeCal: 0.97,
 };
 
