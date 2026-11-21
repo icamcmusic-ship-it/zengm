@@ -411,6 +411,8 @@ export const processTeam = async (
 				pss: r["pss"],
 				reb: r["reb"],
 			};
+			// His shooting hand, for the calls that name it ("a lefty slam")
+			(p2 as any).pbpRatings.lft = getShootingHand(p) === "left" ? 1 : 0;
 			// Shot Zones: the floater/touch sub-rating, when he has sub-ratings (the sub-zone of his short shots)
 			if (isValidSubArray(r["sub"])) {
 				(p2 as any).pbpRatings.flt = r["sub"][SUB_INDEX["flt"]!];

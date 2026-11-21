@@ -878,3 +878,14 @@ test("set plays, moves and the game-long colour fill in, and a move reads as its
 		"",
 	);
 });
+
+test("a lefty slam only for a left-handed player (or one whose hand a stored game doesn't know)", () => {
+	const R = ratingsFrom(new Rng(1, 1), 100);
+	const weightOf = (lefty: boolean | undefined) =>
+		dunkKinds({ pid: 1, name: "Joe Smith", pos: "F", t: 0, R, lefty }).find(
+			([, t]: [number, string]) => t.includes("lefty"),
+		)![0];
+	assert.strictEqual(weightOf(false), 0);
+	assert.isAbove(weightOf(true), 0);
+	assert.strictEqual(weightOf(undefined), weightOf(true));
+});

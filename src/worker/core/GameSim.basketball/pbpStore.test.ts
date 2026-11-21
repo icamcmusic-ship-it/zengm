@@ -167,7 +167,12 @@ test("games stored before player traits (version 1), the rivalry (2) and the gam
 			if (target === 1) {
 				assert.isUndefined(p.ratings?.temper);
 			} else {
-				assert.deepStrictEqual(p.ratings, now.players[i]!.ratings);
+				// (the ratings and the temper; the extra keys, such as every player's shooting hand, came with version 4)
+				const withoutExtras = { ...now.players[i]!.ratings };
+				for (const key of EXTRA_KEYS) {
+					delete withoutExtras[key];
+				}
+				assert.deepStrictEqual(p.ratings, withoutExtras);
 			}
 		}
 		const box = makeLiveBoxScore(result, 3);

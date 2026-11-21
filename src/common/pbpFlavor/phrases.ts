@@ -22,7 +22,11 @@ export function dunkKinds(p: any) {
 		[TIER.c * gate(d, 52), n + " jams it home with authority"],
 		[TIER.c * gate(d, 55), n + " rises off two feet and throws it down"],
 		[TIER.c * gate(d, 50), n + " attacks the lane and dunks it"],
-		[TIER.u * gate(d, 58), n + " throws down a lefty slam"],
+		// (only a left-handed player; one whose hand isn't known, in a game stored before it was sent, as then)
+		[
+			p.lefty === false ? 0 : TIER.u * gate(d, 58),
+			n + " throws down a lefty slam",
+		],
 		[
 			TIER.u * gate(Math.min(d, s), 60),
 			n + " hammers down a two-handed dunk in traffic",

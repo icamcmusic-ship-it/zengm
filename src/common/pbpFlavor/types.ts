@@ -22,6 +22,9 @@ export type FPlayer = {
 	// 0 or 1: the index of his team in the box score
 	t: 0 | 1;
 	R: Ratings;
+	// His shooting hand (common/shootingHand.ts), for the calls that name it; undefined when not known (a game stored before it was
+	// sent), and then those calls are worded as they were then, so a stored game still reads as it did live
+	lefty?: boolean;
 };
 
 export type TeamLabel = {

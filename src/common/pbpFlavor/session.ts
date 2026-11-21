@@ -612,12 +612,14 @@ export class FlavorSession {
 			if (this.female) {
 				R.dnk = 0;
 			}
+			const lft = p.ratings?.["lft"];
 			this.players.set(p.pid, {
 				pid: p.pid,
 				name: p.name.replaceAll(/\s+/g, " ").trim() || "???",
 				pos: p.pos,
 				t: p.t,
 				R,
+				...(lft === 0 || lft === 1 ? { lefty: lft === 1 } : {}),
 			});
 		}
 		const names = [...this.players.values()].map((p) => p.name);

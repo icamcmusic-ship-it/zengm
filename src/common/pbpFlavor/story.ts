@@ -35,11 +35,13 @@ export const PBP_TRAIT_KEYS = [
 	"hustle",
 ] as const;
 // Stored after the 14 ratings and the temper (store.ts version 4). Never reorder; add new keys at the end. "former": he has played for the
-// other team (worker/util/pbpGameContext.ts)
+// other team (worker/util/pbpGameContext.ts). "lft": his shooting hand (common/shootingHand.ts), 1 left, 0 right; missing in games stored
+// before it (a count of keys comes first, so those still decode)
 export const EXTRA_KEYS = [
 	...PBP_EXPANDED_KEYS,
 	...PBP_TRAIT_KEYS,
 	"former",
+	"lft",
 ] as const;
 type ExtraKey = (typeof EXTRA_KEYS)[number];
 

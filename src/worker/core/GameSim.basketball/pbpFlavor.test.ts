@@ -8,6 +8,7 @@ import {
 	withSeededRandom,
 	type Line,
 } from "./simLiveGameForTests.ts";
+import { getShootingHand } from "../../../common/shootingHand.ts";
 
 /*
  * The play-by-play text of the live game (src/common/pbpFlavor): played through the real live-game event processor on real simulated games.
@@ -297,6 +298,34 @@ test("special plays happen at about the rates of the League Explorer's play-by-p
 		`kicked/held balls per game: ${kicked + held}`,
 	);
 	assert.isTrue(heaves >= 0.2 && heaves <= 4, `heaves per game: ${heaves}`);
+});
+
+test("a lefty slam is only ever a left-handed player's", async () => {
+	let lefties = 0;
+	let slams = 0;
+	for (const { lines, result } of await games()) {
+		const hands = new Map<string, boolean>();
+		for (const t of result.team) {
+			for (const p of t.player) {
+				const left = getShootingHand({ pid: p.id }) === "left";
+				hands.set(p.name, left);
+				lefties += left ? 1 : 0;
+			}
+		}
+		for (const text of allText(lines)) {
+			const m =
+				/(?:^|[!.] )([^!(.]+?)(?: \(\d+ PTS\))? throws down a lefty slam/.exec(
+					text,
+				);
+			if (m) {
+				slams += 1;
+				assert.isTrue(hands.get(m[1]!), text);
+			}
+		}
+	}
+	// (about 1 in 10 random players is a lefty, and an uncommon dunk call for a strong dunker: a slam or so in 30 games)
+	assert.isAbove(lefties, 0);
+	assert.isAtMost(slams, lefties);
 });
 
 test("a league of women reads in the feminine and has no dunks", async () => {
