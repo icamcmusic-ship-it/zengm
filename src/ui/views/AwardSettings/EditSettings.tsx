@@ -1,4 +1,11 @@
-import { useId, type ChangeEvent, type ReactNode } from "react";
+import { useId, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+	AWARD_AUTOMATIC_TEXT,
+	MAX_AWARD_STAT_COLS,
+	awardStatColOptions,
+	type AwardKeyStats,
+} from "../../components/AwardKeyStats.tsx";
+import { StatColsEditor } from "../../components/StatColsEditor.tsx";
 import { bySport } from "../../../common/sportFunctions.ts";
 import { HelpPopover } from "../../components/HelpPopover.tsx";
 import {
@@ -50,6 +57,10 @@ export const awardSettingToEditingState = (award: AwardSetting) => {
 		mip: !!award.mip,
 		rookie: !!award.rookie,
 		advStats: !!award.advStats,
+		// Stats shown, undefined for automatic
+		statCols: (award.statCols ? [...award.statCols] : undefined) as
+			| string[]
+			| undefined,
 	} as const;
 
 	type ActAs = "mvp" | "roy" | "opoy" | "none";
@@ -122,6 +133,10 @@ const editingStateToAward = (state: EditingState, index: number) => {
 
 	if (state.statRange !== "regularSeason") {
 		common.statRange = state.statRange;
+	}
+
+	if (state.statCols && state.statCols.length > 0) {
+		common.statCols = [...state.statCols];
 	}
 
 	const errorMessages: { index: number; message: string }[] = [];
@@ -251,6 +266,7 @@ export const EditSettings = ({
 	canMoveDown,
 	canMoveUp,
 	disabled,
+	keyStats,
 	move,
 	numGamesPlayoffSeries,
 	playoffsByConf,
@@ -261,6 +277,9 @@ export const EditSettings = ({
 	canMoveDown: boolean;
 	canMoveUp: boolean;
 	disabled: boolean;
+
+	// The saved award's key stats (the stats it can show and the automatic choice), for Stats shown
+	keyStats?: AwardKeyStats;
 	move: (direction: -1 | 1) => void;
 	numGamesPlayoffSeries: number[];
 	playoffsByConf: number | false;
@@ -429,6 +448,7 @@ export const EditSettings = ({
 		});
 	}
 
+	const [showStatCols, setShowStatCols] = useState(false);
 	const actAsId = useId();
 	const teamSelectionId = useId();
 	const groupId = useId();
@@ -885,6 +905,64 @@ export const EditSettings = ({
 						value={state.opoyFormula}
 						onChange={changeHandler("opoyFormula")}
 					/>
+				</div>
+			) : null}
+			{keyStats ? (
+				<div className="mt-2">
+					<button
+						type="button"
+						className="btn btn-link p-0"
+						aria-expanded={showStatCols}
+						onClick={() => {
+							setShowStatCols(!showStatCols);
+						}}
+					>
+						Stats shown:{" "}
+						{state.statCols && state.statCols.length > 0
+							? `Custom (${state.statCols.length})`
+							: "Automatic"}
+					</button>
+					<HelpPopover title="Stats shown" className="ms-2">
+						<p>
+							The stat columns of this award on Award Races, Award History and
+							the season summary.
+						</p>
+						<p>
+							<b>Automatic:</b> the stats that move the formula's score the most
+							among the players shown, padded with the award's usual stats.
+						</p>
+						<p>
+							<b>Custom:</b> pick up to {MAX_AWARD_STAT_COLS} stats, in order.
+							Stats the award can't show (like after changing its range to a
+							playoff round) are skipped.
+						</p>
+						<p>
+							The Columns menu on Award Races and Award History changes this
+							setting too.
+						</p>
+					</HelpPopover>
+					{showStatCols ? (
+						<div className="border rounded p-2 mt-1">
+							<StatColsEditor
+								automaticText={AWARD_AUTOMATIC_TEXT}
+								disabled={disabled}
+								max={MAX_AWARD_STAT_COLS}
+								onChange={(statCols) => {
+									setState({
+										...state,
+										statCols,
+									});
+								}}
+								options={awardStatColOptions(keyStats)}
+								suggested={keyStats.suggested}
+								value={state.statCols}
+							/>
+							<div className="small text-body-secondary mt-1">
+								The stats offered and the automatic ones are from the saved
+								formula and range, and update when you save.
+							</div>
+						</div>
+					) : null}
 				</div>
 			) : null}
 		</div>

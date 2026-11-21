@@ -1,7 +1,9 @@
 // Key stats of an award: the stats its formula reads, ranked by how much each one moves the score among the players shown
 // (the award race candidates, or past winners). Award Races and Award History show the top ones as columns, and a picker
-// can add any other stat the game tracks. Display only: award scoring itself is in processAwards.ts.
+// can add any other stat the game tracks. The user can also choose an award's columns (its statCols setting, Award Settings or the
+// Columns menu), validated here. Display only: award scoring itself is in processAwards.ts.
 import { FormulaEvaluator } from "../../util/FormulaEvaluator.ts";
+import g from "../../util/g.ts";
 import { hasCol } from "../../../common/getCols.ts";
 import {
 	AWARD_STATS_ALL,
@@ -298,14 +300,62 @@ export const colInfoFor = (stats: Iterable<string>): KeyStatColInfo => {
 	return info;
 };
 
+// Most stat columns a user can choose for an award (the award's statCols setting)
+export const MAX_STAT_COLS = 8;
+
+// The user's chosen columns (an award's statCols setting), keeping only stats this award can show: unknown or unavailable keys (a stat
+// from another sport, a series-only stat on a season award, ...) and duplicates are dropped, and at most MAX_STAT_COLS are kept.
+// undefined when nothing valid is left, which means the automatic choice
+export const validStatCols = (
+	statCols: readonly unknown[] | undefined,
+	available: readonly string[],
+): string[] | undefined => {
+	if (!Array.isArray(statCols)) {
+		return;
+	}
+	const availableSet = new Set(available);
+	const valid: string[] = [];
+	for (const stat of statCols) {
+		if (
+			typeof stat === "string" &&
+			availableSet.has(stat) &&
+			!valid.includes(stat)
+		) {
+			valid.push(stat);
+			if (valid.length >= MAX_STAT_COLS) {
+				break;
+			}
+		}
+	}
+	return valid.length > 0 ? valid : undefined;
+};
+
+// The statCols setting of an award: from the league's current award settings when the award is still in them (so a choice made now
+// applies to past seasons too), otherwise the one saved with the award that season
+export const awardStatColsSetting = (award: {
+	shortName: string;
+	statCols?: string[];
+}) => {
+	const current = g
+		.get("awards")
+		.find((row) => row.shortName === award.shortName);
+	return current ? current.statCols : award.statCols;
+};
+
 export type AwardKeyStats = {
 	// What the "Why these stats" note shows
 	formula: string;
 	byPos: boolean;
 	terms: KeyStatTerm[];
 
-	// Default columns
+	// The automatic columns
 	suggested: string[];
+
+	// The user's chosen columns (the award's statCols setting, validated), undefined for the automatic choice
+	custom?: string[];
+
+	// The columns shown: custom, or else suggested
+	shown: string[];
 
 	// Every stat the picker offers
 	available: string[];
@@ -317,10 +367,14 @@ export const getAwardKeyStats = ({
 	award,
 	fallback,
 	rows,
+	statCols,
 }: {
 	award: AwardFormulaInfo;
 	fallback: string[];
 	rows: KeyStatRow[];
+
+	// The award's statCols setting (see awardStatColsSetting), validated here
+	statCols?: readonly unknown[];
 }): AwardKeyStats => {
 	const playoffSeries = typeof award.statRange === "number";
 	const formula = effectiveAwardFormula(award, undefined);
@@ -331,11 +385,14 @@ export const getAwardKeyStats = ({
 		...suggested,
 		...terms.map((term) => term.stat),
 	]);
+	const custom = validStatCols(statCols, available);
 	return {
 		formula,
 		byPos: award.formulaByPos !== undefined,
 		terms,
 		suggested,
+		custom,
+		shown: custom ?? suggested,
 		available,
 		colInfo: colInfoFor([...available, ...terms.map((term) => term.stat)]),
 	};

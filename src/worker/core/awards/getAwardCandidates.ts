@@ -16,6 +16,7 @@ import type { StatOverridesByMatchup } from "./getPlayers.ts";
 import { hashPlayoffSeries } from "./hashPlayoffSeries.ts";
 import { processAwards } from "./processAwards.ts";
 import {
+	awardStatColsSetting,
 	effectiveAwardFormula,
 	getAwardKeyStats,
 	pickerStats,
@@ -337,7 +338,13 @@ export const getAwardCandidates = async (
 				formula: effectiveAwardFormula(award, p.pos),
 			});
 		}
-		return getAwardKeyStats({ award, fallback, rows });
+		return getAwardKeyStats({
+			award,
+			fallback,
+			rows,
+			// Awards being edited (Award Settings) carry their own choice, otherwise the league's current setting for the award
+			statCols: awardsOverride ? award.statCols : awardStatColsSetting(award),
+		});
 	};
 
 	const awardCandidates: Output[][] = realizedAwards.map((group) =>

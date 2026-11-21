@@ -9,7 +9,6 @@ import { showStatsByType } from "../../common/awards.ts";
 import { getCol } from "../../common/getCol.ts";
 import {
 	keyStatTitle,
-	useAwardStatCols,
 	type AwardKeyStats,
 } from "../components/AwardKeyStats.tsx";
 
@@ -41,15 +40,11 @@ const Winner = ({
 	if (!fixedStats) {
 		throw new Error("Invalid showStats");
 	}
-	// Award key stats: the user's chosen columns for this award, or the ones its formula suggests (Award Races, Award History)
+	// Award key stats: the award's chosen columns (its statCols setting), or the ones its formula suggests, as on Award Races and
+	// Award History
 	const keyStats = (award as { keyStats?: AwardKeyStats }).keyStats;
-	const chosen = useAwardStatCols(
-		award.shortName,
-		keyStats,
-		keyStats !== undefined,
-	);
 	const stats: string[] =
-		keyStats && chosen.stats.length > 0 ? chosen.stats : fixedStats;
+		keyStats && keyStats.shown.length > 0 ? keyStats.shown : fixedStats;
 
 	if (!p) {
 		return null;

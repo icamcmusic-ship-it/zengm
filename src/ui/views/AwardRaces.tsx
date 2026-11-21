@@ -9,12 +9,14 @@ import { wrappedPlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import type { DataTableRow } from "../components/DataTable/index.tsx";
 import { RatingWithChange } from "../components/RatingWithChange.tsx";
 import {
-	AwardStatPicker,
 	KeyStatsNote,
 	keyStatCell,
 	keyStatCol,
-	useAwardStatCols,
 } from "../components/AwardKeyStats.tsx";
+import {
+	AwardStatPicker,
+	useAwardStatCols,
+} from "../components/AwardStatCols.tsx";
 import { useLocal } from "../util/local.ts";
 import { getCol } from "../../common/getCol.ts";
 import { Fragment, type ReactNode } from "react";
@@ -247,23 +249,25 @@ export const AwardRaceTable = ({
 	confs,
 	divs,
 	odds,
-	picker = true,
+	previewStats,
 	rowsInfo: { award, season, teams },
 	titleOverride,
 }: {
 	odds?: Record<number, number>;
 
-	// false: always the suggested key stats, no picker (Award Settings preview, where the formula is being edited)
-	picker?: boolean;
+	// Award Settings preview: these columns (the choice being edited), and no Columns menu
+	previewStats?: string[];
 
 	rowsInfo: RowsInfo;
 	titleOverride?: ReactNode;
 } & Pick<View<"awardRaces">, "confs" | "divs">) => {
 	const { mip, rookie, keyStats } = award;
 
-	const statCols = useAwardStatCols(award.shortName, keyStats, picker);
+	const picker = previewStats === undefined;
+	const statCols = useAwardStatCols(award.shortName, keyStats);
+	const chosen = previewStats ?? statCols.stats;
 	const stats = keyStats
-		? [...statCols.stats.filter((stat) => stat !== "score"), "score"]
+		? [...chosen.filter((stat) => stat !== "score"), "score"]
 		: award.stats;
 
 	const asterisk =
@@ -299,11 +303,7 @@ export const AwardRaceTable = ({
 		picker && keyStats ? (
 			<div className="d-flex align-items-start gap-2">
 				{baseTitle}
-				<AwardStatPicker
-					awardName={award.name}
-					keyStats={keyStats}
-					statCols={statCols}
-				/>
+				<AwardStatPicker keyStats={keyStats} statCols={statCols} />
 			</div>
 		) : (
 			baseTitle

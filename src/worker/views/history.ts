@@ -13,6 +13,7 @@ import { groupByUnique, last } from "../../common/utils.ts";
 import { showStatsByType } from "../../common/awards.ts";
 import { awardCandidateStats } from "../core/awards/getAwardCandidates.ts";
 import {
+	awardStatColsSetting,
 	effectiveAwardFormula,
 	getAwardKeyStats,
 	pickerStats,
@@ -298,6 +299,7 @@ export default defineView({
 					award,
 					fallback: awardCandidateStats[award.showStats] ?? [],
 					rows,
+					statCols: awardStatColsSetting(award),
 				});
 			};
 			const storedByShortName = new Map(

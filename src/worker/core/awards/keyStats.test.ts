@@ -12,6 +12,7 @@ import {
 	pickerStats,
 	rankFormulaVariables,
 	suggestKeyStats,
+	validStatCols,
 } from "./keyStats.ts";
 
 const setAdvStats = (on: boolean) => {
@@ -21,6 +22,58 @@ const setAdvStats = (on: boolean) => {
 beforeEach(() => {
 	resetG();
 	setAdvStats(false);
+});
+
+describe("user-chosen stat columns (statCols)", () => {
+	test("validStatCols keeps known stats in order, drops the rest, at most 8", () => {
+		const available = ["pts", "trb", "ast", "blk", "stl", "tov", "fgp", "per"];
+		expect(validStatCols(undefined, available)).toBeUndefined();
+		expect(validStatCols([], available)).toBeUndefined();
+		expect(validStatCols(["nope", 5, null], available)).toBeUndefined();
+		expect(validStatCols(["ast", "nope", "pts", "ast"], available)).toEqual([
+			"ast",
+			"pts",
+		]);
+		expect(
+			validStatCols([...available, "pts", "ws"], [...available, "ws"]),
+		).toEqual(available);
+	});
+
+	test("getAwardKeyStats: custom columns are shown, unknown keys dropped, empty means automatic", () => {
+		const mvp = defaultAwards.mvp;
+		const auto = getAwardKeyStats({ award: mvp, fallback: [], rows: [] });
+		expect(auto.custom).toBeUndefined();
+		expect(auto.shown).toEqual(auto.suggested);
+
+		const custom = getAwardKeyStats({
+			award: mvp,
+			fallback: [],
+			rows: [],
+			statCols: ["tov", "defTck", "fgp"],
+		});
+		expect(custom.custom).toEqual(["tov", "fgp"]);
+		expect(custom.shown).toEqual(["tov", "fgp"]);
+		expect(custom.suggested).toEqual(auto.suggested);
+
+		const none = getAwardKeyStats({
+			award: mvp,
+			fallback: [],
+			rows: [],
+			statCols: ["defTck"],
+		});
+		expect(none.custom).toBeUndefined();
+		expect(none.shown).toEqual(auto.suggested);
+
+		// A playoff series award only offers series stats
+		const series = getAwardKeyStats({
+			award: { ...mvp, statRange: -1 },
+			fallback: [],
+			rows: [],
+			statCols: ["gmsc", "tov"],
+		});
+		expect(series.shown).toContain("gmsc");
+		expect(series.available).toEqual(expect.arrayContaining(series.shown));
+	});
 });
 
 describe("formulaVariables", () => {

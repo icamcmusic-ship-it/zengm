@@ -66,6 +66,11 @@ const awardInfoCommonSchema = z.object({
 		"goalkeeping",
 	]),
 
+	// Stat columns chosen by the user for Award Races, Award History and the season's History page, in order (Award Settings, or the
+	// Columns menu on those pages). Missing or empty: the key stats picked automatically from the formula. Unknown keys are dropped
+	// when shown (worker/core/awards/keyStats.ts)
+	statCols: z.array(z.string()).optional(),
+
 	// Filters
 	bench: z.literal(true).optional(),
 	mip: z.literal(true).optional(),

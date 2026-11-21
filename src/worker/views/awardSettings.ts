@@ -58,6 +58,7 @@ export default defineView({
 			const { awardCandidates, errorMessages } = await getAwardCandidates(
 				season,
 				g.get("awards"),
+				{ pickerStats: true },
 			);
 
 			teams ??= await getTeams(season);

@@ -1827,6 +1827,20 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 							eoy: {
 								type: "string",
 							},
+							// Columns shown for each award (variable names, in order)
+							statCols: {
+								type: "object",
+								properties: {
+									coy: {
+										type: "array",
+										items: { type: "string" },
+									},
+									eoy: {
+										type: "array",
+										items: { type: "string" },
+									},
+								},
+							},
 						},
 					},
 				},

@@ -11,6 +11,7 @@ import type { DropdownOption } from "../../ui/hooks/useDropdownOptions.tsx";
 import type { Awards, PlayerStatAttr, TeamSeason } from "../../common/types.ts";
 import { awardCandidateStats } from "../core/awards/getAwardCandidates.ts";
 import {
+	awardStatColsSetting,
 	effectiveAwardFormula,
 	getAwardKeyStats,
 	pickerStats,
@@ -194,6 +195,7 @@ export default defineView({
 			| "rookie"
 			| "showStats"
 			| "statRange"
+			| "statCols"
 		> = entries[0]?.award ??
 			g.get("awards").find((award) => award.shortName === shortName) ?? {
 				formula: "0",
@@ -387,6 +389,13 @@ export default defineView({
 			award: latestAward,
 			fallback,
 			rows: keyStatRows,
+			statCols:
+				shortName !== undefined
+					? awardStatColsSetting({
+							shortName,
+							statCols: latestAward.statCols,
+						})
+					: undefined,
 		});
 
 		return {

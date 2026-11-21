@@ -9,6 +9,8 @@ import { game, league, phase } from "../core/index.ts";
 import { g, helpers } from "../util/index.ts";
 import { getDefaultSettings } from "./newLeague.ts";
 import * as views from "./index.ts";
+import * as awardSettings from "../api/awardSettings.ts";
+import { awardSettingsSchema } from "../../common/types.ts";
 
 const load = async (id: string, params: Record<string, string>) => {
 	const view = (views as any)[id];
@@ -144,5 +146,88 @@ describe("award key stats views", () => {
 			),
 			dpoy.keyStats.suggested.join(","),
 		);
+	});
+
+	test("User-chosen stat columns: saved in the award settings, validated, shown on every page", async () => {
+		const season = (await load("awardHistory", { award: "MVP" })).rows[0]
+			.season;
+		const awardsBefore = helpers.deepCopy(g.get("awards"));
+
+		// The Columns menu saves into the award setting (unknown keys are kept as given and dropped when shown)
+		const saved = await awardSettings.saveAwardStatCols({
+			shortName: "MVP",
+			statCols: ["tov", "fgp", "tov", "notAStat", "pts"],
+		});
+		assert.isTrue(saved);
+		const mvpSetting = g.get("awards").find((a) => a.shortName === "MVP");
+		assert.deepEqual(mvpSetting?.statCols, ["tov", "fgp", "notAStat", "pts"]);
+		assert.isTrue(awardSettingsSchema.safeParse(g.get("awards")).success);
+		assert.isFalse(
+			await awardSettings.saveAwardStatCols({
+				shortName: "NOPE",
+				statCols: ["pts"],
+			}),
+		);
+
+		const expected = ["tov", "fgp", "pts"];
+		const races = await load("awardRaces", { season: String(season) });
+		const raceMvp = races.awardCandidates.find(
+			(a: any) => a.shortName === "MVP",
+		);
+		assert.deepEqual(raceMvp.keyStats.custom, expected);
+		assert.deepEqual(raceMvp.keyStats.shown, expected);
+		assert.isNumber(raceMvp.players[0].currentStats.tov);
+		// Other awards stay automatic
+		const dpoy = races.awardCandidates.find((a: any) => a.shortName === "DPOY");
+		assert.isUndefined(dpoy.keyStats.custom);
+		assert.deepEqual(dpoy.keyStats.shown, dpoy.keyStats.suggested);
+
+		const history = await load("awardHistory", { award: "MVP" });
+		assert.deepEqual(history.keyStats.shown, expected);
+
+		const summary = await load("history", { season: String(season) });
+		const summaryMvp = summary.awards.individualAwards.find(
+			(a: any) => a.shortName === "MVP",
+		);
+		assert.deepEqual(summaryMvp.keyStats.shown, expected);
+		assert.isNumber(summaryMvp.winner.stats.tov);
+
+		// Award Settings: the edited awards carry their own choice
+		const edited = await awardSettings.getAwardCandidates({
+			type: "custom",
+			season,
+			awards: g
+				.get("awards")
+				.map((a) =>
+					a.shortName === "MVP" ? { ...a, statCols: ["blk", "stl"] } : a,
+				),
+		});
+		const editedMvp = edited.awardCandidates
+			.flat()
+			.find((a) => a.shortName === "MVP");
+		assert.deepEqual(editedMvp?.keyStats.shown, ["blk", "stl"]);
+
+		// Deterministic
+		const again = await load("awardRaces", { season: String(season) });
+		assert.deepEqual(
+			again.awardCandidates.map((a: any) => a.keyStats.shown),
+			races.awardCandidates.map((a: any) => a.keyStats.shown),
+		);
+
+		// Reset to automatic removes the key
+		await awardSettings.saveAwardStatCols({
+			shortName: "MVP",
+			statCols: undefined,
+		});
+		const reset = g.get("awards").find((a) => a.shortName === "MVP");
+		assert.isFalse(reset !== undefined && "statCols" in reset);
+		const races2 = await load("awardRaces", { season: String(season) });
+		const raceMvp2 = races2.awardCandidates.find(
+			(a: any) => a.shortName === "MVP",
+		);
+		assert.isUndefined(raceMvp2.keyStats.custom);
+		assert.deepEqual(raceMvp2.keyStats.shown, raceMvp2.keyStats.suggested);
+
+		await league.setGameAttributes({ awards: awardsBefore });
 	});
 });

@@ -8,7 +8,12 @@ import {
 } from "../../../common/coachExecAwards.ts";
 import { toWorker } from "../../util/toWorker.ts";
 import { showNotification } from "../../util/showNotification.ts";
-import { CoachExecRaceTable } from "../../components/CoachExecAwards.tsx";
+import {
+	COACH_EXEC_AUTOMATIC_TEXT,
+	CoachExecRaceTable,
+	coachExecStatColOptions,
+} from "../../components/CoachExecAwards.tsx";
+import { StatColsEditor } from "../../components/StatColsEditor.tsx";
 import { ActionButton } from "../../components/ActionButton.tsx";
 
 type Info = Awaited<
@@ -148,8 +153,28 @@ export const CoachExecAwardSettings = ({ season }: { season: number }) => {
 									Reset to default
 								</button>
 							</div>
+							<div className="mb-2">
+								<div className="mb-1">Stats shown</div>
+								<StatColsEditor
+									automaticText={COACH_EXEC_AUTOMATIC_TEXT}
+									disabled={status === "saving"}
+									max={info.variables[kind].length}
+									onChange={(value) => {
+										const newFormulas = {
+											...formulas,
+											statCols: { ...formulas.statCols, [kind]: value },
+										};
+										setFormulas(newFormulas);
+										void load(newFormulas);
+									}}
+									options={coachExecStatColOptions(info.variables[kind])}
+									suggested={info.variables[kind]}
+									value={formulas.statCols?.[kind]}
+								/>
+							</div>
 							{race ? (
 								<CoachExecRaceTable
+									preview
 									race={race}
 									season={season}
 									title={<h4>Preview, {season}</h4>}

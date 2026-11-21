@@ -80,6 +80,36 @@ export const DEFAULT_EOY_FORMULA =
 export type CoachExecAwardFormulas = {
 	coy?: string;
 	eoy?: string;
+
+	// Variables shown as columns on Award Races and the Award Settings preview, in order (chosen in Award Settings or the Columns menu).
+	// Missing or empty: every variable of the award
+	statCols?: Partial<Record<CoachExecAwardKind, string[]>>;
+};
+
+export const coachExecVariables = (
+	kind: CoachExecAwardKind,
+): readonly string[] => (kind === "coy" ? COY_VARIABLES : EOY_VARIABLES);
+
+// The chosen columns of Coach/Executive of the Year, keeping only that award's variables (no duplicates). undefined: all of them
+export const validCoachExecStatCols = (
+	kind: CoachExecAwardKind,
+	statCols: unknown,
+): string[] | undefined => {
+	if (!Array.isArray(statCols)) {
+		return;
+	}
+	const variables = coachExecVariables(kind);
+	const valid: string[] = [];
+	for (const stat of statCols) {
+		if (
+			typeof stat === "string" &&
+			variables.includes(stat) &&
+			!valid.includes(stat)
+		) {
+			valid.push(stat);
+		}
+	}
+	return valid.length > 0 ? valid : undefined;
 };
 
 export const defaultCoachExecFormula = (

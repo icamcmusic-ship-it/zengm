@@ -12,12 +12,14 @@ import { wrappedPlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import { useLocal } from "../util/local.ts";
 import { COY_KEY } from "../../common/coachExecAwards.ts";
 import {
-	AwardStatPicker,
 	KeyStatsNote,
 	keyStatCell,
 	keyStatCol,
-	useAwardStatCols,
 } from "../components/AwardKeyStats.tsx";
+import {
+	AwardStatPicker,
+	useAwardStatCols,
+} from "../components/AwardStatCols.tsx";
 
 // Coach of the Year and Executive of the Year (built in): winners only, no key stats
 const CoachExecHistoryTable = ({
@@ -93,7 +95,6 @@ const CoachExecHistoryTable = ({
 
 const AwardHistory = ({
 	award,
-	awardName,
 	awardOptions,
 	coachExecRows,
 	formulaChanged,
@@ -116,7 +117,7 @@ const AwardHistory = ({
 
 	const { userTid } = useLocal(["userTid"]);
 	const [showAll, setShowAll] = useState(false);
-	const statCols = useAwardStatCols(award ?? "", keyStats, award !== undefined);
+	const statCols = useAwardStatCols(award ?? "", keyStats);
 
 	if (award === undefined) {
 		return (
@@ -231,11 +232,7 @@ const AwardHistory = ({
 			<MoreLinks type="awards" page="award_history" />
 
 			<div className="d-flex flex-wrap align-items-center gap-2 mb-2">
-				<AwardStatPicker
-					awardName={awardName ?? award}
-					keyStats={keyStats}
-					statCols={statCols}
-				/>
+				<AwardStatPicker keyStats={keyStats} statCols={statCols} />
 				{anyFinalists ? (
 					<div className="btn-group btn-group-sm">
 						<button

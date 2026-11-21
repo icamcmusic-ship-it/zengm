@@ -35,8 +35,28 @@ import { resetFileInput } from "../../util/resetFileInput.ts";
 import { Documentation } from "./Documentation.tsx";
 import { ImportModal } from "./ImportModal.tsx";
 import { CoachExecAwardSettings } from "./CoachExecAwardSettings.tsx";
+import {
+	MAX_AWARD_STAT_COLS,
+	type AwardKeyStats,
+} from "../../components/AwardKeyStats.tsx";
 
 const MARGIN = 14;
+
+// Preview columns: the Stats shown choice being edited (only stats the award can show, like the worker's validStatCols), or the
+// automatic ones
+const previewStats = (
+	statCols: string[] | undefined,
+	keyStats: AwardKeyStats | undefined,
+) => {
+	if (!keyStats) {
+		return [];
+	}
+	const available = new Set(keyStats.available);
+	const valid = Array.from(
+		new Set((statCols ?? []).filter((stat) => available.has(stat))),
+	).slice(0, MAX_AWARD_STAT_COLS);
+	return valid.length > 0 ? valid : keyStats.suggested;
+};
 
 const getAwardId = (index: number) => `award-${index}`;
 
@@ -201,6 +221,7 @@ const AwardSettings = ({
 									{showEditSettings ? (
 										<div>
 											<EditSettings
+												keyStats={award.keyStats}
 												canMoveDown={i < awardsState.length - 1}
 												canMoveUp={i > 0}
 												disabled={status !== "idle"}
@@ -248,7 +269,10 @@ const AwardSettings = ({
 									<AwardRaceTable
 										confs={confs}
 										divs={divs}
-										picker={false}
+										previewStats={previewStats(
+											editing.statCols,
+											award.keyStats,
+										)}
 										rowsInfo={{ award, season, teams }}
 										titleOverride={title}
 									/>

@@ -15,6 +15,7 @@ import { makeSeededRandom } from "../../common/random.ts";
 import { last } from "../../common/utils.ts";
 import {
 	saveCoachExecAwardFormulas,
+	saveCoachExecStatCols,
 	getCoachExecAwardSettings,
 } from "../api/awardSettings.ts";
 import {
@@ -444,6 +445,47 @@ describe("Coach & Executive of the Year", { timeout: 5 * 60 * 1000 }, () => {
 			);
 		}
 		await saveCoachExecAwardFormulas({});
+		assert.isUndefined(g.get("coachExecAwardFormulas"));
+	});
+
+	test("chosen columns: saved with the formulas, validated, kept when only formulas are saved", async () => {
+		await saveCoachExecStatCols({
+			kind: "coy",
+			statCols: ["mov", "payrollEff", "winp", "mov"],
+		});
+		// payrollEff is not a Coach of the Year variable
+		assert.deepStrictEqual(g.get("coachExecAwardFormulas"), {
+			statCols: { coy: ["mov", "winp"] },
+		});
+		const races = await load("awardRaces", { season: String(season) });
+		const coy = races.coachExecRaces.find((r: any) => r.kind === "coy");
+		const eoy = races.coachExecRaces.find((r: any) => r.kind === "eoy");
+		assert.deepStrictEqual(coy.statCols, ["mov", "winp"]);
+		assert.isUndefined(eoy?.statCols);
+
+		// Saving formulas without statCols keeps them
+		await saveCoachExecAwardFormulas({ coy: "mov" });
+		assert.deepStrictEqual(g.get("coachExecAwardFormulas"), {
+			coy: "mov",
+			statCols: { coy: ["mov", "winp"] },
+		});
+		const settings = await getCoachExecAwardSettings({ season });
+		assert.deepStrictEqual(settings.formulas.statCols, {
+			coy: ["mov", "winp"],
+		});
+		// Preview of edited columns
+		const preview = await getCoachExecAwardSettings({
+			season,
+			formulas: { statCols: { coy: ["injuryRate"] } },
+		});
+		assert.deepStrictEqual(
+			preview.races.find((r) => r.kind === "coy")?.statCols,
+			["injuryRate"],
+		);
+
+		await saveCoachExecStatCols({ kind: "coy", statCols: undefined });
+		assert.deepStrictEqual(g.get("coachExecAwardFormulas"), { coy: "mov" });
+		await saveCoachExecAwardFormulas({ statCols: undefined });
 		assert.isUndefined(g.get("coachExecAwardFormulas"));
 	});
 

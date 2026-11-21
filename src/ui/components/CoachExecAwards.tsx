@@ -11,6 +11,21 @@ import type { CoachExecRace } from "../../worker/core/awards/coachExecAwards.ts"
 import { helpers } from "../util/helpers.ts";
 import { useLocal } from "../util/local.ts";
 import { DataTable, type Col, type DataTableRow } from "./DataTable/index.tsx";
+import { useStatColsChoice } from "./AwardStatCols.tsx";
+import { StatColsDropdown, type StatColOption } from "./StatColsEditor.tsx";
+import { toWorker } from "../util/toWorker.ts";
+
+export const COACH_EXEC_AUTOMATIC_TEXT = "Every variable of the formula";
+
+// The variables of Coach/Executive of the Year, for the stat columns editor
+export const coachExecStatColOptions = (
+	variables: readonly string[],
+): StatColOption[] =>
+	variables.map((key) => ({
+		key,
+		title: COACH_EXEC_VARIABLE_LABELS[key as CoyVariable] ?? key,
+		desc: COACH_EXEC_VARIABLE_DOCS[key as CoyVariable],
+	}));
 
 // Win probability, as shown in the award race tables (see worker/core/seasonOdds/awardOdds.ts)
 export const formatProb = (prob: number) => {
@@ -73,17 +88,34 @@ export const coachExecVariableCols = (keys: readonly string[]): Col[] =>
 	}));
 
 export const CoachExecRaceTable = ({
+	preview,
 	race,
 	season,
 	title,
 }: {
+	// Award Settings preview: the columns being edited (race.statCols), no Columns menu
+	preview?: boolean;
 	race: CoachExecRace;
 	season: number;
 	title?: ReactNode;
 }) => {
 	const { userTid } = useLocal(["userTid"]);
-	const variables: readonly string[] =
+	const allVariables: readonly string[] =
 		race.kind === "coy" ? COY_VARIABLES : EOY_VARIABLES;
+	const choice = useStatColsChoice({
+		key: `coachExec:${race.kind}`,
+		persist: async (stats) => {
+			await toWorker("awardSettings", "saveCoachExecStatCols", {
+				kind: race.kind,
+				statCols: stats,
+			});
+		},
+		saved: race.statCols,
+		suggested: [...allVariables],
+	});
+	const variables: readonly string[] = preview
+		? (race.statCols ?? allVariables)
+		: choice.stats;
 	const hasOdds = race.candidates.some((c) => c.odds !== undefined);
 
 	const cols: Col[] = [
@@ -167,7 +199,26 @@ export const CoachExecRaceTable = ({
 		};
 	});
 
-	const titleNode = title ?? <h2>{race.name}</h2>;
+	const baseTitle = title ?? <h2>{race.name}</h2>;
+	const titleNode = preview ? (
+		baseTitle
+	) : (
+		<div className="d-flex align-items-start gap-2">
+			{baseTitle}
+			<StatColsDropdown
+				automaticText={COACH_EXEC_AUTOMATIC_TEXT}
+				custom={choice.custom}
+				max={allVariables.length}
+				onChange={(stats) => {
+					void choice.save(stats);
+				}}
+				options={coachExecStatColOptions(allVariables)}
+				sessionOnly={choice.sessionOnly}
+				suggested={choice.suggested}
+				value={choice.custom ? choice.stats : undefined}
+			/>
+		</div>
+	);
 
 	if (rows.length === 0) {
 		return (

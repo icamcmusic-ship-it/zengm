@@ -16,6 +16,8 @@ import {
 	compareCandidates,
 	defaultCoachExecFormula,
 	projectedWinps,
+	validCoachExecStatCols,
+	type CoachExecAwardFormulas,
 	type CoachExecAwardKind,
 	type CoyVariable,
 	type EoyVariable,
@@ -108,6 +110,22 @@ export const getCoachExecFormula = (kind: CoachExecAwardKind) => {
 		return custom;
 	}
 	return defaultFormula(kind);
+};
+
+// The variables chosen as columns (Award Settings or the Columns menu), validated; undefined shows all of them
+export const coachExecStatCols = (
+	kind: CoachExecAwardKind,
+	override?: CoachExecAwardFormulas["statCols"],
+) => {
+	let statCols: unknown;
+	if (override) {
+		statCols = override[kind];
+	} else {
+		try {
+			statCols = g.get("coachExecAwardFormulas")?.statCols?.[kind];
+		} catch {}
+	}
+	return validCoachExecStatCols(kind, statCols);
 };
 
 export type TeamAwardContext = {
@@ -843,6 +861,8 @@ export type CoachExecRace =
 			candidates: (CoyCandidate & { id: number; odds?: number })[];
 			// Who actually won, once the award has been given
 			winnerId: number | undefined;
+			// Variables chosen as columns (validated), undefined for all of them
+			statCols: string[] | undefined;
 	  }
 	| {
 			kind: "eoy";
@@ -851,6 +871,8 @@ export type CoachExecRace =
 			formula: string;
 			candidates: (EoyCandidate & { id: number; odds?: number })[];
 			winnerId: number | undefined;
+			// Variables chosen as columns (validated), undefined for all of them
+			statCols: string[] | undefined;
 	  };
 
 /**
@@ -862,6 +884,8 @@ export const getCoachExecRaces = async (
 	options: {
 		limit?: number;
 		formulas?: { coy?: string; eoy?: string };
+		// Columns being edited (Award Settings), instead of the saved ones
+		statCols?: CoachExecAwardFormulas["statCols"];
 		oddsFor?: (
 			scores: { pid: number; score: number }[],
 		) => Record<number, number> | undefined;
@@ -897,6 +921,7 @@ export const getCoachExecRaces = async (
 				.slice(0, limit)
 				.map((c) => ({ ...c, odds: odds?.[c.id] })),
 			winnerId: winner?.cid,
+			statCols: coachExecStatCols("coy", options.statCols),
 		});
 	}
 
@@ -919,6 +944,7 @@ export const getCoachExecRaces = async (
 				.slice(0, limit)
 				.map((c) => ({ ...c, odds: odds?.[c.id] })),
 			winnerId: winner?.tid,
+			statCols: coachExecStatCols("eoy", options.statCols),
 		});
 	}
 
