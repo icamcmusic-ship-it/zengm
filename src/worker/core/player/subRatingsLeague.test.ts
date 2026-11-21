@@ -263,56 +263,61 @@ describe("sub-ratings in a league", () => {
 		},
 	);
 
-	test("league files round-trip with sub-ratings, and files without them get them", async () => {
-		const players = structuredClone(await idb.cache.players.getAll());
-		const before = new Map(
-			players.map((p) => [p.pid, JSON.stringify(p.ratings.at(-1))]),
-		);
-		const streamOf = (ps: typeof players) =>
-			new ReadableStream({
-				start(controller) {
-					for (const p of ps) {
-						controller.enqueue({ key: "players", value: p });
-					}
-					controller.close();
-				},
-			});
+	// (two league creations from a file: several seconds, like the other league tests here)
+	test(
+		"league files round-trip with sub-ratings, and files without them get them",
+		{ timeout: 5 * 60 * 1000 },
+		async () => {
+			const players = structuredClone(await idb.cache.players.getAll());
+			const before = new Map(
+				players.map((p) => [p.pid, JSON.stringify(p.ratings.at(-1))]),
+			);
+			const streamOf = (ps: typeof players) =>
+				new ReadableStream({
+					start(controller) {
+						for (const p of ps) {
+							controller.enqueue({ key: "players", value: p });
+						}
+						controller.close();
+					},
+				});
 
-		await create(true, streamOf(players), ["players"]);
-		let same = 0;
-		for (const p of await idb.cache.players.getAll()) {
-			if (before.get(p.pid) === JSON.stringify(p.ratings.at(-1))) {
-				same += 1;
+			await create(true, streamOf(players), ["players"]);
+			let same = 0;
+			for (const p of await idb.cache.players.getAll()) {
+				if (before.get(p.pid) === JSON.stringify(p.ratings.at(-1))) {
+					same += 1;
+				}
 			}
-		}
-		assert.strictEqual(same, before.size);
+			assert.strictEqual(same, before.size);
 
-		// An old file: no sub-ratings anywhere. Bases unchanged, active players get them.
-		const stripped = structuredClone(players);
-		for (const p of stripped) {
-			delete p.subP;
-			for (const r of p.ratings) {
-				delete (r as any).sub;
+			// An old file: no sub-ratings anywhere. Bases unchanged, active players get them.
+			const stripped = structuredClone(players);
+			for (const p of stripped) {
+				delete p.subP;
+				for (const r of p.ratings) {
+					delete (r as any).sub;
+				}
 			}
-		}
-		await create(true, streamOf(stripped), ["players"]);
-		const imported = await idb.cache.players.getAll();
-		for (const p of imported) {
-			if (!before.has(p.pid)) {
-				// A prospect generated to top up a class
-				continue;
+			await create(true, streamOf(stripped), ["players"]);
+			const imported = await idb.cache.players.getAll();
+			for (const p of imported) {
+				if (!before.has(p.pid)) {
+					// A prospect generated to top up a class
+					continue;
+				}
+				const r = p.ratings.at(-1) as any;
+				const old = JSON.parse(before.get(p.pid)!);
+				for (const k of RATINGS) {
+					assert.strictEqual(r[k], old[k], `pid ${p.pid} ${k}`);
+				}
+				if (p.tid !== PLAYER.RETIRED) {
+					assert.isTrue(subsMatchBases(r), `pid ${p.pid}`);
+					assert.strictEqual(p.subP?.n, 1);
+				}
 			}
-			const r = p.ratings.at(-1) as any;
-			const old = JSON.parse(before.get(p.pid)!);
-			for (const k of RATINGS) {
-				assert.strictEqual(r[k], old[k], `pid ${p.pid} ${k}`);
-			}
-			if (p.tid !== PLAYER.RETIRED) {
-				assert.isTrue(subsMatchBases(r), `pid ${p.pid}`);
-				assert.strictEqual(p.subP?.n, 1);
-			}
-		}
-		// Idempotent
-		assert.strictEqual(await updateSubRatingsForLeague(), 0);
-	});
+			// Idempotent
+			assert.strictEqual(await updateSubRatingsForLeague(), 0);
+		},
+	);
 });

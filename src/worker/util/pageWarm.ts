@@ -65,6 +65,13 @@ const warm = async (myToken: number) => {
 };
 
 export const schedulePageWarm = (delay = 2000) => {
+	// Not in tests (like warmProspectArchetypes): it only saves a visible wait in the UI, and in tests its timer, set after a
+	// file plays games, fired seconds later in the middle of whatever test was running then (test files share a worker), so a
+	// light test could spend seconds wording a season's play-by-play for Best Games and time out. The pages compute what
+	// they need themselves either way.
+	if (__NODE_ENV === "test") {
+		return;
+	}
 	clearTimeout(timer);
 	timer = setTimeout(async () => {
 		timer = undefined;

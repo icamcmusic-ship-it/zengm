@@ -41,7 +41,9 @@ const ratingsOf = (r: PlayerRatings) => {
 	return out;
 };
 
-describe("regenerate ratings (worker)", () => {
+// (each test makes a class and reads every prospect's archetype before and after, a few ms each: 2.5-4 s alone, too close to
+// the 5 s default once a combined run shares the CPU)
+describe("regenerate ratings (worker)", { timeout: 60_000 }, () => {
 	beforeEach(async () => {
 		resetG();
 		await resetCache({});

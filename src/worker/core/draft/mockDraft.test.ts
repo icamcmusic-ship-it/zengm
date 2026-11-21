@@ -9,6 +9,7 @@ import type { DraftPick } from "../../../common/types.ts";
 import { projectProspect, summarizeCareers } from "./proProjection.ts";
 import genRatings from "../player/genRatings.ts";
 import { resetG } from "../../../test/helpers.ts";
+import { makeSeededRandom } from "../../../common/random.ts";
 
 const makeRandom = (seed: number) => () => {
 	seed = (seed * 16807) % 2147483647;
@@ -129,8 +130,11 @@ describe("pro projections", () => {
 
 	test("real development: a better prospect projects higher", () => {
 		resetG();
+		// (the careers are random draws: the same ones whatever ran before)
+		Math.random = makeSeededRandom(3);
 		const weak = genRatings(2025, 1).ratings;
-		const strong = genRatings(2025, 1).ratings;
+		// (the same prospect, 15 better everywhere but height: two independent random prospects could differ by more than that)
+		const strong = structuredClone(weak);
 		for (const key of Object.keys(strong)) {
 			const r = strong as any;
 			if (typeof r[key] === "number" && key !== "season" && key !== "hgt") {
