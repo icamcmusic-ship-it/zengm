@@ -26,6 +26,9 @@
 // the season after it from another run), ERA_CAL_TRACE=1 (also write every iteration). Writes one JSON line per season (fitted values,
 // the targets, the check sample's stats and errors), and the presets as TypeScript (ERA_CAL_OUT.ts) to paste into gameSimPresets.ts.
 // The presets in gameSimPresets.ts were fit with ERA_CAL_GAMES=210 ERA_CAL_ITERS=16 ERA_CAL_AVG_ITERS=10 ERA_CAL_CHECK_GAMES=510.
+// A fit is only as good as its league's level: random leagues score up to ~4 points per team game apart at the same settings, so check a
+// new fit's 2026 values with shotShareCalibration.script.test.ts on ~8 seeds. (A refit averaged over ERA_CAL_SEED=1-3 came out ~1.2 points
+// and 0.01 eFG% low on 8 seeds, because those three leagues score high; the presets here measured 115.6 points, eFG% .548 there.)
 import "fake-indexeddb/auto";
 import { appendFileSync } from "node:fs";
 import { test } from "vitest";

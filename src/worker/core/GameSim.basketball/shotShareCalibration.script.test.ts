@@ -18,6 +18,8 @@
 // settings in effect and the winners' edges League Eras reads. SHOT_SHARE_PREVIEW=150 also plays that many preview games (the era
 // calibration's games: full rosters, no injuries) at the start of each season. Leagues made by tests have league salt 0, so League Eras
 // draws the same walk for every seed: pass {"featureLeagueEras":false} in SHOT_SHARE_SETTINGS to measure anything else.
+// Random leagues differ: at the same settings, one league's 4-season mean is anywhere from ~111 to ~119 points per team game (2026 preset,
+// seeds 1-8), so reading a preset's level to ~1 point takes about 8 seeds (seeds 1-3 alone came out ~1.3 points above the 8-seed mean).
 import "fake-indexeddb/auto";
 // @ts-expect-error node types are not in the web tsconfig, but tests run in node
 import { appendFileSync } from "node:fs";
