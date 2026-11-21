@@ -188,6 +188,10 @@ describe("generation, settings and storage", () => {
 
 	test("draft prospects get deterministic trait seeds from league seed and pid", async () => {
 		g.setWithoutSavingToDB("playerTraitsSeed", 777);
+		// No relatives: addRelatives (random, 2% per prospect by default) makes some prospects brothers of others, and those
+		// intentionally inherit part of their trait seeds (heredity.ts), so the test would fail in a random fraction of runs
+		g.setWithoutSavingToDB("sonRate", 0);
+		g.setWithoutSavingToDB("brotherRate", 0);
 		idb.league = mockIDBLeague();
 		await resetCache({ players: [] });
 		await draft.genPlayers(2026, DEFAULT_LEVEL);
