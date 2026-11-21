@@ -1440,6 +1440,12 @@ season). Never for an edited face. Measured over 3,000 seeds:
 - **Lottery what-if:** move teams up or down the lottery order (chances stay with the slot) or pick another lottery format, then _Run lottery_ for exact odds (where fast enough), a 20,000-lottery simulation (hover a cell) and one sample draw.
 - **Known limits:** current season only. Tiebreakers are approximated (random among tied teams). Series follow the real home court pattern for any length, and reseeding is applied. Award odds only consider the top 10 candidates shown and don't model team record changes. The what-if ignores nba2027 restrictions and COLA when switching formats; in the other sports (no Season Odds there) it goes with the _Extra frivolities_ switch.
 
+### Power rankings in the playoffs
+
+- **Where:** _Power Rankings_ (score, rank, movement arrows and the rank-over-time chart), all sports.
+- **What:** once a season's playoffs have started (and for past seasons), the score adds each playoff team's results to the regular season score (`playoffScore` in `worker/views/powerRankings.ts`): 4 per round won (`PLAYOFF_ROUND_WEIGHT`, about a 10-0 last ten), up to ±6 for the playoff record (wins minus losses over at least 4 games, play-in left out) and half the regular season weight of the playoff point margin per game (scaled per sport, fully counted after 10 games). Teams out of the playoffs get nothing, so a champion ends up near the top and an early exit drops a little.
+- **Snapshots:** the weekly snapshots (`teamSeason.powerRankHistory`) go on through the playoffs, ranked with the playoff ratings and results and marked `playoffs: true`; the movement arrows compare with the last snapshot ranked the same way (the regular season or playoff toggle of the page).
+
 ### Realistic schedule length
 
 - **Setting:** _Always on in every league (core; see Core features). Before:_ `realisticSchedule`. On for new leagues, off for existing leagues (off = exactly the old schedule). Takes effect with the next schedule (the start of the next regular season). Not used with _Group schedule into series_.

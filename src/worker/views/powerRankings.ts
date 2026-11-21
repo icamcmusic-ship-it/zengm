@@ -73,18 +73,56 @@ export const parseLastTen = (lastTen: string) => {
 	};
 };
 
+// Playoff results, once the season's playoffs have started: what a team has done there moves it next to its regular season
+export type PowerRankingsPlayoffs = {
+	// Playoff rounds won (teamSeason.playoffRoundsWon, -1 if it missed the playoffs)
+	roundsWon: number;
+	// Playoff games won and lost (play-in excluded)
+	won: number;
+	lost: number;
+	// Playoff point margin per game
+	mov: number;
+};
+
+// Each round won is worth about as much as going 10-0 in the last 10, so a champion ends up near the top unless it was far behind
+export const PLAYOFF_ROUND_WEIGHT = 4;
+// Winning (or losing) every playoff game is worth up to this much, shrunk towards 0 over the first few games
+export const PLAYOFF_RECORD_WEIGHT = 6;
+// Playoff margin counts half as much as regular season margin per game, and only fully after 10 games
+export const PLAYOFF_MOV_WEIGHT = 0.5;
+
+export const playoffScore = ({
+	roundsWon,
+	won,
+	lost,
+	mov,
+}: PowerRankingsPlayoffs) => {
+	if (roundsWon < 0) {
+		return 0;
+	}
+	const gp = won + lost;
+	let score = PLAYOFF_ROUND_WEIGHT * roundsWon;
+	if (gp > 0) {
+		score += (PLAYOFF_RECORD_WEIGHT * (won - lost)) / Math.max(gp, 4);
+		score += PLAYOFF_MOV_WEIGHT * MOV_SCALE * mov * Math.min(1, gp / 10);
+	}
+	return score;
+};
+
 export const getPowerRankingsScore = ({
 	mov,
 	gp,
 	numGames,
 	ovr,
 	lastTen,
+	playoffs,
 }: {
 	mov: number;
 	gp: number;
 	numGames: number;
 	ovr: number;
 	lastTen: string;
+	playoffs?: PowerRankingsPlayoffs;
 }) => {
 	// Start with MOV, scaled for games played (and per sport)
 	let score = numGames > 0 ? (MOV_SCALE * mov * gp) / numGames : 0;
@@ -99,7 +137,67 @@ export const getPowerRankingsScore = ({
 		score += 10 * ((2 * won) / played - 1);
 	}
 
+	if (playoffs) {
+		score += playoffScore(playoffs);
+	}
+
 	return score;
+};
+
+// Whether a season's playoffs have started, so its power rankings include playoff results
+const playoffsStarted = (season: number) =>
+	season < g.get("season") ||
+	(season === g.get("season") && g.get("phase") >= PHASE.PLAYOFFS);
+
+const getPlayoffResults = async (season: number) => {
+	const byTid = new Map<number, PowerRankingsPlayoffs>();
+	if (!playoffsStarted(season)) {
+		return byTid;
+	}
+	const playoffSeries = await idb.merged.playoffSeries.get(season);
+	if (!playoffSeries) {
+		return byTid;
+	}
+	const teams = await team.getFormattedAll({
+		attrs: ["tid"],
+		seasonAttrs: ["playoffRoundsWon"],
+		stats: ["gp", "mov"],
+		season,
+		playoffs: true,
+		regularSeason: false,
+		showNoStats: true,
+	});
+	const record = new Map<number, { won: number; lost: number }>();
+	for (const round of playoffSeries.series) {
+		for (const { home, away } of round) {
+			if (!away) {
+				continue;
+			}
+			for (const [t, opp] of [
+				[home, away],
+				[away, home],
+			] as const) {
+				const row = record.get(t.tid) ?? { won: 0, lost: 0 };
+				row.won += t.won;
+				row.lost += opp.won;
+				record.set(t.tid, row);
+			}
+		}
+	}
+	for (const t of teams) {
+		const roundsWon = t.seasonAttrs.playoffRoundsWon ?? -1;
+		if (roundsWon < 0) {
+			continue;
+		}
+		const { won, lost } = record.get(t.tid) ?? { won: 0, lost: 0 };
+		byTid.set(t.tid, {
+			roundsWon,
+			won,
+			lost,
+			mov: won + lost > 0 && t.stats.gp > 0 ? t.stats.mov : 0,
+		});
+	}
+	return byTid;
 };
 
 export const addPowerRankingsStuffToTeams = async <
@@ -166,6 +264,8 @@ export const addPowerRankingsStuffToTeams = async <
 	).flat();
 	const rowsByTid = Map.groupBy(rows, (row) => row.tid);
 
+	const playoffResults = await getPlayoffResults(season);
+
 	// Calculate team ovr ratings
 	const teamsWithRankings = teams.map((t) => {
 		// Sorted by pid so ties in team.ovr are broken the same way regardless of which index the players were read from
@@ -193,6 +293,7 @@ export const addPowerRankingsStuffToTeams = async <
 			numGames: g.get("numGames", season),
 			ovr: currentSeason ? ovrCurrent : ovr,
 			lastTen: t.seasonAttrs.lastTen,
+			playoffs: playoffResults.get(t.tid),
 		});
 
 		const other: Record<string, number> = {};
@@ -263,7 +364,8 @@ export const addPowerRankingsStuffToTeams = async <
 
 const SNAPSHOT_INTERVAL_DAYS = __SPORT === "football" ? 1 : 7;
 
-// Store each team's power rank in its teamSeason about once every SNAPSHOT_INTERVAL_DAYS days of games
+// Store each team's power rank in its teamSeason about once every SNAPSHOT_INTERVAL_DAYS days of games, through the regular season and
+// the playoffs (playoff snapshots use the playoff rotation ratings and include playoff results, and are marked as such)
 export const snapshotPowerRankings = async () => {
 	const season = g.get("season");
 	const teamSeasons = (
@@ -292,10 +394,11 @@ export const snapshotPowerRankings = async () => {
 		season,
 		showNoStats: true,
 	});
+	const playoffs = g.get("phase") === PHASE.PLAYOFFS;
 	const ranked = await addPowerRankingsStuffToTeams(
 		teams,
 		season,
-		"regularSeason",
+		playoffs ? "playoffs" : "regularSeason",
 	);
 	const rankByTid = new Map(ranked.map((t) => [t.tid, t.powerRankings.rank]));
 
@@ -304,7 +407,10 @@ export const snapshotPowerRankings = async () => {
 		if (rank === undefined) {
 			continue;
 		}
-		ts.powerRankHistory = [...(ts.powerRankHistory ?? []), { day, rank }];
+		ts.powerRankHistory = [
+			...(ts.powerRankHistory ?? []),
+			playoffs ? { day, rank, playoffs: true as const } : { day, rank },
+		];
 		await idb.cache.teamSeasons.put(ts);
 	}
 };
@@ -347,16 +453,16 @@ export default defineView({
 				// Movement since the previous weekly snapshot. If a snapshot was taken on the latest game day, compare to the one before it
 				const history = t.seasonAttrs.powerRankHistory ?? [];
 				const latestDay = t.seasonAttrs.lastGameDay;
+				// Only against a snapshot ranked the same way (regular season or playoff ratings)
 				const prev = history.findLast(
-					(row) => row.day < (latestDay ?? Infinity),
+					(row) =>
+						row.day < (latestDay ?? Infinity) &&
+						!!row.playoffs === (playoffs === "playoffs"),
 				);
 				return {
 					...t,
 					powerRankHistory: history,
-					rankChange:
-						playoffs === "regularSeason" && prev
-							? prev.rank - t.powerRankings.rank
-							: undefined,
+					rankChange: prev ? prev.rank - t.powerRankings.rank : undefined,
 				};
 			});
 

@@ -394,6 +394,10 @@ const play = async (
 				// Weekly power rankings snapshot, for movement arrows on the Power Rankings page
 				await snapshotPowerRankings();
 			}
+			if (dayTick && phase === PHASE.PLAYOFFS) {
+				// The snapshots go on through the playoffs, which now move the rankings too
+				await snapshotPowerRankings();
+			}
 			if (dayTick && phase === PHASE.REGULAR_SEASON) {
 				// AI-to-AI trades and AI offers are background activity: a bug in them must not stop the season
 				await trade.runAiTradesSafely();

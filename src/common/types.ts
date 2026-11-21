@@ -2822,10 +2822,12 @@ export type TeamSeasonWithoutKey = {
 	userControl?: "user" | "auto";
 	ownerMood?: OwnerMood;
 	ownerEvaluation?: OwnerEvaluation;
-	// Power rankings snapshots taken about once a week during the regular season, used for movement arrows and the rank-over-time chart
+	// Power rankings snapshots taken about once a week during the regular season and the playoffs (playoffs: true, ranked with the playoff
+	// ratings and results), used for movement arrows and the rank-over-time chart
 	powerRankHistory?: {
 		day: number;
 		rank: number;
+		playoffs?: true;
 	}[];
 	numPlayersTradedAway: number;
 	note?: string;

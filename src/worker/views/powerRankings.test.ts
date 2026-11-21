@@ -1,8 +1,10 @@
 import { assert, describe, test } from "vitest";
 import {
 	MOV_SCALE,
+	PLAYOFF_ROUND_WEIGHT,
 	getPowerRankingsScore,
 	parseLastTen,
+	playoffScore,
 } from "./powerRankings.ts";
 
 describe("power rankings score", () => {
@@ -64,5 +66,36 @@ describe("power rankings score", () => {
 		} else if (__SPORT === "hockey" || __SPORT === "baseball") {
 			assert.isAbove(MOV_SCALE, 1);
 		}
+	});
+
+	test("playoff results: nothing for teams out of the playoffs, rounds and record for the rest", () => {
+		const base = {
+			mov: 3,
+			gp: 82,
+			numGames: 82,
+			ovr: 55,
+			lastTen: "6-4",
+		};
+		const without = getPowerRankingsScore(base);
+		assert.strictEqual(
+			getPowerRankingsScore({
+				...base,
+				playoffs: { roundsWon: -1, won: 0, lost: 0, mov: 0 },
+			}),
+			without,
+		);
+
+		// Champion 16-4 with +8 margin beats a first round exit 1-4 with -6 margin
+		const champ = playoffScore({ roundsWon: 4, won: 16, lost: 4, mov: 8 });
+		const out = playoffScore({ roundsWon: 0, won: 1, lost: 4, mov: -6 });
+		assert.isAbove(champ, 4 * PLAYOFF_ROUND_WEIGHT);
+		assert.isBelow(out, 0);
+		assert.isAbove(champ - out, 20);
+
+		// A sweep in the first two games counts, but less than over a whole series
+		const twoGames = playoffScore({ roundsWon: 0, won: 2, lost: 0, mov: 10 });
+		const fourGames = playoffScore({ roundsWon: 1, won: 4, lost: 0, mov: 10 });
+		assert.isAbove(twoGames, 0);
+		assert.isAbove(fourGames, twoGames + PLAYOFF_ROUND_WEIGHT);
 	});
 });

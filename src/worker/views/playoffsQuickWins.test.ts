@@ -130,6 +130,17 @@ describe("playoff quick wins", () => {
 			assert.strictEqual(recaps.seriesAwards[0].name, "Semifinals MVP");
 		}
 
+		// Power rankings snapshots went on through the playoffs
+		const teamSeasons = await idb.cache.teamSeasons.indexGetAll(
+			"teamSeasonsBySeasonTid",
+			[[season], [season, "Z"]],
+		);
+		assert.isTrue(
+			teamSeasons.some((ts) =>
+				ts.powerRankHistory?.some((row) => row.playoffs),
+			),
+		);
+
 		// Not for the finals (it has the Finals MVP) or the first round
 		const firstRound = playoffSeries.series[0]![0]!;
 		const recaps = await load("seriesRecaps", {
