@@ -22,6 +22,7 @@ import {
 	SIM_FIX_PERF_FACTOR,
 	SIM_FIX_STRENGTH_GAP,
 	SIM_FIX_SHOT_CHOICE,
+	SIM_FIX_THREE,
 	SIM_FIX_TRANSITION,
 } from "./simSettings.ts";
 import {
@@ -218,6 +219,32 @@ const LATE_GAME_BASE_ERROR = 0.06;
 
 // The most likely a shot attempt is a three (shot-type roll), whatever the settings
 export const MAX_THREE_PROB = 0.85;
+
+// Game Sim Fixes: the three-point draw (the product of its factors) keeps only threeExcess of the part above threeKnee, times
+// threeScale (see SIM_FIX_SHOT_CHOICE)
+const threeDrawKnee = (
+	simFixes: boolean,
+	x: number,
+	c: PlayerGameSim["compositeRating"],
+) => {
+	if (!simFixes) {
+		return x;
+	}
+	const fix = SIM_FIX_SHOT_CHOICE;
+	const edge = helpers.bound(
+		fix.threeVsMid *
+			(c.shootingThreePointer - (c.shootingMidRangeMake ?? c.shootingMidRange)),
+		-fix.threeVsMidMax,
+		fix.threeVsMidMax,
+	);
+	const y = x * (1 + edge);
+	return (
+		fix.threeScale *
+		(y > fix.threeKnee
+			? fix.threeKnee + fix.threeExcess * (y - fix.threeKnee)
+			: y)
+	);
+};
 
 // A probability in [0, 1] (NaN -> 0, which is what comparing NaN with Math.random() did)
 const clampProb = (x: number) => (x > 0 ? (x < 1 ? x : 1) : 0);
@@ -5127,29 +5154,33 @@ class GameSim extends GameSimBase {
 				// (capped: up to 7 factors multiply here, and past a three-point tendency of about 1.5 nearly every shot was a three)
 				Math.min(
 					MAX_THREE_PROB,
-					(this.shotShare ? this.ssThreeTilt(p, selfCreated) : 1) *
-						(trailBy2 ? fix.trailBy2Three : 1) *
-						0.67 *
-						shootingThreePointerScaled2 *
-						this.ga.threePointTendencyFactor *
-						(this.coachSys
-							? this.cs[this.o].three * this.cs[this.d].dThree
-							: 1) *
-						(sc
-							? selfCreated
-								? CREATION.selfThree
-								: CREATION.otherThree
-							: 1) *
-						(this.playTypes
-							? PLAY_TYPES.three *
-								(selfCreated ? PLAY_TYPES.selfThree : PLAY_TYPES.otherThree) *
-								(this.offEmph
-									? selfCreated
-										? this.oe[this.o].selfThree
-										: this.oe[this.o].three
-									: 1)
-							: 1) *
-						(sp ? sp.three : 1),
+					threeDrawKnee(
+						this.simFixes,
+						(this.shotShare ? this.ssThreeTilt(p, selfCreated) : 1) *
+							(trailBy2 ? fix.trailBy2Three : 1) *
+							0.67 *
+							shootingThreePointerScaled2 *
+							this.ga.threePointTendencyFactor *
+							(this.coachSys
+								? this.cs[this.o].three * this.cs[this.d].dThree
+								: 1) *
+							(sc
+								? selfCreated
+									? CREATION.selfThree
+									: CREATION.otherThree
+								: 1) *
+							(this.playTypes
+								? PLAY_TYPES.three *
+									(selfCreated ? PLAY_TYPES.selfThree : PLAY_TYPES.otherThree) *
+									(this.offEmph
+										? selfCreated
+											? this.oe[this.o].selfThree
+											: this.oe[this.o].three
+										: 1)
+								: 1) *
+							(sp ? sp.three : 1),
+						p.compositeRating,
+					),
 				)
 		) {
 			// Three pointer
@@ -5159,15 +5190,25 @@ class GameSim extends GameSimBase {
 			}
 			fgaLogType = this.ga.threePointers ? "fgaTp" : "fgaTpFake";
 			probMissAndFoul = 0.02;
-			probMake =
-				(this.matchupDefense
-					? eliteFinisher(
-							shootingThreePointerScaled,
-							ATTENTION.makeKnee.threePointer,
-						)
-					: shootingThreePointerScaled) *
-					0.3 +
-				0.36;
+			probMake = this.simFixes
+				? // Game Sim Fixes: the make reads the composite itself (the high end squash above is for how often he shoots), with only the
+					// help defense's knee at the very top
+					SIM_FIX_THREE.intercept +
+					SIM_FIX_THREE.slope *
+						(this.matchupDefense
+							? eliteFinisher(
+									p.compositeRating.shootingThreePointer,
+									SIM_FIX_THREE.knee,
+								)
+							: p.compositeRating.shootingThreePointer)
+				: (this.matchupDefense
+						? eliteFinisher(
+								shootingThreePointerScaled,
+								ATTENTION.makeKnee.threePointer,
+							)
+						: shootingThreePointerScaled) *
+						0.3 +
+					0.36;
 			probAndOne = 0.01;
 			if (this.expandedRatings2 || this.subRatingsSim) {
 				probMake += this.jumpShotStyleDelta(
@@ -5461,7 +5502,11 @@ class GameSim extends GameSimBase {
 				this.attentionShooterShare > ATTENTION.makeRef
 			) {
 				probMake -=
-					ATTENTION.make * (this.attentionShooterShare - ATTENTION.makeRef);
+					ATTENTION.make *
+					(this.attentionShooterShare - ATTENTION.makeRef) *
+					(type === "threePointer" || type === "midRange"
+						? ATTENTION.makeJumper
+						: 1);
 			}
 
 			// Shot Share Model: a forced shot late in the shot clock, a role player forcing his shots
@@ -5478,7 +5523,17 @@ class GameSim extends GameSimBase {
 					p === this.attentionShooter &&
 					this.attentionShooterShare > STAR.ref
 				) {
-					probMake -= STAR.make * (this.attentionShooterShare - STAR.ref);
+					probMake -=
+						STAR.make *
+						(this.attentionShooterShare - STAR.ref) *
+						(type === "threePointer" || type === "midRange"
+							? STAR.makeJumper
+							: 1);
+				}
+				if (type === "threePointer") {
+					probMake += STAR.threeCal;
+				} else if (type === "midRange") {
+					probMake += STAR.midCal;
 				}
 				// Clutch time: the defense tightens (late-game intensity, the scouting report, shots late in the shot clock)
 				if (this.isClutchNba()) {

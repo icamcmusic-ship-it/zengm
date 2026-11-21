@@ -50,6 +50,9 @@ export const ATTENTION = {
 	// Help defense: his shots go in this much less often per unit of his share of the shooter draw (before the cap) above makeRef
 	make: 0.8,
 	makeRef: 0.32,
+	// ...times this on a jumper (three or mid-range): the help keys on his drives and post-ups, a shooter's jumpers stay about as good at a
+	// high volume
+	makeJumper: 0.3,
 	// Help defense on elite finishers (eliteFinisher, applied in the GameSim constructor and the three-point make): a make composite above
 	// its knee keeps only makeExcess of the part above it, as does the foul-drawing composite (whose square scales the shooting fouls, so a
 	// great foul drawer's misses mostly vanished from his FGA). The help rotates to the best finishers and shooters, so an elite edge has

@@ -11,12 +11,13 @@ export const SIM_FIX_COMPOSITE_WEIGHTS: CompositeWeights<string> = {
 		ratings: ["ins", "dnk", "fg", "tp", "spd", "hgt", "drb", "oiq"],
 		weights: [0.6, 1, 0.5, 1, 0.5, 0.5, 0.5, 0.5],
 	},
-	// How often he takes a mid-range jumper (stock: shootingMidRange, oiq -0.5, fg 1, stre 0.2). Offensive IQ still steers players
-	// away from it; fg moves it much less, so a better shooter doesn't trade many more layups for jumpers (the constant keeps
-	// the league's mid-range rate the same)
+	// How often he takes a mid-range jumper (stock: shootingMidRange, oiq -0.5, fg 1, stre 0.2). Mid-range shooting (fg) leads, so a
+	// better mid-range shooter takes more of them (with the old 0.4 fg / -0.5 oiq, and the better shooters also taking more threes, the
+	// best mid-range shooters took the smallest share of their shots from mid-range); offensive IQ still steers players away from it a
+	// little. The constant keeps the league's mid-range rate the same
 	shootingMidRangeSelect: {
 		ratings: [51, "fg", "stre", "oiq"],
-		weights: [0.6, 0.4, 0.2, -0.5],
+		weights: [0.2, 1, 0.2, -0.25],
 	},
 	// How often he posts up (stock: shootingLowPost): inside scoring counts less here and more in the make below
 	shootingLowPostSelect: {
@@ -64,6 +65,10 @@ export const SIM_FIX_EXPANDED_COMPOSITE_WEIGHTS: CompositeWeights<string> = {
 // matters more, intercepts so the league percentages stay the same
 export const SIM_FIX_MID_RANGE = { intercept: 0.343, slope: 0.5 };
 export const SIM_FIX_LOW_POST = { intercept: 0.253, slope: 0.5 };
+// Three-pointers: the stock make squashed the composite above 0.55 to two thirds (and Matchup Defense's knee kept a quarter of what was
+// left above 0.68 of that), so a 90 three-point shooter made barely more than a 65. The make reads the composite unsquashed, with the help
+// defense's knee (ATTENTION.makeExcess above knee) only for the very best
+export const SIM_FIX_THREE = { intercept: 0.36, slope: 0.3, knee: 0.85 };
 
 // Transition possessions (realistic possession model) lean toward the rim and away from post-ups
 export const SIM_FIX_TRANSITION = { rim: 1.6, post: 0.3 };
@@ -78,8 +83,13 @@ export const SIM_FIX_TRANSITION = { rim: 1.6, post: 0.3 };
 // - forceThree*: end-of-game forced threes (when trailing by 3-10 late) fade out for a shooter whose three-point composite is below
 //   forceThreeFull, and are never forced below forceThreeNone, unless it's a heave (under 2 seconds)
 // - trailBy2*: trailing by 1-2 late, the shot leans away from threes and toward the rim
+// - threeVsMid*: the three-point draw × 1 + threeVsMid × (three-point composite - mid-range make composite), within ±threeVsMidMax: a
+//   better mid-range than three-point shooter pulls up from inside the line more, a better three-point shooter steps out
+// - threeKnee/threeExcess/threeScale: the three-point draw (the product of all its factors) keeps only threeExcess of the part above
+//   threeKnee, times threeScale (so the league's 3PA rate stays put). Its factors stack (three-point composite, Hunt threes, spacing,
+//   kick-outs, play types...), and the best shooters took up to 20 threes a game, three quarters of their shots
 export const SIM_FIX_SHOT_CHOICE = {
-	mid: 0.93,
+	mid: 0.9,
 	rim: 1.06,
 	post: 0.34,
 	multMin: 0.4,
@@ -90,6 +100,11 @@ export const SIM_FIX_SHOT_CHOICE = {
 	trailBy2Seconds: 10,
 	trailBy2Three: 0.6,
 	trailBy2Rim: 1.5,
+	threeKnee: 0.4,
+	threeExcess: 0.12,
+	threeScale: 1.26,
+	threeVsMid: 1.5,
+	threeVsMidMax: 0.25,
 };
 
 // Rest at the breaks between periods (energy, 0-1, recovered by every player on the roster): quarter breaks and halftime. A bench

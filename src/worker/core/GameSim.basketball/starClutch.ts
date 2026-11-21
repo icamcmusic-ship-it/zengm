@@ -12,6 +12,13 @@
 export const STAR = {
 	ref: 0.21,
 	make: 0.7,
+	// ...times this on a jumper (three or mid-range): the defense keys on his drives and post-ups. With the full penalty on his threes
+	// (and the share of the shot draw going with the three-point rating), the better a high-volume shooter was the worse his 3P% got.
+	// Every three gets threeCal and every mid-range jumper midCal, so the league's 3P% and mid-range FG% stay put (the five's give-back
+	// below still counts the full penalty)
+	makeJumper: 0.3,
+	threeCal: -0.0555,
+	midCal: -0.045,
 	give: 1,
 };
 
