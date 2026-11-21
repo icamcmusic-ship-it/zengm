@@ -7,6 +7,7 @@ import type {
 import { helpers } from "../util/helpers.ts";
 import type { ReactNode } from "react";
 import { ChampionshipBanner } from "./ChampionshipBanner.tsx";
+import { formatOdds } from "./SeasonOdds.tsx";
 
 type SeriesTeam = PlayoffSeriesTeamAugmented;
 
@@ -63,6 +64,7 @@ const Team = ({
 	won,
 	lost,
 	gid,
+	odds,
 }: {
 	editing?: Editing;
 	expandTeamName: boolean;
@@ -75,6 +77,7 @@ const Team = ({
 	won: boolean;
 	lost: boolean;
 	gid?: number;
+	odds?: number;
 }) => {
 	if (!team) {
 		return null;
@@ -204,7 +207,22 @@ const Team = ({
 					</span>
 				</div>
 			)}
-			{showWon && typeof team.won === "number" ? wonPtsLink(team.won) : null}
+			{odds !== undefined ? (
+				<div className="ms-auto h-100 d-flex align-items-center">
+					<span
+						className="small fw-normal text-body-secondary pe-2"
+						data-testid="series-odds"
+						title="Chance to win the series (Season Odds)"
+					>
+						{formatOdds(odds)}
+					</span>
+					{showWon && typeof team.won === "number"
+						? wonPtsLink(team.won)
+						: null}
+				</div>
+			) : showWon && typeof team.won === "number" ? (
+				wonPtsLink(team.won)
+			) : null}
 			{!showWon && showPts && typeof team.pts === "number"
 				? wonPtsLink(
 						<>
@@ -225,6 +243,7 @@ export const PlayoffMatchup = ({
 	expandTeamNames = false,
 	extraHighlight,
 	numGamesToWinSeries = 7,
+	odds,
 	recapUrl,
 	season,
 	series,
@@ -235,6 +254,8 @@ export const PlayoffMatchup = ({
 	expandTeamNames?: boolean;
 	extraHighlight?: boolean;
 	numGamesToWinSeries?: number;
+	// Season Odds chance of each team winning this series (unfinished series only)
+	odds?: Record<number, number>;
 	// Link to the series recap (Series Recaps feature)
 	recapUrl?: string;
 	season: number;
@@ -280,6 +301,11 @@ export const PlayoffMatchup = ({
 					expandTeamName={expandTeamNames}
 					extraHighlight={extraHighlight}
 					team={series.home}
+					odds={
+						odds && !series.home.pendingPlayIn && !homeWon && !awayWon
+							? odds[series.home.tid]
+							: undefined
+					}
 					season={season}
 					showPts={showPts}
 					showWon={showWon}
@@ -293,6 +319,15 @@ export const PlayoffMatchup = ({
 					expandTeamName={expandTeamNames}
 					extraHighlight={extraHighlight}
 					team={series.away}
+					odds={
+						odds &&
+						series.away &&
+						!series.away.pendingPlayIn &&
+						!homeWon &&
+						!awayWon
+							? odds[series.away.tid]
+							: undefined
+					}
 					season={season}
 					showPts={showPts}
 					showWon={showWon}

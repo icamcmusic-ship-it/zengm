@@ -11,6 +11,8 @@ import type { PlayoffSeries } from "../../common/types.ts";
 import { defineView } from "../util/defineView.ts";
 import { orderTeams } from "../util/orderTeams.ts";
 import { validateSeasonOnly } from "../util/processInputs.ts";
+import { getSeasonOdds } from "../core/seasonOdds/index.ts";
+import { PHASE } from "../../common/constants.ts";
 
 type TeamToEdit = {
 	tid: number;
@@ -51,6 +53,12 @@ export default defineView({
 				playoffsByConf: number | false;
 				season: number;
 				series: Awaited<ReturnType<typeof helpers.augmentSeries>>;
+				// Season Odds chance of each team winning its series in seriesOdds.round (the round in progress, or the first round
+				// during the play-in), from the same simulations as the Standings odds
+				seriesOdds?: {
+					round: number;
+					byTid: Record<number, number>;
+				};
 				teamsToEdit: TeamToEdit[];
 		  }
 		| { errorMessage: string }
@@ -256,6 +264,27 @@ export default defineView({
 				}
 			}
 
+			let seriesOdds;
+			if (
+				playoffSeries &&
+				inputs.season === g.get("season") &&
+				g.get("phase") === PHASE.PLAYOFFS &&
+				!isCollege()
+			) {
+				const odds = await getSeasonOdds();
+				const round = Math.max(0, playoffSeries.currentRound);
+				if (odds && round < odds.numRounds) {
+					const byTid: Record<number, number> = {};
+					for (const t of odds.teams) {
+						const prob = t.roundsWon[round];
+						if (prob !== undefined && prob > 0) {
+							byTid[t.tid] = prob;
+						}
+					}
+					seriesOdds = { round, byTid };
+				}
+			}
+
 			return {
 				canEdit,
 				collegeFirstFour,
@@ -271,6 +300,7 @@ export default defineView({
 				playoffsByConf,
 				season: inputs.season,
 				series: series2,
+				seriesOdds,
 				teamsToEdit,
 			};
 		}

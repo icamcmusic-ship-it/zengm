@@ -27,6 +27,7 @@ const Playoffs = ({
 	playoffsByConf,
 	season,
 	series,
+	seriesOdds,
 	teamsToEdit,
 }: View<"playoffs">) => {
 	useTitleBar({
@@ -240,6 +241,11 @@ const Playoffs = ({
 											<PlayoffMatchup
 												bannerForWinner={finals}
 												numGamesToWinSeries={numGamesToWinSeries[m.matchup[0]]}
+												odds={
+													seriesOdds && seriesOdds.round === m.matchup[0]
+														? seriesOdds.byTid
+														: undefined
+												}
 												recapUrl={
 													series[m.matchup[0]]?.[m.matchup[1]]
 														? recapUrl(series[m.matchup[0]]![m.matchup[1]]!)
