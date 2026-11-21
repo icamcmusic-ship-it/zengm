@@ -24,6 +24,7 @@ import {
 import { bySport } from "../../common/sportFunctions.ts";
 import { formatList } from "../../common/formatList.ts";
 import { team } from "../core/index.ts";
+import { featureOn } from "./nativeFeatures.ts";
 
 const findAwards = <
 	Input extends AwardSettingIndividual | AwardSettingTeam,
@@ -2254,6 +2255,173 @@ if (__SPORT === "basketball") {
 			},
 		);
 	}
+}
+
+// GM career achievements (basketball): the user's front office career across seasons and teams
+if (__SPORT === "basketball") {
+	// The user ran this team that season: the team seasons' record of who ran the user's teams (spectator or auto play all season is
+	// "auto"), else (seasons before that was recorded) the season's user team
+	const userRanTeam = (
+		tid: number,
+		season: number,
+		teamSeasons: { tid: number; userControl?: "user" | "auto" }[],
+	) => {
+		if (teamSeasons.some((row) => row.userControl !== undefined)) {
+			return teamSeasons.find((row) => row.tid === tid)?.userControl === "user";
+		}
+		try {
+			return g.get("userTid", season) === tid;
+		} catch {
+			return false;
+		}
+	};
+
+	const wonTitleIn = (
+		ts: { playoffRoundsWon: number } | undefined,
+		season: number,
+	) =>
+		!!ts &&
+		ts.playoffRoundsWon >= 0 &&
+		ts.playoffRoundsWon === g.get("numGamesPlayoffSeries", season).length;
+
+	// Teams the user ran in his career, and whether he won a title with each
+	const userTeamsAndTitles = async () => {
+		const byTid = new Map<number, boolean>();
+		for (
+			let season = g.get("startingSeason");
+			season <= g.get("season");
+			season++
+		) {
+			const teamSeasons = await idb.merged.teamSeasons.getAll({ season });
+			for (const ts of teamSeasons) {
+				if (userRanTeam(ts.tid, season, teamSeasons)) {
+					byTid.set(
+						ts.tid,
+						(byTid.get(ts.tid) ?? false) || wonTitleIn(ts, season),
+					);
+				}
+			}
+		}
+		return byTid;
+	};
+
+	const GM_OUTLAST = 10;
+	const GM_REBUILD_SEASONS = 4;
+
+	achievements.push(
+		{
+			slug: "gm_outlast",
+			name: "Survivor",
+			desc: `Outlast ${GM_OUTLAST} AI general managers: see ${GM_OUTLAST} of them fired while you keep your job.`,
+			category: "Front Office",
+
+			async check() {
+				if (!featureOn("gmPersonalities")) {
+					return false;
+				}
+				const start = g.get("startingSeason");
+				let numFired = 0;
+				for (const t of await idb.cache.teams.getAll()) {
+					for (const gm of [...(t.gm ? [t.gm] : []), ...(t.formerGms ?? [])]) {
+						for (const tenure of gm.tenures) {
+							if (
+								tenure.reason === "fired" &&
+								tenure.end !== undefined &&
+								tenure.end >= start
+							) {
+								numFired += 1;
+							}
+						}
+					}
+				}
+				return numFired >= GM_OUTLAST;
+			},
+
+			when: "afterPlayoffs",
+		},
+		{
+			slug: "gm_eoty",
+			name: "Executive of the Year",
+			desc: "Win the Executive of the Year award.",
+			category: "Front Office",
+
+			async check() {
+				if (!featureOn("coachExecAwards")) {
+					return false;
+				}
+				// The user's front office has no AI GM, so his award is on the team season (core/awards/coachExecAwards.ts)
+				const teamSeasons = await idb.cache.teamSeasons.indexGetAll(
+					"teamSeasonsBySeasonTid",
+					[[g.get("season")], [g.get("season"), "Z"]],
+				);
+				return teamSeasons.some((ts) => ts.execOfTheYear?.user);
+			},
+
+			when: "afterPlayoffs",
+		},
+		{
+			slug: "gm_every_team",
+			name: "Everywhere You Go",
+			desc: "Win a title with every team you ran (at least 2 teams).",
+			category: "Front Office",
+
+			async check() {
+				if (!(await userWonTitle())) {
+					return false;
+				}
+				const byTid = await userTeamsAndTitles();
+				return byTid.size >= 2 && byTid.values().every(Boolean);
+			},
+
+			when: "afterPlayoffs",
+		},
+		{
+			slug: "gm_rebuild",
+			name: "Blueprint",
+			desc: `Win a title within ${GM_REBUILD_SEASONS} seasons of running a team projected to finish in the bottom 3 before the season.`,
+			category: "Front Office",
+
+			async check() {
+				const season = g.get("season");
+				const tid = g.get("userTid");
+				if (!(await userWonTitle())) {
+					return false;
+				}
+				// Every season from the bad one to the title with the same team
+				for (let s = season; s >= season - GM_REBUILD_SEASONS; s--) {
+					if (s < g.get("startingSeason")) {
+						return false;
+					}
+					const teamSeasons = await idb.merged.teamSeasons.getAll({
+						season: s,
+					});
+					const ts = teamSeasons.find((row) => row.tid === tid);
+					if (!userRanTeam(tid, s, teamSeasons)) {
+						return false;
+					}
+					if (s === season || ts?.ovrStart === undefined) {
+						continue;
+					}
+					// Projected from the roster rating at its first game, against the rest of the league
+					const ovrs = teamSeasons
+						.map((row) => row.ovrStart)
+						.filter((ovr) => ovr !== undefined);
+					if (ovrs.length < 10) {
+						continue;
+					}
+					// Bottom 3: every other team but at most 2 was projected better
+					const mine = ts.ovrStart;
+					const numBetter = ovrs.filter((ovr) => ovr > mine).length;
+					if (numBetter >= ovrs.length - 3) {
+						return true;
+					}
+				}
+				return false;
+			},
+
+			when: "afterPlayoffs",
+		},
+	);
 }
 
 if (__SPORT === "football") {
