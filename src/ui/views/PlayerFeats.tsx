@@ -7,9 +7,14 @@ import { bySport } from "../../common/sportFunctions.ts";
 import { wrappedPlayerNameLabels } from "../components/PlayerNameLabels.tsx";
 import type { DataTableRow } from "../components/DataTable/index.tsx";
 import { useLocal } from "../util/local.ts";
+import { useState } from "react";
+import { featLeaders } from "../../common/featKinds.ts";
+import type { Col } from "../components/DataTable/index.tsx";
 
 const PlayerFeats = ({
-	feats,
+	feats: allFeats,
+	kindOptions,
+	typeOptions,
 	quarterLengthFactor,
 	season,
 	stats,
@@ -34,6 +39,19 @@ const PlayerFeats = ({
 		},
 	});
 	const { userTid } = useLocal(["userTid"]);
+
+	// Feat type and game type filters, and the per-player leaderboard
+	const [kind, setKind] = useState("all");
+	const [gameType, setGameType] = useState("all");
+	const [tab, setTab] = useState<"games" | "leaders">("games");
+	const kindValid = kind === "all" || kindOptions.some((k) => k.key === kind);
+	const typeValid =
+		gameType === "all" || typeOptions.some((t) => t.key === gameType);
+	const feats = allFeats.filter(
+		(feat) =>
+			(!kindValid || kind === "all" || feat.kinds.includes(kind as any)) &&
+			(!typeValid || gameType === "all" || feat.type === gameType),
+	);
 
 	const cols = getCols([
 		"Name",
@@ -221,16 +239,162 @@ const PlayerFeats = ({
 				),
 			})}
 
+			<div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+				<div className="btn-group" role="group">
+					<button
+						className={`btn btn-sm ${tab === "games" ? "btn-primary" : "btn-light-bordered"}`}
+						onClick={() => setTab("games")}
+					>
+						Games
+					</button>
+					<button
+						className={`btn btn-sm ${tab === "leaders" ? "btn-primary" : "btn-light-bordered"}`}
+						data-testid="feats-leaders-tab"
+						onClick={() => setTab("leaders")}
+					>
+						Leaderboard
+					</button>
+				</div>
+				{kindOptions.length > 0 ? (
+					<select
+						className="form-select form-select-sm w-auto"
+						aria-label="Feat type"
+						data-testid="feats-kind"
+						value={kindValid ? kind : "all"}
+						onChange={(event) => setKind(event.target.value)}
+					>
+						<option value="all">All feats</option>
+						{kindOptions.map((k) => (
+							<option key={k.key} value={k.key}>
+								{k.name}
+							</option>
+						))}
+					</select>
+				) : null}
+				{typeOptions.length > 1 ? (
+					<select
+						className="form-select form-select-sm w-auto"
+						aria-label="Games"
+						data-testid="feats-game-type"
+						value={typeValid ? gameType : "all"}
+						onChange={(event) => setGameType(event.target.value)}
+					>
+						<option value="all">All games</option>
+						{typeOptions.map((t) => (
+							<option key={t.key} value={t.key}>
+								{t.name}
+							</option>
+						))}
+					</select>
+				) : null}
+			</div>
+
+			{tab === "games" ? (
+				<DataTable
+					cols={cols}
+					defaultSort={[23, "desc"]}
+					defaultStickyCols={window.mobile ? 0 : 1}
+					name="PlayerFeats"
+					rows={rows}
+					superCols={superCols}
+					pagination
+				/>
+			) : (
+				<FeatLeaderboard
+					feats={feats}
+					kindOptions={kind === "all" || !kindValid ? kindOptions : []}
+					season={season}
+					userTid={userTid}
+				/>
+			)}
+		</>
+	);
+};
+
+// Feats per player for the feats shown (team, season and filters), with a count of each feat type
+const FeatLeaderboard = ({
+	feats,
+	kindOptions,
+	season,
+	userTid,
+}: {
+	feats: View<"playerFeats">["feats"];
+	kindOptions: View<"playerFeats">["kindOptions"];
+	season: View<"playerFeats">["season"];
+	userTid: number;
+}) => {
+	const { teamInfoCache } = useLocal(["teamInfoCache"]);
+	const leaders = featLeaders(feats);
+
+	const cols: Col[] = [
+		...getCols(["#", "Name", "Team"]),
+		{
+			title: "Feats",
+			desc: "Statistical feats",
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+		},
+		...kindOptions.map((k): Col => ({
+			title: k.short,
+			desc: k.name,
+			sortSequence: ["desc", "asc"],
+			sortType: "number",
+		})),
+		{
+			title: "Seasons",
+			desc: "First and last season with a feat",
+			sortType: "number",
+		},
+	];
+
+	const rows: DataTableRow[] = leaders.map((p, i) => {
+		const abbrev = teamInfoCache[p.tid]?.abbrev;
+		return {
+			key: p.pid,
+			data: [
+				i + 1,
+				p.deleted ? (
+					p.name
+				) : (
+					<a href={helpers.leagueUrl(["player", p.pid])}>{p.name}</a>
+				),
+				abbrev ? (
+					<a
+						href={helpers.leagueUrl([
+							"roster",
+							`${abbrev}_${p.tid}`,
+							typeof season === "number" ? season : p.last,
+						])}
+					>
+						{abbrev}
+					</a>
+				) : (
+					""
+				),
+				p.count,
+				...kindOptions.map((k) => p.byKind[k.key] ?? 0),
+				{
+					value: p.first === p.last ? `${p.first}` : `${p.first}-${p.last}`,
+					sortValue: p.last,
+				},
+			],
+			classNames: {
+				"table-info": p.tid === userTid,
+			},
+		};
+	});
+
+	return (
+		<div data-testid="feats-leaderboard">
 			<DataTable
 				cols={cols}
-				defaultSort={[23, "desc"]}
-				defaultStickyCols={window.mobile ? 0 : 1}
-				name="PlayerFeats"
+				defaultSort={[3, "desc"]}
+				defaultStickyCols={window.mobile ? 0 : 2}
+				name="PlayerFeatsLeaders"
 				rows={rows}
-				superCols={superCols}
 				pagination
 			/>
-		</>
+		</div>
 	);
 };
 

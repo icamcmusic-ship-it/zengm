@@ -1448,6 +1448,11 @@ season). Never for an edited face. Measured over 3,000 seeds:
 - **What:** once a season's playoffs have started (and for past seasons), the score adds each playoff team's results to the regular season score (`playoffScore` in `worker/views/powerRankings.ts`): 4 per round won (`PLAYOFF_ROUND_WEIGHT`, about a 10-0 last ten), up to ±6 for the playoff record (wins minus losses over at least 4 games, play-in left out) and half the regular season weight of the playoff point margin per game (scaled per sport, fully counted after 10 games). Teams out of the playoffs get nothing, so a champion ends up near the top and an early exit drops a little.
 - **Snapshots:** the weekly snapshots (`teamSeason.powerRankHistory`) go on through the playoffs, ranked with the playoff ratings and results and marked `playoffs: true`; the movement arrows compare with the last snapshot ranked the same way (the regular season or playoff toggle of the page).
 
+### Statistical feats: filters and leaderboard
+
+- **Where:** _Statistical Feats_ (`/l/:lid/player_feats`), all sports for the game type filter, basketball for the feat types.
+- **What:** a _Games_ / _Leaderboard_ switch and two filters above the table, applied to the team and season picked in the title bar. _Feat type_ (basketball: triple-double, 5x5, 50+ points, 25+ rebounds, 20+ assists, 10+ steals, 10+ blocks, 10+ threes; only the types present are offered) is worked out from each feat's box score line with the cutoffs it was recorded with (`common/featKinds.ts`, the same as `checkStatisticalFeat`, scaled by the feat's stored factor), so a feat can be several types. _Games_ offers the game types present (regular season, playoffs, NIT, All-Star). The leaderboard counts each player's feats (team of his latest feat, first and last season), with a column per feat type when no type is picked.
+
 ### Realistic schedule length
 
 - **Setting:** _Always on in every league (core; see Core features). Before:_ `realisticSchedule`. On for new leagues, off for existing leagues (off = exactly the old schedule). Takes effect with the next schedule (the start of the next regular season). Not used with _Group schedule into series_.

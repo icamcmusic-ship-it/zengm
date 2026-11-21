@@ -149,4 +149,55 @@ describe("playoff quick wins", () => {
 		});
 		assert.strictEqual(recaps.seriesAwards.length, 0);
 	});
+
+	test("Statistical Feats: each feat's kinds and the filter options", async () => {
+		const p = (await idb.cache.players.indexGetAll("playersByTid", 0))[0]!;
+		await idb.cache.playerFeats.add({
+			pid: p.pid,
+			name: `${p.firstName} ${p.lastName}`,
+			pos: "G",
+			season: g.get("season"),
+			tid: 0,
+			oppTid: 1,
+			playoffs: true,
+			gid: 0,
+			stats: {
+				gs: 1,
+				min: 40,
+				fg: 20,
+				fga: 30,
+				tp: 4,
+				tpa: 8,
+				ft: 8,
+				fta: 9,
+				orb: 2,
+				drb: 9,
+				ast: 10,
+				tov: 2,
+				stl: 1,
+				blk: 0,
+				pf: 2,
+				pts: 52,
+			},
+			result: "W",
+			score: "120-110",
+			overtimes: 0,
+			numPeriods: 4,
+			factor: 1,
+		});
+		const output = await load("playerFeats", {});
+		const feat = output.feats.find((f: any) => f.pid === p.pid && f.gid === 0);
+		assert.deepStrictEqual(feat.kinds, ["tripleDouble", "pts50"]);
+		assert.strictEqual(feat.type, "playoffs");
+		const kindKeys = output.kindOptions.map((k: any) => k.key);
+		assert.includeMembers(kindKeys, ["tripleDouble", "pts50"]);
+		assert.include(
+			output.typeOptions.map((t: any) => t.key),
+			"playoffs",
+		);
+		// Every feat qualified for something
+		for (const f of output.feats) {
+			assert.isAbove(f.kinds.length, 0, JSON.stringify(f.stats));
+		}
+	});
 });

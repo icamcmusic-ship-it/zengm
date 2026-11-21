@@ -8,6 +8,13 @@ import { getWatchPids } from "./news.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import { validateTeam } from "../util/processInputs.ts";
 import { validateSeason } from "../util/processInputs.ts";
+import {
+	FEAT_GAME_TYPE_NAMES,
+	FEAT_KINDS_BASKETBALL,
+	featKindsBasketball,
+	type FeatGameType,
+	type FeatKind,
+} from "../../common/featKinds.ts";
 
 const processInputs = (params: RouteParams<"playerFeats">) => {
 	let season: number | "all";
@@ -114,7 +121,18 @@ export default defineView({
 					score += ` (${overtimeText})`;
 				}
 
-				let type: "regularSeason" | "playoffs" | "allStar" | "nit";
+				// Basketball: which cutoffs it met, for the feat type filter and the leaderboard (same cutoffs as when it was
+				// recorded, with its stored factor)
+				const kinds: FeatKind[] =
+					__SPORT === "basketball"
+						? featKindsBasketball(
+								feat.stats,
+								feat.factor ??
+									helpers.featScaleFactor(feat.overtimes, feat.playoffs),
+							)
+						: [];
+
+				let type: FeatGameType;
 				if (feat.playoffs) {
 					type = "playoffs";
 				} else if (feat.nit) {
@@ -132,9 +150,21 @@ export default defineView({
 					abbrev: g.get("teamInfoCache")[feat.tid]?.abbrev,
 					oppAbbrev: g.get("teamInfoCache")[feat.oppTid]?.abbrev,
 					type,
+					kinds,
 					deleted: !pidExists.has(feat.pid),
 				};
 			});
+
+			// Filter options: the kinds and game types these feats have
+			const kindsPresent = new Set(featsProcessed.flatMap((f) => f.kinds));
+			const kindOptions = FEAT_KINDS_BASKETBALL.filter((kind) =>
+				kindsPresent.has(kind.key),
+			).map(({ key, name, short }) => ({ key, name, short }));
+			const typesPresent = new Set(featsProcessed.map((f) => f.type));
+			const typeOptions = helpers
+				.keys(FEAT_GAME_TYPE_NAMES)
+				.filter((type) => typesPresent.has(type))
+				.map((type) => ({ key: type, name: FEAT_GAME_TYPE_NAMES[type] }));
 
 			// The cutoffs in the text: for one season, the ones its regulation games used (feats store their factor), so
 			// changed settings don't rewrite old seasons' cutoffs. Otherwise the current settings.
@@ -244,6 +274,8 @@ export default defineView({
 			return {
 				team: inputs.team,
 				feats: featsProcessed,
+				kindOptions,
+				typeOptions,
 				quarterLengthFactor,
 				season: inputs.season,
 				stats,
