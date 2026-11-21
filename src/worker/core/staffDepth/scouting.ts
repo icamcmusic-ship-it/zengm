@@ -141,8 +141,7 @@ const saveState = async (t: Team, state: StaffDepthTeam) => {
 	await idb.cache.teams.put(t);
 };
 
-const schoolOf = (p: Player) =>
-	getPreDraftSchool(p) || undefined;
+const schoolOf = (p: Player) => getPreDraftSchool(p) || undefined;
 
 export const regionOf = (p: Player) =>
 	prospectRegion({ pid: p.pid, school: schoolOf(p), bornLoc: p.born.loc });

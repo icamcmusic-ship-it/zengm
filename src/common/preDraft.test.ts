@@ -2,6 +2,7 @@ import { assert, describe, test } from "vitest";
 import { PLAYER } from "./constants.ts";
 import {
 	getPreDraftAwards,
+	getPreDraftSchool,
 	getPreDraftStats,
 	getProAwards,
 	getProStats,
@@ -104,5 +105,55 @@ describe("filter helpers", () => {
 		const p = { draft: { year: 2025 }, awards: [a1, a2] };
 		assert.deepStrictEqual(getProAwards(p), [a2]);
 		assert.deepStrictEqual(getPreDraftAwards(p), [a1]);
+	});
+});
+
+describe("getPreDraftSchool", () => {
+	const DNE = PLAYER.DOES_NOT_EXIST;
+	test("a generated path's last school wins over a stale p.college", () => {
+		assert.strictEqual(
+			getPreDraftSchool({
+				college: "Duke",
+				draft: { year: 2025 },
+				preDraftCareer: {
+					years: [{ school: "Iona" }, { school: "Ascent Pro Pathway" }],
+				},
+			}),
+			"Ascent Pro Pathway",
+		);
+	});
+	test("real players keep their real college", () => {
+		assert.strictEqual(
+			getPreDraftSchool({
+				real: true,
+				college: "Duke",
+				draft: { year: 2025 },
+				preDraftCareer: { years: [{ school: "Ascent Pro Pathway" }] },
+			}),
+			"Duke",
+		);
+	});
+	test("linked college prospects: the school he left", () => {
+		assert.strictEqual(
+			getPreDraftSchool({
+				college: "",
+				draft: { year: 2025 },
+				linkedCollege: { school: "State" },
+			}),
+			"State",
+		);
+	});
+	test("no path, no college: last pre-draft row, never a stash season", () => {
+		assert.strictEqual(
+			getPreDraftSchool({
+				college: "",
+				draft: { year: 2025 },
+				stats: [
+					{ tid: DNE, season: 2025, teamName: "Partizan" },
+					{ tid: DNE, season: 2026, teamName: "Real Madrid", stash: true },
+				],
+			}),
+			"Partizan",
+		);
 	});
 });

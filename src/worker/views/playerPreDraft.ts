@@ -951,8 +951,6 @@ const getComps = async (pRaw: Player, rDraft: PlayerRatings, fuzz: number) => {
 				.filter((row) => !row.playoffs && (row.gp ?? 0) > 0)
 				.map((row) => row.season),
 		).size;
-		const preDraft = getPreDraftStats(p).filter((row) => !row.playoffs);
-		const lastPre = preDraft.at(-1);
 		let peakOvr = 0;
 		for (const row of p.ratings) {
 			if (row.season > p.draft.year) {

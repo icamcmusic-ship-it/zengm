@@ -76,10 +76,7 @@ import getNumPlayoffTeams from "../core/season/getNumPlayoffTeams.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import { validateSeason, validateTeam } from "../util/processInputs.ts";
-import {
-	getPreDraftSchool,
-	getProStats,
-} from "../../common/preDraft.ts";
+import { getPreDraftSchool, getProStats } from "../../common/preDraft.ts";
 
 const processInputs = (params: RouteParams<"newspaper">) => {
 	return {

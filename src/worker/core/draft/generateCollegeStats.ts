@@ -18,10 +18,7 @@ import {
 	storeCollegeSeasonMarkers,
 	type ClassNcaaSeason,
 } from "./collegeSeason.ts";
-import {
-	getCareerSchool,
-	hasPreDraftStats,
-} from "../../../common/preDraft.ts";
+import { getCareerSchool, hasPreDraftStats } from "../../../common/preDraft.ts";
 import { assignRecruitRanks } from "./recruiting.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
@@ -84,9 +81,7 @@ export const syncCollegeToPath = (p: Player, input: string) => {
 			delete p.preDraftCareer.collegeInput;
 		}
 	}
-	return (
-		before !== p.college || beforeInput !== p.preDraftCareer?.collegeInput
-	);
+	return before !== p.college || beforeInput !== p.preDraftCareer?.collegeInput;
 };
 
 /**

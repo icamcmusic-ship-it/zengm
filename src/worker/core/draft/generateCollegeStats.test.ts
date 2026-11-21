@@ -7,11 +7,17 @@ import { draft, player } from "../index.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import {
 	getPreDraftAwards,
+	getPreDraftSchool,
+	getPreDraftStats,
 	hasPreDraftStats,
 } from "../../../common/preDraft.ts";
 import {
 	generateCollegeStats,
+	getGenerationCollege,
 	removeCollegeStats,
+	renamePathSchool,
+	syncCollegeToPath,
+	syncPreDraftSchools,
 } from "./generateCollegeStats.ts";
 import genPlayersWithoutSaving from "./genPlayersWithoutSaving.ts";
 import { NCAA_SEASON_VERSION } from "../../../common/collegeStats/ncaa.ts";
@@ -391,5 +397,84 @@ describe("college season (featureCollegeSeason)", () => {
 		assert.strictEqual(JSON.stringify(again.season), before);
 
 		await removeCollegeStats(SEASON);
+	});
+});
+
+describe("bio college and pre-draft path", () => {
+	const snapshot = async () =>
+		JSON.stringify(
+			(await getProspects())
+				.sort((a, b) => a.pid - b.pid)
+				.map((p) => [p.college, p.preDraftCareer, getPreDraftStats(p)]),
+		);
+
+	test("p.college is the school his path ends at, and remaking with the same seed gives the same paths", async () => {
+		await generateCollegeStats({ draftYear: SEASON, seed: "bio" });
+		const players = await getProspects();
+		assert(players.some((p) => p.preDraftCareer));
+		for (const p of players) {
+			if (!p.preDraftCareer) {
+				continue;
+			}
+			const last = p.preDraftCareer.years.at(-1)!;
+			assert.strictEqual(p.college, last.school);
+			assert.strictEqual(getPreDraftSchool(p), p.college);
+			const row = getPreDraftStats(p).find((r) => r.season === last.season);
+			if (row) {
+				assert.strictEqual(row.teamName, p.college);
+			}
+		}
+		const before = await snapshot();
+		await generateCollegeStats({ draftYear: SEASON, seed: "bio" });
+		assert.strictEqual(await snapshot(), before);
+	});
+
+	test("a path that ends elsewhere than where generation started keeps that college for the next remake", async () => {
+		await generateCollegeStats({ draftYear: SEASON, seed: "bio" });
+		const p = (await getProspects()).find(
+			(p) => p.preDraftCareer && p.college !== "" && !p.real,
+		)!;
+		const school = p.college;
+		// Like the pro pathway program: his path ends at another team than the Division I school he was headed to
+		p.preDraftCareer!.years.at(-1)!.school = "Ascent Pro Pathway";
+		assert.strictEqual(getGenerationCollege(p), school);
+		assert.isTrue(syncCollegeToPath(p, school));
+		assert.strictEqual(p.college, "Ascent Pro Pathway");
+		assert.strictEqual(p.preDraftCareer!.collegeInput, school);
+		assert.strictEqual(getGenerationCollege(p), school);
+
+		// An existing league: p.college still the one generation read
+		p.college = school;
+		delete p.preDraftCareer!.collegeInput;
+		await idb.cache.players.put(p);
+		assert.strictEqual(await syncPreDraftSchools(), 1);
+		assert.strictEqual(p.college, "Ascent Pro Pathway");
+		assert.strictEqual(p.preDraftCareer!.collegeInput, school);
+		// Idempotent
+		assert.strictEqual(await syncPreDraftSchools(), 0);
+		assert.strictEqual(p.preDraftCareer!.collegeInput, school);
+
+		// Real players keep their real college
+		p.real = true;
+		p.college = "Somewhere Real";
+		assert.strictEqual(await syncPreDraftSchools(), 0);
+		assert.strictEqual(getPreDraftSchool(p), "Somewhere Real");
+	});
+
+	test("a hand-edited college renames the end of his path", async () => {
+		await generateCollegeStats({ draftYear: SEASON, seed: "bio" });
+		const p = (await getProspects()).find(
+			(p) => p.preDraftCareer && p.college !== "" && !p.real,
+		)!;
+		const school = p.college;
+		p.college = "Somewhere Else";
+		renamePathSchool(p, school);
+		assert.strictEqual(
+			p.preDraftCareer!.years.at(-1)!.school,
+			"Somewhere Else",
+		);
+		assert.strictEqual(getPreDraftSchool(p), "Somewhere Else");
+		const row = getPreDraftStats(p).find((r) => r.season === SEASON);
+		assert.strictEqual(row?.teamName, "Somewhere Else");
 	});
 });

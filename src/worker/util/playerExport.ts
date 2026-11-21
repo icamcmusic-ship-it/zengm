@@ -369,7 +369,7 @@ export const getPlayersForExport = async ({
 				showRatings && typeof ratingsRow?.wng === "number"
 					? ratingsRow.wng
 					: undefined,
-			college: getPreDraftSchool(p) || undefined,
+			college: getPreDraftSchool(pRaw) || undefined,
 			// College leagues have no pro draft or contracts for their players (the pages don't show them)
 			draft: college
 				? { year: 0, round: 0, pick: 0 }
