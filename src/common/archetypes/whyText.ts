@@ -375,8 +375,9 @@ export const whyDrivers = ({
 		}
 	}
 	// archreview2: an honest name (v2/honest.ts) has no profile, so no drivers: his best skills so far, against players of
-	// his position
-	if (out.length === 0 && a.tags.includes("honest")) {
+	// his position. The same for any name left without a driver (a composed name whose words are all style ones he shows
+	// none of, "Highlight-Reel Forward" without the play types: an empty profile), so the why always has a line
+	if (out.length === 0) {
 		const best = (Object.keys(DIM_WORDS) as (keyof typeof DIM_WORDS)[])
 			.filter((d) => d !== "hgt" && typeof pz[d] === "number")
 			.sort((x, y) => (pz[y] ?? 0) - (pz[x] ?? 0) || (x < y ? -1 : 1))

@@ -1,4 +1,4 @@
-import { assert, beforeAll, describe, test } from "vitest";
+import { assert, beforeEach, describe, test } from "vitest";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { DEFAULT_LEVEL } from "../../../common/budgetLevels.ts";
 import type {
@@ -321,7 +321,9 @@ const NUM_TEAMS = 30;
 describe("with a league", () => {
 	const dpids: number[][] = [];
 
-	beforeAll(async () => {
+	// A new league for each test: several trade, protect or move picks (one trade can't be undone by design), and a test
+	// reading the same picks after them would depend on the order the tests run in
+	beforeEach(async () => {
 		resetG();
 		g.setWithoutSavingToDB("phase", PHASE.REGULAR_SEASON);
 		g.setWithoutSavingToDB("featureDraftPickConditions", true);

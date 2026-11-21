@@ -15,6 +15,7 @@ import {
 	viewOf,
 } from "../../../common/archetypes/index.ts";
 import { last } from "../../../common/utils.ts";
+import { makeSeededRandom } from "../../../common/random.ts";
 import { mockIDBLeague, resetCache, resetG } from "../../../test/helpers.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
@@ -59,6 +60,8 @@ const makePlayers = () => {
 
 describe("stored archetypes", () => {
 	beforeEach(async () => {
+		// (each test's random players are its own, whatever ran before it: the file reads the same in any order)
+		Math.random = makeSeededRandom(7);
 		resetG();
 		resetArchetypeNorms();
 		idb.league = mockIDBLeague();
@@ -280,16 +283,16 @@ describe("stored archetypes", () => {
 		assert.strictEqual(stored.archetypes?.length, 1);
 		const info2 = await archetypeInfoForPlayer(stored);
 		assert.strictEqual(info2!.id, info!.id);
-		// (the build's three strongest dimensions; archreview2: an honest name has no profile, and its why line names his
-		// best skills instead)
-		if (info!.id.startsWith("v2:h")) {
-			assert.strictEqual(info!.why.length, 0);
-		} else if (info!.id.startsWith("v2:")) {
-			// (archnouns: a noun name's profile is the dimensions its words say: up to three)
+		// (the build's three strongest dimensions. archnouns: a composed name's profile is the dimensions its words say, up to
+		// three; archreview2: an honest name's words mostly say none ("Camp Body"), some one ("Empty Scorer"). Which one he
+		// gets depends on the random players, so the test reads the kind of id, not one name: "v2:h..." is not the honest
+		// names, it also starts the noun roles hammer, highFlyer, ...)
+		if (info!.id.startsWith("v2:")) {
 			assert.isAtMost(info!.why.length, 3);
 		} else {
 			assert.strictEqual(info!.why.length, 3);
 		}
+		// (always at least one bullet, even for a name with an empty profile: whyText.ts)
 		assert.isAtLeast(info!.whyBullets?.length ?? 0, 1);
 	});
 

@@ -53,28 +53,15 @@ const testDraftUser = async (round: number) => {
 	userDraftedPid = p.pid;
 };
 
-beforeAll(async () => {
+const setUp = async () => {
 	await loadTeamSeasons();
-	idb.league = mockIDBLeague();
 	await draft.genPlayers(g.get("season"), DEFAULT_LEVEL);
 	const draftTids = await getDraftTids();
 	userPick1 = draftTids.indexOf(g.get("userTid")) + 1;
 	userPick2 = draftTids.lastIndexOf(g.get("userTid")) + 1;
-});
-afterAll(() => {
-	// @ts-expect-error
-	idb.league = undefined;
-});
+};
 
-test("draft players before the user's team first round pick", () => {
-	return testRunPicks(userPick1 - 1, userPick1 - 1);
-});
-
-test("then allow the user to draft in the first round", () => {
-	return testDraftUser(1);
-});
-
-test("don't let a player be drafted twice, like if the user double clicks", async () => {
+const doubleClick = async () => {
 	const draftPicks = await draft.getOrder();
 	const dp = draftPicks[0];
 	assert(dp);
@@ -85,17 +72,48 @@ test("don't let a player be drafted twice, like if the user double clicks", asyn
 	const p = await idb.cache.players.get(userDraftedPid);
 	assert.strictEqual(p?.draft.pick, userPick1);
 	assert.strictEqual((await draft.getOrder()).length, draftPicks.length);
+};
+
+// One draft, step by step. Each test starts a new draft and plays the steps before its own, so it passes in any order
+// (--sequence.shuffle) and alone
+const STEPS = [
+	() => testRunPicks(userPick1 - 1, userPick1 - 1),
+	() => testDraftUser(1),
+	doubleClick,
+	() => testRunPicks(userPick2 - userPick1 - 1, userPick2 - 1),
+	() => testDraftUser(2),
+	() => {
+		const numAfter = 60 - userPick2;
+		return testRunPicks(numAfter, userPick2 + numAfter);
+	},
+];
+const throughStep = async (step: number) => {
+	await setUp();
+	for (let i = 0; i <= step; i++) {
+		await STEPS[i]!();
+	}
+};
+
+beforeAll(() => {
+	idb.league = mockIDBLeague();
+});
+afterAll(() => {
+	// @ts-expect-error
+	idb.league = undefined;
 });
 
-test("when called again after the user drafts, should draft players before the user's second round pick comes up", () => {
-	return testRunPicks(userPick2 - userPick1 - 1, userPick2 - 1);
-});
+test("draft players before the user's team first round pick", () =>
+	throughStep(0));
 
-test("then allow the user to draft in the second round", () => {
-	return testDraftUser(2);
-});
+test("then allow the user to draft in the first round", () => throughStep(1));
 
-test("when called again after the user drafts, should draft more players to finish the draft", () => {
-	const numAfter = 60 - userPick2;
-	return testRunPicks(numAfter, userPick2 + numAfter);
-});
+test("don't let a player be drafted twice, like if the user double clicks", () =>
+	throughStep(2));
+
+test("when called again after the user drafts, should draft players before the user's second round pick comes up", () =>
+	throughStep(3));
+
+test("then allow the user to draft in the second round", () => throughStep(4));
+
+test("when called again after the user drafts, should draft more players to finish the draft", () =>
+	throughStep(5));

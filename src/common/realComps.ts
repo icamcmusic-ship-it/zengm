@@ -328,9 +328,52 @@ export const findRealComps = (
 ): RealCompMatch[] => {
 	const a = COMP_RATINGS.map((key) => prospect.ratings[key]);
 	const numPlayers = index.slugs.length;
-	const posOk = index.pos.map((pos) => positionsCompatible(prospect.pos, pos));
+	const posOk = index.pos.map(
+		(pos, i) =>
+			positionsCompatible(prospect.pos, pos) &&
+			// (never his own comp: he is left out of the result, so his rows are not read at all)
+			index.slugs[i] !== prospect.srID,
+	);
 	const bestD = new Float64Array(numPlayers).fill(Infinity);
 	const bestRow = new Int32Array(numPlayers);
+	// (speed, same results) The players with the count best distances so far: once there are count of them, a row whose distance
+	// can't come under the worst of them (a cheap lower bound: the height and standing parts and the age, without the other
+	// ratings' shape) can't change the result, so its full distance is never worked out. Every distance is at least its bound
+	// (the same operations on smaller nonnegative numbers), and a row is skipped only when its bound is strictly above the
+	// threshold, so ties come out as before.
+	const top: number[] = [];
+	const inTop = new Uint8Array(numPlayers);
+	// (the slot of the worst of them, whose distance is the threshold once there are count of them)
+	let worst = 0;
+	let threshold = Infinity;
+	const findWorst = () => {
+		worst = 0;
+		for (let t = 1; t < top.length; t++) {
+			if (bestD[top[t]!]! > bestD[top[worst]!]!) {
+				worst = t;
+			}
+		}
+		threshold = bestD[top[worst]!]!;
+	};
+	// (after player i's distance went down)
+	const updateTop = (i: number) => {
+		if (inTop[i]) {
+			if (top.length >= count && top[worst] === i) {
+				findWorst();
+			}
+		} else if (top.length < count) {
+			top.push(i);
+			inTop[i] = 1;
+			if (top.length >= count) {
+				findWorst();
+			}
+		} else if (bestD[i]! < threshold) {
+			inTop[top[worst]!] = 0;
+			top[worst] = i;
+			inTop[i] = 1;
+			findWorst();
+		}
+	};
 	const n = index.rowPlayer.length;
 	for (let row = 0; row < n; row++) {
 		const i = index.rowPlayer[row]!;
@@ -343,6 +386,21 @@ export const findRealComps = (
 				AGE_PENALTY_MAX_YEARS,
 				Math.abs(index.rowAge[row]! - prospect.age),
 			);
+		if (threshold < Infinity) {
+			const dh = a[0]! - index.rowRatings[row * NUM]!;
+			const lower =
+				Math.sqrt(
+					(HEIGHT_WEIGHT * dh * dh) / (WEIGHT_SUM + HEIGHT_WEIGHT) +
+						(prospect.levelPct === undefined
+							? 0
+							: (LEVEL_PCT_SCALE *
+									(prospect.levelPct - index.rowLevelPct[row]!)) **
+								2),
+				) + age;
+			if (lower > threshold) {
+				continue;
+			}
+		}
 		const d =
 			(prospect.levelPct === undefined
 				? ratingsDistance(a, index.rowRatings, row * NUM)
@@ -355,6 +413,7 @@ export const findRealComps = (
 		if (d < bestD[i]!) {
 			bestD[i] = d;
 			bestRow[i] = row;
+			updateTop(i);
 		}
 	}
 

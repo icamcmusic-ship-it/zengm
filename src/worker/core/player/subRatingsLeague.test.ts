@@ -229,30 +229,39 @@ describe("sub-ratings in a league", () => {
 		assert.isTrue(prospects.every((p) => p.subP?.b !== undefined));
 	});
 
-	test("views: sub-ratings with the setting on, none with it off", async () => {
-		const pid = (await idb.cache.players.getAll()).find(
-			(p) => p.tid === 0,
-		)!.pid;
-		const player = await load("player", { pid: String(pid) });
-		assert.isTrue(isValidSubArray((player.player.ratings as any[]).at(-1).sub));
-		// The hidden growth profile never goes to the UI
-		assert.isUndefined((player.player as any).subP);
-		const ratings = await load("playerRatings", {});
-		assert.isTrue(
-			ratings.players.some((p: any) => isValidSubArray(p.ratings.sub)),
-		);
-		const scouting = await load("draftScouting", {});
-		assert.isTrue(
-			scouting.seasons[0].players.some(
-				(p: any) => p.subHighlights !== undefined,
-			),
-		);
+	// Draft Scouting's first load reads every prospect's archetype live: the default 7 upcoming classes of 70 at a few ms each
+	// in the classifier (plus the real comps), ~3.5 s alone and more in a combined run. The game warms that memo in the
+	// background after the league loads (archetype.ts), which a test never waits for, so this is the cold cost, not a bug
+	test(
+		"views: sub-ratings with the setting on, none with it off",
+		{ timeout: 60 * 1000 },
+		async () => {
+			const pid = (await idb.cache.players.getAll()).find(
+				(p) => p.tid === 0,
+			)!.pid;
+			const player = await load("player", { pid: String(pid) });
+			assert.isTrue(
+				isValidSubArray((player.player.ratings as any[]).at(-1).sub),
+			);
+			// The hidden growth profile never goes to the UI
+			assert.isUndefined((player.player as any).subP);
+			const ratings = await load("playerRatings", {});
+			assert.isTrue(
+				ratings.players.some((p: any) => isValidSubArray(p.ratings.sub)),
+			);
+			const scouting = await load("draftScouting", {});
+			assert.isTrue(
+				scouting.seasons[0].players.some(
+					(p: any) => p.subHighlights !== undefined,
+				),
+			);
 
-		await league.setGameAttributes({ subRatings: false });
-		const player2 = await load("player", { pid: String(pid) });
-		assert.isUndefined((player2.player.ratings as any[]).at(-1).sub);
-		await league.setGameAttributes({ subRatings: true });
-	});
+			await league.setGameAttributes({ subRatings: false });
+			const player2 = await load("player", { pid: String(pid) });
+			assert.isUndefined((player2.player.ratings as any[]).at(-1).sub);
+			await league.setGameAttributes({ subRatings: true });
+		},
+	);
 
 	test("league files round-trip with sub-ratings, and files without them get them", async () => {
 		const players = structuredClone(await idb.cache.players.getAll());
