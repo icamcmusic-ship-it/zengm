@@ -43,7 +43,11 @@ import {
 	saveTeams,
 } from "./wrappedPersist.ts";
 import { hashString } from "../../common/wrapped/util.ts";
-import { getProAwards, getProStats } from "../../common/preDraft.ts";
+import {
+	getPreDraftSchool,
+	getProAwards,
+	getProStats,
+} from "../../common/preDraft.ts";
 import { NUM_PRIOR_SEASONS_EVENTS } from "../db/Cache.ts";
 
 // Where the Wrapped and Storylines snapshot comes from. Reading and converting a whole league is slow, so the converted pieces are kept between page loads and only what changed (found through the change log, see db/changeLog.ts) is read again:
@@ -175,7 +179,7 @@ const toWPlayer = (p: Player): WPlayer => ({
 	lastName: p.lastName,
 	bornYear: p.born.year,
 	bornLoc: p.born.loc,
-	college: p.college,
+	college: getPreDraftSchool(p),
 	draft: {
 		year: p.draft.year,
 		round: p.draft.round,

@@ -3,7 +3,10 @@
 // careers. Seeded streams only; nothing runs while the setting is off.
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import skills from "../player/skills.ts";
-import { getPreDraftStats } from "../../../common/preDraft.ts";
+import {
+	getPreDraftSchool,
+	getPreDraftStats,
+} from "../../../common/preDraft.ts";
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import {
 	departmentQualityForLevel,
@@ -139,7 +142,7 @@ const saveState = async (t: Team, state: StaffDepthTeam) => {
 };
 
 const schoolOf = (p: Player) =>
-	(getPreDraftStats(p).at(-1) as any)?.teamName ?? p.college ?? undefined;
+	getPreDraftSchool(p) || undefined;
 
 export const regionOf = (p: Player) =>
 	prospectRegion({ pid: p.pid, school: schoolOf(p), bornLoc: p.born.loc });

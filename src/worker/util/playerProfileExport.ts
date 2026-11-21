@@ -36,7 +36,11 @@ import { formatTraitReading } from "../../common/playerTraits/scouting.ts";
 import type { Conditions } from "../../common/types.ts";
 import { isCollege } from "../core/college/isCollege.ts";
 import { league } from "../core/index.ts";
-import { getPreDraftAwards, getPreDraftStats } from "../../common/preDraft.ts";
+import {
+	getPreDraftAwards,
+	getPreDraftSchool,
+	getPreDraftStats,
+} from "../../common/preDraft.ts";
 import { featureOn } from "./nativeFeatures.ts";
 import {
 	getPlayerScoutingPage,
@@ -271,7 +275,7 @@ export const getPlayerProfileExport = async (
 				...fact("Died", p.diedYear),
 				...fact("Height", formatHeight(p.hgt)),
 				...fact("Weight", `${p.weight} lbs`),
-				...fact("College", p.college),
+				...fact("College", getPreDraftSchool(p)),
 				...fact(
 					"Draft",
 					draft.round > 0
@@ -552,7 +556,7 @@ export const getPlayerProfileExport = async (
 		} else {
 			sections.preDraft = section("preDraft", {
 				facts: [
-					...fact("School", p.college),
+					...fact("School", getPreDraftSchool(p)),
 					...fact("Draft year", info?.draftYear),
 					...fact(
 						"Drafted",
@@ -1134,7 +1138,7 @@ export const getPlayerProfileExport = async (
 			hgt: p.hgt,
 			height: formatHeight(p.hgt),
 			weight: p.weight,
-			college: p.college || undefined,
+			college: getPreDraftSchool(p) || undefined,
 			draft: card.draft,
 			classYear: college ? classYearName(p.classYear) : undefined,
 			jerseyNumber: p.jerseyNumber,

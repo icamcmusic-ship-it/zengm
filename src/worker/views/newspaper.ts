@@ -76,7 +76,10 @@ import getNumPlayoffTeams from "../core/season/getNumPlayoffTeams.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
 import { validateSeason, validateTeam } from "../util/processInputs.ts";
-import { getProStats } from "../../common/preDraft.ts";
+import {
+	getPreDraftSchool,
+	getProStats,
+} from "../../common/preDraft.ts";
 
 const processInputs = (params: RouteParams<"newspaper">) => {
 	return {
@@ -651,7 +654,7 @@ export const getNewsFacts = async (
 			boxGp: box?.boxGp,
 			career: careerBefore(p, season),
 			honors: honorsBefore(p, season),
-			college: p.college || undefined,
+			college: getPreDraftSchool(p) || undefined,
 			country: countryOf(p.born.loc),
 			jersey: p.jerseyNumber,
 			po: lineFor(p, season, true),
@@ -1048,7 +1051,7 @@ export const getNewsFacts = async (
 				// His draft-night ratings as the scouts saw them, not the true ones
 				ovr: r ? seen(r.ovr, r.fuzz) : 0,
 				pot: r ? seen(r.pot, r.fuzz) : 0,
-				college: p.college || undefined,
+				college: getPreDraftSchool(p) || undefined,
 				cons: p.preDraftRank?.s === season ? p.preDraftRank.v : undefined,
 				consN: p.preDraftRank?.s === season ? p.preDraftRank.n : undefined,
 				stash:

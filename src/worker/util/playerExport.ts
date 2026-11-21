@@ -28,6 +28,7 @@ import { idb } from "../db/index.ts";
 import { getPlayer } from "../views/player.ts";
 import { g } from "./index.ts";
 import { getTraitViewContext, getTraitsForView } from "./playerTraitsView.ts";
+import { getPreDraftSchool } from "../../common/preDraft.ts";
 
 const SUMMARY_STATS = Object.values(PLAYER_SUMMARY)[0]?.stats ?? [];
 
@@ -368,7 +369,7 @@ export const getPlayersForExport = async ({
 				showRatings && typeof ratingsRow?.wng === "number"
 					? ratingsRow.wng
 					: undefined,
-			college: p.college || undefined,
+			college: getPreDraftSchool(p) || undefined,
 			// College leagues have no pro draft or contracts for their players (the pages don't show them)
 			draft: college
 				? { year: 0, round: 0, pick: 0 }

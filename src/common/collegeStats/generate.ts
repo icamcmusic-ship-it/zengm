@@ -346,7 +346,7 @@ const pickSchool = (
 	// Prospects of the class in the pro pathway program (getPathwayKeys)
 	pathwayKeys?: Set<string>,
 ): School | undefined => {
-	if (pathwayKeys?.has(p.key)) {
+	if (pathwayKeys?.has(p.key) && !p.fixedSchool) {
 		return getSchool(PATHWAY_TEAM);
 	}
 	// A blank college filled in with the pro pathway program when his stats were made last time is blank again: whether he is in it depends on the seed
@@ -388,7 +388,8 @@ export const getPathwayKeys = (
 		if (
 			getClassIndex(p.age) !== 0 ||
 			(region !== "usa" && region !== "canada") ||
-			p.injuryHistory
+			p.injuryHistory ||
+			p.fixedSchool
 		) {
 			continue;
 		}

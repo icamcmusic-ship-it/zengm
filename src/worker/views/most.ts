@@ -17,7 +17,11 @@ import { extraStats } from "./hallOfFame.ts";
 import { bySport } from "../../common/sportFunctions.ts";
 import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
 import { formatPlayerAwardName } from "../../common/awards.ts";
-import { getProAwards, getProStats } from "../../common/preDraft.ts";
+import {
+	getPreDraftSchool,
+	getProAwards,
+	getProStats,
+} from "../../common/preDraft.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 
 const processInputs = (params: RouteParams<"most">) => {
@@ -1049,7 +1053,7 @@ export default defineView({
 				)}">Other colleges.</a>`;
 
 				filter = (p) => {
-					const college = p.college && p.college !== "" ? p.college : "None";
+					const college = getPreDraftSchool(p) || "None";
 					return college === arg;
 				};
 				getValue = playerValue;

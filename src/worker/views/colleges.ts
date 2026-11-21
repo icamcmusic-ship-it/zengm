@@ -7,7 +7,10 @@ import { getValueStatsRow } from "../core/player/checkJerseyNumberRetirement.ts"
 import addFirstNameShort from "../util/addFirstNameShort.ts";
 import { extraStats } from "./hallOfFame.ts";
 import { processPlayersHallOfFame } from "../util/processPlayersHallOfFame.ts";
-import { getProStats } from "../../common/preDraft.ts";
+import {
+	getPreDraftSchool,
+	getProStats,
+} from "../../common/preDraft.ts";
 import { player } from "../core/index.ts";
 
 type InfoTemp = {
@@ -39,7 +42,7 @@ const reducer = (
 ) => {
 	let name;
 	if (type === "college") {
-		name = p.college && p.college !== "" ? p.college : "None";
+		name = getPreDraftSchool(p) || "None";
 	} else if (type === "jerseyNumbers") {
 		name = helpers.getJerseyNumber(p, "mostCommon");
 		if (name === undefined) {

@@ -18,6 +18,7 @@ import {
 import {
 	COLLEGE_AWARD_PREFIX,
 	getPreDraftAwards,
+	getPreDraftSchool,
 	getPreDraftStats,
 	getProStats,
 } from "../../common/preDraft.ts";
@@ -101,7 +102,7 @@ const validCareer = (
 	}
 	for (const row of rows) {
 		const year = bySeason.get(row.season);
-		if (!year || year.school !== (row.teamName ?? p.college ?? "")) {
+		if (!year || year.school !== (row.teamName ?? getPreDraftSchool(p))) {
 			return undefined;
 		}
 	}
@@ -199,7 +200,7 @@ const formatTable = async (
 		rows: (formatted.stats as Record<string, any>[])
 			.map((row, i): Record<string, any> => ({
 				...row,
-				teamName: rawRows[i]!.teamName ?? pRaw.college ?? "",
+				teamName: rawRows[i]!.teamName ?? getPreDraftSchool(pRaw),
 			}))
 			.filter((row) => (row.gp ?? 0) > 0),
 		career: formatted.careerStats as Record<string, any> | undefined,
@@ -417,7 +418,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 			}))
 		: rawRows.map((row) => ({
 				season: row.season,
-				teamName: row.teamName ?? pRaw.college ?? "",
+				teamName: row.teamName ?? getPreDraftSchool(pRaw),
 				row,
 				year: undefined,
 			}));
@@ -973,7 +974,7 @@ const getComps = async (pRaw: Player, rDraft: PlayerRatings, fuzz: number) => {
 			age: p.draft.year - p.born.year,
 			ovrAtDraft: r.ovr,
 			potAtDraft: r.pot,
-			school: lastPre?.teamName ?? p.college ?? "",
+			school: getPreDraftSchool(p),
 			similarity: Math.max(0, Math.round(100 - 3 * distance)),
 			proSeasons,
 			peakOvr: peakOvr > 0 ? peakOvr : undefined,

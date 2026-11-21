@@ -28,7 +28,11 @@ import type {
 } from "../../common/types.ts";
 import { defineView, keepType } from "../util/defineView.ts";
 import { last, orderBy } from "../../common/utils.ts";
-import { getPreDraftAwards, getPreDraftStats } from "../../common/preDraft.ts";
+import {
+	getPreDraftAwards,
+	getPreDraftSchool,
+	getPreDraftStats,
+} from "../../common/preDraft.ts";
 import { formatEventText } from "../util/formatEventText.ts";
 import { upgradeFace } from "../util/face.ts";
 import { choice } from "../../common/random.ts";
@@ -162,7 +166,7 @@ export const getPlayer = async <
 		if (preDraft && preDraft.stats.length === preDraftRaw.length) {
 			preDraftStats = preDraft.stats.map((row, i) => ({
 				...row,
-				teamName: preDraftRaw[i]!.teamName ?? pRaw.college ?? "",
+				teamName: preDraftRaw[i]!.teamName ?? getPreDraftSchool(pRaw),
 			})) as any;
 		}
 	}

@@ -11,6 +11,7 @@ import g from "./g.ts";
 import { getTeamInfoBySeason } from "./getTeamInfoBySeason.ts";
 import { getHeadCoachForSeason } from "../core/staff/data.ts";
 import type { Player } from "../../common/types.ts";
+import { getPreDraftSchool } from "../../common/preDraft.ts";
 
 const teamNameCache = new Map<string, string>();
 const teamName = async (tid: number, season: number) => {
@@ -118,7 +119,7 @@ export const careerFacts = async (
 		allStars: count("All-Star"),
 		dpoys: count("Defensive Player of the Year"),
 		roy: count("Rookie of the Year") > 0,
-		college: p.college || undefined,
+		college: getPreDraftSchool(p) || undefined,
 		hometown: p.born?.loc || undefined,
 		hgt: p.hgt,
 		career: {

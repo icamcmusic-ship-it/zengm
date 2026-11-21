@@ -101,6 +101,10 @@ export type PlannedYear = CareerYear & {
 // What is kept on the player (p.preDraftCareer): his years, his story and, once it has been set against the rest of his high school class, his recruiting ranking (null: unranked)
 export type StoredPreDraftCareer = PreDraftCareer & {
 	recruit?: { rank: number | null; posRank: number | null };
+	// p.college as generation read it, when p.college was then set to a different school (his draft year one, like the pro pathway program
+	// for a prospect headed to a Division I school). Generation reads this again while p.college is still that school, so remaking his
+	// stats with the same seed gives the same path
+	collegeInput?: string;
 };
 
 export type CareerPlan = {

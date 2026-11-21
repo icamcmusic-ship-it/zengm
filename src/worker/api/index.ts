@@ -278,6 +278,7 @@ import { registerGlobal } from "../../common/registerGlobal.ts";
 import { getTeamInfoCache } from "../core/team/getTeamInfoCache.ts";
 import {
 	getPreDraftAwards,
+	getPreDraftSchool,
 	isPreDraftStatsRow,
 } from "../../common/preDraft.ts";
 import {
@@ -1945,7 +1946,7 @@ const exportDraftClass = async ({
 		startingSeason: season,
 		players: players.map((p) => ({
 			born: p.born,
-			college: p.college,
+			college: getPreDraftSchool(p),
 			draft: {
 				...p.draft,
 				round: 0,
@@ -5996,6 +5997,10 @@ const upsertCustomizedPlayer = async (
 		p.subP = helpers.deepCopy(prevPlayer.subP);
 	} else {
 		delete p.subP;
+	}
+	// A hand-edited college is where his pre-draft path ends now, so his bio and College/Overseas page agree
+	if (__SPORT === "basketball" && prevPlayer) {
+		draft.renamePathSchool(p as any, prevPlayer.college);
 	}
 	applyCustomizedContract(p, originalTid, contractInput, contractSeasons);
 	updateOwedByTids(p);

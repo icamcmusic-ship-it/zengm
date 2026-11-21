@@ -6,7 +6,11 @@ import { last } from "../../common/utils.ts";
 import { defineView } from "../util/defineView.ts";
 import { player } from "../core/index.ts";
 import { getScoutReport } from "../core/draft/scouting.ts";
-import { getPreDraftAwards, getPreDraftStats } from "../../common/preDraft.ts";
+import {
+	getPreDraftAwards,
+	getPreDraftSchool,
+	getPreDraftStats,
+} from "../../common/preDraft.ts";
 import { getPreDraftLabel } from "../../common/collegeStats/overseas.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import addFirstNameShort from "../util/addFirstNameShort.ts";
@@ -120,7 +124,7 @@ export default defineView({
 							: i + 1,
 						build: p.ratingsBuild?.name,
 						comps: realComps.get(pa.pid),
-						school: lastRow?.teamName ?? p.college ?? "",
+						school: getPreDraftSchool(p),
 						preDraftLabel,
 						preDraftLine,
 						numHonors: getPreDraftAwards(p).length,

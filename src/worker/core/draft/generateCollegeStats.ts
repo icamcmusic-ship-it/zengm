@@ -16,7 +16,10 @@ import {
 	storeCollegeSeasonMarkers,
 	type ClassNcaaSeason,
 } from "./collegeSeason.ts";
-import { hasPreDraftStats } from "../../../common/preDraft.ts";
+import {
+	getCareerSchool,
+	hasPreDraftStats,
+} from "../../../common/preDraft.ts";
 import { assignRecruitRanks } from "./recruiting.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
@@ -40,6 +43,125 @@ const getProspects = async (draftYear: number) => {
 		[[draftYear], [draftYear, Infinity]],
 	);
 	return players.filter((p) => p.tid === PLAYER.UNDRAFTED);
+};
+
+/**
+ * The college generation starts from: p.college, except when p.college was set to the school his last generated path ended at (the pro
+ * pathway program, say) and that path started from another one (p.preDraftCareer.collegeInput). Then that one, so remaking his stats
+ * with the same seed gives the same path, as long as nobody changed his college since.
+ */
+export const getGenerationCollege = (p: Player) => {
+	const college = p.college ?? "";
+	const input = p.preDraftCareer?.collegeInput;
+	if (input !== undefined && college === getCareerSchool(p)) {
+		return input;
+	}
+	return college;
+};
+
+/**
+ * Keep p.college equal to the school his pre-draft path ends at (common/preDraft.ts getPreDraftSchool), the one his bio lists. A real
+ * player keeps his real college and a linked college league prospect his school there, only a blank one being filled in. When p.college
+ * changes from what generation read (`input`), that is kept on the path so it can be remade the same way. Returns whether p changed.
+ */
+export const syncCollegeToPath = (p: Player, input: string) => {
+	const before = p.college;
+	const beforeInput = p.preDraftCareer?.collegeInput;
+	const final = getCareerSchool(p);
+	if (p.real || p.linkedCollege) {
+		if ((p.college ?? "") === "" && final !== undefined) {
+			p.college = final;
+		}
+	} else if (final !== undefined) {
+		p.college = final;
+	}
+	if (p.preDraftCareer) {
+		if (input !== "" && input !== p.college && final !== undefined) {
+			p.preDraftCareer.collegeInput = input;
+		} else {
+			delete p.preDraftCareer.collegeInput;
+		}
+	}
+	return (
+		before !== p.college || beforeInput !== p.preDraftCareer?.collegeInput
+	);
+};
+
+/**
+ * Existing leagues: players whose stored pre-draft path ends at a school other than p.college (stats made before p.college was kept equal
+ * to it, like a prospect in the pro pathway program still listed at the Division I school he was headed to) get p.college set to it, the
+ * college they had kept as what generation read. Players in the cache (everyone but retired players, whose views and exports read
+ * getPreDraftSchool anyway). Idempotent: once synced, nothing changes. Returns how many players changed.
+ */
+export const syncPreDraftSchools = async () => {
+	if (__SPORT !== "basketball") {
+		return 0;
+	}
+	let count = 0;
+	for (const p of await idb.cache.players.getAll()) {
+		const final = getCareerSchool(p);
+		if (final === undefined || p.college === final) {
+			continue;
+		}
+		if ((p.real || p.linkedCollege) && (p.college ?? "") !== "") {
+			continue;
+		}
+		if (syncCollegeToPath(p, p.college ?? "")) {
+			await idb.cache.players.put(p);
+			count += 1;
+		}
+	}
+	return count;
+};
+
+/**
+ * His college was edited by hand (Customize Player): his pre-draft path ends there now. His last stop (the run of seasons at the school
+ * his path ended at) and those seasons' stats rows are renamed, so his bio and his College/Overseas page still agree.
+ */
+export const renamePathSchool = (
+	p: {
+		college: string;
+		real?: boolean;
+		linkedCollege?: unknown;
+		preDraftCareer?: Player["preDraftCareer"];
+		stats: { tid: number; season: number; teamName?: string }[];
+		draft: { year: number };
+	},
+	oldCollege: string | undefined,
+) => {
+	const career = p.preDraftCareer;
+	const final = getCareerSchool(p);
+	if (
+		!career ||
+		final === undefined ||
+		p.real ||
+		p.linkedCollege ||
+		p.college === "" ||
+		p.college === final ||
+		p.college === oldCollege
+	) {
+		return;
+	}
+	const seasons = new Set<number>();
+	for (let i = career.years.length - 1; i >= 0; i--) {
+		const year = career.years[i]!;
+		if (year.school !== final) {
+			break;
+		}
+		year.school = p.college;
+		seasons.add(year.season);
+	}
+	delete career.collegeInput;
+	for (const row of p.stats) {
+		if (
+			row.tid === PLAYER.DOES_NOT_EXIST &&
+			row.season <= p.draft.year &&
+			seasons.has(row.season) &&
+			row.teamName === final
+		) {
+			row.teamName = p.college;
+		}
+	}
 };
 
 export const toCollegeProspect = (
@@ -81,7 +203,8 @@ export const toCollegeProspect = (
 		pot: ratingsRow.pot,
 		pos: ratingsRow.pos,
 		ratings,
-		college: p.college ?? "",
+		college: getGenerationCollege(p),
+		...(p.real || p.linkedCollege ? { fixedSchool: true } : {}),
 		bornLoc: p.born.loc,
 		heightInches: p.hgt,
 		...(p.draftClassShapeInjury ? { injuryHistory: true } : {}),
@@ -198,14 +321,19 @@ export const generateCollegeStats = async ({
 				? COLLEGE_STATS_VERSION
 				: COLLEGE_STATS_VERSION_BASE;
 		p.awards = replacePreDraftAwards(p.awards, result.honors, draftYear);
-		if (p.college === "" && result.school !== "") {
-			p.college = result.school;
-		}
 		// His years before the draft. The recruiting ranking is set below, against the rest of his high school class
 		if (result.career) {
 			p.preDraftCareer = structuredClone(result.career);
 		} else {
 			delete p.preDraftCareer;
+		}
+		// His college is where his path ends (a transfer's last school, the pro pathway program, an overseas club...), so his bio and his
+		// College/Overseas page agree. With no path (no seasons), a blank college is still filled in with his destination
+		const input = prospect?.college ?? p.college ?? "";
+		if (result.career) {
+			syncCollegeToPath(p, input);
+		} else if (p.college === "" && result.school !== "") {
+			p.college = result.school;
 		}
 
 		numSeasons += rows.length;

@@ -20,6 +20,7 @@ import {
 	type MedicalGrade,
 } from "../../common/draftCombine.ts";
 import { PHASE } from "../../common/constants.ts";
+import { getPreDraftSchool } from "../../common/preDraft.ts";
 
 /**
  * Combine tab of Draft Scouting (Draft Lottery Night & Combine setting): a draft class's measurements, athletic testing and
@@ -78,7 +79,7 @@ export default defineView({
 				lastName: p.lastName,
 				pos: r?.pos ?? "",
 				age: p.draft.year - p.born.year,
-				college: p.college,
+				college: getPreDraftSchool(p),
 				draft:
 					p.draft.round > 0 && p.draft.pick > 0 && p.tid >= 0
 						? {

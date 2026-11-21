@@ -229,7 +229,9 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 	if (__SPORT === "basketball") {
 		try {
 			const upgraded = await draft.upgradeCollegeStats();
-			if (upgraded.length > 0) {
+			// His college (bio) is the school his pre-draft path ends at: players whose stats were made before it was kept that way
+			const synced = await draft.syncPreDraftSchools();
+			if (upgraded.length > 0 || synced > 0) {
 				await idb.cache.flush();
 			}
 		} catch (error) {

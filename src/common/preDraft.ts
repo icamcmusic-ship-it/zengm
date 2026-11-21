@@ -117,3 +117,65 @@ export const getPreDraftAwards = <
 
 // Prefix for honors generated natively by this fork, so they can never be confused with a pro award type
 export const COLLEGE_AWARD_PREFIX = "College: ";
+
+type PreDraftSchoolSource = DraftYearSource & {
+	college?: string;
+	real?: boolean;
+	linkedCollege?: { school: string };
+	preDraftCareer?: { years: { school: string }[] };
+	stats?: (StatsRowSource & { teamName?: string; playoffs?: boolean })[];
+};
+
+/**
+ * The school a generated pre-draft path ends at: his draft year school or club. undefined without a path.
+ */
+export const getCareerSchool = (p: {
+	preDraftCareer?: { years: { school: string }[] };
+}): string | undefined => {
+	const school = p.preDraftCareer?.years?.at(-1)?.school;
+	return school ? school : undefined;
+};
+
+/**
+ * The school or club a player played for in his last season before the draft (his draft year): the one his bio lists as his college. This is the single definition every view, export and story reads, and p.college is kept equal to it when his pre-draft path is generated (worker/core/draft/generateCollegeStats.ts) and reconciled once for existing leagues (syncPreDraftSchools there).
+ *
+ * - Real players keep their real college
+ * - A prospect from a linked college league: the college team he left (p.college, set to it on import)
+ * - A generated pre-draft path (p.preDraftCareer): his draft year school, so after transfers, junior college, the pro pathway program or overseas tiers, his last stop. A draft-and-stash club never is: stash seasons come after the draft, and the club is p.stash.league
+ * - Otherwise p.college, or with none the team of his last pre-draft season (never a stash season)
+ */
+export const getPreDraftSchool = (p: PreDraftSchoolSource): string => {
+	if (p.real) {
+		return p.college ?? "";
+	}
+	if (p.linkedCollege) {
+		return p.college || p.linkedCollege.school;
+	}
+	const careerSchool = getCareerSchool(p);
+	if (careerSchool !== undefined) {
+		return careerSchool;
+	}
+	if (p.college) {
+		return p.college;
+	}
+	const draftYear = p.draft?.year;
+	if (p.stats && isValidDraftYear(draftYear)) {
+		let last: { season: number; teamName?: string } | undefined;
+		for (const row of p.stats) {
+			if (
+				row.tid === PLAYER.DOES_NOT_EXIST &&
+				row.season <= draftYear &&
+				!row.stash &&
+				!row.playoffs &&
+				row.teamName &&
+				(!last || row.season >= last.season)
+			) {
+				last = row;
+			}
+		}
+		if (last?.teamName) {
+			return last.teamName;
+		}
+	}
+	return "";
+};

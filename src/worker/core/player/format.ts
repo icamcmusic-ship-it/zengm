@@ -26,6 +26,7 @@ import {
 	getDisplayBadges,
 } from "../../../common/skillBadges/index.ts";
 import {
+	getPreDraftSchool,
 	getPreDraftStats,
 	getProAwards,
 	getProStats,
@@ -558,6 +559,9 @@ const processAttrs = (
 				}
 			}
 			output.experience = seasons.size;
+		} else if (attr === "college") {
+			// The school his pre-draft path ends at, the one source every view lists (common/preDraft.ts)
+			output.college = getPreDraftSchool(p);
 		} else {
 			// Several other attrs are not primitive types, so deepCopy
 			output[attr] = helpers.deepCopy(p[attr]);

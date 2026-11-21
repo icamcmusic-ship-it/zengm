@@ -1,5 +1,8 @@
 import { PLAYER } from "../../../common/constants.ts";
-import { getPreDraftStats } from "../../../common/preDraft.ts";
+import {
+	getPreDraftSchool,
+	getPreDraftStats,
+} from "../../../common/preDraft.ts";
 import { getSchool } from "../../../common/collegeStats/colleges.helpers.ts";
 import {
 	adjustRecruitRank,
@@ -89,7 +92,7 @@ export const getRecruitBasis = (
 		if (row.playoffs) {
 			return false;
 		}
-		const school = getSchool(row.teamName ?? p.college ?? "");
+		const school = getSchool(row.teamName ?? getPreDraftSchool(p));
 		return !!school && !school.nonCollege && school.conference !== undefined;
 	});
 	if (!firstNcaa) {
@@ -106,7 +109,7 @@ export const getRecruitBasis = (
 		id: p.pid,
 		pos,
 		classOf: plain.classOf,
-		committed: firstNcaa.teamName ?? p.college ?? "",
+		committed: firstNcaa.teamName ?? getPreDraftSchool(p),
 		jucoStart: false,
 		rank: plain.nationalRank,
 		posRank: plain.posRank,
