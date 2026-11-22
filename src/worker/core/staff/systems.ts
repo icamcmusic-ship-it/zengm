@@ -610,6 +610,10 @@ export const hotSeat = (
 		);
 	if (extra) {
 		rows.push({ ...extra, playoffRoundsWon: -1 });
+		// The season in progress is the most recent of the 3 (a 4th row had no weight, and the heat came out NaN)
+		if (rows.length > 3) {
+			rows.shift();
+		}
 	}
 	if (rows.length === 0) {
 		return 0;

@@ -314,6 +314,32 @@ describe("coaching systems in a league", () => {
 		});
 		assert.isAbove(heat, 0.8);
 
+		// Three full seasons with the team plus the season in progress (the hot seat on a view mid-season): a number, the season in
+		// progress weighing most
+		const season3 = (season: number, won: number) => ({
+			season,
+			tid: head.tid,
+			role: "head" as const,
+			won,
+			lost: 82 - won,
+			tied: 0,
+			otl: 0,
+			playoffRoundsWon: -1,
+			expectedPct: 0.5,
+		});
+		const veteran = {
+			...head,
+			stats: [
+				season3(g.get("season") - 3, 41),
+				season3(g.get("season") - 2, 41),
+				season3(g.get("season") - 1, 41),
+			],
+		};
+		const losingNow = hotSeat(veteran, { pct: 0.2, expectedPct: 0.5 });
+		const winningNow = hotSeat(veteran, { pct: 0.8, expectedPct: 0.5 });
+		assert.isFalse(Number.isNaN(losingNow));
+		assert.isAbove(losingNow, winningNow);
+
 		const ctx = await getTeamHiringContext(0);
 		const developer = {
 			...head,
