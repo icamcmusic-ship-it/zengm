@@ -45,6 +45,7 @@ import { NitStats } from "./NitStats.tsx";
 import { TrackingProfile } from "./TrackingProfile.tsx";
 import { ShotDiet } from "./ShotDiet.tsx";
 import { ShotZones } from "./ShotZones.tsx";
+import { Rankings } from "./Rankings.tsx";
 import {
 	ScoutingSummaryLine,
 	useScoutingOn,
@@ -65,6 +66,7 @@ const Player2 = ({
 	playerTraits,
 	randomDebutsForeverPids,
 	ratings,
+	rankings,
 	retired,
 	stashInfo,
 	statTables,
@@ -185,6 +187,8 @@ const Player2 = ({
 					leaders={leaders}
 				/>
 			))}
+
+			<Rankings rankings={rankings} />
 
 			<TrackingProfile
 				advSeasons={advSeasons}
