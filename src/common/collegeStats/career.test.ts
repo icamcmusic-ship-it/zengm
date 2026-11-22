@@ -230,9 +230,16 @@ describe("career model", () => {
 			for (let i = 1; i < years.length; i++) {
 				const year = years[i]!;
 				const prev = years[i - 1]!;
-				if (year.move) {
+				if (prev.status === "gap") {
+					// A year away from basketball before college (preDraftPaths routes)
+					assert.strictEqual(i, 1);
+				} else if (year.move) {
 					assert.notStrictEqual(year.school, prev.school);
-					if (year.move !== "juco") {
+					if (
+						year.move === "up" ||
+						year.move === "down" ||
+						year.move === "lateral"
+					) {
 						moved = true;
 						kinds[year.move] += 1;
 						assert.strictEqual(prev.level, "ncaa");

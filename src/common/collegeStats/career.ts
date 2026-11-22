@@ -1,12 +1,22 @@
 import {
+	ACADEMIES,
 	COLLEGES,
 	CONFERENCES,
+	LOWER_LEVEL_INFO,
 	NON_NCAA,
 	OVERSEAS_EXTRA,
 	PATHWAY_TEAM,
+	PREP_SCHOOLS,
+	SMALL_COLLEGES,
 	type Region,
 } from "./colleges.ts";
-import { getRegion, getSchool, type School } from "./colleges.helpers.ts";
+import {
+	getCountry,
+	getRegion,
+	getSchool,
+	homeLeagueFactor,
+	type School,
+} from "./colleges.helpers.ts";
 import {
 	getLeagueEnv,
 	getLeagueTier,
@@ -15,9 +25,12 @@ import {
 	type OverseasTier,
 } from "./overseas.ts";
 import { planInjuries, type PreDraftInjury } from "./injuries.ts";
+import { JUCOS, JUCOS_MORE } from "./juco.ts";
 import { getHeadCoach } from "./profile.ts";
 import { Rng, clamp } from "./rng.ts";
 import type { CollegeProspect } from "./types.ts";
+
+const JUCOS_ALL = [...JUCOS, ...JUCOS_MORE];
 
 /**
  * The career model: where a prospect spent each year before the draft, and the handful of prospects per class with a story. Everything here is biography built around the ratings he already has: it decides schools, redshirt years, minutes and how raw he was early on, never his ratings, age or anything else the pro game reads.
@@ -35,9 +48,53 @@ import type { CollegeProspect } from "./types.ts";
  * - Overseas tiers: every season abroad has a tier (top, mid, development) from its league; a prospect works his way up, so his earlier, younger seasons are often in lower tier leagues of his region.
  */
 
-export type CareerStatus = "redshirt" | "medical" | "injury";
-export type CareerMove = "up" | "down" | "lateral" | "juco";
-export type CareerLevel = "ncaa" | "juco" | "pathway" | "other";
+// gap: a year away from basketball (preDraftPaths: a gap year, military service, a mission), no team and no games
+export type CareerStatus = "redshirt" | "medical" | "injury" | "gap";
+// juco/small: from a junior college or a Division II/NAIA program to Division I; prep: from a post-graduate year to college; academy: from
+// a youth academy to a pro club or college
+export type CareerMove =
+	| "up"
+	| "down"
+	| "lateral"
+	| "juco"
+	| "small"
+	| "prep"
+	| "academy";
+// prep: a post-graduate year at a prep school; academy: a youth academy; dii/naia: a Division II or NAIA program; gap: a year away from
+// basketball (all preDraftPaths)
+export type CareerLevel =
+	| "ncaa"
+	| "juco"
+	| "pathway"
+	| "other"
+	| "prep"
+	| "academy"
+	| "dii"
+	| "naia"
+	| "gap";
+
+/**
+ * More pre-draft paths: how a prospect got to the draft when it was not the usual way, told in a line on his College/Overseas page.
+ * - postgrad: a post-graduate year at a prep school before college (reclassified to a later high school class)
+ * - academy: an international prospect's year or two at a youth academy before college
+ * - smallCollege: a Division II or NAIA start, then Division I
+ * - gap, military, mission: a year away from basketball before college
+ * - twoSport: also on the football team, joining the basketball team late in his early seasons
+ * - nextStars: an elite prospect's one season in the NBL's Next Stars program instead of college
+ * - abroad: an American who turned pro overseas out of high school
+ */
+export const ROUTE_KINDS = [
+	"postgrad",
+	"academy",
+	"smallCollege",
+	"gap",
+	"military",
+	"mission",
+	"twoSport",
+	"nextStars",
+	"abroad",
+] as const;
+export type RouteKind = (typeof ROUTE_KINDS)[number];
 // Why he transferred: a coaching change at either school, playing time (he was buried, or wanted a bigger role) or a breakout year at a smaller school
 export type TransferReason = "coach" | "minutes" | "breakout";
 
@@ -56,6 +113,8 @@ export type CareerYear = {
 	why?: TransferReason;
 	// A season abroad: the tier of the league (preDraftPaths). Careers stored before it have none; getLeagueTier gives it from the league
 	tier?: OverseasTier;
+	// A two-sport athlete's season: he joined the basketball team after the football season (preDraftPaths)
+	football?: true;
 };
 
 export const STORY_KINDS = [
@@ -74,6 +133,8 @@ export type PreDraftCareer = {
 	// Every year from his first one after high school to the draft year, oldest first, redshirt years included
 	years: CareerYear[];
 	story?: StoryKind;
+	// How he got to the draft, when it was not the usual way (preDraftPaths)
+	route?: RouteKind;
 	// The high school class he was recruited in, for a prospect with a US high school path (an NCAA or JUCO first stop)
 	hsClass?: number;
 };
@@ -110,61 +171,11 @@ export type StoredPreDraftCareer = PreDraftCareer & {
 export type CareerPlan = {
 	years: PlannedYear[];
 	story?: StoryKind;
+	route?: RouteKind;
 	hsClass?: number;
 };
 
-// Junior colleges (NJCAA Division I programs). None is a name in COLLEGES
-export const JUCOS = [
-	"Chipola College",
-	"John A. Logan",
-	"Indian Hills CC",
-	"South Plains College",
-	"Salt Lake CC",
-	"Northwest Florida State",
-	"Trinity Valley CC",
-	"Odessa College",
-	"Hutchinson CC",
-	"Casper College",
-	"Cowley College",
-	"Eastern Florida State",
-	"Moberly Area CC",
-	"Northeastern JC",
-	"Ranger College",
-	"Coffeyville CC",
-	"Western Nebraska CC",
-	"Mineral Area College",
-	"Iowa Western CC",
-	"Panola College",
-	"Wabash Valley College",
-	"Cochise College",
-	"Barton CC",
-	"Snow College",
-	"College of Southern Idaho",
-	"Gillette College",
-	"Florida SouthWestern",
-	"Kilgore College",
-	"Navarro College",
-	"Tyler JC",
-	"Jones College",
-	"Pensacola State",
-	"State Fair CC",
-	"Three Rivers College",
-	"Midland College",
-	"Shelton State",
-	"Wallace State",
-	"Gulf Coast State",
-	"Butler CC",
-	"Seward County CC",
-	"Dodge City CC",
-	"New Mexico JC",
-	"College of Central Florida",
-	"Sheridan College",
-	"Kirkwood CC",
-].filter((name) => !COLLEGES[name]);
-
-const JUCO_SET = new Set(JUCOS);
-export const isJuco = (name: string | undefined) =>
-	name !== undefined && JUCO_SET.has(name);
+export { JUCOS, JUCOS_MORE, isJuco } from "./juco.ts";
 export const JUCO_STRENGTH = 40;
 export const JUCO_LEAGUE = "NJCAA";
 
@@ -371,22 +382,36 @@ const getLeaguesByTier = () => {
 	return leaguesByTier;
 };
 
-// A league of this tier, likely one where players from his part of the world go
+// A league of this tier, likely one where players from his part of the world go (with `country`, preDraftPaths: most likely his own
+// country's domestic league)
 export const pickLeagueOfTier = (
 	tier: OverseasTier,
 	region: Region,
 	rng: Rng,
+	country?: string,
 ) => {
 	const names = getLeaguesByTier()[tier];
 	const weights = names.map((name) => {
 		const info = NON_NCAA[name] ?? OVERSEAS_EXTRA[name]!;
-		return info.w * (info.regions[region] ?? 1);
+		return (
+			info.w *
+			(info.regions[region] ?? 1) *
+			(country !== undefined ? homeLeagueFactor(name, country) : 1)
+		);
 	});
 	return rng.weighted(names, weights);
 };
 
+// Chance the first season of a teenager abroad (17 or 18 that season) in the development tier was at a youth academy instead
+const ACADEMY_START_CHANCE = 0.4;
+
+// The youth academy for prospects born in a region
+export const academyFor = (region: Region) =>
+	Object.keys(ACADEMIES).find((name) => ACADEMIES[name]!.includes(region)) ??
+	"NBA Academy";
+
 /**
- * Overseas tiers for a prospect abroad (preDraftPaths). His draft year is in his own league, at its tier. Going back a season at a time, he may have been a tier lower (likelier the younger he was), in a league of that tier in his part of the world; once lower, never higher further back. A season in a lower tier league is a different league, with its own level of competition, minutes and pace. Drawn from a stream of its own, so nothing else about him changes.
+ * Overseas tiers for a prospect abroad (preDraftPaths). His draft year is in his own league, at its tier. Going back a season at a time, he may have been a tier lower (likelier the younger he was), in a league of that tier in his part of the world (most likely his own country's); once lower, never higher further back. A season in a lower tier league is a different league, with its own level of competition, minutes and pace. A first season at 17 or 18 in the development tier may have been at a youth academy instead. Drawn from streams of their own, so nothing else about him changes.
  */
 const planTiers = (
 	p: CollegeProspect,
@@ -399,13 +424,14 @@ const planTiers = (
 	last.tier = tier;
 	const rng = new Rng(`${seedBase}|tiers`);
 	const region = getRegion(p.bornLoc);
+	const country = getCountry(p.bornLoc);
 	let league = last.school;
 	for (let i = years.length - 2; i >= 0; i--) {
 		const year = years[i]!;
 		const lower = TIER_BELOW[tier];
 		if (lower && rng.random() < tierDropChance(p.age - year.yearsBack, z)) {
 			tier = lower;
-			league = pickLeagueOfTier(tier, region, rng);
+			league = pickLeagueOfTier(tier, region, rng, country);
 			years[i + 1]!.move = "up";
 		}
 		year.tier = tier;
@@ -415,6 +441,23 @@ const planTiers = (
 			year.strength = info.strength;
 			year.gameMinutes = info.gameMinutes;
 		}
+	}
+	const firstYear = years[0]!;
+	if (
+		years.length >= 2 &&
+		firstYear.tier === "dev" &&
+		p.age - firstYear.yearsBack <= 18 &&
+		region !== "usa" &&
+		region !== "canada" &&
+		new Rng(`${seedBase}|academy`).random() < ACADEMY_START_CHANCE
+	) {
+		firstYear.school = academyFor(region);
+		firstYear.level = "academy";
+		firstYear.strength = LOWER_LEVEL_INFO.academy.strength;
+		firstYear.gameMinutes = LOWER_LEVEL_INFO.academy.gameMinutes;
+		firstYear.teamGames = 30;
+		delete firstYear.tier;
+		years[1]!.move = "academy";
 	}
 };
 
@@ -432,6 +475,7 @@ export const planCareer = (
 		classIndex,
 		injuries = true,
 		paths = true,
+		route: classRoute,
 	}: {
 		seed: string;
 		draftYear: number;
@@ -441,10 +485,13 @@ export const planCareer = (
 		classIndex: number;
 		// Pre-draft injuries (injuries.ts), from a stream of their own. Default true
 		injuries?: boolean;
-		// More pre-draft paths (preDraftPaths): coaching changes in the transfer portal, the pro pathway program, overseas tiers. Default true
+		// More pre-draft paths (preDraftPaths): coaching changes in the transfer portal, the pro pathway program, overseas tiers, routes. Default true
 		paths?: boolean;
+		// A route picked for him with the rest of his class (generate.ts getClassRoutes: the NBL's Next Stars, an American abroad)
+		route?: RouteKind;
 	},
 ): CareerPlan => {
+	let route = paths ? classRoute : undefined;
 	if (!school || school.idle) {
 		return { years: [] };
 	}
@@ -455,7 +502,7 @@ export const planCareer = (
 	const c = classIndex;
 	// The pro pathway program is his story
 	const story =
-		priorSeasons && !pathway
+		priorSeasons && !pathway && !route
 			? pickStory(p, { z, classIndex: c, isNcaa, school }, seedBase)
 			: undefined;
 
@@ -495,11 +542,19 @@ export const planCareer = (
 			redshirt = true;
 		}
 
+		// More pre-draft paths: a route that was not the usual one (a post-graduate year, an academy, a small college start, a year away),
+		// from a stream of its own. A prospect with one gets no junior college or redshirt year
+		if (paths && !story && !redshirt && !route) {
+			route = pickCollegeRoute(p, n, z, seedBase);
+		}
+		const lead = route ? applyCollegeRoute(route, p, years, seedBase) : 0;
+
 		// Junior college start
 		let numJuco = 0;
 		if (
 			n >= 3 &&
 			!redshirt &&
+			!route &&
 			story !== "bust" &&
 			story !== "lateBloomer" &&
 			story !== "reclass" &&
@@ -512,7 +567,8 @@ export const planCareer = (
 			if (rng.random() < pJuco) {
 				numJuco =
 					n === 3 ? (rng.random() < 0.5 ? 1 : 2) : rng.random() < 0.7 ? 2 : 1;
-				const juco = JUCOS[Math.floor(rng.random() * JUCOS.length)]!;
+				const jucos = paths ? JUCOS_ALL : JUCOS;
+				const juco = jucos[Math.floor(rng.random() * jucos.length)]!;
 				for (let i = 0; i < numJuco; i++) {
 					const year = years[i]!;
 					year.school = juco;
@@ -528,7 +584,13 @@ export const planCareer = (
 		}
 
 		// Redshirt year: his first year on campus, no games
-		if (!redshirt && n >= 2 && numJuco === 0 && story !== "bust") {
+		if (
+			!redshirt &&
+			n >= 2 &&
+			numJuco === 0 &&
+			story !== "bust" &&
+			!route
+		) {
 			const pRedshirt =
 				story === "lateBloomer" ? 0.3 : story ? 0.03 : z < 0 ? 0.11 : 0.06;
 			if (rng.random() < pRedshirt) {
@@ -540,15 +602,17 @@ export const planCareer = (
 			years[0]!.status = "redshirt";
 		}
 
+		// Where his Division I years start
+		const first = numJuco + lead;
+
 		// Medical redshirt: a Division I season before the draft year that ended after a few games
-		if (!redshirt && n - numJuco >= 3 && !story && rng.random() < 0.04) {
-			const i = numJuco + Math.floor(rng.random() * (n - numJuco - 1));
+		if (!redshirt && n - first >= 3 && !story && rng.random() < 0.04) {
+			const i = first + Math.floor(rng.random() * (n - first - 1));
 			years[i]!.status = "medical";
 			years[i]!.gamesCap = 3 + Math.floor(rng.random() * 7);
 		}
 
 		// Transfers between Division I schools
-		const first = numJuco;
 		const d1 = n - first;
 		// Transfer portal (preDraftPaths): seasons his school started with a new head coach (the one the College/Overseas page shows), who brings in transfers of his own. With one in his window a transfer is more likely, without one less, so the overall share stays about the same
 		const coachSeasons = new Set<number>();
@@ -578,7 +642,7 @@ export const planCareer = (
 					: story === "smallSchoolScorer" || story === "reclass"
 						? 0
 						: (P_TRANSFER[clamp(d1, 0, 5)] ?? 0) *
-							(numJuco > 0 ? 0.5 : 1) *
+							(numJuco > 0 || route === "smallCollege" ? 0.5 : 1) *
 							coachFactor;
 		if (d1 >= 2 && rng.random() < pTransfer) {
 			const used = new Set([school.name]);
@@ -678,6 +742,10 @@ export const planCareer = (
 		let redshirted = false;
 		for (const year of years) {
 			year.classIndex = clamp(elig, 0, 3);
+			// A post-graduate year, an academy or a year away is before college: no class year, no eligibility used
+			if (!countsForEligibility(year.level)) {
+				continue;
+			}
 			year.cls = classLabel(elig, redshirted);
 			if (year.status === "redshirt" || year.status === "medical") {
 				redshirted = true;
@@ -747,12 +815,194 @@ export const planCareer = (
 		});
 	}
 
+	// A two-sport athlete's early seasons: he joined after the football season (games missed, whatever else kept him out)
+	if (route === "twoSport") {
+		const sportRng = new Rng(`${seedBase}|twoSport`);
+		for (const year of years) {
+			const games = 7 + Math.floor(sportRng.random() * 6);
+			if (year.football && year.played && year.gamesCap === undefined) {
+				year.injuryGames = Math.max(year.injuryGames ?? 0, games);
+			}
+		}
+	}
+
 	const firstYear = years[0]!;
+	const region = getRegion(p.bornLoc);
+	// A US high school path: a college, junior college or post-graduate first stop, or an American who skipped college for a pro club
+	const hsPath =
+		firstYear.level !== "other" ||
+		((route === "nextStars" || route === "abroad") &&
+			(region === "usa" || region === "canada"));
 	return {
 		years,
 		...(story ? { story } : {}),
-		...(firstYear.level !== "other" ? { hsClass: firstYear.season - 1 } : {}),
+		...(route ? { route } : {}),
+		...(hsPath ? { hsClass: firstYear.season - 1 } : {}),
 	};
+};
+
+// Years of college eligibility: not a post-graduate year, an academy or a year away
+const countsForEligibility = (level: CareerLevel) =>
+	level !== "prep" && level !== "academy" && level !== "gap";
+
+// Chances of each route (preDraftPaths) for a prospect at a Division I school, by where he was born
+const ROUTE_RATES = {
+	// A post-graduate year: Americans sometimes, Canadians often (a year at a US prep school), internationals at a US college often
+	postgrad: { usa: 0.028, canada: 0.1, intl: 0.1 },
+	// An international prospect's academy years before college
+	academy: 0.16,
+	// A Division II or NAIA start, more for lesser prospects
+	smallCollege: 0.022,
+	gap: 0.004,
+	military: 0.0012,
+	mission: 0.0015,
+	twoSport: 0.007,
+};
+
+/**
+ * The route a Division I prospect took when it was not the usual one (preDraftPaths), if any, from a stream of his own: n is how many years he has had since high school (his draft year included). Most have none.
+ */
+export const pickCollegeRoute = (
+	p: CollegeProspect,
+	n: number,
+	z: number,
+	seedBase: string,
+): RouteKind | undefined => {
+	if (n < 2) {
+		return undefined;
+	}
+	const u = new Rng(`${seedBase}|routes`).random();
+	const region = getRegion(p.bornLoc);
+	const na = region === "usa" || region === "canada";
+	const options: [RouteKind, number][] = [];
+	options.push([
+		"postgrad",
+		region === "usa"
+			? ROUTE_RATES.postgrad.usa
+			: region === "canada"
+				? ROUTE_RATES.postgrad.canada
+				: ROUTE_RATES.postgrad.intl,
+	]);
+	if (!na) {
+		options.push(["academy", ROUTE_RATES.academy]);
+	}
+	if (n >= 3 && na) {
+		options.push([
+			"smallCollege",
+			ROUTE_RATES.smallCollege * (z < 0 ? 1.4 : 0.6),
+		]);
+	}
+	if (n >= 3) {
+		options.push(["gap", ROUTE_RATES.gap]);
+		if (region === "usa") {
+			options.push(["military", ROUTE_RATES.military]);
+			if (p.age >= 21) {
+				options.push(["mission", ROUTE_RATES.mission]);
+			}
+		}
+	}
+	if (region === "usa") {
+		options.push(["twoSport", ROUTE_RATES.twoSport]);
+	}
+	let acc = 0;
+	for (const [kind, rate] of options) {
+		acc += rate;
+		if (u < acc) {
+			return kind;
+		}
+	}
+	return undefined;
+};
+
+// What a year away from basketball is called on his record
+export const GAP_NAMES = {
+	gap: "Gap year",
+	military: "Military service",
+	mission: "Church mission",
+} as const;
+
+// A lower level year: its school, level and level of competition
+const setLowerYear = (
+	year: PlannedYear,
+	school: string,
+	level: CareerLevel,
+	info: { strength: number; gameMinutes: number },
+	rng: Rng,
+) => {
+	year.school = school;
+	year.level = level;
+	year.strength = info.strength + rng.normal(0, 2);
+	year.conference = undefined;
+	year.gameMinutes = info.gameMinutes;
+	year.teamGames = 26 + Math.floor(rng.random() * 8);
+};
+
+/**
+ * Rewrite the first years of a Division I career for its route (preDraftPaths). Returns how many years before his Division I ones it took (0 for a two-sport athlete, whose years are all Division I). Draws from a stream of its own.
+ */
+export const applyCollegeRoute = (
+	route: RouteKind,
+	p: CollegeProspect,
+	years: PlannedYear[],
+	seedBase: string,
+): number => {
+	const rng = new Rng(`${seedBase}|route`);
+	const n = years.length;
+	if (route === "postgrad") {
+		const school = PREP_SCHOOLS[Math.floor(rng.random() * PREP_SCHOOLS.length)]!;
+		setLowerYear(years[0]!, school, "prep", LOWER_LEVEL_INFO.prep, rng);
+		// Against high school competition he was one of the best players on the floor
+		years[0]!.zShift += 0.8;
+		years[0]!.mpgShift += 2;
+		years[1]!.move = "prep";
+		return 1;
+	}
+	if (route === "academy") {
+		const academy = academyFor(getRegion(p.bornLoc));
+		// Two years there for a prospect who went to college at 19 or later
+		const k = n >= 4 && rng.random() < 0.4 ? 2 : 1;
+		for (let i = 0; i < k; i++) {
+			setLowerYear(years[i]!, academy, "academy", LOWER_LEVEL_INFO.academy, rng);
+			years[i]!.zShift += 0.6;
+			years[i]!.mpgShift += 1;
+		}
+		years[k]!.move = "academy";
+		return k;
+	}
+	if (route === "smallCollege") {
+		const names = Object.keys(SMALL_COLLEGES);
+		const school = names[Math.floor(rng.random() * names.length)]!;
+		const level = SMALL_COLLEGES[school]!;
+		const k = n === 3 ? 1 : rng.random() < 0.6 ? 2 : 1;
+		for (let i = 0; i < k; i++) {
+			setLowerYear(years[i]!, school, level, LOWER_LEVEL_INFO[level], rng);
+			// Inflated numbers against weak competition, like a junior college star
+			years[i]!.zShift += 1.1;
+			years[i]!.mpgShift += 2.5;
+		}
+		years[k]!.move = "small";
+		return k;
+	}
+	if (route === "gap" || route === "military" || route === "mission") {
+		const year = years[0]!;
+		year.school = GAP_NAMES[route];
+		year.level = "gap";
+		year.played = false;
+		year.status = "gap";
+		year.conference = undefined;
+		// Rusty in his first season back
+		years[1]!.lag += 2;
+		years[1]!.mpgShift -= 2;
+		return 1;
+	}
+	// Two sports: every season before his last one
+	for (const year of years) {
+		if (year.yearsBack >= 1) {
+			year.football = true;
+			year.mpgShift -= 1.5;
+		}
+	}
+	return 0;
 };
 
 export const toCareer = (plan: CareerPlan): PreDraftCareer => ({
@@ -766,8 +1016,10 @@ export const toCareer = (plan: CareerPlan): PreDraftCareer => ({
 		...(year.injury ? { injury: { ...year.injury } } : {}),
 		...(year.why ? { why: year.why } : {}),
 		...(year.tier ? { tier: year.tier } : {}),
+		...(year.football ? { football: true as const } : {}),
 	})),
 	...(plan.story ? { story: plan.story } : {}),
+	...(plan.route ? { route: plan.route } : {}),
 	...(plan.hsClass !== undefined ? { hsClass: plan.hsClass } : {}),
 });
 
@@ -801,6 +1053,15 @@ export const getMoveNote = (
 	}
 	if (year.move === "juco") {
 		return `Junior college transfer from ${prev.school}`;
+	}
+	if (year.move === "small") {
+		return `Transferred up from ${prev.school} (${prev.level === "naia" ? "NAIA" : "Division II"})`;
+	}
+	if (year.move === "prep") {
+		return `Enrolled after a post-graduate year at ${prev.school}`;
+	}
+	if (year.move === "academy") {
+		return `${getLeagueTier(year.school) ? "Turned pro" : "Enrolled"} after his time at the ${prev.school}`;
 	}
 	const prevTier = prev.tier ?? getLeagueTier(prev.school);
 	const tier = year.tier ?? getLeagueTier(year.school);
@@ -912,6 +1173,79 @@ export const getStoryText = (
 			return {
 				title: "Injury-shortened season",
 				text: `His ${facts.lastSeason} season ended after ${facts.lastGp} ${facts.lastGp === 1 ? "game" : "games"} because of an injury, and he missed the postseason. Teams had to judge him on what he showed before it.`,
+			};
+	}
+};
+
+/**
+ * His route in a line, for the College/Overseas page (preDraftPaths). `years` is his career, `school` his draft year school or league.
+ */
+export const getRouteText = (
+	kind: RouteKind,
+	years: CareerYear[],
+	facts: { hsClass?: number; school: string; lastSeason: number },
+): { title: string; text: string } => {
+	const first = years[0];
+	const firstCollege = years.find(
+		(year) => countsForEligibility(year.level) && year.level !== "other",
+	);
+	const enrolledAt = firstCollege?.school ?? facts.school;
+	const lower = years.filter(
+		(year) => year.level === "dii" || year.level === "naia",
+	);
+	const hs =
+		facts.hsClass !== undefined
+			? ` after graduating from high school in ${facts.hsClass}`
+			: " out of high school";
+	switch (kind) {
+		case "postgrad":
+			return {
+				title: "Post-graduate year",
+				text: `Spent a post-graduate year at ${first?.school ?? "a prep school"}${hs}, then enrolled at ${enrolledAt} a year behind his high school class.`,
+			};
+		case "academy": {
+			const academy = years.filter((year) => year.level === "academy");
+			return {
+				title: "Academy product",
+				text: `Developed at the ${first?.school ?? "NBA Academy"}${academy.length > 1 ? ` for ${academy.length} seasons` : ""} before ${firstCollege ? `coming to the United States to play for ${firstCollege.school}` : "turning pro"}.`,
+			};
+		}
+		case "smallCollege": {
+			const level = lower[0]?.level === "naia" ? "NAIA" : "Division II";
+			return {
+				title: `${level} to Division I`,
+				text: `Started at ${lower[0]?.school ?? "a small college"} (${level}), put up big numbers for ${lower.length === 1 ? "a season" : `${lower.length} seasons`} and moved up to Division I with ${enrolledAt}.`,
+			};
+		}
+		case "gap":
+			return {
+				title: "Gap year",
+				text: `Took a year away from basketball${hs} before enrolling at ${enrolledAt}.`,
+			};
+		case "military":
+			return {
+				title: "Military service",
+				text: `Served in the military for a year${hs} before enrolling at ${enrolledAt}.`,
+			};
+		case "mission":
+			return {
+				title: "Church mission",
+				text: `Spent a year on a church mission${hs} before enrolling at ${enrolledAt}, older than most of his classmates as a result.`,
+			};
+		case "twoSport":
+			return {
+				title: "Two-sport athlete",
+				text: `Also played football at ${facts.school}, joining the basketball team after the football season, before committing to basketball full time for his last season, ${facts.lastSeason}.`,
+			};
+		case "nextStars":
+			return {
+				title: "NBL Next Stars",
+				text: `Skipped college${hs} for a season in Australia's NBL through its Next Stars program, playing against grown men before the draft.`,
+			};
+		case "abroad":
+			return {
+				title: "Turned pro overseas",
+				text: `Skipped college${hs} to sign with a club in the ${facts.school}, one of the few Americans to go straight from high school to a pro league abroad.`,
 			};
 	}
 };

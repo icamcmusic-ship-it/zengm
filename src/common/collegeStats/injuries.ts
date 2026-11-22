@@ -96,7 +96,7 @@ const pick = (rng: Rng, defs: InjuryDef[]) =>
 type PlanYear = {
 	yearsBack: number;
 	played: boolean;
-	status?: "redshirt" | "medical" | "injury";
+	status?: "redshirt" | "medical" | "injury" | "gap";
 	gamesCap?: number;
 	injury?: PreDraftInjury;
 	// Games missed in the middle of a season (the season simulation takes them out of his games played)

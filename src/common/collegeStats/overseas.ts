@@ -1,4 +1,10 @@
-import { NON_NCAA, OVERSEAS_EXTRA, PATHWAY_TEAM } from "./colleges.ts";
+import {
+	NON_NCAA,
+	OVERSEAS_EXTRA,
+	PATHWAY_TEAM,
+	getLowerLevel,
+} from "./colleges.ts";
+import { isJuco } from "./juco.ts";
 
 /**
  * The overseas (pro club abroad) stat environment and honors, ported from the BBGM Draft Class Workshop (bbgmdraft js/stats.js LEAGUE_ENV and js/awards.js PRO_AWARDS / PRO_SHORT).
@@ -68,6 +74,39 @@ export const LEAGUE_ENV: Record<string, LeagueEnv> = {
 	"Mexican LNBP": env(80, 40, 28, 34, 40),
 	// Development tier (preDraftPaths): a second division, where a teenager gets real minutes and a big role against weaker teams
 	"European Second Division": env(76, 40, 30, 35, 34, -0.012, -1.5),
+	"LEB Oro": env(74, 40, 28, 34, 34, -0.015, -2.5),
+	"LNB Pro B": env(76, 40, 28, 34, 34, -0.015, -2.5),
+	"Serie A2": env(74, 40, 28, 34, 34, -0.015, -2),
+	"German ProA": env(76, 40, 28, 34, 32, -0.015, -2),
+	"Turkish TBL": env(76, 40, 28, 34, 30, -0.015, -2.5),
+	"Greek Elite League": env(74, 40, 30, 35, 26, -0.01, -1.5),
+	"ABA League Second Division": env(74, 40, 28, 34, 26, -0.015, -2),
+	"Serbian KLS": env(74, 40, 28, 34, 30, -0.015, -2.5),
+	"Croatian Premijer liga": env(74, 40, 30, 35, 28, -0.01, -1.5),
+	"Slovenian SKL": env(74, 40, 30, 35, 28, -0.01, -1.5),
+	"Czech NBL": env(76, 40, 30, 35, 32, -0.01, -1.5),
+	"Latvian-Estonian League": env(76, 40, 28, 34, 30, -0.015, -2.5),
+	"Israeli Liga Leumit": env(78, 40, 30, 35, 30, -0.01, -1.5),
+	"Hungarian NB I": env(76, 40, 30, 35, 30, -0.01, -1.5),
+	"Bulgarian NBL": env(78, 40, 30, 35, 28, -0.01, -1),
+	"Ukrainian Superleague": env(76, 40, 30, 35, 30, -0.01, -1),
+	"Georgian Superleague": env(78, 40, 30, 35, 24, -0.01, -1),
+	"Finnish Korisliiga": env(80, 40, 30, 35, 34, -0.01, -1.5),
+	"Super League Basketball": env(80, 40, 30, 35, 30, -0.01, -1.5),
+	"Portuguese LPB": env(76, 40, 30, 35, 28, -0.01, -1),
+	"FIBA Europe Cup": env(74, 40, 26, 34, 30, -0.03, -5),
+	"Japan B2 League": env(76, 40, 30, 35, 60, -0.015, -2),
+	"Chinese NBL": env(84, 48, 30, 38, 26, -0.015, -2),
+	"Taiwan TPBL": env(82, 48, 28, 36, 36, -0.02, -3),
+	"Lebanese Basketball League": env(78, 40, 28, 34, 24, -0.02, -3),
+	"Iranian Super League": env(76, 40, 30, 35, 26, -0.01, -1),
+	"Venezuelan SPB": env(80, 40, 28, 35, 30, -0.015, -2),
+	"Dominican LNB": env(82, 40, 28, 35, 24, -0.015, -2),
+	"Uruguayan LUB": env(76, 40, 28, 35, 30, -0.015, -2),
+	"Chilean LNB": env(78, 40, 30, 35, 28, -0.01, -1),
+	"Angolan Basketball League": env(76, 40, 28, 35, 26, -0.015, -2),
+	"Egyptian Super League": env(76, 40, 28, 35, 30, -0.015, -2),
+	"Nigerian Premier League": env(80, 40, 32, 36, 18, -0.005, 0),
 };
 
 // The pro pathway program (preDraftPaths): one season of 48-minute games against pro development teams for an elite high school prospect who skips college. He comes off a pro bench more than he would start in college (a few minutes fewer than the same player in college), takes fewer shots, and finishes worse against grown men (a few points of FG% below the same player in college)
@@ -107,6 +146,40 @@ export const PRO_SHORT: Record<string, string> = {
 	"Philippine PBA": "PBA",
 	"Argentine Liga Nacional": "Liga Nacional",
 	"Mexican LNBP": "LNBP",
+	"European Second Division": "2nd Division",
+	"LEB Oro": "LEB Oro",
+	"LNB Pro B": "Pro B",
+	"Serie A2": "A2",
+	"German ProA": "ProA",
+	"Turkish TBL": "TBL",
+	"Greek Elite League": "Elite League",
+	"ABA League Second Division": "ABA 2",
+	"Serbian KLS": "KLS",
+	"Croatian Premijer liga": "Premijer liga",
+	"Slovenian SKL": "SKL",
+	"Czech NBL": "Czech NBL",
+	"Latvian-Estonian League": "LEBL",
+	"Israeli Liga Leumit": "Liga Leumit",
+	"Hungarian NB I": "NB I",
+	"Bulgarian NBL": "Bulgarian NBL",
+	"Ukrainian Superleague": "Superleague",
+	"Georgian Superleague": "Georgian Superleague",
+	"Finnish Korisliiga": "Korisliiga",
+	"Super League Basketball": "SLB",
+	"Portuguese LPB": "LPB",
+	"FIBA Europe Cup": "Europe Cup",
+	"Japan B2 League": "B2",
+	"Chinese NBL": "Chinese NBL",
+	"Taiwan TPBL": "TPBL",
+	"Lebanese Basketball League": "Lebanese League",
+	"Iranian Super League": "Iranian League",
+	"Venezuelan SPB": "SPB",
+	"Dominican LNB": "LNB",
+	"Uruguayan LUB": "LUB",
+	"Chilean LNB": "Chilean LNB",
+	"Angolan Basketball League": "Angolan League",
+	"Egyptian Super League": "Egyptian League",
+	"Nigerian Premier League": "Nigerian League",
 };
 
 // A pro league (not the NCAA, not a youth/prep program, not the pro pathway program)
@@ -148,12 +221,22 @@ export const getLeagueTier = (
 	return strength >= 76 ? "top" : strength >= 60 ? "mid" : "dev";
 };
 
+export type PreDraftLabel =
+	| "Overseas"
+	| "G League"
+	| "Pro pathway"
+	| "JUCO"
+	| "Prep"
+	| "Academy"
+	| "Small college"
+	| "College";
+
 /**
- * What a pre-draft stats row is, from where it was played: "Overseas" for a pro club abroad, "G League" for the G League, "Pro pathway" for the pro pathway program, "College" for everything else (NCAA, prep, youth programs).
+ * What a pre-draft stats row is, from where it was played: "Overseas" for a pro club abroad, "G League" for the G League, "Pro pathway" for the pro pathway program, "JUCO" for a junior college, "Prep" for a prep school or post-graduate year, "Academy" for a youth academy (and Overtime Elite), "Small college" for Division II, Division III and NAIA programs, "College" for everything else (Division I).
  */
 export const getPreDraftLabel = (
 	teamName: string | undefined,
-): "Overseas" | "G League" | "Pro pathway" | "College" => {
+): PreDraftLabel => {
 	if (teamName === "NBA G League") {
 		return "G League";
 	}
@@ -163,8 +246,25 @@ export const getPreDraftLabel = (
 	if (teamName !== undefined && isOverseasLeague(teamName)) {
 		return "Overseas";
 	}
+	if (teamName === "JUCO" || isJuco(teamName)) {
+		return "JUCO";
+	}
+	const lower = getLowerLevel(teamName);
+	if (lower === "prep") {
+		return "Prep";
+	}
+	if (lower === "academy") {
+		return "Academy";
+	}
+	if (lower) {
+		return "Small college";
+	}
 	return "College";
 };
+
+// A school (any level of college, prep or youth program) rather than a pro team: the "College" side of College/Overseas
+export const isSchoolLabel = (label: PreDraftLabel) =>
+	label !== "Overseas" && label !== "G League" && label !== "Pro pathway";
 
 // Bars on strength-adjusted game score per game (pro box scores run lower than college ones: fewer minutes, slower pace)
 export const PRO_BARS = {
