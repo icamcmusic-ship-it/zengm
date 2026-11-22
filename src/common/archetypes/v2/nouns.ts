@@ -19,12 +19,11 @@ import { CONCEPTS, conceptsOf } from "../twoK/concepts.ts";
 import type { ArchetypeRatings, Pos } from "../types.ts";
 import { SUB_INDEX } from "../../subRatings.ts";
 import { GATE_REF } from "./gateScale.data.ts";
-import { percentileIn, type RatingQuantiles } from "./gateScale.ts";
-import { ELITE_RE, hasUpside, isHonestKey } from "./honest.ts";
+import { NOUN_GROUP_REF } from "./nounGroups.data.ts";
+import { percentileIn, RQ_POINTS, type RatingQuantiles } from "./gateScale.ts";
+import { ELITE_RE, hasUpside } from "./honest.ts";
 import {
-	composedId,
 	composeName,
-	DESC_BY_KEY,
 	GROUP_OF,
 	isComposedId,
 	parseComposedId,
@@ -61,8 +60,9 @@ export const ELITE_OVR_FLOOR = 55;
 export const GENERIC_PCT = 0.6;
 // A trait adds one word to a one-noun name at this score (the user: "one trait word per name when the trait is 70+")
 export const TRAIT_WORD_MIN = 70;
-// Sub-ratings decide a noun's word when one leads another by this much
-export const SUB_LEAN = 6;
+// Sub-ratings decide a noun's word when one leads another by this much (archcov: 10, past a sub-rating's usual change
+// from one season to the next, so the variant word doesn't flip on noise)
+export const SUB_LEAN = 10;
 export const ELITE_PCT = 0.92;
 // Below this ovr a player with one noun gets an honest name (a specialist), not "<noun> <Position>"
 export const ONE_NOUN_OVR = 50;
@@ -149,10 +149,11 @@ export const POS_WORD: Record<Pos, PosWord> = {
 };
 
 // ---- the scores ----
-const sub = (r: ArchetypeRatings, key: string): number | undefined => {
+// (archcov: a sub-rating of 0 is missing, not a rating: an export without the athletic sub-ratings has 0s there)
+export const sub = (r: ArchetypeRatings, key: string): number | undefined => {
 	const i = SUB_INDEX[key];
 	const v = i === undefined ? undefined : r.sub?.[i];
-	return typeof v === "number" ? v : undefined;
+	return typeof v === "number" && v > 0 ? v : undefined;
 };
 const mean = (xs: (number | undefined)[]) => {
 	const v = xs.filter((x): x is number => typeof x === "number");
@@ -202,6 +203,53 @@ const NOUN_VALUE: Record<
 	crafty: { value: (r) => r.oiq, table: () => "oiq" },
 };
 export const NOUNS = Object.keys(NOUN_VALUE) as NounKey[];
+// archcov: each noun's value among the players of one position group (guards, wings, bigs): the quantiles of the
+// values themselves (RQ_POINTS points, 0%..100%)
+export type NounGroupQuantiles = Partial<
+	Record<PosGroup | "all", Partial<Record<NounKey, number[]>>>
+>;
+export const nounValue = (k: NounKey, r: ArchetypeRatings) =>
+	NOUN_VALUE[k].value(r);
+export const nounGroupQuantiles = (
+	rows: readonly { ratings: ArchetypeRatings; pos?: string }[],
+): NounGroupQuantiles => {
+	const out: NounGroupQuantiles = {};
+	// ("all": the league's own table of each noun's value, so a blended noun is read against its own blend)
+	for (const g of ["all", "guard", "wing", "big"] as const) {
+		const mine = rows.filter(
+			(x) => g === "all" || (x.pos !== undefined && GROUP_OF_POS[x.pos] === g),
+		);
+		if (mine.length < 40) {
+			continue;
+		}
+		const t: Partial<Record<NounKey, number[]>> = {};
+		for (const k of NOUNS) {
+			const v = mine
+				.map((x) => NOUN_VALUE[k].value(x.ratings))
+				.filter((x) => Number.isFinite(x))
+				.sort((a, b) => a - b);
+			t[k] = Array.from({ length: RQ_POINTS }, (_, i) => {
+				const p = (i / (RQ_POINTS - 1)) * (v.length - 1);
+				const lo = Math.floor(p);
+				const hi = Math.min(v.length - 1, lo + 1);
+				return Math.round((v[lo]! + (v[hi]! - v[lo]!) * (p - lo)) * 10) / 10;
+			});
+		}
+		out[g] = t;
+	}
+	return out;
+};
+const GROUP_OF_POS: Record<string, PosGroup> = {
+	PG: "guard",
+	G: "guard",
+	SG: "guard",
+	GF: "wing",
+	SF: "wing",
+	F: "wing",
+	PF: "big",
+	FC: "big",
+	C: "big",
+};
 // The base rating the regenerator raises for a noun (it sets base ratings only)
 export const NOUN_RATING: Record<NounKey, keyof ArchetypeRatings> = {
 	three: "tp",
@@ -310,11 +358,11 @@ export const twoWayOk = (r: ArchetypeRatings, rq?: RatingQuantiles) => {
 	);
 	return d >= TWO_WAY_MIN && pct >= TWO_WAY_PCT;
 };
-const mobile = (r: ArchetypeRatings, rq?: RatingQuantiles) =>
+export const mobile = (r: ArchetypeRatings, rq?: RatingQuantiles) =>
 	Math.max(pctOf("spd", sub(r, "lat") ?? r.spd, rq), pctOf("spd", r.spd, rq)) >=
 	MOBILE_PCT;
 
-const OFFENSE: ReadonlySet<NounKey> = new Set([
+export const OFFENSE: ReadonlySet<NounKey> = new Set([
 	"three",
 	"mid",
 	"post",
@@ -323,7 +371,6 @@ const OFFENSE: ReadonlySet<NounKey> = new Set([
 	"creator",
 	"pass",
 ]);
-const DEFENSE: ReadonlySet<NounKey> = new Set(["perimD", "steal"]);
 
 // ---- special names (builds) ----
 // The nouns a concept of a build's name says (a concept that is no noun makes the build no special name)
@@ -437,7 +484,7 @@ export const specialsAt = (pos: Pos): Special[] => {
 	return out;
 };
 // Words a special name may only have at some positions, or with a trait
-const BIG_POS: ReadonlySet<Pos> = new Set(["PF", "FC", "C"]);
+export const BIG_POS: ReadonlySet<Pos> = new Set(["PF", "FC", "C"]);
 const TRAIT_WORDS: [RegExp, string, number][] = [
 	[/Hustle|Hustling|Energy|Junkyard|Gritty|Grinder/, "hustle", 55],
 	[
@@ -595,7 +642,7 @@ export const TRAIT_KEYWORDS: TraitKeyword[] = [
 	},
 ];
 // His strongest trait keyword, if any
-const traitKeywordOf = (
+export const traitKeywordOf = (
 	x: NounInput,
 	pct: Record<NounKey, number>,
 	group: PosGroup,
@@ -612,7 +659,7 @@ const traitKeywordOf = (
 	return best;
 };
 // (Connector: an end word with no trait: good passing and IQ, no standout skill)
-const connector = (pct: Record<NounKey, number>) =>
+export const connector = (pct: Record<NounKey, number>) =>
 	pct.pass >= 0.55 && pct.crafty >= 0.55;
 
 // ---- the pick ----
@@ -625,6 +672,9 @@ export type NounInput = {
 	prospect?: boolean;
 	traits?: Record<string, number>;
 	rq?: RatingQuantiles;
+	// archcov: each noun's values among the players of his position group in his league (absent: the reference
+	// league's, nounGroups.data.ts)
+	ng?: NounGroupQuantiles;
 	// last season's pick, to keep its order when it is still about as good (archstick: and his whole label, `id` his
 	// main name's id and `defense` his defensive label, kept while every rule still holds and it is about as good)
 	prev?: {
@@ -636,6 +686,8 @@ export type NounInput = {
 	};
 	// archstick: false for the plain order of his nouns (no near tie given to last season's)
 	tie?: false;
+	// archcov: every standing moved by this much (re-checking last season's label with slack)
+	slack?: number;
 	// the user's "Doesn't fit" verdicts with no pick
 	rejected?: readonly Rejection[];
 	// how common each label is in the league (share, by id): a near-tie goes to the rarer name
@@ -669,12 +721,20 @@ export type NounPick = (
 ) & {
 	// the defensive label
 	defense?: string;
+	// archcov: the skills (and modifiers) the main name names, and why the name was chosen
+	main?: NounKey[];
+	explain?: CoverExplain;
 	// archstick: read in the plain order of his nouns (NounInput.tie)
 	tie?: false;
+	// archcov: read with this slack (last season's label re-checked: NounInput.slack)
+	slack?: number;
 };
 
 // How sure the name is (0..1): how clearly his named nouns clear the bar and stand above the next one he isn't named for
-const confOf = (cleared: readonly NounScore[], named: readonly NounKey[]) => {
+export const confOf = (
+	cleared: readonly NounScore[],
+	named: readonly NounKey[],
+) => {
 	const pcts = named
 		.map((n) => cleared.find((c) => c.key === n)?.pct)
 		.filter((p): p is number => p !== undefined);
@@ -689,7 +749,7 @@ const confOf = (cleared: readonly NounScore[], named: readonly NounKey[]) => {
 	return Math.round((0.4 + 0.35 * clear + 0.25 * gap) * 100) / 100;
 };
 
-const groupOfPos = (pos: Pos): PosGroup =>
+export const groupOfPos = (pos: Pos): PosGroup =>
 	pos === "PG" || pos === "G" || pos === "SG"
 		? "guard"
 		: pos === "GF" || pos === "SF" || pos === "F"
@@ -697,7 +757,10 @@ const groupOfPos = (pos: Pos): PosGroup =>
 			: "big";
 
 // The sub-rating that leads (by SUB_LEAN or more) among some, or undefined
-const leadSub = (r: ArchetypeRatings, keys: string[]): string | undefined => {
+export const leadSub = (
+	r: ArchetypeRatings,
+	keys: string[],
+): string | undefined => {
 	const v = keys
 		.map((k) => ({ k, v: sub(r, k) }))
 		.filter((x): x is { k: string; v: number } => x.v !== undefined)
@@ -705,7 +768,7 @@ const leadSub = (r: ArchetypeRatings, keys: string[]): string | undefined => {
 	return v.length >= 2 && v[0]!.v - v[1]!.v >= SUB_LEAN ? v[0]!.k : undefined;
 };
 // (the user: "split common labels using sub-ratings": the plain word of a noun says which kind of it he is)
-const SUB_WORD: Partial<
+export const SUB_WORD: Partial<
 	Record<
 		NounKey,
 		{ keys: string[]; words: Record<string, string>; groups?: PosGroup[] }
@@ -889,7 +952,7 @@ export const WORD_REQ: WordReq[] = [
 	},
 	{
 		re: /Slash|Open-Lane/,
-		check: (c) => c.pct("handle") >= 0.5 && c.cleared.has("speed"),
+		check: (c) => c.pct("handle") >= 0.5 && c.pct("speed") >= NOUN_CLEAR,
 		why: "a slasher's handle (top 50%) and speed",
 	},
 	// passing, rebounding
@@ -1009,6 +1072,12 @@ export const WORD_REQ: WordReq[] = [
 	{ re: /Iron\b|Durable/, trait: "durability", min: 55, why: "durability" },
 	// elite words, development words
 	{ re: ELITE_RE, check: (c) => c.eliteOvr, why: "an elite ovr" },
+	// (archcov, the user's 2064 audit: "athlete with no game" with steals in the top 1%)
+	{
+		re: /No Game|Raw Athlete|Big Body|Toolsy/,
+		check: (c) => c.cleared.size === 0,
+		why: "no basketball skill in the top 30%",
+	},
 	{
 		re: /\bRaw\b|Developing|Project|Late Bloomer|Lottery/,
 		check: (c) => c.ovr <= DEV_MAX_OVR || c.cleared.size === 0,
@@ -1060,7 +1129,7 @@ export type Rejection = {
 	own: boolean;
 	pct?: Partial<Record<NounKey, number>>;
 };
-const normName = (n: string) =>
+export const normName = (n: string) =>
 	n
 		.toLowerCase()
 		.replace(/[\s-]+/g, " ")
@@ -1068,11 +1137,11 @@ const normName = (n: string) =>
 
 // ---- length (Expanded Ratings: wingspan well above his height) ----
 export const LONG_MIN = 7;
-const isLong = (r: ArchetypeRatings) =>
+export const isLong = (r: ArchetypeRatings) =>
 	typeof r.wng === "number" && r.wng - r.hgt >= LONG_MIN;
 
 // ---- the user's own special names (tested on his nouns, sub-ratings and traits; checked before anything else) ----
-type SpecialCtx = {
+export type SpecialCtx = {
 	pos: Pos;
 	// his ovr's standing in the league (0..1)
 	ovrPct?: number;
@@ -1995,7 +2064,7 @@ export const shortForPos = (r: ArchetypeRatings, pos: Pos) =>
 
 // ---- end words (the user's nouns): in place of his position at the end of the name. One that says a noun (Maestro: his
 // mid-range) needs that noun among his two shown, and the noun is then said by the end word alone ----
-type EndCtx = {
+export type EndCtx = {
 	pct: Record<NounKey, number>;
 	r: ArchetypeRatings;
 	traits?: Record<string, number>;
@@ -2007,7 +2076,7 @@ type EndCtx = {
 	// his ovr's standing in the league (0..1)
 	ovrPct: number;
 };
-const GUARD_POS: ReadonlySet<Pos> = new Set(["PG", "G", "SG"]);
+export const GUARD_POS: ReadonlySet<Pos> = new Set(["PG", "G", "SG"]);
 const lead2 = (r: ArchetypeRatings, a: string, b: string) =>
 	(sub(r, a) ?? 0) > (sub(r, b) ?? 0);
 const athletic = (pct: Record<NounKey, number>) =>
@@ -2227,10 +2296,14 @@ export const END_WORDS: {
 ];
 
 // ---- the defensive label ----
-const DEF_NOUNS: ReadonlySet<NounKey> = new Set(["rimD", "perimD", "steal"]);
+export const DEF_NOUNS: ReadonlySet<NounKey> = new Set([
+	"rimD",
+	"perimD",
+	"steal",
+]);
 
 // Whether his ovr is elite: the league's top ELITE_OVR_PCT, never below ELITE_OVR_FLOOR (no league table: NOUN_ELITE_OVR)
-const eliteOvrOf = (ovr: number | undefined, rq?: RatingQuantiles) => {
+export const eliteOvrOf = (ovr: number | undefined, rq?: RatingQuantiles) => {
 	const ovrTable = tableOf("ovr", rq);
 	return (
 		ovr !== undefined &&
@@ -2239,59 +2312,8 @@ const eliteOvrOf = (ovr: number | undefined, rq?: RatingQuantiles) => {
 			: ovr >= NOUN_ELITE_OVR)
 	);
 };
-// archnouns4: what his name's words are checked against (namePromises)
-export const nameCtxOf = (x: NounInput): NameCtx => {
-	const scores = nounScores(x.r, x.rq);
-	const cleared = clearedNouns(scores, tieFavored(x)).filter(
-		(c) => c.key !== "crafty",
-	);
-	const pct = Object.fromEntries(scores.map((s) => [s.key, s.pct])) as Record<
-		NounKey,
-		number
-	>;
-	const crt = sub(x.r, "crt");
-	return {
-		cleared: new Set(cleared.map((c) => c.key)),
-		top3: new Set(cleared.slice(0, 3).map((c) => c.key)),
-		pct: (k) => pct[k],
-		...(crt === undefined ? {} : { crtPct: pctOf("drb", crt, x.rq) }),
-		...(x.traits ? { traits: x.traits } : {}),
-		eliteOvr: eliteOvrOf(x.ovr, x.rq),
-		mobile: mobile(x.r, x.rq),
-		ovr: x.ovr ?? 99,
-		upside: hasUpside(x),
-	};
-};
-
-// archstick: a near tie goes to last season's nouns only where that keeps his label: when the tie-break keeps less of
-// it than the plain order, the plain order's pick (so the tie-break never gives a third label)
-export const pickNouns = (x: NounInput): NounPick => {
-	const a = pickNounsOnce(x);
-	if (x.tie === false || favoredNouns(x) === undefined) {
-		return a;
-	}
-	const keptA = keptOfPrev(x, a);
-	if (keptA === 3) {
-		return a;
-	}
-	const b = pickNounsOnce({ ...x, tie: false });
-	return keptOfPrev(x, b) >= keptA ? { ...b, tie: false } : a;
-};
-// (how much of last season's label a pick keeps: 2 for its main name, 1 for its defensive label)
-const keptOfPrev = (x: NounInput, p: NounPick): number => {
-	const id = x.prev?.id;
-	const pc = id && isComposedId(id) ? parseComposedId(id) : undefined;
-	const main =
-		id !== undefined &&
-		(pickIdOf(p, x.pos) === id ||
-			(p.kind === "honest" &&
-				pc !== undefined &&
-				isHonestKey(pc.role.key) &&
-				(HONEST_NOUNS[pc.role.key] ?? []).includes(p.noun ?? "none")));
-	return (main ? 2 : 0) + (p.defense === x.prev?.defense ? 1 : 0);
-};
 // (what an honest name is about, as the noun it is named for: "none" for a name about no skill)
-const HONEST_NOUNS: Record<string, (NounKey | "none")[]> = {
+export const HONEST_NOUNS: Record<string, (NounKey | "none")[]> = {
 	hShoot: ["three"],
 	hGunner: ["three", "mid", "none"],
 	hPerD: ["perimD", "steal"],
@@ -2329,949 +2351,11 @@ const HONEST_NOUNS: Record<string, (NounKey | "none")[]> = {
 	hJourneyman: ["none"],
 	hCampBody: ["none"],
 };
-// (a pick's id, as the engine gives it; undefined for an honest name, which the engine names)
-const pickIdOf = (p: NounPick, pos: Pos): string | undefined => {
-	const g = GROUP_OF[pos];
-	switch (p.kind) {
-		case "special":
-			return p.id;
-		case "composed":
-			return (
-				p.keepId ??
-				composedId(
-					ROLE_BY_KEY.get(p.role)!,
-					p.descs.map((k) => DESC_BY_KEY.get(k)!),
-					g,
-					p.pick ?? {},
-				)
-			);
-		case "trait":
-			return composedId(ROLE_BY_KEY.get(p.key)!, [], g, { [p.key]: p.name });
-		default:
-			return undefined;
-	}
-};
-const pickNounsOnce = (x: NounInput): NounPick => {
-	const { r, pos, rq } = x;
-	const group = groupOfPos(pos);
-	const scores = nounScores(r, rq);
-	// (archstick: a near tie goes to last season's nouns; nameCtxOf orders them the same way)
-	let cleared = clearedNouns(scores, tieFavored(x));
-	const eliteOvr = eliteOvrOf(x.ovr, rq);
-	// archnouns4: every name's words are checked against what they promise
-	const nctx = nameCtxOf(x);
-	const fits = (name: string) => namePromises(name, nctx).length === 0;
-	const isElite = (s: NounScore) =>
-		eliteOvr &&
-		s.pct >= ELITE_PCT &&
-		// (Lockdown needs mobility: the user's audit)
-		(s.key !== "perimD" || mobile(r, rq));
-	const twoWay = twoWayOk(r, rq);
-	const long = isLong(r);
-
-	// The user's verdicts
-	const pctOfKey = Object.fromEntries(
-		scores.map((s) => [s.key, s.pct]),
-	) as Record<NounKey, number>;
-	const vetoed = (name: string) =>
-		(x.rejected ?? []).some((rj) => {
-			if (normName(rj.name) !== normName(name)) {
-				return false;
-			}
-			if (rj.own || !rj.pct) {
-				return rj.own;
-			}
-			let sum = 0;
-			let n = 0;
-			for (const k of NOUNS) {
-				const v = rj.pct[k];
-				if (v !== undefined) {
-					sum += Math.abs(v - pctOfKey[k]);
-					n++;
-				}
-			}
-			return n > 0 && sum / n <= REJECT_NEAR;
-		});
-	const okName = (name: string) =>
-		!vetoed(name) && !nameProblem(name) && fits(name);
-
-	// The user's own special names first: the most specific that fits and has his best noun (a two-sided one names him
-	// whole: no defensive label; archnouns4: an offensive one keeps his defensive label)
-	let customPick: NounPick | undefined;
-	let customDef = false;
-	// (archstick: Jack-Of-All-Trades is returned after the defensive label is read, which it never has)
-	let jackPick: NounPick | undefined;
-	const young = hasUpside(x) && (x.ovr ?? 99) <= DEV_MAX_OVR;
-	const customCtx: SpecialCtx = {
-		pos,
-		ovrPct: x.ovr === undefined ? 0 : pctOf("ovr", x.ovr, rq),
-		pct: pctOfKey,
-		r,
-		traits: x.traits,
-		eliteOvr,
-		ovr: x.ovr ?? 0,
-		best: cleared.find((c) => c.key !== "crafty")?.key,
-	};
-	const top3Custom = new Set<NounKey>(
-		cleared
-			.filter((c) => c.key !== "crafty")
-			.slice(0, 3)
-			.map((c) => (c.key === "creator" ? "handle" : c.key)),
-	);
-	top3Custom.add("crafty");
-	// (archstick: every rule a user special name has to pass, for this season's pick and for last season's name alike:
-	// its score, or undefined when it fails one)
-	const customScore = (c: CustomSpecial): number | undefined => {
-		if (young || !c.positions.includes(pos) || !c.test(customCtx)) {
-			return undefined;
-		}
-		// (the user's rule: one skill under ONE_NOUN_OVR is a specialist's honest name, not a one-skill special)
-		if (
-			c.nouns.length <= 1 &&
-			!c.anyBest &&
-			(x.ovr ?? 99) < ONE_NOUN_OVR &&
-			cleared.filter((s2) => s2.key !== "crafty").length < 2
-		) {
-			return undefined;
-		}
-		// (archnouns3, the user's rule for every special name: all its skills among his three best)
-		if (
-			!c.anyBest &&
-			!c.nouns.every((n) => top3Custom.has(n === "creator" ? "handle" : n))
-		) {
-			return undefined;
-		}
-		const best = customCtx.best;
-		const nouns: NounKey[] = c.nouns.map((n) =>
-			n === "creator" ? "handle" : n,
-		);
-		if (
-			!c.anyBest &&
-			best &&
-			!nouns.includes(best) &&
-			!(best === "creator" && nouns.includes("handle"))
-		) {
-			return undefined;
-		}
-		// (archnouns3, the real-player check: a many-skills name never hides a true standout: with his best noun in the
-		// league's top STANDOUT_PCT, the name must be about it)
-		if (c.anyBest && best && pctOfKey[best] >= STANDOUT_PCT) {
-			return undefined;
-		}
-		const role = ROLE_BY_KEY.get(c.key)!;
-		// (the user's own names: only his verdicts can rule one out; archnouns4: and every word must keep its promise)
-		const cname = composeName(role, [], GROUP_OF[pos]);
-		if (vetoed(cname) || !fits(cname)) {
-			return undefined;
-		}
-		return (
-			c.nouns.reduce((sum, n) => sum + pctOfKey[n], 0) +
-			c.nouns.length -
-			SPREAD_PEN * (x.common?.[composedId(role, [], GROUP_OF[pos])] ?? 0)
-		);
-	};
-	const customPickOf = (c: CustomSpecial): NounPick => ({
-		kind: "trait",
-		key: c.key,
-		name: composeName(ROLE_BY_KEY.get(c.key)!, [], GROUP_OF[pos]),
-		conf: confOf(cleared, c.nouns),
-	});
-	// (Jack-Of-All-Trades: many good skills, no great one; archnouns4: JACK_CLEARED skills in the top 30%)
-	const jackOk = () =>
-		!young &&
-		nctx.cleared.size >= JACK_CLEARED &&
-		scores.every((s) => s.pct < 0.9) &&
-		(x.ovr ?? 0) >= 45 &&
-		fits(JACK_NAME) &&
-		!vetoed(JACK_NAME);
-	{
-		let pick: CustomSpecial | undefined;
-		let pickScore = -Infinity;
-		for (const c of CUSTOM_SPECIALS) {
-			const sc = customScore(c);
-			// (archstick: a tie goes to the name that comes first in the list, whatever else changed)
-			if (sc !== undefined && sc > pickScore) {
-				pick = c;
-				pickScore = sc;
-			}
-		}
-		if (pick) {
-			customPick = customPickOf(pick);
-			customDef = pick.nouns.some((n) => DEF_NOUNS.has(n));
-		} else if (jackOk()) {
-			jackPick = { kind: "trait", key: "sJack", name: JACK_NAME, conf: 0.6 };
-		}
-	}
-
-	// The defensive label (the user: an offensive and a defensive label, "Pull-Up Shot Hunter · Point-of-Attack Pest"):
-	// from his defensive nouns; his main name is then from the rest. A player whose only nouns are defensive keeps them
-	// in his main name and has no second label.
-	let defense: string | undefined;
-	// (his nouns and skills before the defensive label takes its nouns: what Jack-Of-All-Trades names)
-	const clearedAll = cleared;
-	const skillsAll = cleared.filter((c) => c.key !== "crafty");
-	// (a defensive noun names him when it is among his three best, or in the league's top 15%)
-	const top3All = new Set(cleared.slice(0, 3).map((c) => c.key));
-	// (archnouns3: for a star, near the top of the league at everything, "top 15%" says little: outside his three best
-	// it must also be within 0.05 of his very best)
-	const bestPct = cleared[0]?.pct ?? 0;
-	// (a defensive skill among his three best names him, or one in the league's top 15% within 0.05 of his best: the
-	// user's 2048 audit rules out a defensive label about a skill outside his three best)
-	const dList = cleared.filter(
-		(c) =>
-			DEF_NOUNS.has(c.key) &&
-			(top3All.has(c.key) || c.pct >= Math.max(DEF_LABEL_PCT, bestPct - 0.05)),
-	);
-	const dKeys = new Set(dList.map((c) => c.key));
-	const hasDef = (k: NounKey) => dList.find((c) => c.key === k);
-	const rim = hasDef("rimD");
-	const per = hasDef("perimD");
-	const stl = hasDef("steal");
-	// (archnouns4: the trait words of a defensive label need their traits: Pest hustle 55+, Switch defensive
-	// versatility 55+)
-	const trv = (k: string) => x.traits?.[k] ?? -Infinity;
-	const switchOk = trv("defensiveVersatility") >= 55;
-	const pestOk = trv("hustle") >= 55;
-	const rimLead = leadSub(r, ["blk", "idf"]);
-	const latPct = pctOf("spd", sub(r, "lat") ?? r.spd, rq);
-	const stalkerOk =
-		!!per &&
-		per.pct >= 0.8 &&
-		Math.max(x.traits?.motor ?? 0, x.traits?.hustle ?? 0) >= 65;
-	const menaceOk =
-		!!stl &&
-		stl.pct >= 0.85 &&
-		(trv("competitiveness") >= TRAIT_WORD_MIN ||
-			trv("motor") >= TRAIT_WORD_MIN ||
-			trv("hustle") >= TRAIT_WORD_MIN);
-	if (
-		dList.length > 0 &&
-		cleared.some((c) => !DEF_NOUNS.has(c.key) && c.key !== "crafty")
-	) {
-		const rimName = (rr: NounScore) =>
-			isElite(rr)
-				? "Shot Eraser"
-				: rimLead === "blk"
-					? "Shot Blocker"
-					: rimLead === "idf"
-						? "Post Defender"
-						: "Rim Protector";
-		const perName = (pp: NounScore) =>
-			isElite(pp)
-				? "Lockdown Defender"
-				: eliteOvr && pp.pct >= ELITE_PCT
-					? "Cerebral Defender"
-					: latPct >= 0.7
-						? "On-Ball Stopper"
-						: "Perimeter Defender";
-		const stlName = () =>
-			menaceOk
-				? "Ball-Hawking Menace"
-				: stl!.pct >= 0.85 && (sub(r, "stl") ?? 0) > (sub(r, "pdf") ?? 0)
-					? "Passing-Lane Interceptor"
-					: "Ball Hawk";
-		let n: string;
-		if (rim && stl && group !== "big" && rim.pct >= 0.8 && stl.pct >= 0.8) {
-			n = "Help-Side Roamer";
-		} else if (rim && per && rim.pct >= 0.8 && per.pct >= 0.8 && switchOk) {
-			n = "Switch Defender";
-		} else if (rim && group === "guard" && rim.pct >= 0.85) {
-			n = "Swatting Guard";
-		} else if (
-			rim &&
-			(!per || rim.pct >= per.pct) &&
-			(!stl || rim.pct >= stl.pct)
-		) {
-			n = rimName(rim);
-		} else if (stalkerOk) {
-			n = "Perimeter Stalker";
-		} else if (per && stl && pestOk) {
-			// (archnouns3: Pest, the lighter one)
-			n = per.pct < 0.85 && stl.pct < 0.85 ? "Pest" : "Point-of-Attack Pest";
-		} else if (per && (!stl || per.pct >= stl.pct)) {
-			n = perName(per);
-		} else {
-			n = stlName();
-		}
-		if (long && !/Lockdown|Eraser/.test(n)) {
-			n = `Long ${n}`;
-		} else if (
-			(x.traits?.defensiveVersatility ?? 0) >= TRAIT_WORD_MIN &&
-			n !== "Switch Defender"
-		) {
-			n = `Switchable ${n}`;
-		}
-		defense = n;
-		// (the defensive nouns he isn't named for stay out of his main name too: the label covers his defense)
-		cleared = cleared.filter((c) => !DEF_NOUNS.has(c.key));
-	}
-	// (archstick: what each defensive label says, and what it needs beyond its nouns: the same tests that pick it, read
-	// as "is it still true" rather than "is it the first that fits")
-	const DEF_BASE: Record<string, { nouns: NounKey[]; ok: () => boolean }> = {
-		"Help-Side Roamer": {
-			nouns: ["rimD", "steal"],
-			ok: () => group !== "big" && rim!.pct >= 0.8 && stl!.pct >= 0.8,
-		},
-		"Switch Defender": {
-			nouns: ["rimD", "perimD"],
-			ok: () => rim!.pct >= 0.8 && per!.pct >= 0.8 && switchOk,
-		},
-		"Swatting Guard": {
-			nouns: ["rimD"],
-			ok: () => group === "guard" && rim!.pct >= 0.85,
-		},
-		"Shot Eraser": { nouns: ["rimD"], ok: () => isElite(rim!) },
-		"Shot Blocker": {
-			nouns: ["rimD"],
-			ok: () => !isElite(rim!) && rimLead !== "idf",
-		},
-		"Post Defender": {
-			nouns: ["rimD"],
-			ok: () => !isElite(rim!) && rimLead !== "blk",
-		},
-		"Rim Protector": { nouns: ["rimD"], ok: () => !isElite(rim!) },
-		"Perimeter Stalker": { nouns: ["perimD"], ok: () => stalkerOk },
-		"Point-of-Attack Pest": {
-			nouns: ["perimD", "steal"],
-			ok: () => pestOk && Math.max(per!.pct, stl!.pct) >= 0.85,
-		},
-		Pest: { nouns: ["perimD", "steal"], ok: () => pestOk },
-		"Lockdown Defender": { nouns: ["perimD"], ok: () => isElite(per!) },
-		"Cerebral Defender": {
-			nouns: ["perimD"],
-			ok: () => !isElite(per!) && eliteOvr && per!.pct >= ELITE_PCT,
-		},
-		"On-Ball Stopper": {
-			nouns: ["perimD"],
-			ok: () => !isElite(per!) && latPct >= 0.7,
-		},
-		"Perimeter Defender": { nouns: ["perimD"], ok: () => !isElite(per!) },
-		"Ball-Hawking Menace": { nouns: ["steal"], ok: () => menaceOk },
-		"Passing-Lane Interceptor": {
-			nouns: ["steal"],
-			ok: () => stl!.pct >= 0.85,
-		},
-		"Ball Hawk": { nouns: ["steal"], ok: () => true },
-	};
-	const defBaseOf = (name: string) => {
-		let base = name;
-		let prefix: "long" | "switchable" | undefined;
-		if (base.startsWith("Long ")) {
-			prefix = "long";
-			base = base.slice("Long ".length);
-		} else if (base.startsWith("Switchable ")) {
-			prefix = "switchable";
-			base = base.slice("Switchable ".length);
-		}
-		const d = DEF_BASE[base];
-		return d ? { ...d, base, prefix } : undefined;
-	};
-	const defCtx: NameCtx = { ...nctx, top3: new Set([...nctx.top3, ...dKeys]) };
-	// (a defensive label he may still have: every noun of it among the ones that name his defense, its own test, its
-	// prefix's, and every word's promise)
-	const defOk = (name: string): boolean => {
-		const d = defBaseOf(name);
-		if (
-			!d ||
-			!d.nouns.every((n) => dKeys.has(n)) ||
-			!d.ok() ||
-			(d.prefix === "long" && (!long || /Lockdown|Eraser/.test(d.base))) ||
-			(d.prefix === "switchable" &&
-				(trv("defensiveVersatility") < TRAIT_WORD_MIN ||
-					d.base === "Switch Defender"))
-		) {
-			return false;
-		}
-		return !vetoed(name) && namePromises(name, defCtx).length === 0;
-	};
-	const defNouns = (name: string): NounKey[] => defBaseOf(name)?.nouns ?? [];
-
-	const withDef = <T extends NounPick>(p: T): T =>
-		defense ? { ...p, defense } : p;
-
-	const top3 = cleared.slice(0, 3);
-	const top3Keys = new Set(top3.map((s) => s.key));
-	// (skills: Crafty is a style, it never stands alone)
-	const skills = cleared.filter((s) => s.key !== "crafty");
-	// (one noun at low ovr, or none: only a trait name or an honest one)
-	const fewSkills =
-		skills.length === 0 ||
-		(skills.length === 1 && (x.ovr ?? 99) < ONE_NOUN_OVR);
-
-	// Special names: every noun among his three best, with his best one; as many nouns as his name would have otherwise
-	// (archstick: `kept` for last season's name, whose nouns need only still stand above the next, not HYST above it)
-	const specialOk = (sp: Special, kept = false): boolean => {
-		if (young || skills.length === 0) {
-			return false;
-		}
-		const best = cleared[0]!.key;
-		const want = Math.min(2, skills.length);
-		if (sp.twoWay && (!twoWay || defense)) {
-			return false;
-		}
-		if (defense && sp.nouns.some((n) => DEF_NOUNS.has(n))) {
-			return false;
-		}
-		// (the user's audit: Stretch / Four / Five are bigs' words; a trait word needs the trait at 55+)
-		if (!wordsFit(sp.name, pos, x.traits) || !okName(sp.name)) {
-			return false;
-		}
-		const size = sp.nouns.length + (sp.twoWay ? 1 : 0);
-		if (size < want || size > 3) {
-			return false;
-		}
-		if (!sp.nouns.every((n) => top3Keys.has(n))) {
-			return false;
-		}
-		// (the user: a stacked name only when it is clear: each of its nouns stands HYST or more above his next noun
-		// that it doesn't have; else the plainer name)
-		if (sp.nouns.length >= 2) {
-			const next = cleared.find((c) => !sp.nouns.includes(c.key));
-			const low = Math.min(
-				...sp.nouns.map((n) => cleared.find((c) => c.key === n)!.pct),
-			);
-			if (next && low - next.pct < (kept ? 0 : HYST)) {
-				return false;
-			}
-		}
-		if (!sp.nouns.includes(best) && !(sp.twoWay && DEFENSE.has(best))) {
-			return false;
-		}
-		if (sp.elite) {
-			const head = top3.find((s) => s.key === sp.nouns[0])!;
-			if (!eliteOvr || !isElite(cleared[0]!) || !isElite(head)) {
-				return false;
-			}
-		}
-		return true;
-	};
-	const specialPick = (sp: Special): NounPick =>
-		withDef({
-			kind: "special",
-			id: sp.id,
-			name: sp.name,
-			nouns: sp.nouns,
-			conf: confOf(cleared, sp.nouns),
-		});
-
-	// His two best nouns in front of his position (2-Way for a two-way player with no defensive label: his perimeter
-	// defense with an offensive noun next to it). A pair whose name the checker or a verdict rejects gives way to the next.
-	// (handle and shot creation say about the same thing: his name has the better of the two; so do steals and perimeter
-	// defense)
-	const SAME: Partial<Record<NounKey, NounKey>> = {
-		creator: "handle",
-		handle: "creator",
-		steal: "perimD",
-		perimD: "steal",
-	};
-	// (the end word: his position; Bruiser for a guard or wing whose best is strength; Enigma for a talented player with
-	// no consistency)
-	const enigma = (x.traits?.consistency ?? 100) <= 30 && (x.ovr ?? 0) >= 45;
-	const baseEnd = enigma
-		? "enigma"
-		: group !== "big" && skills[0]?.key === "strength"
-			? "bruiser"
-			: POS_WORD[pos];
-	const endCtxOf = (shown: readonly NounKey[]): EndCtx => ({
-		pct: pctOfKey,
-		r,
-		traits: x.traits,
-		pos,
-		group,
-		elite: (k) => {
-			const sc = scores.find((s) => s.key === k);
-			return sc !== undefined && isElite(sc);
-		},
-		shown,
-		ovr: x.ovr ?? 0,
-		ovrPct: x.ovr === undefined ? 0 : pctOf("ovr", x.ovr, rq),
-	});
-	// (the user's end words: the first that fits the nouns his name shows)
-	const endFor = (shown: readonly NounKey[]) => {
-		if (baseEnd === "enigma" || baseEnd === "bruiser") {
-			return { key: baseEnd as string, covers: undefined };
-		}
-		const ctx = endCtxOf(shown);
-		for (const e of END_WORDS) {
-			if (e.covers !== undefined && !shown.includes(e.covers)) {
-				continue;
-			}
-			if (e.ok(ctx) && !vetoed(ROLE_BY_KEY.get(e.key)?.names[0] ?? "")) {
-				return { key: e.key, covers: e.covers };
-			}
-		}
-		return { key: baseEnd as string, covers: undefined };
-	};
-	const nameOf = (
-		end: string,
-		descs: string[],
-		pick?: Record<string, string>,
-	) =>
-		composeName(
-			ROLE_BY_KEY.get(end)!,
-			descs.map((k) => DESC_BY_KEY.get(k)!),
-			GROUP_OF[pos],
-			pick,
-		);
-	const hasOffense = cleared.slice(0, 3).some((s) => OFFENSE.has(s.key));
-
-	// (archstick: whether a noun's word in last season's name still says him: his elite word while he is elite, else
-	// its plain word, or the sub-rating word unless another sub-rating now leads)
-	const descWordOk = (n: NounKey, d: string): boolean => {
-		const sc = scores.find((s) => s.key === n);
-		if (!sc) {
-			return false;
-		}
-		const el = isElite(sc);
-		if (d === nounWord(n, el, group, r)) {
-			return true;
-		}
-		if (el) {
-			return false;
-		}
-		const w = NOUN_DESC[n];
-		if (d === (w.byGroup?.[group] ?? w.desc)) {
-			return true;
-		}
-		const sw = SUB_WORD[n];
-		if (sw && (!sw.groups || sw.groups.includes(group))) {
-			const k = Object.keys(sw.words).find((key) => sw.words[key] === d);
-			if (k) {
-				const lead = leadSub(r, sw.keys);
-				return lead === undefined || lead === k;
-			}
-		}
-		return false;
-	};
-	// (archstick: last season's noun name, if every rule that builds one still holds: its nouns, front words and end word;
-	// the nouns it names, or undefined)
-	const composedOk = (
-		roleKey: string,
-		descKeys: readonly string[],
-		name: string,
-	): NounKey[] | undefined => {
-		if (young || fewSkills || !okName(name)) {
-			return undefined;
-		}
-		const nouns: NounKey[] = [];
-		for (const d of descKeys) {
-			if (d === "long") {
-				if (!long) {
-					return undefined;
-				}
-			} else if (d === "highlightReel") {
-				if (pctOfKey.jump < 0.85 || pctOfKey.finish < 0.85) {
-					return undefined;
-				}
-				nouns.push("jump", "finish");
-			} else if (d === "twoWay") {
-				if (!twoWay || defense) {
-					return undefined;
-				}
-				nouns.push("perimD");
-			} else {
-				const tk = TRAIT_KEYWORDS.find((t) => t.desc === d);
-				if (tk) {
-					if (tk.over(x, pctOfKey, group) < 0) {
-						return undefined;
-					}
-					continue;
-				}
-				const n = nounOfDesc(d);
-				if (!n || !descWordOk(n, d)) {
-					return undefined;
-				}
-				nouns.push(n);
-			}
-		}
-		if (roleKey === "enigma") {
-			if (!enigma) {
-				return undefined;
-			}
-		} else if (roleKey === "bruiser") {
-			if (group === "big") {
-				return undefined;
-			}
-		} else if (roleKey.startsWith("pos")) {
-			if (roleKey !== POS_WORD[pos]) {
-				return undefined;
-			}
-		} else {
-			const e = END_WORDS.find((w) => w.key === roleKey);
-			if (!e || vetoed(ROLE_BY_KEY.get(e.key)?.names[0] ?? "")) {
-				return undefined;
-			}
-			if (e.covers !== undefined) {
-				nouns.push(e.covers);
-			}
-			if (!e.ok(endCtxOf(nouns))) {
-				return undefined;
-			}
-		}
-		const uniq = [...new Set(nouns)];
-		// (every noun among his four best that his main name may have, no two saying the same thing)
-		const top4 = new Set(cleared.slice(0, 4).map((c) => c.key));
-		if (
-			uniq.length === 0 ||
-			!uniq.every((n) => top4.has(n)) ||
-			uniq.some((n) => SAME[n] !== undefined && uniq.includes(SAME[n]!))
-		) {
-			return undefined;
-		}
-		return uniq;
-	};
-
-	// ---- archstick: last season's label stays while it still passes every rule and is about as good ----
-	// (Labels changed for 48% of player-seasons from one season to the next: only last season's noun pair was sticky.)
-	// Last season's whole label (its main name with its end word, trait words and word variants, a special or the user's
-	// own name, Jack-Of-All-Trades, a trait name, and its defensive label) is kept while every rule that could give it
-	// still holds now (each word's promise, the gates and tests of its kind of name, the user's verdicts) and the nouns it
-	// names stand within STICK_MARGIN (mean standing) of the ones this season's pick names; else this season's pick. A
-	// development or honest name is never kept here: the engine keeps an honest name's words only while he is still the
-	// same kind of honest name. Near ties between his nouns already went to last season's (clearedNouns).
-	const prevMain = prevMainOf(x, pos);
-	const freshNouns = (p: NounPick): NounKey[] | undefined => {
-		switch (p.kind) {
-			case "special":
-			case "composed":
-				return p.nouns;
-			case "trait": {
-				const c = CUSTOM_SPECIALS.find((cs) => cs.key === p.key);
-				if (c) {
-					return c.nouns;
-				}
-				return p.key === "sJack"
-					? skillsAll.slice(0, JACK_CLEARED).map((s) => s.key)
-					: undefined;
-			}
-			default:
-				return undefined;
-		}
-	};
-	const meanPct = (ns: readonly NounKey[]) =>
-		ns.reduce((sum, n) => sum + pctOfKey[n], 0) / Math.max(1, ns.length);
-	const freshId = (p: NounPick) => pickIdOf(p, pos);
-	// (last season's main name as this season's pick, with the defensive label the rules give it; undefined when a rule
-	// now rules it out)
-	const prevPick = (): { pick: NounPick; nouns: NounKey[] } | undefined => {
-		if (!prevMain) {
-			return undefined;
-		}
-		switch (prevMain.kind) {
-			case "custom": {
-				const c = prevMain.c;
-				if (customScore(c) === undefined) {
-					return undefined;
-				}
-				const p = customPickOf(c);
-				return {
-					pick: c.nouns.some((n) => DEF_NOUNS.has(n)) ? p : withDef(p),
-					nouns: c.nouns,
-				};
-			}
-			case "jack":
-				return jackOk()
-					? {
-							pick: { kind: "trait", key: "sJack", name: JACK_NAME, conf: 0.6 },
-							nouns: skillsAll.slice(0, JACK_CLEARED).map((s) => s.key),
-						}
-					: undefined;
-			case "special":
-				return specialOk(prevMain.sp, true)
-					? { pick: specialPick(prevMain.sp), nouns: prevMain.sp.nouns }
-					: undefined;
-			case "keyword": {
-				const role = ROLE_BY_KEY.get(prevMain.role);
-				const name = prevMain.name;
-				const ok =
-					!young &&
-					skills.length === 0 &&
-					role !== undefined &&
-					role.names.includes(name) &&
-					(prevMain.role === "tConnector"
-						? connector(pctOfKey)
-						: TRAIT_KEYWORDS.some(
-								(t) =>
-									t.role === prevMain.role && t.over(x, pctOfKey, group) >= 0,
-							)) &&
-					!vetoed(name) &&
-					fits(name);
-				return ok
-					? {
-							pick: withDef({
-								kind: "trait",
-								key: prevMain.role,
-								name,
-								conf: 0.6,
-							}),
-							nouns: [],
-						}
-					: undefined;
-			}
-			case "composed": {
-				const nouns = composedOk(prevMain.role, prevMain.descs, prevMain.name);
-				if (!nouns) {
-					return undefined;
-				}
-				return {
-					pick: withDef({
-						kind: "composed",
-						descs: [...prevMain.descs],
-						role: prevMain.role as PosWord,
-						nouns,
-						pick: { ...prevMain.pick },
-						conf: confOf(cleared, nouns),
-						keepId: prevMain.id,
-					}),
-					nouns,
-				};
-			}
-		}
-	};
-	const settle = (fresh: NounPick): NounPick => {
-		let out = fresh;
-		// (whether his main name is last season's, and the nouns it names)
-		let mainIsPrev = prevMain !== undefined && prevMain.id === freshId(fresh);
-		let mainNouns = freshNouns(fresh) ?? [];
-		if (prevMain && !mainIsPrev) {
-			const kept = prevPick();
-			const fn = freshNouns(fresh);
-			if (
-				kept &&
-				// (no fewer skills named than this season's pick would name, up to two, unless each skill it leaves out only
-				// just clears its bar)
-				(fn === undefined ||
-					kept.nouns.length >= Math.min(2, fn.length) ||
-					fresh.kind === "trait" ||
-					fn.every(
-						(n) =>
-							kept.nouns.includes(n) || pctOfKey[n] - clearAt(n) < STICK_MARGIN,
-					)) &&
-				// (and about as good: its nouns' mean standing within STICK_MARGIN)
-				(fn === undefined ||
-					fn.length === 0 ||
-					kept.nouns.length === 0 ||
-					meanPct(kept.nouns) >= meanPct(fn) - STICK_MARGIN)
-			) {
-				out = kept.pick;
-				mainIsPrev = true;
-				mainNouns = kept.nouns;
-			}
-		}
-		// His defensive label: last season's while it still holds and its nouns stand within STICK_MARGIN of this season's
-		const pd = x.prev?.defense;
-		if (
-			out.defense &&
-			pd &&
-			pd !== out.defense &&
-			defOk(pd) &&
-			meanPct(defNouns(pd)) >= meanPct(defNouns(out.defense)) - STICK_MARGIN
-		) {
-			out = { ...out, defense: pd };
-		}
-		// No defensive label last season: none this season either while every defensive noun that would name him only
-		// just does (within STICK_MARGIN of the cut) and his main name, last season's, says all his best (no label promises
-		// nothing, and the defensive noun stays out of his name only while it is not his best or what his name would
-		// need among his three best)
-		if (
-			out.defense &&
-			!pd &&
-			mainIsPrev &&
-			x.prev?.id !== undefined &&
-			dList.every((c) => {
-				const fourth = clearedAll[3];
-				const byRank = top3All.has(c.key)
-					? rankPct(c) - (fourth ? rankPct(fourth) : 0)
-					: -Infinity;
-				const byPct = c.pct - Math.max(DEF_LABEL_PCT, bestPct - 0.05);
-				return (
-					c.key !== clearedAll[0]?.key && Math.max(byRank, byPct) < STICK_MARGIN
-				);
-			}) &&
-			mainNouns.every((n) =>
-				clearedAll
-					.slice(0, out.kind === "special" ? 3 : 4)
-					.some((c) => c.key === n),
-			)
-		) {
-			const { defense: _drop, ...rest } = out;
-			out = rest as NounPick;
-		}
-		return out;
-	};
-
-	if (jackPick) {
-		return settle(jackPick);
-	}
-	if (customPick) {
-		return settle(customDef ? customPick : withDef(customPick));
-	}
-
-	// A young player with upside at ovr DEV_MAX_OVR or below: a development name about his best noun (the user's rule)
-	if (young) {
-		return settle(withDef({ kind: "honest", noun: skills[0]?.key, conf: 0.8 }));
-	}
-
-	if (skills.length > 0) {
-		let pick: Special | undefined;
-		let pickScore = -Infinity;
-		for (const sp of specialsAt(pos)) {
-			if (!specialOk(sp)) {
-				continue;
-			}
-			const size = sp.nouns.length + (sp.twoWay ? 1 : 0);
-			const score =
-				size * 10 +
-				sp.nouns.reduce(
-					(sum, n) => sum + top3.find((s) => s.key === n)!.pct,
-					0,
-				) +
-				(x.prev?.special === sp.id ? 1 : 0) -
-				SPREAD_PEN * (x.common?.[sp.id] ?? 0);
-			// (archstick: a tie goes to the name that comes first in the list)
-			if (score > pickScore) {
-				pick = sp;
-				pickScore = score;
-			}
-		}
-		if (pick) {
-			return settle(specialPick(pick));
-		}
-	}
-
-	// One noun at low ovr, or none: a trait name, else an honest one about that noun. (The user: a Raw / Developing /
-	// Project name only at ovr DEV_MAX_OVR or below, or with no noun at all; above it a young player with one skill gets
-	// that skill's specialist name: honest.ts checks the skill before the development names)
-	if (fewSkills) {
-		// (no skill: his strongest trait keyword's end word, or Connector)
-		if (skills.length === 0) {
-			const t = traitKeywordOf(x, pctOfKey, group);
-			const role = t ? ROLE_BY_KEY.get(t.role) : ROLE_BY_KEY.get("tConnector");
-			if (role && (t || connector(pctOfKey))) {
-				const i = Math.min(t?.variant?.(x) ?? 0, role.names.length - 1);
-				const name = role.names[i]!;
-				if (!vetoed(name) && fits(name)) {
-					return settle(
-						withDef({ kind: "trait", key: role.key, name, conf: 0.6 }),
-					);
-				}
-			}
-		}
-		// (no noun in the top 30%: his best in the top 40% still names him, a generic name only below that)
-		const near = scores.find(
-			(s) =>
-				s.key !== "crafty" &&
-				s.pct >= GENERIC_PCT &&
-				!(defense && DEF_NOUNS.has(s.key)),
-		);
-		return settle(
-			withDef({
-				kind: "honest",
-				noun: skills[0]?.key ?? near?.key,
-				conf: skills.length > 0 ? 0.7 : near ? 0.55 : 0.8,
-			}),
-		);
-	}
-
-	const build = (two: NounScore[]) => {
-		const descs: string[] = [];
-		const nouns: NounKey[] = [];
-		// (Highlight-Reel: finishing and leaping both in the top 15% say it in one word)
-		if (
-			two.length === 2 &&
-			two.some((t) => t.key === "jump") &&
-			two.some((t) => t.key === "finish") &&
-			two.every((t) => t.pct >= 0.85)
-		) {
-			return {
-				descs: ["highlightReel"],
-				nouns: two.map((t) => t.key),
-				pick: {} as Record<string, string>,
-			};
-		}
-		for (const s of two) {
-			if (s.key === "perimD" && twoWay && hasOffense && !isElite(s)) {
-				descs.push("twoWay");
-			} else {
-				descs.push(nounWord(s.key, isElite(s), group, r));
-			}
-			nouns.push(s.key);
-		}
-		// (a two-way player whose two words are both offense: 2-Way in front when his defense is among his three best)
-		if (
-			!defense &&
-			twoWay &&
-			!descs.includes("twoWay") &&
-			descs.length === 2 &&
-			nouns.every((n) => OFFENSE.has(n)) &&
-			top3.some((s) => s.key === "perimD")
-		) {
-			descs.unshift("twoWay");
-			descs.pop();
-			nouns.pop();
-			nouns.unshift("perimD");
-		}
-		// (one noun: his strongest trait keyword adds its front word, else his length)
-		const pick: Record<string, string> = {};
-		if (descs.length === 1) {
-			const t = traitKeywordOf(x, pctOfKey, group);
-			const d = t ? DESC_BY_KEY.get(t.desc) : undefined;
-			if (t && d) {
-				descs.unshift(t.desc);
-				const i = Math.min(t.variant?.(x) ?? 0, d.names.length - 1);
-				if (i > 0) {
-					pick[t.desc] = d.names[i]!;
-				}
-			} else if (long) {
-				descs.unshift("long");
-			}
-		}
-		return { descs, nouns, pick };
-	};
-	const top = cleared.slice(0, 4);
-	const tries: NounScore[][] = [];
-	for (let i = 0; i < top.length; i++) {
-		for (let j = i + 1; j < top.length; j++) {
-			if (SAME[top[i]!.key] !== top[j]!.key) {
-				tries.push([top[i]!, top[j]!]);
-			}
-		}
-	}
-	tries.push([skills[0]!]);
-	for (const two of tries) {
-		const end = endFor(two.map((t) => t.key));
-		// (an end word that says one of his nouns says it alone: that noun leaves the front words)
-		const front = end.covers ? two.filter((t) => t.key !== end.covers) : two;
-		const b = build(front.length > 0 ? front : two);
-		const descs = front.length > 0 || !end.covers ? b.descs : ([] as string[]);
-		const nouns = end.covers ? [...new Set([...b.nouns, end.covers])] : b.nouns;
-		if (descs.length === 0) {
-			continue;
-		}
-		if (okName(nameOf(end.key, descs, b.pick))) {
-			return settle(
-				withDef({
-					kind: "composed",
-					descs,
-					role: end.key as PosWord,
-					nouns,
-					pick: b.pick,
-					conf: confOf(cleared, nouns),
-				}),
-			);
-		}
-	}
-	return settle(withDef({ kind: "honest", noun: skills[0]?.key, conf: 0.5 }));
-};
-
-// archstick: how far (mean league standing of the nouns a label names) last season's label may trail this season's
-// pick and still be kept
-export const STICK_MARGIN = 0.05;
 
 // archstick: last season's main name, read back from its id: a special name (a build), the user's own name,
 // Jack-Of-All-Trades, a trait name with no noun, or a noun name (front words and an end word). Undefined for an honest
 // name (the engine keeps those), an id of another size group, or a name the nouns never give.
-type PrevMain = { id: string } & (
+export type PrevMain = { id: string } & (
 	| { kind: "special"; sp: Special }
 	| { kind: "custom"; c: CustomSpecial }
 	| { kind: "jack" }
@@ -3285,7 +2369,7 @@ type PrevMain = { id: string } & (
 	  }
 );
 // (the nouns a near tie goes to, unless the plain order was asked for)
-const tieFavored = (x: NounInput) =>
+export const tieFavored = (x: NounInput) =>
 	x.tie === false ? undefined : favoredNouns(x);
 // archstick: the nouns last season's label named (its main name and its defensive label), which win a near tie
 const favoredNouns = (x: NounInput): ReadonlySet<NounKey> | undefined => {
@@ -3333,7 +2417,7 @@ const favoredNouns = (x: NounInput): ReadonlySet<NounKey> | undefined => {
 	return out.size > 0 ? out : undefined;
 };
 // (the nouns a defensive label says)
-const defLabelNouns = (label: string | undefined): NounKey[] => {
+export const defLabelNouns = (label: string | undefined): NounKey[] => {
 	if (!label) {
 		return [];
 	}
@@ -3355,7 +2439,7 @@ const defLabelNouns = (label: string | undefined): NounKey[] => {
 	}
 	return /Hawk|Menace|Interceptor/.test(base) ? ["steal"] : [];
 };
-const prevMainOf = (x: NounInput, pos: Pos): PrevMain | undefined => {
+export const prevMainOf = (x: NounInput, pos: Pos): PrevMain | undefined => {
 	const id = x.prev?.id;
 	if (!id) {
 		return undefined;
@@ -3404,6 +2488,309 @@ const prevMainOf = (x: NounInput, pos: Pos): PrevMain | undefined => {
 		};
 	}
 	return undefined;
+};
+
+// archcov: why a name was chosen (stored with the label: types.ts ArchetypeReason)
+export type CoverExplain = {
+	skills: NounKey[];
+	pct: number[];
+	weights: number[];
+	gate: string;
+	variant: string;
+	score: number;
+	fit: number;
+	runnerUp?: { name: string; score: number };
+};
+// ---- archcov: the coverage reading (the user's 2064 audit) ----
+// Each noun is read against the league AND against his position group (guards, wings, bigs): its standing is the lower
+// of the two, so a skill counts only when it is good outright and good for his position (a big's rebounding at the
+// league's 78th percentile is only par among bigs). Speed, leaping and strength are modifiers, not skills: they lead a
+// name only when no basketball skill clears its bar, and else may only add a word next to one.
+// A basketball skill may be named from this standing (league and position): its weight in a name's score ramps from
+// nothing here (cover.ts skillWeight), so a skill just over it is named only when nothing better is there
+export const SKILL_BAR = 0.65;
+// ... and is one of his real skills from this one (an honest name below it, a specialist's with one at low ovr)
+export const STRONG_BAR = 0.7;
+// Offensive IQ (Crafty, a style) clears higher
+export const CRAFTY_BAR = 0.75;
+export const CRAFTY_STRONG = 0.8;
+// The athletic nouns: modifiers
+export const ATH_KEYS: ReadonlySet<NounKey> = new Set([
+	"speed",
+	"jump",
+	"strength",
+]);
+// An athletic noun leads a name (no basketball skill clears) from this standing
+export const ATH_LEAD_BAR = 0.7;
+// ... and is a word next to a skill from this one
+export const ATH_WORD_BAR = 0.85;
+// archcov: hysteresis: last season's label is re-checked with every standing this much higher (and an honest name, or no
+// defensive tag, this much lower), so a label is lost only to a real change, not to a point of noise in the ratings
+export const STICK_BOOST = 0.02;
+// A defensive skill outside the main name gives a defensive tag from this standing (or as his second-best skill)
+export const DEF_TAG_PCT = 0.85;
+// A name's skills must be among his best TOP_N (and include his best one)
+export const TOP_N = 4;
+export const coverBar = (k: NounKey) =>
+	k === "crafty" ? CRAFTY_BAR : ATH_KEYS.has(k) ? ATH_LEAD_BAR : SKILL_BAR;
+export const strongBar = (k: NounKey) =>
+	k === "crafty" ? CRAFTY_STRONG : STRONG_BAR;
+
+export type CoverScore = NounScore & {
+	// his standing in the league and among his position group (pct: the lower of the two)
+	league: number;
+	group: number;
+};
+const groupTable = (
+	group: PosGroup,
+	k: NounKey,
+	ng?: NounGroupQuantiles,
+): number[] | undefined => ng?.[group]?.[k] ?? NOUN_GROUP_REF[group]?.[k];
+const byCover = (
+	at: (s: CoverScore) => number = (s) => s.pct,
+): ((a: CoverScore, b: CoverScore) => number) => {
+	return (a, b) =>
+		at(b) - at(a) ||
+		b.league + b.group - (a.league + a.group) ||
+		b.above - a.above ||
+		NOUNS.indexOf(a.key) - NOUNS.indexOf(b.key);
+};
+// Every noun's standing (league, position group, and the lower of the two), best first
+export const coverScores = (
+	r: ArchetypeRatings,
+	pos: Pos,
+	rq?: RatingQuantiles,
+	ng?: NounGroupQuantiles,
+	// archcov: every standing moved by this much (the slack a last-season label is re-checked with: nouns.ts STICK_BOOST)
+	shift = 0,
+): CoverScore[] => {
+	const group = groupOfPos(pos);
+	// (archcov: the league standing against the league's own table of the noun's value; without the league's tables, a
+	// league's rating tables when given, else the reference league's values)
+	return nounScores(r, rq)
+		.map((s) => {
+			const lt =
+				ng?.all?.[s.key] ?? (rq ? undefined : NOUN_GROUP_REF.all?.[s.key]);
+			const l = lt ? percentileIn(lt, s.value) : s.pct;
+			const t = groupTable(group, s.key, ng);
+			const g0 = t ? percentileIn(t, s.value) : l;
+			const league = Math.max(0, Math.min(1, l + shift));
+			const g = Math.max(0, Math.min(1, g0 + shift));
+			return { ...s, league, group: g, pct: Math.min(league, g) };
+		})
+		.sort(byCover());
+};
+// His basketball skills that clear their bar, best first; a near tie (STICK_TIE) goes to the nouns last season's label
+// named
+export const coverSkills = (
+	scores: readonly CoverScore[],
+	favored?: ReadonlySet<NounKey>,
+): CoverScore[] =>
+	scores
+		.filter((s) => !ATH_KEYS.has(s.key) && s.pct >= coverBar(s.key))
+		.sort(byCover((s) => s.pct + (favored?.has(s.key) ? STICK_TIE : 0)));
+
+export type CoverCtx = {
+	// standing (lower of league and position) and league standing
+	pct: (k: NounKey) => number;
+	league: (k: NounKey) => number;
+	// his basketball skills that may be named, best first, and how many of them are real skills (strongBar)
+	skills: NounKey[];
+	strong: NounKey[];
+	// his athletic nouns at the lead bar, best first
+	ath: NounKey[];
+	traits?: Record<string, number>;
+	eliteOvr: boolean;
+	mobile: boolean;
+	ovr: number;
+	upside: boolean;
+	crtPct?: number;
+};
+export const coverCtxOf = (x: NounInput): CoverCtx => {
+	const scores = coverScores(x.r, x.pos, x.rq, x.ng, x.slack);
+	const pct = Object.fromEntries(scores.map((s) => [s.key, s.pct])) as Record<
+		NounKey,
+		number
+	>;
+	const league = Object.fromEntries(
+		scores.map((s) => [s.key, s.league]),
+	) as Record<NounKey, number>;
+	const crt = sub(x.r, "crt");
+	return {
+		pct: (k) => pct[k],
+		league: (k) => league[k],
+		skills: coverSkills(scores, tieFavored(x)).map((s) => s.key),
+		strong: coverSkills(scores, tieFavored(x))
+			.filter((s) => s.pct >= strongBar(s.key))
+			.map((s) => s.key),
+		ath: scores
+			.filter((s) => ATH_KEYS.has(s.key) && s.pct >= ATH_LEAD_BAR)
+			.map((s) => s.key),
+		...(x.traits ? { traits: x.traits } : {}),
+		eliteOvr: eliteOvrOf(x.ovr, x.rq),
+		mobile: mobile(x.r, x.rq),
+		ovr: x.ovr ?? 99,
+		upside: hasUpside(x),
+		...(crt === undefined ? {} : { crtPct: pctOf("drb", crt, x.rq) }),
+	};
+};
+// (handle and shot creation stand in for each other where a name's skill must be among his best)
+const EQUIV: Partial<Record<NounKey, NounKey>> = {
+	creator: "handle",
+	handle: "creator",
+};
+// The rank of a skill among his best (Infinity when it doesn't clear)
+export const skillRank = (c: CoverCtx, n: NounKey): number => {
+	const i = c.skills.indexOf(n);
+	const e = EQUIV[n];
+	const j = e ? c.skills.indexOf(e) : -1;
+	const best = Math.min(i < 0 ? Infinity : i, j < 0 ? Infinity : j);
+	return best;
+};
+const WHY_NOUN: Record<NounKey, string> = {
+	three: "3PT",
+	mid: "mid-range",
+	post: "post scoring",
+	finish: "finishing",
+	rimD: "rim protection",
+	perimD: "perimeter D",
+	steal: "steals",
+	handle: "ball handling",
+	creator: "shot creation",
+	pass: "passing",
+	reb: "rebounding",
+	speed: "speed",
+	jump: "leaping",
+	strength: "strength",
+	crafty: "offensive IQ",
+};
+// archcov: what a name promises, from its own skill list (every kind of name has one: a special name's skills, a noun
+// name's front and end words, an honest name's skill, a defensive label's), so a name's promises never drift from what
+// it is about: each skill clears (league and position) and is among his best TOP_N; an athletic noun is a modifier (the
+// lead bar with no skill, else the word bar, and never alone next to a skill). Then the words that are no skill: trait
+// words, elite words, development words, and the checks (a Gunner's jumper among the name's skills, 2-Way, Lockdown's
+// mobility, a high flyer's finishing, Jack's breadth).
+export const coverPromises = (
+	name: string,
+	list: readonly NounKey[],
+	c: CoverCtx,
+	// (an honest name: its skill was checked on its own, honestPromises)
+	honest = false,
+): string[] => {
+	const out: string[] = [];
+	const skillN = honest ? [] : list.filter((n) => !ATH_KEYS.has(n));
+	const athN = honest ? [] : list.filter((n) => ATH_KEYS.has(n));
+	for (const n of skillN) {
+		const rank = skillRank(c, n);
+		if (rank === Infinity) {
+			out.push(
+				`${WHY_NOUN[n]}: not in the top ${Math.round(100 * (1 - coverBar(n)))}% (league and position)`,
+			);
+		} else if (rank >= TOP_N) {
+			out.push(`${WHY_NOUN[n]}: not one of his ${TOP_N} best`);
+		}
+	}
+	const athBar = c.strong.length === 0 ? ATH_LEAD_BAR : ATH_WORD_BAR;
+	for (const n of athN) {
+		if (c.pct(n) < athBar) {
+			out.push(
+				`${WHY_NOUN[n]} (a modifier): not in the top ${Math.round(100 * (1 - athBar))}%`,
+			);
+		}
+	}
+	if (athN.length > 0 && skillN.length === 0 && c.strong.length > 0) {
+		out.push(
+			`names his athleticism only (his best: ${WHY_NOUN[c.strong[0]!]})`,
+		);
+	}
+	const nctx: NameCtx = {
+		cleared: new Set(c.strong),
+		top3: new Set(c.skills.slice(0, 3)),
+		pct: c.pct,
+		...(c.crtPct === undefined ? {} : { crtPct: c.crtPct }),
+		...(c.traits ? { traits: c.traits } : {}),
+		eliteOvr: c.eliteOvr,
+		mobile: c.mobile,
+		ovr: c.ovr,
+		upside: c.upside,
+	};
+	for (const w of WORD_REQ) {
+		if (!w.re.test(name) || "nouns" in w) {
+			continue;
+		}
+		if ("any" in w) {
+			if (!w.any.some((n) => list.includes(n))) {
+				out.push(`${w.why}: none among the name's skills`);
+			}
+		} else if ("trait" in w) {
+			if ((c.traits?.[w.trait] ?? -Infinity) < w.min) {
+				out.push(`${w.why}: trait below ${w.min}`);
+			}
+		} else if (!w.check(nctx)) {
+			out.push(`needs ${w.why}`);
+		}
+	}
+	return out;
+};
+// An honest name's promises: it is about the skill (or the lack of one) it was picked for, that skill in the league's
+// top 40% at least (it is a limited player's name, and says so), and its other words keep theirs
+export const honestPromises = (
+	key: string,
+	name: string,
+	noun: NounKey | undefined,
+	c: CoverCtx,
+): string[] => {
+	const about = HONEST_NOUNS[key] ?? ["none"];
+	const out: string[] = [];
+	if (noun === undefined) {
+		if (!about.includes("none")) {
+			out.push(`about ${about.join(" or ")}, with no skill to name`);
+		}
+	} else if (!about.includes(noun)) {
+		out.push(`about ${about.join(" or ")}, not his ${WHY_NOUN[noun]}`);
+	} else if (c.pct(noun) < GENERIC_PCT) {
+		out.push(`${WHY_NOUN[noun]}: not in the top 40% (league and position)`);
+	}
+	return [...out, ...coverPromises(name, noun ? [noun] : [], c, true)];
+};
+// The promises of a name with no list of its own, for reports: its skill words read as its list
+export const wordNouns = (name: string): NounKey[] => {
+	const out = new Set<NounKey>();
+	for (const w of WORD_REQ) {
+		if ("nouns" in w && w.re.test(name)) {
+			for (const n of w.nouns) {
+				out.add(n);
+			}
+		}
+	}
+	return [...out];
+};
+// The promises (in words) a name with this skill list makes, for the names CSV
+export const listPromiseText = (
+	name: string,
+	list: readonly NounKey[],
+): string[] => {
+	const out: string[] = [];
+	for (const n of list) {
+		out.push(
+			ATH_KEYS.has(n)
+				? `${WHY_NOUN[n]} (a modifier) top ${Math.round(100 * (1 - ATH_WORD_BAR))}%, or top ${Math.round(100 * (1 - ATH_LEAD_BAR))}% with no skill`
+				: `${WHY_NOUN[n]} top ${Math.round(100 * (1 - coverBar(n)))}% (league and position) and one of his ${TOP_N} best`,
+		);
+	}
+	for (const w of WORD_REQ) {
+		if (!w.re.test(name) || "nouns" in w) {
+			continue;
+		}
+		out.push(
+			"any" in w
+				? `${w.why}: one of ${w.any.map((n) => WHY_NOUN[n]).join(", ")} among the name's skills`
+				: "trait" in w
+					? `trait ${w.trait} ${w.min}+`
+					: w.why,
+		);
+	}
+	return out;
 };
 
 // The nouns a name says (a build's, a composed name's), for reports: undefined when a word of it is no noun

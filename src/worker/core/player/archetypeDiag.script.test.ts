@@ -24,8 +24,8 @@ import { ratingQuantiles } from "../../../common/archetypes/v2/gateScale.ts";
 import {
 	nounScores,
 	nounsOfName,
-	pickNouns,
 } from "../../../common/archetypes/v2/nouns.ts";
+import { pickNouns } from "../../../common/archetypes/v2/cover.ts";
 import { ELITE_RE } from "../../../common/archetypes/v2/honest.ts";
 import { SUB_DEFS } from "../../../common/subRatings.ts";
 import { OFF, runLeague } from "../../../test/ratingInflation/harness.ts";
@@ -658,6 +658,7 @@ test.skipIf(!OUT)(
 						age: season - p.born.year,
 						traits,
 						rq,
+						...(norms.ng ? { ng: norms.ng } : {}),
 						...(norms.common ? { common: norms.common } : {}),
 					});
 					const h = (p.archetypes ?? [])

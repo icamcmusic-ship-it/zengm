@@ -18,8 +18,12 @@ import {
 	END_WORDS,
 	NOUN_DESC,
 	TRAIT_KEYWORDS,
-	WORD_REQ,
+	defLabelNouns,
+	HONEST_NOUNS,
+	listPromiseText,
 	specialNounsOf,
+	wordNouns,
+	type NounKey,
 } from "./nouns.ts";
 import { mergedId } from "../merges.data.ts";
 
@@ -98,18 +102,25 @@ const plain = (fn: unknown): string =>
 		.replace(/ \|\| /g, " or ")
 		.replace(/c\.|\(c\)/g, "")
 		.trim();
-const promises = (name: string) =>
-	WORD_REQ.filter((w) => w.re.test(name))
-		.map((w) =>
-			"nouns" in w
-				? `${w.why} top 30% and one of his 3 best`
-				: "any" in w
-					? `${w.why}: one in the top 30%`
-					: "trait" in w
-						? `trait ${w.trait} ${w.min}+`
-						: w.why,
-		)
-		.join("; ");
+// archcov: a name's promises are generated from its own skill list (nouns.ts listPromiseText): its skills, then the
+// words that are no skill (traits, elite, checks). With no list given, the list its skill words imply.
+const promises = (name: string, list?: readonly NounKey[]) =>
+	listPromiseText(name, list ?? wordNouns(name)).join("; ");
+// (names whose words imply a skill their own list doesn't have: the old word-by-word promises contradicted them)
+const contradictions: string[] = [];
+const checkWords = (name: string, list: readonly NounKey[]) => {
+	const extra = wordNouns(name).filter(
+		(n) =>
+			!list.includes(n) &&
+			!(n === "handle" && list.includes("creator")) &&
+			!(n === "creator" && list.includes("handle")),
+	);
+	if (extra.length > 0) {
+		contradictions.push(
+			`${name}: words say ${extra.join(", ")}; skills ${list.join(", ")}`,
+		);
+	}
+};
 const csv = (rows: unknown[][]) =>
 	rows
 		.map((r) =>
@@ -170,8 +181,8 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 				forms,
 				"noun front word",
 				"any",
-				`${LABEL[k]} in the league's top 30% and among his three best skills${k === "jump" ? " (leaping: top 10%, ranked a little below a skill at the same standing)" : ""}${w.elite ? "; elite form: elite OVR (league top 10%, 55+) and top 8% at it" : ""}`,
-				promises(word(w.desc)),
+				`${LABEL[k]}: standing (the lower of league and position) at the 65th percentile or better, weight ramping from the 60th to the 80th, among his four best skills${["speed", "jump", "strength"].includes(k) ? " (a modifier: leads a name only with no basketball skill at the 70th, else a word next to a skill from the 85th)" : ""}${w.elite ? "; elite form: elite OVR (league top 10%, 55+) and top 8% at it" : ""}`,
+				promises(word(w.desc), [k as NounKey]),
 			]);
 		}
 		for (const [d, k] of [
@@ -279,14 +290,15 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 			const names = [
 				...new Set([r.names[0], ...Object.values(r.byGroup ?? {})]),
 			].join(" / ");
+			checkWords(names, c.nouns);
 			rows.push([
 				`v2:${c.key}:<${GROUP}>`,
 				c.key,
 				names,
 				`special (the user's own)${ELITE_RE.test(names) ? " (elite)" : ""}`,
 				c.positions.join("/"),
-				`${plain(c.test)}; ${c.anyBest ? "a many-skills name (need not have his best skill, never over a top-7% standout)" : `its skills (${c.nouns.map((n) => LABEL[n]).join(", ")}) among his three best and with his best`}`,
-				promises(names),
+				`${plain(c.test)}; ${c.anyBest ? "a many-skills name (need not have his best skill, never over a top-7% standout)" : `its skills (${c.nouns.map((n) => LABEL[n]).join(", ")}) among his four best and with his best`}`,
+				promises(names, c.anyBest ? [] : c.nouns),
 			]);
 		}
 		rows.push([
@@ -295,8 +307,8 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 			"Jack-Of-All-Trades",
 			"special (the user's own)",
 			"any",
-			"4+ skills in the top 30%, none in the top 10%, OVR 45+, not a young player with upside at OVR 30-",
-			promises("Jack-Of-All-Trades"),
+			"4+ real skills (70th percentile, league and position), his 4th at the 85th, OVR 45+; it covers each skill about half way, so it wins only when no specific name covers his best two",
+			promises("Jack-Of-All-Trades", []),
 		]);
 		const seen = new Set<string>();
 		for (const a of ARCHETYPES) {
@@ -310,6 +322,7 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 					continue;
 				}
 				seen.add(`${a.id}|${n}`);
+				checkWords(n, sn.nouns);
 				const ps = a.positions.filter((q) => nameAt(a, q) === n);
 				rows.push([
 					a.id,
@@ -317,15 +330,19 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 					n,
 					`special (build)${ELITE_RE.test(n) ? " (elite)" : ""}`,
 					ps.join("/"),
-					`${sn.twoWay ? "2-Way (perimeter or rim D 60+ and top 40%, no defensive label); " : ""}its skills (${sn.nouns.map((x) => LABEL[x]).join(", ")}) all among his three best, with his best${ELITE_RE.test(n) ? "; elite OVR and top 8% at its first skill" : ""}`,
-					promises(n),
+					`${sn.twoWay ? "2-Way (perimeter or rim D 60+ and top 40%); " : ""}its skills (${sn.nouns.map((x) => LABEL[x]).join(", ")}) all among his four best, with his best${ELITE_RE.test(n) ? "; elite OVR and top 8% at its first skill" : ""}`,
+					promises(n, sn.nouns),
 				]);
 			}
 		}
 		for (const h of HONEST_ROLES) {
 			const r = ROLE_BY_KEY.get(h.key);
 			const names = r?.names ?? h.names;
+			const about = (HONEST_NOUNS[h.key] ?? ["none"]).filter(
+				(x) => x !== "none",
+			) as NounKey[];
 			names.forEach((n, i) => {
+				checkWords(n, about);
 				rows.push([
 					`v2:${h.key}:<${GROUP}>${i > 0 ? `:${h.key}=${i}` : ""}`,
 					h.key,
@@ -335,8 +352,13 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 						.filter(([, ns]) => (ns as string[]).includes(n))
 						.map(([g]) => g)
 						.join("/") || "any",
-					`${h.desc} (one skill at OVR under 50, or none; development names at OVR 30 or below with upside)`,
-					promises(n),
+					`${h.desc} (no real skill, or one at OVR under 50 with no modifier; development names at OVR 30 or below with upside)`,
+					[
+						about.length > 0
+							? `about his ${about.join(" or ")} (league and position top 40%), or no skill at all`
+							: "about no skill",
+						...listPromiseText(n, []),
+					].join("; "),
 				]);
 			});
 		}
@@ -347,11 +369,14 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 				`${n} (may take Long: wingspan 7+ over height; or Switchable: defensiveVersatility 70+)`,
 				"defensive",
 				"any",
-				`${DEF_GATE[n] ?? t.desc}; a defensive skill among his three best, or top 15% within 0.05 of his best`,
-				promises(n),
+				`${DEF_GATE[n] ?? t.desc}; a defensive tag: a defensive skill at the league's 85th percentile (or his second best) that his main name doesn't name`,
+				promises(n, defLabelNouns(n)),
 			]);
 		}
 		writeFileSync(process.env.RUN_ARCH_NAMES, csv(rows));
+		console.log(
+			`names whose words imply a skill not on their own list (promises now come from the list): ${contradictions.length}\n${contradictions.join("\n")}`,
+		);
 
 		if (process.env.ARCH_NAMES_IDS) {
 			const ids = new Map<string, string>();

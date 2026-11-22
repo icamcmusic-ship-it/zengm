@@ -321,7 +321,10 @@ test.skipIf(!DIR)(
 					...saidNouns(main!),
 					...(def ? saidNouns(def) : []),
 				]);
-				const b0 = x.best[0];
+				// (archcov, AUDIT_COVER=1: under the redesign speed, leaping and strength are modifiers, never his "best skill")
+				const b0 = process.env.AUDIT_COVER
+					? x.best.find((b) => !["speed", "jump", "strength"].includes(b.noun))
+					: x.best[0];
 				// (a development name is about his tools and upside, not one skill)
 				if (
 					b0 &&

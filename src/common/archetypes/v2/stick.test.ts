@@ -5,13 +5,14 @@ import type { ArchetypeRatings, Pos } from "../types.ts";
 import { classifyV2 } from "./engine.ts";
 import { composedId, isComposedId, ROLE_BY_KEY } from "./grammar.ts";
 import {
-	clearedNouns,
-	nameCtxOf,
-	namePromises,
+	coverCtxOf,
+	coverPromises,
+	coverSkills,
 	nounScores,
 	NOUNS,
-	type NounScore,
+	type CoverScore,
 } from "./nouns.ts";
+import { pickNouns } from "./cover.ts";
 
 const KEYS = [
 	"hgt",
@@ -109,7 +110,7 @@ describe("archstick: sticky labels", () => {
 				main === a.label.split(" · ")[0]
 			) {
 				kept++;
-				const ctx = nameCtxOf({
+				const x = {
 					r: r2,
 					pos: opts.pos,
 					ovr: opts.ovr,
@@ -119,8 +120,13 @@ describe("archstick: sticky labels", () => {
 						id: isComposedId(a.id) ? a.id : mergedId(a.id),
 						...(a.defense ? { defense: a.defense } : {}),
 					},
-				});
-				assert.deepEqual(namePromises(main, ctx), [], `player ${i}: ${main}`);
+				};
+				const p = pickNouns(x);
+				assert.deepEqual(
+					coverPromises(main, p.main ?? [], coverCtxOf(x)),
+					[],
+					`player ${i}: ${main}`,
+				);
 			}
 		}
 		assert.isAbove(kept, 0);
@@ -155,15 +161,17 @@ describe("archstick: sticky labels", () => {
 	});
 
 	test("ties are broken the same way every time, and a near tie goes to last season's noun", () => {
-		const s = (key: (typeof NOUNS)[number], pct: number): NounScore => ({
+		const s = (key: (typeof NOUNS)[number], pct: number): CoverScore => ({
 			key,
 			value: 70,
 			pct,
+			league: pct,
+			group: pct,
 			above: 0,
 		});
 		const scores = [s("reb", 0.8), s("three", 0.8), s("pass", 0.8)];
-		const order = (xs: NounScore[], fav?: Set<(typeof NOUNS)[number]>) =>
-			clearedNouns(xs, fav).map((x) => x.key);
+		const order = (xs: CoverScore[], fav?: Set<(typeof NOUNS)[number]>) =>
+			coverSkills(xs, fav).map((x) => x.key);
 		const want = [...scores]
 			.map((x) => x.key)
 			.sort((a, b) => NOUNS.indexOf(a) - NOUNS.indexOf(b));

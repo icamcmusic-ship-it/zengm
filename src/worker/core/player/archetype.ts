@@ -93,6 +93,7 @@ import {
 } from "./archetypeFeedback.ts";
 import { pickKey } from "../../../common/archetypes/v2/picks.ts";
 import { ratingQuantiles } from "../../../common/archetypes/v2/gateScale.ts";
+import { nounGroupQuantiles } from "../../../common/archetypes/v2/nouns.ts";
 
 // archfb: the shipped model with the user's tuning on top, or undefined (the shipped model) with no tuning
 export const tunedModelFor = (
@@ -360,8 +361,9 @@ export const getLeagueNorms = async (force = false): Promise<Norms> => {
 	}
 	if (rows.length >= MIN_LEAGUE_FOR_NORMS) {
 		const q = ratingQuantiles(rows);
-		// (archnouns: the nouns' standings, in every league)
+		// (archnouns: the nouns' standings, in every league; archcov: and among his position group)
 		norms.nq = q;
+		norms.ng = nounGroupQuantiles(rows);
 		if (
 			players.filter((p) => p.srID !== undefined).length >=
 			players.length / 2
@@ -789,6 +791,46 @@ export type PlayerArchetypeInfo = {
 	gameLabel?: string;
 };
 
+// archcov: the stored reason in words (no numbers: the no-visible-ratings challenge hides them)
+const REASON_WORDS: Record<string, string> = {
+	three: "3-point shooting",
+	mid: "mid-range shooting",
+	post: "post scoring",
+	finish: "finishing",
+	rimD: "rim protection",
+	perimD: "perimeter defense",
+	steal: "steals",
+	handle: "ball handling",
+	creator: "shot creation",
+	pass: "passing",
+	reb: "rebounding",
+	speed: "speed",
+	jump: "leaping",
+	strength: "strength",
+	crafty: "basketball IQ",
+};
+export const reasonLine = (
+	r: NonNullable<StoredArchetype["why"]>,
+): string | undefined => {
+	const words = r.skills
+		.map((k) => REASON_WORDS[k])
+		.filter((w): w is string => w !== undefined);
+	if (words.length === 0) {
+		return undefined;
+	}
+	const list =
+		words.length === 1
+			? words[0]!
+			: `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+	const kept =
+		r.variant === "kept from last season" ? " (kept from last season)" : "";
+	const other =
+		r.runnerUp && !r.runnerUp.name.startsWith("(")
+			? `; the closest other name: ${r.runnerUp.name}`
+			: "";
+	return `Named for his ${list}${kept}${other}.`;
+};
+
 // Everything the player page shows. A non-prospect with no entry gets one stored here, once.
 export const archetypeInfoForPlayer = async (
 	p: Player,
@@ -855,6 +897,14 @@ export const archetypeInfoForPlayer = async (
 	// archnouns: the defensive label's own why line, after the main label's
 	if (v.defense) {
 		whyList = [...(whyList ?? []), defenseWhy(v.defense)];
+	}
+	// archcov: why this name and not another (the reason stored with the label), in words
+	const reason = found.stored ? currentEntry(p.archetypes)?.why : undefined;
+	if (reason) {
+		const line = reasonLine(reason);
+		if (line) {
+			whyList = [...(whyList ?? []), line];
+		}
 	}
 	const mode = archetypeLabelSource();
 	const tk =

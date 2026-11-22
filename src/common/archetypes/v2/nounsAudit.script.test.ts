@@ -149,7 +149,10 @@ test.skipIf(!DIR)(
 				});
 				const name = c.label;
 				const why: string[] = [];
-				const bestNoun = x.best[0];
+				// (archcov, AUDIT_COVER=1: under the redesign speed, leaping and strength are modifiers, never his "best skill")
+				const bestNoun = process.env.AUDIT_COVER
+					? x.best.find((b) => !["speed", "jump", "strength"].includes(b.noun))
+					: x.best[0];
 				const top3 = new Set(x.best.map((b) => b.noun));
 				const nn = nounsOfName(name);
 				if (ELITE_RE.test(name) && x.ovr < 58) {
