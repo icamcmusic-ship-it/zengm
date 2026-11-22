@@ -8,9 +8,9 @@ import { useLocal } from "../util/local.ts";
 import { toWorker } from "../util/toWorker.ts";
 import {
 	ProjectionCells,
-	verdictClass,
 	type ProProjectionData,
 } from "../components/ProProjection.tsx";
+import { draftOutlook, outlookClass } from "../../common/draftOutlook.ts";
 import { PHASE } from "../../common/constants.ts";
 
 type MockResult = Awaited<ReturnType<typeof runMock>>;
@@ -80,6 +80,8 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 	}
 
 	const picks = result?.picks ?? [];
+	// Picks per round (the most picks numbered in any round), for each pick's overall slot
+	const picksPerRound = Math.max(1, ...picks.map((p) => p.pick));
 
 	return (
 		<>
@@ -166,6 +168,13 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 							{picks.map((pick, i) => {
 								const mine = userTids.includes(pick.tid);
 								const projection = projections[pick.pid];
+								const outlook = projection
+									? draftOutlook(
+											projection.peak,
+											(pick.round - 1) * picksPerRound + pick.pick,
+											picksPerRound,
+										)
+									: undefined;
 								return (
 									<tr
 										key={pick.pid}
@@ -234,15 +243,28 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 										<ProjectionCells
 											projection={projection}
 											hidePeak={challengeNoRatings}
+											noBust={pick.round >= 2}
 										/>
-										<td
-											className={
-												projection
-													? verdictClass(projection.verdict)
-													: undefined
-											}
-										>
-											{projection?.verdict}
+										<td className="text-nowrap">
+											{outlook ? (
+												<>
+													<span className={outlookClass(outlook.kind)}>
+														{outlook.label}
+													</span>
+													{outlook.slot ? (
+														<div
+															className={`small ${outlookClass(outlook.slot.kind) ?? "text-body-secondary"}`}
+															title={
+																challengeNoRatings
+																	? undefined
+																	: `A pick here usually peaks around ${Math.round(outlook.slot.expected)} ovr`
+															}
+														>
+															{outlook.slot.label}
+														</div>
+													) : null}
+												</>
+											) : null}
 										</td>
 									</tr>
 								);

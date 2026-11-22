@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { toWorker } from "../util/toWorker.ts";
 import { useFeatureOn } from "../util/nativeFeatures.ts";
 import { useLocal } from "../util/local.ts";
+import { draftOutlook, outlookClass } from "../../common/draftOutlook.ts";
 
 export type ProProjectionData = Awaited<
 	ReturnType<typeof getProjections>
@@ -25,8 +26,11 @@ export const verdictClass = (verdict: string) =>
 export const ProjectionCells = ({
 	projection,
 	hidePeak,
+	noBust,
 }: {
 	projection: ProProjectionData | undefined;
+	// A second-round pick: no bust odds (little is expected of him)
+	noBust?: boolean;
 	// No visible ratings challenge: the peak is an ovr
 	hidePeak?: boolean;
 }) => {
@@ -56,7 +60,14 @@ export const ProjectionCells = ({
 			)}
 			<td>{pct(projection.starPct)}</td>
 			<td>{pct(projection.starterPct)}</td>
-			<td>{pct(projection.bustPct)}</td>
+			<td
+				className={noBust ? "text-body-secondary" : undefined}
+				title={
+					noBust ? "Second-round picks are not graded as busts" : undefined
+				}
+			>
+				{noBust ? "—" : pct(projection.bustPct)}
+			</td>
 		</>
 	);
 };
@@ -89,6 +100,10 @@ export const ProProjectionSection = ({ pid }: { pid: number }) => {
 	if (!on || projection === undefined) {
 		return null;
 	}
+	// Before he is picked there is no slot, so a low projection reads as a long shot, never a bust
+	const outlook = projection
+		? draftOutlook(projection.peak, undefined, 30)
+		: undefined;
 
 	return (
 		<div className="mb-3" style={{ maxWidth: 520 }}>
@@ -99,8 +114,8 @@ export const ProProjectionSection = ({ pid }: { pid: number }) => {
 				<>
 					<p className="mb-2">
 						Projects as a{" "}
-						<span className={verdictClass(projection.verdict)}>
-							{projection.verdict.toLowerCase()}
+						<span className={outlookClass(outlook!.kind)}>
+							{outlook!.label.toLowerCase()}
 						</span>
 						:{" "}
 						{challengeNoRatings
