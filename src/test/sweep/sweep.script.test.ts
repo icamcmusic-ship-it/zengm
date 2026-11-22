@@ -3,7 +3,8 @@
 // Runtime bug sweep: creates leagues the way the New League page does and auto plays them through every phase (all teams by the
 // AI), then checks the stored data and renders every worker view. Opt in with
 //   RUN_SWEEP=1 npx vitest run --project basketball src/test/sweep/sweep.script.test.ts
-// SWEEP_CONFIGS=random,real,college,unusual picks the leagues (default all), SWEEP_SEASONS the random league's seasons (default 6),
+// SWEEP_CONFIGS=random,real,college,unusual picks the leagues (default those four; also allon: every League extra on, alloff: every
+// one off, SWEEP_SEASONS_EXTRA seasons each, default 3), SWEEP_SEASONS the random league's seasons (default 6),
 // SWEEP_OUT=<file> writes the JSON report there (default: printed). SWEEP_VIEWS=0 skips the view renders.
 import "fake-indexeddb/auto";
 import { appendFileSync, writeFileSync } from "node:fs";
@@ -14,6 +15,7 @@ import {
 	PLAYER,
 } from "../../common/constants.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
+import { NATIVE_FEATURES } from "../../../common/nativeFeatures.ts";
 import { makeSeededRandom } from "../../common/random.ts";
 import { last } from "../../common/utils.ts";
 import { getCurrentContract } from "../../common/contracts.ts";
@@ -1310,6 +1312,33 @@ test.skipIf(!process.env.RUN_SWEEP)(
 						divs,
 					});
 					await sweepLeague({ config: "college", issues, seasons: 1 });
+				});
+			}
+			// Every League extra on, and every one off (most are on or off by default, so these reach the code the others don't)
+			for (const [config, on, seed] of [
+				["allon", true, 5],
+				["alloff", false, 6],
+			] as const) {
+				if (!configs.includes(config)) {
+					continue;
+				}
+				currentConfig = config;
+				Math.random = makeSeededRandom(seed);
+				await runConfig(config, issues, async () => {
+					const settings: any = getDefaultSettings();
+					for (const f of NATIVE_FEATURES) {
+						settings[f.key] = on;
+					}
+					await createLeague({
+						lid: config === "allon" ? 104 : 105,
+						name: `sweep ${config}`,
+						settings,
+					});
+					await sweepLeague({
+						config,
+						issues,
+						seasons: Number(process.env.SWEEP_SEASONS_EXTRA ?? 3),
+					});
 				});
 			}
 			if (configs.includes("unusual")) {
