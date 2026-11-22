@@ -5,6 +5,7 @@
 //   RUN_SWEEP=1 npx vitest run --project basketball src/test/sweep/sweep.script.test.ts
 // SWEEP_CONFIGS=random,real,college,unusual picks the leagues (default those four; also allon: every League extra on, alloff: every
 // one off, SWEEP_SEASONS_EXTRA seasons each, default 3), SWEEP_SEASONS the random league's seasons (default 6),
+// SWEEP_REAL_SEASONS the real players league's (default 1),
 // SWEEP_OUT=<file> writes the JSON report there (default: printed). SWEEP_VIEWS=0 skips the view renders.
 import "fake-indexeddb/auto";
 import { appendFileSync, writeFileSync } from "node:fs";
@@ -1292,7 +1293,11 @@ test.skipIf(!process.env.RUN_SWEEP)(
 						realLeague,
 						getLeagueOptions,
 					});
-					await sweepLeague({ config: "real", issues, seasons: 1 });
+					await sweepLeague({
+						config: "real",
+						issues,
+						seasons: Number(process.env.SWEEP_REAL_SEASONS ?? 1),
+					});
 				});
 			}
 			if (configs.includes("college")) {
