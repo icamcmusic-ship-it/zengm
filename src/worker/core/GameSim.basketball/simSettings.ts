@@ -176,8 +176,9 @@ export const SIM_FIX_LEFTY = { make: 0.012, sameHand: 0.3, drive: 1.04 };
 // percentages stay put at the base shares) and block multiplier.
 // - base: [open, heavily contested] shares at z = 0, by shot type (three, mid-range, at the rim, post-up); the rest is contested
 // - k: how far z moves the shares (log-odds per unit of z)
-// - make: make probability change of [open, contested, heavy], by shot type; blk: block multiplier of each level (both centered on the
-//   base shares in contestDeltas)
+// - make: make probability change of [open, contested, heavy], by shot type; blk and foul: block and shooting foul multipliers of each
+//   level (all centered on the base shares in gameFlow.ts contestTables; the fouls then × foulScale and the makes + makeOffset, which
+//   keep the league's free throw attempts and FG% where they were)
 // - the z terms: defender (per unit of his defensive composite above defRef, by shot type), help (per unit of the defense's help z,
 //   by shot type: a pack-the-paint or zone help defense leaves threes more open), spacing (per unit of spacingAround), late (shot clock
 //   at 0, ramping in over the last lateSeconds), pullUp / catchShoot (jumpers), transition, rushed (end-of-period heave), rimProtector
@@ -197,6 +198,9 @@ export const SIM_FIX_CONTEST = {
 		[0.05, 0, -0.06],
 	],
 	blk: [0.4, 1, 1.6],
+	foul: [0.85, 1, 1.15],
+	foulScale: 1.01,
+	makeOffset: -0.003,
 	defender: [1.5, 3, 2.5, 3],
 	defRef: [0.5, 0.5, 0.5, 0.5],
 	help: [0.15, 0.25, 0.5, 0.4],
@@ -238,7 +242,7 @@ export const SIM_FIX_HELP = {
 	deter: 0.06,
 	selMin: 0.75,
 	selMax: 1.25,
-	selNorm: 1,
+	selNorm: 0.99,
 	switchExposure: 0.35,
 	switchMake: 0.02,
 };
@@ -247,7 +251,8 @@ export const SIM_FIX_HELP = {
 // - A run against a team: the most the other team has outscored it by over the scoring since the last timeout (or the start of the
 //   period) while it scored at most maxOwn (8-0, 10-2: net 8). Its coach stops a run of net or more with a timeout: net - dial × his
 //   timeout trigger dial (coaching systems, -1 saves them ... 1 quick) - mgmt × his game management ((mgmt - 50) / 25), rounded, within
-//   [minNet, maxNet]. Never in the final period's last ENDGAME.noRunTimeoutSeconds, in overtime, or in garbage time
+//   [minNet, maxNet], spare less in the period before the final one while he has more timeouts than he can take into it. Never in the
+//   final period's last ENDGAME.noRunTimeoutSeconds, in overtime, or in garbage time
 // - Momentum: a team on a run (net momStart or more) makes its shots momBump × min(1, (net - momStart) / momSpan) more often, fading
 //   by momDecay per possession since its last basket; any timeout ends every run. momOffset comes off every shot so the league's
 //   percentages stay the same
@@ -261,6 +266,7 @@ export const SIM_FIX_RUNS = {
 	mgmt: 0.5,
 	minNet: 6,
 	maxNet: 11,
+	spare: 2,
 	momStart: 5,
 	momSpan: 5,
 	momBump: 0.015,
@@ -296,7 +302,7 @@ export const SIM_FIX_ADJUST = {
 	focusPts: 12,
 	focusShare: 0.25,
 	focus: 0.8,
-	pps: [1.08, 0.84, 1.28, 0.86],
+	pps: [1.12, 0.84, 1.28, 0.86],
 	zoneMin: 5,
 	sel: 0.15,
 	make: 0.012,
@@ -304,8 +310,9 @@ export const SIM_FIX_ADJUST = {
 
 // Fatigue and minutes (Game Sim Fixes, gameFlow.ts):
 // - Tired legs show on defense first: a player's defensive composites (and his part of a shot's contest) take def × the stock fatigue
-//   penalty (1 - fatigue), his offense (ball handling, passing, rebounding and his own shots) off × it. def > 1 > off, set so the
-//   league's scoring stays the same
+//   penalty x = 1 - fatigue, his offense (ball handling, passing, rebounding and his own shots) off × it, each shifted so it is the stock
+//   one at the league's average x0 (x0Shot for the shooter's own fatigue, with Load, Fatigue & Venue's curve): a fresher player than
+//   average defends a little better than before, a tired one a lot worse, while his offense fades less. The league's scoring stays put
 // - The second night of a back-to-back (or the third game in four nights) starts everyone at 1 - b2bEnergy energy, and a long trip
 //   (Load, Fatigue & Venue's travel) the visitors at 1 - travelEnergy × min(1, km / LOAD.travelKm)
 // - Minutes by the score (Realistic Rotations): in the second half the minutes plan of the top starRanks players by value (half as much
@@ -314,26 +321,28 @@ export const SIM_FIX_ADJUST = {
 export const SIM_FIX_FATIGUE = {
 	def: 1.4,
 	off: 0.7,
+	x0: 0.058,
+	x0Shot: 0.05,
 	b2bEnergy: 0.04,
 	travelEnergy: 0.02,
 	starRanks: 3,
 	close: 0.08,
 	closeMargin: 6,
-	blowout: 0.15,
-	blowoutFrom: 12,
+	blowout: 0.1,
+	blowoutFrom: 14,
 	blowoutSpan: 10,
 };
 
 // Garbage time (Game Sim Fixes with Realistic Rotations): with the regulation time left R (minutes, scaled to a 48-minute game) at
-// most window, a lead of base + perMin × R or more (25 with 13.6 minutes left, 20 with 9, 15 with 4.5, 11 in the last minute) starts it;
+// most window, a lead of base + perMin × R or more (31 with 12 minutes left, 22 with 6, 18 with 3, 15 in the last minute) starts it;
 // it ends only if the lead falls exit below that line (so the starters aren't sent back in to pad their stats). In garbage time the five
 // best players by value sit (× starter on their substitution value), the next three play less (× rotation), the deep bench plays (× bench
 // for players ranked 9th or lower by value), both defenses let up (their defensive composites × effort), and no team calls a timeout
 // to stop a run. Not in overtime or an Elam ending
 export const SIM_FIX_GARBAGE = {
-	window: 14,
-	base: 10,
-	perMin: 1.1,
+	window: 12,
+	base: 14,
+	perMin: 1.4,
 	exit: 8,
 	starter: 0.02,
 	rotation: 0.35,

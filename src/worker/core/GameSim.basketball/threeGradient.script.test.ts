@@ -2,7 +2,9 @@
 // Jump shot skill gradient: plays seasons of a new random league (new-league defaults plus the 2026 preset) and prints, over all of
 // its seasons, the league totals, 3P% and volume by three-point rating (players with 100+ 3PA) and its correlation with the rating,
 // mid-range share and FG% by mid-range rating, and the top scorers. THREE_GRAD_OUT also writes one JSON line per player season and one
-// per season's league totals (to pool several seeds).
+// per season's league totals (to pool several seeds). It also prints the game flow counters (gameFlow.ts FLOW_DIAG: contest levels by shot
+// type, timeouts, coaching adjustments, garbage time, minutes by value rank) and writes them as a "flow" line. THREE_GRAD_CONST can change
+// any constant object of simSettings.ts too.
 //   THREE_GRAD=1 [THREE_GRAD_SEED=1] [THREE_GRAD_SEASONS=3] [THREE_GRAD_SETTINGS='{}'] [THREE_GRAD_OUT=/tmp/x.jsonl]
 //   [THREE_GRAD_CONST='{"STAR":{"makeJumper":0.3}}'] npx vitest run --project basketball --silent=false <this file>
 import "fake-indexeddb/auto";

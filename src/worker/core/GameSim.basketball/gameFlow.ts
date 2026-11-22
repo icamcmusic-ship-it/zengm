@@ -32,15 +32,18 @@ const tables = () => {
 		const make = C.make[ti]!;
 		let meanMake = 0;
 		let meanBlk = 0;
+		let meanFoul = 0;
 		for (let l = 0; l < 3; l++) {
 			meanMake += shares[l]! * make[l]!;
 			meanBlk += shares[l]! * C.blk[l]!;
+			meanFoul += shares[l]! * C.foul[l]!;
 		}
 		return {
 			openLogit: logit(open!),
 			heavyLogit: logit(heavy!),
-			make: make.map((x) => x - meanMake),
+			make: make.map((x) => x - meanMake + C.makeOffset),
 			blk: C.blk.map((x) => x / meanBlk),
+			foul: C.foul.map((x) => (C.foulScale * x) / meanFoul),
 		};
 	});
 };

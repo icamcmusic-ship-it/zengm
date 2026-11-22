@@ -861,6 +861,9 @@ class GameSim extends GameSimBase {
 	lastScorePoss: [number, number] = [0, 0];
 	momentum = 0;
 	timeoutsUsed: [number, number] = [0, 0];
+	// A run-stopping or rest timeout was called before the possession started (with the whole shot clock): the possession after it is a
+	// normal half-court one, not a set play with what is left of the shot clock
+	freshTimeout = false;
 	// Coaching adjustments at the breaks (SIM_FIX_ADJUST, with coaching systems): each defense's focus (the opponent's hot scorer its best
 	// defender goes to) and how much more his threat counts, the zone it takes away (contest type index, -1: none) with the opponent's
 	// selection multiplier and make change there, and each player's minutes plan at tip-off
@@ -1961,6 +1964,9 @@ class GameSim extends GameSimBase {
 		if (this.flowRuns) {
 			this.possCount += 1;
 			this.momentum = this.momentumOf(this.o);
+			if (this.prevPossessionOutcome !== "timeout") {
+				this.freshTimeout = false;
+			}
 		}
 		if (FLOW_DIAG.on) {
 			flowCount("poss");
@@ -2277,13 +2283,16 @@ class GameSim extends GameSimBase {
 
 	// ---- Game flow: fatigue, minutes and garbage time (SIM_FIX_FATIGUE, SIM_FIX_GARBAGE). Only called with Game Sim Fixes on ----
 
-	// Fatigue multipliers (1 = fresh) of his defense and his offense, from the stock one
+	// Fatigue multipliers (1 = fresh) of his defense and his offense, from the stock one: steeper on defense, flatter on offense, the
+	// same as the stock one at the league's average fatigue x0 (x0Shot for a shooter's own make)
 	defFatigue(fatigue: number) {
-		const x = 1 - SIM_FIX_FATIGUE.def * (1 - fatigue);
+		const F = SIM_FIX_FATIGUE;
+		const x = 1 - F.def * (1 - fatigue) + (F.def - 1) * F.x0;
 		return x > 0 ? x : 0;
 	}
-	offFatigue(fatigue: number) {
-		const x = 1 - SIM_FIX_FATIGUE.off * (1 - fatigue);
+	offFatigue(fatigue: number, x0: number = SIM_FIX_FATIGUE.x0) {
+		const F = SIM_FIX_FATIGUE;
+		const x = 1 - F.off * (1 - fatigue) + (F.off - 1) * x0;
 		return x > 0 ? x : 0;
 	}
 
@@ -2569,9 +2578,16 @@ class GameSim extends GameSimBase {
 		const mgmt = this.coachSys
 			? helpers.bound(((cs.mgmt ?? 50) - 50) / 25, -1, 1)
 			: 0;
+		// (the timeouts he can't take into the final period are spent more readily in the period before it)
+		const period = this.team[0].stat.ptsQtrs.length;
+		const spare =
+			period === this.numPeriods - 1 &&
+			this.earlyTimeouts[t] > ENDGAME.maxFinalPeriod
+				? R.spare
+				: 0;
 		return helpers.bound(
-			Math.round(R.net - R.dial * dial - R.mgmt * mgmt),
-			R.minNet,
+			Math.round(R.net - R.dial * dial - R.mgmt * mgmt) - spare,
+			R.minNet - spare,
 			R.maxNet,
 		);
 	}
@@ -2618,6 +2634,7 @@ class GameSim extends GameSimBase {
 		this.earlyTimeouts[o] -= 1;
 		this.clearRuns();
 		this.timeoutsUsed[o] += 1;
+		this.freshTimeout = true;
 		if (FLOW_DIAG.on) {
 			flowCount("restTimeouts");
 		}
@@ -2681,6 +2698,7 @@ class GameSim extends GameSimBase {
 		if (this.flowRuns) {
 			this.clearRuns();
 			this.timeoutsUsed[o] += 1;
+			this.freshTimeout = true;
 			if (FLOW_DIAG.on) {
 				flowCount("runTimeouts");
 			}
@@ -4167,6 +4185,9 @@ class GameSim extends GameSimBase {
 					const p = lineup[i]!;
 					const ratings = p.compositeRating;
 					const fatigue = this.fatigueLate(p.stat.energy, lateGame);
+					if (FLOW_DIAG.on) {
+						flowSum("xCourt", 1 - fatigue);
+					}
 					const pf = p.stat.pf;
 					const foulLimitFactor =
 						pf === foulLimit ? 0.9 : pf > foulLimit ? 0.75 : 1;
@@ -5090,10 +5111,13 @@ class GameSim extends GameSimBase {
 		const prev = this.prevPossessionOutcome;
 
 		let shotAt;
+		// (Game flow: after a timeout called before the possession started, a normal half-court possession, without transition)
+		const fresh = this.freshTimeout && prev === "timeout";
+		this.freshTimeout = false;
 		if (
 			prev === "nonShootingFoul" ||
 			prev === "outOfBoundsDefense" ||
-			prev === "timeout"
+			(prev === "timeout" && !fresh)
 		) {
 			// Inbounding with part of the shot clock used: run a set play with what is left
 			shotAt = k * drawRestartSearch(sc, clockFactor === "maintainLead");
@@ -5118,14 +5142,15 @@ class GameSim extends GameSimBase {
 				: k *
 					Math.max(1, ORB_RESET_SEARCH_MEAN + ORB_RESET_SEARCH_SD * gaussian());
 		} else {
-			let probTransition = possessionStartsInFrontcourt
-				? 0
-				: (prev === "stl"
-						? PROB_TRANSITION.steal
-						: prev === "drb"
-							? PROB_TRANSITION.drb
-							: PROB_TRANSITION.inbound) *
-					this.teamPaceFactor[this.o] ** 3;
+			let probTransition =
+				possessionStartsInFrontcourt || fresh
+					? 0
+					: (prev === "stl"
+							? PROB_TRANSITION.steal
+							: prev === "drb"
+								? PROB_TRANSITION.drb
+								: PROB_TRANSITION.inbound) *
+						this.teamPaceFactor[this.o] ** 3;
 			if (clockFactor === "maintainLead") {
 				probTransition *= 0.3;
 			} else if (clockFactor === "catchUp") {
@@ -6015,6 +6040,7 @@ class GameSim extends GameSimBase {
 
 		// Game flow: how closely the shot is contested (one more random number, only with Game Sim Fixes and Matchup Defense)
 		let contestBlk = 1;
+		let contestFoul = 1;
 		this.contestLevelLast = -1;
 		this.contestMake = 0;
 		if (this.contestOn && !putBack && !tipInFromOutOfBounds) {
@@ -6025,6 +6051,7 @@ class GameSim extends GameSimBase {
 				this.contestLevelLast = level;
 				this.contestMake = tb.make[level]!;
 				contestBlk = tb.blk[level]!;
+				contestFoul = tb.foul[level]!;
 			}
 		}
 
@@ -6066,6 +6093,9 @@ class GameSim extends GameSimBase {
 			if (this.scheduleLoad) {
 				foulFactor *= this.foulMult[this.d];
 			}
+
+			// Game flow: a tightly contested shot draws more shooting fouls
+			foulFactor *= contestFoul;
 
 			probMissAndFoul *= foulFactor;
 			if (this.playTypes && type !== "threePointer") {
@@ -6288,8 +6318,14 @@ class GameSim extends GameSimBase {
 
 		// (Game flow: his own shot feels less of his fatigue than his defense does)
 		const currentFatigue = this.flowFatigue
-			? this.offFatigue(this.fatigue(p.stat.energy, false, true))
+			? this.offFatigue(
+					this.fatigue(p.stat.energy, false, true),
+					SIM_FIX_FATIGUE.x0Shot,
+				)
 			: this.fatigue(p.stat.energy, false, true);
+		if (FLOW_DIAG.on) {
+			flowSum("xShot", 1 - this.fatigue(p.stat.energy, false, true));
+		}
 
 		// Is this an "assisted" attempt (i.e. an assist will be recorded if it's made)
 		let passer: PlayerGameSim | undefined;
