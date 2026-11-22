@@ -213,10 +213,14 @@ export const storeCollegeSeasonMarkers = async ({
 /**
  * Rebuild the college season of a draft year from the prospects who carry it (drafted or not). undefined if there is none.
  */
-export const getCollegeSeason = async (draftYear: number) => {
-	const players = (await idb.merged.players.getAll({ draftYear })).filter(
-		(p) => p.collegeSeason?.season === draftYear,
-	);
+export const getCollegeSeason = async (
+	draftYear: number,
+	// The class's players, when already at hand (default: read them, retired ones included)
+	classPlayers?: Player[],
+) => {
+	const players = (
+		classPlayers ?? (await idb.merged.players.getAll({ draftYear }))
+	).filter((p) => p.collegeSeason?.season === draftYear);
 	if (players.length === 0) {
 		return undefined;
 	}

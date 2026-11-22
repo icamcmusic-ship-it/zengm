@@ -29,6 +29,7 @@ import { JUCOS, JUCOS_MORE } from "./juco.ts";
 import { getHeadCoach } from "./profile.ts";
 import { Rng, clamp } from "./rng.ts";
 import type { CollegeProspect } from "./types.ts";
+import type { SeasonRole } from "./roles.ts";
 
 const JUCOS_ALL = [...JUCOS, ...JUCOS_MORE];
 
@@ -115,6 +116,16 @@ export type CareerYear = {
 	tier?: OverseasTier;
 	// A two-sport athlete's season: he joined the basketball team after the football season (preDraftPaths)
 	football?: true;
+	// Role changes (roles.ts): a breakout or slump season, or a freshman who moved into the starting lineup during it
+	role?: SeasonRole;
+	// Class-aware teams (teams.ts): his team's pace that season, possessions per 40 minutes. Careers made before it have none (the
+	// average pace)
+	pace?: number;
+	// Class-aware teams: what his teammates' generation knows about him that season (teams.ts TeamMember): talent (class sd), and minutes
+	// per game and usage expected before his teammates. Kept so a class made later sees him exactly as a plan of his class would
+	tz?: number;
+	xm?: number;
+	xu?: number;
 };
 
 export const STORY_KINDS = [
@@ -157,6 +168,8 @@ export type PlannedYear = CareerYear & {
 	teamGames?: number;
 	// Games missed with an injury in the middle of the season (injuries.ts)
 	injuryGames?: number;
+	// Minutes his role grew by during the season (roles.ts, a freshman who moved into the starting lineup)
+	ramp?: number;
 };
 
 // What is kept on the player (p.preDraftCareer): his years, his story and, once it has been set against the rest of his high school class, his recruiting ranking (null: unranked)
@@ -1019,6 +1032,9 @@ export const toCareer = (plan: CareerPlan): PreDraftCareer => ({
 		...(year.why ? { why: year.why } : {}),
 		...(year.tier ? { tier: year.tier } : {}),
 		...(year.football ? { football: true as const } : {}),
+		...(year.role ? { role: year.role } : {}),
+		...(year.pace !== undefined ? { pace: year.pace } : {}),
+		...(year.tz !== undefined ? { tz: year.tz, xm: year.xm, xu: year.xu } : {}),
 	})),
 	...(plan.story ? { story: plan.story } : {}),
 	...(plan.route ? { route: plan.route } : {}),

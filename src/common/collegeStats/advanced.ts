@@ -114,6 +114,7 @@ export const calculateAdvanced = (
 		teamGames,
 		rng,
 		z,
+		paceRatio = 1,
 	}: {
 		pos: string;
 		gameMinutes: number;
@@ -121,6 +122,8 @@ export const calculateAdvanced = (
 		strength: number;
 		rng: Rng;
 		z: number;
+		// His team's pace relative to the average (class-aware teams): its totals, which usage, assist and steal rates are shares of
+		paceRatio?: number;
 	},
 ) => {
 	const min = s.min!;
@@ -132,7 +135,7 @@ export const calculateAdvanced = (
 	}
 
 	// Per game of the team's game length, scaled from the 40 minute averages above
-	const lenFactor = gameMinutes / 40;
+	const lenFactor = (gameMinutes / 40) * paceRatio;
 	// Minutes he'd have to play to be on the floor for a full game, summed
 	const teamMinOver5 = gameMinutes * gp;
 	const minShare = min / teamMinOver5;

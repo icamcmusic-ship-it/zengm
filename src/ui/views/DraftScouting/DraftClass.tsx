@@ -249,6 +249,17 @@ const DraftClass = ({
 		}
 	}
 
+	// Age-adjusted production from his pre-draft stats (basketball)
+	const showProduction = players.some((p) => p.production !== undefined);
+	if (showProduction) {
+		cols.push({
+			title: "AgeProd",
+			desc: "Age-adjusted production: schedule-adjusted game score per 40 minutes of his last two pre-draft seasons, plus 1.8 for each year he was younger than 20.5. A 19-year-old's numbers count more than a 22-year-old's.",
+			sortType: "number",
+			sortSequence: ["desc", "asc"],
+		});
+	}
+
 	const rows: DataTableRow<"player">[] = players.map((p) => {
 		return {
 			key: p.pid,
@@ -377,6 +388,9 @@ const DraftClass = ({
 										}
 									: null,
 						]
+					: []),
+				...(showProduction
+					? [p.production !== undefined ? p.production.toFixed(1) : null]
 					: []),
 			],
 		};

@@ -23,7 +23,18 @@ import {
 	type NcaaSeason,
 	type ProspectNcaaGame,
 } from "./ncaa.ts";
-import { gameScore } from "./season.ts";
+import { expectedRole, gameScore } from "./season.ts";
+import { applyRoleArc } from "./roles.ts";
+import { strengthOfTeam } from "./production.ts";
+import {
+	buildRosters,
+	getTeamRoles,
+	getTeamSeason,
+	isTeamSchool,
+	teamKey,
+	type TeamMember,
+	type TeamRole,
+} from "./teams.ts";
 import {
 	isJuco,
 	lagRatings,
@@ -57,6 +68,14 @@ export type GenerateOptions = {
 	injuries?: boolean;
 	// More pre-draft paths (the preDraftPaths League Extra): coaching changes in the transfer portal, the pro pathway program and overseas tiers. Default true; false generates exactly what the model did before them
 	paths?: boolean;
+	// The context model: strength of schedule (season.ts), class-aware teams (teams.ts) and role changes (roles.ts). Default true; false
+	// generates exactly what the model did before it
+	context?: boolean;
+	// Prospects of other draft classes (their seasons, generated or planned with planClassMembers) who can be teammates of this class's
+	teamMembers?: TeamMember[];
+	// Games of team seasons another class's college season model already played (their draft year), by teamKey: teammates there played
+	// those games
+	teamGames?: Map<string, number>;
 };
 
 // How many elite high school prospects of a class join the pro pathway program instead of going to college: at most this many, from at most PATHWAY_POOL of the best
@@ -68,6 +87,9 @@ const PATHWAY_POOL = 10;
 const PATHWAY_STOCK_LEAN = 0.25;
 // Class-relative draft stock (zStock) a prospect needs to be offered a spot: about the top fifth of a class
 const PATHWAY_MIN_STOCK = 0.85;
+
+// Most games a junior college or lower level team plays in a season (class-aware teams)
+const LOWER_MAX_GAMES = 34;
 
 // Game score per 40 minutes a junior college season needs for honors
 const JUCO_BARS = { allAmerican: 17.5, allRegion: 14 };
@@ -136,53 +158,44 @@ export const getClassStats = (prospects: CollegeProspect[]) => {
 	};
 };
 
-/**
- * College seasons and honors for a draft class. Pure and deterministic: the same prospects, seed and options always give the same output. Nothing about a prospect's pro ratings is read back or changed.
- */
-export const generateCollegeClass = (
+type ClassContext = {
+	classStats: { mean: number; sd: number };
+	potStats: { mean: number; sd: number };
+	pathwayKeys: Set<string>;
+	classRoutes: Map<string, ClassRoute>;
+};
+
+const getClassContext = (
 	prospects: CollegeProspect[],
 	options: GenerateOptions,
-): CollegeResult[] => {
+): ClassContext => {
+	const classProspects = options.classProspects ?? prospects;
+	const pathwayKeys = getPathwayKeys(classProspects, options);
+	return {
+		classStats: getClassStats(classProspects),
+		potStats: getClassStats(
+			classProspects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
+		),
+		pathwayKeys,
+		classRoutes: getClassRoutes(classProspects, options, pathwayKeys),
+	};
+};
+
+/**
+ * Where each prospect plays, year by year (his career plan, role changes included), with his talent and ratings each season he played and
+ * his place on a team those seasons (teams.ts). No seasons are simulated: this is all a team needs to know about him.
+ */
+const planProspects = (
+	prospects: CollegeProspect[],
+	options: GenerateOptions,
+	{ classStats, potStats, pathwayKeys, classRoutes }: ClassContext,
+) => {
 	const { seed, draftYear } = options;
 	const priorSeasons = options.priorSeasons ?? true;
-	const noise = clamp(options.noise ?? 1, 0, 3);
 	const paths = options.paths ?? true;
-	const classProspects = options.classProspects ?? prospects;
-	const classStats = getClassStats(classProspects);
-	const potStats = getClassStats(
-		classProspects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
-	);
-	const pathwayKeys = getPathwayKeys(classProspects, options);
-	const classRoutes = getClassRoutes(classProspects, options, pathwayKeys);
-
-	const results: (CollegeResult & { pos: string })[] = [];
-
-	const teamIndexes = new Map<string, number>();
-	const ncaaSeason = options.ncaaSeason;
-	const ncaaEntries: {
-		key: string;
-		school: string;
-		games: ProspectNcaaGame[];
-	}[] = [];
-	const summaries = new Map<string, CollegeResult["ncaa"]>();
-
-	for (const p of prospects) {
-		// Each player has his own stream, so what he gets doesn't depend on who else is in the class
-		const rng = new Rng(`${seed}|${draftYear}|${p.key}`);
+	const teams = options.context ?? true;
+	return prospects.map((p) => {
 		const school = pickSchool(p, options, classStats, pathwayKeys, classRoutes);
-
-		// His team in the college season, if it has one
-		let team = -1;
-		if (ncaaSeason && school && !school.nonCollege) {
-			if (!teamIndexes.has(school.name)) {
-				teamIndexes.set(school.name, getTeamIndex(ncaaSeason, school.name));
-			}
-			team = teamIndexes.get(school.name)!;
-		}
-		const postseason =
-			ncaaSeason && team >= 0 ? getTeamPostseason(ncaaSeason, team) : [];
-
-		const seasons: CollegeSeason[] = [];
 		const zClass = clamp((p.ovr - classStats.mean) / classStats.sd, -2.5, 2.5);
 		const zPot = clamp((p.pot - potStats.mean) / potStats.sd, -2.5, 2.5);
 		const zStock = 0.4 * zClass + 0.6 * zPot;
@@ -199,9 +212,16 @@ export const generateCollegeClass = (
 			paths,
 			route: classRoutes.get(p.key)?.route,
 		});
-		// His draft year season ended early: he missed the postseason
-		let missedPostseason = false;
-		// Oldest first
+		// Role changes, from a stream of their own
+		if (teams && plan.years.length > 0) {
+			applyRoleArc(plan, {
+				seedBase: `${seed}|${draftYear}|${p.key}`,
+				lateness: p.lateness ?? 0,
+				z: zClass,
+			});
+		}
+		const years = [];
+		const members: TeamMember[] = [];
 		for (const year of plan.years) {
 			if (!year.played) {
 				continue;
@@ -219,10 +239,134 @@ export const generateCollegeClass = (
 				backProject(p.ratings, k, p.age),
 				year.lag + stayLag,
 			);
+			years.push({ year, zTalent, ratings });
+			if (teams && !p.linked && isTeamSchool(year.school)) {
+				const expected = expectedRole({
+					ratings,
+					zTalent,
+					classIndex: year.classIndex,
+					gameMinutes: year.gameMinutes,
+					mpgShift: year.mpgShift,
+					usageShift: year.usageShift,
+				});
+				// Rounded as they are stored (career.ts tz, xm, xu), so a stored season and a planned one are the same teammate
+				year.tz = Math.round(100 * zTalent) / 100;
+				year.xm = Math.round(10 * expected.mpg) / 10;
+				year.xu = Math.round(1000 * expected.usg) / 1000;
+				members.push({
+					key: p.key,
+					draftYear,
+					school: year.school,
+					season: year.season,
+					z: year.tz,
+					pos: p.pos,
+					mpg: year.xm,
+					usg: year.xu,
+				});
+			}
+		}
+		return { p, school, plan, years, members };
+	});
+};
+
+/**
+ * A class's prospects on teams, season by season (class-aware teams), as generateCollegeClass with the same options would place them,
+ * without simulating anything: for another class's generation to see who its prospects' teammates are.
+ */
+export const planClassMembers = (
+	prospects: CollegeProspect[],
+	options: GenerateOptions,
+): TeamMember[] =>
+	planProspects(
+		prospects,
+		{ ...options, context: true },
+		getClassContext(prospects, options),
+	).flatMap((x) => x.members.map((m) => ({ ...m, locked: true })));
+
+/**
+ * College seasons and honors for a draft class. Pure and deterministic: the same prospects, seed and options always give the same output. Nothing about a prospect's pro ratings is read back or changed.
+ */
+export const generateCollegeClass = (
+	prospects: CollegeProspect[],
+	options: GenerateOptions,
+): CollegeResult[] => {
+	const { seed, draftYear } = options;
+	const noise = clamp(options.noise ?? 1, 0, 3);
+	const paths = options.paths ?? true;
+	const results: (CollegeResult & { pos: string })[] = [];
+
+	const teamIndexes = new Map<string, number>();
+	const ncaaSeason = options.ncaaSeason;
+	const ncaaEntries: {
+		key: string;
+		school: string;
+		games: ProspectNcaaGame[];
+	}[] = [];
+	const summaries = new Map<string, CollegeResult["ncaa"]>();
+
+	// Pass 1: every prospect's school and years, so the teams (class-aware teams) are known before any season is played
+	const planned = planProspects(
+		prospects,
+		options,
+		getClassContext(prospects, options),
+	);
+
+	// Pass 2: teams. His teammates are the class's other prospects and other classes' (options.teamMembers) on the same team that season
+	const teams = options.context ?? true;
+	const roles = teams
+		? getTeamRoles(
+				buildRosters([
+					...planned.flatMap((x) => x.members),
+					...(options.teamMembers ?? []),
+				]),
+				strengthOfTeam,
+			)
+		: new Map<string, TeamRole>();
+
+	// Pass 3: the seasons
+	for (const { p, school, plan, years: plannedYears } of planned) {
+		// Each player has his own stream, so what he gets doesn't depend on who else is in the class
+		const rng = new Rng(`${seed}|${draftYear}|${p.key}`);
+
+		// His team in the college season, if it has one
+		let team = -1;
+		if (ncaaSeason && school && !school.nonCollege) {
+			if (!teamIndexes.has(school.name)) {
+				teamIndexes.set(school.name, getTeamIndex(ncaaSeason, school.name));
+			}
+			team = teamIndexes.get(school.name)!;
+		}
+		const postseason =
+			ncaaSeason && team >= 0 ? getTeamPostseason(ncaaSeason, team) : [];
+
+		const seasons: CollegeSeason[] = [];
+		// His draft year season ended early: he missed the postseason
+		let missedPostseason = false;
+		// Oldest first
+		for (const { year, zTalent, ratings } of plannedYears) {
+			const k = year.yearsBack;
 			const draftYearTeam = k === 0 && ncaaSeason && team >= 0;
 			if (draftYearTeam && year.gamesCap !== undefined) {
 				missedPostseason = true;
 			}
+			// Class-aware teams: the team season he played in (a team, not a league of clubs), its games and pace shared with his teammates
+			const proEnv = getLeagueEnv(year.school);
+			const role = roles.get(`${p.key}|${year.season}`);
+			let teamGames = year.teamGames;
+			let pace: number | undefined;
+			if (teams && !p.linked && !proEnv && isTeamSchool(year.school)) {
+				const teamSeason = getTeamSeason(year.school, year.season);
+				pace = teamSeason.pace;
+				year.pace = pace;
+				// Below Division I, seasons run a few games shorter
+				teamGames =
+					options.teamGames?.get(teamKey(year.school, year.season)) ??
+					(COLLEGES[year.school]
+						? teamSeason.games
+						: Math.min(LOWER_MAX_GAMES, teamSeason.games));
+			}
+			const mpgShift = year.mpgShift + (role?.mpgShift ?? 0);
+			const usageShift = year.usageShift + (role?.usageShift ?? 0);
 			seasons.push(
 				simulateSeason({
 					season: draftYear - k,
@@ -236,17 +380,18 @@ export const generateCollegeClass = (
 					gameMinutes: year.gameMinutes,
 					noise,
 					pos: p.pos,
-					proEnv: getLeagueEnv(year.school),
+					proEnv,
 					age: p.age - k,
-					...(year.mpgShift !== 0 ? { mpgShift: year.mpgShift } : {}),
-					...(year.usageShift !== 0 ? { usageShift: year.usageShift } : {}),
+					...(teams ? { sos: true } : {}),
+					...(mpgShift !== 0 ? { mpgShift } : {}),
+					...(usageShift !== 0 ? { usageShift } : {}),
 					...(year.gamesCap !== undefined ? { gamesCap: year.gamesCap } : {}),
 					...(year.injuryGames !== undefined
 						? { injuryGames: year.injuryGames }
 						: {}),
-					...(year.teamGames !== undefined
-						? { teamGames: year.teamGames }
-						: {}),
+					...(teamGames !== undefined ? { teamGames } : {}),
+					...(pace !== undefined ? { pace } : {}),
+					...(year.ramp !== undefined ? { ramp: year.ramp } : {}),
 					...(draftYearTeam
 						? {
 								teamGames:

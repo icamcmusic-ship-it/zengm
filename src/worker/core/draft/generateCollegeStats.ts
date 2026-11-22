@@ -20,6 +20,7 @@ import {
 } from "./collegeSeason.ts";
 import { getCareerSchool, hasPreDraftStats } from "../../../common/preDraft.ts";
 import { assignRecruitRanks } from "./recruiting.ts";
+import { getClassTeamContext } from "./classTeams.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
@@ -202,6 +203,7 @@ export const toCollegeProspect = (
 		ratings,
 		college: getGenerationCollege(p),
 		...(p.real || p.linkedCollege ? { fixedSchool: true } : {}),
+		...(p.linkedCollege ? { linked: true } : {}),
 		bornLoc: p.born.loc,
 		heightInches: p.hgt,
 		...(p.draftClassShapeInjury ? { injuryHistory: true } : {}),
@@ -284,10 +286,20 @@ export const generateCollegeStats = async ({
 	}
 	const ncaaSeason: NcaaSeason | undefined = ncaa?.season;
 
+	// Class-aware teams: teammates from other classes (and from this one, with stats already), and team seasons other classes' college
+	// seasons played
+	const teamContext = await getClassTeamContext({
+		draftYear,
+		targets: new Set(players.map((p) => p.pid)),
+		toProspect: toCollegeProspect,
+		paths: options.paths,
+	});
+
 	const results = generateCollegeClass(prospects, {
 		...options,
 		ncaaSeason,
 		injuries: featureOn("preDraftMedicals"),
+		...teamContext,
 	});
 	const resultsByKey = new Map(results.map((result) => [result.key, result]));
 
