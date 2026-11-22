@@ -3025,7 +3025,8 @@ const staffDepthAction = async (
 		| { type: "apply"; action: SuggestionAction; suggestionId?: string }
 		| { type: "dismiss"; id: string }
 		| { type: "dismissRec"; id: string; undo?: boolean }
-		| { type: "boardLock"; pid: number; locked: boolean },
+		| { type: "boardLock"; pid: number; locked: boolean }
+		| { type: "manageScout"; scoutId: number; what: "promote" | "fire" },
 ): Promise<string | undefined> => {
 	// A sentence for the confirmation toast (accepting a recommendation or approving a proposal)
 	let message: string | undefined;
@@ -3044,6 +3045,8 @@ const staffDepthAction = async (
 		await staffDepthActions.dismissStaffSuggestion(action.id);
 	} else if (action.type === "dismissRec") {
 		await staffDepthActions.dismissStaffRecommendation(action.id, action.undo);
+	} else if (action.type === "manageScout") {
+		message = await staffDepthActions.manageScout(action.scoutId, action.what);
 	} else {
 		await staffDepthActions.setDraftBoardLock(action.pid, action.locked);
 	}

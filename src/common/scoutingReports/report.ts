@@ -1,5 +1,6 @@
 // The full scouting report: a scout's grades (with ranges when unsure), projection, breakdowns, flags, development plan, team fit and
 // bottom line, all from a ScoutInput (what the user's scouts can see). Pure and deterministic.
+import { buildCone, coneNumbers } from "./cone.ts";
 import {
 	FOCUS_SIGMA_MULT,
 	SCOUT_FOCUS_NAMES,
@@ -189,7 +190,11 @@ export const scoutTake = ({
 	input: ScoutInput;
 	peers: PeerTable;
 	scout: Scout;
-}): ScoutTake & { u: number; scores: CategoryScores } => {
+}): ScoutTake & {
+	u: number;
+	scores: CategoryScores;
+	proj: { floor: number; ceiling: number; expected: number };
+} => {
 	const group = peerGroupOf(input.pos);
 	const productionMult =
 		scout.bias === "production" ? 1.8 : scout.bias === "tools" ? 0.45 : 1;
@@ -293,6 +298,7 @@ export const scoutTake = ({
 		expected: tierForOvr(proj.expected, input.roleScale),
 		u,
 		scores,
+		proj,
 	};
 };
 
@@ -317,14 +323,16 @@ export const projection = (input: ScoutInput, optimism: number, u: number) => {
 			pot = s.allStar + 2 - frac * (s.allStar - s.bench + 4);
 			ovr = pot - 10;
 		}
-		const young = input.age <= 19 ? 2 : input.age >= 23 ? -1 : 0;
-		const expected = pot - 1 + 0.6 * optimism;
-		const ceiling = pot + 4 + 1.2 * u + young + 0.6 * optimism;
-		const floor = Math.max(
-			ovr - 1,
-			pot - 8 - 1.2 * u - Math.max(0, young) + 0.6 * optimism,
-		);
-		return { floor, ceiling, expected };
+		// Projection cone: floor / median / ceiling from the uncertainty, his age and his trajectory (cone.ts)
+		const c = coneNumbers({
+			ovr,
+			pot,
+			age: input.age,
+			u,
+			optimism,
+			trajectory: input.trajectory?.score,
+		});
+		return { floor: c.floor, ceiling: c.ceiling, expected: c.median };
 	}
 	let ovr: number;
 	if (input.ratings) {
@@ -687,7 +695,25 @@ export const buildReport = ({
 		...c,
 		line: `${v.child(`comp${c.pid}`).pick(["Plays like", "Reminds us of", "Shades of", "Think"])} ${c.name} (${c.when}; ${c.outcome})`,
 	}));
-	const rangeLine = `Floor: ${floorText} · Ceiling: ${ceilingText}`;
+	const cone =
+		input.kind === "prospect"
+			? buildCone({
+					numbers: {
+						floor: take.proj.floor,
+						median: take.proj.expected,
+						ceiling: take.proj.ceiling,
+					},
+					showNumbers: input.ratings !== undefined,
+					scale: input.roleScale,
+					group,
+					age: input.age,
+					u: take.u,
+					trajectory: input.trajectory,
+				})
+			: undefined;
+	const rangeLine = cone
+		? `Floor: ${floorText} · Median: ${capFirst(cone.medianRole)} · Ceiling: ${ceilingText}`
+		: `Floor: ${floorText} · Ceiling: ${ceilingText}`;
 
 	const reference =
 		input.kind === "prospect"
@@ -1296,6 +1322,7 @@ export const buildReport = ({
 			rangeLine,
 			confidence,
 			confidenceNote,
+			cone,
 		},
 		reference,
 		grades,

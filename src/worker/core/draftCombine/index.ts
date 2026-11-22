@@ -4,8 +4,14 @@
 // invited prospect's results are stored on him (p.combine), so regenerating his ratings or the class later doesn't rewrite them.
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import {
+	buildCombineHistory,
 	combineNudges,
 	combineRanks,
+	effortStory,
+	historyPercentiles,
+	listedMeasurements,
+	measurementStories,
+	type CombineHistory,
 	generateDraftCombine,
 	generateMedical,
 	medicalGradeOf,
@@ -266,10 +272,15 @@ export const getPlayerCombine = async (p: Player) => {
 			...(early ? { early: true as const } : {}),
 		};
 	}
+	const listed = listedFor(p);
 	return {
 		invited: true as const,
 		result,
 		ranks: c.ranks.get(p.pid) ?? {},
+		hist: historyPercentiles(result, await getCombineHistory(p.draft.year)),
+		listed,
+		stories: measurementStories(listed, result.measurements).map((x) => x.text),
+		effortStory: result.drills ? effortStory(result.effort) : undefined,
 		n: c.results.size,
 		...(early ? { early: true as const } : {}),
 	};
@@ -312,6 +323,38 @@ export const getDraftCombineNudges = async (
 		}
 	}
 	return nudges;
+};
+
+// His school's or club's listing before the combine (derived, nothing stored)
+export const listedFor = (p: Player) =>
+	listedMeasurements({
+		pid: p.pid,
+		season: p.draft.year,
+		heightInches: p.hgt,
+		weight: p.weight,
+	});
+
+// Every stored combine of earlier classes, per test (for percentiles against the league's history). Memoized per league, season and
+// phase: stored results only change when a combine is held
+let historyMemo: { key: string; history: CombineHistory } | undefined;
+export const getCombineHistory = async (beforeSeason: number) => {
+	const key = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}|${beforeSeason}`;
+	if (historyMemo?.key === key) {
+		return historyMemo.history;
+	}
+	const players = await idb.merged.players.getAll({ activeAndRetired: true });
+	const history = buildCombineHistory(
+		players
+			.filter(
+				(p) =>
+					p.combine &&
+					p.combine.season === p.draft.year &&
+					p.combine.season < beforeSeason,
+			)
+			.map((p) => p.combine!),
+	);
+	historyMemo = { key, history };
+	return history;
 };
 
 const playerLink = (p: Player) =>
@@ -388,6 +431,41 @@ export const afterNewPhase = async (phase: number, conditions?: Conditions) => {
 		},
 		conditions,
 	);
+
+	// Listed vs measured: the biggest surprises among the top of the class
+	const stories: string[] = [];
+	const storyPids: number[] = [];
+	for (const p of c.players.slice(0, 40)) {
+		const res = c.results.get(p.pid);
+		if (!res) {
+			continue;
+		}
+		const story = measurementStories(listedFor(p), res.measurements).find(
+			(x) => x.kind === "shorter" || x.kind === "taller",
+		);
+		if (story) {
+			stories.push(
+				`${playerLink(p)}: ${story.text.charAt(0).toLowerCase()}${story.text.slice(1)}`,
+			);
+			storyPids.push(p.pid);
+		}
+		if (stories.length >= 3) {
+			break;
+		}
+	}
+	if (stories.length > 0) {
+		logEvent(
+			{
+				type: "draft",
+				text: `Tape measure surprises at the <a href="${helpers.leagueUrl(["draft_combine", season])}">${season} draft combine</a>: ${stories.join("; ")}.`,
+				showNotification: false,
+				pids: storyPids,
+				tids: [],
+				score: 0,
+			},
+			conditions,
+		);
+	}
 
 	// Pre-Draft Injuries & Combine Medicals: red flags among the top prospects (as your medical staff reads them)
 	if (medicalsOn()) {

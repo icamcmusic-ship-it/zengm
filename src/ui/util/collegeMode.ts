@@ -22,6 +22,7 @@ const PRO_ONLY_PAGES = new Set([
 	"draft_board",
 	"mock_draft",
 	"draft_combine",
+	"big_boards",
 	"college_overseas",
 	"draft_team_history",
 	"league_finances",

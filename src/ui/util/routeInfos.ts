@@ -141,6 +141,8 @@ export const routeInfos = {
 	"/l/:lid/mock_draft": "mockDraft",
 	"/l/:lid/draft_combine": "draftCombine",
 	"/l/:lid/draft_combine/:season": "draftCombine",
+	"/l/:lid/big_boards": "bigBoards",
+	"/l/:lid/big_boards/:season": "bigBoards",
 	"/l/:lid/college_overseas": "collegeOverseas",
 	"/l/:lid/college_polls": "collegePolls",
 	"/l/:lid/college_polls/:season": "collegePolls",

@@ -9,7 +9,7 @@ import type {
 	SuggestionAction,
 } from "../../../common/staffDepth/types.ts";
 import { idb } from "../../db/index.ts";
-import { g, local } from "../../util/index.ts";
+import { g, local, logEvent } from "../../util/index.ts";
 import { userHire } from "../staff/index.ts";
 import {
 	clearDepthCache,
@@ -19,9 +19,13 @@ import {
 } from "./coaching.ts";
 import {
 	applyBoardRanks,
+	careerOf,
+	directorFor,
 	getScoutingContext,
+	scoutingDepthOn,
 	updateBoard,
 } from "./scouting.ts";
+import { clearScoutingCache, departmentFor } from "../scoutingReports/input.ts";
 import { removeSuggestion } from "./suggestions.ts";
 
 // Refuses in spectator mode and while auto play runs: the staff decides then, like for every AI team
@@ -264,4 +268,80 @@ export const setDraftBoardLock = async (pid: number, locked: boolean) => {
 		delete p.draftBoard.locked;
 	}
 	await idb.cache.players.put(p);
+};
+
+/**
+ * Scout track records: the user acts on them. Promote a scout to Director of Scouting (the Director leaves; the scout's slot gets a new
+ * hire) or let a scout go (his slot's next scout starts now; one hired this season leaves after it). Effective this season.
+ */
+export const manageScout = async (
+	scoutId: number,
+	what: "promote" | "fire",
+): Promise<string> => {
+	if (!scoutingDepthOn()) {
+		throw new Error("Scouting Director & Regions is off.");
+	}
+	const t = await userTeam();
+	const season = g.get("season");
+	const dept = await departmentFor(t.tid);
+	const s = dept.scouts.find((x) => x.id === scoutId);
+	if (!s) {
+		throw new Error("He isn't one of your scouts.");
+	}
+	const career = careerOf(t);
+	if (career.cuts[s.id] !== undefined && career.cuts[s.id]! <= season + 1) {
+		throw new Error(`${s.name} is already on his way out.`);
+	}
+	let message: string;
+	if (what === "fire") {
+		// (a cut must come after his first season in the chain)
+		const leaves = s.since < season ? season : season + 1;
+		career.cuts[s.id] = leaves;
+		career.cutWhy = { ...career.cutWhy, [s.id]: "fired" };
+		message =
+			leaves === season
+				? `You let ${s.name} go. A new scout takes his place.`
+				: `${s.name} will leave after this season (he was only hired this year).`;
+		career.log.push({ season, text: `Let go of ${s.name}` });
+	} else {
+		if (s.since >= season) {
+			throw new Error(
+				`${s.name} was hired this season: give him a season before promoting him.`,
+			);
+		}
+		const old = directorFor(t, season, dept.level);
+		career.cuts[s.id] = season;
+		career.cutWhy = { ...career.cutWhy, [s.id]: "promoted" };
+		if (!career.dirs.some((d) => d.since <= season - 1)) {
+			// Keep the outgoing Director in the history
+			career.dirs.unshift({ id: old.id, since: old.since, how: "hired" });
+		}
+		career.dirs = career.dirs.filter((d) => d.since !== season);
+		career.dirs.push({
+			id: s.id,
+			since: season,
+			how: "promoted",
+			q: s.quality,
+			age: s.age,
+		});
+		message = `${s.name} is your new Director of Scouting. ${old.name} is out, and a new scout fills ${s.name}'s old job.`;
+		career.log.push({
+			season,
+			text: `${s.name} was promoted to Director of Scouting (${old.name} was replaced)`,
+		});
+	}
+	career.log = career.log.slice(-30);
+	t.scoutCareer = career;
+	await idb.cache.teams.put(t);
+	clearScoutingCache();
+	clearDepthCache();
+	await logEvent({
+		type: "info",
+		category: "draft",
+		text: message,
+		showNotification: false,
+		tids: [t.tid],
+		score: 0,
+	});
+	return message;
 };

@@ -1710,6 +1710,9 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 	// Frozen Pre-draft Ranks setting: his ranks in his class when the draft started (s: draft year, r: your scouts' list, v: the consensus
 	// board by value, n: class size), so they don't move as players are picked. See worker/core/draft/preDraftRanks.ts
 	preDraftRank?: PreDraftRank;
+	// Big boards (media outlets): each outlet's final rank of him when the draft started (r, OUTLETS order; 0 = off its board), the
+	// consensus rank (c) and your board's rank (y). See worker/core/draftOutlets
+	outletRanks?: { s: number; r: number[]; c: number; y?: number };
 	// Scouting Director & Regions: the user's looks at a prospect this season and the fuzz narrowing applied (common/staffDepth)
 	scoutLooks?: import("./staffDepth/types.ts").ProspectLooks;
 	// Coaching Staff Depth: this season's development plan

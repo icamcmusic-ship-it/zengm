@@ -7,11 +7,17 @@ import {
 	combineHeld,
 	combineRatingsRow,
 	getClassCombine,
+	getCombineHistory,
 	getMedicalReason,
+	listedFor,
 	medicalsOn,
 } from "../core/draftCombine/index.ts";
 import {
 	athleticScore,
+	historyPercentiles,
+	measurementStories,
+	type HistoryPct,
+	type ListedMeasurements,
 	type CombineDrills,
 	type CombineKey,
 	type CombineMeasurements,
@@ -64,7 +70,14 @@ export default defineView({
 			athletic?: number;
 			// Pre-Draft Injuries & Combine Medicals: as your medical staff reads it
 			medical?: { grade: MedicalGrade; reason: string };
+			// His school's listing, and the stories when the tape measure disagrees
+			listed: ListedMeasurements;
+			stories: string[];
+			effort?: number;
+			// Percentiles against the league's earlier combines (or real NBA combines without enough of them)
+			hist: Partial<Record<CombineKey, HistoryPct>>;
 		}[] = [];
+		const history = await getCombineHistory(season);
 		const showMedical = medicalsOn();
 		for (const p of c.players) {
 			const res = c.results.get(p.pid);
@@ -73,6 +86,7 @@ export default defineView({
 			}
 			const r = combineRatingsRow(p);
 			const ranks = c.ranks.get(p.pid) ?? {};
+			const listed = listedFor(p);
 			players.push({
 				pid: p.pid,
 				firstName: p.firstName,
@@ -94,6 +108,12 @@ export default defineView({
 				skipped: res.skipped,
 				ranks,
 				athletic: athleticScore(ranks),
+				listed,
+				stories: measurementStories(listed, res.measurements).map(
+					(x) => x.text,
+				),
+				effort: res.effort,
+				hist: historyPercentiles(res, history),
 				medical:
 					showMedical && res.medical
 						? { grade: res.medical.grade, reason: getMedicalReason(p) }
@@ -109,6 +129,11 @@ export default defineView({
 				season > g.get("season") ||
 				(season === g.get("season") && g.get("phase") < PHASE.DRAFT_LOTTERY),
 			numProspects: c.players.length,
+			// How many earlier results the all-time percentiles compare with (max over the tests; 0: real NBA combines)
+			historyN: Math.max(
+				0,
+				...players.flatMap((p) => Object.values(p.hist).map((x) => x.n)),
+			),
 			players,
 		};
 	},

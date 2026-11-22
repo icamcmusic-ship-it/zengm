@@ -2,6 +2,10 @@
 // reads players for the reports, and it only reads what the UI shows: ratings with the user's scouting fuzz (or nothing under the no
 // visible ratings challenge), visible trait readings (hidden ones only once they are known), stats, measurements and public records.
 // Never true prospect ratings, never hidden trait scores, never the aging curve.
+import {
+	trajectoryOf,
+	type PreDraftSeasonLine,
+} from "../../../common/scoutingReports/cone.ts";
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { getPreDraftRanks } from "../draft/preDraftRanks.ts";
 import {
@@ -13,6 +17,7 @@ import {
 	COMBINE_COLUMN_BY_KEY,
 	combineScoutNotes,
 	combineValue,
+	listedMeasurements,
 	type CombineKey,
 } from "../../../common/draftCombine.ts";
 import { getPlayerCombine, lotteryNightOn } from "../draftCombine/index.ts";
@@ -874,7 +879,16 @@ const nightCombineFor = async (p: Player) => {
 	return {
 		combine: rows,
 		combineTested: { size: true, ath: c.result.drills !== undefined },
-		combineNotes: combineScoutNotes(c.result, c.ranks),
+		combineNotes: combineScoutNotes(
+			c.result,
+			c.ranks,
+			listedMeasurements({
+				pid: p.pid,
+				season: p.draft.year,
+				heightInches: p.hgt,
+				weight: p.weight,
+			}),
+		),
 	};
 };
 
@@ -1012,6 +1026,32 @@ export const prospectUncertainty = (
 	);
 };
 
+// Projection cones: his pre-draft seasons (production per 36) and our stored grades of him in the last year before his draft
+const trajectoryFor = (p: Player) => {
+	const bySeason = new Map<number, PreDraftSeasonLine>();
+	for (const r of getPreDraftStats(p) as any[]) {
+		if (r.playoffs || typeof r.min !== "number") {
+			continue;
+		}
+		const line = bySeason.get(r.season) ?? {
+			season: r.season,
+			min: 0,
+			pts: 0,
+			trb: 0,
+			ast: 0,
+		};
+		line.min += r.min;
+		line.pts += r.pts ?? 0;
+		line.trb += r.trb ?? (r.orb ?? 0) + (r.drb ?? 0);
+		line.ast += r.ast ?? 0;
+		bySeason.set(r.season, line);
+	}
+	const grades = (p.scoutSnaps ?? [])
+		.filter((x) => x.s >= p.draft.year - 1)
+		.map((x) => x.o);
+	return trajectoryOf({ seasons: [...bySeason.values()], grades });
+};
+
 export const buildInput = async (
 	p: Player,
 	ctx: ReportCtx,
@@ -1141,6 +1181,7 @@ export const buildInput = async (
 			abbrev: p.draft.tid >= 0 ? ctx.teamAbbrevs.get(p.draft.tid) : undefined,
 		},
 		projectedPick: prospect ? await projectedPickFor(p) : draftPick,
+		trajectory: prospect ? trajectoryFor(p) : undefined,
 		numPicks: ctx.numPicks,
 		contract,
 		marketValue,

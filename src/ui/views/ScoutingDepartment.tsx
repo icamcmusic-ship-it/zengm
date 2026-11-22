@@ -233,6 +233,124 @@ const AssignmentMap = ({
 	</>
 );
 
+type ScoutRow = View<"scoutingDepartment">["scouts"][number];
+
+const manage = async (s: ScoutRow, what: "promote" | "fire") => {
+	const ok = window.confirm(
+		what === "promote"
+			? `Promote ${s.name} to Director of Scouting? The current Director will be replaced, and a new scout will fill ${s.name}'s job.`
+			: `Let ${s.name} go? A new scout will take his place.`,
+	);
+	if (!ok) {
+		return;
+	}
+	try {
+		const message = await toWorker("main", "staffDepthAction", {
+			type: "manageScout",
+			scoutId: s.id,
+			what,
+		});
+		if (message) {
+			window.alert(message);
+		}
+	} catch (error) {
+		window.alert((error as Error).message);
+	}
+};
+
+// Scout track records: tier calls, slot calls and flags, side by side, so the user can decide who to promote or let go
+const TrackRecordTable = ({
+	scouts,
+	trackSeasons,
+	canManage,
+}: {
+	scouts: ScoutRow[];
+	trackSeasons: number;
+	canManage: boolean;
+}) => (
+	<div className="mb-3" data-testid="scout-track-records">
+		<h2>Scout track records</h2>
+		<p className="small text-body-secondary">
+			Every scout's calls on a class are filed when the draft starts and scored{" "}
+			{trackSeasons} seasons later against how the players turned out: his tier
+			call (hit = within one tier), the slot he gave each prospect in the class
+			(hit = within 5 spots, or 30% of the higher slot; error capped at 40)
+			against where the prospect finished in his class (best ovr in those
+			seasons), and the flags he raised (a green flag is right when the player
+			finished at or above the room's slot, a red flag when he finished below
+			it). Information only: nothing here changes how anyone drafts.
+		</p>
+		<div className="table-responsive">
+			<table className="table table-sm table-striped mb-0">
+				<thead>
+					<tr>
+						<th>Scout</th>
+						<th title="Tier calls (lottery talent, rotation player, ...) within one tier">
+							Tier hits
+						</th>
+						<th title="Slot calls within 5 spots (or 30%) of where he finished">
+							Slot hits
+						</th>
+						<th title="Average spots off on his slot calls (capped at 40)">
+							Avg error
+						</th>
+						<th>Flags right</th>
+						<th>Pending</th>
+						{canManage ? <th /> : null}
+					</tr>
+				</thead>
+				<tbody>
+					{scouts.map((s) => (
+						<tr key={s.id}>
+							<td className="text-nowrap">
+								{s.name}{" "}
+								<span className="text-body-secondary small">
+									{s.qualityLabel.toLowerCase()}
+								</span>
+							</td>
+							<td>
+								{s.accuracy
+									? `${s.accuracy.hitRate}% (${s.accuracy.calls})`
+									: "-"}
+							</td>
+							<td>
+								{s.slots.judged
+									? `${s.slots.judged.hitRate}% (${s.slots.judged.calls})`
+									: "-"}
+							</td>
+							<td>{s.slots.judged ? s.slots.judged.avgError : "-"}</td>
+							<td>
+								{s.flags.judged
+									? `${s.flags.judged.hitRate}% (${s.flags.judged.calls})`
+									: "-"}
+							</td>
+							<td>{s.slots.pending + s.flags.pending}</td>
+							{canManage ? (
+								<td className="text-nowrap">
+									<button
+										type="button"
+										className="btn btn-sm btn-light-bordered me-1"
+										onClick={() => manage(s, "promote")}
+									>
+										Promote
+									</button>
+									<button
+										type="button"
+										className="btn btn-sm btn-light-bordered"
+										onClick={() => manage(s, "fire")}
+									>
+										Let go
+									</button>
+								</td>
+							) : null}
+						</tr>
+					))}
+				</tbody>
+			</table>
+		</div>
+	</div>
+);
+
 // A team's scouting department (Scouting Reports setting)
 const ScoutingDepartment = ({
 	tid,
@@ -247,6 +365,8 @@ const ScoutingDepartment = ({
 	teams,
 	userTid,
 	depth,
+	trackSeasons,
+	canManage,
 }: View<"scoutingDepartment">) => {
 	const team = teams.find((t) => t.tid === tid);
 	useTitleBar({
@@ -309,6 +429,35 @@ const ScoutingDepartment = ({
 											: "No draft calls on file yet"}
 									</div>
 								)}
+								{s.slots.judged ? (
+									<div>
+										Slot calls: {s.slots.judged.hitRate}% hits, off by{" "}
+										{s.slots.judged.avgError} on average
+										{s.slots.judged.worst ? (
+											<div className="text-danger-emphasis">
+												Miss: {s.slots.judged.worst}
+											</div>
+										) : null}
+									</div>
+								) : null}
+								{s.flags.judged ? (
+									<div>
+										Flags: {s.flags.judged.hitRate}% right (
+										{s.flags.judged.calls})
+										{s.flags.judged.recent.map((f) => (
+											<div
+												key={f.text}
+												className={
+													f.hit
+														? "text-success-emphasis"
+														: "text-danger-emphasis"
+												}
+											>
+												{f.text}
+											</div>
+										))}
+									</div>
+								) : null}
 								{depth?.scouts.find((x) => x.id === s.id) ? (
 									<ScoutCareer
 										s={depth.scouts.find((x) => x.id === s.id)!}
@@ -325,11 +474,17 @@ const ScoutingDepartment = ({
 				<AssignmentMap assignments={depth.assignments} />
 			) : null}
 
+			<TrackRecordTable
+				scouts={scouts}
+				trackSeasons={trackSeasons}
+				canManage={canManage}
+			/>
+
 			<h2>Track record</h2>
 			{track.length === 0 ? (
 				<p className="text-body-secondary">
 					Nothing to judge yet. Our take on every prospect is filed at the draft
-					and judged after four seasons (or when he retires).
+					and judged after {trackSeasons} seasons (or when he retires).
 					{pending > 0 ? ` ${pending} calls are waiting.` : ""}
 				</p>
 			) : (

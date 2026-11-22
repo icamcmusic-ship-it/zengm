@@ -169,6 +169,8 @@ export type ScoutInput = {
 	draft: { year: number; round: number; pick: number; abbrev?: string };
 	// Prospects: where the user's board / the consensus has him
 	projectedPick?: number;
+	// Prospects: trajectory signals for the projection cone (pre-draft production year over year, our scouts' grade over time)
+	trajectory?: import("./cone.ts").Trajectory;
 	numPicks: number;
 	contract?: { amount: number; exp: number; rookie?: boolean };
 	// What his production and ratings would get on the market, thousands per year
@@ -296,6 +298,8 @@ export type FullReport = {
 		rangeLine: string;
 		confidence: "Low" | "Medium" | "High" | "Very high";
 		confidenceNote: string;
+		// Prospects: the projection cone (projected peak floor / median / ceiling)
+		cone?: import("./cone.ts").Cone;
 	};
 	reference: string;
 	grades: GradeRow[];

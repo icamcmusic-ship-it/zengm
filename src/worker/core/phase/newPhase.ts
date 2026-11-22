@@ -4,6 +4,7 @@ import { afterNewPhase as scoutingAfterNewPhase } from "../scoutingReports/index
 import { afterNewPhase as draftCombineAfterNewPhase } from "../draftCombine/index.ts";
 import { afterNewPhase as staffDepthAfterNewPhase } from "../staffDepth/index.ts";
 import { afterNewPhase as preDraftRanksAfterNewPhase } from "../draft/preDraftRanks.ts";
+import { afterNewPhase as draftOutletsAfterNewPhase } from "../draftOutlets/index.ts";
 import newPhasePreseason from "./newPhasePreseason.ts";
 import newPhaseRegularSeason from "./newPhaseRegularSeason.ts";
 import newPhaseAfterTradeDeadline from "./newPhaseAfterTradeDeadline.ts";
@@ -102,6 +103,9 @@ const newPhase = async (phase: Phase, conditions: Conditions, extra?: any) => {
 
 				// Frozen Pre-draft Ranks setting: the class's ranks when the draft starts (no-op when off)
 				await preDraftRanksAfterNewPhase(phase);
+
+				// Big boards: the outlets' final boards when the draft starts, their scorecards after it (no-op when off)
+				await draftOutletsAfterNewPhase(phase);
 
 				await finalize(phase, conditions, result);
 			} else {

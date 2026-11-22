@@ -1,3 +1,4 @@
+import { ProjectionCone } from "../../components/ProjectionCone.tsx";
 import { useState } from "react";
 import {
 	draftedVsPreDraftText,
@@ -804,7 +805,10 @@ const DraftCombineSection = ({
 			</HideableSection>
 		);
 	}
-	const { result, ranks, n } = draftCombine;
+	const { result, ranks, n, hist, stories, effortStory } = draftCombine;
+	const histSource = Object.values(hist).some((x) => x?.source === "league")
+		? "league"
+		: "real";
 	return (
 		<HideableSection
 			title={`${draftCombine.season} Draft Combine${"early" in draftCombine && draftCombine.early ? " (early read)" : ""}`}
@@ -821,6 +825,14 @@ const DraftCombineSection = ({
 					<span className="text-body-secondary">{MEDICAL_EXPLANATION}</span>
 				</p>
 			) : null}
+			{stories.length > 0 || effortStory ? (
+				<ul data-testid="pre-draft-combine-stories">
+					{stories.map((text) => (
+						<li key={text}>{text}</li>
+					))}
+					{effortStory ? <li>{effortStory}</li> : null}
+				</ul>
+			) : null}
 			<div className="table-responsive">
 				<table
 					className="table table-striped table-borderless table-sm table-nonfluid"
@@ -832,6 +844,15 @@ const DraftCombineSection = ({
 							<th>Result</th>
 							<th>Rank</th>
 							<th style={{ minWidth: 100 }}>Percentile</th>
+							<th
+								title={
+									histSource === "league"
+										? "Percentile against every earlier combine of this league"
+										: "Percentile against real NBA combines (this league has few earlier combines yet)"
+								}
+							>
+								{histSource === "league" ? "All-time" : "vs NBA"}
+							</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -849,7 +870,7 @@ const DraftCombineSection = ({
 								return (
 									<tr key={col.key}>
 										<td>{col.name}</td>
-										<td className="text-body-secondary" colSpan={3}>
+										<td className="text-body-secondary" colSpan={4}>
 											Did not participate
 										</td>
 									</tr>
@@ -885,6 +906,7 @@ const DraftCombineSection = ({
 											</div>
 										)}
 									</td>
+									<td>{col.neutral ? null : hist[col.key]?.pct}</td>
 								</tr>
 							);
 						})}
@@ -895,10 +917,71 @@ const DraftCombineSection = ({
 	);
 };
 
+// Projection cone (scouting report) and the media outlets' big boards
+const OutlookSection = ({
+	cone,
+	outlets,
+}: Pick<View<"playerPreDraft">, "cone" | "outlets">) => {
+	if (!cone && !outlets) {
+		return null;
+	}
+	return (
+		<HideableSection
+			title="Outlook"
+			description="Your lead scout's projection cone (projected peak: floor, median, ceiling) and where the draft outlets have him."
+		>
+			<div className="row" data-testid="pre-draft-outlook">
+				{cone ? (
+					<div className="col-12 col-lg-6 mb-2">
+						<ProjectionCone cone={cone.cone} />
+						<div className="small text-body-secondary">By {cone.by}</div>
+					</div>
+				) : null}
+				{outlets ? (
+					<div className="col-12 col-lg-6">
+						<div className="small">
+							<b>Big boards</b> ({outlets.edition} edition):{" "}
+							<a href={helpers.leagueUrl(["big_boards", outlets.draftYear])}>
+								consensus No. {outlets.consensus.rank}
+							</a>
+						</div>
+						<table className="table table-sm table-borderless table-nonfluid small mb-0">
+							<tbody>
+								{outlets.outlets.map((o) => (
+									<tr key={o.name}>
+										<td>{o.name}</td>
+										<td>{o.rank ?? "-"}</td>
+										<td>
+											{o.rank !== undefined &&
+											o.prev !== undefined &&
+											o.prev !== o.rank ? (
+												<span
+													className={
+														o.prev > o.rank ? "text-success" : "text-danger"
+													}
+												>
+													{o.prev > o.rank ? "▲" : "▼"}
+													{Math.abs(o.prev - o.rank)}
+												</span>
+											) : null}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				) : null}
+			</div>
+		</HideableSection>
+	);
+};
+
 const PlayerPreDraft = ({
 	bestPos,
+	cone,
 	customMenu,
 	draftCombine,
+	outlets,
 	jerseyNumberInfos,
 	player,
 	preDraft,
@@ -971,6 +1054,7 @@ const PlayerPreDraft = ({
 							Back to overview
 						</a>
 					</p>
+					<OutlookSection cone={cone} outlets={outlets} />
 					{draftCombine ? (
 						<DraftCombineSection draftCombine={draftCombine} />
 					) : null}
@@ -997,6 +1081,7 @@ const PlayerPreDraft = ({
 						</p>
 					) : null}
 					<ScoutingReportSection preDraft={preDraft} />
+					<OutlookSection cone={cone} outlets={outlets} />
 					<ScoutNotesSection preDraft={preDraft} />
 					<TeamsSection preDraft={preDraft} />
 					<StatsSection preDraft={preDraft} />
