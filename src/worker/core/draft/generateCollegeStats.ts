@@ -203,6 +203,7 @@ export const toCollegeProspect = (
 		ratings,
 		college: getGenerationCollege(p),
 		...(p.real || p.linkedCollege ? { fixedSchool: true } : {}),
+		...(p.linkedCollege ? { linked: true } : {}),
 		bornLoc: p.born.loc,
 		heightInches: p.hgt,
 		...(p.draftClassShapeInjury ? { injuryHistory: true } : {}),

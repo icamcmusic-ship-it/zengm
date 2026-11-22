@@ -1,5 +1,8 @@
 import { PLAYER } from "../../../common/constants.ts";
-import { getPreDraftStats } from "../../../common/preDraft.ts";
+import {
+	getPreDraftStats,
+	hasPreDraftStats,
+} from "../../../common/preDraft.ts";
 import {
 	getClassStats,
 	type CollegeProspect,
@@ -123,7 +126,13 @@ export const getClassTeamContext = async ({
 		for (const p of players) {
 			if (p.preDraftCareer) {
 				teamMembers.push(...storedMembers(p, classStats));
-			} else if (p.tid === PLAYER.UNDRAFTED && p.ratings.length > 0) {
+			} else if (
+				p.tid === PLAYER.UNDRAFTED &&
+				p.ratings.length > 0 &&
+				// Imported stats (a linked college league's, a real class's) are his teams: no plan
+				!p.linkedCollege &&
+				!hasPreDraftStats(p)
+			) {
 				unstored.push(p);
 			}
 		}

@@ -52,6 +52,8 @@ export type CollegeProspect = {
 	// His college is a fact (a real player's real college, a linked college league's team): he plays his draft year there, never in the
 	// pro pathway program instead
 	fixedSchool?: boolean;
+	// From a linked college league: his teams are that league's, so he is on no roster here (class-aware teams, teams.ts)
+	linked?: boolean;
 	// Birth place, like "Chicago, IL, USA", used to guess a destination for prospects with no college
 	bornLoc: string;
 	// Listed height in inches, if known (otherwise it is read off the hgt rating). Only used to tell who is unusually tall or small

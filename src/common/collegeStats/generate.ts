@@ -240,7 +240,7 @@ const planProspects = (
 				year.lag + stayLag,
 			);
 			years.push({ year, zTalent, ratings });
-			if (teams && isTeamSchool(year.school)) {
+			if (teams && !p.linked && isTeamSchool(year.school)) {
 				const expected = expectedRole({
 					ratings,
 					zTalent,
@@ -354,7 +354,7 @@ export const generateCollegeClass = (
 			const role = roles.get(`${p.key}|${year.season}`);
 			let teamGames = year.teamGames;
 			let pace: number | undefined;
-			if (teams && !proEnv && isTeamSchool(year.school)) {
+			if (teams && !p.linked && !proEnv && isTeamSchool(year.school)) {
 				const teamSeason = getTeamSeason(year.school, year.season);
 				pace = teamSeason.pace;
 				year.pace = pace;
