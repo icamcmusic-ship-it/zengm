@@ -11,6 +11,22 @@ import type { RouteParams } from "../../ui/router/types.ts";
 import { getCollegeSeason } from "../core/draft/collegeSeason.ts";
 import { featureOn } from "../util/nativeFeatures.ts";
 import { getScoutReport } from "../core/draft/scouting.ts";
+import { getTeammates } from "../core/draft/classTeams.ts";
+import { getPlayerProduction } from "../core/draft/production.ts";
+import {
+	getSeasonContext,
+	strengthOfTeam,
+} from "../../common/collegeStats/production.ts";
+import type { SeasonRole } from "../../common/collegeStats/roles.ts";
+
+// Notable teammates listed a season
+const MAX_TEAMMATES = 5;
+
+const ROLE_NOTES: Record<SeasonRole, string> = {
+	breakout: "Breakout season: a much bigger role than the year before",
+	slump: "Down season: his role and his numbers slipped",
+	midStarter: "Came off the bench, then moved into the starting lineup",
+};
 import {
 	getMedicalReason,
 	getPlayerCombine,
@@ -435,6 +451,9 @@ const getPreDraftInfo = async (pRaw: Player) => {
 				year: undefined,
 			}));
 
+	// Class-aware teams: other prospects (every draft class) on his teams, season by season
+	const teammatesBySeason = await getTeammates(pRaw);
+
 	let collegeIndex = 0;
 	const seasons = [];
 	let prevTeam: string | undefined;
@@ -479,6 +498,10 @@ const getPreDraftInfo = async (pRaw: Player) => {
 			notes.push(
 				`Missed ${year.injury.games} ${year.injury.games === 1 ? "game" : "games"}: ${year.injury.type}`,
 			);
+		}
+		// Role changes
+		if (year?.role) {
+			notes.push(ROLE_NOTES[year.role]);
 		}
 		prevTeam = teamName;
 		prevYear = year;
@@ -572,8 +595,21 @@ const getPreDraftInfo = async (pRaw: Player) => {
 			confRank,
 			gp: row.gp ?? 0,
 			gs: row.gs ?? 0,
+			// Strength of schedule, pace, per 40 and per 100 possessions, schedule-adjusted
+			context: gap
+				? undefined
+				: getSeasonContext(row as any, {
+						strength: strengthOfTeam(teamName),
+						pace: year?.pace,
+					}),
+			teammates: (teammatesBySeason.get(row.season) ?? [])
+				.filter((t) => t.gp > 0)
+				.slice(0, MAX_TEAMMATES),
 		});
 	}
+
+	// Age-adjusted production, and where it ranks in his class
+	const production = getPlayerProduction(pRaw);
 
 	// Recruiting, for a player with a US high school path (an NCAA or junior college first stop). His ranks are his own within his high
 	// school class
@@ -738,9 +774,28 @@ const getPreDraftInfo = async (pRaw: Player) => {
 				)
 			: [];
 
+	let productionRank: { rank: number; n: number } | undefined;
+	if (production) {
+		const values = classPlayers
+			.map((p) => (p.pid === pRaw.pid ? production : getPlayerProduction(p)))
+			.filter((x) => x !== undefined)
+			.map((x) => x.value);
+		productionRank = {
+			rank: values.filter((v) => v > production.value).length + 1,
+			n: values.length,
+		};
+	}
+
 	return {
 		draftYear,
 		drafted,
+		production: production
+			? {
+					value: production.value,
+					minutes: production.minutes,
+					...productionRank,
+				}
+			: undefined,
 		draft:
 			pick !== undefined
 				? {

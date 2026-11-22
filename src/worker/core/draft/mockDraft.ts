@@ -28,6 +28,8 @@ export type MockProspect = {
 	traitFactors?: Record<number, number>;
 	// Draft Lottery Night & Combine setting: the AI's combine nudge (value points), as in runPicks
 	combine?: number;
+	// Age-adjusted pre-draft production against his class (value points, bounded), as in runPicks
+	production?: number;
 };
 
 export type MockTeam = {
@@ -170,13 +172,18 @@ export const runMockDraft = ({
 					? getDraftTraitAdjustment(p.value, p.traitFactors[slot.tid]!)
 					: 0;
 			const combine = p.combine ?? 0;
+			const production = p.production ?? 0;
 			return {
 				p,
 				need,
 				strategy: needAndStrategy - need,
 				trait,
 				combine,
-				score: Math.max(0, p.value + needAndStrategy + trait + combine),
+				production,
+				score: Math.max(
+					0,
+					p.value + needAndStrategy + trait + combine + production,
+				),
 			};
 		});
 		const chosen = weightedChoice(parts, (x) => x.score, random);
@@ -203,6 +210,9 @@ export const runMockDraft = ({
 		}
 		if (chosen.combine >= 0.3) {
 			reasons.push("Combine riser");
+		}
+		if (chosen.production >= 0.9) {
+			reasons.push("Productive for his age");
 		}
 		if (reasons.length === 0) {
 			reasons.push(

@@ -85,6 +85,8 @@ describe("more pre-draft paths", () => {
 				paths: false,
 				// (the hashes predate pre-draft injuries, which have their own switch)
 				injuries: false,
+				// (and the context model: strength of schedule, class-aware teams, role changes)
+				context: false,
 			});
 			assert.strictEqual(
 				String(hashString(JSON.stringify(results))),

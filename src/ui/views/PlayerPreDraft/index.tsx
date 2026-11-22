@@ -257,6 +257,161 @@ const TeamsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 	);
 };
 
+const fmt = (x: number | undefined, digits = 1) =>
+	x === undefined ? "-" : x.toFixed(digits);
+const signed = (x: number | undefined) =>
+	x === undefined ? "-" : `${x > 0 ? "+" : ""}${x.toFixed(1)}`;
+
+// Strength of schedule, team context and age: his seasons per 40 minutes and per 100 possessions, raw and schedule-adjusted
+const ContextSection = ({ preDraft }: { preDraft: PreDraft }) => {
+	const rows = preDraft.seasons.filter((s) => s.context !== undefined);
+	if (rows.length === 0) {
+		return null;
+	}
+	const prod = preDraft.production;
+	return (
+		<HideableSection
+			title="Context-adjusted stats"
+			description="Strength of schedule (SOS, 0-100 on the conference scale, 75 is a mid-major Division I schedule), his team's pace (possessions per 40 minutes) and how much of the offense he ran (usage). Adj columns are schedule-adjusted: the same production against better competition is worth more."
+		>
+			{prod ? (
+				<p data-testid="pre-draft-production">
+					Age-adjusted production: <b>{prod.value.toFixed(1)}</b>
+					{prod.rank !== undefined && prod.n !== undefined && prod.n > 1 ? (
+						<span className="text-body-secondary">
+							{" "}
+							({helpers.ordinal(prod.rank)} of {prod.n} in the{" "}
+							{preDraft.draftYear} class)
+						</span>
+					) : null}
+					<br />
+					<span className="text-body-secondary">
+						Schedule-adjusted game score per 40 minutes of his last two seasons,
+						plus 1.8 for each year he was younger than 20.5, over {prod.minutes}{" "}
+						minutes.
+					</span>
+				</p>
+			) : null}
+			<div className="table-responsive">
+				<table
+					className="table table-striped table-borderless table-sm table-nonfluid"
+					data-testid="pre-draft-context"
+				>
+					<thead>
+						<tr>
+							<th>Year</th>
+							<th>Team</th>
+							<th title="Strength of schedule, 0-100 (75 is a mid-major Division I schedule)">
+								SOS
+							</th>
+							<th title="Team possessions per 40 minutes">Pace</th>
+							<th title="Minutes per game">MP</th>
+							<th title="Usage rate">USG%</th>
+							<th title="Points per 40 minutes">Pts/40</th>
+							<th title="Points per 40 minutes, schedule-adjusted">
+								Adj Pts/40
+							</th>
+							<th title="Rebounds per 40 minutes">Reb/40</th>
+							<th title="Assists per 40 minutes">Ast/40</th>
+							<th title="Points per 100 team possessions on the floor (pace-adjusted)">
+								Pts/100
+							</th>
+							<th title="Game score per 40 minutes">GmSc/40</th>
+							<th title="Game score per 40 minutes, schedule-adjusted">
+								Adj GmSc/40
+							</th>
+							<th title="Box plus/minus">BPM</th>
+							<th title="Box plus/minus, schedule-adjusted">Adj BPM</th>
+						</tr>
+					</thead>
+					<tbody>
+						{rows.map((s) => {
+							const c = s.context!;
+							return (
+								<tr key={s.season}>
+									<td className="text-nowrap">
+										{s.season} {s.classYear ?? null}
+									</td>
+									<td className="text-nowrap">{s.club ?? s.teamName}</td>
+									<td>{c.strength}</td>
+									<td>{fmt(c.pace)}</td>
+									<td>{fmt(c.mpg)}</td>
+									<td>{fmt(c.usgp)}</td>
+									<td>{fmt(c.pts40)}</td>
+									<td>{fmt(c.adjPts40)}</td>
+									<td>{fmt(c.trb40)}</td>
+									<td>{fmt(c.ast40)}</td>
+									<td>{fmt(c.pts100)}</td>
+									<td>{fmt(c.gmsc40)}</td>
+									<td>{fmt(c.adjGmsc40)}</td>
+									<td>{signed(c.bpm)}</td>
+									<td>{signed(c.adjBpm)}</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
+			</div>
+		</HideableSection>
+	);
+};
+
+// Class-aware teams: other prospects (any draft class) who were on his teams
+const TeammatesSection = ({ preDraft }: { preDraft: PreDraft }) => {
+	const rows = preDraft.seasons.filter((s) => s.teammates.length > 0);
+	if (rows.length === 0) {
+		return null;
+	}
+	return (
+		<HideableSection
+			title="Notable teammates"
+			description="Other draft prospects, from every class, who played on his team that season."
+		>
+			<div className="table-responsive">
+				<table
+					className="table table-striped table-borderless table-sm table-nonfluid"
+					data-testid="pre-draft-teammates"
+				>
+					<thead>
+						<tr>
+							<th>Year</th>
+							<th>Team</th>
+							<th>Teammates</th>
+						</tr>
+					</thead>
+					<tbody>
+						{rows.map((s) => (
+							<tr key={s.season}>
+								<td className="text-nowrap">{s.season}</td>
+								<td className="text-nowrap">{s.teamName}</td>
+								<td>
+									{s.teammates.map((t, i) => (
+										<span key={t.pid} className="text-nowrap">
+											{i > 0 ? ", " : null}
+											<a href={helpers.leagueUrl(["player_pre_draft", t.pid])}>
+												{t.name}
+											</a>{" "}
+											<span className="text-body-secondary">
+												({t.pos}, {t.ppg.toFixed(1)} ppg,{" "}
+												{t.draft
+													? `${t.draftYear} pick ${t.draft.round}-${t.draft.pick}${t.draft.abbrev ? ` ${t.draft.abbrev}` : ""}`
+													: t.prospect
+														? `${t.draftYear} prospect`
+														: `${t.draftYear} undrafted`}
+												)
+											</span>
+										</span>
+									))}
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		</HideableSection>
+	);
+};
+
 const pct = (a: number, b: number) =>
 	b > 0 ? `${((100 * a) / b).toFixed(1)}` : "-";
 const perGame = (x: number, gp: number) => (gp > 0 ? (x / gp).toFixed(1) : "-");
@@ -1085,6 +1240,8 @@ const PlayerPreDraft = ({
 					<ScoutNotesSection preDraft={preDraft} />
 					<TeamsSection preDraft={preDraft} />
 					<StatsSection preDraft={preDraft} />
+					<ContextSection preDraft={preDraft} />
+					<TeammatesSection preDraft={preDraft} />
 					<div className="row">
 						{preDraft.summary ? (
 							<div className="col-12 col-xl-8">

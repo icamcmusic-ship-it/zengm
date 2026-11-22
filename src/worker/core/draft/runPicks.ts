@@ -15,6 +15,7 @@ import { last } from "../../../common/utils.ts";
 import { choice } from "../../../common/random.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { getDraftCombineNudges } from "../draftCombine/index.ts";
+import { getDraftProductionNudges, productionNudgesOn } from "./production.ts";
 import { maybeAiDraftNightTrade } from "./draftNightTrades.ts";
 import { prepareWholeRoster } from "../team/ovr.ts";
 import {
@@ -155,6 +156,11 @@ const runPicks = async (
 	// Draft Lottery Night & Combine setting: a small nudge for big combine over/under-performers, averaging zero over the class
 	// (empty when off). Nobody's combine changes during the draft, so it is computed once
 	const combineNudges = await getDraftCombineNudges(playersAll);
+	// Age-adjusted pre-draft production against the class (common/collegeStats/production.ts): a modest, bounded nudge
+	const productionNudges =
+		!DRAFT_BY_TEAM_OVR && productionNudgesOn()
+			? getDraftProductionNudges(playersAll)
+			: new Map<number, number>();
 
 	// Called after either the draft is over or it's the user's pick
 	const afterDoneAuto = async () => {
@@ -298,6 +304,13 @@ const runPicks = async (
 			) {
 				adjustments = playersAll.map(
 					(p, i) => (adjustments?.[i] ?? 0) + (combineNudges.get(p.pid) ?? 0),
+				);
+			}
+
+			if (productionNudges.size > 0 && !g.get("userTids").includes(dp.tid)) {
+				adjustments = playersAll.map(
+					(p, i) =>
+						(adjustments?.[i] ?? 0) + (productionNudges.get(p.pid) ?? 0),
 				);
 			}
 

@@ -181,6 +181,69 @@ export type SeasonContext = {
 	gamesCap?: number;
 	// Games he missed with an injury in the middle of the season (pre-draft injuries, injuries.ts). Taken out of his games played
 	injuryGames?: number;
+	// Strength of schedule outside the pros: competition moves counting stats and turnovers too, and efficiency more (the context model;
+	// without it, only a little efficiency, as before)
+	sos?: boolean;
+	// Class-aware teams (teams.ts): his team's pace that season, in possessions per 40 minutes (default PACE)
+	pace?: number;
+	// Role changes: a freshman who came off the bench and moved into the starting lineup during the season. His minutes climb over the
+	// season by this much from first game to last (his average stays the same), and he starts the games after the climb
+	ramp?: number;
+};
+
+// Strength of schedule (non-pro seasons): the level of competition every adjustment is measured against (teams.ts SOS_REFERENCE)
+const SOS_REF = 75;
+// Efficiency (shooting percentages) per point of strength: better competition, lower raw efficiency for the same talent
+const SOS_EFF = 0.0016;
+// Counting stats per 40 minutes (rebounds, assists, steals, blocks) and turnovers per point of strength
+const SOS_RATE = 0.004;
+export const sosRateFactor = (strength: number) =>
+	clamp(1 + SOS_RATE * (SOS_REF - strength), 0.85, 1.2);
+
+// Minutes he starts at: a game whose planned minutes are this high or more, for a freshman whose role grew during the season
+const RAMP_START_MPG = 22;
+
+/**
+ * The part of a season's minutes per game and usage that does not depend on random numbers (simulateSeason without its draws), for a
+ * team's budget of minutes and usage (teams.ts).
+ */
+export const expectedRole = ({
+	ratings,
+	zTalent,
+	classIndex,
+	gameMinutes,
+	mpgShift = 0,
+	usageShift = 0,
+}: {
+	ratings: Ratings;
+	zTalent: number;
+	classIndex: number;
+	gameMinutes: number;
+	mpgShift?: number;
+	usageShift?: number;
+}) => {
+	const c = clamp(classIndex, 0, 3);
+	const mpg = clamp(
+		25.5 * (gameMinutes / 40) +
+			4.8 * zTalent +
+			[-2.6, -0.8, 0.7, 1.6][c]! +
+			0.04 * (ratings.endu - 45) +
+			mpgShift,
+		7,
+		35.5 * (gameMinutes / 40),
+	);
+	const zUsage =
+		(composite(ratings, "usage") - TYPICAL.usage) / TYPICAL.usageSd;
+	const usgRaw =
+		0.262 +
+		0.044 * (0.6 * zUsage + 0.4 * zTalent + usageShift) +
+		0.0045 * (c - 1.5);
+	const usg = clamp(
+		usgRaw > 0.29 ? 0.29 + 0.55 * (usgRaw - 0.29) : usgRaw,
+		0.13,
+		0.34,
+	);
+	return { mpg, usg };
 };
 
 // A stretch of games (non-conference, conference) summed up
@@ -313,11 +376,16 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	const ln = (sd: number) =>
 		Math.exp(rng.normal(0, sd * noise) - 0.5 * (sd * noise) ** 2);
 
-	// How good the schedule is. Harder leagues shave efficiency a little
-	const compAdj = -0.0022 * (ctx.strength - 70) * 0.5;
+	// How good the schedule is. Harder competition shaves efficiency, and outside the pros (whose leagues have their own environment) also
+	// the counting stats and ball security: a prospect fills the box score against a weak schedule
+	const proEnv = ctx.proEnv;
+	const sos = !!ctx.sos && !proEnv;
+	const compAdj = sos
+		? -SOS_EFF * (ctx.strength - SOS_REF)
+		: -0.0022 * (ctx.strength - 70) * 0.5;
+	const sosRate = sos ? sosRateFactor(ctx.strength) : 1;
 
 	// Games, availability and minutes
-	const proEnv = ctx.proEnv;
 	const drawnTeamGames = proEnv
 		? Math.round(
 				clamp(
@@ -380,10 +448,28 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	}
 	// Full-time starters start every game they play (bar a rare one off the bench); part-time starters vary
 	const startShare = clamp((mpg - 17) / 11, 0, 1);
-	const gs =
+	let gs =
 		startShare >= 1
 			? gp - (rng.random() < 0.15 ? 1 : 0)
 			: Math.min(gp, Math.round(gp * startShare * (0.85 + 0.3 * rng.random())));
+	// A role that grew during the season: his minutes climb from game to game, and he starts once they are a starter's
+	const ramp = ctx.ramp ?? 0;
+	const rampMean = (game: number) =>
+		ramp > 0 && gp > 1 ? mpg + ramp * ((2 * game) / (gp - 1) - 1) : mpg;
+	if (ramp > 0) {
+		// A starter's minutes, but never from the first quarter of the season (he came off the bench) and always by the last
+		const startAt = clamp(
+			RAMP_START_MPG * (gameMinutes / 40),
+			mpg - 0.5 * ramp,
+			mpg + 0.5 * ramp,
+		);
+		gs = 0;
+		for (let game = 0; game < gp; game++) {
+			if (rampMean(game) >= startAt) {
+				gs += 1;
+			}
+		}
+	}
 
 	// Usage: the share of his team's scoring chances he finishes while on the floor
 	const usageComp = composite(ratings, "usage");
@@ -405,7 +491,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 	// Turnovers: share of possessions
 	const tovComp = composite(ratings, "turnovers");
 	const tovRate = clamp(
-		byHeight("tov", b) * (1 - 0.012 * (c - 1.5)) +
+		byHeight("tov", b) * (1 - 0.012 * (c - 1.5)) * (2 - sosRate) +
 			0.1 * (tovComp - 0.44) -
 			// Expanded ratings: ball security beyond what his handle and IQ say
 			(ratings.bsc === undefined
@@ -544,8 +630,8 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 					0.05,
 					0.5,
 				);
-	const orb40 = trb40 * orbShare;
-	const drb40 = trb40 - orb40;
+	const orb40 = trb40 * sosRate * orbShare;
+	const drb40 = trb40 * sosRate - orb40;
 	const ast40 = clamp(
 		// Bigs get fewer chances to make the assist (the ball is in a guard's hands), on top of what passing and handle say
 		(1.5 +
@@ -596,7 +682,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		1.5 + 3.2 * z + rng.normal(0, 1.6 * noise) + 0.1 * (ctx.strength - 70);
 
 	// Game by game. Pace is per game, so shorter games (high school, Overtime Elite) have fewer possessions
-	const pace = proEnv?.pace ?? PACE * (gameMinutes / 40);
+	const pace = proEnv?.pace ?? (ctx.pace ?? PACE) * (gameMinutes / 40);
 	const sdMin = 0.12 * mpg + 1.5;
 	const boxes: GameBox[] = [];
 	const total = emptyBox();
@@ -631,7 +717,7 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 						? -0.008
 						: -0.012;
 		const m = clamp(
-			rng.normal(mpg, sdMin * noise + 0.1),
+			rng.normal(rampMean(game), sdMin * noise + 0.1),
 			3,
 			40 * (gameMinutes / 40),
 		);
@@ -666,9 +752,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 			2 * (box.fgAtRim + box.fgLowPost + box.fgMidRange) + 3 * box.tp + box.ft;
 		box.orb = rng.poisson(((orb40 * m) / 40) * ln(0.2));
 		box.drb = rng.poisson(((drb40 * m) / 40) * ln(0.15));
-		box.ast = rng.poisson(((ast40 * m) / 40) * ln(0.18));
-		box.stl = rng.poisson(((stl40 * m) / 40) * ln(0.2));
-		box.blk = rng.poisson(((blk40 * m) / 40) * ln(0.25));
+		box.ast = rng.poisson(((ast40 * sosRate * m) / 40) * ln(0.18));
+		box.stl = rng.poisson(((stl40 * sosRate * m) / 40) * ln(0.2));
+		box.blk = rng.poisson(((blk40 * sosRate * m) / 40) * ln(0.25));
 		box.ba = rng.poisson(
 			0.018 * (box.fgaAtRim + box.fgaLowPost) * (1.4 - b * 0.6) * 1,
 		);
@@ -770,6 +856,9 @@ export const simulateSeason = (ctx: SeasonContext): CollegeSeason => {
 		strength: ctx.strength,
 		rng,
 		z,
+		...(ctx.pace !== undefined && !proEnv
+			? { paceRatio: ctx.pace / PACE }
+			: {}),
 	});
 	Object.assign(stats, advanced);
 
