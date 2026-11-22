@@ -100,6 +100,30 @@ const classMembers = async (draftYear: number) => {
 	);
 };
 
+// The production outlet's age-adjusted read of his last pre-draft season (productionSignal), undefined without enough minutes. Also
+// what AI teams read of his production when they draft (draft/draftDecision.ts)
+export const productionSignalFor = (p: Player, age: number) => {
+	const prod = preDraftProductionFor(p);
+	return prod
+		? productionSignal(
+				{
+					gp: prod.gp,
+					min: prod.min * prod.gp,
+					pts: prod.pts * prod.gp,
+					trb: prod.trb * prod.gp,
+					ast: prod.ast * prod.gp,
+					stl: prod.stl * prod.gp,
+					blk: prod.blk * prod.gp,
+					tov: prod.tov * prod.gp,
+					fga: prod.fga * prod.gp,
+					fta: prod.fta * prod.gp,
+					level: prod.level,
+				},
+				age,
+			)
+		: undefined;
+};
+
 // What the outlets read of each prospect (the media's view: the value the league drafts by, the pre-draft stats, the combine)
 const outletInputs = async (players: Player[], draftYear: number) => {
 	const combine =
@@ -109,7 +133,6 @@ const outletInputs = async (players: Player[], draftYear: number) => {
 	return players.map((p): OutletProspect => {
 		const r = ratingsRowOf(p);
 		const age = draftYear - p.born.year;
-		const prod = preDraftProductionFor(p);
 		const tested = combine?.results.get(p.pid)?.drills
 			? athleticScore(combine.ranks.get(p.pid))
 			: undefined;
@@ -118,24 +141,7 @@ const outletInputs = async (players: Player[], draftYear: number) => {
 			value: p.value,
 			age,
 			upside: (r?.pot ?? 0) - (r?.ovr ?? 0) + 2 * (21 - age),
-			production: prod
-				? productionSignal(
-						{
-							gp: prod.gp,
-							min: prod.min * prod.gp,
-							pts: prod.pts * prod.gp,
-							trb: prod.trb * prod.gp,
-							ast: prod.ast * prod.gp,
-							stl: prod.stl * prod.gp,
-							blk: prod.blk * prod.gp,
-							tov: prod.tov * prod.gp,
-							fga: prod.fga * prod.gp,
-							fta: prod.fta * prod.gp,
-							level: prod.level,
-						},
-						age,
-					)
-				: undefined,
+			production: productionSignalFor(p, age),
 			// The tape before the combine (or when he skipped the drills), on about the same scale as the combine's athletic score
 			athletic:
 				tested ??

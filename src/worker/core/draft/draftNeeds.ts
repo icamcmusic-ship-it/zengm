@@ -8,9 +8,9 @@
  * The adjustment is at most about 2 value points, while prospects in the same range of a draft are usually several points apart, so value still decides most picks. Measured in draftNeeds.test.ts.
  */
 
-type Group = "G" | "F" | "C";
+export type Group = "G" | "F" | "C";
 
-const POS_GROUPS: Record<string, Partial<Record<Group, number>>> = {
+export const POS_GROUPS: Record<string, Partial<Record<Group, number>>> = {
 	PG: { G: 1 },
 	SG: { G: 1 },
 	G: { G: 1 },
@@ -23,6 +23,21 @@ const POS_GROUPS: Record<string, Partial<Record<Group, number>>> = {
 };
 
 const TARGET: Record<Group, number> = { G: 0.4, F: 0.38, C: 0.22 };
+
+// The group a position mostly plays in (a GF counts as a guard, a PF as a forward, an FC as a big)
+export const primaryGroup = (pos: string): Group => {
+	const groups = POS_GROUPS[pos] ?? { F: 1 };
+	let best: Group = "F";
+	let max = -1;
+	for (const group of ["G", "F", "C"] as const) {
+		const x = groups[group] ?? 0;
+		if (x > max) {
+			max = x;
+			best = group;
+		}
+	}
+	return best;
+};
 
 export const NEED_WEIGHT = 4;
 export const STRATEGY_WEIGHT = 0.05;
