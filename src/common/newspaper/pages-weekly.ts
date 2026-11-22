@@ -223,7 +223,12 @@ export const draftNightStory = (c: Ctx): Article | undefined => {
 		.toSorted((a, b) => a.gap - b.gap || a.d.pid - b.d.pid)
 		.slice(0, 3);
 	const withComps = c.noRatings ? [] : picks.slice(0, 5).filter((d) => d.comps);
+	// Why the top of the first round went the way it did (the AI's own reasons, no numbers)
+	const withWhy = picks
+		.slice(0, 8)
+		.filter((d) => d.round === 1 && d.why && d.why.length > 0);
 	if (
+		withWhy.length === 0 &&
 		trades.length === 0 &&
 		stashed.length === 0 &&
 		steals.length === 0 &&
@@ -282,6 +287,24 @@ export const draftNightStory = (c: Ctx): Article | undefined => {
 					...steals.map((x) => line(x, true)),
 					...reaches.map((x) => line(x, false)),
 				],
+			},
+		);
+	}
+	if (withWhy.length > 0) {
+		body.push(
+			{ type: "sub", text: "Why they picked him" },
+			{
+				type: "list",
+				items: withWhy.map((d): Seg[] => [
+					`No. ${overall(d, perRound)}, `,
+					c.tl(d.tid),
+					": ",
+					c.pl(d.pid, d.name),
+					` — ${d
+						.why!.slice(0, 2)
+						.map((x) => x.charAt(0).toLowerCase() + x.slice(1))
+						.join("; ")}.`,
+				]),
 			},
 		);
 	}

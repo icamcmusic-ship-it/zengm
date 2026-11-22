@@ -278,6 +278,8 @@ export type NPDraftee = {
 	stash?: string;
 	// Real Player Comps: "Name (what he became)", closest first
 	comps?: string[];
+	// AI picks: the factors that moved the pick (p.draft.why)
+	why?: string[];
 };
 
 export type NPInjury = {

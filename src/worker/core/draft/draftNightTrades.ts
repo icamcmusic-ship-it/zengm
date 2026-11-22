@@ -35,7 +35,11 @@ import getPickValues, { getNumPicksPerRound } from "../trade/getPickValues.ts";
 import processTrade from "../trade/processTrade.ts";
 import propose from "../trade/propose.ts";
 import summary from "../trade/summary.ts";
-import { getDraftAdjustment, getTeamNeeds } from "./draftNeeds.ts";
+import { decideDraft } from "./draftDecision.ts";
+import {
+	buildTeamDraftContext,
+	getClassFactsCached,
+} from "./draftDecisionData.ts";
 import getOrder from "./getOrder.ts";
 import { canBeDrafted } from "./canBeDrafted.ts";
 
@@ -96,21 +100,37 @@ export const aiAttemptChance = (round: number, aiTradesFactor: number) =>
 // prospect left by value)
 type BoardEntry = { p: Player; rank: number; score: number };
 
-const getBoard = async (tid: number, prospects: Player[]) => {
+const getBoard = async (tid: number, prospects: Player[], overall = 1) => {
 	const teamPlayers = await idb.cache.players.indexGetAll("playersByTid", tid);
-	const t = await idb.cache.teams.get(tid);
-	const gm = await getGmWeights(tid);
-	const needs = getTeamNeeds(teamPlayers);
-	return prospects
-		.slice(0, 30)
+	const top = prospects.slice(0, 30);
+	// The same scoring as its pick (draftDecision.ts), so a team trades up for the player it would actually take
+	const facts = await getClassFactsCached(prospects, g.get("season"));
+	const team = await buildTeamDraftContext({
+		tid,
+		teamPlayers,
+		prospects: top,
+	});
+	const decisions = decideDraft({
+		pool: top.map((p) => facts.get(p.pid)!),
+		team,
+		overall,
+		numTeams: g.get("numActiveTeams"),
+	});
+	return top
 		.map((p, rank): BoardEntry => ({
 			p,
 			rank,
-			score:
-				p.value + getDraftAdjustment(p, needs, t?.strategy, gm?.draftNeedScale),
+			score: decisions[rank]!.score,
 		}))
 		.sort((a, b) => b.score - a.score);
 };
+
+// Draft-night trades made in this draft (in memory), for the Why of the picks they moved: the pick a team traded up to and the
+// prospect it wanted, and the pick the other team moved down to and the prospect it hoped would last
+type DraftNightMove = { kind: "up" | "down"; overall: number; target: number };
+const moves = new Map<string, DraftNightMove>();
+const moveKey = (dpid: number) => `${g.get("lid")}|${g.get("season")}|${dpid}`;
+export const getDraftNightMove = (dpid: number) => moves.get(moveKey(dpid));
 
 // Wants to move up from its pick at index own (in the remaining order) to the pick at index slot: its top prospect is
 // probably gone before its own pick (consensus rank < own) but should still be there at slot. Returns the urgency, or 0
@@ -349,6 +369,7 @@ export const maybeAiDraftNightTrade = async (
 		own: DraftPick;
 		ownIndex: number;
 		urgency: number;
+		target: number;
 	}[] = [];
 	const seen = new Set([sellerTid]);
 	for (let i = 1; i < order.length && i <= MAX_TRADE_UP_JUMP; i++) {
@@ -357,14 +378,20 @@ export const maybeAiDraftNightTrade = async (
 			continue;
 		}
 		seen.add(own.tid);
-		const board = await getBoard(own.tid, prospects);
+		const board = await getBoard(own.tid, prospects, overallPick(dp));
 		const target = board[0];
 		if (!target) {
 			continue;
 		}
 		const urgency = tradeUpUrgency(target.rank, 0, i);
 		if (urgency > 0) {
-			candidates.push({ tid: own.tid, own, ownIndex: i, urgency });
+			candidates.push({
+				tid: own.tid,
+				own,
+				ownIndex: i,
+				urgency,
+				target: target.p.pid,
+			});
 		}
 	}
 	if (candidates.length === 0) {
@@ -382,7 +409,7 @@ export const maybeAiDraftNightTrade = async (
 
 	// Is the team on the clock willing to move down? More so when its own top prospect should still be there at the
 	// buyer's pick, or it's rebuilding
-	const sellerBoard = await getBoard(sellerTid, prospects);
+	const sellerBoard = await getBoard(sellerTid, prospects, overallPick(dp));
 	const sellerTarget = sellerBoard[0]!;
 	const seller = await idb.cache.teams.get(sellerTid);
 	const willing =
@@ -441,6 +468,12 @@ export const maybeAiDraftNightTrade = async (
 	const overall = overallPick(dp);
 	await processTrade(teams, undefined, {
 		note: `${DRAFT_NIGHT_NOTE_PREFIX}the ${teamName(buyer.tid)} traded up to No. ${overall} with the ${teamName(sellerTid)}.`,
+	});
+	moves.set(moveKey(dp.dpid), { kind: "up", overall, target: buyer.target });
+	moves.set(moveKey(buyer.own.dpid), {
+		kind: "down",
+		overall: overallPick(buyer.own),
+		target: sellerTarget.p.pid,
 	});
 	return true;
 };

@@ -6,6 +6,7 @@ import {
 	type MockTeam,
 } from "./mockDraft.ts";
 import type { DraftPick } from "../../../common/types.ts";
+import { BEST_AVAILABLE_REASON } from "./draftDecision.ts";
 import { projectProspect, summarizeCareers } from "./proProjection.ts";
 import genRatings from "../player/genRatings.ts";
 import { resetG } from "../../../test/helpers.ts";
@@ -73,7 +74,7 @@ describe("runMockDraft", () => {
 			random: makeRandom(2),
 		});
 		assert.strictEqual(picks[0]!.pid, 1);
-		assert.include(picks[0]!.reasons, "Best available");
+		assert.include(picks[0]!.reasons, BEST_AVAILABLE_REASON);
 	});
 
 	test("need breaks a near tie, with the need as the reason", () => {
@@ -88,10 +89,13 @@ describe("runMockDraft", () => {
 				useNeeds: true,
 				useTraits: false,
 				random: makeRandom(seed * 100_003),
+				// (a late first-round pick: at the top of the draft the best player available dominates)
+				firstOverall: 20,
+				numTeams: 30,
 			});
 			if (picks[0]!.pid === 2) {
 				guardPicks += 1;
-				assert.include(picks[0]!.reasons, "Fills the need at guard");
+				assert.include(picks[0]!.reasons, "Fills a need at guard");
 			}
 		}
 		assert.isAbove(guardPicks, 40);

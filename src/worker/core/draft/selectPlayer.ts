@@ -17,9 +17,10 @@ import { canBeDrafted } from "./canBeDrafted.ts";
  * @memberOf core.draft
  * @param {object} dp Pick object, like from getOrder, that contains information like the team, round, etc.
  * @param {number} pid Integer player ID for the player to be drafted.
+ * @param why The AI's reasons for the pick (draftDecision.ts explainPick), stored on the player and in the news
  * @return {Promise<boolean>} false if the player is not available to be drafted, like if the user double clicked on a player who was already picked.
  */
-const selectPlayer = async (dp: DraftPick, pid: number) => {
+const selectPlayer = async (dp: DraftPick, pid: number, why?: string[]) => {
 	if (dp.pick <= 0) {
 		console.log(dp);
 		throw new Error(`Invalid draft pick number "${dp.pick}"`);
@@ -75,6 +76,9 @@ const selectPlayer = async (dp: DraftPick, pid: number) => {
 			skills: p.ratings[0].skills,
 			dpid: dp.dpid,
 		};
+		if (why && why.length > 0) {
+			p.draft.why = why;
+		}
 	}
 
 	// Contract
@@ -210,7 +214,11 @@ const selectPlayer = async (dp: DraftPick, pid: number) => {
 			p.firstName
 		} ${p.lastName}</a> with the ${helpers.ordinal(
 			pickNum,
-		)} pick in the ${draftName}.`,
+		)} pick in the ${draftName}.${
+			p.draft.why && p.draft.why.length > 0
+				? ` Why: ${p.draft.why.slice(0, 2).join("; ")}.`
+				: ""
+		}`,
 		showNotification: false,
 		pids: [p.pid],
 		tids: eventTids,

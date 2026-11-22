@@ -25,13 +25,13 @@ import {
 } from "./proProjection.ts";
 import { getFuzz } from "../player/fuzzRating.ts";
 import {
-	getAiTraitTeamContext,
-	getAiTraitValueFactor,
+	makeAiTraitValueFactorCache,
 	traitsEnabled,
 } from "../player/traits.ts";
-import { getGmWeights } from "../gm/index.ts";
-import { getDraftCombineNudges } from "../draftCombine/index.ts";
-import { getDraftProductionNudges, productionNudgesOn } from "./production.ts";
+import {
+	buildTeamDraftContext,
+	getClassFactsCached,
+} from "./draftDecisionData.ts";
 import { getPreDraftRanks } from "./preDraftRanks.ts";
 
 const MOCK_ROUNDS = 2;
@@ -160,28 +160,28 @@ export const getMockDraft = async () => {
 		number,
 		{ needs: string[]; strategy: string | undefined }
 	> = {};
-	const traitContext: Record<
-		number,
-		{ strategy: any; team: ReturnType<typeof getAiTraitTeamContext> }
-	> = {};
+	// The same team context and class facts the real draft uses (draftDecisionData.ts)
+	const getTraitFactor = makeAiTraitValueFactorCache();
 	for (const tid of tids) {
-		const t = await idb.cache.teams.get(tid);
 		const teamPlayers = await idb.cache.players.indexGetAll(
 			"playersByTid",
 			tid,
 		);
+		const ctx = await buildTeamDraftContext({
+			tid,
+			teamPlayers,
+			prospects: players,
+			getTraitFactor: useTraits ? getTraitFactor : undefined,
+		});
 		const needs = getTeamNeeds(teamPlayers);
 		teams.set(tid, {
 			tid,
 			needs,
-			strategy: t?.strategy,
-			needScale: (await getGmWeights(tid))?.draftNeedScale,
+			strategy: ctx.strategy,
+			needScale: ctx.gm?.draftNeedScale,
+			ctx,
 		});
-		teamInfo[tid] = { needs: getNeedLabels(needs), strategy: t?.strategy };
-		traitContext[tid] = {
-			strategy: t?.strategy,
-			team: getAiTraitTeamContext(teamPlayers),
-		};
+		teamInfo[tid] = { needs: getNeedLabels(needs), strategy: ctx.strategy };
 	}
 
 	// The user's scouting list order (fuzzed value), for reach/steal
@@ -214,28 +214,15 @@ export const getMockDraft = async () => {
 		).filter((p) => p.draft.year === season && p.draft.round > 0).length;
 	}
 
-	// Draft Lottery Night & Combine setting: the AI's combine nudge, as in runPicks
-	const combineNudges = await getDraftCombineNudges(players, season);
-	// Age-adjusted pre-draft production, as in runPicks
-	const productionNudges = productionNudgesOn()
-		? getDraftProductionNudges(players)
-		: new Map<number, number>();
+	// What the AI reads of every prospect (combine, medicals, production, big boards, ...), as in runPicks
+	const facts = await getClassFactsCached(players, season);
 
 	const prospects = players.map((p) => ({
 		pid: p.pid,
 		value: p.value,
-		combine: combineNudges.get(p.pid),
-		production: productionNudges.get(p.pid),
 		ratings: p.ratings,
 		scoutRank: scoutRank.get(p.pid) ?? players.length,
-		traitFactors: useTraits
-			? Object.fromEntries(
-					tids.map((tid) => [
-						tid,
-						getAiTraitValueFactor(p, traitContext[tid]!),
-					]),
-				)
-			: undefined,
+		facts: facts.get(p.pid),
 	}));
 
 	const picks = runMockDraft({
@@ -245,6 +232,7 @@ export const getMockDraft = async () => {
 		useNeeds,
 		useTraits,
 		firstOverall,
+		numTeams: g.get("numActiveTeams"),
 	});
 
 	const byPid = new Map(formatted.map((p: any) => [p.pid, p]));

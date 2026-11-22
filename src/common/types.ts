@@ -1643,6 +1643,8 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 		ovr: number;
 		skills: string[];
 		dpid?: number;
+		// Basketball AI picks: the top factors that moved the pick (draft/draftDecision.ts explainPick), plain lines without hidden numbers
+		why?: string[];
 	};
 	face: FaceConfig;
 	// League Extras "Face Aging": generated face, per-season snapshots and edit lock (common/faceAging.ts)

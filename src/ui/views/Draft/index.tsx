@@ -301,6 +301,18 @@ const Draft = ({
 			sortType: "number",
 		});
 	}
+	// Why each AI pick was made (the factors that moved it), when any pick has one
+	const showWhy =
+		!fantasyDraft &&
+		!expansionDraft &&
+		drafted.some((p) => isDraftedPlayer(p) && p.draft.why);
+	if (showWhy) {
+		colsDrafted.push({
+			title: "Why",
+			desc: "The top factors that moved the pick, from the team's own draft board (hover for all of them)",
+			sortSequence: [],
+		});
+	}
 
 	if (expansionDraft) {
 		colsDrafted.splice(4, 1);
@@ -426,6 +438,34 @@ const Draft = ({
 			data.push(
 				isDraftedPlayer(p) && p.preDraftRank !== undefined
 					? wrappedPreDraftVsPick(p.overallPick, p.preDraftRank)
+					: null,
+			);
+		}
+		if (showWhy) {
+			const why = isDraftedPlayer(p) ? p.draft.why : undefined;
+			data.push(
+				why && why.length > 0
+					? {
+							// Hover for all of them, or click to expand
+							value:
+								why.length > 1 ? (
+									<details className="small" title={why.join("\n")}>
+										<summary>
+											{why[0]}
+											<span className="text-body-secondary">
+												{" "}
+												+{why.length - 1}
+											</span>
+										</summary>
+										{why.slice(1).map((line) => (
+											<div key={line}>{line}</div>
+										))}
+									</details>
+								) : (
+									<span className="small">{why[0]}</span>
+								),
+							searchValue: why.join(" "),
+						}
 					: null,
 			);
 		}

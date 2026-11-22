@@ -2,7 +2,7 @@
  * League data for the AI draft decision (draftDecision.ts): what each prospect of a class brings (computed once per draft or mock draft)
  * and what each team on the clock is looking for. Nothing here draws from the game's random numbers.
  */
-import { DRAFT_BY_TEAM_OVR, PHASE } from "../../../common/constants.ts";
+import { PHASE } from "../../../common/constants.ts";
 import { DEFENSE_NAMES, OFFENSE_NAMES } from "../../../common/coachSystems.ts";
 import { playerSchemeFit } from "../../../common/coachSystems.ts";
 import { athleticScore, combineNudges } from "../../../common/draftCombine.ts";
@@ -18,10 +18,15 @@ import {
 	lotteryNightOn,
 	medicalsOn,
 } from "../draftCombine/index.ts";
-import { getClassBoards, productionSignalFor } from "../draftOutlets/index.ts";
+import { getClassBoards } from "../draftOutlets/index.ts";
+import { getDraftProductionNudges, productionNudgesOn } from "./production.ts";
 import { getGmWeights } from "../gm/index.ts";
 import { gmFinanceStyleOf } from "../gm/finance.ts";
-import { getDraftTraitAdjustment, getTeamNeeds, primaryGroup } from "./draftNeeds.ts";
+import {
+	getDraftTraitAdjustment,
+	getTeamNeeds,
+	primaryGroup,
+} from "./draftNeeds.ts";
 import type { ProspectFacts, TeamDraftContext } from "./draftDecision.ts";
 import {
 	coachSystemsEnabled,
@@ -37,8 +42,26 @@ import {
 	traitsEnabled,
 } from "../player/traits.ts";
 
-// The new decision runs where AI Drafts by Need is about (basketball); other sports draft by team ovr
-export const draftDecisionOn = () => !DRAFT_BY_TEAM_OVR;
+// During the draft nothing a prospect brings changes, so the class facts are kept for the draft: the real picks, draft-night trade
+// boards and the Mock Draft of the remaining picks all read the same ones
+let factsMemo: { key: string; facts: Map<number, ProspectFacts> } | undefined;
+
+export const getClassFactsCached = async (
+	players: Player[],
+	season: number,
+) => {
+	const key = `${g.get("lid")}|${season}|${g.get("phase")}`;
+	if (
+		g.get("phase") === PHASE.DRAFT &&
+		factsMemo?.key === key &&
+		players.every((p) => factsMemo!.facts.get(p.pid)?.value === p.value)
+	) {
+		return factsMemo.facts;
+	}
+	const facts = await buildClassFacts(players, season, true);
+	factsMemo = { key, facts };
+	return facts;
+};
 
 const zScores = (xs: (number | undefined)[]) => {
 	const vals = xs.filter((x): x is number => x !== undefined);
@@ -47,28 +70,29 @@ const zScores = (xs: (number | undefined)[]) => {
 	}
 	const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
 	const sd =
-		Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length) ||
-		1;
+		Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length) || 1;
 	return xs.map((x) => (x === undefined ? undefined : (x - mean) / sd));
 };
 
 const PRODUCTION_OUTLET = OUTLETS.find((o) => o.lean === "production")?.id;
 
 /**
- * What every prospect of a class brings to the AI's decision. season: the class's draft year. withCombine: the combine counts (the real
- * draft in the draft phase, or a mock draft of a class whose combine was held; never fantasy or expansion drafts).
+ * What every prospect of a class brings to the AI's decision. season: the class's draft year. regular: a real draft class (the draft
+ * phase, or a mock draft); fantasy and expansion drafts get value and ratings only (no boards, production, combine or stash).
  */
 export const buildClassFacts = async (
 	players: Player[],
 	season: number,
-	withCombine: boolean,
+	regular: boolean,
 ): Promise<Map<number, ProspectFacts>> => {
 	const byValue = [...players].sort((a, b) => b.value - a.value);
 	const valueRank = new Map(byValue.map((p, i) => [p.pid, i + 1]));
 
 	// Big boards: consensus, production model and how split the outlets are
 	const boards =
-		players.length > 0 ? await getClassBoards(season).catch(() => undefined) : undefined;
+		regular && players.length > 0
+			? await getClassBoards(season).catch(() => undefined)
+			: undefined;
 	const consensus = boards?.consensus;
 	const prodBoard =
 		PRODUCTION_OUTLET !== undefined
@@ -80,20 +104,17 @@ export const buildClassFacts = async (
 	});
 	const spreadZ = zScores(spreadRaw);
 
-	// Age-adjusted production vs value, over the prospects with enough minutes
-	const prodRaw = players.map((p) =>
-		productionSignalFor(p, season - p.born.year),
-	);
-	const prodZ = zScores(prodRaw);
-	const valueZ = zScores(
-		players.map((p, i) => (prodRaw[i] !== undefined ? p.value : undefined)),
-	);
+	// Age-adjusted pre-draft production against the class (common/collegeStats/production.ts)
+	const production =
+		regular && productionNudgesOn()
+			? getDraftProductionNudges(players)
+			: new Map<number, number>();
 
 	// Combine: performance nudge, athleticism, medicals
 	let perf = new Map<number, number>();
 	const athletic = new Map<number, number>();
 	const medical = new Map<number, number>();
-	if (withCombine && lotteryNightOn() && combineHeld(season)) {
+	if (regular && lotteryNightOn() && combineHeld(season)) {
 		const classPlayers = players.filter((p) => p.draft.year === season);
 		const c = await getClassCombine(season, classPlayers);
 		perf = combineNudges(
@@ -113,7 +134,8 @@ export const buildClassFacts = async (
 		}
 	}
 
-	const stashOn = __SPORT === "basketball" && featureOn("draftStash");
+	const stashOn =
+		regular && __SPORT === "basketball" && featureOn("draftStash");
 	const systemsOn = coachSystemsEnabled();
 
 	const out = new Map<number, ProspectFacts>();
@@ -130,8 +152,7 @@ export const buildClassFacts = async (
 			valueRank: valueRank.get(p.pid),
 			consensusRank: consensus?.get(p.pid)?.rank,
 			prodModelRank: prodBoard?.get(p.pid),
-			prodZ: prodZ[i],
-			valueZ: valueZ[i],
+			production: production.get(p.pid),
 			spread: spreadZ[i],
 			combinePerf: perf.get(p.pid),
 			athletic: athletic.get(p.pid),
@@ -142,10 +163,6 @@ export const buildClassFacts = async (
 	});
 	return out;
 };
-
-// Fantasy and expansion drafts: no class facts beyond value and ratings
-export const combineCountsNow = () =>
-	g.get("phase") === PHASE.DRAFT && g.get("expansionDraft").phase !== "draft";
 
 /**
  * What an AI team on the clock is looking for. prospects: the players left (for the trait and lens adjustments), getTraitFactor: a

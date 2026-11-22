@@ -14,25 +14,24 @@ import { player, team } from "../index.ts";
 import { last } from "../../../common/utils.ts";
 import { choice } from "../../../common/random.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
-import { getDraftCombineNudges } from "../draftCombine/index.ts";
-import { getDraftProductionNudges, productionNudgesOn } from "./production.ts";
-import { maybeAiDraftNightTrade } from "./draftNightTrades.ts";
+import {
+	getDraftNightMove,
+	maybeAiDraftNightTrade,
+} from "./draftNightTrades.ts";
 import { prepareWholeRoster } from "../team/ovr.ts";
+import { makeAiTraitValueFactorCache } from "../player/traits.ts";
 import {
-	getDraftAdjustment,
-	getDraftTraitAdjustment,
-	getTeamNeeds,
-} from "./draftNeeds.ts";
+	decideDraft,
+	explainPick,
+	type ProspectDecision,
+	type ProspectFacts,
+	type TeamDraftContext,
+} from "./draftDecision.ts";
 import {
-	makeAiTraitValueFactorCache,
-	traitsEnabled,
-} from "../player/traits.ts";
-import { getGmWeights } from "../gm/index.ts";
-import { gmDraftUpsideAdjustment } from "../../../common/gmPersonality.ts";
-import {
-	gmLensAdjustments,
-	scoutingReportsOn,
-} from "../scoutingReports/index.ts";
+	buildClassFacts,
+	getClassFactsCached,
+	buildTeamDraftContext,
+} from "./draftDecisionData.ts";
 
 // Top ranked prospect on the user's draft board who is still available
 export const getDraftBoardPick = <T extends { draftBoard?: { rank?: number } }>(
@@ -153,14 +152,11 @@ const runPicks = async (
 	}
 	playersAll.sort((a, b) => b.value - a.value);
 
-	// Draft Lottery Night & Combine setting: a small nudge for big combine over/under-performers, averaging zero over the class
-	// (empty when off). Nobody's combine changes during the draft, so it is computed once
-	const combineNudges = await getDraftCombineNudges(playersAll);
-	// Age-adjusted pre-draft production against the class (common/collegeStats/production.ts): a modest, bounded nudge
-	const productionNudges =
-		!DRAFT_BY_TEAM_OVR && productionNudgesOn()
-			? getDraftProductionNudges(playersAll)
-			: new Map<number, number>();
+	// The AI's read of every prospect (combine, medicals, production, big boards, ...): nobody's changes during the draft, so it is
+	// computed once, at the first AI pick. Fantasy and expansion drafts: value and ratings only
+	const regularDraft =
+		g.get("phase") === PHASE.DRAFT && expansionDraft.phase !== "draft";
+	let classFacts: Map<number, ProspectFacts> | undefined;
 
 	// Called after either the draft is over or it's the user's pick
 	const afterDoneAuto = async () => {
@@ -238,80 +234,30 @@ const runPicks = async (
 				dp.tid,
 			);
 			const teamOvrDiffs = await getTeamOvrDiffs(teamPlayers, playersAll);
+			const userTeam = g.get("userTids").includes(dp.tid);
 
-			// AI GM personalities (setting): need vs best available, upside vs ready now. Undefined when off
-			const gm = !DRAFT_BY_TEAM_OVR ? await getGmWeights(dp.tid) : undefined;
-
-			// Basketball: a small need/strategy adjustment on top of value (see draftNeeds.ts)
-			let adjustments: number[] | undefined;
-			if (
-				!DRAFT_BY_TEAM_OVR &&
-				featureOn("aiDraftNeeds") &&
-				!g.get("userTids").includes(dp.tid)
-			) {
-				const t = await idb.cache.teams.get(dp.tid);
-				const needs = getTeamNeeds(teamPlayers);
-				adjustments = playersAll.map((p) =>
-					getDraftAdjustment(p, needs, t?.strategy, gm?.draftNeedScale),
-				);
-			}
-
-			if (gm) {
-				const season = g.get("season");
-				adjustments = playersAll.map((p, i) => {
-					const r = p.ratings.at(-1)!;
-					return (
-						(adjustments?.[i] ?? 0) +
-						gmDraftUpsideAdjustment(gm, {
-							age: season - p.born.year,
-							ovr: r.ovr,
-							pot: r.pot,
-						})
-					);
+			// Basketball: value plus the AI's bounded draft factors (need, fit, timeline, production, combine, medicals, GM...), see
+			// draftDecision.ts. User teams drafting on auto take the best player by value, as before
+			let decisions: ProspectDecision[] | undefined;
+			let teamCtx: TeamDraftContext | undefined;
+			if (!DRAFT_BY_TEAM_OVR && !userTeam) {
+				classFacts ??= regularDraft
+					? await getClassFactsCached(playersAll, g.get("season"))
+					: await buildClassFacts(playersAll, g.get("season"), false);
+				teamCtx = await buildTeamDraftContext({
+					tid: dp.tid,
+					teamPlayers,
+					prospects: playersAll,
+					getTraitFactor,
 				});
-			}
-
-			// Scouting Reports (setting): the GM reads his scouts' grades through his analytics/old-school lens (zero-sum, bounded)
-			if (gm && scoutingReportsOn() && !g.get("userTids").includes(dp.tid)) {
-				const lens = gmLensAdjustments(playersAll, gm.traits.analytics);
-				adjustments = playersAll.map(
-					(p, i) => (adjustments?.[i] ?? 0) + lens[i]!,
-				);
-			}
-
-			// Player traits (setting): what the scouts can read of a prospect's traits, a bounded nudge of at most DRAFT_TRAIT_MAX_ADJ value points
-			if (
-				!DRAFT_BY_TEAM_OVR &&
-				traitsEnabled() &&
-				!g.get("userTids").includes(dp.tid)
-			) {
-				const t = await idb.cache.teams.get(dp.tid);
-				const traitTeam = getTraitFactor.teamContext(teamPlayers);
-				adjustments = playersAll.map(
-					(p, i) =>
-						(adjustments?.[i] ?? 0) +
-						getDraftTraitAdjustment(
-							p.value,
-							getTraitFactor(p, { strategy: t?.strategy, team: traitTeam }),
-						),
-				);
-			}
-
-			if (
-				!DRAFT_BY_TEAM_OVR &&
-				combineNudges.size > 0 &&
-				!g.get("userTids").includes(dp.tid)
-			) {
-				adjustments = playersAll.map(
-					(p, i) => (adjustments?.[i] ?? 0) + (combineNudges.get(p.pid) ?? 0),
-				);
-			}
-
-			if (productionNudges.size > 0 && !g.get("userTids").includes(dp.tid)) {
-				adjustments = playersAll.map(
-					(p, i) =>
-						(adjustments?.[i] ?? 0) + (productionNudges.get(p.pid) ?? 0),
-				);
+				teamCtx.move = getDraftNightMove(dp.dpid);
+				const numTeams = g.get("numActiveTeams");
+				decisions = decideDraft({
+					pool: playersAll.map((p) => classFacts!.get(p.pid)!),
+					team: teamCtx,
+					overall: (dp.round - 1) * numTeams + dp.pick,
+					numTeams,
+				});
 			}
 
 			const score = (p: Player, i: number) => {
@@ -319,21 +265,12 @@ const runPicks = async (
 					return (teamOvrDiffs[i]! + 0.05 * p.value) ** 40;
 				}
 
-				return Math.max(0, p.value + (adjustments?.[i] ?? 0)) ** 69;
+				return (decisions?.[i]?.score ?? Math.max(0, p.value)) ** 69;
 			};
-			/*let sum = 0;
-			for (const p of playersAll) {
-				sum += score(p);
-			}
-			for (let i = 0; i < playersAll.length; i++) {
-				const p = playersAll[i];
-				console.log(p.firstName, p.lastName, teamOvrDiffs[i], 0.05 * p.value, score(p) / sum);
-			}
-			console.log(sum);*/
 
 			// The user's own draft board, when auto drafting for the user
 			const boardPick =
-				g.get("userTids").includes(dp.tid) &&
+				userTeam &&
 				featureOn("draftBoard") &&
 				// Scouting Director & Regions: the Director's board is the draft-day auto pick
 				(g.get("draftBoardAutoDraft") || featureOn("scoutingDepth"))
@@ -342,8 +279,20 @@ const runPicks = async (
 
 			const selection = boardPick ?? choice(playersAll, score);
 
+			// Why: the factors that moved the pick, from the same parts as the score
+			const why =
+				decisions && teamCtx
+					? explainPick({ decisions, chosenPid: selection.pid, team: teamCtx })
+					: !DRAFT_BY_TEAM_OVR && userTeam && regularDraft
+						? [
+								boardPick
+									? "Top of your draft board"
+									: "Auto draft: best available",
+							]
+						: undefined;
+
 			const pid = selection.pid;
-			await selectPlayer(dp, pid);
+			await selectPlayer(dp, pid, why);
 			pids.push(pid);
 			playersAll = playersAll.filter((p) => p !== selection); // Delete from the list of undrafted players
 

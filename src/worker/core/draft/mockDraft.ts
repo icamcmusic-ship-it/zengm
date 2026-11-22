@@ -1,8 +1,8 @@
 /**
  * Mock draft (League extras "Mock Draft", basketball). A dry run of the AI draft logic in runPicks.ts: each team on the
- * clock scores every available prospect by value plus the same bounded adjustments the real AI uses (need/strategy from
- * draftNeeds.ts when "AI Drafts by Need" is on, player traits when they are on) and picks with the same weighted random
- * choice (score ** 69). Nothing is saved. Each pick comes with the reason the adjustment points to.
+ * clock scores every available prospect with the same decision as the real AI (draftDecision.ts: value plus bounded need,
+ * fit, timeline, production, combine, medical and GM factors) and picks with the same weighted random choice (score ** 69).
+ * Nothing is saved. Each pick comes with the same Why as a real pick (explainPick), plus reach/steal against your board.
  *
  * Ported in spirit from the Draft Workshop's mock draft (bbgmdraft js/pro.js), but with BBGM's own teams, pick order and
  * AI draft logic instead of invented ones.
@@ -10,11 +10,13 @@
 import type { DraftPick } from "../../../common/types.ts";
 import { helpers } from "../../../common/helpers.ts";
 import { resolvePickConditionsPure } from "./pickConditions.ts";
+import { getDraftTraitAdjustment, type TeamNeeds } from "./draftNeeds.ts";
 import {
-	getDraftAdjustment,
-	getDraftTraitAdjustment,
-	type TeamNeeds,
-} from "./draftNeeds.ts";
+	decideDraft,
+	explainPick,
+	type ProspectFacts,
+	type TeamDraftContext,
+} from "./draftDecision.ts";
 
 export type MockProspect = {
 	pid: number;
@@ -30,6 +32,8 @@ export type MockProspect = {
 	combine?: number;
 	// Age-adjusted pre-draft production against his class (value points, bounded), as in runPicks
 	production?: number;
+	// Everything the AI reads of him (draftDecisionData.ts buildClassFacts); without it, the fields above
+	facts?: ProspectFacts;
 };
 
 export type MockTeam = {
@@ -38,6 +42,8 @@ export type MockTeam = {
 	strategy: "contending" | "rebuilding" | undefined;
 	// AI GM personalities (setting): the GM's need vs best available weight, like the real draft
 	needScale?: number;
+	// The whole team context of the real draft (draftDecisionData.ts buildTeamDraftContext); without it, the fields above
+	ctx?: TeamDraftContext;
 };
 
 export type MockSlot = {
@@ -96,12 +102,6 @@ export type MockPick = MockSlot & {
 	reasons: string[];
 };
 
-const GROUP_NAMES: Record<keyof TeamNeeds, string> = {
-	G: "guard",
-	F: "wing",
-	C: "big",
-};
-
 // Same exponent as the real AI (runPicks.ts): almost always the top score, sometimes the next one
 export const SCORE_EXPONENT = 69;
 
@@ -131,6 +131,81 @@ const weightedChoice = <T>(
 export const topNeedGroup = (needs: TeamNeeds) =>
 	(["G", "F", "C"] as const).reduce((a, b) => (needs[b] > needs[a] ? b : a));
 
+const factsOf = (p: MockProspect): ProspectFacts => {
+	if (p.facts) {
+		return p.facts;
+	}
+	const r = p.ratings.at(-1)!;
+	return {
+		pid: p.pid,
+		value: p.value,
+		age: 20,
+		ovr: r.ovr,
+		pot: r.pot,
+		pos: r.pos,
+		skills: [],
+		combinePerf: p.combine,
+		production: p.production,
+	};
+};
+
+const contextOf = (
+	tid: number,
+	team: MockTeam | undefined,
+	prospects: MockProspect[],
+	useNeeds: boolean,
+	useTraits: boolean,
+): TeamDraftContext => {
+	const base: TeamDraftContext = team?.ctx
+		? { ...team.ctx }
+		: {
+				tid,
+				needs: team?.needs,
+				// (no roster: no skill need, crowding or stash)
+				groupCounts: { G: 2, F: 2, C: 2 },
+				youngCore: { G: 0, F: 0, C: 0 },
+				teamSkills: { "3": 1, B: 1, Ps: 1, Di: 1, Dp: 1, R: 1, Po: 1, A: 1 },
+				strategy: team?.strategy,
+				rosterSize: 13,
+				maxRosterSize: 15,
+				gm:
+					team?.needScale !== undefined
+						? {
+								traits: {
+									patience: 0,
+									analytics: 0,
+									risk: 0,
+									taxTolerance: 0,
+									pickValue: 0,
+									tradeFreq: 0,
+									loyalty: 0,
+									faStars: 0,
+									draftBPA: 0,
+									draftUpside: 0,
+								},
+								draftNeedScale: team.needScale,
+								draftUpside: 0,
+							}
+						: undefined,
+			};
+	if (!useNeeds) {
+		base.needs = undefined;
+	}
+	if (!team?.ctx || !useTraits) {
+		base.trait = useTraits
+			? new Map(
+					prospects
+						.filter((p) => p.traitFactors?.[tid] !== undefined)
+						.map((p) => [
+							p.pid,
+							getDraftTraitAdjustment(p.value, p.traitFactors![tid]!),
+						]),
+				)
+			: undefined;
+	}
+	return base;
+};
+
 export const runMockDraft = ({
 	slots,
 	prospects,
@@ -139,6 +214,10 @@ export const runMockDraft = ({
 	useTraits,
 	random = Math.random,
 	firstOverall = 1,
+	numTeams = Math.max(
+		1,
+		slots.filter((s) => s.round === slots[0]?.round).length,
+	),
 }: {
 	slots: MockSlot[];
 	prospects: MockProspect[];
@@ -149,94 +228,62 @@ export const runMockDraft = ({
 	// Overall number of the first slot. 1 = the whole draft; during the draft (Frozen Pre-draft Ranks setting), the next real pick, so a
 	// steal or reach compares the pick with the frozen pre-draft rank on the same scale
 	firstOverall?: number;
+	// Teams per round (the pick scale of the fit factors)
+	numTeams?: number;
 }): MockPick[] => {
 	let pool = [...prospects].sort((a, b) => b.value - a.value);
 	const picks: MockPick[] = [];
+	const contexts = new Map<number, TeamDraftContext>();
 
 	for (const slot of slots) {
 		if (pool.length === 0) {
 			break;
 		}
-		const team = teams.get(slot.tid);
-		const parts = pool.map((p) => {
-			const need =
-				useNeeds && team
-					? getDraftAdjustment(p, team.needs, undefined, team.needScale)
-					: 0;
-			const needAndStrategy =
-				useNeeds && team
-					? getDraftAdjustment(p, team.needs, team.strategy, team.needScale)
-					: 0;
-			const trait =
-				useTraits && p.traitFactors?.[slot.tid] !== undefined
-					? getDraftTraitAdjustment(p.value, p.traitFactors[slot.tid]!)
-					: 0;
-			const combine = p.combine ?? 0;
-			const production = p.production ?? 0;
-			return {
-				p,
-				need,
-				strategy: needAndStrategy - need,
-				trait,
-				combine,
-				production,
-				score: Math.max(
-					0,
-					p.value + needAndStrategy + trait + combine + production,
-				),
-			};
-		});
-		const chosen = weightedChoice(parts, (x) => x.score, random);
-		const best = pool[0]!;
-
-		const reasons: string[] = [];
-		if (chosen.p === best) {
-			reasons.push("Best available");
-		}
-		if (team && chosen.need >= 0.6) {
-			reasons.push(
-				`Fills the need at ${GROUP_NAMES[topNeedGroup(team.needs)]}`,
+		let ctx = contexts.get(slot.tid);
+		if (!ctx) {
+			ctx = contextOf(
+				slot.tid,
+				teams.get(slot.tid),
+				prospects,
+				useNeeds,
+				useTraits,
 			);
-		}
-		if (team && chosen.strategy >= 0.4) {
-			reasons.push(
-				team.strategy === "rebuilding"
-					? "Rebuilding: bets on the ceiling"
-					: "Contending: ready to help now",
-			);
-		}
-		if (chosen.trait >= 0.75) {
-			reasons.push("Likes his traits");
-		}
-		if (chosen.combine >= 0.3) {
-			reasons.push("Combine riser");
-		}
-		if (chosen.production >= 0.9) {
-			reasons.push("Productive for his age");
-		}
-		if (reasons.length === 0) {
-			reasons.push(
-				chosen.score >= Math.max(...parts.map((x) => x.score))
-					? "Best fit for the team"
-					: "Team preference",
-			);
+			contexts.set(slot.tid, ctx);
 		}
 		const overall = firstOverall + picks.length;
-		const diff = chosen.p.scoutRank - overall;
+		const decisions = decideDraft({
+			pool: pool.map(factsOf),
+			team: ctx,
+			overall,
+			numTeams,
+		});
+		const chosenIndex = weightedChoice(
+			decisions.map((_, i) => i),
+			(i) => decisions[i]!.score,
+			random,
+		);
+		const chosen = pool[chosenIndex]!;
+
+		const reasons = explainPick({
+			decisions,
+			chosenPid: chosen.pid,
+			team: ctx,
+		});
+		const diff = chosen.scoutRank - overall;
 		if (diff >= 8) {
-			reasons.push(`Steal: No. ${chosen.p.scoutRank} on your board`);
+			reasons.push(`Steal: No. ${chosen.scoutRank} on your board`);
 		} else if (diff <= -8) {
-			reasons.push(`Reach: No. ${chosen.p.scoutRank} on your board`);
+			reasons.push(`Reach: No. ${chosen.scoutRank} on your board`);
 		}
 
 		picks.push({
 			...slot,
 			overall,
-			pid: chosen.p.pid,
-			scoutRank: chosen.p.scoutRank,
+			pid: chosen.pid,
+			scoutRank: chosen.scoutRank,
 			reasons,
 		});
-		pool = pool.filter((p) => p !== chosen.p);
+		pool = pool.filter((p) => p !== chosen);
 	}
 
 	return picks;

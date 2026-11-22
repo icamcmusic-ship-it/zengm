@@ -7,7 +7,7 @@
  * - Fit (scaled by the pick: 0.3 at No. 1, full from about pick 19, 1.15 in later rounds, so the best player available dominates the top of
  *   the draft and needs matter more later): positional need, archetype/skill need, roster crowding, timeline (contender floor / rebuilder
  *   ceiling, from projection cones), positional scarcity in what's left, coach system fit, draft-and-stash, the GM's finance style.
- * - Information (not scaled): age-adjusted production and the outlets' consensus (what the AI reads beyond value), combine athleticism and
+ * - Information (not scaled): age-adjusted production (draft/production.ts) and the outlets' consensus (what the AI reads beyond value), combine athleticism and
  *   performance, medical risk, scout disagreement (outlet spread) through the GM's risk tolerance, the GM's lens, upside lean and traits.
  *
  * The total is capped (±1.2 value points at No. 1, up to ±3.5 from the second round), so a prospect clearly better by value still goes
@@ -45,9 +45,8 @@ export type ProspectFacts = {
 	// Big boards (media outlets): the consensus rank and the production outlet's rank, 0/undefined = off the board
 	consensusRank?: number;
 	prodModelRank?: number;
-	// Age-adjusted production (productionSignal of his last pre-draft season) and value, z-scores over the class
-	prodZ?: number;
-	valueZ?: number;
+	// Age-adjusted pre-draft production against his class (draft/production.ts getDraftProductionNudges), value points, ±1.5
+	production?: number;
 	// Scout disagreement: how far apart the outlets' boards are on him (z over the class; positive = more split)
 	spread?: number;
 	// Combine: the performance nudge (value points, averages zero over the class) and the athletic score (percentile)
@@ -122,7 +121,8 @@ export const FACTOR_WEIGHTS = {
 	// Three or more young players at his position in the top 10: minutes blocked
 	crowd3: -0.5,
 	crowd2: -0.2,
-	// Per point of cone floor (contender) or ceiling (rebuilder) above the pool's average, capped
+	// Per point above the average of the players near the top of what is left: contenders half cone floor, half ovr now (ready now);
+	// rebuilders the cone ceiling. Capped
 	timelinePer: 0.08,
 	timelineMax: 1.2,
 	// He is the last (or second last) of his position near the top of what's left, for a team that needs it
@@ -137,8 +137,9 @@ export const FACTOR_WEIGHTS = {
 	// Development-first front office: per point of ceiling above the pool's average
 	financePer: 0.04,
 	financeMax: 0.4,
-	// Per standard deviation of production beyond what his value says (analytics GMs ×1.6, analytics front office +0.3)
-	productionPer: 0.25,
+	// Age-adjusted production nudge (±1.5, draft/production.ts) times 1 + this × the GM's analytics lean (+ more for an analytics front office)
+	productionAnalytics: 0.4,
+	productionFinance: 0.2,
 	// Per rank the consensus has him above his value rank (old-school GMs trust it more)
 	consensusPer: 0.02,
 	consensusMaxRanks: 20,
@@ -205,6 +206,8 @@ export const decideDraft = ({
 		Math.max(1, near.length);
 	const meanFloor = meanOf("floor");
 	const meanCeiling = meanOf("ceiling");
+	const meanOvr =
+		near.reduce((a, f) => a + f.ovr, 0) / Math.max(1, near.length);
 	const topIndex = new Map(sorted.map((f, i) => [f.pid, i]));
 
 	return pool.map((f): ProspectDecision => {
@@ -236,7 +239,7 @@ export const decideDraft = ({
 				const align = team.strategy === "contending" ? -patience : patience;
 				const x =
 					team.strategy === "contending"
-						? cone.floor - meanFloor
+						? 0.5 * (cone.floor - meanFloor) + 0.5 * (f.ovr - meanOvr)
 						: cone.ceiling - meanCeiling;
 				parts.timeline =
 					scale *
@@ -254,8 +257,7 @@ export const decideDraft = ({
 					}
 				}
 				parts.scarcity =
-					scale *
-					(others === 0 ? W.scarcity1 : others === 1 ? W.scarcity2 : 0);
+					scale * (others === 0 ? W.scarcity1 : others === 1 ? W.scarcity2 : 0);
 			}
 
 			if (
@@ -288,13 +290,17 @@ export const decideDraft = ({
 				);
 		}
 
-		if (f.prodZ !== undefined && f.valueZ !== undefined) {
+		if (f.production) {
+			// Analytics GMs (and analytics-first front offices) lean on it more, old-school ones less
 			parts.production =
-				W.productionPer *
-				clamp(f.prodZ - f.valueZ, -2, 2) *
-				(1 +
-					0.6 * analytics +
-					(team.financeStyle === "analytics" ? 0.3 : 0));
+				f.production *
+				clamp(
+					1 +
+						W.productionAnalytics * analytics +
+						(team.financeStyle === "analytics" ? W.productionFinance : 0),
+					0.5,
+					1.6,
+				);
 		}
 		if (f.consensusRank && f.valueRank) {
 			parts.consensus =
@@ -456,8 +462,8 @@ const factorText = (
 				return `Their GM loves analytics: production model #${rank}`;
 			}
 			return team.financeStyle === "analytics"
-				? "Analytics front office: production stands out for his age"
-				: "Production stands out for his age";
+				? "Analytics front office: productive for his age"
+				: "Productive for his age";
 		}
 		case "consensus":
 			return own && chosen.facts.consensusRank

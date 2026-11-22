@@ -1056,6 +1056,7 @@ export const getNewsFacts = async (
 				consN: p.preDraftRank?.s === season ? p.preDraftRank.n : undefined,
 				stash:
 					p.stash && p.stash.season === season ? p.stash.league : undefined,
+				why: p.draft.why,
 			});
 		}
 	}
