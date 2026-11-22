@@ -187,7 +187,7 @@ describe("AI draft decision", () => {
 		assert.strictEqual(new Set(why).size, why.length);
 		assert.include(why, "Their GM loves analytics: production model #3");
 		assert.include(why, "Draft-and-stash: no roster spot");
-		assert.include(why, "Passed on a prospect with medical concerns");
+		assert.include(why, "Passed on a prospect with a medical red flag");
 
 		// Taking the flagged player anyway says so
 		const risky = explainPick({ decisions, chosenPid: 1, team: t });

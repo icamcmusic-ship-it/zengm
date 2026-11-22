@@ -384,8 +384,15 @@ const SKILL_PHRASES: Record<string, string> = {
 
 export const BEST_AVAILABLE_REASON = "Best player available on their board";
 
-// Smallest difference in a factor (value points) that counts as moving the decision
+// Smallest difference in a factor (value points) that counts as moving the decision. Medicals only for a red flag (a minor concern is
+// common and small), traits only when clearly ahead (nearly every prospect has some trait nudge)
 const MIN_DELTA = 0.15;
+const MIN_DELTA_BY_KEY: Partial<Record<FactorKey, number>> = {
+	medical: 0.6,
+	traits: 0.3,
+};
+// A medical penalty this big is a red flag (MEDICAL_DRAFT_PENALTY, even for a gambler GM)
+const RED_FLAG_PARTS = -0.6;
 
 const factorText = (
 	key: FactorKey,
@@ -476,7 +483,7 @@ const factorText = (
 		case "combine":
 			return own ? "Combine riser" : "The other option slipped at the combine";
 		case "medical":
-			return "Passed on a prospect with medical concerns";
+			return "Passed on a prospect with a medical red flag";
 		case "uncertainty":
 			return own
 				? "Gambler GM: scouts split on him, big range"
@@ -556,7 +563,7 @@ export const explainPick = ({
 			key,
 			delta: (chosen.parts[key] ?? 0) - (alt?.parts[key] ?? 0),
 		}))
-		.filter((x) => x.delta >= MIN_DELTA)
+		.filter((x) => x.delta >= (MIN_DELTA_BY_KEY[x.key] ?? MIN_DELTA))
 		.sort((a, b) => b.delta - a.delta);
 	for (const { key } of deltas) {
 		if (reasons.length >= 4) {
@@ -566,7 +573,7 @@ export const explainPick = ({
 	}
 
 	// A risk he carried that they took anyway
-	if (reasons.length < 4 && (chosen.parts.medical ?? 0) <= -0.25) {
+	if (reasons.length < 4 && (chosen.parts.medical ?? 0) <= RED_FLAG_PARTS) {
 		add("Medical flag lowered him, they took the risk");
 	}
 
