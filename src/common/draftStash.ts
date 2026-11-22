@@ -224,17 +224,26 @@ export const aiShouldStash = ({
 	teamRotationOvr,
 	rosterSize,
 	maxRosterSize,
+	picksPerRound = 30,
 }: {
 	pickNum: number;
 	ovr: number;
 	teamRotationOvr: number;
 	rosterSize: number;
 	maxRosterSize: number;
+	// Picks in a round (the number of teams): first-round picks are stashed far less often
+	picksPerRound?: number;
 }) => {
-	if (pickNum <= 10) {
+	// (the user: AI teams stashed 12 of the 20 first-rounders after No. 10; real teams stash a few a year, mostly late)
+	if (pickNum <= Math.round(picksPerRound / 2)) {
 		return false;
 	}
-	return rosterSize > maxRosterSize || ovr < teamRotationOvr - 4;
+	if (rosterSize > maxRosterSize) {
+		return true;
+	}
+	// A first-round pick comes over unless he is far from playing; a second-round pick is stashed when he is not close
+	const firstRound = pickNum <= picksPerRound;
+	return ovr < teamRotationOvr - (firstRound ? 10 : 5);
 };
 
 /**

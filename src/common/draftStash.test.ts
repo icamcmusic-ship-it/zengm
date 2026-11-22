@@ -232,6 +232,9 @@ describe("draft-and-stash rules", () => {
 		assert.isFalse(aiShouldStash({ ...stash, pickNum: 5 }));
 		// Ready enough, room on the roster
 		assert.isFalse(aiShouldStash({ ...stash, ovr: 46 }));
+		// A late first-round pick comes over unless he is far from playing
+		assert.isFalse(aiShouldStash({ ...stash, pickNum: 25 }));
+		assert.isTrue(aiShouldStash({ ...stash, pickNum: 25, ovr: 36 }));
 		// Ready enough, but no room
 		assert.isTrue(aiShouldStash({ ...stash, ovr: 46, rosterSize: 16 }));
 

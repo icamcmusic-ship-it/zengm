@@ -397,6 +397,7 @@ export const aiStashAfterDraft = async () => {
 					teamRotationOvr: bar,
 					rosterSize: size,
 					maxRosterSize: g.get("maxRosterSize"),
+					picksPerRound: g.get("numActiveTeams"),
 				})
 			) {
 				const error = await stashPlayer(p, { silent: true });
