@@ -144,6 +144,10 @@ export const resetCache = async (
 export const resetG = () => {
 	const season = 2016;
 	const teams = helpers.getTeamsDefault();
+	// Start from nothing, as when a league is loaded: test files share a worker (isolate: false), so a key that is not a default
+	// game attribute (a feature's stored state, like the archetype feedback with its per-player overrides) would otherwise leak
+	// into the next file and make its results depend on which file ran before it
+	helpers.resetG();
 	Object.assign(g, defaultGameAttributes);
 
 	if (__SPORT === "football") {
