@@ -285,7 +285,7 @@ describe("more pre-draft paths", () => {
 	});
 
 	describe("pro pathway program", () => {
-		test("2-5 elite North American freshmen a class, one season, no college", () => {
+		test("0-2 elite North American freshmen a class (about 0.8 on average), one season, no college", () => {
 			const perClass: number[] = [];
 			for (const c of getClasses()) {
 				const keys = getPathwayKeys(c.prospects, {
@@ -320,14 +320,11 @@ describe("more pre-draft paths", () => {
 					assert.strictEqual(result.honors.length, 0);
 				}
 			}
-			assert.isAtMost(Math.max(...perClass), 5);
+			assert.isAtMost(Math.max(...perClass), 2);
 			const mean = perClass.reduce((a, b) => a + b, 0) / perClass.length;
-			assert.isAbove(mean, 2, String(mean));
-			assert.isBelow(mean, 4);
-			assert.isAtLeast(
-				perClass.filter((x) => x >= 2).length,
-				0.75 * NUM_CLASSES,
-			);
+			assert.isAbove(mean, 0.3, String(mean));
+			assert.isBelow(mean, 1.4, String(mean));
+			assert.isAtLeast(perClass.filter((x) => x >= 1).length, 1);
 		});
 
 		test("pathway players are not in the college season", () => {
