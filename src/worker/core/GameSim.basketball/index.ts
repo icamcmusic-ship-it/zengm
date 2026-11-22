@@ -25,6 +25,7 @@ import {
 	SIM_FIX_THREE,
 	SIM_FIX_TRANSITION,
 	SIM_FIX_CONTEST,
+	SIM_FIX_HELP,
 } from "./simSettings.ts";
 import {
 	CLOSER_FACTOR,
@@ -176,6 +177,7 @@ import {
 } from "./shotShare.ts";
 import {
 	contestLevel,
+	flowSum,
 	contestTables,
 	contestTypeIndex,
 	FLOW_DIAG,
@@ -392,6 +394,10 @@ type PlayerGameSim = {
 	shotProfile?: ShotProfile;
 	// Game Sim Fixes (loadTeams): whether he shoots left-handed (common/shootingHand.ts). Undefined when off
 	lefty?: boolean;
+	// Matchup Defense (loadTeams): height, speed and lateral quickness (Sub-Ratings in Sim) ratings
+	simHgt?: number;
+	simSpd?: number;
+	simLat?: number;
 };
 type TeamGameSim = {
 	id: number;
@@ -831,6 +837,15 @@ class GameSim extends GameSimBase {
 	contestMake = 0;
 	helpZ: [number, number] = [0, 0];
 	rimProtZ: [number, number] = [0, 0];
+	// Help defense (SIM_FIX_HELP): each player's help value, and for each defense's five its help z with the scheme's sag (inside, and
+	// on threes), the drive multiplier it gives the offense and its smallest defender (the one a switch leaves on a big)
+	helpValue = new Map<PlayerGameSim, number>();
+	helpZThree: [number, number] = [0, 0];
+	helpRimSel: [number, number] = [1, 1];
+	smallestDefender: [PlayerGameSim | undefined, PlayerGameSim | undefined] = [
+		undefined,
+		undefined,
+	];
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -979,8 +994,22 @@ class GameSim extends GameSimBase {
 			);
 			this.strengthGap = [pred[0]! - pred[1]!, pred[1]! - pred[0]!];
 		}
-		// Game flow: contest levels
+		// Game flow: contest levels and help defense
 		this.contestOn = this.simFixes && this.matchupDefense && !allStarGame;
+		if (this.contestOn) {
+			const H = SIM_FIX_HELP;
+			for (const t of teams) {
+				for (const p of t.player) {
+					const lat = p.simLat ?? p.simSpd ?? p.pbpRatings?.spd ?? 50;
+					this.helpValue.set(
+						p,
+						(H.diq * (p.pbpRatings?.diq ?? 50)) / 100 +
+							(H.lat * lat) / 100 +
+							H.idef * p.compositeRating.defenseInterior,
+					);
+				}
+			}
+		}
 		this.starClutchCal =
 			this.matchupDefense &&
 			!allStarGame &&
@@ -2349,12 +2378,16 @@ class GameSim extends GameSimBase {
 					switching,
 					this.teamVersatility[d],
 				);
+				// (Game flow: the post mismatches a switch leaves, see postMismatchFlow)
 				const gap =
 					mean -
 					fit +
 					0.25 *
-						relief *
-						(postMismatch(a, defender) + driveMismatch(a, defender));
+						(this.contestOn
+							? this.postMismatchFlow(a, defender, d, switching) +
+								relief * driveMismatch(a, defender)
+							: relief *
+								(postMismatch(a, defender) + driveMismatch(a, defender)));
 				if (gap > bestGap) {
 					bestGap = gap;
 					bestIdx = j;
@@ -3419,7 +3452,69 @@ class GameSim extends GameSimBase {
 			}
 			this.teamVersatility[d] =
 				versatility / Math.max(1, this.playersOnCourt[d].length);
+			if (this.contestOn) {
+				this.updateHelpDefense(d);
+			}
 		}
+	}
+
+	// Game flow: help defense of team d's five (SIM_FIX_HELP)
+	updateHelpDefense(d: TeamNum) {
+		const H = SIM_FIX_HELP;
+		const lineup = this.playersOnCourt[d];
+		if (lineup.length === 0) {
+			return;
+		}
+		let sum = 0;
+		let min = Infinity;
+		let rim = -Infinity;
+		let smallest = lineup[0]!;
+		for (const p of lineup) {
+			const h = this.helpValue.get(p) ?? H.ref;
+			sum += h;
+			if (h < min) {
+				min = h;
+			}
+			const r = p.compositeRating.defenseInterior;
+			if (r > rim) {
+				rim = r;
+			}
+			if ((p.simHgt ?? 50) < (smallest.simHgt ?? 50)) {
+				smallest = p;
+			}
+		}
+		const help = (1 - H.weakest) * (sum / lineup.length) + H.weakest * min;
+		const scheme = this.team[d].coachSim?.def ?? "";
+		const helpZ =
+			helpers.bound((help - H.ref) / H.scale, -H.max, H.max) +
+			(H.schemeInside[scheme] ?? 0);
+		const rimZ = helpers.bound((rim - H.rimRef) / H.rimScale, -H.max, H.max);
+		this.helpZ[d] = helpZ;
+		this.helpZThree[d] = helpZ + (H.schemeThree[scheme] ?? 0);
+		this.rimProtZ[d] = rimZ;
+		this.helpRimSel[d] =
+			helpers.bound(1 - H.rimSel * helpZ - H.deter * rimZ, H.selMin, H.selMax) /
+			H.selNorm;
+		this.smallestDefender[d] = smallest;
+	}
+
+	// Game flow: the post mismatch of attacker a against defender, with switches (SIM_FIX_HELP): no switch relief on the post, and on some
+	// possessions the smallest defender ends up on him. Returns the mismatch and the part of it from a switch
+	postMismatchFlow(
+		a: PlayerGameSim,
+		defender: PlayerGameSim,
+		d: TeamNum,
+		switching: boolean,
+	) {
+		const own =
+			mismatchScale(defender, false, this.teamVersatility[d]) *
+			postMismatch(a, defender);
+		const small = this.smallestDefender[d];
+		const sw =
+			switching && small
+				? SIM_FIX_HELP.switchExposure * postMismatch(a, small)
+				: 0;
+		return sw > own ? sw : own;
 	}
 
 	isSwitching(d: TeamNum) {
@@ -5054,7 +5149,10 @@ class GameSim extends GameSimBase {
 					this.isSwitching(this.d),
 					this.teamVersatility[this.d],
 				);
-				const post = mismatchRelief * postMismatch(p, defender);
+				// (Game flow: switches leave smalls on bigs, see postMismatchFlow)
+				const post = this.contestOn
+					? this.postMismatchFlow(p, defender, this.d, this.isSwitching(this.d))
+					: mismatchRelief * postMismatch(p, defender);
 				const drive = mismatchRelief * driveMismatch(p, defender);
 				// (divided by the league average, so the league shot mix stays the same)
 				postTilt = (1 + post) / MATCHUP.postNorm;
@@ -5265,6 +5363,7 @@ class GameSim extends GameSimBase {
 								: 1) * Math.max(0.2, 1 + SPACING.selectRim * spacing)
 					: 1) *
 				driveTilt *
+				(this.contestOn ? this.helpRimSel[this.d] : 1) *
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				(this.offEmph ? this.oe[this.o].rim : 1) *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1) *
@@ -5599,6 +5698,19 @@ class GameSim extends GameSimBase {
 
 			// Game flow: open, contested or heavily contested
 			probMake += this.contestMake;
+			// Game flow: posting up the small a switch left on him
+			if (
+				this.contestOn &&
+				type === "lowPost" &&
+				this.isSwitching(this.d) &&
+				this.lastMatchup.post > 0
+			) {
+				probMake +=
+					(SIM_FIX_HELP.switchMake * this.lastMatchup.post) / MATCHUP.post;
+				if (FLOW_DIAG.on) {
+					flowSum("switchPost", this.lastMatchup.post);
+				}
+			}
 
 			if (!tipInFromOutOfBounds) {
 				// Adjust probMake for end of quarter situations, where shot quality will be lower without much time
@@ -6056,7 +6168,7 @@ class GameSim extends GameSimBase {
 					C.defRef[ti]!);
 		}
 		z +=
-			C.help[ti]! * this.helpZ[this.d] +
+			C.help[ti]! * (ti === 0 ? this.helpZThree[this.d] : this.helpZ[this.d]) +
 			C.rimProtector[ti]! * this.rimProtZ[this.d];
 		z -= C.spacing * spacing;
 		if (
@@ -6067,7 +6179,7 @@ class GameSim extends GameSimBase {
 			z += (C.late * (C.lateSeconds - this.shotClock)) / C.lateSeconds;
 		}
 		if (ti <= 1) {
-			z += passer === undefined ? C.pullUp : C.catchShoot;
+			z += passer === undefined ? C.pullUp[ti]! : C.catchShoot[ti]!;
 		}
 		if (this.advTransition) {
 			z += C.transition;
@@ -6077,6 +6189,9 @@ class GameSim extends GameSimBase {
 		}
 		const level = contestLevel(ti, z, Math.random());
 		if (FLOW_DIAG.on) {
+			flowSum("helpZ", this.helpZ[this.d]);
+			flowSum("rimProtZ", this.rimProtZ[this.d]);
+			flowSum("helpRimSel", this.helpRimSel[this.d]);
 			FLOW_DIAG.zSum[ti]! += z;
 			FLOW_DIAG.zN[ti]! += 1;
 			FLOW_DIAG.deltaSum[ti]! += contestTables()[ti]!.make[level]!;

@@ -191,22 +191,54 @@ export const SIM_FIX_CONTEST = {
 	],
 	k: 1,
 	make: [
-		[0.035, -0.008, -0.075],
+		[0.03, -0.006, -0.06],
 		[0.04, -0.006, -0.065],
 		[0.07, 0, -0.085],
 		[0.05, 0, -0.06],
 	],
 	blk: [0.4, 1, 1.6],
-	defender: [3, 3, 2.5, 3],
+	defender: [1.5, 3, 2.5, 3],
 	defRef: [0.5, 0.5, 0.5, 0.5],
-	help: [-0.2, 0.25, 0.5, 0.4],
+	help: [0.15, 0.25, 0.5, 0.4],
 	rimProtector: [0, 0, 0.6, 0.4],
 	spacing: 8,
 	late: 1.2,
 	lateSeconds: 6,
-	pullUp: 0.35,
-	catchShoot: -0.2,
+	pullUp: [0.15, 0.35],
+	catchShoot: [-0.2, -0.2],
 	transition: -0.8,
 	rushed: 1,
-	center: [-0.59, -0.42, -0.66, -0.44],
+	center: [-0.65, -0.38, -0.61, -0.36],
+};
+
+// Help defense (Game Sim Fixes with Matchup Defense, gameFlow.ts): how well each five rotates behind the man on the ball.
+// - A player's help value: diq × defensive IQ / 100 + lat × lateral quickness / 100 (his speed without sub-ratings) + idef × his
+//   interior defense composite. A five's help: (1 - weakest) × its mean + weakest × its worst (one weak help defender is a hole)
+// - helpZ = (help - ref) / scale, within ±max: more help, more contested shots (SIM_FIX_CONTEST.help) and fewer drives (rimSel)
+// - Rim protection: the five's best interior defense composite, z = (best - rimRef) / rimScale within ±max: contests at the rim and in
+//   the post (SIM_FIX_CONTEST.rimProtector) and deters drives (deter)
+// - Schemes: Pack the Paint and Zone sag (more help inside, by schemeInside, and threes more open, by schemeThree on the three's z)
+// - The drive weight is × 1 - rimSel × helpZ - deter × rimZ, within [selMin, selMax], / selNorm (its league mean)
+// - Switching: a switching defense still feels post mismatches (no switch relief on them), and on switchExposure of a big's
+//   possessions the smallest defender ends up on him (a post mismatch the offense hunts); his post-ups against a switch go in
+//   switchMake more per unit of that mismatch (relative to the largest)
+export const SIM_FIX_HELP = {
+	diq: 0.45,
+	lat: 0.25,
+	idef: 0.3,
+	weakest: 0.4,
+	ref: 0.48,
+	scale: 0.05,
+	max: 2,
+	rimRef: 0.63,
+	rimScale: 0.08,
+	schemeInside: { pack: 0.6, zone: 0.4 } as Record<string, number>,
+	schemeThree: { pack: -0.35, zone: -0.25 } as Record<string, number>,
+	rimSel: 0.06,
+	deter: 0.06,
+	selMin: 0.75,
+	selMax: 1.25,
+	selNorm: 1,
+	switchExposure: 0.35,
+	switchMake: 0.02,
 };
