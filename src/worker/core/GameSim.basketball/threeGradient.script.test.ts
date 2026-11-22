@@ -21,12 +21,15 @@ import gameSimPresets from "../../../ui/views/Settings/gameSimPresets.ts";
 import { ATTENTION } from "./matchupDefense.ts";
 import { STAR } from "./starClutch.ts";
 import { SHOT_SHARE } from "./shotShare.ts";
+import * as simSettings from "./simSettings.ts";
 import { SIM_FIX_SHOT_CHOICE, SIM_FIX_THREE } from "./simSettings.ts";
+import { FLOW_DIAG } from "./gameFlow.ts";
 
 const env = (globalThis as any).process.env;
 // THREE_GRAD_CONST changes the sim's constants (for tuning)
 if (env.THREE_GRAD_CONST) {
 	const mods = {
+		...simSettings,
 		ATTENTION,
 		STAR,
 		SIM_FIX_SHOT_CHOICE,
@@ -63,6 +66,7 @@ test.skipIf(!env.THREE_GRAD)(
 		const extra = JSON.parse(env.THREE_GRAD_SETTINGS ?? "{}");
 		const out = env.THREE_GRAD_OUT;
 		Math.random = makeSeededRandom(seed);
+		FLOW_DIAG.on = true;
 		const settings: any = {
 			...getDefaultSettings(),
 			...gameSimPresets[2026],
@@ -113,7 +117,19 @@ test.skipIf(!env.THREE_GRAD)(
 				}
 			}
 
-			const sum = { gp: 0, pts: 0, fga: 0, fg: 0, tpa: 0, tp: 0 };
+			const sum = {
+				gp: 0,
+				pts: 0,
+				fga: 0,
+				fg: 0,
+				tpa: 0,
+				tp: 0,
+				tov: 0,
+				fta: 0,
+				ast: 0,
+				orb: 0,
+				pf: 0,
+			};
 			for (const ts of await idb.cache.teamStats.getAll()) {
 				if (ts.season === s && !ts.playoffs) {
 					for (const k of Object.keys(sum)) {
@@ -129,6 +145,12 @@ test.skipIf(!env.THREE_GRAD)(
 				tpp: sum.tp / sum.tpa,
 				tpaRate: sum.tpa / sum.fga,
 				fgp: sum.fg / sum.fga,
+				tov: sum.tov / sum.gp,
+				fta: sum.fta / sum.gp,
+				ast: sum.ast / sum.gp,
+				orb: sum.orb / sum.gp,
+				pf: sum.pf / sum.gp,
+				poss: (sum.fga + 0.44 * sum.fta - sum.orb + sum.tov) / sum.gp,
 			};
 			leagues.push(lg);
 			const rows = [];
@@ -190,7 +212,7 @@ test.skipIf(!env.THREE_GRAD)(
 
 		const lines = [];
 		lines.push(
-			`LEAGUE pts ${mean(leagues.map((l) => l.pts)).toFixed(2)} 3P% ${f3(mean(leagues.map((l) => l.tpp)))} 3PA rate ${f3(mean(leagues.map((l) => l.tpaRate)))} FG% ${f3(mean(leagues.map((l) => l.fgp)))}`,
+			`LEAGUE pts ${mean(leagues.map((l) => l.pts)).toFixed(2)} 3P% ${f3(mean(leagues.map((l) => l.tpp)))} 3PA rate ${f3(mean(leagues.map((l) => l.tpaRate)))} FG% ${f3(mean(leagues.map((l) => l.fgp)))} TOV ${mean(leagues.map((l) => l.tov)).toFixed(2)} FTA ${mean(leagues.map((l) => l.fta)).toFixed(2)} AST ${mean(leagues.map((l) => l.ast)).toFixed(2)} ORB ${mean(leagues.map((l) => l.orb)).toFixed(2)} PF ${mean(leagues.map((l) => l.pf)).toFixed(2)} poss ${mean(leagues.map((l) => l.poss)).toFixed(2)}`,
 		);
 		const shooters = players.filter((p) => p.tpa >= 100);
 		lines.push(
@@ -265,6 +287,29 @@ test.skipIf(!env.THREE_GRAD)(
 				`SCORERS ${lg.season}: leader ${ppg[0].toFixed(1)}, 25+ ppg ${ppg.filter((x) => x >= 25).length}`,
 			);
 		}
+		// Game flow: contest levels (share, FG% by shot type and level; mean z and make change), and the other counters
+		const ct = ["three", "mid", "rim", "post"].map((name, ti) => {
+			const n = FLOW_DIAG.ctN[ti];
+			const m = FLOW_DIAG.ctMake[ti];
+			const tot = n[0] + n[1] + n[2];
+			return `${name}: share ${n.map((x) => f3(x / tot)).join("/")} FG% ${n.map((x, l) => f3(m[l] / x)).join("/")} z ${f3(FLOW_DIAG.zSum[ti] / FLOW_DIAG.zN[ti])} make ${(FLOW_DIAG.deltaSum[ti] / FLOW_DIAG.zN[ti]).toFixed(4)}`;
+		});
+		lines.push(`CONTEST ${ct.join(" | ")}`);
+		const means = Object.fromEntries(
+			Object.entries(FLOW_DIAG.sums).map(([k, v]) => [
+				k,
+				Number((v / FLOW_DIAG.counts[`n:${k}`]).toFixed(4)),
+			]),
+		);
+		lines.push(
+			`FLOW counts ${JSON.stringify(FLOW_DIAG.counts)} means ${JSON.stringify(means)}`,
+		);
 		console.log(lines.join("\n"));
+		if (out) {
+			appendFileSync(
+				out,
+				`${JSON.stringify({ kind: "flow", seed, ctN: FLOW_DIAG.ctN, ctMake: FLOW_DIAG.ctMake, zSum: FLOW_DIAG.zSum, zN: FLOW_DIAG.zN, deltaSum: FLOW_DIAG.deltaSum, counts: FLOW_DIAG.counts, sums: FLOW_DIAG.sums })}\n`,
+			);
+		}
 	},
 );

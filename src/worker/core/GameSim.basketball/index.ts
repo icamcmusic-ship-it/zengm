@@ -24,6 +24,7 @@ import {
 	SIM_FIX_SHOT_CHOICE,
 	SIM_FIX_THREE,
 	SIM_FIX_TRANSITION,
+	SIM_FIX_CONTEST,
 } from "./simSettings.ts";
 import {
 	CLOSER_FACTOR,
@@ -173,6 +174,12 @@ import {
 	SHOT_SHARE,
 	shotPlanMult,
 } from "./shotShare.ts";
+import {
+	contestLevel,
+	contestTables,
+	contestTypeIndex,
+	FLOW_DIAG,
+} from "./gameFlow.ts";
 import {
 	ADV as ADV_LAYOUT,
 	SHOT_ZONE_INDEX,
@@ -817,6 +824,13 @@ class GameSim extends GameSimBase {
 	advTransition = false;
 	advQuick = false;
 	advThreePointers = true;
+	// Game flow (Game Sim Fixes, gameFlow.ts). contestOn: contest levels (with Matchup Defense); contestLevelLast: the last shot's level
+	// (-1: none) and its make change; helpZ/rimProtZ: each defense's help and rim protection (0 until help defense is worked out)
+	contestOn = false;
+	contestLevelLast = -1;
+	contestMake = 0;
+	helpZ: [number, number] = [0, 0];
+	rimProtZ: [number, number] = [0, 0];
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -965,6 +979,8 @@ class GameSim extends GameSimBase {
 			);
 			this.strengthGap = [pred[0]! - pred[1]!, pred[1]! - pred[0]!];
 		}
+		// Game flow: contest levels
+		this.contestOn = this.simFixes && this.matchupDefense && !allStarGame;
 		this.starClutchCal =
 			this.matchupDefense &&
 			!allStarGame &&
@@ -5400,10 +5416,26 @@ class GameSim extends GameSimBase {
 			}
 		}
 
+		// Game flow: how closely the shot is contested (one more random number, only with Game Sim Fixes and Matchup Defense)
+		let contestBlk = 1;
+		this.contestLevelLast = -1;
+		this.contestMake = 0;
+		if (this.contestOn && !putBack && !tipInFromOutOfBounds) {
+			const ti = contestTypeIndex(type);
+			if (ti >= 0) {
+				const level = this.drawContest(ti, defender, spacing, passer, rushed);
+				const tb = contestTables()[ti]!;
+				this.contestLevelLast = level;
+				this.contestMake = tb.make[level]!;
+				contestBlk = tb.blk[level]!;
+			}
+		}
+
 		let blocked;
 		if (
 			(this.expandedRatings ? this.probBlkExpanded(p, type) : this.probBlk()) *
-				(this.subRatingsSim ? SUB_SIM_CAL.blk : 1) >
+				(this.subRatingsSim ? SUB_SIM_CAL.blk : 1) *
+				contestBlk >
 			Math.random()
 		) {
 			blocked = true;
@@ -5564,6 +5596,9 @@ class GameSim extends GameSimBase {
 					probMake += SPACING.makePost * (spacing - SPACING.makeCenter);
 				}
 			}
+
+			// Game flow: open, contested or heavily contested
+			probMake += this.contestMake;
 
 			if (!tipInFromOutOfBounds) {
 				// Adjust probMake for end of quarter situations, where shot quality will be lower without much time
@@ -5886,6 +5921,9 @@ class GameSim extends GameSimBase {
 			clock: this.t,
 		});
 		this.adv?.shotDone(false, undefined, this.d, this.playersOnCourt[this.d]);
+		if (FLOW_DIAG.on) {
+			this.flowShotDone(false, type);
+		}
 		if (p.ss) {
 			p.ss.streak = 0;
 			p.ss.hot = 0;
@@ -5924,6 +5962,7 @@ class GameSim extends GameSimBase {
 		this.adv!.emphO = this.o;
 		this.adv!.szZone = this.shotZones ? this.szZone : -1;
 		this.adv!.szXfg = this.szXfg;
+		this.adv!.ctLevel = this.contestLevelLast;
 		this.adv!.shot(
 			p,
 			passer,
@@ -5980,6 +6019,69 @@ class GameSim extends GameSimBase {
 			spacing,
 			rushed ? Math.sqrt(this.possessionLength / 8) : 1,
 		);
+	}
+
+	// Game flow calibration counters: a field goal attempt by contest level
+	flowShotDone(made: boolean, type: ShotType) {
+		const ti = contestTypeIndex(type);
+		if (ti >= 0 && this.contestLevelLast >= 0) {
+			FLOW_DIAG.ctN[ti]![this.contestLevelLast]! += 1;
+			if (made) {
+				FLOW_DIAG.ctMake[ti]![this.contestLevelLast]! += 1;
+			}
+		}
+	}
+
+	// Game flow: the contest level of a shot (gameFlow.ts, SIM_FIX_CONTEST) from its score z: positive is tighter. One random number
+	drawContest(
+		ti: number,
+		defender: PlayerGameSim | undefined,
+		spacing: number,
+		passer: PlayerGameSim | undefined,
+		rushed: boolean,
+	) {
+		const C = SIM_FIX_CONTEST;
+		let z = -C.center[ti]!;
+		if (defender) {
+			const r = defender.compositeRating;
+			const v =
+				ti <= 1
+					? r.defensePerimeter
+					: ti === 3
+						? r.defenseInterior
+						: 0.5 * (r.defensePerimeter + r.defenseInterior);
+			z +=
+				C.defender[ti]! *
+				(v * this.fatigueLate(defender.stat.energy, this.isLateGame()) -
+					C.defRef[ti]!);
+		}
+		z +=
+			C.help[ti]! * this.helpZ[this.d] +
+			C.rimProtector[ti]! * this.rimProtZ[this.d];
+		z -= C.spacing * spacing;
+		if (
+			this.realPoss &&
+			this.t > this.shotClock &&
+			this.shotClock < C.lateSeconds
+		) {
+			z += (C.late * (C.lateSeconds - this.shotClock)) / C.lateSeconds;
+		}
+		if (ti <= 1) {
+			z += passer === undefined ? C.pullUp : C.catchShoot;
+		}
+		if (this.advTransition) {
+			z += C.transition;
+		}
+		if (rushed) {
+			z += C.rushed;
+		}
+		const level = contestLevel(ti, z, Math.random());
+		if (FLOW_DIAG.on) {
+			FLOW_DIAG.zSum[ti]! += z;
+			FLOW_DIAG.zN[ti]! += 1;
+			FLOW_DIAG.deltaSum[ti]! += contestTables()[ti]!.make[level]!;
+		}
+		return level;
 	}
 
 	// Advanced Tracking Stats: a turnover by the offensive rebounder right after his rebound counts as a putback possession
@@ -6093,6 +6195,9 @@ class GameSim extends GameSimBase {
 		const p2 = this.pickPlayer("blocking", this.d, 10);
 		this.recordStat(this.d, p2, "blk");
 		this.adv?.shotDone(false, p2, this.d, this.playersOnCourt[this.d]);
+		if (FLOW_DIAG.on) {
+			this.flowShotDone(false, type);
+		}
 		this.noteDefensiveStop("blk", p2, p, type);
 		let blockLogType: BlockType | undefined;
 		if (type === "tipIn") {
@@ -6225,6 +6330,9 @@ class GameSim extends GameSimBase {
 		}
 		this.recordLastScore(this.o, p, type, passer, defender);
 		this.adv?.shotDone(true, undefined, this.d, this.playersOnCourt[this.d]);
+		if (FLOW_DIAG.on) {
+			this.flowShotDone(true, type);
+		}
 
 		if (andOne && !this.elamDone) {
 			this.doPf({ t: this.d, type: "pfAndOne", shooter: p, fouler });

@@ -1,10 +1,15 @@
 import { useState } from "react";
 import HideableSection from "../../components/HideableSection.tsx";
-import { SHOT_ZONES, shotZones } from "../../../common/advStats.ts";
+import {
+	contestSplits,
+	SHOT_ZONES,
+	shotZones,
+} from "../../../common/advStats.ts";
 
 // Shot Zones (League extras): a player's shot chart by zone (a half court colored by his FG% vs the league's), the sub-zone table
 // (frequency and FG% vs the league and his position) and his shot quality (expected FG% from where and how his shots came vs his
-// actual FG%). Recorded by Advanced Tracking Stats, so only seasons played with Shot Zones on have it.
+// actual FG%), and how often his shots were open, contested or heavily contested and what he made of each (Game flow's contest levels).
+// Recorded by Advanced Tracking Stats, so only seasons played with Shot Zones on have it.
 
 type AdvSeason = { season: number | "career"; adv: number[] };
 type ZoneRef = {
@@ -150,6 +155,65 @@ const Court = ({
 	);
 };
 
+// Game flow: open / contested / heavily contested shots, by shot group, against the league
+const ContestTable = ({
+	adv,
+	league,
+}: {
+	adv: number[];
+	league: number[] | undefined;
+}) => {
+	const mine = contestSplits(adv);
+	if (!mine) {
+		return null;
+	}
+	const lg = contestSplits(league);
+	const rows = [
+		{ key: "all", name: "All", levels: mine.all, lgLevels: lg?.all },
+		...mine.groups.map((grp, gi) => ({
+			key: grp.key,
+			name: grp.name,
+			levels: grp.levels,
+			lgLevels: lg?.groups[gi]?.levels,
+		})),
+	];
+	return (
+		<div className="table-responsive mt-3">
+			<table className="table table-sm table-striped mb-0">
+				<thead>
+					<tr>
+						<th>Contest</th>
+						{mine.all.map((lvl) => (
+							<th key={lvl.key} className="text-end">
+								{lvl.name}
+							</th>
+						))}
+					</tr>
+				</thead>
+				<tbody>
+					{rows.map((row) => (
+						<tr key={row.key}>
+							<td className="text-nowrap">{row.name}</td>
+							{row.levels.map((lvl, li) => (
+								<td key={lvl.key} className="text-end text-nowrap">
+									{pct(lvl.freq, 0)} · {pct(lvl.fgp)}{" "}
+									<span className="text-body-secondary small">
+										({pct(row.lgLevels?.[li]?.fgp)})
+									</span>
+								</td>
+							))}
+						</tr>
+					))}
+				</tbody>
+			</table>
+			<div className="text-body-secondary small">
+				Share of his attempts and FG% when open, contested and heavily contested
+				(league FG% in parentheses).
+			</div>
+		</div>
+	);
+};
+
 export const ShotZones = ({
 	advSeasons,
 	refs,
@@ -274,6 +338,7 @@ export const ShotZones = ({
 							</tbody>
 						</table>
 					</div>
+					<ContestTable adv={selected.adv} league={ref?.league} />
 				</div>
 			</div>
 		</HideableSection>

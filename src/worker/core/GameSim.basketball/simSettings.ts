@@ -166,3 +166,47 @@ export const SIM_FIX_FT_ORB = 0.5;
 // keeps that fraction), and he drives a little more (drive, on the at-rim weight). Both are offset over everyone in the game by the
 // share of lefties in it, so the league's at-rim/post rates and percentages stay the same
 export const SIM_FIX_LEFTY = { make: 0.012, sameHand: 0.3, drive: 1.04 };
+
+// ---- Game flow (Game Sim Fixes, gameFlow.ts). Default engine mechanics of the core sim features; with simFixes off none of this runs ----
+
+// Contest levels (Game Sim Fixes with Matchup Defense): every jump shot, drive and post-up is open, contested or heavily contested. One
+// random number per shot picks the level from a score z (positive = tighter): the shooter's defender (his perimeter or interior defense,
+// tired defenders give more room), the help behind him (helpZ, below), the floor spacing, the shot clock (late-clock shots are rushed),
+// catch-and-shoot vs pull-up, transition and end-of-quarter heaves. Each level has its own make change (centered, so the league's
+// percentages stay put at the base shares) and block multiplier.
+// - base: [open, heavily contested] shares at z = 0, by shot type (three, mid-range, at the rim, post-up); the rest is contested
+// - k: how far z moves the shares (log-odds per unit of z)
+// - make: make probability change of [open, contested, heavy], by shot type; blk: block multiplier of each level (both centered on the
+//   base shares in contestDeltas)
+// - the z terms: defender (per unit of his defensive composite above defRef, by shot type), help (per unit of the defense's help z,
+//   by shot type: a pack-the-paint or zone help defense leaves threes more open), spacing (per unit of spacingAround), late (shot clock
+//   at 0, ramping in over the last lateSeconds), pullUp / catchShoot (jumpers), transition, rushed (end-of-period heave), rimProtector
+//   (at the rim and in the post, per unit of the defense's rim protection z), center (by shot type, the league mean of the rest)
+export const SIM_FIX_CONTEST = {
+	base: [
+		[0.4, 0.1],
+		[0.27, 0.2],
+		[0.26, 0.33],
+		[0.14, 0.38],
+	],
+	k: 1,
+	make: [
+		[0.035, -0.008, -0.075],
+		[0.04, -0.006, -0.065],
+		[0.07, 0, -0.085],
+		[0.05, 0, -0.06],
+	],
+	blk: [0.4, 1, 1.6],
+	defender: [3, 3, 2.5, 3],
+	defRef: [0.5, 0.5, 0.5, 0.5],
+	help: [-0.2, 0.25, 0.5, 0.4],
+	rimProtector: [0, 0, 0.6, 0.4],
+	spacing: 8,
+	late: 1.2,
+	lateSeconds: 6,
+	pullUp: 0.35,
+	catchShoot: -0.2,
+	transition: -0.8,
+	rushed: 1,
+	center: [-0.59, -0.42, -0.66, -0.44],
+};

@@ -243,6 +243,8 @@ type Current = {
 	// Shot Zones: the sub-zone (-1: none) and 1000 × expected FG%
 	zone: number;
 	xfg: number;
+	// Game flow: the contest level (-1: none)
+	ct: number;
 };
 
 const RIM_EXP_SHRINK = 10;
@@ -302,10 +304,13 @@ export class AdvTracker {
 		threePointer: false,
 		zone: -1,
 		xfg: 0,
+		ct: -1,
 	};
 	// Shot Zones: set by the sim before shot() (-1: the setting is off)
 	szZone = -1;
 	szXfg = 0;
+	// Game flow: the contest level of the shot, set by the sim before shot() (-1: none)
+	ctLevel = -1;
 	clutch = false;
 	// The lineups may have changed (GameSim.updatePlayersOnCourt ran)
 	dirty = true;
@@ -617,6 +622,7 @@ export class AdvTracker {
 		cur.threePointer = type === "threePointer" && threePointers;
 		cur.zone = this.szZone;
 		cur.xfg = Math.round(1000 * this.szXfg);
+		cur.ct = this.ctLevel;
 		this.cur = cur;
 	}
 
@@ -640,6 +646,14 @@ export class AdvTracker {
 			}
 			a[ADV.szXfg]! += cur.xfg;
 			a[ADV.szN]! += 1;
+		}
+		if (cur.ct >= 0) {
+			const group =
+				cur.type === "threePointer" ? 2 : cur.type === "midRange" ? 1 : 0;
+			a[ADV.ctFga + 3 * group + cur.ct]! += 1;
+			if (made) {
+				a[ADV.ctFgm + 3 * group + cur.ct]! += 1;
+			}
 		}
 		const three = cur.type === "threePointer";
 		if (made) {
