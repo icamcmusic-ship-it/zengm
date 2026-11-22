@@ -1,4 +1,5 @@
 import { featureOn } from "../util/nativeFeatures.ts";
+import { getPlayerRankings } from "../util/playerRankingsData.ts";
 import { getPreDraftRank } from "../core/draft/preDraftRanks.ts";
 import {
 	getTraitViewContext,
@@ -850,8 +851,12 @@ export default defineView({
 				advSeasons,
 			);
 
+			// League extras (Records Book option): all-time and franchise rankings of his totals, from the kept lists
+			const rankings = await getPlayerRankings(topStuff.pRaw);
+
 			return {
 				...topStuffForUI,
+				rankings,
 				advSeasons,
 				shotZoneRefs,
 				// His season-by-season tracking was folded into the career total when he retired

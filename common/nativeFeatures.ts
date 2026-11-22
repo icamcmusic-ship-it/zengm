@@ -1483,6 +1483,14 @@ export const NATIVE_FEATURES = [
 				type: "bool",
 				default: true,
 			},
+			{
+				key: "featurePlayerRankings",
+				name: "Player Page Rankings",
+				description:
+					"A Rankings section on player pages: where his career totals (regular season and playoffs) rank all-time and in each franchise he played for, and his top single seasons, with the gap to the next player up for active players.",
+				type: "bool",
+				default: true,
+			},
 		],
 	},
 	{
