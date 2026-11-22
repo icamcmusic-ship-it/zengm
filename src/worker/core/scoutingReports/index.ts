@@ -85,9 +85,12 @@ const peersFor = (input: ScoutInput, ctx: ReportCtx) =>
 export const reportFor = async (
 	p: Player,
 	ctx: ReportCtx,
-	opts: { leadId?: number; light?: boolean } = {},
+	opts: { leadId?: number; light?: boolean; skills?: boolean } = {},
 ) => {
-	const input = await buildInput(p, ctx, { light: opts.light });
+	const input = await buildInput(p, ctx, {
+		light: opts.light,
+		skills: opts.skills,
+	});
 	const peers = await peersFor(input, ctx);
 	const report = buildReport({
 		input,
@@ -262,7 +265,8 @@ export const getScoutingHover = async (pid: number) => {
 		return undefined;
 	}
 	const ctx = await getReportCtx();
-	const { report } = await reportFor(p, ctx, { light: true });
+	// (strengths & weaknesses: one player's own records, cheap enough for a hover)
+	const { report } = await reportFor(p, ctx, { light: true, skills: true });
 	return hoverOf(report);
 };
 
@@ -978,6 +982,28 @@ export const gmLensAdjustments = (players: Player[], analytics: number) => {
 	);
 };
 
+// Strengths & weaknesses as plain lines (PDF)
+const skillsSection = (k: NonNullable<FullReport["skills"]>) => {
+	const item = (x: (typeof k.strengths)[number]) => [
+		`${x.side === "strength" ? "+" : "-"} ${x.title} [${x.tierLabel}]${x.trend ? ` ${x.trend.dir === "up" ? "(up)" : x.trend.dir === "down" ? "(down)" : ""}` : ""}: ${x.text}`,
+		...x.evidence.map((e) => `    ${e.src}: ${e.text}`),
+		...(x.fix ? [`    ${x.fix.text}`] : []),
+		...(x.dissent ? [`    ${x.dissent}`] : []),
+	];
+	return {
+		title: "Strengths & weaknesses",
+		lines: [
+			...k.strengths.flatMap(item),
+			...k.weaknesses.flatMap(item),
+			k.swing.text,
+			`${k.role.text} Risk: ${k.role.risk} (${k.role.why}).`,
+			...(k.anchor ? [k.anchor] : []),
+			...k.contradictions,
+			k.certaintyNote,
+		],
+	};
+};
+
 // The PDF page (Download players)
 // The report as the PDF draws it. extended (the Export profile PDF set) adds what else the Scouting page shows: the two scouts'
 // takes, stock up / stock down and the track record
@@ -1061,6 +1087,7 @@ export const scoutingExportFromPage = (
 			...(report.retro
 				? [{ title: "Retrospective", lines: [report.retro] }]
 				: []),
+			...(report.skills ? [skillsSection(report.skills)] : []),
 			{ title: "Offense", lines: report.offense },
 			{ title: "Defense", lines: report.defense },
 			{

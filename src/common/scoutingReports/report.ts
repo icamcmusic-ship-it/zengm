@@ -25,6 +25,7 @@ import {
 	percentileOf,
 } from "./grades.ts";
 import { gradeLine } from "./lines.ts";
+import { buildSkillReport } from "./skills.ts";
 import {
 	assignScouts,
 	briefOf,
@@ -1299,6 +1300,27 @@ export const buildReport = ({
 		bottomLine = `${retro} ${bv.pick(["The tape says he was", "Our files have him as"])} ${andJoin(strengthsText)} at his best.`;
 	}
 
+	// ---- strengths & weaknesses (prospects' full reports) ----
+	const skills =
+		input.kind === "prospect" && input.skills
+			? buildSkillReport({
+					input,
+					take,
+					scout: lead,
+					second,
+					secondTake: take2,
+					deptQuality: dept.quality,
+					peers,
+					selfCreated,
+					floorRole: roleName(take.floor, group),
+					ceilingRole: roleName(take.ceiling, group),
+					idealRole: idealRoleOf(grades, group, v.child("skillsRole")),
+					comp: comps[0]
+						? `${comps[0].name} (${comps[0].when}; ${comps[0].outcome})`
+						: undefined,
+				})
+			: undefined;
+
 	return {
 		pid: input.pid,
 		name: input.name,
@@ -1339,6 +1361,7 @@ export const buildReport = ({
 		fit,
 		pro,
 		retro,
+		skills,
 		bottomLine,
 		take: stripTake(take),
 		secondTake: take2 ? stripTake(take2) : undefined,

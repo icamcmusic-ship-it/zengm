@@ -13,6 +13,10 @@ export type ScoutHover = {
 	range: string;
 	bottomLine: string;
 	byline: string;
+	// Prospects: the swing skill and the top strength and weakness
+	swing?: string;
+	plus?: string;
+	minus?: string;
 };
 
 const HOVER_KEYS: GradeKey[] = [
@@ -41,6 +45,13 @@ export const hoverOf = (r: FullReport): ScoutHover => ({
 	range: r.header.rangeLine,
 	bottomLine: r.bottomLine,
 	byline: `${r.byline.lead.name}, ${r.byline.lead.title}`,
+	swing: r.skills?.swing.skill,
+	plus: r.skills?.strengths[0]
+		? `${r.skills.strengths[0].title} (${r.skills.strengths[0].tierLabel.toLowerCase()})`
+		: undefined,
+	minus: r.skills?.weaknesses[0]
+		? `${r.skills.weaknesses[0].title} (${r.skills.weaknesses[0].tierLabel.toLowerCase()})`
+		: undefined,
 });
 
 // One line, short: "B+ wing: A- shooter, C+ defender. Rotation wing to starter. Fairly paid."

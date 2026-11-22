@@ -198,6 +198,178 @@ export type ScoutInput = {
 	// Same team as the user
 	onUserTeam: boolean;
 	retiredSeason?: number;
+	// Prospects' full reports: the public facts the strengths & weaknesses read beyond the draft-year line (skills.ts)
+	skills?: SkillSignals;
+};
+
+// ---- Strengths & weaknesses (skills.ts) ----
+
+// One pre-draft season, totals (only public stats: the College/Overseas page shows the same numbers)
+export type SkillSeasonLine = {
+	season: number;
+	age: number;
+	level: ScoutProduction["level"];
+	// Level of competition on the conference scale (75 = an average power-conference schedule)
+	strength: number;
+	gp: number;
+	min: number;
+	pts: number;
+	orb: number;
+	drb: number;
+	ast: number;
+	tov: number;
+	stl: number;
+	blk: number;
+	pf: number;
+	fg: number;
+	fga: number;
+	tp: number;
+	tpa: number;
+	ft: number;
+	fta: number;
+	// Shot locations (0 when not tracked)
+	rimA: number;
+	rim: number;
+	postA: number;
+	post: number;
+	midA: number;
+	mid: number;
+	// His shots that were blocked
+	ba: number;
+	usg?: number;
+};
+
+// A stretch of games, totals (non-conference, conference play)
+export type SkillSplit = {
+	gp: number;
+	min: number;
+	pts: number;
+	orb: number;
+	drb: number;
+	ast: number;
+	stl: number;
+	blk: number;
+	tov: number;
+	fg: number;
+	fga: number;
+	tp: number;
+	tpa: number;
+	ft: number;
+	fta: number;
+	pf: number;
+};
+
+// One of his postseason games (conference tournament, NCAA tournament, NIT)
+export type SkillGame = {
+	event: "conf" | "ncaa" | "nit";
+	// Against a strong opponent: an NCAA tournament game, or a seeded opponent seeded higher than his team
+	strong: boolean;
+	won: boolean;
+	min: number;
+	pts: number;
+	fg: number;
+	fga: number;
+	tp: number;
+	tpa: number;
+	gmsc: number;
+};
+
+export type SkillSignals = {
+	// Pre-draft seasons, oldest first
+	seasons: SkillSeasonLine[];
+	// Draft-year season split into non-conference (November-December) and conference play (January-March)
+	splits?: { nonConf: SkillSplit; conf: SkillSplit };
+	games?: SkillGame[];
+	// Age- and schedule-adjusted production (game score per 40, collegeStats/production.ts)
+	ageAdjusted?: number;
+	// Public: the hand he shoots with (shootingHand.ts)
+	hand?: "left" | "right";
+	// The combine (measurements are public): wingspan minus height without shoes, measured minus listed height in shoes and weight,
+	// drill effort (missing = full), skipped drills, shooting drills (makes / attempts)
+	combine?: {
+		apeIndex?: number;
+		heightVsListed?: number;
+		weightVsListed?: number;
+		weight?: number;
+		effort?: number;
+		skipped?: boolean;
+		spotUp?: [number, number];
+		offDribble?: [number, number];
+		sprintPct?: number;
+		agilityPct?: number;
+		benchPct?: number;
+	};
+	// Real Player Comps (none under the no visible ratings challenge)
+	realComp?: {
+		name: string;
+		season: string;
+		age: number;
+		similarity: string;
+		became: string;
+	};
+	// What his archetype label rests on, in words (no numbers)
+	archetypeWhy?: string[];
+	// His class's average trait reading (the scouts' view), so a motor or temper read means he stands out in his class
+	traitCenters?: Record<string, number>;
+	// Last season's report: our grades of him then (GRADE_KEYS order), for trend arrows
+	prev?: { season: number; grades: number[] };
+};
+
+export type SkillTier = "elite" | "plus" | "average" | "minus" | "major";
+
+export type SkillFamily =
+	| "skill"
+	| "situational"
+	| "consistency"
+	| "mechanics"
+	| "feel"
+	| "defense"
+	| "physical"
+	| "motor"
+	| "role";
+
+export type SkillEvidence = {
+	src: "stats" | "splits" | "combine" | "film" | "traits";
+	text: string;
+};
+
+export type SkillItem = {
+	key: string;
+	family: SkillFamily;
+	side: "strength" | "weakness";
+	tier: SkillTier;
+	tierLabel: string;
+	title: string;
+	text: string;
+	evidence: SkillEvidence[];
+	// Vs last season's report
+	trend?: { dir: "up" | "down" | "flat"; text: string };
+	// Weaknesses: can development fix it, and the development plan focus that targets it
+	fix?: { fixable: boolean; text: string; focus?: string };
+	// The second scout sees it differently
+	dissent?: string;
+};
+
+export type SkillReport = {
+	strengths: SkillItem[];
+	weaknesses: SkillItem[];
+	swing: {
+		key: GradeKey;
+		skill: string;
+		text: string;
+		evidence?: SkillEvidence;
+	};
+	role: {
+		text: string;
+		risk: "Low" | "Moderate" | "High" | "Very high";
+		why: string;
+	};
+	anchor?: string;
+	contradictions: string[];
+	certainty: "confident" | "measured" | "hedged";
+	certaintyNote: string;
+	// The lead scout's lean, as the report words it
+	voice: string;
 };
 
 export type ScoutTeamFit = {
@@ -323,6 +495,8 @@ export type FullReport = {
 		usage: string;
 	};
 	retro?: string;
+	// Prospects' full reports: strengths & weaknesses, swing skill, NBA role and risk (skills.ts)
+	skills?: SkillReport;
 	bottomLine: string;
 	// For the history, the blurbs, AI and rumors
 	take: ScoutTake;

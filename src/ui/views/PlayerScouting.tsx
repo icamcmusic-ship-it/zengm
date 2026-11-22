@@ -14,6 +14,7 @@ import {
 	GradeRadar,
 	ReportSection,
 	ShotMixChart,
+	SkillsSection,
 } from "../components/ScoutingReport/index.tsx";
 import { FlagChips, ScoutRoomTable } from "../components/ScoutRoom.tsx";
 
@@ -241,6 +242,17 @@ const PlayerScouting = ({
 					<p className="mb-0">{report.bottomLine}</p>
 				</ReportSection>
 			</div>
+
+			{report.skills ? (
+				<div style={{ maxWidth: 1000 }}>
+					<ReportSection
+						title="Strengths & weaknesses"
+						testid="scouting-skills-section"
+					>
+						<SkillsSection skills={report.skills} />
+					</ReportSection>
+				</div>
+			) : null}
 
 			{room?.room ? (
 				<div style={{ maxWidth: 1000 }}>

@@ -15,6 +15,8 @@ import {
 	type FullReport,
 	type GradeRow,
 	type ScoutHover,
+	type SkillItem,
+	type SkillReport,
 } from "../../../common/scoutingReports/index.ts";
 
 // The setting is on and this is not a college league
@@ -374,6 +376,17 @@ const HoverBody = ({ hover }: { hover: ScoutHover }) => (
 			</tbody>
 		</table>
 		<div className="small mb-1">{hover.range}</div>
+		{hover.swing ? (
+			<div className="small mb-1" data-testid="scouting-hover-skills">
+				<b>Swing skill:</b> {hover.swing}
+				{hover.plus ? (
+					<div className="text-success-emphasis">▲ {hover.plus}</div>
+				) : null}
+				{hover.minus ? (
+					<div className="text-danger-emphasis">▼ {hover.minus}</div>
+				) : null}
+			</div>
+		) : null}
 		<div className="small">{hover.bottomLine}</div>
 		<div className="small text-body-secondary mt-1">{hover.byline}</div>
 	</div>
@@ -607,5 +620,143 @@ export const ReportSection = ({
 	<div className="mb-3" data-testid={testid}>
 		<h3 className="mb-1">{title}</h3>
 		{children}
+	</div>
+);
+
+const TIER_CLASS: Record<SkillItem["tier"], string> = {
+	elite: "text-bg-success",
+	plus: "bg-success-subtle text-success-emphasis",
+	average: "text-bg-secondary",
+	minus: "bg-danger-subtle text-danger-emphasis",
+	major: "text-bg-danger",
+};
+
+const SOURCE_LABEL: Record<SkillItem["evidence"][number]["src"], string> = {
+	stats: "Stats",
+	splits: "Splits",
+	combine: "Combine",
+	film: "Film",
+	traits: "Traits",
+};
+
+const TrendArrow = ({ trend }: { trend: SkillItem["trend"] }) => {
+	if (!trend) {
+		return null;
+	}
+	return (
+		<span
+			className={clsx(
+				"ms-1 small",
+				trend.dir === "up"
+					? "text-success"
+					: trend.dir === "down"
+						? "text-danger"
+						: "text-body-secondary",
+			)}
+			title={`Vs last season: ${trend.text}`}
+			data-testid="skill-trend"
+		>
+			{trend.dir === "up" ? "▲" : trend.dir === "down" ? "▼" : "■"}
+		</span>
+	);
+};
+
+const SkillRow = ({ item }: { item: SkillItem }) => (
+	<li className="mb-2" data-testid={`skill-${item.side}`}>
+		<span className={clsx("badge me-1", TIER_CLASS[item.tier])}>
+			{item.tierLabel}
+		</span>
+		<b>{item.title}</b>
+		<TrendArrow trend={item.trend} />
+		<div>{item.text}</div>
+		{item.evidence.length > 0 ? (
+			<ul className="mb-0 ps-3 small text-body-secondary">
+				{item.evidence.map((e, i) => (
+					<li key={i}>
+						<span className="fw-bold">{SOURCE_LABEL[e.src]}:</span> {e.text}
+					</li>
+				))}
+			</ul>
+		) : null}
+		{item.trend ? (
+			<div className="small text-body-secondary">
+				Since last season: {item.trend.text}
+			</div>
+		) : null}
+		{item.fix ? (
+			<div
+				className={clsx(
+					"small",
+					item.fix.fixable ? "text-success-emphasis" : "text-danger-emphasis",
+				)}
+			>
+				{item.fix.text}
+			</div>
+		) : null}
+		{item.dissent ? (
+			<div className="small fst-italic">{item.dissent}</div>
+		) : null}
+	</li>
+);
+
+const RISK_CLASS: Record<SkillReport["role"]["risk"], string> = {
+	Low: "text-bg-success",
+	Moderate: "text-bg-info",
+	High: "text-bg-warning",
+	"Very high": "text-bg-danger",
+};
+
+// Strengths & weaknesses of a prospect's report: severity tiers, evidence, trends, fixable or structural, the swing skill, the NBA
+// role with its risk, a real-player anchor and the rating-vs-stats contradictions
+export const SkillsSection = ({ skills }: { skills: SkillReport }) => (
+	<div data-testid="scouting-skills">
+		<div className="small text-body-secondary mb-2">
+			{skills.voice}. {skills.certaintyNote}
+		</div>
+		<div className="mb-2" data-testid="scouting-swing">
+			<b>{skills.swing.text}</b>
+			{skills.swing.evidence ? (
+				<span className="small text-body-secondary">
+					{" "}
+					({SOURCE_LABEL[skills.swing.evidence.src]}:{" "}
+					{skills.swing.evidence.text})
+				</span>
+			) : null}
+		</div>
+		<div className="row">
+			<div className="col-12 col-md-6">
+				<h4 className="h6 text-success-emphasis mb-1">Strengths</h4>
+				<ul className="list-unstyled mb-2">
+					{skills.strengths.map((x) => (
+						<SkillRow key={x.key} item={x} />
+					))}
+				</ul>
+			</div>
+			<div className="col-12 col-md-6">
+				<h4 className="h6 text-danger-emphasis mb-1">Weaknesses</h4>
+				<ul className="list-unstyled mb-2">
+					{skills.weaknesses.map((x) => (
+						<SkillRow key={x.key} item={x} />
+					))}
+				</ul>
+			</div>
+		</div>
+		<div className="mb-1" data-testid="scouting-role">
+			{skills.role.text}{" "}
+			<span className={clsx("badge", RISK_CLASS[skills.role.risk])}>
+				{skills.role.risk} risk
+			</span>{" "}
+			<span className="small text-body-secondary">({skills.role.why})</span>
+		</div>
+		{skills.anchor ? <div className="mb-1">{skills.anchor}</div> : null}
+		{skills.contradictions.length > 0 ? (
+			<div className="mb-1" data-testid="scouting-contradictions">
+				{skills.contradictions.map((c) => (
+					<div key={c} className="text-warning-emphasis">
+						⚠ {c}
+					</div>
+				))}
+			</div>
+		) : null}
 	</div>
 );

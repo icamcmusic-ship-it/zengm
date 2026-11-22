@@ -8,3 +8,4 @@ export * from "./report.ts";
 export * from "./history.ts";
 export * from "./blurb.ts";
 export * from "./cone.ts";
+export * from "./skills.ts";

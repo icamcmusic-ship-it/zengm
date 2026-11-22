@@ -155,7 +155,7 @@ const per36 = (s: ScoutProduction, x: number) =>
 	s.min > 0 ? (x * 36) / s.min : 0;
 
 // Production on the rating scale (50 = typical rotation player). Undefined when that stat says nothing (no attempts)
-const productionScores = (
+export const productionScores = (
 	s: ScoutProduction,
 	group: PeerGroup,
 ): Partial<Record<GradeKey, number>> => {

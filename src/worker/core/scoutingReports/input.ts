@@ -82,6 +82,12 @@ import { archetypeFor, getLeagueNorms } from "../player/archetype.ts";
 import { expandedRatingsApply } from "../player/expandedRatings.ts";
 import { getUncertainty } from "../draft/scouting.ts";
 import { effectiveQuality } from "../../../common/staffDepth/regions.ts";
+import { getRealComps, realCompsOn } from "../draft/realComps.ts";
+import {
+	classTraitCenters,
+	clearTraitCenters,
+	skillSignalsFor,
+} from "./skillSignals.ts";
 
 // Off in college leagues (no draft, contracts or trades to scout for): the pages are hidden there
 // Scout Specialties & Assignments (needs Scouting Director & Regions)
@@ -462,6 +468,7 @@ let ctxCache: { key: string; time: number; ctx: ReportCtx } | undefined;
 
 export const clearScoutingCache = () => {
 	ctxCache = undefined;
+	clearTraitCenters();
 };
 
 const getRoleScale = async (): Promise<RoleScale> => {
@@ -877,6 +884,7 @@ const nightCombineFor = async (p: Player) => {
 		}
 	}
 	return {
+		raw: { result: c.result, listed: c.listed, ranks: c.ranks },
 		combine: rows,
 		combineTested: { size: true, ath: c.result.drills !== undefined },
 		combineNotes: combineScoutNotes(
@@ -1058,7 +1066,10 @@ export const buildInput = async (
 	{
 		light = false,
 		archetype: withArchetype = true,
+		skills: withSkills = !light,
 	}: {
+		// Strengths & weaknesses (prospects): the extra public facts they read (skillSignals.ts)
+		skills?: boolean;
 		light?: boolean;
 		// perf2: the archetype only shows in a full report's header (buildReport); snapshots, scout calls and the rumors'
 		// scouting split never read it, and a prospect's is a live classification each time
@@ -1115,11 +1126,17 @@ export const buildInput = async (
 			? 0
 			: Math.max(0.4, 1.8 - 0.45 * proSeasons);
 	let archetype: string | undefined;
+	let archetypeWhy: string[] | undefined;
 	if (withArchetype && ratings && featureOn("archetypes")) {
 		const found = archetypeFor(p, await getLeagueNorms());
 		if (found) {
 			// Only the archetype's name (no 2K build lists or "also close to")
 			archetype = found.view.name;
+			// What the label rests on, in words (read from the ratings as the user's scouts see them)
+			archetypeWhy = found.classification?.why
+				.filter((w) => w.want * w.z > 0)
+				.slice(0, 2)
+				.map((w) => w.label);
 		}
 	}
 	const current = !prospect && !retired ? getCurrentContract(p) : undefined;
@@ -1164,7 +1181,11 @@ export const buildInput = async (
 					}
 				: undefined,
 		...(nightCombine
-			? nightCombine
+			? {
+					combine: nightCombine.combine,
+					combineTested: nightCombine.combineTested,
+					combineNotes: nightCombine.combineNotes,
+				}
 			: {
 					combine: prospect && !light ? await combineFor(p) : undefined,
 				}),
@@ -1200,6 +1221,31 @@ export const buildInput = async (
 		onUserTeam: p.tid === ctx.userTid,
 		retiredSeason: retired ? p.retiredYear : undefined,
 	};
+	if (prospect && withSkills) {
+		input.skills = skillSignalsFor(p, {
+			season: ctx.season,
+			night: nightCombine?.raw,
+			oldCombine:
+				!nightCombine && featureOn("collegeStats") ? combineOf(p) : undefined,
+			combineRows: input.combine,
+			realComp: realCompsOn()
+				? (await getRealComps([p])).get(p.pid)?.[0]
+				: undefined,
+			archetypeWhy,
+			traitCenters: traits
+				? classTraitCenters(
+						(
+							await idb.cache.players.indexGetAll(
+								"playersByTid",
+								PLAYER.UNDRAFTED,
+							)
+						).filter((x) => x.draft.year === p.draft.year),
+						`${g.get("lid")}|${p.draft.year}|${ctx.season}|${ctx.phase}|${ctx.scoutingLevel}`,
+						(x) => traitReadingsFor(x, ctx.scoutingLevel, ctx.season),
+					)
+				: undefined,
+		});
+	}
 	return input;
 };
 
