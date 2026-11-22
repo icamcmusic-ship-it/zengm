@@ -446,17 +446,12 @@ export const getOutletHistory = async (
 	return out.sort((a, b) => b.season - a.season);
 };
 
-// Every player, retired ones included (the cache's copy wins: right after a draft, its players have moved teams there)
-export const everyPlayer = async () => {
-	const byPid = new Map<number, Player>();
-	for (const p of await idb.merged.players.getAll({ activeAndRetired: true })) {
-		byPid.set(p.pid, p);
-	}
-	for (const p of await idb.cache.players.getAll()) {
-		byPid.set(p.pid, p);
-	}
-	return [...byPid.values()];
-};
+// Every player, retired and stashed ones included, plus the prospects still undrafted (in the cache only; right after the draft,
+// before they turn free agents, the scorecard still needs the ones the outlets ranked)
+export const everyPlayer = async () => [
+	...(await idb.merged.players.getAll({ activeAndRetired: true })),
+	...(await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)),
+];
 
 export const boardKeyName = (key: BoardKey) =>
 	key === "cons"

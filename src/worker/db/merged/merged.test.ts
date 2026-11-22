@@ -362,7 +362,12 @@ describe("players selectors", () => {
 		const randomPlayer = (pid: number, retired: boolean) => {
 			const draftYear = randInt(SEASON - 12, SEASON - 1);
 			const p = makePlayer(pid, {
-				tid: retired ? PLAYER.RETIRED : randInt(PLAYER.UNDRAFTED, 3),
+				// (some drafted players stashed overseas: neither prospects nor on a team, but still in activeAndRetired)
+				tid: retired
+					? PLAYER.RETIRED
+					: Math.random() < 0.1
+						? PLAYER.STASHED
+						: randInt(PLAYER.UNDRAFTED, 3),
 				retiredYear: retired ? randInt(draftYear, SEASON) : Infinity,
 				statsTids: [randInt(0, 3), randInt(0, 3)],
 			});

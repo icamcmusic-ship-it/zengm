@@ -146,7 +146,11 @@ class PlayersStore extends MergedStore<"players", PlayersSelector> {
 						.transaction("players")
 						.store.index("tid")
 						.iterate(PLAYER.RETIRED),
-				matches: (p) => p.tid === PLAYER.RETIRED || p.tid >= PLAYER.FREE_AGENT,
+				// Draft-and-stash: a drafted player stashed overseas (PLAYER.STASHED, kept in the cache) is not a prospect either
+				matches: (p) =>
+					p.tid === PLAYER.RETIRED ||
+					p.tid >= PLAYER.FREE_AGENT ||
+					p.tid === PLAYER.STASHED,
 			};
 		}
 
