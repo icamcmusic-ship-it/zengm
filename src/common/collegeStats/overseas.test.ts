@@ -64,9 +64,10 @@ describe("overseas pre-draft stats", () => {
 			makeProspects(60, () => "EuroLeague"),
 			{ seed: "s", draftYear: 2030 },
 		);
+		// 60 prospects at one school would share a roster (class-aware teams): one player's line instead
 		const college = generateCollegeClass(
 			makeProspects(60, () => "Duke"),
-			{ seed: "s", draftYear: 2030 },
+			{ seed: "s", draftYear: 2030, context: false },
 		);
 		const e = perGame(euro, "min");
 		const c = perGame(college, "min");

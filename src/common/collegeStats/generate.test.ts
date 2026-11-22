@@ -153,9 +153,11 @@ describe("generateCollegeClass", () => {
 	});
 
 	test("lines are realistic, on average", () => {
+		// 50 prospects a school: one player's line, without the class-aware teams that would make them share one roster
 		const results = generateCollegeClass(makeProspects(200), {
 			seed: "avg",
 			draftYear: 2027,
+			context: false,
 		});
 		const rows = results.flatMap((r) =>
 			r.seasons.filter((s) => s.season === 2027),

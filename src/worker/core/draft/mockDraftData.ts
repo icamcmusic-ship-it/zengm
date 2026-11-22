@@ -31,6 +31,7 @@ import {
 } from "../player/traits.ts";
 import { getGmWeights } from "../gm/index.ts";
 import { getDraftCombineNudges } from "../draftCombine/index.ts";
+import { getDraftProductionNudges, productionNudgesOn } from "./production.ts";
 import { getPreDraftRanks } from "./preDraftRanks.ts";
 
 const MOCK_ROUNDS = 2;
@@ -215,11 +216,16 @@ export const getMockDraft = async () => {
 
 	// Draft Lottery Night & Combine setting: the AI's combine nudge, as in runPicks
 	const combineNudges = await getDraftCombineNudges(players, season);
+	// Age-adjusted pre-draft production, as in runPicks
+	const productionNudges = productionNudgesOn()
+		? getDraftProductionNudges(players)
+		: new Map<number, number>();
 
 	const prospects = players.map((p) => ({
 		pid: p.pid,
 		value: p.value,
 		combine: combineNudges.get(p.pid),
+		production: productionNudges.get(p.pid),
 		ratings: p.ratings,
 		scoutRank: scoutRank.get(p.pid) ?? players.length,
 		traitFactors: useTraits
