@@ -73,10 +73,10 @@ describe("overseas pre-draft stats", () => {
 		assert.isBelow(e.mpg, c.mpg - 5);
 		assert.isBelow(e.ppg, c.ppg);
 		assert.isAtMost(e.mpg, 32);
-		// Teenagers are capped
+		// Teenagers are capped (in the EuroLeague: an earlier season in a lower tier league or at an academy gets more, preDraftPaths)
 		for (const r of euro) {
 			for (const s of r.seasons) {
-				if ((s.age ?? 99) <= 20) {
+				if ((s.age ?? 99) <= 20 && s.school === "EuroLeague") {
 					assert.isAtMost(s.stats.min! / s.stats.gp!, 24);
 				}
 			}

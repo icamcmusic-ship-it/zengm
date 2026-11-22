@@ -15,6 +15,7 @@ import {
 	getLeagueTier,
 	getPreDraftLabel,
 	isOverseasLeague,
+	isSchoolLabel,
 	isPathway,
 } from "../../common/collegeStats/overseas.ts";
 import { NCAA_REGIONS } from "../../common/collegeStats/ncaa.ts";
@@ -129,7 +130,7 @@ export default defineView({
 				if (
 					!row ||
 					!row.teamName ||
-					getPreDraftLabel(row.teamName) === "College"
+					isSchoolLabel(getPreDraftLabel(row.teamName))
 				) {
 					return [];
 				}

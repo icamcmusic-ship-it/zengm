@@ -58,12 +58,17 @@ import type { MinimalPlayerRatings, Player } from "../../common/types.ts";
 import {
 	JUCO_LEAGUE,
 	getMoveNote,
+	getRouteText,
 	getStoryText,
 	isJuco,
 	type CareerYear,
 	type StoredPreDraftCareer,
 } from "../../common/collegeStats/career.ts";
-import { COLLEGES } from "../../common/collegeStats/colleges.ts";
+import {
+	COLLEGES,
+	LOWER_LEVEL_INFO,
+	getLowerLevel,
+} from "../../common/collegeStats/colleges.ts";
 import {
 	getScoutingReport,
 	type ReportPath,
@@ -111,7 +116,11 @@ const validCareer = (
 		return undefined;
 	}
 	for (const year of career.years) {
-		if (year.status !== "redshirt" && !rowSeasons.has(year.season)) {
+		if (
+			year.status !== "redshirt" &&
+			year.status !== "gap" &&
+			!rowSeasons.has(year.season)
+		) {
 			return undefined;
 		}
 	}
@@ -131,6 +140,7 @@ const CAREER_NOTES: Record<string, string> = {
 	redshirt: "Redshirt year (did not play)",
 	medical: "Medical redshirt",
 	injury: "Season-ending injury",
+	gap: "Away from basketball",
 };
 
 const isProspect = (p: Player) =>
@@ -431,11 +441,15 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		const { teamName, year } = entry;
 		const row = entry.row ?? { season: entry.season, gp: 0, gs: 0 };
 		const juco = isJuco(teamName);
-		const label = juco ? ("JUCO" as const) : getPreDraftLabel(teamName);
+		const label = getPreDraftLabel(teamName);
 		const school = getSchool(teamName);
 		const isNcaa = !!school && !school.nonCollege;
+		// More pre-draft paths: a prep school, youth academy or small college season, or a year away from basketball
+		const lower = getLowerLevel(teamName);
+		const gap = year?.status === "gap";
 		const env = getLeagueEnv(teamName);
-		const club = isNcaa || juco ? undefined : getClub(teamName, pRaw.pid);
+		const club =
+			isNcaa || juco || lower || gap ? undefined : getClub(teamName, pRaw.pid);
 		const coachKey = club ? `${teamName}|${club}` : teamName;
 		const coach = getHeadCoach(coachKey, row.season, label === "Overseas");
 		const pathway = isPathway(teamName);
@@ -447,6 +461,9 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		}
 		if (pathway) {
 			notes.push("Skipped college for the pro pathway program");
+		}
+		if (year?.football) {
+			notes.push("Joined the team after the football season");
 		}
 		if (year?.status) {
 			// Pre-Draft Injuries & Combine Medicals: the injury that ended it
@@ -506,7 +523,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 			team: coachKey,
 			season: row.season,
 			// A junior college that sends players on to Division I wins most of its games
-			strength: juco ? 74 : (school?.strength ?? 60),
+			strength: juco || lower ? 74 : (school?.strength ?? 60),
 			gp: row.gp ?? 0,
 			conference: isNcaa ? school.conference : undefined,
 		});
@@ -521,18 +538,24 @@ const getPreDraftInfo = async (pRaw: Player) => {
 					? CLASS_NAMES[Math.min(collegeIndex++, 4)]
 					: undefined,
 			conference: isNcaa ? school.conference : undefined,
-			league: isNcaa
-				? undefined
-				: juco
-					? JUCO_LEAGUE
-					: pathway
-						? "Pro development games"
-						: teamName,
-			leagueShort: isNcaa
-				? undefined
-				: juco
-					? "JUCO"
-					: (PRO_SHORT[teamName] ?? teamName),
+			league:
+				isNcaa || gap
+					? undefined
+					: juco
+						? JUCO_LEAGUE
+						: lower
+							? LOWER_LEVEL_INFO[lower].league
+							: pathway
+								? "Pro development games"
+								: teamName,
+			leagueShort:
+				isNcaa || gap
+					? undefined
+					: juco
+						? "JUCO"
+						: lower
+							? LOWER_LEVEL_INFO[lower].short
+							: (PRO_SHORT[teamName] ?? teamName),
 			tier,
 			tierName: tier ? TIER_NAMES[tier] : undefined,
 			status: year?.status,
@@ -672,6 +695,19 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		};
 	}
 
+	// His route to the draft, when it was not the usual one (preDraftPaths)
+	let route;
+	if (career?.route && lastEntry) {
+		route = {
+			kind: career.route,
+			...getRouteText(career.route, career.years, {
+				hsClass: career.hsClass,
+				school: lastEntry.teamName,
+				lastSeason: lastEntry.season,
+			}),
+		};
+	}
+
 	const scoutingReport = await getReport(pRaw, {
 		rDraft,
 		lastSeason: seasons.findLast((x) => x.gp > 0),
@@ -733,6 +769,7 @@ const getPreDraftInfo = async (pRaw: Player) => {
 		stock,
 		comps,
 		story,
+		route,
 		scoutingReport,
 		// Scouting System setting: your scouts' ranges and notes on a prospect (only here and on his other pages, not on the Draft
 		// Board or Draft Scouting)
@@ -758,6 +795,10 @@ const getReportPath = (
 	}
 	if (isPathway(lastTeam)) {
 		return { pathway: true };
+	}
+	const route = career?.route;
+	if (route === "nextStars" || route === "abroad" || route === "twoSport") {
+		return { route };
 	}
 	const years = career?.years ?? [];
 	const last = years.at(-1);

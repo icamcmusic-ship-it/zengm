@@ -584,13 +584,7 @@ export const planCareer = (
 		}
 
 		// Redshirt year: his first year on campus, no games
-		if (
-			!redshirt &&
-			n >= 2 &&
-			numJuco === 0 &&
-			story !== "bust" &&
-			!route
-		) {
+		if (!redshirt && n >= 2 && numJuco === 0 && story !== "bust" && !route) {
 			const pRedshirt =
 				story === "lateBloomer" ? 0.3 : story ? 0.03 : z < 0 ? 0.11 : 0.06;
 			if (rng.random() < pRedshirt) {
@@ -828,9 +822,10 @@ export const planCareer = (
 
 	const firstYear = years[0]!;
 	const region = getRegion(p.bornLoc);
-	// A US high school path: a college, junior college or post-graduate first stop, or an American who skipped college for a pro club
+	// A US high school path: a college, junior college, prep, or a year away (not an international academy start), or an American who skipped
+	// college for a pro club
 	const hsPath =
-		firstYear.level !== "other" ||
+		years.some((year) => year.level !== "other" && year.level !== "academy") ||
 		((route === "nextStars" || route === "abroad") &&
 			(region === "usa" || region === "canada"));
 	return {
@@ -949,7 +944,8 @@ export const applyCollegeRoute = (
 	const rng = new Rng(`${seedBase}|route`);
 	const n = years.length;
 	if (route === "postgrad") {
-		const school = PREP_SCHOOLS[Math.floor(rng.random() * PREP_SCHOOLS.length)]!;
+		const school =
+			PREP_SCHOOLS[Math.floor(rng.random() * PREP_SCHOOLS.length)]!;
 		setLowerYear(years[0]!, school, "prep", LOWER_LEVEL_INFO.prep, rng);
 		// Against high school competition he was one of the best players on the floor
 		years[0]!.zShift += 0.8;
@@ -962,7 +958,13 @@ export const applyCollegeRoute = (
 		// Two years there for a prospect who went to college at 19 or later
 		const k = n >= 4 && rng.random() < 0.4 ? 2 : 1;
 		for (let i = 0; i < k; i++) {
-			setLowerYear(years[i]!, academy, "academy", LOWER_LEVEL_INFO.academy, rng);
+			setLowerYear(
+				years[i]!,
+				academy,
+				"academy",
+				LOWER_LEVEL_INFO.academy,
+				rng,
+			);
 			years[i]!.zShift += 0.6;
 			years[i]!.mpgShift += 1;
 		}

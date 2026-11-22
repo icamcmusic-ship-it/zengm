@@ -80,6 +80,7 @@ const ASIA = new Set([
 	"Lebanon",
 	"Jordan",
 	"Kazakhstan",
+	"Uzbekistan",
 	"Thailand",
 	"Indonesia",
 	"Vietnam",
@@ -287,6 +288,8 @@ export const getCountry = (bornLoc: string) => {
 // More pre-draft paths: how much a prospect leans to the domestic league of his own country, and away from the domestic league of
 // another country of his part of the world (a Spaniard plays in Spain much more often than in Poland)
 const HOME_LEAGUE_BOOST = 5;
+// ...less for a league that is home to a whole continent (the Basketball Africa League)
+const CONTINENTAL_HOME_BOOST = 2;
 const AWAY_LEAGUE_FACTOR = 0.55;
 
 /**
@@ -297,8 +300,13 @@ export const homeLeagueFactor = (league: string, country: string) => {
 	if (home.length === 0) {
 		return 1;
 	}
-	return home.includes(country) ? HOME_LEAGUE_BOOST : AWAY_LEAGUE_FACTOR;
+	if (!home.includes(country)) {
+		return AWAY_LEAGUE_FACTOR;
+	}
+	return home.length > 8 ? CONTINENTAL_HOME_BOOST : HOME_LEAGUE_BOOST;
 };
+
+const INTL_G_LEAGUE_FACTOR = 0.5;
 
 // The draft year destinations of a blank college with the paths on: the ones of NON_NCAA and the overseas leagues with a `dest` weight
 let moreDestinations: {
@@ -356,6 +364,11 @@ export const pickBlankDestination = (
 				w *
 				regionOf(name) *
 				homeLeagueFactor(name, country) *
+				// An international prospect is in the G League less often than its regional weight says once the leagues of his own country
+				// are on the list (a teenager abroad signs at home first)
+				(name === "NBA G League" && region !== "usa" && region !== "canada"
+					? INTL_G_LEAGUE_FACTOR
+					: 1) *
 				// A top prospect is at a top club, a raw one where he plays (pro leagues only: a prep year or a small college is not a
 				// level of pro competition)
 				(pro ? Math.exp(0.5 * talentZ * ((strength - 66) / 14)) : 1),

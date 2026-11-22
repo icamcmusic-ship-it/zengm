@@ -24,7 +24,13 @@ import {
 	type ProspectNcaaGame,
 } from "./ncaa.ts";
 import { gameScore } from "./season.ts";
-import { isJuco, lagRatings, planCareer, toCareer } from "./career.ts";
+import {
+	isJuco,
+	lagRatings,
+	pickStory,
+	planCareer,
+	toCareer,
+} from "./career.ts";
 import { COLLEGE_AWARD_PREFIX } from "../preDraft.ts";
 import type {
 	CollegeProspect,
@@ -163,13 +169,7 @@ export const generateCollegeClass = (
 	for (const p of prospects) {
 		// Each player has his own stream, so what he gets doesn't depend on who else is in the class
 		const rng = new Rng(`${seed}|${draftYear}|${p.key}`);
-		const school = pickSchool(
-			p,
-			options,
-			classStats,
-			pathwayKeys,
-			classRoutes,
-		);
+		const school = pickSchool(p, options, classStats, pathwayKeys, classRoutes);
 
 		// His team in the college season, if it has one
 		let team = -1;
@@ -492,12 +492,12 @@ export type ClassRoute = { route: "nextStars" | "abroad"; league: string };
 // college or their own league (real classes: 0-2 a year), from at most NEXT_STARS_POOL of the best. Not Australians and New Zealanders,
 // for whom the NBL is home anyway
 const NEXT_STARS_COUNTS = [0, 1, 2];
-const NEXT_STARS_COUNT_WEIGHTS = [0.5, 0.38, 0.12];
+const NEXT_STARS_COUNT_WEIGHTS = [0.6, 0.32, 0.08];
 const NEXT_STARS_POOL = 20;
 const NEXT_STARS_MIN_STOCK = 0.3;
 // Americans who turn pro abroad out of high school (a handful a decade make the draft): 0 or 1 a class
 const ABROAD_COUNTS = [0, 1];
-const ABROAD_COUNT_WEIGHTS = [0.8, 0.2];
+const ABROAD_COUNT_WEIGHTS = [0.85, 0.15];
 const ABROAD_STOCK = [-0.2, 1.4];
 // Where they go: leagues that sign American teenagers
 const ABROAD_LEAGUES = [
@@ -552,6 +552,23 @@ export const getClassRoutes = (
 			2.5,
 		);
 		const zStock = 0.4 * zClass + 0.6 * zPot;
+		// A prospect with a story keeps it, and the school it is about (stories also style his sub-ratings): the same story draw
+		// generateCollegeClass makes for him
+		const seedBase = `${options.seed}|${options.draftYear}|${p.key}`;
+		const classIndex = isCollegeSchool(school)
+			? getClassIndexForStock(
+					p.age,
+					0.4 * zClass +
+						0.6 * clamp((p.pot - potStats.mean) / potStats.sd, -2.5, 2.5),
+					new Rng(`${seedBase}|class`).random(),
+				)
+			: getClassIndex(p.age);
+		if (
+			(options.priorSeasons ?? true) &&
+			pickStory(p, { z: zClass, classIndex, isNcaa: d1, school }, seedBase)
+		) {
+			continue;
+		}
 		const na = region === "usa" || region === "canada";
 		if (
 			zStock >= NEXT_STARS_MIN_STOCK &&
@@ -584,7 +601,7 @@ export const getClassRoutes = (
 		// Most Next Stars are internationals
 		const pick = rng.weighted(
 			left,
-			left.map((x) => (x.na ? 0.6 : 1)),
+			left.map((x) => (x.na ? 0.4 : 1)),
 		);
 		routes.set(pick.key, { route: "nextStars", league: "NBL" });
 	}
@@ -625,13 +642,7 @@ export const getNcaaSchools = (
 	);
 	const output = new Map<string, string>();
 	for (const p of prospects) {
-		const school = pickSchool(
-			p,
-			options,
-			classStats,
-			pathwayKeys,
-			classRoutes,
-		);
+		const school = pickSchool(p, options, classStats, pathwayKeys, classRoutes);
 		if (school && !school.nonCollege && !school.idle) {
 			output.set(p.key, school.name);
 		}

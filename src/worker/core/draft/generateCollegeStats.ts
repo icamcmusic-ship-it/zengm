@@ -256,7 +256,8 @@ export const generateCollegeStats = async ({
 		seed,
 		draftYear,
 		fillBlankColleges: fillBlankColleges ?? true,
-		// More pre-draft paths: the transfer portal's coaching changes, the pro pathway program, overseas tiers
+		// More pre-draft paths: the transfer portal's coaching changes, the pro pathway program, overseas tiers, routes (prep years, academies,
+		// small colleges, the NBL's Next Stars...), more leagues
 		paths: featureOn("preDraftPaths"),
 		// Measured against the whole class, also when only some of it gets stats
 		...(players.length < classPlayers.length

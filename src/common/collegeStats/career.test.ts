@@ -7,7 +7,7 @@ import {
 	isJuco,
 	type CareerYear,
 } from "./career.ts";
-import { COLLEGES } from "./colleges.ts";
+import { COLLEGES, SMALL_COLLEGES } from "./colleges.ts";
 import { makeClass } from "./career.testutil.ts";
 import { getNcaaSchools } from "./generate.ts";
 import { getProspectBoost, simulateNcaaSeason } from "./ncaa.ts";
@@ -98,11 +98,20 @@ describe("career model", () => {
 			// The draft year school is his own school, never a redshirt year
 			assert.strictEqual(years.at(-1)!.school, result.school);
 			assert.notStrictEqual(years.at(-1)!.status, "redshirt");
-			if (p.college !== "" && years.at(-1)!.level !== "pathway") {
+			// (unless the pro pathway program, the NBL's Next Stars or a pro club abroad took him out of college)
+			if (
+				p.college !== "" &&
+				years.at(-1)!.level !== "pathway" &&
+				career.route !== "nextStars" &&
+				career.route !== "abroad"
+			) {
 				assert.strictEqual(result.school, p.college);
 			}
 
-			const played = years.filter((year) => year.status !== "redshirt");
+			// No games in a redshirt year or a year away from basketball
+			const played = years.filter(
+				(year) => year.status !== "redshirt" && year.status !== "gap",
+			);
 			assert.deepStrictEqual(
 				result.seasons.map((s) => [s.season, s.school]),
 				played.map((year) => [year.season, year.school]),
@@ -152,9 +161,22 @@ describe("career model", () => {
 			let elig = 0;
 			let redshirted = false;
 			let jucoYears = 0;
+			let smallYears = 0;
+			// A post-graduate year, an academy or a year away (preDraftPaths): before college, no class year, no eligibility used
+			let preYears = 0;
 			let seenD1 = false;
 			for (const [i, year] of years.entries()) {
 				assert.notStrictEqual(year.level, "other");
+				if (
+					year.level === "prep" ||
+					year.level === "academy" ||
+					year.level === "gap"
+				) {
+					assert.isUndefined(year.cls);
+					assert(!seenD1 && jucoYears === 0, "before college");
+					preYears += 1;
+					continue;
+				}
 				// The label is his eligibility year, "RS" once a year did not count
 				assert.strictEqual(
 					year.cls,
@@ -166,6 +188,12 @@ describe("career model", () => {
 					assert(!seenD1, "junior college comes before Division I");
 					assert(isJuco(year.school));
 					assert.isUndefined(COLLEGES[year.school]);
+					assert.isUndefined(season!.conference);
+				} else if (year.level === "dii" || year.level === "naia") {
+					// A Division II or NAIA start (preDraftPaths), like a junior college one
+					smallYears += 1;
+					assert(!seenD1, "a small college comes before Division I");
+					assert.strictEqual(SMALL_COLLEGES[year.school], year.level);
 					assert.isUndefined(season!.conference);
 				} else {
 					seenD1 = true;
@@ -187,12 +215,19 @@ describe("career model", () => {
 			}
 			// Four seasons of eligibility; a fifth year only with a year that did not count
 			assert.isAtMost(elig, 4);
-			assert.isAtMost(years.length, redshirted ? 5 : 4);
+			assert.isAtMost(years.length - preYears, redshirted ? 5 : 4);
 			assert.isAtMost(jucoYears, 2);
+			assert.isAtMost(smallYears, 2);
+			if (preYears > 0) {
+				assert.oneOf(years[preYears]!.move, ["prep", "academy", undefined]);
+			}
 			if (jucoYears > 0) {
 				assert.isBelow(jucoYears, years.length, "ends at a Division I school");
 				assert.strictEqual(years[jucoYears]!.move, "juco");
 				numJuco += 1;
+			}
+			if (smallYears > 0) {
+				assert.strictEqual(years[preYears + smallYears]!.move, "small");
 			}
 			if (years.some((year) => year.status === "redshirt")) {
 				numRedshirt += 1;
@@ -411,7 +446,8 @@ describe("career model", () => {
 		for (const { p, result } of stories.get("olderIntl")!) {
 			assert.isAtLeast(p.age, 22);
 			assert.isAtLeast(result.seasons.length, 5);
-			assert.strictEqual(result.career!.years[0]!.level, "other");
+			// (his first season may have been at a youth academy: preDraftPaths)
+			assert.oneOf(result.career!.years[0]!.level, ["other", "academy"]);
 			assert.isUndefined(result.career!.hsClass);
 		}
 

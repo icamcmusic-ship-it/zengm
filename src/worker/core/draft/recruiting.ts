@@ -54,7 +54,15 @@ export const getRecruitBasis = (
 			id: p.pid,
 			pos,
 			classOf: career.hsClass,
-			committed: first.school,
+			// The school he committed to: his first college one, after a post-graduate year, an academy or a year away (preDraftPaths)
+			committed: (
+				career.years.find(
+					(year) =>
+						year.level !== "prep" &&
+						year.level !== "academy" &&
+						year.level !== "gap",
+				) ?? first
+			).school,
 			jucoStart: first.level === "juco",
 		};
 		if (career.recruit && !ranking) {

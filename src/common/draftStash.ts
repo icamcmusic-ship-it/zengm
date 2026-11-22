@@ -11,8 +11,17 @@
 // seeded with the player and the season (salted per league).
 import { PHASE, PLAYER } from "./constants.ts";
 import { Rng, clamp } from "./collegeStats/rng.ts";
-import { getLeagueEnv, isOverseasLeague } from "./collegeStats/overseas.ts";
-import { getSchool } from "./collegeStats/colleges.helpers.ts";
+import {
+	getLeagueEnv,
+	getLeagueTier,
+	isOverseasLeague,
+} from "./collegeStats/overseas.ts";
+import {
+	getCountry,
+	getRegion,
+	getSchool,
+} from "./collegeStats/colleges.helpers.ts";
+import { pickLeagueOfTier } from "./collegeStats/career.ts";
 import { simulateSeason } from "./collegeStats/season.ts";
 import type { CollegeSeason, Ratings } from "./collegeStats/types.ts";
 import type { Phase } from "./types.ts";
@@ -248,6 +257,41 @@ export const aiShouldBringOver = ({
 		return false;
 	}
 	return ovr >= teamRotationOvr - (lastChance ? 4 : 1);
+};
+
+// The ovr a stashed player needs to move up from a development tier league to a mid tier one, and from a mid tier league to a top one
+export const STASH_MOVE_UP_OVR = { mid: 44, top: 49 };
+
+/**
+ * The league a stashed player spends a season in: the one he was in, unless he has outgrown a development or mid tier league (his ovr at
+ * the bar of the tier above). Then a league of the next tier up, from the full list of overseas leagues (preDraftPaths' domestic leagues
+ * included), most likely his own country's or one of his part of the world. Seeded by the player and the season, so the same season always
+ * gives the same league; one step a season at most.
+ */
+export const getStashLeague = ({
+	pid,
+	season,
+	league,
+	ovr,
+	bornLoc,
+}: {
+	pid: number;
+	season: number;
+	league: string;
+	ovr: number;
+	bornLoc: string;
+}) => {
+	const tier = getLeagueTier(league);
+	const next = tier === "dev" ? "mid" : tier === "mid" ? "top" : undefined;
+	if (next === undefined || ovr < STASH_MOVE_UP_OVR[next]) {
+		return league;
+	}
+	return pickLeagueOfTier(
+		next,
+		getRegion(bornLoc),
+		new Rng(`draftStash|moveUp|${pid}|${season}`),
+		getCountry(bornLoc),
+	);
 };
 
 /**

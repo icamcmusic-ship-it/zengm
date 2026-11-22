@@ -68,6 +68,8 @@ export type ScoutingReportInput = {
 
 export type ReportPath = {
 	pathway?: boolean;
+	// More pre-draft paths: a route whose last season reads differently (the NBL's Next Stars, an American abroad, a two-sport athlete)
+	route?: "nextStars" | "abroad" | "twoSport";
 	transferredFrom?: string;
 	tier?: "top" | "mid" | "dev";
 };
@@ -583,6 +585,15 @@ export const getPathNote = (
 	}
 	if (path.pathway) {
 		return "Skipped college for a season with a pro development team: fewer minutes and a smaller role than he would have had in college, against grown men, so his numbers undersell him a little.";
+	}
+	if (path.route === "nextStars") {
+		return "Skipped college for a season in Australia's NBL against grown men: a smaller role than college would have given him, so his numbers undersell him.";
+	}
+	if (path.route === "abroad") {
+		return "Turned pro overseas out of high school: a teenager on a pro roster, so judge the tape more than the box score.";
+	}
+	if (path.route === "twoSport") {
+		return "Split his time with football until this season: there should be more to come with basketball full time.";
 	}
 	if (path.transferredFrom) {
 		return `Transferred in from ${path.transferredFrom}${team ? `, so ${team} saw only one season of him` : ""}; teams will look at both stops.`;

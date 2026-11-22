@@ -59,6 +59,10 @@ const getClasses = () => {
 
 const lastLevel = (result: CollegeResult) => result.career?.years.at(-1)?.level;
 
+// A transfer between Division I schools (not a move up from a junior college, small college, prep year or academy)
+const isTransfer = (year: CareerYear) =>
+	year.move === "up" || year.move === "down" || year.move === "lateral";
+
 describe("more pre-draft paths", () => {
 	beforeAll(() => {
 		getClasses();
@@ -114,11 +118,13 @@ describe("more pre-draft paths", () => {
 
 	test("shares of college, overseas and other paths stay the same", () => {
 		const count = (key: "on" | "off") => {
-			const out = { ncaa: 0, pathway: 0, overseas: 0, other: 0 };
+			const out = { ncaa: 0, pathway: 0, overseas: 0, other: 0, none: 0 };
 			for (const c of getClasses()) {
 				for (const result of c[key]) {
 					const last = result.career?.years.at(-1);
 					if (!last) {
+						// Did not play
+						out.none += 1;
 						continue;
 					}
 					if (last.level === "ncaa") {
@@ -136,10 +142,29 @@ describe("more pre-draft paths", () => {
 		};
 		const on = count("on");
 		const off = count("off");
+		// College players who spent their draft year in the NBL's Next Stars program or with a club abroad instead (routes)
+		let routedFromCollege = 0;
+		for (const c of getClasses()) {
+			for (const [i, result] of c.on.entries()) {
+				const route = result.career?.route;
+				if (
+					(route === "nextStars" || route === "abroad") &&
+					lastLevel(c.off[i]!) === "ncaa"
+				) {
+					routedFromCollege += 1;
+				}
+			}
+		}
 		assert.strictEqual(off.pathway, 0);
-		assert.strictEqual(on.overseas, off.overseas);
-		assert.strictEqual(on.other, off.other);
-		assert.strictEqual(on.ncaa + on.pathway, off.ncaa);
+		assert.strictEqual(on.ncaa + on.pathway + routedFromCollege, off.ncaa);
+		// Who goes to college is the same; the rest pick from more leagues (a few more abroad, fewer at prep and youth programs)
+		assert.strictEqual(
+			on.overseas + on.other + on.none,
+			off.overseas + off.other + off.none + routedFromCollege,
+		);
+		assert.isAtLeast(on.overseas, off.overseas + routedFromCollege);
+		assert.isAbove(routedFromCollege, 0);
+		assert.isBelow(routedFromCollege, NUM_CLASSES);
 	});
 
 	describe("transfer portal", () => {
@@ -155,13 +180,20 @@ describe("more pre-draft paths", () => {
 					const d1 = years.filter(
 						(year) => year.level === "ncaa" && year.status !== "redshirt",
 					);
-					if (d1.length < 2 || years.some((year) => year.level === "juco")) {
+					// (not a junior college or small college start, nor its move up to Division I)
+					if (
+						d1.length < 2 ||
+						years.some(
+							(year) =>
+								year.level === "juco" ||
+								year.level === "dii" ||
+								year.level === "naia",
+						)
+					) {
 						continue;
 					}
 					multi += 1;
-					const transfers = years.filter(
-						(year) => year.move && year.move !== "juco",
-					);
+					const transfers = years.filter(isTransfer);
 					if (transfers.length > 0) {
 						moved += 1;
 					}
@@ -222,7 +254,7 @@ describe("more pre-draft paths", () => {
 						if (season) {
 							assert.strictEqual(season.school, year.school);
 						}
-						if (year.move && year.move !== "juco" && year.level === "ncaa") {
+						if (isTransfer(year) && year.level === "ncaa") {
 							const note = getMoveNote(years[i - 1], year)!;
 							assert(
 								note.startsWith(
@@ -387,16 +419,28 @@ describe("more pre-draft paths", () => {
 					const p = prospects[i]!;
 					const years = result.career!.years;
 					const last = years.at(-1)!;
+					if (result.career!.route === "nextStars") {
+						// A season in the NBL's Next Stars program instead (routes)
+						assert.strictEqual(last.school, "NBL");
+						continue;
+					}
 					assert.strictEqual(last.school, p.college);
 					assert.strictEqual(last.tier, getLeagueTier(p.college));
 					for (const [j, year] of years.entries()) {
+						if (year.level === "academy") {
+							// A first season at a youth academy (preDraftPaths): no tier, then a move to a pro club
+							assert.strictEqual(j, 0);
+							assert.isUndefined(year.tier);
+							assert.strictEqual(years[1]!.move, "academy");
+							continue;
+						}
 						assert.include(OVERSEAS_TIERS, year.tier);
 						assert.strictEqual(year.tier, getLeagueTier(year.school));
 						const season = result.seasons.find(
 							(s) => s.season === year.season,
 						)!;
 						assert.strictEqual(season.school, year.school);
-						if (j > 0) {
+						if (j > 0 && years[j - 1]!.level !== "academy") {
 							const prev = years[j - 1]!;
 							assert.isAtMost(
 								OVERSEAS_TIERS.indexOf(prev.tier!),
@@ -440,7 +484,10 @@ describe("more pre-draft paths", () => {
 					paths: false,
 				});
 				for (const [i, result] of on.entries()) {
-					if (result.career!.years.some((year) => year.move)) {
+					if (
+						result.career!.years.some((year) => year.move) ||
+						result.career!.route
+					) {
 						continue;
 					}
 					unchanged += 1;

@@ -19,7 +19,15 @@ import {
 	NON_NCAA,
 	PATHWAY_TEAM,
 } from "../../../common/collegeStats/colleges.ts";
-import { isOverseasLeague } from "../../../common/collegeStats/overseas.ts";
+import {
+	getLeagueTier,
+	isOverseasLeague,
+} from "../../../common/collegeStats/overseas.ts";
+
+// getLeagueHome is new with the routes: none before
+const collegesModule = await import("../../../common/collegeStats/colleges.ts");
+const getLeagueHome = (name) =>
+	(collegesModule as any).getLeagueHome?.(name) ?? [];
 import { Rng, hashString } from "../../../common/collegeStats/rng.ts";
 
 const NUM_CLASSES = Number(process.env.ROUTES_CLASSES ?? 12);
@@ -31,7 +39,12 @@ const countriesSource = readFileSync(
 );
 const basketballBlock = countriesSource
 	.slice(countriesSource.indexOf("basketball: {"))
-	.slice(0, countriesSource.slice(countriesSource.indexOf("basketball: {")).indexOf("},"));
+	.slice(
+		0,
+		countriesSource
+			.slice(countriesSource.indexOf("basketball: {"))
+			.indexOf("},"),
+	);
 const COUNTRY_FREQ = [
 	...basketballBlock.matchAll(/(?:"([^"]+)"|([A-Za-zçé]+)): (\d+)/g),
 ].map((m) => [m[1] ?? m[2], Number(m[3])]);
@@ -68,13 +81,18 @@ export const routeOf = (p) => {
 		if (years.some((y) => y.status === "redshirt")) {
 			return "D-I redshirt";
 		}
+		if (years.some((y) => y.status === "medical")) {
+			return "D-I medical redshirt";
+		}
 		return "D-I";
 	}
 	if (final === "NBA G League") {
 		return "G League";
 	}
 	if (isOverseasLeague(final)) {
-		return "overseas";
+		return years[0]?.level === "academy"
+			? "overseas (academy start)"
+			: "overseas";
 	}
 	return final || "none";
 };
@@ -87,6 +105,12 @@ test.skipIf(!process.env.RUN_ROUTES)(
 		const intlLeagues = new Map();
 		const usAbroad = new Map();
 		const finals = new Map();
+		// International prospects at a club abroad: in a league of their own country (the domestic league or its second division)
+		let intlAbroad = 0;
+		let intlAtHome = 0;
+		const tiers = new Map();
+		// Youth national team and small college honors
+		const honors = new Map();
 		let total = 0;
 		let ratingsHash = "";
 		for (let c = 0; c < NUM_CLASSES; c++) {
@@ -98,7 +122,11 @@ test.skipIf(!process.env.RUN_ROUTES)(
 			g.setWithoutSavingToDB("season", 2026);
 			g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
 			g.setWithoutSavingToDB("generateCollegeStats", false);
-			for (const key of ["featurePreDraftPaths", "featurePreDraftMedicals", "featureCollegeSeason"]) {
+			for (const key of [
+				"featurePreDraftPaths",
+				"featurePreDraftMedicals",
+				"featureCollegeSeason",
+			]) {
 				g.setWithoutSavingToDB(key, true);
 			}
 			const draftYear = 2026;
@@ -159,6 +187,31 @@ test.skipIf(!process.env.RUN_ROUTES)(
 				const region = getRegion(p.born.loc);
 				const final = getPreDraftSchool(p);
 				finals.set(final, (finals.get(final) ?? 0) + 1);
+				if (
+					region !== "usa" &&
+					region !== "canada" &&
+					isOverseasLeague(final)
+				) {
+					intlAbroad += 1;
+					const country = p.born.loc.split(", ").at(-1);
+					if (getLeagueHome(final).includes(country)) {
+						intlAtHome += 1;
+					}
+				}
+				for (const award of p.awards ?? []) {
+					const m = /^College: (FIBA \S+ \S+|Division II|NAIA)/.exec(
+						award.type,
+					);
+					if (m) {
+						honors.set(m[1], (honors.get(m[1]) ?? 0) + 1);
+					}
+				}
+				for (const y of p.preDraftCareer?.years ?? []) {
+					if (isOverseasLeague(y.school)) {
+						const t = `${y.tier ?? getLeagueTier(y.school)}`;
+						tiers.set(t, (tiers.get(t) ?? 0) + 1);
+					}
+				}
 				if (region !== "usa" && region !== "canada") {
 					const key = `${COLLEGES[final] ? "NCAA" : final}`;
 					intlLeagues.set(key, (intlLeagues.get(key) ?? 0) + 1);
@@ -181,9 +234,13 @@ test.skipIf(!process.env.RUN_ROUTES)(
 			top10: sorted(top10),
 			intlLeagues: sorted(intlLeagues),
 			northAmericansNotAtD1: sorted(usAbroad),
+			intlAbroadInHomeLeague: `${intlAtHome}/${intlAbroad}`,
+			overseasSeasonTiers: sorted(tiers),
+			honors: sorted(honors),
 			numDistinctFinalSchools: finals.size,
 			nonNcaaDestinations: Object.keys(NON_NCAA).length,
-			countries: COUNTRY_FREQ.length, colleges: COLLEGE_FREQ.length,
+			countries: COUNTRY_FREQ.length,
+			colleges: COLLEGE_FREQ.length,
 		};
 		const text = JSON.stringify(out, null, 1);
 		if (process.env.ROUTES_OUT) {

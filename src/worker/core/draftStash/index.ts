@@ -9,6 +9,7 @@ import {
 	getStashBuyout,
 	getStashContract,
 	getStashLapseSeason,
+	getStashLeague,
 	rotationOvr,
 	simulateStashSeason,
 	stashBlockedReason,
@@ -301,6 +302,16 @@ export const addStashSeasons = async () => {
 			continue;
 		}
 		const r = p.ratings.at(-1)!;
+		// More pre-draft paths: he may have moved up to a stronger league for this season
+		if (featureOn("preDraftPaths")) {
+			p.stash.league = getStashLeague({
+				pid: p.pid,
+				season,
+				league: p.stash.league,
+				ovr: r.ovr,
+				bornLoc: p.born.loc,
+			});
+		}
 		const line = simulateStashSeason({
 			pid: p.pid,
 			season,

@@ -310,13 +310,16 @@ export const preDraftProductionFor = (p: Player) => {
 	const label = getPreDraftLabel(teamName);
 	const careerYear = p.preDraftCareer?.years.find((y) => y.season === season);
 	const level: ScoutProduction["level"] =
-		careerYear?.level === "juco"
+		careerYear?.level === "juco" || label === "JUCO"
 			? "juco"
-			: label === "Overseas"
-				? "overseas"
-				: label === "G League" || label === "Pro pathway"
-					? "pro"
-					: "college";
+			: // A prep school, youth academy or small college: well below Division I competition
+				label === "Prep" || label === "Academy" || label === "Small college"
+				? "other"
+				: label === "Overseas"
+					? "overseas"
+					: label === "G League" || label === "Pro pathway"
+						? "pro"
+						: "college";
 	const prod = productionFromRows(seasonRows, season, teamName ?? "", level);
 	// Pre-draft rows have no shot locations or advanced stats worth reading
 	return prod

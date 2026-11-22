@@ -4,6 +4,7 @@ import { COLLEGE_AWARD_PREFIX } from "../preDraft.ts";
 import { generateCollegeClass, getClassIndex } from "./index.ts";
 import { getClassIndexForStock } from "./generate.ts";
 import { COLLEGES, PATHWAY_TEAM } from "./colleges.ts";
+import { isOverseasLeague } from "./overseas.ts";
 import { Rng } from "./rng.ts";
 import { RATING_KEYS, type CollegeProspect } from "./types.ts";
 
@@ -210,6 +211,12 @@ describe("generateCollegeClass", () => {
 			} else if (result.career?.years.at(-1)?.level === "pathway") {
 				// An elite freshman picked for the pro pathway program (preDraftPaths)
 				assert.strictEqual(result.school, PATHWAY_TEAM);
+			} else if (
+				result.career?.route === "nextStars" ||
+				result.career?.route === "abroad"
+			) {
+				// The NBL's Next Stars, or an American who turned pro abroad (preDraftPaths)
+				assert(isOverseasLeague(result.school));
 			} else {
 				assert.strictEqual(result.school, prospects[i]!.college);
 			}

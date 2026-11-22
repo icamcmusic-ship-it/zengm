@@ -22,6 +22,7 @@ import { CollegeSeasonSection } from "../Player/CollegeSeasonSection.tsx";
 import { getProfileUrl, usePlayerProfileOptions } from "../Player/common.tsx";
 import { last } from "../../../common/utils.ts";
 import { SchoolBadge, Stars, StockChart } from "./parts.tsx";
+import { isSchoolLabel } from "../../../common/collegeStats/overseas.ts";
 
 type PreDraft = NonNullable<View<"playerPreDraft">["preDraft"]>;
 
@@ -212,23 +213,37 @@ const TeamsSection = ({ preDraft }: { preDraft: PreDraft }) => {
 										</span>
 									) : null}
 								</td>
-								<td className="text-nowrap">
-									{s.coach.name}{" "}
-									<span className="text-body-secondary">
-										(since {s.coach.since})
-									</span>
-								</td>
-								<td className="text-nowrap">
-									{s.record.w}-{s.record.l}
-									{s.record.confW !== undefined
-										? ` (${s.record.confW}-${s.record.confL})`
-										: null}
-									{s.record.estimated ? "*" : null}
-									{s.apRank !== undefined ? `, AP #${s.apRank}` : null}
-								</td>
+								{s.status === "gap" ? (
+									// A year away from basketball: no team, coach or record
+									<>
+										<td>-</td>
+										<td>-</td>
+									</>
+								) : (
+									<>
+										<td className="text-nowrap">
+											{s.coach.name}{" "}
+											<span className="text-body-secondary">
+												(since {s.coach.since})
+											</span>
+										</td>
+										<td className="text-nowrap">
+											{s.record.w}-{s.record.l}
+											{s.record.confW !== undefined
+												? ` (${s.record.confW}-${s.record.confL})`
+												: null}
+											{s.record.estimated ? "*" : null}
+											{s.apRank !== undefined ? `, AP #${s.apRank}` : null}
+										</td>
+									</>
+								)}
 								<td>{s.ncaa ?? null}</td>
-								<td>{s.status === "redshirt" ? "-" : s.gp}</td>
-								<td>{s.status === "redshirt" ? "-" : s.gs}</td>
+								<td>
+									{s.status === "redshirt" || s.status === "gap" ? "-" : s.gp}
+								</td>
+								<td>
+									{s.status === "redshirt" || s.status === "gap" ? "-" : s.gs}
+								</td>
 								{hasNotes ? (
 									<td className="text-nowrap">{s.notes.join("; ")}</td>
 								) : null}
@@ -749,7 +764,7 @@ const OverviewCards = ({
 			{lastSeason ? (
 				<div>
 					<div className="text-body-secondary small">
-						{lastSeason.label === "College" ? "School" : "Club"}
+						{isSchoolLabel(lastSeason.label) ? "School" : "Club"}
 					</div>
 					<div>
 						<SchoolBadge name={lastSeason.club ?? lastSeason.teamName} />{" "}
@@ -970,6 +985,15 @@ const PlayerPreDraft = ({
 							style={{ maxWidth: 900 }}
 						>
 							<b>{preDraft.story.title}.</b> {preDraft.story.text}
+						</p>
+					) : null}
+					{preDraft.route ? (
+						<p
+							className="alert alert-info py-2"
+							data-testid="pre-draft-route"
+							style={{ maxWidth: 900 }}
+						>
+							<b>{preDraft.route.title}.</b> {preDraft.route.text}
 						</p>
 					) : null}
 					<ScoutingReportSection preDraft={preDraft} />

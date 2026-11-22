@@ -463,7 +463,11 @@ export const recruitingSection = ({
 					? `${s.league ?? "Overseas"}${s.tierName ? ` (${s.tierName.toLowerCase()})` : ""}`
 					: s.label === "JUCO"
 						? "Junior college"
-						: (s.conference ?? s.label ?? ""),
+						: s.label === "Prep" ||
+							  s.label === "Academy" ||
+							  s.label === "Small college"
+							? (s.league ?? s.label)
+							: (s.conference ?? s.label ?? ""),
 				s.classYear ?? "",
 				s.gp,
 				(s.notes ?? []).join("; "),
