@@ -180,6 +180,12 @@ export type GameAggregates = {
 	h2h: NPHeadToHead[];
 };
 
+// The season's games between league teams: not the All-Star Game (teams -1 and -2), which the paper's scoreboard read as
+// "undefined 147, undefined 146"
+export const leagueGamesOnly = <T extends { teams: { tid: number }[] }>(
+	games: T[],
+) => games.filter((game) => game.teams.every((t) => t.tid >= 0));
+
 // Facts only the box scores know: close and overtime records, streaks, double-doubles and 30-point games, season series
 export const aggregateGames = (games: Game[]): GameAggregates => {
 	const teams: GameAggregates["teams"] = new Map();

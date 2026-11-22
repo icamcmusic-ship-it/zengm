@@ -60,6 +60,7 @@ import type { Game, Player, TeamSeason } from "../../common/types.ts";
 import { franchiseChangeKind } from "../../common/franchiseStory.ts";
 import {
 	aggregateGames,
+	leagueGamesOnly,
 	decideRebuild,
 	pickEdition,
 	careerBefore,
@@ -580,7 +581,9 @@ export const getNewsFacts = async (
 	}
 
 	// Games: the box scores give close and overtime records, streaks, double-doubles and season series
-	const allGames: Game[] = await idb.merged.games.getAll({ season });
+	const allGames: Game[] = leagueGamesOnly(
+		await idb.merged.games.getAll({ season }),
+	);
 	const agg = aggregateGames(allGames);
 	for (const t of teams) {
 		const a = agg.teams.get(t.tid);

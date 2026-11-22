@@ -7,6 +7,7 @@ import {
 	pickEdition,
 	careerBefore,
 	honorsBefore,
+	leagueGamesOnly,
 	lineFor,
 	num,
 	seasonTid,
@@ -232,6 +233,18 @@ describe("newspaper facts from the worker", () => {
 			allLeague: 1,
 			titles: 1,
 		});
+	});
+
+	test("the All-Star Game is not one of the season's games", () => {
+		const games = [
+			{ gid: 1, teams: [{ tid: 3 }, { tid: 7 }] },
+			{ gid: 2, teams: [{ tid: -1 }, { tid: -2 }] },
+			{ gid: 3, teams: [{ tid: 0 }, { tid: 1 }] },
+		];
+		assert.deepStrictEqual(
+			leagueGamesOnly(games).map((x) => x.gid),
+			[1, 3],
+		);
 	});
 
 	test("aggregateGames finds close records, streaks, double-doubles and series", () => {
