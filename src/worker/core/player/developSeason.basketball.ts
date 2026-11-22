@@ -242,6 +242,66 @@ const baseChangeByAge = (age: number) => {
 	return -6;
 };
 
+// Speed (monteCarloPot runs developSeason ~200 times per young player): the parts of a rating's age modifier and change limits that only
+// depend on the (whole number) age and the Realistic Aging setting, worked out once per age. The same arithmetic in the same order as
+// realisticAgeModifier / the stock formulas, so the results are identical; endurance's random modifier (23 and under, stock formula) is
+// still drawn live, in the same place.
+type AgeRow = {
+	// Modifier before the height and past-40 parts, or undefined to call the stock formula live (random)
+	pre: number | undefined;
+	// Realistic Aging: bigExtra (31+), added as bigExtra * height factor
+	big: number | undefined;
+	// Realistic Aging past 40
+	post: number | undefined;
+	lo: number;
+	hi: number;
+};
+const ageRowsCache = [new Map<number, AgeRow[]>(), new Map<number, AgeRow[]>()];
+const ageRowsFor = (age: number, realistic: boolean): AgeRow[] => {
+	const cache = ageRowsCache[realistic ? 1 : 0]!;
+	let rows = cache.get(age);
+	if (rows) {
+		return rows;
+	}
+	rows = ratingsFormulasEntries.map(([key, formula]) => {
+		const [lo, hi] = formula.changeLimits(age);
+		const randomStock = key === "endu" && age <= 23;
+		if (!realistic) {
+			return {
+				pre: randomStock ? undefined : formula.ageModifier(age),
+				big: undefined,
+				post: undefined,
+				lo,
+				hi,
+			};
+		}
+		const target = REALISTIC_AGING_TARGETS[key];
+		if (age <= (target.stockUntil ?? STOCK_UNTIL)) {
+			return {
+				pre: randomStock ? undefined : formula.ageModifier(age),
+				big: undefined,
+				post: undefined,
+				lo,
+				hi,
+			};
+		}
+		const a = helpers.bound(Math.round(age), 19, 40);
+		return {
+			pre:
+				target.byAge[a - 19]! - baseChangeByAge(age) + (VETERAN_EASE[a] ?? 0),
+			big:
+				target.bigExtra !== undefined && age >= 31
+					? target.bigExtra
+					: undefined,
+			post: age > 40 ? baseChangeByAge(age) - baseChangeByAge(40) : undefined,
+			lo,
+			hi,
+		};
+	});
+	cache.set(age, rows);
+	return rows;
+};
+
 // Prospect variety (players generated since it exists): a real bust tail. Young players' yearly noise is bounded at -4; the part of the same
 // draw between -4 and -7 is added back to every rating after its limits (so it can't be clipped away), minus its mean (0.418), so the
 // league's development is unchanged on average for every rating
@@ -320,18 +380,39 @@ const developSeason = (
 	const realistic = realisticAgingOn();
 	const hgt = ratings.hgt;
 
-	for (const [key, formula] of ratingsFormulasEntries) {
-		const ageModifier = realistic
-			? realisticAgeModifier(key, formula, age, hgt)
-			: formula.ageModifier(age);
-		const changeLimits = formula.changeLimits(age);
+	const ageRows = Number.isInteger(age)
+		? ageRowsFor(age, realistic)
+		: undefined;
+
+	for (let i = 0; i < ratingsFormulasEntries.length; i++) {
+		const [key, formula] = ratingsFormulasEntries[i]!;
+		let ageModifier: number;
+		let lo: number;
+		let hi: number;
+		const row = ageRows?.[i];
+		if (row) {
+			if (row.pre === undefined) {
+				ageModifier = formula.ageModifier(age);
+			} else {
+				ageModifier = row.pre;
+				if (row.big !== undefined) {
+					ageModifier += row.big * helpers.bound((hgt - 55) / 15, 0, 1);
+				}
+				if (row.post !== undefined) {
+					ageModifier += row.post;
+				}
+			}
+			lo = row.lo;
+			hi = row.hi;
+		} else {
+			ageModifier = realistic
+				? realisticAgeModifier(key, formula, age, hgt)
+				: formula.ageModifier(age);
+			[lo, hi] = formula.changeLimits(age);
+		}
 
 		const u = uniform(0.4, 1.4);
-		let change = helpers.bound(
-			(baseChange + ageModifier) * u,
-			changeLimits[0],
-			changeLimits[1],
-		);
+		let change = helpers.bound((baseChange + ageModifier) * u, lo, hi);
 		// Prospect variety: his group's rate scales a gain (after the limits, so a fast developer isn't clipped back), and the bust tail
 		if (useRates && change > 0) {
 			change *= rateFor(rates, key);
