@@ -391,7 +391,7 @@ test("a foul to give, a foul that stops a break, a shooting foul on the break, f
 					blocker: prev === "block" ? d : undefined,
 				});
 				assert.notMatch(t, BAD, t);
-				assert.match(t, /^[A-Z].*[.!]$/, t);
+				assert.match(t, /^[A-Z].*[!.]$/, t);
 				assert.match(t, /Mavericks|Celtics/, t);
 				// the player who touched it last is on the team it went out off
 				if (prev === "shot") {

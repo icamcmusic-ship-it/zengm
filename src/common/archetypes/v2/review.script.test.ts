@@ -84,8 +84,8 @@ test.skipIf(!process.env.RUN_ARCHETYPE_REVIEW)(
 			out.push(
 				`(1) gates vs the user's verdicts on the ${rows.length} labels he was shown: agree on ${pct(cm.tp + cm.tn, rows.length)}`,
 				...Object.entries(bySet).map(([k, v]) => `    ${k}: ${v}`),
+				"    disagreements the gates pass (first 25):",
 			);
-			out.push("    disagreements the gates pass (first 25):");
 			for (const x of rows
 				.filter((x) => !x.agree && gateGap(x.label, ratingsOf(x), x.r.ovr) <= 0)
 				.slice(0, 25))
@@ -137,7 +137,7 @@ test.skipIf(!process.env.RUN_ARCHETYPE_REVIEW)(
 			labels[vn] = res;
 			const { ELITE_RE, tierOf } = await import("./honest.ts");
 			const { archetypeById } = await import("../classify.ts");
-			for (const f of [...new Set(rows.map((x) => x.file))]) {
+			for (const f of new Set(rows.map((x) => x.file))) {
 				const xs = rows.filter((x) => x.file === f);
 				let ok = 0,
 					tierOk = 0,

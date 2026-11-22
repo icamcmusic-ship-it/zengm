@@ -106,13 +106,13 @@ describe("faceParts batch E", () => {
 					...faceToSvgString(face).matchAll(/<g transform="([^"]*)">/g),
 				].map((m) => m[1]!);
 				const scale = (t: string) =>
-					/^scale\(([\d.]+) 1\) translate\([-\d.e]+ 0\)$/.exec(t)?.[1];
+					/^scale\(([\d.]+) 1\) translate\([\d.e-]+ 0\)$/.exec(t)?.[1];
 				const fat = transforms.filter(
 					(t) => scale(t) !== undefined && Number(scale(t)) < 1,
 				);
 				const centre = (t: string) => {
 					const [, s, tx] =
-						/scale\(([\d.]+) 1\) translate\(([-\d.e]+) 0\)/.exec(t)!;
+						/scale\(([\d.]+) 1\) translate\(([\d.e-]+) 0\)/.exec(t)!;
 					// scale(s) translate(tx): the fixed point is x = s * tx / (1 - s)
 					return (Number(s) * Number(tx)) / (1 - Number(s));
 				};

@@ -988,8 +988,6 @@ export const outOfBounds = (
 						otherBare +
 						" ball.",
 				],
-			);
-			rows.push(
 				[
 					0.7,
 					"Jump ball: " +

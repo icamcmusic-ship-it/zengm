@@ -1,4 +1,5 @@
 // @ts-nocheck (diagnostic script)
+/* eslint-disable no-undef */
 // A scan of the play-by-play text against the game it describes: many simulated games (several rule sets), every line rendered as the live
 // view renders it, checked against a running game state kept from the events: broken text, running tallies, personal and team foul counts,
 // free throw trips (one-and-ones too), scores, ties, leads, runs and streaks, lead changes, clock, period and shot clock words, buzzer and
@@ -408,7 +409,7 @@ const scanGame = async (seed: number, sc: any) => {
 		Sx: number,
 		Ox: number,
 	) => {
-		let a = [0, 0];
+		const a = [0, 0];
 		for (let i = h.length - 1; i >= 0; i--) {
 			a[h[i][0]] += h[i][1];
 			for (const tt of team === undefined ? [0, 1] : [team]) {
@@ -531,7 +532,7 @@ const scanGame = async (seed: number, sc: any) => {
 			["doubled word", /\b(['a-z]{2,}) \1\b/i],
 			[
 				"doubled punctuation",
-				/[,:;]{2}|\.\.(?!\.)|, ,|\. \.|[.!?][,;:]|[,;:][.!?]/,
+				/[,:;]{2}|\.\.(?!\.)|, ,|\. \.|[!.?][,:;]|[,:;][!.?]/,
 			],
 			["space before punctuation", /\s[!,.:;?](\s|$)/],
 			["double space", / {2}/],
@@ -539,7 +540,7 @@ const scanGame = async (seed: number, sc: any) => {
 			["a before a vowel", /\b[Aa] (?!one|Euro|uni|US|U\.|use)[AEIOUaeiou]/],
 			[
 				"an before a consonant",
-				/\b[Aa]n (?!hour|honest|8|11|18|[AEIOUaeiou])[A-Za-z0-9]/,
+				/\b[Aa]n (?!hour|honest|8|11|18|[AEIOUaeiou])[\dA-Za-z]/,
 			],
 			["a before 8/11/18", /\ba (8|11|18|8\d)\b/],
 			["lowercase start", /^[a-z]/],
@@ -555,7 +556,7 @@ const scanGame = async (seed: number, sc: any) => {
 					add(name, where, s);
 				}
 			}
-			if (!/[.!?)"]$/.test(s) && !o.textOnly) {
+			if (!/[!").?]$/.test(s) && !o.textOnly) {
 				add("no end mark", where, s);
 			}
 			// possessives of the names, against the poss helper
@@ -583,12 +584,12 @@ const scanGame = async (seed: number, sc: any) => {
 			recent.shift();
 		}
 		if (note) {
-			for (const sentence of note.split(/(?<=[.!?]) /)) {
+			for (const sentence of note.split(/(?<=[!.?]) /)) {
 				if (recentNotes.includes(sentence)) {
 					add("identical note sentence within 8 lines", where, sentence);
 				}
 			}
-			recentNotes.push(...note.split(/(?<=[.!?]) /));
+			recentNotes.push(...note.split(/(?<=[!.?]) /));
 			while (recentNotes.length > 8) {
 				recentNotes.shift();
 			}
@@ -598,7 +599,7 @@ const scanGame = async (seed: number, sc: any) => {
 		for (const s of both) {
 			for (const [n, pid] of pidByName) {
 				const re = new RegExp(
-					`${escape(n)}(?:'s? [A-Za-z-]+|')? \\((\\d+) (PTS|AST|REB|STL|BLK|TOV)\\)`,
+					String.raw`${escape(n)}(?:'s? [A-Za-z-]+|')? \((\d+) (PTS|AST|REB|STL|BLK|TOV)\)`,
 					"g",
 				);
 				for (const m of s.matchAll(re)) {
@@ -636,7 +637,7 @@ const scanGame = async (seed: number, sc: any) => {
 				const x = S(pid);
 				return k === "trb" ? x.orb + x.drb : x[k];
 			};
-			for (const sentence of note.split(/(?<=[.!?]) /))
+			for (const sentence of note.split(/(?<=[!.?]) /)) {
 				for (const [n, pid] of pidByName) {
 					if (!sentence.includes(n)) {
 						continue;
@@ -747,6 +748,7 @@ const scanGame = async (seed: number, sc: any) => {
 						add("first triple-double claim", where, note);
 					}
 				}
+			}
 		}
 
 		// ---- foul tags ----
@@ -895,9 +897,6 @@ const scanGame = async (seed: number, sc: any) => {
 				if (/second|both|pair/.test(text) && trip.oneAndOne && trip.i === 1) {
 					// fine
 				}
-				if (trip.oneAndOne && /(first|second) free throw/.test(text) && false) {
-					//
-				}
 				if (
 					type === "missFt" &&
 					trip.oneAndOne &&
@@ -965,13 +964,13 @@ const scanGame = async (seed: number, sc: any) => {
 			) {
 				add("run numbers", where, s);
 			}
-			m = /(?:scored (\d+) straight\.|(\d+) unanswered)/.exec(s);
+			m = /scored (\d+) straight\.|(\d+) unanswered/.exec(s);
 			if (m && !suffixHas(hist, undefined, Number(m[1] ?? m[2]), 0)) {
 				add("run numbers", where, s);
 			}
 			// a player's streak of the game's points
 			m =
-				/(?:(?:has scored|show:) (\d+) straight|(\d+) straight points for|(\d+) in a row for)/.exec(
+				/(?:has scored|show:) (\d+) straight|(\d+) straight points for|(\d+) in a row for/.exec(
 					s,
 				);
 			if (m) {
@@ -1068,7 +1067,7 @@ const scanGame = async (seed: number, sc: any) => {
 				add("n-point game claim", where, s);
 			}
 			m =
-				/(?:All tied at (\d+)|(Celtics|Mavericks) lead (\d+)-(\d+)|we're tied at (\d+)|it's (Celtics|Mavericks) by (\d+))/.exec(
+				/All tied at (\d+)|(Celtics|Mavericks) lead (\d+)-(\d+)|we're tied at (\d+)|it's (Celtics|Mavericks) by (\d+)/.exec(
 					s,
 				);
 			if (
@@ -1340,7 +1339,7 @@ const scanGame = async (seed: number, sc: any) => {
 			}
 		}
 		if (
-			/five minutes|Five more minutes/i.test(full) &&
+			/five minutes|five more minutes/i.test(full) &&
 			(sc.settings?.overtimeLength ?? 5) !== 5
 		) {
 			add("overtime length", where, full);

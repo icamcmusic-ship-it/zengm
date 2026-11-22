@@ -1,4 +1,5 @@
 // @ts-nocheck
+/* eslint-disable no-undef */
 // Position shares of the user's league players (ExportPlayers files), re-read from their ratings under a POSITION_BIAS
 // variant. RUN_POS_LEAGUE=<comma list of files>, POS_BIAS='{"F":..}', POS_OUT=file.
 import { test } from "vitest";

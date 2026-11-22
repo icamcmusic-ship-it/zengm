@@ -1,4 +1,5 @@
 // @ts-nocheck
+/* eslint-disable no-undef */
 // Position shares of generated players (ratings only), for tuning POSITION_BIAS. RUN_POS_SHARES=1.
 import { test } from "vitest";
 import { writeFileSync } from "node:fs";

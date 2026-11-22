@@ -344,8 +344,7 @@ describe("archetype feedback", () => {
 		// The picks file carries them, and a reset forgets them
 		const file = await api.tuningExport();
 		assert.strictEqual(
-			fromPickFile(JSON.parse(JSON.stringify(file))).filter((x) => x.verdict)
-				.length,
+			fromPickFile(structuredClone(file)).filter((x) => x.verdict).length,
 			2,
 		);
 		await api.tuningReset();

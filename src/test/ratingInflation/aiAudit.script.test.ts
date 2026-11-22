@@ -172,7 +172,7 @@ const eventCounts = async (season: number) => {
 				? 0
 				: by("luxuryTax").reduce(
 						(sum, e) =>
-							sum + Number(/tax of \$([0-9.]+)M/.exec(e.text)?.[1] ?? 0),
+							sum + Number(/tax of \$([\d.]+)M/.exec(e.text)?.[1] ?? 0),
 						0,
 					),
 		),
