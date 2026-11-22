@@ -118,9 +118,71 @@ export const ADV = {
 	szFgm: NUM_PT * PT_FIELDS + 59 + 9,
 	szXfg: NUM_PT * PT_FIELDS + 59 + 18,
 	szN: NUM_PT * PT_FIELDS + 59 + 19,
+	// Game flow, contest levels (Game Sim Fixes): field goal attempts and makes by shot group (CONTEST_GROUPS: at the rim and post-ups,
+	// mid-range, threes) and level (CONTEST_LEVELS: open, contested, heavily contested), at ctFga + 3 × group + level and ctFgm + ...
+	ctFga: NUM_PT * PT_FIELDS + 59 + 20,
+	ctFgm: NUM_PT * PT_FIELDS + 59 + 29,
 } as const;
 
-export const ADV_LEN = NUM_PT * PT_FIELDS + 59 + 20;
+export const ADV_LEN = NUM_PT * PT_FIELDS + 59 + 38;
+
+// Game flow: contest levels and the shot groups they are recorded by (storage order, append-only)
+export const CONTEST_LEVELS = [
+	{ key: "open", name: "Open" },
+	{ key: "contested", name: "Contested" },
+	{ key: "heavy", name: "Heavily contested" },
+] as const;
+export const CONTEST_GROUPS = [
+	{ key: "inside", name: "Rim & post" },
+	{ key: "mid", name: "Mid-range" },
+	{ key: "three", name: "Three" },
+] as const;
+
+// Game flow: a player's (or a group's) shots by contest level, undefined without any recorded
+export const contestSplits = (adv: readonly number[] | undefined) => {
+	if (!adv) {
+		return undefined;
+	}
+	let total = 0;
+	const groups = CONTEST_GROUPS.map((grp, gi) => {
+		let fga = 0;
+		const levels = CONTEST_LEVELS.map((lvl, li) => {
+			const a = adv[ADV.ctFga + 3 * gi + li] ?? 0;
+			const m = adv[ADV.ctFgm + 3 * gi + li] ?? 0;
+			fga += a;
+			return { ...lvl, fga: a, fgm: m, fgp: a > 0 ? m / a : undefined };
+		});
+		total += fga;
+		return {
+			...grp,
+			fga,
+			levels: levels.map((l) => ({
+				...l,
+				freq: fga > 0 ? l.fga / fga : undefined,
+			})),
+		};
+	});
+	if (total <= 0) {
+		return undefined;
+	}
+	// All groups together, by level
+	const all = CONTEST_LEVELS.map((lvl, li) => {
+		let fga = 0;
+		let fgm = 0;
+		for (const grp of groups) {
+			fga += grp.levels[li]!.fga;
+			fgm += grp.levels[li]!.fgm;
+		}
+		return {
+			...lvl,
+			fga,
+			fgm,
+			freq: fga / total,
+			fgp: fga > 0 ? fgm / fga : undefined,
+		};
+	});
+	return { fga: total, groups, all };
+};
 
 // Shot Zones: the sub-zones (index order is the storage order, append-only), their coarse group and points
 export const SHOT_ZONES = [

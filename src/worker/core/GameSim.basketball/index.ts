@@ -24,6 +24,12 @@ import {
 	SIM_FIX_SHOT_CHOICE,
 	SIM_FIX_THREE,
 	SIM_FIX_TRANSITION,
+	SIM_FIX_CONTEST,
+	SIM_FIX_HELP,
+	SIM_FIX_RUNS,
+	SIM_FIX_ADJUST,
+	SIM_FIX_FATIGUE,
+	SIM_FIX_GARBAGE,
 } from "./simSettings.ts";
 import {
 	CLOSER_FACTOR,
@@ -173,6 +179,14 @@ import {
 	SHOT_SHARE,
 	shotPlanMult,
 } from "./shotShare.ts";
+import {
+	contestLevel,
+	flowCount,
+	flowSum,
+	contestTables,
+	contestTypeIndex,
+	FLOW_DIAG,
+} from "./gameFlow.ts";
 import {
 	ADV as ADV_LAYOUT,
 	SHOT_ZONE_INDEX,
@@ -385,6 +399,10 @@ type PlayerGameSim = {
 	shotProfile?: ShotProfile;
 	// Game Sim Fixes (loadTeams): whether he shoots left-handed (common/shootingHand.ts). Undefined when off
 	lefty?: boolean;
+	// Matchup Defense (loadTeams): height, speed and lateral quickness (Sub-Ratings in Sim) ratings
+	simHgt?: number;
+	simSpd?: number;
+	simLat?: number;
 };
 type TeamGameSim = {
 	id: number;
@@ -817,6 +835,54 @@ class GameSim extends GameSimBase {
 	advTransition = false;
 	advQuick = false;
 	advThreePointers = true;
+	// Game flow (Game Sim Fixes, gameFlow.ts). contestOn: contest levels (with Matchup Defense); contestLevelLast: the last shot's level
+	// (-1: none) and its make change; helpZ/rimProtZ: each defense's help and rim protection (0 until help defense is worked out)
+	contestOn = false;
+	contestLevelLast = -1;
+	contestMake = 0;
+	helpZ: [number, number] = [0, 0];
+	rimProtZ: [number, number] = [0, 0];
+	// Help defense (SIM_FIX_HELP): each player's help value, and for each defense's five its help z with the scheme's sag (inside, and
+	// on threes), the drive multiplier it gives the offense and its smallest defender (the one a switch leaves on a big)
+	helpValue = new Map<PlayerGameSim, number>();
+	helpZThree: [number, number] = [0, 0];
+	helpRimSel: [number, number] = [1, 1];
+	smallestDefender: [PlayerGameSim | undefined, PlayerGameSim | undefined] = [
+		undefined,
+		undefined,
+	];
+	// Runs, momentum and timeouts (SIM_FIX_RUNS, with End-of-Game Intelligence): the scoring since the last timeout or the start of the
+	// period (team, points), the possession count and each team's last scoring possession, the momentum of the team with the ball this
+	// possession, and the timeouts each team used
+	flowRuns = false;
+	runLogTeam: TeamNum[] = [];
+	runLogPts: number[] = [];
+	possCount = 0;
+	lastScorePoss: [number, number] = [0, 0];
+	momentum = 0;
+	timeoutsUsed: [number, number] = [0, 0];
+	// A run-stopping or rest timeout was called before the possession started (with the whole shot clock): the possession after it is a
+	// normal half-court one, not a set play with what is left of the shot clock
+	freshTimeout = false;
+	// Coaching adjustments at the breaks (SIM_FIX_ADJUST, with coaching systems): each defense's focus (the opponent's hot scorer its best
+	// defender goes to) and how much more his threat counts, the zone it takes away (contest type index, -1: none) with the opponent's
+	// selection multiplier and make change there, and each player's minutes plan at tip-off
+	flowAdjust = false;
+	adjFocus: [PlayerGameSim | undefined, PlayerGameSim | undefined] = [
+		undefined,
+		undefined,
+	];
+	adjFocusW: [number, number] = [0, 0];
+	adjZone: [number, number] = [-1, -1];
+	adjSel: [number, number] = [1, 1];
+	adjMake: [number, number] = [0, 0];
+	minutesPlan0 = new Map<PlayerGameSim, number>();
+	// Fatigue and minutes (SIM_FIX_FATIGUE): tired legs show on defense first, back-to-backs and travel, stars' minutes by the score
+	flowFatigue = false;
+	// Garbage time (SIM_FIX_GARBAGE, with Realistic Rotations): whether it is on now, and whether it came this game
+	flowGarbage = false;
+	garbage = false;
+	hadGarbage = false;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -965,6 +1031,22 @@ class GameSim extends GameSimBase {
 			);
 			this.strengthGap = [pred[0]! - pred[1]!, pred[1]! - pred[0]!];
 		}
+		// Game flow: contest levels and help defense
+		this.contestOn = this.simFixes && this.matchupDefense && !allStarGame;
+		if (this.contestOn) {
+			const H = SIM_FIX_HELP;
+			for (const t of teams) {
+				for (const p of t.player) {
+					const lat = p.simLat ?? p.simSpd ?? p.pbpRatings?.spd ?? 50;
+					this.helpValue.set(
+						p,
+						(H.diq * (p.pbpRatings?.diq ?? 50)) / 100 +
+							(H.lat * lat) / 100 +
+							H.idef * p.compositeRating.defenseInterior,
+					);
+				}
+			}
+		}
 		this.starClutchCal =
 			this.matchupDefense &&
 			!allStarGame &&
@@ -980,6 +1062,19 @@ class GameSim extends GameSimBase {
 		if (this.smartEndgame) {
 			this.earlyTimeouts = [ENDGAME.earlyTimeouts, ENDGAME.earlyTimeouts];
 			this.rotationQuarterSeconds = g.get("quarterLength") * 60;
+		}
+		// Game flow: coaching adjustments at the breaks
+		this.flowAdjust = this.simFixes && this.coachSys && !allStarGame;
+		// Game flow: fatigue and minutes, garbage time
+		this.flowFatigue = this.simFixes && !allStarGame;
+		// Game flow: runs, momentum and timeouts. The run-stopping timeouts scale with the number of periods
+		this.flowRuns = this.simFixes && this.smartEndgame;
+		if (this.flowRuns) {
+			const n = Math.max(
+				1,
+				Math.round((ENDGAME.earlyTimeouts * g.get("numPeriods")) / 4),
+			);
+			this.earlyTimeouts = [n, n];
 		}
 
 		this.realisticTurnovers = nativeFeatureEnabled(
@@ -1044,6 +1139,7 @@ class GameSim extends GameSimBase {
 			this.numPeriods = g.get("numPeriods");
 			this.planRotations();
 		}
+		this.flowGarbage = this.simFixes && this.realisticRotations && !allStarGame;
 		this.playersOnCourt = [
 			this.team[0].player.slice(0, this.numPlayersOnCourt),
 			this.team[1].player.slice(0, this.numPlayersOnCourt),
@@ -1141,6 +1237,23 @@ class GameSim extends GameSimBase {
 
 		if (!neutralSite) {
 			this.homeCourtAdvantage(homeCourtFactor);
+		}
+
+		// Game flow: the second night of a back-to-back and a long trip start the game a little tired
+		if (this.flowFatigue) {
+			const F = SIM_FIX_FATIGUE;
+			for (const t of teamNums) {
+				let deficit = (this.team[t] as any).backToBack ? F.b2bEnergy : 0;
+				if (t === 1 && this.travelKm !== undefined) {
+					deficit +=
+						F.travelEnergy * Math.min(1, this.travelKm / LOAD.travelKm);
+				}
+				if (deficit > 0) {
+					for (const p of this.team[t].player) {
+						p.stat.energy = Math.min(p.stat.energy, 1 - deficit);
+					}
+				}
+			}
 		}
 
 		this.o = 0;
@@ -1289,6 +1402,16 @@ class GameSim extends GameSimBase {
 		});
 
 		this.adv?.finish();
+
+		if (FLOW_DIAG.on) {
+			this.flowGameDiag();
+		}
+
+		// Game flow: timeouts used by each team (a box score and team stat)
+		if (this.flowRuns) {
+			this.team[0].stat.tmo = this.timeoutsUsed[0];
+			this.team[1].stat.tmo = this.timeoutsUsed[1];
+		}
 
 		// Delete stuff that isn't needed before returning
 		for (const t of teamNums) {
@@ -1613,12 +1736,22 @@ class GameSim extends GameSimBase {
 				}
 			}
 
+			// Game flow: the coaches' adjustments, mostly at halftime
+			if (this.flowAdjust) {
+				this.coachAdjust(
+					period - 1 === Math.ceil(this.numPeriods / 2)
+						? 1
+						: SIM_FIX_ADJUST.quarter,
+				);
+			}
+
 			this.team[0].stat.ptsQtrs.push(0);
 			this.team[1].stat.ptsQtrs.push(0);
 			this.foulsThisQuarter = [0, 0];
 			this.foulsLastTwoMinutes = [0, 0];
 			this.lastScoringPlay = [];
 			this.scoringRun = [0, 0];
+			this.clearRuns();
 			this.t = this.ga.quarterLength * 60;
 			this.playByPlay.logEvent({
 				type: "period",
@@ -1634,6 +1767,7 @@ class GameSim extends GameSimBase {
 		this.timeouts = [NUM_TIMEOUTS_OVERTIME, NUM_TIMEOUTS_OVERTIME];
 		this.earlyTimeouts = [0, 0];
 		this.scoringRun = [0, 0];
+		this.clearRuns();
 		this.logTimeouts();
 
 		this.lastScoringPlay = [];
@@ -1827,6 +1961,19 @@ class GameSim extends GameSimBase {
 		this.d = this.o === 1 ? 0 : 1;
 		this.nextOffense = this.o;
 		this.runTimeoutNow = false;
+		if (this.flowRuns) {
+			this.possCount += 1;
+			this.momentum = this.momentumOf(this.o);
+			if (this.prevPossessionOutcome !== "timeout") {
+				this.freshTimeout = false;
+			}
+		}
+		if (FLOW_DIAG.on) {
+			flowCount("poss");
+			if (this.garbage) {
+				flowCount("garbagePoss");
+			}
+		}
 		this.updateTeamCompositeRatings();
 
 		const dtInbound = this.dtInbound();
@@ -2134,11 +2281,389 @@ class GameSim extends GameSimBase {
 		}
 	}
 
+	// ---- Game flow: fatigue, minutes and garbage time (SIM_FIX_FATIGUE, SIM_FIX_GARBAGE). Only called with Game Sim Fixes on ----
+
+	// Fatigue multipliers (1 = fresh) of his defense and his offense, from the stock one: steeper on defense, flatter on offense, the
+	// same as the stock one at the league's average fatigue x0 (x0Shot for a shooter's own make)
+	defFatigue(fatigue: number) {
+		const F = SIM_FIX_FATIGUE;
+		const x = 1 - F.def * (1 - fatigue) + (F.def - 1) * F.x0;
+		return x > 0 ? x : 0;
+	}
+	offFatigue(fatigue: number, x0: number = SIM_FIX_FATIGUE.x0) {
+		const F = SIM_FIX_FATIGUE;
+		const x = 1 - F.off * (1 - fatigue) + (F.off - 1) * x0;
+		return x > 0 ? x : 0;
+	}
+
+	// In the second half, the stars' minutes plan by the score: more in a close game, fewer in a lopsided one
+	scoreMinutesScale(p: PlayerGameSim, elapsed: number) {
+		const F = SIM_FIX_FATIGUE;
+		if (elapsed < (this.numPeriods * this.rotationQuarterSeconds) / 2) {
+			return 1;
+		}
+		const rank = this.valueRanks.get(p) ?? Infinity;
+		const w = rank < F.starRanks ? 1 : rank < F.starRanks + 2 ? 0.5 : 0;
+		if (w === 0) {
+			return 1;
+		}
+		const margin = Math.abs(this.team[0].stat.pts - this.team[1].stat.pts);
+		if (margin <= F.closeMargin) {
+			return 1 + w * F.close;
+		}
+		if (margin > F.blowoutFrom) {
+			return (
+				1 -
+				w * F.blowout * Math.min(1, (margin - F.blowoutFrom) / F.blowoutSpan)
+			);
+		}
+		return 1;
+	}
+
+	// Garbage time: on when the lead is big for the time left, off again only if it shrinks well below that
+	updateGarbage() {
+		const G = SIM_FIX_GARBAGE;
+		const quarter = this.team[0].stat.ptsQtrs.length;
+		if (
+			this.elamActive ||
+			this.overtimes > 0 ||
+			quarter > this.numPeriods ||
+			!Number.isFinite(this.t)
+		) {
+			this.garbage = false;
+			return false;
+		}
+		const remaining =
+			((this.numPeriods - quarter) * this.ga.quarterLength * 60 + this.t) /
+			60 /
+			this.gameLengthScale();
+		const lead = Math.abs(this.team[0].stat.pts - this.team[1].stat.pts);
+		const line = G.base + G.perMin * remaining;
+		if (remaining > G.window) {
+			this.garbage = false;
+		} else if (this.garbage) {
+			if (lead < line - G.exit) {
+				this.garbage = false;
+			}
+		} else if (lead >= line) {
+			this.garbage = true;
+			this.hadGarbage = true;
+		}
+		return this.garbage;
+	}
+
+	// Garbage time: the starters sit, the deep bench plays
+	garbageFactor(p: PlayerGameSim) {
+		const G = SIM_FIX_GARBAGE;
+		const rank = this.valueRanks.get(p) ?? 0;
+		return rank < 5 ? G.starter : rank < 8 ? G.rotation : G.bench;
+	}
+
+	// Calibration counters at the end of a game: minutes by value rank, the best player's minutes by the final margin, garbage time
+	flowGameDiag() {
+		const margin = Math.abs(this.team[0].stat.pts - this.team[1].stat.pts);
+		const bucket =
+			margin <= 5
+				? "0-5"
+				: margin <= 10
+					? "6-10"
+					: margin <= 20
+						? "11-20"
+						: "21+";
+		for (const t of teamNums) {
+			for (const p of this.team[t].player) {
+				const rank = this.valueRanks.get(p);
+				if (rank === undefined || p.injured) {
+					continue;
+				}
+				flowSum(`min_r${rank}`, p.stat.min);
+				if (rank === 0) {
+					flowSum(`starMin_${bucket}`, p.stat.min);
+				}
+			}
+			flowSum("tmo", this.timeoutsUsed[t]);
+		}
+		flowCount("games");
+		if (this.hadGarbage) {
+			flowCount("garbageGames");
+		}
+	}
+
+	// ---- Game flow: coaching adjustments at the breaks (SIM_FIX_ADJUST). Only called with Game Sim Fixes and coaching systems on ----
+
+	coachAdjust(weight: number) {
+		const A = SIM_FIX_ADJUST;
+		// (the thresholds are for halftime of a regulation game, scaled to how much of it has been played)
+		const regulation = this.numPeriods * this.ga.quarterLength * 60;
+		const scale =
+			regulation > 0
+				? Math.max(0.25, this.elapsedRegulationSeconds() / (regulation / 2))
+				: 1;
+		for (const t of teamNums) {
+			const opp: TeamNum = t === 0 ? 1 : 0;
+			const cs = this.cs[t];
+			const adapt = helpers.bound(cs.adapt ?? 50, 0, 100);
+			const skill = helpers.bound(
+				((cs.mgmt ?? 50) - 50 + adapt - 50) / 50,
+				-1,
+				1,
+			);
+			const amount = (weight * adapt) / 100;
+			const good = (1 + skill) / 2;
+
+			// Minutes: the hot hand plays more, a cold one less
+			if (this.realisticRotations) {
+				this.adjustMinutes(t, amount * good, scale);
+			}
+
+			// Matchups: the best fitting defender goes to the opponent's top scorer
+			let top: PlayerGameSim | undefined;
+			for (const p of this.team[opp].player) {
+				if (!top || p.stat.pts > top.stat.pts) {
+					top = p;
+				}
+			}
+			if (
+				top &&
+				top.stat.pts >= A.focusPts * scale &&
+				top.stat.pts >= A.focusShare * this.team[opp].stat.pts
+			) {
+				this.adjFocus[t] = top;
+				this.adjFocusW[t] = A.focus * amount * good;
+				if (FLOW_DIAG.on) {
+					flowCount("adjFocus");
+				}
+			}
+
+			// Scheme: take away the zone that hurt the most
+			const st = this.team[opp].stat;
+			const zones = [
+				[st.tpa, 3 * st.tp],
+				[st.fgaMidRange, 2 * st.fgMidRange],
+				[st.fgaAtRim, 2 * st.fgAtRim],
+				[st.fgaLowPost, 2 * st.fgLowPost],
+			];
+			let best = -1;
+			let bestExcess = A.zoneMin * scale;
+			for (let ti = 0; ti < zones.length; ti++) {
+				const [fga, pts] = zones[ti]!;
+				const excess = (pts ?? 0) - (fga ?? 0) * A.pps[ti]!;
+				if (excess >= bestExcess) {
+					best = ti;
+					bestExcess = excess;
+				}
+			}
+			if (best >= 0) {
+				this.adjZone[t] = best;
+				this.adjSel[t] = 1 - A.sel * amount * good;
+				this.adjMake[t] = -A.make * amount * skill;
+				if (FLOW_DIAG.on) {
+					flowCount(`adjZone${best}`);
+					flowSum("adjMake", this.adjMake[t]);
+				}
+			}
+		}
+		if (this.matchupDefense) {
+			this.assignMatchups();
+			this.ssVersion += 1;
+		}
+	}
+
+	// A coach's minutes adjustment (k: how far, 0-1): the hot hand's plan goes up, a cold shooter's down, the rest of the rotation
+	// evens it out
+	adjustMinutes(t: TeamNum, k: number, scale: number) {
+		const A = SIM_FIX_ADJUST;
+		if (k <= 0) {
+			return;
+		}
+		let change = 0;
+		const moved = new Set<PlayerGameSim>();
+		for (const p of this.team[t].player) {
+			const target = this.minutesTargets.get(p) ?? 0;
+			if (target <= 0 || p.injured) {
+				continue;
+			}
+			if (!this.minutesPlan0.has(p)) {
+				this.minutesPlan0.set(p, target);
+			}
+			const fga = p.stat.fga;
+			const eff = p.stat.pts / Math.max(1, fga + 0.44 * p.stat.fta);
+			let delta = 0;
+			if (
+				fga >= A.hotFga * scale &&
+				eff >= A.hotEff &&
+				p.stat.pts >= A.hotPts * scale
+			) {
+				delta = A.hotMin * k;
+			} else if (fga >= A.coldFga * scale && eff <= A.coldEff) {
+				delta = -A.coldMin * k;
+			}
+			if (delta !== 0) {
+				const plan0 = this.minutesPlan0.get(p)!;
+				const next = helpers.bound(
+					target + delta,
+					Math.max(0, plan0 - A.maxShift),
+					plan0 + A.maxShift,
+				);
+				change += next - target;
+				this.minutesTargets.set(p, next);
+				moved.add(p);
+				if (FLOW_DIAG.on) {
+					flowCount(delta > 0 ? "adjHot" : "adjCold");
+				}
+			}
+		}
+		if (change === 0) {
+			return;
+		}
+		// The others give (or take) the difference, by their planned minutes
+		let sum = 0;
+		for (const p of this.team[t].player) {
+			const target = this.minutesTargets.get(p) ?? 0;
+			if (target > 0 && !moved.has(p) && !p.injured) {
+				sum += target;
+			}
+		}
+		if (sum <= 0) {
+			return;
+		}
+		for (const p of this.team[t].player) {
+			const target = this.minutesTargets.get(p) ?? 0;
+			if (target > 0 && !moved.has(p) && !p.injured) {
+				this.minutesTargets.set(
+					p,
+					Math.max(0, target - (change * target) / sum),
+				);
+			}
+		}
+	}
+
+	// ---- Game flow: runs, momentum and timeouts (SIM_FIX_RUNS). Only called with Game Sim Fixes and End-of-Game Intelligence on ----
+
+	// Any timeout (and a new period) ends every run
+	clearRuns() {
+		this.runLogTeam.length = 0;
+		this.runLogPts.length = 0;
+		this.momentum = 0;
+	}
+
+	// The most team t has outscored the other team by, over the scoring since the last timeout, while the other team scored at most
+	// SIM_FIX_RUNS.maxOwn (an 8-0 or a 10-2 run is 8)
+	runNet(t: TeamNum) {
+		const maxOwn = SIM_FIX_RUNS.maxOwn;
+		let mine = 0;
+		let theirs = 0;
+		let best = 0;
+		for (let i = this.runLogTeam.length - 1; i >= 0; i--) {
+			if (this.runLogTeam[i] === t) {
+				mine += this.runLogPts[i]!;
+			} else {
+				theirs += this.runLogPts[i]!;
+				if (theirs > maxOwn) {
+					break;
+				}
+			}
+			if (mine - theirs > best) {
+				best = mine - theirs;
+			}
+		}
+		return best;
+	}
+
+	// The run (net points) that makes team t's coach call a timeout: quicker for a quick trigger and for a good game manager
+	runTimeoutNet(t: TeamNum) {
+		const R = SIM_FIX_RUNS;
+		const cs = this.cs[t];
+		const dial = this.coachSys ? (cs.timeoutDial ?? 0) : 0;
+		const mgmt = this.coachSys
+			? helpers.bound(((cs.mgmt ?? 50) - 50) / 25, -1, 1)
+			: 0;
+		// (the timeouts he can't take into the final period are spent more readily in the period before it)
+		const period = this.team[0].stat.ptsQtrs.length;
+		const spare =
+			period === this.numPeriods - 1 &&
+			this.earlyTimeouts[t] > ENDGAME.maxFinalPeriod
+				? R.spare
+				: 0;
+		return helpers.bound(
+			Math.round(R.net - R.dial * dial - R.mgmt * mgmt) - spare,
+			R.minNet - spare,
+			R.maxNet,
+		);
+	}
+
+	// Team t's momentum: its run, fading with each of its possessions since its last basket
+	momentumOf(t: TeamNum) {
+		const R = SIM_FIX_RUNS;
+		const net = this.runNet(t);
+		if (net < R.momStart) {
+			return 0;
+		}
+		const since = Math.max(0, (this.possCount - this.lastScorePoss[t] - 2) / 2);
+		return (
+			R.momBump *
+			Math.min(1, (net - R.momStart) / R.momSpan) *
+			R.momDecay ** since
+		);
+	}
+
+	// Late in a close game, a breather for a tired five: one of the team's early timeouts at a dead ball, with the ball
+	maybeRestTimeout(): PossessionOutcome | undefined {
+		const R = SIM_FIX_RUNS;
+		const o = this.o;
+		if (
+			this.earlyTimeouts[o] <= 0 ||
+			this.overtimes > 0 ||
+			this.team[0].stat.ptsQtrs.length < this.numPeriods ||
+			this.t > R.restSeconds * this.gameLengthScale() ||
+			this.t <= ENDGAME.noRunTimeoutSeconds ||
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) > R.restMargin ||
+			(this.prevPossessionOutcome !== "fg" &&
+				this.prevPossessionOutcome !== "ft")
+		) {
+			return;
+		}
+		let energy = 0;
+		for (const p of this.playersOnCourt[o]) {
+			energy += p.stat.energy;
+		}
+		energy /= Math.max(1, this.playersOnCourt[o].length);
+		if (energy >= R.restEnergy) {
+			return;
+		}
+		this.earlyTimeouts[o] -= 1;
+		this.clearRuns();
+		this.timeoutsUsed[o] += 1;
+		this.freshTimeout = true;
+		if (FLOW_DIAG.on) {
+			flowCount("restTimeouts");
+		}
+		this.runTimeoutNow = true;
+		this.isClockRunning = false;
+		this.timeoutBreather();
+		this.playByPlay.logEvent({
+			type: "timeout",
+			clock: this.t,
+			t: o,
+			numLeft: this.earlyTimeouts[o] + this.timeouts[o],
+			advancesBall: false,
+		});
+		return "timeout";
+	}
+
 	// At the start of a possession: the team with the ball stops the other team's run with a timeout
 	maybeRunTimeout(): PossessionOutcome | undefined {
 		const o = this.o;
 		const quick = this.coachSys ? this.cs[o].burnTimeout : undefined;
-		if (
+		if (this.flowRuns) {
+			// Game flow: a run of 8-0 or 10-2 (by the coach), or late in a close game a breather for a tired five
+			if (this.elamActive || this.garbage) {
+				return;
+			}
+			if (this.runNet(this.d) < this.runTimeoutNet(o)) {
+				return this.maybeRestTimeout();
+			}
+		} else if (
 			this.elamActive ||
 			this.scoringRun[this.d] < runTimeoutThreshold(quick)
 		) {
@@ -2170,6 +2695,14 @@ class GameSim extends GameSimBase {
 			this.logTimeouts();
 		}
 		this.scoringRun[this.d] = 0;
+		if (this.flowRuns) {
+			this.clearRuns();
+			this.timeoutsUsed[o] += 1;
+			this.freshTimeout = true;
+			if (FLOW_DIAG.on) {
+				flowCount("runTimeouts");
+			}
+		}
 		this.runTimeoutNow = true;
 		this.endgameCounts.runTimeouts += 1;
 		this.isClockRunning = false;
@@ -2333,12 +2866,16 @@ class GameSim extends GameSimBase {
 					switching,
 					this.teamVersatility[d],
 				);
+				// (Game flow: the post mismatches a switch leaves, see postMismatchFlow)
 				const gap =
 					mean -
 					fit +
 					0.25 *
-						relief *
-						(postMismatch(a, defender) + driveMismatch(a, defender));
+						(this.contestOn
+							? this.postMismatchFlow(a, defender, d, switching) +
+								relief * driveMismatch(a, defender)
+							: relief *
+								(postMismatch(a, defender) + driveMismatch(a, defender)));
 				if (gap > bestGap) {
 					bestGap = gap;
 					bestIdx = j;
@@ -2711,7 +3248,9 @@ class GameSim extends GameSimBase {
 		if (closers) {
 			factor *= closers.has(p) ? CLOSER_FACTOR : NON_CLOSER_FACTOR;
 		} else {
-			const target = this.minutesTargets.get(p) ?? 0;
+			const target =
+				(this.minutesTargets.get(p) ?? 0) *
+				(this.flowFatigue ? this.scoreMinutesScale(p, elapsed) : 1);
 			if (target > 0) {
 				const regulationSeconds = this.numPeriods * this.rotationQuarterSeconds;
 				factor *= minutesDebtFactor(
@@ -2814,6 +3353,9 @@ class GameSim extends GameSimBase {
 					this.elamTarget -
 					Math.max(this.team[this.d].stat.pts, this.team[this.o].stat.pts);
 				blowout = diff >= 20 && ptsToTarget < diff;
+			} else if (this.flowGarbage) {
+				// Game flow: garbage time
+				blowout = this.updateGarbage();
 			} else {
 				// (cutoffs for a 48-minute game, scaled to the game's length)
 				const s = this.gameLengthScale();
@@ -2870,9 +3412,10 @@ class GameSim extends GameSimBase {
 
 						// Also scale based on margin late in games, so stars play less in blowouts (this doesn't really work that well, but better than nothing)
 						if (blowout) {
-							// Realistic Rotations: the end of the bench by value, not by roster order
+							// Realistic Rotations: the end of the bench by value, not by roster order (Game flow: the starters sit)
 							ovr *= this.realisticRotations
-								? (this.valueRanks.get(p)! + 1) / 10
+								? ((this.valueRanks.get(p)! + 1) / 10) *
+									(this.flowGarbage ? this.garbageFactor(p) : 1)
 								: (i + 1) / 10;
 						} else if (this.realisticRotations) {
 							ovr *= this.rotationFactor(p, foulLimit, elapsed, closers?.[t]);
@@ -3396,6 +3939,8 @@ class GameSim extends GameSimBase {
 				this.playersOnCourt[d],
 				this.isSwitching(d),
 				this.guards[d],
+				this.adjFocus[d],
+				1 + this.adjFocusW[d],
 			);
 			let versatility = 0;
 			for (const p of this.playersOnCourt[d]) {
@@ -3403,7 +3948,69 @@ class GameSim extends GameSimBase {
 			}
 			this.teamVersatility[d] =
 				versatility / Math.max(1, this.playersOnCourt[d].length);
+			if (this.contestOn) {
+				this.updateHelpDefense(d);
+			}
 		}
+	}
+
+	// Game flow: help defense of team d's five (SIM_FIX_HELP)
+	updateHelpDefense(d: TeamNum) {
+		const H = SIM_FIX_HELP;
+		const lineup = this.playersOnCourt[d];
+		if (lineup.length === 0) {
+			return;
+		}
+		let sum = 0;
+		let min = Infinity;
+		let rim = -Infinity;
+		let smallest = lineup[0]!;
+		for (const p of lineup) {
+			const h = this.helpValue.get(p) ?? H.ref;
+			sum += h;
+			if (h < min) {
+				min = h;
+			}
+			const r = p.compositeRating.defenseInterior;
+			if (r > rim) {
+				rim = r;
+			}
+			if ((p.simHgt ?? 50) < (smallest.simHgt ?? 50)) {
+				smallest = p;
+			}
+		}
+		const help = (1 - H.weakest) * (sum / lineup.length) + H.weakest * min;
+		const scheme = this.team[d].coachSim?.def ?? "";
+		const helpZ =
+			helpers.bound((help - H.ref) / H.scale, -H.max, H.max) +
+			(H.schemeInside[scheme] ?? 0);
+		const rimZ = helpers.bound((rim - H.rimRef) / H.rimScale, -H.max, H.max);
+		this.helpZ[d] = helpZ;
+		this.helpZThree[d] = helpZ + (H.schemeThree[scheme] ?? 0);
+		this.rimProtZ[d] = rimZ;
+		this.helpRimSel[d] =
+			helpers.bound(1 - H.rimSel * helpZ - H.deter * rimZ, H.selMin, H.selMax) /
+			H.selNorm;
+		this.smallestDefender[d] = smallest;
+	}
+
+	// Game flow: the post mismatch of attacker a against defender, with switches (SIM_FIX_HELP): no switch relief on the post, and on some
+	// possessions the smallest defender ends up on him. Returns the mismatch and the part of it from a switch
+	postMismatchFlow(
+		a: PlayerGameSim,
+		defender: PlayerGameSim,
+		d: TeamNum,
+		switching: boolean,
+	) {
+		const own =
+			mismatchScale(defender, false, this.teamVersatility[d]) *
+			postMismatch(a, defender);
+		const small = this.smallestDefender[d];
+		const sw =
+			switching && small
+				? SIM_FIX_HELP.switchExposure * postMismatch(a, small)
+				: 0;
+		return sw > own ? sw : own;
 	}
 
 	isSwitching(d: TeamNum) {
@@ -3472,7 +4079,8 @@ class GameSim extends GameSimBase {
 					: type === "lowPost"
 						? r.defenseInterior
 						: 0.5 * (r.defensePerimeter + r.defenseInterior);
-			return value * this.fatigueLate(q.stat.energy, lateGame);
+			const fatigue = this.fatigueLate(q.stat.energy, lateGame);
+			return value * (this.flowFatigue ? this.defFatigue(fatigue) : fatigue);
 		};
 		const lineup = this.playersOnCourt[this.d];
 		let sum = 0;
@@ -3577,11 +4185,22 @@ class GameSim extends GameSimBase {
 					const p = lineup[i]!;
 					const ratings = p.compositeRating;
 					const fatigue = this.fatigueLate(p.stat.energy, lateGame);
+					if (FLOW_DIAG.on) {
+						flowSum("xCourt", 1 - fatigue);
+					}
 					const pf = p.stat.pf;
 					const foulLimitFactor =
 						pf === foulLimit ? 0.9 : pf > foulLimit ? 0.75 : 1;
-					const base = fatigue * perfFactor;
-					const baseD = base * foulLimitFactor;
+					// (Game flow: tired legs show on defense first, and garbage time lets up)
+					const base =
+						(this.flowFatigue ? this.offFatigue(fatigue) : fatigue) *
+						perfFactor;
+					const baseD = this.flowFatigue
+						? this.defFatigue(fatigue) *
+							perfFactor *
+							foulLimitFactor *
+							(this.garbage ? SIM_FIX_GARBAGE.effort : 1)
+						: base * foulLimitFactor;
 					const int = shares.interior[i]!;
 					const reb = shares.rebound[i]!;
 					const per = shares.perimeter[i]!;
@@ -4245,6 +4864,13 @@ class GameSim extends GameSimBase {
 				this.isClockRunning = false;
 				this.timeouts[this.o] -= 1;
 				this.logTimeouts();
+				if (this.flowRuns) {
+					this.clearRuns();
+					this.timeoutsUsed[this.o] += 1;
+					if (FLOW_DIAG.on) {
+						flowCount("lateTimeouts");
+					}
+				}
 				if (smart) {
 					this.timeoutBreather();
 				}
@@ -4485,10 +5111,13 @@ class GameSim extends GameSimBase {
 		const prev = this.prevPossessionOutcome;
 
 		let shotAt;
+		// (Game flow: after a timeout called before the possession started, a normal half-court possession, without transition)
+		const fresh = this.freshTimeout && prev === "timeout";
+		this.freshTimeout = false;
 		if (
 			prev === "nonShootingFoul" ||
 			prev === "outOfBoundsDefense" ||
-			prev === "timeout"
+			(prev === "timeout" && !fresh)
 		) {
 			// Inbounding with part of the shot clock used: run a set play with what is left
 			shotAt = k * drawRestartSearch(sc, clockFactor === "maintainLead");
@@ -4513,14 +5142,15 @@ class GameSim extends GameSimBase {
 				: k *
 					Math.max(1, ORB_RESET_SEARCH_MEAN + ORB_RESET_SEARCH_SD * gaussian());
 		} else {
-			let probTransition = possessionStartsInFrontcourt
-				? 0
-				: (prev === "stl"
-						? PROB_TRANSITION.steal
-						: prev === "drb"
-							? PROB_TRANSITION.drb
-							: PROB_TRANSITION.inbound) *
-					this.teamPaceFactor[this.o] ** 3;
+			let probTransition =
+				possessionStartsInFrontcourt || fresh
+					? 0
+					: (prev === "stl"
+							? PROB_TRANSITION.steal
+							: prev === "drb"
+								? PROB_TRANSITION.drb
+								: PROB_TRANSITION.inbound) *
+						this.teamPaceFactor[this.o] ** 3;
 			if (clockFactor === "maintainLead") {
 				probTransition *= 0.3;
 			} else if (clockFactor === "catchUp") {
@@ -5038,7 +5668,10 @@ class GameSim extends GameSimBase {
 					this.isSwitching(this.d),
 					this.teamVersatility[this.d],
 				);
-				const post = mismatchRelief * postMismatch(p, defender);
+				// (Game flow: switches leave smalls on bigs, see postMismatchFlow)
+				const post = this.contestOn
+					? this.postMismatchFlow(p, defender, this.d, this.isSwitching(this.d))
+					: mismatchRelief * postMismatch(p, defender);
 				const drive = mismatchRelief * driveMismatch(p, defender);
 				// (divided by the league average, so the league shot mix stays the same)
 				postTilt = (1 + post) / MATCHUP.postNorm;
@@ -5178,7 +5811,8 @@ class GameSim extends GameSimBase {
 											: this.oe[this.o].three
 										: 1)
 								: 1) *
-							(sp ? sp.three : 1),
+							(sp ? sp.three : 1) *
+							(this.adjZone[this.d] === 0 ? this.adjSel[this.d] : 1),
 						p.compositeRating,
 					),
 				)
@@ -5238,7 +5872,8 @@ class GameSim extends GameSimBase {
 				pullUpTilt *
 				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
 				(this.offEmph ? this.oe[this.o].mid : 1) *
-				(sp ? sp.mid : 1);
+				(sp ? sp.mid : 1) *
+				(this.adjZone[this.d] === 1 ? this.adjSel[this.d] : 1);
 			const m2 =
 				(this.coachSys ? cso.rim * csd.dRim : 1) *
 				(sc
@@ -5249,6 +5884,8 @@ class GameSim extends GameSimBase {
 								: 1) * Math.max(0.2, 1 + SPACING.selectRim * spacing)
 					: 1) *
 				driveTilt *
+				(this.contestOn ? this.helpRimSel[this.d] : 1) *
+				(this.adjZone[this.d] === 2 ? this.adjSel[this.d] : 1) *
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				(this.offEmph ? this.oe[this.o].rim : 1) *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1) *
@@ -5265,7 +5902,8 @@ class GameSim extends GameSimBase {
 				postTilt *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.post : 1) *
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
-				(sp ? sp.post : 1);
+				(sp ? sp.post : 1) *
+				(this.adjZone[this.d] === 3 ? this.adjSel[this.d] : 1);
 			// Synergy makes easy shots either more likely or less likely
 			const synergy =
 				this.synergyFactor *
@@ -5400,10 +6038,28 @@ class GameSim extends GameSimBase {
 			}
 		}
 
+		// Game flow: how closely the shot is contested (one more random number, only with Game Sim Fixes and Matchup Defense)
+		let contestBlk = 1;
+		let contestFoul = 1;
+		this.contestLevelLast = -1;
+		this.contestMake = 0;
+		if (this.contestOn && !putBack && !tipInFromOutOfBounds) {
+			const ti = contestTypeIndex(type);
+			if (ti >= 0) {
+				const level = this.drawContest(ti, defender, spacing, passer, rushed);
+				const tb = contestTables()[ti]!;
+				this.contestLevelLast = level;
+				this.contestMake = tb.make[level]!;
+				contestBlk = tb.blk[level]!;
+				contestFoul = tb.foul[level]!;
+			}
+		}
+
 		let blocked;
 		if (
 			(this.expandedRatings ? this.probBlkExpanded(p, type) : this.probBlk()) *
-				(this.subRatingsSim ? SUB_SIM_CAL.blk : 1) >
+				(this.subRatingsSim ? SUB_SIM_CAL.blk : 1) *
+				contestBlk >
 			Math.random()
 		) {
 			blocked = true;
@@ -5437,6 +6093,9 @@ class GameSim extends GameSimBase {
 			if (this.scheduleLoad) {
 				foulFactor *= this.foulMult[this.d];
 			}
+
+			// Game flow: a tightly contested shot draws more shooting fouls
+			foulFactor *= contestFoul;
 
 			probMissAndFoul *= foulFactor;
 			if (this.playTypes && type !== "threePointer") {
@@ -5565,6 +6224,36 @@ class GameSim extends GameSimBase {
 				}
 			}
 
+			// Game flow: open, contested or heavily contested
+			probMake += this.contestMake;
+			// Game flow: the defense's adjustment at the last break, against the zone that hurt it
+			if (
+				this.adjZone[this.d] >= 0 &&
+				this.adjZone[this.d] === contestTypeIndex(type)
+			) {
+				probMake += this.adjMake[this.d];
+			}
+			// Game flow: a team on a run
+			if (this.flowRuns) {
+				probMake += this.momentum - SIM_FIX_RUNS.momOffset;
+				if (FLOW_DIAG.on) {
+					flowSum("momentum", this.momentum);
+				}
+			}
+			// Game flow: posting up the small a switch left on him
+			if (
+				this.contestOn &&
+				type === "lowPost" &&
+				this.isSwitching(this.d) &&
+				this.lastMatchup.post > 0
+			) {
+				probMake +=
+					(SIM_FIX_HELP.switchMake * this.lastMatchup.post) / MATCHUP.post;
+				if (FLOW_DIAG.on) {
+					flowSum("switchPost", this.lastMatchup.post);
+				}
+			}
+
 			if (!tipInFromOutOfBounds) {
 				// Adjust probMake for end of quarter situations, where shot quality will be lower without much time
 				if (rushed) {
@@ -5627,7 +6316,16 @@ class GameSim extends GameSimBase {
 			p = this.lastOrbPlayer;
 		}
 
-		const currentFatigue = this.fatigue(p.stat.energy, false, true);
+		// (Game flow: his own shot feels less of his fatigue than his defense does)
+		const currentFatigue = this.flowFatigue
+			? this.offFatigue(
+					this.fatigue(p.stat.energy, false, true),
+					SIM_FIX_FATIGUE.x0Shot,
+				)
+			: this.fatigue(p.stat.energy, false, true);
+		if (FLOW_DIAG.on) {
+			flowSum("xShot", 1 - this.fatigue(p.stat.energy, false, true));
+		}
 
 		// Is this an "assisted" attempt (i.e. an assist will be recorded if it's made)
 		let passer: PlayerGameSim | undefined;
@@ -5886,6 +6584,9 @@ class GameSim extends GameSimBase {
 			clock: this.t,
 		});
 		this.adv?.shotDone(false, undefined, this.d, this.playersOnCourt[this.d]);
+		if (FLOW_DIAG.on) {
+			this.flowShotDone(false, type);
+		}
 		if (p.ss) {
 			p.ss.streak = 0;
 			p.ss.hot = 0;
@@ -5924,6 +6625,7 @@ class GameSim extends GameSimBase {
 		this.adv!.emphO = this.o;
 		this.adv!.szZone = this.shotZones ? this.szZone : -1;
 		this.adv!.szXfg = this.szXfg;
+		this.adv!.ctLevel = this.contestLevelLast;
 		this.adv!.shot(
 			p,
 			passer,
@@ -5980,6 +6682,75 @@ class GameSim extends GameSimBase {
 			spacing,
 			rushed ? Math.sqrt(this.possessionLength / 8) : 1,
 		);
+	}
+
+	// Game flow calibration counters: a field goal attempt by contest level
+	flowShotDone(made: boolean, type: ShotType) {
+		const ti = contestTypeIndex(type);
+		if (ti >= 0 && this.contestLevelLast >= 0) {
+			FLOW_DIAG.ctN[ti]![this.contestLevelLast]! += 1;
+			if (made) {
+				FLOW_DIAG.ctMake[ti]![this.contestLevelLast]! += 1;
+			}
+		}
+	}
+
+	// Game flow: the contest level of a shot (gameFlow.ts, SIM_FIX_CONTEST) from its score z: positive is tighter. One random number
+	drawContest(
+		ti: number,
+		defender: PlayerGameSim | undefined,
+		spacing: number,
+		passer: PlayerGameSim | undefined,
+		rushed: boolean,
+	) {
+		const C = SIM_FIX_CONTEST;
+		let z = -C.center[ti]!;
+		if (defender) {
+			const r = defender.compositeRating;
+			const v =
+				ti <= 1
+					? r.defensePerimeter
+					: ti === 3
+						? r.defenseInterior
+						: 0.5 * (r.defensePerimeter + r.defenseInterior);
+			z +=
+				C.defender[ti]! *
+				(v *
+					this.defFatigue(
+						this.fatigueLate(defender.stat.energy, this.isLateGame()),
+					) -
+					C.defRef[ti]!);
+		}
+		z +=
+			C.help[ti]! * (ti === 0 ? this.helpZThree[this.d] : this.helpZ[this.d]) +
+			C.rimProtector[ti]! * this.rimProtZ[this.d];
+		z -= C.spacing * spacing;
+		if (
+			this.realPoss &&
+			this.t > this.shotClock &&
+			this.shotClock < C.lateSeconds
+		) {
+			z += (C.late * (C.lateSeconds - this.shotClock)) / C.lateSeconds;
+		}
+		if (ti <= 1) {
+			z += passer === undefined ? C.pullUp[ti]! : C.catchShoot[ti]!;
+		}
+		if (this.advTransition) {
+			z += C.transition;
+		}
+		if (rushed) {
+			z += C.rushed;
+		}
+		const level = contestLevel(ti, z, Math.random());
+		if (FLOW_DIAG.on) {
+			flowSum("helpZ", this.helpZ[this.d]);
+			flowSum("rimProtZ", this.rimProtZ[this.d]);
+			flowSum("helpRimSel", this.helpRimSel[this.d]);
+			FLOW_DIAG.zSum[ti]! += z;
+			FLOW_DIAG.zN[ti]! += 1;
+			FLOW_DIAG.deltaSum[ti]! += contestTables()[ti]!.make[level]!;
+		}
+		return level;
 	}
 
 	// Advanced Tracking Stats: a turnover by the offensive rebounder right after his rebound counts as a putback possession
@@ -6093,6 +6864,9 @@ class GameSim extends GameSimBase {
 		const p2 = this.pickPlayer("blocking", this.d, 10);
 		this.recordStat(this.d, p2, "blk");
 		this.adv?.shotDone(false, p2, this.d, this.playersOnCourt[this.d]);
+		if (FLOW_DIAG.on) {
+			this.flowShotDone(false, type);
+		}
 		this.noteDefensiveStop("blk", p2, p, type);
 		let blockLogType: BlockType | undefined;
 		if (type === "tipIn") {
@@ -6225,6 +6999,9 @@ class GameSim extends GameSimBase {
 		}
 		this.recordLastScore(this.o, p, type, passer, defender);
 		this.adv?.shotDone(true, undefined, this.d, this.playersOnCourt[this.d]);
+		if (FLOW_DIAG.on) {
+			this.flowShotDone(true, type);
+		}
 
 		if (andOne && !this.elamDone) {
 			this.doPf({ t: this.d, type: "pfAndOne", shooter: p, fouler });
@@ -7408,6 +8185,11 @@ class GameSim extends GameSimBase {
 				if (this.smartEndgame) {
 					this.scoringRun[t] += amt;
 					this.scoringRun[t === 0 ? 1 : 0] = 0;
+				}
+				if (this.flowRuns) {
+					this.runLogTeam.push(t);
+					this.runLogPts.push(amt);
+					this.lastScorePoss[t] = this.possCount;
 				}
 
 				for (const i of [0, 1] as const) {

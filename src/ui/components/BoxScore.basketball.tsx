@@ -242,6 +242,11 @@ const BoxScore = ({
 							season={boxScore.season}
 							t={t}
 						/>
+						{typeof t.tmo === "number" ? (
+							<div className="text-body-secondary small">
+								Timeouts used: {t.tmo}
+							</div>
+						) : null}
 					</div>
 				);
 			})}

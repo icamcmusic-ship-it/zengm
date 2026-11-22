@@ -166,3 +166,186 @@ export const SIM_FIX_FT_ORB = 0.5;
 // keeps that fraction), and he drives a little more (drive, on the at-rim weight). Both are offset over everyone in the game by the
 // share of lefties in it, so the league's at-rim/post rates and percentages stay the same
 export const SIM_FIX_LEFTY = { make: 0.012, sameHand: 0.3, drive: 1.04 };
+
+// ---- Game flow (Game Sim Fixes, gameFlow.ts). Default engine mechanics of the core sim features; with simFixes off none of this runs ----
+
+// Contest levels (Game Sim Fixes with Matchup Defense): every jump shot, drive and post-up is open, contested or heavily contested. One
+// random number per shot picks the level from a score z (positive = tighter): the shooter's defender (his perimeter or interior defense,
+// tired defenders give more room), the help behind him (helpZ, below), the floor spacing, the shot clock (late-clock shots are rushed),
+// catch-and-shoot vs pull-up, transition and end-of-quarter heaves. Each level has its own make change (centered, so the league's
+// percentages stay put at the base shares) and block multiplier.
+// - base: [open, heavily contested] shares at z = 0, by shot type (three, mid-range, at the rim, post-up); the rest is contested
+// - k: how far z moves the shares (log-odds per unit of z)
+// - make: make probability change of [open, contested, heavy], by shot type; blk and foul: block and shooting foul multipliers of each
+//   level (all centered on the base shares in gameFlow.ts contestTables; the fouls then × foulScale and the makes + makeOffset, which
+//   keep the league's free throw attempts and FG% where they were)
+// - the z terms: defender (per unit of his defensive composite above defRef, by shot type), help (per unit of the defense's help z,
+//   by shot type: a pack-the-paint or zone help defense leaves threes more open), spacing (per unit of spacingAround), late (shot clock
+//   at 0, ramping in over the last lateSeconds), pullUp / catchShoot (jumpers), transition, rushed (end-of-period heave), rimProtector
+//   (at the rim and in the post, per unit of the defense's rim protection z), center (by shot type, the league mean of the rest)
+export const SIM_FIX_CONTEST = {
+	base: [
+		[0.4, 0.1],
+		[0.27, 0.2],
+		[0.26, 0.33],
+		[0.14, 0.38],
+	],
+	k: 1,
+	make: [
+		[0.03, -0.006, -0.06],
+		[0.04, -0.006, -0.065],
+		[0.07, 0, -0.085],
+		[0.05, 0, -0.06],
+	],
+	blk: [0.4, 1, 1.6],
+	foul: [0.85, 1, 1.15],
+	foulScale: 1.01,
+	makeOffset: -0.003,
+	defender: [1.5, 3, 2.5, 3],
+	defRef: [0.5, 0.5, 0.5, 0.5],
+	help: [0.15, 0.25, 0.5, 0.4],
+	rimProtector: [0, 0, 0.6, 0.4],
+	spacing: 8,
+	late: 1.2,
+	lateSeconds: 6,
+	pullUp: [0.15, 0.35],
+	catchShoot: [-0.2, -0.2],
+	transition: -0.8,
+	rushed: 1,
+	center: [-0.65, -0.38, -0.61, -0.36],
+};
+
+// Help defense (Game Sim Fixes with Matchup Defense, gameFlow.ts): how well each five rotates behind the man on the ball.
+// - A player's help value: diq × defensive IQ / 100 + lat × lateral quickness / 100 (his speed without sub-ratings) + idef × his
+//   interior defense composite. A five's help: (1 - weakest) × its mean + weakest × its worst (one weak help defender is a hole)
+// - helpZ = (help - ref) / scale, within ±max: more help, more contested shots (SIM_FIX_CONTEST.help) and fewer drives (rimSel)
+// - Rim protection: the five's best interior defense composite, z = (best - rimRef) / rimScale within ±max: contests at the rim and in
+//   the post (SIM_FIX_CONTEST.rimProtector) and deters drives (deter)
+// - Schemes: Pack the Paint and Zone sag (more help inside, by schemeInside, and threes more open, by schemeThree on the three's z)
+// - The drive weight is × 1 - rimSel × helpZ - deter × rimZ, within [selMin, selMax], / selNorm (its league mean)
+// - Switching: a switching defense still feels post mismatches (no switch relief on them), and on switchExposure of a big's
+//   possessions the smallest defender ends up on him (a post mismatch the offense hunts); his post-ups against a switch go in
+//   switchMake more per unit of that mismatch (relative to the largest)
+export const SIM_FIX_HELP = {
+	diq: 0.45,
+	lat: 0.25,
+	idef: 0.3,
+	weakest: 0.4,
+	ref: 0.48,
+	scale: 0.05,
+	max: 2,
+	rimRef: 0.63,
+	rimScale: 0.08,
+	schemeInside: { pack: 0.6, zone: 0.4 } as Record<string, number>,
+	schemeThree: { pack: -0.35, zone: -0.25 } as Record<string, number>,
+	rimSel: 0.06,
+	deter: 0.06,
+	selMin: 0.75,
+	selMax: 1.25,
+	selNorm: 0.99,
+	switchExposure: 0.35,
+	switchMake: 0.02,
+};
+
+// Runs, momentum and timeouts (Game Sim Fixes with End-of-Game Intelligence, gameFlow.ts):
+// - A run against a team: the most the other team has outscored it by over the scoring since the last timeout (or the start of the
+//   period) while it scored at most maxOwn (8-0, 10-2: net 8). Its coach stops a run of net or more with a timeout: net - dial × his
+//   timeout trigger dial (coaching systems, -1 saves them ... 1 quick) - mgmt × his game management ((mgmt - 50) / 25), rounded, within
+//   [minNet, maxNet], spare less in the period before the final one while he has more timeouts than he can take into it. Never in the
+//   final period's last ENDGAME.noRunTimeoutSeconds, in overtime, or in garbage time
+// - Momentum: a team on a run (net momStart or more) makes its shots momBump × min(1, (net - momStart) / momSpan) more often, fading
+//   by momDecay per possession since its last basket; any timeout ends every run. momOffset comes off every shot so the league's
+//   percentages stay the same
+// - Timeouts by the league's rules: the run-stopping (early) timeouts scale with the number of periods (ENDGAME.earlyTimeouts ×
+//   numPeriods / 4, rounded, at least 1). Rest timeouts: in the final period's last restSeconds, within restMargin, a team whose five's
+//   average energy is below restEnergy uses one of its early timeouts (a breather) at a dead ball with the ball
+export const SIM_FIX_RUNS = {
+	net: 8,
+	maxOwn: 2,
+	dial: 1.5,
+	mgmt: 0.5,
+	minNet: 6,
+	maxNet: 11,
+	spare: 2,
+	momStart: 5,
+	momSpan: 5,
+	momBump: 0.015,
+	momDecay: 0.75,
+	momOffset: 0,
+	restSeconds: 360,
+	restMargin: 8,
+	restEnergy: 0.8,
+};
+
+// Coaching adjustments at the breaks (Game Sim Fixes with coaching systems, gameFlow.ts): at halftime (weight 1) and the other breaks
+// between periods (weight quarter) each head coach looks at the box score so far. skill = ((mgmt - 50) + (adapt - 50)) / 50 within ±1
+// (his game management and adaptability), amount = weight × adapt / 100: adaptable coaches change more, good ones change the right
+// way (a below-average one's scheme tweak backfires).
+// - Minutes (Realistic Rotations): a hot hand (hotFga+ shots, hotEff+ points per shot, hotPts+ points) gets up to hotMin more minutes
+//   in his plan, a cold one (coldFga+ shots at coldEff or less) up to coldMin fewer, × amount × (1 + skill) / 2; the rest of the
+//   rotation gives or takes the difference. Each player's plan moves at most maxShift from tip-off
+// - Matchups: the opponent's top scorer so far (focusPts+ points, focusShare+ of his team's) draws the best fitting defender: his threat
+//   counts 1 + focus × amount × (1 + skill) / 2 in the assignment
+// - Scheme tweak: the zone (three, mid-range, rim, post) where the opponent scored the most above pps (league points per shot) × its
+//   attempts, if zoneMin+ points: the opponent goes there sel × amount × (1 + skill) / 2 less often, and its shots there change by
+//   -make × amount × skill (better coaches take it away, poor ones open something else up)
+export const SIM_FIX_ADJUST = {
+	quarter: 0.4,
+	hotFga: 5,
+	hotEff: 1.3,
+	hotPts: 10,
+	hotMin: 4,
+	coldFga: 6,
+	coldEff: 0.75,
+	coldMin: 3,
+	maxShift: 5,
+	focusPts: 12,
+	focusShare: 0.25,
+	focus: 0.8,
+	pps: [1.12, 0.84, 1.28, 0.86],
+	zoneMin: 5,
+	sel: 0.15,
+	make: 0.012,
+};
+
+// Fatigue and minutes (Game Sim Fixes, gameFlow.ts):
+// - Tired legs show on defense first: a player's defensive composites (and his part of a shot's contest) take def × the stock fatigue
+//   penalty x = 1 - fatigue, his offense (ball handling, passing, rebounding and his own shots) off × it, each shifted so it is the stock
+//   one at the league's average x0 (x0Shot for the shooter's own fatigue, with Load, Fatigue & Venue's curve): a fresher player than
+//   average defends a little better than before, a tired one a lot worse, while his offense fades less. The league's scoring stays put
+// - The second night of a back-to-back (or the third game in four nights) starts everyone at 1 - b2bEnergy energy, and a long trip
+//   (Load, Fatigue & Venue's travel) the visitors at 1 - travelEnergy × min(1, km / LOAD.travelKm)
+// - Minutes by the score (Realistic Rotations): in the second half the minutes plan of the top starRanks players by value (half as much
+//   for the next two) is × 1 + close when the margin is within closeMargin, × 1 - blowout × min(1, (margin - blowoutFrom) / blowoutSpan)
+//   when it is lopsided (before garbage time takes over)
+export const SIM_FIX_FATIGUE = {
+	def: 1.4,
+	off: 0.7,
+	x0: 0.058,
+	x0Shot: 0.05,
+	b2bEnergy: 0.04,
+	travelEnergy: 0.02,
+	starRanks: 3,
+	close: 0.08,
+	closeMargin: 6,
+	blowout: 0.1,
+	blowoutFrom: 14,
+	blowoutSpan: 10,
+};
+
+// Garbage time (Game Sim Fixes with Realistic Rotations): with the regulation time left R (minutes, scaled to a 48-minute game) at
+// most window, a lead of base + perMin × R or more (31 with 12 minutes left, 22 with 6, 18 with 3, 15 in the last minute) starts it;
+// it ends only if the lead falls exit below that line (so the starters aren't sent back in to pad their stats). In garbage time the five
+// best players by value sit (× starter on their substitution value), the next three play less (× rotation), the deep bench plays (× bench
+// for players ranked 9th or lower by value), both defenses let up (their defensive composites × effort), and no team calls a timeout
+// to stop a run. Not in overtime or an Elam ending
+export const SIM_FIX_GARBAGE = {
+	window: 12,
+	base: 14,
+	perMin: 1.4,
+	exit: 8,
+	starter: 0.02,
+	rotation: 0.35,
+	bench: 1.6,
+	effort: 0.97,
+};
