@@ -110,12 +110,18 @@ export const assignMatchups = (
 	defense: MatchupPlayer[],
 	switching: boolean,
 	out: number[] = [],
+	// Game Sim Fixes (a coach's adjustment at a break): an attacker whose threat counts focusMult times, so the best fitting defender
+	// goes to him
+	focus?: MatchupPlayer,
+	focusMult: number = 1,
 ) => {
 	const n = Math.min(offense.length, defense.length);
 	const sizeWeight = switching ? MATCHUP.switchSizeWeight : 1;
 	const scores: number[] = [];
 	for (let j = 0; j < n; j++) {
-		const threat = offense[j]!.compositeRating.usage;
+		const threat =
+			offense[j]!.compositeRating.usage *
+			(focus !== undefined && offense[j] === focus ? focusMult : 1);
 		for (let i = 0; i < n; i++) {
 			scores[j * n + i] =
 				threat * defenderFit(defense[i]!, offense[j]!, sizeWeight);

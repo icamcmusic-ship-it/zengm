@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toWorker } from "../../util/toWorker.ts";
 import { useFeatureOn } from "../../util/nativeFeatures.ts";
 import DraftClass from "./DraftClass.tsx";
 import { LinkedCollege } from "./LinkedCollege.tsx";
@@ -34,6 +35,7 @@ const DraftScouting = ({
 	useTitleBar({ title: !noDraft ? "Draft Scouting" : "Upcoming Prospects" });
 
 	const [page, setPage] = useState(0);
+	const [regeneratingAll, setRegeneratingAll] = useState(false);
 
 	if (seasons.length <= PAGE_SIZE && page !== 0) {
 		setPage(0);
@@ -84,6 +86,28 @@ const DraftScouting = ({
 
 			{canLink ? <LinkedCollege linkedCollege={linkedCollege} /> : null}
 
+			{godMode && !fantasyDraft && seasons.length > 1 ? (
+				<div className="mb-3">
+					<button
+						className="btn btn-outline-god-mode"
+						disabled={regeneratingAll}
+						onClick={async () => {
+							setRegeneratingAll(true);
+							try {
+								await toWorker(
+									"main",
+									"regenerateAllDraftClasses",
+									seasons.map((info) => info.season),
+								);
+							} finally {
+								setRegeneratingAll(false);
+							}
+						}}
+					>
+						{regeneratingAll ? "Regenerating…" : "Regenerate all classes"}
+					</button>
+				</div>
+			) : null}
 			{regeneratorOn ? (
 				<RegenerateRatingsButton seasons={seasons.map((info) => info.season)} />
 			) : null}

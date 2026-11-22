@@ -336,13 +336,13 @@ describe("more pre-draft paths", () => {
 				const stock = (p: CollegeProspect) => 0.4 * p.ovr + 0.6 * p.pot;
 				const byStock = [...c.prospects].sort((a, b) => stock(b) - stock(a));
 				const top = new Set(
-					byStock.slice(0, Math.ceil(0.25 * byStock.length)).map((p) => p.key),
+					byStock.slice(0, Math.ceil(0.6 * byStock.length)).map((p) => p.key),
 				);
 				for (const result of inPathway) {
 					const p = c.prospects.find((x) => x.key === result.key)!;
 					assert.isAtMost(p.age, 19);
 					assert.match(p.bornLoc, /USA$/);
-					assert(top.has(p.key), "an elite prospect");
+					assert(top.has(p.key), "a good prospect (top half of the class)");
 					assert.strictEqual(result.school, PATHWAY_TEAM);
 					assert.strictEqual(result.career!.years.length, 1);
 					assert.strictEqual(result.seasons.length, 1);
@@ -350,8 +350,13 @@ describe("more pre-draft paths", () => {
 					assert.isUndefined(result.career!.story);
 					assert.isUndefined(result.ncaa);
 					assert.strictEqual(result.career!.hsClass, DRAFT_YEAR - 1);
-					// No college or league honors
-					assert.strictEqual(result.honors.length, 0);
+					// No college or league honors (a youth national team honor is possible)
+					assert.deepStrictEqual(
+						result.honors.filter(
+							(h) => !/youth|U1[6-9]|U2[0-3]|national/i.test(JSON.stringify(h)),
+						),
+						[],
+					);
 				}
 			}
 			assert.isAtMost(Math.max(...perClass), 2);

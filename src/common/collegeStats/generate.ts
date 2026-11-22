@@ -82,11 +82,14 @@ export type GenerateOptions = {
 // (the user: far too many players went this way; cut by about 75%, from 3.2 a class on average to about 0.8)
 const PATHWAY_COUNTS = [0, 1, 2];
 const PATHWAY_COUNT_WEIGHTS = [0.38, 0.44, 0.18];
-const PATHWAY_POOL = 10;
-// How much a candidate's draft stock raises his chance of being one who joins (was 1.5, which made the class's best a near-lock)
-const PATHWAY_STOCK_LEAN = 0.25;
-// Class-relative draft stock (zStock) a prospect needs to be offered a spot: about the top fifth of a class
-const PATHWAY_MIN_STOCK = 0.85;
+// (the user: "not always top prospects": the program now takes good prospects from the top half of a class, not only the
+// best few, picked almost evenly)
+const PATHWAY_POOL = 30;
+// How much a candidate's draft stock raises his chance of being one who joins (was 1.5, then 0.25)
+const PATHWAY_STOCK_LEAN = 0.1;
+// Class-relative draft stock (zStock) a prospect needs to be offered a spot: about the top half of a class (was 0.85,
+// the top fifth)
+const PATHWAY_MIN_STOCK = 0;
 
 // Most games a junior college or lower level team plays in a season (class-aware teams)
 const LOWER_MAX_GAMES = 34;
