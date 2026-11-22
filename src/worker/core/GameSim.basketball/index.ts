@@ -28,6 +28,7 @@ import {
 	SIM_FIX_HELP,
 	SIM_FIX_RUNS,
 	SIM_FIX_ADJUST,
+	SIM_FIX_FATIGUE,
 } from "./simSettings.ts";
 import {
 	CLOSER_FACTOR,
@@ -872,6 +873,8 @@ class GameSim extends GameSimBase {
 	adjSel: [number, number] = [1, 1];
 	adjMake: [number, number] = [0, 0];
 	minutesPlan0 = new Map<PlayerGameSim, number>();
+	// Fatigue and minutes (SIM_FIX_FATIGUE): tired legs show on defense first, back-to-backs and travel, stars' minutes by the score
+	flowFatigue = false;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -1054,6 +1057,8 @@ class GameSim extends GameSimBase {
 		}
 		// Game flow: coaching adjustments at the breaks
 		this.flowAdjust = this.simFixes && this.coachSys && !allStarGame;
+		// Game flow: fatigue and minutes, garbage time
+		this.flowFatigue = this.simFixes && !allStarGame;
 		// Game flow: runs, momentum and timeouts. The run-stopping timeouts scale with the number of periods
 		this.flowRuns = this.simFixes && this.smartEndgame;
 		if (this.flowRuns) {
@@ -1225,6 +1230,23 @@ class GameSim extends GameSimBase {
 			this.homeCourtAdvantage(homeCourtFactor);
 		}
 
+		// Game flow: the second night of a back-to-back and a long trip start the game a little tired
+		if (this.flowFatigue) {
+			const F = SIM_FIX_FATIGUE;
+			for (const t of teamNums) {
+				let deficit = (this.team[t] as any).backToBack ? F.b2bEnergy : 0;
+				if (t === 1 && this.travelKm !== undefined) {
+					deficit +=
+						F.travelEnergy * Math.min(1, this.travelKm / LOAD.travelKm);
+				}
+				if (deficit > 0) {
+					for (const p of this.team[t].player) {
+						p.stat.energy = Math.min(p.stat.energy, 1 - deficit);
+					}
+				}
+			}
+		}
+
 		this.o = 0;
 		this.d = 1;
 	}
@@ -1371,6 +1393,10 @@ class GameSim extends GameSimBase {
 		});
 
 		this.adv?.finish();
+
+		if (FLOW_DIAG.on) {
+			this.flowGameDiag();
+		}
 
 		// Game flow: timeouts used by each team (a box score and team stat)
 		if (this.flowRuns) {
@@ -1930,6 +1956,9 @@ class GameSim extends GameSimBase {
 			this.possCount += 1;
 			this.momentum = this.momentumOf(this.o);
 		}
+		if (FLOW_DIAG.on) {
+			flowCount("poss");
+		}
 		this.updateTeamCompositeRatings();
 
 		const dtInbound = this.dtInbound();
@@ -2235,6 +2264,69 @@ class GameSim extends GameSimBase {
 				p.stat.energy = Math.min(1, p.stat.energy + ENDGAME.timeoutRest);
 			}
 		}
+	}
+
+	// ---- Game flow: fatigue, minutes and garbage time (SIM_FIX_FATIGUE, SIM_FIX_GARBAGE). Only called with Game Sim Fixes on ----
+
+	// Fatigue multipliers (1 = fresh) of his defense and his offense, from the stock one
+	defFatigue(fatigue: number) {
+		const x = 1 - SIM_FIX_FATIGUE.def * (1 - fatigue);
+		return x > 0 ? x : 0;
+	}
+	offFatigue(fatigue: number) {
+		const x = 1 - SIM_FIX_FATIGUE.off * (1 - fatigue);
+		return x > 0 ? x : 0;
+	}
+
+	// In the second half, the stars' minutes plan by the score: more in a close game, fewer in a lopsided one
+	scoreMinutesScale(p: PlayerGameSim, elapsed: number) {
+		const F = SIM_FIX_FATIGUE;
+		if (elapsed < (this.numPeriods * this.rotationQuarterSeconds) / 2) {
+			return 1;
+		}
+		const rank = this.valueRanks.get(p) ?? Infinity;
+		const w = rank < F.starRanks ? 1 : rank < F.starRanks + 2 ? 0.5 : 0;
+		if (w === 0) {
+			return 1;
+		}
+		const margin = Math.abs(this.team[0].stat.pts - this.team[1].stat.pts);
+		if (margin <= F.closeMargin) {
+			return 1 + w * F.close;
+		}
+		if (margin > F.blowoutFrom) {
+			return (
+				1 -
+				w * F.blowout * Math.min(1, (margin - F.blowoutFrom) / F.blowoutSpan)
+			);
+		}
+		return 1;
+	}
+
+	// Calibration counters at the end of a game: minutes by value rank, the best player's minutes by the final margin, garbage time
+	flowGameDiag() {
+		const margin = Math.abs(this.team[0].stat.pts - this.team[1].stat.pts);
+		const bucket =
+			margin <= 5
+				? "0-5"
+				: margin <= 10
+					? "6-10"
+					: margin <= 20
+						? "11-20"
+						: "21+";
+		for (const t of teamNums) {
+			for (const p of this.team[t].player) {
+				const rank = this.valueRanks.get(p);
+				if (rank === undefined || p.injured) {
+					continue;
+				}
+				flowSum(`min_r${rank}`, p.stat.min);
+				if (rank === 0) {
+					flowSum(`starMin_${bucket}`, p.stat.min);
+				}
+			}
+			flowSum("tmo", this.timeoutsUsed[t]);
+		}
+		flowCount("games");
 	}
 
 	// ---- Game flow: coaching adjustments at the breaks (SIM_FIX_ADJUST). Only called with Game Sim Fixes and coaching systems on ----
@@ -3087,7 +3179,9 @@ class GameSim extends GameSimBase {
 		if (closers) {
 			factor *= closers.has(p) ? CLOSER_FACTOR : NON_CLOSER_FACTOR;
 		} else {
-			const target = this.minutesTargets.get(p) ?? 0;
+			const target =
+				(this.minutesTargets.get(p) ?? 0) *
+				(this.flowFatigue ? this.scoreMinutesScale(p, elapsed) : 1);
 			if (target > 0) {
 				const regulationSeconds = this.numPeriods * this.rotationQuarterSeconds;
 				factor *= minutesDebtFactor(
@@ -3912,7 +4006,8 @@ class GameSim extends GameSimBase {
 					: type === "lowPost"
 						? r.defenseInterior
 						: 0.5 * (r.defensePerimeter + r.defenseInterior);
-			return value * this.fatigueLate(q.stat.energy, lateGame);
+			const fatigue = this.fatigueLate(q.stat.energy, lateGame);
+			return value * (this.flowFatigue ? this.defFatigue(fatigue) : fatigue);
 		};
 		const lineup = this.playersOnCourt[this.d];
 		let sum = 0;
@@ -4020,8 +4115,13 @@ class GameSim extends GameSimBase {
 					const pf = p.stat.pf;
 					const foulLimitFactor =
 						pf === foulLimit ? 0.9 : pf > foulLimit ? 0.75 : 1;
-					const base = fatigue * perfFactor;
-					const baseD = base * foulLimitFactor;
+					// (Game flow: tired legs show on defense first)
+					const base =
+						(this.flowFatigue ? this.offFatigue(fatigue) : fatigue) *
+						perfFactor;
+					const baseD = this.flowFatigue
+						? this.defFatigue(fatigue) * perfFactor * foulLimitFactor
+						: base * foulLimitFactor;
 					const int = shares.interior[i]!;
 					const reb = shares.rebound[i]!;
 					const per = shares.perimeter[i]!;
@@ -6128,7 +6228,10 @@ class GameSim extends GameSimBase {
 			p = this.lastOrbPlayer;
 		}
 
-		const currentFatigue = this.fatigue(p.stat.energy, false, true);
+		// (Game flow: his own shot feels less of his fatigue than his defense does)
+		const currentFatigue = this.flowFatigue
+			? this.offFatigue(this.fatigue(p.stat.energy, false, true))
+			: this.fatigue(p.stat.energy, false, true);
 
 		// Is this an "assisted" attempt (i.e. an assist will be recorded if it's made)
 		let passer: PlayerGameSim | undefined;
@@ -6518,7 +6621,10 @@ class GameSim extends GameSimBase {
 						: 0.5 * (r.defensePerimeter + r.defenseInterior);
 			z +=
 				C.defender[ti]! *
-				(v * this.fatigueLate(defender.stat.energy, this.isLateGame()) -
+				(v *
+					this.defFatigue(
+						this.fatigueLate(defender.stat.energy, this.isLateGame()),
+					) -
 					C.defRef[ti]!);
 		}
 		z +=

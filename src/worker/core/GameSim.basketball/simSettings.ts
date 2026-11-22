@@ -301,3 +301,25 @@ export const SIM_FIX_ADJUST = {
 	sel: 0.15,
 	make: 0.012,
 };
+
+// Fatigue and minutes (Game Sim Fixes, gameFlow.ts):
+// - Tired legs show on defense first: a player's defensive composites (and his part of a shot's contest) take def × the stock fatigue
+//   penalty (1 - fatigue), his offense (ball handling, passing, rebounding and his own shots) off × it. def > 1 > off, set so the
+//   league's scoring stays the same
+// - The second night of a back-to-back (or the third game in four nights) starts everyone at 1 - b2bEnergy energy, and a long trip
+//   (Load, Fatigue & Venue's travel) the visitors at 1 - travelEnergy × min(1, km / LOAD.travelKm)
+// - Minutes by the score (Realistic Rotations): in the second half the minutes plan of the top starRanks players by value (half as much
+//   for the next two) is × 1 + close when the margin is within closeMargin, × 1 - blowout × min(1, (margin - blowoutFrom) / blowoutSpan)
+//   when it is lopsided (before garbage time takes over)
+export const SIM_FIX_FATIGUE = {
+	def: 1.4,
+	off: 0.7,
+	b2bEnergy: 0.04,
+	travelEnergy: 0.02,
+	starRanks: 3,
+	close: 0.08,
+	closeMargin: 6,
+	blowout: 0.15,
+	blowoutFrom: 12,
+	blowoutSpan: 10,
+};
