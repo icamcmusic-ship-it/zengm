@@ -23,6 +23,7 @@ import { g, helpers, lock } from "../../util/index.ts";
 import { idb } from "../../db/index.ts";
 import { setWeeklyFits } from "../staff/systems.ts";
 import { setWeeklyTraitEffects } from "../player/traits.ts";
+import * as views from "../../views/index.ts";
 
 const env = (globalThis as any).process.env;
 const MODE: string | undefined = env.SIM_BENCH;
@@ -139,6 +140,50 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 		await league.loadGameAttributes();
 		await mark("create");
 
+		// SIM_BENCH_VIEWS=1: also time the heavy views' first loads (and a second load) at a few points. Views can store things
+		// (caches), so leave it off when comparing hashes
+		const viewTimes: Record<string, number> = {};
+		const timeViews = async (label: string) => {
+			if (!env.SIM_BENCH_VIEWS) {
+				return;
+			}
+			await idb.cache.flush();
+			const top = (await idb.cache.players.getAll())
+				.filter((p) => p.tid >= 0)
+				.sort((a, b) => b.value - a.value)[0]!;
+			const list: [string, Record<string, unknown>][] = [
+				["draftScouting", {}],
+				["player", { pid: String(top.pid) }],
+				["newspaper", {}],
+				["awardRaces", {}],
+				["powerRankings", {}],
+				["playerRatings", {}],
+				["standings", {}],
+			];
+			for (const [id, params] of list) {
+				for (const run of ["1", "2"]) {
+					const view = (views as any)[id];
+					const inputs = view.processInputs
+						? view.processInputs(params, {})
+						: {};
+					const t = performance.now();
+					await lock.runView(() =>
+						view.load({
+							inputs,
+							updateEvents: new Set(["firstRun"]),
+							prevInputs: undefined,
+							prevOutput: {},
+							conditions: {},
+						}),
+					);
+					viewTimes[`${label}.${id}.${run}`] = Math.round(
+						performance.now() - t,
+					);
+				}
+			}
+			await mark(`views.${label}`);
+		};
+
 		const play = async (numDays: number) => {
 			await lock.set("gameSim", false);
 			await game.play(numDays, {});
@@ -150,12 +195,18 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 		await mark("day1");
 		await play(6);
 		await mark("week1");
+		if (env.SIM_BENCH_VIEWS) {
+			await play(Math.floor((await season.getDaysLeftSchedule()) / 2));
+			await mark("halfOfRegularSeason");
+			await timeViews("midSeason");
+		}
 		await play(await season.getDaysLeftSchedule());
 		await mark("restOfRegularSeason");
 		await play(100);
 		await mark("playoffs");
 		await phase.newPhase(PHASE.DRAFT, {});
 		await mark("toDraft");
+		await timeViews("draft");
 		await draft.runPicks({ type: "untilEnd" }, {});
 		await mark("draft");
 		await phase.newPhase(PHASE.RESIGN_PLAYERS, {});
@@ -273,7 +324,7 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 						Math.max(1, gp),
 				) / 1000;
 		}
-		const line = `SIM_BENCH_RESULT ${JSON.stringify({ mode: MODE, feature: FEATURE, seed: SEED, phase: g.get("phase"), numGames, hash, hash2, perf3Off: env.SIM_BENCH_PERF3_OFF, hash3, totals, times, cpu })}`;
+		const line = `SIM_BENCH_RESULT ${JSON.stringify({ mode: MODE, feature: FEATURE, seed: SEED, phase: g.get("phase"), numGames, hash, hash2, perf3Off: env.SIM_BENCH_PERF3_OFF, hash3, totals, times, cpu, viewTimes })}`;
 		console.log(line);
 		await stopProf();
 		if (heapSession) {
