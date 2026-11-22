@@ -353,7 +353,7 @@ describe("more pre-draft paths", () => {
 					// No college or league honors (a youth national team honor is possible)
 					assert.deepStrictEqual(
 						result.honors.filter(
-							(h) => !/youth|U1[6-9]|U2[0-3]|national/i.test(JSON.stringify(h)),
+							(h) => !/youth|u1[6-9]|u2[0-3]|national/i.test(JSON.stringify(h)),
 						),
 						[],
 					);
