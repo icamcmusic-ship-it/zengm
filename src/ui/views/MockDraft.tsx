@@ -14,7 +14,7 @@ import {
 import { PHASE } from "../../common/constants.ts";
 
 type MockResult = Awaited<ReturnType<typeof runMock>>;
-const runMock = () => toWorker("main", "runMockDraft", undefined);
+const runMock = (rerun: boolean) => toWorker("main", "runMockDraft", rerun);
 
 const BATCH = 6;
 
@@ -37,10 +37,11 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 	const runId = useRef(0);
 	const { challengeNoRatings } = useLocal(["challengeNoRatings"]);
 
-	const run = useCallback(async () => {
+	// rerun: a new draw (the button); otherwise the last mock draft for this season and phase, if there is one
+	const run = useCallback(async (rerun: boolean) => {
 		const id = ++runId.current;
 		setRunning(true);
-		const mock = await runMock();
+		const mock = await runMock(rerun);
 		if (id !== runId.current) {
 			return;
 		}
@@ -71,7 +72,7 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 	}, []);
 
 	useEffect(() => {
-		run();
+		run(false);
 	}, [run, season, phase]);
 
 	if (result && "message" in result) {
@@ -95,7 +96,11 @@ const MockDraft = ({ season, phase, shape, userTids }: View<"mockDraft">) => {
 				scouts see.
 			</p>
 			<div className="d-flex align-items-center gap-3 mb-3 flex-wrap">
-				<button className="btn btn-primary" disabled={running} onClick={run}>
+				<button
+					className="btn btn-primary"
+					disabled={running}
+					onClick={() => run(true)}
+				>
 					{running ? "Drafting…" : "Rerun mock draft"}
 				</button>
 				{progress ? (

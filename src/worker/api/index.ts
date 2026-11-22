@@ -2886,11 +2886,25 @@ const updateDraftBoard = async (
 	await toUI("realtimeUpdate", [["playerMovement"]]);
 };
 
-const runMockDraft = () => {
+// The last mock draft, so leaving and returning to the page shows the same draft: a new one is drawn only when the
+// user presses Rerun (or the first time for this league, season and phase)
+let lastMockDraft:
+	| {
+			key: string;
+			result: Awaited<ReturnType<typeof getMockDraft>>;
+	  }
+	| undefined;
+const runMockDraft = async (rerun?: boolean) => {
 	if (!featureOn("mockDraft")) {
 		throw new Error("Mock Draft is turned off");
 	}
-	return getMockDraft();
+	const key = `${g.get("lid")}|${g.get("season")}|${g.get("phase")}`;
+	if (!rerun && lastMockDraft?.key === key) {
+		return lastMockDraft.result;
+	}
+	const result = await getMockDraft();
+	lastMockDraft = { key, result };
+	return result;
 };
 
 const getProProjections = (pids: number[]) => {
