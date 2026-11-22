@@ -147,6 +147,8 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 			if (!env.SIM_BENCH_VIEWS) {
 				return;
 			}
+			// (let background work started by the phase change or the last day, like league achievements, finish first)
+			await new Promise((resolve) => setTimeout(resolve, 3000));
 			await idb.cache.flush();
 			const top = (await idb.cache.players.getAll())
 				.filter((p) => p.tid >= 0)
@@ -166,6 +168,11 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 					const inputs = view.processInputs
 						? view.processInputs(params, {})
 						: {};
+					// SIM_BENCH_VIEW_PROF=<label.id.run>: a CPU profile of that one load (to SIM_BENCH_PROF)
+					const profThis = env.SIM_BENCH_VIEW_PROF === `${label}.${id}.${run}`;
+					if (profThis) {
+						await startProf();
+					}
 					const t = performance.now();
 					await lock.runView(() =>
 						view.load({
@@ -179,6 +186,9 @@ describe.skipIf(!MODE)("sim benchmark", () => {
 					viewTimes[`${label}.${id}.${run}`] = Math.round(
 						performance.now() - t,
 					);
+					if (profThis) {
+						await stopProf();
+					}
 				}
 			}
 			await mark(`views.${label}`);

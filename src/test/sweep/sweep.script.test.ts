@@ -31,6 +31,19 @@ import * as views from "../../worker/views/index.ts";
 import { idb } from "../../worker/db/index.ts";
 import { getDefaultSettings } from "../../worker/views/newLeague.ts";
 import { g, helpers, local, lock } from "../../worker/util/index.ts";
+import { ADV, ADV_LEN } from "../../common/advStats.ts";
+import { draftOutletsOn } from "../../worker/core/draftOutlets/index.ts";
+import { scoutingReportsOn } from "../../worker/core/scoutingReports/input.ts";
+import {
+	getPlayerRankings,
+	playerRankingsOn,
+} from "../../worker/util/playerRankingsData.ts";
+import {
+	PR_INFO,
+	prCareer,
+	prRowsOf,
+	type PRStat,
+} from "../../common/playerRankings.ts";
 
 // Progress and findings, as they happen (SWEEP_LOG=<file>, else stdout)
 const log = (...args: unknown[]) => {
@@ -440,11 +453,29 @@ const sweepLeague = async ({
 		}
 		// Box scores: the players' points add up to the team's
 		let boxChecked = 0;
+		let tmoTotal = 0;
 		for (const game of await idb.league.getAll("games")) {
 			if (game.season !== finished) {
 				continue;
 			}
 			boxChecked += 1;
+			// Game flow: timeouts used within what the teams had (the run-stopping ones, the end-of-game ones, 2 per overtime)
+			const maxTmo =
+				Math.max(1, Math.round((5 * (game.numPeriods ?? 4)) / 4)) +
+				2 +
+				2 * (game.overtimes ?? 0);
+			for (const t of game.teams as any[]) {
+				if (t.tmo !== undefined) {
+					tmoTotal += t.tmo;
+					if (!(Number.isInteger(t.tmo) && t.tmo >= 0 && t.tmo <= maxTmo)) {
+						add(
+							"timeouts",
+							label,
+							`gid ${game.gid} tid ${t.tid}: ${t.tmo} timeouts (max ${maxTmo})`,
+						);
+					}
+				}
+			}
 			for (const t of game.teams) {
 				const sum = t.players.reduce((acc, p) => acc + (p.pts ?? 0), 0);
 				if (sum !== t.pts) {
@@ -456,6 +487,69 @@ const sweepLeague = async ({
 					break;
 				}
 			}
+		}
+		if (boxChecked > 0) {
+			log(
+				`[sweep:${config}] season ${finished}: ${(tmoTotal / (2 * boxChecked)).toFixed(2)} timeouts per team game`,
+			);
+		}
+		// Game flow: shots by contest level add up (threes: every tracked three has a level; all: no more than the tracked shots)
+		let ctRows = 0;
+		let ctBad = 0;
+		for (const p of await idb.league.getAll("players")) {
+			for (const row of p.stats as any[]) {
+				const adv = row.adv;
+				if (
+					row.season !== finished ||
+					!Array.isArray(adv) ||
+					adv.length < ADV_LEN
+				) {
+					continue;
+				}
+				let ct = 0;
+				let ct3 = 0;
+				let bad = "";
+				for (let i = 0; i < 9; i++) {
+					const a = adv[ADV.ctFga + i] ?? 0;
+					const m = adv[ADV.ctFgm + i] ?? 0;
+					ct += a;
+					if (i >= 6) {
+						ct3 += a;
+					}
+					if (m > a || a < 0) {
+						bad = `cell ${i}: ${m} made of ${a}`;
+					}
+				}
+				if (ct === 0) {
+					continue;
+				}
+				ctRows += 1;
+				const tracked3 = (adv[ADV.cs3a] ?? 0) + (adv[ADV.pu3a] ?? 0);
+				if (!bad && ct3 !== tracked3) {
+					bad = `contested threes ${ct3}, tracked threes ${tracked3}`;
+				}
+				if (!bad && ct > row.fga) {
+					bad = `contest levels ${ct} > fga ${row.fga}`;
+				}
+				if (!bad && ct3 > row.tpa) {
+					bad = `contested threes ${ct3} > tpa ${row.tpa}`;
+				}
+				if (bad) {
+					ctBad += 1;
+					if (ctBad <= 5) {
+						add(
+							"contest tracking",
+							label,
+							`pid ${p.pid} season ${finished} tid ${row.tid}${row.playoffs ? " playoffs" : ""}: ${bad}`,
+						);
+					}
+				}
+			}
+		}
+		if (ctRows > 0) {
+			log(
+				`[sweep:${config}] season ${finished}: contest levels on ${ctRows} stats rows, ${ctBad} inconsistent`,
+			);
 		}
 		// Player stats: games played within the season
 		// (college: the conference tournaments are regular season games too)
@@ -501,6 +595,231 @@ const sweepLeague = async ({
 		}
 	};
 
+	// The newer features' invariants (cheap): AI draft picks' Why, the outlets' big boards, prospects' Strengths & weaknesses, the
+	// player page rankings against a brute-force count
+	const featureChecks = async (label: string, target: number) => {
+		const season = g.get("season");
+		const isCollege = g.get("leagueType") === "college";
+		const basketball = __SPORT === "basketball";
+		// Every AI pick of this draft has a Why (draftDecision.ts explainPick), with no undefined/NaN in it
+		if (
+			basketball &&
+			!isCollege &&
+			target === PHASE.AFTER_DRAFT &&
+			g.get("draftType") !== "freeAgents"
+		) {
+			const userTids = g.get("userTids");
+			let picks = 0;
+			let missing = 0;
+			for (const p of await idb.cache.players.getAll()) {
+				if (
+					p.draft.year !== season ||
+					!(p.draft.round > 0) ||
+					userTids.includes(p.draft.tid)
+				) {
+					continue;
+				}
+				picks += 1;
+				const why = (p.draft as any).why as string[] | undefined;
+				if (!Array.isArray(why) || why.length === 0) {
+					missing += 1;
+					if (missing <= 3) {
+						add(
+							"draft why",
+							`${label} ${where()}`,
+							`pid ${p.pid} pick ${p.draft.round}-${p.draft.pick} has no Why`,
+						);
+					}
+				} else {
+					for (const w of why) {
+						if (typeof w !== "string" || newsTextScan(w).length > 0) {
+							add("draft why", `${label} ${where()}`, `pid ${p.pid}: "${w}"`);
+						}
+					}
+				}
+			}
+			log(
+				`[sweep:${config}] draft why: ${picks - missing}/${picks} AI picks with a Why`,
+			);
+		}
+		// The outlets' big boards were stored for the whole class when the draft started
+		if (target === PHASE.DRAFT && draftOutletsOn()) {
+			const cls = (await idb.cache.players.getAll()).filter(
+				(p) =>
+					p.draft.year === season &&
+					(p.tid === PLAYER.UNDRAFTED || p.draft.round > 0),
+			);
+			let bad = 0;
+			for (const p of cls) {
+				const o = (p as any).outletRanks;
+				const ok =
+					o &&
+					o.s === season &&
+					Array.isArray(o.r) &&
+					o.r.length > 0 &&
+					o.r.every(
+						(x: number) => Number.isInteger(x) && x > 0 && x <= cls.length,
+					) &&
+					Number.isInteger(o.c) &&
+					o.c > 0 &&
+					o.c <= cls.length;
+				if (!ok) {
+					bad += 1;
+					if (bad <= 3) {
+						add(
+							"outlet boards",
+							`${label} ${where()}`,
+							`pid ${p.pid}: ${JSON.stringify(o)}`,
+						);
+					}
+				}
+			}
+			log(
+				`[sweep:${config}] outlet boards: ${cls.length - bad}/${cls.length} prospects ranked`,
+			);
+		}
+		// Prospects' full scouting reports have the Strengths & weaknesses section
+		if (
+			scoutingReportsOn() &&
+			(target === PHASE.REGULAR_SEASON || target === PHASE.DRAFT)
+		) {
+			const prospects = (
+				await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+			)
+				.sort((a, b) => b.value - a.value)
+				.slice(0, 4);
+			prospects.push(
+				...(
+					await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+				)
+					.sort((a, b) => a.value - b.value)
+					.slice(0, 2),
+			);
+			let withSkills = 0;
+			for (const p of prospects) {
+				let out: any;
+				try {
+					out = await loadView("playerScouting", { pid: String(p.pid) });
+				} catch (error) {
+					add(
+						"scouting skills",
+						`${label} ${where()}`,
+						`pid ${p.pid} threw ${String(error)}`,
+					);
+					continue;
+				}
+				const k = out?.scouting?.report?.skills;
+				if (!k) {
+					add(
+						"scouting skills",
+						`${label} ${where()}`,
+						`pid ${p.pid}: no Strengths & weaknesses (${out?.errorMessage ?? out?.scouting?.kind})`,
+					);
+					continue;
+				}
+				withSkills += 1;
+				if (
+					!(k.strengths?.length >= 1 && k.strengths.length <= 4) ||
+					!(k.weaknesses?.length >= 1 && k.weaknesses.length <= 3) ||
+					!k.swing?.text
+				) {
+					add(
+						"scouting skills",
+						`${label} ${where()}`,
+						`pid ${p.pid}: ${k.strengths?.length} strengths, ${k.weaknesses?.length} weaknesses, swing ${k.swing?.text}`,
+					);
+				}
+				const bad: string[] = [];
+				scan(out.scouting, "scouting", bad, {
+					strings: true,
+					infinityOk: true,
+				});
+				if (bad.length > 0) {
+					add(
+						"scouting skills",
+						`${label} ${where()}`,
+						`pid ${p.pid}: ${bad.slice(0, 4).join("; ")}`,
+					);
+				}
+			}
+			log(
+				`[sweep:${config}] scouting skills: ${withSkills}/${prospects.length} prospects with Strengths & weaknesses`,
+			);
+		}
+		// Player page rankings: league-wide ranks of career totals against a brute-force count over every player
+		if (
+			playerRankingsOn() &&
+			(target === PHASE.PLAYOFFS || target === PHASE.PRESEASON)
+		) {
+			await idb.cache.flush();
+			const all = await idb.league.getAll("players");
+			const totals = new Map<number, ReturnType<typeof prCareer>>();
+			for (const p of all) {
+				const rows = prRowsOf(p.stats);
+				if (rows.length > 0) {
+					totals.set(p.pid, prCareer(rows));
+				}
+			}
+			const round = (x: number, d: number) => Math.round(x * 10 ** d) / 10 ** d;
+			const valueOf = (pid: number, k: PRStat, po: 0 | 1) => {
+				const t = totals.get(pid)?.all[po];
+				return t ? round(t[k], PR_INFO[k].d) : 0;
+			};
+			const byPts = [...totals.keys()].sort(
+				(a, b) => valueOf(b, "pts", 0) - valueOf(a, "pts", 0),
+			);
+			const sample = [
+				...byPts.slice(0, 4),
+				...byPts
+					.filter(
+						(pid) => all.find((p) => p.pid === pid)?.tid === PLAYER.RETIRED,
+					)
+					.slice(0, 3),
+			];
+			let checked = 0;
+			for (const pid of sample) {
+				const p = all.find((x) => x.pid === pid)!;
+				const rankings = await getPlayerRankings(p);
+				for (const r of rankings ?? []) {
+					if (!(r.rank >= 1 && r.rank <= r.of && Number.isFinite(r.v))) {
+						add(
+							"player rankings",
+							`${label} ${where()}`,
+							`pid ${pid} ${JSON.stringify(r)}`,
+						);
+					}
+					if (r.above && !(r.above.v >= r.v && r.above.rank < r.rank)) {
+						add(
+							"player rankings",
+							`${label} ${where()}`,
+							`pid ${pid} above ${JSON.stringify(r)}`,
+						);
+					}
+					if (r.scope !== "league") {
+						continue;
+					}
+					const po = r.playoffs ? 1 : 0;
+					const v = valueOf(pid, r.stat, po);
+					let greater = 0;
+					for (const other of totals.keys()) {
+						if (valueOf(other, r.stat, po) > v) {
+							greater += 1;
+						}
+					}
+					checked += 1;
+					if (v !== r.v || greater + 1 !== r.rank) {
+						add(
+							"player rankings",
+							`${label} ${where()}`,
+							`pid ${pid} ${r.stat}${r.playoffs ? " playoffs" : ""}: shown #${r.rank} (${r.v}), brute force #${greater + 1} (${v})`,
+						);
+					}
+				}
+			}
+			log(`[sweep:${config}] player rankings: ${checked} league ranks checked`);
+		}
+	};
+
 	const views0 = Object.keys(views).filter((id) => !SKIP_VIEWS.has(id));
 	const renderViews = async (label: string) => {
 		if (process.env.SWEEP_VIEWS === "0") {
@@ -512,6 +831,12 @@ const sweepLeague = async ({
 		const somePlayer = (
 			await idb.cache.players.indexGetAll("playersByTid", userTid)
 		)[0];
+		const prospectPid = (
+			await idb.cache.players.indexGetAll("playersByTid", PLAYER.UNDRAFTED)
+		).sort((a, b) => b.value - a.value)[0]?.pid;
+		const retiredPid = (
+			await idb.league.getAllFromIndex("players", "tid", PLAYER.RETIRED)
+		).sort((a, b) => b.stats.length - a.stats.length)[0]?.pid;
 		const coaches = await idb.cache.coaches.getAll();
 		const games = await idb.cache.games.getAll();
 		const lastGame = games.at(-1);
@@ -525,6 +850,9 @@ const sweepLeague = async ({
 				season: String(season),
 			},
 			{ pid: somePlayer ? String(somePlayer.pid) : undefined },
+			// A draft prospect and a retired player (pre-draft, scouting and rankings pages)
+			...(prospectPid !== undefined ? [{ pid: String(prospectPid) }] : []),
+			...(retiredPid !== undefined ? [{ pid: String(retiredPid) }] : []),
 			{ cid: coaches[0] ? String(coaches[0].cid) : undefined },
 			{
 				gid: lastGame ? String(lastGame.gid) : undefined,
@@ -780,6 +1108,18 @@ const sweepLeague = async ({
 				}
 			}
 			await checkState(`after p${target}`);
+			try {
+				await featureChecks(`after p${target}`, target);
+			} catch (error) {
+				add(
+					"feature checks threw",
+					where(),
+					String(error?.stack ?? error)
+						.split("\n")
+						.slice(0, 6)
+						.join(" | "),
+				);
+			}
 			const firstOrLast = i === 0 || i === seasons - 1;
 			// Mid-season and mid-playoffs, as the play menu does it (a number of days)
 			if (target === PHASE.REGULAR_SEASON || target === PHASE.PLAYOFFS) {
