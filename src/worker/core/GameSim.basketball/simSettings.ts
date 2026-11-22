@@ -323,3 +323,20 @@ export const SIM_FIX_FATIGUE = {
 	blowoutFrom: 12,
 	blowoutSpan: 10,
 };
+
+// Garbage time (Game Sim Fixes with Realistic Rotations): with the regulation time left R (minutes, scaled to a 48-minute game) at
+// most window, a lead of base + perMin × R or more (25 with 13.6 minutes left, 20 with 9, 15 with 4.5, 11 in the last minute) starts it;
+// it ends only if the lead falls exit below that line (so the starters aren't sent back in to pad their stats). In garbage time the five
+// best players by value sit (× starter on their substitution value), the next three play less (× rotation), the deep bench plays (× bench
+// for players ranked 9th or lower by value), both defenses let up (their defensive composites × effort), and no team calls a timeout
+// to stop a run. Not in overtime or an Elam ending
+export const SIM_FIX_GARBAGE = {
+	window: 14,
+	base: 10,
+	perMin: 1.1,
+	exit: 8,
+	starter: 0.02,
+	rotation: 0.35,
+	bench: 1.6,
+	effort: 0.97,
+};

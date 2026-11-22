@@ -29,6 +29,7 @@ import {
 	SIM_FIX_RUNS,
 	SIM_FIX_ADJUST,
 	SIM_FIX_FATIGUE,
+	SIM_FIX_GARBAGE,
 } from "./simSettings.ts";
 import {
 	CLOSER_FACTOR,
@@ -875,6 +876,10 @@ class GameSim extends GameSimBase {
 	minutesPlan0 = new Map<PlayerGameSim, number>();
 	// Fatigue and minutes (SIM_FIX_FATIGUE): tired legs show on defense first, back-to-backs and travel, stars' minutes by the score
 	flowFatigue = false;
+	// Garbage time (SIM_FIX_GARBAGE, with Realistic Rotations): whether it is on now, and whether it came this game
+	flowGarbage = false;
+	garbage = false;
+	hadGarbage = false;
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -1131,6 +1136,7 @@ class GameSim extends GameSimBase {
 			this.numPeriods = g.get("numPeriods");
 			this.planRotations();
 		}
+		this.flowGarbage = this.simFixes && this.realisticRotations && !allStarGame;
 		this.playersOnCourt = [
 			this.team[0].player.slice(0, this.numPlayersOnCourt),
 			this.team[1].player.slice(0, this.numPlayersOnCourt),
@@ -1958,6 +1964,9 @@ class GameSim extends GameSimBase {
 		}
 		if (FLOW_DIAG.on) {
 			flowCount("poss");
+			if (this.garbage) {
+				flowCount("garbagePoss");
+			}
 		}
 		this.updateTeamCompositeRatings();
 
@@ -2302,6 +2311,45 @@ class GameSim extends GameSimBase {
 		return 1;
 	}
 
+	// Garbage time: on when the lead is big for the time left, off again only if it shrinks well below that
+	updateGarbage() {
+		const G = SIM_FIX_GARBAGE;
+		const quarter = this.team[0].stat.ptsQtrs.length;
+		if (
+			this.elamActive ||
+			this.overtimes > 0 ||
+			quarter > this.numPeriods ||
+			!Number.isFinite(this.t)
+		) {
+			this.garbage = false;
+			return false;
+		}
+		const remaining =
+			((this.numPeriods - quarter) * this.ga.quarterLength * 60 + this.t) /
+			60 /
+			this.gameLengthScale();
+		const lead = Math.abs(this.team[0].stat.pts - this.team[1].stat.pts);
+		const line = G.base + G.perMin * remaining;
+		if (remaining > G.window) {
+			this.garbage = false;
+		} else if (this.garbage) {
+			if (lead < line - G.exit) {
+				this.garbage = false;
+			}
+		} else if (lead >= line) {
+			this.garbage = true;
+			this.hadGarbage = true;
+		}
+		return this.garbage;
+	}
+
+	// Garbage time: the starters sit, the deep bench plays
+	garbageFactor(p: PlayerGameSim) {
+		const G = SIM_FIX_GARBAGE;
+		const rank = this.valueRanks.get(p) ?? 0;
+		return rank < 5 ? G.starter : rank < 8 ? G.rotation : G.bench;
+	}
+
 	// Calibration counters at the end of a game: minutes by value rank, the best player's minutes by the final margin, garbage time
 	flowGameDiag() {
 		const margin = Math.abs(this.team[0].stat.pts - this.team[1].stat.pts);
@@ -2327,6 +2375,9 @@ class GameSim extends GameSimBase {
 			flowSum("tmo", this.timeoutsUsed[t]);
 		}
 		flowCount("games");
+		if (this.hadGarbage) {
+			flowCount("garbageGames");
+		}
 	}
 
 	// ---- Game flow: coaching adjustments at the breaks (SIM_FIX_ADJUST). Only called with Game Sim Fixes and coaching systems on ----
@@ -2589,7 +2640,7 @@ class GameSim extends GameSimBase {
 		const quick = this.coachSys ? this.cs[o].burnTimeout : undefined;
 		if (this.flowRuns) {
 			// Game flow: a run of 8-0 or 10-2 (by the coach), or late in a close game a breather for a tired five
-			if (this.elamActive) {
+			if (this.elamActive || this.garbage) {
 				return;
 			}
 			if (this.runNet(this.d) < this.runTimeoutNet(o)) {
@@ -3284,6 +3335,9 @@ class GameSim extends GameSimBase {
 					this.elamTarget -
 					Math.max(this.team[this.d].stat.pts, this.team[this.o].stat.pts);
 				blowout = diff >= 20 && ptsToTarget < diff;
+			} else if (this.flowGarbage) {
+				// Game flow: garbage time
+				blowout = this.updateGarbage();
 			} else {
 				// (cutoffs for a 48-minute game, scaled to the game's length)
 				const s = this.gameLengthScale();
@@ -3340,9 +3394,10 @@ class GameSim extends GameSimBase {
 
 						// Also scale based on margin late in games, so stars play less in blowouts (this doesn't really work that well, but better than nothing)
 						if (blowout) {
-							// Realistic Rotations: the end of the bench by value, not by roster order
+							// Realistic Rotations: the end of the bench by value, not by roster order (Game flow: the starters sit)
 							ovr *= this.realisticRotations
-								? (this.valueRanks.get(p)! + 1) / 10
+								? ((this.valueRanks.get(p)! + 1) / 10) *
+									(this.flowGarbage ? this.garbageFactor(p) : 1)
 								: (i + 1) / 10;
 						} else if (this.realisticRotations) {
 							ovr *= this.rotationFactor(p, foulLimit, elapsed, closers?.[t]);
@@ -4115,12 +4170,15 @@ class GameSim extends GameSimBase {
 					const pf = p.stat.pf;
 					const foulLimitFactor =
 						pf === foulLimit ? 0.9 : pf > foulLimit ? 0.75 : 1;
-					// (Game flow: tired legs show on defense first)
+					// (Game flow: tired legs show on defense first, and garbage time lets up)
 					const base =
 						(this.flowFatigue ? this.offFatigue(fatigue) : fatigue) *
 						perfFactor;
 					const baseD = this.flowFatigue
-						? this.defFatigue(fatigue) * perfFactor * foulLimitFactor
+						? this.defFatigue(fatigue) *
+							perfFactor *
+							foulLimitFactor *
+							(this.garbage ? SIM_FIX_GARBAGE.effort : 1)
 						: base * foulLimitFactor;
 					const int = shares.interior[i]!;
 					const reb = shares.rebound[i]!;
