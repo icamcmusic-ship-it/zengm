@@ -3882,6 +3882,49 @@ const regenerateDraftClass = async (season: number, conditions: Conditions) => {
 	}
 };
 
+// Every upcoming draft class at once (God Mode): the same as Regenerate on each class, nearest class first (a later
+// class's prospects are placed onto the college rosters of the classes before it)
+const regenerateAllDraftClasses = async (
+	seasons: number[],
+	conditions: Conditions,
+) => {
+	const proceed = await toUI(
+		"confirm",
+		[
+			`This will delete all ${seasons.length} upcoming draft classes and replace them with new ones filled with randomly generated players. Are you sure you want to do that?`,
+			{
+				okText: "Regenerate All Classes",
+			},
+		],
+		conditions,
+	);
+	if (!proceed) {
+		return;
+	}
+
+	// (not a class whose draft is under way)
+	const sorted = [...new Set(seasons)]
+		.filter(
+			(season) =>
+				!(season === g.get("season") && g.get("phase") === PHASE.DRAFT),
+		)
+		.sort((a, b) => a - b);
+	// Remove every class first, so no new class is built around prospects about to be replaced
+	for (const season of sorted) {
+		const oldPlayers = await idb.cache.players.indexGetAll(
+			"playersByDraftYearRetiredYear",
+			[[season], [season, Infinity]],
+		);
+		await player.remove(
+			oldPlayers.filter((p) => p.tid === PLAYER.UNDRAFTED).map((p) => p.pid),
+		);
+	}
+	for (const season of sorted) {
+		await draft.genPlayers(season);
+	}
+	await toUI("realtimeUpdate", [["playerMovement"]]);
+};
+
 const regenerateSchedule = async (param: unknown, conditions: Conditions) => {
 	const teams = await team.getFormattedAll({
 		attrs: ["tid"],
@@ -6758,6 +6801,7 @@ const api = {
 		reSignAll,
 		realtimeUpdate,
 		regenerateDraftClass,
+		regenerateAllDraftClasses,
 		regenerateSchedule,
 		releasePlayer,
 		stashDraftPick,
