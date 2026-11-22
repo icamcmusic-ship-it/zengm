@@ -67,7 +67,10 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // user's verdicts as vetoes)
 // archnouns2: 24 (end words, the user's second list of special names, Stalker / Roamer / Interceptor)
 // archnouns3: 25 (the third list, and the picker improvements)
-export const ARCHETYPE_READING_VERSION = 26;
+// archcov: 27 (the user's 2064 audit: skills read against the league and his position group, athletic nouns as
+// modifiers, names chosen by how much of his strengths they cover, end words that fit the front words, stickiness
+// re-checked every season, promises from each name's skill list, the defensive tag at the 85th percentile)
+export const ARCHETYPE_READING_VERSION = 27;
 
 export const toStored = (
 	season: number,
@@ -87,6 +90,9 @@ export const toStored = (
 	}
 	if (c.defense) {
 		out.def = c.defense;
+	}
+	if (c.reason) {
+		out.why = c.reason;
 	}
 	return out;
 };

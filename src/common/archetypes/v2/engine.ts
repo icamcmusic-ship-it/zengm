@@ -40,17 +40,20 @@ import {
 } from "./honest.ts";
 import {
 	END_WORDS,
-	nameCtxOf,
-	namePromises,
+	coverCtxOf,
+	HONEST_NOUNS,
+	honestPromises,
 	nounOfDesc,
 	nounScores,
-	pickNouns,
+	type CoverExplain,
+	type NounGroupQuantiles,
 	type NounInput,
 	type NounKey,
 	type Rejection,
 } from "./nouns.ts";
 import type { RatingQuantiles } from "./gateScale.ts";
 import { defenseSentence } from "./defenseLabels.ts";
+import { pickNouns } from "./cover.ts";
 import { TWO_K_NAMES } from "../defs.data.ts";
 import type { ArchetypeRatings, Classification, Pos } from "../types.ts";
 import {
@@ -1034,6 +1037,7 @@ export const classifyV2 = (
 	let nounHonest: NounKey | null | undefined;
 	let nounConf: number | undefined;
 	let nounDefense: string | undefined;
+	let nounExplain: CoverExplain | undefined;
 	let nounIn: NounInput | undefined;
 	if (P.nouns && isPos(pos)) {
 		const prevParsed = prevComposed ? parseComposedId(prevRaw) : undefined;
@@ -1056,6 +1060,7 @@ export const classifyV2 = (
 			prospect: opts.prospect,
 			traits: opts.traits as Record<string, number> | undefined,
 			rq: (norms.nq ?? norms.rq) as RatingQuantiles | undefined,
+			...(norms.ng ? { ng: norms.ng as NounGroupQuantiles } : {}),
 			...(norms.common ? { common: norms.common } : {}),
 			rejected: opts.rejects?.map((rj): Rejection => ({
 				name: rj.name,
@@ -1086,9 +1091,14 @@ export const classifyV2 = (
 		if (np.tie === false) {
 			nounIn = { ...nounIn, tie: false };
 		}
+		// (archcov: and with the slack his last-season label was re-checked with)
+		if (np.slack !== undefined) {
+			nounIn = { ...nounIn, slack: np.slack };
+		}
 		const score = eff(first);
 		nounConf = np.conf;
 		nounDefense = np.defense;
+		nounExplain = np.explain;
 		if (np.kind === "special") {
 			const a = archetypeById(np.id)!;
 			const nm = nameAt(a, pos);
@@ -1167,19 +1177,24 @@ export const classifyV2 = (
 						? { skill: nounHonest === null ? null : NOUN_SKILL[nounHonest] }
 						: {}),
 				});
-				// archnouns4: an honest name's words keep their promises too (a specialist's skill in the top 30%, a trait
-				// word's trait at its bar); else the name about no skill, else a plain depth name
+				// archcov: an honest name keeps its promises too (it is about the skill it was picked for, in the top 40%, and its
+				// other words keep theirs): else another word for it, else the name about no skill, else a plain depth name
 				if (nounIn) {
-					const nctx = nameCtxOf(nounIn);
-					// (another word for the same name, then another of his skills in the top 30%, best first, then none)
-					const ok = (name: string) => namePromises(name, nctx).length === 0;
+					const cctx = coverCtxOf(nounIn);
+					let about: NounKey | undefined = nounHonest ?? undefined;
+					const ok = (key: string, name: string) =>
+						honestPromises(key, name, about, cctx).length === 0;
 					const synonym = (key: string) =>
-						ROLE_BY_KEY.get(key)?.names.find(ok) ??
+						ROLE_BY_KEY.get(key)?.names.find((nm) => ok(key, nm)) ??
 						Object.values(ROLE_BY_KEY.get(key)?.byGroup ?? {}).find((nm) =>
-							ok(nm!),
+							ok(key, nm!),
 						);
-					for (const n of [...nctx.cleared, null]) {
-						if (ok(h.name)) {
+					for (const n of [about, null]) {
+						about = n ?? undefined;
+						if (n === null) {
+							h = honestName({ ...hIn, skill: null });
+						}
+						if (ok(h.key, h.name)) {
 							break;
 						}
 						const alt = synonym(h.key);
@@ -1187,12 +1202,8 @@ export const classifyV2 = (
 							h = { key: h.key, name: alt };
 							break;
 						}
-						h = honestName({
-							...hIn,
-							skill: n === null ? null : NOUN_SKILL[n],
-						});
 					}
-					if (namePromises(h.name, nctx).length > 0) {
+					if (!ok(h.key, h.name)) {
 						const key =
 							(opts.ovr ?? 99) < 35
 								? "hCampBody"
@@ -1201,23 +1212,24 @@ export const classifyV2 = (
 									: "hFiller";
 						h = { key, name: ROLE_BY_KEY.get(key)!.names[0]! };
 					}
-				}
-				// archstick: last season's honest name, in its own words, while he is still the same kind of honest name (a
-				// player who outgrows it, a development name above ovr 30 or a specialist with a second skill, gets this
-				// season's name: that is a new kind, never kept)
-				const prevH = prevComposed ? parseComposedId(prevRaw) : undefined;
-				if (
-					prevH &&
-					prevH.role.key === h.key &&
-					prevH.group === group &&
-					prevH.descs.length === 0
-				) {
-					const pn = composeName(prevH.role, [], group, prevH.pick);
+					// archstick: last season's honest name, in its own words, while he is still the same kind of honest name
+					// (a player who outgrows it gets this season's name: that is a new kind, never kept)
+					// (archcov: or another honest name about the same skill, or the lack of one, while it keeps its promises:
+					// a development name only while he is still young with upside)
+					const prevH = prevComposed ? parseComposedId(prevRaw) : undefined;
 					if (
-						pn !== h.name &&
-						(!nounIn || namePromises(pn, nameCtxOf(nounIn)).length === 0)
+						prevH &&
+						prevH.group === group &&
+						prevH.descs.length === 0 &&
+						isHonestKey(prevH.role.key) &&
+						(prevH.role.key === h.key ||
+							(DEV_KEYS.has(prevH.role.key) === DEV_KEYS.has(h.key) &&
+								(HONEST_NOUNS[prevH.role.key] ?? []).includes(about ?? "none")))
 					) {
-						h = { key: h.key, name: pn };
+						const pn = composeName(prevH.role, [], group, prevH.pick);
+						if (pn !== h.name && ok(prevH.role.key, pn)) {
+							h = { key: prevH.role.key, name: pn };
+						}
 					}
 				}
 				const role = ROLE_BY_KEY.get(h.key)!;
@@ -1294,6 +1306,20 @@ export const classifyV2 = (
 			(isComposedId(a.id) ? a.name : first.classic ? classic.label : a.name) +
 			(nounDefense ? ` · ${nounDefense}` : ""),
 		...(nounDefense ? { defense: nounDefense } : {}),
+		// archcov: why the label was chosen
+		...(nounExplain
+			? {
+					reason: {
+						...nounExplain,
+						name:
+							(isComposedId(a.id)
+								? a.name
+								: first.classic
+									? classic.label
+									: a.name) + (nounDefense ? ` · ${nounDefense}` : ""),
+					},
+				}
+			: {}),
 		group: a.group,
 		family: a.family,
 		// (archnouns: both labels in the description)
@@ -1328,6 +1354,24 @@ export const classifyV2 = (
 		},
 	};
 };
+
+// archcov: the development names (a young player with upside)
+const DEV_KEYS: ReadonlySet<string> = new Set([
+	"hDevShoot",
+	"hDevPerD",
+	"hDevRimD",
+	"hDevPass",
+	"hDevHandle",
+	"hDevReb",
+	"hDevScore",
+	"hDevPost",
+	"hDevAth",
+	"hDevStrength",
+	"hTools",
+	"hProject",
+	"hLottery",
+	"hLateBloomer",
+]);
 
 // archnouns: the honest skill a noun is
 const NOUN_SKILL: Record<NounKey, Skill> = {

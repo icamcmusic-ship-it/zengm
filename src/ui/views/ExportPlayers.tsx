@@ -4,7 +4,12 @@ import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import { toWorker } from "../util/toWorker.ts";
 import { getCols } from "../../common/getCols.ts";
-import { useLocal } from "../util/local.ts";
+import { local, useLocal } from "../util/local.ts";
+import {
+	completeTraitSeeds,
+	proSeasonsPlayed,
+	traitScores,
+} from "../../common/playerTraits/index.ts";
 import { DataTable } from "../components/DataTable/index.tsx";
 import { MoreLinks } from "../components/MoreLinks.tsx";
 import type { View } from "../../common/types.ts";
@@ -41,6 +46,26 @@ export const exportPlayers = async (
 				p.exportedSeason = seasonsByPid.get(p.pid);
 				if (p.exportedSeason === "latest") {
 					p.exportedSeason = p.ratings.at(-1).season;
+				}
+				// archcov: his trait scores (0-100, what the game and the archetype labels read), next to the stored seeds, so
+				// an audit of the file uses the exact values. Score = clamp(round(50 + calibration offset + rating part
+				// (0.9 x weighted rating gaps) + age/experience part + 12 x seed)). Not read back on import
+				const row = p.ratings?.at(-1);
+				if (p.traits && row) {
+					const season: number = row.season;
+					p.traitScores = traitScores(
+						row,
+						completeTraitSeeds(p.traits, 0, p.pid),
+						{
+							age: season - p.born.year,
+							experience: Math.max(0, season - (p.draft?.year ?? season)),
+							proSeasons: proSeasonsPlayed({
+								p,
+								season,
+								startingSeason: local.getState().startingSeason,
+							}),
+						},
+					);
 				}
 
 				delete p.gamesUntilTradable;

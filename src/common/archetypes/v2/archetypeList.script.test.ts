@@ -11,13 +11,33 @@ import { DEFENSE_TEXT } from "./defenseLabels.ts";
 import { ROLE_BY_KEY } from "./grammar.ts";
 import { ELITE_RE, HONEST_ROLES } from "./honest.ts";
 import {
+	ATH_WORD_BAR,
+	CRAFTY_BAR,
 	CUSTOM_SPECIALS,
 	END_WORDS,
+	JACK_CLEARED,
 	NOUN_DESC,
+	SKILL_BAR,
+	STICK_BOOST,
+	STRONG_BAR,
+	TOP_N,
 	TRAIT_KEYWORDS,
 	WORD_REQ,
 	specialNounsOf,
 } from "./nouns.ts";
+import {
+	EXTRA_COST,
+	GENERIC_COVER,
+	JACK_FLAT,
+	MISS_TOP2,
+	RAMP_HI,
+	RAMP_LO,
+	SECOND_COST,
+	STICK_COVER,
+	TAG_COVER,
+} from "./cover.ts";
+
+const pctTop = (p: number) => `${Math.round(100 * p)}th percentile`;
 import { DESC_BY_KEY } from "./grammar.ts";
 import { ARCHETYPE_READING_VERSION } from "../helpers.ts";
 
@@ -47,30 +67,39 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 		out.push(`# Archetypes (reading ${ARCHETYPE_READING_VERSION})`);
 		out.push("");
 		out.push(
-			"Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is a main name, plus a defensive label after a · when a defensive skill is among his best.",
+			"Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is a main name, plus a defensive tag after a · for a defensive skill at the league's 85th percentile (or his second best) that the main name doesn't name.",
 		);
 		out.push("");
 		out.push("## How a main name is built");
 		out.push("");
 		out.push(
-			"Each skill is a noun scored by his standing in the league that season. His name is, in order: one of the special names below whose skills are all among his three best (and include his best); else his two best nouns' front words and an end word (his position, or one of the end words below); else, with one skill at low OVR or none, an honest name.",
+			`Each skill is read against the league and against his position group (guards, wings, bigs): its standing is the lower of the two, so a skill counts only when it is good outright and good for his position. A skill may be named from the ${pctTop(SKILL_BAR)} (offensive IQ from the ${pctTop(CRAFTY_BAR)}); its weight ramps from nothing at the ${pctTop(RAMP_LO)} to full at the ${pctTop(RAMP_HI)}, so there is no cliff. Speed, leaping and strength are modifiers, not skills: they lead a name only when no basketball skill reaches the ${pctTop(STRONG_BAR)}, and else add at most a word next to a skill (from the ${pctTop(ATH_WORD_BAR)}).`,
+		);
+		out.push("");
+		out.push(
+			`Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his ${TOP_N} best skills it names (the defensive tag counts ${TAG_COVER} of one), minus ${MISS_TOP2} times the weight of either of his top two it leaves out, minus ${SECOND_COST} for a second skill named and ${EXTRA_COST} for each beyond two. Its skills must be among his best ${TOP_N} and include his best one. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). With no real skill (or one at OVR under 50, with no modifier) he gets an honest name.`,
+		);
+		out.push("");
+		out.push(
+			`Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of ${STICK_BOOST} on each standing, so a point of noise doesn't take it away) and this season's best name doesn't cover more by ${STICK_COVER} or more. An honest or development name is never kept once he outgrows it. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.`,
 		);
 		out.push("");
 		out.push("## Every word keeps its promise");
 		out.push("");
 		out.push(
-			"Every kind of name (special names, the user's own names, noun names, end words, honest names, defensive labels) is checked word by word: a skill word needs that skill in the league's top 30% and among his three best, a trait word its trait at the bar, an elite word an elite OVR. A name that breaks a promise gives way to the next one.",
+			`A name's promises come from its own skill list (a special name's skills, a noun name's front and end words, an honest name's skill, a defensive label's), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best ${TOP_N}, each modifier at its bar. The other words keep these promises:`,
 		);
 		out.push("");
 		for (const w of WORD_REQ) {
+			if ("nouns" in w) {
+				continue;
+			}
 			const what =
-				"nouns" in w
-					? `${w.why} in the top 30% and among his three best`
-					: "any" in w
-						? `${w.why}: one in the top 30%`
-						: "trait" in w
-							? `trait ${w.trait} ${w.min}+`
-							: w.why;
+				"any" in w
+					? `${w.why}: one of them among the name's skills`
+					: "trait" in w
+						? `trait ${w.trait} ${w.min}+`
+						: w.why;
 			out.push(`- \`${String(w.re).slice(1, 70)}\`: ${what}`);
 		}
 		out.push("");
@@ -120,7 +149,7 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 			);
 		}
 		out.push(
-			"- **Jack-Of-All-Trades** [any]: 4+ skills in the top 30%, none in the top 10%.",
+			`- **Jack-Of-All-Trades** [any]: ${JACK_CLEARED}+ real skills, his ${JACK_CLEARED}th at the ${pctTop(JACK_FLAT)}; it covers each of his skills ${GENERIC_COVER} of the way.`,
 		);
 		out.push("");
 		const builds: string[] = [];

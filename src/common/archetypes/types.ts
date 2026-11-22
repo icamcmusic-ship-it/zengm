@@ -212,6 +212,9 @@ export type Norms = {
 	// archnouns: the same quantiles among the league's own players for every league, rebuilt each season: the nouns'
 	// standings (v2/nouns.ts) are always relative to the league as it is
 	nq?: Partial<Record<string, number[]>>;
+	// archcov: each noun's values among the league's guards, wings and bigs (v2/nouns.ts nounGroupQuantiles): a skill is
+	// read against his position group too
+	ng?: Partial<Record<string, Partial<Record<string, number[]>>>>;
 	// archnouns3: how common each label is in the league right now (share of players, by id), so near-ties go to the rarer
 	// name (the user's "spread out near-ties")
 	common?: Record<string, number>;
@@ -291,6 +294,8 @@ export type Classification = {
 	also?: { id: string; name: string };
 	// archnouns: his defensive label, shown after the name ("Pull-Up Shot Hunter · Point-of-Attack Pest")
 	defense?: string;
+	// archcov: why the label was chosen
+	reason?: ArchetypeReason;
 	// 0..1: how similar the shape of his ratings is to the build's profile (absolute, see POOR_FIT in classify.ts)
 	score: number;
 	// How exceptional that fit is among the league's players the build allows, with the name's floors applied (z)
@@ -314,6 +319,22 @@ export type Classification = {
 };
 
 // What is stored on a player, compactly
+// archcov: why a label was chosen, stored with it so every label can be explained and tested: the skills it names (main
+// name and defensive tag) with their standing (the lower of league and position, 0-100) and weight (0-1), the rule that
+// let it name him, its kind (position word, end word, special, kept from last season, ...), its coverage score, the
+// share of his three biggest strengths it covers, and the closest other name with its score
+export type ArchetypeReason = {
+	name: string;
+	skills: string[];
+	pct: number[];
+	weights: number[];
+	gate: string;
+	variant: string;
+	score: number;
+	fit: number;
+	runnerUp?: { name: string; score: number };
+};
+
 export type StoredArchetype = {
 	season: number;
 	// Archetype id (see ARCHETYPES)
@@ -328,6 +349,8 @@ export type StoredArchetype = {
 	also?: string;
 	// archnouns: his defensive label
 	def?: string;
+	// archcov: why it was chosen
+	why?: ArchetypeReason;
 	// The reading's version (ARCHETYPE_READING_VERSION) when it was stored: an entry from an older reading is read again
 	v?: number;
 };
