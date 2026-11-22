@@ -556,7 +556,13 @@ const sweepLeague = async ({
 		const maxGp = g.get("numGames") + (isCollege ? 6 : 0);
 		for (const p of await idb.league.getAll("players")) {
 			for (const row of p.stats) {
-				if (row.season === finished && !row.playoffs && row.gp > maxGp + 3) {
+				// (pro rows only: pre-draft college and overseas rows are stored with tid PLAYER.DOES_NOT_EXIST)
+				if (
+					row.tid >= 0 &&
+					row.season === finished &&
+					!row.playoffs &&
+					row.gp > maxGp + 3
+				) {
 					add(
 						"player gp",
 						label,
