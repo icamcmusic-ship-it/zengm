@@ -26,6 +26,7 @@ import {
 	SIM_FIX_TRANSITION,
 	SIM_FIX_CONTEST,
 	SIM_FIX_HELP,
+	SIM_FIX_RUNS,
 } from "./simSettings.ts";
 import {
 	CLOSER_FACTOR,
@@ -177,6 +178,7 @@ import {
 } from "./shotShare.ts";
 import {
 	contestLevel,
+	flowCount,
 	flowSum,
 	contestTables,
 	contestTypeIndex,
@@ -846,6 +848,16 @@ class GameSim extends GameSimBase {
 		undefined,
 		undefined,
 	];
+	// Runs, momentum and timeouts (SIM_FIX_RUNS, with End-of-Game Intelligence): the scoring since the last timeout or the start of the
+	// period (team, points), the possession count and each team's last scoring possession, the momentum of the team with the ball this
+	// possession, and the timeouts each team used
+	flowRuns = false;
+	runLogTeam: TeamNum[] = [];
+	runLogPts: number[] = [];
+	possCount = 0;
+	lastScorePoss: [number, number] = [0, 0];
+	momentum = 0;
+	timeoutsUsed: [number, number] = [0, 0];
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -1025,6 +1037,15 @@ class GameSim extends GameSimBase {
 		if (this.smartEndgame) {
 			this.earlyTimeouts = [ENDGAME.earlyTimeouts, ENDGAME.earlyTimeouts];
 			this.rotationQuarterSeconds = g.get("quarterLength") * 60;
+		}
+		// Game flow: runs, momentum and timeouts. The run-stopping timeouts scale with the number of periods
+		this.flowRuns = this.simFixes && this.smartEndgame;
+		if (this.flowRuns) {
+			const n = Math.max(
+				1,
+				Math.round((ENDGAME.earlyTimeouts * g.get("numPeriods")) / 4),
+			);
+			this.earlyTimeouts = [n, n];
 		}
 
 		this.realisticTurnovers = nativeFeatureEnabled(
@@ -1334,6 +1355,12 @@ class GameSim extends GameSimBase {
 		});
 
 		this.adv?.finish();
+
+		// Game flow: timeouts used by each team (a box score and team stat)
+		if (this.flowRuns) {
+			this.team[0].stat.tmo = this.timeoutsUsed[0];
+			this.team[1].stat.tmo = this.timeoutsUsed[1];
+		}
 
 		// Delete stuff that isn't needed before returning
 		for (const t of teamNums) {
@@ -1664,6 +1691,7 @@ class GameSim extends GameSimBase {
 			this.foulsLastTwoMinutes = [0, 0];
 			this.lastScoringPlay = [];
 			this.scoringRun = [0, 0];
+			this.clearRuns();
 			this.t = this.ga.quarterLength * 60;
 			this.playByPlay.logEvent({
 				type: "period",
@@ -1679,6 +1707,7 @@ class GameSim extends GameSimBase {
 		this.timeouts = [NUM_TIMEOUTS_OVERTIME, NUM_TIMEOUTS_OVERTIME];
 		this.earlyTimeouts = [0, 0];
 		this.scoringRun = [0, 0];
+		this.clearRuns();
 		this.logTimeouts();
 
 		this.lastScoringPlay = [];
@@ -1872,6 +1901,10 @@ class GameSim extends GameSimBase {
 		this.d = this.o === 1 ? 0 : 1;
 		this.nextOffense = this.o;
 		this.runTimeoutNow = false;
+		if (this.flowRuns) {
+			this.possCount += 1;
+			this.momentum = this.momentumOf(this.o);
+		}
 		this.updateTeamCompositeRatings();
 
 		const dtInbound = this.dtInbound();
@@ -2179,11 +2212,124 @@ class GameSim extends GameSimBase {
 		}
 	}
 
+	// ---- Game flow: runs, momentum and timeouts (SIM_FIX_RUNS). Only called with Game Sim Fixes and End-of-Game Intelligence on ----
+
+	// Any timeout (and a new period) ends every run
+	clearRuns() {
+		this.runLogTeam.length = 0;
+		this.runLogPts.length = 0;
+		this.momentum = 0;
+	}
+
+	// The most team t has outscored the other team by, over the scoring since the last timeout, while the other team scored at most
+	// SIM_FIX_RUNS.maxOwn (an 8-0 or a 10-2 run is 8)
+	runNet(t: TeamNum) {
+		const maxOwn = SIM_FIX_RUNS.maxOwn;
+		let mine = 0;
+		let theirs = 0;
+		let best = 0;
+		for (let i = this.runLogTeam.length - 1; i >= 0; i--) {
+			if (this.runLogTeam[i] === t) {
+				mine += this.runLogPts[i]!;
+			} else {
+				theirs += this.runLogPts[i]!;
+				if (theirs > maxOwn) {
+					break;
+				}
+			}
+			if (mine - theirs > best) {
+				best = mine - theirs;
+			}
+		}
+		return best;
+	}
+
+	// The run (net points) that makes team t's coach call a timeout: quicker for a quick trigger and for a good game manager
+	runTimeoutNet(t: TeamNum) {
+		const R = SIM_FIX_RUNS;
+		const cs = this.cs[t];
+		const dial = this.coachSys ? (cs.timeoutDial ?? 0) : 0;
+		const mgmt = this.coachSys
+			? helpers.bound(((cs.mgmt ?? 50) - 50) / 25, -1, 1)
+			: 0;
+		return helpers.bound(
+			Math.round(R.net - R.dial * dial - R.mgmt * mgmt),
+			R.minNet,
+			R.maxNet,
+		);
+	}
+
+	// Team t's momentum: its run, fading with each of its possessions since its last basket
+	momentumOf(t: TeamNum) {
+		const R = SIM_FIX_RUNS;
+		const net = this.runNet(t);
+		if (net < R.momStart) {
+			return 0;
+		}
+		const since = Math.max(0, (this.possCount - this.lastScorePoss[t] - 2) / 2);
+		return (
+			R.momBump *
+			Math.min(1, (net - R.momStart) / R.momSpan) *
+			R.momDecay ** since
+		);
+	}
+
+	// Late in a close game, a breather for a tired five: one of the team's early timeouts at a dead ball, with the ball
+	maybeRestTimeout(): PossessionOutcome | undefined {
+		const R = SIM_FIX_RUNS;
+		const o = this.o;
+		if (
+			this.earlyTimeouts[o] <= 0 ||
+			this.overtimes > 0 ||
+			this.team[0].stat.ptsQtrs.length < this.numPeriods ||
+			this.t > R.restSeconds * this.gameLengthScale() ||
+			this.t <= ENDGAME.noRunTimeoutSeconds ||
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) > R.restMargin ||
+			(this.prevPossessionOutcome !== "fg" &&
+				this.prevPossessionOutcome !== "ft")
+		) {
+			return;
+		}
+		let energy = 0;
+		for (const p of this.playersOnCourt[o]) {
+			energy += p.stat.energy;
+		}
+		energy /= Math.max(1, this.playersOnCourt[o].length);
+		if (energy >= R.restEnergy) {
+			return;
+		}
+		this.earlyTimeouts[o] -= 1;
+		this.clearRuns();
+		this.timeoutsUsed[o] += 1;
+		if (FLOW_DIAG.on) {
+			flowCount("restTimeouts");
+		}
+		this.runTimeoutNow = true;
+		this.isClockRunning = false;
+		this.timeoutBreather();
+		this.playByPlay.logEvent({
+			type: "timeout",
+			clock: this.t,
+			t: o,
+			numLeft: this.earlyTimeouts[o] + this.timeouts[o],
+			advancesBall: false,
+		});
+		return "timeout";
+	}
+
 	// At the start of a possession: the team with the ball stops the other team's run with a timeout
 	maybeRunTimeout(): PossessionOutcome | undefined {
 		const o = this.o;
 		const quick = this.coachSys ? this.cs[o].burnTimeout : undefined;
-		if (
+		if (this.flowRuns) {
+			// Game flow: a run of 8-0 or 10-2 (by the coach), or late in a close game a breather for a tired five
+			if (this.elamActive) {
+				return;
+			}
+			if (this.runNet(this.d) < this.runTimeoutNet(o)) {
+				return this.maybeRestTimeout();
+			}
+		} else if (
 			this.elamActive ||
 			this.scoringRun[this.d] < runTimeoutThreshold(quick)
 		) {
@@ -2215,6 +2361,13 @@ class GameSim extends GameSimBase {
 			this.logTimeouts();
 		}
 		this.scoringRun[this.d] = 0;
+		if (this.flowRuns) {
+			this.clearRuns();
+			this.timeoutsUsed[o] += 1;
+			if (FLOW_DIAG.on) {
+				flowCount("runTimeouts");
+			}
+		}
 		this.runTimeoutNow = true;
 		this.endgameCounts.runTimeouts += 1;
 		this.isClockRunning = false;
@@ -4356,6 +4509,13 @@ class GameSim extends GameSimBase {
 				this.isClockRunning = false;
 				this.timeouts[this.o] -= 1;
 				this.logTimeouts();
+				if (this.flowRuns) {
+					this.clearRuns();
+					this.timeoutsUsed[this.o] += 1;
+					if (FLOW_DIAG.on) {
+						flowCount("lateTimeouts");
+					}
+				}
 				if (smart) {
 					this.timeoutBreather();
 				}
@@ -5698,6 +5858,13 @@ class GameSim extends GameSimBase {
 
 			// Game flow: open, contested or heavily contested
 			probMake += this.contestMake;
+			// Game flow: a team on a run
+			if (this.flowRuns) {
+				probMake += this.momentum - SIM_FIX_RUNS.momOffset;
+				if (FLOW_DIAG.on) {
+					flowSum("momentum", this.momentum);
+				}
+			}
 			// Game flow: posting up the small a switch left on him
 			if (
 				this.contestOn &&
@@ -7631,6 +7798,11 @@ class GameSim extends GameSimBase {
 				if (this.smartEndgame) {
 					this.scoringRun[t] += amt;
 					this.scoringRun[t === 0 ? 1 : 0] = 0;
+				}
+				if (this.flowRuns) {
+					this.runLogTeam.push(t);
+					this.runLogPts.push(amt);
+					this.lastScorePoss[t] = this.possCount;
 				}
 
 				for (const i of [0, 1] as const) {

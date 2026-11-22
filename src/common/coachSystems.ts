@@ -333,6 +333,11 @@ export type CoachSim = {
 	foulWindow: number;
 	// disciplinarians keep tempers in check (technical and flagrant fouls)
 	temper: number;
+	// The head coach's game management and adaptability (0-100) and timeout trigger dial (-1 saves them ... 1 quick), as in his profile:
+	// the sim's game flow reads them (Game Sim Fixes: run-stopping timeouts, adjustments at the breaks). Undefined: an average coach
+	mgmt?: number;
+	adapt?: number;
+	timeoutDial?: number;
 };
 
 export const NEUTRAL_COACH_SIM: Omit<CoachSim, "off" | "def"> = {
@@ -1098,6 +1103,9 @@ export const coachSimEffects = ({
 		burnTimeout: profile.timeouts > 0.4,
 		foulWindow: 27 + 6 * clamp((profile.mgmt - 50) / 30, -1, 1),
 		temper: 1 + 0.25 * profile.personality,
+		mgmt: profile.mgmt,
+		adapt: profile.adapt,
+		timeoutDial: profile.timeouts,
 	};
 };
 

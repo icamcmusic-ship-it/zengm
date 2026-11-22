@@ -242,3 +242,31 @@ export const SIM_FIX_HELP = {
 	switchExposure: 0.35,
 	switchMake: 0.02,
 };
+
+// Runs, momentum and timeouts (Game Sim Fixes with End-of-Game Intelligence, gameFlow.ts):
+// - A run against a team: the most the other team has outscored it by over the scoring since the last timeout (or the start of the
+//   period) while it scored at most maxOwn (8-0, 10-2: net 8). Its coach stops a run of net or more with a timeout: net - dial × his
+//   timeout trigger dial (coaching systems, -1 saves them ... 1 quick) - mgmt × his game management ((mgmt - 50) / 25), rounded, within
+//   [minNet, maxNet]. Never in the final period's last ENDGAME.noRunTimeoutSeconds, in overtime, or in garbage time
+// - Momentum: a team on a run (net momStart or more) makes its shots momBump × min(1, (net - momStart) / momSpan) more often, fading
+//   by momDecay per possession since its last basket; any timeout ends every run. momOffset comes off every shot so the league's
+//   percentages stay the same
+// - Timeouts by the league's rules: the run-stopping (early) timeouts scale with the number of periods (ENDGAME.earlyTimeouts ×
+//   numPeriods / 4, rounded, at least 1). Rest timeouts: in the final period's last restSeconds, within restMargin, a team whose five's
+//   average energy is below restEnergy uses one of its early timeouts (a breather) at a dead ball with the ball
+export const SIM_FIX_RUNS = {
+	net: 8,
+	maxOwn: 2,
+	dial: 1.5,
+	mgmt: 0.5,
+	minNet: 6,
+	maxNet: 11,
+	momStart: 5,
+	momSpan: 5,
+	momBump: 0.015,
+	momDecay: 0.75,
+	momOffset: 0,
+	restSeconds: 360,
+	restMargin: 8,
+	restEnergy: 0.8,
+};
