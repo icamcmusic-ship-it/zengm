@@ -75,6 +75,8 @@ export type DraftCombineResult = {
 	skipped?: "injured" | "topProspect" | "personal";
 	// Over/under-performance in the drills against what his ratings predict, about N(0, 1). 0 when he skipped
 	performance: number;
+	// Effort in the drills, when he went through the motions (under 1; missing = full effort). His drill results are worse for it
+	effort?: number;
 	// Pre-Draft Injuries & Combine Medicals: his medical grade. Missing for a combine held before it existed
 	medical?: CombineMedical;
 };
@@ -565,8 +567,21 @@ export const generateDraftCombine = (
 		return { pid, season, measurements, skipped, performance: 0 };
 	}
 
+	// Effort: most prospects go all out, a few coast through the testing (a stream of its own, so the draws above never move)
+	const effort = drillEffort(pid, season);
+	const slack = 1 - effort;
+	const maxVertE = roundTo(clamp(maxVert - 4.5 * slack, 22, 46), 0.5);
+	const standingVertE = roundTo(
+		clamp(standingVert - 3.5 * slack, 18, Math.min(40, maxVertE - 1)),
+		0.5,
+	);
+	const laneAgilityE = round2(clamp(laneAgility + 0.7 * slack, 10.05, 13.3));
+	const shuttleE = round2(clamp(shuttle + 0.22 * slack, 2.6, 3.8));
+	const sprintE = round2(clamp(sprint + 0.14 * slack, 2.95, 3.9));
+	const benchE = Math.max(0, Math.round(bench - 5 * slack));
+
 	// Over/under-performance: each drill's result against what his ratings predict, in standard deviations, averaged so the
-	// total is about N(0, 1)
+	// total is about N(0, 1). Teams see through a prospect coasting: it's read from what he'd have done going all out
 	const parts = [
 		(maxVert - maxVertExp) / 2,
 		(laneExp - laneAgility) / 0.25,
@@ -584,18 +599,217 @@ export const generateDraftCombine = (
 		season,
 		measurements,
 		drills: {
-			laneAgility,
-			shuttle,
-			sprint,
-			standingVert,
-			maxVert,
-			bench,
+			laneAgility: laneAgilityE,
+			shuttle: shuttleE,
+			sprint: sprintE,
+			standingVert: standingVertE,
+			maxVert: maxVertE,
+			bench: benchE,
 			spotUp,
 			offDribble,
 			freeThrows,
 		},
 		performance,
+		...(effort < 1 ? { effort } : {}),
 	};
+};
+
+// How hard he went in the drills: 1 for most, 0.55-0.85 for the one in nine or so who coasts through them
+export const COAST_CHANCE = 0.11;
+export const drillEffort = (pid: number, season: number) => {
+	const rng = new Rng(`draftCombineEffort|${pid}|${season}`);
+	if (rng.random() >= COAST_CHANCE) {
+		return 1;
+	}
+	return Math.round((0.55 + 0.3 * rng.random()) * 100) / 100;
+};
+
+// ---- Listed vs measured ----
+// Before the combine, the public numbers are his school's or club's listing: heights are often rounded up an inch or two (a few
+// are listed short), weights are out of date. The combine measures him (his true height and weight plus a little noise), and a big
+// difference makes a story. Derived from pid, draft year and his true height and weight with an RNG of its own: nothing stored.
+
+export type ListedMeasurements = {
+	// Height with shoes as listed, inches (whole inches)
+	height: number;
+	// Weight as listed, lbs (rounded to 5)
+	weight: number;
+};
+
+export const listedMeasurements = ({
+	pid,
+	season,
+	heightInches,
+	weight,
+}: {
+	pid: number;
+	season: number;
+	heightInches: number;
+	weight: number;
+}): ListedMeasurements => {
+	const rng = new Rng(`draftCombineListed|${pid}|${season}`);
+	const u = rng.random();
+	const inflation =
+		u < 0.1 ? -1 : u < 0.3 ? 0 : u < 0.74 ? 1 : u < 0.93 ? 2 : 3;
+	const listedWeight = Math.round((weight - 3 + rng.normal(0, 7)) / 5) * 5;
+	return {
+		height: Math.round(heightInches) + inflation,
+		weight: listedWeight,
+	};
+};
+
+// Big enough to be a story: 1.5" shorter or 1" taller in shoes than listed, 10 lbs either way
+export const MISMEASURE_HEIGHT = 1.5;
+export const MISMEASURE_WEIGHT = 10;
+
+export type MeasurementStory = {
+	kind: "shorter" | "taller" | "heavier" | "lighter";
+	text: string;
+};
+
+export const measurementStories = (
+	listed: ListedMeasurements,
+	measured: Pick<
+		CombineMeasurements,
+		"heightShoes" | "heightNoShoes" | "weight"
+	>,
+): MeasurementStory[] => {
+	const out: MeasurementStory[] = [];
+	const dh = measured.heightShoes - listed.height;
+	if (dh <= -MISMEASURE_HEIGHT) {
+		out.push({
+			kind: "shorter",
+			text: `Shorter than billed: listed at ${feetInches(listed.height)}, measured ${feetInches(measured.heightShoes)} in shoes (${feetInches(measured.heightNoShoes)} without)`,
+		});
+	} else if (dh >= 1) {
+		out.push({
+			kind: "taller",
+			text: `Taller than listed: ${feetInches(measured.heightShoes)} in shoes against a listed ${feetInches(listed.height)}`,
+		});
+	}
+	const dw = measured.weight - listed.weight;
+	if (dw >= MISMEASURE_WEIGHT) {
+		out.push({
+			kind: "heavier",
+			text: `Weighed in at ${measured.weight} lbs, ${dw} more than his listed ${listed.weight}`,
+		});
+	} else if (dw <= -MISMEASURE_WEIGHT) {
+		out.push({
+			kind: "lighter",
+			text: `Weighed in at ${measured.weight} lbs, ${-dw} under his listed ${listed.weight}`,
+		});
+	}
+	return out;
+};
+
+// Scouting Director & Regions: the combine's looks (the fuzz narrowing it buys) are worth less when he only got measured (skipped
+// the drills) or coasted through them
+export const combineLooksMult = (
+	res: Pick<DraftCombineResult, "drills" | "effort">,
+) => (!res.drills ? 0.55 : res.effort !== undefined ? 0.8 : 1);
+
+export const effortStory = (effort: number | undefined) =>
+	effort === undefined
+		? undefined
+		: effort < 0.7
+			? "Looked like he was going through the motions in the drills"
+			: "Didn't look like he went all out in the drills";
+
+// ---- Percentiles against combine history ----
+
+// Every past result per test, sorted ascending (for historyPercentile)
+export type CombineHistory = Partial<Record<CombineKey, number[]>>;
+
+export const buildCombineHistory = (
+	results: Iterable<Pick<DraftCombineResult, "measurements" | "drills">>,
+): CombineHistory => {
+	const out: CombineHistory = {};
+	for (const res of results) {
+		for (const col of COMBINE_COLUMNS) {
+			const v = combineValue(res as DraftCombineResult, col.key);
+			if (v !== undefined) {
+				(out[col.key] ??= []).push(v);
+			}
+		}
+	}
+	for (const list of Object.values(out)) {
+		list.sort((a, b) => a - b);
+	}
+	return out;
+};
+
+// Fewer past results than this for a test: compare with real NBA combines instead
+export const MIN_HISTORY = 40;
+
+const normalCdf = (x: number) => {
+	// Abramowitz-Stegun approximation
+	const t = 1 / (1 + 0.2316419 * Math.abs(x));
+	const d = 0.3989423 * Math.exp((-x * x) / 2);
+	const p =
+		d *
+		t *
+		(0.3193815 +
+			t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+	return x > 0 ? 1 - p : p;
+};
+
+export type HistoryPct = { pct: number; source: "league" | "real"; n: number };
+
+/**
+ * Percentile (0-100, higher is better; weight: heavier is higher) of a result against every earlier combine of this league, or against
+ * real NBA combines (COMBINE_REAL_RANGES, a normal fit) while the league has fewer than MIN_HISTORY results for that test.
+ */
+export const historyPercentile = (
+	key: CombineKey,
+	v: number,
+	history: CombineHistory,
+): HistoryPct => {
+	const col = COMBINE_COLUMN_BY_KEY[key];
+	const list = history[key];
+	let pct: number;
+	let source: HistoryPct["source"];
+	let n = 0;
+	if (list && list.length >= MIN_HISTORY) {
+		source = "league";
+		n = list.length;
+		let below = 0;
+		let equal = 0;
+		for (const x of list) {
+			if (x < v) {
+				below += 1;
+			} else if (x === v) {
+				equal += 1;
+			}
+		}
+		pct = (100 * (below + 0.5 * equal)) / list.length;
+	} else {
+		source = "real";
+		const ref = COMBINE_REAL_RANGES[key];
+		// Shooting drills are make rates in the reference
+		const x =
+			key === "spotUp" || key === "offDribble" || key === "freeThrows"
+				? v / SHOOTING_ATTEMPTS[key]
+				: v;
+		pct = 100 * normalCdf((x - ref.mean) / ref.sd);
+	}
+	if (col.lowerBetter) {
+		pct = 100 - pct;
+	}
+	return { pct: Math.max(0, Math.min(100, Math.round(pct))), source, n };
+};
+
+export const historyPercentiles = (
+	res: Pick<DraftCombineResult, "measurements" | "drills">,
+	history: CombineHistory,
+) => {
+	const out: Partial<Record<CombineKey, HistoryPct>> = {};
+	for (const col of COMBINE_COLUMNS) {
+		const v = combineValue(res as DraftCombineResult, col.key);
+		if (v !== undefined) {
+			out[col.key] = historyPercentile(col.key, v, history);
+		}
+	}
+	return out;
 };
 
 export const combineValue = (
@@ -695,6 +909,8 @@ const ordinalTop = (rank: number) => (rank === 1 ? "best" : `top-${rank}`);
 export const combineScoutNotes = (
 	res: DraftCombineResult,
 	ranks: Partial<Record<CombineKey, CombineRank>> | undefined,
+	// His school's listing, for the listed vs measured story
+	listed?: ListedMeasurements,
 ) => {
 	const notes: string[] = [];
 	const m = res.measurements;
@@ -702,6 +918,15 @@ export const combineScoutNotes = (
 	notes.push(
 		`Measured ${feetInches(m.heightNoShoes)} without shoes, ${feetInches(m.wingspan)} wingspan (${ape >= 0 ? "+" : ""}${ape.toFixed(2).replace(/\.?0+$/, "")}" ape index)`,
 	);
+	if (listed) {
+		for (const story of measurementStories(listed, m)) {
+			notes.push(story.text);
+		}
+	}
+	const effortNote = effortStory(res.effort);
+	if (res.drills && effortNote) {
+		notes.push(effortNote);
+	}
 	if (!res.drills) {
 		notes.push(
 			res.skipped === "injured"

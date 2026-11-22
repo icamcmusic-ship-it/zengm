@@ -1,3 +1,4 @@
+import { ProjectionCone } from "../components/ProjectionCone.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import type { View } from "../../common/types.ts";
 import TopStuff from "./Player/TopStuff.tsx";
@@ -172,7 +173,11 @@ const PlayerScouting = ({
 							</span>
 						</h2>
 						{h.archetype ? <div className="fw-bold">{h.archetype}</div> : null}
-						<div>{h.rangeLine}</div>
+						{h.cone ? (
+							<ProjectionCone cone={h.cone} />
+						) : (
+							<div>{h.rangeLine}</div>
+						)}
 						<div className="small text-body-secondary">
 							By {report.byline.lead.name}, {report.byline.lead.title}
 							{report.byline.lead.focus

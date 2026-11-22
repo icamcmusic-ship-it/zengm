@@ -71,6 +71,7 @@ import {
 	scoutFocusOf,
 } from "../../../common/staffDepth/scoutFocus.ts";
 import { scoutCalls } from "../scoutingReports/index.ts";
+import { combineLooksMult } from "../../../common/draftCombine.ts";
 import { addSuggestion } from "./suggestions.ts";
 
 export const scoutingDepthOn = () =>
@@ -385,6 +386,10 @@ const addLooks = async (
 				continue;
 			}
 			added = eventLooks(what.event, coverage);
+			if (what.event === "combine" && p.combine) {
+				// Measured only, or coasting through the drills: less to learn from him
+				added *= combineLooksMult(p.combine);
+			}
 			event = what.event;
 		}
 		// Scout Specialties: a scout working this region whose focus covers him gets more out of each look

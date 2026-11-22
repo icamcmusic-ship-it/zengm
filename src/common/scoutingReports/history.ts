@@ -22,13 +22,18 @@ export type ScoutSnap = {
 	x?: number[];
 };
 
-// The department's take at the draft: season, consensus expected tier, scouts (lead first), each one's expected tier, overall grade
+// The department's take at the draft: season, consensus expected tier, scouts (lead first), each one's expected tier, overall grade.
+// With Scout Consensus & Flags, also every scout's slot call ([scout id, slot in the class]), the room's consensus slot and the flags
+// raised on him ("+" green, "-" red, the text after), credited to the lead scout
 export type ScoutDraftRecord = {
 	s: number;
 	t: number;
 	by: number[];
 	v: number[];
 	o: number;
+	rk?: [number, number][];
+	cs?: number;
+	fl?: string[];
 };
 
 export const MAX_SNAPS = 8;
@@ -269,12 +274,13 @@ export const outcomeTier = ({
 	return Math.min(5, tierForOvr(peakOvr, scale));
 };
 
-// A draft take can be judged once the career has had time: 4 seasons after the draft, or retired
+// A draft take can be judged once the career has had time: TRACK_SEASONS seasons after the draft, or retired
+export const TRACK_SEASONS = 3;
 export const judgeable = (
 	draftSeason: number,
 	season: number,
 	retired: boolean,
-) => retired || season - draftSeason >= 4;
+) => retired || season - draftSeason >= TRACK_SEASONS;
 
 export const trackLine = (said: number, became: number) =>
 	`Our scouts said: ${draftTierName(said)} → ${outcomeName(became)}`;
@@ -321,3 +327,99 @@ export const scoutAccuracy = (calls: ScoutCall[]) => {
 			worst && Math.abs(worst.became - worst.said) >= 2 ? worst : undefined,
 	};
 };
+
+// ---- Scout track records: slot calls and flags ----
+
+// Where a prospect finished in his class TRACK_SEASONS seasons on: rank by his best visible ovr in those seasons (ties by minutes)
+export const classFinishRanks = (
+	members: { pid: number; peak: number; min: number }[],
+) => {
+	const sorted = [...members].sort(
+		(a, b) => b.peak - a.peak || b.min - a.min || a.pid - b.pid,
+	);
+	return new Map(sorted.map((m, i) => [m.pid, i + 1]));
+};
+
+export type SlotCall = {
+	scoutId: number;
+	pid: number;
+	name: string;
+	season: number;
+	// The scout's slot for him in the class, and where he finished
+	slot: number;
+	finish: number;
+};
+
+// A slot call is a hit when he finished within max(5, 30% of the better of the two) spots of it
+export const slotHit = (slot: number, finish: number) =>
+	Math.abs(slot - finish) <=
+	Math.max(5, Math.round(0.3 * Math.min(slot, finish)));
+
+// Errors are capped, so one undrafted prospect slotted in the lottery doesn't swamp a scout's record
+export const SLOT_ERROR_CAP = 40;
+
+const slotError = (c: Pick<SlotCall, "slot" | "finish">) =>
+	Math.min(SLOT_ERROR_CAP, Math.abs(c.slot - c.finish));
+
+export const slotAccuracy = (calls: SlotCall[]) => {
+	if (calls.length === 0) {
+		return undefined;
+	}
+	let hits = 0;
+	let err = 0;
+	let worst: SlotCall | undefined;
+	let best: SlotCall | undefined;
+	for (const c of calls) {
+		err += slotError(c);
+		if (slotHit(c.slot, c.finish)) {
+			hits += 1;
+			// Best call: the hit on the player who finished highest
+			if (!best || c.finish < best.finish) {
+				best = c;
+			}
+		}
+		if (!worst || slotError(c) > slotError(worst)) {
+			worst = c;
+		}
+	}
+	return {
+		calls: calls.length,
+		hits,
+		hitRate: hits / calls.length,
+		avgError: err / calls.length,
+		best,
+		worst: worst && !slotHit(worst.slot, worst.finish) ? worst : undefined,
+	};
+};
+
+export type FlagCall = {
+	scoutId: number;
+	pid: number;
+	name: string;
+	season: number;
+	text: string;
+	tone: "red" | "green";
+	// The room's consensus slot, and where he finished
+	consensus: number;
+	finish: number;
+};
+
+// A green flag is right when he finished at or above where the room slotted him (within 3 spots), a red flag when he finished below it
+export const flagHit = (c: Pick<FlagCall, "tone" | "consensus" | "finish">) =>
+	c.tone === "green" ? c.finish <= c.consensus + 3 : c.finish > c.consensus;
+
+export const flagAccuracy = (calls: FlagCall[]) => {
+	if (calls.length === 0) {
+		return undefined;
+	}
+	const hits = calls.filter(flagHit).length;
+	return { calls: calls.length, hits, hitRate: hits / calls.length };
+};
+
+export const encodeFlag = (tone: "red" | "green", text: string) =>
+	`${tone === "green" ? "+" : "-"}${text}`;
+
+export const decodeFlag = (code: string) => ({
+	tone: (code.startsWith("+") ? "green" : "red") as "red" | "green",
+	text: code.slice(1),
+});

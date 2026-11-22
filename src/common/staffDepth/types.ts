@@ -98,7 +98,7 @@ export type StaffDepthTeam = {
 export type ScoutCareerTeam = {
 	// Scout id -> the season he left early (poached, promoted, retired); the slot's next scout starts then
 	cuts: Record<number, number>;
-	cutWhy?: Record<number, "poached" | "promoted" | "retired">;
+	cutWhy?: Record<number, "poached" | "promoted" | "retired" | "fired">;
 	// Directors of Scouting, oldest first (a scout id: his own chain, promoted from a slot, or hired away from another team)
 	dirs: {
 		id: number;

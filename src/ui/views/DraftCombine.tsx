@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { DataTable } from "../components/DataTable/index.tsx";
 import type { Col } from "../components/DataTable/index.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
@@ -158,13 +159,65 @@ const Standouts = ({ players }: { players: Prospect[] }) => {
 	);
 };
 
+// Listed vs measured: the tape measure stories, and who coasted through the drills
+const Stories = ({ players }: { players: Prospect[] }) => {
+	const stories = players.filter((p) => p.stories.length > 0);
+	const coasted = players.filter((p) => p.effort !== undefined);
+	if (stories.length === 0 && coasted.length === 0) {
+		return null;
+	}
+	return (
+		<div className="row g-3 mb-3" data-testid="combine-stories">
+			{stories.length > 0 ? (
+				<div className="col-12 col-md-6">
+					<h3>Listed vs measured</h3>
+					<ul className="list-unstyled mb-0">
+						{stories.slice(0, 8).map((p) => (
+							<li key={p.pid} className="mb-1">
+								<NameLink p={p} />{" "}
+								<span className="text-body-secondary">{p.pos}</span>
+								{p.stories.map((text) => (
+									<div key={text} className="small text-body-secondary">
+										{text}
+									</div>
+								))}
+							</li>
+						))}
+					</ul>
+				</div>
+			) : null}
+			{coasted.length > 0 ? (
+				<div className="col-12 col-md-6">
+					<h3>Questions about effort</h3>
+					<p className="small text-body-secondary mb-1">
+						Went through the motions in the drills: his results undersell him,
+						and teams notice.
+					</p>
+					<ul className="list-unstyled mb-0">
+						{coasted.slice(0, 8).map((p) => (
+							<li key={p.pid}>
+								<NameLink p={p} />{" "}
+								<span className="text-body-secondary">{p.pos}</span>
+							</li>
+						))}
+					</ul>
+				</div>
+			) : null}
+		</div>
+	);
+};
+
+type Mode = "values" | "class" | "history";
+
 const DraftCombine = ({
 	held,
+	historyN,
 	numProspects,
 	players,
 	season,
 	upcoming,
 }: View<"draftCombine">) => {
+	const [mode, setMode] = useState<Mode>("values");
 	useTitleBar({
 		title: `${season} Draft Combine`,
 		dropdown: {
@@ -267,11 +320,39 @@ const DraftCombine = ({
 						sortValue: null,
 					};
 				}
+				if (mode !== "values") {
+					const pct = mode === "class" ? r?.pct : p.hist[c.key]?.pct;
+					return {
+						value: pct === undefined ? "" : String(pct),
+						sortValue: pct ?? null,
+						title: c.format(v),
+						classNames:
+							c.neutral || pct === undefined
+								? undefined
+								: pct >= 90
+									? "table-success"
+									: pct <= 10
+										? "table-danger"
+										: undefined,
+					};
+				}
 				const hi = !c.neutral && r && r.n >= 10 && r.rank <= 5;
 				const lo = !c.neutral && r && r.n >= 10 && r.rank > r.n - 5;
+				const listedNote =
+					c.key === "heightShoes" || c.key === "weight"
+						? `Listed: ${c.key === "weight" ? `${p.listed.weight} lbs` : c.format(p.listed.height)}`
+						: undefined;
 				return {
-					value: c.format(v),
+					value:
+						c.key === "laneAgility" && p.effort !== undefined ? (
+							<span title="Didn't go all out in the drills">
+								{c.format(v)}*
+							</span>
+						) : (
+							c.format(v)
+						),
 					sortValue: v,
+					title: listedNote,
 					classNames: hi ? "table-success" : lo ? "table-danger" : undefined,
 				};
 			}),
@@ -309,8 +390,40 @@ const DraftCombine = ({
 					: null}
 			</p>
 			<Standouts players={players} />
+			<Stories players={players} />
 			<h3>Top performers</h3>
 			<Leaders players={players} />
+			<div className="btn-group mb-2" role="group" aria-label="Show">
+				{(
+					[
+						["values", "Results"],
+						["class", "Class percentile"],
+						["history", "All-time percentile"],
+					] as const
+				).map(([m, label]) => (
+					<button
+						key={m}
+						type="button"
+						className={`btn btn-sm ${mode === m ? "btn-primary" : "btn-light-bordered"}`}
+						onClick={() => setMode(m)}
+					>
+						{label}
+					</button>
+				))}
+			</div>
+			{mode === "history" ? (
+				<p className="small text-body-secondary">
+					{historyN > 0
+						? `Percentiles against every earlier combine of this league (up to ${historyN} results per test), 100 = best (weight: heaviest).`
+						: "This league has few earlier combines yet, so percentiles are against real NBA combines (2000s-2020s), 100 = best (weight: heaviest)."}{" "}
+					Hover a cell for the result.
+				</p>
+			) : mode === "class" ? (
+				<p className="small text-body-secondary">
+					Percentiles within the {season} class, 100 = best. Hover a cell for
+					the result.
+				</p>
+			) : null}
 			<DataTable
 				cols={cols}
 				defaultSort={[COMBINE_COLUMNS.length + (showDraft ? 4 : 3), "desc"]}

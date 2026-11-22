@@ -37,6 +37,7 @@ export { default as DraftScouting } from "./DraftScouting/index.tsx";
 export { default as DraftBoard } from "./DraftBoard.tsx";
 export { default as MockDraft } from "./MockDraft.tsx";
 export { default as DraftCombine } from "./DraftCombine.tsx";
+export { default as BigBoards } from "./BigBoards.tsx";
 export { default as CollegeOverseas } from "./CollegeOverseas/index.tsx";
 export { default as DraftTeamHistory } from "./DraftTeamHistory.tsx";
 export { default as Dropbox } from "./Dropbox.tsx";

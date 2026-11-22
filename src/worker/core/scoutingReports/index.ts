@@ -19,6 +19,15 @@ import {
 	hoverOf,
 	judgeable,
 	makeSnap,
+	classFinishRanks,
+	decodeFlag,
+	encodeFlag,
+	flagAccuracy,
+	flagHit,
+	slotAccuracy,
+	TRACK_SEASONS,
+	type FlagCall,
+	type SlotCall,
 	opponentNotes,
 	outcomeTier,
 	parseScoutId,
@@ -47,6 +56,8 @@ import type { ScoutingExportPage } from "../../../common/playerExport.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import { generateFace } from "../../util/face.ts";
+import { getProspectRooms } from "./room.ts";
+import { scoutingDepthOn } from "../staffDepth/scouting.ts";
 import fuzzRating from "../player/fuzzRating.ts";
 import {
 	buildInput,
@@ -227,6 +238,21 @@ export const getScoutingSummary = async (pid: number) => {
 	};
 };
 
+// Projection cone of a draft prospect (his pre-draft page), the lead scout's read. undefined for anyone else
+export const getProspectCone = async (pid: number) => {
+	if (!scoutingReportsOn()) {
+		return undefined;
+	}
+	const p = await idb.merged.players.get(pid);
+	if (!p || !isProspectPlayer(p)) {
+		return undefined;
+	}
+	const ctx = await getReportCtx();
+	const { report } = await reportFor(p, ctx, { light: true });
+	const cone = report.header.cone;
+	return cone ? { cone, by: report.byline.lead.name } : undefined;
+};
+
 export const getScoutingHover = async (pid: number) => {
 	if (!scoutingReportsOn()) {
 		return undefined;
@@ -273,14 +299,21 @@ const seededFace = (seed: string) => {
 	}
 };
 
-export const scoutCalls = async (ctx: ReportCtx) => {
-	const players = await idb.merged.players.getAll({ activeAndRetired: true });
-	const prospects = await idb.cache.players.indexGetAll(
-		"playersByTid",
-		PLAYER.UNDRAFTED,
-	);
+// Every player, retired ones included (the cache's copy wins: right after a draft, its players have moved teams there)
+const callPlayers = async () => {
+	const byPid = new Map<number, Player>();
+	for (const p of await idb.merged.players.getAll({ activeAndRetired: true })) {
+		byPid.set(p.pid, p);
+	}
+	for (const p of await idb.cache.players.getAll()) {
+		byPid.set(p.pid, p);
+	}
+	return [...byPid.values()];
+};
+
+export const scoutCalls = async (ctx: ReportCtx, all?: Player[]) => {
 	const calls: (ScoutCall & { judged: boolean })[] = [];
-	for (const p of [...players, ...prospects]) {
+	for (const p of all ?? (await callPlayers())) {
 		const rec = p.scoutDraft;
 		if (!rec) {
 			continue;
@@ -319,6 +352,87 @@ export const scoutCalls = async (ctx: ReportCtx) => {
 	return calls;
 };
 
+/**
+ * Scout track records (Scout Consensus & Flags): every scout's slot call and the lead scout's flags on each prospect, scored
+ * TRACK_SEASONS seasons after the draft against where the prospect finished in his class (best visible ovr in those seasons, ties by
+ * minutes). Calls of classes not judged yet are counted as pending.
+ */
+export const scoutTrackCalls = (all: Player[], season: number) => {
+	const recorded = all.filter((p) => p.scoutDraft?.rk || p.scoutDraft?.fl);
+	const years = new Set(recorded.map((p) => p.scoutDraft!.s));
+	const slots: (SlotCall & { judged: boolean })[] = [];
+	const flags: (FlagCall & { judged: boolean })[] = [];
+	for (const year of years) {
+		const judged = season - year >= TRACK_SEASONS;
+		let finish = new Map<number, number>();
+		if (judged) {
+			const members = all.filter((p) => p.draft.year === year);
+			finish = classFinishRanks(
+				members.map((p) => {
+					const peak = Math.max(
+						0,
+						...(p.ratings as any[])
+							.filter(
+								(r) => r.season > year && r.season <= year + TRACK_SEASONS,
+							)
+							.map((r) => fuzzRating(r.ovr, r.fuzz ?? 0)),
+					);
+					const min = (p.stats as any[])
+						.filter(
+							(s) =>
+								!s.playoffs &&
+								s.tid >= 0 &&
+								s.season > year &&
+								s.season <= year + TRACK_SEASONS,
+						)
+						.reduce((a, s) => a + (s.min ?? 0), 0);
+					return { pid: p.pid, peak, min };
+				}),
+			);
+		}
+		for (const p of recorded) {
+			const rec = p.scoutDraft!;
+			if (rec.s !== year) {
+				continue;
+			}
+			const name = `${p.firstName} ${p.lastName}`;
+			const f = finish.get(p.pid) ?? 0;
+			for (const [scoutId, slot] of rec.rk ?? []) {
+				slots.push({
+					scoutId,
+					pid: p.pid,
+					name,
+					season: year,
+					slot,
+					finish: f,
+					judged,
+				});
+			}
+			const lead = rec.by[0];
+			if (lead !== undefined && rec.cs !== undefined) {
+				for (const code of rec.fl ?? []) {
+					const { tone, text } = decodeFlag(code);
+					flags.push({
+						scoutId: lead,
+						pid: p.pid,
+						name,
+						season: year,
+						text,
+						tone,
+						consensus: rec.cs,
+						finish: f,
+						judged,
+					});
+				}
+			}
+		}
+	}
+	return { slots, flags };
+};
+
+const slotLine = (c: SlotCall) =>
+	`${c.name} (${c.season}): slotted No. ${c.slot}, finished No. ${c.finish} in his class`;
+
 // The Scouting Department page
 export const getDepartmentPage = async (tid: number) => {
 	const ctx = await getReportCtx();
@@ -332,12 +446,19 @@ export const getDepartmentPage = async (tid: number) => {
 		startingSeason: ctx.startingSeason,
 		cuts: await careerCutsFor(tid),
 	});
-	const calls = await scoutCalls(ctx);
+	const all = await callPlayers();
+	const calls = await scoutCalls(ctx, all);
 	const mine = calls.filter((c) => parseScoutId(c.scoutId).tid === tid);
+	const trackCalls = scoutTrackCalls(all, ctx.season);
+
 	const scoutRow = (s: Scout, current: boolean) => {
 		const own = mine.filter((c) => c.scoutId === s.id);
 		const judged = own.filter((c) => c.judged);
 		const acc = scoutAccuracy(judged);
+		const ownSlots = trackCalls.slots.filter((c) => c.scoutId === s.id);
+		const slotAcc = slotAccuracy(ownSlots.filter((c) => c.judged));
+		const ownFlags = trackCalls.flags.filter((c) => c.scoutId === s.id);
+		const flagAcc = flagAccuracy(ownFlags.filter((c) => c.judged));
 		return {
 			...briefOf(s),
 			specialtyName: SPECIALTY_NAMES[s.specialty],
@@ -349,6 +470,36 @@ export const getDepartmentPage = async (tid: number) => {
 			current,
 			face: current ? seededFace(s.seed) : undefined,
 			calls: own.length,
+			// Slot calls (where he had each prospect in the class) and flags, scored TRACK_SEASONS seasons on
+			slots: {
+				pending: ownSlots.filter((c) => !c.judged).length,
+				judged: slotAcc
+					? {
+							calls: slotAcc.calls,
+							hitRate: Math.round(100 * slotAcc.hitRate),
+							avgError: Math.round(10 * slotAcc.avgError) / 10,
+							best: slotAcc.best ? slotLine(slotAcc.best) : undefined,
+							worst: slotAcc.worst ? slotLine(slotAcc.worst) : undefined,
+						}
+					: undefined,
+			},
+			flags: {
+				pending: ownFlags.filter((c) => !c.judged).length,
+				judged: flagAcc
+					? {
+							calls: flagAcc.calls,
+							hitRate: Math.round(100 * flagAcc.hitRate),
+							recent: ownFlags
+								.filter((c) => c.judged)
+								.toSorted((a, b) => b.season - a.season)
+								.slice(0, 3)
+								.map((c) => ({
+									text: `${c.tone === "green" ? "▲" : "▼"} ${c.text}: ${c.name} (${c.season}), finished No. ${c.finish} vs the room's No. ${c.consensus}`,
+									hit: flagHit(c),
+								})),
+						}
+					: undefined,
+			},
 			accuracy: acc
 				? {
 						calls: acc.calls,
@@ -423,6 +574,13 @@ export const getDepartmentPage = async (tid: number) => {
 		moves: moves.slice(0, 15),
 		track,
 		pending: mine.filter((c) => !c.judged).length,
+		trackSeasons: TRACK_SEASONS,
+		// The user can promote a scout to Director or let him go (Scouting Director & Regions, own team only)
+		canManage:
+			scoutingDepthOn() &&
+			tid === g.get("userTid") &&
+			g.get("userTids").includes(tid) &&
+			!g.get("spectator"),
 		teams: teams
 			.filter((t) => !t.disabled)
 			.map((t) => ({
@@ -447,6 +605,15 @@ export const recordSnapshots = async (phase: number) => {
 		PLAYER.UNDRAFTED,
 		Infinity,
 	]);
+	// Scout Consensus & Flags: every scout's slot call and the flags on this year's class, for the scouts' track records
+	const rooms =
+		phase === PHASE.DRAFT
+			? await getProspectRooms(
+					players.filter(
+						(p) => p.tid === PLAYER.UNDRAFTED && p.draft.year === season,
+					),
+				)
+			: undefined;
 	for (const p of players) {
 		if (p.tid !== PLAYER.UNDRAFTED && p.tid < PLAYER.FREE_AGENT) {
 			continue;
@@ -501,6 +668,17 @@ export const recordSnapshots = async (phase: number) => {
 				v,
 				o: take.overall.grade,
 			};
+			const room = rooms?.get(p.pid);
+			if (room?.room) {
+				p.scoutDraft.rk = room.room.grades.map(
+					(x) => [x.scoutId, x.slot] as [number, number],
+				);
+				p.scoutDraft.cs = room.room.consensusSlot;
+			}
+			const flags = room?.flags.filter((f) => !f.hint) ?? [];
+			if (flags.length > 0) {
+				p.scoutDraft.fl = flags.map((f) => encodeFlag(f.tone, f.text));
+			}
 			changed = true;
 		}
 		if (changed) {

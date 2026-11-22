@@ -1,3 +1,5 @@
+import { getProspectCone } from "../core/scoutingReports/index.ts";
+import { getPlayerOutletRanks } from "../core/draftOutlets/index.ts";
 import { PLAYER, PLAYER_STATS_TABLES } from "../../common/constants.ts";
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
@@ -1104,12 +1106,25 @@ export default defineView({
 					? await getPlayerCombine(topStuff.pRaw)
 					: undefined;
 
+			// Projection cone (Scouting Reports): the lead scout's floor / median / ceiling for a prospect
+			const cone =
+				__SPORT === "basketball"
+					? await getProspectCone(topStuff.pRaw.pid)
+					: undefined;
+			// Big boards (media outlets): where each outlet has him
+			const outlets =
+				__SPORT === "basketball"
+					? await getPlayerOutletRanks(topStuff.pRaw)
+					: undefined;
+
 			// The raw player stays in the worker (hidden trait seeds, etc.)
 			const { pRaw: _pRaw, ...topStuffForUI } = topStuff;
 
 			return {
 				...topStuffForUI,
 				preDraft,
+				cone,
+				outlets,
 				draftCombine: draftCombine
 					? withMedical(draftCombine, topStuff.pRaw)
 					: undefined,
