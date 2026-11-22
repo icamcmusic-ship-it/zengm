@@ -979,18 +979,52 @@ export const NON_NCAA: Record<
 	},
 };
 
-// Overseas leagues a prospect can play in on his way up (preDraftPaths: the development tier) but that no prospect is sent to as his draft year destination. They are not in NON_NCAA, so the destinations of blank colleges are drawn exactly as before
-export const OVERSEAS_EXTRA: Record<
-	string,
-	{
-		strength: number;
-		w: number;
-		regions: Record<Region, number>;
-	}
-> = {
+/**
+ * Overseas leagues that are not in NON_NCAA (preDraftPaths), so the destinations of blank colleges with the paths off are drawn exactly
+ * as before. `w` is a league's weight as a step on the way up (an earlier, lower tier season), `dest` its weight as a draft year
+ * destination for a blank college with the paths on (none: only a step on the way up, like the generic European Second Division), and
+ * `home` the countries it is the domestic league of (players born there lean to it).
+ */
+export type ExtraLeague = {
+	strength: number;
+	w: number;
+	regions: Record<Region, number>;
+	dest?: number;
+	home?: string[];
+};
+
+// Region weights for a league most of whose players come from one part of the world
+const rw = (main: Region, w: number, rest = 0.15): Record<Region, number> => {
+	const out: Record<Region, number> = {
+		usa: rest,
+		canada: rest,
+		europe: rest,
+		oceania: rest,
+		asia: rest,
+		latam: rest,
+		africa: rest,
+		other: rest * 2,
+	};
+	out[main] = w;
+	return out;
+};
+
+const ABA_COUNTRIES = [
+	"Serbia",
+	"Croatia",
+	"Slovenia",
+	"Montenegro",
+	"Bosnia and Herzegovina",
+	"North Macedonia",
+];
+const NORDIC = ["Finland", "Sweden", "Norway", "Denmark", "Iceland"];
+const UK = ["United Kingdom", "England", "Scotland", "Wales", "Ireland"];
+
+export const OVERSEAS_EXTRA: Record<string, ExtraLeague> = {
+	// Generic, from before the domestic second divisions below: only a step on the way up for careers stored with it
 	"European Second Division": {
 		strength: 54,
-		w: 8,
+		w: 2,
 		regions: {
 			usa: 0.3,
 			canada: 0.3,
@@ -1002,6 +1036,454 @@ export const OVERSEAS_EXTRA: Record<
 			other: 0.8,
 		},
 	},
+	// Europe: second divisions and smaller first divisions, where a teenager gets real minutes
+	"LEB Oro": {
+		strength: 58,
+		w: 4,
+		regions: rw("europe", 2.2),
+		dest: 2.5,
+		home: ["Spain", "Andorra"],
+	},
+	"LNB Pro B": {
+		strength: 57,
+		w: 4,
+		regions: { ...rw("europe", 2.2), africa: 1 },
+		dest: 2.5,
+		home: ["France", "Guadeloupe", "Martinique", "French Guiana"],
+	},
+	"Serie A2": {
+		strength: 55,
+		w: 3,
+		regions: rw("europe", 2),
+		dest: 1.5,
+		home: ["Italy"],
+	},
+	"German ProA": {
+		strength: 55,
+		w: 3,
+		regions: rw("europe", 2),
+		dest: 1.5,
+		home: ["Germany", "Austria", "Switzerland"],
+	},
+	"Turkish TBL": {
+		strength: 56,
+		w: 3,
+		regions: rw("europe", 1.8),
+		dest: 1.2,
+		home: ["Turkey"],
+	},
+	"Greek Elite League": {
+		strength: 50,
+		w: 2,
+		regions: rw("europe", 1.8),
+		dest: 1,
+		home: ["Greece", "Cyprus"],
+	},
+	"ABA League Second Division": {
+		strength: 55,
+		w: 4,
+		regions: rw("europe", 2.2),
+		dest: 2.5,
+		home: ABA_COUNTRIES,
+	},
+	"Serbian KLS": {
+		strength: 58,
+		w: 3,
+		regions: rw("europe", 2),
+		dest: 2,
+		home: ["Serbia", "Montenegro"],
+	},
+	"Croatian Premijer liga": {
+		strength: 52,
+		w: 2,
+		regions: rw("europe", 1.8),
+		dest: 1,
+		home: ["Croatia", "Bosnia and Herzegovina"],
+	},
+	"Slovenian SKL": {
+		strength: 52,
+		w: 2,
+		regions: rw("europe", 1.8),
+		dest: 1,
+		home: ["Slovenia"],
+	},
+	"Czech NBL": {
+		strength: 54,
+		w: 2,
+		regions: rw("europe", 1.8),
+		dest: 1,
+		home: ["Czech Republic", "Czechia", "Slovakia"],
+	},
+	"Latvian-Estonian League": {
+		strength: 58,
+		w: 3,
+		regions: rw("europe", 1.8),
+		dest: 1.5,
+		home: ["Latvia", "Estonia"],
+	},
+	"Israeli Liga Leumit": {
+		strength: 50,
+		w: 2,
+		regions: rw("europe", 1.6),
+		dest: 0.8,
+		home: ["Israel"],
+	},
+	"Hungarian NB I": {
+		strength: 52,
+		w: 2,
+		regions: rw("europe", 1.6),
+		dest: 0.8,
+		home: ["Hungary", "Romania"],
+	},
+	"Bulgarian NBL": {
+		strength: 48,
+		w: 1.5,
+		regions: rw("europe", 1.6),
+		dest: 0.6,
+		home: ["Bulgaria", "North Macedonia", "Albania", "Kosovo"],
+	},
+	"Ukrainian Superleague": {
+		strength: 50,
+		w: 1.5,
+		regions: rw("europe", 1.6),
+		dest: 0.6,
+		home: ["Ukraine", "Belarus", "Moldova"],
+	},
+	"Georgian Superleague": {
+		strength: 48,
+		w: 1,
+		regions: rw("europe", 1.4),
+		dest: 0.4,
+		home: ["Georgia", "Azerbaijan"],
+	},
+	"Finnish Korisliiga": {
+		strength: 52,
+		w: 2,
+		regions: rw("europe", 1.6),
+		dest: 1,
+		home: NORDIC,
+	},
+	"Super League Basketball": {
+		strength: 52,
+		w: 2,
+		regions: rw("europe", 1.6),
+		dest: 1,
+		home: UK,
+	},
+	"Portuguese LPB": {
+		strength: 50,
+		w: 1.5,
+		regions: { ...rw("europe", 1.5), africa: 0.6 },
+		dest: 0.6,
+		home: ["Portugal", "Cape Verde"],
+	},
+	"FIBA Europe Cup": {
+		strength: 64,
+		w: 4,
+		regions: rw("europe", 1.8, 0.25),
+		dest: 2,
+	},
+	// Asia and Oceania
+	"Japan B2 League": {
+		strength: 54,
+		w: 2,
+		regions: rw("asia", 2.2),
+		dest: 1,
+		home: ["Japan"],
+	},
+	"Chinese NBL": {
+		strength: 52,
+		w: 2,
+		regions: rw("asia", 2.2),
+		dest: 1,
+		home: ["China"],
+	},
+	"Taiwan TPBL": {
+		strength: 56,
+		w: 2,
+		regions: rw("asia", 2.2),
+		dest: 1,
+		home: ["Taiwan"],
+	},
+	"Lebanese Basketball League": {
+		strength: 58,
+		w: 2,
+		regions: rw("asia", 1.8),
+		dest: 1,
+		home: ["Lebanon", "Jordan", "Syria", "Iraq"],
+	},
+	"Iranian Super League": {
+		strength: 50,
+		w: 1,
+		regions: rw("asia", 1.6),
+		dest: 0.6,
+		home: ["Iran"],
+	},
+	// Latin America and the Caribbean
+	"Venezuelan SPB": {
+		strength: 54,
+		w: 2,
+		regions: rw("latam", 2),
+		dest: 1,
+		home: ["Venezuela", "Colombia"],
+	},
+	"Dominican LNB": {
+		strength: 54,
+		w: 2,
+		regions: rw("latam", 2),
+		dest: 1,
+		home: ["Dominican Republic", "Haiti"],
+	},
+	"Uruguayan LUB": {
+		strength: 54,
+		w: 2,
+		regions: rw("latam", 1.8),
+		dest: 1,
+		home: ["Uruguay", "Paraguay"],
+	},
+	"Chilean LNB": {
+		strength: 48,
+		w: 1,
+		regions: rw("latam", 1.6),
+		dest: 0.5,
+		home: ["Chile", "Peru", "Bolivia"],
+	},
+	// Africa
+	"Angolan Basketball League": {
+		strength: 54,
+		w: 2,
+		regions: rw("africa", 2.2),
+		dest: 1,
+		home: ["Angola", "Mozambique", "Cape Verde"],
+	},
+	"Egyptian Super League": {
+		strength: 54,
+		w: 2,
+		regions: rw("africa", 2),
+		dest: 1,
+		home: ["Egypt", "Tunisia", "Morocco", "Algeria"],
+	},
+	"Nigerian Premier League": {
+		strength: 44,
+		w: 1.5,
+		regions: rw("africa", 2.2),
+		dest: 0.8,
+		home: ["Nigeria", "Ghana", "Benin", "Togo"],
+	},
+};
+
+// The countries each league in NON_NCAA is the domestic league of (preDraftPaths: a prospect born there leans to it). Leagues not listed
+// (the EuroLeague, the EuroCup, the Champions League, the G League...) draw from everywhere
+export const LEAGUE_HOME: Record<string, string[]> = {
+	"Liga ACB": ["Spain", "Andorra"],
+	NBL: ["Australia", "New Zealand"],
+	"Chinese CBA": ["China"],
+	"LNB Pro A": ["France", "Monaco", "Guadeloupe", "Martinique", "French Guiana"],
+	"Basketball Bundesliga": ["Germany", "Austria"],
+	"Adriatic League": ABA_COUNTRIES,
+	NBL1: ["Australia"],
+	"Turkish BSL": ["Turkey"],
+	"Greek Basket League": ["Greece", "Cyprus"],
+	"Israeli Premier League": ["Israel"],
+	"Japan B.League": ["Japan"],
+	"Brazil NBB": ["Brazil"],
+	"Basketball Africa League": [
+		"Nigeria",
+		"Senegal",
+		"Cameroon",
+		"Mali",
+		"Angola",
+		"Egypt",
+		"Tunisia",
+		"Morocco",
+		"Rwanda",
+		"Ivory Coast",
+		"South Sudan",
+		"Guinea",
+		"Congo",
+		"DR Congo",
+		"Democratic Republic of the Congo",
+		"Central African Republic",
+		"Chad",
+		"Gabon",
+		"Kenya",
+		"Libya",
+	],
+	CEBL: ["Canada"],
+	"Italian LBA": ["Italy"],
+	"Lithuanian LKL": ["Lithuania"],
+	"VTB United League": ["Russia", "Belarus", "Kazakhstan"],
+	"Polish PLK": ["Poland"],
+	"BNXT League": ["Belgium", "Netherlands", "Luxembourg"],
+	"Korean KBL": ["South Korea", "Korea"],
+	"Philippine PBA": ["Philippines"],
+	"Argentine Liga Nacional": ["Argentina"],
+	"Mexican LNBP": ["Mexico"],
+	"Puerto Rico BSN": ["Puerto Rico", "Virgin Islands"],
+	"New Zealand NBL": ["New Zealand"],
+};
+
+// The home countries of any overseas league, [] for one that draws from everywhere
+export const getLeagueHome = (name: string): string[] =>
+	LEAGUE_HOME[name] ?? OVERSEAS_EXTRA[name]?.home ?? [];
+
+// BBGM college names (worker/data/defaultColleges.ts) of schools that are here under another name. With the paths on, a prospect with
+// one of them plays for that school (its conference, its college season) instead of an unknown one
+export const COLLEGE_ALIASES: Record<string, string> = {
+	"Arkansas-Little Rock": "Little Rock",
+	"Brigham Young": "BYU",
+	"Houston Baptist": "Houston Christian",
+	IUPUI: "IU Indianapolis",
+	"Louisiana-Lafayette": "Louisiana",
+	"Nebraska-Omaha": "Omaha",
+	"Texas Rio Grande Valley": "UT Rio Grande Valley",
+};
+
+/**
+ * Lower levels a prospect can start at before Division I or a pro club (preDraftPaths): a post-graduate year at a prep school, a youth
+ * academy, a Division II or NAIA program. A season at one is a step on the way, not a draft year destination (the generic names in
+ * NON_NCAA, like Prep / Postgrad and NAIA, are). Real public programs, like the junior colleges (career.ts JUCOS), except the generic
+ * European Youth Academy.
+ */
+export type LowerLevel = "prep" | "academy" | "dii" | "diii" | "naia";
+
+// Post-graduate (and prep) programs that send players on to Division I. Games are 32 minutes
+export const PREP_SCHOOLS = [
+	"IMG Academy",
+	"Brewster Academy",
+	"Putnam Science Academy",
+	"Hargrave Military Academy",
+	"Notre Dame Prep",
+	"Woodstock Academy",
+	"Kimball Union Academy",
+	"Bridgton Academy",
+	"Northfield Mount Hermon",
+	"Vermont Academy",
+	"Tilton School",
+	"Fork Union Military Academy",
+	"Combine Academy",
+	"Link Academy",
+	"Prolific Prep",
+	"Wilbraham & Monson",
+	"New Hampton School",
+	"St. Thomas More",
+	"Phillips Exeter Academy",
+	"Massanutten Military Academy",
+];
+
+// Youth academies, by where a prospect was born: an international prospect's first stop before a pro club or college
+export const ACADEMIES: Record<string, Region[]> = {
+	"NBA Academy": ["africa", "asia", "latam", "other"],
+	"NBA Global Academy": ["oceania"],
+	// A made-up generic name: a European club's youth team (junior leagues, the club's second team, youth tournaments)
+	"European Youth Academy": ["europe"],
+};
+
+// Division II and NAIA programs a prospect can start at before transferring up
+export const SMALL_COLLEGES: Record<string, "dii" | "naia"> = {
+	"Northwest Missouri State": "dii",
+	"Nova Southeastern": "dii",
+	"West Liberty": "dii",
+	"Lincoln Memorial": "dii",
+	"Ferris State": "dii",
+	"Indiana (PA)": "dii",
+	Flagler: "dii",
+	"Saint Anselm": "dii",
+	"Cal State San Bernardino": "dii",
+	"Colorado School of Mines": "dii",
+	Augusta: "dii",
+	Barry: "dii",
+	"Florida Southern": "dii",
+	"Emporia State": "dii",
+	Washburn: "dii",
+	"Missouri Southern": "dii",
+	Gannon: "dii",
+	"Central Missouri": "dii",
+	"Minnesota State": "dii",
+	"Western Washington": "dii",
+	"Cal State Dominguez Hills": "dii",
+	"Alaska Anchorage": "dii",
+	"Fairmont State": "dii",
+	"Georgetown (KY)": "naia",
+	"Indiana Wesleyan": "naia",
+	Langston: "naia",
+	"William Carey": "naia",
+	"Freed-Hardeman": "naia",
+	"Grand View": "naia",
+	"Oklahoma Wesleyan": "naia",
+	Dordt: "naia",
+	Talladega: "naia",
+	"Loyola (LA)": "naia",
+	"Life (GA)": "naia",
+	"Arizona Christian": "naia",
+	"College of Idaho": "naia",
+	"Thomas More": "naia",
+	"Saint Francis (IN)": "naia",
+	"Marian (IN)": "naia",
+	Keiser: "naia",
+	"Shawnee State": "naia",
+	"Wayland Baptist": "naia",
+	"Science and Arts": "naia",
+};
+
+// Level of competition of each lower level (on the conference scale), the length of its games and how its league is named
+export const LOWER_LEVEL_INFO: Record<
+	LowerLevel,
+	{ strength: number; gameMinutes: number; league: string; short: string }
+> = {
+	prep: {
+		strength: 34,
+		gameMinutes: 32,
+		league: "Prep / Postgrad",
+		short: "Prep",
+	},
+	academy: {
+		strength: 40,
+		gameMinutes: 40,
+		league: "Youth academy",
+		short: "Academy",
+	},
+	dii: {
+		strength: 42,
+		gameMinutes: 40,
+		league: "NCAA Division II",
+		short: "D-II",
+	},
+	diii: {
+		strength: 28,
+		gameMinutes: 40,
+		league: "NCAA Division III",
+		short: "D-III",
+	},
+	naia: { strength: 38, gameMinutes: 40, league: "NAIA", short: "NAIA" },
+};
+
+const PREP_SET = new Set(PREP_SCHOOLS);
+
+// The lower level of a school or program, if it is one (the generic destinations of blank colleges included)
+export const getLowerLevel = (
+	name: string | undefined,
+): LowerLevel | undefined => {
+	if (name === undefined || COLLEGES[name]) {
+		return undefined;
+	}
+	if (PREP_SET.has(name) || name === "Prep / Postgrad") {
+		return "prep";
+	}
+	if (ACADEMIES[name] || name === "Overtime Elite") {
+		return "academy";
+	}
+	const small = SMALL_COLLEGES[name];
+	if (small) {
+		return small;
+	}
+	if (name === "NAIA") {
+		return "naia";
+	}
+	if (name === "DIII NCAA") {
+		return "diii";
+	}
+	return undefined;
 };
 
 // The pro pathway program (preDraftPaths): a professional development team that a few elite high school prospects a year join instead of going to college. A made-up name

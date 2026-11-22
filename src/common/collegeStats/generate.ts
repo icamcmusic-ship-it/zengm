@@ -1,6 +1,11 @@
 import { backProject, simulateSeason } from "./season.ts";
-import { getHonors } from "./honors.ts";
-import { COLLEGES, PATHWAY_TEAM } from "./colleges.ts";
+import { getHonors, getYouthHonors } from "./honors.ts";
+import {
+	COLLEGES,
+	COLLEGE_ALIASES,
+	PATHWAY_TEAM,
+	getLowerLevel,
+} from "./colleges.ts";
 import {
 	getRegion,
 	getSchool,
@@ -142,6 +147,7 @@ export const generateCollegeClass = (
 		classProspects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
 	);
 	const pathwayKeys = getPathwayKeys(classProspects, options);
+	const classRoutes = getClassRoutes(classProspects, options, pathwayKeys);
 
 	const results: (CollegeResult & { pos: string })[] = [];
 
@@ -157,7 +163,13 @@ export const generateCollegeClass = (
 	for (const p of prospects) {
 		// Each player has his own stream, so what he gets doesn't depend on who else is in the class
 		const rng = new Rng(`${seed}|${draftYear}|${p.key}`);
-		const school = pickSchool(p, options, classStats, pathwayKeys);
+		const school = pickSchool(
+			p,
+			options,
+			classStats,
+			pathwayKeys,
+			classRoutes,
+		);
 
 		// His team in the college season, if it has one
 		let team = -1;
@@ -185,6 +197,7 @@ export const generateCollegeClass = (
 				? getClassIndexForStock(p.age, zStock, classRng.random())
 				: getClassIndex(p.age),
 			paths,
+			route: classRoutes.get(p.key)?.route,
 		});
 		// His draft year season ended early: he missed the postseason
 		let missedPostseason = false;
@@ -297,14 +310,26 @@ export const generateCollegeClass = (
 	// Junior college honors, against fixed bars like the college ones
 	for (const result of results) {
 		for (const season of result.seasons) {
-			if (!isJuco(season.school) || (season.stats.gp ?? 0) < 14) {
+			// Division II and NAIA seasons (preDraftPaths) the same way
+			const lower = getLowerLevel(season.school);
+			const small =
+				lower === "dii" || lower === "naia"
+					? lower === "dii"
+						? "Division II"
+						: "NAIA"
+					: undefined;
+			if (
+				!(isJuco(season.school) || (paths && small)) ||
+				(season.stats.gp ?? 0) < 14
+			) {
 				continue;
 			}
+			const org = small ?? "NJCAA";
 			const type =
 				season.score >= JUCO_BARS.allAmerican
-					? "NJCAA All-American"
+					? `${org} All-American`
 					: season.score >= JUCO_BARS.allRegion
-						? "NJCAA All-Region"
+						? `${org} All-Region`
 						: undefined;
 			if (type) {
 				const list = honors.get(result.key) ?? [];
@@ -312,6 +337,23 @@ export const generateCollegeClass = (
 					season: season.season,
 					type: `${COLLEGE_AWARD_PREFIX}${type}`,
 				});
+				list.sort((a, b) => a.season - b.season);
+				honors.set(result.key, list);
+			}
+		}
+	}
+	// Youth national team honors (preDraftPaths), each from his own stream
+	if (paths) {
+		const bornLocs = new Map(prospects.map((p) => [p.key, p.bornLoc]));
+		for (const result of results) {
+			const youth = getYouthHonors(
+				result.seasons,
+				getRegion(bornLocs.get(result.key) ?? ""),
+				new Rng(`${seed}|${draftYear}|${result.key}|youth`),
+			);
+			if (youth.length > 0) {
+				const list = honors.get(result.key) ?? [];
+				list.push(...youth);
 				list.sort((a, b) => a.season - b.season);
 				honors.set(result.key, list);
 			}
@@ -348,13 +390,22 @@ const pickSchool = (
 	classStats: { mean: number; sd: number },
 	// Prospects of the class in the pro pathway program (getPathwayKeys)
 	pathwayKeys?: Set<string>,
+	// Prospects of the class with a class route (getClassRoutes)
+	classRoutes?: Map<string, ClassRoute>,
 ): School | undefined => {
 	if (pathwayKeys?.has(p.key) && !p.fixedSchool) {
 		return getSchool(PATHWAY_TEAM);
 	}
+	const classRoute = classRoutes?.get(p.key);
+	if (classRoute && !p.fixedSchool) {
+		return getSchool(classRoute.league);
+	}
+	const paths = options.paths ?? true;
 	// A blank college filled in with the pro pathway program when his stats were made last time is blank again: whether he is in it depends on the seed
 	if (p.college !== "" && p.college !== PATHWAY_TEAM) {
-		return getSchool(p.college) ?? unknownSchool(p.college);
+		// A BBGM college name for a school known here by another one (preDraftPaths)
+		const name = (paths ? COLLEGE_ALIASES[p.college] : undefined) ?? p.college;
+		return getSchool(name) ?? unknownSchool(p.college);
 	}
 	if (options.fillBlankColleges ?? true) {
 		// The school is drawn from its own stream, so a school that was filled in earlier (and saved as his college) gives the same seasons as drawing it again
@@ -365,6 +416,7 @@ const pickSchool = (
 			p.bornLoc,
 			schoolRng,
 			clamp((p.ovr - classStats.mean) / classStats.sd, -2.5, 2.5),
+			paths,
 		);
 		return getSchool(name);
 	}
@@ -434,6 +486,126 @@ export const getPathwayKeys = (
 	return keys;
 };
 
+export type ClassRoute = { route: "nextStars" | "abroad"; league: string };
+
+// The NBL's Next Stars program (preDraftPaths): how many of a class's elite young prospects spend their draft year in the NBL instead of
+// college or their own league (real classes: 0-2 a year), from at most NEXT_STARS_POOL of the best. Not Australians and New Zealanders,
+// for whom the NBL is home anyway
+const NEXT_STARS_COUNTS = [0, 1, 2];
+const NEXT_STARS_COUNT_WEIGHTS = [0.5, 0.38, 0.12];
+const NEXT_STARS_POOL = 20;
+const NEXT_STARS_MIN_STOCK = 0.3;
+// Americans who turn pro abroad out of high school (a handful a decade make the draft): 0 or 1 a class
+const ABROAD_COUNTS = [0, 1];
+const ABROAD_COUNT_WEIGHTS = [0.8, 0.2];
+const ABROAD_STOCK = [-0.2, 1.4];
+// Where they go: leagues that sign American teenagers
+const ABROAD_LEAGUES = [
+	"Israeli Premier League",
+	"Italian LBA",
+	"Liga ACB",
+	"Turkish BSL",
+	"Greek Basket League",
+	"Chinese CBA",
+	"LNB Pro A",
+	"Adriatic League",
+];
+const ABROAD_LEAGUE_WEIGHTS = [3, 2, 1.5, 1.5, 1.5, 1.5, 1, 1];
+
+/**
+ * The class's prospects with a route picked with the rest of the class (preDraftPaths), by key: the NBL's Next Stars (0-2 young prospects with high draft stock, more often internationals) and Americans who turned pro abroad out of high school (0-1, a prospect headed to a mid-level role in college). Like the pro pathway program, read off the whole class from streams of the class's own, so the same class and seed always give the same players, whichever of them are being generated, and none of them is in the pro pathway program.
+ */
+export const getClassRoutes = (
+	classProspects: CollegeProspect[],
+	options: GenerateOptions,
+	pathwayKeys: Set<string>,
+): Map<string, ClassRoute> => {
+	const routes = new Map<string, ClassRoute>();
+	if (!(options.paths ?? true) || classProspects.length === 0) {
+		return routes;
+	}
+	const classStats = getClassStats(classProspects);
+	const potStats = getClassStats(
+		classProspects.map((p) => ({ ...p, ovr: p.pot + POT_PRIOR_SHIFT })),
+	);
+	const nextStars: { key: string; zStock: number; na: boolean }[] = [];
+	const abroad: { key: string; zStock: number }[] = [];
+	for (const p of classProspects) {
+		if (
+			getClassIndex(p.age) !== 0 ||
+			p.injuryHistory ||
+			p.fixedSchool ||
+			pathwayKeys.has(p.key)
+		) {
+			continue;
+		}
+		const region = getRegion(p.bornLoc);
+		const school = pickSchool(p, options, classStats);
+		if (!school || school.idle) {
+			continue;
+		}
+		const d1 = !school.nonCollege && !!COLLEGES[school.name];
+		const zClass = clamp((p.ovr - classStats.mean) / classStats.sd, -2.5, 2.5);
+		const zPot = clamp(
+			(p.pot + POT_PRIOR_SHIFT - potStats.mean) / potStats.sd,
+			-2.5,
+			2.5,
+		);
+		const zStock = 0.4 * zClass + 0.6 * zPot;
+		const na = region === "usa" || region === "canada";
+		if (
+			zStock >= NEXT_STARS_MIN_STOCK &&
+			region !== "oceania" &&
+			school.name !== "NBL" &&
+			(d1 || !na)
+		) {
+			nextStars.push({ key: p.key, zStock, na });
+		}
+		if (
+			region === "usa" &&
+			d1 &&
+			zStock >= ABROAD_STOCK[0]! &&
+			zStock < ABROAD_STOCK[1]!
+		) {
+			abroad.push({ key: p.key, zStock });
+		}
+	}
+	const byStock = (a: { key: string; zStock: number }, b: typeof a) =>
+		b.zStock !== a.zStock ? b.zStock - a.zStock : a.key < b.key ? -1 : 1;
+
+	const rng = new Rng(`${options.seed}|${options.draftYear}|nextStars`);
+	const pool = nextStars.sort(byStock).slice(0, NEXT_STARS_POOL);
+	const count = Math.min(
+		pool.length,
+		rng.weighted(NEXT_STARS_COUNTS, NEXT_STARS_COUNT_WEIGHTS),
+	);
+	for (let i = 0; i < count; i++) {
+		const left = pool.filter((x) => !routes.has(x.key));
+		// Most Next Stars are internationals
+		const pick = rng.weighted(
+			left,
+			left.map((x) => (x.na ? 0.6 : 1)),
+		);
+		routes.set(pick.key, { route: "nextStars", league: "NBL" });
+	}
+
+	const abroadRng = new Rng(`${options.seed}|${options.draftYear}|abroad`);
+	const abroadPool = abroad.filter((x) => !routes.has(x.key)).sort(byStock);
+	const numAbroad = Math.min(
+		abroadPool.length,
+		abroadRng.weighted(ABROAD_COUNTS, ABROAD_COUNT_WEIGHTS),
+	);
+	for (let i = 0; i < numAbroad; i++) {
+		const left = abroadPool.filter((x) => !routes.has(x.key));
+		const pick = left[Math.floor(abroadRng.random() * left.length)]!;
+		routes.set(pick.key, {
+			route: "abroad",
+			league: abroadRng.weighted(ABROAD_LEAGUES, ABROAD_LEAGUE_WEIGHTS),
+		});
+	}
+	return routes;
+};
+
 /**
  * The schools generateCollegeClass will give these prospects (with the same options), by key, for building the college season before the stats. Only NCAA schools are included.
  */
@@ -446,9 +618,20 @@ export const getNcaaSchools = (
 		options.classProspects ?? prospects,
 		options,
 	);
+	const classRoutes = getClassRoutes(
+		options.classProspects ?? prospects,
+		options,
+		pathwayKeys,
+	);
 	const output = new Map<string, string>();
 	for (const p of prospects) {
-		const school = pickSchool(p, options, classStats, pathwayKeys);
+		const school = pickSchool(
+			p,
+			options,
+			classStats,
+			pathwayKeys,
+			classRoutes,
+		);
 		if (school && !school.nonCollege && !school.idle) {
 			output.set(p.key, school.name);
 		}

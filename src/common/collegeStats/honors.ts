@@ -2,6 +2,7 @@ import { COLLEGE_AWARD_PREFIX } from "../preDraft.ts";
 import { CONFERENCES } from "./colleges.ts";
 import { PRO_BARS, getProHonorTypes, isProLeague } from "./overseas.ts";
 import { clamp, type Rng } from "./rng.ts";
+import type { Region } from "./colleges.ts";
 import type { CollegeHonor, CollegeSeason } from "./types.ts";
 
 /**
@@ -242,3 +243,71 @@ export const getHonors = (
 };
 
 export const clampZ = (z: number) => clamp(z, -2.5, 2.5);
+
+// Youth national team tournaments (preDraftPaths): the FIBA youth event a prospect from a region plays at an age (his age that season)
+const youthEvent = (region: Region, age: number): string | undefined => {
+	if (age <= 17) {
+		return "FIBA U17 World Cup";
+	}
+	if (age === 19) {
+		return "FIBA U19 World Cup";
+	}
+	if (age === 18) {
+		switch (region) {
+			case "europe":
+				return "FIBA U18 EuroBasket";
+			case "africa":
+				return "FIBA U18 AfroBasket";
+			case "asia":
+			case "oceania":
+				return "FIBA U18 Asia Cup";
+			case "usa":
+			case "canada":
+			case "latam":
+				return "FIBA U18 AmeriCup";
+			default:
+				return undefined;
+		}
+	}
+	if (age === 20 && region === "europe") {
+		return "FIBA U20 EuroBasket";
+	}
+	return undefined;
+};
+
+// Bars on his season's strength-adjusted game score, and how much higher they are for an American (USA Basketball's youth teams are
+// deep: only the very best stand out)
+export const YOUTH_BARS = { allStar: 14, mvp: 17.5, usaExtra: 2.5 };
+
+/**
+ * Youth national team honors (preDraftPaths): an All-Star Five or MVP at the FIBA youth tournament of his age and region, for a prospect whose season at that age stood out. Judged on his season (the tournament is played around it), with noise from his own stream: one draw per season, so a season's honor never moves another's.
+ */
+export const getYouthHonors = (
+	seasons: CollegeSeason[],
+	region: Region,
+	rng: Rng,
+): CollegeHonor[] => {
+	const honors: CollegeHonor[] = [];
+	for (const season of seasons) {
+		const noise = rng.normal(0, 1.2);
+		const age = season.age;
+		if (age === undefined || age > 20 || (season.stats.gp ?? 0) < 10) {
+			continue;
+		}
+		const event = youthEvent(region, age);
+		if (!event) {
+			continue;
+		}
+		const adj =
+			season.score * (1 + 0.008 * (season.strength - 70)) -
+			(region === "usa" ? YOUTH_BARS.usaExtra : 0) +
+			noise;
+		if (adj >= YOUTH_BARS.mvp) {
+			add(honors, season.season, `${event} MVP`);
+		}
+		if (adj >= YOUTH_BARS.allStar) {
+			add(honors, season.season, `${event} All-Star Five`);
+		}
+	}
+	return honors;
+};
