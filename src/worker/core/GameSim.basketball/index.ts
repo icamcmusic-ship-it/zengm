@@ -27,6 +27,7 @@ import {
 	SIM_FIX_CONTEST,
 	SIM_FIX_HELP,
 	SIM_FIX_RUNS,
+	SIM_FIX_ADJUST,
 } from "./simSettings.ts";
 import {
 	CLOSER_FACTOR,
@@ -858,6 +859,19 @@ class GameSim extends GameSimBase {
 	lastScorePoss: [number, number] = [0, 0];
 	momentum = 0;
 	timeoutsUsed: [number, number] = [0, 0];
+	// Coaching adjustments at the breaks (SIM_FIX_ADJUST, with coaching systems): each defense's focus (the opponent's hot scorer its best
+	// defender goes to) and how much more his threat counts, the zone it takes away (contest type index, -1: none) with the opponent's
+	// selection multiplier and make change there, and each player's minutes plan at tip-off
+	flowAdjust = false;
+	adjFocus: [PlayerGameSim | undefined, PlayerGameSim | undefined] = [
+		undefined,
+		undefined,
+	];
+	adjFocusW: [number, number] = [0, 0];
+	adjZone: [number, number] = [-1, -1];
+	adjSel: [number, number] = [1, 1];
+	adjMake: [number, number] = [0, 0];
+	minutesPlan0 = new Map<PlayerGameSim, number>();
 	skillsCountCache = new Map<
 		PlayerGameSim,
 		Record<"3" | "A" | "B" | "Di" | "Dp" | "Po" | "Ps" | "R", number>
@@ -1038,6 +1052,8 @@ class GameSim extends GameSimBase {
 			this.earlyTimeouts = [ENDGAME.earlyTimeouts, ENDGAME.earlyTimeouts];
 			this.rotationQuarterSeconds = g.get("quarterLength") * 60;
 		}
+		// Game flow: coaching adjustments at the breaks
+		this.flowAdjust = this.simFixes && this.coachSys && !allStarGame;
 		// Game flow: runs, momentum and timeouts. The run-stopping timeouts scale with the number of periods
 		this.flowRuns = this.simFixes && this.smartEndgame;
 		if (this.flowRuns) {
@@ -1685,6 +1701,15 @@ class GameSim extends GameSimBase {
 				}
 			}
 
+			// Game flow: the coaches' adjustments, mostly at halftime
+			if (this.flowAdjust) {
+				this.coachAdjust(
+					period - 1 === Math.ceil(this.numPeriods / 2)
+						? 1
+						: SIM_FIX_ADJUST.quarter,
+				);
+			}
+
 			this.team[0].stat.ptsQtrs.push(0);
 			this.team[1].stat.ptsQtrs.push(0);
 			this.foulsThisQuarter = [0, 0];
@@ -2208,6 +2233,155 @@ class GameSim extends GameSimBase {
 		for (const t of teamNums) {
 			for (const p of this.playersOnCourt[t]) {
 				p.stat.energy = Math.min(1, p.stat.energy + ENDGAME.timeoutRest);
+			}
+		}
+	}
+
+	// ---- Game flow: coaching adjustments at the breaks (SIM_FIX_ADJUST). Only called with Game Sim Fixes and coaching systems on ----
+
+	coachAdjust(weight: number) {
+		const A = SIM_FIX_ADJUST;
+		// (the thresholds are for halftime of a regulation game, scaled to how much of it has been played)
+		const regulation = this.numPeriods * this.ga.quarterLength * 60;
+		const scale =
+			regulation > 0
+				? Math.max(0.25, this.elapsedRegulationSeconds() / (regulation / 2))
+				: 1;
+		for (const t of teamNums) {
+			const opp: TeamNum = t === 0 ? 1 : 0;
+			const cs = this.cs[t];
+			const adapt = helpers.bound(cs.adapt ?? 50, 0, 100);
+			const skill = helpers.bound(
+				((cs.mgmt ?? 50) - 50 + adapt - 50) / 50,
+				-1,
+				1,
+			);
+			const amount = (weight * adapt) / 100;
+			const good = (1 + skill) / 2;
+
+			// Minutes: the hot hand plays more, a cold one less
+			if (this.realisticRotations) {
+				this.adjustMinutes(t, amount * good, scale);
+			}
+
+			// Matchups: the best fitting defender goes to the opponent's top scorer
+			let top: PlayerGameSim | undefined;
+			for (const p of this.team[opp].player) {
+				if (!top || p.stat.pts > top.stat.pts) {
+					top = p;
+				}
+			}
+			if (
+				top &&
+				top.stat.pts >= A.focusPts * scale &&
+				top.stat.pts >= A.focusShare * this.team[opp].stat.pts
+			) {
+				this.adjFocus[t] = top;
+				this.adjFocusW[t] = A.focus * amount * good;
+				if (FLOW_DIAG.on) {
+					flowCount("adjFocus");
+				}
+			}
+
+			// Scheme: take away the zone that hurt the most
+			const st = this.team[opp].stat;
+			const zones = [
+				[st.tpa, 3 * st.tp],
+				[st.fgaMidRange, 2 * st.fgMidRange],
+				[st.fgaAtRim, 2 * st.fgAtRim],
+				[st.fgaLowPost, 2 * st.fgLowPost],
+			];
+			let best = -1;
+			let bestExcess = A.zoneMin * scale;
+			for (let ti = 0; ti < zones.length; ti++) {
+				const [fga, pts] = zones[ti]!;
+				const excess = (pts ?? 0) - (fga ?? 0) * A.pps[ti]!;
+				if (excess >= bestExcess) {
+					best = ti;
+					bestExcess = excess;
+				}
+			}
+			if (best >= 0) {
+				this.adjZone[t] = best;
+				this.adjSel[t] = 1 - A.sel * amount * good;
+				this.adjMake[t] = -A.make * amount * skill;
+				if (FLOW_DIAG.on) {
+					flowCount(`adjZone${best}`);
+					flowSum("adjMake", this.adjMake[t]);
+				}
+			}
+		}
+		if (this.matchupDefense) {
+			this.assignMatchups();
+			this.ssVersion += 1;
+		}
+	}
+
+	// A coach's minutes adjustment (k: how far, 0-1): the hot hand's plan goes up, a cold shooter's down, the rest of the rotation
+	// evens it out
+	adjustMinutes(t: TeamNum, k: number, scale: number) {
+		const A = SIM_FIX_ADJUST;
+		if (k <= 0) {
+			return;
+		}
+		let change = 0;
+		const moved = new Set<PlayerGameSim>();
+		for (const p of this.team[t].player) {
+			const target = this.minutesTargets.get(p) ?? 0;
+			if (target <= 0 || p.injured) {
+				continue;
+			}
+			if (!this.minutesPlan0.has(p)) {
+				this.minutesPlan0.set(p, target);
+			}
+			const fga = p.stat.fga;
+			const eff = p.stat.pts / Math.max(1, fga + 0.44 * p.stat.fta);
+			let delta = 0;
+			if (
+				fga >= A.hotFga * scale &&
+				eff >= A.hotEff &&
+				p.stat.pts >= A.hotPts * scale
+			) {
+				delta = A.hotMin * k;
+			} else if (fga >= A.coldFga * scale && eff <= A.coldEff) {
+				delta = -A.coldMin * k;
+			}
+			if (delta !== 0) {
+				const plan0 = this.minutesPlan0.get(p)!;
+				const next = helpers.bound(
+					target + delta,
+					Math.max(0, plan0 - A.maxShift),
+					plan0 + A.maxShift,
+				);
+				change += next - target;
+				this.minutesTargets.set(p, next);
+				moved.add(p);
+				if (FLOW_DIAG.on) {
+					flowCount(delta > 0 ? "adjHot" : "adjCold");
+				}
+			}
+		}
+		if (change === 0) {
+			return;
+		}
+		// The others give (or take) the difference, by their planned minutes
+		let sum = 0;
+		for (const p of this.team[t].player) {
+			const target = this.minutesTargets.get(p) ?? 0;
+			if (target > 0 && !moved.has(p) && !p.injured) {
+				sum += target;
+			}
+		}
+		if (sum <= 0) {
+			return;
+		}
+		for (const p of this.team[t].player) {
+			const target = this.minutesTargets.get(p) ?? 0;
+			if (target > 0 && !moved.has(p) && !p.injured) {
+				this.minutesTargets.set(
+					p,
+					Math.max(0, target - (change * target) / sum),
+				);
 			}
 		}
 	}
@@ -3598,6 +3772,8 @@ class GameSim extends GameSimBase {
 				this.playersOnCourt[d],
 				this.isSwitching(d),
 				this.guards[d],
+				this.adjFocus[d],
+				1 + this.adjFocusW[d],
 			);
 			let versatility = 0;
 			for (const p of this.playersOnCourt[d]) {
@@ -5452,7 +5628,8 @@ class GameSim extends GameSimBase {
 											: this.oe[this.o].three
 										: 1)
 								: 1) *
-							(sp ? sp.three : 1),
+							(sp ? sp.three : 1) *
+							(this.adjZone[this.d] === 0 ? this.adjSel[this.d] : 1),
 						p.compositeRating,
 					),
 				)
@@ -5512,7 +5689,8 @@ class GameSim extends GameSimBase {
 				pullUpTilt *
 				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
 				(this.offEmph ? this.oe[this.o].mid : 1) *
-				(sp ? sp.mid : 1);
+				(sp ? sp.mid : 1) *
+				(this.adjZone[this.d] === 1 ? this.adjSel[this.d] : 1);
 			const m2 =
 				(this.coachSys ? cso.rim * csd.dRim : 1) *
 				(sc
@@ -5524,6 +5702,7 @@ class GameSim extends GameSimBase {
 					: 1) *
 				driveTilt *
 				(this.contestOn ? this.helpRimSel[this.d] : 1) *
+				(this.adjZone[this.d] === 2 ? this.adjSel[this.d] : 1) *
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
 				(this.offEmph ? this.oe[this.o].rim : 1) *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.rim : 1) *
@@ -5540,7 +5719,8 @@ class GameSim extends GameSimBase {
 				postTilt *
 				(this.simFixes && this.advTransition ? SIM_FIX_TRANSITION.post : 1) *
 				(p.ss ? 1 + SHOT_SHARE.sagShort * p.ss.sag : 1) *
-				(sp ? sp.post : 1);
+				(sp ? sp.post : 1) *
+				(this.adjZone[this.d] === 3 ? this.adjSel[this.d] : 1);
 			// Synergy makes easy shots either more likely or less likely
 			const synergy =
 				this.synergyFactor *
@@ -5858,6 +6038,13 @@ class GameSim extends GameSimBase {
 
 			// Game flow: open, contested or heavily contested
 			probMake += this.contestMake;
+			// Game flow: the defense's adjustment at the last break, against the zone that hurt it
+			if (
+				this.adjZone[this.d] >= 0 &&
+				this.adjZone[this.d] === contestTypeIndex(type)
+			) {
+				probMake += this.adjMake[this.d];
+			}
 			// Game flow: a team on a run
 			if (this.flowRuns) {
 				probMake += this.momentum - SIM_FIX_RUNS.momOffset;

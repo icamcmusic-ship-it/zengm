@@ -270,3 +270,34 @@ export const SIM_FIX_RUNS = {
 	restMargin: 8,
 	restEnergy: 0.8,
 };
+
+// Coaching adjustments at the breaks (Game Sim Fixes with coaching systems, gameFlow.ts): at halftime (weight 1) and the other breaks
+// between periods (weight quarter) each head coach looks at the box score so far. skill = ((mgmt - 50) + (adapt - 50)) / 50 within ±1
+// (his game management and adaptability), amount = weight × adapt / 100: adaptable coaches change more, good ones change the right
+// way (a below-average one's scheme tweak backfires).
+// - Minutes (Realistic Rotations): a hot hand (hotFga+ shots, hotEff+ points per shot, hotPts+ points) gets up to hotMin more minutes
+//   in his plan, a cold one (coldFga+ shots at coldEff or less) up to coldMin fewer, × amount × (1 + skill) / 2; the rest of the
+//   rotation gives or takes the difference. Each player's plan moves at most maxShift from tip-off
+// - Matchups: the opponent's top scorer so far (focusPts+ points, focusShare+ of his team's) draws the best fitting defender: his threat
+//   counts 1 + focus × amount × (1 + skill) / 2 in the assignment
+// - Scheme tweak: the zone (three, mid-range, rim, post) where the opponent scored the most above pps (league points per shot) × its
+//   attempts, if zoneMin+ points: the opponent goes there sel × amount × (1 + skill) / 2 less often, and its shots there change by
+//   -make × amount × skill (better coaches take it away, poor ones open something else up)
+export const SIM_FIX_ADJUST = {
+	quarter: 0.4,
+	hotFga: 5,
+	hotEff: 1.3,
+	hotPts: 10,
+	hotMin: 4,
+	coldFga: 6,
+	coldEff: 0.75,
+	coldMin: 3,
+	maxShift: 5,
+	focusPts: 12,
+	focusShare: 0.25,
+	focus: 0.8,
+	pps: [1.08, 0.84, 1.28, 0.86],
+	zoneMin: 5,
+	sel: 0.15,
+	make: 0.012,
+};
