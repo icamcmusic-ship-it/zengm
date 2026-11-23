@@ -199,6 +199,20 @@ import {
 	shotPlanMult,
 } from "./shotShare.ts";
 import {
+	BREAKOUT,
+	formDraw,
+	hotCloser,
+	injuryOpening,
+	isCareerNight,
+	matchupOpening,
+	onHeater,
+	oppDefense,
+	roleFactor,
+	startersOut,
+	usageForm,
+	usageRanks,
+} from "./breakout.ts";
+import {
 	contestLevel,
 	flowCount,
 	flowSum,
@@ -244,6 +258,12 @@ type ShotShareState = {
 	threat: number;
 	streak: number;
 	hot: number;
+	// Breakout nights (breakout.ts): his role factor (0 the top scorer, 1 a role player), how many shooter draws his hot hand lasts, his
+	// straight misses while hot, and the make probability his career night adds
+	rf: number;
+	hotPossN: number;
+	cold: number;
+	nightMake: number;
 };
 
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
@@ -843,6 +863,8 @@ class GameSim extends GameSimBase {
 	// multipliers (refreshed when the lineups change, ssVersion), the late shot clock flag of this possession, and the last draw (for the
 	// shot diet)
 	shotShare = false;
+	// Breakout nights (breakout.ts): with the Shot Share Model, not in All-Star games
+	breakout = false;
 	// Shot Zones (League extras, see shotZones.ts): sub-zones, their make shifts and xFG. Off: nothing here runs and no extra random
 	// number is drawn. szZone/szXfg: the last shot's sub-zone and expected FG% (-1: none), for Advanced Tracking Stats
 	shotZones = false;
@@ -1160,6 +1182,10 @@ class GameSim extends GameSimBase {
 						teamMean,
 					);
 				}
+			}
+			if (!allStarGame) {
+				this.breakout = true;
+				this.breakoutSetup();
 			}
 		}
 
@@ -2360,10 +2386,35 @@ class GameSim extends GameSimBase {
 						b.valueNoPot * (this.allStarGame ? 1 : b.ptModifier) -
 						a.valueNoPot * (this.allStarGame ? 1 : a.ptModifier),
 				);
-			return od
-				? this.pickEndgameClosers(t, candidates)
+			if (od) {
+				return this.pickEndgameClosers(t, candidates);
+			}
+			return this.breakout
+				? this.pickHotClosers(candidates)
 				: pickClosers(candidates, this.numPlayersOnCourt);
 		}) as [Set<PlayerGameSim>, Set<PlayerGameSim>];
+	}
+
+	// Breakout nights (Shot Share Model): a role player who is hot tonight counts as (1 + closerHot) × his value for the closing lineup
+	pickHotClosers(candidates: PlayerGameSim[]) {
+		const hot = (p: PlayerGameSim) =>
+			p.ss !== undefined && p.ss.rf > 0 && hotCloser(p.stat);
+		if (!candidates.some(hot)) {
+			return pickClosers(candidates, this.numPlayersOnCourt);
+		}
+		const picked = pickClosers(
+			candidates.map((p) => ({
+				pos: p.pos,
+				valueNoPot: p.valueNoPot * (hot(p) ? 1 + BREAKOUT.closerHot : 1),
+				p,
+			})),
+			this.numPlayersOnCourt,
+		);
+		const closers = new Set<PlayerGameSim>();
+		for (const { p } of picked) {
+			closers.add(p);
+		}
+		return closers;
 	}
 
 	// ---- End-of-Game Intelligence (the smartEndgame setting, see endgame.ts). Only called with the setting on ----
@@ -2556,7 +2607,7 @@ class GameSim extends GameSimBase {
 
 			// Minutes: the hot hand plays more, a cold one less
 			if (this.realisticRotations) {
-				this.adjustMinutes(t, amount * good, scale);
+				this.adjustMinutes(t, amount * good, scale, (weight * (1 + good)) / 2);
 			}
 
 			// Matchups: the best fitting defender goes to the opponent's top scorer
@@ -2613,12 +2664,16 @@ class GameSim extends GameSimBase {
 	}
 
 	// A coach's minutes adjustment (k: how far, 0-1): the hot hand's plan goes up, a cold shooter's down, the rest of the rotation
-	// evens it out
-	adjustMinutes(t: TeamNum, k: number, scale: number) {
+	// evens it out. Breakout nights (Shot Share Model): a hot bench player's goes up benchK × benchHotMin more, unless it's a blowout
+	adjustMinutes(t: TeamNum, k: number, scale: number, benchK: number = 0) {
 		const A = SIM_FIX_ADJUST;
+		const B = BREAKOUT;
 		if (k <= 0) {
 			return;
 		}
+		const benchRide =
+			this.breakout &&
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) < B.benchBlowout;
 		let change = 0;
 		const moved = new Set<PlayerGameSim>();
 		for (const p of this.team[t].player) {
@@ -2632,12 +2687,20 @@ class GameSim extends GameSimBase {
 			const fga = p.stat.fga;
 			const eff = p.stat.pts / Math.max(1, fga + 0.44 * p.stat.fta);
 			let delta = 0;
+			let maxShift = A.maxShift;
 			if (
 				fga >= A.hotFga * scale &&
 				eff >= A.hotEff &&
 				p.stat.pts >= A.hotPts * scale
 			) {
 				delta = A.hotMin * k;
+				if (benchRide && p.stat.gs === 0) {
+					delta += B.benchHotMin * benchK;
+					maxShift = B.benchMaxShift;
+					if (FLOW_DIAG.on) {
+						flowCount("brkBenchMin");
+					}
+				}
 			} else if (fga >= A.coldFga * scale && eff <= A.coldEff) {
 				delta = -A.coldMin * k;
 			}
@@ -2646,7 +2709,7 @@ class GameSim extends GameSimBase {
 				const next = helpers.bound(
 					target + delta,
 					Math.max(0, plan0 - A.maxShift),
-					plan0 + A.maxShift,
+					plan0 + maxShift,
 				);
 				change += next - target;
 				this.minutesTargets.set(p, next);
@@ -2973,7 +3036,77 @@ class GameSim extends GameSimBase {
 			threat,
 			streak: 0,
 			hot: 0,
+			rf: 0,
+			hotPossN: S.hotPoss,
+			cold: 0,
+			nightMake: 0,
 		};
+	}
+
+	// Breakout nights (breakout.ts): each player's role factor, usage form, career night, openings and hot hand for the game. No draws
+	// from Math.random (his form draw is a stream seeded by the game and the player)
+	breakoutSetup() {
+		const B = BREAKOUT;
+		const S = SHOT_SHARE;
+		for (const t of teamNums) {
+			const players = this.team[t].player;
+			const ranks = usageRanks(
+				players.map((p) => ({
+					p,
+					valueNoPot: p.valueNoPot,
+					injured: p.injured,
+					usage: p.compositeRating.usage,
+				})),
+			);
+			const out = startersOut(players);
+			const def = oppDefense(this.team[t === 0 ? 1 : 0].player);
+			if (FLOW_DIAG.on) {
+				flowSum("brkPerim", def.perim);
+				flowSum("brkInt", def.int);
+			}
+			for (const [{ p }, rank] of ranks) {
+				const s = p.ss;
+				if (!s) {
+					continue;
+				}
+				const rf = roleFactor(rank);
+				s.rf = rf;
+				const draw = formDraw(this.id, p.id);
+				let form = usageForm(rf, p.gameZ, draw.z);
+				if (isCareerNight(rf, draw.u)) {
+					form *= B.careerUsage;
+					s.nightMake = B.careerMake;
+					if (FLOW_DIAG.on) {
+						flowCount("brkCareer");
+					}
+				}
+				const cr = p.compositeRating;
+				form *=
+					injuryOpening(rf, out) *
+					matchupOpening(
+						rf,
+						s.threat,
+						cr.shootingAtRimMake ?? cr.shootingAtRim ?? 0,
+						def,
+					);
+				s.fixed *= form;
+				s.hotBoost = 1 + (s.hotBoost - 1) * (1 + (B.hotRole * rf) / S.hot);
+				s.hotPossN = S.hotPoss + Math.round(B.hotPossRole * rf);
+			}
+		}
+	}
+
+	// Shot Share Model (with Breakout nights): a miss ends a star's hot hand, a role player's after coldMisses straight
+	ssMiss(s: ShotShareState) {
+		s.streak = 0;
+		if (s.rf > 0 && s.hot > 0) {
+			s.cold += 1;
+			if (s.cold < BREAKOUT.coldMisses) {
+				return;
+			}
+		}
+		s.hot = 0;
+		s.cold = 0;
 	}
 
 	// Shot Share Model: team t's roles in its five (by usage composite times game plan), its best creator and, with Matchup Defense, the
@@ -3339,7 +3472,8 @@ class GameSim extends GameSimBase {
 		if ((this.ssTier[t][i] ?? 0) >= 3) {
 			delta += s.roleForceMake;
 		}
-		return delta;
+		// Breakout nights: his career night, and the calibration
+		return delta - s.nightMake + (this.breakout ? BREAKOUT.makeCal : 0);
 	}
 
 	// Shot Share Model: the shot diet (Advanced Tracking Stats): where this shot came from and, for the shooter draw, what moved his share
@@ -6934,8 +7068,7 @@ class GameSim extends GameSimBase {
 			this.flowShotDone(false, type);
 		}
 		if (p.ss) {
-			p.ss.streak = 0;
-			p.ss.hot = 0;
+			this.ssMiss(p.ss);
 		}
 
 		return this.doReb();
@@ -7252,8 +7385,7 @@ class GameSim extends GameSimBase {
 	 */
 	doBlk(p: PlayerGameSim, type: ShotType) {
 		if (p.ss) {
-			p.ss.streak = 0;
-			p.ss.hot = 0;
+			this.ssMiss(p.ss);
 		}
 		this.recordStat(this.o, p, "ba");
 		this.recordStat(this.o, p, "fga");
@@ -7341,10 +7473,14 @@ class GameSim extends GameSimBase {
 	) {
 		const pid = p.id;
 		// Shot Share Model: the hot hand (the team feeds him for its next few shooter draws)
+		// (Breakout nights: a role player's lasts longer, and also starts on a heater)
 		if (p.ss) {
 			p.ss.streak += 1;
+			p.ss.cold = 0;
 			if (p.ss.streak >= p.ss.hotAfter) {
-				p.ss.hot = SHOT_SHARE.hotPoss;
+				p.ss.hot = p.ss.hotPossN;
+			} else if (p.ss.rf > 0 && p.ss.hot === 0 && onHeater(p.stat)) {
+				p.ss.hot = p.ss.hotPossN;
 			}
 		}
 		this.recordStat(this.o, p, "fga");
