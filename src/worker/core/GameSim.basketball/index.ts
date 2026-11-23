@@ -2211,9 +2211,20 @@ class GameSim extends GameSimBase {
 			// (No Visible Ratings: the user's team plans by the fuzzed value he sees, game/loadTeams.ts)
 			const planValue = (p: PlayerGameSim): number =>
 				(p as any).planValue ?? p.valueNoPot;
+			// The user's own team: his roster order (the starters) and playing time buttons count (game/loadTeams.ts sets it)
+			// His starters: the first ones in his roster order who can play (an injured starter's place goes to the next one)
+			const userControlled = (t as any).userRotation === true;
+			const userStarters = new Set(
+				userControlled
+					? t.player
+							.filter((p) => !p.injured && p.ptModifier > 0)
+							.slice(0, this.numPlayersOnCourt)
+					: [],
+			);
 			const targets = planMinutes(
 				t.player.map((p) => ({
 					valueNoPot: planValue(p),
+					userStarter: userStarters.has(p),
 					injured: p.injured,
 					ptModifier: this.allStarGame ? 1 : p.ptModifier,
 					minutesRestriction: (p as any).minutesRestriction,
@@ -2231,6 +2242,7 @@ class GameSim extends GameSimBase {
 					regulationMinutes: this.numPeriods * this.ga.quarterLength,
 					// Playoff series state (set in game/play.ts, common/seriesState.ts)
 					seriesUrgency: (t as any).seriesUrgency,
+					userControlled,
 				},
 			);
 			for (const [i, p] of t.player.entries()) {
