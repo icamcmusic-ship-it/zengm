@@ -808,6 +808,9 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					staffReportHistory: {
 						type: "array",
 					},
+					gmSuccessor: {
+						type: "object",
+					},
 					allStarDunk: {
 						type: "boolean",
 					},

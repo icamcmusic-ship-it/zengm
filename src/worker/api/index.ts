@@ -57,7 +57,10 @@ import * as staff from "../core/staff/index.ts";
 import * as ownerOffice from "../core/ownerOffice/index.ts";
 import { overrideMandate } from "../core/ownerOffice/owner.ts";
 import * as commercial from "../core/commercial/index.ts";
-import { ensureGms } from "../core/gm/index.ts";
+import {
+	ensureGms,
+	setGmSuccessor as setGmSuccessorCore,
+} from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
 import { decodePlayByPlay } from "../../common/pbpFlavor/store.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
@@ -4778,6 +4781,12 @@ const startFantasyDraft = async (tids: number[], conditions: Conditions) => {
 	await phase.newPhase(PHASE.FANTASY_DRAFT, conditions, tids);
 };
 
+// AI GM personalities: fired, pick who takes over your old team (undefined: the owner decides)
+const setGmSuccessor = async (gmid: number | undefined) => {
+	await setGmSuccessorCore(gmid);
+	await toUI("realtimeUpdate", [["gameAttributes"]]);
+};
+
 const switchTeam = async (tid: number, conditions: Conditions) => {
 	const t = await idb.cache.teams.get(tid);
 	if (!t) {
@@ -6849,6 +6858,7 @@ const api = {
 		startExpansionDraft,
 		startFantasyDraft,
 		switchTeam,
+		setGmSuccessor,
 		takeControlTeam,
 		threeSimNext,
 		toggleColaOptOut,

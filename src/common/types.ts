@@ -843,6 +843,9 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	// Staff Report: a compact copy of each past season's report (History tab) and the digests already sent
 	staffReportHistory: StaffReportHistoryEntry[] | undefined;
 
+	// AI GM personalities: the successor the user picked from the GM market when fired (hired by his old team when he leaves it)
+	gmSuccessor: { tid: number; gmid: number } | undefined;
+
 	allStarGame: number | null;
 	allStarNum: number;
 	allStarType: "draft" | "byConf" | "top" | "tournament";

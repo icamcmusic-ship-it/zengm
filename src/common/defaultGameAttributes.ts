@@ -51,6 +51,7 @@ export const gameAttributesKeysGameState: GameAttributeKey[] = [
 	"awardRaceHistory",
 	"bracketChallenge",
 	"staffReportHistory",
+	"gmSuccessor",
 	"playerTraitsSeed",
 	"leagueSalt",
 	"leagueSaltHistory",
@@ -567,6 +568,7 @@ export const defaultGameAttributes: GameAttributesLeagueWithHistory = {
 	awardRaceHistory: undefined,
 	bracketChallenge: undefined,
 	staffReportHistory: undefined,
+	gmSuccessor: undefined,
 	// Saving after every play request makes playing one day at a time slower and slower as the league gets older
 	saveEveryDay: false,
 	stopOnInjury: false,

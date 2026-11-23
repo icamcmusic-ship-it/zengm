@@ -9,6 +9,9 @@ import {
 } from "./teamHistory.ts";
 import { getPlayoffsByConfBySeason } from "./frivolitiesTeamSeasons.ts";
 import { defineView } from "../util/defineView.ts";
+import { gmEnabled } from "../core/gm/index.ts";
+import { getUserVsGms } from "../core/gm/profile.ts";
+import { isCollege } from "../core/college/isCollege.ts";
 
 export default defineView({
 	id: "gmHistory",
@@ -138,8 +141,13 @@ export default defineView({
 				).filter((p) => p !== undefined);
 			}
 
+			// AI GM personalities: your record and trades against each AI GM
+			const vsGms =
+				gmEnabled() && !isCollege() ? await getUserVsGms() : undefined;
+
 			return {
 				...teamHistory,
+				vsGms,
 				execAwards,
 				players: addFirstNameShort(players),
 				stats: historyStats,
