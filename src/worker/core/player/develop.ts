@@ -35,6 +35,8 @@ import {
 } from "./expandedRatings.ts";
 import {
 	devRatesOf,
+	potRatesOf,
+	type DevRates,
 	type GenVariety,
 } from "../../../common/prospectVariety.ts";
 import {
@@ -54,6 +56,15 @@ const getRatingByPos = (
 	pos: string,
 ) => ratingsByPos![pos]!;
 
+// Basketball prospect variety: what his potential reads of his development (potRatesOf), for a generated (not real) player
+export const potRatesForPlayer = (p: {
+	genVar?: GenVariety;
+	srID?: string;
+}): DevRates | undefined =>
+	__SPORT === "basketball" && p.genVar && !p.srID
+		? potRatesOf(p.genVar)
+		: undefined;
+
 const NUM_SIMULATIONS = 20; // Higher is more accurate, but slower. Low accuracy is fine, though!
 
 // Repeatedly simulate aging up to 29, and pick the 75th percentile max
@@ -63,12 +74,15 @@ export const monteCarloPot = async ({
 	srID,
 	pos,
 	usePotEstimator,
+	rates,
 }: {
 	ratings: MinimalPlayerRatings;
 	age: number;
 	srID?: string;
 	pos?: string;
 	usePotEstimator?: boolean;
+	// Basketball prospect variety: what potential reads of his development (potRatesOf)
+	rates?: DevRates;
 }): Promise<number> => {
 	if (age >= 29) {
 		return pos ? getRatingByPos(ratings.ovrs, pos) : ratings.ovr;
@@ -96,6 +110,10 @@ export const monteCarloPot = async ({
 		} else {
 			ovr = ratings.ovr;
 			pot = potEstimator(ovr, age);
+			// His growth rate scales his gains (developSeason), so it scales his expected growth too
+			if (rates) {
+				pot = ovr + (pot - ovr) * rates.ath;
+			}
 		}
 
 		if (ovr > pot) {
@@ -124,6 +142,8 @@ export const monteCarloPot = async ({
 				ageTemp,
 				DEFAULT_LEVEL,
 				realPlayerDeterminismInfo,
+				undefined,
+				rates,
 			);
 
 			const currentOvr = ovr(copiedRatings, pos);
@@ -270,7 +290,12 @@ const develop = async (
 			ratings.ovr = ovr(ratings);
 
 			if (!skipPot) {
-				ratings.pot = await monteCarloPot({ ratings, age, srID: p.srID });
+				ratings.pot = await monteCarloPot({
+					ratings,
+					age,
+					srID: p.srID,
+					rates: potRatesForPlayer(p as { genVar?: GenVariety; srID?: string }),
+				});
 			}
 
 			if (typeof p.pos === "string") {

@@ -1,6 +1,6 @@
 import { PHASE, PLAYER } from "../../../common/constants.ts";
 import addRatingsRow from "./addRatingsRow.ts";
-import develop, { monteCarloPot } from "./develop.ts";
+import develop, { monteCarloPot, potRatesForPlayer } from "./develop.ts";
 import { ensureSubs } from "./subRatings.ts";
 import {
 	setBasesFromSubs,
@@ -320,6 +320,7 @@ const augmentPartialPlayer = async (
 					ratings: r,
 					age: r.season - p.born.year,
 					srID: p.srID,
+					rates: potRatesForPlayer(p),
 				});
 
 				if (p.draft.year === r.season) {
@@ -361,6 +362,7 @@ const augmentPartialPlayer = async (
 				ratings: r,
 				age: r.season - p.born.year,
 				srID: p.srID,
+				rates: potRatesForPlayer(p),
 
 				// Just do a rough estimate for old pot, doesn't matter much
 				usePotEstimator: r.season < currentSeason,

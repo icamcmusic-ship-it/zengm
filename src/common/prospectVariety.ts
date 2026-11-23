@@ -10,7 +10,8 @@ import { Rng } from "./ratingsBuilds/rng.ts";
  * never touched.
  */
 
-export const PROSPECT_VARIETY_VERSION = 1;
+// 2: development reliability (DEV_RELIABILITY), for players generated since it exists. Version 1 players develop exactly as before.
+export const PROSPECT_VARIETY_VERSION = 2;
 
 // What a generated player stores (p.genVar): the version, his variety seed (development group rates are drawn from it), and, until his
 // class is saved, the ages at which he developed before the draft (the hidden trajectory is applied to them once he has a pid)
@@ -547,13 +548,43 @@ export const DEV_RATES = {
 	center: 0.99,
 };
 
-export type DevRates = Record<RatingGroup, number>;
+// Development reliability (version 2 players). Most of the spread in what a prospect becomes used to be each season's development noise,
+// which no one can see coming: the No. 1 pick by value became a star (peak 65+) about 45% of the time, his class's best player came from
+// outside its top 10 about 38% of the time, and picks 4-5 did little better than 6-10. Part of that spread now sits in his growth rate
+// instead (shared by every rating group: a persistent trait, like a motor or a frame that fills out), which his potential reads
+// (potRatesOf), while young players' yearly noise is narrowed around its mean. More of where a prospect is headed shows before the draft,
+// so the best ones go first more often. The per-group rates, the yearly noise and the bust tail (not narrowed) stay hidden, so there are
+// still busts at the top and stars from late picks. Nothing here reads where he was drafted. Measured in docs/native-features.md
+// (Prospect variety, 8b).
+export const DEV_RELIABILITY = {
+	// Spread of the rate shared by every group (version 1: DEV_RATES.sharedSd)
+	sharedSd: 0.38,
+	// Young players' (25 and under) yearly noise: its deviation from its mean is scaled by this (not the bust tail)
+	noiseScale: 0.7,
+};
+
+// Means of the stock young noise draws (normal, sd 5), bounded at [-4, 20] (23 and under) and [-4, 10] (24-25): the center the noise is
+// narrowed around, so the league's development is unchanged on average
+export const YOUNG_NOISE_MEAN = {
+	upTo23: 0.601,
+	upTo25: 0.5586,
+	// Narrowing alone raised young players' gains (fewer of them hit the ratings' limits): six seasons at 20-25 gained 0.54 ovr more. This
+	// puts it back (the same ratings at the same rates: 9.52 vs 9.53 stock; prospectVariety.test.ts)
+	shift: -0.13,
+};
+
+// Per rating group, plus the scale of his young yearly noise (version 2 players; undefined: stock)
+export type DevRates = Record<RatingGroup, number> & { noise?: number };
 
 // His development rate per rating group (multiplies each rating's yearly gain while young). Symmetric around DEV_RATES.center, so the
 // league's rostered players develop about as much as before on average.
 export const devRatesOf = (gv: GenVariety): DevRates => {
+	const v2 = gv.v >= 2;
 	const rng = new Rng(`devRates|${gv.s}`);
-	const shared = rng.normal(0, DEV_RATES.sharedSd);
+	const shared = rng.normal(
+		0,
+		v2 ? DEV_RELIABILITY.sharedSd : DEV_RATES.sharedSd,
+	);
 	const c = gv.c ?? 1;
 	const rate = () =>
 		c *
@@ -564,7 +595,37 @@ export const devRatesOf = (gv: GenVariety): DevRates => {
 				DEV_RATES.center + shared + rng.normal(0, DEV_RATES.groupSd),
 			),
 		);
-	return { ath: rate(), shoot: rate(), skill: rate(), ins: rate() };
+	const rates: DevRates = {
+		ath: rate(),
+		shoot: rate(),
+		skill: rate(),
+		ins: rate(),
+	};
+	if (v2) {
+		rates.noise = DEV_RELIABILITY.noiseScale;
+	}
+	return rates;
+};
+
+// What his potential develops with (version 2 players): the part of his rate scouts can read, the one shared by every group (a frame, a
+// motor), the same for every group, so which part of his game grows fastest stays hidden. Undefined for version 1 players (the stock
+// development, as before)
+export const potRatesOf = (gv: GenVariety): DevRates | undefined => {
+	if (gv.v < 2) {
+		return undefined;
+	}
+	const rng = new Rng(`devRates|${gv.s}`);
+	const shared = rng.normal(0, DEV_RELIABILITY.sharedSd);
+	const rate =
+		(gv.c ?? 1) *
+		Math.max(DEV_RATES.min, Math.min(DEV_RATES.max, DEV_RATES.center + shared));
+	return {
+		ath: rate,
+		shoot: rate,
+		skill: rate,
+		ins: rate,
+		noise: DEV_RELIABILITY.noiseScale,
+	};
 };
 
 export const RATING_TO_GROUP: Record<string, RatingGroup> = Object.fromEntries(
