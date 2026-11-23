@@ -23,6 +23,7 @@ import {
 	fitToScore,
 	installAfterGames,
 	systemFamiliarity,
+	NEUTRAL_COACH_SIM,
 	normalizeCoachSims,
 	OFFENSE_SYSTEMS,
 	playerSchemeFit,
@@ -51,6 +52,7 @@ import { winProb } from "../seasonOdds/simSeason.ts";
 import teamOvr from "../team/ovr.ts";
 import { getGmWeights } from "../gm/index.ts";
 import { getVideoBoost } from "../staffDepth/coaching.ts";
+import fuzzRating from "../player/fuzzRating.ts";
 import type { GmWeights } from "../../../common/gmPersonality.ts";
 
 export const coachSystemsEnabled = () =>
@@ -282,6 +284,27 @@ export const playerSystemFit = (
 	return { fit, score: fitToScore(fit) };
 };
 
+// A player's fit as the user's scouts see it: from his fuzzed ratings, like the player page (height isn't fuzzed; no fuzz in God Mode or
+// multi-team mode). For display only: the sim and the AI use playerSystemFit
+export const playerSystemFitFuzzed = (
+	p: Pick<Player, "ratings">,
+	profile: Pick<CoachProfile, "off" | "def">,
+) => {
+	const r = p.ratings.at(-1) as any;
+	const fuzzed = { ...r };
+	for (const key of Object.keys(r)) {
+		if (
+			typeof r[key] === "number" &&
+			key !== "hgt" &&
+			key !== "season" &&
+			key !== "fuzz"
+		) {
+			fuzzed[key] = fuzzRating(r[key], r.fuzz ?? 0);
+		}
+	}
+	return playerSystemFit({ ratings: [fuzzed] } as any, profile);
+};
+
 const getHeadCoach = async (tid: number) => {
 	const coaches = await idb.cache.coaches.indexGetAll("coachesByTid", tid);
 	return coaches.find((c) => c.role === "head");
@@ -417,6 +440,49 @@ export const getLeagueCoachSystems = async (day?: number) => {
 // Sentinel in pbpGame before the systems (common/pbpFlavor/story.ts parseCoachSystems)
 export const PBP_COACH_SYSTEMS_MARKER = 9101;
 
+// Percentile of the empty head coach job's acting coach among the league's head coaches (game-day coaching)
+export const ACTING_COACH_PERCENTILE = 0.35;
+
+/**
+ * A team without a head coach plays under an acting coach (an assistant running the bench): no system of his own (the team plays its
+ * natural game, the multipliers stay 1), and the game-day coaching of a below-average head coach (the 35th percentile of the league's
+ * head coaches, after league centering). Without it the empty job played like an exactly average coach, so firing a poor coach in-season
+ * was a free upgrade. Deterministic. Undefined when no team has a head coach.
+ */
+export const actingCoachSim = (
+	sims: readonly CoachSim[],
+): CoachSim | undefined => {
+	if (sims.length === 0) {
+		return;
+	}
+	// The value at this percentile from the bad end (low is bad unless highIsBad)
+	const pct = (values: number[], highIsBad = false) => {
+		const sorted = values.toSorted((a, b) => (highIsBad ? b - a : a - b));
+		const x = ACTING_COACH_PERCENTILE * (sorted.length - 1);
+		const lo = Math.floor(x);
+		const hi = Math.min(sorted.length - 1, lo + 1);
+		return sorted[lo]! + (x - lo) * (sorted[hi]! - sorted[lo]!);
+	};
+	return {
+		...NEUTRAL_COACH_SIM,
+		// (labels the sim reads like the no-coach default; not shown in the play-by-play)
+		off: "motion",
+		def: "switch",
+		// Only worse than average: an acting coach is never an upgrade on an average one
+		make: Math.min(0, pct(sims.map((s) => s.make))),
+		dMake: Math.max(
+			0,
+			pct(
+				sims.map((s) => s.dMake),
+				true,
+			),
+		),
+		clutchMake: Math.min(0, pct(sims.map((s) => s.clutchMake))),
+		mgmt: Math.min(50, pct(sims.map((s) => s.mgmt ?? 50))),
+		adapt: Math.min(50, pct(sims.map((s) => s.adapt ?? 50))),
+	};
+};
+
 /**
  * Give each team playing today its coach's sim multipliers (t.coachSim), the rotation hooks (rotationStyle, rest on back-to-backs, trust in
  * young players), playoff series adjustments, and the labels for the box score and play-by-play. Call after loadTeams (and
@@ -437,6 +503,8 @@ export const applyCoachSystems = async (
 	const rotations = nativeFeatureEnabled("realisticRotations", (key) =>
 		g.get(key as any),
 	);
+	// A vacant head coach job (Coaching Staff with Coaching Systems on): the acting coach
+	const acting = actingCoachSim([...league.values()].map((row) => row.sim));
 
 	for (const matchup of schedule) {
 		if (matchup.homeTid < 0 || matchup.awayTid < 0) {
@@ -476,6 +544,10 @@ export const applyCoachSystems = async (
 			const sim = sims[i];
 			const row = league.get(tid);
 			const t = teams[tid];
+			if (!row && t && acting) {
+				t.coachSim = { ...acting };
+				continue;
+			}
 			if (!sim || !row || !t) {
 				continue;
 			}
@@ -682,11 +754,13 @@ export const hotSeatLabel = (heat: number) =>
 				: "Safe";
 
 // Firing probability from the hot seat (replaces the record-based rules when the setting is on). Similar number of firings per season
-export const hotSeatFireProb = (c: Coach, tenure: number) => {
-	if (tenure < 1) {
-		return 0;
-	}
+// headSeasons: seasons in a row as this team's head coach, counting the one just played. After his first season only a disaster (about
+// 12+ wins under the preseason expectation) can get him fired, and rarely
+export const hotSeatFireProb = (c: Coach, headSeasons: number) => {
 	const heat = hotSeat(c);
+	if (headSeasons < 2) {
+		return heat > 0.9 ? Math.min(0.3, 3 * (heat - 0.9)) : 0;
+	}
 	return heat > 0.5 ? Math.min(0.75, 1.5 * (heat - 0.5)) : 0;
 };
 
@@ -1084,9 +1158,15 @@ export const rankHeadCoachCandidates = async (
 // ---- development philosophy ----
 
 // Coaching level change (budget level units, 1-100 scale) for a player's progs from his head coach's philosophy: development coaches help
-// young players and pay less attention to veterans, win-now coaches the other way around. Centered over the league's coaches
-export const philosophyLevelDelta = (profile: CoachProfile, age: number) => {
-	const ph = profile.philosophy;
+// young players and pay less attention to veterans, win-now coaches the other way around. Centered over the league's coaches: leagueMean is
+// the average philosophy of the league's head coaches (philosophyLeagueMean), so AI hiring drifting toward development coaches doesn't
+// speed up every young player in the league
+export const philosophyLevelDelta = (
+	profile: CoachProfile,
+	age: number,
+	leagueMean = 0,
+) => {
+	const ph = profile.philosophy - leagueMean;
 	if (age <= 23) {
 		return 8 * ph;
 	}
@@ -1094,6 +1174,17 @@ export const philosophyLevelDelta = (profile: CoachProfile, age: number) => {
 		return -5 * ph;
 	}
 	return 0;
+};
+
+export const philosophyLeagueMean = (profiles: Map<number, CoachProfile>) => {
+	if (profiles.size === 0) {
+		return 0;
+	}
+	let sum = 0;
+	for (const profile of profiles.values()) {
+		sum += profile.philosophy;
+	}
+	return sum / profiles.size;
 };
 
 export const getHeadProfiles = async () => {

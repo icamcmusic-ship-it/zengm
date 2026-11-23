@@ -18,6 +18,7 @@ import {
 	getStaffLevel,
 	getStaffPayroll,
 	firedRecentlyBy,
+	maxCoachContractExp,
 } from "../core/staff/index.ts";
 import {
 	getRosterFit,
@@ -356,6 +357,8 @@ export default defineView({
 					g.get("phase") <= PHASE.PLAYOFFS ||
 					g.get("phase") === PHASE.EXPANSION_DRAFT,
 				candidates,
+				// Extensions can't take a contract past this season
+				maxContractExp: maxCoachContractExp(),
 				coachSystems: systemsOn,
 				colors,
 				devRank,

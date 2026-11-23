@@ -296,7 +296,10 @@ import { getMetaAttribute, putMetaAttribute } from "../db/metaAttributes.ts";
 import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
 import updateSubRatingsForLeague from "../core/player/updateSubRatingsForLeague.ts";
 import { ensureSubs } from "../core/player/subRatings.ts";
-import { ensureTieredBadges } from "../core/player/tieredBadges.ts";
+import {
+	ensureTieredBadges,
+	refreshTieredBadgesFor,
+} from "../core/player/tieredBadges.ts";
 import {
 	ensureExpandedRatings,
 	expandedRatingsOn,
@@ -2973,7 +2976,7 @@ const generateCollegeStatsAllClasses = async (options: {
 };
 
 const staffAction = async (
-	action:
+	action: (
 		| {
 				type: "hire";
 				cid: number;
@@ -2990,9 +2993,17 @@ const staffAction = async (
 		| { type: "walkAway"; cid: number }
 		| { type: "setHeir"; cid: number | null }
 		| { type: "promoteHeir" }
-		| { type: "interim"; cid: number; keep: boolean; years: number },
+		| { type: "interim"; cid: number; keep: boolean; years: number }
+	) & {
+		// The Staff page's team: in multi-team mode it can be any of the user's
+		// teams, not only the active one. Without it, the active team.
+		tid?: number;
+	},
 ) => {
-	const tid = g.get("userTid");
+	const tid = action.tid ?? g.get("userTid");
+	if (!g.get("userTids").includes(tid) || g.get("spectator")) {
+		throw new Error("You can only manage the staff of your own teams.");
+	}
 	let buyout;
 	let offer;
 	if (action.type === "hire") {
@@ -3394,6 +3405,9 @@ const importPlayers = async ({
 		await player.updateValues(p3);
 
 		await idb.cache.players.put(p3);
+
+		// 2K badges against this season's cutoffs (otherwise none until the next preseason)
+		await refreshTieredBadgesFor(p3 as Player);
 	}
 
 	await toUI("realtimeUpdate", [["playerMovement"]]);
@@ -6382,6 +6396,17 @@ const upsertCustomizedPlayer = async (
 			: (player.initTraits(pWithPid), true);
 		if (changed) {
 			await idb.cache.players.put(pWithPid);
+		}
+
+		// 2K badges for a new player (created or cloned: a clone's copied entry could hold a second Legend), one whose ratings were
+		// edited, or one without badges this season (unretired), against this season's cutoffs
+		if (
+			!prevPlayer ||
+			JSON.stringify(last(prevPlayer.ratings)) !==
+				JSON.stringify(last(pWithPid.ratings)) ||
+			!pWithPid.badges2k?.some((e) => e.season === g.get("season"))
+		) {
+			await refreshTieredBadgesFor(pWithPid);
 		}
 	}
 

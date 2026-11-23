@@ -32,7 +32,7 @@ import {
 	getCoachProfile,
 	hotSeat,
 	hotSeatLabel,
-	playerSystemFit,
+	playerSystemFitFuzzed,
 	reputationLabel,
 } from "../core/staff/systems.ts";
 import { idb } from "../db/index.ts";
@@ -152,16 +152,20 @@ export type HeadCoachOutlook = ReturnType<typeof headCoachOutlook>;
  * the team's scheme fit.
  */
 export const rosterFitPlayers = async (tid: number, c: CoachWithoutKey) => {
+	// From the ratings the user can see: fuzzed like the player page, and nothing under No Visible Ratings
+	if (g.get("challengeNoRatings")) {
+		return { helping: [], hurting: [] };
+	}
 	const profile = getCoachProfile(c);
 	const players = (await idb.cache.players.indexGetAll("playersByTid", tid))
 		.filter((p) => p.injury.gamesRemaining === 0)
-		.sort((a, b) => b.valueNoPot - a.valueNoPot)
+		.sort((a, b) => b.valueNoPotFuzz - a.valueNoPotFuzz)
 		.slice(0, 9)
 		.map((p) => ({
 			pid: p.pid,
 			name: `${p.firstName} ${p.lastName}`,
 			pos: p.ratings.at(-1)!.pos,
-			score: playerSystemFit(p, profile).score,
+			score: playerSystemFitFuzzed(p, profile).score,
 		}))
 		.sort((a, b) => b.score - a.score);
 	return {

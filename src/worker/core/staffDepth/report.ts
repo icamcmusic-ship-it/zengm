@@ -58,7 +58,7 @@ import {
 	coachSystemsEnabled,
 	getCoachProfile,
 	getRosterFit,
-	playerSystemFit,
+	playerSystemFitFuzzed,
 } from "../staff/systems.ts";
 import {
 	coachingDepthOn,
@@ -298,7 +298,8 @@ export const getProScouting = async ({ light }: { light?: boolean } = {}) => {
 				}
 			}
 		}
-		const fit = profile ? playerSystemFit(p, profile).fit : 0;
+		// From his fuzzed ratings, as the scouts see him (the true fit leaked other teams' ratings). No profile under No Visible Ratings
+		const fit = profile ? playerSystemFitFuzzed(p, profile).fit : 0;
 		const score =
 			value +
 			6 * need +
