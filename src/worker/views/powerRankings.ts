@@ -1,6 +1,5 @@
 import { idb } from "../db/index.ts";
 import { g } from "../util/index.ts";
-import { bySport } from "../../common/sportFunctions.ts";
 import type { TeamFiltered } from "../../common/types.ts";
 import { defineView } from "../util/defineView.ts";
 import { player, team } from "../core/index.ts";
@@ -13,7 +12,11 @@ import hasTies from "../core/season/hasTies.ts";
 import { getActualPlayThroughInjuries } from "../core/game/loadTeams.ts";
 import { PHASE } from "../../common/constants.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
-import { getSeasonOdds } from "../core/seasonOdds/index.ts";
+import {
+	getSeasonOdds,
+	MOV_SCALE,
+	teamStrength,
+} from "../core/seasonOdds/index.ts";
 import { validatePlayoffs, validateSeason } from "../util/processInputs.ts";
 
 const processInputs = (params: RouteParams<"powerRankings">) => {
@@ -52,14 +55,8 @@ const otherToRanks = (
 	}
 };
 
-// How much a point (goal, run) of margin of victory is worth next to the rating term. Basketball is the reference (1, so its
-// rankings are unchanged); in low scoring sports a goal or run is worth much more, otherwise MOV barely counts there
-export const MOV_SCALE = bySport({
-	baseball: 7,
-	basketball: 1,
-	football: 1,
-	hockey: 10,
-});
+// Shared with Season Odds (core/seasonOdds/strength.ts)
+export { MOV_SCALE };
 
 // Wins and games played in a "last ten" string (W-L, W-L-OTL, W-L-T or W-L-OTL-T)
 export const parseLastTen = (lastTen: string) => {
@@ -109,39 +106,125 @@ export const playoffScore = ({
 	return score;
 };
 
-export const getPowerRankingsScore = ({
+// The parts of a power ranking score, in score points. Strength is the measure shared with Season Odds (an expected point margin), counted
+// double so it outweighs form; the roster part is split into the healthy roster and what injuries take off it
+export type PowerRankingsParts = {
+	roster: number;
+	injuries: number;
+	results: number;
+	form: number;
+	playoffs: number;
+};
+
+// Score points per point of strength
+export const STRENGTH_WEIGHT = 2;
+
+export const getPowerRankingsParts = ({
 	mov,
 	gp,
-	numGames,
 	ovr,
+	ovrHealthy,
 	lastTen,
 	playoffs,
+	playoffOvr,
 }: {
 	mov: number;
 	gp: number;
-	numGames: number;
 	ovr: number;
+	// The healthy rating, when ovr accounts for injuries
+	ovrHealthy?: number;
 	lastTen: string;
 	playoffs?: PowerRankingsPlayoffs;
-}) => {
-	// Start with MOV, scaled for games played (and per sport)
-	let score = numGames > 0 ? (MOV_SCALE * mov * gp) / numGames : 0;
+	// ovr is the playoff rotation rating
+	playoffOvr?: boolean;
+}): PowerRankingsParts & { strength: number } => {
+	const strength = teamStrength({ ovr, mov, gp, playoffOvr });
+	const healthy =
+		ovrHealthy === undefined
+			? strength
+			: teamStrength({ ovr: ovrHealthy, mov, gp, playoffOvr });
 
-	// Add estimated MOV from ovr (0/100 to -30/30)
-	score += ovr * 0.6 - 30;
-
-	// Modulate by recent record: +10 for winning all of the last 10 and -10 for losing all of them, by the games actually played (a
-	// team 3-0 in its first 3 games gets +10, not -4)
+	// Recent record: +10 for winning all of the last 10 and -10 for losing all of them, by the games actually played (a team 3-0 in its first
+	// 3 games gets +10, not -4)
+	let form = 0;
 	const { won, played } = parseLastTen(lastTen);
 	if (played > 0) {
-		score += 10 * ((2 * won) / played - 1);
+		form = 10 * ((2 * won) / played - 1);
 	}
 
-	if (playoffs) {
-		score += playoffScore(playoffs);
-	}
+	const roster = STRENGTH_WEIGHT * (1 - healthy.w) * healthy.roster;
+	return {
+		strength: strength.strength,
+		roster,
+		injuries: STRENGTH_WEIGHT * (1 - strength.w) * strength.roster - roster,
+		results: STRENGTH_WEIGHT * strength.w * strength.results,
+		form,
+		playoffs: playoffs ? playoffScore(playoffs) : 0,
+	};
+};
 
-	return score;
+export const sumPowerRankingsParts = (parts: PowerRankingsParts) =>
+	parts.roster + parts.injuries + parts.results + parts.form + parts.playoffs;
+
+export const getPowerRankingsScore = (
+	info: Parameters<typeof getPowerRankingsParts>[0],
+) => sumPowerRankingsParts(getPowerRankingsParts(info));
+
+const PART_LABELS: Record<keyof PowerRankingsParts, string> = {
+	roster: "roster",
+	injuries: "injuries",
+	results: "point margin",
+	form: "recent form",
+	playoffs: "playoff run",
+};
+
+export type PowerRankingsWhy = {
+	// Each part compared to the league average, biggest first
+	parts: { key: keyof PowerRankingsParts; label: string; value: number }[];
+	text: string;
+};
+
+// What drives each team's rank: each part of its score next to the league average. Under No Visible Ratings the roster and injury parts
+// are left out (they are the team rating).
+export const explainPowerRankings = (
+	teams: { parts: PowerRankingsParts }[],
+	noRatings: boolean,
+): PowerRankingsWhy[] => {
+	const keys = (
+		Object.keys(PART_LABELS) as (keyof PowerRankingsParts)[]
+	).filter((key) => !noRatings || (key !== "roster" && key !== "injuries"));
+	const avg = {} as Record<keyof PowerRankingsParts, number>;
+	for (const key of keys) {
+		avg[key] =
+			teams.length > 0
+				? teams.reduce((sum, t) => sum + t.parts[key], 0) / teams.length
+				: 0;
+	}
+	return teams.map((t) => {
+		const parts = keys
+			.map((key) => ({
+				key,
+				label: PART_LABELS[key],
+				value: t.parts[key] - avg[key],
+			}))
+			.filter((part) => Math.abs(part.value) >= 0.05)
+			.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+		const up = parts.filter((part) => part.value >= 1).slice(0, 2);
+		const down = parts.filter((part) => part.value <= -1).slice(0, 2);
+		const list = (rows: typeof parts) =>
+			rows.map((part) => part.label).join(" and ");
+		let text;
+		if (up.length > 0 && down.length > 0) {
+			text = `Lifted by ${list(up)}, held back by ${list(down)}.`;
+		} else if (up.length > 0) {
+			text = `Lifted by ${list(up)}.`;
+		} else if (down.length > 0) {
+			text = `Held back by ${list(down)}.`;
+		} else {
+			text = "Close to league average across the board.";
+		}
+		return { parts, text };
+	});
 };
 
 // Whether a season's playoffs have started, so its power rankings include playoff results
@@ -287,14 +370,16 @@ export const addPowerRankingsStuffToTeams = async <
 		});
 
 		// Injury-aware rating in the current season (who can actually play now), healthy rating for past seasons
-		const score = getPowerRankingsScore({
+		const { strength, ...parts } = getPowerRankingsParts({
 			mov: t.stats.mov,
 			gp: t.stats.gp,
-			numGames: g.get("numGames", season),
 			ovr: currentSeason ? ovrCurrent : ovr,
+			ovrHealthy: currentSeason ? ovr : undefined,
 			lastTen: t.seasonAttrs.lastTen,
 			playoffs: playoffResults.get(t.tid),
+			playoffOvr: playoffs === "playoffs",
 		});
+		const score = sumPowerRankingsParts(parts);
 
 		const other: Record<string, number> = {};
 		const otherCurrent: Record<string, number> = {};
@@ -337,6 +422,9 @@ export const addPowerRankingsStuffToTeams = async <
 			...t,
 			powerRankings: {
 				score,
+				strength,
+				parts,
+				why: undefined as PowerRankingsWhy | undefined,
 				ovr,
 				ovrCurrent,
 				other,
@@ -350,6 +438,16 @@ export const addPowerRankingsStuffToTeams = async <
 	});
 
 	otherToRanks(teamsWithRankings);
+
+	const whys = explainPowerRankings(
+		teamsWithRankings.map((t) => t.powerRankings),
+		g.get("challengeNoRatings"),
+	);
+	for (const [t, why] of Iterator.zip([teamsWithRankings, whys], {
+		mode: "strict",
+	})) {
+		t.powerRankings.why = why;
+	}
 
 	teamsWithRankings.sort(
 		(a, b) => b.powerRankings.score - a.powerRankings.score,
@@ -471,6 +569,10 @@ export default defineView({
 				for (const t of teamsWithRankings) {
 					t.powerRankings.other = {};
 					t.powerRankings.otherCurrent = {};
+					// The "why" already leaves the roster out; the strength blend and roster parts would give the team rating away
+					t.powerRankings.strength = 0;
+					t.powerRankings.parts.roster = 0;
+					t.powerRankings.parts.injuries = 0;
 				}
 			}
 

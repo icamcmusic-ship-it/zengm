@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { OverlayTrigger, Popover } from "react-bootstrap";
 import { dropdownOptions } from "../hooks/useDropdownOptions.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
@@ -33,6 +34,82 @@ const Other = ({
 				{current}
 			</span>
 		</>
+	);
+};
+
+const signed = (x: number) =>
+	`${x >= 0 ? "+" : "\u2212"}${Math.abs(x).toFixed(1)}`;
+
+// What drives a team's rank: its score parts next to the league average, and the strength shared with the playoff and title odds
+const RankWhy = ({
+	challengeNoRatings,
+	t,
+}: {
+	challengeNoRatings: boolean;
+	t: View<"powerRankings">["teams"][number];
+}) => {
+	const why = t.powerRankings.why;
+	const rank = (
+		<>
+			{t.powerRankings.rank}
+			<RankChange change={t.rankChange} />
+		</>
+	);
+	if (!why) {
+		return rank;
+	}
+	const popover = (
+		<Popover id={`power-why-${t.tid}`}>
+			<Popover.Header as="h3">
+				Why #{t.powerRankings.rank}: {t.seasonAttrs.abbrev}
+			</Popover.Header>
+			<Popover.Body>
+				<p className="mb-2">{why.text}</p>
+				{why.parts.length > 0 ? (
+					<table className="table table-sm table-borderless mb-2">
+						<tbody>
+							{why.parts.map((part) => (
+								<tr key={part.key}>
+									<td className="ps-0">
+										{helpers.upperCaseFirstLetter(part.label)}
+									</td>
+									<td
+										className={`text-end pe-0 ${part.value >= 0 ? "text-success" : "text-danger"}`}
+									>
+										{signed(part.value)}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				) : null}
+				<div className="text-body-secondary small">
+					Points of power score vs the league average.
+					{!challengeNoRatings ? (
+						<>
+							{" "}
+							Strength {signed(t.powerRankings.strength)} points per game, the
+							same measure behind the playoff and title odds.
+						</>
+					) : null}
+				</div>
+			</Popover.Body>
+		</Popover>
+	);
+	return (
+		<OverlayTrigger
+			trigger={["hover", "focus"]}
+			placement="right"
+			overlay={popover}
+		>
+			<button
+				type="button"
+				className="btn btn-link p-0 border-0 align-baseline text-reset"
+				style={{ cursor: "help", textDecoration: "underline dotted" }}
+			>
+				{rank}
+			</button>
+		</OverlayTrigger>
 	);
 };
 
@@ -180,12 +257,7 @@ const PowerRankings = ({
 			key: t.tid,
 			data: [
 				{
-					value: (
-						<>
-							{t.powerRankings.rank}
-							<RankChange change={t.rankChange} />
-						</>
-					),
+					value: <RankWhy challengeNoRatings={!!challengeNoRatings} t={t} />,
 					sortValue: t.powerRankings.rank,
 					searchValue: t.powerRankings.rank,
 				},
@@ -262,7 +334,9 @@ const PowerRankings = ({
 			<p>
 				The power ranking is a combination of recent performance, margin of
 				victory, and team rating. Team rating is based only on the ratings of
-				players on each team.
+				players on each team. Margin and team rating are blended into one
+				strength measure (margin counts more as games are played), the same one
+				the playoff and title odds use. Hover a rank to see what drives it.
 			</p>
 			{playoffs === "playoffs" && __SPORT === "basketball" ? (
 				<p>

@@ -2,10 +2,15 @@ import { assert, describe, test } from "vitest";
 import {
 	MOV_SCALE,
 	PLAYOFF_ROUND_WEIGHT,
+	STRENGTH_WEIGHT,
+	explainPowerRankings,
+	getPowerRankingsParts,
 	getPowerRankingsScore,
+	sumPowerRankingsParts,
 	parseLastTen,
 	playoffScore,
 } from "./powerRankings.ts";
+import { MOV_PRIOR_GAMES, teamStrength } from "../core/seasonOdds/strength.ts";
 
 describe("power rankings score", () => {
 	test("parses last ten records", () => {
@@ -16,29 +21,70 @@ describe("power rankings score", () => {
 		assert.deepEqual(parseLastTen(""), { won: 0, played: 0 });
 	});
 
-	test("full last ten matches the old formula (-10 + 2 * wins)", () => {
+	test("score is twice the shared strength plus the last ten (-10 + 2 * wins)", () => {
 		const base = {
 			mov: 4,
 			gp: 41,
-			numGames: 82,
 			ovr: 55,
 		};
+		const { strength } = teamStrength(base);
 		for (let won = 0; won <= 10; won++) {
 			const score = getPowerRankingsScore({
 				...base,
 				lastTen: `${won}-${10 - won}`,
 			});
-			const old =
-				(MOV_SCALE * base.mov * base.gp) / base.numGames +
-				base.ovr * 0.6 -
-				30 +
-				(-10 + 2 * won);
-			assert.closeTo(score, old, 1e-9);
+			assert.closeTo(score, STRENGTH_WEIGHT * strength + (-10 + 2 * won), 1e-9);
 		}
 	});
 
+	test("strength blends roster and margin, margin taking over as games are played", () => {
+		// ovr 60 is +3 points per game, ovr 50 is average
+		assert.closeTo(teamStrength({ ovr: 60, mov: 0, gp: 0 }).strength, 3, 1e-9);
+		assert.closeTo(
+			teamStrength({ ovr: 50, mov: 5, gp: MOV_PRIOR_GAMES }).strength,
+			2.5 * MOV_SCALE,
+			1e-9,
+		);
+		assert.isAbove(
+			teamStrength({ ovr: 50, mov: 5, gp: 82 }).strength,
+			teamStrength({ ovr: 50, mov: 5, gp: 20 }).strength,
+		);
+	});
+
+	test("parts add up, injuries are what the injury-aware rating takes off", () => {
+		const parts = getPowerRankingsParts({
+			mov: 2,
+			gp: 30,
+			ovr: 52,
+			ovrHealthy: 58,
+			lastTen: "6-4",
+		});
+		assert.isBelow(parts.injuries, 0);
+		assert.isAbove(parts.roster, 0);
+		assert.closeTo(
+			sumPowerRankingsParts(parts),
+			getPowerRankingsScore({ mov: 2, gp: 30, ovr: 52, lastTen: "6-4" }),
+			1e-9,
+		);
+	});
+
+	test("why: parts against the league average, roster hidden under No Visible Ratings", () => {
+		const zero = { roster: 0, injuries: 0, results: 0, form: 0, playoffs: 0 };
+		const teams = [
+			{ parts: { ...zero, roster: 10, form: -6 } },
+			{ parts: { ...zero, roster: -10, form: 6 } },
+		];
+		const [a, b] = explainPowerRankings(teams, false);
+		assert.strictEqual(a!.parts[0]!.key, "roster");
+		assert.strictEqual(a!.text, "Lifted by roster, held back by recent form.");
+		assert.strictEqual(b!.text, "Lifted by recent form, held back by roster.");
+		const [c] = explainPowerRankings(teams, true);
+		assert.isFalse(c!.parts.some((part) => part.key === "roster"));
+		assert.strictEqual(c!.text, "Held back by recent form.");
+	});
+
 	test("last ten is normalized by games played", () => {
-		const base = { mov: 0, gp: 3, numGames: 82, ovr: 50 };
+		const base = { mov: 0, gp: 3, ovr: 50 };
 		const unbeaten = getPowerRankingsScore({ ...base, lastTen: "3-0" });
 		const tenAndOh = getPowerRankingsScore({ ...base, lastTen: "10-0" });
 		assert.closeTo(unbeaten, tenAndOh, 1e-9);
@@ -53,7 +99,7 @@ describe("power rankings score", () => {
 	});
 
 	test("rating term uses the rating passed (callers pass the injury-aware one)", () => {
-		const base = { mov: 0, gp: 0, numGames: 82, lastTen: "0-0" };
+		const base = { mov: 0, gp: 0, lastTen: "0-0" };
 		assert.isAbove(
 			getPowerRankingsScore({ ...base, ovr: 60 }),
 			getPowerRankingsScore({ ...base, ovr: 50 }),
@@ -72,7 +118,6 @@ describe("power rankings score", () => {
 		const base = {
 			mov: 3,
 			gp: 82,
-			numGames: 82,
 			ovr: 55,
 			lastTen: "6-4",
 		};
