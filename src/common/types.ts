@@ -821,6 +821,13 @@ export type StaffScorecard = {
 	injuryGamesExpected: number;
 };
 
+// Game Sim Fixes (basketball): rotation players' mean ratings, the league's first record (ref) and this season's (cur)
+export type SimTalentCenter = {
+	ref: Record<string, number>;
+	season: number;
+	cur: Record<string, number>;
+};
+
 export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	aiJerseyRetirement: boolean;
 	aiTradesFactor: number;
@@ -1212,6 +1219,8 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 		| Record<number, import("./tieredBadges/compute.ts").TieredBadgeCutoffs>
 		| undefined;
 	draftBoardAutoDraft: boolean;
+	// Game Sim Fixes (basketball): the league's talent center, its rotation players' mean ratings (worker/core/game/talentCenter.ts)
+	simTalentCenter: SimTalentCenter | undefined;
 
 	// Basketball only. Real coaching staff (coaches with ratings and contracts) instead of the coaching budget slider
 	coachingStaff: boolean;

@@ -18,12 +18,15 @@ import { test } from "vitest";
 import {
 	LEAGUE_DATABASE_VERSION,
 	PHASE,
-	PLAYER,
 } from "../../../common/constants.ts";
 import { defaultGameAttributes } from "../../../common/defaultGameAttributes.ts";
 import { makeSeededRandom } from "../../../common/random.ts";
 import { last } from "../../../common/utils.ts";
-import { talentCycle } from "../../../common/prospectVariety.ts";
+import {
+	CLASS_TALENT,
+	TALENT_CYCLE,
+	talentCycle,
+} from "../../../common/prospectVariety.ts";
 import { draft, freeAgents, game, league, phase, season } from "../index.ts";
 import { idb } from "../../db/index.ts";
 import { getDefaultSettings } from "../../views/newLeague.ts";
@@ -31,6 +34,7 @@ import { g, helpers, lock } from "../../util/index.ts";
 import gameSimPresets from "../../../ui/views/Settings/gameSimPresets.ts";
 import { loadMatchups, runPreviewGames } from "../game/previewGameSim.ts";
 import { tiersForSeason } from "../player/tieredBadges.ts";
+import { talentCenterOptions } from "../game/talentCenter.ts";
 
 const env = (globalThis as any).process.env;
 const SEASONS = Number(env.SCORING_DRIFT_SEASONS ?? 30);
@@ -42,6 +46,19 @@ const PROBE_GAMES = Number(env.SCORING_DRIFT_PROBE_GAMES ?? 240);
 const NUM_GAMES = Number(env.SCORING_DRIFT_GAMES ?? 82);
 // Teams (fewer than 30: one conference and division, the top 8 in the playoffs; less memory and time)
 const NUM_TEAMS = Number(env.SCORING_DRIFT_TEAMS ?? 30);
+
+// Experiments: SCORING_DRIFT_NO_CYCLE=1 (no talent cycles), SCORING_DRIFT_NO_CLASS=1 (no class-level talent draw)
+if (env.SCORING_DRIFT_NO_CYCLE) {
+	TALENT_CYCLE.amp = 0;
+	TALENT_CYCLE.amp2 = 0;
+}
+// SCORING_DRIFT_NO_CENTER=1: without the league talent centering (game/talentCenter.ts), as before it
+if (env.SCORING_DRIFT_NO_CENTER) {
+	talentCenterOptions.off = true;
+}
+if (env.SCORING_DRIFT_NO_CLASS) {
+	CLASS_TALENT.sd = 0;
+}
 
 const out = (obj: unknown) => {
 	const line = JSON.stringify(obj);
@@ -117,8 +134,24 @@ const ratingsSnapshot = async () => {
 		}
 	}
 	const ovrs = players.map((p) => last(p.ratings).ovr);
+	const sd = (xs: number[]) => {
+		const m = mean(xs);
+		return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
+	};
+	const season = g.get("season");
+	const ages: number[] = [];
+	for (const list of byTid.values()) {
+		for (const r of list.slice(0, 8)) {
+			const p = players.find((p2) => last(p2.ratings) === r)!;
+			ages.push(season - p.born.year);
+		}
+	}
 	return {
 		n: players.length,
+		top8Age: r3(mean(ages)),
+		sd: Object.fromEntries(
+			Object.entries(sums).map(([k, v]) => [k, r3(sd(v))]),
+		),
 		ovr: r3(mean(ovrs)),
 		share60: r3(ovrs.filter((x) => x >= 60).length / ovrs.length),
 		mean: Object.fromEntries(
@@ -128,6 +161,20 @@ const ratingsSnapshot = async () => {
 			Object.entries(top8).map(([k, v]) => [k, r3(mean(v))]),
 		),
 	};
+};
+
+// Each rating's sorted values over the rostered players (sub-ratings as sub.i), for the quantile probe
+const sortedRatings = async () => {
+	const out: Record<string, number[]> = {};
+	for (const p of await rostered()) {
+		for (const [k, v] of Object.entries(flatRatings(last(p.ratings)))) {
+			(out[k] ??= []).push(v);
+		}
+	}
+	for (const v of Object.values(out)) {
+		v.sort((a, b) => a - b);
+	}
+	return out;
 };
 
 const badgeSnapshot = async () => {
@@ -143,9 +190,7 @@ const badgeSnapshot = async () => {
 };
 
 const coachSnapshot = async () => {
-	const coaches = (await idb.cache.coaches.getAll()).filter(
-		(c) => c.tid >= 0,
-	);
+	const coaches = (await idb.cache.coaches.getAll()).filter((c) => c.tid >= 0);
 	const byRole: Record<string, Record<string, number[]>> = {};
 	for (const c of coaches) {
 		const role = (byRole[c.role] ??= {});
@@ -158,9 +203,7 @@ const coachSnapshot = async () => {
 	return Object.fromEntries(
 		Object.entries(byRole).map(([role, ks]) => [
 			role,
-			Object.fromEntries(
-				Object.entries(ks).map(([k, v]) => [k, r3(mean(v))]),
-			),
+			Object.fromEntries(Object.entries(ks).map(([k, v]) => [k, r3(mean(v))])),
 		]),
 	);
 };
@@ -340,7 +383,11 @@ test.skipIf(!env.SCORING_DRIFT)(
 					featureLeagueEras: false,
 					...gameSimPresets[2026],
 					numGames: NUM_GAMES,
-					saveOldBoxScores: { pastSeasons: 0, pastSeasonsType: "all", note: "all" },
+					saveOldBoxScores: {
+						pastSeasons: 0,
+						pastSeasonsType: "all",
+						note: "all",
+					},
 					...(NUM_TEAMS < 30
 						? {
 								numGamesPlayoffSeries: [7, 7, 7],
@@ -385,7 +432,7 @@ test.skipIf(!env.SCORING_DRIFT)(
 				cycle: r3(talentCycle(String(g.get("lid")), s)),
 			};
 			if (i === 1) {
-				base = { ratings, coaches };
+				base = { ratings, coaches, sorted: await sortedRatings() };
 			}
 			if (PROBES.has(i)) {
 				row.probe = await probe(probePairs, base, i);
@@ -407,9 +454,7 @@ test.skipIf(!env.SCORING_DRIFT)(
 const probe = async (pairs: [number, number][], base: any, i: number) => {
 	const seed = 5000 + SEED;
 	const players = await rostered();
-	const coaches = (await idb.cache.coaches.getAll()).filter(
-		(c) => c.tid >= 0,
-	);
+	const coaches = (await idb.cache.coaches.getAll()).filter((c) => c.tid >= 0);
 	const nowRatings = (await ratingsSnapshot()).mean;
 	const nowCoaches = await coachSnapshot();
 
@@ -418,6 +463,8 @@ const probe = async (pairs: [number, number][], base: any, i: number) => {
 		badges?: boolean;
 		coaches?: boolean;
 		ratings?: boolean;
+		// Every rating (and sub-rating) mapped back to the first season's distribution at the same rank (spread and top end too)
+		quantile?: boolean;
 	}) => {
 		const savedRatings = new Map<number, any>();
 		const savedCoaches = new Map<number, any>();
@@ -441,6 +488,41 @@ const probe = async (pairs: [number, number][], base: any, i: number) => {
 						}
 					}
 				}
+			}
+		}
+		if (opts.quantile) {
+			const qKeys = Object.keys(base.sorted).filter(
+				(k) =>
+					(RATING_KEYS.includes(k) && k !== "hgt") ||
+					k.startsWith("sub.") ||
+					["wng", "pdef", "idef", "oreb", "dreb", "csh", "dsh", "bsc"].includes(
+						k,
+					),
+			);
+			for (const p of players) {
+				if (!savedRatings.has(p.pid)) {
+					savedRatings.set(p.pid, structuredClone(last(p.ratings)));
+				}
+			}
+			for (const k of qKeys) {
+				const [a, b] = k.split(".");
+				const get = (r: any) => (b === undefined ? r[a] : r[a]?.[b]);
+				const rows = players
+					.map((p) => last(p.ratings) as any)
+					.filter((r) => typeof get(r) === "number")
+					.sort((x, y) => get(x) - get(y));
+				const ref = base.sorted[k];
+				rows.forEach((r, j) => {
+					const v =
+						ref[
+							Math.round((j / Math.max(1, rows.length - 1)) * (ref.length - 1))
+						];
+					if (b === undefined) {
+						r[a] = v;
+					} else {
+						r[a][b] = v;
+					}
+				});
 			}
 		}
 		if (opts.coaches) {
@@ -507,6 +589,7 @@ const probe = async (pairs: [number, number][], base: any, i: number) => {
 		res.noBadges = await run({ badges: true });
 		res.coaches = await run({ coaches: true });
 		res.ratings = await run({ ratings: true });
+		res.quantile = await run({ quantile: true });
 		res.all = await run({
 			zt: true,
 			badges: true,

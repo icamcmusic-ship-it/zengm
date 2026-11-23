@@ -69,6 +69,7 @@ import {
 import { ageFacesForPreseason } from "../../util/faceAging.ts";
 import { developStashed } from "../draftStash/index.ts";
 import { updateZoneTendencies } from "../player/zoneTendencies.ts";
+import { updateTalentCenter } from "../game/talentCenter.ts";
 
 // When a player changes teams or leaves his team at the start of a new season without a normal signing or release (repeat season, forced historical rosters), his contract just ends before this season
 const endContractBeforeNewSeason = (
@@ -695,6 +696,11 @@ const newPhasePreseason = async (
 
 	// League Extras "2K Badges": this season's cutoffs and everyone's tiers, from the developed ratings (no randomness)
 	await updateTieredBadges();
+
+	// Game Sim Fixes: this season's talent center for the sim, from the developed ratings (no randomness)
+	if (!repeatSeason) {
+		await updateTalentCenter();
+	}
 
 	// League Extras "Face Aging": faces a year older (seeded from pid and season, no game randomness)
 	if (!repeatSeason) {
