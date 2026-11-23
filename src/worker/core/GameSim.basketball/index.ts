@@ -1398,6 +1398,10 @@ class GameSim extends GameSimBase {
 				team.foFatigue.penalty += 100 * (1 - neutral);
 				team.foFatigue.saved += 100 * (1 - neutral) * (1 - foTravelScale);
 			}
+			if (FLOW_DIAG.on) {
+				// (endurance penalty, in 0.0001s)
+				flowCount(`travelPen${t}`, 10000 * (1 - travel));
+			}
 			if (travel < 1) {
 				for (const p of this.team[t].player) {
 					if (p.compositeRating.endurance !== undefined) {
