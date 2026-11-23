@@ -4,7 +4,7 @@
 // mid-range share and FG% by mid-range rating, and the top scorers. THREE_GRAD_OUT also writes one JSON line per player season and one
 // per season's league totals (to pool several seeds). It also prints the game flow counters (gameFlow.ts FLOW_DIAG: contest levels by shot
 // type, timeouts, coaching adjustments, garbage time, minutes by value rank) and writes them as a "flow" line. THREE_GRAD_CONST can change
-// any constant object of simSettings.ts too.
+// any constant object of simSettings.ts too (and ENDGAME: '{"ENDGAME":{"isoSeconds":-1}}' turns the late-game isolations off).
 //   THREE_GRAD=1 [THREE_GRAD_SEED=1] [THREE_GRAD_SEASONS=3] [THREE_GRAD_SETTINGS='{}'] [THREE_GRAD_OUT=/tmp/x.jsonl]
 //   [THREE_GRAD_CONST='{"STAR":{"makeJumper":0.3}}'] npx vitest run --project basketball --silent=false <this file>
 import "fake-indexeddb/auto";
@@ -23,6 +23,7 @@ import gameSimPresets from "../../../ui/views/Settings/gameSimPresets.ts";
 import { ATTENTION } from "./matchupDefense.ts";
 import { STAR } from "./starClutch.ts";
 import { SHOT_SHARE } from "./shotShare.ts";
+import { ENDGAME } from "./endgame.ts";
 import * as simSettings from "./simSettings.ts";
 import { SIM_FIX_SHOT_CHOICE, SIM_FIX_THREE } from "./simSettings.ts";
 import { FLOW_DIAG } from "./gameFlow.ts";
@@ -45,6 +46,7 @@ if (env.THREE_GRAD_CONST) {
 		SIM_FIX_SHOT_CHOICE,
 		SHOT_SHARE,
 		SIM_FIX_THREE,
+		ENDGAME,
 	};
 	for (const [k, v] of Object.entries(JSON.parse(env.THREE_GRAD_CONST))) {
 		Object.assign(mods[k], v);

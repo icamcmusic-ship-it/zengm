@@ -1,6 +1,10 @@
 import { Fragment, useState } from "react";
 import { MoreLinks } from "../components/MoreLinks.tsx";
-import { GmTraitBars, hotSeatClass } from "../components/GmCard.tsx";
+import {
+	GmBehaviorLine,
+	GmTraitBars,
+	hotSeatClass,
+} from "../components/GmCard.tsx";
 import { StaffFace } from "../components/StaffFace.tsx";
 import { PlusMinus } from "../components/PlusMinus.tsx";
 import useTitleBar from "../hooks/useTitleBar.tsx";
@@ -37,16 +41,19 @@ const FrontOffices = ({
 			season: m.season,
 			midSeason: !!m.midSeason,
 		}));
-	const numCols = 10 + (financeInfo ? 1 : 0) - (noRatings ? 1 : 0);
+	const numCols = 13 + (financeInfo ? 1 : 0) - (noRatings ? 1 : 0);
 
 	return (
 		<>
 			<MoreLinks type="league" page="front_offices" />
 			<p>
 				Every AI team's general manager and his leanings, which shift the team's
-				trades, signings, draft picks and strategy a little. Owners fire GMs who
-				fall short of expectations for too long (the preseason projection of
-				wins, plus playoff success). Click a row to see all of a GM's leanings.
+				trades, signings, payroll, draft picks and strategy, next to his track
+				record (what he has actually done in all his jobs: trades a season,
+				average payroll and luxury tax seasons). Owners fire GMs who fall short
+				of expectations for too long (the preseason projection of wins, plus
+				playoff success). Click a row to see all of a GM's leanings, the picks
+				he has moved and his rosters' age.
 			</p>
 			<h2>General managers</h2>
 			<div className="table-responsive">
@@ -68,6 +75,13 @@ const FrontOffices = ({
 							<th title="Playoff appearances with this team">Playoffs</th>
 							<th>Titles</th>
 							<th>Job security</th>
+							<th title="Trades a season, in all his jobs">Trades</th>
+							<th title="Average payroll as a share of the salary cap, in all his jobs">
+								Payroll
+							</th>
+							<th title="Seasons his team paid the luxury tax, in all his jobs">
+								Tax
+							</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -139,6 +153,21 @@ const FrontOffices = ({
 												<td className={hotSeatClass(gm.hotSeatLabel)}>
 													{gm.hotSeatLabel}
 												</td>
+												<td>
+													{gm.behavior.seasons > 0
+														? gm.behavior.tradesPerSeason.toFixed(1)
+														: "—"}
+												</td>
+												<td>
+													{gm.behavior.payroll !== undefined
+														? `${Math.round(gm.behavior.payroll * 100)}%`
+														: "—"}
+												</td>
+												<td>
+													{gm.behavior.taxSeasonsOf > 0
+														? `${gm.behavior.taxSeasons}/${gm.behavior.taxSeasonsOf}`
+														: "—"}
+												</td>
 											</>
 										) : (
 											<td colSpan={numCols - 1} className="text-body-secondary">
@@ -177,7 +206,11 @@ const FrontOffices = ({
 																{gm.finance.description}
 															</div>
 														) : null}
-														<GmTraitBars traits={gm.traits} />
+														<GmBehaviorLine behavior={gm.behavior} />
+														<GmTraitBars
+															bands={gm.traitBands}
+															traits={gm.traits}
+														/>
 													</div>
 												</div>
 											</td>
@@ -255,6 +288,7 @@ const FrontOffices = ({
 								<th>Last job</th>
 								<th>Career</th>
 								<th>Titles</th>
+								<th>Track record</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -281,6 +315,11 @@ const FrontOffices = ({
 										{gm.careerWon}-{gm.careerLost}
 									</td>
 									<td>{gm.careerTitles}</td>
+									<td className="text-nowrap">
+										{gm.behavior.seasons > 0
+											? `${gm.behavior.tradesPerSeason.toFixed(1)} trades/season${gm.behavior.payroll !== undefined ? `, payroll ${Math.round(gm.behavior.payroll * 100)}% of cap` : ""}`
+											: "—"}
+									</td>
 								</tr>
 							))}
 						</tbody>

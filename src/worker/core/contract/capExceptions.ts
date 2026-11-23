@@ -371,12 +371,13 @@ const AI_MAX_RANK = 10;
 const AI_MAX_RANK_INTO_TAX = 8;
 const AI_REBUILDING_MAX_AGE = 27;
 
-// Will this AI team go into the luxury tax to add a free agent with an exception? Only contenders, and not tax-averse GMs (AI GM personalities).
+// Will this AI team go into the luxury tax to add a free agent with an exception? Only contenders, and not tax-averse GMs (AI GM personalities),
+// except that a big spender (avoidTaxRankShift 2 or more) does it while rebuilding too (for young players, like any rebuilding team)
 const aiGoesIntoTax = (
 	t: Pick<Team, "strategy">,
 	gm: Pick<GmWeights, "avoidTaxRankShift"> | undefined,
 ) =>
-	t.strategy === "contending" &&
+	(t.strategy === "contending" || (gm?.avoidTaxRankShift ?? 0) >= 2) &&
 	(gm?.avoidTaxRankShift ?? 0) >= 0 &&
 	// Competitive Balance (setting): AI teams don't go into the luxury tax with an exception
 	!featureOn("competitiveBalance");
@@ -385,8 +386,15 @@ const aiGoesIntoTax = (
 export const getAiCapExceptionCapacity = (
 	t: Pick<Team, "capExceptions" | "strategy">,
 	payroll: number,
-	gm: Pick<GmWeights, "avoidTaxRankShift"> | undefined,
+	gm:
+		| (Pick<GmWeights, "avoidTaxRankShift"> &
+				Partial<Pick<GmWeights, "faCapRoom">>)
+		| undefined,
 ) => {
+	// A tax-averse GM keeps cap room in free agency and uses no exception (AI GM personalities)
+	if ((gm?.faCapRoom ?? 0) > 0) {
+		return 0;
+	}
 	const available = getAvailableCapExceptions(
 		t,
 		payroll,
@@ -405,9 +413,13 @@ export const makeAiCapExceptionPicker = ({
 	t: Pick<Team, "capExceptions" | "strategy">;
 	roster: Pick<Player, "value">[];
 	payroll: number;
-	gm: Pick<GmWeights, "avoidTaxRankShift"> | undefined;
+	gm:
+		| (Pick<GmWeights, "avoidTaxRankShift"> &
+				Partial<Pick<GmWeights, "faCapRoom">>)
+		| undefined;
 }) => {
-	if (!capExceptionsEnabled()) {
+	// A tax-averse GM keeps cap room in free agency and uses no exception (AI GM personalities)
+	if (!capExceptionsEnabled() || (gm?.faCapRoom ?? 0) > 0) {
 		return;
 	}
 	const noTax = getAvailableCapExceptions(t, payroll, g.get("luxuryPayroll"));

@@ -7,6 +7,7 @@ import {
 } from "../../common/gmFinance.ts";
 import type { Gm } from "../../common/types.ts";
 import { gmFinanceEnabled, gmFinanceStyleOf } from "../core/gm/finance.ts";
+import { getGmBehaviors } from "../core/gm/profile.ts";
 import { idb } from "../db/index.ts";
 import { defineView } from "../util/defineView.ts";
 import { g } from "../util/index.ts";
@@ -53,6 +54,13 @@ export default defineView({
 		const abbrev = (tid: number) => teamInfoCache[tid]?.abbrev ?? "";
 		// Contracted teams too: their GMs' history and the ones on the market (no row on the table)
 		const teams = await idb.cache.teams.getAll();
+		// Track records of every GM on the page, in one pass
+		const behaviors = await getGmBehaviors(
+			teams.flatMap((t) => [
+				...(t.gm ? [t.gm] : []),
+				...(t.formerGms ?? []).filter((gm) => onGmMarket(gm)),
+			]),
+		);
 
 		const rows: {
 			tid: number;
@@ -78,7 +86,10 @@ export default defineView({
 					name: t.name,
 					colors: t.colors,
 					user,
-					gm: t.gm && !user ? await formatGm(t.gm, t.tid) : undefined,
+					gm:
+						t.gm && !user
+							? await formatGm(t.gm, t.tid, behaviors.get(t.gm.gmid))
+							: undefined,
 				});
 			}
 
@@ -117,7 +128,7 @@ export default defineView({
 			// The ones the next carousel can hire (the others retire then)
 			for (const gm of t.formerGms ?? []) {
 				if (onGmMarket(gm)) {
-					market.push(await formatGm(gm));
+					market.push(await formatGm(gm, undefined, behaviors.get(gm.gmid)));
 				}
 			}
 		}

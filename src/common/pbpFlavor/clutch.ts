@@ -119,6 +119,41 @@ const shotPhrase = (
 	}
 };
 
+// An unassisted game-winner or tying shot in the last seconds: the floor cleared for him (End-of-Game Intelligence's late-game isolations)
+const isoShotPhrase = (
+	rng: Rng,
+	shot: ClutchShotType,
+	link: Link,
+	def: ClutchPlayerRef | undefined,
+) => {
+	switch (shot) {
+		case "threePointer":
+			return rng.pick([
+				"clears out, sizes up his man and buries a step-back three",
+				"goes one-on-one at the top of the key and drills a step-back three",
+				"isolates on the wing and knocks down a pull-up three",
+				"waves off the screen and hits a step-back three",
+			]);
+		case "midRange":
+			return rng.pick([
+				"clears out, sizes up his man and drains a step-back jumper",
+				"goes one-on-one and hits a jab-step jumper",
+				"isolates at the elbow and knocks down a fadeaway",
+				"waves everyone away and rises up for a pull-up jumper",
+			]);
+		case "atRim": {
+			const base = rng.pick([
+				"clears out and drives for a layup",
+				"isolates at the top of the key and gets all the way to the rim",
+				"goes one-on-one and attacks the basket for a layup",
+			]);
+			return def ? `${base} over ${link(def)}` : base;
+		}
+		default:
+			return shotPhrase(rng, shot, link, def);
+	}
+};
+
 export const clutchFlavorText = (
 	meta: ClutchMeta,
 	gid: number,
@@ -190,6 +225,15 @@ export const clutchFlavorText = (
 		action = rng.pick(["sinks both free throws", "hits a pair of free throws"]);
 	} else if (meta.finish === "threeFt") {
 		action = "sinks all three free throws";
+	} else if (
+		!meta.ast &&
+		(meta.elam || meta.time <= 24) &&
+		(meta.shot === "threePointer" ||
+			meta.shot === "midRange" ||
+			meta.shot === "atRim") &&
+		rng.random() < 0.65
+	) {
+		action = isoShotPhrase(rng, meta.shot, link, meta.def);
 	} else {
 		action = shotPhrase(rng, meta.shot, link, meta.def);
 		if (meta.ast) {
