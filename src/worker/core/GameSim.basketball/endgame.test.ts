@@ -12,6 +12,7 @@ import {
 	endgameValues,
 	foulTargetWeights,
 	foulToGiveProb,
+	foulToGiveTime,
 	runTimeoutSource,
 	runTimeoutThreshold,
 	saveLastTimeout,
@@ -698,8 +699,16 @@ test("foul to give: the window, the bonus and the score", () => {
 	};
 	assert.strictEqual(foulToGiveProb(base), ENDGAME.ftgProb);
 	// outside the window
-	assert.strictEqual(foulToGiveProb({ ...base, t: 9 }), 0);
-	assert.strictEqual(foulToGiveProb({ ...base, t: 1.5 }), 0);
+	assert.strictEqual(foulToGiveProb({ ...base, t: 25 }), 0);
+	assert.strictEqual(foulToGiveProb({ ...base, t: 2.4 }), 0);
+	// when: 2.5-8 s left, before the time runs out
+	for (const t of [3, 6, 15, 24]) {
+		for (const u of [0, 0.5, 1]) {
+			const at = foulToGiveTime(t, u);
+			assert.isAtMost(at, Math.min(8, t - 0.3));
+			assert.isAtLeast(at, Math.min(2.5, t - 0.3));
+		}
+	}
 	// the next foul is a bonus foul: no foul to give
 	assert.strictEqual(foulToGiveProb({ ...base, foulsUntilBonus: 1 }), 0);
 	// final period: only ahead by 0-2
@@ -729,7 +738,8 @@ test("foul to give: the defense fouls without free throws at the end of a quarte
 	let tries = 0;
 	for (const seed of range(30)) {
 		await scenario(1500 + seed, { smartEndgame: true }, (sim) => {
-			setState(sim, { period: 2, t: 7.5, pts: [50, 52] });
+			setState(sim, { period: 2, t: 20, pts: [50, 52] });
+			sim.shotClock = 24;
 			sim.foulsThisQuarter = [0, 0];
 			const before = sim.team[1].stat.pf;
 			const ftaBefore = sim.team[0].stat.fta;
@@ -740,7 +750,8 @@ test("foul to give: the defense fouls without free throws at the end of a quarte
 				assert.strictEqual(outcome, "nonShootingFoul");
 				assert.strictEqual(sim.team[1].stat.pf, before + 1);
 				assert.strictEqual(sim.team[0].stat.fta, ftaBefore);
-				assert.isBelow(sim.t, 7.5);
+				assert.isAtMost(sim.t, 8);
+				assert.isAtLeast(sim.t, 2.5);
 				fouled += 1;
 				// (once a period)
 				assert.isFalse(sim.shouldFoulToGive());

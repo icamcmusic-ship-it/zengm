@@ -116,6 +116,7 @@ import {
 	endgameRoleScore,
 	endgameValues,
 	foulToGiveProb,
+	foulToGiveTime,
 	foulTargetWeights,
 	runTimeoutSource,
 	runTimeoutThreshold,
@@ -809,6 +810,8 @@ class GameSim extends GameSimBase {
 	endgameCounts = { runTimeouts: 0, up3Fouls: 0, odSubs: 0, foulsToGive: 0 };
 	// The period in which each team (on defense) last decided on a foul to give
 	ftgPeriod: [number, number] = [0, 0];
+	// ...and when this possession's foul to give happens (seconds left)
+	ftgAt: number | undefined;
 	// Load, Fatigue & Venue (League extras, see scheduleLoad.ts): nonlinear fatigue, injury risk with tiredness, the home court split
 	// into base, crowd and referees, travel, and the referee crew. foulMult is each team's foul rate on defense (the referees' lean and
 	// crew). Off: nothing here is used and no extra random numbers are drawn
@@ -1853,7 +1856,7 @@ class GameSim extends GameSimBase {
 		if (this.shouldIntentionalFoul()) {
 			return "intentionalFoul";
 		}
-		if (this.smartEndgame && this.shouldFoulToGive()) {
+		if (this.smartEndgame && this.t <= 26 && this.shouldFoulToGive()) {
 			return "intentionalFoul";
 		}
 
@@ -2067,7 +2070,11 @@ class GameSim extends GameSimBase {
 			}
 		}
 
+		this.ftgAt = undefined;
 		const clockFactor = this.applyLateGameDecision(this.getClockFactor());
+		if (clockFactor !== "intentionalFoul") {
+			this.ftgAt = undefined;
+		}
 		const outcome = this.getPossessionOutcome(clockFactor);
 		this.adv?.possessionEnd();
 
@@ -2789,8 +2796,8 @@ class GameSim extends GameSimBase {
 		return coach;
 	}
 
-	// End-of-Game Intelligence: a foul to give at the end of a period (see endgame.ts foulToGiveProb). Once a period per team; draws a
-	// random number only inside the window with a foul to give
+	// End-of-Game Intelligence: a foul to give at the end of a period (see endgame.ts foulToGiveProb), the offense holding for the last
+	// shot. Once a period per team; draws random numbers only inside the window with a foul to give
 	shouldFoulToGive() {
 		const period = this.team[0].stat.ptsQtrs.length;
 		if (
@@ -2821,6 +2828,7 @@ class GameSim extends GameSimBase {
 		if (FLOW_DIAG.on) {
 			flowCount("foulToGive");
 		}
+		this.ftgAt = foulToGiveTime(this.t, Math.random());
 		return true;
 	}
 
@@ -4979,7 +4987,11 @@ class GameSim extends GameSimBase {
 		dtNormal?: () => number,
 	): PossessionOutcome {
 		let dt;
-		if (clockFactor === "intentionalFoul") {
+		if (this.ftgAt !== undefined) {
+			// (End-of-Game Intelligence: a foul to give, when the defense chose)
+			dt = Math.max(0.1, Math.min(this.t - 0.2, this.t - this.ftgAt));
+			this.ftgAt = undefined;
+		} else if (clockFactor === "intentionalFoul") {
 			if (this.t < 8) {
 				if (this.t <= 0.2 || (this.t < 1 && Math.random() > this.t)) {
 					// Time ran out while trying to foul
@@ -5079,7 +5091,11 @@ class GameSim extends GameSimBase {
 		if (this.shouldIntentionalFoulRealistic()) {
 			return "intentionalFoul" as const;
 		}
-		if (this.smartEndgame && this.shouldFoulToGive()) {
+		if (
+			this.smartEndgame &&
+			this.t <= this.shotClock + 2 &&
+			this.shouldFoulToGive()
+		) {
 			return "intentionalFoul" as const;
 		}
 
