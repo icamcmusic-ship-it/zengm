@@ -8,7 +8,7 @@ import { getContractDemand } from "../contract/index.ts";
 import getPayroll from "../team/getPayroll.ts";
 import getBest from "./getBest.ts";
 import { makeAiCapExceptionPicker } from "../contract/capExceptions.ts";
-import { getAllGmWeights } from "../gm/index.ts";
+import { getAllGmWeights, gmFaPayroll } from "../gm/index.ts";
 
 // How interested an AI team is in a free agent, from autoSign: every day each team (unless it skips that day) signs the best free agent it can fit, so his chances depend on where he is on each team's list
 export type MarketTier = "topTarget" | "backup" | "fallback";
@@ -127,9 +127,19 @@ export const getFreeAgentMarket = async (
 			for (const tier of TIERS) {
 				const p = random
 					? withRandom(random, () =>
-							getBest(roster, available, payroll, pickCapException),
+							getBest(
+								roster,
+								available,
+								gmFaPayroll(payroll, gms.get(t.tid)),
+								pickCapException,
+							),
 						)
-					: getBest(roster, available, payroll, pickCapException);
+					: getBest(
+							roster,
+							available,
+							gmFaPayroll(payroll, gms.get(t.tid)),
+							pickCapException,
+						);
 				if (!p) {
 					break;
 				}

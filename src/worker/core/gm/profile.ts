@@ -11,7 +11,10 @@ import type {
 	TeamSeason,
 } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import { NUM_PRIOR_SEASONS_EVENTS } from "../../db/Cache.ts";
+import {
+	NUM_PRIOR_SEASONS_EVENTS,
+	NUM_PRIOR_SEASONS_TEAM_SEASONS,
+} from "../../db/Cache.ts";
 import { g, local } from "../../util/index.ts";
 
 const allGms = (teams: Team[]) => {
@@ -44,13 +47,41 @@ type TradeEvent = Extract<EventBBGM, { type: "trade" }>;
 const isTrade = (event: EventBBGM): event is TradeEvent =>
 	event.type === "trade";
 
-// Trade events and head-to-head records of past seasons, as the database has them: read once per league connection, cache fill and
-// season, instead of the whole event log on every load (GM History reloads after every simulated day). Only trade events are kept
+// A team season's payroll (average over the games played, as a share of the cap), whether it paid luxury tax and its roster age
+type SeasonFacts = {
+	tid: number;
+	season: number;
+	payroll?: number;
+	tax: boolean;
+	avgAge?: number;
+};
+
+const seasonFactsOf = (ts: TeamSeason): SeasonFacts => {
+	const gp = ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0);
+	const cap = g.get("salaryCap", ts.season);
+	// Salaries are paid per regular season game (1/numGames of each contract), so this is the season's average payroll
+	const payroll =
+		gp > 0 && cap > 0
+			? (ts.expenses.salary * g.get("numGames", ts.season)) / gp / cap
+			: undefined;
+	return {
+		tid: ts.tid,
+		season: ts.season,
+		payroll,
+		tax: ts.expenses.luxuryTax > 0,
+		avgAge: ts.avgAge,
+	};
+};
+
+// Trade events, head-to-head records and team seasons of past seasons, as the database has them: read once per league connection,
+// cache fill and season, instead of the whole event log on every load (GM History reloads after every simulated day). Only trade
+// events are kept, and of team seasons only what the GM track record needs
 type PastData = {
 	key: string;
 	league: unknown;
 	trades: TradeEvent[];
 	headToHeads: HeadToHead[];
+	seasonFacts: SeasonFacts[];
 };
 let pastData: PastData | undefined;
 
@@ -79,7 +110,17 @@ const getPastData = async (): Promise<PastData> => {
 			headToHeads.push(value);
 		}
 	}
-	pastData = { key, league: idb.league, trades, headToHeads };
+	// The cache holds this season's team seasons and NUM_PRIOR_SEASONS_TEAM_SEASONS before it
+	const seasonFacts: SeasonFacts[] = [];
+	for await (const { value } of idb.league
+		.transaction("teamSeasons")
+		.store.index("season, tid")
+		.iterate(
+			IDBKeyRange.upperBound([season - NUM_PRIOR_SEASONS_TEAM_SEASONS - 1, ""]),
+		)) {
+		seasonFacts.push(seasonFactsOf(value));
+	}
+	pastData = { key, league: idb.league, trades, headToHeads, seasonFacts };
 	return pastData;
 };
 
@@ -95,6 +136,136 @@ const tradeEvents = async () => {
 		}
 	}
 	return [...byEid.values()];
+};
+
+// ---- Track record: what a GM actually does, next to his leanings ----------------
+
+export type GmBehavior = {
+	// Seasons he ran a team (this one included once it has started)
+	seasons: number;
+	trades: number;
+	tradesPerSeason: number;
+	// Average payroll as a share of the salary cap, over the seasons with games played
+	payroll?: number;
+	// Seasons he paid luxury tax, of the seasons it has been assessed for
+	taxSeasons: number;
+	taxSeasonsOf: number;
+	// Draft picks (not swap rights) traded away and acquired
+	picksOut: number;
+	picksIn: number;
+	// Minutes weighted roster age, averaged over his seasons that have one (written when the playoffs start)
+	avgAge?: number;
+};
+
+// Every listed GM's track record, from the trade events and team seasons of the seasons he ran each team. Past seasons come from
+// getPastData (read once per cache fill and season), the rest from the cache, so this is cheap enough for every view load
+export const getGmBehaviors = async (
+	gms: Gm[],
+): Promise<Map<number, GmBehavior>> => {
+	const out = new Map<number, GmBehavior>();
+	if (gms.length === 0) {
+		return out;
+	}
+	const season = g.get("season");
+	const phase = g.get("phase");
+
+	const facts = new Map<string, SeasonFacts>();
+	for (const row of (await getPastData()).seasonFacts) {
+		facts.set(`${row.tid}|${row.season}`, row);
+	}
+	for (const ts of await idb.cache.teamSeasons.getAll()) {
+		facts.set(`${ts.tid}|${ts.season}`, seasonFactsOf(ts));
+	}
+
+	// Trades and picks moved by team and effective season
+	const moves = new Map<
+		string,
+		{ trades: number; picksOut: number; picksIn: number }
+	>();
+	for (const event of await tradeEvents()) {
+		const eff = effectiveSeason(event.season, event.phase);
+		for (const [side, tid] of event.tids.entries()) {
+			const key = `${tid}|${eff}`;
+			let row = moves.get(key);
+			if (!row) {
+				row = { trades: 0, picksOut: 0, picksIn: 0 };
+				moves.set(key, row);
+			}
+			row.trades += 1;
+			const isPick = (a: { swap?: true } | object) =>
+				"dpid" in a && !("swap" in a && a.swap);
+			row.picksIn += (event.teams?.[side as 0 | 1]?.assets ?? []).filter(
+				isPick,
+			).length;
+			row.picksOut += (event.teams?.[side === 0 ? 1 : 0]?.assets ?? []).filter(
+				isPick,
+			).length;
+		}
+	}
+
+	for (const gm of gms) {
+		const b: GmBehavior = {
+			seasons: 0,
+			trades: 0,
+			tradesPerSeason: 0,
+			taxSeasons: 0,
+			taxSeasonsOf: 0,
+			picksOut: 0,
+			picksIn: 0,
+		};
+		let payrollSum = 0;
+		let payrollN = 0;
+		let ageSum = 0;
+		let ageN = 0;
+		const seen = new Set<string>();
+		for (const tenure of gm.tenures) {
+			// Offseason trades count for the next season, which he runs if he's still there
+			const last = tenure.end ?? (phase > PHASE.PLAYOFFS ? season + 1 : season);
+			for (let s = tenure.start; s <= last; s++) {
+				const key = `${tenure.tid}|${s}`;
+				if (seen.has(key)) {
+					continue;
+				}
+				seen.add(key);
+				const m = moves.get(key);
+				if (m) {
+					b.trades += m.trades;
+					b.picksOut += m.picksOut;
+					b.picksIn += m.picksIn;
+				}
+				if (s > season || (s === season && phase < PHASE.REGULAR_SEASON)) {
+					continue;
+				}
+				b.seasons += 1;
+				const f = facts.get(key);
+				if (f?.payroll !== undefined) {
+					payrollSum += f.payroll;
+					payrollN += 1;
+				}
+				if (f?.avgAge !== undefined) {
+					ageSum += f.avgAge;
+					ageN += 1;
+				}
+				// The tax is assessed after the playoffs
+				if (f && (s < season || phase > PHASE.PLAYOFFS)) {
+					b.taxSeasonsOf += 1;
+					if (f.tax) {
+						b.taxSeasons += 1;
+					}
+				}
+			}
+		}
+		b.tradesPerSeason =
+			Math.round((10 * b.trades) / Math.max(1, b.seasons)) / 10;
+		if (payrollN > 0) {
+			b.payroll = Math.round((100 * payrollSum) / payrollN) / 100;
+		}
+		if (ageN > 0) {
+			b.avgAge = Math.round((10 * ageSum) / ageN) / 10;
+		}
+		out.set(gm.gmid, b);
+	}
+	return out;
 };
 
 const teamName = (tid: number, season: number, teamSeasons: TeamSeason[]) => {
@@ -267,6 +438,7 @@ export const getGmProfile = async (gmid: number) => {
 		hof: gm.hof,
 		numTrades: trades.length,
 		notableTrades,
+		behavior: (await getGmBehaviors([gm])).get(gm.gmid)!,
 	};
 };
 
