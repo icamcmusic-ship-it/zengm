@@ -25,8 +25,10 @@ export const ROTATION = 8;
 // Largest shift of one rating (rating points)
 export const MAX_SHIFT = 8;
 
-// The developed ratings (height doesn't develop) and the expanded ones (when the league has them)
+// Every rating (height too: the rotations' height moves by a couple of points over the decades, and it is in most defense and finishing
+// composites) and the expanded ones (when the league has them)
 export const CENTER_KEYS = [
+	"hgt",
 	"stre",
 	"spd",
 	"jmp",

@@ -27,8 +27,7 @@ test("rotationMeans averages each team's top players by ovr, and only rostered p
 	const m = rotationMeans(players as any);
 	assert.closeTo(m.tp!, (ROTATION * 60 + 30) / (ROTATION + 1), 1e-3);
 	assert.strictEqual(m.oiq, 50);
-	// Height doesn't develop, so it isn't centered
-	assert.isUndefined(m.hgt);
+	assert.strictEqual(m.hgt, 60);
 });
 
 test("the first record anchors the league; the shift is anchor - now, bounded, and only for the record's season", () => {
