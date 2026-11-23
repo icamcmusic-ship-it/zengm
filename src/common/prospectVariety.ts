@@ -504,6 +504,33 @@ export const classTalentShift = (seed: string) => {
 	return Math.max(-CLASS_TALENT.max, Math.min(CLASS_TALENT.max, x));
 };
 
+// Talent cycles: on top of each class's own draw, a slow league-level cycle of deep and thin eras. Two waves with periods and phases drawn
+// once per league (seeded: the same league always has the same eras), in ovr points (raw), applied to the top `top` prospects of each class
+// (deeper than the class draw's top 15, so a deep era has more good players, not just better stars), bounded by max. Averages 0 over the
+// long run, so the league's talent level doesn't drift.
+export const TALENT_CYCLE = {
+	amp: 1.2,
+	periodMin: 12,
+	periodMax: 20,
+	amp2: 0.6,
+	period2Min: 26,
+	period2Max: 40,
+	max: 1.8,
+	top: 30,
+};
+export const talentCycle = (leagueSeed: string, draftYear: number) => {
+	const c = TALENT_CYCLE;
+	const rng = new Rng(`talentCycle|${leagueSeed}`);
+	const p1 = rng.uniform(c.periodMin, c.periodMax);
+	const ph1 = rng.uniform(0, 2 * Math.PI);
+	const p2 = rng.uniform(c.period2Min, c.period2Max);
+	const ph2 = rng.uniform(0, 2 * Math.PI);
+	const x =
+		c.amp * Math.sin((2 * Math.PI * draftYear) / p1 + ph1) +
+		c.amp2 * Math.sin((2 * Math.PI * draftYear) / p2 + ph2);
+	return Math.max(-c.max, Math.min(c.max, x));
+};
+
 // --- 8. Development: group rates -----------------------------------------------------------------------------------------------------
 
 export const DEV_RATES = {

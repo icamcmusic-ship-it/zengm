@@ -18,6 +18,8 @@ import {
 	DECLARE_FUDGE,
 	FIFTH_YEAR_SHARE,
 	classTalentShift,
+	TALENT_CYCLE,
+	talentCycle,
 	type GenVariety,
 } from "../../../common/prospectVariety.ts";
 import { ovrRaw } from "../player/ovr.basketball.ts";
@@ -108,16 +110,17 @@ const developOneSeason = async (p: PlayerWithoutKey) => {
 	await player.develop(p, 1, true);
 };
 
-// The class's seed for its talent draw (a league id may be missing in tests)
-const classSeed = (draftYear: number) => {
+// The league's seed (a league id may be missing in tests), and the class's for its talent draw
+const leagueSeed = () => {
 	let lid: unknown;
 	try {
 		lid = g.get("lid");
 	} catch {
 		lid = undefined;
 	}
-	return `${String(lid)}|${draftYear}`;
+	return String(lid);
 };
+const classSeed = (draftYear: number) => `${leagueSeed()}|${draftYear}`;
 
 const genPlayersWithoutSaving = async (
 	draftYear: number,
@@ -307,16 +310,22 @@ const genPlayersWithoutSaving = async (
 				changed.add(p);
 			}
 		}
+		// The class's own draw for its top prospects, and the league's talent cycle (deep and thin eras) for a deeper top
 		const shift = classTalentShift(classSeed(draftYear));
-		const top = enteringDraft
+		const cycle = talentCycle(leagueSeed(), draftYear);
+		const ranked = enteringDraft
 			.filter((p) => genVarOf(p))
-			.toSorted((a, b) => b.ratings[0].pot - a.ratings[0].pot)
-			.slice(0, CLASS_TALENT.top);
-		for (const p of top) {
-			const r = p.ratings[0];
-			shiftToRawOvr(r, ovrRaw(r as any) + shift);
-			changed.add(p);
-		}
+			.toSorted((a, b) => b.ratings[0].pot - a.ratings[0].pot);
+		ranked
+			.slice(0, Math.max(CLASS_TALENT.top, TALENT_CYCLE.top))
+			.forEach((p, i) => {
+				const r = p.ratings[0];
+				const delta =
+					(i < CLASS_TALENT.top ? shift : 0) +
+					(i < TALENT_CYCLE.top ? cycle : 0);
+				shiftToRawOvr(r, ovrRaw(r as any) + delta);
+				changed.add(p);
+			});
 		for (const p of changed) {
 			await player.develop(p, 0);
 		}
