@@ -3,6 +3,12 @@
 // Articles and sidebars for the inside sections of the league paper.
 
 import { Ctx, P } from "./ctx.ts";
+import {
+	columnistsFor,
+	voiceLine,
+	type ColumnTopic,
+	type Columnist,
+} from "./columnists.ts";
 import { featureParagraphs } from "../franchiseStory.ts";
 import { inGames, seriesVerb } from "./front.ts";
 import {
@@ -14,6 +20,7 @@ import {
 	ordinal,
 	plural,
 	poss,
+	Rng,
 	record,
 	winp,
 	tradeSides,
@@ -1023,11 +1030,163 @@ const COLUMN_NAMES = [
 	"Corner Three",
 ];
 
-export const opinionColumn = (c: Ctx): Article | undefined => {
-	const r = c.rng("opinion");
+type ColumnBody = { head: string; body: Block[]; subject: string };
+
+// Pythagorean win share from points for and against (exponent 14, about right for basketball)
+const pythagWinp = (pts: number, opp: number) =>
+	pts > 0 && opp > 0 ? pts ** 14 / (pts ** 14 + opp ** 14) : 0.5;
+
+const extraTopics = (
+	c: Ctx,
+): Record<"luck" | "defense" | "history", () => ColumnBody | undefined> => ({
+	luck: () => {
+		if (c.pre) {
+			return undefined;
+		}
+		const cands = c.rows
+			.filter(
+				(t) => t.gp >= 10 && t.pts !== undefined && t.oppPts !== undefined,
+			)
+			.map((t) => {
+				const exp = pythagWinp(t.pts!, t.oppPts!);
+				return { t, exp, gap: winp(t) - exp };
+			})
+			.toSorted((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+		const x = cands[0];
+		if (!x || Math.abs(x.gap) < 0.04) {
+			return undefined;
+		}
+		const expWon = Math.round(x.exp * x.t.gp);
+		const lucky = x.gap > 0;
+		const margin = x.t.pts! - x.t.oppPts!;
+		return {
+			subject: `the ${x.t.name}`,
+			head: lucky
+				? `The ${x.t.name} ${c.T("are", "were")} living on borrowed time`
+				: `The ${x.t.name} ${c.T("are", "were")} better than their record`,
+			body: [
+				P(
+					"The ",
+					c.tl(x.t.tid, c.tfull(x.t.tid)),
+					` ${c.T("are", "finished")} ${record(x.t)} with a point margin of ${margin >= 0 ? "+" : ""}${fmt1(margin)} a game. Teams that score and allow points like that usually win about ${expWon} of ${x.t.gp}, not ${x.t.won}.`,
+				),
+				P(
+					lucky
+						? `The ${x.t.name}' extra ${plural(x.t.won - expWon, "win")} came from close games breaking their way, and close games are mostly coin flips${c.T(", so expect the record to drift back towards the margin.", "; the playoffs are less forgiving than the regular season.")}`
+						: `The ${x.t.name}' missing ${plural(expWon - x.t.won, "win")} went in close losses, and close losses are mostly bad luck${c.T(", so the wins should follow the margin.", "; next season's record should look more like the margin.")}`,
+				),
+			],
+		};
+	},
+	defense: () => {
+		if (c.pre) {
+			return undefined;
+		}
+		const ts = c.rows.filter((t) => t.gp >= 5 && t.oppPts !== undefined);
+		if (ts.length < 4) {
+			return undefined;
+		}
+		const best = ts.toSorted((a, b) => a.oppPts! - b.oppPts!)[0]!;
+		const worst = ts.toSorted((a, b) => b.oppPts! - a.oppPts!)[0]!;
+		const avg = ts.reduce((sum, t) => sum + t.oppPts!, 0) / ts.length;
+		const rank = c.rank(best.tid);
+		return {
+			subject: `the ${best.name}`,
+			head:
+				rank <= 4
+					? `Defense still wins: look at the ${best.name}`
+					: `The ${best.name} ${c.T("defend", "defended")}. Now they need a scorer`,
+			body: [
+				P(
+					"The ",
+					c.tl(best.tid, c.tfull(best.tid)),
+					` ${c.T("allow", "allowed")} ${fmt1(best.oppPts!)} points a game, ${fmt1(avg - best.oppPts!)} fewer than the league average, and ${c.T("sit", "finished")} ${ordinal(rank)} in the standings at ${record(best)}.`,
+				),
+				P(
+					"At the other end, the ",
+					c.tl(worst.tid, c.tfull(worst.tid)),
+					` ${c.T("give", "gave")} up ${fmt1(worst.oppPts!)} a night. ${worst.won < worst.lost ? "It shows in the standings." : "They have outscored their problems so far, which rarely lasts."}`,
+				),
+			],
+		};
+	},
+	history: () => {
+		const top = c.rows[0];
+		const rec = c.f.recordWins;
+		if (top && rec && !c.pre && top.gp >= 10) {
+			const pace = Math.round(winp(top) * c.f.numGames);
+			if (pace >= rec.won - 3) {
+				return {
+					subject: `the ${top.name}`,
+					head: `The ${top.name} ${c.T("are", "were")} chasing history`,
+					body: [
+						P(
+							"The ",
+							c.tl(top.tid, c.tfull(top.tid)),
+							` ${c.T("are", "finished")} ${record(top)}, ${c.T(`a pace for ${pace} wins`, `${pace} wins over a full schedule`)}.`,
+						),
+						P(
+							`The best record the league has seen belongs to the ${rec.season} ${rec.region} ${rec.name}, who won ${rec.won}. ${pace > rec.won ? "This team is ahead of it." : pace === rec.won ? "This team is right on it." : "This team is within reach of it."}`,
+						),
+					],
+				};
+			}
+		}
+		const champ = c.f.champions?.find((x) => x.season === c.season - 1);
+		const t = champ ? c.team(champ.tid) : undefined;
+		if (!champ || !t) {
+			return undefined;
+		}
+		const repeats = (c.f.champions ?? []).filter(
+			(x) => x.tid === champ.tid && x.season < c.season,
+		).length;
+		return {
+			subject: `the ${t.name}`,
+			head: c.pre
+				? c.cycle("column-defense-head", [
+						`Heavy is the head: the ${t.name} start their title defense`,
+						`The ${t.name} are the hunted now`,
+						`Everybody's circling the ${t.name} on the schedule`,
+						`Defending a title is harder than winning one, ${t.name}`,
+					])
+				: `Can the ${t.name} repeat? History says ${c.rank(t.tid) <= 3 ? "maybe" : "probably not"}`,
+			body: [
+				P(
+					`Last season belonged to the `,
+					c.tl(t.tid, c.tfull(t.tid)),
+					repeats > 1
+						? `, their ${ordinal(repeats)} title in the years this paper has covered.`
+						: ", the franchise's first title in the years this paper has covered.",
+				),
+				c.pre
+					? P(
+							c.cycle("column-defense-body", [
+								`Defending champions carry a target all season, and the ${t.name} will see every opponent's best night.`,
+								`Every opponent will treat a game against the ${t.name} like a playoff game, and the good champions welcome that.`,
+								`The ${t.name} get everyone's best shot from opening night on; the question is whether they still have the hunger.`,
+								`A title earns the ${t.name} a banner and a bullseye, in that order.`,
+							]),
+						)
+					: P(
+							`This time around they ${c.T("are", "finished")} ${record(t)}, ${ordinal(c.rank(t.tid))} in the league${c.done ? ` and ${c.fate(t.playoffRoundsWon)}` : ""}.`,
+						),
+			],
+		};
+	},
+});
+
+// One column: the columnist's voice around the first topic on their list that has something to say (and that the other column
+// of the edition is not already on)
+export const opinionColumn = (
+	c: Ctx,
+	writer?: Columnist,
+	index = 0,
+	usedTopics: Set<string> = new Set(),
+): Article | undefined => {
+	const r = c.rng("opinion", writer?.id ?? "");
 	const era = Math.floor((c.season - c.f.firstSeason) / 7);
-	const colName = c.rng("column", era).pick(COLUMN_NAMES);
-	const topics: (() => { head: string; body: Block[] } | undefined)[] = [
+	const colName = writer?.column ?? c.rng("column", era).pick(COLUMN_NAMES);
+	const topics: (() => ColumnBody | undefined)[] = [
 		() => {
 			// The MVP debate: winner vs. runner-up, or two leaders mid-season
 			const mvp = c.award("MVP");
@@ -1041,6 +1200,7 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 				return undefined;
 			}
 			return {
+				subject: a.name,
 				head: mvp
 					? `The voters got it ${b.ws > a.ws ? "wrong" : "right"}`
 					: `${a.name} or ${b.name}? It isn't close yet`,
@@ -1090,6 +1250,7 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 			}
 			const avg = old.stars.reduce((s, p) => s + p.age, 0) / old.stars.length;
 			return {
+				subject: `the ${old.t.name}`,
 				head: `It's time for the ${old.t.name} to start over`,
 				body: [
 					P(
@@ -1125,6 +1286,7 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 					? t.pts - t.oppPts
 					: undefined;
 			return {
+				subject: `the ${t.name}`,
 				head: `Believe in the ${t.name}${c.done ? " — or should you have?" : ""}`,
 				body: [
 					P(
@@ -1150,21 +1312,70 @@ export const opinionColumn = (c: Ctx): Article | undefined => {
 			};
 		},
 	];
-	const order = r.shuffle(topics);
-	for (const topic of order) {
+	const extra = extraTopics(c);
+	const byId: Record<ColumnTopic, () => ColumnBody | undefined> = {
+		mvp: topics[0]!,
+		rebuild: topics[1]!,
+		believe: topics[2]!,
+		...extra,
+	};
+	// A writer's favourite topics first (the top two trade places every other season); without a writer, the old random order
+	const order: [string, () => ColumnBody | undefined][] = writer
+		? (c.season % 2 === 0
+				? writer.topics
+				: [writer.topics[1]!, writer.topics[0]!, ...writer.topics.slice(2)]
+			).map((id) => [id, byId[id]])
+		: r.shuffle(topics).map((topic, i) => [String(i), topic]);
+	for (const [id, topic] of order) {
+		if (usedTopics.has(id)) {
+			continue;
+		}
 		const x = topic();
 		if (x) {
+			usedTopics.add(id);
 			return {
-				id: "column",
+				id: index === 0 ? "column" : `column-${index + 1}`,
+				type: "column",
 				size: "feature",
 				kicker: colName,
 				head: x.head,
-				byline: c.byline("opinion"),
-				body: x.body,
+				byline: writer
+					? { name: writer.name, role: writer.role }
+					: c.byline("opinion"),
+				body: writer
+					? [
+							P(
+								capFirst(
+									voiceLine(
+										c.cycle(`opener-${writer.id}`, writer.openers),
+										x.subject,
+									),
+								),
+							),
+							...x.body,
+							P(
+								`${capFirst(voiceLine(c.cycle(`closer-${writer.id}`, writer.closers), x.subject))} ${writer.sign}`,
+							),
+						]
+					: x.body,
 			};
 		}
 	}
 	return undefined;
+};
+
+// The edition's two columns, by two of the league's columnists
+export const opinionColumns = (c: Ctx): Article[] => {
+	const writers = columnistsFor(new Rng(`${c.f.seedKey}|columnists`), c.season);
+	const used = new Set<string>();
+	const out: Article[] = [];
+	for (const [i, writer] of writers.entries()) {
+		const a = opinionColumn(c, writer, i, used);
+		if (a) {
+			out.push(a);
+		}
+	}
+	return out;
 };
 
 // ---- Sidebars --------------------------------------------------------------

@@ -46,7 +46,18 @@ export type RotationPlanOptions = {
 	backToBackCut?: number;
 	// Minutes in regulation (numPeriods * quarterLength). The tables are for 48; everything is scaled to this. Undefined = 48
 	regulationMinutes?: number;
+	// Playoffs only: the series state (common/seriesState.ts). 1 a deciding game, 0.8 facing elimination: the top 5 play more (up to
+	// 46), the end of the rotation less. Negative (up 3-0): the stars rest a little. Undefined = 0
+	seriesUrgency?: number;
 };
+
+// Playoff series urgency: share of minutes added to the top 5 (and taken from the 7th man on) per unit of urgency
+const URGENCY_STARS = 0.07;
+const URGENCY_BENCH = 0.5;
+const URGENCY_REST_STARS = 0.08;
+const URGENCY_MAX_EXTRA = 2;
+// ... and the cap comes down when resting
+const URGENCY_REST_MAX = 3;
 
 // Minutes targets per regulation game, in the order of players (0 for injured players and the end of the bench). They sum to
 // numPlayersOnCourt * 48 when there are enough healthy players
@@ -73,8 +84,14 @@ export const planMinutes = (
 
 	const targets = players.map(() => 0);
 	const fifthValue = order[Math.min(4, order.length - 1)]?.p.valueNoPot ?? 0;
+	const urgency =
+		options.playoffs && !options.allStarGame
+			? Math.max(-1, Math.min(1, options.seriesUrgency ?? 0))
+			: 0;
 	const max =
-		(options.playoffs ? MAX_TARGET_PLAYOFFS : MAX_TARGET_REGULAR_SEASON) *
+		((options.playoffs ? MAX_TARGET_PLAYOFFS : MAX_TARGET_REGULAR_SEASON) +
+			URGENCY_MAX_EXTRA * Math.max(0, urgency) -
+			URGENCY_REST_MAX * Math.max(0, -urgency)) *
 		Math.min(1, scale);
 
 	for (const [rank, { p, i }] of order.entries()) {
@@ -96,6 +113,17 @@ export const planMinutes = (
 		// Coach style: tight rotations pull minutes toward the top 7, deep ones spread them
 		if (style !== 0) {
 			target *= 1 - 0.12 * style * (rank < 7 ? 1 : -1.5);
+		}
+		// Series state: must-win games tighten the rotation, a comfortable lead rests the stars
+		if (urgency > 0) {
+			target *=
+				rank < 5
+					? 1 + URGENCY_STARS * urgency
+					: rank < 6
+						? 1
+						: 1 - URGENCY_BENCH * urgency;
+		} else if (urgency < 0) {
+			target *= rank < 5 ? 1 + URGENCY_REST_STARS * urgency : 1;
 		}
 		target = Math.min(target, max);
 		if (p.minutesRestriction !== undefined && p.minutesRestriction < 1) {

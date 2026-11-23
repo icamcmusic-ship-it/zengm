@@ -288,6 +288,42 @@ export type NPInjury = {
 	tid: number;
 	type: string;
 	gamesRemaining: number;
+	// Injuries this season (this one included) and over the career, for the medical desk's durability notes
+	seasonInjuries?: number;
+	careerInjuries?: number;
+};
+
+// Award race tracker: the top of each main award race (the Award Races scoring) and where those players were in the last weekly
+// snapshot. prev is the previous rank, 0 when the player was outside the top 5; undefined when there is no earlier snapshot
+export type NPAwardRace = {
+	key: string;
+	name: string;
+	sinceGp?: number;
+	rows: { pid: number; name: string; tid: number; prev?: number }[];
+};
+
+// Medical desk: who is back, who keeps getting hurt, who never does
+export type NPMedical = {
+	// Healthy again after missing 8+ games this season
+	returns: {
+		pid: number;
+		name: string;
+		tid: number;
+		type: string;
+		games: number;
+	}[];
+	// 3+ injuries or 40+ games missed over the last three seasons
+	fragile: {
+		pid: number;
+		name: string;
+		tid: number;
+		injuries: number;
+		games: number;
+	}[];
+	// Five or more seasons and never hurt
+	ironMen: { pid: number; name: string; tid: number; seasons: number }[];
+	// Games missed this season by each team's current players
+	teamGamesLost: { tid: number; games: number }[];
 };
 
 export type NPChampion = {
@@ -397,6 +433,10 @@ export type NewsFacts = {
 	})[];
 	draft: NPDraftee[];
 	injuries: NPInjury[];
+	// Award race tracker (current season, before the awards are given)
+	awardTracker?: NPAwardRace[];
+	// Medical desk (current season)
+	medical?: NPMedical;
 	// The best record (by share of games won, so schedules of different lengths compare) of any team in any earlier
 	// season, if known
 	recordWins?: {

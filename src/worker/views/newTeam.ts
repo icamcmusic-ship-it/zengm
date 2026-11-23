@@ -6,6 +6,14 @@ import { orderBy } from "../../common/utils.ts";
 import { getHistoryTeam } from "./teamHistory.ts";
 import { getPlayoffsByConfBySeason } from "./frivolitiesTeamSeasons.ts";
 import { defineView } from "../util/defineView.ts";
+import {
+	getGmSuccessor,
+	gmEnabled,
+	successorCandidates,
+} from "../core/gm/index.ts";
+import { isCollege } from "../core/college/isCollege.ts";
+import { gmStyleLabels } from "../../common/gmPersonality.ts";
+import { EXEC_OF_THE_YEAR } from "../../common/coachExecAwards.ts";
 
 export const getTeamOvr = async (tid: number) => {
 	const playersAll = await idb.cache.players.indexGetAll("playersByTid", tid);
@@ -203,7 +211,76 @@ export default defineView({
 
 			const finalTeams = await addHistoryAndPicksAndPlayers(teamsWithOvr);
 
+			// AI GM personalities: fired, the user picks who takes over his old team from the GM market
+			let successor:
+				| {
+						tid: number;
+						teamName: string;
+						picked: number | undefined;
+						candidates: {
+							gmid: number;
+							name: string;
+							age: number;
+							won: number;
+							lost: number;
+							titles: number;
+							execAwards: number;
+							styleLabels: string[];
+							lastTeam: string;
+						}[];
+				  }
+				| undefined;
+			const userTid = g.get("userTid");
+			if (
+				g.get("gameOver") &&
+				!expansion &&
+				!disabled &&
+				gmEnabled() &&
+				!isCollege()
+			) {
+				const numRounds = (s: number) =>
+					g.get("numGamesPlayoffSeries", s).length;
+				const candidates = (await successorCandidates(userTid))
+					.map((gm) => {
+						const last = gm.tenures.at(-1);
+						return {
+							gmid: gm.gmid,
+							name: `${gm.firstName} ${gm.lastName}`,
+							age: g.get("season") - gm.born.year,
+							won:
+								gm.seasons.reduce((sum, row) => sum + row.won, 0) +
+								(gm.career?.won ?? 0),
+							lost:
+								gm.seasons.reduce((sum, row) => sum + row.lost, 0) +
+								(gm.career?.lost ?? 0),
+							titles:
+								gm.seasons.filter(
+									(row) =>
+										row.playoffRoundsWon >= 0 &&
+										row.playoffRoundsWon >= numRounds(row.season),
+								).length + (gm.career?.titles ?? 0),
+							execAwards: (gm.awards ?? []).filter(
+								(a) => a.type === EXEC_OF_THE_YEAR,
+							).length,
+							styleLabels: gmStyleLabels(gm.traits),
+							lastTeam: last
+								? (g.get("teamInfoCache")[last.tid]?.abbrev ?? "")
+								: "",
+						};
+					})
+					.sort((a, b) => b.won - b.lost - (a.won - a.lost));
+				const info = g.get("teamInfoCache")[userTid];
+				const pick = getGmSuccessor();
+				successor = {
+					tid: userTid,
+					teamName: info ? `${info.region} ${info.name}` : "your old team",
+					picked: pick?.tid === userTid ? pick.gmid : undefined,
+					candidates,
+				};
+			}
+
 			return {
+				successor,
 				confs: g.get("confs"),
 				disabled,
 				expansion,

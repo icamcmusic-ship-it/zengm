@@ -9,6 +9,7 @@ import {
 	userControls,
 } from "./coaching.ts";
 import { addSuggestion, removeSuggestion } from "./suggestions.ts";
+import { staffDigestsAfterNewPhase } from "./digests.ts";
 import {
 	afterDay as scoutingAfterDay,
 	afterNewPhase as scoutingAfterNewPhase,
@@ -102,6 +103,14 @@ export const afterNewPhase = async (phase: number) => {
 	}
 	if (coachingDepthOn() && phase === PHASE.PRESEASON) {
 		await safely("development plans", () => proposeDevPlans(true));
+	}
+	// Staff Report: freeze the season's report for its History tab, and the pre-draft and pre-free agency digests (inbox)
+	if (
+		__SPORT === "basketball" &&
+		(scoutingDepthOn() || coachingDepthOn()) &&
+		(phase === PHASE.DRAFT_LOTTERY || phase === PHASE.RESIGN_PLAYERS)
+	) {
+		await safely("staff report digest", () => staffDigestsAfterNewPhase(phase));
 	}
 };
 

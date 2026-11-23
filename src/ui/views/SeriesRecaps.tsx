@@ -8,6 +8,7 @@ const SeriesRecaps = ({
 	season,
 	selected,
 	seriesAwards,
+	storylines,
 }: View<"seriesRecaps">) => {
 	useTitleBar({
 		title: "Series Recaps",
@@ -85,6 +86,19 @@ const SeriesRecaps = ({
 							({abbrev(award.tid)})
 						</p>
 					))}
+					{storylines.length > 0 ? (
+						<div
+							className="border-start border-3 border-warning ps-2 mb-2"
+							data-testid="series-storylines"
+						>
+							<div className="small text-body-secondary">Storyline</div>
+							{storylines.map((line, i) => (
+								<p key={i} className="mb-1">
+									{line}
+								</p>
+							))}
+						</div>
+					) : null}
 					{selected.text.map((line, i) => (
 						<p key={i} className="mb-1">
 							{line}

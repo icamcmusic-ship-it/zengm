@@ -1,4 +1,6 @@
 import { applyOffEmphasis } from "../offEmphasis/index.ts";
+import { getPlayoffSeriesStateFn } from "../playoffExtras/seriesState.ts";
+import { playoffExtrasAfterDay } from "../playoffExtras/index.ts";
 import { snapshotPowerRankings } from "../../views/powerRankings.ts";
 import { marqueeCrowdBoost } from "../../../common/marquee.ts";
 import { ALL_STAR_GAME_ONLY, PHASE } from "../../../common/constants.ts";
@@ -453,6 +455,11 @@ const play = async (
 			g.get("phase") === PHASE.PLAYOFFS &&
 			(await season.newSchedulePlayoffsDay());
 
+		// Playoff extras: score the Bracket Challenge after each round, and the news storylines of a round's new matchups
+		if (g.get("phase") === PHASE.PLAYOFFS) {
+			await playoffExtrasAfterDay();
+		}
+
 		let raw;
 		let url;
 
@@ -560,13 +567,28 @@ const play = async (
 		const marqueeOn = nativeFeatureEnabled("marqueeGames", (key) =>
 			g.get(key as any),
 		);
+		const playoffSeriesState = await getPlayoffSeriesStateFn();
 		for (const game of schedule) {
 			const doPlayByPlay = gidOneGame === game.gid && playByPlay;
 
 			const teamsInput = [teams[game.homeTid], teams[game.awayTid]] as any;
 
 			// Marquee Games: a louder home crowd for holiday, national TV and rivalry games (Load, Fatigue & Venue's crowd)
-			const crowdBoost = marqueeOn ? marqueeCrowdBoost(game) : 0;
+			let crowdBoost = marqueeOn ? marqueeCrowdBoost(game) : 0;
+
+			// Playoff series state (basketball): elimination games and Game 7s tighten rotations and get the home crowd going, up 3-0
+			// rests the stars a little
+			const state = playoffSeriesState
+				? playoffSeriesState(game.homeTid, game.awayTid)
+				: undefined;
+			for (const [i, t] of teamsInput.entries()) {
+				if (t) {
+					t.seriesUrgency = state?.urgency[i];
+				}
+			}
+			if (state) {
+				crowdBoost += state.crowdBoost;
+			}
 			if (crowdBoost > 0 && teamsInput[0]) {
 				teamsInput[0].crowdBoost = crowdBoost;
 			}

@@ -25,6 +25,11 @@ import { bySport } from "../../common/sportFunctions.ts";
 import { formatList } from "../../common/formatList.ts";
 import { team } from "../core/index.ts";
 import { featureOn } from "./nativeFeatures.ts";
+import {
+	BRACKETOLOGIST_SHARE,
+	maxPoints,
+	roundsDone,
+} from "../../common/bracketChallenge.ts";
 
 const findAwards = <
 	Input extends AwardSettingIndividual | AwardSettingTeam,
@@ -2335,6 +2340,34 @@ if (__SPORT === "basketball") {
 					}
 				}
 				return numFired >= GM_OUTLAST;
+			},
+
+			when: "afterPlayoffs",
+		},
+		{
+			slug: "bracketologist",
+			name: "Bracketologist",
+			desc: "Score 75% of the possible points in the Bracket Challenge (Playoffs → Bracket Challenge).",
+			category: "Playoffs",
+
+			async check() {
+				const season = g.get("season");
+				const entry = (g.get("bracketChallenge") ?? []).find(
+					(x) => x.season === season,
+				);
+				const ps = await idb.cache.playoffSeries.get(season);
+				if (!entry?.points || !ps) {
+					return false;
+				}
+				const numRounds = g.get("numGamesPlayoffSeries", season).length;
+				if (
+					roundsDone(ps, (r) => helpers.numGamesToWinRound(r, season)) <
+					numRounds
+				) {
+					return false;
+				}
+				const total = entry.points.reduce((a, b) => a + b, 0);
+				return total >= BRACKETOLOGIST_SHARE * maxPoints(ps, numRounds);
 			},
 
 			when: "afterPlayoffs",

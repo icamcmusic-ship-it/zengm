@@ -33,6 +33,8 @@ const PRO_ONLY_PAGES = new Set([
 	"trade_grader",
 	"gm_history",
 	"front_offices",
+	"gm",
+	"bracket_challenge",
 	"owner",
 	"relatives",
 	"player_scouting",

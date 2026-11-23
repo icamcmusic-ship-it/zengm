@@ -7,14 +7,18 @@ import getSchedule from "../season/getSchedule.ts";
 import getPlayoffsByConf from "../season/getPlayoffsByConf.ts";
 import { getActualPlayThroughInjuries } from "../game/loadTeams.ts";
 import { simSeasonOdds, type SeasonOddsResult } from "./simSeason.ts";
+import { teamStrength } from "./strength.ts";
 import type { TeamSeasonRecord } from "../team/getHypotheticalTeam.ts";
 
 export type { SeasonOddsResult, TeamOdds } from "./simSeason.ts";
+export {
+	MOV_PRIOR_GAMES,
+	MOV_SCALE,
+	ovrToMargin,
+	teamStrength,
+} from "./strength.ts";
 
 export const NUM_SIMS = 1000;
-
-// Weight of the actual point margin vs the roster-based rating grows with games played
-const MOV_PRIOR_GAMES = 25;
 
 let cache:
 	| {
@@ -66,9 +70,7 @@ const getTeamRatings = async (tids: number[]) => {
 			},
 			playoffs: g.get("phase") === PHASE.PLAYOFFS,
 		});
-		// team.ovr is a point margin translated to 0-100, undo that (playoffs ovr is shifted by 40)
-		const shifted = g.get("phase") === PHASE.PLAYOFFS ? ovr + 40 : ovr;
-		ratings.set(tid, ((shifted - 50) * 15) / 50);
+		ratings.set(tid, ovr);
 	}
 	return ratings;
 };
@@ -83,7 +85,7 @@ const compute = async (numSims: number) => {
 		.filter((t) => !t.disabled)
 		.map((t) => t.tid);
 	const records = teamSeasons.filter((ts) => activeTids.includes(ts.tid));
-	const ratings = await getTeamRatings(records.map((ts) => ts.tid));
+	const ovrs = await getTeamRatings(records.map((ts) => ts.tid));
 
 	const teamStats = (await idb.cache.teamStats.getAll()).filter(
 		(row) => !row.playoffs,
@@ -98,10 +100,15 @@ const compute = async (numSims: number) => {
 		const stats = statsByTid.get(ts.tid);
 		const gp = stats?.gp ?? 0;
 		const mov = gp > 0 ? (stats.pts - stats.oppPts) / gp : 0;
-		const w = gp / (gp + MOV_PRIOR_GAMES);
+		// The same strength measure as the Power Rankings (./strength.ts)
 		return {
 			tid: ts.tid,
-			rating: (1 - w) * ratings.get(ts.tid)! + w * mov,
+			rating: teamStrength({
+				ovr: ovrs.get(ts.tid)!,
+				mov,
+				gp,
+				playoffOvr: g.get("phase") === PHASE.PLAYOFFS,
+			}).strength,
 			record: ts as TeamSeasonRecord,
 		};
 	});

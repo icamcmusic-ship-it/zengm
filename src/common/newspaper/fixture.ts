@@ -670,8 +670,61 @@ export const makeFixture = (
 						(i + season) % 3
 					]!,
 					gamesRemaining: 3 + i * 4 + (season % 6),
+					seasonInjuries: 1 + (i % 3),
+					careerInjuries: 1 + i + (season % 4),
 				}))
 			: [],
+		awardTracker:
+			gp && (edition === "midseason" || edition === "playoffs")
+				? ["MVP", "DPOY", "ROY"].map((key, k) => ({
+						key,
+						name:
+							key === "MVP"
+								? "Most Valuable Player"
+								: key === "DPOY"
+									? "Defensive Player of the Year"
+									: "Rookie of the Year",
+						sinceGp: season % 2 === 0 ? Math.max(1, gp - 7) : undefined,
+						rows: [0, 1, 2].map((i) => {
+							const pid = 3 + k * 11 + i * 4 + (season % 3);
+							return {
+								pid,
+								name: players[pid]!.name,
+								tid: players[pid]!.tid,
+								prev: season % 2 === 0 ? [2, 1, 0][(i + k) % 3] : undefined,
+							};
+						}),
+					}))
+				: undefined,
+		medical:
+			gp && edition !== "final"
+				? {
+						returns: [0, 1].map((i) => ({
+							pid: 30 + i * 7 + (season % 9),
+							name: players[30 + i * 7 + (season % 9)]!.name,
+							tid: players[30 + i * 7 + (season % 9)]!.tid,
+							type: i ? "Broken Hand" : "Torn Hamstring",
+							games: 12 + i * 9 + (season % 4),
+						})),
+						fragile: [0, 1].map((i) => ({
+							pid: 50 + i * 3 + (season % 7),
+							name: players[50 + i * 3 + (season % 7)]!.name,
+							tid: players[50 + i * 3 + (season % 7)]!.tid,
+							injuries: 3 + i + (season % 2),
+							games: 41 + i * 6,
+						})),
+						ironMen: [0, 1].map((i) => ({
+							pid: 60 + i * 2 + (season % 5),
+							name: players[60 + i * 2 + (season % 5)]!.name,
+							tid: players[60 + i * 2 + (season % 5)]!.tid,
+							seasons: 9 - i + (season % 3),
+						})),
+						teamGamesLost: [0, 1, 2].map((i) => ({
+							tid: (i * 5 + season) % NUM_TEAMS,
+							games: 60 - i * 15,
+						})),
+					}
+				: undefined,
 		recordWins: {
 			won: 70,
 			tid: 2,

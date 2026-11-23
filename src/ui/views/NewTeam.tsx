@@ -95,7 +95,95 @@ const PlayerList = ({
 	);
 };
 
+type Successor = NonNullable<View<"newTeam">["successor"]>;
+
+// Fired: pick who takes over the team you leave, from the GM market (or let the owner hire someone new)
+const SuccessorPicker = ({ successor }: { successor: Successor }) => {
+	const [picked, setPicked] = useState(successor.picked);
+	const choose = async (gmid: number | undefined) => {
+		setPicked(gmid);
+		await toWorker("main", "setGmSuccessor", gmid);
+	};
+	return (
+		<div className="card mb-3" data-testid="gm-successor">
+			<div className="card-header fw-bold">
+				Pick your successor at the {successor.teamName}
+			</div>
+			<div className="card-body">
+				<p className="small">
+					The owner asked for a recommendation. When you take your new job, the
+					general manager you pick here takes over the {successor.teamName}.
+					Otherwise the owner hires someone new.
+				</p>
+				{successor.candidates.length === 0 ? (
+					<p className="small mb-0">
+						Nobody is on the GM market right now, so the owner will hire someone
+						new.
+					</p>
+				) : (
+					<div className="table-responsive">
+						<table className="table table-sm table-hover mb-0">
+							<thead>
+								<tr>
+									<th></th>
+									<th>GM</th>
+									<th>Age</th>
+									<th>Career</th>
+									<th>Titles</th>
+									<th>EOY</th>
+									<th>Last team</th>
+									<th>Style</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td>
+										<input
+											type="radio"
+											className="form-check-input"
+											name="gm-successor"
+											checked={picked === undefined}
+											onChange={() => choose(undefined)}
+										/>
+									</td>
+									<td colSpan={7}>Let the owner decide</td>
+								</tr>
+								{successor.candidates.map((gm) => (
+									<tr key={gm.gmid}>
+										<td>
+											<input
+												type="radio"
+												className="form-check-input"
+												name="gm-successor"
+												aria-label={gm.name}
+												checked={picked === gm.gmid}
+												onChange={() => choose(gm.gmid)}
+											/>
+										</td>
+										<td>
+											<a href={helpers.leagueUrl(["gm", gm.gmid])}>{gm.name}</a>
+										</td>
+										<td>{gm.age}</td>
+										<td>
+											{gm.won}-{gm.lost}
+										</td>
+										<td>{gm.titles}</td>
+										<td>{gm.execAwards}</td>
+										<td>{gm.lastTeam}</td>
+										<td className="small">{gm.styleLabels.join(" · ")}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+			</div>
+		</div>
+	);
+};
+
 const NewTeam = ({
+	successor,
 	confs,
 	disabled,
 	expansion,
@@ -253,6 +341,8 @@ const NewTeam = ({
 	return (
 		<>
 			{message}
+
+			{successor ? <SuccessorPicker successor={successor} /> : null}
 
 			<form className="d-flex" onSubmit={handleNewTeam}>
 				<select

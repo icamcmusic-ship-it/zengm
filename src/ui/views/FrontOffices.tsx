@@ -81,7 +81,9 @@ const FrontOffices = ({
 										{gm ? (
 											<>
 												<td className="text-nowrap">
-													{gm.name}
+													<a href={helpers.leagueUrl(["gm", gm.gmid])}>
+														{gm.name}
+													</a>
 													{gm.previousTeams.length > 0 ? (
 														<span className="text-body-secondary">
 															{" "}
@@ -239,7 +241,9 @@ const FrontOffices = ({
 						<tbody>
 							{market.map((gm) => (
 								<tr key={gm.gmid}>
-									<td className="text-nowrap">{gm.name}</td>
+									<td className="text-nowrap">
+										<a href={helpers.leagueUrl(["gm", gm.gmid])}>{gm.name}</a>
+									</td>
 									<td>{gm.age}</td>
 									<td>
 										{gm.styleLabels.length > 0

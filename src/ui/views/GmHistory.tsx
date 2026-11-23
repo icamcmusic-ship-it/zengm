@@ -1,3 +1,4 @@
+import { Fragment, useState } from "react";
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import type { View } from "../../common/types.ts";
@@ -7,6 +8,82 @@ import Seasons from "./TeamHistory/Seasons.tsx";
 import HideableSection from "../components/HideableSection.tsx";
 import { useLocal } from "../util/local.ts";
 import { Championships } from "./TeamHistory/Championships.tsx";
+
+type VsGmRow = NonNullable<View<"gmHistory">["vsGms"]>[number];
+
+// Your record (regular season and playoffs) against the teams each AI GM ran while he ran them, and every trade you made with him
+const VsGms = ({ rows }: { rows: VsGmRow[] }) => {
+	const [open, setOpen] = useState<number | undefined>();
+	return (
+		<div className="table-responsive" data-testid="gm-history-vs">
+			<table className="table table-sm table-striped table-hover">
+				<thead>
+					<tr>
+						<th>GM</th>
+						<th>Teams</th>
+						<th title="Regular season record against his teams">Record</th>
+						<th title="Playoff games">Playoffs</th>
+						<th>Trades</th>
+					</tr>
+				</thead>
+				<tbody>
+					{rows.map((row) => (
+						<Fragment key={row.gmid}>
+							<tr>
+								<td>
+									<a href={helpers.leagueUrl(["gm", row.gmid])}>{row.name}</a>
+									{row.current ? null : (
+										<span className="text-body-secondary small"> (former)</span>
+									)}
+								</td>
+								<td>{row.abbrevs.join(", ")}</td>
+								<td>
+									{row.won}-{row.lost}
+									{row.tied > 0 ? `-${row.tied}` : ""}
+								</td>
+								<td>
+									{row.playoffWon + row.playoffLost > 0
+										? `${row.playoffWon}-${row.playoffLost}`
+										: ""}
+								</td>
+								<td>
+									{row.trades.length > 0 ? (
+										<button
+											type="button"
+											className="btn btn-link p-0 border-0 align-baseline"
+											onClick={() =>
+												setOpen(open === row.gmid ? undefined : row.gmid)
+											}
+										>
+											{row.trades.length}
+										</button>
+									) : (
+										0
+									)}
+								</td>
+							</tr>
+							{open === row.gmid
+								? row.trades.map((trade) => (
+										<tr key={trade.eid}>
+											<td colSpan={5} className="small ps-4">
+												<a
+													href={helpers.leagueUrl(["trade_summary", trade.eid])}
+												>
+													{trade.season}
+												</a>
+												: you got {trade.got.join(", ") || "nothing"}; he got{" "}
+												{trade.gave.join(", ") || "nothing"}
+											</td>
+										</tr>
+									))
+								: null}
+						</Fragment>
+					))}
+				</tbody>
+			</table>
+		</div>
+	);
+};
 
 const GmHistory = ({
 	bestRecord,
@@ -22,6 +99,7 @@ const GmHistory = ({
 	totalOtl,
 	totalWinp,
 	totalWon,
+	vsGms,
 	worstRecord,
 }: View<"gmHistory">) => {
 	useTitleBar({
@@ -136,6 +214,11 @@ const GmHistory = ({
 									</li>
 								))}
 							</ul>
+						</HideableSection>
+					) : null}
+					{vsGms && vsGms.length > 0 ? (
+						<HideableSection pageName="GmHistory" title="You vs the AI GMs">
+							<VsGms rows={vsGms} />
 						</HideableSection>
 					) : null}
 					<HideableSection title="Players">

@@ -34,7 +34,7 @@ import { isCollege } from "../college/isCollege.ts";
 import { featureOn } from "../../util/nativeFeatures.ts";
 import { generateFace } from "../../util/face.ts";
 import name from "../player/name.ts";
-import { team } from "../index.ts";
+import { league, team } from "../index.ts";
 import { gmAnalyticsShift } from "../frontOffice/index.ts";
 import {
 	GM_FINANCE_STYLES,
@@ -248,7 +248,7 @@ const teamLink = (tid: number) => {
 };
 
 const gmLink = (gm: Gm) =>
-	`<a href="/l/${g.get("lid")}/front_offices">${gm.firstName} ${gm.lastName}</a>`;
+	`<a href="/l/${g.get("lid")}/gm/${gm.gmid}">${gm.firstName} ${gm.lastName}</a>`;
 
 // College mode has no Executive of the Year and no "general managers" (athletic directors don't get fired in the news), so no news there
 const logGmEvent = async (text: string, tids: number[], score = 0) => {
@@ -387,23 +387,96 @@ export const ensureGms = async () => {
 	}
 
 	let gmid = nextGmid(teams);
+	const successor = getGmSuccessor();
 	for (const t of teams) {
 		if (t.disabled || t.gm || userOwnsTeam(t.tid)) {
 			continue;
 		}
-		const gm = await generateGm(gmid, { seeded: !firstTime });
-		gmid += 1;
+		// The successor the user picked when he was fired, if he is still on the market
+		const picked =
+			successor?.tid === t.tid
+				? takeFromMarket(teams, successor.gmid, t.tid)
+				: undefined;
+		const gm = picked ?? (await generateGm(gmid, { seeded: !firstTime }));
+		if (!picked) {
+			gmid += 1;
+		}
 		hireGm(t, gm, firstTime);
 		await idb.cache.teams.put(t);
 		changed = true;
-		if (!firstTime) {
+		if (picked) {
+			await logGmEvent(
+				`${teamLink(t.tid)} named ${gmLink(gm)}${financeText(gm)} general manager, the successor picked by the general manager they fired.`,
+				[t.tid],
+				5,
+			);
+		} else if (!firstTime) {
 			await logGmEvent(
 				`${teamLink(t.tid)} named ${gmLink(gm)}${financeText(gm)} general manager.`,
 				[t.tid],
 			);
 		}
 	}
+	if (successor && !userOwnsTeam(successor.tid)) {
+		await league.setGameAttributes({ gmSuccessor: undefined });
+	}
 	return changed;
+};
+
+// ---- Picking your successor when fired --------------------------------------
+
+export const getGmSuccessor = () => {
+	try {
+		return g.get("gmSuccessor");
+	} catch {
+		return undefined;
+	}
+};
+
+// Takes a GM off the market (out of his old team's former GMs) to hire him, undefined if he's not on the market or ran this team before
+const takeFromMarket = (teams: Team[], gmid: number, tid: number) => {
+	for (const from of teams) {
+		const gm = from.formerGms?.find((x) => x.gmid === gmid);
+		if (gm) {
+			if (!onGmMarket(gm) || gm.tenures.some((x) => x.tid === tid)) {
+				return undefined;
+			}
+			from.formerGms = from.formerGms!.filter((x) => x !== gm);
+			void idb.cache.teams.put(from);
+			return gm;
+		}
+	}
+	return undefined;
+};
+
+// The GMs the user can pick from when fired: the market, minus anyone who ran his team before
+export const successorCandidates = async (tid: number) => {
+	const teams = await idb.cache.teams.getAll();
+	const out: Gm[] = [];
+	for (const t of teams) {
+		for (const gm of t.formerGms ?? []) {
+			if (onGmMarket(gm) && !gm.tenures.some((x) => x.tid === tid)) {
+				out.push(gm);
+			}
+		}
+	}
+	return out;
+};
+
+export const setGmSuccessor = async (gmid: number | undefined) => {
+	const tid = g.get("userTid");
+	if (!g.get("gameOver")) {
+		throw new Error("You can only pick a successor after being fired.");
+	}
+	if (gmid === undefined) {
+		await league.setGameAttributes({ gmSuccessor: undefined });
+		return;
+	}
+	const candidates = await successorCandidates(tid);
+	if (!candidates.some((gm) => gm.gmid === gmid)) {
+		throw new Error("That general manager is not available.");
+	}
+	await league.setGameAttributes({ gmSuccessor: { tid, gmid } });
 };
 
 // The user's teams changed (taking a team over, giving one up, multi team mode, spectator mode), or a team was added or contracted:

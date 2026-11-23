@@ -26,6 +26,7 @@ const INTERNAL_PAGES = new Set([
 	"autoRelocate",
 	"coach",
 	"depth",
+	"gm",
 	"history",
 	"importPlayers",
 	"importPlayersReal",

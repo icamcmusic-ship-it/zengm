@@ -770,6 +770,54 @@ export type TragicDeaths = {
 
 type FootballOvertime = "suddenDeath" | "exceptFg" | "bothPossess";
 
+export type AwardRaceHistory = {
+	season: number;
+	snapshots: {
+		// Most games played by any team when it was taken
+		gp: number;
+		// Award short name -> pids of the top 5, leader first
+		races: Record<string, number[]>;
+	}[];
+};
+
+export type BracketChallengeEntry = {
+	season: number;
+	// When the picks were made
+	madeAt: "playoffs" | "playIn";
+	// picks[round][seriesIndex] = tid the user picked to win that series
+	picks: number[][];
+	// Points by round, once each round is over
+	points?: number[];
+	// Rounds that have been scored (news sent for)
+	scoredRounds?: number;
+};
+
+export type StaffReportHistoryEntry = {
+	season: number;
+	tid: number;
+	// The scorecard and the top recommendations as text, frozen when the season ended
+	scorecard?: StaffScorecard;
+	recommendations: { area: string; text: string }[];
+	// Digests sent this season ("draft", "freeAgency")
+	digests?: string[];
+};
+
+export type StaffScorecard = {
+	season: number;
+	tid: number;
+	// Average change in ovr of the team's young players vs the league average change (rating points; undefined under No Visible
+	// Ratings in views)
+	devYou?: number;
+	devLeague?: number;
+	numDev: number;
+	// Draft picks of the last few drafts that turned out better than their slot (hits) out of those judged
+	scoutHits: number;
+	scoutJudged: number;
+	// Games missed through injury vs what an average roster of that size would miss
+	injuryGames: number;
+	injuryGamesExpected: number;
+};
+
 export type GameAttributesLeague = NativeFeatureGameAttributes & {
 	aiJerseyRetirement: boolean;
 	aiTradesFactor: number;
@@ -785,6 +833,18 @@ export type GameAttributesLeague = NativeFeatureGameAttributes & {
 
 	// Rumors (League extras): the rumor mill's rolling window and track record, undefined until the first rumor
 	rumors: RumorState | undefined;
+
+	// Award race tracker (the Newspaper): weekly snapshots of the award races' leaders this season, for movement arrows
+	awardRaceHistory: AwardRaceHistory | undefined;
+
+	// Bracket challenge (Playoffs): the user's predictions for each season's bracket, scored after each round
+	bracketChallenge: BracketChallengeEntry[] | undefined;
+
+	// Staff Report: a compact copy of each past season's report (History tab) and the digests already sent
+	staffReportHistory: StaffReportHistoryEntry[] | undefined;
+
+	// AI GM personalities: the successor the user picked from the GM market when fired (hired by his old team when he leaves it)
+	gmSuccessor: { tid: number; gmid: number } | undefined;
 
 	allStarGame: number | null;
 	allStarNum: number;
@@ -2576,6 +2636,9 @@ export type PlayoffSeries = {
 
 	// undefined means no play-in tournament
 	playIns?: PlayInTournament[];
+
+	// Playoff extras: rounds whose series storylines were in the news
+	storylinesAnnounced?: number[];
 };
 
 export type ContractInfo = {
