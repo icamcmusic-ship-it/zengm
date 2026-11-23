@@ -137,6 +137,24 @@ describe("Coach & Executive of the Year", { timeout: 5 * 60 * 1000 }, () => {
 				);
 			}
 		}
+		// No Visible Ratings: the roster rating (today's team ratings) is neither sent nor a column
+		assert.isDefined(output.coachExecRaces[0].candidates[0].vars.rosterWinp);
+		assert.isUndefined(output.coachExecRaces[0].hiddenVars);
+		g.setWithoutSavingToDB("challengeNoRatings", true);
+		try {
+			const hidden = await load("awardRaces", { season: String(season) });
+			assert.deepStrictEqual(hidden.coachExecRaces[0].hiddenVars, [
+				"rosterWinp",
+			]);
+			for (const race of hidden.coachExecRaces) {
+				for (const c of race.candidates) {
+					assert.isUndefined(c.vars.rosterWinp);
+				}
+			}
+		} finally {
+			g.setWithoutSavingToDB("challengeNoRatings", false);
+		}
+
 		const eoy = output.coachExecRaces[1];
 		// The user's front office is a candidate, as "You"
 		const user = eoy.candidates.find((c: any) => c.user);

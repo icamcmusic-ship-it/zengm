@@ -63,7 +63,8 @@ export type GmCardInfo = {
 	tenureSeasons: number;
 	won: number;
 	lost: number;
-	aboveExp: number;
+	// Both undefined under No Visible Ratings (expectations come from roster ratings)
+	aboveExp?: number;
 	playoffs: number;
 	titles: number;
 	expWon?: number;

@@ -23,7 +23,11 @@ const isTitle = (season: number, playoffRoundsWon: number) =>
 	playoffRoundsWon >= 0 &&
 	playoffRoundsWon >= g.get("numGamesPlayoffSeries", season).length;
 
+// No Visible Ratings challenge: expected wins come from the roster ratings, so they're not sent
+export const gmExpHidden = () => !!g.get("challengeNoRatings");
+
 export const formatGm = async (gm: Gm, tid?: number) => {
+	const noRatings = gmExpHidden();
 	const tenure = gm.tenures.at(-1);
 	const current = tid !== undefined ? seasonsWithTeam(gm, tid) : [];
 	const sum = (rows: Gm["seasons"], key: "won" | "lost") =>
@@ -65,7 +69,7 @@ export const formatGm = async (gm: Gm, tid?: number) => {
 		tenureSeasons: current.length,
 		won: sum(current, "won"),
 		lost: sum(current, "lost"),
-		aboveExp: Math.round(aboveExp * 10) / 10,
+		aboveExp: noRatings ? undefined : Math.round(aboveExp * 10) / 10,
 		playoffs: current.filter((row) => row.playoffRoundsWon >= 0).length,
 		titles: current.filter((row) => isTitle(row.season, row.playoffRoundsWon))
 			.length,
@@ -80,7 +84,7 @@ export const formatGm = async (gm: Gm, tid?: number) => {
 			.filter((a) => a.type === EXEC_OF_THE_YEAR)
 			.map((a) => a.season)
 			.sort((a, b) => a - b),
-		expWon: gm.expWon,
+		expWon: noRatings ? undefined : gm.expWon,
 		seasonWon,
 		seasonLost,
 		hotSeat: gm.hotSeat,

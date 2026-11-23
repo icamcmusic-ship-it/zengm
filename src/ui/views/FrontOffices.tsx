@@ -20,11 +20,24 @@ const FrontOffices = ({
 	rows,
 	traitInfo,
 	financeInfo,
+	noRatings,
 }: View<"frontOffices">) => {
 	useTitleBar({ title: "Front Offices" });
 	const [open, setOpen] = useState<number | undefined>();
 
-	const seasons = [...new Set(moves.map((m) => m.season))].slice(0, 12);
+	// Carousel groups, newest first (moves come sorted): the offseason after a season, or during one
+	const groupKey = (m: { season: number; midSeason?: boolean }) =>
+		`${m.season}${m.midSeason ? "-during" : ""}`;
+	const groups = [
+		...new Map(moves.map((m) => [groupKey(m), m] as const)).values(),
+	]
+		.slice(0, 12)
+		.map((m) => ({
+			key: groupKey(m),
+			season: m.season,
+			midSeason: !!m.midSeason,
+		}));
+	const numCols = 10 + (financeInfo ? 1 : 0) - (noRatings ? 1 : 0);
 
 	return (
 		<>
@@ -47,9 +60,11 @@ const FrontOffices = ({
 							{financeInfo ? <th>Finances</th> : null}
 							<th>Since</th>
 							<th title="Record with this team">Record</th>
-							<th title="Wins above the preseason expectations, per 82 games, with this team">
-								+/- Exp
-							</th>
+							{noRatings ? null : (
+								<th title="Wins above the preseason expectations, per 82 games, with this team">
+									+/- Exp
+								</th>
+							)}
 							<th title="Playoff appearances with this team">Playoffs</th>
 							<th>Titles</th>
 							<th>Job security</th>
@@ -109,13 +124,16 @@ const FrontOffices = ({
 												<td className="text-nowrap">
 													{gm.tenureSeasons > 0 ? `${gm.won}-${gm.lost}` : "—"}
 												</td>
-												<td>
-													{gm.tenureSeasons > 0 ? (
-														<PlusMinus>{gm.aboveExp}</PlusMinus>
-													) : (
-														"—"
-													)}
-												</td>
+												{noRatings ? null : (
+													<td>
+														{gm.tenureSeasons > 0 &&
+														gm.aboveExp !== undefined ? (
+															<PlusMinus>{gm.aboveExp}</PlusMinus>
+														) : (
+															"—"
+														)}
+													</td>
+												)}
 												<td>{gm.playoffs}</td>
 												<td>{gm.titles}</td>
 												<td className={hotSeatClass(gm.hotSeatLabel)}>
@@ -123,17 +141,14 @@ const FrontOffices = ({
 												</td>
 											</>
 										) : (
-											<td
-												colSpan={financeInfo ? 10 : 9}
-												className="text-body-secondary"
-											>
+											<td colSpan={numCols - 1} className="text-body-secondary">
 												{row.user ? "You" : "Vacant"}
 											</td>
 										)}
 									</tr>
 									{gm && open === row.tid ? (
 										<tr>
-											<td colSpan={financeInfo ? 11 : 10}>
+											<td colSpan={numCols}>
 												<div className="d-flex flex-wrap gap-3">
 													{gm.face ? (
 														<div style={{ width: 80, height: 120 }}>
@@ -176,15 +191,17 @@ const FrontOffices = ({
 			</div>
 
 			<h2>GM carousel</h2>
-			{seasons.length === 0 ? (
+			{groups.length === 0 ? (
 				<p>No GM has been fired or hired yet.</p>
 			) : (
-				seasons.map((season) => (
-					<Fragment key={season}>
-						<h3 className="h5">After the {season} season</h3>
+				groups.map((group) => (
+					<Fragment key={group.key}>
+						<h3 className="h5">
+							{group.midSeason ? "During" : "After"} the {group.season} season
+						</h3>
 						<ul>
 							{moves
-								.filter((m) => m.season === season)
+								.filter((m) => groupKey(m) === group.key)
 								.map((m, i) => (
 									<li key={i}>
 										<a
@@ -197,11 +214,13 @@ const FrontOffices = ({
 										</a>{" "}
 										{m.type === "retired" ? (
 											<>
-												{MOVE_TEXT.retired} {m.name}
+												{MOVE_TEXT.retired}{" "}
+												<a href={helpers.leagueUrl(["gm", m.gmid])}>{m.name}</a>
 											</>
 										) : (
 											<>
-												{MOVE_TEXT[m.type]} {m.name}
+												{MOVE_TEXT[m.type]}{" "}
+												<a href={helpers.leagueUrl(["gm", m.gmid])}>{m.name}</a>
 												{m.type === "hired" && m.finance
 													? `, ${/^[aeiou]/i.test(m.finance) ? "an" : "a"} ${m.finance} GM`
 													: ""}

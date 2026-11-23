@@ -23,18 +23,24 @@ import { player, team } from "../index.ts";
 import { ValueChangeCalculator } from "../team/ValueChangeCalculator.ts";
 import { getDraftAdjustment } from "../draft/draftNeeds.ts";
 import {
+	currentPlayoffTids,
 	ensureGms,
+	extraFirstRoundPicks,
 	getAllGmWeights,
 	getGmWeights,
 	HOT_SEAT_NEWS_MAX,
+	hotSeatMinGp,
 	hotSeatNews,
 	judgedSeasons,
+	leaveTeam,
 	onGmMarket,
 	onRegularSeason,
+	projectedSeasonFireProb,
 	runOffseason,
 	syncGms,
 } from "./index.ts";
 import frontOfficesView from "../../views/frontOffices.ts";
+import { getGmProfile } from "./profile.ts";
 
 const withRandom = async <T>(seed: number, f: () => Promise<T>) => {
 	const orig = Math.random;
@@ -717,6 +723,138 @@ describe("GM hot seat news", () => {
 		await hotSeatNews();
 		assert.strictEqual((await newsTexts()).length, 0, "setting off");
 	});
+
+	test("a team in a playoff spot is projected to make the playoffs", async () => {
+		await setupBadSeasons();
+		const tid = badTids[0]!;
+		const teams = await idb.cache.teams.getAll();
+		const t = teams.find((x) => x.tid === tid)!;
+		const ts = (await idb.cache.teamSeasons.indexGet("teamSeasonsBySeasonTid", [
+			g.get("season"),
+			tid,
+		]))!;
+		// A bit under .500 this season after two bad ones, not hopeless
+		ts.won = 19;
+		ts.lost = 21;
+		const missed = await projectedSeasonFireProb(t, teams, ts, () =>
+			Promise.resolve(new Set<number>()),
+		);
+		const made = await projectedSeasonFireProb(t, teams, ts, () =>
+			Promise.resolve(new Set([tid])),
+		);
+		assert.isAbove(missed, 0);
+		assert.isBelow(made, missed);
+
+		// The standings decide who's in a playoff spot now
+		const best = (await idb.cache.teamSeasons.indexGet(
+			"teamSeasonsBySeasonTid",
+			[g.get("season"), 1],
+		))!;
+		best.won = 39;
+		best.lost = 1;
+		await idb.cache.teamSeasons.put(best);
+		const playoffTids = await currentPlayoffTids();
+		assert.isTrue(playoffTids.has(1));
+		assert.isFalse(playoffTids.has(tid));
+	});
+
+	test("short seasons: the games needed before hot seat news scale with the season", async () => {
+		assert.strictEqual(hotSeatMinGp(), 10);
+		await setupBadSeasons();
+		g.setWithoutSavingToDB("numGames", 10);
+		assert.strictEqual(hotSeatMinGp(), 2);
+		for (const ts of await idb.cache.teamSeasons.indexGetAll(
+			"teamSeasonsBySeasonTid",
+			[[g.get("season")], [g.get("season"), "Z"]],
+		)) {
+			ts.won = badTids.includes(ts.tid) ? 0 : 2;
+			ts.lost = badTids.includes(ts.tid) ? 3 : 1;
+			await idb.cache.teamSeasons.put(ts);
+		}
+		await hotSeatNews();
+		assert.isAbove((await newsTexts()).length, 0);
+		g.setWithoutSavingToDB("numGames", 1);
+		assert.strictEqual(hotSeatMinGp(), 1);
+	});
+});
+
+describe("rebuild credit: first round picks", () => {
+	const own = (seasons: number[]) =>
+		seasons.map((season) => ({ round: 1, season }));
+	const season = 2025;
+
+	test("a team holding its own picks has no extra ones, whatever the phase", () => {
+		// Before the draft: this season's pick (still unused) and the next 3
+		assert.strictEqual(
+			extraFirstRoundPicks(own([2025, 2026, 2027, 2028]), {
+				season,
+				phase: PHASE.PLAYOFFS,
+				numFuture: 4,
+			}),
+			0,
+		);
+		assert.strictEqual(
+			extraFirstRoundPicks(own([2025, 2026, 2027, 2028]), {
+				season,
+				phase: PHASE.REGULAR_SEASON,
+				numFuture: 4,
+			}),
+			0,
+		);
+		// After the draft: the next 4
+		assert.strictEqual(
+			extraFirstRoundPicks(own([2026, 2027, 2028, 2029]), {
+				season,
+				phase: PHASE.FREE_AGENCY,
+				numFuture: 4,
+			}),
+			0,
+		);
+		// During the draft: this season's are being used, the next ones are there
+		assert.strictEqual(
+			extraFirstRoundPicks(own([2026, 2027, 2028]), {
+				season,
+				phase: PHASE.DRAFT,
+				numFuture: 4,
+			}),
+			0,
+		);
+		// Second rounders don't count
+		assert.strictEqual(
+			extraFirstRoundPicks(
+				[{ round: 2, season: 2025 }, ...own([2025, 2026, 2027, 2028])],
+				{ season, phase: PHASE.PLAYOFFS, numFuture: 4 },
+			),
+			0,
+		);
+		// No future picks setting (or no draft): nothing to count
+		assert.strictEqual(
+			extraFirstRoundPicks([], { season, phase: PHASE.PLAYOFFS, numFuture: 0 }),
+			0,
+		);
+	});
+
+	test("this year's pick counts, extra and missing picks too", () => {
+		const opts = { season, phase: PHASE.PLAYOFFS, numFuture: 4 };
+		// Traded this season's pick away
+		assert.strictEqual(extraFirstRoundPicks(own([2026, 2027, 2028]), opts), -1);
+		// Got another team's lottery pick this season
+		assert.strictEqual(
+			extraFirstRoundPicks(own([2025, 2025, 2026, 2027, 2028]), opts),
+			1,
+		);
+		// More than 4 seasons of picks are scaled to 4
+		assert.strictEqual(
+			extraFirstRoundPicks(
+				own([2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032]),
+				{
+					...opts,
+					numFuture: 8,
+				},
+			),
+			0,
+		);
+	});
 });
 
 describe("AI GMs and the user's teams", () => {
@@ -786,6 +924,21 @@ describe("AI GMs and the user's teams", () => {
 		assert.isTrue(texts.some((x) => x.includes(" left ")));
 		assert.isTrue(texts.some((x) => x.includes(" named ")));
 
+		// Hired during the season: the GM carousel files him under this season, not the offseason before it
+		assert.isTrue(t2.gm!.tenures.at(-1)!.midSeason);
+		const fo = (await frontOfficesView.load({
+			inputs: {},
+			updateEvents: new Set(["firstRun"]),
+			prevInputs: {},
+			prevOutput: {},
+			conditions: {},
+		} as any)) as any;
+		const hire = fo.moves.find(
+			(m: any) => m.type === "hired" && m.gmid === t2.gm!.gmid,
+		);
+		assert.strictEqual(hire.season, season);
+		assert.isTrue(hire.midSeason);
+
 		// Spectator mode on and off: the user's team gets a GM, and loses him again
 		g.setWithoutSavingToDB("spectator", true);
 		await syncGms();
@@ -795,9 +948,84 @@ describe("AI GMs and the user's teams", () => {
 		await syncGms();
 		const userTeam = (await idb.cache.teams.get(g.get("userTid")))!;
 		assert.isUndefined(userTeam.gm);
+	});
+
+	test("toggling spectator mode doesn't churn GMs: the same GM steps in, no zero game tenures or news", async () => {
+		const userTid = g.get("userTid");
+		const numEvents = async () => (await idb.cache.events.getAll()).length;
+		g.setWithoutSavingToDB("phase", PHASE.DRAFT);
+
+		// First time on: a new GM, named in the news
+		g.setWithoutSavingToDB("spectator", true);
+		await noRandom(syncGms);
+		const gm = (await idb.cache.teams.get(userTid))!.gm!;
+		assert.isDefined(gm);
+		assert.strictEqual(gm.spectatorFor, userTid);
+		const eventsAfterHire = await numEvents();
+		assert.strictEqual(eventsAfterHire, 1);
+		const gmidsBefore = await allGmids();
+
+		// Off and on a few times, in the offseason and during the season: always him, no tenure left behind, no news
+		for (const phase of [
+			PHASE.DRAFT,
+			PHASE.FREE_AGENCY,
+			PHASE.PRESEASON,
+			PHASE.REGULAR_SEASON,
+		]) {
+			if (phase === PHASE.PRESEASON) {
+				g.setWithoutSavingToDB("season", g.get("season") + 1);
+			}
+			g.setWithoutSavingToDB("phase", phase);
+			g.setWithoutSavingToDB("spectator", false);
+			await noRandom(syncGms);
+			const off = (await idb.cache.teams.get(userTid))!;
+			assert.isUndefined(off.gm);
+			const parked = off.formerGms!.find((x) => x.gmid === gm.gmid)!;
+			assert.strictEqual(parked.tenures.length, 0, "no zero game tenure");
+			assert.isFalse(onGmMarket(parked));
+
+			g.setWithoutSavingToDB("spectator", true);
+			await noRandom(syncGms);
+			const on = (await idb.cache.teams.get(userTid))!;
+			assert.strictEqual(on.gm!.gmid, gm.gmid);
+			assert.isFalse((on.formerGms ?? []).some((x) => x.gmid === gm.gmid));
+		}
+		assert.strictEqual(await numEvents(), eventsAfterHire);
+		assert.deepStrictEqual(await allGmids(), gmidsBefore);
+
+		// He runs a full season, so turning spectator mode off ends a real tenure (with news), and he still steps in again
+		await onRegularSeason();
+		await finishSeason(() => 41);
+		g.setWithoutSavingToDB("phase", PHASE.PLAYOFFS);
+		const t = (await idb.cache.teams.get(userTid))!;
+		t.gm!.born.year = g.get("season") - 40;
+		await idb.cache.teams.put(t);
+		await withRandom(1, runOffseason);
 		assert.strictEqual(
-			userTeam.formerGms!.at(-1)!.tenures.at(-1)!.reason,
-			"left",
+			(await idb.cache.teams.get(userTid))!.gm!.gmid,
+			gm.gmid,
+			"not fired after an average season",
+		);
+		g.setWithoutSavingToDB("phase", PHASE.DRAFT);
+		g.setWithoutSavingToDB("spectator", false);
+		await noRandom(syncGms);
+		const left = (await idb.cache.teams.get(userTid))!.formerGms!.find(
+			(x) => x.gmid === gm.gmid,
+		)!;
+		assert.strictEqual(left.tenures.length, 1);
+		assert.strictEqual(left.tenures[0]!.reason, "left");
+		assert.strictEqual(left.tenures[0]!.end, g.get("season"));
+		assert.strictEqual(left.seasons.length, 1);
+		g.setWithoutSavingToDB("spectator", true);
+		await noRandom(syncGms);
+		assert.strictEqual((await idb.cache.teams.get(userTid))!.gm!.gmid, gm.gmid);
+
+		// Fired: he's not the one who comes back
+		const t2 = (await idb.cache.teams.get(userTid))!;
+		leaveTeam(t2, "fired", g.get("season"));
+		await idb.cache.teams.put(t2);
+		assert.isUndefined(
+			t2.formerGms!.find((x) => x.gmid === gm.gmid)!.spectatorFor,
 		);
 	});
 
@@ -882,6 +1110,7 @@ describe("AI GMs and the user's teams", () => {
 		const t = (await idb.cache.teams.get(tid))!;
 		const gm = t.gm!;
 		gm.born.year = g.get("season") - 80;
+		gm.tenures[0]!.start = g.get("season") - 1;
 		gm.seasons.push({
 			season: g.get("season") - 1,
 			tid,
@@ -907,6 +1136,26 @@ describe("AI GMs and the user's teams", () => {
 		assert.strictEqual(retired.career!.tied, 1);
 		assert.strictEqual(retired.career!.titles, 1);
 		assert.isFalse(onGmMarket(retired));
+		// His job's record is kept too, so his profile doesn't show 0-0
+		assert.deepStrictEqual(retired.tenures[0]!.record, {
+			won: 101,
+			lost: 62,
+			tied: 1,
+			otl: 0,
+			playoffs: 1,
+			titles: 1,
+		});
+		const profile = (await getGmProfile(retired.gmid))!;
+		assert.strictEqual(profile.tenures[0]!.won, 101);
+		assert.strictEqual(profile.tenures[0]!.lost, 62);
+		assert.strictEqual(profile.tenures[0]!.playoffs, 1);
+		assert.strictEqual(profile.tenures[0]!.titles, 1);
+
+		// Retired before tenure records were kept: from the team seasons
+		delete retired.tenures[0]!.record;
+		const legacy = (await getGmProfile(retired.gmid))!;
+		assert.strictEqual(legacy.tenures[0]!.won, 41);
+		assert.strictEqual(legacy.tenures[0]!.lost, 41);
 
 		// A 67 year old former GM can't be hired, so he's not on the market
 		const t2 = (await idb.cache.teams.get(11))!;

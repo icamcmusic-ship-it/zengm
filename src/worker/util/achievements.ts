@@ -2321,10 +2321,28 @@ if (__SPORT === "basketball") {
 			category: "Front Office",
 
 			async check() {
-				if (!featureOn("gmPersonalities")) {
+				if (!featureOn("gmPersonalities") || g.get("gameOver")) {
 					return false;
 				}
-				const start = g.get("startingSeason");
+				// Only firings during his current unbroken run in his job: the seasons up to this one that he ran his team himself (a
+				// season with another team, spectating or after being fired ends it)
+				const tid = g.get("userTid");
+				const current = g.get("season");
+				let start = current + 1;
+				for (
+					let season = current;
+					season >= g.get("startingSeason");
+					season--
+				) {
+					const teamSeasons = await idb.merged.teamSeasons.getAll({ season });
+					if (!userRanTeam(tid, season, teamSeasons)) {
+						break;
+					}
+					start = season;
+				}
+				if (start > current) {
+					return false;
+				}
 				let numFired = 0;
 				for (const t of await idb.cache.teams.getAll()) {
 					for (const gm of [...(t.gm ? [t.gm] : []), ...(t.formerGms ?? [])]) {

@@ -11,7 +11,8 @@ import type {
 	TeamSeason,
 } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
-import { g } from "../../util/index.ts";
+import { NUM_PRIOR_SEASONS_EVENTS } from "../../db/Cache.ts";
+import { g, local } from "../../util/index.ts";
 
 const allGms = (teams: Team[]) => {
 	const out: Gm[] = [];
@@ -43,8 +44,58 @@ type TradeEvent = Extract<EventBBGM, { type: "trade" }>;
 const isTrade = (event: EventBBGM): event is TradeEvent =>
 	event.type === "trade";
 
-const tradeEvents = async () =>
-	(await idb.merged.events.getAll(undefined)).filter(isTrade);
+// Trade events and head-to-head records of past seasons, as the database has them: read once per league connection, cache fill and
+// season, instead of the whole event log on every load (GM History reloads after every simulated day). Only trade events are kept
+type PastData = {
+	key: string;
+	league: unknown;
+	trades: TradeEvent[];
+	headToHeads: HeadToHead[];
+};
+let pastData: PastData | undefined;
+
+const getPastData = async (): Promise<PastData> => {
+	const season = g.get("season");
+	const key = `${idb.cache.fillCount}|${season}`;
+	if (pastData?.league === idb.league && pastData.key === key) {
+		return pastData;
+	}
+	// The cache holds this season's events and NUM_PRIOR_SEASONS_EVENTS before it
+	const cutoff = season - NUM_PRIOR_SEASONS_EVENTS - 1;
+	const trades: TradeEvent[] = [];
+	for await (const cursor of idb.league
+		.transaction("events")
+		.store.index("season")
+		.iterate(IDBKeyRange.upperBound(cutoff))) {
+		if (isTrade(cursor.value)) {
+			trades.push(cursor.value);
+		}
+	}
+	const headToHeads: HeadToHead[] = [];
+	for await (const { value } of idb.league
+		.transaction("headToHeads")
+		.store.iterate()) {
+		if (value.season < season) {
+			headToHeads.push(value);
+		}
+	}
+	pastData = { key, league: idb.league, trades, headToHeads };
+	return pastData;
+};
+
+const tradeEvents = async () => {
+	const byEid = new Map<number, TradeEvent>();
+	for (const event of (await getPastData()).trades) {
+		byEid.set(event.eid, event);
+	}
+	// The cache wins for an event in both (it can hold older seasons too, with auto save off)
+	for (const event of await idb.cache.events.getAll()) {
+		if (isTrade(event)) {
+			byEid.set(event.eid, event);
+		}
+	}
+	return [...byEid.values()];
+};
 
 const teamName = (tid: number, season: number, teamSeasons: TeamSeason[]) => {
 	const ts = teamSeasons.find((x) => x.tid === tid && x.season === season);
@@ -100,13 +151,48 @@ export const getGmProfile = async (gmid: number) => {
 			),
 		}));
 
+	const isTitle = (season: number, playoffRoundsWon: number) =>
+		playoffRoundsWon >= 0 && playoffRoundsWon >= numRounds(season);
+	// A retired GM's season rows are folded into career totals (and, since then, into each tenure's record). One retired before that
+	// has neither: his tenures' records come from the team seasons
+	const legacyRetired = gm.retiredYear !== undefined && gm.seasons.length === 0;
 	const tenures = gm.tenures.map((x) => {
-		const rows = gm.seasons.filter(
-			(row) =>
-				row.tid === x.tid &&
-				row.season >= x.start &&
-				row.season <= (x.end ?? Infinity),
-		);
+		const rows: {
+			won: number;
+			lost: number;
+			playoffs: number;
+			titles: number;
+		}[] = gm.seasons
+			.filter(
+				(row) =>
+					row.tid === x.tid &&
+					row.season >= x.start &&
+					row.season <= (x.end ?? Infinity),
+			)
+			.map((row) => ({
+				won: row.won,
+				lost: row.lost,
+				playoffs: row.playoffRoundsWon >= 0 ? 1 : 0,
+				titles: isTitle(row.season, row.playoffRoundsWon) ? 1 : 0,
+			}));
+		if (x.record) {
+			rows.push(x.record);
+		} else if (legacyRetired) {
+			for (const ts of teamSeasons) {
+				if (
+					ts.tid === x.tid &&
+					ts.season >= x.start &&
+					ts.season <= (x.end ?? Infinity)
+				) {
+					rows.push({
+						won: ts.won,
+						lost: ts.lost,
+						playoffs: ts.playoffRoundsWon >= 0 ? 1 : 0,
+						titles: isTitle(ts.season, ts.playoffRoundsWon) ? 1 : 0,
+					});
+				}
+			}
+		}
 		const info = teamName(x.tid, x.end ?? g.get("season"), teamSeasons);
 		return {
 			tid: x.tid,
@@ -117,12 +203,8 @@ export const getGmProfile = async (gmid: number) => {
 			reason: x.reason,
 			won: rows.reduce((sum, row) => sum + row.won, 0),
 			lost: rows.reduce((sum, row) => sum + row.lost, 0),
-			playoffs: rows.filter((row) => row.playoffRoundsWon >= 0).length,
-			titles: rows.filter(
-				(row) =>
-					row.playoffRoundsWon >= 0 &&
-					row.playoffRoundsWon >= numRounds(row.season),
-			).length,
+			playoffs: rows.reduce((sum, row) => sum + row.playoffs, 0),
+			titles: rows.reduce((sum, row) => sum + row.titles, 0),
 		};
 	});
 
@@ -143,7 +225,10 @@ export const getGmProfile = async (gmid: number) => {
 				tid: event.tids[side]!,
 				otherTid: other,
 				otherAbbrev: teamName(other, event.season, teamSeasons).abbrev,
-				withUser: userTidsBySeason.get(eff)?.has(other) ?? false,
+				withUser:
+					(
+						userTidsBySeason.get(eff) ?? userTidsBySeason.get(event.season)
+					)?.has(other) ?? false,
 				got: tradeAssets(event, side as 0 | 1),
 				gave: tradeAssets(event, side === 0 ? 1 : 0),
 			};
@@ -187,22 +272,30 @@ export const getGmProfile = async (gmid: number) => {
 
 // ---- You vs the AI GMs --------------------------------------------------------
 
-// The teams the user ran in each season (TeamSeason.userControl, else the season's user team), like GM History
+// The teams the user runs now: none while the AI runs them (spectator mode, auto play)
+const currentUserTids = () =>
+	g.get("spectator") || local.autoPlayUntil ? [] : g.get("userTids");
+
+// The teams the user ran in each season, like GM History: TeamSeason.userControl, else for this season before its regular season the
+// teams he runs now, else the season's user team. In the offseason, next season's (which offseason moves count for) are the teams he
+// runs now too
 const userTeamsBySeason = async () => {
 	const out = new Map<number, Set<number>>();
-	for (
-		let season = g.get("startingSeason");
-		season <= g.get("season");
-		season++
-	) {
+	const current = g.get("season");
+	for (let season = g.get("startingSeason"); season <= current; season++) {
 		const all = await idb.merged.teamSeasons.getAll({ season });
 		let tids: number[];
 		if (all.some((ts) => ts.userControl !== undefined)) {
 			tids = all.filter((ts) => ts.userControl === "user").map((ts) => ts.tid);
+		} else if (season === current) {
+			tids = currentUserTids();
 		} else {
 			tids = [g.get("userTid", season)];
 		}
 		out.set(season, new Set(tids));
+	}
+	if (g.get("phase") > PHASE.PLAYOFFS) {
+		out.set(current + 1, new Set(currentUserTids()));
 	}
 	return out;
 };
@@ -228,12 +321,8 @@ const h2hRecord = (h2h: HeadToHead, a: number, b: number) => {
 const headToHeads = async () => {
 	const out = new Map<number, HeadToHead>();
 	const currentSeason = g.get("season");
-	for await (const { value } of idb.league
-		.transaction("headToHeads")
-		.store.iterate()) {
-		if (value.season !== currentSeason) {
-			out.set(value.season, value);
-		}
+	for (const value of (await getPastData()).headToHeads) {
+		out.set(value.season, value);
 	}
 	const current = await idb.cache.headToHeads.get(currentSeason);
 	if (current) {

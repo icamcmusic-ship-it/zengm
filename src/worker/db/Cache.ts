@@ -570,6 +570,9 @@ class Cache {
 
 	_season: number | undefined;
 
+	// Counts fills, so code that keeps rows it read from the database (core/gm/profile.ts) knows when to read them again
+	fillCount = 0;
+
 	_stopAutoFlush: boolean;
 
 	allStars: StoreAPI<AllStars, AllStars, number>;
@@ -922,6 +925,7 @@ class Cache {
 			this._dirty = false;
 		}
 
+		this.fillCount += 1;
 		this._setStatus("full");
 	}
 

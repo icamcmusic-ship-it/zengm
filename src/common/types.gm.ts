@@ -57,6 +57,17 @@ export type GmTenure = {
 	reason?: "fired" | "retired" | "left";
 	// One of the league's first GMs (or the first when the setting was turned on), not hired in a carousel
 	initial?: true;
+	// Hired during the regular season (a team the user gave up, an expansion team), not in an offseason
+	midSeason?: true;
+	// A retired GM's record in this job: his season rows are dropped when he retires (missing in older leagues and while he works)
+	record?: {
+		won: number;
+		lost: number;
+		tied: number;
+		otl: number;
+		playoffs: number;
+		titles: number;
+	};
 };
 
 export type Gm = {
@@ -90,6 +101,9 @@ export type Gm = {
 	// Season of the last "job reportedly in danger" news item about him (hotSeatNews), so he gets at most one a season
 	hotSeatNews?: number;
 	retiredYear?: number;
+	// Hired to run this user team in spectator mode: when the user takes it back he steps aside (on the team's former GMs), and he
+	// runs it again the next time spectator mode is turned on, so toggling it doesn't churn through GMs
+	spectatorFor?: number;
 	// Hall of Fame executives wing (core/hallOfFame): the season he was inducted
 	hof?: number;
 	// Coach & Executive of the Year (League Extra): Executive of the Year awards he won (missing in older leagues)
