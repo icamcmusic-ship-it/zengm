@@ -167,6 +167,8 @@ export { default as HomeCourt } from "./LeagueHistory/HomeCourt.tsx";
 export { default as Staff } from "./Staff/index.tsx";
 export { default as Coach } from "./Coach.tsx";
 export { default as Gm } from "./Gm.tsx";
+export { default as BracketArchive } from "./BracketArchive.tsx";
+export { default as BracketChallenge } from "./BracketChallenge.tsx";
 export { default as Coaches } from "./Coaches.tsx";
 export { default as FrontOffices } from "./FrontOffices.tsx";
 export { default as CoachNotes } from "./CoachNotes.tsx";

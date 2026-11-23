@@ -1,4 +1,5 @@
 import { applyOffEmphasis } from "../offEmphasis/index.ts";
+import { playoffExtrasAfterDay } from "../playoffExtras/index.ts";
 import { snapshotPowerRankings } from "../../views/powerRankings.ts";
 import { marqueeCrowdBoost } from "../../../common/marquee.ts";
 import { ALL_STAR_GAME_ONLY, PHASE } from "../../../common/constants.ts";
@@ -447,6 +448,11 @@ const play = async (
 		const playoffsOver =
 			g.get("phase") === PHASE.PLAYOFFS &&
 			(await season.newSchedulePlayoffsDay());
+
+		// Playoff extras: score the Bracket Challenge after each round, and the news storylines of a round's new matchups
+		if (g.get("phase") === PHASE.PLAYOFFS) {
+			await playoffExtrasAfterDay();
+		}
 
 		let raw;
 		let url;

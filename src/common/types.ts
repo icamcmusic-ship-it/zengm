@@ -2636,6 +2636,9 @@ export type PlayoffSeries = {
 
 	// undefined means no play-in tournament
 	playIns?: PlayInTournament[];
+
+	// Playoff extras: rounds whose series storylines were in the news
+	storylinesAnnounced?: number[];
 };
 
 export type ContractInfo = {

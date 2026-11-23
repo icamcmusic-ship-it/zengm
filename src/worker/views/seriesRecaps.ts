@@ -13,6 +13,7 @@ import {
 import type { Game } from "../../common/types.ts";
 import { getSeriesAwardWinners } from "../core/awards/seriesAwards.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import { storylinesFor } from "../core/playoffExtras/index.ts";
 
 const teamName = (tid: number) =>
 	g.get("teamInfoCache")[tid]?.name ?? `Team ${tid}`;
@@ -141,10 +142,21 @@ export default defineView({
 						tids: [selected.winner.tid, selected.loser.tid],
 					})
 				: [];
+		// Series storylines: rematches, revenge for last season, playoff rivalries
+		const storylines = selected
+			? (
+					await storylinesFor(
+						inputs.season,
+						selected.winner.tid,
+						selected.loser.tid,
+					)
+				).map((x) => x.text)
+			: [];
 		return {
 			season: inputs.season,
 			pair: inputs.pair,
 			seriesAwards,
+			storylines,
 			recaps: recaps.map((r) => ({
 				key: r.key,
 				round: r.round,

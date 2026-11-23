@@ -242,6 +242,18 @@ export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 			url: ["series_recaps"],
 			basketballOnly: true,
 		},
+		{
+			id: "bracketArchive",
+			name: "Bracket Archive",
+			url: ["bracket_archive"],
+			basketballOnly: true,
+		},
+		{
+			id: "bracketChallenge",
+			name: "Bracket Challenge",
+			url: ["bracket_challenge"],
+			basketballOnly: true,
+		},
 	],
 	[
 		{ id: "dailySchedule", name: DAILY_SCHEDULE, url: ["daily_schedule"] },

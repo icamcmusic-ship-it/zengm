@@ -34,6 +34,7 @@ const PRO_ONLY_PAGES = new Set([
 	"gm_history",
 	"front_offices",
 	"gm",
+	"bracket_challenge",
 	"owner",
 	"relatives",
 	"player_scouting",

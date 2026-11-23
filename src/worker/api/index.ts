@@ -57,6 +57,7 @@ import * as staff from "../core/staff/index.ts";
 import * as ownerOffice from "../core/ownerOffice/index.ts";
 import { overrideMandate } from "../core/ownerOffice/owner.ts";
 import * as commercial from "../core/commercial/index.ts";
+import { submitBracketPicks as submitBracketPicksCore } from "../core/playoffExtras/index.ts";
 import {
 	ensureGms,
 	setGmSuccessor as setGmSuccessorCore,
@@ -4787,6 +4788,12 @@ const setGmSuccessor = async (gmid: number | undefined) => {
 	await toUI("realtimeUpdate", [["gameAttributes"]]);
 };
 
+// Playoffs → Bracket Challenge: the user's picks for this season's bracket
+const submitBracketPicks = async (picks: number[][]) => {
+	await submitBracketPicksCore(picks);
+	await toUI("realtimeUpdate", [["gameAttributes"]]);
+};
+
 const switchTeam = async (tid: number, conditions: Conditions) => {
 	const t = await idb.cache.teams.get(tid);
 	if (!t) {
@@ -6859,6 +6866,7 @@ const api = {
 		startFantasyDraft,
 		switchTeam,
 		setGmSuccessor,
+		submitBracketPicks,
 		takeControlTeam,
 		threeSimNext,
 		toggleColaOptOut,
