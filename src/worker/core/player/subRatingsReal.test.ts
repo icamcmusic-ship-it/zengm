@@ -19,7 +19,6 @@ import { parseSubLean, realSubShape } from "../../../common/subRatingsGen.ts";
 import { parseSubZ, wideRealLean } from "../../../common/subRatingsReal.ts";
 import { categoryScores } from "../../../common/scoutingReports/categories.ts";
 import { generateDraftCombine } from "../../../common/draftCombine.ts";
-import { badgeDriver } from "../../../common/skillBadges/subDrivers.ts";
 import { generateCollegeClass } from "../../../common/collegeStats/index.ts";
 import { Rng } from "../../../common/collegeStats/rng.ts";
 import {
@@ -222,20 +221,6 @@ describe("draft combine reads subs", () => {
 		);
 		assert.isAbove(leaper.drills!.maxVert!, plain.drills!.maxVert!);
 		assert.isBelow(leaper.drills!.laneAgility!, plain.drills!.laneAgility!);
-	});
-});
-
-describe("skill badge drivers", () => {
-	test("the best of a badge's subs", () => {
-		const r = withSubs(ratingsRow(), { blk: 14, stl: -8 });
-		const d = badgeDriver("Bk", r.sub);
-		assert.strictEqual(d?.key, "blk");
-		assert.strictEqual(d?.name, "Shot Blocking");
-		assert.strictEqual(badgeDriver("Di", r.sub)?.key, "blk");
-		assert.isUndefined(badgeDriver("Bk", undefined));
-		// Every badge has at least one sub (or none, for badges with no sub-rated base)
-		assert.isDefined(badgeDriver("3", r.sub));
-		assert.isDefined(badgeDriver("Ps", r.sub));
 	});
 });
 

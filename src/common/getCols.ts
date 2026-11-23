@@ -3588,7 +3588,8 @@ const cols: {
 		desc: "Playoff Seed",
 		sortType: "number",
 	},
-	Skills: {},
+	// Basketball shows the 2K badges in this column (the stock skill labels are not shown)
+	Skills: __SPORT === "basketball" ? { title: "Badges" } : {},
 	Start: {
 		sortSequence: ["desc", "asc"],
 		sortType: "number",

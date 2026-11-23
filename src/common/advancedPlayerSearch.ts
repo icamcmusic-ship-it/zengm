@@ -1,3 +1,4 @@
+import { badgeTokenText } from "./tieredBadges/compute.ts";
 import {
 	getPlayerStatsTableStats,
 	PLAYER_STATS_TABLES,
@@ -120,12 +121,14 @@ const allFiltersTemp: Record<
 			},
 			...(__SPORT === "basketball"
 				? {
-						// Extended skill badges (common/skillBadges), as a space-separated list of labels; use "contains"
+						// 2K badges (common/tieredBadges), as text ("Catch & Shoot (Gold), Clamps (Silver)"); use "contains"
 						badges: {
 							colKey: "Badges",
 							valueType: "string",
 							getValue: (p) =>
-								(p.ratings as { badges?: string[] }).badges?.join(" ") ?? "",
+								(p.ratings as { badges?: string[] }).badges
+									?.map(badgeTokenText)
+									.join(", ") ?? "",
 							workerFieldOverride: null,
 						} as MinimalAdvancedPlayerSearchField,
 					}

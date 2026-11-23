@@ -41,11 +41,19 @@ const positionNames = bySport<Record<string, string> | undefined>({
 const skillOptions = [];
 for (const [key, compositeWeight] of Object.entries(COMPOSITE_WEIGHTS)) {
 	if (compositeWeight.skill) {
-		skillOptions.push({
-			key,
-			name: compositeWeight.skill.label,
-			tooltip: SKILLS[compositeWeight.skill.label],
-		});
+		// Basketball: described in words (its stock skill labels are not shown anywhere; the AI still matches on the skills)
+		skillOptions.push(
+			__SPORT === "basketball"
+				? {
+						key,
+						name: SKILLS[compositeWeight.skill.label] ?? key,
+					}
+				: {
+						key,
+						name: compositeWeight.skill.label,
+						tooltip: SKILLS[compositeWeight.skill.label],
+					},
+		);
 	}
 }
 
@@ -60,7 +68,7 @@ export const categories: Categories = {
 		}),
 	},
 	skills: {
-		name: "Skills",
+		name: __SPORT === "basketball" ? "Strengths" : "Skills",
 		options: skillOptions,
 	},
 	assets: {

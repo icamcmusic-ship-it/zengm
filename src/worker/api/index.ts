@@ -4986,11 +4986,6 @@ const updateGameAttributes = async (
 		await ensureGms();
 		await idb.cache.flush();
 	}
-	// 2K Badges turned on: this season's cutoffs and tiers, once (no-op when done)
-	if (gameAttributes.featureTwoKBadges) {
-		await ensureTieredBadges();
-		await idb.cache.flush();
-	}
 	// Keep Career Tracking for Retired Players turned on: retired players' remaining tracking rows folded now (no-op when done)
 	if (await foldRetiredAdvCareers()) {
 		await idb.cache.flush();

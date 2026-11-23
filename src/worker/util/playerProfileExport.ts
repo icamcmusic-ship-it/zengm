@@ -1,3 +1,4 @@
+import { badgeTokenText } from "../../common/tieredBadges/compute.ts";
 // "Export profile": everything the player's profile pages show (Overview, Game Log, College/Overseas, Traits, Scouting), built from
 // the same worker views the pages use, so the hidden information rules are the pages' own: scouted (fuzzed) ratings, hidden
 // entirely under the "no visible ratings" challenge (but for retired players), trait readings as the Traits page shows them
@@ -304,7 +305,12 @@ export const getPlayerProfileExport = async (
 						? `${card.ratings.ovr} / ${card.ratings.pot}`
 						: undefined,
 				),
-				...fact("Skills", showRatings ? card.skills.join(" ") : undefined),
+				...fact(
+					"Skills",
+					showRatings && card.skills.length > 0
+						? card.skills.join(" ")
+						: undefined,
+				),
 				...fact("Badges", showRatings ? card.badges.join(", ") : undefined),
 			],
 			lines: [
@@ -437,10 +443,14 @@ export const getPlayerProfileExport = async (
 								"ovr",
 								"pot",
 								...overview.ratings,
-								"skills",
+								// (basketball: only the 2K badges, never the stock skill labels)
+								...(__SPORT === "basketball" ? [] : ["skills"]),
 								"badges",
 							]) {
-								row[key] = r[key];
+								row[key] =
+									key === "badges" && Array.isArray(r[key])
+										? r[key].map(badgeTokenText)
+										: r[key];
 							}
 							// Sub-ratings (the subRatings setting), by name, on the seasons that kept them
 							if (Array.isArray(r.sub)) {

@@ -1,14 +1,8 @@
-import { useId, useState } from "react";
+import { useId } from "react";
 import { OverlayTrigger, Tooltip } from "react-bootstrap";
 import { useLocal } from "../util/local.ts";
 import { SKILLS } from "../../common/constants.ts";
-import {
-	badgeTitle,
-	capDisplayItems,
-	orderDisplayItems,
-} from "../../common/skillBadges/compute.ts";
-import { useFeatureOn } from "../util/nativeFeatures.ts";
-import { badgeDriverText } from "../../common/skillBadges/subDrivers.ts";
+
 import {
 	TIER_NAMES,
 	parseBadgeToken,
@@ -18,12 +12,6 @@ import {
 const tokenText = (token: string) => {
 	const parsed = parseBadgeToken(token);
 	return parsed ? `${parsed.def.name} ${TIER_NAMES[parsed.tier]}` : token;
-};
-
-// A skill or badge's tooltip, plus the sub-rating that drives it when the row has sub-ratings (the subRatings setting)
-const titleWithDriver = (base: string, token: string, sub?: number[]) => {
-	const driver = sub ? badgeDriverText(token, sub) : undefined;
-	return driver ? `${base} — ${driver}` : base;
 };
 
 const TruncatedSkills = ({
@@ -51,6 +39,10 @@ const TruncatedSkills = ({
 	);
 };
 
+// Basketball: the stock skill labels are never shown (they are still computed for the game logic); players show only their 2K badges
+// (at most MAX_BADGES, best first, as tier-colored pills). Other sports: the stock skills.
+const BADGES_ONLY = __SPORT === "basketball";
+
 export const SkillsBlock = ({
 	className,
 	numSkillsBeforeTruncate,
@@ -61,83 +53,50 @@ export const SkillsBlock = ({
 	className?: string;
 	numSkillsBeforeTruncate?: number;
 	skills?: string[];
-	// Extended skill badges and combos (display only, from getDisplayBadges), all shown after the original skills in the same format
+	// 2K badge tokens (basketball, from player format `badges`), best first
 	badges?: string[];
-	// Sub-ratings of the same row (as scouted), to name the sub that drives each skill in its tooltip
+	// Sub-ratings of the same row (as scouted), to name the sub that drives each skill in its tooltip (other sports: unused)
 	sub?: number[];
 }) => {
 	const { fullNames } = useLocal(["fullNames"]);
-	const extendedOn = useFeatureOn("skillBadges");
-	const twoKOn = useFeatureOn("twoKBadges");
-	const badgesOn = extendedOn || twoKOn;
-	const [expanded, setExpanded] = useState(false);
 
-	if (skills === undefined) {
-		return null;
-	}
-
-	if (badgesOn && badges) {
-		// Extended badges: combos replace the skills they combine (e.g. Dp + Di -> Sw), display only. Up to 7, then a "…" that toggles the rest for this player.
-		const { shown, hasMore } = capDisplayItems(
-			orderDisplayItems(skills, badges),
-			expanded,
-		);
+	if (BADGES_ONLY) {
+		const tiered = (badges ?? [])
+			.map(parseBadgeToken)
+			.filter((x) => x !== undefined);
+		if (tiered.length === 0) {
+			return null;
+		}
+		const truncateBadges =
+			!fullNames &&
+			numSkillsBeforeTruncate !== undefined &&
+			tiered.length > numSkillsBeforeTruncate;
 		return (
 			<span className={className}>
-				{shown.map(({ token, original }) => {
-					// 2K Badges: a tier-colored pill
-					const tiered = original ? undefined : parseBadgeToken(token);
-					if (tiered) {
-						return (
-							<span
-								key={token}
-								className={`skill badge2k badge2k-${tiered.tier}`}
-								title={`${tiered.def.name} (${TIER_NAMES[tiered.tier]})`}
-							>
-								{tiered.def.short}
-							</span>
-						);
-					}
-					return (
-						<span
-							key={token}
-							className="skill"
-							title={titleWithDriver(
-								original ? SKILLS[token]! : badgeTitle(token),
-								token,
-								sub,
-							)}
-						>
-							{token}
-						</span>
-					);
-				})}
-				{hasMore ? (
+				{(truncateBadges
+					? tiered.slice(0, numSkillsBeforeTruncate)
+					: tiered
+				).map((b) => (
 					<span
-						className="skill"
-						role="button"
-						tabIndex={0}
-						aria-expanded={expanded}
-						title={expanded ? "Show fewer skills" : "Show all skills"}
-						style={{ cursor: "pointer" }}
-						onClick={(event) => {
-							event.preventDefault();
-							event.stopPropagation();
-							setExpanded((x) => !x);
-						}}
-						onKeyDown={(event) => {
-							if (event.key === "Enter" || event.key === " ") {
-								event.preventDefault();
-								event.stopPropagation();
-								setExpanded((x) => !x);
-							}
-						}}
+						key={b.def.key}
+						className={`skill badge2k badge2k-${b.tier}`}
+						title={`${b.def.name} (${TIER_NAMES[b.tier]})`}
 					>
-						…
+						{b.def.short}
 					</span>
+				))}
+				{truncateBadges ? (
+					<TruncatedSkills
+						skills={tiered.map((b) => b.def.short)}
+						numSkillsBeforeTruncate={numSkillsBeforeTruncate}
+					/>
 				) : null}
 			</span>
 		);
+	}
+
+	if (skills === undefined) {
+		return null;
 	}
 
 	const truncate =
@@ -151,11 +110,7 @@ export const SkillsBlock = ({
 	return (
 		<span className={className}>
 			{truncatedSkills.map((skill) => (
-				<span
-					key={skill}
-					className="skill"
-					title={titleWithDriver(SKILLS[skill]!, skill, sub)}
-				>
+				<span key={skill} className="skill" title={SKILLS[skill]!}>
 					{skill}
 				</span>
 			))}
@@ -169,7 +124,7 @@ export const SkillsBlock = ({
 	);
 };
 
-// A table cell with only skills: sorted and searched by the skills and extended badges shown (badges are only sent when that League Extra is on)
+// A table cell with only badges (basketball) or skills (other sports): sorted and searched by what is shown (badge names and tiers)
 export const wrappedSkillsBlock = ({
 	skills,
 	badges,
@@ -177,7 +132,9 @@ export const wrappedSkillsBlock = ({
 	skills: string[] | undefined;
 	badges?: string[];
 }) => {
-	const text = [...(skills ?? []), ...(badges ?? []).map(tokenText)].join(" ");
+	const text = BADGES_ONLY
+		? (badges ?? []).map(tokenText).join(" ")
+		: (skills ?? []).join(" ");
 	return {
 		value: (
 			<span className="skills-alone">

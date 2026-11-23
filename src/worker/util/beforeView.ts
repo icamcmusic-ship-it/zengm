@@ -19,6 +19,7 @@ import {
 import { hasExpandedRatings } from "../../common/expandedRatings.ts";
 import updateExpandedRatingsForLeague from "../core/player/updateExpandedRatingsForLeague.ts";
 import forceCoreFeatures from "../core/league/forceCoreFeatures.ts";
+import { ensureTieredBadges } from "../core/player/tieredBadges.ts";
 import updateSubRatingsForLeague, {
 	subRatingsNeedUpdate,
 } from "../core/player/updateSubRatingsForLeague.ts";
@@ -176,6 +177,14 @@ export const beforeLeague = async (newLid: number, conditions?: Conditions) => {
 	// (core/league/forceCoreFeatures.ts)
 	try {
 		if ((await forceCoreFeatures()).length > 0) {
+			await idb.cache.flush();
+		}
+	} catch (error) {
+		console.error(error);
+	}
+	// 2K Badges (core): a league with no badges for this season yet (an older league) gets them now, once
+	try {
+		if (await ensureTieredBadges()) {
 			await idb.cache.flush();
 		}
 	} catch (error) {

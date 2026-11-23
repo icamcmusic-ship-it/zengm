@@ -170,14 +170,16 @@ export const PlayerNameLabels = (props: Props) => {
 
 	// See if we need to truncate skills
 	let numSkillsBeforeTruncate;
-	if (window.mobile && !fullNames && firstNameShort && skills) {
+	// (basketball shows only badges, see SkillsBlock)
+	const labels = __SPORT === "basketball" ? badges : skills;
+	if (window.mobile && !fullNames && firstNameShort && labels) {
 		// Skills are about twice as wide as normal letters
 		const injuryLength = injury && injury.gamesRemaining > 0 ? 3 : 0;
 		const totalLength =
 			firstNameShort.length +
 			lastName.length +
 			injuryLength +
-			skills.length * 2;
+			labels.length * 2;
 
 		const targetLength = 20;
 

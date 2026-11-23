@@ -61,7 +61,7 @@ import { subRatingsOn } from "../player/subRatings.ts";
 import {
 	ensureTieredBadges,
 	simTiers,
-	tieredBadgesOn,
+	tieredBadgeSimOn,
 } from "../player/tieredBadges.ts";
 import { isValidSubArray, SUB_INDEX } from "../../../common/subRatings.ts";
 import { careerAgingOn, oldAgeMinutesCap } from "../player/careerAging.ts";
@@ -356,7 +356,7 @@ export const processTeam = async (
 	}
 
 	// 2K Badges (basketball): each player's tiers this season, for the sim's badge effects (GameSim.basketball/tieredBadgesSim.ts)
-	const badgeSim = tieredBadgesOn();
+	const badgeSim = tieredBadgeSimOn();
 	if (badgeSim) {
 		await ensureTieredBadges();
 	}

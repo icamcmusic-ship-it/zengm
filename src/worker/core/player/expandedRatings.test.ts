@@ -16,7 +16,14 @@ import {
 import { idb } from "../../db/index.ts";
 import updateExpandedRatingsForLeague from "./updateExpandedRatingsForLeague.ts";
 import { PLAYER } from "../../../common/constants.ts";
-import { getSkillBadges } from "../../../common/skillBadges/index.ts";
+import {
+	TIERED_BADGES_BY_KEY,
+	tieredBadgeScore,
+} from "../../../common/tieredBadges/index.ts";
+
+// A 2K badge's score for a ratings row
+const badgeScore = (r: Record<string, any>, key: string) =>
+	tieredBadgeScore(r, TIERED_BADGES_BY_KEY[key]!);
 
 const withSeed = async <T>(seed: number, fn: () => Promise<T> | T) => {
 	const original = Math.random;
@@ -235,22 +242,18 @@ describe("skill badges", () => {
 			pss: 40,
 			reb: 60,
 		};
-		const stock = getSkillBadges(base);
-		const longRimProtector = getSkillBadges({
-			...base,
-			wng: 95,
-			pdef: 30,
-			idef: 80,
-		});
-		const shortLeaper = getSkillBadges({
-			...base,
-			wng: 45,
-			pdef: 70,
-			idef: 35,
-		});
-		assert.isFalse(stock.includes("Bk") && !longRimProtector.includes("Bk"));
-		assert.isTrue(longRimProtector.includes("Bk"));
-		assert.isFalse(shortLeaper.includes("Bk"));
+		// (2K badges: Rim Protector reads wingspan and interior defense, falling back to height and diq without them)
+		const stock = badgeScore(base, "rimProtector");
+		const longRimProtector = badgeScore(
+			{ ...base, wng: 95, pdef: 30, idef: 80 },
+			"rimProtector",
+		);
+		const shortLeaper = badgeScore(
+			{ ...base, wng: 45, pdef: 70, idef: 35 },
+			"rimProtector",
+		);
+		assert.isAbove(longRimProtector, stock);
+		assert.isBelow(shortLeaper, stock);
 	});
 });
 
@@ -375,11 +378,16 @@ describe("second step: rebounding, shooting, ball security", () => {
 			dreb: 45,
 			bsc: 55,
 		};
-		const spotUp = getSkillBadges({ ...base, csh: 78, dsh: 48 });
-		const creator = getSkillBadges({ ...base, csh: 48, dsh: 78 });
-		assert.include(spotUp, "Cs");
-		assert.notInclude(creator, "Cs");
-		assert.include(creator, "Pu");
-		assert.notInclude(spotUp, "Pu");
+		// (2K badges: Catch & Shoot leans on catch-and-shoot, Deadeye on off-the-dribble shooting)
+		const spotUp = { ...base, csh: 78, dsh: 48 };
+		const creator = { ...base, csh: 48, dsh: 78 };
+		assert.isAbove(
+			badgeScore(spotUp, "catchShoot"),
+			badgeScore(creator, "catchShoot") + 5,
+		);
+		assert.isAbove(
+			badgeScore(creator, "deadeye"),
+			badgeScore(spotUp, "deadeye") + 5,
+		);
 	});
 });

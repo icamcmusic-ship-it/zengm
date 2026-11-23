@@ -1,3 +1,4 @@
+import { badgeTokenText } from "../../common/tieredBadges/compute.ts";
 import { SUB_DEFS, SUB_TABLE_ORDER } from "../../common/subRatings.ts";
 import { getScoutingExport } from "../core/scoutingReports/index.ts";
 import { isCollege } from "../core/college/isCollege.ts";
@@ -256,7 +257,8 @@ export const getPlayersForExport = async ({
 					"Ovr",
 					"Pot",
 					...ratingKeys.map((key) => colTitle("rating", key)),
-					"Skills",
+					// (basketball: the 2K badges; the stock skill labels are not shown)
+					__SPORT === "basketball" ? "Badges" : "Skills",
 				],
 				rows: p.ratings.map((r: any) => [
 					r.season,
@@ -266,7 +268,9 @@ export const getPlayersForExport = async ({
 					cell(r.ovr),
 					cell(r.pot),
 					...ratingKeys.map((key) => cell(r[key])),
-					(r.skills ?? []).join(" "),
+					__SPORT === "basketball"
+						? (r.badges ?? []).map(badgeTokenText).join(", ")
+						: (r.skills ?? []).join(" "),
 				]),
 			});
 		}
@@ -405,8 +409,12 @@ export const getPlayersForExport = async ({
 						),
 					}
 				: undefined,
-			skills: showRatings ? (ratingsRow?.skills ?? []) : [],
-			badges: showRatings ? (ratingsRow?.badges ?? []) : [],
+			// Basketball: only the 2K badges (as text), never the stock skill labels
+			skills:
+				showRatings && __SPORT !== "basketball"
+					? (ratingsRow?.skills ?? [])
+					: [],
+			badges: showRatings ? (ratingsRow?.badges ?? []).map(badgeTokenText) : [],
 			archetype: showRatings ? p.archetype?.label : undefined,
 			traits: traits
 				? traits.traits.map((trait) => ({

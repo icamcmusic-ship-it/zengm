@@ -22,16 +22,11 @@ import { actualPhase } from "../../util/actualPhase.ts";
 import { getPayrollSeason } from "../../util/getPayrollSeason.ts";
 import { last } from "../../../common/utils.ts";
 import {
-	BADGE_RATING_KEYS,
-	getDisplayBadges,
-} from "../../../common/skillBadges/index.ts";
-import {
 	getPreDraftSchool,
 	getPreDraftStats,
 	getProAwards,
 	getProStats,
 } from "../../../common/preDraft.ts";
-import { featureOn } from "../../util/nativeFeatures.ts";
 import { getCurrentContract } from "../../../common/contracts.ts";
 import {
 	getContractSummary,
@@ -39,17 +34,18 @@ import {
 	isFlatContract,
 } from "../contract/index.ts";
 import {
-	EXPANDED_RATINGS2,
 	fillExpandedRatings,
 	hasExpandedRatings,
 	isExpandedRatingKey,
 } from "../../../common/expandedRatings.ts";
-import { expandedRatingsApply } from "./expandedRatings.ts";
+import { cutoffsAtOrBefore, getTieredBadgeCutoffs } from "./tieredBadges.ts";
 import { fuzzSubs, subRatingsOn } from "./subRatings.ts";
 import { isValidSubArray } from "../../../common/subRatings.ts";
 import {
 	MAX_TOKENS,
+	assignTiers,
 	badgeToken,
+	displayTiersOf,
 	entryForSeason,
 	sortedBadges,
 } from "../../../common/tieredBadges/compute.ts";
@@ -575,16 +571,31 @@ const processAttrs = (
 	}
 };
 
-// 2K Badges (League Extra): its tier pills take the place of the extended skill badges
-const twoKBadgesOn = () => __SPORT === "basketball" && featureOn("twoKBadges");
+// 2K Badges (basketball, core): the only badges players show. The stock skills are still computed (sent as `skills`, used by game
+// logic and a few internal readers) but never shown in basketball
+const badgesWithSkills = () => __SPORT === "basketball";
 
-const badgesWithSkills = () =>
-	__SPORT === "basketball" &&
-	(featureOn("skillBadges") || featureOn("twoKBadges"));
-
-// 2K Badges: his stored badges of the row's season, best first, as display tokens ("2k:<key>:<tier>", see common/tieredBadges)
-const tieredTokensForRow = (pr: any, p: Player): string[] => {
-	const t = entryForSeason(p.badges2k, pr.season)?.t;
+// 2K Badges: his stored badges of the row's season (the shown tiers, from his ratings as scouted), best first, as display tokens
+// ("2k:<key>:<tier>", see common/tieredBadges). A draft prospect (no stored badges) gets a live reading of his ratings as scouted
+// against this season's cutoffs.
+const tieredTokensForRow = (pr: any, p: Player, row: any): string[] => {
+	const e = entryForSeason(p.badges2k, pr.season);
+	let t = e ? displayTiersOf(e) : undefined;
+	// (also his row from the draft, for the draft histories' "at the draft" column, against that season's cutoffs)
+	if (
+		!t &&
+		(((p.tid === PLAYER.UNDRAFTED || p.tid === PLAYER.STASHED) &&
+			pr === last(p.ratings)) ||
+			(p.ratings.length > 1 && pr === p.ratings[0]))
+	) {
+		const cutoffs =
+			p.tid === PLAYER.UNDRAFTED
+				? getTieredBadgeCutoffs()
+				: cutoffsAtOrBefore(pr.season);
+		if (cutoffs) {
+			t = assignTiers(row, row.ovr ?? 0, cutoffs).t;
+		}
+	}
 	return t
 		? sortedBadges(t)
 				.slice(0, MAX_TOKENS)
@@ -593,12 +604,12 @@ const tieredTokensForRow = (pr: any, p: Player): string[] => {
 };
 
 // The ratings row as the user sees it (fuzzed unless fuzz is false, with God Mode and multi team mode turning fuzz off as everywhere
-// else): the one row both the displayed skills and the extended badges are computed from
+// else): the one row the skills (and a prospect's live badges) are computed from
 const shownRow = (pr: any, fuzz: boolean | undefined, p: Player) =>
 	fuzz ? player.fuzzedSkillRow(pr, false, p) : pr;
 
-// The skills to show for a row, computed live from the shown ratings and the current settings (the same composites and cutoffs as
-// the game sim's synergy, common/skillCutoffs.ts). Falls back to the stored ones for a row missing ratings.
+// The skills for a row, computed live from the shown ratings and the current settings (the same composites and cutoffs as the game
+// sim's synergy, common/skillCutoffs.ts). Falls back to the stored ones for a row missing ratings.
 const skillsForShownRow = (row: any, pr: any): string[] => {
 	try {
 		return player.skillsFromRow(row);
@@ -607,41 +618,9 @@ const skillsForShownRow = (row: any, pr: any): string[] => {
 	}
 };
 
-// Extended skill badges and combos (display only, see common/skillBadges), from the shown row and its live skills
-const getBadgesForShownRow = (
-	row: any,
-	pr: any,
-	skills: string[],
-	p: Player,
-) => {
-	if (twoKBadgesOn()) {
-		return tieredTokensForRow(pr, p);
-	}
-	const r: any = {};
-	for (const key of BADGE_RATING_KEYS) {
-		const v = row[key];
-		if (typeof v !== "number") {
-			return [];
-		}
-		r[key] = v;
-	}
-	// Expanded ratings, when the setting is on (wingspan is a measurement, never fuzzed)
-	if (expandedRatingsApply(pr)) {
-		for (const key of ["wng", "pdef", "idef", ...EXPANDED_RATINGS2]) {
-			r[key] = row[key];
-		}
-	}
-	// Only the latest ratings row: trait scores are for the player now
-	const traits =
-		pr === last(p.ratings)
-			? player.getBadgeTraits(
-					p as any,
-					pr.season,
-					player.getBadgeScoutingLevel(),
-				)
-			: undefined;
-	return getDisplayBadges(r, skills, traits);
-};
+// The badges to show for a row (2K badge tokens)
+const getBadgesForShownRow = (row: any, pr: any, p: Player) =>
+	tieredTokensForRow(pr, p, row);
 
 // For views that show skills from raw ratings rows (not through format): the skills to show (live, as format does)
 export const getSkillsForRow = (
@@ -650,8 +629,8 @@ export const getSkillsForRow = (
 	fuzz = true,
 ): string[] => skillsForShownRow(shownRow(pr, fuzz, p), pr);
 
-// For views that show skills from raw ratings rows (not through format): the extended badges to show with them, or
-// undefined when that League Extra is off. Call prepareSkillBadges once before, for the user's scouting level.
+// For views that show players from raw ratings rows (not through format): the badges to show (2K badge tokens), or undefined
+// outside basketball.
 export const getSkillBadgesForRow = (
 	p: Player,
 	pr: Player["ratings"][number],
@@ -660,12 +639,11 @@ export const getSkillBadgesForRow = (
 	if (!badgesWithSkills()) {
 		return undefined;
 	}
-	const row = shownRow(pr, fuzz, p);
-	return getBadgesForShownRow(row, pr, skillsForShownRow(row, pr), p);
+	return getBadgesForShownRow(shownRow(pr, fuzz, p), pr, p);
 };
 
-export const prepareSkillBadges = () =>
-	loadBadgeScoutingLevelIfNeeded({ ratings: ["badges"] });
+// (Kept for callers: nothing to load any more, 2K badges are stored)
+export const prepareSkillBadges = async () => {};
 
 const processRatings = (
 	output: any,
@@ -750,19 +728,13 @@ const processRatings = (
 				// Live, from the ratings the user sees now (not the stored snapshot, which may be from a God Mode spell)
 				const shown = shownRow(pr, fuzz, p);
 				row.skills = skillsForShownRow(shown, pr);
-				// Wherever skills are shown, the extended badges are shown with them (League Extras switch)
+				// Wherever skills were shown, the 2K badges are shown instead (basketball)
 				if (badgesWithSkills()) {
-					row.badges = getBadgesForShownRow(shown, pr, row.skills, p);
+					row.badges = getBadgesForShownRow(shown, pr, p);
 				}
 			} else if (attr === "badges") {
 				if (badgesWithSkills()) {
-					const shown = shownRow(pr, fuzz, p);
-					row.badges = getBadgesForShownRow(
-						shown,
-						pr,
-						row.skills ?? skillsForShownRow(shown, pr),
-						p,
-					);
+					row.badges = getBadgesForShownRow(shownRow(pr, fuzz, p), pr, p);
 				} else {
 					row.badges = [];
 				}
@@ -1816,20 +1788,6 @@ const getAbbrevsNeeded = ({
  * @param {string=} options.statType What type of stats to return, 'perGame', 'per36', or 'totals' (default is 'perGame).
  * @return {Object|Array.<Object>} Filtered player object or array of filtered player objects, depending on the first argument.
  */
-// Trait-based skill badges need the user's scouting level, which can only be read asynchronously
-const loadBadgeScoutingLevelIfNeeded = async (options: {
-	ratings?: readonly string[];
-}) => {
-	if (
-		__SPORT === "basketball" &&
-		(options.ratings?.includes("badges") ||
-			options.ratings?.includes("skills")) &&
-		featureOn("skillBadges")
-	) {
-		await player.loadBadgeScoutingLevel();
-	}
-};
-
 export const formatAll = async <Options extends PlayerFormatOptions>(
 	players: Player[],
 	optionsInput: Options &
@@ -1837,7 +1795,6 @@ export const formatAll = async <Options extends PlayerFormatOptions>(
 ): Promise<PlayerFiltered<Options>[]> => {
 	const options = normalizeOptions(optionsInput);
 	const { season, seasonRange, tid } = options;
-	await loadBadgeScoutingLevelIfNeeded(options);
 
 	// Preload any abbrevs we need for past seasons, so we don't need to make all functions async and do it on demand
 	let abbrevsCache: AbbrevsCache | undefined;
@@ -1895,7 +1852,6 @@ export const formatAll = async <Options extends PlayerFormatOptions>(
 // Loads the abbrevs that formatting with these options might need, for createFormatter. Since the players are not known ahead of time, this loads abbrevs for every team season (or every team in options.season, if that's the only season abbrevs are needed for), rather than just the ones for specific players.
 export const loadAbbrevs = async (optionsInput: PlayerFormatOptions) => {
 	const options = normalizeOptions(optionsInput);
-	await loadBadgeScoutingLevelIfNeeded(options);
 	const abbrevsNeeded = getAbbrevsNeeded(options);
 	if (!abbrevsNeeded.any) {
 		return;

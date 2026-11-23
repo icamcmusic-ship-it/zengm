@@ -13,6 +13,7 @@ import {
 	updateTieredBadges,
 } from "./tieredBadges.ts";
 import {
+	MAX_BADGES,
 	TIERED_BADGES,
 	badgePointCap,
 	badgePoints,
@@ -62,6 +63,7 @@ describe("2K Badges in a league", () => {
 			assert.isDefined(entry);
 			const r = p.ratings.at(-1)!;
 			assert.isAtMost(badgePoints(entry!.t), badgePointCap(r.ovr));
+			assert.isAtMost(Object.keys(entry!.t).length, MAX_BADGES);
 			for (const [key, tier] of Object.entries(entry!.t)) {
 				if (tier === 5) {
 					legends[key] = (legends[key] ?? 0) + 1;
@@ -77,7 +79,7 @@ describe("2K Badges in a league", () => {
 		assert.isAbove(holders, players.length / 4);
 	});
 
-	test("next season: no badge drops more than one tier, and the history keeps both seasons", async () => {
+	test("next season: no badge drops more than one tier (unless he is at the limit of MAX_BADGES), and the history keeps both seasons", async () => {
 		const before = new Map(
 			(await idb.cache.players.getAll()).map((p) => [
 				p.pid,
@@ -102,6 +104,10 @@ describe("2K Badges in a league", () => {
 		for (const p of await idb.cache.players.getAll()) {
 			assert.strictEqual(p.badges2k!.length, 2);
 			const now = entryForSeason(p.badges2k, 2026)!.t;
+			assert.isAtMost(Object.keys(now).length, MAX_BADGES);
+			if (Object.keys(now).length === MAX_BADGES) {
+				continue;
+			}
 			for (const [key, tier] of Object.entries(before.get(p.pid)!)) {
 				assert.isAtLeast(now[key] ?? 0, tier - 1, `${p.pid} ${key}`);
 			}
@@ -119,16 +125,21 @@ describe("2K Badges in a league", () => {
 		assert.strictEqual(bt.filter((x) => x > 0).length, numBadges(p));
 		const info = (await tieredBadgesForPlayer(p, false))!;
 		assert.isFalse(info.live);
-		assert.isAbove(info.categories.length, 0);
-		const badge = info.categories[0]!.badges[0]!;
+		assert.isAbove(info.earned.length, 0);
+		assert.isAtMost(info.earned.length, MAX_BADGES);
+		const badge = info.earned[0]!;
 		assert.isDefined(badge.drivers[0]!.value);
 		// No visible ratings: badges, but no numbers
 		const hidden = (await tieredBadgesForPlayer(p, true))!;
-		const badge2 = hidden.categories[0]!.badges[0]!;
+		const badge2 = hidden.earned[0]!;
 		assert.strictEqual(badge2.key, badge.key);
 		assert.isUndefined(badge2.score);
 		assert.isUndefined(badge2.progress);
 		assert.isUndefined(badge2.drivers[0]!.value);
 		assert.isUndefined(hidden.cap);
+		for (const b of hidden.nextUp) {
+			assert.isUndefined(b.progress);
+			assert.isUndefined(b.score);
+		}
 	});
 });
