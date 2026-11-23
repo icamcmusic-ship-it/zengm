@@ -17,6 +17,7 @@ import {
 	MOV_SCALE,
 	teamStrength,
 } from "../core/seasonOdds/index.ts";
+import { snapshotAwardRaces } from "../core/awards/awardRaceHistory.ts";
 import { validatePlayoffs, validateSeason } from "../util/processInputs.ts";
 
 const processInputs = (params: RouteParams<"powerRankings">) => {
@@ -510,6 +511,15 @@ export const snapshotPowerRankings = async () => {
 			playoffs ? { day, rank, playoffs: true as const } : { day, rank },
 		];
 		await idb.cache.teamSeasons.put(ts);
+	}
+
+	// The award race tracker (Newspaper) keeps the same weekly rhythm, regular season only
+	if (!playoffs) {
+		try {
+			await snapshotAwardRaces();
+		} catch (error) {
+			console.error(error);
+		}
 	}
 };
 

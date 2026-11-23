@@ -35,6 +35,7 @@ import { DEFAULT_TEAM_COLORS } from "../../common/constants.ts";
 import type {
 	EditionId,
 	NPAward,
+	NPAwardRace,
 	NPCareerRow,
 	NPChampion,
 	NPMvp,
@@ -44,6 +45,7 @@ import type {
 	NPFeat,
 	NPGame,
 	NPInjury,
+	NPMedical,
 	NPPlayer,
 	NPRetiree,
 	NPSeries,
@@ -71,6 +73,11 @@ import {
 	seasonTid,
 } from "./newspaperFacts.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
+import {
+	getAwardRaceHistory,
+	getAwardRaces,
+	previousRanks,
+} from "../core/awards/awardRaceHistory.ts";
 import { getActiveSeasonSelector } from "../db/merged/players.ts";
 import { idb } from "../db/index.ts";
 import { league, player, team } from "../core/index.ts";
@@ -599,6 +606,13 @@ export const getNewsFacts = async (
 	// Players
 	const players: NPPlayer[] = [];
 	const injuries: NPInjury[] = [];
+	const medical: NPMedical = {
+		returns: [],
+		fragile: [],
+		ironMen: [],
+		teamGamesLost: [],
+	};
+	const teamGamesLost = new Map<number, number>();
 	const isCurrent = season === g.get("season");
 	await idb.merged.players.forEach(getActiveSeasonSelector(season), (p) => {
 		const line = lineFor(p, season, false);
@@ -692,6 +706,9 @@ export const getNewsFacts = async (
 						.at(-1)?.tid
 				: undefined,
 		});
+		const seasonInjuries = isCurrent
+			? (p.injuries ?? []).filter((inj) => inj.season === season)
+			: [];
 		if (isCurrent && p.injury.gamesRemaining > 0 && p.tid >= 0) {
 			injuries.push({
 				pid: p.pid,
@@ -699,9 +716,64 @@ export const getNewsFacts = async (
 				tid: p.tid,
 				type: p.injury.type,
 				gamesRemaining: p.injury.gamesRemaining,
+				seasonInjuries: seasonInjuries.length,
+				careerInjuries: (p.injuries ?? []).length,
 			});
 		}
+		// Medical desk
+		if (isCurrent && p.tid >= 0 && edition !== "preseason") {
+			const seasonGames = seasonInjuries.reduce(
+				(sum, inj) => sum + inj.games,
+				0,
+			);
+			if (seasonGames > 0) {
+				teamGamesLost.set(p.tid, (teamGamesLost.get(p.tid) ?? 0) + seasonGames);
+			}
+			const last = seasonInjuries.at(-1);
+			if (p.injury.gamesRemaining === 0 && last && last.games >= 8) {
+				medical.returns.push({
+					pid: p.pid,
+					name,
+					tid: p.tid,
+					type: last.type,
+					games: last.games,
+				});
+			}
+			const recent = (p.injuries ?? []).filter(
+				(inj) => inj.season > season - 3,
+			);
+			const recentGames = recent.reduce((sum, inj) => sum + inj.games, 0);
+			if (recent.length >= 3 || recentGames >= 40) {
+				medical.fragile.push({
+					pid: p.pid,
+					name,
+					tid: p.tid,
+					injuries: recent.length,
+					games: recentGames,
+				});
+			}
+			const proSeasons = new Set(
+				getProStats(p)
+					.filter((row) => !row.playoffs && (row.gp ?? 0) > 0)
+					.map((row) => row.season),
+			).size;
+			if (proSeasons >= 5 && (p.injuries ?? []).length === 0) {
+				medical.ironMen.push({
+					pid: p.pid,
+					name,
+					tid: p.tid,
+					seasons: proSeasons,
+				});
+			}
+		}
 	});
+
+	medical.returns.sort((a, b) => b.games - a.games);
+	medical.fragile.sort((a, b) => b.games - a.games || b.injuries - a.injuries);
+	medical.ironMen.sort((a, b) => b.seasons - a.seasons || a.pid - b.pid);
+	medical.teamGamesLost = [...teamGamesLost]
+		.map(([tid, games]) => ({ tid, games }))
+		.sort((a, b) => b.games - a.games || a.tid - b.tid);
 
 	// Awards
 	const awards: NPAward[] = [];
@@ -1080,6 +1152,38 @@ export const getNewsFacts = async (
 		}
 	}
 
+	// Award race tracker: the races' leaders now and in the last weekly snapshot (current season, before the awards are given)
+	let awardTracker: NPAwardRace[] | undefined;
+	if (
+		__SPORT === "basketball" &&
+		isCurrent &&
+		!headlineOnly &&
+		awards.length === 0 &&
+		maxGp > 0 &&
+		edition !== "preseason" &&
+		edition !== "final"
+	) {
+		try {
+			const history = getAwardRaceHistory();
+			awardTracker = (await getAwardRaces(season)).map((race) => {
+				const prev = previousRanks(history, season, maxGp, race.key);
+				return {
+					key: race.key,
+					name: race.name,
+					sinceGp: prev?.gp,
+					rows: race.rows.slice(0, 3).map((row) => ({
+						pid: row.pid,
+						name: row.name,
+						tid: row.tid,
+						prev: prev ? (prev.ranks.get(row.pid) ?? 0) : undefined,
+					})),
+				};
+			});
+		} catch (error) {
+			console.error(error);
+		}
+	}
+
 	const facts: NewsFacts = {
 		leagueName: await league.getName(),
 		noRatings: noRatings() || undefined,
@@ -1111,6 +1215,12 @@ export const getNewsFacts = async (
 		retirees,
 		draft,
 		injuries,
+		awardTracker:
+			awardTracker && awardTracker.length > 0 ? awardTracker : undefined,
+		medical:
+			isCurrent && edition !== "preseason" && edition !== "final"
+				? medical
+				: undefined,
 		recordWins,
 		firstSeason: g.get("startingSeason"),
 		playIn: ps ? !!ps.playIns : g.get("playIn"),

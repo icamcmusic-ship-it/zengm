@@ -27,6 +27,7 @@ import { playInSidebar } from "./pages-league.ts";
 import { draftPreviewPage } from "./pages-scouting.ts";
 import { draftNightStory, powerRankColumn } from "./pages-weekly.ts";
 import { varyPaper } from "./vary.ts";
+import { awardTrackerColumn, medicalDesk } from "./desk.ts";
 import {
 	allLeagueBlock,
 	awardRace,
@@ -42,7 +43,7 @@ import {
 	leaderTables,
 	leadersSidebar,
 	numbersSidebar,
-	opinionColumn,
+	opinionColumns,
 	retireStories,
 	franchiseStories,
 	rookieStory,
@@ -296,7 +297,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 				allLeagueBlock(c),
 				...awardPages,
 			])
-		: section("awards", "Awards", awardPages);
+		: section("awards", "Awards", [awardTrackerColumn(c), ...awardPages]);
 	// The preview has no games to report, so it has room for more of these
 	const teams = section("teams", "Teams", [
 		powerRankColumn(c),
@@ -314,7 +315,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 		breakoutStory(c),
 		declineStory(c),
 		rookieStory(c),
-		injuryStory(c),
+		medicalDesk(c) ?? injuryStory(c),
 		c.done ? bestGamesStory(c) : undefined,
 		closeGamesStory(c),
 		rivalryWatch(c),
@@ -352,7 +353,7 @@ const leaguePaper = (c: Ctx): Section[] => {
 		...pagesFor(c, "history", 6),
 	]);
 	const obits = section("obits", "Retirements", retireStories(c));
-	const opinion = section("opinion", "Opinion", [opinionColumn(c)]);
+	const opinion = section("opinion", "Opinion", opinionColumns(c));
 	const colour = section(
 		"colour",
 		"Colour & letters",
