@@ -131,7 +131,10 @@ export const CALIBRATION_OFFSETS: Record<TraitKey, number> = {
 	durability: 0.3,
 	shotDiscipline: -4,
 	offBall: -1.5,
-	screen: -1.8,
+	// Re-centered (was -1.8) for development reliability (prospect variety version 2), which leaves a generated league's rotation
+	// weaker in the ratings screening reads (top 300 by ovr, 12 leagues: strength 53.8 -> 52.1, inside 45.5 -> 43.9, offensive IQ
+	// 51.5 -> 50.3), 0.9 points of screen score lower; this puts the rotation's mean back where it was calibrated
+	screen: -0.9,
 	hustle: -0.6,
 	foulDiscipline: -3.8,
 	recovery: 0.6,

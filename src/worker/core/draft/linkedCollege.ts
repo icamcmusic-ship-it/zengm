@@ -250,6 +250,18 @@ export const buildLinkedClassFile = async (
 				weight: p.weight,
 				face: p.face,
 				imgURL: p.imgURL,
+				// Prospect variety: his variety seed and version (not the pre-draft ages, already applied in the college league), so in
+				// this league he keeps developing at his own rates and his potential reads his growth rate (potRatesOf), as a
+				// generated prospect's does. Without it he developed and was projected as a stock player
+				...(p.genVar
+					? {
+							genVar: {
+								v: p.genVar.v,
+								s: p.genVar.s,
+								...(p.genVar.c !== undefined ? { c: p.genVar.c } : {}),
+							},
+						}
+					: {}),
 				college: lastSchool,
 				ratings: [ratings],
 				stats,
