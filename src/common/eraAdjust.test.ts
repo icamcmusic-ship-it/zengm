@@ -117,7 +117,7 @@ test("era-adjusted records book: the low-scoring era's scorer moves up, TS+ adde
 			for (const k of ["pts", "trb", "ast", "stl", "blk", "tp"] as const) {
 				out[k] = r[k] * adj.factor(r.season, k);
 			}
-			out.xpts = 2 * r.tsa * adj.leagueRate(r.season, "tsp")!;
+			out.xpts = 2 * r.tsa! * adj.leagueRate(r.season, "tsp")!;
 			return out;
 		}),
 	}));
