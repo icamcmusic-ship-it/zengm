@@ -1,5 +1,7 @@
 import { featureOn } from "../util/nativeFeatures.ts";
 import { getPlayerRankings } from "../util/playerRankingsData.ts";
+import { hofWatchFor, seasonFracs } from "../core/hallOfFame/watch.ts";
+import { hofBallotOn } from "../core/hallOfFame/index.ts";
 import { getPreDraftRank } from "../core/draft/preDraftRanks.ts";
 import {
 	getTraitViewContext,
@@ -854,9 +856,21 @@ export default defineView({
 			// League extras (Records Book option): all-time and franchise rankings of his totals, from the kept lists
 			const rankings = await getPlayerRankings(topStuff.pRaw);
 
+			// Hall of Fame Watch line: his score, projection and chance (basketball, pro leagues, players who have played)
+			const hofWatchRaw =
+				__SPORT === "basketball" &&
+				!isCollege() &&
+				topStuff.pRaw.tid !== PLAYER.UNDRAFTED
+					? hofWatchFor(topStuff.pRaw, await seasonFracs())
+					: undefined;
+			const hofWatch = hofWatchRaw
+				? { ...hofWatchRaw, ballotOn: hofBallotOn() }
+				: undefined;
+
 			return {
 				...topStuffForUI,
 				rankings,
+				hofWatch,
 				advSeasons,
 				shotZoneRefs,
 				// His season-by-season tracking was folded into the career total when he retired

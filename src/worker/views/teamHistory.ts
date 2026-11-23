@@ -360,6 +360,18 @@ export default defineView({
 				retirableJerseyNumbers: Record<string, number[]>;
 			})[] = [];
 
+			const ringPlayers: {
+				pid: number;
+				name: string;
+				pos: string;
+				hof: boolean;
+				inducted: number | undefined;
+				jerseys: string[];
+				firstSeason: number | undefined;
+				lastSeason: number | undefined;
+				gp: number;
+			}[] = [];
+
 			const players = addFirstNameShort(
 				(
 					await idb.merged.players.getAll(
@@ -374,6 +386,29 @@ export default defineView({
 								const row = processPlayer({ ...pRaw, stats });
 								if (!row) {
 									return;
+								}
+
+								// Ring of Honor: Hall of Famers who played here and players whose jersey the team retired
+								if (pRaw.hof || retiredByPid[pRaw.pid]) {
+									const regular = stats.filter(
+										(r) => !r.playoffs && (r.gp ?? 0) > 0,
+									);
+									const seasons = regular.map((r) => r.season);
+									ringPlayers.push({
+										pid: pRaw.pid,
+										name: `${pRaw.firstName} ${pRaw.lastName}`,
+										pos: row.pos,
+										hof: !!pRaw.hof,
+										inducted: pRaw.awards.find(
+											(a) => a.type === "Inducted into the Hall of Fame",
+										)?.season,
+										jerseys: [...(retiredByPid[pRaw.pid] ?? [])],
+										firstSeason:
+											seasons.length > 0 ? Math.min(...seasons) : undefined,
+										lastSeason:
+											seasons.length > 0 ? Math.max(...seasons) : undefined,
+										gp: regular.reduce((sum, r) => sum + (r.gp ?? 0), 0),
+									});
 								}
 
 								const retirableJerseyNumbers: Record<string, number[]> = {};
@@ -457,8 +492,84 @@ export default defineView({
 						}))
 				: undefined;
 
+			// Ring of Honor: those players, plus Hall of Fame coaches and executives who worked for the team
+			const ringOfHonor: {
+				key: string;
+				kind: "player" | "coach" | "gm";
+				id: number;
+				name: string;
+				pos: string;
+				hof: boolean;
+				inducted: number | undefined;
+				jerseys: string[];
+				firstSeason: number | undefined;
+				lastSeason: number | undefined;
+				gp: number | undefined;
+			}[] = ringPlayers.map((p) => ({
+				key: `p${p.pid}`,
+				kind: "player",
+				id: p.pid,
+				...p,
+			}));
+			if (__SPORT === "basketball") {
+				for (const c of await idb.cache.coaches.getAll()) {
+					if (c.hof === undefined) {
+						continue;
+					}
+					const seasons = c.stats
+						.filter((r) => r.tid === inputs.tid && r.role === "head")
+						.map((r) => r.season);
+					if (seasons.length > 0) {
+						ringOfHonor.push({
+							key: `c${c.cid}`,
+							kind: "coach",
+							id: c.cid,
+							name: `${c.firstName} ${c.lastName}`,
+							pos: "Coach",
+							hof: true,
+							inducted: c.hof,
+							jerseys: [],
+							firstSeason: Math.min(...seasons),
+							lastSeason: Math.max(...seasons),
+							gp: undefined,
+						});
+					}
+				}
+				for (const t2 of await idb.cache.teams.getAll()) {
+					for (const gm of t2.formerGms ?? []) {
+						if (gm.hof === undefined) {
+							continue;
+						}
+						const tenures = gm.tenures.filter((x) => x.tid === inputs.tid);
+						if (tenures.length > 0) {
+							ringOfHonor.push({
+								key: `g${gm.gmid}`,
+								kind: "gm",
+								id: gm.gmid,
+								name: `${gm.firstName} ${gm.lastName}`,
+								pos: "Executive",
+								hof: true,
+								inducted: gm.hof,
+								jerseys: [],
+								firstSeason: Math.min(...tenures.map((x) => x.start)),
+								lastSeason: Math.max(
+									...tenures.map((x) => x.end ?? g.get("season")),
+								),
+								gp: undefined,
+							});
+						}
+					}
+				}
+			}
+			ringOfHonor.sort(
+				(a, b) =>
+					(a.firstSeason ?? Infinity) - (b.firstSeason ?? Infinity) ||
+					a.key.localeCompare(b.key),
+			);
+
 			return {
 				...teamHistory,
+				ringOfHonor,
 				rivals,
 				players,
 				stats: historyStats,

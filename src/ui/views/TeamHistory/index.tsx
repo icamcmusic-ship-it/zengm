@@ -9,6 +9,7 @@ import HideableSection from "../../components/HideableSection.tsx";
 import { useLocal } from "../../util/local.ts";
 import { Championships } from "./Championships.tsx";
 import { Rivals } from "./Rivals.tsx";
+import { RingOfHonor } from "./RingOfHonor.tsx";
 import useLocalStorageState from "use-local-storage-state";
 import clsx from "clsx";
 
@@ -20,6 +21,7 @@ const TeamHistory = ({
 	players,
 	playoffAppearances,
 	retiredJerseyNumbers,
+	ringOfHonor,
 	rivals,
 	stats,
 	tid,
@@ -127,6 +129,7 @@ const TeamHistory = ({
 						tid={tid}
 						userTid={userTid}
 					/>
+					<RingOfHonor ringOfHonor={ringOfHonor} />
 					<Championships history={seasonsHistory} />
 					{rivals && rivals.length > 0 ? (
 						<HideableSection title="Rivals" className="mb-3">

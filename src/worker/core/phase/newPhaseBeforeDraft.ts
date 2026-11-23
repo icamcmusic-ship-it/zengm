@@ -38,6 +38,7 @@ import * as gm from "../gm/index.ts";
 import * as college from "../college/index.ts";
 import { pruneSeasonLineups } from "../player/advStatsStorage.ts";
 import { addStashSeasons } from "../draftStash/index.ts";
+import { runHallOfFame } from "../hallOfFame/index.ts";
 
 const INFLATION_GAME_ATTRIBUTES = [
 	"salaryCap",
@@ -508,6 +509,11 @@ const newPhaseBeforeDraft = async (
 			}
 		}
 		await idb.cache.players.putAll(playersToSave);
+
+		// Hall of Fame ballot, veterans committee and coaches and executives wing, after this offseason's retirements
+		if (!repeatSeasonType) {
+			await runHallOfFame(conditions);
+		}
 
 		for (const [tid, retiredPlayers] of retiredPlayersByTeam) {
 			const text = retiredPlayers

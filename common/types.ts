@@ -319,6 +319,52 @@ export const awardsSchema = z.object({
 			}),
 		)
 		.optional(),
+
+	// Hall of Fame (src/worker/core/hallOfFame): this season's ballot (League Extras "Hall of Fame Ballot"), veterans committee class
+	// and coaches and executives wing inductees
+	hof: z
+		.object({
+			voters: z.number().optional(),
+			ballot: z
+				.array(
+					z.object({
+						pid: z.number(),
+						name: z.string(),
+						tid: z.number(),
+						retiredYear: z.number(),
+						year: z.number(),
+						pct: z.number(),
+						score: z.number(),
+						threshold: z.number(),
+						result: z.enum(["inducted", "dropped", "expired"]).optional(),
+					}),
+				)
+				.optional(),
+			veterans: z
+				.array(
+					z.object({
+						pid: z.number(),
+						name: z.string(),
+						tid: z.number(),
+						retiredYear: z.number(),
+						score: z.number(),
+						threshold: z.number(),
+					}),
+				)
+				.optional(),
+			wing: z
+				.array(
+					z.object({
+						kind: z.enum(["coach", "gm"]),
+						id: z.number(),
+						name: z.string(),
+						tid: z.number(),
+						line: z.string(),
+					}),
+				)
+				.optional(),
+		})
+		.optional(),
 });
 
 export type Award = z.infer<typeof awardSchema>;

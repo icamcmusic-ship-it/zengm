@@ -41,6 +41,8 @@ const PRO_ONLY_PAGES = new Set([
 	"staff_report",
 	// Nobody is inducted in a college league: players leave for the pros, they don't retire
 	"hall_of_fame",
+	"hall_of_fame_watch",
+	"hall_of_fame_ballot",
 ]);
 
 // A league URL (parts after /l/:lid/) of a page that does not exist in the current league, if it is a college league

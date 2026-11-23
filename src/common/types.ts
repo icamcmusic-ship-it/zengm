@@ -1664,6 +1664,15 @@ export type PlayerWithoutKey<PlayerRatings = MinimalPlayerRatings> = {
 		plaque: string;
 		speech: string[];
 	};
+	// Hall of Fame ballot (League Extras, core/hallOfFame): his vote share each season on the ballot, from `first` on, and how it ended
+	// ("veterans": inducted by the veterans committee after falling off). score/threshold as screened at his first ballot
+	hofBallot?: {
+		first: number;
+		votes: number[];
+		score: number;
+		threshold: number;
+		status?: "inducted" | "dropped" | "expired" | "veterans";
+	};
 	imgURL: string;
 	injury: PlayerInjury;
 	injuries: {

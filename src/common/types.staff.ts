@@ -155,6 +155,8 @@ export type CoachWithoutKey = {
 	}[];
 	transactions: CoachTransaction[];
 	retiredYear?: number;
+	// Hall of Fame coaches wing (core/hallOfFame): the season he was inducted
+	hof?: number;
 	// Coaching Staff Depth: how his career started and his coaching tree (works without Coaching Systems too)
 	tree?: CoachTree;
 	// Coach Market & Succession (featureCoachMarket): associate head coach (heir apparent) and interim head coach

@@ -61,6 +61,8 @@ export const featureForUrl = (
 			return "timeline";
 		case "league_eras":
 			return "leagueEras";
+		case "hall_of_fame_ballot":
+			return "hofBallot";
 		case "records_book":
 			return "recordsBook";
 		case "milestones":

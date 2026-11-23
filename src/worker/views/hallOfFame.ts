@@ -13,6 +13,15 @@ import {
 	plaqueWithPrime,
 } from "../util/hofStory.ts";
 import type { Player } from "../../common/types.ts";
+import { g } from "../util/index.ts";
+import {
+	HOF_AWARD,
+	ballotLine,
+	coachHofCase,
+	gmHofCase,
+	hofBallotOn,
+	mostTidOf,
+} from "../core/hallOfFame/index.ts";
 
 // gpF is used on processPlayersHallOfFame for baseball
 export const extraStats = bySport({
@@ -104,6 +113,12 @@ export default defineView({
 								...p,
 								countMvp,
 								countTitles,
+								inducted: pRaw.awards.find((a) => a.type === HOF_AWARD)?.season,
+								// "first ballot, 93.5%" (Hall of Fame Ballot), undefined when inducted when he retired
+								ballot: ballotLine(pRaw.hofBallot),
+								firstBallot:
+									pRaw.hofBallot?.status === "inducted" &&
+									pRaw.hofBallot.votes.length === 1,
 							};
 						},
 					},
@@ -172,7 +187,75 @@ export default defineView({
 				(a, b) => b.retiredYear - a.retiredYear || b.peakOvr - a.peakOvr,
 			);
 
+			// Coaches and executives wing
+			const teamInfoCache = g.get("teamInfoCache");
+			const wing: {
+				kind: "coach" | "gm";
+				id: number;
+				name: string;
+				inducted: number;
+				retiredYear: number | undefined;
+				line: string;
+				won: number;
+				lost: number;
+				titles: number;
+				awards: number;
+				tid: number;
+				abbrev: string;
+			}[] = [];
+			if (__SPORT === "basketball") {
+				for (const c of await idb.cache.coaches.getAll()) {
+					if (c.hof !== undefined) {
+						const hofCase = coachHofCase(c);
+						const tid = mostTidOf(
+							c.stats
+								.filter((row) => row.role === "head")
+								.map((row) => row.tid),
+						);
+						wing.push({
+							kind: "coach",
+							id: c.cid,
+							name: `${c.firstName} ${c.lastName}`,
+							inducted: c.hof,
+							retiredYear: c.retiredYear,
+							line: hofCase.line,
+							won: hofCase.won,
+							lost: hofCase.lost,
+							titles: hofCase.titles,
+							awards: hofCase.coy,
+							tid,
+							abbrev: teamInfoCache[tid]?.abbrev ?? "",
+						});
+					}
+				}
+				for (const t of await idb.cache.teams.getAll()) {
+					for (const gm of t.formerGms ?? []) {
+						if (gm.hof !== undefined) {
+							const hofCase = gmHofCase(gm);
+							const tid = mostTidOf(gm.tenures.map((tenure) => tenure.tid));
+							wing.push({
+								kind: "gm",
+								id: gm.gmid,
+								name: `${gm.firstName} ${gm.lastName}`,
+								inducted: gm.hof,
+								retiredYear: gm.retiredYear,
+								line: hofCase.line,
+								won: hofCase.won,
+								lost: hofCase.lost,
+								titles: hofCase.titles,
+								awards: hofCase.eoy,
+								tid,
+								abbrev: teamInfoCache[tid]?.abbrev ?? "",
+							});
+						}
+					}
+				}
+				wing.sort((a, b) => b.inducted - a.inducted || a.id - b.id);
+			}
+
 			return {
+				ballotOn: hofBallotOn(),
+				wing,
 				players: addFirstNameShort(processPlayersHallOfFame(players)),
 				plaques,
 				stats,

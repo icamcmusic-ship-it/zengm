@@ -90,6 +90,8 @@ export type Gm = {
 	// Season of the last "job reportedly in danger" news item about him (hotSeatNews), so he gets at most one a season
 	hotSeatNews?: number;
 	retiredYear?: number;
+	// Hall of Fame executives wing (core/hallOfFame): the season he was inducted
+	hof?: number;
 	// Coach & Executive of the Year (League Extra): Executive of the Year awards he won (missing in older leagues)
 	awards?: { season: number; type: string; tid: number }[];
 };

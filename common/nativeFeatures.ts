@@ -1467,6 +1467,37 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "hofBallot",
+		key: "featureHofBallot",
+		// Players never retire in a college league
+		college: false,
+		name: "Hall of Fame Ballot",
+		description:
+			'Retired players are voted into the Hall of Fame instead of being inducted the moment they retire: eligible a few seasons after retiring, a simulated vote of 400 voters (from the Hall of Fame score, with voter noise), 75% to get in, up to 10 years on the ballot (under 5% drops him), first-ballot tags, a "Class of" news item with the induction ceremony, and every year\'s results on Hall of Fame > Ballot. Off: players are inducted when they retire, as in the stock game.',
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "hofBallotWait",
+				name: "Hall of Fame Waiting Period",
+				description: "Seasons after retiring before a player is on the ballot.",
+				type: "int",
+				default: 3,
+				min: 1,
+				max: 10,
+			},
+			{
+				key: "hofVeteransCommittee",
+				name: "Veterans Committee",
+				description:
+					"Every few seasons a committee inducts one or two of the best players who fell off the ballot.",
+				type: "bool",
+				default: true,
+			},
+		],
+	},
+	{
 		id: "recordsBook",
 		key: "featureRecordsBook",
 		name: "Records Book",

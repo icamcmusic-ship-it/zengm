@@ -46,6 +46,7 @@ import { TrackingProfile } from "./TrackingProfile.tsx";
 import { ShotDiet } from "./ShotDiet.tsx";
 import { ShotZones } from "./ShotZones.tsx";
 import { Rankings } from "./Rankings.tsx";
+import { HofLine } from "./HofLine.tsx";
 import {
 	ScoutingSummaryLine,
 	useScoutingOn,
@@ -67,6 +68,7 @@ const Player2 = ({
 	randomDebutsForeverPids,
 	ratings,
 	rankings,
+	hofWatch,
 	retired,
 	stashInfo,
 	statTables,
@@ -161,6 +163,8 @@ const Player2 = ({
 			<DownloadPlayerButton name={player.name} pid={player.pid} />
 
 			<StashPlayerPanel info={stashInfo} pid={player.pid} />
+
+			<HofLine hofWatch={hofWatch} />
 
 			{!retired && player.tid !== PLAYER.STASHED ? (
 				<ContractMood pid={player.pid} refreshKey={player} />

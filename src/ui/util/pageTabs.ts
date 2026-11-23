@@ -12,6 +12,21 @@ export type PageTab = {
 
 export const PAGE_TAB_GROUPS: readonly (readonly PageTab[])[] = [
 	[
+		{ id: "hallOfFame", name: "Hall of Fame", url: ["hall_of_fame"] },
+		{
+			id: "hallOfFameWatch",
+			name: "Watch",
+			url: ["hall_of_fame_watch"],
+			basketballOnly: true,
+		},
+		{
+			id: "hallOfFameBallot",
+			name: "Ballot",
+			url: ["hall_of_fame_ballot"],
+			basketballOnly: true,
+		},
+	],
+	[
 		{ id: "settings", name: "League Settings", url: ["settings"] },
 		{ id: "leagueExtras", name: "League Extras", url: ["league_extras"] },
 	],

@@ -7,6 +7,7 @@ import addAward from "./addAward.ts";
 import { endContractEarly } from "../contract/index.ts";
 import { advOnRetire } from "./advStatsStorage.ts";
 import { storeHofStoryAtInduction } from "../../util/hofStory.ts";
+import { hofBallotOn } from "../hallOfFame/index.ts";
 
 /**
  * Have a player retire, including all event and HOF bookkeeping.
@@ -47,9 +48,9 @@ const retire = async (
 		);
 	}
 
-	// Add to Hall of Fame?
+	// Add to Hall of Fame? With the Hall of Fame Ballot (League Extras) he is voted in later instead (core/hallOfFame)
 	let inducted = false;
-	if (conditions && !p.hof && madeHof(p)) {
+	if (conditions && !p.hof && !hofBallotOn() && madeHof(p)) {
 		p.hof = 1;
 		inducted = true;
 		addAward(p, {

@@ -62,6 +62,8 @@ export { default as GmHistory } from "./GmHistory.tsx";
 export { default as GameLog } from "./GameLog.tsx";
 export { default as GodMode } from "./GodMode.tsx";
 export { default as HallOfFame } from "./HallOfFame.tsx";
+export { default as HallOfFameBallot } from "./HallOfFameBallot.tsx";
+export { default as HallOfFameWatch } from "./HallOfFameWatch.tsx";
 export { default as HeadToHead } from "./HeadToHead.tsx";
 export { default as HeadToHeadAll } from "./HeadToHeadAll.tsx";
 export { default as History } from "./History.tsx";

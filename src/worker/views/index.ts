@@ -58,6 +58,8 @@ export { default as gameLog } from "./gameLog.ts";
 export { default as globalSettings } from "./globalSettings.ts";
 export { default as gmHistory } from "./gmHistory.ts";
 export { default as hallOfFame } from "./hallOfFame.ts";
+export { default as hallOfFameBallot } from "./hallOfFameBallot.ts";
+export { default as hallOfFameWatch } from "./hallOfFameWatch.ts";
 export { default as headToHead } from "./headToHead.ts";
 export { default as headToHeadAll } from "./headToHeadAll.ts";
 export { default as history } from "./history.ts";
