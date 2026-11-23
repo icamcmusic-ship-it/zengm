@@ -5,6 +5,7 @@ import {
 } from "../../../common/pbpSettings.ts";
 import { PHASE } from "../../../common/constants.ts";
 import { shotDietOfGame } from "../../../common/advStats.ts";
+import { gameCtxOf } from "../../../common/gameExport/gameCtx.ts";
 import { updatePlayerAwards } from "../awards/awardsByPlayer.ts";
 import { idb } from "../../db/index.ts";
 import { g, helpers, logEvent } from "../../util/index.ts";
@@ -296,6 +297,12 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 	if (results.neutralSite) {
 		gameStats.neutralSite = true;
 	}
+	// Per-game download (worker/util/gameExport): each field goal attempt's defender, play type, sub-zone, xFG and contest level
+	// (Advanced Tracking Stats), presentation only. Kept with the play-by-play (it is read alongside it), so only where that is stored
+	if (__SPORT === "basketball" && results.shotLog && gameStats.pbp) {
+		gameStats.shotLog = results.shotLog;
+	}
+
 	// Shootout: each shot, for the box score's shootout section
 	if (results.shootoutShots) {
 		gameStats.shootoutShots = results.shootoutShots;
@@ -362,6 +369,18 @@ export const gameSimToBoxScore = async (results: GameResults, att: number) => {
 				p.injuryAtStart = p0.injuryAtStart;
 			}
 			p.jerseyNumber = p0.jerseyNumber;
+			// Per-game download (worker/util/gameExport): his playing time setting, minutes restriction, rest and planned minutes
+			if (__SPORT === "basketball" && results.gameCtx) {
+				const ctx = gameCtxOf(results.gameCtx[t], p0.id);
+				// (energy by period goes with the play-by-play, which it is read alongside, so only where that is stored)
+				if (ctx && !gameStats.pbp) {
+					delete ctx.en;
+				}
+				// (an empty one too: it says the game was played since this was recorded)
+				if (ctx) {
+					p.ctx = ctx;
+				}
+			}
 			// Shot Share Model: where his shots came from (Advanced Tracking Stats records it)
 			if (__SPORT === "basketball" && p0.adv) {
 				const sd = shotDietOfGame(p0.adv);

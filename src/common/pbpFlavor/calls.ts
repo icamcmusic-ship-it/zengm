@@ -481,6 +481,28 @@ export const hotLine = (rng: Rng, name: string, n: number) =>
 				`${name} has found his rhythm: ${n} in a row.`,
 			]);
 
+// A reserve catching fire (the session knows who came off the bench), and his team riding him
+export const benchHotLine = (rng: Rng, name: string, n: number) =>
+	pickV(rng, [
+		`${name} is feeling it off the bench: ${n} straight makes.`,
+		`Instant offense from ${name}: ${n} in a row off the bench.`,
+		`${name} came off the bench hot: that's ${n} straight.`,
+		`The bench is giving them a lift: ${n} straight buckets for ${name}.`,
+	]);
+
+export const feedHotLine = (
+	rng: Rng,
+	name: string,
+	pts: number,
+	team: string,
+) =>
+	pickV(rng, [
+		`They keep going to the hot hand: ${pts} straight for ${name}.`,
+		`${cap(team)} keep feeding ${name}, and he keeps delivering: ${pts} straight.`,
+		`Ride the hot hand: ${name} again, ${pts} in a row off the bench.`,
+		`Everything is running through ${name} now: ${pts} straight for ${team}.`,
+	]);
+
 export const droughtLine = (rng: Rng, d: string, team: string) => {
 	const a = /^(8|11|18)\b/.test(d) ? "an" : "a";
 	return pickV(rng, [

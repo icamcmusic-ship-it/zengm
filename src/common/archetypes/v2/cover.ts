@@ -5,15 +5,25 @@
 // 2. Speed, leaping and strength are modifiers: they lead a name only when no basketball skill clears, and else add at
 //    most a word next to one.
 // 3. Every candidate name (a special name, the user's own names, Jack-Of-All-Trades, a noun name: front words and an
-//    end word) is scored by how much of his strengths it covers (with the defensive tag): it must name his best skill,
-//    and leaving out one of his top two, or a strong one, costs heavily. The best-covering name wins (a star gets a
-//    combination name), a near tie going to the rarer name, never to chance.
+//    end word) is scored by how much of his strengths it covers: it must cover his best skill, and leaving out one of
+//    his top two costs heavily. The best-covering name wins (a star gets a combination name), a near tie going to the
+//    rarer name, never to chance.
 // 4. A noun name's end word is picked after its front words, and only one that fits them (a Gunner names a jumper).
 // 5. Last season's label is re-checked every season: kept only while every rule still holds (its skills among his best
-//    TOP_N, his best one named) and it covers about as much as this season's pick. Honest and development names are
-//    never kept once outgrown (the engine keeps an honest name's words only for the same kind of honest name).
-// 6. Every name's promises come from its own skill list (nouns.ts coverPromises), and the defensive tag follows one
-//    rule: a defensive skill at DEF_TAG_PCT (or his second best) that his main name doesn't name.
+//    TOP_N, his best one covered), it still covers his top two skills, and it covers about as much as this season's
+//    pick. Honest and development names are never kept once outgrown.
+// 6. Every name's promises come from its own skill list (nouns.ts coverPromises).
+// archfam (reading 28, the user's 2070 audit):
+// 7. Skills that say the same thing count once, as a family (nouns.ts FAMILY_HEAD): shooting (3PT, mid-range), creation
+//    (handle, shot creation), perimeter D (perimeter D, steals). His best TOP_N are families; a name spends one word on
+//    a family ("3-Level" is the one word for shooting and finishing, from THREE_LEVEL_BAR at all three).
+// 8. No defensive tag: "2-Way" is a prefix any name may take when his best defensive and best offensive skill are both at
+//    TWO_WAY_BAR, and it covers all his defensive skills. Defense-only names stay for players whose best skills are
+//    defensive.
+// 9. Offensive IQ is mostly a flavor word (CRAFTY_COVER); mid-range and offensive IQ need an edge to lead (nouns.ts
+//    LEAD_EDGE, MID_EDGE).
+// 10. Special names (the catalog's, the user's own, the many-skills names) get SPECIAL_EDGE over a plain noun name, and
+//     the many-skills names are gated by how many elite skills he has (ELITE_SKILL), not by his best skill's standing.
 import type { ArchetypeRatings, Pos } from "../types.ts";
 import {
 	composedId,
@@ -35,7 +45,6 @@ import {
 	ATH_WORD_BAR,
 	CUSTOM_SPECIALS,
 	DEF_NOUNS,
-	DEF_TAG_PCT,
 	DEV_MAX_OVR,
 	ELITE_PCT,
 	END_WORDS,
@@ -43,6 +52,7 @@ import {
 	HONEST_NOUNS,
 	JACK_CLEARED,
 	JACK_NAME,
+	MID_EDGE,
 	NOUN_DESC,
 	NOUNS,
 	ONE_NOUN_OVR,
@@ -51,19 +61,17 @@ import {
 	REJECT_NEAR,
 	SPREAD_PEN,
 	STICK_BOOST,
-	STRONG_BAR,
-	STANDOUT_PCT,
 	SUB_WORD,
 	TOP_N,
 	TRAIT_KEYWORDS,
-	TRAIT_WORD_MIN,
 	connector,
-	defLabelNouns,
 	coverCtxOf,
 	coverPromises,
 	coverScores,
 	coverSkills,
 	eliteOvrOf,
+	familyOf,
+	familyRep,
 	groupOfPos,
 	isLong,
 	leadSub,
@@ -76,10 +84,8 @@ import {
 	prevMainOf,
 	skillRank,
 	specialsAt,
-	sub,
 	tieFavored,
 	traitKeywordOf,
-	twoWayOk,
 	wordsFit,
 	type CoverCtx,
 	type CoverScore,
@@ -93,20 +99,39 @@ import {
 	type SpecialCtx,
 } from "./nouns.ts";
 
-// Leaving out one of his top two skills (the defensive tag counts) costs this much coverage
+// Leaving out one of his top two skills costs this much coverage
 export const MISS_TOP2 = 2;
 // A second skill named costs this much (it is named from about the 66th percentile), each beyond two this much (from
 // about the 72nd), so a skill earns its word smoothly, with no cliff
 export const SECOND_COST = 0.3;
 export const EXTRA_COST = 0.6;
-// A defensive skill the tag names counts this much of being in the main name
-export const TAG_COVER = 0.9;
-// A many-skills name (Jack-Of-All-Trades, the user's anyBest names) covers each of his skills this much
-export const GENERIC_COVER = 0.48;
-// Jack-Of-All-Trades: his TOP_N-th skill at this standing (many good skills, none far above the rest)
+// archfam: the many-skills names are gated by how many elite skills he has (skills at ELITE_SKILL, offensive IQ apart),
+// not by his best skill's standing. A broad name (Jack-Of-All-Trades, Swiss-Army-Knife, the user's names with no
+// elite-ovr test) is for a player with many good skills and at most FLAT_ELITE elite ones, and covers each of his best
+// GENERIC_COVER; an elite one (Complete All-Court Prototype, the Unicorns: names with an elite-ovr test) is for a
+// player with MANY_ELITE elite skills or more, and covers each ELITE_COVER (a narrow name says too little of him)
+export const ELITE_SKILL = 0.9;
+export const FLAT_ELITE = 3;
+export const MANY_ELITE = 9;
+export const GENERIC_COVER = 0.52;
+export const ELITE_COVER = 0.9;
+// Jack-Of-All-Trades: his TOP_N-th skill at this standing (many good skills)
 export const JACK_FLAT = 0.85;
-// A special name, or an end word of his own, over a plain noun name that covers the same
+// archfam: a noun name says at most this many skills (2-Way counts as one; a name like "2-Way Crafty Shot-Creating
+// Walking-Bucket" says too much)
+export const MAX_PARTS = 3;
+// An end word of his own over a plain noun name that covers the same
 const FLAVOR = 0.05;
+// archfam: a special name (a catalog build, the user's own names, Jack) over a noun name that covers the same
+export const SPECIAL_EDGE = 0.15;
+// archfam: 2-Way: his best defensive skill and his best offensive skill both at this standing
+export const TWO_WAY_BAR = 0.8;
+// archfam: 3-Level: 3PT, mid-range and finishing all at this standing
+export const THREE_LEVEL_BAR = 0.78;
+// archfam: offensive IQ is mostly a flavor word: it covers this much of what a skill word covers, leaving it out costs
+// nothing, and naming it costs this much of a named skill (nothing: "Crafty" is a flavor word in front of a name)
+export const CRAFTY_COVER = 0.5;
+export const CRAFTY_NAMED = 0;
 // archcov: last season's label stays unless this season's pick covers clearly more (the user: "only switch if the new
 // name beats the current one by a clear margin")
 export const STICK_COVER = 0.1;
@@ -116,6 +141,12 @@ export const RAMP_LO = 0.6;
 export const RAMP_HI = 0.8;
 export const skillWeight = (pct: number) =>
 	Math.max(0, Math.min(1, (pct - RAMP_LO) / (RAMP_HI - RAMP_LO)));
+// (the families 2-Way covers)
+const DEF_FAMS: readonly NounKey[] = ["perimD", "rimD"];
+// Names that say his defense themselves (no 2-Way prefix on them)
+const SAYS_DEFENSE =
+	/2-Way|Two-Way|3 & D|Lockdown|Defend|Defensive|Stopper|\bLock\b|Clamp|Eras|Protect|Warden|Disruptor|Swipe|Pest|Hawk/;
+const THREE_LEVEL_RE = /Three-Level|3-Level/;
 
 const SCORING: ReadonlySet<NounKey> = new Set([
 	"three",
@@ -152,6 +183,10 @@ type Cand = {
 	pick: NounPick;
 	// the skills (and modifiers) the main name names
 	main: NounKey[];
+	// archfam: a 2-Way name (it covers all his defensive skills)
+	twoWay: boolean;
+	// archfam: it covers his top two skills (families)
+	top2: boolean;
 	score: number;
 	// how common its id is
 	common: number;
@@ -187,6 +222,7 @@ const pickIdOf = (p: NounPick, pos: Pos): string | undefined => {
 };
 // archstick: a near tie goes to last season's skills (coverSkills); when that order loses his label and the plain order
 // keeps it, the plain order's pick (a near tie never takes away the label it was meant to keep)
+// archfam: last season's label is kept only while it still covers his top two skills (families)
 const pickCoverTies = (x: NounInput): NounPick => {
 	const a = pickCoverOnce(x);
 	const prevId = x.prev?.id;
@@ -211,38 +247,21 @@ const pickCoverTies = (x: NounInput): NounPick => {
 		}
 		return a;
 	}
-	const pd = x.prev?.defense;
-	// (his defensive tag: last season's, or none, while that still holds with the slack)
-	const tagged = (p: NounPick): NounPick => {
-		if (p.defense === pd || p.main?.some((n) => DEF_NOUNS.has(n))) {
-			return p;
-		}
-		const t = pickCoverOnce({
-			...x,
-			slack: pd ? STICK_BOOST : -STICK_BOOST,
-		});
-		if (t.defense !== pd) {
-			return p;
-		}
-		if (pd) {
-			return { ...p, defense: pd };
-		}
-		const { defense: _drop, ...rest } = p;
-		return rest as NounPick;
-	};
 	if (pickIdOf(a, x.pos) === prevId) {
-		return tagged(a);
+		return a;
 	}
-	// (last season's name still qualifies with the slack, and covers about as much)
+	// (last season's name still qualifies with the slack, covers his top two, and covers about as much)
 	// (with every standing STICK_BOOST higher, then lower: a bar he must reach, or one he must stay under)
 	for (const slack of [STICK_BOOST, -STICK_BOOST]) {
 		const k = pickCoverOnce({ ...x, slack });
-		if (pickIdOf(k, x.pos) === prevId) {
-			return { ...tagged(keptVariant(k)), slack };
+		if (pickIdOf(k, x.pos) === prevId && k.coversTop2 !== false) {
+			return { ...keptVariant(k), slack };
 		}
 	}
 	const b = pickCoverOnce({ ...x, tie: false });
-	return pickIdOf(b, x.pos) === prevId ? tagged({ ...b, tie: false }) : a;
+	return pickIdOf(b, x.pos) === prevId && b.coversTop2 !== false
+		? { ...b, tie: false }
+		: a;
 };
 const keptVariant = (p: NounPick): NounPick =>
 	p.explain
@@ -257,23 +276,74 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		NounKey,
 		number
 	>;
+	// archfam: his skills, one per family (its word), at the family's standing, best first
 	const skillsS = coverSkills(scores, favored);
 	const skills = skillsS.map((s) => s.key);
+	const famPct = new Map<NounKey, number>(
+		skillsS.map((s) => [familyOf(s.key), s.pct]),
+	);
+	// (a family's standing: its best member's, for a family that clears)
+	const fp = (k: NounKey) => famPct.get(familyOf(k)) ?? pct[k];
+	const fams = skills.map(familyOf);
+	// (his best TOP_N families; offensive IQ among them as a flavor)
+	const realFams = fams.filter((f) => f !== "crafty");
+	const topFams = fams.slice(0, TOP_N);
+	// (the window a name's skills must be in: with 2-Way, his defensive families are one)
+	const windowOf = (tw: boolean): NounKey[] => {
+		let d = false;
+		return fams.filter((f) => {
+			if (!tw || !DEF_FAMS.includes(f)) {
+				return true;
+			}
+			const first = !d;
+			d = true;
+			return first;
+		});
+	};
+	const windowIndex = (n: NounKey, tw: boolean): number => {
+		const f = familyOf(n);
+		const w = windowOf(tw);
+		const i = w.indexOf(
+			tw && DEF_FAMS.includes(f)
+				? (w.find((g) => DEF_FAMS.includes(g)) ?? f)
+				: f,
+		);
+		return i < 0 ? Infinity : i;
+	};
 	const ctx: CoverCtx = coverCtxOf(x);
 	// (his real skills: the honest names, the one-skill rule and the athletic lead read these)
 	const nStrong = ctx.strong.length;
 	const ath = ctx.ath;
 	const athWord = ath.filter((a) => pct[a] >= ATH_WORD_BAR);
+	// (a modifier word is never kept on slack: his true standing, for last season's label re-checked with slack)
+	const athTrue = (n: NounKey) => pct[n] - (x.slack ?? 0);
 	const eliteOvr = eliteOvrOf(x.ovr, rq);
 	const isMobile = mobile(r, rq);
 	const isElite = (k: NounKey) =>
 		eliteOvr && pct[k] >= ELITE_PCT && (k !== "perimD" || isMobile);
-	const twoWay = twoWayOk(r, rq);
+	// archfam: 2-Way: his best defensive and best offensive skill both at TWO_WAY_BAR
+	const bestD = Math.max(pct.perimD, pct.rimD, pct.steal);
+	const bestO = Math.max(...[...OFFENSE].map((n) => pct[n]));
+	const twoWay = bestD >= TWO_WAY_BAR && bestO >= TWO_WAY_BAR;
+	// archfam: 3-Level: 3PT, mid-range and finishing all at THREE_LEVEL_BAR
+	const threeLevel =
+		pct.three >= THREE_LEVEL_BAR &&
+		pct.mid >= THREE_LEVEL_BAR &&
+		pct.finish >= THREE_LEVEL_BAR;
+	// (how many elite skills: the many-skills names read these)
+	const eliteN = NOUNS.filter(
+		(n) => !ATH_KEYS.has(n) && n !== "crafty" && pct[n] >= ELITE_SKILL,
+	).length;
 	const long = isLong(r);
 	const ovr = x.ovr ?? 99;
 	const young = hasUpside(x) && ovr <= DEV_MAX_OVR;
 	const rank = (k: NounKey) => skillRank(ctx, k);
-	const best = skills[0];
+	// (his best skill: offensive IQ, a flavor, gives way to the next)
+	const bestFam = fams.find((f) => f !== "crafty") ?? fams[0];
+	const best =
+		bestFam === undefined ? undefined : skills[fams.indexOf(bestFam)];
+	// (the shooting family's word: 3PT unless mid-range leads it by MID_EDGE)
+	const shootRep = familyRep("three", (k) => pct[k]);
 
 	// The user's verdicts (read on league standings, as they were given)
 	const leaguePct = Object.fromEntries(
@@ -298,252 +368,69 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			}
 			return n > 0 && s / n <= REJECT_NEAR;
 		});
-	const okName = (name: string, list: readonly NounKey[]) =>
+	// (with 2-Way, his defensive families are one among his best: the second leaves the list the promises read)
+	const ctxTw: CoverCtx = (() => {
+		const d = ctx.skills.filter((k) => DEF_FAMS.includes(familyOf(k)));
+		return d.length > 1
+			? { ...ctx, skills: ctx.skills.filter((k) => k !== d[1]) }
+			: ctx;
+	})();
+	const okName = (name: string, list: readonly NounKey[], tw = false) =>
 		!vetoed(name) &&
 		!nameProblem(name) &&
-		coverPromises(name, list, ctx).length === 0;
+		coverPromises(name, list, tw ? ctxTw : ctx).length === 0;
 	const common = (id: string | undefined) =>
 		id === undefined ? 0 : (x.common?.[id] ?? 0);
 
-	// ---- the defensive tag: a defensive skill at DEF_TAG_PCT, or his second best, that the main name doesn't name ----
-	const trv = (k: string) => x.traits?.[k] ?? -Infinity;
-	const switchOk = trv("defensiveVersatility") >= 55;
-	const pestOk = trv("hustle") >= 55;
-	const rimLead = leadSub(r, ["blk", "idf"]);
-	const latPct = pctOf("spd", sub(r, "lat") ?? r.spd, rq);
-	// (the user's rule reads the league's 85th percentile; the skill must still clear for his position)
-	// (hysteresis: a skill last season's tag named keeps it from STICK_BOOST lower; with no tag last season, a new one
-	// needs STICK_BOOST more)
-	const prevTagNouns = x.prev?.defense ? defLabelNouns(x.prev.defense) : [];
-	const tagBar = (k: NounKey) =>
-		x.prev?.id === undefined
-			? DEF_TAG_PCT
-			: prevTagNouns.includes(k)
-				? DEF_TAG_PCT - STICK_BOOST
-				: x.prev.defense
-					? DEF_TAG_PCT
-					: DEF_TAG_PCT + STICK_BOOST;
-	const tagList = skillsS.filter(
-		(s) =>
-			DEF_NOUNS.has(s.key) &&
-			(s.league >= tagBar(s.key) || (rank(s.key) <= 1 && s.pct >= STRONG_BAR)),
-	);
-	const hasTag = (k: NounKey) => tagList.find((s) => s.key === k);
-	const rim = hasTag("rimD");
-	const per = hasTag("perimD");
-	const stl = hasTag("steal");
-	const stalkerOk =
-		!!per &&
-		per.pct >= 0.8 &&
-		Math.max(x.traits?.motor ?? 0, x.traits?.hustle ?? 0) >= 65;
-	const menaceOk =
-		!!stl &&
-		stl.pct >= 0.85 &&
-		(trv("competitiveness") >= TRAIT_WORD_MIN ||
-			trv("motor") >= TRAIT_WORD_MIN ||
-			trv("hustle") >= TRAIT_WORD_MIN);
-	// (what each defensive label says, and what it needs beyond its skills)
-	const DEF_BASE: Record<string, { nouns: NounKey[]; ok: () => boolean }> = {
-		"Help-Side Roamer": {
-			nouns: ["rimD", "steal"],
-			ok: () => group !== "big" && rim!.pct >= 0.8 && stl!.pct >= 0.8,
-		},
-		"Switch Defender": {
-			nouns: ["rimD", "perimD"],
-			ok: () => rim!.pct >= 0.8 && per!.pct >= 0.8 && switchOk,
-		},
-		"Swatting Guard": {
-			nouns: ["rimD"],
-			ok: () => group === "guard" && rim!.pct >= 0.85,
-		},
-		"Shot Eraser": { nouns: ["rimD"], ok: () => isElite("rimD") },
-		"Shot Blocker": {
-			nouns: ["rimD"],
-			ok: () => !isElite("rimD") && rimLead !== "idf",
-		},
-		"Post Defender": {
-			nouns: ["rimD"],
-			ok: () => !isElite("rimD") && rimLead !== "blk",
-		},
-		"Rim Protector": { nouns: ["rimD"], ok: () => !isElite("rimD") },
-		"Perimeter Stalker": { nouns: ["perimD"], ok: () => stalkerOk },
-		"Point-of-Attack Pest": {
-			nouns: ["perimD", "steal"],
-			ok: () => pestOk && Math.max(per!.pct, stl!.pct) >= 0.85,
-		},
-		Pest: { nouns: ["perimD", "steal"], ok: () => pestOk },
-		"Lockdown Defender": { nouns: ["perimD"], ok: () => isElite("perimD") },
-		"Cerebral Defender": {
-			nouns: ["perimD"],
-			ok: () => !isElite("perimD") && eliteOvr && per!.pct >= ELITE_PCT,
-		},
-		"On-Ball Stopper": {
-			nouns: ["perimD"],
-			ok: () => !isElite("perimD") && latPct >= 0.7,
-		},
-		"Perimeter Defender": {
-			nouns: ["perimD"],
-			ok: () => !isElite("perimD"),
-		},
-		"Ball-Hawking Menace": { nouns: ["steal"], ok: () => menaceOk },
-		"Passing-Lane Interceptor": {
-			nouns: ["steal"],
-			ok: () => stl!.pct >= 0.85 && (sub(r, "stl") ?? 0) > (sub(r, "pdf") ?? 0),
-		},
-		"Ball Hawk": { nouns: ["steal"], ok: () => true },
-	};
-	const defBaseOf = (name: string) => {
-		let base = name;
-		let prefix: "long" | "switchable" | undefined;
-		if (base.startsWith("Long ")) {
-			prefix = "long";
-			base = base.slice("Long ".length);
-		} else if (base.startsWith("Switchable ")) {
-			prefix = "switchable";
-			base = base.slice("Switchable ".length);
-		}
-		const d = DEF_BASE[base];
-		return d ? { ...d, base, prefix } : undefined;
-	};
-	// (a defensive label he may have: its skills among the ones that give a tag, its own test, its prefix's, and every
-	// word's promise)
-	const defOk = (name: string): boolean => {
-		const d = defBaseOf(name);
-		if (
-			!d ||
-			!d.nouns.every((n) => tagList.some((s) => s.key === n)) ||
-			!d.ok() ||
-			(d.prefix === "long" && (!long || /Lockdown|Eraser/.test(d.base))) ||
-			(d.prefix === "switchable" &&
-				(trv("defensiveVersatility") < TRAIT_WORD_MIN ||
-					d.base === "Switch Defender"))
-		) {
-			return false;
-		}
-		// (its skills were read by the tag's own rule: the rest of its words keep their promises)
-		return (
-			!vetoed(name) && coverPromises(name, d.nouns, ctx, true).length === 0
+	// ---- what a main name covers: the families it names (2-Way: all his defensive ones too) ----
+	const coveredFams = (main: readonly NounKey[], tw: boolean): Set<NounKey> => {
+		const out = new Set<NounKey>(
+			main.filter((n) => !ATH_KEYS.has(n)).map(familyOf),
 		);
-	};
-	// His tag for a main name: none when the main name names a defensive skill, or no defensive skill gives one
-	const tagFor = (
-		main: readonly NounKey[],
-	): { label: string; nouns: NounKey[] } | undefined => {
-		if (tagList.length === 0 || main.some((n) => DEF_NOUNS.has(n))) {
-			return undefined;
-		}
-		const order: string[] = [];
-		if (rim && stl && group !== "big" && rim.pct >= 0.8 && stl.pct >= 0.8) {
-			order.push("Help-Side Roamer");
-		}
-		if (rim && per && rim.pct >= 0.8 && per.pct >= 0.8 && switchOk) {
-			order.push("Switch Defender");
-		}
-		if (rim && group === "guard" && rim.pct >= 0.85) {
-			order.push("Swatting Guard");
-		}
-		const rimFirst =
-			rim && (!per || rim.pct >= per.pct) && (!stl || rim.pct >= stl.pct);
-		const rimNames = rim
-			? isElite("rimD")
-				? ["Shot Eraser"]
-				: rimLead === "blk"
-					? ["Shot Blocker"]
-					: rimLead === "idf"
-						? ["Post Defender"]
-						: ["Rim Protector"]
-			: [];
-		if (rimFirst) {
-			order.push(...rimNames);
-		}
-		if (stalkerOk) {
-			order.push("Perimeter Stalker");
-		}
-		if (per && stl && pestOk) {
-			order.push(
-				per.pct < 0.85 && stl.pct < 0.85 ? "Pest" : "Point-of-Attack Pest",
-			);
-		}
-		const perName = per
-			? isElite("perimD")
-				? "Lockdown Defender"
-				: eliteOvr && per.pct >= ELITE_PCT
-					? "Cerebral Defender"
-					: latPct >= 0.7
-						? "On-Ball Stopper"
-						: "Perimeter Defender"
-			: undefined;
-		const stlName = stl
-			? menaceOk
-				? "Ball-Hawking Menace"
-				: stl.pct >= 0.85 && (sub(r, "stl") ?? 0) > (sub(r, "pdf") ?? 0)
-					? "Passing-Lane Interceptor"
-					: "Ball Hawk"
-			: undefined;
-		if (perName && (!stl || per!.pct >= stl.pct)) {
-			order.push(perName);
-		}
-		if (stlName) {
-			order.push(stlName);
-		}
-		if (perName) {
-			order.push(perName);
-		}
-		order.push(...rimNames);
-		// (the label that says the most of his defense: his best defensive skills first; a tie goes to the order above)
-		let out: { label: string; nouns: NounKey[] } | undefined;
-		let outScore = -Infinity;
-		for (const base of order) {
-			let n = base;
-			if (long && !/Lockdown|Eraser/.test(n)) {
-				n = `Long ${n}`;
-			} else if (
-				trv("defensiveVersatility") >= TRAIT_WORD_MIN &&
-				n !== "Switch Defender"
-			) {
-				n = `Switchable ${n}`;
-			}
-			const label = [n, base].find(defOk);
-			if (label) {
-				const nouns = DEF_BASE[base]!.nouns;
-				const sc = nouns.reduce(
-					(sum, k) =>
-						sum + (skillWeight(pct[k]) + pct[k] / 10) * (rank(k) <= 1 ? 2 : 1),
-					0,
-				);
-				if (sc > outScore + 1e-9) {
-					out = { label, nouns };
-					outScore = sc;
-				}
+		if (tw) {
+			for (const f of DEF_FAMS) {
+				out.add(f);
 			}
 		}
 		return out;
 	};
+	// (it covers his top two families: a many-skills name covers them all a little)
+	const coversTop2 = (main: readonly NounKey[], tw: boolean, generic: number) =>
+		generic > 0 ||
+		realFams.slice(0, 2).every((f) => coveredFams(main, tw).has(f));
 
-	// ---- how much of his strengths a main name (with its tag) covers: his best TOP_N skills, each by how far it stands
-	// above the league's middle; a third skill named costs a little (a long name has to earn it) ----
-	const coverOf = (main: readonly NounKey[], generic = 0): number => {
-		// (a many-skills name covers by its breadth alone: its tag adds nothing to that)
-		const tag = generic > 0 ? undefined : tagFor(main);
+	// ---- how much of his strengths a main name covers: his best TOP_N families, each by how far it stands above the
+	// league's middle; each skill named costs a little (a long name has to earn it) ----
+	const coverOf = (
+		main: readonly NounKey[],
+		tw: boolean,
+		generic = 0,
+	): number => {
+		const cov = coveredFams(main, tw);
 		let s = 0;
-		skills.slice(0, TOP_N).forEach((k, i) => {
-			const c = Math.max(
-				main.includes(k) ? 1 : tag?.nouns.includes(k) ? TAG_COVER : 0,
-				generic,
-			);
-			// (the weight, and a hair of the standing itself so two full-weight skills still order)
-			s += (skillWeight(pct[k]) + pct[k] / 100) * c;
+		let i = 0;
+		for (const f of topFams) {
+			const c = Math.max(cov.has(f) ? 1 : 0, f === "crafty" ? 0 : generic);
+			const p = famPct.get(f) ?? 0;
+			const w = skillWeight(p);
+			// (the weight, and a hair of the standing itself so two full-weight skills still order; offensive IQ a flavor)
+			s += (w + p / 100) * c * (f === "crafty" ? CRAFTY_COVER : 1);
 			// (leaving out one of his top two costs in proportion to that skill's weight)
-			if (c === 0 && i <= 1) {
-				s -= MISS_TOP2 * skillWeight(pct[k]);
+			if (c === 0 && i <= 1 && f !== "crafty") {
+				s -= MISS_TOP2 * w;
 			}
-		});
-		// (a many-skills name claims as much as two named skills; handle and shot creation named together say much the
-		// same thing, so the second counts half)
-		const named = generic > 0 ? 2 : main.filter((n) => !ATH_KEYS.has(n)).length;
-		if (main.includes("handle") && main.includes("creator")) {
-			s -= 0.5 * Math.min(skillWeight(pct.handle), skillWeight(pct.creator));
+			i++;
 		}
+		// (a many-skills name claims as much as two named skills; each family named counts once, 2-Way as one more)
+		const namedFams = new Set(
+			main.filter((n) => !ATH_KEYS.has(n)).map(familyOf),
+		);
+		const named =
+			generic > 0
+				? 2
+				: namedFams.size -
+					(namedFams.has("crafty") ? 1 - CRAFTY_NAMED : 0) +
+					(tw ? 1 : 0);
 		s -= SECOND_COST * Math.min(1, Math.max(0, named - 1));
 		s -= EXTRA_COST * Math.max(0, named - 2);
 		// (a modifier says a little more about him)
@@ -554,9 +441,12 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		}
 		return s;
 	};
-	// Whether a main name's skills may name him: each among his best TOP_N, his best one named (else, with no skill, an
-	// athletic lead), no modifier alone next to a skill
-	const listOk = (list: readonly NounKey[], anyBest = false): boolean => {
+	// Whether a main name's skills may name him: each among his best TOP_N families (and clearing its own bar), his best
+	// one covered (named, or by 2-Way), the shooting family said by its own word, no modifier alone next to a skill
+	const listOk = (
+		list: readonly NounKey[],
+		opts: { anyBest?: boolean; tw?: boolean; oneWord?: boolean } = {},
+	): boolean => {
 		const skillN = list.filter((n) => !ATH_KEYS.has(n));
 		if (nStrong > 0) {
 			if (skillN.length === 0) {
@@ -564,37 +454,75 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			}
 			// (re-checking last season's label: a skill within STICK_BOOST of his TOP_N-th, or of his best, still counts)
 			const tol = (x.slack ?? 0) > 0 ? STICK_BOOST : 0;
-			const nth = skills[TOP_N - 1];
+			const win = windowOf(!!opts.tw);
+			const nthF = win[TOP_N - 1];
+			const nthP = nthF === undefined ? 0 : (famPct.get(nthF) ?? 0);
 			const inTop = (n: NounKey) =>
-				rank(n) < TOP_N ||
-				(tol > 0 &&
-					rank(n) < Infinity &&
-					nth !== undefined &&
-					pct[n] >= pct[nth] - tol);
+				rank(n) < Infinity &&
+				(windowIndex(n, !!opts.tw) < TOP_N ||
+					(tol > 0 && nthF !== undefined && fp(n) >= nthP - tol));
 			if (!skillN.every(inTop)) {
 				return false;
 			}
-			if (
-				!anyBest &&
-				Math.min(...skillN.map(rank)) !== 0 &&
-				!(tol > 0 && Math.max(...skillN.map((n) => pct[n])) >= pct[best!] - tol)
-			) {
-				return false;
+			// (one shooting word: the family's own, 3PT unless mid-range leads by MID_EDGE)
+			const shoot = skillN.filter((n) => familyOf(n) === "three");
+			if (shoot.length === 1 && shoot[0] !== shootRep) {
+				const lead = pct.mid - pct.three - MID_EDGE;
+				if (!(tol > 0 && Math.abs(lead) <= tol)) {
+					return false;
+				}
+			}
+			if (opts.oneWord) {
+				const fs = skillN.map(familyOf);
+				if (new Set(fs).size !== fs.length) {
+					return false;
+				}
+			}
+			if (!opts.anyBest && bestFam !== undefined) {
+				const cov = coveredFams(skillN, !!opts.tw);
+				if (
+					!cov.has(bestFam) &&
+					!(
+						tol > 0 &&
+						[...cov].some((f) => (famPct.get(f) ?? 0) >= fp(bestFam) - tol)
+					)
+				) {
+					return false;
+				}
 			}
 			return list
 				.filter((n) => ATH_KEYS.has(n))
-				.every((n) => pct[n] >= ATH_WORD_BAR);
+				.every((n) => athTrue(n) >= ATH_WORD_BAR);
 		}
 		return (
 			skillN.length === 0 &&
+			!opts.tw &&
 			list.length > 0 &&
 			list.every((n) => pct[n] >= ATH_LEAD_BAR)
 		);
 	};
-
-	const withTag = (p: NounPick, main: readonly NounKey[]): NounPick => {
-		const t = tagFor(main);
-		return t ? { ...p, defense: t.label } : p;
+	// (a special name's skills, one per family, except 3-Level's shooting and finishing)
+	const mainOfNouns = (nouns: readonly NounKey[], name: string): NounKey[] => {
+		const out: NounKey[] = [];
+		const seen = new Set<NounKey>();
+		const tl = THREE_LEVEL_RE.test(name);
+		const list = tl ? [...nouns, "finish" as const] : [...nouns];
+		// (the family's own word first)
+		const ordered = [
+			...list.filter((n) => familyOf(n) !== n || n === shootRep),
+			...list,
+		];
+		for (const n of ordered) {
+			const f = familyOf(n);
+			if (seen.has(f) && !(tl && f === "three")) {
+				continue;
+			}
+			if (!out.includes(n)) {
+				out.push(n);
+			}
+			seen.add(f);
+		}
+		return out;
 	};
 	const confFor = (main: readonly NounKey[]) => {
 		const named = main.filter((n) => !ATH_KEYS.has(n));
@@ -603,8 +531,10 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			return 0.5;
 		}
 		const low = Math.min(...ps);
-		const nextKey = skills.find((k) => !named.includes(k));
-		const next = nextKey === undefined ? 0.6 : pct[nextKey];
+		const nextKey = skills.find(
+			(k) => !named.some((n) => familyOf(n) === familyOf(k)),
+		);
+		const next = nextKey === undefined ? 0.6 : fp(nextKey);
 		const clear = Math.min(1, (low - 0.7) / 0.2);
 		const gap = Math.min(1, Math.max(0, (low - next) / 0.1));
 		return Math.round((0.4 + 0.35 * clear + 0.25 * gap) * 100) / 100;
@@ -619,15 +549,23 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		id: string | undefined,
 		bonus: number,
 		generic = 0,
+		tw = false,
 	) => {
+		const top2 = coversTop2(main, tw, generic);
 		cands.push({
-			pick: withTag({ ...pick, main }, main),
+			pick: { ...pick, main, coversTop2: top2 },
 			main,
-			score: coverOf(main, generic) + bonus - SPREAD_PEN * common(id),
+			twoWay: tw,
+			top2,
+			score: coverOf(main, tw, generic) + bonus - SPREAD_PEN * common(id),
 			common: common(id),
 			order: order++,
 		});
 	};
+	// (a many-skills name: 3+ real skills (families); a broad one with at most FLAT_ELITE elite skills, an elite one
+	// with MANY_ELITE or more)
+	const manyOk = (elite: boolean) =>
+		nStrong >= 3 && (elite ? eliteN >= MANY_ELITE : eliteN <= FLAT_ELITE);
 
 	// The user's own special names (their tests read the standings against league and position)
 	const customCtx: SpecialCtx = {
@@ -640,51 +578,96 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		ovr: x.ovr ?? 0,
 		best,
 	};
-	const customName = (c: CustomSpecial) =>
-		composeName(ROLE_BY_KEY.get(c.key)!, [], GROUP_OF[pos]);
-	const customOk = (c: CustomSpecial): boolean => {
+	// (a name only an elite player may have: its test needs his elite ovr; over one anybody may, an elite name for an
+	// elite player)
+	const eliteGated = (c: CustomSpecial) =>
+		eliteOvr && !c.test({ ...customCtx, eliteOvr: false });
+	const customName = (c: CustomSpecial, tw = false) =>
+		composeName(
+			ROLE_BY_KEY.get(c.key)!,
+			tw ? [DESC_BY_KEY.get("twoWay")!] : [],
+			GROUP_OF[pos],
+		);
+	const customMain = (c: CustomSpecial) =>
+		c.anyBest ? [] : mainOfNouns(c.nouns, customName(c));
+	const customOk = (c: CustomSpecial, tw = false): boolean => {
 		if (young && nStrong <= 1) {
 			return false;
 		}
 		if (!c.positions.includes(pos) || !c.test(customCtx)) {
 			return false;
 		}
-		if (c.anyBest) {
-			if (nStrong < 3 || (best && pct[best] >= STANDOUT_PCT)) {
+		const name = customName(c, tw);
+		if (THREE_LEVEL_RE.test(name) && !threeLevel) {
+			return false;
+		}
+		if (tw) {
+			if (
+				!twoWay ||
+				c.anyBest ||
+				c.nouns.some((n) => DEF_NOUNS.has(n)) ||
+				SAYS_DEFENSE.test(customName(c)) ||
+				!c.nouns.some((n) => OFFENSE.has(n))
+			) {
 				return false;
 			}
-		} else if (!listOk(c.nouns)) {
+		}
+		if (c.anyBest) {
+			if (!manyOk(eliteGated(c))) {
+				return false;
+			}
+		} else if (!listOk(customMain(c), { tw })) {
 			return false;
 		}
 		if (c.nouns.length <= 1 && ovr < ONE_NOUN_OVR && nStrong < 2) {
 			return false;
 		}
-		return okName(customName(c), c.anyBest ? [] : c.nouns);
+		return okName(name, customMain(c), tw);
 	};
-	const customPick = (c: CustomSpecial): NounPick => ({
-		kind: "trait",
-		key: c.key,
-		name: customName(c),
-		conf: confFor(c.nouns),
-	});
-	const customId = (c: CustomSpecial) =>
-		composedId(ROLE_BY_KEY.get(c.key)!, [], GROUP_OF[pos]);
-	const pushCustom = (c: CustomSpecial) =>
+	const pushCustom = (c: CustomSpecial, tw = false) => {
+		const main = customMain(c);
+		if (tw) {
+			// (the user's own name with a 2-Way prefix: a noun name on his name's role)
+			push(
+				{
+					kind: "composed",
+					descs: ["twoWay"],
+					role: c.key as PosWord,
+					nouns: main,
+					conf: confFor(main),
+				},
+				main,
+				composedId(
+					ROLE_BY_KEY.get(c.key)!,
+					[DESC_BY_KEY.get("twoWay")!],
+					GROUP_OF[pos],
+				),
+				SPECIAL_EDGE,
+				0,
+				true,
+			);
+			return;
+		}
 		push(
-			customPick(c),
-			c.nouns,
-			customId(c),
-			FLAVOR,
-			c.anyBest ? GENERIC_COVER : 0,
+			{
+				kind: "trait",
+				key: c.key,
+				name: customName(c),
+				conf: confFor(c.nouns),
+			},
+			main,
+			composedId(ROLE_BY_KEY.get(c.key)!, [], GROUP_OF[pos]),
+			SPECIAL_EDGE + (eliteGated(c) ? FLAVOR : 0),
+			c.anyBest ? (eliteGated(c) ? ELITE_COVER : GENERIC_COVER) : 0,
 		);
+	};
 
-	// Jack-Of-All-Trades: JACK_CLEARED skills or more
+	// Jack-Of-All-Trades: JACK_CLEARED skills (families) or more, his JACK_CLEARED-th at JACK_FLAT, few elite ones
 	const jackOk = () =>
 		!young &&
 		nStrong >= JACK_CLEARED &&
-		// (many good skills, none a standout: with his best in the top 7%, a name about it)
-		pct[best!] < STANDOUT_PCT &&
-		pct[skills[JACK_CLEARED - 1]!] >= JACK_FLAT &&
+		manyOk(false) &&
+		(famPct.get(realFams[JACK_CLEARED - 1]!) ?? 0) >= JACK_FLAT &&
 		ovr >= 45 &&
 		okName(JACK_NAME, []);
 	const jackId = composedId(ROLE_BY_KEY.get("sJack")!, [], GROUP_OF[pos]);
@@ -694,21 +677,19 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			// (it names no skill of its own: it covers each of them a little)
 			[],
 			jackId,
-			FLAVOR,
+			SPECIAL_EDGE,
 			GENERIC_COVER,
 		);
 
-	// Special names (builds): every skill among his best, his best one named, modifiers at the word bar
-	const specialMain = (sp: Special): NounKey[] => {
-		const main = [...sp.nouns];
-		if (sp.twoWay) {
-			const d = (["perimD", "rimD"] as const).find((n) => skills.includes(n));
-			if (d && !main.includes(d)) {
-				main.push(d);
-			}
-		}
-		return main;
-	};
+	// Special names (builds): every skill among his best families, his best one covered, modifiers at the word bar; a
+	// 2-Way build (or a 3 & D one) needs the 2-Way test and covers his defense
+	const specialTw = (sp: Special) =>
+		sp.twoWay || (/3 & D/.test(sp.name) && twoWay);
+	const specialMain = (sp: Special): NounKey[] =>
+		mainOfNouns(
+			specialTw(sp) ? sp.nouns.filter((n) => !DEF_NOUNS.has(n)) : sp.nouns,
+			sp.name,
+		);
 	const specialOk = (sp: Special): boolean => {
 		if (young && nStrong <= 1) {
 			return false;
@@ -716,8 +697,11 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		if (sp.twoWay && !twoWay) {
 			return false;
 		}
+		if (THREE_LEVEL_RE.test(sp.name) && !threeLevel) {
+			return false;
+		}
 		const main = specialMain(sp);
-		if (!listOk(main)) {
+		if (!listOk(main, { tw: specialTw(sp) })) {
 			return false;
 		}
 		if (main.length <= 1 && ovr < ONE_NOUN_OVR && nStrong < 2) {
@@ -729,7 +713,9 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 				return false;
 			}
 		}
-		return wordsFit(sp.name, pos, x.traits) && okName(sp.name, sp.nouns);
+		return (
+			wordsFit(sp.name, pos, x.traits) && okName(sp.name, main, specialTw(sp))
+		);
 	};
 	const pushSpecial = (sp: Special) =>
 		push(
@@ -742,7 +728,9 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			},
 			specialMain(sp),
 			sp.id,
-			FLAVOR,
+			SPECIAL_EDGE,
+			0,
+			specialTw(sp),
 		);
 
 	// Noun names: front words, then the end word that fits them
@@ -762,7 +750,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	// rebounding, or finishing through contact)
 	const bruiserOk = (front: readonly NounKey[]) =>
 		group !== "big" &&
-		pct.strength >= ATH_WORD_BAR &&
+		athTrue("strength") >= ATH_WORD_BAR &&
 		front.some(
 			(n) =>
 				PHYSICAL.has(n) &&
@@ -794,30 +782,46 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		}
 		return false;
 	};
-	// (a noun name, read word by word: its nouns, or undefined when a word no longer says him)
+	// (a noun name, read word by word: its nouns and whether it is 2-Way, or undefined when a word no longer says him or
+	// two words say one family)
 	const composedNouns = (
 		roleKey: string,
 		descKeys: readonly string[],
-	): NounKey[] | undefined => {
+	): { nouns: NounKey[]; tw: boolean } | undefined => {
 		const nouns: NounKey[] = [];
+		const used = new Set<NounKey>();
+		let tw = false;
+		const add = (...ns: NounKey[]): boolean => {
+			const fs = new Set(ns.filter((n) => !ATH_KEYS.has(n)).map(familyOf));
+			for (const f of fs) {
+				if (used.has(f)) {
+					return false;
+				}
+			}
+			for (const f of fs) {
+				used.add(f);
+			}
+			nouns.push(...ns);
+			return true;
+		};
 		for (const d of descKeys) {
 			if (d === "long") {
 				if (!long) {
 					return undefined;
 				}
 			} else if (d === "highlightReel") {
-				if (pct.jump < 0.85 || pct.finish < 0.85) {
+				if (pct.jump < 0.85 || pct.finish < 0.85 || !add("finish", "jump")) {
 					return undefined;
 				}
-				nouns.push("finish", "jump");
 			} else if (d === "twoWay") {
-				const dn = (["perimD", "rimD"] as const).find((n) =>
-					skills.includes(n),
-				);
-				if (!twoWay || !dn) {
+				if (!twoWay || tw) {
 					return undefined;
 				}
-				nouns.push(dn);
+				tw = true;
+			} else if (d === "threeLevel") {
+				if (!threeLevel || !add("three", "mid", "finish")) {
+					return undefined;
+				}
 			} else {
 				const tk = TRAIT_KEYWORDS.find((t) => t.desc === d);
 				if (tk) {
@@ -827,10 +831,9 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 					continue;
 				}
 				const n = nounOfDesc(d);
-				if (!n || !descWordOk(n, d)) {
+				if (!n || !descWordOk(n, d) || !add(n)) {
 					return undefined;
 				}
-				nouns.push(n);
 			}
 		}
 		const front = [...nouns];
@@ -853,14 +856,29 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 				return undefined;
 			}
 			if (e.covers !== undefined && !nouns.includes(e.covers)) {
-				nouns.push(e.covers);
+				if (!add(e.covers)) {
+					return undefined;
+				}
 			}
-			if (!e.ok(endCtxOf(nouns)) || !(END_FITS[e.key]?.(nouns) ?? true)) {
+			// (archfam: a 3-Level name is a Scorer by its 3-Level word: the user's "3-Level Scorer", "2-Way 3-Level Scorer")
+			const tlScorer = e.key === "eScorer" && descKeys.includes("threeLevel");
+			if (
+				(!tlScorer && !e.ok(endCtxOf(nouns))) ||
+				!(END_FITS[e.key]?.(nouns) ?? true)
+			) {
 				return undefined;
 			}
 		}
+		// (2-Way with an offensive word: never a defensive word next to it, which 2-Way already says)
+		if (
+			tw &&
+			(nouns.some((n) => DEF_NOUNS.has(n)) ||
+				!nouns.some((n) => OFFENSE.has(n)))
+		) {
+			return undefined;
+		}
 		const uniq = [...new Set(nouns)];
-		return uniq.length > 0 ? uniq : undefined;
+		return uniq.length > 0 ? { nouns: uniq, tw } : undefined;
 	};
 	const nameOf = (
 		role: string,
@@ -889,12 +907,24 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		if (descs.length === 0) {
 			return false;
 		}
-		const main = composedNouns(role, descs);
-		if (!main || !listOk(main)) {
+		const cn = composedNouns(role, descs);
+		if (!cn) {
+			return false;
+		}
+		const main = cn.nouns;
+		// (archfam: at most MAX_PARTS skill words: 2-Way, each family named, offensive IQ; 3-Level is one)
+		const parts =
+			new Set(main.filter((n) => !ATH_KEYS.has(n)).map(familyOf)).size -
+			(descs.includes("threeLevel") ? 1 : 0) +
+			(cn.tw ? 1 : 0);
+		if (parts > MAX_PARTS) {
+			return false;
+		}
+		if (!listOk(main, { tw: cn.tw, oneWord: !descs.includes("threeLevel") })) {
 			return false;
 		}
 		const name = nameOf(role, descs, pick);
-		if (!okName(name, main)) {
+		if (!wordsFit(name, pos, x.traits) || !okName(name, main, cn.tw)) {
 			return false;
 		}
 		push(
@@ -909,18 +939,23 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			},
 			main,
 			keepId ?? idOf(role, descs, pick),
-			role.startsWith("pos") || role === "bruiser" || role === "enigma"
+			(role.startsWith("pos") || role === "bruiser" || role === "enigma"
 				? 0
-				: FLAVOR,
+				: FLAVOR) + (descs.includes("threeLevel") ? FLAVOR : 0),
+			0,
+			cn.tw,
 		);
 		return true;
 	};
-	// (the words of some front nouns; one noun gets a second word: a modifier, his trait keyword, or his length)
+	// (the words of some front nouns; one noun gets a second word: a modifier, his trait keyword, or his length; 3PT and
+	// finishing at the 3-Level bar are one word)
 	const frontWords = (
 		front: readonly NounKey[],
+		tw = false,
 	): { descs: string[]; pick: Record<string, string> } => {
 		const pick: Record<string, string> = {};
 		if (
+			!tw &&
 			front.length === 2 &&
 			front.includes("finish") &&
 			front.includes("jump") &&
@@ -929,16 +964,27 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		) {
 			return { descs: ["highlightReel"], pick };
 		}
-		const hasOff = front.some((n) => OFFENSE.has(n));
-		const descs = front.map((n) =>
-			n === "perimD" && twoWay && hasOff && !isElite(n)
-				? "twoWay"
-				: // (next to shot creation, his handle is plain Ball-Handling, not a sub-rating's word: "Iso Ball-Handling")
-					n === "handle" && front.includes("creator")
-					? NOUN_DESC.handle.desc
-					: descWord(n),
-		);
-		if (front.length === 1) {
+		const tl =
+			threeLevel &&
+			front.includes("finish") &&
+			front.some((n) => familyOf(n) === "three");
+		const descs: string[] = [];
+		for (const n of front) {
+			if (tl && n === "finish") {
+				continue;
+			}
+			descs.push(
+				tl && familyOf(n) === "three"
+					? "threeLevel"
+					: // (next to shot creation, his handle is plain Ball-Handling, not a sub-rating's word: "Iso Ball-Handling")
+						n === "handle" && front.includes("creator")
+						? NOUN_DESC.handle.desc
+						: descWord(n),
+			);
+		}
+		if (tw) {
+			descs.unshift("twoWay");
+		} else if (front.length === 1) {
 			const t = traitKeywordOf(x, pct, group);
 			const d = t ? DESC_BY_KEY.get(t.desc) : undefined;
 			if (t && d) {
@@ -953,8 +999,8 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		}
 		return { descs, pick };
 	};
-	const pushFront = (front: NounKey[]) => {
-		const { descs, pick } = frontWords(front);
+	const pushFront = (front: NounKey[], tw = false) => {
+		const { descs, pick } = frontWords(front, tw);
 		// (his position, then the first end word of his own that fits the front words, then each end word that says one
 		// of his skills)
 		pushComposed(POS_WORD[pos], descs, pick);
@@ -963,7 +1009,9 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		} else if (bruiserOk(front)) {
 			pushComposed("bruiser", descs, pick);
 		}
-		let plain = false;
+		// (a 3-Level name: Scorer first)
+		let plain =
+			descs.includes("threeLevel") && pushComposed("eScorer", descs, pick);
 		for (const e of END_WORDS) {
 			if (e.covers === undefined) {
 				if (!plain && pushComposed(e.key, descs, pick)) {
@@ -973,12 +1021,14 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 				// (the end word says that noun: it leaves the front words)
 				const rest = front.filter((n) => n !== e.covers);
 				if (rest.length > 0) {
-					const fw = frontWords(rest);
+					const fw = frontWords(rest, tw);
 					pushComposed(e.key, fw.descs, fw.pick);
 				}
 			} else if (
 				front.length <= 2 &&
-				rank(e.covers) < TOP_N &&
+				rank(e.covers) < Infinity &&
+				windowIndex(e.covers, tw) < TOP_N &&
+				!front.some((n) => familyOf(n) === familyOf(e.covers!)) &&
 				// (a third skill from the end word only in the front words' own domain: offense or defense)
 				front.every((n) => DEF_NOUNS.has(n) === DEF_NOUNS.has(e.covers!))
 			) {
@@ -1035,6 +1085,9 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			if (customOk(c)) {
 				pushCustom(c);
 			}
+			if (customOk(c, true)) {
+				pushCustom(c, true);
+			}
 		}
 		if (jackOk()) {
 			pushJack();
@@ -1044,11 +1097,25 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 				pushSpecial(sp);
 			}
 		}
-		// (one skill at low ovr names him only with a modifier next to it)
+		// (his best skill alone, and with each other of his best TOP_N; one skill at low ovr names him only with a modifier
+		// next to it)
+		const repOf = (f: NounKey) => skills[fams.indexOf(f)]!;
+		const top = topFams.map(repOf);
 		const fronts: NounKey[][] =
 			nStrong === 1 && ovr < ONE_NOUN_OVR ? [] : [[best!]];
-		for (let j = 1; j < Math.min(TOP_N, skills.length); j++) {
-			fronts.push([best!, skills[j]!]);
+		for (const k of top) {
+			if (k !== best) {
+				fronts.push([best!, k]);
+			}
+		}
+		// (3-Level and one more of his best)
+		const shootK = top.find((k) => familyOf(k) === "three");
+		if (threeLevel && shootK && top.includes("finish")) {
+			for (const k of top) {
+				if (k !== shootK && k !== "finish" && !DEF_NOUNS.has(k)) {
+					fronts.push([shootK, "finish", k]);
+				}
+			}
 		}
 		// (one skill: a modifier at the word bar as his second word)
 		if (nStrong === 1) {
@@ -1059,6 +1126,34 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		for (const f of fronts) {
 			pushFront(f);
 		}
+		// 2-Way names: his offensive skills among his best TOP_N, one or two of them (or 3-Level and one more), with 2-Way
+		// saying his defense
+		if (twoWay) {
+			const off = windowOf(true)
+				.slice(0, TOP_N)
+				.map(repOf)
+				.filter((k) => !DEF_NOUNS.has(k));
+			const twFronts: NounKey[][] = [];
+			off.forEach((k, i) => {
+				if (k !== "crafty") {
+					twFronts.push([k]);
+				}
+				for (const k2 of off.slice(i + 1)) {
+					twFronts.push([k, k2]);
+				}
+			});
+			const shootW = off.find((k) => familyOf(k) === "three");
+			if (threeLevel && shootW && off.includes("finish")) {
+				for (const k of off) {
+					if (k !== shootW && k !== "finish") {
+						twFronts.push([shootW, "finish", k]);
+					}
+				}
+			}
+			for (const f of twFronts) {
+				pushFront(f, true);
+			}
+		}
 		const c = bestOf(cands);
 		return c ? c.pick : honest(best, 0.5);
 	})();
@@ -1067,14 +1162,14 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	// ---- archcov stickiness: last season's label, re-checked ----
 	const prevMain = prevMainOf(x, pos);
 	if (!prevMain || fresh.kind === "honest") {
-		return settleTag(fresh);
+		return settle(fresh);
 	}
 	const freshCand = cands.find((c) => c.pick === fresh) ?? bestOf(cands);
 	const before = cands.length;
 	switch (prevMain.kind) {
 		case "custom":
-			if (customOk(prevMain.c)) {
-				pushCustom(prevMain.c);
+			if (customOk(prevMain.c, !!prevMain.twoWay)) {
+				pushCustom(prevMain.c, !!prevMain.twoWay);
 			}
 			break;
 		case "jack":
@@ -1100,7 +1195,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 							)) &&
 					okName(prevMain.name, []);
 				if (ok) {
-					return settleTag({
+					return settle({
 						kind: "trait",
 						key: prevMain.role,
 						name: prevMain.name,
@@ -1122,34 +1217,44 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			break;
 	}
 	const kept = cands.length > before ? cands.at(-1) : undefined;
-	if (kept && freshCand && kept.score >= freshCand.score - STICK_COVER) {
-		return settleTag(kept.pick, true);
+	if (
+		kept &&
+		kept.top2 &&
+		freshCand &&
+		kept.score >= freshCand.score - STICK_COVER
+	) {
+		return settle(kept.pick, true);
 	}
-	return settleTag(fresh);
+	return settle(fresh);
 
-	// (his defensive tag: last season's while it still holds, in place of this season's; and why the name was chosen)
-	function settleTag(p: NounPick, keptPrev = false): NounPick {
-		const pd = x.prev?.defense;
-		const q =
-			p.defense && pd && pd !== p.defense && defOk(pd)
-				? { ...p, defense: pd }
-				: p;
-		const me = cands.find((c) => c.pick === p);
+	// (why the name was chosen)
+	function settle(q: NounPick, keptPrev = false): NounPick {
+		const me = cands.find((c) => c.pick === q);
 		const name = pickName(q);
 		const runner = [...cands]
 			.filter((c) => c !== me && pickName(c.pick) !== name)
 			.sort((a, b) => b.score - a.score)[0];
+		// (the skills the name says: its own, and with 2-Way his defensive skills among his best)
+		const tw = me?.twoWay ?? false;
 		const named = [
 			...new Set([
 				...(q.main ?? []),
-				...(q.defense ? defLabelNouns(q.defense) : []),
+				...(tw ? skills.filter((k) => DEF_NOUNS.has(k)) : []),
 			]),
 		];
-		const top3 = skills.slice(0, 3);
-		const fitDen = top3.reduce((sum, k) => sum + skillWeight(pct[k]), 0);
+		const top3 = realFams.slice(0, 3);
+		const cov = coveredFams(q.main ?? [], tw);
+		const fitDen = top3.reduce(
+			(sum, f) => sum + skillWeight(famPct.get(f) ?? 0),
+			0,
+		);
 		const fitNum = top3
-			.filter((k) => named.includes(k))
-			.reduce((sum, k) => sum + skillWeight(pct[k]), 0);
+			.filter((f) => cov.has(f))
+			.reduce((sum, f) => sum + skillWeight(famPct.get(f) ?? 0), 0);
+		const generic =
+			q.kind === "trait" &&
+			(q.key === "sJack" ||
+				CUSTOM_SPECIALS.some((c) => c.key === q.key && c.anyBest));
 		const r2 = (v: number) => Math.round(v * 100) / 100;
 		return {
 			...q,
@@ -1161,12 +1266,16 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 					q.kind === "honest"
 						? "honest: no skill, or one at low ovr"
 						: q.kind === "special"
-							? "special name: its skills among his best four, his best named"
+							? "special name: its skills among his best four (families), his best covered"
 							: q.kind === "composed"
-								? "noun name: his best skill and the skills that cover most"
+								? tw
+									? "noun name, 2-Way: his best skill and the skills that cover most, 2-Way for his defense"
+									: "noun name: his best skill and the skills that cover most"
 								: q.kind === "trait" && q.key === "sJack"
-									? "Jack-Of-All-Trades: four skills at the 80th percentile"
-									: "the user's own name or a trait name",
+									? `Jack-Of-All-Trades: ${JACK_CLEARED} skills (families) at the ${Math.round(100 * JACK_FLAT)}th percentile`
+									: generic
+										? `many-skills name: at most ${FLAT_ELITE} skills at the ${Math.round(100 * ELITE_SKILL)}th (an elite name: ${MANY_ELITE} or more)`
+										: "the user's own name or a trait name",
 				variant: keptPrev
 					? "kept from last season"
 					: q.kind === "composed"
@@ -1175,7 +1284,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 							: "end word"
 						: q.kind,
 				score: r2(me?.score ?? 0),
-				fit: fitDen > 0 ? r2(fitNum / fitDen) : 1,
+				fit: generic ? 1 : fitDen > 0 ? r2(fitNum / fitDen) : 1,
 				...(runner
 					? {
 							runnerUp: {
@@ -1189,19 +1298,17 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	}
 	// (a pick's display name, for the reason)
 	function pickName(p: NounPick): string {
-		const main =
-			p.kind === "special" || p.kind === "trait"
-				? p.name
-				: p.kind === "composed"
-					? (p.keepId && archetypeNameOf(p.keepId)) ||
-						composeName(
-							ROLE_BY_KEY.get(p.role)!,
-							p.descs.map((k) => DESC_BY_KEY.get(k)!),
-							GROUP_OF[pos],
-							p.pick,
-						)
-					: "(honest name)";
-		return p.defense ? `${main} · ${p.defense}` : main;
+		return p.kind === "special" || p.kind === "trait"
+			? p.name
+			: p.kind === "composed"
+				? (p.keepId && archetypeNameOf(p.keepId)) ||
+					composeName(
+						ROLE_BY_KEY.get(p.role)!,
+						p.descs.map((k) => DESC_BY_KEY.get(k)!),
+						GROUP_OF[pos],
+						p.pick,
+					)
+				: "(honest name)";
 	}
 };
 

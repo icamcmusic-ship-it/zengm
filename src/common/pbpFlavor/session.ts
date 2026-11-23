@@ -48,6 +48,8 @@ import {
 	heatCheckNote,
 	homeCrowd,
 	hotLine,
+	benchHotLine,
+	feedHotLine,
 	lateClockMiss,
 	pointsMilestone,
 	runEndedLine,
@@ -534,6 +536,8 @@ export class FlavorSession {
 	private tdWatchSaid = new Set<number>();
 	// players who have been subbed out, so coming back in reads as a return
 	private benched = new Set<number>();
+	// players whose first time on the court was a substitution (the bench), for the bench hot hand lines
+	private reserves = new Set<number>();
 	private lastScoreAbs: [number | undefined, number | undefined] = [
 		undefined,
 		undefined,
@@ -2872,6 +2876,11 @@ export class FlavorSession {
 			ejected: this.ejected,
 			back: this.benched,
 		});
+		for (const pid of on) {
+			if (!this.benched.has(pid)) {
+				this.reserves.add(pid);
+			}
+		}
 		for (const pid of off) {
 			this.foulTrouble.delete(pid);
 			this.benched.add(pid);
@@ -3144,9 +3153,12 @@ export class FlavorSession {
 		}
 		this.streak[opp].pid = undefined;
 		let streakNote = "";
+		const reserve = this.reserves.has(p.pid);
 		if (st.pts >= 8 && !st.said) {
 			st.said = true;
-			streakNote = streakLine(rng, p.name, st.pts, this.the(t));
+			streakNote = reserve
+				? feedHotLine(rng, p.name, st.pts, this.the(t))
+				: streakLine(rng, p.name, st.pts, this.the(t));
 		}
 
 		// ---- a drought that just ended ----
@@ -3165,7 +3177,10 @@ export class FlavorSession {
 		if (o.fg) {
 			const h = (this.hot.get(p.pid) ?? 0) + 1;
 			this.hot.set(p.pid, h);
-			if (h >= 4 && !this.hotSaid.has(p.pid)) {
+			if (reserve && h >= 3 && !this.hotSaid.has(p.pid)) {
+				this.hotSaid.add(p.pid);
+				hotNote = benchHotLine(rng, p.name, h);
+			} else if (h >= 4 && !this.hotSaid.has(p.pid)) {
 				this.hotSaid.add(p.pid);
 				hotNote = hotLine(rng, p.name, h);
 			} else if (h >= 6 && !this.fireSaid.has(p.pid)) {
