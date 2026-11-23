@@ -26,7 +26,7 @@ import {
 	setReboundSplit,
 	setShootingSplit,
 } from "./expandedRatings.ts";
-import { featureOn } from "../../util/nativeFeatures.ts";
+import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import { Rng } from "../../../common/ratingsBuilds/rng.ts";
 import {
 	GROUP_FACTOR,
@@ -40,6 +40,10 @@ import {
 	regionOf,
 	ratingFactor,
 	OUTLIER,
+	GENERATION_PRESETS,
+	presetOf,
+	presetTypeShares,
+	type GenerationPreset,
 	type GenVariety,
 	type RatingGroup,
 } from "../../../common/prospectVariety.ts";
@@ -153,6 +157,34 @@ export const SCORER_MIX: {
 ];
 const scorerMix = (hgt: number) => SCORER_MIX.find((m) => hgt <= m.maxHgt);
 
+// Generation presets (League Extras → Generation Presets): the league's era, balanced when off
+export const generationPreset = (): GenerationPreset =>
+	featureOn("generationPresets")
+		? presetOf(featureOption<string>("generationPreset"))
+		: "balanced";
+
+// A height band's type shares, as the draw below reads them (for the generation presets)
+const typeShares = (
+	hgt: number,
+	scorers: ReturnType<typeof scorerMix>,
+): Record<PlayerType, number> => {
+	if (scorers) {
+		return {
+			point: scorers.point,
+			scorer: scorers.scorer,
+			big: scorers.big,
+			wing: 1 - scorers.point - scorers.scorer - scorers.big,
+		};
+	}
+	if (hgt >= 59) {
+		return { point: 0.01, scorer: 0, big: 0.95, wing: 0.04 };
+	}
+	if (hgt <= 33) {
+		return { point: 0.9, scorer: 0, big: 0, wing: 0.1 };
+	}
+	return { point: 0.03, scorer: 0, big: 0.27, wing: 0.7 };
+};
+
 // Ape index of a generated player (inches): normal, bounded. inHgt: the share of it in the hgt rating (the old -1/0/+1 inch of length
 // had sd 0.82 inch; 0.37 x 2.2 = 0.81)
 export const APE_INDEX = {
@@ -203,6 +235,12 @@ const genRatings = (
 			: undefined;
 	const tiltScale = rng ? rng.uniform(0.5, 1.5) : 0;
 	const tilt = region ? REGION_TILTS[region] : undefined;
+	// Generation presets: the league's era (type weights, a height shift and a rating tilt, all with his ovr put back). Not for real players
+	const preset = rng ? generationPreset() : "balanced";
+	const presetDef =
+		preset !== "balanced" ? GENERATION_PRESETS[preset] : undefined;
+	const heightBeforePreset = heightInInches;
+	heightInInches += presetDef?.height ?? 0;
 
 	// Ape index (wingspan minus height, inches): its own draw, normal around +4 (NBA prospects: mean about +4, sd a little over 2). It
 	// takes the one random number the old -1/0/+1 inch of "length" took, and the hgt rating keeps about the same share of it (sd 0.8
@@ -222,14 +260,26 @@ const genRatings = (
 	const hgt = hgtOverride ?? heightToRating(wingspanAdjust);
 	// His hgt rating without the regional wingspan tilt (the ovr he is put back to)
 	const hgtBeforeTilt =
-		hgtOverride ?? heightToRating(heightInInches + lengthOf(apeOf(0)));
+		hgtOverride ?? heightToRating(heightBeforePreset + lengthOf(apeOf(0)));
 	heightInInches = Math.round(heightInInches); // Pick type of player (point, wing, or big) based on height
 
 	const randType = Math.random();
 	let type: keyof typeof typeFactors;
 
 	const scorers = featureOn("improvedPositions") ? scorerMix(hgt) : undefined;
-	if (scorers) {
+	// Generation presets: the era's type weights within his height band (same random number)
+	if (preset !== "balanced") {
+		const shares = presetTypeShares(typeShares(hgt, scorers), preset);
+		if (randType < shares.point) {
+			type = "point";
+		} else if (randType < shares.point + shares.scorer) {
+			type = "scorer";
+		} else if (randType < shares.point + shares.scorer + shares.big) {
+			type = "big";
+		} else {
+			type = "wing";
+		}
+	} else if (scorers) {
 		// Same draw as below, so with the setting off nothing changes
 		if (randType < scorers.point) {
 			type = "point";
@@ -346,8 +396,15 @@ const genRatings = (
 	}
 
 	if (rng) {
-		const changed = subBuild || outlier || tilt || spikes;
+		const presetTilt = presetDef?.ratings;
+		const changed = subBuild || outlier || tilt || spikes || presetTilt;
 		if (changed) {
+			if (presetTilt) {
+				for (const [key, d] of Object.entries(presetTilt)) {
+					const k = key as keyof typeof rawRatings;
+					rawRatings[k] = limitRating(rawRatings[k] + d);
+				}
+			}
 			if (tilt) {
 				for (const [key, d] of Object.entries(tilt.ratings)) {
 					const k = key as keyof typeof rawRatings;
@@ -362,7 +419,9 @@ const genRatings = (
 					rawRatings[k] = limitRating(rawRatings[k] + d);
 				}
 			}
-			const target = ovrRaw({ ...refRatings, hgt: hgtBeforeTilt } as any);
+			const target =
+				ovrRaw({ ...refRatings, hgt: hgtBeforeTilt } as any) +
+				(presetDef?.ovr ?? 0);
 			const shaped = { ...rawRatings, hgt } as any;
 			shiftToRawOvr(shaped, target, new Set(Object.keys(spikes ?? {})));
 			for (const key of helpers.keys(rawRatings)) {

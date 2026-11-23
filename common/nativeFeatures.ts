@@ -760,6 +760,32 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "generationPresets",
+		key: "featureGenerationPresets",
+		name: "Generation Presets",
+		description:
+			"An era for newly generated players (new leagues' random players and every draft class): Balanced is the normal generator; Guard-heavy, Big-man, Shooting and Athletic eras tilt which player types are drawn within each height band and shift their ratings toward that era's style, with each player's overall kept the same, so the league's talent level doesn't change, only what it looks like. Real players are never changed. Existing players keep their ratings; a new preset affects players generated from then on.",
+		default: true,
+		sports: BBGM,
+		options: [
+			{
+				key: "generationPreset",
+				name: "Generation Preset",
+				description:
+					"The era new players are generated for. Balanced: the normal generator.",
+				type: "string",
+				default: "balanced",
+				values: [
+					{ key: "balanced", value: "Balanced" },
+					{ key: "guard", value: "Guard-heavy era" },
+					{ key: "big", value: "Big-man era" },
+					{ key: "shooting", value: "Shooting era" },
+					{ key: "athletic", value: "Athletic era" },
+				],
+			},
+		],
+	},
+	{
 		id: "forkFaces",
 		key: "featureForkFaces",
 		core: true,
@@ -1380,6 +1406,17 @@ export const NATIVE_FEATURES = [
 		sports: BBGM,
 	},
 	{
+		id: "playerCoachRel",
+		college: false,
+		key: "featurePlayerCoachRel",
+		name: "Player–Coach Relationships",
+		description:
+			"Each player builds a relationship with his head coach over the seasons they spend together: playing time against his role, how he developed, the coach's personality against his ego, winning and loyalty move it a little each season (Very close, Good, Neutral, Strained, Broken). It nudges his mood (a Coach relationship mood item, at most ±1.5, so re-signing with a coach he trusts is easier and a coach he clashed with harder, also as a free agent choosing a team whose coach he knows), and the size of his development plan. Shown on the player's contract & mood panel and on the coach page. Needs Coaching Staff.",
+		default: false,
+		defaultNewLeague: true,
+		sports: BBGM,
+	},
+	{
 		id: "scoutSpecialties",
 		college: false,
 		key: "featureScoutSpecialties",
@@ -1506,6 +1543,15 @@ export const NATIVE_FEATURES = [
 				default: true,
 			},
 		],
+	},
+	{
+		id: "featRarity",
+		key: "featureFeatRarity",
+		name: "Feat Rarity & Streaks",
+		description:
+			'Statistical feats get rarity labels when they happen ("first 60-point game since 2041", "3rd quintuple-double ever", "career-high 52 points") and a feat score normalized for the league\'s era and settings (game length, players on the court, league scoring) for ranking them. Team feats (150+ points, 25+ threes, 30-point comebacks) and streaks (consecutive triple-doubles, double-doubles and 30-point games, with running counters and the longest ever) are tracked as games are played, in the news and on Statistical Feats.',
+		default: true,
+		sports: BBGM,
 	},
 	{
 		id: "recordsBook",

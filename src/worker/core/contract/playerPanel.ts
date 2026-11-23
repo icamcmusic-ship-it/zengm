@@ -7,6 +7,7 @@ import type { MoodComponents } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
 import moodInfo from "../player/moodInfo.ts";
+import { coachRelSummary } from "../staff/relationships.ts";
 import {
 	getExtensionDemand,
 	getExtensionIneligibleReason,
@@ -155,6 +156,8 @@ export const getPlayerContractPanel = async (pid: number) => {
 		tradeRequest: hasActiveTradeRequest(p) ? p.tradeRequest : undefined,
 		holdout: isHoldingOut(p) ? p.holdout : undefined,
 		moodHistory: p.moodHistory ?? [],
+		// Player–coach relationships (undefined when off or none yet)
+		coachRels: await coachRelSummary(p),
 		scenarios,
 	};
 };

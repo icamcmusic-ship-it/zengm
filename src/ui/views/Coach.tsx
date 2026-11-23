@@ -33,6 +33,7 @@ const Coach = ({
 	awards,
 	coach: c,
 	colors,
+	relationships,
 	stats,
 	transactions,
 	tree,
@@ -121,6 +122,19 @@ const Coach = ({
 									</>
 								) : null}
 							</div>
+							{c.systems.mentor && c.systems.inherited.length > 0 ? (
+								<div data-testid="coach-inherited">
+									Carried from {c.systems.mentor.name}:{" "}
+									{c.systems.inherited.join(", ")}
+								</div>
+							) : null}
+							{c.systems.familiarity !== undefined &&
+							c.tid >= 0 &&
+							c.role === "head" ? (
+								<div title="How familiar his systems were to the team when he took over (the previous coach ran them, the two share a coaching tree, assistants who worked under him or his mentor). Familiar systems start further along and install faster.">
+									System familiarity with his team: {c.systems.familiarity}%
+								</div>
+							) : null}
 							{c.tid >= 0 && c.role === "head" && c.abbrev ? (
 								<a
 									href={helpers.leagueUrl([
@@ -224,6 +238,39 @@ const Coach = ({
 							</ul>
 						</>
 					) : null}
+				</div>
+			) : null}
+
+			{relationships && relationships.length > 0 ? (
+				<div data-testid="coach-relationships">
+					<h2>Player relationships</h2>
+					<p className="text-body-secondary small mb-1">
+						Built over the seasons together: playing time against the player's
+						role, his development, personalities and winning. A close bond lifts
+						the player's mood (and his wish to re-sign) and his development plan
+						a little; a strained one does the opposite.
+					</p>
+					<ul className="small">
+						{relationships.map((r) => (
+							<li key={r.pid}>
+								<a href={helpers.leagueUrl(["player", r.pid])}>{r.name}</a>
+								{r.abbrev ? ` (${r.abbrev})` : ""}:{" "}
+								<span
+									className={
+										r.v >= 0.3
+											? "text-success"
+											: r.v <= -0.15
+												? "text-danger"
+												: undefined
+									}
+								>
+									{r.label}
+								</span>
+								, {r.seasons} {r.seasons === 1 ? "season" : "seasons"}
+								{r.current ? "" : `, last ${r.last}`}
+							</li>
+						))}
+					</ul>
 				</div>
 			) : null}
 

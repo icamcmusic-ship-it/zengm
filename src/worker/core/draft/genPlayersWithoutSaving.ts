@@ -27,8 +27,12 @@ import {
 	polishSenior,
 	separateNearDuplicates,
 	shiftToRawOvr,
+	steerArchetypeLabels,
 	steerArchetypeMix,
+	labelSteerOptions,
 } from "../player/prospectVariety.ts";
+import { fuzzedArchetypeLabel } from "../player/archetype.ts";
+import { DEFAULT_NORMS } from "../../../common/archetypes/index.ts";
 import { helpers } from "../../../common/helpers.ts";
 
 // arch13: small guards in the draft. BBGM's prospect generator was tuned to the stock ovr, which flatters small guards;
@@ -338,6 +342,23 @@ const genPlayersWithoutSaving = async (
 		}
 		for (const p of changed) {
 			await player.develop(p, 0);
+		}
+		// Stronger, label-aware steering with the archetype engine itself (read-only, true base ratings: never the sub-ratings, which are
+		// assigned below from the bases, so turning them on or off doesn't change who is steered): crowded labels in the drafted part of
+		// the class are thinned with bounded, ovr-neutral nudges
+		if (featureOn("archetypes") && labelSteerOptions.enabled) {
+			// (the built-in reference league's norms: a class is steered the same whatever league it is generated in)
+			const norms = DEFAULT_NORMS;
+			const { changed: steered } = steerArchetypeLabels(enteringDraft, (p) => {
+				const { sub: _sub, ...row } = p.ratings.at(-1) as any;
+				return fuzzedArchetypeLabel(row, 0, norms, {
+					ovr: row.ovr,
+					pot: row.pot,
+				});
+			});
+			for (const p of steered) {
+				await player.develop(p, 0);
+			}
 		}
 	}
 

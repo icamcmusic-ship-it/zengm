@@ -4,6 +4,7 @@ import { hotSeatLabel, hotSeatNow } from "../core/staff/systems.ts";
 import { defineView } from "../util/defineView.ts";
 import { coachingDepthOn } from "../core/staffDepth/coaching.ts";
 import { coachTreePage } from "../core/staffDepth/careers.ts";
+import { coachRelationshipsFor } from "../core/staff/relationships.ts";
 import { g } from "../util/index.ts";
 import type { RouteParams } from "../../ui/router/types.ts";
 import {
@@ -49,6 +50,8 @@ export default defineView({
 				coach,
 				// Coaching Staff Depth: where his career started, his mentors, protégés and the assistants who worked under him
 				tree: coachingDepthOn() ? await coachTreePage(c) : undefined,
+				// Player–coach relationships (undefined when off)
+				relationships: await coachRelationshipsFor(c.cid),
 				colors: c.tid >= 0 ? (await getTeamColors()).get(c.tid) : undefined,
 				stats: c.stats.map((row) => ({
 					...row,

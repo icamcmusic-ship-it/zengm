@@ -490,6 +490,7 @@ const writePlayerStats = async (
 					conditions,
 					playoffs && !nit,
 					nit,
+					p2,
 				);
 				if (hasFeat) {
 					t.playerFeat = true;

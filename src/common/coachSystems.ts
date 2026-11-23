@@ -1026,6 +1026,55 @@ export const INSTALL_MAKE_PENALTY = 0.005;
 // How far tendencies go in the first game with a new system (then ramp up to full)
 export const INSTALL_START = 0.35;
 
+// Coaching trees: how familiar a new head coach's systems already are to his team (0-1, profile.familiarity). Bounded: at most +0.25 on
+// the starting installation and 30% fewer games to install fully
+export const FAMILIARITY_START = 0.25;
+export const FAMILIARITY_SPEED = 0.3;
+
+export type FamiliarityInput = {
+	// The team's previous head coach ran the same offense/defense system
+	sameOff: boolean;
+	sameDef: boolean;
+	// The new head coach and the previous one share a coaching tree (mentor, protege or the same mentor)
+	sameTree: boolean;
+	// Assistants on his new staff who worked under him or his mentor
+	treeAssistants: number;
+	// He brought his mentor's offense/defense with him (the new team doesn't know it, but he knows it well)
+	inherited: number;
+};
+
+export const systemFamiliarity = ({
+	sameOff,
+	sameDef,
+	sameTree,
+	treeAssistants,
+	inherited,
+}: FamiliarityInput) =>
+	Math.round(
+		100 *
+			clamp(
+				(sameOff ? 0.35 : 0) +
+					(sameDef ? 0.25 : 0) +
+					(sameTree ? 0.2 : 0) +
+					0.1 * Math.min(2, treeAssistants) +
+					0.05 * Math.min(2, inherited),
+				0,
+				1,
+			),
+	) / 100;
+
+// Installation (0-1) after this many games with a new system, given his familiarity (0-1)
+export const installAfterGames = (
+	gp: number,
+	numGames: number,
+	familiarity = 0,
+) => {
+	const f = clamp(familiarity, 0, 1);
+	const start = INSTALL_START + FAMILIARITY_START * f;
+	const games = Math.max(1, 0.5 * numGames * (1 - FAMILIARITY_SPEED * f));
+	return start + (1 - start) * Math.min(1, gp / games);
+};
+
 const z = (x: number) => clamp((x - 50) / 15, -2, 2);
 
 export type CoachSimInput = {

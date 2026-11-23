@@ -41,6 +41,8 @@ const componentText = (
 				return "Enjoys the team-first locker room";
 			case "coachFit":
 				return "Likes the coach and fits his system";
+			case "coachRel":
+				return "Close with the head coach";
 			case "relatives":
 				return `Wants to play with ${helpers.pronoun(gender, "his")} ${helpers.plural("relative", value / 2)}`;
 		}
@@ -69,6 +71,8 @@ const componentText = (
 			return "Put off by the egos in the locker room";
 		case "coachFit":
 			return "Doesn't fit the coach's system";
+		case "coachRel":
+			return "Strained relationship with the head coach";
 	}
 };
 

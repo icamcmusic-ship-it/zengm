@@ -21,7 +21,8 @@ import {
 	DEFENSE_SYSTEMS,
 	deriveCoachProfile,
 	fitToScore,
-	INSTALL_START,
+	installAfterGames,
+	systemFamiliarity,
 	normalizeCoachSims,
 	OFFENSE_SYSTEMS,
 	playerSchemeFit,
@@ -298,7 +299,7 @@ export const installProgress = async (c: Coach, profile: CoachProfile) => {
 		return 1;
 	}
 	if (season < profile.since) {
-		return INSTALL_START;
+		return installAfterGames(0, g.get("numGames"), profile.familiarity);
 	}
 	const ts = await idb.cache.teamSeasons.indexGet("teamSeasonsBySeasonTid", [
 		season,
@@ -309,8 +310,8 @@ export const installProgress = async (c: Coach, profile: CoachProfile) => {
 		const h = c.hiredRecord;
 		gp -= h.won + h.lost + h.tied + h.otl;
 	}
-	const games = Math.max(1, 0.5 * g.get("numGames"));
-	return INSTALL_START + (1 - INSTALL_START) * Math.min(1, gp / games);
+	// Coaching trees: systems the team already knows install faster
+	return installAfterGames(gp, g.get("numGames"), profile.familiarity);
 };
 
 // ---- the sim ----
@@ -833,6 +834,7 @@ export const adaptSystems = async () => {
 		}
 		if (changed) {
 			profile.since = season + 1;
+			profile.familiarity = undefined;
 		}
 		c.profile = profile;
 		await idb.cache.coaches.put(c);
@@ -878,12 +880,23 @@ export const onHeadCoachHired = async (c: Coach) => {
 			const random = makeSeededRandom(
 				hashString(salted(`tree|${c.cid}|${mentor.cid}`)),
 			);
+			const inherited: NonNullable<CoachProfile["inherited"]> = {};
 			if (asAssistant.role === "off" && random() < 0.65) {
 				profile.off = mp.off;
+				inherited.off = true;
 			} else if (asAssistant.role === "def" && random() < 0.65) {
 				profile.def = mp.def;
+				inherited.def = true;
 			} else if (random() < 0.4) {
 				profile.off = mp.off;
+				inherited.off = true;
+			}
+			// Same system anyway (not carried, but he knows it from him)
+			if (profile.off === mp.off) {
+				inherited.off = true;
+			}
+			if (profile.def === mp.def) {
+				inherited.def = true;
 			}
 			profile.philosophy =
 				Math.round(
@@ -892,10 +905,86 @@ export const onHeadCoachHired = async (c: Coach) => {
 							? 0.5 * profile.philosophy + 0.5 * mp.philosophy
 							: 0.75 * profile.philosophy + 0.25 * mp.philosophy),
 				) / 100;
+			inherited.philosophy = true;
+			profile.inherited = inherited;
 		}
 	}
+	profile.familiarity = await familiarityWithTeam(c, profile);
 	c.profile = profile;
 	await idb.cache.coaches.put(c);
+};
+
+const mentorOfCoach = (x: CoachWithoutKey) =>
+	x.tree?.mentor ?? x.profile?.mentor;
+
+/**
+ * Coaching trees: how familiar a new head coach's systems are to the team he takes over (0-1, deterministic, no random draws): the previous
+ * head coach ran the same systems, the two share a coaching tree, assistants on his staff worked under him or his mentor, and the systems he
+ * carried from his mentor.
+ */
+export const familiarityWithTeam = async (c: Coach, profile: CoachProfile) => {
+	if (c.tid < 0) {
+		return 0;
+	}
+	const all = await idb.cache.coaches.getAll();
+	let prev: Coach | undefined;
+	let prevRow: Coach["stats"][number] | undefined;
+	for (const x of all) {
+		if (x.cid === c.cid) {
+			continue;
+		}
+		for (const r of x.stats) {
+			if (
+				r.tid === c.tid &&
+				r.role === "head" &&
+				(!prevRow || r.season > prevRow.season)
+			) {
+				prev = x;
+				prevRow = r;
+			}
+		}
+	}
+	const prevProfile = prev ? getCoachProfile(prev) : undefined;
+	const prevOff = prevRow?.off ?? prevProfile?.off;
+	const prevDef = prevRow?.def ?? prevProfile?.def;
+	const myMentor = mentorOfCoach(c)?.cid;
+	const prevMentor = prev ? mentorOfCoach(prev)?.cid : undefined;
+	const sameTree =
+		!!prev &&
+		(myMentor === prev.cid ||
+			prevMentor === c.cid ||
+			(myMentor !== undefined && myMentor === prevMentor));
+	const treeHeads = new Set([
+		c.cid,
+		...(myMentor !== undefined ? [myMentor] : []),
+	]);
+	const headSeasons = new Set<string>();
+	for (const x of all) {
+		if (treeHeads.has(x.cid)) {
+			for (const r of x.stats) {
+				if (r.role === "head") {
+					headSeasons.add(`${r.season}|${r.tid}`);
+				}
+			}
+		}
+	}
+	const treeAssistants = all.filter(
+		(x) =>
+			x.tid === c.tid &&
+			x.cid !== c.cid &&
+			x.role !== "head" &&
+			x.stats.some(
+				(r) => r.role !== "head" && headSeasons.has(`${r.season}|${r.tid}`),
+			),
+	).length;
+	return systemFamiliarity({
+		sameOff: prevOff !== undefined && prevOff === profile.off,
+		sameDef: prevDef !== undefined && prevDef === profile.def,
+		sameTree,
+		treeAssistants,
+		inherited:
+			Number(!!profile.inherited?.off) + Number(!!profile.inherited?.def),
+	});
 };
 
 // The coaching tree: his mentor's line upward and everyone who worked under him and became a head coach

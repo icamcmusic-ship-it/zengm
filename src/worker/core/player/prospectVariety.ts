@@ -13,6 +13,7 @@ import {
 import { ballSecurityBase } from "../../../common/expandedRatings.ts";
 import {
 	ARCHETYPE_STEER,
+	LABEL_STEER,
 	NEAR_DUPLICATE,
 	profileCosine,
 	SENIOR_POLISH,
@@ -226,6 +227,110 @@ export const steerArchetypeMix = (players: PlayerWithoutKey[]) => {
 		changed.push(p);
 	}
 	return changed;
+};
+
+/**
+ * Label steering (stronger than steerArchetypeMix): reads every prospect of the drafted part of the class with the archetype engine (read-only,
+ * true ratings, `label(row)`), then, while a label is crowded (more than LABEL_STEER.cap holders), tries a few bounded nudges on some of its
+ * holders (his second or third best skill up, his lead skill down, LABEL_STEER.points, ovr kept by reshapeKeepingOvr) and keeps one only if
+ * the engine then gives him a label that isn't crowded. Lowest potential first, so the top of the class is touched last. Deterministic (no
+ * random numbers). Returns the players changed and the class's labels before/after (for measurements).
+ */
+// Measurements only (labelSteer.test.ts): the class steps without the label steering, for the before/after
+export const labelSteerOptions = { enabled: true };
+
+export const steerArchetypeLabels = (
+	players: PlayerWithoutKey[],
+	// The engine's label of a prospect (read-only)
+	label: (p: PlayerWithoutKey) => string,
+	// Brings a candidate's derived ratings (sub-ratings) in line with his new base ratings
+	refresh: (p: PlayerWithoutKey) => void = () => {},
+) => {
+	const pool = [...players]
+		.sort((a, b) => b.ratings.at(-1)!.pot - a.ratings.at(-1)!.pot)
+		.slice(0, LABEL_STEER.pool);
+	const labels = new Map<PlayerWithoutKey, string>();
+	const counts = new Map<string, number>();
+	for (const p of pool) {
+		const l = label(p);
+		labels.set(p, l);
+		counts.set(l, (counts.get(l) ?? 0) + 1);
+	}
+	const before = new Map(counts);
+	const changed: PlayerWithoutKey[] = [];
+	let looked = 0;
+	for (const p of pool.toReversed()) {
+		if (
+			changed.length >= LABEL_STEER.maxSteered ||
+			looked >= LABEL_STEER.maxLooked
+		) {
+			break;
+		}
+		const current = labels.get(p)!;
+		if (!genVarOf(p) || (counts.get(current) ?? 0) <= LABEL_STEER.cap) {
+			continue;
+		}
+		looked += 1;
+		const row = p.ratings.at(-1) as any;
+		const base: Record<string, number> = { hgt: row.hgt };
+		for (const key of SKILL_KEYS) {
+			base[key] = row[key];
+		}
+		const scores = nounScores(base as any);
+		const downKey = NOUN_RATING[scores[0]!.key] as string;
+		const ups: string[] = [];
+		for (const s of scores.slice(1)) {
+			const k = NOUN_RATING[s.key] as string;
+			if (k !== downKey && k !== "hgt" && !ups.includes(k)) {
+				ups.push(k);
+			}
+			if (ups.length >= 3) {
+				break;
+			}
+		}
+		// Every nudge up to LABEL_STEER.tries, smallest first; the best is the one whose new label is held least (a new label in the class first)
+		let best: { q: PlayerWithoutKey; next: string; n: number } | undefined;
+		let tries = 0;
+		for (const points of LABEL_STEER.points) {
+			for (const upKey of ups) {
+				if (tries >= LABEL_STEER.tries || best?.n === 0) {
+					break;
+				}
+				tries += 1;
+				const copy = {
+					...row,
+					...(Array.isArray(row.sub) ? { sub: [...row.sub] } : {}),
+				};
+				const deltas: Record<string, number> = { [upKey]: points };
+				if (downKey !== "hgt") {
+					deltas[downKey] = -points;
+				}
+				reshapeKeepingOvr(copy, deltas);
+				const q = {
+					...p,
+					ratings: [...p.ratings.slice(0, -1), copy],
+					...((p as any).subP ? { subP: { ...(p as any).subP } } : {}),
+				} as unknown as PlayerWithoutKey;
+				refresh(q);
+				const next = label(q);
+				const n = counts.get(next) ?? 0;
+				if (next !== current && n < LABEL_STEER.cap && (!best || n < best.n)) {
+					best = { q, next, n };
+				}
+			}
+		}
+		if (best) {
+			p.ratings[p.ratings.length - 1] = best.q.ratings.at(-1)!;
+			if ((best.q as any).subP) {
+				(p as any).subP = (best.q as any).subP;
+			}
+			counts.set(current, counts.get(current)! - 1);
+			counts.set(best.next, best.n + 1);
+			labels.set(p, best.next);
+			changed.push(p);
+		}
+	}
+	return { changed, before, after: counts };
 };
 
 /**

@@ -627,10 +627,145 @@ export const ARCHETYPE_STEER = {
 	points: 4,
 };
 
+// Label steering (stronger, after the light steer): the archetype engine's full label (read-only, true ratings) of each prospect in the drafted
+// part of the class; a label held by more than `cap` of them is crowded, and some of its holders get a bounded, ovr-neutral nudge toward
+// their second or third best skill, kept only if the engine then gives them a label that isn't crowded. Bounded per class.
+export const LABEL_STEER = {
+	pool: 60,
+	// A label held by more than this many prospects of the pool is crowded (3 of 60: 5%)
+	cap: 3,
+	// At most this many prospects steered per class, each tried with at most `tries` nudges of `points` (ovr kept)
+	maxSteered: 18,
+	points: [4, 6],
+	tries: 6,
+	// At most this many prospects looked at per class (bounds the engine's work)
+	maxLooked: 45,
+};
+
 // --- Extras: heredity of shooting and skill ------------------------------------------------------------------------------------------
 
 export const HEREDITY_SKILL = {
 	// Correlation with the relative's shooting and skill (a little under athleticism's)
 	h: 0.25,
 	maxShift: 6,
+};
+
+// --- Extras: generation presets (League Extras → Generation Presets, generationPreset) -------------------------------------------------
+
+export type GenerationPreset =
+	| "balanced"
+	| "guard"
+	| "big"
+	| "shooting"
+	| "athletic";
+
+export const GENERATION_PRESET_NAMES: Record<GenerationPreset, string> = {
+	balanced: "Balanced",
+	guard: "Guard-heavy era",
+	big: "Big-man era",
+	shooting: "Shooting era",
+	athletic: "Athletic era",
+};
+
+/**
+ * An era's tilt of new players' builds: weights on the player type picked within each height band (renormalized, so heights are drawn as
+ * before) and a rating shift put back to his ovr (like the regional tilts), so the league's talent is unchanged and only what it looks like
+ * moves (an era of guards or bigs is also a little shorter or taller, at the same ovr). Balanced: no tilt (the generator runs exactly as without presets).
+ */
+export const GENERATION_PRESETS: Record<
+	Exclude<GenerationPreset, "balanced">,
+	{
+		types: Partial<Record<PlayerType, number>>;
+		ratings: Record<string, number>;
+		// Inches added to his drawn height (his ovr is put back to what it was at his drawn height)
+		height?: number;
+		// Raw ovr added to the ovr he is put back to: the era's type mix changes talent a little (point guards' type factors give more
+		// ovr than bigs'), which this takes back so the era's mean ovr is the balanced one (generationPresets.test.ts)
+		ovr?: number;
+	}
+> = {
+	guard: {
+		types: { point: 1.8, scorer: 1.5, big: 0.5 },
+		height: -0.8,
+		ovr: -0.7,
+		ratings: {
+			drb: 4,
+			pss: 4,
+			spd: 2,
+			tp: 1,
+			oiq: 1,
+			ins: -3,
+			reb: -4,
+			stre: -2,
+		},
+	},
+	big: {
+		types: { point: 0.6, scorer: 0.7, big: 1.8 },
+		height: 0.8,
+		ovr: 0.6,
+		ratings: {
+			ins: 5,
+			reb: 4,
+			stre: 3,
+			dnk: 1,
+			diq: 1,
+			tp: -4,
+			drb: -3,
+			pss: -2,
+		},
+	},
+	shooting: {
+		types: { scorer: 1.4, wing: 1.1, big: 0.85 },
+		ratings: {
+			tp: 6,
+			ft: 4,
+			fg: 3,
+			oiq: 1,
+			ins: -3,
+			dnk: -3,
+			stre: -2,
+			jmp: -1,
+			reb: -2,
+		},
+	},
+	athletic: {
+		types: { wing: 1.25, point: 0.9 },
+		ratings: {
+			spd: 4,
+			jmp: 5,
+			dnk: 4,
+			endu: 2,
+			oiq: -3,
+			ft: -3,
+			tp: -3,
+			pss: -2,
+			fg: -1,
+		},
+	},
+};
+
+export const presetOf = (value: unknown): GenerationPreset =>
+	typeof value === "string" && Object.hasOwn(GENERATION_PRESET_NAMES, value)
+		? (value as GenerationPreset)
+		: "balanced";
+
+// A height band's type shares (point, scorer, big, wing) under a preset's weights, renormalized
+export const presetTypeShares = (
+	shares: Record<PlayerType, number>,
+	preset: GenerationPreset,
+): Record<PlayerType, number> => {
+	if (preset === "balanced") {
+		return shares;
+	}
+	const w = GENERATION_PRESETS[preset].types;
+	const out = { ...shares };
+	let sum = 0;
+	for (const key of Object.keys(out) as PlayerType[]) {
+		out[key] *= w[key] ?? 1;
+		sum += out[key];
+	}
+	for (const key of Object.keys(out) as PlayerType[]) {
+		out[key] /= sum;
+	}
+	return out;
 };
