@@ -53,7 +53,37 @@ export const ENDGAME = {
 	ftgMinSeconds: 2,
 	ftgProb: 0.55,
 	ftgProbMgmt: 0.3,
+
+	// Late-game isolations: a possession that starts in the last isoSeconds of the final period or overtime with the offense tied or
+	// behind by isoMargin or less (its shot would tie the game or win it) is a clear-out for the closer: isoKeep of the time the closer
+	// (the highest usage + isoCloserCreation × creation composite on the floor) creates and shoots himself. Otherwise the usual draws,
+	// with the creator draw's power multiplied by isoCreatorPower (the ball goes to the best creator) and another shooter who can create
+	// going on his own more often (the rest of his self-create chance times isoSelf); the rest are kick-outs when the help comes. A
+	// self-created shot is assisted isoAst as often (no handoff or re-screen), leans to the pull-up (its mid-range weight times isoMid),
+	// and a self-created, unassisted jumper's make probability changes by isoMake (a contested shot off the dribble against a set
+	// defense)
+	isoSeconds: 24,
+	isoMargin: 3,
+	isoKeep: 0.62,
+	isoCloserCreation: 0.5,
+	isoCreatorPower: 2,
+	isoSelf: 0.5,
+	isoAst: 0.3,
+	isoMid: 1.6,
+	isoMake: -0.015,
 };
+
+// Late-game isolations: is a possession that starts with t seconds left a go-ahead or tying possession at the end of the game. margin is
+// the offense's lead, finalPeriod includes overtime
+export const lateIsoWindow = (
+	t: number,
+	margin: number,
+	finalPeriod: boolean,
+) =>
+	finalPeriod &&
+	t <= ENDGAME.isoSeconds &&
+	margin <= 0 &&
+	margin >= -ENDGAME.isoMargin;
 
 // Unanswered points before a coach stops the run with a timeout. quickTrigger undefined: no coaching systems
 export const runTimeoutThreshold = (quickTrigger: boolean | undefined) =>

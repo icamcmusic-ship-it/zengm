@@ -567,6 +567,11 @@ const HAS_ACTION =
 
 export type SetResult = { text: string; action: ActionKind };
 
+// A late-game isolation's set (see `iso` below) goes before any shot line that doesn't already say how the shot came about: drives,
+// pull-ups, crossovers and step-backs are what an isolation ends in, but not a screen, a pass, a post-up or the break
+const ISO_CONFLICT =
+	/pick-and-|screen|hand-?off|kick|\bcuts?\b|double team|\bpost|outlet|\blob|transition|2-on-1|coast|break|leaks|isolat|clear|one-on-one|sizes up|jab|island|zone|switch|inbound/i;
+
 export const setPlay = (
 	rng: Rng,
 	o: {
@@ -582,8 +587,13 @@ export const setPlay = (
 		scheme: string;
 		offense: string;
 		defense: string;
+		// a late-game isolation: the go-ahead or tying shot in the last seconds, unassisted (the floor clears for the closer)
+		iso?: boolean;
 	},
 ): SetResult | null => {
+	if (o.iso && !o.ast && o.zone !== "post") {
+		return isoSet(rng, o);
+	}
 	if (HAS_ACTION.test(o.line)) {
 		return null;
 	}
@@ -945,6 +955,62 @@ export const setPlay = (
 					"backdoor-cut",
 				);
 			}
+		}
+	}
+	const x = pickW(rng, freshOnly(rows));
+	return x ? { text: x[1], action: x[2] } : null;
+};
+
+// The late-game isolation: the rest of the team clears out and the closer goes one-on-one (unassisted shots only: nothing here has a pass)
+const isoSet = (
+	rng: Rng,
+	o: {
+		p: FPlayer;
+		zone: "rim" | "post" | "mid" | "three";
+		line: string;
+		defs: FPlayer[];
+		offense: string;
+	},
+): SetResult | null => {
+	if (ISO_CONFLICT.test(o.line)) {
+		return null;
+	}
+	const n = o.p.name;
+	const Off = cap(o.offense);
+	const D =
+		o.defs.length > 0
+			? o.defs[Math.floor(rng.random() * o.defs.length)]
+			: undefined;
+	const jumper = o.zone !== "rim";
+	const rows: Row[] = [
+		[1, `${Off} clear out and let ${n} go to work.`, "isolation"],
+		[1, `${poss(n)} teammates clear to one side.`, "isolation"],
+		[0.8, `Isolation for ${n} at the top of the key.`, "isolation"],
+		[0.8, `Everybody else spaces to the corners for ${n}.`, "isolation"],
+		[
+			0.7,
+			`${n} calls for the ball, and the floor empties out for him.`,
+			"isolation",
+		],
+		[0.6, `${Off} spread the floor for ${n}.`, "isolation"],
+	];
+	if (D) {
+		rows.push(
+			[1, `${n} sizes up ${D.name} at the top of the key.`, "isolation"],
+			[
+				0.9,
+				`${n} waves everyone away and goes one-on-one with ${D.name}.`,
+				"isolation",
+			],
+			[0.7, `Everybody clears out: it's ${n} against ${D.name}.`, "isolation"],
+			[0.6, `${n} gets ${D.name} on an island.`, "isolation"],
+		);
+		if (jumper) {
+			rows.push([
+				0.8,
+				`${n} jab-steps at ${D.name}, then jab-steps again.`,
+				"isolation",
+			]);
 		}
 	}
 	const x = pickW(rng, freshOnly(rows));

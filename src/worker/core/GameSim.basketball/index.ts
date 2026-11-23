@@ -119,6 +119,7 @@ import {
 	foulToGiveProb,
 	foulToGiveTime,
 	foulTargetWeights,
+	lateIsoWindow,
 	runTimeoutSource,
 	runTimeoutThreshold,
 	saveLastTimeout,
@@ -805,6 +806,8 @@ class GameSim extends GameSimBase {
 	// unanswered points), offense/defense substitutions in the last minute, who gets fouled on purpose, fouling when up 3, last shots and
 	// 2-for-1s in the stock possession model. Off: nothing here is used and no extra random numbers are drawn
 	smartEndgame: boolean;
+	// End-of-Game Intelligence: this possession is a late-game isolation (a go-ahead or tying possession at the end, see lateIsoPossession)
+	lateIso = false;
 
 	// Star & Clutch Calibration (starClutchCal, with Matchup Defense on): see starClutch.ts
 	starClutchCal = false;
@@ -2438,6 +2441,47 @@ class GameSim extends GameSimBase {
 			: 0;
 	}
 
+	// Late-game isolations (endgame.ts lateIsoWindow): a go-ahead or tying possession in the last seconds, not when the defense fouls on
+	// purpose or with the Elam ending (no clock). No random numbers
+	lateIsoPossession(clockFactor: ClockFactor) {
+		return (
+			this.smartEndgame &&
+			clockFactor !== "intentionalFoul" &&
+			!this.elamActive &&
+			lateIsoWindow(
+				this.t,
+				this.team[this.o].stat.pts - this.team[this.d].stat.pts,
+				this.team[0].stat.ptsQtrs.length >= this.numPeriods,
+			)
+		);
+	}
+
+	// Late-game isolations: ENDGAME.isoKeep of the time the closer (the best scorer on the floor, leaning to those who create their own
+	// shot) gets the ball, creates and takes the shot himself (one random number, only in a late-game isolation); otherwise the usual
+	// shooter draw
+	lateIsoShooter() {
+		if (!this.lateIso || Math.random() >= ENDGAME.isoKeep) {
+			return undefined;
+		}
+		let closer: PlayerGameSim | undefined;
+		let best = -Infinity;
+		for (const p of this.playersOnCourt[this.o]) {
+			const c = p.compositeRating;
+			const score = c.usage + ENDGAME.isoCloserCreation * (c.creation ?? 0);
+			if (score > best) {
+				best = score;
+				closer = p;
+			}
+		}
+		if (closer === undefined) {
+			return undefined;
+		}
+		this.creator = closer;
+		this.ssPick = undefined;
+		this.ssPickKick = undefined;
+		return closer;
+	}
+
 	// The last minute of a close game (final period or overtime), when teams substitute for offense and defense at dead balls
 	endgameOd() {
 		return (
@@ -3526,9 +3570,11 @@ class GameSim extends GameSimBase {
 			this.ssPickKick = undefined;
 			return this.pickFoulTarget();
 		}
-		const p = this.shotShare
-			? this.pickShooterShotShare()
-			: this.pickPlayer("usage", this.o, this.usagePower(), undefined, true);
+		const p =
+			this.lateIsoShooter() ??
+			(this.shotShare
+				? this.pickShooterShotShare()
+				: this.pickPlayer("usage", this.o, this.usagePower(), undefined, true));
 		if (this.matchupDefense) {
 			this.attentionShooter = p;
 			this.attentionShooterShare =
@@ -5006,6 +5052,7 @@ class GameSim extends GameSimBase {
 	}
 
 	getPossessionOutcome(clockFactor: ClockFactor): PossessionOutcome {
+		this.lateIso = false;
 		// If winning at end of game, just run out the clock
 		if (clockFactor === "runOutClock") {
 			this.advanceClockSeconds(Infinity);
@@ -5082,6 +5129,8 @@ class GameSim extends GameSimBase {
 			}
 		}
 
+		// End-of-Game Intelligence: a go-ahead or tying possession at the end is a clear-out for the closer
+		this.lateIso = this.lateIsoPossession(clockFactor);
 		// Spacing & Shot Creation: the creator first, then the shooter
 		if (this.spacingCreation) {
 			this.creator = this.pickPlayer(
@@ -5704,6 +5753,8 @@ class GameSim extends GameSimBase {
 				this.t > this.shotClock && this.shotClock - shotAt < SHOT_SHARE.lateSec;
 		}
 
+		// End-of-Game Intelligence: a go-ahead or tying possession at the end is a clear-out for the closer
+		this.lateIso = this.lateIsoPossession(clockFactor);
 		// Spacing & Shot Creation: the creator first, then the shooter
 		if (this.spacingCreation) {
 			this.creator = this.pickPlayer(
@@ -6324,6 +6375,8 @@ class GameSim extends GameSimBase {
 				(this.coachSys ? cso.mid * csd.dMid : 1) *
 				pullUpTilt *
 				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
+				// (End-of-Game Intelligence: a late-game isolation leans to the pull-up)
+				(this.lateIso && selfCreated ? ENDGAME.isoMid : 1) *
 				(this.offEmph ? this.oe[this.o].mid : 1) *
 				(sp ? sp.mid : 1) *
 				(this.adjZone[this.d] === 1 ? this.adjSel[this.d] : 1) *
@@ -6623,6 +6676,15 @@ class GameSim extends GameSimBase {
 				this.team[0].stat.ptsQtrs.length >= this.numPeriods
 			) {
 				probMake += ENDGAME.atoMake * this.endgameMgmt(this.o);
+			}
+			// End-of-Game Intelligence: a late-game isolation's jumper off the dribble, against a set defense
+			if (
+				this.lateIso &&
+				selfCreated &&
+				passer === undefined &&
+				(type === "threePointer" || type === "midRange")
+			) {
+				probMake += ENDGAME.isoMake;
 			}
 
 			// Matchup Defense, defensive attention: help defense on a shooter who carries much of his team's offense
@@ -7655,15 +7717,18 @@ class GameSim extends GameSimBase {
 
 	// Spacing & Shot Creation: power on the creation composite when picking the creator (the coach's usage multipliers apply)
 	creationPower() {
+		// (End-of-Game Intelligence: a late-game isolation goes to the best creator)
+		const iso = this.lateIso ? ENDGAME.isoCreatorPower : 1;
 		if (!this.coachSys) {
-			return CREATION_POWER * this.clutchUsageMult();
+			return CREATION_POWER * this.clutchUsageMult() * iso;
 		}
 		const cs = this.cs[this.o];
 		return (
 			CREATION_POWER *
 			cs.usage *
 			(this.isClutchTime() ? cs.clutchUsage : 1) *
-			this.clutchUsageMult()
+			this.clutchUsageMult() *
+			iso
 		);
 	}
 
@@ -7672,12 +7737,16 @@ class GameSim extends GameSimBase {
 		if (this.creator === undefined || this.creator === shooter) {
 			return;
 		}
-		const prob =
+		let prob =
 			Math.min(
 				PLAY_TYPES.selfMax,
 				PLAY_TYPES.selfSlope *
 					((shooter.compositeRating.creation ?? 0) - PLAY_TYPES.selfMin),
 			) * (this.offEmph ? this.oe[this.o].selfCreate : 1);
+		// End-of-Game Intelligence: in a late-game isolation a shooter who can create goes on his own more often (the same random number)
+		if (this.lateIso && prob > 0) {
+			prob += (1 - prob) * ENDGAME.isoSelf;
+		}
 		if (prob > 0 && Math.random() < prob) {
 			this.creator = shooter;
 		}
@@ -7714,6 +7783,8 @@ class GameSim extends GameSimBase {
 			this.probAst() *
 			typeFactor *
 			(selfCreated ? CREATION.astSelf : CREATION.astOther) *
+			// (End-of-Game Intelligence: a late-game isolation has no handoff or re-screen)
+			(this.lateIso && selfCreated ? ENDGAME.isoAst : 1) *
 			(this.playTypes
 				? PLAY_TYPES.ast *
 					(selfCreated
