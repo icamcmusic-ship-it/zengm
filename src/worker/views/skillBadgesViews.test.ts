@@ -1,6 +1,8 @@
 // With the extended skill badges on, every page that shows a player's skills gets the badges to show with them (and
 // with them off, none do). Plays a short season in a headless league, then loads the views that show skills.
 import "fake-indexeddb/auto";
+import { ensureTieredBadges } from "../core/player/tieredBadges.ts";
+import { parseBadgeToken } from "../../common/tieredBadges/index.ts";
 import { assert, beforeAll, describe, test } from "vitest";
 import { LEAGUE_DATABASE_VERSION, PHASE } from "../../common/constants.ts";
 import { defaultGameAttributes } from "../../common/defaultGameAttributes.ts";
@@ -123,6 +125,8 @@ describe("skill badges in views", () => {
 					settings: {
 						...getDefaultSettings(),
 						featureSkillBadges: true,
+						// (the extended badges; 2K Badges replace them when on, tested below)
+						featureTwoKBadges: false,
 						numGames: 4,
 						numGamesPlayoffSeries: [1],
 					} as any,
@@ -188,6 +192,35 @@ describe("skill badges in views", () => {
 					);
 				}
 			}
+		},
+	);
+
+	test(
+		"2K Badges on: tier pills in place of the extended badges",
+		{ timeout: 300_000 },
+		async () => {
+			await league.setGameAttributes({
+				featureSkillBadges: true,
+				featureTwoKBadges: true,
+			});
+			await ensureTieredBadges();
+			let numWithBadges = 0;
+			for (const [id, params] of VIEWS) {
+				const output = await load(id, params);
+				const found: Parameters<typeof findSkills>[2] = [];
+				findSkills(output, id, found);
+				for (const f of found) {
+					assert.isTrue(Array.isArray(f.badges), f.path);
+					for (const token of f.badges as string[]) {
+						assert.isDefined(parseBadgeToken(token), `${f.path} ${token}`);
+					}
+					if ((f.badges as string[]).length > 0) {
+						numWithBadges += 1;
+					}
+				}
+			}
+			assert.isAbove(numWithBadges, 50);
+			await league.setGameAttributes({ featureTwoKBadges: false });
 		},
 	);
 });

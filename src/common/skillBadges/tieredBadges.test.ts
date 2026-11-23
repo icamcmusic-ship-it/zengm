@@ -155,7 +155,7 @@ describe("2K Badges tiers", () => {
 	test("hysteresis keeps a tier just under its cutoff, and a badge drops at most one tier a season", () => {
 		const def = TIERED_BADGES.find((d) => d.key === "freeThrowAce")!;
 		const cuts = cutoffs.c[def.key]!;
-		const r = { ...rows[0]!, ovr: 80 };
+		const r: Record<string, any> = { ...rows[0]!, ovr: 80 };
 		// Just below Gold
 		r.ft = cuts[2]! - 0.3;
 		assert.strictEqual(assignTiers(r, 80, cutoffs).t[def.key], 2);

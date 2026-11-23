@@ -6865,11 +6865,6 @@ class GameSim extends GameSimBase {
 		);
 	}
 
-	/**
-	 * Probability that a shot taken this possession is blocked.
-	 *
-	 * @return {number} Probability from 0 to 1.
-	 */
 	// 2K Badges: a shot's make effect (capped, then centered by the league calibration)
 	badgeMakeDelta(
 		type: ShotType,
@@ -6878,6 +6873,9 @@ class GameSim extends GameSimBase {
 		defender: PlayerGameSim | undefined,
 		selfCreated: boolean,
 	) {
+		if (type === "ft") {
+			return 0;
+		}
 		const x = shotMakeEffect(
 			type,
 			p,
@@ -6927,6 +6925,11 @@ class GameSim extends GameSimBase {
 		return x - BADGE_CAL.drb;
 	}
 
+	/**
+	 * Probability that a shot taken this possession is blocked.
+	 *
+	 * @return {number} Probability from 0 to 1.
+	 */
 	probBlk() {
 		return (
 			this.ga.blockFactor *

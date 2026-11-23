@@ -81,16 +81,16 @@ export const BADGE_SIM = {
 // League calibration (subtracted from every event, see above). Measured: the mean raw effect per event, pooled over new random
 // leagues with the 2026 preset (threeGradient.script.test.ts with BADGE_DIAG)
 export const BADGE_CAL = {
-	threePointer: 0.0004,
-	midRange: 0.0004,
-	atRim: -0.0014,
-	lowPost: 0.0014,
-	putBack: 0.0002,
-	ft: 0.0015,
-	blk: 1.0108,
-	drb: 0.0003,
-	stl: 1.0145,
-	tov: 0.997,
+	threePointer: 0.0003,
+	midRange: 0.0002,
+	atRim: -0.0013,
+	lowPost: 0.0012,
+	putBack: 0.0005,
+	ft: 0.0016,
+	blk: 1.0101,
+	drb: 0.0002,
+	stl: 1.014,
+	tov: 0.9969,
 	andOne: 1.015,
 };
 

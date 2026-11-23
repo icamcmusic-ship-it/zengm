@@ -2,7 +2,7 @@ import HideableSection from "../../components/HideableSection.tsx";
 import { helpers } from "../../util/helpers.ts";
 import type { View } from "../../../common/types.ts";
 
-type Info = NonNullable<View<"player">["tieredBadges"]>;
+type Info = NonNullable<View<"player">["player"]["tieredBadges"]>;
 
 export const TierPill = ({
 	short,
