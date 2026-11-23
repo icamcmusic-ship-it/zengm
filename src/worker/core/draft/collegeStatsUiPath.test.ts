@@ -238,6 +238,11 @@ describe("college stats on the path a new league uses", () => {
 			);
 			add("rebounds: hgt", pct(set, top("rpg"), "hgt"));
 			add("rebounds: reb", pct(set, top("rpg"), "reb"));
+			// A rebounder is big, a good rebounder or both
+			add(
+				"rebounds: hgt + reb",
+				(pct(set, top("rpg"), "hgt") + pct(set, top("rpg"), "reb")) / 2,
+			);
 			add("threes: tp", pct(set, top("tpa"), "tp"));
 			add("steals: pdef", pct(set, top("spg"), "pdef"));
 			// Non-shooters barely shoot threes; bigs who can't shoot none at all
@@ -256,10 +261,16 @@ describe("college stats on the path a new league uses", () => {
 			// (one class at a time is noisy: the talent cycles' reshaped top 30 put one class's top rebounder at the 30th percentile of
 			// height, 0.296; with development reliability one class's steals leader sat at the 11th percentile of perimeter defense. Over seeds
 			// 2026-2030 the single-class floor fails in either development: before, rebounds: hgt 0.20; after, steals: pdef 0.11 and 0.16, while
-			// its mean over the classes stays 0.71-0.91)
+			// its mean over the classes stays 0.71-0.91. Rebounds, like blocks, have the floor on the two ratings together: the archetype
+			// label steering, moving prospects off crowded labels with a few points of their second or third skill, can make a short
+			// prospect with a good rebounding rating his class's top rebounder (seed 2026: height 0.18, rebounding 0.96; without the
+			// steering 0.65). Over seeds 2026-2037 the class minimum of height is 0.18-0.81 (rebounding 0.26-0.87, 0.20 before the
+			// archetype change and without the steering), of the two together 0.53-0.83)
 			if (
 				key !== "blocks: idef" &&
 				key !== "blocks: hgt" &&
+				key !== "rebounds: hgt" &&
+				key !== "rebounds: reb" &&
 				key !== "steals: pdef"
 			) {
 				assert.isAtLeast(Math.min(...values), 0.28, key);

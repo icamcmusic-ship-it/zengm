@@ -209,13 +209,11 @@ describe("linked college league", () => {
 				JSON.stringify(honorTypes),
 			);
 			// Rank for rank, the class compares with a generated one on potential and on the age-adjusted value the draft AI uses
-			// (it averages about 1.5 years older: the off-screen college draft takes mostly seniors)
+			// (it averages about 1.5 years older: the off-screen college draft takes mostly seniors). Compared with the mean of a few
+			// generated classes: since development reliability (prospect variety version 2) a class's potential reads its prospects'
+			// growth rates, and the top 60's mean value varies about 1 point from one generated class to the next (0.7 before): against
+			// a single class the gap reached 3.4 in a full test run
 			{
-				const ref = (await genPlayersWithoutSaving(
-					2025,
-					DEFAULT_LEVEL,
-					[],
-				)) as any[];
 				const stats = (ps: any[]) => {
 					const rows = ps
 						.map((p) => {
@@ -240,7 +238,22 @@ describe("linked college league", () => {
 					};
 				};
 				const a = stats(linked);
-				const b = stats(ref);
+				const refs = [];
+				for (let i = 0; i < 4; i++) {
+					refs.push(
+						stats(
+							(await genPlayersWithoutSaving(2025, DEFAULT_LEVEL, [])) as any[],
+						),
+					);
+				}
+				const avg = (xs: number[]) =>
+					xs.reduce((sum, x) => sum + x, 0) / xs.length;
+				const b = {
+					age: avg(refs.map((x) => x.age)),
+					ovr: avg(refs.map((x) => x.ovr)),
+					pot: avg(refs.map((x) => x.pot)),
+					value: avg(refs.map((x) => x.value)),
+				};
 				// (Before value matching: pot 46 vs 56, value 41 vs 49 for the top 60)
 				assert.isAbove(a.age, b.age + 1, "an older class");
 				assert.closeTo(a.value, b.value, 3, JSON.stringify({ a, b }));

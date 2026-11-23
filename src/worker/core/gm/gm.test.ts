@@ -1200,23 +1200,39 @@ describe("trade value", () => {
 		resetG();
 		g.setWithoutSavingToDB("featureGmPersonalities", true);
 		const season = g.get("season");
-		const players = [];
-		for (let tid = 0; tid < 30; tid++) {
-			for (let i = 0; i < 10; i++) {
-				const p = player.generate(tid, 26, season - 6, true, DEFAULT_LEVEL);
-				p.value = 45 + (i % 5);
-				players.push(p);
+		// Seeded: the young player's height moves the analytics factor (gmPlayerStyleScore), so unseeded he made the bound below flaky
+		const players = await withRandom(7, () => {
+			const players = [];
+			for (let tid = 0; tid < 30; tid++) {
+				for (let i = 0; i < 10; i++) {
+					const p = player.generate(tid, 26, season - 6, true, DEFAULT_LEVEL);
+					p.value = 45 + (i % 5);
+					players.push(p);
+				}
 			}
-		}
-		const young = player.generate(PARTNER, 21, season - 2, true, DEFAULT_LEVEL);
-		young.value = 62;
-		young.ratings.at(-1)!.ovr = 50;
-		young.ratings.at(-1)!.pot = 64;
-		const vet = player.generate(PARTNER, 31, season - 11, true, DEFAULT_LEVEL);
-		vet.value = 62;
-		vet.ratings.at(-1)!.ovr = 60;
-		vet.ratings.at(-1)!.pot = 60;
-		players.push(young, vet);
+			const young = player.generate(
+				PARTNER,
+				21,
+				season - 2,
+				true,
+				DEFAULT_LEVEL,
+			);
+			young.value = 62;
+			young.ratings.at(-1)!.ovr = 50;
+			young.ratings.at(-1)!.pot = 64;
+			const vet = player.generate(
+				PARTNER,
+				31,
+				season - 11,
+				true,
+				DEFAULT_LEVEL,
+			);
+			vet.value = 62;
+			vet.ratings.at(-1)!.ovr = 60;
+			vet.ratings.at(-1)!.pot = 60;
+			players.push(young, vet);
+			return Promise.resolve(players);
+		});
 		await resetCache({
 			players,
 			teams: helpers.getTeamsDefault().map(team.generate),
@@ -1270,10 +1286,11 @@ describe("trade value", () => {
 		assert.isAbove(patientYoung - patientVet, winNowYoung - winNowVet);
 
 		// Bounded: trade values are value ** 7 (basketball), so on the value scale even two extreme leanings combined move a player
-		// by less than 15%, and one extreme leaning a pick by less than the 20% pick factor (less than the team strategy factors)
+		// by at most 16% (the timeline's 1.1 or 1.08 times the analytics style factor, at most 1 + 0.06 x 0.9 for a short young
+		// prospect: 1.159), and one extreme leaning a pick by less than the 20% pick factor (less than the team strategy factors)
 		for (const [x, base, max] of [
-			[patientYoung, neutralYoung, 0.15],
-			[winNowVet, neutralVet, 0.15],
+			[patientYoung, neutralYoung, 0.16],
+			[winNowVet, neutralVet, 0.16],
 			[hoarder, neutralPick, 0.201],
 		] as const) {
 			assert.isBelow(Math.abs((x / base) ** (1 / 7) - 1), max);
