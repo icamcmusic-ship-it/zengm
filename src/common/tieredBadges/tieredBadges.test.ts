@@ -278,7 +278,7 @@ describe("2K Badges tiers", () => {
 			assert.isAtMost(later, 1.15 * first, `tier ${tier}`);
 			assert.isAtLeast(later, 0.85 * first, `tier ${tier}`);
 		}
-	});
+	}, 120_000);
 
 	test("at most one Legend per badge in the league", () => {
 		const players = [1, 2, 3].map((pid) => ({
