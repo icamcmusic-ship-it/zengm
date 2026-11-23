@@ -1,5 +1,6 @@
 import { addSimFatigue, getSimFrontOffice } from "../frontOffice/index.ts";
 import { getConditioningInjuryFactor } from "../staffDepth/coaching.ts";
+import { getTalentShift, shiftRatingsForSim } from "./talentCenter.ts";
 import { allStar, player, season, team } from "../index.ts";
 import { careerFromStats } from "../../../common/pbpFlavor/career.ts";
 import { isHoldingOut } from "../contract/unrest.ts";
@@ -335,6 +336,8 @@ export const processTeam = async (
 				: compositeWeightsFor(COMPOSITE_WEIGHTS, expandedRatings)
 			: COMPOSITE_WEIGHTS;
 	const compositeWeights = Object.entries(compositeWeightsObj);
+	// Game Sim Fixes (basketball): the league's talent center this season (undefined when off or without a record)
+	const talentShift = simFixes ? getTalentShift() : undefined;
 	// Sub-Ratings in Sim (basketball, needs Sub-Ratings): the subs folded into the composites, see GameSim.basketball/subRatingsSim.ts
 	const subSim =
 		__SPORT === "basketball" &&
@@ -508,8 +511,12 @@ export const processTeam = async (
 		}
 		const seasonStats: Record<string, number> = {};
 
+		// Game Sim Fixes: the composites read his ratings shifted by the league's talent center (talentCenter.ts), so the league as a whole
+		// plays at its first season's level. The same row without one
+		const simRating = shiftRatingsForSim(rating, talentShift);
+
 		// Sub-Ratings in Sim: undefined with the setting off (or a row without subs), and then every composite is the stock one
-		const sp = subSim ? subSimPlayer(rating) : undefined;
+		const sp = subSim ? subSimPlayer(simRating) : undefined;
 
 		// These use the same formulas as the skill definitions in player.skills!
 		for (const [k, weightInfo] of compositeWeights) {
@@ -517,7 +524,7 @@ export const processTeam = async (
 				(sp && subSimTouches(k)
 					? subSimComposite(sp, k, weightInfo.ratings, weightInfo.weights)
 					: player.compositeRating(
-							rating,
+							simRating,
 							weightInfo.ratings,
 							weightInfo.weights,
 							false,
@@ -581,7 +588,7 @@ export const processTeam = async (
 				p2.compositeRating.creation =
 					(sp
 						? subSimComposite(sp, "creation", w.ratings, w.weights)
-						: player.compositeRating(rating, w.ratings, w.weights, false)) *
+						: player.compositeRating(simRating, w.ratings, w.weights, false)) *
 					injuryFactor;
 				p2.compositeRating.spacingThreat = spacingThreat(
 					p2.compositeRating,

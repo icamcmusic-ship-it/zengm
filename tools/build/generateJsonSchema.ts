@@ -1834,6 +1834,10 @@ export const generateJsonSchema = (sport: Sport | "test") => {
 					tieredBadgeCutoffs: {
 						type: "object",
 					},
+					// Game Sim Fixes: the league's talent center (src/worker/core/game/talentCenter.ts)
+					simTalentCenter: {
+						type: "object",
+					},
 					fakeAgeProb: {
 						type: "number",
 						minimum: 0,

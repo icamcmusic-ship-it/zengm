@@ -15,6 +15,7 @@ import { getMetaAttribute, putMetaAttribute } from "../../db/metaAttributes.ts";
 import { onRegularSeason as gmOnRegularSeason } from "../gm/index.ts";
 import markUserControl from "../team/markUserControl.ts";
 import { recordsCheckBeforeBoxScoresDeleted } from "../../util/recordsBookData.ts";
+import { updateTalentCenter } from "../game/talentCenter.ts";
 
 class GameHasYourTeamCache {
 	cache: Record<number, boolean> = {};
@@ -180,6 +181,9 @@ const newPhaseRegularSeason = async (
 
 	// Coaching systems: each head coach's preseason expectation, for the hot seat
 	await staff.setExpectations();
+
+	// Game Sim Fixes: a new league records its talent center (its anchor) before its first game; later seasons have it from the preseason
+	await updateTalentCenter({ onlyIfMissing: true });
 
 	await deleteOldBoxScores();
 
