@@ -3062,7 +3062,9 @@ class GameSim extends GameSimBase {
 			const role =
 				(rank === 0
 					? S.tier[0]! + S.firstAbility * (s.ability - 0.5)
-					: S.tier[rank]!) * (rank >= 3 ? s.roleForce : 1);
+					: S.tier[rank]!) *
+				(rank >= 3 ? s.roleForce : 1) *
+				(this.bigGame && p.stat.gs === 0 ? S.playoffBench : 1);
 			this.ssRole[i] = role;
 			this.ssPlan[i] = s.plan;
 			const huntMult = hunt[i]!;
@@ -3117,6 +3119,22 @@ class GameSim extends GameSimBase {
 			sum += w[i]!;
 		}
 
+		if (FLOW_DIAG.on && sum > 0) {
+			let starters = 0;
+			for (let i = 0; i < n; i++) {
+				if (players[i]!.stat.gs > 0) {
+					starters += 1;
+				}
+			}
+			const k = `bench:${this.bigGame ? "po" : "rs"}:${starters}`;
+			for (let i = 0; i < n; i++) {
+				if (players[i]!.stat.gs === 0) {
+					flowCount(`${k}:n`);
+					flowCount(`${k}:share`, w[i]! / sum);
+					flowCount(`${k}:tier${this.ssTier[t][i]}`);
+				}
+			}
+		}
 		let picked = 0;
 		let kick: PlayerGameSim | undefined;
 		// Where in his part of the draw the random number fell, 0 to 1 (for the shot diet)

@@ -117,6 +117,11 @@ export const SHOT_SHARE = {
 	// threes as off his drives, so a high-volume shooter's threes went in at .20-.30. With the penalties mostly on his drives and post-ups
 	// (ATTENTION.makeJumper, STAR.makeJumper) the top scorers' eFG% is about .01-.02 above the league's without it
 	starMake: 0,
+	// Playoff bench: in a playoff game (not the All-Star Game) a player who didn't start has his weight × playoffBench. The playoff rotation
+	// puts the 6th-8th men on the court with three or four starters far more often than the regular season does, and there the role tiers
+	// and the knee left them about 13% of the five's shots (12% beside four starters): the bench took 23-26% of the playoff FGA at 0.71 of
+	// the starters' FGA per minute (NBA playoffs about 25-30%, at 0.85-0.9). Regular season games are unchanged
+	playoffBench: 1.2,
 	// Calibration, so league shooting stays the same: added to the make probability of every shot from the shooter draw (the stars take
 	// more of the shots, and more of them against the help defense), and a multiplier on the three-point draw
 	makeCal: 0.02,
