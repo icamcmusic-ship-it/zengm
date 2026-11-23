@@ -161,6 +161,11 @@ export const SIM_FIX_OFF_FOUL = { base: 0.025, k: 1.5 };
 // Offensive rebound chance after a missed last free throw, relative to after a missed shot (NBA: ~13% vs ~25%)
 export const SIM_FIX_FT_ORB = 0.5;
 
+// Blocks out of bounds: this share of blocks goes out of bounds off the blocker, so the offense keeps the ball (with what was left of
+// the shot clock, at least a second: a blocked shot didn't hit the rim, so the clock isn't reset). A blocked ball that stays in play is
+// usually the defense's: the offense's rebound chance is times orbFactor (so a block still ends about 7 in 10 possessions, not 3 in 4)
+export const SIM_FIX_BLOCK = { oob: 0.18, orbFactor: 0.65 };
+
 // Left-handed shooters (common/shootingHand.ts, cached as p.lefty in loadTeams): defenders see fewer of them, so a lefty's at-rim and
 // post makes get a small unfamiliarity bonus (make, added to the make probability), mostly gone against a left-handed defender (sameHand
 // keeps that fraction), and he drives a little more (drive, on the at-rim weight). Both are offset over everyone in the game by the

@@ -16,6 +16,7 @@ import {
 	SIM_FIX_LOW_POST,
 	SIM_FIX_OFF_FOUL,
 	SIM_FIX_FT_ORB,
+	SIM_FIX_BLOCK,
 	SIM_FIX_LEFTY,
 	SIM_FIX_MID_RANGE,
 	SIM_FIX_BREAK_REST,
@@ -7097,7 +7098,30 @@ class GameSim extends GameSimBase {
 			pid: p2.id,
 			clock: this.t,
 		});
+		if (this.simFixes) {
+			return this.blockedBallOutcome();
+		}
 		return this.doReb();
+	}
+
+	// Game Sim Fixes: where a blocked shot goes. Out of bounds off the blocker (the offense keeps the ball, without a new shot clock), or
+	// a loose ball the defense usually gets
+	blockedBallOutcome() {
+		if (this.t === 0) {
+			return "endOfPeriod" as const;
+		}
+		if (Math.random() < SIM_FIX_BLOCK.oob) {
+			this.afterShotAttempt = false;
+			this.advanceClockSeconds(Math.min(this.t, uniform(0.1, 0.7)));
+			if (this.t === 0) {
+				return "endOfPeriod" as const;
+			}
+			if (FLOW_DIAG.on) {
+				flowCount("blkOob");
+			}
+			return this.doOutOfBounds(1);
+		}
+		return this.doReb(false, true);
 	}
 
 	/**
@@ -8106,7 +8130,7 @@ class GameSim extends GameSimBase {
 		return "nonShootingFoul";
 	}
 
-	doReb(afterFt: boolean = false) {
+	doReb(afterFt: boolean = false, afterBlock: boolean = false) {
 		let p;
 		this.afterShotAttempt = true;
 
@@ -8143,6 +8167,10 @@ class GameSim extends GameSimBase {
 		// Game Sim Fixes: fewer offensive rebounds off a missed free throw (the defense has inside position)
 		if (afterFt && this.simFixes) {
 			probDrb = 1 - SIM_FIX_FT_ORB * (1 - probDrb);
+		}
+		// Game Sim Fixes: a blocked ball still in play is usually the defense's
+		if (afterBlock) {
+			probDrb = 1 - SIM_FIX_BLOCK.orbFactor * (1 - probDrb);
 		}
 		// 2K Badges: the defense's best box-out and chaser against the offense's best putback and chaser (centered)
 		if (this.badgeSim) {
