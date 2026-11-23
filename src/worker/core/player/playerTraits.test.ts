@@ -129,10 +129,12 @@ describe("calibration on generated leagues", () => {
 		assert.approximately(mean("clutchTov"), 1, 0.009);
 		assert.approximately(mean("press"), 1, 0.01);
 		// Rotation-weighted; veteran savvy is centred on the minutes-weighted average (about 1.5 points higher), see docs
-		assert.approximately(mean("late"), 0, 0.004);
+		// (0.0037 -> 0.0053 with the label steering of new draft classes, which reshapes a few prospects per class at the same ovr)
+		assert.approximately(mean("late"), 0, 0.006);
 		assert.approximately(mean("chem"), 0, 0.06);
 		// Shot-weighted
-		assert.approximately(sums.quality! / usageTotal, 0, 0.002);
+		// (0.0018 -> 0.0024 with the label steering)
+		assert.approximately(sums.quality! / usageTotal, 0, 0.003);
 		assert.approximately(sums.attempt! / usageTotal, 1, 0.025);
 		assert.isAbove(attemptTotal, 0);
 	}, 120000);

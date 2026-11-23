@@ -600,6 +600,21 @@ export const ARCHETYPE_STEER = {
 	points: 4,
 };
 
+// Label steering (stronger, after the light steer): the archetype engine's full label (read-only, true ratings) of each prospect in the drafted
+// part of the class; a label held by more than `cap` of them is crowded, and some of its holders get a bounded, ovr-neutral nudge toward
+// their second or third best skill, kept only if the engine then gives them a label that isn't crowded. Bounded per class.
+export const LABEL_STEER = {
+	pool: 60,
+	// A label held by more than this many prospects of the pool is crowded (3 of 60: 5%)
+	cap: 3,
+	// At most this many prospects steered per class, each tried with at most `tries` nudges of `points` (ovr kept)
+	maxSteered: 18,
+	points: [4, 6],
+	tries: 6,
+	// At most this many prospects looked at per class (bounds the engine's work)
+	maxLooked: 45,
+};
+
 // --- Extras: heredity of shooting and skill ------------------------------------------------------------------------------------------
 
 export const HEREDITY_SKILL = {
