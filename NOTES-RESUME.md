@@ -30,3 +30,7 @@ Baseline (brk/base.jsonl, seeds 1-3 x 2 seasons):
 v1 (no makeCal, seed 1 season 1 only): bench 374/124/28 (base 258/64/21), role SD 5.65 CV .615, FG% .482 (.479), 3P% .366 (.360).
 v2 (makeCal .003, season 1): seed 2 bench 384/122/37, FG% .4811 (.4786), 3P% .3678 (.3631), leader 35.4 (33.7);
   seed 3 bench 375/124/41, FG% .4782 (.4775), 3P% .3629 (.3610).
+v2 seed 1 (2 seasons, brk/v2.s1.jsonl; base seed 1: bench 236/60/14, FG% .4774, 3P% .3595, pts 115.4, leader 31.5, 25+ PPG 20):
+  bench 342/104/30, role-SD 5.62 CV .620, star SD 8.26, pts 116.14, FG% .4808, 3P% .3640, leader 33.4, 25+ PPG 18.
+  FLOW means: brkPerim 0.515, brkInt 0.523 → set perimRef/intRef to ~0.515/0.523 (refs at 0.5 were penalising matchups slightly;
+  not the cause of the 3P% rise). makeCal .003 is not enough: try ~.006.
