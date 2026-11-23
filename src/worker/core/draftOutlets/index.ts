@@ -25,6 +25,7 @@ import { g, helpers, logEvent } from "../../util/index.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { combineHeld, getClassCombine } from "../draftCombine/index.ts";
 import fuzzRating from "../player/fuzzRating.ts";
+import { getProspectRadar } from "../draft/radar.ts";
 import {
 	leagueSeed,
 	preDraftProductionFor,
@@ -146,6 +147,10 @@ const outletInputs = async (players: Player[], draftYear: number) => {
 			athletic:
 				tested ??
 				Math.max(0, Math.min(100, 50 + 2.2 * ((r?.spd + r?.jmp) / 2 - 52))),
+			// No pedigree, no production and nothing in his story to explain him (draft/radar.ts)
+			...(getProspectRadar(p, { athletic: tested })?.kind === "unknown"
+				? { offRadar: true }
+				: {}),
 		};
 	});
 };

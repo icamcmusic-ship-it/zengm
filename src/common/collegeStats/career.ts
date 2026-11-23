@@ -148,6 +148,9 @@ export type PreDraftCareer = {
 	route?: RouteKind;
 	// The high school class he was recruited in, for a prospect with a US high school path (an NCAA or JUCO first stop)
 	hsClass?: number;
+	// The recruiting rank generation gave him (radar.ts fitHsRank; null: unranked), before it is fitted around the rest of his high school
+	// class (worker/core/draft/recruiting.ts). Careers made before it have none: their rank is read off the player's ratings there
+	hsRank?: number | null;
 };
 
 // What generation needs for one year

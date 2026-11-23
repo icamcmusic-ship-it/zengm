@@ -73,6 +73,15 @@ export const getRecruitBasis = (
 				priority: 0,
 			};
 		}
+		// A career made with the rank generation gave it (collegeStats/radar.ts: follows his draft stock, fitted to his story)
+		if (career.hsRank !== undefined) {
+			return {
+				...common,
+				rank: career.hsRank ?? undefined,
+				posRank: undefined,
+				priority: 2,
+			};
+		}
 		const plain = getRecruiting({
 			pid: p.pid,
 			pot: r.pot,

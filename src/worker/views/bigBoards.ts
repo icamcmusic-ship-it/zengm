@@ -18,6 +18,8 @@ import {
 	type BoardKey,
 } from "../core/draftOutlets/index.ts";
 import { idb } from "../db/index.ts";
+import { classCombineAthletic, getProspectRadar } from "../core/draft/radar.ts";
+import { offRadarText } from "../../common/collegeStats/radar.ts";
 
 /**
  * Big Boards tab of Draft Scouting: every media outlet's big board of a class next to the consensus, your board and (once it happened)
@@ -75,6 +77,7 @@ export default defineView({
 		if (c) {
 			const your = yourBoardFor(c);
 			const byPid = new Map(c.players.map((p) => [p.pid, p]));
+			const athletic = await classCombineAthletic(season, c.players);
 			const consensus = [...c.consensus.entries()].sort(
 				(a, b) => a[1].rank - b[1].rank,
 			);
@@ -85,6 +88,8 @@ export default defineView({
 				}
 				const r = p.ratings.at(-1) as any;
 				const drafted = p.draft.round > 0 && p.draft.pick > 0 && p.tid >= 0;
+				// Why a lowly recruited or unproductive prospect is on the radar, or that nothing explains it
+				const radar = getProspectRadar(p, { athletic: athletic.get(pid) });
 				rows.push({
 					pid,
 					name: `${p.firstName} ${p.lastName}`,
@@ -101,6 +106,13 @@ export default defineView({
 							: null;
 					}),
 					your: your.get(pid) ?? null,
+					radar: radar
+						? {
+								kind: radar.kind,
+								title: radar.title,
+								text: radar.text ?? offRadarText(cons.rank <= 2 * numTeams),
+							}
+						: undefined,
 					pick: drafted
 						? {
 								round: p.draft.round,

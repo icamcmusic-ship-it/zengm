@@ -230,7 +230,19 @@ const BigBoards = (props: Props) => {
 			r.consensus.rank,
 			{
 				value: (
-					<a href={helpers.leagueUrl(["player_pre_draft", r.pid])}>{r.name}</a>
+					<>
+						<a href={helpers.leagueUrl(["player_pre_draft", r.pid])}>
+							{r.name}
+						</a>
+						{r.radar ? (
+							<span
+								className={`badge ${r.radar.kind === "unknown" ? "bg-secondary" : "bg-info text-dark"} ms-1`}
+								title={r.radar.text}
+							>
+								{r.radar.title}
+							</span>
+						) : null}
+					</>
 				),
 				sortValue: r.name,
 				searchValue: r.name,
@@ -294,7 +306,10 @@ const BigBoards = (props: Props) => {
 						.
 					</>
 				) : null}{" "}
-				Green and red cells are 10+ spots higher or lower than the consensus.
+				Green and red cells are 10+ spots higher or lower than the consensus. A
+				tag by a name is why a lowly recruited or unproductive prospect is on
+				the boards (hover for the story); <i>Off the radar</i> means nothing
+				explains him, and the outlets mark him down.
 				{stored
 					? " These are the final boards, kept when the draft started."
 					: null}

@@ -42,6 +42,7 @@ import {
 	planCareer,
 	toCareer,
 } from "./career.ts";
+import { fitHsRank } from "./radar.ts";
 import { COLLEGE_AWARD_PREFIX } from "../preDraft.ts";
 import type {
 	CollegeProspect,
@@ -76,6 +77,9 @@ export type GenerateOptions = {
 	// Games of team seasons another class's college season model already played (their draft year), by teamKey: teammates there played
 	// those games
 	teamGames?: Map<string, number>;
+	// Recruiting ranks that follow draft stock, fitted to the story (radar.ts): new careers get their rank (career.hsRank) here. Default:
+	// on with paths and context (both default on); false leaves it to the old ranking (recruiting.ts reads the player's ratings)
+	radar?: boolean;
 };
 
 // How many elite high school prospects of a class join the pro pathway program instead of going to college: at most this many, from at most PATHWAY_POOL of the best
@@ -268,7 +272,16 @@ const planProspects = (
 				});
 			}
 		}
-		return { p, school, plan, years, members };
+		// Draft stock as the recruiting rank reads it (radar.ts): class-relative, pot weighted
+		const zStockRecruit =
+			0.4 * zClass +
+			0.6 *
+				clamp(
+					(p.pot + POT_PRIOR_SHIFT - potStats.mean) / potStats.sd,
+					-2.5,
+					2.5,
+				);
+		return { p, school, plan, years, members, zStockRecruit };
 	});
 };
 
@@ -327,7 +340,13 @@ export const generateCollegeClass = (
 		: new Map<string, TeamRole>();
 
 	// Pass 3: the seasons
-	for (const { p, school, plan, years: plannedYears } of planned) {
+	for (const {
+		p,
+		school,
+		plan,
+		years: plannedYears,
+		zStockRecruit,
+	} of planned) {
 		// Each player has his own stream, so what he gets doesn't depend on who else is in the class
 		const rng = new Rng(`${seed}|${draftYear}|${p.key}`);
 
@@ -442,13 +461,29 @@ export const generateCollegeClass = (
 			}
 		}
 
+		const career = plan.years.length > 0 ? toCareer(plan) : undefined;
+		if (
+			career &&
+			career.hsClass !== undefined &&
+			(options.radar ?? (paths && teams))
+		) {
+			career.hsRank =
+				fitHsRank({
+					p,
+					career,
+					seasons,
+					zStock: zStockRecruit,
+					seedBase: `${seed}|${draftYear}|${p.key}`,
+					draftYear,
+				}) ?? null;
+		}
 		results.push({
 			key: p.key,
 			school: school && !school.idle ? school.name : p.college,
 			seasons,
 			honors: [],
 			pos: p.pos,
-			...(plan.years.length > 0 ? { career: toCareer(plan) } : {}),
+			...(career ? { career } : {}),
 		});
 	}
 

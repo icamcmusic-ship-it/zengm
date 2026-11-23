@@ -1235,6 +1235,21 @@ const PlayerPreDraft = ({
 							<b>{preDraft.route.title}.</b> {preDraft.route.text}
 						</p>
 					) : null}
+					{preDraft.radar ? (
+						<p
+							className={`alert ${preDraft.radar.kind === "unknown" ? "alert-secondary" : "alert-info"} py-2`}
+							data-testid="pre-draft-radar"
+							style={{ maxWidth: 900 }}
+						>
+							<b>
+								{preDraft.radar.kind === "unknown"
+									? preDraft.radar.title
+									: `On the radar: ${preDraft.radar.title.toLowerCase()}`}
+								.
+							</b>{" "}
+							{preDraft.radar.text}
+						</p>
+					) : null}
 					<ScoutingReportSection preDraft={preDraft} />
 					<OutlookSection cone={cone} outlets={outlets} />
 					<ScoutNotesSection preDraft={preDraft} />
