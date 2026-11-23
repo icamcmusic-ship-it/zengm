@@ -27,7 +27,11 @@ const load = (id: string, params: Record<string, string>) => {
 
 const playSeason = async () => {
 	await phase.newPhase(PHASE.REGULAR_SEASON, {});
-	while (g.get("phase") <= PHASE.PLAYOFFS) {
+	// (a guard: game.play refuses to sim, and this would spin forever, if a roster is short)
+	for (let i = 0; g.get("phase") <= PHASE.PLAYOFFS; i++) {
+		if (i > 500) {
+			throw new Error("season did not finish");
+		}
 		await game.play(1, {});
 	}
 };
@@ -57,6 +61,8 @@ describe("era-adjusted views", () => {
 					settings: {
 						...getDefaultSettings(),
 						featureRecordsBook: true,
+						// (AI-run user team, so its roster is filled in the offseason like everyone else's)
+						spectator: true,
 						numGames: 6,
 						numGamesPlayoffSeries: [1],
 					} as any,
