@@ -338,7 +338,9 @@ describe("real players in a league", () => {
 	test(
 		"a real player's shape is read from the real players data; with the setting off, nothing is stored",
 		{
-			timeout: 120_000,
+			// (archskill, reading 29: 240 s: the draft classes' label steering reads more labels (one-skill nouns crowd a class more than the
+			// honest names' synonyms did), about 120-130 s alone, 75-90 s before)
+			timeout: 240_000,
 		},
 		async () => {
 			const create = async (subRatings: boolean, subRatingsWide = false) => {

@@ -73,7 +73,11 @@ const POS_SIZE: Record<string, ArchetypeGroup> = {
 // archfam: 28 (the user's 2070 audit: skill families that count once (shooting, creation, perimeter D), no defensive
 // tag but a 2-Way prefix, 3-Level, offensive IQ a flavor, special names unlocked and given a bigger edge, last season's
 // label kept only while it covers his top two, honest names that say his skill, "Five" only on a center)
-export const ARCHETYPE_READING_VERSION = 28;
+// archskill: 29 (no honest, flaw, development or depth names: every player is named by his skills, a one-skill player by
+// his skill's plain noun, a player with no real skill by his best one or two; twelve new skills: foul drawing, cutting,
+// help defense, post defense, offensive rebounding, length, ball security, switchability, rim running, screen and roll,
+// transition, motor)
+export const ARCHETYPE_READING_VERSION = 29;
 
 export const toStored = (
 	season: number,

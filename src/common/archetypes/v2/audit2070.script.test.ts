@@ -6,6 +6,7 @@
 // he says, a skill his current label or tag names (unquoted) just under his sixth, "N skills at the 90th+" filled in,
 // and the rest at most at the 55th. His base ratings follow from the standings (the reference tables), so the honest
 // names and the ratings-only checks read about the same player. Each player is read fresh (no last-season label).
+// (archskill, reading 29: the new skills stand with his unquoted ones: the audit quotes none of them.)
 //   RUN_AUDIT_2070=<audit.csv> [AUDIT_2070_OUT=file.csv] [AUDIT_2070_LEAGUE=<dir of BBGM player exports>]
 // Reports: agreement with his "Better fit" and "Other good fits" (exact name, and the same skill families), how many
 // Disagree rows get a name he'd accept, distinct names, one-offs, the top name's share, 2-Way names among the two-way
@@ -23,6 +24,7 @@ import { ratingQuantiles } from "./gateScale.ts";
 import {
 	CUSTOM_SPECIALS,
 	coverScores,
+	NEW_NOUNS,
 	nounGroupQuantiles,
 	nounsOfName,
 	ratingAtPct,
@@ -375,6 +377,12 @@ test.skipIf(!CSV)(
 				if (st[k] === undefined) {
 					st[k] = Math.max(0.2, Math.min(sixth - 0.03, 0.55));
 				}
+			}
+			// (archskill, reading 29: the audit says nothing of the new skills, which the rebuilt ratings can't stand for
+			// either (his height, endurance, sub-ratings and traits are made up): they stand with his unquoted skills, so
+			// this scorecard measures the reading's other changes; the new skills are measured on real exports)
+			for (const k of NEW_NOUNS) {
+				st[k] = Math.max(0.2, Math.min(sixth - 0.03, 0.55));
 			}
 			const at = (k: string, p: number) =>
 				Math.round(Math.max(0, Math.min(100, ratingAtPct(k, p))));

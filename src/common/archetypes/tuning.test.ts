@@ -86,7 +86,8 @@ beforeAll(async () => {
 	players = s.map((p) => ({ ...p, pos: positionOf(p.ratings) }));
 }, 120_000);
 
-describe("archetype tuning", () => {
+// (a 30 s budget per test: each takes 1-3 s alone, and timed out at 5 s with the archetype, player and view suites run together)
+describe("archetype tuning", { timeout: 30_000 }, () => {
 	test("no feedback: the shipped model, labels identical", () => {
 		const t = fitTuning([], modelFor);
 		assert.strictEqual(t.hash, "");

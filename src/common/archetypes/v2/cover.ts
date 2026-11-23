@@ -24,18 +24,22 @@
 //    LEAD_EDGE, MID_EDGE).
 // 10. Special names (the catalog's, the user's own, the many-skills names) get SPECIAL_EDGE over a plain noun name, and
 //     the many-skills names are gated by how many elite skills he has (ELITE_SKILL), not by his best skill's standing.
+// archskill (reading 29, the user: "remove camp body and other 'honest' archetypes ... just put the one skill they are
+// good at"):
+// 11. No honest, flaw, development or depth name. Every skill has a plain noun (nouns.ts SKILL_NOUNS: Rebounder,
+//     Spot-Up Shooter, Contact Finisher, ...): a one-skill name is that noun (SINGLE_NOUN_EDGE over his position word),
+//     a two-skill one the front word of one skill and the noun of the other ("Glass-Cleaning Contact Finisher").
+// 12. A player with no real skill, or one at low ovr, is named by his best skill (or best two) against the league and his
+//     position, whatever its standing (skillPick): every player gets a skill name.
 import type { ArchetypeRatings, Pos } from "../types.ts";
 import {
 	composedId,
 	composeName,
 	DESC_BY_KEY,
 	GROUP_OF,
-	isComposedId,
-	parseComposedId,
 	ROLE_BY_KEY,
 	type PosGroup,
 } from "./grammar.ts";
-import { hasUpside, isHonestKey } from "./honest.ts";
 import { archetypeById } from "../classify.ts";
 
 const archetypeNameOf = (id: string) => archetypeById(id)?.name;
@@ -45,11 +49,8 @@ import {
 	ATH_WORD_BAR,
 	CUSTOM_SPECIALS,
 	DEF_NOUNS,
-	DEV_MAX_OVR,
 	ELITE_PCT,
 	END_WORDS,
-	GENERIC_PCT,
-	HONEST_NOUNS,
 	JACK_CLEARED,
 	JACK_NAME,
 	MID_EDGE,
@@ -64,14 +65,24 @@ import {
 	SUB_WORD,
 	TOP_N,
 	TRAIT_KEYWORDS,
-	connector,
 	coverCtxOf,
 	coverPromises,
 	coverScores,
+	coverBar,
 	coverSkills,
 	eliteOvrOf,
+	familyMembers,
 	familyOf,
 	familyRep,
+	leadEdgeOf,
+	NEW_MEMBER_EDGE,
+	NEW_NOUNS,
+	OLD_NOUNS,
+	NEW_OWN,
+	SKILL_NOUNS,
+	SKILL_ROLE_NOUN,
+	skillNounOf,
+	stemRepeat,
 	groupOfPos,
 	isLong,
 	leadSub,
@@ -97,6 +108,7 @@ import {
 	type PosWord,
 	type Special,
 	type SpecialCtx,
+	type SkillNounCtx,
 } from "./nouns.ts";
 
 // Leaving out one of his top two skills costs this much coverage
@@ -128,6 +140,9 @@ export const SPECIAL_EDGE = 0.15;
 export const TWO_WAY_BAR = 0.8;
 // archfam: 3-Level: 3PT, mid-range and finishing all at this standing
 export const THREE_LEVEL_BAR = 0.78;
+// archskill (reading 29): a one-skill noun name ("Rebounder") over his position word ("Glass-Cleaning Big") that covers
+// the same: the plain noun of his one skill is his name
+export const SINGLE_NOUN_EDGE = 0.01;
 // archfam: offensive IQ is mostly a flavor word: it covers this much of what a skill word covers, leaving it out costs
 // nothing, and naming it costs this much of a named skill (nothing: "Crafty" is a flavor word in front of a name)
 export const CRAFTY_COVER = 0.5;
@@ -141,7 +156,7 @@ export const RAMP_LO = 0.6;
 export const RAMP_HI = 0.8;
 export const skillWeight = (pct: number) =>
 	Math.max(0, Math.min(1, (pct - RAMP_LO) / (RAMP_HI - RAMP_LO)));
-// (the families 2-Way covers)
+// (the families 2-Way covers; archskill: help defense too)
 const DEF_FAMS: readonly NounKey[] = ["perimD", "rimD"];
 // Names that say his defense themselves (no 2-Way prefix on them)
 const SAYS_DEFENSE =
@@ -229,24 +244,6 @@ const pickCoverTies = (x: NounInput): NounPick => {
 	if (x.tie === false || prevId === undefined) {
 		return a;
 	}
-	const pc = isComposedId(prevId) ? parseComposedId(prevId) : undefined;
-	// archcov hysteresis: last season's honest name holds while he is still honest with every standing STICK_BOOST lower
-	// (a second skill must clear by a margin before it names him)
-	if (pc && isHonestKey(pc.role.key)) {
-		const about = HONEST_NOUNS[pc.role.key] ?? [];
-		const same = (p: NounPick) =>
-			p.kind === "honest" && about.includes(p.noun ?? "none");
-		if (same(a)) {
-			return a;
-		}
-		for (const slack of [-STICK_BOOST, STICK_BOOST]) {
-			const h = pickCoverOnce({ ...x, slack });
-			if (same(h)) {
-				return { ...keptVariant(h), slack };
-			}
-		}
-		return a;
-	}
 	if (pickIdOf(a, x.pos) === prevId) {
 		return a;
 	}
@@ -271,7 +268,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	const { r, pos, rq } = x;
 	const group: PosGroup = groupOfPos(pos);
 	const favored = tieFavored(x);
-	const scores = coverScores(r, pos, rq, x.ng, x.slack);
+	const scores = coverScores(r, pos, rq, x.ng, x.slack, x.traits);
 	const pct = Object.fromEntries(scores.map((s) => [s.key, s.pct])) as Record<
 		NounKey,
 		number
@@ -311,7 +308,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		return i < 0 ? Infinity : i;
 	};
 	const ctx: CoverCtx = coverCtxOf(x);
-	// (his real skills: the honest names, the one-skill rule and the athletic lead read these)
+	// (his real skills: the skill pick, the one-skill rule and the athletic lead read these)
 	const nStrong = ctx.strong.length;
 	const ath = ctx.ath;
 	const athWord = ath.filter((a) => pct[a] >= ATH_WORD_BAR);
@@ -322,7 +319,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	const isElite = (k: NounKey) =>
 		eliteOvr && pct[k] >= ELITE_PCT && (k !== "perimD" || isMobile);
 	// archfam: 2-Way: his best defensive and best offensive skill both at TWO_WAY_BAR
-	const bestD = Math.max(pct.perimD, pct.rimD, pct.steal);
+	const bestD = Math.max(...[...DEF_NOUNS].map((n) => pct[n]));
 	const bestO = Math.max(...[...OFFENSE].map((n) => pct[n]));
 	const twoWay = bestD >= TWO_WAY_BAR && bestO >= TWO_WAY_BAR;
 	// archfam: 3-Level: 3PT, mid-range and finishing all at THREE_LEVEL_BAR
@@ -331,12 +328,19 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		pct.mid >= THREE_LEVEL_BAR &&
 		pct.finish >= THREE_LEVEL_BAR;
 	// (how many elite skills: the many-skills names read these)
+	// (archskill: the skills of reading 28 only: the new ones read ratings the old ones already read, and would make the
+	// many-skills names much more common)
 	const eliteN = NOUNS.filter(
-		(n) => !ATH_KEYS.has(n) && n !== "crafty" && pct[n] >= ELITE_SKILL,
+		(n) =>
+			!ATH_KEYS.has(n) &&
+			n !== "crafty" &&
+			!NEW_NOUNS.has(n) &&
+			pct[n] >= ELITE_SKILL,
 	).length;
+	const broadFams = realFams.filter((f) => !NEW_OWN.has(f));
+	const nBroad = ctx.strong.filter((k) => !NEW_OWN.has(familyOf(k))).length;
 	const long = isLong(r);
 	const ovr = x.ovr ?? 99;
-	const young = hasUpside(x) && ovr <= DEV_MAX_OVR;
 	const rank = (k: NounKey) => skillRank(ctx, k);
 	// (his best skill: offensive IQ, a flavor, gives way to the next)
 	const bestFam = fams.find((f) => f !== "crafty") ?? fams[0];
@@ -359,7 +363,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			}
 			let s = 0;
 			let n = 0;
-			for (const k of NOUNS) {
+			for (const k of OLD_NOUNS) {
 				const v = rj.pct[k];
 				if (v !== undefined) {
 					s += Math.abs(v - leaguePct[k]);
@@ -565,7 +569,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	// (a many-skills name: 3+ real skills (families); a broad one with at most FLAT_ELITE elite skills, an elite one
 	// with MANY_ELITE or more)
 	const manyOk = (elite: boolean) =>
-		nStrong >= 3 && (elite ? eliteN >= MANY_ELITE : eliteN <= FLAT_ELITE);
+		nBroad >= 3 && (elite ? eliteN >= MANY_ELITE : eliteN <= FLAT_ELITE);
 
 	// The user's own special names (their tests read the standings against league and position)
 	const customCtx: SpecialCtx = {
@@ -591,9 +595,6 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	const customMain = (c: CustomSpecial) =>
 		c.anyBest ? [] : mainOfNouns(c.nouns, customName(c));
 	const customOk = (c: CustomSpecial, tw = false): boolean => {
-		if (young && nStrong <= 1) {
-			return false;
-		}
 		if (!c.positions.includes(pos) || !c.test(customCtx)) {
 			return false;
 		}
@@ -664,10 +665,9 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 
 	// Jack-Of-All-Trades: JACK_CLEARED skills (families) or more, his JACK_CLEARED-th at JACK_FLAT, few elite ones
 	const jackOk = () =>
-		!young &&
-		nStrong >= JACK_CLEARED &&
+		nBroad >= JACK_CLEARED &&
 		manyOk(false) &&
-		(famPct.get(realFams[JACK_CLEARED - 1]!) ?? 0) >= JACK_FLAT &&
+		(famPct.get(broadFams[JACK_CLEARED - 1]!) ?? 0) >= JACK_FLAT &&
 		ovr >= 45 &&
 		okName(JACK_NAME, []);
 	const jackId = composedId(ROLE_BY_KEY.get("sJack")!, [], GROUP_OF[pos]);
@@ -691,9 +691,6 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			sp.name,
 		);
 	const specialOk = (sp: Special): boolean => {
-		if (young && nStrong <= 1) {
-			return false;
-		}
 		if (sp.twoWay && !twoWay) {
 			return false;
 		}
@@ -760,6 +757,15 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		enigma && front.some((n) => CREATIVE.has(n));
 	// (a front noun's word: its elite word while he is elite, the sub-rating word, the plain word)
 	const descWord = (n: NounKey) => nounWord(n, isElite(n), group, r);
+	// archskill: the noun each skill takes (nouns.ts SKILL_NOUNS)
+	const skillCtx: SkillNounCtx = {
+		pct,
+		r,
+		group,
+		elite: isElite,
+		...(rq ? { rq } : {}),
+		...(x.traits ? { traits: x.traits } : {}),
+	};
 	const descWordOk = (n: NounKey, d: string): boolean => {
 		const el = isElite(n);
 		if (d === nounWord(n, el, group, r)) {
@@ -806,8 +812,12 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		};
 		for (const d of descKeys) {
 			if (d === "long") {
-				if (!long) {
+				// (archskill: his length, the wingspan over his height or the length skill at the word bar)
+				if (!long && athTrue("length") < ATH_WORD_BAR) {
 					return undefined;
+				}
+				if (!long) {
+					nouns.push("length");
 				}
 			} else if (d === "highlightReel") {
 				if (pct.jump < 0.85 || pct.finish < 0.85 || !add("finish", "jump")) {
@@ -848,6 +858,21 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			nouns.push("strength");
 		} else if (roleKey.startsWith("pos")) {
 			if (roleKey !== POS_WORD[pos]) {
+				return undefined;
+			}
+		} else if (SKILL_ROLE_NOUN.has(roleKey)) {
+			// (archskill: a skill noun: the noun his skill takes now)
+			const n = SKILL_ROLE_NOUN.get(roleKey)!;
+			const head =
+				skillNounOf(n, skillCtx) === roleKey
+					? n
+					: (Object.keys(SKILL_NOUNS) as NounKey[]).find(
+							(k) =>
+								k !== n &&
+								familyOf(k) === familyOf(n) &&
+								skillNounOf(k, skillCtx) === roleKey,
+						);
+			if (!head || (!nouns.includes(head) && !add(head))) {
 				return undefined;
 			}
 		} else {
@@ -903,8 +928,10 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		descs: string[],
 		pick: Record<string, string>,
 		keepId?: string,
+		extra = 0,
 	): boolean => {
-		if (descs.length === 0) {
+		const skillNoun = SKILL_ROLE_NOUN.has(role);
+		if (descs.length === 0 && !skillNoun) {
 			return false;
 		}
 		const cn = composedNouns(role, descs);
@@ -924,7 +951,11 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			return false;
 		}
 		const name = nameOf(role, descs, pick);
-		if (!wordsFit(name, pos, x.traits) || !okName(name, main, cn.tw)) {
+		if (
+			!wordsFit(name, pos, x.traits) ||
+			!okName(name, main, cn.tw) ||
+			(skillNoun && stemRepeat(name))
+		) {
 			return false;
 		}
 		push(
@@ -939,9 +970,14 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			},
 			main,
 			keepId ?? idOf(role, descs, pick),
-			(role.startsWith("pos") || role === "bruiser" || role === "enigma"
+			(role.startsWith("pos") ||
+			role === "bruiser" ||
+			role === "enigma" ||
+			skillNoun
 				? 0
-				: FLAVOR) + (descs.includes("threeLevel") ? FLAVOR : 0),
+				: FLAVOR) +
+				(descs.includes("threeLevel") ? FLAVOR : 0) +
+				extra,
 			0,
 			cn.tw,
 		);
@@ -952,6 +988,8 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	const frontWords = (
 		front: readonly NounKey[],
 		tw = false,
+		// (archskill: the front words of a skill-noun name: no trait keyword or length added)
+		plain = false,
 	): { descs: string[]; pick: Record<string, string> } => {
 		const pick: Record<string, string> = {};
 		if (
@@ -984,7 +1022,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		}
 		if (tw) {
 			descs.unshift("twoWay");
-		} else if (front.length === 1) {
+		} else if (front.length === 1 && !plain && !front.includes("length")) {
 			const t = traitKeywordOf(x, pct, group);
 			const d = t ? DESC_BY_KEY.get(t.desc) : undefined;
 			if (t && d) {
@@ -999,6 +1037,32 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		}
 		return { descs, pick };
 	};
+	// archskill: the skill-noun names of some front skills: each skill as the noun, the others as its front words (one
+	// skill: its noun alone, SINGLE_NOUN_EDGE over his position word)
+	const pushSkillNouns = (front: readonly NounKey[], tw: boolean) => {
+		const sk = front.filter((n) => !ATH_KEYS.has(n) && n !== "crafty");
+		if (sk.length === 0 || sk.length > 2) {
+			return;
+		}
+		for (const head of sk) {
+			const role = skillNounOf(head, skillCtx);
+			if (!role) {
+				continue;
+			}
+			const rest = front.filter((n) => n !== head);
+			const fw =
+				rest.length > 0
+					? frontWords(rest, tw, true)
+					: { descs: tw ? ["twoWay"] : [], pick: {} };
+			pushComposed(
+				role,
+				fw.descs,
+				fw.pick,
+				undefined,
+				sk.length === 1 && !tw ? SINGLE_NOUN_EDGE : 0,
+			);
+		}
+	};
 	const pushFront = (front: NounKey[], tw = false) => {
 		const { descs, pick } = frontWords(front, tw);
 		// (his position, then the first end word of his own that fits the front words, then each end word that says one
@@ -1009,6 +1073,7 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 		} else if (bruiserOk(front)) {
 			pushComposed("bruiser", descs, pick);
 		}
+		pushSkillNouns(front, tw);
 		// (a 3-Level name: Scorer first)
 		let plain =
 			descs.includes("threeLevel") && pushComposed("eScorer", descs, pick);
@@ -1038,48 +1103,151 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 	};
 
 	// ---- the pick ----
-	const honest = (noun: NounKey | undefined, conf: number): NounPick => ({
-		kind: "honest",
-		...(noun ? { noun } : {}),
-		conf,
-		main: noun ? [noun] : [],
-	});
-	const fresh = ((): NounPick => {
-		// A young player with upside at ovr DEV_MAX_OVR or below and one skill at most: a development name
-		if (young && nStrong <= 1) {
-			return honest(skills[0] ?? ath[0], 0.8);
-		}
-		// No basketball skill: two athletic nouns lead a name; else his trait keyword, else an honest name
-		if (nStrong === 0) {
-			if (ath.length >= 2) {
-				for (const front of [ath.slice(0, 2), [ath[0]!, ath[2]!]]) {
-					if (front[1] !== undefined) {
-						pushFront(front);
+	// archskill (reading 29): a player with no real skill, or one at low ovr, is named by his best skill (or his best two)
+	// against the league and his position, whatever its standing: his skill families best first (each said by its own
+	// word: a member names it with MID_EDGE over the head; steals and shot creation when higher), the second one named
+	// when it may be named (its bar) and adds more than it costs (the coverage score's terms: its weight and standing over
+	// SECOND_COST, against MISS_TOP2 for leaving it out), and a modifier at the word bar in front of a one-skill name. Only the words that are
+	// no skill keep their promises here (his best is his best, however low).
+	let skillPicked = false;
+	// (the pick just pushed; a skill pick names his best skill by construction, so it counts as covering his top two: last
+	// season's skill name, read again from the same ratings, stays)
+	const skillCand = (): NounPick => {
+		const c = cands.at(-1)!;
+		c.pick.coversTop2 = true;
+		c.top2 = true;
+		return c.pick;
+	};
+	const skillPick = (): NounPick => {
+		const heads = [
+			...new Set(
+				NOUNS.filter((n) => !ATH_KEYS.has(n) && n !== "crafty").map(familyOf),
+			),
+		];
+		const fams = heads
+			.map((h) => {
+				let rep = h;
+				for (const m of familyMembers(h)) {
+					// (a reading-29 member only from its own bar, as familyRep)
+					if (NEW_NOUNS.has(m) && pct[m] < coverBar(m)) {
+						continue;
+					}
+					const edge =
+						(h === "handle" && m === "creator") ||
+						(h === "perimD" && m === "steal")
+							? 1e-9
+							: NEW_NOUNS.has(m)
+								? NEW_MEMBER_EDGE
+								: MID_EDGE;
+					if (m !== h && pct[m] >= pct[rep] + edge) {
+						rep = m;
 					}
 				}
-				const c = bestOf(cands);
-				if (c) {
-					return c.pick;
-				}
-			}
-			const t = traitKeywordOf(x, pct, group);
-			const role = t ? ROLE_BY_KEY.get(t.role) : ROLE_BY_KEY.get("tConnector");
-			if (role && (t || connector(pct))) {
-				const i = Math.min(t?.variant?.(x) ?? 0, role.names.length - 1);
-				const name = role.names[i]!;
-				if (!vetoed(name) && okName(name, [])) {
-					return { kind: "trait", key: role.key, name, conf: 0.6 };
-				}
-			}
-			const near = scores.find(
-				(s) =>
-					!ATH_KEYS.has(s.key) && s.key !== "crafty" && s.pct >= GENERIC_PCT,
+				const p = Math.max(...familyMembers(h).map((m) => pct[m]));
+				return { rep, p };
+			})
+			.sort(
+				(a, b) =>
+					b.p - leadEdgeOf(b.rep) - (a.p - leadEdgeOf(a.rep)) ||
+					NOUNS.indexOf(a.rep) - NOUNS.indexOf(b.rep),
 			);
-			return honest(ath[0] ?? near?.key, ath[0] ? 0.7 : near ? 0.55 : 0.8);
+		const w = (p: number) => skillWeight(p) + p / 100;
+		const [f1, f2] = fams;
+		// (a second skill only when it may be named: its bar, SKILL_BAR, "two modest skills")
+		const pair =
+			f2 !== undefined &&
+			pct[f2.rep] >= coverBar(f2.rep) &&
+			w(f1!.p) + w(f2.p) - SECOND_COST >
+				w(f1!.p) - MISS_TOP2 * skillWeight(f2.p);
+		const modifier = athWord.find(
+			(a) => skillNounOf(a, skillCtx) === undefined,
+		);
+		// (the names in order: the pair (his best skill as the noun first), then his best skill with a modifier, then each
+		// one alone; the first whose words that are no skill keep their promises; else his best skill's plain noun)
+		const tries: { head: NounKey; front: NounKey[] }[] = [];
+		if (pair) {
+			tries.push(
+				{ head: f1!.rep, front: [f2.rep] },
+				{ head: f2.rep, front: [f1!.rep] },
+			);
 		}
-		// One skill at low ovr: a specialist's honest name (unless a modifier at the word bar makes a two-word name)
-		if (nStrong === 1 && ovr < ONE_NOUN_OVR && athWord.length === 0) {
-			return honest(best, 0.7);
+		if (modifier && f1) {
+			tries.push({ head: f1.rep, front: [modifier] });
+		}
+		for (const f of fams.slice(0, pair ? 2 : 1)) {
+			tries.push({ head: f.rep, front: [] });
+		}
+		const build = (
+			t: { head: NounKey; front: NounKey[] },
+			role: string,
+			check: boolean,
+		) => {
+			const descs = t.front.map((n) =>
+				ATH_KEYS.has(n) ? NOUN_DESC[n].desc : descWord(n),
+			);
+			const name = nameOf(role, descs, {});
+			const main = [...t.front, t.head];
+			if (
+				check &&
+				(vetoed(name) ||
+					nameProblem(name) !== undefined ||
+					stemRepeat(name) ||
+					!wordsFit(name, pos, x.traits) ||
+					coverPromises(name, main, ctx, true).length > 0)
+			) {
+				return undefined;
+			}
+			const pick: NounPick = {
+				kind: "composed",
+				descs,
+				role: role as PosWord,
+				nouns: main,
+				pick: {},
+				conf: confFor(main),
+			};
+			push(pick, main, idOf(role, descs, {}), 0);
+			return skillCand();
+		};
+		skillPicked = true;
+		for (const t of tries) {
+			// (the noun his skill takes, else its plain noun)
+			for (const role of new Set([
+				skillNounOf(t.head, skillCtx),
+				SKILL_NOUNS[t.head]?.at(-1)?.key,
+			])) {
+				const p = role ? build(t, role, true) : undefined;
+				if (p) {
+					return p;
+				}
+			}
+		}
+		// (his best skill's plain noun: always says him)
+		const head = f1?.rep ?? "reb";
+		const plainRole = SKILL_NOUNS[head]?.at(-1)?.key ?? "kRebounder";
+		const descs: string[] = [];
+		const main = [head];
+		push(
+			{
+				kind: "composed",
+				descs,
+				role: plainRole as PosWord,
+				nouns: main,
+				pick: {},
+				conf: confFor(main),
+			},
+			main,
+			idOf(plainRole, descs, {}),
+			0,
+		);
+		return skillCand();
+	};
+	const fresh = ((): NounPick => {
+		// No real skill, or one at low ovr with no modifier at the word bar: his best skill (or two), skillPick
+		if (
+			nStrong === 0 ||
+			(nStrong === 1 && ovr < ONE_NOUN_OVR && athWord.length === 0)
+		) {
+			return skillPick();
 		}
 		for (const c of CUSTOM_SPECIALS) {
 			if (customOk(c)) {
@@ -1155,13 +1323,13 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 			}
 		}
 		const c = bestOf(cands);
-		return c ? c.pick : honest(best, 0.5);
+		return c ? c.pick : skillPick();
 	})();
 
 	debugHook?.(cands, scores);
 	// ---- archcov stickiness: last season's label, re-checked ----
 	const prevMain = prevMainOf(x, pos);
-	if (!prevMain || fresh.kind === "honest") {
+	if (!prevMain || skillPicked) {
 		return settle(fresh);
 	}
 	const freshCand = cands.find((c) => c.pick === fresh) ?? bestOf(cands);
@@ -1182,38 +1350,16 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 				pushSpecial(prevMain.sp);
 			}
 			break;
-		case "keyword": {
-			if (fresh.kind === "trait" && nStrong === 0) {
-				const role = ROLE_BY_KEY.get(prevMain.role);
-				const ok =
-					role !== undefined &&
-					role.names.includes(prevMain.name) &&
-					(prevMain.role === "tConnector"
-						? connector(pct)
-						: TRAIT_KEYWORDS.some(
-								(t) => t.role === prevMain.role && t.over(x, pct, group) >= 0,
-							)) &&
-					okName(prevMain.name, []);
-				if (ok) {
-					return settle({
-						kind: "trait",
-						key: prevMain.role,
-						name: prevMain.name,
-						conf: 0.6,
-					});
-				}
-			}
+		case "keyword":
+			// (archskill: a trait name with no skill is not given any more)
 			break;
-		}
 		case "composed":
-			if (!(young && nStrong <= 1)) {
-				pushComposed(
-					prevMain.role,
-					[...prevMain.descs],
-					{ ...prevMain.pick },
-					prevMain.id,
-				);
-			}
+			pushComposed(
+				prevMain.role,
+				[...prevMain.descs],
+				{ ...prevMain.pick },
+				prevMain.id,
+			);
 			break;
 	}
 	const kept = cands.length > before ? cands.at(-1) : undefined;
@@ -1262,8 +1408,9 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 				skills: named,
 				pct: named.map((k) => Math.round(100 * pct[k])),
 				weights: named.map((k) => r2(skillWeight(pct[k]))),
-				gate:
-					q.kind === "honest"
+				gate: skillPicked
+					? "skill name: his best skill (or two) against the league and his position (no real skill, or one at low ovr)"
+					: q.kind === "honest"
 						? "honest: no skill, or one at low ovr"
 						: q.kind === "special"
 							? "special name: its skills among his best four (families), his best covered"
@@ -1281,7 +1428,9 @@ const pickCoverOnce = (x: NounInput): NounPick => {
 					: q.kind === "composed"
 						? q.role.startsWith("pos")
 							? "position"
-							: "end word"
+							: SKILL_ROLE_NOUN.has(q.role)
+								? "skill noun"
+								: "end word"
 						: q.kind,
 				score: r2(me?.score ?? 0),
 				fit: generic ? 1 : fitDen > 0 ? r2(fitNum / fitDen) : 1,

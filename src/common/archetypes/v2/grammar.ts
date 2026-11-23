@@ -651,6 +651,70 @@ DESCRIPTORS.push(
 		slot: 2,
 		nounOnly: true,
 	},
+	// archskill (reading 29): the new skills' front words
+	{
+		key: "foulDrawing",
+		names: ["Foul-Drawing"],
+		concept: "foulDrawNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "backdoor",
+		names: ["Backdoor"],
+		concept: "cutNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "helpSide",
+		names: ["Help-Side"],
+		concept: "helpDNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "mistakeFree",
+		names: ["Mistake-Free"],
+		concept: "secureNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "switchable",
+		names: ["Switchable"],
+		concept: "switchNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "lobCatching",
+		names: ["Lob-Catching"],
+		concept: "rimRunNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "screenRolling",
+		names: ["Screen-and-Roll"],
+		concept: "rollNoun",
+		slot: 2,
+		nounOnly: true,
+	},
+	{
+		key: "transitionWord",
+		names: ["Transition"],
+		concept: "transitionNoun",
+		slot: 1,
+		nounOnly: true,
+	},
+	{
+		key: "highMotor",
+		names: ["High-Motor"],
+		concept: "motorNoun",
+		slot: 1,
+		nounOnly: true,
+	},
 );
 ROLES.push(
 	{
@@ -1986,7 +2050,349 @@ ROLES.push(
 	},
 );
 
+// archskill (reading 29, the user: "just put the one skill they are good at"): the plain noun of each skill, a name of
+// its own ("Rebounder") or after another skill's front word ("Glass-Cleaning Contact Finisher"). Which noun a skill
+// takes (its sub-rating lean, an elite standing) is nouns.ts SKILL_NOUNS.
+export const SKILL_NOUN_ROLES: {
+	key: string;
+	name: string;
+	desc: string;
+	family: Family;
+}[] = [
+	{
+		key: "kSharpshooter",
+		name: "Sharpshooter",
+		desc: "An elite shooter: his jumper is his game.",
+		family: "shooter",
+	},
+	{
+		key: "kSpotUpShooter",
+		name: "Spot-Up Shooter",
+		desc: "A catch-and-shoot three-point shooter.",
+		family: "shooter",
+	},
+	{
+		key: "kPullUpShooter",
+		name: "Pull-Up Shooter",
+		desc: "A three-point shooter off the dribble.",
+		family: "shooter",
+	},
+	{
+		key: "kShooter",
+		name: "Shooter",
+		desc: "A three-point shooter.",
+		family: "shooter",
+	},
+	{
+		key: "kPullUpArtist",
+		name: "Pull-Up Artist",
+		desc: "A mid-range shooter off the dribble.",
+		family: "scorer",
+	},
+	{
+		key: "kMidShooter",
+		name: "Mid-Range Shooter",
+		desc: "A mid-range shooter.",
+		family: "scorer",
+	},
+	{
+		key: "kPostScorer",
+		name: "Post Scorer",
+		desc: "Scores with his back to the basket.",
+		family: "postBig",
+	},
+	{
+		key: "kCloseScorer",
+		name: "Close-Range Scorer",
+		desc: "Scores on short shots around the basket.",
+		family: "scorer",
+	},
+	{
+		key: "kTouchScorer",
+		name: "Touch Scorer",
+		desc: "Scores in the lane with floaters and touch shots.",
+		family: "scorer",
+	},
+	{
+		key: "kBulldozer",
+		name: "Bulldozer",
+		desc: "A strong finisher who goes through contact.",
+		family: "slasher",
+	},
+	{
+		key: "kContactFinisher",
+		name: "Contact Finisher",
+		desc: "Finishes at the rim through contact.",
+		family: "slasher",
+	},
+	{
+		key: "kAcroFinisher",
+		name: "Acrobatic Finisher",
+		desc: "Finishes at the rim with finesse and body control.",
+		family: "slasher",
+	},
+	{
+		key: "kTouchFinisher",
+		name: "Touch Finisher",
+		desc: "Finishes with soft touch and floaters.",
+		family: "slasher",
+	},
+	{
+		key: "kFinisher",
+		name: "Finisher",
+		desc: "Finishes at the rim.",
+		family: "slasher",
+	},
+	{
+		key: "kLobThreat",
+		name: "Lob Threat",
+		desc: "Runs the floor and catches lobs above the rim.",
+		family: "slasher",
+	},
+	{
+		key: "kRimRunner",
+		name: "Rim Runner",
+		desc: "Runs the floor to the rim for easy finishes.",
+		family: "slasher",
+	},
+	{
+		key: "kAndOne",
+		name: "And-One Artist",
+		desc: "Draws contact at the rim and finishes through it.",
+		family: "slasher",
+	},
+	{
+		key: "kFtMerchant",
+		name: "Free-Throw Merchant",
+		desc: "Gets to the line and makes his free throws.",
+		family: "scorer",
+	},
+	{
+		key: "kFoulMagnet",
+		name: "Foul Magnet",
+		desc: "Draws fouls and gets to the line.",
+		family: "scorer",
+	},
+	{
+		key: "kMovementShooter",
+		name: "Movement Shooter",
+		desc: "Moves without the ball and shoots on the catch.",
+		family: "shooter",
+	},
+	{
+		key: "kBackdoorCutter",
+		name: "Backdoor Cutter",
+		desc: "Cuts without the ball for finishes at the rim.",
+		family: "slasher",
+	},
+	{
+		key: "kShotBlocker",
+		name: "Shot Blocker",
+		desc: "Blocks shots at the rim.",
+		family: "rimProtector",
+	},
+	{
+		key: "kRimProtector",
+		name: "Rim Protector",
+		desc: "Protects the rim.",
+		family: "rimProtector",
+	},
+	{
+		key: "kLowPostWall",
+		name: "Low-Post Wall",
+		desc: "A strong post defender who holds his ground.",
+		family: "rimProtector",
+	},
+	{
+		key: "kPostStopper",
+		name: "Post Stopper",
+		desc: "Defends post scorers.",
+		family: "rimProtector",
+	},
+	{
+		key: "kDefQB",
+		name: "Defensive Quarterback",
+		desc: "Reads the play and runs the team's defense.",
+		family: "wingDefender",
+	},
+	{
+		key: "kHelpAnchor",
+		name: "Help-Side Anchor",
+		desc: "A big who rotates and helps from the weak side.",
+		family: "rimProtector",
+	},
+	{
+		key: "kHelpDefender",
+		name: "Help Defender",
+		desc: "Rotates and helps on defense.",
+		family: "wingDefender",
+	},
+	{
+		key: "kLengthDefender",
+		name: "Length Defender",
+		desc: "A perimeter defender who bothers shots with his length.",
+		family: "wingDefender",
+	},
+	{
+		key: "kLockdownDefender",
+		name: "Lockdown Defender",
+		desc: "Shuts down his man on the perimeter.",
+		family: "wingDefender",
+	},
+	{
+		key: "kPerimDefender",
+		name: "Perimeter Defender",
+		desc: "Guards the perimeter.",
+		family: "wingDefender",
+	},
+	{
+		key: "kBallHawk",
+		name: "Ball Hawk",
+		desc: "Jumps passing lanes and takes the ball away.",
+		family: "wingDefender",
+	},
+	{
+		key: "kSwitchDefender",
+		name: "Switchable Defender",
+		desc: "Switches onto several positions on defense.",
+		family: "wingDefender",
+	},
+	{
+		key: "kBallHandler",
+		name: "Ball Handler",
+		desc: "Handles the ball.",
+		family: "playmaker",
+	},
+	{
+		key: "kShotCreator",
+		name: "Shot Creator",
+		desc: "Creates his own shot.",
+		family: "scorer",
+	},
+	{
+		key: "kMistakeFree",
+		name: "Mistake-Free Handler",
+		desc: "Takes care of the ball and rarely turns it over.",
+		family: "playmaker",
+	},
+	{
+		key: "kVisionary",
+		name: "Visionary",
+		desc: "A passer who sees the whole floor.",
+		family: "playmaker",
+	},
+	{
+		key: "kPrecisionPasser",
+		name: "Precision Passer",
+		desc: "A passer who puts the ball on the spot.",
+		family: "playmaker",
+	},
+	{
+		key: "kPasser",
+		name: "Passer",
+		desc: "Moves the ball and finds teammates.",
+		family: "playmaker",
+	},
+	{
+		key: "kRebounder",
+		name: "Rebounder",
+		desc: "Rebounds the ball.",
+		family: "glass",
+	},
+	{
+		key: "kGlassCrasher",
+		name: "Glass Crasher",
+		desc: "Crashes the offensive glass for second chances.",
+		family: "glass",
+	},
+	{
+		key: "kShortRoll",
+		name: "Short-Roll Playmaker",
+		desc: "Sets the screen, catches on the roll and makes the next pass.",
+		family: "playmaker",
+	},
+	{
+		key: "kRollMan",
+		name: "Roll Man",
+		desc: "Sets screens and rolls to the rim.",
+		family: "postBig",
+	},
+];
+for (const k of SKILL_NOUN_ROLES) {
+	ROLES.push({
+		key: k.key,
+		names: [k.name],
+		concepts: [],
+		groups: ALL,
+		nounOnly: true,
+		desc: k.desc,
+		family: k.family,
+	});
+}
+// archskill (reading 29): catalog names of the new skills (nouns.ts SKILL_SPECIALS)
+for (const [key, name, desc, family] of [
+	[
+		"s4Pterodactyl",
+		"Pterodactyl",
+		"Extraordinary length that blocks and bothers everything near the rim.",
+		"rimProtector",
+	],
+	[
+		"s4TransitionWeapon",
+		"Transition Weapon",
+		"Gets out on the break and finishes in the open floor.",
+		"slasher",
+	],
+	[
+		"s4OpenCourtBlur",
+		"Open-Court Blur",
+		"A blur with the ball in the open floor.",
+		"slasher",
+	],
+	[
+		"s4EnergyBig",
+		"Energy Big",
+		"A big who outworks everyone on the glass.",
+		"glass",
+	],
+	[
+		"s4MotorWing",
+		"Motor Wing",
+		"A wing who never stops moving on defense.",
+		"wingDefender",
+	],
+	[
+		"s4RelocationSniper",
+		"Relocation Sniper",
+		"An elite shooter who relocates without the ball for open threes.",
+		"shooter",
+	],
+	[
+		"s4OneThroughFour",
+		"1-through-4 Defender",
+		"Guards point guards through power forwards.",
+		"wingDefender",
+	],
+	[
+		"s4VerticalSpacer",
+		"Vertical Spacer",
+		"A big who stretches the defense vertically with lobs.",
+		"slasher",
+	],
+] as [string, string, string, Family][]) {
+	ROLES.push({
+		key,
+		names: [name],
+		concepts: [],
+		groups: ALL,
+		bare: true,
+		nounOnly: true,
+		desc,
+		family,
+	});
+}
 // archreview2: the honest names (honest.ts), as roles a composed id can name
+// (archskill, reading 29: never given any more; kept so a label stored by an older reading still reads)
 for (const h of HONEST_ROLES) {
 	ROLES.push({
 		key: h.key,

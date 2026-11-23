@@ -28,6 +28,7 @@ import {
 	isComposedId,
 	parseComposedId,
 	ROLE_BY_KEY,
+	SKILL_NOUN_ROLES,
 	type PosGroup,
 } from "./grammar.ts";
 
@@ -46,7 +47,20 @@ export type NounKey =
 	| "speed"
 	| "jump"
 	| "strength"
-	| "crafty";
+	| "crafty"
+	// archskill (reading 29): the new skills, from ratings, sub-ratings and visible traits
+	| "foulDraw"
+	| "cut"
+	| "helpD"
+	| "postD"
+	| "oreb"
+	| "length"
+	| "secure"
+	| "switchD"
+	| "rimRun"
+	| "roll"
+	| "transition"
+	| "motor";
 
 // A noun clears when he is in the league's top 30% at it (the user's audit: "the skill must be in the league's top 30%
 // and one of the player's three best skills")
@@ -56,7 +70,8 @@ export const NOUN_ELITE_OVR = 58;
 // (with a league table of ovr: his league's top ELITE_OVR_PCT, never below ELITE_OVR_FLOOR; the user)
 export const ELITE_OVR_PCT = 0.9;
 export const ELITE_OVR_FLOOR = 55;
-// A generic no-skill name only with no noun in the league's top 40% (else his best one's specialist name; the user)
+// The league's top 40% (a bar some special names and trait words read; archskill, reading 29: no longer a generic
+// no-skill name's bar, as there is no such name)
 export const GENERIC_PCT = 0.6;
 // A trait adds one word to a one-noun name at this score (the user: "one trait word per name when the trait is 70+")
 export const TRAIT_WORD_MIN = 70;
@@ -64,10 +79,9 @@ export const TRAIT_WORD_MIN = 70;
 // from one season to the next, so the variant word doesn't flip on noise)
 export const SUB_LEAN = 10;
 export const ELITE_PCT = 0.92;
-// Below this ovr a player with one noun gets an honest name (a specialist), not "<noun> <Position>"
+// Below this ovr a player with one real skill is named by that skill's noun ("Rebounder"; archskill, reading 29: it was an
+// honest specialist name), not "<noun> <Position>"
 export const ONE_NOUN_OVR = 50;
-// A Raw / Developing / Project name: at this ovr or below (or with no noun at all)
-export const DEV_MAX_OVR = 30;
 // 2-Way: defense (perimeter or interior) 60+ and in the league's top 40%
 const TWO_WAY_MIN = 60;
 const TWO_WAY_PCT = 0.6;
@@ -109,6 +123,18 @@ export const NOUN_DESC: Record<NounKey, NounWords> = {
 	jump: { desc: "highFlying" },
 	strength: { desc: "physical" },
 	crafty: { desc: "crafty" },
+	foulDraw: { desc: "foulDrawing" },
+	cut: { desc: "backdoor" },
+	helpD: { desc: "helpSide" },
+	postD: { desc: "postDefending" },
+	oreb: { desc: "boardHunting" },
+	length: { desc: "long" },
+	secure: { desc: "mistakeFree" },
+	switchD: { desc: "switchable" },
+	rimRun: { desc: "lobCatching" },
+	roll: { desc: "screenRolling" },
+	transition: { desc: "transitionWord" },
+	motor: { desc: "highMotor" },
 };
 // The noun a descriptor says (for last season's name)
 const DESC_NOUN: Record<string, NounKey> = {};
@@ -161,10 +187,34 @@ const mean = (xs: (number | undefined)[]) => {
 };
 // Each noun: its value (0-100, the ratings it is about, with the sub-ratings that say it when he has them) and the
 // league table that says where that value stands
+// archskill: a visible trait (the playerTraits setting, as the user's scouts see it) moves a skill's value by this much per
+// point from 50 (a nudge: the league's tables are read from ratings alone); the traits the skills read, all of them visible
+// traits (classify.ts VISIBLE_TRAITS: a hidden trait never names a player)
+export const TRAIT_NUDGE = 0.15;
+export const SKILL_TRAITS = [
+	"offBall",
+	"handle",
+	"defensiveVersatility",
+	"screen",
+	"motor",
+	"hustle",
+] as const;
+type SkillTrait = (typeof SKILL_TRAITS)[number];
+type Traits = Partial<Record<string, number>> | undefined;
+const trait = (t: Traits, k: SkillTrait): number | undefined => {
+	const v = t?.[k];
+	return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+};
+const nudge = (t: Traits, k: SkillTrait) => {
+	const v = trait(t, k);
+	return v === undefined ? 0 : TRAIT_NUDGE * (v - 50);
+};
+const clamp100 = (v: number) => Math.max(0, Math.min(100, v));
 const NOUN_VALUE: Record<
 	NounKey,
 	{
-		value: (r: ArchetypeRatings) => number;
+		// (undefined: he has no value for it, e.g. length without the wingspan rating, motor without traits)
+		value: (r: ArchetypeRatings, t?: Traits) => number | undefined;
 		table: (r: ArchetypeRatings) => string;
 	}
 > = {
@@ -201,6 +251,96 @@ const NOUN_VALUE: Record<
 	jump: { value: (r) => r.jmp, table: () => "jmp" },
 	strength: { value: (r) => r.stre, table: () => "stre" },
 	crafty: { value: (r) => r.oiq, table: () => "oiq" },
+	// archskill (reading 29): the new skills
+	// Foul drawing: free throws, contact finishing and attacking the rim
+	foulDraw: {
+		value: (r) =>
+			mean([r.ft, sub(r, "con") ?? r.dnk, mean([r.dnk, r.drb, r.spd])]),
+		table: () => "ft",
+	},
+	// Off-ball movement and cutting: spot-up jumper, finishing, speed, and the off-ball trait
+	cut: {
+		value: (r, t) =>
+			clamp100(
+				mean([sub(r, "spu") ?? r.fg, r.dnk, r.spd]) + nudge(t, "offBall"),
+			),
+		table: () => "dnk",
+	},
+	// Help defense: defensive IQ (twice) and interior D (or his size)
+	helpD: {
+		value: (r) => mean([r.diq, r.diq, r.idef ?? r.hgt]),
+		table: () => "diq",
+	},
+	// Post defense: interior D's own part (not the blocks), strength and size
+	postD: {
+		value: (r) => mean([sub(r, "idf") ?? r.idef ?? r.diq, r.stre, r.hgt]),
+		table: (r) => (r.idef !== undefined ? "idef" : "diq"),
+	},
+	// Offensive rebounding: the offensive-rebounding sub-rating (or the expanded rating)
+	oreb: {
+		value: (r) => sub(r, "orb") ?? r.oreb ?? r.reb,
+		table: () => "reb",
+	},
+	// Length: wingspan, and wingspan over height (only with the wingspan rating)
+	length: {
+		value: (r) =>
+			typeof r.wng === "number"
+				? clamp100(mean([r.wng, 50 + 4 * (r.wng - r.hgt)]))
+				: undefined,
+		table: () => "wng",
+	},
+	// Ball security: the ball-security sub-rating (or his handle) and the handle-under-pressure trait
+	secure: {
+		value: (r, t) => clamp100((sub(r, "sec") ?? r.drb) + nudge(t, "handle")),
+		table: () => "drb",
+	},
+	// Switchability: lateral quickness, perimeter and interior D, a size in the middle, and the versatility trait
+	switchD: {
+		value: (r, t) =>
+			clamp100(
+				mean([
+					sub(r, "lat") ?? r.spd,
+					r.pdef ?? r.diq,
+					r.idef ?? r.diq,
+					100 - 2 * Math.abs(r.hgt - 48),
+				]) + nudge(t, "defensiveVersatility"),
+			),
+		table: (r) => (r.pdef !== undefined ? "pdef" : "diq"),
+	},
+	// Rim running / lob threat: max vertical (or leaping), size, finishing, speed
+	rimRun: {
+		value: (r) => mean([sub(r, "mxv") ?? r.jmp, r.hgt, r.dnk, r.dnk, r.spd]),
+		table: () => "dnk",
+	},
+	// Screening / roll man: strength, size, offensive rebounding, contact finishing, and the screen trait
+	roll: {
+		value: (r, t) =>
+			clamp100(
+				mean([
+					r.stre,
+					r.hgt,
+					sub(r, "orb") ?? r.oreb ?? r.reb,
+					sub(r, "con") ?? r.dnk,
+				]) + nudge(t, "screen"),
+			),
+		table: () => "stre",
+	},
+	// Transition: speed, finishing, the floater (or close-range touch)
+	transition: {
+		value: (r) => mean([r.spd, r.dnk, sub(r, "flt") ?? r.ins]),
+		table: () => "spd",
+	},
+	// Motor: the motor and hustle traits and endurance (only with traits: never read without them)
+	motor: {
+		value: (r, t) => {
+			const m = trait(t, "motor");
+			const h = trait(t, "hustle");
+			return m === undefined && h === undefined
+				? undefined
+				: mean([r.endu, m ?? h, h ?? m]);
+		},
+		table: () => "endu",
+	},
 };
 export const NOUNS = Object.keys(NOUN_VALUE) as NounKey[];
 // archcov: each noun's value among the players of one position group (guards, wings, bigs): the quantiles of the
@@ -208,8 +348,11 @@ export const NOUNS = Object.keys(NOUN_VALUE) as NounKey[];
 export type NounGroupQuantiles = Partial<
 	Record<PosGroup | "all", Partial<Record<NounKey, number[]>>>
 >;
-export const nounValue = (k: NounKey, r: ArchetypeRatings) =>
-	NOUN_VALUE[k].value(r);
+export const nounValue = (
+	k: NounKey,
+	r: ArchetypeRatings,
+	t?: Partial<Record<string, number>>,
+) => NOUN_VALUE[k].value(r, t);
 export const nounGroupQuantiles = (
 	rows: readonly { ratings: ArchetypeRatings; pos?: string }[],
 ): NounGroupQuantiles => {
@@ -226,8 +369,12 @@ export const nounGroupQuantiles = (
 		for (const k of NOUNS) {
 			const v = mine
 				.map((x) => NOUN_VALUE[k].value(x.ratings))
-				.filter((x) => Number.isFinite(x))
+				.filter((x): x is number => x !== undefined && Number.isFinite(x))
 				.sort((a, b) => a - b);
+			// (archskill: a skill few players have a value for, length without wingspans or motor without traits: no table)
+			if (v.length < 40) {
+				continue;
+			}
 			t[k] = Array.from({ length: RQ_POINTS }, (_, i) => {
 				const p = (i / (RQ_POINTS - 1)) * (v.length - 1);
 				const lo = Math.floor(p);
@@ -267,6 +414,18 @@ export const NOUN_RATING: Record<NounKey, keyof ArchetypeRatings> = {
 	jump: "jmp",
 	strength: "stre",
 	crafty: "oiq",
+	foulDraw: "ft",
+	cut: "dnk",
+	helpD: "diq",
+	postD: "diq",
+	oreb: "reb",
+	length: "hgt",
+	secure: "drb",
+	switchD: "diq",
+	rimRun: "dnk",
+	roll: "stre",
+	transition: "spd",
+	motor: "endu",
 };
 // The rating at a standing among the league's players
 export const ratingAtPct = (k: string, p: number, rq?: RatingQuantiles) => {
@@ -286,6 +445,8 @@ export type NounScore = {
 	pct: number;
 	// how far above the league's 90th percentile, in units of its top spread (breaks ties at the very top)
 	above: number;
+	// archskill: no value for it (length without wingspans, motor without traits): standing 0
+	missing?: true;
 };
 
 const tableOf = (k: string, rq?: RatingQuantiles) =>
@@ -308,20 +469,31 @@ const byStanding =
 export const nounScores = (
 	r: ArchetypeRatings,
 	rq?: RatingQuantiles,
+	// archskill: his traits (only the visible ones are read: SKILL_TRAITS)
+	traits?: Partial<Record<string, number>>,
+	// archskill: which skills (by default the reading-28 ones, as the callers outside the coverage reading read them:
+	// the draft class's skill mix, the aim targets, the user's verdicts; the coverage reading asks for all of them)
+	keys: readonly NounKey[] = OLD_NOUNS,
 ): NounScore[] =>
-	NOUNS.map((key) => {
-		const value = NOUN_VALUE[key].value(r);
-		const tk = NOUN_VALUE[key].table(r);
-		const t = tableOf(tk, rq);
-		const q90 = t ? t[Math.round(0.9 * (t.length - 1))]! : 70;
-		const top = t ? t.at(-1)! : 100;
-		return {
-			key,
-			value,
-			pct: pctOf(tk, value, rq),
-			above: (value - q90) / Math.max(1, top - q90),
-		};
-	}).sort(byStanding((s) => s.pct));
+	keys
+		.map((key): NounScore => {
+			const v = NOUN_VALUE[key].value(r, traits);
+			if (v === undefined || !Number.isFinite(v)) {
+				return { key, value: 0, pct: 0, above: -1, missing: true };
+			}
+			const value = v;
+			const tk = NOUN_VALUE[key].table(r);
+			const t = tableOf(tk, rq);
+			const q90 = t ? t[Math.round(0.9 * (t.length - 1))]! : 70;
+			const top = t ? t.at(-1)! : 100;
+			return {
+				key,
+				value,
+				pct: pctOf(tk, value, rq),
+				above: (value - q90) / Math.max(1, top - q90),
+			};
+		})
+		.sort(byStanding((s) => s.pct));
 
 // archnouns4 (the user: "a lot of high flyer builds, maybe too many"): leaping names him only from the league's top
 // 10%, and ranks ATH_DISCOUNT below a skill at the same standing, so a skill that is close wins (speed and strength
@@ -349,8 +521,8 @@ export const clearedNouns = (
 		);
 
 export const twoWayOk = (r: ArchetypeRatings, rq?: RatingQuantiles) => {
-	const perim = NOUN_VALUE.perimD.value(r);
-	const rim = NOUN_VALUE.rimD.value(r);
+	const perim = NOUN_VALUE.perimD.value(r) ?? 0;
+	const rim = NOUN_VALUE.rimD.value(r) ?? 0;
 	const d = Math.max(perim, rim);
 	const pct = Math.max(
 		pctOf(NOUN_VALUE.perimD.table(r), perim, rq),
@@ -370,6 +542,12 @@ export const OFFENSE: ReadonlySet<NounKey> = new Set([
 	"handle",
 	"creator",
 	"pass",
+	// archskill (reading 29)
+	"foulDraw",
+	"cut",
+	"secure",
+	"rimRun",
+	"roll",
 ]);
 
 // ---- special names (builds) ----
@@ -791,9 +969,10 @@ export const SUB_WORD: Partial<
 		groups: ["guard", "wing"],
 	},
 	handle: { keys: ["hnd", "sec"], words: { hnd: "shifty", sec: "steady" } },
+	// (archskill: a post defender's word is his own skill's now, post defense)
 	rimD: {
 		keys: ["blk", "idf"],
-		words: { blk: "shotBlocking", idf: "postDefending" },
+		words: { blk: "shotBlocking" },
 	},
 	speed: { keys: ["sls", "lat"], words: { lat: "twitchy" } },
 };
@@ -863,6 +1042,16 @@ export const nameProblem = (name: string): string | undefined => {
 		}
 	}
 	return undefined;
+};
+
+// archskill (reading 29): a skill-noun name never says one stem twice ("Defensive Help Defender", "Rebounding
+// Rebounder"): two words that start with the same five letters
+export const stemRepeat = (name: string): boolean => {
+	const stems = name
+		.split(/[\s-]+/)
+		.filter((t) => t.length >= 5)
+		.map((t) => t.slice(0, 5).toLowerCase());
+	return new Set(stems).size !== stems.length;
 };
 
 // ---- the words' promises (archnouns4, the user's 2053 audit): every word of a name is checked against what it
@@ -975,7 +1164,7 @@ export const WORD_REQ: WordReq[] = [
 	},
 	// athleticism
 	{
-		re: /Speedy|Glider|\bGlide\b|Burner|Track Star|\bJet\b|Blur|Open-Lane|Transition|Twitchy|Quick|\bFast\b|Speed/,
+		re: /Speedy|Glider|\bGlide\b|Burner|Track Star|\bJet\b|Open-Lane|Twitchy|Quick|\bFast\b|Speed/,
 		nouns: ["speed"],
 		why: "speed",
 	},
@@ -1006,7 +1195,7 @@ export const WORD_REQ: WordReq[] = [
 		re: /Two-Way|2-Way/,
 		// (archfam: his best defensive and best offensive skill both in the top 20%)
 		check: (c) =>
-			Math.max(c.pct("perimD"), c.pct("rimD"), c.pct("steal")) >= 0.8 &&
+			Math.max(...[...DEF_NOUNS].map((n) => c.pct(n))) >= 0.8 &&
 			Math.max(...[...OFFENSE].map((n) => c.pct(n))) >= 0.8,
 		why: "two ways (his best defensive and best offensive skill in the top 20%)",
 	},
@@ -1044,10 +1233,13 @@ export const WORD_REQ: WordReq[] = [
 		min: 55,
 		why: "hustle",
 	},
+	// (archskill: with traits, the trait; without them, the skill read from his ratings)
 	{
 		re: /Switch/,
-		trait: "defensiveVersatility",
-		min: 55,
+		check: (c) =>
+			c.traits
+				? (c.traits.defensiveVersatility ?? -Infinity) >= 55
+				: c.pct("switchD") >= NEW_STRONG_BAR,
 		why: "defensive versatility",
 	},
 	{
@@ -1063,11 +1255,20 @@ export const WORD_REQ: WordReq[] = [
 		why: "shot discipline",
 	},
 	{ re: /Clutch|Closer|Ice-Cold/, trait: "clutch", min: 55, why: "clutch" },
-	{ re: /Off-Ball|Cutter|Mover/, trait: "offBall", min: 55, why: "off-ball" },
+	{
+		re: /Off-Ball|Cutter|Mover/,
+		check: (c) =>
+			c.traits
+				? (c.traits.offBall ?? -Infinity) >= 55
+				: c.pct("cut") >= NEW_STRONG_BAR,
+		why: "off-ball",
+	},
 	{
 		re: /Roll Man|Roll-Man|Rolling|Screen/,
-		trait: "screen",
-		min: 50,
+		check: (c) =>
+			c.traits
+				? (c.traits.screen ?? -Infinity) >= 50
+				: c.pct("roll") >= NEW_STRONG_BAR,
 		why: "screen setting",
 	},
 	{
@@ -1078,7 +1279,44 @@ export const WORD_REQ: WordReq[] = [
 	},
 	{ re: /Ruthless/, trait: "competitiveness", min: 55, why: "competitiveness" },
 	{ re: /Iron\b|Durable/, trait: "durability", min: 55, why: "durability" },
-	// elite words, development words
+	// archskill (reading 29): the new skills' words (for reports: a name's skill list says them)
+	{
+		re: /Foul|And-One|Free-Throw/,
+		nouns: ["foulDraw"],
+		why: "foul drawing",
+	},
+	{ re: /Backdoor|Cutter|Movement|Relocation/, nouns: ["cut"], why: "cutting" },
+	{
+		re: /Help-Side|Help Defender|Quarterback/,
+		nouns: ["helpD"],
+		why: "help defense",
+	},
+	{
+		re: /Post-Defend|Post Stopper|Low-Post Wall/,
+		nouns: ["postD"],
+		why: "post defense",
+	},
+	{
+		re: /Board-Hunting|Glass Crasher/,
+		nouns: ["oreb"],
+		why: "offensive rebounding",
+	},
+	{ re: /\bLong\b|Length|Pterodactyl/, nouns: ["length"], why: "length" },
+	{ re: /Mistake-Free/, nouns: ["secure"], why: "ball security" },
+	{ re: /Switchable|1-through-4/, nouns: ["switchD"], why: "switchability" },
+	{
+		re: /Lob-Catching|Lob Threat|Rim Runner|Vertical Spacer/,
+		nouns: ["rimRun"],
+		why: "rim running",
+	},
+	{
+		re: /Screen-and-Roll|Roll Man|Short-Roll/,
+		nouns: ["roll"],
+		why: "screen and roll",
+	},
+	{ re: /Transition|Open-Court/, nouns: ["transition"], why: "transition" },
+	{ re: /High-Motor|Motor Wing|Energy Big/, nouns: ["motor"], why: "motor" },
+	// elite words (archskill, reading 29: and the development words of the older readings' names, never given now)
 	{ re: ELITE_RE, check: (c) => c.eliteOvr, why: "an elite ovr" },
 	// (archcov, the user's 2064 audit: "athlete with no game" with steals in the top 1%)
 	{
@@ -1088,7 +1326,7 @@ export const WORD_REQ: WordReq[] = [
 	},
 	{
 		re: /\bRaw\b|Developing|Project|Late Bloomer|Lottery/,
-		check: (c) => c.ovr <= DEV_MAX_OVR || c.cleared.size === 0,
+		check: (c) => c.ovr <= 30 || c.cleared.size === 0,
 		why: "ovr 30 or below, or no skill",
 	},
 ];
@@ -1253,6 +1491,7 @@ export const CUSTOM_SPECIALS: {
 	},
 	...USER_SPECIALS_2(),
 	...USER_SPECIALS_3(),
+	...SKILL_SPECIALS(),
 	{
 		key: "sSlashMiddyF",
 		positions: ["SF", "F", "PF"],
@@ -1276,7 +1515,7 @@ function USER_SPECIALS_2(): {
 		(sub(r, a) ?? 0) > (sub(r, b) ?? 0);
 	const tr = (c: SpecialCtx, k: string) => c.traits?.[k] ?? 0;
 	const count = (c: SpecialCtx, min: number) =>
-		NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= min).length;
+		OLD_NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= min).length;
 	return [
 		{
 			key: "sMidnightHash",
@@ -1295,7 +1534,7 @@ function USER_SPECIALS_2(): {
 			anyBest: true,
 			test: (c) =>
 				count(c, NOUN_CLEAR) >= 8 &&
-				NOUNS.some((n) => n !== "crafty" && c.pct[n] >= 0.85),
+				OLD_NOUNS.some((n) => n !== "crafty" && c.pct[n] >= 0.85),
 		},
 		{
 			key: "sSwitchblade",
@@ -1512,6 +1751,71 @@ function USER_SPECIALS_2(): {
 }
 
 // The user's third list (archnouns3)
+// archskill (reading 29): catalog names of the new skills (each needs its skills among his best, like any special name)
+function SKILL_SPECIALS(): {
+	key: string;
+	positions: readonly Pos[];
+	nouns: NounKey[];
+	test: (c: SpecialCtx) => boolean;
+}[] {
+	const G_F: Pos[] = ["PG", "G", "SG", "GF", "SF", "F"];
+	const BIGS: Pos[] = ["PF", "FC", "C"];
+	const tv = (c: SpecialCtx, k: string) => c.traits?.[k] ?? -Infinity;
+	return [
+		{
+			key: "s4Pterodactyl",
+			positions: ["GF", "SF", "F", "PF", "FC", "C"],
+			nouns: ["length", "rimD"],
+			test: ({ pct }) => pct.length >= 0.95 && pct.rimD >= 0.8,
+		},
+		{
+			key: "s4TransitionWeapon",
+			positions: G_F,
+			nouns: ["transition", "finish"],
+			test: ({ pct }) => pct.transition >= 0.9 && pct.finish >= 0.8,
+		},
+		{
+			key: "s4OpenCourtBlur",
+			positions: ["PG", "G", "SG"],
+			nouns: ["transition", "handle"],
+			test: ({ pct }) =>
+				pct.transition >= 0.9 && pct.speed >= 0.9 && pct.handle >= 0.75,
+		},
+		{
+			key: "s4EnergyBig",
+			positions: BIGS,
+			nouns: ["motor", "reb"],
+			test: (c) =>
+				c.pct.motor >= 0.85 && c.pct.reb >= 0.75 && tv(c, "hustle") >= 55,
+		},
+		{
+			key: "s4MotorWing",
+			positions: ["SG", "GF", "SF", "F"],
+			nouns: ["motor", "perimD"],
+			test: (c) =>
+				c.pct.motor >= 0.85 && c.pct.perimD >= 0.75 && tv(c, "motor") >= 50,
+		},
+		{
+			key: "s4RelocationSniper",
+			positions: G_F,
+			nouns: ["cut", "three"],
+			test: ({ pct, eliteOvr }) =>
+				eliteOvr && pct.three >= ELITE_PCT && pct.cut >= 0.85,
+		},
+		{
+			key: "s4OneThroughFour",
+			positions: ["GF", "SF", "F", "PF"],
+			nouns: ["switchD"],
+			test: ({ pct }) => pct.switchD >= 0.9 && pct.perimD >= 0.75,
+		},
+		{
+			key: "s4VerticalSpacer",
+			positions: BIGS,
+			nouns: ["rimRun", "jump"],
+			test: ({ pct }) => pct.rimRun >= 0.85 && pct.jump >= 0.9,
+		},
+	];
+}
 function USER_SPECIALS_3(): {
 	key: string;
 	positions: readonly Pos[];
@@ -1537,7 +1841,7 @@ function USER_SPECIALS_3(): {
 		(sub(r, a) ?? 0) - (sub(r, b) ?? 0) > by;
 	const tr = (c: SpecialCtx, k: string) => c.traits?.[k] ?? 0;
 	const count = (c: SpecialCtx, min: number) =>
-		NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= min).length;
+		OLD_NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= min).length;
 	const lat = (c: SpecialCtx) => pctOf("spd", sub(c.r, "lat") ?? c.r.spd);
 	const elite = (c: SpecialCtx) => c.eliteOvr;
 	const scoring = (c: SpecialCtx) =>
@@ -1615,7 +1919,7 @@ function USER_SPECIALS_3(): {
 				c.pct.pass >= 0.7 &&
 				c.pct.handle >= 0.7 &&
 				lead(c.r, "vis", "acc") &&
-				NOUNS.every((n) => n === "crafty" || c.pct[n] < 0.9),
+				OLD_NOUNS.every((n) => n === "crafty" || c.pct[n] < 0.9),
 		),
 		S(
 			"s3SecondaryFacilitator",
@@ -1774,7 +2078,7 @@ function USER_SPECIALS_3(): {
 			["three"],
 			(c) =>
 				c.pct.three >= 0.8 &&
-				NOUNS.every(
+				OLD_NOUNS.every(
 					(n) =>
 						n === "three" || n === "crafty" || c.pct[n] <= c.pct.three - 0.12,
 				),
@@ -1802,8 +2106,9 @@ function USER_SPECIALS_3(): {
 			(c) =>
 				c.pct.three >= 0.75 &&
 				lead(c.r, "tcs", "tod", 5) &&
-				NOUNS.filter((n) => n !== "three" && n !== "crafty" && c.pct[n] >= 0.7)
-					.length <= 1,
+				OLD_NOUNS.filter(
+					(n) => n !== "three" && n !== "crafty" && c.pct[n] >= 0.7,
+				).length <= 1,
 		),
 		S(
 			"s3CornerPocket",
@@ -1835,7 +2140,7 @@ function USER_SPECIALS_3(): {
 			["perimD"],
 			(c) =>
 				count(c, GENERIC_PCT) >= 3 &&
-				NOUNS.every((n) => n === "crafty" || c.pct[n] < 0.85) &&
+				OLD_NOUNS.every((n) => n === "crafty" || c.pct[n] < 0.85) &&
 				c.pct.perimD >= 0.7 &&
 				(c.traits === undefined || (c.traits.ego ?? 0) >= 60),
 			true,
@@ -2261,7 +2566,9 @@ export const END_WORDS: {
 		ok: (c) =>
 			c.pct.three >= 0.8 &&
 			!lead2(c.r, "tod", "tcs") &&
-			NOUNS.every((n) => n === "three" || n === "crafty" || c.pct[n] < 0.85),
+			OLD_NOUNS.every(
+				(n) => n === "three" || n === "crafty" || c.pct[n] < 0.85,
+			),
 	},
 	{
 		key: "eCloser",
@@ -2290,7 +2597,7 @@ export const END_WORDS: {
 		ok: (c) =>
 			c.ovr >= ELITE_OVR_FLOOR &&
 			c.ovrPct >= 0.98 &&
-			NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= 0.9).length >= 2,
+			OLD_NOUNS.filter((n) => n !== "crafty" && c.pct[n] >= 0.9).length >= 2,
 	},
 	{
 		key: "eScorer",
@@ -2306,11 +2613,179 @@ export const END_WORDS: {
 	{ key: "eFive", ok: (c) => c.pos === "C" || c.pos === "FC" },
 ];
 
+// ---- archskill (reading 29): the plain noun of each skill ----
+// A one-skill player's name is the noun of his skill ("Rebounder"); two skills, the front word of one and the noun of
+// the other ("Glass-Cleaning Contact Finisher"). Each skill's nouns are tried in order, the first that fits him naming
+// it: an elite standing, a sub-rating lean (SUB_LEAN), a modifier at the word bar; the last always fits. Crafty and the
+// modifiers have no noun (they are words next to a skill).
+export type SkillNounCtx = {
+	pct: Record<NounKey, number>;
+	r: ArchetypeRatings;
+	group: PosGroup;
+	elite: (k: NounKey) => boolean;
+	rq?: RatingQuantiles;
+	traits?: Record<string, number>;
+};
+type SkillNoun = { key: string; ok?: (c: SkillNounCtx) => boolean };
+const leadOver = (a: number, b: number) => a - b >= SUB_LEAN;
+export const SKILL_NOUNS: Partial<Record<NounKey, SkillNoun[]>> = {
+	three: [
+		{ key: "kSharpshooter", ok: (c) => c.elite("three") },
+		{
+			key: "kSpotUpShooter",
+			ok: (c) => leadSub(c.r, ["tcs", "tod"]) === "tcs",
+		},
+		{
+			key: "kPullUpShooter",
+			ok: (c) => leadSub(c.r, ["tcs", "tod"]) === "tod",
+		},
+		{ key: "kShooter" },
+	],
+	mid: [
+		{
+			key: "kPullUpArtist",
+			ok: (c) => leadSub(c.r, ["pul", "spu"]) === "pul" && c.pct.mid >= 0.7,
+		},
+		{ key: "kMidShooter" },
+	],
+	post: [
+		{
+			key: "kCloseScorer",
+			ok: (c) =>
+				c.group !== "big" && leadSub(c.r, ["pst", "cls", "flt"]) === "cls",
+		},
+		{
+			key: "kTouchScorer",
+			ok: (c) =>
+				c.group !== "big" && leadSub(c.r, ["pst", "cls", "flt"]) === "flt",
+		},
+		{ key: "kPostScorer" },
+	],
+	finish: [
+		{
+			key: "kBulldozer",
+			ok: (c) =>
+				leadSub(c.r, ["con", "fns", "flt"]) === "con" &&
+				c.pct.strength >= ATH_WORD_BAR,
+		},
+		{
+			key: "kContactFinisher",
+			ok: (c) => leadSub(c.r, ["con", "fns", "flt"]) === "con",
+		},
+		{
+			key: "kAcroFinisher",
+			ok: (c) => leadSub(c.r, ["con", "fns", "flt"]) === "fns",
+		},
+		{
+			key: "kTouchFinisher",
+			ok: (c) => leadSub(c.r, ["con", "fns", "flt"]) === "flt",
+		},
+		{ key: "kFinisher" },
+	],
+	rimRun: [
+		{ key: "kLobThreat", ok: (c) => c.pct.jump >= ATH_WORD_BAR },
+		{ key: "kRimRunner" },
+	],
+	foulDraw: [
+		{
+			key: "kAndOne",
+			ok: (c) =>
+				leadOver(sub(c.r, "con") ?? c.r.dnk, c.r.ft) &&
+				c.pct.finish >= STRONG_BAR,
+		},
+		{
+			key: "kFtMerchant",
+			ok: (c) => leadOver(c.r.ft, sub(c.r, "con") ?? c.r.dnk),
+		},
+		{ key: "kFoulMagnet" },
+	],
+	cut: [
+		{
+			key: "kMovementShooter",
+			ok: (c) =>
+				leadOver(sub(c.r, "spu") ?? c.r.fg, c.r.dnk) &&
+				c.pct.three >= SKILL_BAR,
+		},
+		{ key: "kBackdoorCutter" },
+	],
+	rimD: [
+		{
+			key: "kShotBlocker",
+			ok: (c) => leadSub(c.r, ["blk", "idf"]) === "blk",
+		},
+		{ key: "kRimProtector" },
+	],
+	postD: [
+		{ key: "kLowPostWall", ok: (c) => c.pct.strength >= ATH_WORD_BAR },
+		{ key: "kPostStopper" },
+	],
+	helpD: [
+		{ key: "kDefQB", ok: (c) => c.elite("helpD") },
+		{ key: "kHelpAnchor", ok: (c) => c.group === "big" },
+		{ key: "kHelpDefender" },
+	],
+	perimD: [
+		{ key: "kLockdownDefender", ok: (c) => c.elite("perimD") },
+		{ key: "kLengthDefender", ok: (c) => c.pct.length >= ATH_WORD_BAR },
+		{ key: "kPerimDefender" },
+	],
+	steal: [{ key: "kBallHawk" }],
+	switchD: [{ key: "kSwitchDefender" }],
+	handle: [{ key: "kBallHandler" }],
+	creator: [
+		{
+			key: "kShotCreator",
+			ok: (c) => {
+				const crt = sub(c.r, "crt");
+				return crt === undefined || pctOf("drb", crt, c.rq) >= NOUN_CLEAR;
+			},
+		},
+		{ key: "kBallHandler" },
+	],
+	secure: [{ key: "kMistakeFree" }],
+	pass: [
+		{ key: "kVisionary", ok: (c) => leadSub(c.r, ["vis", "acc"]) === "vis" },
+		{
+			key: "kPrecisionPasser",
+			ok: (c) => leadSub(c.r, ["vis", "acc"]) === "acc",
+		},
+		{ key: "kPasser" },
+	],
+	reb: [{ key: "kRebounder" }],
+	oreb: [{ key: "kGlassCrasher" }],
+	roll: [
+		{ key: "kShortRoll", ok: (c) => c.pct.pass >= STRONG_BAR },
+		{ key: "kRollMan" },
+	],
+};
+// The skill each noun says (its first skill: Ball Handler is handling's, also shot creation's last noun)
+export const SKILL_ROLE_NOUN: ReadonlyMap<string, NounKey> = (() => {
+	const m = new Map<string, NounKey>();
+	for (const [n, vs] of Object.entries(SKILL_NOUNS) as [
+		NounKey,
+		SkillNoun[],
+	][]) {
+		for (const v of vs) {
+			if (!m.has(v.key)) {
+				m.set(v.key, n);
+			}
+		}
+	}
+	return m;
+})();
+// The noun his skill takes now (undefined for a skill with no noun: offensive IQ, the modifiers)
+export const skillNounOf = (n: NounKey, c: SkillNounCtx): string | undefined =>
+	SKILL_NOUNS[n]?.find((v) => v.ok?.(c) ?? true)?.key;
+
 // ---- the defensive label ----
 export const DEF_NOUNS: ReadonlySet<NounKey> = new Set([
 	"rimD",
 	"perimD",
 	"steal",
+	// archskill (reading 29)
+	"helpD",
+	"postD",
+	"switchD",
 ]);
 
 // Whether his ovr is elite: the league's top ELITE_OVR_PCT, never below ELITE_OVR_FLOOR (no league table: NOUN_ELITE_OVR)
@@ -2323,49 +2798,9 @@ export const eliteOvrOf = (ovr: number | undefined, rq?: RatingQuantiles) => {
 			: ovr >= NOUN_ELITE_OVR)
 	);
 };
-// (what an honest name is about, as the noun it is named for: "none" for a name about no skill)
-export const HONEST_NOUNS: Record<string, (NounKey | "none")[]> = {
-	hShoot: ["three"],
-	hGunner: ["three", "mid", "none"],
-	hPerD: ["perimD", "steal"],
-	hGlove: ["perimD", "steal"],
-	hRimD: ["rimD"],
-	hReb: ["reb"],
-	hStrength: ["strength"],
-	hJump: ["jump"],
-	hSpeed: ["speed"],
-	hAthNoShot: ["jump", "speed"],
-	hPass: ["pass", "crafty"],
-	hHandle: ["handle", "creator"],
-	hMid: ["mid"],
-	hPost: ["post"],
-	hDunk: ["finish"],
-	hSlowScorer: ["mid", "post"],
-	hEmptyScorer: ["mid", "post", "three"],
-	hEarthbound: ["reb", "rimD", "post", "strength"],
-	hDevShoot: ["three"],
-	hDevPerD: ["perimD", "steal"],
-	hDevRimD: ["rimD"],
-	hDevPass: ["pass", "crafty"],
-	hDevHandle: ["handle", "creator"],
-	hDevReb: ["reb"],
-	hDevScore: ["mid", "finish"],
-	hDevPost: ["post"],
-	hDevAth: ["jump", "speed"],
-	hDevStrength: ["strength"],
-	hTools: ["none"],
-	hProject: ["none"],
-	hLottery: ["none"],
-	hLateBloomer: ["none"],
-	hHustle: ["none"],
-	hFiller: ["none"],
-	hJourneyman: ["none"],
-	hCampBody: ["none"],
-};
-
 // archstick: last season's main name, read back from its id: a special name (a build), the user's own name,
-// Jack-Of-All-Trades, a trait name with no noun, or a noun name (front words and an end word). Undefined for an honest
-// name (the engine keeps those), an id of another size group, or a name the nouns never give.
+// Jack-Of-All-Trades, a trait name with no noun, or a noun name (front words and an end word, or a skill noun).
+// Undefined for a name of an older reading (an honest name), an id of another size group, or a name the nouns never give.
 export type PrevMain = { id: string } & (
 	| { kind: "special"; sp: Special }
 	| { kind: "custom"; c: CustomSpecial; twoWay?: true }
@@ -2412,14 +2847,10 @@ const favoredNouns = (x: NounInput): ReadonlySet<NounKey> | undefined => {
 		if (e?.covers) {
 			out.add(e.covers);
 		}
-	}
-	// (an honest name's noun too)
-	const id = x.prev.id;
-	if (!pm && id !== undefined && isComposedId(id)) {
-		for (const n of HONEST_NOUNS[parseComposedId(id)?.role.key ?? ""] ?? []) {
-			if (n !== "none") {
-				out.add(n);
-			}
+		// (archskill: a skill noun's skill)
+		const k = SKILL_ROLE_NOUN.get(pm.role);
+		if (k) {
+			out.add(k);
 		}
 	}
 	for (const n of defLabelNouns(x.prev.defense)) {
@@ -2488,7 +2919,8 @@ export const prevMainOf = (x: NounInput, pos: Pos): PrevMain | undefined => {
 		key.startsWith("pos") ||
 		key === "bruiser" ||
 		key === "enigma" ||
-		END_WORDS.some((e) => e.key === key)
+		END_WORDS.some((e) => e.key === key) ||
+		SKILL_ROLE_NOUN.has(key)
 	) {
 		const pick: Record<string, string> = {};
 		for (const [k, v] of Object.entries(pc.pick)) {
@@ -2537,6 +2969,10 @@ export const ATH_KEYS: ReadonlySet<NounKey> = new Set([
 	"speed",
 	"jump",
 	"strength",
+	// archskill (reading 29): length, transition and motor are modifiers too (a word next to a skill, or a catalog name)
+	"length",
+	"transition",
+	"motor",
 ]);
 // An athletic noun leads a name (no basketball skill clears) from this standing
 export const ATH_LEAD_BAR = 0.7;
@@ -2549,10 +2985,24 @@ export const STICK_BOOST = 0.02;
 export const DEF_TAG_PCT = 0.85;
 // A name's skills must be among his best TOP_N (and include his best one)
 export const TOP_N = 4;
+// archskill (reading 29): the new skills (not the modifiers) clear higher, as offensive IQ does: each reads ratings an old
+// skill also reads, so it names a player only when it stands out (NEW_SKILL_BAR may be named, NEW_STRONG_BAR real)
+export const NEW_SKILL_BAR = 0.8;
+export const NEW_STRONG_BAR = 0.85;
 export const coverBar = (k: NounKey) =>
-	k === "crafty" ? CRAFTY_BAR : ATH_KEYS.has(k) ? ATH_LEAD_BAR : SKILL_BAR;
+	k === "crafty"
+		? CRAFTY_BAR
+		: ATH_KEYS.has(k)
+			? ATH_LEAD_BAR
+			: NEW_NOUNS.has(k)
+				? NEW_SKILL_BAR
+				: SKILL_BAR;
 export const strongBar = (k: NounKey) =>
-	k === "crafty" ? CRAFTY_STRONG : STRONG_BAR;
+	k === "crafty"
+		? CRAFTY_STRONG
+		: NEW_NOUNS.has(k) && !ATH_KEYS.has(k)
+			? NEW_STRONG_BAR
+			: STRONG_BAR;
 
 export type CoverScore = NounScore & {
 	// his standing in the league and among his position group (pct: the lower of the two)
@@ -2574,6 +3024,16 @@ const byCover = (
 		NOUNS.indexOf(a.key) - NOUNS.indexOf(b.key);
 };
 // Every noun's standing (league, position group, and the lower of the two), best first
+// archskill: a reading asks for the same standings several times (the pick, its context, last season's label re-checked
+// with slack): the last few answers per ratings object are kept, with a print of its values in case it was changed
+const scoreMemo = new WeakMap<
+	object,
+	{ args: readonly unknown[]; out: CoverScore[] }[]
+>();
+const printOf = (r: ArchetypeRatings) =>
+	Object.values(r)
+		.map((v) => (Array.isArray(v) ? v.join(",") : String(v)))
+		.join("|");
 export const coverScores = (
 	r: ArchetypeRatings,
 	pos: Pos,
@@ -2581,6 +3041,30 @@ export const coverScores = (
 	ng?: NounGroupQuantiles,
 	// archcov: every standing moved by this much (the slack a last-season label is re-checked with: nouns.ts STICK_BOOST)
 	shift = 0,
+	// archskill: his traits (the trait-read skills read the visible ones: SKILL_TRAITS)
+	traits?: Partial<Record<string, number>>,
+): CoverScore[] => {
+	const args = [pos, rq, ng, shift, traits, printOf(r)] as const;
+	const memo = scoreMemo.get(r) ?? [];
+	const hit = memo.find((m) => m.args.every((a, i) => a === args[i]));
+	if (hit) {
+		return hit.out;
+	}
+	const out = coverScoresOf(r, pos, rq, ng, shift, traits);
+	memo.push({ args, out });
+	if (memo.length > 6) {
+		memo.shift();
+	}
+	scoreMemo.set(r, memo);
+	return out;
+};
+const coverScoresOf = (
+	r: ArchetypeRatings,
+	pos: Pos,
+	rq: RatingQuantiles | undefined,
+	ng: NounGroupQuantiles | undefined,
+	shift: number,
+	traits: Partial<Record<string, number>> | undefined,
 ): CoverScore[] => {
 	const group = groupOfPos(pos);
 	// (reports only: standings given outright, as an audit quotes them)
@@ -2588,8 +3072,11 @@ export const coverScores = (
 		.__standings;
 	// (archcov: the league standing against the league's own table of the noun's value; without the league's tables, a
 	// league's rating tables when given, else the reference league's values)
-	return nounScores(r, rq)
+	return nounScores(r, rq, traits, NOUNS)
 		.map((s) => {
+			if (s.missing) {
+				return { ...s, league: 0, group: 0, pct: 0 };
+			}
 			const lt =
 				ng?.all?.[s.key] ?? (rq ? undefined : NOUN_GROUP_REF.all?.[s.key]);
 			const gv = given?.[s.key];
@@ -2611,6 +3098,17 @@ export const FAMILY_HEAD: Partial<Record<NounKey, NounKey>> = {
 	mid: "three",
 	creator: "handle",
 	steal: "perimD",
+	// archskill (reading 29): ball security with creation, switchability with perimeter D, post defense and help defense
+	// with rim protection (interior D), offensive rebounding with rebounding, rim running, cutting and the roll man with
+	// finishing (each reads much what its family's head reads: as a family it counts once)
+	secure: "handle",
+	switchD: "perimD",
+	postD: "rimD",
+	oreb: "reb",
+	rimRun: "finish",
+	cut: "finish",
+	roll: "finish",
+	helpD: "rimD",
 };
 export const familyOf = (k: NounKey): NounKey => FAMILY_HEAD[k] ?? k;
 export const familyMembers = (head: NounKey): NounKey[] =>
@@ -2633,14 +3131,63 @@ export const familyRep = (
 			? "mid"
 			: "three";
 	}
-	if (head === "handle") {
-		return pct("creator") > pct("handle") ? "creator" : "handle";
+	let rep: NounKey =
+		head === "handle"
+			? pct("creator") > pct("handle")
+				? "creator"
+				: "handle"
+			: head === "perimD"
+				? pct("steal") > pct("perimD")
+					? "steal"
+					: "perimD"
+				: head;
+	// (archskill: a reading-29 member names its family only with MID_EDGE over the word above, or when that word doesn't
+	// clear its bar and the member does: "Glass Crasher" only for a player whose offensive rebounding clearly leads)
+	for (const m of NEW_MEMBERS[head] ?? []) {
+		if (
+			pct(m) >= coverBar(m) &&
+			(pct(m) >= pct(rep) + NEW_MEMBER_EDGE || pct(rep) < coverBar(rep))
+		) {
+			rep = m;
+		}
 	}
-	if (head === "perimD") {
-		return pct("steal") > pct("perimD") ? "steal" : "perimD";
-	}
-	return head;
+	return rep;
 };
+// archskill (reading 29): the new skills in an old family (they name it only with a clear lead, NEW_MEMBER_EDGE: familyRep)
+export const NEW_MEMBER_EDGE = 0.15;
+const NEW_MEMBERS: Partial<Record<NounKey, NounKey[]>> = {
+	handle: ["secure"],
+	perimD: ["switchD"],
+	rimD: ["postD", "helpD"],
+	reb: ["oreb"],
+	finish: ["rimRun", "cut", "roll"],
+};
+// archskill: a new skill with a family of its own (foul drawing) leads his skills only with this edge (as mid-range and
+// offensive IQ need LEAD_EDGE), so a skill read from ratings an old one also reads (foul drawing from finishing and free
+// throws) doesn't crowd out the old one on a near tie
+export const NEW_EDGE = 0.08;
+// (every reading-29 skill)
+export const NEW_NOUNS: ReadonlySet<NounKey> = new Set([
+	"foulDraw",
+	"cut",
+	"helpD",
+	"postD",
+	"oreb",
+	"length",
+	"secure",
+	"switchD",
+	"rimRun",
+	"roll",
+	"transition",
+	"motor",
+]);
+// (the skills of reading 28: what the catalog's and the user's names count, "8 skills in the top 30%", read on)
+export const OLD_NOUNS: readonly NounKey[] = NOUNS.filter(
+	(n) => !NEW_NOUNS.has(n),
+);
+export const NEW_OWN: ReadonlySet<NounKey> = new Set(["foulDraw"]);
+export const leadEdgeOf = (k: NounKey) =>
+	k === "mid" || k === "crafty" ? LEAD_EDGE : NEW_OWN.has(k) ? NEW_EDGE : 0;
 // His basketball skills that clear their bar, best first, one per family (its naming word, at the family's standing);
 // a near tie (STICK_TIE) goes to the families last season's label named
 export const coverSkills = (
@@ -2674,12 +3221,7 @@ export const coverSkills = (
 	const fav = (k: NounKey) =>
 		familyMembers(familyOf(k)).some((m) => favored?.has(m));
 	return out.sort(
-		byCover(
-			(s) =>
-				s.pct -
-				(s.key === "mid" || s.key === "crafty" ? LEAD_EDGE : 0) +
-				(fav(s.key) ? STICK_TIE : 0),
-		),
+		byCover((s) => s.pct - leadEdgeOf(s.key) + (fav(s.key) ? STICK_TIE : 0)),
 	);
 };
 
@@ -2700,7 +3242,7 @@ export type CoverCtx = {
 	crtPct?: number;
 };
 export const coverCtxOf = (x: NounInput): CoverCtx => {
-	const scores = coverScores(x.r, x.pos, x.rq, x.ng, x.slack);
+	const scores = coverScores(x.r, x.pos, x.rq, x.ng, x.slack, x.traits);
 	const pct = Object.fromEntries(scores.map((s) => [s.key, s.pct])) as Record<
 		NounKey,
 		number
@@ -2756,6 +3298,18 @@ const WHY_NOUN: Record<NounKey, string> = {
 	jump: "leaping",
 	strength: "strength",
 	crafty: "offensive IQ",
+	foulDraw: "foul drawing",
+	cut: "off-ball cutting",
+	helpD: "help defense",
+	postD: "post defense",
+	oreb: "offensive rebounding",
+	length: "length",
+	secure: "ball security",
+	switchD: "switchability",
+	rimRun: "rim running",
+	roll: "screen and roll",
+	transition: "transition",
+	motor: "motor",
 };
 // archcov: what a name promises, from its own skill list (every kind of name has one: a special name's skills, a noun
 // name's front and end words, an honest name's skill, a defensive label's), so a name's promises never drift from what
@@ -2767,12 +3321,13 @@ export const coverPromises = (
 	name: string,
 	list: readonly NounKey[],
 	c: CoverCtx,
-	// (an honest name: its skill was checked on its own, honestPromises)
-	honest = false,
+	// (archskill: a skill name given for his best skills against the league, cover.ts skillPick: only the words that are
+	// no skill are checked)
+	wordsOnly = false,
 ): string[] => {
 	const out: string[] = [];
-	const skillN = honest ? [] : list.filter((n) => !ATH_KEYS.has(n));
-	const athN = honest ? [] : list.filter((n) => ATH_KEYS.has(n));
+	const skillN = wordsOnly ? [] : list.filter((n) => !ATH_KEYS.has(n));
+	const athN = wordsOnly ? [] : list.filter((n) => ATH_KEYS.has(n));
 	for (const n of skillN) {
 		const rank = skillRank(c, n);
 		if (rank === Infinity) {
@@ -2824,27 +3379,6 @@ export const coverPromises = (
 		}
 	}
 	return out;
-};
-// An honest name's promises: it is about the skill (or the lack of one) it was picked for, that skill in the league's
-// top 40% at least (it is a limited player's name, and says so), and its other words keep theirs
-export const honestPromises = (
-	key: string,
-	name: string,
-	noun: NounKey | undefined,
-	c: CoverCtx,
-): string[] => {
-	const about = HONEST_NOUNS[key] ?? ["none"];
-	const out: string[] = [];
-	if (noun === undefined) {
-		if (!about.includes("none")) {
-			out.push(`about ${about.join(" or ")}, with no skill to name`);
-		}
-	} else if (!about.includes(noun)) {
-		out.push(`about ${about.join(" or ")}, not his ${WHY_NOUN[noun]}`);
-	} else if (c.pct(noun) < GENERIC_PCT) {
-		out.push(`${WHY_NOUN[noun]}: not in the top 40% (league and position)`);
-	}
-	return [...out, ...coverPromises(name, noun ? [noun] : [], c, true)];
 };
 // The promises of a name with no list of its own, for reports: its skill words read as its list
 export const wordNouns = (name: string): NounKey[] => {
@@ -2900,7 +3434,17 @@ const WORD_NOUNS: [RegExp, NounKey][] = [
 	[/Power-Finishing|Finesse/, "finish"],
 	[/Close-Range|Floater/, "post"],
 	[/Shifty|Steady/, "handle"],
-	[/Shot-Blocking|Post-Defending/, "rimD"],
+	[/Shot-Blocking/, "rimD"],
+	// (archskill, reading 29: the new skills' front words)
+	[/Post-Defending/, "postD"],
+	[/Foul-Drawing/, "foulDraw"],
+	[/Backdoor/, "cut"],
+	[/Help-Side/, "helpD"],
+	[/Mistake-Free/, "secure"],
+	[/Lob-Catching/, "rimRun"],
+	[/Screen-and-Roll/, "roll"],
+	[/\bTransition\b/, "transition"],
+	[/High-Motor/, "motor"],
 	[/Quick-Footed|Twitchy/, "speed"],
 	[/\b(Driver|Glider)$/, "speed"],
 	[/\bDriver$/, "handle"],
@@ -2958,6 +3502,22 @@ export const nounsOfName = (
 	const custom = CUSTOM_NAME_NOUNS()[name];
 	if (custom) {
 		return { nouns: custom, twoWay: false };
+	}
+	// (archskill: a skill-noun name: its noun says its skill, its front words the others; a catalog build's name is read
+	// by its words as before)
+	const sn = ARCHETYPES.some((a) => a.name === name)
+		? undefined
+		: SKILL_NOUN_ROLES.filter(
+				(k) => name === k.name || name.endsWith(` ${k.name}`),
+			).sort((a, b) => b.name.length - a.name.length)[0];
+	const snNoun = sn ? SKILL_ROLE_NOUN.get(sn.key) : undefined;
+	if (sn && snNoun) {
+		const front = name.slice(0, name.length - sn.name.length).trim();
+		const rest = front ? nounsOfName(`${front} Guard`) : undefined;
+		return {
+			nouns: [...new Set([snNoun, ...(rest?.nouns ?? [])])],
+			twoWay: rest?.twoWay ?? false,
+		};
 	}
 	// (archfam: the user's own name with a 2-Way prefix)
 	const custom2 = /^2-Way /.test(name)

@@ -8,7 +8,7 @@ import { ARCHETYPES } from "../classify.ts";
 import { nameAt } from "../posNames.ts";
 import { POSITIONS } from "../position.ts";
 import { ROLE_BY_KEY } from "./grammar.ts";
-import { ELITE_RE, HONEST_ROLES } from "./honest.ts";
+import { ELITE_RE } from "./honest.ts";
 import {
 	ATH_WORD_BAR,
 	CRAFTY_BAR,
@@ -20,7 +20,6 @@ import {
 	NOUN_DESC,
 	SKILL_BAR,
 	STICK_BOOST,
-	STRONG_BAR,
 	TOP_N,
 	TRAIT_KEYWORDS,
 	WORD_REQ,
@@ -47,7 +46,8 @@ import {
 } from "./cover.ts";
 
 const pctTop = (p: number) => `${Math.round(100 * p)}th percentile`;
-import { DESC_BY_KEY } from "./grammar.ts";
+import { DESC_BY_KEY, SKILL_NOUN_ROLES } from "./grammar.ts";
+import { NEW_SKILL_BAR, NEW_STRONG_BAR, SKILL_NOUNS } from "./nouns.ts";
 import { ARCHETYPE_READING_VERSION } from "../helpers.ts";
 
 const star = (name: string) => (ELITE_RE.test(name) ? "★ " : "");
@@ -67,6 +67,18 @@ const NOUN_LABEL: Record<string, string> = {
 	jump: "leaping",
 	strength: "strength",
 	crafty: "offensive IQ",
+	foulDraw: "foul drawing",
+	cut: "cutting",
+	helpD: "help defense",
+	postD: "post defense",
+	oreb: "offensive rebounding",
+	length: "length",
+	secure: "ball security",
+	switchD: "switchability",
+	rimRun: "rim running",
+	roll: "screen and roll",
+	transition: "transition",
+	motor: "motor",
 };
 
 test.skipIf(!process.env.RUN_ARCH_LIST)(
@@ -82,7 +94,7 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 		out.push("## How a main name is built");
 		out.push("");
 		out.push(
-			`Each skill is read against the league and against his position group (guards, wings, bigs): its standing is the lower of the two, so a skill counts only when it is good outright and good for his position. A skill may be named from the ${pctTop(SKILL_BAR)} (offensive IQ from the ${pctTop(CRAFTY_BAR)}); its weight ramps from nothing at the ${pctTop(RAMP_LO)} to full at the ${pctTop(RAMP_HI)}, so there is no cliff. Speed, leaping and strength are modifiers, not skills: they lead a name only when no basketball skill reaches the ${pctTop(STRONG_BAR)}, and else add at most a word next to a skill (from the ${pctTop(ATH_WORD_BAR)}).`,
+			`Each skill is read against the league and against his position group (guards, wings, bigs): its standing is the lower of the two, so a skill counts only when it is good outright and good for his position. A skill may be named from the ${pctTop(SKILL_BAR)} (offensive IQ from the ${pctTop(CRAFTY_BAR)}); its weight ramps from nothing at the ${pctTop(RAMP_LO)} to full at the ${pctTop(RAMP_HI)}, so there is no cliff. Speed, leaping, strength, length, transition and motor are modifiers, not skills: they add at most a word next to a skill (from the ${pctTop(ATH_WORD_BAR)}) or appear in a catalog name. Reading 29 added twelve skills read from ratings, sub-ratings and visible traits (foul drawing, cutting, help defense, post defense, offensive rebounding, length, ball security, switchability, rim running, screen and roll, transition, motor); the ones that are skills clear higher (the ${pctTop(NEW_SKILL_BAR)}, a real skill from the ${pctTop(NEW_STRONG_BAR)}), since each reads ratings an older skill also reads.`,
 		);
 		out.push("");
 		out.push(
@@ -90,17 +102,17 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 		);
 		out.push("");
 		out.push(
-			`Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his ${TOP_N} best families it names (2-Way names all his defensive ones), minus ${MISS_TOP2} times the weight of either of his top two it leaves out, minus ${SECOND_COST} for a second skill named and ${EXTRA_COST} for each beyond two (2-Way counts as one; a noun name says at most ${MAX_PARTS}). Its skills must be among his best ${TOP_N} families (with 2-Way, his defensive families count as one) and it must cover his best one (offensive IQ apart). A special name (a build, the user's own names, Jack) gets ${SPECIAL_EDGE} over a noun name that covers the same. The many-skills names are gated by how many elite skills (the ${pctTop(ELITE_SKILL)}) he has: a broad one (Jack-Of-All-Trades, Swiss-Army-Knife) needs at most ${FLAT_ELITE} and covers each of his best ${GENERIC_COVER} of the way, an elite one (Complete All-Court Prototype, the Unicorns) needs ${MANY_ELITE} or more and covers each ${ELITE_COVER}. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). With no real skill (or one at OVR under 50, with no modifier) he gets an honest name, about the skill he has ("Spot-Up Specialist").`,
+			`Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his ${TOP_N} best families it names (2-Way names all his defensive ones), minus ${MISS_TOP2} times the weight of either of his top two it leaves out, minus ${SECOND_COST} for a second skill named and ${EXTRA_COST} for each beyond two (2-Way counts as one; a noun name says at most ${MAX_PARTS}). Its skills must be among his best ${TOP_N} families (with 2-Way, his defensive families count as one) and it must cover his best one (offensive IQ apart). A special name (a build, the user's own names, Jack) gets ${SPECIAL_EDGE} over a noun name that covers the same. The many-skills names are gated by how many elite skills (the ${pctTop(ELITE_SKILL)}) he has: a broad one (Jack-Of-All-Trades, Swiss-Army-Knife) needs at most ${FLAT_ELITE} and covers each of his best ${GENERIC_COVER} of the way, an elite one (Complete All-Court Prototype, the Unicorns) needs ${MANY_ELITE} or more and covers each ${ELITE_COVER}. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). Every skill has a plain noun (Rebounder, Spot-Up Shooter, Contact Finisher, Rim Protector, ...): a one-skill name is that noun, a two-skill name the front word of one skill and the noun of the other ("Glass-Cleaning Contact Finisher"). With no real skill (or one at OVR under 50, with no modifier) he is named by his best skill (or best two) against the league and his position, however low: there are no honest, depth or development names.`,
 		);
 		out.push("");
 		out.push(
-			`Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of ${STICK_BOOST} on each standing, so a point of noise doesn't take it away), it still covers his top two skills (families), and this season's best name doesn't cover more by ${STICK_COVER} or more. An honest or development name is never kept once he outgrows it. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.`,
+			`Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of ${STICK_BOOST} on each standing, so a point of noise doesn't take it away), it still covers his top two skills (families), and this season's best name doesn't cover more by ${STICK_COVER} or more. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.`,
 		);
 		out.push("");
 		out.push("## Every word keeps its promise");
 		out.push("");
 		out.push(
-			`A name's promises come from its own skill list (a special name's skills, a noun name's front and end words, an honest name's skill), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best ${TOP_N}, each modifier at its bar. The other words keep these promises:`,
+			`A name's promises come from its own skill list (a special name's skills, a noun name's front and end words), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best ${TOP_N}, each modifier at its bar. The other words keep these promises:`,
 		);
 		out.push("");
 		for (const w of WORD_REQ) {
@@ -193,10 +205,14 @@ test.skipIf(!process.env.RUN_ARCH_LIST)(
 			out.push(`- **${t.key}**: in front: ${front}; as a name: ${end}`);
 		}
 		out.push("");
-		out.push(`## Honest names (${HONEST_ROLES.length} kinds)`);
+		out.push(`## Skill nouns (${SKILL_NOUN_ROLES.length})`);
 		out.push("");
-		for (const h of HONEST_ROLES) {
-			out.push(`- ${h.names.join(", ")}: ${h.desc}`);
+		for (const [n, vs] of Object.entries(SKILL_NOUNS)) {
+			out.push(
+				`- **${NOUN_LABEL[n] ?? n}**: ${(vs ?? [])
+					.map((v) => ROLE_BY_KEY.get(v.key)?.names[0] ?? v.key)
+					.join(" / ")}`,
+			);
 		}
 		out.push("");
 		writeFileSync(

@@ -14,20 +14,27 @@ import { ARCHETYPES } from "../classify.ts";
 import { nameAt } from "../posNames.ts";
 import { POSITIONS } from "../position.ts";
 import { DESC_BY_KEY, ROLE_BY_KEY } from "./grammar.ts";
-import { ELITE_RE, HONEST_ROLES } from "./honest.ts";
+import { ELITE_RE } from "./honest.ts";
 import {
 	CUSTOM_SPECIALS,
 	END_WORDS,
 	NOUN_DESC,
 	TRAIT_KEYWORDS,
-	HONEST_NOUNS,
+	ATH_KEYS,
+	NEW_NOUNS,
+	NEW_OWN,
+	NEW_EDGE,
+	NEW_MEMBER_EDGE,
+	NEW_SKILL_BAR,
+	NEW_STRONG_BAR,
+	TRAIT_NUDGE,
+	SKILL_NOUNS,
+	SKILL_BAR,
 	listPromiseText,
 	specialNounsOf,
 	wordNouns,
 	type NounKey,
-	ATH_LEAD_BAR,
 	ATH_WORD_BAR,
-	CRAFTY_STRONG,
 	STRONG_BAR,
 	TOP_N,
 	SUB_LEAN,
@@ -37,7 +44,6 @@ import {
 	NOUN_ELITE_OVR,
 	GENERIC_PCT,
 	ONE_NOUN_OVR,
-	DEV_MAX_OVR,
 	JACK_CLEARED,
 	STICK_BOOST,
 	SPREAD_PEN,
@@ -63,6 +69,7 @@ import {
 	RAMP_HI,
 	RAMP_LO,
 	SECOND_COST,
+	SINGLE_NOUN_EDGE,
 	SPECIAL_EDGE,
 	STICK_COVER,
 	THREE_LEVEL_BAR,
@@ -86,7 +93,88 @@ const LABEL: Record<string, string> = {
 	jump: "leaping",
 	strength: "strength",
 	crafty: "offensive IQ",
+	foulDraw: "foul drawing",
+	cut: "cutting",
+	helpD: "help defense",
+	postD: "post defense",
+	oreb: "offensive rebounding",
+	length: "length",
+	secure: "ball security",
+	switchD: "switchability",
+	rimRun: "rim running",
+	roll: "screen and roll",
+	transition: "transition",
+	motor: "motor",
 };
+// archskill (reading 29): how each new skill is read, and its family
+const NEW_TXT: Record<string, string> = {
+	foulDraw:
+		"value: mean(free throws, contact finishing sub-rating (or dunk/layup), mean(dunk/layup, dribbling, speed)); a family of its own (offense)",
+	cut: `value: mean(spot-up sub-rating (or mid-range), dunk/layup, speed) + ${TRAIT_NUDGE} x (offBall trait - 50) when traits are on; in the finishing family`,
+	helpD:
+		"value: mean(defensive IQ, defensive IQ, interior D (or height)); in the rim-protection (interior D) family (2-Way covers it)",
+	postD:
+		"value: mean(interior D sub-rating (or interior D, or defensive IQ), strength, height); in the rim-protection (interior D) family",
+	oreb: "value: the offensive-rebounding sub-rating (or expanded offensive rebounding, or rebounding); in the rebounding family",
+	length:
+		"value: mean(wingspan, 50 + 4 x (wingspan - height)), only with the wingspan rating (Expanded Ratings); a modifier like speed",
+	secure: `value: the ball-security sub-rating (or dribbling) + ${TRAIT_NUDGE} x (handle trait - 50) when traits are on; in the creation family`,
+	switchD: `value: mean(lateral quickness sub-rating (or speed), perimeter D (or defensive IQ), interior D (or defensive IQ), 100 - 2 x |height - 48|) + ${TRAIT_NUDGE} x (defensiveVersatility trait - 50) when traits are on; in the perimeter-D family`,
+	rimRun:
+		"value: mean(max-vertical sub-rating (or leaping), height, dunk/layup x2, speed); in the finishing family",
+	roll: `value: mean(strength, height, offensive-rebounding sub-rating (or rebounding), contact finishing sub-rating (or dunk/layup)) + ${TRAIT_NUDGE} x (screen trait - 50) when traits are on; in the finishing family`,
+	transition:
+		"value: mean(speed, dunk/layup, floater sub-rating (or inside scoring)); a modifier like speed",
+	motor:
+		"value: mean(endurance, motor trait, hustle trait), only when traits are on (visible traits only); a modifier like speed",
+};
+// archskill: when each skill noun is the noun his skill takes (the first that fits, in this order)
+const NOUN_VARIANT_TXT = (): Record<string, string> => ({
+	kSharpshooter: `elite at 3PT (elite OVR and top ${Math.round(100 * (1 - ELITE_PCT))}%)`,
+	kSpotUpShooter: `sub tcs (catch & shoot 3) leads tod by ${SUB_LEAN}+`,
+	kPullUpShooter: `sub tod (off-the-dribble 3) leads tcs by ${SUB_LEAN}+`,
+	kShooter: "otherwise",
+	kPullUpArtist: `sub pul (pull-up) leads spu (spot-up) by ${SUB_LEAN}+, mid-range top 30%`,
+	kMidShooter: "otherwise",
+	kCloseScorer: `a guard or wing, sub cls (close shots) leads pst and flt by ${SUB_LEAN}+`,
+	kTouchScorer: `a guard or wing, sub flt (floater) leads pst and cls by ${SUB_LEAN}+`,
+	kPostScorer: "otherwise",
+	kBulldozer: `sub con (contact) leads fns and flt by ${SUB_LEAN}+, strength at the ${P(ATH_WORD_BAR)}`,
+	kContactFinisher: `sub con (contact) leads fns and flt by ${SUB_LEAN}+`,
+	kAcroFinisher: `sub fns (finesse) leads con and flt by ${SUB_LEAN}+`,
+	kTouchFinisher: `sub flt (floater) leads con and fns by ${SUB_LEAN}+`,
+	kFinisher: "otherwise",
+	kLobThreat: `leaping at the ${P(ATH_WORD_BAR)}`,
+	kRimRunner: "otherwise",
+	kAndOne: `contact finishing (or dunk/layup) leads free throws by ${SUB_LEAN}+, finishing top 30%`,
+	kFtMerchant: `free throws lead contact finishing (or dunk/layup) by ${SUB_LEAN}+`,
+	kFoulMagnet: "otherwise",
+	kMovementShooter: `spot-up (or mid-range) leads dunk/layup by ${SUB_LEAN}+, 3PT at the ${P(SKILL_BAR)}`,
+	kBackdoorCutter: "otherwise",
+	kShotBlocker: `sub blk leads idf by ${SUB_LEAN}+`,
+	kRimProtector: "otherwise",
+	kLowPostWall: `strength at the ${P(ATH_WORD_BAR)}`,
+	kPostStopper: "otherwise",
+	kDefQB: `elite at help defense (elite OVR and top ${Math.round(100 * (1 - ELITE_PCT))}%)`,
+	kHelpAnchor: "a big (PF, FC, C)",
+	kHelpDefender: "otherwise",
+	kLockdownDefender: `elite at perimeter D (elite OVR, top ${Math.round(100 * (1 - ELITE_PCT))}%, mobile)`,
+	kLengthDefender: `length at the ${P(ATH_WORD_BAR)}`,
+	kPerimDefender: "otherwise",
+	kBallHawk: "always",
+	kSwitchDefender: "always",
+	kBallHandler:
+		"always (and shot creation's noun when its sub-rating is not top 30%)",
+	kShotCreator: "shot-creation sub-rating top 30% (or no sub-ratings)",
+	kMistakeFree: "always",
+	kVisionary: `sub vis (vision) leads acc by ${SUB_LEAN}+`,
+	kPrecisionPasser: `sub acc (pass accuracy) leads vis by ${SUB_LEAN}+`,
+	kPasser: "otherwise",
+	kRebounder: "always",
+	kGlassCrasher: "always",
+	kShortRoll: "passing top 30%",
+	kRollMan: "otherwise",
+});
 const pctWord = (v: string) => {
 	const x = v === "ELITE_PCT" ? 0.92 : Number(v);
 	return Number.isFinite(x) ? `top ${Math.round((1 - x) * 100)}%` : v;
@@ -226,13 +314,6 @@ const csv = (rows: unknown[][]) =>
 		.join("\n") + "\n";
 
 const P = (x: number) => `${Math.round(100 * x)}th`;
-// (honest names no longer given to a player with a skill)
-const RETIRED = new Set([
-	"hEmptyScorer",
-	"hSlowScorer",
-	"hEarthbound",
-	"hAthNoShot",
-]);
 // (the user's own names whose test reads badly from the code)
 const GATE_FIX: Record<string, string> = {
 	sSwissArmy:
@@ -351,7 +432,6 @@ const VARIANT_SUB: Record<string, [string, string, string[] | undefined]> = {
 		undefined,
 	],
 	shotBlocking: ["rimD", `sub blk leads idf by ${SUB_LEAN}+`, undefined],
-	postDefending: ["rimD", `sub idf leads blk by ${SUB_LEAN}+`, undefined],
 	twitchy: [
 		"speed",
 		`sub lat (lateral) leads sls (straight-line) by ${SUB_LEAN}+`,
@@ -433,16 +513,18 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 				...Object.entries(w.byGroup ?? {}).map(([g, d]) => `${g}: ${word(d!)}`),
 				...(w.elite ? [`elite: ${word(w.elite)}`] : []),
 			].join("; ");
-			const ath = ["speed", "jump", "strength"].includes(k);
+			const ath = ATH_KEYS.has(k as NounKey);
+			const isNew = NEW_NOUNS.has(k as NounKey);
 			rows.push([
 				`v2:<end word>+${w.desc}[+<desc>]:<${GROUP}>`,
 				w.desc,
 				forms,
 				"noun front word",
 				"any",
-				ath
-					? `${LABEL[k]} is a modifier, not a skill: standing (lower of league and position) at the ${P(ATH_LEAD_BAR)} percentile leads a name only when he has no real skill (none at the ${P(STRONG_BAR)}); otherwise a word next to a skill from the ${P(ATH_WORD_BAR)}`
-					: `${LABEL[k]}: standing (lower of league and position) at the ${P(coverBar(k as NounKey))} percentile or better (a real skill from the ${P(strongBar(k as NounKey))}), weight ramping from 0 at the ${P(RAMP_LO)} to 1 at the ${P(RAMP_HI)}, among his ${TOP_N} best skills${w.elite ? `; elite form: ${ELITE_TXT} and top ${Math.round(100 * (1 - ELITE_PCT))}% at it${k === "perimD" ? ", and mobile (lateral quickness or speed at the league median+)" : ""}` : ""}`,
+				(isNew ? `${NEW_TXT[k]}; ` : "") +
+					(ath
+						? `${LABEL[k]} is a modifier, not a skill: a word next to a skill from the ${P(ATH_WORD_BAR)} (or in a catalog name); never a name of its own (reading 29: a player with no real skill is named by his best skill)`
+						: `${LABEL[k]}${isNew ? ` (a reading-29 skill: it clears higher, ${P(NEW_SKILL_BAR)} / real ${P(NEW_STRONG_BAR)}${NEW_OWN.has(k as NounKey) ? `, and leads his skills only with ${NEW_EDGE} of edge` : `, and names its family only with ${NEW_MEMBER_EDGE} over the family's word`})` : ""}: standing (lower of league and position) at the ${P(coverBar(k as NounKey))} percentile or better (a real skill from the ${P(strongBar(k as NounKey))}), weight ramping from 0 at the ${P(RAMP_LO)} to 1 at the ${P(RAMP_HI)}, among his ${TOP_N} best skills${w.elite ? `; elite form: ${ELITE_TXT} and top ${Math.round(100 * (1 - ELITE_PCT))}% at it${k === "perimD" ? ", and mobile (lateral quickness or speed at the league median+)" : ""}` : ""}`),
 				promises(word(w.desc), [k as NounKey]),
 				k,
 				ath
@@ -491,7 +573,7 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 			[
 				"long",
 				"",
-				`a one-skill name with no trait keyword, wingspan ${LONG_MIN}+ over height (Expanded Ratings)`,
+				`a one-skill position name with no trait keyword, wingspan ${LONG_MIN}+ over height (Expanded Ratings); or the length skill's word, at the ${P(ATH_WORD_BAR)}`,
 			],
 		]) {
 			const names = DESC_BY_KEY.get(d)?.names.join(" / ") ?? d;
@@ -517,7 +599,6 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 		}
 		for (const t of TRAIT_KEYWORDS) {
 			const front = DESC_BY_KEY.get(t.desc)?.names.join(" / ");
-			const end = ROLE_BY_KEY.get(t.role)?.names.join(" / ");
 			rows.push([
 				`v2:<end word>+${t.desc}+<desc>:<${GROUP}>`,
 				t.desc,
@@ -533,36 +614,46 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 				"",
 				"",
 			]);
-			rows.push([
-				`v2:${t.role}:<${GROUP}>`,
-				t.role,
-				end,
-				"trait keyword (name)",
-				"any",
-				`no real skill (none at the ${P(STRONG_BAR)}, offensive IQ ${P(CRAFTY_STRONG)}) and no two athletic modifiers to name him; ${TRAIT_GATE[t.key]} (the strongest keyword wins)`,
-				promises(end ?? "", []),
-				"",
-				"not scored (chosen directly)",
-				"",
-				"",
-				"",
-				`kept while he still has no real skill and the keyword still passes`,
-			]);
+		}
+		// archskill (reading 29): the skill nouns: a one-skill name, or the noun after another skill's front word
+		for (const [n, vs] of Object.entries(SKILL_NOUNS)) {
+			for (const v of vs ?? []) {
+				const r = ROLE_BY_KEY.get(v.key);
+				if (!r) {
+					continue;
+				}
+				const name = r.names[0]!;
+				rows.push([
+					`v2:${v.key}[+<desc>]:<${GROUP}>`,
+					v.key,
+					name,
+					"skill noun",
+					"any",
+					`the noun of his ${LABEL[n]} when ${NOUN_VARIANT_TXT()[v.key] ?? "otherwise"}; alone: his one skill (a real skill, or his best against the league when he has none); after one front word: that skill's word, another family's (or a modifier at the ${P(ATH_WORD_BAR)})`,
+					promises(name, [n as NounKey]),
+					n,
+					`weight(${LABEL[n]}) + standing/100, like its front word`,
+					`+${SINGLE_NOUN_EDGE} alone (over his position word); 0 with a front word`,
+					RARITY,
+					`never a front word of its own family; no stem said twice (Defensive Help Defender); at most ${MAX_PARTS} skills`,
+					STICKY_STD,
+				]);
+			}
 		}
 		rows.push([
-			`v2:tConnector:<${GROUP}>`,
-			"tConnector",
-			ROLE_BY_KEY.get("tConnector")?.names.join(" / "),
-			"trait keyword (name)",
+			`v2:<skill noun>[+<desc>]:<${GROUP}>`,
+			"(skill pick)",
+			"(his best skill or two)",
+			"skill name (no real skill)",
 			"any",
-			"no real skill and no trait keyword; passing and offensive IQ both at the 55th percentile+",
-			promises("Connector", []),
-			"",
+			`a player with no real skill (none at the ${P(STRONG_BAR)}), or one at OVR under ${ONE_NOUN_OVR} with no modifier at the ${P(ATH_WORD_BAR)}: his skill families by standing (lower of league and position, whatever its height; a member names its family with ${MID_EDGE} over the head, ${NEW_MEMBER_EDGE} for a reading-29 member clearing its bar; steals and shot creation when higher), the best one's noun; the second one's front word in front of it when the second may be named (its bar) and adds more than it costs (weight + standing/100 - ${SECOND_COST} against ${MISS_TOP2} x weight); else a modifier at the ${P(ATH_WORD_BAR)} in front; the first of these whose words that are no skill keep their promises, else his best skill's plain noun`,
+			"only the words that are no skill (traits, elite)",
+			"his best one or two",
 			"not scored (chosen directly)",
 			"",
 			"",
 			"",
-			"kept while he still has no real skill and passes the test",
+			"re-read each season (not kept on slack)",
 		]);
 		for (const [key, txt, fit, flav] of [
 			["posGuard", "his position is PG, G or SG", "", "0"],
@@ -734,38 +825,21 @@ test.skipIf(!process.env.RUN_ARCH_NAMES)(
 				]);
 			}
 		}
-		for (const h of HONEST_ROLES) {
-			const r = ROLE_BY_KEY.get(h.key);
-			const names = r?.names ?? h.names;
-			const about = (HONEST_NOUNS[h.key] ?? ["none"]).filter(
-				(x) => x !== "none",
-			) as NounKey[];
-			names.forEach((n, i) => {
-				rows.push([
-					`v2:${h.key}:<${GROUP}>${i > 0 ? `:${h.key}=${i}` : ""}`,
-					h.key,
-					n,
-					"honest",
-					Object.entries(h.byGroup ?? {})
-						.filter(([, ns]) => (ns as string[]).includes(n))
-						.map(([g]) => g)
-						.join("/") || "any",
-					`${h.desc} (no real skill; or one real skill (family) at OVR under ${ONE_NOUN_OVR} with no modifier at the ${P(ATH_WORD_BAR)}; development names: age 22 or under (or a prospect) with potential 8+ over OVR, at OVR ${DEV_MAX_OVR} or below with at most one real skill)${RETIRED.has(h.key) ? "; no longer given to a player with a skill (reading 28: an honest name says his actual skill)" : h.key === "hShoot" ? "; Spot-Up Specialist unless his off-the-dribble 3 leads his catch-and-shoot 3 by 10+" : ""}`,
-					[
-						about.length > 0
-							? `about his ${L(about)} (standing in the ${TOPP(GENERIC_PCT)}), or no skill at all`
-							: "about no skill",
-						...listPromiseText(n, []),
-					].join("; "),
-					about.join(","),
-					"not scored (chosen directly)",
-					"",
-					"",
-					"",
-					`kept while he is still the same kind of honest name (re-checked at +/-${STICK_BOOST}); never kept once outgrown`,
-				]);
-			});
-		}
+		rows.push([
+			"(honest names: none since reading 29)",
+			"",
+			"(no honest, flaw, development or depth name)",
+			"honest (retired)",
+			"any",
+			"reading 29 retires every honest, flaw, development and depth name (Camp Body, Journeyman, Rotation Filler, Empty-Calorie Scorer, Spot-Up Specialist, Raw / Developing / Project names, ...): a one-skill player is named by his skill's noun, a player with no real skill by his best skill or two (the skill pick); a stored honest label is re-read on the version bump",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+			"",
+		]);
 		rows.push([
 			"(defensive label: none since reading 28)",
 			"",
