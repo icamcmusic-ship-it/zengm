@@ -1,8 +1,9 @@
 import { idb } from "../../db/index.ts";
 import { g, local } from "../../util/index.ts";
 import type { OwnerMood } from "../../../common/types.ts";
-import { bySport } from "../../../common/sportFunctions.ts";
 import {
+	baseMoodDeltas,
+	capMoodDeltas,
 	getExpectedProfit,
 	getLegacyOwnerMood,
 	getSalaryCapScale,
@@ -17,6 +18,7 @@ import {
 } from "../frontOffice/index.ts";
 import * as college from "../college/index.ts";
 import { ownerOfficeEnabled } from "../ownerOffice/index.ts";
+import { getFiringRule, resolveOwnerSeason } from "../ownerOffice/owner.ts";
 import {
 	evaluateOwnerGoals,
 	judgedGoalsPayroll,
@@ -85,31 +87,17 @@ const updateOwnerMood = async (): Promise<
 
 	const numPlayoffRounds = g.get("numGamesPlayoffSeries", "current").length;
 
-	// Some sports are more random than others, so like a 60% winning percentage is more impressive then. I think it only matters a lot for baseball, so I picked that coeffiient by determining what factor is needed to make 110/162 wins as valuable as 70/82 wins, then adding a little more so like 95 win seasons are still pretty good.
-	const winsFactor = bySport({
-		baseball: 2.2,
-		basketball: 1,
-		football: 1,
-		hockey: 1,
+	const deltas = baseMoodDeltas({
+		won: teamSeason.won,
+		numGames: g.get("numGames"),
+		playoffRoundsWon: teamSeason.playoffRoundsWon,
+		numPlayoffRounds,
+		profit,
+		expectedProfit,
+		salaryCapScale: salaryCapFactor,
+		budget: !!g.get("budget"),
+		overspendPenalty,
 	});
-
-	const deltas = {
-		wins:
-			(winsFactor * (0.25 * (teamSeason.won - g.get("numGames") / 2))) /
-			(g.get("numGames") / 2),
-		playoffs: 0,
-		money: g.get("budget")
-			? (profit - expectedProfit) / (100 * salaryCapFactor) - overspendPenalty
-			: 0,
-	};
-
-	if (teamSeason.playoffRoundsWon < 0) {
-		deltas.playoffs = -0.2;
-	} else if (teamSeason.playoffRoundsWon < numPlayoffRounds) {
-		deltas.playoffs = (0.16 / numPlayoffRounds) * teamSeason.playoffRoundsWon;
-	} else {
-		deltas.playoffs = 0.2;
-	}
 
 	const isCollege = college.isCollege();
 
@@ -158,6 +146,15 @@ const updateOwnerMood = async (): Promise<
 		deltas.money += result.moodDeltas.money;
 	}
 
+	// Owner's Office: the owner's mid-season requests, ultimatums and mandates, and his reaction to losing the franchise player, each with
+	// an explicit stake, bounded in total (common/ownerProfile.ts). Not in college
+	const owner = isCollege ? undefined : await resolveOwnerSeason(teamSeason);
+	if (owner) {
+		deltas.wins += owner.sums.wins;
+		deltas.playoffs += owner.sums.playoffs;
+		deltas.money += owner.sums.money;
+	}
+
 	teamSeason.ownerMood ??= getLegacyOwnerMood(g) ?? {
 		money: 0,
 		playoffs: 0,
@@ -167,19 +164,7 @@ const updateOwnerMood = async (): Promise<
 	const ownerMood = teamSeason.ownerMood;
 
 	// Bound only the top - can't win the game by doing only one thing, but you can lose it by neglecting one thing
-	const cappedDeltas = { ...deltas };
-
-	if (ownerMood.money + cappedDeltas.money > 1) {
-		cappedDeltas.money = 1 - ownerMood.money;
-	}
-
-	if (ownerMood.playoffs + cappedDeltas.playoffs > 1) {
-		cappedDeltas.playoffs = 1 - ownerMood.playoffs;
-	}
-
-	if (ownerMood.wins + cappedDeltas.wins > 1) {
-		cappedDeltas.wins = 1 - ownerMood.wins;
-	}
+	const cappedDeltas = capMoodDeltas(ownerMood, deltas);
 
 	// Only update owner mood if grace period is over
 	const applied =
@@ -196,6 +181,12 @@ const updateOwnerMood = async (): Promise<
 		deltas: { ...deltas },
 		cappedDeltas: { ...cappedDeltas },
 		applied,
+		...(owner && owner.adjustments.length > 0
+			? { adjustments: owner.adjustments }
+			: {}),
+		...(ownerOfficeEnabled() && !isCollege
+			? { firingLine: (await getFiringRule()).line }
+			: {}),
 	};
 	await idb.cache.teamSeasons.put(teamSeason);
 

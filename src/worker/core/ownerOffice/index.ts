@@ -29,9 +29,16 @@ import { adjustOwnerGoals, commercialEnabled } from "../commercial/index.ts";
 import { gmProjectParams } from "../gm/finance.ts";
 import { isCollege } from "../college/isCollege.ts";
 import { OWNER_RESERVE_CAPS } from "../finances/ownerDistribution.ts";
+import { ownerOfficeEnabled } from "./enabled.ts";
+import {
+	adjustGoalsForTraits,
+	ensureOwnerProfile,
+	getOwnerProfile,
+	onPreseasonOwner,
+	ownerAiProjectFactor,
+} from "./owner.ts";
 
-export const ownerOfficeEnabled = () =>
-	__SPORT === "basketball" && featureOn("ownerOffice") && !!g.get("budget");
+export { ownerOfficeEnabled };
 
 // salaryCap / the sport's default cap, frozen like in updateOwnerMood (common/ownerMood.ts)
 export const salaryCapScale = () => getSalaryCapScale(g.get("salaryCap"));
@@ -130,7 +137,11 @@ const maybeStartAi = (t: Team, teamSeason: TeamSeasonWithoutKey) => {
 	const salaryCap = g.get("salaryCap");
 	const rng = makeSeededRandom(g.get("season") * 7919 + t.tid * 104729 + 31);
 	// AI GM finance styles: facilities builders start projects more often with less in reserve, frugal GMs less often (unchanged when off)
-	const { prob, reserve } = gmProjectParams(t, AI_START_PROB);
+	// The owner's patience (common/ownerProfile.ts) makes it a little more or less likely (×0.75 to ×1.25)
+	const { prob, reserve } = gmProjectParams(
+		t,
+		AI_START_PROB * ownerAiProjectFactor(t),
+	);
 	if (rng() >= prob) {
 		return;
 	}
@@ -181,7 +192,8 @@ const meetingMessage = (
 	if (active) {
 		m += `<p>The ${OWNER_PROJECTS[active.type].name.toLowerCase()} is under way: ${formatMillions(active.paid)} of ${formatMillions(active.cost)} paid.</p>`;
 	}
-	m += `<p>Hitting these goals (or missing them) will count a little in my review at the end of the season. You can follow them, and start arena and facilities projects, on <a href="${helpers.leagueUrl(["team_finances"])}">Team Finances</a>.</p>`;
+	m += `<p>Hitting these goals (or missing them) will count a little in my review at the end of the season. You can follow them on the <a href="${helpers.leagueUrl(["owner"])}">Owner</a> page, and start arena and facilities projects on <a href="${helpers.leagueUrl(["team_finances"])}">Team Finances</a>.</p>`;
+	m += `<p>${getOwnerProfile(t).name}</p>`;
 	return m;
 };
 
@@ -206,6 +218,9 @@ export const onPreseason = async () => {
 			"teamSeasonsByTidSeason",
 			[t.tid, season - 1],
 		);
+
+		// The owner's name and traits, stored once (derived from the team and his first season, so existing leagues get them too)
+		ensureOwnerProfile(t);
 
 		if (t.ownerOffice) {
 			t.ownerOffice.facilitiesBonus = Math.max(
@@ -236,9 +251,15 @@ export const onPreseason = async () => {
 			teamSeason.ownerGoals = commercialEnabled()
 				? adjustOwnerGoals(goals, t, salaryCapScale())
 				: goals;
+			// The owner's traits: tax appetite moves the payroll ceiling, patience the win target (bounded)
+			if (!isCollege()) {
+				adjustGoalsForTraits(teamSeason.ownerGoals, t);
+			}
 		}
 
 		if (user) {
+			// A clean slate for the owner's mid-season requests (franchise player noted)
+			await onPreseasonOwner(t, teamSeason);
 			if (teamSeason.ownerGoals) {
 				await idb.cache.messages.add({
 					read: false,

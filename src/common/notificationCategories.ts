@@ -100,6 +100,7 @@ const TYPE_TO_CATEGORY: Record<LogEventType, NotificationCategoryOrSystem> = {
 	commercialDeal: "owner",
 	ownerSale: "owner",
 	revenueSharing: "owner",
+	ownerRequest: "owner",
 };
 
 export const isMappedLogEventType = (type: string) =>

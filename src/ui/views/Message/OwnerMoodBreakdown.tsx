@@ -35,7 +35,9 @@ const OwnerMoodBreakdown = ({ ownerMoods }: { ownerMoods: OwnerMoods }) => {
 				<b>playoffs</b> (missing them hurts, each round won helps, a title helps
 				the most), and <b>finances</b> (profit compared to what the owner
 				expects). Each component is capped at +1 in total, and changes are not
-				counted before the owner starts judging you.
+				counted before the owner starts judging you. With the Owner's Office,
+				the owner's mid-season requests and ultimatums add their stakes, and his
+				patience sets the firing line.
 			</p>
 			<div className="table-responsive">
 				<table className="table table-sm table-striped mb-0">
@@ -107,7 +109,21 @@ const OwnerMoodBreakdown = ({ ownerMoods }: { ownerMoods: OwnerMoods }) => {
 										<Delta value={totalDelta} />
 										<div className="small text-body-secondary">
 											Overall: {row.total.toFixed(2)}
+											{info?.firingLine !== undefined
+												? ` (fired at ${info.firingLine.toFixed(2)})`
+												: null}
 										</div>
+										{info && info.adjustments.length > 0 ? (
+											<div className="small text-body-secondary">
+												Includes the owner's requests:{" "}
+												{info.adjustments
+													.map(
+														(a) =>
+															`${a.text} ${a.delta >= 0 ? "+" : ""}${a.delta.toFixed(2)}`,
+													)
+													.join("; ")}
+											</div>
+										) : null}
 									</td>
 								</tr>
 							);

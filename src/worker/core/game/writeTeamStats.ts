@@ -9,6 +9,7 @@ import {
 	payGame as payOwnerProjectGame,
 	trackPayrollGame,
 } from "../ownerOffice/index.ts";
+import { onUserGame as ownerUserGame } from "../ownerOffice/owner.ts";
 import {
 	commercialEnabled,
 	payGame as payCommercialGame,
@@ -526,6 +527,11 @@ const writeTeamStats = async (results: GameResults) => {
 				tid: teamSeason.tid,
 			});
 			teamSeason.ovrStart = team.ovr(players);
+		}
+
+		// Owner's Office: the owner's mid-season requests, ultimatums and mandates (user's team, seeded)
+		if (ownerOfficeEnabled() && g.get("phase") !== PHASE.PLAYOFFS) {
+			await ownerUserGame(t, teamSeason);
 		}
 
 		await idb.cache.teams.put(t);

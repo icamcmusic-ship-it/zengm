@@ -66,6 +66,8 @@ export type OwnerOfficeTeam = {
 	completed: { type: OwnerProjectType; season: number }[];
 	// Facilities levels from completed projects (added to the facilities level of the last three seasons)
 	facilitiesBonus: number;
+	// The owner: name, first season and personality traits (common/ownerProfile.ts). Derived when missing
+	owner?: import("./ownerProfile.ts").OwnerProfile;
 };
 
 export type OwnerGoals = {

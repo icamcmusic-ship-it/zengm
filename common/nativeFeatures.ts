@@ -1398,7 +1398,7 @@ export const NATIVE_FEATURES = [
 		key: "featureOwnerOffice",
 		name: "Owner's Office",
 		description:
-			"Each preseason the owner holds a budget meeting with you: a payroll ceiling (and whether he'll pay luxury tax), a profit target and a win target, from your market size, cash and last season. At season end the results against those goals nudge owner mood a little. You can also start arena and facilities projects (renovation, practice facility, new arena) on Team Finances, paid from cash over several seasons as an expense line; when done they raise your facilities level (and a new arena adds seats). AI teams get the same goals and sometimes build when they are cash-rich. Needs budget.",
+			"Each preseason the owner holds a budget meeting with you: a payroll ceiling (and whether he'll pay luxury tax), a profit target and a win target, from your market size, cash and last season. At season end the results against those goals nudge owner mood a little. You can also start arena and facilities projects (renovation, practice facility, new arena) on Team Finances, paid from cash over several seasons as an expense line; when done they raise your facilities level (and a new arena adds seats). The owner has a name and personality traits (patience sets the firing line, meddling how often he makes mid-season requests and ultimatums, loyalty to stars, luxury tax appetite), each request with an explicit mood stake; his mandates can be overridden for a mood cost. An Owner page shows all of it with a projected hot-seat call. AI teams get the same goals and owner traits and sometimes build when they are cash-rich. Needs budget.",
 		default: false,
 		defaultNewLeague: true,
 		sports: BBGM,

@@ -121,6 +121,22 @@ const leagueAchievementsLinks: MenuItemLink[] =
 			]
 		: [];
 
+// The Owner page (basketball only, Owner's Office League extra)
+const ownerLinks: MenuItemLink[] =
+	__SPORT === "basketball"
+		? [
+				{
+					type: "link",
+					active: (pageID) => pageID === "owner",
+					league: true,
+					commandPalette: true,
+					feature: "ownerOffice",
+					path: ["owner"],
+					text: "Owner",
+				},
+			]
+		: [];
+
 // Coaching staff (basketball only). Hidden while its League extras are off (the pages themselves say how to turn them
 // on, for old links and bookmarks). The Staff Report is a tab of Draft Scouting (util/pageTabs.ts): its command palette
 // item ("Draft Scouting > Staff Report") is added with the other tab pages, and uses the same rule as the page
@@ -595,6 +611,7 @@ const menuItemsRaw: (MenuItemLink | MenuItemHeader)[] = [
 				path: ["team_finances"],
 				text: "Finances",
 			},
+			...ownerLinks,
 			...staffLinks,
 			{
 				type: "link",

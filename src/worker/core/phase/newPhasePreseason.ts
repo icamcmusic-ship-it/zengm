@@ -33,6 +33,7 @@ import { MAX_LEVEL } from "../../../common/budgetLevels.ts";
 import * as staff from "../staff/index.ts";
 import { ensureGms } from "../gm/index.ts";
 import * as ownerOffice from "../ownerOffice/index.ts";
+import { ownerAiBudgetNudge } from "../ownerOffice/owner.ts";
 import * as commercial from "../commercial/index.ts";
 import { OWNER_TYPES } from "../../../common/commercial.ts";
 import * as college from "../college/index.ts";
@@ -370,6 +371,8 @@ const newPhasePreseason = async (
 					finances.defaultBudgetLevel(popRank) +
 						cashNudge +
 						OWNER_TYPES[commercial.getOwnerType(t)].budgetNudge +
+						// Owner's Office: the owner's luxury tax appetite (-1 to +1 at the extremes, 0 when off)
+						ownerAiBudgetNudge(t) +
 						// AI GM finance styles: the GM spends more or less within the owner's envelope (0 when off)
 						gmSpendNudge(t),
 					1,

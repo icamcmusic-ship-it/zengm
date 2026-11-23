@@ -45,3 +45,66 @@ export const honeymoonOwnerMood = (mood: OwnerMood): OwnerMood => ({
 	playoffs: mood.playoffs < 0 ? 0 : mood.playoffs / 2,
 	wins: mood.wins < 0 ? 0 : mood.wins / 2,
 });
+
+// The main formula of the end-of-season evaluation, before college expectations, owner type weights, budget meeting goals and the
+// owner's requests: regular season (vs .500), playoffs (missing them -0.2, each round up to +0.16 in total, a title +0.2) and money
+// (judged profit vs expected, per $100M scaled to the cap, minus any Front Office overspend penalty). Also used for the Owner page's
+// projection
+export const baseMoodDeltas = ({
+	won,
+	numGames,
+	playoffRoundsWon,
+	numPlayoffRounds,
+	profit,
+	expectedProfit,
+	salaryCapScale,
+	budget,
+	overspendPenalty = 0,
+}: {
+	won: number;
+	numGames: number;
+	playoffRoundsWon: number;
+	numPlayoffRounds: number;
+	profit: number;
+	expectedProfit: number;
+	salaryCapScale: number;
+	budget: boolean;
+	overspendPenalty?: number;
+}): OwnerMood => {
+	// Some sports are more random than others, so like a 60% winning percentage is more impressive then. I think it only matters a lot for baseball, so I picked that coeffiient by determining what factor is needed to make 110/162 wins as valuable as 70/82 wins, then adding a little more so like 95 win seasons are still pretty good.
+	const winsFactor = bySport({
+		baseball: 2.2,
+		basketball: 1,
+		football: 1,
+		hockey: 1,
+	});
+
+	const deltas = {
+		wins: (winsFactor * (0.25 * (won - numGames / 2))) / (numGames / 2),
+		playoffs: 0,
+		money: budget
+			? (profit - expectedProfit) / (100 * salaryCapScale) - overspendPenalty
+			: 0,
+	};
+
+	if (playoffRoundsWon < 0) {
+		deltas.playoffs = -0.2;
+	} else if (playoffRoundsWon < numPlayoffRounds) {
+		deltas.playoffs = (0.16 / numPlayoffRounds) * playoffRoundsWon;
+	} else {
+		deltas.playoffs = 0.2;
+	}
+
+	return deltas;
+};
+
+// Bound only the top - can't win the game by doing only one thing, but you can lose it by neglecting one thing
+export const capMoodDeltas = (mood: OwnerMood, deltas: OwnerMood) => {
+	const capped = { ...deltas };
+	for (const key of ["money", "playoffs", "wins"] as const) {
+		if (mood[key] + capped[key] > 1) {
+			capped[key] = 1 - mood[key];
+		}
+	}
+	return capped;
+};

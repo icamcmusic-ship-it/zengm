@@ -55,6 +55,7 @@ import {
 } from "../core/index.ts";
 import * as staff from "../core/staff/index.ts";
 import * as ownerOffice from "../core/ownerOffice/index.ts";
+import { overrideMandate } from "../core/ownerOffice/owner.ts";
 import * as commercial from "../core/commercial/index.ts";
 import { ensureGms } from "../core/gm/index.ts";
 import { idb } from "../db/index.ts";
@@ -4915,6 +4916,10 @@ const startOwnerProject = async ({
 	return await ownerOffice.startProject(type);
 };
 
+const overrideOwnerMandate = async ({ id }: { id: number }) => {
+	return await overrideMandate(id);
+};
+
 const updateDefaultSettingsOverrides = async (
 	defaultSettingsOverrides: Partial<Settings>,
 ) => {
@@ -6843,6 +6848,7 @@ const api = {
 		updateAwards,
 		updateBudget,
 		startOwnerProject,
+		overrideOwnerMandate,
 		chooseCommercialOffer,
 		updateConfsDivs,
 		updateDefaultSettingsOverrides,

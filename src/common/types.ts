@@ -1146,6 +1146,7 @@ export type LogEventType =
 	| "ownerSale"
 	| "commercialDeal"
 	| "revenueSharing"
+	| "ownerRequest"
 	| "minPayroll"
 	| "undo"
 	| "contractOption"
@@ -1176,6 +1177,9 @@ export type OwnerEvaluation = {
 	cappedDeltas: OwnerMood;
 	// False in the grace period or God Mode, when the mood isn't changed
 	applied: boolean;
+	// Owner's Office: the owner's requests, ultimatums, mandates and star trade reaction (already in deltas), and the firing line
+	adjustments?: import("./ownerProfile.ts").OwnerAdjustment[];
+	firingLine?: number;
 };
 
 export type MessageWithoutKey = {
@@ -2831,6 +2835,9 @@ export type TeamSeasonWithoutKey = {
 	// (common/ownerOffice.ts)
 	projectExpenses?: number;
 	ownerGoals?: import("./ownerOffice.ts").OwnerGoals;
+	// Owner's Office: the owner's mid-season requests, ultimatums and mandates and their mood adjustments (user's team,
+	// common/ownerProfile.ts)
+	ownerSeason?: import("./ownerProfile.ts").OwnerSeasonState;
 	payrollEndOfSeason: number;
 	// Coach & Executive of the Year (League Extra): Executive of the Year won by a front office with no AI GM (the user's team, which
 	// has no GM object). An AI GM's award is stored on the GM instead (Gm.awards)

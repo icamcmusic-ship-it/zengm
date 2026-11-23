@@ -32,6 +32,7 @@ import { g, helpers, local, logEvent, toUI } from "../../util/index.ts";
 import { featureOn, featureOption } from "../../util/nativeFeatures.ts";
 import getLevelLastThree from "../finances/getLevelLastThree.ts";
 import { getFacilitiesBonus } from "../ownerOffice/index.ts";
+import { resetOwnerProfile } from "../ownerOffice/owner.ts";
 import { gmDealStyle } from "../gm/finance.ts";
 
 export const commercialEnabled = () =>
@@ -300,6 +301,8 @@ const applySale = async (t: Team, ownerType: OwnerType) => {
 	office.ownerSince = g.get("season");
 	office.pendingSale = undefined;
 	const def = OWNER_TYPES[ownerType];
+	// Owner's Office: the new owner has his own name and personality traits
+	resetOwnerProfile(t, g.get("season"));
 
 	// Honeymoon: the new owner doesn't inherit his predecessor's grudges (common/ownerMood.ts)
 	const teamSeason = await idb.cache.teamSeasons.indexGet(

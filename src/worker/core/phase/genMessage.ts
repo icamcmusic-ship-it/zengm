@@ -6,6 +6,8 @@ import local from "../../util/local.ts";
 import type { OwnerMood } from "../../../common/types.ts";
 import { COURT } from "../../../common/constants.ts";
 import { isCollege } from "../college/isCollege.ts";
+import { getFiringRule } from "../ownerOffice/owner.ts";
+import { OWNER_REQUESTS } from "../../../common/ownerProfile.ts";
 
 const moodTexts = ["Horrible!", "Bad.", "Pretty good.", "Good.", "Excellent!"];
 
@@ -82,6 +84,13 @@ export const genMessage = async (
 		}
 	}
 
+	// Owner's Office: the owner's patience sets the firing line (stock: -1) and, for a very patient owner, an extra season before he can
+	// fire you (common/ownerProfile.ts)
+	const firingRule = await getFiringRule();
+	const canFire =
+		g.get("season") >= g.get("gracePeriodEnd") + firingRule.graceBonus &&
+		!g.get("godMode");
+
 	// If challenge mode didn't trigger a firing, do normal stuff
 	if (!fired) {
 		const currentMood = moods.at(-1) ?? {
@@ -91,10 +100,7 @@ export const genMessage = async (
 		};
 		const currentTotal =
 			currentMood.wins + currentMood.playoffs + currentMood.money;
-		fired =
-			currentTotal <= -1 &&
-			g.get("season") >= g.get("gracePeriodEnd") &&
-			!g.get("godMode");
+		fired = currentTotal <= firingRule.line && canFire;
 
 		if (!fired) {
 			let overall;
@@ -149,11 +155,14 @@ export const genMessage = async (
 			}
 
 			if (g.get("season") >= g.get("gracePeriodEnd")) {
-				if (currentTotal + deltas.money + deltas.playoffs + deltas.wins < -1) {
+				if (
+					currentTotal + deltas.money + deltas.playoffs + deltas.wins <
+					firingRule.line
+				) {
 					text = "Another season like that and you're fired!";
 				} else if (
 					currentTotal + 2 * (deltas.money + deltas.playoffs + deltas.wins) <
-					-1
+					firingRule.line
 				) {
 					text = "A couple more seasons like that and you're fired!";
 				}
@@ -181,6 +190,16 @@ export const genMessage = async (
 					);
 				}
 				m += `<p>Budget meeting goals: ${parts.join(", ")}.</p>`;
+			}
+
+			// Owner's Office: how the owner's mid-season requests, ultimatums and mandates were settled
+			const requests = teamSeasons.at(-1)?.ownerSeason?.requests ?? [];
+			if (requests.length > 0 && !isCollege()) {
+				const items = requests.map(
+					(r) =>
+						`${OWNER_REQUESTS[r.kind].title}: ${r.status === "met" ? "done" : r.status}${r.note ? ` (${r.note})` : ""}`,
+				);
+				m += `<p>My requests this season: ${items.join("; ")}. Details are on the <a href="${helpers.leagueUrl(["owner"])}">Owner</a> page.</p>`;
 			}
 
 			const prob = helpers.bound(currentTotal, 0, 3) / 3;
