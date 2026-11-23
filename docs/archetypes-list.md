@@ -1,20 +1,20 @@
-# Archetypes (reading 28)
+# Archetypes (reading 29)
 
 Generated from the code (`RUN_ARCH_LIST=1 npx vitest --run --project basketball src/common/archetypes/v2/archetypeList.script.test.ts`). ★ marks an elite name: OVR in the league's top 10% (never below 55). A label is one name: there is no defensive tag. A two-way player's name takes the prefix 2-Way when his best defensive skill and his best offensive skill are both at the 80th percentile; 2-Way covers all his defensive skills.
 
 ## How a main name is built
 
-Each skill is read against the league and against his position group (guards, wings, bigs): its standing is the lower of the two, so a skill counts only when it is good outright and good for his position. A skill may be named from the 65th percentile (offensive IQ from the 75th percentile); its weight ramps from nothing at the 60th percentile to full at the 80th percentile, so there is no cliff. Speed, leaping and strength are modifiers, not skills: they lead a name only when no basketball skill reaches the 70th percentile, and else add at most a word next to a skill (from the 85th percentile).
+Each skill is read against the league and against his position group (guards, wings, bigs): its standing is the lower of the two, so a skill counts only when it is good outright and good for his position. A skill may be named from the 65th percentile (offensive IQ from the 75th percentile); its weight ramps from nothing at the 60th percentile to full at the 80th percentile, so there is no cliff. Speed, leaping, strength, length, transition and motor are modifiers, not skills: they add at most a word next to a skill (from the 85th percentile) or appear in a catalog name. Reading 29 added twelve skills read from ratings, sub-ratings and visible traits (foul drawing, cutting, help defense, post defense, offensive rebounding, length, ball security, switchability, rim running, screen and roll, transition, motor); the ones that are skills clear higher (the 80th percentile, a real skill from the 85th percentile), since each reads ratings an older skill also reads.
 
 Skills that say the same thing count once, as a family: shooting (3PT and mid-range), creation (handle and shot creation) and perimeter D (perimeter D and steals). A family stands where its best member stands and is named by one word: shooting by 3PT unless mid-range leads it by 0.06 of standing, creation and perimeter D by the higher member. No name spends two words on one family; 3-Level is the one word for shooting and finishing, when 3PT, mid-range and finishing are all at the 78th percentile. Mid-range and offensive IQ need 0.03 of standing over the next skill to lead; offensive IQ is mostly a flavor word (it covers 0.5 of a skill word, costs nothing to name or to leave out).
 
-Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his 4 best families it names (2-Way names all his defensive ones), minus 2 times the weight of either of his top two it leaves out, minus 0.3 for a second skill named and 0.6 for each beyond two (2-Way counts as one; a noun name says at most 3). Its skills must be among his best 4 families (with 2-Way, his defensive families count as one) and it must cover his best one (offensive IQ apart). A special name (a build, the user's own names, Jack) gets 0.15 over a noun name that covers the same. The many-skills names are gated by how many elite skills (the 90th percentile) he has: a broad one (Jack-Of-All-Trades, Swiss-Army-Knife) needs at most 3 and covers each of his best 0.52 of the way, an elite one (Complete All-Court Prototype, the Unicorns) needs 9 or more and covers each 0.9. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). With no real skill (or one at OVR under 50, with no modifier) he gets an honest name, about the skill he has ("Spot-Up Specialist").
+Every name in the catalog (the special names, the user's own names, Jack-Of-All-Trades, and noun names: front words with an end word) is scored by how much of his strengths it covers: the weights of his 4 best families it names (2-Way names all his defensive ones), minus 2 times the weight of either of his top two it leaves out, minus 0.3 for a second skill named and 0.6 for each beyond two (2-Way counts as one; a noun name says at most 3). Its skills must be among his best 4 families (with 2-Way, his defensive families count as one) and it must cover his best one (offensive IQ apart). A special name (a build, the user's own names, Jack) gets 0.15 over a noun name that covers the same. The many-skills names are gated by how many elite skills (the 90th percentile) he has: a broad one (Jack-Of-All-Trades, Swiss-Army-Knife) needs at most 3 and covers each of his best 0.52 of the way, an elite one (Complete All-Court Prototype, the Unicorns) needs 9 or more and covers each 0.9. The best-covering name wins; a near tie goes to the rarer name, never to chance. An end word is picked after the front words and only when it fits them (a Gunner names a jumper; Bruiser a physical skill; Enigma a scoring or creating one). Every skill has a plain noun (Rebounder, Spot-Up Shooter, Contact Finisher, Rim Protector, ...): a one-skill name is that noun, a two-skill name the front word of one skill and the noun of the other ("Glass-Cleaning Contact Finisher"). With no real skill (or one at OVR under 50, with no modifier) he is named by his best skill (or best two) against the league and his position, however low: there are no honest, depth or development names.
 
-Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of 0.02 on each standing, so a point of noise doesn't take it away), it still covers his top two skills (families), and this season's best name doesn't cover more by 0.1 or more. An honest or development name is never kept once he outgrows it. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.
+Last season's label is re-checked every season: it stays only while every rule still holds (with a slack of 0.02 on each standing, so a point of noise doesn't take it away), it still covers his top two skills (families), and this season's best name doesn't cover more by 0.1 or more. The label is stored with why it was chosen: the skills it names, their standing and weight, the rule that let it name him, its score, the share of his three biggest strengths it covers, and the closest other name.
 
 ## Every word keeps its promise
 
-A name's promises come from its own skill list (a special name's skills, a noun name's front and end words, an honest name's skill), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best 4, each modifier at its bar. The other words keep these promises:
+A name's promises come from its own skill list (a special name's skills, a noun name's front and end words), never from hand-written word rules that can drift: each skill on it at its bar (league and position) and among his best 4, each modifier at its bar. The other words keep these promises:
 
 - `Gunner|Shot Hunter|Shotmaker|Shot-Maker|Jumper\b/`: a jumper (3PT or mid-range): one of them among the name's skills
 - `Three-Level|3-Level/`: 3PT, mid-range and finishing in the top 22%
@@ -28,12 +28,12 @@ A name's promises come from its own skill list (a special name's skills, a noun 
 - `Jack|Swiss|Do-It-All|All-Around/`: 4 skills in the top 30%
 - `Wing-Running|Rim-Running|Demon|Motor|Workhorse|Relentless/`: trait motor 50+
 - `Hustl|\bPest\b|Chaos|Junkyard|Energy|Pressure|Gritty|Grinder/`: trait hustle 55+
-- `Switch/`: trait defensiveVersatility 55+
+- `Switch/`: defensive versatility
 - `By-the-Book|By-The-Book|Caretaker|Steady/`: trait consistency 55+
 - `Caretaker/`: trait shotDiscipline 50+
 - `Clutch|Closer|Ice-Cold/`: trait clutch 55+
-- `Off-Ball|Cutter|Mover/`: trait offBall 55+
-- `Roll Man|Roll-Man|Rolling|Screen/`: trait screen 50+
+- `Off-Ball|Cutter|Mover/`: off-ball
+- `Roll Man|Roll-Man|Rolling|Screen/`: screen setting
 - `Savvy|Veteran|Old Head/`: trait veteranSavvy 55+
 - `Ruthless/`: trait competitiveness 55+
 - `Iron\b|Durable/`: trait durability 55+
@@ -58,6 +58,18 @@ A name's promises come from its own skill list (a special name's skills, a noun 
 - **leaping**: High-Flying
 - **strength**: Physical
 - **offensive IQ**: Crafty
+- **foul drawing**: Foul-Drawing
+- **cutting**: Backdoor
+- **help defense**: Help-Side
+- **post defense**: Post-Defending
+- **offensive rebounding**: Board-Hunting
+- **length**: Long
+- **ball security**: Mistake-Free
+- **switchability**: Switchable
+- **rim running**: Lob-Catching
+- **screen and roll**: Screen-and-Roll
+- **transition**: Transition
+- **motor**: High-Motor
 
 ## End words (31)
 
@@ -98,7 +110,7 @@ A name's promises come from its own skill list (a special name's skills, a noun 
 - **2-Way**: a prefix any noun name or user's own name may take (the catalog's builds have their own 2-Way forms) when his best defensive skill and his best offensive skill are both at the 80th percentile. It covers all his defensive skills and counts as one skill named.
 - **3-Level**: one word for shooting and finishing, when 3PT, mid-range and finishing are all at the 78th percentile.
 
-## Special names: the user's own (93)
+## Special names: the user's own (101)
 
 - **Swimming Mid-Range Stopper** [PG/G/SG/GF/SF/F] (perimeter D, mid-range): A slippery, mobile perimeter stopper who also hits from mid-range.
 - ★ **Paint Scoring Sniper** [PG/G/SG/GF/SF/F] (3PT, inside): An elite shooter who also scores in the paint with touch.
@@ -191,6 +203,14 @@ A name's promises come from its own skill list (a special name's skills, a noun 
 - ★ **Weak-Side Shot Eraser** [GF/SF/F/PF] (rim protection): A wing or forward who erases shots from the weak side.
 - **Ironclad Defensive Anchor** [PF/FC/C] (rim protection, strength): An elite, durable interior defender.
 - **Relentless Glass Cleaner** [F/PF/FC/C] (rebounding): A rebounder with a nonstop motor.
+- **Pterodactyl** [GF/SF/F/PF/FC/C] (length, rim protection): Extraordinary length that blocks and bothers everything near the rim.
+- **Transition Weapon** [PG/G/SG/GF/SF/F] (transition, finishing): Gets out on the break and finishes in the open floor.
+- **Open-Court Blur** [PG/G/SG] (transition, handle): A blur with the ball in the open floor.
+- **Energy Big** [PF/FC/C] (motor, rebounding): A big who outworks everyone on the glass.
+- **Motor Wing** [SG/GF/SF/F] (motor, perimeter D): A wing who never stops moving on defense.
+- ★ **Relocation Sniper** [PG/G/SG/GF/SF/F] (cutting, 3PT): An elite shooter who relocates without the ball for open threes.
+- **1-through-4 Defender** [GF/SF/F/PF] (switchability): Guards point guards through power forwards.
+- **Vertical Spacer** [PF/FC/C] (rim running, leaping): A big who stretches the defense vertically with lobs.
 - **Slashing Middy Forward** [SF/F/PF] (finishing, handle, mid-range): A forward who attacks the basket and pulls up from mid-range.
 - **Jack-Of-All-Trades** [any]: 4+ real skills (families), his 4th at the 85th percentile, at most 3 at the 90th percentile; it covers each of his skills 0.52 of the way.
 
@@ -414,41 +434,25 @@ A name's promises come from its own skill list (a special name's skills, a noun 
 - **offBall**: in front: Off-Ball / Cutting; as a name: Off-Ball Mover / Cutter
 - **hustle**: in front: Hustle / Gritty; as a name: Hustler / Grinder
 
-## Honest names (36 kinds)
+## Skill nouns (43)
 
-- Spot-Up Specialist, Corner Merchant, One-Trick Shooter, Bench Bomber, Shot-Only Wing: A shooter, and only a shooter: he spaces the floor and waits for the kick-out.
-- Garbage-Time Gunner, Streaky Gunner, Deep Bench Shooter: A low-end shooter who lets it fly when the game is out of reach, makes or misses.
-- Defensive Specialist, Hound, Pest, Gnat: A defender, and only a defender: he hounds his man and gives little back on offense.
-- Glove-Only Guard: A guard who can defend and do nothing else.
-- Shot-Blocking Specialist: A shot blocker, and only that: he protects the rim and gives little else.
-- Board Specialist, Garbage Man, Glass-Only Big: A rebounder, and only a rebounder: he cleans up the glass.
-- Bruiser, Big Body, Wall, Space Eater, Human Screen: Size and strength, not skill: he takes up space and sets screens.
-- Pogo Stick, Bounce-Only Wing: A leaper with little game beyond his bounce.
-- Track Star, All Legs, No Game: A runner with little game beyond his speed.
-- Shooter Without a Jumper: An athlete who can't shoot.
-- Dime Specialist, Pass-First, Pass-Only, Caretaker Guard: A passer, and only a passer: he moves the ball and rarely looks for his own shot.
-- Ball-Handling Specialist, Caretaker Guard: A ball handler with little else: he brings it up and gets it to the scorers.
-- Mid-Range Specialist: A mid-range shooter and not much else.
-- Post-Up Specialist: A post scorer and not much else.
-- Dunk Specialist: A finisher above the rim and not much else.
-- Slow-Motion Scorer: He can score from his spots, but slowly: no burst to get anywhere else.
-- Empty-Calorie Scorer: He gets his points, and gives them back on defense.
-- Earthbound Big: A big who plays below the rim: size and one skill, no athleticism.
-- Hustle Guy, Junkyard Dog, Hustle Over Talent, Energy Big: Effort over talent: he plays hard every minute he gets.
-- Developing Shooter, Raw Shooter, Project Stretch Big: A young shooter still growing into the role.
-- Developing Defender, Stopper-in-Training, Developing Lockdown Wing: A young defender still learning the job.
-- Rim Protector in Training: A young shot blocker still growing into the job.
-- Developing Playmaker: A young passer still learning to run an offense.
-- Developing Ball Handler: A young ball handler still learning to run an offense.
-- Developing Rebounder, Developing Glass Cleaner, Raw Big: A young rebounder still growing into the role.
-- Developing Scorer, Raw Scorer: A young scorer still finding his game.
-- Developing Post Scorer: A young post scorer still learning his moves.
-- Raw Athlete, Raw Bouncy Guard, Raw Bouncy Wing, Raw Bouncy Big: A young athlete whose skills haven't caught up with his body.
-- Raw Big, Raw Bruiser: A young big with size and strength and little skill yet.
-- All Tools, No Toolbox, Toolsy Guard, Toolsy Wing, Toolsy Big: The tools are there; the skills aren't yet.
-- Unfinished Product, Clay, Blueprint, Upside Play, Project Guard, Sleeper, Project Wing, Project Center: A project: nothing in his game is ready yet, but there is room to grow.
-- Lottery Ticket: A long shot with a high ceiling.
-- Late Bloomer: Older than most prospects and still improving.
-- Rotation Filler, Two-Way Contract, Ten-Day Guard, Emergency Big, Practice Squad Big: A depth player: he fills minutes without standing out at anything.
-- Journeyman: A veteran who has been around: he fills a roster spot wherever he's needed.
-- Camp Body, Ten-Day Guard, Ten-Day Wing, Practice Squad Big, Emergency Big: Training camp depth: he's here to fill out the roster.
+- **3PT**: Sharpshooter / Spot-Up Shooter / Pull-Up Shooter / Shooter
+- **mid-range**: Pull-Up Artist / Mid-Range Shooter
+- **inside**: Close-Range Scorer / Touch Scorer / Post Scorer
+- **finishing**: Bulldozer / Contact Finisher / Acrobatic Finisher / Touch Finisher / Finisher
+- **rim running**: Lob Threat / Rim Runner
+- **foul drawing**: And-One Artist / Free-Throw Merchant / Foul Magnet
+- **cutting**: Movement Shooter / Backdoor Cutter
+- **rim protection**: Shot Blocker / Rim Protector
+- **post defense**: Low-Post Wall / Post Stopper
+- **help defense**: Defensive Quarterback / Help-Side Anchor / Help Defender
+- **perimeter D**: Lockdown Defender / Length Defender / Perimeter Defender
+- **steals**: Ball Hawk
+- **switchability**: Switchable Defender
+- **handle**: Ball Handler
+- **shot creation**: Shot Creator / Ball Handler
+- **ball security**: Mistake-Free Handler
+- **passing**: Visionary / Precision Passer / Passer
+- **rebounding**: Rebounder
+- **offensive rebounding**: Glass Crasher
+- **screen and roll**: Short-Roll Playmaker / Roll Man

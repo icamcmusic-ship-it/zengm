@@ -28,6 +28,7 @@ const readFor = (slug: string, subs: boolean) => {
 	return { p, a, norms, read, rows };
 };
 
+// (30 s: a few seconds alone, it timed out at 5 s under the full archetype, player and view run)
 test("the why names the feature that contributed most", () => {
 	for (const slug of SLUGS) {
 		for (const subs of [true, false]) {
@@ -46,7 +47,7 @@ test("the why names the feature that contributed most", () => {
 			}
 		}
 	}
-});
+}, 30_000);
 
 test("sub-ratings are cited by name when the build wants them", () => {
 	const { p, a, norms, read, rows } = readFor("wembavi01", true);
@@ -120,7 +121,7 @@ test("no digits anywhere, 1-4 bullets, no repeats, and the words read from the s
 			assert.notMatch(b, /\d/, b);
 		}
 	}
-});
+}, 30_000);
 
 test("the words come from the shown (fuzzed) ratings", () => {
 	const { p, a, norms, read, rows } = readFor("goberru01", true);

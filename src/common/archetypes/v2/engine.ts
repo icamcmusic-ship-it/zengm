@@ -30,19 +30,9 @@ import { nameAt } from "../posNames.ts";
 import { ATH_NAME_RE, promiseMiss } from "../score.ts";
 import { FLOOR, RULES } from "../rulebook.data.ts";
 import { USER_2K_MAP } from "../twoK/user2kMap.data.ts";
-import {
-	ELITE_RE,
-	honestName,
-	isHonestKey,
-	skillsOf,
-	tierOf,
-	type Skill,
-} from "./honest.ts";
+import { ELITE_RE, isHonestKey, tierOf } from "./honest.ts";
 import {
 	END_WORDS,
-	coverCtxOf,
-	HONEST_NOUNS,
-	honestPromises,
 	nounOfDesc,
 	nounScores,
 	type CoverExplain,
@@ -1034,7 +1024,6 @@ export const classifyV2 = (
 	// else an honest name (a specialist, a developing or a depth name).
 	// archnouns: the name from his nouns (nouns.ts): a special name (a build), his two best nouns and his position, a
 	// trait name, or (one noun at low ovr, or none) an honest name about that noun
-	let nounHonest: NounKey | null | undefined;
 	let nounConf: number | undefined;
 	let nounDefense: string | undefined;
 	let nounExplain: CoverExplain | undefined;
@@ -1136,8 +1125,6 @@ export const classifyV2 = (
 				kind: "comp",
 				score,
 			};
-		} else {
-			nounHonest = np.noun ?? null;
 		}
 	}
 	const tier = P.honest ? tierOf(opts.ovr) : "elite";
@@ -1145,105 +1132,14 @@ export const classifyV2 = (
 		(P.gatePen === 0 || gatePasses(c)) &&
 		(tier === "elite" || !ELITE_RE.test(shownName(c)));
 	if (P.honest) {
-		const cleared = skillsOf(ratings, norms.rq).filter(
-			(x) => x.margin >= 0,
-		).length;
-		const onlyHonest = P.nouns
-			? nounHonest !== undefined
-			: tier === "low" && cleared <= 1;
-		if (onlyHonest || (!P.nouns && !honestFor(first))) {
-			const alt = onlyHonest
-				? undefined
-				: cands
-						.filter(honestFor)
-						.sort((x, y) => eff(y) - eff(x) || (x.canon < y.canon ? -1 : 1))[0];
+		// (archskill, reading 29: no honest names; a label the no-nouns reading finds no word of honest for keeps the best
+		// candidate that is)
+		if (!P.nouns && !honestFor(first)) {
+			const alt = cands
+				.filter(honestFor)
+				.sort((x, y) => eff(y) - eff(x) || (x.canon < y.canon ? -1 : 1))[0];
 			if (alt) {
 				first = alt;
-			} else {
-				const hIn = {
-					r: ratings,
-					group,
-					ovr: opts.ovr,
-					pot: opts.pot,
-					age: opts.age,
-					prospect: opts.prospect,
-					seed: opts.pickKey ?? opts.srID ?? `${ratings.hgt}|${ratings.stre}`,
-					rq: norms.rq,
-					traits: opts.traits as Record<string, number> | undefined,
-				};
-				let h = honestName({
-					...hIn,
-					...(nounHonest !== undefined
-						? { skill: nounHonest === null ? null : NOUN_SKILL[nounHonest] }
-						: {}),
-				});
-				// archcov: an honest name keeps its promises too (it is about the skill it was picked for, in the top 40%, and its
-				// other words keep theirs): else another word for it, else the name about no skill, else a plain depth name
-				if (nounIn) {
-					const cctx = coverCtxOf(nounIn);
-					let about: NounKey | undefined = nounHonest ?? undefined;
-					const ok = (key: string, name: string) =>
-						honestPromises(key, name, about, cctx).length === 0;
-					const synonym = (key: string) =>
-						ROLE_BY_KEY.get(key)?.names.find((nm) => ok(key, nm)) ??
-						Object.values(ROLE_BY_KEY.get(key)?.byGroup ?? {}).find((nm) =>
-							ok(key, nm!),
-						);
-					for (const n of [about, null]) {
-						about = n ?? undefined;
-						if (n === null) {
-							h = honestName({ ...hIn, skill: null });
-						}
-						if (ok(h.key, h.name)) {
-							break;
-						}
-						const alt = synonym(h.key);
-						if (alt) {
-							h = { key: h.key, name: alt };
-							break;
-						}
-					}
-					if (!ok(h.key, h.name)) {
-						const key =
-							(opts.ovr ?? 99) < 35
-								? "hCampBody"
-								: (opts.age ?? 0) >= 30
-									? "hJourneyman"
-									: "hFiller";
-						h = { key, name: ROLE_BY_KEY.get(key)!.names[0]! };
-					}
-					// archstick: last season's honest name, in its own words, while he is still the same kind of honest name
-					// (a player who outgrows it gets this season's name: that is a new kind, never kept)
-					// (archcov: or another honest name about the same skill, or the lack of one, while it keeps its promises:
-					// a development name only while he is still young with upside)
-					const prevH = prevComposed ? parseComposedId(prevRaw) : undefined;
-					if (
-						prevH &&
-						prevH.group === group &&
-						prevH.descs.length === 0 &&
-						isHonestKey(prevH.role.key) &&
-						(prevH.role.key === h.key ||
-							(DEV_KEYS.has(prevH.role.key) === DEV_KEYS.has(h.key) &&
-								(HONEST_NOUNS[prevH.role.key] ?? []).includes(about ?? "none")))
-					) {
-						const pn = composeName(prevH.role, [], group, prevH.pick);
-						if (pn !== h.name && ok(prevH.role.key, pn)) {
-							h = { key: prevH.role.key, name: pn };
-						}
-					}
-				}
-				const role = ROLE_BY_KEY.get(h.key)!;
-				const id = composedId(role, [], group, { [h.key]: h.name });
-				first = {
-					id,
-					name: h.name,
-					canon: id,
-					family: role.family ?? familyOfName(h.name, pos),
-					role: h.key,
-					descs: [],
-					kind: "comp",
-					score: eff(first),
-				};
 			}
 		}
 	}
@@ -1355,43 +1251,6 @@ export const classifyV2 = (
 			classicScore: classicCand.score,
 		},
 	};
-};
-
-// archcov: the development names (a young player with upside)
-const DEV_KEYS: ReadonlySet<string> = new Set([
-	"hDevShoot",
-	"hDevPerD",
-	"hDevRimD",
-	"hDevPass",
-	"hDevHandle",
-	"hDevReb",
-	"hDevScore",
-	"hDevPost",
-	"hDevAth",
-	"hDevStrength",
-	"hTools",
-	"hProject",
-	"hLottery",
-	"hLateBloomer",
-]);
-
-// archnouns: the honest skill a noun is
-const NOUN_SKILL: Record<NounKey, Skill> = {
-	three: "shoot",
-	mid: "mid",
-	post: "post",
-	finish: "dunk",
-	rimD: "rimD",
-	perimD: "perD",
-	steal: "perD",
-	handle: "handle",
-	creator: "handle",
-	pass: "pass",
-	reb: "reb",
-	speed: "speed",
-	jump: "jump",
-	strength: "strength",
-	crafty: "pass",
 };
 
 // The shipped picks (userPicks.data.ts) under the league's own (a league's copy of a shipped pick replaces it)
