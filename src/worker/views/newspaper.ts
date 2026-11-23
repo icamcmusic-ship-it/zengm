@@ -29,6 +29,7 @@ import { DEFENSE_NAMES, OFFENSE_NAMES } from "../../common/coachSystems.ts";
 import { PHASE, PLAYER } from "../../common/constants.ts";
 import { getCurrentContract } from "../../common/contracts.ts";
 import { buildPaper } from "../../common/newspaper/index.ts";
+import { allStarFacts } from "../../common/newspaper/allStar.ts";
 import type { FaceConfig } from "facesjs";
 import { DEFAULT_TEAM_COLORS } from "../../common/constants.ts";
 import type {
@@ -1161,6 +1162,23 @@ export const getNewsFacts = async (
 	// Rivalry Stories: previews of marquee rivalry games and recaps of the season's big ones
 	if (rivalryStoriesOn()) {
 		facts.rivalry = await getRivalryNewsFacts(season);
+	}
+	// All-Star weekend: the game, the contests, Rising Stars, the skills challenge and the vote (basketball)
+	if (__SPORT === "basketball" && edition !== "preseason") {
+		const allStars = await idb.merged.allStars.get(season);
+		if (allStars) {
+			let mvpLine;
+			if (allStars.gid !== undefined && allStars.mvp) {
+				const game = await idb.merged.games.get(allStars.gid);
+				for (const t of game?.teams ?? []) {
+					const p = t.players.find((x: any) => x.pid === allStars.mvp!.pid);
+					if (p) {
+						mvpLine = { pts: p.pts, trb: p.orb + p.drb, ast: p.ast, tp: p.tp };
+					}
+				}
+			}
+			facts.allStar = allStarFacts(allStars, mvpLine);
+		}
 	}
 	// Rumors: this season's rumors and how they turned out (only while they are in the league's rolling window)
 	if (featureOn("rumors")) {

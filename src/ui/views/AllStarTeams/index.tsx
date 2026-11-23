@@ -150,6 +150,7 @@ const AllStars = ({
 	stats,
 	teams,
 	teamNames,
+	tournamentTeams,
 	type,
 }: View<"allStarTeams">) => {
 	const {
@@ -394,7 +395,11 @@ const AllStars = ({
 					</button>
 				</div>
 			) : null}
-			{godMode && nextGameIsAllStar && isCurrentSeason && type !== "draft" ? (
+			{godMode &&
+			nextGameIsAllStar &&
+			isCurrentSeason &&
+			type !== "draft" &&
+			!tournamentTeams ? (
 				<div className="mb-3">
 					<button
 						className="btn btn-lg btn-god-mode"
@@ -406,7 +411,35 @@ const AllStars = ({
 					</button>
 				</div>
 			) : null}
-			<div className="row">
+			{tournamentTeams ? (
+				<>
+					<p>
+						Tournament: the four teams play two semifinals to a target score
+						right before the All-Star Game, and the winners meet in the All-Star
+						Game.{" "}
+						<a href={helpers.leagueUrl(["all_star", "weekend", season])}>
+							All-Star Weekend
+						</a>
+					</p>
+					<div className="row">
+						{tournamentTeams.map((t, i) => (
+							<div className="col-lg-6" key={i}>
+								<h2>{t.name}</h2>
+								<PlayersTable
+									challengeNoRatings={challengeNoRatings}
+									draftType={draftType}
+									name={`Tournament${i}`}
+									players={t.players}
+									season={season}
+									stats={stats}
+									userTids={userTids}
+								/>
+							</div>
+						))}
+					</div>
+				</>
+			) : null}
+			<div className={tournamentTeams ? "d-none" : "row"}>
 				<div className="col-sm-6 col-md-8">
 					<div className="row">
 						<div className="col-md-6">

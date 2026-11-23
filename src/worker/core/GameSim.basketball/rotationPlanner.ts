@@ -2,6 +2,8 @@
 // trouble rules and the closing lineup. Pure functions, no random numbers; GameSim.updatePlayersOnCourt multiplies its usual
 // substitution values by the factors from here.
 
+import { ALL_STAR_MINUTES } from "./allStarSim.ts";
+
 // Minutes per regulation game (48) planned by rank in value among the healthy players, regular season. Sums to 240. Planned a little
 // above what the top of the rotation ends up playing, since blowouts and foul trouble take minutes from them (calibrated so the
 // league minutes by rank stay about the same as with the setting off, see docs/native-features.md). The top three were raised (and the
@@ -60,7 +62,7 @@ export const planMinutes = (
 			: REGULAR_SEASON_TARGETS;
 	if (options.allStarGame) {
 		// Everybody plays
-		table = [26, 25, 24, 23, 22, 21, 20, 19, 17, 15, 14, 14];
+		table = ALL_STAR_MINUTES;
 	}
 	const style = Math.max(-1, Math.min(1, options.rotationStyle ?? 0));
 

@@ -187,6 +187,9 @@ type Key =
 	| "weightFactor"
 	| "allStarDunk"
 	| "allStarThree"
+	| "allStarVote"
+	| "allStarRisingStars"
+	| "allStarSkills"
 	| "minRetireAge"
 	| "numWatchColors"
 	| "giveMeWorstRoster"
@@ -416,6 +419,9 @@ export const getInitialSettings = (): Settings => {
 		weightFactor: g.get("weightFactor"),
 		allStarDunk: g.get("allStarDunk"),
 		allStarThree: g.get("allStarThree"),
+		allStarVote: g.get("allStarVote"),
+		allStarRisingStars: g.get("allStarRisingStars"),
+		allStarSkills: g.get("allStarSkills"),
 		minRetireAge: g.get("minRetireAge"),
 		numWatchColors: g.get("numWatchColors"),
 		groupScheduleSeries: g.get("groupScheduleSeries"),

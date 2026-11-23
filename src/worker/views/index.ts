@@ -7,6 +7,7 @@ export { default as allStarDunk } from "./allStarDunk.ts";
 export { default as allStarHistory } from "./allStarHistory.ts";
 export { default as allStarTeams } from "./allStarTeams.ts";
 export { default as allStarThree } from "./allStarThree.ts";
+export { default as allStarWeekend } from "./allStarWeekend.ts";
 export { default as autoExpand } from "./autoExpand.ts";
 export { default as autoRelocate } from "./autoRelocate.ts";
 export { default as awardRaces } from "./awardRaces.ts";
