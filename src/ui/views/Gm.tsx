@@ -1,7 +1,7 @@
 import useTitleBar from "../hooks/useTitleBar.tsx";
 import { helpers } from "../util/helpers.ts";
 import type { View } from "../../common/types.ts";
-import { GmTraitBars } from "../components/GmCard.tsx";
+import { GmTraitBars, gmBehaviorParts } from "../components/GmCard.tsx";
 import { StaffFace } from "../components/StaffFace.tsx";
 
 const REASONS = {
@@ -24,6 +24,7 @@ const playoffText = (roundsWon: number, numRounds: number) => {
 
 const Gm = ({
 	age,
+	behavior,
 	born,
 	career,
 	currentTid,
@@ -40,6 +41,7 @@ const Gm = ({
 	status,
 	styleLabels,
 	tenures,
+	traitBands,
 	traits,
 	gmid,
 }: View<"gm">) => {
@@ -101,7 +103,7 @@ const Gm = ({
 					</p>
 				</div>
 				<div style={{ flex: "0 1 360px" }}>
-					<GmTraitBars traits={traits} />
+					<GmTraitBars bands={traitBands} traits={traits} />
 				</div>
 			</div>
 
@@ -154,6 +156,34 @@ const Gm = ({
 					</tbody>
 				</table>
 			</div>
+
+			<h2>Track record</h2>
+			{gmBehaviorParts(behavior).length === 0 ? (
+				<p>Nothing yet.</p>
+			) : (
+				<>
+					<p className="text-body-secondary">
+						What he has actually done in all his jobs, next to his leanings.
+					</p>
+					<div className="table-responsive">
+						<table
+							className="table table-sm table-striped w-auto"
+							data-testid="gm-track-record"
+						>
+							<tbody>
+								{gmBehaviorParts(behavior).map((part) => (
+									<tr key={part.label}>
+										<th className="fw-normal" title={part.title}>
+											{part.label}
+										</th>
+										<td>{part.value}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				</>
+			)}
 
 			<h2>Career</h2>
 			{seasons.length === 0 ? (

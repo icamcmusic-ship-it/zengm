@@ -126,6 +126,16 @@ export const getAllGmWeights = async (): Promise<Map<number, GmWeights>> => {
 	return map;
 };
 
+// Free agency: the payroll an AI team signs against. A tax-averse GM keeps part of the cap free (faCapRoom), as if that much more were
+// already committed, so no signing above the minimum takes him past (1 - faCapRoom) of the cap
+export const gmFaPayroll = (
+	payroll: number,
+	gm: Pick<GmWeights, "faCapRoom"> | undefined,
+) =>
+	gm && gm.faCapRoom > 0
+		? payroll + gm.faCapRoom * g.get("salaryCap")
+		: payroll;
+
 const allGms = (teams: Team[]) => {
 	const gms: Gm[] = [];
 	for (const t of teams) {

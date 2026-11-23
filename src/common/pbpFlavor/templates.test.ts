@@ -42,6 +42,8 @@ import {
 	heatCheckNote,
 	homeCrowd,
 	hotLine,
+	benchHotLine,
+	feedHotLine,
 	lateClockMiss,
 	pointsMilestone,
 	runEndedLine,
@@ -540,6 +542,8 @@ test("calls, crowd, momentum and milestone lines fill in", () => {
 		);
 		check("streak", streakLine(rng, p.name, 8 + (i % 6), "the Celtics"));
 		check("hot", hotLine(rng, p.name, 4 + (i % 4)));
+		check("bench hot", benchHotLine(rng, p.name, 3 + (i % 4)));
+		check("feed hot", feedHotLine(rng, p.name, 8 + (i % 6), "the Celtics"));
 		check("drought", droughtLine(rng, clockOf(180 + i * 7), "the Celtics"));
 		check("heat check", heatCheckNote(rng, p.name, 3 + (i % 4), i % 2 === 0));
 		check(

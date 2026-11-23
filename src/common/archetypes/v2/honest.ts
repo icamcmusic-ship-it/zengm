@@ -12,6 +12,7 @@
 // Synonyms are picked by a stable seed per player, so a player keeps his name while his situation stays the same.
 import type { Family } from "../families.ts";
 import type { ArchetypeRatings } from "../types.ts";
+import { SUB_INDEX } from "../../subRatings.ts";
 import { scaleCutoff, type RatingQuantiles } from "./gateScale.ts";
 
 export type PosGroup = "guard" | "wing" | "big";
@@ -422,6 +423,17 @@ const hash = (s: string) => {
 };
 
 // Which honest name he has (role and the synonym), for a player who may not have the reading's label
+// (his off-the-dribble 3PT sub-rating leads his catch-and-shoot one by 10+)
+const offDribble = (r: ArchetypeRatings): boolean => {
+	const tcs = r.sub?.[SUB_INDEX.tcs!];
+	const tod = r.sub?.[SUB_INDEX.tod!];
+	return (
+		typeof tcs === "number" &&
+		typeof tod === "number" &&
+		tcs > 0 &&
+		tod - tcs >= 10
+	);
+};
 export const honestName = (x: HonestInput): { key: string; name: string } => {
 	const { r, group } = x;
 	const skills = skillsOf(r, x.rq);
@@ -495,35 +507,13 @@ export const honestName = (x: HonestInput): { key: string; name: string } => {
 			}
 			return "hFiller";
 		}
-		// one skill (or the best of several, when he has no other name): flaws first, then the specialist
+		// one skill (or the best of several, when he has no other name): the specialist, named for the skill he has
+		// (archfam, the user's 2070 audit: an honest name says his actual skill, "Spot-Up Specialist", not a flaw:
+		// Empty-Calorie Scorer, Slow-Motion Scorer, Earthbound Big, Shooter Without a Jumper and Garbage-Time Gunner are
+		// no longer given to a player with a skill)
 		const s = best!;
-		const slow = (r.spd ?? 0) < 30;
-		if (
-			group === "big" &&
-			(s === "reb" || s === "rimD" || s === "post" || s === "strength") &&
-			(r.jmp ?? 0) < 35 &&
-			(r.spd ?? 0) < 35
-		) {
-			return "hEarthbound";
-		}
-		if (
-			(s === "jump" || s === "speed") &&
-			(r.tp ?? 0) < 40 &&
-			(r.fg ?? 0) < 40
-		) {
-			return "hAthNoShot";
-		}
-		if ((s === "mid" || s === "post") && slow) {
-			return "hSlowScorer";
-		}
-		if ((s === "mid" || s === "post" || s === "shoot") && (r.diq ?? 50) < 30) {
-			return "hEmptyScorer";
-		}
 		if (s === "perD" && group === "guard" && (r.oiq ?? 50) < 40) {
 			return "hGlove";
-		}
-		if (s === "shoot" && (x.ovr ?? 99) < 42) {
-			return "hGunner";
 		}
 		switch (s) {
 			case "shoot":
@@ -556,7 +546,14 @@ export const honestName = (x: HonestInput): { key: string; name: string } => {
 	const names = role.byGroup?.[group] ?? role.names;
 	return {
 		key,
-		name: names[hash(`${x.seed}|${key}`) % names.length]!,
+		// (archfam: a one-skill shooter is a Spot-Up Specialist, the user's word for him, unless his shots come off the
+		// dribble: then another shooter's name; other names by the seed)
+		name:
+			key === "hShoot" && !offDribble(r)
+				? names[0]!
+				: key === "hShoot"
+					? names.slice(1)[hash(`${x.seed}|${key}`) % (names.length - 1)]!
+					: names[hash(`${x.seed}|${key}`) % names.length]!,
 	};
 };
 // (a young player whose best tool is close to the bar: Raw ___)

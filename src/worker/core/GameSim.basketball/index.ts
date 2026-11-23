@@ -119,6 +119,7 @@ import {
 	foulToGiveProb,
 	foulToGiveTime,
 	foulTargetWeights,
+	lateIsoWindow,
 	runTimeoutSource,
 	runTimeoutThreshold,
 	saveLastTimeout,
@@ -199,6 +200,20 @@ import {
 	shotPlanMult,
 } from "./shotShare.ts";
 import {
+	BREAKOUT,
+	formDraw,
+	hotCloser,
+	injuryOpening,
+	isCareerNight,
+	matchupOpening,
+	onHeater,
+	oppDefense,
+	roleFactor,
+	startersOut,
+	usageForm,
+	usageRanks,
+} from "./breakout.ts";
+import {
 	contestLevel,
 	flowCount,
 	flowSum,
@@ -244,6 +259,12 @@ type ShotShareState = {
 	threat: number;
 	streak: number;
 	hot: number;
+	// Breakout nights (breakout.ts): his role factor (0 the top scorer, 1 a role player), how many shooter draws his hot hand lasts, his
+	// straight misses while hot, and the make probability his career night adds
+	rf: number;
+	hotPossN: number;
+	cold: number;
+	nightMake: number;
 };
 
 // Player traits: the chance that a team misses the right end-of-game call (foul when behind, hold for the last shot, 2-for-1) at full
@@ -785,6 +806,8 @@ class GameSim extends GameSimBase {
 	// unanswered points), offense/defense substitutions in the last minute, who gets fouled on purpose, fouling when up 3, last shots and
 	// 2-for-1s in the stock possession model. Off: nothing here is used and no extra random numbers are drawn
 	smartEndgame: boolean;
+	// End-of-Game Intelligence: this possession is a late-game isolation (a go-ahead or tying possession at the end, see lateIsoPossession)
+	lateIso = false;
 
 	// Star & Clutch Calibration (starClutchCal, with Matchup Defense on): see starClutch.ts
 	starClutchCal = false;
@@ -843,6 +866,8 @@ class GameSim extends GameSimBase {
 	// multipliers (refreshed when the lineups change, ssVersion), the late shot clock flag of this possession, and the last draw (for the
 	// shot diet)
 	shotShare = false;
+	// Breakout nights (breakout.ts): with the Shot Share Model, not in All-Star games
+	breakout = false;
 	// Shot Zones (League extras, see shotZones.ts): sub-zones, their make shifts and xFG. Off: nothing here runs and no extra random
 	// number is drawn. szZone/szXfg: the last shot's sub-zone and expected FG% (-1: none), for Advanced Tracking Stats
 	shotZones = false;
@@ -1160,6 +1185,10 @@ class GameSim extends GameSimBase {
 						teamMean,
 					);
 				}
+			}
+			if (!allStarGame) {
+				this.breakout = true;
+				this.breakoutSetup();
 			}
 		}
 
@@ -2372,10 +2401,35 @@ class GameSim extends GameSimBase {
 						b.valueNoPot * (this.allStarGame ? 1 : b.ptModifier) -
 						a.valueNoPot * (this.allStarGame ? 1 : a.ptModifier),
 				);
-			return od
-				? this.pickEndgameClosers(t, candidates)
+			if (od) {
+				return this.pickEndgameClosers(t, candidates);
+			}
+			return this.breakout
+				? this.pickHotClosers(candidates)
 				: pickClosers(candidates, this.numPlayersOnCourt);
 		}) as [Set<PlayerGameSim>, Set<PlayerGameSim>];
+	}
+
+	// Breakout nights (Shot Share Model): a role player who is hot tonight counts as (1 + closerHot) × his value for the closing lineup
+	pickHotClosers(candidates: PlayerGameSim[]) {
+		const hot = (p: PlayerGameSim) =>
+			p.ss !== undefined && p.ss.rf > 0 && hotCloser(p.stat);
+		if (!candidates.some(hot)) {
+			return pickClosers(candidates, this.numPlayersOnCourt);
+		}
+		const picked = pickClosers(
+			candidates.map((p) => ({
+				pos: p.pos,
+				valueNoPot: p.valueNoPot * (hot(p) ? 1 + BREAKOUT.closerHot : 1),
+				p,
+			})),
+			this.numPlayersOnCourt,
+		);
+		const closers = new Set<PlayerGameSim>();
+		for (const { p } of picked) {
+			closers.add(p);
+		}
+		return closers;
 	}
 
 	// ---- End-of-Game Intelligence (the smartEndgame setting, see endgame.ts). Only called with the setting on ----
@@ -2385,6 +2439,47 @@ class GameSim extends GameSimBase {
 		return this.coachSys
 			? helpers.bound((this.cs[t].foulWindow - 27) / 6, -1, 1)
 			: 0;
+	}
+
+	// Late-game isolations (endgame.ts lateIsoWindow): a go-ahead or tying possession in the last seconds, not when the defense fouls on
+	// purpose or with the Elam ending (no clock). No random numbers
+	lateIsoPossession(clockFactor: ClockFactor) {
+		return (
+			this.smartEndgame &&
+			clockFactor !== "intentionalFoul" &&
+			!this.elamActive &&
+			lateIsoWindow(
+				this.t,
+				this.team[this.o].stat.pts - this.team[this.d].stat.pts,
+				this.team[0].stat.ptsQtrs.length >= this.numPeriods,
+			)
+		);
+	}
+
+	// Late-game isolations: ENDGAME.isoKeep of the time the closer (the best scorer on the floor, leaning to those who create their own
+	// shot) gets the ball, creates and takes the shot himself (one random number, only in a late-game isolation); otherwise the usual
+	// shooter draw
+	lateIsoShooter() {
+		if (!this.lateIso || Math.random() >= ENDGAME.isoKeep) {
+			return undefined;
+		}
+		let closer: PlayerGameSim | undefined;
+		let best = -Infinity;
+		for (const p of this.playersOnCourt[this.o]) {
+			const c = p.compositeRating;
+			const score = c.usage + ENDGAME.isoCloserCreation * (c.creation ?? 0);
+			if (score > best) {
+				best = score;
+				closer = p;
+			}
+		}
+		if (closer === undefined) {
+			return undefined;
+		}
+		this.creator = closer;
+		this.ssPick = undefined;
+		this.ssPickKick = undefined;
+		return closer;
 	}
 
 	// The last minute of a close game (final period or overtime), when teams substitute for offense and defense at dead balls
@@ -2568,7 +2663,7 @@ class GameSim extends GameSimBase {
 
 			// Minutes: the hot hand plays more, a cold one less
 			if (this.realisticRotations) {
-				this.adjustMinutes(t, amount * good, scale);
+				this.adjustMinutes(t, amount * good, scale, (weight * (1 + good)) / 2);
 			}
 
 			// Matchups: the best fitting defender goes to the opponent's top scorer
@@ -2625,12 +2720,16 @@ class GameSim extends GameSimBase {
 	}
 
 	// A coach's minutes adjustment (k: how far, 0-1): the hot hand's plan goes up, a cold shooter's down, the rest of the rotation
-	// evens it out
-	adjustMinutes(t: TeamNum, k: number, scale: number) {
+	// evens it out. Breakout nights (Shot Share Model): a hot bench player's goes up benchK × benchHotMin more, unless it's a blowout
+	adjustMinutes(t: TeamNum, k: number, scale: number, benchK: number = 0) {
 		const A = SIM_FIX_ADJUST;
+		const B = BREAKOUT;
 		if (k <= 0) {
 			return;
 		}
+		const benchRide =
+			this.breakout &&
+			Math.abs(this.team[0].stat.pts - this.team[1].stat.pts) < B.benchBlowout;
 		let change = 0;
 		const moved = new Set<PlayerGameSim>();
 		for (const p of this.team[t].player) {
@@ -2644,12 +2743,20 @@ class GameSim extends GameSimBase {
 			const fga = p.stat.fga;
 			const eff = p.stat.pts / Math.max(1, fga + 0.44 * p.stat.fta);
 			let delta = 0;
+			let maxShift = A.maxShift;
 			if (
 				fga >= A.hotFga * scale &&
 				eff >= A.hotEff &&
 				p.stat.pts >= A.hotPts * scale
 			) {
 				delta = A.hotMin * k;
+				if (benchRide && p.stat.gs === 0) {
+					delta += B.benchHotMin * benchK;
+					maxShift = B.benchMaxShift;
+					if (FLOW_DIAG.on) {
+						flowCount("brkBenchMin");
+					}
+				}
 			} else if (fga >= A.coldFga * scale && eff <= A.coldEff) {
 				delta = -A.coldMin * k;
 			}
@@ -2658,7 +2765,7 @@ class GameSim extends GameSimBase {
 				const next = helpers.bound(
 					target + delta,
 					Math.max(0, plan0 - A.maxShift),
-					plan0 + A.maxShift,
+					plan0 + maxShift,
 				);
 				change += next - target;
 				this.minutesTargets.set(p, next);
@@ -2985,7 +3092,77 @@ class GameSim extends GameSimBase {
 			threat,
 			streak: 0,
 			hot: 0,
+			rf: 0,
+			hotPossN: S.hotPoss,
+			cold: 0,
+			nightMake: 0,
 		};
+	}
+
+	// Breakout nights (breakout.ts): each player's role factor, usage form, career night, openings and hot hand for the game. No draws
+	// from Math.random (his form draw is a stream seeded by the game and the player)
+	breakoutSetup() {
+		const B = BREAKOUT;
+		const S = SHOT_SHARE;
+		for (const t of teamNums) {
+			const players = this.team[t].player;
+			const ranks = usageRanks(
+				players.map((p) => ({
+					p,
+					valueNoPot: p.valueNoPot,
+					injured: p.injured,
+					usage: p.compositeRating.usage,
+				})),
+			);
+			const out = startersOut(players);
+			const def = oppDefense(this.team[t === 0 ? 1 : 0].player);
+			if (FLOW_DIAG.on) {
+				flowSum("brkPerim", def.perim);
+				flowSum("brkInt", def.int);
+			}
+			for (const [{ p }, rank] of ranks) {
+				const s = p.ss;
+				if (!s) {
+					continue;
+				}
+				const rf = roleFactor(rank);
+				s.rf = rf;
+				const draw = formDraw(this.id, p.id);
+				let form = usageForm(rf, p.gameZ, draw.z);
+				if (isCareerNight(rf, draw.u)) {
+					form *= B.careerUsage;
+					s.nightMake = B.careerMake;
+					if (FLOW_DIAG.on) {
+						flowCount("brkCareer");
+					}
+				}
+				const cr = p.compositeRating;
+				form *=
+					injuryOpening(rf, out) *
+					matchupOpening(
+						rf,
+						s.threat,
+						cr.shootingAtRimMake ?? cr.shootingAtRim ?? 0,
+						def,
+					);
+				s.fixed *= form;
+				s.hotBoost = 1 + (s.hotBoost - 1) * (1 + (B.hotRole * rf) / S.hot);
+				s.hotPossN = S.hotPoss + Math.round(B.hotPossRole * rf);
+			}
+		}
+	}
+
+	// Shot Share Model (with Breakout nights): a miss ends a star's hot hand, a role player's after coldMisses straight
+	ssMiss(s: ShotShareState) {
+		s.streak = 0;
+		if (s.rf > 0 && s.hot > 0) {
+			s.cold += 1;
+			if (s.cold < BREAKOUT.coldMisses) {
+				return;
+			}
+		}
+		s.hot = 0;
+		s.cold = 0;
 	}
 
 	// Shot Share Model: team t's roles in its five (by usage composite times game plan), its best creator and, with Matchup Defense, the
@@ -3351,7 +3528,8 @@ class GameSim extends GameSimBase {
 		if ((this.ssTier[t][i] ?? 0) >= 3) {
 			delta += s.roleForceMake;
 		}
-		return delta;
+		// Breakout nights: his career night, and the calibration
+		return delta - s.nightMake + (this.breakout ? BREAKOUT.makeCal : 0);
 	}
 
 	// Shot Share Model: the shot diet (Advanced Tracking Stats): where this shot came from and, for the shooter draw, what moved his share
@@ -3392,9 +3570,11 @@ class GameSim extends GameSimBase {
 			this.ssPickKick = undefined;
 			return this.pickFoulTarget();
 		}
-		const p = this.shotShare
-			? this.pickShooterShotShare()
-			: this.pickPlayer("usage", this.o, this.usagePower(), undefined, true);
+		const p =
+			this.lateIsoShooter() ??
+			(this.shotShare
+				? this.pickShooterShotShare()
+				: this.pickPlayer("usage", this.o, this.usagePower(), undefined, true));
 		if (this.matchupDefense) {
 			this.attentionShooter = p;
 			this.attentionShooterShare =
@@ -4872,6 +5052,7 @@ class GameSim extends GameSimBase {
 	}
 
 	getPossessionOutcome(clockFactor: ClockFactor): PossessionOutcome {
+		this.lateIso = false;
 		// If winning at end of game, just run out the clock
 		if (clockFactor === "runOutClock") {
 			this.advanceClockSeconds(Infinity);
@@ -4948,6 +5129,8 @@ class GameSim extends GameSimBase {
 			}
 		}
 
+		// End-of-Game Intelligence: a go-ahead or tying possession at the end is a clear-out for the closer
+		this.lateIso = this.lateIsoPossession(clockFactor);
 		// Spacing & Shot Creation: the creator first, then the shooter
 		if (this.spacingCreation) {
 			this.creator = this.pickPlayer(
@@ -5570,6 +5753,8 @@ class GameSim extends GameSimBase {
 				this.t > this.shotClock && this.shotClock - shotAt < SHOT_SHARE.lateSec;
 		}
 
+		// End-of-Game Intelligence: a go-ahead or tying possession at the end is a clear-out for the closer
+		this.lateIso = this.lateIsoPossession(clockFactor);
 		// Spacing & Shot Creation: the creator first, then the shooter
 		if (this.spacingCreation) {
 			this.creator = this.pickPlayer(
@@ -6190,6 +6375,8 @@ class GameSim extends GameSimBase {
 				(this.coachSys ? cso.mid * csd.dMid : 1) *
 				pullUpTilt *
 				(this.playTypes && selfCreated ? PLAY_TYPES.selfMid : 1) *
+				// (End-of-Game Intelligence: a late-game isolation leans to the pull-up)
+				(this.lateIso && selfCreated ? ENDGAME.isoMid : 1) *
 				(this.offEmph ? this.oe[this.o].mid : 1) *
 				(sp ? sp.mid : 1) *
 				(this.adjZone[this.d] === 1 ? this.adjSel[this.d] : 1) *
@@ -6489,6 +6676,15 @@ class GameSim extends GameSimBase {
 				this.team[0].stat.ptsQtrs.length >= this.numPeriods
 			) {
 				probMake += ENDGAME.atoMake * this.endgameMgmt(this.o);
+			}
+			// End-of-Game Intelligence: a late-game isolation's jumper off the dribble, against a set defense
+			if (
+				this.lateIso &&
+				selfCreated &&
+				passer === undefined &&
+				(type === "threePointer" || type === "midRange")
+			) {
+				probMake += ENDGAME.isoMake;
 			}
 
 			// Matchup Defense, defensive attention: help defense on a shooter who carries much of his team's offense
@@ -6946,8 +7142,7 @@ class GameSim extends GameSimBase {
 			this.flowShotDone(false, type);
 		}
 		if (p.ss) {
-			p.ss.streak = 0;
-			p.ss.hot = 0;
+			this.ssMiss(p.ss);
 		}
 
 		return this.doReb();
@@ -7264,8 +7459,7 @@ class GameSim extends GameSimBase {
 	 */
 	doBlk(p: PlayerGameSim, type: ShotType) {
 		if (p.ss) {
-			p.ss.streak = 0;
-			p.ss.hot = 0;
+			this.ssMiss(p.ss);
 		}
 		this.recordStat(this.o, p, "ba");
 		this.recordStat(this.o, p, "fga");
@@ -7353,10 +7547,14 @@ class GameSim extends GameSimBase {
 	) {
 		const pid = p.id;
 		// Shot Share Model: the hot hand (the team feeds him for its next few shooter draws)
+		// (Breakout nights: a role player's lasts longer, and also starts on a heater)
 		if (p.ss) {
 			p.ss.streak += 1;
+			p.ss.cold = 0;
 			if (p.ss.streak >= p.ss.hotAfter) {
-				p.ss.hot = SHOT_SHARE.hotPoss;
+				p.ss.hot = p.ss.hotPossN;
+			} else if (p.ss.rf > 0 && p.ss.hot === 0 && onHeater(p.stat)) {
+				p.ss.hot = p.ss.hotPossN;
 			}
 		}
 		this.recordStat(this.o, p, "fga");
@@ -7519,15 +7717,18 @@ class GameSim extends GameSimBase {
 
 	// Spacing & Shot Creation: power on the creation composite when picking the creator (the coach's usage multipliers apply)
 	creationPower() {
+		// (End-of-Game Intelligence: a late-game isolation goes to the best creator)
+		const iso = this.lateIso ? ENDGAME.isoCreatorPower : 1;
 		if (!this.coachSys) {
-			return CREATION_POWER * this.clutchUsageMult();
+			return CREATION_POWER * this.clutchUsageMult() * iso;
 		}
 		const cs = this.cs[this.o];
 		return (
 			CREATION_POWER *
 			cs.usage *
 			(this.isClutchTime() ? cs.clutchUsage : 1) *
-			this.clutchUsageMult()
+			this.clutchUsageMult() *
+			iso
 		);
 	}
 
@@ -7536,12 +7737,16 @@ class GameSim extends GameSimBase {
 		if (this.creator === undefined || this.creator === shooter) {
 			return;
 		}
-		const prob =
+		let prob =
 			Math.min(
 				PLAY_TYPES.selfMax,
 				PLAY_TYPES.selfSlope *
 					((shooter.compositeRating.creation ?? 0) - PLAY_TYPES.selfMin),
 			) * (this.offEmph ? this.oe[this.o].selfCreate : 1);
+		// End-of-Game Intelligence: in a late-game isolation a shooter who can create goes on his own more often (the same random number)
+		if (this.lateIso && prob > 0) {
+			prob += (1 - prob) * ENDGAME.isoSelf;
+		}
 		if (prob > 0 && Math.random() < prob) {
 			this.creator = shooter;
 		}
@@ -7578,6 +7783,8 @@ class GameSim extends GameSimBase {
 			this.probAst() *
 			typeFactor *
 			(selfCreated ? CREATION.astSelf : CREATION.astOther) *
+			// (End-of-Game Intelligence: a late-game isolation has no handoff or re-screen)
+			(this.lateIso && selfCreated ? ENDGAME.isoAst : 1) *
 			(this.playTypes
 				? PLAY_TYPES.ast *
 					(selfCreated
