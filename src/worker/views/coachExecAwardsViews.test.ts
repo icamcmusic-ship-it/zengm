@@ -166,7 +166,14 @@ describe("Coach & Executive of the Year", { timeout: 5 * 60 * 1000 }, () => {
 
 	test("team variables: win% against preseason and roster projections, payroll and injuries", async () => {
 		const contexts = await getTeamAwardContexts(season);
-		assert.strictEqual(contexts.size, g.get("numActiveTeams"));
+		// Every team that has played (after 3 days of a short season, a team may not have played yet)
+		const played = (await idb.cache.teamSeasons.getAll()).filter(
+			(ts) =>
+				ts.season === season &&
+				ts.won + ts.lost + (ts.tied ?? 0) + (ts.otl ?? 0) > 0,
+		).length;
+		assert.isAtLeast(played, g.get("numActiveTeams") - 2);
+		assert.strictEqual(contexts.size, played);
 		const expMean =
 			[...contexts.values()].reduce((sum, ctx) => sum + ctx.expWinp, 0) /
 			contexts.size;
