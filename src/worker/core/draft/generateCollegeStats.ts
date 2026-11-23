@@ -488,25 +488,60 @@ export const upgradeCollegeStats = async () => {
 		(a, b) => a - b,
 	);
 	for (const draftYear of years) {
-		const counts = new Map<string, number>();
-		for (const p of prospects) {
-			if (p.draft.year === draftYear && p.collegeSeason?.season === draftYear) {
-				const seed = p.collegeSeason.seed;
-				counts.set(seed, (counts.get(seed) ?? 0) + 1);
-			}
-		}
-		const seed =
-			[...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ??
-			`${g.get("lid")}-${draftYear}-auto`;
 		await generateCollegeStats({
 			draftYear,
-			seed,
+			seed: classStatsSeed(prospects, draftYear),
 			pids: stale.filter((p) => p.draft.year === draftYear).map((p) => p.pid),
 			keepSeason: true,
 			fillBlankColleges: true,
 		});
 	}
 	return years;
+};
+
+// The seed a class's college stats were generated with (stored with its college season, otherwise the automatic seed)
+const classStatsSeed = (prospects: Player[], draftYear: number) => {
+	const counts = new Map<string, number>();
+	for (const p of prospects) {
+		if (p.draft.year === draftYear && p.collegeSeason?.season === draftYear) {
+			const seed = p.collegeSeason.seed;
+			counts.set(seed, (counts.get(seed) ?? 0) + 1);
+		}
+	}
+	return (
+		[...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ??
+		`${g.get("lid")}-${draftYear}-auto`
+	);
+};
+
+/**
+ * Regenerate Ratings: remake the generated college/overseas stats of prospects whose ratings were rebuilt, so the pre-draft story (and
+ * the scouting report's evidence that reads it) matches the new build. Deterministic, with the class's own seed, and the class's college
+ * season (schedule, results, bracket) is kept. Only prospects with generated stats (a stored career) are touched, never imported rows.
+ */
+export const remakeCollegeStatsFor = async (
+	draftYear: number,
+	pids: number[],
+) => {
+	if (__SPORT !== "basketball" || pids.length === 0) {
+		return 0;
+	}
+	const prospects = await getProspects(draftYear);
+	const which = new Set(pids);
+	const targets = prospects.filter(
+		(p) => which.has(p.pid) && p.preDraftCareer !== undefined,
+	);
+	if (targets.length === 0) {
+		return 0;
+	}
+	await generateCollegeStats({
+		draftYear,
+		seed: classStatsSeed(prospects, draftYear),
+		pids: targets.map((p) => p.pid),
+		keepSeason: true,
+		fillBlankColleges: true,
+	});
+	return targets.length;
 };
 
 // Kept for callers of the old name

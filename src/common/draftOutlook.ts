@@ -22,9 +22,13 @@ const TIERS: readonly (readonly [number, string, OutlookKind])[] = [
 	[45, "Bench depth", "low"],
 ];
 
-// What a pick usually becomes (projected peak ovr), from about 66 at #1 down to about 46 at the last pick of round 2
-export const expectedPeakAtPick = (overallPick: number, numTeams: number) => {
-	const n = Math.max(2, 2 * Math.max(1, numTeams));
+// Picks the curve spans (two rounds of a 30-team league). Classes have at least about 70 prospects whatever the league size, so what
+// a pick becomes depends on how many players went before him, not on his share of the league: the curve is by absolute overall pick
+const EXPECTED_PEAK_SPAN = 60;
+
+// What a pick usually becomes (projected peak ovr), from about 66 at #1 down to about 46 at pick 60 (and after)
+export const expectedPeakAtPick = (overallPick: number) => {
+	const n = EXPECTED_PEAK_SPAN;
 	const x = Math.min(1, Math.max(0, (overallPick - 1) / (n - 1)));
 	return 66 - 20 * Math.sqrt(x);
 };
@@ -59,7 +63,7 @@ export const draftOutlook = (
 
 	let slot: DraftOutlook["slot"];
 	if (overallPick !== undefined) {
-		const expected = expectedPeakAtPick(overallPick, numTeams);
+		const expected = expectedPeakAtPick(overallPick);
 		const diff = peak - expected;
 		const secondRound = overallPick > numTeams;
 		slot =

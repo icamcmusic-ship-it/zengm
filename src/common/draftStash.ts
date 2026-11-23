@@ -105,7 +105,11 @@ export const stashBlockedReason = ({
 	hasProStats,
 	overseasLeague,
 }: {
-	p: { tid: number; draft: { year: number; round: number } };
+	p: {
+		tid: number;
+		draft: { year: number; round: number };
+		born: { year: number };
+	};
 	season: number;
 	phase: Phase;
 	hasProStats: boolean;
@@ -121,10 +125,14 @@ export const stashBlockedReason = ({
 		return "Only a player drafted this season can be stashed.";
 	}
 	if (!isStashWindowPhase(phase)) {
-		return "Players can only be stashed between the draft and the start of the regular season.";
+		return "Players can only be stashed between the draft and the end of free agency (not in the preseason).";
 	}
 	if (hasProStats) {
 		return "He has already played for his team.";
+	}
+	// Rights that would lapse at the start of free agency this summer (he is already STASH_MAX_AGE): the pick would be wasted
+	if (stashRightsLapse({ draft: p.draft, born: p.born }, season)) {
+		return `Rights to a stashed player end at age ${STASH_MAX_AGE}, so his would lapse this summer.`;
 	}
 	return undefined;
 };
@@ -142,7 +150,7 @@ export const bringOverBlockedReason = ({
 	maxRosterSize: number;
 }): string | undefined => {
 	if (!isStashWindowPhase(phase)) {
-		return "A stashed player can only be brought over between the draft and the start of the regular season.";
+		return "A stashed player can only be brought over between the draft and the end of free agency (not in the preseason).";
 	}
 	if (rosterSize >= maxRosterSize) {
 		return `The roster is full (${maxRosterSize} players).`;

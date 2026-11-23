@@ -8,7 +8,8 @@ import { toWorker } from "../../util/toWorker.ts";
 import { getCols } from "../../../common/getCols.ts";
 import { RealCompCell } from "../../components/RealComps.tsx";
 import type { View } from "../../../common/types.ts";
-import { WEBSITE_ROOT } from "../../../common/constants.ts";
+import { PHASE, WEBSITE_ROOT } from "../../../common/constants.ts";
+import { useLocal } from "../../util/local.ts";
 import { wrappedPlayerNameLabels } from "../../components/PlayerNameLabels.tsx";
 import type { DataTableRow } from "../../components/DataTable/index.tsx";
 import { downloadFile } from "../../util/downloadFile.ts";
@@ -115,6 +116,13 @@ const DraftClass = ({
 	const [showImportForm, setShowImportForm] = useState(false);
 	const [showCollegeStats, setShowCollegeStats] = useState(false);
 	const [status, setStatus] = useState<"exporting" | "loading" | undefined>();
+	// A class whose draft is under way can't be regenerated (the worker refuses too)
+	const { phase: currentPhase, season: currentSeason } = useLocal([
+		"phase",
+		"season",
+	]);
+	const draftInProgress =
+		season === currentSeason && currentPhase === PHASE.DRAFT;
 
 	// Derived from each prospect's ratings, so it follows any regeneration
 	const showArchetype =
@@ -440,7 +448,7 @@ const DraftClass = ({
 						>
 							Export
 						</button>
-						{godMode ? (
+						{godMode && !draftInProgress ? (
 							<button
 								className="btn btn-outline-god-mode btn-xs"
 								disabled={status === "exporting" || status === "loading"}

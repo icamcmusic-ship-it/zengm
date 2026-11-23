@@ -3873,6 +3873,20 @@ const realtimeUpdate = async (updateEvents: UpdateEvents) => {
 };
 
 const regenerateDraftClass = async (season: number, conditions: Conditions) => {
+	// Not a class whose draft is under way (as with Regenerate all classes): the new prospects would have no frozen ranks, big boards,
+	// college season or combine
+	if (season === g.get("season") && g.get("phase") === PHASE.DRAFT) {
+		logEvent(
+			{
+				type: "error",
+				text: "A draft class can't be regenerated while its draft is in progress.",
+				saveToDb: false,
+			},
+			conditions,
+		);
+		return;
+	}
+
 	const proceed = await toUI(
 		"confirm",
 		[

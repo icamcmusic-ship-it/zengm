@@ -29,7 +29,23 @@ describe("draftOutlook", () => {
 	});
 
 	test("expected peak falls from the first pick to the last", () => {
-		assert.isAbove(expectedPeakAtPick(1, 30), expectedPeakAtPick(30, 30));
-		assert.isAbove(expectedPeakAtPick(30, 30), expectedPeakAtPick(60, 30));
+		assert.isAbove(expectedPeakAtPick(1), expectedPeakAtPick(30));
+		assert.isAbove(expectedPeakAtPick(30), expectedPeakAtPick(60));
+	});
+
+	test("a typical pick reads Fair value in any league size", () => {
+		for (const numTeams of [10, 20, 30, 40]) {
+			for (const pick of [1, 5, 10, 20, 30, 40, 55]) {
+				const o = draftOutlook(
+					Math.round(expectedPeakAtPick(pick)),
+					pick,
+					numTeams,
+				);
+				assert.strictEqual(o.slot!.label, "Fair value", `${numTeams}/${pick}`);
+			}
+		}
+		// The 30-team scale is unchanged: 66 at #1, 46 at #60
+		assert.closeTo(expectedPeakAtPick(1), 66, 1e-9);
+		assert.closeTo(expectedPeakAtPick(60), 46, 1e-9);
 	});
 });

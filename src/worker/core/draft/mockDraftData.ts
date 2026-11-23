@@ -23,16 +23,18 @@ import {
 	projectProspect,
 	type ProProjection,
 } from "./proProjection.ts";
-import { getFuzz } from "../player/fuzzRating.ts";
+import { applyFuzz, getFuzz } from "../player/fuzzRating.ts";
 import {
 	makeAiTraitValueFactorCache,
 	traitsEnabled,
 } from "../player/traits.ts";
 import {
 	buildTeamDraftContext,
-	getClassFactsCached,
+	buildClassFacts,
+	wholeClassOf,
 } from "./draftDecisionData.ts";
 import { getPreDraftRanks } from "./preDraftRanks.ts";
+import { getClassBoards } from "../draftOutlets/index.ts";
 
 const MOCK_ROUNDS = 2;
 
@@ -129,6 +131,29 @@ const getFuzzedView = (p: Player) => {
 	return fuzzedRatings(r, fuzz);
 };
 
+/**
+ * A prospect as the user's scouts see him: value as scouted (valueFuzz) and his ratings with the scouting fuzz. The Mock Draft and the
+ * draft-day team boards order prospects by this, so rerunning the mock (or reading the boards) can't recover the true order the real
+ * AI drafts by (runPicks still uses true value). Without fuzz (God Mode, multi team mode) he is as he is.
+ */
+export const perceivedProspect = (p: Player): Player => {
+	const r = last(p.ratings);
+	const fuzz = getFuzz(r.fuzz);
+	if (fuzz === 0) {
+		return p;
+	}
+	const row = {
+		...fuzzedRatings(r, fuzz),
+		ovr: applyFuzz(r.ovr, fuzz),
+		pot: applyFuzz(r.pot, fuzz),
+	} as typeof r;
+	return {
+		...p,
+		value: p.valueFuzz,
+		ratings: [...p.ratings.slice(0, -1), row] as unknown as Player["ratings"],
+	};
+};
+
 export const getMockDraft = async () => {
 	const season = getMockDraftSeason();
 	if (season === undefined) {
@@ -149,6 +174,8 @@ export const getMockDraft = async () => {
 	}
 
 	const players = await getProspects(season);
+	// The mock drafts the prospects as the user's scouts see them (perceivedProspect), not by true value
+	const perceived = players.map(perceivedProspect);
 	const { slots, source } = await getSlots(season);
 
 	const useNeeds = !DRAFT_BY_TEAM_OVR && featureOn("aiDraftNeeds");
@@ -170,7 +197,7 @@ export const getMockDraft = async () => {
 		const ctx = await buildTeamDraftContext({
 			tid,
 			teamPlayers,
-			prospects: players,
+			prospects: perceived,
 			getTraitFactor: useTraits ? getTraitFactor : undefined,
 		});
 		const needs = getTeamNeeds(teamPlayers);
@@ -214,10 +241,15 @@ export const getMockDraft = async () => {
 		).filter((p) => p.draft.year === season && p.draft.round > 0).length;
 	}
 
-	// What the AI reads of every prospect (combine, medicals, production, big boards, ...), as in runPicks
-	const facts = await getClassFactsCached(players, season);
+	// What the AI reads of every prospect (combine, medicals, production, big boards, ...), as in runPicks, but over the class as the
+	// user's scouts see it (drafted players included, see wholeClassOf)
+	const facts = await buildClassFacts(
+		(await wholeClassOf(players, season)).map(perceivedProspect),
+		season,
+		true,
+	);
 
-	const prospects = players.map((p) => ({
+	const prospects = perceived.map((p) => ({
 		pid: p.pid,
 		value: p.value,
 		ratings: p.ratings,
@@ -268,12 +300,39 @@ export const getMockDraft = async () => {
 const cache = new Map<string, ProProjection>();
 let cacheLid: number | undefined;
 
+/**
+ * Where a class's prospects project to go, by what the user can know: the big boards' consensus when the outlets are on, else the
+ * frozen pre-draft rank on the user's scouts' list during the draft, else the scouts' list now (value as scouted). pid -> rank.
+ */
+const projectedSlots = async (draftYear: number) => {
+	const boards = await getClassBoards(draftYear).catch(() => undefined);
+	if (boards && boards.consensus.size > 0) {
+		return new Map(
+			[...boards.consensus].map(([pid, row]) => [pid, row.rank] as const),
+		);
+	}
+	const frozen = await getPreDraftRanks(draftYear);
+	if (frozen) {
+		return new Map([...frozen].map(([pid, info]) => [pid, info.r] as const));
+	}
+	const prospects = (await getProspects(draftYear)).sort(
+		(a, b) => b.valueFuzz - a.valueFuzz || a.pid - b.pid,
+	);
+	return new Map(prospects.map((p, i) => [p.pid, i + 1] as const));
+};
+
+export type ProProjectionWithSlot = ProProjection & {
+	// Projected to go in the first round (by projectedSlots). A projected second-rounder gets no bust odds: little is expected of him
+	projectedFirstRound: boolean;
+};
+
 export const getProProjections = async (pids: number[]) => {
 	if (cacheLid !== g.get("lid")) {
 		cache.clear();
 		cacheLid = g.get("lid");
 	}
-	const out: Record<number, ProProjection> = {};
+	const slotsByYear = new Map<number, Map<number, number>>();
+	const out: Record<number, ProProjectionWithSlot> = {};
 	for (const pid of pids) {
 		const p = await idb.cache.players.get(pid);
 		if (!p || p.tid !== PLAYER.UNDRAFTED) {
@@ -287,7 +346,17 @@ export const getProProjections = async (pids: number[]) => {
 			projection = projectProspect(pid, ratings, age);
 			cache.set(key, projection);
 		}
-		out[pid] = projection;
+		let slots = slotsByYear.get(p.draft.year);
+		if (!slots) {
+			slots = await projectedSlots(p.draft.year);
+			slotsByYear.set(p.draft.year, slots);
+		}
+		const slot = slots.get(pid);
+		out[pid] = {
+			...projection,
+			projectedFirstRound:
+				slot !== undefined && slot <= g.get("numActiveTeams"),
+		};
 	}
 	return out;
 };

@@ -2,12 +2,15 @@
  * League data for the AI draft decision (draftDecision.ts): what each prospect of a class brings (computed once per draft or mock draft)
  * and what each team on the clock is looking for. Nothing here draws from the game's random numbers.
  */
-import { PHASE } from "../../../common/constants.ts";
+import { PHASE, PLAYER } from "../../../common/constants.ts";
 import { DEFENSE_NAMES, OFFENSE_NAMES } from "../../../common/coachSystems.ts";
 import { playerSchemeFit } from "../../../common/coachSystems.ts";
 import { athleticScore, combineNudges } from "../../../common/draftCombine.ts";
 import { OUTLETS } from "../../../common/draftOutlets.ts";
-import { getOverseasLeague } from "../../../common/draftStash.ts";
+import {
+	getOverseasLeague,
+	stashRightsLapse,
+} from "../../../common/draftStash.ts";
 import type { Player } from "../../../common/types.ts";
 import { idb } from "../../db/index.ts";
 import { g } from "../../util/index.ts";
@@ -46,6 +49,31 @@ import {
 // boards and the Mock Draft of the remaining picks all read the same ones
 let factsMemo: { key: string; facts: Map<number, ProspectFacts> } | undefined;
 
+/**
+ * The whole class of a draft year, drafted players included, with the given players in place of their stored copies. Class-relative
+ * facts (value rank, production and spread z-scores, combine nudges) are measured over it, so they don't depend on how many picks have
+ * been made when they are built (a reload mid-draft rebuilds the same facts).
+ */
+export const wholeClassOf = async (players: Player[], season: number) => {
+	const byPid = new Map(players.map((p) => [p.pid, p]));
+	const stored = await idb.cache.players.indexGetAll(
+		"playersByDraftYearRetiredYear",
+		[[season], [season, Infinity]],
+	);
+	for (const p of stored) {
+		if (
+			!byPid.has(p.pid) &&
+			p.draft.year === season &&
+			p.tid !== PLAYER.UNDRAFTED_FANTASY_TEMP &&
+			p.ratings.length > 0
+		) {
+			byPid.set(p.pid, p);
+		}
+	}
+	// (in pid order, so sums over the class come out the same whichever players were passed)
+	return [...byPid.values()].sort((a, b) => a.pid - b.pid);
+};
+
 export const getClassFactsCached = async (
 	players: Player[],
 	season: number,
@@ -58,7 +86,11 @@ export const getClassFactsCached = async (
 	) {
 		return factsMemo.facts;
 	}
-	const facts = await buildClassFacts(players, season, true);
+	const facts = await buildClassFacts(
+		await wholeClassOf(players, season),
+		season,
+		true,
+	);
 	factsMemo = { key, facts };
 	return facts;
 };
@@ -157,7 +189,11 @@ export const buildClassFacts = async (
 			combinePerf: perf.get(p.pid),
 			athletic: athletic.get(p.pid),
 			medicalRisk: medical.get(p.pid),
-			stashable: stashOn && getOverseasLeague(p) !== undefined,
+			// (not when his rights would lapse this summer, see stashBlockedReason)
+			stashable:
+				stashOn &&
+				getOverseasLeague(p) !== undefined &&
+				!stashRightsLapse({ draft: { year: season }, born: p.born }, season),
 			schemeFit: systemsOn ? playerSchemeFit(fitRatingsOf(p)) : undefined,
 		});
 	});

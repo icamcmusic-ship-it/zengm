@@ -166,10 +166,28 @@ export const overviewExtras = async ({
 		const proj: any = (await getProProjections([pRaw.pid]))[pRaw.pid];
 		if (proj) {
 			const { peak, peakLow, peakHigh, ...rest } = proj;
+			// A projected second-rounder is never a bust (no bust odds, and a low projection reads as a long shot)
+			const verdict =
+				!proj.projectedFirstRound && proj.verdict === "Bust risk"
+					? "Long shot"
+					: proj.verdict;
+			if (!proj.projectedFirstRound) {
+				delete rest.bustPct;
+			}
+			rest.verdict = verdict;
+			// No visible ratings: the odds are as telling as a rating, so only the tier (from the scouted ratings)
+			if (!showRatings) {
+				delete rest.starPct;
+				delete rest.starterPct;
+				delete rest.bustPct;
+				delete rest.ovr;
+			}
 			out.facts.push(
 				...fact(
 					"Pro projection",
-					`${proj.verdict ?? ""}${proj.verdict ? ": " : ""}star ${pct(proj.starPct)}, starter ${pct(proj.starterPct)}, bust ${pct(proj.bustPct)}`,
+					showRatings
+						? `${verdict ?? ""}${verdict ? ": " : ""}star ${pct(proj.starPct)}, starter ${pct(proj.starterPct)}${proj.projectedFirstRound ? `, bust ${pct(proj.bustPct)}` : ""}`
+						: verdict,
 				),
 				...fact(
 					"Projected peak",

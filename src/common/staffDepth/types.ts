@@ -117,7 +117,8 @@ export type ScoutCareerTeam = {
 		sid: number;
 		pid: number;
 		name: string;
-		judged?: "star" | "bust" | "solid";
+		// miss: a second-rounder or undrafted player who didn't pan out (never a bust)
+		judged?: "star" | "bust" | "solid" | "miss";
 	}[];
 	// Moves for the department page and the news
 	log: { season: number; text: string }[];
